@@ -239,6 +239,51 @@ CREATE TABLE settlements (
 );
 ```
 
+## 🔍 인덱스 및 제약조건
+
+### 핵심 제약조건
+```sql
+-- 1. order_id는 하나의 활성 결제만 가능 (1:1 관계)
+CREATE UNIQUE INDEX idx_payments_order_id_unique
+ON payments(order_id)
+WHERE status IN ('READY', 'AUTHORIZED', 'CAPTURED');
+
+-- 2. payment_id는 unique (하나의 결제에 하나의 정산)
+CREATE UNIQUE INDEX idx_settlements_payment_id_unique
+ON settlements(payment_id);
+```
+
+### 성능 최적화 인덱스
+```sql
+-- 배치 작업용 복합 인덱스
+CREATE INDEX idx_payments_status_updated_at ON payments(status, updated_at);
+CREATE INDEX idx_settlements_date_status ON settlements(settlement_date, status);
+
+-- 조회 최적화
+CREATE INDEX idx_orders_user_id ON orders(user_id);
+CREATE INDEX idx_orders_status ON orders(status);
+CREATE INDEX idx_payments_order_id ON payments(order_id);
+CREATE INDEX idx_settlements_settlement_date ON settlements(settlement_date);
+```
+
+### 배치 실행 이력 (선택사항)
+```sql
+CREATE TABLE batch_run_history (
+    id BIGSERIAL PRIMARY KEY,
+    batch_name VARCHAR(100) NOT NULL,
+    run_id VARCHAR(100) NOT NULL,           -- 배치 실행 고유 ID
+    target_date DATE NOT NULL,
+    status VARCHAR(20) NOT NULL,
+    started_at TIMESTAMP NOT NULL,
+    completed_at TIMESTAMP,
+    processed_count INT DEFAULT 0,
+    error_message TEXT
+);
+
+CREATE INDEX idx_batch_history_run_id ON batch_run_history(run_id);
+CREATE INDEX idx_batch_history_target_date ON batch_run_history(target_date);
+```
+
 ## 🚀 시작하기
 
 ### 1. 사전 요구사항
@@ -356,7 +401,66 @@ PATCH /payments/{paymentId}/capture
 PATCH /payments/{paymentId}/refund
 ```
 
+### 환불 API
+
+#### 1. 전체 환불 (Full Refund)
+```http
+POST /refunds/full/{paymentId}
+```
+- Payment: CAPTURED → REFUNDED
+- Order: PAID → REFUNDED
+- Settlement: PENDING/CONFIRMED → CANCELED
+
+#### 2. 부분 환불 (Partial Refund)
+```http
+POST /refunds/partial/{paymentId}?refundAmount=5000.00
+```
+- 음수 Payment 레코드 생성 (환불 금액)
+- Order: PAID 유지
+- Settlement: 금액 조정
+
+#### 3. 결제 실패 환불 (Failed Payment Refund)
+```http
+POST /refunds/failed/{paymentId}
+```
+- Payment: AUTHORIZED/FAILED → CANCELED
+- Order: CREATED 유지 (재결제 가능)
+- Settlement: 없음
+
 ### 정산 배치 작업
+
+#### Pseudo Code 흐름:
+
+**1. 대상 조회 (매일 새벽 2시)**
+```
+BEGIN TRANSACTION
+  targetDate = yesterday
+  payments = SELECT * FROM payments
+             WHERE status = 'CAPTURED'
+             AND updated_at BETWEEN targetDate 00:00:00 AND 23:59:59
+
+  FOR EACH payment IN payments:
+    IF NOT EXISTS settlement WHERE payment_id = payment.id:
+      INSERT INTO settlements (payment_id, order_id, amount, status, settlement_date)
+      VALUES (payment.id, payment.order_id, payment.amount, 'PENDING', targetDate)
+  END FOR
+COMMIT
+```
+
+**2. 정산 확정 (매일 새벽 3시)**
+```
+BEGIN TRANSACTION
+  targetDate = yesterday
+  settlements = SELECT * FROM settlements
+                WHERE settlement_date = targetDate AND status = 'PENDING'
+
+  FOR EACH settlement IN settlements:
+    UPDATE settlements
+    SET status = 'CONFIRMED', confirmed_at = NOW()
+    WHERE id = settlement.id
+  END FOR
+COMMIT
+```
 
 - **매일 새벽 2시**: 전날 `CAPTURED` 상태의 결제를 `PENDING` 정산 대상으로 생성
 - **매일 새벽 3시**: 전날 생성된 `PENDING` 정산을 `CONFIRMED`로 확정
