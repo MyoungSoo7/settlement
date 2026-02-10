@@ -36,6 +36,17 @@ management:
       show-details: always
       show-components: always
   metrics:
+    distribution:
+      percentiles-histogram:
+        refund.processing.duration: true
+        settlement.batch.creation.duration: true
+        settlement.batch.confirmation.duration: true
+        settlement.batch.adjustment.duration: true
+      percentiles:
+        refund.processing.duration: 0.5,0.95,0.99
+        settlement.batch.creation.duration: 0.5,0.95,0.99
+        settlement.batch.confirmation.duration: 0.5,0.95,0.99
+        settlement.batch.adjustment.duration: 0.5,0.95,0.99
     tags:
       application: ${spring.application.name}
       environment: ${ENVIRONMENT:local}
@@ -52,5 +63,10 @@ app:
     issuer: ${JWT_ISSUER}
     secret: ${JWT_SECRET}
     ttl-seconds: 86400
+  alerting:
+    slack:
+      webhook-url: ${SLACK_WEBHOOK_URL:}
+      channel: ${SLACK_CHANNEL:#alerts}
+      enabled: ${SLACK_ALERTS_ENABLED:false}
 
 

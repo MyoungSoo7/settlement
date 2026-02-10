@@ -1,0 +1,65 @@
+global:
+  resolve_timeout: 5m
+  slack_api_url: '${SLACK_WEBHOOK_URL}'
+
+route:
+  group_by: ['alertname', 'severity']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 12h
+  receiver: 'slack-alerts'
+  routes:
+    - match:
+        severity: critical
+      receiver: 'slack-critical'
+      repeat_interval: 5m
+    - match:
+        severity: warning
+      receiver: 'slack-alerts'
+      repeat_interval: 1h
+
+receivers:
+  - name: 'slack-alerts'
+    slack_configs:
+      - channel: '#alerts'
+        title: '⚠️ Lemuel Alert - {{ .GroupLabels.alertname }}'
+        text: |
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Description:* {{ .CommonAnnotations.description }}
+          *Severity:* {{ .CommonLabels.severity }}
+          *Environment:* {{ .CommonLabels.environment }}
+
+          *Details:*
+          {{ range .Alerts }}
+            • *Alert:* {{ .Labels.alertname }}
+            • *Status:* {{ .Status }}
+            {{ if .Labels.job }}• *Job:* {{ .Labels.job }}{{ end }}
+            {{ if .Annotations.runbook_url }}• *Runbook:* {{ .Annotations.runbook_url }}{{ end }}
+          {{ end }}
+        send_resolved: true
+
+  - name: 'slack-critical'
+    slack_configs:
+      - channel: '#alerts-critical'
+        title: '🚨 CRITICAL - {{ .GroupLabels.alertname }}'
+        text: |
+          *CRITICAL ALERT*
+
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Description:* {{ .CommonAnnotations.description }}
+          *Environment:* {{ .CommonLabels.environment }}
+
+          *Affected Services:*
+          {{ range .Alerts }}
+            • {{ .Labels.alertname }} ({{ .Status }})
+          {{ end }}
+
+          @channel - Immediate attention required!
+        send_resolved: true
+
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'environment']

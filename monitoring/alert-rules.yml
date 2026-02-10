@@ -1,0 +1,189 @@
+groups:
+  - name: lemuel_batch_alerts
+    interval: 30s
+    rules:
+      # 배치 실패 알림
+      - alert: SettlementBatchFailure
+        expr: rate(batch_failures_total{job="lemuel"}[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          component: settlement-batch
+        annotations:
+          summary: "정산 배치 작업 실패 발생"
+          description: "최근 5분간 {{ $value | humanizePercentage }} 비율로 배치 실패가 발생했습니다. job={{ $labels.job }}, batch_type={{ $labels.batch_type }}"
+          runbook_url: "https://github.com/your-org/lemuel/wiki/Settlement-Batch-Failure"
+
+      # 배치 처리 시간 지연
+      - alert: SettlementBatchSlowProcessing
+        expr: histogram_quantile(0.95, rate(settlement_creation_duration_seconds_bucket[5m])) > 60
+        for: 5m
+        labels:
+          severity: warning
+          component: settlement-batch
+        annotations:
+          summary: "정산 생성 배치 처리 시간 지연"
+          description: "정산 생성 배치의 95 percentile 처리 시간이 {{ $value }}초로 60초를 초과했습니다."
+          runbook_url: "https://github.com/your-org/lemuel/wiki/Settlement-Batch-Performance"
+
+      - alert: SettlementConfirmationSlowProcessing
+        expr: histogram_quantile(0.95, rate(settlement_confirmation_duration_seconds_bucket[5m])) > 120
+        for: 5m
+        labels:
+          severity: warning
+          component: settlement-batch
+        annotations:
+          summary: "정산 확정 배치 처리 시간 지연"
+          description: "정산 확정 배치의 95 percentile 처리 시간이 {{ $value }}초로 120초를 초과했습니다."
+
+      # 배치 작업 미실행 (하루 이상 실행되지 않음)
+      - alert: SettlementBatchNotRunning
+        expr: time() - settlement_batch_last_run_timestamp_seconds > 86400
+        for: 1h
+        labels:
+          severity: critical
+          component: settlement-batch
+        annotations:
+          summary: "정산 배치 작업이 24시간 이상 실행되지 않음"
+          description: "마지막 배치 실행 후 {{ $value | humanizeDuration }}가 경과했습니다. 스케줄러 또는 애플리케이션 상태를 확인하세요."
+
+  - name: lemuel_refund_alerts
+    interval: 30s
+    rules:
+      # 환불 실패율 높음 (5분간 10% 이상 실패)
+      - alert: HighRefundFailureRate
+        expr: |
+          (
+            rate(refund_failed_total{job="lemuel"}[5m])
+            /
+            rate(refund_requests_total{job="lemuel"}[5m])
+          ) > 0.1
+        for: 3m
+        labels:
+          severity: critical
+          component: refund
+        annotations:
+          summary: "환불 실패율 높음"
+          description: "최근 5분간 환불 실패율이 {{ $value | humanizePercentage }}로 10%를 초과했습니다."
+          runbook_url: "https://github.com/your-org/lemuel/wiki/Refund-Failure-Rate"
+
+      # 환불 요청 급증 (평소 대비 5배 이상)
+      - alert: RefundRequestSpike
+        expr: |
+          rate(refund_requests_total{job="lemuel"}[5m])
+          >
+          5 * avg_over_time(rate(refund_requests_total{job="lemuel"}[5m])[1h:5m])
+        for: 5m
+        labels:
+          severity: warning
+          component: refund
+        annotations:
+          summary: "환불 요청 급증 감지"
+          description: "현재 환불 요청률이 평소 대비 5배 이상 증가했습니다. 현재: {{ $value | humanize }}/sec"
+
+      # 환불 처리 시간 지연
+      - alert: RefundProcessingSlow
+        expr: histogram_quantile(0.95, rate(refund_processing_duration_seconds_bucket[5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+          component: refund
+        annotations:
+          summary: "환불 처리 시간 지연"
+          description: "환불 처리의 95 percentile 시간이 {{ $value }}초로 5초를 초과했습니다."
+
+      # Idempotency Key 재사용 급증
+      - alert: HighIdempotencyKeyReuse
+        expr: rate(idempotency_key_reuse_total{job="lemuel"}[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: refund
+        annotations:
+          summary: "Idempotency Key 재사용 빈도 높음"
+          description: "최근 5분간 초당 {{ $value | humanize }}건의 중복 요청이 발생하고 있습니다. 클라이언트 재시도 로직을 확인하세요."
+
+  - name: lemuel_settlement_adjustment_alerts
+    interval: 30s
+    rules:
+      # 미확정 Adjustment 누적
+      - alert: PendingSettlementAdjustmentBacklog
+        expr: count(settlement_adjustment_status{status="PENDING"} > 0) > 100
+        for: 1h
+        labels:
+          severity: warning
+          component: settlement-adjustment
+        annotations:
+          summary: "미확정 정산 조정 건수 누적"
+          description: "PENDING 상태의 정산 조정이 {{ $value }}건으로 100건을 초과했습니다."
+
+      # Adjustment 확정 실패
+      - alert: AdjustmentConfirmationFailure
+        expr: rate(batch_failures_total{batch_type="adjustment_confirmation"}[5m]) > 0
+        for: 2m
+        labels:
+          severity: critical
+          component: settlement-adjustment
+        annotations:
+          summary: "정산 조정 확정 배치 실패"
+          description: "정산 조정 확정 배치에서 실패가 발생했습니다."
+
+  - name: lemuel_health_alerts
+    interval: 30s
+    rules:
+      # 헬스 체크 실패
+      - alert: ApplicationHealthDown
+        expr: up{job="lemuel"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: application
+        annotations:
+          summary: "애플리케이션 다운"
+          description: "Lemuel 애플리케이션이 응답하지 않습니다. instance={{ $labels.instance }}"
+
+      # Custom Health Indicator - 배치 상태 불량
+      - alert: SettlementBatchHealthWarning
+        expr: health_status{component="settlementBatch"} == 0
+        for: 5m
+        labels:
+          severity: warning
+          component: settlement-batch
+        annotations:
+          summary: "정산 배치 헬스 체크 경고"
+          description: "정산 배치 헬스 체크가 WARNING 상태입니다. PENDING 건수를 확인하세요."
+
+  - name: lemuel_performance_alerts
+    interval: 1m
+    rules:
+      # JVM 메모리 사용률 높음
+      - alert: HighJVMMemoryUsage
+        expr: |
+          (
+            jvm_memory_used_bytes{job="lemuel", area="heap"}
+            /
+            jvm_memory_max_bytes{job="lemuel", area="heap"}
+          ) > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          component: jvm
+        annotations:
+          summary: "JVM Heap 메모리 사용률 높음"
+          description: "Heap 메모리 사용률이 {{ $value | humanizePercentage }}로 85%를 초과했습니다."
+
+      # DB 커넥션 풀 고갈 임박
+      - alert: DatabaseConnectionPoolNearExhaustion
+        expr: |
+          (
+            hikaricp_connections_active{pool="HikariPool-1"}
+            /
+            hikaricp_connections_max{pool="HikariPool-1"}
+          ) > 0.8
+        for: 3m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "DB 커넥션 풀 고갈 임박"
+          description: "DB 커넥션 사용률이 {{ $value | humanizePercentage }}로 80%를 초과했습니다."

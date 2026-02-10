@@ -42,7 +42,7 @@ public class SettlementBatchService {
     @Scheduled(cron = "0 0 2 * * *")
     @Transactional
     public void createDailySettlements() {
-        Timer.Sample sample = batchMetrics.startTimer(); // ✅ 변경
+        Timer.Sample sample = batchMetrics.startTimer();
 
         try {
             LocalDate yesterday = LocalDate.now().minusDays(1);
@@ -54,6 +54,7 @@ public class SettlementBatchService {
             List<Payment> capturedPayments =
                 paymentRepository.findCapturedPaymentsBetween(startOfYesterday, endOfYesterday);
 
+            int totalPayments = capturedPayments.size();
             int createdCount = 0;
             for (Payment payment : capturedPayments) {
                 if (settlementRepository.findByPaymentId(payment.getId()).isPresent()) {
@@ -72,10 +73,13 @@ public class SettlementBatchService {
                 createdCount++;
             }
 
-            logger.info("정산 배치 완료: {} 건 생성됨", createdCount);
+            logger.info("정산 배치 완료: {} 건 생성됨 (전체 대상: {} 건)", createdCount, totalPayments);
 
+            // 메트릭 기록
             batchMetrics.incrementSettlementCreated(createdCount);
+            batchMetrics.recordSettlementCreationDataVolume(totalPayments); // 히스토그램
             batchMetrics.stopAndRecordSettlementCreation(sample);
+            batchMetrics.updateLastBatchRunTimestamp();
 
         } catch (Exception e) {
             logger.error("정산 생성 배치 실패", e);
@@ -87,7 +91,7 @@ public class SettlementBatchService {
     @Scheduled(cron = "0 0 3 * * *")
     @Transactional
     public void confirmDailySettlements() {
-        Timer.Sample sample = batchMetrics.startTimer(); // ✅ 변경
+        Timer.Sample sample = batchMetrics.startTimer();
 
         try {
             LocalDate yesterday = LocalDate.now().minusDays(1);
@@ -97,6 +101,7 @@ public class SettlementBatchService {
             // ⚠️ 메서드명이 findBySettlementDate면 상태 필터가 없을 수 있음 (아래 개선 포인트 참고)
             List<Settlement> settlements = settlementRepository.findBySettlementDate(yesterday);
 
+            int totalSettlements = settlements.size();
             int confirmedCount = 0;
             for (Settlement settlement : settlements) {
                 if (settlement.getStatus() == Settlement.SettlementStatus.PENDING) {
@@ -107,10 +112,13 @@ public class SettlementBatchService {
                 }
             }
 
-            logger.info("정산 확정 배치 완료: {} 건 확정됨", confirmedCount);
+            logger.info("정산 확정 배치 완료: {} 건 확정됨 (전체 대상: {} 건)", confirmedCount, totalSettlements);
 
+            // 메트릭 기록
             batchMetrics.incrementSettlementConfirmed(confirmedCount);
+            batchMetrics.recordSettlementConfirmationDataVolume(totalSettlements); // 히스토그램
             batchMetrics.stopAndRecordSettlementConfirmation(sample);
+            batchMetrics.updateLastBatchRunTimestamp();
 
         } catch (Exception e) {
             logger.error("정산 확정 배치 실패", e);
@@ -122,7 +130,7 @@ public class SettlementBatchService {
     @Scheduled(cron = "0 10 3 * * *")
     @Transactional
     public void confirmDailySettlementAdjustments() {
-        Timer.Sample sample = batchMetrics.startTimer(); // ✅ 변경
+        Timer.Sample sample = batchMetrics.startTimer();
 
         try {
             LocalDate yesterday = LocalDate.now().minusDays(1);
@@ -132,6 +140,7 @@ public class SettlementBatchService {
             List<SettlementAdjustment> pendingAdjustments =
                 settlementAdjustmentRepository.findPendingByAdjustmentDate(yesterday);
 
+            int totalAdjustments = pendingAdjustments.size();
             int confirmedCount = 0;
             for (SettlementAdjustment adjustment : pendingAdjustments) {
                 adjustment.setStatus(SettlementAdjustment.AdjustmentStatus.CONFIRMED);
@@ -142,8 +151,11 @@ public class SettlementBatchService {
 
             logger.info("정산 조정 확정 배치 완료: {} 건 확정됨", confirmedCount);
 
+            // 메트릭 기록
             batchMetrics.incrementAdjustmentConfirmed(confirmedCount);
+            batchMetrics.recordAdjustmentConfirmationDataVolume(totalAdjustments); // 히스토그램
             batchMetrics.stopAndRecordAdjustmentConfirmation(sample);
+            batchMetrics.updateLastBatchRunTimestamp();
 
         } catch (Exception e) {
             logger.error("정산 조정 확정 배치 실패", e);

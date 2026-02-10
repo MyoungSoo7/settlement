@@ -3,7 +3,14 @@
 ## 📊 개요
 
 Lemuel 시스템은 Spring Boot Actuator와 Micrometer를 사용하여 포괄적인 모니터링 기능을 제공합니다.
-Prometheus, Grafana 등의 외부 모니터링 시스템과 연동 가능합니다.
+Prometheus, Grafana 등의 외부 모니터링 시스템과 연동 가능하며, Alertmanager를 통해 Slack 알림을 지원합니다.
+
+**주요 기능**:
+- 히스토그램 기반 성능 메트릭 (percentile 추적)
+- 배치 처리 데이터 양과 처리 시간의 상관관계 분석
+- Prometheus AlertManager + Slack 연동
+- 커스텀 Health Indicator
+- 실시간 알림 (배치 실패, 환불 실패율, 처리 시간 지연 등)
 
 ## 🔍 Actuator 엔드포인트
 
@@ -61,11 +68,44 @@ settlement_batch_confirmed_total{batch="settlement_confirmation"} 150
 settlement_batch_adjustment_confirmed_total{batch="adjustment_confirmation"} 5
 ```
 
-#### 배치 실행 시간
+#### 배치 실행 시간 (히스토그램 지원)
 ```
-settlement_batch_creation_duration_seconds_sum 2.5
-settlement_batch_creation_duration_seconds_count 1
-settlement_batch_creation_duration_seconds_max 2.5
+# 처리 시간 히스토그램 - P50, P95, P99 percentile 추적
+settlement_creation_duration_seconds_bucket{le="1.0"} 0
+settlement_creation_duration_seconds_bucket{le="5.0"} 10
+settlement_creation_duration_seconds_bucket{le="10.0"} 45
+settlement_creation_duration_seconds_bucket{le="60.0"} 100
+settlement_creation_duration_seconds_bucket{le="+Inf"} 100
+settlement_creation_duration_seconds_sum 2500.5
+settlement_creation_duration_seconds_count 100
+
+# Percentile 메트릭 (자동 계산)
+settlement_creation_duration_seconds{quantile="0.5"} 2.1
+settlement_creation_duration_seconds{quantile="0.95"} 5.8
+settlement_creation_duration_seconds{quantile="0.99"} 9.2
+```
+
+#### 배치 처리 데이터 양 (히스토그램)
+성능 최적화 시점 판단을 위한 데이터 양 추적:
+```
+# 처리한 레코드 수 분포
+settlement_creation_data_volume_bucket{le="100.0"} 10
+settlement_creation_data_volume_bucket{le="500.0"} 45
+settlement_creation_data_volume_bucket{le="1000.0"} 80
+settlement_creation_data_volume_bucket{le="5000.0"} 95
+settlement_creation_data_volume_bucket{le="+Inf"} 100
+settlement_creation_data_volume_sum 125000
+settlement_creation_data_volume_count 100
+
+# Percentile 메트릭
+settlement_creation_data_volume{quantile="0.5"} 450
+settlement_creation_data_volume{quantile="0.95"} 2100
+settlement_creation_data_volume{quantile="0.99"} 4500
+```
+
+#### 마지막 배치 실행 시간 (알림용)
+```
+settlement_batch_last_run_timestamp_seconds 1707552000
 ```
 
 #### 배치 실패 건수
@@ -294,17 +334,96 @@ volumes:
 
 ## 📞 외부 시스템 연동
 
-### 1. Slack 알림
-```yaml
-# AlertManager 설정
-receivers:
-  - name: 'slack'
-    slack_configs:
-      - api_url: 'https://hooks.slack.com/services/YOUR/WEBHOOK/URL'
-        channel: '#lemuel-alerts'
-        title: '{{ .GroupLabels.alertname }}'
-        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+### 1. Slack 알림 설정 (완전 가이드)
+
+#### Step 1: Slack Incoming Webhook 생성
+1. Slack workspace에서 Apps 페이지 접속: https://api.slack.com/apps
+2. "Create New App" → "From scratch" 선택
+3. App 이름: "Lemuel Alerts", workspace 선택
+4. "Incoming Webhooks" 활성화
+5. "Add New Webhook to Workspace" → 채널 선택 (#alerts 또는 #alerts-critical)
+6. Webhook URL 복사 (예: `https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXX`)
+
+#### Step 2: 환경 변수 설정
+`monitoring/.env` 파일 생성:
+```bash
+# Slack Configuration
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
+SLACK_CHANNEL=#alerts
+SLACK_ALERTS_ENABLED=true
+
+# Database
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=your_password
+
+# JWT
+JWT_ISSUER=lemuel-api
+JWT_SECRET=your_secret_key
+
+# Grafana
+GRAFANA_ADMIN_PASSWORD=admin
+
+# Environment
+ENVIRONMENT=production
 ```
+
+#### Step 3: Docker Compose로 전체 스택 실행
+```bash
+cd monitoring
+docker-compose up -d
+```
+
+**실행되는 서비스**:
+- `lemuel-app:8080` - Spring Boot 애플리케이션
+- `prometheus:9090` - 메트릭 수집
+- `alertmanager:9093` - 알림 라우팅
+- `grafana:3000` - 대시보드
+
+#### Step 4: 알림 테스트
+```bash
+# 수동으로 배치 실패 알림 트리거 (테스트용)
+curl -X POST http://localhost:8080/actuator/metrics/batch_failures_total
+```
+
+#### Slack 메시지 형식
+**일반 알림 (#alerts)**:
+```
+⚠️ Lemuel Alert - HighRefundFailureRate
+
+Summary: 환불 실패율 높음
+Description: 최근 5분간 환불 실패율이 12.5%로 10%를 초과했습니다.
+Severity: warning
+Environment: production
+
+Details:
+  • Alert: HighRefundFailureRate
+  • Status: firing
+  • Job: lemuel
+  • Runbook: https://github.com/your-org/lemuel/wiki/Refund-Failure-Rate
+```
+
+**Critical 알림 (#alerts-critical)**:
+```
+🚨 CRITICAL - SettlementBatchFailure
+
+CRITICAL ALERT
+
+Summary: 정산 배치 작업 실패 발생
+Description: 최근 5분간 settlement_creation 비율로 배치 실패가 발생했습니다.
+Environment: production
+
+Affected Services:
+  • SettlementBatchFailure (firing)
+
+@channel - Immediate attention required!
+```
+
+#### AlertManager 설정 (`monitoring/alertmanager.yml`)
+이미 생성되어 있으며 다음 기능 제공:
+- `severity: warning` → `#alerts` 채널, 1시간마다 반복
+- `severity: critical` → `#alerts-critical` 채널, 5분마다 반복, @channel 멘션
+- 해결 시 자동 알림 (`send_resolved: true`)
+- Critical 알림이 Warning 억제 (inhibit_rules)
 
 ### 2. PagerDuty 연동
 ```yaml
@@ -368,6 +487,36 @@ public class MyService {
 3. **성능 지표 추적**: 배치 실행 시간, 환불 처리 시간 등 성능 메트릭 추적
 4. **용량 계획**: PENDING 정산/조정 누적 추세 모니터링으로 시스템 부하 예측
 5. **SLO 정의**: 배치 성공률 99.9%, 환불 처리 시간 P99 < 2초 등 SLO 설정
+
+### 🎯 히스토그램을 통한 성능 최적화 시점 판단
+
+#### 데이터 양과 처리 시간 상관관계 분석
+Prometheus에서 다음 쿼리로 상관관계 파악:
+
+```promql
+# P95 처리 시간 vs 데이터 양
+histogram_quantile(0.95,
+  rate(settlement_creation_duration_seconds_bucket[1h])
+) /
+histogram_quantile(0.95,
+  rate(settlement_creation_data_volume_bucket[1h])
+)
+```
+
+**최적화 시점 판단 기준**:
+- **100-500건**: 단순 loop 방식 적합
+- **500-2000건**: 배치 처리 (JPA batch insert) 적용 고려
+- **2000-5000건**: JDBC batch + multi-threading 검토
+- **5000건 이상**: 분산 처리 또는 Spring Batch 프레임워크 전환
+
+#### P95 처리 시간 추이 모니터링
+```promql
+settlement_creation_duration_seconds{quantile="0.95"}
+```
+
+- P95 < 10초: 정상
+- P95 10-30초: 주의, 최적화 검토
+- P95 > 30초: 긴급, 즉시 최적화 필요
 
 ## 🚀 빠른 시작
 
