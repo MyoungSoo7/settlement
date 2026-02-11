@@ -3,6 +3,7 @@ package github.lms.lemuel.batch;
 import github.lms.lemuel.domain.Payment;
 import github.lms.lemuel.domain.Settlement;
 import github.lms.lemuel.domain.SettlementAdjustment;
+import github.lms.lemuel.event.SettlementIndexEvent;
 import github.lms.lemuel.monitoring.SettlementBatchMetrics;
 import github.lms.lemuel.repository.PaymentRepository;
 import github.lms.lemuel.repository.SettlementAdjustmentRepository;
@@ -10,6 +11,7 @@ import github.lms.lemuel.repository.SettlementRepository;
 import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,7 +19,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class SettlementBatchService {
@@ -28,15 +32,18 @@ public class SettlementBatchService {
     private final SettlementRepository settlementRepository;
     private final SettlementAdjustmentRepository settlementAdjustmentRepository;
     private final SettlementBatchMetrics batchMetrics;
+    private final ApplicationEventPublisher eventPublisher;
 
     public SettlementBatchService(PaymentRepository paymentRepository,
         SettlementRepository settlementRepository,
         SettlementAdjustmentRepository settlementAdjustmentRepository,
-        SettlementBatchMetrics batchMetrics) {
+        SettlementBatchMetrics batchMetrics,
+        ApplicationEventPublisher eventPublisher) {
         this.paymentRepository = paymentRepository;
         this.settlementRepository = settlementRepository;
         this.settlementAdjustmentRepository = settlementAdjustmentRepository;
         this.batchMetrics = batchMetrics;
+        this.eventPublisher = eventPublisher;
     }
 
     @Scheduled(cron = "0 0 2 * * *")
@@ -56,6 +63,8 @@ public class SettlementBatchService {
 
             int totalPayments = capturedPayments.size();
             int createdCount = 0;
+            List<Long> createdSettlementIds = new ArrayList<>();
+
             for (Payment payment : capturedPayments) {
                 if (settlementRepository.findByPaymentId(payment.getId()).isPresent()) {
                     logger.debug("이미 정산 대상이 존재함: paymentId={}", payment.getId());
@@ -69,11 +78,20 @@ public class SettlementBatchService {
                 settlement.setStatus(Settlement.SettlementStatus.PENDING);
                 settlement.setSettlementDate(yesterday);
 
-                settlementRepository.save(settlement);
+                Settlement saved = settlementRepository.save(settlement);
+                createdSettlementIds.add(saved.getId());
                 createdCount++;
             }
 
             logger.info("정산 배치 완료: {} 건 생성됨 (전체 대상: {} 건)", createdCount, totalPayments);
+
+            // Elasticsearch 비동기 인덱싱 이벤트 발행
+            if (!createdSettlementIds.isEmpty()) {
+                eventPublisher.publishEvent(
+                    new SettlementIndexEvent(createdSettlementIds, SettlementIndexEvent.IndexEventType.BATCH_CREATED)
+                );
+                logger.info("Published settlement index event: count={}", createdSettlementIds.size());
+            }
 
             // 메트릭 기록
             batchMetrics.incrementSettlementCreated(createdCount);
@@ -103,16 +121,27 @@ public class SettlementBatchService {
 
             int totalSettlements = settlements.size();
             int confirmedCount = 0;
+            List<Long> confirmedSettlementIds = new ArrayList<>();
+
             for (Settlement settlement : settlements) {
                 if (settlement.getStatus() == Settlement.SettlementStatus.PENDING) {
                     settlement.setStatus(Settlement.SettlementStatus.CONFIRMED);
                     settlement.setConfirmedAt(LocalDateTime.now());
-                    settlementRepository.save(settlement);
+                    Settlement saved = settlementRepository.save(settlement);
+                    confirmedSettlementIds.add(saved.getId());
                     confirmedCount++;
                 }
             }
 
             logger.info("정산 확정 배치 완료: {} 건 확정됨 (전체 대상: {} 건)", confirmedCount, totalSettlements);
+
+            // Elasticsearch 비동기 인덱싱 이벤트 발행
+            if (!confirmedSettlementIds.isEmpty()) {
+                eventPublisher.publishEvent(
+                    new SettlementIndexEvent(confirmedSettlementIds, SettlementIndexEvent.IndexEventType.BATCH_CONFIRMED)
+                );
+                logger.info("Published settlement index event: count={}", confirmedSettlementIds.size());
+            }
 
             // 메트릭 기록
             batchMetrics.incrementSettlementConfirmed(confirmedCount);

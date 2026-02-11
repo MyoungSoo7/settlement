@@ -1,4 +1,7 @@
 spring:
+  profiles:
+    active: local
+
   application:
     name: lemuel
 
@@ -25,6 +28,18 @@ spring:
     default-schema: opslab
     create-schemas: true
 
+  data:
+    elasticsearch:
+      repositories:
+        enabled: false
+
+  elasticsearch:
+    uris: https://5d37123531be45ad8e84d19cca735fb5.us-central1.gcp.cloud.es.io
+    username: ${ELASTICSEARCH_USER}
+    password: ${ELASTICSEARCH_PASSWORD}
+    connection-timeout: 5s
+    socket-timeout: 60s
+
 
 management:
   endpoints:
@@ -35,6 +50,9 @@ management:
     health:
       show-details: always
       show-components: always
+  health:
+    elasticsearch:
+      enabled: false
   metrics:
     distribution:
       percentiles-histogram:
@@ -59,6 +77,8 @@ springdoc:
 
 
 app:
+  search:
+    enabled: false
   jwt:
     issuer: ${JWT_ISSUER}
     secret: ${JWT_SECRET}
