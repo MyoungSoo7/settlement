@@ -24,13 +24,28 @@ public class Settlement {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private SettlementStatus status = SettlementStatus.PENDING;
+    private SettlementStatus status = SettlementStatus.WAITING_APPROVAL;
 
     @Column(name = "settlement_date", nullable = false)
     private LocalDate settlementDate;
 
     @Column(name = "confirmed_at")
     private LocalDateTime confirmedAt;
+
+    @Column(name = "approved_by")
+    private Long approvedBy;
+
+    @Column(name = "approved_at")
+    private LocalDateTime approvedAt;
+
+    @Column(name = "rejected_by")
+    private Long rejectedBy;
+
+    @Column(name = "rejected_at")
+    private LocalDateTime rejectedAt;
+
+    @Column(name = "rejection_reason", length = 500)
+    private String rejectionReason;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
@@ -39,9 +54,13 @@ public class Settlement {
     private LocalDateTime updatedAt = LocalDateTime.now();
 
     public enum SettlementStatus {
-        PENDING,    // 정산 대상 생성(아직 확정 전)
-        CONFIRMED,  // 정산 금액 확정(회계 기준 확정)
-        CANCELED    // 정산 취소(환불/취소 반영)
+        CALCULATED,         // 정산 금액 계산 완료
+        WAITING_APPROVAL,   // 승인 대기 중
+        APPROVED,          // 승인됨
+        REJECTED,          // 반려됨
+        PENDING,           // 정산 대상 생성(아직 확정 전) - 하위 호환성 유지
+        CONFIRMED,         // 정산 금액 확정(회계 기준 확정) - 하위 호환성 유지
+        CANCELED           // 정산 취소(환불/취소 반영)
     }
 
     @PrePersist
@@ -53,7 +72,7 @@ public class Settlement {
             updatedAt = LocalDateTime.now();
         }
         if (status == null) {
-            status = SettlementStatus.PENDING;
+            status = SettlementStatus.WAITING_APPROVAL;
         }
     }
 
@@ -137,5 +156,45 @@ public class Settlement {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public Long getApprovedBy() {
+        return approvedBy;
+    }
+
+    public void setApprovedBy(Long approvedBy) {
+        this.approvedBy = approvedBy;
+    }
+
+    public LocalDateTime getApprovedAt() {
+        return approvedAt;
+    }
+
+    public void setApprovedAt(LocalDateTime approvedAt) {
+        this.approvedAt = approvedAt;
+    }
+
+    public Long getRejectedBy() {
+        return rejectedBy;
+    }
+
+    public void setRejectedBy(Long rejectedBy) {
+        this.rejectedBy = rejectedBy;
+    }
+
+    public LocalDateTime getRejectedAt() {
+        return rejectedAt;
+    }
+
+    public void setRejectedAt(LocalDateTime rejectedAt) {
+        this.rejectedAt = rejectedAt;
+    }
+
+    public String getRejectionReason() {
+        return rejectionReason;
+    }
+
+    public void setRejectionReason(String rejectionReason) {
+        this.rejectionReason = rejectionReason;
     }
 }

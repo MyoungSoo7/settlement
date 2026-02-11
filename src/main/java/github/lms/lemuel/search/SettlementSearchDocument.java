@@ -26,7 +26,7 @@ public class SettlementSearchDocument {
     private Long settlementId;
 
     @Field(type = FieldType.Keyword)
-    private String settlementStatus; // PENDING, CONFIRMED, CANCELED
+    private String settlementStatus; // CALCULATED, WAITING_APPROVAL, APPROVED, REJECTED, PENDING, CONFIRMED, CANCELED
 
     @Field(type = FieldType.Scaled_Float, scalingFactor = 100)
     private BigDecimal settlementAmount;
@@ -36,6 +36,21 @@ public class SettlementSearchDocument {
 
     @Field(type = FieldType.Date)
     private LocalDateTime settlementConfirmedAt;
+
+    @Field(type = FieldType.Long)
+    private Long approvedBy;
+
+    @Field(type = FieldType.Date)
+    private LocalDateTime approvedAt;
+
+    @Field(type = FieldType.Long)
+    private Long rejectedBy;
+
+    @Field(type = FieldType.Date)
+    private LocalDateTime rejectedAt;
+
+    @Field(type = FieldType.Text, analyzer = "nori_analyzer")
+    private String rejectionReason;
 
     // Order 정보
     @Field(type = FieldType.Long)
@@ -303,5 +318,45 @@ public class SettlementSearchDocument {
 
     public void setIndexedAt(LocalDateTime indexedAt) {
         this.indexedAt = indexedAt;
+    }
+
+    public Long getApprovedBy() {
+        return approvedBy;
+    }
+
+    public void setApprovedBy(Long approvedBy) {
+        this.approvedBy = approvedBy;
+    }
+
+    public LocalDateTime getApprovedAt() {
+        return approvedAt;
+    }
+
+    public void setApprovedAt(LocalDateTime approvedAt) {
+        this.approvedAt = approvedAt;
+    }
+
+    public Long getRejectedBy() {
+        return rejectedBy;
+    }
+
+    public void setRejectedBy(Long rejectedBy) {
+        this.rejectedBy = rejectedBy;
+    }
+
+    public LocalDateTime getRejectedAt() {
+        return rejectedAt;
+    }
+
+    public void setRejectedAt(LocalDateTime rejectedAt) {
+        this.rejectedAt = rejectedAt;
+    }
+
+    public String getRejectionReason() {
+        return rejectionReason;
+    }
+
+    public void setRejectionReason(String rejectionReason) {
+        this.rejectionReason = rejectionReason;
     }
 }

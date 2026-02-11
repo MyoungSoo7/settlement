@@ -47,6 +47,11 @@ public class SettlementSearchDocumentMapper {
         document.setSettlementAmount(settlement.getAmount());
         document.setSettlementDate(settlement.getSettlementDate());
         document.setSettlementConfirmedAt(settlement.getConfirmedAt());
+        document.setApprovedBy(settlement.getApprovedBy());
+        document.setApprovedAt(settlement.getApprovedAt());
+        document.setRejectedBy(settlement.getRejectedBy());
+        document.setRejectedAt(settlement.getRejectedAt());
+        document.setRejectionReason(settlement.getRejectionReason());
 
         // Payment 정보 조회 및 매핑
         paymentRepository.findById(settlement.getPaymentId()).ifPresentOrElse(

@@ -75,7 +75,7 @@ public class SettlementBatchService {
                 settlement.setPaymentId(payment.getId());
                 settlement.setOrderId(payment.getOrderId());
                 settlement.setAmount(payment.getAmount());
-                settlement.setStatus(Settlement.SettlementStatus.PENDING);
+                settlement.setStatus(Settlement.SettlementStatus.WAITING_APPROVAL);
                 settlement.setSettlementDate(yesterday);
 
                 Settlement saved = settlementRepository.save(settlement);

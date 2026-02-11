@@ -15,7 +15,9 @@ public class SettlementIndexEvent {
         BATCH_CREATED,      // 배치로 정산 생성됨
         BATCH_CONFIRMED,    // 배치로 정산 확정됨
         SINGLE_UPDATED,     // 개별 정산 업데이트
-        REFUND_PROCESSED    // 환불 처리됨
+        REFUND_PROCESSED,   // 환불 처리됨
+        APPROVED,           // 정산 승인됨
+        REJECTED            // 정산 반려됨
     }
 
     public SettlementIndexEvent(List<Long> settlementIds, IndexEventType eventType) {
