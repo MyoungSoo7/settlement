@@ -41,6 +41,9 @@ dependencies {
     // Elasticsearch
     implementation("org.springframework.boot:spring-boot-starter-data-elasticsearch")
 
+    // Spring Batch
+    implementation("org.springframework.boot:spring-boot-starter-batch")
+
     developmentOnly("org.springframework.boot:spring-boot-devtools")
     runtimeOnly("org.postgresql:postgresql")
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")

@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
  * 정산 검색용 통합 Document
  * Settlement, Order, Payment, Refund 데이터를 통합하여 Elasticsearch에 저장
  */
-@Document(indexName = "settlement_search")
+@Document(indexName = "settlement_search", createIndex = false)
 @Setting(settingPath = "elasticsearch/settlement-index-settings.json")
 public class SettlementSearchDocument {
 
