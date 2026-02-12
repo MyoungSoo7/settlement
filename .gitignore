@@ -33,6 +33,11 @@ out/
 /nbdist/
 /.nb-gradle/
 
+
 ### VS Code ###
 .vscode/
 .env
+
+### react ###
+node_modules/
+frontend/node_modules/
