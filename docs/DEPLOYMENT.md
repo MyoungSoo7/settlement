@@ -458,7 +458,7 @@ kubectl get hpa -n lemuel
 
 ## 참고 자료
 
-- [INFRASTRUCTURE.md](./INFRASTRUCTURE.md) - 백엔드 인프라 상세 가이드
-- [frontend/SETUP.md](./frontend/SETUP.md) - 프론트엔드 개발 가이드
+- [INFRASTRUCTURE.md](INFRASTRUCTURE.md) - 백엔드 인프라 상세 가이드
+- [frontend/SETUP.md](../frontend/SETUP.md) - 프론트엔드 개발 가이드
 - [Kubernetes Documentation](https://kubernetes.io/docs/)
 - [NGINX Ingress Controller](https://kubernetes.github.io/ingress-nginx/)
