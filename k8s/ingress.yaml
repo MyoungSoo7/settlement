@@ -8,21 +8,28 @@ metadata:
   name: lemuel-ingress
   namespace: lemuel
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    # CORS 설정
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "Authorization, Content-Type, X-Requested-With, Idempotency-Key"
+    nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
     # Rate Limiting (Optional)
     nginx.ingress.kubernetes.io/limit-rps: "100"
     # Connection Timeout
     nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    # Body Size Limit
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
 spec:
   ingressClassName: nginx
   rules:
     - host: lemuel.local  # /etc/hosts에 추가: <서버IP> lemuel.local
       http:
         paths:
-          - path: /
+          # 백엔드 API 라우팅 (우선순위 높음)
+          - path: /api
             pathType: Prefix
             backend:
               service:
@@ -30,7 +37,41 @@ spec:
                 port:
                   number: 8080
 
-          # Actuator 엔드포인트는 별도 경로로 제한 가능 (보안)
+          # 인증 API
+          - path: /auth
+            pathType: Prefix
+            backend:
+              service:
+                name: lemuel-service
+                port:
+                  number: 8080
+
+          # 주문/결제/환불 API
+          - path: /orders
+            pathType: Prefix
+            backend:
+              service:
+                name: lemuel-service
+                port:
+                  number: 8080
+
+          - path: /payments
+            pathType: Prefix
+            backend:
+              service:
+                name: lemuel-service
+                port:
+                  number: 8080
+
+          - path: /refunds
+            pathType: Prefix
+            backend:
+              service:
+                name: lemuel-service
+                port:
+                  number: 8080
+
+          # Actuator (관리 엔드포인트)
           - path: /actuator
             pathType: Prefix
             backend:
@@ -38,6 +79,32 @@ spec:
                 name: lemuel-service
                 port:
                   number: 8080
+
+          # Swagger UI
+          - path: /swagger-ui
+            pathType: Prefix
+            backend:
+              service:
+                name: lemuel-service
+                port:
+                  number: 8080
+
+          - path: /v3/api-docs
+            pathType: Prefix
+            backend:
+              service:
+                name: lemuel-service
+                port:
+                  number: 8080
+
+          # 프론트엔드 (React SPA - 가장 낮은 우선순위)
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: lemuel-frontend-service
+                port:
+                  number: 80
 
   # TLS 설정 (Let's Encrypt + cert-manager 사용 권장)
   # tls:

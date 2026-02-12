@@ -1,0 +1,100 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lemuel-frontend
+  namespace: lemuel
+  labels:
+    app: lemuel-frontend
+    tier: frontend
+spec:
+  replicas: 2  # 프론트엔드 2개 Pod
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0  # 프론트엔드는 무중단 배포
+  selector:
+    matchLabels:
+      app: lemuel-frontend
+      tier: frontend
+  template:
+    metadata:
+      labels:
+        app: lemuel-frontend
+        tier: frontend
+    spec:
+      terminationGracePeriodSeconds: 30
+
+      containers:
+        - name: frontend
+          image: ghcr.io/your-org/lemuel-frontend:latest
+          imagePullPolicy: Always
+
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+
+          # Environment Variables
+          env:
+            - name: NGINX_HOST
+              value: "lemuel.local"
+            - name: NGINX_PORT
+              value: "80"
+
+          # Resource Limits
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+
+          # Liveness Probe
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          # Readiness Probe
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          # Startup Probe
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 0
+            periodSeconds: 5
+            failureThreshold: 12  # 최대 60초 대기
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: lemuel-frontend-service
+  namespace: lemuel
+  labels:
+    app: lemuel-frontend
+spec:
+  type: ClusterIP
+  selector:
+    app: lemuel-frontend
+    tier: frontend
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 80
+  sessionAffinity: None
