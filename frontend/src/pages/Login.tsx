@@ -85,6 +85,19 @@ const Login: React.FC = () => {
               {loading ? '로그인 중...' : '로그인'}
             </button>
           </div>
+
+          <div className="text-center">
+            <p className="text-sm text-gray-600">
+              계정이 없으신가요?{' '}
+              <button
+                type="button"
+                onClick={() => navigate('/register')}
+                className="font-medium text-blue-600 hover:text-blue-500"
+              >
+                회원가입
+              </button>
+            </p>
+          </div>
         </form>
       </div>
     </div>

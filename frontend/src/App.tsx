@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { authApi } from './api/auth';
 import Layout from './components/Layout';
 import Login from './pages/Login';
+import Register from './pages/Register';
 import OrderPage from './pages/OrderPage';
 import SettlementDashboard from './pages/SettlementDashboard';
 import SettlementAdmin from './pages/SettlementAdmin';
@@ -39,6 +40,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
         <Route
           path="/order"
           element={

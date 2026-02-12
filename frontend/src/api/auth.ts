@@ -1,5 +1,5 @@
 import api from './axios';
-import { LoginRequest, LoginResponse } from '@/types';
+import { LoginRequest, LoginResponse, RegisterRequest, UserResponse } from '@/types';
 
 export const authApi = {
   /**
@@ -8,6 +8,15 @@ export const authApi = {
    */
   login: async (credentials: LoginRequest): Promise<LoginResponse> => {
     const response = await api.post<LoginResponse>('/auth/login', credentials);
+    return response.data;
+  },
+
+  /**
+   * 회원가입
+   * POST /users
+   */
+  register: async (userData: RegisterRequest): Promise<UserResponse> => {
+    const response = await api.post<UserResponse>('/users', userData);
     return response.data;
   },
 
