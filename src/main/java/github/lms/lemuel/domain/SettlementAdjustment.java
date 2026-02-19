@@ -1,12 +1,17 @@
 package github.lms.lemuel.domain;
 
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "settlement_adjustments")
+@Table(name = "settlement_adjustments") //정산 조정
+@Getter
+@Setter
 public class SettlementAdjustment {
 
     @Id
@@ -61,43 +66,6 @@ public class SettlementAdjustment {
         updatedAt = LocalDateTime.now();
     }
 
-    // Getters and Setters
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public Long getSettlementId() {
-        return settlementId;
-    }
-
-    public void setSettlementId(Long settlementId) {
-        this.settlementId = settlementId;
-    }
-
-    public Long getRefundId() {
-        return refundId;
-    }
-
-    public void setRefundId(Long refundId) {
-        this.refundId = refundId;
-    }
-
-    public BigDecimal getAmount() {
-        return amount;
-    }
-
-    public void setAmount(BigDecimal amount) {
-        this.amount = amount;
-    }
-
-    public AdjustmentStatus getStatus() {
-        return status;
-    }
-
     public void setStatus(AdjustmentStatus status) {
         this.status = status;
         this.updatedAt = LocalDateTime.now();
@@ -106,35 +74,4 @@ public class SettlementAdjustment {
         }
     }
 
-    public LocalDate getAdjustmentDate() {
-        return adjustmentDate;
-    }
-
-    public void setAdjustmentDate(LocalDate adjustmentDate) {
-        this.adjustmentDate = adjustmentDate;
-    }
-
-    public LocalDateTime getConfirmedAt() {
-        return confirmedAt;
-    }
-
-    public void setConfirmedAt(LocalDateTime confirmedAt) {
-        this.confirmedAt = confirmedAt;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public LocalDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(LocalDateTime updatedAt) {
-        this.updatedAt = updatedAt;
-    }
 }

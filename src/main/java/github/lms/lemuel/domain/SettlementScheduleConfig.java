@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
  * 업체별로 다른 정산 주기를 DB로 관리
  */
 @Entity
-@Table(name = "settlement_schedule_config")
+@Table(name = "settlement_schedule_config")  //정산 스케줄 설정
 @Getter
 @Setter
 public class SettlementScheduleConfig {
