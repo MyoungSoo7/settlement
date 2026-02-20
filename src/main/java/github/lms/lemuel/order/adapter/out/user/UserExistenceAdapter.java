@@ -16,7 +16,7 @@ public class UserExistenceAdapter implements LoadUserForOrderPort {
     private final LoadUserPort loadUserPort;
 
     @Override
-    public boolean existsUser(Long userId) {
+    public boolean existsById(Long userId) {
         return loadUserPort.findById(userId).isPresent();
     }
 }
