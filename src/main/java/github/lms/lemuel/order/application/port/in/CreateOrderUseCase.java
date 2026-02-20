@@ -4,20 +4,20 @@ import github.lms.lemuel.order.domain.Order;
 
 import java.math.BigDecimal;
 
-/**
- * 주문 생성 UseCase (Inbound Port)
- */
 public interface CreateOrderUseCase {
 
     Order createOrder(CreateOrderCommand command);
 
-    record CreateOrderCommand(Long userId, BigDecimal amount) {
+    record CreateOrderCommand(
+            Long userId,
+            BigDecimal amount
+    ) {
         public CreateOrderCommand {
-            if (userId == null || userId <= 0) {
-                throw new IllegalArgumentException("User ID is required and must be positive");
+            if (userId == null) {
+                throw new IllegalArgumentException("User ID cannot be null");
             }
-            if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-                throw new IllegalArgumentException("Amount must be greater than zero");
+            if (amount == null) {
+                throw new IllegalArgumentException("Amount cannot be null");
             }
         }
     }
