@@ -34,7 +34,7 @@ public class SettlementSearchDocumentMapper {
         // Settlement 정보 매핑
         document.setSettlementId(settlement.getId());
         document.setSettlementStatus(settlement.getStatus().name());
-        document.setSettlementAmount(settlement.getAmount());
+        document.setSettlementAmount(settlement.getNetAmount()); // 실 지급액
         document.setSettlementDate(settlement.getSettlementDate());
         document.setSettlementConfirmedAt(settlement.getConfirmedAt());
 

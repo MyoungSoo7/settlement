@@ -19,7 +19,9 @@ public class SettlementPersistenceMapper {
                 entity.getId(),
                 entity.getPaymentId(),
                 entity.getOrderId(),
-                entity.getAmount(),
+                entity.getPaymentAmount(),
+                entity.getCommission(),
+                entity.getNetAmount(),
                 SettlementStatus.fromString(entity.getStatus()),
                 entity.getSettlementDate(),
                 entity.getConfirmedAt(),
@@ -37,7 +39,9 @@ public class SettlementPersistenceMapper {
         entity.setId(domain.getId());
         entity.setPaymentId(domain.getPaymentId());
         entity.setOrderId(domain.getOrderId());
-        entity.setAmount(domain.getAmount());
+        entity.setPaymentAmount(domain.getPaymentAmount());
+        entity.setCommission(domain.getCommission());
+        entity.setNetAmount(domain.getNetAmount());
         entity.setStatus(domain.getStatus().name());
         entity.setSettlementDate(domain.getSettlementDate());
         entity.setConfirmedAt(domain.getConfirmedAt());

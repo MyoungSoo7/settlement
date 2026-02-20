@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 
 /**
  * Settlement JPA Entity (인프라 레이어, 도메인과 분리)
- * DB 스키마: id, payment_id, order_id, amount, status, settlement_date, confirmed_at, created_at, updated_at
+ * DB 스키마: id, payment_id, order_id, payment_amount, commission, net_amount, status, settlement_date, confirmed_at, created_at, updated_at
  */
 @Entity
 @Table(name = "settlements")
@@ -32,8 +32,14 @@ public class SettlementJpaEntity {
     @Column(name = "order_id", nullable = false)
     private Long orderId;
 
+    @Column(name = "payment_amount", nullable = false, precision = 10, scale = 2)
+    private BigDecimal paymentAmount;
+
     @Column(nullable = false, precision = 10, scale = 2)
-    private BigDecimal amount;
+    private BigDecimal commission;
+
+    @Column(name = "net_amount", nullable = false, precision = 10, scale = 2)
+    private BigDecimal netAmount;
 
     @Column(nullable = false, length = 20)
     private String status;

@@ -19,7 +19,9 @@ public class SettlementResponse {
     private Long id;
     private Long paymentId;
     private Long orderId;
-    private BigDecimal amount;
+    private BigDecimal paymentAmount;
+    private BigDecimal commission;
+    private BigDecimal netAmount;
     private String status;
     private LocalDate settlementDate;
     private LocalDateTime confirmedAt;
@@ -31,7 +33,9 @@ public class SettlementResponse {
                 settlement.getId(),
                 settlement.getPaymentId(),
                 settlement.getOrderId(),
-                settlement.getAmount(),
+                settlement.getPaymentAmount(),
+                settlement.getCommission(),
+                settlement.getNetAmount(),
                 settlement.getStatus().name(),
                 settlement.getSettlementDate(),
                 settlement.getConfirmedAt(),

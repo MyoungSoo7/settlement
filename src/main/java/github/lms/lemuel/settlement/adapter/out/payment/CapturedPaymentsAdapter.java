@@ -6,6 +6,7 @@ import github.lms.lemuel.settlement.application.port.out.LoadCapturedPaymentsPor
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -21,8 +22,10 @@ public class CapturedPaymentsAdapter implements LoadCapturedPaymentsPort {
     private final PaymentJpaRepository paymentJpaRepository;
 
     @Override
-    public List<CapturedPaymentInfo> findCapturedPaymentsBetween(
-            LocalDateTime startDateTime, LocalDateTime endDateTime) {
+    public List<CapturedPaymentInfo> findCapturedPaymentsByDate(LocalDate settlementDate) {
+        // LocalDate를 LocalDateTime 범위로 변환 (해당 날짜 00:00:00 ~ 23:59:59)
+        LocalDateTime startDateTime = settlementDate.atStartOfDay();
+        LocalDateTime endDateTime = settlementDate.plusDays(1).atStartOfDay();
 
         // Payment JPA Entity를 직접 조회
         List<PaymentJpaEntity> payments = paymentJpaRepository
@@ -34,7 +37,6 @@ public class CapturedPaymentsAdapter implements LoadCapturedPaymentsPort {
                         payment.getId(),
                         payment.getOrderId(),
                         payment.getAmount(),
-                        payment.getRefundedAmount(),
                         payment.getCapturedAt()
                 ))
                 .collect(Collectors.toList());
