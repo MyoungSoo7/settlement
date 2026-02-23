@@ -2,42 +2,20 @@ package github.lms.lemuel.user.adapter.out.persistence;
 
 import github.lms.lemuel.user.domain.User;
 import github.lms.lemuel.user.domain.UserRole;
-import org.springframework.stereotype.Component;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 
 /**
- * Domain <-> JpaEntity 매핑
+ * Domain <-> JpaEntity 매핑 (MapStruct)
  */
-@Component
-public class UserPersistenceMapper {
+@Mapper(componentModel = "spring", imports = UserRole.class)
+public interface UserPersistenceMapper {
 
-    public User toDomain(UserJpaEntity entity) {
-        if (entity == null) {
-            return null;
-        }
+    @Mapping(target = "passwordHash", source = "password")
+    @Mapping(target = "role", expression = "java(UserRole.fromString(entity.getRole()))")
+    User toDomain(UserJpaEntity entity);
 
-        return new User(
-                entity.getId(),
-                entity.getEmail(),
-                entity.getPassword(),
-                UserRole.fromString(entity.getRole()),
-                entity.getCreatedAt(),
-                entity.getUpdatedAt()
-        );
-    }
-
-    public UserJpaEntity toEntity(User domain) {
-        if (domain == null) {
-            return null;
-        }
-
-        UserJpaEntity entity = new UserJpaEntity();
-        entity.setId(domain.getId());
-        entity.setEmail(domain.getEmail());
-        entity.setPassword(domain.getPasswordHash());
-        entity.setRole(domain.getRole().name());
-        entity.setCreatedAt(domain.getCreatedAt());
-        entity.setUpdatedAt(domain.getUpdatedAt());
-
-        return entity;
-    }
+    @Mapping(target = "password", source = "passwordHash")
+    @Mapping(target = "role", expression = "java(domain.getRole().name())")
+    UserJpaEntity toEntity(User domain);
 }

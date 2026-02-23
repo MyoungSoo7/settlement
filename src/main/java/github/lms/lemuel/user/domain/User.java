@@ -2,7 +2,6 @@ package github.lms.lemuel.user.domain;
 
 import lombok.Getter;
 import lombok.Setter;
-
 import java.time.LocalDateTime;
 
 /**
