@@ -124,13 +124,13 @@ jobs:
           SPRING_DATASOURCE_PASSWORD: testpass
           SPRING_ELASTICSEARCH_URIS: http://localhost:9200
 
-      - name: SonarCloud Quality Gate
-        uses: sonarsource/sonarqube-quality-gate-action@v1.1.0
-        timeout-minutes: 5
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        with:
-          scanMetadataReportFile: build/sonar/report-task.txt
+#      - name: SonarCloud Quality Gate
+#        uses: sonarsource/sonarqube-quality-gate-action@v1.1.0
+#        timeout-minutes: 5
+#        env:
+#          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+#        with:
+#          scanMetadataReportFile: build/sonar/report-task.txt
 
   backend-ghcr:
     name: Backend - Build & Push to GHCR

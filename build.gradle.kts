@@ -103,5 +103,8 @@ sonar {
         property("sonar.coverage.jacoco.xmlReportPaths", "${layout.buildDirectory.get()}/reports/jacoco/test/jacocoTestReport.xml")
         property("sonar.java.coveragePlugin", "jacoco")
         property("sonar.qualitygate.wait", true)
+        property("sonar.junit.reportPaths", "${layout.buildDirectory.get()}/test-results/test")
+        property("sonar.java.source", "21")
+
     }
 }
