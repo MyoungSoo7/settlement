@@ -141,10 +141,31 @@ jobs:
           scanMetadataReportFile: build/sonar/report-task.txt
 
       # ✅ checkstyle + reviewdog (repo not found 방지)
+      # checkstyle XML 생성(이미 있는 스텝 유지)
       - name: Run Checkstyle (generate XML)
         if: github.event_name == 'pull_request'
         run: ./gradlew checkstyleMain checkstyleTest --no-daemon
         continue-on-error: true
+
+      # ✅ reviewdog 설치 (action-reviewdog 대신)
+      - name: Setup reviewdog
+        if: github.event_name == 'pull_request'
+        uses: reviewdog/action-setup@v1.2.1
+        with:
+          reviewdog_version: latest
+
+      # ✅ PR diff에 코멘트 달기
+      - name: Reviewdog (Checkstyle)
+        if: github.event_name == 'pull_request' && always()
+        env:
+          REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -f build/reports/checkstyle/main.xml ]; then
+            reviewdog -f=checkstyle -name="checkstyle(main)" -reporter=github-pr-review -filter-mode=diff_context -level=warning < build/reports/checkstyle/main.xml
+          fi
+          if [ -f build/reports/checkstyle/test.xml ]; then
+            reviewdog -f=checkstyle -name="checkstyle(test)" -reporter=github-pr-review -filter-mode=diff_context -level=warning < build/reports/checkstyle/test.xml
+          fi
 
       - name: Upload Checkstyle report
         if: github.event_name == 'pull_request' && always()
