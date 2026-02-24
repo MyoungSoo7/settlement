@@ -2,18 +2,18 @@ version: '3.8'
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     container_name: lemuel-postgres
-    env_file:
-      - .env
+    env_file: [ .env ]
     environment:
       POSTGRES_DB: inter
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d inter"]
       interval: 10s
@@ -23,80 +23,49 @@ services:
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.17.0
     container_name: lemuel-elasticsearch
-    env_file:
-      - .env
+    env_file: [ .env ]
     environment:
       - discovery.type=single-node
-
-      # .env의 ELASTICSEARCH_PASSWORD 사용
       - xpack.security.enabled=true
       - ELASTIC_PASSWORD=${ELASTICSEARCH_PASSWORD}
-
-      # dev 편의: TLS 끔 (로컬에서 https/cert 설정 없이 쓰기)
       - xpack.security.http.ssl.enabled=false
       - xpack.security.transport.ssl.enabled=false
-
-      # 메모리
       - ES_JAVA_OPTS=-Xms512m -Xmx512m
     ports:
-      - "9200:9200"
-      - "9300:9300"
+      - "127.0.0.1:9200:9200"
+      - "127.0.0.1:9300:9300"
     volumes:
       - elasticsearch-data:/usr/share/elasticsearch/data
+    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS -u ${ELASTICSEARCH_USER}:${ELASTICSEARCH_PASSWORD} http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=5s >/dev/null || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 20
 
-  kibana:
-    image: docker.elastic.co/kibana/kibana:8.17.0
-    container_name: lemuel-kibana
-    env_file:
-      - .env
-    environment:
-      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-      - ELASTICSEARCH_USERNAME=${ELASTICSEARCH_USER}
-      - ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD}
-    ports:
-      - "5601:5601"
-    depends_on:
-      elasticsearch:
-        condition: service_healthy
-
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/myoungsoo7/settlement:latest
     container_name: lemuel-app
-    env_file:
-      - .env
+    env_file: [ .env ]
     environment:
-      #  Spring Datasource: host는 컨테이너 이름(postgres)
+      SPRING_PROFILES_ACTIVE: prod
+
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/inter
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
 
-      #  Spring Elasticsearch (Boot 3 기준) - 상황에 맞게 둘 중 하나 사용
-      # (1) Spring Data Elasticsearch (보통)
       SPRING_ELASTICSEARCH_URIS: http://elasticsearch:9200
       SPRING_ELASTICSEARCH_USERNAME: ${ELASTICSEARCH_USER}
       SPRING_ELASTICSEARCH_PASSWORD: ${ELASTICSEARCH_PASSWORD}
 
-      # (2) 앱에서 커스텀으로 쓰는 경우라면 아래 형태로도 많이 둡니다.
-      # ELASTICSEARCH_URL: http://elasticsearch:9200
-      # ELASTICSEARCH_USER: ${ELASTICSEARCH_USER}
-      # ELASTICSEARCH_PASSWORD: ${ELASTICSEARCH_PASSWORD}
-
-      #  JWT
       JWT_ISSUER: ${JWT_ISSUER}
       JWT_SECRET: ${JWT_SECRET}
       JWT_TTL_SECONDS: ${JWT_TTL_SECONDS}
 
-      # 컨테이너 메모리 옵션 (원하면 조정)
       JAVA_OPTS: -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0
     ports:
-      - "8080:8080"
+      - "8088:8080"
+    restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
