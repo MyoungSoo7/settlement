@@ -12,7 +12,7 @@ groups:
         annotations:
           summary: "정산 배치 작업 실패 발생"
           description: "최근 5분간 {{ $value | humanizePercentage }} 비율로 배치 실패가 발생했습니다. job={{ $labels.job }}, batch_type={{ $labels.batch_type }}"
-          runbook_url: "https://github.com/your-org/lemuel/wiki/Settlement-Batch-Failure"
+          runbook_url: "https://github.com/MyoungSoo7/lemuel/wiki/Settlement-Batch-Failure"
 
       # 배치 처리 시간 지연
       - alert: SettlementBatchSlowProcessing
@@ -24,7 +24,7 @@ groups:
         annotations:
           summary: "정산 생성 배치 처리 시간 지연"
           description: "정산 생성 배치의 95 percentile 처리 시간이 {{ $value }}초로 60초를 초과했습니다."
-          runbook_url: "https://github.com/your-org/lemuel/wiki/Settlement-Batch-Performance"
+          runbook_url: "https://github.com/MyoungSoo7/lemuel/wiki/Settlement-Batch-Performance"
 
       - alert: SettlementConfirmationSlowProcessing
         expr: histogram_quantile(0.95, rate(settlement_confirmation_duration_seconds_bucket[5m])) > 120
@@ -65,7 +65,7 @@ groups:
         annotations:
           summary: "환불 실패율 높음"
           description: "최근 5분간 환불 실패율이 {{ $value | humanizePercentage }}로 10%를 초과했습니다."
-          runbook_url: "https://github.com/your-org/lemuel/wiki/Refund-Failure-Rate"
+          runbook_url: "https://github.com/MyoungSoo7/lemuel/wiki/Refund-Failure-Rate"
 
       # 환불 요청 급증 (평소 대비 5배 이상)
       - alert: RefundRequestSpike

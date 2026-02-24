@@ -21,8 +21,8 @@ route:
 receivers:
   - name: 'slack-alerts'
     slack_configs:
-      - channel: '#alerts'
-        title: '⚠️ Lemuel Alert - {{ .GroupLabels.alertname }}'
+      - channel: '${SLACK_CHANNEL}'
+        title: ' Lemuel Alert - {{ .GroupLabels.alertname }}'
         text: |
           *Summary:* {{ .CommonAnnotations.summary }}
           *Description:* {{ .CommonAnnotations.description }}
@@ -41,7 +41,7 @@ receivers:
   - name: 'slack-critical'
     slack_configs:
       - channel: '#alerts-critical'
-        title: '🚨 CRITICAL - {{ .GroupLabels.alertname }}'
+        title: 'CRITICAL - {{ .GroupLabels.alertname }}'
         text: |
           *CRITICAL ALERT*
 
