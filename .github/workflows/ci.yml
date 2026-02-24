@@ -241,3 +241,29 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64
+
+  deploy:
+    name: Deploy Server (pull & up)
+    runs-on: self-hosted
+    needs: [ changes, backend-ghcr ]
+    if: github.event_name != 'pull_request' && needs.changes.outputs.backend == 'true' && success()
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Sanity check
+        run: |
+          set -e
+          whoami
+          docker --version
+          docker compose version
+          ls -al /home/iamipro/java/settlement
+          test -f /home/iamipro/java/settlement/docker-compose.prod.yml
+
+      - name: Pull & Up (backend)
+        run: |
+          set -e
+          cd /home/iamipro/java/settlement
+          docker compose -f docker-compose.prod.yml pull
+          docker compose -f docker-compose.prod.yml up -d
+          docker image prune -f  
