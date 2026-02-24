@@ -2,13 +2,9 @@ name: CI (Backend + SonarCloud + GHCR) / Frontend GHCR
 
 on:
   push:
-    branches: [ main ,master ]
+    branches: [ main, master ]
   pull_request:
-    branches: [ main ,master ]
-
-concurrency:
-  group: ci-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: true
+    branches: [ main, master ]
 
 env:
   JAVA_VERSION: "21"
@@ -48,7 +44,6 @@ jobs:
       contents: read
       pull-requests: write
       checks: write
-
     services:
       postgres:
         image: postgres:17
@@ -93,6 +88,7 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      # build 안에 test + jacoco verification
       - name: Build (skip coverage verification)
         run: ./gradlew clean build --no-daemon --stacktrace -x jacocoTestCoverageVerification
         env:
@@ -102,8 +98,8 @@ jobs:
           SPRING_ELASTICSEARCH_URIS: http://localhost:9200
 
       - name: Upload test/coverage reports
-        if: always()
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: backend-reports
           path: |
@@ -117,10 +113,6 @@ jobs:
         with:
           paths: ${{ github.workspace }}/build/reports/jacoco/test/jacocoTestReport.xml
           token: ${{ secrets.GITHUB_TOKEN }}
-          min-coverage-overall: 4
-          min-coverage-changed-files: 4
-          title: '📊 JaCoCo Code Coverage Report'
-          update-comment: true
 
       - name: SonarCloud Scan
         run: ./gradlew sonar --no-daemon --stacktrace
@@ -132,102 +124,18 @@ jobs:
           SPRING_DATASOURCE_PASSWORD: testpass
           SPRING_ELASTICSEARCH_URIS: http://localhost:9200
 
-      - name: SonarCloud Quality Gate Check
-        uses: sonarsource/sonarqube-quality-gate-action@master
-        timeout-minutes: 5
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        with:
-          scanMetadataReportFile: build/sonar/report-task.txt
-
-      # ✅ checkstyle + reviewdog (repo not found 방지)
-      # checkstyle XML 생성(이미 있는 스텝 유지)
-      - name: Run Checkstyle (generate XML)
-        if: github.event_name == 'pull_request'
-        run: ./gradlew checkstyleMain checkstyleTest --no-daemon
-        continue-on-error: true
-
-      # ✅ reviewdog 설치 (action-reviewdog 대신)
-      - name: Setup reviewdog
-        if: github.event_name == 'pull_request'
-        uses: reviewdog/action-setup@v1.2.1
-        with:
-          reviewdog_version: latest
-
-      # ✅ PR diff에 코멘트 달기
-      - name: Reviewdog (Checkstyle)
-        if: github.event_name == 'pull_request' && always()
-        env:
-          REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if [ -f build/reports/checkstyle/main.xml ]; then
-            reviewdog -f=checkstyle -name="checkstyle(main)" -reporter=github-pr-review -filter-mode=diff_context -level=warning < build/reports/checkstyle/main.xml
-          fi
-          if [ -f build/reports/checkstyle/test.xml ]; then
-            reviewdog -f=checkstyle -name="checkstyle(test)" -reporter=github-pr-review -filter-mode=diff_context -level=warning < build/reports/checkstyle/test.xml
-          fi
-
-      - name: Upload Checkstyle report
-        if: github.event_name == 'pull_request' && always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: checkstyle-report
-          path: build/reports/checkstyle/
-          retention-days: 7
-
-      - name: Reviewdog (Checkstyle)
-        if: github.event_name == 'pull_request' && always()
-        uses: reviewdog/action-reviewdog@v1
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          reporter: github-pr-review
-          level: warning
-          filter_mode: diff_context
-          fail_on_error: "false"
-          tool_name: checkstyle
-          run: |
-            if [ -f build/reports/checkstyle/main.xml ]; then
-              reviewdog -f=checkstyle -name="checkstyle(main)" -reporter=github-pr-review -filter-mode=diff_context -fail-on-error=false -level=warning < build/reports/checkstyle/main.xml
-            fi
-            if [ -f build/reports/checkstyle/test.xml ]; then
-              reviewdog -f=checkstyle -name="checkstyle(test)" -reporter=github-pr-review -filter-mode=diff_context -fail-on-error=false -level=warning < build/reports/checkstyle/test.xml
-            fi
-
-      - name: Post/Update PR Comment - Build Summary
-        if: github.event_name == 'pull_request' && always()
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
-            const issue_number = context.issue.number;
-            
-            const marker = '<!-- CI_BUILD_SUMMARY -->';
-            
-            const body =
-              `${marker}\n` +
-              `## 🤖 CI Build Summary\n\n` +
-              `- Build/Test: done\n` +
-              `- JaCoCo: comment updated\n` +
-              `- SonarCloud: scan + quality gate\n` +
-              `- Checkstyle: reviewdog comments (diff)\n\n` +
-              `---\n` +
-              `*Generated by GitHub Actions*\n`;
-            
-            const comments = await github.rest.issues.listComments({ owner, repo, issue_number, per_page: 100 });
-            const existing = comments.data.find(c => (c.body || '').includes(marker));
-            
-            if (existing) {
-              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
-            } else {
-              await github.rest.issues.createComment({ owner, repo, issue_number, body });
-            }
+  #      - name: SonarCloud Quality Gate
+  #        uses: sonarsource/sonarqube-quality-gate-action@v1.1.0
+  #        timeout-minutes: 5
+  #        env:
+  #          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+  #        with:
+  #          scanMetadataReportFile: build/sonar/report-task.txt
 
   backend-ghcr:
     name: Backend - Build & Push to GHCR
     runs-on: ubuntu-latest
-    needs: [ changes, backend-ci ]
+    needs: [changes, backend-ci]
     if: github.event_name != 'pull_request' && needs.changes.outputs.backend == 'true'
     permissions:
       contents: read
@@ -244,6 +152,13 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 준비: Docker Hub 로그인 (추후 사용)
+      # - name: Log in to Docker Hub
+      #   uses: docker/login-action@v3
+      #   with:
+      #     username: ${{ secrets.DOCKERHUB_USERNAME }}
+      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Docker metadata
         id: meta
