@@ -1,0 +1,63 @@
+name: CI + CD to Home Ubuntu
+
+on:
+  push:
+    branches: [ "main" ,"master" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Build & Test
+        run: ./gradlew clean test build
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-jar
+          path: build/libs/*.jar
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: app-jar
+          path: dist
+
+      - name: Copy jar to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          source: "dist/*.jar"
+          target: "/opt/myapp"
+          strip_components: 1
+
+      - name: Rename & restart via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script: |
+            set -e
+            cd /opt/myapp
+            # jar 파일명이 버전 포함이면 단일 이름으로 맞추기
+            JAR=$(ls -1 *.jar | head -n 1)
+            mv -f "$JAR" app.jar
+            sudo systemctl restart myapp
+            sudo systemctl status myapp --no-pager -l
