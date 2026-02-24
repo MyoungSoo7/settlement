@@ -2,6 +2,8 @@ plugins {
     java
     id("org.springframework.boot") version "3.5.10"
     id("io.spring.dependency-management") version "1.1.7"
+    jacoco
+    id("org.sonarqube") version "5.1.0.4882"
 }
 
 group = "github.lms"
@@ -67,4 +69,39 @@ dependencies {
 
 tasks.named<Test>("test") {
     useJUnitPlatform()
+    finalizedBy(tasks.jacocoTestReport)
+}
+
+tasks.jacocoTestReport {
+    dependsOn(tasks.test)
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+        csv.required.set(false)
+    }
+}
+
+tasks.jacocoTestCoverageVerification {
+    violationRules {
+        rule {
+            limit {
+                minimum = "0.70".toBigDecimal()
+            }
+        }
+    }
+}
+
+tasks.check {
+    dependsOn(tasks.jacocoTestCoverageVerification)
+}
+
+sonar {
+    properties {
+        property("sonar.projectKey", "MyoungSoo7_settlement7")
+        property("sonar.organization", "myoungsoo7")
+        property("sonar.host.url", "https://sonarcloud.io")
+        property("sonar.coverage.jacoco.xmlReportPaths", "${layout.buildDirectory.get()}/reports/jacoco/test/jacocoTestReport.xml")
+        property("sonar.java.coveragePlugin", "jacoco")
+        property("sonar.qualitygate.wait", true)
+    }
 }
