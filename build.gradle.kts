@@ -4,7 +4,7 @@ plugins {
     id("io.spring.dependency-management") version "1.1.7"
     jacoco
     id("org.sonarqube") version "5.1.0.4882"
-    id("io.snyk.gradle.plugin.snykplugin") version "0.6.1"
+    id("io.snyk.gradle.plugin.snykplugin") version "0.7.0"
 }
 
 group = "github.lms"
