@@ -1,7 +1,7 @@
 ############################
 # Stage 1: Build
 ############################
-FROM gradle:8.5-jdk21-alpine AS builder
+FROM gradle:9.3-jdk21-alpine AS builder
 WORKDIR /workspace
 
 # 1) 의존성 캐싱을 최대한 살리기 위해 "변경 적은 파일" 먼저 복사
