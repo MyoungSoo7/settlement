@@ -115,16 +115,16 @@ const CreateProductForm: React.FC<CreateProductFormProps> = ({ onSuccess, onCanc
 
   return (
     <div className="max-w-2xl mx-auto p-6 bg-white rounded-lg shadow-md">
-      <h2 className="text-2xl font-bold mb-6 text-gray-800">신규 상품 등록</h2>
+      <h2 className="text-2xl font-bold mb-6 text-gray-900">신규 상품 등록</h2>
 
       {successMessage && (
-        <div className="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
+        <div className="mb-4 p-4 bg-green-100 border border-green-400 text-green-800 rounded">
           {successMessage}
         </div>
       )}
 
       {errorMessage && (
-        <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+        <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-800 rounded">
           {errorMessage}
         </div>
       )}
@@ -132,8 +132,8 @@ const CreateProductForm: React.FC<CreateProductFormProps> = ({ onSuccess, onCanc
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* 상품명 */}
         <div>
-          <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-            상품명 <span className="text-red-500">*</span>
+          <label htmlFor="name" className="block text-sm font-semibold text-gray-900 mb-2">
+            상품명 <span className="text-red-600">*</span>
           </label>
           <input
             type="text"
@@ -141,23 +141,23 @@ const CreateProductForm: React.FC<CreateProductFormProps> = ({ onSuccess, onCanc
             name="name"
             value={formData.name}
             onChange={handleChange}
-            className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+            className={`w-full px-4 py-2 border rounded-lg text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
               errors.name ? 'border-red-500' : 'border-gray-300'
             }`}
             placeholder="상품명을 입력하세요"
             maxLength={200}
           />
           {errors.name && (
-            <p className="mt-1 text-sm text-red-500">{errors.name}</p>
+            <p className="mt-1 text-sm text-red-600">{errors.name}</p>
           )}
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="mt-1 text-xs text-gray-600">
             {formData.name.length}/200자
           </p>
         </div>
 
         {/* 상품 설명 */}
         <div>
-          <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="description" className="block text-sm font-semibold text-gray-900 mb-2">
             상품 설명
           </label>
           <textarea
@@ -166,15 +166,15 @@ const CreateProductForm: React.FC<CreateProductFormProps> = ({ onSuccess, onCanc
             value={formData.description}
             onChange={handleChange}
             rows={4}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="상품 설명을 입력하세요 (선택사항)"
           />
         </div>
 
         {/* 가격 */}
         <div>
-          <label htmlFor="price" className="block text-sm font-medium text-gray-700 mb-2">
-            가격 (원) <span className="text-red-500">*</span>
+          <label htmlFor="price" className="block text-sm font-semibold text-gray-900 mb-2">
+            가격 (원) <span className="text-red-600">*</span>
           </label>
           <input
             type="number"
@@ -184,23 +184,23 @@ const CreateProductForm: React.FC<CreateProductFormProps> = ({ onSuccess, onCanc
             onChange={handleChange}
             min="0"
             step="0.01"
-            className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+            className={`w-full px-4 py-2 border rounded-lg text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
               errors.price ? 'border-red-500' : 'border-gray-300'
             }`}
             placeholder="0"
           />
           {errors.price && (
-            <p className="mt-1 text-sm text-red-500">{errors.price}</p>
+            <p className="mt-1 text-sm text-red-600">{errors.price}</p>
           )}
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="mt-1 text-xs text-gray-600">
             {new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(formData.price)}
           </p>
         </div>
 
         {/* 재고 수량 */}
         <div>
-          <label htmlFor="stockQuantity" className="block text-sm font-medium text-gray-700 mb-2">
-            초기 재고 수량 <span className="text-red-500">*</span>
+          <label htmlFor="stockQuantity" className="block text-sm font-semibold text-gray-900 mb-2">
+            초기 재고 수량 <span className="text-red-600">*</span>
           </label>
           <input
             type="number"
@@ -210,13 +210,13 @@ const CreateProductForm: React.FC<CreateProductFormProps> = ({ onSuccess, onCanc
             onChange={handleChange}
             min="0"
             step="1"
-            className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+            className={`w-full px-4 py-2 border rounded-lg text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
               errors.stockQuantity ? 'border-red-500' : 'border-gray-300'
             }`}
             placeholder="0"
           />
           {errors.stockQuantity && (
-            <p className="mt-1 text-sm text-red-500">{errors.stockQuantity}</p>
+            <p className="mt-1 text-sm text-red-600">{errors.stockQuantity}</p>
           )}
         </div>
 
@@ -238,7 +238,7 @@ const CreateProductForm: React.FC<CreateProductFormProps> = ({ onSuccess, onCanc
             type="button"
             onClick={handleReset}
             disabled={isSubmitting}
-            className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 font-semibold hover:bg-gray-50 active:bg-gray-100 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-6 py-3 border border-gray-300 rounded-lg text-gray-900 font-semibold hover:bg-gray-50 active:bg-gray-100 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             초기화
           </button>
@@ -248,7 +248,7 @@ const CreateProductForm: React.FC<CreateProductFormProps> = ({ onSuccess, onCanc
               type="button"
               onClick={onCancel}
               disabled={isSubmitting}
-              className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 font-semibold hover:bg-gray-50 active:bg-gray-100 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-3 border border-gray-300 rounded-lg text-gray-900 font-semibold hover:bg-gray-50 active:bg-gray-100 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               취소
             </button>
@@ -257,9 +257,9 @@ const CreateProductForm: React.FC<CreateProductFormProps> = ({ onSuccess, onCanc
       </form>
 
       {/* 안내 문구 */}
-      <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-        <h3 className="text-sm font-semibold text-blue-800 mb-2">📝 상품 등록 안내</h3>
-        <ul className="text-sm text-blue-700 space-y-1">
+      <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+        <h3 className="text-sm font-semibold text-blue-900 mb-2">📝 상품 등록 안내</h3>
+        <ul className="text-sm text-blue-900 space-y-1">
           <li>• 상품명은 필수이며 최대 200자까지 입력 가능합니다.</li>
           <li>• 가격은 0 이상의 숫자만 입력 가능합니다.</li>
           <li>• 재고 수량은 0 이상의 정수만 입력 가능합니다.</li>
