@@ -4,6 +4,7 @@ plugins {
     id("io.spring.dependency-management") version "1.1.7"
     jacoco
     id("org.sonarqube") version "5.1.0.4882"
+    id("io.snyk.gradle.plugin.snykplugin") version "0.6.1"
 }
 
 group = "github.lms"
@@ -110,4 +111,14 @@ sonar {
         property("sonar.java.source", "21")
 
     }
+}
+
+// Snyk Configuration
+snyk {
+    // Snyk 설정
+    setArguments("--all-projects")
+    setSeverity("low") // low, medium, high, critical
+    setApi(System.getenv("SNYK_TOKEN") ?: "")
+    setAutoDownload(true)
+    setAutoUpdate(true)
 }

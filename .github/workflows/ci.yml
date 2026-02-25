@@ -124,6 +124,20 @@ jobs:
           SPRING_DATASOURCE_PASSWORD: testpass
           SPRING_ELASTICSEARCH_URIS: http://localhost:9200
 
+      - name: Run Snyk Security Scan (Backend)
+        uses: snyk/actions/gradle-jdk21@master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high --all-projects
+
+      - name: Upload Snyk results to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: snyk.sarif
+
   #      - name: SonarCloud Quality Gate
   #        uses: sonarsource/sonarqube-quality-gate-action@v1.1.0
   #        timeout-minutes: 5
@@ -208,6 +222,20 @@ jobs:
       - name: ESLint check
         working-directory: frontend
         run: npm run lint
+
+      - name: Run Snyk Security Scan (Frontend)
+        uses: snyk/actions/node@master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high --file=frontend/package.json
+
+      - name: Upload Snyk results to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: snyk.sarif
 
   frontend-ghcr:
     name: Frontend - Build & Push to GHCR
