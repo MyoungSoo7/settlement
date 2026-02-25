@@ -100,6 +100,10 @@ public class SecurityConfig {
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                         .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/games/**").permitAll()
+                        // 공개 카테고리 API
+                        .requestMatchers(HttpMethod.GET, "/categories", "/categories/**").permitAll()
+                        // 관리자 전용 카테고리 API
+                        .requestMatchers("/admin/categories/**").hasRole("ADMIN")
                         // 나머지는 인증 필요
                         .anyRequest().authenticated()
                 )

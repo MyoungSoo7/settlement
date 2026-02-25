@@ -172,3 +172,46 @@ export interface UpdateProductStockRequest {
   quantity: number;
   operation: StockOperation;
 }
+
+// Category Types
+export interface CategoryResponse {
+  id: number;
+  name: string;
+  description?: string;
+  parentId?: number;
+  displayOrder: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateCategoryRequest {
+  name: string;
+  description?: string;
+  parentId?: number;
+  displayOrder?: number;
+}
+
+export interface UpdateCategoryRequest {
+  name?: string;
+  description?: string;
+  displayOrder?: number;
+}
+
+// Tag Types
+export interface TagResponse {
+  id: number;
+  name: string;
+  color: string;
+  createdAt: string;
+}
+
+export interface CreateTagRequest {
+  name: string;
+  color: string;
+}
+
+export interface UpdateTagRequest {
+  name?: string;
+  color?: string;
+}

@@ -2,10 +2,12 @@ package github.lms.lemuel.product.domain;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Product Domain Entity (순수 POJO, 스프링/JPA 의존성 없음)
- * DB 스키마: id, name, description, price, stock_quantity, status, created_at, updated_at
+ * DB 스키마: id, name, description, price, stock_quantity, status, category_id, created_at, updated_at
  */
 public class Product {
 
@@ -15,6 +17,8 @@ public class Product {
     private BigDecimal price;
     private Integer stockQuantity;
     private ProductStatus status;
+    private Long categoryId;
+    private List<Long> tagIds;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -22,13 +26,14 @@ public class Product {
     public Product() {
         this.status = ProductStatus.ACTIVE;
         this.stockQuantity = 0;
+        this.tagIds = new ArrayList<>();
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
     }
 
     // 전체 생성자
     public Product(Long id, String name, String description, BigDecimal price,
-                   Integer stockQuantity, ProductStatus status,
+                   Integer stockQuantity, ProductStatus status, Long categoryId, List<Long> tagIds,
                    LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.id = id;
         this.name = name;
@@ -36,6 +41,8 @@ public class Product {
         this.price = price;
         this.stockQuantity = stockQuantity != null ? stockQuantity : 0;
         this.status = status != null ? status : ProductStatus.ACTIVE;
+        this.categoryId = categoryId;
+        this.tagIds = tagIds != null ? new ArrayList<>(tagIds) : new ArrayList<>();
         this.createdAt = createdAt != null ? createdAt : LocalDateTime.now();
         this.updatedAt = updatedAt != null ? updatedAt : LocalDateTime.now();
     }
@@ -237,5 +244,51 @@ public class Product {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public Long getCategoryId() {
+        return categoryId;
+    }
+
+    public void setCategoryId(Long categoryId) {
+        this.categoryId = categoryId;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public List<Long> getTagIds() {
+        return new ArrayList<>(tagIds);
+    }
+
+    public void setTagIds(List<Long> tagIds) {
+        this.tagIds = tagIds != null ? new ArrayList<>(tagIds) : new ArrayList<>();
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    // 비즈니스 메서드: 태그 추가
+    public void addTag(Long tagId) {
+        if (tagId == null) {
+            throw new IllegalArgumentException("Tag ID cannot be null");
+        }
+        if (!this.tagIds.contains(tagId)) {
+            this.tagIds.add(tagId);
+            this.updatedAt = LocalDateTime.now();
+        }
+    }
+
+    // 비즈니스 메서드: 태그 제거
+    public void removeTag(Long tagId) {
+        this.tagIds.remove(tagId);
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    // 비즈니스 메서드: 모든 태그 제거
+    public void clearTags() {
+        this.tagIds.clear();
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    // 상태 확인 메서드: 특정 태그 보유 여부
+    public boolean hasTag(Long tagId) {
+        return this.tagIds.contains(tagId);
     }
 }

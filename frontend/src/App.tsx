@@ -15,6 +15,9 @@ import GamesPage from './pages/GamesPage';
 import GomokuGame from './pages/GomokuGame';
 import BadukGame from './pages/BadukGame';
 import ViewerPage from './pages/ViewerPage';
+import CategoryManagementPage from './pages/CategoryManagementPage';
+import TagManagementPage from './pages/TagManagementPage';
+import EcommerceCategoryAdmin from './pages/EcommerceCategoryAdmin';
 
 // Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -114,6 +117,30 @@ function App() {
               <ProtectedRoute>
                 <ViewerPage />
               </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/categories"
+            element={
+              <ProtectedRoute>
+                <CategoryManagementPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/tags"
+            element={
+              <ProtectedRoute>
+                <TagManagementPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/ecommerce-categories"
+            element={
+              <AdminRoute>
+                <EcommerceCategoryAdmin />
+              </AdminRoute>
             }
           />
           <Route path="/" element={<Navigate to="/order" replace />} />

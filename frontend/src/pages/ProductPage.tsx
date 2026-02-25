@@ -2,11 +2,21 @@ import React, { useState } from 'react';
 import CreateProductForm from '@/components/product/CreateProductForm';
 import ProductList from '@/components/product/ProductList';
 import { ProductResponse } from '@/types';
+import { productApi } from '@/api/product';
+import { useToast } from '@/contexts/ToastContext';
 
 const ProductPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'list' | 'create'>('list');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [selectedProduct, setSelectedProduct] = useState<ProductResponse | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: '',
+    description: '',
+    price: 0,
+    stockQuantity: 0,
+  });
+  const { showToast } = useToast();
 
   const handleProductCreated = () => {
     setRefreshTrigger(prev => prev + 1);
@@ -15,8 +25,76 @@ const ProductPage: React.FC = () => {
 
   const handleProductSelect = (product: ProductResponse) => {
     setSelectedProduct(product);
-    // 상품 상세 보기 모달을 여기에 구현할 수 있습니다
-    console.log('선택된 상품:', product);
+    setIsEditing(false);
+    setEditForm({
+      name: product.name,
+      description: product.description || '',
+      price: product.price,
+      stockQuantity: product.stockQuantity,
+    });
+  };
+
+  const handleEditToggle = () => {
+    if (isEditing && selectedProduct) {
+      setEditForm({
+        name: selectedProduct.name,
+        description: selectedProduct.description || '',
+        price: selectedProduct.price,
+        stockQuantity: selectedProduct.stockQuantity,
+      });
+    }
+    setIsEditing(!isEditing);
+  };
+
+  const handleEditSubmit = async () => {
+    if (!selectedProduct) return;
+
+    try {
+      await productApi.updateProductInfo(selectedProduct.id, {
+        name: editForm.name,
+        description: editForm.description,
+      });
+
+      if (editForm.price !== selectedProduct.price) {
+        await productApi.updateProductPrice(selectedProduct.id, {
+          newPrice: editForm.price,
+        });
+      }
+
+      if (editForm.stockQuantity !== selectedProduct.stockQuantity) {
+        const stockDiff = editForm.stockQuantity - selectedProduct.stockQuantity;
+        await productApi.updateProductStock(selectedProduct.id, {
+          quantity: Math.abs(stockDiff),
+          increase: stockDiff > 0,
+        });
+      }
+
+      showToast('상품이 수정되었습니다.', 'success');
+      setIsEditing(false);
+      setRefreshTrigger(prev => prev + 1);
+      setSelectedProduct(null);
+    } catch (error) {
+      showToast('상품 수정에 실패했습니다.', 'error');
+      console.error('상품 수정 오류:', error);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!selectedProduct) return;
+
+    if (!window.confirm(`"${selectedProduct.name}" 상품을 정말 삭제하시겠습니까?`)) {
+      return;
+    }
+
+    try {
+      await productApi.discontinueProduct(selectedProduct.id);
+      showToast('상품이 단종 처리되었습니다.', 'success');
+      setRefreshTrigger(prev => prev + 1);
+      setSelectedProduct(null);
+    } catch (error) {
+      showToast('상품 삭제에 실패했습니다.', 'error');
+      console.error('상품 삭제 오류:', error);
+    }
   };
 
   return (
@@ -123,45 +201,93 @@ const ProductPage: React.FC = () => {
                   <p className="text-gray-900">{selectedProduct.id}</p>
                 </div>
 
-                {selectedProduct.description && (
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-700 mb-1">설명</h3>
-                    <p className="text-gray-900">{selectedProduct.description}</p>
-                  </div>
+                {isEditing ? (
+                  <>
+                    <div>
+                      <label className="text-sm font-semibold text-gray-900 mb-1 block">상품명</label>
+                      <input
+                        type="text"
+                        value={editForm.name}
+                        onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-semibold text-gray-900 mb-1 block">설명</label>
+                      <textarea
+                        value={editForm.description}
+                        onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                        rows={3}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm font-semibold text-gray-900 mb-1 block">가격 (원)</label>
+                        <input
+                          type="number"
+                          value={editForm.price}
+                          onChange={(e) => setEditForm({ ...editForm, price: Number(e.target.value) })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-sm font-semibold text-gray-900 mb-1 block">재고</label>
+                        <input
+                          type="number"
+                          value={editForm.stockQuantity}
+                          onChange={(e) => setEditForm({ ...editForm, stockQuantity: Number(e.target.value) })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                        />
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {selectedProduct.description && (
+                      <div>
+                        <h3 className="text-sm font-semibold text-gray-700 mb-1">설명</h3>
+                        <p className="text-gray-900">{selectedProduct.description}</p>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <h3 className="text-sm font-semibold text-gray-700 mb-1">가격</h3>
+                        <p className="text-xl font-bold text-blue-600">
+                          {new Intl.NumberFormat('ko-KR', {
+                            style: 'currency',
+                            currency: 'KRW',
+                          }).format(selectedProduct.price)}
+                        </p>
+                      </div>
+
+                      <div>
+                        <h3 className="text-sm font-semibold text-gray-700 mb-1">재고</h3>
+                        <p className="text-xl font-bold text-gray-900">
+                          {selectedProduct.stockQuantity}개
+                        </p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-700 mb-1">상태</h3>
+                      <p className="text-gray-900">{selectedProduct.status}</p>
+                    </div>
+
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-700 mb-1">
+                        판매 가능 여부
+                      </h3>
+                      <p className="text-gray-900">
+                        {selectedProduct.availableForSale ? '가능' : '불가능'}
+                      </p>
+                    </div>
+                  </>
                 )}
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-700 mb-1">가격</h3>
-                    <p className="text-xl font-bold text-blue-600">
-                      {new Intl.NumberFormat('ko-KR', {
-                        style: 'currency',
-                        currency: 'KRW',
-                      }).format(selectedProduct.price)}
-                    </p>
-                  </div>
-
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-700 mb-1">재고</h3>
-                    <p className="text-xl font-bold text-gray-900">
-                      {selectedProduct.stockQuantity}개
-                    </p>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-700 mb-1">상태</h3>
-                  <p className="text-gray-900">{selectedProduct.status}</p>
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-700 mb-1">
-                    판매 가능 여부
-                  </h3>
-                  <p className="text-gray-900">
-                    {selectedProduct.availableForSale ? '가능' : '불가능'}
-                  </p>
-                </div>
 
                 <div className="pt-4 border-t">
                   <div className="text-sm text-gray-500 space-y-1">
@@ -177,13 +303,44 @@ const ProductPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="mt-6 flex justify-end">
-                <button
-                  onClick={() => setSelectedProduct(null)}
-                  className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors duration-200"
-                >
-                  닫기
-                </button>
+              <div className="mt-6 flex justify-end gap-3">
+                {isEditing ? (
+                  <>
+                    <button
+                      onClick={handleEditSubmit}
+                      className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 font-medium"
+                    >
+                      저장
+                    </button>
+                    <button
+                      onClick={handleEditToggle}
+                      className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors duration-200"
+                    >
+                      취소
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={handleEditToggle}
+                      className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200 font-medium"
+                    >
+                      수정
+                    </button>
+                    <button
+                      onClick={handleDelete}
+                      className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors duration-200 font-medium"
+                    >
+                      삭제
+                    </button>
+                    <button
+                      onClick={() => setSelectedProduct(null)}
+                      className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors duration-200"
+                    >
+                      닫기
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </div>
