@@ -102,12 +102,17 @@ public class SecurityConfig {
                         .requestMatchers("/games/**").permitAll()
                         // 공개 카테고리 API
                         .requestMatchers(HttpMethod.GET, "/categories", "/categories/**").permitAll()
-                        // 쿠폰 검증 (인증된 사용자)
-                        .requestMatchers(HttpMethod.GET, "/coupons/*/validate").authenticated()
+                        // 쿠폰 관련 API
+                        .requestMatchers(HttpMethod.GET, "/coupons", "/coupons/**").hasAnyRole("ADMIN", "MANAGER")
+                        .requestMatchers(HttpMethod.POST, "/coupons").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/coupons/*/use").hasAnyRole("ADMIN", "MANAGER", "USER")
+                        // 전체 주문/사용자 조회 (관리자·매니저)
+                        .requestMatchers("/orders/admin/all").hasAnyRole("ADMIN", "MANAGER")
+                        .requestMatchers("/users/admin/all").hasRole("ADMIN")
                         // 관리자 전용 카테고리 API
                         .requestMatchers("/admin/categories/**").hasRole("ADMIN")
-                        // 정산 관련 API (관리자 전용)
-                        .requestMatchers("/settlements/**").hasRole("ADMIN")
+                        // 정산 관련 API (관리자·매니저)
+                        .requestMatchers("/settlements/**").hasAnyRole("ADMIN", "MANAGER")
                         // 나머지는 인증 필요
                         .anyRequest().authenticated()
                 )

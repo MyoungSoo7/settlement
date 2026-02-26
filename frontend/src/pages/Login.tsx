@@ -16,36 +16,16 @@ const Login: React.FC = () => {
     setError(null);
     try {
       const response = await authApi.login(credentials);
-      authApi.saveToken(response);
-      
-      // ADMIN 역할이면 관리자 대시보드로, 아니면 주문 페이지로 이동
-      if (response.role === 'ADMIN') {
+      // ADMIN/MANAGER가 실수로 이 페이지에서 로그인하면 관리자 대시보드로
+      if (response.role === 'ADMIN' || response.role === 'MANAGER') {
+        authApi.saveToken(response);
         navigate('/admin');
       } else {
+        authApi.saveToken(response);
         navigate('/order');
       }
     } catch (err: any) {
       setError(err.response?.data?.message || '이메일 또는 비밀번호가 올바르지 않습니다.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleAdminQuickLogin = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const adminCredentials = { email: 'seed_admin@test.com', password: 'password123' };
-      const response = await authApi.login(adminCredentials);
-      authApi.saveToken(response);
-      
-      if (response.role === 'ADMIN') {
-        navigate('/admin');
-      } else {
-        navigate('/order');
-      }
-    } catch (err: any) {
-      setError(err.response?.data?.message || '관리자 로그인에 실패했습니다.');
     } finally {
       setLoading(false);
     }
@@ -115,14 +95,13 @@ const Login: React.FC = () => {
 
           <button
             type="button"
-            onClick={handleAdminQuickLogin}
-            disabled={loading}
-            className="w-full py-3 px-4 bg-purple-100 text-purple-700 text-sm font-semibold rounded-xl hover:bg-purple-200 transition-colors flex items-center justify-center gap-2"
+            onClick={() => navigate('/admin/login')}
+            className="w-full py-3 px-4 bg-gray-800 text-gray-200 text-sm font-semibold rounded-xl hover:bg-gray-700 transition-colors flex items-center justify-center gap-2"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
             </svg>
-            관리자 퀵 로그인
+            관리자 시스템 로그인 →
           </button>
 
           <div className="flex justify-between text-sm">
