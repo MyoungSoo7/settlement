@@ -2,6 +2,8 @@ package github.lms.lemuel.payment.adapter.in.api;
 
 import github.lms.lemuel.payment.adapter.in.dto.PaymentRequest;
 import github.lms.lemuel.payment.adapter.in.dto.PaymentResponse;
+import github.lms.lemuel.payment.adapter.in.dto.TossPaymentConfirmRequest;
+import github.lms.lemuel.payment.application.TossPaymentService;
 import github.lms.lemuel.payment.application.port.in.*;
 import github.lms.lemuel.payment.domain.PaymentDomain;
 import jakarta.validation.Valid;
@@ -21,17 +23,20 @@ public class PaymentController {
     private final CapturePaymentPort capturePaymentPort;
     private final RefundPaymentPort refundPaymentPort;
     private final GetPaymentPort getPaymentPort;
+    private final TossPaymentService tossPaymentService;
 
     public PaymentController(CreatePaymentPort createPaymentPort,
                              AuthorizePaymentPort authorizePaymentPort,
                              CapturePaymentPort capturePaymentPort,
                              RefundPaymentPort refundPaymentPort,
-                             GetPaymentPort getPaymentPort) {
+                             GetPaymentPort getPaymentPort,
+                             TossPaymentService tossPaymentService) {
         this.createPaymentPort = createPaymentPort;
         this.authorizePaymentPort = authorizePaymentPort;
         this.capturePaymentPort = capturePaymentPort;
         this.refundPaymentPort = refundPaymentPort;
         this.getPaymentPort = getPaymentPort;
+        this.tossPaymentService = tossPaymentService;
     }
 
     @PostMapping
@@ -66,6 +71,21 @@ public class PaymentController {
     @GetMapping("/{id}")
     public ResponseEntity<PaymentResponse> getPayment(@PathVariable Long id) {
         PaymentDomain paymentDomain = getPaymentPort.getPayment(id);
+        return ResponseEntity.ok(new PaymentResponse(paymentDomain));
+    }
+
+    /**
+     * 토스페이먼츠 결제 확인
+     * POST /payments/toss/confirm
+     */
+    @PostMapping("/toss/confirm")
+    public ResponseEntity<PaymentResponse> confirmTossPayment(@Valid @RequestBody TossPaymentConfirmRequest request) {
+        PaymentDomain paymentDomain = tossPaymentService.confirmTossPayment(
+                request.getDbOrderId(),
+                request.getPaymentKey(),
+                request.getTossOrderId(),
+                request.getAmount()
+        );
         return ResponseEntity.ok(new PaymentResponse(paymentDomain));
     }
 }

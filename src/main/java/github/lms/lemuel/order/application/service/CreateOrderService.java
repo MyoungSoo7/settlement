@@ -21,7 +21,7 @@ public class CreateOrderService implements CreateOrderUseCase {
 
     @Override
     public Order createOrder(CreateOrderCommand command) {
-        log.info("주문 생성 시작: userId={}, amount={}", command.userId(), command.amount());
+        log.info("주문 생성 시작: userId={}, productId={}, amount={}", command.userId(), command.productId(), command.amount());
 
         // 1. 사용자 존재 확인
         if (!loadUserForOrderPort.existsById(command.userId())) {
@@ -30,7 +30,7 @@ public class CreateOrderService implements CreateOrderUseCase {
         }
 
         // 2. Order 도메인 생성 (도메인 검증 수행)
-        Order order = Order.create(command.userId(), command.amount());
+        Order order = Order.create(command.userId(), command.productId(), command.amount());
 
         // 3. 저장
         Order savedOrder = saveOrderPort.save(order);

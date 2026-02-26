@@ -19,6 +19,10 @@ public class CreateOrderRequest {
     @Positive(message = "User ID must be positive")
     private Long userId;
 
+    @NotNull(message = "Product ID is required")
+    @Positive(message = "Product ID must be positive")
+    private Long productId;
+
     @NotNull(message = "Amount is required")
     @Positive(message = "Amount must be positive")
     private BigDecimal amount;

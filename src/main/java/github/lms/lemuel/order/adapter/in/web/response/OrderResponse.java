@@ -17,6 +17,7 @@ public class OrderResponse {
 
     private Long id;
     private Long userId;
+    private Long productId;
     private BigDecimal amount;
     private String status;
     private LocalDateTime createdAt;
@@ -26,6 +27,7 @@ public class OrderResponse {
         return new OrderResponse(
                 order.getId(),
                 order.getUserId(),
+                order.getProductId(),
                 order.getAmount(),
                 order.getStatus().name(),
                 order.getCreatedAt(),

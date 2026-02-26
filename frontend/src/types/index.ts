@@ -88,12 +88,14 @@ export interface SettlementSearchResponse {
 // Order Types
 export interface OrderCreateRequest {
   userId: number;
+  productId: number;
   amount: number;
 }
 
 export interface OrderResponse {
   id: number;
   userId: number;
+  productId: number;
   amount: number;
   status: string;
   createdAt: string;
@@ -104,6 +106,13 @@ export interface OrderResponse {
 export interface PaymentRequest {
   orderId: number;
   paymentMethod: string;
+}
+
+export interface TossConfirmRequest {
+  dbOrderId: number;
+  paymentKey: string;
+  tossOrderId: string;
+  amount: number;
 }
 
 export interface PaymentResponse {

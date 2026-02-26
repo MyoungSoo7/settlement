@@ -18,6 +18,8 @@ import ViewerPage from './pages/ViewerPage';
 import CategoryManagementPage from './pages/CategoryManagementPage';
 import TagManagementPage from './pages/TagManagementPage';
 import EcommerceCategoryAdmin from './pages/EcommerceCategoryAdmin';
+import TossPaymentSuccess from './pages/TossPaymentSuccess';
+import TossPaymentFail from './pages/TossPaymentFail';
 
 // Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -143,6 +145,15 @@ function App() {
               </AdminRoute>
             }
           />
+          <Route
+            path="/order/toss/success"
+            element={
+              <ProtectedRoute>
+                <TossPaymentSuccess />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/order/toss/fail" element={<TossPaymentFail />} />
           <Route path="/" element={<Navigate to="/order" replace />} />
         </Routes>
       </BrowserRouter>

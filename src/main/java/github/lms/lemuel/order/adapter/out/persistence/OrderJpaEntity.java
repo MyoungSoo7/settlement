@@ -28,6 +28,9 @@ public class OrderJpaEntity {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
+    @Column(name = "product_id")
+    private Long productId;
+
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal amount;
 

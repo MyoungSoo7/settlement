@@ -10,11 +10,15 @@ public interface CreateOrderUseCase {
 
     record CreateOrderCommand(
             Long userId,
+            Long productId,
             BigDecimal amount
     ) {
         public CreateOrderCommand {
             if (userId == null) {
                 throw new IllegalArgumentException("User ID cannot be null");
+            }
+            if (productId == null) {
+                throw new IllegalArgumentException("Product ID cannot be null");
             }
             if (amount == null) {
                 throw new IllegalArgumentException("Amount cannot be null");

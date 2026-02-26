@@ -30,7 +30,7 @@ public class OrderController {
     @PostMapping
     public ResponseEntity<OrderResponse> createOrder(@Valid @RequestBody CreateOrderRequest request) {
         Order order = createOrderUseCase.createOrder(
-                new CreateOrderUseCase.CreateOrderCommand(request.getUserId(), request.getAmount())
+                new CreateOrderUseCase.CreateOrderCommand(request.getUserId(), request.getProductId(), request.getAmount())
         );
         return ResponseEntity.status(HttpStatus.CREATED).body(OrderResponse.from(order));
     }

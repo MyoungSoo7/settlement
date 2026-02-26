@@ -32,7 +32,7 @@ public class PaymentJpaEntity {
     @Column(name = "payment_method", length = 50)
     private String paymentMethod;
 
-    @Column(name = "pg_transaction_id", length = 100)
+    @Column(name = "pg_transaction_id", length = 500)
     private String pgTransactionId;
 
     @Column(name = "captured_at")
