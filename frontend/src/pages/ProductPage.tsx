@@ -1,14 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import CreateProductForm from '@/components/product/CreateProductForm';
 import ProductList from '@/components/product/ProductList';
-import { ProductResponse } from '@/types';
+import ImageUpload from '@/components/product/ImageUpload';
+import { ProductResponse, ProductImageResponse } from '@/types';
 import { productApi } from '@/api/product';
 import { useToast } from '@/contexts/ToastContext';
+import api from '@/api/axios';
 
 const ProductPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'list' | 'create'>('list');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [selectedProduct, setSelectedProduct] = useState<ProductResponse | null>(null);
+  const [productImages, setProductImages] = useState<ProductImageResponse[]>([]);
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({
     name: '',
@@ -23,6 +26,16 @@ const ProductPage: React.FC = () => {
     setActiveTab('list');
   };
 
+  const fetchProductImages = async (productId: number) => {
+    try {
+      const response = await api.get<ProductImageResponse[]>(`/admin/products/${productId}/images`);
+      setProductImages(response.data);
+    } catch (error) {
+      console.error('이미지 로딩 오류:', error);
+      setProductImages([]);
+    }
+  };
+
   const handleProductSelect = (product: ProductResponse) => {
     setSelectedProduct(product);
     setIsEditing(false);
@@ -32,7 +45,15 @@ const ProductPage: React.FC = () => {
       price: product.price,
       stockQuantity: product.stockQuantity,
     });
+    fetchProductImages(product.id);
   };
+
+  // Load images when product is selected
+  useEffect(() => {
+    if (selectedProduct) {
+      fetchProductImages(selectedProduct.id);
+    }
+  }, [selectedProduct?.id]);
 
   const handleEditToggle = () => {
     if (isEditing && selectedProduct) {
@@ -65,7 +86,7 @@ const ProductPage: React.FC = () => {
         const stockDiff = editForm.stockQuantity - selectedProduct.stockQuantity;
         await productApi.updateProductStock(selectedProduct.id, {
           quantity: Math.abs(stockDiff),
-          increase: stockDiff > 0,
+          operation: stockDiff > 0 ? 'INCREASE' : 'DECREASE',
         });
       }
 
@@ -196,6 +217,50 @@ const ProductPage: React.FC = () => {
               </div>
 
               <div className="space-y-4">
+                {/* 이미지 갤러리 - 항상 표시 */}
+                {productImages.length > 0 && !isEditing && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-700 mb-2">상품 이미지</h3>
+                    <div className="grid grid-cols-4 gap-2">
+                      {productImages.map((image) => (
+                        <div key={image.id} className="relative aspect-square">
+                          <img
+                            src={image.url}
+                            alt={image.originalFileName}
+                            className="w-full h-full object-cover rounded-lg border border-gray-200"
+                          />
+                          {image.isPrimary && (
+                            <span className="absolute top-1 right-1 bg-blue-600 text-white text-xs px-2 py-1 rounded">
+                              대표
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 이미지 업로드 - 편집 모드일 때만 */}
+                {isEditing && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-700 mb-2">상품 이미지 관리</h3>
+                    <ImageUpload
+                      productId={selectedProduct.id}
+                      images={productImages.map(img => ({
+                        id: img.id,
+                        url: img.url,
+                        originalFileName: img.originalFileName,
+                        isPrimary: img.isPrimary,
+                        orderIndex: img.orderIndex,
+                        sizeBytes: img.sizeBytes,
+                        width: img.width,
+                        height: img.height,
+                      }))}
+                      onImagesChange={() => fetchProductImages(selectedProduct.id)}
+                    />
+                  </div>
+                )}
+
                 <div>
                   <h3 className="text-sm font-semibold text-gray-700 mb-1">상품 ID</h3>
                   <p className="text-gray-900">{selectedProduct.id}</p>

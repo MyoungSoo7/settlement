@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: lemuel
+      POSTGRES_USER: lemuel
+      POSTGRES_PASSWORD: lemuel
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/lemuel
+      SPRING_DATASOURCE_USERNAME: lemuel
+      SPRING_DATASOURCE_PASSWORD: lemuel
+      APP_UPLOAD_DIR: /data/uploads
+    volumes:
+      - upload_data:/data/uploads
+    depends_on:
+      - postgres
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - upload_data:/data/uploads:ro
+      - ./frontend/dist:/usr/share/nginx/html:ro
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  upload_data:

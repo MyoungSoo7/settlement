@@ -15,7 +15,8 @@ public record ProductResponse(
         ProductStatus status,
         boolean availableForSale,
         LocalDateTime createdAt,
-        LocalDateTime updatedAt
+        LocalDateTime updatedAt,
+        String primaryImageUrl
 ) {
     public static ProductResponse from(Product product) {
         return new ProductResponse(
@@ -27,7 +28,23 @@ public record ProductResponse(
                 product.getStatus(),
                 product.isAvailableForSale(),
                 product.getCreatedAt(),
-                product.getUpdatedAt()
+                product.getUpdatedAt(),
+                null
+        );
+    }
+
+    public static ProductResponse from(Product product, String primaryImageUrl) {
+        return new ProductResponse(
+                product.getId(),
+                product.getName(),
+                product.getDescription(),
+                product.getPrice(),
+                product.getStockQuantity(),
+                product.getStatus(),
+                product.isAvailableForSale(),
+                product.getCreatedAt(),
+                product.getUpdatedAt(),
+                primaryImageUrl
         );
     }
 }

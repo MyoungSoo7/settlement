@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { ProductCreateRequest } from '@/types';
+import { ProductCreateRequest, ProductResponse, ProductImageResponse } from '@/types';
 import { productApi } from '@/api/product';
+import ImageUpload from './ImageUpload';
+import api from '@/api/axios';
 
 interface CreateProductFormProps {
   onSuccess?: () => void;
@@ -19,6 +21,8 @@ const CreateProductForm: React.FC<CreateProductFormProps> = ({ onSuccess, onCanc
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [createdProduct, setCreatedProduct] = useState<ProductResponse | null>(null);
+  const [productImages, setProductImages] = useState<ProductImageResponse[]>([]);
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -76,8 +80,9 @@ const CreateProductForm: React.FC<CreateProductFormProps> = ({ onSuccess, onCanc
     setSuccessMessage('');
 
     try {
-      await productApi.createProduct(formData);
-      setSuccessMessage('상품이 성공적으로 등록되었습니다!');
+      const product = await productApi.createProduct(formData);
+      setCreatedProduct(product);
+      setSuccessMessage('상품이 성공적으로 등록되었습니다! 이제 이미지를 추가할 수 있습니다.');
 
       // 폼 초기화
       setFormData({
@@ -86,18 +91,30 @@ const CreateProductForm: React.FC<CreateProductFormProps> = ({ onSuccess, onCanc
         price: 0,
         stockQuantity: 0,
       });
-
-      if (onSuccess) {
-        setTimeout(() => {
-          onSuccess();
-        }, 1500);
-      }
     } catch (error: any) {
       const message = error.response?.data?.message || '상품 등록에 실패했습니다.';
       setErrorMessage(message);
       console.error('상품 등록 실패:', error);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const fetchProductImages = async (productId: number) => {
+    try {
+      const response = await api.get<ProductImageResponse[]>(`/admin/products/${productId}/images`);
+      setProductImages(response.data);
+    } catch (error) {
+      console.error('이미지 로딩 오류:', error);
+      setProductImages([]);
+    }
+  };
+
+  const handleComplete = () => {
+    setCreatedProduct(null);
+    setProductImages([]);
+    if (onSuccess) {
+      onSuccess();
     }
   };
 
@@ -111,7 +128,60 @@ const CreateProductForm: React.FC<CreateProductFormProps> = ({ onSuccess, onCanc
     setErrors({});
     setErrorMessage('');
     setSuccessMessage('');
+    setCreatedProduct(null);
+    setProductImages([]);
   };
+
+  // If product is created, show image upload interface
+  if (createdProduct) {
+    return (
+      <div className="max-w-2xl mx-auto p-6 bg-white rounded-lg shadow-md">
+        <h2 className="text-2xl font-bold mb-6 text-gray-900">상품 이미지 추가</h2>
+
+        <div className="mb-4 p-4 bg-green-100 border border-green-400 text-green-800 rounded">
+          상품 "{createdProduct.name}"이(가) 성공적으로 등록되었습니다!
+        </div>
+
+        <div className="mb-6">
+          <p className="text-sm text-gray-700 mb-4">
+            이제 상품 이미지를 추가할 수 있습니다. 이미지는 나중에도 추가하거나 수정할 수 있습니다.
+          </p>
+
+          <ImageUpload
+            productId={createdProduct.id}
+            images={productImages.map(img => ({
+              id: img.id,
+              url: img.url,
+              originalFileName: img.originalFileName,
+              isPrimary: img.isPrimary,
+              orderIndex: img.orderIndex,
+              sizeBytes: img.sizeBytes,
+              width: img.width,
+              height: img.height,
+            }))}
+            onImagesChange={() => fetchProductImages(createdProduct.id)}
+          />
+        </div>
+
+        <div className="flex gap-4 pt-4">
+          <button
+            onClick={handleComplete}
+            className="flex-1 py-3 px-6 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors duration-200"
+          >
+            완료
+          </button>
+          {onCancel && (
+            <button
+              onClick={onCancel}
+              className="px-6 py-3 border border-gray-300 rounded-lg text-gray-900 font-semibold hover:bg-gray-50 transition-colors duration-200"
+            >
+              닫기
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-2xl mx-auto p-6 bg-white rounded-lg shadow-md">

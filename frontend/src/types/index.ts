@@ -157,6 +157,7 @@ export interface ProductResponse {
   availableForSale: boolean;
   createdAt: string;
   updatedAt: string;
+  primaryImageUrl?: string;
 }
 
 export interface UpdateProductInfoRequest {
@@ -171,6 +172,25 @@ export interface UpdateProductPriceRequest {
 export interface UpdateProductStockRequest {
   quantity: number;
   operation: StockOperation;
+}
+
+// Product Image Types
+export interface ProductImageResponse {
+  id: number;
+  productId: number;
+  originalFileName: string;
+  storedFileName: string;
+  filePath: string;
+  url: string;
+  contentType: string;
+  sizeBytes: number;
+  width?: number;
+  height?: number;
+  checksum?: string;
+  isPrimary: boolean;
+  orderIndex: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // Category Types

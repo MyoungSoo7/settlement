@@ -31,24 +31,27 @@ public class ProductController {
     private final GetProductUseCase getProductUseCase;
     private final UpdateProductUseCase updateProductUseCase;
     private final ManageProductStatusUseCase manageProductStatusUseCase;
+    private final github.lms.lemuel.product.application.service.ProductImageService productImageService;
 
     @PostMapping
     public ResponseEntity<ProductResponse> createProduct(@RequestBody CreateProductRequest request) {
         Product product = createProductUseCase.createProduct(request.toCommand());
-        return ResponseEntity.status(HttpStatus.CREATED).body(ProductResponse.from(product));
+        String primaryImageUrl = productImageService.getPrimaryImageUrl(product.getId());
+        return ResponseEntity.status(HttpStatus.CREATED).body(ProductResponse.from(product, primaryImageUrl));
     }
 
     @GetMapping("/{productId}")
     public ResponseEntity<ProductResponse> getProduct(@PathVariable Long productId) {
         Product product = getProductUseCase.getProductById(productId);
-        return ResponseEntity.ok(ProductResponse.from(product));
+        String primaryImageUrl = productImageService.getPrimaryImageUrl(productId);
+        return ResponseEntity.ok(ProductResponse.from(product, primaryImageUrl));
     }
 
     @GetMapping
     public ResponseEntity<List<ProductResponse>> getAllProducts() {
         List<Product> products = getProductUseCase.getAllProducts();
         List<ProductResponse> responses = products.stream()
-                .map(ProductResponse::from)
+                .map(p -> ProductResponse.from(p, productImageService.getPrimaryImageUrl(p.getId())))
                 .collect(Collectors.toList());
         return ResponseEntity.ok(responses);
     }
@@ -57,7 +60,7 @@ public class ProductController {
     public ResponseEntity<List<ProductResponse>> getProductsByStatus(@PathVariable ProductStatus status) {
         List<Product> products = getProductUseCase.getProductsByStatus(status);
         List<ProductResponse> responses = products.stream()
-                .map(ProductResponse::from)
+                .map(p -> ProductResponse.from(p, productImageService.getPrimaryImageUrl(p.getId())))
                 .collect(Collectors.toList());
         return ResponseEntity.ok(responses);
     }
@@ -66,7 +69,7 @@ public class ProductController {
     public ResponseEntity<List<ProductResponse>> getAvailableProducts() {
         List<Product> products = getProductUseCase.getAvailableProducts();
         List<ProductResponse> responses = products.stream()
-                .map(ProductResponse::from)
+                .map(p -> ProductResponse.from(p, productImageService.getPrimaryImageUrl(p.getId())))
                 .collect(Collectors.toList());
         return ResponseEntity.ok(responses);
     }
@@ -78,7 +81,8 @@ public class ProductController {
         UpdateProductInfoCommand command = new UpdateProductInfoCommand(
                 productId, request.name(), request.description());
         Product product = updateProductUseCase.updateProductInfo(command);
-        return ResponseEntity.ok(ProductResponse.from(product));
+        String primaryImageUrl = productImageService.getPrimaryImageUrl(productId);
+        return ResponseEntity.ok(ProductResponse.from(product, primaryImageUrl));
     }
 
     @PutMapping("/{productId}/price")
@@ -88,7 +92,8 @@ public class ProductController {
         UpdateProductPriceCommand command = new UpdateProductPriceCommand(
                 productId, request.newPrice());
         Product product = updateProductUseCase.updateProductPrice(command);
-        return ResponseEntity.ok(ProductResponse.from(product));
+        String primaryImageUrl = productImageService.getPrimaryImageUrl(productId);
+        return ResponseEntity.ok(ProductResponse.from(product, primaryImageUrl));
     }
 
     @PutMapping("/{productId}/stock")
@@ -98,24 +103,28 @@ public class ProductController {
         UpdateProductStockCommand command = new UpdateProductStockCommand(
                 productId, request.quantity(), request.operation());
         Product product = updateProductUseCase.updateProductStock(command);
-        return ResponseEntity.ok(ProductResponse.from(product));
+        String primaryImageUrl = productImageService.getPrimaryImageUrl(productId);
+        return ResponseEntity.ok(ProductResponse.from(product, primaryImageUrl));
     }
 
     @PostMapping("/{productId}/activate")
     public ResponseEntity<ProductResponse> activateProduct(@PathVariable Long productId) {
         Product product = manageProductStatusUseCase.activateProduct(productId);
-        return ResponseEntity.ok(ProductResponse.from(product));
+        String primaryImageUrl = productImageService.getPrimaryImageUrl(productId);
+        return ResponseEntity.ok(ProductResponse.from(product, primaryImageUrl));
     }
 
     @PostMapping("/{productId}/deactivate")
     public ResponseEntity<ProductResponse> deactivateProduct(@PathVariable Long productId) {
         Product product = manageProductStatusUseCase.deactivateProduct(productId);
-        return ResponseEntity.ok(ProductResponse.from(product));
+        String primaryImageUrl = productImageService.getPrimaryImageUrl(productId);
+        return ResponseEntity.ok(ProductResponse.from(product, primaryImageUrl));
     }
 
     @PostMapping("/{productId}/discontinue")
     public ResponseEntity<ProductResponse> discontinueProduct(@PathVariable Long productId) {
         Product product = manageProductStatusUseCase.discontinueProduct(productId);
-        return ResponseEntity.ok(ProductResponse.from(product));
+        String primaryImageUrl = productImageService.getPrimaryImageUrl(productId);
+        return ResponseEntity.ok(ProductResponse.from(product, primaryImageUrl));
     }
 }
