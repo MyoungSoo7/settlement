@@ -2,9 +2,9 @@ name: CI (Backend + SonarCloud + GHCR) / Frontend GHCR
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [  master ]
   pull_request:
-    branches: [ main, master ]
+    branches: [  master ]
 
 env:
   JAVA_VERSION: "21"
