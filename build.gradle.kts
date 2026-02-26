@@ -1,3 +1,5 @@
+import org.flywaydb.gradle.FlywayExtension
+
 plugins {
     java
     id("org.springframework.boot") version "3.5.10"
@@ -5,6 +7,7 @@ plugins {
     jacoco
     id("org.sonarqube") version "5.1.0.4882"
     id("io.snyk.gradle.plugin.snykplugin") version "0.6.1"
+    id("org.flywaydb.flyway") version "11.7.2"
 }
 
 group = "github.lms"
@@ -52,6 +55,7 @@ dependencies {
 
     developmentOnly("org.springframework.boot:spring-boot-devtools")
     runtimeOnly("org.postgresql:postgresql")
+    testImplementation("com.h2database:h2")
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
 
     // Lombok
@@ -121,4 +125,13 @@ snyk {
     setApi(System.getenv("SNYK_TOKEN") ?: "")
     setAutoDownload(true)
     setAutoUpdate(true)
+}
+
+extensions.configure<FlywayExtension> {
+    url = System.getenv("SPRING_DATASOURCE_URL") ?: "jdbc:postgresql://localhost:5432/opslab"
+    user = System.getenv("SPRING_DATASOURCE_USERNAME") ?: "inter"
+    password = System.getenv("SPRING_DATASOURCE_PASSWORD") ?: "1234"
+    schemas = arrayOf("opslab")
+    defaultSchema = "opslab"
+    locations = arrayOf("classpath:db/migration")
 }

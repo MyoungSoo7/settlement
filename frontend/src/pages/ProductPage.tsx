@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 import CreateProductForm from '@/components/product/CreateProductForm';
 import ProductList from '@/components/product/ProductList';
 import ImageUpload from '@/components/product/ImageUpload';
+import InventoryTab from '@/components/product/InventoryTab';
 import { ProductResponse, ProductImageResponse } from '@/types';
 import { productApi } from '@/api/product';
 import { useToast } from '@/contexts/ToastContext';
 import api from '@/api/axios';
 
 const ProductPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'list' | 'create'>('list');
+  const [activeTab, setActiveTab] = useState<'list' | 'create' | 'inventory'>('list');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [selectedProduct, setSelectedProduct] = useState<ProductResponse | null>(null);
   const [productImages, setProductImages] = useState<ProductImageResponse[]>([]);
@@ -154,6 +155,16 @@ const ProductPage: React.FC = () => {
             >
               ➕ 상품 등록
             </button>
+            <button
+              onClick={() => setActiveTab('inventory')}
+              className={`${
+                activeTab === 'inventory'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200`}
+            >
+              📊 재고 관리
+            </button>
           </nav>
         </div>
       </div>
@@ -189,6 +200,18 @@ const ProductPage: React.FC = () => {
               onSuccess={handleProductCreated}
               onCancel={() => setActiveTab('list')}
             />
+          </div>
+        )}
+
+        {activeTab === 'inventory' && (
+          <div>
+            <div className="mb-6">
+              <h2 className="text-xl font-semibold text-gray-900">재고 관리</h2>
+              <p className="mt-1 text-sm text-gray-600">
+                상품별 재고 현황을 확인하고 입고·출고를 처리할 수 있습니다.
+              </p>
+            </div>
+            <InventoryTab />
           </div>
         )}
       </div>

@@ -15,8 +15,10 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -79,11 +81,41 @@ public class TossPaymentService {
     }
 
     /**
+     * 토스페이먼츠 장바구니 일괄 결제 확인
+     * 1. Toss API 1회 검증
+     * 2. 각 주문에 대해 READY → AUTHORIZED → CAPTURED 처리
+     */
+    public List<PaymentDomain> confirmTossCartPayment(List<Long> orderIds, String paymentKey,
+                                                      String tossOrderId, Long totalAmount) {
+        log.info("토스 장바구니 결제 확인 시작: orderIds={}, totalAmount={}", orderIds, totalAmount);
+
+        // 1. Toss API 검증 (1회만)
+        callTossConfirmApi(paymentKey, tossOrderId, totalAmount);
+
+        // 2. 각 주문에 결제 생성 → 승인 → 확정
+        List<PaymentDomain> results = new ArrayList<>();
+        for (Long orderId : orderIds) {
+            PaymentDomain payment = createPaymentPort.createPayment(
+                    new CreatePaymentCommand(orderId, "TOSS_PAYMENTS")
+            );
+            payment.authorize(paymentKey);
+            savePaymentPort.save(payment);
+
+            PaymentDomain captured = capturePaymentPort.capturePayment(payment.getId());
+            results.add(captured);
+            log.info("장바구니 항목 결제 완료: orderId={}, paymentId={}", orderId, captured.getId());
+        }
+
+        log.info("토스 장바구니 결제 전체 완료: {}건", results.size());
+        return results;
+    }
+
+    /**
      * Toss Payments 결제 확인 API 호출
      * POST https://api.tosspayments.com/v1/payments/confirm
      * 4xx 응답 시 Toss 에러 메시지를 그대로 예외에 포함
      */
-    private void callTossConfirmApi(String paymentKey, String tossOrderId, Long amount) {
+    public void callTossConfirmApi(String paymentKey, String tossOrderId, Long amount) {
         String encoded = Base64.getEncoder()
                 .encodeToString((secretKey + ":").getBytes(StandardCharsets.UTF_8));
 

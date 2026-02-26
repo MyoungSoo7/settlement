@@ -2,9 +2,11 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { authApi } from './api/auth';
 import { ToastProvider } from './contexts/ToastContext';
+import { CartProvider } from './contexts/CartContext';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import StartPage from './pages/StartPage';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import OrderPage from './pages/OrderPage';
@@ -20,6 +22,8 @@ import TagManagementPage from './pages/TagManagementPage';
 import EcommerceCategoryAdmin from './pages/EcommerceCategoryAdmin';
 import TossPaymentSuccess from './pages/TossPaymentSuccess';
 import TossPaymentFail from './pages/TossPaymentFail';
+import CartPage from './pages/CartPage';
+import MyPage from './pages/MyPage';
 
 // Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -51,6 +55,7 @@ const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 function App() {
   return (
     <ToastProvider>
+      <CartProvider>
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
@@ -154,9 +159,25 @@ function App() {
             }
           />
           <Route path="/order/toss/fail" element={<TossPaymentFail />} />
-          <Route path="/" element={<Navigate to="/order" replace />} />
+          <Route
+            path="/mypage"
+            element={
+              <ProtectedRoute>
+                <MyPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/cart"
+            element={
+              <ProtectedRoute>
+                <CartPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/" element={<StartPage />} />
         </Routes>
       </BrowserRouter>
+      </CartProvider>
     </ToastProvider>
   );
 }

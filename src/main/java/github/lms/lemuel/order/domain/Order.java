@@ -47,6 +47,10 @@ public class Order {
         return order;
     }
 
+    public static Order create(Long userId, BigDecimal amount) {
+        return create(userId, 1L, amount); // 기본 productId를 1로 지정
+    }
+
     // 도메인 규칙: userId 검증
     public void validateUserId() {
         if (userId == null || userId <= 0) {

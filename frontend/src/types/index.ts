@@ -115,6 +115,13 @@ export interface TossConfirmRequest {
   amount: number;
 }
 
+export interface TossCartConfirmRequest {
+  orderIds: number[];
+  paymentKey: string;
+  tossOrderId: string;
+  totalAmount: number;
+}
+
 export interface PaymentResponse {
   id: number;
   orderId: number;
@@ -198,6 +205,30 @@ export interface ProductImageResponse {
   checksum?: string;
   isPrimary: boolean;
   orderIndex: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Review Types
+export interface ReviewCreateRequest {
+  productId: number;
+  userId: number;
+  rating: number; // 1-5
+  content?: string;
+}
+
+export interface ReviewUpdateRequest {
+  userId: number;
+  rating: number;
+  content?: string;
+}
+
+export interface ReviewResponse {
+  id: number;
+  productId: number;
+  userId: number;
+  rating: number;
+  content?: string;
   createdAt: string;
   updatedAt: string;
 }

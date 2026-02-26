@@ -98,6 +98,13 @@ jobs:
           SPRING_DATASOURCE_PASSWORD: testpass
           SPRING_ELASTICSEARCH_URIS: http://localhost:9200
 
+      - name: Flyway Validate
+        run: ./gradlew flywayValidate
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/testdb
+          SPRING_DATASOURCE_USERNAME: testuser
+          SPRING_DATASOURCE_PASSWORD: testpass
+
       - name: Upload test/coverage reports
         uses: actions/upload-artifact@v4
         if: always()

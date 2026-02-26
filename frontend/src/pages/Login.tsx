@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { authApi } from '@/api/auth';
 import { LoginRequest } from '@/types';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const requestedRole = queryParams.get('role') || 'USER';
+
   const [credentials, setCredentials] = useState<LoginRequest>({
     email: '',
     password: '',
@@ -13,13 +17,27 @@ const Login: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [existingSession, setExistingSession] = useState<string | null>(null);
 
-  // 컴포넌트 마운트 시 기존 세션 확인
+  // 컴포넌트 마운트 시 기존 세션 확인 및 롤에 따른 초기값 설정 (선택사항)
   React.useEffect(() => {
     const currentUser = authApi.getCurrentUser();
     if (currentUser) {
       setExistingSession(currentUser.email);
     }
-  }, []);
+
+    // 역할을 명시적으로 요청한 경우 해당 프리셋으로 채워줄 수도 있음
+    if (requestedRole === 'ADMIN') {
+      setCredentials({ email: 'seed_admin@test.com', password: 'password123' });
+    } else if (requestedRole === 'MANAGER') {
+      setCredentials({ email: 'seed_manager@test.com', password: 'password123' });
+    } else if (requestedRole === 'USER') {
+       // 유저는 여러 명일 수 있으니 하나만 예시로
+       setCredentials({ email: 'seed_user1@test.com', password: 'password123' });
+    }
+  }, [requestedRole]);
+
+  const handleQuickLogin = (email: string) => {
+    setCredentials({ email, password: 'password123' });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,10 +60,52 @@ const Login: React.FC = () => {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">Lemuel</h2>
-          <p className="mt-2 text-center text-sm text-gray-600">정산 시스템 로그인</p>
+          <button 
+            onClick={() => navigate('/')}
+            className="mb-4 text-sm text-blue-600 hover:text-blue-800 flex items-center"
+          >
+            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            시작 화면으로 돌아가기
+          </button>
+          <h2 className="mt-2 text-center text-3xl font-extrabold text-gray-900">Lemuel</h2>
+          <p className="mt-2 text-center text-sm text-gray-600">
+            {requestedRole === 'ADMIN' ? '관리자 시스템 로그인' : 
+             requestedRole === 'MANAGER' ? '매니저 시스템 로그인' : 
+             '사용자 쇼핑 로그인'}
+          </p>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+
+        {/* Quick Login Presets */}
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 space-y-3">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">빠른 로그인 (테스트용)</p>
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              type="button"
+              onClick={() => handleQuickLogin('seed_user1@test.com')}
+              className={`py-2 px-2 text-xs font-medium rounded border ${requestedRole === 'USER' ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'}`}
+            >
+              일반 사용자
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickLogin('seed_manager@test.com')}
+              className={`py-2 px-2 text-xs font-medium rounded border ${requestedRole === 'MANAGER' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'}`}
+            >
+              매니저
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickLogin('seed_admin@test.com')}
+              className={`py-2 px-2 text-xs font-medium rounded border ${requestedRole === 'ADMIN' ? 'bg-purple-50 border-purple-200 text-purple-700' : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'}`}
+            >
+              관리자
+            </button>
+          </div>
+        </div>
+
+        <form className="mt-4 space-y-6" onSubmit={handleSubmit}>
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
               <label htmlFor="email" className="sr-only">

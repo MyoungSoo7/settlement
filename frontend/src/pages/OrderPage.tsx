@@ -2,9 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { orderApi } from '@/api/order';
 import { paymentApi } from '@/api/payment';
 import { productApi } from '@/api/product';
-import { OrderResponse, PaymentResponse, ProductResponse } from '@/types';
+import { reviewApi } from '@/api/review';
+import { OrderResponse, PaymentResponse, ProductResponse, ReviewResponse } from '@/types';
+import { useCart } from '@/contexts/CartContext';
 import Card from '@/components/Card';
 import Spinner from '@/components/Spinner';
+import StarRating from '@/components/review/StarRating';
+import ReviewList from '@/components/review/ReviewList';
 
 const PRODUCTS_PER_PAGE = 5;
 const TOSS_CLIENT_KEY = import.meta.env.VITE_TOSS_CLIENT_KEY as string;
@@ -20,110 +24,12 @@ const loadTossScript = (): Promise<void> =>
   });
 
 /* ─────────────────────────────────────────
-   주문 상품 탭 - 주문 목록
-───────────────────────────────────────── */
-const OrderListTab: React.FC = () => {
-  const userId = 1;
-  const [orders, setOrders] = useState<OrderResponse[]>([]);
-  const [products, setProducts] = useState<Map<number, ProductResponse>>(new Map());
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const [orderList, productList] = await Promise.all([
-          orderApi.getUserOrders(userId),
-          productApi.getAllProducts(),
-        ]);
-        const productMap = new Map(productList.map((p) => [p.id, p]));
-        setOrders(orderList.sort((a, b) => b.id - a.id));
-        setProducts(productMap);
-      } catch {
-        setError('주문 목록을 불러오지 못했습니다.');
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, []);
-
-  const formatCurrency = (v: number) =>
-    new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(v);
-
-  const formatDate = (s: string) =>
-    new Date(s).toLocaleDateString('ko-KR', {
-      year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-    });
-
-  const statusConfig: Record<string, { label: string; cls: string }> = {
-    CREATED:   { label: '주문 완료',   cls: 'bg-yellow-100 text-yellow-800' },
-    PAID:      { label: '결제 완료',   cls: 'bg-green-100 text-green-800' },
-    CANCELED:  { label: '취소됨',      cls: 'bg-red-100 text-red-800' },
-    REFUNDED:  { label: '환불됨',      cls: 'bg-purple-100 text-purple-800' },
-  };
-
-  if (loading) return <Spinner size="md" message="주문 목록 불러오는 중..." />;
-  if (error) return <p className="text-center text-red-600 py-8">{error}</p>;
-  if (orders.length === 0)
-    return (
-      <div className="text-center py-16 text-gray-400">
-        <svg className="mx-auto h-12 w-12 mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5"
-            d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-        </svg>
-        <p className="text-sm">주문 내역이 없습니다.</p>
-      </div>
-    );
-
-  return (
-    <div className="space-y-4">
-      {orders.map((order) => {
-        const product = order.productId ? products.get(order.productId) : null;
-        const status = statusConfig[order.status] ?? { label: order.status, cls: 'bg-gray-100 text-gray-700' };
-        return (
-          <div key={order.id} className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-            <div className="flex items-start justify-between mb-3">
-              <div className="flex items-center gap-3">
-                {product?.primaryImageUrl ? (
-                  <img src={product.primaryImageUrl} alt={product.name}
-                    className="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
-                ) : (
-                  <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                    <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5"
-                        d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                    </svg>
-                  </div>
-                )}
-                <div>
-                  <p className="font-semibold text-gray-900">
-                    {product ? product.name : `상품 #${order.productId ?? '-'}`}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-0.5">주문 #{order.id}</p>
-                </div>
-              </div>
-              <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${status.cls}`}>
-                {status.label}
-              </span>
-            </div>
-
-            <div className="flex justify-between items-center pt-3 border-t border-gray-100">
-              <span className="text-xs text-gray-400">{formatDate(order.createdAt)}</span>
-              <span className="text-base font-bold text-blue-700">{formatCurrency(order.amount)}</span>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-};
-
-/* ─────────────────────────────────────────
    주문하기 탭 - 주문 폼
 ───────────────────────────────────────── */
 const OrderFormTab: React.FC = () => {
   const userId = 1;
+  const { addItem } = useCart();
+  const [addedProductId, setAddedProductId] = useState<number | null>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [products, setProducts] = useState<ProductResponse[]>([]);
@@ -137,6 +43,11 @@ const OrderFormTab: React.FC = () => {
   const [payment, setPayment] = useState<PaymentResponse | null>(null);
   const [step, setStep] = useState<'input' | 'order-created' | 'payment-ready' | 'completed'>('input');
 
+  // 상품 리뷰 미리보기
+  const [reviews, setReviews] = useState<ReviewResponse[]>([]);
+  const [reviewsOpen, setReviewsOpen] = useState(false);
+  const [loadingReviews, setLoadingReviews] = useState(false);
+
   useEffect(() => {
     setLoadingProducts(true);
     productApi.getAvailableProducts()
@@ -144,6 +55,15 @@ const OrderFormTab: React.FC = () => {
       .catch(() => setError('상품 목록을 불러오지 못했습니다.'))
       .finally(() => setLoadingProducts(false));
   }, []);
+
+  useEffect(() => {
+    if (!selectedProduct) { setReviews([]); setReviewsOpen(false); return; }
+    setLoadingReviews(true);
+    reviewApi.getProductReviews(selectedProduct.id)
+      .then(setReviews)
+      .catch(() => {})
+      .finally(() => setLoadingReviews(false));
+  }, [selectedProduct]);
 
   const filteredProducts = products
     .filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -235,6 +155,12 @@ const OrderFormTab: React.FC = () => {
     }
   };
 
+  const handleAddToCart = (product: ProductResponse) => {
+    addItem(product);
+    setAddedProductId(product.id);
+    setTimeout(() => setAddedProductId(null), 1500);
+  };
+
   const handleNewOrder = () => {
     setSearchQuery('');
     setSelectedProduct(null);
@@ -318,9 +244,31 @@ const OrderFormTab: React.FC = () => {
                             )}
                           </div>
                         </div>
-                        <div className="text-right flex-shrink-0">
-                          <p className="text-sm font-semibold text-gray-900">{fmt(product.price)}</p>
-                          <p className="text-xs text-gray-400">재고 {product.stockQuantity}개</p>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <div className="text-right">
+                            <p className="text-sm font-semibold text-gray-900">{fmt(product.price)}</p>
+                            <p className="text-xs text-gray-400">재고 {product.stockQuantity}개</p>
+                          </div>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleAddToCart(product); }}
+                            title="장바구니 담기"
+                            className={`p-1.5 rounded-lg border transition-all flex-shrink-0 ${
+                              addedProductId === product.id
+                                ? 'bg-green-500 border-green-500 text-white'
+                                : 'border-gray-300 text-gray-500 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50'
+                            }`}
+                          >
+                            {addedProductId === product.id ? (
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+                              </svg>
+                            ) : (
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8"
+                                  d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                              </svg>
+                            )}
+                          </button>
                         </div>
                       </li>
                     );
@@ -342,6 +290,47 @@ const OrderFormTab: React.FC = () => {
                   <span className="text-sm text-gray-800">{selectedProduct.name}</span>
                   <span className="font-bold text-blue-700">{fmt(selectedProduct.price)}</span>
                 </div>
+              </div>
+            )}
+
+            {/* 상품 리뷰 미리보기 */}
+            {selectedProduct && (
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setReviewsOpen((o) => !o)}
+                  className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors text-sm"
+                >
+                  <span className="font-medium text-gray-700 flex items-center gap-2">
+                    {loadingReviews ? (
+                      <span className="text-gray-400">리뷰 불러오는 중...</span>
+                    ) : reviews.length === 0 ? (
+                      '상품 리뷰 (0개)'
+                    ) : (
+                      <>
+                        <span>상품 리뷰 ({reviews.length}개)</span>
+                        <StarRating
+                          value={Math.round(reviews.reduce((s, r) => s + r.rating, 0) / reviews.length)}
+                          size="sm"
+                        />
+                        <span className="text-yellow-600 font-semibold">
+                          {(reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)}
+                        </span>
+                      </>
+                    )}
+                  </span>
+                  <svg
+                    className={`w-4 h-4 text-gray-400 transition-transform ${reviewsOpen ? 'rotate-180' : ''}`}
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {reviewsOpen && (
+                  <div className="px-4 py-4 max-h-72 overflow-y-auto">
+                    <ReviewList reviews={reviews} />
+                  </div>
+                )}
               </div>
             )}
 
@@ -498,47 +487,16 @@ const OrderFormTab: React.FC = () => {
 };
 
 /* ─────────────────────────────────────────
-   메인 OrderPage - 탭 컨테이너
+   메인 OrderPage
 ───────────────────────────────────────── */
-type TabId = 'order' | 'history';
-
-const TABS: { id: TabId; label: string }[] = [
-  { id: 'order',   label: '주문하기' },
-  { id: 'history', label: '주문 상품' },
-];
-
 const OrderPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<TabId>('order');
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 py-10 px-4 sm:px-6 lg:px-8">
       <div className="max-w-2xl mx-auto">
-
-        {/* 헤더 */}
         <div className="text-center mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">주문 & 결제</h1>
+          <h1 className="text-3xl font-bold text-gray-900">주문하기</h1>
         </div>
-
-        {/* 탭 */}
-        <div className="flex bg-white rounded-xl shadow-sm border border-gray-200 mb-6 p-1">
-          {TABS.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 py-2.5 text-sm font-semibold rounded-lg transition-all ${
-                activeTab === tab.id
-                  ? 'bg-blue-600 text-white shadow'
-                  : 'text-gray-500 hover:text-gray-800'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* 탭 콘텐츠 */}
-        {activeTab === 'order'   && <OrderFormTab />}
-        {activeTab === 'history' && <OrderListTab />}
+        <OrderFormTab />
       </div>
     </div>
   );
