@@ -42,7 +42,7 @@ github/lms/lemuel/
 ├── category/      # 다계층 이커머스 카테고리
 ├── coupon/        # 쿠폰 발급/사용/만료                  (16개)
 ├── review/        # 상품 리뷰                            (11개)
-├── game/          # 오목/바둑 (Controller만, 미완성)     🚧
+├── game/          # 오목/바둑 (Controller만)     
 └── common/        # JWT, Security, Batch, Web 설정
 ```
 
@@ -130,7 +130,7 @@ github/lms/lemuel/
 | ADMIN·MANAGER | `/admin/settlement` | 정산 관리 |
 | ADMIN·MANAGER | `/settlement/search` | 정산 조회 |
 | ADMIN·MANAGER | `/product`, `/categories`, `/tags` | 상품·카테고리·태그 |
-| ADMIN만 | `/admin/system/ecommerce-categories` | 이커머스 카테고리 |
+| ADMIN | `/admin/system/ecommerce-categories` | 이커머스 카테고리 |
 
 ### 3.2 주요 라이브러리
 
