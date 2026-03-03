@@ -3,11 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { authApi } from '@/api/auth';
 import { RegisterRequest } from '@/types';
 
-const QUICK_LOGINS = [
-  { label: 'ADMIN 퀵 로그인',   email: 'seed_admin@test.com',   password: 'password123', color: 'purple' },
-  { label: 'MANAGER 퀵 로그인', email: 'seed_manager@test.com', password: 'password123', color: 'green'  },
-] as const;
-
 type Tab = 'login' | 'register';
 
 const AdminLoginPage: React.FC = () => {
@@ -165,34 +160,6 @@ const AdminLoginPage: React.FC = () => {
                 </button>
               </form>
 
-              {/* 구분선 */}
-              <div className="flex items-center my-5">
-                <div className="flex-1 border-t border-gray-200" />
-                <span className="mx-3 text-xs text-gray-400">테스트 계정</span>
-                <div className="flex-1 border-t border-gray-200" />
-              </div>
-
-              {/* 퀵 로그인 */}
-              <div className="space-y-2">
-                {QUICK_LOGINS.map((q) => {
-                  const isPurple = q.color === 'purple';
-                  return (
-                    <button
-                      key={q.email}
-                      type="button"
-                      onClick={() => doLogin({ email: q.email, password: q.password })}
-                      disabled={loading}
-                      className={`w-full py-2.5 text-sm font-semibold rounded-xl transition-colors disabled:opacity-50 ${
-                        isPurple
-                          ? 'bg-purple-100 text-purple-700 hover:bg-purple-200'
-                          : 'bg-green-100 text-green-700 hover:bg-green-200'
-                      }`}
-                    >
-                      {q.label}
-                    </button>
-                  );
-                })}
-              </div>
             </>
           )}
 
