@@ -87,7 +87,7 @@ function App() {
             {/* ── 관리자·매니저 공용 ── */}
             <Route path="/admin"              element={<AdminManagerRoute><AdminDashboardPage /></AdminManagerRoute>} />
             <Route path="/admin/settlement"   element={<AdminManagerRoute><SettlementAdmin /></AdminManagerRoute>} />
-            <Route path="/dashboard"          element={<AdminManagerRoute><SettlementDashboard /></AdminManagerRoute>} />
+            <Route path="/settlement/search"   element={<AdminManagerRoute><SettlementDashboard /></AdminManagerRoute>} />
             <Route path="/product"            element={<AdminManagerRoute><ProductPage /></AdminManagerRoute>} />
             <Route path="/categories"         element={<AdminManagerRoute><CategoryManagementPage /></AdminManagerRoute>} />
             <Route path="/tags"               element={<AdminManagerRoute><TagManagementPage /></AdminManagerRoute>} />

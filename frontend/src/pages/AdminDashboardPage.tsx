@@ -263,9 +263,9 @@ const AdminDashboardPage: React.FC = () => {
               className="px-4 py-2 bg-purple-600 text-white text-sm font-semibold rounded-lg hover:bg-purple-700 transition-colors">
               정산 관리 →
             </Link>
-            <Link to="/dashboard"
+            <Link to="/settlement/search"
               className="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition-colors">
-              정산 대시보드 →
+              정산 조회 →
             </Link>
           </div>
         </div>

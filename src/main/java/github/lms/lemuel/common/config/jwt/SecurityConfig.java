@@ -113,6 +113,7 @@ public class SecurityConfig {
                         .requestMatchers("/admin/categories/**").hasRole("ADMIN")
                         // 정산 관련 API (관리자·매니저)
                         .requestMatchers("/settlements/**").hasAnyRole("ADMIN", "MANAGER")
+                        .requestMatchers("/api/settlements/**").hasAnyRole("ADMIN", "MANAGER")
                         // 나머지는 인증 필요
                         .anyRequest().authenticated()
                 )

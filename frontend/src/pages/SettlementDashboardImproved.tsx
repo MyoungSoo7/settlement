@@ -109,7 +109,7 @@ const SettlementDashboard: React.FC = () => {
             <label className="block text-sm font-medium text-gray-700 mb-2">주문자명</label>
             <input
               type="text"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
               placeholder="주문자명 입력"
               value={filters.ordererName || ''}
               onChange={(e) => handleFilterChange('ordererName', e.target.value)}
@@ -120,7 +120,7 @@ const SettlementDashboard: React.FC = () => {
             <label className="block text-sm font-medium text-gray-700 mb-2">상품명</label>
             <input
               type="text"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
               placeholder="상품명 입력"
               value={filters.productName || ''}
               onChange={(e) => handleFilterChange('productName', e.target.value)}
@@ -130,7 +130,7 @@ const SettlementDashboard: React.FC = () => {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">정산 상태</label>
             <select
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
               value={filters.status || ''}
               onChange={(e) => handleFilterChange('status', e.target.value || undefined)}
             >
@@ -171,7 +171,7 @@ const SettlementDashboard: React.FC = () => {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">환불 여부</label>
             <select
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
               value={filters.isRefunded === undefined ? '' : String(filters.isRefunded)}
               onChange={(e) =>
                 handleFilterChange('isRefunded', e.target.value === '' ? undefined : e.target.value === 'true')
