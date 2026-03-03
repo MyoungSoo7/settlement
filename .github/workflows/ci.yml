@@ -122,6 +122,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: SonarCloud Scan
+        if: github.event_name != 'pull_request'
         run: ./gradlew sonar --no-daemon --stacktrace
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
