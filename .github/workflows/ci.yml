@@ -1,4 +1,4 @@
-name: CI (Backend + SonarCloud + GHCR) / Frontend GHCR
+name: ci
 
 on:
   push:
