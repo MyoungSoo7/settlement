@@ -39,7 +39,7 @@ const Register: React.FC = () => {
         });
         authApi.saveToken(loginResponse);
         alert('회원가입이 완료되었습니다. 자동으로 로그인됩니다.');
-        navigate('/dashboard');
+        navigate('/order');
       } catch (loginErr) {
         console.error('자동 로그인 실패:', loginErr);
         alert('회원가입은 성공했으나 자동 로그인에 실패했습니다. 로그인 페이지로 이동합니다.');

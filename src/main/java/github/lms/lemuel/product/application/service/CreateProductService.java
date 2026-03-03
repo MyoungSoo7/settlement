@@ -7,6 +7,7 @@ import github.lms.lemuel.product.domain.Product;
 import github.lms.lemuel.product.domain.exception.DuplicateProductNameException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,6 +21,7 @@ public class CreateProductService implements CreateProductUseCase {
     private final SaveProductPort saveProductPort;
 
     @Override
+    @CacheEvict(value = "products", allEntries = true)
     public Product createProduct(CreateProductCommand command) {
         log.info("상품 생성 시작: name={}, price={}, stock={}",
                 command.name(), command.price(), command.stockQuantity());

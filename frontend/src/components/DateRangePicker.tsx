@@ -46,7 +46,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
           <label className="block text-sm font-medium text-gray-700 mb-2">시작일</label>
           <input
             type="date"
-            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 ${
               error ? 'border-red-300' : 'border-gray-300'
             }`}
             value={startDate}
@@ -58,7 +58,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
           <label className="block text-sm font-medium text-gray-700 mb-2">종료일</label>
           <input
             type="date"
-            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 ${
               error ? 'border-red-300' : 'border-gray-300'
             }`}
             value={endDate}

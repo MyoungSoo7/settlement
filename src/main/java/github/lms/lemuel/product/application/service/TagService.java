@@ -5,6 +5,8 @@ import github.lms.lemuel.product.application.port.out.LoadTagPort;
 import github.lms.lemuel.product.application.port.out.SaveTagPort;
 import github.lms.lemuel.product.domain.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,6 +22,7 @@ public class TagService implements TagUseCase {
 
     @Override
     @Transactional
+    @CacheEvict(value = "tags", allEntries = true)
     public Tag createTag(String name, String color) {
         Tag tag = Tag.create(name, color);
         return saveTagPort.save(tag);
@@ -32,17 +35,20 @@ public class TagService implements TagUseCase {
     }
 
     @Override
+    @Cacheable("tags")
     public List<Tag> getAllTags() {
         return loadTagPort.findAll();
     }
 
     @Override
+    @Cacheable(value = "tags", key = "'product:' + #productId")
     public List<Tag> getTagsByProductId(Long productId) {
         return loadTagPort.findByProductId(productId);
     }
 
     @Override
     @Transactional
+    @CacheEvict(value = "tags", allEntries = true)
     public Tag updateTag(Long id, String name, String color) {
         Tag tag = getTagById(id);
         tag.updateInfo(name, color);
@@ -51,12 +57,14 @@ public class TagService implements TagUseCase {
 
     @Override
     @Transactional
+    @CacheEvict(value = "tags", allEntries = true)
     public void deleteTag(Long id) {
         saveTagPort.delete(id);
     }
 
     @Override
     @Transactional
+    @CacheEvict(value = "tags", key = "'product:' + #productId")
     public void addTagToProduct(Long productId, Long tagId) {
         // 태그 존재 여부 확인
         getTagById(tagId);
@@ -65,6 +73,7 @@ public class TagService implements TagUseCase {
 
     @Override
     @Transactional
+    @CacheEvict(value = "tags", key = "'product:' + #productId")
     public void removeTagFromProduct(Long productId, Long tagId) {
         saveTagPort.removeTagFromProduct(productId, tagId);
     }

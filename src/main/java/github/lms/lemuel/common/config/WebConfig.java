@@ -50,7 +50,7 @@ public class WebConfig implements WebMvcConfigurer {
                         "http://localhost:8080"   // 같은 도메인
                 )
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
-                .allowedHeaders("*")
+                .allowedHeaders("Authorization", "Content-Type", "X-Requested-With", "Idempotency-Key")
                 .allowCredentials(true)
                 .maxAge(3600);
     }

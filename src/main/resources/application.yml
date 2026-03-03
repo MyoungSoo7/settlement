@@ -29,6 +29,11 @@ spring:
     create-schemas: true
     validate-on-migrate: false
 
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=500,expireAfterWrite=600s
+
   data:
     elasticsearch:
       repositories:
@@ -97,6 +102,8 @@ management:
         include: health,info,metrics,prometheus
       base-path: /actuator
   endpoint:
+    prometheus:
+      enabled: true
     health:
       show-details: always
       show-components: always

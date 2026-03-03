@@ -8,6 +8,7 @@ import github.lms.lemuel.product.domain.exception.InsufficientStockException;
 import github.lms.lemuel.product.domain.exception.ProductNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +22,7 @@ public class UpdateProductService implements UpdateProductUseCase {
     private final SaveProductPort saveProductPort;
 
     @Override
+    @CacheEvict(value = "products", allEntries = true)
     public Product updateProductInfo(UpdateProductInfoCommand command) {
         log.info("상품 정보 수정: productId={}", command.productId());
 
@@ -35,6 +37,7 @@ public class UpdateProductService implements UpdateProductUseCase {
     }
 
     @Override
+    @CacheEvict(value = "products", allEntries = true)
     public Product updateProductPrice(UpdateProductPriceCommand command) {
         log.info("상품 가격 수정: productId={}, newPrice={}", command.productId(), command.newPrice());
 
@@ -50,6 +53,7 @@ public class UpdateProductService implements UpdateProductUseCase {
     }
 
     @Override
+    @CacheEvict(value = "products", allEntries = true)
     public Product updateProductStock(UpdateProductStockCommand command) {
         log.info("상품 재고 수정: productId={}, quantity={}, operation={}",
                 command.productId(), command.quantity(), command.operation());

@@ -4,6 +4,7 @@ import { adminApi, AdminUserResponse } from '@/api/admin';
 import { productApi } from '@/api/product';
 import { orderApi } from '@/api/order';
 import { couponApi } from '@/api/coupon';
+import { authApi } from '@/api/auth';
 import { OrderResponse, ProductResponse, CouponResponse, CouponType, CouponCreateRequest } from '@/types';
 import Spinner from '@/components/Spinner';
 
@@ -82,6 +83,9 @@ const RoleBadge: React.FC<{ role: string }> = ({ role }) => {
 
 // ════════════════════════════════════════════════════════════════════════════
 const AdminDashboardPage: React.FC = () => {
+  const currentUser = authApi.getCurrentUser();
+  const isAdmin = currentUser?.role === 'ADMIN';
+
   const [activeTab, setActiveTab] = useState<Tab>('overview');
 
   const [orders,   setOrders]   = useState<OrderResponse[]>([]);
@@ -113,9 +117,15 @@ const AdminDashboardPage: React.FC = () => {
   useEffect(() => {
     const load = async () => {
       try {
+        // MANAGER는 회원 목록/쿠폰 조회 권한이 없으므로 ADMIN일 때만 요청
+      const baseRequests = [
+        adminApi.getAllOrders(),
+        productApi.getAllProducts(),
+      ] as const;
+
+      if (isAdmin) {
         const [orderList, productList, userList, couponList] = await Promise.all([
-          adminApi.getAllOrders(),
-          productApi.getAllProducts(),
+          ...baseRequests,
           adminApi.getAllUsers(),
           couponApi.getAll(),
         ]);
@@ -123,6 +133,11 @@ const AdminDashboardPage: React.FC = () => {
         setProducts(productList.sort((a, b) => b.id - a.id));
         setUsers(userList.sort((a, b) => a.id - b.id));
         setCoupons(couponList.sort((a, b) => b.id - a.id));
+      } else {
+        const [orderList, productList] = await Promise.all(baseRequests);
+        setOrders(orderList.sort((a, b) => b.id - a.id));
+        setProducts(productList.sort((a, b) => b.id - a.id));
+      }
       } catch {
         setError('데이터를 불러오지 못했습니다.');
       } finally {
@@ -192,13 +207,14 @@ const AdminDashboardPage: React.FC = () => {
     }
   };
 
-  const TABS: { id: Tab; label: string; icon: string }[] = [
+  const ALL_TABS: { id: Tab; label: string; icon: string; adminOnly?: boolean }[] = [
     { id: 'overview',  label: '개요',      icon: '📊' },
     { id: 'orders',    label: '주문 관리',  icon: '📦' },
     { id: 'products',  label: '상품 관리',  icon: '🛍️' },
-    { id: 'users',     label: '회원 관리',  icon: '👥' },
-    { id: 'coupons',   label: '쿠폰 관리',  icon: '🎟️' },
+    { id: 'users',     label: '회원 관리',  icon: '👥', adminOnly: true },
+    { id: 'coupons',   label: '쿠폰 관리',  icon: '🎟️', adminOnly: true },
   ];
+  const TABS = ALL_TABS.filter((t) => !t.adminOnly || isAdmin);
 
   if (loading) {
     return (
@@ -223,9 +239,19 @@ const AdminDashboardPage: React.FC = () => {
         {/* 헤더 */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">관리자 대시보드</h1>
-            <p className="text-sm text-gray-500 mt-1">
-              주문 {orders.length}건 · 상품 {products.length}개 · 회원 {users.length}명
+            <div className="flex items-center gap-3 mb-1">
+              <h1 className="text-3xl font-bold text-gray-900">
+                {isAdmin ? '관리자 대시보드' : '매니저 대시보드'}
+              </h1>
+              <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                isAdmin ? 'bg-red-100 text-red-700' : 'bg-purple-100 text-purple-700'
+              }`}>
+                {currentUser?.role}
+              </span>
+            </div>
+            <p className="text-sm text-gray-500">
+              주문 {orders.length}건 · 상품 {products.length}개
+              {isAdmin && ` · 회원 ${users.length}명`}
             </p>
           </div>
           <div className="flex gap-2">
@@ -237,9 +263,9 @@ const AdminDashboardPage: React.FC = () => {
               className="px-4 py-2 bg-purple-600 text-white text-sm font-semibold rounded-lg hover:bg-purple-700 transition-colors">
               정산 관리 →
             </Link>
-            <Link to="/dashboard"
+            <Link to="/settlement/search"
               className="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition-colors">
-              정산 대시보드 →
+              정산 조회 →
             </Link>
           </div>
         </div>

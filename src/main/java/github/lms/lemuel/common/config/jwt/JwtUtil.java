@@ -12,12 +12,21 @@ import java.util.Date;
 @Component
 public class JwtUtil {
 
+    /** HMAC-SHA256 최소 키 길이: 256 bit = 32 byte */
+    private static final int MIN_SECRET_BYTES = 32;
+
     private final JwtProperties jwtProperties;
     private final SecretKey secretKey;
 
     public JwtUtil(JwtProperties jwtProperties) {
         this.jwtProperties = jwtProperties;
-        this.secretKey = Keys.hmacShaKeyFor(jwtProperties.getSecret().getBytes(StandardCharsets.UTF_8));
+        byte[] keyBytes = jwtProperties.getSecret().getBytes(StandardCharsets.UTF_8);
+        if (keyBytes.length < MIN_SECRET_BYTES) {
+            throw new IllegalStateException(
+                "JWT secret must be at least 32 bytes (256 bits). Current length: " + keyBytes.length
+            );
+        }
+        this.secretKey = Keys.hmacShaKeyFor(keyBytes);
     }
 
     public String generateToken(String email, String role) {

@@ -4,7 +4,7 @@ import { authApi } from '@/api/auth';
 
 const QUICK_LOGINS = [
   { email: 'seed_admin@test.com',   password: 'password123', role: 'ADMIN',   redirect: '/admin' },
-  { email: 'seed_manager@test.com', password: 'password123', role: 'MANAGER', redirect: '/product' },
+  { email: 'seed_manager@test.com', password: 'password123', role: 'MANAGER', redirect: '/admin' },
 ];
 
 const StartPage: React.FC = () => {
@@ -19,11 +19,9 @@ const StartPage: React.FC = () => {
       const response = await authApi.login({ email: entry.email, password: entry.password });
       authApi.saveToken(response);
       
-      // 백엔드에서 반환된 실제 역할(role)에 따라 리다이렉션
-      if (response.role === 'ADMIN') {
+      // ADMIN / MANAGER → 관리자 대시보드, USER → 주문 페이지
+      if (response.role === 'ADMIN' || response.role === 'MANAGER') {
         navigate('/admin');
-      } else if (response.role === 'MANAGER') {
-        navigate('/product');
       } else {
         navigate('/order');
       }
@@ -100,7 +98,7 @@ const StartPage: React.FC = () => {
                   <h3 className="text-lg font-bold text-gray-800">매니저 모드 (MANAGER)</h3>
                   <span className="text-xs bg-green-100 text-green-700 font-semibold px-2 py-0.5 rounded-full">빠른 로그인</span>
                 </div>
-                <p className="text-sm text-gray-500">재고 관리 및 주문 현황 확인. 테스트 계정으로 즉시 입장합니다.</p>
+                <p className="text-sm text-gray-500">상품·주문·정산 관리. 테스트 계정으로 관리자 대시보드에 즉시 입장합니다.</p>
               </div>
             </button>
 
