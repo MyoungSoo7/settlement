@@ -64,7 +64,9 @@ services:
 
       JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
     ports:
-      - "127.0.0.1:8088:8080"
+      - "127.0.0.1:8089:8080"
+      - "127.0.0.1:8089:8080"
+      - "127.0.0.1:8088:8088"
     restart: unless-stopped
     depends_on:
       postgres:

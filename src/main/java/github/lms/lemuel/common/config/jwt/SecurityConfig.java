@@ -41,6 +41,7 @@ public class SecurityConfig {
 
         // 허용할 Origin (React 개발 서버)
         configuration.setAllowedOrigins(Arrays.asList(
+                "http://localhost:8089",
                 "http://localhost:3000",
                 "http://localhost:5173",  // Vite 기본 포트
                 "http://127.0.0.1:3000",
