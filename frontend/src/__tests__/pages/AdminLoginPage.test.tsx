@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import AdminLoginPage from '@/pages/AdminLoginPage';
@@ -29,6 +29,20 @@ const renderPage = () =>
     </MemoryRouter>
   );
 
+/** 로그인 폼의 submit 버튼 (type="submit") 반환 */
+const getLoginSubmitBtn = () => {
+  const form = screen.getByPlaceholderText('비밀번호').closest('form')!;
+  return within(form).getByRole('button');
+};
+
+/** 회원가입 탭 버튼 (tab switcher) 클릭 */
+const clickRegisterTab = async (user: ReturnType<typeof userEvent.setup>) => {
+  // 탭 영역의 "회원가입" 버튼 — 탭 컨테이너 내부에 두 개의 탭 버튼이 있음
+  const tabBtns = screen.getAllByRole('button', { name: '회원가입' });
+  // 탭 버튼은 type="button", register form의 submit은 "MANAGER 계정 생성" / "ADMIN 계정 생성"
+  await user.click(tabBtns[0]);
+};
+
 describe('AdminLoginPage', () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -43,14 +57,16 @@ describe('AdminLoginPage', () => {
       expect(screen.getByText('관리자 시스템')).toBeInTheDocument();
     });
 
-    it('로그인/회원가입 탭이 렌더링된다', () => {
+    it('로그인/회원가입 탭 버튼이 2개 렌더링된다', () => {
       renderPage();
 
-      expect(screen.getByRole('button', { name: '로그인' })).toBeInTheDocument();
+      // 탭 영역: type="button" 인 로그인·회원가입 탭 + submit 버튼
+      const loginBtns = screen.getAllByRole('button', { name: '로그인' });
+      expect(loginBtns.length).toBeGreaterThanOrEqual(1);
       expect(screen.getByRole('button', { name: '회원가입' })).toBeInTheDocument();
     });
 
-    it('초기에는 로그인 탭이 활성화된다', () => {
+    it('초기에는 로그인 폼이 표시된다', () => {
       renderPage();
 
       expect(screen.getByPlaceholderText('이메일')).toBeInTheDocument();
@@ -65,27 +81,20 @@ describe('AdminLoginPage', () => {
       const user = userEvent.setup();
       renderPage();
 
-      await user.click(screen.getByRole('button', { name: '회원가입' }));
+      await clickRegisterTab(user);
 
       expect(screen.getByText('역할 선택')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'MANAGER' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'ADMIN' })).toBeInTheDocument();
     });
 
-    it('탭 전환 시 에러 메시지가 초기화된다', async () => {
+    it('회원가입 탭 클릭 시 비밀번호 확인 입력 필드가 나타난다', async () => {
       const user = userEvent.setup();
-      vi.mocked(authApi.login).mockRejectedValueOnce({
-        response: { data: { message: '로그인 실패' } },
-      });
       renderPage();
 
-      // 로그인 실패로 에러 발생
-      await user.click(screen.getByRole('button', { name: '로그인', hidden: false }));
-      // 실제로 폼 submit이어야 에러가 나므로, 탭 자체 에러 시나리오를 검증
-      await user.click(screen.getByRole('button', { name: '회원가입' }));
-      await user.click(screen.getByRole('button', { name: '로그인' }));
+      await clickRegisterTab(user);
 
-      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(screen.getByPlaceholderText('비밀번호 확인')).toBeInTheDocument();
     });
   });
 
@@ -98,7 +107,7 @@ describe('AdminLoginPage', () => {
 
       await user.type(screen.getByPlaceholderText('이메일'), 'admin@test.com');
       await user.type(screen.getByPlaceholderText('비밀번호'), 'password');
-      await user.click(screen.getByRole('button', { name: '로그인' }));
+      await user.click(getLoginSubmitBtn());
 
       await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/admin'));
       expect(authApi.saveToken).toHaveBeenCalled();
@@ -111,7 +120,7 @@ describe('AdminLoginPage', () => {
 
       await user.type(screen.getByPlaceholderText('이메일'), 'mgr@test.com');
       await user.type(screen.getByPlaceholderText('비밀번호'), 'password');
-      await user.click(screen.getByRole('button', { name: '로그인' }));
+      await user.click(getLoginSubmitBtn());
 
       await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/admin'));
     });
@@ -123,7 +132,7 @@ describe('AdminLoginPage', () => {
 
       await user.type(screen.getByPlaceholderText('이메일'), 'user@test.com');
       await user.type(screen.getByPlaceholderText('비밀번호'), 'password');
-      await user.click(screen.getByRole('button', { name: '로그인' }));
+      await user.click(getLoginSubmitBtn());
 
       await waitFor(() =>
         expect(screen.getByText('관리자(ADMIN) 또는 매니저(MANAGER) 계정으로만 로그인할 수 있습니다.')).toBeInTheDocument()
@@ -140,14 +149,14 @@ describe('AdminLoginPage', () => {
 
       await user.type(screen.getByPlaceholderText('이메일'), 'bad@test.com');
       await user.type(screen.getByPlaceholderText('비밀번호'), 'wrong');
-      await user.click(screen.getByRole('button', { name: '로그인' }));
+      await user.click(getLoginSubmitBtn());
 
       await waitFor(() =>
         expect(screen.getByText('이메일 또는 비밀번호가 올바르지 않습니다.')).toBeInTheDocument()
       );
     });
 
-    it('로그인 중에는 버튼이 비활성화된다', async () => {
+    it('로그인 중에는 submit 버튼이 비활성화된다', async () => {
       const user = userEvent.setup();
       let resolveLogin!: (v: any) => void;
       vi.mocked(authApi.login).mockImplementationOnce(() => new Promise(r => { resolveLogin = r; }));
@@ -155,9 +164,13 @@ describe('AdminLoginPage', () => {
 
       await user.type(screen.getByPlaceholderText('이메일'), 'admin@test.com');
       await user.type(screen.getByPlaceholderText('비밀번호'), 'password');
-      await user.click(screen.getByRole('button', { name: '로그인' }));
+      await user.click(getLoginSubmitBtn());
 
-      await waitFor(() => expect(screen.getByRole('button', { name: '로그인 중...' })).toBeDisabled());
+      await waitFor(() => {
+        const btn = getLoginSubmitBtn();
+        expect(btn).toBeDisabled();
+        expect(btn).toHaveTextContent('로그인 중...');
+      });
 
       resolveLogin({ token: 'jwt', email: 'admin@test.com', role: 'ADMIN' });
     });
@@ -165,32 +178,32 @@ describe('AdminLoginPage', () => {
 
   // ─── 회원가입 ─────────────────────────────────────────────
   describe('회원가입', () => {
-    const goToRegisterTab = async (user: ReturnType<typeof userEvent.setup>) => {
-      await user.click(screen.getByRole('button', { name: '회원가입' }));
-    };
-
     it('비밀번호 불일치 시 에러 메시지를 표시한다', async () => {
       const user = userEvent.setup();
       renderPage();
-      await goToRegisterTab(user);
+      await clickRegisterTab(user);
 
-      const inputs = screen.getAllByPlaceholderText('비밀번호');
-      await user.type(inputs[0], 'password123');
-      await user.type(screen.getByPlaceholderText('비밀번호 확인'), 'different');
+      await user.type(screen.getByPlaceholderText('이메일'), 'mgr@test.com');
+      const pwInput = screen.getByPlaceholderText('비밀번호');
+      await user.type(pwInput, 'password123');
+      await user.type(screen.getByPlaceholderText('비밀번호 확인'), 'differentpass');
+
       await user.click(screen.getByRole('button', { name: 'MANAGER 계정 생성' }));
 
-      expect(screen.getByText('비밀번호가 일치하지 않습니다.')).toBeInTheDocument();
+      await waitFor(() =>
+        expect(screen.getByText('비밀번호가 일치하지 않습니다.')).toBeInTheDocument()
+      );
+      expect(authApi.register).not.toHaveBeenCalled();
     });
 
-    it('MANAGER 계정 생성 성공 시 로그인 탭으로 전환되고 성공 메시지가 표시된다', async () => {
+    it('MANAGER 계정 생성 성공 시 성공 메시지가 표시된다', async () => {
       const user = userEvent.setup();
       vi.mocked(authApi.register).mockResolvedValueOnce({ id: 1, email: 'mgr@test.com', createdAt: '', updatedAt: '' });
       renderPage();
-      await goToRegisterTab(user);
+      await clickRegisterTab(user);
 
       await user.type(screen.getByPlaceholderText('이메일'), 'mgr@test.com');
-      const pwInputs = screen.getAllByPlaceholderText('비밀번호');
-      await user.type(pwInputs[0], 'password123');
+      await user.type(screen.getByPlaceholderText('비밀번호'), 'password123');
       await user.type(screen.getByPlaceholderText('비밀번호 확인'), 'password123');
       await user.click(screen.getByRole('button', { name: 'MANAGER 계정 생성' }));
 
@@ -202,7 +215,7 @@ describe('AdminLoginPage', () => {
     it('ADMIN 역할 선택 후 계정 생성 버튼 텍스트가 변경된다', async () => {
       const user = userEvent.setup();
       renderPage();
-      await goToRegisterTab(user);
+      await clickRegisterTab(user);
 
       await user.click(screen.getByRole('button', { name: 'ADMIN' }));
 
@@ -213,15 +226,33 @@ describe('AdminLoginPage', () => {
       const user = userEvent.setup();
       vi.mocked(authApi.register).mockRejectedValueOnce({ response: { status: 409 } });
       renderPage();
-      await goToRegisterTab(user);
+      await clickRegisterTab(user);
 
       await user.type(screen.getByPlaceholderText('이메일'), 'dup@test.com');
-      const pwInputs = screen.getAllByPlaceholderText('비밀번호');
-      await user.type(pwInputs[0], 'password123');
+      await user.type(screen.getByPlaceholderText('비밀번호'), 'password123');
       await user.type(screen.getByPlaceholderText('비밀번호 확인'), 'password123');
       await user.click(screen.getByRole('button', { name: 'MANAGER 계정 생성' }));
 
       await waitFor(() => expect(screen.getByText('이미 사용 중인 이메일입니다.')).toBeInTheDocument());
+    });
+
+    it('가입 중에는 submit 버튼이 비활성화된다', async () => {
+      const user = userEvent.setup();
+      let resolveRegister!: (v: any) => void;
+      vi.mocked(authApi.register).mockImplementationOnce(
+        () => new Promise(r => { resolveRegister = r; })
+      );
+      renderPage();
+      await clickRegisterTab(user);
+
+      await user.type(screen.getByPlaceholderText('이메일'), 'mgr@test.com');
+      await user.type(screen.getByPlaceholderText('비밀번호'), 'password123');
+      await user.type(screen.getByPlaceholderText('비밀번호 확인'), 'password123');
+      await user.click(screen.getByRole('button', { name: 'MANAGER 계정 생성' }));
+
+      await waitFor(() => expect(screen.getByRole('button', { name: '가입 중...' })).toBeDisabled());
+
+      resolveRegister({ id: 1, email: 'mgr@test.com', createdAt: '', updatedAt: '' });
     });
   });
 });

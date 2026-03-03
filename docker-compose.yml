@@ -49,11 +49,9 @@ services:
     env_file: [ .env ]
     environment:
       SPRING_PROFILES_ACTIVE: prod
-
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/inter
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
-
       SPRING_ELASTICSEARCH_URIS: http://elasticsearch:9200
       SPRING_ELASTICSEARCH_USERNAME: ${ELASTICSEARCH_USER}
       SPRING_ELASTICSEARCH_PASSWORD: ${ELASTICSEARCH_PASSWORD}
@@ -71,6 +69,15 @@ services:
         condition: service_healthy
       elasticsearch:
         condition: service_healthy
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: lemuel-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+    restart: unless-stopped
 
 volumes:
   postgres-data:

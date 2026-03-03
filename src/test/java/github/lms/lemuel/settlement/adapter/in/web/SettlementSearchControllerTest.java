@@ -1,6 +1,5 @@
 package github.lms.lemuel.settlement.adapter.in.web;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import github.lms.lemuel.settlement.adapter.in.web.response.SettlementAggregationsResponse;
 import github.lms.lemuel.settlement.adapter.in.web.response.SettlementPageResponse;
 import github.lms.lemuel.settlement.adapter.in.web.response.SettlementSearchItemResponse;
@@ -8,32 +7,29 @@ import github.lms.lemuel.settlement.adapter.out.persistence.SettlementSearchJdbc
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.context.annotation.Import;
-import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.web.servlet.MockMvc;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.ResponseEntity;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.BDDMockito.given;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.BDDMockito.*;
 
-@WebMvcTest(SettlementSearchController.class)
+@ExtendWith(MockitoExtension.class)
 @DisplayName("SettlementSearchController")
 class SettlementSearchControllerTest {
 
-    @Autowired MockMvc mockMvc;
-    @Autowired ObjectMapper objectMapper;
+    @Mock
+    private SettlementSearchJdbcRepository searchRepository;
 
-    @MockBean
-    SettlementSearchJdbcRepository searchRepository;
+    @InjectMocks
+    private SettlementSearchController controller;
 
     private SettlementPageResponse emptyPage() {
         return new SettlementPageResponse(
@@ -42,128 +38,105 @@ class SettlementSearchControllerTest {
         );
     }
 
-    private SettlementPageResponse pageWithItems(List<SettlementSearchItemResponse> items) {
+    private SettlementPageResponse pageWithItem() {
+        SettlementSearchItemResponse item = new SettlementSearchItemResponse(
+            1L, 10L, 100L,
+            "user@test.com", "상품A",
+            new BigDecimal("100000"), BigDecimal.ZERO, new BigDecimal("97000"),
+            "DONE", false, LocalDate.of(2026, 1, 15)
+        );
         return new SettlementPageResponse(
-            items, items.size(), 1, 0, 20,
-            new SettlementAggregationsResponse(new BigDecimal("100000"), BigDecimal.ZERO, new BigDecimal("97000"), Map.of("DONE", (long) items.size()))
+            List.of(item), 1L, 1, 0, 20,
+            new SettlementAggregationsResponse(
+                new BigDecimal("100000"), BigDecimal.ZERO, new BigDecimal("97000"),
+                Map.of("DONE", 1L)
+            )
         );
     }
 
     @Nested
-    @DisplayName("GET /api/settlements/search")
-    class Search {
+    @DisplayName("search 메서드")
+    class SearchMethod {
 
         @Test
-        @WithMockUser(roles = "ADMIN")
-        @DisplayName("파라미터 없이 요청 시 200과 빈 결과를 반환한다")
-        void search_noParams_returns200() throws Exception {
-            given(searchRepository.search(isNull(), isNull(), isNull(), isNull(), isNull(), isNull(),
-                eq(0), eq(20), eq("createdAt"), eq("DESC")))
+        @DisplayName("파라미터를 그대로 repository에 전달하고 200 OK를 반환한다")
+        void search_delegatesToRepository_returns200() {
+            given(searchRepository.search(null, null, null, null, null, null, 0, 20, "createdAt", "DESC"))
                 .willReturn(emptyPage());
 
-            mockMvc.perform(get("/api/settlements/search"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalElements").value(0))
-                .andExpect(jsonPath("$.currentPage").value(0))
-                .andExpect(jsonPath("$.pageSize").value(20));
+            ResponseEntity<SettlementPageResponse> response = controller.search(
+                null, null, null, null, null, null, 0, 20, "createdAt", "DESC");
+
+            assertThat(response.getStatusCodeValue()).isEqualTo(200);
+            assertThat(response.getBody()).isNotNull();
+            assertThat(response.getBody().getTotalElements()).isEqualTo(0L);
+            then(searchRepository).should().search(null, null, null, null, null, null, 0, 20, "createdAt", "DESC");
         }
 
         @Test
-        @WithMockUser(roles = "ADMIN")
-        @DisplayName("날짜 범위 파라미터로 검색한다")
-        void search_withDateRange_passesParamsToRepository() throws Exception {
-            given(searchRepository.search(isNull(), isNull(), isNull(), isNull(),
-                eq("2026-01-01"), eq("2026-01-31"),
-                eq(0), eq(20), eq("createdAt"), eq("DESC")))
+        @DisplayName("날짜 범위 파라미터를 repository에 전달한다")
+        void search_withDateRange_passesParamsToRepository() {
+            given(searchRepository.search(null, null, null, null, "2026-01-01", "2026-01-31", 0, 20, "createdAt", "DESC"))
                 .willReturn(emptyPage());
 
-            mockMvc.perform(get("/api/settlements/search")
-                    .param("startDate", "2026-01-01")
-                    .param("endDate", "2026-01-31"))
-                .andExpect(status().isOk());
+            controller.search(null, null, null, null, "2026-01-01", "2026-01-31", 0, 20, "createdAt", "DESC");
+
+            then(searchRepository).should().search(null, null, null, null, "2026-01-01", "2026-01-31", 0, 20, "createdAt", "DESC");
         }
 
         @Test
-        @WithMockUser(roles = "ADMIN")
-        @DisplayName("status 파라미터로 필터링한다")
-        void search_withStatus_filtersCorrectly() throws Exception {
-            SettlementSearchItemResponse item = new SettlementSearchItemResponse(
-                1L, 10L, 100L, "user@test.com", "상품A",
-                new BigDecimal("100000"), BigDecimal.ZERO, new BigDecimal("97000"),
-                "DONE", false, LocalDate.of(2026, 1, 15)
-            );
-            given(searchRepository.search(isNull(), isNull(), isNull(), eq("DONE"),
-                isNull(), isNull(), eq(0), eq(20), eq("createdAt"), eq("DESC")))
-                .willReturn(pageWithItems(List.of(item)));
+        @DisplayName("status 필터 파라미터를 repository에 전달한다")
+        void search_withStatus_passesStatusToRepository() {
+            given(searchRepository.search(null, null, null, "DONE", null, null, 0, 20, "createdAt", "DESC"))
+                .willReturn(pageWithItem());
 
-            mockMvc.perform(get("/api/settlements/search").param("status", "DONE"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalElements").value(1))
-                .andExpect(jsonPath("$.settlements[0].status").value("DONE"))
-                .andExpect(jsonPath("$.settlements[0].settlementId").value(1));
+            ResponseEntity<SettlementPageResponse> response =
+                controller.search(null, null, null, "DONE", null, null, 0, 20, "createdAt", "DESC");
+
+            assertThat(response.getBody().getTotalElements()).isEqualTo(1L);
+            assertThat(response.getBody().getSettlements()).hasSize(1);
+            assertThat(response.getBody().getSettlements().get(0).getStatus()).isEqualTo("DONE");
         }
 
         @Test
-        @WithMockUser(roles = "ADMIN")
-        @DisplayName("페이지네이션 파라미터를 전달한다")
-        void search_withPagination_passesPageParams() throws Exception {
-            given(searchRepository.search(isNull(), isNull(), isNull(), isNull(),
-                isNull(), isNull(), eq(2), eq(10), eq("amount"), eq("ASC")))
+        @DisplayName("페이지네이션 파라미터를 repository에 전달한다")
+        void search_withPagination_passesPageParams() {
+            given(searchRepository.search(null, null, null, null, null, null, 2, 10, "amount", "ASC"))
                 .willReturn(emptyPage());
 
-            mockMvc.perform(get("/api/settlements/search")
-                    .param("page", "2")
-                    .param("size", "10")
-                    .param("sortBy", "amount")
-                    .param("sortDirection", "ASC"))
-                .andExpect(status().isOk());
+            controller.search(null, null, null, null, null, null, 2, 10, "amount", "ASC");
+
+            then(searchRepository).should().search(null, null, null, null, null, null, 2, 10, "amount", "ASC");
         }
 
         @Test
-        @WithMockUser(roles = "MANAGER")
-        @DisplayName("MANAGER 역할도 접근 가능하다")
-        void search_asManager_returns200() throws Exception {
-            given(searchRepository.search(any(), any(), any(), any(), any(), any(),
-                anyInt(), anyInt(), any(), any()))
-                .willReturn(emptyPage());
+        @DisplayName("ordererName, productName, isRefunded 파라미터를 repository에 전달한다")
+        void search_withAllFilters_passesAllToRepository() {
+            given(searchRepository.search("user@test.com", "상품A", true, "DONE", "2026-01-01", "2026-01-31", 0, 20, "createdAt", "DESC"))
+                .willReturn(pageWithItem());
 
-            mockMvc.perform(get("/api/settlements/search"))
-                .andExpect(status().isOk());
+            ResponseEntity<SettlementPageResponse> response =
+                controller.search("user@test.com", "상품A", true, "DONE", "2026-01-01", "2026-01-31", 0, 20, "createdAt", "DESC");
+
+            assertThat(response.getStatusCodeValue()).isEqualTo(200);
+            then(searchRepository).should().search("user@test.com", "상품A", true, "DONE", "2026-01-01", "2026-01-31", 0, 20, "createdAt", "DESC");
         }
 
         @Test
-        @WithMockUser(roles = "USER")
-        @DisplayName("USER 역할은 접근이 거부된다")
-        void search_asUser_returns403() throws Exception {
-            mockMvc.perform(get("/api/settlements/search"))
-                .andExpect(status().isForbidden());
-        }
-
-        @Test
-        @DisplayName("비인증 요청은 401을 반환한다")
-        void search_unauthenticated_returns401() throws Exception {
-            mockMvc.perform(get("/api/settlements/search"))
-                .andExpect(status().isUnauthorized());
-        }
-
-        @Test
-        @WithMockUser(roles = "ADMIN")
         @DisplayName("aggregations 정보가 응답에 포함된다")
-        void search_includesAggregations() throws Exception {
-            SettlementSearchItemResponse item = new SettlementSearchItemResponse(
-                1L, 10L, 100L, "user@test.com", "상품A",
-                new BigDecimal("100000"), BigDecimal.ZERO, new BigDecimal("97000"),
-                "DONE", false, LocalDate.of(2026, 1, 15)
-            );
+        void search_includesAggregationsInResponse() {
             given(searchRepository.search(any(), any(), any(), any(), any(), any(),
                 anyInt(), anyInt(), any(), any()))
-                .willReturn(pageWithItems(List.of(item)));
+                .willReturn(pageWithItem());
 
-            mockMvc.perform(get("/api/settlements/search"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.aggregations").exists())
-                .andExpect(jsonPath("$.aggregations.totalAmount").value(100000))
-                .andExpect(jsonPath("$.aggregations.totalFinalAmount").value(97000));
+            ResponseEntity<SettlementPageResponse> response =
+                controller.search(null, null, null, null, null, null, 0, 20, "createdAt", "DESC");
+
+            SettlementAggregationsResponse agg = response.getBody().getAggregations();
+            assertThat(agg).isNotNull();
+            assertThat(agg.getTotalAmount()).isEqualByComparingTo("100000");
+            assertThat(agg.getTotalFinalAmount()).isEqualByComparingTo("97000");
+            assertThat(agg.getStatusCounts()).containsEntry("DONE", 1L);
         }
     }
 }

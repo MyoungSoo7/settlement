@@ -6,15 +6,15 @@ global:
     replica: '1'
 
 # Alertmanager configuration
-alerting:
-  alertmanagers:
-    - static_configs:
-        - targets:
-            - 'alertmanager:9093'
+#alerting:
+#  alertmanagers:
+#    - static_configs:
+#        - targets:
+#            - 'alertmanager:9093'
 
 # Load alert rules
-rule_files:
-  - 'alert-rules.yml'
+#rule_files:
+#  - 'alert-rules.yml'
 
 # Scrape configurations
 scrape_configs:
@@ -22,7 +22,7 @@ scrape_configs:
   - job_name: 'lemuel'
     metrics_path: '/actuator/prometheus'
     static_configs:
-      - targets: ['lemuel-app:8080']
+      - targets: ['app:8080']
         labels:
           application: 'lemuel'
           environment: 'production'
@@ -33,6 +33,6 @@ scrape_configs:
       - targets: ['localhost:9090']
 
   # Alertmanager monitoring
-  - job_name: 'alertmanager'
-    static_configs:
-      - targets: ['alertmanager:9093']
+#  - job_name: 'alertmanager'
+#    static_configs:
+#      - targets: ['alertmanager:9093']
