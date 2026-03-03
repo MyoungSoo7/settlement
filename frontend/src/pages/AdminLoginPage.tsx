@@ -1,19 +1,32 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authApi } from '@/api/auth';
+import { RegisterRequest } from '@/types';
 
 const QUICK_LOGINS = [
   { label: 'ADMIN 퀵 로그인',   email: 'seed_admin@test.com',   password: 'password123', color: 'purple' },
   { label: 'MANAGER 퀵 로그인', email: 'seed_manager@test.com', password: 'password123', color: 'green'  },
 ] as const;
 
+type Tab = 'login' | 'register';
+
 const AdminLoginPage: React.FC = () => {
   const navigate = useNavigate();
+  const [tab, setTab] = useState<Tab>('login');
+
+  // 로그인 상태
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState<string | null>(null);
 
+  // 회원가입 상태
+  const [regForm, setRegForm] = useState<RegisterRequest>({ email: '', password: '', role: 'MANAGER' });
+  const [confirmPassword, setConfirmPassword] = useState('');
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  // ── 로그인 ──────────────────────────────────────────────
   const doLogin = async (creds: { email: string; password: string }) => {
     setLoading(true);
     setError(null);
@@ -32,9 +45,43 @@ const AdminLoginPage: React.FC = () => {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     doLogin({ email, password });
+  };
+
+  // ── 회원가입 ─────────────────────────────────────────────
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (regForm.password !== confirmPassword) {
+      setError('비밀번호가 일치하지 않습니다.');
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      await authApi.register(regForm);
+      setSuccess(`${regForm.role} 계정이 생성되었습니다. 로그인해주세요.`);
+      setRegForm({ email: '', password: '', role: 'MANAGER' });
+      setConfirmPassword('');
+      setTab('login');
+    } catch (err: any) {
+      if (err.response?.status === 409) {
+        setError('이미 사용 중인 이메일입니다.');
+      } else {
+        const msg = err.response?.data?.message || err.response?.data || err.message || '회원가입에 실패했습니다.';
+        setError(typeof msg === 'string' ? msg : JSON.stringify(msg));
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const switchTab = (t: Tab) => {
+    setTab(t);
+    setError(null);
+    setSuccess(null);
   };
 
   return (
@@ -49,74 +96,171 @@ const AdminLoginPage: React.FC = () => {
 
         {/* 카드 */}
         <div className="bg-white rounded-2xl shadow-2xl p-8">
-          <h2 className="text-xl font-bold text-gray-900 mb-1">관리자 로그인</h2>
-          <p className="text-sm text-gray-400 mb-6">ADMIN / MANAGER 계정으로 로그인하세요.</p>
 
+          {/* 탭 */}
+          <div className="flex rounded-xl overflow-hidden border border-gray-200 mb-6">
+            <button
+              type="button"
+              onClick={() => switchTab('login')}
+              className={`flex-1 py-2.5 text-sm font-semibold transition-colors ${
+                tab === 'login' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-50'
+              }`}
+            >
+              로그인
+            </button>
+            <button
+              type="button"
+              onClick={() => switchTab('register')}
+              className={`flex-1 py-2.5 text-sm font-semibold transition-colors ${
+                tab === 'register' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-50'
+              }`}
+            >
+              회원가입
+            </button>
+          </div>
+
+          {/* 알림 */}
           {error && (
             <div className="mb-5 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
               {error}
             </div>
           )}
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="rounded-xl border border-gray-300 overflow-hidden">
-              <input
-                type="email"
-                required
-                autoComplete="email"
-                placeholder="이메일"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="block w-full px-4 py-3 text-sm text-gray-900 placeholder-gray-400 border-b border-gray-300 focus:outline-none focus:ring-0"
-              />
-              <input
-                type="password"
-                required
-                autoComplete="current-password"
-                placeholder="비밀번호"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="block w-full px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-0"
-              />
+          {success && (
+            <div className="mb-5 bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-700">
+              {success}
             </div>
+          )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3 bg-gray-900 text-white text-sm font-semibold rounded-xl hover:bg-gray-800 transition-colors disabled:opacity-50"
-            >
-              {loading ? '로그인 중...' : '로그인'}
-            </button>
-          </form>
+          {/* ── 로그인 폼 ── */}
+          {tab === 'login' && (
+            <>
+              <form onSubmit={handleLoginSubmit} className="space-y-4">
+                <div className="rounded-xl border border-gray-300 overflow-hidden">
+                  <input
+                    type="email"
+                    required
+                    autoComplete="email"
+                    placeholder="이메일"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="block w-full px-4 py-3 text-sm text-gray-900 placeholder-gray-400 border-b border-gray-300 focus:outline-none focus:ring-0"
+                  />
+                  <input
+                    type="password"
+                    required
+                    autoComplete="current-password"
+                    placeholder="비밀번호"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="block w-full px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-0"
+                  />
+                </div>
 
-          {/* 구분선 */}
-          <div className="flex items-center my-5">
-            <div className="flex-1 border-t border-gray-200" />
-            <span className="mx-3 text-xs text-gray-400">테스트 계정</span>
-            <div className="flex-1 border-t border-gray-200" />
-          </div>
-
-          {/* 퀵 로그인 */}
-          <div className="space-y-2">
-            {QUICK_LOGINS.map((q) => {
-              const isPurple = q.color === 'purple';
-              return (
                 <button
-                  key={q.email}
-                  type="button"
-                  onClick={() => doLogin({ email: q.email, password: q.password })}
+                  type="submit"
                   disabled={loading}
-                  className={`w-full py-2.5 text-sm font-semibold rounded-xl transition-colors disabled:opacity-50 ${
-                    isPurple
-                      ? 'bg-purple-100 text-purple-700 hover:bg-purple-200'
-                      : 'bg-green-100 text-green-700 hover:bg-green-200'
-                  }`}
+                  className="w-full py-3 bg-gray-900 text-white text-sm font-semibold rounded-xl hover:bg-gray-800 transition-colors disabled:opacity-50"
                 >
-                  {q.label}
+                  {loading ? '로그인 중...' : '로그인'}
                 </button>
-              );
-            })}
-          </div>
+              </form>
+
+              {/* 구분선 */}
+              <div className="flex items-center my-5">
+                <div className="flex-1 border-t border-gray-200" />
+                <span className="mx-3 text-xs text-gray-400">테스트 계정</span>
+                <div className="flex-1 border-t border-gray-200" />
+              </div>
+
+              {/* 퀵 로그인 */}
+              <div className="space-y-2">
+                {QUICK_LOGINS.map((q) => {
+                  const isPurple = q.color === 'purple';
+                  return (
+                    <button
+                      key={q.email}
+                      type="button"
+                      onClick={() => doLogin({ email: q.email, password: q.password })}
+                      disabled={loading}
+                      className={`w-full py-2.5 text-sm font-semibold rounded-xl transition-colors disabled:opacity-50 ${
+                        isPurple
+                          ? 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                          : 'bg-green-100 text-green-700 hover:bg-green-200'
+                      }`}
+                    >
+                      {q.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {/* ── 회원가입 폼 ── */}
+          {tab === 'register' && (
+            <form onSubmit={handleRegisterSubmit} className="space-y-4">
+              {/* 역할 선택 */}
+              <div>
+                <p className="text-xs font-semibold text-gray-500 mb-2">역할 선택</p>
+                <div className="flex gap-3">
+                  {(['MANAGER', 'ADMIN'] as const).map((role) => (
+                    <button
+                      key={role}
+                      type="button"
+                      onClick={() => setRegForm({ ...regForm, role })}
+                      className={`flex-1 py-2.5 text-sm font-semibold rounded-xl border-2 transition-colors ${
+                        regForm.role === role
+                          ? role === 'ADMIN'
+                            ? 'border-purple-600 bg-purple-50 text-purple-700'
+                            : 'border-green-600 bg-green-50 text-green-700'
+                          : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                      }`}
+                    >
+                      {role}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-gray-300 overflow-hidden">
+                <input
+                  type="email"
+                  required
+                  autoComplete="email"
+                  placeholder="이메일"
+                  value={regForm.email}
+                  onChange={(e) => setRegForm({ ...regForm, email: e.target.value })}
+                  className="block w-full px-4 py-3 text-sm text-gray-900 placeholder-gray-400 border-b border-gray-300 focus:outline-none focus:ring-0"
+                />
+                <input
+                  type="password"
+                  required
+                  autoComplete="new-password"
+                  placeholder="비밀번호"
+                  value={regForm.password}
+                  onChange={(e) => setRegForm({ ...regForm, password: e.target.value })}
+                  className="block w-full px-4 py-3 text-sm text-gray-900 placeholder-gray-400 border-b border-gray-300 focus:outline-none focus:ring-0"
+                />
+                <input
+                  type="password"
+                  required
+                  autoComplete="new-password"
+                  placeholder="비밀번호 확인"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="block w-full px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-0"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-3 bg-gray-900 text-white text-sm font-semibold rounded-xl hover:bg-gray-800 transition-colors disabled:opacity-50"
+              >
+                {loading ? '가입 중...' : `${regForm.role} 계정 생성`}
+              </button>
+            </form>
+          )}
         </div>
 
         {/* 뒤로 가기 */}

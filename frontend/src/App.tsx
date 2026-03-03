@@ -7,7 +7,6 @@ import Layout from './components/Layout';
 import Login from './pages/Login';
 import AdminLoginPage from './pages/AdminLoginPage';
 import Register from './pages/Register';
-import StartPage from './pages/StartPage';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import OrderPage from './pages/OrderPage';
@@ -67,7 +66,7 @@ function App() {
           <Routes>
 
             {/* ── 공개 (인증 불필요) ── */}
-            <Route path="/"                   element={<StartPage />} />
+            <Route path="/"                   element={<Navigate to="/login" replace />} />
             <Route path="/login"              element={<Login />} />
             <Route path="/admin/login"        element={<AdminLoginPage />} />
             <Route path="/register"           element={<Register />} />

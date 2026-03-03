@@ -70,8 +70,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               {user && !isAdminOrManager && (
                 <nav className="flex space-x-1">
                   <Link to="/order"      className={navLinkClass('/order')}>주문하기</Link>
-                  <Link to="/categories" className={navLinkClass('/categories')}>카테고리</Link>
-                  <Link to="/tags"       className={navLinkClass('/tags')}>태그</Link>
                   <Link to="/games"      className={navLinkClass('/games')}>🎮 게임</Link>
                   <Link to="/viewer"     className={navLinkClass('/viewer')}>📖 뷰어</Link>
                 </nav>
