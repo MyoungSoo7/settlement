@@ -5,6 +5,8 @@ import github.lms.lemuel.product.application.port.out.LoadCategoryPort;
 import github.lms.lemuel.product.application.port.out.SaveCategoryPort;
 import github.lms.lemuel.product.domain.Category;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,6 +22,7 @@ public class CategoryService implements CategoryUseCase {
 
     @Override
     @Transactional
+    @CacheEvict(value = "categories", allEntries = true)
     public Category createCategory(String name, String description, Long parentId, Integer displayOrder) {
         Category category;
         if (parentId == null) {
@@ -37,27 +40,32 @@ public class CategoryService implements CategoryUseCase {
     }
 
     @Override
+    @Cacheable("categories")
     public List<Category> getAllCategories() {
         return loadCategoryPort.findAll();
     }
 
     @Override
+    @Cacheable(value = "categories", key = "'active'")
     public List<Category> getActiveCategories() {
         return loadCategoryPort.findActiveCategories();
     }
 
     @Override
+    @Cacheable(value = "categories", key = "'root'")
     public List<Category> getRootCategories() {
         return loadCategoryPort.findRootCategories();
     }
 
     @Override
+    @Cacheable(value = "categories", key = "'sub:' + #parentId")
     public List<Category> getSubCategories(Long parentId) {
         return loadCategoryPort.findSubCategories(parentId);
     }
 
     @Override
     @Transactional
+    @CacheEvict(value = "categories", allEntries = true)
     public Category updateCategory(Long id, String name, String description, Integer displayOrder) {
         Category category = getCategoryById(id);
         category.updateInfo(name, description);
@@ -69,6 +77,7 @@ public class CategoryService implements CategoryUseCase {
 
     @Override
     @Transactional
+    @CacheEvict(value = "categories", allEntries = true)
     public void activateCategory(Long id) {
         Category category = getCategoryById(id);
         category.activate();
@@ -77,6 +86,7 @@ public class CategoryService implements CategoryUseCase {
 
     @Override
     @Transactional
+    @CacheEvict(value = "categories", allEntries = true)
     public void deactivateCategory(Long id) {
         Category category = getCategoryById(id);
         category.deactivate();

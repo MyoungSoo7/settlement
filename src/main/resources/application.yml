@@ -29,6 +29,11 @@ spring:
     create-schemas: true
     validate-on-migrate: false
 
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=500,expireAfterWrite=600s
+
   data:
     elasticsearch:
       repositories:

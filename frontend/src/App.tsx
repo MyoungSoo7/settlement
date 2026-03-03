@@ -1,30 +1,36 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { authApi } from './api/auth';
 import { ToastProvider } from './contexts/ToastContext';
 import { CartProvider } from './contexts/CartContext';
 import Layout from './components/Layout';
+
+// 공개 페이지 (즉시 로드)
 import Login from './pages/Login';
 import AdminLoginPage from './pages/AdminLoginPage';
 import Register from './pages/Register';
-import ForgotPassword from './pages/ForgotPassword';
-import ResetPassword from './pages/ResetPassword';
-import OrderPage from './pages/OrderPage';
-import ProductPage from './pages/ProductPage';
-import SettlementDashboard from './pages/SettlementDashboardImproved';
-import SettlementAdmin from './pages/SettlementAdmin';
-import GamesPage from './pages/GamesPage';
-import GomokuGame from './pages/GomokuGame';
-import BadukGame from './pages/BadukGame';
-import ViewerPage from './pages/ViewerPage';
-import CategoryManagementPage from './pages/CategoryManagementPage';
-import TagManagementPage from './pages/TagManagementPage';
-import EcommerceCategoryAdmin from './pages/EcommerceCategoryAdmin';
-import TossPaymentSuccess from './pages/TossPaymentSuccess';
 import TossPaymentFail from './pages/TossPaymentFail';
-import CartPage from './pages/CartPage';
-import MyPage from './pages/MyPage';
-import AdminDashboardPage from './pages/AdminDashboardPage';
+
+// 인증 필요 페이지 (lazy load)
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const OrderPage = lazy(() => import('./pages/OrderPage'));
+const CartPage = lazy(() => import('./pages/CartPage'));
+const MyPage = lazy(() => import('./pages/MyPage'));
+const GamesPage = lazy(() => import('./pages/GamesPage'));
+const GomokuGame = lazy(() => import('./pages/GomokuGame'));
+const BadukGame = lazy(() => import('./pages/BadukGame'));
+const ViewerPage = lazy(() => import('./pages/ViewerPage'));
+const TossPaymentSuccess = lazy(() => import('./pages/TossPaymentSuccess'));
+
+// 관리자 페이지 (lazy load)
+const ProductPage = lazy(() => import('./pages/ProductPage'));
+const SettlementDashboard = lazy(() => import('./pages/SettlementDashboardImproved'));
+const SettlementAdmin = lazy(() => import('./pages/SettlementAdmin'));
+const CategoryManagementPage = lazy(() => import('./pages/CategoryManagementPage'));
+const TagManagementPage = lazy(() => import('./pages/TagManagementPage'));
+const EcommerceCategoryAdmin = lazy(() => import('./pages/EcommerceCategoryAdmin'));
+const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'));
 
 // ── 일반 사용자용 (인증 필수, 역할 무관) ──────────────────────────────────
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -63,6 +69,7 @@ function App() {
     <ToastProvider>
       <CartProvider>
         <BrowserRouter>
+          <Suspense fallback={<div className="flex justify-center items-center min-h-screen"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>}>
           <Routes>
 
             {/* ── 공개 (인증 불필요) ── */}
@@ -97,6 +104,7 @@ function App() {
               element={<AdminOnlyRoute><EcommerceCategoryAdmin /></AdminOnlyRoute>} />
 
           </Routes>
+          </Suspense>
         </BrowserRouter>
       </CartProvider>
     </ToastProvider>

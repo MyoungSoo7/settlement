@@ -7,6 +7,7 @@ import github.lms.lemuel.product.domain.ProductStatus;
 import github.lms.lemuel.product.domain.exception.ProductNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +22,7 @@ public class GetProductService implements GetProductUseCase {
     private final LoadProductPort loadProductPort;
 
     @Override
+    @Cacheable(value = "products", key = "#productId")
     public Product getProductById(Long productId) {
         log.info("상품 조회: productId={}", productId);
         return loadProductPort.findById(productId)
@@ -28,18 +30,21 @@ public class GetProductService implements GetProductUseCase {
     }
 
     @Override
+    @Cacheable(value = "products", key = "'all'")
     public List<Product> getAllProducts() {
         log.info("전체 상품 조회");
         return loadProductPort.findAll();
     }
 
     @Override
+    @Cacheable(value = "products", key = "'status:' + #status")
     public List<Product> getProductsByStatus(ProductStatus status) {
         log.info("상태별 상품 조회: status={}", status);
         return loadProductPort.findByStatus(status);
     }
 
     @Override
+    @Cacheable(value = "products", key = "'available'")
     public List<Product> getAvailableProducts() {
         log.info("판매 가능한 상품 조회");
         return loadProductPort.findAvailableProducts();

@@ -55,6 +55,10 @@ dependencies {
     // Mail
     implementation("org.springframework.boot:spring-boot-starter-mail")
 
+    // Cache (Caffeine)
+    implementation("org.springframework.boot:spring-boot-starter-cache")
+    implementation("com.github.ben-manes.caffeine:caffeine")
+
     // prometheus
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
 
