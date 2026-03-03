@@ -97,6 +97,8 @@ management:
         include: health,info,metrics,prometheus
       base-path: /actuator
   endpoint:
+    prometheus:
+      enabled: true
     health:
       show-details: always
       show-components: always

@@ -55,9 +55,7 @@ dependencies {
     // Mail
     implementation("org.springframework.boot:spring-boot-starter-mail")
 
-    developmentOnly("org.springframework.boot:spring-boot-devtools")
-
-    testImplementation("com.h2database:h2")
+    // prometheus
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
 
     // Lombok
@@ -71,7 +69,9 @@ dependencies {
     annotationProcessor("org.mapstruct:mapstruct-processor:1.6.3")
     annotationProcessor("org.projectlombok:lombok-mapstruct-binding:0.2.0")
 
-
+    // Test
+    developmentOnly("org.springframework.boot:spring-boot-devtools")
+    testImplementation("com.h2database:h2")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.security:spring-security-test")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")

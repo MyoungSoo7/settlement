@@ -83,7 +83,7 @@
 3. **정산 조정**: 회계 감사 추적
 4. **환불 누적 추적**: 실시간 환불 상태 관리
 
-자세한 내용은 [ARCHITECTURE.md](docs/ARCHITECTURE.md)를 참고하세요.
+자세한 내용은 [ARCHITECTURE.md](.idea/ARCHITECTURE.md)를 참고하세요.
 
 ## 📡 API 엔드포인트
 
@@ -123,8 +123,8 @@ GET /api/settlements/search?startDate=2026-01-01T00:00:00&endDate=2026-02-11T23:
 
 ## 📚 문서
 
-- **[SKILLS.md](docs/SKILLS.md)** - 기술 스택 및 기능 상세 설명
-- **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** - 시스템 아키텍처 및 설계
+- **[SKILLS.md](.idea/SKILLS.md)** - 기술 스택 및 기능 상세 설명
+- **[ARCHITECTURE.md](.idea/ARCHITECTURE.md)** - 시스템 아키텍처 및 설계
 - **[ETC.md](ETC.md)** - 설치 가이드 및 트러블슈팅
 
 ## 🚀 빠른 시작
