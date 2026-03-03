@@ -276,23 +276,7 @@ push / PR 트리거
 | 권한 모델 단순 | ADMIN/MANAGER/USER 3단계 → RBAC 세분화 |
 | 로그 수집 없음 | stdout만 사용 → ELK / Loki 도입 검토 |
 
----
+ 
 
-## 8. 종합 평가
 
-| 항목 | 평가 |
-|------|------|
-| 아키텍처 | 🟢 우수 — 헥사고날 구조 명확 |
-| 도메인 모델 | 🟢 우수 — 비즈니스 로직 분리 |
-| DB 관리 | 🟢 좋음 — Flyway V21까지 버전 관리 |
-| API 설계 | 🟢 좋음 — RESTful 원칙 준수 |
-| CI/CD | 🟢 좋음 — 변경 감지 병렬 빌드, 코드 품질 관리 |
-| 보안 | 🟡 보통 — JWT 기본, Refresh Token 없음 |
-| 테스트 | 🔴 부족 — 프론트 테스트 미실행 |
-| 모니터링 | 🟡 보통 — Prometheus/Grafana 있으나 Alert 미설정 |
 
-### 권장 개선 순서
-
-1. **Phase 1** — Game 도메인 완성 + 프론트 테스트 활성화
-2. **Phase 2** — Redis 캐싱 + Refresh Token + 권한 모델 개선
-3. **Phase 3** — WebSocket 실시간 기능 + 모니터링 고도화 (ELK / Alert)
