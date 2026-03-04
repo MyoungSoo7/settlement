@@ -71,9 +71,9 @@ services:
 
       JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
 
-      # management.server.port=8088(별도 서버)이면 ManagementWebSecurityAutoConfiguration이 백오프되어
-      # 관리 포트에서 Spring Security 기본값(모두 인증 필요)이 적용 → /actuator/health 403 발생.
-      # 메인 포트와 동일하게 설정하면 단일 서버로 합쳐져 SecurityConfig의 permitAll()이 적용됨.
+      # server.port=8080으로 설정하고 management도 동일한 8080 사용 → 단일 서버로 통합
+      # SecurityConfig의 permitAll()이 actuator에도 적용됨
+      SERVER_PORT: 8080
       MANAGEMENT_SERVER_PORT: 8080
 
       LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY: DEBUG
