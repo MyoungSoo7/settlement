@@ -14,6 +14,12 @@ RUN npm ci
 # Copy source code
 COPY . .
 
+# Build-time env vars (override .env.production)
+ARG VITE_API_BASE_URL
+ARG VITE_TOSS_CLIENT_KEY
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+ENV VITE_TOSS_CLIENT_KEY=$VITE_TOSS_CLIENT_KEY
+
 # Build for production
 RUN npm run build
 
