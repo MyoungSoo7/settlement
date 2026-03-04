@@ -240,6 +240,9 @@ jobs:
       - name: Build production bundle
         working-directory: frontend
         run: npm run build
+        env:
+          API_BASE_URL: ${{ vars.VITE_API_BASE_URL || 'http://localhost:8089' }}
+          TOSS_CLIENT_KEY: ${{ secrets.VITE_TOSS_CLIENT_KEY || 'test_ck_D5GePWvyJnrK0W0k6q8gLzN97Eoq' }}
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -334,6 +337,9 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VITE_API_BASE_URL=${{ vars.VITE_API_BASE_URL || 'http://localhost:8089' }}
+            VITE_TOSS_CLIENT_KEY=${{ secrets.VITE_TOSS_CLIENT_KEY || 'test_ck_D5GePWvyJnrK0W0k6q8gLzN97Eoq' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64
