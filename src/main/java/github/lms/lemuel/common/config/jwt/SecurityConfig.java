@@ -101,8 +101,6 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // CORS Preflight 허용
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        // 루트 및 에러 경로
-                        .requestMatchers("/", "/error").permitAll()
                         // 인증 불필요 (Public endpoints)
                         .requestMatchers(HttpMethod.POST, "/users").permitAll()               // 회원가입
                         .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()          // 로그인
