@@ -1,0 +1,1 @@
+import{a as e}from"./index-ysfsb0dm.js";const p={validate:async(s,a,o)=>(await e.get(`/coupons/${s}/validate`,{params:{userId:a,amount:o}})).data,use:async(s,a,o)=>{await e.post(`/coupons/${s}/use`,{userId:a,orderId:o})},getAll:async()=>(await e.get("/coupons")).data,create:async s=>(await e.post("/coupons",s)).data};export{p as c};

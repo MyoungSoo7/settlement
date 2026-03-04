@@ -2,7 +2,9 @@ services:
   postgres:
     image: postgres:17-alpine
     container_name: lemuel-postgres
-    env_file: [ .env ]
+    env_file:
+      - path: .env
+        required: false
     environment:
       POSTGRES_DB: inter
       POSTGRES_USER: ${POSTGRES_USER}
@@ -22,7 +24,9 @@ services:
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.17.0
     container_name: lemuel-elasticsearch
-    env_file: [ .env ]
+    env_file:
+      - path: .env
+        required: false
     environment:
       discovery.type: single-node
       xpack.security.enabled: "true"
@@ -47,7 +51,9 @@ services:
     build: .
     image: ghcr.io/myoungsoo7/settlement:latest
     container_name: lemuel-app
-    env_file: [ .env ]
+    env_file:
+      - path: .env
+        required: false
     environment:
       SPRING_PROFILES_ACTIVE: prod
 
