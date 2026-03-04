@@ -1,5 +1,6 @@
 package github.lms.lemuel.common.config.jwt;
 
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -31,6 +32,9 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
+
+
+
     /**
      * CORS 설정
      * React 프론트엔드(localhost:3000)와의 통신을 허용합니다.
@@ -41,6 +45,7 @@ public class SecurityConfig {
 
         // 허용할 Origin (React 개발 서버)
         configuration.setAllowedOrigins(Arrays.asList(
+                "http://localhost:8089",
                 "http://localhost:3000",
                 "http://localhost:5173",  // Vite 기본 포트
                 "http://127.0.0.1:3000",
@@ -93,20 +98,20 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 // 요청별 인증 설정
                 .authorizeHttpRequests(auth -> auth
+                        // CORS Preflight 허용
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         // 인증 불필요 (Public endpoints)
                         .requestMatchers(HttpMethod.POST, "/users").permitAll()               // 회원가입
                         .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()          // 로그인
                         .requestMatchers(HttpMethod.POST, "/users/password-reset/**").permitAll()  // 비밀번호 재설정
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                         // Actuator: 헬스체크 프로브만 공개, 메트릭/prometheus는 인증 필요
-                        .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
-                        .requestMatchers("/actuator/**").hasRole("ADMIN")
+                        .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
                         .requestMatchers("/games/**").permitAll()
                         // 공개 카테고리 API
                         .requestMatchers(HttpMethod.GET, "/categories", "/categories/**").permitAll()
                         // 쿠폰 관련 API
                         .requestMatchers(HttpMethod.GET, "/coupons", "/coupons/**").hasAnyRole("ADMIN", "MANAGER")
-                        .requestMatchers(HttpMethod.POST, "/coupons").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/coupons/*/use").hasAnyRole("ADMIN", "MANAGER", "USER")
                         // 전체 주문/사용자 조회 (관리자·매니저)
                         .requestMatchers("/orders/admin/all").hasAnyRole("ADMIN", "MANAGER")
@@ -118,6 +123,13 @@ public class SecurityConfig {
                         .requestMatchers("/api/settlements/**").hasAnyRole("ADMIN", "MANAGER")
                         // 나머지는 인증 필요
                         .anyRequest().authenticated()
+                )
+                // 미인증 요청 → 401, 권한 부족 → 403
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint((request, response, e) ->
+                                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized"))
+                        .accessDeniedHandler((request, response, e) ->
+                                response.sendError(HttpServletResponse.SC_FORBIDDEN, "Forbidden"))
                 )
                 // JWT 필터 추가
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
