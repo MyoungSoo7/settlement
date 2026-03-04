@@ -3,6 +3,6 @@ POST http://localhost:8089/auth/login
 Content-Type: application/json
 
 {
-  "email": "iamipr@naver.com",
-  "password": "dlaaudtn1!"
+  "email": "test@naver.com",
+  "password": "test1234QWER"
 }
