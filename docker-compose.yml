@@ -63,12 +63,22 @@ services:
       JWT_TTL_SECONDS: ${JWT_TTL_SECONDS}
 
       JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
+
+      # management.server.port=8088(별도 서버)이면 ManagementWebSecurityAutoConfiguration이 백오프되어
+      # 관리 포트에서 Spring Security 기본값(모두 인증 필요)이 적용 → /actuator/health 403 발생.
+      # 메인 포트와 동일하게 설정하면 단일 서버로 합쳐져 SecurityConfig의 permitAll()이 적용됨.
+      MANAGEMENT_SERVER_PORT: 8080
+
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY: DEBUG
     ports:
       - "127.0.0.1:8089:8080"
-      - "127.0.0.1:8089:8080"
-      - "127.0.0.1:8088:8088"
-      - "127.0.0.1:8088:8080"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
     depends_on:
       postgres:
         condition: service_healthy
@@ -87,3 +97,5 @@ services:
 volumes:
   postgres-data:
   elasticsearch-data:
+
+
