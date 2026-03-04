@@ -44,6 +44,7 @@ services:
       retries: 20
 
   app:
+    build: .
     image: ghcr.io/myoungsoo7/settlement:latest
     container_name: lemuel-app
     env_file: [ .env ]
