@@ -49,6 +49,7 @@ public class SecurityConfig {
                 "http://localhost:3000",
                 "http://localhost:5173",  // Vite 기본 포트
                 "http://127.0.0.1:3000",
+                "http://127.0.0.1:8089",
                 "http://127.0.0.1:5173"
         ));
 
@@ -100,6 +101,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // CORS Preflight 허용
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        // 루트 및 에러 경로
+                        .requestMatchers("/", "/error").permitAll()
                         // 인증 불필요 (Public endpoints)
                         .requestMatchers(HttpMethod.POST, "/users").permitAll()               // 회원가입
                         .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()          // 로그인
