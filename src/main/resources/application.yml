@@ -121,7 +121,7 @@ management:
     db:
       enabled: true  # PostgreSQL Health Check
   server:
-    port: 8088  # 로컬 dev: 메인(8080)과 분리. Docker: MANAGEMENT_SERVER_PORT=8080으로 오버라이드하여 단일 포트로 통합
+    port: 8089  # 로컬 dev: 메인(8080)과 분리. Docker: MANAGEMENT_SERVER_PORT=8080으로 오버라이드하여 단일 포트로 통합
   metrics:
     distribution:
       percentiles-histogram:
