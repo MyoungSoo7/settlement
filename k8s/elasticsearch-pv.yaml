@@ -78,12 +78,13 @@ spec:
             - name: ES_JAVA_OPTS
               value: "-Xms1g -Xmx1g"  # 힙 메모리 설정
             - name: xpack.security.enabled
-              value: "false"  # 개발 환경에서는 비활성화 (운영에서는 활성화 권장)
-            - name: ELASTIC_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: lemuel-secret
-                  key: ELASTICSEARCH_PASSWORD
+              value: "false"  # 개발 환경에서는 비활성화 (운영에서는 "true"로 변경 + ELASTIC_PASSWORD 주석 해제)
+            # xpack.security.enabled: "true" 로 변경 시 아래 주석 해제
+            # - name: ELASTIC_PASSWORD
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: lemuel-secret
+            #       key: ELASTICSEARCH_PASSWORD
           volumeMounts:
             - name: elasticsearch-storage
               mountPath: /usr/share/elasticsearch/data

@@ -1,0 +1,42 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: lemuel
+  namespace: argocd
+  # App of Apps 패턴 사용 시 finalizer 추가 권장
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/MyoungSoo7/settlement
+    targetRevision: main  # main 브랜치 추적
+    path: k8s            # 레포 루트 기준 k8s 디렉토리
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: lemuel
+
+  syncPolicy:
+    automated:
+      prune: true       # Git에서 제거된 리소스 자동 삭제
+      selfHeal: true    # 클러스터 상태가 Git과 달라지면 자동 복구
+    syncOptions:
+      - CreateNamespace=true           # lemuel 네임스페이스 없으면 자동 생성
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true                 # 삭제는 마지막에 (안전한 순서 보장)
+      - ServerSideApply=true           # 대용량 리소스(CRD) 적용 시 필요
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  # 리소스 상태 무시 설정 (ArgoCD가 자동 변경되는 필드로 인해 항상 OutOfSync 뜨는 것 방지)
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas  # HPA가 있을 경우 replicas 변경 무시

@@ -17,9 +17,11 @@ spec:
       template:
         spec:
           restartPolicy: Never
+          imagePullSecrets:
+            - name: ghcr-secret
           containers:
             - name: settlement-batch
-              image: ghcr.io/your-org/lemuel:latest
+              image: ghcr.io/myoungsoo7/settlement:latest
               command:
                 - java
                 - -jar
@@ -60,9 +62,11 @@ spec:
       template:
         spec:
           restartPolicy: Never
+          imagePullSecrets:
+            - name: ghcr-secret
           containers:
             - name: settlement-confirm-batch
-              image: ghcr.io/your-org/lemuel:latest
+              image: ghcr.io/myoungsoo7/settlement:latest
               command:
                 - java
                 - -jar

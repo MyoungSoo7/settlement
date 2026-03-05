@@ -7,12 +7,12 @@ metadata:
     app: lemuel
     tier: backend
 spec:
-  replicas: 3  # High Availability: 3개의 Pod 실행
+  replicas: 1  # 단일 노드 환경: 1개 Pod (멀티 노드 시 3으로 조정)
   strategy:
     type: RollingUpdate
     rollingUpdate:
       maxSurge: 1        # 업데이트 시 최대 1개 추가 Pod 생성 가능
-      maxUnavailable: 1  # 업데이트 시 최대 1개 Pod 중단 가능
+      maxUnavailable: 0  # replicas=1 환경에서 무중단 배포 (신규 Pod 먼저 기동 후 구 Pod 종료)
   selector:
     matchLabels:
       app: lemuel
@@ -42,7 +42,7 @@ spec:
 
       containers:
         - name: lemuel
-          image: ghcr.io/your-org/lemuel:latest  # GitHub Actions에서 빌드된 이미지
+          image: ghcr.io/myoungsoo7/settlement:latest  # GitHub Actions에서 빌드된 이미지
           imagePullPolicy: Always
 
           ports:
@@ -56,21 +56,6 @@ spec:
                 name: lemuel-config
             - secretRef:
                 name: lemuel-secret
-
-          # Additional Environment Variables
-          env:
-            - name: SPRING_DATASOURCE_URL
-              value: "jdbc:postgresql://postgresql-service:5432/inter"
-            - name: SPRING_DATASOURCE_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: lemuel-secret
-                  key: POSTGRES_USER
-            - name: SPRING_DATASOURCE_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: lemuel-secret
-                  key: POSTGRES_PASSWORD
 
           # Resource Limits and Requests
           resources:
@@ -120,5 +105,5 @@ spec:
           emptyDir: {}
 
       # Image Pull Secrets (Private Registry 사용 시)
-      # imagePullSecrets:
-      #   - name: ghcr-secret
+      imagePullSecrets:
+        - name: ghcr-secret  # ghcr-secret는 클러스터에 만들어야 함.

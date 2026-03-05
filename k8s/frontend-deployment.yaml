@@ -27,7 +27,7 @@ spec:
 
       containers:
         - name: frontend
-          image: ghcr.io/your-org/lemuel-frontend:latest
+          image: ghcr.io/myoungsoo7/settlement-frontend:latest
           imagePullPolicy: Always
 
           ports:
@@ -51,10 +51,10 @@ spec:
               memory: "256Mi"
               cpu: "200m"
 
-          # Liveness Probe
+          # Liveness Probe (nginx 기본 이미지는 /health 없음 → / 사용)
           livenessProbe:
             httpGet:
-              path: /health
+              path: /
               port: 80
             initialDelaySeconds: 10
             periodSeconds: 10
@@ -64,7 +64,7 @@ spec:
           # Readiness Probe
           readinessProbe:
             httpGet:
-              path: /health
+              path: /
               port: 80
             initialDelaySeconds: 5
             periodSeconds: 5
@@ -74,11 +74,15 @@ spec:
           # Startup Probe
           startupProbe:
             httpGet:
-              path: /health
+              path: /
               port: 80
             initialDelaySeconds: 0
             periodSeconds: 5
             failureThreshold: 12  # 최대 60초 대기
+
+      # Image Pull Secrets (GHCR Private Registry)
+      imagePullSecrets:
+        - name: ghcr-secret
 ---
 apiVersion: v1
 kind: Service
