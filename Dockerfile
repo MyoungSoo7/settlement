@@ -22,7 +22,6 @@ COPY src ./src
 RUN --mount=type=cache,target=/home/gradle/.gradle \
     gradle --no-daemon bootJar -x test
 
-
 ############################
 # Stage 2: Runtime
 ############################
