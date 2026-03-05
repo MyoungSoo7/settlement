@@ -276,7 +276,10 @@ push / PR 트리거
 | 권한 모델 단순 | ADMIN/MANAGER/USER 3단계 → RBAC 세분화 |
 | 로그 수집 없음 | stdout만 사용 → ELK / Loki 도입 검토 |
 
- 
 
 
+## ⚖️ License & Open Source
+This project is licensed under the **AGPL-3.0** (due to iText 8 dependency).
+- **iText 8**: Used for PDF generation (Licensed under AGPL).
+- **Ghostscript**: Used for PDF rendering and compression (External CLI tool).
 
