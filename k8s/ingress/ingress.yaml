@@ -40,11 +40,9 @@ spec:
   rules:
     # 운영 시 실제 도메인으로 변경 (예: myservice.com)
     # 로컬 테스트 시: /etc/hosts 에 "<서버IP> lemuel.local" 추가
-    - host: lemuel.local
-      http:
+    - http:
         paths:
           # --- 백엔드 API 경로 (우선순위 높음) ---
-
           # REST API 전체 (가장 많이 쓰이는 진입점)
           - path: /api
             pathType: Prefix
