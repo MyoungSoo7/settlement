@@ -43,7 +43,6 @@ spec:
     - http:
         paths:
           # --- 백엔드 API 경로 (우선순위 높음) ---
-
           # REST API 전체 (가장 많이 쓰이는 진입점)
           - path: /api
             pathType: Prefix
