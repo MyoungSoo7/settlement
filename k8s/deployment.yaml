@@ -1,3 +1,16 @@
+# ============================================================
+# deployment.yaml
+# 역할: Spring Boot 백엔드 애플리케이션 Pod를 실행하고 관리한다.
+#
+# Deployment는 "이 컨테이너를 N개 항상 실행해라"는 선언이다.
+# Pod가 죽으면 자동으로 재시작하고,
+# 새 이미지로 업데이트할 때 무중단 RollingUpdate를 수행한다.
+#
+# 연관 리소스:
+#   - ConfigMap: lemuel-config (비밀 아닌 환경변수)
+#   - Secret: lemuel-secret (비밀번호·토큰, SealedSecret으로 생성됨)
+#   - Service: lemuel-service (이 Pod로 트래픽을 전달)
+# ============================================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -7,11 +20,13 @@ metadata:
     app: lemuel
     tier: backend
 spec:
-  replicas: 1  # 단일 노드 환경: 1개 Pod (멀티 노드 시 3으로 조정)
+  # 단일 노드 환경: 1개 Pod (멀티 노드 시 3으로 조정)
+  replicas: 1
+  # 배포 전략: 새 Pod가 준비된 후 구 Pod 종료 (무중단)
   strategy:
     type: RollingUpdate
     rollingUpdate:
-      maxSurge: 1        # 업데이트 시 최대 1개 추가 Pod 생성 가능
+      maxSurge: 1        # 업데이트 중 최대 1개 추가 Pod 생성
       maxUnavailable: 0  # replicas=1 환경에서 무중단 배포 (신규 Pod 먼저 기동 후 구 Pod 종료)
   selector:
     matchLabels:
@@ -23,7 +38,7 @@ spec:
         app: lemuel
         tier: backend
     spec:
-      # Pod Anti-Affinity: 같은 노드에 배포되지 않도록 (단일 노드에서는 무시됨)
+      # Pod Anti-Affinity: 가능하면 서로 다른 노드에 Pod를 배치 (단일 노드에서는 무시됨)
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -37,73 +52,77 @@ spec:
                         - lemuel
                 topologyKey: kubernetes.io/hostname
 
-      # Graceful Shutdown을 위한 종료 유예 시간
+      # SIGTERM 수신 후 최대 60초 동안 진행 중인 요청 처리 후 종료
       terminationGracePeriodSeconds: 60
 
       containers:
         - name: lemuel
-          image: ghcr.io/myoungsoo7/settlement:latest  # GitHub Actions에서 빌드된 이미지
-          imagePullPolicy: Always
+          # GitHub Actions가 빌드해서 GHCR에 push한 이미지
+          image: ghcr.io/myoungsoo7/settlement:latest
+          imagePullPolicy: Always  # 항상 최신 이미지 pull (latest 태그 사용 시 필요)
 
           ports:
             - name: http
               containerPort: 8080
               protocol: TCP
 
-          # Environment Variables from ConfigMap
+          # ConfigMap과 Secret의 모든 키를 환경변수로 주입
           envFrom:
             - configMapRef:
-                name: lemuel-config
+                name: lemuel-config   # 비밀 아닌 설정값
             - secretRef:
-                name: lemuel-secret
+                name: lemuel-secret   # 비밀번호·토큰 (SealedSecret이 생성한 Secret)
 
-          # Resource Limits and Requests
+          # 리소스 제한: requests=스케줄링 기준, limits=최대 사용량
           resources:
             requests:
-              memory: "512Mi"   # 최소 메모리
-              cpu: "250m"       # 최소 CPU (0.25 core)
+              memory: "512Mi"
+              cpu: "250m"       # 0.25 core
             limits:
-              memory: "2Gi"     # 최대 메모리
-              cpu: "1000m"      # 최대 CPU (1 core)
+              memory: "2Gi"
+              cpu: "1000m"      # 1 core
 
-          # Liveness Probe: 컨테이너가 살아있는지 확인
-          livenessProbe:
-            httpGet:
-              path: /actuator/health/liveness
-              port: 8080
-            initialDelaySeconds: 90   # 시작 후 90초 대기
-            periodSeconds: 10         # 10초마다 체크
-            timeoutSeconds: 5         # 5초 타임아웃
-            failureThreshold: 3       # 3번 실패 시 재시작
-
-          # Readiness Probe: 트래픽을 받을 준비가 되었는지 확인
-          readinessProbe:
-            httpGet:
-              path: /actuator/health/readiness
-              port: 8080
-            initialDelaySeconds: 60   # 시작 후 60초 대기
-            periodSeconds: 5          # 5초마다 체크
-            timeoutSeconds: 3         # 3초 타임아웃
-            failureThreshold: 3       # 3번 실패 시 트래픽 차단
-
-          # Startup Probe: 초기 시작 시간이 오래 걸리는 경우
+          # Startup Probe: 앱 최초 기동 완료까지 대기 (최대 300초)
+          # 이 probe가 성공해야 liveness/readiness probe가 시작된다
           startupProbe:
             httpGet:
               path: /actuator/health/liveness
               port: 8080
             initialDelaySeconds: 0
             periodSeconds: 10
-            failureThreshold: 30      # 최대 300초(5분) 대기
+            failureThreshold: 30  # 10초 × 30 = 최대 300초 대기
 
-          # Volume Mounts (필요한 경우)
+          # Liveness Probe: 앱이 정상 동작 중인지 확인. 실패 시 Pod 재시작
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8080
+            initialDelaySeconds: 90
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          # Readiness Probe: 트래픽을 받을 준비가 됐는지 확인. 실패 시 Service에서 제외
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          # 로그 파일 저장용 임시 볼륨 마운트
           volumeMounts:
             - name: logs
               mountPath: /app/logs
 
       volumes:
+        # emptyDir: Pod 생애주기와 같은 임시 디렉토리 (Pod 재시작 시 초기화)
         - name: logs
           emptyDir: {}
 
-      # Image Pull Secrets (Private Registry 사용 시)
+      # GHCR(GitHub Container Registry) private 이미지 pull을 위한 인증 정보
+      # kubectl create secret docker-registry ghcr-secret ... 으로 사전 생성 필요
       imagePullSecrets:
-        - name: ghcr-secret  # ghcr-secret는 클러스터에 만들어야 함.
+        - name: ghcr-secret

@@ -1,34 +1,51 @@
-# Ingress를 사용하려면 Ingress Controller가 필요합니다.
-# 단일 노드 환경에서는 NGINX Ingress Controller 설치 권장:
-# kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.1/deploy/static/provider/baremetal/deploy.yaml
-
+# ============================================================
+# ingress.yaml
+# 역할: 도메인 기반 HTTP 라우팅 규칙을 정의한다.
+#
+# Ingress는 "어떤 URL 경로를 어떤 Service로 보낼지"를 정의하는 규칙이다.
+# 실제로 트래픽을 처리하는 것은 NGINX Ingress Controller (별도 설치 필요).
+#
+# 라우팅 규칙 (우선순위 순):
+#   /api, /auth, /orders, /payments, /refunds  → lemuel-service (Spring Boot :8080)
+#   /actuator, /swagger-ui, /v3/api-docs       → lemuel-service (Spring Boot :8080)
+#   /                                          → lemuel-frontend-service (Nginx :80)
+#
+# 설치 필요:
+#   kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/
+#     controller-v1.8.1/deploy/static/provider/baremetal/deploy.yaml
+# ============================================================
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: lemuel-ingress
   namespace: lemuel
   annotations:
+    # HTTP → HTTPS 자동 리다이렉트 (TLS 설정 전까지 false)
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
-    # CORS 설정
+    # CORS 설정 (프론트엔드가 다른 포트/도메인에서 API 호출할 때 필요)
     nginx.ingress.kubernetes.io/enable-cors: "true"
     nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, PATCH, DELETE, OPTIONS"
     nginx.ingress.kubernetes.io/cors-allow-headers: "Authorization, Content-Type, X-Requested-With, Idempotency-Key"
     nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
-    # Rate Limiting (Optional)
+    # Rate Limiting: 초당 최대 100 요청
     nginx.ingress.kubernetes.io/limit-rps: "100"
-    # Connection Timeout
+    # 타임아웃 설정 (초)
     nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
-    # Body Size Limit
+    # 요청 바디 최대 크기 (파일 업로드 등)
     nginx.ingress.kubernetes.io/proxy-body-size: "10m"
 spec:
-  ingressClassName: nginx
+  ingressClassName: nginx  # NGINX Ingress Controller 사용
   rules:
-    - host: lemuel.local  # /etc/hosts에 추가: <서버IP> lemuel.local
+    # 운영 시 실제 도메인으로 변경 (예: myservice.com)
+    # 로컬 테스트 시: /etc/hosts 에 "<서버IP> lemuel.local" 추가
+    - host: lemuel.local
       http:
         paths:
-          # 백엔드 API 라우팅 (우선순위 높음)
+          # --- 백엔드 API 경로 (우선순위 높음) ---
+
+          # REST API 전체 (가장 많이 쓰이는 진입점)
           - path: /api
             pathType: Prefix
             backend:
@@ -37,7 +54,7 @@ spec:
                 port:
                   number: 8080
 
-          # 인증 API
+          # 로그인/회원가입 등 인증 API
           - path: /auth
             pathType: Prefix
             backend:
@@ -46,7 +63,7 @@ spec:
                 port:
                   number: 8080
 
-          # 주문/결제/환불 API
+          # 주문 API
           - path: /orders
             pathType: Prefix
             backend:
@@ -55,6 +72,7 @@ spec:
                 port:
                   number: 8080
 
+          # 결제 API
           - path: /payments
             pathType: Prefix
             backend:
@@ -63,6 +81,7 @@ spec:
                 port:
                   number: 8080
 
+          # 환불 API
           - path: /refunds
             pathType: Prefix
             backend:
@@ -71,7 +90,7 @@ spec:
                 port:
                   number: 8080
 
-          # Actuator (관리 엔드포인트)
+          # Spring Boot Actuator (헬스체크, 메트릭 등 관리 엔드포인트)
           - path: /actuator
             pathType: Prefix
             backend:
@@ -80,7 +99,7 @@ spec:
                 port:
                   number: 8080
 
-          # Swagger UI
+          # Swagger UI (API 문서 UI)
           - path: /swagger-ui
             pathType: Prefix
             backend:
@@ -89,6 +108,7 @@ spec:
                 port:
                   number: 8080
 
+          # OpenAPI 스펙 JSON (Swagger가 이 경로에서 API 명세를 가져옴)
           - path: /v3/api-docs
             pathType: Prefix
             backend:
@@ -97,7 +117,9 @@ spec:
                 port:
                   number: 8080
 
-          # 프론트엔드 (React SPA - 가장 낮은 우선순위)
+          # --- 프론트엔드 (React SPA) ---
+          # 가장 마지막에 위치해야 다른 경로 규칙이 먼저 매칭됨
+          # React Router 사용 시 모든 경로를 index.html로 응답해야 SPA 라우팅 동작
           - path: /
             pathType: Prefix
             backend:
@@ -106,8 +128,8 @@ spec:
                 port:
                   number: 80
 
-  # TLS 설정 (Let's Encrypt + cert-manager 사용 권장)
+  # TLS(HTTPS) 설정 - 운영 시 cert-manager + Let's Encrypt 사용 권장
   # tls:
   #   - hosts:
   #       - lemuel.local
-  #     secretName: lemuel-tls
+  #     secretName: lemuel-tls  # cert-manager가 자동 생성하는 인증서 Secret

@@ -1,5 +1,73 @@
 # Kubernetes + ArgoCD GitOps 배포 가이드
 
+## k8s 파일별 역할 요약
+
+Kubernetes는 선언형(declarative) 시스템이다. YAML 파일에 "원하는 상태"를 선언하면
+클러스터가 그 상태를 유지해준다.
+
+```
+k8s/
+├── namespace.yaml          # 프로젝트 전용 격리 공간 생성
+├── configmap.yaml          # 비밀 아닌 설정값 (DB 호스트, 포트 등)
+├── sealed-secret.yaml      # 암호화된 민감 정보 (비밀번호, JWT 등)
+├── deployment.yaml         # Spring Boot 백엔드 Pod 실행 및 관리
+├── frontend-deployment.yaml # React/Nginx 프론트엔드 Pod + Service
+├── service.yaml            # 백엔드를 외부/Ingress에서 접근 가능하게 노출
+├── ingress.yaml            # URL 경로별 라우팅 규칙 (Nginx Ingress Controller)
+├── postgresql-pv.yaml      # PostgreSQL 스토리지 + StatefulSet + Service
+├── elasticsearch-pv.yaml   # Elasticsearch 스토리지 + StatefulSet + Service
+├── batch-cronjob.yaml      # 정산 배치 스케줄 (매일 01:00, 02:00)
+└── argocd-app.yaml         # ArgoCD GitOps 자동 배포 등록
+```
+
+### 핵심 개념 한눈에 보기
+
+| 리소스 | 역할 | 비유 |
+|--------|------|------|
+| **Namespace** | 프로젝트 격리 공간 | 폴더 |
+| **ConfigMap** | 비밀 아닌 환경변수 묶음 | .env 파일 |
+| **SealedSecret** | 암호화된 환경변수 묶음 | 암호화된 .env 파일 |
+| **Deployment** | 앱 Pod를 N개 유지, 무중단 업데이트 | 앱 실행 설정서 |
+| **StatefulSet** | DB처럼 상태 있는 Pod 실행 (이름 고정) | DB 실행 설정서 |
+| **Service** | Pod 여러 개를 하나의 주소로 묶음 | 내부 로드밸런서 |
+| **Ingress** | 도메인/경로 기반 HTTP 라우팅 | Nginx 리버스 프록시 |
+| **PV / PVC** | 디스크 공간 정의 / 사용 신청 | 하드디스크 / 마운트 |
+| **CronJob** | 주기적 Job 실행 (crontab) | 배치 스케줄러 |
+
+### 트래픽 흐름
+
+```
+사용자 브라우저
+    │
+    ▼
+<서버IP>:80 (NGINX Ingress Controller)
+    │
+    ├── /api/*, /auth/*, /orders/* 등  ──→  lemuel-service:8080  ──→  Spring Boot Pod
+    │
+    └── /*  ──────────────────────────────→  lemuel-frontend-service:80  ──→  Nginx Pod
+                                                                                │
+                                                                    React 정적 파일 응답
+```
+
+### 리소스 의존 관계 (적용 순서)
+
+```
+namespace.yaml
+    └── sealed-secret.yaml (lemuel-secret 생성)
+    └── configmap.yaml (lemuel-config 생성)
+        └── postgresql-pv.yaml (PV → PVC → StatefulSet → Service)
+        └── elasticsearch-pv.yaml (PV → PVC → StatefulSet → Service)
+            └── deployment.yaml (lemuel-secret + lemuel-config 참조)
+            └── frontend-deployment.yaml
+                └── service.yaml
+                └── ingress.yaml (lemuel-service + lemuel-frontend-service 참조)
+                └── batch-cronjob.yaml (lemuel-secret + lemuel-config 참조)
+
+argocd-app.yaml  ← ArgoCD 설치 후 별도로 한 번만 적용
+```
+
+---
+
 ## 아키텍처 개요
 
 ```

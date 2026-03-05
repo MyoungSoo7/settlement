@@ -1,4 +1,22 @@
-# PostgreSQL Persistent Volume - 우분투 로컬 디렉토리 연결
+# ============================================================
+# postgresql-pv.yaml
+# 역할: PostgreSQL 데이터베이스의 영구 저장소와 실행 환경을 정의한다.
+#
+# 이 파일은 3개의 리소스를 포함한다:
+#   1. PersistentVolume (PV)    - 실제 디스크 공간 (우분투 서버의 /data/k8s/postgresql)
+#   2. PersistentVolumeClaim (PVC) - PV를 요청하는 "사용 신청서"
+#   3. StatefulSet              - PostgreSQL 컨테이너 실행 (순서 보장, 고정 이름)
+#   4. Service (ClusterIP)      - 다른 Pod에서 postgresql-service:5432 로 접근
+#
+# StatefulSet vs Deployment:
+#   DB처럼 상태(데이터)를 가진 앱은 StatefulSet으로 실행한다.
+#   Pod 이름이 고정되고(postgresql-0), 순서대로 기동/종료된다.
+#
+# 사전 준비 (우분투 서버):
+#   sudo mkdir -p /data/k8s/postgresql
+# ============================================================
+
+# --- 1. PersistentVolume: 실제 디스크 공간 정의 ---
 apiVersion: v1
 kind: PersistentVolume
 metadata:
@@ -7,16 +25,17 @@ metadata:
     type: local
     app: postgresql
 spec:
-  storageClassName: manual
+  storageClassName: manual  # PVC와 같은 이름으로 맞춰야 바인딩됨
   capacity:
-    storage: 20Gi  # 20GB 할당
+    storage: 20Gi
   accessModes:
-    - ReadWriteOnce  # 단일 노드에서만 쓰기 가능
-  persistentVolumeReclaimPolicy: Retain  # PVC 삭제 시 데이터 보존
+    - ReadWriteOnce  # 한 번에 하나의 노드에서만 마운트 가능 (단일 노드에 적합)
+  persistentVolumeReclaimPolicy: Retain  # PVC 삭제해도 데이터 보존 (실수 방지)
   hostPath:
     path: "/data/k8s/postgresql"  # 우분투 서버의 실제 경로
-    type: DirectoryOrCreate
+    type: DirectoryOrCreate       # 없으면 자동 생성
 ---
+# --- 2. PersistentVolumeClaim: Pod가 스토리지를 요청하는 신청서 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -31,17 +50,17 @@ spec:
       storage: 20Gi
   selector:
     matchLabels:
-      app: postgresql
+      app: postgresql  # 위에서 정의한 PV와 매칭
 ---
-# PostgreSQL StatefulSet (또는 Deployment)
+# --- 3. StatefulSet: PostgreSQL 컨테이너 실행 ---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: postgresql
   namespace: lemuel
 spec:
-  serviceName: "postgresql-service"
-  replicas: 1  # 단일 노드이므로 1개만 실행
+  serviceName: "postgresql-service"  # Headless Service와 연결 (StatefulSet 필수)
+  replicas: 1
   selector:
     matchLabels:
       app: postgresql
@@ -57,8 +76,10 @@ spec:
             - containerPort: 5432
               name: postgres
           env:
+            # DB 이름 (ConfigMap의 POSTGRES_DB와 일치)
             - name: POSTGRES_DB
               value: "opslab"
+            # 유저/비밀번호는 SealedSecret으로 생성된 Secret에서 가져옴
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
@@ -69,6 +90,7 @@ spec:
                 secretKeyRef:
                   name: lemuel-secret
                   key: POSTGRES_PASSWORD
+            # 데이터 저장 경로 (마운트 경로 하위에 pgdata 디렉토리 사용)
             - name: PGDATA
               value: /var/lib/postgresql/data/pgdata
           volumeMounts:
@@ -81,6 +103,7 @@ spec:
             limits:
               memory: "1Gi"
               cpu: "1000m"
+          # Liveness: PostgreSQL이 살아있는지 확인
           livenessProbe:
             exec:
               command:
@@ -89,6 +112,7 @@ spec:
                 - $(POSTGRES_USER)
             initialDelaySeconds: 30
             periodSeconds: 10
+          # Readiness: 쿼리를 받을 준비가 됐는지 확인
           readinessProbe:
             exec:
               command:
@@ -100,9 +124,11 @@ spec:
       volumes:
         - name: postgresql-storage
           persistentVolumeClaim:
-            claimName: postgresql-pvc
+            claimName: postgresql-pvc  # 위에서 정의한 PVC 연결
 ---
-# PostgreSQL Service
+# --- 4. Service: 다른 Pod에서 PostgreSQL에 접근하는 내부 주소 ---
+# ClusterIP이므로 클러스터 내부에서만 접근 가능
+# 접근 주소: postgresql-service.lemuel.svc.cluster.local:5432
 apiVersion: v1
 kind: Service
 metadata:
