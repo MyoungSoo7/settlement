@@ -60,7 +60,7 @@ spec:
           # Additional Environment Variables
           env:
             - name: SPRING_DATASOURCE_URL
-              value: "jdbc:postgresql://$(POSTGRES_HOST):$(POSTGRES_PORT)/$(POSTGRES_DB)"
+              value: "jdbc:postgresql://postgresql-service:5432/inter"
             - name: SPRING_DATASOURCE_USERNAME
               valueFrom:
                 secretKeyRef:

@@ -45,3 +45,6 @@ frontend/node_modules/
 /gradle.properties
 .gradle.properties
 gradle.properties
+
+### Kubernetes Secrets (절대 커밋 금지) ###
+k8s/secret.yaml
