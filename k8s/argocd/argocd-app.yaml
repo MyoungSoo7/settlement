@@ -1,0 +1,62 @@
+# ============================================================
+# argocd-app.yaml
+# 역할: ArgoCD가 이 Git 레포지토리를 감시하고 클러스터에 자동 배포하도록 등록한다.
+#
+# GitOps 동작 방식:
+#   1. 개발자가 코드를 main 브랜치에 push
+#   2. GitHub Actions가 Docker 이미지 빌드 → GHCR에 push
+#   3. k8s/*.yaml 파일이 변경되면 ArgoCD가 감지
+#   4. ArgoCD가 자동으로 kubectl apply 수행 (클러스터 동기화)
+#
+# 설치 위치: ArgoCD가 설치된 클러스터에 적용
+#   kubectl apply -f k8s/argocd-app.yaml
+#
+# 주의: ArgoCD가 설치되어 있어야 하며, argocd 네임스페이스에 생성된다.
+# ============================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: lemuel
+  namespace: argocd  # ArgoCD 자체 네임스페이스 (lemuel 아님)
+  # finalizer: Application 삭제 시 클러스터의 리소스도 함께 삭제
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    # 감시할 Git 레포지토리 (public이므로 별도 인증 불필요)
+    repoURL: https://github.com/MyoungSoo7/settlement
+    # 감시할 브랜치: main에 push되면 자동 동기화
+    targetRevision: main
+    # 레포 루트(lemuel/) 기준으로 k8s 디렉토리
+    path: k8s
+
+  destination:
+    # 현재 클러스터에 배포
+    server: https://kubernetes.default.svc
+    namespace: lemuel
+
+  syncPolicy:
+    automated:
+      prune: true      # k8s/*.yaml에서 삭제된 리소스는 클러스터에서도 삭제
+      selfHeal: true   # 누군가 kubectl로 직접 수정해도 Git 상태로 되돌림
+    syncOptions:
+      - CreateNamespace=true            # lemuel 네임스페이스 없으면 자동 생성
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true                  # 삭제 작업은 다른 작업이 끝난 후 실행
+      - ServerSideApply=true            # SealedSecret 같은 CRD 적용 시 필요
+    retry:
+      limit: 5          # 동기화 실패 시 최대 5번 재시도
+      backoff:
+        duration: 5s    # 첫 재시도 대기 시간
+        factor: 2       # 재시도마다 대기 시간 2배 증가
+        maxDuration: 3m # 최대 3분 대기
+
+  # ignoreDifferences: ArgoCD가 이 필드 차이는 OutOfSync로 판단하지 않음
+  # HPA(HorizontalPodAutoscaler)가 replicas를 자동으로 변경하는 경우에 필요
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas

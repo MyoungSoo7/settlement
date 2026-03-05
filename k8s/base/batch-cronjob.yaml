@@ -1,38 +1,59 @@
-# Spring Batch Job을 CronJob으로 실행
-# 이렇게 하면 여러 Pod가 동시에 배치를 실행하지 않음
+# ============================================================
+# batch-cronjob.yaml
+# 역할: 정산 배치 작업을 매일 정해진 시간에 자동 실행한다.
+#
+# CronJob은 Linux의 crontab처럼 일정 주기로 Job을 생성한다.
+# Job은 Pod를 실행해서 작업을 완료하면 종료된다 (Deployment와 다르게 계속 실행되지 않음).
+#
+# 배치 종류:
+#   1. settlement-batch-creation    - 매일 01:00 정산 데이터 생성
+#   2. settlement-batch-confirmation - 매일 02:00 정산 데이터 확정
+#
+# concurrencyPolicy: Forbid - 이전 Job이 아직 실행 중이면 새 Job 실행 안 함 (중복 방지)
+# ============================================================
 
+# --- 1. 정산 생성 배치 (매일 새벽 1시) ---
 apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: settlement-batch-creation
   namespace: lemuel
 spec:
-  schedule: "0 1 * * *"  # 매일 새벽 1시 실행
-  concurrencyPolicy: Forbid  # 중복 실행 방지
-  successfulJobsHistoryLimit: 3
-  failedJobsHistoryLimit: 3
+  schedule: "0 1 * * *"      # cron 표현식: 매일 01:00 실행
+  concurrencyPolicy: Forbid   # 이전 실행이 끝나지 않으면 새 실행 건너뜀
+  successfulJobsHistoryLimit: 3  # 성공한 Job 기록 3개까지 보관
+  failedJobsHistoryLimit: 3      # 실패한 Job 기록 3개까지 보관 (로그 확인용)
   jobTemplate:
     spec:
       backoffLimit: 2  # 실패 시 최대 2번 재시도
       template:
         spec:
-          restartPolicy: Never
+          restartPolicy: Never  # Job 실패 시 Pod 재시작 안 함 (backoffLimit으로 제어)
+          # GHCR private 이미지 pull을 위한 인증 정보
+          imagePullSecrets:
+            - name: ghcr-secret
           containers:
             - name: settlement-batch
-              image: ghcr.io/your-org/lemuel:latest
+              # 백엔드와 동일한 이미지 사용 (배치 프로파일로 실행)
+              image: ghcr.io/myoungsoo7/settlement:latest
+              # 특정 Spring Batch Job만 실행하도록 명시
               command:
                 - java
                 - -jar
                 - app.jar
                 - --spring.batch.job.names=createSettlementJob
+              # ConfigMap + Secret 환경변수 주입
               envFrom:
                 - configMapRef:
                     name: lemuel-config
                 - secretRef:
                     name: lemuel-secret
               env:
+                # POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB는 ConfigMap에서 주입됨
+                # 이를 조합해 JDBC URL 구성
                 - name: SPRING_DATASOURCE_URL
                   value: "jdbc:postgresql://$(POSTGRES_HOST):$(POSTGRES_PORT)/$(POSTGRES_DB)"
+                # 앱 기동 시 배치 Job 자동 실행 활성화
                 - name: SPRING_BATCH_JOB_ENABLED
                   value: "true"
               resources:
@@ -43,14 +64,14 @@ spec:
                   memory: "2Gi"
                   cpu: "1000m"
 ---
-# 정산 확정 배치 Job
+# --- 2. 정산 확정 배치 (매일 새벽 2시) ---
 apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: settlement-batch-confirmation
   namespace: lemuel
 spec:
-  schedule: "0 2 * * *"  # 매일 새벽 2시 실행
+  schedule: "0 2 * * *"      # cron 표현식: 매일 02:00 실행
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 3
@@ -60,9 +81,11 @@ spec:
       template:
         spec:
           restartPolicy: Never
+          imagePullSecrets:
+            - name: ghcr-secret
           containers:
             - name: settlement-confirm-batch
-              image: ghcr.io/your-org/lemuel:latest
+              image: ghcr.io/myoungsoo7/settlement:latest
               command:
                 - java
                 - -jar

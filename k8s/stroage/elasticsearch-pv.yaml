@@ -1,0 +1,166 @@
+# ============================================================
+# elasticsearch-pv.yaml
+# 역할: Elasticsearch 검색엔진의 영구 저장소와 실행 환경을 정의한다.
+#
+# 이 파일은 4개의 리소스를 포함한다:
+#   1. PersistentVolume (PV)    - 실제 디스크 공간 (/data/k8s/elasticsearch)
+#   2. PersistentVolumeClaim (PVC) - PV 사용 신청서
+#   3. StatefulSet              - Elasticsearch 컨테이너 실행
+#   4. Service (ClusterIP)      - elasticsearch-service:9200 으로 내부 접근
+#
+# 특이사항:
+#   Elasticsearch는 vm.max_map_count 커널 값이 기본값보다 높아야 한다.
+#   initContainers로 Pod 기동 전에 이 값을 설정한다 (privileged 권한 필요).
+#
+# 사전 준비 (우분투 서버):
+#   sudo mkdir -p /data/k8s/elasticsearch
+#   sudo chmod 777 /data/k8s/elasticsearch  # uid 1000(elasticsearch)으로 실행됨
+# ============================================================
+
+# --- 1. PersistentVolume ---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: elasticsearch-pv
+  labels:
+    type: local
+    app: elasticsearch
+spec:
+  storageClassName: manual
+  capacity:
+    storage: 30Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  hostPath:
+    path: "/data/k8s/elasticsearch"
+    type: DirectoryOrCreate
+---
+# --- 2. PersistentVolumeClaim ---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: elasticsearch-pvc
+  namespace: lemuel
+spec:
+  storageClassName: manual
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 30Gi
+  selector:
+    matchLabels:
+      app: elasticsearch
+---
+# --- 3. StatefulSet: Elasticsearch 컨테이너 실행 ---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: elasticsearch
+  namespace: lemuel
+spec:
+  serviceName: "elasticsearch-service"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: elasticsearch
+  template:
+    metadata:
+      labels:
+        app: elasticsearch
+    spec:
+      # initContainers: 메인 컨테이너 실행 전에 먼저 실행되는 초기화 컨테이너들
+      initContainers:
+        # 데이터 디렉토리의 소유자를 elasticsearch 유저(uid 1000)로 변경
+        - name: fix-permissions
+          image: busybox
+          command: ["sh", "-c", "chown -R 1000:1000 /usr/share/elasticsearch/data"]
+          volumeMounts:
+            - name: elasticsearch-storage
+              mountPath: /usr/share/elasticsearch/data
+
+        # Elasticsearch가 요구하는 커널 파라미터 설정 (host 전체에 적용됨)
+        # 기본값(65530)으로는 Elasticsearch 기동 시 오류 발생
+        - name: increase-vm-max-map
+          image: busybox
+          command: ["sysctl", "-w", "vm.max_map_count=262144"]
+          securityContext:
+            privileged: true  # sysctl 명령어는 root 권한 필요
+
+      containers:
+        - name: elasticsearch
+          image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+          ports:
+            - containerPort: 9200
+              name: http       # REST API 포트
+            - containerPort: 9300
+              name: transport  # 노드 간 통신 포트 (단일 노드에서는 사용 안 함)
+          env:
+            # 단일 노드 모드: 클러스터 구성 없이 혼자 동작
+            - name: discovery.type
+              value: "single-node"
+            # JVM 힙 메모리: Xms(초기)와 Xmx(최대)를 같게 설정 권장
+            - name: ES_JAVA_OPTS
+              value: "-Xms1g -Xmx1g"
+            # xpack 보안 비활성화 (개발/테스트 환경)
+            # 운영 시 "true"로 변경하고 아래 ELASTIC_PASSWORD 주석 해제
+            - name: xpack.security.enabled
+              value: "false"
+            # xpack.security.enabled: "true" 로 변경 시 아래 주석 해제
+            # - name: ELASTIC_PASSWORD
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: lemuel-secret
+            #       key: ELASTICSEARCH_PASSWORD
+          volumeMounts:
+            - name: elasticsearch-storage
+              mountPath: /usr/share/elasticsearch/data
+          resources:
+            requests:
+              memory: "2Gi"   # Elasticsearch는 메모리를 많이 사용함
+              cpu: "500m"
+            limits:
+              memory: "4Gi"
+              cpu: "2000m"
+          # Liveness: 클러스터 헬스 확인
+          livenessProbe:
+            httpGet:
+              path: /_cluster/health
+              port: 9200
+            initialDelaySeconds: 90
+            periodSeconds: 10
+            timeoutSeconds: 5
+          # Readiness: 인덱싱/검색 요청을 받을 준비 확인
+          readinessProbe:
+            httpGet:
+              path: /_cluster/health
+              port: 9200
+            initialDelaySeconds: 60
+            periodSeconds: 5
+            timeoutSeconds: 3
+      volumes:
+        - name: elasticsearch-storage
+          persistentVolumeClaim:
+            claimName: elasticsearch-pvc
+---
+# --- 4. Service: 다른 Pod에서 Elasticsearch에 접근하는 내부 주소 ---
+# 접근 주소: elasticsearch-service.lemuel.svc.cluster.local:9200
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticsearch-service
+  namespace: lemuel
+spec:
+  type: ClusterIP
+  selector:
+    app: elasticsearch
+  ports:
+    - port: 9200
+      targetPort: 9200
+      protocol: TCP
+      name: http
+    - port: 9300
+      targetPort: 9300
+      protocol: TCP
+      name: transport

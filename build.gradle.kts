@@ -55,6 +55,11 @@ dependencies {
     // Mail
     implementation("org.springframework.boot:spring-boot-starter-mail")
 
+    // Ghostscript 연동 (ProcessBuilder로 gs CLI 호출)
+    // gs 바이너리는 Docker 이미지에 설치됨 (apk add ghostscript)
+    // iText7 AGPL: PDF 생성/수정 후 gs로 렌더링/압축 파이프라인에서 사용
+    implementation("com.itextpdf:itext-core:8.0.5")
+
     // Cache (Caffeine)
     implementation("org.springframework.boot:spring-boot-starter-cache")
     implementation("com.github.ben-manes.caffeine:caffeine")

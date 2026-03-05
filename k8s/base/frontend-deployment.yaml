@@ -1,0 +1,125 @@
+# ============================================================
+# frontend-deployment.yaml
+# 역할: React 빌드 결과물을 Nginx로 서빙하는 프론트엔드 Pod를 실행한다.
+#       + 프론트엔드 전용 ClusterIP Service도 함께 정의한다.
+#
+# 동작 방식:
+#   - React 앱을 빌드(npm run build)해서 Nginx 이미지에 포함시킨 컨테이너를 실행
+#   - Nginx가 포트 80에서 정적 파일(HTML/JS/CSS)을 제공
+#   - /api/* 요청은 Ingress에서 백엔드(lemuel-service)로 라우팅하므로
+#     프론트엔드 Nginx는 별도 프록시 설정 불필요
+#
+# 연관 리소스:
+#   - Ingress: / 경로를 이 Service(lemuel-frontend-service)로 라우팅
+# ============================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lemuel-frontend
+  namespace: lemuel
+  labels:
+    app: lemuel-frontend
+    tier: frontend
+spec:
+  replicas: 2  # 프론트엔드는 stateless라 2개 이상 실행 가능
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0  # 프론트엔드는 항상 최소 2개 Pod 유지 (무중단)
+  selector:
+    matchLabels:
+      app: lemuel-frontend
+      tier: frontend
+  template:
+    metadata:
+      labels:
+        app: lemuel-frontend
+        tier: frontend
+    spec:
+      terminationGracePeriodSeconds: 30
+
+      containers:
+        - name: frontend
+          # GitHub Actions가 빌드해서 GHCR에 push한 프론트엔드 이미지
+          image: ghcr.io/myoungsoo7/settlement-frontend:latest
+          imagePullPolicy: Always
+
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+
+          # Nginx 컨테이너 내부에서 사용할 환경변수
+          env:
+            - name: NGINX_HOST
+              value: "lemuel.local"
+            - name: NGINX_PORT
+              value: "80"
+
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+
+          # Startup Probe: Nginx 기동 완료까지 대기 (최대 60초)
+          startupProbe:
+            httpGet:
+              path: /health  # frontend/nginx.conf 에 명시적으로 정의된 헬스체크 엔드포인트
+              port: 80
+            initialDelaySeconds: 0
+            periodSeconds: 5
+            failureThreshold: 12
+
+          # Liveness Probe: Nginx가 응답하는지 확인. 실패 시 Pod 재시작
+          livenessProbe:
+            httpGet:
+              path: /health  # frontend/nginx.conf 에 명시적으로 정의된 헬스체크 엔드포인트
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          # Readiness Probe: 트래픽 수신 준비 확인. 실패 시 Service에서 제외
+          readinessProbe:
+            httpGet:
+              path: /health  # frontend/nginx.conf 에 명시적으로 정의된 헬스체크 엔드포인트
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+      # GHCR private 이미지 pull을 위한 인증 정보
+      imagePullSecrets:
+        - name: ghcr-secret
+---
+# ============================================================
+# Service (ClusterIP) — 프론트엔드 전용
+# 역할: 프론트엔드 Pod들을 하나의 가상 IP로 묶어준다.
+#
+# ClusterIP: 클러스터 내부에서만 접근 가능한 내부 IP를 할당.
+# 외부에서의 접근은 Ingress를 통해 이 Service로 라우팅된다.
+# ============================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: lemuel-frontend-service
+  namespace: lemuel
+  labels:
+    app: lemuel-frontend
+spec:
+  type: ClusterIP
+  selector:
+    app: lemuel-frontend   # 이 라벨을 가진 Pod에게 트래픽 전달
+    tier: frontend
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80        # Service가 받는 포트
+      targetPort: 80  # Pod의 포트
+  sessionAffinity: None

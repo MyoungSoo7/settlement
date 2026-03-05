@@ -28,7 +28,9 @@ RUN --mount=type=cache,target=/home/gradle/.gradle \
 FROM eclipse-temurin:21-jre-alpine
 
 # tini: PID1 시그널/좀비 프로세스 처리 (graceful shutdown 안정)
-RUN apk add --no-cache curl tini
+# ghostscript: PDF 렌더링 및 이미지 변환 (GPL 라이선스 - 오픈소스 프로젝트에서 사용 가능)
+# curl: actuator 헬스체크, tini: PID1 시그널 처리
+RUN apk add --no-cache curl tini ghostscript
 
 # non-root 유저
 RUN addgroup -S spring && adduser -S spring -G spring
