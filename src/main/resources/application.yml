@@ -136,7 +136,7 @@ management:
         settlement.batch.adjustment.duration: 0.5,0.95,0.99
     tags:
       application: ${spring.application.name}
-      environment: ${ENVIRONMENT:local}
+      environment: ${ENVIRONMENT}
 
 springdoc:
   api-docs:
