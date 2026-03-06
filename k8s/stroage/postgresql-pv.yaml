@@ -106,19 +106,13 @@ spec:
           # Liveness: PostgreSQL이 살아있는지 확인
           livenessProbe:
             exec:
-              command:
-                - pg_isready
-                - -U
-                - $(POSTGRES_USER)
+              command: ["sh","-c","pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
             initialDelaySeconds: 30
             periodSeconds: 10
           # Readiness: 쿼리를 받을 준비가 됐는지 확인
           readinessProbe:
             exec:
-              command:
-                - pg_isready
-                - -U
-                - $(POSTGRES_USER)
+              command: ["sh","-c","pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
             initialDelaySeconds: 5
             periodSeconds: 5
       volumes:
@@ -135,7 +129,7 @@ metadata:
   name: postgresql-service
   namespace: lemuel
 spec:
-  type: ClusterIP
+  clusterIP: None
   selector:
     app: postgresql
   ports:

@@ -57,8 +57,10 @@ dependencies {
 
     // Ghostscript 연동 (ProcessBuilder로 gs CLI 호출)
     // gs 바이너리는 Docker 이미지에 설치됨 (apk add ghostscript)
-    // iText7 AGPL: PDF 생성/수정 후 gs로 렌더링/압축 파이프라인에서 사용
+    // iText8 AGPL: PDF 생성 (정산서 등)
     implementation("com.itextpdf:itext-core:8.0.5")
+    // 한국어(CJK) 폰트 지원 - HYGoThic-Medium 등 내장 폰트 제공
+    implementation("com.itextpdf:font-asian:8.0.5")
 
     // Cache (Caffeine)
     implementation("org.springframework.boot:spring-boot-starter-cache")
