@@ -1,9 +1,4 @@
-HELP.md
-.gradle
-build/
-!gradle/wrapper/gradle-wrapper.jar
-!**/src/main/**/build/
-!**/src/test/**/build/
+치ㅊ
 
 ### STS ###
 .apt_generated
@@ -48,3 +43,8 @@ gradle.properties
 
 ### Kubernetes Secrets (절대 커밋 금지) ###
 k8s/secret.yaml
+
+### Build output ###
+build/
+target/
+**/*.class
