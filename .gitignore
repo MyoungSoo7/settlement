@@ -44,6 +44,11 @@ gradle.properties
 ### Kubernetes Secrets (절대 커밋 금지) ###
 k8s/secret.yaml
 
+### Gradle ###
+.gradle/
+gradle-app.setting
+!gradle-wrapper.jar
+
 ### Build output ###
 build/
 target/
