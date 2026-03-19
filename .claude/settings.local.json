@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /c/Users/iamip/IdeaProjects/kubenetis/settlement -type f -name \"*.java\" | xargs grep -l \"Kafka\\\\|kafka\" 2>/dev/null | head -5)",
+      "Bash(find /c/Users/iamip/IdeaProjects/kubenetis/settlement -type f -name \"*Event*\" | grep -E \"\\\\.java$\" | head -20)",
+      "Bash(find /c/Users/iamip/IdeaProjects/kubenetis/settlement/src/main/java -type f -name \"*Refund*\" -o -name \"*Approval*\" | grep -E \"\\\\.java$\")",
+      "Bash(./gradlew compileJava 2>&1 | tail -30)",
+      "Bash(./gradlew test:*)",
+      "Read(//mnt/c/Users/iamip/IdeaProjects/kubenetis/**)",
+      "Bash(./gradlew compileJava)"
+    ]
+  }
+}
