@@ -4,15 +4,18 @@ import github.lms.lemuel.coupon.adapter.in.web.dto.*;
 import github.lms.lemuel.coupon.application.port.in.CouponUseCase;
 import github.lms.lemuel.coupon.domain.Coupon;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Validated
 @RestController
 @RequestMapping("/coupons")
 @RequiredArgsConstructor
@@ -57,8 +60,8 @@ public class CouponController {
     @GetMapping("/{code}/validate")
     public ResponseEntity<CouponValidateResponse> validateCoupon(
             @PathVariable String code,
-            @RequestParam Long userId,
-            @RequestParam BigDecimal amount
+            @RequestParam @Positive(message = "userId는 양수여야 합니다") Long userId,
+            @RequestParam @Positive(message = "주문 금액은 0보다 커야 합니다") BigDecimal amount
     ) {
         CouponUseCase.ValidateResult result = couponUseCase.validateCoupon(code, userId, amount);
         return ResponseEntity.ok(new CouponValidateResponse(

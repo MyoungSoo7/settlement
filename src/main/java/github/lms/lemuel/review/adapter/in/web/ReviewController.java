@@ -6,9 +6,11 @@ import github.lms.lemuel.review.adapter.in.web.dto.ReviewUpdateRequest;
 import github.lms.lemuel.review.application.ReviewService;
 import github.lms.lemuel.review.domain.Review;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -22,6 +24,7 @@ import java.util.stream.Collectors;
  * PUT    /reviews/{id}                 - 리뷰 수정
  * DELETE /reviews/{id}?userId=         - 리뷰 삭제
  */
+@Validated
 @RestController
 @RequestMapping("/reviews")
 @RequiredArgsConstructor
@@ -46,14 +49,16 @@ public class ReviewController {
     }
 
     @GetMapping("/product/{productId}")
-    public ResponseEntity<List<ReviewResponse>> getProductReviews(@PathVariable Long productId) {
+    public ResponseEntity<List<ReviewResponse>> getProductReviews(
+            @PathVariable @Positive(message = "상품 ID는 양수여야 합니다") Long productId) {
         List<ReviewResponse> reviews = reviewService.getProductReviews(productId)
                 .stream().map(ReviewResponse::new).collect(Collectors.toList());
         return ResponseEntity.ok(reviews);
     }
 
     @GetMapping("/user/{userId}")
-    public ResponseEntity<List<ReviewResponse>> getUserReviews(@PathVariable Long userId) {
+    public ResponseEntity<List<ReviewResponse>> getUserReviews(
+            @PathVariable @Positive(message = "유저 ID는 양수여야 합니다") Long userId) {
         List<ReviewResponse> reviews = reviewService.getUserReviews(userId)
                 .stream().map(ReviewResponse::new).collect(Collectors.toList());
         return ResponseEntity.ok(reviews);
@@ -61,7 +66,7 @@ public class ReviewController {
 
     @PutMapping("/{id}")
     public ResponseEntity<?> updateReview(
-            @PathVariable Long id,
+            @PathVariable @Positive(message = "리뷰 ID는 양수여야 합니다") Long id,
             @Valid @RequestBody ReviewUpdateRequest request) {
         try {
             Review updated = reviewService.updateReview(
@@ -78,8 +83,8 @@ public class ReviewController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteReview(
-            @PathVariable Long id,
-            @RequestParam Long userId) {
+            @PathVariable @Positive(message = "리뷰 ID는 양수여야 합니다") Long id,
+            @RequestParam @Positive(message = "유저 ID는 양수여야 합니다") Long userId) {
         try {
             reviewService.deleteReview(id, userId);
             return ResponseEntity.noContent().build();
