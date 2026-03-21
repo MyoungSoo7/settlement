@@ -22,6 +22,13 @@ java {
 
 repositories {
     mavenCentral()
+    maven { url = uri("https://repo.spring.io/milestone") }
+}
+
+dependencyManagement {
+    imports {
+        mavenBom("org.springframework.ai:spring-ai-bom:1.0.0-M6")
+    }
 }
 
 dependencies {
@@ -48,6 +55,10 @@ dependencies {
 
     // Elasticsearch
     implementation("org.springframework.boot:spring-boot-starter-data-elasticsearch")
+
+    // Spring AI (OpenAI) + pgvector
+    implementation("org.springframework.ai:spring-ai-openai-spring-boot-starter")
+    implementation("com.pgvector:pgvector:0.1.6")
 
     // Spring Batch
     implementation("org.springframework.boot:spring-boot-starter-batch")

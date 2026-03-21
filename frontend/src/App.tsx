@@ -4,6 +4,7 @@ import { authApi } from './api/auth';
 import { ToastProvider } from './contexts/ToastContext';
 import { CartProvider } from './contexts/CartContext';
 import Layout from './components/Layout';
+import ChatWidget from './components/chat/ChatWidget';
 
 // 공개 페이지 (즉시 로드)
 import Login from './pages/Login';
@@ -104,6 +105,7 @@ function App() {
               element={<AdminOnlyRoute><EcommerceCategoryAdmin /></AdminOnlyRoute>} />
 
           </Routes>
+          <ChatWidget />
           </Suspense>
         </BrowserRouter>
       </CartProvider>
