@@ -22,6 +22,15 @@ java {
 
 repositories {
     mavenCentral()
+    maven { url = uri("https://repo.spring.io/milestone") }
+}
+
+extra["springAiVersion"] = "1.0.0-M6"
+
+dependencyManagement {
+    imports {
+        mavenBom("org.springframework.ai:spring-ai-bom:${property("springAiVersion")}")
+    }
 }
 
 dependencies {
@@ -51,6 +60,10 @@ dependencies {
 
     // Spring Batch
     implementation("org.springframework.boot:spring-boot-starter-batch")
+
+    // Spring AI
+    implementation("org.springframework.ai:spring-ai-anthropic-spring-boot-starter")
+    implementation("org.springframework.ai:spring-ai-openai-spring-boot-starter")
 
     // Mail
     implementation("org.springframework.boot:spring-boot-starter-mail")
