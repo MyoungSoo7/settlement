@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find src/test -name *.java)",
+      "Bash(find src/main -name *.java)",
+      "Bash(find src/test -name *.java -exec grep -l @Test {})",
+      "Bash(2)",
+      "Bash(find src/main/java -name *.java -path */domain/*)",
+      "Bash(find src/main/java -name *.java -path */service/*)",
+      "Bash(pip install:*)",
+      "Bash(find src/main/java -name *Controller.java -exec grep -l Mapping {})",
+      "Bash(find frontend/src -name *.tsx -o -name *.ts)",
+      "Bash(python:*)",
+      "Bash(grep -r \"CREATE TABLE\" src/main/resources/db/migration/*.sql)",
+      "Bash(mv \"07_현행시스템분석서.md\" \"07_현행시스템_분석서.md\")",
+      "Bash(mv \"08_요구사항정의서\\(SRS\\).md\" \"08_요구사항_정의서_SRS.md\")",
+      "Bash(mv \"09_요구사항추적매트릭스\\(RTM\\).md\" \"09_요구사항_추적_매트릭스_RTM.md\")",
+      "Bash(mv \"10_업무프로세스정의서\\(BPD\\).md\" \"10_업무프로세스_정의서_BPD.md\")",
+      "Bash(mv \"11_유스케이스명세서.md\" \"11_유스케이스_명세서.md\")",
+      "Bash(mv \"14_시스템아키텍처설계서.md\" \"14_시스템_아키텍처_설계서.md\")",
+      "Bash(mv \"15_화면설계서\\(UI_UX\\).md\" \"15_화면설계서_UI_UX.md\")",
+      "Bash(mv \"16_데이터베이스설계서\\(ERD\\).md\" \"16_데이터모델링_ERD.md\")",
+      "Bash(mv \"17_테이블정의서.md\" \"17_테이블_정의서.md\")",
+      "Bash(mv \"18_인터페이스정의서.md\" \"18_인터페이스_설계서.md\")",
+      "Bash(gh pr:*)",
+      "Bash(where gh:*)"
+    ]
+  }
+}
