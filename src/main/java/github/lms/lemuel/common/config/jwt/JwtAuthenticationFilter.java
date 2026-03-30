@@ -1,5 +1,6 @@
 package github.lms.lemuel.common.config.jwt;
 
+import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -32,9 +33,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (header != null && header.startsWith("Bearer ")) {
             String token = header.substring(7);
 
-            if (jwtUtil.validateToken(token)) {
-                String email = jwtUtil.getEmailFromToken(token);
-                String role = jwtUtil.parseToken(token).get("role", String.class);
+            try {
+                // 토큰 파싱 1회로 통합 (기존: validateToken + getEmail + parseToken = 3회)
+                Claims claims = jwtUtil.parseToken(token);
+                String email = claims.getSubject();
+                String role = claims.get("role", String.class);
 
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(
@@ -44,6 +47,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         );
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(authentication);
+            } catch (Exception ignored) {
+                // 유효하지 않은 토큰 — 인증 없이 통과 (Spring Security가 401 처리)
             }
         }
 
