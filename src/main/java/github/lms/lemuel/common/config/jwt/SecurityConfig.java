@@ -23,6 +23,9 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
+    @org.springframework.beans.factory.annotation.Value("${cors.allowed-origins:}")
+    private String corsAllowedOrigins;
+
     public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
     }
@@ -43,15 +46,19 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // 허용할 Origin (React 개발 서버)
-        configuration.setAllowedOrigins(Arrays.asList(
-                "http://localhost:8089",
-                "http://localhost:3000",
-                "http://localhost:5173",  // Vite 기본 포트
-                "http://127.0.0.1:3000",
-                "http://127.0.0.1:8089",
-                "http://127.0.0.1:5173"
-        ));
+        // CORS origin: 환경변수 우선, 없으면 localhost (개발용)
+        if (corsAllowedOrigins != null && !corsAllowedOrigins.isBlank()) {
+            configuration.setAllowedOrigins(Arrays.asList(corsAllowedOrigins.split(",")));
+        } else {
+            configuration.setAllowedOrigins(Arrays.asList(
+                    "http://localhost:8089",
+                    "http://localhost:3000",
+                    "http://localhost:5173",
+                    "http://127.0.0.1:3000",
+                    "http://127.0.0.1:8089",
+                    "http://127.0.0.1:5173"
+            ));
+        }
 
         // 허용할 HTTP 메서드
         configuration.setAllowedMethods(Arrays.asList(
