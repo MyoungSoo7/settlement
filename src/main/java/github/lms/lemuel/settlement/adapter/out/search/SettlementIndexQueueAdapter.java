@@ -1,5 +1,7 @@
 package github.lms.lemuel.settlement.adapter.out.search;
 
+import github.lms.lemuel.settlement.adapter.out.persistence.SettlementIndexQueueJpaEntity;
+import github.lms.lemuel.settlement.adapter.out.persistence.SpringDataSettlementIndexQueueRepository;
 import github.lms.lemuel.settlement.application.port.out.EnqueueFailedIndexPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -8,7 +10,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * 인덱싱 실패 시 재시도 큐 추가 Adapter (Outbound Adapter)
- * TODO: SettlementIndexQueueService를 settlement 모듈로 이동 후 연결
+ * settlement_index_queue 테이블에 재시도 작업을 저장한다.
  */
 @Slf4j
 @Component
@@ -16,16 +18,15 @@ import org.springframework.stereotype.Component;
 @ConditionalOnProperty(name = "app.search.enabled", havingValue = "true", matchIfMissing = false)
 public class SettlementIndexQueueAdapter implements EnqueueFailedIndexPort {
 
-    // TODO: SettlementIndexQueueService 주입
-    // private final SettlementIndexQueueService queueService;
+    private final SpringDataSettlementIndexQueueRepository queueRepository;
 
     @Override
     public void enqueueForRetry(Long settlementId, String operation) {
         log.info("재시도 큐 추가: settlementId={}, operation={}", settlementId, operation);
 
-        // TODO: queueService.enqueue(settlementId, operation);
+        var entity = new SettlementIndexQueueJpaEntity(settlementId, operation);
+        queueRepository.save(entity);
 
-        // 임시: 로그만 출력
-        log.warn("재시도 큐 서비스가 아직 이동되지 않음. settlementId={}", settlementId);
+        log.info("재시도 큐 저장 완료: settlementId={}, nextRetryAt={}", settlementId, entity.getNextRetryAt());
     }
 }
