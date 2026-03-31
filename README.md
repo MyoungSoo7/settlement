@@ -278,8 +278,39 @@ push / PR 트리거
 
 
 
-## ⚖️ License & Open Source
-This project is licensed under the **AGPL-3.0** (due to iText 8 dependency).
-- **iText 8**: Used for PDF generation (Licensed under AGPL).
-- **Ghostscript**: Used for PDF rendering and compression (External CLI tool).
+## 8. 최근 개선사항
+
+### JaCoCo 코드 커버리지
+
+- CI 파이프라인에 JaCoCo 커버리지 리포트 통합
+- PR 댓글에 커버리지 결과 자동 게시
+- 최소 커버리지 기준: **70%**
+
+### PR #52 개선사항
+
+- 환불 동시성 제어 강화 (Pessimistic Lock + 멱등성 키)
+- 정산 배치 처리 안정성 향상
+- 코드 품질 개선 및 테스트 보강
+
+---
+
+## 9. 문서 목록
+
+> `docs/` 폴더는 현재 준비 중입니다. 프로젝트 문서는 아래 파일을 참고하세요.
+
+| 문서 | 경로 |
+|------|------|
+| 프로젝트 컨텍스트 | [`CLAUDE.md`](./CLAUDE.md) |
+| CI/CD 워크플로우 | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) |
+| Docker Compose 설정 | [`docker-compose.yml`](./docker-compose.yml) |
+| Kubernetes 설정 | [`k8s/`](./k8s/) |
+| Flyway 마이그레이션 | [`src/main/resources/db/migration/`](src/main/resources/db/migration/) |
+
+---
+
+## 라이선스
+
+이 프로젝트는 **AGPL-3.0** 라이선스를 따릅니다 (iText 8 의존성).
+- **iText 8**: PDF 생성 (AGPL 라이선스)
+- **Ghostscript**: PDF 렌더링 및 압축 (외부 CLI 도구)
 
