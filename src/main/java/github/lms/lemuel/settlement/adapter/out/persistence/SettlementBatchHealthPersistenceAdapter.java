@@ -35,7 +35,7 @@ public class SettlementBatchHealthPersistenceAdapter implements LoadSettlementBa
                 .filter(s -> "CONFIRMED".equals(s.getStatus()))
                 .count();
 
-        // SettlementAdjustment 조회 (TODO 해결)
+        // SettlementAdjustment 조회
         long pendingAdjustmentCount = adjustmentRepository
                 .findByAdjustmentDateAndStatus(date, "PENDING")
                 .size();
