@@ -121,3 +121,26 @@ docker compose down
 # 특정 프로파일로 실행
 ./gradlew bootRun --args='--spring.profiles.active=local'
 ```
+
+
+
+
+
+
+
+
+
+
+
+
+## 프로젝트 현황
+
+- **최종 갱신**: 2026-04-07 11:29
+- **상태**: 활성
+- **테스트 파일 수**: 48
+- **최근 커밋**:
+- 59d07b5 feat: ai-dev-team 커맨드 + 에이전트 프롬프트 17개 추가 (7일 전)
+- 48cfb7c docs: README.md 업데이트 (최근 개선사항/JaCoCo/문서 목록) (7일 전)
+- 7e9bf08 fix: TODO 잔여 주석 정리 (7일 전)
+
+> 전체 현황: [STATUS.md](/Users/lms/inter-asat/docs/STATUS.md)

@@ -5,6 +5,11 @@ import github.lms.lemuel.review.adapter.in.web.dto.ReviewResponse;
 import github.lms.lemuel.review.adapter.in.web.dto.ReviewUpdateRequest;
 import github.lms.lemuel.review.application.ReviewService;
 import github.lms.lemuel.review.domain.Review;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -22,6 +27,7 @@ import java.util.stream.Collectors;
  * PUT    /reviews/{id}                 - 리뷰 수정
  * DELETE /reviews/{id}?userId=         - 리뷰 삭제
  */
+@Tag(name = "Review", description = "상품 리뷰 및 평점 API")
 @RestController
 @RequestMapping("/reviews")
 @RequiredArgsConstructor
@@ -29,6 +35,11 @@ public class ReviewController {
 
     private final ReviewService reviewService;
 
+    @Operation(summary = "리뷰 작성", description = "사용자가 특정 상품에 리뷰를 작성한다. 중복 작성은 불가.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "작성 성공"),
+            @ApiResponse(responseCode = "409", description = "이미 작성된 리뷰 존재")
+    })
     @PostMapping
     public ResponseEntity<?> createReview(@Valid @RequestBody ReviewRequest request) {
         try {
@@ -45,23 +56,39 @@ public class ReviewController {
         }
     }
 
+    @Operation(summary = "상품 리뷰 목록 조회", description = "특정 상품의 리뷰를 조회한다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공")
+    })
     @GetMapping("/product/{productId}")
-    public ResponseEntity<List<ReviewResponse>> getProductReviews(@PathVariable Long productId) {
+    public ResponseEntity<List<ReviewResponse>> getProductReviews(
+            @Parameter(description = "상품 ID", required = true) @PathVariable Long productId) {
         List<ReviewResponse> reviews = reviewService.getProductReviews(productId)
                 .stream().map(ReviewResponse::new).collect(Collectors.toList());
         return ResponseEntity.ok(reviews);
     }
 
+    @Operation(summary = "사용자 리뷰 목록 조회", description = "특정 사용자가 작성한 리뷰를 조회한다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공")
+    })
     @GetMapping("/user/{userId}")
-    public ResponseEntity<List<ReviewResponse>> getUserReviews(@PathVariable Long userId) {
+    public ResponseEntity<List<ReviewResponse>> getUserReviews(
+            @Parameter(description = "사용자 ID", required = true) @PathVariable Long userId) {
         List<ReviewResponse> reviews = reviewService.getUserReviews(userId)
                 .stream().map(ReviewResponse::new).collect(Collectors.toList());
         return ResponseEntity.ok(reviews);
     }
 
+    @Operation(summary = "리뷰 수정", description = "본인이 작성한 리뷰의 평점/내용을 수정한다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "수정 성공"),
+            @ApiResponse(responseCode = "403", description = "수정 권한 없음"),
+            @ApiResponse(responseCode = "404", description = "리뷰를 찾을 수 없음")
+    })
     @PutMapping("/{id}")
     public ResponseEntity<?> updateReview(
-            @PathVariable Long id,
+            @Parameter(description = "리뷰 ID", required = true) @PathVariable Long id,
             @Valid @RequestBody ReviewUpdateRequest request) {
         try {
             Review updated = reviewService.updateReview(
@@ -76,10 +103,16 @@ public class ReviewController {
         }
     }
 
+    @Operation(summary = "리뷰 삭제", description = "본인이 작성한 리뷰를 삭제한다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "삭제 성공"),
+            @ApiResponse(responseCode = "403", description = "삭제 권한 없음"),
+            @ApiResponse(responseCode = "404", description = "리뷰를 찾을 수 없음")
+    })
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteReview(
-            @PathVariable Long id,
-            @RequestParam Long userId) {
+            @Parameter(description = "리뷰 ID", required = true) @PathVariable Long id,
+            @Parameter(description = "요청자(작성자) 사용자 ID", required = true) @RequestParam Long userId) {
         try {
             reviewService.deleteReview(id, userId);
             return ResponseEntity.noContent().build();
