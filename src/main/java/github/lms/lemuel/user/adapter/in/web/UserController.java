@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
  * User API Controller
  */
 @RestController
-@RequestMapping("/users")
+@RequestMapping("/api/users")
 @RequiredArgsConstructor
 public class UserController {
 

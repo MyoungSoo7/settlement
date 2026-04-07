@@ -82,13 +82,13 @@ public class CategoryController {
         return ResponseEntity.ok(CategoryResponse.from(category));
     }
 
-    @PostMapping("/{id}/activate")
+    @PatchMapping("/{id}/activate")
     public ResponseEntity<Void> activateCategory(@PathVariable Long id) {
         categoryUseCase.activateCategory(id);
         return ResponseEntity.ok().build();
     }
 
-    @PostMapping("/{id}/deactivate")
+    @PatchMapping("/{id}/deactivate")
     public ResponseEntity<Void> deactivateCategory(@PathVariable Long id) {
         categoryUseCase.deactivateCategory(id);
         return ResponseEntity.ok().build();

@@ -43,6 +43,21 @@ public class OrderJpaEntity {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    @Column(name = "shipping_fee", precision = 10, scale = 2)
+    private BigDecimal shippingFee;
+
+    @Column(name = "discount_amount", precision = 10, scale = 2)
+    private BigDecimal discountAmount;
+
+    @Column(name = "total_amount", precision = 10, scale = 2)
+    private BigDecimal totalAmount;
+
+    @Column(name = "shipping_address_id")
+    private Long shippingAddressId;
+
+    @Column(name = "coupon_code", length = 50)
+    private String couponCode;
+
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) {

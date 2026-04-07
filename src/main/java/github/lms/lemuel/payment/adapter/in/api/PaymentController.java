@@ -19,26 +19,23 @@ import java.util.stream.Collectors;
  * REST Controller for Payment API - Maps HTTP requests to use case ports
  */
 @RestController
-@RequestMapping("/payments")
+@RequestMapping("/api/payments")
 public class PaymentController {
 
     private final CreatePaymentPort createPaymentPort;
     private final AuthorizePaymentPort authorizePaymentPort;
     private final CapturePaymentPort capturePaymentPort;
-    private final RefundPaymentPort refundPaymentPort;
     private final GetPaymentPort getPaymentPort;
     private final TossPaymentService tossPaymentService;
 
     public PaymentController(CreatePaymentPort createPaymentPort,
                              AuthorizePaymentPort authorizePaymentPort,
                              CapturePaymentPort capturePaymentPort,
-                             RefundPaymentPort refundPaymentPort,
                              GetPaymentPort getPaymentPort,
                              TossPaymentService tossPaymentService) {
         this.createPaymentPort = createPaymentPort;
         this.authorizePaymentPort = authorizePaymentPort;
         this.capturePaymentPort = capturePaymentPort;
-        this.refundPaymentPort = refundPaymentPort;
         this.getPaymentPort = getPaymentPort;
         this.tossPaymentService = tossPaymentService;
     }
@@ -63,12 +60,6 @@ public class PaymentController {
     @PatchMapping("/{id}/capture")
     public ResponseEntity<PaymentResponse> capturePayment(@PathVariable Long id) {
         PaymentDomain paymentDomain = capturePaymentPort.capturePayment(id);
-        return ResponseEntity.ok(new PaymentResponse(paymentDomain));
-    }
-
-    @PatchMapping("/{id}/refund")
-    public ResponseEntity<PaymentResponse> refundPayment(@PathVariable Long id) {
-        PaymentDomain paymentDomain = refundPaymentPort.refundPayment(id);
         return ResponseEntity.ok(new PaymentResponse(paymentDomain));
     }
 

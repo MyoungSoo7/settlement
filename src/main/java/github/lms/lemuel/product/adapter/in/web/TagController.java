@@ -62,19 +62,19 @@ public class TagController {
         return ResponseEntity.noContent().build();
     }
 
-    @PostMapping("/product/{productId}/tag/{tagId}")
+    @PutMapping("/products/{productId}/tags/{tagId}")
     public ResponseEntity<Void> addTagToProduct(
             @PathVariable Long productId,
             @PathVariable Long tagId) {
         tagUseCase.addTagToProduct(productId, tagId);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
     }
 
-    @DeleteMapping("/product/{productId}/tag/{tagId}")
+    @DeleteMapping("/products/{productId}/tags/{tagId}")
     public ResponseEntity<Void> removeTagFromProduct(
             @PathVariable Long productId,
             @PathVariable Long tagId) {
         tagUseCase.removeTagFromProduct(productId, tagId);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
     }
 }

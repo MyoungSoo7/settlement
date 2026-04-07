@@ -4,55 +4,55 @@ import { PaymentRequest, PaymentResponse, TossConfirmRequest, TossCartConfirmReq
 export const paymentApi = {
   /**
    * 결제 생성
-   * POST /payments
+   * POST /api/payments
    */
   createPayment: async (request: PaymentRequest): Promise<PaymentResponse> => {
-    const response = await api.post<PaymentResponse>('/payments', request);
+    const response = await api.post<PaymentResponse>('/api/payments', request);
     return response.data;
   },
 
   /**
    * 결제 승인 (Authorization)
-   * PATCH /payments/{id}/authorize
+   * PATCH /api/payments/{id}/authorize
    */
   authorizePayment: async (id: number): Promise<PaymentResponse> => {
-    const response = await api.patch<PaymentResponse>(`/payments/${id}/authorize`);
+    const response = await api.patch<PaymentResponse>(`/api/payments/${id}/authorize`);
     return response.data;
   },
 
   /**
    * 결제 확정 (Capture)
-   * PATCH /payments/{id}/capture
+   * PATCH /api/payments/{id}/capture
    */
   capturePayment: async (id: number): Promise<PaymentResponse> => {
-    const response = await api.patch<PaymentResponse>(`/payments/${id}/capture`);
+    const response = await api.patch<PaymentResponse>(`/api/payments/${id}/capture`);
     return response.data;
   },
 
   /**
    * 결제 조회
-   * GET /payments/{id}
+   * GET /api/payments/{id}
    */
   getPayment: async (id: number): Promise<PaymentResponse> => {
-    const response = await api.get<PaymentResponse>(`/payments/${id}`);
+    const response = await api.get<PaymentResponse>(`/api/payments/${id}`);
     return response.data;
   },
 
   /**
    * 토스페이먼츠 결제 확인
-   * POST /payments/toss/confirm
+   * POST /api/payments/toss/confirm
    */
   confirmTossPayment: async (request: TossConfirmRequest): Promise<PaymentResponse> => {
-    const response = await api.post<PaymentResponse>('/payments/toss/confirm', request);
+    const response = await api.post<PaymentResponse>('/api/payments/toss/confirm', request);
     return response.data;
   },
 
   /**
    * 토스페이먼츠 장바구니 일괄 결제 확인
-   * POST /payments/toss/cart/confirm
+   * POST /api/payments/toss/cart/confirm
    */
   confirmTossCartPayment: async (request: TossCartConfirmRequest): Promise<PaymentResponse[]> => {
-    const response = await api.post<PaymentResponse[]>('/payments/toss/cart/confirm', request);
+    const response = await api.post<PaymentResponse[]>('/api/payments/toss/cart/confirm', request);
     return response.data;
   },
 };

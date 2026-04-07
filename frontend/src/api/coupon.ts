@@ -4,10 +4,10 @@ import { CouponResponse, CouponValidateResponse, CouponCreateRequest } from '@/t
 export const couponApi = {
   /**
    * 쿠폰 유효성 검증
-   * GET /coupons/{code}/validate?userId=&amount=
+   * GET /api/coupons/{code}/validate?userId=&amount=
    */
   validate: async (code: string, userId: number, amount: number): Promise<CouponValidateResponse> => {
-    const response = await api.get<CouponValidateResponse>(`/coupons/${code}/validate`, {
+    const response = await api.get<CouponValidateResponse>(`/api/coupons/${code}/validate`, {
       params: { userId, amount },
     });
     return response.data;
@@ -15,27 +15,27 @@ export const couponApi = {
 
   /**
    * 쿠폰 사용 처리
-   * POST /coupons/{code}/use
+   * POST /api/coupons/{code}/usage
    */
   use: async (code: string, userId: number, orderId: number): Promise<void> => {
-    await api.post(`/coupons/${code}/use`, { userId, orderId });
+    await api.post(`/api/coupons/${code}/usage`, { userId, orderId });
   },
 
   /**
    * 전체 쿠폰 목록 (관리자)
-   * GET /coupons
+   * GET /api/coupons
    */
   getAll: async (): Promise<CouponResponse[]> => {
-    const response = await api.get<CouponResponse[]>('/coupons');
+    const response = await api.get<CouponResponse[]>('/api/coupons');
     return response.data;
   },
 
   /**
    * 쿠폰 생성 (관리자)
-   * POST /coupons
+   * POST /api/coupons
    */
   create: async (data: CouponCreateRequest): Promise<CouponResponse> => {
-    const response = await api.post<CouponResponse>('/coupons', data);
+    const response = await api.post<CouponResponse>('/api/coupons', data);
     return response.data;
   },
 };

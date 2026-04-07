@@ -50,6 +50,24 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * 404 - 리소스 없음 (IllegalArgumentException)
+     */
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, Object>> handleIllegalArgument(IllegalArgumentException ex) {
+        log.warn("[IllegalArgumentException] {}", ex.getMessage());
+        return buildErrorResponse(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", ex.getMessage());
+    }
+
+    /**
+     * 409 - 비즈니스 규칙 위반 (IllegalStateException)
+     */
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<Map<String, Object>> handleIllegalState(IllegalStateException ex) {
+        log.warn("[IllegalStateException] {}", ex.getMessage());
+        return buildErrorResponse(HttpStatus.CONFLICT, "BUSINESS_RULE_VIOLATION", ex.getMessage());
+    }
+
+    /**
      * 400 - Idempotency-Key 누락
      */
     @ExceptionHandler(MissingIdempotencyKeyException.class)

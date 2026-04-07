@@ -4,19 +4,19 @@ import { LoginRequest, LoginResponse, RegisterRequest, UserResponse } from '@/ty
 export const authApi = {
   /**
    * 로그인
-   * POST /auth/login
+   * POST /api/auth/login
    */
   login: async (credentials: LoginRequest): Promise<LoginResponse> => {
-    const response = await api.post<LoginResponse>('/auth/login', credentials);
+    const response = await api.post<LoginResponse>('/api/auth/login', credentials);
     return response.data;
   },
 
   /**
    * 회원가입
-   * POST /users
+   * POST /api/users
    */
   register: async (userData: RegisterRequest): Promise<UserResponse> => {
-    const response = await api.post<UserResponse>('/users', userData);
+    const response = await api.post<UserResponse>('/api/users', userData);
     return response.data;
   },
 

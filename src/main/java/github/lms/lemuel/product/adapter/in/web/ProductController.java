@@ -74,7 +74,7 @@ public class ProductController {
         return ResponseEntity.ok(responses);
     }
 
-    @PutMapping("/{productId}/info")
+    @PatchMapping("/{productId}/info")
     public ResponseEntity<ProductResponse> updateProductInfo(
             @PathVariable Long productId,
             @RequestBody UpdateProductInfoRequest request) {
@@ -85,7 +85,7 @@ public class ProductController {
         return ResponseEntity.ok(ProductResponse.from(product, primaryImageUrl));
     }
 
-    @PutMapping("/{productId}/price")
+    @PatchMapping("/{productId}/price")
     public ResponseEntity<ProductResponse> updateProductPrice(
             @PathVariable Long productId,
             @RequestBody UpdateProductPriceRequest request) {
@@ -96,7 +96,7 @@ public class ProductController {
         return ResponseEntity.ok(ProductResponse.from(product, primaryImageUrl));
     }
 
-    @PutMapping("/{productId}/stock")
+    @PatchMapping("/{productId}/stock")
     public ResponseEntity<ProductResponse> updateProductStock(
             @PathVariable Long productId,
             @RequestBody UpdateProductStockRequest request) {
@@ -107,21 +107,21 @@ public class ProductController {
         return ResponseEntity.ok(ProductResponse.from(product, primaryImageUrl));
     }
 
-    @PostMapping("/{productId}/activate")
+    @PatchMapping("/{productId}/activate")
     public ResponseEntity<ProductResponse> activateProduct(@PathVariable Long productId) {
         Product product = manageProductStatusUseCase.activateProduct(productId);
         String primaryImageUrl = productImageService.getPrimaryImageUrl(productId);
         return ResponseEntity.ok(ProductResponse.from(product, primaryImageUrl));
     }
 
-    @PostMapping("/{productId}/deactivate")
+    @PatchMapping("/{productId}/deactivate")
     public ResponseEntity<ProductResponse> deactivateProduct(@PathVariable Long productId) {
         Product product = manageProductStatusUseCase.deactivateProduct(productId);
         String primaryImageUrl = productImageService.getPrimaryImageUrl(productId);
         return ResponseEntity.ok(ProductResponse.from(product, primaryImageUrl));
     }
 
-    @PostMapping("/{productId}/discontinue")
+    @PatchMapping("/{productId}/discontinue")
     public ResponseEntity<ProductResponse> discontinueProduct(@PathVariable Long productId) {
         Product product = manageProductStatusUseCase.discontinueProduct(productId);
         String primaryImageUrl = productImageService.getPrimaryImageUrl(productId);

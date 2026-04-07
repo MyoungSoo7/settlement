@@ -9,15 +9,21 @@ export interface AdminUserResponse {
 }
 
 export const adminApi = {
-  /** GET /orders/admin/all */
+  /**
+   * 전체 주문 목록 (관리자)
+   * GET /api/orders/admin/all
+   */
   getAllOrders: async (): Promise<OrderResponse[]> => {
-    const response = await api.get<OrderResponse[]>('/orders/admin/all');
+    const response = await api.get<OrderResponse[]>('/api/orders/admin/all');
     return response.data;
   },
 
-  /** GET /users/admin/all */
+  /**
+   * 전체 사용자 목록 (관리자)
+   * GET /api/users/admin/all
+   */
   getAllUsers: async (): Promise<AdminUserResponse[]> => {
-    const response = await api.get<AdminUserResponse[]>('/users/admin/all');
+    const response = await api.get<AdminUserResponse[]>('/api/users/admin/all');
     return response.data;
   },
 };

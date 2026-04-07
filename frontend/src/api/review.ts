@@ -2,32 +2,47 @@ import api from './axios';
 import { ReviewCreateRequest, ReviewUpdateRequest, ReviewResponse } from '@/types';
 
 export const reviewApi = {
-  /** POST /reviews */
+  /**
+   * 리뷰 작성
+   * POST /api/reviews
+   */
   createReview: async (request: ReviewCreateRequest): Promise<ReviewResponse> => {
-    const response = await api.post<ReviewResponse>('/reviews', request);
+    const response = await api.post<ReviewResponse>('/api/reviews', request);
     return response.data;
   },
 
-  /** GET /reviews/product/{productId} */
+  /**
+   * 상품 리뷰 목록
+   * GET /api/reviews/product/{productId}
+   */
   getProductReviews: async (productId: number): Promise<ReviewResponse[]> => {
-    const response = await api.get<ReviewResponse[]>(`/reviews/product/${productId}`);
+    const response = await api.get<ReviewResponse[]>(`/api/reviews/product/${productId}`);
     return response.data;
   },
 
-  /** GET /reviews/user/{userId} */
+  /**
+   * 사용자 리뷰 목록
+   * GET /api/reviews/user/{userId}
+   */
   getUserReviews: async (userId: number): Promise<ReviewResponse[]> => {
-    const response = await api.get<ReviewResponse[]>(`/reviews/user/${userId}`);
+    const response = await api.get<ReviewResponse[]>(`/api/reviews/user/${userId}`);
     return response.data;
   },
 
-  /** PUT /reviews/{id} */
+  /**
+   * 리뷰 수정
+   * PATCH /api/reviews/{id}
+   */
   updateReview: async (id: number, request: ReviewUpdateRequest): Promise<ReviewResponse> => {
-    const response = await api.put<ReviewResponse>(`/reviews/${id}`, request);
+    const response = await api.patch<ReviewResponse>(`/api/reviews/${id}`, request);
     return response.data;
   },
 
-  /** DELETE /reviews/{id}?userId= */
+  /**
+   * 리뷰 삭제
+   * DELETE /api/reviews/{id}?userId=
+   */
   deleteReview: async (id: number, userId: number): Promise<void> => {
-    await api.delete(`/reviews/${id}`, { params: { userId } });
+    await api.delete(`/api/reviews/${id}`, { params: { userId } });
   },
 };

@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.*;
  */
 @Validated
 @RestController
-@RequestMapping("/settlements")
+@RequestMapping("/api/settlements")
 @RequiredArgsConstructor
 public class SettlementController {
 

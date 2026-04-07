@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
 
 @Validated
 @RestController
-@RequestMapping("/coupons")
+@RequestMapping("/api/coupons")
 @RequiredArgsConstructor
 public class CouponController {
 
@@ -74,9 +74,9 @@ public class CouponController {
 
     /**
      * 쿠폰 사용 처리
-     * POST /coupons/{code}/use
+     * POST /coupons/{code}/usage
      */
-    @PostMapping("/{code}/use")
+    @PostMapping("/{code}/usage")
     public ResponseEntity<Void> useCoupon(
             @PathVariable String code,
             @Valid @RequestBody CouponUseRequest request

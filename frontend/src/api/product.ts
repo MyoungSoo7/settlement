@@ -56,55 +56,55 @@ export const productApi = {
 
   /**
    * 상품 정보 수정
-   * PUT /api/products/{id}/info
+   * PATCH /api/products/{id}/info
    */
   updateProductInfo: async (id: number, request: UpdateProductInfoRequest): Promise<ProductResponse> => {
-    const response = await api.put<ProductResponse>(`/api/products/${id}/info`, request);
+    const response = await api.patch<ProductResponse>(`/api/products/${id}/info`, request);
     return response.data;
   },
 
   /**
    * 상품 가격 수정
-   * PUT /api/products/{id}/price
+   * PATCH /api/products/{id}/price
    */
   updateProductPrice: async (id: number, request: UpdateProductPriceRequest): Promise<ProductResponse> => {
-    const response = await api.put<ProductResponse>(`/api/products/${id}/price`, request);
+    const response = await api.patch<ProductResponse>(`/api/products/${id}/price`, request);
     return response.data;
   },
 
   /**
    * 상품 재고 수정
-   * PUT /api/products/{id}/stock
+   * PATCH /api/products/{id}/stock
    */
   updateProductStock: async (id: number, request: UpdateProductStockRequest): Promise<ProductResponse> => {
-    const response = await api.put<ProductResponse>(`/api/products/${id}/stock`, request);
+    const response = await api.patch<ProductResponse>(`/api/products/${id}/stock`, request);
     return response.data;
   },
 
   /**
    * 상품 활성화
-   * POST /api/products/{id}/activate
+   * PATCH /api/products/{id}/activate
    */
   activateProduct: async (id: number): Promise<ProductResponse> => {
-    const response = await api.post<ProductResponse>(`/api/products/${id}/activate`);
+    const response = await api.patch<ProductResponse>(`/api/products/${id}/activate`);
     return response.data;
   },
 
   /**
    * 상품 비활성화
-   * POST /api/products/{id}/deactivate
+   * PATCH /api/products/{id}/deactivate
    */
   deactivateProduct: async (id: number): Promise<ProductResponse> => {
-    const response = await api.post<ProductResponse>(`/api/products/${id}/deactivate`);
+    const response = await api.patch<ProductResponse>(`/api/products/${id}/deactivate`);
     return response.data;
   },
 
   /**
    * 상품 단종
-   * POST /api/products/{id}/discontinue
+   * PATCH /api/products/{id}/discontinue
    */
   discontinueProduct: async (id: number): Promise<ProductResponse> => {
-    const response = await api.post<ProductResponse>(`/api/products/${id}/discontinue`);
+    const response = await api.patch<ProductResponse>(`/api/products/${id}/discontinue`);
     return response.data;
   },
 };

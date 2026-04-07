@@ -39,7 +39,7 @@ const ResetPassword: React.FC = () => {
     }
 
     try {
-      await api.post('/users/password-reset/confirm', {
+      await api.post('/api/users/password-reset/confirm', {
         token,
         newPassword,
       });

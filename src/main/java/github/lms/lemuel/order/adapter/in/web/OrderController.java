@@ -1,5 +1,6 @@
 package github.lms.lemuel.order.adapter.in.web;
 
+import github.lms.lemuel.order.adapter.in.web.request.CreateMultiItemOrderRequest;
 import github.lms.lemuel.order.adapter.in.web.request.CreateOrderRequest;
 import github.lms.lemuel.order.adapter.in.web.response.OrderResponse;
 import github.lms.lemuel.order.application.port.in.ChangeOrderStatusUseCase;
@@ -22,7 +23,7 @@ import java.util.stream.Collectors;
  */
 @Validated
 @RestController
-@RequestMapping("/orders")
+@RequestMapping("/api/orders")
 @RequiredArgsConstructor
 public class OrderController {
 
@@ -35,6 +36,23 @@ public class OrderController {
         Order order = createOrderUseCase.createOrder(
                 new CreateOrderUseCase.CreateOrderCommand(request.getUserId(), request.getProductId(), request.getAmount())
         );
+        return ResponseEntity.status(HttpStatus.CREATED).body(OrderResponse.from(order));
+    }
+
+    @PostMapping("/multi")
+    public ResponseEntity<OrderResponse> createMultiItemOrder(@Valid @RequestBody CreateMultiItemOrderRequest request) {
+        List<CreateOrderUseCase.OrderItemCommand> itemCommands = request.items().stream()
+                .map(item -> new CreateOrderUseCase.OrderItemCommand(item.productId(), item.quantity()))
+                .collect(Collectors.toList());
+
+        CreateOrderUseCase.CreateMultiItemOrderCommand command = new CreateOrderUseCase.CreateMultiItemOrderCommand(
+                request.userId(),
+                itemCommands,
+                request.shippingAddressId(),
+                request.couponCode()
+        );
+
+        Order order = createOrderUseCase.createMultiItemOrder(command);
         return ResponseEntity.status(HttpStatus.CREATED).body(OrderResponse.from(order));
     }
 
