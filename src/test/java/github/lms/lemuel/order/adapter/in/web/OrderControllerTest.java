@@ -1,5 +1,6 @@
 package github.lms.lemuel.order.adapter.in.web;
 
+import github.lms.lemuel.common.config.jwt.JwtUtil;
 import github.lms.lemuel.order.application.port.in.ChangeOrderStatusUseCase;
 import github.lms.lemuel.order.application.port.in.CreateOrderUseCase;
 import github.lms.lemuel.order.application.port.in.GetOrderUseCase;
@@ -8,9 +9,9 @@ import github.lms.lemuel.order.domain.exception.OrderNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.bean.MockBean;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -26,9 +27,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class OrderControllerTest {
 
     @Autowired MockMvc mockMvc;
-    @MockBean CreateOrderUseCase createOrderUseCase;
-    @MockBean GetOrderUseCase getOrderUseCase;
-    @MockBean ChangeOrderStatusUseCase changeOrderStatusUseCase;
+    @MockitoBean JwtUtil jwtUtil;
+    @MockitoBean CreateOrderUseCase createOrderUseCase;
+    @MockitoBean GetOrderUseCase getOrderUseCase;
+    @MockitoBean ChangeOrderStatusUseCase changeOrderStatusUseCase;
 
     @Test @DisplayName("GET /orders/{id} - 성공") void getOrder() throws Exception {
         Order order = Order.create(1L, 1L, new BigDecimal("10000"));

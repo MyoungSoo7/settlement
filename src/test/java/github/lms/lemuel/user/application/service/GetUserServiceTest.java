@@ -24,7 +24,7 @@ class GetUserServiceTest {
     @InjectMocks GetUserService service;
 
     @Test @DisplayName("ID로 조회 성공") void getById() {
-        User user = User.create("test@test.com", "hash", UserRole.USER);
+        User user = User.createWithRole("test@test.com", "hash", UserRole.USER);
         when(loadUserPort.findById(1L)).thenReturn(Optional.of(user));
         assertThat(service.getUserById(1L).getEmail()).isEqualTo("test@test.com");
     }
@@ -33,7 +33,7 @@ class GetUserServiceTest {
         assertThatThrownBy(() -> service.getUserById(999L)).isInstanceOf(UserNotFoundException.class);
     }
     @Test @DisplayName("이메일로 조회") void getByEmail() {
-        User user = User.create("a@b.com", "hash", UserRole.USER);
+        User user = User.createWithRole("a@b.com", "hash", UserRole.USER);
         when(loadUserPort.findByEmail("a@b.com")).thenReturn(Optional.of(user));
         assertThat(service.getUserByEmail("a@b.com")).isNotNull();
     }

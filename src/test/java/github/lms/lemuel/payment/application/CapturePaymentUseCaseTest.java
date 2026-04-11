@@ -1,7 +1,6 @@
 package github.lms.lemuel.payment.application;
 
-import github.lms.lemuel.payment.application.port.out.LoadPaymentPort;
-import github.lms.lemuel.payment.application.port.out.SavePaymentPort;
+import github.lms.lemuel.payment.application.port.out.*;
 import github.lms.lemuel.payment.domain.PaymentDomain;
 import github.lms.lemuel.payment.domain.PaymentStatus;
 import github.lms.lemuel.payment.domain.exception.PaymentNotFoundException;
@@ -24,6 +23,9 @@ class CapturePaymentUseCaseTest {
 
     @Mock LoadPaymentPort loadPaymentPort;
     @Mock SavePaymentPort savePaymentPort;
+    @Mock PgClientPort pgClientPort;
+    @Mock UpdateOrderStatusPort updateOrderStatusPort;
+    @Mock PublishEventPort publishEventPort;
     @Mock CreateSettlementFromPaymentUseCase createSettlementFromPaymentUseCase;
     @InjectMocks CapturePaymentUseCase capturePaymentUseCase;
 
@@ -37,7 +39,7 @@ class CapturePaymentUseCaseTest {
         PaymentDomain result = capturePaymentUseCase.capturePayment(1L);
 
         assertThat(result.getStatus()).isEqualTo(PaymentStatus.CAPTURED);
-        verify(createSettlementFromPaymentUseCase).createSettlement(any());
+        verify(createSettlementFromPaymentUseCase).createSettlementFromPayment(anyLong(), anyLong(), any());
     }
 
     @Test @DisplayName("결제 미존재 시 예외")

@@ -10,7 +10,8 @@ class PaymentStatusTest {
     @Test @DisplayName("모든 상태값 존재") void allStatuses() {
         assertThat(PaymentStatus.values()).containsExactlyInAnyOrder(
                 PaymentStatus.READY, PaymentStatus.AUTHORIZED,
-                PaymentStatus.CAPTURED, PaymentStatus.REFUNDED
+                PaymentStatus.CAPTURED, PaymentStatus.FAILED,
+                PaymentStatus.CANCELED, PaymentStatus.REFUNDED
         );
     }
 

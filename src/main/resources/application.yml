@@ -56,10 +56,9 @@ spring:
     username: ${ELASTICSEARCH_USER}
     password: ${ELASTICSEARCH_PASSWORD}
     connection-timeout: 5s
-    socket-timeout: 30s
+    socket-timeout: 60s
     ssl:
       verification-mode: full
-    socket-timeout: 60s
 
   # Graceful Shutdown for K8s Rolling Update
   lifecycle:

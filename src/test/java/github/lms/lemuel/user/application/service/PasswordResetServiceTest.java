@@ -30,7 +30,7 @@ class PasswordResetServiceTest {
 
     @Test @DisplayName("비밀번호 재설정 요청 - 존재하지 않는 이메일이면 조용히 무시")
     void requestReset_unknownEmail_silentlyIgnored() {
-        when(loadUserPort.loadByEmail("unknown@test.com")).thenReturn(Optional.empty());
+        when(loadUserPort.findByEmail("unknown@test.com")).thenReturn(Optional.empty());
 
         // 예외 없이 조용히 처리되어야 함 (보안: 이메일 존재 여부 노출 방지)
         assertThatCode(() -> passwordResetService.requestPasswordReset("unknown@test.com"))

@@ -67,7 +67,7 @@ class SettlementSearchControllerTest {
             ResponseEntity<SettlementPageResponse> response = controller.search(
                 null, null, null, null, null, null, 0, 20, "createdAt", "DESC");
 
-            assertThat(response.getStatusCodeValue()).isEqualTo(200);
+            assertThat(response.getStatusCode().value()).isEqualTo(200);
             assertThat(response.getBody()).isNotNull();
             assertThat(response.getBody().getTotalElements()).isEqualTo(0L);
             then(searchRepository).should().search(null, null, null, null, null, null, 0, 20, "createdAt", "DESC");
@@ -118,7 +118,7 @@ class SettlementSearchControllerTest {
             ResponseEntity<SettlementPageResponse> response =
                 controller.search("user@test.com", "상품A", true, "DONE", "2026-01-01", "2026-01-31", 0, 20, "createdAt", "DESC");
 
-            assertThat(response.getStatusCodeValue()).isEqualTo(200);
+            assertThat(response.getStatusCode().value()).isEqualTo(200);
             then(searchRepository).should().search("user@test.com", "상품A", true, "DONE", "2026-01-01", "2026-01-31", 0, 20, "createdAt", "DESC");
         }
 
