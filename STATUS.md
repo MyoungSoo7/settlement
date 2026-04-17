@@ -1,6 +1,6 @@
 # STATUS — Lemuel (Settlement)
 
-> 전자상거래 주문·결제·정산 통합 시스템 (Spring Boot 3.5 / Java 21 / 헥사고날)
+> 전자상거래 주문·결제·정산 통합 시스템 (Spring Boot 4.0 / Java 25 / 헥사고날)
 
 **Last updated:** 2026-04-09
 

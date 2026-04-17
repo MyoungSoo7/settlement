@@ -8,8 +8,8 @@
 
 | 구분 | 기술 |
 |------|------|
-| 언어 | Java 21 |
-| 프레임워크 | Spring Boot 3.5.10 |
+| 언어 | Java 25 |
+| 프레임워크 | Spring Boot 4.0.4 |
 | 데이터베이스 | PostgreSQL 17 |
 | 검색 엔진 | Elasticsearch 8.17 |
 | PG 연동 | Toss Payments |

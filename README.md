@@ -10,7 +10,7 @@
 |------|------|
 | 구조 | 모노레포 (백엔드 + 프론트엔드) |
 | 버전 | v0.2.0 |
-| 백엔드 | Spring Boot 3.5.10, Java 21 |
+| 백엔드 | Spring Boot 4.0.4, Java 25 |
 | 프론트엔드 | React 18, TypeScript, Vite |
 | 아키텍처 | 헥사고날 (Ports & Adapters) |
 
@@ -67,7 +67,7 @@ github/lms/lemuel/
 
 | 분야 | 라이브러리 |
 |------|-----------|
-| 핵심 | Spring Boot 3.5.10, Java 21 |
+| 핵심 | Spring Boot 4.0.4, Java 25 |
 | DB | PostgreSQL 17, Flyway 11.7.2, Hibernate JPA |
 | 검색 | Elasticsearch 8.x (Nori Analyzer) |
 | 인증 | JJWT (JWT), Spring Security |

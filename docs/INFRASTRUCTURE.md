@@ -6,7 +6,7 @@ Lemuel은 정산 시스템을 위한 Spring Boot 애플리케이션으로, Kuber
 
 ### 아키텍처 구성
 
-- **Application**: Spring Boot 3.5.x + Java 21
+- **Application**: Spring Boot 4.0.x + Java 25
 - **Framework**: Spring Batch, Spring Data JPA, Spring Security
 - **Database**: PostgreSQL 16
 - **Search Engine**: Elasticsearch 8.11
@@ -93,7 +93,7 @@ spring:
 
 ```dockerfile
 # Stage 1: Build
-FROM gradle:8.5-jdk21-alpine AS builder
+FROM gradle:8.5-jdk25-alpine AS builder
 WORKDIR /app
 COPY ../build.gradle.kts settings.gradle.kts ./
 RUN gradle dependencies --no-daemon || true
@@ -101,7 +101,7 @@ COPY ../src ./src
 RUN gradle bootJar --no-daemon -x test
 
 # Stage 2: Runtime
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:25-jre-alpine
 COPY --from=builder /app/build/libs/*.jar app.jar
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]
@@ -116,7 +116,7 @@ ENTRYPOINT ["java", "-jar", "app.jar"]
 
 **`.github/workflows/deploy.yml`**:
 1. 코드 체크아웃
-2. JDK 21 설치 및 Gradle 캐싱
+2. JDK 25 설치 및 Gradle 캐싱
 3. 테스트 실행
 4. Gradle 빌드 (`bootJar`)
 5. Docker 이미지 빌드 및 GHCR 푸시

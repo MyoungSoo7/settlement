@@ -1,7 +1,7 @@
 # CI/CD Pipeline Setup Guide
 
 ## Overview
-This guide will help you set up the production-grade CI pipeline for this Spring Boot 3.x project with hexagonal architecture.
+This guide will help you set up the production-grade CI pipeline for this Spring Boot 4.x project with hexagonal architecture.
 
 ---
 
@@ -10,7 +10,7 @@ This guide will help you set up the production-grade CI pipeline for this Spring
 1. **GitHub Repository** with admin access
 2. **SonarCloud Account** (free for open-source projects)
    - Sign up at: https://sonarcloud.io
-3. **Java 21** installed locally (for testing)
+3. **Java 25** installed locally (for testing)
 4. **Gradle 8+** (included via wrapper)
 
 ---
@@ -186,7 +186,7 @@ src/main/java/github/lms/lemuel/
 - ✅ Port/Adapter separation maintained
 
 ## Tech Stack
-- **Java 21** with Spring Boot 3.5.x
+- **Java 25** with Spring Boot 4.0.x
 - **Gradle Kotlin DSL**
 - **PostgreSQL** + Flyway migrations
 - **Elasticsearch** for search
@@ -198,7 +198,7 @@ src/main/java/github/lms/lemuel/
 ## Getting Started
 
 ### Prerequisites
-- Java 21
+- Java 25
 - Docker & Docker Compose (for PostgreSQL, Elasticsearch)
 
 ### Run Locally
