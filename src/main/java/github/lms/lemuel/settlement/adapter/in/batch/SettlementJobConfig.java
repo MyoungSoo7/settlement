@@ -4,8 +4,8 @@ import github.lms.lemuel.settlement.adapter.in.batch.tasklet.ConfirmSettlementsT
 import github.lms.lemuel.settlement.adapter.in.batch.tasklet.CreateSettlementsTasklet;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.batch.core.Job;
-import org.springframework.batch.core.Step;
+import org.springframework.batch.core.job.Job;
+import org.springframework.batch.core.step.Step;
 import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;

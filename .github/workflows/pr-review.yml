@@ -1,0 +1,80 @@
+name: PR Review Bot
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  basic-review:
+    name: Lightweight PR Review
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Collect PR stats
+        id: stats
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          ADDED=$(git diff --shortstat origin/${{ github.base_ref }}...HEAD | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+' || echo 0)
+          DELETED=$(git diff --shortstat origin/${{ github.base_ref }}...HEAD | grep -oE '[0-9]+ deletion' | grep -oE '[0-9]+' || echo 0)
+          FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | wc -l | tr -d ' ')
+          echo "added=$ADDED" >> "$GITHUB_OUTPUT"
+          echo "deleted=$DELETED" >> "$GITHUB_OUTPUT"
+          echo "files=$FILES" >> "$GITHUB_OUTPUT"
+
+      - name: Claude review (optional)
+        id: claude
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "review=Set ANTHROPIC_API_KEY secret to enable AI review." >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          DIFF=$(git diff origin/${{ github.base_ref }}...HEAD | head -c 60000)
+          PAYLOAD=$(jq -Rn --arg diff "$DIFF" '{
+            model: "claude-opus-4-5",
+            max_tokens: 1024,
+            messages: [{role:"user", content:("Review this diff for code quality, security, tests, naming. Be concise.\n\n" + $diff)}]
+          }')
+          RESP=$(curl -sS https://api.anthropic.com/v1/messages \
+            -H "x-api-key: $ANTHROPIC_API_KEY" \
+            -H "anthropic-version: 2023-06-01" \
+            -H "content-type: application/json" \
+            -d "$PAYLOAD")
+          REVIEW=$(echo "$RESP" | jq -r '.content[0].text // "No content."')
+          {
+            echo "review<<EOF_R"
+            echo "$REVIEW"
+            echo "EOF_R"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Post comment
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const body = [
+              '## PR Review Summary',
+              '',
+              `- Files changed: ${{ steps.stats.outputs.files }}`,
+              `- Lines added: ${{ steps.stats.outputs.added }}`,
+              `- Lines deleted: ${{ steps.stats.outputs.deleted }}`,
+              '',
+              '### AI Review',
+              `${{ steps.claude.outputs.review }}`
+            ].join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });

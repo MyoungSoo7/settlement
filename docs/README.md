@@ -4,8 +4,8 @@
 
 **Lemuel**은 Spring Boot 기반의 엔터프라이즈급 주문·결제·정산 통합 시스템입니다.
 
-- **Java**: 21
-- **Spring Boot**: 3.5.10
+- **Java**: 25
+- **Spring Boot**: 4.0.4
 - **PostgreSQL**: 17
 - **버전**: v0.2.0
 
@@ -130,7 +130,7 @@ GET /api/settlements/search?startDate=2026-01-01T00:00:00&endDate=2026-02-11T23:
 ## 🚀 빠른 시작
 
 ### 1. 사전 요구사항
-- Java 21
+- Java 25
 - PostgreSQL 17
 - Docker & Docker Compose
 - Elastic Cloud 계정 (무료 트라이얼)

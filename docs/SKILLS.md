@@ -3,8 +3,8 @@
 ## 🛠️ 기술 스택
 
 ### Backend
-- **Java**: 21
-- **Spring Boot**: 3.5.10
+- **Java**: 25
+- **Spring Boot**: 4.0.4
 - **Spring Security**: JWT 기반 인증
 - **Spring Data JPA**: ORM 레이어
 - **Spring Batch**: 정산 배치 작업

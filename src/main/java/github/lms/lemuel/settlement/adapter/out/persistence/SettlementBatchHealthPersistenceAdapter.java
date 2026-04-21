@@ -15,17 +15,16 @@ import java.util.List;
 public class SettlementBatchHealthPersistenceAdapter implements LoadSettlementBatchHealthPort {
 
     private final SpringDataSettlementJpaRepository settlementRepository;
-    // TODO: SettlementAdjustment가 클린 아키텍처로 이동되면 해당 Repository 주입
-    // private final SpringDataSettlementAdjustmentJpaRepository adjustmentRepository;
+    private final SpringDataSettlementAdjustmentJpaRepository adjustmentRepository;
 
-    public SettlementBatchHealthPersistenceAdapter(SpringDataSettlementJpaRepository settlementRepository) {
+    public SettlementBatchHealthPersistenceAdapter(SpringDataSettlementJpaRepository settlementRepository,
+                                                     SpringDataSettlementAdjustmentJpaRepository adjustmentRepository) {
         this.settlementRepository = settlementRepository;
-        // this.adjustmentRepository = adjustmentRepository;
+        this.adjustmentRepository = adjustmentRepository;
     }
 
     @Override
     public SettlementBatchHealthSnapshot loadHealthSnapshot(LocalDate date) {
-        // 정산 데이터 조회
         List<SettlementJpaEntity> settlements = settlementRepository.findBySettlementDate(date);
 
         long pendingCount = settlements.stream()
@@ -36,14 +35,10 @@ public class SettlementBatchHealthPersistenceAdapter implements LoadSettlementBa
                 .filter(s -> "CONFIRMED".equals(s.getStatus()))
                 .count();
 
-        // TODO: SettlementAdjustment 조회
-        // SettlementAdjustment가 클린 아키텍처로 이동되면 아래 주석 해제
-        // List<SettlementAdjustmentJpaEntity> adjustments =
-        //     adjustmentRepository.findPendingByAdjustmentDate(date);
-        // long pendingAdjustmentCount = adjustments.size();
-
-        // 임시: adjustment 카운트는 0으로 처리 (SettlementAdjustment 이동 전)
-        long pendingAdjustmentCount = 0;
+        // SettlementAdjustment 조회
+        long pendingAdjustmentCount = adjustmentRepository
+                .findByAdjustmentDateAndStatus(date, "PENDING")
+                .size();
 
         return new SettlementBatchHealthSnapshot(
                 date,

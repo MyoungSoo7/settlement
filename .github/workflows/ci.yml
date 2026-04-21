@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 env:
-  JAVA_VERSION: "21"
+  JAVA_VERSION: "25"
   REGISTRY: ghcr.io
   BACKEND_IMAGE: ${{ github.repository }}
   FRONTEND_IMAGE: ${{ github.repository }}-frontend
