@@ -7,7 +7,9 @@
       "Bash(./gradlew compileJava 2>&1 | tail -30)",
       "Bash(./gradlew test:*)",
       "Read(//mnt/c/Users/iamip/IdeaProjects/kubenetis/**)",
-      "Bash(./gradlew compileJava)"
+      "Bash(./gradlew compileJava)",
+      "Bash(gh api -X POST repos/MyoungSoo7/settlement/branches/master/rename -f new_name=develop)",
+      "Bash(gh api -X POST repos/MyoungSoo7/settlement/branches/master/rename -f new_name=develop --jq *)"
     ]
   }
 }
