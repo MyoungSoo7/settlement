@@ -7,9 +7,11 @@ import github.lms.lemuel.order.application.port.in.CreateOrderUseCase;
 import github.lms.lemuel.order.application.port.in.GetOrderUseCase;
 import github.lms.lemuel.order.domain.Order;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,6 +20,7 @@ import java.util.stream.Collectors;
 /**
  * Order API Controller
  */
+@Validated
 @RestController
 @RequestMapping("/orders")
 @RequiredArgsConstructor
@@ -36,13 +39,15 @@ public class OrderController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<OrderResponse> getOrder(@PathVariable Long id) {
+    public ResponseEntity<OrderResponse> getOrder(
+            @PathVariable @Positive(message = "주문 ID는 양수여야 합니다") Long id) {
         Order order = getOrderUseCase.getOrderById(id);
         return ResponseEntity.ok(OrderResponse.from(order));
     }
 
     @GetMapping("/user/{userId}")
-    public ResponseEntity<List<OrderResponse>> getUserOrders(@PathVariable Long userId) {
+    public ResponseEntity<List<OrderResponse>> getUserOrders(
+            @PathVariable @Positive(message = "유저 ID는 양수여야 합니다") Long userId) {
         List<OrderResponse> orders = getOrderUseCase.getOrdersByUserId(userId)
                 .stream()
                 .map(OrderResponse::from)
@@ -60,7 +65,8 @@ public class OrderController {
     }
 
     @PatchMapping("/{id}/cancel")
-    public ResponseEntity<OrderResponse> cancelOrder(@PathVariable Long id) {
+    public ResponseEntity<OrderResponse> cancelOrder(
+            @PathVariable @Positive(message = "주문 ID는 양수여야 합니다") Long id) {
         Order order = changeOrderStatusUseCase.cancelOrder(id);
         return ResponseEntity.ok(OrderResponse.from(order));
     }

@@ -10,9 +10,9 @@ import lombok.Setter;
 @NoArgsConstructor
 public class CouponUseRequest {
 
-    @NotNull
+    @NotNull(message = "userId는 필수값입니다")
     private Long userId;
 
-    @NotNull
+    @NotNull(message = "orderId는 필수값입니다")
     private Long orderId;
 }
