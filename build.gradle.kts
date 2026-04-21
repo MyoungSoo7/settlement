@@ -56,6 +56,12 @@ dependencies {
     // Mail
     implementation("org.springframework.boot:spring-boot-starter-mail")
 
+    implementation("com.querydsl:querydsl-jpa:5.0.0:jakarta")
+    annotationProcessor("com.querydsl:querydsl-apt:5.0.0:jakarta")
+    annotationProcessor("jakarta.annotation:jakarta.annotation-api")
+    annotationProcessor("jakarta.persistence:jakarta.persistence-api")
+
+
     // Ghostscript 연동 (ProcessBuilder로 gs CLI 호출)
     // gs 바이너리는 Docker 이미지에 설치됨 (apk add ghostscript)
     // iText8 AGPL: PDF 생성 (정산서 등)
@@ -149,4 +155,21 @@ extensions.configure<FlywayExtension> {
     schemas = arrayOf("opslab")
     defaultSchema = "opslab"
     locations = arrayOf("classpath:db/migration")
+}
+
+val querydslDir = layout.buildDirectory.dir("generated/querydsl")
+
+tasks.withType<JavaCompile>().configureEach {
+    options.generatedSourceOutputDirectory.set(querydslDir.get().asFile)
+}
+
+tasks.named("clean") {
+    doLast {
+        delete(querydslDir)
+    }
+}
+sourceSets {
+    named("main") {
+        java.srcDir(querydslDir)
+    }
 }

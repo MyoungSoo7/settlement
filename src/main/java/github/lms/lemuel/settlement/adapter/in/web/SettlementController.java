@@ -9,17 +9,20 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 /**
  * Settlement API Controller
  */
 @Tag(name = "Settlement", description = "정산 조회 및 정산서 PDF 다운로드 API")
+@Validated
 @RestController
 @RequestMapping("/settlements")
 @RequiredArgsConstructor
@@ -35,7 +38,7 @@ public class SettlementController {
     })
     @GetMapping("/{id}")
     public ResponseEntity<SettlementResponse> getSettlement(
-            @Parameter(description = "정산 ID", required = true) @PathVariable Long id) {
+            @Parameter(description = "정산 ID", required = true) @PathVariable @Positive(message = "정산 ID는 양수여야 합니다") Long id) {
         Settlement settlement = getSettlementUseCase.getSettlementById(id);
         return ResponseEntity.ok(SettlementResponse.from(settlement));
     }
@@ -47,7 +50,7 @@ public class SettlementController {
     })
     @GetMapping("/payment/{paymentId}")
     public ResponseEntity<SettlementResponse> getSettlementByPaymentId(
-            @Parameter(description = "결제 ID", required = true) @PathVariable Long paymentId) {
+            @Parameter(description = "결제 ID", required = true) @PathVariable @Positive(message = "결제 ID는 양수여야 합니다") Long paymentId) {
         var settlements = getSettlementUseCase.getSettlementsByPaymentId(paymentId);
         if (settlements.isEmpty()) {
             return ResponseEntity.notFound().build();

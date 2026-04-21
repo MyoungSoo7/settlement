@@ -9,9 +9,11 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -19,6 +21,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Tag(name = "Coupon", description = "쿠폰 생성/조회/검증/사용 API")
+@Validated
 @RestController
 @RequestMapping("/coupons")
 @RequiredArgsConstructor
@@ -77,8 +80,8 @@ public class CouponController {
     @GetMapping("/{code}/validate")
     public ResponseEntity<CouponValidateResponse> validateCoupon(
             @Parameter(description = "쿠폰 코드", required = true) @PathVariable String code,
-            @Parameter(description = "사용자 ID", required = true) @RequestParam Long userId,
-            @Parameter(description = "주문 총액", required = true) @RequestParam BigDecimal amount
+            @Parameter(description = "사용자 ID", required = true) @RequestParam @Positive(message = "userId는 양수여야 합니다") Long userId,
+            @Parameter(description = "주문 총액", required = true) @RequestParam @Positive(message = "주문 금액은 0보다 커야 합니다") BigDecimal amount
     ) {
         CouponUseCase.ValidateResult result = couponUseCase.validateCoupon(code, userId, amount);
         return ResponseEntity.ok(new CouponValidateResponse(

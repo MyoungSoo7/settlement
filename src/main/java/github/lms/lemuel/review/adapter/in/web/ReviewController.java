@@ -11,9 +11,11 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -28,6 +30,7 @@ import java.util.stream.Collectors;
  * DELETE /reviews/{id}?userId=         - 리뷰 삭제
  */
 @Tag(name = "Review", description = "상품 리뷰 및 평점 API")
+@Validated
 @RestController
 @RequestMapping("/reviews")
 @RequiredArgsConstructor
@@ -62,7 +65,7 @@ public class ReviewController {
     })
     @GetMapping("/product/{productId}")
     public ResponseEntity<List<ReviewResponse>> getProductReviews(
-            @Parameter(description = "상품 ID", required = true) @PathVariable Long productId) {
+            @Parameter(description = "상품 ID", required = true) @PathVariable @Positive(message = "상품 ID는 양수여야 합니다") Long productId) {
         List<ReviewResponse> reviews = reviewService.getProductReviews(productId)
                 .stream().map(ReviewResponse::new).collect(Collectors.toList());
         return ResponseEntity.ok(reviews);
@@ -74,7 +77,7 @@ public class ReviewController {
     })
     @GetMapping("/user/{userId}")
     public ResponseEntity<List<ReviewResponse>> getUserReviews(
-            @Parameter(description = "사용자 ID", required = true) @PathVariable Long userId) {
+            @Parameter(description = "사용자 ID", required = true) @PathVariable @Positive(message = "유저 ID는 양수여야 합니다") Long userId) {
         List<ReviewResponse> reviews = reviewService.getUserReviews(userId)
                 .stream().map(ReviewResponse::new).collect(Collectors.toList());
         return ResponseEntity.ok(reviews);
@@ -88,7 +91,7 @@ public class ReviewController {
     })
     @PutMapping("/{id}")
     public ResponseEntity<?> updateReview(
-            @Parameter(description = "리뷰 ID", required = true) @PathVariable Long id,
+            @Parameter(description = "리뷰 ID", required = true) @PathVariable @Positive(message = "리뷰 ID는 양수여야 합니다") Long id,
             @Valid @RequestBody ReviewUpdateRequest request) {
         try {
             Review updated = reviewService.updateReview(
@@ -111,8 +114,8 @@ public class ReviewController {
     })
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteReview(
-            @Parameter(description = "리뷰 ID", required = true) @PathVariable Long id,
-            @Parameter(description = "요청자(작성자) 사용자 ID", required = true) @RequestParam Long userId) {
+            @Parameter(description = "리뷰 ID", required = true) @PathVariable @Positive(message = "리뷰 ID는 양수여야 합니다") Long id,
+            @Parameter(description = "요청자(작성자) 사용자 ID", required = true) @RequestParam @Positive(message = "유저 ID는 양수여야 합니다") Long userId) {
         try {
             reviewService.deleteReview(id, userId);
             return ResponseEntity.noContent().build();
