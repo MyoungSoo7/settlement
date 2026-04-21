@@ -133,7 +133,7 @@ jobs:
           SPRING_ELASTICSEARCH_URIS: http://localhost:9200
 
       - name: Run Snyk Security Scan (Backend)
-        uses: snyk/actions/gradle-jdk25@master
+        uses: snyk/actions/gradle-jdk21@master
         continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
