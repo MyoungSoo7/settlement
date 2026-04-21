@@ -1,1 +1,0 @@
-import{j as s}from"./index-BK4yAbud.js";const o=({title:r,children:e,className:a=""})=>s.jsxs("div",{className:`bg-white rounded-lg shadow ${a}`,children:[r&&s.jsx("div",{className:"px-6 py-4 border-b border-gray-200",children:s.jsx("h3",{className:"text-lg font-semibold text-gray-900",children:r})}),s.jsx("div",{className:"p-6",children:e})]});export{o as C};

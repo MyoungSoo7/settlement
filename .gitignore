@@ -53,3 +53,7 @@ gradle-app.setting
 build/
 target/
 **/*.class
+
+### Local runtime artifacts ###
+.claude/scheduled_tasks.lock
+*.stackdump

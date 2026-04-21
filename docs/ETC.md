@@ -3,7 +3,7 @@
 ## 🚀 시작하기
 
 ### 1. 사전 요구사항
-- Java 21
+- Java 25
 - Docker & Docker Compose
 - Gradle
 - **PostgreSQL 17** (로컬 설치)

@@ -10,13 +10,6 @@ spring:
     username: ${POSTGRES_USER}
     password: ${POSTGRES_PASSWORD}
     driver-class-name: org.postgresql.Driver
-    hikari:
-      maximum-pool-size: 20
-      minimum-idle: 5
-      idle-timeout: 300000
-      connection-timeout: 20000
-      max-lifetime: 1200000
-      leak-detection-threshold: 60000
 
   jpa:
     hibernate:
@@ -27,11 +20,6 @@ spring:
       hibernate:
         format_sql: true
         default_schema: opslab
-        default_batch_fetch_size: 50
-        order_inserts: true
-        order_updates: true
-        jdbc:
-          batch_size: 50
 
   flyway:
     enabled: true
@@ -93,11 +81,7 @@ spring:
 # Server Configuration
 server:
   port: 8088
-  shutdown: graceful
-  compression:
-    enabled: true
-    mime-types: application/json,application/xml,text/html,text/xml,text/plain
-    min-response-size: 1024
+  shutdown: graceful  # Graceful Shutdown 활성화
   tomcat:
     connection-timeout: 20s
     threads:
@@ -121,10 +105,10 @@ management:
     prometheus:
       enabled: true
     health:
-      show-details: when-authorized
-      show-components: when-authorized
+      show-details: always
+      show-components: always
       probes:
-        enabled: true
+        enabled: true  # K8s Liveness/Readiness Probe 활성화
   health:
     mail:
       enabled: false
