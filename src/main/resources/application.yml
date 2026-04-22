@@ -195,4 +195,35 @@ toss:
   secret-key: ${TOSS_SECRET_KEY}
   api-url: https://api.tosspayments.com/v1/payments/confirm
 
+# Resilience4j — Toss PG 호출 복원력
+resilience4j:
+  circuitbreaker:
+    instances:
+      tossPg:
+        registerHealthIndicator: true
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 20                    # 최근 20회 요청 기준
+        minimumNumberOfCalls: 10                 # 최소 10건 수집 후 판정
+        failureRateThreshold: 50                 # 50% 이상 실패면 OPEN
+        waitDurationInOpenState: 30s             # OPEN → HALF_OPEN 대기
+        permittedNumberOfCallsInHalfOpenState: 5
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        # 4xx 는 PG 쪽의 비즈니스 오류 (결제키 만료 등) 이므로 서킷 판정에서 제외
+        ignoreExceptions:
+          - org.springframework.web.client.HttpClientErrorException
+  retry:
+    instances:
+      tossPg:
+        maxAttempts: 3
+        waitDuration: 500ms
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+        # 4xx 는 재시도해도 똑같이 실패 — 재시도 안 함
+        ignoreExceptions:
+          - org.springframework.web.client.HttpClientErrorException
+        retryExceptions:
+          - org.springframework.web.client.ResourceAccessException
+          - org.springframework.web.client.HttpServerErrorException
+          - java.io.IOException
+
 

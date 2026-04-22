@@ -76,6 +76,10 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-cache")
     implementation("com.github.ben-manes.caffeine:caffeine")
 
+    // Resilience4j — Toss PG 호출에 CircuitBreaker + Retry 적용 (AOP 기반)
+    implementation("io.github.resilience4j:resilience4j-spring-boot3:2.2.0")
+    implementation("org.springframework.boot:spring-boot-starter-aop")
+
     // prometheus
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
 
