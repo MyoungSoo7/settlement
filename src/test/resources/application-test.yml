@@ -30,6 +30,13 @@ spring:
     password: test
 
 app:
+  kafka:
+    enabled: false
+    topic:
+      payment-captured: lemuel.payment.captured
+      payment-refunded: lemuel.payment.refunded
+  outbox:
+    polling-delay-ms: 2000
   search:
     enabled: false
   jwt:

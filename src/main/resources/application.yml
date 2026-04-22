@@ -46,6 +46,26 @@ spring:
     connection-timeout: 5s
     socket-timeout: 60s
 
+  # Kafka 설정 — app.kafka.enabled 로 활성/비활성 스위칭
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      acks: all                                 # 모든 in-sync replica 확인 (신뢰성 우선)
+      retries: 5
+      properties:
+        enable.idempotence: true                # 프로듀서 중복 발행 방지
+        max.in.flight.requests.per.connection: 5
+        compression.type: lz4
+    consumer:
+      group-id: lemuel-settlement
+      auto-offset-reset: earliest               # 새 컨슈머는 시작부터 재생
+      enable-auto-commit: false                 # 수동 ack → 멱등 처리 후 커밋
+      properties:
+        isolation.level: read_committed
+    listener:
+      ack-mode: manual_immediate
+      missing-topics-fatal: false
+
   # Graceful Shutdown for K8s Rolling Update
   lifecycle:
     timeout-per-shutdown-phase: 30s  # Pod 종료 시 최대 30초 대기
@@ -146,6 +166,13 @@ springdoc:
 
 
 app:
+  kafka:
+    enabled: ${APP_KAFKA_ENABLED:false}         # 로컬 개발 기본 OFF — 프로덕션 compose/K8s 에서 true
+    topic:
+      payment-captured: lemuel.payment.captured
+      payment-refunded: lemuel.payment.refunded
+  outbox:
+    polling-delay-ms: 2000
   search:
     enabled: false
   jwt:

@@ -33,6 +33,10 @@ dependencies {
 
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")
+
+    // Kafka (실 브로커 — Redpanda/Apache Kafka 호환).
+    // app.kafka.enabled=true 일 때만 KafkaOutboxPublisher / 컨슈머가 활성화된다.
+    implementation("org.springframework.kafka:spring-kafka")
     runtimeOnly("org.postgresql:postgresql:42.7.3")
 
     // SpringDoc OpenAPI
@@ -100,7 +104,9 @@ dependencies {
     // Testcontainers: 실 Postgres 에서 Flyway+Hibernate schema validation 을 CI 에서 검증
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:postgresql")
+    testImplementation("org.testcontainers:kafka")
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
+    testImplementation("org.springframework.kafka:spring-kafka-test")
 }
 
 val mockitoAgent = configurations.create("mockitoAgent")

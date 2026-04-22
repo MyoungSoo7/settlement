@@ -8,12 +8,20 @@ import github.lms.lemuel.payment.application.port.out.PgClientPort;
 import github.lms.lemuel.payment.application.port.out.PublishEventPort;
 import github.lms.lemuel.payment.application.port.out.SavePaymentPort;
 import github.lms.lemuel.payment.application.port.out.UpdateOrderStatusPort;
-import github.lms.lemuel.settlement.application.port.in.CreateSettlementFromPaymentUseCase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * 결제 승인→매입(capture) 유스케이스.
+ *
+ * <p><b>아키텍처 노트:</b> 정산 생성은 본 트랜잭션의 직접 호출이 아니라
+ * outbox 이벤트({@code publishPaymentCaptured}) 를 통해 Kafka 컨슈머가 수행한다.
+ * 이로써 결제 트랜잭션의 원자성이 정산 서비스 가용성과 분리된다.
+ * Kafka 가 비활성({@code app.kafka.enabled=false}) 이면 ApplicationEventOutboxPublisher
+ * 폴백으로 전달되고, 배치 CronJob 이 누락분을 reconcile 한다.
+ */
 @Service
 @Transactional
 public class CapturePaymentUseCase implements CapturePaymentPort {
@@ -25,20 +33,17 @@ public class CapturePaymentUseCase implements CapturePaymentPort {
     private final PgClientPort pgClientPort;
     private final UpdateOrderStatusPort updateOrderStatusPort;
     private final PublishEventPort publishEventPort;
-    private final CreateSettlementFromPaymentUseCase createSettlementFromPaymentUseCase;
 
     public CapturePaymentUseCase(LoadPaymentPort loadPaymentPort,
                                  SavePaymentPort savePaymentPort,
                                  PgClientPort pgClientPort,
                                  UpdateOrderStatusPort updateOrderStatusPort,
-                                 PublishEventPort publishEventPort,
-                                 CreateSettlementFromPaymentUseCase createSettlementFromPaymentUseCase) {
+                                 PublishEventPort publishEventPort) {
         this.loadPaymentPort = loadPaymentPort;
         this.savePaymentPort = savePaymentPort;
         this.pgClientPort = pgClientPort;
         this.updateOrderStatusPort = updateOrderStatusPort;
         this.publishEventPort = publishEventPort;
-        this.createSettlementFromPaymentUseCase = createSettlementFromPaymentUseCase;
     }
 
     @Override
@@ -46,33 +51,19 @@ public class CapturePaymentUseCase implements CapturePaymentPort {
         PaymentDomain paymentDomain = loadPaymentPort.loadById(paymentId)
             .orElseThrow(() -> new PaymentNotFoundException(paymentId));
 
-        // Call external PG to capture
         pgClientPort.capture(paymentDomain.getPgTransactionId(), paymentDomain.getAmount());
-
-        // Domain logic
         paymentDomain.capture();
 
-        // Save payment
         PaymentDomain savedPaymentDomain = savePaymentPort.save(paymentDomain);
-
-        // Update order status to PAID
         updateOrderStatusPort.updateOrderStatus(savedPaymentDomain.getOrderId(), "PAID");
 
-        // Publish event
-        publishEventPort.publishPaymentCaptured(savedPaymentDomain.getId(), savedPaymentDomain.getOrderId());
-
-        // ========== 정산 자동 생성 (핵심!) ==========
-        try {
-            createSettlementFromPaymentUseCase.createSettlementFromPayment(
+        // outbox 에 PaymentCaptured 이벤트 기록 (같은 @Transactional).
+        // OutboxPublisherScheduler 가 Kafka 로 발행 → PaymentEventKafkaConsumer 가 정산 생성.
+        publishEventPort.publishPaymentCaptured(
                 savedPaymentDomain.getId(),
                 savedPaymentDomain.getOrderId(),
-                savedPaymentDomain.getAmount()
-            );
-            log.info("Settlement created automatically for payment. paymentId={}", savedPaymentDomain.getId());
-        } catch (Exception e) {
-            log.error("Failed to create settlement for payment. paymentId={}", savedPaymentDomain.getId(), e);
-            // 정산 생성 실패 시에도 결제는 정상 처리 (비동기로 재시도 가능)
-        }
+                savedPaymentDomain.getAmount());
+        log.info("PaymentCaptured event queued to outbox. paymentId={}", savedPaymentDomain.getId());
 
         return savedPaymentDomain;
     }

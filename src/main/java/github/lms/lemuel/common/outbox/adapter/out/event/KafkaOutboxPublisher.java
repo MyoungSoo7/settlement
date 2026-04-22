@@ -2,35 +2,103 @@ package github.lms.lemuel.common.outbox.adapter.out.event;
 
 import github.lms.lemuel.common.outbox.application.port.out.PublishExternalEventPort;
 import github.lms.lemuel.common.outbox.domain.OutboxEvent;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.header.internals.RecordHeader;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.support.SendResult;
+import org.springframework.stereotype.Component;
+
+import java.nio.charset.StandardCharsets;
+import java.util.Locale;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
- * Kafka 발행 구현체의 자리 표시 (skeleton).
+ * Kafka 로 outbox 이벤트를 발행하는 {@link PublishExternalEventPort} 구현체.
  *
- * <p>현재는 {@code app.kafka.enabled=true} 스위치가 실제로 존재하지 않으며 빈으로
- * 등록되지 않는다. Kafka 도입 시 다음 단계만 추가하면 된다:
- *   1. build.gradle 에 {@code org.springframework.kafka:spring-kafka} 의존성 추가
- *   2. docker-compose.yml 에 Kafka/Redpanda 브로커 구성
- *   3. KafkaTemplate 주입 + @ConditionalOnProperty("app.kafka.enabled") @Component 등록
- *   4. {@link ApplicationEventOutboxPublisher} 를 @ConditionalOnMissingBean 구조로 변경
+ * <p>활성화 조건: {@code app.kafka.enabled=true}
  *
- * <p>이 구조의 핵심: {@link PublishExternalEventPort} 추상화를 미리 분리해 두어
- * 도메인 서비스와 OutboxPublisherScheduler 는 Kafka 전환 시에도 수정되지 않는다.
+ * <p>토픽 명명 규칙: {@code lemuel.<aggregate_type_lower>.<event_type_snake>}
+ *   예) aggregateType=Payment, eventType=PaymentCaptured → lemuel.payment.captured
+ *
+ * <p>파티셔닝: aggregateId (예: payment_id) 를 key 로 사용해 같은 집합의 이벤트 순서 보장.
+ *
+ * <p>동기 send + get(timeout): 폴러 트랜잭션 안에서 실패를 즉시 감지해 markFailed 경로로 간다.
  */
-public final class KafkaOutboxPublisher implements PublishExternalEventPort {
+@Component
+@ConditionalOnProperty(name = "app.kafka.enabled", havingValue = "true")
+public class KafkaOutboxPublisher implements PublishExternalEventPort {
 
-    // private final KafkaTemplate<String, String> kafkaTemplate;
-    // private final String topicPrefix;
+    private static final Logger log = LoggerFactory.getLogger(KafkaOutboxPublisher.class);
+    private static final long SEND_TIMEOUT_SEC = 5;
 
-    private KafkaOutboxPublisher() {
-        // 활성화 전까지 인스턴스 생성 금지
+    private final KafkaTemplate<String, String> kafkaTemplate;
+
+    public KafkaOutboxPublisher(KafkaTemplate<String, String> kafkaTemplate) {
+        this.kafkaTemplate = kafkaTemplate;
     }
 
     @Override
     public void publish(OutboxEvent event) {
-        // TODO: kafkaTemplate.send(topicPrefix + "." + event.getAggregateType().toLowerCase(),
-        //                          event.getAggregateId(),
-        //                          event.getPayload());
-        throw new UnsupportedOperationException(
-                "Kafka 발행은 아직 활성화되지 않았습니다. ApplicationEventOutboxPublisher 를 사용하세요.");
+        String topic = resolveTopic(event);
+        ProducerRecord<String, String> record = new ProducerRecord<>(
+                topic,
+                null, // partition — 키 해시로 자동 할당
+                event.getAggregateId(),
+                event.getPayload()
+        );
+        record.headers().add(new RecordHeader("event_id",
+                event.getEventId().toString().getBytes(StandardCharsets.UTF_8)));
+        record.headers().add(new RecordHeader("event_type",
+                event.getEventType().getBytes(StandardCharsets.UTF_8)));
+        record.headers().add(new RecordHeader("aggregate_type",
+                event.getAggregateType().getBytes(StandardCharsets.UTF_8)));
+
+        try {
+            SendResult<String, String> result = kafkaTemplate.send(record)
+                    .get(SEND_TIMEOUT_SEC, TimeUnit.SECONDS);
+            log.debug("Kafka publish OK: topic={}, partition={}, offset={}, eventId={}",
+                    result.getRecordMetadata().topic(),
+                    result.getRecordMetadata().partition(),
+                    result.getRecordMetadata().offset(),
+                    event.getEventId());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Kafka publish interrupted", e);
+        } catch (ExecutionException | TimeoutException e) {
+            throw new RuntimeException("Kafka publish failed for eventId=" + event.getEventId(), e);
+        }
+    }
+
+    /**
+     * "Payment" + "PaymentCaptured" → "lemuel.payment.captured"
+     * 접두사 중복을 피하기 위해 eventType 에서 aggregateType prefix 를 제거한 뒤 camel→snake 변환.
+     */
+    private static String resolveTopic(OutboxEvent event) {
+        String aggregate = event.getAggregateType().toLowerCase(Locale.ROOT);
+        String eventType = event.getEventType();
+        if (eventType.startsWith(event.getAggregateType())) {
+            eventType = eventType.substring(event.getAggregateType().length());
+        }
+        String suffix = camelToSnake(eventType);
+        return "lemuel." + aggregate + "." + suffix;
+    }
+
+    private static String camelToSnake(String camel) {
+        StringBuilder out = new StringBuilder(camel.length() + 4);
+        for (int i = 0; i < camel.length(); i++) {
+            char c = camel.charAt(i);
+            if (Character.isUpperCase(c)) {
+                if (i > 0) out.append('_');
+                out.append(Character.toLowerCase(c));
+            } else {
+                out.append(c);
+            }
+        }
+        return out.toString();
     }
 }

@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -51,10 +52,11 @@ public class OutboxBackedEventPublisher implements PublishEventPort {
     }
 
     @Override
-    public void publishPaymentCaptured(Long paymentId, Long orderId) {
+    public void publishPaymentCaptured(Long paymentId, Long orderId, BigDecimal amount) {
         writeOutbox(paymentId, "PaymentCaptured", Map.of(
                 "paymentId", paymentId,
-                "orderId", orderId
+                "orderId", orderId,
+                "amount", amount.toPlainString()
         ));
     }
 
