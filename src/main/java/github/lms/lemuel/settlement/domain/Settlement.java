@@ -191,11 +191,23 @@ public class Settlement {
             throw new IllegalArgumentException("Refund amount must be greater than zero");
         }
 
+        // DONE 상태는 이미 판매자 지급 완료된 정산 → 금액 직접 변경 금지.
+        // 환불은 SettlementAdjustment 별도 레코드로만 기록해야 원장 정합성 유지됨.
+        if (this.status == SettlementStatus.DONE) {
+            throw new IllegalStateException(
+                "DONE settlement is immutable. Use SettlementAdjustment to record the refund offset.");
+        }
+
         if (this.refundedAmount == null) {
             this.refundedAmount = BigDecimal.ZERO;
         }
 
-        this.refundedAmount = this.refundedAmount.add(refundAmount);
+        BigDecimal newRefunded = this.refundedAmount.add(refundAmount);
+        if (newRefunded.compareTo(this.paymentAmount) > 0) {
+            throw new IllegalArgumentException(
+                "Cumulative refund " + newRefunded + " exceeds payment amount " + this.paymentAmount);
+        }
+        this.refundedAmount = newRefunded;
 
         // 순 정산 금액 재계산: (결제금액 - 환불금액 - 수수료)
         BigDecimal remainingAmount = this.paymentAmount.subtract(this.refundedAmount);
