@@ -90,7 +90,6 @@ dependencies {
     developmentOnly("org.springframework.boot:spring-boot-devtools")
     testImplementation("com.h2database:h2")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
-    testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("org.springframework.security:spring-security-test")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     // Mockito 를 명시적 javaagent 로 주입 (JDK 21+ 필수, JDK 25 에서 self-attach 불가)
@@ -98,6 +97,10 @@ dependencies {
     testImplementation("org.mockito:mockito-core")
     // ArchUnit: 헥사고날 경계 규칙을 테스트로 강제
     testImplementation("com.tngtech.archunit:archunit-junit5:1.3.0")
+    // Testcontainers: 실 Postgres 에서 Flyway+Hibernate schema validation 을 CI 에서 검증
+    testImplementation("org.testcontainers:junit-jupiter")
+    testImplementation("org.testcontainers:postgresql")
+    testImplementation("org.springframework.boot:spring-boot-testcontainers")
 }
 
 val mockitoAgent = configurations.create("mockitoAgent")
@@ -132,7 +135,7 @@ tasks.jacocoTestCoverageVerification {
             //   - 컨트롤러 다수 → @WebMvcTest 테스트 필요
             // 회귀 방지선을 0.20 으로 고정. 통합 테스트 스윗 구축은 별도 작업 항목.
             limit {
-                minimum = "0.20".toBigDecimal()
+                minimum = "0.22".toBigDecimal()
             }
         }
     }
