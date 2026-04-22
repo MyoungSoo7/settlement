@@ -2,8 +2,8 @@ package github.lms.lemuel.settlement.adapter.in.monitoring;
 
 import github.lms.lemuel.settlement.application.dto.SettlementBatchHealthSnapshot;
 import github.lms.lemuel.settlement.application.port.out.LoadSettlementBatchHealthPort;
-import org.springframework.boot.health.contributor.Health;
-import org.springframework.boot.health.contributor.HealthIndicator;
+import org.springframework.boot.actuate.health.Health;
+import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
