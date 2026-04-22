@@ -60,11 +60,10 @@ class HexagonalArchitectureTest {
     void applicationServiceShouldNotUseJpaRepositoryDirectly() {
         ArchRule rule = noClasses()
                 .that().resideInAPackage("..application.service..")
-                .and().doNotHaveSimpleName("EcommerceCategoryService")
                 .and().doNotHaveSimpleName("ProductImageService")
                 .should().dependOnClassesThat().resideInAPackage("..adapter.out.persistence..")
                 .because("애플리케이션 서비스는 어댑터(JPA)에 직접 의존하지 않고 포트를 사용해야 한다. "
-                        + "예외: EcommerceCategoryService, ProductImageService 는 향후 리팩터 대상")
+                        + "예외: ProductImageService 는 향후 리팩터 대상")
                 .allowEmptyShould(true);
 
         rule.check(mainClasses);
