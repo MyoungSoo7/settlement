@@ -97,6 +97,8 @@ dependencies {
     // Mockito 를 명시적 javaagent 로 주입 (JDK 21+ 필수, JDK 25 에서 self-attach 불가)
     // 동시에 JaCoCo 에이전트와의 충돌을 방지해 instrumentation 이 정상 적용되도록 한다
     testImplementation("org.mockito:mockito-core")
+    // ArchUnit: 헥사고날 경계 규칙을 테스트로 강제
+    testImplementation("com.tngtech.archunit:archunit-junit5:1.3.0")
 }
 
 val mockitoAgent = configurations.create("mockitoAgent")
