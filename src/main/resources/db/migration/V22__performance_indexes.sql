@@ -36,4 +36,4 @@ CREATE INDEX IF NOT EXISTS idx_reviews_product_id
 
 -- Coupons: expiry date filtering
 CREATE INDEX IF NOT EXISTS idx_coupons_expires_at
-    ON opslab.coupons (expires_at) WHERE used_at IS NULL;
+    ON opslab.coupons (expires_at) WHERE is_active = true;

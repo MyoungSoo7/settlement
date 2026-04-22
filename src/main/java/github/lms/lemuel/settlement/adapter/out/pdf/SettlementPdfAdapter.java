@@ -227,22 +227,17 @@ public class SettlementPdfAdapter implements SettlementPdfPort {
 
     private Paragraph statusBadge(SettlementStatus status, PdfFont font) {
         DeviceRgb color = switch (status) {
-            case DONE, CONFIRMED -> COLOR_DONE;
-            case FAILED, REJECTED, CANCELED -> COLOR_FAILED;
-            case PROCESSING, WAITING_APPROVAL -> COLOR_PROCESSING;
-            default -> COLOR_GRAY;
+            case DONE -> COLOR_DONE;
+            case FAILED, CANCELED -> COLOR_FAILED;
+            case PROCESSING -> COLOR_PROCESSING;
+            case REQUESTED -> COLOR_GRAY;
         };
         String label = switch (status) {
             case DONE -> "완료";
-            case CONFIRMED -> "확정";
             case FAILED -> "실패";
             case CANCELED -> "취소";
             case PROCESSING -> "처리 중";
             case REQUESTED -> "요청됨";
-            case PENDING -> "대기";
-            case WAITING_APPROVAL -> "승인 대기";
-            case REJECTED -> "거부";
-            default -> status.name();
         };
         return new Paragraph("● " + label)
                 .setFont(font).setFontSize(10).setFontColor(color)

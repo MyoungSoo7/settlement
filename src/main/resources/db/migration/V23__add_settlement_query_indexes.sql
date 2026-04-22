@@ -9,17 +9,14 @@ ON settlements(settlement_date DESC, id DESC);
 -- GROUP BY settlement_date WHERE status = ? 쿼리에서 Index-Only Scan 가능
 CREATE INDEX IF NOT EXISTS idx_settlements_date_status_amounts
 ON settlements(settlement_date, status)
-INCLUDE (payment_amount, refunded_amount, commission, net_amount);
+INCLUDE (payment_amount, commission, net_amount);
 
 -- 3. 대사(Reconciliation) 쿼리용: payment_id로 settlement 조회 시 금액 포함
 CREATE INDEX IF NOT EXISTS idx_settlements_payment_id_amounts
 ON settlements(payment_id)
-INCLUDE (payment_amount, refunded_amount, net_amount, status);
+INCLUDE (payment_amount, net_amount, status);
 
--- 4. 승인 상태 추적용: 승인 관련 상태만 필터링 (partial index)
-CREATE INDEX IF NOT EXISTS idx_settlements_approval_status
-ON settlements(status)
-WHERE status IN ('WAITING_APPROVAL', 'APPROVED', 'REJECTED');
+-- 4. [제거] 승인 관련 레거시 상태 partial index 는 V26 에서 DROP
 
 -- 5. payments 테이블: captured_at 기반 조회 최적화
 CREATE INDEX IF NOT EXISTS idx_payments_captured_status_amount

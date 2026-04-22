@@ -47,6 +47,33 @@ services:
       timeout: 5s
       retries: 20
 
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v24.2.7
+    container_name: lemuel-redpanda
+    command:
+      - redpanda start
+      - --smp 1
+      - --overprovisioned
+      - --node-id 0
+      - --kafka-addr PLAINTEXT://0.0.0.0:29092,OUTSIDE://0.0.0.0:9092
+      - --advertise-kafka-addr PLAINTEXT://redpanda:29092,OUTSIDE://localhost:9092
+      - --pandaproxy-addr 0.0.0.0:8082
+      - --advertise-pandaproxy-addr localhost:8082
+      - --rpc-addr 0.0.0.0:33145
+      - --advertise-rpc-addr redpanda:33145
+    ports:
+      - "127.0.0.1:9092:9092"   # 외부(호스트) 클라이언트용
+      - "127.0.0.1:29092:29092" # 컨테이너 네트워크 내부 클라이언트용
+      - "127.0.0.1:8082:8082"   # REST proxy
+    volumes:
+      - redpanda-data:/var/lib/redpanda/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health --exit-when-healthy || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
   app:
     build: .
     image: ghcr.io/myoungsoo7/settlement:latest
@@ -64,6 +91,10 @@ services:
       SPRING_ELASTICSEARCH_URIS: http://elasticsearch:9200
       SPRING_ELASTICSEARCH_USERNAME: ${ELASTICSEARCH_USER}
       SPRING_ELASTICSEARCH_PASSWORD: ${ELASTICSEARCH_PASSWORD}
+
+      # Kafka (Redpanda) — 컨테이너 네트워크 내부 endpoint
+      APP_KAFKA_ENABLED: "true"
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
 
       JWT_ISSUER: ${JWT_ISSUER}
       JWT_SECRET: ${JWT_SECRET}
@@ -91,6 +122,8 @@ services:
         condition: service_healthy
       elasticsearch:
         condition: service_healthy
+      redpanda:
+        condition: service_healthy
 
   frontend:
     image: nginx:1.25-alpine
@@ -116,5 +149,6 @@ services:
 volumes:
   postgres-data:
   elasticsearch-data:
+  redpanda-data:
 
 

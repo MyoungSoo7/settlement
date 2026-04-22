@@ -3,6 +3,8 @@ package github.lms.lemuel.user.adapter.in.web;
 import github.lms.lemuel.user.domain.exception.DuplicateEmailException;
 import github.lms.lemuel.user.domain.exception.InvalidCredentialsException;
 import github.lms.lemuel.user.domain.exception.UserNotFoundException;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -13,9 +15,10 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * User 모듈 전용 Exception Handler
+ * User 모듈 전용 Exception Handler — GlobalExceptionHandler 보다 먼저 매칭되도록 우선순위 명시
  */
-@RestControllerAdvice(basePackages = "github.lms.lemuel.user.adapter.in.web")
+@RestControllerAdvice
+@Order(Ordered.HIGHEST_PRECEDENCE)
 public class UserExceptionHandler {
 
     @ExceptionHandler(UserNotFoundException.class)

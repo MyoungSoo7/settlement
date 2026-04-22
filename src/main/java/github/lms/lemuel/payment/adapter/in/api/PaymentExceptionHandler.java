@@ -4,6 +4,8 @@ import github.lms.lemuel.payment.domain.exception.InvalidOrderStateException;
 import github.lms.lemuel.payment.domain.exception.InvalidPaymentStateException;
 import github.lms.lemuel.payment.domain.exception.OrderNotFoundException;
 import github.lms.lemuel.payment.domain.exception.PaymentNotFoundException;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -13,7 +15,8 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
-@RestControllerAdvice(basePackages = "github.lms.lemuel.payment.api")
+@RestControllerAdvice
+@Order(Ordered.HIGHEST_PRECEDENCE)
 public class PaymentExceptionHandler {
 
     @ExceptionHandler({PaymentNotFoundException.class, OrderNotFoundException.class})

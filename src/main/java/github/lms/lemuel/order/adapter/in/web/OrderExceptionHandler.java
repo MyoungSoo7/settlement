@@ -2,6 +2,8 @@ package github.lms.lemuel.order.adapter.in.web;
 
 import github.lms.lemuel.order.domain.exception.OrderNotFoundException;
 import github.lms.lemuel.order.domain.exception.UserNotExistsException;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -12,9 +14,10 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Order 모듈 전용 Exception Handler
+ * Order 모듈 전용 Exception Handler — GlobalExceptionHandler 보다 먼저 매칭되도록 우선순위 명시
  */
-@RestControllerAdvice(basePackages = "github.lms.lemuel.order.adapter.in.web")
+@RestControllerAdvice
+@Order(Ordered.HIGHEST_PRECEDENCE)
 public class OrderExceptionHandler {
 
     @ExceptionHandler(OrderNotFoundException.class)

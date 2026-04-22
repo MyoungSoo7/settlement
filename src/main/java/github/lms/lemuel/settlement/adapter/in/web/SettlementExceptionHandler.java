@@ -2,6 +2,8 @@ package github.lms.lemuel.settlement.adapter.in.web;
 
 import github.lms.lemuel.settlement.domain.exception.PaymentNotFoundException;
 import github.lms.lemuel.settlement.domain.exception.SettlementNotFoundException;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -10,9 +12,10 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import java.util.Map;
 
 /**
- * Settlement 모듈 전용 Exception Handler
+ * Settlement 모듈 전용 Exception Handler — GlobalExceptionHandler 보다 먼저 매칭되도록 우선순위 명시
  */
-@RestControllerAdvice(basePackages = "github.lms.lemuel.settlement.adapter.in.web")
+@RestControllerAdvice
+@Order(Ordered.HIGHEST_PRECEDENCE)
 public class SettlementExceptionHandler {
 
     @ExceptionHandler(SettlementNotFoundException.class)
