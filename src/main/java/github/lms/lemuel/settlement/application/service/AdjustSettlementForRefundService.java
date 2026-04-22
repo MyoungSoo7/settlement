@@ -37,8 +37,9 @@ public class AdjustSettlementForRefundService implements AdjustSettlementForRefu
     }
 
     @Override
-    public Settlement adjustSettlementForRefund(Long paymentId, BigDecimal refundAmount) {
-        log.info("Adjusting settlement for refund. paymentId={}, refundAmount={}", paymentId, refundAmount);
+    public Settlement adjustSettlementForRefund(Long paymentId, BigDecimal refundAmount, Long refundId) {
+        log.info("Adjusting settlement for refund. paymentId={}, refundAmount={}, refundId={}",
+                paymentId, refundAmount, refundId);
 
         // 해당 결제의 정산 조회
         Settlement settlement = loadSettlementPort.findByPaymentId(paymentId)
@@ -48,12 +49,13 @@ public class AdjustSettlementForRefundService implements AdjustSettlementForRefu
         settlement.adjustForRefund(refundAmount);
         Settlement adjustedSettlement = saveSettlementPort.save(settlement);
 
-        // 감사 추적: 별도 음수 금액 레코드로 역정산 이력 보존
+        // 감사 추적: 별도 음수 금액 레코드로 역정산 이력 보존 — refundId 로 환불과 1:1 매핑
         SettlementAdjustment adjustment = SettlementAdjustment.ofRefund(
                 adjustedSettlement.getId(),
                 refundAmount,
                 LocalDate.now()
         );
+        adjustment.setRefundId(refundId);
         saveSettlementAdjustmentPort.save(adjustment);
 
         log.info("Settlement adjusted for refund. settlementId={}, status={}, netAmount={}, adjustmentAmount={}",
