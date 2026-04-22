@@ -2,7 +2,7 @@ import org.flywaydb.gradle.FlywayExtension
 
 plugins {
     java
-    id("org.springframework.boot") version "3.5.10"
+    id("org.springframework.boot") version "4.0.4"
     id("io.spring.dependency-management") version "1.1.7"
     jacoco
     id("org.sonarqube") version "5.1.0.4882"
@@ -30,6 +30,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-web")
+    implementation("org.springframework.boot:spring-boot-starter-jackson")
 
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")
@@ -94,6 +95,7 @@ dependencies {
     developmentOnly("org.springframework.boot:spring-boot-devtools")
     testImplementation("com.h2database:h2")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
+    testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("org.springframework.security:spring-security-test")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     // Mockito 를 명시적 javaagent 로 주입 (JDK 21+ 필수, JDK 25 에서 self-attach 불가)
@@ -141,7 +143,9 @@ tasks.jacocoTestCoverageVerification {
             //   - 컨트롤러 다수 → @WebMvcTest 테스트 필요
             // 회귀 방지선을 0.20 으로 고정. 통합 테스트 스윗 구축은 별도 작업 항목.
             limit {
-                minimum = "0.22".toBigDecimal()
+
+                minimum = "0.30".toBigDecimal() // TODO: Boot 4 마이그레이션 후 커버리지 회복 필요 (기존 0.70)
+
             }
         }
     }

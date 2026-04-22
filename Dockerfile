@@ -2,6 +2,7 @@
 # Stage 1: Build
 ############################
 FROM gradle:9.1.0-jdk25 AS builder
+
 WORKDIR /workspace
 
 # 1) 의존성 캐싱을 최대한 살리기 위해 "변경 적은 파일" 먼저 복사

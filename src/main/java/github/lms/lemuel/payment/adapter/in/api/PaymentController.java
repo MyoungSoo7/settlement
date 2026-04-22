@@ -104,6 +104,15 @@ public class PaymentController {
             @Parameter(description = "부분 환불 멱등 키", required = false)
                 @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
         PaymentDomain paymentDomain = refundPaymentPort.refundPayment(id, amount, idempotencyKey);
+    @Operation(summary = "결제 환불", description = "결제 상태를 CAPTURED -> REFUNDED로 변경한다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "환불 성공"),
+            @ApiResponse(responseCode = "404", description = "결제를 찾을 수 없음")
+    })
+    @PatchMapping("/{id}/refund")
+    public ResponseEntity<PaymentResponse> refundPayment(
+            @Parameter(description = "결제 ID", required = true) @PathVariable Long id) {
+        PaymentDomain paymentDomain = refundPaymentPort.refundPayment(id);
         return ResponseEntity.ok(new PaymentResponse(paymentDomain));
     }
 
