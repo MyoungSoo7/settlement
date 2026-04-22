@@ -126,12 +126,15 @@ tasks.jacocoTestReport {
 tasks.jacocoTestCoverageVerification {
     violationRules {
         rule {
-            // 2026-04-22: Mockito self-attach 문제 수정 후 실제 커버리지는 약 14% (이전 측정치 1% 는 JaCoCo
-            // instrumentation 이 소실돼 잘못 잡힌 수치). 현재를 회귀 방지선으로 잡고 CLAUDE.md 목표(70%)
-            // 까지 점진적으로 끌어올린다.
-            // TODO(70% 달성 경로): category 서비스·product 서비스·settlement 배치 서비스·각 어댑터에 테스트 추가.
+            // 2026-04-22: 현재 22% 까지 끌어올림 (서비스·도메인 단위 테스트 다수 추가).
+            // CLAUDE.md 의 70% 목표까지의 잔여 격차는 주로 아래 영역 — 전부 인프라성 테스트가 필요.
+            //   - QueryDSL generated code (Q* 클래스, ~1,400 줄) → 실제 QueryDSL 통합 테스트 필요
+            //   - JPA Entity getter/setter 및 @PrePersist/@PreUpdate 훅 → @DataJpaTest 통합 테스트 필요
+            //   - PDF/Elasticsearch/Batch 어댑터 → Testcontainers 기반 통합 테스트 필요
+            //   - 컨트롤러 다수 → @WebMvcTest 테스트 필요
+            // 회귀 방지선을 0.20 으로 고정. 통합 테스트 스윗 구축은 별도 작업 항목.
             limit {
-                minimum = "0.13".toBigDecimal()
+                minimum = "0.20".toBigDecimal()
             }
         }
     }
