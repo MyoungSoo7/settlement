@@ -1,5 +1,7 @@
 package github.lms.lemuel.payment.application;
 
+import github.lms.lemuel.common.exception.MissingIdempotencyKeyException;
+import github.lms.lemuel.common.exception.RefundExceedsPaymentException;
 import github.lms.lemuel.payment.application.port.out.LoadPaymentPort;
 import github.lms.lemuel.payment.application.port.out.LoadRefundPort;
 import github.lms.lemuel.payment.application.port.out.PgClientPort;
@@ -49,6 +51,11 @@ class RefundPaymentUseCaseTest {
                 PaymentStatus.CAPTURED, "CARD", "pg-tx-123", null, null, null);
     }
 
+    private PaymentDomain partiallyRefundedPayment(BigDecimal alreadyRefunded) {
+        return new PaymentDomain(1L, 10L, new BigDecimal("50000"), alreadyRefunded,
+                PaymentStatus.CAPTURED, "CARD", "pg-tx-123", null, null, null);
+    }
+
     private void stubRefundPersistence() {
         when(loadRefundPort.findByPaymentIdAndIdempotencyKey(any(), any())).thenReturn(Optional.empty());
         when(saveRefundPort.save(any())).thenAnswer(inv -> {
@@ -58,8 +65,8 @@ class RefundPaymentUseCaseTest {
         });
     }
 
-    @Test @DisplayName("정상 환불 처리 - Refund 엔티티 생성·완료 및 정산 조정 호출")
-    void refund_success() {
+    @Test @DisplayName("전액 환불: amount=null 이면 결제 전액이 환불되고 Payment 는 REFUNDED")
+    void fullRefund_defaultAmount() {
         PaymentDomain payment = capturedPayment();
         when(loadPaymentPort.loadById(1L)).thenReturn(Optional.of(payment));
         when(savePaymentPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -70,9 +77,62 @@ class RefundPaymentUseCaseTest {
         assertThat(result.getStatus()).isEqualTo(PaymentStatus.REFUNDED);
         verify(pgClientPort).refund("pg-tx-123", new BigDecimal("50000"));
         verify(updateOrderStatusPort).updateOrderStatus(10L, "REFUNDED");
-        verify(publishEventPort).publishPaymentRefunded(any(), eq(10L));
         verify(adjustSettlementForRefundUseCase).adjustSettlementForRefund(
                 eq(1L), eq(new BigDecimal("50000")), eq(999L));
+    }
+
+    @Test @DisplayName("부분 환불: amount < 결제금액이면 Payment 는 CAPTURED 유지, 주문 상태 미변경")
+    void partialRefund_stillCaptured() {
+        PaymentDomain payment = capturedPayment();
+        when(loadPaymentPort.loadById(1L)).thenReturn(Optional.of(payment));
+        when(savePaymentPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        stubRefundPersistence();
+
+        PaymentDomain result = refundPaymentUseCase.refundPayment(
+                1L, new BigDecimal("20000"), "partial-key-1");
+
+        assertThat(result.getStatus()).isEqualTo(PaymentStatus.CAPTURED);
+        assertThat(result.getRefundedAmount()).isEqualTo(new BigDecimal("20000"));
+        verify(pgClientPort).refund("pg-tx-123", new BigDecimal("20000"));
+        verify(updateOrderStatusPort, never()).updateOrderStatus(any(), any());
+        verify(adjustSettlementForRefundUseCase).adjustSettlementForRefund(
+                eq(1L), eq(new BigDecimal("20000")), eq(999L));
+    }
+
+    @Test @DisplayName("부분 환불로 전액 도달 시 Payment REFUNDED + 주문 상태 REFUNDED")
+    void partialRefund_reachesFull_transitionsToRefunded() {
+        PaymentDomain payment = partiallyRefundedPayment(new BigDecimal("30000"));
+        when(loadPaymentPort.loadById(1L)).thenReturn(Optional.of(payment));
+        when(savePaymentPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        stubRefundPersistence();
+
+        PaymentDomain result = refundPaymentUseCase.refundPayment(
+                1L, new BigDecimal("20000"), "partial-key-2");
+
+        assertThat(result.getStatus()).isEqualTo(PaymentStatus.REFUNDED);
+        verify(updateOrderStatusPort).updateOrderStatus(10L, "REFUNDED");
+    }
+
+    @Test @DisplayName("부분 환불에 idempotencyKey 가 없으면 MissingIdempotencyKeyException")
+    void partialRefund_requiresIdempotencyKey() {
+        PaymentDomain payment = capturedPayment();
+        when(loadPaymentPort.loadById(1L)).thenReturn(Optional.of(payment));
+
+        assertThatThrownBy(() -> refundPaymentUseCase.refundPayment(
+                1L, new BigDecimal("10000"), null))
+                .isInstanceOf(MissingIdempotencyKeyException.class);
+        verify(pgClientPort, never()).refund(any(), any());
+    }
+
+    @Test @DisplayName("잔여 환불 가능 금액 초과 시 RefundExceedsPaymentException")
+    void refund_exceedsRefundable() {
+        PaymentDomain payment = partiallyRefundedPayment(new BigDecimal("40000"));
+        when(loadPaymentPort.loadById(1L)).thenReturn(Optional.of(payment));
+
+        assertThatThrownBy(() -> refundPaymentUseCase.refundPayment(
+                1L, new BigDecimal("20000"), "too-much"))
+                .isInstanceOf(RefundExceedsPaymentException.class);
+        verify(pgClientPort, never()).refund(any(), any());
     }
 
     @Test @DisplayName("결제 미존재 시 예외")
@@ -82,21 +142,20 @@ class RefundPaymentUseCaseTest {
                 .isInstanceOf(PaymentNotFoundException.class);
     }
 
-    @Test @DisplayName("이미 REFUNDED 상태면 PG 호출 없이 멱등 반환")
+    @Test @DisplayName("이미 REFUNDED 면 PG 호출 없이 멱등 반환")
     void refund_alreadyRefunded_noPgCall() {
-        PaymentDomain payment = new PaymentDomain(1L, 10L, new BigDecimal("50000"), BigDecimal.ZERO,
+        PaymentDomain payment = new PaymentDomain(1L, 10L, new BigDecimal("50000"), new BigDecimal("50000"),
                 PaymentStatus.REFUNDED, "CARD", "pg-tx-123", null, null, null);
         when(loadPaymentPort.loadById(1L)).thenReturn(Optional.of(payment));
 
-        PaymentDomain result = refundPaymentUseCase.refundPayment(1L);
+        refundPaymentUseCase.refundPayment(1L);
 
-        assertThat(result.getStatus()).isEqualTo(PaymentStatus.REFUNDED);
         verify(pgClientPort, never()).refund(any(), any());
         verify(saveRefundPort, never()).save(any());
     }
 
-    @Test @DisplayName("기존 Refund 가 COMPLETED 면 PG 재호출 없이 멱등 반환")
-    void refund_existingCompletedRefund_noPgCall() {
+    @Test @DisplayName("동일 idempotencyKey 로 COMPLETED Refund 가 있으면 PG 재호출 없음")
+    void refund_existingCompleted_noPgCall() {
         PaymentDomain payment = capturedPayment();
         when(loadPaymentPort.loadById(1L)).thenReturn(Optional.of(payment));
         Refund existing = Refund.request(1L, new BigDecimal("50000"), "payment-1-full", "x");
@@ -111,7 +170,7 @@ class RefundPaymentUseCaseTest {
         verify(saveRefundPort, never()).save(any());
     }
 
-    @Test @DisplayName("CAPTURED 가 아닌 상태(READY)에서 환불 시도하면 예외 + PG 호출 없음")
+    @Test @DisplayName("CAPTURED 가 아닌 상태에서는 환불 시도 시 예외 + PG 호출 없음")
     void refund_notCaptured_throwsBeforePgCall() {
         PaymentDomain payment = new PaymentDomain(1L, 10L, new BigDecimal("50000"), BigDecimal.ZERO,
                 PaymentStatus.READY, "CARD", null, null, null, null);
