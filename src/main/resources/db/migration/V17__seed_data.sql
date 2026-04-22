@@ -108,16 +108,13 @@ BEGIN
         )
         RETURNING id INTO v_payment_id;
 
-        -- ── 정산 상태 결정 (8가지 순환) ──
-        v_status := CASE (i % 8)
-            WHEN 0 THEN 'CONFIRMED'
-            WHEN 1 THEN 'DONE'
-            WHEN 2 THEN 'PENDING'
-            WHEN 3 THEN 'WAITING_APPROVAL'
-            WHEN 4 THEN 'APPROVED'
-            WHEN 5 THEN 'REQUESTED'
-            WHEN 6 THEN 'PROCESSING'
-            ELSE        'FAILED'
+        -- ── 정산 상태 결정 (새 상태 머신 5가지 순환) ──
+        v_status := CASE (i % 5)
+            WHEN 0 THEN 'REQUESTED'
+            WHEN 1 THEN 'PROCESSING'
+            WHEN 2 THEN 'DONE'
+            WHEN 3 THEN 'FAILED'
+            ELSE        'CANCELED'
         END;
 
         -- ── 정산 ──
@@ -138,12 +135,12 @@ BEGIN
             v_status,
             (v_created_at + INTERVAL '1 day')::DATE,
             -- confirmed_at
-            CASE WHEN v_status IN ('CONFIRMED', 'DONE')
+            CASE WHEN v_status IN ('DONE')
                  THEN v_created_at + INTERVAL '2 days' ELSE NULL END,
             -- approved_by / approved_at
-            CASE WHEN v_status IN ('CONFIRMED', 'DONE', 'APPROVED')
+            CASE WHEN v_status IN ('DONE')
                  THEN v_admin_id ELSE NULL END,
-            CASE WHEN v_status IN ('CONFIRMED', 'DONE', 'APPROVED')
+            CASE WHEN v_status IN ('DONE')
                  THEN v_created_at + INTERVAL '1 day' ELSE NULL END,
             -- rejected_by / rejected_at / rejection_reason
             CASE WHEN v_status = 'FAILED' THEN v_admin_id ELSE NULL END,

@@ -16,10 +16,7 @@ CREATE INDEX IF NOT EXISTS idx_settlements_payment_id_amounts
 ON settlements(payment_id)
 INCLUDE (payment_amount, refunded_amount, net_amount, status);
 
--- 4. 승인 상태 추적용: 승인 관련 상태만 필터링 (partial index)
-CREATE INDEX IF NOT EXISTS idx_settlements_approval_status
-ON settlements(status)
-WHERE status IN ('WAITING_APPROVAL', 'APPROVED', 'REJECTED');
+-- 4. [제거] 승인 관련 레거시 상태 partial index 는 V26 에서 DROP
 
 -- 5. payments 테이블: captured_at 기반 조회 최적화
 CREATE INDEX IF NOT EXISTS idx_payments_captured_status_amount

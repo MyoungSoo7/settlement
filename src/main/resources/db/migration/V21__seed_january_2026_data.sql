@@ -49,8 +49,8 @@ BEGIN
                             + make_interval(hours => v_hour)
                             + make_interval(mins  => (i * 7) % 60);
 
-            -- 정산 상태: 마지막 5일치(27~31일)는 CONFIRMED, 나머지는 DONE
-            v_settled_status := CASE WHEN v_day >= 27 THEN 'CONFIRMED' ELSE 'DONE' END;
+            -- 정산 상태: 전체 DONE (레거시 CONFIRMED 제거, 새 상태 머신만 사용)
+            v_settled_status := 'DONE';
 
             -- ── 주문 ──
             INSERT INTO orders (user_id, product_id, amount, status, created_at, updated_at)
