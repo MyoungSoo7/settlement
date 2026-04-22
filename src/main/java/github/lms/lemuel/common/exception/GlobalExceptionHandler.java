@@ -3,6 +3,8 @@ package github.lms.lemuel.common.exception;
 import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -17,6 +19,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Hidden
 @RestControllerAdvice
+@Order(Ordered.LOWEST_PRECEDENCE) // 도메인별 ExceptionHandler 가 먼저 매칭되도록 폴백 우선순위를 최하위로 내린다
 public class GlobalExceptionHandler {
 
     // ─── 4xx ────────────────────────────────────────────────────────────────────
