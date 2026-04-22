@@ -187,3 +187,38 @@ groups:
         annotations:
           summary: "DB 커넥션 풀 고갈 임박"
           description: "DB 커넥션 사용률이 {{ $value | humanizePercentage }}로 80%를 초과했습니다."
+
+  - name: lemuel_outbox_alerts
+    interval: 30s
+    rules:
+      # Outbox PENDING 적체 — 폴러 이슈나 외부 시스템 장애 신호
+      - alert: OutboxPendingBacklog
+        expr: outbox_pending_count > 1000
+        for: 5m
+        labels:
+          severity: warning
+          component: outbox
+        annotations:
+          summary: "Outbox PENDING 적체"
+          description: "outbox_events 테이블 PENDING 건수가 {{ $value }}건으로 1000을 초과했습니다. OutboxPublisherScheduler 또는 외부 발행 경로를 확인하세요."
+
+      - alert: OutboxPendingCritical
+        expr: outbox_pending_count > 10000
+        for: 2m
+        labels:
+          severity: critical
+          component: outbox
+        annotations:
+          summary: "Outbox 심각한 적체 — 이벤트 유실 위험"
+          description: "outbox_events PENDING 건수가 {{ $value }}건. 발행 파이프라인 완전 정지 가능성. 즉시 대응."
+
+      # Outbox 발행 지연 — p95 초과
+      - alert: OutboxPublishSlow
+        expr: histogram_quantile(0.95, rate(outbox_publish_duration_seconds_bucket[5m])) > 2
+        for: 10m
+        labels:
+          severity: warning
+          component: outbox
+        annotations:
+          summary: "Outbox 발행 p95 지연 > 2s"
+          description: "단일 outbox 이벤트 외부 발행 p95 가 {{ $value }}초. 네트워크 또는 외부 시스템 응답 확인."
