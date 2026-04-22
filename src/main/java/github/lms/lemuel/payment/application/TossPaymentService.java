@@ -76,7 +76,7 @@ public class TossPaymentService {
         //    위에서 merge 된 AUTHORIZED 엔티티를 first-level cache 에서 조회
         PaymentDomain captured = capturePaymentPort.capturePayment(payment.getId());
 
-        log.info("토스 결제 완료: paymentId={}, pgTxId={}", captured.getId(), captured.getPgTransactionId());
+        log.info("토스 결제 완료: paymentId={}", captured.getId());
         return captured;
     }
 

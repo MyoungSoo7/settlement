@@ -1,6 +1,7 @@
 package github.lms.lemuel.payment.application;
 
 import github.lms.lemuel.payment.domain.PaymentDomain;
+import github.lms.lemuel.payment.domain.PaymentStatus;
 import github.lms.lemuel.payment.domain.exception.PaymentNotFoundException;
 import github.lms.lemuel.payment.application.port.in.RefundPaymentPort;
 import github.lms.lemuel.payment.application.port.out.LoadPaymentPort;
@@ -47,7 +48,20 @@ public class RefundPaymentUseCase implements RefundPaymentPort {
         PaymentDomain paymentDomain = loadPaymentPort.loadById(paymentId)
             .orElseThrow(() -> new PaymentNotFoundException(paymentId));
 
-        // Call external PG to refund
+        // 멱등성 보장: 이미 환불된 결제는 추가 PG 호출 없이 현재 상태 반환
+        if (paymentDomain.getStatus() == PaymentStatus.REFUNDED) {
+            log.info("Payment already refunded, skipping PG call. paymentId={}", paymentId);
+            return paymentDomain;
+        }
+
+        // 상태 가드를 PG 호출 전에 먼저 실행 (잘못된 상태에서 PG가 호출되는 것을 방지)
+        if (paymentDomain.getStatus() != PaymentStatus.CAPTURED) {
+            throw new IllegalStateException(
+                "Payment must be in CAPTURED status to refund. Current: " + paymentDomain.getStatus()
+            );
+        }
+
+        // Call external PG to refund (상태 가드 통과 후에만 실행)
         pgClientPort.refund(paymentDomain.getPgTransactionId(), paymentDomain.getAmount());
 
         // Domain logic

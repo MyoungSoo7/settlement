@@ -22,6 +22,7 @@ public class Settlement {
     private LocalDateTime confirmedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private Long version;                 // 낙관적 락 버전 (JPA @Version)
 
     public Settlement() {
         this.status = SettlementStatus.REQUESTED; // 초기 상태를 REQUESTED로 변경
@@ -153,25 +154,27 @@ public class Settlement {
     }
 
     /**
-     * 정산 확정 (레거시 호환)
+     * 정산 확정 — 정식 상태 머신을 우회하지 않고 REQUESTED → PROCESSING → DONE 를 한 번에 수행한다.
+     * 레거시 호출부 호환을 위해 제공되며, 신규 코드는 startProcessing()/complete() 를 직접 호출할 것.
      */
     public void confirm() {
-        if (this.status != SettlementStatus.PENDING &&
-            this.status != SettlementStatus.WAITING_APPROVAL &&
-            this.status != SettlementStatus.PROCESSING) {
-            throw new IllegalStateException("Only PENDING, WAITING_APPROVAL, or PROCESSING settlements can be confirmed");
+        if (this.status == SettlementStatus.REQUESTED) {
+            startProcessing();
         }
-        this.status = SettlementStatus.CONFIRMED;
-        this.confirmedAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
+        if (this.status != SettlementStatus.PROCESSING) {
+            throw new IllegalStateException(
+                String.format("Cannot confirm. Current status: %s. Expected: REQUESTED or PROCESSING", this.status)
+            );
+        }
+        complete();
     }
 
     /**
-     * 정산 취소
+     * 정산 취소 — 종료 상태(DONE)는 취소 불가
      */
     public void cancel() {
-        if (this.status == SettlementStatus.CONFIRMED || this.status == SettlementStatus.DONE) {
-            throw new IllegalStateException("CONFIRMED or DONE settlements cannot be canceled");
+        if (this.status == SettlementStatus.DONE) {
+            throw new IllegalStateException("DONE settlements cannot be canceled");
         }
         this.status = SettlementStatus.CANCELED;
         this.updatedAt = LocalDateTime.now();
@@ -209,11 +212,11 @@ public class Settlement {
     // ========== 상태 확인 메서드 ==========
 
     public boolean isConfirmed() {
-        return this.status == SettlementStatus.CONFIRMED;
+        return this.status == SettlementStatus.DONE;
     }
 
     public boolean isPending() {
-        return this.status == SettlementStatus.PENDING || this.status == SettlementStatus.WAITING_APPROVAL;
+        return this.status == SettlementStatus.REQUESTED;
     }
 
     public boolean canRetry() {
@@ -268,4 +271,7 @@ public class Settlement {
     
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    public Long getVersion() { return version; }
+    public void setVersion(Long version) { this.version = version; }
 }
