@@ -241,6 +241,86 @@ GET /payments/123/refunds   (alternative)
 
 ---
 
+### T3-⑨ 정산 기반 자금 흐름 리포트 + 대사 통합
+
+**Why.** 현재 `/settlements` 조회 API 는 **건별 리스트**에 머물러 있어 경영진·재무팀이 쓸 **집계 관점의 뷰가 없다**. 월말 마감 때 "이번 달 총 GMV, 총 환불, 수수료, 순지급액이 얼마지?" 같은 질문에 매번 커스텀 SQL 을 던져야 함. 별도 BI 툴 도입 전 단계의 경량 대안으로, 애플리케이션이 직접 **자금 흐름 리포트**를 내주는 엔드포인트 + PDF 를 도입한다. 동시에 대사(reconciliation) 결과를 같은 리포트 안에 녹여 "이 숫자는 검증됐다"는 신뢰 서명까지 한 번에 제공한다.
+
+**선행 조건.** 없음 — 기존 `payments` / `settlements` / `settlement_adjustments` / `refunds` / `outbox_events` 만으로 집계 가능. Flyway 신규 필요 없음.
+
+#### (a) 기간별 자금 흐름 요약 — Cashflow Summary
+
+**엔드포인트.**
+```
+GET /reports/cashflow?from=2026-01-01&to=2026-01-31&groupBy=day|week|month
+GET /reports/cashflow/{yearMonth}/pdf        (iText 8 재사용)
+```
+
+**응답 구조.**
+```json
+{
+  "period": { "from": "2026-01-01", "to": "2026-01-31", "groupBy": "day" },
+  "totals": {
+    "gmv": "125000000.00",                 // 총 결제액 (CAPTURED 기준)
+    "refundedAmount": "8500000.00",        // 총 환불액
+    "commissionAmount": "3495000.00",      // 총 수수료
+    "netSettlement": "113005000.00",       // 순정산액
+    "transactionCount": 4120,
+    "refundRate": 0.068
+  },
+  "buckets": [
+    { "bucket": "2026-01-01", "gmv": "...", "refunded": "...", "commission": "...", "net": "..." },
+    ...
+  ],
+  "reconciliation": {
+    "matched": true,
+    "mismatches": [],
+    "checksRun": 3
+  }
+}
+```
+
+**포트/어댑터.**
+- `application.port.in.GenerateCashflowReportUseCase` — 입력 `CashflowReportCommand(from, to, groupBy)`
+- `application.port.out.LoadCashflowAggregatePort` — 기간/그룹별 집계 쿼리. QueryDSL 로 PaymentJpaEntity + SettlementJpaEntity 조인 집계 or Postgres native `date_trunc('day|week|month', ...)` GROUP BY
+- `application.port.out.GenerateCashflowPdfPort` — 기존 `GenerateSettlementPdfService` 의 iText 유틸 재사용
+- `application.service.GenerateCashflowReportService` — UseCase 구현, 대사 결과를 include 하도록 `ReconciliationCheckPort` 를 얇게 호출
+
+**Controller.** `ReportController` (신규) — `@PreAuthorize("hasAnyRole('ADMIN','FINANCE')")`. `FINANCE` 롤이 없으면 ADMIN 단독 우선.
+
+#### (b) 리포트 내장 대사 섹션
+
+리포트 안에 **숫자 검증 박스**를 포함해 아래 3 불변식 검사 결과를 표시:
+
+1. `Σ(payments.amount - payments.refunded_amount)  ==  Σ(settlements.net_amount + settlements.commission)` — 결제 ↔ 정산 총액 대사
+2. `Σ(settlement_adjustments.amount)  ==  Σ(refunds.amount WHERE status=COMPLETED)` — 환불 ↔ 역정산 대사
+3. `count(outbox_events WHERE event_type='PaymentCaptured' AND status='PUBLISHED')  ==  count(settlements created in period)` — **이벤트 기반 파이프라인의 원자성 증명** (배치→이벤트 전환의 신뢰도 데모)
+
+불일치 발생 시 `mismatches[]` 에 금액·건수·주요 키 나열. 대사 로직 자체는 `ReconcileDailyTotalsService` (Tier 1 완료 전제) 를 확장하거나, 해당 서비스가 없으면 본 작업에 같이 포함.
+
+#### (c) 판매자별 확장 (선택)
+
+- `GET /reports/sellers/{sellerId}/cashflow?yearMonth=2026-01`
+- 내부적으로 (a) 쿼리에 `WHERE product.seller_id = ?` 필터 추가
+- T3-⑦ (SellerTier) 와 같이 가면 자연스러움 — 단독으로도 의미 있음
+
+#### (d) 관련 메트릭 / 알림 (선택)
+
+- Micrometer gauge: `cashflow_report_generation_duration_seconds` (p95)
+- Alertmanager: 리포트 생성 실패율 spike — 재무 마감 전 조기 경보
+
+**영향 받는 파일.**
+- 신규: `report/` 도메인 패키지 (`application/port/{in,out}`, `application/service`, `adapter/in/web/ReportController`, `adapter/out/persistence/CashflowAggregateQueryAdapter`, `adapter/out/pdf/CashflowPdfAdapter`)
+- 수정: 없음 (기존 도메인 건드리지 않음) — 단 대사 로직이 이미 있다면 그 포트를 주입
+
+**예상 난이도.** 중. 순수 추가성, DB 스키마 변경 없음. 집계 쿼리 설계가 핵심. **8~10시간** 수렴.
+
+**어필 포인트.**
+- "배치→이벤트 전환 신뢰성" 주장을 리포트 내 **대사 행(row) 로 실시간 증명**
+- iText 기반 PDF 로 임원 제출 가능한 실물 산출물
+- 헥사고날 구조 유지 (report 도메인이 기존 settlement/payment 도메인에 의존하지 않고 포트로 읽음)
+
+---
+
 ### T3-⑧ ADR + Runbook 문서화
 
 **Why.** 지금까지 내린 결정들이 **커밋 메시지에만 있음**. 새로 합류하는 사람이 "왜 헥사고날?", "왜 Kafka?", "왜 @Version 쓰면서 domain 에 version 필드?" 같은 질문에 답을 찾으려면 커밋 archaeology 가 필요. 운영 장애 때 **Runbook 없으면 매번 재발명**.
@@ -299,10 +379,12 @@ GET /payments/123/refunds   (alternative)
 1. **T2-④** (로그 + traceId) — 다른 모든 관찰가능성의 전제. 가장 ROI 큼.
 2. **T2-⑥** (통합 테스트) — JaCoCo 70% 도달의 유일한 경로. 다른 T2/T3 작업의 회귀 방어망.
 3. **T2-⑤** (Audit + PII + Rate limit) — 3개 하위 항목으로 PR 쪼개기
-4. **T3-⑦ (c)** (Refund 이력 API) — 단독 반나절. (a)(b) 보다 먼저 해도 무방
-5. **T3-⑧ (a)** (ADR) — T2/T3 작업 진행하면서 **병행** 작성 (결정을 내린 순간 기록)
-6. **T3-⑦ (a)(b)** (차등 수수료 + 주기) — DB 스키마 변경이라 신중히
-7. **T3-⑧ (b)** (Runbook) — 모든 인프라 구축 후 운영 관점에서 작성
+4. **T3-⑨ (a)(b)** (자금 흐름 리포트 + 대사) — DB 변경 없음 + 임원/재무 제출 산출물 + "이벤트 전환 신뢰도" 실증. ROI 높음
+5. **T3-⑦ (c)** (Refund 이력 API) — 단독 반나절. (a)(b) 보다 먼저 해도 무방
+6. **T3-⑧ (a)** (ADR) — T2/T3 작업 진행하면서 **병행** 작성 (결정을 내린 순간 기록)
+7. **T3-⑦ (a)(b)** (차등 수수료 + 주기) — DB 스키마 변경이라 신중히
+8. **T3-⑨ (c)** (판매자별 자금 흐름) — T3-⑦ (SellerTier) 와 같이 묶어도 좋음
+9. **T3-⑧ (b)** (Runbook) — 모든 인프라 구축 후 운영 관점에서 작성
 
 ## 남은 잠재 리스크 (여기 계획 밖)
 
