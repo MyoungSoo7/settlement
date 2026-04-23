@@ -6,7 +6,7 @@ plugins {
     id("io.spring.dependency-management") version "1.1.7"
     jacoco
     id("org.sonarqube") version "5.1.0.4882"
-    id("io.snyk.gradle.plugin.snykplugin") version "0.6.1"
+    // id("io.snyk.gradle.plugin.snykplugin") version "0.6.1"
     id("org.flywaydb.flyway") version "11.7.2"
 }
 
@@ -174,14 +174,14 @@ sonar {
 }
 
 // Snyk Configuration
-snyk {
-    // Snyk 설정
-    setArguments("--all-projects")
-    setSeverity("low") // low, medium, high, critical
-    setApi(System.getenv("SNYK_TOKEN") ?: "")
-    setAutoDownload(true)
-    setAutoUpdate(true)
-}
+// snyk {
+//     // Snyk 설정
+//     setArguments("--all-projects")
+//     setSeverity("low") // low, medium, high, critical
+//     setApi(System.getenv("SNYK_TOKEN") ?: "")
+//     setAutoDownload(true)
+//     setAutoUpdate(true)
+// }
 
 extensions.configure<FlywayExtension> {
     url = System.getenv("SPRING_DATASOURCE_URL") ?: "jdbc:postgresql://localhost:5432/opslab"
