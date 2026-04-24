@@ -27,6 +27,15 @@ public class SellerPersistenceMapper {
         seller.setApprovedAt(entity.getApprovedAt());
         seller.setCreatedAt(entity.getCreatedAt());
         seller.setUpdatedAt(entity.getUpdatedAt());
+        seller.setSettlementCycle(
+            entity.getSettlementCycle() != null
+                ? github.lms.lemuel.seller.domain.SettlementCycle.valueOf(entity.getSettlementCycle())
+                : github.lms.lemuel.seller.domain.SettlementCycle.DAILY);
+        if (entity.getWeeklySettlementDay() != null) {
+            seller.setWeeklySettlementDay(java.time.DayOfWeek.valueOf(entity.getWeeklySettlementDay()));
+        }
+        seller.setMonthlySettlementDay(entity.getMonthlySettlementDay());
+        seller.setMinimumWithdrawalAmount(entity.getMinimumWithdrawalAmount());
         return seller;
     }
 
@@ -47,6 +56,12 @@ public class SellerPersistenceMapper {
         entity.setApprovedAt(domain.getApprovedAt());
         entity.setCreatedAt(domain.getCreatedAt());
         entity.setUpdatedAt(domain.getUpdatedAt());
+        entity.setSettlementCycle(
+            domain.getSettlementCycle() != null ? domain.getSettlementCycle().name() : "DAILY");
+        entity.setWeeklySettlementDay(
+            domain.getWeeklySettlementDay() != null ? domain.getWeeklySettlementDay().name() : null);
+        entity.setMonthlySettlementDay(domain.getMonthlySettlementDay());
+        entity.setMinimumWithdrawalAmount(domain.getMinimumWithdrawalAmount());
         return entity;
     }
 }

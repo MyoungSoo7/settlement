@@ -60,6 +60,18 @@ public class SellerJpaEntity {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    @Column(name = "settlement_cycle", nullable = false, length = 10)
+    private String settlementCycle = "DAILY";
+
+    @Column(name = "weekly_settlement_day", length = 10)
+    private String weeklySettlementDay;
+
+    @Column(name = "monthly_settlement_day")
+    private Integer monthlySettlementDay;
+
+    @Column(name = "minimum_withdrawal_amount", nullable = false, precision = 12, scale = 2)
+    private BigDecimal minimumWithdrawalAmount = new BigDecimal("1000");
+
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) createdAt = LocalDateTime.now();

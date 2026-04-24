@@ -12,6 +12,7 @@ public class Settlement {
     private Long id;
     private Long paymentId;
     private Long orderId;
+    private Long sellerId;
     private BigDecimal paymentAmount;     // 원 결제 금액
     private BigDecimal refundedAmount;    // 환불 금액
     private BigDecimal commission;        // 수수료
@@ -63,6 +64,27 @@ public class Settlement {
         
         settlement.calculateCommissionAndNetAmount();
         
+        return settlement;
+    }
+
+    public static Settlement createFromPayment(Long paymentId, Long orderId, Long sellerId,
+                                               BigDecimal paymentAmount, BigDecimal commissionRate,
+                                               LocalDate settlementDate) {
+        Settlement settlement = new Settlement();
+        settlement.setPaymentId(paymentId);
+        settlement.setOrderId(orderId);
+        settlement.setSellerId(sellerId);
+        settlement.setPaymentAmount(paymentAmount);
+        settlement.setSettlementDate(settlementDate);
+
+        settlement.validatePaymentId();
+        settlement.validateAmount();
+        settlement.validateSettlementDate();
+
+        CommissionCalculation calc = CommissionCalculation.calculate(paymentAmount, commissionRate);
+        settlement.commission = calc.commissionAmount();
+        settlement.netAmount = calc.netAmount();
+
         return settlement;
     }
 
@@ -238,7 +260,10 @@ public class Settlement {
     
     public Long getOrderId() { return orderId; }
     public void setOrderId(Long orderId) { this.orderId = orderId; }
-    
+
+    public Long getSellerId() { return sellerId; }
+    public void setSellerId(Long sellerId) { this.sellerId = sellerId; }
+
     public BigDecimal getPaymentAmount() { return paymentAmount; }
     public void setPaymentAmount(BigDecimal paymentAmount) { this.paymentAmount = paymentAmount; }
     

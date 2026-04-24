@@ -32,6 +32,9 @@ public class SettlementJpaEntity {
     @Column(name = "order_id", nullable = false)
     private Long orderId;
 
+    @Column(name = "seller_id")
+    private Long sellerId;
+
     @Column(name = "payment_amount", nullable = false, precision = 10, scale = 2)
     private BigDecimal paymentAmount;
 
