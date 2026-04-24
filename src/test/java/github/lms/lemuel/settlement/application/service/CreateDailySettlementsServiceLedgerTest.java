@@ -50,7 +50,7 @@ class CreateDailySettlementsServiceLedgerTest {
     void 정산_생성_시_레저_분개() {
         LocalDate targetDate = LocalDate.of(2026, 4, 25);
         CapturedPaymentInfo payment = new CapturedPaymentInfo(
-                1L, 100L, new BigDecimal("10000"), LocalDateTime.now());
+                1L, 100L, 42L, new BigDecimal("10000"), LocalDateTime.now());
 
         given(loadCapturedPaymentsPort.findCapturedPaymentsByDate(targetDate))
                 .willReturn(List.of(payment));
