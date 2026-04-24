@@ -1,5 +1,7 @@
 package github.lms.lemuel.settlement.application.service;
 
+import github.lms.lemuel.ledger.application.port.in.RecordJournalEntryUseCase;
+import github.lms.lemuel.ledger.domain.Money;
 import github.lms.lemuel.settlement.application.port.in.CreateDailySettlementsUseCase;
 import github.lms.lemuel.settlement.application.port.out.LoadCapturedPaymentsPort;
 import github.lms.lemuel.settlement.application.port.out.LoadCapturedPaymentsPort.CapturedPaymentInfo;
@@ -23,6 +25,7 @@ public class CreateDailySettlementsService implements CreateDailySettlementsUseC
     private final LoadCapturedPaymentsPort loadCapturedPaymentsPort;
     private final SaveSettlementPort saveSettlementPort;
     private final SettlementSearchIndexPort settlementSearchIndexPort;
+    private final RecordJournalEntryUseCase recordJournalEntryUseCase;
 
     @Override
     public CreateSettlementResult createDailySettlements(CreateSettlementCommand command) {
@@ -64,6 +67,20 @@ public class CreateDailySettlementsService implements CreateDailySettlementsUseC
                 .collect(Collectors.toList());
 
         log.info("정산 {}건 저장 완료", savedSettlements.size());
+
+        // 5. Ledger 분개 기록
+        savedSettlements.forEach(savedSettlement -> {
+            try {
+                recordJournalEntryUseCase.recordSettlementCreated(
+                        savedSettlement.getId(),
+                        0L, // TODO: Phase 2에서 sellerId 연결
+                        Money.krw(savedSettlement.getPaymentAmount()),
+                        Money.krw(savedSettlement.getCommission())
+                );
+            } catch (Exception e) {
+                log.error("Ledger 분개 실패 (정산 생성은 성공): settlementId={}", savedSettlement.getId(), e);
+            }
+        });
 
         // 4. Elasticsearch 비동기 인덱싱 (검색 활성화된 경우만)
         if (settlementSearchIndexPort.isSearchEnabled()) {
