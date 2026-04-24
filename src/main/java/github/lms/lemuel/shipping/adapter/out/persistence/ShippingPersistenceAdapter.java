@@ -58,7 +58,7 @@ public class ShippingPersistenceAdapter
     // ── LoadDeliveryPort ────────────────────────────────────────────────
 
     @Override
-    public Optional<Delivery> findById(Long id) {
+    public Optional<Delivery> findDeliveryById(Long id) {
         return deliveryRepository.findById(id).map(ShippingPersistenceMapper::toDomain);
     }
 

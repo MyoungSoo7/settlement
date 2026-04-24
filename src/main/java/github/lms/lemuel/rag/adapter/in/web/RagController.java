@@ -48,7 +48,7 @@ public class RagController {
                     }
                 });
 
-                String doneJson = objectMapper.writeValueAsString(RagStreamEvent.done());
+                String doneJson = objectMapper.writeValueAsString(RagStreamEvent.finished());
                 emitter.send(SseEmitter.event().data(doneJson, MediaType.APPLICATION_JSON));
                 emitter.complete();
             } catch (Exception e) {

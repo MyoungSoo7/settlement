@@ -8,7 +8,7 @@ import java.util.Optional;
 
 public interface LoadDeliveryPort {
 
-    Optional<Delivery> findById(Long id);
+    Optional<Delivery> findDeliveryById(Long id);
 
     Optional<Delivery> findByOrderId(Long orderId);
 

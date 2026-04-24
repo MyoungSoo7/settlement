@@ -6,7 +6,7 @@ public record RagStreamEvent(String token, boolean done) {
         return new RagStreamEvent(token, false);
     }
 
-    public static RagStreamEvent done() {
+    public static RagStreamEvent finished() {
         return new RagStreamEvent(null, true);
     }
 }

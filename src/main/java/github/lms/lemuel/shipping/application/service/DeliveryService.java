@@ -43,7 +43,7 @@ public class DeliveryService implements DeliveryUseCase {
     public Delivery shipDelivery(Long deliveryId, String trackingNumber, String carrier) {
         log.info("배송 출발: deliveryId={}, trackingNumber={}", deliveryId, trackingNumber);
 
-        Delivery delivery = loadDeliveryPort.findById(deliveryId)
+        Delivery delivery = loadDeliveryPort.findDeliveryById(deliveryId)
                 .orElseThrow(() -> new IllegalArgumentException("배송 정보를 찾을 수 없습니다. id=" + deliveryId));
 
         delivery.ship(trackingNumber, carrier);
@@ -56,7 +56,7 @@ public class DeliveryService implements DeliveryUseCase {
     public Delivery updateStatus(Long deliveryId, DeliveryStatus status) {
         log.info("배송 상태 변경: deliveryId={}, status={}", deliveryId, status);
 
-        Delivery delivery = loadDeliveryPort.findById(deliveryId)
+        Delivery delivery = loadDeliveryPort.findDeliveryById(deliveryId)
                 .orElseThrow(() -> new IllegalArgumentException("배송 정보를 찾을 수 없습니다. id=" + deliveryId));
 
         switch (status) {
@@ -76,7 +76,7 @@ public class DeliveryService implements DeliveryUseCase {
     @Override
     @Transactional(readOnly = true)
     public Delivery getDelivery(Long id) {
-        return loadDeliveryPort.findById(id)
+        return loadDeliveryPort.findDeliveryById(id)
                 .orElseThrow(() -> new IllegalArgumentException("배송 정보를 찾을 수 없습니다. id=" + id));
     }
 
