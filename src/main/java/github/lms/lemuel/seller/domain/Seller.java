@@ -23,6 +23,10 @@ public class Seller {
     private LocalDateTime approvedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private SettlementCycle settlementCycle;
+    private java.time.DayOfWeek weeklySettlementDay;
+    private Integer monthlySettlementDay;
+    private BigDecimal minimumWithdrawalAmount;
 
     public Seller() {}
 
@@ -39,6 +43,8 @@ public class Seller {
         seller.status = SellerStatus.PENDING;
         seller.createdAt = LocalDateTime.now();
         seller.updatedAt = LocalDateTime.now();
+        seller.settlementCycle = SettlementCycle.DAILY;
+        seller.minimumWithdrawalAmount = new BigDecimal("1000");
         return seller;
     }
 
@@ -107,6 +113,30 @@ public class Seller {
         return this.status == SellerStatus.PENDING;
     }
 
+    public void updateSettlementCycle(SettlementCycle cycle, java.time.DayOfWeek weeklyDay, Integer monthlyDay) {
+        if (cycle == null) {
+            throw new IllegalArgumentException("정산 주기는 필수입니다.");
+        }
+        if (cycle == SettlementCycle.MONTHLY) {
+            if (monthlyDay == null || monthlyDay < 1 || monthlyDay > 28) {
+                throw new IllegalArgumentException("월 정산일은 1~28 사이여야 합니다.");
+            }
+        }
+        this.settlementCycle = cycle;
+        this.weeklySettlementDay = weeklyDay;
+        this.monthlySettlementDay = monthlyDay;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public boolean isSettlementDueOn(java.time.LocalDate date) {
+        if (settlementCycle == null) return true; // default DAILY
+        return switch (settlementCycle) {
+            case DAILY -> true;
+            case WEEKLY -> date.getDayOfWeek() == weeklySettlementDay;
+            case MONTHLY -> date.getDayOfMonth() == monthlySettlementDay;
+        };
+    }
+
     // ── Getters & Setters ──────────────────────────────────────────────
 
     public Long getId()                              { return id; }
@@ -153,4 +183,16 @@ public class Seller {
 
     public LocalDateTime getUpdatedAt()              { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    public SettlementCycle getSettlementCycle()          { return settlementCycle; }
+    public void setSettlementCycle(SettlementCycle c)    { this.settlementCycle = c; }
+
+    public java.time.DayOfWeek getWeeklySettlementDay()  { return weeklySettlementDay; }
+    public void setWeeklySettlementDay(java.time.DayOfWeek d) { this.weeklySettlementDay = d; }
+
+    public Integer getMonthlySettlementDay()             { return monthlySettlementDay; }
+    public void setMonthlySettlementDay(Integer d)       { this.monthlySettlementDay = d; }
+
+    public BigDecimal getMinimumWithdrawalAmount()       { return minimumWithdrawalAmount; }
+    public void setMinimumWithdrawalAmount(BigDecimal a) { this.minimumWithdrawalAmount = a; }
 }
