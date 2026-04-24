@@ -2,6 +2,9 @@ package github.lms.lemuel.settlement.application.service;
 
 import github.lms.lemuel.ledger.application.port.in.RecordJournalEntryUseCase;
 import github.lms.lemuel.ledger.domain.Money;
+import github.lms.lemuel.seller.application.port.out.LoadSellerPort;
+import github.lms.lemuel.seller.domain.Seller;
+import github.lms.lemuel.seller.domain.SellerStatus;
 import github.lms.lemuel.settlement.application.port.in.CreateDailySettlementsUseCase;
 import github.lms.lemuel.settlement.application.port.out.LoadCapturedPaymentsPort;
 import github.lms.lemuel.settlement.application.port.out.LoadCapturedPaymentsPort.CapturedPaymentInfo;
@@ -13,8 +16,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -26,78 +29,80 @@ public class CreateDailySettlementsService implements CreateDailySettlementsUseC
     private final SaveSettlementPort saveSettlementPort;
     private final SettlementSearchIndexPort settlementSearchIndexPort;
     private final RecordJournalEntryUseCase recordJournalEntryUseCase;
+    private final LoadSellerPort loadSellerPort;
 
     @Override
     public CreateSettlementResult createDailySettlements(CreateSettlementCommand command) {
         log.info("일일 정산 생성 시작: targetDate={}", command.targetDate());
 
-        // 1. 특정 날짜의 승인된 결제 내역 조회
-        List<CapturedPaymentInfo> capturedPayments = 
-                loadCapturedPaymentsPort.findCapturedPaymentsByDate(command.targetDate());
+        // 1. 승인된 판매자 중 오늘 정산 대상인 판매자 필터링
+        List<Seller> dueSellers = loadSellerPort.findByStatus(SellerStatus.APPROVED).stream()
+                .filter(seller -> seller.isSettlementDueOn(command.targetDate()))
+                .toList();
 
-        if (capturedPayments.isEmpty()) {
-            log.info("정산 대상 결제 없음: targetDate={}", command.targetDate());
+        if (dueSellers.isEmpty()) {
+            log.info("정산 대상 판매자 없음: targetDate={}", command.targetDate());
             return new CreateSettlementResult(command.targetDate(), 0, 0);
         }
 
-        log.info("정산 대상 결제 {}건 발견", capturedPayments.size());
+        log.info("정산 대상 판매자 {}명", dueSellers.size());
 
-        // 2. 각 결제에 대해 정산 생성
-        List<Settlement> settlements = capturedPayments.stream()
-                .map(payment -> {
-                    // Settlement 도메인 생성 (수수료 계산 포함)
-                    Settlement settlement = Settlement.createFromPayment(
-                            payment.paymentId(),
-                            payment.orderId(),
-                            payment.amount(),
-                            command.targetDate()
-                    );
-                    
-                    log.debug("정산 생성: paymentId={}, amount={}, commission={}, netAmount={}",
-                            payment.paymentId(), payment.amount(), 
-                            settlement.getCommission(), settlement.getNetAmount());
-                    
-                    return settlement;
-                })
-                .collect(Collectors.toList());
+        List<Settlement> allSaved = new ArrayList<>();
+        int totalPayments = 0;
 
-        // 3. 정산 저장
-        List<Settlement> savedSettlements = settlements.stream()
-                .map(saveSettlementPort::save)
-                .collect(Collectors.toList());
+        // 2. 판매자별 결제 조회 + 정산 생성
+        for (Seller seller : dueSellers) {
+            List<CapturedPaymentInfo> payments =
+                    loadCapturedPaymentsPort.findCapturedPaymentsByDateAndSeller(
+                            command.targetDate(), seller.getId());
 
-        log.info("정산 {}건 저장 완료", savedSettlements.size());
+            if (payments.isEmpty()) continue;
 
-        // 5. Ledger 분개 기록
-        savedSettlements.forEach(savedSettlement -> {
-            try {
-                recordJournalEntryUseCase.recordSettlementCreated(
-                        savedSettlement.getId(),
-                        0L, // TODO: Phase 2에서 sellerId 연결
-                        Money.krw(savedSettlement.getPaymentAmount()),
-                        Money.krw(savedSettlement.getCommission())
+            totalPayments += payments.size();
+
+            for (CapturedPaymentInfo payment : payments) {
+                Settlement settlement = Settlement.createFromPayment(
+                        payment.paymentId(),
+                        payment.orderId(),
+                        seller.getId(),
+                        payment.amount(),
+                        seller.getCommissionRate(),
+                        command.targetDate()
                 );
-            } catch (Exception e) {
-                log.error("Ledger 분개 실패 (정산 생성은 성공): settlementId={}", savedSettlement.getId(), e);
-            }
-        });
 
-        // 4. Elasticsearch 비동기 인덱싱 (검색 활성화된 경우만)
-        if (settlementSearchIndexPort.isSearchEnabled()) {
-            try {
-                settlementSearchIndexPort.bulkIndexSettlements(savedSettlements);
-                log.info("Elasticsearch 비동기 인덱싱 요청 완료: {}건", savedSettlements.size());
-            } catch (Exception e) {
-                log.error("Elasticsearch 인덱싱 실패 (정산 생성은 성공): targetDate={}", 
-                        command.targetDate(), e);
-                // 인덱싱 실패해도 정산 생성은 성공으로 처리
+                Settlement saved = saveSettlementPort.save(settlement);
+
+                // 3. Ledger 분개 기록
+                try {
+                    recordJournalEntryUseCase.recordSettlementCreated(
+                            saved.getId(),
+                            seller.getId(),
+                            Money.krw(saved.getPaymentAmount()),
+                            Money.krw(saved.getCommission())
+                    );
+                } catch (Exception e) {
+                    log.error("Ledger 분개 실패 (정산 생성은 성공): settlementId={}", saved.getId(), e);
+                }
+
+                allSaved.add(saved);
+
+                log.debug("정산 생성: sellerId={}, paymentId={}, amount={}, commission={}, net={}",
+                        seller.getId(), payment.paymentId(), payment.amount(),
+                        saved.getCommission(), saved.getNetAmount());
             }
         }
 
-        return new CreateSettlementResult(
-                command.targetDate(),
-                capturedPayments.size(),
-                savedSettlements.size()
-        );
+        log.info("정산 {}건 저장 완료 (결제 {}건)", allSaved.size(), totalPayments);
+
+        // 4. Elasticsearch 비동기 인덱싱
+        if (settlementSearchIndexPort.isSearchEnabled() && !allSaved.isEmpty()) {
+            try {
+                settlementSearchIndexPort.bulkIndexSettlements(allSaved);
+            } catch (Exception e) {
+                log.error("Elasticsearch 인덱싱 실패: targetDate={}", command.targetDate(), e);
+            }
+        }
+
+        return new CreateSettlementResult(command.targetDate(), totalPayments, allSaved.size());
     }
 }

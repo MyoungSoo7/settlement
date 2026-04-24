@@ -2,7 +2,9 @@ package github.lms.lemuel.settlement.application.service;
 
 import github.lms.lemuel.ledger.application.port.in.RecordJournalEntryUseCase;
 import github.lms.lemuel.ledger.domain.Money;
-import github.lms.lemuel.settlement.application.port.in.CreateDailySettlementsUseCase;
+import github.lms.lemuel.seller.application.port.out.LoadSellerPort;
+import github.lms.lemuel.seller.domain.Seller;
+import github.lms.lemuel.seller.domain.SellerStatus;
 import github.lms.lemuel.settlement.application.port.in.CreateDailySettlementsUseCase.CreateSettlementCommand;
 import github.lms.lemuel.settlement.application.port.out.LoadCapturedPaymentsPort;
 import github.lms.lemuel.settlement.application.port.out.LoadCapturedPaymentsPort.CapturedPaymentInfo;
@@ -22,7 +24,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
@@ -42,6 +43,9 @@ class CreateDailySettlementsServiceLedgerTest {
     @Mock
     private RecordJournalEntryUseCase recordJournalEntryUseCase;
 
+    @Mock
+    private LoadSellerPort loadSellerPort;
+
     @InjectMocks
     private CreateDailySettlementsService service;
 
@@ -49,10 +53,16 @@ class CreateDailySettlementsServiceLedgerTest {
     @DisplayName("정산 생성 시 Ledger 분개도 함께 기록된다")
     void 정산_생성_시_레저_분개() {
         LocalDate targetDate = LocalDate.of(2026, 4, 25);
+
+        Seller seller = Seller.create(1L, "테스트상점", "1234567890", "홍길동", "010-1234-5678", "test@test.com");
+        seller.setId(42L);
+        seller.approve();
+
         CapturedPaymentInfo payment = new CapturedPaymentInfo(
                 1L, 100L, 42L, new BigDecimal("10000"), LocalDateTime.now());
 
-        given(loadCapturedPaymentsPort.findCapturedPaymentsByDate(targetDate))
+        given(loadSellerPort.findByStatus(SellerStatus.APPROVED)).willReturn(List.of(seller));
+        given(loadCapturedPaymentsPort.findCapturedPaymentsByDateAndSeller(targetDate, 42L))
                 .willReturn(List.of(payment));
         given(saveSettlementPort.save(any())).willAnswer(inv -> {
             Settlement s = inv.getArgument(0);
@@ -65,7 +75,7 @@ class CreateDailySettlementsServiceLedgerTest {
 
         verify(recordJournalEntryUseCase).recordSettlementCreated(
                 eq(1L),
-                anyLong(),
+                eq(42L),
                 any(Money.class),
                 any(Money.class)
         );
