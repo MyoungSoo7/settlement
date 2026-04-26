@@ -94,14 +94,6 @@ public class PaymentDomain {
         this.updatedAt = java.time.LocalDateTime.now();
     }
 
-    /**
-     * @deprecated requestRefund(amount) 사용. 전액 환불은 requestRefund(getRefundableAmount()).
-     */
-    @Deprecated
-    public void refund() {
-        requestRefund(getRefundableAmount());
-    }
-
     // Business logic: Calculate refundable amount
     public BigDecimal getRefundableAmount() {
         return amount.subtract(refundedAmount);
@@ -110,12 +102,6 @@ public class PaymentDomain {
     // Business logic: Check if fully refunded
     public boolean isFullyRefunded() {
         return refundedAmount.compareTo(amount) >= 0;
-    }
-
-    // Business logic: Add refunded amount
-    public void addRefundedAmount(BigDecimal refundAmount) {
-        this.refundedAmount = this.refundedAmount.add(refundAmount);
-        this.updatedAt = LocalDateTime.now();
     }
 
 
