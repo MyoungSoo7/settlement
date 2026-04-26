@@ -61,4 +61,19 @@ class AccountTest {
     void EXPENSE_정상방향_DEBIT() {
         assertThat(AccountType.EXPENSE.normalSide()).isEqualTo(DebitCredit.DEBIT);
     }
+
+    @Test
+    @DisplayName("OWNERS_EQUITY 계정은 CREDIT이 정상 방향이다")
+    void OWNERS_EQUITY_정상방향_CREDIT() {
+        assertThat(AccountType.OWNERS_EQUITY.normalSide()).isEqualTo(DebitCredit.CREDIT);
+    }
+
+    @Test
+    @DisplayName("플랫폼 자본금 계정을 생성한다")
+    void 플랫폼_자본금_계정() {
+        Account account = Account.createPlatformOwnersEquity();
+        assertThat(account.getCode()).isEqualTo("PLATFORM_OWNERS_EQUITY");
+        assertThat(account.getName()).isEqualTo("플랫폼 자본금");
+        assertThat(account.getType()).isEqualTo(AccountType.OWNERS_EQUITY);
+    }
 }
