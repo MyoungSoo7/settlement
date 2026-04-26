@@ -1,20 +1,15 @@
 package github.lms.lemuel.payment.adapter.in.api;
 
 import github.lms.lemuel.common.exception.MissingIdempotencyKeyException;
-import github.lms.lemuel.payment.adapter.in.dto.PaymentResponse;
+import github.lms.lemuel.payment.adapter.in.dto.RefundRequest;
+import github.lms.lemuel.payment.adapter.in.dto.RefundResponse;
+import github.lms.lemuel.payment.application.port.in.RefundCommand;
 import github.lms.lemuel.payment.application.port.in.RefundPaymentPort;
-import github.lms.lemuel.payment.domain.PaymentDomain;
+import github.lms.lemuel.payment.domain.Refund;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-/**
- * Refund REST API Controller
- *
- * POST /api/refunds/{paymentId}         - 환불 요청 (전액)
- * POST /api/refunds/full/{paymentId}    - 전액 환불
- * POST /api/refunds/partial/{paymentId} - 부분 환불
- */
 @RestController
 @RequestMapping("/api/refunds")
 @RequiredArgsConstructor
@@ -23,44 +18,20 @@ public class RefundController {
     private final RefundPaymentPort refundPaymentPort;
 
     /**
-     * 환불 요청
+     * 부분 환불 (또는 전체 환불 with amount = paymentAmount).
      * POST /api/refunds/{paymentId}
+     * Body: { amount, reason? }
+     * Header: Idempotency-Key (required)
      */
     @PostMapping("/{paymentId}")
-    public ResponseEntity<PaymentResponse> createRefund(
+    public ResponseEntity<RefundResponse> createRefund(
             @PathVariable Long paymentId,
+            @RequestBody RefundRequest request,
             @RequestHeader("Idempotency-Key") String idempotencyKey) {
         validateIdempotencyKey(idempotencyKey);
-        PaymentDomain paymentDomain = refundPaymentPort.refundPayment(paymentId);
-        return ResponseEntity.ok(new PaymentResponse(paymentDomain));
-    }
-
-    /**
-     * 전액 환불
-     * POST /api/refunds/full/{paymentId}
-     */
-    @PostMapping("/full/{paymentId}")
-    public ResponseEntity<PaymentResponse> processFullRefund(
-            @PathVariable Long paymentId,
-            @RequestHeader("Idempotency-Key") String idempotencyKey) {
-        validateIdempotencyKey(idempotencyKey);
-        PaymentDomain paymentDomain = refundPaymentPort.refundPayment(paymentId);
-        return ResponseEntity.ok(new PaymentResponse(paymentDomain));
-    }
-
-    /**
-     * 부분 환불
-     * POST /api/refunds/partial/{paymentId}
-     */
-    @PostMapping("/partial/{paymentId}")
-    public ResponseEntity<PaymentResponse> processPartialRefund(
-            @PathVariable Long paymentId,
-            @RequestParam java.math.BigDecimal refundAmount,
-            @RequestHeader("Idempotency-Key") String idempotencyKey) {
-        validateIdempotencyKey(idempotencyKey);
-        // TODO: 부분 환불 로직 구현 시 refundAmount 활용
-        PaymentDomain paymentDomain = refundPaymentPort.refundPayment(paymentId);
-        return ResponseEntity.ok(new PaymentResponse(paymentDomain));
+        Refund refund = refundPaymentPort.refund(
+                new RefundCommand(paymentId, request.amount(), idempotencyKey, request.reason()));
+        return ResponseEntity.ok(RefundResponse.from(refund));
     }
 
     private void validateIdempotencyKey(String idempotencyKey) {

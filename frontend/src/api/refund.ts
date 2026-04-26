@@ -1,5 +1,5 @@
 import api from './axios';
-import { RefundRequest, RefundResponse, PaymentResponse } from '@/types';
+import { RefundRequest, RefundResponse } from '@/types';
 
 export const refundApi = {
   /**
@@ -17,41 +17,6 @@ export const refundApi = {
         'Idempotency-Key': idempotencyKey,
       },
     });
-    return response.data;
-  },
-
-  /**
-   * 전체 환불
-   * POST /api/refunds/full/{paymentId}
-   */
-  processFullRefund: async (paymentId: number, idempotencyKey: string): Promise<PaymentResponse> => {
-    const response = await api.post<PaymentResponse>(`/api/refunds/full/${paymentId}`, null, {
-      headers: {
-        'Idempotency-Key': idempotencyKey,
-      },
-    });
-    return response.data;
-  },
-
-  /**
-   * 부분 환불
-   * POST /api/refunds/partial/{paymentId}
-   */
-  processPartialRefund: async (
-    paymentId: number,
-    refundAmount: number,
-    idempotencyKey: string
-  ): Promise<PaymentResponse> => {
-    const response = await api.post<PaymentResponse>(
-      `/api/refunds/partial/${paymentId}`,
-      null,
-      {
-        params: { refundAmount },
-        headers: {
-          'Idempotency-Key': idempotencyKey,
-        },
-      }
-    );
     return response.data;
   },
 };

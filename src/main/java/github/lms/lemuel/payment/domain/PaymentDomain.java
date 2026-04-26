@@ -1,5 +1,6 @@
 package github.lms.lemuel.payment.domain;
 
+import github.lms.lemuel.common.exception.RefundExceedsPaymentException;
 import lombok.Getter;
 
 import java.math.BigDecimal;
@@ -69,12 +70,28 @@ public class PaymentDomain {
         this.updatedAt = LocalDateTime.now();
     }
 
-    // Business logic: Refund payment
-    public void refund() {
-        if (this.status != PaymentStatus.CAPTURED) {
-            throw new IllegalStateException("Payment must be in CAPTURED status to refund");
+    /**
+     * 부분 또는 전체 환불 요청.
+     * 누적 환불액이 결제액과 같아지면 status를 REFUNDED로 전이.
+     */
+    public void requestRefund(BigDecimal refundAmount) {
+        if (refundAmount == null || refundAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Refund amount must be greater than zero");
         }
-        this.status = PaymentStatus.REFUNDED;
+        if (this.status != PaymentStatus.CAPTURED) {
+            throw new IllegalStateException(
+                "Payment must be in CAPTURED status to refund. current=" + this.status);
+        }
+        BigDecimal newRefunded = this.refundedAmount.add(refundAmount);
+        if (newRefunded.compareTo(this.amount) > 0) {
+            throw new RefundExceedsPaymentException(
+                String.format("Refund exceeds payment. paymentAmount=%s, alreadyRefunded=%s, requested=%s",
+                    this.amount, this.refundedAmount, refundAmount));
+        }
+        this.refundedAmount = newRefunded;
+        if (this.refundedAmount.compareTo(this.amount) == 0) {
+            this.status = PaymentStatus.REFUNDED;
+        }
         this.updatedAt = LocalDateTime.now();
     }
 
@@ -86,12 +103,6 @@ public class PaymentDomain {
     // Business logic: Check if fully refunded
     public boolean isFullyRefunded() {
         return refundedAmount.compareTo(amount) >= 0;
-    }
-
-    // Business logic: Add refunded amount
-    public void addRefundedAmount(BigDecimal refundAmount) {
-        this.refundedAmount = this.refundedAmount.add(refundAmount);
-        this.updatedAt = LocalDateTime.now();
     }
 
 

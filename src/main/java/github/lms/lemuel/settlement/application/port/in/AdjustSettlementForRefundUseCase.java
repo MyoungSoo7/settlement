@@ -1,20 +1,16 @@
 package github.lms.lemuel.settlement.application.port.in;
 
-import github.lms.lemuel.settlement.domain.Settlement;
-
 import java.math.BigDecimal;
 
-/**
- * Use Case: 환불 발생 시 정산 조정
- */
 public interface AdjustSettlementForRefundUseCase {
 
     /**
-     * 환불 금액을 정산에 반영하여 순 정산 금액 재계산
+     * 환불 1건당 SettlementAdjustment INSERT + Ledger recordRefundProcessed 분개 기록.
+     * 원 Settlement는 변경하지 않는다 (audit immutability).
      *
-     * @param paymentId 결제 ID
-     * @param refundAmount 환불 금액
-     * @return 조정된 정산
+     * @param refundId      환불 ID (Adjustment의 refund_id 외래키 + Ledger idempotency)
+     * @param paymentId     결제 ID (Settlement 조회용)
+     * @param refundAmount  환불 금액 (양수)
      */
-    Settlement adjustSettlementForRefund(Long paymentId, BigDecimal refundAmount);
+    void adjustSettlementForRefund(Long refundId, Long paymentId, BigDecimal refundAmount);
 }

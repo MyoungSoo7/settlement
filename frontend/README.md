@@ -157,9 +157,7 @@ const response = await settlementApi.search({
 - `GET /payments/{id}` - 결제 조회
 
 ### 환불
-- `POST /refunds/{paymentId}` - 환불 요청 (Idempotency-Key 헤더 필수)
-- `POST /refunds/full/{paymentId}` - 전체 환불
-- `POST /refunds/partial/{paymentId}` - 부분 환불
+- `POST /refunds/{paymentId}` - 환불 요청 (부분/전체 통합, Idempotency-Key 헤더 필수)
 
 ## 스타일링
 
