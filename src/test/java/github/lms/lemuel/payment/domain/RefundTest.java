@@ -76,5 +76,39 @@ class RefundTest {
             refund.markFailed("PG timeout");
             assertThat(refund.getStatus()).isEqualTo(RefundStatus.FAILED);
         }
+
+        @Test
+        @DisplayName("FAILED 상태에서 markFailed 재호출 거부")
+        void markFailed_twice_rejected() {
+            Refund refund = Refund.request(10L, new BigDecimal("3000"), "K1", null);
+            refund.markFailed("PG timeout");
+            assertThatThrownBy(() -> refund.markFailed("again"))
+                    .isInstanceOf(IllegalStateException.class);
+        }
+
+        @Test
+        @DisplayName("FAILED 상태에서 markCompleted 거부")
+        void markCompleted_after_failed_rejected() {
+            Refund refund = Refund.request(10L, new BigDecimal("3000"), "K1", null);
+            refund.markFailed("PG timeout");
+            assertThatThrownBy(refund::markCompleted)
+                    .isInstanceOf(IllegalStateException.class);
+        }
+
+        @Test
+        @DisplayName("markFailed: 원래 reason이 있으면 FAIL: 접두어와 결합")
+        void markFailed_appends_to_existing_reason() {
+            Refund refund = Refund.request(10L, new BigDecimal("3000"), "K1", "고객 변심");
+            refund.markFailed("PG timeout");
+            assertThat(refund.getReason()).isEqualTo("고객 변심 | FAIL: PG timeout");
+        }
+
+        @Test
+        @DisplayName("markFailed: 원래 reason이 null이면 FAIL: 접두어만 적용")
+        void markFailed_prefixes_when_reason_was_null() {
+            Refund refund = Refund.request(10L, new BigDecimal("3000"), "K1", null);
+            refund.markFailed("PG timeout");
+            assertThat(refund.getReason()).isEqualTo("FAIL: PG timeout");
+        }
     }
 }
