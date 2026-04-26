@@ -48,4 +48,10 @@ public class AdjustSettlementForRefundService implements AdjustSettlementForRefu
 
         return adjustedSettlement;
     }
+
+    @Override
+    public void adjustSettlementForRefund(Long refundId, Long paymentId, BigDecimal refundAmount) {
+        // Task 3.3에서 재작성 (Settlement immutable + SettlementAdjustment INSERT + Ledger 분개)
+        adjustSettlementForRefund(paymentId, refundAmount);
+    }
 }

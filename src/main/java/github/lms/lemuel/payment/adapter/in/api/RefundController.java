@@ -1,12 +1,14 @@
 package github.lms.lemuel.payment.adapter.in.api;
 
 import github.lms.lemuel.common.exception.MissingIdempotencyKeyException;
-import github.lms.lemuel.payment.adapter.in.dto.PaymentResponse;
+import github.lms.lemuel.payment.application.port.in.RefundCommand;
 import github.lms.lemuel.payment.application.port.in.RefundPaymentPort;
-import github.lms.lemuel.payment.domain.PaymentDomain;
+import github.lms.lemuel.payment.domain.Refund;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.math.BigDecimal;
 
 /**
  * Refund REST API Controller
@@ -14,6 +16,9 @@ import org.springframework.web.bind.annotation.*;
  * POST /api/refunds/{paymentId}         - 환불 요청 (전액)
  * POST /api/refunds/full/{paymentId}    - 전액 환불
  * POST /api/refunds/partial/{paymentId} - 부분 환불
+ *
+ * NOTE: Task 2.4에서 RefundResponse DTO + 단일 엔드포인트로 정식 재작성 예정.
+ *       현재는 Task 2.2/2.3 빌드 통과를 위한 임시 구현.
  */
 @RestController
 @RequestMapping("/api/refunds")
@@ -27,12 +32,15 @@ public class RefundController {
      * POST /api/refunds/{paymentId}
      */
     @PostMapping("/{paymentId}")
-    public ResponseEntity<PaymentResponse> createRefund(
+    public ResponseEntity<Long> createRefund(
             @PathVariable Long paymentId,
+            @RequestParam(required = false) BigDecimal refundAmount,
+            @RequestParam(required = false) String reason,
             @RequestHeader("Idempotency-Key") String idempotencyKey) {
         validateIdempotencyKey(idempotencyKey);
-        PaymentDomain paymentDomain = refundPaymentPort.refundPayment(paymentId);
-        return ResponseEntity.ok(new PaymentResponse(paymentDomain));
+        Refund refund = refundPaymentPort.refund(
+                new RefundCommand(paymentId, refundAmount, idempotencyKey, reason));
+        return ResponseEntity.ok(refund.getId());
     }
 
     /**
@@ -40,12 +48,15 @@ public class RefundController {
      * POST /api/refunds/full/{paymentId}
      */
     @PostMapping("/full/{paymentId}")
-    public ResponseEntity<PaymentResponse> processFullRefund(
+    public ResponseEntity<Long> processFullRefund(
             @PathVariable Long paymentId,
+            @RequestParam BigDecimal refundAmount,
+            @RequestParam(required = false) String reason,
             @RequestHeader("Idempotency-Key") String idempotencyKey) {
         validateIdempotencyKey(idempotencyKey);
-        PaymentDomain paymentDomain = refundPaymentPort.refundPayment(paymentId);
-        return ResponseEntity.ok(new PaymentResponse(paymentDomain));
+        Refund refund = refundPaymentPort.refund(
+                new RefundCommand(paymentId, refundAmount, idempotencyKey, reason));
+        return ResponseEntity.ok(refund.getId());
     }
 
     /**
@@ -53,14 +64,15 @@ public class RefundController {
      * POST /api/refunds/partial/{paymentId}
      */
     @PostMapping("/partial/{paymentId}")
-    public ResponseEntity<PaymentResponse> processPartialRefund(
+    public ResponseEntity<Long> processPartialRefund(
             @PathVariable Long paymentId,
-            @RequestParam java.math.BigDecimal refundAmount,
+            @RequestParam BigDecimal refundAmount,
+            @RequestParam(required = false) String reason,
             @RequestHeader("Idempotency-Key") String idempotencyKey) {
         validateIdempotencyKey(idempotencyKey);
-        // TODO: 부분 환불 로직 구현 시 refundAmount 활용
-        PaymentDomain paymentDomain = refundPaymentPort.refundPayment(paymentId);
-        return ResponseEntity.ok(new PaymentResponse(paymentDomain));
+        Refund refund = refundPaymentPort.refund(
+                new RefundCommand(paymentId, refundAmount, idempotencyKey, reason));
+        return ResponseEntity.ok(refund.getId());
     }
 
     private void validateIdempotencyKey(String idempotencyKey) {
