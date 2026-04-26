@@ -69,13 +69,37 @@ public class PaymentDomain {
         this.updatedAt = LocalDateTime.now();
     }
 
-    // Business logic: Refund payment
-    public void refund() {
-        if (this.status != PaymentStatus.CAPTURED) {
-            throw new IllegalStateException("Payment must be in CAPTURED status to refund");
+    /**
+     * 부분 또는 전체 환불 요청.
+     * 누적 환불액이 결제액과 같아지면 status를 REFUNDED로 전이.
+     */
+    public void requestRefund(java.math.BigDecimal refundAmount) {
+        if (refundAmount == null || refundAmount.compareTo(java.math.BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Refund amount must be greater than zero");
         }
-        this.status = PaymentStatus.REFUNDED;
-        this.updatedAt = LocalDateTime.now();
+        if (this.status != PaymentStatus.CAPTURED) {
+            throw new IllegalStateException(
+                "Payment must be in CAPTURED status to refund. current=" + this.status);
+        }
+        java.math.BigDecimal newRefunded = this.refundedAmount.add(refundAmount);
+        if (newRefunded.compareTo(this.amount) > 0) {
+            throw new github.lms.lemuel.common.exception.RefundExceedsPaymentException(
+                String.format("Refund exceeds payment. paymentAmount=%s, alreadyRefunded=%s, requested=%s",
+                    this.amount, this.refundedAmount, refundAmount));
+        }
+        this.refundedAmount = newRefunded;
+        if (this.refundedAmount.compareTo(this.amount) == 0) {
+            this.status = PaymentStatus.REFUNDED;
+        }
+        this.updatedAt = java.time.LocalDateTime.now();
+    }
+
+    /**
+     * @deprecated requestRefund(amount) 사용. 전액 환불은 requestRefund(getRefundableAmount()).
+     */
+    @Deprecated
+    public void refund() {
+        requestRefund(getRefundableAmount());
     }
 
     // Business logic: Calculate refundable amount
