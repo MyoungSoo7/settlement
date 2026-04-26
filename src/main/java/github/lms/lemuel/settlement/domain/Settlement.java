@@ -175,39 +175,17 @@ public class Settlement {
     }
 
     /**
-     * 정산 확정 (레거시 호환)
-     */
-    public void confirm() {
-        if (this.status != SettlementStatus.PENDING &&
-            this.status != SettlementStatus.WAITING_APPROVAL &&
-            this.status != SettlementStatus.PROCESSING) {
-            throw new IllegalStateException("Only PENDING, WAITING_APPROVAL, or PROCESSING settlements can be confirmed");
-        }
-        this.status = SettlementStatus.CONFIRMED;
-        this.confirmedAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
-    }
-
-    /**
      * 정산 취소
      */
     public void cancel() {
-        if (this.status == SettlementStatus.CONFIRMED || this.status == SettlementStatus.DONE) {
-            throw new IllegalStateException("CONFIRMED or DONE settlements cannot be canceled");
+        if (this.status == SettlementStatus.DONE) {
+            throw new IllegalStateException("DONE settlements cannot be canceled");
         }
         this.status = SettlementStatus.CANCELED;
         this.updatedAt = LocalDateTime.now();
     }
 
     // ========== 상태 확인 메서드 ==========
-
-    public boolean isConfirmed() {
-        return this.status == SettlementStatus.CONFIRMED;
-    }
-
-    public boolean isPending() {
-        return this.status == SettlementStatus.PENDING || this.status == SettlementStatus.WAITING_APPROVAL;
-    }
 
     public boolean canRetry() {
         return this.status == SettlementStatus.FAILED;
