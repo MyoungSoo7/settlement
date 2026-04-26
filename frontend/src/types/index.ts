@@ -180,7 +180,7 @@ export interface RefundResponse {
   status: string;
   idempotencyKey: string;
   createdAt: string;
-  payment: PaymentResponse;
+  payment?: PaymentResponse;
 }
 
 // Product Types

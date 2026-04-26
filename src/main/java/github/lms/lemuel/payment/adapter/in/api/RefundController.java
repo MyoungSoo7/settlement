@@ -1,6 +1,7 @@
 package github.lms.lemuel.payment.adapter.in.api;
 
 import github.lms.lemuel.common.exception.MissingIdempotencyKeyException;
+import github.lms.lemuel.payment.adapter.in.dto.RefundRequest;
 import github.lms.lemuel.payment.adapter.in.dto.RefundResponse;
 import github.lms.lemuel.payment.application.port.in.RefundCommand;
 import github.lms.lemuel.payment.application.port.in.RefundPaymentPort;
@@ -8,8 +9,6 @@ import github.lms.lemuel.payment.domain.Refund;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.math.BigDecimal;
 
 @RestController
 @RequestMapping("/api/refunds")
@@ -19,18 +18,19 @@ public class RefundController {
     private final RefundPaymentPort refundPaymentPort;
 
     /**
-     * 부분 환불 (또는 전체 환불 with refundAmount = paymentAmount).
-     * POST /api/refunds/{paymentId}?refundAmount=...
+     * 부분 환불 (또는 전체 환불 with amount = paymentAmount).
+     * POST /api/refunds/{paymentId}
+     * Body: { amount, reason? }
+     * Header: Idempotency-Key (required)
      */
     @PostMapping("/{paymentId}")
     public ResponseEntity<RefundResponse> createRefund(
             @PathVariable Long paymentId,
-            @RequestParam BigDecimal refundAmount,
-            @RequestParam(required = false) String reason,
+            @RequestBody RefundRequest request,
             @RequestHeader("Idempotency-Key") String idempotencyKey) {
         validateIdempotencyKey(idempotencyKey);
         Refund refund = refundPaymentPort.refund(
-                new RefundCommand(paymentId, refundAmount, idempotencyKey, reason));
+                new RefundCommand(paymentId, request.amount(), idempotencyKey, request.reason()));
         return ResponseEntity.ok(RefundResponse.from(refund));
     }
 
