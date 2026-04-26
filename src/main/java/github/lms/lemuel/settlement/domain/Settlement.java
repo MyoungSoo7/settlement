@@ -199,35 +199,6 @@ public class Settlement {
         this.updatedAt = LocalDateTime.now();
     }
 
-    // ========== 환불 처리 ==========
-
-    /**
-     * 환불 반영 (정산 금액 조정)
-     * @param refundAmount 환불 금액
-     */
-    public void adjustForRefund(BigDecimal refundAmount) {
-        if (refundAmount == null || refundAmount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("Refund amount must be greater than zero");
-        }
-
-        if (this.refundedAmount == null) {
-            this.refundedAmount = BigDecimal.ZERO;
-        }
-
-        this.refundedAmount = this.refundedAmount.add(refundAmount);
-
-        // 순 정산 금액 재계산: (결제금액 - 환불금액 - 수수료)
-        BigDecimal remainingAmount = this.paymentAmount.subtract(this.refundedAmount);
-        this.netAmount = remainingAmount.subtract(this.commission).setScale(2, RoundingMode.HALF_UP);
-
-        // 환불로 인해 정산 금액이 0 이하가 되면 취소 처리
-        if (this.netAmount.compareTo(BigDecimal.ZERO) <= 0) {
-            this.status = SettlementStatus.CANCELED;
-        }
-
-        this.updatedAt = LocalDateTime.now();
-    }
-
     // ========== 상태 확인 메서드 ==========
 
     public boolean isConfirmed() {
