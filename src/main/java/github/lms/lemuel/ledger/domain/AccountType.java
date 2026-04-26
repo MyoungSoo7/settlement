@@ -3,6 +3,7 @@ package github.lms.lemuel.ledger.domain;
 public enum AccountType {
     ASSET(DebitCredit.DEBIT),
     LIABILITY(DebitCredit.CREDIT),
+    OWNERS_EQUITY(DebitCredit.CREDIT),
     REVENUE(DebitCredit.CREDIT),
     EXPENSE(DebitCredit.DEBIT);
 

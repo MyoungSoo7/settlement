@@ -39,6 +39,10 @@ public class Account {
         return create("PLATFORM_COMMISSION", "플랫폼 수수료 수익", AccountType.REVENUE);
     }
 
+    public static Account createPlatformOwnersEquity() {
+        return create("PLATFORM_OWNERS_EQUITY", "플랫폼 자본금", AccountType.OWNERS_EQUITY);
+    }
+
     // Reconstitution constructor for persistence
     public Account(Long id, String code, String name, AccountType type, LocalDateTime createdAt) {
         this.id = id;
