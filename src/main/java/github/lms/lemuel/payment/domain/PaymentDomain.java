@@ -1,5 +1,6 @@
 package github.lms.lemuel.payment.domain;
 
+import github.lms.lemuel.common.exception.RefundExceedsPaymentException;
 import lombok.Getter;
 
 import java.math.BigDecimal;
@@ -73,17 +74,17 @@ public class PaymentDomain {
      * 부분 또는 전체 환불 요청.
      * 누적 환불액이 결제액과 같아지면 status를 REFUNDED로 전이.
      */
-    public void requestRefund(java.math.BigDecimal refundAmount) {
-        if (refundAmount == null || refundAmount.compareTo(java.math.BigDecimal.ZERO) <= 0) {
+    public void requestRefund(BigDecimal refundAmount) {
+        if (refundAmount == null || refundAmount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Refund amount must be greater than zero");
         }
         if (this.status != PaymentStatus.CAPTURED) {
             throw new IllegalStateException(
                 "Payment must be in CAPTURED status to refund. current=" + this.status);
         }
-        java.math.BigDecimal newRefunded = this.refundedAmount.add(refundAmount);
+        BigDecimal newRefunded = this.refundedAmount.add(refundAmount);
         if (newRefunded.compareTo(this.amount) > 0) {
-            throw new github.lms.lemuel.common.exception.RefundExceedsPaymentException(
+            throw new RefundExceedsPaymentException(
                 String.format("Refund exceeds payment. paymentAmount=%s, alreadyRefunded=%s, requested=%s",
                     this.amount, this.refundedAmount, refundAmount));
         }
@@ -91,7 +92,7 @@ public class PaymentDomain {
         if (this.refundedAmount.compareTo(this.amount) == 0) {
             this.status = PaymentStatus.REFUNDED;
         }
-        this.updatedAt = java.time.LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
     }
 
     // Business logic: Calculate refundable amount
