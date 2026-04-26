@@ -20,7 +20,7 @@ public class RefundPersistenceAdapter implements SaveRefundPort, LoadRefundPort 
         if (refund.getId() == null && saved.getId() != null) {
             refund.assignId(saved.getId());
         }
-        return RefundMapper.toDomain(saved);
+        return refund;
     }
 
     @Override

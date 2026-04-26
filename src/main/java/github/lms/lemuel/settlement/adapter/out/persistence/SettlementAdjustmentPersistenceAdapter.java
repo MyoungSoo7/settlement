@@ -18,6 +18,6 @@ public class SettlementAdjustmentPersistenceAdapter implements SaveSettlementAdj
         if (adjustment.getId() == null && saved.getId() != null) {
             adjustment.assignId(saved.getId());
         }
-        return SettlementAdjustmentMapper.toDomain(saved);
+        return adjustment;
     }
 }
