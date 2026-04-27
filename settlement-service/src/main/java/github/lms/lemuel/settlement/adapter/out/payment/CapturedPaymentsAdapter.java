@@ -1,7 +1,7 @@
 package github.lms.lemuel.settlement.adapter.out.payment;
 
-import github.lms.lemuel.payment.adapter.out.persistence.PaymentJpaEntity;
-import github.lms.lemuel.payment.adapter.out.persistence.PaymentJpaRepository;
+import github.lms.lemuel.settlement.adapter.out.readmodel.SettlementPaymentReadModel;
+import github.lms.lemuel.settlement.adapter.out.readmodel.SettlementPaymentReadModelRepository;
 import github.lms.lemuel.settlement.application.port.out.LoadCapturedPaymentsPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -12,26 +12,26 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Settlement에서 Payment 정보를 조회하는 Adapter
- * Payment 모듈의 JPA Repository를 사용하되, 인터페이스로 의존성 분리
+ * Settlement 가 정산 대상 결제(=CAPTURED 상태)를 조회하는 어댑터.
+ *
+ * <p>order-service 의 PaymentJpaEntity 를 직접 참조하지 않고, settlement-service 자체의
+ * read-only projection ({@link SettlementPaymentReadModel}) 을 통해 조회한다.
+ * 모듈 간 코드 의존성을 끊으면서, 단일 PG DB 는 공유 (포트폴리오 간소화).</p>
  */
 @Component
 @RequiredArgsConstructor
 public class CapturedPaymentsAdapter implements LoadCapturedPaymentsPort {
 
-    private final PaymentJpaRepository paymentJpaRepository;
+    private final SettlementPaymentReadModelRepository paymentReadRepository;
 
     @Override
     public List<CapturedPaymentInfo> findCapturedPaymentsByDate(LocalDate settlementDate) {
-        // LocalDate를 LocalDateTime 범위로 변환 (해당 날짜 00:00:00 ~ 23:59:59)
         LocalDateTime startDateTime = settlementDate.atStartOfDay();
         LocalDateTime endDateTime = settlementDate.plusDays(1).atStartOfDay();
 
-        // Payment JPA Entity를 직접 조회
-        List<PaymentJpaEntity> payments = paymentJpaRepository
+        List<SettlementPaymentReadModel> payments = paymentReadRepository
                 .findByCapturedAtBetweenAndStatus(startDateTime, endDateTime, "CAPTURED");
 
-        // DTO로 변환하여 반환 (도메인 의존성 제거)
         return payments.stream()
                 .map(payment -> new CapturedPaymentInfo(
                         payment.getId(),

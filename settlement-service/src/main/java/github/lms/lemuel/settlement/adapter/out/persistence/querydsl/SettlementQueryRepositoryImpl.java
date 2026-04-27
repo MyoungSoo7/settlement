@@ -7,12 +7,12 @@ import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.core.types.dsl.NumberExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
-import github.lms.lemuel.order.adapter.out.persistence.QOrderJpaEntity;
-import github.lms.lemuel.payment.adapter.out.persistence.QPaymentJpaEntity;
-import github.lms.lemuel.product.adapter.out.persistence.QProductJpaEntity;
 import github.lms.lemuel.settlement.adapter.out.persistence.QSettlementJpaEntity;
 import github.lms.lemuel.settlement.adapter.out.persistence.querydsl.dto.*;
-import github.lms.lemuel.user.adapter.out.persistence.QUserJpaEntity;
+import github.lms.lemuel.settlement.adapter.out.readmodel.QSettlementOrderReadModel;
+import github.lms.lemuel.settlement.adapter.out.readmodel.QSettlementPaymentReadModel;
+import github.lms.lemuel.settlement.adapter.out.readmodel.QSettlementProductReadModel;
+import github.lms.lemuel.settlement.adapter.out.readmodel.QSettlementUserReadModel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
@@ -28,10 +28,10 @@ public class SettlementQueryRepositoryImpl implements SettlementQueryRepository 
     private final JPAQueryFactory queryFactory;
 
     private static final QSettlementJpaEntity settlement = QSettlementJpaEntity.settlementJpaEntity;
-    private static final QPaymentJpaEntity payment = QPaymentJpaEntity.paymentJpaEntity;
-    private static final QOrderJpaEntity order = QOrderJpaEntity.orderJpaEntity;
-    private static final QUserJpaEntity user = QUserJpaEntity.userJpaEntity;
-    private static final QProductJpaEntity product = QProductJpaEntity.productJpaEntity;
+    private static final QSettlementPaymentReadModel payment = QSettlementPaymentReadModel.settlementPaymentReadModel;
+    private static final QSettlementOrderReadModel order = QSettlementOrderReadModel.settlementOrderReadModel;
+    private static final QSettlementUserReadModel user = QSettlementUserReadModel.settlementUserReadModel;
+    private static final QSettlementProductReadModel product = QSettlementProductReadModel.settlementProductReadModel;
 
     /**
      * 일별 정산 요약
