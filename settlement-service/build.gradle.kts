@@ -6,6 +6,9 @@ plugins {
 
 dependencies {
     implementation(project(":shared-common"))
+    // 임시 — Phase 5 에서 Kafka 이벤트 + 자체 read model 로 끊어낼 예정.
+    // 현재는 settlement 가 order/payment JpaEntity 를 직접 참조 (단일 모놀리스 잔재).
+    implementation(project(":order-service"))
 
     // Spring Boot 스타터
     implementation("org.springframework.boot:spring-boot-starter-actuator")

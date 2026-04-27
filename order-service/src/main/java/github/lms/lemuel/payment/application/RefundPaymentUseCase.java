@@ -14,7 +14,6 @@ import github.lms.lemuel.payment.domain.PaymentDomain;
 import github.lms.lemuel.payment.domain.PaymentStatus;
 import github.lms.lemuel.payment.domain.Refund;
 import github.lms.lemuel.payment.domain.exception.PaymentNotFoundException;
-import github.lms.lemuel.settlement.application.port.in.AdjustSettlementForRefundUseCase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -38,7 +37,6 @@ public class RefundPaymentUseCase implements RefundPaymentPort {
     private final PublishEventPort publishEventPort;
     private final LoadRefundPort loadRefundPort;
     private final SaveRefundPort saveRefundPort;
-    private final AdjustSettlementForRefundUseCase adjustSettlementForRefundUseCase;
 
     public RefundPaymentUseCase(LoadPaymentPort loadPaymentPort,
                                 SavePaymentPort savePaymentPort,
@@ -46,8 +44,7 @@ public class RefundPaymentUseCase implements RefundPaymentPort {
                                 UpdateOrderStatusPort updateOrderStatusPort,
                                 PublishEventPort publishEventPort,
                                 LoadRefundPort loadRefundPort,
-                                SaveRefundPort saveRefundPort,
-                                AdjustSettlementForRefundUseCase adjustSettlementForRefundUseCase) {
+                                SaveRefundPort saveRefundPort) {
         this.loadPaymentPort = loadPaymentPort;
         this.savePaymentPort = savePaymentPort;
         this.pgClientPort = pgClientPort;
@@ -55,7 +52,6 @@ public class RefundPaymentUseCase implements RefundPaymentPort {
         this.publishEventPort = publishEventPort;
         this.loadRefundPort = loadRefundPort;
         this.saveRefundPort = saveRefundPort;
-        this.adjustSettlementForRefundUseCase = adjustSettlementForRefundUseCase;
     }
 
     @Override
@@ -135,21 +131,12 @@ public class RefundPaymentUseCase implements RefundPaymentPort {
             updateOrderStatusPort.updateOrderStatus(savedPaymentDomain.getOrderId(), "REFUNDED");
         }
 
-        // 11. 이벤트 발행
+        // 11. 이벤트 발행 — settlement 모듈은 RefundCompleted Kafka 이벤트로 자체 조정.
+        //     (이전: AdjustSettlementForRefundUseCase 직접 호출 → MSA 분리 시 cross-service 호출 금지)
+        //     Phase 5 에서 Outbox 패턴으로 보강 예정.
         publishEventPort.publishPaymentRefunded(savedPaymentDomain.getId(), savedPaymentDomain.getOrderId());
-
-        // 12. 정산 조정 + refundId 전달
-        try {
-            adjustSettlementForRefundUseCase.adjustSettlementForRefund(
-                savedPaymentDomain.getId(),
-                refundAmount,
-                completedRefund.getId()
-            );
-            log.info("Settlement adjusted for refund. paymentId={}, refundId={}, refundAmount={}",
-                    savedPaymentDomain.getId(), completedRefund.getId(), refundAmount);
-        } catch (Exception e) {
-            log.error("Failed to adjust settlement for refund. paymentId={}", savedPaymentDomain.getId(), e);
-        }
+        log.info("PaymentRefunded event published. paymentId={}, refundId={}, refundAmount={}",
+                savedPaymentDomain.getId(), completedRefund.getId(), refundAmount);
 
         return savedPaymentDomain;
     }
