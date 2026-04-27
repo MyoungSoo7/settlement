@@ -131,6 +131,10 @@ public class SecurityConfig {
                         // 정산 관련 API (관리자·매니저)
                         .requestMatchers("/settlements/**").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers("/api/settlements/**").hasAnyRole("ADMIN", "MANAGER")
+                        // 재무/자금흐름 리포트 (관리자·매니저)
+                        .requestMatchers("/api/reports/**").hasAnyRole("ADMIN", "MANAGER")
+                        // 결제 환불 이력 조회 (관리자·매니저·본인) — 더 세밀한 권한은 향후 Audit PR 에서
+                        .requestMatchers("/api/payments/*/refunds").hasAnyRole("ADMIN", "MANAGER", "USER")
                         // 나머지는 인증 필요
                         .anyRequest().authenticated()
                 )

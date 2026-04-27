@@ -1,14 +1,13 @@
 package github.lms.lemuel.common.config;
 
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.converter.HttpMessageConverter;
+import org.springframework.http.converter.HttpMessageConverters;
 import org.springframework.http.converter.StringHttpMessageConverter;
-import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.nio.charset.StandardCharsets;
-import java.util.List;
 
 /**
  * Spring MVC 설정
@@ -22,18 +21,20 @@ public class WebConfig implements WebMvcConfigurer {
      * HTTP Message Converter에 UTF-8 인코딩 명시적 설정
      * - JSON 응답 시 한글이 깨지지 않도록 보장
      * - String 응답 시에도 UTF-8 적용
+     *
+     * <p>Spring 7 의 fluent {@link HttpMessageConverters.ServerBuilder} 를 사용하여
+     * 기본 컨버터 세트에서 String/JSON 만 UTF-8 변형으로 교체한다.
      */
     @Override
-    public void configureMessageConverters(List<HttpMessageConverter<?>> converters) {
-        // StringHttpMessageConverter에 UTF-8 설정
+    public void configureMessageConverters(HttpMessageConverters.ServerBuilder builder) {
         StringHttpMessageConverter stringConverter = new StringHttpMessageConverter(StandardCharsets.UTF_8);
         stringConverter.setWriteAcceptCharset(false); // Accept-Charset 헤더 제거 (보안상 권장)
-        converters.add(stringConverter);
 
-        // MappingJackson2HttpMessageConverter에 UTF-8 설정
-        MappingJackson2HttpMessageConverter jsonConverter = new MappingJackson2HttpMessageConverter();
+        JacksonJsonHttpMessageConverter jsonConverter = new JacksonJsonHttpMessageConverter();
         jsonConverter.setDefaultCharset(StandardCharsets.UTF_8);
-        converters.add(jsonConverter);
+
+        builder.withStringConverter(stringConverter)
+               .withJsonConverter(jsonConverter);
     }
 
     /**

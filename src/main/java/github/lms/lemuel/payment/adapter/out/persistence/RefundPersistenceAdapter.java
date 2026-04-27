@@ -5,6 +5,7 @@ import github.lms.lemuel.payment.application.port.out.SaveRefundPort;
 import github.lms.lemuel.payment.domain.Refund;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -20,6 +21,13 @@ public class RefundPersistenceAdapter implements LoadRefundPort, SaveRefundPort 
     public Optional<Refund> findByPaymentIdAndIdempotencyKey(Long paymentId, String idempotencyKey) {
         return repository.findByPaymentIdAndIdempotencyKey(paymentId, idempotencyKey)
                 .map(this::toDomain);
+    }
+
+    @Override
+    public List<Refund> findAllByPaymentId(Long paymentId) {
+        return repository.findByPaymentIdOrderByRequestedAtDesc(paymentId).stream()
+                .map(this::toDomain)
+                .toList();
     }
 
     @Override

@@ -1,15 +1,13 @@
 package github.lms.lemuel.user.adapter.in.web;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import github.lms.lemuel.common.config.jwt.JwtAuthenticationFilter;
 import github.lms.lemuel.common.config.jwt.JwtUtil;
 import github.lms.lemuel.common.config.jwt.SecurityConfig;
-import github.lms.lemuel.user.adapter.in.web.request.LoginRequest;
 import github.lms.lemuel.user.application.port.in.LoginUseCase;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
@@ -30,7 +28,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AuthControllerSecurityTest {
 
     @Autowired MockMvc mockMvc;
-    @Autowired ObjectMapper objectMapper;
     @MockitoBean LoginUseCase loginUseCase;
     @MockitoBean JwtUtil jwtUtil;
 
@@ -40,7 +37,11 @@ class AuthControllerSecurityTest {
         when(loginUseCase.login(any()))
                 .thenReturn(new LoginUseCase.LoginResult("token-123", "user@test.com", "USER"));
 
-        String body = objectMapper.writeValueAsString(new LoginRequest("user@test.com", "password123"));
+        // Boot 4 + Jackson 3 에서 WebMvcTest 슬라이스에 ObjectMapper 가 기본 주입되지 않아
+        // JSON 은 하드코딩된 리터럴을 사용한다 (permitAll 규칙 검증만이 목적).
+        String body = """
+                {"email":"user@test.com","password":"password123"}
+                """;
 
         mockMvc.perform(post("/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)

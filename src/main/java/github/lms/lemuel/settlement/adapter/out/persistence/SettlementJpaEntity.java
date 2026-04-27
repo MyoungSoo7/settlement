@@ -41,6 +41,9 @@ public class SettlementJpaEntity {
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal commission;
 
+    @Column(name = "commission_rate", nullable = false, precision = 5, scale = 4)
+    private BigDecimal commissionRate = new BigDecimal("0.0300");
+
     @Column(name = "net_amount", nullable = false, precision = 10, scale = 2)
     private BigDecimal netAmount;
 

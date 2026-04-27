@@ -34,14 +34,21 @@ dependencies {
 
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")
+    // Boot 4 에서 FlywayAutoConfiguration 이 별도 모듈로 분리됨 — 없으면
+    // 앱 기동 시 마이그레이션이 돌지 않는다. starter 없이 모듈 직접 선언.
+    implementation("org.springframework.boot:spring-boot-flyway")
 
     // Kafka (실 브로커 — Redpanda/Apache Kafka 호환).
     // app.kafka.enabled=true 일 때만 KafkaOutboxPublisher / 컨슈머가 활성화된다.
+    // Boot 4 에서 KafkaAutoConfiguration 이 별도 모듈(spring-boot-kafka)로 분리 —
+    // 없으면 KafkaTemplate 빈이 자동생성되지 않는다.
+    implementation("org.springframework.boot:spring-boot-starter-kafka")
     implementation("org.springframework.kafka:spring-kafka")
     runtimeOnly("org.postgresql:postgresql:42.7.3")
 
-    // SpringDoc OpenAPI
-    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.0")
+    // SpringDoc OpenAPI — 3.x 계열은 Boot 4 + Spring 7 + Spring Data 신 API 에 호환.
+    // 이전 2.8.0 은 QuerydslProvider 가 구 Spring Data TypeInformation 을 참조해 @SpringBootTest 컨텍스트 로드 실패.
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.2")
 
     // JWT
     implementation("io.jsonwebtoken:jjwt-api:0.12.5")
@@ -78,8 +85,15 @@ dependencies {
     implementation("com.github.ben-manes.caffeine:caffeine")
 
     // Resilience4j — Toss PG 호출에 CircuitBreaker + Retry 적용 (AOP 기반)
+    // Boot 4.0 에서 spring-boot-starter-aop 가 퍼블리시되지 않으므로 제거.
+    // spring-aop(7.0.x) + aspectjweaver 는 다른 스타터(data-jpa → spring-aspects)를 통해 전이적으로 확보된다.
     implementation("io.github.resilience4j:resilience4j-spring-boot3:2.2.0")
-    implementation("org.springframework.boot:spring-boot-starter-aop")
+
+    // 구조화 로그 (T2-④) — JSON 인코더. spring 프로파일에서만 활성, local 은 평문.
+    implementation("net.logstash.logback:logstash-logback-encoder:7.4")
+
+    // Rate Limiting (T2-⑤) — in-memory Bucket4j. 단일 노드 가정, 클러스터는 Redis backed 로 추후 교체.
+    implementation("com.bucket4j:bucket4j-core:8.10.1")
 
     // prometheus
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
@@ -100,6 +114,10 @@ dependencies {
     testImplementation("com.h2database:h2")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
+    // Boot 4 에서 WebMvcTest 슬라이스에 Jackson 자동설정이 기본 포함되지 않아 명시 추가.
+    testImplementation("org.springframework.boot:spring-boot-starter-jackson-test")
+    // Boot 4 에서 @DataJpaTest / @AutoConfigureTestDatabase 가 별도 모듈로 분리되어 스타터로 추가.
+    testImplementation("org.springframework.boot:spring-boot-starter-data-jpa-test")
     testImplementation("org.springframework.security:spring-security-test")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     // Mockito 를 명시적 javaagent 로 주입 (JDK 21+ 필수, JDK 25 에서 self-attach 불가)
@@ -107,7 +125,9 @@ dependencies {
     testImplementation("org.mockito:mockito-core")
     // ArchUnit: 헥사고날 경계 규칙을 테스트로 강제
     testImplementation("com.tngtech.archunit:archunit-junit5:1.3.0")
-    // Testcontainers: 실 Postgres 에서 Flyway+Hibernate schema validation 을 CI 에서 검증
+    // Testcontainers: 실 Postgres 에서 Flyway+Hibernate schema validation 을 CI 에서 검증.
+    // Boot 4.0 BOM 은 testcontainers 버전을 관리하지 않으므로 BOM 을 명시적으로 임포트.
+    testImplementation(platform("org.testcontainers:testcontainers-bom:1.21.4"))
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:postgresql")
     testImplementation("org.testcontainers:kafka")
@@ -139,16 +159,17 @@ tasks.jacocoTestReport {
 tasks.jacocoTestCoverageVerification {
     violationRules {
         rule {
-            // 2026-04-22: 현재 22% 까지 끌어올림 (서비스·도메인 단위 테스트 다수 추가).
-            // CLAUDE.md 의 70% 목표까지의 잔여 격차는 주로 아래 영역 — 전부 인프라성 테스트가 필요.
+            // 2026-04-23: report + observability + SellerTier + SellerCycle + Audit + RateLimit +
+            //             PII + AuditLog IT + ADR 추가로 INSTRUCTION 38.06%, LINE 41.34%, CLASS 62.07%.
+            // CLAUDE.md 의 70% 목표까지의 잔여 격차는 주로 아래 영역 — 전부 인프라성 테스트.
             //   - QueryDSL generated code (Q* 클래스, ~1,400 줄) → 실제 QueryDSL 통합 테스트 필요
             //   - JPA Entity getter/setter 및 @PrePersist/@PreUpdate 훅 → @DataJpaTest 통합 테스트 필요
             //   - PDF/Elasticsearch/Batch 어댑터 → Testcontainers 기반 통합 테스트 필요
             //   - 컨트롤러 다수 → @WebMvcTest 테스트 필요
-            // 회귀 방지선을 0.20 으로 고정. 통합 테스트 스윗 구축은 별도 작업 항목.
+            // 회귀 방지선을 0.38 로 갱신. Persistence adapter 통합 테스트 확충은 별도 작업.
             limit {
 
-                minimum = "0.30".toBigDecimal() // TODO: Boot 4 마이그레이션 후 커버리지 회복 필요 (기존 0.70)
+                minimum = "0.38".toBigDecimal() // TODO: 통합 테스트 확충 후 0.70 까지 단계적 상향
 
             }
         }

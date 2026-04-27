@@ -7,7 +7,11 @@ import java.time.LocalDateTime;
 
 public class Settlement {
 
-    private static final BigDecimal COMMISSION_RATE = new BigDecimal("0.03"); // 3% 수수료
+    /**
+     * 레거시 기본 수수료율 (3%). 차등 수수료 전환 전 생성된 정산은 이 값으로 계산.
+     * 신규 경로는 {@link SellerTier} 별 rate 를 받아 사용한다.
+     */
+    public static final BigDecimal COMMISSION_RATE = new BigDecimal("0.03");
 
     private Long id;
     private Long paymentId;
@@ -15,6 +19,7 @@ public class Settlement {
     private BigDecimal paymentAmount;     // 원 결제 금액
     private BigDecimal refundedAmount;    // 환불 금액
     private BigDecimal commission;        // 수수료
+    private BigDecimal commissionRate;    // 적용된 수수료율 (이력 보존)
     private BigDecimal netAmount;         // 실 지급액
     private SettlementStatus status;
     private LocalDate settlementDate;
@@ -50,25 +55,37 @@ public class Settlement {
         this.updatedAt = updatedAt != null ? updatedAt : LocalDateTime.now();
     }
 
-    public static Settlement createFromPayment(Long paymentId, Long orderId, 
+    public static Settlement createFromPayment(Long paymentId, Long orderId,
                                                BigDecimal paymentAmount, LocalDate settlementDate) {
+        return createFromPayment(paymentId, orderId, paymentAmount, settlementDate, COMMISSION_RATE);
+    }
+
+    /**
+     * 차등 수수료 지원 팩토리.
+     * @param commissionRate 적용할 수수료율 (예: {@link SellerTier#rate()}). null 이면 {@link #COMMISSION_RATE}.
+     */
+    public static Settlement createFromPayment(Long paymentId, Long orderId,
+                                               BigDecimal paymentAmount, LocalDate settlementDate,
+                                               BigDecimal commissionRate) {
         Settlement settlement = new Settlement();
         settlement.setPaymentId(paymentId);
         settlement.setOrderId(orderId);
         settlement.setPaymentAmount(paymentAmount);
         settlement.setSettlementDate(settlementDate);
-        
+        settlement.commissionRate = commissionRate != null ? commissionRate : COMMISSION_RATE;
+
         settlement.validatePaymentId();
         settlement.validateAmount();
         settlement.validateSettlementDate();
-        
+
         settlement.calculateCommissionAndNetAmount();
-        
+
         return settlement;
     }
 
     private void calculateCommissionAndNetAmount() {
-        this.commission = paymentAmount.multiply(COMMISSION_RATE)
+        BigDecimal rate = commissionRate != null ? commissionRate : COMMISSION_RATE;
+        this.commission = paymentAmount.multiply(rate)
                 .setScale(2, RoundingMode.HALF_UP);
         this.netAmount = paymentAmount.subtract(commission)
                 .setScale(2, RoundingMode.HALF_UP);
@@ -262,6 +279,9 @@ public class Settlement {
     
     public BigDecimal getCommission() { return commission; }
     public void setCommission(BigDecimal commission) { this.commission = commission; }
+
+    public BigDecimal getCommissionRate() { return commissionRate != null ? commissionRate : COMMISSION_RATE; }
+    public void setCommissionRate(BigDecimal commissionRate) { this.commissionRate = commissionRate; }
     
     public BigDecimal getNetAmount() { return netAmount; }
     public void setNetAmount(BigDecimal netAmount) { this.netAmount = netAmount; }

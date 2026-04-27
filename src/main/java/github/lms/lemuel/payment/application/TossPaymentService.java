@@ -10,11 +10,11 @@ import io.github.resilience4j.retry.annotation.Retry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.HttpClientErrorException;
@@ -55,15 +55,15 @@ public class TossPaymentService {
     private final SavePaymentPort savePaymentPort;
     private final CapturePaymentPort capturePaymentPort;
 
-    public TossPaymentService(RestTemplateBuilder restTemplateBuilder,
-                              CreatePaymentPort createPaymentPort,
+    public TossPaymentService(CreatePaymentPort createPaymentPort,
                               SavePaymentPort savePaymentPort,
                               CapturePaymentPort capturePaymentPort) {
-        // connect/read timeout 으로 쓰레드 풀 고갈 방지 — 상위는 Resilience4j 가 담당
-        this.restTemplate = restTemplateBuilder
-                .connectTimeout(Duration.ofSeconds(3))
-                .readTimeout(Duration.ofSeconds(5))
-                .build();
+        // Boot 4 에서 RestTemplateBuilder 가 제거되어 SimpleClientHttpRequestFactory 로 직접 구성.
+        // connect/read timeout 으로 쓰레드 풀 고갈 방지 — 상위는 Resilience4j 가 담당.
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(Duration.ofSeconds(3));
+        factory.setReadTimeout(Duration.ofSeconds(5));
+        this.restTemplate = new RestTemplate(factory);
         this.createPaymentPort = createPaymentPort;
         this.savePaymentPort = savePaymentPort;
         this.capturePaymentPort = capturePaymentPort;
