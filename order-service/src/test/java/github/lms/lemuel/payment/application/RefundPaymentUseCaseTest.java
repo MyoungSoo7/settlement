@@ -13,7 +13,6 @@ import github.lms.lemuel.payment.domain.PaymentDomain;
 import github.lms.lemuel.payment.domain.PaymentStatus;
 import github.lms.lemuel.payment.domain.Refund;
 import github.lms.lemuel.payment.domain.exception.PaymentNotFoundException;
-import github.lms.lemuel.settlement.application.port.in.AdjustSettlementForRefundUseCase;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,11 +27,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * RefundPaymentUseCase 테스트.
+ *
+ * <p>MSA 분리 이후: 정산 조정은 settlement-service 가 PaymentRefunded Kafka 이벤트를
+ * 컨슈밍해서 처리한다. 따라서 이 테스트는 publishPaymentRefunded 호출 검증으로 대체.</p>
+ */
 @ExtendWith(MockitoExtension.class)
 class RefundPaymentUseCaseTest {
 
@@ -43,7 +47,6 @@ class RefundPaymentUseCaseTest {
     @Mock PublishEventPort publishEventPort;
     @Mock LoadRefundPort loadRefundPort;
     @Mock SaveRefundPort saveRefundPort;
-    @Mock AdjustSettlementForRefundUseCase adjustSettlementForRefundUseCase;
     @InjectMocks RefundPaymentUseCase refundPaymentUseCase;
 
     private PaymentDomain capturedPayment() {
@@ -77,8 +80,7 @@ class RefundPaymentUseCaseTest {
         assertThat(result.getStatus()).isEqualTo(PaymentStatus.REFUNDED);
         verify(pgClientPort).refund("pg-tx-123", new BigDecimal("50000"));
         verify(updateOrderStatusPort).updateOrderStatus(10L, "REFUNDED");
-        verify(adjustSettlementForRefundUseCase).adjustSettlementForRefund(
-                eq(1L), eq(new BigDecimal("50000")), eq(999L));
+        verify(publishEventPort).publishPaymentRefunded(eq(1L), eq(10L));
     }
 
     @Test @DisplayName("부분 환불: amount < 결제금액이면 Payment 는 CAPTURED 유지, 주문 상태 미변경")
@@ -95,8 +97,7 @@ class RefundPaymentUseCaseTest {
         assertThat(result.getRefundedAmount()).isEqualTo(new BigDecimal("20000"));
         verify(pgClientPort).refund("pg-tx-123", new BigDecimal("20000"));
         verify(updateOrderStatusPort, never()).updateOrderStatus(any(), any());
-        verify(adjustSettlementForRefundUseCase).adjustSettlementForRefund(
-                eq(1L), eq(new BigDecimal("20000")), eq(999L));
+        verify(publishEventPort).publishPaymentRefunded(eq(1L), eq(10L));
     }
 
     @Test @DisplayName("부분 환불로 전액 도달 시 Payment REFUNDED + 주문 상태 REFUNDED")
@@ -179,19 +180,5 @@ class RefundPaymentUseCaseTest {
         assertThatThrownBy(() -> refundPaymentUseCase.refundPayment(1L))
                 .isInstanceOf(IllegalStateException.class);
         verify(pgClientPort, never()).refund(any(), any());
-    }
-
-    @Test @DisplayName("정산 조정 실패해도 환불은 성공")
-    void refund_settlementAdjustFails_refundStillSucceeds() {
-        PaymentDomain payment = capturedPayment();
-        when(loadPaymentPort.loadById(1L)).thenReturn(Optional.of(payment));
-        when(savePaymentPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        stubRefundPersistence();
-        doThrow(new RuntimeException("settlement error"))
-                .when(adjustSettlementForRefundUseCase).adjustSettlementForRefund(any(), any(), any());
-
-        PaymentDomain result = refundPaymentUseCase.refundPayment(1L);
-
-        assertThat(result.getStatus()).isEqualTo(PaymentStatus.REFUNDED);
     }
 }
