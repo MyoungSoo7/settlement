@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -19,7 +20,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 import static org.mockito.Mockito.when;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -46,28 +46,31 @@ class SettlementControllerSecurityTest {
 
     @Test
     @DisplayName("USER 권한은 403 — accessDeniedHandler (정산은 ADMIN/MANAGER 전용)")
+    @WithMockUser(roles = "USER")
     void userRoleReturns403() throws Exception {
-        mockMvc.perform(get("/settlements/1").with(user("u").roles("USER")))
+        mockMvc.perform(get("/settlements/1"))
                 .andExpect(status().isForbidden());
     }
 
     @Test
     @DisplayName("ADMIN 권한은 200 — 필터 통과 후 컨트롤러 도달")
+    @WithMockUser(roles = "ADMIN")
     void adminRoleReturns200() throws Exception {
         Settlement s = Settlement.createFromPayment(1L, 10L, new BigDecimal("50000"), LocalDate.now());
         when(getSettlementUseCase.getSettlementById(1L)).thenReturn(s);
 
-        mockMvc.perform(get("/settlements/1").with(user("admin").roles("ADMIN")))
+        mockMvc.perform(get("/settlements/1"))
                 .andExpect(status().isOk());
     }
 
     @Test
     @DisplayName("MANAGER 권한도 200 — hasAnyRole 에 포함")
+    @WithMockUser(roles = "MANAGER")
     void managerRoleReturns200() throws Exception {
         Settlement s = Settlement.createFromPayment(1L, 10L, new BigDecimal("50000"), LocalDate.now());
         when(getSettlementUseCase.getSettlementById(1L)).thenReturn(s);
 
-        mockMvc.perform(get("/settlements/1").with(user("mgr").roles("MANAGER")))
+        mockMvc.perform(get("/settlements/1"))
                 .andExpect(status().isOk());
     }
 }
