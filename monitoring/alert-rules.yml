@@ -222,3 +222,46 @@ groups:
         annotations:
           summary: "Outbox 발행 p95 지연 > 2s"
           description: "단일 outbox 이벤트 외부 발행 p95 가 {{ $value }}초. 네트워크 또는 외부 시스템 응답 확인."
+
+  - name: lemuel_cashflow_report_alerts
+    interval: 30s
+    rules:
+      # Cashflow 리포트 대사 불일치 — 금액 원장 정합성 위반
+      # 어떤 check (payments/adjustments/outbox) 가 실패해도 1시간 내 1건 이상 집계되면 critical
+      - alert: CashflowReconciliationMismatch
+        expr: increase(cashflow_reconciliation_mismatch_total[1h]) > 0
+        for: 2m
+        labels:
+          severity: critical
+          component: cashflow-report
+        annotations:
+          summary: "Cashflow 대사 불일치 ({{ $labels.check }})"
+          description: |
+            최근 1시간 내 cashflow 리포트 대사에서 {{ $labels.check }} 불변식이 {{ $value }}건 실패했습니다.
+            실패한 check:
+              - payments_minus_refunds_equals_settlement → 결제·환불·정산 금액 불일치 (금액 유실 가능성)
+              - adjustments_equal_linked_refunds → 조정·환불 원장 연결 끊김
+              - outbox_published_equals_settlements_created → 이벤트-정산 파이프라인 drop
+            즉시 /api/reports/cashflow 로 조회해 mismatches[].detail 확인.
+
+      # 리포트 생성 지연 — 재무 마감 시 적시성 확보
+      - alert: CashflowReportGenerationSlow
+        expr: histogram_quantile(0.95, rate(cashflow_report_generation_duration_seconds_bucket[5m])) > 3
+        for: 10m
+        labels:
+          severity: warning
+          component: cashflow-report
+        annotations:
+          summary: "Cashflow 리포트 p95 생성 지연 > 3s"
+          description: "최근 5분 p95 생성 시간이 {{ $value }}초. DB 인덱스, 집계 쿼리, JDBC 커넥션 상태 확인."
+
+      # 특정 check 가 반복적으로 실패 — 원인 제거 전 지속 감시
+      - alert: CashflowReconciliationPersistentFailure
+        expr: increase(cashflow_reconciliation_mismatch_total[6h]) > 10
+        for: 5m
+        labels:
+          severity: critical
+          component: cashflow-report
+        annotations:
+          summary: "Cashflow 대사 지속 실패 ({{ $labels.check }})"
+          description: "{{ $labels.check }} 불변식이 6시간 내 {{ $value }}회 실패. 근본 원인 미해결 상태. 데이터 복구 및 원인 분석 필요."

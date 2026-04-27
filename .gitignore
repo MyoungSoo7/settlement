@@ -57,3 +57,6 @@ target/
 ### Local runtime artifacts ###
 .claude/scheduled_tasks.lock
 *.stackdump
+
+### Claude auto-memory (local only) ###
+memory/

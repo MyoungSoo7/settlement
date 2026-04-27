@@ -15,7 +15,6 @@ services:
       - postgres-data:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      # healthcheck 안에서 변수는 컨테이너 쉘에서 해석되도록 $$ 사용
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 10s
       timeout: 3s
@@ -41,7 +40,6 @@ services:
       - elasticsearch-data:/usr/share/elasticsearch/data
     restart: unless-stopped
     healthcheck:
-      # 컨테이너 내부에서 자기 자신(ES) 체크: localhost OK
       test: ["CMD-SHELL", "curl -fsS -u $$ELASTICSEARCH_USER:$$ELASTICSEARCH_PASSWORD http://127.0.0.1:9200/_cluster/health?wait_for_status=yellow&timeout=5s >/dev/null || exit 1"]
       interval: 10s
       timeout: 5s
@@ -57,14 +55,14 @@ services:
       - --node-id 0
       - --kafka-addr PLAINTEXT://0.0.0.0:29092,OUTSIDE://0.0.0.0:9092
       - --advertise-kafka-addr PLAINTEXT://redpanda:29092,OUTSIDE://localhost:9092
-      - --pandaproxy-addr 0.0.0.0:8082
-      - --advertise-pandaproxy-addr localhost:8082
+      - --pandaproxy-addr 0.0.0.0:18082
+      - --advertise-pandaproxy-addr localhost:18082
       - --rpc-addr 0.0.0.0:33145
       - --advertise-rpc-addr redpanda:33145
     ports:
-      - "127.0.0.1:9092:9092"   # 외부(호스트) 클라이언트용
-      - "127.0.0.1:29092:29092" # 컨테이너 네트워크 내부 클라이언트용
-      - "127.0.0.1:8082:8082"   # REST proxy
+      - "127.0.0.1:9092:9092"
+      - "127.0.0.1:29092:29092"
+      - "127.0.0.1:18082:18082"
     volumes:
       - redpanda-data:/var/lib/redpanda/data
     restart: unless-stopped
@@ -74,42 +72,73 @@ services:
       timeout: 5s
       retries: 20
 
-  app:
-    build: .
-    image: ghcr.io/myoungsoo7/settlement:latest
-    container_name: lemuel-app
+  order-service:
+    build:
+      context: .
+      args:
+        MODULE: order-service
+    image: ghcr.io/myoungsoo7/lemuel-order:latest
+    container_name: lemuel-order
     env_file:
       - path: .env
         required: false
     environment:
       SPRING_PROFILES_ACTIVE: prod
-
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/inter
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
-
-      SPRING_ELASTICSEARCH_URIS: http://elasticsearch:9200
-      SPRING_ELASTICSEARCH_USERNAME: ${ELASTICSEARCH_USER}
-      SPRING_ELASTICSEARCH_PASSWORD: ${ELASTICSEARCH_PASSWORD}
-
-      # Kafka (Redpanda) — 컨테이너 네트워크 내부 endpoint
       APP_KAFKA_ENABLED: "true"
       SPRING_KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
-
       JWT_ISSUER: ${JWT_ISSUER}
       JWT_SECRET: ${JWT_SECRET}
       JWT_TTL_SECONDS: ${JWT_TTL_SECONDS}
-
       JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
-
-      # server.port=8080으로 설정하고 management도 동일한 8080 사용 → 단일 서버로 통합
-      # SecurityConfig의 permitAll()이 actuator에도 적용됨
       SERVER_PORT: 8080
       MANAGEMENT_SERVER_PORT: 8080
-
-      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY: DEBUG
     ports:
-      - "127.0.0.1:8089:8080"
+      - "127.0.0.1:8088:8080"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+
+  settlement-service:
+    build:
+      context: .
+      args:
+        MODULE: settlement-service
+    image: ghcr.io/myoungsoo7/lemuel-settlement:latest
+    container_name: lemuel-settlement
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/inter
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_ELASTICSEARCH_URIS: http://elasticsearch:9200
+      SPRING_ELASTICSEARCH_USERNAME: ${ELASTICSEARCH_USER}
+      SPRING_ELASTICSEARCH_PASSWORD: ${ELASTICSEARCH_PASSWORD}
+      APP_KAFKA_ENABLED: "true"
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
+      JWT_ISSUER: ${JWT_ISSUER}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_TTL_SECONDS: ${JWT_TTL_SECONDS}
+      APP_SEARCH_ENABLED: "true"
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
+      SERVER_PORT: 8080
+      MANAGEMENT_SERVER_PORT: 8080
+    ports:
+      - "127.0.0.1:8082:8080"
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
@@ -124,6 +153,38 @@ services:
         condition: service_healthy
       redpanda:
         condition: service_healthy
+      order-service:
+        condition: service_healthy
+
+  gateway-service:
+    build:
+      context: .
+      args:
+        MODULE: gateway-service
+    image: ghcr.io/myoungsoo7/lemuel-gateway:latest
+    container_name: lemuel-gateway
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      ORDER_SERVICE_URI: http://order-service:8080
+      SETTLEMENT_SERVICE_URI: http://settlement-service:8080
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
+    ports:
+      - "127.0.0.1:8080:8080"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    depends_on:
+      order-service:
+        condition: service_healthy
+      settlement-service:
+        condition: service_healthy
 
   frontend:
     image: nginx:1.25-alpine
@@ -135,7 +196,7 @@ services:
       - "127.0.0.1:3000:80"
     restart: unless-stopped
     depends_on:
-      - app
+      - gateway-service
 
   prometheus:
     image: prom/prometheus:latest
@@ -150,5 +211,3 @@ volumes:
   postgres-data:
   elasticsearch-data:
   redpanda-data:
-
-

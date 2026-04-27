@@ -1,0 +1,13 @@
+package github.lms.lemuel.common.audit.domain;
+
+public enum AuditAction {
+    SETTLEMENT_CONFIRMED,
+    SETTLEMENT_CANCELED,
+    REFUND_REQUESTED,
+    REFUND_COMPLETED,
+    REFUND_FAILED,
+    USER_ROLE_CHANGED,
+    LOGIN_SUCCESS,
+    LOGIN_FAILED,
+    CASHFLOW_REPORT_ACCESSED
+}
