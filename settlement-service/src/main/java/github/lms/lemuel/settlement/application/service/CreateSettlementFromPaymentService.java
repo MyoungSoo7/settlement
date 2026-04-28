@@ -60,8 +60,10 @@ public class CreateSettlementFromPaymentService implements CreateSettlementFromP
             // 판매자 등급별 수수료율 — 매핑 없으면 NORMAL fallback
             SellerTier tier = loadSellerTierPort.findTierByPaymentId(paymentId)
                     .orElse(SellerTier.NORMAL);
+            // 정산 주기: 셀러가 명시한 cycle 이 있으면 우선, 없으면 등급별 default
+            // (NORMAL=T+7, VIP=T+3, STRATEGIC=T+1)
             SettlementCycle cycle = loadSellerSettlementCyclePort.findCycleByPaymentId(paymentId)
-                    .orElse(SettlementCycle.DAILY);
+                    .orElse(tier.defaultCycle());
             log.info("Applying seller tier={}, rate={}, cycle={}", tier, tier.rate(), cycle);
 
             // 정산 생성 — 주기별 resolveSettlementDate 규칙으로 정산일 계산

@@ -32,6 +32,27 @@ public enum SettlementCycle {
         public LocalDate resolveSettlementDate(LocalDate paymentDate) {
             return paymentDate.with(TemporalAdjusters.lastDayOfMonth());
         }
+    },
+    /** T+1 영업일 정산 — STRATEGIC 등급 셀러의 default. 주말/공휴일 자동 건너뜀. */
+    T_PLUS_1 {
+        @Override
+        public LocalDate resolveSettlementDate(LocalDate paymentDate) {
+            return BusinessDayCalculator.addBusinessDays(paymentDate, 1);
+        }
+    },
+    /** T+3 영업일 정산 — VIP 등급 셀러의 default. */
+    T_PLUS_3 {
+        @Override
+        public LocalDate resolveSettlementDate(LocalDate paymentDate) {
+            return BusinessDayCalculator.addBusinessDays(paymentDate, 3);
+        }
+    },
+    /** T+7 영업일 정산 — NORMAL 등급 셀러의 default. */
+    T_PLUS_7 {
+        @Override
+        public LocalDate resolveSettlementDate(LocalDate paymentDate) {
+            return BusinessDayCalculator.addBusinessDays(paymentDate, 7);
+        }
     };
 
     public abstract LocalDate resolveSettlementDate(LocalDate paymentDate);
