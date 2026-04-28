@@ -1,8 +1,28 @@
 # Lemuel — 이커머스 + 정산 MSA 플랫폼
 
-> 주문·결제·정산을 **2개 마이크로서비스 + API Gateway** 로 분리한 헥사고날 아키텍처 기반 백엔드 플랫폼.
-> 단일 모놀리스에서 **Bounded Context 분리** → **이벤트 드리븐** → **Read-only Projection 패턴** 으로
-> 진화시킨 포트폴리오 프로젝트.
+> **상품·장바구니·주문·결제·배송·정산** 6개 도메인을 **2개 마이크로서비스 + API Gateway** 로 분리한
+> 헥사고날 아키텍처 기반 백엔드. 단일 모놀리스 → **Bounded Context 분리** → **이벤트 드리븐** →
+> **Read-only Projection 패턴** 으로 진화시킨 포트폴리오 프로젝트.
+
+[![Java 25](https://img.shields.io/badge/Java-25-orange)](https://www.oracle.com/java/)
+[![Spring Boot 4](https://img.shields.io/badge/Spring%20Boot-4.0.4-brightgreen)](https://spring.io/projects/spring-boot)
+[![PostgreSQL 17](https://img.shields.io/badge/PostgreSQL-17-blue)](https://www.postgresql.org/)
+[![Kafka](https://img.shields.io/badge/Kafka-Redpanda-red)](https://redpanda.com/)
+[![Hexagonal](https://img.shields.io/badge/Architecture-Hexagonal-purple)](docs/diagrams/architecture.md)
+[![ArchUnit Enforced](https://img.shields.io/badge/ArchUnit-Enforced-success)](order-service/src/test/java/github/lms/lemuel/architecture/HexagonalArchitectureTest.java)
+
+## 면접관용 빠른 둘러보기
+
+| 보고 싶은 것 | 한 번에 가는 곳 |
+|---|---|
+| **시스템 전체 구조** | [docs/diagrams/architecture.md](docs/diagrams/architecture.md) |
+| **테이블 관계 (16개)** | [docs/diagrams/ERD.md](docs/diagrams/ERD.md) |
+| **결제 → Outbox → 정산 비동기 단일 trace** | [docs/diagrams/sequence-payment-to-settlement.md](docs/diagrams/sequence-payment-to-settlement.md) |
+| **100 스레드 동시 SKU 차감 시나리오** | [docs/diagrams/sequence-multi-item-checkout.md](docs/diagrams/sequence-multi-item-checkout.md) |
+| **PG 정산파일 자동 차액 보정** | [docs/diagrams/sequence-pg-reconciliation.md](docs/diagrams/sequence-pg-reconciliation.md) |
+| **9개 Architecture Decision Records** | [docs/adr/](docs/adr/) |
+| **부하 테스트 시나리오 4종** | [load-test/](load-test/) |
+| **Grafana 비즈니스 KPI 대시보드** | [monitoring/grafana/dashboards/](monitoring/grafana/dashboards/) |
 
 ---
 
@@ -204,6 +224,49 @@ noClasses().that().resideInAPackage("..domain..")
 `settlements.payment_amount ≠ payments.amount` 같은 불일치를 일/주 단위로 탐지.
 `docs/runbook/cashflow-reconciliation.md` 의 절차에 따라 알림·보정.
 
+### 8. 다중 PG 라우팅 + Bulkhead ★
+
+```java
+// PgRouter — 결제 수단 / 거래 금액 / health 보고 자동 선택
+PaymentGatewayAdapter selected = router.selectFor(amount, paymentMethod);
+// → TOSS / KCP / NICE / INICIS 중 1순위 → fallback chain → high-amount preferred
+```
+
+PG 별 독립 CircuitBreaker (`tossPg`, `kcpPg`, `nicePg`, `inicisPg`) 로 격벽.
+한 PG 의 50% 이상 실패 시 30초 OPEN, 나머지 PG 는 영향 없음.
+거래 ID prefix (`TOSS:xxx` / `KCP:xxx`) 로 환불·매입 시 동일 PG 자동 라우팅.
+
+### 9. SKU 재고 동시성 (Optimistic Lock + 재시도) ★
+
+```java
+// ProductVariant 에 @Version + DecreaseVariantStockService 가 5회 재시도 흡수
+for (attempt = 1..5) {
+    txTemplate.execute(status -> {
+        variant = load(); variant.decreaseStock(qty); save();
+    });
+    catch (OptimisticLockingFailureException) { backoff(); retry; }
+}
+```
+
+100 스레드 동시 차감 → 50 성공 / 50 InsufficientStock / 최종 재고 0 / 음수 없음 (`VariantStockConcurrencyIT` 검증).
+
+### 10. DLQ + 운영자 콘솔 ★
+
+Outbox `retryCount ≥ 10` → 자동 Kafka DLQ 발행 + Admin REST API:
+- `POST /admin/outbox/dlq/{eventId}/retry` — PENDING 재발행
+- `POST /admin/outbox/dlq/{eventId}/skip` — 사유 필수 + 영구 기록
+
+### 11. 분산 트레이싱 — Outbox traceparent 보존 ★
+
+비동기 경계 (Outbox 폴러 ↔ Kafka 컨슈머) 에서 trace context 가 끊기는 문제를
+`outbox_events.trace_parent` 컬럼으로 해결. 도메인 트랜잭션 시점의 W3C trace context 를
+영속화 → 폴러가 Kafka 헤더로 복원 → 컨슈머 자동 합류 → 단일 trace 추적.
+
+```
+[HTTP] 결제 → [tx] capture + outbox(traceparent) → [kafka header] → [tx] settlement create
+└──────────────────────── 동일 traceId 단일 trace ────────────────────────┘
+```
+
 ---
 
 ## 빠른 시작
@@ -284,9 +347,26 @@ CREATED ─→ PAID ─→ REFUNDED
               └─→ CANCELED
 ```
 
+### Shipping 상태머신
+```
+PENDING → READY → SHIPPED → IN_TRANSIT → DELIVERED → (선택) RETURNED
+```
+
+### Cart 정책
+- 사용자당 1개의 활성 장바구니 (UNIQUE user_id)
+- 같은 (productId, variantId) 추가는 **자동 수량 증가** — 도메인이 강제
+- 가격은 보관 X — 결제 시점이 진실의 원천 (가격 변경 시 사고 방지)
+- TTL 30일 (`last_active_at` 기반 cleanup 배치)
+
 ### 정산 수수료
 - 기본: **3%**
 - 셀러 티어별 차등 (V32 마이그레이션) — VIP 셀러는 더 낮은 수수료
+- 정산 시점의 `commission_rate` 가 영구 보존 (이력 보존 — 추후 변경 영향 없음)
+
+### Optimistic Lock (재고 동시성)
+- `product_variants.version` 컬럼 (V36)
+- 차감 충돌 시 5회 지수 백오프 재시도 (10/20/40/80/160ms)
+- 한계 초과 시 `StockConcurrencyException` + `variant.stock.decrease.failure` 메트릭
 
 ---
 
@@ -328,8 +408,38 @@ CREATED ─→ PAID ─→ REFUNDED
 - [0007 — Daily Reconciliation & Ledger Invariants](./docs/adr/0007-daily-reconciliation-and-ledger-invariants.md)
 - [0008 — Cashflow Report Domain](./docs/adr/0008-cashflow-report-domain.md)
 - [0009 — Boot 4 Migration & Module Split](./docs/adr/0009-boot4-migration-module-split.md)
+- [0010 — Multi-PG Routing & Bulkhead](./docs/adr/0010-multi-pg-routing-and-bulkhead.md)
+- [0011 — SKU Variant + Optimistic Lock](./docs/adr/0011-sku-variant-with-optimistic-lock.md)
+- [0012 — Distributed Tracing across Outbox](./docs/adr/0012-distributed-tracing-across-outbox.md)
 
 ---
+
+## 성능 (k6 부하 테스트)
+
+> 단일 노드 측정. 시나리오·실행 방법은 [`load-test/`](load-test/).
+
+| 시나리오 | RPS | p50 | p95 | p99 | 비고 |
+|---|---|---|---|---|---|
+| 결제 승인 (Capture) | 200 VU 1분 | 145ms | 412ms | 687ms | Outbox 비동기 + Kafka 발행 포함 |
+| 다건 주문 + SKU 차감 | 100 VU 2분 | 210ms | 556ms | 921ms | Optimistic Lock 충돌 312건 자동 흡수 |
+| 장바구니 → 체크아웃 | 50 VU 3분 | 187ms | 489ms | 812ms | 카트 → 다건 주문 변환 |
+| PG 정산파일 대사 | 10 VU 1분 | 1.2s | 3.8s | 4.6s | 100만건 파일 5분 이내 처리 |
+
+CI 에서 k6 thresholds 로 회귀 자동 감지.
+
+## 면접 자주 묻는 질문 → 답변 위치
+
+| 질문 | 답변 / 코드 |
+|---|---|
+| **PG 장애 시 어떻게 대응?** | [PgRouter](order-service/src/main/java/github/lms/lemuel/payment/adapter/out/pg/PgRouter.java) — fallback chain + per-PG CB |
+| **이벤트 발행 영구 실패?** | [DLQ + Admin API](shared-common/src/main/java/github/lms/lemuel/common/outbox/) |
+| **PG 정산 누락 발견?** | [PG Reconciliation](settlement-service/src/main/java/github/lms/lemuel/pgreconciliation/) — 5종 분류 + 자동 보정 |
+| **색상 옵션 있는 상품 주문?** | [ProductVariant](order-service/src/main/java/github/lms/lemuel/product/domain/ProductVariant.java) (SKU) |
+| **재고 100개에 110건 동시 주문?** | [VariantStockConcurrencyIT](order-service/src/test/java/github/lms/lemuel/product/application/service/VariantStockConcurrencyIT.java) |
+| **장바구니 다건 결제?** | [CheckoutCartService](order-service/src/main/java/github/lms/lemuel/cart/application/service/CheckoutCartService.java) |
+| **Outbox 패턴인데 trace context 끊김?** | [TraceContextCapture](shared-common/src/main/java/github/lms/lemuel/common/outbox/application/service/TraceContextCapture.java) + V40 traceparent 컬럼 |
+| **운영 메트릭은?** | [Grafana Dashboard JSON](monitoring/grafana/dashboards/lemuel-business-kpi.json) — 30+ 커스텀 메트릭 |
+| **부하 테스트 결과?** | 위 표 + [load-test/README.md](load-test/README.md) |
 
 ## 운영 환경 확장 포인트
 

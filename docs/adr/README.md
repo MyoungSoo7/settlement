@@ -13,6 +13,9 @@
 | [0007](0007-daily-reconciliation-and-ledger-invariants.md) | 일일 대사 + 기간 대사 3 불변식 | Accepted |
 | [0008](0008-cashflow-report-domain.md) | Cashflow Report 도메인 분리 | Accepted |
 | [0009](0009-boot4-migration-module-split.md) | Spring Boot 4.0 모듈 분리 대응 | Accepted |
+| [0010](0010-multi-pg-routing-and-bulkhead.md) | 다중 PG 추상화 + Bulkhead 격벽 | Accepted |
+| [0011](0011-sku-variant-with-optimistic-lock.md) | ProductVariant (SKU) + Optimistic Lock | Accepted |
+| [0012](0012-distributed-tracing-across-outbox.md) | Outbox 경계에서 끊기지 않는 분산 트레이싱 | Accepted |
 
 ## 규칙
 

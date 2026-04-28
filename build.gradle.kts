@@ -45,6 +45,46 @@ subprojects {
             csv.required.set(false)
         }
     }
+
+    // 커버리지 임계값. CI 에서 회귀 시 즉시 빌드 실패 → PR 차단.
+    // INSTRUCTION 60% / BRANCH 50% — 도메인 핵심에 대한 최소 보장.
+    // 점진 상향 정책: 70% → 80% (ADR 0010 참조).
+    tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
+        dependsOn(tasks.named("jacocoTestReport"))
+        violationRules {
+            rule {
+                limit {
+                    counter = "INSTRUCTION"
+                    minimum = "0.60".toBigDecimal()
+                }
+                limit {
+                    counter = "BRANCH"
+                    minimum = "0.50".toBigDecimal()
+                }
+            }
+            // 핵심 도메인은 더 엄격하게
+            rule {
+                element = "PACKAGE"
+                includes = listOf(
+                    "github.lms.lemuel.payment.domain.*",
+                    "github.lms.lemuel.order.domain.*",
+                    "github.lms.lemuel.product.domain.*",
+                    "github.lms.lemuel.cart.domain.*",
+                    "github.lms.lemuel.shipping.domain.*",
+                    "github.lms.lemuel.settlement.domain.*",
+                    "github.lms.lemuel.pgreconciliation.domain.*",
+                    "github.lms.lemuel.common.outbox.domain.*",
+                )
+                limit {
+                    counter = "INSTRUCTION"
+                    minimum = "0.80".toBigDecimal()
+                }
+            }
+        }
+    }
+
+    // check 가 호출되면 커버리지 검증도 같이 — CI 의 ./gradlew check 가 자동 강제
+    tasks.named("check") { dependsOn(tasks.named("jacocoTestCoverageVerification")) }
 }
 
 sonar {
