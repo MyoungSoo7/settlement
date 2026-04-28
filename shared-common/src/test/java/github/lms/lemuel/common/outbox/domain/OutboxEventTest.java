@@ -59,4 +59,64 @@ class OutboxEventTest {
 
         assertThat(a.getEventId()).isNotEqualTo(b.getEventId());
     }
+
+    @Test
+    @DisplayName("requeue: FAILED → PENDING, retryCount=0 으로 초기화. 운영자 재처리 진입점.")
+    void requeueResetsState() {
+        OutboxEvent e = pushToFailed();
+
+        e.requeue();
+
+        assertThat(e.isPending()).isTrue();
+        assertThat(e.getRetryCount()).isZero();
+        // lastError 는 보존 — 사후 추적 가능
+        assertThat(e.getLastError()).isEqualTo("final");
+    }
+
+    @Test
+    @DisplayName("requeue: FAILED 가 아닌 상태에서 호출 시 IllegalStateException")
+    void requeueRejectsWrongState() {
+        OutboxEvent e = OutboxEvent.pending("Payment", "1", "PaymentCaptured", "{}");
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, e::requeue);
+    }
+
+    @Test
+    @DisplayName("skip: FAILED → PUBLISHED, lastError 에 [SKIPPED] prefix + 사유 기록")
+    void skipMarksPublishedWithReason() {
+        OutboxEvent e = pushToFailed();
+
+        e.skip("이미 다른 경로로 보정 완료");
+
+        assertThat(e.getStatus()).isEqualTo(OutboxEventStatus.PUBLISHED);
+        assertThat(e.getPublishedAt()).isNotNull();
+        assertThat(e.getLastError()).startsWith("[SKIPPED]");
+        assertThat(e.getLastError()).contains("이미 다른 경로로 보정 완료");
+    }
+
+    @Test
+    @DisplayName("skip: 사유 없이 호출 시 IllegalArgumentException (감사 추적용 필수)")
+    void skipRequiresReason() {
+        OutboxEvent e = pushToFailed();
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+                () -> e.skip(null));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+                () -> e.skip(" "));
+    }
+
+    @Test
+    @DisplayName("skip: PENDING 상태에서 호출 시 IllegalStateException — FAILED 만 가능")
+    void skipRejectsNonFailedState() {
+        OutboxEvent e = OutboxEvent.pending("Payment", "1", "PaymentCaptured", "{}");
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                () -> e.skip("이유"));
+    }
+
+    private static OutboxEvent pushToFailed() {
+        OutboxEvent e = OutboxEvent.pending("Payment", "1", "PaymentCaptured", "{}");
+        for (int i = 0; i < 9; i++) {
+            e.markFailed("transient " + i);
+        }
+        e.markFailed("final");
+        return e;
+    }
 }

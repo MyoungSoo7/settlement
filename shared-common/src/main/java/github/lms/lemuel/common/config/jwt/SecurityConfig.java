@@ -128,6 +128,10 @@ public class SecurityConfig {
                         .requestMatchers("/users/admin/all").hasRole("ADMIN")
                         // 관리자 전용 카테고리 API
                         .requestMatchers("/admin/categories/**").hasRole("ADMIN")
+                        // 운영자 전용 — Outbox DLQ / PG 라우팅 / PG 정산파일 대사
+                        .requestMatchers("/admin/outbox/**").hasRole("ADMIN")
+                        .requestMatchers("/admin/pg/**").hasAnyRole("ADMIN", "MANAGER")
+                        .requestMatchers("/admin/reconciliation/**").hasAnyRole("ADMIN", "MANAGER")
                         // 정산 관련 API (관리자·매니저)
                         .requestMatchers("/settlements/**").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers("/api/settlements/**").hasAnyRole("ADMIN", "MANAGER")
