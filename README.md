@@ -411,6 +411,9 @@ PENDING → READY → SHIPPED → IN_TRANSIT → DELIVERED → (선택) RETURNED
 - [0010 — Multi-PG Routing & Bulkhead](./docs/adr/0010-multi-pg-routing-and-bulkhead.md)
 - [0011 — SKU Variant + Optimistic Lock](./docs/adr/0011-sku-variant-with-optimistic-lock.md)
 - [0012 — Distributed Tracing across Outbox](./docs/adr/0012-distributed-tracing-across-outbox.md)
+- [0013 — Split Payment + Reverse Refund](./docs/adr/0013-split-payment-with-tenders.md)
+- [0014 — Tier-based T+N Settlement Cycle](./docs/adr/0014-tier-based-settlement-cycle.md)
+- [0015 — Settlement Holdback Policy](./docs/adr/0015-settlement-holdback-policy.md)
 
 ---
 

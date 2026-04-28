@@ -16,6 +16,9 @@
 | [0010](0010-multi-pg-routing-and-bulkhead.md) | 다중 PG 추상화 + Bulkhead 격벽 | Accepted |
 | [0011](0011-sku-variant-with-optimistic-lock.md) | ProductVariant (SKU) + Optimistic Lock | Accepted |
 | [0012](0012-distributed-tracing-across-outbox.md) | Outbox 경계에서 끊기지 않는 분산 트레이싱 | Accepted |
+| [0013](0013-split-payment-with-tenders.md) | 분할결제 + 역순 환불 정책 | Accepted |
+| [0014](0014-tier-based-settlement-cycle.md) | SellerTier 기반 T+N 영업일 정산 주기 | Accepted |
+| [0015](0015-settlement-holdback-policy.md) | 정산 보류 — 등급별 차등 + 자동 해제 | Accepted |
 
 ## 규칙
 
