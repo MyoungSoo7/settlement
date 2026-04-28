@@ -18,6 +18,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @SpringBootApplication(
     scanBasePackages = {
         "github.lms.lemuel.settlement",
+        "github.lms.lemuel.pgreconciliation",
         "github.lms.lemuel.report",
         "github.lms.lemuel.common",
     }

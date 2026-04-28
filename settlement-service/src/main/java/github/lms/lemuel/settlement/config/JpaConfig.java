@@ -15,11 +15,13 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 @Configuration
 @EntityScan(basePackages = {
     "github.lms.lemuel.settlement",
+    "github.lms.lemuel.pgreconciliation.adapter.out.persistence",
     "github.lms.lemuel.common.audit.adapter.out.persistence",
     "github.lms.lemuel.common.outbox.adapter.in.kafka",
 })
 @EnableJpaRepositories(basePackages = {
     "github.lms.lemuel.settlement",
+    "github.lms.lemuel.pgreconciliation.adapter.out.persistence",
     "github.lms.lemuel.common.audit.adapter.out.persistence",
     "github.lms.lemuel.common.outbox.adapter.in.kafka",
 })
