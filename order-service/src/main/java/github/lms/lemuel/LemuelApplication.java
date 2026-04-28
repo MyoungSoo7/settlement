@@ -10,6 +10,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         "github.lms.lemuel.user",
         "github.lms.lemuel.order",
         "github.lms.lemuel.cart",
+        "github.lms.lemuel.shipping",
         "github.lms.lemuel.payment",
         "github.lms.lemuel.product",
         "github.lms.lemuel.category",
