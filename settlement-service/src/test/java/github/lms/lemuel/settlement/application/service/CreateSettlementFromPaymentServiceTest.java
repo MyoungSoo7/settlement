@@ -58,7 +58,7 @@ class CreateSettlementFromPaymentServiceTest {
         assertThat(result.getNetAmount()).isEqualByComparingTo("97500.00");
     }
 
-    @Test @DisplayName("판매자 매핑 없으면 NORMAL + DAILY 로 fallback") void create_fallback() {
+    @Test @DisplayName("판매자 매핑 없으면 NORMAL + T+7 default cycle 로 fallback") void create_fallback() {
         when(loadSettlementPort.findByPaymentId(3L)).thenReturn(Optional.empty());
         when(loadSellerTierPort.findTierByPaymentId(3L)).thenReturn(Optional.empty());
         when(loadSellerSettlementCyclePort.findCycleByPaymentId(3L)).thenReturn(Optional.empty());
@@ -66,8 +66,9 @@ class CreateSettlementFromPaymentServiceTest {
         Settlement result = service.createSettlementFromPayment(3L, 30L, new BigDecimal("10000"));
         // NORMAL fallback 3.5% → 10000 * 0.035 = 350
         assertThat(result.getCommission()).isEqualByComparingTo("350.00");
-        // DAILY fallback → 오늘 + 1
-        assertThat(result.getSettlementDate()).isEqualTo(LocalDate.now().plusDays(1));
+        // NORMAL.defaultCycle() = T_PLUS_7 → 오늘로부터 7 영업일 후
+        assertThat(result.getSettlementDate())
+                .isEqualTo(SettlementCycle.T_PLUS_7.resolveSettlementDate(LocalDate.now()));
     }
 
     @Test @DisplayName("MONTHLY_LAST 판매자는 말일로 정산일 세팅") void create_monthlyCycle() {

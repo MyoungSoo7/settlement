@@ -29,6 +29,16 @@ public class Settlement {
     private LocalDateTime updatedAt;
     private Long version;                 // 낙관적 락 버전 (JPA @Version)
 
+    /** 정산금 중 보류된 금액. 즉시 지급액 = netAmount - holdbackAmount. */
+    private BigDecimal holdbackAmount = BigDecimal.ZERO;
+    /** 정산 시점 적용된 보류율 (이력 보존). */
+    private BigDecimal holdbackRate = BigDecimal.ZERO;
+    /** 보류 해제 예정일. 이 날짜 이후 배치가 자동 release. */
+    private LocalDate holdbackReleaseDate;
+    /** 보류 해제 여부. */
+    private boolean holdbackReleased = false;
+    private LocalDateTime holdbackReleasedAt;
+
     public Settlement() {
         this.status = SettlementStatus.REQUESTED; // 초기 상태를 REQUESTED로 변경
         this.refundedAmount = BigDecimal.ZERO;
@@ -306,4 +316,96 @@ public class Settlement {
 
     public Long getVersion() { return version; }
     public void setVersion(Long version) { this.version = version; }
+
+    // ========== 정산 보류 (Holdback) ==========
+
+    /**
+     * 보류 정책 적용. 정산 생성 직후 호출 (또는 createFromPayment 안에서 자동).
+     *
+     * @param rate         보류율 (예: 0.30 = 30%)
+     * @param releaseDate  보류 해제 예정일 (settlementDate + N 영업일)
+     */
+    public void applyHoldback(BigDecimal rate, LocalDate releaseDate) {
+        if (rate == null || rate.signum() < 0 || rate.compareTo(BigDecimal.ONE) > 0) {
+            throw new IllegalArgumentException("보류율은 0 ~ 1 사이여야 합니다: " + rate);
+        }
+        if (this.netAmount == null) {
+            throw new IllegalStateException("netAmount 계산 후에만 holdback 적용 가능");
+        }
+        this.holdbackRate = rate;
+        this.holdbackAmount = this.netAmount.multiply(rate)
+                .setScale(2, RoundingMode.HALF_UP);
+        this.holdbackReleaseDate = releaseDate;
+        this.holdbackReleased = rate.signum() == 0; // 0% 면 보류 없으므로 즉시 released
+        if (this.holdbackReleased) {
+            this.holdbackReleasedAt = LocalDateTime.now();
+        }
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    /**
+     * 보류 해제 — release_date 도달 후 배치가 호출. 이미 해제됐거나 환불로 소진된 경우 무시.
+     */
+    public void releaseHoldback(LocalDate today) {
+        if (this.holdbackReleased) return;
+        if (this.holdbackReleaseDate == null) return;
+        if (today.isBefore(this.holdbackReleaseDate)) {
+            throw new IllegalStateException(
+                    "아직 release 시점이 아닙니다. releaseDate=" + holdbackReleaseDate + ", today=" + today);
+        }
+        this.holdbackReleased = true;
+        this.holdbackReleasedAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    /**
+     * 환불 시 holdback 에서 우선 차감. holdback 잔액으로 충분하면 셀러 net 에는 영향 없음 —
+     * 신뢰도 낮은 셀러를 위한 안전장치 효과.
+     *
+     * @return 실제 holdback 에서 차감된 금액 (나머지는 호출자가 일반 환불 흐름으로 처리)
+     */
+    public BigDecimal consumeHoldbackForRefund(BigDecimal refundAmount) {
+        if (refundAmount == null || refundAmount.signum() <= 0) {
+            throw new IllegalArgumentException("refundAmount 양수 필수");
+        }
+        if (this.holdbackAmount.signum() <= 0 || this.holdbackReleased) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal consumed = this.holdbackAmount.compareTo(refundAmount) <= 0
+                ? this.holdbackAmount : refundAmount;
+        this.holdbackAmount = this.holdbackAmount.subtract(consumed);
+        if (this.holdbackAmount.signum() == 0) {
+            this.holdbackReleased = true;
+            this.holdbackReleasedAt = LocalDateTime.now();
+        }
+        this.updatedAt = LocalDateTime.now();
+        return consumed;
+    }
+
+    /**
+     * 셀러에게 즉시 지급 가능한 금액 (보류분 제외).
+     */
+    public BigDecimal getImmediatePayoutAmount() {
+        if (this.netAmount == null) return BigDecimal.ZERO;
+        if (this.holdbackReleased) return this.netAmount;
+        return this.netAmount.subtract(this.holdbackAmount).max(BigDecimal.ZERO);
+    }
+
+    public boolean isHoldbackReleasable(LocalDate today) {
+        return !holdbackReleased
+                && holdbackAmount.signum() > 0
+                && holdbackReleaseDate != null
+                && !today.isBefore(holdbackReleaseDate);
+    }
+
+    public BigDecimal getHoldbackAmount() { return holdbackAmount; }
+    public void setHoldbackAmount(BigDecimal v) { this.holdbackAmount = v == null ? BigDecimal.ZERO : v; }
+    public BigDecimal getHoldbackRate() { return holdbackRate; }
+    public void setHoldbackRate(BigDecimal v) { this.holdbackRate = v == null ? BigDecimal.ZERO : v; }
+    public LocalDate getHoldbackReleaseDate() { return holdbackReleaseDate; }
+    public void setHoldbackReleaseDate(LocalDate v) { this.holdbackReleaseDate = v; }
+    public boolean isHoldbackReleased() { return holdbackReleased; }
+    public void setHoldbackReleased(boolean v) { this.holdbackReleased = v; }
+    public LocalDateTime getHoldbackReleasedAt() { return holdbackReleasedAt; }
+    public void setHoldbackReleasedAt(LocalDateTime v) { this.holdbackReleasedAt = v; }
 }

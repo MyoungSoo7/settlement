@@ -7,6 +7,7 @@ import github.lms.lemuel.settlement.application.port.out.LoadSellerSettlementCyc
 import github.lms.lemuel.settlement.application.port.out.LoadSellerTierPort;
 import github.lms.lemuel.settlement.application.port.out.LoadSettlementPort;
 import github.lms.lemuel.settlement.application.port.out.SaveSettlementPort;
+import github.lms.lemuel.settlement.domain.HoldbackPolicy;
 import github.lms.lemuel.settlement.domain.SellerTier;
 import github.lms.lemuel.settlement.domain.Settlement;
 import github.lms.lemuel.settlement.domain.SettlementCycle;
@@ -70,6 +71,12 @@ public class CreateSettlementFromPaymentService implements CreateSettlementFromP
             LocalDate settlementDate = cycle.resolveSettlementDate(LocalDate.now());
             Settlement settlement = Settlement.createFromPayment(
                     paymentId, orderId, amount, settlementDate, tier.rate());
+
+            // 셀러 등급별 보류 정책 적용 (NORMAL=30%/30일, VIP=10%/14일, STRATEGIC=0%)
+            HoldbackPolicy holdback = HoldbackPolicy.forTier(tier);
+            settlement.applyHoldback(holdback.rate(), holdback.computeReleaseDate(settlementDate));
+            log.info("Applying holdback: rate={}, amount={}, releaseDate={}",
+                    holdback.rate(), settlement.getHoldbackAmount(), settlement.getHoldbackReleaseDate());
 
             // 저장
             Settlement savedSettlement = saveSettlementPort.save(settlement);

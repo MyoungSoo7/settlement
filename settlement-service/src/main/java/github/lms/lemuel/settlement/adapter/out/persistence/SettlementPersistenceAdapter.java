@@ -1,10 +1,12 @@
 package github.lms.lemuel.settlement.adapter.out.persistence;
 
+import github.lms.lemuel.settlement.application.port.out.LoadReleasableHoldbackPort;
 import github.lms.lemuel.settlement.application.port.out.LoadSettlementPort;
 import github.lms.lemuel.settlement.application.port.out.SaveSettlementPort;
 import github.lms.lemuel.settlement.domain.Settlement;
 import github.lms.lemuel.settlement.domain.SettlementStatus;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
@@ -17,7 +19,8 @@ import java.util.stream.Collectors;
  */
 @Repository
 @RequiredArgsConstructor
-public class SettlementPersistenceAdapter implements LoadSettlementPort, SaveSettlementPort {
+public class SettlementPersistenceAdapter
+        implements LoadSettlementPort, SaveSettlementPort, LoadReleasableHoldbackPort {
 
     private final SpringDataSettlementJpaRepository settlementJpaRepository;
     private final SettlementPersistenceMapper mapper;
@@ -66,6 +69,15 @@ public class SettlementPersistenceAdapter implements LoadSettlementPort, SaveSet
         List<SettlementJpaEntity> saved = settlementJpaRepository.saveAll(entities);
 
         return saved.stream()
+                .map(mapper::toDomain)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<Settlement> findReleasableOn(LocalDate today, int limit) {
+        return settlementJpaRepository
+                .findReleasableHoldbacks(today, PageRequest.of(0, Math.max(1, limit)))
+                .stream()
                 .map(mapper::toDomain)
                 .collect(Collectors.toList());
     }

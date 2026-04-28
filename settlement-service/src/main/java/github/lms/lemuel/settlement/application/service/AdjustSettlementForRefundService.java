@@ -45,6 +45,14 @@ public class AdjustSettlementForRefundService implements AdjustSettlementForRefu
         Settlement settlement = loadSettlementPort.findByPaymentId(paymentId)
                 .orElseThrow(() -> new SettlementNotFoundException("Settlement not found for paymentId: " + paymentId));
 
+        // ★ Holdback 우선 차감 정책: 보류금이 있으면 거기서 먼저 빼서 셀러 추가 부담 없게 한다.
+        // 신뢰도 낮은 셀러의 환불 다발 위험을 정산 사이클 안에서 흡수하는 안전장치.
+        BigDecimal consumedFromHoldback = settlement.consumeHoldbackForRefund(refundAmount);
+        if (consumedFromHoldback.signum() > 0) {
+            log.info("Holdback 에서 우선 차감: settlementId={}, consumed={}, holdbackRemaining={}",
+                    settlement.getId(), consumedFromHoldback, settlement.getHoldbackAmount());
+        }
+
         // 환불 반영 (도메인 로직) — 정산의 netAmount 재계산 (running total)
         settlement.adjustForRefund(refundAmount);
         Settlement adjustedSettlement = saveSettlementPort.save(settlement);

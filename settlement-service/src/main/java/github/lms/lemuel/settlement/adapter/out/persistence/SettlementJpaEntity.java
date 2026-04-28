@@ -66,6 +66,23 @@ public class SettlementJpaEntity {
     @Column(name = "version", nullable = false)
     private Long version;
 
+    // ========== 정산 보류 (Holdback) — V42 ==========
+
+    @Column(name = "holdback_amount", nullable = false, precision = 12, scale = 2)
+    private BigDecimal holdbackAmount = BigDecimal.ZERO;
+
+    @Column(name = "holdback_rate", nullable = false, precision = 5, scale = 4)
+    private BigDecimal holdbackRate = BigDecimal.ZERO;
+
+    @Column(name = "holdback_release_date")
+    private LocalDate holdbackReleaseDate;
+
+    @Column(name = "holdback_released", nullable = false)
+    private boolean holdbackReleased = false;
+
+    @Column(name = "holdback_released_at")
+    private LocalDateTime holdbackReleasedAt;
+
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) {
