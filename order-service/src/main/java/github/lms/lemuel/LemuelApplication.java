@@ -9,6 +9,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
     scanBasePackages = {
         "github.lms.lemuel.user",
         "github.lms.lemuel.order",
+        "github.lms.lemuel.cart",
         "github.lms.lemuel.payment",
         "github.lms.lemuel.product",
         "github.lms.lemuel.category",
