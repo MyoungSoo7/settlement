@@ -141,3 +141,13 @@ app:
     issuer: ${JWT_ISSUER:lemuel}
     secret: ${JWT_SECRET:dev-secret-please-override}
     ttl-seconds: ${JWT_TTL_SECONDS:3600}
+  # 정산금 출금 (Payout) 정책
+  payout:
+    system-daily-limit: ${APP_PAYOUT_SYSTEM_DAILY_LIMIT:1000000000}
+    seller-daily-limit: ${APP_PAYOUT_SELLER_DAILY_LIMIT:100000000}
+    execute-cron: "0 0 4 * * *"
+  holdback:
+    release-cron: "0 0 3 * * *"
+  # 펌뱅킹 mock — 0.0 = 항상 성공. 시연용으로 0.1 (10% 실패) 으로 설정해 운영자 retry 워크플로 검증
+  firmbanking:
+    failure-rate: ${APP_FIRMBANKING_FAILURE_RATE:0.0}

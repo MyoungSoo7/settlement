@@ -132,6 +132,8 @@ public class SecurityConfig {
                         .requestMatchers("/admin/outbox/**").hasRole("ADMIN")
                         .requestMatchers("/admin/pg/**").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers("/admin/reconciliation/**").hasAnyRole("ADMIN", "MANAGER")
+                        // Payout 콘솔 — 송금 권한은 ADMIN 만
+                        .requestMatchers("/admin/payouts/**").hasRole("ADMIN")
                         // 정산 관련 API (관리자·매니저)
                         .requestMatchers("/settlements/**").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers("/api/settlements/**").hasAnyRole("ADMIN", "MANAGER")
