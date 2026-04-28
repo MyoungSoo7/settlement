@@ -2,10 +2,21 @@ package github.lms.lemuel.order.domain;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Order Domain Entity (순수 POJO, 스프링/JPA 의존성 없음)
- * DB 스키마: id, user_id, amount, status, created_at, updated_at
+ *
+ * <p>두 가지 생성 경로:
+ * <ul>
+ *   <li>{@link #create(Long, Long, BigDecimal)} — 단건 주문 (레거시 호환). productId 단일.</li>
+ *   <li>{@link #createMultiItem(Long, List)} — 다건 주문. productId NULL, items 가 진실의 원천.</li>
+ * </ul>
+ *
+ * <p>amount 는 다건 주문에서 모든 line_amount 의 합으로 자동 계산되어 도메인 불변식
+ * (영수증 ↔ 결제 ↔ 정산 금액 일치) 을 보장한다.
  */
 public class Order {
 
@@ -16,6 +27,7 @@ public class Order {
     private OrderStatus status;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private final List<OrderItem> items = new ArrayList<>();
 
     // 기본 생성자
     public Order() {
@@ -49,6 +61,29 @@ public class Order {
 
     public static Order create(Long userId, BigDecimal amount) {
         return create(userId, 1L, amount); // 기본 productId를 1로 지정
+    }
+
+    /**
+     * 다건 주문 팩토리.
+     *
+     * <p>amount 는 모든 OrderItem.lineAmount 의 합으로 자동 계산되며,
+     * productId 는 null 로 두어 "이 주문은 다건이다" 라는 의미를 부여한다.
+     * 외부에서 amount 를 수동 지정할 수 없어 영수증/결제/정산 금액 정합성이 도메인 차원에서 보장된다.
+     */
+    public static Order createMultiItem(Long userId, List<OrderItem> items) {
+        if (items == null || items.isEmpty()) {
+            throw new IllegalArgumentException("다건 주문은 최소 1 개 이상의 아이템이 필요합니다");
+        }
+        Order order = new Order();
+        order.setUserId(userId);
+        order.validateUserId();
+        BigDecimal total = items.stream()
+                .map(OrderItem::getLineAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        order.setAmount(total);
+        order.validateAmount();
+        order.items.addAll(items);
+        return order;
     }
 
     // 도메인 규칙: userId 검증
@@ -155,5 +190,38 @@ public class Order {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    /**
+     * 다건 주문 라인 아이템 (단건 주문은 빈 리스트).
+     */
+    public List<OrderItem> getItems() {
+        return Collections.unmodifiableList(items);
+    }
+
+    public boolean isMultiItem() {
+        return !items.isEmpty();
+    }
+
+    /**
+     * Persistence 어댑터에서 자식들에 PK 가 부여된 후 부모 id 를 자식에게 주입할 때 사용.
+     */
+    public void attachItemsToOrder() {
+        if (this.id == null) {
+            throw new IllegalStateException("Order id 부여 후에만 호출 가능");
+        }
+        for (OrderItem item : items) {
+            item.attachToOrder(this.id);
+        }
+    }
+
+    /**
+     * 영속 상태 복원 시 자식 아이템 채우기.
+     */
+    public void replaceItems(List<OrderItem> reloadedItems) {
+        this.items.clear();
+        if (reloadedItems != null) {
+            this.items.addAll(reloadedItems);
+        }
     }
 }

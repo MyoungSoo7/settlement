@@ -3,6 +3,7 @@ package github.lms.lemuel.order.adapter.in.web;
 import github.lms.lemuel.order.adapter.in.web.request.CreateOrderRequest;
 import github.lms.lemuel.order.adapter.in.web.response.OrderResponse;
 import github.lms.lemuel.order.application.port.in.ChangeOrderStatusUseCase;
+import github.lms.lemuel.order.application.port.in.CreateMultiItemOrderUseCase;
 import github.lms.lemuel.order.application.port.in.CreateOrderUseCase;
 import github.lms.lemuel.order.application.port.in.GetOrderUseCase;
 import github.lms.lemuel.order.domain.Order;
@@ -33,10 +34,11 @@ import java.util.stream.Collectors;
 public class OrderController {
 
     private final CreateOrderUseCase createOrderUseCase;
+    private final CreateMultiItemOrderUseCase createMultiItemOrderUseCase;
     private final GetOrderUseCase getOrderUseCase;
     private final ChangeOrderStatusUseCase changeOrderStatusUseCase;
 
-    @Operation(summary = "주문 생성", description = "사용자/상품/금액을 기반으로 주문을 생성한다.")
+    @Operation(summary = "주문 생성 (단건)", description = "단일 상품 주문 — 레거시 호환 경로.")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "주문 생성 성공"),
             @ApiResponse(responseCode = "400", description = "잘못된 요청")
@@ -48,6 +50,30 @@ public class OrderController {
         );
         return ResponseEntity.status(HttpStatus.CREATED).body(OrderResponse.from(order));
     }
+
+    @Operation(summary = "주문 생성 (다건/SKU)",
+            description = "장바구니 다건 주문. SKU(variantId) 지정 시 자동 재고 차감 + Optimistic Lock 동시성 보장.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "다건 주문 생성 성공"),
+            @ApiResponse(responseCode = "409", description = "재고 부족 또는 동시성 충돌 한계 초과")
+    })
+    @PostMapping("/multi")
+    public ResponseEntity<OrderResponse> createMultiItemOrder(@Valid @RequestBody MultiItemOrderRequest request) {
+        List<CreateMultiItemOrderUseCase.Line> lines = request.lines().stream()
+                .map(l -> new CreateMultiItemOrderUseCase.Line(l.productId(), l.variantId(), l.quantity()))
+                .toList();
+        Order order = createMultiItemOrderUseCase.create(request.userId(), lines);
+        return ResponseEntity.status(HttpStatus.CREATED).body(OrderResponse.from(order));
+    }
+
+    public record MultiItemOrderRequest(
+            @jakarta.validation.constraints.NotNull Long userId,
+            @jakarta.validation.constraints.NotEmpty List<LineRequest> lines) {}
+
+    public record LineRequest(
+            @jakarta.validation.constraints.NotNull Long productId,
+            Long variantId,
+            @jakarta.validation.constraints.Min(1) int quantity) {}
 
     @Operation(summary = "주문 단건 조회", description = "주문 ID로 주문을 조회한다.")
     @ApiResponses({

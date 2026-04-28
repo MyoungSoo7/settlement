@@ -2,6 +2,7 @@ package github.lms.lemuel.order.adapter.in.web;
 
 import github.lms.lemuel.common.config.jwt.JwtUtil;
 import github.lms.lemuel.order.application.port.in.ChangeOrderStatusUseCase;
+import github.lms.lemuel.order.application.port.in.CreateMultiItemOrderUseCase;
 import github.lms.lemuel.order.application.port.in.CreateOrderUseCase;
 import github.lms.lemuel.order.application.port.in.GetOrderUseCase;
 import github.lms.lemuel.order.domain.Order;
@@ -29,6 +30,7 @@ class OrderControllerTest {
     @Autowired MockMvc mockMvc;
     @MockitoBean JwtUtil jwtUtil;
     @MockitoBean CreateOrderUseCase createOrderUseCase;
+    @MockitoBean CreateMultiItemOrderUseCase createMultiItemOrderUseCase;
     @MockitoBean GetOrderUseCase getOrderUseCase;
     @MockitoBean ChangeOrderStatusUseCase changeOrderStatusUseCase;
 
