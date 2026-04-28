@@ -17,6 +17,7 @@
 |---|---|
 | **📄 1장 요약 (이력서 첨부용)** | **[PORTFOLIO.md](PORTFOLIO.md)** |
 | **📺 3분 시연 영상 스크립트** | [docs/DEMO.md](docs/DEMO.md) |
+| **🎬 시연용 Postman + 시드** | [demo/](demo/) — `./demo/seed.sh` 한 번이면 녹화 준비 끝 |
 | **시스템 전체 구조** | [docs/diagrams/architecture.md](docs/diagrams/architecture.md) |
 | **테이블 관계 (16개)** | [docs/diagrams/ERD.md](docs/diagrams/ERD.md) |
 | **결제 → Outbox → 정산 비동기 단일 trace** | [docs/diagrams/sequence-payment-to-settlement.md](docs/diagrams/sequence-payment-to-settlement.md) |
