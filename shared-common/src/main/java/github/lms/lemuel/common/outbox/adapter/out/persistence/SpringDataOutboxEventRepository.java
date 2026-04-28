@@ -6,6 +6,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
 public interface SpringDataOutboxEventRepository extends JpaRepository<OutboxEventJpaEntity, Long> {
 
@@ -13,4 +15,6 @@ public interface SpringDataOutboxEventRepository extends JpaRepository<OutboxEve
     List<OutboxEventJpaEntity> findByStatusOrderByCreatedAtAsc(OutboxEventStatus status, Pageable pageable);
 
     long countByStatus(OutboxEventStatus status);
+
+    Optional<OutboxEventJpaEntity> findByEventId(UUID eventId);
 }

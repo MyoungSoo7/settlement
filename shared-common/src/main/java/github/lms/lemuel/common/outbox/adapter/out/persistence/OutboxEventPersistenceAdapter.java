@@ -8,6 +8,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
 @Component
 public class OutboxEventPersistenceAdapter implements SaveOutboxEventPort, LoadOutboxEventPort {
@@ -31,7 +33,8 @@ public class OutboxEventPersistenceAdapter implements SaveOutboxEventPort, LoadO
                 event.getRetryCount(),
                 event.getLastError(),
                 event.getCreatedAt(),
-                event.getPublishedAt()
+                event.getPublishedAt(),
+                event.getTraceParent()
         );
         OutboxEventJpaEntity saved = repository.save(entity);
         return toDomain(saved);
@@ -51,6 +54,26 @@ public class OutboxEventPersistenceAdapter implements SaveOutboxEventPort, LoadO
         return repository.countByStatus(OutboxEventStatus.PENDING);
     }
 
+    @Override
+    public List<OutboxEvent> findFailed(int offset, int limit) {
+        int page = limit > 0 ? offset / limit : 0;
+        return repository
+                .findByStatusOrderByCreatedAtAsc(OutboxEventStatus.FAILED, PageRequest.of(page, limit))
+                .stream()
+                .map(OutboxEventPersistenceAdapter::toDomain)
+                .toList();
+    }
+
+    @Override
+    public long countFailed() {
+        return repository.countByStatus(OutboxEventStatus.FAILED);
+    }
+
+    @Override
+    public Optional<OutboxEvent> findByEventId(UUID eventId) {
+        return repository.findByEventId(eventId).map(OutboxEventPersistenceAdapter::toDomain);
+    }
+
     private static OutboxEvent toDomain(OutboxEventJpaEntity e) {
         return OutboxEvent.rehydrate(
                 e.getId(),
@@ -63,7 +86,8 @@ public class OutboxEventPersistenceAdapter implements SaveOutboxEventPort, LoadO
                 e.getRetryCount(),
                 e.getLastError(),
                 e.getCreatedAt(),
-                e.getPublishedAt()
+                e.getPublishedAt(),
+                e.getTraceParent()
         );
     }
 }

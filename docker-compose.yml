@@ -95,6 +95,8 @@ services:
       JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
       SERVER_PORT: 8080
       MANAGEMENT_SERVER_PORT: 8080
+      MANAGEMENT_OTLP_TRACING_ENDPOINT: http://tempo:4318/v1/traces
+      MANAGEMENT_TRACING_SAMPLING_PROBABILITY: "1.0"
     ports:
       - "127.0.0.1:8088:8080"
     restart: unless-stopped
@@ -137,6 +139,8 @@ services:
       JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
       SERVER_PORT: 8080
       MANAGEMENT_SERVER_PORT: 8080
+      MANAGEMENT_OTLP_TRACING_ENDPOINT: http://tempo:4318/v1/traces
+      MANAGEMENT_TRACING_SAMPLING_PROBABILITY: "1.0"
     ports:
       - "127.0.0.1:8082:8080"
     restart: unless-stopped
@@ -207,7 +211,42 @@ services:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     restart: unless-stopped
 
+  # 분산 트레이싱 백엔드 — OTLP 수신 → Tempo 저장 → Grafana 에서 trace 검색.
+  # order-service / settlement-service 가 OTEL_EXPORTER_OTLP_ENDPOINT 로 발행.
+  tempo:
+    image: grafana/tempo:2.5.0
+    container_name: lemuel-tempo
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./monitoring/tempo.yaml:/etc/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    ports:
+      - "127.0.0.1:3200:3200"   # Tempo HTTP query API
+      - "127.0.0.1:4317:4317"   # OTLP gRPC
+      - "127.0.0.1:4318:4318"   # OTLP HTTP
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: lemuel-grafana
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_FEATURE_TOGGLES_ENABLE: "traceqlEditor"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "127.0.0.1:3001:3000"
+    depends_on:
+      - prometheus
+      - tempo
+    restart: unless-stopped
+
 volumes:
   postgres-data:
   elasticsearch-data:
   redpanda-data:
+  tempo-data:
+  grafana-data:

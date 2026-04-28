@@ -116,6 +116,14 @@ server:
 
 
 management:
+  # 분산 트레이싱 — Micrometer Tracing + OpenTelemetry → Tempo (또는 Jaeger / Zipkin)
+  # 로컬 기본값은 비활성. docker-compose 에서 OTEL_EXPORTER_OTLP_ENDPOINT 만 주면 자동 활성.
+  tracing:
+    sampling:
+      probability: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:1.0}
+  otlp:
+    tracing:
+      endpoint: ${MANAGEMENT_OTLP_TRACING_ENDPOINT:}
   endpoints:
     web:
       exposure:
@@ -173,6 +181,24 @@ app:
       payment-refunded: lemuel.payment.refunded
   outbox:
     polling-delay-ms: 2000
+  # 다중 PG 라우팅 정책 — PgRouter 가 결제수단·금액·health 를 보고 어댑터 선택
+  pg:
+    routing:
+      # 결제 수단별 1순위 PG (가장 흔한 케이스가 빠른 경로로 가도록)
+      primary-by-method:
+        CARD: TOSS
+        TOSS_PAYMENTS: TOSS
+        BANK_TRANSFER: KCP
+        VIRTUAL_ACCOUNT: KCP
+        KAKAO_PAY: NICE
+        NAVER_PAY: NICE
+        PAYCO: NICE
+        SAMSUNG_PAY: NICE
+      # 1순위가 미지원/OPEN 일 때 좌→우 순으로 시도
+      fallback-chain: [TOSS, NICE, KCP, INICIS]
+      # 100 만원 이상 거래는 한도/안정성을 위해 고액 우선 PG 로 라우팅
+      high-amount-threshold: 1000000
+      high-amount-preferred: NICE
   search:
     enabled: false
   jwt:
@@ -195,11 +221,11 @@ toss:
   secret-key: ${TOSS_SECRET_KEY}
   api-url: https://api.tosspayments.com/v1/payments/confirm
 
-# Resilience4j — Toss PG 호출 복원력
+# Resilience4j — PG 별 독립 CircuitBreaker (한 PG 장애가 다른 PG 로 전이되지 않도록 격벽)
 resilience4j:
   circuitbreaker:
-    instances:
-      tossPg:
+    configs:
+      pgDefault:
         registerHealthIndicator: true
         slidingWindowType: COUNT_BASED
         slidingWindowSize: 20                    # 최근 20회 요청 기준
@@ -211,9 +237,18 @@ resilience4j:
         # 4xx 는 PG 쪽의 비즈니스 오류 (결제키 만료 등) 이므로 서킷 판정에서 제외
         ignoreExceptions:
           - org.springframework.web.client.HttpClientErrorException
-  retry:
     instances:
       tossPg:
+        baseConfig: pgDefault
+      kcpPg:
+        baseConfig: pgDefault
+      nicePg:
+        baseConfig: pgDefault
+      inicisPg:
+        baseConfig: pgDefault
+  retry:
+    configs:
+      pgDefault:
         maxAttempts: 3
         waitDuration: 500ms
         enableExponentialBackoff: true
@@ -225,5 +260,14 @@ resilience4j:
           - org.springframework.web.client.ResourceAccessException
           - org.springframework.web.client.HttpServerErrorException
           - java.io.IOException
+    instances:
+      tossPg:
+        baseConfig: pgDefault
+      kcpPg:
+        baseConfig: pgDefault
+      nicePg:
+        baseConfig: pgDefault
+      inicisPg:
+        baseConfig: pgDefault
 
 

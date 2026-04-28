@@ -55,11 +55,26 @@ public class OutboxEventJpaEntity {
     @Column(name = "published_at")
     private LocalDateTime publishedAt;
 
+    /**
+     * W3C Trace Context. 도메인 트랜잭션 시점의 trace 를 영속화해 비동기 발행 시
+     * Kafka 헤더로 복원 → 단일 trace 추적 보장.
+     */
+    @Column(name = "trace_parent", length = 64)
+    private String traceParent;
+
     protected OutboxEventJpaEntity() { }
 
     public OutboxEventJpaEntity(Long id, String aggregateType, String aggregateId, String eventType,
                                 UUID eventId, String payload, OutboxEventStatus status, int retryCount,
                                 String lastError, LocalDateTime createdAt, LocalDateTime publishedAt) {
+        this(id, aggregateType, aggregateId, eventType, eventId, payload,
+                status, retryCount, lastError, createdAt, publishedAt, null);
+    }
+
+    public OutboxEventJpaEntity(Long id, String aggregateType, String aggregateId, String eventType,
+                                UUID eventId, String payload, OutboxEventStatus status, int retryCount,
+                                String lastError, LocalDateTime createdAt, LocalDateTime publishedAt,
+                                String traceParent) {
         this.id = id;
         this.aggregateType = aggregateType;
         this.aggregateId = aggregateId;
@@ -71,6 +86,7 @@ public class OutboxEventJpaEntity {
         this.lastError = lastError;
         this.createdAt = createdAt;
         this.publishedAt = publishedAt;
+        this.traceParent = traceParent;
     }
 
     public Long getId() { return id; }
@@ -84,4 +100,5 @@ public class OutboxEventJpaEntity {
     public String getLastError() { return lastError; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getPublishedAt() { return publishedAt; }
+    public String getTraceParent() { return traceParent; }
 }

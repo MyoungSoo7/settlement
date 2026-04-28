@@ -50,6 +50,12 @@ dependencies {
     // Micrometer (outbox publisher 메트릭 등)
     api("io.micrometer:micrometer-core")
 
+    // 분산 트레이싱 — Micrometer Tracing + OpenTelemetry Bridge.
+    // OutboxEvent 가 traceparent 를 영속화해 비동기 경계에서도 trace context 가 끊기지 않게 한다.
+    api("io.micrometer:micrometer-tracing")
+    api("io.micrometer:micrometer-tracing-bridge-otel")
+    api("io.opentelemetry:opentelemetry-exporter-otlp")
+
     // Spring Boot autoconfigure (ConditionalOnProperty 등 어노테이션 사용)
     api("org.springframework.boot:spring-boot-autoconfigure")
 

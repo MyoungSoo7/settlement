@@ -3,6 +3,7 @@ package github.lms.lemuel.payment.adapter.out.event;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import github.lms.lemuel.common.outbox.application.port.out.SaveOutboxEventPort;
+import github.lms.lemuel.common.outbox.application.service.TraceContextCapture;
 import github.lms.lemuel.common.outbox.domain.OutboxEvent;
 import github.lms.lemuel.payment.application.port.out.PublishEventPort;
 import org.slf4j.Logger;
@@ -29,11 +30,14 @@ public class OutboxBackedEventPublisher implements PublishEventPort {
 
     private final SaveOutboxEventPort saveOutboxEventPort;
     private final ObjectMapper objectMapper;
+    private final TraceContextCapture traceContextCapture;
 
     public OutboxBackedEventPublisher(SaveOutboxEventPort saveOutboxEventPort,
-                                      ObjectMapper objectMapper) {
+                                      ObjectMapper objectMapper,
+                                      TraceContextCapture traceContextCapture) {
         this.saveOutboxEventPort = saveOutboxEventPort;
         this.objectMapper = objectMapper;
+        this.traceContextCapture = traceContextCapture;
     }
 
     @Override
@@ -78,11 +82,14 @@ public class OutboxBackedEventPublisher implements PublishEventPort {
             // 직렬화 실패는 즉시 치명적 — 이벤트 손실보다 예외로 커밋 롤백이 안전
             throw new IllegalStateException("Failed to serialize outbox payload for " + eventType, e);
         }
+        // 도메인 트랜잭션 시점의 W3C trace context 캡처 → outbox 영속화 → Kafka 헤더로 복원
+        String traceParent = traceContextCapture.captureCurrentTraceParent();
         OutboxEvent event = OutboxEvent.pending(
                 AGGREGATE_TYPE,
                 String.valueOf(paymentId),
                 eventType,
-                json
+                json,
+                traceParent
         );
         saveOutboxEventPort.save(event);
         log.debug("Outbox write: type={}, aggregateId={}", eventType, paymentId);

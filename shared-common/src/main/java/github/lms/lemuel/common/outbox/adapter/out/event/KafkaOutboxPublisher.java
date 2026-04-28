@@ -57,6 +57,11 @@ public class KafkaOutboxPublisher implements PublishExternalEventPort {
                 event.getEventType().getBytes(StandardCharsets.UTF_8)));
         record.headers().add(new RecordHeader("aggregate_type",
                 event.getAggregateType().getBytes(StandardCharsets.UTF_8)));
+        // 도메인 트랜잭션 시점의 W3C trace context 를 헤더로 복원 → 컨슈머가 같은 trace 합류
+        if (event.getTraceParent() != null && !event.getTraceParent().isBlank()) {
+            record.headers().add(new RecordHeader("traceparent",
+                    event.getTraceParent().getBytes(StandardCharsets.UTF_8)));
+        }
 
         try {
             SendResult<String, String> result = kafkaTemplate.send(record)

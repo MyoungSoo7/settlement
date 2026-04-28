@@ -23,6 +23,12 @@ public class OutboxEvent {
     private String lastError;
     private final LocalDateTime createdAt;
     private LocalDateTime publishedAt;
+    /**
+     * W3C Trace Context (예: "00-{traceId}-{spanId}-01"). 도메인 트랜잭션 시점의 trace 를
+     * 영속화해 폴러 발행 시 Kafka 헤더로 복원 → 비동기 경계에서도 단일 trace 보장.
+     * 트레이싱이 비활성이거나 미캡처면 null.
+     */
+    private final String traceParent;
 
     private OutboxEvent(Long id,
                         String aggregateType,
@@ -34,7 +40,8 @@ public class OutboxEvent {
                         int retryCount,
                         String lastError,
                         LocalDateTime createdAt,
-                        LocalDateTime publishedAt) {
+                        LocalDateTime publishedAt,
+                        String traceParent) {
         this.id = id;
         this.aggregateType = Objects.requireNonNull(aggregateType, "aggregateType");
         this.aggregateId = Objects.requireNonNull(aggregateId, "aggregateId");
@@ -46,13 +53,23 @@ public class OutboxEvent {
         this.lastError = lastError;
         this.createdAt = Objects.requireNonNull(createdAt, "createdAt");
         this.publishedAt = publishedAt;
+        this.traceParent = traceParent;
     }
 
     /**
-     * 신규 PENDING 이벤트 생성.
+     * 신규 PENDING 이벤트 생성. traceParent 미지정 (트레이싱 비활성 환경 호환).
      */
     public static OutboxEvent pending(String aggregateType, String aggregateId,
                                       String eventType, String payload) {
+        return pending(aggregateType, aggregateId, eventType, payload, null);
+    }
+
+    /**
+     * 신규 PENDING 이벤트 생성 + 현재 trace context 캡처. 도메인 트랜잭션과 같은 호출 스택에서
+     * 호출되어야 의미가 있다 — 폴러 시점이 아닌 비즈니스 변경 시점의 trace 를 보존.
+     */
+    public static OutboxEvent pending(String aggregateType, String aggregateId,
+                                      String eventType, String payload, String traceParent) {
         return new OutboxEvent(
                 null,
                 aggregateType,
@@ -64,19 +81,29 @@ public class OutboxEvent {
                 0,
                 null,
                 LocalDateTime.now(),
-                null
+                null,
+                traceParent
         );
     }
 
     /**
-     * 영속 상태에서 재구성 (어댑터에서만 사용).
+     * 영속 상태에서 재구성 (어댑터에서만 사용). traceParent 누락 호환 호출.
      */
     public static OutboxEvent rehydrate(Long id, String aggregateType, String aggregateId,
                                         String eventType, UUID eventId, String payload,
                                         OutboxEventStatus status, int retryCount, String lastError,
                                         LocalDateTime createdAt, LocalDateTime publishedAt) {
+        return rehydrate(id, aggregateType, aggregateId, eventType, eventId, payload,
+                status, retryCount, lastError, createdAt, publishedAt, null);
+    }
+
+    public static OutboxEvent rehydrate(Long id, String aggregateType, String aggregateId,
+                                        String eventType, UUID eventId, String payload,
+                                        OutboxEventStatus status, int retryCount, String lastError,
+                                        LocalDateTime createdAt, LocalDateTime publishedAt,
+                                        String traceParent) {
         return new OutboxEvent(id, aggregateType, aggregateId, eventType, eventId, payload,
-                status, retryCount, lastError, createdAt, publishedAt);
+                status, retryCount, lastError, createdAt, publishedAt, traceParent);
     }
 
     public void markPublished() {
@@ -94,8 +121,48 @@ public class OutboxEvent {
         }
     }
 
+    /**
+     * 운영자가 FAILED 이벤트를 다시 발행 큐에 올린다.
+     *
+     * <p>retryCount 를 0 으로 초기화하고 PENDING 으로 되돌려, 다음 폴링 주기에 발행을 다시 시도한다.
+     * lastError 는 보존하여 재시도 결정의 근거 추적이 가능하게 한다.
+     *
+     * <p>FAILED 상태가 아닐 때 호출되면 IllegalStateException — 정상 흐름에서는 발생하지 않음.
+     */
+    public void requeue() {
+        if (this.status != OutboxEventStatus.FAILED) {
+            throw new IllegalStateException(
+                    "FAILED 상태의 이벤트만 재처리 가능합니다. 현재 상태: " + this.status);
+        }
+        this.status = OutboxEventStatus.PENDING;
+        this.retryCount = 0;
+    }
+
+    /**
+     * 운영자가 FAILED 이벤트를 의도적으로 스킵한다 (수동 보정 완료 등).
+     *
+     * <p>PUBLISHED 로 마킹하되, lastError 필드에 스킵 사유를 기록해 사후 감사가 가능하게 한다.
+     * 같은 컨슈머가 이미 PROCESSED 상태로 처리한 케이스에서 outbox 만 정리할 때 사용.
+     */
+    public void skip(String reason) {
+        if (this.status != OutboxEventStatus.FAILED) {
+            throw new IllegalStateException(
+                    "FAILED 상태의 이벤트만 스킵 가능합니다. 현재 상태: " + this.status);
+        }
+        if (reason == null || reason.isBlank()) {
+            throw new IllegalArgumentException("스킵 사유는 필수입니다 (감사 추적용)");
+        }
+        this.status = OutboxEventStatus.PUBLISHED;
+        this.publishedAt = LocalDateTime.now();
+        this.lastError = "[SKIPPED] " + reason;
+    }
+
     public boolean isPending() {
         return status == OutboxEventStatus.PENDING;
+    }
+
+    public boolean isFailed() {
+        return status == OutboxEventStatus.FAILED;
     }
 
     // Getters
@@ -110,4 +177,5 @@ public class OutboxEvent {
     public String getLastError() { return lastError; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getPublishedAt() { return publishedAt; }
+    public String getTraceParent() { return traceParent; }
 }
