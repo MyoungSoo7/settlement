@@ -28,8 +28,8 @@ COPY gateway-service ./gateway-service
 RUN --mount=type=cache,target=/home/gradle/.gradle \
     gradle --no-daemon :${MODULE}:bootJar -x test
 
-# bootJar 결과를 고정 경로로 복사
-RUN cp /workspace/${MODULE}/build/libs/*.jar /workspace/app.jar
+# bootJar 결과를 고정 경로로 복사 (Spring Boot 가 만드는 *-plain.jar 는 제외)
+RUN find /workspace/${MODULE}/build/libs -maxdepth 1 -name '*.jar' ! -name '*-plain.jar' -exec cp {} /workspace/app.jar \;
 
 ############################
 # Stage 2: Runtime

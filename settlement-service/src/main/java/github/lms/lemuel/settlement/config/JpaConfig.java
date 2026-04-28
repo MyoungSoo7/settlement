@@ -19,6 +19,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
     "github.lms.lemuel.payout.adapter.out.persistence",
     "github.lms.lemuel.common.audit.adapter.out.persistence",
     "github.lms.lemuel.common.outbox.adapter.in.kafka",
+    "github.lms.lemuel.common.outbox.adapter.out.persistence",
 })
 @EnableJpaRepositories(basePackages = {
     "github.lms.lemuel.settlement",
@@ -26,6 +27,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
     "github.lms.lemuel.payout.adapter.out.persistence",
     "github.lms.lemuel.common.audit.adapter.out.persistence",
     "github.lms.lemuel.common.outbox.adapter.in.kafka",
+    "github.lms.lemuel.common.outbox.adapter.out.persistence",
 })
 public class JpaConfig {
 }
