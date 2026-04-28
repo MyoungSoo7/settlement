@@ -15,12 +15,14 @@
 
 | 보고 싶은 것 | 한 번에 가는 곳 |
 |---|---|
+| **📄 1장 요약 (이력서 첨부용)** | **[PORTFOLIO.md](PORTFOLIO.md)** |
+| **📺 3분 시연 영상 스크립트** | [docs/DEMO.md](docs/DEMO.md) |
 | **시스템 전체 구조** | [docs/diagrams/architecture.md](docs/diagrams/architecture.md) |
 | **테이블 관계 (16개)** | [docs/diagrams/ERD.md](docs/diagrams/ERD.md) |
 | **결제 → Outbox → 정산 비동기 단일 trace** | [docs/diagrams/sequence-payment-to-settlement.md](docs/diagrams/sequence-payment-to-settlement.md) |
 | **100 스레드 동시 SKU 차감 시나리오** | [docs/diagrams/sequence-multi-item-checkout.md](docs/diagrams/sequence-multi-item-checkout.md) |
 | **PG 정산파일 자동 차액 보정** | [docs/diagrams/sequence-pg-reconciliation.md](docs/diagrams/sequence-pg-reconciliation.md) |
-| **9개 Architecture Decision Records** | [docs/adr/](docs/adr/) |
+| **16개 Architecture Decision Records** | [docs/adr/](docs/adr/) |
 | **부하 테스트 시나리오 4종** | [load-test/](load-test/) |
 | **Grafana 비즈니스 KPI 대시보드** | [monitoring/grafana/dashboards/](monitoring/grafana/dashboards/) |
 
@@ -414,6 +416,7 @@ PENDING → READY → SHIPPED → IN_TRANSIT → DELIVERED → (선택) RETURNED
 - [0013 — Split Payment + Reverse Refund](./docs/adr/0013-split-payment-with-tenders.md)
 - [0014 — Tier-based T+N Settlement Cycle](./docs/adr/0014-tier-based-settlement-cycle.md)
 - [0015 — Settlement Holdback Policy](./docs/adr/0015-settlement-holdback-policy.md)
+- [0016 — Payout Domain + Firm Banking](./docs/adr/0016-payout-domain-firm-banking.md)
 
 ---
 

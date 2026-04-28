@@ -19,6 +19,7 @@
 | [0013](0013-split-payment-with-tenders.md) | 분할결제 + 역순 환불 정책 | Accepted |
 | [0014](0014-tier-based-settlement-cycle.md) | SellerTier 기반 T+N 영업일 정산 주기 | Accepted |
 | [0015](0015-settlement-holdback-policy.md) | 정산 보류 — 등급별 차등 + 자동 해제 | Accepted |
+| [0016](0016-payout-domain-firm-banking.md) | Payout (출금) — 정산 사이클의 종착점 | Accepted |
 
 ## 규칙
 
