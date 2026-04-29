@@ -7,6 +7,7 @@ import github.lms.lemuel.product.application.port.out.SaveProductVariantPort;
 import github.lms.lemuel.product.domain.ProductVariant;
 import github.lms.lemuel.product.domain.exception.InsufficientStockException;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.junit.jupiter.api.condition.EnabledIf;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -21,6 +22,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -59,12 +61,18 @@ import static org.assertj.core.api.Assertions.assertThat;
  * CI 환경에서만 활성화하거나 로컬에서 Docker Desktop 실행 후 수동 검증.
  */
 @Testcontainers
+@EnabledIf(value = "isDockerAvailable", disabledReason = "Docker is not available")
 @DataJpaTest
 @ImportAutoConfiguration(FlywayAutoConfiguration.class)
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({ProductVariantPersistenceAdapter.class})
 @ActiveProfiles("test")
 class VariantStockConcurrencyIT {
+
+    static boolean isDockerAvailable() {
+        try { DockerClientFactory.instance().client(); return true; }
+        catch (Throwable ex) { return false; }
+    }
 
     @Container
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17-alpine")

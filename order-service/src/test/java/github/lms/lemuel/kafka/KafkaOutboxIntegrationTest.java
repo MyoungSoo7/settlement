@@ -11,6 +11,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.condition.EnabledIf;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +21,7 @@ import org.springframework.kafka.test.utils.KafkaTestUtils;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -48,6 +50,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 컨슈머 로직의 핵심(멱등 체크, 정산 서비스 호출) 은 별도 단위 테스트로 검증한다.
  */
 @Testcontainers
+@EnabledIf(value = "isDockerAvailable", disabledReason = "Docker is not available")
 @SpringBootTest(
         classes = github.lms.lemuel.LemuelApplication.class,
         properties = {
@@ -62,6 +65,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ActiveProfiles("test")
 class KafkaOutboxIntegrationTest {
+
+    static boolean isDockerAvailable() {
+        try { DockerClientFactory.instance().client(); return true; }
+        catch (Throwable ex) { return false; }
+    }
 
     @Container
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17-alpine")

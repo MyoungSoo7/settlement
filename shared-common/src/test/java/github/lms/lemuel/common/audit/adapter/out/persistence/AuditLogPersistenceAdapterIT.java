@@ -2,6 +2,7 @@ package github.lms.lemuel.common.audit.adapter.out.persistence;
 
 import github.lms.lemuel.common.audit.domain.AuditAction;
 import github.lms.lemuel.common.audit.domain.AuditLog;
+import org.junit.jupiter.api.condition.EnabledIf;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,6 +14,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -24,12 +26,18 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 도메인 ↔ 엔티티 매핑을 올바르게 수행하는지 Testcontainers 로 검증.
  */
 @Testcontainers
+@EnabledIf(value = "isDockerAvailable", disabledReason = "Docker is not available")
 @DataJpaTest
 @ImportAutoConfiguration(FlywayAutoConfiguration.class)
 @Import(AuditLogPersistenceAdapter.class)
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ActiveProfiles("test")
 class AuditLogPersistenceAdapterIT {
+
+    static boolean isDockerAvailable() {
+        try { DockerClientFactory.instance().client(); return true; }
+        catch (Throwable ex) { return false; }
+    }
 
     @Container
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17-alpine")

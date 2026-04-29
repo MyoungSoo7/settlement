@@ -1,5 +1,6 @@
 package github.lms.lemuel.schema;
 
+import org.junit.jupiter.api.condition.EnabledIf;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
@@ -9,6 +10,7 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -25,6 +27,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * V27 누락 컬럼 같은 류의 이슈가 자동 감지된다.
  */
 @Testcontainers
+@EnabledIf(value = "isDockerAvailable", disabledReason = "Docker is not available")
 @DataJpaTest
 // Boot 4 에서 @DataJpaTest 슬라이스는 FlywayAutoConfiguration 을 기본 포함하지 않는다.
 // 마이그레이션이 실제로 적용되도록 명시적 import.
@@ -32,6 +35,11 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ActiveProfiles("test")
 class SchemaIntegrationTest {
+
+    static boolean isDockerAvailable() {
+        try { DockerClientFactory.instance().client(); return true; }
+        catch (Throwable ex) { return false; }
+    }
 
     @Container
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17-alpine")
