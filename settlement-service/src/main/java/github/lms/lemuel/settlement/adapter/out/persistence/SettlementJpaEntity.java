@@ -53,6 +53,9 @@ public class SettlementJpaEntity {
     @Column(name = "settlement_date", nullable = false)
     private LocalDate settlementDate;
 
+    @Column(name = "failure_reason")
+    private String failureReason;
+
     @Column(name = "confirmed_at")
     private LocalDateTime confirmedAt;
 

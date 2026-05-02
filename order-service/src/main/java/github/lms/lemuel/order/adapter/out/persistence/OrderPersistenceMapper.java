@@ -12,6 +12,7 @@ import org.mapstruct.Mapping;
 public interface OrderPersistenceMapper {
 
     @Mapping(target = "status", expression = "java(OrderStatus.fromString(entity.getStatus()))")
+    @Mapping(target = "items", ignore = true)
     Order toDomain(OrderJpaEntity entity);
 
     @Mapping(target = "status", expression = "java(domain.getStatus().name())")
