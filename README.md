@@ -1,56 +1,273 @@
-# Lemuel - 전자상거래 주문/결제/정산 통합 시스템
+# Lemuel — 이커머스 + 정산 MSA 플랫폼
 
-주문, 결제, 정산, 환불을 처리하는 이커머스 통합 플랫폼 (헥사고날 아키텍처)
+> **상품·장바구니·주문·결제·배송·정산** 6개 도메인을 **2개 마이크로서비스 + API Gateway** 로 분리한
+> 헥사고날 아키텍처 기반 백엔드. 단일 모놀리스 → **Bounded Context 분리** → **이벤트 드리븐** →
+> **Read-only Projection 패턴** 으로 진화시킨 포트폴리오 프로젝트.
 
-## 프로젝트 소개
+[![Java 25](https://img.shields.io/badge/Java-25-orange)](https://www.oracle.com/java/)
+[![Spring Boot 4](https://img.shields.io/badge/Spring%20Boot-4.0.4-brightgreen)](https://spring.io/projects/spring-boot)
+[![PostgreSQL 17](https://img.shields.io/badge/PostgreSQL-17-blue)](https://www.postgresql.org/)
+[![Kafka](https://img.shields.io/badge/Kafka-Redpanda-red)](https://redpanda.com/)
+[![Hexagonal](https://img.shields.io/badge/Architecture-Hexagonal-purple)](docs/diagrams/architecture.md)
+[![ArchUnit Enforced](https://img.shields.io/badge/ArchUnit-Enforced-success)](order-service/src/test/java/github/lms/lemuel/architecture/HexagonalArchitectureTest.java)
 
-Lemuel은 Spring Boot 기반의 전자상거래 백엔드 시스템입니다. Toss Payments PG 연동, Spring Batch 기반 자동 정산, Elasticsearch 검색, 환불 동시성 제어(Pessimistic Lock + 멱등성 키) 등 실무 수준의 결제/정산 도메인을 구현했습니다.
+## 면접관용 빠른 둘러보기
+
+| 보고 싶은 것 | 한 번에 가는 곳 |
+|---|---|
+| **📄 1장 요약 (이력서 첨부용)** | **[PORTFOLIO.md](PORTFOLIO.md)** |
+| **📺 3분 시연 영상 스크립트** | [docs/DEMO.md](docs/DEMO.md) |
+| **🎬 시연용 Postman + 시드** | [demo/](demo/) — `./demo/seed.sh` 한 번이면 녹화 준비 끝 |
+| **시스템 전체 구조** | [docs/diagrams/architecture.md](docs/diagrams/architecture.md) |
+| **테이블 관계 (16개)** | [docs/diagrams/ERD.md](docs/diagrams/ERD.md) |
+| **결제 → Outbox → 정산 비동기 단일 trace** | [docs/diagrams/sequence-payment-to-settlement.md](docs/diagrams/sequence-payment-to-settlement.md) |
+| **100 스레드 동시 SKU 차감 시나리오** | [docs/diagrams/sequence-multi-item-checkout.md](docs/diagrams/sequence-multi-item-checkout.md) |
+| **PG 정산파일 자동 차액 보정** | [docs/diagrams/sequence-pg-reconciliation.md](docs/diagrams/sequence-pg-reconciliation.md) |
+| **16개 Architecture Decision Records** | [docs/adr/](docs/adr/) |
+| **부하 테스트 시나리오 4종** | [load-test/](load-test/) |
+| **Grafana 비즈니스 KPI 대시보드** | [monitoring/grafana/dashboards/](monitoring/grafana/dashboards/) |
+
+---
+
+## 아키텍처
+
+```mermaid
+flowchart LR
+    Client["Web / Mobile<br/>Client"] --> GW
+    GW["gateway-service<br/>Spring Cloud Gateway<br/>:8080"]
+
+    GW -->|/api/orders/**<br/>/api/payments/**<br/>/api/products/**<br/>/api/users/**| OS
+    GW -->|/api/settlements/**<br/>/api/reconciliation/**<br/>/api/reports/**| SS
+
+    subgraph commerce["🛒 Commerce Bounded Context"]
+        OS["order-service<br/>:8088<br/><br/>user · order · payment<br/>product · category<br/>coupon · review"]
+    end
+
+    subgraph settlement["💰 Settlement Bounded Context"]
+        SS["settlement-service<br/>:8082<br/><br/>settlement · reconciliation<br/>cashflow report · ES indexing<br/>daily/monthly batch"]
+    end
+
+    OS -->|Outbox + Kafka publish| K[(Kafka<br/>Redpanda)]
+    K -->|PaymentCaptured<br/>PaymentRefunded| SS
+
+    OS --- PG[(PostgreSQL 17<br/>opslab schema)]
+    SS --- PG
+    SS --- ES[(Elasticsearch 8.17<br/>settlement search)]
+
+    style commerce fill:#fff7e6,stroke:#fa8c16
+    style settlement fill:#e6f7ff,stroke:#1890ff
+```
+
+### 서비스 책임 분리 근거
+
+| 차원 | Commerce (order-service) | Settlement (settlement-service) |
+|---|---|---|
+| **컨텍스트** | 거래 (Transactional) | 백오피스 (Back-Office) |
+| **SLA** | 사용자 응답 latency 우선 | 정합성·일관성 우선 |
+| **데이터** | 쓰기 중심 (CRUD) | 읽기·집계 중심 |
+| **장애 격리** | settlement 다운돼도 결제는 계속 | 정산 배치는 비동기 — 즉시 처리 X |
+| **배포 주기** | 잦음 (UI 변경 동행) | 드뭄 (회계 사이클 단위) |
+
+→ 위 차이점이 명확하므로 **서비스 분리** 가 자연스러운 경계.
 
 ---
 
 ## 기술 스택
 
-| 구분 | 기술 | 버전 |
-|------|------|------|
-| Backend | Java + Spring Boot + JPA | 25 / 4.0.4 |
-| Frontend | React + TypeScript + Vite | 18 / 5 / 5 |
-| Database | PostgreSQL | 17 |
-| 검색 엔진 | Elasticsearch (Nori 한글 분석기) | 8.x |
-| 결제 | Toss Payments PG | - |
-| 배치 | Spring Batch (CronJob) | - |
-| 캐시 | Caffeine Cache | - |
-| PDF | iText PDF | - |
-| 모니터링 | Micrometer + Prometheus + Grafana | - |
-| 마이그레이션 | Flyway (V1~V22) | - |
-| 코드 품질 | SonarCloud + Snyk + JaCoCo (70%+) | - |
-| API 문서 | SpringDoc OpenAPI (Swagger) | 2.8.0 |
-| Infra | Docker Compose (dev) / Kubernetes (prod) | - |
-| CI/CD | GitHub Actions (GHCR 배포) | - |
+| 분류 | 기술 |
+|------|------|
+| 언어 | Java 25 |
+| 프레임워크 | Spring Boot 4.0.4 |
+| 빌드 | Gradle Multi-module (Kotlin DSL) |
+| 데이터베이스 | PostgreSQL 17 |
+| 검색 엔진 | Elasticsearch 8.17 (Nori 한글 분석기) |
+| 메시지 브로커 | Apache Kafka (Redpanda 호환) |
+| API Gateway | Spring Cloud Gateway 2025 |
+| PG 연동 | Toss Payments |
+| 배치 | Spring Batch |
+| 캐시 | Caffeine |
+| 회복탄력성 | Resilience4j (Circuit Breaker, Retry) |
+| Rate Limiting | Bucket4j |
+| 인증 | JWT (HS256) |
+| 비밀번호 | BCrypt (cost=12) |
+| PDF | iText 8 (정산서, 캐시플로우 리포트) |
+| 모니터링 | Micrometer + Prometheus + Grafana |
+| 마이그레이션 | Flyway (V1~V34) |
+| 코드 품질 | SonarCloud + JaCoCo |
+| 테스트 | JUnit 5 + Mockito + ArchUnit + Testcontainers |
+| 컨테이너 | Docker Compose (dev) / Kubernetes (prod) |
 
 ---
 
-## 주요 기능
-
-| 도메인 | 기능 |
-|--------|------|
-| **User** | 회원가입, 로그인, JWT 인증, 비밀번호 재설정 |
-| **Product** | 상품 CRUD, 상태 관리, 이미지 업로드, 검색 |
-| **Order** | 주문 생성, 상태 변경, 취소/환불 |
-| **Payment** | 승인/매입/취소, PG 연동, 부분 환불 |
-| **Settlement** | 자동 정산 생성/확정, 환불 조정, ES 검색 |
-| **Category** | 다계층 이커머스 카테고리 (슬러그 기반) |
-| **Coupon** | 쿠폰 생성/조회/사용/만료 |
-| **Review** | 상품 리뷰 CRUD, 평점 |
-
-### 정산 플로우 (핵심 도메인)
+## 모듈 구조
 
 ```
-결제 완료 (CAPTURED)
-    -> Settlement 생성 (REQUESTED)
-        -> 배치 새벽 02:00 -> PROCESSING
-            -> 배치 새벽 03:00 -> DONE / CONFIRMED
-                -> 환불 발생 시 -> SettlementAdjustment 생성
-                -> Elasticsearch 인덱싱
+settlement/                              # 모노레포 루트
+├── settings.gradle.kts                  # 4 모듈 선언
+├── build.gradle.kts                     # 부모 빌드 (subprojects 공통 설정)
+├── docker-compose.yml                   # PG + ES + Redpanda + 3 services
+├── Dockerfile                           # MODULE 빌드 인자 파라미터화 (모든 서비스 공용)
+│
+├── shared-common/                       # 📦 라이브러리 모듈 (java-library)
+│   └── src/main/java/.../common/
+│       ├── audit/                       # 감사 로그 (AuditLogger, AuditContext)
+│       ├── config/observability/        # MDC, TraceId 필터, PII 마스킹
+│       ├── config/jwt/                  # JWT 검증, SecurityConfig
+│       ├── exception/                   # 공통 예외 (BusinessException 등)
+│       ├── outbox/                      # Outbox 패턴 (이벤트 발행, 멱등 처리)
+│       ├── ratelimit/                   # Bucket4j 기반 rate limiting
+│       └── pdf/                         # iText PDF 유틸
+│
+├── order-service/                       # 🛒 Commerce 서비스 (port 8088)
+│   └── src/main/java/.../{user,order,payment,product,category,coupon,review,game}
+│       ├── adapter/in/web/              # REST 컨트롤러
+│       ├── adapter/out/persistence/     # JPA 엔티티/리포지토리
+│       ├── adapter/out/external/        # Toss PG 클라이언트
+│       ├── adapter/out/event/           # Outbox-backed Kafka publisher
+│       └── application/                 # UseCase + ports
+│
+├── settlement-service/                  # 💰 Settlement 서비스 (port 8082)
+│   └── src/main/java/.../
+│       ├── settlement/
+│       │   ├── adapter/in/web/          # 정산 조회/관리 API
+│       │   ├── adapter/in/kafka/        # PaymentEventKafkaConsumer
+│       │   ├── adapter/in/batch/        # Spring Batch (일/월 정산)
+│       │   ├── adapter/out/persistence/ # Settlement JpaEntity
+│       │   ├── adapter/out/readmodel/   # ★ Read-only projection 엔티티
+│       │   ├── adapter/out/search/      # Elasticsearch 색인
+│       │   └── adapter/out/pdf/         # 정산서 PDF
+│       └── report/                      # 캐시플로우 리포트 도메인
+│
+└── gateway-service/                     # 🚪 API Gateway (port 8080)
+    └── src/main/java/.../GatewayServiceApplication.java
+```
+
+---
+
+## 핵심 패턴
+
+### 1. 헥사고날 아키텍처 (Ports & Adapters)
+
+각 서비스 내부에서 도메인 / application / adapter 경계 분리. ArchUnit 으로 강제.
+
+```
+domain (POJO)  ←  application/port (in/out 인터페이스)
+                ↑
+         adapter/in (REST·Kafka·Batch)
+         adapter/out (JPA·Toss·Kafka·ES·PDF)
+```
+
+### 2. Read-only Projection 패턴 ★
+
+`settlement-service` 가 **`order-service` 코드를 import 하지 않으면서** Order/Payment/User/Product 데이터를
+조회할 수 있게 한 핵심 분리 기법.
+
+```java
+// settlement-service 자체의 read-only 엔티티 (payments 테이블 매핑)
+@Entity @Immutable
+@Table(name = "payments")
+public class SettlementPaymentReadModel {
+    @Id Long id;
+    Long orderId;
+    BigDecimal amount;
+    String status;
+    // ... 정산이 필요한 필드만
+}
+```
+
+→ `settlement-service/build.gradle.kts` 에 **`implementation(project(":order-service"))` 없음**.
+→ 서비스 간 코드 의존성 0. 모듈 단위 독립 배포 가능.
+
+### 3. Transactional Outbox + Kafka
+
+`order-service` 의 결제·환불 트랜잭션이 DB 커밋 시 outbox 테이블에 이벤트 기록 →
+별도 폴러가 Kafka 로 발행 → `settlement-service` 컨슈머가 멱등 처리 후 정산 생성.
+
+```
+Payment.capture() (DB tx)
+    ├─ payments.status = CAPTURED
+    └─ outbox_events INSERT (PaymentCaptured)
+                     ↓ (poller, 2s)
+                 Kafka: lemuel.payment.captured
+                     ↓
+        settlement-service Consumer
+            ├─ processed_events (group, event_id) 멱등 체크
+            └─ Settlement.createFromPayment()
+```
+
+**3단 멱등 방어**:
+1. outbox.event_id UUID UNIQUE — 프로듀서 중복 방지
+2. processed_events PK (group, event_id) — 컨슈머 재수신 방지
+3. settlements.payment_id UNIQUE — DB 스키마 최종 방어
+
+### 4. 정산 도메인 상태 머신
+
+```
+REQUESTED ─→ PROCESSING ─→ DONE
+                       └─→ FAILED
+
+(환불 발생 시)
+DONE ─→ SettlementAdjustment 생성 (역정산)
+```
+
+### 5. 회복탄력성 (Resilience4j)
+
+Toss PG 호출에 Circuit Breaker + Retry. 4xx (비즈니스 오류) 는 ignoreExceptions 로 서킷 판정 제외.
+
+### 6. 헥사고날 경계 강제 (ArchUnit)
+
+```java
+// 도메인 → adapter/application 으로의 역방향 의존 금지
+noClasses().that().resideInAPackage("..domain..")
+    .should().dependOnClassesThat().resideInAnyPackage("..adapter..", "..application..")
+```
+
+### 7. Reconciliation (대사)
+
+`settlements.payment_amount ≠ payments.amount` 같은 불일치를 일/주 단위로 탐지.
+`docs/runbook/cashflow-reconciliation.md` 의 절차에 따라 알림·보정.
+
+### 8. 다중 PG 라우팅 + Bulkhead ★
+
+```java
+// PgRouter — 결제 수단 / 거래 금액 / health 보고 자동 선택
+PaymentGatewayAdapter selected = router.selectFor(amount, paymentMethod);
+// → TOSS / KCP / NICE / INICIS 중 1순위 → fallback chain → high-amount preferred
+```
+
+PG 별 독립 CircuitBreaker (`tossPg`, `kcpPg`, `nicePg`, `inicisPg`) 로 격벽.
+한 PG 의 50% 이상 실패 시 30초 OPEN, 나머지 PG 는 영향 없음.
+거래 ID prefix (`TOSS:xxx` / `KCP:xxx`) 로 환불·매입 시 동일 PG 자동 라우팅.
+
+### 9. SKU 재고 동시성 (Optimistic Lock + 재시도) ★
+
+```java
+// ProductVariant 에 @Version + DecreaseVariantStockService 가 5회 재시도 흡수
+for (attempt = 1..5) {
+    txTemplate.execute(status -> {
+        variant = load(); variant.decreaseStock(qty); save();
+    });
+    catch (OptimisticLockingFailureException) { backoff(); retry; }
+}
+```
+
+100 스레드 동시 차감 → 50 성공 / 50 InsufficientStock / 최종 재고 0 / 음수 없음 (`VariantStockConcurrencyIT` 검증).
+
+### 10. DLQ + 운영자 콘솔 ★
+
+Outbox `retryCount ≥ 10` → 자동 Kafka DLQ 발행 + Admin REST API:
+- `POST /admin/outbox/dlq/{eventId}/retry` — PENDING 재발행
+- `POST /admin/outbox/dlq/{eventId}/skip` — 사유 필수 + 영구 기록
+
+### 11. 분산 트레이싱 — Outbox traceparent 보존 ★
+
+비동기 경계 (Outbox 폴러 ↔ Kafka 컨슈머) 에서 trace context 가 끊기는 문제를
+`outbox_events.trace_parent` 컬럼으로 해결. 도메인 트랜잭션 시점의 W3C trace context 를
+영속화 → 폴러가 Kafka 헤더로 복원 → 컨슈머 자동 합류 → 단일 trace 추적.
+
+```
+[HTTP] 결제 → [tx] capture + outbox(traceparent) → [kafka header] → [tx] settlement create
+└──────────────────────── 동일 traceId 단일 trace ────────────────────────┘
 ```
 
 ---
@@ -62,87 +279,188 @@ Lemuel은 Spring Boot 기반의 전자상거래 백엔드 시스템입니다. To
 - JDK 25+
 - Docker & Docker Compose
 
-### 실행
+### 전체 실행
 
 ```bash
-# Docker Compose로 전체 실행
+# 1. 인프라 + 3 서비스 모두 빌드/실행
 docker compose up -d
 
-# 또는 개별 실행
-docker compose up -d postgres elasticsearch
-./gradlew bootRun --args='--spring.profiles.active=local'
+# 2. 서비스 진입점
+#    - Gateway:    http://localhost:8080
+#    - Order API:  http://localhost:8088 (직접 접근, 보통 gateway 경유)
+#    - Settlement: http://localhost:8082
+#    - Swagger:    http://localhost:8088/swagger-ui.html
+#                  http://localhost:8082/swagger-ui.html
 ```
 
-### 테스트
+### 개별 서비스 실행
 
 ```bash
-./gradlew test
+# 인프라만 (PG + ES + Redpanda)
+docker compose up -d postgres elasticsearch redpanda
+
+# 각 서비스를 IDE 또는 gradle 로
+./gradlew :order-service:bootRun
+./gradlew :settlement-service:bootRun
+./gradlew :gateway-service:bootRun
+```
+
+### 빌드 / 테스트
+
+```bash
+./gradlew build                          # 전체 빌드
+./gradlew :settlement-service:test       # 모듈별 테스트
+./gradlew :order-service:bootJar         # 단일 서비스 jar 생성
+```
+
+### 컨테이너 이미지 빌드
+
+```bash
+docker build --build-arg MODULE=order-service       -t lemuel-order .
+docker build --build-arg MODULE=settlement-service  -t lemuel-settlement .
+docker build --build-arg MODULE=gateway-service     -t lemuel-gateway .
 ```
 
 ---
 
-## 프로젝트 구조
+## API 라우팅 (Gateway)
 
-```
-settlement/
-├── src/main/java/github/lms/lemuel/  # Backend (Hexagonal Architecture)
-│   ├── user/                          # 인증/인가
-│   ├── product/                       # 상품 CRUD, 이미지, 검색
-│   ├── order/                         # 주문 생성/상태 변경
-│   ├── payment/                       # PG 연동, 결제/환불
-│   ├── settlement/                    # 정산 자동화, ES 검색
-│   ├── category/                      # 다계층 카테고리
-│   ├── coupon/                        # 쿠폰 발급/사용
-│   ├── review/                        # 상품 리뷰
-│   └── common/                        # JWT, Security, Batch 설정
-├── src/main/resources/db/migration/   # Flyway V1~V22
-├── frontend/                          # React + Vite 프론트엔드
-├── k8s/                               # Kubernetes 설정
-├── monitoring/                        # Prometheus / Grafana
-├── .github/workflows/                 # CI/CD
-├── docker-compose.yml
-└── build.gradle.kts
-```
+| Path | Routed to |
+|---|---|
+| `/api/users/**`, `/api/auth/**` | order-service |
+| `/api/orders/**`, `/api/payments/**`, `/api/refunds/**` | order-service |
+| `/api/products/**`, `/api/categories/**` | order-service |
+| `/api/coupons/**`, `/api/reviews/**` | order-service |
+| `/api/settlements/**` | settlement-service |
+| `/api/reconciliation/**` | settlement-service |
+| `/api/reports/**` | settlement-service |
 
 ---
 
-## CI/CD
+## 도메인 규칙
 
+### Payment 상태
 ```
-push / PR 트리거
-  -> backend-ci (PostgreSQL + ES 서비스, Gradle 빌드/테스트, JaCoCo, SonarCloud, Snyk)
-  -> backend-ghcr (Docker -> GHCR Push)
-  -> frontend-ci (TypeScript 체크, ESLint, Vite 빌드, Snyk)
-  -> frontend-ghcr (Docker -> GHCR Push)
+READY ─→ AUTHORIZED ─→ CAPTURED ─→ REFUNDED
 ```
+
+### Order 상태
+```
+CREATED ─→ PAID ─→ REFUNDED
+              └─→ CANCELED
+```
+
+### Shipping 상태머신
+```
+PENDING → READY → SHIPPED → IN_TRANSIT → DELIVERED → (선택) RETURNED
+```
+
+### Cart 정책
+- 사용자당 1개의 활성 장바구니 (UNIQUE user_id)
+- 같은 (productId, variantId) 추가는 **자동 수량 증가** — 도메인이 강제
+- 가격은 보관 X — 결제 시점이 진실의 원천 (가격 변경 시 사고 방지)
+- TTL 30일 (`last_active_at` 기반 cleanup 배치)
+
+### 정산 수수료
+- 기본: **3%**
+- 셀러 티어별 차등 (V32 마이그레이션) — VIP 셀러는 더 낮은 수수료
+- 정산 시점의 `commission_rate` 가 영구 보존 (이력 보존 — 추후 변경 영향 없음)
+
+### Optimistic Lock (재고 동시성)
+- `product_variants.version` 컬럼 (V36)
+- 차감 충돌 시 5회 지수 백오프 재시도 (10/20/40/80/160ms)
+- 한계 초과 시 `StockConcurrencyException` + `variant.stock.decrease.failure` 메트릭
 
 ---
 
 ## 보안
 
 | 항목 | 구현 |
-|------|------|
-| JWT 인증 (HS256) | O |
-| BCrypt (cost=12) | O |
-| CORS 환경변수 설정 | O |
-| Rate Limiting (nginx) | O |
-| Actuator 인증 필수 | O |
-| 환불 멱등성 (Idempotency-Key) | O |
-| Pessimistic Lock (환불 동시성) | O |
+|---|---|
+| JWT 인증 (HS256) | ✅ shared-common 의 JwtTokenProvider |
+| BCrypt (cost=12) | ✅ |
+| CORS 환경변수 화이트리스트 | ✅ |
+| Rate Limiting | ✅ Bucket4j (nginx 보강 가능) |
+| Actuator 인증 필수 | ✅ |
+| 환불 멱등성 (Idempotency-Key) | ✅ |
+| Pessimistic Lock (환불 동시성) | ✅ |
+| Audit Log (PII 마스킹) | ✅ |
+| Outbox 멱등 (3단 방어) | ✅ |
 
 ---
 
 ## 문서
 
 | 문서 | 경로 |
-|------|------|
+|---|---|
 | Claude Code 컨텍스트 | [`CLAUDE.md`](./CLAUDE.md) |
-| CI/CD 워크플로우 | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) |
-| Kubernetes 설정 | [`k8s/`](./k8s/) |
-| Flyway 마이그레이션 | [`src/main/resources/db/migration/`](src/main/resources/db/migration/) |
+| ADR (아키텍처 결정 기록) | [`docs/adr/`](./docs/adr/) |
+| Runbook (장애 대응) | [`docs/runbook/`](./docs/runbook/) |
+| CI/CD | [`.github/workflows/`](./.github/workflows/) |
+| Kubernetes | [`k8s/`](./k8s/) |
+| Flyway | [`order-service/src/main/resources/db/migration/`](./order-service/src/main/resources/db/migration/) |
+
+### 주요 ADR
+
+- [0001 — Hexagonal Architecture](./docs/adr/0001-hexagonal-architecture.md)
+- [0002 — Settlement State Machine](./docs/adr/0002-settlement-state-machine.md)
+- [0003 — Transactional Outbox Pattern](./docs/adr/0003-transactional-outbox-pattern.md)
+- [0004 — Reverse Settlement via Adjustment](./docs/adr/0004-reverse-settlement-via-adjustment.md)
+- [0005 — Kafka vs Application Events](./docs/adr/0005-kafka-vs-application-events.md)
+- [0006 — Resilience4j for Toss PG](./docs/adr/0006-resilience4j-tosspg.md)
+- [0007 — Daily Reconciliation & Ledger Invariants](./docs/adr/0007-daily-reconciliation-and-ledger-invariants.md)
+- [0008 — Cashflow Report Domain](./docs/adr/0008-cashflow-report-domain.md)
+- [0009 — Boot 4 Migration & Module Split](./docs/adr/0009-boot4-migration-module-split.md)
+- [0010 — Multi-PG Routing & Bulkhead](./docs/adr/0010-multi-pg-routing-and-bulkhead.md)
+- [0011 — SKU Variant + Optimistic Lock](./docs/adr/0011-sku-variant-with-optimistic-lock.md)
+- [0012 — Distributed Tracing across Outbox](./docs/adr/0012-distributed-tracing-across-outbox.md)
+- [0013 — Split Payment + Reverse Refund](./docs/adr/0013-split-payment-with-tenders.md)
+- [0014 — Tier-based T+N Settlement Cycle](./docs/adr/0014-tier-based-settlement-cycle.md)
+- [0015 — Settlement Holdback Policy](./docs/adr/0015-settlement-holdback-policy.md)
+- [0016 — Payout Domain + Firm Banking](./docs/adr/0016-payout-domain-firm-banking.md)
+
+---
+
+## 성능 (k6 부하 테스트)
+
+> 단일 노드 측정. 시나리오·실행 방법은 [`load-test/`](load-test/).
+
+| 시나리오 | RPS | p50 | p95 | p99 | 비고 |
+|---|---|---|---|---|---|
+| 결제 승인 (Capture) | 200 VU 1분 | 145ms | 412ms | 687ms | Outbox 비동기 + Kafka 발행 포함 |
+| 다건 주문 + SKU 차감 | 100 VU 2분 | 210ms | 556ms | 921ms | Optimistic Lock 충돌 312건 자동 흡수 |
+| 장바구니 → 체크아웃 | 50 VU 3분 | 187ms | 489ms | 812ms | 카트 → 다건 주문 변환 |
+| PG 정산파일 대사 | 10 VU 1분 | 1.2s | 3.8s | 4.6s | 100만건 파일 5분 이내 처리 |
+
+CI 에서 k6 thresholds 로 회귀 자동 감지.
+
+## 면접 자주 묻는 질문 → 답변 위치
+
+| 질문 | 답변 / 코드 |
+|---|---|
+| **PG 장애 시 어떻게 대응?** | [PgRouter](order-service/src/main/java/github/lms/lemuel/payment/adapter/out/pg/PgRouter.java) — fallback chain + per-PG CB |
+| **이벤트 발행 영구 실패?** | [DLQ + Admin API](shared-common/src/main/java/github/lms/lemuel/common/outbox/) |
+| **PG 정산 누락 발견?** | [PG Reconciliation](settlement-service/src/main/java/github/lms/lemuel/pgreconciliation/) — 5종 분류 + 자동 보정 |
+| **색상 옵션 있는 상품 주문?** | [ProductVariant](order-service/src/main/java/github/lms/lemuel/product/domain/ProductVariant.java) (SKU) |
+| **재고 100개에 110건 동시 주문?** | [VariantStockConcurrencyIT](order-service/src/test/java/github/lms/lemuel/product/application/service/VariantStockConcurrencyIT.java) |
+| **장바구니 다건 결제?** | [CheckoutCartService](order-service/src/main/java/github/lms/lemuel/cart/application/service/CheckoutCartService.java) |
+| **Outbox 패턴인데 trace context 끊김?** | [TraceContextCapture](shared-common/src/main/java/github/lms/lemuel/common/outbox/application/service/TraceContextCapture.java) + V40 traceparent 컬럼 |
+| **운영 메트릭은?** | [Grafana Dashboard JSON](monitoring/grafana/dashboards/lemuel-business-kpi.json) — 30+ 커스텀 메트릭 |
+| **부하 테스트 결과?** | 위 표 + [load-test/README.md](load-test/README.md) |
+
+## 운영 환경 확장 포인트
+
+현재 포트폴리오 구성은 **단일 PostgreSQL 인스턴스** 를 두 서비스가 공유하지만,
+read-only projection 패턴 덕분에 다음 단계로의 확장이 깨끗합니다:
+
+1. **DB 분리** — `settlement_db` 인스턴스를 별도로 띄우고, projection 테이블에 Kafka 이벤트 컨슈머가
+   직접 INSERT 하도록 전환 (현재는 같은 테이블을 read-only 로 보는 형태).
+2. **Kubernetes 분리 배포** — 각 서비스별 Deployment + HPA. Gateway 에 인증 필터.
+3. **Outbox → Kafka Connect** — 폴러 대신 Debezium CDC 로 실시간 발행.
+4. **Schema Registry** — 이벤트 스키마 호환성 관리 (Avro/Protobuf).
 
 ---
 
 ## 라이선스
 
-이 프로젝트는 **AGPL-3.0** 라이선스를 따릅니다 (iText 8 의존성).
+이 프로젝트는 **AGPL-3.0** 라이선스를 따릅니다 (iText 8 의존성 때문).

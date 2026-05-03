@@ -1,0 +1,153 @@
+spring:
+  profiles:
+    active: local
+
+  application:
+    name: lemuel-settlement
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/opslab
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: false
+        default_schema: opslab
+
+  # 마이그레이션은 order-service 가 책임진다 (단일 PG 공유, Phase 5 이후 분리 검토).
+  flyway:
+    enabled: false
+
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=500,expireAfterWrite=600s
+
+  data:
+    elasticsearch:
+      repositories:
+        enabled: false
+
+  elasticsearch:
+    uris: ${ELASTICSEARCH_URIS:http://localhost:9200}
+    username: ${ELASTICSEARCH_USER:}
+    password: ${ELASTICSEARCH_PASSWORD:}
+    connection-timeout: 5s
+    socket-timeout: 60s
+
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: lemuel-settlement
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      properties:
+        isolation.level: read_committed
+    listener:
+      ack-mode: manual_immediate
+      missing-topics-fatal: false
+
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+  batch:
+    jdbc:
+      initialize-schema: always
+    job:
+      enabled: false
+
+server:
+  port: 8082
+  shutdown: graceful
+  tomcat:
+    connection-timeout: 20s
+    threads:
+      max: 200
+      min-spare: 10
+    uri-encoding: UTF-8
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+management:
+  tracing:
+    sampling:
+      probability: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:1.0}
+  otlp:
+    tracing:
+      endpoint: ${MANAGEMENT_OTLP_TRACING_ENDPOINT:}
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    prometheus:
+      enabled: true
+    health:
+      show-details: always
+      show-components: always
+      probes:
+        enabled: true
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true
+    elasticsearch:
+      enabled: false
+    db:
+      enabled: true
+  server:
+    port: 8083
+  metrics:
+    distribution:
+      percentiles-histogram:
+        settlement.batch.creation.duration: true
+        settlement.batch.confirmation.duration: true
+        settlement.batch.adjustment.duration: true
+      percentiles:
+        settlement.batch.creation.duration: 0.5,0.95,0.99
+        settlement.batch.confirmation.duration: 0.5,0.95,0.99
+        settlement.batch.adjustment.duration: 0.5,0.95,0.99
+    tags:
+      application: ${spring.application.name}
+      environment: ${ENVIRONMENT:local}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+app:
+  kafka:
+    enabled: ${APP_KAFKA_ENABLED:false}
+    topic:
+      payment-captured: lemuel.payment.captured
+      payment-refunded: lemuel.payment.refunded
+  search:
+    enabled: false
+  jwt:
+    issuer: ${JWT_ISSUER:lemuel}
+    secret: ${JWT_SECRET:dev-secret-please-override}
+    ttl-seconds: ${JWT_TTL_SECONDS:3600}
+  # 정산금 출금 (Payout) 정책
+  payout:
+    system-daily-limit: ${APP_PAYOUT_SYSTEM_DAILY_LIMIT:1000000000}
+    seller-daily-limit: ${APP_PAYOUT_SELLER_DAILY_LIMIT:100000000}
+    execute-cron: "0 0 4 * * *"
+  holdback:
+    release-cron: "0 0 3 * * *"
+  # 펌뱅킹 mock — 0.0 = 항상 성공. 시연용으로 0.1 (10% 실패) 으로 설정해 운영자 retry 워크플로 검증
+  firmbanking:
+    failure-rate: ${APP_FIRMBANKING_FAILURE_RATE:0.0}
