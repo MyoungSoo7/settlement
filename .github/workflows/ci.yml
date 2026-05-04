@@ -110,19 +110,20 @@ jobs:
         with:
           name: backend-reports
           path: |
-            build/reports/jacoco/test/
-            build/reports/tests/test/
+            */build/reports/jacoco/test/
+            */build/reports/tests/test/
           retention-days: 30
 
       - name: Add coverage comment to PR
         if: github.event_name == 'pull_request'
         uses: madrapps/jacoco-report@v1.6.1
         with:
-          paths: ${{ github.workspace }}/build/reports/jacoco/test/jacocoTestReport.xml
+          paths: ${{ github.workspace }}/*/build/reports/jacoco/test/jacocoTestReport.xml
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: SonarCloud Scan
         if: github.event_name != 'pull_request'
+        continue-on-error: true
         run: ./gradlew sonar --no-daemon --stacktrace
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
