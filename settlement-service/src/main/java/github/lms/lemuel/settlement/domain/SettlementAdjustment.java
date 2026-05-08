@@ -13,7 +13,8 @@ public class SettlementAdjustment {
     private Long id;
     private Long settlementId;
     private Long refundId;             // Refund 엔티티 도입 전까지 nullable 허용
-    private BigDecimal amount;         // 항상 음수 (환불 반영분)
+    private Long chargebackId;         // V44 — 카드사 분쟁 연결. refund_id 와 양립 (둘 중 하나만)
+    private BigDecimal amount;         // 항상 음수 (환불·분쟁 반영분)
     private String status;
     private LocalDate adjustmentDate;
     private LocalDateTime createdAt;
@@ -33,6 +34,29 @@ public class SettlementAdjustment {
         return adjustment;
     }
 
+    /**
+     * 카드사 분쟁(Chargeback) ACCEPTED 시 정산에서 차감하는 음수 row.
+     * V44 chk_adjustment_refund_xor_chargeback 제약과 일치 — chargebackId 만 채우고 refundId 는 NULL.
+     */
+    public static SettlementAdjustment ofChargeback(Long settlementId, Long chargebackId,
+                                                     BigDecimal chargebackAmount,
+                                                     LocalDate adjustmentDate) {
+        if (chargebackId == null || chargebackId <= 0) {
+            throw new IllegalArgumentException("chargebackId 필수");
+        }
+        if (chargebackAmount == null || chargebackAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Chargeback amount must be greater than zero");
+        }
+        SettlementAdjustment adjustment = new SettlementAdjustment();
+        adjustment.settlementId = settlementId;
+        adjustment.chargebackId = chargebackId;
+        adjustment.amount = chargebackAmount.negate();
+        adjustment.status = "PENDING";
+        adjustment.adjustmentDate = adjustmentDate;
+        adjustment.createdAt = LocalDateTime.now();
+        return adjustment;
+    }
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -41,6 +65,9 @@ public class SettlementAdjustment {
 
     public Long getRefundId() { return refundId; }
     public void setRefundId(Long refundId) { this.refundId = refundId; }
+
+    public Long getChargebackId() { return chargebackId; }
+    public void setChargebackId(Long chargebackId) { this.chargebackId = chargebackId; }
 
     public BigDecimal getAmount() { return amount; }
     public void setAmount(BigDecimal amount) { this.amount = amount; }
