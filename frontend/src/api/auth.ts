@@ -21,6 +21,27 @@ export const authApi = {
   },
 
   /**
+   * 데모 자동로그인 (USER / MANAGER / ADMIN)
+   * POST /auth/dev/auto-login?role=USER
+   * 백엔드의 lemuel.demo.enabled=true 일 때만 200, 아니면 404.
+   */
+  autoLogin: async (role: 'USER' | 'MANAGER' | 'ADMIN'): Promise<LoginResponse> => {
+    const response = await api.post<LoginResponse>(
+      `/auth/dev/auto-login?role=${role}`
+    );
+    return response.data;
+  },
+
+  /**
+   * 게스트 둘러보기 토큰 (DB 사용자 없음, 읽기 전용 화면용)
+   * POST /auth/dev/guest
+   */
+  guestLogin: async (): Promise<LoginResponse> => {
+    const response = await api.post<LoginResponse>('/auth/dev/guest');
+    return response.data;
+  },
+
+  /**
    * 로그아웃 (클라이언트 측)
    */
   logout: (): void => {

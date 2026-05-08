@@ -31,6 +31,44 @@ const Login: React.FC = () => {
     }
   };
 
+  /** 데모 자동로그인 (lemuel.demo.enabled=true 일 때만 작동, 그 외 404) */
+  const handleAutoLogin = async (role: 'USER' | 'MANAGER' | 'ADMIN') => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await authApi.autoLogin(role);
+      authApi.saveToken(response);
+      navigate(role === 'USER' ? '/order' : '/admin');
+    } catch (err: any) {
+      if (err.response?.status === 404) {
+        setError('데모 모드가 비활성 상태입니다. (lemuel.demo.enabled=true 필요)');
+      } else {
+        setError(err.response?.data?.message || '자동 로그인에 실패했습니다.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /** 게스트 둘러보기 — 읽기 전용 토큰 발급 후 메인으로 */
+  const handleGuestLogin = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await authApi.guestLogin();
+      authApi.saveToken(response);
+      navigate('/');
+    } catch (err: any) {
+      if (err.response?.status === 404) {
+        setError('게스트 모드가 비활성 상태입니다.');
+      } else {
+        setError(err.response?.data?.message || '게스트 진입에 실패했습니다.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
@@ -110,6 +148,50 @@ const Login: React.FC = () => {
             </button>
           </div>
         </form>
+
+        {/* 데모 / 빠른 진입 — 시연·둘러보기 용도 */}
+        <div className="border-t border-gray-200 pt-6">
+          <p className="text-center text-xs text-gray-500 mb-3">
+            계정 없이 빠르게 둘러보고 싶으시다면 ↓
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => handleAutoLogin('USER')}
+              className="py-2.5 px-3 text-sm font-medium rounded-lg border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 transition disabled:opacity-50"
+            >
+              👤 일반 사용자
+            </button>
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => handleAutoLogin('MANAGER')}
+              className="py-2.5 px-3 text-sm font-medium rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition disabled:opacity-50"
+            >
+              🧑‍💼 매니저
+            </button>
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => handleAutoLogin('ADMIN')}
+              className="py-2.5 px-3 text-sm font-medium rounded-lg border border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100 transition disabled:opacity-50"
+            >
+              👑 관리자
+            </button>
+            <button
+              type="button"
+              disabled={loading}
+              onClick={handleGuestLogin}
+              className="py-2.5 px-3 text-sm font-medium rounded-lg border border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100 transition disabled:opacity-50"
+            >
+              🔍 게스트 둘러보기
+            </button>
+          </div>
+          <p className="text-center text-[11px] text-gray-400 mt-3">
+            데모 계정은 운영 환경에서는 비활성됩니다.
+          </p>
+        </div>
 
       </div>
     </div>
