@@ -21,6 +21,7 @@
 | [0015](0015-settlement-holdback-policy.md) | 정산 보류 — 등급별 차등 + 자동 해제 | Accepted |
 | [0016](0016-payout-domain-firm-banking.md) | Payout (출금) — 정산 사이클의 종착점 | Accepted |
 | [0017](0017-kafka-consumer-dlt-and-replay.md) | Kafka 컨슈머 DLT + 운영자 Replay | Accepted |
+| [0018](0018-chargeback-domain.md) | Chargeback (카드사 분쟁) 도메인 | Accepted |
 
 ## 규칙
 
