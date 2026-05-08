@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"ls .omc 2>$null; ls .claude 2>$null\",\"description\":\"Check for OMC and Claude config directories\"}",
+  "error": "Exit code 1\n/usr/bin/bash: line 1: $null: ambiguous redirect\n/usr/bin/bash: line 1: $null: ambiguous redirect",
+  "timestamp": "2026-05-08T01:45:19.919Z",
+  "retry_count": 1
+}

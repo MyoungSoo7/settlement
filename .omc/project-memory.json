@@ -1,0 +1,562 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1778204677985,
+  "projectRoot": "C:\\Users\\INTERWEB\\Documents\\GitHub\\settlement",
+  "techStack": {
+    "languages": [
+      {
+        "name": "Kotlin",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "build.gradle.kts"
+        ]
+      }
+    ],
+    "frameworks": [],
+    "packageManager": "gradle",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": null,
+    "lintCommand": null,
+    "devCommand": null,
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "docs"
+    ],
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "build": {
+      "path": "build",
+      "purpose": "Build output",
+      "fileCount": 0,
+      "lastAccessed": 1778204677938,
+      "keyFiles": []
+    },
+    "demo": {
+      "path": "demo",
+      "purpose": null,
+      "fileCount": 7,
+      "lastAccessed": 1778204677939,
+      "keyFiles": [
+        "postman-collection.json",
+        "postman-environment.json",
+        "README.md",
+        "reset.sh",
+        "sample-pg-reconciliation.csv"
+      ]
+    },
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 30,
+      "lastAccessed": 1778204677940,
+      "keyFiles": [
+        "api-architect.md",
+        "ARCHITECTURE.md",
+        "BIBE-VIEW.md",
+        "BIBE.md",
+        "CI_CONFIGURATION.md"
+      ]
+    },
+    "frontend": {
+      "path": "frontend",
+      "purpose": null,
+      "fileCount": 17,
+      "lastAccessed": 1778204677941,
+      "keyFiles": [
+        "Dockerfile",
+        "index.html",
+        "nginx.conf",
+        "package-lock.json",
+        "package.json"
+      ]
+    },
+    "gateway-service": {
+      "path": "gateway-service",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1778204677942,
+      "keyFiles": [
+        "build.gradle.kts"
+      ]
+    },
+    "gradle": {
+      "path": "gradle",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1778204677942,
+      "keyFiles": []
+    },
+    "https": {
+      "path": "https",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1778204677944,
+      "keyFiles": [
+        "requests.http"
+      ]
+    },
+    "k8s": {
+      "path": "k8s",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1778204677950,
+      "keyFiles": []
+    },
+    "load-test": {
+      "path": "load-test",
+      "purpose": null,
+      "fileCount": 5,
+      "lastAccessed": 1778204677953,
+      "keyFiles": [
+        "cart-checkout.js",
+        "multi-item-order.js",
+        "payment-confirm.js",
+        "pg-reconciliation.js",
+        "README.md"
+      ]
+    },
+    "memory": {
+      "path": "memory",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1778204677960,
+      "keyFiles": [
+        "MEMORY.md",
+        "project_settlement.md"
+      ]
+    },
+    "monitoring": {
+      "path": "monitoring",
+      "purpose": null,
+      "fileCount": 6,
+      "lastAccessed": 1778204677974,
+      "keyFiles": [
+        "alert-rules.yml",
+        "alertmanager.yml",
+        "docker-compose.yml",
+        "prometheus.yml",
+        "tempo.yaml"
+      ]
+    },
+    "order-service": {
+      "path": "order-service",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1778204677977,
+      "keyFiles": [
+        "build.gradle.kts"
+      ]
+    },
+    "settlement-service": {
+      "path": "settlement-service",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1778204677978,
+      "keyFiles": [
+        "build.gradle.kts"
+      ]
+    },
+    "shared-common": {
+      "path": "shared-common",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1778204677978,
+      "keyFiles": [
+        "build.gradle.kts"
+      ]
+    },
+    "frontend\\dist": {
+      "path": "frontend\\dist",
+      "purpose": "Distribution/build output",
+      "fileCount": 1,
+      "lastAccessed": 1778204677980,
+      "keyFiles": [
+        "index.html"
+      ]
+    },
+    "gateway-service\\build": {
+      "path": "gateway-service\\build",
+      "purpose": "Build output",
+      "fileCount": 1,
+      "lastAccessed": 1778204677981,
+      "keyFiles": [
+        "resolvedMainClassName"
+      ]
+    },
+    "gateway-service\\src": {
+      "path": "gateway-service\\src",
+      "purpose": "Source code",
+      "fileCount": 0,
+      "lastAccessed": 1778204677981,
+      "keyFiles": []
+    },
+    "order-service\\build": {
+      "path": "order-service\\build",
+      "purpose": "Build output",
+      "fileCount": 1,
+      "lastAccessed": 1778204677983,
+      "keyFiles": [
+        "resolvedMainClassName"
+      ]
+    },
+    "order-service\\src": {
+      "path": "order-service\\src",
+      "purpose": "Source code",
+      "fileCount": 0,
+      "lastAccessed": 1778204677983,
+      "keyFiles": []
+    },
+    "settlement-service\\build": {
+      "path": "settlement-service\\build",
+      "purpose": "Build output",
+      "fileCount": 1,
+      "lastAccessed": 1778204677984,
+      "keyFiles": [
+        "resolvedMainClassName"
+      ]
+    },
+    "settlement-service\\src": {
+      "path": "settlement-service\\src",
+      "purpose": "Source code",
+      "fileCount": 0,
+      "lastAccessed": 1778204677984,
+      "keyFiles": []
+    },
+    "shared-common\\build": {
+      "path": "shared-common\\build",
+      "purpose": "Build output",
+      "fileCount": 0,
+      "lastAccessed": 1778204677985,
+      "keyFiles": []
+    },
+    "shared-common\\src": {
+      "path": "shared-common\\src",
+      "purpose": "Source code",
+      "fileCount": 0,
+      "lastAccessed": 1778204677985,
+      "keyFiles": []
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "settlement-service\\src\\main\\java\\github\\lms\\lemuel\\settlement\\adapter\\in\\kafka\\KafkaErrorHandlerConfig.java",
+      "accessCount": 4,
+      "lastAccessed": 1778205751125,
+      "type": "file"
+    },
+    {
+      "path": "settlement-service\\src\\test\\java\\github\\lms\\lemuel\\settlement\\adapter\\in\\kafka\\DlqMessageParsingTest.java",
+      "accessCount": 4,
+      "lastAccessed": 1778216986373,
+      "type": "file"
+    },
+    {
+      "path": "settlement-service\\src\\test\\java\\github\\lms\\lemuel\\settlement\\adapter\\in\\kafka\\DlqEndToEndTest.java",
+      "accessCount": 4,
+      "lastAccessed": 1778217003028,
+      "type": "file"
+    },
+    {
+      "path": "settlement-service",
+      "accessCount": 3,
+      "lastAccessed": 1778205409623,
+      "type": "directory"
+    },
+    {
+      "path": "settlement-service\\src\\main\\java\\github\\lms\\lemuel\\settlement\\adapter\\in\\kafka\\PaymentEventKafkaConsumer.java",
+      "accessCount": 3,
+      "lastAccessed": 1778205558066,
+      "type": "file"
+    },
+    {
+      "path": "settlement-service\\src\\main\\java\\github\\lms\\lemuel\\settlement\\domain\\SettlementAdjustment.java",
+      "accessCount": 3,
+      "lastAccessed": 1778217398150,
+      "type": "file"
+    },
+    {
+      "path": "shared-common\\src\\main\\java\\github\\lms\\lemuel\\common\\config\\jwt\\SecurityConfig.java",
+      "accessCount": 3,
+      "lastAccessed": 1778220317587,
+      "type": "file"
+    },
+    {
+      "path": "docs\\adr\\README.md",
+      "accessCount": 3,
+      "lastAccessed": 1778225727407,
+      "type": "file"
+    },
+    {
+      "path": "shared-common\\src\\main\\java\\github\\lms\\lemuel\\common\\audit\\domain\\AuditAction.java",
+      "accessCount": 2,
+      "lastAccessed": 1778205452908,
+      "type": "file"
+    },
+    {
+      "path": "shared-common\\src\\main\\java\\github\\lms\\lemuel\\common\\config\\kafka\\KafkaConfig.java",
+      "accessCount": 2,
+      "lastAccessed": 1778205466537,
+      "type": "file"
+    },
+    {
+      "path": "settlement-service\\src\\main\\resources\\application.yml",
+      "accessCount": 2,
+      "lastAccessed": 1778205646509,
+      "type": "file"
+    },
+    {
+      "path": "settlement-service\\src\\main\\java\\github\\lms\\lemuel\\settlement\\adapter\\in\\kafka\\DlqReplayService.java",
+      "accessCount": 2,
+      "lastAccessed": 1778216961988,
+      "type": "file"
+    },
+    {
+      "path": "monitoring\\alert-rules.yml",
+      "accessCount": 2,
+      "lastAccessed": 1778217203603,
+      "type": "file"
+    },
+    {
+      "path": "settlement-service\\src\\main\\java\\github\\lms\\lemuel\\settlement\\adapter\\out\\persistence\\SettlementAdjustmentJpaEntity.java",
+      "accessCount": 2,
+      "lastAccessed": 1778220325953,
+      "type": "file"
+    },
+    {
+      "path": "settlement-service\\src\\main\\java\\github\\lms\\lemuel\\settlement\\adapter\\out\\persistence\\SettlementAdjustmentPersistenceAdapter.java",
+      "accessCount": 2,
+      "lastAccessed": 1778220337414,
+      "type": "file"
+    },
+    {
+      "path": "settlement-service\\src\\main\\java\\github\\lms\\lemuel\\settlement\\adapter\\in\\batch\\SettlementJobConfig.java",
+      "accessCount": 1,
+      "lastAccessed": 1778204800716,
+      "type": "file"
+    },
+    {
+      "path": "settlement-service\\src\\main\\java\\github\\lms\\lemuel\\settlement\\adapter\\in\\batch\\SettlementScheduler.java",
+      "accessCount": 1,
+      "lastAccessed": 1778204802442,
+      "type": "file"
+    },
+    {
+      "path": "settlement-service\\src\\main\\java\\github\\lms\\lemuel\\settlement\\domain\\Settlement.java",
+      "accessCount": 1,
+      "lastAccessed": 1778204809281,
+      "type": "file"
+    },
+    {
+      "path": "settlement-service\\src\\main\\java\\github\\lms\\lemuel\\settlement\\domain\\SettlementStatus.java",
+      "accessCount": 1,
+      "lastAccessed": 1778204810161,
+      "type": "file"
+    },
+    {
+      "path": "settlement-service\\src\\main\\java\\github\\lms\\lemuel\\payout\\application\\service\\PayoutService.java",
+      "accessCount": 1,
+      "lastAccessed": 1778204811080,
+      "type": "file"
+    },
+    {
+      "path": "settlement-service\\src\\main\\java\\github\\lms\\lemuel\\payout\\domain\\Payout.java",
+      "accessCount": 1,
+      "lastAccessed": 1778204812045,
+      "type": "file"
+    },
+    {
+      "path": "order-service\\src\\main\\resources\\application.yml",
+      "accessCount": 1,
+      "lastAccessed": 1778205209297,
+      "type": "file"
+    },
+    {
+      "path": "settlement-service\\src\\main\\java\\github\\lms\\lemuel\\payout\\adapter\\in\\web\\PayoutAdminController.java",
+      "accessCount": 1,
+      "lastAccessed": 1778205411782,
+      "type": "file"
+    },
+    {
+      "path": "order-service\\src\\main\\resources\\db\\migration\\V34__audit_logs.sql",
+      "accessCount": 1,
+      "lastAccessed": 1778205422857,
+      "type": "file"
+    },
+    {
+      "path": "shared-common\\src\\main\\java\\github\\lms\\lemuel\\common\\audit\\application\\AuditLogger.java",
+      "accessCount": 1,
+      "lastAccessed": 1778205423982,
+      "type": "file"
+    },
+    {
+      "path": "shared-common\\src\\main\\java\\github\\lms\\lemuel\\common\\config\\jwt\\JwtAuthenticationFilter.java",
+      "accessCount": 1,
+      "lastAccessed": 1778205429517,
+      "type": "file"
+    },
+    {
+      "path": "settlement-service\\src\\main\\java\\github\\lms\\lemuel\\settlement\\adapter\\in\\web\\admin\\DlqAdminController.java",
+      "accessCount": 1,
+      "lastAccessed": 1778205629486,
+      "type": "file"
+    },
+    {
+      "path": "docs\\adr\\0016-payout-domain-firm-banking.md",
+      "accessCount": 1,
+      "lastAccessed": 1778217084726,
+      "type": "file"
+    },
+    {
+      "path": "docs\\adr\\0017-kafka-consumer-dlt-and-replay.md",
+      "accessCount": 1,
+      "lastAccessed": 1778217141941,
+      "type": "file"
+    },
+    {
+      "path": "monitoring\\prometheus.yml",
+      "accessCount": 1,
+      "lastAccessed": 1778217163966,
+      "type": "file"
+    },
+    {
+      "path": "monitoring\\docker-compose.yml",
+      "accessCount": 1,
+      "lastAccessed": 1778217164373,
+      "type": "file"
+    },
+    {
+      "path": "order-service\\src\\main\\resources\\db\\migration\\V4__refunds_and_settlement_adjustments.sql",
+      "accessCount": 1,
+      "lastAccessed": 1778217251658,
+      "type": "file"
+    },
+    {
+      "path": "order-service\\src\\main\\resources\\db\\migration\\V25__relax_settlement_adjustment_refund_fk.sql",
+      "accessCount": 1,
+      "lastAccessed": 1778217274509,
+      "type": "file"
+    },
+    {
+      "path": "order-service\\src\\main\\resources\\db\\migration\\V44__chargebacks.sql",
+      "accessCount": 1,
+      "lastAccessed": 1778217309346,
+      "type": "file"
+    },
+    {
+      "path": "settlement-service\\src\\main\\java\\github\\lms\\lemuel\\chargeback\\domain\\ChargebackStatus.java",
+      "accessCount": 1,
+      "lastAccessed": 1778217318224,
+      "type": "file"
+    },
+    {
+      "path": "settlement-service\\src\\main\\java\\github\\lms\\lemuel\\chargeback\\domain\\ChargebackReason.java",
+      "accessCount": 1,
+      "lastAccessed": 1778217329878,
+      "type": "file"
+    },
+    {
+      "path": "settlement-service\\src\\main\\java\\github\\lms\\lemuel\\chargeback\\domain\\ChargebackSource.java",
+      "accessCount": 1,
+      "lastAccessed": 1778217336815,
+      "type": "file"
+    },
+    {
+      "path": "settlement-service\\src\\main\\java\\github\\lms\\lemuel\\chargeback\\domain\\Chargeback.java",
+      "accessCount": 1,
+      "lastAccessed": 1778217374208,
+      "type": "file"
+    },
+    {
+      "path": "settlement-service\\src\\test\\java\\github\\lms\\lemuel\\chargeback\\domain\\ChargebackTest.java",
+      "accessCount": 1,
+      "lastAccessed": 1778217431162,
+      "type": "file"
+    },
+    {
+      "path": "settlement-service\\src\\main\\java\\github\\lms\\lemuel\\payout\\adapter\\out\\persistence\\PayoutJpaEntity.java",
+      "accessCount": 1,
+      "lastAccessed": 1778220133794,
+      "type": "file"
+    },
+    {
+      "path": "settlement-service\\src\\main\\java\\github\\lms\\lemuel\\payout\\adapter\\out\\persistence\\PayoutPersistenceAdapter.java",
+      "accessCount": 1,
+      "lastAccessed": 1778220134910,
+      "type": "file"
+    },
+    {
+      "path": "settlement-service\\src\\main\\java\\github\\lms\\lemuel\\chargeback\\application\\port\\in\\OpenChargebackUseCase.java",
+      "accessCount": 1,
+      "lastAccessed": 1778220179041,
+      "type": "file"
+    },
+    {
+      "path": "settlement-service\\src\\main\\java\\github\\lms\\lemuel\\chargeback\\application\\port\\in\\DecideChargebackUseCase.java",
+      "accessCount": 1,
+      "lastAccessed": 1778220190220,
+      "type": "file"
+    },
+    {
+      "path": "settlement-service\\src\\main\\java\\github\\lms\\lemuel\\chargeback\\application\\port\\out\\LoadChargebackPort.java",
+      "accessCount": 1,
+      "lastAccessed": 1778220199360,
+      "type": "file"
+    },
+    {
+      "path": "settlement-service\\src\\main\\java\\github\\lms\\lemuel\\chargeback\\application\\port\\out\\SaveChargebackPort.java",
+      "accessCount": 1,
+      "lastAccessed": 1778220204237,
+      "type": "file"
+    },
+    {
+      "path": "settlement-service\\src\\main\\java\\github\\lms\\lemuel\\chargeback\\application\\service\\ChargebackService.java",
+      "accessCount": 1,
+      "lastAccessed": 1778220241857,
+      "type": "file"
+    },
+    {
+      "path": "settlement-service\\src\\main\\java\\github\\lms\\lemuel\\chargeback\\adapter\\out\\persistence\\ChargebackJpaEntity.java",
+      "accessCount": 1,
+      "lastAccessed": 1778220261427,
+      "type": "file"
+    },
+    {
+      "path": "settlement-service\\src\\main\\java\\github\\lms\\lemuel\\chargeback\\adapter\\out\\persistence\\SpringDataChargebackRepository.java",
+      "accessCount": 1,
+      "lastAccessed": 1778220267839,
+      "type": "file"
+    },
+    {
+      "path": "settlement-service\\src\\main\\java\\github\\lms\\lemuel\\chargeback\\adapter\\out\\persistence\\ChargebackPersistenceAdapter.java",
+      "accessCount": 1,
+      "lastAccessed": 1778220282891,
+      "type": "file"
+    },
+    {
+      "path": "settlement-service\\src\\main\\java\\github\\lms\\lemuel\\chargeback\\adapter\\in\\web\\ChargebackAdminController.java",
+      "accessCount": 1,
+      "lastAccessed": 1778220309005,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}
