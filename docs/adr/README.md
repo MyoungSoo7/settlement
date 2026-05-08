@@ -20,6 +20,7 @@
 | [0014](0014-tier-based-settlement-cycle.md) | SellerTier 기반 T+N 영업일 정산 주기 | Accepted |
 | [0015](0015-settlement-holdback-policy.md) | 정산 보류 — 등급별 차등 + 자동 해제 | Accepted |
 | [0016](0016-payout-domain-firm-banking.md) | Payout (출금) — 정산 사이클의 종착점 | Accepted |
+| [0017](0017-kafka-consumer-dlt-and-replay.md) | Kafka 컨슈머 DLT + 운영자 Replay | Accepted |
 
 ## 규칙
 

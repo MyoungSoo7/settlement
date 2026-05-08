@@ -41,4 +41,33 @@ public class KafkaConfig {
                 .config("retention.ms", String.valueOf(7L * 24 * 60 * 60 * 1000))
                 .build();
     }
+
+    /**
+     * Dead Letter Topic — payment.captured 컨슈머가 재시도 끝에 처리 실패한 메시지가 격리되는 토픽.
+     *
+     * <p>설계 선택:
+     * <ul>
+     *   <li>partitions=3 — 원본과 동일. key 기반 순서를 replay 시에도 유지.</li>
+     *   <li>retention=30d — 원본(7d)보다 길게. 운영자가 사후 분석·재처리할 시간 확보.</li>
+     *   <li>이름 규칙 {@code .DLT} — Spring Kafka {@link
+     *       org.springframework.kafka.listener.DeadLetterPublishingRecoverer} 기본 명명 규칙.</li>
+     * </ul>
+     */
+    @Bean
+    public NewTopic paymentCapturedDltTopic() {
+        return TopicBuilder.name("lemuel.payment.captured.DLT")
+                .partitions(3)
+                .replicas(1)
+                .config("retention.ms", String.valueOf(30L * 24 * 60 * 60 * 1000)) // 30일
+                .build();
+    }
+
+    @Bean
+    public NewTopic paymentRefundedDltTopic() {
+        return TopicBuilder.name("lemuel.payment.refunded.DLT")
+                .partitions(3)
+                .replicas(1)
+                .config("retention.ms", String.valueOf(30L * 24 * 60 * 60 * 1000))
+                .build();
+    }
 }

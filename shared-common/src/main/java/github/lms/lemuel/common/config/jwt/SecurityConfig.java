@@ -128,8 +128,9 @@ public class SecurityConfig {
                         .requestMatchers("/users/admin/all").hasRole("ADMIN")
                         // 관리자 전용 카테고리 API
                         .requestMatchers("/admin/categories/**").hasRole("ADMIN")
-                        // 운영자 전용 — Outbox DLQ / PG 라우팅 / PG 정산파일 대사
+                        // 운영자 전용 — Outbox DLQ / Kafka DLT / PG 라우팅 / PG 정산파일 대사
                         .requestMatchers("/admin/outbox/**").hasRole("ADMIN")
+                        .requestMatchers("/admin/dlq/**").hasRole("ADMIN")
                         .requestMatchers("/admin/pg/**").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers("/admin/reconciliation/**").hasAnyRole("ADMIN", "MANAGER")
                         // Payout 콘솔 — 송금 권한은 ADMIN 만
