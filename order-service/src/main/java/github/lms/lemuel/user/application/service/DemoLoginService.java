@@ -38,8 +38,9 @@ public class DemoLoginService implements DemoLoginUseCase {
 
     @Override
     @Transactional
-    public LoginUseCase.LoginResult autoLogin(UserRole role) {
-        if (role == null) role = UserRole.USER;
+    public LoginUseCase.LoginResult autoLogin(UserRole requestedRole) {
+        // 파라미터 재할당 대신 새 final 변수에 담아 람다 캡처 가능하게 함.
+        final UserRole role = requestedRole == null ? UserRole.USER : requestedRole;
         String email = "demo-" + role.name().toLowerCase() + "@lemuel.local";
 
         User user = loadUserPort.findByEmail(email)
