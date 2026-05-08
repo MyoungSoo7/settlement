@@ -22,8 +22,13 @@ public class SettlementAdjustmentJpaEntity {
     @Column(name = "settlement_id", nullable = false)
     private Long settlementId;
 
-    @Column(name = "refund_id", nullable = false)
+    /** V25 에서 nullable 로 완화. Chargeback 경로는 NULL. */
+    @Column(name = "refund_id")
     private Long refundId;
+
+    /** V44 — 카드사 분쟁 연결. refund_id 와 양립 (둘 중 하나만 채워짐). */
+    @Column(name = "chargeback_id")
+    private Long chargebackId;
 
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal amount;

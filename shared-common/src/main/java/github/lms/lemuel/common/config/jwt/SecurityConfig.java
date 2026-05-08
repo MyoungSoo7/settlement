@@ -135,6 +135,8 @@ public class SecurityConfig {
                         .requestMatchers("/admin/reconciliation/**").hasAnyRole("ADMIN", "MANAGER")
                         // Payout 콘솔 — 송금 권한은 ADMIN 만
                         .requestMatchers("/admin/payouts/**").hasRole("ADMIN")
+                        // Chargeback 콘솔 — 셀러 환수 결정은 ADMIN 만
+                        .requestMatchers("/admin/chargebacks/**").hasRole("ADMIN")
                         // 정산 관련 API (관리자·매니저)
                         .requestMatchers("/settlements/**").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers("/api/settlements/**").hasAnyRole("ADMIN", "MANAGER")
