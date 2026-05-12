@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"ls .omc 2>$null; ls .claude 2>$null\",\"description\":\"Check for OMC and Claude config directories\"}",
-  "error": "Exit code 1\n/usr/bin/bash: line 1: $null: ambiguous redirect\n/usr/bin/bash: line 1: $null: ambiguous redirect",
-  "timestamp": "2026-05-08T01:45:19.919Z",
+  "tool_input_preview": "{\"command\":\"ls -la \\\"C:\\\\Users\\\\INTERWEB\\\\Documents\\\\GitHub\\\\settlement\\\\settlement-service\\\\src\\\\main\\\\resources\\\\\\\" 2>/dev/null || echo \\\"Not found\\\"; find . -name \\\"V4*.sql\\\" 2>/dev/null | head -20...",
+  "error": "Exit code 2\n/usr/bin/bash: eval: line 1: unexpected EOF while looking for matching `\"'",
+  "timestamp": "2026-05-12T00:52:14.788Z",
   "retry_count": 1
 }
