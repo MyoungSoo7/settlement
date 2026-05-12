@@ -11,11 +11,10 @@
 [![Hexagonal](https://img.shields.io/badge/Architecture-Hexagonal-purple)](docs/diagrams/architecture.md)
 [![ArchUnit Enforced](https://img.shields.io/badge/ArchUnit-Enforced-success)](order-service/src/test/java/github/lms/lemuel/architecture/HexagonalArchitectureTest.java)
 
-## 면접관용 빠른 둘러보기
 
 | 보고 싶은 것 | 한 번에 가는 곳 |
 |---|---|
-| **📄 1장 요약 (이력서 첨부용)** | **[PORTFOLIO.md](PORTFOLIO.md)** |
+| **📄 1장 요약 ** | **[PORTFOLIO.md](PORTFOLIO.md)** |
 | **📺 3분 시연 영상 스크립트** | [docs/DEMO.md](docs/DEMO.md) |
 | **🎬 시연용 Postman + 시드** | [demo/](demo/) — `./demo/seed.sh` 한 번이면 녹화 준비 끝 |
 | **시스템 전체 구조** | [docs/diagrams/architecture.md](docs/diagrams/architecture.md) |
