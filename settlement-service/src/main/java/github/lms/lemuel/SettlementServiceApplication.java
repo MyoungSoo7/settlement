@@ -20,6 +20,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         "github.lms.lemuel.settlement",
         "github.lms.lemuel.pgreconciliation",
         "github.lms.lemuel.payout",
+        "github.lms.lemuel.chargeback",
+        "github.lms.lemuel.ledger",
         "github.lms.lemuel.report",
         "github.lms.lemuel.common",
     }
