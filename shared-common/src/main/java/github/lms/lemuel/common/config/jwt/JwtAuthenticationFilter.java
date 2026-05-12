@@ -69,6 +69,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             || path.startsWith("/swagger-ui")
             || path.startsWith("/v3/api-docs")
             || (path.equals("/auth/login"))
+            || (path.startsWith("/auth/dev/"))   // 데모/게스트 토큰 발급 (lemuel.demo.enabled 로 컨트롤러에서 차단)
             || (path.equals("/users"));
     }
 }

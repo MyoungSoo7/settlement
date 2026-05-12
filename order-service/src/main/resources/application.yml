@@ -271,3 +271,8 @@ resilience4j:
         baseConfig: pgDefault
 
 
+
+# 데모 자동로그인 / 게스트 토글. 운영 false, dev/demo true.
+lemuel:
+  demo:
+    enabled: ${LEMUEL_DEMO_ENABLED:false}

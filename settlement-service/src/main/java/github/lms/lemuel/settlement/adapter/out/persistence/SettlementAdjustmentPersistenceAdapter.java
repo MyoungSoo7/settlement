@@ -27,6 +27,7 @@ public class SettlementAdjustmentPersistenceAdapter implements SaveSettlementAdj
         entity.setId(domain.getId());
         entity.setSettlementId(domain.getSettlementId());
         entity.setRefundId(domain.getRefundId());
+        entity.setChargebackId(domain.getChargebackId());
         entity.setAmount(domain.getAmount());
         entity.setStatus(domain.getStatus() != null ? domain.getStatus() : "PENDING");
         entity.setAdjustmentDate(domain.getAdjustmentDate());
@@ -41,6 +42,7 @@ public class SettlementAdjustmentPersistenceAdapter implements SaveSettlementAdj
         domain.setId(entity.getId());
         domain.setSettlementId(entity.getSettlementId());
         domain.setRefundId(entity.getRefundId());
+        domain.setChargebackId(entity.getChargebackId());
         domain.setAmount(entity.getAmount());
         domain.setStatus(entity.getStatus());
         domain.setAdjustmentDate(entity.getAdjustmentDate());

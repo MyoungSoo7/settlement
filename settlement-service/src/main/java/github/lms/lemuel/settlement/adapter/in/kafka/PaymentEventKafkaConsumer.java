@@ -27,6 +27,14 @@ import java.util.UUID;
  *   1. outbox event_id UUID unique — 프로듀서 측 중복 발행 방지
  *   2. processed_events(consumer_group, event_id) PK — 컨슈머 측 재수신 방지
  *   3. settlements.payment_id UNIQUE (V3) — 스키마 수준 최종 방어
+ *
+ * <p>장애 처리 (DLT):
+ * <ul>
+ *   <li>예외가 throw 되면 ack 하지 않고 {@link KafkaErrorHandlerConfig} 의 DefaultErrorHandler 로 위임.</li>
+ *   <li>일시적 예외 → ExponentialBackOff(2s ×2, 3회) 재시도 → 끝나면 DLT</li>
+ *   <li>독성 메시지 (JsonProcessingException, IllegalArgumentException, IllegalStateException)
+ *       → 재시도 없이 즉시 DLT — 같은 파티션의 후속 메시지 stall 방지</li>
+ * </ul>
  */
 @Component
 @ConditionalOnProperty(name = "app.kafka.enabled", havingValue = "true")
@@ -71,37 +79,39 @@ public class PaymentEventKafkaConsumer {
             return;
         }
 
+        // 2. 페이로드 파싱 — JsonProcessingException 은 즉시 DLT (재시도 무의미)
+        JsonNode node;
         try {
-            // 2. 페이로드 파싱
-            JsonNode node = objectMapper.readTree(record.value());
-            Long paymentId = node.get("paymentId").asLong();
-            Long orderId = node.get("orderId").asLong();
-
-            // 3. 금액은 이벤트에 없으면 조회해야 하지만, 정산 서비스가 payment_id 로 조회 가능 —
-            //    이벤트 스키마 확장 시 amount 를 outbox 페이로드에 포함시키는 것이 더 안전.
-            //    현재 단순화를 위해 관례적으로 payload 의 amount 필드 존재 여부로 분기.
-            BigDecimal amount = node.has("amount")
-                    ? new BigDecimal(node.get("amount").asText())
-                    : BigDecimal.ZERO;  // 0 이면 정산 서비스가 이후 보강 책임
-
-            // 4. 정산 생성 (내부에서 payment_id unique 로 추가 중복 방어)
-            createSettlementFromPaymentUseCase.createSettlementFromPayment(paymentId, orderId, amount);
-
-            // 5. 처리 기록
-            processedEventRepository.save(new ProcessedEventJpaEntity(
-                    CONSUMER_GROUP,
-                    eventId,
-                    "PaymentCaptured"
-            ));
-
-            log.info("Settlement created from Kafka event. eventId={}, paymentId={}", eventId, paymentId);
-            ack.acknowledge();
-        } catch (Exception e) {
-            // ack 하지 않음 → 재전달 (Kafka 재배달 + 위 멱등 체크로 안전)
-            log.error("Failed to process payment captured event. eventId={}, error={}",
-                    eventId, e.getMessage(), e);
-            throw new RuntimeException("Kafka consumer failed", e);
+            node = objectMapper.readTree(record.value());
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            log.error("Invalid JSON payload (will go to DLT). eventId={}, payload={}", eventId, record.value());
+            throw new IllegalArgumentException("Invalid JSON payload, eventId=" + eventId, e);
         }
+
+        Long paymentId = node.get("paymentId").asLong();
+        Long orderId = node.get("orderId").asLong();
+
+        // 3. 금액은 이벤트에 없으면 조회해야 하지만, 정산 서비스가 payment_id 로 조회 가능 —
+        //    이벤트 스키마 확장 시 amount 를 outbox 페이로드에 포함시키는 것이 더 안전.
+        //    현재 단순화를 위해 관례적으로 payload 의 amount 필드 존재 여부로 분기.
+        BigDecimal amount = node.has("amount")
+                ? new BigDecimal(node.get("amount").asText())
+                : BigDecimal.ZERO;  // 0 이면 정산 서비스가 이후 보강 책임
+
+        // 4. 정산 생성 (내부에서 payment_id unique 로 추가 중복 방어)
+        //    — 도메인 예외(IllegalArgumentException/IllegalStateException) 는 DefaultErrorHandler 가
+        //    재시도 없이 즉시 DLT 로 라우팅. 일시적 예외(DB 락, IO) 는 ExponentialBackOff 재시도.
+        createSettlementFromPaymentUseCase.createSettlementFromPayment(paymentId, orderId, amount);
+
+        // 5. 처리 기록 — 재처리 시 (group, event_id) 멱등 보장
+        processedEventRepository.save(new ProcessedEventJpaEntity(
+                CONSUMER_GROUP,
+                eventId,
+                "PaymentCaptured"
+        ));
+
+        log.info("Settlement created from Kafka event. eventId={}, paymentId={}", eventId, paymentId);
+        ack.acknowledge();
     }
 
     private static UUID extractEventId(ConsumerRecord<String, String> record) {
