@@ -201,6 +201,10 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # Dockerfile 의 ARG MODULE 가 비어있으면 'gradle ::bootJar' 처럼 빈 세그먼트가 되어 빌드 실패.
+          # order-service 가 LemuelApplication (settlement 이미지의 entrypoint) 을 가짐.
+          build-args: |
+            MODULE=order-service
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64
