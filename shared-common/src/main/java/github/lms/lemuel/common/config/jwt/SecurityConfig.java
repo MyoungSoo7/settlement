@@ -23,7 +23,9 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
-    @org.springframework.beans.factory.annotation.Value("${cors.allowed-origins:}")
+    // helm-deploy 차트가 CORS_ORIGINS 환경변수로 주입하므로 cors.origins 우선,
+    // 하위호환으로 cors.allowed-origins fallback.
+    @org.springframework.beans.factory.annotation.Value("${cors.origins:${cors.allowed-origins:}}")
     private String corsAllowedOrigins;
 
     public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
