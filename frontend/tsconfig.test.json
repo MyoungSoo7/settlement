@@ -9,5 +9,6 @@
     "**/*.test.tsx",
     "**/*.spec.ts",
     "**/*.spec.tsx"
-  ]
+  ],
+  "exclude": ["e2e", "node_modules", "dist", "build"]
 }
