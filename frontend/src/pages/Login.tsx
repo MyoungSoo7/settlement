@@ -188,9 +188,6 @@ const Login: React.FC = () => {
               🔍 게스트 둘러보기
             </button>
           </div>
-          <p className="text-center text-[11px] text-gray-400 mt-3">
-            데모 계정은 운영 환경에서는 비활성됩니다.
-          </p>
         </div>
 
       </div>
