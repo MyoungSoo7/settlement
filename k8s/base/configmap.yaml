@@ -30,3 +30,7 @@ data:
   # JWT 설정 (시크릿 키는 sealed-secret.yaml에서 주입)
   JWT_ISSUER: "lemuel-service"
   JWT_TTL_SECONDS: "86400"
+
+  # 데모 자동로그인 (USER/MANAGER/ADMIN) + 게스트 토큰 활성화
+  # 포트폴리오 시연용으로 운영에도 노출. 보안 민감 데이터 없는 데모 계정 사용.
+  LEMUEL_DEMO_ENABLED: "true"

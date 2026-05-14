@@ -1,5 +1,6 @@
 package github.lms.lemuel.settlement.application.service;
 
+import github.lms.lemuel.ledger.adapter.in.event.dto.LedgerReverseEntryEvent;
 import github.lms.lemuel.settlement.application.port.in.AdjustSettlementForRefundUseCase;
 import github.lms.lemuel.settlement.application.port.out.LoadSettlementPort;
 import github.lms.lemuel.settlement.application.port.out.SaveSettlementAdjustmentPort;
@@ -9,6 +10,7 @@ import github.lms.lemuel.settlement.domain.SettlementAdjustment;
 import github.lms.lemuel.settlement.domain.exception.SettlementNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,13 +29,16 @@ public class AdjustSettlementForRefundService implements AdjustSettlementForRefu
     private final LoadSettlementPort loadSettlementPort;
     private final SaveSettlementPort saveSettlementPort;
     private final SaveSettlementAdjustmentPort saveSettlementAdjustmentPort;
+    private final ApplicationEventPublisher eventPublisher;
 
     public AdjustSettlementForRefundService(LoadSettlementPort loadSettlementPort,
                                             SaveSettlementPort saveSettlementPort,
-                                            SaveSettlementAdjustmentPort saveSettlementAdjustmentPort) {
+                                            SaveSettlementAdjustmentPort saveSettlementAdjustmentPort,
+                                            ApplicationEventPublisher eventPublisher) {
         this.loadSettlementPort = loadSettlementPort;
         this.saveSettlementPort = saveSettlementPort;
         this.saveSettlementAdjustmentPort = saveSettlementAdjustmentPort;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -58,10 +63,11 @@ public class AdjustSettlementForRefundService implements AdjustSettlementForRefu
         Settlement adjustedSettlement = saveSettlementPort.save(settlement);
 
         // 감사 추적: 별도 음수 금액 레코드로 역정산 이력 보존 — refundId 로 환불과 1:1 매핑
+        LocalDate today = LocalDate.now();
         SettlementAdjustment adjustment = SettlementAdjustment.ofRefund(
                 adjustedSettlement.getId(),
                 refundAmount,
-                LocalDate.now()
+                today
         );
         adjustment.setRefundId(refundId);
         saveSettlementAdjustmentPort.save(adjustment);
@@ -69,6 +75,12 @@ public class AdjustSettlementForRefundService implements AdjustSettlementForRefu
         log.info("Settlement adjusted for refund. settlementId={}, status={}, netAmount={}, adjustmentAmount={}",
                 adjustedSettlement.getId(), adjustedSettlement.getStatus(),
                 adjustedSettlement.getNetAmount(), adjustment.getAmount());
+
+        // refundId 가 있을 때만 ledger 역분개 트리거 — 레거시 2-arg 호출 경로 보호.
+        if (refundId != null) {
+            eventPublisher.publishEvent(new LedgerReverseEntryEvent(
+                    adjustedSettlement.getId(), refundId, refundAmount, today));
+        }
 
         return adjustedSettlement;
     }

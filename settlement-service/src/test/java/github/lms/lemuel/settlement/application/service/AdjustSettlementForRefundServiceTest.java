@@ -1,5 +1,6 @@
 package github.lms.lemuel.settlement.application.service;
 
+import github.lms.lemuel.ledger.adapter.in.event.dto.LedgerReverseEntryEvent;
 import github.lms.lemuel.settlement.application.port.out.LoadSettlementPort;
 import github.lms.lemuel.settlement.application.port.out.SaveSettlementAdjustmentPort;
 import github.lms.lemuel.settlement.application.port.out.SaveSettlementPort;
@@ -13,6 +14,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -21,6 +23,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -30,6 +33,7 @@ class AdjustSettlementForRefundServiceTest {
     @Mock LoadSettlementPort loadSettlementPort;
     @Mock SaveSettlementPort saveSettlementPort;
     @Mock SaveSettlementAdjustmentPort saveSettlementAdjustmentPort;
+    @Mock ApplicationEventPublisher eventPublisher;
     @InjectMocks AdjustSettlementForRefundService service;
 
     private Settlement settlement() {
@@ -77,5 +81,35 @@ class AdjustSettlementForRefundServiceTest {
         ArgumentCaptor<SettlementAdjustment> captor = ArgumentCaptor.forClass(SettlementAdjustment.class);
         verify(saveSettlementAdjustmentPort).save(captor.capture());
         assertThat(captor.getValue().getRefundId()).isNull();
+    }
+
+    @Test @DisplayName("3-arg 호출은 LedgerReverseEntryEvent 를 정확한 payload 로 발행")
+    void publishes_ledger_reverse_event_when_refundId_present() {
+        Settlement s = settlement();
+        when(loadSettlementPort.findByPaymentId(1L)).thenReturn(Optional.of(s));
+        when(saveSettlementPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(saveSettlementAdjustmentPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.adjustSettlementForRefund(1L, new BigDecimal("12000"), 555L);
+
+        ArgumentCaptor<LedgerReverseEntryEvent> captor = ArgumentCaptor.forClass(LedgerReverseEntryEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        LedgerReverseEntryEvent event = captor.getValue();
+        assertThat(event.settlementId()).isEqualTo(100L);
+        assertThat(event.refundId()).isEqualTo(555L);
+        assertThat(event.refundAmount()).isEqualByComparingTo("12000");
+        assertThat(event.adjustmentDate()).isEqualTo(LocalDate.now());
+    }
+
+    @Test @DisplayName("2-arg 레거시 호출은 LedgerReverseEntryEvent 발행하지 않음 (refundId 없음)")
+    void does_not_publish_event_for_legacy_2arg_call() {
+        Settlement s = settlement();
+        when(loadSettlementPort.findByPaymentId(1L)).thenReturn(Optional.of(s));
+        when(saveSettlementPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(saveSettlementAdjustmentPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.adjustSettlementForRefund(1L, new BigDecimal("15000"));
+
+        verify(eventPublisher, never()).publishEvent(any(LedgerReverseEntryEvent.class));
     }
 }
