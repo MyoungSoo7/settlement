@@ -113,6 +113,7 @@ public class SecurityConfig {
                         // 인증 불필요 (Public endpoints)
                         .requestMatchers(HttpMethod.POST, "/users").permitAll()               // 회원가입
                         .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()          // 로그인
+                        .requestMatchers(HttpMethod.POST, "/auth/dev/**").permitAll()         // 데모 자동로그인/게스트 (lemuel.demo.enabled=true 시)
                         .requestMatchers(HttpMethod.POST, "/users/password-reset/**").permitAll()  // 비밀번호 재설정
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                         // Actuator: 헬스체크 프로브만 공개, 메트릭/prometheus는 인증 필요
