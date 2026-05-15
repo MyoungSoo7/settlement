@@ -4,6 +4,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
@@ -40,7 +41,7 @@ public interface PaymentJpaRepository extends JpaRepository<PaymentJpaEntity, Lo
      * @return 캡처된 결제 목록
      */
     @Query("SELECT p FROM PaymentJpaEntity p WHERE p.status = 'CAPTURED' AND p.updatedAt >= :startDate AND p.updatedAt < :endDate")
-    List<PaymentJpaEntity> findCapturedPaymentsBetween(LocalDateTime startDate, LocalDateTime endDate);
+    List<PaymentJpaEntity> findCapturedPaymentsBetween(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
 
     /**
      * Spring Batch용 페이징 쿼리

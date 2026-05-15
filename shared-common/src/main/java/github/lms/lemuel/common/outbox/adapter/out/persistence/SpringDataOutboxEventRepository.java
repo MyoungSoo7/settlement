@@ -4,6 +4,7 @@ import github.lms.lemuel.common.outbox.domain.OutboxEventStatus;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -12,7 +13,7 @@ import java.util.UUID;
 public interface SpringDataOutboxEventRepository extends JpaRepository<OutboxEventJpaEntity, Long> {
 
     @Query("SELECT e FROM OutboxEventJpaEntity e WHERE e.status = :status ORDER BY e.createdAt ASC")
-    List<OutboxEventJpaEntity> findByStatusOrderByCreatedAtAsc(OutboxEventStatus status, Pageable pageable);
+    List<OutboxEventJpaEntity> findByStatusOrderByCreatedAtAsc(@Param("status") OutboxEventStatus status, Pageable pageable);
 
     long countByStatus(OutboxEventStatus status);
 
