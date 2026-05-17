@@ -6,6 +6,10 @@ plugins {
 
 dependencies {
     implementation(project(":shared-common"))
+    // 임시 모놀리식 번들: settlement-service 모듈 클래스를 같은 JAR 에 포함시켜
+    // LemuelApplication 이 settlement 컨트롤러까지 스캔할 수 있게 한다.
+    // 분리 배포(MSA)는 Phase B 에서 별도 헬름 차트 + CI MODULE=settlement-service 로 재도입 예정.
+    implementation(project(":settlement-service"))
 
     // Spring Boot 스타터
     implementation("org.springframework.boot:spring-boot-starter-actuator")
