@@ -56,11 +56,11 @@ public class SettlementSearchJdbcRepository {
         }
 
         String fromClause =
-                " FROM settlements s" +
-                " JOIN orders o ON s.order_id = o.id" +
-                " JOIN payments py ON s.payment_id = py.id" +
-                " JOIN users u ON o.user_id = u.id" +
-                " LEFT JOIN products pr ON o.product_id = pr.id" +
+                " FROM opslab.settlements s" +
+                " JOIN opslab.orders o ON s.order_id = o.id" +
+                " JOIN opslab.payments py ON s.payment_id = py.id" +
+                " JOIN opslab.users u ON o.user_id = u.id" +
+                " LEFT JOIN opslab.products pr ON o.product_id = pr.id" +
                 where;
 
         Object[] baseArgs = params.toArray();

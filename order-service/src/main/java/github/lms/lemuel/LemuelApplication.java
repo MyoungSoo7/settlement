@@ -19,6 +19,12 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         "github.lms.lemuel.report",
         "github.lms.lemuel.game",
         "github.lms.lemuel.common",
+        // settlement-service 모듈 (임시 번들)
+        "github.lms.lemuel.settlement",
+        "github.lms.lemuel.pgreconciliation",
+        "github.lms.lemuel.payout",
+        "github.lms.lemuel.chargeback",
+        "github.lms.lemuel.ledger",
     }
 )
 @EnableScheduling

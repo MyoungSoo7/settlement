@@ -4,6 +4,16 @@ plugins {
     id("io.spring.dependency-management")
 }
 
+// Library mode: settlement-service 는 order-service 의 fat jar 에 번들된다.
+// MSA 분리 배포(원래 의도)는 Phase B 에서 helm/CI 분리와 함께 재도입 예정.
+tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
+    enabled = false
+}
+tasks.named<Jar>("jar") {
+    enabled = true
+    archiveClassifier.set("")
+}
+
 dependencies {
     implementation(project(":shared-common"))
 
