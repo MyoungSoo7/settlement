@@ -42,7 +42,9 @@ const mockDetail: SettlementDetail = {
   id: 1,
   paymentId: 100,
   orderId: 10,
-  amount: 100000,
+  paymentAmount: 100000,
+  commission: 3000,
+  netAmount: 97000,
   status: 'DONE',
   settlementDate: '2026-01-15',
   createdAt: '2026-01-01T00:00:00',
@@ -111,7 +113,7 @@ describe('settlementApi', () => {
 
       const result = await settlementApi.getSettlement(1);
 
-      expect(api.get).toHaveBeenCalledWith('/api/settlements/1');
+      expect(api.get).toHaveBeenCalledWith('/settlements/1');
       expect(result).toEqual(mockDetail);
     });
 
@@ -120,32 +122,6 @@ describe('settlementApi', () => {
       vi.mocked(api.get).mockRejectedValueOnce(error);
 
       await expect(settlementApi.getSettlement(9999)).rejects.toMatchObject({ response: { status: 404 } });
-    });
-  });
-
-  // ─── approveSettlement ────────────────────────────────────
-  describe('approveSettlement', () => {
-    it('정산을 승인하고 갱신된 SettlementDetail을 반환한다', async () => {
-      const approved = { ...mockDetail, status: 'CONFIRMED' };
-      vi.mocked(api.post).mockResolvedValueOnce({ data: approved });
-
-      const result = await settlementApi.approveSettlement(1);
-
-      expect(api.post).toHaveBeenCalledWith('/api/settlements/1/approve');
-      expect(result.status).toBe('CONFIRMED');
-    });
-  });
-
-  // ─── rejectSettlement ─────────────────────────────────────
-  describe('rejectSettlement', () => {
-    it('반려 사유와 함께 정산을 반려한다', async () => {
-      const rejected = { ...mockDetail, status: 'REJECTED' };
-      vi.mocked(api.post).mockResolvedValueOnce({ data: rejected });
-
-      const result = await settlementApi.rejectSettlement(1, '검토 필요');
-
-      expect(api.post).toHaveBeenCalledWith('/api/settlements/1/reject', { reason: '검토 필요' });
-      expect(result.status).toBe('REJECTED');
     });
   });
 });

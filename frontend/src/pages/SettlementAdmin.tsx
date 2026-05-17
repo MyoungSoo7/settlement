@@ -14,10 +14,6 @@ const SettlementAdmin: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedSettlement, setSelectedSettlement] = useState<SettlementDetail | null>(null);
-  const [showApprovalModal, setShowApprovalModal] = useState(false);
-  const [showRejectModal, setShowRejectModal] = useState(false);
-  const [rejectReason, setRejectReason] = useState('');
-  const [actionLoading, setActionLoading] = useState(false);
 
   const [filters, setFilters] = useState<SettlementSearchRequest>({
     page: 0,
@@ -56,44 +52,6 @@ const SettlementAdmin: React.FC = () => {
     }
   };
 
-  // 정산 승인
-  const handleApprove = async () => {
-    if (!selectedSettlement) return;
-
-    setActionLoading(true);
-    try {
-      await settlementApi.approveSettlement(selectedSettlement.id);
-      setShowApprovalModal(false);
-      setSelectedSettlement(null);
-      fetchSettlements(); // 목록 새로고침
-    } catch (err: any) {
-      setError(err.response?.data?.message || '승인에 실패했습니다.');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  // 정산 반려
-  const handleReject = async () => {
-    if (!selectedSettlement || !rejectReason.trim()) {
-      setError('반려 사유를 입력해주세요.');
-      return;
-    }
-
-    setActionLoading(true);
-    try {
-      await settlementApi.rejectSettlement(selectedSettlement.id, rejectReason);
-      setShowRejectModal(false);
-      setSelectedSettlement(null);
-      setRejectReason('');
-      fetchSettlements(); // 목록 새로고침
-    } catch (err: any) {
-      setError(err.response?.data?.message || '반려에 실패했습니다.');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
   // 필터 변경
   const handleFilterChange = (key: keyof SettlementSearchRequest, value: any) => {
     setFilters((prev) => ({
@@ -116,28 +74,24 @@ const SettlementAdmin: React.FC = () => {
     }).format(amount);
   };
 
-  // 상태 뱃지
+  // 상태 뱃지 — SettlementStatus enum: REQUESTED → PROCESSING → DONE / FAILED / CANCELED
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
-      CALCULATED: 'bg-yellow-100 text-yellow-800',
-      WAITING_APPROVAL: 'bg-blue-100 text-blue-800',
-      APPROVED: 'bg-green-100 text-green-800',
-      REJECTED: 'bg-red-100 text-red-800',
-      PENDING: 'bg-gray-100 text-gray-800',
-      CONFIRMED: 'bg-indigo-100 text-indigo-800',
-      CANCELED: 'bg-red-100 text-red-800',
+      REQUESTED: 'bg-yellow-100 text-yellow-800',
+      PROCESSING: 'bg-blue-100 text-blue-800',
+      DONE: 'bg-green-100 text-green-800',
+      FAILED: 'bg-red-100 text-red-800',
+      CANCELED: 'bg-gray-100 text-gray-800',
     };
     return styles[status] || 'bg-gray-100 text-gray-800';
   };
 
   const getStatusText = (status: string) => {
     const texts: Record<string, string> = {
-      CALCULATED: '계산완료',
-      WAITING_APPROVAL: '승인대기',
-      APPROVED: '승인됨',
-      REJECTED: '반려됨',
-      PENDING: '대기중',
-      CONFIRMED: '확정',
+      REQUESTED: '요청됨',
+      PROCESSING: '처리중',
+      DONE: '완료',
+      FAILED: '실패',
       CANCELED: '취소됨',
     };
     return texts[status] || status;
@@ -171,10 +125,11 @@ const SettlementAdmin: React.FC = () => {
                 onChange={(e) => handleFilterChange('status', e.target.value || undefined)}
               >
                 <option value="">전체</option>
-                <option value="CALCULATED">계산완료</option>
-                <option value="WAITING_APPROVAL">승인대기</option>
-                <option value="APPROVED">승인됨</option>
-                <option value="REJECTED">반려됨</option>
+                <option value="REQUESTED">요청됨</option>
+                <option value="PROCESSING">처리중</option>
+                <option value="DONE">완료</option>
+                <option value="FAILED">실패</option>
+                <option value="CANCELED">취소됨</option>
               </select>
             </div>
 
@@ -307,28 +262,6 @@ const SettlementAdmin: React.FC = () => {
                         >
                           상세보기
                         </button>
-                        {(settlement.status === 'WAITING_APPROVAL' || settlement.status === 'CALCULATED') && (
-                          <>
-                            <button
-                              onClick={() => {
-                                handleViewDetail(settlement.settlementId);
-                                setShowApprovalModal(true);
-                              }}
-                              className="text-green-600 hover:text-green-900"
-                            >
-                              승인
-                            </button>
-                            <button
-                              onClick={() => {
-                                handleViewDetail(settlement.settlementId);
-                                setShowRejectModal(true);
-                              }}
-                              className="text-red-600 hover:text-red-900"
-                            >
-                              반려
-                            </button>
-                          </>
-                        )}
                       </td>
                     </tr>
                   ))}
@@ -388,7 +321,7 @@ const SettlementAdmin: React.FC = () => {
         )}
 
         {/* 상세 정보 모달 */}
-        {selectedSettlement && !showApprovalModal && !showRejectModal && (
+        {selectedSettlement && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-lg max-w-2xl w-full p-6">
               <div className="flex justify-between items-center mb-4">
@@ -415,9 +348,19 @@ const SettlementAdmin: React.FC = () => {
                   <span className="font-semibold">#{selectedSettlement.paymentId}</span>
                 </div>
                 <div className="flex justify-between py-2 border-b">
-                  <span className="text-gray-600">정산 금액</span>
+                  <span className="text-gray-600">결제 금액</span>
+                  <span className="font-semibold">{formatCurrency(selectedSettlement.paymentAmount)}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b">
+                  <span className="text-gray-600">수수료</span>
+                  <span className="font-semibold text-red-600">
+                    -{formatCurrency(selectedSettlement.commission)}
+                  </span>
+                </div>
+                <div className="flex justify-between py-2 border-b">
+                  <span className="text-gray-600">정산 금액 (Net)</span>
                   <span className="text-lg font-bold text-green-600">
-                    {formatCurrency(selectedSettlement.amount)}
+                    {formatCurrency(selectedSettlement.netAmount)}
                   </span>
                 </div>
                 <div className="flex justify-between py-2 border-b">
@@ -434,109 +377,13 @@ const SettlementAdmin: React.FC = () => {
                   <span className="text-gray-600">정산일</span>
                   <span className="font-semibold">{selectedSettlement.settlementDate}</span>
                 </div>
-                {selectedSettlement.approvedAt && (
+                {selectedSettlement.confirmedAt && (
                   <div className="flex justify-between py-2 border-b">
-                    <span className="text-gray-600">승인 일시</span>
-                    <span className="font-semibold">{selectedSettlement.approvedAt}</span>
+                    <span className="text-gray-600">확정 일시</span>
+                    <span className="font-semibold">{selectedSettlement.confirmedAt}</span>
                   </div>
                 )}
-                {selectedSettlement.rejectedAt && (
-                  <>
-                    <div className="flex justify-between py-2 border-b">
-                      <span className="text-gray-600">반려 일시</span>
-                      <span className="font-semibold">{selectedSettlement.rejectedAt}</span>
-                    </div>
-                    <div className="flex justify-between py-2 border-b">
-                      <span className="text-gray-600">반려 사유</span>
-                      <span className="text-red-600">{selectedSettlement.rejectionReason}</span>
-                    </div>
-                  </>
-                )}
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* 승인 확인 모달 */}
-        {showApprovalModal && selectedSettlement && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg max-w-md w-full p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">정산 승인</h2>
-              <p className="text-gray-600 mb-6">
-                정산 ID #{selectedSettlement.id}를 승인하시겠습니까?
-                <br />
-                <span className="font-semibold text-green-600">
-                  {formatCurrency(selectedSettlement.amount)}
-                </span>
-              </p>
-
-              {actionLoading ? (
-                <Spinner size="sm" message="처리 중..." />
-              ) : (
-                <div className="flex space-x-3">
-                  <button
-                    onClick={handleApprove}
-                    className="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700"
-                  >
-                    승인
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowApprovalModal(false);
-                      setSelectedSettlement(null);
-                    }}
-                    className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-400"
-                  >
-                    취소
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* 반려 모달 */}
-        {showRejectModal && selectedSettlement && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg max-w-md w-full p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">정산 반려</h2>
-              <p className="text-gray-600 mb-4">
-                정산 ID #{selectedSettlement.id}를 반려합니다.
-              </p>
-
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">반려 사유 (필수)</label>
-                <textarea
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-red-500 text-gray-900"
-                  rows={4}
-                  placeholder="반려 사유를 입력하세요..."
-                  value={rejectReason}
-                  onChange={(e) => setRejectReason(e.target.value)}
-                />
-              </div>
-
-              {actionLoading ? (
-                <Spinner size="sm" message="처리 중..." />
-              ) : (
-                <div className="flex space-x-3">
-                  <button
-                    onClick={handleReject}
-                    className="flex-1 bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700"
-                  >
-                    반려
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowRejectModal(false);
-                      setSelectedSettlement(null);
-                      setRejectReason('');
-                    }}
-                    className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-400"
-                  >
-                    취소
-                  </button>
-                </div>
-              )}
             </div>
           </div>
         )}
