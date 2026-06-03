@@ -1,6 +1,7 @@
 package github.lms.lemuel.settlement.adapter.in.batch;
 
 import github.lms.lemuel.settlement.application.port.in.ReleaseHoldbackUseCase;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -29,6 +30,7 @@ public class HoldbackReleaseScheduler {
      * 매일 03:00 (KST) 실행. 운영 환경 timezone 설정 확인 필요.
      */
     @Scheduled(cron = "${app.holdback.release-cron:0 0 3 * * *}", zone = "Asia/Seoul")
+    @SchedulerLock(name = "settlement-holdback-release", lockAtMostFor = "PT30M")
     public void releaseDue() {
         LocalDate today = LocalDate.now();
         log.info("[HoldbackRelease] 시작: today={}", today);

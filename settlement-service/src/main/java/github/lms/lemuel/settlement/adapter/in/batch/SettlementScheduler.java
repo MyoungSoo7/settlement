@@ -6,6 +6,7 @@ import github.lms.lemuel.settlement.application.port.in.CreateDailySettlementsUs
 import github.lms.lemuel.settlement.application.port.in.CreateDailySettlementsUseCase.CreateSettlementCommand;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -28,6 +29,7 @@ public class SettlementScheduler {
      * 매일 새벽 2시에 전일 정산 생성
      */
     @Scheduled(cron = "0 0 2 * * *")
+    @SchedulerLock(name = "settlement-create-daily", lockAtMostFor = "PT30M")
     public void scheduledCreateDailySettlements() {
         try {
             LocalDate targetDate = LocalDate.now().minusDays(1);
@@ -49,6 +51,7 @@ public class SettlementScheduler {
      * 매일 새벽 3시에 전일 정산 확정
      */
     @Scheduled(cron = "0 0 3 * * *")
+    @SchedulerLock(name = "settlement-confirm-daily", lockAtMostFor = "PT30M")
     public void scheduledConfirmDailySettlements() {
         try {
             LocalDate targetDate = LocalDate.now().minusDays(1);
