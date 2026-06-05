@@ -14,6 +14,10 @@ public class PayoutJpaEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Version
+    @Column(nullable = false)
+    private Long version;
+
     @Column(name = "settlement_id")
     private Long settlementId;
 
@@ -107,6 +111,7 @@ public class PayoutJpaEntity {
     }
 
     public Long getId() { return id; }
+    public Long getVersion() { return version; }
     public Long getSettlementId() { return settlementId; }
     public Long getSellerId() { return sellerId; }
     public BigDecimal getAmount() { return amount; }
