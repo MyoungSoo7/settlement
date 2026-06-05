@@ -25,7 +25,7 @@ public class LedgerReverseEntryEventListener {
 
     private final ReverseEntryUseCase reverseEntryUseCase;
 
-    @Async
+    @Async("ledgerTaskExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handle(LedgerReverseEntryEvent event) {
         if (event == null) return;

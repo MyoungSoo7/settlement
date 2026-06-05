@@ -26,7 +26,7 @@ public class LedgerCreationEventListener {
 
     private final CreateLedgerEntryUseCase createLedgerEntryUseCase;
 
-    @Async
+    @Async("ledgerTaskExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleSettlementConfirmed(SettlementIndexEvent event) {
         if (event == null || event.getEventType() != SettlementIndexEvent.IndexEventType.BATCH_CONFIRMED) {
