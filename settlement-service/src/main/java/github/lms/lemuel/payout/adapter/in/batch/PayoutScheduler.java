@@ -1,6 +1,7 @@
 package github.lms.lemuel.payout.adapter.in.batch;
 
 import github.lms.lemuel.payout.application.port.in.ExecutePayoutUseCase;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -26,6 +27,7 @@ public class PayoutScheduler {
     }
 
     @Scheduled(cron = "${app.payout.execute-cron:0 0 4 * * *}", zone = "Asia/Seoul")
+    @SchedulerLock(name = "settlement-payout-execute", lockAtMostFor = "PT1H")
     public void execute() {
         log.info("[PayoutScheduler] 시작");
         var report = executeUseCase.executeAllPending();
