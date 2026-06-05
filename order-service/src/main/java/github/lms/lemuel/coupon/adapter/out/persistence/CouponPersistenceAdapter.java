@@ -43,6 +43,11 @@ public class CouponPersistenceAdapter implements LoadCouponPort, SaveCouponPort 
     }
 
     @Override
+    public boolean incrementUsageIfAvailable(Long couponId) {
+        return couponRepository.incrementUsedCountIfAvailable(couponId) > 0;
+    }
+
+    @Override
     public void recordUsage(Long couponId, Long userId, Long orderId) {
         CouponUsageJpaEntity usage = new CouponUsageJpaEntity();
         usage.setCouponId(couponId);

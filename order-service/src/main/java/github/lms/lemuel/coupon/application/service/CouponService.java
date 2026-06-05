@@ -68,8 +68,9 @@ public class CouponService implements CouponUseCase {
         Coupon coupon = loadCouponPort.findByCode(code.toUpperCase().trim())
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 쿠폰: " + code));
 
-        coupon.incrementUsage();
-        saveCouponPort.save(coupon);
+        if (!saveCouponPort.incrementUsageIfAvailable(coupon.getId())) {
+            throw new IllegalStateException("쿠폰 사용 한도를 초과했습니다.");
+        }
         saveCouponPort.recordUsage(coupon.getId(), userId, orderId);
 
         log.info("쿠폰 사용 완료: code={}, userId={}, orderId={}", code, userId, orderId);

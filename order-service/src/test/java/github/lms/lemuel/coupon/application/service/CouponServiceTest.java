@@ -64,10 +64,22 @@ class CouponServiceTest {
         Coupon coupon = mock(Coupon.class);
         when(loadCouponPort.findByCode("CODE")).thenReturn(Optional.of(coupon));
         when(coupon.getId()).thenReturn(1L);
+        when(saveCouponPort.incrementUsageIfAvailable(1L)).thenReturn(true);
         service.useCoupon("code", 1L, 100L);
-        verify(coupon).incrementUsage();
-        verify(saveCouponPort).save(coupon);
+        verify(saveCouponPort).incrementUsageIfAvailable(1L);
         verify(saveCouponPort).recordUsage(1L, 1L, 100L);
+    }
+
+    @Test @DisplayName("useCoupon: 사용 한도 초과면 예외, 사용 기록 안 함")
+    void useCoupon_exhausted() {
+        Coupon coupon = mock(Coupon.class);
+        when(loadCouponPort.findByCode("CODE")).thenReturn(Optional.of(coupon));
+        when(coupon.getId()).thenReturn(1L);
+        when(saveCouponPort.incrementUsageIfAvailable(1L)).thenReturn(false);
+        assertThatThrownBy(() -> service.useCoupon("code", 1L, 100L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("한도");
+        verify(saveCouponPort, never()).recordUsage(anyLong(), anyLong(), anyLong());
     }
 
     @Test @DisplayName("useCoupon: 존재하지 않는 쿠폰이면 예외")
