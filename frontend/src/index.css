@@ -2,6 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 전역 form element 색상 — 시스템 dark mode 가 form 만 검정으로 만드는 함정 차단.
+   모든 input/select/textarea 가 흰 배경 + 검은 글씨로 강제 (의도 적용 시 컴포넌트별 override). */
+@layer base {
+  input,
+  select,
+  textarea {
+    background-color: #ffffff;
+    color: #111827; /* gray-900 */
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: #9ca3af; /* gray-400 */
+  }
+  /* Date / time / file input 의 native control 도 light scheme 강제 */
+  input[type='date'],
+  input[type='datetime-local'],
+  input[type='time'],
+  input[type='month'],
+  input[type='week'] {
+    color-scheme: light;
+  }
+}
+
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
