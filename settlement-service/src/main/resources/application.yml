@@ -5,6 +5,10 @@ spring:
   application:
     name: lemuel-settlement
 
+  threads:
+    virtual:
+      enabled: true  # Java 21+ 가상 스레드 (Tomcat 요청 처리 + @Scheduled). JEP 491(JDK24+)로 synchronized 핀 없음
+
   datasource:
     url: jdbc:postgresql://localhost:5432/opslab
     username: ${POSTGRES_USER}
