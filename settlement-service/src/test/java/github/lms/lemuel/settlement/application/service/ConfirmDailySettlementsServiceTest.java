@@ -1,5 +1,6 @@
 package github.lms.lemuel.settlement.application.service;
 
+import github.lms.lemuel.ledger.application.port.in.EnqueueLedgerTaskPort;
 import github.lms.lemuel.settlement.application.port.in.ConfirmDailySettlementsUseCase;
 import github.lms.lemuel.settlement.application.port.out.LoadSettlementPort;
 import github.lms.lemuel.settlement.application.port.out.PublishSettlementEventPort;
@@ -30,6 +31,7 @@ class ConfirmDailySettlementsServiceTest {
     @Mock LoadSettlementPort loadSettlementPort;
     @Mock SaveSettlementPort saveSettlementPort;
     @Mock PublishSettlementEventPort publishSettlementEventPort;
+    @Mock EnqueueLedgerTaskPort enqueueLedgerTaskPort;
     @InjectMocks ConfirmDailySettlementsService service;
 
     private Settlement requestedSettlement(Long id) {
@@ -53,6 +55,7 @@ class ConfirmDailySettlementsServiceTest {
         assertThat(result.totalSettlements()).isEqualTo(2);
         assertThat(s1.getStatus()).isEqualTo(SettlementStatus.DONE);
         assertThat(s2.getStatus()).isEqualTo(SettlementStatus.DONE);
+        verify(enqueueLedgerTaskPort).enqueueCreate(anyList());
         verify(publishSettlementEventPort).publishSettlementConfirmedEvent(anyList());
     }
 
@@ -69,6 +72,7 @@ class ConfirmDailySettlementsServiceTest {
 
         assertThat(result.confirmedCount()).isZero();
         verify(saveSettlementPort, never()).save(any());
+        verify(enqueueLedgerTaskPort, never()).enqueueCreate(anyList());
         verify(publishSettlementEventPort, never()).publishSettlementConfirmedEvent(anyList());
     }
 
@@ -81,6 +85,7 @@ class ConfirmDailySettlementsServiceTest {
                 new ConfirmDailySettlementsUseCase.ConfirmSettlementCommand(target));
 
         assertThat(result.totalSettlements()).isZero();
+        verify(enqueueLedgerTaskPort, never()).enqueueCreate(anyList());
         verify(publishSettlementEventPort, never()).publishSettlementConfirmedEvent(anyList());
     }
 

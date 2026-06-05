@@ -1,22 +1,15 @@
 package github.lms.lemuel.common.outbox.application.service;
 
 import github.lms.lemuel.common.outbox.application.port.out.LoadOutboxEventPort;
-import github.lms.lemuel.common.outbox.application.port.out.PublishDlqEventPort;
-import github.lms.lemuel.common.outbox.application.port.out.PublishExternalEventPort;
-import github.lms.lemuel.common.outbox.application.port.out.SaveOutboxEventPort;
 import github.lms.lemuel.common.outbox.domain.OutboxEvent;
-import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.Timer;
 import jakarta.annotation.PostConstruct;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
@@ -37,24 +30,16 @@ public class OutboxPublisherScheduler {
     private static final int BATCH_SIZE = 100;
 
     private final LoadOutboxEventPort loadOutboxEventPort;
-    private final SaveOutboxEventPort saveOutboxEventPort;
-    private final PublishExternalEventPort publishExternalEventPort;
-    private final PublishDlqEventPort publishDlqEventPort;
+    private final OutboxSingleEventPublisher singleEventPublisher;
     private final MeterRegistry meterRegistry;
     private final AtomicLong pendingGauge = new AtomicLong(0L);
     private final AtomicLong failedGauge = new AtomicLong(0L);
-    private Timer publishTimer;
-    private Counter dlqCounter;
 
     public OutboxPublisherScheduler(LoadOutboxEventPort loadOutboxEventPort,
-                                    SaveOutboxEventPort saveOutboxEventPort,
-                                    PublishExternalEventPort publishExternalEventPort,
-                                    PublishDlqEventPort publishDlqEventPort,
+                                    OutboxSingleEventPublisher singleEventPublisher,
                                     MeterRegistry meterRegistry) {
         this.loadOutboxEventPort = loadOutboxEventPort;
-        this.saveOutboxEventPort = saveOutboxEventPort;
-        this.publishExternalEventPort = publishExternalEventPort;
-        this.publishDlqEventPort = publishDlqEventPort;
+        this.singleEventPublisher = singleEventPublisher;
         this.meterRegistry = meterRegistry;
     }
 
@@ -65,13 +50,6 @@ public class OutboxPublisherScheduler {
                 .register(meterRegistry);
         Gauge.builder("outbox.failed.count", failedGauge, AtomicLong::get)
                 .description("outbox_events 테이블의 FAILED 건수 (DLQ 알람 대상)")
-                .register(meterRegistry);
-        this.publishTimer = Timer.builder("outbox.publish.duration")
-                .description("단일 outbox 이벤트 외부 발행 처리 시간")
-                .publishPercentiles(0.5, 0.95, 0.99)
-                .register(meterRegistry);
-        this.dlqCounter = Counter.builder("outbox.dlq.published")
-                .description("DLQ 로 발행된 누적 이벤트 수 (재시도 한계 초과)")
                 .register(meterRegistry);
     }
 
@@ -99,7 +77,7 @@ public class OutboxPublisherScheduler {
         int failed = 0;
         for (OutboxEvent event : pending) {
             try {
-                publishSingle(event);
+                singleEventPublisher.publish(event);
                 published++;
             } catch (Exception e) {
                 failed++;
@@ -113,32 +91,5 @@ public class OutboxPublisherScheduler {
             log.info("Outbox batch complete: published={}, failed={}, batchSize={}",
                     published, failed, pending.size());
         }
-    }
-
-    /**
-     * 개별 이벤트 발행. REQUIRES_NEW 로 자체 트랜잭션을 열어 실패 시 현재 이벤트만 롤백.
-     *
-     * <p>재시도 한계 (10회) 초과로 FAILED 전이된 시점에 DLQ 토픽으로도 발행한다 —
-     * 운영팀이 별도 알람을 받고, DLQ 컨슈머가 자동 워크플로 (티켓 생성·슬랙 알림)를 트리거한다.
-     */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    protected void publishSingle(OutboxEvent event) {
-        publishTimer.record(() -> {
-            try {
-                publishExternalEventPort.publish(event);
-                event.markPublished();
-            } catch (RuntimeException e) {
-                event.markFailed(e.getMessage());
-                // markFailed 가 retryCount>=10 에서 PENDING → FAILED 로 전이시킴.
-                // 이번 호출이 그 전이의 결정타라면 DLQ 발행을 트리거.
-                if (event.isFailed()) {
-                    publishDlqEventPort.publishToDlq(event);
-                    dlqCounter.increment();
-                }
-                saveOutboxEventPort.save(event);
-                throw e;
-            }
-            saveOutboxEventPort.save(event);
-        });
     }
 }

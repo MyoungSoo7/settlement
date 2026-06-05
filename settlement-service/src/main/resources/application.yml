@@ -148,6 +148,10 @@ app:
       payment-refunded: lemuel.payment.refunded
   search:
     enabled: false
+  # 원장 전용 트랜잭셔널 아웃박스 로컬 폴러 (Kafka 미경유)
+  ledger-outbox:
+    enabled: ${APP_LEDGER_OUTBOX_ENABLED:true}
+    poll-delay-ms: ${APP_LEDGER_OUTBOX_POLL_DELAY_MS:5000}
   jwt:
     issuer: ${JWT_ISSUER:lemuel}
     secret: ${JWT_SECRET:dev-secret-please-override}

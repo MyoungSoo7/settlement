@@ -38,6 +38,12 @@ public class SettlementPersistenceAdapter
     }
 
     @Override
+    public Optional<Settlement> findByPaymentIdForUpdate(Long paymentId) {
+        return settlementJpaRepository.findByPaymentIdForUpdate(paymentId)
+                .map(mapper::toDomain);
+    }
+
+    @Override
     public List<Settlement> findBySettlementDate(LocalDate settlementDate) {
         return settlementJpaRepository.findBySettlementDate(settlementDate)
                 .stream()

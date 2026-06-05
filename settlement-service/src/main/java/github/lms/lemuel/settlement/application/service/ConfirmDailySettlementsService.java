@@ -1,5 +1,6 @@
 package github.lms.lemuel.settlement.application.service;
 
+import github.lms.lemuel.ledger.application.port.in.EnqueueLedgerTaskPort;
 import github.lms.lemuel.settlement.application.port.in.ConfirmDailySettlementsUseCase;
 import github.lms.lemuel.settlement.application.port.out.LoadSettlementPort;
 import github.lms.lemuel.settlement.application.port.out.PublishSettlementEventPort;
@@ -25,6 +26,7 @@ public class ConfirmDailySettlementsService implements ConfirmDailySettlementsUs
     private final LoadSettlementPort loadSettlementPort;
     private final SaveSettlementPort saveSettlementPort;
     private final PublishSettlementEventPort publishSettlementEventPort;
+    private final EnqueueLedgerTaskPort enqueueLedgerTaskPort;
 
     @Override
     @Transactional
@@ -50,8 +52,9 @@ public class ConfirmDailySettlementsService implements ConfirmDailySettlementsUs
 
         log.info("정산 확정 완료: confirmedCount={}, totalSettlements={}", confirmedCount, totalSettlements);
 
-        // 3. 이벤트 발행
+        // 3. 원장 분개 작업을 같은 트랜잭션에 아웃박스로 적재 (크래시 내성) + ES 인덱싱 이벤트 발행
         if (!confirmedSettlementIds.isEmpty()) {
+            enqueueLedgerTaskPort.enqueueCreate(confirmedSettlementIds);
             publishSettlementEventPort.publishSettlementConfirmedEvent(confirmedSettlementIds);
         }
 

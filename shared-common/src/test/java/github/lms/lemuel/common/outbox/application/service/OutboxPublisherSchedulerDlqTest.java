@@ -27,7 +27,7 @@ class OutboxPublisherSchedulerDlqTest {
     private SaveOutboxEventPort savePort;
     private PublishExternalEventPort publishPort;
     private PublishDlqEventPort dlqPort;
-    private OutboxPublisherScheduler scheduler;
+    private OutboxSingleEventPublisher singleEventPublisher;
 
     @BeforeEach
     void setup() {
@@ -35,9 +35,8 @@ class OutboxPublisherSchedulerDlqTest {
         savePort = mock(SaveOutboxEventPort.class);
         publishPort = mock(PublishExternalEventPort.class);
         dlqPort = mock(PublishDlqEventPort.class);
-        scheduler = new OutboxPublisherScheduler(loadPort, savePort, publishPort, dlqPort,
+        singleEventPublisher = new OutboxSingleEventPublisher(savePort, publishPort, dlqPort,
                 new SimpleMeterRegistry());
-        scheduler.registerMetrics();
     }
 
     @Test
@@ -54,7 +53,7 @@ class OutboxPublisherSchedulerDlqTest {
         doThrow(new RuntimeException("PG down")).when(publishPort).publish(any());
 
         try {
-            scheduler.publishSingle(event);
+            singleEventPublisher.publish(event);
         } catch (RuntimeException ignored) {
             // REQUIRES_NEW 트랜잭션 롤백을 시뮬레이트하기 위해 예외가 위로 전파됨 — 정상
         }
@@ -69,7 +68,7 @@ class OutboxPublisherSchedulerDlqTest {
     void noDlqOnSuccess() {
         OutboxEvent event = OutboxEvent.pending("Payment", "1", "PaymentCaptured", "{}");
 
-        scheduler.publishSingle(event);
+        singleEventPublisher.publish(event);
 
         verify(dlqPort, never()).publishToDlq(any());
         assertThat(event.getStatus().name()).isEqualTo("PUBLISHED");
@@ -82,7 +81,7 @@ class OutboxPublisherSchedulerDlqTest {
         doThrow(new RuntimeException("transient")).when(publishPort).publish(any());
 
         try {
-            scheduler.publishSingle(event);
+            singleEventPublisher.publish(event);
         } catch (RuntimeException ignored) { }
 
         verify(dlqPort, never()).publishToDlq(any());

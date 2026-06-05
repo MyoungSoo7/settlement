@@ -42,6 +42,9 @@ spring:
     elasticsearch:
       repositories:
         enabled: false
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
 
   elasticsearch:
     uris: https://5d37123531be45ad8e84d19cca735fb5.us-central1.gcp.cloud.es.io
@@ -144,6 +147,8 @@ management:
   health:
     mail:
       enabled: false
+    redis:
+      enabled: ${MANAGEMENT_HEALTH_REDIS_ENABLED:false}  # jpa 모드(기본)엔 Redis 서버 없음 → readiness DOWN 방지. redis 모드 compose 에서 true
     livenessState:
       enabled: true
     readinessState:
@@ -176,6 +181,10 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
 
+
+# 장바구니 저장소 선택 — jpa(기본, PostgreSQL) | redis. 빈 충돌 방지를 위해 어댑터가 @ConditionalOnProperty 로 토글된다.
+cart:
+  store: ${CART_STORE:jpa}
 
 app:
   kafka:

@@ -1,6 +1,6 @@
 package github.lms.lemuel.settlement.application.service;
 
-import github.lms.lemuel.ledger.adapter.in.event.dto.LedgerReverseEntryEvent;
+import github.lms.lemuel.ledger.application.port.in.EnqueueLedgerTaskPort;
 import github.lms.lemuel.settlement.application.port.out.LoadSettlementPort;
 import github.lms.lemuel.settlement.application.port.out.SaveSettlementAdjustmentPort;
 import github.lms.lemuel.settlement.application.port.out.SaveSettlementPort;
@@ -14,7 +14,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -23,6 +22,8 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -33,7 +34,7 @@ class AdjustSettlementForRefundServiceTest {
     @Mock LoadSettlementPort loadSettlementPort;
     @Mock SaveSettlementPort saveSettlementPort;
     @Mock SaveSettlementAdjustmentPort saveSettlementAdjustmentPort;
-    @Mock ApplicationEventPublisher eventPublisher;
+    @Mock EnqueueLedgerTaskPort enqueueLedgerTaskPort;
     @InjectMocks AdjustSettlementForRefundService service;
 
     private Settlement settlement() {
@@ -45,7 +46,7 @@ class AdjustSettlementForRefundServiceTest {
     @Test @DisplayName("환불 반영 + 역정산 레코드 생성, refundId 전달")
     void adjusts_and_writes_adjustment() {
         Settlement s = settlement();
-        when(loadSettlementPort.findByPaymentId(1L)).thenReturn(Optional.of(s));
+        when(loadSettlementPort.findByPaymentIdForUpdate(1L)).thenReturn(Optional.of(s));
         when(saveSettlementPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(saveSettlementAdjustmentPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -62,7 +63,7 @@ class AdjustSettlementForRefundServiceTest {
 
     @Test @DisplayName("정산이 존재하지 않으면 SettlementNotFoundException")
     void throwsWhenSettlementMissing() {
-        when(loadSettlementPort.findByPaymentId(999L)).thenReturn(Optional.empty());
+        when(loadSettlementPort.findByPaymentIdForUpdate(999L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.adjustSettlementForRefund(
                 999L, new BigDecimal("10000"), 1L))
@@ -72,7 +73,7 @@ class AdjustSettlementForRefundServiceTest {
     @Test @DisplayName("레거시 2-arg 오버로드도 default 로 작동 (refundId=null)")
     void legacyOverload() {
         Settlement s = settlement();
-        when(loadSettlementPort.findByPaymentId(1L)).thenReturn(Optional.of(s));
+        when(loadSettlementPort.findByPaymentIdForUpdate(1L)).thenReturn(Optional.of(s));
         when(saveSettlementPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(saveSettlementAdjustmentPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -83,33 +84,28 @@ class AdjustSettlementForRefundServiceTest {
         assertThat(captor.getValue().getRefundId()).isNull();
     }
 
-    @Test @DisplayName("3-arg 호출은 LedgerReverseEntryEvent 를 정확한 payload 로 발행")
-    void publishes_ledger_reverse_event_when_refundId_present() {
+    @Test @DisplayName("3-arg 호출은 원장 역분개 작업을 정확한 인자로 아웃박스에 적재")
+    void enqueues_ledger_reverse_when_refundId_present() {
         Settlement s = settlement();
-        when(loadSettlementPort.findByPaymentId(1L)).thenReturn(Optional.of(s));
+        when(loadSettlementPort.findByPaymentIdForUpdate(1L)).thenReturn(Optional.of(s));
         when(saveSettlementPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(saveSettlementAdjustmentPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         service.adjustSettlementForRefund(1L, new BigDecimal("12000"), 555L);
 
-        ArgumentCaptor<LedgerReverseEntryEvent> captor = ArgumentCaptor.forClass(LedgerReverseEntryEvent.class);
-        verify(eventPublisher).publishEvent(captor.capture());
-        LedgerReverseEntryEvent event = captor.getValue();
-        assertThat(event.settlementId()).isEqualTo(100L);
-        assertThat(event.refundId()).isEqualTo(555L);
-        assertThat(event.refundAmount()).isEqualByComparingTo("12000");
-        assertThat(event.adjustmentDate()).isEqualTo(LocalDate.now());
+        verify(enqueueLedgerTaskPort).enqueueReverse(
+                eq(100L), eq(555L), eq(new BigDecimal("12000")), eq(LocalDate.now()));
     }
 
-    @Test @DisplayName("2-arg 레거시 호출은 LedgerReverseEntryEvent 발행하지 않음 (refundId 없음)")
-    void does_not_publish_event_for_legacy_2arg_call() {
+    @Test @DisplayName("2-arg 레거시 호출은 원장 역분개 작업을 적재하지 않음 (refundId 없음)")
+    void does_not_enqueue_for_legacy_2arg_call() {
         Settlement s = settlement();
-        when(loadSettlementPort.findByPaymentId(1L)).thenReturn(Optional.of(s));
+        when(loadSettlementPort.findByPaymentIdForUpdate(1L)).thenReturn(Optional.of(s));
         when(saveSettlementPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(saveSettlementAdjustmentPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         service.adjustSettlementForRefund(1L, new BigDecimal("15000"));
 
-        verify(eventPublisher, never()).publishEvent(any(LedgerReverseEntryEvent.class));
+        verify(enqueueLedgerTaskPort, never()).enqueueReverse(anyLong(), anyLong(), any(), any());
     }
 }
