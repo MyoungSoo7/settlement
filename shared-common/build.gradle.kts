@@ -63,6 +63,10 @@ dependencies {
     api("org.springframework:spring-context-support")
     api("com.github.ben-manes.caffeine:caffeine")
 
+    // ShedLock — @Scheduled 의 분산 락 (replicas N 개 중 1 개만 실행 보장)
+    api("net.javacrumbs.shedlock:shedlock-spring:5.16.0")
+    api("net.javacrumbs.shedlock:shedlock-provider-jdbc-template:5.16.0")
+
     // QueryDSL (config bean)
     api("com.querydsl:querydsl-jpa:5.0.0:jakarta")
 

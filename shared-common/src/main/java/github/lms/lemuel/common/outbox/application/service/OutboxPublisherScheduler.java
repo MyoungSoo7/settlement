@@ -10,6 +10,7 @@ import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import jakarta.annotation.PostConstruct;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -79,6 +80,10 @@ public class OutboxPublisherScheduler {
      * 각 이벤트 처리를 별도 트랜잭션으로 격리해 부분 실패 시에도 다른 이벤트 발행이 계속된다.
      */
     @Scheduled(fixedDelayString = "${app.outbox.polling-delay-ms:2000}")
+    @SchedulerLock(
+            name = "outbox-publisher",
+            lockAtMostFor = "PT1M",
+            lockAtLeastFor = "PT500MS")
     public void publishPendingEvents() {
         List<OutboxEvent> pending = loadOutboxEventPort.findPending(BATCH_SIZE);
         pendingGauge.set(loadOutboxEventPort.countPending());
