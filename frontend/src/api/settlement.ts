@@ -23,31 +23,11 @@ export const settlementApi = {
   },
 
   /**
-   * 정산 상세 조회
-   * GET /api/settlements/{id}
+   * 정산 상세 조회 (SettlementController @RequestMapping("/settlements"))
+   * GET /settlements/{id}
    */
   getSettlement: async (id: number): Promise<SettlementDetail> => {
-    const response = await api.get<SettlementDetail>(`/api/settlements/${id}`);
-    return response.data;
-  },
-
-  /**
-   * 정산 승인
-   * POST /api/settlements/{id}/approve
-   */
-  approveSettlement: async (id: number): Promise<SettlementDetail> => {
-    const response = await api.post<SettlementDetail>(`/api/settlements/${id}/approve`);
-    return response.data;
-  },
-
-  /**
-   * 정산 반려
-   * POST /api/settlements/{id}/reject
-   */
-  rejectSettlement: async (id: number, reason: string): Promise<SettlementDetail> => {
-    const response = await api.post<SettlementDetail>(`/api/settlements/${id}/reject`, {
-      reason,
-    });
+    const response = await api.get<SettlementDetail>(`/settlements/${id}`);
     return response.data;
   },
 };
