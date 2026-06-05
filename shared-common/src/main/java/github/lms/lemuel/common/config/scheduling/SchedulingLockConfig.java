@@ -26,6 +26,7 @@ public class SchedulingLockConfig {
         return new JdbcTemplateLockProvider(
                 JdbcTemplateLockProvider.Configuration.builder()
                         .withJdbcTemplate(new JdbcTemplate(dataSource))
+                        .withTableName("opslab.shedlock") // Flyway 가 opslab 스키마에 생성 — search_path 기본값(public)과 불일치 방지
                         .usingDbTime() // DB time 사용 → 노드 간 clock drift 면역
                         .build());
     }
