@@ -1,5 +1,7 @@
 package github.lms.lemuel.settlement.application.service;
 
+import github.lms.lemuel.common.audit.application.Auditable;
+import github.lms.lemuel.common.audit.domain.AuditAction;
 import github.lms.lemuel.ledger.application.port.in.EnqueueLedgerTaskPort;
 import github.lms.lemuel.settlement.application.port.in.ConfirmDailySettlementsUseCase;
 import github.lms.lemuel.settlement.application.port.out.LoadSettlementPort;
@@ -29,6 +31,12 @@ public class ConfirmDailySettlementsService implements ConfirmDailySettlementsUs
     private final EnqueueLedgerTaskPort enqueueLedgerTaskPort;
 
     @Override
+    @Auditable(
+            action = AuditAction.SETTLEMENT_CONFIRMED,
+            resourceType = "SettlementBatch",
+            resourceId = "#p0.targetDate().toString()",
+            detail = "{'targetDate': #p0.targetDate().toString(), 'confirmedCount': #result.confirmedCount(), 'totalSettlements': #result.totalSettlements()}"
+    )
     @Transactional
     public ConfirmSettlementResult confirmDailySettlements(ConfirmSettlementCommand command) {
         log.info("정산 확정 시작: targetDate={}", command.targetDate());

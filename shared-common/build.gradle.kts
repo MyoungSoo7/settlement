@@ -8,6 +8,8 @@ dependencies {
     api(platform("org.springframework.boot:spring-boot-dependencies:4.0.4"))
 
     // Spring 코어
+    implementation("org.springframework:spring-aop")
+    implementation("org.aspectj:aspectjweaver")
     api("org.springframework:spring-context")
     api("org.springframework:spring-web")
     api("org.springframework:spring-tx")

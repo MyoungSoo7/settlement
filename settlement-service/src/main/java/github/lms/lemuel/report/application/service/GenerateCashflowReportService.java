@@ -1,5 +1,7 @@
 package github.lms.lemuel.report.application.service;
 
+import github.lms.lemuel.common.audit.application.Auditable;
+import github.lms.lemuel.common.audit.domain.AuditAction;
 import github.lms.lemuel.report.application.port.in.GenerateCashflowReportUseCase;
 import github.lms.lemuel.report.application.port.out.LoadCashflowAggregatePort;
 import github.lms.lemuel.report.application.port.out.LoadPeriodReconciliationPort;
@@ -51,6 +53,12 @@ public class GenerateCashflowReportService implements GenerateCashflowReportUseC
     }
 
     @Override
+    @Auditable(
+            action = AuditAction.CASHFLOW_REPORT_ACCESSED,
+            resourceType = "CashflowReport",
+            resourceId = "#p0.from().toString() + ':' + #p0.to().toString()",
+            detail = "{'from': #p0.from().toString(), 'to': #p0.to().toString(), 'granularity': #p0.granularity().name(), 'sellerId': #p0.sellerId()}"
+    )
     public CashflowReport generate(CashflowReportCommand command) {
         return generationTimer.record(() -> doGenerate(command));
     }
