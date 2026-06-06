@@ -3,8 +3,7 @@ spring:
     name: lemuel-gateway
 
   main:
-    # shared-common 이 jakarta.servlet-api 등 servlet 스택을 transitive 로 끌고 오므로
-    # Spring 자동 감지가 SERVLET 으로 흐른다. Gateway 는 WebFlux 기반이므로 강제 지정.
+    # Gateway 는 WebFlux(reactive) 기반이므로 명시적으로 고정한다.
     web-application-type: reactive
 
   cloud:
