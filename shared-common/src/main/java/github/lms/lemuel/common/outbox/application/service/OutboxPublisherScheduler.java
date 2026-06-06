@@ -61,7 +61,7 @@ public class OutboxPublisherScheduler {
     @SchedulerLock(
             name = "outbox-publisher",
             lockAtMostFor = "PT1M",
-            lockAtLeastFor = "PT0.5S")
+            lockAtLeastFor = "PT0.5S")  // "PT500MS" 는 ISO-8601 Duration 비표준 — Java Duration.parse 실패
     public void publishPendingEvents() {
         List<OutboxEvent> pending = loadOutboxEventPort.findPending(BATCH_SIZE);
         pendingGauge.set(loadOutboxEventPort.countPending());
