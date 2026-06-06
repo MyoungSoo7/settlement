@@ -39,11 +39,11 @@ flowchart LR
     GW -->|/api/settlements/**<br/>/api/reconciliation/**<br/>/api/reports/**| SS
 
     subgraph commerce["🛒 Commerce Bounded Context"]
-        OS["order-service<br/>:8088<br/><br/>user · order · payment<br/>product · category<br/>coupon · review"]
+        OS["order-service<br/>:8088<br/><br/>user · order · payment · cart<br/>shipping · product · category<br/>coupon · review · game"]
     end
 
     subgraph settlement["💰 Settlement Bounded Context"]
-        SS["settlement-service<br/>:8082<br/><br/>settlement · reconciliation<br/>cashflow report · ES indexing<br/>daily/monthly batch"]
+        SS["settlement-service<br/>:8082<br/><br/>settlement · payout · ledger<br/>chargeback · pgreconciliation<br/>report · ES indexing · batch"]
     end
 
     OS -->|Outbox + Kafka publish| K[(Kafka<br/>Redpanda)]
@@ -91,7 +91,7 @@ flowchart LR
 | 비밀번호 | BCrypt (cost=12) |
 | PDF | iText 8 (정산서, 캐시플로우 리포트) |
 | 모니터링 | Micrometer + Prometheus + Grafana |
-| 마이그레이션 | Flyway (V1~V34) |
+| 마이그레이션 | Flyway (V1~V49, 이후 timestamp 명명) |
 | 코드 품질 | SonarCloud + JaCoCo |
 | 테스트 | JUnit 5 + Mockito + ArchUnit + Testcontainers |
 | 컨테이너 | Docker Compose (dev) / Kubernetes (prod) |
@@ -118,7 +118,7 @@ settlement/                              # 모노레포 루트
 │       └── pdf/                         # iText PDF 유틸
 │
 ├── order-service/                       # 🛒 Commerce 서비스 (port 8088)
-│   └── src/main/java/.../{user,order,payment,product,category,coupon,review,game}
+│   └── src/main/java/.../{user,order,payment,cart,shipping,product,category,coupon,review,game}
 │       ├── adapter/in/web/              # REST 컨트롤러
 │       ├── adapter/out/persistence/     # JPA 엔티티/리포지토리
 │       ├── adapter/out/external/        # Toss PG 클라이언트
@@ -127,7 +127,7 @@ settlement/                              # 모노레포 루트
 │
 ├── settlement-service/                  # 💰 Settlement 서비스 (port 8082)
 │   └── src/main/java/.../
-│       ├── settlement/
+│       ├── settlement/                  # 정산 생성/확정·홀드백
 │       │   ├── adapter/in/web/          # 정산 조회/관리 API
 │       │   ├── adapter/in/kafka/        # PaymentEventKafkaConsumer
 │       │   ├── adapter/in/batch/        # Spring Batch (일/월 정산)
@@ -135,6 +135,10 @@ settlement/                              # 모노레포 루트
 │       │   ├── adapter/out/readmodel/   # ★ Read-only projection 엔티티
 │       │   ├── adapter/out/search/      # Elasticsearch 색인
 │       │   └── adapter/out/pdf/         # 정산서 PDF
+│       ├── payout/                      # 셀러 지급 (펌뱅킹, SellerBankAccount)
+│       ├── ledger/                      # 복식부기 원장 (LedgerEntry, Outbox)
+│       ├── chargeback/                  # 지급 분쟁/거절 처리
+│       ├── pgreconciliation/            # PG 정산파일 대사 + 차액 보정
 │       └── report/                      # 캐시플로우 리포트 도메인
 │
 └── gateway-service/                     # 🚪 API Gateway (port 8080)
@@ -203,10 +207,16 @@ Payment.capture() (DB tx)
 
 ```
 REQUESTED ─→ PROCESSING ─→ DONE
-                       └─→ FAILED
+                       ├─→ FAILED
+                       └─→ CANCELED
 
 (환불 발생 시)
 DONE ─→ SettlementAdjustment 생성 (역정산)
+
+(확정 정산 → 셀러 지급)
+Payout:    REQUESTED ─→ SENDING ─→ COMPLETED / FAILED / CANCELED
+Ledger:    PENDING ─→ POSTED ─→ REVERSED      (복식부기 원장)
+Chargeback: OPEN ─→ ACCEPTED / REJECTED       (지급 분쟁)
 ```
 
 ### 5. 회복탄력성 (Resilience4j)
@@ -328,11 +338,13 @@ docker build --build-arg MODULE=gateway-service     -t lemuel-gateway .
 |---|---|
 | `/api/users/**`, `/api/auth/**` | order-service |
 | `/api/orders/**`, `/api/payments/**`, `/api/refunds/**` | order-service |
-| `/api/products/**`, `/api/categories/**` | order-service |
+| `/api/products/**`, `/api/categories/**`, `/api/tags/**` | order-service |
 | `/api/coupons/**`, `/api/reviews/**` | order-service |
-| `/api/settlements/**` | settlement-service |
-| `/api/reconciliation/**` | settlement-service |
-| `/api/reports/**` | settlement-service |
+| `/admin/categories/**`, `/admin/pg/**`, `/admin/products/**` | order-service |
+| `/api/settlements/**`, `/api/reconciliation/**`, `/api/reports/**` | settlement-service |
+| `/api/ledger/**` | settlement-service |
+| `/admin/payouts/**`, `/admin/chargebacks/**` | settlement-service |
+| `/admin/pg-reconciliation/**`, `/admin/reconciliation/**`, `/admin/dlq/**` | settlement-service |
 
 ---
 
