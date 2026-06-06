@@ -22,7 +22,7 @@
 | 캐시 | Caffeine |
 | PDF 생성 | iText 8 |
 | 모니터링 | Micrometer + Prometheus |
-| 마이그레이션 | Flyway (V1 ~ V34) |
+| 마이그레이션 | Flyway (V1 ~ V49, 이후 timestamp 명명) |
 | 회복탄력성 | Resilience4j |
 | Rate Limiting | Bucket4j |
 
@@ -35,9 +35,9 @@ settlement/                       # Gradle 멀티 모듈 루트
 ├── shared-common/                # 📦 java-library: 양 서비스가 의존
 │   └── github.lms.lemuel.common.{audit, config, exception, outbox, ratelimit, pdf}
 ├── order-service/                # 🛒 Commerce 서비스 (port 8088)
-│   └── github.lms.lemuel.{user, order, payment, product, category, coupon, review, game}
+│   └── github.lms.lemuel.{user, order, payment, cart, shipping, product, category, coupon, review, game}
 ├── settlement-service/           # 💰 Settlement 서비스 (port 8082)
-│   └── github.lms.lemuel.{settlement, report}
+│   └── github.lms.lemuel.{settlement, payout, ledger, chargeback, pgreconciliation, report}
 └── gateway-service/              # 🚪 API Gateway (port 8080)
 ```
 
@@ -45,8 +45,8 @@ settlement/                       # Gradle 멀티 모듈 루트
 
 | 서비스 | 패키지 | 책임 |
 |--------|--------|------|
-| **order-service** | `user, order, payment, product, category, coupon, review, game` | 회원·상품·주문·결제 — 거래 컨텍스트 |
-| **settlement-service** | `settlement, report` | 정산 생성/확정, 대사, ES 색인, PDF, 캐시플로우 리포트 |
+| **order-service** | `user, order, payment, cart, shipping, product, category, coupon, review, game` | 회원·상품·장바구니·주문·결제·배송 — 거래 컨텍스트 |
+| **settlement-service** | `settlement, payout, ledger, chargeback, pgreconciliation, report` | 정산 생성/확정, 지급(payout), 복식부기 원장(ledger), 차지백, PG 대사, ES 색인, PDF, 캐시플로우 리포트 |
 | **gateway-service** | (Spring Cloud Gateway) | 라우팅, 인증 필터 |
 | **shared-common** | `common.*` | 양 서비스 공유 — 감사·관측·예외·Outbox·rate limit·JWT·PDF |
 
@@ -100,6 +100,7 @@ READY → AUTHORIZED → CAPTURED → REFUNDED
 ```
 REQUESTED → PROCESSING → DONE
                        → FAILED
+                       → CANCELED
 ```
 
 ### Order 상태
@@ -108,9 +109,34 @@ CREATED → PAID → REFUNDED
               → CANCELED
 ```
 
+### Payout 상태 (셀러 지급)
+```
+REQUESTED → SENDING → COMPLETED
+                    → FAILED
+                    → CANCELED
+```
+
+### Chargeback 상태 (지급 거절/분쟁)
+```
+OPEN → ACCEPTED
+     → REJECTED
+```
+
+### Ledger 상태 (복식부기 원장)
+```
+PENDING → POSTED → REVERSED
+```
+
+### PG 대사 실행 상태 (PgReconciliation)
+```
+RUNNING → COMPLETED
+        → FAILED
+```
+
 ### 수수료
 - 기본 정산 수수료율: **3%**
 - 셀러 티어별 차등 (V32 마이그레이션, `SellerTier`)
+- 홀드백(holdback) 정책: `HoldbackPolicy` — 일부 보류 후 `holdbackReleaseDate` 에 해제
 
 ## 이벤트 흐름 (Outbox + Kafka)
 
@@ -136,7 +162,7 @@ CREATED → PAID → REFUNDED
 - **아키텍처**: 헥사고날 (Ports & Adapters)
 - **도메인 모델**: 순수 POJO, 프레임워크 의존성 없음
 - **포트/어댑터**: in/out 명확히 분리
-- **DB 마이그레이션**: Flyway, V1 ~ V34
+- **DB 마이그레이션**: Flyway, V1 ~ V49 (이후 `V{timestamp}__` 명명 컨벤션, 예: `V20260606003307__`)
 - **테스트**: 도메인 단위 → 서비스 → 컨트롤러 → 통합 순
 - **헥사고날 강제**: ArchUnit 으로 패키지 의존 방향 검증
 - **MSA 경계**: settlement-service ↔ order-service 코드 의존 0 (read-model 또는 Kafka 이벤트로만)
