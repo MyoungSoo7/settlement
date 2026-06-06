@@ -3,13 +3,12 @@ package github.lms.lemuel.product.application.service;
 import github.lms.lemuel.product.application.port.out.LoadProductVariantPort;
 import github.lms.lemuel.product.application.port.out.SaveProductVariantPort;
 import github.lms.lemuel.product.domain.ProductVariant;
+import github.lms.lemuel.product.domain.ProductVariantStatus;
 import github.lms.lemuel.product.domain.exception.InsufficientStockException;
-import github.lms.lemuel.product.domain.exception.StockConcurrencyException;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
@@ -17,14 +16,13 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 /**
- * 재시도 로직 단위 테스트.
+ * 원자적 조건부 UPDATE 기반 재고 차감 단위 테스트.
  *
- * <p>실 PostgreSQL 동시성은 별도 통합 테스트로 검증. 여기서는 OptimisticLockingFailureException
- * 시 N 회 재시도 + 백오프 + 한계 도달 시 StockConcurrencyException 전환 동작만 격리 검증한다.
+ * <p>실 PostgreSQL 동시성은 별도 통합 테스트로 검증. 여기서는 영향 행 수(1/0)에 따른 성공/거절
+ * 분기와 거절 원인(재고부족·단종·미존재) 분류 로직을 격리 검증한다.
  */
 class DecreaseVariantStockServiceTest {
 
@@ -47,78 +45,63 @@ class DecreaseVariantStockServiceTest {
     }
 
     @Test
-    @DisplayName("정상 차감: 첫 시도에 성공 — 재시도 없음")
-    void firstAttemptSucceeds() {
-        ProductVariant variant = ProductVariant.rehydrate(1L, 10L, "SKU", "옵션",
-                BigDecimal.ZERO, 50, 0L,
-                github.lms.lemuel.product.domain.ProductVariantStatus.ACTIVE, null, null);
-        when(loadPort.loadById(1L)).thenReturn(Optional.of(variant));
-        when(savePort.save(any())).thenReturn(variant);
+    @DisplayName("정상 차감: 원자 UPDATE 1 행 → 갱신된 variant 반환")
+    void decreasesAtomically() {
+        ProductVariant afterDecrease = variant(45, ProductVariantStatus.ACTIVE);
+        when(savePort.decreaseStockIfAvailable(1L, 5)).thenReturn(1);
+        when(loadPort.loadById(1L)).thenReturn(Optional.of(afterDecrease));
 
         ProductVariant result = service.decrease(1L, 5);
 
         assertThat(result).isNotNull();
+        assertThat(result.getStockQuantity()).isEqualTo(45);
+        verify(savePort, times(1)).decreaseStockIfAvailable(1L, 5);
+        // 성공 경로는 차감 후 상태 조회 1 회만 (원인 분류 조회 없음)
         verify(loadPort, times(1)).loadById(1L);
     }
 
     @Test
-    @DisplayName("OptimisticLock 충돌 시 재시도 후 성공")
-    void retriesOnOptimisticLock() {
-        ProductVariant variant = freshVariant();
-        when(loadPort.loadById(1L)).thenReturn(Optional.of(variant));
-        // 처음 2번은 충돌, 3번째 성공
-        when(savePort.save(any()))
-                .thenThrow(new OptimisticLockingFailureException("conflict 1"))
-                .thenThrow(new OptimisticLockingFailureException("conflict 2"))
-                .thenReturn(variant);
-
-        ProductVariant result = service.decrease(1L, 1);
-
-        assertThat(result).isNotNull();
-        verify(loadPort, times(3)).loadById(1L); // 매 재시도마다 다시 로드
-        verify(savePort, times(3)).save(any());
-    }
-
-    @Test
-    @DisplayName("재시도 한계 초과: StockConcurrencyException 으로 전환")
-    void exceedsRetryLimit() {
-        // 매번 새 variant 인스턴스 반환 (재시도마다 fresh load)
-        when(loadPort.loadById(1L)).thenAnswer(inv -> Optional.of(freshVariant()));
-        when(savePort.save(any())).thenThrow(new OptimisticLockingFailureException("conflict"));
-
-        assertThatThrownBy(() -> service.decrease(1L, 1))
-                .isInstanceOf(StockConcurrencyException.class)
-                .hasMessageContaining("재시도");
-
-        verify(savePort, times(DecreaseVariantStockService.MAX_ATTEMPTS)).save(any());
-    }
-
-    @Test
-    @DisplayName("재고 부족: InsufficientStockException — 재시도 없음 (도메인 검증 실패는 재시도 대상 아님)")
-    void insufficientStock_noRetry() {
-        ProductVariant variant = ProductVariant.rehydrate(1L, 10L, "SKU", "옵션",
-                BigDecimal.ZERO, 1, 0L,
-                github.lms.lemuel.product.domain.ProductVariantStatus.ACTIVE, null, null);
-        when(loadPort.loadById(1L)).thenReturn(Optional.of(variant));
+    @DisplayName("재고 부족: 영향 행 0 + ACTIVE → InsufficientStockException")
+    void insufficientStock() {
+        when(savePort.decreaseStockIfAvailable(1L, 5)).thenReturn(0);
+        when(loadPort.loadById(1L)).thenReturn(Optional.of(variant(1, ProductVariantStatus.ACTIVE)));
 
         assertThatThrownBy(() -> service.decrease(1L, 5))
                 .isInstanceOf(InsufficientStockException.class);
-
-        verify(savePort, never()).save(any());
     }
 
     @Test
-    @DisplayName("variant 미존재 시 IllegalArgumentException")
+    @DisplayName("단종 SKU: 영향 행 0 + DISCONTINUED → IllegalStateException")
+    void discontinued() {
+        when(savePort.decreaseStockIfAvailable(1L, 1)).thenReturn(0);
+        when(loadPort.loadById(1L)).thenReturn(Optional.of(variant(50, ProductVariantStatus.DISCONTINUED)));
+
+        assertThatThrownBy(() -> service.decrease(1L, 1))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("단종");
+    }
+
+    @Test
+    @DisplayName("variant 미존재: 영향 행 0 + 조회 empty → IllegalArgumentException")
     void unknownVariant() {
+        when(savePort.decreaseStockIfAvailable(999L, 1)).thenReturn(0);
         when(loadPort.loadById(999L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.decrease(999L, 1))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
-    private static ProductVariant freshVariant() {
+    @Test
+    @DisplayName("수량 <= 0: DB 접근 없이 IllegalArgumentException")
+    void nonPositiveQuantity() {
+        assertThatThrownBy(() -> service.decrease(1L, 0))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verify(savePort, never()).decreaseStockIfAvailable(anyLong(), anyInt());
+    }
+
+    private static ProductVariant variant(int stock, ProductVariantStatus status) {
         return ProductVariant.rehydrate(1L, 10L, "SKU", "옵션",
-                BigDecimal.ZERO, 50, 0L,
-                github.lms.lemuel.product.domain.ProductVariantStatus.ACTIVE, null, null);
+                BigDecimal.ZERO, stock, 0L, status, null, null);
     }
 }

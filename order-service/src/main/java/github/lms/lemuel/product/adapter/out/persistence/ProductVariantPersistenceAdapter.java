@@ -5,6 +5,7 @@ import github.lms.lemuel.product.application.port.out.SaveProductVariantPort;
 import github.lms.lemuel.product.domain.ProductVariant;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -59,6 +60,11 @@ public class ProductVariantPersistenceAdapter
         }
         ProductVariantJpaEntity saved = repository.save(entity);
         return toDomain(saved);
+    }
+
+    @Override
+    public int decreaseStockIfAvailable(Long variantId, int quantity) {
+        return repository.decreaseStockIfAvailable(variantId, quantity, LocalDateTime.now());
     }
 
     private static ProductVariant toDomain(ProductVariantJpaEntity e) {
