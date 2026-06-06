@@ -3,12 +3,11 @@ package github.lms.lemuel;
 import io.github.cdimascio.dotenv.Dotenv;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.persistence.autoconfigure.EntityScan;
-import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication(
     scanBasePackages = {
+        "github.lms.lemuel.config",
         "github.lms.lemuel.user",
         "github.lms.lemuel.order",
         "github.lms.lemuel.cart",
@@ -30,40 +29,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         "github.lms.lemuel.chargeback",
     }
 )
-@EntityScan(basePackages = {
-    "github.lms.lemuel.cart",
-    "github.lms.lemuel.category",
-    "github.lms.lemuel.chargeback",
-    "github.lms.lemuel.common",
-    "github.lms.lemuel.coupon",
-    "github.lms.lemuel.ledger",
-    "github.lms.lemuel.order",
-    "github.lms.lemuel.payment",
-    "github.lms.lemuel.payout",
-    "github.lms.lemuel.pgreconciliation",
-    "github.lms.lemuel.product",
-    "github.lms.lemuel.review",
-    "github.lms.lemuel.settlement",
-    "github.lms.lemuel.shipping",
-    "github.lms.lemuel.user",
-})
-@EnableJpaRepositories(basePackages = {
-    "github.lms.lemuel.cart",
-    "github.lms.lemuel.category",
-    "github.lms.lemuel.chargeback",
-    "github.lms.lemuel.common",
-    "github.lms.lemuel.coupon",
-    "github.lms.lemuel.ledger",
-    "github.lms.lemuel.order",
-    "github.lms.lemuel.payment",
-    "github.lms.lemuel.payout",
-    "github.lms.lemuel.pgreconciliation",
-    "github.lms.lemuel.product",
-    "github.lms.lemuel.review",
-    "github.lms.lemuel.settlement",
-    "github.lms.lemuel.shipping",
-    "github.lms.lemuel.user",
-})
 @EnableScheduling
 public class LemuelApplication {
 

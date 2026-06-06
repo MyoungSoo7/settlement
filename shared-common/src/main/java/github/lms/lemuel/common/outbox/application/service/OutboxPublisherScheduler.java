@@ -61,7 +61,7 @@ public class OutboxPublisherScheduler {
     @SchedulerLock(
             name = "outbox-publisher",
             lockAtMostFor = "PT1M",
-            lockAtLeastFor = "PT500MS")
+            lockAtLeastFor = "PT0.5S")
     public void publishPendingEvents() {
         List<OutboxEvent> pending = loadOutboxEventPort.findPending(BATCH_SIZE);
         pendingGauge.set(loadOutboxEventPort.countPending());
