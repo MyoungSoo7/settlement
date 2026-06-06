@@ -21,21 +21,22 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         "github.lms.lemuel.report",
         "github.lms.lemuel.game",
         "github.lms.lemuel.common",
-        // settlement-service 모듈 (임시 번들). ledger 는 prod DB 에 테이블 미생성이라 제외.
+        // settlement-service 모듈 (임시 번들). ledger 테이블(ledger_entries V45, ledger_outbox V49)이
+        // 적용돼 ledger 포함 — settlement 서비스가 EnqueueLedgerTaskPort 빈을 필요로 한다.
         "github.lms.lemuel.settlement",
+        "github.lms.lemuel.ledger",
         "github.lms.lemuel.pgreconciliation",
         "github.lms.lemuel.payout",
         "github.lms.lemuel.chargeback",
     }
 )
-// ledger 패키지 entity 가 자동 스캔되지 않도록 명시 — ledger_entries 테이블이 prod 에 없어
-// Hibernate schema validation 실패. Phase B 에서 V47 마이그레이션 추가 후 복귀.
 @EntityScan(basePackages = {
     "github.lms.lemuel.cart",
     "github.lms.lemuel.category",
     "github.lms.lemuel.chargeback",
     "github.lms.lemuel.common",
     "github.lms.lemuel.coupon",
+    "github.lms.lemuel.ledger",
     "github.lms.lemuel.order",
     "github.lms.lemuel.payment",
     "github.lms.lemuel.payout",
@@ -52,6 +53,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
     "github.lms.lemuel.chargeback",
     "github.lms.lemuel.common",
     "github.lms.lemuel.coupon",
+    "github.lms.lemuel.ledger",
     "github.lms.lemuel.order",
     "github.lms.lemuel.payment",
     "github.lms.lemuel.payout",
