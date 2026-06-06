@@ -33,14 +33,15 @@ public class ConfirmDailySettlementsService implements ConfirmDailySettlementsUs
     public ConfirmSettlementResult confirmDailySettlements(ConfirmSettlementCommand command) {
         log.info("정산 확정 시작: targetDate={}", command.targetDate());
 
-        // 1. 대상 정산 조회
-        List<Settlement> settlements = loadSettlementPort.findBySettlementDate(command.targetDate());
+        // 1. 대상 정산 조회 — 비관적 락으로 확정 대상(REQUESTED)을 잠근다.
+        //    동시 확정 배치/수동 트리거가 같은 일자를 처리해도 직렬화되어 이중 확정이 발생하지 않는다.
+        List<Settlement> settlements = loadSettlementPort.findConfirmableForUpdate(command.targetDate());
 
         int totalSettlements = settlements.size();
         int confirmedCount = 0;
         List<Long> confirmedSettlementIds = new ArrayList<>();
 
-        // 2. 정산 확정
+        // 2. 정산 확정 (조회 결과는 모두 REQUESTED 이나 방어적으로 isPending 재확인)
         for (Settlement settlement : settlements) {
             if (settlement.isPending()) {
                 settlement.confirm(); // 도메인 로직 호출

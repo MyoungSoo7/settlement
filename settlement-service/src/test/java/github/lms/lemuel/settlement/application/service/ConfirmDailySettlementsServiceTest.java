@@ -45,7 +45,7 @@ class ConfirmDailySettlementsServiceTest {
         LocalDate target = LocalDate.of(2026, 4, 22);
         Settlement s1 = requestedSettlement(1L);
         Settlement s2 = requestedSettlement(2L);
-        when(loadSettlementPort.findBySettlementDate(target)).thenReturn(List.of(s1, s2));
+        when(loadSettlementPort.findConfirmableForUpdate(target)).thenReturn(List.of(s1, s2));
         when(saveSettlementPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         var result = service.confirmDailySettlements(
@@ -59,13 +59,13 @@ class ConfirmDailySettlementsServiceTest {
         verify(publishSettlementEventPort).publishSettlementConfirmedEvent(anyList());
     }
 
-    @Test @DisplayName("DONE 정산은 건너뜀, 이벤트도 발행 안 함")
+    @Test @DisplayName("방어적 isPending: 락 조회가 DONE 행을 반환해도 건너뜀, 이벤트도 발행 안 함")
     void skipsAlreadyDone() {
         LocalDate target = LocalDate.of(2026, 4, 22);
         Settlement done = requestedSettlement(1L);
         done.startProcessing();
         done.complete();
-        when(loadSettlementPort.findBySettlementDate(target)).thenReturn(List.of(done));
+        when(loadSettlementPort.findConfirmableForUpdate(target)).thenReturn(List.of(done));
 
         var result = service.confirmDailySettlements(
                 new ConfirmDailySettlementsUseCase.ConfirmSettlementCommand(target));
@@ -79,7 +79,7 @@ class ConfirmDailySettlementsServiceTest {
     @Test @DisplayName("대상 정산 없으면 이벤트 발행 안 함")
     void noSettlements() {
         LocalDate target = LocalDate.of(2026, 4, 22);
-        when(loadSettlementPort.findBySettlementDate(target)).thenReturn(List.of());
+        when(loadSettlementPort.findConfirmableForUpdate(target)).thenReturn(List.of());
 
         var result = service.confirmDailySettlements(
                 new ConfirmDailySettlementsUseCase.ConfirmSettlementCommand(target));

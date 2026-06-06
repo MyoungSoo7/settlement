@@ -78,6 +78,16 @@ public class PayoutPersistenceAdapter implements LoadPayoutPort, SavePayoutPort 
         return toDomain(repository.save(entity));
     }
 
+    @Override
+    public Optional<Payout> claimForSending(Long payoutId) {
+        int claimed = repository.claimForSending(payoutId, LocalDateTime.now());
+        if (claimed == 0) {
+            return Optional.empty();
+        }
+        // clearAutomatically=true 로 영속성 컨텍스트가 비워졌으므로 DB 에서 SENDING 상태를 다시 읽어 반환.
+        return repository.findById(payoutId).map(PayoutPersistenceAdapter::toDomain);
+    }
+
     private static Payout toDomain(PayoutJpaEntity e) {
         SellerBankAccount account = new SellerBankAccount(
                 e.getBankCode(), e.getBankAccountNumber(), e.getAccountHolderName()

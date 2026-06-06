@@ -6,6 +6,7 @@ import github.lms.lemuel.coupon.application.port.out.SaveCouponPort;
 import github.lms.lemuel.coupon.domain.Coupon;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -71,7 +72,17 @@ public class CouponService implements CouponUseCase {
         if (!saveCouponPort.incrementUsageIfAvailable(coupon.getId())) {
             throw new IllegalStateException("쿠폰 사용 한도를 초과했습니다.");
         }
-        saveCouponPort.recordUsage(coupon.getId(), userId, orderId);
+
+        // 1인 1매 한도는 coupon_usages(coupon_id, user_id) UNIQUE 제약으로 강제한다.
+        // validateCoupon 의 hasUserUsedCoupon 체크는 동시 요청을 막지 못하는 소프트 체크이므로,
+        // 같은 사용자의 동시 사용 시 두 번째 INSERT 가 제약 위반 → 전체 트랜잭션 롤백(used_count 증가도 취소)
+        // → 사용자에게 멱등하게 "이미 사용한 쿠폰" 으로 응답한다.
+        try {
+            saveCouponPort.recordUsage(coupon.getId(), userId, orderId);
+        } catch (DataIntegrityViolationException e) {
+            log.warn("쿠폰 중복 사용 차단: code={}, userId={}", code, userId);
+            throw new IllegalStateException("이미 사용한 쿠폰입니다.", e);
+        }
 
         log.info("쿠폰 사용 완료: code={}, userId={}, orderId={}", code, userId, orderId);
     }

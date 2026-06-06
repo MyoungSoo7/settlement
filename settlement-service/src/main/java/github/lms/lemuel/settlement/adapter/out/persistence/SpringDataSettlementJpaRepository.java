@@ -31,6 +31,22 @@ public interface SpringDataSettlementJpaRepository extends JpaRepository<Settlem
     List<SettlementJpaEntity> findBySettlementDateAndStatus(LocalDate settlementDate, String status);
 
     /**
+     * 정산 확정 배치용 비관적 락 조회 — 해당 일자의 특정 상태(REQUESTED) 정산 행을 잠근다.
+     *
+     * <p>스케줄 배치(ShedLock)와 운영자 수동 트리거가 같은 일자를 동시에 확정하려 해도, 두 번째
+     * 트랜잭션은 이 락에서 대기하다 첫 번째 커밋 후 진행한다. 그 시점엔 행이 이미 DONE 이라
+     * 결과 집합에서 빠져 이중 확정/이중 원장 적재가 발생하지 않는다.
+     * 데드락 회피를 위해 id 오름차순으로 결정적 잠금. 반드시 @Transactional 안에서 호출.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT s FROM SettlementJpaEntity s " +
+           "WHERE s.settlementDate = :settlementDate AND s.status = :status " +
+           "ORDER BY s.id ASC")
+    List<SettlementJpaEntity> findBySettlementDateAndStatusForUpdate(
+            @Param("settlementDate") LocalDate settlementDate,
+            @Param("status") String status);
+
+    /**
      * 보류 해제 배치 — release_date <= today 이고 아직 released=false 이며 holdback > 0 인 row.
      *
      * 비관적 락(SELECT ... FOR UPDATE)으로 잠가, 동시 환불(consumeHoldbackForRefund)이 같은 정산의

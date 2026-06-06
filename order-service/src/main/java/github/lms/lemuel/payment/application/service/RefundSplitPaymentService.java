@@ -57,7 +57,9 @@ public class RefundSplitPaymentService {
     }
 
     public PaymentDomain refundSplit(Long paymentId, BigDecimal totalRefundAmount) {
-        PaymentDomain payment = loadPaymentPort.loadById(paymentId)
+        // 비관적 락: 동시 분할환불이 같은 결제/tender 행을 동시에 갱신해 정합성이 깨지는 것을
+        // 막기 위해 부모 결제 행을 잠근다. tender 갱신은 같은 트랜잭션 안에서 직렬화된다.
+        PaymentDomain payment = loadPaymentPort.loadByIdForUpdate(paymentId)
                 .orElseThrow(() -> new PaymentNotFoundException(paymentId));
 
         if (!payment.isSplit()) {

@@ -60,6 +60,15 @@ public class SettlementPersistenceAdapter
     }
 
     @Override
+    public List<Settlement> findConfirmableForUpdate(LocalDate settlementDate) {
+        return settlementJpaRepository
+                .findBySettlementDateAndStatusForUpdate(settlementDate, SettlementStatus.REQUESTED.name())
+                .stream()
+                .map(mapper::toDomain)
+                .collect(Collectors.toList());
+    }
+
+    @Override
     public Settlement save(Settlement settlement) {
         SettlementJpaEntity entity = mapper.toEntity(settlement);
         SettlementJpaEntity saved = settlementJpaRepository.save(entity);

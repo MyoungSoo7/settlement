@@ -25,4 +25,10 @@ public interface LoadSettlementPort {
     List<Settlement> findBySettlementDate(LocalDate settlementDate);
 
     List<Settlement> findBySettlementDateAndStatus(LocalDate settlementDate, SettlementStatus status);
+
+    /**
+     * 정산 확정 대상(해당 일자의 REQUESTED) 을 비관적 락으로 조회한다.
+     * 동시 확정 배치/수동 트리거를 직렬화해 이중 확정·이중 원장 적재를 막는다.
+     */
+    List<Settlement> findConfirmableForUpdate(LocalDate settlementDate);
 }

@@ -56,7 +56,9 @@ public class RefundPaymentUseCase implements RefundPaymentPort {
 
     @Override
     public PaymentDomain refundPayment(Long paymentId, BigDecimal amount, String idempotencyKey) {
-        PaymentDomain paymentDomain = loadPaymentPort.loadById(paymentId)
+        // 비관적 락: 동시 환불이 같은 결제 행을 읽고 각자 refundedAmount 를 덮어쓰는
+        // lost update + PG 이중 호출을 막기 위해 트랜잭션 종료까지 행을 잠근다.
+        PaymentDomain paymentDomain = loadPaymentPort.loadByIdForUpdate(paymentId)
             .orElseThrow(() -> new PaymentNotFoundException(paymentId));
 
         // 1. 이미 전액 환불된 결제는 추가 PG 호출 없이 현재 상태 반환
