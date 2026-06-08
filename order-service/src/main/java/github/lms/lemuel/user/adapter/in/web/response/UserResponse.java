@@ -19,6 +19,9 @@ public class UserResponse {
     private Long id;
     private String email;
     private String role;
+    private String name;
+    private String phoneNumber;
+    private boolean active;
     private LocalDateTime createdAt;
 
     public static UserResponse from(User user) {
@@ -26,6 +29,9 @@ public class UserResponse {
                 user.getId(),
                 user.getEmail(),
                 user.getRole().name(),
+                user.getName(),
+                user.getPhoneNumber(),
+                user.isActive(),
                 user.getCreatedAt()
         );
     }

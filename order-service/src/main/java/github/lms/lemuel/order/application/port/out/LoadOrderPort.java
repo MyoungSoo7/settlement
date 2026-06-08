@@ -14,5 +14,7 @@ public interface LoadOrderPort {
 
     List<Order> findByUserId(Long userId);
 
+    List<Order> findByUserId(Long userId, String status, java.time.LocalDateTime from, java.time.LocalDateTime to);
+
     List<Order> findAll();
 }

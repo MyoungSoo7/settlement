@@ -13,5 +13,7 @@ public interface GetOrderUseCase {
 
     List<Order> getOrdersByUserId(Long userId);
 
+    List<Order> getOrdersByUserId(Long userId, String status, java.time.LocalDateTime from, java.time.LocalDateTime to);
+
     List<Order> getAllOrders();
 }

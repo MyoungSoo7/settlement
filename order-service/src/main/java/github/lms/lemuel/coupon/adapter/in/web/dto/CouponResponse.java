@@ -15,6 +15,9 @@ public record CouponResponse(
         BigDecimal maxDiscountAmount,
         int maxUses,
         int usedCount,
+        String targetType,
+        Long targetId,
+        LocalDateTime startsAt,
         LocalDateTime expiresAt,
         boolean isActive,
         LocalDateTime createdAt
@@ -29,6 +32,9 @@ public record CouponResponse(
                 coupon.getMaxDiscountAmount(),
                 coupon.getMaxUses(),
                 coupon.getUsedCount(),
+                coupon.getTargetType(),
+                coupon.getTargetId(),
+                coupon.getStartsAt(),
                 coupon.getExpiresAt(),
                 coupon.isActive(),
                 coupon.getCreatedAt()

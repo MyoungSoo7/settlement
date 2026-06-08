@@ -35,7 +35,13 @@ public class CreateUserService implements CreateUserUseCase {
         String hashedPassword = passwordHashPort.hash(command.rawPassword());
 
         // 3. User 도메인 생성 (도메인 검증 수행)
-        User user = User.createWithRole(command.email(), hashedPassword, command.role());
+        User user = User.createWithProfile(
+                command.email(),
+                hashedPassword,
+                command.role(),
+                command.name(),
+                command.phoneNumber()
+        );
 
         // 4. 저장
         User savedUser = saveUserPort.save(user);

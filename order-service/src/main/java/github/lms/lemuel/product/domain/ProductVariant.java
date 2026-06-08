@@ -27,6 +27,8 @@ public class ProductVariant {
     private final String sku;
     private String optionName;
     private BigDecimal additionalPrice;
+    private BigDecimal discountPrice;
+    private BigDecimal discountRate;
     private int stockQuantity;
     private long version;
     private ProductVariantStatus status;
@@ -45,7 +47,7 @@ public class ProductVariant {
             throw new IllegalArgumentException("초기 재고는 0 이상");
         }
         BigDecimal price = additionalPrice == null ? BigDecimal.ZERO : additionalPrice;
-        return new ProductVariant(null, productId, sku, optionName, price, initialStock,
+        return new ProductVariant(null, productId, sku, optionName, price, null, null, initialStock,
                 0L, initialStock == 0 ? ProductVariantStatus.OUT_OF_STOCK : ProductVariantStatus.ACTIVE,
                 LocalDateTime.now(), LocalDateTime.now());
     }
@@ -54,18 +56,30 @@ public class ProductVariant {
                                             BigDecimal additionalPrice, int stockQuantity, long version,
                                             ProductVariantStatus status, LocalDateTime createdAt,
                                             LocalDateTime updatedAt) {
-        return new ProductVariant(id, productId, sku, optionName, additionalPrice, stockQuantity,
+        return rehydrate(id, productId, sku, optionName, additionalPrice, null, null, stockQuantity,
                 version, status, createdAt, updatedAt);
     }
 
+    public static ProductVariant rehydrate(Long id, Long productId, String sku, String optionName,
+                                            BigDecimal additionalPrice, BigDecimal discountPrice,
+                                            BigDecimal discountRate, int stockQuantity, long version,
+                                            ProductVariantStatus status, LocalDateTime createdAt,
+                                            LocalDateTime updatedAt) {
+        return new ProductVariant(id, productId, sku, optionName, additionalPrice, discountPrice,
+                discountRate, stockQuantity, version, status, createdAt, updatedAt);
+    }
+
     private ProductVariant(Long id, Long productId, String sku, String optionName,
-                           BigDecimal additionalPrice, int stockQuantity, long version,
-                           ProductVariantStatus status, LocalDateTime createdAt, LocalDateTime updatedAt) {
+                           BigDecimal additionalPrice, BigDecimal discountPrice, BigDecimal discountRate,
+                           int stockQuantity, long version, ProductVariantStatus status,
+                           LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.id = id;
         this.productId = productId;
         this.sku = sku;
         this.optionName = optionName;
         this.additionalPrice = additionalPrice;
+        this.discountPrice = discountPrice;
+        this.discountRate = discountRate;
         this.stockQuantity = stockQuantity;
         this.version = version;
         this.status = status;
@@ -120,6 +134,8 @@ public class ProductVariant {
     public String getSku() { return sku; }
     public String getOptionName() { return optionName; }
     public BigDecimal getAdditionalPrice() { return additionalPrice; }
+    public BigDecimal getDiscountPrice() { return discountPrice; }
+    public BigDecimal getDiscountRate() { return discountRate; }
     public int getStockQuantity() { return stockQuantity; }
     public long getVersion() { return version; }
     public ProductVariantStatus getStatus() { return status; }

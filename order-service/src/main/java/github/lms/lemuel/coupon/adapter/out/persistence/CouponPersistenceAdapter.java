@@ -65,6 +65,9 @@ public class CouponPersistenceAdapter implements LoadCouponPort, SaveCouponPort 
         entity.setMinOrderAmount(domain.getMinOrderAmount());
         entity.setMaxUses(domain.getMaxUses());
         entity.setUsedCount(domain.getUsedCount());
+        entity.setTargetType(domain.getTargetType());
+        entity.setTargetId(domain.getTargetId());
+        entity.setStartsAt(domain.getStartsAt());
         entity.setExpiresAt(domain.getExpiresAt());
         entity.setActive(domain.isActive());
         entity.setCreatedAt(domain.getCreatedAt());
@@ -81,6 +84,9 @@ public class CouponPersistenceAdapter implements LoadCouponPort, SaveCouponPort 
         coupon.setMinOrderAmount(entity.getMinOrderAmount());
         coupon.setMaxUses(entity.getMaxUses());
         coupon.setUsedCount(entity.getUsedCount());
+        coupon.setTargetType(entity.getTargetType());
+        coupon.setTargetId(entity.getTargetId());
+        coupon.setStartsAt(entity.getStartsAt());
         coupon.setExpiresAt(entity.getExpiresAt());
         coupon.setActive(entity.isActive());
         coupon.setCreatedAt(entity.getCreatedAt());

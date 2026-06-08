@@ -4,6 +4,7 @@ import { flushSync } from 'react-dom';
 import userEvent from '@testing-library/user-event';
 import CreateProductForm from '@/components/product/CreateProductForm';
 import { productApi } from '@/api/product';
+import { ToastProvider } from '@/contexts/ToastContext';
 
 vi.mock('@/api/product', () => ({
   productApi: {
@@ -35,19 +36,27 @@ const setNumberInput = (labelRegex: RegExp, name: string, value: string) => {
   });
 };
 
+const renderForm = (ui: React.ReactElement) => render(
+  <ToastProvider>
+    {ui}
+  </ToastProvider>
+);
+
 describe('CreateProductForm', () => {
   beforeEach(() => {
     vi.resetAllMocks(); // mockOnce 큐까지 초기화
+    vi.stubGlobal('alert', vi.fn());
   });
 
   afterEach(() => {
+    vi.unstubAllGlobals();
     vi.useRealTimers();
   });
 
   // ─── 렌더링 ─────────────────────────────────────────────────
   describe('렌더링', () => {
     it('폼 요소들이 올바르게 렌더링된다', () => {
-      render(<CreateProductForm />);
+      renderForm(<CreateProductForm />);
 
       expect(screen.getByLabelText(/상품명/)).toBeInTheDocument();
       expect(screen.getByLabelText(/상품 설명/)).toBeInTheDocument();
@@ -58,19 +67,19 @@ describe('CreateProductForm', () => {
     });
 
     it('onCancel prop이 있으면 취소 버튼이 렌더링된다', () => {
-      render(<CreateProductForm onCancel={vi.fn()} />);
+      renderForm(<CreateProductForm onCancel={vi.fn()} />);
 
       expect(screen.getByRole('button', { name: '취소' })).toBeInTheDocument();
     });
 
     it('onCancel prop이 없으면 취소 버튼이 렌더링되지 않는다', () => {
-      render(<CreateProductForm />);
+      renderForm(<CreateProductForm />);
 
       expect(screen.queryByRole('button', { name: '취소' })).not.toBeInTheDocument();
     });
 
     it('초기값이 빈 상태로 렌더링된다', () => {
-      render(<CreateProductForm />);
+      renderForm(<CreateProductForm />);
 
       expect(screen.getByLabelText(/상품명/)).toHaveValue('');
       expect(screen.getByLabelText(/상품 설명/)).toHaveValue('');
@@ -81,7 +90,7 @@ describe('CreateProductForm', () => {
   describe('유효성 검사', () => {
     it('상품명이 비어있으면 에러 메시지를 표시한다', async () => {
       const user = userEvent.setup();
-      render(<CreateProductForm />);
+      renderForm(<CreateProductForm />);
 
       await user.click(screen.getByRole('button', { name: '상품 등록' }));
 
@@ -90,7 +99,7 @@ describe('CreateProductForm', () => {
 
     it('상품명이 공백만 있으면 에러 메시지를 표시한다', async () => {
       const user = userEvent.setup();
-      render(<CreateProductForm />);
+      renderForm(<CreateProductForm />);
 
       await user.type(screen.getByLabelText(/상품명/), '   ');
       await user.click(screen.getByRole('button', { name: '상품 등록' }));
@@ -100,7 +109,7 @@ describe('CreateProductForm', () => {
 
     it('상품명이 200자를 초과하면 에러 메시지를 표시한다', async () => {
       const user = userEvent.setup();
-      render(<CreateProductForm />);
+      renderForm(<CreateProductForm />);
 
       // JSDOM이 maxlength를 강제하므로 속성 제거 후 값 설정
       const input = screen.getByLabelText(/상품명/) as HTMLInputElement;
@@ -116,7 +125,7 @@ describe('CreateProductForm', () => {
     });
 
     it('가격이 음수이면 에러 메시지를 표시한다', async () => {
-      render(<CreateProductForm />);
+      renderForm(<CreateProductForm />);
 
       // name 설정
       flushSync(() => {
@@ -140,7 +149,7 @@ describe('CreateProductForm', () => {
     });
 
     it('재고 수량이 음수이면 에러 메시지를 표시한다', async () => {
-      render(<CreateProductForm />);
+      renderForm(<CreateProductForm />);
 
       flushSync(() => {
         fireEvent.change(screen.getByLabelText(/상품명/), {
@@ -162,7 +171,7 @@ describe('CreateProductForm', () => {
 
     it('필드를 입력하면 해당 필드의 에러가 사라진다', async () => {
       const user = userEvent.setup();
-      render(<CreateProductForm />);
+      renderForm(<CreateProductForm />);
 
       await user.click(screen.getByRole('button', { name: '상품 등록' }));
       expect(screen.getByText('상품명은 필수입니다.')).toBeInTheDocument();
@@ -173,7 +182,7 @@ describe('CreateProductForm', () => {
 
     it('유효성 검사 실패 시 API를 호출하지 않는다', async () => {
       const user = userEvent.setup();
-      render(<CreateProductForm />);
+      renderForm(<CreateProductForm />);
 
       await user.click(screen.getByRole('button', { name: '상품 등록' }));
 
@@ -186,7 +195,7 @@ describe('CreateProductForm', () => {
     it('유효한 폼 제출 시 API를 호출한다', async () => {
       const user = userEvent.setup();
       vi.mocked(productApi.createProduct).mockResolvedValueOnce(mockProduct);
-      render(<CreateProductForm />);
+      renderForm(<CreateProductForm />);
 
       await user.type(screen.getByLabelText(/상품명/), '신규 상품');
       await user.type(screen.getByLabelText(/상품 설명/), '상품 설명');
@@ -204,52 +213,49 @@ describe('CreateProductForm', () => {
       });
     });
 
-    it('등록 성공 시 성공 메시지가 표시된다', async () => {
+    it('등록 성공 시 이미지 업로드 화면이 표시된다', async () => {
       const user = userEvent.setup();
       vi.mocked(productApi.createProduct).mockResolvedValueOnce(mockProduct);
-      render(<CreateProductForm />);
+      renderForm(<CreateProductForm />);
 
       await user.type(screen.getByLabelText(/상품명/), '신규 상품');
       await user.click(screen.getByRole('button', { name: '상품 등록' }));
 
       await waitFor(() => {
-        expect(screen.getByText('상품이 성공적으로 등록되었습니다!')).toBeInTheDocument();
+        expect(screen.getByText(/신규 상품.*성공적으로 등록되었습니다/)).toBeInTheDocument();
       });
+      expect(screen.getByRole('heading', { name: '상품 이미지 추가' })).toBeInTheDocument();
     });
 
-    it('등록 성공 시 폼이 초기화된다', async () => {
+    it('등록 성공 시 기존 입력 폼은 이미지 업로드 화면으로 대체된다', async () => {
       const user = userEvent.setup();
       vi.mocked(productApi.createProduct).mockResolvedValueOnce(mockProduct);
-      render(<CreateProductForm />);
+      renderForm(<CreateProductForm />);
 
       await user.type(screen.getByLabelText(/상품명/), '신규 상품');
       await user.click(screen.getByRole('button', { name: '상품 등록' }));
 
       await waitFor(() => {
-        expect(screen.getByLabelText(/상품명/)).toHaveValue('');
+        expect(screen.queryByLabelText(/상품명/)).not.toBeInTheDocument();
       });
+      expect(screen.getByRole('button', { name: '완료' })).toBeInTheDocument();
     });
 
-    it('등록 성공 후 1.5초 뒤 onSuccess 콜백이 호출된다', async () => {
-      // shouldAdvanceTime: waitFor 내부 타이머도 정상 동작
-      vi.useFakeTimers({ shouldAdvanceTime: true });
-      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime.bind(vi) });
+    it('등록 성공 후 완료 버튼을 누르면 onSuccess 콜백이 호출된다', async () => {
+      const user = userEvent.setup();
       vi.mocked(productApi.createProduct).mockResolvedValueOnce(mockProduct);
       const onSuccess = vi.fn();
-      render(<CreateProductForm onSuccess={onSuccess} />);
+      renderForm(<CreateProductForm onSuccess={onSuccess} />);
 
       await user.type(screen.getByLabelText(/상품명/), '신규 상품');
       await user.click(screen.getByRole('button', { name: '상품 등록' }));
 
       await waitFor(() => {
-        expect(screen.getByText('상품이 성공적으로 등록되었습니다!')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: '완료' })).toBeInTheDocument();
       });
-
-      // 1.5초 경과 전
       expect(onSuccess).not.toHaveBeenCalled();
 
-      // 1.5초 경과 후
-      act(() => { vi.advanceTimersByTime(1500); });
+      await user.click(screen.getByRole('button', { name: '완료' }));
       expect(onSuccess).toHaveBeenCalledTimes(1);
     });
   });
@@ -261,7 +267,7 @@ describe('CreateProductForm', () => {
       vi.mocked(productApi.createProduct).mockRejectedValueOnce({
         response: { data: { message: '상품 등록에 실패했습니다.' } },
       });
-      render(<CreateProductForm />);
+      renderForm(<CreateProductForm />);
 
       await user.type(screen.getByLabelText(/상품명/), '신규 상품');
       await user.click(screen.getByRole('button', { name: '상품 등록' }));
@@ -274,7 +280,7 @@ describe('CreateProductForm', () => {
     it('서버 메시지가 없으면 기본 에러 메시지가 표시된다', async () => {
       const user = userEvent.setup();
       vi.mocked(productApi.createProduct).mockRejectedValueOnce(new Error('Network Error'));
-      render(<CreateProductForm />);
+      renderForm(<CreateProductForm />);
 
       await user.type(screen.getByLabelText(/상품명/), '신규 상품');
       await user.click(screen.getByRole('button', { name: '상품 등록' }));
@@ -290,7 +296,7 @@ describe('CreateProductForm', () => {
       vi.mocked(productApi.createProduct).mockImplementationOnce(
         () => new Promise(resolve => { resolveSubmit = resolve; })
       );
-      render(<CreateProductForm />);
+      renderForm(<CreateProductForm />);
 
       await user.type(screen.getByLabelText(/상품명/), '신규 상품');
       await user.click(screen.getByRole('button', { name: '상품 등록' }));
@@ -308,7 +314,7 @@ describe('CreateProductForm', () => {
   describe('초기화 및 취소', () => {
     it('초기화 버튼을 클릭하면 폼이 리셋된다', async () => {
       const user = userEvent.setup();
-      render(<CreateProductForm />);
+      renderForm(<CreateProductForm />);
 
       await user.type(screen.getByLabelText(/상품명/), '입력한 값');
       await user.type(screen.getByLabelText(/상품 설명/), '설명 값');
@@ -320,7 +326,7 @@ describe('CreateProductForm', () => {
 
     it('초기화 버튼을 클릭하면 에러 메시지가 사라진다', async () => {
       const user = userEvent.setup();
-      render(<CreateProductForm />);
+      renderForm(<CreateProductForm />);
 
       await user.click(screen.getByRole('button', { name: '상품 등록' }));
       expect(screen.getByText('상품명은 필수입니다.')).toBeInTheDocument();
@@ -332,7 +338,7 @@ describe('CreateProductForm', () => {
     it('취소 버튼을 클릭하면 onCancel 콜백이 호출된다', async () => {
       const user = userEvent.setup();
       const onCancel = vi.fn();
-      render(<CreateProductForm onCancel={onCancel} />);
+      renderForm(<CreateProductForm onCancel={onCancel} />);
 
       await user.click(screen.getByRole('button', { name: '취소' }));
 

@@ -17,6 +17,9 @@ public class Coupon {
     private BigDecimal maxDiscountAmount; // 할인 상한선 (null이면 무제한)
     private int maxUses;
     private int usedCount;
+    private String targetType;
+    private Long targetId;
+    private LocalDateTime startsAt;
     private LocalDateTime expiresAt;
     private boolean isActive;
     private LocalDateTime createdAt;
@@ -55,8 +58,31 @@ public class Coupon {
         coupon.minOrderAmount = minOrderAmount != null ? minOrderAmount : BigDecimal.ZERO;
         coupon.maxDiscountAmount = maxDiscountAmount;
         coupon.maxUses = maxUses;
+        coupon.targetType = "ALL";
         coupon.expiresAt = expiresAt;
         return coupon;
+    }
+
+    public void configureTarget(String targetType, Long targetId) {
+        String normalized = targetType == null || targetType.isBlank()
+                ? "ALL"
+                : targetType.trim().toUpperCase();
+        if (!normalized.equals("ALL") && !normalized.equals("CATEGORY") && !normalized.equals("PRODUCT")) {
+            throw new IllegalArgumentException("지원하지 않는 쿠폰 적용 대상입니다: " + targetType);
+        }
+        if (!normalized.equals("ALL") && targetId == null) {
+            throw new IllegalArgumentException("특정 대상 쿠폰은 targetId가 필요합니다.");
+        }
+        this.targetType = normalized;
+        this.targetId = normalized.equals("ALL") ? null : targetId;
+    }
+
+    public void configurePeriod(LocalDateTime startsAt, LocalDateTime expiresAt) {
+        if (startsAt != null && expiresAt != null && startsAt.isAfter(expiresAt)) {
+            throw new IllegalArgumentException("쿠폰 시작일은 종료일보다 늦을 수 없습니다.");
+        }
+        this.startsAt = startsAt;
+        this.expiresAt = expiresAt;
     }
 
     /**
@@ -68,6 +94,9 @@ public class Coupon {
         }
         if (usedCount >= maxUses) {
             throw new IllegalStateException("쿠폰 사용 한도를 초과했습니다.");
+        }
+        if (startsAt != null && LocalDateTime.now().isBefore(startsAt)) {
+            throw new IllegalStateException("아직 사용할 수 없는 쿠폰입니다.");
         }
         if (expiresAt != null && LocalDateTime.now().isAfter(expiresAt)) {
             throw new IllegalStateException("만료된 쿠폰입니다.");
@@ -142,6 +171,15 @@ public class Coupon {
 
     public int getUsedCount() { return usedCount; }
     public void setUsedCount(int usedCount) { this.usedCount = usedCount; }
+
+    public String getTargetType() { return targetType == null ? "ALL" : targetType; }
+    public void setTargetType(String targetType) { this.targetType = targetType; }
+
+    public Long getTargetId() { return targetId; }
+    public void setTargetId(Long targetId) { this.targetId = targetId; }
+
+    public LocalDateTime getStartsAt() { return startsAt; }
+    public void setStartsAt(LocalDateTime startsAt) { this.startsAt = startsAt; }
 
     public LocalDateTime getExpiresAt() { return expiresAt; }
     public void setExpiresAt(LocalDateTime expiresAt) { this.expiresAt = expiresAt; }

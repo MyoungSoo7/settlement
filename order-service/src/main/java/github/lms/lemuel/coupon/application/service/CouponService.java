@@ -33,6 +33,8 @@ public class CouponService implements CouponUseCase {
                 command.maxUses(),
                 command.expiresAt()
         );
+        coupon.configureTarget(command.targetType(), command.targetId());
+        coupon.configurePeriod(command.startsAt(), command.expiresAt());
         return saveCouponPort.save(coupon);
     }
 
@@ -65,6 +67,17 @@ public class CouponService implements CouponUseCase {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<ValidateResult> getAvailableCoupons(Long userId, BigDecimal orderAmount,
+                                                    Long productId, Long categoryId) {
+        return loadCouponPort.findAll().stream()
+                .filter(c -> appliesTo(c, productId, categoryId))
+                .map(c -> validateCoupon(c.getCode(), userId, orderAmount))
+                .filter(ValidateResult::valid)
+                .toList();
+    }
+
+    @Override
     public void useCoupon(String code, Long userId, Long orderId) {
         Coupon coupon = loadCouponPort.findByCode(code.toUpperCase().trim())
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 쿠폰: " + code));
@@ -91,5 +104,13 @@ public class CouponService implements CouponUseCase {
     @Transactional(readOnly = true)
     public List<Coupon> getAllCoupons() {
         return loadCouponPort.findAll();
+    }
+
+    private static boolean appliesTo(Coupon coupon, Long productId, Long categoryId) {
+        return switch (coupon.getTargetType()) {
+            case "PRODUCT" -> coupon.getTargetId() != null && coupon.getTargetId().equals(productId);
+            case "CATEGORY" -> coupon.getTargetId() != null && coupon.getTargetId().equals(categoryId);
+            default -> true;
+        };
     }
 }

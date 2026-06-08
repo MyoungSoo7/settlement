@@ -24,6 +24,8 @@ public interface CouponUseCase {
 
     List<Coupon> getAllCoupons();
 
+    List<ValidateResult> getAvailableCoupons(Long userId, BigDecimal orderAmount, Long productId, Long categoryId);
+
     record CreateCouponCommand(
             String code,
             CouponType type,
@@ -31,8 +33,18 @@ public interface CouponUseCase {
             BigDecimal minOrderAmount,
             BigDecimal maxDiscountAmount,
             int maxUses,
+            String targetType,
+            Long targetId,
+            LocalDateTime startsAt,
             LocalDateTime expiresAt
-    ) {}
+    ) {
+        public CreateCouponCommand(String code, CouponType type, BigDecimal discountValue,
+                                   BigDecimal minOrderAmount, BigDecimal maxDiscountAmount,
+                                   int maxUses, LocalDateTime expiresAt) {
+            this(code, type, discountValue, minOrderAmount, maxDiscountAmount, maxUses,
+                    "ALL", null, null, expiresAt);
+        }
+    }
 
     record ValidateResult(
             boolean valid,

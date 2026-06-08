@@ -47,6 +47,9 @@ public class CouponController {
                 request.getMinOrderAmount(),
                 request.getMaxDiscountAmount(),
                 request.getMaxUses(),
+                request.getTargetType(),
+                request.getTargetId(),
+                request.getStartsAt(),
                 request.getExpiresAt()
         ));
         return ResponseEntity.status(HttpStatus.CREATED).body(CouponResponse.from(coupon));
@@ -66,6 +69,25 @@ public class CouponController {
                 .map(CouponResponse::from)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(coupons);
+    }
+
+    @Operation(summary = "사용 가능 쿠폰 조회", description = "주문 금액과 상품/카테고리 기준으로 사용 가능한 쿠폰을 계산한다.")
+    @GetMapping("/available")
+    public ResponseEntity<List<CouponValidateResponse>> getAvailableCoupons(
+            @RequestParam Long userId,
+            @RequestParam BigDecimal amount,
+            @RequestParam(required = false) Long productId,
+            @RequestParam(required = false) Long categoryId) {
+        List<CouponValidateResponse> responses = couponUseCase
+                .getAvailableCoupons(userId, amount, productId, categoryId)
+                .stream()
+                .map(r -> new CouponValidateResponse(
+                        r.valid(),
+                        r.message(),
+                        r.discountAmount(),
+                        r.finalAmount()))
+                .toList();
+        return ResponseEntity.ok(responses);
     }
 
     /**

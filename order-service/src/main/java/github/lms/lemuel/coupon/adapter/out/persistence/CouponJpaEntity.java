@@ -36,6 +36,15 @@ public class CouponJpaEntity {
     @Column(name = "used_count", nullable = false)
     private int usedCount;
 
+    @Column(name = "target_type", nullable = false, length = 20)
+    private String targetType;
+
+    @Column(name = "target_id")
+    private Long targetId;
+
+    @Column(name = "starts_at")
+    private LocalDateTime startsAt;
+
     @Column(name = "expires_at")
     private LocalDateTime expiresAt;
 
@@ -52,6 +61,7 @@ public class CouponJpaEntity {
     protected void onCreate() {
         if (createdAt == null) createdAt = LocalDateTime.now();
         if (updatedAt == null) updatedAt = LocalDateTime.now();
+        if (targetType == null) targetType = "ALL";
     }
 
     @PreUpdate

@@ -42,7 +42,8 @@ public class ProductVariantPersistenceAdapter
         if (variant.getId() == null) {
             entity = new ProductVariantJpaEntity(
                     null, variant.getProductId(), variant.getSku(), variant.getOptionName(),
-                    variant.getAdditionalPrice(), variant.getStockQuantity(), variant.getVersion(),
+                    variant.getAdditionalPrice(), variant.getDiscountPrice(), variant.getDiscountRate(),
+                    variant.getStockQuantity(), variant.getVersion(),
                     variant.getStatus(), variant.getCreatedAt(), variant.getUpdatedAt()
             );
         } else {
@@ -70,7 +71,8 @@ public class ProductVariantPersistenceAdapter
     private static ProductVariant toDomain(ProductVariantJpaEntity e) {
         return ProductVariant.rehydrate(
                 e.getId(), e.getProductId(), e.getSku(), e.getOptionName(),
-                e.getAdditionalPrice(), e.getStockQuantity(), e.getVersion(),
+                e.getAdditionalPrice(), e.getDiscountPrice(), e.getDiscountRate(),
+                e.getStockQuantity(), e.getVersion(),
                 e.getStatus(), e.getCreatedAt(), e.getUpdatedAt()
         );
     }
