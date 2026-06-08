@@ -77,7 +77,7 @@ services:
     container_name: lemuel-redis
     command: ["redis-server", "--appendonly", "yes"]
     ports:
-      - "127.0.0.1:6379:6379"
+      - "127.0.0.1:6380:6379"
     volumes:
       - redis-data:/data
     restart: unless-stopped
@@ -194,7 +194,7 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: prod
       ORDER_SERVICE_URI: http://order-service:8080
-      SETTLEMENT_SERVICE_URI: http://settlement-service:8080
+      SETTLEMENT_SERVICE_URI: http://order-service:8080
       JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
     ports:
       - "127.0.0.1:8080:8080"
@@ -207,8 +207,6 @@ services:
       start_period: 30s
     depends_on:
       order-service:
-        condition: service_healthy
-      settlement-service:
         condition: service_healthy
 
   frontend:
