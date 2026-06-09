@@ -9,4 +9,6 @@ public interface GetReservationUseCase {
     Reservation getById(Long reservationId);
 
     List<Reservation> getByCompany(Long companyId);
+
+    List<Reservation> getByTechnician(Long technicianId);
 }

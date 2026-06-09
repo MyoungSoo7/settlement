@@ -36,4 +36,12 @@ public class ReservationPersistenceAdapter implements SaveReservationPort, LoadR
                 .map(mapper::toDomain)
                 .collect(Collectors.toList());
     }
+
+    @Override
+    public List<Reservation> findByTechnicianId(Long technicianId) {
+        return repository.findByTechnicianIdOrderByScheduledDateAsc(technicianId)
+                .stream()
+                .map(mapper::toDomain)
+                .collect(Collectors.toList());
+    }
 }

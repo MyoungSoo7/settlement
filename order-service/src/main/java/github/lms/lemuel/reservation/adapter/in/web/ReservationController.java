@@ -101,6 +101,17 @@ public class ReservationController {
         return ResponseEntity.ok(result);
     }
 
+    @Operation(summary = "내 배정 작업 조회", description = "로그인한 시공기사에게 배정된 예약을 일정 순으로 조회한다.")
+    @GetMapping("/assigned/my")
+    public ResponseEntity<List<ReservationResponse>> getMyAssignments() {
+        User technician = requireTechnician();
+        List<ReservationResponse> result = getReservationUseCase.getByTechnician(technician.getId())
+                .stream()
+                .map(ReservationResponse::from)
+                .toList();
+        return ResponseEntity.ok(result);
+    }
+
     // ── 상태 전이 API ────────────────────────────────────────
 
     @Operation(summary = "예약 확인", description = "관리자가 접수된 예약을 확인한다. (REQUESTED → CONFIRMED)")
@@ -169,6 +180,14 @@ public class ReservationController {
         User user = requireAuthenticated();
         if (user.getRole() != UserRole.ADMIN && user.getRole() != UserRole.MANAGER) {
             throw new InvalidCredentialsException("Only ADMIN or MANAGER can change reservation status");
+        }
+        return user;
+    }
+
+    private User requireTechnician() {
+        User user = requireAuthenticated();
+        if (user.getRole() != UserRole.TECHNICIAN && user.getRole() != UserRole.ADMIN) {
+            throw new InvalidCredentialsException("Only TECHNICIAN can view assigned jobs");
         }
         return user;
     }

@@ -10,4 +10,6 @@ public interface LoadReservationPort {
     Optional<Reservation> findById(Long reservationId);
 
     List<Reservation> findByCompanyId(Long companyId);
+
+    List<Reservation> findByTechnicianId(Long technicianId);
 }

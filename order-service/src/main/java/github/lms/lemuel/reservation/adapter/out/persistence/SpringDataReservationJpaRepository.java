@@ -7,4 +7,6 @@ import java.util.List;
 public interface SpringDataReservationJpaRepository extends JpaRepository<ReservationJpaEntity, Long> {
 
     List<ReservationJpaEntity> findByCompanyIdOrderByScheduledDateDesc(Long companyId);
+
+    List<ReservationJpaEntity> findByTechnicianIdOrderByScheduledDateAsc(Long technicianId);
 }

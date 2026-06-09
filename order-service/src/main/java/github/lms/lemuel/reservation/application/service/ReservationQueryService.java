@@ -27,4 +27,9 @@ public class ReservationQueryService implements GetReservationUseCase {
     public List<Reservation> getByCompany(Long companyId) {
         return loadReservationPort.findByCompanyId(companyId);
     }
+
+    @Override
+    public List<Reservation> getByTechnician(Long technicianId) {
+        return loadReservationPort.findByTechnicianId(technicianId);
+    }
 }
