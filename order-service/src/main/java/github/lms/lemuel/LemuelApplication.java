@@ -17,6 +17,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         "github.lms.lemuel.category",
         "github.lms.lemuel.coupon",
         "github.lms.lemuel.review",
+        "github.lms.lemuel.reservation",
         "github.lms.lemuel.report",
         "github.lms.lemuel.game",
         "github.lms.lemuel.common",

@@ -70,3 +70,7 @@ frontend/playwright-report/
 frontend/test-results/
 frontend/blob-report/
 frontend/playwright/.cache/
+
+### Python sim artifacts ###
+scripts/sim/__pycache__/
+scripts/sim/.sim_state.json
