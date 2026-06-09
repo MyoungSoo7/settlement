@@ -19,6 +19,7 @@ public class Reservation {
 
     private Long id;
     private Long companyId;                 // 예약 등록 업체 회원(User.id, role=COMPANY)
+    private Long technicianId;              // 배정된 시공기사(User.id, role=TECHNICIAN), 미배정 시 null
     private ReservationStatus status;
 
     // 시공 일정 / 현장 정보
@@ -112,8 +113,16 @@ public class Reservation {
         transitionTo(ReservationStatus.CONFIRMED);
     }
 
-    public void assign() {
+    /**
+     * 시공기사 배정. 대상이 실제 배정 가능한 TECHNICIAN 인지(존재/역할/상태)는
+     * 애플리케이션 서비스에서 검증하고, 도메인은 식별자 필수만 보장한다.
+     */
+    public void assign(Long technicianId) {
         requireStatus(ReservationStatus.CONFIRMED);
+        if (technicianId == null) {
+            throw new IllegalArgumentException("technicianId is required to assign");
+        }
+        this.technicianId = technicianId;
         transitionTo(ReservationStatus.ASSIGNED);
     }
 

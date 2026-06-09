@@ -29,6 +29,9 @@ public class ReservationJpaEntity {
     @Column(name = "company_id", nullable = false)
     private Long companyId;
 
+    @Column(name = "technician_id")
+    private Long technicianId;
+
     @Column(nullable = false, length = 20)
     private String status;
 

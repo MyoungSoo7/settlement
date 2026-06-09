@@ -91,7 +91,7 @@ class ReservationTest {
 
             r.confirm();
             assertThat(r.getStatus()).isEqualTo(ReservationStatus.CONFIRMED);
-            r.assign();
+            r.assign(20L);
             assertThat(r.getStatus()).isEqualTo(ReservationStatus.ASSIGNED);
             r.start();
             assertThat(r.getStatus()).isEqualTo(ReservationStatus.IN_PROGRESS);
@@ -104,11 +104,34 @@ class ReservationTest {
         void skipTransition() {
             Reservation r = newReservation(); // REQUESTED
 
-            assertThatThrownBy(r::assign)
+            assertThatThrownBy(() -> r.assign(20L))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("expected CONFIRMED");
             assertThatThrownBy(r::start).isInstanceOf(IllegalStateException.class);
             assertThatThrownBy(r::complete).isInstanceOf(IllegalStateException.class);
+        }
+
+        @Test
+        @DisplayName("배정 시 technicianId 가 저장된다")
+        void assign_setsTechnician() {
+            Reservation r = newReservation();
+            r.confirm();
+
+            r.assign(20L);
+
+            assertThat(r.getStatus()).isEqualTo(ReservationStatus.ASSIGNED);
+            assertThat(r.getTechnicianId()).isEqualTo(20L);
+        }
+
+        @Test
+        @DisplayName("technicianId 없이 배정하면 예외")
+        void assign_nullTechnicianFails() {
+            Reservation r = newReservation();
+            r.confirm();
+
+            assertThatThrownBy(() -> r.assign(null))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("technicianId");
         }
 
         @Test
@@ -128,7 +151,7 @@ class ReservationTest {
         void cancel_completedReservationFails() {
             Reservation r = newReservation();
             r.confirm();
-            r.assign();
+            r.assign(20L);
             r.start();
             r.complete();
 

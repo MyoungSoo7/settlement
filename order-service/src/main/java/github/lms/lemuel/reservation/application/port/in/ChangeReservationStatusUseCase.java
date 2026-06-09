@@ -13,8 +13,8 @@ public interface ChangeReservationStatusUseCase {
     /** REQUESTED → CONFIRMED (관리자 확인) */
     Reservation confirm(Long reservationId);
 
-    /** CONFIRMED → ASSIGNED (기사 배정) */
-    Reservation assign(Long reservationId);
+    /** CONFIRMED → ASSIGNED (시공기사 배정). technicianId 는 실제 APPROVED 상태의 TECHNICIAN 이어야 한다. */
+    Reservation assign(Long reservationId, Long technicianId);
 
     /** ASSIGNED → IN_PROGRESS (시공 시작) */
     Reservation start(Long reservationId);

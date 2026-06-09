@@ -112,9 +112,12 @@ public class ReservationController {
 
     @Operation(summary = "기사 배정", description = "관리자가 확인된 예약에 시공기사를 배정한다. (CONFIRMED → ASSIGNED)")
     @PostMapping("/{id}/assign")
-    public ResponseEntity<ReservationResponse> assign(@PathVariable Long id) {
+    public ResponseEntity<ReservationResponse> assign(
+            @PathVariable Long id,
+            @Valid @RequestBody AssignTechnicianRequest request) {
         requireAdmin();
-        return ResponseEntity.ok(ReservationResponse.from(changeReservationStatusUseCase.assign(id)));
+        return ResponseEntity.ok(ReservationResponse.from(
+                changeReservationStatusUseCase.assign(id, request.technicianId())));
     }
 
     @Operation(summary = "시공 시작", description = "배정된 예약의 시공을 시작한다. (ASSIGNED → IN_PROGRESS)")
@@ -182,4 +185,12 @@ public class ReservationController {
         }
         return user;
     }
+
+    public record AssignTechnicianRequest(
+            @jakarta.validation.constraints.NotNull Long technicianId
+    ) {}
+
+    public record CancelReservationRequest(
+            @jakarta.validation.constraints.Size(max = 500) String reason
+    ) {}
 }

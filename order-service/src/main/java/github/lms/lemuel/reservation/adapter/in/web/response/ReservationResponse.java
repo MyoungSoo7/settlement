@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 public record ReservationResponse(
         Long id,
         Long companyId,
+        Long technicianId,
         String status,
         LocalDate scheduledDate,
         String siteAddress,
@@ -39,6 +40,7 @@ public record ReservationResponse(
         return new ReservationResponse(
                 r.getId(),
                 r.getCompanyId(),
+                r.getTechnicianId(),
                 r.getStatus().name(),
                 r.getScheduledDate(),
                 r.getSiteAddress(),
