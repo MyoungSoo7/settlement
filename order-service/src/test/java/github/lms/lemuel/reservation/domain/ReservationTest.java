@@ -135,6 +135,54 @@ class ReservationTest {
         }
 
         @Test
+        @DisplayName("재배정: ASSIGNED 상태에서 다른 기사로 교체 (상태 유지)")
+        void reassign_success() {
+            Reservation r = newReservation();
+            r.confirm();
+            r.assign(20L);
+
+            r.reassign(30L);
+
+            assertThat(r.getStatus()).isEqualTo(ReservationStatus.ASSIGNED);
+            assertThat(r.getTechnicianId()).isEqualTo(30L);
+        }
+
+        @Test
+        @DisplayName("재배정: 배정 전(CONFIRMED)에는 불가")
+        void reassign_beforeAssignFails() {
+            Reservation r = newReservation();
+            r.confirm();
+
+            assertThatThrownBy(() -> r.reassign(30L))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("expected ASSIGNED");
+        }
+
+        @Test
+        @DisplayName("재배정: 시공 시작 후(IN_PROGRESS)에는 불가")
+        void reassign_afterStartFails() {
+            Reservation r = newReservation();
+            r.confirm();
+            r.assign(20L);
+            r.start();
+
+            assertThatThrownBy(() -> r.reassign(30L))
+                    .isInstanceOf(IllegalStateException.class);
+        }
+
+        @Test
+        @DisplayName("재배정: 동일 기사로는 불가")
+        void reassign_sameTechnicianFails() {
+            Reservation r = newReservation();
+            r.confirm();
+            r.assign(20L);
+
+            assertThatThrownBy(() -> r.reassign(20L))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Already assigned");
+        }
+
+        @Test
         @DisplayName("비종료 상태에서 취소 가능, 사유가 기록된다")
         void cancel_fromNonTerminal() {
             Reservation r = newReservation();

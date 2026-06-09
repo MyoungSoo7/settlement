@@ -45,6 +45,14 @@ public class ChangeReservationStatusService implements ChangeReservationStatusUs
         return result;
     }
 
+    @Override
+    public Reservation reassign(Long reservationId, Long newTechnicianId) {
+        verifyAssignableTechnician(newTechnicianId);
+        Reservation result = transition(reservationId, r -> r.reassign(newTechnicianId), "reassign");
+        log.info("기사 재배정: reservationId={}, newTechnicianId={}", reservationId, newTechnicianId);
+        return result;
+    }
+
     /** 배정 대상이 존재하는 APPROVED 상태의 TECHNICIAN 인지 검증한다. */
     private void verifyAssignableTechnician(Long technicianId) {
         if (technicianId == null) {

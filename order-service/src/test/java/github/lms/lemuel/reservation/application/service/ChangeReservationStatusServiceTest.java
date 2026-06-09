@@ -137,6 +137,35 @@ class ChangeReservationStatusServiceTest {
     }
 
     @Test
+    @DisplayName("reassign: ASSIGNED 예약의 기사를 다른 APPROVED TECHNICIAN 으로 교체")
+    void reassign_success() {
+        Reservation r = confirmed();
+        r.assign(20L); // 현재 20번 기사
+        when(loadReservationPort.findById(1L)).thenReturn(Optional.of(r));
+        when(loadUserPort.findById(30L)).thenReturn(Optional.of(technician(30L)));
+        when(saveReservationPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Reservation result = service.reassign(1L, 30L);
+
+        assertThat(result.getStatus()).isEqualTo(ReservationStatus.ASSIGNED);
+        assertThat(result.getTechnicianId()).isEqualTo(30L);
+    }
+
+    @Test
+    @DisplayName("reassign: 새 기사가 TECHNICIAN 이 아니면 예외, 저장하지 않는다")
+    void reassign_notTechnician() {
+        User notTech = User.createWithProfile("c@x.com", "hash", UserRole.COMPANY, "업체", "010-1111-2222");
+        notTech.setId(30L);
+        when(loadUserPort.findById(30L)).thenReturn(Optional.of(notTech));
+
+        assertThatThrownBy(() -> service.reassign(1L, 30L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("TECHNICIAN");
+
+        verify(saveReservationPort, never()).save(any());
+    }
+
+    @Test
     @DisplayName("잘못된 순서의 전이는 IllegalStateException, 저장하지 않는다")
     void invalidTransition_doesNotSave() {
         Reservation r = requested(); // REQUESTED 상태에서 바로 start 불가

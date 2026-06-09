@@ -167,6 +167,23 @@ public class ReservationController {
                 changeReservationStatusUseCase.assign(id, request.technicianId())));
     }
 
+    @Operation(summary = "기사 재배정", description = "배정된(ASSIGNED) 예약의 담당 기사를 다른 기사로 교체한다. 시공 시작 전에만 가능.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "재배정 성공"),
+            @ApiResponse(responseCode = "400", description = "잘못된 기사 또는 동일 기사"),
+            @ApiResponse(responseCode = "403", description = "관리자만 가능"),
+            @ApiResponse(responseCode = "404", description = "예약/기사를 찾을 수 없음"),
+            @ApiResponse(responseCode = "409", description = "ASSIGNED 상태가 아니면 재배정 불가")
+    })
+    @PostMapping("/{id}/reassign")
+    public ResponseEntity<ReservationResponse> reassign(
+            @PathVariable Long id,
+            @Valid @RequestBody AssignTechnicianRequest request) {
+        requireAdmin();
+        return ResponseEntity.ok(ReservationResponse.from(
+                changeReservationStatusUseCase.reassign(id, request.technicianId())));
+    }
+
     @Operation(summary = "시공 시작", description = "배정된 예약의 시공을 시작한다. (ASSIGNED → IN_PROGRESS)")
     @PostMapping("/{id}/start")
     public ResponseEntity<ReservationResponse> start(@PathVariable Long id) {

@@ -126,6 +126,22 @@ public class Reservation {
         transitionTo(ReservationStatus.ASSIGNED);
     }
 
+    /**
+     * 시공기사 재배정. 이미 배정된(ASSIGNED) 예약의 담당 기사를 다른 기사로 교체한다.
+     * 상태는 ASSIGNED 로 유지되며, 시공이 시작(IN_PROGRESS)된 뒤에는 재배정할 수 없다.
+     */
+    public void reassign(Long newTechnicianId) {
+        requireStatus(ReservationStatus.ASSIGNED);
+        if (newTechnicianId == null) {
+            throw new IllegalArgumentException("technicianId is required to reassign");
+        }
+        if (newTechnicianId.equals(this.technicianId)) {
+            throw new IllegalArgumentException("Already assigned to technician " + newTechnicianId);
+        }
+        this.technicianId = newTechnicianId;
+        this.updatedAt = LocalDateTime.now();
+    }
+
     public void start() {
         requireStatus(ReservationStatus.ASSIGNED);
         transitionTo(ReservationStatus.IN_PROGRESS);
