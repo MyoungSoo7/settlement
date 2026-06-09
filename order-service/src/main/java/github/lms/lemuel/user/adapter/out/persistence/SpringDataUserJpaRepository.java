@@ -2,6 +2,7 @@ package github.lms.lemuel.user.adapter.out.persistence;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -12,4 +13,6 @@ public interface SpringDataUserJpaRepository extends JpaRepository<UserJpaEntity
     Optional<UserJpaEntity> findByEmail(String email);
 
     boolean existsByEmail(String email);
+
+    List<UserJpaEntity> findByMembershipStatusOrderByCreatedAtAsc(String membershipStatus);
 }

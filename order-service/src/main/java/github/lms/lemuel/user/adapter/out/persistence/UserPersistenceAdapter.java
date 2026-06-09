@@ -1,8 +1,10 @@
 package github.lms.lemuel.user.adapter.out.persistence;
 
 import github.lms.lemuel.user.application.port.out.ExistsUserPort;
+import github.lms.lemuel.user.application.port.out.LoadMembersByStatusPort;
 import github.lms.lemuel.user.application.port.out.LoadUserPort;
 import github.lms.lemuel.user.application.port.out.SaveUserPort;
+import github.lms.lemuel.user.domain.MembershipStatus;
 import github.lms.lemuel.user.domain.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
@@ -16,7 +18,7 @@ import java.util.stream.Collectors;
  */
 @Repository
 @RequiredArgsConstructor
-public class UserPersistenceAdapter implements LoadUserPort, SaveUserPort, ExistsUserPort {
+public class UserPersistenceAdapter implements LoadUserPort, SaveUserPort, ExistsUserPort, LoadMembersByStatusPort {
 
     private final SpringDataUserJpaRepository userJpaRepository;
     private final UserPersistenceMapper mapper;
@@ -51,5 +53,13 @@ public class UserPersistenceAdapter implements LoadUserPort, SaveUserPort, Exist
     @Override
     public boolean existsByEmail(String email) {
         return userJpaRepository.existsByEmail(email);
+    }
+
+    @Override
+    public List<User> findByMembershipStatus(MembershipStatus status) {
+        return userJpaRepository.findByMembershipStatusOrderByCreatedAtAsc(status.name())
+                .stream()
+                .map(mapper::toDomain)
+                .collect(Collectors.toList());
     }
 }

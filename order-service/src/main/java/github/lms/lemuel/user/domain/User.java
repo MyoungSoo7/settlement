@@ -19,6 +19,7 @@ public class User {
     private String name;
     private String phoneNumber;
     private boolean active;
+    private MembershipStatus membershipStatus;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -26,6 +27,7 @@ public class User {
     public User() {
         this.role = UserRole.USER;
         this.active = true;
+        this.membershipStatus = MembershipStatus.APPROVED;
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
     }
@@ -46,6 +48,7 @@ public class User {
         this.name = name;
         this.phoneNumber = phoneNumber;
         this.active = active == null || active;
+        this.membershipStatus = MembershipStatus.APPROVED;
         this.createdAt = createdAt != null ? createdAt : LocalDateTime.now();
         this.updatedAt = updatedAt != null ? updatedAt : LocalDateTime.now();
     }
@@ -126,6 +129,60 @@ public class User {
 
     public boolean isAdmin() {
         return this.role == UserRole.ADMIN;
+    }
+
+    // ── 회원 승인 워크플로 ────────────────────────────────────
+    // 상태머신: PENDING → APPROVED → SUSPENDED → APPROVED ; PENDING → REJECTED
+
+    /** 업체 회원/시공기사는 가입 후 관리자 승인을 거쳐야 한다. */
+    public boolean requiresApproval() {
+        return this.role == UserRole.COMPANY || this.role == UserRole.TECHNICIAN;
+    }
+
+    /** 승인 대기 상태로 전환 (승인이 필요한 역할의 가입 시점). */
+    public void markPending() {
+        this.membershipStatus = MembershipStatus.PENDING;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    /** 승인: PENDING → APPROVED */
+    public void approveMembership() {
+        requireMembership(MembershipStatus.PENDING);
+        transitionMembership(MembershipStatus.APPROVED);
+    }
+
+    /** 반려: PENDING → REJECTED */
+    public void rejectMembership() {
+        requireMembership(MembershipStatus.PENDING);
+        transitionMembership(MembershipStatus.REJECTED);
+    }
+
+    /** 정지: APPROVED → SUSPENDED */
+    public void suspendMembership() {
+        requireMembership(MembershipStatus.APPROVED);
+        transitionMembership(MembershipStatus.SUSPENDED);
+    }
+
+    /** 정지 해제: SUSPENDED → APPROVED */
+    public void reinstateMembership() {
+        requireMembership(MembershipStatus.SUSPENDED);
+        transitionMembership(MembershipStatus.APPROVED);
+    }
+
+    public boolean canUseService() {
+        return this.membershipStatus != null && this.membershipStatus.canUseService();
+    }
+
+    private void requireMembership(MembershipStatus expected) {
+        if (this.membershipStatus != expected) {
+            throw new IllegalStateException(
+                    "Invalid membership transition: expected " + expected + " but was " + this.membershipStatus);
+        }
+    }
+
+    private void transitionMembership(MembershipStatus next) {
+        this.membershipStatus = next;
+        this.updatedAt = LocalDateTime.now();
     }
 
 }

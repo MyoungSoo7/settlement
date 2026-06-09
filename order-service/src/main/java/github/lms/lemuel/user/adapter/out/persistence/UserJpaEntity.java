@@ -42,6 +42,9 @@ public class UserJpaEntity {
     @Column(name = "is_active", nullable = false)
     private Boolean active;
 
+    @Column(name = "membership_status", nullable = false, length = 20)
+    private String membershipStatus;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -61,6 +64,9 @@ public class UserJpaEntity {
         }
         if (active == null) {
             active = true;
+        }
+        if (membershipStatus == null) {
+            membershipStatus = "APPROVED";
         }
     }
 

@@ -43,6 +43,12 @@ public class CreateUserService implements CreateUserUseCase {
                 command.phoneNumber()
         );
 
+        // 3-1. 승인 필요 역할(업체/시공기사)은 승인 대기로 가입
+        if (user.requiresApproval()) {
+            user.markPending();
+            log.info("승인 대기 가입: email={}, role={}", command.email(), user.getRole());
+        }
+
         // 4. 저장
         User savedUser = saveUserPort.save(user);
 
