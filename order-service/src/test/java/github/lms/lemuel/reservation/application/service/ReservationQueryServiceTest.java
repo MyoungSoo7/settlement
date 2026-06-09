@@ -2,6 +2,7 @@ package github.lms.lemuel.reservation.application.service;
 
 import github.lms.lemuel.reservation.application.port.out.LoadReservationPort;
 import github.lms.lemuel.reservation.domain.Reservation;
+import github.lms.lemuel.reservation.domain.ReservationStatus;
 import github.lms.lemuel.reservation.domain.exception.ReservationNotFoundException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -64,5 +65,25 @@ class ReservationQueryServiceTest {
         List<Reservation> result = service.getByTechnician(20L);
 
         assertThat(result).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("search: 일자/상태 필터를 그대로 포트에 위임")
+    void search_withFilters() {
+        LocalDate date = LocalDate.of(2026, 7, 1);
+        when(loadReservationPort.search(date, ReservationStatus.CONFIRMED))
+                .thenReturn(List.of(sample()));
+
+        List<Reservation> result = service.search(date, ReservationStatus.CONFIRMED);
+
+        assertThat(result).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("search: 필터 없음(null,null)도 위임")
+    void search_noFilters() {
+        when(loadReservationPort.search(null, null)).thenReturn(List.of(sample(), sample()));
+
+        assertThat(service.search(null, null)).hasSize(2);
     }
 }

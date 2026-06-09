@@ -7,6 +7,7 @@ import github.lms.lemuel.reservation.application.port.in.ChangeReservationStatus
 import github.lms.lemuel.reservation.application.port.in.GetReservationUseCase;
 import github.lms.lemuel.reservation.application.port.in.RegisterReservationUseCase;
 import github.lms.lemuel.reservation.domain.Reservation;
+import github.lms.lemuel.reservation.domain.ReservationStatus;
 import github.lms.lemuel.user.application.port.out.LoadUserPort;
 import github.lms.lemuel.user.domain.User;
 import github.lms.lemuel.user.domain.UserRole;
@@ -19,12 +20,14 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -110,6 +113,39 @@ public class ReservationController {
                 .map(ReservationResponse::from)
                 .toList();
         return ResponseEntity.ok(result);
+    }
+
+    @Operation(summary = "관리자 대시보드 조회",
+            description = "시공일자(date)/상태(status)로 예약을 조회한다. 둘 다 선택이며, 없으면 전체. 일정 오름차순.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "400", description = "잘못된 상태값"),
+            @ApiResponse(responseCode = "403", description = "관리자만 조회 가능")
+    })
+    @GetMapping("/admin")
+    public ResponseEntity<List<ReservationResponse>> dashboard(
+            @Parameter(description = "시공일자 (yyyy-MM-dd)")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @Parameter(description = "예약 상태 (REQUESTED, CONFIRMED, ASSIGNED, IN_PROGRESS, COMPLETED, CANCELED)")
+            @RequestParam(required = false) String status) {
+        requireAdmin();
+        ReservationStatus statusFilter = parseStatus(status);
+        List<ReservationResponse> result = getReservationUseCase.search(date, statusFilter)
+                .stream()
+                .map(ReservationResponse::from)
+                .toList();
+        return ResponseEntity.ok(result);
+    }
+
+    private ReservationStatus parseStatus(String status) {
+        if (status == null || status.isBlank()) {
+            return null;
+        }
+        try {
+            return ReservationStatus.valueOf(status.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid reservation status: " + status);
+        }
     }
 
     // ── 상태 전이 API ────────────────────────────────────────
