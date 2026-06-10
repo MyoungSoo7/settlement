@@ -10,7 +10,8 @@ spring:
       enabled: true  # Java 21+ 가상 스레드 (Tomcat 요청 처리 + @Scheduled). JEP 491(JDK24+)로 synchronized 핀 없음
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/opslab
+    # reWriteBatchedInserts=true → JDBC 배치 INSERT 를 단일 multi-row 문장으로 재작성 (대량 적재 처리량↑)
+    url: jdbc:postgresql://localhost:5432/opslab?reWriteBatchedInserts=true
     username: ${POSTGRES_USER}
     password: ${POSTGRES_PASSWORD}
     driver-class-name: org.postgresql.Driver
@@ -34,6 +35,13 @@ spring:
       hibernate:
         format_sql: false
         default_schema: opslab
+        # JDBC 배치 — INSERT/UPDATE 를 묶어 라운드트립 감소. order_inserts/updates 로 배치 그룹화 정렬,
+        # batch_versioned_data 로 @Version(낙관적 락) 엔티티도 배치 대상에 포함.
+        jdbc:
+          batch_size: 50
+          batch_versioned_data: true
+        order_inserts: true
+        order_updates: true
 
   flyway:
     enabled: true
@@ -197,9 +205,26 @@ cart:
   store: ${CART_STORE:jpa}
 
 app:
+  # 읽기/쓰기 분리 (opt-in). enabled=true 일 때만 라우팅 데이터소스 활성 — readOnly 트랜잭션은 read 로.
+  # 활성화 시 write/read 에 Hikari 네이티브 프로퍼티(jdbc-url 등)를 지정한다.
+  datasource:
+    read-replica:
+      enabled: ${APP_DATASOURCE_READ_REPLICA_ENABLED:false}
+    # write:
+    #   jdbc-url: ${SPRING_DATASOURCE_URL}
+    #   username: ${POSTGRES_USER}
+    #   password: ${POSTGRES_PASSWORD}
+    #   maximum-pool-size: ${DB_POOL_MAX:30}
+    # read:
+    #   jdbc-url: ${APP_DATASOURCE_READ_URL}      # 읽기 레플리카 엔드포인트
+    #   username: ${POSTGRES_USER}
+    #   password: ${POSTGRES_PASSWORD}
+    #   maximum-pool-size: ${DB_POOL_MAX:30}
+    #   read-only: true
   kafka:
     enabled: ${APP_KAFKA_ENABLED:false}         # 로컬 개발 기본 OFF — 프로덕션 compose/K8s 에서 true
     topic:
+      partitions: ${APP_KAFKA_TOPIC_PARTITIONS:3}   # 컨슈머 병렬 소비 상한 — settlement concurrency 와 함께 스케일
       payment-captured: lemuel.payment.captured
       payment-refunded: lemuel.payment.refunded
   outbox:

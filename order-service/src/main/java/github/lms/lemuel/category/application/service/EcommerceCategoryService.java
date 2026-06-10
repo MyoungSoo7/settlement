@@ -10,6 +10,8 @@ import github.lms.lemuel.category.domain.exception.CircularReferenceException;
 import github.lms.lemuel.category.domain.exception.DuplicateSlugException;
 import github.lms.lemuel.category.util.SlugGenerator;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +32,7 @@ public class EcommerceCategoryService {
     private final SlugGenerator slugGenerator;
 
     @Transactional
+    @CacheEvict(value = "ecommerce-categories", allEntries = true)
     public EcommerceCategory createCategory(String name, String slug, Long parentId, Integer sortOrder) {
         if (slug == null || slug.trim().isEmpty()) {
             if (parentId != null) {
@@ -59,21 +62,25 @@ public class EcommerceCategoryService {
         return savePort.save(category);
     }
 
+    @Cacheable(value = "ecommerce-categories", key = "'id:' + #id")
     public EcommerceCategory getCategoryById(Long id) {
         return loadPort.findByIdNotDeleted(id)
                 .orElseThrow(() -> new CategoryNotFoundException(id));
     }
 
+    @Cacheable(value = "ecommerce-categories", key = "'slug:' + #slug")
     public EcommerceCategory getCategoryBySlug(String slug) {
         return loadPort.findBySlug(slug)
                 .filter(c -> !c.isDeleted())
                 .orElseThrow(() -> new CategoryNotFoundException(slug));
     }
 
+    @Cacheable(value = "ecommerce-categories", key = "'tree'")
     public List<EcommerceCategory> getAllCategoriesTree() {
         return buildTree(loadPort.findAllNotDeleted());
     }
 
+    @Cacheable(value = "ecommerce-categories", key = "'tree:active'")
     public List<EcommerceCategory> getActiveCategoriesTree() {
         return buildTree(loadPort.findAllActiveNotDeleted());
     }
@@ -101,6 +108,7 @@ public class EcommerceCategoryService {
     }
 
     @Transactional
+    @CacheEvict(value = "ecommerce-categories", allEntries = true)
     public EcommerceCategory updateCategory(Long id, String name, String slug) {
         EcommerceCategory category = getCategoryById(id);
 
@@ -115,6 +123,7 @@ public class EcommerceCategoryService {
     }
 
     @Transactional
+    @CacheEvict(value = "ecommerce-categories", allEntries = true)
     public EcommerceCategory moveCategory(Long categoryId, Long newParentId) {
         EcommerceCategory category = getCategoryById(categoryId);
 
@@ -160,6 +169,7 @@ public class EcommerceCategoryService {
     }
 
     @Transactional
+    @CacheEvict(value = "ecommerce-categories", allEntries = true)
     public EcommerceCategory changeSortOrder(Long id, Integer sortOrder) {
         EcommerceCategory category = getCategoryById(id);
         category.changeSortOrder(sortOrder);
@@ -167,6 +177,7 @@ public class EcommerceCategoryService {
     }
 
     @Transactional
+    @CacheEvict(value = "ecommerce-categories", allEntries = true)
     public EcommerceCategory activateCategory(Long id) {
         EcommerceCategory category = getCategoryById(id);
         category.activate();
@@ -174,6 +185,7 @@ public class EcommerceCategoryService {
     }
 
     @Transactional
+    @CacheEvict(value = "ecommerce-categories", allEntries = true)
     public EcommerceCategory deactivateCategory(Long id) {
         EcommerceCategory category = getCategoryById(id);
         category.deactivate();
@@ -181,6 +193,7 @@ public class EcommerceCategoryService {
     }
 
     @Transactional
+    @CacheEvict(value = "ecommerce-categories", allEntries = true)
     public void deleteCategory(Long id) {
         EcommerceCategory category = getCategoryById(id);
 

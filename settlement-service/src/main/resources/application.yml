@@ -10,7 +10,8 @@ spring:
       enabled: true  # Java 21+ 가상 스레드 (Tomcat 요청 처리 + @Scheduled). JEP 491(JDK24+)로 synchronized 핀 없음
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/opslab
+    # reWriteBatchedInserts=true → JDBC 배치 INSERT 를 단일 multi-row 문장으로 재작성 (정산/원장 대량 적재 처리량↑)
+    url: jdbc:postgresql://localhost:5432/opslab?reWriteBatchedInserts=true
     username: ${POSTGRES_USER}
     password: ${POSTGRES_PASSWORD}
     driver-class-name: org.postgresql.Driver
@@ -34,6 +35,12 @@ spring:
       hibernate:
         format_sql: false
         default_schema: opslab
+        # JDBC 배치 — 정산/원장 대량 INSERT/UPDATE 라운드트립 감소
+        jdbc:
+          batch_size: 50
+          batch_versioned_data: true
+        order_inserts: true
+        order_updates: true
 
   # 마이그레이션은 order-service 가 책임진다 (단일 PG 공유, Phase 5 이후 분리 검토).
   flyway:
@@ -151,9 +158,29 @@ springdoc:
     path: /swagger-ui.html
 
 app:
+  # 읽기/쓰기 분리 (opt-in). enabled=true 일 때만 라우팅 데이터소스 활성 — readOnly 트랜잭션은 read 로.
+  datasource:
+    read-replica:
+      enabled: ${APP_DATASOURCE_READ_REPLICA_ENABLED:false}
+    # write:
+    #   jdbc-url: ${SPRING_DATASOURCE_URL}
+    #   username: ${POSTGRES_USER}
+    #   password: ${POSTGRES_PASSWORD}
+    #   maximum-pool-size: ${DB_POOL_MAX:30}
+    # read:
+    #   jdbc-url: ${APP_DATASOURCE_READ_URL}
+    #   username: ${POSTGRES_USER}
+    #   password: ${POSTGRES_PASSWORD}
+    #   maximum-pool-size: ${DB_POOL_MAX:30}
+    #   read-only: true
   kafka:
     enabled: ${APP_KAFKA_ENABLED:false}
+    consumer:
+      # 리스너 컨테이너 동시성(컨슈머 스레드 수). 파티션 단위 병렬 소비 → 정산 생성 병렬화.
+      # 유효 상한은 topic.partitions. 더 올리려면 partitions 와 함께 상향.
+      concurrency: ${APP_KAFKA_CONSUMER_CONCURRENCY:3}
     topic:
+      partitions: ${APP_KAFKA_TOPIC_PARTITIONS:3}
       payment-captured: lemuel.payment.captured
       payment-refunded: lemuel.payment.refunded
   search:

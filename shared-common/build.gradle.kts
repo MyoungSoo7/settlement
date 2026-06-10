@@ -65,6 +65,10 @@ dependencies {
     api("org.springframework:spring-context-support")
     api("com.github.ben-manes.caffeine:caffeine")
 
+    // HikariCP — read-replica 라우팅 데이터소스(ReadReplicaDataSourceConfig)의 컴파일 전용 타입.
+    // 런타임 구현은 각 앱 모듈의 spring-boot-starter-data-jpa 가 전이 제공한다.
+    compileOnly("com.zaxxer:HikariCP")
+
     // ShedLock — @Scheduled 의 분산 락 (replicas N 개 중 1 개만 실행 보장)
     api("net.javacrumbs.shedlock:shedlock-spring:5.16.0")
     api("net.javacrumbs.shedlock:shedlock-provider-jdbc-template:5.16.0")

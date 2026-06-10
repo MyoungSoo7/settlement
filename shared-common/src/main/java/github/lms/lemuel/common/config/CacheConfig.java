@@ -16,7 +16,7 @@ public class CacheConfig {
     @Bean
     public CacheManager cacheManager() {
         CaffeineCacheManager manager = new CaffeineCacheManager(
-            "categories", "tags", "products"
+            "categories", "tags", "products", "ecommerce-categories"
         );
         manager.setCaffeine(
             Caffeine.newBuilder()
