@@ -3,6 +3,7 @@ package github.lms.lemuel.user.adapter.in.web;
 import github.lms.lemuel.common.config.jwt.JwtAuthenticationFilter;
 import github.lms.lemuel.common.config.jwt.JwtUtil;
 import github.lms.lemuel.common.config.jwt.SecurityConfig;
+import github.lms.lemuel.user.application.port.in.DemoLoginUseCase;
 import github.lms.lemuel.user.application.port.in.LoginUseCase;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,6 +30,7 @@ class AuthControllerSecurityTest {
 
     @Autowired MockMvc mockMvc;
     @MockitoBean LoginUseCase loginUseCase;
+    @MockitoBean DemoLoginUseCase demoLoginUseCase;
     @MockitoBean JwtUtil jwtUtil;
 
     @Test

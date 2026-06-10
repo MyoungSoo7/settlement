@@ -130,6 +130,51 @@ class CouponTest {
         assertThat(coupon.getUsedCount()).isEqualTo(2);
     }
 
+    @Test @DisplayName("ALL 대상 쿠폰은 모든 상품/카테고리에 적용된다")
+    void appliesTo_all() {
+        Coupon coupon = Coupon.create("ALL", CouponType.FIXED, new BigDecimal("1000"),
+                BigDecimal.ZERO, null, 10, null);
+        // targetType 미설정 → 기본 ALL
+        assertThat(coupon.appliesTo(1L, 2L)).isTrue();
+        assertThat(coupon.appliesTo(null, null)).isTrue();
+    }
+
+    @Test @DisplayName("PRODUCT 대상 쿠폰은 targetId 와 일치하는 상품에만 적용된다")
+    void appliesTo_product() {
+        Coupon coupon = Coupon.create("P", CouponType.FIXED, new BigDecimal("1000"),
+                BigDecimal.ZERO, null, 10, null);
+        coupon.configureTarget("PRODUCT", 100L);
+        assertThat(coupon.appliesTo(100L, 999L)).isTrue();
+        assertThat(coupon.appliesTo(101L, 999L)).isFalse();
+    }
+
+    @Test @DisplayName("CATEGORY 대상 쿠폰은 targetId 와 일치하는 카테고리에만 적용된다")
+    void appliesTo_category() {
+        Coupon coupon = Coupon.create("C", CouponType.FIXED, new BigDecimal("1000"),
+                BigDecimal.ZERO, null, 10, null);
+        coupon.configureTarget("CATEGORY", 50L);
+        assertThat(coupon.appliesTo(1L, 50L)).isTrue();
+        assertThat(coupon.appliesTo(1L, 51L)).isFalse();
+    }
+
+    @Test @DisplayName("지원하지 않는 적용 대상이면 예외")
+    void configureTarget_unsupported() {
+        Coupon coupon = Coupon.create("C", CouponType.FIXED, new BigDecimal("1000"),
+                BigDecimal.ZERO, null, 10, null);
+        assertThatThrownBy(() -> coupon.configureTarget("SELLER", 1L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("지원하지 않는");
+    }
+
+    @Test @DisplayName("특정 대상(PRODUCT/CATEGORY) 쿠폰은 targetId 가 필수")
+    void configureTarget_requiresTargetId() {
+        Coupon coupon = Coupon.create("C", CouponType.FIXED, new BigDecimal("1000"),
+                BigDecimal.ZERO, null, 10, null);
+        assertThatThrownBy(() -> coupon.configureTarget("PRODUCT", null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("targetId");
+    }
+
     @Test @DisplayName("부분 환불 할인 계산")
     void calculateDiscountForRefund() {
         Coupon coupon = Coupon.create("F", CouponType.FIXED, new BigDecimal("10000"),

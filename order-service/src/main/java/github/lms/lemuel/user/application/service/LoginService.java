@@ -1,5 +1,7 @@
 package github.lms.lemuel.user.application.service;
 
+import github.lms.lemuel.common.audit.application.Auditable;
+import github.lms.lemuel.common.audit.domain.AuditAction;
 import github.lms.lemuel.user.application.port.in.LoginUseCase;
 import github.lms.lemuel.user.application.port.out.LoadUserPort;
 import github.lms.lemuel.user.application.port.out.PasswordHashPort;
@@ -22,6 +24,13 @@ public class LoginService implements LoginUseCase {
     private final TokenProviderPort tokenProviderPort;
 
     @Override
+    @Auditable(
+            action = AuditAction.LOGIN_SUCCESS,
+            failureAction = "LOGIN_FAILED",
+            resourceType = "User",
+            resourceId = "#p0.email()",
+            detail = "{'email': #p0.email(), 'role': #result == null ? null : #result.role()}"
+    )
     @Transactional(readOnly = true)
     public LoginResult login(LoginCommand command) {
         // 사용자 조회

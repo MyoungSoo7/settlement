@@ -1,8 +1,10 @@
 package github.lms.lemuel.payment.adapter.out.persistence;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -19,6 +21,17 @@ import java.util.Optional;
 public interface PaymentJpaRepository extends JpaRepository<PaymentJpaEntity, Long> {
 
     Optional<PaymentJpaEntity> findByOrderId(Long orderId);
+
+    /**
+     * 환불용 비관적 락 조회 (SELECT ... FOR UPDATE).
+     * 동시 환불(전액/부분/분할)이 같은 결제 행을 읽고 각자 refundedAmount 를 갱신해
+     * lost update 가 나거나 PG 가 이중 호출되는 것을 막는다. 부모 결제 행을 잠그면
+     * 같은 결제의 자식 tender 갱신도 트랜잭션 단위로 직렬화된다.
+     * 반드시 @Transactional 컨텍스트 안에서 호출할 것.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM PaymentJpaEntity p WHERE p.id = :id")
+    Optional<PaymentJpaEntity> findByIdForUpdate(@Param("id") Long id);
 
     List<PaymentJpaEntity> findByStatus(String status);
 

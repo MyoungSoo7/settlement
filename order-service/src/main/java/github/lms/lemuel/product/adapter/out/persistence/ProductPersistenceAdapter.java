@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Comparator;
 import java.util.stream.Collectors;
 
 @Component
@@ -59,7 +60,29 @@ public class ProductPersistenceAdapter implements LoadProductPort, SaveProductPo
     }
 
     @Override
+    public List<Product> search(String keyword, Long categoryId, String sortBy, String sortDirection) {
+        Comparator<Product> comparator = comparator(sortBy);
+        if ("DESC".equalsIgnoreCase(sortDirection)) {
+            comparator = comparator.reversed();
+        }
+        String normalizedKeyword = keyword == null || keyword.isBlank() ? null : keyword.trim();
+        return repository.search(normalizedKeyword, categoryId).stream()
+                .map(mapper::toDomain)
+                .sorted(comparator)
+                .collect(Collectors.toList());
+    }
+
+    @Override
     public boolean existsByName(String name) {
         return repository.existsByName(name);
+    }
+
+    private static Comparator<Product> comparator(String sortBy) {
+        return switch (sortBy == null ? "" : sortBy) {
+            case "price" -> Comparator.comparing(Product::getPrice);
+            case "latest", "createdAt" -> Comparator.comparing(Product::getCreatedAt);
+            case "name" -> Comparator.comparing(Product::getName, String.CASE_INSENSITIVE_ORDER);
+            default -> Comparator.comparing(Product::getId);
+        };
     }
 }

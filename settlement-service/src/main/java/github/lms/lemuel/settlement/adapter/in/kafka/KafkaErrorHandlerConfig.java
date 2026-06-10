@@ -63,11 +63,20 @@ public class KafkaErrorHandlerConfig {
 
     private final MeterRegistry meterRegistry;
     private final String bootstrapServers;
+    /**
+     * 리스너 컨테이너 동시성 — 컨슈머 스레드 수. 각 스레드가 토픽 파티션의 disjoint 부분집합을 맡아
+     * 정산 생성을 병렬 처리한다. 유효 상한은 파티션 수(기본 3)이며, 초과분은 idle 이라 토픽 파티션과
+     * 함께 올려야 처리량이 는다. 멱등 3단 방어(processed_events PK + settlements.payment_id UNIQUE)로
+     * 파티션 간 병렬 처리가 안전하다.
+     */
+    private final int concurrency;
 
     public KafkaErrorHandlerConfig(MeterRegistry meterRegistry,
-                                    @Value("${spring.kafka.bootstrap-servers}") String bootstrapServers) {
+                                    @Value("${spring.kafka.bootstrap-servers}") String bootstrapServers,
+                                    @Value("${app.kafka.consumer.concurrency:3}") int concurrency) {
         this.meterRegistry = meterRegistry;
         this.bootstrapServers = bootstrapServers;
+        this.concurrency = concurrency;
     }
 
     /**
@@ -191,6 +200,9 @@ public class KafkaErrorHandlerConfig {
         factory.setConsumerFactory(settlementConsumerFactory);
         factory.setCommonErrorHandler(kafkaErrorHandler);
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE);
+        // 파티션 단위 병렬 소비 — concurrency 개의 컨슈머 스레드가 파티션을 나눠 정산 생성을 병렬화.
+        factory.setConcurrency(concurrency);
+        log.info("Kafka listener concurrency set to {}", concurrency);
         return factory;
     }
 }

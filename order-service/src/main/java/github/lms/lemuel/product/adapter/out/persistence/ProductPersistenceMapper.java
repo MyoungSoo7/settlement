@@ -8,7 +8,6 @@ import org.mapstruct.MappingConstants;
 @Mapper(componentModel = MappingConstants.ComponentModel.SPRING)
 public interface ProductPersistenceMapper {
 
-    @Mapping(target = "categoryId", ignore = true)
     @Mapping(target = "tagIds", ignore = true)
     Product toDomain(ProductJpaEntity entity);
 

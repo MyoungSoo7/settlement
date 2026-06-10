@@ -1,6 +1,6 @@
 package github.lms.lemuel.settlement.application.service;
 
-import github.lms.lemuel.ledger.adapter.in.event.dto.LedgerReverseEntryEvent;
+import github.lms.lemuel.ledger.application.port.in.EnqueueLedgerTaskPort;
 import github.lms.lemuel.settlement.application.port.in.AdjustSettlementForRefundUseCase;
 import github.lms.lemuel.settlement.application.port.out.LoadSettlementPort;
 import github.lms.lemuel.settlement.application.port.out.SaveSettlementAdjustmentPort;
@@ -10,7 +10,6 @@ import github.lms.lemuel.settlement.domain.SettlementAdjustment;
 import github.lms.lemuel.settlement.domain.exception.SettlementNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,16 +28,16 @@ public class AdjustSettlementForRefundService implements AdjustSettlementForRefu
     private final LoadSettlementPort loadSettlementPort;
     private final SaveSettlementPort saveSettlementPort;
     private final SaveSettlementAdjustmentPort saveSettlementAdjustmentPort;
-    private final ApplicationEventPublisher eventPublisher;
+    private final EnqueueLedgerTaskPort enqueueLedgerTaskPort;
 
     public AdjustSettlementForRefundService(LoadSettlementPort loadSettlementPort,
                                             SaveSettlementPort saveSettlementPort,
                                             SaveSettlementAdjustmentPort saveSettlementAdjustmentPort,
-                                            ApplicationEventPublisher eventPublisher) {
+                                            EnqueueLedgerTaskPort enqueueLedgerTaskPort) {
         this.loadSettlementPort = loadSettlementPort;
         this.saveSettlementPort = saveSettlementPort;
         this.saveSettlementAdjustmentPort = saveSettlementAdjustmentPort;
-        this.eventPublisher = eventPublisher;
+        this.enqueueLedgerTaskPort = enqueueLedgerTaskPort;
     }
 
     @Override
@@ -46,8 +45,9 @@ public class AdjustSettlementForRefundService implements AdjustSettlementForRefu
         log.info("Adjusting settlement for refund. paymentId={}, refundAmount={}, refundId={}",
                 paymentId, refundAmount, refundId);
 
-        // 해당 결제의 정산 조회
-        Settlement settlement = loadSettlementPort.findByPaymentId(paymentId)
+        // 해당 결제의 정산을 비관적 락(SELECT ... FOR UPDATE)으로 조회.
+        // 동시 환불 2건이 같은 refundedAmount/holdback 을 읽고 각자 차감해 덮어쓰는 lost update 방지.
+        Settlement settlement = loadSettlementPort.findByPaymentIdForUpdate(paymentId)
                 .orElseThrow(() -> new SettlementNotFoundException("Settlement not found for paymentId: " + paymentId));
 
         // ★ Holdback 우선 차감 정책: 보류금이 있으면 거기서 먼저 빼서 셀러 추가 부담 없게 한다.
@@ -77,9 +77,10 @@ public class AdjustSettlementForRefundService implements AdjustSettlementForRefu
                 adjustedSettlement.getNetAmount(), adjustment.getAmount());
 
         // refundId 가 있을 때만 ledger 역분개 트리거 — 레거시 2-arg 호출 경로 보호.
+        // 같은 트랜잭션 아웃박스에 적재 → 커밋 후 로컬 폴러가 멱등 역분개 처리 (크래시 내성).
         if (refundId != null) {
-            eventPublisher.publishEvent(new LedgerReverseEntryEvent(
-                    adjustedSettlement.getId(), refundId, refundAmount, today));
+            enqueueLedgerTaskPort.enqueueReverse(
+                    adjustedSettlement.getId(), refundId, refundAmount, today);
         }
 
         return adjustedSettlement;

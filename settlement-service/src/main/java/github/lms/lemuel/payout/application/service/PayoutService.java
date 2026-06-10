@@ -3,7 +3,6 @@ package github.lms.lemuel.payout.application.service;
 import github.lms.lemuel.payout.application.port.in.ExecutePayoutUseCase;
 import github.lms.lemuel.payout.application.port.in.RequestPayoutUseCase;
 import github.lms.lemuel.payout.application.port.in.RetryFailedPayoutUseCase;
-import github.lms.lemuel.payout.application.port.out.FirmBankingPort;
 import github.lms.lemuel.payout.application.port.out.LoadPayoutPort;
 import github.lms.lemuel.payout.application.port.out.SavePayoutPort;
 import github.lms.lemuel.payout.domain.Payout;
@@ -13,6 +12,7 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,26 +48,28 @@ public class PayoutService implements RequestPayoutUseCase, ExecutePayoutUseCase
 
     private final LoadPayoutPort loadPort;
     private final SavePayoutPort savePort;
-    private final FirmBankingPort firmBanking;
+    private final PayoutSingleExecutor singleExecutor;
     private final PayoutLimitChecker limitChecker;
     private final Counter completedCounter;
     private final Counter failedCounter;
     private final Counter limitedCounter;
     private final Counter retryCounter;
+    private final Counter conflictCounter;
 
     public PayoutService(LoadPayoutPort loadPort,
                           SavePayoutPort savePort,
-                          FirmBankingPort firmBanking,
+                          PayoutSingleExecutor singleExecutor,
                           PayoutLimitChecker limitChecker,
                           MeterRegistry meterRegistry) {
         this.loadPort = loadPort;
         this.savePort = savePort;
-        this.firmBanking = firmBanking;
+        this.singleExecutor = singleExecutor;
         this.limitChecker = limitChecker;
         this.completedCounter = Counter.builder("payout.completed").register(meterRegistry);
         this.failedCounter = Counter.builder("payout.failed").register(meterRegistry);
         this.limitedCounter = Counter.builder("payout.limited").register(meterRegistry);
         this.retryCounter = Counter.builder("payout.admin.retry").register(meterRegistry);
+        this.conflictCounter = Counter.builder("payout.conflict").register(meterRegistry);
     }
 
     @Override
@@ -84,9 +86,10 @@ public class PayoutService implements RequestPayoutUseCase, ExecutePayoutUseCase
     }
 
     @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public ExecutionReport executeAllPending() {
         List<Payout> pending = loadPort.findByStatus(PayoutStatus.REQUESTED, BATCH_SIZE);
-        int succeeded = 0, failed = 0, limited = 0;
+        int succeeded = 0, failed = 0, limited = 0, conflicts = 0;
         LocalDate today = LocalDate.now();
 
         for (Payout p : pending) {
@@ -100,40 +103,25 @@ public class PayoutService implements RequestPayoutUseCase, ExecutePayoutUseCase
             }
 
             try {
-                executeSingle(p);
+                singleExecutor.execute(p);
                 succeeded++;
                 completedCounter.increment();
+            } catch (PayoutConcurrentClaimException | OptimisticLockingFailureException e) {
+                // 동시성 경합 — 다른 인스턴스가 이미 처리. 실패 아님(알람 X), 해당 건은 그대로 두고 skip.
+                conflicts++;
+                conflictCounter.increment();
+                log.warn("[Payout] concurrent-skip: payoutId={}, reason={}", p.getId(), e.toString());
             } catch (RuntimeException e) {
                 failed++;
                 failedCounter.increment();
                 log.error("[Payout] 실패: payoutId={}, err={}", p.getId(), e.toString());
             }
         }
-        if (succeeded > 0 || failed > 0 || limited > 0) {
-            log.info("[Payout] batch complete: succeeded={}, failed={}, limited={}",
-                    succeeded, failed, limited);
+        if (succeeded > 0 || failed > 0 || limited > 0 || conflicts > 0) {
+            log.info("[Payout] batch complete: succeeded={}, failed={}, limited={}, conflicts={}",
+                    succeeded, failed, limited, conflicts);
         }
         return new ExecutionReport(succeeded, failed, limited);
-    }
-
-    /**
-     * 개별 Payout 실행 — REQUIRES_NEW 트랜잭션으로 격리해 한 건 실패가 다른 건에 영향 없게 함.
-     */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    protected void executeSingle(Payout payout) {
-        payout.startSending();
-        Payout sending = savePort.save(payout);
-
-        try {
-            String referenceId = "PAYOUT-" + sending.getId();
-            String txnId = firmBanking.send(sending.getAccount(), sending.getAmount(), referenceId);
-            sending.markCompleted(txnId);
-        } catch (FirmBankingPort.FirmBankingException e) {
-            sending.markFailed(e.getErrorCode() + " " + e.getMessage());
-            savePort.save(sending);
-            throw e;
-        }
-        savePort.save(sending);
     }
 
     @Override

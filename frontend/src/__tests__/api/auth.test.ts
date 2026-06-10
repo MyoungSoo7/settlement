@@ -61,6 +61,29 @@ describe('authApi', () => {
     });
   });
 
+  // ─── demo login ───────────────────────────────────────────
+  describe('demo login', () => {
+    it('역할 기반 자동로그인 API를 호출한다', async () => {
+      const mockResponse = { token: 'manager-token', email: 'manager@test.com', role: 'MANAGER' };
+      vi.mocked(api.post).mockResolvedValueOnce({ data: mockResponse });
+
+      const result = await authApi.autoLogin('MANAGER');
+
+      expect(api.post).toHaveBeenCalledWith('/auth/dev/auto-login?role=MANAGER');
+      expect(result).toEqual(mockResponse);
+    });
+
+    it('게스트 로그인 API를 호출한다', async () => {
+      const mockResponse = { token: 'guest-token', email: 'guest@test.com', role: 'USER' };
+      vi.mocked(api.post).mockResolvedValueOnce({ data: mockResponse });
+
+      const result = await authApi.guestLogin();
+
+      expect(api.post).toHaveBeenCalledWith('/auth/dev/guest');
+      expect(result).toEqual(mockResponse);
+    });
+  });
+
   // ─── saveToken ────────────────────────────────────────────
   describe('saveToken', () => {
     const loginResp = { token: 'my-jwt', email: 'user@test.com', role: 'USER' };
@@ -75,6 +98,7 @@ describe('authApi', () => {
     });
 
     it('다른 이메일의 기존 세션이 있으면 교체한다', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       localStorage.setItem('access_token', 'old-token');
       localStorage.setItem('user_email', 'old@test.com');
       localStorage.setItem('user_role', 'USER');
@@ -83,6 +107,7 @@ describe('authApi', () => {
 
       expect(localStorage.getItem('user_email')).toBe('user@test.com');
       expect(localStorage.getItem('access_token')).toBe('my-jwt');
+      expect(warnSpy).toHaveBeenCalledWith('세션 교체: old@test.com -> user@test.com');
     });
 
     it('같은 이메일의 기존 세션은 덮어쓴다', () => {

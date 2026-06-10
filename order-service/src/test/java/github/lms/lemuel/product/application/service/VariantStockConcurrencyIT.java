@@ -21,6 +21,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -47,14 +48,14 @@ import static org.assertj.core.api.Assertions.assertThat;
  *     - 정확히 50 건 InsufficientStockException
  *     - 최종 재고: 0
  *     - 어떤 스레드도 음수 재고를 만들지 않음
- *     - Optimistic Lock 충돌은 retry 로 흡수되어 최종 결과는 일관적
+ *     - 원자적 조건부 UPDATE 라 락 대기·충돌 재시도 없이 보유 수량만큼만 성공
  * </pre>
  *
  * <p>이 테스트가 통과한다는 것은 다음을 보장한다:
  * <ul>
- *   <li>JPA {@code @Version} 이 올바르게 동작</li>
- *   <li>{@link DecreaseVariantStockService} 의 retry 로직이 올바르게 동시성 충돌을 흡수</li>
- *   <li>도메인의 {@code stockQuantity < quantity} 체크가 race condition 에서도 깨지지 않음</li>
+ *   <li>{@link DecreaseVariantStockService} 의 원자적 조건부 UPDATE 가 초과판매를 막음</li>
+ *   <li>{@code stock >= qty} 가드가 row 락 안에서 평가되어 race condition 에서도 깨지지 않음</li>
+ *   <li>차감 성공 횟수만큼만 {@code @Version} 이 증가</li>
  * </ul>
  *
  * <p><b>실행 환경</b>: Testcontainers (Docker 필수). Docker 미가용 시 자동 실패 →
@@ -97,14 +98,16 @@ class VariantStockConcurrencyIT {
 
     @BeforeEach
     void setup() {
-        // 사전 조건: products 테이블에 행 1 개 (FK 만족용) — Flyway 시드에 1 번 상품이 있다고 가정
-        // 본 테스트는 V36 product_variants 의 product_id FK 만 만족시키면 되므로
-        // V17 (seed_data.sql) 또는 V21 의 시드 상품 사용. 없으면 INSERT 직접.
-
-        ProductVariant variant = ProductVariant.create(1L, "TEST-SKU-" + System.nanoTime(),
-                "색상:빨강/사이즈:L", BigDecimal.ZERO, 50);
-        ProductVariant saved = persistenceAdapter.save(variant);
-        variantId = saved.getId();
+        // @DataJpaTest 는 테스트 메서드를 롤백 트랜잭션으로 감싼다. 시드를 그 트랜잭션 안에서
+        // 저장하면 미커밋 상태라, 별도 트랜잭션을 여는 워커 스레드가 READ COMMITTED 에서 행을
+        // 보지 못해 모든 차감이 0 행이 된다. 따라서 시드는 REQUIRES_NEW 로 독립 커밋한다.
+        TransactionTemplate seedTx = new TransactionTemplate(txManager);
+        seedTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        variantId = seedTx.execute(s -> {
+            ProductVariant variant = ProductVariant.create(1L, "TEST-SKU-" + System.nanoTime(),
+                    "색상:빨강/사이즈:L", BigDecimal.ZERO, 50);
+            return persistenceAdapter.save(variant).getId();
+        });
 
         TransactionTemplate txTemplate = new TransactionTemplate(txManager);
         service = new DecreaseVariantStockService(persistenceAdapter, persistenceAdapter,
@@ -150,7 +153,7 @@ class VariantStockConcurrencyIT {
         executor.shutdown();
 
         assertThat(finished).as("모든 스레드 30 초 내 완료").isTrue();
-        assertThat(unexpectedErrors).as("재시도 한계 초과 또는 알 수 없는 오류 — Optimistic Lock 흡수 실패")
+        assertThat(unexpectedErrors).as("InsufficientStock 외 예상치 못한 예외 — 원자 차감 일관성 위반")
                 .isEmpty();
 
         // 핵심 불변식 검증

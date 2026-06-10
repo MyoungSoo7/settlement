@@ -32,6 +32,13 @@ public class GetOrderService implements GetOrderUseCase {
     }
 
     @Override
+    public List<Order> getOrdersByUserId(Long userId, String status,
+                                         java.time.LocalDateTime from,
+                                         java.time.LocalDateTime to) {
+        return loadOrderPort.findByUserId(userId, status, from, to);
+    }
+
+    @Override
     public List<Order> getAllOrders() {
         return loadOrderPort.findAll();
     }

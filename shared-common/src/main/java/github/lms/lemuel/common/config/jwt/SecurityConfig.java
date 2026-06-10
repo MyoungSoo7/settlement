@@ -124,10 +124,12 @@ public class SecurityConfig {
                         // 공개 카테고리 API
                         .requestMatchers(HttpMethod.GET, "/categories", "/categories/**").permitAll()
                         // 쿠폰 관련 API
+                        .requestMatchers(HttpMethod.GET, "/coupons/available").hasAnyRole("ADMIN", "MANAGER", "USER")
                         .requestMatchers(HttpMethod.GET, "/coupons", "/coupons/**").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers(HttpMethod.POST, "/coupons/*/use").hasAnyRole("ADMIN", "MANAGER", "USER")
                         // 전체 주문/사용자 조회 (관리자·매니저)
                         .requestMatchers("/orders/admin/all").hasAnyRole("ADMIN", "MANAGER")
+                        .requestMatchers("/orders/admin/**").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers("/users/admin/all").hasRole("ADMIN")
                         // 관리자 전용 카테고리 API
                         .requestMatchers("/admin/categories/**").hasRole("ADMIN")

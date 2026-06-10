@@ -72,6 +72,55 @@ services:
       timeout: 5s
       retries: 20
 
+  redis:
+    image: redis:7-alpine
+    container_name: lemuel-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:6380:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  # PgBouncer — 트랜잭션 풀링. 가상 스레드가 켜져 있어 앱은 수많은 커넥션을 원하지만
+  # PostgreSQL max_connections 는 100 이 한계. PgBouncer 가 많은 앱 커넥션을 적은 PG 백엔드로
+  # 멀티플렉싱해 동시 처리량(TPS)을 끌어올린다. 앱은 postgres:5432 대신 pgbouncer:6432 로 접속.
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    container_name: lemuel-pgbouncer
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: inter
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      AUTH_TYPE: scram-sha-256
+      POOL_MODE: transaction              # 트랜잭션 단위로 백엔드 커넥션 반납 → 멀티플렉싱
+      MAX_CLIENT_CONN: "1000"             # 앱 측 동시 커넥션 상한 (가상 스레드 대응)
+      DEFAULT_POOL_SIZE: "25"             # PG 로 나가는 실제 백엔드 커넥션 수 (서비스당)
+      MIN_POOL_SIZE: "5"
+      RESERVE_POOL_SIZE: "5"
+      SERVER_RESET_QUERY: DISCARD ALL
+    ports:
+      - "127.0.0.1:6432:6432"
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 6432 -U $$DB_USER -d $$DB_NAME || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
   order-service:
     build:
       context: .
@@ -84,11 +133,19 @@ services:
         required: false
     environment:
       SPRING_PROFILES_ACTIVE: prod
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/inter
+      # PgBouncer(transaction pooling) 경유. prepareThreshold=0 → 서버사이드 prepared statement 비활성
+      # (transaction 풀링 호환). reWriteBatchedInserts=true → JDBC 배치 INSERT 단일 문장 재작성(처리량↑).
+      SPRING_DATASOURCE_URL: jdbc:postgresql://pgbouncer:6432/inter?prepareThreshold=0&reWriteBatchedInserts=true
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_POOL_MAX: "50"                   # PgBouncer 가 흡수하므로 앱 풀을 넉넉히
       APP_KAFKA_ENABLED: "true"
       SPRING_KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
+      CART_STORE: redis
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
+      MANAGEMENT_HEALTH_REDIS_ENABLED: "true"
+      APP_CACHE_TWO_TIER_ENABLED: "true"   # L1 Caffeine + L2 Redis (공유 캐시 + Pub/Sub 무효화)
       JWT_ISSUER: ${JWT_ISSUER}
       JWT_SECRET: ${JWT_SECRET}
       JWT_TTL_SECONDS: ${JWT_TTL_SECONDS}
@@ -107,9 +164,11 @@ services:
       retries: 10
       start_period: 60s
     depends_on:
-      postgres:
+      pgbouncer:
         condition: service_healthy
       redpanda:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   settlement-service:
@@ -124,9 +183,11 @@ services:
         required: false
     environment:
       SPRING_PROFILES_ACTIVE: prod
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/inter
+      # PgBouncer(transaction pooling) 경유 — prepareThreshold=0 / reWriteBatchedInserts=true
+      SPRING_DATASOURCE_URL: jdbc:postgresql://pgbouncer:6432/inter?prepareThreshold=0&reWriteBatchedInserts=true
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_POOL_MAX: "50"
       SPRING_ELASTICSEARCH_URIS: http://elasticsearch:9200
       SPRING_ELASTICSEARCH_USERNAME: ${ELASTICSEARCH_USER}
       SPRING_ELASTICSEARCH_PASSWORD: ${ELASTICSEARCH_PASSWORD}
@@ -151,7 +212,7 @@ services:
       retries: 10
       start_period: 60s
     depends_on:
-      postgres:
+      pgbouncer:
         condition: service_healthy
       elasticsearch:
         condition: service_healthy
@@ -173,7 +234,7 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: prod
       ORDER_SERVICE_URI: http://order-service:8080
-      SETTLEMENT_SERVICE_URI: http://settlement-service:8080
+      SETTLEMENT_SERVICE_URI: http://order-service:8080
       JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
     ports:
       - "127.0.0.1:8080:8080"
@@ -186,8 +247,6 @@ services:
       start_period: 30s
     depends_on:
       order-service:
-        condition: service_healthy
-      settlement-service:
         condition: service_healthy
 
   frontend:
@@ -248,5 +307,6 @@ volumes:
   postgres-data:
   elasticsearch-data:
   redpanda-data:
+  redis-data:
   tempo-data:
   grafana-data:

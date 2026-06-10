@@ -11,11 +11,6 @@ import java.util.UUID;
  */
 public interface LoadOutboxEventPort {
     /**
-     * PENDING 상태의 이벤트를 생성 시간 오름차순으로 최대 limit 개 반환.
-     */
-    List<OutboxEvent> findPending(int limit);
-
-    /**
      * 운영 지표용 — 현재 PENDING 개수.
      */
     long countPending();

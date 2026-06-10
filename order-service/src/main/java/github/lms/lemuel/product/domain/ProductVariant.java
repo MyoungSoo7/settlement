@@ -14,9 +14,10 @@ import java.util.Objects;
  *
  * <p>동시성 정책:
  * <ul>
- *   <li>{@code version} 필드를 JPA {@code @Version} 으로 매핑 → 동시 차감 시 OptimisticLockException</li>
- *   <li>충돌 시 애플리케이션 계층에서 N 회 재시도 ({@code DecreaseVariantStockService})</li>
- *   <li>대량 차감 (수천 RPS) 이 예상되면 Redis 분산 락 또는 DB Pessimistic Lock 으로 격상 가능</li>
+ *   <li>재고 차감은 {@code DecreaseVariantStockService} 의 원자적 조건부 UPDATE 로 처리 →
+ *       동시 차감 폭주에도 락 대기·재시도 없이 초과판매 방지</li>
+ *   <li>{@code version} 필드는 {@code @Version} 으로 매핑되어 일반 부분 수정(옵션/가격 변경 등)의
+ *       lost update 를 막는다. 차감 경로는 UPDATE 문에서 version 을 직접 +1 한다.</li>
  * </ul>
  */
 public class ProductVariant {
@@ -26,6 +27,8 @@ public class ProductVariant {
     private final String sku;
     private String optionName;
     private BigDecimal additionalPrice;
+    private BigDecimal discountPrice;
+    private BigDecimal discountRate;
     private int stockQuantity;
     private long version;
     private ProductVariantStatus status;
@@ -44,7 +47,7 @@ public class ProductVariant {
             throw new IllegalArgumentException("초기 재고는 0 이상");
         }
         BigDecimal price = additionalPrice == null ? BigDecimal.ZERO : additionalPrice;
-        return new ProductVariant(null, productId, sku, optionName, price, initialStock,
+        return new ProductVariant(null, productId, sku, optionName, price, null, null, initialStock,
                 0L, initialStock == 0 ? ProductVariantStatus.OUT_OF_STOCK : ProductVariantStatus.ACTIVE,
                 LocalDateTime.now(), LocalDateTime.now());
     }
@@ -53,18 +56,30 @@ public class ProductVariant {
                                             BigDecimal additionalPrice, int stockQuantity, long version,
                                             ProductVariantStatus status, LocalDateTime createdAt,
                                             LocalDateTime updatedAt) {
-        return new ProductVariant(id, productId, sku, optionName, additionalPrice, stockQuantity,
+        return rehydrate(id, productId, sku, optionName, additionalPrice, null, null, stockQuantity,
                 version, status, createdAt, updatedAt);
     }
 
+    public static ProductVariant rehydrate(Long id, Long productId, String sku, String optionName,
+                                            BigDecimal additionalPrice, BigDecimal discountPrice,
+                                            BigDecimal discountRate, int stockQuantity, long version,
+                                            ProductVariantStatus status, LocalDateTime createdAt,
+                                            LocalDateTime updatedAt) {
+        return new ProductVariant(id, productId, sku, optionName, additionalPrice, discountPrice,
+                discountRate, stockQuantity, version, status, createdAt, updatedAt);
+    }
+
     private ProductVariant(Long id, Long productId, String sku, String optionName,
-                           BigDecimal additionalPrice, int stockQuantity, long version,
-                           ProductVariantStatus status, LocalDateTime createdAt, LocalDateTime updatedAt) {
+                           BigDecimal additionalPrice, BigDecimal discountPrice, BigDecimal discountRate,
+                           int stockQuantity, long version, ProductVariantStatus status,
+                           LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.id = id;
         this.productId = productId;
         this.sku = sku;
         this.optionName = optionName;
         this.additionalPrice = additionalPrice;
+        this.discountPrice = discountPrice;
+        this.discountRate = discountRate;
         this.stockQuantity = stockQuantity;
         this.version = version;
         this.status = status;
@@ -73,10 +88,8 @@ public class ProductVariant {
     }
 
     /**
-     * 재고 차감. 음수 재고는 도메인 불변식 위반이므로 즉시 예외.
-     *
-     * <p>동시성: 같은 트랜잭션에서 호출되더라도 JPA {@code @Version} 으로 다른 트랜잭션의 변경이
-     * flush 시점에 감지된다. 충돌 발생 시 OptimisticLockException → 호출자가 재시도.
+     * 재고 차감 도메인 불변식 가드(음수 재고 방지). 고동시성 차감은 영속 계층의 원자적 조건부
+     * UPDATE 가 담당하므로, 이 메서드는 단건/검증 용도로만 사용한다.
      */
     public void decreaseStock(int quantity) {
         if (quantity <= 0) {
@@ -121,6 +134,8 @@ public class ProductVariant {
     public String getSku() { return sku; }
     public String getOptionName() { return optionName; }
     public BigDecimal getAdditionalPrice() { return additionalPrice; }
+    public BigDecimal getDiscountPrice() { return discountPrice; }
+    public BigDecimal getDiscountRate() { return discountRate; }
     public int getStockQuantity() { return stockQuantity; }
     public long getVersion() { return version; }
     public ProductVariantStatus getStatus() { return status; }

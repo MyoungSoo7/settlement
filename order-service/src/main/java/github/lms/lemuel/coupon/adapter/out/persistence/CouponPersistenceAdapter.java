@@ -3,6 +3,7 @@ package github.lms.lemuel.coupon.adapter.out.persistence;
 import github.lms.lemuel.coupon.application.port.out.LoadCouponPort;
 import github.lms.lemuel.coupon.application.port.out.SaveCouponPort;
 import github.lms.lemuel.coupon.domain.Coupon;
+import github.lms.lemuel.coupon.domain.CouponTarget;
 import github.lms.lemuel.coupon.domain.CouponType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -43,6 +44,11 @@ public class CouponPersistenceAdapter implements LoadCouponPort, SaveCouponPort 
     }
 
     @Override
+    public boolean incrementUsageIfAvailable(Long couponId) {
+        return couponRepository.incrementUsedCountIfAvailable(couponId) > 0;
+    }
+
+    @Override
     public void recordUsage(Long couponId, Long userId, Long orderId) {
         CouponUsageJpaEntity usage = new CouponUsageJpaEntity();
         usage.setCouponId(couponId);
@@ -60,6 +66,9 @@ public class CouponPersistenceAdapter implements LoadCouponPort, SaveCouponPort 
         entity.setMinOrderAmount(domain.getMinOrderAmount());
         entity.setMaxUses(domain.getMaxUses());
         entity.setUsedCount(domain.getUsedCount());
+        entity.setTargetType(domain.getTargetType().name());
+        entity.setTargetId(domain.getTargetId());
+        entity.setStartsAt(domain.getStartsAt());
         entity.setExpiresAt(domain.getExpiresAt());
         entity.setActive(domain.isActive());
         entity.setCreatedAt(domain.getCreatedAt());
@@ -76,6 +85,9 @@ public class CouponPersistenceAdapter implements LoadCouponPort, SaveCouponPort 
         coupon.setMinOrderAmount(entity.getMinOrderAmount());
         coupon.setMaxUses(entity.getMaxUses());
         coupon.setUsedCount(entity.getUsedCount());
+        coupon.setTargetType(CouponTarget.fromStorageOrDefault(entity.getTargetType()));
+        coupon.setTargetId(entity.getTargetId());
+        coupon.setStartsAt(entity.getStartsAt());
         coupon.setExpiresAt(entity.getExpiresAt());
         coupon.setActive(entity.isActive());
         coupon.setCreatedAt(entity.getCreatedAt());

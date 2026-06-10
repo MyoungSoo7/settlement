@@ -33,5 +33,11 @@ public class CouponCreateRequest {
 
     private BigDecimal maxDiscountAmount;
 
+    private String targetType = "ALL";
+
+    private Long targetId;
+
+    private LocalDateTime startsAt;
+
     private LocalDateTime expiresAt;
 }

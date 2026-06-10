@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -44,6 +45,38 @@ public class KafkaOutboxPublisher implements PublishExternalEventPort {
 
     @Override
     public void publish(OutboxEvent event) {
+        try {
+            SendResult<String, String> result = kafkaTemplate.send(buildRecord(event))
+                    .get(SEND_TIMEOUT_SEC, TimeUnit.SECONDS);
+            log.debug("Kafka publish OK: topic={}, partition={}, offset={}, eventId={}",
+                    result.getRecordMetadata().topic(),
+                    result.getRecordMetadata().partition(),
+                    result.getRecordMetadata().offset(),
+                    event.getEventId());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Kafka publish interrupted", e);
+        } catch (ExecutionException | TimeoutException e) {
+            throw new RuntimeException("Kafka publish failed for eventId=" + event.getEventId(), e);
+        }
+    }
+
+    /**
+     * 비동기 발행 — {@code .get()} 없이 send future 를 그대로 반환한다. 배치 폴러가 여러 이벤트를
+     * 한꺼번에 dispatch 한 뒤 future 들을 모아 기다리면, 프로듀서가 in-flight 로 묶어 보내 라운드트립이
+     * 병렬화된다. (기존 동기 {@link #publish} 의 N회 직렬 {@code .get()} 대비 처리량↑)
+     */
+    @Override
+    public CompletableFuture<Void> publishAsync(OutboxEvent event) {
+        return kafkaTemplate.send(buildRecord(event)).thenAccept(result ->
+                log.debug("Kafka publish OK (async): topic={}, partition={}, offset={}, eventId={}",
+                        result.getRecordMetadata().topic(),
+                        result.getRecordMetadata().partition(),
+                        result.getRecordMetadata().offset(),
+                        event.getEventId()));
+    }
+
+    private ProducerRecord<String, String> buildRecord(OutboxEvent event) {
         String topic = resolveTopic(event);
         ProducerRecord<String, String> record = new ProducerRecord<>(
                 topic,
@@ -62,21 +95,7 @@ public class KafkaOutboxPublisher implements PublishExternalEventPort {
             record.headers().add(new RecordHeader("traceparent",
                     event.getTraceParent().getBytes(StandardCharsets.UTF_8)));
         }
-
-        try {
-            SendResult<String, String> result = kafkaTemplate.send(record)
-                    .get(SEND_TIMEOUT_SEC, TimeUnit.SECONDS);
-            log.debug("Kafka publish OK: topic={}, partition={}, offset={}, eventId={}",
-                    result.getRecordMetadata().topic(),
-                    result.getRecordMetadata().partition(),
-                    result.getRecordMetadata().offset(),
-                    event.getEventId());
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("Kafka publish interrupted", e);
-        } catch (ExecutionException | TimeoutException e) {
-            throw new RuntimeException("Kafka publish failed for eventId=" + event.getEventId(), e);
-        }
+        return record;
     }
 
     /**

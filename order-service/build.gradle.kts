@@ -46,6 +46,9 @@ dependencies {
     // Caffeine
     implementation("com.github.ben-manes.caffeine:caffeine")
 
+    // Redis — cart.store=redis 일 때 장바구니 어댑터 백엔드 (Lettuce, 연결 lazy)
+    implementation("org.springframework.boot:spring-boot-starter-data-redis")
+
     // Resilience4j (Toss PG)
     implementation("io.github.resilience4j:resilience4j-spring-boot3:2.2.0")
 

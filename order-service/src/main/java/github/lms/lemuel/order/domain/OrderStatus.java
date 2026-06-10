@@ -6,6 +6,15 @@ package github.lms.lemuel.order.domain;
 public enum OrderStatus {
     CREATED,    // 주문 생성됨(결제 전)
     PAID,       // 결제 완료로 주문 확정
+    ORDER_PLACED,
+    PAYMENT_COMPLETED,
+    SHIPPING_PENDING,
+    IN_TRANSIT,
+    DELIVERED,
+    CANCELLATION_REQUESTED,
+    CANCELLATION_APPROVED,
+    REFUND_REQUESTED,
+    REFUND_COMPLETED,
     CANCELED,   // 결제 전 취소
     REFUNDED;   // 결제 후 환불 완료
 

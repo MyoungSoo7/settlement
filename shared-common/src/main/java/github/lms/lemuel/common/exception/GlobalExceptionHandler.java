@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -49,6 +50,14 @@ public class GlobalExceptionHandler {
                 })
                 .collect(Collectors.joining(", "));
         log.warn("[ConstraintViolationException] {}", message);
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "INVALID_PARAMETER", message);
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<Map<String, Object>> handleMissingServletRequestParameter(
+            MissingServletRequestParameterException ex) {
+        String message = ex.getParameterName() + " parameter is required";
+        log.warn("[MissingServletRequestParameterException] {}", message);
         return buildErrorResponse(HttpStatus.BAD_REQUEST, "INVALID_PARAMETER", message);
     }
 
