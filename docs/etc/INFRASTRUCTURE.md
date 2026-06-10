@@ -95,7 +95,7 @@ spring:
 # Stage 1: Build
 FROM gradle:8.5-jdk25-alpine AS builder
 WORKDIR /app
-COPY ../build.gradle.kts settings.gradle.kts ./
+COPY ../../build.gradle.kts settings.gradle.kts ./
 RUN gradle dependencies --no-daemon || true
 COPY ../src ./src
 RUN gradle bootJar --no-daemon -x test

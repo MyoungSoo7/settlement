@@ -1,6 +1,6 @@
 # DevOps — GitHub 관리부터 CI 보안·코드 품질, CD 자동 배포, 운영 안전망까지
 
-> 이 문서는 settlement 프로젝트가 **소스 한 줄 변경부터 jen.lemuel.co.kr 실 운영 반영, 그리고 운영 결함 자동 감지까지** 어떤 게이트와 자동화를 거치는지 정리한다. 도메인 아키텍처는 [PORTFOLIO.md](../PORTFOLIO.md) 와 [docs/ARCHITECTURE.md](./ARCHITECTURE.md) 를 참고.
+> 이 문서는 settlement 프로젝트가 **소스 한 줄 변경부터 jen.lemuel.co.kr 실 운영 반영, 그리고 운영 결함 자동 감지까지** 어떤 게이트와 자동화를 거치는지 정리한다. 도메인 아키텍처는 [PORTFOLIO.md](../../PORTFOLIO.md) 와 [docs/ARCHITECTURE.md](ARCHITECTURE.md) 를 참고.
 
 **Last updated:** 2026-05-15
 
@@ -414,12 +414,12 @@ memory `settlement_e2e_automation_goal` 의 그림:
 
 ## 부록 — 참고 파일
 
-- [.github/workflows/ci.yml](../.github/workflows/ci.yml) — CI 전체 정의
-- [.github/workflows/pr-review.yml](../.github/workflows/pr-review.yml) — Lightweight PR Review
+- [.github/workflows/ci.yml](../../.github/workflows/ci.yml) — CI 전체 정의
+- [.github/workflows/pr-review.yml](../../.github/workflows/pr-review.yml) — Lightweight PR Review
 - `helm-deploy/charts/settlement/values-prod.yaml` — prod 배포 values
 - `helm-deploy/charts/settlement/values-staging.yaml` — staging 배포 values (수동 tag)
-- [frontend/playwright.config.ts](../frontend/playwright.config.ts) — Playwright 환경 분기
+- [frontend/playwright.config.ts](../../frontend/playwright.config.ts) — Playwright 환경 분기
 - [frontend/e2e/](../frontend/e2e/) — 4 종 자동로그인 + smoke 시나리오
-- [docs/DEPLOYMENT.md](./DEPLOYMENT.md) — 배포 상세
-- [docs/INFRASTRUCTURE.md](./INFRASTRUCTURE.md) — K3s / ArgoCD / 네트워크
-- [docs/CI_CONFIGURATION.md](./CI_CONFIGURATION.md) — CI 세부 설정 변천사
+- [docs/DEPLOYMENT.md](DEPLOYMENT.md) — 배포 상세
+- [docs/INFRASTRUCTURE.md](INFRASTRUCTURE.md) — K3s / ArgoCD / 네트워크
+- [docs/CI_CONFIGURATION.md](CI_CONFIGURATION.md) — CI 세부 설정 변천사
