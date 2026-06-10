@@ -15,5 +15,8 @@ public final class MdcKeys {
     public static final String SETTLEMENT_ID = "settlementId";
     public static final String REFUND_ID = "refundId";
 
+    /** {@code @Transactional} 메서드 경계마다 부착되는 트랜잭션 상관 키. */
+    public static final String TX_ID = "txId";
+
     private MdcKeys() {}
 }
