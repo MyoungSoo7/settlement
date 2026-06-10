@@ -1,6 +1,6 @@
 # Lemuel — 이커머스 + 정산 MSA 플랫폼
 
-> **상품·장바구니·주문·결제·배송·정산** 6개 도메인을 **2개 마이크로서비스 + API Gateway** 로 분리한
+> **상품·장바구니·주문·결제·배송·정산·시공예약** 도메인을 **2개 마이크로서비스 + API Gateway** 로 분리한
 > 헥사고날 아키텍처 기반 백엔드. 단일 모놀리스 → **Bounded Context 분리** → **이벤트 드리븐** →
 > **Read-only Projection 패턴** 으로 진화시킨 포트폴리오 프로젝트.
 
@@ -39,7 +39,7 @@ flowchart LR
     GW -->|/api/settlements/**<br/>/api/reconciliation/**<br/>/api/reports/**| SS
 
     subgraph commerce["🛒 Commerce Bounded Context"]
-        OS["order-service<br/>:8088<br/><br/>user · order · payment · cart<br/>shipping · product · category<br/>coupon · review · game"]
+        OS["order-service<br/>:8088<br/><br/>user · order · payment · cart<br/>shipping · product · category<br/>coupon · review · reservation · game"]
     end
 
     subgraph settlement["💰 Settlement Bounded Context"]
@@ -84,14 +84,14 @@ flowchart LR
 | API Gateway | Spring Cloud Gateway 2025 |
 | PG 연동 | Toss Payments |
 | 배치 | Spring Batch |
-| 캐시 | Caffeine |
+| 캐시 | Caffeine (L1) + 선택적 Redis L2 — 2-tier 캐시 (opt-in, Pub/Sub 무효화) |
 | 회복탄력성 | Resilience4j (Circuit Breaker, Retry) |
 | Rate Limiting | Bucket4j |
 | 인증 | JWT (HS256) |
 | 비밀번호 | BCrypt (cost=12) |
 | PDF | iText 8 (정산서, 캐시플로우 리포트) |
 | 모니터링 | Micrometer + Prometheus + Grafana |
-| 마이그레이션 | Flyway (V1~V49, 이후 timestamp 명명) |
+| 마이그레이션 | Flyway (초기 V1~V50, 이후 `V{timestamp}__` 명명 혼재) |
 | 코드 품질 | SonarCloud + JaCoCo |
 | 테스트 | JUnit 5 + Mockito + ArchUnit + Testcontainers |
 | 컨테이너 | Docker Compose (dev) / Kubernetes (prod) |
@@ -118,7 +118,7 @@ settlement/                              # 모노레포 루트
 │       └── pdf/                         # iText PDF 유틸
 │
 ├── order-service/                       # 🛒 Commerce 서비스 (port 8088)
-│   └── src/main/java/.../{user,order,payment,cart,shipping,product,category,coupon,review,game}
+│   └── src/main/java/.../{user,order,payment,cart,shipping,product,category,coupon,review,reservation,game}
 │       ├── adapter/in/web/              # REST 컨트롤러
 │       ├── adapter/out/persistence/     # JPA 엔티티/리포지토리
 │       ├── adapter/out/external/        # Toss PG 클라이언트
@@ -190,13 +190,16 @@ public class SettlementPaymentReadModel {
 Payment.capture() (DB tx)
     ├─ payments.status = CAPTURED
     └─ outbox_events INSERT (PaymentCaptured)
-                     ↓ (poller, 2s)
+                     ↓ (멀티워커 폴러 — FOR UPDATE SKIP LOCKED claim + 비동기 배치 발행, 기본 2s)
                  Kafka: lemuel.payment.captured
                      ↓
-        settlement-service Consumer
+        settlement-service Consumer (파티션 단위 병렬 소비, concurrency=3)
             ├─ processed_events (group, event_id) 멱등 체크
             └─ Settlement.createFromPayment()
 ```
+
+> 폴러는 여러 인스턴스가 동시에 돌아도 `FOR UPDATE SKIP LOCKED` 로 서로 겹치지 않는 행만 claim 해
+> 수평 확장된다(리스 만료로 크래시 자동 회수). 처리량 튜닝 상세는 [`docs/tps.md`](docs/tps.md).
 
 **3단 멱등 방어**:
 1. outbox.event_id UUID UNIQUE — 프로듀서 중복 방지
@@ -340,11 +343,14 @@ docker build --build-arg MODULE=gateway-service     -t lemuel-gateway .
 | `/api/orders/**`, `/api/payments/**`, `/api/refunds/**` | order-service |
 | `/api/products/**`, `/api/categories/**`, `/api/tags/**` | order-service |
 | `/api/coupons/**`, `/api/reviews/**` | order-service |
+| `/reservations/**` | order-service |
 | `/admin/categories/**`, `/admin/pg/**`, `/admin/products/**` | order-service |
 | `/api/settlements/**`, `/api/reconciliation/**`, `/api/reports/**` | settlement-service |
 | `/api/ledger/**` | settlement-service |
 | `/admin/payouts/**`, `/admin/chargebacks/**` | settlement-service |
 | `/admin/pg-reconciliation/**`, `/admin/reconciliation/**`, `/admin/dlq/**` | settlement-service |
+
+> 참고: `user` 도메인의 멤버십 승인 엔드포인트(`/memberships/**`)는 order-service 에 있으나 아직 gateway 라우트 미등록 — 현재는 order-service(:8088) 직접 접근.
 
 ---
 
@@ -353,6 +359,7 @@ docker build --build-arg MODULE=gateway-service     -t lemuel-gateway .
 ### Payment 상태
 ```
 READY ─→ AUTHORIZED ─→ CAPTURED ─→ REFUNDED
+   └────────┴─→ FAILED        └─→ CANCELED (승인취소)
 ```
 
 ### Order 상태
@@ -360,6 +367,19 @@ READY ─→ AUTHORIZED ─→ CAPTURED ─→ REFUNDED
 CREATED ─→ PAID ─→ REFUNDED
               └─→ CANCELED
 ```
+실제 enum 은 배송·취소·환불 단계를 더 세분화:
+`ORDER_PLACED, PAYMENT_COMPLETED, SHIPPING_PENDING, IN_TRANSIT, DELIVERED,
+CANCELLATION_REQUESTED/APPROVED, REFUND_REQUESTED/COMPLETED`
+
+### Reservation 상태머신 (시공 예약)
+```
+REQUESTED ─→ CONFIRMED ─→ ASSIGNED ─→ IN_PROGRESS ─→ COMPLETED
+ (접수)      (관리자확인)   (기사배정)    (시공중)         (시공완료)
+                                                  └─→ CANCELED
+```
+- 업체회원이 예약 등록 → 관리자 확인 → 시공기사 배정/**재배정** → 진행/완료
+- 기사 본인 배정 작업 조회(`/reservations/assigned/my`), 관리자 대시보드(`/reservations/admin`)
+- 엔드포인트는 order-service `/reservations/**` (gateway 라우팅됨)
 
 ### Shipping 상태머신
 ```
@@ -405,6 +425,7 @@ PENDING → READY → SHIPPED → IN_TRANSIT → DELIVERED → (선택) RETURNED
 | 문서 | 경로 |
 |---|---|
 | Claude Code 컨텍스트 | [`CLAUDE.md`](./CLAUDE.md) |
+| TPS / 처리량 개선 작업 | [`docs/tps.md`](./docs/tps.md) |
 | ADR (아키텍처 결정 기록) | [`docs/adr/`](./docs/adr/) |
 | Runbook (장애 대응) | [`docs/runbook/`](./docs/runbook/) |
 | CI/CD | [`.github/workflows/`](./.github/workflows/) |
