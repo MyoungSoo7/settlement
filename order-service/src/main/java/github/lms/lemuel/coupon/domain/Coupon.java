@@ -17,7 +17,7 @@ public class Coupon {
     private BigDecimal maxDiscountAmount; // 할인 상한선 (null이면 무제한)
     private int maxUses;
     private int usedCount;
-    private String targetType;
+    private CouponTarget targetType;
     private Long targetId;
     private LocalDateTime startsAt;
     private LocalDateTime expiresAt;
@@ -44,9 +44,7 @@ public class Coupon {
         if (discountValue == null || discountValue.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("할인 금액은 0보다 커야 합니다.");
         }
-        if (type == CouponType.PERCENTAGE && discountValue.compareTo(new BigDecimal("100")) > 0) {
-            throw new IllegalArgumentException("정률 할인은 100%를 초과할 수 없습니다.");
-        }
+        type.validateDiscountValue(discountValue); // 타입별 제약 검증을 Strategy 에 위임
         if (maxUses <= 0) {
             throw new IllegalArgumentException("최대 사용 횟수는 1 이상이어야 합니다.");
         }
@@ -58,23 +56,18 @@ public class Coupon {
         coupon.minOrderAmount = minOrderAmount != null ? minOrderAmount : BigDecimal.ZERO;
         coupon.maxDiscountAmount = maxDiscountAmount;
         coupon.maxUses = maxUses;
-        coupon.targetType = "ALL";
+        coupon.targetType = CouponTarget.ALL;
         coupon.expiresAt = expiresAt;
         return coupon;
     }
 
     public void configureTarget(String targetType, Long targetId) {
-        String normalized = targetType == null || targetType.isBlank()
-                ? "ALL"
-                : targetType.trim().toUpperCase();
-        if (!normalized.equals("ALL") && !normalized.equals("CATEGORY") && !normalized.equals("PRODUCT")) {
-            throw new IllegalArgumentException("지원하지 않는 쿠폰 적용 대상입니다: " + targetType);
-        }
-        if (!normalized.equals("ALL") && targetId == null) {
+        CouponTarget target = CouponTarget.fromInput(targetType);
+        if (target.requiresTargetId() && targetId == null) {
             throw new IllegalArgumentException("특정 대상 쿠폰은 targetId가 필요합니다.");
         }
-        this.targetType = normalized;
-        this.targetId = normalized.equals("ALL") ? null : targetId;
+        this.targetType = target;
+        this.targetId = target == CouponTarget.ALL ? null : targetId;
     }
 
     public void configurePeriod(LocalDateTime startsAt, LocalDateTime expiresAt) {
@@ -111,18 +104,21 @@ public class Coupon {
      * 할인 금액 계산
      */
     public BigDecimal calculateDiscount(BigDecimal orderAmount) {
-        BigDecimal discount;
-        if (type == CouponType.FIXED) {
-            discount = discountValue.min(orderAmount);
-        } else {
-            discount = orderAmount.multiply(discountValue)
-                    .divide(new BigDecimal("100"), 0, RoundingMode.FLOOR);
-        }
-
+        BigDecimal discount = type.rawDiscount(discountValue, orderAmount); // 타입별 계산을 Strategy 에 위임
         if (maxDiscountAmount != null && discount.compareTo(maxDiscountAmount) > 0) {
             return maxDiscountAmount;
         }
         return discount;
+    }
+
+    /**
+     * 이 쿠폰이 주어진 상품/카테고리 주문에 적용 가능한 대상인지 판정한다.
+     *
+     * <p>적용 대상 매칭 규칙은 {@link CouponTarget} enum-Strategy 가 캡슐화한다 — 도메인/서비스에서
+     * targetType 문자열을 꺼내 분기하던 로직을 타입 자체로 흡수.
+     */
+    public boolean appliesTo(Long productId, Long categoryId) {
+        return getTargetType().matches(targetId, productId, categoryId);
     }
 
     /**
@@ -172,8 +168,8 @@ public class Coupon {
     public int getUsedCount() { return usedCount; }
     public void setUsedCount(int usedCount) { this.usedCount = usedCount; }
 
-    public String getTargetType() { return targetType == null ? "ALL" : targetType; }
-    public void setTargetType(String targetType) { this.targetType = targetType; }
+    public CouponTarget getTargetType() { return targetType == null ? CouponTarget.ALL : targetType; }
+    public void setTargetType(CouponTarget targetType) { this.targetType = targetType; }
 
     public Long getTargetId() { return targetId; }
     public void setTargetId(Long targetId) { this.targetId = targetId; }

@@ -14,7 +14,7 @@ spring:
             - id: order-service-orders
               uri: ${ORDER_SERVICE_URI:http://localhost:8088}
               predicates:
-                - Path=/api/orders/**,/api/payments/**,/api/refunds/**,/api/products/**,/api/categories/**,/api/tags/**,/api/coupons/**,/api/reviews/**,/api/users/**,/api/auth/**,/admin/categories/**,/admin/pg/**,/admin/products/**
+                - Path=/api/orders/**,/api/payments/**,/api/refunds/**,/api/products/**,/api/categories/**,/api/tags/**,/api/coupons/**,/api/reviews/**,/api/users/**,/api/auth/**,/reservations/**,/admin/categories/**,/admin/pg/**,/admin/products/**
             - id: settlement-service
               uri: ${SETTLEMENT_SERVICE_URI:http://localhost:8082}
               predicates:

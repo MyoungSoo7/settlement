@@ -145,6 +145,7 @@ services:
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: "6379"
       MANAGEMENT_HEALTH_REDIS_ENABLED: "true"
+      APP_CACHE_TWO_TIER_ENABLED: "true"   # L1 Caffeine + L2 Redis (공유 캐시 + Pub/Sub 무효화)
       JWT_ISSUER: ${JWT_ISSUER}
       JWT_SECRET: ${JWT_SECRET}
       JWT_TTL_SECONDS: ${JWT_TTL_SECONDS}

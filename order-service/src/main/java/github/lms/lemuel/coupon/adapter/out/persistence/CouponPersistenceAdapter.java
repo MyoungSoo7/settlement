@@ -3,6 +3,7 @@ package github.lms.lemuel.coupon.adapter.out.persistence;
 import github.lms.lemuel.coupon.application.port.out.LoadCouponPort;
 import github.lms.lemuel.coupon.application.port.out.SaveCouponPort;
 import github.lms.lemuel.coupon.domain.Coupon;
+import github.lms.lemuel.coupon.domain.CouponTarget;
 import github.lms.lemuel.coupon.domain.CouponType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -65,7 +66,7 @@ public class CouponPersistenceAdapter implements LoadCouponPort, SaveCouponPort 
         entity.setMinOrderAmount(domain.getMinOrderAmount());
         entity.setMaxUses(domain.getMaxUses());
         entity.setUsedCount(domain.getUsedCount());
-        entity.setTargetType(domain.getTargetType());
+        entity.setTargetType(domain.getTargetType().name());
         entity.setTargetId(domain.getTargetId());
         entity.setStartsAt(domain.getStartsAt());
         entity.setExpiresAt(domain.getExpiresAt());
@@ -84,7 +85,7 @@ public class CouponPersistenceAdapter implements LoadCouponPort, SaveCouponPort 
         coupon.setMinOrderAmount(entity.getMinOrderAmount());
         coupon.setMaxUses(entity.getMaxUses());
         coupon.setUsedCount(entity.getUsedCount());
-        coupon.setTargetType(entity.getTargetType());
+        coupon.setTargetType(CouponTarget.fromStorageOrDefault(entity.getTargetType()));
         coupon.setTargetId(entity.getTargetId());
         coupon.setStartsAt(entity.getStartsAt());
         coupon.setExpiresAt(entity.getExpiresAt());

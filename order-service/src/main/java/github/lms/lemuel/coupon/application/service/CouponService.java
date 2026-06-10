@@ -71,7 +71,7 @@ public class CouponService implements CouponUseCase {
     public List<ValidateResult> getAvailableCoupons(Long userId, BigDecimal orderAmount,
                                                     Long productId, Long categoryId) {
         return loadCouponPort.findAll().stream()
-                .filter(c -> appliesTo(c, productId, categoryId))
+                .filter(c -> c.appliesTo(productId, categoryId))
                 .map(c -> validateCoupon(c.getCode(), userId, orderAmount))
                 .filter(ValidateResult::valid)
                 .toList();
@@ -104,13 +104,5 @@ public class CouponService implements CouponUseCase {
     @Transactional(readOnly = true)
     public List<Coupon> getAllCoupons() {
         return loadCouponPort.findAll();
-    }
-
-    private static boolean appliesTo(Coupon coupon, Long productId, Long categoryId) {
-        return switch (coupon.getTargetType()) {
-            case "PRODUCT" -> coupon.getTargetId() != null && coupon.getTargetId().equals(productId);
-            case "CATEGORY" -> coupon.getTargetId() != null && coupon.getTargetId().equals(categoryId);
-            default -> true;
-        };
     }
 }

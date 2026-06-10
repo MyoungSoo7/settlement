@@ -221,6 +221,14 @@ app:
     #   password: ${POSTGRES_PASSWORD}
     #   maximum-pool-size: ${DB_POOL_MAX:30}
     #   read-only: true
+  # 2-tier 캐시 (opt-in). enabled=true 면 L1(Caffeine)+L2(Redis) 가 활성화되고 로컬 전용 Caffeine 은 back off.
+  # Redis 클래스패스가 있어야 동작(order-service 만 redis 스타터 보유). 다중 인스턴스에서 L2 공유 + Pub/Sub 무효화.
+  cache:
+    two-tier:
+      enabled: ${APP_CACHE_TWO_TIER_ENABLED:false}
+      l1-ttl-seconds: ${APP_CACHE_L1_TTL_SECONDS:60}     # L1 staleness 안전망 (무효화 누락 대비)
+      l2-ttl-seconds: ${APP_CACHE_L2_TTL_SECONDS:600}    # L2 권위 TTL
+      max-size: ${APP_CACHE_MAX_SIZE:500}
   kafka:
     enabled: ${APP_KAFKA_ENABLED:false}         # 로컬 개발 기본 OFF — 프로덕션 compose/K8s 에서 true
     topic:
@@ -258,6 +266,11 @@ app:
       webhook-url: ${SLACK_WEBHOOK_URL}
       channel: ${SLACK_CHANNEL}
       enabled: ${SLACK_ALERTS_ENABLED}
+  # 주문 알림 멀티채널 (Strategy + Composite). 메일은 항상 활성, Slack 은 opt-in.
+  notification:
+    slack:
+      enabled: ${APP_NOTIFICATION_SLACK_ENABLED:false}
+      webhook-url: ${APP_NOTIFICATION_SLACK_WEBHOOK_URL:}
   mail:
     from: ${MAIL_FROM:}
     support-email: ${SUPPORT_EMAIL}

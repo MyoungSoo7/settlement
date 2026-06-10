@@ -32,7 +32,7 @@ public record CouponResponse(
                 coupon.getMaxDiscountAmount(),
                 coupon.getMaxUses(),
                 coupon.getUsedCount(),
-                coupon.getTargetType(),
+                coupon.getTargetType().name(),
                 coupon.getTargetId(),
                 coupon.getStartsAt(),
                 coupon.getExpiresAt(),
