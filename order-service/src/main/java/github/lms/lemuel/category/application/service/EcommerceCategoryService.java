@@ -15,7 +15,9 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -157,13 +159,35 @@ public class EcommerceCategoryService {
         }
     }
 
+    /**
+     * 주어진 카테고리의 모든 하위(자손) id 집합을 반환한다.
+     *
+     * <p>전체 카테고리를 <b>한 번만</b> 로드해 {@code parentId -> children} 인접 맵을 구성한 뒤,
+     * 그 위에서 {@link ArrayDeque} 기반 <b>BFS</b> 로 자손을 순회한다. 노드마다 DB 를 조회하던
+     * 기존 재귀 방식의 N+1 쿼리를 제거한다. 이미 방문한 노드는 큐에 다시 넣지 않아
+     * (방어적으로) 데이터 사이클에도 무한 루프하지 않는다.
+     */
     private Set<Long> getDescendantIds(Long categoryId) {
-        Set<Long> descendants = new HashSet<>();
-        List<EcommerceCategory> children = loadPort.findByParentId(categoryId);
+        Map<Long, List<EcommerceCategory>> childrenByParent = new HashMap<>();
+        for (EcommerceCategory category : loadPort.findAllNotDeleted()) {
+            if (category.getParentId() != null) {
+                childrenByParent
+                        .computeIfAbsent(category.getParentId(), k -> new ArrayList<>())
+                        .add(category);
+            }
+        }
 
-        for (EcommerceCategory child : children) {
-            descendants.add(child.getId());
-            descendants.addAll(getDescendantIds(child.getId()));
+        Set<Long> descendants = new HashSet<>();
+        Deque<Long> queue = new ArrayDeque<>();
+        queue.add(categoryId);
+        while (!queue.isEmpty()) {
+            Long current = queue.poll();
+            for (EcommerceCategory child : childrenByParent.getOrDefault(current, List.of())) {
+                Long childId = child.getId();
+                if (descendants.add(childId)) { // 처음 본 노드만 큐에 추가 (중복/사이클 방어)
+                    queue.add(childId);
+                }
+            }
         }
         return descendants;
     }
