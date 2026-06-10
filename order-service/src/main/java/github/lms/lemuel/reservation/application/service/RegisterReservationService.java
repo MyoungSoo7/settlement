@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class RegisterReservationService implements RegisterReservationUseCase {
 
     private final SaveReservationPort saveReservationPort;
+    private final ReservationPricingPolicy pricingPolicy = new ReservationPricingPolicy();
 
     @Override
     public Reservation register(RegisterReservationCommand command) {
@@ -50,8 +51,8 @@ public class RegisterReservationService implements RegisterReservationUseCase {
         // 3. 조건부 규칙 재검증 (확장→확장면적, 보양→보양평수)
         reservation.validate();
 
-        // NOTE: 보양비/추가비용 자동계산은 pricing 도메인(2단계)에서 PricingPort 로 위임 예정.
-        //       현재는 0 으로 저장된다.
+        ReservationPricingPolicy.PricingResult pricing = pricingPolicy.calculate(reservation);
+        reservation.applyCalculatedFees(pricing.protectionFee(), pricing.additionalFee());
 
         // 4. 저장
         Reservation saved = saveReservationPort.save(reservation);
