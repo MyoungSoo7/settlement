@@ -4,15 +4,8 @@ plugins {
     id("io.spring.dependency-management")
 }
 
-// Phase A: 라이브러리 모드 — order-service fat jar 에 번들된다.
-// Phase B(Task B1)에서 bootJar 활성 + 자체 main 클래스로 전환.
-tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
-    enabled = false
-}
-tasks.named<Jar>("jar") {
-    enabled = true
-    archiveClassifier.set("")
-}
+// Phase B: 독립 배포 — 자체 ReservationServiceApplication 으로 bootJar 를 생성한다.
+// (Phase A 의 라이브러리 모드 bootJar 비활성 블록 제거됨)
 
 dependencies {
     implementation(project(":shared-common"))

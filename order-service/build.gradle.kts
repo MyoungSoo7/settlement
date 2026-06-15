@@ -10,8 +10,6 @@ dependencies {
     // LemuelApplication 이 settlement 컨트롤러까지 스캔할 수 있게 한다.
     // 분리 배포(MSA)는 Phase B 에서 별도 헬름 차트 + CI MODULE=settlement-service 로 재도입 예정.
     implementation(project(":settlement-service"))
-    // 임시 모놀리식 번들 — Phase A. Phase B(Task B1)에서 제거.
-    implementation(project(":reservation-service"))
 
     // Spring Boot 스타터
     implementation("org.springframework.boot:spring-boot-starter-actuator")
