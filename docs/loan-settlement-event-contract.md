@@ -25,6 +25,16 @@ Outbox 폴러는 `aggregateType` + `eventType` 으로 토픽을 자동 라우팅
 | `lemuel.loan.disbursement_requested` | 대출 실행 | `{loanId, sellerId, amount}` | settlement 가 payout 으로 셀러에게 `amount` 송금 |
 | `lemuel.loan.repayment_applied` | 상환 차감 완료 | `{settlementId, sellerId, deducted}` | settlement 가 **순지급액 = amount − deducted** 로 payout |
 
+## ⚠️ 구현 전 반드시 알아야 할 제약 (2026-06-16 발견)
+
+- **Settlement 도메인에 `sellerId` 가 없다.** 정산은 `paymentId/orderId` 로만 키잉되고 sellerId 는
+  조인(payments→orders→products→users, `LoadSellerTierPort` 경로)으로 해석된다. 이벤트 페이로드의
+  `sellerId` 를 채우려면 **settlement 내부에 sellerId 해석 포트/쿼리를 신규 추가**해야 한다.
+- **payout 은 배치 파이프라인**(`PayoutScheduler`→`PayoutService`/`PayoutSingleExecutor`→`FirmBankingPort`).
+  "net = amount − deducted" 는 이 파이프라인에 `LoanRepaymentApplied` 수신 결과를 반영하는 개조가 필요.
+- 위 두 경로는 **settlement-standalone(자체 DB 승격, `feat/settlement-standalone`) 개편 대상과 겹친다.**
+  → Chunk 7 은 settlement-standalone 머지 이후 그 구조 위에서 구현 권장 (그 전 구현은 재작업 위험).
+
 ## settlement 가 구현할 것 (Chunk 7)
 
 1. **SettlementCreated / SettlementConfirmed Outbox 발행** 추가
