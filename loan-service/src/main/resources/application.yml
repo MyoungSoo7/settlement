@@ -121,9 +121,10 @@ app:
       # 수신 (settlement → loan)
       settlement-created: lemuel.settlement.created
       settlement-confirmed: lemuel.settlement.confirmed
-      # 발행 (loan → settlement)
-      loan-disbursement-requested: lemuel.loan.disbursement.requested
-      loan-repayment-applied: lemuel.loan.repayment.applied
+      # 발행 (loan → settlement). Outbox 폴러가 aggregateType="Loan"+eventType 으로 자동 라우팅하는
+      # 실제 토픽명(snake_case). settlement 측 컨슈머(Chunk 7)가 이 이름으로 구독해야 한다.
+      loan-disbursement-requested: lemuel.loan.disbursement_requested
+      loan-repayment-applied: lemuel.loan.repayment_applied
 
   # 선정산 대출 정책 (정산예정금 기반 단순 모델 — CreditPolicy 빈에 주입)
   loan:
