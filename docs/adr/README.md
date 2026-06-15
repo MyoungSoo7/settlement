@@ -22,6 +22,8 @@
 | [0016](0016-payout-domain-firm-banking.md) | Payout (출금) — 정산 사이클의 종착점 | Accepted |
 | [0017](0017-kafka-consumer-dlt-and-replay.md) | Kafka 컨슈머 DLT + 운영자 Replay | Accepted |
 | [0018](0018-chargeback-domain.md) | Chargeback (카드사 분쟁) 도메인 | Accepted |
+| 0019 | ReversePayout (Payout 완료 후 셀러 환수) | Planned (예약, 파일 없음) |
+| [0020](0020-order-settlement-db-split.md) | order ↔ settlement DB 물리 분리 (이벤트 CQRS) | Proposed |
 
 ## 규칙
 

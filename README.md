@@ -22,7 +22,7 @@
 | **결제 → Outbox → 정산 비동기 단일 trace** | [docs/diagrams/sequence-payment-to-settlement.md](docs/diagrams/sequence-payment-to-settlement.md) |
 | **100 스레드 동시 SKU 차감 시나리오** | [docs/diagrams/sequence-multi-item-checkout.md](docs/diagrams/sequence-multi-item-checkout.md) |
 | **PG 정산파일 자동 차액 보정** | [docs/diagrams/sequence-pg-reconciliation.md](docs/diagrams/sequence-pg-reconciliation.md) |
-| **18개 Architecture Decision Records** | [docs/adr/](docs/adr/) |
+| **19개 Architecture Decision Records** | [docs/adr/](docs/adr/) |
 | **부하 테스트 시나리오 4종** | [load-test/](load-test/) |
 | **Grafana 비즈니스 KPI 대시보드** | [monitoring/grafana/dashboards/](monitoring/grafana/dashboards/) |
 
@@ -454,6 +454,8 @@ PENDING → READY → SHIPPED → IN_TRANSIT → DELIVERED → (선택) RETURNED
 - [0016 — Payout Domain + Firm Banking](./docs/adr/0016-payout-domain-firm-banking.md)
 - [0017 — Kafka Consumer DLT & Replay](./docs/adr/0017-kafka-consumer-dlt-and-replay.md)
 - [0018 — Chargeback Domain](./docs/adr/0018-chargeback-domain.md)
+- 0019 — ReversePayout (예약/Planned)
+- [0020 — order ↔ settlement DB 물리 분리 (이벤트 CQRS)](./docs/adr/0020-order-settlement-db-split.md) *(Proposed)*
 
 ---
 
