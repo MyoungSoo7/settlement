@@ -8,5 +8,6 @@ include(
     "shared-common",
     "order-service",
     "settlement-service",
+    "reservation-service",
     "gateway-service",
 )
