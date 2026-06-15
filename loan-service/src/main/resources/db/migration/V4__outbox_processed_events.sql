@@ -20,6 +20,10 @@ CREATE TABLE IF NOT EXISTS outbox_events (
     created_at        TIMESTAMP    NOT NULL DEFAULT NOW(),
     published_at      TIMESTAMP,
     trace_parent      VARCHAR(64),
+    -- 멀티워커 claim(리스) 컬럼 — OutboxPublisherScheduler 의 FOR UPDATE SKIP LOCKED claim.
+    -- ★ shared-common ClaimOutboxEventPort 네이티브 쿼리가 claimed_at/claimed_by 를 직접 참조하므로 필수.
+    claimed_at        TIMESTAMP,
+    claimed_by        VARCHAR(64),
 
     CONSTRAINT chk_loan_outbox_status CHECK (status IN ('PENDING', 'PUBLISHED', 'FAILED'))
 );
@@ -35,6 +39,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_loan_outbox_event_id
 
 CREATE INDEX IF NOT EXISTS idx_loan_outbox_aggregate
     ON outbox_events (aggregate_type, aggregate_id);
+
+-- claim 후보 조회 최적화: PENDING 행을 created_at 순으로, claimed_at(리스) 필터와 함께
+CREATE INDEX IF NOT EXISTS idx_loan_outbox_pending_claim
+    ON outbox_events (created_at, claimed_at)
+    WHERE status = 'PENDING';
 
 -- 컨슈머 측 멱등 추적: (consumer_group, event_id) 단위 처리 여부 기록.
 -- loan 은 SettlementCreated / SettlementConfirmed 를 at-least-once 로 수신하므로 필수.
