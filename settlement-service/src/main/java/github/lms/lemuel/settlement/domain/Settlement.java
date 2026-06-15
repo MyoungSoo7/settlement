@@ -1,10 +1,19 @@
 package github.lms.lemuel.settlement.domain;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+/**
+ * 정산 Aggregate Root.
+ *
+ * <p>정산 1건의 생명주기(상태 머신)·금액 계산·보류(holdback)·환불 반영에 대한 불변식을 캡슐화한다.
+ * 외부(애플리케이션/어댑터)는 이 루트를 통해서만 정산 상태를 변경해야 하며, 종료 상태(DONE)는
+ * 불변이라 금액 변경 대신 {@link SettlementAdjustment} 로만 보정한다.
+ *
+ * <p>모든 통화 금액 계산은 {@link Money} 값 객체를 통과시켜 반올림(scale 2, HALF_UP)·부호 규칙을
+ * 한곳에 모은다. public getter/setter 는 영속성 경계 호환을 위해 {@link BigDecimal} 표현을 유지한다.
+ */
 public class Settlement {
 
     /**
@@ -95,10 +104,10 @@ public class Settlement {
 
     private void calculateCommissionAndNetAmount() {
         BigDecimal rate = commissionRate != null ? commissionRate : COMMISSION_RATE;
-        this.commission = paymentAmount.multiply(rate)
-                .setScale(2, RoundingMode.HALF_UP);
-        this.netAmount = paymentAmount.subtract(commission)
-                .setScale(2, RoundingMode.HALF_UP);
+        Money payment = Money.of(paymentAmount);
+        Money commissionMoney = payment.times(rate);
+        this.commission = commissionMoney.toBigDecimal();
+        this.netAmount = payment.minus(commissionMoney).toBigDecimal();
     }
 
     public void validatePaymentId() {
@@ -237,11 +246,13 @@ public class Settlement {
         this.refundedAmount = newRefunded;
 
         // 순 정산 금액 재계산: (결제금액 - 환불금액 - 수수료)
-        BigDecimal remainingAmount = this.paymentAmount.subtract(this.refundedAmount);
-        this.netAmount = remainingAmount.subtract(this.commission).setScale(2, RoundingMode.HALF_UP);
+        Money net = Money.of(this.paymentAmount)
+                .minus(Money.of(this.refundedAmount))
+                .minus(Money.of(this.commission));
+        this.netAmount = net.toBigDecimal();
 
         // 환불로 인해 정산 금액이 0 이하가 되면 취소 처리
-        if (this.netAmount.compareTo(BigDecimal.ZERO) <= 0) {
+        if (net.isZeroOrNegative()) {
             this.status = SettlementStatus.CANCELED;
         }
 
@@ -333,8 +344,7 @@ public class Settlement {
             throw new IllegalStateException("netAmount 계산 후에만 holdback 적용 가능");
         }
         this.holdbackRate = rate;
-        this.holdbackAmount = this.netAmount.multiply(rate)
-                .setScale(2, RoundingMode.HALF_UP);
+        this.holdbackAmount = Money.of(this.netAmount).times(rate).toBigDecimal();
         this.holdbackReleaseDate = releaseDate;
         this.holdbackReleased = rate.signum() == 0; // 0% 면 보류 없으므로 즉시 released
         if (this.holdbackReleased) {
@@ -371,15 +381,14 @@ public class Settlement {
         if (this.holdbackAmount.signum() <= 0 || this.holdbackReleased) {
             return BigDecimal.ZERO;
         }
-        BigDecimal consumed = this.holdbackAmount.compareTo(refundAmount) <= 0
-                ? this.holdbackAmount : refundAmount;
-        this.holdbackAmount = this.holdbackAmount.subtract(consumed);
+        Money consumed = Money.of(this.holdbackAmount).min(Money.of(refundAmount));
+        this.holdbackAmount = Money.of(this.holdbackAmount).minus(consumed).toBigDecimal();
         if (this.holdbackAmount.signum() == 0) {
             this.holdbackReleased = true;
             this.holdbackReleasedAt = LocalDateTime.now();
         }
         this.updatedAt = LocalDateTime.now();
-        return consumed;
+        return consumed.toBigDecimal();
     }
 
     /**
@@ -388,7 +397,7 @@ public class Settlement {
     public BigDecimal getImmediatePayoutAmount() {
         if (this.netAmount == null) return BigDecimal.ZERO;
         if (this.holdbackReleased) return this.netAmount;
-        return this.netAmount.subtract(this.holdbackAmount).max(BigDecimal.ZERO);
+        return Money.of(this.netAmount).minus(Money.of(this.holdbackAmount)).max(Money.ZERO).toBigDecimal();
     }
 
     public boolean isHoldbackReleasable(LocalDate today) {

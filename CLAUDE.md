@@ -147,9 +147,14 @@ RUNNING → COMPLETED
 ```
 
 ### 수수료
-- 기본 정산 수수료율: **3%**
-- 셀러 티어별 차등 (V32 마이그레이션, `SellerTier`)
-- 홀드백(holdback) 정책: `HoldbackPolicy` — 일부 보류 후 `holdbackReleaseDate` 에 해제
+- 셀러 등급별 차등 수수료율 (V32 `commission_rate` 스냅샷, `SellerTier`):
+  **NORMAL 3.5% / VIP 2.5% / STRATEGIC 2.0%**
+  (레거시 기본 3% 는 `Settlement.COMMISSION_RATE` 상수로만 보존 — 운영 rate 는 등급 기준)
+- 정산 시점의 `commission_rate` 영구 보존 (이력 보존 — 추후 요율 변경 영향 없음)
+- 정산 주기도 등급별 차등 (`SellerTier.defaultCycle`, `users.settlement_cycle` 우선):
+  **NORMAL T+7 / VIP T+3 / STRATEGIC T+1** 영업일
+- 홀드백(holdback) 정책: `HoldbackPolicy.forTier` —
+  **NORMAL 30%/30일, VIP 10%/14일, STRATEGIC 0%** 보류 후 `holdbackReleaseDate` 에 해제
 
 ## 이벤트 흐름 (Outbox + Kafka)
 
@@ -186,7 +191,7 @@ RUNNING → COMPLETED
 - **리버스 프록시**: gateway-service (Spring Cloud Gateway)
 - **모니터링**: Prometheus + Micrometer + Grafana
 - **메시지 브로커**: Redpanda (Kafka 호환)
-- **코드 커버리지**: JaCoCo — CI 게이트 LINE 최소 50%, 핵심 도메인 패키지(payment/order/product/settlement/... domain) INSTRUCTION 80% 강제 (`build.gradle.kts`). persistence/web/batch 어댑터는 게이트에서 제외(통합 테스트로 별도 검증)
+- **코드 커버리지**: JaCoCo — CI 게이트 LINE 최소 50%, 핵심 도메인 패키지(payment/order/product/settlement/... domain) INSTRUCTION 80% 강제 (`build.gradle.kts`). adapter in/out 서브패키지 전반은 게이트에서 제외(통합 테스트로 별도 검증)
 
 ## 보안
 
