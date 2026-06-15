@@ -36,6 +36,11 @@ public class PaymentPersistenceAdapter implements LoadPaymentPort, SavePaymentPo
     }
 
     @Override
+    public Optional<PaymentDomain> loadByIdForUpdate(Long id) {
+        return paymentJpaRepository.findByIdForUpdate(id).map(this::toDomainWithTenders);
+    }
+
+    @Override
     public Optional<PaymentDomain> loadByOrderId(Long orderId) {
         return paymentJpaRepository.findByOrderId(orderId).map(this::toDomainWithTenders);
     }

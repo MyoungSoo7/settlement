@@ -38,6 +38,9 @@ public class ProductJpaEntity {
     @Column(nullable = false, length = 20)
     private ProductStatus status;
 
+    @Column(name = "category_id")
+    private Long categoryId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

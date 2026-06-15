@@ -17,10 +17,13 @@ import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.security.Principal;
+import java.time.LocalDateTime;
 import java.util.stream.Collectors;
 
 /**
@@ -93,8 +96,11 @@ public class OrderController {
     })
     @GetMapping("/user/{userId}")
     public ResponseEntity<List<OrderResponse>> getUserOrders(
-            @Parameter(description = "사용자 ID", required = true) @PathVariable @Positive(message = "유저 ID는 양수여야 합니다") Long userId) {
-        List<OrderResponse> orders = getOrderUseCase.getOrdersByUserId(userId)
+            @Parameter(description = "사용자 ID", required = true) @PathVariable @Positive(message = "유저 ID는 양수여야 합니다") Long userId,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to) {
+        List<OrderResponse> orders = getOrderUseCase.getOrdersByUserId(userId, status, from, to)
                 .stream()
                 .map(OrderResponse::from)
                 .collect(Collectors.toList());
@@ -127,4 +133,62 @@ public class OrderController {
         Order order = changeOrderStatusUseCase.cancelOrder(id);
         return ResponseEntity.ok(OrderResponse.from(order));
     }
+
+    @Operation(summary = "주문 취소 신청", description = "사용자가 주문 취소를 신청한다.")
+    @PostMapping("/{id}/cancellation-request")
+    public ResponseEntity<OrderResponse> requestCancellation(
+            @PathVariable Long id,
+            @RequestBody StatusReasonRequest request,
+            Principal principal) {
+        Order order = changeOrderStatusUseCase.requestCancellation(id, request.reason(), actor(principal));
+        return ResponseEntity.ok(OrderResponse.from(order));
+    }
+
+    @Operation(summary = "환불 신청", description = "사용자가 결제 완료 주문의 환불을 신청한다.")
+    @PostMapping("/{id}/refund-request")
+    public ResponseEntity<OrderResponse> requestRefund(
+            @PathVariable Long id,
+            @RequestBody StatusReasonRequest request,
+            Principal principal) {
+        Order order = changeOrderStatusUseCase.requestRefund(id, request.reason(), actor(principal));
+        return ResponseEntity.ok(OrderResponse.from(order));
+    }
+
+    @Operation(summary = "취소 승인 (관리자)", description = "관리자가 취소 신청을 승인한다.")
+    @PostMapping("/admin/{id}/cancellation-approve")
+    public ResponseEntity<OrderResponse> approveCancellation(
+            @PathVariable Long id,
+            @RequestBody StatusReasonRequest request,
+            Principal principal) {
+        Order order = changeOrderStatusUseCase.approveCancellation(id, request.reason(), actor(principal));
+        return ResponseEntity.ok(OrderResponse.from(order));
+    }
+
+    @Operation(summary = "환불 승인 (관리자)", description = "관리자가 환불 신청을 승인한다.")
+    @PostMapping("/admin/{id}/refund-approve")
+    public ResponseEntity<OrderResponse> approveRefund(
+            @PathVariable Long id,
+            @RequestBody StatusReasonRequest request,
+            Principal principal) {
+        Order order = changeOrderStatusUseCase.approveRefund(id, request.reason(), actor(principal));
+        return ResponseEntity.ok(OrderResponse.from(order));
+    }
+
+    @Operation(summary = "배송 상태 변경 (관리자)", description = "SHIPPING_PENDING/IN_TRANSIT/DELIVERED 로 주문 상태를 변경한다.")
+    @PatchMapping("/admin/{id}/shipping-status")
+    public ResponseEntity<OrderResponse> changeShippingStatus(
+            @PathVariable Long id,
+            @RequestBody AdminStatusRequest request,
+            Principal principal) {
+        Order order = changeOrderStatusUseCase.changeShippingStatus(
+                id, request.status(), request.reason(), actor(principal));
+        return ResponseEntity.ok(OrderResponse.from(order));
+    }
+
+    private static String actor(Principal principal) {
+        return principal == null ? "system" : principal.getName();
+    }
+
+    public record StatusReasonRequest(String reason) {}
+    public record AdminStatusRequest(String status, String reason) {}
 }

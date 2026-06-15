@@ -18,5 +18,7 @@ public interface LoadProductPort {
 
     List<Product> findAvailableProducts();
 
+    List<Product> search(String keyword, Long categoryId, String sortBy, String sortDirection);
+
     boolean existsByName(String name);
 }

@@ -5,6 +5,7 @@ import github.lms.lemuel.product.application.port.out.SaveProductVariantPort;
 import github.lms.lemuel.product.domain.ProductVariant;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -41,7 +42,8 @@ public class ProductVariantPersistenceAdapter
         if (variant.getId() == null) {
             entity = new ProductVariantJpaEntity(
                     null, variant.getProductId(), variant.getSku(), variant.getOptionName(),
-                    variant.getAdditionalPrice(), variant.getStockQuantity(), variant.getVersion(),
+                    variant.getAdditionalPrice(), variant.getDiscountPrice(), variant.getDiscountRate(),
+                    variant.getStockQuantity(), variant.getVersion(),
                     variant.getStatus(), variant.getCreatedAt(), variant.getUpdatedAt()
             );
         } else {
@@ -61,10 +63,16 @@ public class ProductVariantPersistenceAdapter
         return toDomain(saved);
     }
 
+    @Override
+    public int decreaseStockIfAvailable(Long variantId, int quantity) {
+        return repository.decreaseStockIfAvailable(variantId, quantity, LocalDateTime.now());
+    }
+
     private static ProductVariant toDomain(ProductVariantJpaEntity e) {
         return ProductVariant.rehydrate(
                 e.getId(), e.getProductId(), e.getSku(), e.getOptionName(),
-                e.getAdditionalPrice(), e.getStockQuantity(), e.getVersion(),
+                e.getAdditionalPrice(), e.getDiscountPrice(), e.getDiscountRate(),
+                e.getStockQuantity(), e.getVersion(),
                 e.getStatus(), e.getCreatedAt(), e.getUpdatedAt()
         );
     }

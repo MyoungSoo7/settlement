@@ -15,7 +15,13 @@ import java.time.LocalDateTime;
  * DB 스키마: id, payment_id, order_id, payment_amount, commission, net_amount, status, settlement_date, confirmed_at, created_at, updated_at
  */
 @Entity
-@Table(name = "settlements")
+@Table(
+        name = "settlements",
+        // 정산 멱등성 3단 방어 중 스키마 계층 — 같은 결제는 정산 1건만 존재.
+        // prod 스키마는 Flyway V3 가 동일 제약을 소유하며, 이 선언은 entity 기반
+        // 스키마 생성(테스트 create-drop) 시에도 제약이 재현되도록 명시한 것이다.
+        uniqueConstraints = @UniqueConstraint(name = "uk_settlements_payment_id", columnNames = "payment_id")
+)
 @Getter
 @Setter
 @NoArgsConstructor

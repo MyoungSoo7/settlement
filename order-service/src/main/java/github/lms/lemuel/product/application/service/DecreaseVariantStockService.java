@@ -4,53 +4,43 @@ import github.lms.lemuel.product.application.port.in.DecreaseVariantStockUseCase
 import github.lms.lemuel.product.application.port.out.LoadProductVariantPort;
 import github.lms.lemuel.product.application.port.out.SaveProductVariantPort;
 import github.lms.lemuel.product.domain.ProductVariant;
-import github.lms.lemuel.product.domain.exception.StockConcurrencyException;
+import github.lms.lemuel.product.domain.ProductVariantStatus;
+import github.lms.lemuel.product.domain.exception.InsufficientStockException;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
-import jakarta.persistence.OptimisticLockException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * 옵션(SKU) 재고 차감 — Optimistic Lock 기반 동시성 제어.
+ * 옵션(SKU) 재고 차감 — 원자적 조건부 UPDATE 기반 동시성 제어.
  *
- * <p>흐름:
- * <ol>
- *   <li>variant 로드 → {@link ProductVariant#decreaseStock(int)} 호출 → save</li>
- *   <li>save 시 Hibernate 가 {@code UPDATE ... WHERE id = ? AND version = ?} 발행</li>
- *   <li>다른 트랜잭션이 먼저 커밋되어 version 이 바뀌었으면 0 row updated → 예외</li>
- *   <li>예외를 잡아 N 회 재시도 (지수 백오프)</li>
- *   <li>재시도 한계 초과 시 {@link StockConcurrencyException} 으로 전환해 운영팀이 인지</li>
- * </ol>
+ * <p>흐름: 단 한 번의 {@code UPDATE ... SET stock = stock - q WHERE id = ? AND stock >= q AND status <> DISCONTINUED}
+ * 로 "재고 검증 + 차감 + 매진 전이" 를 DB row 락 안에서 원자적으로 처리한다.
+ * <ul>
+ *   <li>영향 행 1 → 차감 성공. 차감된 최종 상태를 다시 읽어 반환.</li>
+ *   <li>영향 행 0 → 재고 부족·단종·미존재 중 하나. 원인을 분류해 적절한 예외로 전환.</li>
+ * </ul>
  *
- * <p>각 재시도마다 변경 사항은 {@code REQUIRES_NEW} 트랜잭션으로 격리되어 이전 시도의
- * stale 1차 캐시를 끌고 가지 않는다.
+ * <p>낙관적 락(@Version)+재시도 방식과 달리, 선착순/핫딜로 같은 SKU 에 차감이 폭주해도
+ * 락 대기·충돌 재시도·재시도 한계 실패가 발생하지 않으며 초과판매도 방지된다. 따라서 별도의
+ * 백오프 재시도 루프가 필요 없다.
  *
  * <p>운영 메트릭:
  * <ul>
- *   <li>{@code variant.stock.decrease.success} — 성공 카운터</li>
- *   <li>{@code variant.stock.decrease.retry} — 재시도 발생 카운터</li>
- *   <li>{@code variant.stock.decrease.failure} — 한계 초과 실패 카운터</li>
+ *   <li>{@code variant.stock.decrease.success} — 차감 성공 누적</li>
+ *   <li>{@code variant.stock.decrease.rejected} — 재고 부족·단종 등으로 차감 거절된 누적</li>
  * </ul>
  */
 @Service
 public class DecreaseVariantStockService implements DecreaseVariantStockUseCase {
 
-    private static final Logger log = LoggerFactory.getLogger(DecreaseVariantStockService.class);
-    static final int MAX_ATTEMPTS = 5;
-    static final long INITIAL_BACKOFF_MS = 10;
-
     private final LoadProductVariantPort loadPort;
     private final SaveProductVariantPort savePort;
     private final TransactionTemplate transactionTemplate;
     private final Counter successCounter;
-    private final Counter retryCounter;
-    private final Counter failureCounter;
+    private final Counter rejectedCounter;
 
     public DecreaseVariantStockService(LoadProductVariantPort loadPort,
                                        SaveProductVariantPort savePort,
@@ -62,60 +52,48 @@ public class DecreaseVariantStockService implements DecreaseVariantStockUseCase 
         this.successCounter = Counter.builder("variant.stock.decrease.success")
                 .description("Variant 재고 차감 성공 누적")
                 .register(meterRegistry);
-        this.retryCounter = Counter.builder("variant.stock.decrease.retry")
-                .description("Optimistic Lock 충돌로 재시도된 누적 횟수")
-                .register(meterRegistry);
-        this.failureCounter = Counter.builder("variant.stock.decrease.failure")
-                .description("재시도 한계 초과 실패 누적")
+        this.rejectedCounter = Counter.builder("variant.stock.decrease.rejected")
+                .description("재고 부족·단종 등으로 차감 거절된 누적")
                 .register(meterRegistry);
     }
 
     @Override
     public ProductVariant decrease(Long variantId, int quantity) {
-        for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-            try {
-                ProductVariant result = transactionTemplate.execute(status -> {
-                    ProductVariant variant = loadPort.loadById(variantId)
-                            .orElseThrow(() -> new IllegalArgumentException(
-                                    "ProductVariant not found: " + variantId));
-                    variant.decreaseStock(quantity);
-                    return savePort.save(variant);
-                });
-                successCounter.increment();
-                if (attempt > 1) {
-                    log.info("[VariantStock] decreased after {} attempts. variantId={}, qty={}",
-                            attempt, variantId, quantity);
-                }
-                return result;
-            } catch (OptimisticLockingFailureException | OptimisticLockException e) {
-                // ObjectOptimisticLockingFailureException 은 OptimisticLockingFailureException 의 하위라 자동 포함됨
-                retryCounter.increment();
-                if (attempt == MAX_ATTEMPTS) {
-                    failureCounter.increment();
-                    throw new StockConcurrencyException(
-                            "재시도 " + MAX_ATTEMPTS + " 회 모두 충돌. variantId=" + variantId, e);
-                }
-                long backoff = INITIAL_BACKOFF_MS << (attempt - 1); // 10, 20, 40, 80, ...
-                log.debug("[VariantStock] retry {}/{} after {}ms. variantId={}",
-                        attempt, MAX_ATTEMPTS, backoff, variantId);
-                sleep(backoff);
-            }
+        if (quantity <= 0) {
+            throw new IllegalArgumentException("차감 수량은 양수여야 합니다");
         }
-        // 도달 불가 — 위 루프에서 항상 return 또는 throw
-        throw new IllegalStateException("unreachable");
+        ProductVariant result = transactionTemplate.execute(status -> {
+            int affected = savePort.decreaseStockIfAvailable(variantId, quantity);
+            if (affected == 0) {
+                throw classifyFailure(variantId, quantity);
+            }
+            return loadPort.loadById(variantId).orElseThrow(() -> new IllegalStateException(
+                    "재고 차감 후 variant 사라짐 (id=" + variantId + ")"));
+        });
+        successCounter.increment();
+        return result;
     }
 
-    private static void sleep(long ms) {
-        try {
-            Thread.sleep(ms);
-        } catch (InterruptedException ie) {
-            Thread.currentThread().interrupt();
+    /**
+     * 원자적 차감 실패(영향 행 0) 원인 분류. 경합이 아니라 '차감 불가' 상태이므로 재시도 대상이 아니다.
+     */
+    private RuntimeException classifyFailure(Long variantId, int quantity) {
+        rejectedCounter.increment();
+        ProductVariant current = loadPort.loadById(variantId).orElse(null);
+        if (current == null) {
+            return new IllegalArgumentException("ProductVariant not found: " + variantId);
         }
+        if (current.getStatus() == ProductVariantStatus.DISCONTINUED) {
+            return new IllegalStateException("단종된 SKU 는 차감할 수 없습니다: " + current.getSku());
+        }
+        return new InsufficientStockException(
+                "재고 부족: sku=" + current.getSku() + ", 요청=" + quantity
+                        + ", 가용=" + current.getStockQuantity());
     }
 
     /**
      * 외부에서 트랜잭션을 가지고 들어온 환경 (e.g. 결제 트랜잭션 안) 에서 사용할 진입점.
-     * 내부에서 {@code REQUIRES_NEW} 로 새 트랜잭션을 열어 재시도가 정상 작동하도록 보장.
+     * 내부에서 {@code REQUIRES_NEW} 로 새 트랜잭션을 열어 차감을 독립 커밋한다.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public ProductVariant decreaseInNewTransaction(Long variantId, int quantity) {

@@ -40,6 +40,17 @@ public class OrderPersistenceAdapter implements LoadOrderPort, SaveOrderPort {
     }
 
     @Override
+    public List<Order> findByUserId(Long userId, String status,
+                                    java.time.LocalDateTime from,
+                                    java.time.LocalDateTime to) {
+        String normalizedStatus = status == null || status.isBlank() ? null : status.toUpperCase();
+        return orderJpaRepository.findUserOrders(userId, normalizedStatus, from, to)
+                .stream()
+                .map(this::toDomainWithItems)
+                .collect(Collectors.toList());
+    }
+
+    @Override
     public List<Order> findAll() {
         return orderJpaRepository.findAll()
                 .stream()

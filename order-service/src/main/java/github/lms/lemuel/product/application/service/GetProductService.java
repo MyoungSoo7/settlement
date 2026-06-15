@@ -49,4 +49,11 @@ public class GetProductService implements GetProductUseCase {
         log.info("판매 가능한 상품 조회");
         return loadProductPort.findAvailableProducts();
     }
+
+    @Override
+    public List<Product> searchProducts(String keyword, Long categoryId, String sortBy, String sortDirection) {
+        log.info("상품 검색: keyword={}, categoryId={}, sortBy={}, sortDirection={}",
+                keyword, categoryId, sortBy, sortDirection);
+        return loadProductPort.search(keyword, categoryId, sortBy, sortDirection);
+    }
 }

@@ -17,4 +17,13 @@ public interface SpringDataProductJpaRepository extends JpaRepository<ProductJpa
 
     @Query("SELECT p FROM ProductJpaEntity p WHERE p.status = 'ACTIVE' AND p.stockQuantity > 0")
     List<ProductJpaEntity> findAvailableProducts();
+
+    @Query("""
+            SELECT p FROM ProductJpaEntity p
+            WHERE (:categoryId IS NULL OR p.categoryId = :categoryId)
+              AND (:keyword IS NULL
+                   OR LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                   OR LOWER(COALESCE(p.description, '')) LIKE LOWER(CONCAT('%', :keyword, '%')))
+            """)
+    List<ProductJpaEntity> search(String keyword, Long categoryId);
 }

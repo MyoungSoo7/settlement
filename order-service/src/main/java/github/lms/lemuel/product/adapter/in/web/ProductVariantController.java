@@ -74,6 +74,8 @@ public class ProductVariantController {
                     "sku", v.getSku(),
                     "optionName", v.getOptionName(),
                     "additionalPrice", v.getAdditionalPrice(),
+                    "discountPrice", v.getDiscountPrice(),
+                    "discountRate", v.getDiscountRate(),
                     "stockQuantity", v.getStockQuantity(),
                     "version", v.getVersion(),
                     "status", v.getStatus().name()

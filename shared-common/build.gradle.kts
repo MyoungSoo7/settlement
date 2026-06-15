@@ -8,6 +8,8 @@ dependencies {
     api(platform("org.springframework.boot:spring-boot-dependencies:4.0.4"))
 
     // Spring 코어
+    implementation("org.springframework:spring-aop")
+    implementation("org.aspectj:aspectjweaver")
     api("org.springframework:spring-context")
     api("org.springframework:spring-web")
     api("org.springframework:spring-tx")
@@ -63,6 +65,15 @@ dependencies {
     api("org.springframework:spring-context-support")
     api("com.github.ben-manes.caffeine:caffeine")
 
+    // HikariCP — read-replica 라우팅 데이터소스(ReadReplicaDataSourceConfig)의 컴파일 전용 타입.
+    // 런타임 구현은 각 앱 모듈의 spring-boot-starter-data-jpa 가 전이 제공한다.
+    compileOnly("com.zaxxer:HikariCP")
+
+    // Spring Data Redis — 2-tier 캐시(TwoTierCacheConfig) L2 의 컴파일 전용 타입.
+    // 런타임은 redis 를 쓰는 모듈(order-service: spring-boot-starter-data-redis)이 전이 제공하고,
+    // 2-tier 는 app.cache.two-tier.enabled=true + Redis 클래스패스 존재 시에만 활성화된다.
+    compileOnly("org.springframework.boot:spring-boot-starter-data-redis")
+
     // ShedLock — @Scheduled 의 분산 락 (replicas N 개 중 1 개만 실행 보장)
     api("net.javacrumbs.shedlock:shedlock-spring:5.16.0")
     api("net.javacrumbs.shedlock:shedlock-provider-jdbc-template:5.16.0")
@@ -88,6 +99,8 @@ dependencies {
     testImplementation(platform("org.testcontainers:testcontainers-bom:1.21.4"))
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:postgresql")
+    // 2-tier 캐시 L2 통합 테스트용 — compileOnly 인 redis 를 테스트 런타임에 올린다.
+    testImplementation("org.springframework.boot:spring-boot-starter-data-redis")
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
     testRuntimeOnly("org.postgresql:postgresql:42.7.3")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")

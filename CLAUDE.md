@@ -19,10 +19,10 @@
 | 메시지 브로커 | Kafka (Redpanda 호환) |
 | PG 연동 | Toss Payments |
 | 배치 처리 | Spring Batch |
-| 캐시 | Caffeine |
+| 캐시 | Caffeine (L1) + 선택적 Redis L2 (2-tier, opt-in) |
 | PDF 생성 | iText 8 |
 | 모니터링 | Micrometer + Prometheus |
-| 마이그레이션 | Flyway (V1 ~ V34) |
+| 마이그레이션 | Flyway (초기 V1~V50, 이후 `V{timestamp}__` 명명 혼재) |
 | 회복탄력성 | Resilience4j |
 | Rate Limiting | Bucket4j |
 
@@ -35,9 +35,9 @@ settlement/                       # Gradle 멀티 모듈 루트
 ├── shared-common/                # 📦 java-library: 양 서비스가 의존
 │   └── github.lms.lemuel.common.{audit, config, exception, outbox, ratelimit, pdf}
 ├── order-service/                # 🛒 Commerce 서비스 (port 8088)
-│   └── github.lms.lemuel.{user, order, payment, product, category, coupon, review, game}
+│   └── github.lms.lemuel.{user, order, payment, cart, shipping, product, category, coupon, review, reservation, game}
 ├── settlement-service/           # 💰 Settlement 서비스 (port 8082)
-│   └── github.lms.lemuel.{settlement, report}
+│   └── github.lms.lemuel.{settlement, payout, ledger, chargeback, pgreconciliation, report}
 └── gateway-service/              # 🚪 API Gateway (port 8080)
 ```
 
@@ -45,8 +45,8 @@ settlement/                       # Gradle 멀티 모듈 루트
 
 | 서비스 | 패키지 | 책임 |
 |--------|--------|------|
-| **order-service** | `user, order, payment, product, category, coupon, review, game` | 회원·상품·주문·결제 — 거래 컨텍스트 |
-| **settlement-service** | `settlement, report` | 정산 생성/확정, 대사, ES 색인, PDF, 캐시플로우 리포트 |
+| **order-service** | `user, order, payment, cart, shipping, product, category, coupon, review, reservation, game` | 회원·상품·장바구니·주문·결제·배송·시공예약 — 거래 컨텍스트 |
+| **settlement-service** | `settlement, payout, ledger, chargeback, pgreconciliation, report` | 정산 생성/확정, 지급(payout), 복식부기 원장(ledger), 차지백, PG 대사, ES 색인, PDF, 캐시플로우 리포트 |
 | **gateway-service** | (Spring Cloud Gateway) | 라우팅, 인증 필터 |
 | **shared-common** | `common.*` | 양 서비스 공유 — 감사·관측·예외·Outbox·rate limit·JWT·PDF |
 
@@ -94,12 +94,14 @@ settlement-service/.../adapter/out/readmodel/
 ### Payment 상태
 ```
 READY → AUTHORIZED → CAPTURED → REFUNDED
+              ↘ FAILED        ↘ CANCELED (승인취소)
 ```
 
 ### Settlement 상태
 ```
 REQUESTED → PROCESSING → DONE
                        → FAILED
+                       → CANCELED
 ```
 
 ### Order 상태
@@ -107,10 +109,47 @@ REQUESTED → PROCESSING → DONE
 CREATED → PAID → REFUNDED
               → CANCELED
 ```
+실제 enum 은 더 세분화된 라이프사이클 보유:
+`ORDER_PLACED, PAYMENT_COMPLETED, SHIPPING_PENDING, IN_TRANSIT, DELIVERED,
+CANCELLATION_REQUESTED/APPROVED, REFUND_REQUESTED/COMPLETED` (배송·취소·환불 단계)
+
+### Reservation 상태 (시공 예약)
+```
+REQUESTED → CONFIRMED → ASSIGNED → IN_PROGRESS → COMPLETED
+(접수)      (관리자확인)  (기사배정)   (시공중)       (시공완료)
+                                              → CANCELED
+```
+업체회원이 예약 등록(REQUESTED) → 관리자 확인 → 시공기사 배정/재배정 → 진행/완료.
+엔드포인트 `/reservations/**` (order-service, gateway 라우팅됨).
+
+### Payout 상태 (셀러 지급)
+```
+REQUESTED → SENDING → COMPLETED
+                    → FAILED
+                    → CANCELED
+```
+
+### Chargeback 상태 (지급 거절/분쟁)
+```
+OPEN → ACCEPTED
+     → REJECTED
+```
+
+### Ledger 상태 (복식부기 원장)
+```
+PENDING → POSTED → REVERSED
+```
+
+### PG 대사 실행 상태 (PgReconciliation)
+```
+RUNNING → COMPLETED
+        → FAILED
+```
 
 ### 수수료
 - 기본 정산 수수료율: **3%**
 - 셀러 티어별 차등 (V32 마이그레이션, `SellerTier`)
+- 홀드백(holdback) 정책: `HoldbackPolicy` — 일부 보류 후 `holdbackReleaseDate` 에 해제
 
 ## 이벤트 흐름 (Outbox + Kafka)
 
@@ -118,7 +157,7 @@ CREATED → PAID → REFUNDED
 [order-service] Payment.capture() (DB tx)
     ├─ payments.status = CAPTURED
     └─ outbox_events INSERT (PaymentCaptured)
-                     ↓ (poller 2s 주기)
+                     ↓ (멀티워커 폴러 — FOR UPDATE SKIP LOCKED claim, 기본 2s, 비동기 배치 발행)
                  Kafka topic: lemuel.payment.captured
                      ↓
 [settlement-service] PaymentEventKafkaConsumer
@@ -136,7 +175,7 @@ CREATED → PAID → REFUNDED
 - **아키텍처**: 헥사고날 (Ports & Adapters)
 - **도메인 모델**: 순수 POJO, 프레임워크 의존성 없음
 - **포트/어댑터**: in/out 명확히 분리
-- **DB 마이그레이션**: Flyway, V1 ~ V34
+- **DB 마이그레이션**: Flyway, 초기 V1~V50 + `V{timestamp}__` 명명 혼재 (예: `V20260611110000__`). 신규는 timestamp 명명 권장
 - **테스트**: 도메인 단위 → 서비스 → 컨트롤러 → 통합 순
 - **헥사고날 강제**: ArchUnit 으로 패키지 의존 방향 검증
 - **MSA 경계**: settlement-service ↔ order-service 코드 의존 0 (read-model 또는 Kafka 이벤트로만)
@@ -147,7 +186,7 @@ CREATED → PAID → REFUNDED
 - **리버스 프록시**: gateway-service (Spring Cloud Gateway)
 - **모니터링**: Prometheus + Micrometer + Grafana
 - **메시지 브로커**: Redpanda (Kafka 호환)
-- **코드 커버리지**: JaCoCo, 현재 약 38%, 목표 70% 까지 단계적 상향
+- **코드 커버리지**: JaCoCo — CI 게이트 LINE 최소 50%, 핵심 도메인 패키지(payment/order/product/settlement/... domain) INSTRUCTION 80% 강제 (`build.gradle.kts`). persistence/web/batch 어댑터는 게이트에서 제외(통합 테스트로 별도 검증)
 
 ## 보안
 
@@ -195,16 +234,11 @@ docker build --build-arg MODULE=settlement-service  -t lemuel-settlement .
 docker build --build-arg MODULE=gateway-service     -t lemuel-gateway .
 ```
 
-## 작업 브랜치 정보
+## 작업 이력 / 브랜치 정보
 
-- **MSA 분리 작업 브랜치**: `feat/msa-split` (현재)
-- **MSA 분리 전 백업**: `backup/pre-msa-split`
 - **메인 라인**: `develop` → `main`
-
-MSA 분리 커밋 히스토리 (역순):
-1. `chore: WIP checkpoint before MSA module split`
-2. `chore(msa): scaffold 4-module gradle structure`
-3. `refactor(msa): redistribute source code into modules`
-4. `feat(msa): docker-compose + parameterized Dockerfile`
-5. `refactor(msa): break settlement-service → order-service code coupling` ★
-6. `test(msa): align RefundPaymentUseCaseTest + shared-common test deps`
+- **MSA 분리**: 완료됨 (4-module + Read-only Projection 으로 settlement↔order 코드 의존 0).
+  분리 전 백업은 `backup/pre-msa-split`.
+- **이후 추가 도메인**: `reservation`(시공 예약/기사 배정), 멤버십 승인 등.
+- **TPS 개선 작업**: PgBouncer, Read Replica 라우팅(opt-in), JDBC 배치, Outbox 비동기 배치 +
+  SKIP LOCKED 멀티워커, Kafka 컨슈머 병렬화, Redis 2-tier 캐시(opt-in). 상세는 [`docs/tps.md`](./docs/tps.md).

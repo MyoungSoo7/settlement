@@ -41,7 +41,7 @@ class CreateLedgerEntryServiceTest {
     void setUp() {
         settlements = new FakeSettlementPort();
         ledger = new FakeLedgerPort();
-        service = new CreateLedgerEntryService(settlements, ledger, ledger);
+        service = new CreateLedgerEntryService(new SingleLedgerEntryWriter(settlements, ledger, ledger));
     }
 
     @Nested

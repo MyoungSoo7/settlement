@@ -1,6 +1,7 @@
 package github.lms.lemuel.order.application.service;
 
 import github.lms.lemuel.order.application.port.out.LoadOrderPort;
+import github.lms.lemuel.order.application.port.out.SaveOrderStatusHistoryPort;
 import github.lms.lemuel.order.application.port.out.SaveOrderPort;
 import github.lms.lemuel.order.domain.Order;
 import github.lms.lemuel.order.domain.OrderStatus;
@@ -23,6 +24,7 @@ class ChangeOrderStatusServiceTest {
 
     @Mock LoadOrderPort loadOrderPort;
     @Mock SaveOrderPort saveOrderPort;
+    @Mock SaveOrderStatusHistoryPort historyPort;
     @InjectMocks ChangeOrderStatusService service;
 
     @Test @DisplayName("주문 취소 성공")
@@ -35,6 +37,8 @@ class ChangeOrderStatusServiceTest {
 
         assertThat(result.getStatus()).isEqualTo(OrderStatus.CANCELED);
         verify(saveOrderPort).save(any());
+        verify(historyPort).save(eq(1L), eq(OrderStatus.CREATED.name()),
+                eq(OrderStatus.CANCELED.name()), eq("system"), eq("cancelOrder"));
     }
 
     @Test @DisplayName("주문 미존재 시 예외")

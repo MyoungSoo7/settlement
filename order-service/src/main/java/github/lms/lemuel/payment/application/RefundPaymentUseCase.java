@@ -1,5 +1,7 @@
 package github.lms.lemuel.payment.application;
 
+import github.lms.lemuel.common.audit.application.Auditable;
+import github.lms.lemuel.common.audit.domain.AuditAction;
 import github.lms.lemuel.common.exception.MissingIdempotencyKeyException;
 import github.lms.lemuel.common.exception.RefundExceedsPaymentException;
 import github.lms.lemuel.payment.application.port.in.RefundPaymentPort;
@@ -55,8 +57,17 @@ public class RefundPaymentUseCase implements RefundPaymentPort {
     }
 
     @Override
+    @Auditable(
+            action = AuditAction.REFUND_COMPLETED,
+            failureAction = "REFUND_FAILED",
+            resourceType = "Payment",
+            resourceId = "#p0.toString()",
+            detail = "{'paymentId': #p0, 'amount': #p1, 'idempotencyKeyProvided': #p2 != null && !#p2.isBlank(), 'paymentStatus': #result == null ? null : #result.getStatus().name()}"
+    )
     public PaymentDomain refundPayment(Long paymentId, BigDecimal amount, String idempotencyKey) {
-        PaymentDomain paymentDomain = loadPaymentPort.loadById(paymentId)
+        // 비관적 락: 동시 환불이 같은 결제 행을 읽고 각자 refundedAmount 를 덮어쓰는
+        // lost update + PG 이중 호출을 막기 위해 트랜잭션 종료까지 행을 잠근다.
+        PaymentDomain paymentDomain = loadPaymentPort.loadByIdForUpdate(paymentId)
             .orElseThrow(() -> new PaymentNotFoundException(paymentId));
 
         // 1. 이미 전액 환불된 결제는 추가 PG 호출 없이 현재 상태 반환

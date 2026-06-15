@@ -4,6 +4,7 @@ import github.lms.lemuel.cart.application.port.out.LoadCartPort;
 import github.lms.lemuel.cart.application.port.out.SaveCartPort;
 import github.lms.lemuel.cart.domain.Cart;
 import github.lms.lemuel.cart.domain.CartItem;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -11,15 +12,16 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * 장바구니 영속성 어댑터.
+ * 장바구니 영속성 어댑터 (JPA/PostgreSQL).
  *
  * <p>저장 전략: 단순 "기존 자식 삭제 → 현재 상태 일괄 INSERT". 항목 수가 적은 장바구니에는
  * 충분하며, "어떤 라인이 변경됐는지" 까지 추적할 필요가 없다.
  *
- * <p>향후 Redis 로 옮길 때 이 어댑터만 RedisCartAdapter 로 교체하면 application 코드는
- * 변경 없이 동작한다 — 헥사고날 경계의 가치.
+ * <p>{@code cart.store=jpa} (기본값) 일 때만 활성화된다. {@code cart.store=redis} 로 바꾸면
+ * {@link RedisCartAdapter} 가 대신 활성화되고 application 코드는 변경 없이 동작한다 — 헥사고날 경계의 가치.
  */
 @Component
+@ConditionalOnProperty(name = "cart.store", havingValue = "jpa", matchIfMissing = true)
 public class CartPersistenceAdapter implements LoadCartPort, SaveCartPort {
 
     private final SpringDataCartRepository cartRepository;

@@ -14,4 +14,6 @@ public interface GetProductUseCase {
     List<Product> getProductsByStatus(ProductStatus status);
 
     List<Product> getAvailableProducts();
+
+    List<Product> searchProducts(String keyword, Long categoryId, String sortBy, String sortDirection);
 }

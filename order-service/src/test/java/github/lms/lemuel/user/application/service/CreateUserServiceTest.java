@@ -68,9 +68,9 @@ class CreateUserServiceTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
-    @Test @DisplayName("Command 검증: role 누락")
+    @Test @DisplayName("Command 검증: role 누락 시 USER 기본값")
     void command_missingRole() {
-        assertThatThrownBy(() -> new CreateUserUseCase.CreateUserCommand("a@b.c", "pw", null))
-                .isInstanceOf(IllegalArgumentException.class);
+        var command = new CreateUserUseCase.CreateUserCommand("a@b.c", "pw", null);
+        assertThat(command.role()).isEqualTo(UserRole.USER);
     }
 }

@@ -69,9 +69,30 @@ public class ProductController {
             @ApiResponse(responseCode = "200", description = "조회 성공")
     })
     @GetMapping
-    public ResponseEntity<List<ProductResponse>> getAllProducts() {
-        List<Product> products = getProductUseCase.getAllProducts();
+    public ResponseEntity<List<ProductResponse>> getAllProducts(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(defaultValue = "latest") String sortBy,
+            @RequestParam(defaultValue = "DESC") String sortDirection) {
+        List<Product> products = (keyword != null || categoryId != null)
+                ? getProductUseCase.searchProducts(keyword, categoryId, sortBy, sortDirection)
+                : getProductUseCase.getAllProducts();
         List<ProductResponse> responses = products.stream()
+                .map(p -> ProductResponse.from(p, productImageService.getPrimaryImageUrl(p.getId())))
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(responses);
+    }
+
+    @Operation(summary = "상품 검색", description = "상품명/설명 키워드, 카테고리, 정렬 조건으로 상품을 검색한다.")
+    @GetMapping("/search")
+    public ResponseEntity<List<ProductResponse>> searchProducts(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(defaultValue = "latest") String sortBy,
+            @RequestParam(defaultValue = "DESC") String sortDirection) {
+        List<ProductResponse> responses = getProductUseCase
+                .searchProducts(keyword, categoryId, sortBy, sortDirection)
+                .stream()
                 .map(p -> ProductResponse.from(p, productImageService.getPrimaryImageUrl(p.getId())))
                 .collect(Collectors.toList());
         return ResponseEntity.ok(responses);

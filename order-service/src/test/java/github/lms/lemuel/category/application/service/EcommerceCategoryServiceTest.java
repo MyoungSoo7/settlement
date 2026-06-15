@@ -118,10 +118,26 @@ class EcommerceCategoryServiceTest {
         EcommerceCategory c = EcommerceCategory.createChild("c", "r-c", 1L, 0, 0);
         c.setId(2L);
         when(loadPort.findByIdNotDeleted(1L)).thenReturn(Optional.of(r));
-        when(loadPort.findByParentId(1L)).thenReturn(List.of(c));
-        when(loadPort.findByParentId(2L)).thenReturn(List.of());
+        // getDescendantIds 가 전체를 1회 로드해 BFS 하므로 findAllNotDeleted 로 스텁
+        when(loadPort.findAllNotDeleted()).thenReturn(List.of(r, c));
 
         assertThatThrownBy(() -> service.moveCategory(1L, 2L))
+                .isInstanceOf(CircularReferenceException.class);
+    }
+
+    @Test @DisplayName("moveCategory - 손자(전이적 자손)를 부모로 지정해도 순환 예외 (BFS 다단계 순회)")
+    void move_circular_transitive() {
+        // 1 → 2 → 3 체인. 1 을 자신의 손자 3 밑으로 옮기면 순환.
+        EcommerceCategory r = root(1L, "r");
+        EcommerceCategory c2 = EcommerceCategory.createChild("c2", "r-c2", 1L, 0, 0);
+        c2.setId(2L);
+        EcommerceCategory c3 = EcommerceCategory.createChild("c3", "r-c2-c3", 2L, 1, 0);
+        c3.setId(3L);
+        when(loadPort.findByIdNotDeleted(1L)).thenReturn(Optional.of(r));
+        when(loadPort.findAllNotDeleted()).thenReturn(List.of(r, c2, c3));
+
+        // getDescendantIds(1) 가 BFS 로 2 → 3 까지 도달해야 순환을 잡아낸다
+        assertThatThrownBy(() -> service.moveCategory(1L, 3L))
                 .isInstanceOf(CircularReferenceException.class);
     }
 
