@@ -30,18 +30,28 @@ public class JwtUtil {
     }
 
     public String generateToken(String email, String role) {
+        return generateToken(email, role, null);
+    }
+
+    /**
+     * userId(uid) claim 을 포함한 토큰을 발급한다.
+     * uid 가 null 이면 claim 을 생략한다(GUEST 등 식별자 없는 주체).
+     */
+    public String generateToken(String email, String role, Long userId) {
         long nowMillis = System.currentTimeMillis();
         Date now = new Date(nowMillis);
         Date expiration = new Date(nowMillis + (jwtProperties.getTtlSeconds() * 1000));
 
-        return Jwts.builder()
+        var builder = Jwts.builder()
                 .issuer(jwtProperties.getIssuer())
                 .subject(email)
                 .claim("role", role)
                 .issuedAt(now)
-                .expiration(expiration)
-                .signWith(secretKey)
-                .compact();
+                .expiration(expiration);
+        if (userId != null) {
+            builder.claim("uid", userId);
+        }
+        return builder.signWith(secretKey).compact();
     }
 
     public Claims parseToken(String token) {

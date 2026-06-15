@@ -4,11 +4,8 @@ import github.lms.lemuel.reservation.application.port.in.ChangeReservationStatus
 import github.lms.lemuel.reservation.application.port.out.LoadReservationPort;
 import github.lms.lemuel.reservation.application.port.out.SaveReservationPort;
 import github.lms.lemuel.reservation.domain.Reservation;
+import github.lms.lemuel.reservation.application.port.out.ReservationTechnicianPort;
 import github.lms.lemuel.reservation.domain.exception.ReservationNotFoundException;
-import github.lms.lemuel.user.application.port.out.LoadUserPort;
-import github.lms.lemuel.user.domain.User;
-import github.lms.lemuel.user.domain.UserRole;
-import github.lms.lemuel.user.domain.exception.UserNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -30,7 +27,7 @@ public class ChangeReservationStatusService implements ChangeReservationStatusUs
 
     private final LoadReservationPort loadReservationPort;
     private final SaveReservationPort saveReservationPort;
-    private final LoadUserPort loadUserPort;
+    private final ReservationTechnicianPort technicianPort;
 
     @Override
     public Reservation confirm(Long reservationId) {
@@ -53,18 +50,13 @@ public class ChangeReservationStatusService implements ChangeReservationStatusUs
         return result;
     }
 
-    /** 배정 대상이 존재하는 APPROVED 상태의 TECHNICIAN 인지 검증한다. */
+    /** 배정 대상이 존재하는 APPROVED 상태의 TECHNICIAN 인지 검증한다. (포트로 위임 — 기사 자격은 user 도메인 소유) */
     private void verifyAssignableTechnician(Long technicianId) {
         if (technicianId == null) {
             throw new IllegalArgumentException("technicianId is required");
         }
-        User technician = loadUserPort.findById(technicianId)
-                .orElseThrow(() -> new UserNotFoundException(technicianId));
-        if (technician.getRole() != UserRole.TECHNICIAN) {
-            throw new IllegalArgumentException("Assignee must be a TECHNICIAN: userId=" + technicianId);
-        }
-        if (!technician.canUseService()) {
-            throw new IllegalArgumentException("Technician is not active(APPROVED): userId=" + technicianId);
+        if (!technicianPort.isAssignableTechnician(technicianId)) {
+            throw new IllegalArgumentException("Assignee must be an active(APPROVED) TECHNICIAN: userId=" + technicianId);
         }
     }
 

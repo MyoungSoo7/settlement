@@ -1,14 +1,11 @@
 package github.lms.lemuel.reservation.application.service;
 
 import github.lms.lemuel.reservation.application.port.out.LoadReservationPort;
+import github.lms.lemuel.reservation.application.port.out.ReservationTechnicianPort;
 import github.lms.lemuel.reservation.application.port.out.SaveReservationPort;
 import github.lms.lemuel.reservation.domain.Reservation;
 import github.lms.lemuel.reservation.domain.ReservationStatus;
 import github.lms.lemuel.reservation.domain.exception.ReservationNotFoundException;
-import github.lms.lemuel.user.application.port.out.LoadUserPort;
-import github.lms.lemuel.user.domain.User;
-import github.lms.lemuel.user.domain.UserRole;
-import github.lms.lemuel.user.domain.exception.UserNotFoundException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -32,7 +29,7 @@ class ChangeReservationStatusServiceTest {
 
     @Mock LoadReservationPort loadReservationPort;
     @Mock SaveReservationPort saveReservationPort;
-    @Mock LoadUserPort loadUserPort;
+    @Mock ReservationTechnicianPort technicianPort;
     @InjectMocks ChangeReservationStatusService service;
 
     private Reservation requested() {
@@ -49,12 +46,6 @@ class ChangeReservationStatusServiceTest {
         Reservation r = requested();
         r.confirm();
         return r;
-    }
-
-    private User technician(Long id) {
-        User u = User.createWithProfile("tech@x.com", "hash", UserRole.TECHNICIAN, "기사", "010-9999-8888");
-        u.setId(id);
-        return u; // 기본 APPROVED
     }
 
     @Test
@@ -84,25 +75,24 @@ class ChangeReservationStatusServiceTest {
     }
 
     @Test
-    @DisplayName("assign: APPROVED TECHNICIAN 배정 시 ASSIGNED + technicianId 저장")
+    @DisplayName("assign: 배정 가능한 기사면 ASSIGNED + technicianId 저장")
     void assign_success() {
         Reservation r = confirmed();
         when(loadReservationPort.findById(1L)).thenReturn(Optional.of(r));
-        when(loadUserPort.findById(20L)).thenReturn(Optional.of(technician(20L)));
+        when(technicianPort.isAssignableTechnician(20L)).thenReturn(true);
         when(saveReservationPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         Reservation result = service.assign(1L, 20L);
 
         assertThat(result.getStatus()).isEqualTo(ReservationStatus.ASSIGNED);
         assertThat(result.getTechnicianId()).isEqualTo(20L);
+        verify(technicianPort).isAssignableTechnician(20L);
     }
 
     @Test
-    @DisplayName("assign: 대상이 TECHNICIAN 이 아니면 예외, 저장하지 않는다")
-    void assign_notTechnician() {
-        User notTech = User.createWithProfile("c@x.com", "hash", UserRole.COMPANY, "업체", "010-1111-2222");
-        notTech.setId(20L);
-        when(loadUserPort.findById(20L)).thenReturn(Optional.of(notTech));
+    @DisplayName("assign: 배정 불가 기사(비-TECHNICIAN/정지/부재)면 예외, 저장하지 않는다")
+    void assign_notAssignable() {
+        when(technicianPort.isAssignableTechnician(20L)).thenReturn(false);
 
         assertThatThrownBy(() -> service.assign(1L, 20L))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -112,37 +102,22 @@ class ChangeReservationStatusServiceTest {
     }
 
     @Test
-    @DisplayName("assign: 정지(SUSPENDED) 기사는 배정 불가")
-    void assign_suspendedTechnician() {
-        User tech = technician(20L);
-        tech.suspendMembership(); // APPROVED → SUSPENDED
-        when(loadUserPort.findById(20L)).thenReturn(Optional.of(tech));
-
-        assertThatThrownBy(() -> service.assign(1L, 20L))
+    @DisplayName("assign: technicianId 가 null 이면 예외, 검증 호출 없음")
+    void assign_nullTechnician() {
+        assertThatThrownBy(() -> service.assign(1L, null))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("APPROVED");
+                .hasMessageContaining("required");
 
         verify(saveReservationPort, never()).save(any());
     }
 
     @Test
-    @DisplayName("assign: 기사가 존재하지 않으면 UserNotFoundException")
-    void assign_technicianNotFound() {
-        when(loadUserPort.findById(404L)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> service.assign(1L, 404L))
-                .isInstanceOf(UserNotFoundException.class);
-
-        verify(saveReservationPort, never()).save(any());
-    }
-
-    @Test
-    @DisplayName("reassign: ASSIGNED 예약의 기사를 다른 APPROVED TECHNICIAN 으로 교체")
+    @DisplayName("reassign: ASSIGNED 예약의 기사를 다른 배정 가능 기사로 교체")
     void reassign_success() {
         Reservation r = confirmed();
         r.assign(20L); // 현재 20번 기사
         when(loadReservationPort.findById(1L)).thenReturn(Optional.of(r));
-        when(loadUserPort.findById(30L)).thenReturn(Optional.of(technician(30L)));
+        when(technicianPort.isAssignableTechnician(30L)).thenReturn(true);
         when(saveReservationPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         Reservation result = service.reassign(1L, 30L);
@@ -152,11 +127,9 @@ class ChangeReservationStatusServiceTest {
     }
 
     @Test
-    @DisplayName("reassign: 새 기사가 TECHNICIAN 이 아니면 예외, 저장하지 않는다")
-    void reassign_notTechnician() {
-        User notTech = User.createWithProfile("c@x.com", "hash", UserRole.COMPANY, "업체", "010-1111-2222");
-        notTech.setId(30L);
-        when(loadUserPort.findById(30L)).thenReturn(Optional.of(notTech));
+    @DisplayName("reassign: 새 기사가 배정 불가면 예외, 저장하지 않는다")
+    void reassign_notAssignable() {
+        when(technicianPort.isAssignableTechnician(30L)).thenReturn(false);
 
         assertThatThrownBy(() -> service.reassign(1L, 30L))
                 .isInstanceOf(IllegalArgumentException.class)

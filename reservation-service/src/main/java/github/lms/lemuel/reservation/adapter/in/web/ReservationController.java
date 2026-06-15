@@ -8,11 +8,8 @@ import github.lms.lemuel.reservation.application.port.in.GetReservationUseCase;
 import github.lms.lemuel.reservation.application.port.in.RegisterReservationUseCase;
 import github.lms.lemuel.reservation.domain.Reservation;
 import github.lms.lemuel.reservation.domain.ReservationStatus;
-import github.lms.lemuel.user.application.port.out.LoadUserPort;
-import github.lms.lemuel.user.domain.User;
-import github.lms.lemuel.user.domain.UserRole;
-import github.lms.lemuel.user.domain.exception.InvalidCredentialsException;
-import github.lms.lemuel.user.domain.exception.UserNotFoundException;
+import github.lms.lemuel.common.config.jwt.AuthPrincipal;
+import github.lms.lemuel.reservation.domain.exception.ForbiddenReservationAccessException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -42,7 +39,6 @@ public class ReservationController {
     private final RegisterReservationUseCase registerReservationUseCase;
     private final GetReservationUseCase getReservationUseCase;
     private final ChangeReservationStatusUseCase changeReservationStatusUseCase;
-    private final LoadUserPort loadUserPort;
 
     @Operation(summary = "시공 예약 등록", description = "인증된 업체 회원이 마루 시공 예약을 등록한다.")
     @ApiResponses({
@@ -53,11 +49,11 @@ public class ReservationController {
     @PostMapping
     public ResponseEntity<ReservationResponse> register(
             @Valid @RequestBody RegisterReservationRequest request) {
-        User company = requireCompany();
+        AuthPrincipal company = requireCompany();
 
         Reservation reservation = registerReservationUseCase.register(
                 new RegisterReservationUseCase.RegisterReservationCommand(
-                        company.getId(),
+                        company.userId(),
                         request.getScheduledDate(),
                         request.getSiteAddress(),
                         request.getSitePassword(),
@@ -96,8 +92,8 @@ public class ReservationController {
     @Operation(summary = "내 예약 현황 조회", description = "로그인한 업체 회원의 예약 목록을 조회한다.")
     @GetMapping("/my")
     public ResponseEntity<List<ReservationResponse>> getMine() {
-        User company = requireCompany();
-        List<ReservationResponse> result = getReservationUseCase.getByCompany(company.getId())
+        AuthPrincipal company = requireCompany();
+        List<ReservationResponse> result = getReservationUseCase.getByCompany(company.userId())
                 .stream()
                 .map(ReservationResponse::from)
                 .toList();
@@ -107,8 +103,8 @@ public class ReservationController {
     @Operation(summary = "내 배정 작업 조회", description = "로그인한 시공기사에게 배정된 예약을 일정 순으로 조회한다.")
     @GetMapping("/assigned/my")
     public ResponseEntity<List<ReservationResponse>> getMyAssignments() {
-        User technician = requireTechnician();
-        List<ReservationResponse> result = getReservationUseCase.getByTechnician(technician.getId())
+        AuthPrincipal technician = requireTechnician();
+        List<ReservationResponse> result = getReservationUseCase.getByTechnician(technician.userId())
                 .stream()
                 .map(ReservationResponse::from)
                 .toList();
@@ -208,54 +204,50 @@ public class ReservationController {
     public ResponseEntity<ReservationResponse> cancel(
             @PathVariable Long id,
             @Valid @RequestBody(required = false) CancelReservationRequest request) {
-        User actor = requireAuthenticated();
-        if (actor.getRole() != UserRole.ADMIN) {
+        AuthPrincipal actor = currentUser();
+        if (!"ADMIN".equals(actor.role())) {
             // 업체 회원은 본인이 등록한 예약만 취소 가능
             Reservation existing = getReservationUseCase.getById(id);
-            if (actor.getRole() != UserRole.COMPANY || !existing.getCompanyId().equals(actor.getId())) {
-                throw new InvalidCredentialsException("Only the owning COMPANY member or an ADMIN can cancel");
+            if (!"COMPANY".equals(actor.role()) || !existing.getCompanyId().equals(actor.userId())) {
+                throw new ForbiddenReservationAccessException("Only the owning COMPANY member or an ADMIN can cancel");
             }
         }
         String reason = request != null ? request.reason() : null;
         return ResponseEntity.ok(ReservationResponse.from(changeReservationStatusUseCase.cancel(id, reason)));
     }
 
-    private User requireAuthenticated() {
+    private AuthPrincipal currentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || authentication.getName() == null) {
-            throw new InvalidCredentialsException("Authentication required");
+        if (authentication == null
+                || !(authentication.getPrincipal() instanceof AuthPrincipal p)
+                || p.userId() == null) {
+            throw new ForbiddenReservationAccessException("Authentication required");
         }
-        return loadUserPort.findByEmail(authentication.getName())
-                .orElseThrow(() -> new UserNotFoundException(authentication.getName()));
+        return p;
     }
 
-    private User requireAdmin() {
-        User user = requireAuthenticated();
-        if (user.getRole() != UserRole.ADMIN && user.getRole() != UserRole.MANAGER) {
-            throw new InvalidCredentialsException("Only ADMIN or MANAGER can change reservation status");
+    private AuthPrincipal requireAdmin() {
+        AuthPrincipal p = currentUser();
+        if (!"ADMIN".equals(p.role()) && !"MANAGER".equals(p.role())) {
+            throw new ForbiddenReservationAccessException("Only ADMIN or MANAGER can change reservation status");
         }
-        return user;
+        return p;
     }
 
-    private User requireTechnician() {
-        User user = requireAuthenticated();
-        if (user.getRole() != UserRole.TECHNICIAN && user.getRole() != UserRole.ADMIN) {
-            throw new InvalidCredentialsException("Only TECHNICIAN can view assigned jobs");
+    private AuthPrincipal requireTechnician() {
+        AuthPrincipal p = currentUser();
+        if (!"TECHNICIAN".equals(p.role()) && !"ADMIN".equals(p.role())) {
+            throw new ForbiddenReservationAccessException("Only TECHNICIAN can view assigned jobs");
         }
-        return user;
+        return p;
     }
 
-    private User requireCompany() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || authentication.getName() == null) {
-            throw new InvalidCredentialsException("Authentication required");
+    private AuthPrincipal requireCompany() {
+        AuthPrincipal p = currentUser();
+        if (!"COMPANY".equals(p.role()) && !"ADMIN".equals(p.role())) {
+            throw new ForbiddenReservationAccessException("Only COMPANY members can register reservations");
         }
-        User user = loadUserPort.findByEmail(authentication.getName())
-                .orElseThrow(() -> new UserNotFoundException(authentication.getName()));
-        if (user.getRole() != UserRole.COMPANY && user.getRole() != UserRole.ADMIN) {
-            throw new InvalidCredentialsException("Only COMPANY members can register reservations");
-        }
-        return user;
+        return p;
     }
 
     public record AssignTechnicianRequest(

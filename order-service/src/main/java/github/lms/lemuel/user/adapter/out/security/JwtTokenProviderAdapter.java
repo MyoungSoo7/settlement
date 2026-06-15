@@ -20,6 +20,11 @@ public class JwtTokenProviderAdapter implements TokenProviderPort {
     }
 
     @Override
+    public String generateToken(String email, String role, Long userId) {
+        return jwtUtil.generateToken(email, role, userId);
+    }
+
+    @Override
     public boolean validateToken(String token) {
         return jwtUtil.validateToken(token);
     }

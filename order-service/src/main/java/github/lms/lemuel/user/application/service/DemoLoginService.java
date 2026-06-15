@@ -60,7 +60,7 @@ public class DemoLoginService implements DemoLoginUseCase {
             user = saveUserPort.save(user);
         }
 
-        String token = tokenProviderPort.generateToken(user.getEmail(), user.getRole().name());
+        String token = tokenProviderPort.generateToken(user.getEmail(), user.getRole().name(), user.getId());
         return new LoginUseCase.LoginResult(token, user.getEmail(), user.getRole().name());
     }
 
