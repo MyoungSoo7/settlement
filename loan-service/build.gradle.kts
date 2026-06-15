@@ -4,15 +4,10 @@ plugins {
     id("io.spring.dependency-management")
 }
 
-// Library mode: loan-service 는 settlement-service 와 동일하게 order-service fat jar 에 번들된다.
-// MSA 독립 배포(원래 의도)는 Phase B 에서 helm/CI 분리와 함께 재도입 예정.
-tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
-    enabled = false
-}
-tasks.named<Jar>("jar") {
-    enabled = true
-    archiveClassifier.set("")
-}
+// ★ loan-service 는 자체 DB(lemuel_loan) 를 소유하는 DB-per-service 이므로,
+//   단일 datasource 인 order-service 컨텍스트에 번들될 수 없다.
+//   settlement-service(opslab 공유 → library-mode 번들) 와 달리 처음부터 독립 부팅 서비스다.
+//   → bootJar 활성(Spring Boot 플러그인 기본). 자체 @SpringBootApplication(LoanServiceApplication) 보유.
 
 dependencies {
     implementation(project(":shared-common"))
