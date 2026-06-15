@@ -48,7 +48,11 @@ import static org.assertj.core.api.Assertions.assertThat;
         classes = DlqEndToEndTest.TestApp.class,
         properties = {
                 "app.kafka.enabled=true",
-                "spring.kafka.bootstrap-servers=${spring.embedded.kafka.brokers}"
+                "spring.kafka.bootstrap-servers=${spring.embedded.kafka.brokers}",
+                // 컨슈머 1스레드로 고정 — partitions=1 토픽에 concurrency=3(운영 기본)이면
+                // 유휴 컨슈머 합류로 리밸런스가 발생해 실패 레코드가 재전달(재시도 카운트 +1)될 수 있다.
+                // 재시도 횟수(정확히 4)를 검증하는 E2E 이므로 리밸런스 변수를 제거한다.
+                "app.kafka.consumer.concurrency=1"
         }
 )
 @EmbeddedKafka(
