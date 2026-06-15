@@ -1,5 +1,6 @@
 package github.lms.lemuel.loan.application.service;
 
+import github.lms.lemuel.loan.application.port.out.AppendLedgerPort;
 import github.lms.lemuel.loan.application.port.out.LoadLoanPort;
 import github.lms.lemuel.loan.application.port.out.LoadSettlementViewPort;
 import github.lms.lemuel.loan.application.port.out.PublishLoanEventPort;
@@ -27,12 +28,13 @@ class DisburseLoanServiceTest {
     @Mock SaveLoanPort saveLoanPort;
     @Mock LoadSettlementViewPort loadSettlementViewPort;
     @Mock PublishLoanEventPort publishLoanEventPort;
+    @Mock AppendLedgerPort appendLedgerPort;
 
     private final CreditPolicy creditPolicy = new CreditPolicy(new BigDecimal("0.80"), new BigDecimal("0.0002"));
 
     private DisburseLoanService service() {
         return new DisburseLoanService(loadLoanPort, saveLoanPort, loadSettlementViewPort,
-                creditPolicy, publishLoanEventPort);
+                creditPolicy, publishLoanEventPort, appendLedgerPort);
     }
 
     private LoanAdvance requestedLoan() {
@@ -52,6 +54,8 @@ class DisburseLoanServiceTest {
         assertThat(result.getStatus()).isEqualTo(LoanStatus.DISBURSED);
         assertThat(result.getOutstanding()).isEqualByComparingTo("800800"); // 원금+수수료
         verify(publishLoanEventPort).publishDisbursementRequested(any());
+        // 복식부기 전표 2건: 선지급 + 수수료 인식
+        verify(appendLedgerPort, org.mockito.Mockito.times(2)).append(any());
     }
 
     @Test

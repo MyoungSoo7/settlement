@@ -1,6 +1,7 @@
 package github.lms.lemuel.loan.application.service;
 
 import github.lms.lemuel.loan.application.port.in.ApplyRepaymentUseCase.ApplyRepaymentCommand;
+import github.lms.lemuel.loan.application.port.out.AppendLedgerPort;
 import github.lms.lemuel.loan.application.port.out.LoadLoanPort;
 import github.lms.lemuel.loan.application.port.out.PublishLoanEventPort;
 import github.lms.lemuel.loan.application.port.out.RecordRepaymentPort;
@@ -31,10 +32,11 @@ class ApplyRepaymentServiceTest {
     @Mock RecordRepaymentPort recordRepaymentPort;
     @Mock SaveSettlementViewPort saveSettlementViewPort;
     @Mock PublishLoanEventPort publishLoanEventPort;
+    @Mock AppendLedgerPort appendLedgerPort;
 
     private ApplyRepaymentService service() {
         return new ApplyRepaymentService(loadLoanPort, saveLoanPort, recordRepaymentPort,
-                saveSettlementViewPort, publishLoanEventPort);
+                saveSettlementViewPort, publishLoanEventPort, appendLedgerPort);
     }
 
     private LoanAdvance disbursed(long id, BigDecimal outstanding) {

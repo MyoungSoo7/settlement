@@ -1,12 +1,14 @@
 package github.lms.lemuel.loan.application.service;
 
 import github.lms.lemuel.loan.application.port.in.ApplyRepaymentUseCase;
+import github.lms.lemuel.loan.application.port.out.AppendLedgerPort;
 import github.lms.lemuel.loan.application.port.out.LoadLoanPort;
 import github.lms.lemuel.loan.application.port.out.PublishLoanEventPort;
 import github.lms.lemuel.loan.application.port.out.RecordRepaymentPort;
 import github.lms.lemuel.loan.application.port.out.SaveLoanPort;
 import github.lms.lemuel.loan.application.port.out.SaveSettlementViewPort;
 import github.lms.lemuel.loan.domain.LoanAdvance;
+import github.lms.lemuel.loan.domain.LoanLedgerEntry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -34,17 +36,20 @@ public class ApplyRepaymentService implements ApplyRepaymentUseCase {
     private final RecordRepaymentPort recordRepaymentPort;
     private final SaveSettlementViewPort saveSettlementViewPort;
     private final PublishLoanEventPort publishLoanEventPort;
+    private final AppendLedgerPort appendLedgerPort;
 
     public ApplyRepaymentService(LoadLoanPort loadLoanPort,
                                  SaveLoanPort saveLoanPort,
                                  RecordRepaymentPort recordRepaymentPort,
                                  SaveSettlementViewPort saveSettlementViewPort,
-                                 PublishLoanEventPort publishLoanEventPort) {
+                                 PublishLoanEventPort publishLoanEventPort,
+                                 AppendLedgerPort appendLedgerPort) {
         this.loadLoanPort = loadLoanPort;
         this.saveLoanPort = saveLoanPort;
         this.recordRepaymentPort = recordRepaymentPort;
         this.saveSettlementViewPort = saveSettlementViewPort;
         this.publishLoanEventPort = publishLoanEventPort;
+        this.appendLedgerPort = appendLedgerPort;
     }
 
     @Override
@@ -73,6 +78,11 @@ public class ApplyRepaymentService implements ApplyRepaymentUseCase {
                 totalDeducted = totalDeducted.add(deducted);
                 remaining = remaining.subtract(deducted);
             }
+        }
+
+        // 복식부기: 상환(현금/대출채권). 차감이 0이면 전표 없음.
+        if (totalDeducted.signum() > 0) {
+            appendLedgerPort.append(LoanLedgerEntry.repayment(settlementId, totalDeducted));
         }
 
         // 차감이 0(대출 없음)이어도 기록·발행한다 → settlement 가 전액 지급하도록 통지(멱등 보장)

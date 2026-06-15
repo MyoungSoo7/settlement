@@ -1,11 +1,13 @@
 package github.lms.lemuel.loan.application.service;
 
 import github.lms.lemuel.loan.application.port.in.DisburseLoanUseCase;
+import github.lms.lemuel.loan.application.port.out.AppendLedgerPort;
 import github.lms.lemuel.loan.application.port.out.LoadLoanPort;
 import github.lms.lemuel.loan.application.port.out.LoadSettlementViewPort;
 import github.lms.lemuel.loan.application.port.out.PublishLoanEventPort;
 import github.lms.lemuel.loan.application.port.out.SaveLoanPort;
 import github.lms.lemuel.loan.domain.LoanAdvance;
+import github.lms.lemuel.loan.domain.LoanLedgerEntry;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,17 +29,20 @@ public class DisburseLoanService implements DisburseLoanUseCase {
     private final LoadSettlementViewPort loadSettlementViewPort;
     private final CreditPolicy creditPolicy;
     private final PublishLoanEventPort publishLoanEventPort;
+    private final AppendLedgerPort appendLedgerPort;
 
     public DisburseLoanService(LoadLoanPort loadLoanPort,
                                SaveLoanPort saveLoanPort,
                                LoadSettlementViewPort loadSettlementViewPort,
                                CreditPolicy creditPolicy,
-                               PublishLoanEventPort publishLoanEventPort) {
+                               PublishLoanEventPort publishLoanEventPort,
+                               AppendLedgerPort appendLedgerPort) {
         this.loadLoanPort = loadLoanPort;
         this.saveLoanPort = saveLoanPort;
         this.loadSettlementViewPort = loadSettlementViewPort;
         this.creditPolicy = creditPolicy;
         this.publishLoanEventPort = publishLoanEventPort;
+        this.appendLedgerPort = appendLedgerPort;
     }
 
     @Override
@@ -58,6 +63,13 @@ public class DisburseLoanService implements DisburseLoanUseCase {
 
         loan.disburse();
         LoanAdvance saved = saveLoanPort.save(loan);
+
+        // 복식부기: 선지급(대출채권/현금) + 수수료 인식(미수수익/수수료수익)
+        appendLedgerPort.append(LoanLedgerEntry.disbursement(saved.getId(), saved.getPrincipal()));
+        if (saved.getFee().signum() > 0) {
+            appendLedgerPort.append(LoanLedgerEntry.feeAccrual(saved.getId(), saved.getFee()));
+        }
+
         publishLoanEventPort.publishDisbursementRequested(saved);
         return saved;
     }
