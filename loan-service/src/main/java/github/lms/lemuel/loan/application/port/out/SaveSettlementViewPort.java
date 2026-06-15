@@ -7,4 +7,7 @@ import github.lms.lemuel.loan.domain.SellerSettlementView;
  */
 public interface SaveSettlementViewPort {
     void upsert(SellerSettlementView view);
+
+    /** 정산 확정(SettlementConfirmed) 시 해당 정산건 투영을 CONFIRMED 로 전이. 미존재 시 no-op. */
+    void markConfirmed(long settlementId);
 }

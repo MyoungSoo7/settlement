@@ -4,6 +4,7 @@ import github.lms.lemuel.loan.domain.SettlementViewStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -28,4 +29,8 @@ public interface SellerSettlementViewRepository extends JpaRepository<SellerSett
             """)
     List<SellerSettlementViewJpaEntity> findBySellerAndStatusForUpdate(@Param("sellerId") Long sellerId,
                                                                        @Param("status") SettlementViewStatus status);
+
+    @Modifying
+    @Query("update SellerSettlementViewJpaEntity v set v.status = :status where v.settlementId = :settlementId")
+    int updateStatus(@Param("settlementId") Long settlementId, @Param("status") SettlementViewStatus status);
 }

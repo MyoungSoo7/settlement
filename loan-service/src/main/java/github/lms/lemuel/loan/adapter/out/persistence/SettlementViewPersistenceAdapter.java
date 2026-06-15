@@ -31,6 +31,11 @@ public class SettlementViewPersistenceAdapter implements SaveSettlementViewPort,
     }
 
     @Override
+    public void markConfirmed(long settlementId) {
+        repository.updateStatus(settlementId, SettlementViewStatus.CONFIRMED);
+    }
+
+    @Override
     public BigDecimal sumUnpaidBySeller(Long sellerId) {
         return repository.sumBySellerAndStatus(sellerId, SettlementViewStatus.PENDING);
     }
