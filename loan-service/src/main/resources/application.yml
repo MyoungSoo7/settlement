@@ -1,0 +1,132 @@
+spring:
+  profiles:
+    active: local
+
+  application:
+    name: lemuel-loan
+
+  threads:
+    virtual:
+      enabled: true
+
+  # ★ loan-service 는 자체 DB(lemuel_loan) 를 소유한다 (DB-per-service).
+  #   order/settlement 의 공유 DB(opslab) 와 물리적으로 분리되며,
+  #   정산 데이터는 read-model 이 아닌 Kafka 이벤트로만 수신해 로컬 뷰로 적재한다.
+  datasource:
+    url: jdbc:postgresql://localhost:5432/lemuel_loan?reWriteBatchedInserts=true
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      pool-name: lemuel-loan-pool
+      maximum-pool-size: ${DB_POOL_MAX:20}
+      minimum-idle: ${DB_POOL_MIN_IDLE:5}
+      connection-timeout: 10000
+      leak-detection-threshold: 30000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: false
+        default_schema: public
+        jdbc:
+          batch_size: 50
+          batch_versioned_data: true
+        order_inserts: true
+        order_updates: true
+
+  # ★ settlement-service 와 달리 loan-service 는 자체 DB 마이그레이션을 직접 책임진다.
+  flyway:
+    enabled: true
+    schemas: public
+    locations: classpath:db/migration
+
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=500,expireAfterWrite=600s
+
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: lemuel-loan
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      properties:
+        isolation.level: read_committed
+    producer:
+      acks: all
+      retries: 5
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+    listener:
+      ack-mode: manual_immediate
+      missing-topics-fatal: false
+
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+server:
+  port: 8084
+  shutdown: graceful
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    prometheus:
+      enabled: true
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  health:
+    elasticsearch:
+      enabled: false
+    db:
+      enabled: true
+  server:
+    port: 8085
+  metrics:
+    tags:
+      application: ${spring.application.name}
+      environment: ${ENVIRONMENT:local}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+app:
+  kafka:
+    enabled: ${APP_KAFKA_ENABLED:false}
+    consumer:
+      concurrency: ${APP_KAFKA_CONSUMER_CONCURRENCY:3}
+    topic:
+      partitions: ${APP_KAFKA_TOPIC_PARTITIONS:3}
+      # 수신 (settlement → loan)
+      settlement-created: lemuel.settlement.created
+      settlement-confirmed: lemuel.settlement.confirmed
+      # 발행 (loan → settlement). Outbox 폴러가 aggregateType="Loan"+eventType 으로 자동 라우팅하는
+      # 실제 토픽명(snake_case). settlement 측 컨슈머(Chunk 7)가 이 이름으로 구독해야 한다.
+      loan-disbursement-requested: lemuel.loan.disbursement_requested
+      loan-repayment-applied: lemuel.loan.repayment_applied
+
+  # 선정산 대출 정책 (정산예정금 기반 단순 모델 — CreditPolicy 빈에 주입)
+  loan:
+    ltv: ${APP_LOAN_LTV:0.80}                 # 한도 = 미지급 정산예정금 × LTV
+    daily-rate: ${APP_LOAN_DAILY_RATE:0.0002} # 수수료 = 선지급액 × 일할이율 × 일수
