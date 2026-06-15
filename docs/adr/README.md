@@ -24,6 +24,7 @@
 | [0018](0018-chargeback-domain.md) | Chargeback (카드사 분쟁) 도메인 | Accepted |
 | 0019 | ReversePayout (Payout 완료 후 셀러 환수) | Planned (예약, 파일 없음) |
 | [0020](0020-order-settlement-db-split.md) | order ↔ settlement DB 물리 분리 (이벤트 CQRS) | Proposed |
+| [0021](0021-shared-common-as-platform-library.md) | shared-common 을 버전드 플랫폼 라이브러리로 | Proposed |
 
 ## 규칙
 
