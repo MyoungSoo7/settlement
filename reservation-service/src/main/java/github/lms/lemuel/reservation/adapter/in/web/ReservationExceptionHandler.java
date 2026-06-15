@@ -1,5 +1,6 @@
 package github.lms.lemuel.reservation.adapter.in.web;
 
+import github.lms.lemuel.reservation.domain.exception.ForbiddenReservationAccessException;
 import github.lms.lemuel.reservation.domain.exception.ReservationNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -21,6 +22,12 @@ public class ReservationExceptionHandler {
     @ExceptionHandler(ReservationNotFoundException.class)
     public ResponseEntity<Map<String, String>> handleNotFound(ReservationNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", ex.getMessage()));
+    }
+
+    /** 403 - 권한/소유권 부족 */
+    @ExceptionHandler(ForbiddenReservationAccessException.class)
+    public ResponseEntity<Map<String, String>> handleForbidden(ForbiddenReservationAccessException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", ex.getMessage()));
     }
 
     /** 409 - 잘못된 예약 상태 전이 (가드 위반) */
