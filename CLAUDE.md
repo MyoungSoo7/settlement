@@ -2,7 +2,7 @@
 
 ## 프로젝트 개요
 
-주문·결제·정산을 **2개 마이크로서비스 + API Gateway** 로 분리한 헥사고날 아키텍처 백엔드.
+주문·결제·정산·시공예약을 **3개 마이크로서비스 + API Gateway** 로 분리한 헥사고날 아키텍처 백엔드.
 원래 단일 모놀리스였으나 Bounded Context 분리 + Read-only Projection 패턴으로 MSA 화 함.
 자세한 사용자용 문서는 [`README.md`](./README.md) 참조.
 
@@ -30,14 +30,16 @@
 
 ```
 settlement/                       # Gradle 멀티 모듈 루트
-├── settings.gradle.kts           # 4 모듈 선언
+├── settings.gradle.kts           # 5 모듈 선언
 ├── build.gradle.kts              # 부모 빌드 (subprojects 공통 설정)
-├── shared-common/                # 📦 java-library: 양 서비스가 의존
+├── shared-common/                # 📦 java-library: 전 서비스가 의존
 │   └── github.lms.lemuel.common.{audit, config, exception, outbox, ratelimit, pdf}
 ├── order-service/                # 🛒 Commerce 서비스 (port 8088)
-│   └── github.lms.lemuel.{user, order, payment, cart, shipping, product, category, coupon, review, reservation, game}
+│   └── github.lms.lemuel.{user, order, payment, cart, shipping, product, category, coupon, review, game}
 ├── settlement-service/           # 💰 Settlement 서비스 (port 8082)
 │   └── github.lms.lemuel.{settlement, payout, ledger, chargeback, pgreconciliation, report}
+├── reservation-service/          # 🛠 Reservation 서비스 (port 8083, 자체 DB reservations_db)
+│   └── github.lms.lemuel.reservation.*
 └── gateway-service/              # 🚪 API Gateway (port 8080)
 ```
 
@@ -45,10 +47,11 @@ settlement/                       # Gradle 멀티 모듈 루트
 
 | 서비스 | 패키지 | 책임 |
 |--------|--------|------|
-| **order-service** | `user, order, payment, cart, shipping, product, category, coupon, review, reservation, game` | 회원·상품·장바구니·주문·결제·배송·시공예약 — 거래 컨텍스트 |
+| **order-service** | `user, order, payment, cart, shipping, product, category, coupon, review, game` | 회원·상품·장바구니·주문·결제·배송 — 거래 컨텍스트 |
 | **settlement-service** | `settlement, payout, ledger, chargeback, pgreconciliation, report` | 정산 생성/확정, 지급(payout), 복식부기 원장(ledger), 차지백, PG 대사, ES 색인, PDF, 캐시플로우 리포트 |
+| **reservation-service** | `reservation` | 시공 예약/기사 배정 — 독립 배포 + 자체 DB(reservations_db). 기사 자격은 user 멤버십 이벤트로 동기화되는 로컬 `technician_view` 프로젝션으로 검증(코드·DB 의존 0) |
 | **gateway-service** | (Spring Cloud Gateway) | 라우팅, 인증 필터 |
-| **shared-common** | `common.*` | 양 서비스 공유 — 감사·관측·예외·Outbox·rate limit·JWT·PDF |
+| **shared-common** | `common.*` | 전 서비스 공유 — 감사·관측·예외·Outbox·rate limit·JWT·PDF |
 
 ## 헥사고날 아키텍처 (각 서비스 내부)
 
@@ -120,7 +123,7 @@ REQUESTED → CONFIRMED → ASSIGNED → IN_PROGRESS → COMPLETED
                                               → CANCELED
 ```
 업체회원이 예약 등록(REQUESTED) → 관리자 확인 → 시공기사 배정/재배정 → 진행/완료.
-엔드포인트 `/reservations/**` (order-service, gateway 라우팅됨).
+엔드포인트 `/reservations/**` (reservation-service:8083, gateway 라우팅됨).
 
 ### Payout 상태 (셀러 지급)
 ```
