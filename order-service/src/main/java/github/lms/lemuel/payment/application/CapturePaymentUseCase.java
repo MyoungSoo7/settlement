@@ -33,17 +33,20 @@ public class CapturePaymentUseCase implements CapturePaymentPort {
     private final PgClientPort pgClientPort;
     private final UpdateOrderStatusPort updateOrderStatusPort;
     private final PublishEventPort publishEventPort;
+    private final github.lms.lemuel.payment.application.port.out.LoadSellerSettlementMetaPort loadSellerSettlementMetaPort;
 
     public CapturePaymentUseCase(LoadPaymentPort loadPaymentPort,
                                  SavePaymentPort savePaymentPort,
                                  PgClientPort pgClientPort,
                                  UpdateOrderStatusPort updateOrderStatusPort,
-                                 PublishEventPort publishEventPort) {
+                                 PublishEventPort publishEventPort,
+                                 github.lms.lemuel.payment.application.port.out.LoadSellerSettlementMetaPort loadSellerSettlementMetaPort) {
         this.loadPaymentPort = loadPaymentPort;
         this.savePaymentPort = savePaymentPort;
         this.pgClientPort = pgClientPort;
         this.updateOrderStatusPort = updateOrderStatusPort;
         this.publishEventPort = publishEventPort;
+        this.loadSellerSettlementMetaPort = loadSellerSettlementMetaPort;
     }
 
     @Override
@@ -62,7 +65,8 @@ public class CapturePaymentUseCase implements CapturePaymentPort {
         publishEventPort.publishPaymentCaptured(
                 savedPaymentDomain.getId(),
                 savedPaymentDomain.getOrderId(),
-                savedPaymentDomain.getAmount());
+                savedPaymentDomain.getAmount(),
+                loadSellerSettlementMetaPort.findByPaymentId(savedPaymentDomain.getId()).orElse(null));
         log.info("PaymentCaptured event queued to outbox. paymentId={}", savedPaymentDomain.getId());
 
         return savedPaymentDomain;

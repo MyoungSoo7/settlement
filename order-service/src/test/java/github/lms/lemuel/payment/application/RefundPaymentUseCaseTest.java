@@ -1,7 +1,7 @@
 package github.lms.lemuel.payment.application;
 
-import github.lms.lemuel.common.exception.MissingIdempotencyKeyException;
-import github.lms.lemuel.common.exception.RefundExceedsPaymentException;
+import github.lms.lemuel.payment.domain.exception.MissingIdempotencyKeyException;
+import github.lms.lemuel.payment.domain.exception.RefundExceedsPaymentException;
 import github.lms.lemuel.payment.application.port.out.LoadPaymentPort;
 import github.lms.lemuel.payment.application.port.out.LoadRefundPort;
 import github.lms.lemuel.payment.application.port.out.PgClientPort;

@@ -56,12 +56,19 @@ public class OutboxBackedEventPublisher implements PublishEventPort {
     }
 
     @Override
-    public void publishPaymentCaptured(Long paymentId, Long orderId, BigDecimal amount) {
-        writeOutbox(paymentId, "PaymentCaptured", Map.of(
-                "paymentId", paymentId,
-                "orderId", orderId,
-                "amount", amount.toPlainString()
-        ));
+    public void publishPaymentCaptured(Long paymentId, Long orderId, BigDecimal amount,
+                                       github.lms.lemuel.payment.application.port.out.SellerSettlementMeta sellerMeta) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("paymentId", paymentId);
+        payload.put("orderId", orderId);
+        payload.put("amount", amount.toPlainString());
+        // Event-Carried State Transfer (ADR 0020 Phase 1) — 셀러 메타 동봉 (미해석/미할당 시 생략)
+        if (sellerMeta != null) {
+            if (sellerMeta.sellerId() != null) payload.put("sellerId", sellerMeta.sellerId());
+            if (sellerMeta.sellerTier() != null) payload.put("sellerTier", sellerMeta.sellerTier());
+            if (sellerMeta.settlementCycle() != null) payload.put("settlementCycle", sellerMeta.settlementCycle());
+        }
+        writeOutbox(paymentId, "PaymentCaptured", payload);
     }
 
     @Override

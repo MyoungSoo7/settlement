@@ -98,10 +98,17 @@ public class PaymentEventKafkaConsumer {
                 ? new BigDecimal(node.get("amount").asText())
                 : BigDecimal.ZERO;  // 0 이면 정산 서비스가 이후 보강 책임
 
+        // 3-b. Event-Carried State Transfer (ADR 0020 Phase 1) — 셀러 메타가 동봉됐으면 사용,
+        //      없으면(구 이벤트/미할당) 정산 서비스가 order DB 조인으로 fallback.
+        Long sellerId = node.hasNonNull("sellerId") ? node.get("sellerId").asLong() : null;
+        String sellerTier = node.hasNonNull("sellerTier") ? node.get("sellerTier").asText() : null;
+        String settlementCycle = node.hasNonNull("settlementCycle") ? node.get("settlementCycle").asText() : null;
+
         // 4. 정산 생성 (내부에서 payment_id unique 로 추가 중복 방어)
         //    — 도메인 예외(IllegalArgumentException/IllegalStateException) 는 DefaultErrorHandler 가
         //    재시도 없이 즉시 DLT 로 라우팅. 일시적 예외(DB 락, IO) 는 ExponentialBackOff 재시도.
-        createSettlementFromPaymentUseCase.createSettlementFromPayment(paymentId, orderId, amount);
+        createSettlementFromPaymentUseCase.createSettlementFromPayment(
+                paymentId, orderId, amount, sellerId, sellerTier, settlementCycle);
 
         // 5. 처리 기록 — 재처리 시 (group, event_id) 멱등 보장
         processedEventRepository.save(new ProcessedEventJpaEntity(

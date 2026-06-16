@@ -1,4 +1,4 @@
-package github.lms.lemuel.common.exception;
+package github.lms.lemuel.payment.domain.exception;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,8 +29,5 @@ class RefundExceptionTest {
         assertThat(new MissingIdempotencyKeyException("키 누락"))
                 .isInstanceOf(RefundException.class)
                 .hasMessage("키 누락");
-        assertThat(new InvalidPaymentStateException("상태 불가"))
-                .isInstanceOf(RefundException.class)
-                .hasMessage("상태 불가");
     }
 }

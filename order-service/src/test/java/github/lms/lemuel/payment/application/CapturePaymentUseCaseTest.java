@@ -25,6 +25,7 @@ class CapturePaymentUseCaseTest {
     @Mock PgClientPort pgClientPort;
     @Mock UpdateOrderStatusPort updateOrderStatusPort;
     @Mock PublishEventPort publishEventPort;
+    @Mock github.lms.lemuel.payment.application.port.out.LoadSellerSettlementMetaPort loadSellerSettlementMetaPort;
     @InjectMocks CapturePaymentUseCase capturePaymentUseCase;
 
     @Test @DisplayName("AUTHORIZED → CAPTURED 후 PaymentCaptured 이벤트가 outbox 로 기록된다")
@@ -37,7 +38,7 @@ class CapturePaymentUseCaseTest {
         PaymentDomain result = capturePaymentUseCase.capturePayment(1L);
 
         assertThat(result.getStatus()).isEqualTo(PaymentStatus.CAPTURED);
-        verify(publishEventPort).publishPaymentCaptured(1L, 10L, new BigDecimal("30000"));
+        verify(publishEventPort).publishPaymentCaptured(1L, 10L, new BigDecimal("30000"), null);
         // 정산 생성은 CapturePaymentUseCase 가 직접 호출하지 않는다 —
         // Kafka 컨슈머가 이벤트 수신 후 수행하므로 여기서는 검증하지 않는다.
     }

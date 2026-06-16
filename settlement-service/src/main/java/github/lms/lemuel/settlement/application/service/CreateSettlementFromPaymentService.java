@@ -54,6 +54,12 @@ public class CreateSettlementFromPaymentService implements CreateSettlementFromP
 
     @Override
     public Settlement createSettlementFromPayment(Long paymentId, Long orderId, BigDecimal amount) {
+        return createSettlementFromPayment(paymentId, orderId, amount, null, null, null);
+    }
+
+    @Override
+    public Settlement createSettlementFromPayment(Long paymentId, Long orderId, BigDecimal amount,
+                                                  Long sellerId, String sellerTier, String settlementCycle) {
         try (var ignorePayment = MdcScope.of(MdcKeys.PAYMENT_ID, String.valueOf(paymentId));
              var ignoreOrder = MdcScope.of(MdcKeys.ORDER_ID, String.valueOf(orderId))) {
             log.info("Creating settlement from payment. amount={}", amount);
@@ -66,13 +72,15 @@ public class CreateSettlementFromPaymentService implements CreateSettlementFromP
                 return existingSettlement.get();
             }
 
-            // 판매자 등급별 수수료율 — 매핑 없으면 NORMAL fallback
-            SellerTier tier = loadSellerTierPort.findTierByPaymentId(paymentId)
-                    .orElse(SellerTier.NORMAL);
-            // 정산 주기: 셀러가 명시한 cycle 이 있으면 우선, 없으면 등급별 default
+            // 판매자 등급별 수수료율 — 이벤트 동봉값 우선(ADR 0020 Phase 1), 없으면 order DB 조인 fallback, 그래도 없으면 NORMAL
+            SellerTier tier = sellerTier != null
+                    ? SellerTier.fromStringOrDefault(sellerTier)
+                    : loadSellerTierPort.findTierByPaymentId(paymentId).orElse(SellerTier.NORMAL);
+            // 정산 주기 — 이벤트 동봉값 우선, 없으면 조인 fallback, 그래도 없으면 등급별 default
             // (NORMAL=T+7, VIP=T+3, STRATEGIC=T+1)
-            SettlementCycle cycle = loadSellerSettlementCyclePort.findCycleByPaymentId(paymentId)
-                    .orElse(tier.defaultCycle());
+            SettlementCycle cycle = settlementCycle != null
+                    ? SettlementCycle.fromStringOrDefault(settlementCycle)
+                    : loadSellerSettlementCyclePort.findCycleByPaymentId(paymentId).orElse(tier.defaultCycle());
             log.info("Applying seller tier={}, rate={}, cycle={}", tier, tier.rate(), cycle);
 
             // 정산 생성 — 주기별 resolveSettlementDate 규칙으로 정산일 계산
@@ -96,12 +104,18 @@ public class CreateSettlementFromPaymentService implements CreateSettlementFromP
             // loan-service 로 SettlementCreated 발행 (선정산 대출 담보 = 미지급 정산예정금).
             // 같은 트랜잭션의 Outbox 에 적재 → 폴러가 lemuel.settlement.created 로 발행.
             // 판매자 미할당 정산은 대출 대상이 아니므로 발행 생략.
-            loadSellerIdPort.findSellerIdByPaymentId(paymentId).ifPresentOrElse(
-                    sellerId -> publishSettlementDomainEventPort.publishSettlementCreated(
-                            savedSettlement.getId(), sellerId,
-                            savedSettlement.getNetAmount(), savedSettlement.getSettlementDate()),
-                    () -> log.debug("판매자 미해석 — SettlementCreated 발행 생략. settlementId={}",
-                            savedSettlement.getId()));
+            // 이벤트 동봉 sellerId 우선, 없으면 order DB 조인 fallback
+            Long resolvedSellerId = sellerId != null
+                    ? sellerId
+                    : loadSellerIdPort.findSellerIdByPaymentId(paymentId).orElse(null);
+            if (resolvedSellerId != null) {
+                publishSettlementDomainEventPort.publishSettlementCreated(
+                        savedSettlement.getId(), resolvedSellerId,
+                        savedSettlement.getNetAmount(), savedSettlement.getSettlementDate());
+            } else {
+                log.debug("판매자 미해석 — SettlementCreated 발행 생략. settlementId={}",
+                        savedSettlement.getId());
+            }
 
             return savedSettlement;
         }

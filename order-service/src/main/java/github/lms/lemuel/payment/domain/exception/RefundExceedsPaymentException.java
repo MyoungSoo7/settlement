@@ -1,4 +1,4 @@
-package github.lms.lemuel.common.exception;
+package github.lms.lemuel.payment.domain.exception;
 
 public class RefundExceedsPaymentException extends RefundException {
     public RefundExceedsPaymentException(String message) {
