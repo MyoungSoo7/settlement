@@ -389,3 +389,43 @@ groups:
           description: |
             최근 10분 처리율이 0 이며 30분 지속. 트래픽이 없는 유휴 구간일 수도 있으나,
             컨슈머 정지/구독 해제 가능성도 있으니 lemuel-settlement 컨슈머 상태를 확인하세요.
+
+      # cross-DB 대사(Phase 5.2): opslab 원천 vs settlement_db 프로젝션 행 수 드리프트.
+      # order(settlement_recon_source_rows) - settlement(settlement_projection_rows), view 라벨로 매칭.
+      # 짧은 복제 lag 은 정상이므로 임계(>10건) + 지속(15m)으로 노이즈 억제.
+      - alert: SettlementProjectionDriftHigh
+        expr: |
+          (
+            max by (view) (settlement_recon_source_rows)
+            - max by (view) (settlement_projection_rows)
+          ) > 10
+        for: 15m
+        labels:
+          severity: warning
+          component: settlement-projection
+        annotations:
+          summary: "settlement 프로젝션 행 수 드리프트 ({{ $labels.view }})"
+          description: |
+            opslab 원천이 settlement_db 프로젝션({{ $labels.view }})보다 {{ $value }}건 많은 상태가
+            15분 지속됐습니다. 단순 복제 lag 을 넘어선 프로젝션 누락 가능성.
+            점검: lemuel-settlement 컨슈머 lag / DLT 적체.
+            자가치유: POST /admin/settlement-projection/backfill (멱등 이벤트 재발행).
+            runbook: docs/runbook/settlement-projection-lag.md
+
+      # 드리프트 지속 — 자가치유(백필) 후에도 1시간 이상 수렴하지 않으면 심각
+      - alert: SettlementProjectionDriftPersistent
+        expr: |
+          (
+            max by (view) (settlement_recon_source_rows)
+            - max by (view) (settlement_projection_rows)
+          ) > 10
+        for: 1h
+        labels:
+          severity: critical
+          component: settlement-projection
+        annotations:
+          summary: "settlement 프로젝션 드리프트 미수렴 ({{ $labels.view }})"
+          description: |
+            {{ $labels.view }} 드리프트 {{ $value }}건이 1시간 지속 — 백필로도 수렴 안 됨.
+            이벤트 파이프라인(Outbox→Kafka→컨슈머) 단절 또는 토픽/스키마 드리프트 의심.
+            ADR 0020 / DLT inspect 로 근본 원인 분석 필요.

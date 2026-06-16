@@ -1,7 +1,8 @@
-# Runbook — settlement 프로젝션 복제 지연 (ADR 0020 Phase 5.6)
+# Runbook — settlement 프로젝션 복제 지연·드리프트 (ADR 0020 Phase 5.6 / 5.2)
 
 > 대상 알림: `SettlementProjectionLagHigh`(p95>30s) · `SettlementProjectionLagCritical`(p95>120s) ·
-> `SettlementProjectionStalled`(30분 반영 0).
+> `SettlementProjectionStalled`(30분 반영 0) · `SettlementProjectionDriftHigh`(원천-프로젝션>10, 15m) ·
+> `SettlementProjectionDriftPersistent`(드리프트 1h 미수렴).
 > 배경: settlement 는 order 도메인 이벤트(Kafka)를 소비해 `settlement_db` 의 `settlement_*_view`
 > 프로젝션을 채운다(CQRS). 물리 분리(Phase 4) 후 이 경로의 지연이 조회/리포팅 정합성에 직결된다.
 
@@ -11,9 +12,27 @@
 |---|---|
 | `settlement_projection_lag_seconds{type}` | 발행→반영 end-to-end 지연 타이머 (Kafka record ts 기준). p95/p99 추적 |
 | `settlement_projection_applied_total{type}` | type(payment/order/user/product) 별 반영 건수 |
-| `settlement_projection_rows{view}` | 각 `*_view` 현재 행 수 (opslab 원천과 대조) |
+| `settlement_projection_rows{view}` | 각 `*_view` 현재 행 수 (settlement-service 노출) |
+| `settlement_recon_source_rows{view}` | opslab 원천 행 수 (order-service 노출, cross-DB 대조용) |
 
 대시보드: Grafana **"Lemuel — Settlement Projection"** (`lemuel-settlement-projection`).
+
+## Cross-DB 대사 (Phase 5.2)
+
+코드 의존성 0 불변식을 지키기 위해 **어느 서비스도 상대 DB 를 직접 읽지 않는다.** 대신
+order 가 `settlement_recon_source_rows{view}`(opslab 원천), settlement 가
+`settlement_projection_rows{view}`(프로젝션) 를 각각 노출하고 **Prometheus 관측 계층**에서 대조한다.
+
+```promql
+# view 별 드리프트 (0 이 정상, 짧은 lag 으로 인한 소량 양수는 허용)
+max by (view) (settlement_recon_source_rows) - max by (view) (settlement_projection_rows)
+```
+
+- view 매핑: `user_view`=users, `product_view`=products, `order_view`=orders,
+  `payment_view`=CAPTURED 결제 건수.
+- 소량/일시 드리프트는 복제 lag 이라 정상. `DriftHigh` 는 >10건 15분 지속에서만 발동.
+- **자가치유**: `POST /admin/settlement-projection/backfill` (멱등) → 누락분 이벤트 재발행으로 수렴.
+- `DriftPersistent`(1h 미수렴)면 백필로도 안 되는 것 → 파이프라인 단절/스키마 드리프트 의심.
 
 ## 영향 범위
 

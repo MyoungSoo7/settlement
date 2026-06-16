@@ -35,6 +35,9 @@ public interface PaymentJpaRepository extends JpaRepository<PaymentJpaEntity, Lo
 
     List<PaymentJpaEntity> findByStatus(String status);
 
+    /** 상태별 건수 — settlement 프로젝션 cross-DB 대사(ADR 0020 Phase 5.2)의 원천 카운트. */
+    long countByStatus(String status);
+
     /**
      * 특정 기간 동안 캡처된 결제 조회 (정산 생성용)
      * @param startDateTime 시작 시간

@@ -137,6 +137,58 @@
           "legendFormat": "replayed"
         }
       ]
+    },
+    {
+      "id": 9,
+      "type": "row",
+      "title": "Cross-DB 대사 (Phase 5.2) — opslab 원천 vs settlement_db 프로젝션",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 27 },
+      "collapsed": false
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "원천 vs 프로젝션 행 수 (view 별)",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "max by (view) (settlement_recon_source_rows)",
+          "legendFormat": "source {{view}}"
+        },
+        {
+          "expr": "max by (view) (settlement_projection_rows)",
+          "legendFormat": "projection {{view}}"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "프로젝션 드리프트 (원천 - 프로젝션, view 별)",
+      "datasource": "Prometheus",
+      "description": "0 이 정상. 양수가 지속되면 프로젝션 누락 → /admin/settlement-projection/backfill 자가치유.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 10 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "max by (view) (settlement_recon_source_rows) - max by (view) (settlement_projection_rows)",
+          "legendFormat": "drift {{view}}"
+        }
+      ]
     }
   ]
 }
