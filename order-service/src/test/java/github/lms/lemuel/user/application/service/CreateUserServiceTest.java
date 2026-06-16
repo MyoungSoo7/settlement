@@ -29,6 +29,7 @@ class CreateUserServiceTest {
     @Mock LoadUserPort loadUserPort;
     @Mock SaveUserPort saveUserPort;
     @Mock PasswordHashPort passwordHashPort;
+    @Mock github.lms.lemuel.user.application.port.out.PublishUserEventPort publishUserEventPort;
     @InjectMocks CreateUserService service;
 
     @Test @DisplayName("정상 회원가입 - 비밀번호 해싱 + User 저장")

@@ -49,6 +49,14 @@ public class OutboxBackedUserEventPublisher implements PublishUserEventPort {
         writeOutbox(userId, "UserMembershipChanged", payload);
     }
 
+    @Override
+    public void publishUserRegistered(Long userId, String email) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("userId", userId);
+        payload.put("email", email);
+        writeOutbox(userId, "UserRegistered", payload);
+    }
+
     private void writeOutbox(Long userId, String eventType, Map<String, Object> payload) {
         String json;
         try {
