@@ -131,6 +131,7 @@ class SettlementIdempotencyIntegrationTest {
     @Autowired ProcessedEventRepository processedEventRepository;
     @Autowired SpringDataSettlementJpaRepository settlementRepo;
     @Autowired ObjectMapper objectMapper;
+    @Autowired github.lms.lemuel.settlement.adapter.out.readmodel.SettlementPaymentViewRepository paymentViewRepository;
 
     private PaymentEventKafkaConsumer consumer;
 
@@ -138,10 +139,11 @@ class SettlementIdempotencyIntegrationTest {
     void setUp() {
         // 컨슈머는 kafka.enabled=false 라 빈으로 안 뜸 → 실 빈들로 직접 조립.
         consumer = new PaymentEventKafkaConsumer(
-                createSettlementFromPaymentUseCase, processedEventRepository, objectMapper);
+                createSettlementFromPaymentUseCase, processedEventRepository, paymentViewRepository, objectMapper);
         // create-drop 스키마는 컨텍스트 단위라 메서드 간 데이터가 누적된다 — 매 테스트 전 비운다.
         settlementRepo.deleteAll();
         processedEventRepository.deleteAll();
+        paymentViewRepository.deleteAll();
     }
 
     @Test
@@ -169,6 +171,24 @@ class SettlementIdempotencyIntegrationTest {
         assertThat(processedEventRepository.count())
                 .as("처리 이력도 (group,event_id) 단일 키로 1건")
                 .isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Phase 2: PaymentCaptured 소비 시 settlement_payment_view 로컬 프로젝션이 적재된다 (ADR 0020)")
+    void paymentCaptured_populatesLocalPaymentViewProjection() {
+        long paymentId = 7303L;
+        long orderId = 8303L;
+        UUID eventId = UUID.fromString("33333333-3333-3333-3333-333333333333");
+
+        consumer.onPaymentCaptured(paymentCapturedRecord(eventId, paymentId, orderId, "70000"),
+                mock(org.springframework.kafka.support.Acknowledgment.class));
+
+        var view = paymentViewRepository.findById(paymentId);
+        assertThat(view).as("결제 프로젝션이 이벤트로 적재됨").isPresent();
+        assertThat(view.get().getStatus()).isEqualTo("CAPTURED");
+        assertThat(view.get().getOrderId()).isEqualTo(orderId);
+        assertThat(view.get().getAmount()).isEqualByComparingTo("70000");
+        assertThat(view.get().getCapturedAt()).as("capturedAt 은 이벤트 동봉값 또는 수신시각으로 채워짐").isNotNull();
     }
 
     @Test

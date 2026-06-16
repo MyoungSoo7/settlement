@@ -137,6 +137,7 @@ class RefundSplitPaymentServiceTest {
         @Override public void publishPaymentCreated(Long paymentId, Long orderId) { }
         @Override public void publishPaymentAuthorized(Long paymentId) { }
         @Override public void publishPaymentCaptured(Long paymentId, Long orderId, BigDecimal amount,
+                java.time.LocalDateTime capturedAt,
                 github.lms.lemuel.payment.application.port.out.SellerSettlementMeta sellerMeta) { }
         @Override public void publishPaymentRefunded(Long paymentId, Long orderId) { count++; }
     }

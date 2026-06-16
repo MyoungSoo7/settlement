@@ -57,11 +57,14 @@ public class OutboxBackedEventPublisher implements PublishEventPort {
 
     @Override
     public void publishPaymentCaptured(Long paymentId, Long orderId, BigDecimal amount,
+                                       java.time.LocalDateTime capturedAt,
                                        github.lms.lemuel.payment.application.port.out.SellerSettlementMeta sellerMeta) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("paymentId", paymentId);
         payload.put("orderId", orderId);
         payload.put("amount", amount.toPlainString());
+        // Phase 2 — 로컬 payment_view 프로젝션 적재에 필요 (정산 대상일 필터)
+        if (capturedAt != null) payload.put("capturedAt", capturedAt.toString());
         // Event-Carried State Transfer (ADR 0020 Phase 1) — 셀러 메타 동봉 (미해석/미할당 시 생략)
         if (sellerMeta != null) {
             if (sellerMeta.sellerId() != null) payload.put("sellerId", sellerMeta.sellerId());

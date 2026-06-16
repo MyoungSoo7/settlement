@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import github.lms.lemuel.common.outbox.adapter.in.kafka.ProcessedEventJpaEntity;
 import github.lms.lemuel.common.outbox.adapter.in.kafka.ProcessedEventRepository;
+import github.lms.lemuel.settlement.adapter.out.readmodel.SettlementPaymentViewJpaEntity;
+import github.lms.lemuel.settlement.adapter.out.readmodel.SettlementPaymentViewRepository;
 import github.lms.lemuel.settlement.application.port.in.CreateSettlementFromPaymentUseCase;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
@@ -16,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
@@ -45,13 +48,16 @@ public class PaymentEventKafkaConsumer {
 
     private final CreateSettlementFromPaymentUseCase createSettlementFromPaymentUseCase;
     private final ProcessedEventRepository processedEventRepository;
+    private final SettlementPaymentViewRepository paymentViewRepository;
     private final ObjectMapper objectMapper;
 
     public PaymentEventKafkaConsumer(CreateSettlementFromPaymentUseCase createSettlementFromPaymentUseCase,
                                      ProcessedEventRepository processedEventRepository,
+                                     SettlementPaymentViewRepository paymentViewRepository,
                                      ObjectMapper objectMapper) {
         this.createSettlementFromPaymentUseCase = createSettlementFromPaymentUseCase;
         this.processedEventRepository = processedEventRepository;
+        this.paymentViewRepository = paymentViewRepository;
         this.objectMapper = objectMapper;
     }
 
@@ -109,6 +115,24 @@ public class PaymentEventKafkaConsumer {
         //    재시도 없이 즉시 DLT 로 라우팅. 일시적 예외(DB 락, IO) 는 ExponentialBackOff 재시도.
         createSettlementFromPaymentUseCase.createSettlementFromPayment(
                 paymentId, orderId, amount, sellerId, sellerTier, settlementCycle);
+
+        // 4-b. 로컬 결제 프로젝션 적재 (ADR 0020 Phase 2) — 기존 @Immutable read-model 과 dual-run.
+        //      Phase 3 에서 조회(CapturedPaymentsAdapter 등)를 이 프로젝션으로 컷오버한다.
+        LocalDateTime capturedAt = node.hasNonNull("capturedAt")
+                ? LocalDateTime.parse(node.get("capturedAt").asText())
+                : LocalDateTime.now();
+        SettlementPaymentViewJpaEntity view = paymentViewRepository.findById(paymentId)
+                .orElseGet(SettlementPaymentViewJpaEntity::new);
+        view.setPaymentId(paymentId);
+        view.setOrderId(orderId);
+        view.setAmount(amount);
+        view.setStatus("CAPTURED");
+        view.setCapturedAt(capturedAt);
+        view.setSellerId(sellerId);
+        view.setSellerTier(sellerTier);
+        view.setSettlementCycle(settlementCycle);
+        view.setUpdatedAt(LocalDateTime.now());
+        paymentViewRepository.save(view);
 
         // 5. 처리 기록 — 재처리 시 (group, event_id) 멱등 보장
         processedEventRepository.save(new ProcessedEventJpaEntity(

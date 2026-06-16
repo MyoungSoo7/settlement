@@ -14,7 +14,8 @@ public interface PublishEventPort {
      * sellerMeta(sellerId·tier·cycle)를 동봉하면 settlement 가 정산 생성 시 order DB 조인을
      * 하지 않아도 된다(ADR 0020 Phase 1, Event-Carried State Transfer). 미해석 시 null 허용.
      */
-    void publishPaymentCaptured(Long paymentId, Long orderId, BigDecimal amount, SellerSettlementMeta sellerMeta);
+    void publishPaymentCaptured(Long paymentId, Long orderId, BigDecimal amount,
+                                java.time.LocalDateTime capturedAt, SellerSettlementMeta sellerMeta);
 
     void publishPaymentRefunded(Long paymentId, Long orderId);
 }

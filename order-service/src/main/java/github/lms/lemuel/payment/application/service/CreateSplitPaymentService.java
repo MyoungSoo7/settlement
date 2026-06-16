@@ -86,6 +86,7 @@ public class CreateSplitPaymentService implements CreateSplitPaymentUseCase {
 
         updateOrderStatusPort.updateOrderStatus(saved.getOrderId(), "PAID");
         publishEventPort.publishPaymentCaptured(saved.getId(), saved.getOrderId(), saved.getAmount(),
+                saved.getCapturedAt(),
                 loadSellerSettlementMetaPort.findByPaymentId(saved.getId()).orElse(null));
 
         log.info("분할결제 완료: paymentId={}, totalAmount={}, tenders={}",
