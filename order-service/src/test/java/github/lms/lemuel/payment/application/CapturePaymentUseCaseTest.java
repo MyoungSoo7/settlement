@@ -38,7 +38,8 @@ class CapturePaymentUseCaseTest {
         PaymentDomain result = capturePaymentUseCase.capturePayment(1L);
 
         assertThat(result.getStatus()).isEqualTo(PaymentStatus.CAPTURED);
-        verify(publishEventPort).publishPaymentCaptured(eq(1L), eq(10L), eq(new BigDecimal("30000")), any(), isNull());
+        verify(publishEventPort).publishPaymentCaptured(eq(1L), eq(10L), eq(new BigDecimal("30000")),
+                any(), any(), any(), isNull());
         // 정산 생성은 CapturePaymentUseCase 가 직접 호출하지 않는다 —
         // Kafka 컨슈머가 이벤트 수신 후 수행하므로 여기서는 검증하지 않는다.
     }

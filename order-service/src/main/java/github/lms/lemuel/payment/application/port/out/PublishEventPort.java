@@ -15,7 +15,10 @@ public interface PublishEventPort {
      * 하지 않아도 된다(ADR 0020 Phase 1, Event-Carried State Transfer). 미해석 시 null 허용.
      */
     void publishPaymentCaptured(Long paymentId, Long orderId, BigDecimal amount,
-                                java.time.LocalDateTime capturedAt, SellerSettlementMeta sellerMeta);
+                                java.time.LocalDateTime capturedAt,
+                                String paymentMethod, String pgTransactionId,
+                                SellerSettlementMeta sellerMeta);
 
-    void publishPaymentRefunded(Long paymentId, Long orderId);
+    /** 환불. refundedAmount 를 동봉해 settlement 결제 프로젝션의 환불액·상태를 갱신한다(ADR 0020 Phase 3b-4). */
+    void publishPaymentRefunded(Long paymentId, Long orderId, BigDecimal refundedAmount);
 }

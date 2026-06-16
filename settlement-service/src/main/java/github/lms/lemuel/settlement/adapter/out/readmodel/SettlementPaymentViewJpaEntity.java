@@ -50,6 +50,16 @@ public class SettlementPaymentViewJpaEntity {
     @Column(name = "settlement_cycle", length = 20)
     private String settlementCycle;
 
+    // Phase 3b-4 — QueryDSL/ES 컷오버용 확장 필드
+    @Column(name = "payment_method", length = 40)
+    private String paymentMethod;
+
+    @Column(name = "refunded_amount", precision = 15, scale = 2)
+    private BigDecimal refundedAmount;
+
+    @Column(name = "pg_transaction_id", length = 100)
+    private String pgTransactionId;
+
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 }

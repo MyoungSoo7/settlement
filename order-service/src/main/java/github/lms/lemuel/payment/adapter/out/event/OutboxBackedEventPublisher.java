@@ -58,6 +58,7 @@ public class OutboxBackedEventPublisher implements PublishEventPort {
     @Override
     public void publishPaymentCaptured(Long paymentId, Long orderId, BigDecimal amount,
                                        java.time.LocalDateTime capturedAt,
+                                       String paymentMethod, String pgTransactionId,
                                        github.lms.lemuel.payment.application.port.out.SellerSettlementMeta sellerMeta) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("paymentId", paymentId);
@@ -65,6 +66,9 @@ public class OutboxBackedEventPublisher implements PublishEventPort {
         payload.put("amount", amount.toPlainString());
         // Phase 2 — 로컬 payment_view 프로젝션 적재에 필요 (정산 대상일 필터)
         if (capturedAt != null) payload.put("capturedAt", capturedAt.toString());
+        // Phase 3b-4 — 프로젝션 확장 필드 (ES/QueryDSL 컷오버용)
+        if (paymentMethod != null) payload.put("paymentMethod", paymentMethod);
+        if (pgTransactionId != null) payload.put("pgTransactionId", pgTransactionId);
         // Event-Carried State Transfer (ADR 0020 Phase 1) — 셀러 메타 동봉 (미해석/미할당 시 생략)
         if (sellerMeta != null) {
             if (sellerMeta.sellerId() != null) payload.put("sellerId", sellerMeta.sellerId());
@@ -75,11 +79,12 @@ public class OutboxBackedEventPublisher implements PublishEventPort {
     }
 
     @Override
-    public void publishPaymentRefunded(Long paymentId, Long orderId) {
-        writeOutbox(paymentId, "PaymentRefunded", Map.of(
-                "paymentId", paymentId,
-                "orderId", orderId
-        ));
+    public void publishPaymentRefunded(Long paymentId, Long orderId, BigDecimal refundedAmount) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("paymentId", paymentId);
+        payload.put("orderId", orderId);
+        if (refundedAmount != null) payload.put("refundedAmount", refundedAmount.toPlainString());
+        writeOutbox(paymentId, "PaymentRefunded", payload);
     }
 
     private void writeOutbox(Long paymentId, String eventType, Map<String, Object> payload) {

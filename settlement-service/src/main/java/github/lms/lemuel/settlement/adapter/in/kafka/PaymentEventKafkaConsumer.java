@@ -131,6 +131,12 @@ public class PaymentEventKafkaConsumer {
         view.setSellerId(sellerId);
         view.setSellerTier(sellerTier);
         view.setSettlementCycle(settlementCycle);
+        // Phase 3b-4 — 확장 필드 (ES/QueryDSL 컷오버용)
+        view.setPaymentMethod(node.hasNonNull("paymentMethod") ? node.get("paymentMethod").asText() : null);
+        view.setPgTransactionId(node.hasNonNull("pgTransactionId") ? node.get("pgTransactionId").asText() : null);
+        if (view.getRefundedAmount() == null) {
+            view.setRefundedAmount(BigDecimal.ZERO); // 환불 이벤트가 먼저 도착한 드문 경우 기존값 보존
+        }
         view.setUpdatedAt(LocalDateTime.now());
         paymentViewRepository.save(view);
 

@@ -145,7 +145,8 @@ public class RefundPaymentUseCase implements RefundPaymentPort {
         // 11. 이벤트 발행 — settlement 모듈은 RefundCompleted Kafka 이벤트로 자체 조정.
         //     (이전: AdjustSettlementForRefundUseCase 직접 호출 → MSA 분리 시 cross-service 호출 금지)
         //     Phase 5 에서 Outbox 패턴으로 보강 예정.
-        publishEventPort.publishPaymentRefunded(savedPaymentDomain.getId(), savedPaymentDomain.getOrderId());
+        publishEventPort.publishPaymentRefunded(savedPaymentDomain.getId(), savedPaymentDomain.getOrderId(),
+                savedPaymentDomain.getRefundedAmount());
         log.info("PaymentRefunded event published. paymentId={}, refundId={}, refundAmount={}",
                 savedPaymentDomain.getId(), completedRefund.getId(), refundAmount);
 

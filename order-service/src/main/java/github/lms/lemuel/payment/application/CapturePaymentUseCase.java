@@ -67,6 +67,8 @@ public class CapturePaymentUseCase implements CapturePaymentPort {
                 savedPaymentDomain.getOrderId(),
                 savedPaymentDomain.getAmount(),
                 savedPaymentDomain.getCapturedAt(),
+                savedPaymentDomain.getPaymentMethod(),
+                savedPaymentDomain.getPgTransactionId(),
                 loadSellerSettlementMetaPort.findByPaymentId(savedPaymentDomain.getId()).orElse(null));
         log.info("PaymentCaptured event queued to outbox. paymentId={}", savedPaymentDomain.getId());
 
