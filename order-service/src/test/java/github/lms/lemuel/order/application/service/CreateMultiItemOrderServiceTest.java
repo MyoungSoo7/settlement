@@ -38,6 +38,7 @@ class CreateMultiItemOrderServiceTest {
     @Mock DecreaseVariantStockUseCase decreaseStockUseCase;
     @Mock SaveOrderPort saveOrderPort;
     @Mock SendOrderNotificationPort sendNotificationPort;
+    @Mock github.lms.lemuel.order.application.port.out.PublishOrderEventPort publishOrderEventPort;
     @InjectMocks CreateMultiItemOrderService service;
 
     private Product mockProduct(Long id, String name, BigDecimal price) {
