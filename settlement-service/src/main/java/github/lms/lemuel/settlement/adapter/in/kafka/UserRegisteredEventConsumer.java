@@ -35,13 +35,16 @@ public class UserRegisteredEventConsumer {
     private final SettlementUserViewRepository userViewRepository;
     private final ProcessedEventRepository processedEventRepository;
     private final ObjectMapper objectMapper;
+    private final SettlementProjectionMetrics projectionMetrics;
 
     public UserRegisteredEventConsumer(SettlementUserViewRepository userViewRepository,
                                        ProcessedEventRepository processedEventRepository,
-                                       ObjectMapper objectMapper) {
+                                       ObjectMapper objectMapper,
+                                       SettlementProjectionMetrics projectionMetrics) {
         this.userViewRepository = userViewRepository;
         this.processedEventRepository = processedEventRepository;
         this.objectMapper = objectMapper;
+        this.projectionMetrics = projectionMetrics;
     }
 
     @KafkaListener(
@@ -87,6 +90,7 @@ public class UserRegisteredEventConsumer {
         userViewRepository.save(view);
 
         processedEventRepository.save(new ProcessedEventJpaEntity(CONSUMER_GROUP, eventId, "UserRegistered"));
+        projectionMetrics.recordApply("user", record.timestamp());
         log.info("settlement_user_view upserted. eventId={}, userId={}", eventId, userId);
         ack.acknowledge();
     }

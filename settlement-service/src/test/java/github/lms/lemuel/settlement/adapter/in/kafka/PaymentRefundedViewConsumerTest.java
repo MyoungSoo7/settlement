@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import github.lms.lemuel.common.outbox.adapter.in.kafka.ProcessedEventRepository;
 import github.lms.lemuel.settlement.adapter.out.readmodel.SettlementPaymentViewJpaEntity;
 import github.lms.lemuel.settlement.adapter.out.readmodel.SettlementPaymentViewRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -36,7 +37,8 @@ class PaymentRefundedViewConsumerTest {
 
     @BeforeEach
     void setUp() {
-        consumer = new PaymentRefundedViewConsumer(paymentViewRepository, processedEventRepository, objectMapper);
+        consumer = new PaymentRefundedViewConsumer(paymentViewRepository, processedEventRepository, objectMapper,
+                new SettlementProjectionMetrics(new SimpleMeterRegistry()));
     }
 
     private ConsumerRecord<String, String> refundedRecord(UUID eventId, String json) {

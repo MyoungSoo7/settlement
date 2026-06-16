@@ -93,5 +93,5 @@ cat <<'NEXT'
          POST /admin/settlement-projection/backfill  (ADMIN, order-service)
     2) ES 재색인으로 settlement_index_queue / 검색 인덱스 재생성.
     3) 대사(reconciliation)로 정합성 검증 후 트래픽 컷오버.
-    자세한 절차: docs/runbooks/settlement-db-cutover.md
+    자세한 절차: docs/runbook/settlement-db-cutover.md
 NEXT

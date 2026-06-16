@@ -337,3 +337,55 @@ groups:
           description: |
             최근 5 분 내 {{ $value }} 건 replay. x-replay-count 5 회 cap 이 작동 중인지 확인.
             audit_logs 에서 operator 추적 필요.
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Settlement 로컬 프로젝션 (CQRS read model) — ADR 0020 Phase 5.6
+  # order 이벤트가 settlement_db 프로젝션에 반영되는 지연/처리량 감시.
+  # DB 물리 분리(Phase 4) 후 eventual consistency 의 lag 를 운영에서 관측.
+  # 메트릭: SettlementProjectionMetrics / SettlementProjectionGauges 노출.
+  # ──────────────────────────────────────────────────────────────────────
+  - name: lemuel_settlement_projection_alerts
+    interval: 30s
+    rules:
+      # 프로젝션 반영 지연 p95 > 30s — 복제 지연 경고
+      - alert: SettlementProjectionLagHigh
+        expr: histogram_quantile(0.95, sum by (le, type) (rate(settlement_projection_lag_seconds_bucket[5m]))) > 30
+        for: 5m
+        labels:
+          severity: warning
+          component: settlement-projection
+        annotations:
+          summary: "settlement 프로젝션 반영 지연 p95 > 30s ({{ $labels.type }})"
+          description: |
+            {{ $labels.type }} 프로젝션의 발행→반영 p95 지연이 {{ $value }}초입니다.
+            조회/리포팅이 stale 데이터를 볼 수 있습니다. 점검:
+              - 컨슈머 그룹(lemuel-settlement) lag / 컨슈머 정지 여부
+              - settlement_db 부하 (HikariCP, 슬로우 쿼리)
+              - redpanda 파티션 적체
+
+      # 프로젝션 반영 지연 p95 > 120s — 심각 (컷오버/대사 정합성 위협)
+      - alert: SettlementProjectionLagCritical
+        expr: histogram_quantile(0.95, sum by (le, type) (rate(settlement_projection_lag_seconds_bucket[5m]))) > 120
+        for: 3m
+        labels:
+          severity: critical
+          component: settlement-projection
+        annotations:
+          summary: "settlement 프로젝션 반영 지연 심각 ({{ $labels.type }})"
+          description: |
+            {{ $labels.type }} p95 지연 {{ $value }}초 — 프로젝션이 사실상 정지 가능성.
+            정산 생성은 이벤트 동봉 데이터로 계속되나 조회 read model 이 크게 뒤처짐.
+            즉시 컨슈머/DB/브로커 상태 확인. runbook: docs/runbook/settlement-projection-lag.md
+
+      # 프로젝션 반영 정지 — 처리량 0 이 지속 (유휴와 구분하려 for 길게)
+      - alert: SettlementProjectionStalled
+        expr: sum(rate(settlement_projection_applied_total[10m])) == 0
+        for: 30m
+        labels:
+          severity: warning
+          component: settlement-projection
+        annotations:
+          summary: "settlement 프로젝션 반영이 30분간 없음"
+          description: |
+            최근 10분 처리율이 0 이며 30분 지속. 트래픽이 없는 유휴 구간일 수도 있으나,
+            컨슈머 정지/구독 해제 가능성도 있으니 lemuel-settlement 컨슈머 상태를 확인하세요.

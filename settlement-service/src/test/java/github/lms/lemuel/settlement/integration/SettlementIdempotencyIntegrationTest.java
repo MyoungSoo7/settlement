@@ -139,7 +139,9 @@ class SettlementIdempotencyIntegrationTest {
     void setUp() {
         // 컨슈머는 kafka.enabled=false 라 빈으로 안 뜸 → 실 빈들로 직접 조립.
         consumer = new PaymentEventKafkaConsumer(
-                createSettlementFromPaymentUseCase, processedEventRepository, paymentViewRepository, objectMapper);
+                createSettlementFromPaymentUseCase, processedEventRepository, paymentViewRepository, objectMapper,
+                new github.lms.lemuel.settlement.adapter.in.kafka.SettlementProjectionMetrics(
+                        new io.micrometer.core.instrument.simple.SimpleMeterRegistry()));
         // create-drop 스키마는 컨텍스트 단위라 메서드 간 데이터가 누적된다 — 매 테스트 전 비운다.
         settlementRepo.deleteAll();
         processedEventRepository.deleteAll();

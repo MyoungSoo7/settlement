@@ -36,13 +36,16 @@ public class OrderEventKafkaConsumer {
     private final SettlementOrderViewRepository orderViewRepository;
     private final ProcessedEventRepository processedEventRepository;
     private final ObjectMapper objectMapper;
+    private final SettlementProjectionMetrics projectionMetrics;
 
     public OrderEventKafkaConsumer(SettlementOrderViewRepository orderViewRepository,
                                    ProcessedEventRepository processedEventRepository,
-                                   ObjectMapper objectMapper) {
+                                   ObjectMapper objectMapper,
+                                   SettlementProjectionMetrics projectionMetrics) {
         this.orderViewRepository = orderViewRepository;
         this.processedEventRepository = processedEventRepository;
         this.objectMapper = objectMapper;
+        this.projectionMetrics = projectionMetrics;
     }
 
     @KafkaListener(
@@ -92,6 +95,7 @@ public class OrderEventKafkaConsumer {
         orderViewRepository.save(view);
 
         processedEventRepository.save(new ProcessedEventJpaEntity(CONSUMER_GROUP, eventId, "OrderCreated"));
+        projectionMetrics.recordApply("order", record.timestamp());
         log.info("settlement_order_view upserted. eventId={}, orderId={}", eventId, orderId);
         ack.acknowledge();
     }

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import github.lms.lemuel.common.outbox.adapter.in.kafka.ProcessedEventRepository;
 import github.lms.lemuel.settlement.adapter.out.readmodel.SettlementUserViewJpaEntity;
 import github.lms.lemuel.settlement.adapter.out.readmodel.SettlementUserViewRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -36,7 +37,8 @@ class UserRegisteredEventConsumerTest {
 
     @BeforeEach
     void setUp() {
-        consumer = new UserRegisteredEventConsumer(userViewRepository, processedEventRepository, objectMapper);
+        consumer = new UserRegisteredEventConsumer(userViewRepository, processedEventRepository, objectMapper,
+                new SettlementProjectionMetrics(new SimpleMeterRegistry()));
     }
 
     private ConsumerRecord<String, String> userRegisteredRecord(UUID eventId, String json) {

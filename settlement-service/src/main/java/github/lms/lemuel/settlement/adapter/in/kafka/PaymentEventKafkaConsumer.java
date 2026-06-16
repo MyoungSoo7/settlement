@@ -50,15 +50,18 @@ public class PaymentEventKafkaConsumer {
     private final ProcessedEventRepository processedEventRepository;
     private final SettlementPaymentViewRepository paymentViewRepository;
     private final ObjectMapper objectMapper;
+    private final SettlementProjectionMetrics projectionMetrics;
 
     public PaymentEventKafkaConsumer(CreateSettlementFromPaymentUseCase createSettlementFromPaymentUseCase,
                                      ProcessedEventRepository processedEventRepository,
                                      SettlementPaymentViewRepository paymentViewRepository,
-                                     ObjectMapper objectMapper) {
+                                     ObjectMapper objectMapper,
+                                     SettlementProjectionMetrics projectionMetrics) {
         this.createSettlementFromPaymentUseCase = createSettlementFromPaymentUseCase;
         this.processedEventRepository = processedEventRepository;
         this.paymentViewRepository = paymentViewRepository;
         this.objectMapper = objectMapper;
+        this.projectionMetrics = projectionMetrics;
     }
 
     @KafkaListener(
@@ -147,6 +150,7 @@ public class PaymentEventKafkaConsumer {
                 "PaymentCaptured"
         ));
 
+        projectionMetrics.recordApply("payment", record.timestamp());
         log.info("Settlement created from Kafka event. eventId={}, paymentId={}", eventId, paymentId);
         ack.acknowledge();
     }

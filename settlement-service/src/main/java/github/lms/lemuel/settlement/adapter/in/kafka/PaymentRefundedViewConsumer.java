@@ -38,13 +38,16 @@ public class PaymentRefundedViewConsumer {
     private final SettlementPaymentViewRepository paymentViewRepository;
     private final ProcessedEventRepository processedEventRepository;
     private final ObjectMapper objectMapper;
+    private final SettlementProjectionMetrics projectionMetrics;
 
     public PaymentRefundedViewConsumer(SettlementPaymentViewRepository paymentViewRepository,
                                        ProcessedEventRepository processedEventRepository,
-                                       ObjectMapper objectMapper) {
+                                       ObjectMapper objectMapper,
+                                       SettlementProjectionMetrics projectionMetrics) {
         this.paymentViewRepository = paymentViewRepository;
         this.processedEventRepository = processedEventRepository;
         this.objectMapper = objectMapper;
+        this.projectionMetrics = projectionMetrics;
     }
 
     @KafkaListener(
@@ -100,6 +103,7 @@ public class PaymentRefundedViewConsumer {
         paymentViewRepository.save(view);
 
         processedEventRepository.save(new ProcessedEventJpaEntity(CONSUMER_GROUP, eventId, "PaymentRefunded"));
+        projectionMetrics.recordApply("payment", record.timestamp());
         log.info("settlement_payment_view refund applied. eventId={}, paymentId={}, refunded={}",
                 eventId, paymentId, refundedAmount);
         ack.acknowledge();

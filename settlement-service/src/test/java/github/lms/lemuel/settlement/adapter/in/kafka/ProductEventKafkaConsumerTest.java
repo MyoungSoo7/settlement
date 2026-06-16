@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import github.lms.lemuel.common.outbox.adapter.in.kafka.ProcessedEventRepository;
 import github.lms.lemuel.settlement.adapter.out.readmodel.SettlementProductViewJpaEntity;
 import github.lms.lemuel.settlement.adapter.out.readmodel.SettlementProductViewRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -36,7 +37,8 @@ class ProductEventKafkaConsumerTest {
 
     @BeforeEach
     void setUp() {
-        consumer = new ProductEventKafkaConsumer(productViewRepository, processedEventRepository, objectMapper);
+        consumer = new ProductEventKafkaConsumer(productViewRepository, processedEventRepository, objectMapper,
+                new SettlementProjectionMetrics(new SimpleMeterRegistry()));
     }
 
     private ConsumerRecord<String, String> productChangedRecord(UUID eventId, String json) {

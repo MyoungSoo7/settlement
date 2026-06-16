@@ -5,6 +5,7 @@ import github.lms.lemuel.common.outbox.adapter.in.kafka.ProcessedEventJpaEntity;
 import github.lms.lemuel.common.outbox.adapter.in.kafka.ProcessedEventRepository;
 import github.lms.lemuel.settlement.adapter.out.readmodel.SettlementOrderViewJpaEntity;
 import github.lms.lemuel.settlement.adapter.out.readmodel.SettlementOrderViewRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -37,7 +38,8 @@ class OrderEventKafkaConsumerTest {
 
     @BeforeEach
     void setUp() {
-        consumer = new OrderEventKafkaConsumer(orderViewRepository, processedEventRepository, objectMapper);
+        consumer = new OrderEventKafkaConsumer(orderViewRepository, processedEventRepository, objectMapper,
+                new SettlementProjectionMetrics(new SimpleMeterRegistry()));
     }
 
     private ConsumerRecord<String, String> orderCreatedRecord(UUID eventId, String json) {
