@@ -183,6 +183,8 @@ app:
       partitions: ${APP_KAFKA_TOPIC_PARTITIONS:3}
       payment-captured: lemuel.payment.captured
       payment-refunded: lemuel.payment.refunded
+      # loan → settlement (상환 차감 결과 수신). loan Outbox 자동 라우팅명(snake_case)과 일치.
+      loan-repayment-applied: lemuel.loan.repayment_applied
   search:
     enabled: false
   # 원장 전용 트랜잭셔널 아웃박스 로컬 폴러 (Kafka 미경유)

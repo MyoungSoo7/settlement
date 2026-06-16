@@ -1,5 +1,6 @@
 package github.lms.lemuel.settlement.adapter.out.persistence;
 
+import github.lms.lemuel.settlement.application.port.out.LoadSellerIdPort;
 import github.lms.lemuel.settlement.application.port.out.LoadSellerSettlementCyclePort;
 import github.lms.lemuel.settlement.application.port.out.LoadSellerTierPort;
 import github.lms.lemuel.settlement.domain.SellerTier;
@@ -11,11 +12,11 @@ import org.springframework.stereotype.Repository;
 import java.util.Optional;
 
 /**
- * payment → order → product → user 경로를 단일 쿼리로 해석해 판매자 메타(등급·주기)를 반환.
+ * payment → order → product → user 경로를 단일 쿼리로 해석해 판매자 메타(ID·등급·주기)를 반환.
  * 판매자 미할당(seller_id NULL) 이거나 매핑 실패 시 empty 반환.
  */
 @Repository
-public class SellerTierJdbcAdapter implements LoadSellerTierPort, LoadSellerSettlementCyclePort {
+public class SellerTierJdbcAdapter implements LoadSellerTierPort, LoadSellerSettlementCyclePort, LoadSellerIdPort {
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -36,6 +37,23 @@ public class SellerTierJdbcAdapter implements LoadSellerTierPort, LoadSellerSett
         try {
             String tier = jdbcTemplate.queryForObject(sql, String.class, paymentId);
             return Optional.of(SellerTier.fromStringOrDefault(tier));
+        } catch (EmptyResultDataAccessException e) {
+            return Optional.empty();
+        }
+    }
+
+    @Override
+    public Optional<Long> findSellerIdByPaymentId(Long paymentId) {
+        String sql = """
+                SELECT pr.seller_id
+                FROM opslab.payments pay
+                JOIN opslab.orders o ON o.id = pay.order_id
+                JOIN opslab.products pr ON pr.id = o.product_id
+                WHERE pay.id = ?
+                """;
+        try {
+            Long sellerId = jdbcTemplate.queryForObject(sql, Long.class, paymentId);
+            return Optional.ofNullable(sellerId);
         } catch (EmptyResultDataAccessException e) {
             return Optional.empty();
         }

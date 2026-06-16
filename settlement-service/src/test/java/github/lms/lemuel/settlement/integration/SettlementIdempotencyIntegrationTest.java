@@ -98,9 +98,12 @@ class SettlementIdempotencyIntegrationTest {
             return new SellerMetaStub();
         }
 
-        static class SellerMetaStub implements LoadSellerTierPort, LoadSellerSettlementCyclePort {
+        static class SellerMetaStub implements LoadSellerTierPort, LoadSellerSettlementCyclePort,
+                github.lms.lemuel.settlement.application.port.out.LoadSellerIdPort {
             @Override public Optional<SellerTier> findTierByPaymentId(Long paymentId) { return Optional.empty(); }
             @Override public Optional<SettlementCycle> findCycleByPaymentId(Long paymentId) { return Optional.empty(); }
+            // sellerId 미해석 → SettlementCreated 발행 생략 (멱등 검증과 무관하게 opslab 조인 회피)
+            @Override public Optional<Long> findSellerIdByPaymentId(Long paymentId) { return Optional.empty(); }
         }
     }
 
