@@ -4,15 +4,9 @@ plugins {
     id("io.spring.dependency-management")
 }
 
-// Library mode: settlement-service 는 order-service 의 fat jar 에 번들된다.
-// MSA 분리 배포(원래 의도)는 Phase B 에서 helm/CI 분리와 함께 재도입 예정.
-tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
-    enabled = false
-}
-tasks.named<Jar>("jar") {
-    enabled = true
-    archiveClassifier.set("")
-}
+// Standalone 모드 (ADR 0020 Phase 0): settlement-service 는 자체 실행가능 jar 로 독립 기동(:8082).
+// 이전 라이브러리 모드(order-service fat jar 번들)는 해제 — bootJar 가 Spring Boot 플러그인
+// 기본값(활성)으로 동작하며, 진입점은 SettlementServiceApplication 이다.
 
 dependencies {
     implementation(project(":shared-common"))

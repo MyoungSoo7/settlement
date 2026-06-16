@@ -36,7 +36,7 @@ class LoginServiceTest {
     void login_success() {
         when(loadUserPort.findByEmail("u@example.com")).thenReturn(Optional.of(user()));
         when(passwordHashPort.matches("raw", "hashed")).thenReturn(true);
-        when(tokenProviderPort.generateToken("u@example.com", "USER")).thenReturn("jwt-token");
+        when(tokenProviderPort.generateToken("u@example.com", "USER", 1L)).thenReturn("jwt-token");
 
         LoginUseCase.LoginResult result = service.login(
                 new LoginUseCase.LoginCommand("u@example.com", "raw"));

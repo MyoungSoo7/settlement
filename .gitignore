@@ -56,7 +56,9 @@ target/
 
 ### Local runtime artifacts ###
 .claude/scheduled_tasks.lock
+.claude/worktrees/
 *.stackdump
+build-test-output.log
 
 ### Claude auto-memory (local only) ###
 memory/

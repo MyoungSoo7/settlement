@@ -2,6 +2,7 @@
 # Stage 1: Build (parameterized)
 #   docker build --build-arg MODULE=order-service .
 #   docker build --build-arg MODULE=settlement-service .
+#   docker build --build-arg MODULE=reservation-service .
 #   docker build --build-arg MODULE=gateway-service .
 ############################
 FROM gradle:9.1.0-jdk25 AS builder
@@ -14,6 +15,7 @@ COPY gradle ./gradle
 COPY shared-common/build.gradle.kts ./shared-common/
 COPY order-service/build.gradle.kts ./order-service/
 COPY settlement-service/build.gradle.kts ./settlement-service/
+COPY reservation-service/build.gradle.kts ./reservation-service/
 COPY gateway-service/build.gradle.kts ./gateway-service/
 
 RUN --mount=type=cache,target=/home/gradle/.gradle \
@@ -23,6 +25,7 @@ RUN --mount=type=cache,target=/home/gradle/.gradle \
 COPY shared-common ./shared-common
 COPY order-service ./order-service
 COPY settlement-service ./settlement-service
+COPY reservation-service ./reservation-service
 COPY gateway-service ./gateway-service
 
 RUN --mount=type=cache,target=/home/gradle/.gradle \

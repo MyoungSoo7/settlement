@@ -43,7 +43,7 @@ public class LoginService implements LoginUseCase {
         }
 
         // 토큰 생성
-        String token = tokenProviderPort.generateToken(user.getEmail(), user.getRole().name());
+        String token = tokenProviderPort.generateToken(user.getEmail(), user.getRole().name(), user.getId());
 
         return new LoginResult(token, user.getEmail(), user.getRole().name());
     }

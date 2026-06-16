@@ -2,6 +2,7 @@ package github.lms.lemuel.user.application.service;
 
 import github.lms.lemuel.user.application.port.out.LoadMembersByStatusPort;
 import github.lms.lemuel.user.application.port.out.LoadUserPort;
+import github.lms.lemuel.user.application.port.out.PublishUserEventPort;
 import github.lms.lemuel.user.application.port.out.SaveMembershipApprovalPort;
 import github.lms.lemuel.user.application.port.out.SaveUserPort;
 import github.lms.lemuel.user.domain.MembershipAction;
@@ -35,6 +36,7 @@ class MembershipApprovalServiceTest {
     @Mock SaveUserPort saveUserPort;
     @Mock LoadMembersByStatusPort loadMembersByStatusPort;
     @Mock SaveMembershipApprovalPort saveMembershipApprovalPort;
+    @Mock PublishUserEventPort publishUserEventPort;
     @InjectMocks MembershipApprovalService service;
 
     private User pendingCompany() {
