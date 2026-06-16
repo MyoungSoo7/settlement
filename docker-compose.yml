@@ -42,6 +42,28 @@ services:
       timeout: 3s
       retries: 10
 
+  # ★ DB-per-service: settlement-service 전용 PostgreSQL (opslab 와 물리 분리, ADR 0020 Phase 4)
+  settlement-db:
+    image: postgres:17-alpine
+    container_name: lemuel-settlement-db
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      POSTGRES_DB: settlement_db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "127.0.0.1:5436:5432"
+    volumes:
+      - settlement-db-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
   # ★ DB-per-service: loan-service 전용 PostgreSQL (opslab 와 물리 분리)
   loan-postgres:
     image: postgres:17-alpine
@@ -227,8 +249,8 @@ services:
         required: false
     environment:
       SPRING_PROFILES_ACTIVE: prod
-      # PgBouncer(transaction pooling) 경유 — prepareThreshold=0 / reWriteBatchedInserts=true
-      SPRING_DATASOURCE_URL: jdbc:postgresql://pgbouncer:6432/inter?prepareThreshold=0&reWriteBatchedInserts=true
+      # ADR 0020 Phase 4 — 자체 DB(settlement_db). opslab 와 물리 분리, 자체 Flyway 가 스키마 생성.
+      SPRING_DATASOURCE_URL: jdbc:postgresql://settlement-db:5432/settlement_db?reWriteBatchedInserts=true
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       DB_POOL_MAX: "50"
@@ -256,13 +278,11 @@ services:
       retries: 10
       start_period: 60s
     depends_on:
-      pgbouncer:
+      settlement-db:
         condition: service_healthy
       elasticsearch:
         condition: service_healthy
       redpanda:
-        condition: service_healthy
-      order-service:
         condition: service_healthy
 
   reservation-service:
@@ -436,6 +456,7 @@ services:
 volumes:
   postgres-data:
   reservations-postgres-data:
+  settlement-db-data:
   loan-postgres-data:
   elasticsearch-data:
   redpanda-data:

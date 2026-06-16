@@ -32,13 +32,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest(
         classes = SettlementServiceApplication.class,
         properties = {
-                "spring.flyway.enabled=false",
-                "spring.jpa.hibernate.ddl-auto=none",
+                // 자체 Flyway 베이스라인(V1__settlement_baseline.sql) 적용 후 Hibernate validate —
+                // 베이스라인이 엔티티와 정확히 일치함을 검증(전사 오류를 잡는다).
+                "spring.flyway.enabled=true",
+                "spring.flyway.locations=classpath:db/migration",
+                "spring.flyway.schemas=public",
+                "spring.flyway.default-schema=public",
+                "spring.jpa.hibernate.ddl-auto=validate",
                 "spring.jpa.properties.hibernate.default_schema=public",
-                // jakarta schema-generation 으로 DB 생성 + 스크립트(운영 Flyway 베이스라인 원천) 동시 출력
-                "spring.jpa.properties.jakarta.persistence.schema-generation.database.action=create",
-                "spring.jpa.properties.jakarta.persistence.schema-generation.scripts.action=create",
-                "spring.jpa.properties.jakarta.persistence.schema-generation.scripts.create-target=build/generated/settlement_db_schema.sql",
                 "app.kafka.enabled=false",
                 "app.search.enabled=false",
                 "spring.batch.job.enabled=false",
