@@ -19,6 +19,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         "github.lms.lemuel.review",
         "github.lms.lemuel.report",
         "github.lms.lemuel.game",
+        "github.lms.lemuel.projectionbackfill",
         "github.lms.lemuel.common",
         // settlement-service 모듈 (임시 번들). ledger 테이블(ledger_entries V45, ledger_outbox V49)이
         // 적용돼 ledger 포함 — settlement 서비스가 EnqueueLedgerTaskPort 빈을 필요로 한다.
