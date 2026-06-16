@@ -1,8 +1,10 @@
 package github.lms.lemuel.settlement.application.service;
 
+import github.lms.lemuel.settlement.application.port.out.LoadSellerIdPort;
 import github.lms.lemuel.settlement.application.port.out.LoadSellerSettlementCyclePort;
 import github.lms.lemuel.settlement.application.port.out.LoadSellerTierPort;
 import github.lms.lemuel.settlement.application.port.out.LoadSettlementPort;
+import github.lms.lemuel.settlement.application.port.out.PublishSettlementDomainEventPort;
 import github.lms.lemuel.settlement.application.port.out.SaveSettlementPort;
 import github.lms.lemuel.settlement.domain.SellerTier;
 import github.lms.lemuel.settlement.domain.Settlement;
@@ -29,6 +31,8 @@ class CreateSettlementFromPaymentServiceTest {
     @Mock SaveSettlementPort saveSettlementPort;
     @Mock LoadSellerTierPort loadSellerTierPort;
     @Mock LoadSellerSettlementCyclePort loadSellerSettlementCyclePort;
+    @Mock LoadSellerIdPort loadSellerIdPort;
+    @Mock PublishSettlementDomainEventPort publishSettlementDomainEventPort;
     @InjectMocks CreateSettlementFromPaymentService service;
 
     @Test @DisplayName("정산 생성 성공 — NORMAL 판매자 (기본 3.5%)") void create() {
@@ -80,6 +84,38 @@ class CreateSettlementFromPaymentServiceTest {
         // 오늘이 속한 월의 말일 — 오늘의 달 마지막 날
         assertThat(result.getSettlementDate()).isEqualTo(
                 LocalDate.now().with(java.time.temporal.TemporalAdjusters.lastDayOfMonth()));
+    }
+
+    @Test @DisplayName("판매자 해석되면 SettlementCreated 를 netAmount·정산일로 발행") void create_publishesSettlementCreated() {
+        when(loadSettlementPort.findByPaymentId(5L)).thenReturn(Optional.empty());
+        when(loadSellerTierPort.findTierByPaymentId(5L)).thenReturn(Optional.of(SellerTier.NORMAL));
+        when(loadSellerSettlementCyclePort.findCycleByPaymentId(5L)).thenReturn(Optional.of(SettlementCycle.DAILY));
+        when(saveSettlementPort.save(any())).thenAnswer(inv -> {
+            Settlement s = inv.getArgument(0);
+            s.setId(500L); // DB 가 PK 를 부여하는 것을 흉내 (발행은 savedSettlement.getId() 사용)
+            return s;
+        });
+        when(loadSellerIdPort.findSellerIdByPaymentId(5L)).thenReturn(Optional.of(77L));
+
+        service.createSettlementFromPayment(5L, 50L, new BigDecimal("10000"));
+
+        // netAmount = 10000 - 3.5% = 9650, 정산일 = 오늘+1(DAILY)
+        verify(publishSettlementDomainEventPort).publishSettlementCreated(
+                eq(500L), eq(77L),
+                argThat(a -> a.compareTo(new BigDecimal("9650.00")) == 0),
+                eq(LocalDate.now().plusDays(1)));
+    }
+
+    @Test @DisplayName("판매자 미해석이면 발행 생략") void create_skipPublishWhenNoSeller() {
+        when(loadSettlementPort.findByPaymentId(6L)).thenReturn(Optional.empty());
+        when(loadSellerTierPort.findTierByPaymentId(6L)).thenReturn(Optional.of(SellerTier.NORMAL));
+        when(loadSellerSettlementCyclePort.findCycleByPaymentId(6L)).thenReturn(Optional.of(SettlementCycle.DAILY));
+        when(saveSettlementPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(loadSellerIdPort.findSellerIdByPaymentId(6L)).thenReturn(Optional.empty());
+
+        service.createSettlementFromPayment(6L, 60L, new BigDecimal("10000"));
+
+        verifyNoInteractions(publishSettlementDomainEventPort);
     }
 
     @Test @DisplayName("중복 생성 시 기존 반환 (멱등성)") void create_idempotent() {

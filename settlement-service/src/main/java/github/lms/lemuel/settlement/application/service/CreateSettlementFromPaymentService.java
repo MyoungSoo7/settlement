@@ -3,9 +3,11 @@ package github.lms.lemuel.settlement.application.service;
 import github.lms.lemuel.common.config.observability.MdcKeys;
 import github.lms.lemuel.common.config.observability.MdcScope;
 import github.lms.lemuel.settlement.application.port.in.CreateSettlementFromPaymentUseCase;
+import github.lms.lemuel.settlement.application.port.out.LoadSellerIdPort;
 import github.lms.lemuel.settlement.application.port.out.LoadSellerSettlementCyclePort;
 import github.lms.lemuel.settlement.application.port.out.LoadSellerTierPort;
 import github.lms.lemuel.settlement.application.port.out.LoadSettlementPort;
+import github.lms.lemuel.settlement.application.port.out.PublishSettlementDomainEventPort;
 import github.lms.lemuel.settlement.application.port.out.SaveSettlementPort;
 import github.lms.lemuel.settlement.domain.HoldbackPolicy;
 import github.lms.lemuel.settlement.domain.SellerTier;
@@ -33,15 +35,21 @@ public class CreateSettlementFromPaymentService implements CreateSettlementFromP
     private final SaveSettlementPort saveSettlementPort;
     private final LoadSellerTierPort loadSellerTierPort;
     private final LoadSellerSettlementCyclePort loadSellerSettlementCyclePort;
+    private final LoadSellerIdPort loadSellerIdPort;
+    private final PublishSettlementDomainEventPort publishSettlementDomainEventPort;
 
     public CreateSettlementFromPaymentService(LoadSettlementPort loadSettlementPort,
                                               SaveSettlementPort saveSettlementPort,
                                               LoadSellerTierPort loadSellerTierPort,
-                                              LoadSellerSettlementCyclePort loadSellerSettlementCyclePort) {
+                                              LoadSellerSettlementCyclePort loadSellerSettlementCyclePort,
+                                              LoadSellerIdPort loadSellerIdPort,
+                                              PublishSettlementDomainEventPort publishSettlementDomainEventPort) {
         this.loadSettlementPort = loadSettlementPort;
         this.saveSettlementPort = saveSettlementPort;
         this.loadSellerTierPort = loadSellerTierPort;
         this.loadSellerSettlementCyclePort = loadSellerSettlementCyclePort;
+        this.loadSellerIdPort = loadSellerIdPort;
+        this.publishSettlementDomainEventPort = publishSettlementDomainEventPort;
     }
 
     @Override
@@ -84,6 +92,16 @@ public class CreateSettlementFromPaymentService implements CreateSettlementFromP
                     String.valueOf(savedSettlement.getId()))) {
                 log.info("Settlement created successfully. status={}", savedSettlement.getStatus());
             }
+
+            // loan-service 로 SettlementCreated 발행 (선정산 대출 담보 = 미지급 정산예정금).
+            // 같은 트랜잭션의 Outbox 에 적재 → 폴러가 lemuel.settlement.created 로 발행.
+            // 판매자 미할당 정산은 대출 대상이 아니므로 발행 생략.
+            loadSellerIdPort.findSellerIdByPaymentId(paymentId).ifPresentOrElse(
+                    sellerId -> publishSettlementDomainEventPort.publishSettlementCreated(
+                            savedSettlement.getId(), sellerId,
+                            savedSettlement.getNetAmount(), savedSettlement.getSettlementDate()),
+                    () -> log.debug("판매자 미해석 — SettlementCreated 발행 생략. settlementId={}",
+                            savedSettlement.getId()));
 
             return savedSettlement;
         }

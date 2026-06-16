@@ -4,7 +4,9 @@ import github.lms.lemuel.common.audit.application.Auditable;
 import github.lms.lemuel.common.audit.domain.AuditAction;
 import github.lms.lemuel.ledger.application.port.in.EnqueueLedgerTaskPort;
 import github.lms.lemuel.settlement.application.port.in.ConfirmDailySettlementsUseCase;
+import github.lms.lemuel.settlement.application.port.out.LoadSellerIdPort;
 import github.lms.lemuel.settlement.application.port.out.LoadSettlementPort;
+import github.lms.lemuel.settlement.application.port.out.PublishSettlementDomainEventPort;
 import github.lms.lemuel.settlement.application.port.out.PublishSettlementEventPort;
 import github.lms.lemuel.settlement.application.port.out.SaveSettlementPort;
 import github.lms.lemuel.settlement.domain.Settlement;
@@ -29,6 +31,8 @@ public class ConfirmDailySettlementsService implements ConfirmDailySettlementsUs
     private final SaveSettlementPort saveSettlementPort;
     private final PublishSettlementEventPort publishSettlementEventPort;
     private final EnqueueLedgerTaskPort enqueueLedgerTaskPort;
+    private final LoadSellerIdPort loadSellerIdPort;
+    private final PublishSettlementDomainEventPort publishSettlementDomainEventPort;
 
     @Override
     @Auditable(
@@ -56,6 +60,12 @@ public class ConfirmDailySettlementsService implements ConfirmDailySettlementsUs
                 Settlement saved = saveSettlementPort.save(settlement);
                 confirmedSettlementIds.add(saved.getId());
                 confirmedCount++;
+
+                // loan-service 로 SettlementConfirmed 발행 (상환 차감 트리거).
+                // 같은 트랜잭션 Outbox 적재 → lemuel.settlement.confirmed. 판매자 미할당은 발행 생략.
+                loadSellerIdPort.findSellerIdByPaymentId(saved.getPaymentId()).ifPresent(sellerId ->
+                        publishSettlementDomainEventPort.publishSettlementConfirmed(
+                                saved.getId(), sellerId, saved.getNetAmount()));
             }
         }
 
