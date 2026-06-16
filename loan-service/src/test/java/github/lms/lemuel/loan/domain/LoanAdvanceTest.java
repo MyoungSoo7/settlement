@@ -94,4 +94,56 @@ class LoanAdvanceTest {
         loan.reject();
         assertThat(loan.getStatus()).isEqualTo(LoanStatus.REJECTED);
     }
+
+    @Test
+    void APPROVED에서도_거절_가능하고_그외상태는_예외() {
+        LoanAdvance approved = requested();
+        approved.approve();
+        approved.reject();
+        assertThat(approved.getStatus()).isEqualTo(LoanStatus.REJECTED);
+
+        LoanAdvance disbursed = requested();
+        disbursed.approve();
+        disbursed.disburse();
+        assertThatThrownBy(disbursed::reject).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void 신청_원금이_null이거나_0이하면_예외() {
+        assertThatThrownBy(() -> LoanAdvance.request(1L, null, new BigDecimal("100")))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> LoanAdvance.request(1L, BigDecimal.ZERO, new BigDecimal("100")))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void 신청_수수료가_null이거나_음수면_예외() {
+        assertThatThrownBy(() -> LoanAdvance.request(1L, new BigDecimal("1000"), null))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> LoanAdvance.request(1L, new BigDecimal("1000"), new BigDecimal("-1")))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void 상환_가용액이_null이거나_음수면_예외() {
+        LoanAdvance loan = requested();
+        loan.approve();
+        loan.disburse();
+        assertThatThrownBy(() -> loan.applyRepayment(null))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> loan.applyRepayment(new BigDecimal("-1")))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void reconstitute_영속상태_복원() {
+        LoanAdvance loan = LoanAdvance.reconstitute(5L, 1L, new BigDecimal("1000"),
+                new BigDecimal("10"), new BigDecimal("500"), LoanStatus.DISBURSED);
+        assertThat(loan.getId()).isEqualTo(5L);
+        assertThat(loan.getSellerId()).isEqualTo(1L);
+        assertThat(loan.getPrincipal()).isEqualByComparingTo("1000");
+        assertThat(loan.getFee()).isEqualByComparingTo("10");
+        assertThat(loan.getOutstanding()).isEqualByComparingTo("500");
+        assertThat(loan.getStatus()).isEqualTo(LoanStatus.DISBURSED);
+    }
 }
