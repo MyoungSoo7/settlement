@@ -26,6 +26,7 @@ class UpdateProductServiceTest {
 
     @Mock LoadProductPort loadProductPort;
     @Mock SaveProductPort saveProductPort;
+    @Mock github.lms.lemuel.product.application.port.out.PublishProductEventPort publishProductEventPort;
     @InjectMocks UpdateProductService service;
 
     private Product createProduct() {

@@ -2,6 +2,7 @@ package github.lms.lemuel.product.application.service;
 
 import github.lms.lemuel.product.application.port.in.UpdateProductUseCase;
 import github.lms.lemuel.product.application.port.out.LoadProductPort;
+import github.lms.lemuel.product.application.port.out.PublishProductEventPort;
 import github.lms.lemuel.product.application.port.out.SaveProductPort;
 import github.lms.lemuel.product.domain.Product;
 import github.lms.lemuel.product.domain.exception.InsufficientStockException;
@@ -20,6 +21,7 @@ public class UpdateProductService implements UpdateProductUseCase {
 
     private final LoadProductPort loadProductPort;
     private final SaveProductPort saveProductPort;
+    private final PublishProductEventPort publishProductEventPort;
 
     @Override
     @CacheEvict(value = "products", allEntries = true)
@@ -31,6 +33,9 @@ public class UpdateProductService implements UpdateProductUseCase {
 
         product.updateInfo(command.name(), command.description());
         Product updatedProduct = saveProductPort.save(product);
+
+        // ADR 0020 Phase 3b — 이름 변경 시 settlement product 프로젝션 동기화
+        publishProductEventPort.publishProductChanged(updatedProduct.getId(), updatedProduct.getName());
 
         log.info("상품 정보 수정 완료: productId={}", updatedProduct.getId());
         return updatedProduct;
