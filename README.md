@@ -22,7 +22,7 @@
 | **결제 → Outbox → 정산 비동기 단일 trace** | [docs/diagrams/sequence-payment-to-settlement.md](docs/diagrams/sequence-payment-to-settlement.md) |
 | **100 스레드 동시 SKU 차감 시나리오** | [docs/diagrams/sequence-multi-item-checkout.md](docs/diagrams/sequence-multi-item-checkout.md) |
 | **PG 정산파일 자동 차액 보정** | [docs/diagrams/sequence-pg-reconciliation.md](docs/diagrams/sequence-pg-reconciliation.md) |
-| **18개 Architecture Decision Records** | [docs/adr/](docs/adr/) |
+| **20개 Architecture Decision Records** | [docs/adr/](docs/adr/) |
 | **부하 테스트 시나리오 4종** | [load-test/](load-test/) |
 | **Grafana 비즈니스 KPI 대시보드** | [monitoring/grafana/dashboards/](monitoring/grafana/dashboards/) |
 
@@ -35,26 +35,39 @@ flowchart LR
     Client["Web / Mobile<br/>Client"] --> GW
     GW["gateway-service<br/>Spring Cloud Gateway<br/>:8080"]
 
-    GW -->|/api/orders/**<br/>/api/payments/**<br/>/api/products/**<br/>/api/users/**| OS
-    GW -->|/api/settlements/**<br/>/api/reconciliation/**<br/>/api/reports/**| SS
+    GW -->|/api/orders, payments<br/>products, users ...| OS
+    GW -->|/api/settlements<br/>reports, ledger ...| SS
+    GW -->|/reservations/**| RS
+    GW -->|/loans/**| LS
 
-    subgraph commerce["🛒 Commerce Bounded Context"]
-        OS["order-service<br/>:8088<br/><br/>user · order · payment · cart<br/>shipping · product · category<br/>coupon · review · reservation · game"]
+    subgraph commerce["🛒 Commerce"]
+        OS["order-service :8088<br/><br/>user · order · payment · cart<br/>shipping · product · category<br/>coupon · review · game"]
+    end
+    subgraph settlement["💰 Settlement"]
+        SS["settlement-service :8082<br/><br/>settlement · payout · ledger<br/>chargeback · pgreconciliation · report"]
+    end
+    subgraph reservation["🛠 Reservation (DB-per-service)"]
+        RS["reservation-service :8083<br/><br/>시공예약 · 기사배정"]
+    end
+    subgraph loan["💸 Loan (DB-per-service)"]
+        LS["loan-service :8084<br/><br/>선정산 대출 · 상환 · 자체 원장"]
     end
 
-    subgraph settlement["💰 Settlement Bounded Context"]
-        SS["settlement-service<br/>:8082<br/><br/>settlement · payout · ledger<br/>chargeback · pgreconciliation<br/>report · ES indexing · batch"]
-    end
+    OS -->|Outbox + Kafka| K[(Kafka<br/>Redpanda)]
+    K -->|PaymentCaptured / Refunded| SS
+    K -->|SettlementCreated / Confirmed| LS
+    LS -->|LoanDisbursement / Repayment| K
 
-    OS -->|Outbox + Kafka publish| K[(Kafka<br/>Redpanda)]
-    K -->|PaymentCaptured<br/>PaymentRefunded| SS
-
-    OS --- PG[(PostgreSQL 17<br/>opslab schema)]
+    OS --- PG[(PostgreSQL opslab<br/>order + settlement 공유)]
     SS --- PG
+    RS --- RDB[(reservations_db)]
+    LS --- LDB[(lemuel_loan)]
     SS --- ES[(Elasticsearch 8.17<br/>settlement search)]
 
     style commerce fill:#fff7e6,stroke:#fa8c16
     style settlement fill:#e6f7ff,stroke:#1890ff
+    style reservation fill:#f6ffed,stroke:#52c41a
+    style loan fill:#fff0f6,stroke:#eb2f96
 ```
 
 ### 서비스 책임 분리 근거
@@ -67,7 +80,9 @@ flowchart LR
 | **장애 격리** | settlement 다운돼도 결제는 계속 | 정산 배치는 비동기 — 즉시 처리 X |
 | **배포 주기** | 잦음 (UI 변경 동행) | 드뭄 (회계 사이클 단위) |
 
-→ 위 차이점이 명확하므로 **서비스 분리** 가 자연스러운 경계.
+→ 위 차이점이 명확하므로 **서비스 분리** 가 자연스러운 경계. order↔settlement 는 강한 일관성을 위해
+**공유 DB(opslab) + Read-only Projection** 으로 두고, 결합이 약한 **reservation·loan 은 DB-per-service +
+Kafka 이벤트**로 분리한다 (정합성 경계 기준 차등 적용 — [ADR 0020](docs/adr/0020-order-settlement-db-split.md) 참조).
 
 ---
 
@@ -102,9 +117,9 @@ flowchart LR
 
 ```
 settlement/                              # 모노레포 루트
-├── settings.gradle.kts                  # 4 모듈 선언
+├── settings.gradle.kts                  # 6 모듈 선언
 ├── build.gradle.kts                     # 부모 빌드 (subprojects 공통 설정)
-├── docker-compose.yml                   # PG + ES + Redpanda + 3 services
+├── docker-compose.yml                   # opslab+reservations_db+lemuel_loan PG · ES · Redpanda · 5 services
 ├── Dockerfile                           # MODULE 빌드 인자 파라미터화 (모든 서비스 공용)
 │
 ├── shared-common/                       # 📦 라이브러리 모듈 (java-library)
@@ -118,14 +133,14 @@ settlement/                              # 모노레포 루트
 │       └── pdf/                         # iText PDF 유틸
 │
 ├── order-service/                       # 🛒 Commerce 서비스 (port 8088)
-│   └── src/main/java/.../{user,order,payment,cart,shipping,product,category,coupon,review,reservation,game}
+│   └── src/main/java/.../{user,order,payment,cart,shipping,product,category,coupon,review,game}
 │       ├── adapter/in/web/              # REST 컨트롤러
 │       ├── adapter/out/persistence/     # JPA 엔티티/리포지토리
 │       ├── adapter/out/external/        # Toss PG 클라이언트
 │       ├── adapter/out/event/           # Outbox-backed Kafka publisher
 │       └── application/                 # UseCase + ports
 │
-├── settlement-service/                  # 💰 Settlement 서비스 (port 8082)
+├── settlement-service/                  # 💰 Settlement 서비스 (port 8082, standalone — order 와 opslab 공유)
 │   └── src/main/java/.../
 │       ├── settlement/                  # 정산 생성/확정·홀드백
 │       │   ├── adapter/in/web/          # 정산 조회/관리 API
@@ -140,6 +155,12 @@ settlement/                              # 모노레포 루트
 │       ├── chargeback/                  # 지급 분쟁/거절 처리
 │       ├── pgreconciliation/            # PG 정산파일 대사 + 차액 보정
 │       └── report/                      # 캐시플로우 리포트 도메인
+│
+├── reservation-service/                 # 🛠 Reservation 서비스 (port 8083, 자체 DB reservations_db)
+│   └── src/main/java/.../reservation/   # 시공예약·기사배정 — order/user 코드 의존 0 (이벤트로 동기화)
+│
+├── loan-service/                        # 💸 Loan 서비스 (port 8084, 자체 DB lemuel_loan) — 선정산 대출
+│   └── src/main/java/.../loan/          # 한도·선지급·상환 saga·자체 복식부기 — settlement 이벤트로만 연계
 │
 └── gateway-service/                     # 🚪 API Gateway (port 8080)
     └── src/main/java/.../GatewayServiceApplication.java
@@ -343,8 +364,9 @@ docker build --build-arg MODULE=gateway-service     -t lemuel-gateway .
 | `/api/orders/**`, `/api/payments/**`, `/api/refunds/**` | order-service |
 | `/api/products/**`, `/api/categories/**`, `/api/tags/**` | order-service |
 | `/api/coupons/**`, `/api/reviews/**` | order-service |
-| `/reservations/**` | order-service |
 | `/admin/categories/**`, `/admin/pg/**`, `/admin/products/**` | order-service |
+| `/reservations/**` | **reservation-service** (자체 DB) |
+| `/loans/**` | **loan-service** (자체 DB) |
 | `/api/settlements/**`, `/api/reconciliation/**`, `/api/reports/**` | settlement-service |
 | `/api/ledger/**` | settlement-service |
 | `/admin/payouts/**`, `/admin/chargebacks/**` | settlement-service |
@@ -379,7 +401,7 @@ REQUESTED ─→ CONFIRMED ─→ ASSIGNED ─→ IN_PROGRESS ─→ COMPLETED
 ```
 - 업체회원이 예약 등록 → 관리자 확인 → 시공기사 배정/**재배정** → 진행/완료
 - 기사 본인 배정 작업 조회(`/reservations/assigned/my`), 관리자 대시보드(`/reservations/admin`)
-- 엔드포인트는 order-service `/reservations/**` (gateway 라우팅됨)
+- 엔드포인트는 **reservation-service** `/reservations/**` (gateway 라우팅됨, 자체 DB reservations_db)
 
 ### Shipping 상태머신
 ```
@@ -454,6 +476,9 @@ PENDING → READY → SHIPPED → IN_TRANSIT → DELIVERED → (선택) RETURNED
 - [0016 — Payout Domain + Firm Banking](./docs/adr/0016-payout-domain-firm-banking.md)
 - [0017 — Kafka Consumer DLT & Replay](./docs/adr/0017-kafka-consumer-dlt-and-replay.md)
 - [0018 — Chargeback Domain](./docs/adr/0018-chargeback-domain.md)
+- 0019 — ReversePayout (예약/Planned)
+- [0020 — order ↔ settlement DB 물리 분리 (이벤트 CQRS)](./docs/adr/0020-order-settlement-db-split.md) *(Proposed)*
+- [0021 — shared-common 을 버전드 플랫폼 라이브러리로](./docs/adr/0021-shared-common-as-platform-library.md) *(Proposed)*
 
 ---
 

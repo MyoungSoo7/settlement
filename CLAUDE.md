@@ -2,8 +2,9 @@
 
 ## 프로젝트 개요
 
-주문·결제·정산을 **2개 마이크로서비스 + API Gateway** 로 분리한 헥사고날 아키텍처 백엔드.
-원래 단일 모놀리스였으나 Bounded Context 분리 + Read-only Projection 패턴으로 MSA 화 함.
+주문·결제·정산·시공예약·선정산대출을 **4개 마이크로서비스 + API Gateway** 로 분리한 헥사고날 아키텍처 백엔드.
+원래 단일 모놀리스였으나 Bounded Context 로 분리. order↔settlement 는 Read-only Projection(공유 DB opslab),
+reservation·loan 은 DB-per-service + Kafka 이벤트로 분리한다.
 자세한 사용자용 문서는 [`README.md`](./README.md) 참조.
 
 ## 기술 스택
@@ -30,14 +31,18 @@
 
 ```
 settlement/                       # Gradle 멀티 모듈 루트
-├── settings.gradle.kts           # 4 모듈 선언
+├── settings.gradle.kts           # 6 모듈 선언
 ├── build.gradle.kts              # 부모 빌드 (subprojects 공통 설정)
-├── shared-common/                # 📦 java-library: 양 서비스가 의존
+├── shared-common/                # 📦 java-library: 전 서비스가 의존
 │   └── github.lms.lemuel.common.{audit, config, exception, outbox, ratelimit, pdf}
 ├── order-service/                # 🛒 Commerce 서비스 (port 8088)
-│   └── github.lms.lemuel.{user, order, payment, cart, shipping, product, category, coupon, review, reservation, game}
-├── settlement-service/           # 💰 Settlement 서비스 (port 8082)
+│   └── github.lms.lemuel.{user, order, payment, cart, shipping, product, category, coupon, review, game}
+├── settlement-service/           # 💰 Settlement 서비스 (port 8082, standalone — order 와 opslab DB 공유)
 │   └── github.lms.lemuel.{settlement, payout, ledger, chargeback, pgreconciliation, report}
+├── reservation-service/          # 🛠 Reservation 서비스 (port 8083, 자체 DB reservations_db)
+│   └── github.lms.lemuel.reservation.*
+├── loan-service/                 # 💸 Loan 서비스 (port 8084, 자체 DB lemuel_loan) — 선정산 대출
+│   └── github.lms.lemuel.loan.*
 └── gateway-service/              # 🚪 API Gateway (port 8080)
 ```
 
@@ -45,10 +50,12 @@ settlement/                       # Gradle 멀티 모듈 루트
 
 | 서비스 | 패키지 | 책임 |
 |--------|--------|------|
-| **order-service** | `user, order, payment, cart, shipping, product, category, coupon, review, reservation, game` | 회원·상품·장바구니·주문·결제·배송·시공예약 — 거래 컨텍스트 |
+| **order-service** | `user, order, payment, cart, shipping, product, category, coupon, review, game` | 회원·상품·장바구니·주문·결제·배송 — 거래 컨텍스트 |
 | **settlement-service** | `settlement, payout, ledger, chargeback, pgreconciliation, report` | 정산 생성/확정, 지급(payout), 복식부기 원장(ledger), 차지백, PG 대사, ES 색인, PDF, 캐시플로우 리포트 |
+| **reservation-service** | `reservation` | 시공 예약/기사 배정 — 독립 배포 + 자체 DB(reservations_db). 기사 자격은 user 멤버십 이벤트로 동기화되는 로컬 `technician_view` 프로젝션으로 검증(코드·DB 의존 0) |
+| **loan-service** | `loan` | 선정산 대출 — 셀러의 미확정 정산금을 담보로 선지급. 독립 배포 + 자체 DB(lemuel_loan) + 자체 복식부기 원장. settlement 정산 데이터는 Kafka 이벤트(`settlement.created/confirmed`)로만 수신, 상환은 이벤트 saga 로 연계(코드·DB 의존 0) |
 | **gateway-service** | (Spring Cloud Gateway) | 라우팅, 인증 필터 |
-| **shared-common** | `common.*` | 양 서비스 공유 — 감사·관측·예외·Outbox·rate limit·JWT·PDF |
+| **shared-common** | `common.*` | 전 서비스 공유 — 감사·관측·예외·Outbox·rate limit·JWT·PDF |
 
 ## 헥사고날 아키텍처 (각 서비스 내부)
 
@@ -120,7 +127,7 @@ REQUESTED → CONFIRMED → ASSIGNED → IN_PROGRESS → COMPLETED
                                               → CANCELED
 ```
 업체회원이 예약 등록(REQUESTED) → 관리자 확인 → 시공기사 배정/재배정 → 진행/완료.
-엔드포인트 `/reservations/**` (order-service, gateway 라우팅됨).
+엔드포인트 `/reservations/**` (reservation-service:8083, gateway 라우팅됨).
 
 ### Payout 상태 (셀러 지급)
 ```
@@ -215,6 +222,8 @@ RUNNING → COMPLETED
 ./gradlew :shared-common:compileJava
 ./gradlew :order-service:compileJava
 ./gradlew :settlement-service:compileJava
+./gradlew :reservation-service:compileJava
+./gradlew :loan-service:compileJava
 ./gradlew :gateway-service:compileJava
 
 # 모듈별 테스트
@@ -230,12 +239,14 @@ RUNNING → COMPLETED
 ./gradlew :order-service:bootJar
 
 # Docker Compose
-docker compose up -d                # PG + ES + Redpanda + 3 services
+docker compose up -d                # opslab+reservations_db+lemuel_loan PG · ES · Redpanda · 5 services
 docker compose down
 
 # 컨테이너 이미지 (MODULE 빌드 인자로 어떤 서비스인지 지정)
 docker build --build-arg MODULE=order-service       -t lemuel-order .
 docker build --build-arg MODULE=settlement-service  -t lemuel-settlement .
+docker build --build-arg MODULE=reservation-service -t lemuel-reservation .
+docker build --build-arg MODULE=loan-service        -t lemuel-loan .
 docker build --build-arg MODULE=gateway-service     -t lemuel-gateway .
 ```
 

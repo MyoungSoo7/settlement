@@ -7,10 +7,12 @@ import static org.assertj.core.api.Assertions.*;
 
 class UserRoleTest {
 
-    @Test @DisplayName("enum에 3개의 값이 존재한다")
+    @Test @DisplayName("enum에 6개의 값이 존재한다 (이커머스 USER/ADMIN/MANAGER + 시공 CUSTOMER/COMPANY/TECHNICIAN)")
     void values_count() {
-        assertThat(UserRole.values()).hasSize(3);
-        assertThat(UserRole.values()).containsExactly(UserRole.USER, UserRole.ADMIN, UserRole.MANAGER);
+        assertThat(UserRole.values()).hasSize(6);
+        assertThat(UserRole.values()).containsExactly(
+                UserRole.USER, UserRole.ADMIN, UserRole.MANAGER,
+                UserRole.CUSTOMER, UserRole.COMPANY, UserRole.TECHNICIAN);
     }
 
     @Test @DisplayName("fromString: 대문자 변환")

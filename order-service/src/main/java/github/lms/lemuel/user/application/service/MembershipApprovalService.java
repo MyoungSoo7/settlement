@@ -4,6 +4,7 @@ import github.lms.lemuel.user.application.port.in.ApproveMembershipUseCase;
 import github.lms.lemuel.user.application.port.in.GetPendingMembersUseCase;
 import github.lms.lemuel.user.application.port.out.LoadMembersByStatusPort;
 import github.lms.lemuel.user.application.port.out.LoadUserPort;
+import github.lms.lemuel.user.application.port.out.PublishUserEventPort;
 import github.lms.lemuel.user.application.port.out.SaveMembershipApprovalPort;
 import github.lms.lemuel.user.application.port.out.SaveUserPort;
 import github.lms.lemuel.user.domain.MembershipAction;
@@ -35,6 +36,7 @@ public class MembershipApprovalService implements ApproveMembershipUseCase, GetP
     private final SaveUserPort saveUserPort;
     private final LoadMembersByStatusPort loadMembersByStatusPort;
     private final SaveMembershipApprovalPort saveMembershipApprovalPort;
+    private final PublishUserEventPort publishUserEventPort;
 
     @Override
     @Transactional
@@ -76,6 +78,13 @@ public class MembershipApprovalService implements ApproveMembershipUseCase, GetP
 
         saveMembershipApprovalPort.save(
                 new MembershipApproval(userId, action, reason, processedBy));
+
+        // 같은 트랜잭션에서 outbox 발행 — reservation-service 등이 기사 프로젝션을 동기화한다.
+        publishUserEventPort.publishMembershipChanged(
+                saved.getId(),
+                saved.getRole().name(),
+                saved.getMembershipStatus().name(),
+                saved.isActive());
 
         log.info("회원 승인 처리: userId={}, action={}, status={}, processedBy={}",
                 userId, action, saved.getMembershipStatus(), processedBy);
