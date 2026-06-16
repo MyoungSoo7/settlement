@@ -1,7 +1,7 @@
 package github.lms.lemuel.settlement.adapter.out.payment;
 
-import github.lms.lemuel.settlement.adapter.out.readmodel.SettlementPaymentReadModel;
-import github.lms.lemuel.settlement.adapter.out.readmodel.SettlementPaymentReadModelRepository;
+import github.lms.lemuel.settlement.adapter.out.readmodel.SettlementPaymentViewJpaEntity;
+import github.lms.lemuel.settlement.adapter.out.readmodel.SettlementPaymentViewRepository;
 import github.lms.lemuel.settlement.application.port.out.LoadCapturedPaymentsPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -14,27 +14,27 @@ import java.util.stream.Collectors;
 /**
  * Settlement 가 정산 대상 결제(=CAPTURED 상태)를 조회하는 어댑터.
  *
- * <p>order-service 의 PaymentJpaEntity 를 직접 참조하지 않고, settlement-service 자체의
- * read-only projection ({@link SettlementPaymentReadModel}) 을 통해 조회한다.
- * 모듈 간 코드 의존성을 끊으면서, 단일 PG DB 는 공유 (포트폴리오 간소화).</p>
+ * <p>ADR 0020 Phase 3 — order payments 를 @Immutable 로 직접 매핑하던 read-model 대신
+ * settlement 소유 로컬 프로젝션({@link SettlementPaymentViewJpaEntity}, PaymentCaptured 이벤트로 적재)을
+ * 조회한다. 이로써 정산 배치의 결제 조회가 order 테이블 직접 매핑에서 분리된다.</p>
  */
 @Component
 @RequiredArgsConstructor
 public class CapturedPaymentsAdapter implements LoadCapturedPaymentsPort {
 
-    private final SettlementPaymentReadModelRepository paymentReadRepository;
+    private final SettlementPaymentViewRepository paymentViewRepository;
 
     @Override
     public List<CapturedPaymentInfo> findCapturedPaymentsByDate(LocalDate settlementDate) {
         LocalDateTime startDateTime = settlementDate.atStartOfDay();
         LocalDateTime endDateTime = settlementDate.plusDays(1).atStartOfDay();
 
-        List<SettlementPaymentReadModel> payments = paymentReadRepository
+        List<SettlementPaymentViewJpaEntity> payments = paymentViewRepository
                 .findByCapturedAtBetweenAndStatus(startDateTime, endDateTime, "CAPTURED");
 
         return payments.stream()
                 .map(payment -> new CapturedPaymentInfo(
-                        payment.getId(),
+                        payment.getPaymentId(),
                         payment.getOrderId(),
                         payment.getAmount(),
                         payment.getCapturedAt()
