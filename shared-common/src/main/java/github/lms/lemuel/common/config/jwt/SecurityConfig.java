@@ -118,8 +118,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/auth/dev/**").permitAll()         // 데모 자동로그인/게스트 (lemuel.demo.enabled=true 시)
                         .requestMatchers(HttpMethod.POST, "/users/password-reset/**").permitAll()  // 비밀번호 재설정
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
-                        // Actuator: 헬스체크 프로브만 공개, 메트릭/prometheus는 인증 필요
-                        .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
+                        // Actuator: 헬스체크 프로브 + prometheus 스크랩 엔드포인트 공개.
+                        // /actuator/prometheus 는 메트릭 텍스트만 노출하며 gateway 라우트에 없어 외부 미노출(클러스터 내부 Prometheus 가 스크랩, NetworkPolicy 로 격리 권장).
+                        // /actuator/metrics(탐색형 단건 조회 API)는 그대로 인증 필요.
+                        .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info", "/actuator/prometheus").permitAll()
                         .requestMatchers("/games/**").permitAll()
                         // 공개 카테고리 API
                         .requestMatchers(HttpMethod.GET, "/categories", "/categories/**").permitAll()
