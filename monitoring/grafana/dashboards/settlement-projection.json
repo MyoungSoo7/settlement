@@ -189,6 +189,51 @@
           "legendFormat": "drift {{view}}"
         }
       ]
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "원천 vs 프로젝션 금액 합계 (view 별, CAPTURED 결제·전체 주문)",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 36 },
+      "fieldConfig": { "defaults": { "unit": "locale" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "max by (view) (settlement_recon_source_amount)",
+          "legendFormat": "source {{view}}"
+        },
+        {
+          "expr": "max by (view) (settlement_projection_amount)",
+          "legendFormat": "projection {{view}}"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "금액 드리프트 (원천 - 프로젝션, view 별)",
+      "datasource": "Prometheus",
+      "description": "0 이 정상. |drift|>1000(KRW) 지속이면 금액 불일치 → backfill 자가치유. 부동소수 노이즈 무시용 임계.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 36 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "locale",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1000 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "max by (view) (settlement_recon_source_amount) - max by (view) (settlement_projection_amount)",
+          "legendFormat": "amount drift {{view}}"
+        }
+      ]
     }
   ]
 }

@@ -2,7 +2,7 @@
 
 > 대상 알림: `SettlementProjectionLagHigh`(p95>30s) · `SettlementProjectionLagCritical`(p95>120s) ·
 > `SettlementProjectionStalled`(30분 반영 0) · `SettlementProjectionDriftHigh`(원천-프로젝션>10, 15m) ·
-> `SettlementProjectionDriftPersistent`(드리프트 1h 미수렴).
+> `SettlementProjectionDriftPersistent`(드리프트 1h 미수렴) · `SettlementProjectionAmountDrift`(금액 합계 |drift|>1000, 15m).
 > 배경: settlement 는 order 도메인 이벤트(Kafka)를 소비해 `settlement_db` 의 `settlement_*_view`
 > 프로젝션을 채운다(CQRS). 물리 분리(Phase 4) 후 이 경로의 지연이 조회/리포팅 정합성에 직결된다.
 
@@ -14,6 +14,8 @@
 | `settlement_projection_applied_total{type}` | type(payment/order/user/product) 별 반영 건수 |
 | `settlement_projection_rows{view}` | 각 `*_view` 현재 행 수 (settlement-service 노출) |
 | `settlement_recon_source_rows{view}` | opslab 원천 행 수 (order-service 노출, cross-DB 대조용) |
+| `settlement_projection_amount{view}` | 프로젝션 금액 합계 (payment_view=CAPTURED, order_view=전체) |
+| `settlement_recon_source_amount{view}` | opslab 원천 금액 합계 (금액 대사용) |
 
 대시보드: Grafana **"Lemuel — Settlement Projection"** (`lemuel-settlement-projection`).
 
@@ -24,9 +26,17 @@ order 가 `settlement_recon_source_rows{view}`(opslab 원천), settlement 가
 `settlement_projection_rows{view}`(프로젝션) 를 각각 노출하고 **Prometheus 관측 계층**에서 대조한다.
 
 ```promql
-# view 별 드리프트 (0 이 정상, 짧은 lag 으로 인한 소량 양수는 허용)
+# 건수 드리프트 (0 이 정상, 짧은 lag 으로 인한 소량 양수는 허용)
 max by (view) (settlement_recon_source_rows) - max by (view) (settlement_projection_rows)
+
+# 금액 드리프트 (payment_view=CAPTURED 결제, order_view=전체 주문). |drift|>1000(KRW) 지속이면 위험
+max by (view) (settlement_recon_source_amount) - max by (view) (settlement_projection_amount)
 ```
+
+> 금액 대사는 양쪽 모두 **CAPTURED 결제만** 합산해 정합을 맞춘다(환불 시 order 는 status=REFUNDED 로
+> CAPTURED 집계에서 빠지고, settlement payment_view 도 CAPTURED 만 합산하므로 동일 기준). 게이지는
+> 모니터링용 double 합산이라 미세 부동소수 오차가 있을 수 있어 임계를 1000 KRW 로 둔다(실제 불일치는
+> 보통 결제 1건 금액 이상이라 충분히 검출).
 
 - view 매핑: `user_view`=users, `product_view`=products, `order_view`=orders,
   `payment_view`=CAPTURED 결제 건수.

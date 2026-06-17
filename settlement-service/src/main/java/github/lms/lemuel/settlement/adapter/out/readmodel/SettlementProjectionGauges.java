@@ -6,6 +6,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
+import java.util.function.Supplier;
+
 /**
  * settlement 로컬 프로젝션 행 수 게이지 (ADR 0020 Phase 5.6).
  *
@@ -30,6 +33,10 @@ public class SettlementProjectionGauges {
         register(registry, "order_view", orderViewRepository);
         register(registry, "user_view", userViewRepository);
         register(registry, "product_view", productViewRepository);
+
+        // 금액 대사(Phase 5.2 심화) — CAPTURED 결제 금액·전체 주문 금액. order 원천 게이지와 정합 의미.
+        amountGauge(registry, "payment_view", paymentViewRepository::sumCapturedAmount);
+        amountGauge(registry, "order_view", orderViewRepository::sumAmount);
     }
 
     private void register(MeterRegistry registry, String view, CrudRepository<?, ?> repository) {
@@ -37,5 +44,16 @@ public class SettlementProjectionGauges {
                 .tag("view", view)
                 .description("settlement_" + view + " 프로젝션 행 수 (opslab 원천 대조용)")
                 .register(registry);
+    }
+
+    private void amountGauge(MeterRegistry registry, String view, Supplier<BigDecimal> sum) {
+        Gauge.builder("settlement.projection.amount", () -> toDouble(sum.get()))
+                .tag("view", view)
+                .description("settlement_" + view + " 프로젝션 금액 합계 (opslab 원천 금액 대조용)")
+                .register(registry);
+    }
+
+    private static double toDouble(BigDecimal value) {
+        return value == null ? 0.0 : value.doubleValue();
     }
 }

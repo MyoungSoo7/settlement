@@ -38,6 +38,10 @@ public interface PaymentJpaRepository extends JpaRepository<PaymentJpaEntity, Lo
     /** 상태별 건수 — settlement 프로젝션 cross-DB 대사(ADR 0020 Phase 5.2)의 원천 카운트. */
     long countByStatus(String status);
 
+    /** CAPTURED 결제 금액 합계 — cross-DB 금액 대사(Phase 5.2)의 원천. 환불(REFUNDED)은 제외해 프로젝션과 정합. */
+    @Query("SELECT COALESCE(SUM(p.amount), 0) FROM PaymentJpaEntity p WHERE p.status = 'CAPTURED'")
+    java.math.BigDecimal sumCapturedAmount();
+
     /**
      * 특정 기간 동안 캡처된 결제 조회 (정산 생성용)
      * @param startDateTime 시작 시간

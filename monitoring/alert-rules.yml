@@ -412,6 +412,28 @@ groups:
             자가치유: POST /admin/settlement-projection/backfill (멱등 이벤트 재발행).
             runbook: docs/runbook/settlement-projection-lag.md
 
+      # cross-DB 금액 대사(Phase 5.2 심화): CAPTURED 결제·전체 주문 금액 합계 드리프트.
+      # double 합산 부동소수 노이즈를 피해 1000 KRW 임계 + 15m 지속(단발 lag 은 수초 내 수렴).
+      # 양방향 mismatch 모두 위험하므로 abs.
+      - alert: SettlementProjectionAmountDrift
+        expr: |
+          abs(
+            max by (view) (settlement_recon_source_amount)
+            - max by (view) (settlement_projection_amount)
+          ) > 1000
+        for: 15m
+        labels:
+          severity: critical
+          component: settlement-projection
+        annotations:
+          summary: "settlement 프로젝션 금액 드리프트 ({{ $labels.view }})"
+          description: |
+            opslab 원천과 settlement_db 프로젝션({{ $labels.view }})의 금액 합계가 {{ $value }} 만큼
+            15분 이상 벌어졌습니다. 금액 불일치는 정산 정합성 위협 — 건수보다 우선 대응.
+            점검: 누락/중복 프로젝션, 환불 반영 누락(payment_view 는 CAPTURED 만 합산).
+            자가치유: POST /admin/settlement-projection/backfill.
+            runbook: docs/runbook/settlement-projection-lag.md
+
       # 드리프트 지속 — 자가치유(백필) 후에도 1시간 이상 수렴하지 않으면 심각
       - alert: SettlementProjectionDriftPersistent
         expr: |

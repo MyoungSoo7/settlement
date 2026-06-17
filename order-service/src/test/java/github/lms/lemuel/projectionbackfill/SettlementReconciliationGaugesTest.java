@@ -8,6 +8,8 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -36,7 +38,23 @@ class SettlementReconciliationGaugesTest {
         assertThat(gauge("payment_view")).isEqualTo(78.0);
     }
 
+    @Test
+    @DisplayName("Phase 5.2 금액: CAPTURED 결제·전체 주문 금액 합계를 게이지로 노출한다")
+    void exposesSourceAmountGauges() {
+        when(paymentRepo.sumCapturedAmount()).thenReturn(new BigDecimal("150000"));
+        when(orderRepo.sumAmount()).thenReturn(new BigDecimal("240000"));
+
+        new SettlementReconciliationGauges(registry, userRepo, productRepo, orderRepo, paymentRepo);
+
+        assertThat(amountGauge("payment_view")).isEqualTo(150000.0);
+        assertThat(amountGauge("order_view")).isEqualTo(240000.0);
+    }
+
     private double gauge(String view) {
         return registry.get("settlement.recon.source.rows").tag("view", view).gauge().value();
+    }
+
+    private double amountGauge(String view) {
+        return registry.get("settlement.recon.source.amount").tag("view", view).gauge().value();
     }
 }
