@@ -111,6 +111,9 @@ class RefundSplitPaymentServiceTest {
         @Override public Optional<PaymentDomain> loadById(Long id) { return Optional.ofNullable(stored); }
         @Override public Optional<PaymentDomain> loadByIdForUpdate(Long id) { return Optional.ofNullable(stored); }
         @Override public Optional<PaymentDomain> loadByOrderId(Long orderId) { return Optional.ofNullable(stored); }
+        @Override public java.util.List<PaymentDomain> findAllCaptured() {
+            return stored == null ? java.util.List.of() : java.util.List.of(stored);
+        }
         @Override public PaymentDomain save(PaymentDomain p) { this.stored = p; return p; }
     }
 
@@ -136,7 +139,9 @@ class RefundSplitPaymentServiceTest {
         private int count = 0;
         @Override public void publishPaymentCreated(Long paymentId, Long orderId) { }
         @Override public void publishPaymentAuthorized(Long paymentId) { }
-        @Override public void publishPaymentCaptured(Long paymentId, Long orderId, BigDecimal amount) { }
-        @Override public void publishPaymentRefunded(Long paymentId, Long orderId) { count++; }
+        @Override public void publishPaymentCaptured(Long paymentId, Long orderId, BigDecimal amount,
+                java.time.LocalDateTime capturedAt, String paymentMethod, String pgTransactionId,
+                github.lms.lemuel.payment.application.port.out.SellerSettlementMeta sellerMeta) { }
+        @Override public void publishPaymentRefunded(Long paymentId, Long orderId, BigDecimal refundedAmount) { count++; }
     }
 }

@@ -1,7 +1,7 @@
 package github.lms.lemuel.payment.application;
 
-import github.lms.lemuel.common.exception.MissingIdempotencyKeyException;
-import github.lms.lemuel.common.exception.RefundExceedsPaymentException;
+import github.lms.lemuel.payment.domain.exception.MissingIdempotencyKeyException;
+import github.lms.lemuel.payment.domain.exception.RefundExceedsPaymentException;
 import github.lms.lemuel.payment.application.port.out.LoadPaymentPort;
 import github.lms.lemuel.payment.application.port.out.LoadRefundPort;
 import github.lms.lemuel.payment.application.port.out.PgClientPort;
@@ -80,7 +80,7 @@ class RefundPaymentUseCaseTest {
         assertThat(result.getStatus()).isEqualTo(PaymentStatus.REFUNDED);
         verify(pgClientPort).refund("pg-tx-123", new BigDecimal("50000"));
         verify(updateOrderStatusPort).updateOrderStatus(10L, "REFUNDED");
-        verify(publishEventPort).publishPaymentRefunded(eq(1L), eq(10L));
+        verify(publishEventPort).publishPaymentRefunded(eq(1L), eq(10L), any());
     }
 
     @Test @DisplayName("부분 환불: amount < 결제금액이면 Payment 는 CAPTURED 유지, 주문 상태 미변경")
@@ -97,7 +97,7 @@ class RefundPaymentUseCaseTest {
         assertThat(result.getRefundedAmount()).isEqualTo(new BigDecimal("20000"));
         verify(pgClientPort).refund("pg-tx-123", new BigDecimal("20000"));
         verify(updateOrderStatusPort, never()).updateOrderStatus(any(), any());
-        verify(publishEventPort).publishPaymentRefunded(eq(1L), eq(10L));
+        verify(publishEventPort).publishPaymentRefunded(eq(1L), eq(10L), any());
     }
 
     @Test @DisplayName("부분 환불로 전액 도달 시 Payment REFUNDED + 주문 상태 REFUNDED")

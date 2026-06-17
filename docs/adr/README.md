@@ -23,8 +23,9 @@
 | [0017](0017-kafka-consumer-dlt-and-replay.md) | Kafka 컨슈머 DLT + 운영자 Replay | Accepted |
 | [0018](0018-chargeback-domain.md) | Chargeback (카드사 분쟁) 도메인 | Accepted |
 | 0019 | ReversePayout (Payout 완료 후 셀러 환수) | Planned (예약, 파일 없음) |
-| [0020](0020-order-settlement-db-split.md) | order ↔ settlement DB 물리 분리 (이벤트 CQRS) | Proposed |
+| [0020](0020-order-settlement-db-split.md) | order ↔ settlement DB 물리 분리 (이벤트 CQRS) | Accepted (Phase 0~4 + 5.2/5.4/5.6 완료) |
 | [0021](0021-shared-common-as-platform-library.md) | shared-common 을 버전드 플랫폼 라이브러리로 | Proposed |
+| [0022](0022-event-schema-registry.md) | 이벤트 Schema Registry (계약 강제 + 호환성) | Proposed (0020 Phase 5.3) |
 
 ## 규칙
 

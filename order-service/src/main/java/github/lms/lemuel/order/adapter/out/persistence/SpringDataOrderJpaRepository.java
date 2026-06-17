@@ -22,4 +22,8 @@ public interface SpringDataOrderJpaRepository extends JpaRepository<OrderJpaEnti
             ORDER BY o.createdAt DESC
             """)
     List<OrderJpaEntity> findUserOrders(Long userId, String status, LocalDateTime from, LocalDateTime to);
+
+    /** 전체 주문 금액 합계 — cross-DB 금액 대사(ADR 0020 Phase 5.2)의 원천. */
+    @Query("SELECT COALESCE(SUM(o.amount), 0) FROM OrderJpaEntity o")
+    java.math.BigDecimal sumAmount();
 }

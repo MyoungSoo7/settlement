@@ -2,7 +2,9 @@ package github.lms.lemuel.settlement.application.service;
 
 import github.lms.lemuel.ledger.application.port.in.EnqueueLedgerTaskPort;
 import github.lms.lemuel.settlement.application.port.in.ConfirmDailySettlementsUseCase;
+import github.lms.lemuel.settlement.application.port.out.LoadSellerIdPort;
 import github.lms.lemuel.settlement.application.port.out.LoadSettlementPort;
+import github.lms.lemuel.settlement.application.port.out.PublishSettlementDomainEventPort;
 import github.lms.lemuel.settlement.application.port.out.PublishSettlementEventPort;
 import github.lms.lemuel.settlement.application.port.out.SaveSettlementPort;
 import github.lms.lemuel.settlement.domain.Settlement;
@@ -17,10 +19,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -32,6 +36,8 @@ class ConfirmDailySettlementsServiceTest {
     @Mock SaveSettlementPort saveSettlementPort;
     @Mock PublishSettlementEventPort publishSettlementEventPort;
     @Mock EnqueueLedgerTaskPort enqueueLedgerTaskPort;
+    @Mock LoadSellerIdPort loadSellerIdPort;
+    @Mock PublishSettlementDomainEventPort publishSettlementDomainEventPort;
     @InjectMocks ConfirmDailySettlementsService service;
 
     private Settlement requestedSettlement(Long id) {
@@ -57,6 +63,23 @@ class ConfirmDailySettlementsServiceTest {
         assertThat(s2.getStatus()).isEqualTo(SettlementStatus.DONE);
         verify(enqueueLedgerTaskPort).enqueueCreate(anyList());
         verify(publishSettlementEventPort).publishSettlementConfirmedEvent(anyList());
+    }
+
+    @Test @DisplayName("판매자 해석되면 각 확정 정산마다 SettlementConfirmed(loan) 발행")
+    void publishesConfirmedPerSettlement() {
+        LocalDate target = LocalDate.of(2026, 4, 22);
+        Settlement s1 = requestedSettlement(1L);
+        Settlement s2 = requestedSettlement(2L);
+        when(loadSettlementPort.findConfirmableForUpdate(target)).thenReturn(List.of(s1, s2));
+        when(saveSettlementPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(loadSellerIdPort.findSellerIdByPaymentId(1L)).thenReturn(Optional.of(91L));
+        when(loadSellerIdPort.findSellerIdByPaymentId(2L)).thenReturn(Optional.of(92L));
+
+        service.confirmDailySettlements(
+                new ConfirmDailySettlementsUseCase.ConfirmSettlementCommand(target));
+
+        verify(publishSettlementDomainEventPort).publishSettlementConfirmed(eq(1L), eq(91L), any());
+        verify(publishSettlementDomainEventPort).publishSettlementConfirmed(eq(2L), eq(92L), any());
     }
 
     @Test @DisplayName("방어적 isPending: 락 조회가 DONE 행을 반환해도 건너뜀, 이벤트도 발행 안 함")

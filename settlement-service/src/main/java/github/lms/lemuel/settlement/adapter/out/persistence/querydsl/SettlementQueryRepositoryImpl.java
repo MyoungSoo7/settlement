@@ -9,10 +9,10 @@ import com.querydsl.core.types.dsl.NumberExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import github.lms.lemuel.settlement.adapter.out.persistence.QSettlementJpaEntity;
 import github.lms.lemuel.settlement.adapter.out.persistence.querydsl.dto.*;
-import github.lms.lemuel.settlement.adapter.out.readmodel.QSettlementOrderReadModel;
-import github.lms.lemuel.settlement.adapter.out.readmodel.QSettlementPaymentReadModel;
-import github.lms.lemuel.settlement.adapter.out.readmodel.QSettlementProductReadModel;
-import github.lms.lemuel.settlement.adapter.out.readmodel.QSettlementUserReadModel;
+import github.lms.lemuel.settlement.adapter.out.readmodel.QSettlementOrderViewJpaEntity;
+import github.lms.lemuel.settlement.adapter.out.readmodel.QSettlementPaymentViewJpaEntity;
+import github.lms.lemuel.settlement.adapter.out.readmodel.QSettlementProductViewJpaEntity;
+import github.lms.lemuel.settlement.adapter.out.readmodel.QSettlementUserViewJpaEntity;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
@@ -21,6 +21,13 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 
+/**
+ * 정산 조회/리포트 QueryDSL 구현.
+ *
+ * <p>ADR 0020 Phase 3b — order 테이블을 @Immutable 매핑하던 read-model 대신 settlement 소유
+ * 로컬 프로젝션(settlement_payment/order/user/product_view, 이벤트로 적재)을 조인한다.
+ * 프로젝션의 PK 는 paymentId/orderId/userId/productId 이다(read-model 의 id 와 명칭만 다름).
+ */
 @Repository
 @RequiredArgsConstructor
 public class SettlementQueryRepositoryImpl implements SettlementQueryRepository {
@@ -28,10 +35,10 @@ public class SettlementQueryRepositoryImpl implements SettlementQueryRepository 
     private final JPAQueryFactory queryFactory;
 
     private static final QSettlementJpaEntity settlement = QSettlementJpaEntity.settlementJpaEntity;
-    private static final QSettlementPaymentReadModel payment = QSettlementPaymentReadModel.settlementPaymentReadModel;
-    private static final QSettlementOrderReadModel order = QSettlementOrderReadModel.settlementOrderReadModel;
-    private static final QSettlementUserReadModel user = QSettlementUserReadModel.settlementUserReadModel;
-    private static final QSettlementProductReadModel product = QSettlementProductReadModel.settlementProductReadModel;
+    private static final QSettlementPaymentViewJpaEntity payment = QSettlementPaymentViewJpaEntity.settlementPaymentViewJpaEntity;
+    private static final QSettlementOrderViewJpaEntity order = QSettlementOrderViewJpaEntity.settlementOrderViewJpaEntity;
+    private static final QSettlementUserViewJpaEntity user = QSettlementUserViewJpaEntity.settlementUserViewJpaEntity;
+    private static final QSettlementProductViewJpaEntity product = QSettlementProductViewJpaEntity.settlementProductViewJpaEntity;
 
     /**
      * 일별 정산 요약
@@ -100,7 +107,7 @@ public class SettlementQueryRepositoryImpl implements SettlementQueryRepository 
      *
      * Cursor(settlement_date, id) 복합 커서로 O(log n) 탐색
      * INDEX: idx_settlements_date_id_desc
-     * N+1 방지: 단일 쿼리로 settlement/payment/order/user/product 모두 프로젝션
+     * N+1 방지: 단일 쿼리로 settlement/payment/order/user/product 프로젝션 모두 조인
      */
     @Override
     public SettlementCursorPageResponse<SettlementDetailDto> searchSettlements(SettlementSearchCondition condition) {
@@ -124,9 +131,9 @@ public class SettlementQueryRepositoryImpl implements SettlementQueryRepository 
                         settlement.settlementDate,
                         settlement.confirmedAt,
                         settlement.createdAt,
-                        order.id,
+                        order.orderId,
                         order.userId,
-                        payment.id,
+                        payment.paymentId,
                         payment.paymentMethod,
                         payment.status,
                         user.email,
@@ -134,10 +141,10 @@ public class SettlementQueryRepositoryImpl implements SettlementQueryRepository 
                         settlement.refundedAmount.gt(BigDecimal.ZERO)
                 ))
                 .from(settlement)
-                .join(payment).on(settlement.paymentId.eq(payment.id))
-                .join(order).on(settlement.orderId.eq(order.id))
-                .join(user).on(order.userId.eq(user.id))
-                .leftJoin(product).on(order.productId.eq(product.id))
+                .join(payment).on(settlement.paymentId.eq(payment.paymentId))
+                .join(order).on(settlement.orderId.eq(order.orderId))
+                .join(user).on(order.userId.eq(user.userId))
+                .leftJoin(product).on(order.productId.eq(product.productId))
                 .where(where)
                 .orderBy(buildOrderSpecifier(condition))
                 .limit(fetchSize + 1)
@@ -239,8 +246,8 @@ public class SettlementQueryRepositoryImpl implements SettlementQueryRepository 
                         user.email
                 ))
                 .from(settlement)
-                .join(order).on(settlement.orderId.eq(order.id))
-                .join(user).on(order.userId.eq(user.id))
+                .join(order).on(settlement.orderId.eq(order.orderId))
+                .join(user).on(order.userId.eq(user.userId))
                 .where(where)
                 .orderBy(settlement.id.desc())
                 .limit(fetchSize + 1)
@@ -264,8 +271,6 @@ public class SettlementQueryRepositoryImpl implements SettlementQueryRepository 
      *
      * payments.amount ≠ settlements.payment_amount → 정산 생성 시점 버그
      * payments.refunded_amount ≠ settlements.refunded_amount → 환불 반영 누락
-     *
-     * INDEX: idx_settlements_payment_id_amounts (covering index)
      */
     @Override
     public List<SettlementReconciliationDto> findReconciliationMismatches(
@@ -283,7 +288,7 @@ public class SettlementQueryRepositoryImpl implements SettlementQueryRepository 
                         settlement.status
                 ))
                 .from(settlement)
-                .join(payment).on(settlement.paymentId.eq(payment.id))
+                .join(payment).on(settlement.paymentId.eq(payment.paymentId))
                 .where(
                         settlement.settlementDate.goe(startDate),
                         settlement.settlementDate.loe(endDate),
@@ -311,9 +316,9 @@ public class SettlementQueryRepositoryImpl implements SettlementQueryRepository 
                         settlement.settlementDate,
                         settlement.confirmedAt,
                         settlement.createdAt,
-                        order.id,
+                        order.orderId,
                         order.userId,
-                        payment.id,
+                        payment.paymentId,
                         payment.paymentMethod,
                         payment.status,
                         user.email,
@@ -321,10 +326,10 @@ public class SettlementQueryRepositoryImpl implements SettlementQueryRepository 
                         settlement.refundedAmount.gt(BigDecimal.ZERO)
                 ))
                 .from(settlement)
-                .join(payment).on(settlement.paymentId.eq(payment.id))
-                .join(order).on(settlement.orderId.eq(order.id))
-                .join(user).on(order.userId.eq(user.id))
-                .leftJoin(product).on(order.productId.eq(product.id))
+                .join(payment).on(settlement.paymentId.eq(payment.paymentId))
+                .join(order).on(settlement.orderId.eq(order.orderId))
+                .join(user).on(order.userId.eq(user.userId))
+                .leftJoin(product).on(order.productId.eq(product.productId))
                 .where(settlement.paymentId.eq(paymentId))
                 .orderBy(settlement.createdAt.desc())
                 .fetch();

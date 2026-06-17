@@ -10,4 +10,10 @@ public interface PublishUserEventPort {
 
     /** 회원 멤버십/역할/활성 상태 변경 발행. */
     void publishMembershipChanged(Long userId, String role, String membershipStatus, boolean active);
+
+    /**
+     * 회원 가입 발행 — settlement 등이 user 프로젝션(user_view, email)을 동기화한다
+     * (ADR 0020 Phase 3b).
+     */
+    void publishUserRegistered(Long userId, String email);
 }

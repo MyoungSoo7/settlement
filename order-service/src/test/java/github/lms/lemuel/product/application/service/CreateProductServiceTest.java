@@ -23,6 +23,7 @@ class CreateProductServiceTest {
 
     @Mock LoadProductPort loadProductPort;
     @Mock SaveProductPort saveProductPort;
+    @Mock github.lms.lemuel.product.application.port.out.PublishProductEventPort publishProductEventPort;
     @InjectMocks CreateProductService service;
 
     @Test @DisplayName("createProduct: 성공")

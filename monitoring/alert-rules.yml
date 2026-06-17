@@ -337,3 +337,117 @@ groups:
           description: |
             최근 5 분 내 {{ $value }} 건 replay. x-replay-count 5 회 cap 이 작동 중인지 확인.
             audit_logs 에서 operator 추적 필요.
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Settlement 로컬 프로젝션 (CQRS read model) — ADR 0020 Phase 5.6
+  # order 이벤트가 settlement_db 프로젝션에 반영되는 지연/처리량 감시.
+  # DB 물리 분리(Phase 4) 후 eventual consistency 의 lag 를 운영에서 관측.
+  # 메트릭: SettlementProjectionMetrics / SettlementProjectionGauges 노출.
+  # ──────────────────────────────────────────────────────────────────────
+  - name: lemuel_settlement_projection_alerts
+    interval: 30s
+    rules:
+      # 프로젝션 반영 지연 p95 > 30s — 복제 지연 경고
+      - alert: SettlementProjectionLagHigh
+        expr: histogram_quantile(0.95, sum by (le, type) (rate(settlement_projection_lag_seconds_bucket[5m]))) > 30
+        for: 5m
+        labels:
+          severity: warning
+          component: settlement-projection
+        annotations:
+          summary: "settlement 프로젝션 반영 지연 p95 > 30s ({{ $labels.type }})"
+          description: |
+            {{ $labels.type }} 프로젝션의 발행→반영 p95 지연이 {{ $value }}초입니다.
+            조회/리포팅이 stale 데이터를 볼 수 있습니다. 점검:
+              - 컨슈머 그룹(lemuel-settlement) lag / 컨슈머 정지 여부
+              - settlement_db 부하 (HikariCP, 슬로우 쿼리)
+              - redpanda 파티션 적체
+
+      # 프로젝션 반영 지연 p95 > 120s — 심각 (컷오버/대사 정합성 위협)
+      - alert: SettlementProjectionLagCritical
+        expr: histogram_quantile(0.95, sum by (le, type) (rate(settlement_projection_lag_seconds_bucket[5m]))) > 120
+        for: 3m
+        labels:
+          severity: critical
+          component: settlement-projection
+        annotations:
+          summary: "settlement 프로젝션 반영 지연 심각 ({{ $labels.type }})"
+          description: |
+            {{ $labels.type }} p95 지연 {{ $value }}초 — 프로젝션이 사실상 정지 가능성.
+            정산 생성은 이벤트 동봉 데이터로 계속되나 조회 read model 이 크게 뒤처짐.
+            즉시 컨슈머/DB/브로커 상태 확인. runbook: docs/runbook/settlement-projection-lag.md
+
+      # 프로젝션 반영 정지 — 처리량 0 이 지속 (유휴와 구분하려 for 길게)
+      - alert: SettlementProjectionStalled
+        expr: sum(rate(settlement_projection_applied_total[10m])) == 0
+        for: 30m
+        labels:
+          severity: warning
+          component: settlement-projection
+        annotations:
+          summary: "settlement 프로젝션 반영이 30분간 없음"
+          description: |
+            최근 10분 처리율이 0 이며 30분 지속. 트래픽이 없는 유휴 구간일 수도 있으나,
+            컨슈머 정지/구독 해제 가능성도 있으니 lemuel-settlement 컨슈머 상태를 확인하세요.
+
+      # cross-DB 대사(Phase 5.2): opslab 원천 vs settlement_db 프로젝션 행 수 드리프트.
+      # order(settlement_recon_source_rows) - settlement(settlement_projection_rows), view 라벨로 매칭.
+      # 짧은 복제 lag 은 정상이므로 임계(>10건) + 지속(15m)으로 노이즈 억제.
+      - alert: SettlementProjectionDriftHigh
+        expr: |
+          (
+            max by (view) (settlement_recon_source_rows)
+            - max by (view) (settlement_projection_rows)
+          ) > 10
+        for: 15m
+        labels:
+          severity: warning
+          component: settlement-projection
+        annotations:
+          summary: "settlement 프로젝션 행 수 드리프트 ({{ $labels.view }})"
+          description: |
+            opslab 원천이 settlement_db 프로젝션({{ $labels.view }})보다 {{ $value }}건 많은 상태가
+            15분 지속됐습니다. 단순 복제 lag 을 넘어선 프로젝션 누락 가능성.
+            점검: lemuel-settlement 컨슈머 lag / DLT 적체.
+            자가치유: POST /admin/settlement-projection/backfill (멱등 이벤트 재발행).
+            runbook: docs/runbook/settlement-projection-lag.md
+
+      # cross-DB 금액 대사(Phase 5.2 심화): CAPTURED 결제·전체 주문 금액 합계 드리프트.
+      # double 합산 부동소수 노이즈를 피해 1000 KRW 임계 + 15m 지속(단발 lag 은 수초 내 수렴).
+      # 양방향 mismatch 모두 위험하므로 abs.
+      - alert: SettlementProjectionAmountDrift
+        expr: |
+          abs(
+            max by (view) (settlement_recon_source_amount)
+            - max by (view) (settlement_projection_amount)
+          ) > 1000
+        for: 15m
+        labels:
+          severity: critical
+          component: settlement-projection
+        annotations:
+          summary: "settlement 프로젝션 금액 드리프트 ({{ $labels.view }})"
+          description: |
+            opslab 원천과 settlement_db 프로젝션({{ $labels.view }})의 금액 합계가 {{ $value }} 만큼
+            15분 이상 벌어졌습니다. 금액 불일치는 정산 정합성 위협 — 건수보다 우선 대응.
+            점검: 누락/중복 프로젝션, 환불 반영 누락(payment_view 는 CAPTURED 만 합산).
+            자가치유: POST /admin/settlement-projection/backfill.
+            runbook: docs/runbook/settlement-projection-lag.md
+
+      # 드리프트 지속 — 자가치유(백필) 후에도 1시간 이상 수렴하지 않으면 심각
+      - alert: SettlementProjectionDriftPersistent
+        expr: |
+          (
+            max by (view) (settlement_recon_source_rows)
+            - max by (view) (settlement_projection_rows)
+          ) > 10
+        for: 1h
+        labels:
+          severity: critical
+          component: settlement-projection
+        annotations:
+          summary: "settlement 프로젝션 드리프트 미수렴 ({{ $labels.view }})"
+          description: |
+            {{ $labels.view }} 드리프트 {{ $value }}건이 1시간 지속 — 백필로도 수렴 안 됨.
+            이벤트 파이프라인(Outbox→Kafka→컨슈머) 단절 또는 토픽/스키마 드리프트 의심.
+            ADR 0020 / DLT inspect 로 근본 원인 분석 필요.

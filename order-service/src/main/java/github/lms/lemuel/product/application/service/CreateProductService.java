@@ -2,6 +2,7 @@ package github.lms.lemuel.product.application.service;
 
 import github.lms.lemuel.product.application.port.in.CreateProductUseCase;
 import github.lms.lemuel.product.application.port.out.LoadProductPort;
+import github.lms.lemuel.product.application.port.out.PublishProductEventPort;
 import github.lms.lemuel.product.application.port.out.SaveProductPort;
 import github.lms.lemuel.product.domain.Product;
 import github.lms.lemuel.product.domain.exception.DuplicateProductNameException;
@@ -19,6 +20,7 @@ public class CreateProductService implements CreateProductUseCase {
 
     private final LoadProductPort loadProductPort;
     private final SaveProductPort saveProductPort;
+    private final PublishProductEventPort publishProductEventPort;
 
     @Override
     @CacheEvict(value = "products", allEntries = true)
@@ -42,6 +44,9 @@ public class CreateProductService implements CreateProductUseCase {
 
         // 3. 저장
         Product savedProduct = saveProductPort.save(product);
+
+        // ADR 0020 Phase 3b — settlement product 프로젝션(name) 동기화용 ProductChanged 발행
+        publishProductEventPort.publishProductChanged(savedProduct.getId(), savedProduct.getName());
 
         log.info("상품 생성 완료: productId={}, name={}", savedProduct.getId(), savedProduct.getName());
 
