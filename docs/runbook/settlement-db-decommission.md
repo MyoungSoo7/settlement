@@ -31,6 +31,11 @@
 
 ## 절차
 
+> **스키마**: opslab 의 settlement 잔여 테이블은 `opslab` 스키마에 있고(order Flyway default-schema),
+> settlement_db 는 `public` 이다. 스크립트가 각각 `OPSLAB_SCHEMA`(기본 `opslab`)·`SETTLEMENT_SCHEMA`
+> (기본 `public`)로 처리하므로 보통 추가 지정 불필요. (과거엔 양쪽을 `public` 으로 가정해 opslab 잔여를
+> 전혀 못 지우던 버그가 있었음 — `OpslabDecommissionIT` 로 회귀 검증.)
+
 ### 1. 점검 (DRY-RUN, 무해)
 
 ```bash
