@@ -50,6 +50,10 @@ spring:
     default-schema: opslab
     create-schemas: true
     validate-on-migrate: false
+    # 정수 버전 (V1~V50) 과 타임스탬프 버전 (V20260606003307~) 혼용 환경에서
+    # 신규 정수 버전이 *이미 적용된* 타임스탬프 버전보다 numerically 작아 out-of-order 로
+    # 판정되어 silent skip 되는 사고 방지. 2026-06-16 production 사고 직접 원인.
+    out-of-order: true
 
   cache:
     type: caffeine
