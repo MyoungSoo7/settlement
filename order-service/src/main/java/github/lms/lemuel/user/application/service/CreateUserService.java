@@ -3,6 +3,7 @@ package github.lms.lemuel.user.application.service;
 import github.lms.lemuel.user.application.port.in.CreateUserUseCase;
 import github.lms.lemuel.user.application.port.out.LoadUserPort;
 import github.lms.lemuel.user.application.port.out.PasswordHashPort;
+import github.lms.lemuel.user.application.port.out.PublishUserEventPort;
 import github.lms.lemuel.user.application.port.out.SaveUserPort;
 import github.lms.lemuel.user.domain.User;
 import github.lms.lemuel.user.domain.exception.DuplicateEmailException;
@@ -20,6 +21,7 @@ public class CreateUserService implements CreateUserUseCase {
     private final LoadUserPort loadUserPort;
     private final SaveUserPort saveUserPort;
     private final PasswordHashPort passwordHashPort;
+    private final PublishUserEventPort publishUserEventPort;
 
     @Override
     public User createUser(CreateUserCommand command) {
@@ -51,6 +53,9 @@ public class CreateUserService implements CreateUserUseCase {
 
         // 4. 저장
         User savedUser = saveUserPort.save(user);
+
+        // ADR 0020 Phase 3b — settlement user 프로젝션(email) 동기화용 UserRegistered 발행(같은 트랜잭션 Outbox)
+        publishUserEventPort.publishUserRegistered(savedUser.getId(), savedUser.getEmail());
 
         log.info("회원가입 완료: userId={}, email={}", savedUser.getId(), savedUser.getEmail());
 

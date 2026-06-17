@@ -20,14 +20,12 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         "github.lms.lemuel.reservation",
         "github.lms.lemuel.report",
         "github.lms.lemuel.game",
+        "github.lms.lemuel.projectionbackfill",
         "github.lms.lemuel.common",
-        // settlement-service 모듈 (임시 번들). ledger 테이블(ledger_entries V45, ledger_outbox V49)이
-        // 적용돼 ledger 포함 — settlement 서비스가 EnqueueLedgerTaskPort 빈을 필요로 한다.
-        "github.lms.lemuel.settlement",
-        "github.lms.lemuel.ledger",
-        "github.lms.lemuel.pgreconciliation",
-        "github.lms.lemuel.payout",
-        "github.lms.lemuel.chargeback",
+        // ADR 0020 Phase 5.5 — settlement 분리 완료. settlement/ledger/payout/chargeback/
+        // pgreconciliation 코드는 settlement-service 로 이전돼 order 소스에 존재하지 않으므로
+        // 과거의 번들 스캔 엔트리(아무 빈도 못 잡던 잔재)를 제거했다. opslab 의 잔여 테이블 정리는
+        // docs/runbook/settlement-db-decommission.md 참조.
     }
 )
 @EnableScheduling

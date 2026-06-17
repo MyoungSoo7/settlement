@@ -46,6 +46,15 @@ public class PaymentPersistenceAdapter implements LoadPaymentPort, SavePaymentPo
     }
 
     @Override
+    public List<PaymentDomain> findAllCaptured() {
+        // 1회성 백필 전용 — 전체 결제를 도메인으로 hydrate 후 CAPTURED 만 필터.
+        return paymentJpaRepository.findAll().stream()
+                .map(this::toDomainWithTenders)
+                .filter(p -> p.getStatus() == github.lms.lemuel.payment.domain.PaymentStatus.CAPTURED)
+                .toList();
+    }
+
+    @Override
     public PaymentDomain save(PaymentDomain paymentDomain) {
         PaymentJpaEntity entity = paymentMapper.toJpaEntity(paymentDomain);
         PaymentJpaEntity savedEntity = paymentJpaRepository.save(entity);

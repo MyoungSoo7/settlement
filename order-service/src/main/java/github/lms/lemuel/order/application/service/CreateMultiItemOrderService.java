@@ -2,6 +2,7 @@ package github.lms.lemuel.order.application.service;
 
 import github.lms.lemuel.order.application.port.in.CreateMultiItemOrderUseCase;
 import github.lms.lemuel.order.application.port.out.LoadUserForOrderPort;
+import github.lms.lemuel.order.application.port.out.PublishOrderEventPort;
 import github.lms.lemuel.order.application.port.out.SaveOrderPort;
 import github.lms.lemuel.order.application.port.out.SendOrderNotificationPort;
 import github.lms.lemuel.order.domain.Order;
@@ -49,19 +50,22 @@ public class CreateMultiItemOrderService implements CreateMultiItemOrderUseCase 
     private final DecreaseVariantStockUseCase decreaseStockUseCase;
     private final SaveOrderPort saveOrderPort;
     private final SendOrderNotificationPort sendNotificationPort;
+    private final PublishOrderEventPort publishOrderEventPort;
 
     public CreateMultiItemOrderService(LoadUserForOrderPort loadUserPort,
                                        LoadProductPort loadProductPort,
                                        LoadProductVariantPort loadVariantPort,
                                        DecreaseVariantStockUseCase decreaseStockUseCase,
                                        SaveOrderPort saveOrderPort,
-                                       SendOrderNotificationPort sendNotificationPort) {
+                                       SendOrderNotificationPort sendNotificationPort,
+                                       PublishOrderEventPort publishOrderEventPort) {
         this.loadUserPort = loadUserPort;
         this.loadProductPort = loadProductPort;
         this.loadVariantPort = loadVariantPort;
         this.decreaseStockUseCase = decreaseStockUseCase;
         this.saveOrderPort = saveOrderPort;
         this.sendNotificationPort = sendNotificationPort;
+        this.publishOrderEventPort = publishOrderEventPort;
     }
 
     @Override
@@ -101,6 +105,12 @@ public class CreateMultiItemOrderService implements CreateMultiItemOrderUseCase 
 
         Order order = Order.createMultiItem(userId, items);
         Order saved = saveOrderPort.save(order);
+
+        // ADR 0020 Phase 3b — settlement order 프로젝션 동기화용 OrderCreated 발행(같은 트랜잭션 Outbox)
+        publishOrderEventPort.publishOrderCreated(
+                saved.getId(), saved.getUserId(), saved.getProductId(),
+                saved.getStatus().name(), saved.getAmount(), saved.getCreatedAt());
+
         log.info("다건 주문 생성 완료: orderId={}, items={}, amount={}",
                 saved.getId(), saved.getItems().size(), saved.getAmount());
 

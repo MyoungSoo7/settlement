@@ -30,6 +30,7 @@ class CreateOrderServiceTest {
     @Mock LoadUserForOrderPort loadUserForOrderPort;
     @Mock SaveOrderPort saveOrderPort;
     @Mock SendOrderNotificationPort sendOrderNotificationPort;
+    @Mock github.lms.lemuel.order.application.port.out.PublishOrderEventPort publishOrderEventPort;
     @InjectMocks CreateOrderService service;
 
     @Test @DisplayName("정상 주문 생성 + 알림 발송")

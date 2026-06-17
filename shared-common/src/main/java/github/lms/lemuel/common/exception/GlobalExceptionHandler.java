@@ -61,46 +61,13 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(HttpStatus.BAD_REQUEST, "INVALID_PARAMETER", message);
     }
 
-    /**
-     * 400 - Idempotency-Key 누락
-     */
-    @ExceptionHandler(MissingIdempotencyKeyException.class)
-    public ResponseEntity<Map<String, Object>> handleMissingIdempotencyKey(MissingIdempotencyKeyException ex) {
-        log.warn("[MissingIdempotencyKeyException] {}", ex.getMessage());
-        return buildErrorResponse(HttpStatus.BAD_REQUEST, "MISSING_IDEMPOTENCY_KEY", ex.getMessage());
-    }
-
-    /**
-     * 409 - 환불 금액 초과
-     */
-    @ExceptionHandler(RefundExceedsPaymentException.class)
-    public ResponseEntity<Map<String, Object>> handleRefundExceedsPayment(RefundExceedsPaymentException ex) {
-        log.warn("[RefundExceedsPaymentException] {}", ex.getMessage());
-        return buildErrorResponse(HttpStatus.CONFLICT, "REFUND_EXCEEDS_PAYMENT", ex.getMessage());
-    }
-
-    /**
-     * 409 - 잘못된 결제 상태 전이
-     */
-    @ExceptionHandler(InvalidPaymentStateException.class)
-    public ResponseEntity<Map<String, Object>> handleInvalidPaymentState(InvalidPaymentStateException ex) {
-        log.warn("[InvalidPaymentStateException] {}", ex.getMessage());
-        return buildErrorResponse(HttpStatus.CONFLICT, "INVALID_PAYMENT_STATE", ex.getMessage());
-    }
-
     // ─── 5xx ────────────────────────────────────────────────────────────────────
 
     /**
-     * 500 - 환불 처리 오류
-     */
-    @ExceptionHandler(RefundException.class)
-    public ResponseEntity<Map<String, Object>> handleRefundException(RefundException ex) {
-        log.error("[RefundException] {}", ex.getMessage(), ex);
-        return buildErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR, "REFUND_ERROR", ex.getMessage());
-    }
-
-    /**
      * 500 - 예상치 못한 시스템 예외 폴백
+     *
+     * <p>참고: 결제/환불 도메인 예외(RefundException 등)는 order-service 의
+     * {@code PaymentExceptionHandler} 가 전담한다 (이 공통 핸들러는 순수 기술 폴백만 담당).
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleException(Exception ex) {

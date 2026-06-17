@@ -2,6 +2,7 @@ package github.lms.lemuel.order.application.service;
 
 import github.lms.lemuel.order.application.port.in.CreateOrderUseCase;
 import github.lms.lemuel.order.application.port.out.LoadUserForOrderPort;
+import github.lms.lemuel.order.application.port.out.PublishOrderEventPort;
 import github.lms.lemuel.order.application.port.out.SaveOrderPort;
 import github.lms.lemuel.order.application.port.out.SendOrderNotificationPort;
 import github.lms.lemuel.order.domain.Order;
@@ -20,6 +21,7 @@ public class CreateOrderService implements CreateOrderUseCase {
     private final LoadUserForOrderPort loadUserForOrderPort;
     private final SaveOrderPort saveOrderPort;
     private final SendOrderNotificationPort sendOrderNotificationPort;
+    private final PublishOrderEventPort publishOrderEventPort;
 
     @Override
     public Order createOrder(CreateOrderCommand command) {
@@ -37,6 +39,11 @@ public class CreateOrderService implements CreateOrderUseCase {
 
         // 3. 저장
         Order savedOrder = saveOrderPort.save(order);
+
+        // ADR 0020 Phase 3b — settlement order 프로젝션 동기화용 OrderCreated 발행(같은 트랜잭션 Outbox)
+        publishOrderEventPort.publishOrderCreated(
+                savedOrder.getId(), savedOrder.getUserId(), savedOrder.getProductId(),
+                savedOrder.getStatus().name(), savedOrder.getAmount(), savedOrder.getCreatedAt());
 
         log.info("주문 생성 완료: orderId={}, userId={}, amount={}",
                 savedOrder.getId(), savedOrder.getUserId(), savedOrder.getAmount());

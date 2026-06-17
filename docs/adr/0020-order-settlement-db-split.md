@@ -1,7 +1,7 @@
 # ADR 0020 — order ↔ settlement DB 물리 분리 (이벤트 기반 CQRS 전환)
 
-- 상태: Proposed (구현 전 계획 — Strangler 단계별 승인 후 Accepted 전환)
-- 일자: 2026-06-15
+- 상태: Accepted (Phase 0~4 구현 완료 — 코드·운영 자산 모두 머지. Phase 5 하드닝 일부 잔여)
+- 일자: 2026-06-15 (Accepted 전환: 2026-06-17)
 
 > 번호 주의: `0019` 는 ADR 0018 에서 **ReversePayout** 용으로 예약됨. 본 결정은 `0020` 사용.
 
@@ -47,14 +47,19 @@ settlement-service → settlement_db   (settlements·adjustments·payout·ledger
 
 ### Phase 로드맵
 
-| Phase | 목표 | 핵심 변경 | 검증 | 롤백 |
-|---|---|---|---|---|
-| **0. 기반** | settlement standalone 승격 | bootJar 활성, prod `@SpringBootApplication`, 자체 Flyway 소유, `settlement_db` 프로비저닝, gateway URI 분리 | 단독 부팅 (통합테스트 부트스트랩 보유) | 번들 모드 복귀 |
-| **1. 이벤트 자급자족** | 이벤트만으로 정산 생성 가능 | Outbox 페이로드에 amount·sellerId·sellerTier·settlementCycle·productName 동봉 → 4테이블 조인 제거 | 이벤트 기반 정산 vs DB조회 정산 **대사 일치** | 페이로드 무시 |
-| **2. 로컬 read model** | CQRS projection 병렬 구축 | order 이벤트 소비 → settlement 소유 테이블 적재. 기존 매핑과 dual-run | projection lag·값 일치율 메트릭 | projection 미사용 |
-| **3. 읽기 컷오버** | order 테이블 직접 참조 0 | 모든 조회를 로컬 projection 으로 전환, native opslab SQL 제거 | ArchUnit 규칙: settlement 가 order 테이블 매핑/조인 금지 | 매핑 복귀 |
-| **4. 물리 분리** | DB 인스턴스 분리 | settlement 데이터소스 → 별도 PG, 테이블+projection 이전(백필) | order DB 다운 시 settlement 조회/정산 지속(큐 적체만) | 데이터소스 원복 |
-| **5. 하드닝** | 운영 안정화 | cross-DB 대사 불변식, Schema Registry(Avro/Protobuf), 파티션 키=aggregateId 순서보장 | DLQ replay·대사 무결성 | — |
+| Phase | 상태 | 목표 | 핵심 변경 | 검증 | 롤백 |
+|---|---|---|---|---|---|
+| **0. 기반** | ✅ 완료 | settlement standalone 승격 | bootJar 활성, prod `@SpringBootApplication`, 자체 Flyway 소유, `settlement_db` 프로비저닝, gateway URI 분리 | 단독 부팅 (통합테스트 부트스트랩 보유) | 번들 모드 복귀 |
+| **1. 이벤트 자급자족** | ✅ 완료 | 이벤트만으로 정산 생성 가능 | Outbox 페이로드에 amount·sellerId·sellerTier·settlementCycle·productName 동봉 → 4테이블 조인 제거 | 이벤트 기반 정산 vs DB조회 정산 **대사 일치** | 페이로드 무시 |
+| **2. 로컬 read model** | ✅ 완료 | CQRS projection 병렬 구축 | order 이벤트 소비 → settlement 소유 테이블 적재. 기존 매핑과 dual-run | projection lag·값 일치율 메트릭 | projection 미사용 |
+| **3. 읽기 컷오버** | ✅ 완료 | order 테이블 직접 참조 0 | 모든 조회를 로컬 projection 으로 전환, native opslab SQL 제거 | ArchUnit 규칙: settlement 가 order 테이블 매핑/조인 금지 | 매핑 복귀 |
+| **4. 물리 분리** | ✅ 완료 | DB 인스턴스 분리 | settlement 데이터소스 → 별도 PG, 테이블+projection 이전(백필) | order DB 다운 시 settlement 조회/정산 지속(큐 적체만) | 데이터소스 원복 |
+| **5. 하드닝** | 🟡 진행중 | 운영 안정화 | cross-DB 대사 불변식, Schema Registry(Avro/Protobuf), 파티션 키=aggregateId 순서보장 | DLQ replay·대사 무결성 | — |
+
+> Phase 4 는 4개 Chunk 로 분화 실행됨: Chunk 1~2(자체 Flyway baseline + `SettlementDbBootIT` 로 settlement_db 단독 부팅 증명),
+> Chunk 3(`/admin/settlement-projection/backfill` — 기존 order 데이터를 이벤트 재발행으로 projection 시드),
+> Chunk 4(일회성 ETL 스크립트 + 컷오버 런북 + settlement 독립 k8s 매니페스트).
+> 상세: [Phase 5 — 하드닝 잔여 작업](#phase-5--하드닝-잔여-작업).
 
 ### 재사용 자산 (신규 인프라 불필요)
 
@@ -90,14 +95,44 @@ Outbox 프로듀서, 3단 멱등성, Outbox `traceparent` 분산 트레이싱, D
    reservation/loan 으로 패턴을 먼저 증명한 뒤 본 전환에 착수 권장.
 2. Phase 0(standalone 승격)은 본 전환의 **하드 선결**.
 
-## 후속 (단계별 ADR 골격 — 실행 시 분화 예정)
+## 후속 (실행 결과)
 
-| 예정 ADR | 범위 |
-|---|---|
-| 0020-1 | Phase 0 — settlement standalone 승격 (bootJar·Flyway 소유권 이전) |
-| 0020-2 | Phase 1 — Outbox 이벤트 페이로드 enrich 계약 |
-| 0020-3 | Phase 2~3 — CQRS 로컬 read model + 읽기 컷오버 |
-| 0020-4 | Phase 4~5 — 물리 분리 + Schema Registry + cross-DB 대사 |
+Phase 0~4 는 **별도 ADR 로 분화하지 않고 본 ADR 아래 Strangler 단계로 직접 구현**했다
+(단계별 커밋이 곧 실행 증빙). Phase 5 는 트랙별로 분화하여 후속 PR/ADR 로 진행한다.
+
+| 단계 | 실행 형태 | 결과 |
+|---|---|---|
+| 0020-1 (Phase 0) | 본 ADR 내 구현 | ✅ settlement standalone 승격 (bootJar·자체 Flyway) |
+| 0020-2 (Phase 1) | 본 ADR 내 구현 | ✅ Outbox 페이로드 enrich (amount·sellerTier·cycle·productName) |
+| 0020-3 (Phase 2~3) | 본 ADR 내 구현 | ✅ CQRS 로컬 read model + 읽기 컷오버 (ArchUnit 강제) |
+| 0020-4 (Phase 4) | 본 ADR 내 구현 (Chunk 1~4) | ✅ 물리 분리 + 백필 + ETL/런북/k8s |
+| 0020-5 (Phase 5) | 본 ADR 내 + 분화 | 🟡 5.6 메트릭·5.2 대사(건수)·5.4 순서보장 ✅ / 5.3 Schema Registry 설계는 [ADR 0022](0022-event-schema-registry.md) / 5.5 opslab 정리·5.2 금액대사 잔여 (위 [Phase 5](#phase-5--하드닝-잔여-작업) 참조) |
+
+## Phase 5 — 하드닝 잔여 작업
+
+Phase 0~4 로 **물리 분리 자체는 완료**(코드·인프라·운영 자산 머지). Phase 5 는 "운영에서
+오래 안전하게 굴리기" 위한 강화 작업으로, 분리 완성도와 무관하게 점진 적용한다.
+
+| # | 항목 | 상태 | 내용 / 완료기준 |
+|---|---|---|---|
+| 5.1 | **이미 확보된 자산** | ✅ | Outbox 3단 멱등성, `traceparent` 분산 트레이싱, DLQ + replay, ledger 3불변식 대사(ADR 0007) — Phase 1~4 가 이 위에 올라가 추가 인프라 없이 동작 |
+| 5.2 | **cross-DB 대사 잡** | ✅ 완료(건수+금액) | 코드 의존성 0 유지 — 양쪽이 게이지를 노출하고 Prometheus 관측 계층에서 대조. **건수**: `settlement_recon_source_rows{view}` vs `settlement_projection_rows{view}`. **금액**: `settlement_recon_source_amount{view}` vs `settlement_projection_amount{view}`(payment_view=CAPTURED만 양쪽 합산해 환불 정합). 알림 `SettlementProjectionDriftHigh`/`Persistent`(건수)+`SettlementProjectionAmountDrift`(금액 |drift|>1000) + 대시보드 드리프트 패널. 자가치유=백필 엔드포인트 재사용 |
+| 5.3 | **Schema Registry (Avro/Protobuf)** | 🟡 설계완료 | 설계·의사결정 고정 → [ADR 0022](0022-event-schema-registry.md): Redpanda 내장 SR(인프라 추가 0) + Avro + FULL_TRANSITIVE 호환성 + 5단계 점진 마이그레이션. 구현은 후속 PR |
+| 5.4 | **파티션 키 = aggregateId 순서보장** | ✅ 완료 | 전체 체인 확립·검증: ① 발행 key=aggregateId(`KafkaOutboxPublisher`, 4 publisher 모두 orderId/paymentId/userId/productId) → 동일 aggregate 단일 파티션, ② producer `enable.idempotence=true`+`max.in.flight=5`+`acks=all`(order·settlement 양쪽) → 재시도 시 파티션 내 재정렬 방지, ③ outbox claim `ORDER BY created_at`+순서보존 배치 dispatch → 생성순 발행. 가드 테스트 `KafkaOutboxPublisherTest` 로 key=aggregateId 불변식 고정. **잔여 한계**: SKIP LOCKED 멀티워커가 같은 aggregate 의 연속 이벤트를 서로 다른 claim 배치로 나눠 잡으면 발행 레이스 창이 존재(작음). 컨슈머 upsert 멱등 + 동일키-동일파티션으로 최종일관성은 보장되며, 완전 차단이 필요하면 워커별 aggregate 샤딩이 후속 옵션 |
+| 5.5 | **opslab 원본 정리(decommission)** | 🟡 준비완료(실행 게이트) | 코드 잔재 제거(order `LemuelApplication` 의 settlement/ledger/payout/chargeback/pgreconciliation 스캔 엔트리 — 클래스 0개의 번들 잔재) + 가드형 제거 스크립트([`settlement-opslab-decommission.sh`](../../scripts/etl/settlement-opslab-decommission.sh): dry-run 기본·settlement_db 대조·CONFIRM=DROP) + [런북](../runbook/settlement-db-decommission.md). 실제 DROP 은 안정화·롤백창 종료 후 수동 실행 |
+| 5.6 | **운영 메트릭/알람** | ✅ 완료 | `settlement_projection_lag_seconds{type}`(발행→반영 end-to-end), `settlement_projection_applied_total{type}`, `settlement_projection_rows{view}` Micrometer 노출(`SettlementProjectionMetrics`/`SettlementProjectionGauges`) + Grafana 대시보드(`lemuel-settlement-projection`) + 알림 3종(`SettlementProjectionLagHigh`/`Critical`/`Stalled`) + 런북([settlement-projection-lag](../runbook/settlement-projection-lag.md)). prometheus 에 settlement scrape job 추가 |
+
+### 권장 착수 순서
+
+1. ~~**5.6 메트릭**~~ ✅ — projection lag/throughput/rows + 대시보드/알림/런북.
+2. ~~**5.2 cross-DB 대사**~~ ✅(건수) — 양쪽 게이지 + Prometheus 드리프트 알림 + 백필 자가치유.
+3. ~~**5.4 파티션 키**~~ ✅ — key=aggregateId + producer idempotence + 생성순 claim. 가드 테스트 고정.
+4. **5.3 Schema Registry** — 설계 고정([ADR 0022](0022-event-schema-registry.md)). 구현은 후속 PR.
+5. ~~**5.5 opslab 정리**~~ 🟡 준비완료 — 스크립트·런북·코드잔재 제거 완료. 물리 DROP 은 안정화 후 수동.
+6. ~~**5.2 금액 레벨 대사**~~ ✅ — amount 합계 대조(원천 vs 프로젝션, CAPTURED 정합) + `SettlementProjectionAmountDrift` 알림.
+
+> 이 단계들은 **분리 완료의 전제가 아니다.** Phase 4 까지로 DB-per-service 는 성립하며,
+> Phase 5 는 운영 성숙도를 높이는 후속 트랙으로 별도 PR/ADR 분화하여 진행한다.
 
 ## 참조
 

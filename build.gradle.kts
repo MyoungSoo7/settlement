@@ -44,6 +44,10 @@ subprojects {
             html.required.set(true)
             csv.required.set(false)
         }
+        // QueryDSL 생성 클래스(Q*)는 자동 생성 코드 → 커버리지 측정에서 제외 (전 모듈 공통)
+        classDirectories.setFrom(classDirectories.files.map { dir ->
+            fileTree(dir) { exclude("**/Q*.class") }
+        })
     }
 
     // 커버리지 임계값. CI 에서 회귀 시 즉시 빌드 실패 → PR 차단.

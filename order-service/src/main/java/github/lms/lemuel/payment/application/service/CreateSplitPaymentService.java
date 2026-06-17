@@ -39,15 +39,18 @@ public class CreateSplitPaymentService implements CreateSplitPaymentUseCase {
     private final SavePaymentPort savePaymentPort;
     private final UpdateOrderStatusPort updateOrderStatusPort;
     private final PublishEventPort publishEventPort;
+    private final github.lms.lemuel.payment.application.port.out.LoadSellerSettlementMetaPort loadSellerSettlementMetaPort;
 
     public CreateSplitPaymentService(PgClientPort pgClientPort,
                                       SavePaymentPort savePaymentPort,
                                       UpdateOrderStatusPort updateOrderStatusPort,
-                                      PublishEventPort publishEventPort) {
+                                      PublishEventPort publishEventPort,
+                                      github.lms.lemuel.payment.application.port.out.LoadSellerSettlementMetaPort loadSellerSettlementMetaPort) {
         this.pgClientPort = pgClientPort;
         this.savePaymentPort = savePaymentPort;
         this.updateOrderStatusPort = updateOrderStatusPort;
         this.publishEventPort = publishEventPort;
+        this.loadSellerSettlementMetaPort = loadSellerSettlementMetaPort;
     }
 
     @Override
@@ -82,7 +85,11 @@ public class CreateSplitPaymentService implements CreateSplitPaymentUseCase {
         PaymentDomain saved = savePaymentPort.save(payment);
 
         updateOrderStatusPort.updateOrderStatus(saved.getOrderId(), "PAID");
-        publishEventPort.publishPaymentCaptured(saved.getId(), saved.getOrderId(), saved.getAmount());
+        publishEventPort.publishPaymentCaptured(saved.getId(), saved.getOrderId(), saved.getAmount(),
+                saved.getCapturedAt(),
+                saved.getPaymentMethod(),
+                saved.getPgTransactionId(),
+                loadSellerSettlementMetaPort.findByPaymentId(saved.getId()).orElse(null));
 
         log.info("분할결제 완료: paymentId={}, totalAmount={}, tenders={}",
                 saved.getId(), saved.getAmount(), saved.getTenders().size());

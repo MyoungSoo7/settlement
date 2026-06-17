@@ -11,7 +11,8 @@ spring:
 
   datasource:
     # reWriteBatchedInserts=true → JDBC 배치 INSERT 를 단일 multi-row 문장으로 재작성 (정산/원장 대량 적재 처리량↑)
-    url: jdbc:postgresql://localhost:5432/opslab?reWriteBatchedInserts=true
+    # ADR 0020 Phase 4 — 자체 DB(settlement_db). order 의 opslab 와 물리 분리.
+    url: ${SETTLEMENT_DATASOURCE_URL:jdbc:postgresql://localhost:5432/settlement_db?reWriteBatchedInserts=true}
     username: ${POSTGRES_USER}
     password: ${POSTGRES_PASSWORD}
     driver-class-name: org.postgresql.Driver
@@ -34,7 +35,7 @@ spring:
     properties:
       hibernate:
         format_sql: false
-        default_schema: opslab
+        default_schema: public
         # JDBC 배치 — 정산/원장 대량 INSERT/UPDATE 라운드트립 감소
         jdbc:
           batch_size: 50
@@ -42,9 +43,14 @@ spring:
         order_inserts: true
         order_updates: true
 
-  # 마이그레이션은 order-service 가 책임진다 (단일 PG 공유, Phase 5 이후 분리 검토).
+  # ADR 0020 Phase 4 — settlement 가 자체 스키마(settlement_db)를 소유한다.
   flyway:
-    enabled: false
+    enabled: true
+    locations: classpath:db/migration
+    schemas: public
+    default-schema: public
+    create-schemas: true
+    validate-on-migrate: false
 
   cache:
     type: caffeine
@@ -183,6 +189,8 @@ app:
       partitions: ${APP_KAFKA_TOPIC_PARTITIONS:3}
       payment-captured: lemuel.payment.captured
       payment-refunded: lemuel.payment.refunded
+      # loan → settlement (상환 차감 결과 수신). loan Outbox 자동 라우팅명(snake_case)과 일치.
+      loan-repayment-applied: lemuel.loan.repayment_applied
   search:
     enabled: false
   # 원장 전용 트랜잭셔널 아웃박스 로컬 폴러 (Kafka 미경유)

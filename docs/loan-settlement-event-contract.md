@@ -25,11 +25,26 @@ Outbox 폴러는 `aggregateType` + `eventType` 으로 토픽을 자동 라우팅
 | `lemuel.loan.disbursement_requested` | 대출 실행 | `{loanId, sellerId, amount}` | settlement 가 payout 으로 셀러에게 `amount` 송금 |
 | `lemuel.loan.repayment_applied` | 상환 차감 완료 | `{settlementId, sellerId, deducted}` | settlement 가 **순지급액 = amount − deducted** 로 payout |
 
-## ⚠️ 구현 전 반드시 알아야 할 제약 (2026-06-16 발견)
+## 진행 상황 (2026-06-16)
 
-- **Settlement 도메인에 `sellerId` 가 없다.** 정산은 `paymentId/orderId` 로만 키잉되고 sellerId 는
-  조인(payments→orders→products→users, `LoadSellerTierPort` 경로)으로 해석된다. 이벤트 페이로드의
-  `sellerId` 를 채우려면 **settlement 내부에 sellerId 해석 포트/쿼리를 신규 추가**해야 한다.
+- ✅ **Phase 7a 완료** (`feat/loan-chunk7`, assign 기준): settlement 가 `SettlementCreated`/
+  `SettlementConfirmed` 를 Outbox→Kafka 발행. `LoadSellerIdPort`(payment→order→product 조인)로 sellerId
+  해석. → loan 종단 연동 핵심 경로 완성(loan 이 실제로 이벤트 수신·상환·`LoanRepaymentApplied` 발행).
+- ⬜ **Phase 7b 미구현**: settlement 가 loan 이벤트를 소비해 payout 에 반영하는 부분.
+
+### ⚠️ Phase 7b 착수 전 발견 (중요)
+- **`PayoutService.requestForSettlement(...)` 에 호출자가 없다** — "정산 확정/보류해제 → payout 요청"
+  트리거가 아직 미배선이다. 즉 7b 는 단순 수정이 아니라 **정산→payout 트리거 신규 구축**을 포함한다.
+- 7b 범위: ① 정산→payout 트리거 생성 ② `LoanRepaymentApplied` 수신 → 해당 정산 payout 을
+  `amount−deducted` 로 net ③ `LoanDisbursementRequested` 수신 → 셀러 선지급 payout(정산 키가 아닌 별도
+  경로) ④ `payout_status(AWAITING_LOAN/HELD)` + 미응답 HOLD 스케줄러.
+- 머니-크리티컬 경로이므로 payout 통합테스트와 함께 전용 세션에서 구현 권장.
+
+## ⚠️ 과거 제약 메모 (7a 에서 일부 해소됨)
+
+- ~~Settlement 도메인에 sellerId 가 없다~~ → **7a 에서 `LoadSellerIdPort` 로 해소.** (참고용 보존)
+- 정산은 `paymentId/orderId` 로만 키잉되고 sellerId 는
+  조인(payments→orders→products→users, `LoadSellerTierPort` 경로)으로 해석된다.
 - **payout 은 배치 파이프라인**(`PayoutScheduler`→`PayoutService`/`PayoutSingleExecutor`→`FirmBankingPort`).
   "net = amount − deducted" 는 이 파이프라인에 `LoanRepaymentApplied` 수신 결과를 반영하는 개조가 필요.
 - 위 두 경로는 **settlement-standalone(자체 DB 승격, `feat/settlement-standalone`) 개편 대상과 겹친다.**
