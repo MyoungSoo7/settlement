@@ -1,5 +1,6 @@
 package github.lms.lemuel.report.adapter.out.persistence;
 
+import github.lms.lemuel.architecture.AuditCrossRead;
 import github.lms.lemuel.report.application.port.out.LoadPeriodReconciliationPort;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -19,6 +20,7 @@ import java.time.LocalDate;
  * </ul>
  */
 @Repository
+@AuditCrossRead("기간 대사 — order 원천(opslab.payments/refunds/outbox_events)을 직독해 settlement 와 대조")
 public class PeriodReconciliationJdbcAdapter implements LoadPeriodReconciliationPort {
 
     private final JdbcTemplate jdbcTemplate;

@@ -1,5 +1,6 @@
 package github.lms.lemuel.pgreconciliation.adapter.out.persistence;
 
+import github.lms.lemuel.architecture.AuditCrossRead;
 import github.lms.lemuel.pgreconciliation.application.port.out.LoadInternalPaymentsForReconciliationPort;
 import github.lms.lemuel.pgreconciliation.domain.InternalPaymentRow;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -17,6 +18,7 @@ import java.util.List;
  * <p>매칭 키: {@code pg_transaction_id} — PG 파일에서 받은 거래 ID 와 1:1 매칭.
  */
 @Repository
+@AuditCrossRead("PG 대사 — order 원천(opslab.payments)을 pg_transaction_id 로 직독해 PG 파일과 대조")
 public class InternalPaymentsForReconJdbcAdapter implements LoadInternalPaymentsForReconciliationPort {
 
     private final JdbcTemplate jdbcTemplate;

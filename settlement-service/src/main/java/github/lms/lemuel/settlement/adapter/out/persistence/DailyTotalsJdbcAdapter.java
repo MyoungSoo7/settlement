@@ -1,5 +1,6 @@
 package github.lms.lemuel.settlement.adapter.out.persistence;
 
+import github.lms.lemuel.architecture.AuditCrossRead;
 import github.lms.lemuel.settlement.application.port.out.LoadDailyTotalsPort;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -16,6 +17,7 @@ import java.time.LocalDate;
  * 이는 감사(audit) 도구의 본질상 모든 원장을 들여다봐야 하므로 허용.
  */
 @Repository
+@AuditCrossRead("일일 대사 — order 원천(opslab.payments/refunds)을 직독해 settlement 집계와 대조")
 public class DailyTotalsJdbcAdapter implements LoadDailyTotalsPort {
 
     private final JdbcTemplate jdbcTemplate;
