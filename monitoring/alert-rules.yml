@@ -451,3 +451,24 @@ groups:
             {{ $labels.view }} 드리프트 {{ $value }}건이 1시간 지속 — 백필로도 수렴 안 됨.
             이벤트 파이프라인(Outbox→Kafka→컨슈머) 단절 또는 토픽/스키마 드리프트 의심.
             ADR 0020 / DLT inspect 로 근본 원인 분석 필요.
+
+  # ──────────────────────────────────────────────────────────────────────
+  # HTTP 에러율 — 전 서비스 공통(http_server_requests). 4xx+5xx 비율이 임계 초과 시.
+  # ──────────────────────────────────────────────────────────────────────
+  - name: lemuel_http_error_alerts
+    interval: 15s
+    rules:
+      - alert: HighHttpErrorRate
+        expr: |
+          100 * sum(rate(http_server_requests_seconds_count{job="lemuel",status=~"4..|5.."}[1m]))
+              / sum(rate(http_server_requests_seconds_count{job="lemuel"}[1m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+          component: http
+        annotations:
+          summary: "HTTP 에러율 > 5% (5분 지속)"
+          description: |
+            최근 1분 4xx+5xx 비율이 {{ $value | printf "%.1f" }}% 로 5% 를 초과한 상태가 5분 지속됐습니다.
+            상태코드 분해: sum by(status)(rate(http_server_requests_seconds_count[1m]))
+            경로 식별: 5xx rps by uri 패널(lemuel-http-traffic 대시보드) 확인.
