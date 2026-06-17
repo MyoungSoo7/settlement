@@ -20,6 +20,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         "github.lms.lemuel.report",
         "github.lms.lemuel.game",
         "github.lms.lemuel.projectionbackfill",
+        "github.lms.lemuel.recon",
         "github.lms.lemuel.common",
         // ADR 0020 Phase 5.5 — settlement 분리 완료. settlement/ledger/payout/chargeback/
         // pgreconciliation 코드는 settlement-service 로 이전돼 order 소스에 존재하지 않으므로

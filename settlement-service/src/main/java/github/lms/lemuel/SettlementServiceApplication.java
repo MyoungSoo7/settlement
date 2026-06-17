@@ -11,10 +11,10 @@ import org.springframework.boot.SpringApplication;
  * settlement-service main + shared-common 빈만 잡힌다 (order-service 는 이 모듈의 classpath 에
  * 없어 MSA 코드 경계가 그대로 유지된다).
  *
- * <p>Phase 4 완료: 프로세스·DB 모두 독립. 자체 {@code settlement_db} 를 소유하고 자체 Flyway
+ * <p>Phase 4~5 완료: 프로세스·DB 모두 독립. 자체 {@code settlement_db} 를 소유하고 자체 Flyway
  * (V1 베이스라인)로 스키마를 생성한다. order 데이터는 Kafka 이벤트로 적재한 로컬 프로젝션
- * (settlement_*_view)으로만 읽는다. 잔여 {@code opslab} 직독은 대사(audit) 도구에 한정되며
- * {@code @AuditCrossRead} 로 명시된 의도적 예외다 (Phase 5.5).
+ * (settlement_*_view)으로만 읽고, 대사(audit)는 order 내부 API({@code OrderReconClient})로 order 의
+ * 자기 합계를 받아 비교한다 — settlement 는 order DB 를 직접 읽지 않는다(cross-DB 연결 0).
  */
 @SpringBootApplication
 public class SettlementServiceApplication {

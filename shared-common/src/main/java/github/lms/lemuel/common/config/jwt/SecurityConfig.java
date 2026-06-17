@@ -142,6 +142,9 @@ public class SecurityConfig {
                         .requestMatchers("/admin/dlq/**").hasRole("ADMIN")
                         .requestMatchers("/admin/pg/**").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers("/admin/reconciliation/**").hasAnyRole("ADMIN", "MANAGER")
+                        // 내부 서비스 간 호출 — order 가 자기 대사 합계를 노출(settlement 가 소비, ADR 0020 Phase 5 self-totals).
+                        // gateway 라우트 predicate 에 없어 외부 미노출(클러스터 내부 전용). 운영에선 NetworkPolicy/mTLS 로 추가 격리 권장.
+                        .requestMatchers("/internal/**").permitAll()
                         // Payout 콘솔 — 송금 권한은 ADMIN 만
                         .requestMatchers("/admin/payouts/**").hasRole("ADMIN")
                         // Chargeback 콘솔 — 셀러 환수 결정은 ADMIN 만

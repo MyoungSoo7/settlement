@@ -1,0 +1,108 @@
+package github.lms.lemuel.recon;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpMethod;
+import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.web.client.RestClient;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.http.MediaType.APPLICATION_JSON;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
+
+/**
+ * ADR 0020 Phase 5 — {@link OrderReconClient} ↔ order {@code /internal/recon/*} 계약 검증.
+ *
+ * <p>실제 order 를 띄우지 않고 {@link MockRestServiceServer} 로 HTTP 경계를 스텁해, 클라이언트가
+ * 올바른 URL·메서드·바디로 요청하고 응답 JSON 필드를 정확히 파싱하는지 확인한다(계약 가드).
+ */
+class OrderReconClientTest {
+
+    private MockRestServiceServer server;
+    private OrderReconClient client;
+
+    @BeforeEach
+    void setUp() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://order-test");
+        server = MockRestServiceServer.bindTo(builder).build();
+        client = new OrderReconClient(builder.build());
+    }
+
+    @Test
+    void dailyTotals_requestsCorrectUriAndParsesResponse() {
+        server.expect(requestTo("http://order-test/internal/recon/daily-totals?date=2026-06-17"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("{\"capturedPayments\":1000.00,\"completedRefunds\":50.00}", APPLICATION_JSON));
+
+        OrderReconClient.DailyTotals totals = client.dailyTotals(LocalDate.of(2026, 6, 17));
+
+        assertThat(totals.capturedPayments()).isEqualByComparingTo("1000.00");
+        assertThat(totals.completedRefunds()).isEqualByComparingTo("50.00");
+        server.verify();
+    }
+
+    @Test
+    void periodTotals_parsesAmountsAndCount() {
+        server.expect(requestTo("http://order-test/internal/recon/period-totals?from=2026-06-01&to=2026-06-30"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess(
+                        "{\"capturedPayments\":900.00,\"completedRefunds\":10.00,\"paymentCapturedPublishedCount\":12}",
+                        APPLICATION_JSON));
+
+        OrderReconClient.PeriodTotals totals =
+                client.periodTotals(LocalDate.of(2026, 6, 1), LocalDate.of(2026, 6, 30));
+
+        assertThat(totals.capturedPayments()).isEqualByComparingTo("900.00");
+        assertThat(totals.completedRefunds()).isEqualByComparingTo("10.00");
+        assertThat(totals.paymentCapturedPublishedCount()).isEqualTo(12L);
+        server.verify();
+    }
+
+    @Test
+    void refundsCompletedSum_postsRefundIdsAndParsesAmount() {
+        server.expect(requestTo("http://order-test/internal/recon/refunds-completed-sum"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(jsonPath("$.refundIds.length()").value(2))
+                .andExpect(jsonPath("$.refundIds[0]").value(7))
+                .andRespond(withSuccess("{\"amount\":150.00}", APPLICATION_JSON));
+
+        BigDecimal sum = client.refundsCompletedSum(List.of(7L, 8L));
+
+        assertThat(sum).isEqualByComparingTo("150.00");
+        server.verify();
+    }
+
+    @Test
+    void refundsCompletedSum_emptyIds_shortCircuitsWithoutHttpCall() {
+        // 기대 설정 없음 — HTTP 호출이 발생하면 server.verify() 가 실패한다.
+        BigDecimal sum = client.refundsCompletedSum(List.of());
+
+        assertThat(sum).isEqualByComparingTo("0");
+        server.verify();
+    }
+
+    @Test
+    void capturedPayments_parsesRowList() {
+        server.expect(requestTo("http://order-test/internal/recon/captured-payments?date=2026-06-17"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("""
+                        [{"paymentId":1,"pgTransactionId":"pg_1","amount":1000.00,"refundedAmount":0.00,"capturedDate":"2026-06-17"}]
+                        """, APPLICATION_JSON));
+
+        List<OrderReconClient.ReconPaymentRow> rows = client.capturedPayments(LocalDate.of(2026, 6, 17));
+
+        assertThat(rows).hasSize(1);
+        assertThat(rows.get(0).paymentId()).isEqualTo(1L);
+        assertThat(rows.get(0).pgTransactionId()).isEqualTo("pg_1");
+        assertThat(rows.get(0).amount()).isEqualByComparingTo("1000.00");
+        assertThat(rows.get(0).capturedDate()).isEqualTo(LocalDate.of(2026, 6, 17));
+        server.verify();
+    }
+}
