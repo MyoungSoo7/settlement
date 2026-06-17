@@ -11,6 +11,7 @@
 | Flyway 마이그레이션 실패 | [db-migration-rollback.md](db-migration-rollback.md) | 앱 기동 실패 |
 | DB 손실 / K8s/리전 장애 | [disaster-recovery.md](disaster-recovery.md) | 다수 critical |
 | settlement DB 분리 컷오버 (ADR 0020 P4) | [settlement-db-cutover.md](settlement-db-cutover.md) | (일회성 운영 절차) |
+| opslab settlement 테이블 정리 (ADR 0020 P5.5) | [settlement-db-decommission.md](settlement-db-decommission.md) | (일회성, 안정화 후) |
 | settlement 프로젝션 복제 지연 (ADR 0020 P5.6) | [settlement-projection-lag.md](settlement-projection-lag.md) | `SettlementProjectionLagHigh`/`Critical`/`Stalled` |
 
 ## 공통 원칙
