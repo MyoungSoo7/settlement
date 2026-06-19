@@ -415,10 +415,31 @@ services:
   prometheus:
     image: prom/prometheus:latest
     container_name: lemuel-prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"          # POST /-/reload 로 핫 리로드 허용 (실습 편의)
     ports:
       - "127.0.0.1:9090:9090"
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alert-rules.yml:/etc/prometheus/alert-rules.yml:ro   # rule_files 가 참조 — 마운트 필수
+    restart: unless-stopped
+    depends_on:
+      - alertmanager
+
+  # Alertmanager — Prometheus 알림 수신·그룹핑·silence. 실습용 null 리시버(외부 미전송) 설정 사용.
+  # 실제 Slack 연동을 실습하려면 마운트를 ./monitoring/alertmanager.yml 로 교체 (envsubst 선처리 필요).
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: lemuel-alertmanager
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+    ports:
+      - "127.0.0.1:9093:9093"
+    volumes:
+      - ./monitoring/alertmanager.practice.yml:/etc/alertmanager/alertmanager.yml:ro
     restart: unless-stopped
 
   # 분산 트레이싱 백엔드 — OTLP 수신 → Tempo 저장 → Grafana 에서 trace 검색.
