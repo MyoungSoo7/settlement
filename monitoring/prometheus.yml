@@ -18,11 +18,11 @@ rule_files:
 
 # Scrape configurations
 scrape_configs:
-  # Lemuel Spring Boot Application (order-service / 번들 모드 app)
+  # Lemuel Spring Boot Application (order-service) — compose 서비스명 order-service:8080
   - job_name: 'lemuel'
     metrics_path: '/actuator/prometheus'
     static_configs:
-      - targets: ['app:8080']
+      - targets: ['order-service:8080']
         labels:
           application: 'lemuel'
           environment: 'production'

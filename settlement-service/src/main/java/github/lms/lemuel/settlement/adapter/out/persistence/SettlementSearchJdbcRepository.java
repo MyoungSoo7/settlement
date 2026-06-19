@@ -50,17 +50,19 @@ public class SettlementSearchJdbcRepository {
             params.add("%" + productName + "%");
         }
         if (Boolean.TRUE.equals(isRefunded)) {
-            where.append(" AND py.refunded_amount > 0");
+            where.append(" AND s.refunded_amount > 0");
         } else if (Boolean.FALSE.equals(isRefunded)) {
-            where.append(" AND py.refunded_amount = 0");
+            where.append(" AND s.refunded_amount = 0");
         }
 
+        // ADR 0020 Phase 5.5 — 서빙 경로 로컬화: order 원천 직접 조인 대신 settlement 소유
+        // 로컬 프로젝션(settlement_*_view)만 읽는다. 환불액은 settlement 자체 컬럼(s.refunded_amount)
+        // 으로 충족되므로 payments 조인은 제거됨. settlement_db 단독으로 검색이 성립한다.
         String fromClause =
-                " FROM opslab.settlements s" +
-                " JOIN opslab.orders o ON s.order_id = o.id" +
-                " JOIN opslab.payments py ON s.payment_id = py.id" +
-                " JOIN opslab.users u ON o.user_id = u.id" +
-                " LEFT JOIN opslab.products pr ON o.product_id = pr.id" +
+                " FROM settlements s" +
+                " JOIN settlement_order_view o ON s.order_id = o.order_id" +
+                " JOIN settlement_user_view u ON o.user_id = u.user_id" +
+                " LEFT JOIN settlement_product_view pr ON o.product_id = pr.product_id" +
                 where;
 
         Object[] baseArgs = params.toArray();
@@ -75,7 +77,7 @@ public class SettlementSearchJdbcRepository {
         BigDecimal totalRefundedAmount = BigDecimal.ZERO;
         BigDecimal totalFinalAmount = BigDecimal.ZERO;
         List<BigDecimal[]> aggRows = jdbcTemplate.query(
-                "SELECT COALESCE(SUM(s.payment_amount),0), COALESCE(SUM(py.refunded_amount),0), COALESCE(SUM(s.net_amount),0)" + fromClause,
+                "SELECT COALESCE(SUM(s.payment_amount),0), COALESCE(SUM(s.refunded_amount),0), COALESCE(SUM(s.net_amount),0)" + fromClause,
                 (rs, n) -> new BigDecimal[]{rs.getBigDecimal(1), rs.getBigDecimal(2), rs.getBigDecimal(3)},
                 baseArgs);
         if (!aggRows.isEmpty()) {
@@ -105,7 +107,7 @@ public class SettlementSearchJdbcRepository {
                 "SELECT s.id, s.order_id, s.payment_id," +
                 " u.email AS orderer_name," +
                 " COALESCE(pr.name, '') AS product_name," +
-                " s.payment_amount, py.refunded_amount, s.net_amount," +
+                " s.payment_amount, s.refunded_amount, s.net_amount," +
                 " s.status, s.settlement_date" +
                 fromClause +
                 " ORDER BY " + orderColumn + " " + orderDir +

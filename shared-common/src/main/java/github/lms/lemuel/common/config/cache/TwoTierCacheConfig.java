@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 import com.fasterxml.jackson.databind.jsontype.PolymorphicTypeValidator;
+import io.micrometer.core.instrument.MeterRegistry;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -100,7 +102,8 @@ public class TwoTierCacheConfig {
 
     @Bean
     public CacheManager cacheManager(RedisTemplate<String, Object> cacheRedisTemplate,
-                                     CacheInvalidationPublisher cacheInvalidationPublisher) {
+                                     CacheInvalidationPublisher cacheInvalidationPublisher,
+                                     ObjectProvider<MeterRegistry> meterRegistryProvider) {
         return new TwoTierCacheManager(
                 CacheNames.ALL,
                 cacheRedisTemplate,
@@ -108,7 +111,8 @@ public class TwoTierCacheConfig {
                 Duration.ofSeconds(l1TtlSeconds),
                 Duration.ofSeconds(l2TtlSeconds),
                 l1MaxSize,
-                true);
+                true,
+                meterRegistryProvider.getIfAvailable());   // 레지스트리 없으면 메트릭 생략(로그만)
     }
 
     @Bean

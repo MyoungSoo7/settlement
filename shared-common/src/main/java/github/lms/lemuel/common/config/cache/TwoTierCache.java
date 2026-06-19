@@ -1,5 +1,6 @@
 package github.lms.lemuel.common.config.cache;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.support.AbstractValueAdaptingCache;
@@ -27,24 +28,35 @@ public class TwoTierCache extends AbstractValueAdaptingCache {
 
     private static final Logger log = LoggerFactory.getLogger(TwoTierCache.class);
 
+    /** 조회 결과 카운터 — Prometheus: {@code lemuel_cache_requests_total{cache,result}}. */
+    private static final String METRIC_REQUESTS = "lemuel.cache.requests";
+    private static final String RESULT_L1_HIT = "l1_hit";
+    private static final String RESULT_L2_HIT = "l2_hit";
+    private static final String RESULT_MISS = "miss";
+
     private final String name;
     private final com.github.benmanes.caffeine.cache.Cache<Object, Object> l1;
     private final RedisTemplate<String, Object> l2;
     private final Duration l2Ttl;
     private final CacheInvalidationPublisher publisher;
+    /** 캐시 hit/miss 메트릭 발행기. 직접 생성 테스트 등 레지스트리가 없을 땐 {@code null} → 메트릭 생략, 로그만. */
+    @Nullable
+    private final MeterRegistry meterRegistry;
 
     public TwoTierCache(String name,
                         com.github.benmanes.caffeine.cache.Cache<Object, Object> l1,
                         RedisTemplate<String, Object> l2,
                         Duration l2Ttl,
                         CacheInvalidationPublisher publisher,
-                        boolean allowNullValues) {
+                        boolean allowNullValues,
+                        @Nullable MeterRegistry meterRegistry) {
         super(allowNullValues);
         this.name = name;
         this.l1 = l1;
         this.l2 = l2;
         this.l2Ttl = l2Ttl;
         this.publisher = publisher;
+        this.meterRegistry = meterRegistry;
     }
 
     @Override
@@ -57,19 +69,43 @@ public class TwoTierCache extends AbstractValueAdaptingCache {
         return l1;
     }
 
+    /**
+     * L1 → L2 순으로 조회. L1 적중 시 바로 반환. L1 미스 시 L2 조회 후 적중하면 L1 채우고 반환.
+     * @param key the key whose associated value is to be returned
+     * @return
+     */
     @Override
     @Nullable
     protected Object lookup(Object key) {
         String k = str(key);
         Object v = l1.getIfPresent(k);
         if (v != null) {
+            record(RESULT_L1_HIT, k);
             return v;
         }
         Object fromL2 = l2Get(k);
         if (fromL2 != null) {
             l1.put(k, fromL2);   // L2 적중분을 L1 으로 승격(near-cache)
+            record(RESULT_L2_HIT, k);
+            return fromL2;
         }
-        return fromL2;
+        record(RESULT_MISS, k);
+        return null;
+    }
+
+    /**
+     * 조회 결과(L1 hit / L2 hit / miss)를 메트릭 카운터와 DEBUG 로그로 기록한다.
+     *
+     * <p>Micrometer 카운터는 등록 후 내부 맵에 캐시되므로 매 조회마다 호출해도 비용이 낮다.
+     * 로그는 {@code logging.level.github.lms.lemuel.common.config.cache=DEBUG} 일 때만 찍힌다.
+     */
+    private void record(String result, String k) {
+        if (meterRegistry != null) {
+            meterRegistry.counter(METRIC_REQUESTS, "cache", name, "result", result).increment();
+        }
+        if (log.isDebugEnabled()) {
+            log.debug("cache lookup [{}] cache={} key={}", result, name, k);
+        }
     }
 
     @Override

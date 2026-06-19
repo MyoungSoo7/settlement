@@ -114,6 +114,12 @@ springdoc:
     path: /swagger-ui.html
 
 app:
+  # JWT — shared-common JwtProperties(prefix=app.jwt). 루트 @SpringBootApplication 이
+  # common.config.jwt 를 스캔하므로 secret 이 필수다(order-service 와 동일 시크릿).
+  jwt:
+    issuer: ${JWT_ISSUER:lemuel}
+    secret: ${JWT_SECRET}
+    ttl-seconds: ${JWT_TTL_SECONDS:3600}
   kafka:
     enabled: ${APP_KAFKA_ENABLED:false}
     consumer:

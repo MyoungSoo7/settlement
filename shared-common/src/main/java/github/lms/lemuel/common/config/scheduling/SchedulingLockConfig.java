@@ -4,6 +4,7 @@ import javax.sql.DataSource;
 import net.javacrumbs.shedlock.core.LockProvider;
 import net.javacrumbs.shedlock.provider.jdbctemplate.JdbcTemplateLockProvider;
 import net.javacrumbs.shedlock.spring.annotation.EnableSchedulerLock;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -22,11 +23,15 @@ import org.springframework.jdbc.core.JdbcTemplate;
 public class SchedulingLockConfig {
 
     @Bean
-    public LockProvider shedLockProvider(DataSource dataSource) {
+    public LockProvider shedLockProvider(
+            DataSource dataSource,
+            // 서비스별 스키마(order=opslab, settlement=public) 재사용 — 네이티브 SQL 은 default_schema 를
+            // 무시하므로 명시적 한정자를 주입한다(ADR 0020 DB-per-service 분리 대응). pgbouncer 안전.
+            @Value("${spring.jpa.properties.hibernate.default_schema:public}") String schema) {
         return new JdbcTemplateLockProvider(
                 JdbcTemplateLockProvider.Configuration.builder()
                         .withJdbcTemplate(new JdbcTemplate(dataSource))
-                        .withTableName("opslab.shedlock") // Flyway 가 opslab 스키마에 생성 — search_path 기본값(public)과 불일치 방지
+                        .withTableName(schema + ".shedlock") // Flyway 가 default_schema 에 생성 — search_path 기본값(public)과 불일치 방지
                         .usingDbTime() // DB time 사용 → 노드 간 clock drift 면역
                         .build());
     }

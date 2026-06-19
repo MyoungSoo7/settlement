@@ -1,0 +1,17 @@
+# 데모 전용 빠른 발화 규칙 (커밋 안 함). repo HighHttpErrorRate(for:5m)와 동일 조건, for만 1m.
+groups:
+  - name: demo_fast_http_error
+    interval: 10s
+    rules:
+      - alert: HighHttpErrorRateFast
+        expr: |
+          100 * sum(rate(http_server_requests_seconds_count{job="lemuel",status=~"4..|5.."}[1m]))
+              / sum(rate(http_server_requests_seconds_count{job="lemuel"}[1m])) > 5
+        for: 1m
+        labels:
+          severity: warning
+          component: http
+          demo: "true"
+        annotations:
+          summary: "[DEMO] HTTP 에러율 > 5% (1분 지속)"
+          description: "데모용 빠른 규칙. 운영 규칙은 for:5m(HighHttpErrorRate)."
