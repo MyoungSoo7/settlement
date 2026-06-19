@@ -74,3 +74,4 @@ frontend/playwright/.cache/
 ### Python sim artifacts ###
 scripts/sim/__pycache__/
 scripts/sim/.sim_state.json
+docs

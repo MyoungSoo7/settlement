@@ -1,6 +1,7 @@
 package github.lms.lemuel.common.config.cache;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -22,6 +23,7 @@ public class TwoTierCacheManager implements CacheManager {
 
     private final Map<String, TwoTierCache> caches = new LinkedHashMap<>();
 
+    /** 메트릭 없이 생성(직접 생성 테스트 등). hit/miss 카운터는 비활성, DEBUG 로그만 동작한다. */
     public TwoTierCacheManager(Collection<String> cacheNames,
                                RedisTemplate<String, Object> redisTemplate,
                                CacheInvalidationPublisher publisher,
@@ -29,12 +31,23 @@ public class TwoTierCacheManager implements CacheManager {
                                Duration l2Ttl,
                                long l1MaxSize,
                                boolean allowNullValues) {
+        this(cacheNames, redisTemplate, publisher, l1Ttl, l2Ttl, l1MaxSize, allowNullValues, null);
+    }
+
+    public TwoTierCacheManager(Collection<String> cacheNames,
+                               RedisTemplate<String, Object> redisTemplate,
+                               CacheInvalidationPublisher publisher,
+                               Duration l1Ttl,
+                               Duration l2Ttl,
+                               long l1MaxSize,
+                               boolean allowNullValues,
+                               @Nullable MeterRegistry meterRegistry) {
         for (String name : cacheNames) {
             com.github.benmanes.caffeine.cache.Cache<Object, Object> l1 = Caffeine.newBuilder()
                     .expireAfterWrite(l1Ttl)
                     .maximumSize(l1MaxSize)
                     .build();
-            caches.put(name, new TwoTierCache(name, l1, redisTemplate, l2Ttl, publisher, allowNullValues));
+            caches.put(name, new TwoTierCache(name, l1, redisTemplate, l2Ttl, publisher, allowNullValues, meterRegistry));
         }
     }
 

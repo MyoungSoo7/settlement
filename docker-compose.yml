@@ -168,6 +168,7 @@ services:
       DB_NAME: inter
       DB_USER: ${POSTGRES_USER}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
+      LISTEN_PORT: "6432"                 # pgbouncer 리슨 포트를 6432 로 (기본 5432). 매핑·헬스체크·앱 접속(pgbouncer:6432)과 일치
       AUTH_TYPE: scram-sha-256
       POOL_MODE: transaction              # 트랜잭션 단위로 백엔드 커넥션 반납 → 멀티플렉싱
       MAX_CLIENT_CONN: "1000"             # 앱 측 동시 커넥션 상한 (가상 스레드 대응)

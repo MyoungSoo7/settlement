@@ -1,8 +1,10 @@
 package github.lms.lemuel.reservation;
 
+import github.lms.lemuel.common.config.JacksonCompatConfig;
 import io.github.cdimascio.dotenv.Dotenv;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.Import;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
@@ -21,6 +23,9 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         //  - Kafka 컨테이너 팩토리는 자체 ReservationKafkaConfig, 예외 매핑은 ReservationExceptionHandler 가 담당
         "github.lms.lemuel.common.config.jwt",
 })
+// shared-common 의 Jackson 2↔3 호환 ObjectMapper 빈만 선택 주입한다.
+// (common.config 전체 스캔은 Redis 의존 TwoTierCacheConfig 등이 딸려와 회피)
+@Import(JacksonCompatConfig.class)
 @EnableScheduling
 public class ReservationServiceApplication {
 
