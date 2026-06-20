@@ -1,0 +1,1 @@
+import{a as r}from"./index-BGeq5yEj.js";const t={createOrder:async e=>(await r.post("/orders",e)).data,getOrder:async e=>(await r.get(`/orders/${e}`)).data,getUserOrders:async e=>(await r.get(`/orders/user/${e}`)).data,cancelOrder:async e=>(await r.patch(`/orders/${e}/cancel`)).data};export{t as o};

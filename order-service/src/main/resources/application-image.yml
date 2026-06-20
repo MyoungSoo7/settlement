@@ -1,0 +1,16 @@
+# 이미지 업로드 설정
+app:
+  upload:
+    dir: /data/uploads
+    base-url: /assets
+    max-file-size: 5MB
+    max-request-size: 25MB
+
+# Spring Multipart 설정
+spring:
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 5MB
+      max-request-size: 25MB
+      file-size-threshold: 2MB

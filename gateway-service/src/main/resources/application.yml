@@ -1,0 +1,42 @@
+spring:
+  application:
+    name: lemuel-gateway
+
+  main:
+    # Gateway 는 WebFlux(reactive) 기반이므로 명시적으로 고정한다.
+    web-application-type: reactive
+
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: order-service-orders
+              uri: ${ORDER_SERVICE_URI:http://localhost:8088}
+              predicates:
+                - Path=/api/orders/**,/api/payments/**,/api/refunds/**,/api/products/**,/api/categories/**,/api/tags/**,/api/coupons/**,/api/reviews/**,/api/users/**,/api/auth/**,/reservations/**,/admin/categories/**,/admin/pg/**,/admin/products/**
+            - id: settlement-service
+              uri: ${SETTLEMENT_SERVICE_URI:http://localhost:8082}
+              predicates:
+                - Path=/api/settlements/**,/api/reconciliation/**,/api/reports/**,/api/ledger/**,/admin/payouts/**,/admin/chargebacks/**,/admin/pg-reconciliation/**,/admin/dlq/**,/admin/reconciliation/**
+
+server:
+  port: 8080
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true

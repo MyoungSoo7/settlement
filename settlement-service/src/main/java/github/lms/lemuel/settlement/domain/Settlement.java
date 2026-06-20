@@ -1,0 +1,411 @@
+package github.lms.lemuel.settlement.domain;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
+public class Settlement {
+
+    /**
+     * 레거시 기본 수수료율 (3%). 차등 수수료 전환 전 생성된 정산은 이 값으로 계산.
+     * 신규 경로는 {@link SellerTier} 별 rate 를 받아 사용한다.
+     */
+    public static final BigDecimal COMMISSION_RATE = new BigDecimal("0.03");
+
+    private Long id;
+    private Long paymentId;
+    private Long orderId;
+    private BigDecimal paymentAmount;     // 원 결제 금액
+    private BigDecimal refundedAmount;    // 환불 금액
+    private BigDecimal commission;        // 수수료
+    private BigDecimal commissionRate;    // 적용된 수수료율 (이력 보존)
+    private BigDecimal netAmount;         // 실 지급액
+    private SettlementStatus status;
+    private LocalDate settlementDate;
+    private String failureReason;         // 실패 사유
+    private LocalDateTime confirmedAt;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+    private Long version;                 // 낙관적 락 버전 (JPA @Version)
+
+    /** 정산금 중 보류된 금액. 즉시 지급액 = netAmount - holdbackAmount. */
+    private BigDecimal holdbackAmount = BigDecimal.ZERO;
+    /** 정산 시점 적용된 보류율 (이력 보존). */
+    private BigDecimal holdbackRate = BigDecimal.ZERO;
+    /** 보류 해제 예정일. 이 날짜 이후 배치가 자동 release. */
+    private LocalDate holdbackReleaseDate;
+    /** 보류 해제 여부. */
+    private boolean holdbackReleased = false;
+    private LocalDateTime holdbackReleasedAt;
+
+    public Settlement() {
+        this.status = SettlementStatus.REQUESTED; // 초기 상태를 REQUESTED로 변경
+        this.refundedAmount = BigDecimal.ZERO;
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public Settlement(Long id, Long paymentId, Long orderId, BigDecimal paymentAmount,
+                      BigDecimal refundedAmount, BigDecimal commission, BigDecimal netAmount,
+                      SettlementStatus status, LocalDate settlementDate, String failureReason,
+                      LocalDateTime confirmedAt, LocalDateTime createdAt, LocalDateTime updatedAt) {
+        this.id = id;
+        this.paymentId = paymentId;
+        this.orderId = orderId;
+        this.paymentAmount = paymentAmount;
+        this.refundedAmount = refundedAmount != null ? refundedAmount : BigDecimal.ZERO;
+        this.commission = commission;
+        this.netAmount = netAmount;
+        this.status = status != null ? status : SettlementStatus.REQUESTED;
+        this.settlementDate = settlementDate;
+        this.failureReason = failureReason;
+        this.confirmedAt = confirmedAt;
+        this.createdAt = createdAt != null ? createdAt : LocalDateTime.now();
+        this.updatedAt = updatedAt != null ? updatedAt : LocalDateTime.now();
+    }
+
+    public static Settlement createFromPayment(Long paymentId, Long orderId,
+                                               BigDecimal paymentAmount, LocalDate settlementDate) {
+        return createFromPayment(paymentId, orderId, paymentAmount, settlementDate, COMMISSION_RATE);
+    }
+
+    /**
+     * 차등 수수료 지원 팩토리.
+     * @param commissionRate 적용할 수수료율 (예: {@link SellerTier#rate()}). null 이면 {@link #COMMISSION_RATE}.
+     */
+    public static Settlement createFromPayment(Long paymentId, Long orderId,
+                                               BigDecimal paymentAmount, LocalDate settlementDate,
+                                               BigDecimal commissionRate) {
+        Settlement settlement = new Settlement();
+        settlement.setPaymentId(paymentId);
+        settlement.setOrderId(orderId);
+        settlement.setPaymentAmount(paymentAmount);
+        settlement.setSettlementDate(settlementDate);
+        settlement.commissionRate = commissionRate != null ? commissionRate : COMMISSION_RATE;
+
+        settlement.validatePaymentId();
+        settlement.validateAmount();
+        settlement.validateSettlementDate();
+
+        settlement.calculateCommissionAndNetAmount();
+
+        return settlement;
+    }
+
+    private void calculateCommissionAndNetAmount() {
+        BigDecimal rate = commissionRate != null ? commissionRate : COMMISSION_RATE;
+        this.commission = paymentAmount.multiply(rate)
+                .setScale(2, RoundingMode.HALF_UP);
+        this.netAmount = paymentAmount.subtract(commission)
+                .setScale(2, RoundingMode.HALF_UP);
+    }
+
+    public void validatePaymentId() {
+        if (paymentId == null || paymentId <= 0) {
+            throw new IllegalArgumentException("Payment ID must be a positive number");
+        }
+    }
+
+    public void validateAmount() {
+        if (paymentAmount == null || paymentAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Amount must be greater than zero");
+        }
+    }
+
+    public void validateSettlementDate() {
+        if (settlementDate == null) {
+            throw new IllegalArgumentException("Settlement date is required");
+        }
+    }
+
+    // ========== 상태 머신 메서드 ==========
+
+    /**
+     * 정산 처리 시작
+     * REQUESTED → PROCESSING
+     */
+    public void startProcessing() {
+        if (this.status != SettlementStatus.REQUESTED) {
+            throw new IllegalStateException(
+                String.format("Cannot start processing. Current status: %s. Expected: REQUESTED", this.status)
+            );
+        }
+        this.status = SettlementStatus.PROCESSING;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    /**
+     * 정산 완료
+     * PROCESSING → DONE
+     */
+    public void complete() {
+        if (this.status != SettlementStatus.PROCESSING) {
+            throw new IllegalStateException(
+                String.format("Cannot complete. Current status: %s. Expected: PROCESSING", this.status)
+            );
+        }
+        this.status = SettlementStatus.DONE;
+        this.confirmedAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    /**
+     * 정산 실패
+     * PROCESSING → FAILED
+     */
+    public void fail(String reason) {
+        if (this.status != SettlementStatus.PROCESSING) {
+            throw new IllegalStateException(
+                String.format("Cannot fail. Current status: %s. Expected: PROCESSING", this.status)
+            );
+        }
+        this.status = SettlementStatus.FAILED;
+        this.failureReason = reason;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    /**
+     * 재시도 (실패한 정산을 다시 요청 상태로)
+     * FAILED → REQUESTED
+     */
+    public void retry() {
+        if (this.status != SettlementStatus.FAILED) {
+            throw new IllegalStateException(
+                String.format("Cannot retry. Current status: %s. Expected: FAILED", this.status)
+            );
+        }
+        this.status = SettlementStatus.REQUESTED;
+        this.failureReason = null;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    /**
+     * 정산 확정 — 정식 상태 머신을 우회하지 않고 REQUESTED → PROCESSING → DONE 를 한 번에 수행한다.
+     * 레거시 호출부 호환을 위해 제공되며, 신규 코드는 startProcessing()/complete() 를 직접 호출할 것.
+     */
+    public void confirm() {
+        if (this.status == SettlementStatus.REQUESTED) {
+            startProcessing();
+        }
+        if (this.status != SettlementStatus.PROCESSING) {
+            throw new IllegalStateException(
+                String.format("Cannot confirm. Current status: %s. Expected: REQUESTED or PROCESSING", this.status)
+            );
+        }
+        complete();
+    }
+
+    /**
+     * 정산 취소 — 종료 상태(DONE)는 취소 불가
+     */
+    public void cancel() {
+        if (this.status == SettlementStatus.DONE) {
+            throw new IllegalStateException("DONE settlements cannot be canceled");
+        }
+        this.status = SettlementStatus.CANCELED;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    // ========== 환불 처리 ==========
+
+    /**
+     * 환불 반영 (정산 금액 조정)
+     * @param refundAmount 환불 금액
+     */
+    public void adjustForRefund(BigDecimal refundAmount) {
+        if (refundAmount == null || refundAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Refund amount must be greater than zero");
+        }
+
+        // DONE 상태는 이미 판매자 지급 완료된 정산 → 금액 직접 변경 금지.
+        // 환불은 SettlementAdjustment 별도 레코드로만 기록해야 원장 정합성 유지됨.
+        if (this.status == SettlementStatus.DONE) {
+            throw new IllegalStateException(
+                "DONE settlement is immutable. Use SettlementAdjustment to record the refund offset.");
+        }
+
+        if (this.refundedAmount == null) {
+            this.refundedAmount = BigDecimal.ZERO;
+        }
+
+        BigDecimal newRefunded = this.refundedAmount.add(refundAmount);
+        if (newRefunded.compareTo(this.paymentAmount) > 0) {
+            throw new IllegalArgumentException(
+                "Cumulative refund " + newRefunded + " exceeds payment amount " + this.paymentAmount);
+        }
+        this.refundedAmount = newRefunded;
+
+        // 순 정산 금액 재계산: (결제금액 - 환불금액 - 수수료)
+        BigDecimal remainingAmount = this.paymentAmount.subtract(this.refundedAmount);
+        this.netAmount = remainingAmount.subtract(this.commission).setScale(2, RoundingMode.HALF_UP);
+
+        // 환불로 인해 정산 금액이 0 이하가 되면 취소 처리
+        if (this.netAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            this.status = SettlementStatus.CANCELED;
+        }
+
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    // ========== 상태 확인 메서드 ==========
+
+    public boolean isConfirmed() {
+        return this.status == SettlementStatus.DONE;
+    }
+
+    public boolean isPending() {
+        return this.status == SettlementStatus.REQUESTED;
+    }
+
+    public boolean canRetry() {
+        return this.status == SettlementStatus.FAILED;
+    }
+
+    public boolean isProcessing() {
+        return this.status == SettlementStatus.PROCESSING;
+    }
+
+    public boolean isDone() {
+        return this.status == SettlementStatus.DONE;
+    }
+
+    // ========== Getters and Setters ==========
+    
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    
+    public Long getPaymentId() { return paymentId; }
+    public void setPaymentId(Long paymentId) { this.paymentId = paymentId; }
+    
+    public Long getOrderId() { return orderId; }
+    public void setOrderId(Long orderId) { this.orderId = orderId; }
+    
+    public BigDecimal getPaymentAmount() { return paymentAmount; }
+    public void setPaymentAmount(BigDecimal paymentAmount) { this.paymentAmount = paymentAmount; }
+    
+    public BigDecimal getRefundedAmount() { return refundedAmount != null ? refundedAmount : BigDecimal.ZERO; }
+    public void setRefundedAmount(BigDecimal refundedAmount) { this.refundedAmount = refundedAmount; }
+    
+    public BigDecimal getCommission() { return commission; }
+    public void setCommission(BigDecimal commission) { this.commission = commission; }
+
+    public BigDecimal getCommissionRate() { return commissionRate != null ? commissionRate : COMMISSION_RATE; }
+    public void setCommissionRate(BigDecimal commissionRate) { this.commissionRate = commissionRate; }
+    
+    public BigDecimal getNetAmount() { return netAmount; }
+    public void setNetAmount(BigDecimal netAmount) { this.netAmount = netAmount; }
+    
+    public SettlementStatus getStatus() { return status; }
+    public void setStatus(SettlementStatus status) { this.status = status; }
+    
+    public LocalDate getSettlementDate() { return settlementDate; }
+    public void setSettlementDate(LocalDate settlementDate) { this.settlementDate = settlementDate; }
+    
+    public String getFailureReason() { return failureReason; }
+    public void setFailureReason(String failureReason) { this.failureReason = failureReason; }
+    
+    public LocalDateTime getConfirmedAt() { return confirmedAt; }
+    public void setConfirmedAt(LocalDateTime confirmedAt) { this.confirmedAt = confirmedAt; }
+    
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    public Long getVersion() { return version; }
+    public void setVersion(Long version) { this.version = version; }
+
+    // ========== 정산 보류 (Holdback) ==========
+
+    /**
+     * 보류 정책 적용. 정산 생성 직후 호출 (또는 createFromPayment 안에서 자동).
+     *
+     * @param rate         보류율 (예: 0.30 = 30%)
+     * @param releaseDate  보류 해제 예정일 (settlementDate + N 영업일)
+     */
+    public void applyHoldback(BigDecimal rate, LocalDate releaseDate) {
+        if (rate == null || rate.signum() < 0 || rate.compareTo(BigDecimal.ONE) > 0) {
+            throw new IllegalArgumentException("보류율은 0 ~ 1 사이여야 합니다: " + rate);
+        }
+        if (this.netAmount == null) {
+            throw new IllegalStateException("netAmount 계산 후에만 holdback 적용 가능");
+        }
+        this.holdbackRate = rate;
+        this.holdbackAmount = this.netAmount.multiply(rate)
+                .setScale(2, RoundingMode.HALF_UP);
+        this.holdbackReleaseDate = releaseDate;
+        this.holdbackReleased = rate.signum() == 0; // 0% 면 보류 없으므로 즉시 released
+        if (this.holdbackReleased) {
+            this.holdbackReleasedAt = LocalDateTime.now();
+        }
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    /**
+     * 보류 해제 — release_date 도달 후 배치가 호출. 이미 해제됐거나 환불로 소진된 경우 무시.
+     */
+    public void releaseHoldback(LocalDate today) {
+        if (this.holdbackReleased) return;
+        if (this.holdbackReleaseDate == null) return;
+        if (today.isBefore(this.holdbackReleaseDate)) {
+            throw new IllegalStateException(
+                    "아직 release 시점이 아닙니다. releaseDate=" + holdbackReleaseDate + ", today=" + today);
+        }
+        this.holdbackReleased = true;
+        this.holdbackReleasedAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    /**
+     * 환불 시 holdback 에서 우선 차감. holdback 잔액으로 충분하면 셀러 net 에는 영향 없음 —
+     * 신뢰도 낮은 셀러를 위한 안전장치 효과.
+     *
+     * @return 실제 holdback 에서 차감된 금액 (나머지는 호출자가 일반 환불 흐름으로 처리)
+     */
+    public BigDecimal consumeHoldbackForRefund(BigDecimal refundAmount) {
+        if (refundAmount == null || refundAmount.signum() <= 0) {
+            throw new IllegalArgumentException("refundAmount 양수 필수");
+        }
+        if (this.holdbackAmount.signum() <= 0 || this.holdbackReleased) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal consumed = this.holdbackAmount.compareTo(refundAmount) <= 0
+                ? this.holdbackAmount : refundAmount;
+        this.holdbackAmount = this.holdbackAmount.subtract(consumed);
+        if (this.holdbackAmount.signum() == 0) {
+            this.holdbackReleased = true;
+            this.holdbackReleasedAt = LocalDateTime.now();
+        }
+        this.updatedAt = LocalDateTime.now();
+        return consumed;
+    }
+
+    /**
+     * 셀러에게 즉시 지급 가능한 금액 (보류분 제외).
+     */
+    public BigDecimal getImmediatePayoutAmount() {
+        if (this.netAmount == null) return BigDecimal.ZERO;
+        if (this.holdbackReleased) return this.netAmount;
+        return this.netAmount.subtract(this.holdbackAmount).max(BigDecimal.ZERO);
+    }
+
+    public boolean isHoldbackReleasable(LocalDate today) {
+        return !holdbackReleased
+                && holdbackAmount.signum() > 0
+                && holdbackReleaseDate != null
+                && !today.isBefore(holdbackReleaseDate);
+    }
+
+    public BigDecimal getHoldbackAmount() { return holdbackAmount; }
+    public void setHoldbackAmount(BigDecimal v) { this.holdbackAmount = v == null ? BigDecimal.ZERO : v; }
+    public BigDecimal getHoldbackRate() { return holdbackRate; }
+    public void setHoldbackRate(BigDecimal v) { this.holdbackRate = v == null ? BigDecimal.ZERO : v; }
+    public LocalDate getHoldbackReleaseDate() { return holdbackReleaseDate; }
+    public void setHoldbackReleaseDate(LocalDate v) { this.holdbackReleaseDate = v; }
+    public boolean isHoldbackReleased() { return holdbackReleased; }
+    public void setHoldbackReleased(boolean v) { this.holdbackReleased = v; }
+    public LocalDateTime getHoldbackReleasedAt() { return holdbackReleasedAt; }
+    public void setHoldbackReleasedAt(LocalDateTime v) { this.holdbackReleasedAt = v; }
+}

@@ -1,0 +1,76 @@
+치ㅊㅊ
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+
+### VS Code ###
+.vscode/
+.env
+
+### react ###
+node_modules/
+frontend/node_modules/
+
+/gradle.properties
+.gradle.properties
+gradle.properties
+
+### Kubernetes Secrets (절대 커밋 금지) ###
+k8s/secret.yaml
+
+### Gradle ###
+.gradle/
+gradle-app.setting
+!gradle-wrapper.jar
+
+### Build output ###
+build/
+target/
+**/*.class
+
+### Local runtime artifacts ###
+.claude/scheduled_tasks.lock
+*.stackdump
+
+### Claude auto-memory (local only) ###
+memory/
+
+### OMC local runtime state ###
+.omc/
+
+
+### Playwright ###
+frontend/playwright-report/
+frontend/test-results/
+frontend/blob-report/
+frontend/playwright/.cache/
+
+### Python sim artifacts ###
+scripts/sim/__pycache__/
+scripts/sim/.sim_state.json

@@ -1,0 +1,205 @@
+spring:
+  profiles:
+    active: local
+
+  application:
+    name: lemuel-settlement
+
+  threads:
+    virtual:
+      enabled: true  # Java 21+ 가상 스레드 (Tomcat 요청 처리 + @Scheduled). JEP 491(JDK24+)로 synchronized 핀 없음
+
+  datasource:
+    # reWriteBatchedInserts=true → JDBC 배치 INSERT 를 단일 multi-row 문장으로 재작성 (정산/원장 대량 적재 처리량↑)
+    url: jdbc:postgresql://localhost:5432/opslab?reWriteBatchedInserts=true
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      # 가상 스레드가 켜져 있어 요청 스레드 수에는 상한이 없다. 따라서 동시 처리량의
+      # 실질 천장은 이 커넥션 풀이다 — 암묵적 기본값(10) 대신 명시적으로 둬서 의도된 스로틀로 만든다.
+      # PostgreSQL max_connections(기본 100)를 서비스들이 공유하므로 과대 설정 금지.
+      pool-name: lemuel-settlement-pool
+      maximum-pool-size: ${DB_POOL_MAX:20}
+      minimum-idle: ${DB_POOL_MIN_IDLE:5}
+      # 풀 고갈 시 가상 스레드가 무한 대기하지 않도록 빠르게 실패시킨다.
+      connection-timeout: 10000
+      leak-detection-threshold: 30000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: false
+        default_schema: opslab
+        # JDBC 배치 — 정산/원장 대량 INSERT/UPDATE 라운드트립 감소
+        jdbc:
+          batch_size: 50
+          batch_versioned_data: true
+        order_inserts: true
+        order_updates: true
+
+  # 마이그레이션은 order-service 가 책임진다 (단일 PG 공유, Phase 5 이후 분리 검토).
+  flyway:
+    enabled: false
+
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=500,expireAfterWrite=600s
+
+  data:
+    elasticsearch:
+      repositories:
+        enabled: false
+
+  elasticsearch:
+    uris: ${ELASTICSEARCH_URIS:http://localhost:9200}
+    username: ${ELASTICSEARCH_USER:}
+    password: ${ELASTICSEARCH_PASSWORD:}
+    connection-timeout: 5s
+    socket-timeout: 60s
+
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: lemuel-settlement
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      properties:
+        isolation.level: read_committed
+    # Producer — DLT publish 와 replay 시 원본 토픽 publish 에 사용
+    producer:
+      acks: all
+      retries: 5
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+    listener:
+      ack-mode: manual_immediate
+      missing-topics-fatal: false
+
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+  batch:
+    jdbc:
+      initialize-schema: always
+    job:
+      enabled: false
+
+server:
+  port: 8082
+  shutdown: graceful
+  tomcat:
+    connection-timeout: 20s
+    threads:
+      max: 200
+      min-spare: 10
+    uri-encoding: UTF-8
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+management:
+  tracing:
+    sampling:
+      probability: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:1.0}
+  otlp:
+    tracing:
+      endpoint: ${MANAGEMENT_OTLP_TRACING_ENDPOINT:}
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    prometheus:
+      enabled: true
+    health:
+      show-details: always
+      show-components: always
+      probes:
+        enabled: true
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true
+    elasticsearch:
+      enabled: false
+    db:
+      enabled: true
+  server:
+    port: 8083
+  metrics:
+    distribution:
+      percentiles-histogram:
+        settlement.batch.creation.duration: true
+        settlement.batch.confirmation.duration: true
+        settlement.batch.adjustment.duration: true
+      percentiles:
+        settlement.batch.creation.duration: 0.5,0.95,0.99
+        settlement.batch.confirmation.duration: 0.5,0.95,0.99
+        settlement.batch.adjustment.duration: 0.5,0.95,0.99
+    tags:
+      application: ${spring.application.name}
+      environment: ${ENVIRONMENT:local}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+app:
+  # 읽기/쓰기 분리 (opt-in). enabled=true 일 때만 라우팅 데이터소스 활성 — readOnly 트랜잭션은 read 로.
+  datasource:
+    read-replica:
+      enabled: ${APP_DATASOURCE_READ_REPLICA_ENABLED:false}
+    # write:
+    #   jdbc-url: ${SPRING_DATASOURCE_URL}
+    #   username: ${POSTGRES_USER}
+    #   password: ${POSTGRES_PASSWORD}
+    #   maximum-pool-size: ${DB_POOL_MAX:30}
+    # read:
+    #   jdbc-url: ${APP_DATASOURCE_READ_URL}
+    #   username: ${POSTGRES_USER}
+    #   password: ${POSTGRES_PASSWORD}
+    #   maximum-pool-size: ${DB_POOL_MAX:30}
+    #   read-only: true
+  kafka:
+    enabled: ${APP_KAFKA_ENABLED:false}
+    consumer:
+      # 리스너 컨테이너 동시성(컨슈머 스레드 수). 파티션 단위 병렬 소비 → 정산 생성 병렬화.
+      # 유효 상한은 topic.partitions. 더 올리려면 partitions 와 함께 상향.
+      concurrency: ${APP_KAFKA_CONSUMER_CONCURRENCY:3}
+    topic:
+      partitions: ${APP_KAFKA_TOPIC_PARTITIONS:3}
+      payment-captured: lemuel.payment.captured
+      payment-refunded: lemuel.payment.refunded
+  search:
+    enabled: false
+  # 원장 전용 트랜잭셔널 아웃박스 로컬 폴러 (Kafka 미경유)
+  ledger-outbox:
+    enabled: ${APP_LEDGER_OUTBOX_ENABLED:true}
+    poll-delay-ms: ${APP_LEDGER_OUTBOX_POLL_DELAY_MS:5000}
+  jwt:
+    issuer: ${JWT_ISSUER:lemuel}
+    secret: ${JWT_SECRET:dev-secret-please-override}
+    ttl-seconds: ${JWT_TTL_SECONDS:3600}
+  # 정산금 출금 (Payout) 정책
+  payout:
+    system-daily-limit: ${APP_PAYOUT_SYSTEM_DAILY_LIMIT:1000000000}
+    seller-daily-limit: ${APP_PAYOUT_SELLER_DAILY_LIMIT:100000000}
+    execute-cron: "0 0 4 * * *"
+  holdback:
+    release-cron: "0 0 3 * * *"
+  # 펌뱅킹 mock — 0.0 = 항상 성공. 시연용으로 0.1 (10% 실패) 으로 설정해 운영자 retry 워크플로 검증
+  firmbanking:
+    failure-rate: ${APP_FIRMBANKING_FAILURE_RATE:0.0}

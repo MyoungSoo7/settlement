@@ -1,0 +1,410 @@
+name: ci
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  JAVA_VERSION: "25"
+  REGISTRY: ghcr.io
+  BACKEND_IMAGE: ${{ github.repository }}
+  FRONTEND_IMAGE: ${{ github.repository }}-frontend
+
+jobs:
+  changes:
+    name: Detect changed paths
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Paths filter
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            frontend:
+              - 'frontend/**'
+            backend:
+              - '**'
+              - '!frontend/**'
+
+  backend-ci:
+    name: Backend - Build/Test/JaCoCo/SonarCloud
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
+      security-events: write
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: testdb
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      elasticsearch:
+        image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+        env:
+          discovery.type: single-node
+          xpack.security.enabled: false
+          ES_JAVA_OPTS: -Xms512m -Xmx512m
+        ports:
+          - 9200:9200
+        options: >-
+          --health-cmd "curl -f http://localhost:9200/_cluster/health || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      # build 안에 test + jacoco verification
+      - name: Build (skip coverage verification)
+        run: ./gradlew clean build --no-daemon --stacktrace -x jacocoTestCoverageVerification -x test
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/testdb
+          SPRING_DATASOURCE_USERNAME: testuser
+          SPRING_DATASOURCE_PASSWORD: testpass
+          SPRING_ELASTICSEARCH_URIS: http://localhost:9200
+
+      - name: Init schema (opslab)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+          PGPASSWORD=testpass psql -h localhost -U testuser -d testdb -c "CREATE SCHEMA IF NOT EXISTS opslab;"    
+
+      - name: Upload test/coverage reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-reports
+          path: |
+            */build/reports/jacoco/test/
+            */build/reports/tests/test/
+          retention-days: 30
+
+      - name: Add coverage comment to PR
+        if: github.event_name == 'pull_request'
+        uses: madrapps/jacoco-report@v1.6.1
+        with:
+          paths: ${{ github.workspace }}/*/build/reports/jacoco/test/jacocoTestReport.xml
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: SonarCloud Scan
+        if: github.event_name != 'pull_request'
+        continue-on-error: true
+        run: ./gradlew sonar --no-daemon --stacktrace
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/testdb
+          SPRING_DATASOURCE_USERNAME: testuser
+          SPRING_DATASOURCE_PASSWORD: testpass
+          SPRING_ELASTICSEARCH_URIS: http://localhost:9200
+
+      - name: Run Snyk Security Scan (Backend)
+        uses: snyk/actions/gradle-jdk21@master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high --all-projects
+
+      - name: Upload Snyk results to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v4
+        if: always() && hashFiles('snyk.sarif') != ''
+        with:
+          sarif_file: snyk.sarif
+
+  #      - name: SonarCloud Quality Gate
+  #        uses: sonarsource/sonarqube-quality-gate-action@v1.1.0
+  #        timeout-minutes: 5
+  #        env:
+  #          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+  #        with:
+  #          scanMetadataReportFile: build/sonar/report-task.txt
+
+  backend-ghcr:
+    name: Backend - Build & Push to GHCR
+    runs-on: ubuntu-latest
+    needs: [changes, backend-ci]
+    if: github.event_name != 'pull_request' && needs.changes.outputs.backend == 'true'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 준비: Docker Hub 로그인 (추후 사용)
+      # - name: Log in to Docker Hub
+      #   uses: docker/login-action@v3
+      #   with:
+      #     username: ${{ secrets.DOCKERHUB_USERNAME }}
+      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push (GHCR)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Dockerfile 의 ARG MODULE 가 비어있으면 'gradle ::bootJar' 처럼 빈 세그먼트가 되어 빌드 실패.
+          # order-service 가 LemuelApplication (settlement 이미지의 entrypoint) 을 가짐.
+          build-args: |
+            MODULE=order-service
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
+  frontend-ci:
+    name: Frontend - Production Build & Quality
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      # Production typecheck (excludes test files)
+      - name: TypeScript type check (production code only)
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: ESLint check
+        working-directory: frontend
+        run: npm run lint
+        continue-on-error: true
+
+      # Build production bundle
+      - name: Build production bundle
+        working-directory: frontend
+        run: npm run build
+        env:
+          API_BASE_URL: ${{ vars.VITE_API_BASE_URL || '' }}
+          TOSS_CLIENT_KEY: ${{ secrets.VITE_TOSS_CLIENT_KEY || 'test_ck_D5GePWvyJnrK0W0k6q8gLzN97Eoq' }}
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+          retention-days: 7
+
+      - name: Run Snyk Security Scan (Frontend)
+        uses: snyk/actions/node@master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high --file=frontend/package.json
+
+      - name: Upload Snyk results to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v4
+        if: always() && hashFiles('snyk.sarif') != ''
+        with:
+          sarif_file: snyk.sarif
+
+  # Optional: Separate test job (disabled by default)
+  frontend-tests:
+    name: Frontend - Tests (Optional)
+    runs-on: ubuntu-latest
+    needs: changes
+    # Only run if explicitly triggered or if RUN_TESTS env var is set
+    if: false  # Change to 'needs.changes.outputs.frontend == true' to enable
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run tests
+        working-directory: frontend
+        run: npm run test:run
+
+      - name: Upload test coverage
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: frontend-test-coverage
+          path: frontend/coverage
+          retention-days: 30
+
+  frontend-ghcr:
+    name: Frontend - Build & Push to GHCR
+    runs-on: ubuntu-latest
+    needs: [changes, frontend-ci]
+    if: github.event_name != 'pull_request' && needs.changes.outputs.frontend == 'true'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push (GHCR)
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VITE_API_BASE_URL=${{ vars.VITE_API_BASE_URL || '' }}
+            VITE_TOSS_CLIENT_KEY=${{ secrets.VITE_TOSS_CLIENT_KEY || 'test_ck_D5GePWvyJnrK0W0k6q8gLzN97Eoq' }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
+  # main 머지 후 ArgoCD 가 새 이미지를 픽업·rollout 한 뒤 운영(jen.lemuel.co.kr) 에 직접 E2E.
+  # 코드 단위테스트가 잡지 못하는 nginx/CORS/JWT 등 통합 결함을 30초 안에 감지.
+  #
+  # needs 의 4 단계 (ci + ghcr) 를 모두 포함 — ci 가 실패하면 ghcr 는 skipped 되어
+  # `result != 'failure'` 는 통과해버림. 그래서 ci.result 도 직접 검사: success/skipped 만 허용.
+  # paths-filter 로 변경 없는 쪽은 skipped 되니 success/skipped 양쪽 다 통과시킴.
+  post-deploy-smoke:
+    name: Post-deploy E2E (jen.lemuel.co.kr)
+    runs-on: ubuntu-latest
+    needs: [frontend-ci, frontend-ghcr, backend-ci, backend-ghcr]
+    if: |
+      github.event_name == 'push'
+      && github.ref == 'refs/heads/main'
+      && always()
+      && !cancelled()
+      && (needs.frontend-ci.result == 'success' || needs.frontend-ci.result == 'skipped')
+      && (needs.backend-ci.result == 'success' || needs.backend-ci.result == 'skipped')
+      && (needs.frontend-ghcr.result == 'success' || needs.frontend-ghcr.result == 'skipped')
+      && (needs.backend-ghcr.result == 'success' || needs.backend-ghcr.result == 'skipped')
+    permissions:
+      contents: read
+    env:
+      PLAYWRIGHT_BASE_URL: https://jen.lemuel.co.kr
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install Playwright browser
+        working-directory: frontend
+        run: npm run e2e:install
+
+      # ArgoCD image-updater 의 폴링 주기(약 2분) + pod rollout 여유.
+      # 짧으면 옛 이미지로 테스트 → 의미 없음. 길면 알림 지연. 3분으로 타협.
+      - name: Wait for ArgoCD rollout
+        run: sleep 180
+
+      - name: Run Playwright E2E against jen.lemuel.co.kr
+        working-directory: frontend
+        run: npm run e2e
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 14
+
+

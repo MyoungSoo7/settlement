@@ -1,0 +1,339 @@
+spring:
+  profiles:
+    active: local
+
+  application:
+    name: lemuel
+
+  threads:
+    virtual:
+      enabled: true  # Java 21+ 가상 스레드 (Tomcat 요청 처리 + @Scheduled). JEP 491(JDK24+)로 synchronized 핀 없음
+
+  datasource:
+    # reWriteBatchedInserts=true → JDBC 배치 INSERT 를 단일 multi-row 문장으로 재작성 (대량 적재 처리량↑)
+    url: jdbc:postgresql://localhost:5432/opslab?reWriteBatchedInserts=true
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      # 가상 스레드가 켜져 있어 요청 스레드 수에는 상한이 없다. 따라서 동시 처리량의
+      # 실질 천장은 이 커넥션 풀이다 — 암묵적 기본값(10) 대신 명시적으로 둬서 의도된 스로틀로 만든다.
+      # PostgreSQL max_connections(기본 100)를 서비스들이 공유하므로 과대 설정 금지.
+      pool-name: lemuel-order-pool
+      maximum-pool-size: ${DB_POOL_MAX:20}
+      minimum-idle: ${DB_POOL_MIN_IDLE:5}
+      # 풀 고갈 시 가상 스레드가 무한 대기하지 않도록 빠르게 실패시킨다.
+      connection-timeout: 10000
+      leak-detection-threshold: 30000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: false
+        default_schema: opslab
+        # JDBC 배치 — INSERT/UPDATE 를 묶어 라운드트립 감소. order_inserts/updates 로 배치 그룹화 정렬,
+        # batch_versioned_data 로 @Version(낙관적 락) 엔티티도 배치 대상에 포함.
+        jdbc:
+          batch_size: 50
+          batch_versioned_data: true
+        order_inserts: true
+        order_updates: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    schemas: opslab
+    default-schema: opslab
+    create-schemas: true
+    validate-on-migrate: false
+
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=500,expireAfterWrite=600s
+
+  data:
+    elasticsearch:
+      repositories:
+        enabled: false
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+
+  elasticsearch:
+    uris: https://5d37123531be45ad8e84d19cca735fb5.us-central1.gcp.cloud.es.io
+    username: ${ELASTICSEARCH_USER}
+    password: ${ELASTICSEARCH_PASSWORD}
+    connection-timeout: 5s
+    socket-timeout: 60s
+
+  # Kafka 설정 — app.kafka.enabled 로 활성/비활성 스위칭
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      acks: all                                 # 모든 in-sync replica 확인 (신뢰성 우선)
+      retries: 5
+      properties:
+        enable.idempotence: true                # 프로듀서 중복 발행 방지
+        max.in.flight.requests.per.connection: 5
+        compression.type: lz4
+    consumer:
+      group-id: lemuel-settlement
+      auto-offset-reset: earliest               # 새 컨슈머는 시작부터 재생
+      enable-auto-commit: false                 # 수동 ack → 멱등 처리 후 커밋
+      properties:
+        isolation.level: read_committed
+    listener:
+      ack-mode: manual_immediate
+      missing-topics-fatal: false
+
+  # Graceful Shutdown for K8s Rolling Update
+  lifecycle:
+    timeout-per-shutdown-phase: 30s  # Pod 종료 시 최대 30초 대기
+
+  batch:
+    jdbc:
+      initialize-schema: always  # BATCH_* 테이블 자동 생성
+    job:
+      enabled: false  # 애플리케이션 시작 시 자동 실행 방지
+
+  # Mail Configuration
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+            # 아래 설정을 추가하거나 확인해 보세요
+          ssl:
+            trust: smtp.gmail.com
+            protocols: TLSv1.2
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+    default-encoding: UTF-8
+
+# Server Configuration
+server:
+  port: 8088
+  shutdown: graceful  # Graceful Shutdown 활성화
+  tomcat:
+    connection-timeout: 20s
+    threads:
+      max: 200
+      min-spare: 10
+    uri-encoding: UTF-8  # URL 파라미터 한글 인코딩
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true  # 요청/응답 모두 UTF-8 강제
+
+
+management:
+  # 분산 트레이싱 — Micrometer Tracing + OpenTelemetry → Tempo (또는 Jaeger / Zipkin)
+  # 로컬 기본값은 비활성. docker-compose 에서 OTEL_EXPORTER_OTLP_ENDPOINT 만 주면 자동 활성.
+  tracing:
+    sampling:
+      probability: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:1.0}
+  otlp:
+    tracing:
+      endpoint: ${MANAGEMENT_OTLP_TRACING_ENDPOINT:}
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    prometheus:
+      enabled: true
+    health:
+      show-details: always
+      show-components: always
+      probes:
+        enabled: true  # K8s Liveness/Readiness Probe 활성화
+  health:
+    mail:
+      enabled: false
+    redis:
+      enabled: ${MANAGEMENT_HEALTH_REDIS_ENABLED:false}  # jpa 모드(기본)엔 Redis 서버 없음 → readiness DOWN 방지. redis 모드 compose 에서 true
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true
+    elasticsearch:
+      enabled: false
+    db:
+      enabled: true  # PostgreSQL Health Check
+  server:
+    port: 8089  # 로컬 dev: 메인(8080)과 분리. Docker: MANAGEMENT_SERVER_PORT=8080으로 오버라이드하여 단일 포트로 통합
+  metrics:
+    distribution:
+      percentiles-histogram:
+        refund.processing.duration: true
+        settlement.batch.creation.duration: true
+        settlement.batch.confirmation.duration: true
+        settlement.batch.adjustment.duration: true
+      percentiles:
+        refund.processing.duration: 0.5,0.95,0.99
+        settlement.batch.creation.duration: 0.5,0.95,0.99
+        settlement.batch.confirmation.duration: 0.5,0.95,0.99
+        settlement.batch.adjustment.duration: 0.5,0.95,0.99
+    tags:
+      application: ${spring.application.name}
+      environment: ${ENVIRONMENT}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+
+# 장바구니 저장소 선택 — jpa(기본, PostgreSQL) | redis. 빈 충돌 방지를 위해 어댑터가 @ConditionalOnProperty 로 토글된다.
+cart:
+  store: ${CART_STORE:jpa}
+
+app:
+  # 읽기/쓰기 분리 (opt-in). enabled=true 일 때만 라우팅 데이터소스 활성 — readOnly 트랜잭션은 read 로.
+  # 활성화 시 write/read 에 Hikari 네이티브 프로퍼티(jdbc-url 등)를 지정한다.
+  datasource:
+    read-replica:
+      enabled: ${APP_DATASOURCE_READ_REPLICA_ENABLED:false}
+    # write:
+    #   jdbc-url: ${SPRING_DATASOURCE_URL}
+    #   username: ${POSTGRES_USER}
+    #   password: ${POSTGRES_PASSWORD}
+    #   maximum-pool-size: ${DB_POOL_MAX:30}
+    # read:
+    #   jdbc-url: ${APP_DATASOURCE_READ_URL}      # 읽기 레플리카 엔드포인트
+    #   username: ${POSTGRES_USER}
+    #   password: ${POSTGRES_PASSWORD}
+    #   maximum-pool-size: ${DB_POOL_MAX:30}
+    #   read-only: true
+  # 2-tier 캐시 (opt-in). enabled=true 면 L1(Caffeine)+L2(Redis) 가 활성화되고 로컬 전용 Caffeine 은 back off.
+  # Redis 클래스패스가 있어야 동작(order-service 만 redis 스타터 보유). 다중 인스턴스에서 L2 공유 + Pub/Sub 무효화.
+  cache:
+    two-tier:
+      enabled: ${APP_CACHE_TWO_TIER_ENABLED:false}
+      l1-ttl-seconds: ${APP_CACHE_L1_TTL_SECONDS:60}     # L1 staleness 안전망 (무효화 누락 대비)
+      l2-ttl-seconds: ${APP_CACHE_L2_TTL_SECONDS:600}    # L2 권위 TTL
+      max-size: ${APP_CACHE_MAX_SIZE:500}
+  kafka:
+    enabled: ${APP_KAFKA_ENABLED:false}         # 로컬 개발 기본 OFF — 프로덕션 compose/K8s 에서 true
+    topic:
+      partitions: ${APP_KAFKA_TOPIC_PARTITIONS:3}   # 컨슈머 병렬 소비 상한 — settlement concurrency 와 함께 스케일
+      payment-captured: lemuel.payment.captured
+      payment-refunded: lemuel.payment.refunded
+  outbox:
+    polling-delay-ms: 2000
+  # 다중 PG 라우팅 정책 — PgRouter 가 결제수단·금액·health 를 보고 어댑터 선택
+  pg:
+    routing:
+      # 결제 수단별 1순위 PG (가장 흔한 케이스가 빠른 경로로 가도록)
+      primary-by-method:
+        CARD: TOSS
+        TOSS_PAYMENTS: TOSS
+        BANK_TRANSFER: KCP
+        VIRTUAL_ACCOUNT: KCP
+        KAKAO_PAY: NICE
+        NAVER_PAY: NICE
+        PAYCO: NICE
+        SAMSUNG_PAY: NICE
+      # 1순위가 미지원/OPEN 일 때 좌→우 순으로 시도
+      fallback-chain: [TOSS, NICE, KCP, INICIS]
+      # 100 만원 이상 거래는 한도/안정성을 위해 고액 우선 PG 로 라우팅
+      high-amount-threshold: 1000000
+      high-amount-preferred: NICE
+  search:
+    enabled: false
+  jwt:
+    issuer: ${JWT_ISSUER}
+    secret: ${JWT_SECRET}
+    ttl-seconds: ${JWT_TTL_SECONDS}
+  alerting:
+    slack:
+      webhook-url: ${SLACK_WEBHOOK_URL}
+      channel: ${SLACK_CHANNEL}
+      enabled: ${SLACK_ALERTS_ENABLED}
+  # 주문 알림 멀티채널 (Strategy + Composite). 메일은 항상 활성, Slack 은 opt-in.
+  notification:
+    slack:
+      enabled: ${APP_NOTIFICATION_SLACK_ENABLED:false}
+      webhook-url: ${APP_NOTIFICATION_SLACK_WEBHOOK_URL:}
+  mail:
+    from: ${MAIL_FROM:}
+    support-email: ${SUPPORT_EMAIL}
+  password-reset:
+    token-expiry-minutes: 30
+    base-url: ${APP_BASE_URL:http://localhost:5173}
+
+toss:
+  secret-key: ${TOSS_SECRET_KEY}
+  api-url: https://api.tosspayments.com/v1/payments/confirm
+
+# Resilience4j — PG 별 독립 CircuitBreaker (한 PG 장애가 다른 PG 로 전이되지 않도록 격벽)
+resilience4j:
+  circuitbreaker:
+    configs:
+      pgDefault:
+        registerHealthIndicator: true
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 20                    # 최근 20회 요청 기준
+        minimumNumberOfCalls: 10                 # 최소 10건 수집 후 판정
+        failureRateThreshold: 50                 # 50% 이상 실패면 OPEN
+        waitDurationInOpenState: 30s             # OPEN → HALF_OPEN 대기
+        permittedNumberOfCallsInHalfOpenState: 5
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        # 4xx 는 PG 쪽의 비즈니스 오류 (결제키 만료 등) 이므로 서킷 판정에서 제외
+        ignoreExceptions:
+          - org.springframework.web.client.HttpClientErrorException
+    instances:
+      tossPg:
+        baseConfig: pgDefault
+      kcpPg:
+        baseConfig: pgDefault
+      nicePg:
+        baseConfig: pgDefault
+      inicisPg:
+        baseConfig: pgDefault
+  retry:
+    configs:
+      pgDefault:
+        maxAttempts: 3
+        waitDuration: 500ms
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+        # 4xx 는 재시도해도 똑같이 실패 — 재시도 안 함
+        ignoreExceptions:
+          - org.springframework.web.client.HttpClientErrorException
+        retryExceptions:
+          - org.springframework.web.client.ResourceAccessException
+          - org.springframework.web.client.HttpServerErrorException
+          - java.io.IOException
+    instances:
+      tossPg:
+        baseConfig: pgDefault
+      kcpPg:
+        baseConfig: pgDefault
+      nicePg:
+        baseConfig: pgDefault
+      inicisPg:
+        baseConfig: pgDefault
+
+
+
+# 데모 자동로그인 / 게스트 토글. 운영 false, dev/demo true.
+lemuel:
+  demo:
+    enabled: ${LEMUEL_DEMO_ENABLED:false}
