@@ -6,6 +6,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 import com.fasterxml.jackson.databind.jsontype.PolymorphicTypeValidator;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import io.micrometer.core.instrument.MeterRegistry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -41,6 +48,8 @@ import java.util.UUID;
 @ConditionalOnProperty(name = "app.cache.two-tier.enabled", havingValue = "true")
 public class TwoTierCacheConfig {
 
+    private static final Logger log = LoggerFactory.getLogger(TwoTierCacheConfig.class);
+
     /** 인스턴스 식별자 — Pub/Sub 무효화에서 자기 메시지를 걸러내는 데 쓴다. */
     private final String originId = "cache-node-" + UUID.randomUUID();
 
@@ -52,6 +61,16 @@ public class TwoTierCacheConfig {
 
     @Value("${app.cache.two-tier.max-size:500}")
     private long l1MaxSize;
+
+    // --- L2(Redis) CircuitBreaker 튜닝 (실험/운영에서 환경변수로 조정 가능) ---
+    @Value("${app.cache.two-tier.cb.sliding-window-size:4}")
+    private int cbWindowSize;
+    @Value("${app.cache.two-tier.cb.minimum-calls:2}")
+    private int cbMinCalls;
+    @Value("${app.cache.two-tier.cb.failure-rate:50}")
+    private float cbFailureRate;
+    @Value("${app.cache.two-tier.cb.wait-open-seconds:10}")
+    private long cbWaitOpenSeconds;
 
     /**
      * L2 직렬화기. 필드 가시성만 켜고(getter/setter/creator off) 무인자 생성자로 인스턴스화 후
@@ -98,9 +117,34 @@ public class TwoTierCacheConfig {
         return new CacheInvalidationPublisher(stringRedisTemplate, originId);
     }
 
+    /**
+     * L2(Redis) 호출 보호용 CircuitBreaker.
+     *
+     * <p>최근 호출 중 실패율이 임계치를 넘으면 회로를 OPEN → 이후 호출은 Redis 까지 가지 않고 즉시 차단되어
+     * 타임아웃 대기조차 없앤다. {@code wait-open-seconds} 후 HALF_OPEN 으로 1건 시범 호출 → 성공 시 CLOSED 복귀.
+     */
+    @Bean
+    public CircuitBreaker l2RedisCircuitBreaker() {
+        CircuitBreakerConfig config = CircuitBreakerConfig.custom()
+                .slidingWindowType(CircuitBreakerConfig.SlidingWindowType.COUNT_BASED)
+                .slidingWindowSize(cbWindowSize)
+                .minimumNumberOfCalls(cbMinCalls)
+                .failureRateThreshold(cbFailureRate)
+                .waitDurationInOpenState(Duration.ofSeconds(cbWaitOpenSeconds))
+                .permittedNumberOfCallsInHalfOpenState(1)
+                .automaticTransitionFromOpenToHalfOpenEnabled(true)
+                .build();
+        CircuitBreaker cb = CircuitBreakerRegistry.of(config).circuitBreaker("l2-redis");
+        cb.getEventPublisher().onStateTransition(e ->
+                log.info("L2 Redis CircuitBreaker state transition: {}", e.getStateTransition()));
+        return cb;
+    }
+
     @Bean
     public CacheManager cacheManager(RedisTemplate<String, Object> cacheRedisTemplate,
-                                     CacheInvalidationPublisher cacheInvalidationPublisher) {
+                                     CacheInvalidationPublisher cacheInvalidationPublisher,
+                                     CircuitBreaker l2RedisCircuitBreaker,
+                                     ObjectProvider<MeterRegistry> meterRegistryProvider) {
         return new TwoTierCacheManager(
                 CacheNames.ALL,
                 cacheRedisTemplate,
@@ -108,7 +152,9 @@ public class TwoTierCacheConfig {
                 Duration.ofSeconds(l1TtlSeconds),
                 Duration.ofSeconds(l2TtlSeconds),
                 l1MaxSize,
-                true);
+                true,
+                meterRegistryProvider.getIfAvailable(),   // 레지스트리 없으면 메트릭 생략(로그만)
+                l2RedisCircuitBreaker);
     }
 
     @Bean

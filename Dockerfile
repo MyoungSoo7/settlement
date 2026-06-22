@@ -12,10 +12,12 @@ WORKDIR /workspace
 # 의존성 캐싱: 변경 적은 파일 먼저
 COPY settings.gradle.kts build.gradle.kts ./
 COPY gradle ./gradle
-COPY shared-common/build.gradle.kts ./shared-common/
+# shared-common 은 독립 빌드(includeBuild) — 합성 설정에 자체 settings 가 필요
+COPY shared-common/settings.gradle.kts shared-common/build.gradle.kts ./shared-common/
 COPY order-service/build.gradle.kts ./order-service/
 COPY settlement-service/build.gradle.kts ./settlement-service/
 COPY reservation-service/build.gradle.kts ./reservation-service/
+COPY loan-service/build.gradle.kts ./loan-service/
 COPY gateway-service/build.gradle.kts ./gateway-service/
 
 RUN --mount=type=cache,target=/home/gradle/.gradle \
@@ -26,6 +28,7 @@ COPY shared-common ./shared-common
 COPY order-service ./order-service
 COPY settlement-service ./settlement-service
 COPY reservation-service ./reservation-service
+COPY loan-service ./loan-service
 COPY gateway-service ./gateway-service
 
 RUN --mount=type=cache,target=/home/gradle/.gradle \

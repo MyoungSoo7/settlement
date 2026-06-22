@@ -8,7 +8,7 @@ plugins {
 // (Phase A 의 라이브러리 모드 bootJar 비활성 블록 제거됨)
 
 dependencies {
-    implementation(project(":shared-common"))
+    implementation("github.lms.lemuel:shared-common:1.0.0")   // 버전드 내부 라이브러리(composite build 로 로컬 치환)
 
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")

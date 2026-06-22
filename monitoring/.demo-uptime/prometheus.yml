@@ -1,0 +1,34 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 15s
+
+# 알림 실습 — repo 의 실제 룰파일 로드(HighHttpErrorRate 포함). 데모 컴포즈가 마운트.
+rule_files:
+  - '/etc/prometheus/alert-rules.yml'
+  - '/etc/prometheus/demo-fast-rules.yml'
+
+scrape_configs:
+  # uptime 데모용 — 호스트에서 bootRun 중인 gateway-service(actuator/prometheus)를 scrape.
+  # job=lemuel 로 두어 system-uptime 대시보드의 {job="lemuel"} 쿼리와 매칭.
+  - job_name: 'lemuel'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['host.docker.internal:8080']
+        labels:
+          application: 'lemuel-gateway'
+          environment: 'local-demo'
+      # p95 실습용 — HTTP 히스토그램 버킷 켠 gateway(8090). _bucket 노출 → histogram_quantile 가능.
+      - targets: ['host.docker.internal:8090']
+        labels:
+          application: 'lemuel-gateway-hist'
+          environment: 'local-demo'
+      # settlement-service(:8082) — 정산 고유 메트릭(settlement_projection/outbox/kafka_dlt 등) 스크랩.
+      # job=lemuel 이라 settlement 알림 규칙({job="lemuel"})과 자동 매칭.
+      - targets: ['host.docker.internal:8082']
+        labels:
+          application: 'lemuel-settlement'
+          environment: 'local-demo'
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

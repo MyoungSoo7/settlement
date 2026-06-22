@@ -10,6 +10,7 @@ import github.lms.lemuel.settlement.application.port.in.CreateSettlementFromPaym
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
@@ -52,16 +53,25 @@ public class PaymentEventKafkaConsumer {
     private final ObjectMapper objectMapper;
     private final SettlementProjectionMetrics projectionMetrics;
 
+    /**
+     * [실습 전용] 메시지당 인위 처리 지연(ms). 기본 0 = 꺼짐(운영 무영향).
+     * Kafka 컨슈머 lag 을 의도적으로 발생시켜 모니터링/스케일 실습을 하기 위한 토글.
+     * env {@code APP_KAFKA_PRACTICE_CONSUMER_DELAY_MS} 로 켠다.
+     */
+    private final long practiceDelayMs;
+
     public PaymentEventKafkaConsumer(CreateSettlementFromPaymentUseCase createSettlementFromPaymentUseCase,
                                      ProcessedEventRepository processedEventRepository,
                                      SettlementPaymentViewRepository paymentViewRepository,
                                      ObjectMapper objectMapper,
-                                     SettlementProjectionMetrics projectionMetrics) {
+                                     SettlementProjectionMetrics projectionMetrics,
+                                     @Value("${app.kafka.practice.consumer-delay-ms:0}") long practiceDelayMs) {
         this.createSettlementFromPaymentUseCase = createSettlementFromPaymentUseCase;
         this.processedEventRepository = processedEventRepository;
         this.paymentViewRepository = paymentViewRepository;
         this.objectMapper = objectMapper;
         this.projectionMetrics = projectionMetrics;
+        this.practiceDelayMs = practiceDelayMs;
     }
 
     @KafkaListener(
@@ -71,6 +81,8 @@ public class PaymentEventKafkaConsumer {
     )
     @Transactional
     public void onPaymentCaptured(ConsumerRecord<String, String> record, Acknowledgment ack) {
+        slowDownForPractice();   // [실습 전용] 기본 0 = no-op
+
         UUID eventId = extractEventId(record);
         if (eventId == null) {
             log.warn("Skipping record without event_id header. topic={}, offset={}",
@@ -153,6 +165,19 @@ public class PaymentEventKafkaConsumer {
         projectionMetrics.recordApply("payment", record.timestamp());
         log.info("Settlement created from Kafka event. eventId={}, paymentId={}", eventId, paymentId);
         ack.acknowledge();
+    }
+
+    /**
+     * [실습 전용] 컨슈머를 의도적으로 느리게 만들어 lag 을 발생시킨다.
+     * {@code practiceDelayMs <= 0} 이면 즉시 반환(운영 무영향).
+     */
+    private void slowDownForPractice() {
+        if (practiceDelayMs <= 0) return;
+        try {
+            Thread.sleep(practiceDelayMs);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private static UUID extractEventId(ConsumerRecord<String, String> record) {

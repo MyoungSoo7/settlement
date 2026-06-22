@@ -25,6 +25,13 @@ set -euo pipefail
 
 : "${OPSLAB_URL:?OPSLAB_URL 이 필요합니다 예: postgresql://u:p@opslab:5432/opslab}"
 
+# 스키마: order Flyway 는 settlement 잔여 테이블을 schema=opslab 에 생성한다
+# (order-service application.yml: flyway.default-schema=opslab). settlement_db 는 baseline 이
+# public 에 생성한다. 각 DB 의 실제 스키마를 분리 지정 — 과거엔 양쪽 모두 public 으로 가정해
+# opslab 의 잔여 테이블을 전혀 못 지우는 버그가 있었다.
+OPSLAB_SCHEMA="${OPSLAB_SCHEMA:-opslab}"
+SETTLEMENT_SCHEMA="${SETTLEMENT_SCHEMA:-public}"
+
 # DROP 대상 = settlement_db(V1 baseline)로 이관 완료된 settlement 도메인 테이블만.
 # 자식(FK 참조) 먼저 → 부모 순. CASCADE 로 잔여 의존도 정리.
 # KEEP(공유, order 가 계속 사용): outbox_events, processed_events, audit_logs, shedlock, batch_run_history.
@@ -50,13 +57,13 @@ echo "    KEEP(공유): outbox_events, processed_events, audit_logs, shedlock, b
 echo "    REVIEW(별도): settlement_schedule_config — settlement_db baseline 부재, 미사용 확인 후 수동 판단"
 echo
 
-count() { psql "$1" -tAc "SELECT count(*) FROM public.${2};" 2>/dev/null || echo "N/A"; }
+count() { psql "$1" -tAc "SELECT count(*) FROM ${2}.${3};" 2>/dev/null || echo "N/A"; }
 
 blocked=0
 for t in "${DROP_TABLES[@]}"; do
-  src=$(count "$OPSLAB_URL" "$t")
+  src=$(count "$OPSLAB_URL" "$OPSLAB_SCHEMA" "$t")
   if [[ -n "${SETTLEMENT_URL:-}" ]]; then
-    dst=$(count "$SETTLEMENT_URL" "$t")
+    dst=$(count "$SETTLEMENT_URL" "$SETTLEMENT_SCHEMA" "$t")
     flag=""
     # 대조: settlement_db 행 수가 opslab 미만이면 미이관 의심 → 차단
     if [[ "$src" =~ ^[0-9]+$ && "$dst" =~ ^[0-9]+$ && "$dst" -lt "$src" ]]; then
@@ -84,14 +91,14 @@ echo; echo "==> CONFIRM=DROP — opslab 에서 단일 트랜잭션으로 DROP �
 {
   echo "BEGIN;"
   for t in "${DROP_TABLES[@]}"; do
-    echo "DROP TABLE IF EXISTS public.${t} CASCADE;"
+    echo "DROP TABLE IF EXISTS ${OPSLAB_SCHEMA}.${t} CASCADE;"
   done
   echo "COMMIT;"
 } | psql "$OPSLAB_URL" --set ON_ERROR_STOP=on
 
 echo "==> 완료. 잔여 확인:"
 for t in "${DROP_TABLES[@]}"; do
-  exists=$(psql "$OPSLAB_URL" -tAc "SELECT to_regclass('public.${t}') IS NOT NULL;")
+  exists=$(psql "$OPSLAB_URL" -tAc "SELECT to_regclass('${OPSLAB_SCHEMA}.${t}') IS NOT NULL;")
   printf "    %-34s exists=%s\n" "$t" "$exists"
 done
 
