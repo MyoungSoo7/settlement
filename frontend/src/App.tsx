@@ -17,10 +17,8 @@ const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const OrderPage = lazy(() => import('./pages/OrderPage'));
 const CartPage = lazy(() => import('./pages/CartPage'));
 const MyPage = lazy(() => import('./pages/MyPage'));
-const GamesPage = lazy(() => import('./pages/GamesPage'));
-const GomokuGame = lazy(() => import('./pages/GomokuGame'));
-const BadukGame = lazy(() => import('./pages/BadukGame'));
-const ViewerPage = lazy(() => import('./pages/ViewerPage'));
+const ReservationPage = lazy(() => import('./pages/ReservationPage'));
+const LoanPage = lazy(() => import('./pages/LoanPage'));
 const TossPaymentSuccess = lazy(() => import('./pages/TossPaymentSuccess'));
 
 // 관리자 페이지 (lazy load)
@@ -82,13 +80,11 @@ function App() {
             <Route path="/order/toss/fail"    element={<TossPaymentFail />} />
 
             {/* ── 일반 사용자 (USER + 인증) ── */}
-            <Route path="/order"    element={<ProtectedRoute><OrderPage /></ProtectedRoute>} />
-            <Route path="/cart"     element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
-            <Route path="/mypage"   element={<ProtectedRoute><MyPage /></ProtectedRoute>} />
-            <Route path="/games"    element={<ProtectedRoute><GamesPage /></ProtectedRoute>} />
-            <Route path="/games/gomoku" element={<ProtectedRoute><GomokuGame /></ProtectedRoute>} />
-            <Route path="/games/baduk"  element={<ProtectedRoute><BadukGame /></ProtectedRoute>} />
-            <Route path="/viewer"   element={<ProtectedRoute><ViewerPage /></ProtectedRoute>} />
+            <Route path="/order"        element={<ProtectedRoute><OrderPage /></ProtectedRoute>} />
+            <Route path="/cart"         element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
+            <Route path="/mypage"       element={<ProtectedRoute><MyPage /></ProtectedRoute>} />
+            <Route path="/reservations" element={<ProtectedRoute><ReservationPage /></ProtectedRoute>} />
+            <Route path="/loans"        element={<ProtectedRoute><LoanPage /></ProtectedRoute>} />
             <Route path="/order/toss/success" element={<ProtectedRoute><TossPaymentSuccess /></ProtectedRoute>} />
 
             {/* ── 관리자·매니저 공용 ── */}
