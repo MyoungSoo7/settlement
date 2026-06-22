@@ -65,6 +65,10 @@ dependencies {
     api("org.springframework:spring-context-support")
     api("com.github.ben-manes.caffeine:caffeine")
 
+    // Resilience4j CircuitBreaker — 2-tier 캐시 L2(Redis) 호출 보호.
+    // 장애 지속 시 회로를 OPEN 해 L2 호출 자체를 차단(타임아웃 대기 0)하고 즉시 L1/DB 로 폴백한다.
+    api("io.github.resilience4j:resilience4j-circuitbreaker:2.2.0")
+
     // HikariCP — read-replica 라우팅 데이터소스(ReadReplicaDataSourceConfig)의 컴파일 전용 타입.
     // 런타임 구현은 각 앱 모듈의 spring-boot-starter-data-jpa 가 전이 제공한다.
     compileOnly("com.zaxxer:HikariCP")

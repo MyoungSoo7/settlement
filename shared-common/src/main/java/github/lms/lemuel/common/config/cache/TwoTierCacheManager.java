@@ -1,6 +1,7 @@
 package github.lms.lemuel.common.config.cache;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
@@ -42,12 +43,24 @@ public class TwoTierCacheManager implements CacheManager {
                                long l1MaxSize,
                                boolean allowNullValues,
                                @Nullable MeterRegistry meterRegistry) {
+        this(cacheNames, redisTemplate, publisher, l1Ttl, l2Ttl, l1MaxSize, allowNullValues, meterRegistry, null);
+    }
+
+    public TwoTierCacheManager(Collection<String> cacheNames,
+                               RedisTemplate<String, Object> redisTemplate,
+                               CacheInvalidationPublisher publisher,
+                               Duration l1Ttl,
+                               Duration l2Ttl,
+                               long l1MaxSize,
+                               boolean allowNullValues,
+                               @Nullable MeterRegistry meterRegistry,
+                               @Nullable CircuitBreaker l2CircuitBreaker) {
         for (String name : cacheNames) {
             com.github.benmanes.caffeine.cache.Cache<Object, Object> l1 = Caffeine.newBuilder()
                     .expireAfterWrite(l1Ttl)
                     .maximumSize(l1MaxSize)
                     .build();
-            caches.put(name, new TwoTierCache(name, l1, redisTemplate, l2Ttl, publisher, allowNullValues, meterRegistry));
+            caches.put(name, new TwoTierCache(name, l1, redisTemplate, l2Ttl, publisher, allowNullValues, meterRegistry, l2CircuitBreaker));
         }
     }
 
