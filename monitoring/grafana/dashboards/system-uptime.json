@@ -1,0 +1,173 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "title": "Lemuel — System Uptime",
+  "uid": "lemuel-system-uptime",
+  "tags": ["lemuel", "system", "uptime"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-24h", "to": "now" },
+  "templating": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "가동 시간 (Uptime)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "collapsed": false
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "현재 가동 시간 (인스턴스별)",
+      "datasource": "Prometheus",
+      "description": "프로세스 부팅 후 경과 시간. 값이 갑자기 0 으로 떨어지면 재시작.",
+      "gridPos": { "h": 7, "w": 10, "x": 0, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 300 },
+              { "color": "green", "value": 3600 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "process_uptime_seconds{job=\"lemuel\"}",
+          "legendFormat": "{{application}} ({{instance}})"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "가동 시간 추이 — 재시작 시 톱니처럼 0 으로 리셋",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 7, "w": 14, "x": 10, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "process_uptime_seconds{job=\"lemuel\"}",
+          "legendFormat": "{{application}} ({{instance}})"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "row",
+      "title": "가동률 & 재시작",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 8 },
+      "collapsed": false
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "가동률 (최근 24h, %)",
+      "datasource": "Prometheus",
+      "description": "scrape 타깃이 살아있던(up=1) 시간 비율.",
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 9 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 95 },
+              { "color": "green", "value": 99 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "avg_over_time(up{job=\"lemuel\"}[24h]) * 100",
+          "legendFormat": "{{application}} ({{instance}})"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "타깃 생사 (up: 1=살아있음, 0=다운)",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 9 },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "min": 0, "max": 1 },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "up{job=\"lemuel\"}",
+          "legendFormat": "{{application}} ({{instance}})"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "재시작 횟수 (최근 24h)",
+      "datasource": "Prometheus",
+      "description": "process_start_time_seconds 변경 횟수 = 프로세스 재기동 수.",
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 9 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "changes(process_start_time_seconds{job=\"lemuel\"}[24h])",
+          "legendFormat": "{{application}} ({{instance}})"
+        }
+      ]
+    }
+  ]
+}

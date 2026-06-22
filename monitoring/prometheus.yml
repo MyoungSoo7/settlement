@@ -18,13 +18,24 @@ rule_files:
 
 # Scrape configurations
 scrape_configs:
-  # Lemuel Spring Boot Application
+  # Lemuel Spring Boot Application (order-service) — compose 서비스명 order-service:8080
   - job_name: 'lemuel'
     metrics_path: '/actuator/prometheus'
     static_configs:
-      - targets: ['app:8080']
+      - targets: ['order-service:8080']
         labels:
           application: 'lemuel'
+          environment: 'production'
+
+  # settlement-service (ADR 0020 Phase 4 독립 배포) — 프로젝션 lag/throughput/rows 등 노출
+  # compose 서비스명 settlement-service:8080. job 라벨 'lemuel' 유지로 기존 알림식과 호환.
+  - job_name: 'lemuel-settlement'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['settlement-service:8080']
+        labels:
+          job: 'lemuel'
+          application: 'lemuel-settlement'
           environment: 'production'
 
   # Prometheus self-monitoring

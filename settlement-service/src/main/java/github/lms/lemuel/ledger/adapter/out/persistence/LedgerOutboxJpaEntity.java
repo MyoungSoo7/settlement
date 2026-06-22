@@ -10,7 +10,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
- * 원장 아웃박스 row — V49 opslab.ledger_outbox 매핑.
+ * 원장 아웃박스 row — settlement_db 의 ledger_outbox 매핑 (V1 베이스라인, settlement 소유).
  */
 @Entity
 @Table(name = "ledger_outbox")

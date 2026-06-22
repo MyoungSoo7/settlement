@@ -118,8 +118,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/auth/dev/**").permitAll()         // 데모 자동로그인/게스트 (lemuel.demo.enabled=true 시)
                         .requestMatchers(HttpMethod.POST, "/users/password-reset/**").permitAll()  // 비밀번호 재설정
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
-                        // Actuator: 헬스체크 프로브만 공개, 메트릭/prometheus는 인증 필요
-                        .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
+                        // Actuator: 헬스체크 프로브 + prometheus 스크랩 엔드포인트 공개.
+                        // /actuator/prometheus 는 메트릭 텍스트만 노출하며 gateway 라우트에 없어 외부 미노출(클러스터 내부 Prometheus 가 스크랩, NetworkPolicy 로 격리 권장).
+                        // /actuator/metrics(탐색형 단건 조회 API)는 그대로 인증 필요.
+                        .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info", "/actuator/prometheus").permitAll()
                         .requestMatchers("/games/**").permitAll()
                         // 공개 카테고리 API
                         .requestMatchers(HttpMethod.GET, "/categories", "/categories/**").permitAll()
@@ -135,11 +137,16 @@ public class SecurityConfig {
                         .requestMatchers("/admin/categories/**").hasRole("ADMIN")
                         // 운영자 전용 — reservation-service 기사 프로젝션 백필
                         .requestMatchers("/admin/reservation-projection/**").hasRole("ADMIN")
+                        // 운영자 전용 — settlement 프로젝션 백필 (Phase 4 Chunk 3)
+                        .requestMatchers("/admin/settlement-projection/**").hasRole("ADMIN")
                         // 운영자 전용 — Outbox DLQ / Kafka DLT / PG 라우팅 / PG 정산파일 대사
                         .requestMatchers("/admin/outbox/**").hasRole("ADMIN")
                         .requestMatchers("/admin/dlq/**").hasRole("ADMIN")
                         .requestMatchers("/admin/pg/**").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers("/admin/reconciliation/**").hasAnyRole("ADMIN", "MANAGER")
+                        // 내부 서비스 간 호출 — order 가 자기 대사 합계를 노출(settlement 가 소비, ADR 0020 Phase 5 self-totals).
+                        // gateway 라우트 predicate 에 없어 외부 미노출(클러스터 내부 전용). 운영에선 NetworkPolicy/mTLS 로 추가 격리 권장.
+                        .requestMatchers("/internal/**").permitAll()
                         // Payout 콘솔 — 송금 권한은 ADMIN 만
                         .requestMatchers("/admin/payouts/**").hasRole("ADMIN")
                         // Chargeback 콘솔 — 셀러 환수 결정은 ADMIN 만

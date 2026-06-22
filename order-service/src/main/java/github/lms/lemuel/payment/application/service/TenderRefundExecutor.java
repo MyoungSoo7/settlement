@@ -100,7 +100,7 @@ public class TenderRefundExecutor {
     public void finalizeRefund(Long paymentId) {
         PaymentDomain payment = loadPaymentPort.loadById(paymentId)
                 .orElseThrow(() -> new PaymentNotFoundException(paymentId));
-        publishEventPort.publishPaymentRefunded(payment.getId(), payment.getOrderId());
+        publishEventPort.publishPaymentRefunded(payment.getId(), payment.getOrderId(), payment.getRefundedAmount());
         log.info("분할결제 환불 이벤트 발행: paymentId={}, status={}, refunded={}/{}",
                 payment.getId(), payment.getStatus(), payment.getRefundedAmount(), payment.getAmount());
     }

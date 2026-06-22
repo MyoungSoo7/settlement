@@ -1,0 +1,171 @@
+###############################################################################
+# Grafana 실습용 HTTP 요청 모음
+#
+# 대상: 모니터링 실습 샌드박스(.demo-uptime) 의 Grafana.
+#   - 데모 Grafana : http://localhost:3009   (익명 Admin 활성 → 인증 불필요)
+#   - 메인 Grafana : http://localhost:3001   (lemuel-grafana — 로그인 필요)
+#
+# 띄우기:
+#   docker compose -f monitoring/.demo-uptime/docker-compose.yml up -d
+#
+# 데모는 GF_AUTH_ANONYMOUS_ENABLED=true / ROLE=Admin 이라 토큰 없이 API 호출 가능.
+# 메인(3001)은 Basic 인증 필요 → @auth 헤더 주석 해제 후 사용.
+#
+# 프로비저닝된 데이터소스(데모 기준):
+#   Prometheus  id=1  uid=PBFA97CFB590B2093  (default)
+#   Tempo       uid=tempo
+###############################################################################
+
+@grafana = http://localhost:3009
+@promUid = PBFA97CFB590B2093
+@promId = 1
+
+# 메인 Grafana(3001) 쓸 때만 — admin / ${GRAFANA_ADMIN_PASSWORD}
+# (Basic base64 는 IDE 가 Authorization: Basic user pass 형식도 인코딩해 준다)
+# @grafana = http://localhost:3001
+# @auth = Authorization: Basic admin <password>
+
+
+###############################################################################
+# [0] 헬스 (인증 불필요 — 메인에서도 열림)
+###############################################################################
+
+### [0-1] Grafana 헬스 (DB/버전)
+GET {{grafana}}/api/health
+
+
+###############################################################################
+# [1] 데이터소스 — 무엇이 연결돼 있나
+###############################################################################
+
+### [1-1] 데이터소스 목록 (id/uid/type/default)
+GET {{grafana}}/api/datasources
+
+### [1-2] 이름으로 조회 (uid 알아내기)
+GET {{grafana}}/api/datasources/name/Prometheus
+
+### [1-3] uid 로 단건 조회
+GET {{grafana}}/api/datasources/uid/{{promUid}}
+
+### [1-4] 데이터소스 연결 상태 헬스체크 (Prometheus 까지 살아있나)
+GET {{grafana}}/api/datasources/uid/{{promUid}}/health
+
+
+###############################################################################
+# [2] 대시보드 — 프로비저닝으로 로드된 4개
+###############################################################################
+
+### [2-1] 대시보드 검색 (전체)
+GET {{grafana}}/api/search?type=dash-db
+
+### [2-2] System Uptime 대시보드 JSON (패널/쿼리 구조 보기)
+GET {{grafana}}/api/dashboards/uid/lemuel-system-uptime
+
+### [2-3] HTTP Traffic 대시보드 JSON
+GET {{grafana}}/api/dashboards/uid/lemuel-http-traffic
+
+### [2-4] Settlement Projection 대시보드 JSON
+GET {{grafana}}/api/dashboards/uid/lemuel-settlement-projection
+
+### [2-5] Business KPI 대시보드 JSON
+GET {{grafana}}/api/dashboards/uid/lemuel-kpi
+
+
+###############################################################################
+# [3] 데이터소스 프록시 — Grafana 를 통해 Prometheus 에 쿼리
+# (Grafana 가 백엔드로 프록시 → 브라우저 CORS/인증을 Grafana 가 처리하는 방식)
+# 경로 뒤에 Prometheus HTTP API 를 그대로 붙인다.
+###############################################################################
+
+### [3-1] 프록시로 up 쿼리
+GET {{grafana}}/api/datasources/proxy/uid/{{promUid}}/api/v1/query?query=up
+
+### [3-2] 프록시로 타겟 상태 조회
+GET {{grafana}}/api/datasources/proxy/uid/{{promUid}}/api/v1/targets
+
+### [3-3] 프록시로 메트릭 이름 목록
+GET {{grafana}}/api/datasources/proxy/uid/{{promUid}}/api/v1/label/__name__/values
+
+### [3-4] (구버전 호환) 숫자 id 기반 프록시
+GET {{grafana}}/api/datasources/proxy/{{promId}}/api/v1/query?query=outbox_pending_count
+
+
+###############################################################################
+# [4] 통합 쿼리 API (/api/ds/query) — 대시보드 패널이 실제로 쓰는 엔드포인트
+# 상대 시간("now-1h"/"now") 을 Grafana 가 해석해 준다 → 타임스탬프 계산 불필요.
+###############################################################################
+
+### [4-1] instant 쿼리 (up)
+POST {{grafana}}/api/ds/query
+Content-Type: application/json
+
+{
+  "queries": [
+    {
+      "refId": "A",
+      "datasource": { "uid": "{{promUid}}" },
+      "expr": "up",
+      "instant": true
+    }
+  ],
+  "from": "now-5m",
+  "to": "now"
+}
+
+### [4-2] range 쿼리 — 요청률 최근 1시간 (그래프용 시계열)
+POST {{grafana}}/api/ds/query
+Content-Type: application/json
+
+{
+  "queries": [
+    {
+      "refId": "A",
+      "datasource": { "uid": "{{promUid}}" },
+      "expr": "sum(rate(http_server_requests_seconds_count[1m]))",
+      "range": true,
+      "intervalMs": 15000
+    }
+  ],
+  "from": "now-1h",
+  "to": "now"
+}
+
+### [4-3] 정산 프로젝션 lag p95 — settlement 메트릭 실데이터
+POST {{grafana}}/api/ds/query
+Content-Type: application/json
+
+{
+  "queries": [
+    {
+      "refId": "A",
+      "datasource": { "uid": "{{promUid}}" },
+      "expr": "histogram_quantile(0.95, sum by (le, type) (rate(settlement_projection_lag_seconds_bucket[5m])))",
+      "range": true,
+      "intervalMs": 15000
+    }
+  ],
+  "from": "now-1h",
+  "to": "now"
+}
+
+
+###############################################################################
+# [5] 알림(Unified Alerting) — Grafana 가 본 룰/상태
+###############################################################################
+
+### [5-1] Prometheus 룰을 Grafana 알림 뷰로 (룰+현재 상태)
+GET {{grafana}}/api/prometheus/grafana/api/v1/rules
+
+### [5-2] 현재 발화 중인 알림 인스턴스
+GET {{grafana}}/api/alertmanager/grafana/api/v2/alerts
+
+
+###############################################################################
+# [6] 조직 / 설정 (Admin 권한 — 데모 익명 Admin 으로 열림)
+###############################################################################
+
+### [6-1] 현재 조직
+GET {{grafana}}/api/org
+
+### [6-2] 프런트엔드 설정 (버전/기능 플래그/기본 데이터소스)
+GET {{grafana}}/api/frontend/settings

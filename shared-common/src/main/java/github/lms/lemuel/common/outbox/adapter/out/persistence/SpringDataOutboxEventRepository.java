@@ -27,7 +27,7 @@ public interface SpringDataOutboxEventRepository extends JpaRepository<OutboxEve
      * 반드시 {@link #stampClaim}/발행과 같은 트랜잭션 안에서 호출해야 잠금이 유지된다.
      */
     @Query(value = """
-            SELECT e.id FROM opslab.outbox_events e
+            SELECT e.id FROM #{@outboxSchema.name}.outbox_events e
             WHERE e.status = 'PENDING'
               AND (e.claimed_at IS NULL OR e.claimed_at < now() - (:leaseSeconds * INTERVAL '1 second'))
             ORDER BY e.created_at
@@ -37,12 +37,12 @@ public interface SpringDataOutboxEventRepository extends JpaRepository<OutboxEve
     List<Long> selectClaimableIds(@Param("limit") int limit, @Param("leaseSeconds") long leaseSeconds);
 
     @Modifying
-    @Query(value = "UPDATE opslab.outbox_events SET claimed_at = :now, claimed_by = :worker WHERE id IN (:ids)",
+    @Query(value = "UPDATE #{@outboxSchema.name}.outbox_events SET claimed_at = :now, claimed_by = :worker WHERE id IN (:ids)",
             nativeQuery = true)
     void stampClaim(@Param("ids") List<Long> ids, @Param("worker") String worker, @Param("now") LocalDateTime now);
 
     @Modifying
-    @Query(value = "UPDATE opslab.outbox_events SET claimed_at = NULL, claimed_by = NULL WHERE id IN (:ids)",
+    @Query(value = "UPDATE #{@outboxSchema.name}.outbox_events SET claimed_at = NULL, claimed_by = NULL WHERE id IN (:ids)",
             nativeQuery = true)
     void clearClaim(@Param("ids") List<Long> ids);
 

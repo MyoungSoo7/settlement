@@ -1,8 +1,151 @@
-### login
-POST http://localhost:8089/auth/login
+### =====================================================================
+### Lemuel — 2-tier 캐시(L1 Caffeine + L2 Redis) 실습용 요청 모음
+### =====================================================================
+### 사용법:
+###  1) docker compose up -d  (order-service 가 APP_CACHE_TWO_TIER_ENABLED=true 로 기동)
+###  2) 아래 "로그인"을 먼저 실행 → 응답의 token 이 {{authToken}} 으로 자동 저장됨
+###  3) 캐시 대상 GET 을 두 번 이상 호출해 hit/miss 관찰
+###       - 1회차 = miss(DB) + Redis SET / 2회차(60초 내) = L1 hit (Redis 무접근)
+###       - 60초 후 ~ 600초 내 = L2 hit (Redis GET 만, SET 없음 → L1 승격)
+###  4) 쓰기(PUT/POST)로 무효화(@CacheEvict) 발생 → 다음 조회는 다시 miss
+###  5) 확인: redis-cli MONITOR / Grafana(lemuel-cache) / {{mgmt}}/actuator/prometheus
+###
+### 캐시 4종: products / categories / ecommerce-categories / tags
+###
+### 포트: 앱 = 8088 (로컬 server.port, 도커 매핑 동일)
+###       actuator = 로컬 8089 / 도커는 8088 (단일 포트 통합) → 아래 @mgmt 조정
+### =====================================================================
+
+@host = http://localhost:8088
+@mgmt = http://localhost:8089
+
+### ★ 1) 로그인 — 다른 요청 전에 반드시 먼저 실행! 응답 token 을 전역변수 authToken 으로 저장
+# @name login
+POST {{host}}/auth/login
 Content-Type: application/json
 
 {
   "email": "test@naver.com",
   "password": "test1234QWER"
 }
+
+> {%
+    client.test("login 200", () => client.assert(response.status === 200, "login 실패: HTTP " + response.status));
+    client.global.set("authToken", response.body.token);
+    client.log("authToken 저장: " + (response.body.token ? "OK" : "EMPTY(로그인 응답에 token 없음)"));
+%}
+
+### (대안) 실계정이 없으면 데모 자동로그인 — LEMUEL_DEMO_ENABLED=true 일 때만 동작
+# @name loginDemo
+POST {{host}}/auth/dev/auto-login?role=ADMIN
+
+> {%
+    client.global.set("authToken", response.body.token);
+%}
+
+### ---------------------------------------------------------------------
+### [products] 캐시 — GetProductService
+### ---------------------------------------------------------------------
+
+### 판매 가능 상품 (products::available) — 캐시 관찰 1순위. 연속 2번 호출해보기
+GET {{host}}/api/products/available
+Authorization: Bearer {{authToken}}
+
+### 전체 상품 (products::all)
+GET {{host}}/api/products
+Authorization: Bearer {{authToken}}
+
+### 상품 단건 (products::1)
+GET {{host}}/api/products/1
+Authorization: Bearer {{authToken}}
+
+### 상태별 상품 (products::status:ACTIVE)
+GET {{host}}/api/products/status/ACTIVE
+Authorization: Bearer {{authToken}}
+
+### ---------------------------------------------------------------------
+### [categories] 캐시 — product.CategoryService (/api/categories)
+### ---------------------------------------------------------------------
+
+### 전체 카테고리 (categories)
+GET {{host}}/api/categories
+Authorization: Bearer {{authToken}}
+
+### 활성 카테고리 (categories::active)
+GET {{host}}/api/categories/active
+Authorization: Bearer {{authToken}}
+
+### 루트 카테고리 (categories::root)
+GET {{host}}/api/categories/root
+Authorization: Bearer {{authToken}}
+
+### 하위 카테고리 (categories::sub:1)
+GET {{host}}/api/categories/parent/1
+Authorization: Bearer {{authToken}}
+
+### ---------------------------------------------------------------------
+### [ecommerce-categories] 캐시 — category.EcommerceCategoryService (/categories)
+### ---------------------------------------------------------------------
+
+### 활성 카테고리 트리 (ecommerce-categories::tree:active)
+GET {{host}}/categories
+Authorization: Bearer {{authToken}}
+
+### slug 단건 (ecommerce-categories::slug:living)
+GET {{host}}/categories/living
+Authorization: Bearer {{authToken}}
+
+### ---------------------------------------------------------------------
+### [tags] 캐시 — TagService (/api/tags)
+### ---------------------------------------------------------------------
+
+### 전체 태그 (tags)
+GET {{host}}/api/tags
+Authorization: Bearer {{authToken}}
+
+### 상품의 태그 (tags::product:1)
+GET {{host}}/api/tags/product/1
+Authorization: Bearer {{authToken}}
+
+### ---------------------------------------------------------------------
+### 무효화 트리거 (쓰기 → @CacheEvict allEntries) — 실행 후 위 GET 재호출 시 miss 확인
+### ---------------------------------------------------------------------
+
+### 상품 정보 수정 → products 캐시 전체 무효화 (redis-cli 에 DEL / Grafana miss 스파이크)
+PUT {{host}}/api/products/1/info
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "수정된 상품명",
+  "description": "캐시 무효화 테스트용 설명"
+}
+
+### 상품 가격 변경 → products 캐시 전체 무효화
+PUT {{host}}/api/products/1/price
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "newPrice": 19900
+}
+
+### 태그 수정 → tags 캐시 전체 무효화
+PUT {{host}}/api/tags/1
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "베스트",
+  "color": "#FF0000"
+}
+
+### ---------------------------------------------------------------------
+### 관측 (Observability) — hit/miss 메트릭 & 헬스
+### ---------------------------------------------------------------------
+
+### 헬스 (redis 컴포넌트 UP 확인)
+GET {{mgmt}}/actuator/health
+
+### Prometheus raw — lemuel_cache_requests_total{cache,result} 검색
+GET {{mgmt}}/actuator/prometheus

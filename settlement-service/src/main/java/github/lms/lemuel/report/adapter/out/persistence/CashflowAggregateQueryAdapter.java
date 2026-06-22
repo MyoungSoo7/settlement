@@ -61,8 +61,9 @@ public class CashflowAggregateQueryAdapter implements LoadCashflowAggregatePort 
         if (sellerId == null) {
             throw new IllegalArgumentException("sellerId is required");
         }
-        // Product JPA 엔티티에 seller_id 필드가 아직 정의되지 않아 QueryDSL 로 직접 필터 불가.
-        // V31 마이그레이션으로 DB 컬럼은 존재하므로 raw JDBC aggregation 으로 처리.
+        // ADR 0020 Phase 5.5 — 서빙 경로 로컬화: order 의 products.seller_id 를 조인하는 대신
+        // settlement 소유 프로젝션 settlement_payment_view.seller_id 를 payment_id 로 조인해 필터한다.
+        // settlement_db 단독으로 셀러별 집계가 성립 (order DB 의존 0).
         String bucketExpr = switch (granularity) {
             case DAY -> "s.settlement_date";
             case WEEK -> "CAST(date_trunc('week', s.settlement_date) AS date)";
@@ -76,11 +77,10 @@ public class CashflowAggregateQueryAdapter implements LoadCashflowAggregatePort 
                        COALESCE(SUM(s.refunded_amount), 0) AS refunded,
                        COALESCE(SUM(s.commission), 0) AS commission,
                        COALESCE(SUM(s.net_amount), 0) AS net
-                FROM opslab.settlements s
-                JOIN opslab.orders o ON o.id = s.order_id
-                JOIN opslab.products p ON p.id = o.product_id
+                FROM settlements s
+                JOIN settlement_payment_view pv ON pv.payment_id = s.payment_id
                 WHERE s.settlement_date BETWEEN ? AND ?
-                  AND p.seller_id = ?
+                  AND pv.seller_id = ?
                 GROUP BY %s
                 ORDER BY %s ASC
                 """, bucketExpr, bucketExpr, bucketExpr);

@@ -62,6 +62,30 @@ class CreateSettlementFromPaymentServiceTest {
         assertThat(result.getNetAmount()).isEqualByComparingTo("97500.00");
     }
 
+    @Test @DisplayName("이벤트 동봉 메타(tier/cycle/sellerId) 사용 시 order DB fallback 포트를 호출하지 않는다 (ADR 0020 Phase 1)")
+    void create_usesEventCarriedMeta_noFallback() {
+        when(loadSettlementPort.findByPaymentId(7L)).thenReturn(Optional.empty());
+        // 발행부가 settlementId(primitive long)를 사용하므로 영속 id 를 부여해 언박싱 NPE 회피
+        when(saveSettlementPort.save(any())).thenAnswer(inv -> {
+            Settlement s = inv.getArgument(0);
+            s.setId(700L);
+            return s;
+        });
+
+        Settlement result = service.createSettlementFromPayment(
+                7L, 70L, new BigDecimal("100000"), 99L, "VIP", "DAILY");
+
+        // 이벤트값으로 VIP(2.5%) + DAILY(T+1) 적용
+        assertThat(result.getCommission()).isEqualByComparingTo("2500.00");
+        assertThat(result.getSettlementDate()).isEqualTo(LocalDate.now().plusDays(1));
+        // ★ 핵심: order DB 조인 포트는 한 번도 호출되지 않는다 (opslab-free 생성)
+        verify(loadSellerTierPort, never()).findTierByPaymentId(any());
+        verify(loadSellerSettlementCyclePort, never()).findCycleByPaymentId(any());
+        verify(loadSellerIdPort, never()).findSellerIdByPaymentId(any());
+        // 이벤트 sellerId 로 SettlementCreated 발행 (port 는 primitive long 시그니처 → anyLong)
+        verify(publishSettlementDomainEventPort).publishSettlementCreated(anyLong(), eq(99L), any(), any());
+    }
+
     @Test @DisplayName("판매자 매핑 없으면 NORMAL + T+7 default cycle 로 fallback") void create_fallback() {
         when(loadSettlementPort.findByPaymentId(3L)).thenReturn(Optional.empty());
         when(loadSellerTierPort.findTierByPaymentId(3L)).thenReturn(Optional.empty());
