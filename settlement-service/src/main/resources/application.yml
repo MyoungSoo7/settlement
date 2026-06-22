@@ -168,6 +168,10 @@ app:
   # settlement 가 order DB 를 직접 읽지 않는다(cross-DB 연결 0). gateway 미라우팅 내부 엔드포인트.
   order-service:
     base-url: ${ORDER_SERVICE_URL:http://localhost:8088}
+  # 내부 API(/internal/**) 공유 시크릿 — OrderReconClient 가 X-Internal-Api-Key 헤더로 전송.
+  # order 의 INTERNAL_API_KEY 와 동일해야 한다. 미설정 시 헤더 생략(개발).
+  internal:
+    api-key: ${INTERNAL_API_KEY:}
   # 읽기/쓰기 분리 (opt-in). enabled=true 일 때만 라우팅 데이터소스 활성 — readOnly 트랜잭션은 read 로.
   datasource:
     read-replica:
