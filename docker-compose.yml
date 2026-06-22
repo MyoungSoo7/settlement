@@ -260,6 +260,12 @@ services:
       SPRING_ELASTICSEARCH_PASSWORD: ${ELASTICSEARCH_PASSWORD}
       APP_KAFKA_ENABLED: "true"
       SPRING_KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
+      # [실습 전용] payment.captured 컨슈머 메시지당 인위 지연(ms). 기본 0 = 꺼짐.
+      # 값을 주고 `docker compose up -d settlement-service` 로 재기동하면 lag 발생 → kafka-lag 대시보드로 관찰.
+      APP_KAFKA_PRACTICE_CONSUMER_DELAY_MS: "${SETTLEMENT_CONSUMER_DELAY_MS:-0}"
+      # [실습 전용] 컨슈머 동시성(리스너 스레드 수). 회복 단계에서 3→6 으로 올려 처리 용량을 키운다.
+      # 유효 상한은 토픽 파티션 수 — 파티션보다 스레드를 많이 줘도 남는 스레드는 논다.
+      APP_KAFKA_CONSUMER_CONCURRENCY: "${SETTLEMENT_CONSUMER_CONCURRENCY:-3}"
       JWT_ISSUER: ${JWT_ISSUER}
       JWT_SECRET: ${JWT_SECRET}
       JWT_TTL_SECONDS: ${JWT_TTL_SECONDS}
@@ -411,6 +417,22 @@ services:
     restart: unless-stopped
     depends_on:
       - gateway-service
+
+  # kafka-exporter — Redpanda(Kafka) 컨슈머 그룹의 파티션별 lag·오프셋을 Prometheus 메트릭으로 노출.
+  # 앱 actuator 가 내보내는 client-side lag(kafka_consumer_fetch_manager_records_lag) 과 달리
+  # 브로커 관점의 정확한 파티션별 lag(kafka_consumergroup_lag) 을 제공 → Grafana lag 대시보드의 소스.
+  kafka-exporter:
+    image: danielqsj/kafka-exporter:v1.8.0
+    container_name: lemuel-kafka-exporter
+    command:
+      - "--kafka.server=redpanda:29092"   # 브로커 내부 주소 (compose 네트워크)
+      - "--web.listen-address=:9308"
+    ports:
+      - "127.0.0.1:9308:9308"             # /metrics (실습 중 직접 확인용)
+    restart: unless-stopped
+    depends_on:
+      redpanda:
+        condition: service_healthy
 
   prometheus:
     image: prom/prometheus:latest
