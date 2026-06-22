@@ -10,7 +10,7 @@ plugins {
 //   → bootJar 활성(Spring Boot 플러그인 기본). 자체 @SpringBootApplication(LoanServiceApplication) 보유.
 
 dependencies {
-    implementation(project(":shared-common"))
+    implementation("github.lms.lemuel:shared-common:1.0.0")   // 버전드 내부 라이브러리(composite build 로 로컬 치환)
 
     // Spring Boot 스타터
     implementation("org.springframework.boot:spring-boot-starter-actuator")

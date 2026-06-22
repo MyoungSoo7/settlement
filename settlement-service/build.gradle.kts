@@ -9,7 +9,7 @@ plugins {
 // 기본값(활성)으로 동작하며, 진입점은 SettlementServiceApplication 이다.
 
 dependencies {
-    implementation(project(":shared-common"))
+    implementation("github.lms.lemuel:shared-common:1.0.0")   // 버전드 내부 라이브러리(composite build 로 로컬 치환)
 
     // Spring Boot 스타터
     implementation("org.springframework.boot:spring-boot-starter-actuator")

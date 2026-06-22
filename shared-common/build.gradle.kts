@@ -1,6 +1,24 @@
+// 독립 빌드(composite/polyrepo): 루트 subprojects {} 설정을 더 이상 상속받지 않으므로
+// toolchain·repositories·dependency-management·jacoco 를 자체 선언한다.
 plugins {
     `java-library`
-    id("io.spring.dependency-management")
+    `maven-publish`
+    id("io.spring.dependency-management") version "1.1.7"
+    jacoco
+}
+
+group = "github.lms.lemuel"
+version = "1.0.0"
+
+repositories {
+    mavenCentral()
+}
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(25))
+    }
+    withSourcesJar()
 }
 
 dependencies {
@@ -109,3 +127,60 @@ dependencies {
     testRuntimeOnly("org.postgresql:postgresql:42.7.3")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
+
+// ── 발행 (버전드 내부 라이브러리) ───────────────────────────────────────────────
+// 로컬 개발: ./gradlew -p shared-common publishToMavenLocal (별도 repo 불필요).
+// 원격(GitHub Packages): GITHUB_ACTOR / GITHUB_TOKEN 환경변수가 있을 때만 활성화 → ./gradlew -p shared-common publish
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            from(components["java"])   // java-library → compile/runtime + sourcesJar 포함
+        }
+    }
+    repositories {
+        val ghActor = System.getenv("GITHUB_ACTOR")
+        val ghToken = System.getenv("GITHUB_TOKEN")
+        if (ghActor != null && ghToken != null) {
+            maven {
+                name = "GitHubPackages"
+                url = uri("https://maven.pkg.github.com/MyoungSoo7/settlement")
+                credentials {
+                    username = ghActor
+                    password = ghToken
+                }
+            }
+        }
+    }
+}
+
+// ── 커버리지 게이트 ─────────────────────────────────────────────────────────────
+// 루트 subprojects 에서 강제하던 common.outbox.domain INSTRUCTION 80% 게이트를 이관(라이브러리 자체 책임).
+tasks.withType<Test>().configureEach {
+    useJUnitPlatform()
+    finalizedBy(tasks.named("jacocoTestReport"))
+}
+
+tasks.named<JacocoReport>("jacocoTestReport") {
+    dependsOn(tasks.named("test"))
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+        csv.required.set(false)
+    }
+}
+
+tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
+    dependsOn(tasks.named("jacocoTestReport"))
+    violationRules {
+        rule {
+            element = "PACKAGE"
+            includes = listOf("github.lms.lemuel.common.outbox.domain.*")
+            limit {
+                counter = "INSTRUCTION"
+                minimum = "0.80".toBigDecimal()
+            }
+        }
+    }
+}
+
+tasks.named("check") { dependsOn(tasks.named("jacocoTestCoverageVerification")) }
