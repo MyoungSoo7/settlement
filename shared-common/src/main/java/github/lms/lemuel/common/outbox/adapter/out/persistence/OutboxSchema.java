@@ -13,8 +13,9 @@ import org.springframework.stereotype.Component;
  * not exist} 로 Outbox 발행이 전량 실패한다.
  *
  * <p>각 서비스가 이미 선언한 {@code spring.jpa.properties.hibernate.default_schema} 를 단일 진실로
- * 재사용해, {@link SpringDataOutboxEventRepository} 의 {@code #{@outboxSchema.name}} SpEL 로 주입한다.
- * pgbouncer transaction pooling 에서 불안정한 search_path 의존 없이 명시적 한정자를 유지한다.
+ * 재사용해, {@link SpringDataOutboxEventRepositoryCustomImpl} 이 네이티브 SQL 조립 시 스키마
+ * 한정자로 주입한다. pgbouncer transaction pooling 에서 불안정한 search_path 의존 없이 명시적
+ * 한정자를 유지한다.
  */
 @Component("outboxSchema")
 public class OutboxSchema {
