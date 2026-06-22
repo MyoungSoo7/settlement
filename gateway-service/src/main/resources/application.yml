@@ -13,8 +13,11 @@ spring:
           routes:
             - id: order-service-orders
               uri: ${ORDER_SERVICE_URI:http://localhost:8088}
+              # 백엔드 컨트롤러 매핑에 맞춘 경로(게이트웨이는 prefix 미변경 전달). order 는 컨트롤러별
+              # prefix 가 혼재한다: 거래/회원/인증계는 비-/api(/auth,/users,/orders,/payments,/coupons,
+              # /reviews,/games,/categories,/memberships,/products), 상품/카테고리/태그/환불이력은 /api.
               predicates:
-                - Path=/api/orders/**,/api/payments/**,/api/refunds/**,/api/products/**,/api/categories/**,/api/tags/**,/api/coupons/**,/api/reviews/**,/api/users/**,/api/auth/**,/admin/categories/**,/admin/pg/**,/admin/products/**
+                - Path=/auth/**,/users/**,/orders/**,/payments/**,/coupons/**,/reviews/**,/games/**,/categories/**,/memberships/**,/products/**,/api/products/**,/api/categories/**,/api/tags/**,/api/payments/**,/admin/categories/**,/admin/products/**,/admin/pg/**,/admin/reservation-projection/**
             - id: reservation-service
               uri: ${RESERVATION_SERVICE_URI:http://localhost:8083}
               predicates:
@@ -25,8 +28,9 @@ spring:
                 - Path=/loans/**
             - id: settlement-service
               uri: ${SETTLEMENT_SERVICE_URI:http://localhost:8082}
+              # SettlementController 는 /settlements(비-/api), 검색/원장/리포트는 /api, 운영 콘솔은 /admin.
               predicates:
-                - Path=/api/settlements/**,/api/reconciliation/**,/api/reports/**,/api/ledger/**,/admin/payouts/**,/admin/chargebacks/**,/admin/pg-reconciliation/**,/admin/dlq/**,/admin/reconciliation/**
+                - Path=/settlements/**,/api/settlements/**,/api/ledger/**,/api/reports/**,/admin/payouts/**,/admin/chargebacks/**,/admin/pg-reconciliation/**,/admin/reconciliation/**,/admin/dlq/**,/admin/settlement-projection/**
 
 server:
   port: 8080
