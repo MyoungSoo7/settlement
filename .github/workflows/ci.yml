@@ -163,12 +163,17 @@ jobs:
     permissions:
       contents: read
       packages: write
-    # 배포 단위별 이미지: order-service(번들=settlement 포함) + reservation-service(독립 MSA)
+    # 배포 단위별 이미지(ADR 0020 — settlement 독립 분리 완료):
+    #   order-service(commerce)   → settlement:latest
+    #   settlement-service(독립 MSA) → settlement-settlement:latest  (k8s settlement-deployment 가 참조)
+    #   reservation-service(독립 MSA) → settlement-reservation:latest
     strategy:
       matrix:
         include:
           - module: order-service
             image_suffix: ""
+          - module: settlement-service
+            image_suffix: "-settlement"
           - module: reservation-service
             image_suffix: "-reservation"
     steps:
