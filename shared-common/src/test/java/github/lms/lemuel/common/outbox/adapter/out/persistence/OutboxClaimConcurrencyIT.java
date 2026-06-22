@@ -53,7 +53,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DataJpaTest
 @ImportAutoConfiguration(FlywayAutoConfiguration.class)
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import(OutboxEventPersistenceAdapter.class)
+@Import({OutboxEventPersistenceAdapter.class, OutboxSchema.class})
 @ActiveProfiles("test")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class OutboxClaimConcurrencyIT {

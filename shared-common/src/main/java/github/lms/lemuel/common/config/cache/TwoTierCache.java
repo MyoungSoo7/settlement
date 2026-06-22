@@ -1,5 +1,7 @@
 package github.lms.lemuel.common.config.cache;
 
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,6 +13,7 @@ import org.springframework.lang.Nullable;
 import java.time.Duration;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.function.Supplier;
 
 /**
  * 2-tier 캐시: L1(Caffeine, 인스턴스 로컬) + L2(Redis, 공유).
@@ -42,6 +45,9 @@ public class TwoTierCache extends AbstractValueAdaptingCache {
     /** 캐시 hit/miss 메트릭 발행기. 직접 생성 테스트 등 레지스트리가 없을 땐 {@code null} → 메트릭 생략, 로그만. */
     @Nullable
     private final MeterRegistry meterRegistry;
+    /** L2(Redis) 호출 보호용 CircuitBreaker. {@code null} 이면 보호 없이 직접 호출(테스트 등). */
+    @Nullable
+    private final CircuitBreaker l2CircuitBreaker;
 
     public TwoTierCache(String name,
                         com.github.benmanes.caffeine.cache.Cache<Object, Object> l1,
@@ -49,7 +55,8 @@ public class TwoTierCache extends AbstractValueAdaptingCache {
                         Duration l2Ttl,
                         CacheInvalidationPublisher publisher,
                         boolean allowNullValues,
-                        @Nullable MeterRegistry meterRegistry) {
+                        @Nullable MeterRegistry meterRegistry,
+                        @Nullable CircuitBreaker l2CircuitBreaker) {
         super(allowNullValues);
         this.name = name;
         this.l1 = l1;
@@ -57,6 +64,7 @@ public class TwoTierCache extends AbstractValueAdaptingCache {
         this.l2Ttl = l2Ttl;
         this.publisher = publisher;
         this.meterRegistry = meterRegistry;
+        this.l2CircuitBreaker = l2CircuitBreaker;
     }
 
     @Override
@@ -162,42 +170,56 @@ public class TwoTierCache extends AbstractValueAdaptingCache {
         l1.invalidateAll();
     }
 
-    // --- L2(Redis) 접근 — 전부 graceful degrade. key 는 이미 문자열화된 값(k). ---
+    // --- L2(Redis) 접근 — 전부 graceful degrade + CircuitBreaker. key 는 이미 문자열화된 값(k). ---
 
     @Nullable
     private Object l2Get(String k) {
-        try {
-            return l2.opsForValue().get(redisKey(k));
-        } catch (RuntimeException e) {
-            log.warn("L2(Redis) get failed, falling back. cache={}, key={}, error={}", name, k, e.getMessage());
-            return null;
-        }
+        return l2Execute("get", k, () -> l2.opsForValue().get(redisKey(k)));
     }
 
     private void l2Put(String k, Object storeValue) {
-        try {
+        l2Execute("put", k, () -> {
             l2.opsForValue().set(redisKey(k), storeValue, l2Ttl);
-        } catch (RuntimeException e) {
-            log.warn("L2(Redis) put failed, L1 only. cache={}, key={}, error={}", name, k, e.getMessage());
-        }
+            return null;
+        });
     }
 
     private void l2Delete(String k) {
-        try {
+        l2Execute("delete", k, () -> {
             l2.delete(redisKey(k));
-        } catch (RuntimeException e) {
-            log.warn("L2(Redis) delete failed. cache={}, key={}, error={}", name, k, e.getMessage());
-        }
+            return null;
+        });
     }
 
     private void l2Clear() {
-        try {
+        l2Execute("clear", "*", () -> {
             Set<String> keys = l2.keys(name + "::*");
             if (keys != null && !keys.isEmpty()) {
                 l2.delete(keys);
             }
+            return null;
+        });
+    }
+
+    /**
+     * L2(Redis) 호출 공통 실행기 — graceful degrade.
+     *
+     * <p>CircuitBreaker 가 있으면 호출을 감싼다. 연속 실패로 회로가 OPEN 되면 이후 호출은 Redis 까지
+     * 가지 않고 즉시 {@link CallNotPermittedException} 으로 차단되어 <b>타임아웃 대기(수백 ms)조차
+     * 사라진다</b>. 회로 차단은 DEBUG, 실제 호출 실패는 WARN 으로 남기고 어느 쪽이든 null 폴백한다.
+     */
+    @Nullable
+    private Object l2Execute(String op, String k, Supplier<Object> action) {
+        try {
+            return l2CircuitBreaker != null ? l2CircuitBreaker.executeSupplier(action) : action.get();
+        } catch (CallNotPermittedException e) {
+            if (log.isDebugEnabled()) {
+                log.debug("L2(Redis) circuit OPEN, skip {} cache={} key={}", op, name, k);
+            }
+            return null;
         } catch (RuntimeException e) {
-            log.warn("L2(Redis) clear failed. cache={}, error={}", name, e.getMessage());
+            log.warn("L2(Redis) {} failed, falling back. cache={}, key={}, error={}", op, name, k, e.getMessage());
+            return null;
         }
     }
 

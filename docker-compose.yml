@@ -260,6 +260,12 @@ services:
       SPRING_ELASTICSEARCH_PASSWORD: ${ELASTICSEARCH_PASSWORD}
       APP_KAFKA_ENABLED: "true"
       SPRING_KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
+      # [실습 전용] payment.captured 컨슈머 메시지당 인위 지연(ms). 기본 0 = 꺼짐.
+      # 값을 주고 `docker compose up -d settlement-service` 로 재기동하면 lag 발생 → kafka-lag 대시보드로 관찰.
+      APP_KAFKA_PRACTICE_CONSUMER_DELAY_MS: "${SETTLEMENT_CONSUMER_DELAY_MS:-0}"
+      # [실습 전용] 컨슈머 동시성(리스너 스레드 수). 회복 단계에서 3→6 으로 올려 처리 용량을 키운다.
+      # 유효 상한은 토픽 파티션 수 — 파티션보다 스레드를 많이 줘도 남는 스레드는 논다.
+      APP_KAFKA_CONSUMER_CONCURRENCY: "${SETTLEMENT_CONSUMER_CONCURRENCY:-3}"
       JWT_ISSUER: ${JWT_ISSUER}
       JWT_SECRET: ${JWT_SECRET}
       JWT_TTL_SECONDS: ${JWT_TTL_SECONDS}
@@ -496,13 +502,50 @@ services:
     depends_on:
       - gateway-service
 
+  # kafka-exporter — Redpanda(Kafka) 컨슈머 그룹의 파티션별 lag·오프셋을 Prometheus 메트릭으로 노출.
+  # 앱 actuator 가 내보내는 client-side lag(kafka_consumer_fetch_manager_records_lag) 과 달리
+  # 브로커 관점의 정확한 파티션별 lag(kafka_consumergroup_lag) 을 제공 → Grafana lag 대시보드의 소스.
+  kafka-exporter:
+    image: danielqsj/kafka-exporter:v1.8.0
+    container_name: lemuel-kafka-exporter
+    command:
+      - "--kafka.server=redpanda:29092"   # 브로커 내부 주소 (compose 네트워크)
+      - "--web.listen-address=:9308"
+    ports:
+      - "127.0.0.1:9308:9308"             # /metrics (실습 중 직접 확인용)
+    restart: unless-stopped
+    depends_on:
+      redpanda:
+        condition: service_healthy
+
   prometheus:
     image: prom/prometheus:latest
     container_name: lemuel-prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"          # POST /-/reload 로 핫 리로드 허용 (실습 편의)
     ports:
       - "127.0.0.1:9090:9090"
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alert-rules.yml:/etc/prometheus/alert-rules.yml:ro   # rule_files 가 참조 — 마운트 필수
+    restart: unless-stopped
+    depends_on:
+      - alertmanager
+
+  # Alertmanager — Prometheus 알림 수신·그룹핑·silence. 실습용 null 리시버(외부 미전송) 설정 사용.
+  # 실제 Slack 연동을 실습하려면 마운트를 ./monitoring/alertmanager.yml 로 교체 (envsubst 선처리 필요).
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: lemuel-alertmanager
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+    ports:
+      - "127.0.0.1:9093:9093"
+    volumes:
+      - ./monitoring/alertmanager.practice.yml:/etc/alertmanager/alertmanager.yml:ro
     restart: unless-stopped
 
   # 분산 트레이싱 백엔드 — OTLP 수신 → Tempo 저장 → Grafana 에서 trace 검색.

@@ -5,7 +5,7 @@ plugins {
 }
 
 dependencies {
-    implementation(project(":shared-common"))
+    implementation("github.lms.lemuel:shared-common:1.0.0")   // 버전드 내부 라이브러리(composite build 로 로컬 치환)
     // settlement-service 번들 해제 (ADR 0020 Phase 0): settlement 는 독립 프로세스(:8082)로 분리 기동.
     // order-service 는 settlement 코드에 컴파일 의존하지 않으므로(헥사고날 경계), 의존성 제거만으로 분리된다.
 
