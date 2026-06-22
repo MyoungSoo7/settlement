@@ -22,14 +22,17 @@ import java.util.Arrays;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final InternalApiKeyFilter internalApiKeyFilter;
 
     // helm-deploy 차트가 CORS_ORIGINS 환경변수로 주입하므로 cors.origins 우선,
     // 하위호환으로 cors.allowed-origins fallback.
     @org.springframework.beans.factory.annotation.Value("${cors.origins:${cors.allowed-origins:}}")
     private String corsAllowedOrigins;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
+                          InternalApiKeyFilter internalApiKeyFilter) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.internalApiKeyFilter = internalApiKeyFilter;
     }
 
     @Bean
@@ -145,7 +148,8 @@ public class SecurityConfig {
                         .requestMatchers("/admin/pg/**").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers("/admin/reconciliation/**").hasAnyRole("ADMIN", "MANAGER")
                         // 내부 서비스 간 호출 — order 가 자기 대사 합계를 노출(settlement 가 소비, ADR 0020 Phase 5 self-totals).
-                        // gateway 라우트 predicate 에 없어 외부 미노출(클러스터 내부 전용). 운영에선 NetworkPolicy/mTLS 로 추가 격리 권장.
+                        // gateway 미라우팅이지만 NodePort 직노출 대비 InternalApiKeyFilter 가 X-Internal-Api-Key 공유
+                        // 시크릿을 검증(미설정 시 통과+경고). 여기선 permitAll 로 두고 게이팅은 필터가 담당. 운영선 NetworkPolicy/mTLS 추가 권장.
                         .requestMatchers("/internal/**").permitAll()
                         // Payout 콘솔 — 송금 권한은 ADMIN 만
                         .requestMatchers("/admin/payouts/**").hasRole("ADMIN")
@@ -171,7 +175,9 @@ public class SecurityConfig {
                                 response.sendError(HttpServletResponse.SC_FORBIDDEN, "Forbidden"))
                 )
                 // JWT 필터 추가
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                // 내부 API 공유 시크릿 필터 — JWT 보다 먼저 /internal/** 무자격 접근 차단
+                .addFilterBefore(internalApiKeyFilter, JwtAuthenticationFilter.class);
 
         return http.build();
     }

@@ -209,6 +209,10 @@ cart:
   store: ${CART_STORE:jpa}
 
 app:
+  # 내부 API(/internal/**) 공유 시크릿 — InternalApiKeyFilter 가 X-Internal-Api-Key 헤더를 검증.
+  # settlement(OrderReconClient)의 INTERNAL_API_KEY 와 동일해야 한다. 미설정 시 검증 비활성(개발)+경고.
+  internal:
+    api-key: ${INTERNAL_API_KEY:}
   # 읽기/쓰기 분리 (opt-in). enabled=true 일 때만 라우팅 데이터소스 활성 — readOnly 트랜잭션은 read 로.
   # 활성화 시 write/read 에 Hikari 네이티브 프로퍼티(jdbc-url 등)를 지정한다.
   datasource:

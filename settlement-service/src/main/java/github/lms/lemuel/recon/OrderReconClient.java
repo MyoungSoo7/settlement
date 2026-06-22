@@ -1,5 +1,6 @@
 package github.lms.lemuel.recon;
 
+import github.lms.lemuel.common.config.jwt.InternalApiKeyFilter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
@@ -27,8 +28,14 @@ public class OrderReconClient {
     private final RestClient client;
 
     @Autowired
-    public OrderReconClient(@Value("${app.order-service.base-url:http://localhost:8088}") String baseUrl) {
-        this.client = RestClient.builder().baseUrl(baseUrl).build();
+    public OrderReconClient(@Value("${app.order-service.base-url:http://localhost:8088}") String baseUrl,
+                            @Value("${app.internal.api-key:}") String internalApiKey) {
+        RestClient.Builder builder = RestClient.builder().baseUrl(baseUrl);
+        // 내부 API 공유 시크릿 — order 의 InternalApiKeyFilter 가 검증한다. 미설정 시 헤더 생략(개발).
+        if (internalApiKey != null && !internalApiKey.isBlank()) {
+            builder.defaultHeader(InternalApiKeyFilter.HEADER, internalApiKey);
+        }
+        this.client = builder.build();
     }
 
     /** 테스트용 — 미리 구성된(예: MockRestServiceServer 바인딩) RestClient 주입. */
