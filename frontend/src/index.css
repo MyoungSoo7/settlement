@@ -2,6 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 시스템 관리 폼 공용 input 스타일 (.input) */
+@layer components {
+  .input {
+    @apply w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500;
+  }
+}
+
 /* 전역 form element 색상 — 시스템 dark mode 가 form 만 검정으로 만드는 함정 차단.
    모든 input/select/textarea 가 흰 배경 + 검은 글씨로 강제 (의도 적용 시 컴포넌트별 override). */
 @layer base {

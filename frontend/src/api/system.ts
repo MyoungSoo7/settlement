@@ -1,0 +1,179 @@
+import api from './axios';
+
+// ════════════════════════════════════════════════════════════════════════════
+// 공통코드 (Common Code)
+// ════════════════════════════════════════════════════════════════════════════
+export interface CommonCodeGroup {
+  groupCode: string;
+  name: string;
+  description?: string | null;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CommonCode {
+  id: number;
+  groupCode: string;
+  code: string;
+  label: string;
+  sortOrder: number;
+  active: boolean;
+  extra1?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CommonCodeGroupCreateRequest {
+  groupCode: string;
+  name: string;
+  description?: string;
+}
+export interface CommonCodeGroupUpdateRequest {
+  name: string;
+  description?: string;
+  active: boolean;
+}
+export interface CommonCodeCreateRequest {
+  groupCode: string;
+  code: string;
+  label: string;
+  sortOrder: number;
+  extra1?: string;
+}
+export interface CommonCodeUpdateRequest {
+  label: string;
+  sortOrder: number;
+  active: boolean;
+  extra1?: string;
+}
+
+export const commonCodeApi = {
+  /** GET /admin/common-codes/groups */
+  getGroups: async (): Promise<CommonCodeGroup[]> =>
+    (await api.get<CommonCodeGroup[]>('/admin/common-codes/groups')).data,
+
+  /** POST /admin/common-codes/groups */
+  createGroup: async (body: CommonCodeGroupCreateRequest): Promise<CommonCodeGroup> =>
+    (await api.post<CommonCodeGroup>('/admin/common-codes/groups', body)).data,
+
+  /** PUT /admin/common-codes/groups/{groupCode} */
+  updateGroup: async (groupCode: string, body: CommonCodeGroupUpdateRequest): Promise<CommonCodeGroup> =>
+    (await api.put<CommonCodeGroup>(`/admin/common-codes/groups/${encodeURIComponent(groupCode)}`, body)).data,
+
+  /** DELETE /admin/common-codes/groups/{groupCode} */
+  deleteGroup: async (groupCode: string): Promise<void> => {
+    await api.delete(`/admin/common-codes/groups/${encodeURIComponent(groupCode)}`);
+  },
+
+  /** GET /admin/common-codes/groups/{groupCode}/codes */
+  getCodes: async (groupCode: string): Promise<CommonCode[]> =>
+    (await api.get<CommonCode[]>(`/admin/common-codes/groups/${encodeURIComponent(groupCode)}/codes`)).data,
+
+  /** POST /admin/common-codes */
+  createCode: async (body: CommonCodeCreateRequest): Promise<CommonCode> =>
+    (await api.post<CommonCode>('/admin/common-codes', body)).data,
+
+  /** PUT /admin/common-codes/{id} */
+  updateCode: async (id: number, body: CommonCodeUpdateRequest): Promise<CommonCode> =>
+    (await api.put<CommonCode>(`/admin/common-codes/${id}`, body)).data,
+
+  /** DELETE /admin/common-codes/{id} */
+  deleteCode: async (id: number): Promise<void> => {
+    await api.delete(`/admin/common-codes/${id}`);
+  },
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// 메뉴 (Menu)
+// ════════════════════════════════════════════════════════════════════════════
+export interface MenuNode {
+  id: number;
+  parentId: number | null;
+  name: string;
+  path?: string | null;
+  icon?: string | null;
+  sortOrder: number;
+  requiredRole?: string | null;
+  visible: boolean;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+  children: MenuNode[];
+}
+
+export interface MenuCreateRequest {
+  name: string;
+  path?: string;
+  icon?: string;
+  parentId?: number | null;
+  sortOrder: number;
+  requiredRole?: string;
+  visible: boolean;
+}
+export interface MenuUpdateRequest extends MenuCreateRequest {
+  active: boolean;
+}
+
+export const menuApi = {
+  /** GET /admin/menus (트리) */
+  getTree: async (): Promise<MenuNode[]> =>
+    (await api.get<MenuNode[]>('/admin/menus')).data,
+
+  /** GET /admin/menus/flat */
+  getFlat: async (): Promise<MenuNode[]> =>
+    (await api.get<MenuNode[]>('/admin/menus/flat')).data,
+
+  /** POST /admin/menus */
+  create: async (body: MenuCreateRequest): Promise<MenuNode> =>
+    (await api.post<MenuNode>('/admin/menus', body)).data,
+
+  /** PUT /admin/menus/{id} */
+  update: async (id: number, body: MenuUpdateRequest): Promise<MenuNode> =>
+    (await api.put<MenuNode>(`/admin/menus/${id}`, body)).data,
+
+  /** DELETE /admin/menus/{id} */
+  remove: async (id: number): Promise<void> => {
+    await api.delete(`/admin/menus/${id}`);
+  },
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// RBAC (Role / Permission)
+// ════════════════════════════════════════════════════════════════════════════
+export interface Role {
+  id: number;
+  code: string;
+  name: string;
+  description?: string | null;
+  builtin: boolean;
+  createdAt: string;
+  permissionIds: number[];
+  permissionCodes: string[];
+}
+
+export interface Permission {
+  id: number;
+  code: string;
+  name: string;
+  category: string;
+  description?: string | null;
+}
+
+export const rbacApi = {
+  /** GET /admin/rbac/roles */
+  getRoles: async (): Promise<Role[]> =>
+    (await api.get<Role[]>('/admin/rbac/roles')).data,
+
+  /** GET /admin/rbac/permissions */
+  getPermissions: async (): Promise<Permission[]> =>
+    (await api.get<Permission[]>('/admin/rbac/permissions')).data,
+
+  /** GET /admin/rbac/roles/{id} */
+  getRole: async (id: number): Promise<Role> =>
+    (await api.get<Role>(`/admin/rbac/roles/${id}`)).data,
+
+  /** PUT /admin/rbac/roles/{id}/permissions */
+  updateRolePermissions: async (id: number, permissionIds: number[]): Promise<Role> =>
+    (await api.put<Role>(`/admin/rbac/roles/${id}/permissions`, { permissionIds })).data,
+};

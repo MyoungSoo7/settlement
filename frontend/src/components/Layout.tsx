@@ -60,7 +60,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   <Link to="/settlement/search" className={adminNavLinkClass('/settlement/search')}>정산조회</Link>
                   <Link to="/loans"            className={adminNavLinkClass('/loans')}>대출관리</Link>
                   {user.role === 'ADMIN' && (
-                    <Link to="/admin/system/ecommerce-categories" className={adminNavLinkClass('/admin/system')}>
+                    <Link to="/admin/system/menus" className={adminNavLinkClass('/admin/system')}>
                       시스템
                     </Link>
                   )}
