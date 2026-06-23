@@ -1,6 +1,6 @@
 # Lemuel — 이커머스 + 정산 MSA 플랫폼
 
-> **상품·장바구니·주문·결제·배송·정산·선정산대출** 도메인을 **4개 마이크로서비스 + API Gateway** 로 분리한
+> **상품·장바구니·주문·결제·배송·정산·선정산대출** 도메인을 **3개 마이크로서비스 + API Gateway** 로 분리한
 > 헥사고날 아키텍처 기반 백엔드. 단일 모놀리스 → **Bounded Context 분리** → **이벤트 드리븐** →
 > **DB-per-service + 이벤트 프로젝션 패턴**(ADR 0020 완료) 으로 진화시킨 포트폴리오 프로젝트.
 
@@ -32,7 +32,6 @@ flowchart LR
 
     GW -->|/api/orders, payments<br/>products, users ...| OS
     GW -->|/api/settlements<br/>reports, ledger ...| SS
-    GW -->|/reservations/**| RS
     GW -->|/loans/**| LS
 
     subgraph commerce["🛒 Commerce"]
@@ -52,13 +51,11 @@ flowchart LR
 
     OS --- PG[(PostgreSQL opslab<br/>order 전용)]
     SS --- SDB[(settlement_db<br/>이벤트 프로젝션)]
-    RS --- RDB[(reservations_db)]
     LS --- LDB[(lemuel_loan)]
     SS --- ES[(Elasticsearch 8.17<br/>settlement search)]
 
     style commerce fill:#fff7e6,stroke:#fa8c16
     style settlement fill:#e6f7ff,stroke:#1890ff
-    style reservation fill:#f6ffed,stroke:#52c41a
     style loan fill:#fff0f6,stroke:#eb2f96
 ```
 
@@ -111,9 +108,9 @@ CQRS 로 분리하고, 대사는 order 의 내부 API 를 호출해 cross-DB 연
 
 ```
 settlement/                              # 모노레포 루트
-├── settings.gradle.kts                  # 6 모듈 선언
+├── settings.gradle.kts                  # 4 서비스 모듈 선언 (shared-common 은 composite build)
 ├── build.gradle.kts                     # 부모 빌드 (subprojects 공통 설정)
-├── docker-compose.yml                   # opslab+settlement_db+reservations_db+lemuel_loan PG(4) · ES · Redpanda · 5 services
+├── docker-compose.yml                   # opslab+settlement_db+lemuel_loan PG(3) · ES · Redpanda · 4 services
 ├── Dockerfile                           # MODULE 빌드 인자 파라미터화 (모든 서비스 공용)
 │
 ├── shared-common/                       # 📦 라이브러리 모듈 (java-library)
@@ -316,14 +313,13 @@ Outbox `retryCount ≥ 10` → 자동 Kafka DLQ 발행 + Admin REST API:
 ### 전체 실행
 
 ```bash
-# 1. 인프라 + 5 서비스 모두 빌드/실행
+# 1. 인프라 + 4 서비스 모두 빌드/실행
 docker compose up -d
 
 # 2. 서비스 진입점
 #    - Gateway:     http://localhost:8080
 #    - Order API:   http://localhost:8088 (직접 접근, 보통 gateway 경유)
 #    - Settlement:  http://localhost:8082
-#    - Reservation: http://localhost:8083
 #    - Loan:        http://localhost:8084
 #    - Swagger:     http://localhost:8088/swagger-ui.html
 #                   http://localhost:8082/swagger-ui.html
@@ -332,13 +328,12 @@ docker compose up -d
 ### 개별 서비스 실행
 
 ```bash
-# 인프라만 (PG 4종 + ES + Redpanda)
-docker compose up -d postgres settlement-db reservations-postgres loan-postgres elasticsearch redpanda
+# 인프라만 (PG 3종 + ES + Redpanda)
+docker compose up -d postgres settlement-db loan-postgres elasticsearch redpanda
 
 # 각 서비스를 IDE 또는 gradle 로
 ./gradlew :order-service:bootRun
 ./gradlew :settlement-service:bootRun
-./gradlew :reservation-service:bootRun
 ./gradlew :loan-service:bootRun
 ./gradlew :gateway-service:bootRun
 ```
@@ -356,7 +351,6 @@ docker compose up -d postgres settlement-db reservations-postgres loan-postgres 
 ```bash
 docker build --build-arg MODULE=order-service       -t lemuel-order .
 docker build --build-arg MODULE=settlement-service  -t lemuel-settlement .
-docker build --build-arg MODULE=reservation-service -t lemuel-reservation .
 docker build --build-arg MODULE=loan-service        -t lemuel-loan .
 docker build --build-arg MODULE=gateway-service     -t lemuel-gateway .
 ```
@@ -372,7 +366,6 @@ docker build --build-arg MODULE=gateway-service     -t lemuel-gateway .
 | `/api/products/**`, `/api/categories/**`, `/api/tags/**` | order-service |
 | `/api/coupons/**`, `/api/reviews/**` | order-service |
 | `/admin/categories/**`, `/admin/pg/**`, `/admin/products/**` | order-service |
-| `/reservations/**` | **reservation-service** (자체 DB) |
 | `/loans/**` | **loan-service** (자체 DB) |
 | `/api/settlements/**`, `/api/reconciliation/**`, `/api/reports/**` | settlement-service |
 | `/api/ledger/**` | settlement-service |

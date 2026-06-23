@@ -33,7 +33,7 @@ order↔settlement 는 settlement 가 자체 DB 에 **이벤트 드리븐 프로
 
 ```
 settlement/                       # Gradle 멀티 모듈 루트
-├── settings.gradle.kts           # 6 모듈 선언
+├── settings.gradle.kts           # 4 서비스 모듈 선언 (shared-common 은 composite build)
 ├── build.gradle.kts              # 부모 빌드 (subprojects 공통 설정)
 ├── shared-common/                # 📦 java-library: 전 서비스가 의존
 │   └── github.lms.lemuel.common.{audit, config, exception, outbox, ratelimit, pdf}
@@ -225,7 +225,6 @@ RUNNING → COMPLETED
 ./gradlew :shared-common:compileJava
 ./gradlew :order-service:compileJava
 ./gradlew :settlement-service:compileJava
-./gradlew :reservation-service:compileJava
 ./gradlew :loan-service:compileJava
 ./gradlew :gateway-service:compileJava
 
@@ -242,13 +241,12 @@ RUNNING → COMPLETED
 ./gradlew :order-service:bootJar
 
 # Docker Compose
-docker compose up -d                # opslab+settlement_db+reservations_db+lemuel_loan PG(4) · ES · Redpanda · 5 services
+docker compose up -d                # opslab+settlement_db+lemuel_loan PG(3) · ES · Redpanda · 4 services
 docker compose down
 
 # 컨테이너 이미지 (MODULE 빌드 인자로 어떤 서비스인지 지정)
 docker build --build-arg MODULE=order-service       -t lemuel-order .
 docker build --build-arg MODULE=settlement-service  -t lemuel-settlement .
-docker build --build-arg MODULE=reservation-service -t lemuel-reservation .
 docker build --build-arg MODULE=loan-service        -t lemuel-loan .
 docker build --build-arg MODULE=gateway-service     -t lemuel-gateway .
 ```
@@ -256,7 +254,8 @@ docker build --build-arg MODULE=gateway-service     -t lemuel-gateway .
 ## 작업 이력 / 브랜치 정보
 
 - **메인 라인**: `develop` → `main`
-- **MSA 분리**: 완료됨 (4 서비스 + DB-per-service, settlement↔order 는 이벤트 드리븐 프로젝션으로 코드·DB 의존 0).
+- **MSA 분리**: 완료됨 (3 서비스 + DB-per-service, settlement↔order 는 이벤트 드리븐 프로젝션으로 코드·DB 의존 0).
   분리 전 백업은 `backup/pre-msa-split`. order↔settlement DB 물리 분리는 ADR 0020 으로 완료.
-- **이후 추가 도메인**: `reservation`(시공 예약/기사 배정), 멤버십 승인 등.
+- **제거된 도메인**: `reservation`(시공 예약/기사 배정) 서비스는 제거됨 — 모듈·자체 DB·gateway 라우팅·프론트·k8s 매니페스트 모두 정리.
+- **이후 추가 도메인**: 멤버십 승인 등.
 - **TPS 개선 작업**: PgBouncer, Reaㅋ
