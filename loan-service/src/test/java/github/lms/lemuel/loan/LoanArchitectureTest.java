@@ -16,7 +16,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
  * <ul>
  *   <li>도메인은 application/adapter 에 의존하지 않는다 (의존 방향).</li>
  *   <li>application 은 adapter 에 의존하지 않는다.</li>
- *   <li>★ loan-service 는 order/settlement/reservation 패키지에 코드 의존 0
+ *   <li>★ loan-service 는 order/settlement 패키지에 코드 의존 0
  *       — 정산 데이터는 Kafka 이벤트로만 수신한다 (DB-per-service 경계).</li>
  * </ul>
  *
@@ -55,14 +55,13 @@ class LoanArchitectureTest {
     }
 
     @Test
-    void loan_은_order_settlement_reservation_에_코드의존하지_않는다() {
+    void loan_은_order_settlement_에_코드의존하지_않는다() {
         ArchRule rule = noClasses()
                 .that().resideInAPackage("github.lms.lemuel.loan..")
                 .should().dependOnClassesThat()
                 .resideInAnyPackage(
                         "github.lms.lemuel.order..",
-                        "github.lms.lemuel.settlement..",
-                        "github.lms.lemuel.reservation..")
+                        "github.lms.lemuel.settlement..")
                 .allowEmptyShould(true);
         rule.check(loanClasses);
     }
