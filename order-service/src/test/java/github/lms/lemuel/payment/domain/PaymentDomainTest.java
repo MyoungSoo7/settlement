@@ -60,6 +60,26 @@ class PaymentDomainTest {
         assertThatThrownBy(p::capture).isInstanceOf(IllegalStateException.class);
     }
 
+    @Test @DisplayName("AUTHORIZED → CANCELED (승인취소) 성공")
+    void cancel_success() {
+        PaymentDomain p = createReadyPayment();
+        p.authorize("pg-tx");
+        p.cancel();
+        assertThat(p.getStatus()).isEqualTo(PaymentStatus.CANCELED);
+    }
+
+    @Test @DisplayName("READY 상태에서 cancel 실패 (AUTHORIZED 만 취소 가능)")
+    void cancel_fail_notAuthorized() {
+        PaymentDomain p = createReadyPayment();
+        assertThatThrownBy(p::cancel).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test @DisplayName("CAPTURED 이후에는 cancel 불가 (refund 경로 사용)")
+    void cancel_fail_afterCapture() {
+        PaymentDomain p = createCapturedPayment();
+        assertThatThrownBy(p::cancel).isInstanceOf(IllegalStateException.class);
+    }
+
     @Test @DisplayName("CAPTURED → REFUNDED 성공")
     void refund_success() {
         PaymentDomain p = createCapturedPayment();
