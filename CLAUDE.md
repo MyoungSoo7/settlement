@@ -3,8 +3,10 @@
 ## 프로젝트 개요
 
 주문·결제·정산·시공예약·선정산대출을 **4개 마이크로서비스 + API Gateway** 로 분리한 헥사고날 아키텍처 백엔드.
-원래 단일 모놀리스였으나 Bounded Context 로 분리. order↔settlement 는 Read-only Projection(공유 DB opslab),
-reservation·loan 은 DB-per-service + Kafka 이벤트로 분리한다.
+원래 단일 모놀리스였으나 Bounded Context 로 분리. **4개 서비스 모두 DB-per-service**(order=opslab, settlement=settlement_db,
+reservation=reservations_db, loan=lemuel_loan) 로 물리 분리돼 있고, 서비스 간 연계는 **Kafka 이벤트로만** 한다.
+order↔settlement 는 settlement 가 자체 DB 에 **이벤트 드리븐 프로젝션**(`settlement_*_view`)을 적재하는 CQRS 로 분리하고
+(ADR 0020 완료), 대사(reconciliation)는 order 의 내부 API(`/internal/recon`)를 호출해 cross-DB 연결 0 을 유지한다.
 자세한 사용자용 문서는 [`README.md`](./README.md) 참조.
 
 ## 기술 스택
@@ -37,7 +39,7 @@ settlement/                       # Gradle 멀티 모듈 루트
 │   └── github.lms.lemuel.common.{audit, config, exception, outbox, ratelimit, pdf}
 ├── order-service/                # 🛒 Commerce 서비스 (port 8088)
 │   └── github.lms.lemuel.{user, order, payment, cart, shipping, product, category, coupon, review, game}
-├── settlement-service/           # 💰 Settlement 서비스 (port 8082, standalone — order 와 opslab DB 공유)
+├── settlement-service/           # 💰 Settlement 서비스 (port 8082, standalone — 자체 DB settlement_db)
 │   └── github.lms.lemuel.{settlement, payout, ledger, chargeback, pgreconciliation, report}
 ├── reservation-service/          # 🛠 Reservation 서비스 (port 8083, 자체 DB reservations_db)
 │   └── github.lms.lemuel.reservation.*
@@ -50,8 +52,8 @@ settlement/                       # Gradle 멀티 모듈 루트
 
 | 서비스 | 패키지 | 책임 |
 |--------|--------|------|
-| **order-service** | `user, order, payment, cart, shipping, product, category, coupon, review, game` | 회원·상품·장바구니·주문·결제·배송 — 거래 컨텍스트 |
-| **settlement-service** | `settlement, payout, ledger, chargeback, pgreconciliation, report` | 정산 생성/확정, 지급(payout), 복식부기 원장(ledger), 차지백, PG 대사, ES 색인, PDF, 캐시플로우 리포트 |
+| **order-service** | `user, order, payment, cart, shipping, product, category, coupon, review, game` (+ `recon`, `projectionbackfill` — ADR 0020 내부 대사 API/프로젝션 백필) | 회원·상품·장바구니·주문·결제·배송 — 거래 컨텍스트. opslab DB 소유, 자기 합계를 `/internal/recon` 으로 노출 |
+| **settlement-service** | `settlement, payout, ledger, chargeback, pgreconciliation, report` (+ `recon` — `OrderReconClient`) | 정산 생성/확정, 지급(payout), 복식부기 원장(ledger), 차지백, PG 대사, ES 색인, PDF, 캐시플로우 리포트. **자체 DB settlement_db** — order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝션(`settlement_*_view`)으로 조회(코드·DB 의존 0) |
 | **reservation-service** | `reservation` | 시공 예약/기사 배정 — 독립 배포 + 자체 DB(reservations_db). 기사 자격은 user 멤버십 이벤트로 동기화되는 로컬 `technician_view` 프로젝션으로 검증(코드·DB 의존 0) |
 | **loan-service** | `loan` | 선정산 대출 — 셀러의 미확정 정산금을 담보로 선지급. 독립 배포 + 자체 DB(lemuel_loan) + 자체 복식부기 원장. settlement 정산 데이터는 Kafka 이벤트(`settlement.created/confirmed`)로만 수신, 상환은 이벤트 saga 로 연계(코드·DB 의존 0) |
 | **gateway-service** | (Spring Cloud Gateway) | 라우팅, 인증 필터 |
@@ -73,28 +75,37 @@ settlement/                       # Gradle 멀티 모듈 루트
     ├── out/persistence/ # JPA 리포지토리, 엔티티
     ├── out/external/    # PG 클라이언트 (Toss)
     ├── out/event/       # Outbox-backed Kafka publisher
-    ├── out/readmodel/   # ★ Read-only projection (settlement-service 전용)
+    ├── out/readmodel/   # ★ 이벤트 드리븐 프로젝션 뷰 (settlement-service 전용, 자체 DB)
     ├── out/search/      # ES 색인
     └── out/pdf/         # iText PDF
 ```
 
-## ★ Read-only Projection 패턴 (핵심)
+## ★ 이벤트 드리븐 프로젝션 패턴 (핵심) — ADR 0020 완료
 
-`settlement-service` 가 `order-service` 코드를 **import 하지 않으면서** Order/Payment/User/Product
-데이터를 조회하기 위한 분리 기법. settlement-service 자체에 `@Immutable JpaEntity` 정의 →
-같은 테이블 매핑 → 코드 의존성 0.
+`settlement-service` 가 `order-service` 코드를 **import 하지 않고 DB 도 공유하지 않으면서** Order/Payment/User/Product
+데이터를 조회하기 위한 분리 기법. settlement 가 **자체 DB(settlement_db)에 소유하는 프로젝션 테이블**을 두고,
+order 가 발행하는 Kafka 이벤트를 컨슈머가 받아 **로컬에 적재**한다. (과거 opslab 의 같은 테이블을 `@Immutable` 로
+read-only 매핑하던 방식에서 진화 — 이제 cross-DB 연결 0.)
 
 ```
-settlement-service/.../adapter/out/readmodel/
-├── SettlementPaymentReadModel    (payments 테이블 read-only)
-├── SettlementOrderReadModel      (orders 테이블)
-├── SettlementUserReadModel       (users 테이블, email만)
-├── SettlementProductReadModel    (products 테이블, name만)
-└── *Repository                   (Spring Data JPA)
+settlement-service/.../adapter/out/readmodel/   (settlement_db 소유 프로젝션 테이블)
+├── SettlementOrderViewJpaEntity      (settlement_order_view   ← lemuel.order.created)
+├── SettlementPaymentViewJpaEntity    (settlement_payment_view ← lemuel.payment.captured/refunded)
+├── SettlementUserViewJpaEntity       (settlement_user_view    ← lemuel.user.registered)
+├── SettlementProductViewJpaEntity    (settlement_product_view ← lemuel.product.changed)
+└── SettlementProjectionGauges        (프로젝션 적재 상태 메트릭)
+
+settlement-service/.../adapter/in/kafka/        (프로젝션 적재 컨슈머)
+├── OrderEventKafkaConsumer · PaymentEventKafkaConsumer · PaymentRefundedViewConsumer
+├── ProductEventKafkaConsumer · UserRegisteredEventConsumer
 ```
+
+- **대사(reconciliation)**: settlement 의 `recon.OrderReconClient` 가 order 의 내부 API `/internal/recon`
+  (공유 시크릿 `X-Internal-Api-Key`)을 호출해 합계를 비교 — 양측 모두 자기 DB 만 읽는다(cross-DB 0).
+- **백필**: 초기 적재/복구는 order 의 `projectionbackfill` 모듈이 담당.
 
 → `settlement-service/build.gradle.kts` 에 `implementation(project(":order-service"))` **없음**.
-→ MSA 의 코드 경계 100% 확립.
+→ MSA 의 코드 경계 + 데이터 경계 100% 확립.
 
 ## 도메인 규칙
 
@@ -182,6 +193,9 @@ RUNNING → COMPLETED
 2. `processed_events PK (consumer_group, event_id)`
 3. `settlements.payment_id UNIQUE`
 
+> 같은 Outbox+Kafka 경로로 `order.created`/`user.registered`/`product.changed`/`payment.refunded` 이벤트도
+> 흐르며, settlement 의 프로젝션 컨슈머가 `settlement_*_view` 에 적재한다(위 ★ 프로젝션 패턴).
+
 ## 코딩 컨벤션
 
 - **아키텍처**: 헥사고날 (Ports & Adapters)
@@ -190,7 +204,7 @@ RUNNING → COMPLETED
 - **DB 마이그레이션**: Flyway, 초기 V1~V50 + `V{timestamp}__` 명명 혼재 (예: `V20260611110000__`). 신규는 timestamp 명명 권장
 - **테스트**: 도메인 단위 → 서비스 → 컨트롤러 → 통합 순
 - **헥사고날 강제**: ArchUnit 으로 패키지 의존 방향 검증
-- **MSA 경계**: settlement-service ↔ order-service 코드 의존 0 (read-model 또는 Kafka 이벤트로만)
+- **MSA 경계**: settlement-service ↔ order-service 코드·DB 의존 0 (Kafka 이벤트 프로젝션 + 내부 대사 API `/internal/recon` 으로만)
 
 ## 인프라
 
@@ -239,7 +253,7 @@ RUNNING → COMPLETED
 ./gradlew :order-service:bootJar
 
 # Docker Compose
-docker compose up -d                # opslab+reservations_db+lemuel_loan PG · ES · Redpanda · 5 services
+docker compose up -d                # opslab+settlement_db+reservations_db+lemuel_loan PG(4) · ES · Redpanda · 5 services
 docker compose down
 
 # 컨테이너 이미지 (MODULE 빌드 인자로 어떤 서비스인지 지정)
@@ -253,8 +267,8 @@ docker build --build-arg MODULE=gateway-service     -t lemuel-gateway .
 ## 작업 이력 / 브랜치 정보
 
 - **메인 라인**: `develop` → `main`
-- **MSA 분리**: 완료됨 (4-module + Read-only Projection 으로 settlement↔order 코드 의존 0).
-  분리 전 백업은 `backup/pre-msa-split`.
+- **MSA 분리**: 완료됨 (4 서비스 + DB-per-service, settlement↔order 는 이벤트 드리븐 프로젝션으로 코드·DB 의존 0).
+  분리 전 백업은 `backup/pre-msa-split`. order↔settlement DB 물리 분리는 ADR 0020 으로 완료.
 - **이후 추가 도메인**: `reservation`(시공 예약/기사 배정), 멤버십 승인 등.
 - **TPS 개선 작업**: PgBouncer, Read Replica 라우팅(opt-in), JDBC 배치, Outbox 비동기 배치 +
-  SKIP LOCKED 멀티워커, Kafka 컨슈머 병렬화, Redis 2-tier 캐시(opt-in). 상세는 [`docs/tps.md`](./docs/tps.md).
+  SKIP LOCKED 멀티워커, Kafka 컨슈머 병렬화, Redis 2-tier 캐시(opt-in).
