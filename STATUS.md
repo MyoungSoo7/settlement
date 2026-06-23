@@ -12,7 +12,6 @@
 ## 최근 진척
 - 경량 PR 리뷰 워크플로우(GitHub Actions) 추가
 - Swagger/OpenAPI 문서화 완료
-- ai-dev-team 커맨드 + 17개 에이전트 프롬프트 도입
 - JaCoCo 커버리지 리포트 설정
 - Caffeine 캐시 확대, Elasticsearch TLS 설정
 - 화면설계서/프로세스 정의서 (Mermaid)

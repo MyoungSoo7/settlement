@@ -9,6 +9,7 @@ ETL 스크립트 [`scripts/etl/settlement-db-cutover.sh`](../../scripts/etl/sett
 
 ---
 
+
 ## 전제 조건
 
 - [ ] `settlement_db` 인스턴스가 프로비저닝됨 (compose: `settlement-db:5432` / k8s: `settlement-db-service`).

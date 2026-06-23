@@ -1,6 +1,6 @@
 # Lemuel — 이커머스 + 정산 MSA 플랫폼
 
-> **상품·장바구니·주문·결제·배송·정산·시공예약·선정산대출** 도메인을 **4개 마이크로서비스 + API Gateway** 로 분리한
+> **상품·장바구니·주문·결제·배송·정산·선정산대출** 도메인을 **4개 마이크로서비스 + API Gateway** 로 분리한
 > 헥사고날 아키텍처 기반 백엔드. 단일 모놀리스 → **Bounded Context 분리** → **이벤트 드리븐** →
 > **DB-per-service + 이벤트 프로젝션 패턴**(ADR 0020 완료) 으로 진화시킨 포트폴리오 프로젝트.
 
@@ -41,9 +41,6 @@ flowchart LR
     subgraph settlement["💰 Settlement"]
         SS["settlement-service :8082<br/><br/>settlement · payout · ledger<br/>chargeback · pgreconciliation · report"]
     end
-    subgraph reservation["🛠 Reservation (DB-per-service)"]
-        RS["reservation-service :8083<br/><br/>시공예약 · 기사배정"]
-    end
     subgraph loan["💸 Loan (DB-per-service)"]
         LS["loan-service :8084<br/><br/>선정산 대출 · 상환 · 자체 원장"]
     end
@@ -76,7 +73,7 @@ flowchart LR
 | **배포 주기** | 잦음 (UI 변경 동행) | 드뭄 (회계 사이클 단위) |
 
 → 위 차이점이 명확하므로 **서비스 분리** 가 자연스러운 경계. **4개 서비스 모두 DB-per-service**
-(order=opslab · settlement=settlement_db · reservation=reservations_db · loan=lemuel_loan) 로 물리 분리하고,
+(order=opslab · settlement=settlement_db · loan=lemuel_loan) 로 물리 분리하고,
 연계는 **Kafka 이벤트로만** 한다. order↔settlement 는 settlement 가 자체 DB 에 이벤트 프로젝션을 적재하는
 CQRS 로 분리하고, 대사는 order 의 내부 API 를 호출해 cross-DB 연결 0 을 유지한다
 ([ADR 0020](docs/adr/0020-order-settlement-db-split.md) — 완료).
@@ -155,9 +152,6 @@ settlement/                              # 모노레포 루트
 │       ├── chargeback/                  # 지급 분쟁/거절 처리
 │       ├── pgreconciliation/            # PG 정산파일 대사 + 차액 보정
 │       └── report/                      # 캐시플로우 리포트 도메인
-│
-├── reservation-service/                 # 🛠 Reservation 서비스 (port 8083, 자체 DB reservations_db)
-│   └── src/main/java/.../reservation/   # 시공예약·기사배정 — order/user 코드 의존 0 (이벤트로 동기화)
 │
 ├── loan-service/                        # 💸 Loan 서비스 (port 8084, 자체 DB lemuel_loan) — 선정산 대출
 │   └── src/main/java/.../loan/          # 한도·선지급·상환 saga·자체 복식부기 — settlement 이벤트로만 연계
@@ -407,16 +401,6 @@ CREATED ─→ PAID ─→ REFUNDED
 CANCELLATION_REQUESTED/APPROVED, REFUND_REQUESTED/COMPLETED`.
 전이 규칙은 `OrderStatus.canTransitionTo()` 상태머신에 명시되어 `Order.transitionTo()` 가 강제한다.
 
-### Reservation 상태머신 (시공 예약)
-```
-REQUESTED ─→ CONFIRMED ─→ ASSIGNED ─→ IN_PROGRESS ─→ COMPLETED
- (접수)      (관리자확인)   (기사배정)    (시공중)         (시공완료)
-                                                  └─→ CANCELED
-```
-- 업체회원이 예약 등록 → 관리자 확인 → 시공기사 배정/**재배정** → 진행/완료
-- 기사 본인 배정 작업 조회(`/reservations/assigned/my`), 관리자 대시보드(`/reservations/admin`)
-- 엔드포인트는 **reservation-service** `/reservations/**` (gateway 라우팅됨, 자체 DB reservations_db)
-
 ### Shipping 상태머신
 ```
 PENDING → READY → SHIPPED → IN_TRANSIT → DELIVERED → (선택) RETURNED
@@ -489,7 +473,6 @@ PENDING → READY → SHIPPED → IN_TRANSIT → DELIVERED → (선택) RETURNED
 - [0016 — Payout Domain + Firm Banking](./docs/adr/0016-payout-domain-firm-banking.md)
 - [0017 — Kafka Consumer DLT & Replay](./docs/adr/0017-kafka-consumer-dlt-and-replay.md)
 - [0018 — Chargeback Domain](./docs/adr/0018-chargeback-domain.md)
-- 0019 — ReversePayout (예약/Planned)
 - [0020 — order ↔ settlement DB 물리 분리 (이벤트 CQRS)](./docs/adr/0020-order-settlement-db-split.md) *(완료 — settlement_db + 이벤트 프로젝션 + /internal/recon)*
 - [0021 — shared-common 을 버전드 플랫폼 라이브러리로](./docs/adr/0021-shared-common-as-platform-library.md) *(완료 — composite build + maven-publish 1.0.0)*
 
@@ -524,8 +507,8 @@ CI 에서 k6 thresholds 로 회귀 자동 감지.
 
 ## 운영 환경 확장 포인트
 
-현재 구성은 **4개 서비스 모두 DB-per-service** 로 물리 분리돼 있고(order=opslab, settlement=settlement_db,
-reservation=reservations_db, loan=lemuel_loan), 이벤트 프로젝션 패턴 덕분에 다음 단계로의 확장이 깨끗합니다:
+현재 구성은 **3개 서비스 모두 DB-per-service** 로 물리 분리돼 있고(order=opslab, settlement=settlement_db,
+loan=lemuel_loan), 이벤트 프로젝션 패턴 덕분에 다음 단계로의 확장이 깨끗합니다:
 
 1. ~~**DB 분리**~~ — ✅ 완료. settlement 가 자체 `settlement_db` 의 projection 테이블에 Kafka 이벤트 컨슈머가
    직접 INSERT 하고, 대사는 order 내부 API(`/internal/recon`)로 cross-DB 0 ([ADR 0020](docs/adr/0020-order-settlement-db-split.md)).
