@@ -18,7 +18,6 @@ const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const OrderPage = lazy(() => import('./pages/OrderPage'));
 const CartPage = lazy(() => import('./pages/CartPage'));
 const MyPage = lazy(() => import('./pages/MyPage'));
-const ReservationPage = lazy(() => import('./pages/ReservationPage'));
 const LoanPage = lazy(() => import('./pages/LoanPage'));
 const TossPaymentSuccess = lazy(() => import('./pages/TossPaymentSuccess'));
 
@@ -89,7 +88,6 @@ function App() {
             <Route path="/order"        element={<ProtectedRoute><OrderPage /></ProtectedRoute>} />
             <Route path="/cart"         element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
             <Route path="/mypage"       element={<ProtectedRoute><MyPage /></ProtectedRoute>} />
-            <Route path="/reservations" element={<ProtectedRoute><ReservationPage /></ProtectedRoute>} />
             <Route path="/loans"        element={<ProtectedRoute><LoanPage /></ProtectedRoute>} />
             <Route path="/order/toss/success" element={<ProtectedRoute><TossPaymentSuccess /></ProtectedRoute>} />
 
