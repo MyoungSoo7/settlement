@@ -100,6 +100,26 @@ public class Order {
         }
     }
 
+    /**
+     * 상태머신 가드 전이. {@link OrderStatus#canTransitionTo(OrderStatus)} 규칙에 어긋나면 예외.
+     * 배송·취소·환불 다단계 전이(서비스 계층)와 타 컨텍스트(payment) 의 상태 변경 요청이 모두 이 경로를 거친다.
+     * 동일 상태로의 재적용은 멱등 처리(no-op)한다.
+     */
+    public void transitionTo(OrderStatus target) {
+        if (target == null) {
+            throw new IllegalArgumentException("target status required");
+        }
+        if (this.status == target) {
+            return; // 멱등: 동일 상태 재적용 무시
+        }
+        if (!this.status.canTransitionTo(target)) {
+            throw new IllegalStateException(
+                    "허용되지 않은 주문 상태 전이: " + this.status + " → " + target);
+        }
+        this.status = target;
+        this.updatedAt = LocalDateTime.now();
+    }
+
     // 비즈니스 메서드: 주문 취소
     public void cancel() {
         if (this.status != OrderStatus.CREATED) {

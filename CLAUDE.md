@@ -128,8 +128,9 @@ CREATED → PAID → REFUNDED
               → CANCELED
 ```
 실제 enum 은 더 세분화된 라이프사이클 보유:
-`ORDER_PLACED, PAYMENT_COMPLETED, SHIPPING_PENDING, IN_TRANSIT, DELIVERED,
-CANCELLATION_REQUESTED/APPROVED, REFUND_REQUESTED/COMPLETED` (배송·취소·환불 단계)
+`SHIPPING_PENDING, IN_TRANSIT, DELIVERED,
+CANCELLATION_REQUESTED/APPROVED, REFUND_REQUESTED/COMPLETED` (배송·취소·환불 단계).
+전이 규칙은 `OrderStatus.canTransitionTo()` 상태머신에 명시되어 `Order.transitionTo()` 가 강제(비정상 전이 차단).
 
 ### Reservation 상태 (시공 예약)
 ```

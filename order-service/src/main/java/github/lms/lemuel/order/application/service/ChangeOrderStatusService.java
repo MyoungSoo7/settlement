@@ -79,7 +79,7 @@ public class ChangeOrderStatusService implements ChangeOrderStatusUseCase {
 
         OrderStatus target = OrderStatus.valueOf(status);
         OrderStatus previous = order.getStatus();
-        order.setStatus(target);
+        order.transitionTo(target);
 
         Order saved = saveOrderPort.save(order);
         historyPort.save(orderId, previous.name(), saved.getStatus().name(), "system", "updateStatus");
@@ -90,7 +90,7 @@ public class ChangeOrderStatusService implements ChangeOrderStatusUseCase {
         Order order = loadOrderPort.findById(orderId)
                 .orElseThrow(() -> new OrderNotFoundException(orderId));
         OrderStatus previous = order.getStatus();
-        order.setStatus(target);
+        order.transitionTo(target);
         Order saved = saveOrderPort.save(order);
         historyPort.save(orderId, previous.name(), target.name(),
                 changedBy == null || changedBy.isBlank() ? "system" : changedBy, reason);
