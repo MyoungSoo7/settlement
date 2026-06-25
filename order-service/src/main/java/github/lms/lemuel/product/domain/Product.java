@@ -7,7 +7,11 @@ import java.util.List;
 
 /**
  * Product Domain Entity (순수 POJO, 스프링/JPA 의존성 없음)
- * DB 스키마: id, name, description, price, stock_quantity, status, category_id, created_at, updated_at
+ * DB 스키마: id, name, description, price, stock_quantity, status, category_id, options_json, created_at, updated_at
+ *
+ * <p>{@code optionsJson} 은 상품 등록 시점의 <b>원본 옵션 트리</b>를 JSON 문자열(JSONB 저장)로 보관한다.
+ * 임의 깊이(무한 뎁스)의 옵션 구조를 그대로 표현하는 진열/표시용 원천이며, 실제 재고 차감은 이 트리를
+ * 펼친 {@link ProductVariant}(SKU) 단위로 처리한다 — 표현(JSON)과 재고(SKU)의 책임을 분리한다.
  */
 public class Product {
 
@@ -19,6 +23,7 @@ public class Product {
     private ProductStatus status;
     private Long categoryId;
     private List<Long> tagIds;
+    private String optionsJson;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -34,7 +39,7 @@ public class Product {
     // 전체 생성자
     public Product(Long id, String name, String description, BigDecimal price,
                    Integer stockQuantity, ProductStatus status, Long categoryId, List<Long> tagIds,
-                   LocalDateTime createdAt, LocalDateTime updatedAt) {
+                   String optionsJson, LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.id = id;
         this.name = name;
         this.description = description;
@@ -43,6 +48,7 @@ public class Product {
         this.status = status != null ? status : ProductStatus.ACTIVE;
         this.categoryId = categoryId;
         this.tagIds = tagIds != null ? new ArrayList<>(tagIds) : new ArrayList<>();
+        this.optionsJson = optionsJson;
         this.createdAt = createdAt != null ? createdAt : LocalDateTime.now();
         this.updatedAt = updatedAt != null ? updatedAt : LocalDateTime.now();
     }
@@ -57,6 +63,16 @@ public class Product {
         product.validateName();
         product.validatePrice();
         product.validateStockQuantity();
+        return product;
+    }
+
+    /**
+     * 옵션 트리(JSON) 를 함께 보관하는 상품 생성. {@code optionsJson} 이 null/blank 면 옵션 없는 상품과 동일.
+     */
+    public static Product create(String name, String description, BigDecimal price,
+                                 Integer stockQuantity, String optionsJson) {
+        Product product = create(name, description, price, stockQuantity);
+        product.optionsJson = optionsJson != null && optionsJson.isBlank() ? null : optionsJson;
         return product;
     }
 
@@ -252,6 +268,16 @@ public class Product {
 
     public void setCategoryId(Long categoryId) {
         this.categoryId = categoryId;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    /** 원본 옵션 트리(JSON 문자열, JSONB 저장). null 이면 옵션 없는 상품. */
+    public String getOptionsJson() {
+        return optionsJson;
+    }
+
+    public void setOptionsJson(String optionsJson) {
+        this.optionsJson = optionsJson;
         this.updatedAt = LocalDateTime.now();
     }
 

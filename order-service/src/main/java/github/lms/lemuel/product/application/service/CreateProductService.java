@@ -34,12 +34,13 @@ public class CreateProductService implements CreateProductUseCase {
             throw new DuplicateProductNameException(command.name());
         }
 
-        // 2. Product 도메인 생성 (도메인 검증 수행)
+        // 2. Product 도메인 생성 (도메인 검증 수행) — 옵션 트리(JSON) 포함
         Product product = Product.create(
                 command.name(),
                 command.description(),
                 command.price(),
-                command.stockQuantity()
+                command.stockQuantity(),
+                command.optionsJson()
         );
 
         // 3. 저장

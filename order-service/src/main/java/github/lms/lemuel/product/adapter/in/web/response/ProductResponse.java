@@ -17,22 +17,11 @@ public record ProductResponse(
         boolean availableForSale,
         LocalDateTime createdAt,
         LocalDateTime updatedAt,
-        String primaryImageUrl
+        String primaryImageUrl,
+        String optionsJson
 ) {
     public static ProductResponse from(Product product) {
-        return new ProductResponse(
-                product.getId(),
-                product.getName(),
-                product.getDescription(),
-                product.getPrice(),
-                product.getStockQuantity(),
-                product.getStatus(),
-                product.getCategoryId(),
-                product.isAvailableForSale(),
-                product.getCreatedAt(),
-                product.getUpdatedAt(),
-                null
-        );
+        return from(product, null);
     }
 
     public static ProductResponse from(Product product, String primaryImageUrl) {
@@ -47,7 +36,8 @@ public record ProductResponse(
                 product.isAvailableForSale(),
                 product.getCreatedAt(),
                 product.getUpdatedAt(),
-                primaryImageUrl
+                primaryImageUrl,
+                product.getOptionsJson()
         );
     }
 }

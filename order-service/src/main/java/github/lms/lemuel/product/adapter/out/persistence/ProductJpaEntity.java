@@ -6,6 +6,8 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -40,6 +42,11 @@ public class ProductJpaEntity {
 
     @Column(name = "category_id")
     private Long categoryId;
+
+    /** 원본 옵션 트리(임의 깊이). JSONB 컬럼에 문자열 그대로 저장 — 재고는 ProductVariant 가 담당. */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "options_json", columnDefinition = "jsonb")
+    private String optionsJson;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
