@@ -86,6 +86,58 @@ class ProductVariantTest {
     }
 
     @Test
+    @DisplayName("유효 단가: 할인 없으면 기준가 + 옵션 추가금")
+    void effectiveUnitPrice_additionalOnly() {
+        var v = ProductVariant.create(1L, "SKU", "옵션", new BigDecimal("1000"), 10);
+
+        assertThat(v.effectiveUnitPrice(new BigDecimal("10000")))
+                .isEqualByComparingTo("11000");
+    }
+
+    @Test
+    @DisplayName("유효 단가: 정액 할인(discountPrice) 이 추가금 반영 후 차감된다")
+    void effectiveUnitPrice_fixedDiscount() {
+        var v = ProductVariant.rehydrate(1L, 1L, "SKU", "옵션",
+                new BigDecimal("1000"), new BigDecimal("500"), null, 10, 0L,
+                ProductVariantStatus.ACTIVE, null, null);
+        // 10000 + 1000 - 500 = 10500
+        assertThat(v.effectiveUnitPrice(new BigDecimal("10000")))
+                .isEqualByComparingTo("10500");
+    }
+
+    @Test
+    @DisplayName("유효 단가: 정률 할인(discountRate %) 은 정액 할인 적용 후 금액에 적용, 원 단위 버림")
+    void effectiveUnitPrice_rateDiscount() {
+        var v = ProductVariant.rehydrate(1L, 1L, "SKU", "옵션",
+                new BigDecimal("1000"), new BigDecimal("500"), new BigDecimal("10"), 10, 0L,
+                ProductVariantStatus.ACTIVE, null, null);
+        // (10000 + 1000 - 500) = 10500, 10% 할인 1050 → 9450
+        assertThat(v.effectiveUnitPrice(new BigDecimal("10000")))
+                .isEqualByComparingTo("9450");
+    }
+
+    @Test
+    @DisplayName("유효 단가: 정률 할인 버림(FLOOR) — 1원 미만은 버린다")
+    void effectiveUnitPrice_rateFloor() {
+        var v = ProductVariant.rehydrate(1L, 1L, "SKU", "옵션",
+                BigDecimal.ZERO, null, new BigDecimal("3"), 10, 0L,
+                ProductVariantStatus.ACTIVE, null, null);
+        // 9999 * 3% = 299.97 → FLOOR 299, 9999 - 299 = 9700
+        assertThat(v.effectiveUnitPrice(new BigDecimal("9999")))
+                .isEqualByComparingTo("9700");
+    }
+
+    @Test
+    @DisplayName("유효 단가: 할인이 단가를 초과해도 0 미만으로 내려가지 않는다")
+    void effectiveUnitPrice_flooredAtZero() {
+        var v = ProductVariant.rehydrate(1L, 1L, "SKU", "옵션",
+                BigDecimal.ZERO, new BigDecimal("99999"), null, 10, 0L,
+                ProductVariantStatus.ACTIVE, null, null);
+        assertThat(v.effectiveUnitPrice(new BigDecimal("10000")))
+                .isEqualByComparingTo("0");
+    }
+
+    @Test
     @DisplayName("rehydrate: 영속 상태에서 복원 — version 보존")
     void rehydrate_preservesVersion() {
         var v = ProductVariant.rehydrate(99L, 1L, "SKU", "옵션",
