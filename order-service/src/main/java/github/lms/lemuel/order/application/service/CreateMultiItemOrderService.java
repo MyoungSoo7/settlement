@@ -1,5 +1,6 @@
 package github.lms.lemuel.order.application.service;
 
+import github.lms.lemuel.coupon.application.port.in.CouponUseCase;
 import github.lms.lemuel.order.application.port.in.CreateMultiItemOrderUseCase;
 import github.lms.lemuel.order.application.port.out.LoadUserForOrderPort;
 import github.lms.lemuel.order.application.port.out.PublishOrderEventPort;
@@ -8,6 +9,7 @@ import github.lms.lemuel.order.application.port.out.SendOrderNotificationPort;
 import github.lms.lemuel.order.domain.Order;
 import github.lms.lemuel.order.domain.OrderItem;
 import github.lms.lemuel.order.domain.exception.UserNotExistsException;
+import github.lms.lemuel.product.application.port.in.DecreaseProductStockUseCase;
 import github.lms.lemuel.product.application.port.in.DecreaseVariantStockUseCase;
 import github.lms.lemuel.product.application.port.out.LoadProductPort;
 import github.lms.lemuel.product.application.port.out.LoadProductVariantPort;
@@ -37,6 +39,11 @@ import java.util.List;
  *
  * <p>재고 차감과 Order 저장이 같은 트랜잭션이므로 PG 결제 실패 시 롤백되어
  * "재고는 빠졌는데 주문 안 만들어진" 정합성 깨짐을 방지한다.
+ *
+ * <p><b>쿠폰 결합:</b> {@code couponCode} 가 주어지면 소계(subtotal) 기준 쿠폰 검증 → 할인 반영 →
+ * 주문 저장 → 쿠폰 사용 기록을 <b>모두 이 메서드의 단일 {@code @Transactional} 안에서</b> 수행한다.
+ * 따라서 쿠폰 검증 실패(만료·최소금액 미달 등)나 사용 기록 실패(한도 초과·1인 1매 중복)가 발생하면
+ * 주문 INSERT·재고 차감·Outbox 발행까지 전부 롤백되어, "쿠폰은 못 썼는데 주문만 생성된" 불일치를 차단한다.
  */
 @Service
 @Transactional
@@ -48,29 +55,35 @@ public class CreateMultiItemOrderService implements CreateMultiItemOrderUseCase 
     private final LoadProductPort loadProductPort;
     private final LoadProductVariantPort loadVariantPort;
     private final DecreaseVariantStockUseCase decreaseStockUseCase;
+    private final DecreaseProductStockUseCase decreaseProductStockUseCase;
     private final SaveOrderPort saveOrderPort;
     private final SendOrderNotificationPort sendNotificationPort;
     private final PublishOrderEventPort publishOrderEventPort;
+    private final CouponUseCase couponUseCase;
 
     public CreateMultiItemOrderService(LoadUserForOrderPort loadUserPort,
                                        LoadProductPort loadProductPort,
                                        LoadProductVariantPort loadVariantPort,
                                        DecreaseVariantStockUseCase decreaseStockUseCase,
+                                       DecreaseProductStockUseCase decreaseProductStockUseCase,
                                        SaveOrderPort saveOrderPort,
                                        SendOrderNotificationPort sendNotificationPort,
-                                       PublishOrderEventPort publishOrderEventPort) {
+                                       PublishOrderEventPort publishOrderEventPort,
+                                       CouponUseCase couponUseCase) {
         this.loadUserPort = loadUserPort;
         this.loadProductPort = loadProductPort;
         this.loadVariantPort = loadVariantPort;
         this.decreaseStockUseCase = decreaseStockUseCase;
+        this.decreaseProductStockUseCase = decreaseProductStockUseCase;
         this.saveOrderPort = saveOrderPort;
         this.sendNotificationPort = sendNotificationPort;
         this.publishOrderEventPort = publishOrderEventPort;
+        this.couponUseCase = couponUseCase;
     }
 
     @Override
-    public Order create(Long userId, List<Line> lines) {
-        log.info("다건 주문 생성: userId={}, lines={}", userId, lines.size());
+    public Order create(Long userId, List<Line> lines, String couponCode) {
+        log.info("다건 주문 생성: userId={}, lines={}, coupon={}", userId, lines.size(), couponCode);
 
         String userEmail = loadUserPort.findEmailById(userId)
                 .orElseThrow(() -> new UserNotExistsException(userId));
@@ -84,7 +97,7 @@ public class CreateMultiItemOrderService implements CreateMultiItemOrderUseCase 
             String productName = product.getName();
             String sku = null;
 
-            // SKU 라인이면 variant 조회 + 재고 차감 + 가산금 반영
+            // SKU 라인이면 variant 조회 + 재고 차감 + 옵션 단가(추가금·할인) 반영
             if (line.variantId() != null) {
                 ProductVariant variant = loadVariantPort.loadById(line.variantId())
                         .orElseThrow(() -> new IllegalArgumentException(
@@ -95,26 +108,61 @@ public class CreateMultiItemOrderService implements CreateMultiItemOrderUseCase 
                                     + ", product=" + line.productId());
                 }
                 sku = variant.getSku();
-                unitPrice = unitPrice.add(variant.getAdditionalPrice());
+                // 옵션 단가 = 기준가 + 추가금 - 정액할인 - 정률할인 (ProductVariant 가 우선순위 강제)
+                unitPrice = variant.effectiveUnitPrice(product.getPrice());
                 decreaseStockUseCase.decrease(line.variantId(), line.quantity());
+            } else {
+                // 옵션 없는 일반 상품: products.stock_quantity 를 원자적 조건부 UPDATE 로 차감.
+                // 같은 트랜잭션이므로 이후 단계(쿠폰·결제) 실패 시 재고도 함께 롤백된다.
+                decreaseProductStockUseCase.decrease(line.productId(), line.quantity());
             }
 
             items.add(OrderItem.newItem(line.productId(), line.variantId(), sku,
                     productName, unitPrice, line.quantity()));
         }
 
-        Order order = Order.createMultiItem(userId, items);
+        // 소계 기준 쿠폰 검증 → 할인 금액 산출 (검증 실패 시 예외 → 트랜잭션 롤백)
+        BigDecimal subtotal = items.stream()
+                .map(OrderItem::getLineAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        boolean hasCoupon = couponCode != null && !couponCode.isBlank();
+        BigDecimal discount = BigDecimal.ZERO;
+        if (hasCoupon) {
+            CouponUseCase.ValidateResult result =
+                    couponUseCase.validateCoupon(couponCode, userId, subtotal);
+            if (!result.valid()) {
+                throw new CouponApplicationException(result.message());
+            }
+            discount = result.discountAmount();
+        }
+
+        Order order = Order.createMultiItem(userId, items, discount);
         Order saved = saveOrderPort.save(order);
+
+        // 쿠폰 사용 기록 — 같은 트랜잭션. 한도 초과/1인 1매 중복이면 예외 → 주문·재고 차감까지 전부 롤백
+        if (hasCoupon) {
+            couponUseCase.useCoupon(couponCode, userId, saved.getId());
+        }
 
         // ADR 0020 Phase 3b — settlement order 프로젝션 동기화용 OrderCreated 발행(같은 트랜잭션 Outbox)
         publishOrderEventPort.publishOrderCreated(
                 saved.getId(), saved.getUserId(), saved.getProductId(),
                 saved.getStatus().name(), saved.getAmount(), saved.getCreatedAt());
 
-        log.info("다건 주문 생성 완료: orderId={}, items={}, amount={}",
-                saved.getId(), saved.getItems().size(), saved.getAmount());
+        log.info("다건 주문 생성 완료: orderId={}, items={}, subtotal={}, discount={}, amount={}",
+                saved.getId(), saved.getItems().size(), subtotal, discount, saved.getAmount());
 
         sendNotificationPort.sendOrderConfirmation(userEmail, saved);
         return saved;
+    }
+
+    /**
+     * 쿠폰 적용 실패(검증 단계). {@link IllegalArgumentException} 상속이라
+     * {@code OrderExceptionHandler} 가 400(Bad Request)으로 매핑하며, 트랜잭션은 롤백된다.
+     */
+    public static class CouponApplicationException extends IllegalArgumentException {
+        public CouponApplicationException(String message) {
+            super("쿠폰 적용 실패: " + message);
+        }
     }
 }

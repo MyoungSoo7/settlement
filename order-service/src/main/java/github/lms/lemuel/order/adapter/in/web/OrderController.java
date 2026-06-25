@@ -65,13 +65,14 @@ public class OrderController {
         List<CreateMultiItemOrderUseCase.Line> lines = request.lines().stream()
                 .map(l -> new CreateMultiItemOrderUseCase.Line(l.productId(), l.variantId(), l.quantity()))
                 .toList();
-        Order order = createMultiItemOrderUseCase.create(request.userId(), lines);
+        Order order = createMultiItemOrderUseCase.create(request.userId(), lines, request.couponCode());
         return ResponseEntity.status(HttpStatus.CREATED).body(OrderResponse.from(order));
     }
 
     public record MultiItemOrderRequest(
             @jakarta.validation.constraints.NotNull Long userId,
-            @jakarta.validation.constraints.NotEmpty List<LineRequest> lines) {}
+            @jakarta.validation.constraints.NotEmpty List<LineRequest> lines,
+            String couponCode) {}
 
     public record LineRequest(
             @jakarta.validation.constraints.NotNull Long productId,

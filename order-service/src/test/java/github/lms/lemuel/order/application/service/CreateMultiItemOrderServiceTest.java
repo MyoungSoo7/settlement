@@ -1,11 +1,13 @@
 package github.lms.lemuel.order.application.service;
 
+import github.lms.lemuel.coupon.application.port.in.CouponUseCase;
 import github.lms.lemuel.order.application.port.in.CreateMultiItemOrderUseCase;
 import github.lms.lemuel.order.application.port.out.LoadUserForOrderPort;
 import github.lms.lemuel.order.application.port.out.SaveOrderPort;
 import github.lms.lemuel.order.application.port.out.SendOrderNotificationPort;
 import github.lms.lemuel.order.domain.Order;
 import github.lms.lemuel.order.domain.exception.UserNotExistsException;
+import github.lms.lemuel.product.application.port.in.DecreaseProductStockUseCase;
 import github.lms.lemuel.product.application.port.in.DecreaseVariantStockUseCase;
 import github.lms.lemuel.product.application.port.out.LoadProductPort;
 import github.lms.lemuel.product.application.port.out.LoadProductVariantPort;
@@ -36,9 +38,11 @@ class CreateMultiItemOrderServiceTest {
     @Mock LoadProductPort loadProductPort;
     @Mock LoadProductVariantPort loadVariantPort;
     @Mock DecreaseVariantStockUseCase decreaseStockUseCase;
+    @Mock DecreaseProductStockUseCase decreaseProductStockUseCase;
     @Mock SaveOrderPort saveOrderPort;
     @Mock SendOrderNotificationPort sendNotificationPort;
     @Mock github.lms.lemuel.order.application.port.out.PublishOrderEventPort publishOrderEventPort;
+    @Mock CouponUseCase couponUseCase;
     @InjectMocks CreateMultiItemOrderService service;
 
     private Product mockProduct(Long id, String name, BigDecimal price) {
@@ -60,6 +64,8 @@ class CreateMultiItemOrderServiceTest {
         Order result = service.create(1L, lines);
         assertThat(result).isNotNull();
         assertThat(result.getItems()).hasSize(1);
+        // 옵션 없는 일반 상품도 재고 차감되어야 한다 (variant 경로는 미진입)
+        verify(decreaseProductStockUseCase).decrease(10L, 2);
         verify(decreaseStockUseCase, never()).decrease(any(), anyInt());
         verify(sendNotificationPort).sendOrderConfirmation(eq("user@test.com"), any());
     }
@@ -80,6 +86,8 @@ class CreateMultiItemOrderServiceTest {
         Order result = service.create(1L, lines);
         assertThat(result).isNotNull();
         verify(decreaseStockUseCase).decrease(20L, 1);
+        // SKU 라인은 일반 상품 재고 차감 경로를 타지 않는다
+        verify(decreaseProductStockUseCase, never()).decrease(any(), anyInt());
     }
 
     @Test @DisplayName("create: 사용자 없으면 예외")
@@ -97,6 +105,84 @@ class CreateMultiItemOrderServiceTest {
         var lines = List.of(new CreateMultiItemOrderUseCase.Line(10L, null, 1));
         assertThatThrownBy(() -> service.create(1L, lines))
                 .isInstanceOf(ProductNotFoundException.class);
+    }
+
+    @Test @DisplayName("create+쿠폰: 검증 성공 → 할인 반영 + 같은 트랜잭션에서 사용 기록")
+    void create_withValidCoupon_appliesDiscountAndRecordsUsage() {
+        when(loadUserPort.findEmailById(1L)).thenReturn(Optional.of("user@test.com"));
+        Product product = mockProduct(10L, "상품A", new BigDecimal("10000"));
+        when(loadProductPort.findById(10L)).thenReturn(Optional.of(product));
+        when(saveOrderPort.save(any())).thenAnswer(inv -> {
+            Order o = inv.getArgument(0);
+            o.setId(500L);
+            return o;
+        });
+        // 소계 20,000 (10,000 x 2) 기준 2,000원 할인
+        when(couponUseCase.validateCoupon(eq("SAVE2000"), eq(1L), any()))
+                .thenReturn(new CouponUseCase.ValidateResult(
+                        true, "ok", new BigDecimal("2000"), new BigDecimal("18000"), null));
+
+        var lines = List.of(new CreateMultiItemOrderUseCase.Line(10L, null, 2));
+        Order result = service.create(1L, lines, "SAVE2000");
+
+        // amount = 소계 20,000 - 할인 2,000 = 18,000
+        assertThat(result.getAmount()).isEqualByComparingTo("18000");
+        // 검증은 소계(20,000) 기준으로 호출
+        verify(couponUseCase).validateCoupon("SAVE2000", 1L, new BigDecimal("20000"));
+        // 사용 기록은 저장된 orderId 로, 같은 흐름에서 호출
+        verify(couponUseCase).useCoupon("SAVE2000", 1L, 500L);
+    }
+
+    @Test @DisplayName("create+쿠폰: 검증 실패 → 예외 + 주문 저장/쿠폰 사용 모두 미수행(롤백)")
+    void create_withInvalidCoupon_throwsAndDoesNotSaveOrder() {
+        when(loadUserPort.findEmailById(1L)).thenReturn(Optional.of("user@test.com"));
+        Product product = mockProduct(10L, "상품A", new BigDecimal("10000"));
+        when(loadProductPort.findById(10L)).thenReturn(Optional.of(product));
+        when(couponUseCase.validateCoupon(eq("EXPIRED"), eq(1L), any()))
+                .thenReturn(new CouponUseCase.ValidateResult(
+                        false, "만료된 쿠폰입니다.", BigDecimal.ZERO, new BigDecimal("10000"), null));
+
+        var lines = List.of(new CreateMultiItemOrderUseCase.Line(10L, null, 1));
+        assertThatThrownBy(() -> service.create(1L, lines, "EXPIRED"))
+                .isInstanceOf(CreateMultiItemOrderService.CouponApplicationException.class)
+                .hasMessageContaining("만료된 쿠폰");
+
+        verify(saveOrderPort, never()).save(any());
+        verify(couponUseCase, never()).useCoupon(any(), any(), any());
+        verify(publishOrderEventPort, never()).publishOrderCreated(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test @DisplayName("create+쿠폰: 사용 기록 실패(한도/중복) → 예외 전파로 트랜잭션 롤백")
+    void create_couponUseFails_propagatesForRollback() {
+        when(loadUserPort.findEmailById(1L)).thenReturn(Optional.of("user@test.com"));
+        Product product = mockProduct(10L, "상품A", new BigDecimal("10000"));
+        when(loadProductPort.findById(10L)).thenReturn(Optional.of(product));
+        when(saveOrderPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(couponUseCase.validateCoupon(eq("LIMIT"), eq(1L), any()))
+                .thenReturn(new CouponUseCase.ValidateResult(
+                        true, "ok", new BigDecimal("1000"), new BigDecimal("9000"), null));
+        doThrow(new IllegalStateException("쿠폰 사용 한도를 초과했습니다."))
+                .when(couponUseCase).useCoupon(eq("LIMIT"), eq(1L), any());
+
+        var lines = List.of(new CreateMultiItemOrderUseCase.Line(10L, null, 1));
+        assertThatThrownBy(() -> service.create(1L, lines, "LIMIT"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("한도");
+        // 사용 기록 실패는 useCoupon 이후 — 이벤트 발행까지 도달하지 않아야 롤백 의미가 산다
+        verify(publishOrderEventPort, never()).publishOrderCreated(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test @DisplayName("create: 쿠폰 코드 없으면(null) 쿠폰 경로 미진입")
+    void create_noCoupon_skipsCouponFlow() {
+        when(loadUserPort.findEmailById(1L)).thenReturn(Optional.of("user@test.com"));
+        Product product = mockProduct(10L, "상품A", new BigDecimal("10000"));
+        when(loadProductPort.findById(10L)).thenReturn(Optional.of(product));
+        when(saveOrderPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        var lines = List.of(new CreateMultiItemOrderUseCase.Line(10L, null, 1));
+        service.create(1L, lines, null);
+
+        verifyNoInteractions(couponUseCase);
     }
 
     @Test @DisplayName("create: variant가 product에 속하지 않으면 예외")

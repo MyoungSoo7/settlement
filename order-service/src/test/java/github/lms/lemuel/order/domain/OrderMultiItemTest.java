@@ -31,6 +31,57 @@ class OrderMultiItemTest {
     }
 
     @Test
+    @DisplayName("createMultiItem(할인): amount = 소계 - 할인 금액")
+    void multiItem_withDiscount_subtractsFromSubtotal() {
+        List<OrderItem> items = List.of(
+                OrderItem.newItem(1L, null, null, "맥북", new BigDecimal("3000000"), 1),
+                OrderItem.newItem(2L, null, null, "마우스", new BigDecimal("50000"), 1)
+        );
+
+        Order order = Order.createMultiItem(100L, items, new BigDecimal("70000"));
+
+        // 소계 3,050,000 - 할인 70,000 = 2,980,000
+        assertThat(order.getAmount()).isEqualByComparingTo("2980000");
+        assertThat(order.getItems()).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("createMultiItem(할인): null/0 할인은 소계 그대로 (기존 동작 보존)")
+    void multiItem_nullOrZeroDiscount_keepsSubtotal() {
+        List<OrderItem> items = List.of(
+                OrderItem.newItem(1L, null, null, "A", new BigDecimal("10000"), 2));
+
+        assertThat(Order.createMultiItem(1L, items, null).getAmount())
+                .isEqualByComparingTo("20000");
+        assertThat(Order.createMultiItem(1L, items, BigDecimal.ZERO).getAmount())
+                .isEqualByComparingTo("20000");
+    }
+
+    @Test
+    @DisplayName("createMultiItem(할인): 할인이 소계 이상이면 예외 (결제 금액 0 이하 차단)")
+    void multiItem_discountGteSubtotal_throws() {
+        List<OrderItem> items = List.of(
+                OrderItem.newItem(1L, null, null, "A", new BigDecimal("10000"), 1));
+
+        assertThatThrownBy(() -> Order.createMultiItem(1L, items, new BigDecimal("10000")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("이상일 수 없습니다");
+        assertThatThrownBy(() -> Order.createMultiItem(1L, items, new BigDecimal("15000")))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("createMultiItem(할인): 음수 할인은 예외")
+    void multiItem_negativeDiscount_throws() {
+        List<OrderItem> items = List.of(
+                OrderItem.newItem(1L, null, null, "A", new BigDecimal("10000"), 1));
+
+        assertThatThrownBy(() -> Order.createMultiItem(1L, items, new BigDecimal("-1")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("음수");
+    }
+
+    @Test
     @DisplayName("createMultiItem: 빈 리스트 → IllegalArgumentException")
     void multiItem_empty() {
         assertThatThrownBy(() -> Order.createMultiItem(1L, List.of()))
