@@ -27,8 +27,11 @@ public interface LoadSettlementPort {
     List<Settlement> findBySettlementDateAndStatus(LocalDate settlementDate, SettlementStatus status);
 
     /**
-     * 정산 확정 대상(해당 일자의 REQUESTED) 을 비관적 락으로 조회한다.
+     * 정산 확정 대상(해당 일자의 REQUESTED)을 비관적 락으로 최대 {@code limit} 건 조회한다.
      * 동시 확정 배치/수동 트리거를 직렬화해 이중 확정·이중 원장 적재를 막는다.
+     *
+     * <p>확정 청크 배치의 페이지 리더가 호출한다. 확정된 행은 DONE 으로 전이되어 다음 페이지 조회에서
+     * 자연히 빠지므로(상태 기반 진행), offset 없이 매 페이지를 재조회해도 행이 밀리지 않는다.
      */
-    List<Settlement> findConfirmableForUpdate(LocalDate settlementDate);
+    List<Settlement> findConfirmableForUpdate(LocalDate settlementDate, int limit);
 }

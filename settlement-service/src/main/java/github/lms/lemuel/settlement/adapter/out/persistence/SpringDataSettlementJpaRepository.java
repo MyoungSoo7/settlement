@@ -44,7 +44,8 @@ public interface SpringDataSettlementJpaRepository extends JpaRepository<Settlem
            "ORDER BY s.id ASC")
     List<SettlementJpaEntity> findBySettlementDateAndStatusForUpdate(
             @Param("settlementDate") LocalDate settlementDate,
-            @Param("status") String status);
+            @Param("status") String status,
+            org.springframework.data.domain.Pageable pageable);
 
     /**
      * 보류 해제 배치 — release_date <= today 이고 아직 released=false 이며 holdback > 0 인 row.
