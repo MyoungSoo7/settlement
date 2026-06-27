@@ -19,11 +19,13 @@ public enum ErrorCode {
     INVALID_STATE(HttpStatus.BAD_REQUEST, "현재 상태에서 처리할 수 없습니다."),
     INVALID_REQUEST(HttpStatus.BAD_REQUEST, "요청 형식이 올바르지 않습니다."),
     INVALID_PARAMETER(HttpStatus.BAD_REQUEST, "요청 파라미터가 올바르지 않습니다."),
+    LOCK_TIMEOUT(HttpStatus.CONFLICT, "요청이 몰려 처리하지 못했습니다. 잠시 후 다시 시도해주세요."),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요."),
 
     // ─── order ───────────────────────────────────────────────────────────────
     ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "주문을 찾을 수 없습니다."),
     USER_NOT_EXISTS(HttpStatus.BAD_REQUEST, "존재하지 않는 사용자입니다."),
+    DUPLICATE_ORDER_SUBMISSION(HttpStatus.CONFLICT, "이미 처리 중이거나 처리된 주문 요청입니다."),
 
     // ─── user ────────────────────────────────────────────────────────────────
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."),
