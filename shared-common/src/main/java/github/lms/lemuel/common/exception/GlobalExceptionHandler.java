@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -30,11 +32,17 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> handleMethodArgumentNotValid(MethodArgumentNotValidException ex) {
-        String message = ex.getBindingResult().getFieldErrors().stream()
+        List<FieldError> fieldErrors = ex.getBindingResult().getFieldErrors();
+        String message = fieldErrors.stream()
                 .map(FieldError::getDefaultMessage)
                 .collect(Collectors.joining(", "));
+        // 도메인 핸들러(과거 Order/User)가 제공하던 필드별 검증 맵({field: message})을 보존해 일원화
+        Map<String, String> errors = new LinkedHashMap<>();
+        for (FieldError fe : fieldErrors) {
+            errors.putIfAbsent(fe.getField(), fe.getDefaultMessage());
+        }
         log.warn("[MethodArgumentNotValidException] {}", message);
-        return buildErrorResponse(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", message);
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", message, errors);
     }
 
     /**
@@ -61,6 +69,32 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(HttpStatus.BAD_REQUEST, "INVALID_PARAMETER", message);
     }
 
+    /**
+     * 400 - 잘못된 인자 (도메인 입력값 검증 실패)
+     *
+     * <p>과거 Order/User/Settlement/Payment/Product 등 도메인별 ExceptionHandler 에 동일하게
+     * 복제돼 있던 {@code IllegalArgumentException → 400} 매핑을 이 공통 폴백으로 일원화한다.
+     * 전용 advice 가 없는 서비스(loan-service 등)에서 이 예외가 아래 {@link #handleException}
+     * (500) 으로 누수되던 문제도 함께 차단한다.
+     */
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, Object>> handleIllegalArgument(IllegalArgumentException ex) {
+        log.warn("[IllegalArgumentException] {}", ex.getMessage());
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "INVALID_ARGUMENT", ex.getMessage());
+    }
+
+    /**
+     * 400 - 잘못된 상태에서의 요청 (도메인 불변식 위반)
+     *
+     * <p>상태별로 다른 HTTP 코드가 필요한 경우(예: 409/403)는 해당 컨트롤러/도메인이 전용 예외나
+     * 로컬 처리로 직접 매핑하므로 이 공통 폴백에 도달하지 않는다.
+     */
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<Map<String, Object>> handleIllegalState(IllegalStateException ex) {
+        log.warn("[IllegalStateException] {}", ex.getMessage());
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "INVALID_STATE", ex.getMessage());
+    }
+
     // ─── 5xx ────────────────────────────────────────────────────────────────────
 
     /**
@@ -79,12 +113,21 @@ public class GlobalExceptionHandler {
     // ─── 공통 응답 빌더 ──────────────────────────────────────────────────────────
 
     private ResponseEntity<Map<String, Object>> buildErrorResponse(HttpStatus status, String errorCode, String message) {
-        return ResponseEntity.status(status).body(Map.of(
-                "timestamp", LocalDateTime.now(),
-                "status", status.value(),
-                "error", status.getReasonPhrase(),
-                "errorCode", errorCode,
-                "message", message
-        ));
+        return buildErrorResponse(status, errorCode, message, null);
+    }
+
+    private ResponseEntity<Map<String, Object>> buildErrorResponse(
+            HttpStatus status, String errorCode, String message, Map<String, String> fieldErrors) {
+        // LinkedHashMap 사용: 키 순서 보존 + message 가 null 이어도 안전(Map.of 는 null 값 금지)
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("timestamp", LocalDateTime.now());
+        body.put("status", status.value());
+        body.put("error", status.getReasonPhrase());
+        body.put("errorCode", errorCode);
+        body.put("message", message);
+        if (fieldErrors != null && !fieldErrors.isEmpty()) {
+            body.put("errors", fieldErrors);
+        }
+        return ResponseEntity.status(status).body(body);
     }
 }

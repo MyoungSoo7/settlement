@@ -11,8 +11,6 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.MissingServletRequestParameterException;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -20,7 +18,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
-import java.util.Map;
 
 /**
  * 자금 흐름 리포트 API — T3-⑨(a).
@@ -87,15 +84,6 @@ public class ReportController {
         CashflowReport report = generateCashflowReportUseCase.generate(command);
         return ResponseEntity.ok(CashflowReportResponse.from(report));
     }
-
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<Map<String, String>> handleIllegalArgument(IllegalArgumentException e) {
-        return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-    }
-
-    @ExceptionHandler(MissingServletRequestParameterException.class)
-    public ResponseEntity<Map<String, String>> handleMissingParam(MissingServletRequestParameterException e) {
-        return ResponseEntity.badRequest().body(Map.of(
-                "error", "required parameter missing: " + e.getParameterName()));
-    }
+    // IllegalArgumentException(잘못된 groupBy)·MissingServletRequestParameterException(필수 파라미터 누락) →
+    // 400 매핑은 shared-common 의 GlobalExceptionHandler 로 일원화했다.
 }

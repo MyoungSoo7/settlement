@@ -31,17 +31,10 @@ public class PaymentExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
     }
 
-    @ExceptionHandler({InvalidPaymentStateException.class, InvalidOrderStateException.class, IllegalStateException.class})
+    // InvalidPaymentStateException/InvalidOrderStateException 는 결제 도메인 고유 예외라 여기서 매핑.
+    // 일반 IllegalStateException/IllegalArgumentException → 400 매핑은 GlobalExceptionHandler 로 일원화했다.
+    @ExceptionHandler({InvalidPaymentStateException.class, InvalidOrderStateException.class})
     public ResponseEntity<Map<String, Object>> handleBadRequestException(RuntimeException ex) {
-        Map<String, Object> errorResponse = new HashMap<>();
-        errorResponse.put("timestamp", LocalDateTime.now());
-        errorResponse.put("message", ex.getMessage());
-        errorResponse.put("status", HttpStatus.BAD_REQUEST.value());
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
-    }
-
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<Map<String, Object>> handleIllegalArgumentException(IllegalArgumentException ex) {
         Map<String, Object> errorResponse = new HashMap<>();
         errorResponse.put("timestamp", LocalDateTime.now());
         errorResponse.put("message", ex.getMessage());
