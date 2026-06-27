@@ -29,11 +29,21 @@ public enum ErrorCode {
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."),
     DUPLICATE_EMAIL(HttpStatus.CONFLICT, "이미 존재하는 이메일입니다."),
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다."),
+    INVALID_PASSWORD_RESET_TOKEN(HttpStatus.BAD_REQUEST, "유효하지 않거나 만료된 비밀번호 재설정 토큰입니다."),
 
     // ─── product ─────────────────────────────────────────────────────────────
     PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "상품을 찾을 수 없습니다."),
     DUPLICATE_PRODUCT_NAME(HttpStatus.CONFLICT, "이미 존재하는 상품명입니다."),
     INSUFFICIENT_STOCK(HttpStatus.BAD_REQUEST, "재고가 부족합니다."),
+    STOCK_CONCURRENCY(HttpStatus.CONFLICT, "재고 동시성 충돌이 발생했습니다. 잠시 후 다시 시도해주세요."),
+
+    // ─── category ────────────────────────────────────────────────────────────
+    CATEGORY_NOT_FOUND(HttpStatus.NOT_FOUND, "카테고리를 찾을 수 없습니다."),
+    DUPLICATE_SLUG(HttpStatus.CONFLICT, "이미 존재하는 슬러그입니다."),
+    CIRCULAR_REFERENCE(HttpStatus.BAD_REQUEST, "순환 참조가 발생합니다."),
+    CATEGORY_HAS_PRODUCTS(HttpStatus.CONFLICT, "연결된 상품이 있어 삭제할 수 없습니다."),
+    CATEGORY_HAS_CHILDREN(HttpStatus.CONFLICT, "하위 카테고리가 있어 삭제할 수 없습니다."),
+    CATEGORY_DEPTH_EXCEEDED(HttpStatus.BAD_REQUEST, "허용된 카테고리 깊이를 초과했습니다."),
 
     // ─── payment ─────────────────────────────────────────────────────────────
     PAYMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "결제를 찾을 수 없습니다."),
@@ -43,8 +53,9 @@ public enum ErrorCode {
     REFUND_EXCEEDS_PAYMENT(HttpStatus.CONFLICT, "환불 금액이 결제 금액을 초과합니다."),
     REFUND_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "환불 처리 중 오류가 발생했습니다."),
 
-    // ─── settlement ──────────────────────────────────────────────────────────
-    SETTLEMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "정산을 찾을 수 없습니다.");
+    // ─── settlement / ledger ──────────────────────────────────────────────────
+    SETTLEMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "정산을 찾을 수 없습니다."),
+    LEDGER_NOT_FOUND(HttpStatus.NOT_FOUND, "원장 항목을 찾을 수 없습니다.");
 
     private final HttpStatus status;
     private final String defaultMessage;

@@ -1,7 +1,11 @@
 package github.lms.lemuel.category.domain.exception;
 
-public class CategoryHasProductsException extends RuntimeException {
+import github.lms.lemuel.common.exception.BusinessException;
+import github.lms.lemuel.common.exception.ErrorCode;
+
+public class CategoryHasProductsException extends BusinessException {
     public CategoryHasProductsException(Long categoryId) {
-        super(String.format("Cannot delete category %d: has associated products", categoryId));
+        super(ErrorCode.CATEGORY_HAS_PRODUCTS,
+                String.format("Cannot delete category %d: has associated products", categoryId));
     }
 }

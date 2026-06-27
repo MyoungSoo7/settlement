@@ -1,12 +1,15 @@
 package github.lms.lemuel.ledger.domain.exception;
 
-public class LedgerNotFoundException extends RuntimeException {
+import github.lms.lemuel.common.exception.BusinessException;
+import github.lms.lemuel.common.exception.ErrorCode;
+
+public class LedgerNotFoundException extends BusinessException {
 
     public LedgerNotFoundException(Long id) {
-        super("LedgerEntry not found: id=" + id);
+        super(ErrorCode.LEDGER_NOT_FOUND, "LedgerEntry not found: id=" + id);
     }
 
     public LedgerNotFoundException(String message) {
-        super(message);
+        super(ErrorCode.LEDGER_NOT_FOUND, message);
     }
 }

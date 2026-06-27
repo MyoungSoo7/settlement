@@ -1,7 +1,10 @@
 package github.lms.lemuel.category.domain.exception;
 
-public class DuplicateSlugException extends RuntimeException {
+import github.lms.lemuel.common.exception.BusinessException;
+import github.lms.lemuel.common.exception.ErrorCode;
+
+public class DuplicateSlugException extends BusinessException {
     public DuplicateSlugException(String slug) {
-        super("Category slug already exists: " + slug);
+        super(ErrorCode.DUPLICATE_SLUG, "Category slug already exists: " + slug);
     }
 }
