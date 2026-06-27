@@ -158,7 +158,7 @@ public class CreateMultiItemOrderService implements CreateMultiItemOrderUseCase 
 
     /**
      * 쿠폰 적용 실패(검증 단계). {@link IllegalArgumentException} 상속이라
-     * {@code OrderExceptionHandler} 가 400(Bad Request)으로 매핑하며, 트랜잭션은 롤백된다.
+     * 공통 {@code GlobalExceptionHandler} 가 400(Bad Request)으로 매핑하며, 트랜잭션은 롤백된다.
      */
     public static class CouponApplicationException extends IllegalArgumentException {
         public CouponApplicationException(String message) {

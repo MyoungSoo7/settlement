@@ -1,8 +1,11 @@
 package github.lms.lemuel.product.domain.exception;
 
-public class DuplicateProductNameException extends RuntimeException {
+import github.lms.lemuel.common.exception.BusinessException;
+import github.lms.lemuel.common.exception.ErrorCode;
+
+public class DuplicateProductNameException extends BusinessException {
 
     public DuplicateProductNameException(String productName) {
-        super("Product already exists with name: " + productName);
+        super(ErrorCode.DUPLICATE_PRODUCT_NAME, "Product already exists with name: " + productName);
     }
 }
