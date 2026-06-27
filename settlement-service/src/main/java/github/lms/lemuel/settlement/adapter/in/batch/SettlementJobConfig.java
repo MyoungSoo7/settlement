@@ -1,7 +1,6 @@
 package github.lms.lemuel.settlement.adapter.in.batch;
 
 import github.lms.lemuel.settlement.adapter.in.batch.tasklet.ConfirmSettlementsTasklet;
-import github.lms.lemuel.settlement.adapter.in.batch.tasklet.CreateSettlementsTasklet;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.job.Job;
@@ -24,25 +23,7 @@ public class SettlementJobConfig {
 
     private final JobRepository jobRepository;
     private final PlatformTransactionManager transactionManager;
-    private final CreateSettlementsTasklet createSettlementsTasklet;
     private final ConfirmSettlementsTasklet confirmSettlementsTasklet;
-
-    /**
-     * 정산 생성 Job
-     */
-    @Bean
-    public Job createSettlementJob() {
-        return new JobBuilder("createSettlementJob", jobRepository)
-                .start(createSettlementStep())
-                .build();
-    }
-
-    @Bean
-    public Step createSettlementStep() {
-        return new StepBuilder("createSettlementStep", jobRepository)
-                .tasklet(createSettlementsTasklet, transactionManager)
-                .build();
-    }
 
     /**
      * 정산 확정 Job
