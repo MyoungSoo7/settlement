@@ -1,7 +1,10 @@
 package github.lms.lemuel.payment.domain.exception;
 
-public class InvalidOrderStateException extends RuntimeException {
+import github.lms.lemuel.common.exception.BusinessException;
+import github.lms.lemuel.common.exception.ErrorCode;
+
+public class InvalidOrderStateException extends BusinessException {
     public InvalidOrderStateException(String message) {
-        super(message);
+        super(ErrorCode.INVALID_ORDER_STATE, message);
     }
 }

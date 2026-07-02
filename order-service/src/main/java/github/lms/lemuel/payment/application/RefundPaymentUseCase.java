@@ -3,6 +3,7 @@ package github.lms.lemuel.payment.application;
 import github.lms.lemuel.common.audit.application.Auditable;
 import github.lms.lemuel.common.audit.domain.AuditAction;
 import github.lms.lemuel.payment.domain.exception.MissingIdempotencyKeyException;
+import github.lms.lemuel.payment.domain.exception.RefundException;
 import github.lms.lemuel.payment.domain.exception.RefundExceedsPaymentException;
 import github.lms.lemuel.payment.application.port.in.RefundPaymentPort;
 import github.lms.lemuel.payment.application.port.out.LoadPaymentPort;
@@ -124,7 +125,21 @@ public class RefundPaymentUseCase implements RefundPaymentPort {
         }
 
         // 7. PG 환불 호출 (amount 만큼)
-        pgClientPort.refund(paymentDomain.getPgTransactionId(), refundAmount);
+        //    PG 가 실패하면 트랜잭션 전체가 롤백되어 6번에서 INSERT 한 REQUESTED refund 와
+        //    이후 payment.refundedAmount 누적이 모두 취소된다 → 유령 환불(돈은 안 빠졌는데 환불 기록만 남음)
+        //    이 생기지 않고, 같은 idempotencyKey 재시도는 깨끗한 상태에서 다시 시작한다.
+        //    원시 PG 예외(HttpServerErrorException 등)를 도메인 예외로 변환해 502 누수 대신
+        //    REFUND_ERROR(500) 로 일관되게 매핑하고, @Auditable(failureAction=REFUND_FAILED) 로 실패를 감사 기록한다.
+        try {
+            pgClientPort.refund(paymentDomain.getPgTransactionId(), refundAmount);
+        } catch (RefundException e) {
+            throw e; // 이미 도메인 예외면 변환 없이 전파 (롤백)
+        } catch (RuntimeException e) {
+            log.error("PG refund failed — rolling back. paymentId={}, key={}, amount={}",
+                    paymentId, effectiveKey, refundAmount, e);
+            throw new RefundException(
+                    "PG refund failed for paymentId=" + paymentId + ", amount=" + refundAmount, e);
+        }
 
         // 8. Refund COMPLETED
         refund.markCompleted();

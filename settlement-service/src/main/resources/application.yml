@@ -201,6 +201,10 @@ app:
       loan-repayment-applied: lemuel.loan.repayment_applied
   search:
     enabled: false
+  # 정산 확정 청크 배치 — 한 청크(트랜잭션)에서 확정할 정산 건수. 롱 트랜잭션/락 보유 시간과 처리량의 균형.
+  settlement:
+    confirm:
+      chunk-size: ${APP_SETTLEMENT_CONFIRM_CHUNK_SIZE:100}
   # 원장 전용 트랜잭셔널 아웃박스 로컬 폴러 (Kafka 미경유)
   ledger-outbox:
     enabled: ${APP_LEDGER_OUTBOX_ENABLED:true}

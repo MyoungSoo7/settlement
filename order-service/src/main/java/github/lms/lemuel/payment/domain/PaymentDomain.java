@@ -98,6 +98,17 @@ public class PaymentDomain {
         this.updatedAt = LocalDateTime.now();
     }
 
+    // Business logic: Cancel authorization (승인취소) — 매입(capture) 전 AUTHORIZED 건만 취소 가능.
+    // capture 이후 자금 회수는 refund 경로를 사용한다(상태머신: AUTHORIZED ↘ CANCELED).
+    public void cancel() {
+        if (this.status != PaymentStatus.AUTHORIZED) {
+            throw new IllegalStateException(
+                "Payment must be in AUTHORIZED status to cancel. Current: " + this.status);
+        }
+        this.status = PaymentStatus.CANCELED;
+        this.updatedAt = LocalDateTime.now();
+    }
+
     // Business logic: Refund payment
     public void refund() {
         if (this.status != PaymentStatus.CAPTURED) {

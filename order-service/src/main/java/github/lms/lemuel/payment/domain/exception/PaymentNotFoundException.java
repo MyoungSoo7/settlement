@@ -1,7 +1,10 @@
 package github.lms.lemuel.payment.domain.exception;
 
-public class PaymentNotFoundException extends RuntimeException {
+import github.lms.lemuel.common.exception.BusinessException;
+import github.lms.lemuel.common.exception.ErrorCode;
+
+public class PaymentNotFoundException extends BusinessException {
     public PaymentNotFoundException(Long paymentId) {
-        super("Payment not found: " + paymentId);
+        super(ErrorCode.PAYMENT_NOT_FOUND, "Payment not found: " + paymentId);
     }
 }

@@ -138,8 +138,6 @@ public class SecurityConfig {
                         .requestMatchers("/users/admin/all").hasRole("ADMIN")
                         // 관리자 전용 카테고리 API
                         .requestMatchers("/admin/categories/**").hasRole("ADMIN")
-                        // 운영자 전용 — reservation-service 기사 프로젝션 백필
-                        .requestMatchers("/admin/reservation-projection/**").hasRole("ADMIN")
                         // 운영자 전용 — settlement 프로젝션 백필 (Phase 4 Chunk 3)
                         .requestMatchers("/admin/settlement-projection/**").hasRole("ADMIN")
                         // 운영자 전용 — Outbox DLQ / Kafka DLT / PG 라우팅 / PG 정산파일 대사

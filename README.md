@@ -1,14 +1,14 @@
 # Lemuel — 이커머스 + 정산 MSA 플랫폼
 
-> **상품·장바구니·주문·결제·배송·정산·시공예약** 도메인을 **2개 마이크로서비스 + API Gateway** 로 분리한
+> **상품·장바구니·주문·결제·배송·정산·선정산대출** 도메인을 **3개 마이크로서비스 + API Gateway** 로 분리한
 > 헥사고날 아키텍처 기반 백엔드. 단일 모놀리스 → **Bounded Context 분리** → **이벤트 드리븐** →
-> **Read-only Projection 패턴** 으로 진화시킨 포트폴리오 프로젝트.
+> **DB-per-service + 이벤트 프로젝션 패턴**(ADR 0020 완료) 으로 진화시킨 포트폴리오 프로젝트.
 
 [![Java 25](https://img.shields.io/badge/Java-25-orange)](https://www.oracle.com/java/)
 [![Spring Boot 4](https://img.shields.io/badge/Spring%20Boot-4.0.4-brightgreen)](https://spring.io/projects/spring-boot)
 [![PostgreSQL 17](https://img.shields.io/badge/PostgreSQL-17-blue)](https://www.postgresql.org/)
 [![Kafka](https://img.shields.io/badge/Kafka-Redpanda-red)](https://redpanda.com/)
-[![Hexagonal](https://img.shields.io/badge/Architecture-Hexagonal-purple)](docs/diagrams/architecture.md)
+[![Hexagonal](https://img.shields.io/badge/Architecture-Hexagonal-purple)](docs/adr/0001-hexagonal-architecture.md)
 [![ArchUnit Enforced](https://img.shields.io/badge/ArchUnit-Enforced-success)](order-service/src/test/java/github/lms/lemuel/architecture/HexagonalArchitectureTest.java)
 
 ## 면접관용 빠른 둘러보기
@@ -16,13 +16,8 @@
 | 보고 싶은 것 | 한 번에 가는 곳 |
 |---|---|
 | **📄 1장 요약 (이력서 첨부용)** | **[PORTFOLIO.md](PORTFOLIO.md)** |
-| **🎬 시연용 Postman + 시드** | [demo/](docs/demo/) — `./demo/seed.sh` 한 번이면 녹화 준비 끝 |
-| **시스템 전체 구조** | [docs/diagrams/architecture.md](docs/diagrams/architecture.md) |
-| **테이블 관계 (16개)** | [docs/diagrams/ERD.md](docs/diagrams/ERD.md) |
-| **결제 → Outbox → 정산 비동기 단일 trace** | [docs/diagrams/sequence-payment-to-settlement.md](docs/diagrams/sequence-payment-to-settlement.md) |
-| **100 스레드 동시 SKU 차감 시나리오** | [docs/diagrams/sequence-multi-item-checkout.md](docs/diagrams/sequence-multi-item-checkout.md) |
-| **PG 정산파일 자동 차액 보정** | [docs/diagrams/sequence-pg-reconciliation.md](docs/diagrams/sequence-pg-reconciliation.md) |
-| **20개 Architecture Decision Records** | [docs/adr/](docs/adr/) |
+| **시스템 전체 구조** | [아키텍처 다이어그램 (본 README)](#아키텍처) |
+| **Architecture Decision Records** | [docs/adr/](docs/adr/) |
 | **부하 테스트 시나리오 4종** | [load-test/](load-test/) |
 | **Grafana 비즈니스 KPI 대시보드** | [monitoring/grafana/dashboards/](monitoring/grafana/dashboards/) |
 
@@ -37,7 +32,6 @@ flowchart LR
 
     GW -->|/api/orders, payments<br/>products, users ...| OS
     GW -->|/api/settlements<br/>reports, ledger ...| SS
-    GW -->|/reservations/**| RS
     GW -->|/loans/**| LS
 
     subgraph commerce["🛒 Commerce"]
@@ -46,27 +40,22 @@ flowchart LR
     subgraph settlement["💰 Settlement"]
         SS["settlement-service :8082<br/><br/>settlement · payout · ledger<br/>chargeback · pgreconciliation · report"]
     end
-    subgraph reservation["🛠 Reservation (DB-per-service)"]
-        RS["reservation-service :8083<br/><br/>시공예약 · 기사배정"]
-    end
     subgraph loan["💸 Loan (DB-per-service)"]
         LS["loan-service :8084<br/><br/>선정산 대출 · 상환 · 자체 원장"]
     end
 
     OS -->|Outbox + Kafka| K[(Kafka<br/>Redpanda)]
-    K -->|PaymentCaptured / Refunded| SS
+    K -->|Payment·Order·User·Product 이벤트| SS
     K -->|SettlementCreated / Confirmed| LS
     LS -->|LoanDisbursement / Repayment| K
 
-    OS --- PG[(PostgreSQL opslab<br/>order + settlement 공유)]
-    SS --- PG
-    RS --- RDB[(reservations_db)]
+    OS --- PG[(PostgreSQL opslab<br/>order 전용)]
+    SS --- SDB[(settlement_db<br/>이벤트 프로젝션)]
     LS --- LDB[(lemuel_loan)]
     SS --- ES[(Elasticsearch 8.17<br/>settlement search)]
 
     style commerce fill:#fff7e6,stroke:#fa8c16
     style settlement fill:#e6f7ff,stroke:#1890ff
-    style reservation fill:#f6ffed,stroke:#52c41a
     style loan fill:#fff0f6,stroke:#eb2f96
 ```
 
@@ -80,9 +69,11 @@ flowchart LR
 | **장애 격리** | settlement 다운돼도 결제는 계속 | 정산 배치는 비동기 — 즉시 처리 X |
 | **배포 주기** | 잦음 (UI 변경 동행) | 드뭄 (회계 사이클 단위) |
 
-→ 위 차이점이 명확하므로 **서비스 분리** 가 자연스러운 경계. order↔settlement 는 강한 일관성을 위해
-**공유 DB(opslab) + Read-only Projection** 으로 두고, 결합이 약한 **reservation·loan 은 DB-per-service +
-Kafka 이벤트**로 분리한다 (정합성 경계 기준 차등 적용 — [ADR 0020](docs/adr/0020-order-settlement-db-split.md) 참조).
+→ 위 차이점이 명확하므로 **서비스 분리** 가 자연스러운 경계. **4개 서비스 모두 DB-per-service**
+(order=opslab · settlement=settlement_db · loan=lemuel_loan) 로 물리 분리하고,
+연계는 **Kafka 이벤트로만** 한다. order↔settlement 는 settlement 가 자체 DB 에 이벤트 프로젝션을 적재하는
+CQRS 로 분리하고, 대사는 order 의 내부 API 를 호출해 cross-DB 연결 0 을 유지한다
+([ADR 0020](docs/adr/0020-order-settlement-db-split.md) — 완료).
 
 ---
 
@@ -117,9 +108,9 @@ Kafka 이벤트**로 분리한다 (정합성 경계 기준 차등 적용 — [AD
 
 ```
 settlement/                              # 모노레포 루트
-├── settings.gradle.kts                  # 6 모듈 선언
+├── settings.gradle.kts                  # 4 서비스 모듈 선언 (shared-common 은 composite build)
 ├── build.gradle.kts                     # 부모 빌드 (subprojects 공통 설정)
-├── docker-compose.yml                   # opslab+reservations_db+lemuel_loan PG · ES · Redpanda · 5 services
+├── docker-compose.yml                   # opslab+settlement_db+lemuel_loan PG(3) · ES · Redpanda · 4 services
 ├── Dockerfile                           # MODULE 빌드 인자 파라미터화 (모든 서비스 공용)
 │
 ├── shared-common/                       # 📦 라이브러리 모듈 (java-library)
@@ -132,32 +123,32 @@ settlement/                              # 모노레포 루트
 │       ├── ratelimit/                   # Bucket4j 기반 rate limiting
 │       └── pdf/                         # iText PDF 유틸
 │
-├── order-service/                       # 🛒 Commerce 서비스 (port 8088)
+├── order-service/                       # 🛒 Commerce 서비스 (port 8088, 자체 DB opslab)
 │   └── src/main/java/.../{user,order,payment,cart,shipping,product,category,coupon,review,game}
 │       ├── adapter/in/web/              # REST 컨트롤러
 │       ├── adapter/out/persistence/     # JPA 엔티티/리포지토리
 │       ├── adapter/out/external/        # Toss PG 클라이언트
 │       ├── adapter/out/event/           # Outbox-backed Kafka publisher
+│       ├── recon/                       # /internal/recon — 자기 합계 노출(settlement 대사용, ADR 0020)
+│       ├── projectionbackfill/          # settlement 프로젝션 백필 (ADR 0020)
 │       └── application/                 # UseCase + ports
 │
-├── settlement-service/                  # 💰 Settlement 서비스 (port 8082, standalone — order 와 opslab 공유)
+├── settlement-service/                  # 💰 Settlement 서비스 (port 8082, standalone — 자체 DB settlement_db)
 │   └── src/main/java/.../
 │       ├── settlement/                  # 정산 생성/확정·홀드백
 │       │   ├── adapter/in/web/          # 정산 조회/관리 API
-│       │   ├── adapter/in/kafka/        # PaymentEventKafkaConsumer
+│       │   ├── adapter/in/kafka/        # Payment/Order/User/Product 이벤트 컨슈머 (프로젝션 적재)
 │       │   ├── adapter/in/batch/        # Spring Batch (일/월 정산)
 │       │   ├── adapter/out/persistence/ # Settlement JpaEntity
-│       │   ├── adapter/out/readmodel/   # ★ Read-only projection 엔티티
+│       │   ├── adapter/out/readmodel/   # ★ 이벤트 프로젝션 뷰 (settlement_*_view, 자체 DB 소유)
 │       │   ├── adapter/out/search/      # Elasticsearch 색인
 │       │   └── adapter/out/pdf/         # 정산서 PDF
+│       ├── recon/                       # OrderReconClient — order /internal/recon 호출(cross-DB 0)
 │       ├── payout/                      # 셀러 지급 (펌뱅킹, SellerBankAccount)
 │       ├── ledger/                      # 복식부기 원장 (LedgerEntry, Outbox)
 │       ├── chargeback/                  # 지급 분쟁/거절 처리
 │       ├── pgreconciliation/            # PG 정산파일 대사 + 차액 보정
 │       └── report/                      # 캐시플로우 리포트 도메인
-│
-├── reservation-service/                 # 🛠 Reservation 서비스 (port 8083, 자체 DB reservations_db)
-│   └── src/main/java/.../reservation/   # 시공예약·기사배정 — order/user 코드 의존 0 (이벤트로 동기화)
 │
 ├── loan-service/                        # 💸 Loan 서비스 (port 8084, 자체 DB lemuel_loan) — 선정산 대출
 │   └── src/main/java/.../loan/          # 한도·선지급·상환 saga·자체 복식부기 — settlement 이벤트로만 연계
@@ -181,26 +172,33 @@ domain (POJO)  ←  application/port (in/out 인터페이스)
          adapter/out (JPA·Toss·Kafka·ES·PDF)
 ```
 
-### 2. Read-only Projection 패턴 ★
+### 2. 이벤트 드리븐 프로젝션 패턴 ★ (ADR 0020 완료)
 
-`settlement-service` 가 **`order-service` 코드를 import 하지 않으면서** Order/Payment/User/Product 데이터를
-조회할 수 있게 한 핵심 분리 기법.
+`settlement-service` 가 **`order-service` 코드를 import 하지 않고 DB 도 공유하지 않으면서** Order/Payment/User/Product
+데이터를 조회할 수 있게 한 핵심 분리 기법. settlement 가 **자체 DB(settlement_db)에 소유한 프로젝션 테이블**을
+두고, order 가 발행하는 Kafka 이벤트를 받아 로컬에 적재한다. (과거 opslab 의 같은 테이블을 `@Immutable` 로
+read-only 매핑하던 방식에서 진화 — 이제 cross-DB 연결이 0.)
 
 ```java
-// settlement-service 자체의 read-only 엔티티 (payments 테이블 매핑)
-@Entity @Immutable
-@Table(name = "payments")
-public class SettlementPaymentReadModel {
-    @Id Long id;
-    Long orderId;
+// settlement-service 가 자체 DB 에 소유하는 프로젝션 엔티티 (settlement_order_view)
+@Entity
+@Table(name = "settlement_order_view")
+public class SettlementOrderViewJpaEntity {
+    @Id Long orderId;        // OrderEventKafkaConsumer 가 lemuel.order.created 로 적재
+    Long userId;
     BigDecimal amount;
     String status;
     // ... 정산이 필요한 필드만
 }
 ```
 
+- 적재 컨슈머: `OrderEventKafkaConsumer` · `PaymentEventKafkaConsumer` · `PaymentRefundedViewConsumer` ·
+  `ProductEventKafkaConsumer` · `UserRegisteredEventConsumer`
+- 대사(reconciliation): `OrderReconClient` 가 order 의 내부 API `/internal/recon` 을 호출(공유 시크릿
+  `X-Internal-Api-Key`)해 합계 비교 — 양측 모두 자기 DB 만 읽는다.
+
 → `settlement-service/build.gradle.kts` 에 **`implementation(project(":order-service"))` 없음**.
-→ 서비스 간 코드 의존성 0. 모듈 단위 독립 배포 가능.
+→ 서비스 간 **코드·DB 의존성 0**. 모듈 단위 독립 배포 가능.
 
 ### 3. Transactional Outbox + Kafka
 
@@ -220,7 +218,7 @@ Payment.capture() (DB tx)
 ```
 
 > 폴러는 여러 인스턴스가 동시에 돌아도 `FOR UPDATE SKIP LOCKED` 로 서로 겹치지 않는 행만 claim 해
-> 수평 확장된다(리스 만료로 크래시 자동 회수). 처리량 튜닝 상세는 [`docs/tps.md`](docs/tps.md).
+> 수평 확장된다(리스 만료로 크래시 자동 회수).
 
 **3단 멱등 방어**:
 1. outbox.event_id UUID UNIQUE — 프로듀서 중복 방지
@@ -315,26 +313,28 @@ Outbox `retryCount ≥ 10` → 자동 Kafka DLQ 발행 + Admin REST API:
 ### 전체 실행
 
 ```bash
-# 1. 인프라 + 3 서비스 모두 빌드/실행
+# 1. 인프라 + 4 서비스 모두 빌드/실행
 docker compose up -d
 
 # 2. 서비스 진입점
-#    - Gateway:    http://localhost:8080
-#    - Order API:  http://localhost:8088 (직접 접근, 보통 gateway 경유)
-#    - Settlement: http://localhost:8082
-#    - Swagger:    http://localhost:8088/swagger-ui.html
-#                  http://localhost:8082/swagger-ui.html
+#    - Gateway:     http://localhost:8080
+#    - Order API:   http://localhost:8088 (직접 접근, 보통 gateway 경유)
+#    - Settlement:  http://localhost:8082
+#    - Loan:        http://localhost:8084
+#    - Swagger:     http://localhost:8088/swagger-ui.html
+#                   http://localhost:8082/swagger-ui.html
 ```
 
 ### 개별 서비스 실행
 
 ```bash
-# 인프라만 (PG + ES + Redpanda)
-docker compose up -d postgres elasticsearch redpanda
+# 인프라만 (PG 3종 + ES + Redpanda)
+docker compose up -d postgres settlement-db loan-postgres elasticsearch redpanda
 
 # 각 서비스를 IDE 또는 gradle 로
 ./gradlew :order-service:bootRun
 ./gradlew :settlement-service:bootRun
+./gradlew :loan-service:bootRun
 ./gradlew :gateway-service:bootRun
 ```
 
@@ -351,6 +351,7 @@ docker compose up -d postgres elasticsearch redpanda
 ```bash
 docker build --build-arg MODULE=order-service       -t lemuel-order .
 docker build --build-arg MODULE=settlement-service  -t lemuel-settlement .
+docker build --build-arg MODULE=loan-service        -t lemuel-loan .
 docker build --build-arg MODULE=gateway-service     -t lemuel-gateway .
 ```
 
@@ -365,7 +366,6 @@ docker build --build-arg MODULE=gateway-service     -t lemuel-gateway .
 | `/api/products/**`, `/api/categories/**`, `/api/tags/**` | order-service |
 | `/api/coupons/**`, `/api/reviews/**` | order-service |
 | `/admin/categories/**`, `/admin/pg/**`, `/admin/products/**` | order-service |
-| `/reservations/**` | **reservation-service** (자체 DB) |
 | `/loans/**` | **loan-service** (자체 DB) |
 | `/api/settlements/**`, `/api/reconciliation/**`, `/api/reports/**` | settlement-service |
 | `/api/ledger/**` | settlement-service |
@@ -390,18 +390,9 @@ CREATED ─→ PAID ─→ REFUNDED
               └─→ CANCELED
 ```
 실제 enum 은 배송·취소·환불 단계를 더 세분화:
-`ORDER_PLACED, PAYMENT_COMPLETED, SHIPPING_PENDING, IN_TRANSIT, DELIVERED,
-CANCELLATION_REQUESTED/APPROVED, REFUND_REQUESTED/COMPLETED`
-
-### Reservation 상태머신 (시공 예약)
-```
-REQUESTED ─→ CONFIRMED ─→ ASSIGNED ─→ IN_PROGRESS ─→ COMPLETED
- (접수)      (관리자확인)   (기사배정)    (시공중)         (시공완료)
-                                                  └─→ CANCELED
-```
-- 업체회원이 예약 등록 → 관리자 확인 → 시공기사 배정/**재배정** → 진행/완료
-- 기사 본인 배정 작업 조회(`/reservations/assigned/my`), 관리자 대시보드(`/reservations/admin`)
-- 엔드포인트는 **reservation-service** `/reservations/**` (gateway 라우팅됨, 자체 DB reservations_db)
+`SHIPPING_PENDING, IN_TRANSIT, DELIVERED,
+CANCELLATION_REQUESTED/APPROVED, REFUND_REQUESTED/COMPLETED`.
+전이 규칙은 `OrderStatus.canTransitionTo()` 상태머신에 명시되어 `Order.transitionTo()` 가 강제한다.
 
 ### Shipping 상태머신
 ```
@@ -449,7 +440,6 @@ PENDING → READY → SHIPPED → IN_TRANSIT → DELIVERED → (선택) RETURNED
 | 문서 | 경로 |
 |---|---|
 | Claude Code 컨텍스트 | [`CLAUDE.md`](./CLAUDE.md) |
-| TPS / 처리량 개선 작업 | [`docs/tps.md`](./docs/tps.md) |
 | ADR (아키텍처 결정 기록) | [`docs/adr/`](./docs/adr/) |
 | Runbook (장애 대응) | [`docs/runbook/`](./docs/runbook/) |
 | CI/CD | [`.github/workflows/`](./.github/workflows/) |
@@ -476,9 +466,8 @@ PENDING → READY → SHIPPED → IN_TRANSIT → DELIVERED → (선택) RETURNED
 - [0016 — Payout Domain + Firm Banking](./docs/adr/0016-payout-domain-firm-banking.md)
 - [0017 — Kafka Consumer DLT & Replay](./docs/adr/0017-kafka-consumer-dlt-and-replay.md)
 - [0018 — Chargeback Domain](./docs/adr/0018-chargeback-domain.md)
-- 0019 — ReversePayout (예약/Planned)
-- [0020 — order ↔ settlement DB 물리 분리 (이벤트 CQRS)](./docs/adr/0020-order-settlement-db-split.md) *(Proposed)*
-- [0021 — shared-common 을 버전드 플랫폼 라이브러리로](./docs/adr/0021-shared-common-as-platform-library.md) *(Proposed)*
+- [0020 — order ↔ settlement DB 물리 분리 (이벤트 CQRS)](./docs/adr/0020-order-settlement-db-split.md) *(완료 — settlement_db + 이벤트 프로젝션 + /internal/recon)*
+- [0021 — shared-common 을 버전드 플랫폼 라이브러리로](./docs/adr/0021-shared-common-as-platform-library.md) *(완료 — composite build + maven-publish 1.0.0)*
 
 ---
 
@@ -511,11 +500,11 @@ CI 에서 k6 thresholds 로 회귀 자동 감지.
 
 ## 운영 환경 확장 포인트
 
-현재 포트폴리오 구성은 **단일 PostgreSQL 인스턴스** 를 두 서비스가 공유하지만,
-read-only projection 패턴 덕분에 다음 단계로의 확장이 깨끗합니다:
+현재 구성은 **3개 서비스 모두 DB-per-service** 로 물리 분리돼 있고(order=opslab, settlement=settlement_db,
+loan=lemuel_loan), 이벤트 프로젝션 패턴 덕분에 다음 단계로의 확장이 깨끗합니다:
 
-1. **DB 분리** — `settlement_db` 인스턴스를 별도로 띄우고, projection 테이블에 Kafka 이벤트 컨슈머가
-   직접 INSERT 하도록 전환 (현재는 같은 테이블을 read-only 로 보는 형태).
+1. ~~**DB 분리**~~ — ✅ 완료. settlement 가 자체 `settlement_db` 의 projection 테이블에 Kafka 이벤트 컨슈머가
+   직접 INSERT 하고, 대사는 order 내부 API(`/internal/recon`)로 cross-DB 0 ([ADR 0020](docs/adr/0020-order-settlement-db-split.md)).
 2. **Kubernetes 분리 배포** — 각 서비스별 Deployment + HPA. Gateway 에 인증 필터.
 3. **Outbox → Kafka Connect** — 폴러 대신 Debezium CDC 로 실시간 발행.
 4. **Schema Registry** — 이벤트 스키마 호환성 관리 (Avro/Protobuf).

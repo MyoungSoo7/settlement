@@ -15,8 +15,9 @@ import java.util.List;
  *   <li>{@link #createMultiItem(Long, List)} — 다건 주문. productId NULL, items 가 진실의 원천.</li>
  * </ul>
  *
- * <p>amount 는 다건 주문에서 모든 line_amount 의 합으로 자동 계산되어 도메인 불변식
- * (영수증 ↔ 결제 ↔ 정산 금액 일치) 을 보장한다.
+ * <p>amount 는 다건 주문에서 {@code (모든 line_amount 의 합) - 쿠폰 할인} 으로 자동 계산되어
+ * 도메인 불변식 (영수증 ↔ 결제 ↔ 정산 금액 일치) 을 보장한다. 쿠폰 없는 주문은 할인 0 이므로
+ * amount = line_amount 합.
  */
 public class Order {
 
@@ -71,16 +72,42 @@ public class Order {
      * 외부에서 amount 를 수동 지정할 수 없어 영수증/결제/정산 금액 정합성이 도메인 차원에서 보장된다.
      */
     public static Order createMultiItem(Long userId, List<OrderItem> items) {
+        return createMultiItem(userId, items, BigDecimal.ZERO);
+    }
+
+    /**
+     * 다건 주문 팩토리 (쿠폰 할인 반영).
+     *
+     * <p>소계(subtotal) = 모든 {@link OrderItem#getLineAmount()} 의 합. 최종 결제 금액
+     * {@code amount = subtotal - discountAmount} 로, 외부에서 amount 를 임의 지정할 수 없어
+     * 영수증/결제/정산 정합성이 도메인 차원에서 보장된다.
+     *
+     * <p>할인 금액은 별도 컬럼으로 저장하지 않아도 subtotal(= 영속된 {@code order_items.line_amount}
+     * 합) 에서 {@code discount = subtotal - amount} 로 항상 역산할 수 있으므로 스키마 확장이 필요 없다.
+     * 쿠폰-주문의 연결 자체는 {@code coupon_usages.order_id} 가 보존한다.
+     *
+     * @param discountAmount 쿠폰 할인 금액(없으면 {@code null}/0). 0 이상이어야 하고, 결제 금액은
+     *                       0 보다 커야 하므로 subtotal 미만이어야 한다.
+     */
+    public static Order createMultiItem(Long userId, List<OrderItem> items, BigDecimal discountAmount) {
         if (items == null || items.isEmpty()) {
             throw new IllegalArgumentException("다건 주문은 최소 1 개 이상의 아이템이 필요합니다");
+        }
+        BigDecimal discount = discountAmount != null ? discountAmount : BigDecimal.ZERO;
+        if (discount.signum() < 0) {
+            throw new IllegalArgumentException("할인 금액은 음수일 수 없습니다");
         }
         Order order = new Order();
         order.setUserId(userId);
         order.validateUserId();
-        BigDecimal total = items.stream()
+        BigDecimal subtotal = items.stream()
                 .map(OrderItem::getLineAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        order.setAmount(total);
+        if (discount.compareTo(subtotal) >= 0) {
+            throw new IllegalArgumentException(
+                    "할인 금액(" + discount + ") 이 주문 소계(" + subtotal + ") 이상일 수 없습니다");
+        }
+        order.setAmount(subtotal.subtract(discount));
         order.validateAmount();
         order.items.addAll(items);
         return order;
@@ -98,6 +125,26 @@ public class Order {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Amount must be greater than zero");
         }
+    }
+
+    /**
+     * 상태머신 가드 전이. {@link OrderStatus#canTransitionTo(OrderStatus)} 규칙에 어긋나면 예외.
+     * 배송·취소·환불 다단계 전이(서비스 계층)와 타 컨텍스트(payment) 의 상태 변경 요청이 모두 이 경로를 거친다.
+     * 동일 상태로의 재적용은 멱등 처리(no-op)한다.
+     */
+    public void transitionTo(OrderStatus target) {
+        if (target == null) {
+            throw new IllegalArgumentException("target status required");
+        }
+        if (this.status == target) {
+            return; // 멱등: 동일 상태 재적용 무시
+        }
+        if (!this.status.canTransitionTo(target)) {
+            throw new IllegalStateException(
+                    "허용되지 않은 주문 상태 전이: " + this.status + " → " + target);
+        }
+        this.status = target;
+        this.updatedAt = LocalDateTime.now();
     }
 
     // 비즈니스 메서드: 주문 취소

@@ -1,5 +1,6 @@
 package github.lms.lemuel.schema;
 
+import github.lms.lemuel.common.outbox.adapter.out.persistence.OutboxSchema;
 import org.junit.jupiter.api.condition.EnabledIf;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -7,6 +8,7 @@ import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.flyway.autoconfigure.FlywayAutoConfiguration;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -33,6 +35,9 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 // 마이그레이션이 실제로 적용되도록 명시적 import.
 @ImportAutoConfiguration(FlywayAutoConfiguration.class)
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+// @DataJpaTest 가 스캔하는 common 의 outbox 리포지토리 커스텀 프래그먼트가 요구하는 @Component.
+// 슬라이스는 일반 @Component 를 로드하지 않으므로 명시 import (없으면 컨텍스트 로드 실패).
+@Import(OutboxSchema.class)
 @ActiveProfiles("test")
 class SchemaIntegrationTest {
 

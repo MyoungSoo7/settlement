@@ -6,6 +6,7 @@ import github.lms.lemuel.order.application.port.in.ChangeOrderStatusUseCase;
 import github.lms.lemuel.order.application.port.in.CreateMultiItemOrderUseCase;
 import github.lms.lemuel.order.application.port.in.CreateOrderUseCase;
 import github.lms.lemuel.order.application.port.in.GetOrderUseCase;
+import github.lms.lemuel.order.application.port.in.IdempotentMultiItemOrderUseCase;
 import github.lms.lemuel.order.domain.Order;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -37,7 +38,7 @@ import java.util.stream.Collectors;
 public class OrderController {
 
     private final CreateOrderUseCase createOrderUseCase;
-    private final CreateMultiItemOrderUseCase createMultiItemOrderUseCase;
+    private final IdempotentMultiItemOrderUseCase createMultiItemOrderUseCase;
     private final GetOrderUseCase getOrderUseCase;
     private final ChangeOrderStatusUseCase changeOrderStatusUseCase;
 
@@ -55,23 +56,29 @@ public class OrderController {
     }
 
     @Operation(summary = "주문 생성 (다건/SKU)",
-            description = "장바구니 다건 주문. SKU(variantId) 지정 시 자동 재고 차감 + Optimistic Lock 동시성 보장.")
+            description = "장바구니 다건 주문. SKU(variantId) 지정 시 자동 재고 차감. "
+                    + "Idempotency-Key 헤더를 주면 동일 키의 중복 제출(더블클릭·재시도)을 분산 락 + DB UNIQUE 로 차단해 "
+                    + "1건만 생성하고, 재요청 시 기존 주문을 그대로 반환한다.")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "다건 주문 생성 성공"),
-            @ApiResponse(responseCode = "409", description = "재고 부족 또는 동시성 충돌 한계 초과")
+            @ApiResponse(responseCode = "409", description = "재고 부족·동시성 충돌·중복 제출 충돌")
     })
     @PostMapping("/multi")
-    public ResponseEntity<OrderResponse> createMultiItemOrder(@Valid @RequestBody MultiItemOrderRequest request) {
+    public ResponseEntity<OrderResponse> createMultiItemOrder(
+            @Valid @RequestBody MultiItemOrderRequest request,
+            @Parameter(description = "중복 주문 방지용 멱등 키(선택). 같은 키 재요청은 동일 주문을 반환.")
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
         List<CreateMultiItemOrderUseCase.Line> lines = request.lines().stream()
                 .map(l -> new CreateMultiItemOrderUseCase.Line(l.productId(), l.variantId(), l.quantity()))
                 .toList();
-        Order order = createMultiItemOrderUseCase.create(request.userId(), lines);
+        Order order = createMultiItemOrderUseCase.create(request.userId(), lines, request.couponCode(), idempotencyKey);
         return ResponseEntity.status(HttpStatus.CREATED).body(OrderResponse.from(order));
     }
 
     public record MultiItemOrderRequest(
             @jakarta.validation.constraints.NotNull Long userId,
-            @jakarta.validation.constraints.NotEmpty List<LineRequest> lines) {}
+            @jakarta.validation.constraints.NotEmpty List<LineRequest> lines,
+            String couponCode) {}
 
     public record LineRequest(
             @jakarta.validation.constraints.NotNull Long productId,

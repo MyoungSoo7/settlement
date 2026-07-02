@@ -60,9 +60,11 @@ public class SettlementPersistenceAdapter
     }
 
     @Override
-    public List<Settlement> findConfirmableForUpdate(LocalDate settlementDate) {
+    public List<Settlement> findConfirmableForUpdate(LocalDate settlementDate, int limit) {
         return settlementJpaRepository
-                .findBySettlementDateAndStatusForUpdate(settlementDate, SettlementStatus.REQUESTED.name())
+                .findBySettlementDateAndStatusForUpdate(
+                        settlementDate, SettlementStatus.REQUESTED.name(),
+                        PageRequest.of(0, Math.max(1, limit)))
                 .stream()
                 .map(mapper::toDomain)
                 .collect(Collectors.toList());

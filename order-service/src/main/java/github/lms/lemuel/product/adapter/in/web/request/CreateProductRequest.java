@@ -8,9 +8,10 @@ public record CreateProductRequest(
         String name,
         String description,
         BigDecimal price,
-        Integer stockQuantity
+        Integer stockQuantity,
+        String optionsJson
 ) {
     public CreateProductCommand toCommand() {
-        return new CreateProductCommand(name, description, price, stockQuantity);
+        return new CreateProductCommand(name, description, price, stockQuantity, optionsJson);
     }
 }

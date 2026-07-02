@@ -4,6 +4,7 @@ import { authApi } from './api/auth';
 import { ToastProvider } from './contexts/ToastContext';
 import { CartProvider } from './contexts/CartContext';
 import Layout from './components/Layout';
+import SystemLayout from './components/SystemLayout';
 
 // 공개 페이지 (즉시 로드)
 import Login from './pages/Login';
@@ -17,10 +18,7 @@ const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const OrderPage = lazy(() => import('./pages/OrderPage'));
 const CartPage = lazy(() => import('./pages/CartPage'));
 const MyPage = lazy(() => import('./pages/MyPage'));
-const GamesPage = lazy(() => import('./pages/GamesPage'));
-const GomokuGame = lazy(() => import('./pages/GomokuGame'));
-const BadukGame = lazy(() => import('./pages/BadukGame'));
-const ViewerPage = lazy(() => import('./pages/ViewerPage'));
+const LoanPage = lazy(() => import('./pages/LoanPage'));
 const TossPaymentSuccess = lazy(() => import('./pages/TossPaymentSuccess'));
 
 // 관리자 페이지 (lazy load)
@@ -31,6 +29,11 @@ const CategoryManagementPage = lazy(() => import('./pages/CategoryManagementPage
 const TagManagementPage = lazy(() => import('./pages/TagManagementPage'));
 const EcommerceCategoryAdmin = lazy(() => import('./pages/EcommerceCategoryAdmin'));
 const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'));
+
+// 시스템 관리 (최고 관리자 전용, 좌측 사이드바)
+const MenuManagementPage = lazy(() => import('./pages/system/MenuManagementPage'));
+const CommonCodeManagementPage = lazy(() => import('./pages/system/CommonCodeManagementPage'));
+const RbacManagementPage = lazy(() => import('./pages/system/RbacManagementPage'));
 
 // ── 일반 사용자용 (인증 필수, 역할 무관) ──────────────────────────────────
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -82,13 +85,10 @@ function App() {
             <Route path="/order/toss/fail"    element={<TossPaymentFail />} />
 
             {/* ── 일반 사용자 (USER + 인증) ── */}
-            <Route path="/order"    element={<ProtectedRoute><OrderPage /></ProtectedRoute>} />
-            <Route path="/cart"     element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
-            <Route path="/mypage"   element={<ProtectedRoute><MyPage /></ProtectedRoute>} />
-            <Route path="/games"    element={<ProtectedRoute><GamesPage /></ProtectedRoute>} />
-            <Route path="/games/gomoku" element={<ProtectedRoute><GomokuGame /></ProtectedRoute>} />
-            <Route path="/games/baduk"  element={<ProtectedRoute><BadukGame /></ProtectedRoute>} />
-            <Route path="/viewer"   element={<ProtectedRoute><ViewerPage /></ProtectedRoute>} />
+            <Route path="/order"        element={<ProtectedRoute><OrderPage /></ProtectedRoute>} />
+            <Route path="/cart"         element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
+            <Route path="/mypage"       element={<ProtectedRoute><MyPage /></ProtectedRoute>} />
+            <Route path="/loans"        element={<ProtectedRoute><LoanPage /></ProtectedRoute>} />
             <Route path="/order/toss/success" element={<ProtectedRoute><TossPaymentSuccess /></ProtectedRoute>} />
 
             {/* ── 관리자·매니저 공용 ── */}
@@ -99,9 +99,17 @@ function App() {
             <Route path="/categories"         element={<AdminManagerRoute><CategoryManagementPage /></AdminManagerRoute>} />
             <Route path="/tags"               element={<AdminManagerRoute><TagManagementPage /></AdminManagerRoute>} />
 
-            {/* ── 최고 관리자 전용 ── */}
+            {/* ── 최고 관리자 전용: 시스템 관리 (좌측 사이드바) ── */}
+            <Route path="/admin/system"
+              element={<Navigate to="/admin/system/menus" replace />} />
+            <Route path="/admin/system/menus"
+              element={<AdminOnlyRoute><SystemLayout><MenuManagementPage /></SystemLayout></AdminOnlyRoute>} />
+            <Route path="/admin/system/codes"
+              element={<AdminOnlyRoute><SystemLayout><CommonCodeManagementPage /></SystemLayout></AdminOnlyRoute>} />
+            <Route path="/admin/system/rbac"
+              element={<AdminOnlyRoute><SystemLayout><RbacManagementPage /></SystemLayout></AdminOnlyRoute>} />
             <Route path="/admin/system/ecommerce-categories"
-              element={<AdminOnlyRoute><EcommerceCategoryAdmin /></AdminOnlyRoute>} />
+              element={<AdminOnlyRoute><SystemLayout><EcommerceCategoryAdmin /></SystemLayout></AdminOnlyRoute>} />
 
           </Routes>
           </Suspense>

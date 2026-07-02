@@ -58,8 +58,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   <Link to="/product"          className={adminNavLinkClass('/product')}>상품관리</Link>
                   <Link to="/admin/settlement" className={adminNavLinkClass('/admin/settlement')}>정산관리</Link>
                   <Link to="/settlement/search" className={adminNavLinkClass('/settlement/search')}>정산조회</Link>
+                  <Link to="/loans"            className={adminNavLinkClass('/loans')}>대출관리</Link>
                   {user.role === 'ADMIN' && (
-                    <Link to="/admin/system/ecommerce-categories" className={adminNavLinkClass('/admin/system')}>
+                    <Link to="/admin/system/menus" className={adminNavLinkClass('/admin/system')}>
                       시스템
                     </Link>
                   )}
@@ -69,9 +70,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               {/* ── 일반 사용자 내비 ── */}
               {user && !isAdminOrManager && (
                 <nav className="flex space-x-1">
-                  <Link to="/order"      className={navLinkClass('/order')}>주문하기</Link>
-                  <Link to="/games"      className={navLinkClass('/games')}>🎮 게임</Link>
-                  <Link to="/viewer"     className={navLinkClass('/viewer')}>📖 뷰어</Link>
+                  <Link to="/order"        className={navLinkClass('/order')}>주문하기</Link>
+                  <Link to="/loans"        className={navLinkClass('/loans')}>💸 대출하기</Link>
                 </nav>
               )}
             </div>

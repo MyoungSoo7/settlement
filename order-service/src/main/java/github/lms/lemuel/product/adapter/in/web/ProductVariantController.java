@@ -2,6 +2,7 @@ package github.lms.lemuel.product.adapter.in.web;
 
 import github.lms.lemuel.product.application.port.in.CreateProductVariantUseCase;
 import github.lms.lemuel.product.application.port.in.DecreaseVariantStockUseCase;
+import github.lms.lemuel.product.application.port.in.ResolveOptionSelectionUseCase;
 import github.lms.lemuel.product.application.port.out.LoadProductVariantPort;
 import github.lms.lemuel.product.domain.ProductVariant;
 import io.swagger.v3.oas.annotations.Operation;
@@ -23,13 +24,16 @@ public class ProductVariantController {
     private final CreateProductVariantUseCase createUseCase;
     private final DecreaseVariantStockUseCase decreaseStockUseCase;
     private final LoadProductVariantPort loadPort;
+    private final ResolveOptionSelectionUseCase resolveUseCase;
 
     public ProductVariantController(CreateProductVariantUseCase createUseCase,
                                      DecreaseVariantStockUseCase decreaseStockUseCase,
-                                     LoadProductVariantPort loadPort) {
+                                     LoadProductVariantPort loadPort,
+                                     ResolveOptionSelectionUseCase resolveUseCase) {
         this.createUseCase = createUseCase;
         this.decreaseStockUseCase = decreaseStockUseCase;
         this.loadPort = loadPort;
+        this.resolveUseCase = resolveUseCase;
     }
 
     @Operation(summary = "옵션(SKU) 생성")
@@ -57,6 +61,23 @@ public class ProductVariantController {
         ProductVariant updated = decreaseStockUseCase.decrease(variantId, request.quantity());
         return ResponseEntity.ok(VariantResponse.from(updated));
     }
+
+    @Operation(summary = "옵션 트리 선택 → SKU 해석",
+            description = "상품의 options_json 트리에서 선택 경로를 검증하고 대응하는 옵션(SKU)을 반환한다. "
+                    + "주문 시 선택 경로를 variantId 로 변환하는 용도.")
+    @PostMapping("/resolve")
+    public ResponseEntity<VariantResponse> resolve(@PathVariable Long productId,
+                                                   @RequestBody ResolveRequest request) {
+        List<ResolveOptionSelectionUseCase.Selection> selections = request.selections().stream()
+                .map(s -> new ResolveOptionSelectionUseCase.Selection(s.name(), s.value()))
+                .toList();
+        ProductVariant variant = resolveUseCase.resolve(productId, selections);
+        return ResponseEntity.ok(VariantResponse.from(variant));
+    }
+
+    public record ResolveRequest(List<SelectionDto> selections) {}
+
+    public record SelectionDto(String name, String value) {}
 
     public record CreateVariantRequest(
             @NotBlank String sku,

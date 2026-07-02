@@ -7,6 +7,7 @@ import github.lms.lemuel.product.domain.ProductStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.Comparator;
@@ -70,6 +71,11 @@ public class ProductPersistenceAdapter implements LoadProductPort, SaveProductPo
                 .map(mapper::toDomain)
                 .sorted(comparator)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public int decreaseStockIfAvailable(Long productId, int quantity) {
+        return repository.decreaseStockIfAvailable(productId, quantity, LocalDateTime.now());
     }
 
     @Override

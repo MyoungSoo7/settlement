@@ -171,6 +171,27 @@ class RefundPaymentUseCaseTest {
         verify(saveRefundPort, never()).save(any());
     }
 
+    @Test @DisplayName("PG 환불 실패 시 RefundException 으로 변환 + payment/주문 미변경 + 이벤트 미발행 (롤백)")
+    void refund_pgFailure_translatesAndDoesNotMutate() {
+        PaymentDomain payment = capturedPayment();
+        when(loadPaymentPort.loadByIdForUpdate(1L)).thenReturn(Optional.of(payment));
+        stubRefundPersistence();
+        // PG 가 원시 런타임 예외를 던지는 상황 (네트워크/5xx 등)
+        org.mockito.Mockito.doThrow(new RuntimeException("PG 504 timeout"))
+                .when(pgClientPort).refund(eq("pg-tx-123"), any());
+
+        assertThatThrownBy(() -> refundPaymentUseCase.refundPayment(1L))
+                .isInstanceOf(github.lms.lemuel.payment.domain.exception.RefundException.class)
+                .hasMessageContaining("paymentId=1");
+
+        // payment 상태/누적금액 변경 없음 (트랜잭션이면 롤백되지만, 단위 테스트에서도 도메인 미변경 검증)
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.CAPTURED);
+        assertThat(payment.getRefundedAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+        // 주문 상태 전이/환불 이벤트 발행이 일어나지 않음
+        verify(updateOrderStatusPort, never()).updateOrderStatus(any(), any());
+        verify(publishEventPort, never()).publishPaymentRefunded(any(), any(), any());
+    }
+
     @Test @DisplayName("CAPTURED 가 아닌 상태에서는 환불 시도 시 예외 + PG 호출 없음")
     void refund_notCaptured_throwsBeforePgCall() {
         PaymentDomain payment = new PaymentDomain(1L, 10L, new BigDecimal("50000"), BigDecimal.ZERO,

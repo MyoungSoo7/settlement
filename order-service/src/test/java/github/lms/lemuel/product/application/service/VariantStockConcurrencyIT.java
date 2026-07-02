@@ -4,6 +4,7 @@ import github.lms.lemuel.product.adapter.out.persistence.ProductVariantPersisten
 import github.lms.lemuel.product.adapter.out.persistence.SpringDataProductVariantRepository;
 import github.lms.lemuel.product.application.port.out.LoadProductVariantPort;
 import github.lms.lemuel.product.application.port.out.SaveProductVariantPort;
+import github.lms.lemuel.common.outbox.adapter.out.persistence.OutboxSchema;
 import github.lms.lemuel.product.domain.ProductVariant;
 import github.lms.lemuel.product.domain.exception.InsufficientStockException;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -66,7 +67,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DataJpaTest
 @ImportAutoConfiguration(FlywayAutoConfiguration.class)
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({ProductVariantPersistenceAdapter.class})
+// @DataJpaTest 슬라이스는 모든 Spring Data 리포지토리를 스캔하므로, common 의 outbox 리포지토리
+// 커스텀 프래그먼트(SpringDataOutboxEventRepositoryCustomImpl)도 인스턴스화된다. 이 프래그먼트는
+// @Component OutboxSchema 를 생성자 주입받지만, 슬라이스는 일반 @Component 를 로드하지 않으므로 명시 import.
+@Import({ProductVariantPersistenceAdapter.class, OutboxSchema.class})
 @ActiveProfiles("test")
 class VariantStockConcurrencyIT {
 

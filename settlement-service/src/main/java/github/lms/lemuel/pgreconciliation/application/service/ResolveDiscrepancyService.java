@@ -2,6 +2,7 @@ package github.lms.lemuel.pgreconciliation.application.service;
 
 import github.lms.lemuel.pgreconciliation.application.port.in.ResolveDiscrepancyUseCase;
 import github.lms.lemuel.pgreconciliation.application.port.out.LoadReconciliationRunPort;
+import github.lms.lemuel.pgreconciliation.application.port.out.PublishDiscrepancyResolvedEventPort;
 import github.lms.lemuel.pgreconciliation.application.port.out.SaveReconciliationRunPort;
 import github.lms.lemuel.pgreconciliation.domain.ReconciliationDiscrepancy;
 import io.micrometer.core.instrument.Counter;
@@ -19,14 +20,17 @@ public class ResolveDiscrepancyService implements ResolveDiscrepancyUseCase {
 
     private final LoadReconciliationRunPort loadPort;
     private final SaveReconciliationRunPort savePort;
+    private final PublishDiscrepancyResolvedEventPort publishPort;
     private final Counter approvedCounter;
     private final Counter rejectedCounter;
 
     public ResolveDiscrepancyService(LoadReconciliationRunPort loadPort,
                                      SaveReconciliationRunPort savePort,
+                                     PublishDiscrepancyResolvedEventPort publishPort,
                                      MeterRegistry meterRegistry) {
         this.loadPort = loadPort;
         this.savePort = savePort;
+        this.publishPort = publishPort;
         this.approvedCounter = Counter.builder("pg.reconciliation.discrepancies.approved")
                 .description("운영자가 승인한 PG 대사 차이 누적 수")
                 .register(meterRegistry);
@@ -44,7 +48,10 @@ public class ResolveDiscrepancyService implements ResolveDiscrepancyUseCase {
         approvedCounter.increment();
         log.warn("[PgRecon] APPROVED by operator. discrepancyId={}, operator={}, type={}, diff={}",
                 discrepancyId, operatorId, d.getType(), d.getDifference());
-        // TODO: APPROVED 이벤트 발행 → AdjustSettlementForRefundUseCase 와 유사한 보정 흐름 트리거
+        // 승인 → 같은 트랜잭션 Outbox 에 APPROVED 이벤트 적재 → 커밋 후 폴러가 Kafka 발행.
+        // 후속 보정 핸들러가 type 별(과/소 정산) 부호 규칙으로 정산을 조정한다.
+        // (보정 적용 핸들러는 타입별 부호 규칙 확정 후 추가 — AdjustSettlementForRefundUseCase 와 유사 흐름)
+        publishPort.publishDiscrepancyApproved(saved);
         return saved;
     }
 

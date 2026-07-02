@@ -6,7 +6,18 @@ import java.util.List;
 
 public interface CreateMultiItemOrderUseCase {
 
-    Order create(Long userId, List<Line> lines);
+    /**
+     * 다건 주문 생성. {@code couponCode} 가 주어지면 쿠폰 검증·할인 반영·사용 기록을
+     * 주문 생성과 <b>같은 트랜잭션</b>에서 처리하여, 쿠폰 실패 시 주문·재고 차감까지 모두 롤백한다.
+     *
+     * @param couponCode 적용할 쿠폰 코드. 없으면 {@code null}/빈 문자열
+     */
+    Order create(Long userId, List<Line> lines, String couponCode);
+
+    /** 쿠폰 없는 다건 주문 (기존 호출 호환). */
+    default Order create(Long userId, List<Line> lines) {
+        return create(userId, lines, null);
+    }
 
     /**
      * 주문 생성 요청에서 들어오는 1 라인.

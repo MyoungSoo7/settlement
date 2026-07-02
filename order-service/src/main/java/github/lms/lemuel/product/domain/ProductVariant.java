@@ -3,6 +3,7 @@ package github.lms.lemuel.product.domain;
 import github.lms.lemuel.product.domain.exception.InsufficientStockException;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.Objects;
 
@@ -107,6 +108,32 @@ public class ProductVariant {
             this.status = ProductVariantStatus.OUT_OF_STOCK;
         }
         this.updatedAt = LocalDateTime.now();
+    }
+
+    /**
+     * 이 옵션이 적용된 <b>주문 단가</b>를 계산한다 (할인 적용 후).
+     *
+     * <p>금액 우선순위(피드백 합의 — 환불 금액 역산도 이 순서를 따른다):
+     * <ol>
+     *   <li>기준 가격({@code basePrice}) — products.price 스냅샷</li>
+     *   <li>+ 옵션 추가금({@code additionalPrice}, 음수 가능)</li>
+     *   <li>- 옵션 정액 할인({@code discountPrice})</li>
+     *   <li>- 옵션 정률 할인({@code discountRate} %) — 위 (기준가+추가금-정액할인) 에 적용, 원 단위 버림(FLOOR)</li>
+     * </ol>
+     * 최종 단가가 음수가 되면 0 으로 절삭한다. 두 할인 필드는 null 이면 미적용.
+     */
+    public BigDecimal effectiveUnitPrice(BigDecimal basePrice) {
+        Objects.requireNonNull(basePrice, "basePrice");
+        BigDecimal price = basePrice.add(additionalPrice == null ? BigDecimal.ZERO : additionalPrice);
+        if (discountPrice != null) {
+            price = price.subtract(discountPrice);
+        }
+        if (discountRate != null && price.signum() > 0) {
+            BigDecimal rateDiscount = price.multiply(discountRate)
+                    .divide(BigDecimal.valueOf(100), 0, RoundingMode.FLOOR);
+            price = price.subtract(rateDiscount);
+        }
+        return price.signum() < 0 ? BigDecimal.ZERO : price;
     }
 
     public void increaseStock(int quantity) {

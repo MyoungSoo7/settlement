@@ -48,6 +48,52 @@ touch "order-service/src/main/resources/db/migration/V${TS}__${SUMMARY}.sql"
 - 운영 DB 의 `flyway_schema_history` *직접 수정 절대 금지* (Flyway 가 관리)
 - `spring.flyway.out-of-order: true` 운영 — 정수 번호 누락 사고 안전망. 단, *재발 방지의 본질은 정수 번호 금지*.
 
+## ⚠️ Idempotent 패턴 의무 — 2026-06-23 V50 사고
+
+*과거 사례 3* (2026-06-23): V50 의 첫 적용 시도 가 *어떤 이유* 로 *partial 적용* 후 rollback (CHECK constraint 만 살아남음). 이후 재시도 마다 `ERROR: constraint "chk_product_variants_discount_price" for relation "product_variants" already exists` 로 무한 CrashLoop. 옛 ReplicaSet 의 pod 들 은 정상 작동 했지만 *새 deploy 가 영원히 살지 못함*.
+
+**원인**: PostgreSQL 의 `ADD CONSTRAINT` 는 `IF NOT EXISTS` 옵션이 없음. 한 번 실패 후 *수동 정리* 안 하면 *영원히 같은 자리* 에서 멈춤.
+
+**처방**: 새 마이그레이션 부터 *모든 `ADD CONSTRAINT` 는 *idempotent wrap* 의무*.
+
+```sql
+-- ❌ 안티 — partial 적용 후 재시도 시 fail
+ALTER TABLE opslab.product_variants
+    ADD CONSTRAINT chk_product_variants_discount_price
+        CHECK (discount_price IS NULL OR discount_price >= 0);
+
+-- ✅ idempotent — 이미 존재 시 silently skip
+DO $$ BEGIN
+    ALTER TABLE opslab.product_variants
+        ADD CONSTRAINT chk_product_variants_discount_price
+            CHECK (discount_price IS NULL OR discount_price >= 0);
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
+```
+
+같은 패턴이 필요한 SQL:
+- `ADD CONSTRAINT` (CHECK, UNIQUE, FOREIGN KEY) — `duplicate_object`
+- `CREATE TRIGGER` — `duplicate_object`
+- `CREATE FUNCTION` — `OR REPLACE` 사용
+- `CREATE TABLE` — `IF NOT EXISTS` (이미 지원)
+- `CREATE INDEX` — `IF NOT EXISTS` (이미 지원)
+- `ALTER TABLE ... ADD COLUMN` — `IF NOT EXISTS` (이미 지원, V50 의 column 추가 가 이 패턴이라 정상 작동했음)
+
+### 회복 절차 (이미 partial 상태가 된 경우)
+
+1. *모든 변경 사항이 *DB 에 적용 됐는지* 검증 (information_schema, pg_constraint, pg_indexes 직접 확인)
+2. 9/9 모두 적용 됐다면 — `flyway_schema_history` 에 *해당 version 강제 INSERT*:
+   ```sql
+   INSERT INTO opslab.flyway_schema_history
+       (installed_rank, version, description, type, script, checksum, installed_by, installed_on, execution_time, success)
+   VALUES (<next_rank>, '<v>', '<desc>', 'SQL', '<file>', <crc32>, '<user>', now(), 0, true);
+   ```
+3. checksum 은 V50 의 *Flyway CRC32* — Python `zlib.crc32(content.encode('utf-8'))`
+4. 새 pod 재시작 → Flyway 가 *이미 success* 로 인식 → 다음 migration 으로 넘어감
+
+이 절차 가 *2026-06-23 V50 사고* 의 *실제 복구 방법*. 같은 패턴 의 사고 재발 시 *동일 절차 적용 가능*.
+
 ## 📚 참고
 - [Flyway naming convention](https://documentation.red-gate.com/fd/migrations-271583317.html)
 - 본 프로젝트 *2026-06-06 컨벤션 전환 이전* 의 V1~V47 은 *영구 유지*.
