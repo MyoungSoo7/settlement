@@ -34,8 +34,14 @@ public class OrderJpaEntity {
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal amount;
 
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false, length = 30)
     private String status;
+
+    @Column(name = "shipping_fee", nullable = false, precision = 10, scale = 2)
+    private BigDecimal shippingFee;
+
+    @Column(name = "shipped", nullable = false)
+    private boolean shipped;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -53,6 +59,9 @@ public class OrderJpaEntity {
         }
         if (status == null) {
             status = "CREATED";
+        }
+        if (shippingFee == null) {
+            shippingFee = BigDecimal.ZERO;
         }
     }
 

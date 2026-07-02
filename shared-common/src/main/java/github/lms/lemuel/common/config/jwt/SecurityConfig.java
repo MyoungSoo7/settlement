@@ -164,6 +164,11 @@ public class SecurityConfig {
                         .requestMatchers("/api/ledger/**").hasAnyRole("ADMIN", "MANAGER")
                         // 결제 환불 이력 조회 (관리자·매니저·본인) — 더 세밀한 권한은 향후 Audit PR 에서
                         .requestMatchers("/api/payments/*/refunds").hasAnyRole("ADMIN", "MANAGER", "USER")
+                        // 환불 실행(직접 PG 환불) — "어드민 승인 후 환불" 원칙에 따라 운영자 전용.
+                        // 사용자 직접 호출 경로와 운영자 승인 경로를 분리한다(관리자 승인은 /orders/admin/{id}/refund-approve).
+                        // 결제 생성/인증/캡처(/payments POST·/authorize·/capture)는 사용자 결제 흐름이라 제한하지 않는다.
+                        .requestMatchers(HttpMethod.PATCH, "/payments/*/refund").hasAnyRole("ADMIN", "MANAGER")
+                        .requestMatchers(HttpMethod.POST, "/payments/split/*/refund").hasAnyRole("ADMIN", "MANAGER")
                         // 나머지는 인증 필요
                         .anyRequest().authenticated()
                 )

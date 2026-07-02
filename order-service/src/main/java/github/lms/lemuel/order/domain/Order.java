@@ -28,6 +28,8 @@ public class Order {
     private OrderStatus status;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private BigDecimal shippingFee = BigDecimal.ZERO;  // 결제에 포함된 배송비(기본 0). 환불 정책 계산에 사용.
+    private boolean shipped = false;                   // 배송 시작(IN_TRANSIT/DELIVERED 도달) 여부 — 상태 전이와 무관하게 보존.
     private final List<OrderItem> items = new ArrayList<>();
 
     // 기본 생성자
@@ -144,6 +146,11 @@ public class Order {
                     "허용되지 않은 주문 상태 전이: " + this.status + " → " + target);
         }
         this.status = target;
+        // 배송이 한 번이라도 시작되면(IN_TRANSIT/DELIVERED) 기록을 남긴다 — 이후 환불 신청으로
+        // 상태가 REFUND_REQUESTED 로 바뀌어도 "배송 시작됨" 사실은 유지되어 환불 정책이 배송비를 차감한다.
+        if (target == OrderStatus.IN_TRANSIT || target == OrderStatus.DELIVERED) {
+            this.shipped = true;
+        }
         this.updatedAt = LocalDateTime.now();
     }
 
@@ -237,6 +244,22 @@ public class Order {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public BigDecimal getShippingFee() {
+        return shippingFee;
+    }
+
+    public void setShippingFee(BigDecimal shippingFee) {
+        this.shippingFee = shippingFee == null ? BigDecimal.ZERO : shippingFee;
+    }
+
+    public boolean isShipped() {
+        return shipped;
+    }
+
+    public void setShipped(boolean shipped) {
+        this.shipped = shipped;
     }
 
     /**
