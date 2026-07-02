@@ -126,7 +126,7 @@ class RefundSplitPaymentServiceTest {
 
         @Override public String authorize(Long paymentId, BigDecimal amount, String paymentMethod) { return "PG-X"; }
         @Override public void capture(String pgTransactionId, BigDecimal amount) { }
-        @Override public void refund(String pgTransactionId, BigDecimal amount) {
+        @Override public void refund(String pgTransactionId, BigDecimal amount, String idempotencyKey) {
             calls++;
             if (calls == failAtCall) {
                 throw new IllegalStateException("PG refund 실패 (call=" + calls + ")");

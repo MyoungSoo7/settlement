@@ -153,6 +153,8 @@ public class SecurityConfig {
                         .requestMatchers("/admin/payouts/**").hasRole("ADMIN")
                         // Chargeback 콘솔 — 셀러 환수 결정은 ADMIN 만
                         .requestMatchers("/admin/chargebacks/**").hasRole("ADMIN")
+                        // 환불 콘솔 — 실패/재시도 소진 환불 조회(운영 개입용). 실행 없는 조회라 MANAGER 도 허용
+                        .requestMatchers("/admin/refunds/**").hasAnyRole("ADMIN", "MANAGER")
                         // 정산 관련 API (관리자·매니저)
                         .requestMatchers("/settlements/**").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers("/api/settlements/**").hasAnyRole("ADMIN", "MANAGER")

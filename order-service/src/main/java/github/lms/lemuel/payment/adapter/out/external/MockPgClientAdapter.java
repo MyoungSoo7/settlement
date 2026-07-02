@@ -28,7 +28,7 @@ public class MockPgClientAdapter implements PgClientPort {
     }
 
     @Override
-    public void refund(String pgTransactionId, BigDecimal amount) {
+    public void refund(String pgTransactionId, BigDecimal amount, String idempotencyKey) {
         // no-op
     }
 }

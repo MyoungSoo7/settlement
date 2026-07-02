@@ -73,7 +73,9 @@ public class TenderRefundExecutor {
                         "Tender not found: paymentId=" + paymentId + ", tenderId=" + tenderId));
 
         if (tender.getType().usesExternalPg()) {
-            pgClientPort.refund(tender.getPgTransactionId(), portion);
+            // tender·금액 단위로 안정적인 멱등 키 — 같은 tender 를 같은 금액으로 재환불 요청해도 PG 이중환불 방지.
+            String idempotencyKey = "tender-" + tender.getId() + "-" + portion.stripTrailingZeros().toPlainString();
+            pgClientPort.refund(tender.getPgTransactionId(), portion, idempotencyKey);
             log.info("외부 PG 환불: tenderId={}, type={}, amount={}",
                     tender.getId(), tender.getType(), portion);
         } else {

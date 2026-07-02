@@ -66,7 +66,9 @@ public class TossPgAdapter implements PaymentGatewayAdapter {
     }
 
     @Override
-    public void refund(String pgTransactionId, BigDecimal amount) {
-        log.info("[TOSS] refund txnId={}, amount={}", pgTransactionId, amount);
+    public void refund(String pgTransactionId, BigDecimal amount, String idempotencyKey) {
+        // 실 운영: Toss 환불(cancel) API 호출 시 idempotencyKey 를 HTTP `Idempotency-Key` 헤더로 전송한다.
+        // 같은 키 재요청은 Toss 가 중복 취소하지 않고 최초 결과를 반환 → 자동 재시도의 이중 환불 방지.
+        log.info("[TOSS] refund txnId={}, amount={}, idempotencyKey={}", pgTransactionId, amount, idempotencyKey);
     }
 }

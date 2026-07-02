@@ -50,8 +50,8 @@ public class RoutingPgClientAdapter implements PgClientPort {
     }
 
     @Override
-    public void refund(String pgTransactionId, BigDecimal amount) {
+    public void refund(String pgTransactionId, BigDecimal amount, String idempotencyKey) {
         PaymentGatewayAdapter adapter = router.resolveByTransactionId(pgTransactionId);
-        adapter.refund(pgTransactionId, amount);
+        adapter.refund(pgTransactionId, amount, idempotencyKey);
     }
 }
