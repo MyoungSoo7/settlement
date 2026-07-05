@@ -5,6 +5,7 @@ import github.lms.lemuel.payment.application.port.in.GetPaymentPort;
 import github.lms.lemuel.payment.application.port.in.RefundPaymentPort;
 import github.lms.lemuel.payment.domain.PaymentDomain;
 import github.lms.lemuel.payment.domain.PaymentStatus;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -17,6 +18,10 @@ import java.util.Optional;
  * JPA 엔티티·리포지토리를 직접 참조하지 않고 Payment 의 inbound use case({@link GetPaymentPort},
  * {@link RefundPaymentPort})만 호출한다. 두 포트는 각각 별도 빈(GetPaymentUseCase / RefundPaymentUseCase)이라
  * Spring 프록시를 거치므로 RefundPaymentUseCase 의 {@code @Transactional}/{@code @Auditable} 가 정상 적용된다.
+ *
+ * <p>주입은 {@code @Lazy} 프록시로 받는다 — payment 쪽 {@code OrderAdapter} 가 order 의
+ * {@code ChangeOrderStatusUseCase} 를 의존하는 역방향 간선과 만나 생성자 주입 사이클이 되므로
+ * (Change→본 어댑터→RefundUseCase→OrderAdapter→Change), 이 간선만 첫 호출 시점으로 지연시켜 끊는다.
  */
 @Component
 public class OrderPaymentRefundAdapter implements RefundOrderPaymentPort {
@@ -24,8 +29,8 @@ public class OrderPaymentRefundAdapter implements RefundOrderPaymentPort {
     private final GetPaymentPort getPaymentPort;
     private final RefundPaymentPort refundPaymentPort;
 
-    public OrderPaymentRefundAdapter(GetPaymentPort getPaymentPort,
-                                     RefundPaymentPort refundPaymentPort) {
+    public OrderPaymentRefundAdapter(@Lazy GetPaymentPort getPaymentPort,
+                                     @Lazy RefundPaymentPort refundPaymentPort) {
         this.getPaymentPort = getPaymentPort;
         this.refundPaymentPort = refundPaymentPort;
     }
