@@ -20,28 +20,6 @@ services:
       timeout: 3s
       retries: 10
 
-  # ★ DB-per-service: reservation-service 전용 PostgreSQL (opslab 와 물리 분리)
-  reservations-postgres:
-    image: postgres:17-alpine
-    container_name: lemuel-reservations-db
-    env_file:
-      - path: .env
-        required: false
-    environment:
-      POSTGRES_DB: reservations_db
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    ports:
-      - "127.0.0.1:5434:5432"
-    volumes:
-      - reservations-postgres-data:/var/lib/postgresql/data
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
-      interval: 10s
-      timeout: 3s
-      retries: 10
-
   # ★ DB-per-service: settlement-service 전용 PostgreSQL (opslab 와 물리 분리, ADR 0020 Phase 4)
   settlement-db:
     image: postgres:17-alpine
@@ -299,48 +277,6 @@ services:
       redpanda:
         condition: service_healthy
 
-  reservation-service:
-    build:
-      context: .
-      args:
-        MODULE: reservation-service
-    image: ghcr.io/myoungsoo7/lemuel-reservation:latest
-    container_name: lemuel-reservation
-    env_file:
-      - path: .env
-        required: false
-    environment:
-      SPRING_PROFILES_ACTIVE: prod
-      # 자체 DB(reservations_db) — opslab 와 물리 분리. 교차 FK 없음.
-      RESERVATION_DATASOURCE_URL: jdbc:postgresql://reservations-postgres:5432/reservations_db?reWriteBatchedInserts=true
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      APP_KAFKA_ENABLED: "true"
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
-      # JWT 시크릿은 order-service 와 동일해야 토큰 검증 가능
-      JWT_ISSUER: ${JWT_ISSUER}
-      JWT_SECRET: ${JWT_SECRET}
-      JWT_TTL_SECONDS: ${JWT_TTL_SECONDS}
-      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
-      SERVER_PORT: 8080
-      MANAGEMENT_SERVER_PORT: 8080
-      MANAGEMENT_OTLP_TRACING_ENDPOINT: http://tempo:4318/v1/traces
-      MANAGEMENT_TRACING_SAMPLING_PROBABILITY: "1.0"
-    ports:
-      - "127.0.0.1:8083:8080"
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 10
-      start_period: 60s
-    depends_on:
-      reservations-postgres:
-        condition: service_healthy
-      redpanda:
-        condition: service_healthy
-
   loan-service:
     build:
       context: .
@@ -397,7 +333,6 @@ services:
       SPRING_PROFILES_ACTIVE: prod
       ORDER_SERVICE_URI: http://order-service:8080
       SETTLEMENT_SERVICE_URI: http://settlement-service:8080
-      RESERVATION_SERVICE_URI: http://reservation-service:8080
       LOAN_SERVICE_URI: http://loan-service:8080
       JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
     ports:
@@ -506,7 +441,6 @@ services:
 
 volumes:
   postgres-data:
-  reservations-postgres-data:
   settlement-db-data:
   loan-postgres-data:
   elasticsearch-data:
