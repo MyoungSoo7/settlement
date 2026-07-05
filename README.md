@@ -310,19 +310,71 @@ Outbox `retryCount ≥ 10` → 자동 Kafka DLQ 발행 + Admin REST API:
 - JDK 25+
 - Docker & Docker Compose
 
+### 환경변수 (.env)
+
+`docker compose up` 전에 루트에 `.env` 를 만들어야 합니다 (`.env.example` 복사 후 값 채우기):
+
+```bash
+cp .env.example .env
+```
+
+```dotenv
+# 최소 필수 값 (compose 기동에 반드시 필요)
+POSTGRES_USER=lemuel
+POSTGRES_PASSWORD=lemuel-local
+ELASTICSEARCH_USER=elastic
+ELASTICSEARCH_PASSWORD=es-local
+JWT_ISSUER=lemuel
+JWT_SECRET=local-dev-secret-key-32bytes-min!!   # HS256 — 32바이트 이상
+JWT_TTL_SECONDS=3600
+```
+
 ### 전체 실행
 
 ```bash
 # 1. 인프라 + 4 서비스 모두 빌드/실행
-docker compose up -d
+#    기동 순서는 compose healthcheck 기반 depends_on 이 보장:
+#    PG 3종·ES·Redpanda → order/settlement/loan → gateway → prometheus/grafana
+docker compose up -d --build
 
-# 2. 서비스 진입점
-#    - Gateway:     http://localhost:8080
-#    - Order API:   http://localhost:8088 (직접 접근, 보통 gateway 경유)
-#    - Settlement:  http://localhost:8082
-#    - Loan:        http://localhost:8084
+# 2. 전체 healthcheck 통과 확인 — 모든 서비스가 healthy 가 될 때까지 대기
+docker compose ps        # STATUS 열이 전부 Up (healthy) 이면 성공
+
+# 3. 서비스 진입점 / 헬스체크 URL
+#    - Gateway:     http://localhost:8080  (health: /actuator/health)
+#    - Order API:   http://localhost:8088/actuator/health (직접 접근, 보통 gateway 경유)
+#    - Settlement:  http://localhost:8082/actuator/health
+#    - Loan:        http://localhost:8084/actuator/health
 #    - Swagger:     http://localhost:8088/swagger-ui.html
 #                   http://localhost:8082/swagger-ui.html
+```
+
+### 모니터링 접속
+
+| 항목 | 값 |
+|---|---|
+| Grafana | http://localhost:3001 (admin / admin) |
+| Prometheus | http://localhost:9090 |
+| 대표 대시보드 | **Lemuel — System (Uptime · CPU · Memory · HTTP)** — CPU·메모리·API 요청량 한 화면 |
+| 그 외 대시보드 | Lemuel Business KPI · HTTP Traffic · Kafka Lag · Settlement Projection · Cache Hit Ratio |
+
+**장애 판단 기준** (대시보드 패널 임계값과 동일):
+
+| 지표 | 정상 | 경고 |
+|---|---|---|
+| API 5xx 비율 | < 1% | ≥ 1% 가 5분 지속 |
+| p95 지연시간 | < 500ms | ≥ 1s 지속 |
+| Kafka consumer lag | ≈ 0 (즉시 소비) | 1,000 이상 증가 추세 |
+| JVM heap 사용률 | < 70% | 70~85% 경고, ≥ 85% 위험 (OOM 임박) |
+| process CPU | < 60% | ≥ 70% 가 5분 지속 |
+
+### E2E 최종 검증 (가입 → 주문 → 결제 → 취소 → 환불)
+
+전체 구매 흐름을 gateway 경유로 한 번에 검증하는 시나리오:
+[docs/demo/E2E-SCENARIO.md](docs/demo/E2E-SCENARIO.md) (단계별 요청값·기대 응답·데이터 초기화 포함)
+
+```bash
+npx newman run docs/demo/postman-e2e-purchase-flow.json -e docs/demo/postman-environment.json
 ```
 
 ### 개별 서비스 실행
