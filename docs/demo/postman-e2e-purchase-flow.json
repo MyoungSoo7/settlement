@@ -104,14 +104,14 @@
       }
     },
     {
-      "name": "03. 로그인(관리자, 데모 자동로그인) — POST /auth/dev/auto-login?role=ADMIN",
+      "name": "03. 로그인(관리자, V17 시드) — POST /auth/login",
       "event": [
         {
           "listen": "test",
           "script": {
             "exec": [
-              "// lemuel.demo.enabled=true(compose 기본값) 에서만 열리는 데모 엔드포인트.",
-              "// V17 시드 계정의 BCrypt 해시가 주석(password123)과 달라 비밀번호 로그인이 불가한 것과 무관하게 ADMIN 토큰 확보.",
+              "// V17 시드 + V20260706090000(해시 정정) 로 seed_admin@test.com / password123 로그인 가능.",
+              "// 대안: POST /auth/dev/auto-login?role=ADMIN (lemuel.demo.enabled=true 데모 기능).",
               "pm.test('관리자 토큰 발급 (role=ADMIN)', () => {",
               "  pm.response.to.have.status(200);",
               "  const body = pm.response.json();",
@@ -126,8 +126,12 @@
       "request": {
         "auth": { "type": "noauth" },
         "method": "POST",
-        "header": [],
-        "url": "{{GATEWAY_API}}/auth/dev/auto-login?role=ADMIN"
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{E2E_ADMIN_EMAIL}}\",\n  \"password\": \"{{E2E_ADMIN_PASSWORD}}\"\n}"
+        },
+        "url": "{{GATEWAY_API}}/auth/login"
       }
     },
     {

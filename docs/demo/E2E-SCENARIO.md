@@ -24,9 +24,9 @@ npx newman run docs/demo/postman-e2e-purchase-flow.json -e docs/demo/postman-env
 
 - **Flyway 시드가 자동 적용**된다 (order-service 기동 시): `V17__seed_data.sql` 이 시드 사용자·상품·주문을 생성.
   `ON CONFLICT DO UPDATE` 라 재기동에도 안전.
-- **관리자 토큰은 데모 자동 로그인**으로 얻는다: `POST /auth/dev/auto-login?role=ADMIN`
-  (`lemuel.demo.enabled=true` — compose 기본값). ⚠️ V17 시드 계정의 BCrypt 해시는 주석(password123)과
-  달라 비밀번호 로그인이 실제로는 불가하다 — E2E 검증 중 발견된 시드 데이터 불일치.
+- **관리자 계정**: `seed_admin@test.com` / `password123` (V17 시드 + `V20260706090000` 해시 정정 —
+  E2E 검증 중 V17 의 해시가 주석과 불일치해 로그인이 불가하던 것을 바로잡음).
+  대안으로 데모 자동 로그인 `POST /auth/dev/auto-login?role=ADMIN` 도 사용 가능(`lemuel.demo.enabled=true`).
 - 구매자 계정·상품·주문은 **시나리오가 매 실행마다 새로 생성**한다
   (이메일에 timestamp 포함 → 재실행 시 충돌 없음, 별도 클린업 불필요).
 - 완전 초기화가 필요하면: `docker compose down -v && docker compose up -d --build` (볼륨 삭제 → 시드 재적용).
@@ -38,7 +38,7 @@ npx newman run docs/demo/postman-e2e-purchase-flow.json -e docs/demo/postman-env
 | 00 | 헬스체크 | `GET /actuator/health` | — | `200`, `status=UP` |
 | 01 | 회원가입 | `POST /users` | `email`(유니크 자동생성), `password`, `name` | `2xx`, `id` 반환 → `E2E_USER_ID` 저장 |
 | 02 | 로그인(구매자) | `POST /auth/login` | email, password | `200`, `token` 발급 → `E2E_TOKEN` |
-| 03 | 로그인(관리자) | `POST /auth/dev/auto-login?role=ADMIN` (데모 기능) | — | `200`, `role=ADMIN` → `E2E_ADMIN_TOKEN` |
+| 03 | 로그인(관리자) | `POST /auth/login` | `seed_admin@test.com` / `password123` (V17 시드) | `200`, `role=ADMIN` → `E2E_ADMIN_TOKEN` |
 | 04 | 상품 생성 | `POST /api/products` | name, price=10000, stockQuantity=10 | `2xx`, `id` → `E2E_PRODUCT_ID` |
 | 05 | 장바구니 담기 | `POST /users/{userId}/cart/items` | productId, quantity=1 | `2xx`, `items[]` 에 해당 상품 존재 |
 | 06 | 주문 생성 | `POST /orders/multi` + 헤더 `Idempotency-Key` | userId, lines[{productId, quantity:1}] | `2xx`, `amount=10000` → `E2E_ORDER_ID`. 같은 키 재요청 시 중복 주문 없이 기존 주문 반환 |
