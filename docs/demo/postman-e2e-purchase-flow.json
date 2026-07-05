@@ -104,12 +104,14 @@
       }
     },
     {
-      "name": "03. 로그인(관리자, V17 시드) — POST /auth/login",
+      "name": "03. 로그인(관리자, 데모 자동로그인) — POST /auth/dev/auto-login?role=ADMIN",
       "event": [
         {
           "listen": "test",
           "script": {
             "exec": [
+              "// lemuel.demo.enabled=true(compose 기본값) 에서만 열리는 데모 엔드포인트.",
+              "// V17 시드 계정의 BCrypt 해시가 주석(password123)과 달라 비밀번호 로그인이 불가한 것과 무관하게 ADMIN 토큰 확보.",
               "pm.test('관리자 토큰 발급 (role=ADMIN)', () => {",
               "  pm.response.to.have.status(200);",
               "  const body = pm.response.json();",
@@ -124,17 +126,22 @@
       "request": {
         "auth": { "type": "noauth" },
         "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"email\": \"{{E2E_ADMIN_EMAIL}}\",\n  \"password\": \"{{E2E_ADMIN_PASSWORD}}\"\n}"
-        },
-        "url": "{{GATEWAY_API}}/auth/login"
+        "header": [],
+        "url": "{{GATEWAY_API}}/auth/dev/auto-login?role=ADMIN"
       }
     },
     {
       "name": "04. 상품 생성 — POST /api/products",
       "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "// 상품명 UNIQUE 제약 — 실행마다 유니크한 이름 생성 (재실행 안전)",
+              "pm.collectionVariables.set('E2E_PRODUCT_NAME', `E2E 테스트 상품 ${Date.now()}`);"
+            ]
+          }
+        },
         {
           "listen": "test",
           "script": {
@@ -154,7 +161,7 @@
         "header": [{ "key": "Content-Type", "value": "application/json" }],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"name\": \"E2E 테스트 상품\",\n  \"description\": \"E2E 구매 흐름 검증용\",\n  \"price\": 10000,\n  \"stockQuantity\": 10\n}"
+          "raw": "{\n  \"name\": \"{{E2E_PRODUCT_NAME}}\",\n  \"description\": \"E2E 구매 흐름 검증용\",\n  \"price\": 10000,\n  \"stockQuantity\": 10\n}"
         },
         "url": "{{GATEWAY_API}}/api/products"
       }

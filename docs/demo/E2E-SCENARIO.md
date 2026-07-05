@@ -20,8 +20,11 @@ npx newman run docs/demo/postman-e2e-purchase-flow.json -e docs/demo/postman-env
 
 ## 테스트 데이터 초기화
 
-- **Flyway 시드가 자동 적용**된다 (order-service 기동 시): `V17__seed_data.sql` 이 관리자 계정
-  `seed_admin@test.com` / `password123` (ADMIN) 을 생성. `ON CONFLICT DO UPDATE` 라 재기동에도 안전.
+- **Flyway 시드가 자동 적용**된다 (order-service 기동 시): `V17__seed_data.sql` 이 시드 사용자·상품·주문을 생성.
+  `ON CONFLICT DO UPDATE` 라 재기동에도 안전.
+- **관리자 토큰은 데모 자동 로그인**으로 얻는다: `POST /auth/dev/auto-login?role=ADMIN`
+  (`lemuel.demo.enabled=true` — compose 기본값). ⚠️ V17 시드 계정의 BCrypt 해시는 주석(password123)과
+  달라 비밀번호 로그인이 실제로는 불가하다 — E2E 검증 중 발견된 시드 데이터 불일치.
 - 구매자 계정·상품·주문은 **시나리오가 매 실행마다 새로 생성**한다
   (이메일에 timestamp 포함 → 재실행 시 충돌 없음, 별도 클린업 불필요).
 - 완전 초기화가 필요하면: `docker compose down -v && docker compose up -d --build` (볼륨 삭제 → 시드 재적용).
@@ -33,7 +36,7 @@ npx newman run docs/demo/postman-e2e-purchase-flow.json -e docs/demo/postman-env
 | 00 | 헬스체크 | `GET /actuator/health` | — | `200`, `status=UP` |
 | 01 | 회원가입 | `POST /users` | `email`(유니크 자동생성), `password`, `name` | `2xx`, `id` 반환 → `E2E_USER_ID` 저장 |
 | 02 | 로그인(구매자) | `POST /auth/login` | email, password | `200`, `token` 발급 → `E2E_TOKEN` |
-| 03 | 로그인(관리자) | `POST /auth/login` | `seed_admin@test.com` / `password123` (V17 시드) | `200`, `role=ADMIN` → `E2E_ADMIN_TOKEN` |
+| 03 | 로그인(관리자) | `POST /auth/dev/auto-login?role=ADMIN` (데모 기능) | — | `200`, `role=ADMIN` → `E2E_ADMIN_TOKEN` |
 | 04 | 상품 생성 | `POST /api/products` | name, price=10000, stockQuantity=10 | `2xx`, `id` → `E2E_PRODUCT_ID` |
 | 05 | 장바구니 담기 | `POST /users/{userId}/cart/items` | productId, quantity=1 | `2xx`, `items[]` 에 해당 상품 존재 |
 | 06 | 주문 생성 | `POST /orders/multi` + 헤더 `Idempotency-Key` | userId, lines[{productId, quantity:1}] | `2xx`, `amount=10000` → `E2E_ORDER_ID`. 같은 키 재요청 시 중복 주문 없이 기존 주문 반환 |
@@ -53,8 +56,14 @@ npx newman run docs/demo/postman-e2e-purchase-flow.json -e docs/demo/postman-env
 - **멱등성**: 6단계 `Idempotency-Key` 재전송 시 새 주문이 생기지 않아야 한다 (분산락 + DB UNIQUE).
 - **취소 승인 = 환불 원자성**: 11단계 승인 한 번으로 주문 REFUNDED + 결제 REFUNDED + 환불 이력 기록이 모두 일어난다.
   PG 환불 실패 시 트랜잭션 롤백 → 주문은 CANCELLATION_REQUESTED 로 남는다.
-- **정산 연쇄 (선택 확장)**: 9단계 캡처 후 `settlement_db.settlements` 에 정산 생성, 11단계 환불 후 역정산 —
-  `docker compose exec settlement-db psql -U $POSTGRES_USER -d settlement_db -c "SELECT payment_id, status FROM settlements ORDER BY id DESC LIMIT 5;"`
+- **정산 연쇄 (선택 확장)**: 9단계 캡처 → Outbox → Kafka → `settlement_db.settlements` 에 정산 생성
+  (검증 실측: 10,000원 → 수수료 3.5% → net 9,650원, status REQUESTED). 11단계 환불 → `PaymentRefunded` 이벤트 →
+  `settlement_payment_view.refunded_amount` 에 즉시 반영(실측 10,000원). `settlements.refunded_amount` 는
+  정산 확정 배치가 뷰를 기준으로 반영하는 설계.
+  ```bash
+  docker compose exec settlement-db psql -U $POSTGRES_USER -d settlement_db \
+    -c "SELECT payment_id, net_amount, status FROM settlements ORDER BY id DESC LIMIT 5;"
+  ```
 
 ## 한계 / 참고
 
