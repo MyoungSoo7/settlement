@@ -353,7 +353,9 @@ services:
     container_name: lemuel-frontend
     volumes:
       - ./frontend/dist:/usr/share/nginx/html:ro
-      - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      # compose 전용 conf — gateway 재생성 시 stale DNS 로 전 API 500 나는 문제를
+      # 도커 내장 DNS 재해석으로 방지 (k8s 이미지는 기존 nginx.conf 사용)
+      - ./frontend/nginx.compose.conf:/etc/nginx/conf.d/default.conf:ro
     ports:
       - "127.0.0.1:3000:80"
     restart: unless-stopped
