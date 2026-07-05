@@ -18,6 +18,8 @@ npx newman run docs/demo/postman-e2e-purchase-flow.json -e docs/demo/postman-env
 모든 요청은 **gateway(`http://localhost:8080`)** 를 경유한다 (라우팅 검증 겸용).
 각 단계의 Postman test 스크립트가 기대 응답을 자동 assert 하므로, Runner 결과가 전부 green 이면 시나리오 통과.
 
+**최근 실행 증거**: [`e2e-report.html`](./e2e-report.html) — 14/14 assertion 통과 (전체 재빌드 스택, newman htmlextra 리포트).
+
 ## 테스트 데이터 초기화
 
 - **Flyway 시드가 자동 적용**된다 (order-service 기동 시): `V17__seed_data.sql` 이 시드 사용자·상품·주문을 생성.

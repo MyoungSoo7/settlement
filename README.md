@@ -377,6 +377,10 @@ docker compose ps        # STATUS 열이 전부 Up (healthy) 이면 성공
 npx newman run docs/demo/postman-e2e-purchase-flow.json -e docs/demo/postman-environment.json
 ```
 
+**실행 증거**: [docs/demo/e2e-report.html](docs/demo/e2e-report.html) — 전체 재빌드 스택에서
+14개 요청·14개 assertion 전부 통과한 newman HTML 리포트 (단계별 요청/응답 포함).
+재생성: 위 명령에 `--reporters cli,htmlextra --reporter-htmlextra-export docs/demo/e2e-report.html` 추가.
+
 ### 개별 서비스 실행
 
 ```bash
