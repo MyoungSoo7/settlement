@@ -1,6 +1,8 @@
 package github.lms.lemuel.common.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -22,6 +24,10 @@ public class JacksonCompatConfig {
 
     @Bean
     public ObjectMapper jacksonLegacyObjectMapper() {
-        return new ObjectMapper();
+        // JavaTimeModule 미등록 시 java.time 필드 직렬화가 InvalidDefinitionException 으로 실패
+        // (RedisCartAdapter 의 LocalDateTime 등). 날짜는 ISO-8601 문자열로 통일.
+        return new ObjectMapper()
+                .registerModule(new JavaTimeModule())
+                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     }
 }
