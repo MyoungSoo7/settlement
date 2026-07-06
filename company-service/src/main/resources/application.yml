@@ -118,6 +118,16 @@ app:
       request-interval-ms: 200   # 네이버 쿼터(일 25,000콜) 보호용 기업 간 호출 간격
     reputation:
       window-days: 30            # 평판 스냅샷 산정 대상 기사 윈도우 (발행일시 기준 최근 N일)
+    # 감성분석 제공자 (ADR 0023): keyword(기본, 룰 기반) 또는 llm(Claude). Phase 4.
+    sentiment:
+      provider: ${APP_COMPANY_SENTIMENT_PROVIDER:keyword}
+      claude:
+        # Anthropic API 키 — 미설정이면 provider=llm 이어도 키워드 폴백
+        api-key: ${ANTHROPIC_API_KEY:}
+        model: ${APP_COMPANY_SENTIMENT_MODEL:claude-opus-4-8}
+        base-url: https://api.anthropic.com
+        version: "2023-06-01"
+        max-tokens: 20
   # ★ Phase 3: Outbox → Kafka 이벤트 발행 (평판 등급 변동 → loan 리스크 프로젝션)
   kafka:
     enabled: ${APP_KAFKA_ENABLED:false}

@@ -3,6 +3,7 @@ package github.lms.lemuel.company.adapter.out.analysis;
 import github.lms.lemuel.company.application.port.out.AnalyzeSentimentPort;
 import github.lms.lemuel.company.domain.ArticleSentiment;
 import github.lms.lemuel.company.domain.IssueCategory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
@@ -16,10 +17,12 @@ import java.util.Map;
  * 이슈 카테고리를 붙인다(카테고리 우선순위는 enum 순서: FINANCIAL→LEGAL→GOVERNANCE→LABOR→PRODUCT).
  * 부정이 없고 긍정 키워드가 있으면 POSITIVE, 둘 다 없으면 NEUTRAL.
  *
- * <p>정밀한 분석은 Phase 4 의 LLM 구현체가 맡는다 — 이 클래스는 {@link AnalyzeSentimentPort}
- * 뒤에 있어 무중단 교체된다.
+ * <p>기본 감성 분석기다({@code app.company.sentiment.provider} 미설정 또는 keyword). Phase 4 에서
+ * {@code provider=llm} 으로 두면 {@link LlmSentimentAnalyzer} 가 대신 등록되고, 이 클래스는 그 폴백이 된다
+ * — {@link AnalyzeSentimentPort} 뒤에서 무중단 교체된다.
  */
 @Component
+@ConditionalOnProperty(name = "app.company.sentiment.provider", havingValue = "keyword", matchIfMissing = true)
 public class KeywordSentimentAnalyzer implements AnalyzeSentimentPort {
 
     // 카테고리별 부정 키워드. enum 순서대로 검사해 첫 매칭 카테고리가 이긴다(중복 키워드 대비).

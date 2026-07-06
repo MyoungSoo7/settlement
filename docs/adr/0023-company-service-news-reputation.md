@@ -111,7 +111,7 @@ loan 이 이벤트 드리븐 프로젝션으로 소비한다.
 | **1 (이번)** | 서비스 골격 — company 마스터(시드) + 네이버 뉴스 수집 + 조회 REST + compose |
 | **2** | ES 기사 색인·전문검색, 룰 기반 감성분석, reputation INSERT-only 스냅샷 |
 | **3 (구현 완료)** | shared-common(common.outbox) 의존 추가, outbox 이벤트(`lemuel.company.reputation_changed`) 발행 → loan `CompanyReputationChangedConsumer` + `company_reputation` 프로젝션. CreditPolicy 반영·셀러 매핑은 후속 |
-| **4** | LLM 감성분석 교체, 관심기업 구독/알림, financial 과 기업 마스터 단일화 검토 |
+| **4 (진행 중)** | LLM 감성분석 교체(구현 완료 — `LlmSentimentAnalyzer`, `app.company.sentiment.provider=llm`, Claude opus-4-8 기본·키워드 폴백) / financial 마스터 단일화(ADR 0025 로 제안) / 관심기업 구독·알림(후속) |
 
 ## 결과
 
