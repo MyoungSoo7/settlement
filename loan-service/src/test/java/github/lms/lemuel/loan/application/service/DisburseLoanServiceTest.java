@@ -2,6 +2,7 @@ package github.lms.lemuel.loan.application.service;
 
 import github.lms.lemuel.loan.application.port.out.AppendLedgerPort;
 import github.lms.lemuel.loan.application.port.out.LoadLoanPort;
+import github.lms.lemuel.loan.application.port.out.LoadSellerReputationPort;
 import github.lms.lemuel.loan.application.port.out.LoadSettlementViewPort;
 import github.lms.lemuel.loan.application.port.out.PublishLoanEventPort;
 import github.lms.lemuel.loan.application.port.out.SaveLoanPort;
@@ -13,10 +14,13 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -27,14 +31,19 @@ class DisburseLoanServiceTest {
     @Mock LoadLoanPort loadLoanPort;
     @Mock SaveLoanPort saveLoanPort;
     @Mock LoadSettlementViewPort loadSettlementViewPort;
+    @Mock LoadSellerReputationPort loadSellerReputationPort;
     @Mock PublishLoanEventPort publishLoanEventPort;
     @Mock AppendLedgerPort appendLedgerPort;
 
-    private final CreditPolicy creditPolicy = new CreditPolicy(new BigDecimal("0.80"), new BigDecimal("0.0002"));
+    private final CreditPolicy creditPolicy = new CreditPolicy(new BigDecimal("0.80"), new BigDecimal("0.0002"),
+            Map.of("A", BigDecimal.ONE, "B", BigDecimal.ONE, "C", new BigDecimal("0.85"),
+                    "D", new BigDecimal("0.70"), "E", BigDecimal.ZERO));
 
     private DisburseLoanService service() {
+        // 평판 미상 기본(무변동) — 개별 테스트에서 필요 시 재stub
+        lenient().when(loadSellerReputationPort.findGrade(7L)).thenReturn(Optional.empty());
         return new DisburseLoanService(loadLoanPort, saveLoanPort, loadSettlementViewPort,
-                creditPolicy, publishLoanEventPort, appendLedgerPort);
+                loadSellerReputationPort, creditPolicy, publishLoanEventPort, appendLedgerPort);
     }
 
     private LoanAdvance requestedLoan() {

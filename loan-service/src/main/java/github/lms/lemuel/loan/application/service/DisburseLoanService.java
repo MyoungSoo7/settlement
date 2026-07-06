@@ -3,6 +3,7 @@ package github.lms.lemuel.loan.application.service;
 import github.lms.lemuel.loan.application.port.in.DisburseLoanUseCase;
 import github.lms.lemuel.loan.application.port.out.AppendLedgerPort;
 import github.lms.lemuel.loan.application.port.out.LoadLoanPort;
+import github.lms.lemuel.loan.application.port.out.LoadSellerReputationPort;
 import github.lms.lemuel.loan.application.port.out.LoadSettlementViewPort;
 import github.lms.lemuel.loan.application.port.out.PublishLoanEventPort;
 import github.lms.lemuel.loan.application.port.out.SaveLoanPort;
@@ -27,6 +28,7 @@ public class DisburseLoanService implements DisburseLoanUseCase {
     private final LoadLoanPort loadLoanPort;
     private final SaveLoanPort saveLoanPort;
     private final LoadSettlementViewPort loadSettlementViewPort;
+    private final LoadSellerReputationPort loadSellerReputationPort;
     private final CreditPolicy creditPolicy;
     private final PublishLoanEventPort publishLoanEventPort;
     private final AppendLedgerPort appendLedgerPort;
@@ -34,12 +36,14 @@ public class DisburseLoanService implements DisburseLoanUseCase {
     public DisburseLoanService(LoadLoanPort loadLoanPort,
                                SaveLoanPort saveLoanPort,
                                LoadSettlementViewPort loadSettlementViewPort,
+                               LoadSellerReputationPort loadSellerReputationPort,
                                CreditPolicy creditPolicy,
                                PublishLoanEventPort publishLoanEventPort,
                                AppendLedgerPort appendLedgerPort) {
         this.loadLoanPort = loadLoanPort;
         this.saveLoanPort = saveLoanPort;
         this.loadSettlementViewPort = loadSettlementViewPort;
+        this.loadSellerReputationPort = loadSellerReputationPort;
         this.creditPolicy = creditPolicy;
         this.publishLoanEventPort = publishLoanEventPort;
         this.appendLedgerPort = appendLedgerPort;
@@ -51,10 +55,11 @@ public class DisburseLoanService implements DisburseLoanUseCase {
         LoanAdvance loan = loadLoanPort.load(loanId);
         loan.approve();
 
-        // 실행 직전 담보 재검증 (비관적 락으로 동시 실행 직렬화)
+        // 실행 직전 담보 + 평판 재검증 (비관적 락으로 동시 실행 직렬화 / 신청 이후 평판 악화 반영)
         BigDecimal freshUnpaid = loadSettlementViewPort.sumUnpaidBySellerForUpdate(loan.getSellerId());
+        String grade = loadSellerReputationPort.findGrade(loan.getSellerId()).orElse(null);
         try {
-            creditPolicy.validateWithinLimit(loan.getPrincipal(), freshUnpaid);
+            creditPolicy.validateWithinLimit(loan.getPrincipal(), freshUnpaid, grade);
         } catch (IllegalArgumentException e) {
             loan.reject();
             saveLoanPort.save(loan);

@@ -140,3 +140,12 @@ app:
   loan:
     ltv: ${APP_LOAN_LTV:0.80}                 # 한도 = 미지급 정산예정금 × LTV
     daily-rate: ${APP_LOAN_DAILY_RATE:0.0002} # 수수료 = 선지급액 × 일할이율 × 일수
+    # 평판 등급별 한도 haircut (ADR 0023 Phase 3 후속) — 셀러 법인 뉴스 평판이 나쁠수록 한도 축소.
+    # 등급 미상(매핑/이벤트 미수신)이면 1.0(무변동, fail-open).
+    reputation:
+      haircut:
+        a: ${APP_LOAN_REP_HAIRCUT_A:1.0}
+        b: ${APP_LOAN_REP_HAIRCUT_B:1.0}
+        c: ${APP_LOAN_REP_HAIRCUT_C:0.85}
+        d: ${APP_LOAN_REP_HAIRCUT_D:0.70}
+        e: ${APP_LOAN_REP_HAIRCUT_E:0.0}

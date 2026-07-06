@@ -4,12 +4,14 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import github.lms.lemuel.common.outbox.application.port.out.SaveOutboxEventPort;
 import github.lms.lemuel.common.outbox.domain.OutboxEvent;
+import github.lms.lemuel.company.application.port.out.LoadSellerLinkPort;
 import github.lms.lemuel.company.application.port.out.PublishReputationEventPort;
 import github.lms.lemuel.company.domain.ReputationGrade;
 import github.lms.lemuel.company.domain.ReputationScore;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -30,16 +32,21 @@ public class CompanyReputationEventPublisherAdapter implements PublishReputation
     private static final String EVENT_TYPE = "CompanyReputationChanged";
 
     private final SaveOutboxEventPort saveOutboxEventPort;
+    private final LoadSellerLinkPort loadSellerLinkPort;
     private final ObjectMapper objectMapper;
 
     public CompanyReputationEventPublisherAdapter(SaveOutboxEventPort saveOutboxEventPort,
+                                                  LoadSellerLinkPort loadSellerLinkPort,
                                                   ObjectMapper objectMapper) {
         this.saveOutboxEventPort = saveOutboxEventPort;
+        this.loadSellerLinkPort = loadSellerLinkPort;
         this.objectMapper = objectMapper;
     }
 
     @Override
     public void publishReputationChanged(ReputationScore score, ReputationGrade previousGrade) {
+        // 이 기업에 링크된 셀러들을 동봉 → loan 이 셀러별 신용 haircut 에 반영 (ADR 0023 Phase 3 후속)
+        List<Long> sellerIds = loadSellerLinkPort.sellersOf(score.stockCode());
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("stockCode", score.stockCode());
         payload.put("snapshotDate", score.snapshotDate().toString());
@@ -48,6 +55,7 @@ public class CompanyReputationEventPublisherAdapter implements PublishReputation
         payload.put("previousGrade", previousGrade == null ? null : previousGrade.name());
         payload.put("articleCount", score.articleCount());
         payload.put("negativeCount", score.negativeCount());
+        payload.put("sellerIds", sellerIds);
         payload.put("calculatedAt", score.calculatedAt().toString());
         saveOutboxEventPort.save(OutboxEvent.pending(
                 AGGREGATE_TYPE,

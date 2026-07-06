@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import github.lms.lemuel.common.outbox.application.port.out.SaveOutboxEventPort;
 import github.lms.lemuel.common.outbox.domain.OutboxEvent;
+import github.lms.lemuel.company.application.port.out.LoadSellerLinkPort;
 import github.lms.lemuel.company.domain.ArticleSentiment;
 import github.lms.lemuel.company.domain.IssueCategory;
 import github.lms.lemuel.company.domain.ReputationGrade;
@@ -20,13 +21,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class CompanyReputationEventPublisherAdapterTest {
 
     private final SaveOutboxEventPort saveOutboxEventPort = mock(SaveOutboxEventPort.class);
+    private final LoadSellerLinkPort loadSellerLinkPort = mock(LoadSellerLinkPort.class);
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final CompanyReputationEventPublisherAdapter adapter =
-            new CompanyReputationEventPublisherAdapter(saveOutboxEventPort, objectMapper);
+            new CompanyReputationEventPublisherAdapter(saveOutboxEventPort, loadSellerLinkPort, objectMapper);
 
     private static ReputationScore score() {
         // 2건 중 1건 FINANCIAL 부정 → 가중 3 / (2*3) → 50점(C)
@@ -38,6 +41,7 @@ class CompanyReputationEventPublisherAdapterTest {
     @Test
     @DisplayName("Outbox 이벤트를 Company/CompanyReputationChanged 로 기록하고 종목코드를 aggregateId 로 쓴다")
     void writesOutboxEventWithConventionalRouting() {
+        when(loadSellerLinkPort.sellersOf("005930")).thenReturn(List.of());
         adapter.publishReputationChanged(score(), ReputationGrade.B);
 
         ArgumentCaptor<OutboxEvent> captor = ArgumentCaptor.forClass(OutboxEvent.class);
@@ -51,8 +55,9 @@ class CompanyReputationEventPublisherAdapterTest {
     }
 
     @Test
-    @DisplayName("페이로드에 등급·직전등급·점수·집계가 담기고 java.time 은 문자열이다")
+    @DisplayName("페이로드에 등급·직전등급·점수·집계·링크셀러가 담기고 java.time 은 문자열이다")
     void payloadShape() throws Exception {
+        when(loadSellerLinkPort.sellersOf("005930")).thenReturn(List.of(7L, 9L));
         adapter.publishReputationChanged(score(), ReputationGrade.B);
 
         ArgumentCaptor<OutboxEvent> captor = ArgumentCaptor.forClass(OutboxEvent.class);
@@ -67,11 +72,15 @@ class CompanyReputationEventPublisherAdapterTest {
         assertEquals(2, payload.get("articleCount").asInt());
         assertEquals(1, payload.get("negativeCount").asInt());
         assertEquals("2026-07-07T09:00:00Z", payload.get("calculatedAt").asText());
+        assertEquals(2, payload.get("sellerIds").size());
+        assertEquals(7, payload.get("sellerIds").get(0).asInt());
+        assertEquals(9, payload.get("sellerIds").get(1).asInt());
     }
 
     @Test
     @DisplayName("최초 스냅샷은 previousGrade 가 null 로 직렬화된다")
     void nullPreviousGrade() throws Exception {
+        when(loadSellerLinkPort.sellersOf("005930")).thenReturn(List.of());
         adapter.publishReputationChanged(score(), null);
 
         ArgumentCaptor<OutboxEvent> captor = ArgumentCaptor.forClass(OutboxEvent.class);

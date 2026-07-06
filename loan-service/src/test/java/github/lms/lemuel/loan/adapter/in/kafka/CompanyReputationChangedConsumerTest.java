@@ -64,8 +64,27 @@ class CompanyReputationChangedConsumerTest {
         assertEquals("C", cmd.grade());
         assertEquals("B", cmd.previousGrade());
         assertEquals(LocalDate.of(2026, 7, 7), cmd.snapshotDate());
+        assertEquals(java.util.List.of(), cmd.sellerIds());   // 페이로드에 sellerIds 없음 → 빈 리스트
         verify(processed).save(any(ProcessedEventJpaEntity.class));
         verify(ack).acknowledge();
+    }
+
+    @Test
+    @DisplayName("페이로드의 sellerIds 배열을 명령으로 전달한다 (셀러별 프로젝션용)")
+    void parsesSellerIds() {
+        UUID eventId = UUID.randomUUID();
+        when(processed.existsById(any())).thenReturn(false);
+        String payload = """
+                {"stockCode":"005930","snapshotDate":"2026-07-07","score":50,"grade":"C",
+                 "previousGrade":"B","sellerIds":[7,9],"calculatedAt":"2026-07-07T09:00:00Z"}
+                """;
+
+        consumer.onReputationChanged(record(eventId, payload), ack);
+
+        ArgumentCaptor<IngestCompanyReputationCommand> captor =
+                ArgumentCaptor.forClass(IngestCompanyReputationCommand.class);
+        verify(ingest).ingest(captor.capture());
+        assertEquals(java.util.List.of(7L, 9L), captor.getValue().sellerIds());
     }
 
     @Test

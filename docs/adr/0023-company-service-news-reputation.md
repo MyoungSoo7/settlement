@@ -93,9 +93,16 @@ loan 이 이벤트 드리븐 프로젝션으로 소비한다.
   java.time 값은 문자열로 담는다.
 - 3단 멱등 방어 동일 적용(outbox `event_id` UNIQUE → `processed_events` PK → 프로젝션 stockCode UPSERT).
 
-**이번 Phase 3 범위에서 제외(후속)**: ① loan `CreditPolicy` 가 이 프로젝션을 실제 여신 한도/금리에
-반영(금융 로직이라 별도 변경·테스트로 분리) ② `lemuel.user.registered` 구독 → 셀러↔기업 매핑
-(`company_seller_links`) 축적(매핑 키 정의가 모호해 보류).
+**Phase 3 후속 (구현 완료)**:
+- **셀러↔기업 매핑**: company 가 `lemuel.user.registered`(userId/email — 기업 연결 키 없음)를 소비해
+  셀러 목록(`company_sellers`)을 축적하고, 운영자가 `POST /admin/company/sellers/{sellerId}/link/{stockCode}`
+  로 명시 링크(`company_seller_links`)한다. 자동 매핑은 불가능(이벤트에 사업자번호 등 연결 키 부재) →
+  명시 링크가 유일하게 정확한 방법. 평판 등급 변동 시 링크된 sellerId 를 이벤트 payload 에 동봉.
+- **신용 반영**: loan 이 동봉된 sellerId 로 셀러별 프로젝션(`seller_reputation`)을 적재하고,
+  `CreditPolicy` 가 등급별 한도 haircut 을 적용한다(A·B=1.0, C=0.85, D=0.70, E=0.0 = 차단;
+  `app.loan.reputation.haircut.*` 설정). 등급 미상은 1.0(fail-open). 신청·실행 양 시점 모두 재검증.
+
+**여전히 제외(후속)**: 금리 가산 반영(현재는 한도 haircut 만), user.registered 자동 매칭(연결 키 부재로 불가).
 
 ## 단계별 로드맵
 

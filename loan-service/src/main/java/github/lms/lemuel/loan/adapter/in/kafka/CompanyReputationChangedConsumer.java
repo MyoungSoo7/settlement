@@ -17,6 +17,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -72,12 +74,18 @@ public class CompanyReputationChangedConsumer {
             throw new IllegalArgumentException("Invalid JSON payload, eventId=" + eventId, e);
         }
 
+        List<Long> sellerIds = new ArrayList<>();
+        if (node.hasNonNull("sellerIds") && node.get("sellerIds").isArray()) {
+            node.get("sellerIds").forEach(n -> sellerIds.add(n.asLong()));
+        }
+
         IngestCompanyReputationCommand command = new IngestCompanyReputationCommand(
                 node.get("stockCode").asText(),
                 node.get("score").asInt(),
                 node.get("grade").asText(),
                 node.hasNonNull("previousGrade") ? node.get("previousGrade").asText() : null,
-                LocalDate.parse(node.get("snapshotDate").asText()));
+                LocalDate.parse(node.get("snapshotDate").asText()),
+                sellerIds);
 
         ingestCompanyReputationUseCase.ingest(command);
 
