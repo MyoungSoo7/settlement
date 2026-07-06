@@ -129,6 +129,8 @@ app:
       # 수신 (settlement → loan)
       settlement-created: lemuel.settlement.created
       settlement-confirmed: lemuel.settlement.confirmed
+      # 수신 (company → loan) — 평판 등급 변동 → 로컬 리스크 프로젝션 (ADR 0023 Phase 3)
+      company-reputation-changed: lemuel.company.reputation_changed
       # 발행 (loan → settlement). Outbox 폴러가 aggregateType="Loan"+eventType 으로 자동 라우팅하는
       # 실제 토픽명(snake_case). settlement 측 컨슈머(Chunk 7)가 이 이름으로 구독해야 한다.
       loan-disbursement-requested: lemuel.loan.disbursement_requested

@@ -5,7 +5,6 @@ import github.lms.lemuel.company.application.port.out.AnalyzeSentimentPort;
 import github.lms.lemuel.company.application.port.out.LoadArticlePort;
 import github.lms.lemuel.company.application.port.out.LoadCompanyPort;
 import github.lms.lemuel.company.application.port.out.LoadReputationPort;
-import github.lms.lemuel.company.application.port.out.SaveReputationPort;
 import github.lms.lemuel.company.domain.Article;
 import github.lms.lemuel.company.domain.ArticleSentiment;
 import github.lms.lemuel.company.domain.Company;
@@ -39,20 +38,20 @@ public class ReputationRecalcService implements RecalcReputationUseCase {
     private final LoadArticlePort loadArticlePort;
     private final AnalyzeSentimentPort analyzeSentimentPort;
     private final LoadReputationPort loadReputationPort;
-    private final SaveReputationPort saveReputationPort;
+    private final ReputationSnapshotWriter snapshotWriter;
     private final int windowDays;
 
     public ReputationRecalcService(LoadCompanyPort loadCompanyPort,
                                    LoadArticlePort loadArticlePort,
                                    AnalyzeSentimentPort analyzeSentimentPort,
                                    LoadReputationPort loadReputationPort,
-                                   SaveReputationPort saveReputationPort,
+                                   ReputationSnapshotWriter snapshotWriter,
                                    @Value("${app.company.reputation.window-days:30}") int windowDays) {
         this.loadCompanyPort = loadCompanyPort;
         this.loadArticlePort = loadArticlePort;
         this.analyzeSentimentPort = analyzeSentimentPort;
         this.loadReputationPort = loadReputationPort;
-        this.saveReputationPort = saveReputationPort;
+        this.snapshotWriter = snapshotWriter;
         this.windowDays = windowDays;
     }
 
@@ -98,8 +97,9 @@ public class ReputationRecalcService implements RecalcReputationUseCase {
                 .map(a -> analyzeSentimentPort.analyze(a.title(), a.summary()))
                 .toList();
         ReputationScore score = ReputationScore.compute(company.stockCode(), today, sentiments, now);
-        if (!saveReputationPort.saveIfAbsent(score)) {
-            return Outcome.exists();   // 동시 재계산 레이스 — 다른 실행이 먼저 저장
+        // 저장 + 등급 변동 이벤트 발행을 한 트랜잭션으로 (원자성). 오늘자 존재/레이스면 false.
+        if (!snapshotWriter.writeIfChanged(score)) {
+            return Outcome.exists();
         }
         log.info("평판 스냅샷 저장 stockCode={} score={} grade={} (기사 {}건)",
                 company.stockCode(), score.score(), score.grade(), score.articleCount());

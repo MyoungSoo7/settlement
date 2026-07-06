@@ -5,10 +5,13 @@ plugins {
 }
 
 // ★ company-service 는 기업 뉴스 기사·평판 조회 서비스 (ADR 0023).
-//   자체 DB(lemuel_company) 소유 + 독립 부팅. Phase 1 은 이벤트가 없어 financial 과 동일하게
-//   shared-common(JWT·Outbox·Kafka 토글)을 물지 않는다 — Phase 3(outbox 이벤트 발행)에서 추가.
+//   자체 DB(lemuel_company) 소유 + 독립 부팅.
+//   Phase 3 부터 shared-common 의 Outbox·멱등 인프라를 물어 평판 등급 변동을 Kafka 이벤트로 발행한다
+//   (common.outbox 만 스캔 — JWT/audit 스택은 여전히 제외, 자체 SecurityConfig 유지).
 
 dependencies {
+    implementation("github.lms.lemuel:shared-common:1.0.0")   // 버전드 내부 라이브러리(composite build 로 로컬 치환) — Outbox/멱등
+
     // Spring Boot 스타터
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
@@ -22,6 +25,10 @@ dependencies {
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")
     implementation("org.springframework.boot:spring-boot-flyway")
+
+    // Kafka — 평판 등급 변동 Outbox 이벤트(lemuel.company.reputation_changed) 발행
+    implementation("org.springframework.boot:spring-boot-starter-kafka")
+    implementation("org.springframework.kafka:spring-kafka")
 
     // SpringDoc OpenAPI
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.2")

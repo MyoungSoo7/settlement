@@ -44,6 +44,18 @@ spring:
     caffeine:
       spec: maximumSize=2000,expireAfterWrite=300s
 
+  # ★ Phase 3: 평판 등급 변동 Outbox 이벤트 발행용 Kafka 프로듀서 (KafkaOutboxPublisher).
+  #   app.kafka.enabled=false(기본) 이면 KafkaOutboxPublisher 대신 ApplicationEventOutboxPublisher
+  #   폴백이 등록돼 in-process no-op 으로 발행 처리된다 — 로컬은 kafka 없이도 부팅된다.
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      acks: all
+      retries: 5
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+
   lifecycle:
     timeout-per-shutdown-phase: 30s
 
@@ -97,3 +109,12 @@ app:
       request-interval-ms: 200   # 네이버 쿼터(일 25,000콜) 보호용 기업 간 호출 간격
     reputation:
       window-days: 30            # 평판 스냅샷 산정 대상 기사 윈도우 (발행일시 기준 최근 N일)
+  # ★ Phase 3: Outbox → Kafka 이벤트 발행 (평판 등급 변동 → loan 리스크 프로젝션)
+  kafka:
+    enabled: ${APP_KAFKA_ENABLED:false}
+    topic:
+      # 발행 (company → loan). Outbox 폴러가 aggregateType="Company"+eventType="CompanyReputationChanged"
+      # 로 자동 라우팅하는 실제 토픽명(snake_case). loan 컨슈머가 이 이름으로 구독한다.
+      reputation-changed: lemuel.company.reputation_changed
+  outbox:
+    polling-delay-ms: ${APP_OUTBOX_POLLING_DELAY_MS:2000}   # OutboxPublisherScheduler 폴링 주기

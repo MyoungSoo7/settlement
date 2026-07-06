@@ -5,7 +5,6 @@ import github.lms.lemuel.company.application.port.out.AnalyzeSentimentPort;
 import github.lms.lemuel.company.application.port.out.LoadArticlePort;
 import github.lms.lemuel.company.application.port.out.LoadCompanyPort;
 import github.lms.lemuel.company.application.port.out.LoadReputationPort;
-import github.lms.lemuel.company.application.port.out.SaveReputationPort;
 import github.lms.lemuel.company.domain.Article;
 import github.lms.lemuel.company.domain.ArticleSentiment;
 import github.lms.lemuel.company.domain.ArticleSource;
@@ -25,8 +24,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -39,9 +36,9 @@ class ReputationRecalcServiceTest {
     private final LoadArticlePort loadArticlePort = mock(LoadArticlePort.class);
     private final AnalyzeSentimentPort analyzeSentimentPort = mock(AnalyzeSentimentPort.class);
     private final LoadReputationPort loadReputationPort = mock(LoadReputationPort.class);
-    private final SaveReputationPort saveReputationPort = mock(SaveReputationPort.class);
+    private final ReputationSnapshotWriter snapshotWriter = mock(ReputationSnapshotWriter.class);
     private final ReputationRecalcService service = new ReputationRecalcService(
-            loadCompanyPort, loadArticlePort, analyzeSentimentPort, loadReputationPort, saveReputationPort, 30);
+            loadCompanyPort, loadArticlePort, analyzeSentimentPort, loadReputationPort, snapshotWriter, 30);
 
     private static final Company SAMSUNG = new Company("005930", null, "삼성전자", null);
 
@@ -66,8 +63,8 @@ class ReputationRecalcServiceTest {
         Optional<ReputationScore> result = service.recalcFor("005930");
 
         assertTrue(result.isEmpty());
-        verify(loadArticlePort, never()).findForScoring(anyString(), any());
-        verify(saveReputationPort, never()).saveIfAbsent(any());
+        verify(loadArticlePort, never()).findForScoring(any(), any());
+        verify(snapshotWriter, never()).writeIfChanged(any());
     }
 
     @Test
@@ -80,18 +77,18 @@ class ReputationRecalcServiceTest {
         Optional<ReputationScore> result = service.recalcFor("005930");
 
         assertTrue(result.isEmpty());
-        verify(saveReputationPort, never()).saveIfAbsent(any());
+        verify(snapshotWriter, never()).writeIfChanged(any());
     }
 
     @Test
-    @DisplayName("기사를 분류해 스냅샷을 산정·저장한다")
-    void computesAndSavesSnapshot() {
+    @DisplayName("기사를 분류해 스냅샷을 산정하고 writer 로 저장 위임한다")
+    void computesAndDelegatesToWriter() {
         when(loadCompanyPort.findByStockCode("005930")).thenReturn(Optional.of(SAMSUNG));
         when(loadReputationPort.existsForDate(eq("005930"), any(LocalDate.class))).thenReturn(false);
         when(loadArticlePort.findForScoring(eq("005930"), any())).thenReturn(List.of(article(), article()));
         when(analyzeSentimentPort.analyze(any(), any()))
                 .thenReturn(ArticleSentiment.negative(IssueCategory.LEGAL), ArticleSentiment.positive());
-        when(saveReputationPort.saveIfAbsent(any())).thenReturn(true);
+        when(snapshotWriter.writeIfChanged(any())).thenReturn(true);
 
         Optional<ReputationScore> result = service.recalcFor("005930");
 
@@ -100,7 +97,7 @@ class ReputationRecalcServiceTest {
         assertEquals(1, result.get().negativeCount());
         // 가중합 3, 분모 2*3=6 → 100-50 = 50
         assertEquals(50, result.get().score());
-        verify(saveReputationPort).saveIfAbsent(any());
+        verify(snapshotWriter).writeIfChanged(any());
     }
 
     @Test
@@ -116,7 +113,7 @@ class ReputationRecalcServiceTest {
         when(loadArticlePort.findForScoring(eq("005930"), any())).thenReturn(List.of(article()));
         when(loadArticlePort.findForScoring(eq("035420"), any())).thenReturn(List.of());
         when(analyzeSentimentPort.analyze(any(), any())).thenReturn(ArticleSentiment.neutral());
-        when(saveReputationPort.saveIfAbsent(any())).thenReturn(true);
+        when(snapshotWriter.writeIfChanged(any())).thenReturn(true);
 
         RecalcReputationUseCase.RecalcSummary summary = service.recalcAll();
 

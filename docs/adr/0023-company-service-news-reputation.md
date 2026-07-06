@@ -65,22 +65,37 @@
 키워드 분류(`FINANCIAL/LEGAL/LABOR/PRODUCT/GOVERNANCE`)로 시작하고, 감성분석은
 `AnalyzeSentimentPort` 뒤에 숨겨 LLM 구현체로 무중단 교체 가능하게 한다.
 
-### 5. 이벤트 연계 (Phase 3)
+### 5. 이벤트 연계 (Phase 3 — 구현 완료)
+
+company 가 shared-common 의 Outbox·멱등 인프라를 물어(단, `common.outbox` 만 스캔 —
+JWT/audit 스택은 제외해 자체 SecurityConfig 유지) 평판 등급 변동을 Kafka 로 발행하고,
+loan 이 이벤트 드리븐 프로젝션으로 소비한다.
 
 ```
-[company-service] ScoreRecalcJob (DB tx)
-    ├─ reputation_scores INSERT (스냅샷)
-    └─ 등급 변동 시 outbox_events INSERT (CompanyReputationChanged)
-                     ↓ shared-common 멀티워커 폴러
-                 lemuel.company.reputation.changed
+[company-service] ReputationSnapshotWriter (한 DB tx)
+    ├─ reputation_scores INSERT (스냅샷, INSERT-only)
+    └─ 등급 변동 시 outbox_events INSERT (aggregateType="Company",
+       eventType="CompanyReputationChanged")           ← 원자적(둘 다 커밋/롤백)
+                     ↓ shared-common OutboxPublisherScheduler (FOR UPDATE SKIP LOCKED)
+                 토픽: lemuel.company.reputation_changed
+                       (KafkaOutboxPublisher 규칙 = lemuel.<aggregate>.<event_snake>)
                      ↓
-[loan-service] ReputationEventConsumer
-    ├─ processed_events 멱등 체크
-    └─ 해당 기업 연결 셀러의 리스크 티어/심사 플래그 반영
+[loan-service] CompanyReputationChangedConsumer (group=lemuel-loan)
+    ├─ processed_events(consumer_group, event_id) PK 멱등 체크
+    └─ company_reputation 프로젝션 UPSERT (stockCode PK) — 여신 심사 참고 지표
+                     → GET /loans/company-reputation/{stockCode}
 ```
 
-3단 멱등 방어 동일 적용. 역방향으로 `lemuel.user.registered`(셀러 사업자번호)를 구독해
-셀러↔기업 매핑(`company_seller_links`)을 축적하는 것도 Phase 3 범위.
+- **등급 변동 판정**: 직전 스냅샷 등급과 다를 때만 발행(최초 스냅샷=직전 없음도 변동으로 간주 →
+  loan 이 초기 등급을 최소 1회 학습). 같은 등급이 유지되는 날은 발행하지 않는다.
+- **페이로드**: `stockCode, snapshotDate, score, grade, previousGrade, articleCount,
+  negativeCount, calculatedAt` — company 의 ObjectMapper 가 JavaTimeModule 미등록이라
+  java.time 값은 문자열로 담는다.
+- 3단 멱등 방어 동일 적용(outbox `event_id` UNIQUE → `processed_events` PK → 프로젝션 stockCode UPSERT).
+
+**이번 Phase 3 범위에서 제외(후속)**: ① loan `CreditPolicy` 가 이 프로젝션을 실제 여신 한도/금리에
+반영(금융 로직이라 별도 변경·테스트로 분리) ② `lemuel.user.registered` 구독 → 셀러↔기업 매핑
+(`company_seller_links`) 축적(매핑 키 정의가 모호해 보류).
 
 ## 단계별 로드맵
 
@@ -88,7 +103,7 @@
 |---|---|
 | **1 (이번)** | 서비스 골격 — company 마스터(시드) + 네이버 뉴스 수집 + 조회 REST + compose |
 | **2** | ES 기사 색인·전문검색, 룰 기반 감성분석, reputation INSERT-only 스냅샷 |
-| **3** | shared-common 의존 추가, outbox 이벤트 발행 → loan 리스크 컨슈머, 셀러↔기업 매핑 |
+| **3 (구현 완료)** | shared-common(common.outbox) 의존 추가, outbox 이벤트(`lemuel.company.reputation_changed`) 발행 → loan `CompanyReputationChangedConsumer` + `company_reputation` 프로젝션. CreditPolicy 반영·셀러 매핑은 후속 |
 | **4** | LLM 감성분석 교체, 관심기업 구독/알림, financial 과 기업 마스터 단일화 검토 |
 
 ## 결과
