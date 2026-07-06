@@ -130,6 +130,28 @@ services:
       timeout: 3s
       retries: 10
 
+  # ★ DB-per-service: economics-service 전용 PostgreSQL (ECOS 거시 경제지표 조회)
+  economics-postgres:
+    image: postgres:17-alpine
+    container_name: lemuel-economics-db
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      POSTGRES_DB: lemuel_economics
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "127.0.0.1:5440:5432"
+    volumes:
+      - economics-postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.17.0
     container_name: lemuel-elasticsearch
@@ -503,6 +525,41 @@ services:
       redpanda:
         condition: service_healthy
 
+  economics-service:
+    build:
+      context: .
+      args:
+        MODULE: economics-service
+    image: ghcr.io/myoungsoo7/lemuel-economics:latest
+    container_name: lemuel-economics
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      # 자체 DB(lemuel_economics) — 공개 read-only 조회 서비스, 타 서비스와 코드·DB·이벤트 의존 없음
+      SPRING_DATASOURCE_URL: jdbc:postgresql://economics-postgres:5432/lemuel_economics?reWriteBatchedInserts=true
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # 한국은행 ECOS 인증키 — 미설정이면 Flyway 시드 데이터로만 동작 (수집 트리거는 409/경고)
+      ECOS_API_KEY: ${ECOS_API_KEY:-}
+      ECONOMICS_INTERNAL_API_KEY: ${ECONOMICS_INTERNAL_API_KEY:-}
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
+      SERVER_PORT: 8080
+      MANAGEMENT_SERVER_PORT: 8080
+    ports:
+      - "127.0.0.1:8087:8080"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    depends_on:
+      economics-postgres:
+        condition: service_healthy
+
   gateway-service:
     build:
       context: .
@@ -520,6 +577,7 @@ services:
       LOAN_SERVICE_URI: http://loan-service:8080
       FINANCIAL_SERVICE_URI: http://financial-statements-service:8080
       OPERATION_SERVICE_URI: http://operation-service:8080
+      ECONOMICS_SERVICE_URI: http://economics-service:8080
       JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
     ports:
       - "127.0.0.1:8080:8080"
@@ -663,6 +721,7 @@ volumes:
   financial-postgres-data:
   company-postgres-data:
   operation-postgres-data:
+  economics-postgres-data:
   elasticsearch-data:
   redpanda-data:
   redis-data:

@@ -84,6 +84,7 @@ subprojects {
                     "**/FinancialStatementsApplication*",
                     "**/CompanyServiceApplication*",
                     "**/OperationServiceApplication*",
+                    "**/EconomicsApplication*",
                 )
             }
         })

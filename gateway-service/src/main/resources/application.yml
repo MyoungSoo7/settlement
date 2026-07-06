@@ -27,6 +27,11 @@ spring:
               # 공개 조회 API 만 라우팅 — DART 수집 트리거(/admin/financial/**)는 외부 미노출
               predicates:
                 - Path=/api/financial/**
+            - id: economics-service
+              uri: ${ECONOMICS_SERVICE_URI:http://localhost:8087}
+              # 공개 조회 API 만 라우팅 — ECOS 수집 트리거(/admin/economics/**)는 외부 미노출
+              predicates:
+                - Path=/api/economics/**
             - id: company-service
               uri: ${COMPANY_SERVICE_URI:http://localhost:8090}
               # 공개 조회 API 만 라우팅 — 뉴스 수집 트리거(/admin/company/**)는 외부 미노출
