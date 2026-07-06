@@ -107,6 +107,7 @@ subprojects {
                     "github.lms.lemuel.shipping.domain.*",
                     "github.lms.lemuel.settlement.domain.*",
                     "github.lms.lemuel.pgreconciliation.domain.*",
+                    "github.lms.lemuel.economics.domain.*",
                     // common.outbox.domain 게이트는 shared-common 독립 빌드로 이관됨
                 )
                 limit {
