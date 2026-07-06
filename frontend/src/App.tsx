@@ -21,6 +21,7 @@ const MyPage = lazy(() => import('./pages/MyPage'));
 const LoanPage = lazy(() => import('./pages/LoanPage'));
 const TossPaymentSuccess = lazy(() => import('./pages/TossPaymentSuccess'));
 const FinancialStatementsPage = lazy(() => import('./pages/FinancialStatementsPage'));
+const EconomicsPage = lazy(() => import('./pages/EconomicsPage'));
 
 // 관리자 페이지 (lazy load)
 const ProductPage = lazy(() => import('./pages/ProductPage'));
@@ -86,6 +87,8 @@ function App() {
             <Route path="/order/toss/fail"    element={<TossPaymentFail />} />
             {/* 코스피 재무제표 — 공시 데이터라 공개 */}
             <Route path="/financials"         element={<FinancialStatementsPage />} />
+            {/* 한국은행 ECOS 경제지표 — 공공 데이터라 공개 */}
+            <Route path="/economics"          element={<EconomicsPage />} />
 
             {/* ── 일반 사용자 (USER + 인증) ── */}
             <Route path="/order"        element={<ProtectedRoute><OrderPage /></ProtectedRoute>} />
