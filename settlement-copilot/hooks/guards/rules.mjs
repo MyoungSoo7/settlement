@@ -91,9 +91,10 @@ export function checkCommand(command) {
   const push = (rule, severity, message) => violations.push({ rule, severity, line: 0, message });
 
   // prod-db-guard: 정산 계열 DB 직접 접속
+  // write-verb 는 단어 경계 + 후행 공백 필수 — 'updated_at' 같은 컬럼명 오탐 방지 (2026-07-06 실전 오탐 수정)
   if (/\b(psql|pgcli|pg_dump)\b/.test(command)
       && /(opslab|settlement_db|lemuel_loan)/.test(command)
-      && /(UPDATE|DELETE|INSERT|TRUNCATE|ALTER)/i.test(command)) {
+      && /\b(UPDATE|DELETE|INSERT|TRUNCATE|ALTER)\s/i.test(command)) {
     push('prod-db-guard', 'BLOCK',
       '정산 계열 DB 에 직접 쓰기 시도 — 데이터 정정은 adjustment/역분개 API 경로로만. 조회는 MCP 도구(recon_run, ledger_entries)를 사용하세요.');
   }

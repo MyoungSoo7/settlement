@@ -94,6 +94,12 @@ function testGuards() {
 
   const cmdOk = checkCommand('git status');
   assert('command: 일반 명령 통과', cmdOk.length === 0);
+
+  // 회귀: 'updated_at' 컬럼명이 UPDATE 로 오탐되면 안 됨 (2026-07-06 실전 오탐)
+  const cmdReadOnly = checkCommand(
+    'docker exec pg psql -U u -d opslab -c "SELECT id, updated_at FROM payments WHERE updated_at >= now()"');
+  assert('prod-db: 읽기 전용 SELECT(updated_at 포함) 통과',
+    !cmdReadOnly.some(v => v.rule === 'prod-db-guard'), JSON.stringify(cmdReadOnly));
 }
 
 await testMcp();
