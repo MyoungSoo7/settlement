@@ -16,6 +16,7 @@ COPY shared-common/settings.gradle.kts shared-common/build.gradle.kts ./shared-c
 COPY order-service/build.gradle.kts ./order-service/
 COPY settlement-service/build.gradle.kts ./settlement-service/
 COPY loan-service/build.gradle.kts ./loan-service/
+COPY financial-statements-service/build.gradle.kts ./financial-statements-service/
 COPY gateway-service/build.gradle.kts ./gateway-service/
 
 RUN --mount=type=cache,target=/home/gradle/.gradle \
@@ -26,6 +27,7 @@ COPY shared-common ./shared-common
 COPY order-service ./order-service
 COPY settlement-service ./settlement-service
 COPY loan-service ./loan-service
+COPY financial-statements-service ./financial-statements-service
 COPY gateway-service ./gateway-service
 
 RUN --mount=type=cache,target=/home/gradle/.gradle \
