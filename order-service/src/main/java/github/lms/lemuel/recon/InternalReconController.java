@@ -31,12 +31,14 @@ public class InternalReconController {
         this.repository = repository;
     }
 
-    @Operation(summary = "일일 대사 합계 (order 원천)", description = "해당 날짜 CAPTURED 결제·COMPLETED 환불 합계")
+    @Operation(summary = "일일 대사 합계 (order 원천)",
+            description = "해당 날짜 캡처 gross(CAPTURED+REFUNDED)·완료 환불(완료일 기준)·캡처일 기준 반영 환불 합계")
     @GetMapping("/daily-totals")
     public DailyTotals dailyTotals(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return new DailyTotals(
                 repository.sumCapturedPayments(date),
-                repository.sumCompletedRefunds(date));
+                repository.sumCompletedRefunds(date),
+                repository.sumRefundedAgainstCaptures(date));
     }
 
     @Operation(summary = "기간 대사 합계 (order 원천)",
@@ -65,7 +67,8 @@ public class InternalReconController {
         return repository.loadCapturedPaymentRows(date);
     }
 
-    public record DailyTotals(BigDecimal capturedPayments, BigDecimal completedRefunds) {
+    public record DailyTotals(BigDecimal capturedPayments, BigDecimal completedRefunds,
+                              BigDecimal refundedAgainstCaptures) {
     }
 
     public record PeriodTotals(BigDecimal capturedPayments, BigDecimal completedRefunds,

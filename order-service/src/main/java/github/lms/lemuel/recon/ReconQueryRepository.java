@@ -45,6 +45,19 @@ public class ReconQueryRepository {
                 """, from, to);
     }
 
+    /**
+     * 해당 날짜 캡처된 결제에 대해 반영된 환불액 합계 — <b>캡처일 기준</b>.
+     * settlement 는 자기 정산의 {@code refunded_amount}(생성일=캡처일)를 이 값과 대조해
+     * "order 는 환불했는데 정산엔 미반영" 을 감지한다. 환불 완료일이 아니라 캡처일로 키를 맞춰
+     * 처리 지연(T+N·백필)에 흔들리지 않는 안정 축을 만든다.
+     */
+    public BigDecimal sumRefundedAgainstCaptures(LocalDate date) {
+        return decimal("""
+                SELECT COALESCE(SUM(refunded_amount), 0) FROM opslab.payments
+                WHERE status IN ('CAPTURED', 'REFUNDED') AND captured_at::date = ?
+                """, date);
+    }
+
     /** 해당 날짜 COMPLETED 환불 amount 합계. */
     public BigDecimal sumCompletedRefunds(LocalDate date) {
         return decimal("""

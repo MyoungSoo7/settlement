@@ -80,7 +80,8 @@ public class OrderReconClient {
 
     // ── order /internal/recon 응답 계약 (JSON 매칭, shared-common 외 공유 모듈 없음) ──
 
-    public record DailyTotals(BigDecimal capturedPayments, BigDecimal completedRefunds) {
+    public record DailyTotals(BigDecimal capturedPayments, BigDecimal completedRefunds,
+                              BigDecimal refundedAgainstCaptures) {
     }
 
     public record PeriodTotals(BigDecimal capturedPayments, BigDecimal completedRefunds,
