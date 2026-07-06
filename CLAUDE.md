@@ -2,9 +2,9 @@
 
 ## 프로젝트 개요
 
-주문·결제·정산·선정산대출·재무제표조회·기업뉴스평판을 **5개 마이크로서비스 + API Gateway** 로 분리한 헥사고날 아키텍처 백엔드.
-원래 단일 모놀리스였으나 Bounded Context 로 분리. **5개 서비스 모두 DB-per-service**(order=opslab, settlement=settlement_db,
-loan=lemuel_loan, financial=lemuel_financial, company=lemuel_company) 로 물리 분리돼 있고, 서비스 간 연계는 **Kafka 이벤트로만** 한다.
+주문·결제·정산·선정산대출·재무제표조회·기업뉴스평판·운영관제를 **6개 마이크로서비스 + API Gateway** 로 분리한 헥사고날 아키텍처 백엔드.
+원래 단일 모놀리스였으나 Bounded Context 로 분리. **6개 서비스 모두 DB-per-service**(order=opslab, settlement=settlement_db,
+loan=lemuel_loan, financial=lemuel_financial, company=lemuel_company, operation=lemuel_operation) 로 물리 분리돼 있고, 서비스 간 연계는 **Kafka 이벤트로만** 한다.
 order↔settlement 는 settlement 가 자체 DB 에 **이벤트 드리븐 프로젝션**(`settlement_*_view`)을 적재하는 CQRS 로 분리하고
 (ADR 0020 완료), 대사(reconciliation)는 order 의 내부 API(`/internal/recon`)를 호출해 cross-DB 연결 0 을 유지한다.
 자세한 사용자용 문서는 [`README.md`](./README.md) 참조.
@@ -47,6 +47,8 @@ settlement/                       # Gradle 멀티 모듈 루트
 │   └── github.lms.lemuel.financial.*   # ★ shared-common 미의존 (공개 read-only, 자체 SecurityConfig)
 ├── company-service/              # 📰 Company 서비스 (port 8090, 자체 DB lemuel_company) — 기업 뉴스·평판 (ADR 0023)
 │   └── github.lms.lemuel.company.*     # ★ shared-common 미의존 (Phase 3 outbox 이벤트 발행 시 추가 예정)
+├── operation-service/            # 🖥️ Operation 서비스 (port 8092, 자체 DB lemuel_operation) — 운영 관제 (인시던트)
+│   └── github.lms.lemuel.operation.*   # Phase 1: Alertmanager webhook → 인시던트 라이프사이클 (docs/design/operation-service-phase1.md)
 └── gateway-service/              # 🚪 API Gateway (port 8080)
 ```
 
@@ -59,6 +61,7 @@ settlement/                       # Gradle 멀티 모듈 루트
 | **loan-service** | `loan` | 선정산 대출 — 셀러의 미확정 정산금을 담보로 선지급. 독립 배포 + 자체 DB(lemuel_loan) + 자체 복식부기 원장. settlement 정산 데이터는 Kafka 이벤트(`settlement.created/confirmed`)로만 수신, 상환은 이벤트 saga 로 연계(코드·DB 의존 0) |
 | **financial-statements-service** | `financial` | 코스피 상장사(~800) 요약 재무제표 공개 조회 — DART OpenAPI 수집(기업/재무제표 배치, `DART_API_KEY`) + Flyway 시드 폴백. 자체 DB(lemuel_financial), 타 서비스와 코드·DB·이벤트 의존 0. shared-common 미의존(자체 최소 SecurityConfig — GET 공개, `/admin/financial/**` 는 X-Internal-Api-Key 게이트) |
 | **company-service** | `company` | 기업 뉴스 기사 수집(네이버 뉴스 API, `NAVER_CLIENT_ID/SECRET`)·조회 + Phase 2 평판 스코어 — ADR 0023. 자체 DB(lemuel_company), 기업 식별자(stockCode/corpCode)는 financial 과 공용 비즈니스 키. 기사 본문 미저장(저작권 — 제목·요약·링크만), `url_hash` UNIQUE 멱등 수집. shared-common 미의존(자체 SecurityConfig — GET 공개, `/admin/company/**` 는 X-Internal-Api-Key 게이트) |
+| **operation-service** | `operation` | 운영 관제 — Alertmanager 알람을 webhook(Bearer=INTERNAL_API_KEY)으로 받아 인시던트(OPEN→ACKNOWLEDGED→RESOLVED/FALSE_POSITIVE)로 적재·관리. `(source, correlation_key)` partial unique index 로 활성 중복 0, repeat firing 은 refire 병합(+낙관적 락 재시도). 자체 DB(lemuel_operation, opslab 스키마 재사용 — loan 과 동일 이유), 콘솔 `/api/ops/**` 는 JWT ADMIN 전용. **Phase 2a 완료**: `signal` BC — 도메인 성공 이벤트(order/payment/settlement.created) 구독으로 신호 분모 + Prometheus 폴링(kafka lag/redis/deadlock/http)으로 인프라 게이지를 `ops_metric_bucket`(5분, ON CONFLICT UPSERT)에 적재. 남은 로드맵: 2b 실패 이벤트 신설(분자) → 3 베이스라인 이상탐지 → 4 AI 브리핑 (docs/design/operation-service-phase1.md) |
 | **gateway-service** | (Spring Cloud Gateway) | 라우팅, 인증 필터 |
 | **shared-common** | `common.*` | 전 서비스 공유 — 감사·관측·예외·Outbox·rate limit·JWT·PDF |
 
@@ -234,6 +237,7 @@ RUNNING → COMPLETED
 ./gradlew :loan-service:compileJava
 ./gradlew :financial-statements-service:compileJava
 ./gradlew :company-service:compileJava
+./gradlew :operation-service:compileJava
 ./gradlew :gateway-service:compileJava
 
 # 모듈별 테스트

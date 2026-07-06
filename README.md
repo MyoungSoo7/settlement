@@ -156,6 +156,9 @@ settlement/                              # 모노레포 루트
 ├── financial-statements-service/        # 📊 Financial 서비스 (port 8086, 자체 DB lemuel_financial)
 │   └── src/main/java/.../financial/     # 코스피 상장사 요약 재무제표 조회 — DART OpenAPI 수집 + 시드 폴백
 │
+├── operation-service/                   # 🖥️ Operation 서비스 (port 8092, 자체 DB lemuel_operation) — 운영 관제
+│   └── src/main/java/.../operation/     # Alertmanager 알람 → 인시던트 라이프사이클(ack/resolve/오탐) + 요약(MTTR)
+│
 └── gateway-service/                     # 🚪 API Gateway (port 8080)
     └── src/main/java/.../GatewayServiceApplication.java
 ```
@@ -387,14 +390,15 @@ npx newman run docs/demo/postman-e2e-purchase-flow.json -e docs/demo/postman-env
 ### 개별 서비스 실행
 
 ```bash
-# 인프라만 (PG 4종 + ES + Redpanda)
-docker compose up -d postgres settlement-db loan-postgres financial-postgres elasticsearch redpanda
+# 인프라만 (PG 5종 + ES + Redpanda)
+docker compose up -d postgres settlement-db loan-postgres financial-postgres operation-postgres elasticsearch redpanda
 
 # 각 서비스를 IDE 또는 gradle 로
 ./gradlew :order-service:bootRun
 ./gradlew :settlement-service:bootRun
 ./gradlew :loan-service:bootRun
 ./gradlew :financial-statements-service:bootRun
+./gradlew :operation-service:bootRun
 ./gradlew :gateway-service:bootRun
 ```
 
@@ -413,6 +417,7 @@ docker build --build-arg MODULE=order-service       -t lemuel-order .
 docker build --build-arg MODULE=settlement-service  -t lemuel-settlement .
 docker build --build-arg MODULE=loan-service        -t lemuel-loan .
 docker build --build-arg MODULE=financial-statements-service -t lemuel-financial .
+docker build --build-arg MODULE=operation-service   -t lemuel-operation .
 docker build --build-arg MODULE=gateway-service     -t lemuel-gateway .
 ```
 
@@ -429,6 +434,7 @@ docker build --build-arg MODULE=gateway-service     -t lemuel-gateway .
 | `/admin/categories/**`, `/admin/pg/**`, `/admin/products/**` | order-service |
 | `/loans/**` | **loan-service** (자체 DB) |
 | `/api/financial/**` | **financial-statements-service** (자체 DB, 공개 조회) |
+| `/api/ops/**` | **operation-service** (자체 DB, 운영 관제 — ADMIN 전용, webhook 은 Bearer 게이트) |
 | `/api/settlements/**`, `/api/reconciliation/**`, `/api/reports/**` | settlement-service |
 | `/api/ledger/**` | settlement-service |
 | `/admin/payouts/**`, `/admin/chargebacks/**` | settlement-service |

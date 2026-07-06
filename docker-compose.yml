@@ -108,6 +108,28 @@ services:
       timeout: 3s
       retries: 10
 
+  # ★ DB-per-service: operation-service 전용 PostgreSQL (운영 관제 — 인시던트/이상탐지)
+  operation-postgres:
+    image: postgres:17-alpine
+    container_name: lemuel-operation-db
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      POSTGRES_DB: lemuel_operation
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "127.0.0.1:5439:5432"
+    volumes:
+      - operation-postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.17.0
     container_name: lemuel-elasticsearch
@@ -436,6 +458,51 @@ services:
       company-postgres:
         condition: service_healthy
 
+  operation-service:
+    build:
+      context: .
+      args:
+        MODULE: operation-service
+    image: ghcr.io/myoungsoo7/lemuel-operation:latest
+    container_name: lemuel-operation
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      # 자체 DB(lemuel_operation) — 운영 관제 인시던트 저장소. 타 서비스와 코드·DB 의존 0.
+      SPRING_DATASOURCE_URL: jdbc:postgresql://operation-postgres:5432/lemuel_operation?reWriteBatchedInserts=true
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # JWT 시크릿은 order-service 와 동일해야 운영자 토큰 검증 가능
+      JWT_ISSUER: ${JWT_ISSUER}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_TTL_SECONDS: ${JWT_TTL_SECONDS}
+      # Alertmanager webhook Bearer 토큰 — alertmanager.practice.yml 의 credentials 와 동일해야 한다.
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-lemuel-internal-dev-key}
+      # Phase 2 — 신호 수집. 도메인 성공 이벤트 구독(분모) + Prometheus 폴링(인프라 게이지).
+      APP_KAFKA_ENABLED: "true"
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
+      OPS_PROMETHEUS_ENABLED: "true"
+      OPS_PROMETHEUS_URL: http://prometheus:9090
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
+      SERVER_PORT: 8080
+      MANAGEMENT_SERVER_PORT: 8080
+    ports:
+      - "127.0.0.1:8092:8080"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    depends_on:
+      operation-postgres:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+
   gateway-service:
     build:
       context: .
@@ -452,7 +519,7 @@ services:
       SETTLEMENT_SERVICE_URI: http://settlement-service:8080
       LOAN_SERVICE_URI: http://loan-service:8080
       FINANCIAL_SERVICE_URI: http://financial-statements-service:8080
-      COMPANY_SERVICE_URI: http://company-service:8080
+      OPERATION_SERVICE_URI: http://operation-service:8080
       JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
     ports:
       - "127.0.0.1:8080:8080"
@@ -495,6 +562,35 @@ services:
     restart: unless-stopped
     depends_on:
       redpanda:
+        condition: service_healthy
+
+  # postgres-exporter — PostgreSQL 통계(데드락·커넥션·트랜잭션)를 Prometheus 메트릭으로 노출.
+  # operation-service 가 pg_stat_database_deadlocks 를 폴링해 DB_DEADLOCK 신호 게이지로 적재한다.
+  # 대표로 opslab(order) DB 를 관측 — 필요 시 서비스별 exporter 를 늘린다.
+  postgres-exporter:
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.16.0
+    container_name: lemuel-postgres-exporter
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/inter?sslmode=disable"
+    ports:
+      - "127.0.0.1:9187:9187"
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # redis-exporter — Redis 가용성(redis_up)·메모리·연결을 Prometheus 메트릭으로 노출.
+  # operation-service 가 redis_up 을 폴링해 REDIS_FAILURE 신호 게이지로 적재한다.
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.62.0
+    container_name: lemuel-redis-exporter
+    environment:
+      REDIS_ADDR: "redis://redis:6379"
+    ports:
+      - "127.0.0.1:9121:9121"
+    restart: unless-stopped
+    depends_on:
+      redis:
         condition: service_healthy
 
   prometheus:
@@ -566,6 +662,7 @@ volumes:
   loan-postgres-data:
   financial-postgres-data:
   company-postgres-data:
+  operation-postgres-data:
   elasticsearch-data:
   redpanda-data:
   redis-data:

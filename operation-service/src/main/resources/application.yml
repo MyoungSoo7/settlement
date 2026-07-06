@@ -1,0 +1,176 @@
+spring:
+  profiles:
+    active: local
+
+  application:
+    name: lemuel-operation
+
+  threads:
+    virtual:
+      enabled: true
+
+  # ★ operation-service 는 자체 DB(lemuel_operation) 를 소유한다 (DB-per-service).
+  #   로컬 기본값은 compose 의 호스트 매핑(127.0.0.1:5439 → operation-postgres:5432)을 가리킨다.
+  datasource:
+    url: jdbc:postgresql://localhost:5439/lemuel_operation?reWriteBatchedInserts=true
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      pool-name: lemuel-operation-pool
+      maximum-pool-size: ${DB_POOL_MAX:20}
+      minimum-idle: ${DB_POOL_MIN_IDLE:5}
+      connection-timeout: 10000
+      leak-detection-threshold: 30000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        # ★ 스키마명은 opslab 을 재사용한다(물리 DB 는 lemuel_operation 으로 분리됨).
+        #   shared-common Outbox claim 네이티브 쿼리가 'opslab.outbox_events' 를 하드코딩하므로,
+        #   엔티티의 무스키마 매핑도 opslab 으로 해석되도록 default_schema 를 맞춘다 (loan-service 와 동일).
+        default_schema: opslab
+        jdbc:
+          batch_size: 50
+          batch_versioned_data: true
+        order_inserts: true
+        order_updates: true
+
+  # 자체 DB 마이그레이션을 직접 책임진다 (V1 인시던트 코어, V2 outbox/멱등 인프라).
+  flyway:
+    enabled: true
+    schemas: opslab          # opslab 스키마를 생성·기본 스키마로 사용 (무스키마 DDL 이 여기로 적재됨)
+    locations: classpath:db/migration
+
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=500,expireAfterWrite=600s
+
+  # Kafka (Phase 2) — 도메인 이벤트 구독으로 신호 분모(시도 건수) 집계.
+  # operation 전용 컨슈머 그룹 → settlement/loan 소비에 영향 없음. 트렌드 신호이므로
+  # auto-offset-reset=latest (과거 전량 재적재 불필요, 새로 뜨면 지금부터 관측).
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: lemuel-operation
+      auto-offset-reset: latest
+      enable-auto-commit: false
+      properties:
+        isolation.level: read_committed
+    listener:
+      ack-mode: manual_immediate
+      missing-topics-fatal: false
+
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+server:
+  port: 8092
+  shutdown: graceful
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    prometheus:
+      enabled: true
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  health:
+    elasticsearch:
+      enabled: false
+    db:
+      enabled: true
+  server:
+    port: 8093
+  metrics:
+    tags:
+      application: ${spring.application.name}
+      environment: ${ENVIRONMENT:local}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+app:
+  # Kafka 컨슈머·인프라 빈 토글 (shared-common KafkaConfig + operation 컨슈머의 @ConditionalOnProperty).
+  # 로컬/테스트 기본 off — 브로커 없이 부팅. compose/운영에서 APP_KAFKA_ENABLED=true 주입.
+  kafka:
+    enabled: ${APP_KAFKA_ENABLED:false}
+
+  # JWT — shared-common JwtProperties(prefix=app.jwt). 루트 @SpringBootApplication 이
+  # common.config.jwt 를 스캔하므로 secret 이 필수다(order-service 와 동일 시크릿).
+  jwt:
+    issuer: ${JWT_ISSUER:lemuel}
+    secret: ${JWT_SECRET}
+    ttl-seconds: ${JWT_TTL_SECONDS:3600}
+
+  ops:
+    webhook:
+      # Alertmanager → webhook 인증 토큰. Alertmanager 는 커스텀 헤더를 못 보내므로
+      # X-Internal-Api-Key 대신 Authorization: Bearer 를 쓰되, 시크릿 값은 기존
+      # INTERNAL_API_KEY 를 재사용해 시크릿 관리 지점을 늘리지 않는다.
+      # 미설정 시 검증 비활성(개발) + 경고 — shared-common InternalApiKeyFilter 와 동일 시맨틱.
+      token: ${INTERNAL_API_KEY:}
+    # Alertmanager alert 의 labels.component → SignalCategory 매핑.
+    # 알람 룰(alert-rules.yml)이 늘어나면 여기만 추가하면 된다 (재빌드 불필요, 재기동만).
+    category-mapping:
+      settlement-batch: SETTLEMENT_FAILURE
+      settlement-adjustment: SETTLEMENT_FAILURE
+      cashflow-report: SETTLEMENT_FAILURE
+      refund: PAYMENT_FAILURE
+      kafka-consumer: KAFKA_BACKLOG
+      outbox: KAFKA_BACKLOG
+      settlement-projection: KAFKA_BACKLOG
+      http: API_TIMEOUT
+      database: DB_DEADLOCK
+      jvm: INFRA_ETC
+      application: INFRA_ETC
+    default-category: UNKNOWN
+    # REFIRED 타임라인 억제 간격 — repeat_interval(critical 5m)마다 재수신되는 firing 이
+    # 타임라인을 폭주시키지 않도록, 직전 REFIRED 이후 이 간격이 지나야만 타임라인 행을 남긴다.
+    refire-timeline-suppression: 30m
+
+    # ── Phase 2: 신호 수집 ──────────────────────────────────────────────
+    # 카프카 도메인 이벤트 → 신호 버킷 분모(시도 건수). enabled 는 spring.kafka 와 별개로
+    # 컨슈머 빈만 토글 (shared-common 은 app.kafka.enabled 를 봄).
+    signal:
+      # 성공 이벤트 → count_total(분모). 실패 이벤트(count_signal)는 Phase 2b 에서 추가.
+      topics:
+        order-created: ${OPS_TOPIC_ORDER_CREATED:lemuel.order.created}
+        payment-captured: ${OPS_TOPIC_PAYMENT_CAPTURED:lemuel.payment.captured}
+        settlement-created: ${OPS_TOPIC_SETTLEMENT_CREATED:lemuel.settlement.created}
+      # 버킷 폭 (초). 5분 = 300. Phase 3 베이스라인/z-score 판정 단위와 일치해야 한다.
+      bucket-seconds: 300
+
+    # Prometheus 인스턴트 쿼리 폴링 → 게이지 버킷. 인프라 신호(Kafka lag/Redis/DB deadlock/HTTP)는
+    # 이벤트로 만들 필요 없이 이미 메트릭으로 존재하므로 폴링으로 흡수한다.
+    prometheus:
+      # 기본 off — 로컬/테스트에서 Prometheus 없이 부팅. compose/운영에서 true + base-url 주입.
+      enabled: ${OPS_PROMETHEUS_ENABLED:false}
+      base-url: ${OPS_PROMETHEUS_URL:http://localhost:9090}
+      poll-interval-ms: ${OPS_PROMETHEUS_POLL_MS:60000}
+      timeout-ms: 5000
+      # metric_key → PromQL 인스턴트 쿼리. 알람 룰이 늘면 여기만 추가(재빌드 불필요).
+      queries:
+        kafka.lag.max: "max(kafka_consumergroup_lag)"
+        redis.up: "min(redis_up)"
+        db.deadlock.rate: "sum(rate(pg_stat_database_deadlocks[5m]))"
+        http.error.ratio: "100 * sum(rate(http_server_requests_seconds_count{status=~\"4..|5..\"}[5m])) / sum(rate(http_server_requests_seconds_count[5m]))"
