@@ -254,6 +254,8 @@ services:
       JWT_TTL_SECONDS: ${JWT_TTL_SECONDS}
       # 내부 API 공유 시크릿 — order 와 동일해야 OrderReconClient 호출이 통과한다(#124).
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-lemuel-internal-dev-key}
+      # OrderReconClient 대상 — 컨테이너 안에서 기본값 localhost:8088 은 자기 자신이라 연결 거부(/admin/reconciliation 500).
+      ORDER_SERVICE_URL: http://order-service:8080
       APP_SEARCH_ENABLED: "true"
       JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
       SERVER_PORT: 8080
