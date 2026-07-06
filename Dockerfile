@@ -19,6 +19,7 @@ COPY loan-service/build.gradle.kts ./loan-service/
 COPY financial-statements-service/build.gradle.kts ./financial-statements-service/
 COPY company-service/build.gradle.kts ./company-service/
 COPY operation-service/build.gradle.kts ./operation-service/
+COPY economics-service/build.gradle.kts ./economics-service/
 COPY gateway-service/build.gradle.kts ./gateway-service/
 
 RUN --mount=type=cache,target=/home/gradle/.gradle \
@@ -32,6 +33,7 @@ COPY loan-service ./loan-service
 COPY financial-statements-service ./financial-statements-service
 COPY company-service ./company-service
 COPY operation-service ./operation-service
+COPY economics-service ./economics-service
 COPY gateway-service ./gateway-service
 
 RUN --mount=type=cache,target=/home/gradle/.gradle \
