@@ -2,9 +2,9 @@
 
 ## 프로젝트 개요
 
-주문·결제·정산·선정산대출을 **3개 마이크로서비스 + API Gateway** 로 분리한 헥사고날 아키텍처 백엔드.
-원래 단일 모놀리스였으나 Bounded Context 로 분리. **3개 서비스 모두 DB-per-service**(order=opslab, settlement=settlement_db,
-loan=lemuel_loan) 로 물리 분리돼 있고, 서비스 간 연계는 **Kafka 이벤트로만** 한다.
+주문·결제·정산·선정산대출·재무제표조회를 **4개 마이크로서비스 + API Gateway** 로 분리한 헥사고날 아키텍처 백엔드.
+원래 단일 모놀리스였으나 Bounded Context 로 분리. **4개 서비스 모두 DB-per-service**(order=opslab, settlement=settlement_db,
+loan=lemuel_loan, financial=lemuel_financial) 로 물리 분리돼 있고, 서비스 간 연계는 **Kafka 이벤트로만** 한다.
 order↔settlement 는 settlement 가 자체 DB 에 **이벤트 드리븐 프로젝션**(`settlement_*_view`)을 적재하는 CQRS 로 분리하고
 (ADR 0020 완료), 대사(reconciliation)는 order 의 내부 API(`/internal/recon`)를 호출해 cross-DB 연결 0 을 유지한다.
 자세한 사용자용 문서는 [`README.md`](./README.md) 참조.
@@ -43,6 +43,8 @@ settlement/                       # Gradle 멀티 모듈 루트
 │   └── github.lms.lemuel.{settlement, payout, ledger, chargeback, pgreconciliation, report}
 ├── loan-service/                 # 💸 Loan 서비스 (port 8084, 자체 DB lemuel_loan) — 선정산 대출
 │   └── github.lms.lemuel.loan.*
+├── financial-statements-service/ # 📊 Financial 서비스 (port 8086, 자체 DB lemuel_financial) — 코스피 재무제표 조회
+│   └── github.lms.lemuel.financial.*   # ★ 유일하게 shared-common 미의존 (공개 read-only, 자체 SecurityConfig)
 └── gateway-service/              # 🚪 API Gateway (port 8080)
 ```
 
@@ -53,6 +55,7 @@ settlement/                       # Gradle 멀티 모듈 루트
 | **order-service** | `user, order, payment, cart, shipping, product, category, coupon, review, game` (+ `recon`, `projectionbackfill` — ADR 0020 내부 대사 API/프로젝션 백필) | 회원·상품·장바구니·주문·결제·배송 — 거래 컨텍스트. opslab DB 소유, 자기 합계를 `/internal/recon` 으로 노출 |
 | **settlement-service** | `settlement, payout, ledger, chargeback, pgreconciliation, report` (+ `recon` — `OrderReconClient`) | 정산 생성/확정, 지급(payout), 복식부기 원장(ledger), 차지백, PG 대사, ES 색인, PDF, 캐시플로우 리포트. **자체 DB settlement_db** — order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝션(`settlement_*_view`)으로 조회(코드·DB 의존 0) |
 | **loan-service** | `loan` | 선정산 대출 — 셀러의 미확정 정산금을 담보로 선지급. 독립 배포 + 자체 DB(lemuel_loan) + 자체 복식부기 원장. settlement 정산 데이터는 Kafka 이벤트(`settlement.created/confirmed`)로만 수신, 상환은 이벤트 saga 로 연계(코드·DB 의존 0) |
+| **financial-statements-service** | `financial` | 코스피 상장사(~800) 요약 재무제표 공개 조회 — DART OpenAPI 수집(기업/재무제표 배치, `DART_API_KEY`) + Flyway 시드 폴백. 자체 DB(lemuel_financial), 타 서비스와 코드·DB·이벤트 의존 0. shared-common 미의존(자체 최소 SecurityConfig — GET 공개, `/admin/financial/**` 는 X-Internal-Api-Key 게이트) |
 | **gateway-service** | (Spring Cloud Gateway) | 라우팅, 인증 필터 |
 | **shared-common** | `common.*` | 전 서비스 공유 — 감사·관측·예외·Outbox·rate limit·JWT·PDF |
 
@@ -226,6 +229,7 @@ RUNNING → COMPLETED
 ./gradlew :order-service:compileJava
 ./gradlew :settlement-service:compileJava
 ./gradlew :loan-service:compileJava
+./gradlew :financial-statements-service:compileJava
 ./gradlew :gateway-service:compileJava
 
 # 모듈별 테스트
@@ -248,6 +252,7 @@ docker compose down
 docker build --build-arg MODULE=order-service       -t lemuel-order .
 docker build --build-arg MODULE=settlement-service  -t lemuel-settlement .
 docker build --build-arg MODULE=loan-service        -t lemuel-loan .
+docker build --build-arg MODULE=financial-statements-service -t lemuel-financial .
 docker build --build-arg MODULE=gateway-service     -t lemuel-gateway .
 ```
 

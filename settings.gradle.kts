@@ -8,6 +8,7 @@ include(
     "order-service",
     "settlement-service",
     "loan-service",
+    "financial-statements-service",
     "gateway-service",
 )
 
