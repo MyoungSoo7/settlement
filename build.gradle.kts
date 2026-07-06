@@ -81,6 +81,7 @@ subprojects {
                     "**/LemuelApplication*",
                     "**/SettlementServiceApplication*",
                     "**/GatewayServiceApplication*",
+                    "**/FinancialStatementsApplication*",
                 )
             }
         })

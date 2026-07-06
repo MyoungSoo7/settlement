@@ -1,0 +1,1 @@
+import{a as s}from"./index-DKK6kIjJ.js";const n={search:async e=>(await s.get("/api/settlements/search",{params:e})).data,searchByPost:async e=>(await s.post("/api/settlements/search",e)).data,getSettlement:async e=>(await s.get(`/settlements/${e}`)).data};export{n as s};

@@ -1,6 +1,6 @@
 # Lemuel — 이커머스 + 정산 MSA 플랫폼
 
-> **상품·장바구니·주문·결제·배송·정산·선정산대출** 도메인을 **3개 마이크로서비스 + API Gateway** 로 분리한
+> **상품·장바구니·주문·결제·배송·정산·선정산대출·재무제표조회** 도메인을 **4개 마이크로서비스 + API Gateway** 로 분리한
 > 헥사고날 아키텍처 기반 백엔드. 단일 모놀리스 → **Bounded Context 분리** → **이벤트 드리븐** →
 > **DB-per-service + 이벤트 프로젝션 패턴**(ADR 0020 완료) 으로 진화시킨 포트폴리오 프로젝트.
 
@@ -152,6 +152,9 @@ settlement/                              # 모노레포 루트
 │
 ├── loan-service/                        # 💸 Loan 서비스 (port 8084, 자체 DB lemuel_loan) — 선정산 대출
 │   └── src/main/java/.../loan/          # 한도·선지급·상환 saga·자체 복식부기 — settlement 이벤트로만 연계
+│
+├── financial-statements-service/        # 📊 Financial 서비스 (port 8086, 자체 DB lemuel_financial)
+│   └── src/main/java/.../financial/     # 코스피 상장사 요약 재무제표 조회 — DART OpenAPI 수집 + 시드 폴백
 │
 └── gateway-service/                     # 🚪 API Gateway (port 8080)
     └── src/main/java/.../GatewayServiceApplication.java
@@ -384,13 +387,14 @@ npx newman run docs/demo/postman-e2e-purchase-flow.json -e docs/demo/postman-env
 ### 개별 서비스 실행
 
 ```bash
-# 인프라만 (PG 3종 + ES + Redpanda)
-docker compose up -d postgres settlement-db loan-postgres elasticsearch redpanda
+# 인프라만 (PG 4종 + ES + Redpanda)
+docker compose up -d postgres settlement-db loan-postgres financial-postgres elasticsearch redpanda
 
 # 각 서비스를 IDE 또는 gradle 로
 ./gradlew :order-service:bootRun
 ./gradlew :settlement-service:bootRun
 ./gradlew :loan-service:bootRun
+./gradlew :financial-statements-service:bootRun
 ./gradlew :gateway-service:bootRun
 ```
 
@@ -408,6 +412,7 @@ docker compose up -d postgres settlement-db loan-postgres elasticsearch redpanda
 docker build --build-arg MODULE=order-service       -t lemuel-order .
 docker build --build-arg MODULE=settlement-service  -t lemuel-settlement .
 docker build --build-arg MODULE=loan-service        -t lemuel-loan .
+docker build --build-arg MODULE=financial-statements-service -t lemuel-financial .
 docker build --build-arg MODULE=gateway-service     -t lemuel-gateway .
 ```
 
@@ -423,6 +428,7 @@ docker build --build-arg MODULE=gateway-service     -t lemuel-gateway .
 | `/api/coupons/**`, `/api/reviews/**` | order-service |
 | `/admin/categories/**`, `/admin/pg/**`, `/admin/products/**` | order-service |
 | `/loans/**` | **loan-service** (자체 DB) |
+| `/api/financial/**` | **financial-statements-service** (자체 DB, 공개 조회) |
 | `/api/settlements/**`, `/api/reconciliation/**`, `/api/reports/**` | settlement-service |
 | `/api/ledger/**` | settlement-service |
 | `/admin/payouts/**`, `/admin/chargebacks/**` | settlement-service |
