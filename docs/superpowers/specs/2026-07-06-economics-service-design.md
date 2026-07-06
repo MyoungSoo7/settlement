@@ -23,7 +23,7 @@
 기존 컨벤션(헥사고날, DB-per-service, 독립 부팅)을 그대로 따른다. 템플릿은 financial-statements-service.
 
 ```
-economics-service/                    (port 8087, 자체 DB lemuel_economics → host 5438)
+economics-service/                    (port 8087, 자체 DB lemuel_economics → host 5440)
 └── github.lms.lemuel.economics
     ├── domain/                       Indicator(지표 정의), IndicatorValue(관측치),
     │                                 IndicatorCycle(D/M), ValueSource(SEED/ECOS)
@@ -106,7 +106,7 @@ GET /api/economics/indicators/{code}/series?from=&to=  시계열 (기본 최근 
 ### 인프라
 
 - `settings.gradle.kts` 에 `economics-service` 모듈 추가.
-- docker-compose: `economics-postgres`(host 5438, DB lemuel_economics) + `economics-service`(host 8087)
+- docker-compose: `economics-postgres`(host 5440 — 5438·5439 는 이미 점유, DB lemuel_economics) + `economics-service`(host 8087, 컨테이너 내부 8080 규약)
   + gateway env(`ECONOMICS_SERVICE_URI`).
 - Dockerfile 은 기존 `MODULE=economics-service` 빌드 인자 재사용.
 - CLAUDE.md / README 의 서비스 목록 갱신 (5번째 마이크로서비스).
