@@ -27,6 +27,11 @@ spring:
               # 공개 조회 API 만 라우팅 — DART 수집 트리거(/admin/financial/**)는 외부 미노출
               predicates:
                 - Path=/api/financial/**
+            - id: company-service
+              uri: ${COMPANY_SERVICE_URI:http://localhost:8090}
+              # 공개 조회 API 만 라우팅 — 뉴스 수집 트리거(/admin/company/**)는 외부 미노출
+              predicates:
+                - Path=/api/company/**
             - id: settlement-service
               uri: ${SETTLEMENT_SERVICE_URI:http://localhost:8082}
               # SettlementController 는 /settlements(비-/api), 검색/원장/리포트는 /api, 운영 콘솔은 /admin.
