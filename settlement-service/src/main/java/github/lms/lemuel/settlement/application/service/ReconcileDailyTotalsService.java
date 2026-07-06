@@ -33,18 +33,22 @@ public class ReconcileDailyTotalsService implements ReconcileDailyTotalsUseCase 
                 loadDailyTotalsPort.sumCapturedPayments(targetDate),
                 loadDailyTotalsPort.sumCompletedRefunds(targetDate),
                 loadDailyTotalsPort.sumSettlementNet(targetDate),
-                loadDailyTotalsPort.sumSettlementCommission(targetDate)
+                loadDailyTotalsPort.sumSettlementCommission(targetDate),
+                loadDailyTotalsPort.sumRefundAdjustments(targetDate)
         );
 
         if (report.matched()) {
-            log.info("[Reconciliation] {} OK — payments={}, refunds={}, settlementNet={}, commission={}",
+            log.info("[Reconciliation] {} OK — payments={}, refunds={}, settlementNet={}, commission={}, refundAdjustments={}",
                     targetDate, report.totalPayments(), report.totalRefunds(),
-                    report.totalSettlementNet(), report.totalSettlementCommission());
+                    report.totalSettlementNet(), report.totalSettlementCommission(),
+                    report.totalRefundAdjustments());
         } else {
             // 금액이 샜음 — 즉시 감시 가능한 ERROR 레벨. 운영에서는 Alertmanager 로 연계 권장.
-            log.error("[Reconciliation] {} MISMATCH discrepancy={} — payments={}, refunds={}, settlementNet={}, commission={}",
-                    targetDate, report.discrepancy(), report.totalPayments(), report.totalRefunds(),
-                    report.totalSettlementNet(), report.totalSettlementCommission());
+            log.error("[Reconciliation] {} MISMATCH paymentDiscrepancy={}, refundDiscrepancy={} — payments={}, refunds={}, settlementNet={}, commission={}, refundAdjustments={}",
+                    targetDate, report.paymentDiscrepancy(), report.refundDiscrepancy(),
+                    report.totalPayments(), report.totalRefunds(),
+                    report.totalSettlementNet(), report.totalSettlementCommission(),
+                    report.totalRefundAdjustments());
         }
         return report;
     }

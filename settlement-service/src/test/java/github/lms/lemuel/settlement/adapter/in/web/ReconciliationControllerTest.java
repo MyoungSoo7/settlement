@@ -33,10 +33,11 @@ class ReconciliationControllerTest {
         LocalDate date = LocalDate.of(2026, 4, 1);
         when(reconcileUseCase.reconcile(date)).thenReturn(ReconciliationReport.of(
                 date,
-                new BigDecimal("100000"),
-                new BigDecimal("10000"),
-                new BigDecimal("87000"),
-                new BigDecimal("3000")
+                new BigDecimal("100000"), // 캡처 gross
+                new BigDecimal("10000"),  // 환불
+                new BigDecimal("96500"),  // 생성된 정산 net
+                new BigDecimal("3500"),   // 생성된 정산 commission (3.5%)
+                new BigDecimal("10000")   // 환불 조정
         ));
 
         mockMvc.perform(get("/admin/reconciliation").param("date", "2026-04-01"))

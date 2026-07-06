@@ -38,10 +38,12 @@ public class DailyTotalsJdbcAdapter implements LoadDailyTotalsPort {
 
     @Override
     public BigDecimal sumSettlementNet(LocalDate date) {
+        // 생성 대사: created_at 기준. settlement_date(지급 예정일, T+N 영업일)로 자르면
+        // 캡처일 D 의 정산이 D+N 버킷으로 빠져 대사가 구조적으로 깨진다.
         return queryDecimal("""
                 SELECT COALESCE(SUM(net_amount), 0)
                 FROM settlements
-                WHERE settlement_date = ?
+                WHERE created_at::date = ?
                   AND status <> 'CANCELED'
                 """, date);
     }
@@ -51,8 +53,20 @@ public class DailyTotalsJdbcAdapter implements LoadDailyTotalsPort {
         return queryDecimal("""
                 SELECT COALESCE(SUM(commission), 0)
                 FROM settlements
-                WHERE settlement_date = ?
+                WHERE created_at::date = ?
                   AND status <> 'CANCELED'
+                """, date);
+    }
+
+    @Override
+    public BigDecimal sumRefundAdjustments(LocalDate date) {
+        // 환불 조정(ADR 0004)은 음수 기록 — 양수 환산해 환불 축과 직접 비교한다.
+        // chargeback 조정은 환불 축이 아니므로 refund_id 연결분만 집계.
+        return queryDecimal("""
+                SELECT COALESCE(SUM(-amount), 0)
+                FROM settlement_adjustments
+                WHERE refund_id IS NOT NULL
+                  AND created_at::date = ?
                 """, date);
     }
 

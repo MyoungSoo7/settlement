@@ -25,19 +25,23 @@ public class ReconQueryRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    /** 해당 날짜 CAPTURED 결제 원 amount 합계 (환불 반영 전). */
+    /**
+     * 해당 날짜 캡처된 결제 gross amount 합계 — <b>캡처 이력 기준</b> (이후 환불돼 REFUNDED 로
+     * 전이한 건도 포함). 현재 상태 CAPTURED 만 세면 환불 시점에 과거 날짜의 합계가 소급 변동해
+     * 대사 기준값으로 쓸 수 없다 (환불은 별도 축으로 대조).
+     */
     public BigDecimal sumCapturedPayments(LocalDate date) {
         return decimal("""
                 SELECT COALESCE(SUM(amount), 0) FROM opslab.payments
-                WHERE status = 'CAPTURED' AND captured_at::date = ?
+                WHERE status IN ('CAPTURED', 'REFUNDED') AND captured_at::date = ?
                 """, date);
     }
 
-    /** 기간 내 CAPTURED 결제 원 amount 합계. */
+    /** 기간 내 캡처된 결제 gross amount 합계 (캡처 이력 기준 — 위 단일 날짜 버전과 동일 의미). */
     public BigDecimal sumCapturedPayments(LocalDate from, LocalDate to) {
         return decimal("""
                 SELECT COALESCE(SUM(amount), 0) FROM opslab.payments
-                WHERE status = 'CAPTURED' AND captured_at::date BETWEEN ? AND ?
+                WHERE status IN ('CAPTURED', 'REFUNDED') AND captured_at::date BETWEEN ? AND ?
                 """, from, to);
     }
 
