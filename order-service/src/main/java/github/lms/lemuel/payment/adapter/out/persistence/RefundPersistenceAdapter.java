@@ -5,6 +5,7 @@ import github.lms.lemuel.payment.application.port.out.SaveRefundPort;
 import github.lms.lemuel.payment.domain.Refund;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -24,8 +25,27 @@ public class RefundPersistenceAdapter implements LoadRefundPort, SaveRefundPort 
     }
 
     @Override
+    public Optional<Refund> findById(Long id) {
+        return repository.findById(id).map(this::toDomain);
+    }
+
+    @Override
     public List<Refund> findAllByPaymentId(Long paymentId) {
         return repository.findByPaymentIdOrderByRequestedAtDesc(paymentId).stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
+    @Override
+    public List<Refund> findRetryable(LocalDateTime now) {
+        return repository.findByStatusAndNextRetryAtLessThanEqual(Refund.Status.FAILED.name(), now).stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
+    @Override
+    public List<Refund> findByStatus(Refund.Status status) {
+        return repository.findByStatusOrderByUpdatedAtDesc(status.name()).stream()
                 .map(this::toDomain)
                 .toList();
     }
@@ -45,6 +65,8 @@ public class RefundPersistenceAdapter implements LoadRefundPort, SaveRefundPort 
         entity.setStatus(domain.getStatus().name());
         entity.setReason(domain.getReason());
         entity.setIdempotencyKey(domain.getIdempotencyKey());
+        entity.setRetryCount(domain.getRetryCount());
+        entity.setNextRetryAt(domain.getNextRetryAt());
         entity.setRequestedAt(domain.getRequestedAt());
         entity.setCompletedAt(domain.getCompletedAt());
         entity.setCreatedAt(domain.getCreatedAt());
@@ -60,6 +82,8 @@ public class RefundPersistenceAdapter implements LoadRefundPort, SaveRefundPort 
         domain.setStatus(Refund.Status.valueOf(entity.getStatus()));
         domain.setReason(entity.getReason());
         domain.setIdempotencyKey(entity.getIdempotencyKey());
+        domain.setRetryCount(entity.getRetryCount());
+        domain.setNextRetryAt(entity.getNextRetryAt());
         domain.setRequestedAt(entity.getRequestedAt());
         domain.setCompletedAt(entity.getCompletedAt());
         domain.setCreatedAt(entity.getCreatedAt());

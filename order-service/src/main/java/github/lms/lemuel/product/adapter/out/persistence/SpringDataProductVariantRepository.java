@@ -37,4 +37,26 @@ public interface SpringDataProductVariantRepository extends JpaRepository<Produc
            "  AND v.stockQuantity >= :qty " +
            "  AND v.status <> github.lms.lemuel.product.domain.ProductVariantStatus.DISCONTINUED")
     int decreaseStockIfAvailable(@Param("id") Long id, @Param("qty") int qty, @Param("now") LocalDateTime now);
+
+    /**
+     * 옵션(SKU) 재고 원자적 원복(증가) — 환불/취소 시 차감했던 SKU 재고를 되돌린다.
+     *
+     * <p>차감의 역연산: {@code stock = stock + qty}. 품절(OUT_OF_STOCK)이었던 SKU 는 ACTIVE 로 되살린다.
+     * 단종(DISCONTINUED)은 부활시키지 않는다(영향 행 0 → 원복 스킵).
+     * bulk JPQL UPDATE 는 {@code @Version} 을 자동 증가시키지 않으므로 명시적으로 +1 한다.
+     *
+     * <p>{@code flushAutomatically=true}: 벌크 UPDATE 전에 대기 중인 영속성 변경(예: 같은 트랜잭션의
+     * 주문 상태 전이)을 flush 해, 이어지는 {@code clearAutomatically} 로 유실되지 않게 한다.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("UPDATE ProductVariantJpaEntity v " +
+           "SET v.stockQuantity = v.stockQuantity + :qty, " +
+           "    v.status = CASE WHEN v.status = github.lms.lemuel.product.domain.ProductVariantStatus.OUT_OF_STOCK " +
+           "                    THEN github.lms.lemuel.product.domain.ProductVariantStatus.ACTIVE " +
+           "                    ELSE v.status END, " +
+           "    v.version = v.version + 1, " +
+           "    v.updatedAt = :now " +
+           "WHERE v.id = :id " +
+           "  AND v.status <> github.lms.lemuel.product.domain.ProductVariantStatus.DISCONTINUED")
+    int increaseStock(@Param("id") Long id, @Param("qty") int qty, @Param("now") LocalDateTime now);
 }

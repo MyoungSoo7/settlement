@@ -79,6 +79,11 @@ public class ProductPersistenceAdapter implements LoadProductPort, SaveProductPo
     }
 
     @Override
+    public int increaseStock(Long productId, int quantity) {
+        return repository.increaseStock(productId, quantity, LocalDateTime.now());
+    }
+
+    @Override
     public boolean existsByName(String name) {
         return repository.existsByName(name);
     }

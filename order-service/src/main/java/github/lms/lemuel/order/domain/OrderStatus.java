@@ -13,7 +13,10 @@ import java.util.Set;
  * 실제 전이는 {@link Order#transitionTo(OrderStatus)} 가 이 규칙으로 검증한다.
  *
  * <p>환불(REFUNDED)은 결제 이후 어떤 진행 단계(배송 포함)에서도 발생할 수 있어 종단 도달을 관대하게 허용하되,
- * 결제 전(CREATED)이나 종단 상태(CANCELED/REFUNDED/REFUND_COMPLETED)에서의 비정상 전이는 막는다.
+ * 결제 전(CREATED)이나 종단 상태(CANCELED/REFUNDED)에서의 비정상 전이는 막는다.
+ *
+ * <p>환불 완료 종단은 {@link #REFUNDED} 하나로 일원화한다 — 관리자 환불 승인(approveRefund)이든
+ * 직접 환불(/payments/{id}/refund)이든, 실제 PG 환불 성공 시 payment 가 주문을 REFUNDED 로 전이한다.
  */
 public enum OrderStatus {
     CREATED,    // 주문 생성됨(결제 전)
@@ -24,9 +27,14 @@ public enum OrderStatus {
     CANCELLATION_REQUESTED,
     CANCELLATION_APPROVED,
     REFUND_REQUESTED,
+    /**
+     * @deprecated 환불 완료 종단은 {@link #REFUNDED} 로 일원화됨. 신규 전이 없음.
+     * enum 값 자체는 과거 이 상태로 기록된 DB 행과의 호환을 위해 보존한다.
+     */
+    @Deprecated
     REFUND_COMPLETED,
     CANCELED,   // 결제 전 취소 / 취소 승인 종단
-    REFUNDED;   // 결제 후 환불 완료 종단
+    REFUNDED;   // 결제 후 환불 완료 종단 (단일 환불 완료 종단)
 
     private static final Map<OrderStatus, Set<OrderStatus>> ALLOWED = new EnumMap<>(OrderStatus.class);
 
@@ -38,7 +46,7 @@ public enum OrderStatus {
         ALLOWED.put(DELIVERED, EnumSet.of(REFUND_REQUESTED, REFUNDED));
         ALLOWED.put(CANCELLATION_REQUESTED, EnumSet.of(CANCELLATION_APPROVED, CANCELED));
         ALLOWED.put(CANCELLATION_APPROVED, EnumSet.of(CANCELED, REFUND_REQUESTED, REFUNDED));
-        ALLOWED.put(REFUND_REQUESTED, EnumSet.of(REFUND_COMPLETED, REFUNDED));
+        ALLOWED.put(REFUND_REQUESTED, EnumSet.of(REFUNDED));
         // 종단 상태 — 추가 전이 없음
         ALLOWED.put(REFUND_COMPLETED, EnumSet.noneOf(OrderStatus.class));
         ALLOWED.put(CANCELED, EnumSet.noneOf(OrderStatus.class));

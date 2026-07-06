@@ -60,7 +60,8 @@ public class InicisPgAdapter implements PaymentGatewayAdapter {
     }
 
     @Override
-    public void refund(String pgTransactionId, BigDecimal amount) {
-        log.info("[INICIS] refund txnId={}, amount={}", pgTransactionId, amount);
+    public void refund(String pgTransactionId, BigDecimal amount, String idempotencyKey) {
+        // 실 운영: 이니시스 취소 API 의 멱등 파라미터로 idempotencyKey 를 전달해 재시도 이중환불을 막는다.
+        log.info("[INICIS] refund txnId={}, amount={}, idempotencyKey={}", pgTransactionId, amount, idempotencyKey);
     }
 }

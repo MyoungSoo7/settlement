@@ -25,4 +25,12 @@ public class GetRefundHistoryService implements GetRefundHistoryUseCase {
         }
         return loadRefundPort.findAllByPaymentId(paymentId);
     }
+
+    @Override
+    public List<Refund> getRefundsByStatus(Refund.Status status) {
+        if (status == null) {
+            throw new IllegalArgumentException("status required");
+        }
+        return loadRefundPort.findByStatus(status);
+    }
 }

@@ -170,6 +170,6 @@ class PgRouterTest {
             return provider.prefix() + ":fake-" + id;
         }
         @Override public void capture(String txnId, BigDecimal amount) { }
-        @Override public void refund(String txnId, BigDecimal amount) { }
+        @Override public void refund(String txnId, BigDecimal amount, String idempotencyKey) { }
     }
 }

@@ -50,6 +50,9 @@ public interface PaymentGatewayAdapter {
 
     /**
      * 매입된 거래 환불 (부분/전체) — 동일 PG 로 라우팅된다.
+     *
+     * @param idempotencyKey PG 에 전달할 멱등 키(예: Toss 의 {@code Idempotency-Key} 헤더). 같은 키
+     *                       재요청은 PG 가 중복 환불하지 않는다. 자동 재시도의 이중 환불 방지에 쓰인다.
      */
-    void refund(String pgTransactionId, BigDecimal amount);
+    void refund(String pgTransactionId, BigDecimal amount, String idempotencyKey);
 }

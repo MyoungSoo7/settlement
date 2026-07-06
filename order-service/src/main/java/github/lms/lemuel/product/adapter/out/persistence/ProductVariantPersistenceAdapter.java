@@ -68,6 +68,11 @@ public class ProductVariantPersistenceAdapter
         return repository.decreaseStockIfAvailable(variantId, quantity, LocalDateTime.now());
     }
 
+    @Override
+    public int increaseStock(Long variantId, int quantity) {
+        return repository.increaseStock(variantId, quantity, LocalDateTime.now());
+    }
+
     private static ProductVariant toDomain(ProductVariantJpaEntity e) {
         return ProductVariant.rehydrate(
                 e.getId(), e.getProductId(), e.getSku(), e.getOptionName(),

@@ -80,3 +80,5 @@ frontend/repro-*.mjs
 scripts/sim/__pycache__/
 scripts/sim/.sim_state.json
 docs
+### Vite local env (실제 키 — 커밋 금지) ###
+frontend/.env.production.local

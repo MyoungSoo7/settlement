@@ -1,0 +1,411 @@
+{
+  "info": {
+    "_postman_id": "lemuel-e2e-purchase-flow",
+    "name": "Lemuel E2E — 가입부터 환불까지 (Purchase Flow)",
+    "description": "사용자 실제 구매 흐름 End-to-End 검증 컬렉션.\n\n순서: 회원가입 → 로그인 → 상품 생성 → 장바구니 담기 → 주문 생성(Idempotency-Key) → 결제 생성/인증/캡처 → 취소 신청 → 관리자 취소 승인(→ 전액 환불 자동 실행) → 환불 확인.\n\n사전 조건:\n1. `docker compose up -d --build` 후 전 서비스 healthy (docker compose ps)\n2. Flyway V17 시드 자동 적용 — 관리자 계정 seed_admin@test.com / password123\n3. Postman 환경: docs/demo/postman-environment.json import (GATEWAY_API=http://localhost:8080)\n\nRunner 로 위→아래 순서 실행하면 각 단계의 테스트 스크립트가 기대 응답을 자동 검증합니다.\nnewman: npx newman run docs/demo/postman-e2e-purchase-flow.json -e docs/demo/postman-environment.json",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{E2E_TOKEN}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "E2E_PASSWORD", "value": "password123!" },
+    { "key": "E2E_ADMIN_EMAIL", "value": "seed_admin@test.com" },
+    { "key": "E2E_ADMIN_PASSWORD", "value": "password123" }
+  ],
+  "item": [
+    {
+      "name": "00. Health — gateway/order/settlement 기동 확인",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('gateway health 200 & UP', () => {",
+              "  pm.response.to.have.status(200);",
+              "  pm.expect(pm.response.json().status).to.eql('UP');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "GET",
+        "header": [],
+        "url": "{{GATEWAY_API}}/actuator/health"
+      }
+    },
+    {
+      "name": "01. 회원가입 — POST /users",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "// 실행마다 유니크한 이메일 생성 (재실행 안전)",
+              "pm.collectionVariables.set('E2E_EMAIL', `e2e_${Date.now()}@test.com`);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('가입 성공 & id 반환', () => {",
+              "  pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.id).to.be.a('number');",
+              "  pm.expect(body.email).to.eql(pm.collectionVariables.get('E2E_EMAIL'));",
+              "  pm.collectionVariables.set('E2E_USER_ID', body.id);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{E2E_EMAIL}}\",\n  \"password\": \"{{E2E_PASSWORD}}\",\n  \"name\": \"E2E 구매자\",\n  \"phoneNumber\": \"010-0000-0000\"\n}"
+        },
+        "url": "{{GATEWAY_API}}/users"
+      }
+    },
+    {
+      "name": "02. 로그인(구매자) — POST /auth/login",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('JWT 토큰 발급', () => {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.token).to.be.a('string').and.not.empty;",
+              "  pm.collectionVariables.set('E2E_TOKEN', body.token);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{E2E_EMAIL}}\",\n  \"password\": \"{{E2E_PASSWORD}}\"\n}"
+        },
+        "url": "{{GATEWAY_API}}/auth/login"
+      }
+    },
+    {
+      "name": "03. 로그인(관리자, V17 시드) — POST /auth/login",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "// V17 시드 + V20260706090000(해시 정정) 로 seed_admin@test.com / password123 로그인 가능.",
+              "// 대안: POST /auth/dev/auto-login?role=ADMIN (lemuel.demo.enabled=true 데모 기능).",
+              "pm.test('관리자 토큰 발급 (role=ADMIN)', () => {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.token).to.be.a('string').and.not.empty;",
+              "  pm.expect(body.role).to.eql('ADMIN');",
+              "  pm.collectionVariables.set('E2E_ADMIN_TOKEN', body.token);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{E2E_ADMIN_EMAIL}}\",\n  \"password\": \"{{E2E_ADMIN_PASSWORD}}\"\n}"
+        },
+        "url": "{{GATEWAY_API}}/auth/login"
+      }
+    },
+    {
+      "name": "04. 상품 생성 — POST /api/products",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "// 상품명 UNIQUE 제약 — 실행마다 유니크한 이름 생성 (재실행 안전)",
+              "pm.collectionVariables.set('E2E_PRODUCT_NAME', `E2E 테스트 상품 ${Date.now()}`);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('상품 생성 & productId 반환', () => {",
+              "  pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.id).to.be.a('number');",
+              "  pm.collectionVariables.set('E2E_PRODUCT_ID', body.id);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"{{E2E_PRODUCT_NAME}}\",\n  \"description\": \"E2E 구매 흐름 검증용\",\n  \"price\": 10000,\n  \"stockQuantity\": 10\n}"
+        },
+        "url": "{{GATEWAY_API}}/api/products"
+      }
+    },
+    {
+      "name": "05. 장바구니 담기 — POST /users/{userId}/cart/items",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('장바구니에 상품 1건 담김', () => {",
+              "  pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.items).to.be.an('array').with.length.of.at.least(1);",
+              "  const item = body.items.find(i => String(i.productId) === String(pm.collectionVariables.get('E2E_PRODUCT_ID')));",
+              "  pm.expect(item, '방금 담은 상품이 장바구니에 존재').to.exist;",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"productId\": {{E2E_PRODUCT_ID}},\n  \"quantity\": 1\n}"
+        },
+        "url": "{{GATEWAY_API}}/users/{{E2E_USER_ID}}/cart/items"
+      }
+    },
+    {
+      "name": "06. 주문 생성 — POST /orders/multi (+ Idempotency-Key)",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "// 같은 키 재요청 시 중복 주문이 생기지 않음 (분산락 + DB UNIQUE)",
+              "pm.collectionVariables.set('E2E_IDEM_KEY', `e2e-order-${pm.collectionVariables.get('E2E_EMAIL')}`);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('주문 생성 & 금액 = 10,000', () => {",
+              "  pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.id).to.be.a('number');",
+              "  pm.expect(Number(body.amount)).to.eql(10000);",
+              "  pm.collectionVariables.set('E2E_ORDER_ID', body.id);",
+              "  pm.collectionVariables.set('E2E_ORDER_AMOUNT', Number(body.amount));",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Idempotency-Key", "value": "{{E2E_IDEM_KEY}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": {{E2E_USER_ID}},\n  \"lines\": [\n    { \"productId\": {{E2E_PRODUCT_ID}}, \"quantity\": 1 }\n  ]\n}"
+        },
+        "url": "{{GATEWAY_API}}/orders/multi"
+      }
+    },
+    {
+      "name": "07. 결제 생성 — POST /payments (READY)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('결제 생성 → READY', () => {",
+              "  pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.status).to.eql('READY');",
+              "  pm.collectionVariables.set('E2E_PAYMENT_ID', body.id);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"orderId\": {{E2E_ORDER_ID}},\n  \"paymentMethod\": \"CARD\"\n}"
+        },
+        "url": "{{GATEWAY_API}}/payments"
+      }
+    },
+    {
+      "name": "08. 결제 인증 — PATCH /payments/{id}/authorize (AUTHORIZED)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('READY → AUTHORIZED', () => {",
+              "  pm.response.to.have.status(200);",
+              "  pm.expect(pm.response.json().status).to.eql('AUTHORIZED');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "PATCH",
+        "header": [],
+        "url": "{{GATEWAY_API}}/payments/{{E2E_PAYMENT_ID}}/authorize"
+      }
+    },
+    {
+      "name": "09. 결제 캡처 — PATCH /payments/{id}/capture (CAPTURED)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('AUTHORIZED → CAPTURED (Outbox → Kafka → 정산 생성 트리거)', () => {",
+              "  pm.response.to.have.status(200);",
+              "  pm.expect(pm.response.json().status).to.eql('CAPTURED');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "PATCH",
+        "header": [],
+        "url": "{{GATEWAY_API}}/payments/{{E2E_PAYMENT_ID}}/capture"
+      }
+    },
+    {
+      "name": "10. 취소 신청(구매자) — POST /orders/{id}/cancellation-request",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('주문 → CANCELLATION_REQUESTED', () => {",
+              "  pm.response.to.have.status(200);",
+              "  pm.expect(pm.response.json().status).to.eql('CANCELLATION_REQUESTED');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"reason\": \"E2E 시나리오 — 단순 변심 취소\"\n}"
+        },
+        "url": "{{GATEWAY_API}}/orders/{{E2E_ORDER_ID}}/cancellation-request"
+      }
+    },
+    {
+      "name": "11. 취소 승인(관리자) — POST /orders/admin/{id}/cancellation-approve",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('승인 → 전액 환불 자동 실행 → 주문 REFUNDED', () => {",
+              "  pm.response.to.have.status(200);",
+              "  // 결제(CAPTURED)가 있으므로 승인이 PG 전액 환불까지 실행하고 REFUNDED 로 확정",
+              "  pm.expect(pm.response.json().status).to.eql('REFUNDED');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [{ "key": "token", "value": "{{E2E_ADMIN_TOKEN}}", "type": "string" }]
+        },
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"reason\": \"E2E 시나리오 — 관리자 취소 승인\"\n}"
+        },
+        "url": "{{GATEWAY_API}}/orders/admin/{{E2E_ORDER_ID}}/cancellation-approve"
+      }
+    },
+    {
+      "name": "12. 환불 확인 ① — GET /payments/{id} (REFUNDED)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('결제 상태 REFUNDED', () => {",
+              "  pm.response.to.have.status(200);",
+              "  pm.expect(pm.response.json().status).to.eql('REFUNDED');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{GATEWAY_API}}/payments/{{E2E_PAYMENT_ID}}"
+      }
+    },
+    {
+      "name": "13. 환불 확인 ② — GET /api/payments/{id}/refunds (이력·금액)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('환불 이력 1건 이상 & 총 환불액 = 주문 금액', () => {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.refunds).to.be.an('array').with.length.of.at.least(1);",
+              "  pm.expect(Number(body.totalRefundedAmount)).to.eql(Number(pm.collectionVariables.get('E2E_ORDER_AMOUNT')));",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{GATEWAY_API}}/api/payments/{{E2E_PAYMENT_ID}}/refunds"
+      }
+    }
+  ]
+}

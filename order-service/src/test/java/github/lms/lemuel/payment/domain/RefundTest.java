@@ -63,15 +63,44 @@ class RefundTest {
         refund.markCompleted();
         assertThatThrownBy(refund::markCompleted)
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Only REQUESTED");
+                .hasMessageContaining("already COMPLETED");
     }
 
-    @Test @DisplayName("markFailed: REQUESTED → FAILED")
+    @Test @DisplayName("markCompleted: 재시도로 살아난 FAILED → COMPLETED 전이 가능 + 재시도 예약 해제")
+    void markCompleted_fromFailed() {
+        Refund refund = Refund.request(1L, BigDecimal.TEN, "key", "이유");
+        refund.markFailed("PG 일시 오류");
+        assertThat(refund.getStatus()).isEqualTo(Refund.Status.FAILED);
+        assertThat(refund.getNextRetryAt()).isNotNull();
+
+        refund.markCompleted();
+        assertThat(refund.getStatus()).isEqualTo(Refund.Status.COMPLETED);
+        assertThat(refund.isCompleted()).isTrue();
+        assertThat(refund.getNextRetryAt()).isNull();
+    }
+
+    @Test @DisplayName("markFailed: REQUESTED → FAILED + 재시도 횟수 1 + 다음 재시도 예약")
     void markFailed() {
         Refund refund = Refund.request(1L, BigDecimal.TEN, "key", "이유");
         refund.markFailed("PG 오류");
         assertThat(refund.getStatus()).isEqualTo(Refund.Status.FAILED);
         assertThat(refund.getReason()).isEqualTo("PG 오류");
+        assertThat(refund.getRetryCount()).isEqualTo(1);
+        assertThat(refund.getNextRetryAt()).isNotNull();
+        assertThat(refund.isRetryable()).isTrue();
+        assertThat(refund.isRetryExhausted()).isFalse();
+    }
+
+    @Test @DisplayName("markFailed: 재시도 실패가 누적되면 상한 도달 시 재시도 소진(nextRetryAt=null)")
+    void markFailed_exhaustsAfterMaxRetries() {
+        Refund refund = Refund.request(1L, BigDecimal.TEN, "key", "이유");
+        for (int i = 0; i < Refund.MAX_RETRIES; i++) {
+            refund.markFailed("PG 오류 #" + i);
+        }
+        assertThat(refund.getRetryCount()).isEqualTo(Refund.MAX_RETRIES);
+        assertThat(refund.getNextRetryAt()).isNull();
+        assertThat(refund.isRetryable()).isFalse();
+        assertThat(refund.isRetryExhausted()).isTrue();
     }
 
     @Test @DisplayName("markFailed: COMPLETED 상태에서 호출하면 예외")
@@ -80,6 +109,19 @@ class RefundTest {
         refund.markCompleted();
         assertThatThrownBy(() -> refund.markFailed("실패"))
                 .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test @DisplayName("abandon: 적용 불가 실패건을 재시도 소진 상태로 고정")
+    void abandon() {
+        Refund refund = Refund.request(1L, BigDecimal.TEN, "key", "이유");
+        refund.markFailed("PG 오류");
+        refund.abandon("payment already fully refunded");
+        assertThat(refund.getStatus()).isEqualTo(Refund.Status.FAILED);
+        assertThat(refund.getReason()).isEqualTo("payment already fully refunded");
+        assertThat(refund.getRetryCount()).isEqualTo(Refund.MAX_RETRIES);
+        assertThat(refund.getNextRetryAt()).isNull();
+        assertThat(refund.isRetryable()).isFalse();
+        assertThat(refund.isRetryExhausted()).isTrue();
     }
 
     @Test @DisplayName("Status enum: 3개의 값")

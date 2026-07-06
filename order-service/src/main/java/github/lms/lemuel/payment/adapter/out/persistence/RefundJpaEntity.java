@@ -33,6 +33,12 @@ public class RefundJpaEntity {
     @Column(name = "idempotency_key", nullable = false)
     private String idempotencyKey;
 
+    @Column(name = "retry_count", nullable = false)
+    private int retryCount;
+
+    @Column(name = "next_retry_at")
+    private LocalDateTime nextRetryAt;
+
     @Column(name = "requested_at", nullable = false)
     private LocalDateTime requestedAt;
 
