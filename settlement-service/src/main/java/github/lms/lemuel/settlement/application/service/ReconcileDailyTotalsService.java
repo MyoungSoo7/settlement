@@ -31,24 +31,21 @@ public class ReconcileDailyTotalsService implements ReconcileDailyTotalsUseCase 
         ReconciliationReport report = ReconciliationReport.of(
                 targetDate,
                 loadDailyTotalsPort.sumCapturedPayments(targetDate),
-                loadDailyTotalsPort.sumCompletedRefunds(targetDate),
-                loadDailyTotalsPort.sumSettlementNet(targetDate),
-                loadDailyTotalsPort.sumSettlementCommission(targetDate),
-                loadDailyTotalsPort.sumRefundAdjustments(targetDate)
+                loadDailyTotalsPort.sumSettlementGross(targetDate),
+                loadDailyTotalsPort.sumRefundedAgainstCaptures(targetDate),
+                loadDailyTotalsPort.sumSettlementRefunded(targetDate)
         );
 
         if (report.matched()) {
-            log.info("[Reconciliation] {} OK — payments={}, refunds={}, settlementNet={}, commission={}, refundAdjustments={}",
-                    targetDate, report.totalPayments(), report.totalRefunds(),
-                    report.totalSettlementNet(), report.totalSettlementCommission(),
-                    report.totalRefundAdjustments());
+            log.info("[Reconciliation] {} OK — capturedPayments={}, settlementGross={}, refundedAgainstCaptures={}, settlementRefunded={}",
+                    targetDate, report.capturedPayments(), report.settlementGross(),
+                    report.refundedAgainstCaptures(), report.settlementRefunded());
         } else {
             // 금액이 샜음 — 즉시 감시 가능한 ERROR 레벨. 운영에서는 Alertmanager 로 연계 권장.
-            log.error("[Reconciliation] {} MISMATCH paymentDiscrepancy={}, refundDiscrepancy={} — payments={}, refunds={}, settlementNet={}, commission={}, refundAdjustments={}",
-                    targetDate, report.paymentDiscrepancy(), report.refundDiscrepancy(),
-                    report.totalPayments(), report.totalRefunds(),
-                    report.totalSettlementNet(), report.totalSettlementCommission(),
-                    report.totalRefundAdjustments());
+            log.error("[Reconciliation] {} MISMATCH captureDiscrepancy={}, refundDiscrepancy={} — capturedPayments={}, settlementGross={}, refundedAgainstCaptures={}, settlementRefunded={}",
+                    targetDate, report.captureDiscrepancy(), report.refundDiscrepancy(),
+                    report.capturedPayments(), report.settlementGross(),
+                    report.refundedAgainstCaptures(), report.settlementRefunded());
         }
         return report;
     }

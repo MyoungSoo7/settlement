@@ -17,6 +17,7 @@ COPY order-service/build.gradle.kts ./order-service/
 COPY settlement-service/build.gradle.kts ./settlement-service/
 COPY loan-service/build.gradle.kts ./loan-service/
 COPY financial-statements-service/build.gradle.kts ./financial-statements-service/
+COPY company-service/build.gradle.kts ./company-service/
 COPY gateway-service/build.gradle.kts ./gateway-service/
 
 RUN --mount=type=cache,target=/home/gradle/.gradle \
@@ -28,6 +29,7 @@ COPY order-service ./order-service
 COPY settlement-service ./settlement-service
 COPY loan-service ./loan-service
 COPY financial-statements-service ./financial-statements-service
+COPY company-service ./company-service
 COPY gateway-service ./gateway-service
 
 RUN --mount=type=cache,target=/home/gradle/.gradle \

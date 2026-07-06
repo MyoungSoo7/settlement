@@ -82,6 +82,7 @@ subprojects {
                     "**/SettlementServiceApplication*",
                     "**/GatewayServiceApplication*",
                     "**/FinancialStatementsApplication*",
+                    "**/CompanyServiceApplication*",
                 )
             }
         })

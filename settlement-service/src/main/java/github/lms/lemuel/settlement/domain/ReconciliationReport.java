@@ -5,53 +5,51 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 
 /**
- * 일일 정산 대사(Reconciliation) 리포트 — <b>생성 대사</b>.
+ * 일일 정산 대사(Reconciliation) 리포트 — <b>캡처일 기준 양축 대사</b>.
  *
  * <p>등급별 정산주기(ADR 0014, T+N 영업일) 도입 후 {@code settlement_date} 는 지급 예정일이 되어
- * 결제 캡처일과 어긋난다. 따라서 대사는 지급예정일이 아니라 <b>같은 날 일어난 사건끼리</b> 두 축으로 대조한다:
+ * 캡처일과 어긋난다. 또 {@code net_amount} 는 환불로 실시간 감소한다. 그래서 대사는 캡처일 하나로
+ * 키를 맞추고, 환불에 소급 변동하지 않는 안정 컬럼(gross {@code payment_amount}, {@code refunded_amount})
+ * 으로 두 축을 대조한다:
  *
  * <ol>
- *   <li><b>결제 축</b>: 그날 캡처된 결제 총액(gross, 이후 환불 여부 무관)
- *       = 그날 <b>생성된</b> 정산의 {@code netAmount + commission} 합계
- *       (모든 캡처는 같은 날 정산 1건을 만들어야 한다 — 3단 멱등 방어의 대사 측 검증)</li>
- *   <li><b>환불 축</b>: 그날 COMPLETED 된 환불 총액
- *       = 그날 생성된 환불 조정(역정산, ADR 0004)의 합계(양수 환산)</li>
+ *   <li><b>캡처 축</b>: order 캡처 gross(CAPTURED+REFUNDED) == 그날 생성된 정산 gross(payment_amount) 합계.
+ *       모든 캡처가 같은 날 정산 1건을 만들었는지 검증(3단 멱등 방어의 대사 측).</li>
+ *   <li><b>환불 축</b>: order 캡처분에 반영된 환불 == 그날 생성된 정산의 refunded_amount 합계.
+ *       환불이 정산에 실반영됐는지 검증(역정산 컨슈머 결선 여부를 정면 감지).</li>
  * </ol>
  *
  * 어느 축이든 어긋나면 금액이 새고 있다는 의미이므로 즉시 알림을 보내야 한다.
  */
 public record ReconciliationReport(
         LocalDate targetDate,
-        BigDecimal totalPayments,             // 해당 날짜 캡처된 결제 gross 합계 (이후 환불 무관)
-        BigDecimal totalRefunds,              // 해당 날짜 COMPLETED 환불 합계
-        BigDecimal totalSettlementNet,        // 해당 날짜 생성된 정산 netAmount 합계 (CANCELED 제외)
-        BigDecimal totalSettlementCommission, // 해당 날짜 생성된 정산 commission 합계 (CANCELED 제외)
-        BigDecimal totalRefundAdjustments,    // 해당 날짜 생성된 환불 조정 합계 (음수 기록의 양수 환산)
-        BigDecimal paymentDiscrepancy,        // payments - (net + commission) = 0 이어야 함
-        BigDecimal refundDiscrepancy,         // refunds - refundAdjustments = 0 이어야 함
-        BigDecimal discrepancy,               // |paymentDiscrepancy| + |refundDiscrepancy| (경보 총량)
+        BigDecimal capturedPayments,      // order: 그날 캡처 gross (CAPTURED+REFUNDED)
+        BigDecimal settlementGross,       // settlement: 그날 생성 정산 payment_amount 합계
+        BigDecimal refundedAgainstCaptures, // order: 그날 캡처분에 반영된 환불액
+        BigDecimal settlementRefunded,    // settlement: 그날 생성 정산 refunded_amount 합계
+        BigDecimal captureDiscrepancy,    // capturedPayments - settlementGross = 0 이어야 함
+        BigDecimal refundDiscrepancy,     // refundedAgainstCaptures - settlementRefunded = 0 이어야 함
+        BigDecimal discrepancy,           // |captureDiscrepancy| + |refundDiscrepancy| (경보 총량)
         boolean matched
 ) {
 
     public static ReconciliationReport of(LocalDate date,
-                                          BigDecimal payments,
-                                          BigDecimal refunds,
-                                          BigDecimal settlementNet,
-                                          BigDecimal settlementCommission,
-                                          BigDecimal refundAdjustments) {
-        BigDecimal pays = nz(payments);
-        BigDecimal refs = nz(refunds);
-        BigDecimal net = nz(settlementNet);
-        BigDecimal comm = nz(settlementCommission);
-        BigDecimal adjs = nz(refundAdjustments);
+                                          BigDecimal capturedPayments,
+                                          BigDecimal settlementGross,
+                                          BigDecimal refundedAgainstCaptures,
+                                          BigDecimal settlementRefunded) {
+        BigDecimal caps = nz(capturedPayments);
+        BigDecimal sGross = nz(settlementGross);
+        BigDecimal oRefunded = nz(refundedAgainstCaptures);
+        BigDecimal sRefunded = nz(settlementRefunded);
 
-        BigDecimal payDiff = pays.subtract(net.add(comm)).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal refDiff = refs.subtract(adjs).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal total = payDiff.abs().add(refDiff.abs());
+        BigDecimal capDiff = caps.subtract(sGross).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal refDiff = oRefunded.subtract(sRefunded).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal total = capDiff.abs().add(refDiff.abs());
 
-        boolean ok = payDiff.compareTo(BigDecimal.ZERO) == 0
+        boolean ok = capDiff.compareTo(BigDecimal.ZERO) == 0
                 && refDiff.compareTo(BigDecimal.ZERO) == 0;
-        return new ReconciliationReport(date, pays, refs, net, comm, adjs, payDiff, refDiff, total, ok);
+        return new ReconciliationReport(date, caps, sGross, oRefunded, sRefunded, capDiff, refDiff, total, ok);
     }
 
     private static BigDecimal nz(BigDecimal v) {

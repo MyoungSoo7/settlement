@@ -9,6 +9,7 @@ include(
     "settlement-service",
     "loan-service",
     "financial-statements-service",
+    "company-service",
     "gateway-service",
 )
 

@@ -9,11 +9,16 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 /**
- * 일일 대사용 집계 어댑터 (ADR 0020 Phase 5 self-totals).
+ * 일일 대사용 집계 어댑터 (ADR 0020 Phase 5 self-totals) — 캡처일 기준 양축.
  *
- * <p>order 원천 합계(CAPTURED 결제·COMPLETED 환불)는 {@link OrderReconClient} 로 order 의 내부 API
- * 에서 받아오고, settlement 자기 합계(net·commission)는 자기 settlement_db 의 {@code settlements} 에서
- * 직접 집계한다. → settlement 가 order DB 를 직접 읽지 않는다(cross-DB 연결 0).
+ * <p>order 원천(캡처 gross·캡처분 반영 환불)은 {@link OrderReconClient} 로 order 내부 API 에서 받고,
+ * settlement 자기 합계(정산 gross·반영 환불)는 자기 settlement_db 의 {@code settlements} 에서
+ * <b>생성일(created_at) 기준</b>으로 직접 집계한다. → cross-DB 연결 0.
+ *
+ * <p>gross 는 {@code payment_amount}, 반영 환불은 {@code refunded_amount} 를 쓴다. 둘 다 환불로
+ * 소급 변동하지 않는 안정 컬럼이라 대사가 항상 수렴한다({@code net_amount} 는 환불로 실시간 감소해 부적합).
+ * 상태 필터를 걸지 않는다 — CANCELED(전액 환불) 정산도 실제 캡처를 대표하므로 gross 에 포함돼야
+ * order 캡처 합계(REFUNDED 포함)와 일치한다.
  */
 @Repository
 public class DailyTotalsJdbcAdapter implements LoadDailyTotalsPort {
@@ -32,41 +37,25 @@ public class DailyTotalsJdbcAdapter implements LoadDailyTotalsPort {
     }
 
     @Override
-    public BigDecimal sumCompletedRefunds(LocalDate date) {
-        return nz(orderReconClient.dailyTotals(date).completedRefunds());
+    public BigDecimal sumRefundedAgainstCaptures(LocalDate date) {
+        return nz(orderReconClient.dailyTotals(date).refundedAgainstCaptures());
     }
 
     @Override
-    public BigDecimal sumSettlementNet(LocalDate date) {
-        // 생성 대사: created_at 기준. settlement_date(지급 예정일, T+N 영업일)로 자르면
-        // 캡처일 D 의 정산이 D+N 버킷으로 빠져 대사가 구조적으로 깨진다.
+    public BigDecimal sumSettlementGross(LocalDate date) {
         return queryDecimal("""
-                SELECT COALESCE(SUM(net_amount), 0)
+                SELECT COALESCE(SUM(payment_amount), 0)
                 FROM settlements
                 WHERE created_at::date = ?
-                  AND status <> 'CANCELED'
                 """, date);
     }
 
     @Override
-    public BigDecimal sumSettlementCommission(LocalDate date) {
+    public BigDecimal sumSettlementRefunded(LocalDate date) {
         return queryDecimal("""
-                SELECT COALESCE(SUM(commission), 0)
+                SELECT COALESCE(SUM(refunded_amount), 0)
                 FROM settlements
                 WHERE created_at::date = ?
-                  AND status <> 'CANCELED'
-                """, date);
-    }
-
-    @Override
-    public BigDecimal sumRefundAdjustments(LocalDate date) {
-        // 환불 조정(ADR 0004)은 음수 기록 — 양수 환산해 환불 축과 직접 비교한다.
-        // chargeback 조정은 환불 축이 아니므로 refund_id 연결분만 집계.
-        return queryDecimal("""
-                SELECT COALESCE(SUM(-amount), 0)
-                FROM settlement_adjustments
-                WHERE refund_id IS NOT NULL
-                  AND created_at::date = ?
                 """, date);
     }
 
