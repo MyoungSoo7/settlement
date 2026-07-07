@@ -106,7 +106,7 @@ const CompanyLookupPage: React.FC = () => {
               <div className="overflow-x-auto">
                 <table className="min-w-full text-sm">
                   <thead>
-                    <tr className="text-left text-gray-500 border-b">
+                    <tr className="text-left text-gray-900 border-b">
                       <th className="py-2 pr-4">종목코드</th>
                       <th className="py-2 pr-4">기업명</th>
                       <th className="py-2 pr-4">시장</th>
@@ -116,9 +116,9 @@ const CompanyLookupPage: React.FC = () => {
                   <tbody>
                     {companies?.content.map((c) => (
                       <tr key={c.stockCode} className="border-b last:border-0 hover:bg-indigo-50/60">
-                        <td className="py-2 pr-4 font-mono">{c.stockCode}</td>
-                        <td className="py-2 pr-4 font-medium">{c.name}</td>
-                        <td className="py-2 pr-4">{c.market}</td>
+                        <td className="py-2 pr-4 font-mono text-gray-900">{c.stockCode}</td>
+                        <td className="py-2 pr-4 font-medium text-gray-900">{c.name}</td>
+                        <td className="py-2 pr-4 text-gray-900">{c.market}</td>
                         <td className="py-2 text-right">
                           <button
                             onClick={() => openCompany(c)}
