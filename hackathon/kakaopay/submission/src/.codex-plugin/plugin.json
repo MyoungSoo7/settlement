@@ -1,0 +1,16 @@
+{
+  "name": "kakaopay-invest-companion",
+  "version": "0.2.0",
+  "description": "초보 투자자의 매수·매도 불안을 '감정 인정 → 데이터 사실확인 → 규칙 상기 → 다음 단계 1개' 설득 구조로 안심시키는 Codex 플러그인 (AX 인재전쟁 — 카카오페이증권 과제)",
+  "author": { "name": "AX 인재전쟁 참가자" },
+  "keywords": ["investment", "beginner", "anxiety", "trust", "compliance"],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "KakaoPay Invest Companion",
+    "shortDescription": "불안 트리아지 · 다음 단계 안내 · 신뢰 설명 구조 — 초보 투자자를 안심시켜 다음 행동으로",
+    "developerName": "AX 인재전쟁 참가자",
+    "category": "Research",
+    "capabilities": ["Read"]
+  }
+}

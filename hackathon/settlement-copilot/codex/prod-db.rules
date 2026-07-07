@@ -1,0 +1,37 @@
+# settlement-copilot — Codex execpolicy rules (prefix_rule 서브셋).
+# 세션 중 위험 명령을 승인 프롬프트로 승격한다. 내용 검사(SQL 안의 UPDATE 등)는
+# prefix 매칭으로 불가능하므로 MCP guard_check + git pre-commit 가드가 담당한다.
+#
+# 검증: codex execpolicy check --rules settlement-copilot/codex/prod-db.rules psql -d settlement_db
+
+prefix_rule(
+    pattern = [["psql", "pgcli", "pg_dump"]],
+    decision = "prompt",
+    justification = "정산 계열 DB 직접 접속 — 조회는 settlement-copilot MCP 도구(recon_run, ledger_entries, integrity_check)를, 데이터 정정은 adjustment/역분개 API 경로를 사용하세요.",
+    match = ["psql -d settlement_db", "pg_dump opslab"],
+    not_match = ["git status"],
+)
+
+prefix_rule(
+    pattern = ["kubectl", "exec"],
+    decision = "prompt",
+    justification = "운영 파드 직접 접속 — 러너북 절차 또는 MCP 도구를 우선 사용하세요.",
+    match = ["kubectl exec -it settlement-0 -- psql"],
+    not_match = ["kubectl get pods"],
+)
+
+prefix_rule(
+    pattern = ["rpk", "topic", "produce"],
+    decision = "prompt",
+    justification = "운영 토픽 직접 produce 는 Outbox event_id 멱등 체계를 우회합니다. 테스트 목적이면 -z none 및 테스트 토픽을 사용하세요.",
+    match = ["rpk topic produce lemuel.payment.captured"],
+    not_match = ["rpk topic list"],
+)
+
+prefix_rule(
+    pattern = ["kafka-console-producer"],
+    decision = "prompt",
+    justification = "운영 토픽 직접 produce 는 Outbox event_id 멱등 체계를 우회합니다.",
+    match = ["kafka-console-producer --topic lemuel.payment.captured"],
+    not_match = ["kafka-console-consumer --topic lemuel.payment.captured"],
+)
