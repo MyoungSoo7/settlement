@@ -79,6 +79,12 @@ frontend/repro-*.mjs
 ### Python sim artifacts ###
 scripts/sim/__pycache__/
 scripts/sim/.sim_state.json
-docs
+
 ### Vite local env (실제 키 — 커밋 금지) ###
 frontend/.env.production.local
+
+### fashion-copilot 제출물 산출 디렉터리 ###
+fashion-copilot/dist/
+
+# pwc submission DART corp-code cache (재생성 가능)
+pwc/submission/src/data/cache/

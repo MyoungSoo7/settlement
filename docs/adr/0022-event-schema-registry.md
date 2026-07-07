@@ -2,6 +2,8 @@
 
 - 상태: Proposed (설계 — ADR 0020 Phase 5.3 분화. 구현 전 의사결정 고정)
 - 일자: 2026-06-17
+- 참고: 대안 검토의 "JSON + JSON Schema 검증(경량)"은 [ADR 0024](0024-event-contract-as-code.md) 로
+  선행 실행됨 (2026-07-07) — 본 ADR 의 SR 마이그레이션 착수 시 0024 의 스키마가 Avro IDL 원본이 된다.
 
 > ADR 0020(order↔settlement DB 물리 분리) Phase 5.3 의 상세 결정. 본 ADR 은 **설계만** 다루며
 > 코드 변경은 포함하지 않는다(인프라 도입 시 별도 PR).

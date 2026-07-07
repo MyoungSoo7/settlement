@@ -557,3 +557,58 @@ operation 전용 컨슈머 그룹(`lemuel-operation`)으로 구독해 `count_tot
   분자가 채워진다(코드/스키마 변경 0).
 - `SignalCategory` 의 ORDER_FAILURE/PAYMENT_FAILURE/STOCK_SHORTAGE/SHIPPING_DELAY 는 2b 실패 이벤트가
   인시던트(ANOMALY source, Phase 3)로 승격될 때 사용.
+
+---
+
+# operation-service Phase 2b — 실패 이벤트 (count_signal 분자)
+
+> 상태: **구현 완료** (2026-07-07). Phase 2 의 두 번째 조각 — 교차 서비스 실패 이벤트로
+> failure_rate 의 분자를 채운다. 이제 "정산 실패율이 평소보다 N% 증가"의 분자·분모가 모두 흐른다.
+
+## 2b.1 발행 backbone — shared-common `common.opssignal`
+
+전 서비스가 실패 지점에서 호출하는 재사용 백본:
+- `OpsSignal`(envelope: category/service/entityType/entityId/severity/occurredAt/attributes) — PII 미포함(ID·비식별 메타만).
+- `OpsSignalCategory`(5종 + 전용 토픽 `lemuel.ops.{order,payment,stock,shipping,settlement}.failed`).
+- `OpsSignalPort` — **계약: 절대 throw 안 함**.
+- `KafkaOpsSignalPublisher`(app.kafka.enabled=true) / `NoOpOpsSignalPublisher`(matchIfMissing).
+
+★ 설계 핵심 — **비즈니스 트랜잭션 무영향**:
+- **Outbox 미사용** — 실패는 흔히 트랜잭션 롤백을 동반해 outbox 행도 사라진다. 실패 신호는
+  out-of-band(직접 Kafka)로 보내야 롤백돼도 관측된다.
+- **비동기 send + 예외 전삼킴** — `.get()` 없이 fire-and-forget, 직렬화·전송 준비 단계의 어떤 예외도
+  삼키고 로그만. 결제/정산 catch 블록에 emit 한 줄을 넣어도 2차 예외로 오염되지 않는다.
+
+## 2b.2 수집 — operation `OpsFailureSignalConsumer`
+
+5개 `lemuel.ops.*.failed` 토픽을 operation 그룹으로 구독 → `recordEvent(metricKey, signal=true, occurredAt)`.
+이때 count_total 도 +1 되어(시도) failure_rate = count_signal/count_total 이 성립한다(성공 분모는 2a).
+버킷 시각은 envelope.occurredAt 우선, 없으면 record timestamp 폴백.
+
+## 2b.3 발행 지점 배선 (실 실패 사이트)
+
+| 신호 | 발행 지점 | 방식 |
+|---|---|---|
+| `settlement.failed` | `PayoutSingleExecutor` — 펌뱅킹 실패 catch(markFailed 직후) | 단일 생성자 주입 |
+| `payment.failed` | `RefundLifecycle.fail` — 환불(결제 도메인) 실패 기록 직후 | 단일 생성자 주입 |
+| `stock.depleted` | `Decrease{Variant,Product}StockService.classifyFailure` — 구매 시 재고 부족 분기 | **오버로드 생성자** |
+| `shipping.delayed` | 신규 `ShippingDelayScanner` 배치 — IN_TRANSIT 임계(72h) crossing window 스캔 | 신규 컴포넌트 |
+
+- **오버로드 생성자 패턴(재고)**: 재고 서비스는 동시성 테스트 10곳이 직접 생성하므로, `@Autowired` 5-arg(실 빈)
+  + 4-arg 편의 생성자(NoOp 위임)를 둬 **기존 테스트 무수정**으로 배선했다.
+- **shipping 중복 방지**: "임계를 이번 스캔 창에서 막 넘어선" 배송만 crossing window(`shippedAt ∈ (임계-스캔주기, 임계]`)로
+  잡아 같은 지연 건의 매 스캔 재발행(카운트 부풀림)을 막는다 — 배송당 대략 1회.
+
+## 2b.4 미배선 (문서화) — `order.failed`
+
+order 도메인에는 "주문 생성 실패"의 단일 catch 지점·전역 예외 핸들러가 없어(InsufficientStockException 은
+uncaught 전파, 그 케이스는 이미 stock.depleted 로 커버), 잘못된 지점 계측의 위험을 피해 배선을 보류했다.
+**소비자·토픽·envelope 는 준비 완료** — 주문 생성 오케스트레이션의 실패 catch 지점이 확정되면 emit 한 줄로 완결된다.
+
+## 2b.5 구현 노트
+
+- **토픽 자동 생성**: operation 은 `missing-topics-fatal=false` 로 미존재 토픽 구독을 허용하고, 토픽은 첫 발행 시
+  Redpanda auto-create 로 생성된다(별도 NewTopic 빈 불필요).
+- **ObjectMapper**: envelope 의 `Instant` 직렬화는 shared ObjectMapper(JacksonCompatConfig)가 JavaTimeModule 을
+  등록해 지원한다(테스트도 동일 mapper 사용).
+- **멱등 미적용**: 2a 성공 컨슈머와 동일 — 통계 5분 버킷은 at-least-once/드문 유실에 강건.
