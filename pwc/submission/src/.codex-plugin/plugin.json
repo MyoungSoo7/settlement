@@ -1,0 +1,26 @@
+{
+  "schema_version": "1.0",
+  "name": "trusted-ceo-agent",
+  "version": "0.1.0",
+  "description": "기업 내부 정형/비정형 데이터의 행간에서 CEO가 놓친 리스크(회계처리 오류·현금흐름 병목·원가배분 왜곡)를 역으로 추출하고, 논리적 근거를 자연어로 제시하는 Codex 플러그인.",
+  "author": {
+    "name": "Lemuel — AX 인재전쟁 Round 10 / 삼일PwC 과제"
+  },
+  "license": "Apache-2.0",
+  "keywords": ["accounting", "risk", "cashflow", "cost-allocation", "ceo", "audit"],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Trusted CEO Agent",
+    "shortDescription": "데이터 행간에서 CEO가 놓친 리스크를 근거와 함께 추출",
+    "longDescription": "시산표·채권 aging·원가배분표 등 흩어진 기업 데이터를 대사(reconcile)하고, 이상 신호를 가설-검증 구조로 분류해 CEO 서명용 브리핑으로 전달합니다. 대시보드가 아니라 '왜 문제인지'의 인과 사슬을 자연어로 설명하는 것이 목적입니다.",
+    "developerName": "Lemuel",
+    "category": "Productivity",
+    "capabilities": ["Read"],
+    "defaultPrompt": [
+      "Use Trusted CEO Agent to find the risks hidden in data/sample and explain why they matter.",
+      "data/sample 의 재무 데이터에서 CEO가 놓치고 있는 리스크를 추출하고 근거를 설명해줘."
+    ],
+    "brandColor": "#D04A02"
+  }
+}

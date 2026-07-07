@@ -1,0 +1,4 @@
+product,sales,direct_cost,allocated_common_cost,allocation_basis_sales_pct,actual_machine_hours_pct,operating_income
+제품A,7900,4740,1500,50,30,1660
+제품B,5530,3320,1050,35,25,1160
+제품C,2370,1900,450,15,45,20
