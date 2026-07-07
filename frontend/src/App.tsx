@@ -5,6 +5,7 @@ import { ToastProvider } from './contexts/ToastContext';
 import { CartProvider } from './contexts/CartContext';
 import Layout from './components/Layout';
 import SystemLayout from './components/SystemLayout';
+import CeoLayout from './components/CeoLayout';
 
 // 공개 페이지 (즉시 로드)
 import Login from './pages/Login';
@@ -23,6 +24,7 @@ const TossPaymentSuccess = lazy(() => import('./pages/TossPaymentSuccess'));
 const FinancialStatementsPage = lazy(() => import('./pages/FinancialStatementsPage'));
 const EconomicsPage = lazy(() => import('./pages/EconomicsPage'));
 const CompanyLookupPage = lazy(() => import('./pages/CompanyLookupPage'));
+const CeoInsightPage = lazy(() => import('./pages/CeoInsightPage'));
 
 // 관리자 페이지 (lazy load)
 const ProductPage = lazy(() => import('./pages/ProductPage'));
@@ -111,9 +113,9 @@ function App() {
             <Route path="/categories"         element={<AdminManagerRoute><CategoryManagementPage /></AdminManagerRoute>} />
             <Route path="/tags"               element={<AdminManagerRoute><TagManagementPage /></AdminManagerRoute>} />
 
-            {/* ── 최고 관리자 전용: 운영 관제 (operation-service 인시던트 콘솔) ── */}
+            {/* ── 최고 관리자 전용: 운영 관제 — 시스템 관리(운영관리)로 편입, 구 경로는 리다이렉트 ── */}
             <Route path="/admin/operation"
-              element={<AdminOnlyRoute><OperationConsolePage /></AdminOnlyRoute>} />
+              element={<Navigate to="/admin/system/operation" replace />} />
 
             {/* ── 최고 관리자 전용: 시스템 관리 (좌측 사이드바) ── */}
             <Route path="/admin/system"
@@ -126,6 +128,22 @@ function App() {
               element={<AdminOnlyRoute><SystemLayout><RbacManagementPage /></SystemLayout></AdminOnlyRoute>} />
             <Route path="/admin/system/ecommerce-categories"
               element={<AdminOnlyRoute><SystemLayout><EcommerceCategoryAdmin /></SystemLayout></AdminOnlyRoute>} />
+            <Route path="/admin/system/operation"
+              element={<AdminOnlyRoute><SystemLayout><OperationConsolePage /></SystemLayout></AdminOnlyRoute>} />
+
+            {/* ── 최고 관리자 전용: CEO 인사이트 (좌측 사이드바) — 위성 조회 서비스 묶음 ── */}
+            <Route path="/admin/ceo"
+              element={<Navigate to="/admin/ceo/insight" replace />} />
+            <Route path="/admin/ceo/insight"
+              element={<AdminOnlyRoute><CeoLayout><CeoInsightPage /></CeoLayout></AdminOnlyRoute>} />
+            <Route path="/admin/ceo/economics"
+              element={<AdminOnlyRoute><CeoLayout><EconomicsPage /></CeoLayout></AdminOnlyRoute>} />
+            <Route path="/admin/ceo/financials"
+              element={<AdminOnlyRoute><CeoLayout><FinancialStatementsPage /></CeoLayout></AdminOnlyRoute>} />
+            <Route path="/admin/ceo/companies"
+              element={<AdminOnlyRoute><CeoLayout><CompanyLookupPage /></CeoLayout></AdminOnlyRoute>} />
+            <Route path="/admin/ceo/loans"
+              element={<AdminOnlyRoute><CeoLayout><LoanPage /></CeoLayout></AdminOnlyRoute>} />
 
           </Routes>
           </Suspense>

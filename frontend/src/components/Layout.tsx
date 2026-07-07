@@ -58,18 +58,21 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   <Link to="/product"          className={adminNavLinkClass('/product')}>상품관리</Link>
                   <Link to="/admin/settlement" className={adminNavLinkClass('/admin/settlement')}>정산관리</Link>
                   <Link to="/settlement/search" className={adminNavLinkClass('/settlement/search')}>정산조회</Link>
-                  <Link to="/loans"            className={adminNavLinkClass('/loans')}>대출관리</Link>
-                  <Link to="/economics"        className={adminNavLinkClass('/economics')}>경제지표</Link>
+                  {/* MANAGER 는 위성 조회를 개별 링크로 유지 (CEO 그룹은 ADMIN 전용) */}
+                  {user.role === 'MANAGER' && (
+                    <>
+                      <Link to="/loans"     className={adminNavLinkClass('/loans')}>대출관리</Link>
+                      <Link to="/economics" className={adminNavLinkClass('/economics')}>경제지표</Link>
+                    </>
+                  )}
                   {user.role === 'ADMIN' && (
                     <>
+                      {/* CEO — 경제지표·재무제표·기업조회·대출관리 4개 하위 (좌측 사이드바) */}
+                      <Link to="/admin/ceo/insight" className={adminNavLinkClass('/admin/ceo')}>
+                        CEO
+                      </Link>
                       <Link to="/admin/system/menus" className={adminNavLinkClass('/admin/system')}>
                         시스템
-                      </Link>
-                      <Link to="/financials" className={adminNavLinkClass('/financials')}>
-                        재무제표
-                      </Link>
-                      <Link to="/companies" className={adminNavLinkClass('/companies')}>
-                        기업조회
                       </Link>
                     </>
                   )}
