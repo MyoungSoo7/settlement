@@ -90,6 +90,47 @@ public class ReconQueryRepository {
         return result != null ? result : BigDecimal.ZERO;
     }
 
+    /**
+     * 해당 날짜 캡처된 결제 <b>건수</b> — 캡처 이력 기준 (INV-9 건수 대사 축).
+     * 금액 합계 대사는 +N/−N 상쇄 오류를 통과시키므로 건수를 병행 대조한다.
+     */
+    public long countCapturedPayments(LocalDate date) {
+        Long result = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM opslab.payments
+                WHERE status IN ('CAPTURED', 'REFUNDED') AND captured_at::date = ?
+                """, Long.class, date);
+        return result != null ? result : 0L;
+    }
+
+    /** 해당 날짜 COMPLETED 환불 건수 (완료일 기준). */
+    public long countCompletedRefunds(LocalDate date) {
+        Long result = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM opslab.refunds
+                WHERE status = 'COMPLETED' AND completed_at::date = ?
+                """, Long.class, date);
+        return result != null ? result : 0L;
+    }
+
+    /**
+     * 기간 내 COMPLETED 환불 행 목록 (완료일 기준) — INV-8 지연 환불 조정 대사용.
+     * settlement 가 자기 settlement_adjustments.refund_id 집합과 대조해
+     * "환불은 완료됐는데 조정(역정산)이 없는 건"을 찾는다.
+     */
+    public List<CompletedRefundRow> listCompletedRefunds(LocalDate from, LocalDate to, int limit) {
+        return jdbcTemplate.query("""
+                SELECT id, payment_id, amount, completed_at::date AS completed_date
+                  FROM opslab.refunds
+                 WHERE status = 'COMPLETED' AND completed_at::date BETWEEN ? AND ?
+                 ORDER BY id
+                 LIMIT ?
+                """, (rs, n) -> new CompletedRefundRow(
+                        rs.getLong("id"),
+                        rs.getLong("payment_id"),
+                        rs.getBigDecimal("amount"),
+                        rs.getObject("completed_date", LocalDate.class)),
+                from, to, limit);
+    }
+
     /** 기간 내 PaymentCaptured outbox 이벤트가 PUBLISHED 로 전이된 건수. */
     public long countPaymentCapturedPublished(LocalDate from, LocalDate to) {
         Long result = jdbcTemplate.queryForObject("""
@@ -125,5 +166,10 @@ public class ReconQueryRepository {
     /** PG 대사용 결제 행 DTO (order → settlement 직렬화). */
     public record ReconPaymentRow(Long paymentId, String pgTransactionId, BigDecimal amount,
                                   BigDecimal refundedAmount, LocalDate capturedDate) {
+    }
+
+    /** INV-8 지연 환불 대사용 완료 환불 행 DTO (order → settlement 직렬화). */
+    public record CompletedRefundRow(Long refundId, Long paymentId, BigDecimal amount,
+                                     LocalDate completedDate) {
     }
 }

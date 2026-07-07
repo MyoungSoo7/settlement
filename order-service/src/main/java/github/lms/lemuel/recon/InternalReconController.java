@@ -53,6 +53,25 @@ public class InternalReconController {
                 repository.countPaymentCapturedPublished(from, to));
     }
 
+    @Operation(summary = "일일 대사 건수 (order 원천) — INV-9 건수 축",
+            description = "해당 날짜 캡처 건수(캡처 이력 기준)·COMPLETED 환불 건수(완료일 기준). 금액 합계 대사의 ±상쇄 사각지대 보완")
+    @GetMapping("/daily-counts")
+    public DailyCounts dailyCounts(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return new DailyCounts(
+                repository.countCapturedPayments(date),
+                repository.countCompletedRefunds(date));
+    }
+
+    @Operation(summary = "기간 COMPLETED 환불 목록 (완료일 기준) — INV-8 지연 환불 조정 대사용",
+            description = "refund id·payment id·금액·완료일. settlement 가 settlement_adjustments.refund_id 와 대조해 조정 누락을 감지")
+    @GetMapping("/refunds-completed")
+    public List<ReconQueryRepository.CompletedRefundRow> refundsCompleted(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(defaultValue = "1000") int limit) {
+        return repository.listCompletedRefunds(from, to, Math.min(limit, 5000));
+    }
+
     @Operation(summary = "환불 id 집합의 COMPLETED 합계",
             description = "settlement 의 조정(settlement_adjustments)이 참조하는 refund_id 들의 COMPLETED 환불 합계 — cross-DB JOIN 분해용")
     @PostMapping("/refunds-completed-sum")
@@ -69,6 +88,9 @@ public class InternalReconController {
 
     public record DailyTotals(BigDecimal capturedPayments, BigDecimal completedRefunds,
                               BigDecimal refundedAgainstCaptures) {
+    }
+
+    public record DailyCounts(long capturedCount, long completedRefundsCount) {
     }
 
     public record PeriodTotals(BigDecimal capturedPayments, BigDecimal completedRefunds,

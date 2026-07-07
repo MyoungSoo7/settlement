@@ -19,6 +19,14 @@ public interface PublishEventPort {
                                 String paymentMethod, String pgTransactionId,
                                 SellerSettlementMeta sellerMeta);
 
-    /** 환불. refundedAmount 를 동봉해 settlement 결제 프로젝션의 환불액·상태를 갱신한다(ADR 0020 Phase 3b-4). */
-    void publishPaymentRefunded(Long paymentId, Long orderId, BigDecimal refundedAmount);
+    /**
+     * 환불. refundedAmount(누적)는 settlement 결제 프로젝션의 환불액·상태 갱신에(ADR 0020 Phase 3b-4),
+     * refundAmount(이번 환불 건별 금액)·refundId 는 settlement 역정산(netAmount 재계산·원장 역분개)에 쓰인다.
+     *
+     * @param refundedAmount 이 환불 반영 후 누적 환불액
+     * @param refundAmount   이번 환불 1건의 금액 (delta)
+     * @param refundId       환불 엔티티 ID (분할결제 등 Refund 미생성 경로는 null 허용)
+     */
+    void publishPaymentRefunded(Long paymentId, Long orderId, BigDecimal refundedAmount,
+                                BigDecimal refundAmount, Long refundId);
 }

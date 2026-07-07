@@ -188,8 +188,9 @@ public class RefundPaymentUseCase implements RefundPaymentPort {
         }
 
         // 이벤트 발행 — settlement 모듈은 PaymentRefunded Kafka 이벤트로 자체 정산 조정.
+        // 누적(refundedAmount)은 프로젝션 뷰 갱신, 건별(refundAmount)+refundId 는 역정산 트리거에 쓰인다.
         publishEventPort.publishPaymentRefunded(savedPaymentDomain.getId(), savedPaymentDomain.getOrderId(),
-                savedPaymentDomain.getRefundedAmount());
+                savedPaymentDomain.getRefundedAmount(), refundAmount, completedRefund.getId());
         log.info("PaymentRefunded event published. paymentId={}, refundId={}, refundAmount={}",
                 savedPaymentDomain.getId(), completedRefund.getId(), refundAmount);
 

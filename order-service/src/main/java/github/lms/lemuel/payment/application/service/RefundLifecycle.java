@@ -1,5 +1,7 @@
 package github.lms.lemuel.payment.application.service;
 
+import github.lms.lemuel.common.opssignal.OpsSignalCategory;
+import github.lms.lemuel.common.opssignal.OpsSignalPort;
 import github.lms.lemuel.payment.application.port.out.LoadRefundPort;
 import github.lms.lemuel.payment.application.port.out.SaveRefundPort;
 import github.lms.lemuel.payment.domain.Refund;
@@ -11,6 +13,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.Map;
 
 /**
  * 환불 시도 이력(refunds 행)의 상태 전이를 <b>본 환불 트랜잭션과 분리된 독립 트랜잭션</b>으로 커밋하는
@@ -34,10 +37,13 @@ public class RefundLifecycle {
 
     private final LoadRefundPort loadRefundPort;
     private final SaveRefundPort saveRefundPort;
+    private final OpsSignalPort opsSignalPort;
 
-    public RefundLifecycle(LoadRefundPort loadRefundPort, SaveRefundPort saveRefundPort) {
+    public RefundLifecycle(LoadRefundPort loadRefundPort, SaveRefundPort saveRefundPort,
+                           OpsSignalPort opsSignalPort) {
         this.loadRefundPort = loadRefundPort;
         this.saveRefundPort = saveRefundPort;
+        this.opsSignalPort = opsSignalPort;
     }
 
     /**
@@ -80,5 +86,8 @@ public class RefundLifecycle {
         saveRefundPort.save(refund);
         log.warn("환불 실패 기록. refundId={}, retryCount={}, nextRetryAt={}, reason={}",
                 refundId, refund.getRetryCount(), refund.getNextRetryAt(), reason);
+        // 운영 관제 실패 신호 — best-effort(절대 throw 안 함). 환불(=결제 도메인) 실패를 operation-service 로 집계.
+        opsSignalPort.emit(OpsSignalCategory.PAYMENT_FAILED, "refund", String.valueOf(refundId),
+                Map.of("reason", "REFUND_FAILED", "retryCount", refund.getRetryCount()));
     }
 }

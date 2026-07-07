@@ -94,7 +94,7 @@ class RefundPaymentUseCaseTest {
         verify(refundLifecycle).begin(eq(1L), any(), eq("payment-1-full"), any());
         verify(pgClientPort).refund("pg-tx-123", new BigDecimal("50000"), "payment-1-full");
         verify(updateOrderStatusPort).updateOrderStatus(10L, "REFUNDED");
-        verify(publishEventPort).publishPaymentRefunded(eq(1L), eq(10L), any());
+        verify(publishEventPort).publishPaymentRefunded(eq(1L), eq(10L), any(), any(), any());
     }
 
     @Test @DisplayName("부분 환불: amount < 결제금액이면 Payment 는 CAPTURED 유지, 주문 상태 미변경")
@@ -113,7 +113,7 @@ class RefundPaymentUseCaseTest {
         assertThat(result.getRefundedAmount()).isEqualTo(new BigDecimal("20000"));
         verify(pgClientPort).refund("pg-tx-123", new BigDecimal("20000"), "partial-key-1");
         verify(updateOrderStatusPort, never()).updateOrderStatus(any(), any());
-        verify(publishEventPort).publishPaymentRefunded(eq(1L), eq(10L), any());
+        verify(publishEventPort).publishPaymentRefunded(eq(1L), eq(10L), any(), any(), any());
     }
 
     @Test @DisplayName("부분 환불로 전액 도달 시 Payment REFUNDED + 주문 상태 REFUNDED")
@@ -214,7 +214,7 @@ class RefundPaymentUseCaseTest {
         assertThat(payment.getRefundedAmount()).isEqualByComparingTo(BigDecimal.ZERO);
         // 주문 상태 전이/환불 이벤트 발행이 일어나지 않음
         verify(updateOrderStatusPort, never()).updateOrderStatus(any(), any());
-        verify(publishEventPort, never()).publishPaymentRefunded(any(), any(), any());
+        verify(publishEventPort, never()).publishPaymentRefunded(any(), any(), any(), any(), any());
     }
 
     @Test @DisplayName("재시도 성공: 기존 FAILED 이력을 재사용해 begin 없이 COMPLETED 로 확정")
@@ -238,7 +238,7 @@ class RefundPaymentUseCaseTest {
         assertThat(failed.getStatus()).isEqualTo(Refund.Status.COMPLETED);
         verify(refundLifecycle, never()).begin(any(), any(), any(), any());
         verify(pgClientPort).refund("pg-tx-123", new BigDecimal("50000"), "payment-1-full");
-        verify(publishEventPort).publishPaymentRefunded(eq(1L), eq(10L), any());
+        verify(publishEventPort).publishPaymentRefunded(eq(1L), eq(10L), any(), any(), any());
     }
 
     @Test @DisplayName("결제가 이미 전액 환불된 상태에서 남은 FAILED 재시도는 적용 불가로 재시도 소진 고정")
