@@ -31,4 +31,10 @@ public interface LoadDailyTotalsPort {
 
     /** settlement: 해당 날짜 생성된 정산의 반영 환불액(refunded_amount) 합계 */
     BigDecimal sumSettlementRefunded(LocalDate date);
+
+    /** order: 해당 날짜 캡처된 결제 건수 (INV-9 건수 축) */
+    long countCapturedPayments(LocalDate date);
+
+    /** settlement: 해당 날짜 생성된 정산 건수 (INV-9 건수 축) */
+    long countSettlementsCreated(LocalDate date);
 }

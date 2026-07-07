@@ -71,6 +71,40 @@ class ReconcileDailyTotalsServiceTest {
         assertThat(r.discrepancy()).isEqualByComparingTo("40000");
     }
 
+    @Test @DisplayName("건수 축 불일치(INV-9): 금액이 ±상쇄로 일치해도 건수가 다르면 matched=false")
+    void countAxisCatchesOffsettingAmounts() {
+        // 상쇄 시나리오: order 캡처 1건 60,000 인데 settlement 에 30,000 정산 2건이 생김 —
+        // 금액 합계 대사(양축)는 통과하지만 건수 축이 잡는다.
+        when(loadDailyTotalsPort.sumCapturedPayments(DATE)).thenReturn(new BigDecimal("60000"));
+        when(loadDailyTotalsPort.sumSettlementGross(DATE)).thenReturn(new BigDecimal("60000"));
+        when(loadDailyTotalsPort.sumRefundedAgainstCaptures(DATE)).thenReturn(BigDecimal.ZERO);
+        when(loadDailyTotalsPort.sumSettlementRefunded(DATE)).thenReturn(BigDecimal.ZERO);
+        when(loadDailyTotalsPort.countCapturedPayments(DATE)).thenReturn(1L);
+        when(loadDailyTotalsPort.countSettlementsCreated(DATE)).thenReturn(2L);
+
+        ReconciliationReport r = service.reconcile(DATE);
+
+        assertThat(r.captureDiscrepancy()).isEqualByComparingTo("0"); // 금액 축은 침묵
+        assertThat(r.refundDiscrepancy()).isEqualByComparingTo("0");
+        assertThat(r.countDiscrepancy()).isEqualTo(-1);               // 건수 축이 감지
+        assertThat(r.matched()).isFalse();
+    }
+
+    @Test @DisplayName("건수 축 일치: 금액·건수 모두 일치하면 matched=true")
+    void countAxisMatched() {
+        when(loadDailyTotalsPort.sumCapturedPayments(DATE)).thenReturn(new BigDecimal("60000"));
+        when(loadDailyTotalsPort.sumSettlementGross(DATE)).thenReturn(new BigDecimal("60000"));
+        when(loadDailyTotalsPort.sumRefundedAgainstCaptures(DATE)).thenReturn(BigDecimal.ZERO);
+        when(loadDailyTotalsPort.sumSettlementRefunded(DATE)).thenReturn(BigDecimal.ZERO);
+        when(loadDailyTotalsPort.countCapturedPayments(DATE)).thenReturn(3L);
+        when(loadDailyTotalsPort.countSettlementsCreated(DATE)).thenReturn(3L);
+
+        ReconciliationReport r = service.reconcile(DATE);
+
+        assertThat(r.matched()).isTrue();
+        assertThat(r.countDiscrepancy()).isZero();
+    }
+
     @Test @DisplayName("null 값은 0 으로 취급 — 데이터 없는 날에도 NPE 없이 matched=true")
     void nullsAsZero() {
         when(loadDailyTotalsPort.sumCapturedPayments(DATE)).thenReturn(null);

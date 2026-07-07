@@ -1,11 +1,15 @@
 package github.lms.lemuel.payout.application.service;
 
+import github.lms.lemuel.common.opssignal.OpsSignalCategory;
+import github.lms.lemuel.common.opssignal.OpsSignalPort;
 import github.lms.lemuel.payout.application.port.out.FirmBankingPort;
 import github.lms.lemuel.payout.application.port.out.SavePayoutPort;
 import github.lms.lemuel.payout.domain.Payout;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Map;
 
 /**
  * 단일 Payout 실행 트랜잭션 경계.
@@ -15,10 +19,13 @@ public class PayoutSingleExecutor {
 
     private final SavePayoutPort savePort;
     private final FirmBankingPort firmBanking;
+    private final OpsSignalPort opsSignalPort;
 
-    public PayoutSingleExecutor(SavePayoutPort savePort, FirmBankingPort firmBanking) {
+    public PayoutSingleExecutor(SavePayoutPort savePort, FirmBankingPort firmBanking,
+                                OpsSignalPort opsSignalPort) {
         this.savePort = savePort;
         this.firmBanking = firmBanking;
+        this.opsSignalPort = opsSignalPort;
     }
 
     /**
@@ -49,6 +56,9 @@ public class PayoutSingleExecutor {
         } catch (FirmBankingPort.FirmBankingException e) {
             sending.markFailed(e.getErrorCode() + " " + e.getMessage());
             savePort.save(sending);
+            // 운영 관제 실패 신호 — best-effort(절대 throw 안 함), 정산금 지급 실패를 operation-service 로 집계.
+            opsSignalPort.emit(OpsSignalCategory.SETTLEMENT_FAILED, "payout", String.valueOf(sending.getId()),
+                    Map.of("reason", "FIRM_BANKING", "errorCode", String.valueOf(e.getErrorCode())));
             throw e;
         }
         savePort.save(sending);

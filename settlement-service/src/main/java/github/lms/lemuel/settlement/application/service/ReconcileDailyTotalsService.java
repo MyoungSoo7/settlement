@@ -33,19 +33,24 @@ public class ReconcileDailyTotalsService implements ReconcileDailyTotalsUseCase 
                 loadDailyTotalsPort.sumCapturedPayments(targetDate),
                 loadDailyTotalsPort.sumSettlementGross(targetDate),
                 loadDailyTotalsPort.sumRefundedAgainstCaptures(targetDate),
-                loadDailyTotalsPort.sumSettlementRefunded(targetDate)
+                loadDailyTotalsPort.sumSettlementRefunded(targetDate),
+                loadDailyTotalsPort.countCapturedPayments(targetDate),
+                loadDailyTotalsPort.countSettlementsCreated(targetDate)
         );
 
         if (report.matched()) {
-            log.info("[Reconciliation] {} OK — capturedPayments={}, settlementGross={}, refundedAgainstCaptures={}, settlementRefunded={}",
+            log.info("[Reconciliation] {} OK — capturedPayments={}, settlementGross={}, refundedAgainstCaptures={}, settlementRefunded={}, counts={}/{}",
                     targetDate, report.capturedPayments(), report.settlementGross(),
-                    report.refundedAgainstCaptures(), report.settlementRefunded());
+                    report.refundedAgainstCaptures(), report.settlementRefunded(),
+                    report.capturedCount(), report.settlementCount());
         } else {
             // 금액이 샜음 — 즉시 감시 가능한 ERROR 레벨. 운영에서는 Alertmanager 로 연계 권장.
-            log.error("[Reconciliation] {} MISMATCH captureDiscrepancy={}, refundDiscrepancy={} — capturedPayments={}, settlementGross={}, refundedAgainstCaptures={}, settlementRefunded={}",
+            log.error("[Reconciliation] {} MISMATCH captureDiscrepancy={}, refundDiscrepancy={}, countDiscrepancy={} — capturedPayments={}, settlementGross={}, refundedAgainstCaptures={}, settlementRefunded={}, counts={}/{}",
                     targetDate, report.captureDiscrepancy(), report.refundDiscrepancy(),
+                    report.countDiscrepancy(),
                     report.capturedPayments(), report.settlementGross(),
-                    report.refundedAgainstCaptures(), report.settlementRefunded());
+                    report.refundedAgainstCaptures(), report.settlementRefunded(),
+                    report.capturedCount(), report.settlementCount());
         }
         return report;
     }

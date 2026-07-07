@@ -59,6 +59,19 @@ public class DailyTotalsJdbcAdapter implements LoadDailyTotalsPort {
                 """, date);
     }
 
+    @Override
+    public long countCapturedPayments(LocalDate date) {
+        return orderReconClient.dailyCounts(date).capturedCount();
+    }
+
+    @Override
+    public long countSettlementsCreated(LocalDate date) {
+        Long result = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM settlements WHERE created_at::date = ?
+                """, Long.class, date);
+        return result != null ? result : 0L;
+    }
+
     private BigDecimal queryDecimal(String sql, LocalDate date) {
         BigDecimal result = jdbcTemplate.queryForObject(sql, BigDecimal.class, date);
         return result != null ? result : BigDecimal.ZERO;
