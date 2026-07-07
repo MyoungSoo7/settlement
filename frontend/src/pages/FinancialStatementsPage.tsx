@@ -96,7 +96,7 @@ const FinancialStatementsPage: React.FC = () => {
               <div className="overflow-x-auto">
                 <table className="min-w-full text-sm">
                   <thead>
-                    <tr className="text-left text-gray-500 border-b">
+                    <tr className="text-left text-black border-b">
                       <th className="py-2 pr-4">종목코드</th>
                       <th className="py-2 pr-4">기업명</th>
                       <th className="py-2 pr-4">시장</th>

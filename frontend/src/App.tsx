@@ -6,6 +6,7 @@ import { CartProvider } from './contexts/CartContext';
 import Layout from './components/Layout';
 import SystemLayout from './components/SystemLayout';
 import CeoLayout from './components/CeoLayout';
+import SettlementLayout from './components/SettlementLayout';
 
 // 공개 페이지 (즉시 로드)
 import Login from './pages/Login';
@@ -107,9 +108,10 @@ function App() {
 
             {/* ── 관리자·매니저 공용 ── */}
             <Route path="/admin"              element={<AdminManagerRoute><AdminDashboardPage /></AdminManagerRoute>} />
-            <Route path="/admin/settlement"   element={<AdminManagerRoute><SettlementAdmin /></AdminManagerRoute>} />
-            <Route path="/settlement/search"   element={<AdminManagerRoute><SettlementDashboard /></AdminManagerRoute>} />
-            <Route path="/product"            element={<AdminManagerRoute><ProductPage /></AdminManagerRoute>} />
+            {/* 정산 그룹 (상품관리·정산관리·정산조회) — 좌측 사이드바(SettlementLayout)로 묶음 */}
+            <Route path="/product"            element={<AdminManagerRoute><SettlementLayout><ProductPage /></SettlementLayout></AdminManagerRoute>} />
+            <Route path="/admin/settlement"   element={<AdminManagerRoute><SettlementLayout><SettlementAdmin /></SettlementLayout></AdminManagerRoute>} />
+            <Route path="/settlement/search"   element={<AdminManagerRoute><SettlementLayout><SettlementDashboard /></SettlementLayout></AdminManagerRoute>} />
             <Route path="/categories"         element={<AdminManagerRoute><CategoryManagementPage /></AdminManagerRoute>} />
             <Route path="/tags"               element={<AdminManagerRoute><TagManagementPage /></AdminManagerRoute>} />
 

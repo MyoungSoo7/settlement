@@ -38,6 +38,15 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       : `${base} text-gray-600 hover:bg-gray-100`;
   };
 
+  // 정산 그룹(상품관리·정산관리·정산조회) — 세 경로 중 어디에 있어도 활성
+  const settlementNavLinkClass = (() => {
+    const base = 'px-4 py-2 rounded-lg font-medium transition-colors text-sm';
+    const active = isActive('/product') || isActive('/admin/settlement') || isActive('/settlement/search');
+    return active
+      ? `${base} bg-gray-800 text-white`
+      : `${base} text-gray-600 hover:bg-gray-100`;
+  })();
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -55,9 +64,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               {user && isAdminOrManager && (
                 <nav className="flex space-x-1">
                   <Link to="/admin"            className={adminNavLinkClass('/admin')}>대시보드</Link>
-                  <Link to="/product"          className={adminNavLinkClass('/product')}>상품관리</Link>
-                  <Link to="/admin/settlement" className={adminNavLinkClass('/admin/settlement')}>정산관리</Link>
-                  <Link to="/settlement/search" className={adminNavLinkClass('/settlement/search')}>정산조회</Link>
+                  {/* 정산 — 상품관리·정산관리·정산조회 3개 하위 (좌측 사이드바) */}
+                  <Link
+                    to="/admin/settlement"
+                    className={settlementNavLinkClass}
+                  >
+                    정산
+                  </Link>
                   {/* MANAGER 는 위성 조회를 개별 링크로 유지 (CEO 그룹은 ADMIN 전용) */}
                   {user.role === 'MANAGER' && (
                     <>

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
-interface SystemLayoutProps {
+interface SettlementLayoutProps {
   children: React.ReactNode;
 }
 
@@ -13,14 +13,12 @@ interface SidebarItem {
 }
 
 const ITEMS: SidebarItem[] = [
-  { to: '/admin/system/menus', label: '메뉴 관리',    icon: '🗂️', desc: '네비게이션 메뉴 트리' },
-  { to: '/admin/system/codes', label: '공통코드 관리', icon: '🏷️', desc: '코드 그룹 / 항목' },
-  { to: '/admin/system/rbac',  label: 'RBAC 관리',    icon: '🔐', desc: '역할 · 권한 매트릭스' },
-  { to: '/admin/system/ecommerce-categories', label: '이커머스 카테고리', icon: '📁', desc: '상품 카테고리 트리' },
-  { to: '/admin/system/operation', label: '운영관리', icon: '🖥️', desc: '인시던트 관제 콘솔' },
+  { to: '/product',           label: '상품관리', icon: '📦', desc: '상품 · 재고 관리' },
+  { to: '/admin/settlement',  label: '정산관리', icon: '💰', desc: '정산 생성 · 확정' },
+  { to: '/settlement/search', label: '정산조회', icon: '🔍', desc: '정산 내역 조회' },
 ];
 
-const SystemLayout: React.FC<SystemLayoutProps> = ({ children }) => {
+const SettlementLayout: React.FC<SettlementLayoutProps> = ({ children }) => {
   const location = useLocation();
 
   const isActive = (to: string) =>
@@ -36,9 +34,9 @@ const SystemLayout: React.FC<SystemLayoutProps> = ({ children }) => {
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden lg:sticky lg:top-8">
               <div className="px-5 py-4 border-b border-gray-100 bg-gray-900">
                 <p className="text-white font-bold flex items-center gap-2">
-                  <span>⚙️</span> 시스템 관리
+                  <span>💰</span> 정산
                 </p>
-                <p className="text-gray-400 text-xs mt-0.5">System Administration</p>
+                <p className="text-gray-400 text-xs mt-0.5">Settlement</p>
               </div>
               <nav className="p-2 space-y-1">
                 {ITEMS.map((item) => {
@@ -75,4 +73,4 @@ const SystemLayout: React.FC<SystemLayoutProps> = ({ children }) => {
   );
 };
 
-export default SystemLayout;
+export default SettlementLayout;

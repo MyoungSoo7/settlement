@@ -239,18 +239,18 @@ const CeoInsightPage: React.FC = () => {
                 <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
                   <Card title="재무 요약">
                     {insight.latestStatement ? (
-                      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-                        <dt className="text-slate-500">기준연도</dt>
+                      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm text-black">
+                        <dt>기준연도</dt>
                         <dd className="text-right font-semibold">{insight.latestStatement.fiscalYear} {insight.latestStatement.fsDivision}</dd>
-                        <dt className="text-slate-500">매출</dt>
+                        <dt>매출</dt>
                         <dd className="text-right font-semibold">{fmtAmount(insight.latestStatement.revenue)}</dd>
-                        <dt className="text-slate-500">영업이익</dt>
+                        <dt>영업이익</dt>
                         <dd className="text-right font-semibold">{fmtAmount(insight.latestStatement.operatingProfit)}</dd>
-                        <dt className="text-slate-500">순이익</dt>
+                        <dt>순이익</dt>
                         <dd className="text-right font-semibold">{fmtAmount(insight.latestStatement.netIncome)}</dd>
-                        <dt className="text-slate-500">자산총계</dt>
+                        <dt>자산총계</dt>
                         <dd className="text-right font-semibold">{fmtAmount(insight.latestStatement.totalAssets)}</dd>
-                        <dt className="text-slate-500">출처</dt>
+                        <dt>출처</dt>
                         <dd className="text-right font-semibold">{insight.latestStatement.source}</dd>
                       </dl>
                     ) : (
@@ -262,8 +262,8 @@ const CeoInsightPage: React.FC = () => {
                     {insight.reputation ? (
                       <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
                         <span className="rounded-md bg-slate-900 px-3 py-1 text-lg font-bold text-white">{insight.reputation.grade}</span>
-                        <span className="font-semibold text-slate-800">{insight.reputation.score}/100점</span>
-                        <span className="text-slate-500">부정 {insight.reputation.negativeCount}건</span>
+                        <span className="font-semibold text-black">{insight.reputation.score}/100점</span>
+                        <span className="text-black">부정 {insight.reputation.negativeCount}건</span>
                       </div>
                     ) : (
                       <p className="mb-4 text-sm text-slate-500">평판 스냅샷이 아직 없습니다.</p>
@@ -271,10 +271,10 @@ const CeoInsightPage: React.FC = () => {
                     <ul className="divide-y divide-slate-100">
                       {insight.articles.slice(0, 5).map((article) => (
                         <li key={article.url} className="py-2">
-                          <a href={article.url} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-slate-900 hover:text-slate-600">
+                          <a href={article.url} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-black hover:text-slate-600">
                             {article.title}
                           </a>
-                          {article.summary && <p className="mt-1 line-clamp-2 text-xs text-slate-500">{article.summary}</p>}
+                          {article.summary && <p className="mt-1 line-clamp-2 text-xs text-black">{article.summary}</p>}
                         </li>
                       ))}
                       {insight.articles.length === 0 && <li className="py-2 text-sm text-slate-500">수집된 기사가 없습니다.</li>}
