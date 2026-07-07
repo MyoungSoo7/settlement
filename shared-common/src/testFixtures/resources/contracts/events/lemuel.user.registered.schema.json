@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "lemuel.user.registered",
+  "description": "order-service(OutboxBackedUserEventPublisher) → settlement-service(UserRegisteredEventConsumer). settlement_user_view 프로젝션 적재 (ADR 0020 Phase 3b). email 은 항상 존재하되 null 허용 — 컨슈머가 null-safe 처리.",
+  "type": "object",
+  "properties": {
+    "userId": { "type": "integer" },
+    "email": { "type": ["string", "null"] }
+  },
+  "required": ["userId", "email"],
+  "additionalProperties": true
+}
