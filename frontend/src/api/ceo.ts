@@ -1,6 +1,7 @@
 import { companyApi, type Article, type Company, type Reputation } from './company';
 import { economicsApi, type EconomicIndicator } from './economics';
 import { financialApi, type FinancialCompany, type FinancialStatement } from './financial';
+import { marketApi, type MarketQuote } from './market';
 
 export type RiskSeverity = 'high' | 'medium' | 'low';
 
@@ -58,6 +59,16 @@ export interface CeoBriefing {
   risks: CeoRisk[];
 }
 
+/**
+ * 시총 기반 밸류에이션 — market-service 시총과 financial 재무제표를 소비측에서 조인해 산출.
+ * (market-service 는 MSA 경계상 financial 을 모르므로 PER/PBR 계산은 여기 소비측 몫이다.)
+ */
+export interface CeoValuation {
+  marketCap: number | null;   // 시가총액(원)
+  per: number | null;         // 시총 / 순이익 (순이익 <= 0 이면 null)
+  pbr: number | null;         // 시총 / 자본총계 (자본총계 <= 0 이면 null)
+}
+
 export interface CeoInsight {
   company: FinancialCompany;
   companyProfile: Company | null;
@@ -66,8 +77,28 @@ export interface CeoInsight {
   reputation: Reputation | null;
   articles: Article[];
   indicators: EconomicIndicator[];
+  marketQuote: MarketQuote | null;
+  valuation: CeoValuation;
   briefing: CeoBriefing;
 }
+
+/**
+ * 시총 + 재무제표로 PER/PBR 을 계산한다. 분모(순이익·자본총계)가 없거나 0 이하면 해당 배수는 null.
+ * marketCap 과 재무값은 동일하게 '원' 단위라 그대로 나눈다(financial 재무제표는 원 단위 절대금액).
+ */
+export const computeValuation = ({
+  marketCap,
+  netIncome,
+  totalEquity,
+}: {
+  marketCap: number | null;
+  netIncome: number | null;
+  totalEquity: number | null;
+}): CeoValuation => ({
+  marketCap: marketCap ?? null,
+  per: marketCap != null && netIncome != null && netIncome > 0 ? marketCap / netIncome : null,
+  pbr: marketCap != null && totalEquity != null && totalEquity > 0 ? marketCap / totalEquity : null,
+});
 
 const pct = (value: number | null | undefined) =>
   value === null || value === undefined ? 'N/A' : `${value.toFixed(2)}%`;
@@ -206,17 +237,25 @@ export const ceoApi = {
   searchCompanies: financialApi.companies,
 
   insight: async (company: FinancialCompany): Promise<CeoInsight> => {
-    const [statements, reputation, articlesPage, indicators] = await Promise.all([
+    const [statements, reputation, articlesPage, indicators, marketSnapshot] = await Promise.all([
       financialApi.statements(company.stockCode),
       companyApi.reputation(company.stockCode).catch(() => null),
       companyApi.articles(company.stockCode, 0, 5).catch(() => ({ content: [], page: 0, size: 5, totalElements: 0, totalPages: 0 })),
       economicsApi.indicators(),
+      // 시세 미적재/미상장 종목은 404 → null. 시총 없이도 브리핑은 정상 생성된다.
+      marketApi.latest(company.stockCode).catch(() => null),
     ]);
     const companyProfile = await companyApi
       .companies(company.stockCode, 0, 1)
       .then((page) => page.content.find((item) => item.stockCode === company.stockCode) ?? null)
       .catch(() => null);
     const latestStatement = pickLatestStatement(statements);
+    const marketQuote = marketSnapshot?.latest ?? null;
+    const valuation = computeValuation({
+      marketCap: marketQuote?.marketCap ?? null,
+      netIncome: latestStatement?.netIncome ?? null,
+      totalEquity: latestStatement?.totalEquity ?? null,
+    });
 
     return {
       company,
@@ -226,6 +265,8 @@ export const ceoApi = {
       reputation,
       articles: articlesPage.content,
       indicators,
+      marketQuote,
+      valuation,
       briefing: buildCeoBriefing({
         companyName: company.name,
         statement: latestStatement,

@@ -16,6 +16,20 @@ const fmtAmount = (value: number | null | undefined) => {
   return value.toLocaleString('ko-KR');
 };
 
+const fmtMultiple = (value: number | null | undefined) =>
+  value === null || value === undefined ? 'N/A' : `${value.toFixed(1)}배`;
+
+const fmtRate = (value: number | null | undefined) => {
+  if (value === null || value === undefined) return '';
+  const arrow = value > 0 ? '▲' : value < 0 ? '▼' : '';
+  return `${arrow}${Math.abs(value).toFixed(2)}%`;
+};
+
+const rateToneClass = (value: number | null | undefined) => {
+  if (value === null || value === undefined || value === 0) return 'text-slate-400';
+  return value > 0 ? 'text-red-600' : 'text-blue-600';
+};
+
 const cardToneClass = (tone: CeoSummaryCard['tone']) => {
   switch (tone) {
     case 'good':
@@ -209,6 +223,43 @@ const CeoInsightPage: React.FC = () => {
                       </div>
                     ))}
                   </div>
+                </Card>
+
+                <Card title="시세 · 밸류에이션">
+                  {insight.marketQuote ? (
+                    <>
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                        <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
+                          <p className="text-xs font-semibold text-slate-500">시가총액</p>
+                          <p className="mt-1 text-2xl font-bold text-slate-900">{fmtAmount(insight.marketQuote.marketCap)}</p>
+                        </div>
+                        <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
+                          <p className="text-xs font-semibold text-slate-500">종가</p>
+                          <p className="mt-1 text-2xl font-bold text-slate-900">
+                            {insight.marketQuote.closePrice.toLocaleString('ko-KR')}<span className="text-sm font-medium text-slate-500">원</span>
+                          </p>
+                          <p className={`mt-0.5 text-xs font-semibold ${rateToneClass(insight.marketQuote.fluctuationRate)}`}>
+                            {fmtRate(insight.marketQuote.fluctuationRate)}
+                          </p>
+                        </div>
+                        <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
+                          <p className="text-xs font-semibold text-slate-500">PER</p>
+                          <p className="mt-1 text-2xl font-bold text-slate-900">{fmtMultiple(insight.valuation.per)}</p>
+                          <p className="mt-0.5 text-xs text-slate-400">시총/순이익</p>
+                        </div>
+                        <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
+                          <p className="text-xs font-semibold text-slate-500">PBR</p>
+                          <p className="mt-1 text-2xl font-bold text-slate-900">{fmtMultiple(insight.valuation.pbr)}</p>
+                          <p className="mt-0.5 text-xs text-slate-400">시총/자본총계</p>
+                        </div>
+                      </div>
+                      <p className="mt-3 text-xs text-slate-400">
+                        기준일 {insight.marketQuote.baseDate} · 출처 {insight.marketQuote.source} · 재무제표 조인으로 산출한 참고치입니다.
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-slate-500">market-service에 등록된 시세가 없습니다 (미상장·미수집 종목).</p>
+                  )}
                 </Card>
 
                 <Card title="Agent Briefing">

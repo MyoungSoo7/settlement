@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildCeoBriefing,
+  computeValuation,
   pickLatestStatement,
   type CeoReputationInput,
   type CeoStatementInput,
@@ -71,5 +72,30 @@ describe('CEO insight analysis', () => {
     );
     expect(briefing.risks[0].severity).toBe('high');
     expect(briefing.summaryCards.some((card) => card.label === '부채비율')).toBe(true);
+  });
+
+  it('computes PER/PBR from market cap joined with the statement', () => {
+    const valuation = computeValuation({
+      marketCap: 30_000_000_000, // 시총 300억
+      netIncome: 1_000_000_000,  // 순이익 10억 → PER 30
+      totalEquity: 15_000_000_000, // 자본 150억 → PBR 2
+    });
+
+    expect(valuation.per).toBeCloseTo(30);
+    expect(valuation.pbr).toBeCloseTo(2);
+    expect(valuation.marketCap).toBe(30_000_000_000);
+  });
+
+  it('returns null multiples when denominators are missing or non-positive', () => {
+    expect(computeValuation({ marketCap: 30_000_000_000, netIncome: 0, totalEquity: -5 })).toEqual({
+      marketCap: 30_000_000_000,
+      per: null,
+      pbr: null,
+    });
+    expect(computeValuation({ marketCap: null, netIncome: 1_000, totalEquity: 1_000 })).toEqual({
+      marketCap: null,
+      per: null,
+      pbr: null,
+    });
   });
 });
