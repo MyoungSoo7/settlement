@@ -1,6 +1,6 @@
 # ai-service Phase 1 상세 설계 — 골격 + 대화형 AI 챗봇 (대화 이력 유지)
 
-> 상태: **설계** (2026-07-08)
+> 상태: **구현 완료** (2026-07-08). 설계 대비 변경분은 문서 말미 "구현 노트" 참조.
 > 선행 문서: 없음 (ai-service 도입 제안 — 전체 로드맵 Phase 1~3 중 1단계)
 > 관련 ADR: 0001(헥사고날), 0009(멀티모듈), 0021(shared-common), 0023(위성 서비스 패턴 선례)
 > 참고 구현: [MyoungSoo7/sparta-msa-project](https://github.com/MyoungSoo7/sparta-msa-project) 의
@@ -338,3 +338,21 @@ CI 게이트: 기존 JaCoCo 정책 준수 (`ai.chat.domain` INSTRUCTION 80%).
 | LLM 비용 | 데모 중 과금 폭주 | rate limit + max-tokens + usage 스냅샷(§4)으로 관측 |
 | PII | 사용자가 대화에 개인정보 입력 가능 | Phase 1 은 system prompt 로 수집 억제 문구만. 마스킹/보존 정책은 Phase 2 에서 shared-common audit 연계 검토 |
 | JWT 시크릿 공유 | ai-service 가 order 발급 토큰을 검증 | 기존 loan/operation 과 동일한 공유 시크릿 모델 — 신규 리스크 아님 |
+
+## 13. 구현 노트 (2026-07-08 구현 완료 — 설계 대비 변경분)
+
+- **Spring AI 2.0 내부 구조 변화**: 2.0 은 1.x 의 자체 `AnthropicApi`(RestClient) 를 버리고
+  **공식 Anthropic Java SDK**(`com.anthropic:anthropic-java-core`, OkHttp) 위에 재작성됐다.
+  수동 조립 진입점은 `AnthropicSetup.setupSyncClient(baseUrl, apiKey, timeout, maxRetries, ...)`
+  — 설계의 "타임아웃 30s + 재시도 1회"가 SDK 클라이언트 레벨 옵션으로 흡수돼 어댑터 수동
+  재시도 코드가 필요 없어졌다.
+- **재시도 정책**: 동기·스트리밍 모두 SDK maxRetries=1. 어댑터 수준 추가 재시도는 제거
+  (스트리밍은 청크가 이미 나간 뒤 재시도하면 응답 중복이라 원래도 불가).
+- **rate limiter 배치**: bucket4j 구현을 `config` 가 아닌 `adapter/out/ratelimit`(RateLimitPort 구현)로
+  — 인메모리 단일 인스턴스 전제, 스케일아웃 시 Redis ProxyManager 교체 지점 명시.
+- **검증 결과**: `:ai-service:build` 그린(테스트 36개 — 도메인/서비스/컨트롤러/ArchUnit/Testcontainers
+  통합 포함), 실 부팅 + Flyway V1(pgvector pg17 컨테이너) + 무인증 401 + 실 Anthropic API 호출까지
+  확인. 유료 크레딧 부족 계정에서는 503 + 이력 무저장(§2.4)이 설계대로 동작함을 실호출로 검증.
+- **로컬 bootRun 주의**: dotenv 는 JVM cwd 의 `.env` 를 읽으므로 `./gradlew :ai-service:bootRun` 은
+  루트 `.env` 를 못 볼 수 있다 — 셸에서 `set -a; . ./.env; set +a` 후 실행하거나 compose 로 기동
+  (loan/operation 과 동일한 운영 특성).

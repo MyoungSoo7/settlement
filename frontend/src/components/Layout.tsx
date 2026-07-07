@@ -71,6 +71,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   >
                     정산
                   </Link>
+                  <Link to="/ai/chat" className={adminNavLinkClass('/ai/chat')}>AI 도우미</Link>
                   {/* MANAGER 는 위성 조회를 개별 링크로 유지 (CEO 그룹은 ADMIN 전용) */}
                   {user.role === 'MANAGER' && (
                     <>
@@ -98,6 +99,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   <Link to="/order"        className={navLinkClass('/order')}>주문하기</Link>
                   <Link to="/loans"        className={navLinkClass('/loans')}>💸 대출하기</Link>
                   <Link to="/economics"    className={navLinkClass('/economics')}>📈 경제지표</Link>
+                  <Link to="/ai/chat"      className={navLinkClass('/ai/chat')}>🤖 AI 도우미</Link>
                 </nav>
               )}
             </div>

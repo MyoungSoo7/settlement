@@ -76,6 +76,7 @@ subprojects {
                     "**/adapter/out/monitoring/**",
                     "**/adapter/out/user/**",
                     "**/adapter/out/pg/**",
+                    "**/adapter/out/llm/**",
                     "**/adapter/in/web/**",
                     "**/adapter/in/kafka/**",
                     "**/adapter/in/batch/**",
@@ -91,6 +92,7 @@ subprojects {
                     "**/OperationServiceApplication*",
                     "**/EconomicsApplication*",
                     "**/MarketApplication*",
+                    "**/AiServiceApplication*",
                 )
             }
         })
@@ -115,6 +117,7 @@ subprojects {
                     "github.lms.lemuel.pgreconciliation.domain.*",
                     "github.lms.lemuel.economics.domain.*",
                     "github.lms.lemuel.market.domain.*",
+                    "github.lms.lemuel.ai.chat.domain.*",
                     // common.outbox.domain 게이트는 shared-common 독립 빌드로 이관됨
                 )
                 limit {

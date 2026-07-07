@@ -26,6 +26,7 @@ const FinancialStatementsPage = lazy(() => import('./pages/FinancialStatementsPa
 const EconomicsPage = lazy(() => import('./pages/EconomicsPage'));
 const CompanyLookupPage = lazy(() => import('./pages/CompanyLookupPage'));
 const CeoInsightPage = lazy(() => import('./pages/CeoInsightPage'));
+const AiChatPage = lazy(() => import('./pages/AiChatPage'));
 
 // 관리자 페이지 (lazy load)
 const ProductPage = lazy(() => import('./pages/ProductPage'));
@@ -104,6 +105,8 @@ function App() {
             <Route path="/cart"         element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
             <Route path="/mypage"       element={<ProtectedRoute><MyPage /></ProtectedRoute>} />
             <Route path="/loans"        element={<ProtectedRoute><LoanPage /></ProtectedRoute>} />
+            {/* AI 챗봇 (ai-service) — LLM 비용이 들어 인증 필수(USER 이상), 역할 무관 */}
+            <Route path="/ai/chat"      element={<ProtectedRoute><AiChatPage /></ProtectedRoute>} />
             <Route path="/order/toss/success" element={<ProtectedRoute><TossPaymentSuccess /></ProtectedRoute>} />
 
             {/* ── 관리자·매니저 공용 ── */}

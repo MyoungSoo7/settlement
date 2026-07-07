@@ -33,6 +33,11 @@ export default defineConfig({
   server: {
     port: 3000,
     proxy: {
+      // ai-service (8096) — /api 보다 먼저 선언해야 우선 매칭 (SSE 스트리밍 포함)
+      '/api/ai': {
+        target: 'http://localhost:8096',
+        changeOrigin: true,
+      },
       '/api': {
         target: 'http://localhost:8088',
         changeOrigin: true,
