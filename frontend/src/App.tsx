@@ -22,6 +22,7 @@ const LoanPage = lazy(() => import('./pages/LoanPage'));
 const TossPaymentSuccess = lazy(() => import('./pages/TossPaymentSuccess'));
 const FinancialStatementsPage = lazy(() => import('./pages/FinancialStatementsPage'));
 const EconomicsPage = lazy(() => import('./pages/EconomicsPage'));
+const CompanyLookupPage = lazy(() => import('./pages/CompanyLookupPage'));
 
 // 관리자 페이지 (lazy load)
 const ProductPage = lazy(() => import('./pages/ProductPage'));
@@ -31,6 +32,9 @@ const CategoryManagementPage = lazy(() => import('./pages/CategoryManagementPage
 const TagManagementPage = lazy(() => import('./pages/TagManagementPage'));
 const EcommerceCategoryAdmin = lazy(() => import('./pages/EcommerceCategoryAdmin'));
 const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'));
+
+// 운영 관제 (최고 관리자 전용) — operation-service 인시던트 콘솔
+const OperationConsolePage = lazy(() => import('./pages/operation/OperationConsolePage'));
 
 // 시스템 관리 (최고 관리자 전용, 좌측 사이드바)
 const MenuManagementPage = lazy(() => import('./pages/system/MenuManagementPage'));
@@ -85,10 +89,12 @@ function App() {
             <Route path="/forgot-password"    element={<ForgotPassword />} />
             <Route path="/reset-password"     element={<ResetPassword />} />
             <Route path="/order/toss/fail"    element={<TossPaymentFail />} />
-            {/* 코스피 재무제표 — 공시 데이터라 공개 */}
-            <Route path="/financials"         element={<FinancialStatementsPage />} />
-            {/* 한국은행 ECOS 경제지표 — 공공 데이터라 공개 */}
-            <Route path="/economics"          element={<EconomicsPage />} />
+            {/* 코스피 재무제표 — 공시 데이터라 공개 (관리자 헤더 메뉴 '재무제표' 진입, Layout 로 헤더 유지) */}
+            <Route path="/financials"         element={<Layout><FinancialStatementsPage /></Layout>} />
+            {/* 기업 뉴스·평판 조회 (ADR 0023) — 공개 조회 API, 관리자 헤더 메뉴 '기업조회' 진입, Layout 유지 */}
+            <Route path="/companies"          element={<Layout><CompanyLookupPage /></Layout>} />
+            {/* 한국은행 ECOS 경제지표 — 공공 데이터라 공개. 모든 사용자가 헤더 메뉴로 접근·왕복하도록 Layout 유지 */}
+            <Route path="/economics"          element={<Layout><EconomicsPage /></Layout>} />
 
             {/* ── 일반 사용자 (USER + 인증) ── */}
             <Route path="/order"        element={<ProtectedRoute><OrderPage /></ProtectedRoute>} />
@@ -104,6 +110,10 @@ function App() {
             <Route path="/product"            element={<AdminManagerRoute><ProductPage /></AdminManagerRoute>} />
             <Route path="/categories"         element={<AdminManagerRoute><CategoryManagementPage /></AdminManagerRoute>} />
             <Route path="/tags"               element={<AdminManagerRoute><TagManagementPage /></AdminManagerRoute>} />
+
+            {/* ── 최고 관리자 전용: 운영 관제 (operation-service 인시던트 콘솔) ── */}
+            <Route path="/admin/operation"
+              element={<AdminOnlyRoute><OperationConsolePage /></AdminOnlyRoute>} />
 
             {/* ── 최고 관리자 전용: 시스템 관리 (좌측 사이드바) ── */}
             <Route path="/admin/system"
