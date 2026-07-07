@@ -37,6 +37,11 @@ spring:
               # 공개 조회 API 만 라우팅 — 뉴스 수집 트리거(/admin/company/**)는 외부 미노출
               predicates:
                 - Path=/api/company/**
+            - id: market-service
+              uri: ${MARKET_SERVICE_URI:http://localhost:8094}
+              # 공개 조회 API 만 라우팅 — KRX 시세 수집 트리거(/admin/market/**)는 외부 미노출
+              predicates:
+                - Path=/api/market/**
             - id: operation-service
               uri: ${OPERATION_SERVICE_URI:http://localhost:8092}
               # 운영 관제 콘솔(인시던트) — JWT ROLE_ADMIN 전용, webhook 은 Bearer 필터가 자체 게이팅
