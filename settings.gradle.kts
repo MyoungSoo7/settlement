@@ -11,6 +11,7 @@ include(
     "financial-statements-service",
     "economics-service",
     "company-service",
+    "market-service",
     "gateway-service",
     "operation-service",
 )

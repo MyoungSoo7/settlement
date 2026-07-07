@@ -90,6 +90,7 @@ subprojects {
                     "**/CompanyServiceApplication*",
                     "**/OperationServiceApplication*",
                     "**/EconomicsApplication*",
+                    "**/MarketApplication*",
                 )
             }
         })
@@ -113,6 +114,7 @@ subprojects {
                     "github.lms.lemuel.settlement.domain.*",
                     "github.lms.lemuel.pgreconciliation.domain.*",
                     "github.lms.lemuel.economics.domain.*",
+                    "github.lms.lemuel.market.domain.*",
                     // common.outbox.domain 게이트는 shared-common 독립 빌드로 이관됨
                 )
                 limit {
