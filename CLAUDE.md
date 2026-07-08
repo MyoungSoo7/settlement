@@ -2,9 +2,9 @@
 
 ## 프로젝트 개요
 
-주문·결제·정산·선정산대출·재무제표조회·경제지표조회·기업뉴스평판·운영관제·주식시세조회·AI챗봇을 **9개 마이크로서비스 + API Gateway** 로 분리한 헥사고날 아키텍처 백엔드.
-원래 단일 모놀리스였으나 Bounded Context 로 분리. **9개 서비스 모두 DB-per-service**(order=opslab, settlement=settlement_db,
-loan=lemuel_loan, financial=lemuel_financial, economics=lemuel_economics, company=lemuel_company, operation=lemuel_operation, market=lemuel_market, ai=lemuel_ai) 로 물리 분리돼 있고, 서비스 간 연계는 **Kafka 이벤트로만** 한다.
+주문·결제·정산·선정산대출·재무제표조회·경제지표조회·기업뉴스평판·운영관제·주식시세조회·AI챗봇·공공데이터조회를 **10개 마이크로서비스 + API Gateway** 로 분리한 헥사고날 아키텍처 백엔드.
+원래 단일 모놀리스였으나 Bounded Context 로 분리. **10개 서비스 모두 DB-per-service**(order=opslab, settlement=settlement_db,
+loan=lemuel_loan, financial=lemuel_financial, economics=lemuel_economics, company=lemuel_company, operation=lemuel_operation, market=lemuel_market, ai=lemuel_ai, commondata=lemuel_commondata) 로 물리 분리돼 있고, 서비스 간 연계는 **Kafka 이벤트로만** 한다.
 order↔settlement 는 settlement 가 자체 DB 에 **이벤트 드리븐 프로젝션**(`settlement_*_view`)을 적재하는 CQRS 로 분리하고
 (ADR 0020 완료), 대사(reconciliation)는 order 의 내부 API(`/internal/recon`)를 호출해 cross-DB 연결 0 을 유지한다.
 자세한 사용자용 문서는 [`README.md`](./README.md) 참조.
@@ -33,7 +33,7 @@ order↔settlement 는 settlement 가 자체 DB 에 **이벤트 드리븐 프로
 
 ```
 settlement/                       # Gradle 멀티 모듈 루트
-├── settings.gradle.kts           # 9 서비스 모듈 선언 (shared-common 은 composite build)
+├── settings.gradle.kts           # 10 서비스 모듈 선언 (shared-common 은 composite build)
 ├── build.gradle.kts              # 부모 빌드 (subprojects 공통 설정)
 ├── shared-common/                # 📦 java-library: 전 서비스가 의존
 │   └── github.lms.lemuel.common.{audit, config, exception, outbox, ratelimit, pdf}
@@ -277,7 +277,7 @@ RUNNING → COMPLETED
 ./gradlew :order-service:bootJar
 
 # Docker Compose
-docker compose up -d                # DB-per-service PG 8종 · ES · Redpanda · 8 services + gateway
+docker compose up -d                # DB-per-service PG 10종 · ES · Redpanda · 10 services + gateway
 docker compose down
 
 # 컨테이너 이미지 (MODULE 빌드 인자로 어떤 서비스인지 지정)
@@ -285,7 +285,12 @@ docker build --build-arg MODULE=order-service       -t lemuel-order .
 docker build --build-arg MODULE=settlement-service  -t lemuel-settlement .
 docker build --build-arg MODULE=loan-service        -t lemuel-loan .
 docker build --build-arg MODULE=financial-statements-service -t lemuel-financial .
+docker build --build-arg MODULE=economics-service   -t lemuel-economics .
+docker build --build-arg MODULE=company-service     -t lemuel-company .
+docker build --build-arg MODULE=operation-service   -t lemuel-operation .
 docker build --build-arg MODULE=market-service      -t lemuel-market .
+docker build --build-arg MODULE=ai-service          -t lemuel-ai .
+docker build --build-arg MODULE=common-data-service -t lemuel-commondata .
 docker build --build-arg MODULE=gateway-service     -t lemuel-gateway .
 ```
 
