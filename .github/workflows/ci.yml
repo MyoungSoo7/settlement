@@ -194,6 +194,14 @@ jobs:
             image_suffix: ""
           - module: settlement-service
             image_suffix: "-settlement"
+          - module: economics-service
+            image_suffix: "-economics"
+          - module: financial-statements-service
+            image_suffix: "-financial"
+          - module: company-service
+            image_suffix: "-company"
+          - module: ai-service
+            image_suffix: "-ai"
     steps:
       - uses: actions/checkout@v4
 
