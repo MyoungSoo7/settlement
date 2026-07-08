@@ -37,6 +37,9 @@ jobs:
             "postgres:17-alpine"
             "postgres:17"
             "redis:7-alpine"
+            # testcontainers 유틸 — hub.image.name.prefix 가 ryuk 에도 적용되므로 미러 필수
+            # (버전은 org.testcontainers 라이브러리 버전에 따라 다름 — 실패 로그의 imageName 참조)
+            "testcontainers/ryuk:0.14.0"
           )
           for img in "${images[@]}"; do
             echo "── $img"
