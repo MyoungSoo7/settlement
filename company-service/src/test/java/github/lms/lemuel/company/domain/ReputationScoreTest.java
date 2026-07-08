@@ -6,8 +6,10 @@ import org.junit.jupiter.api.Test;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class ReputationScoreTest {
 
@@ -65,6 +67,42 @@ class ReputationScoreTest {
         assertEquals(1, score.negativeCountOf(IssueCategory.FINANCIAL));
         assertEquals(1, score.negativeCountOf(IssueCategory.PRODUCT));
         assertEquals(0, score.negativeCountOf(IssueCategory.LEGAL));
+    }
+
+    @Test
+    @DisplayName("rehydrate — 저장값을 그대로 복원하고 카테고리 건수를 노출한다")
+    void rehydratePreservesStoredValues() {
+        ReputationScore score = ReputationScore.rehydrate("005930", DATE, 65, ReputationGrade.B,
+                4, 1, 2, 1, Map.of(IssueCategory.LEGAL, 1, IssueCategory.PRODUCT, 1), AT);
+
+        assertEquals("005930", score.stockCode());
+        assertEquals(DATE, score.snapshotDate());
+        assertEquals(65, score.score());
+        assertEquals(ReputationGrade.B, score.grade());
+        assertEquals(4, score.articleCount());
+        assertEquals(1, score.positiveCount());
+        assertEquals(2, score.negativeCount());
+        assertEquals(1, score.neutralCount());
+        assertEquals(AT, score.calculatedAt());
+        assertEquals(1, score.negativeCountOf(IssueCategory.LEGAL));
+        assertEquals(0, score.negativeCountOf(IssueCategory.FINANCIAL));
+        assertEquals(2, score.negativeByCategory().size());
+    }
+
+    @Test
+    @DisplayName("compute — 종목코드가 6자리가 아니면 예외")
+    void computeRejectsInvalidStockCode() {
+        assertThrows(IllegalArgumentException.class,
+                () -> ReputationScore.compute("12345", DATE, List.of(), AT));
+    }
+
+    @Test
+    @DisplayName("compute — snapshotDate·calculatedAt 은 필수")
+    void computeRejectsNullDates() {
+        assertThrows(IllegalArgumentException.class,
+                () -> ReputationScore.compute("005930", null, List.of(), AT));
+        assertThrows(IllegalArgumentException.class,
+                () -> ReputationScore.compute("005930", DATE, List.of(), null));
     }
 
     @Test

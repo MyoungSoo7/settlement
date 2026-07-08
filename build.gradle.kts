@@ -102,7 +102,7 @@ subprojects {
             rule {
                 limit {
                     counter = "LINE"
-                    minimum = "0.50".toBigDecimal()
+                    minimum = "0.90".toBigDecimal()
                 }
             }
             // 핵심 도메인은 더 엄격하게

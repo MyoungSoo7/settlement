@@ -92,6 +92,50 @@ class OrderReconClientTest {
     }
 
     @Test
+    void dailyCounts_parsesCounts() {
+        server.expect(requestTo("http://order-test/internal/recon/daily-counts?date=2026-06-17"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess(
+                        "{\"capturedCount\":12,\"completedRefundsCount\":3}", APPLICATION_JSON));
+
+        OrderReconClient.DailyCounts counts = client.dailyCounts(LocalDate.of(2026, 6, 17));
+
+        assertThat(counts.capturedCount()).isEqualTo(12L);
+        assertThat(counts.completedRefundsCount()).isEqualTo(3L);
+        server.verify();
+    }
+
+    @Test
+    void refundsCompleted_parsesRowListWithParams() {
+        server.expect(requestTo(
+                "http://order-test/internal/recon/refunds-completed?from=2026-06-01&to=2026-06-30&limit=100"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("""
+                        [{"refundId":5,"paymentId":1,"amount":2000.00,"completedDate":"2026-06-15"}]
+                        """, APPLICATION_JSON));
+
+        List<OrderReconClient.CompletedRefundRow> rows =
+                client.refundsCompleted(LocalDate.of(2026, 6, 1), LocalDate.of(2026, 6, 30), 100);
+
+        assertThat(rows).hasSize(1);
+        assertThat(rows.get(0).refundId()).isEqualTo(5L);
+        assertThat(rows.get(0).amount()).isEqualByComparingTo("2000.00");
+        server.verify();
+    }
+
+    @Test
+    void refundsCompletedSum_nullAmountResponse_returnsZero() {
+        server.expect(requestTo("http://order-test/internal/recon/refunds-completed-sum"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess("{}", APPLICATION_JSON));
+
+        BigDecimal sum = client.refundsCompletedSum(List.of(1L));
+
+        assertThat(sum).isEqualByComparingTo("0");
+        server.verify();
+    }
+
+    @Test
     void capturedPayments_parsesRowList() {
         server.expect(requestTo("http://order-test/internal/recon/captured-payments?date=2026-06-17"))
                 .andExpect(method(HttpMethod.GET))

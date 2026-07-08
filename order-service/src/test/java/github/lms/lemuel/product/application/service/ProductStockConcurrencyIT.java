@@ -107,7 +107,9 @@ class ProductStockConcurrencyIT {
         final int threads = 100;
         final int initialStock = 10;
 
-        ExecutorService executor = Executors.newFixedThreadPool(Math.min(threads, 32));
+        // startLatch 배리어에서 threads 개 태스크 전원이 풀 스레드를 점유한 채 대기하므로,
+        // 풀 크기가 threads 미만이면 readyLatch 가 끝까지 내려가지 못해 교착한다 — 반드시 threads 개.
+        ExecutorService executor = Executors.newFixedThreadPool(threads);
         CountDownLatch readyLatch = new CountDownLatch(threads);
         CountDownLatch startLatch = new CountDownLatch(1);
         CountDownLatch doneLatch = new CountDownLatch(threads);
@@ -133,11 +135,12 @@ class ProductStockConcurrencyIT {
             });
         }
 
-        readyLatch.await();
+        boolean allReady = readyLatch.await(30, TimeUnit.SECONDS);
         startLatch.countDown();
         boolean finished = doneLatch.await(30, TimeUnit.SECONDS);
         executor.shutdown();
 
+        assertThat(allReady).as("모든 스레드 30초 내 준비 (교착 방지 타임아웃)").isTrue();
         assertThat(finished).as("모든 스레드 30초 내 완료").isTrue();
         assertThat(unexpectedErrors).as("InsufficientStock 외 예상치 못한 예외 — 원자 차감 일관성 위반").isEmpty();
         assertThat(successCount.get()).as("성공한 차감 수").isEqualTo(initialStock);

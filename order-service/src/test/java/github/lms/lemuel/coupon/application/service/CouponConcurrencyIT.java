@@ -147,7 +147,9 @@ class CouponConcurrencyIT {
     }
 
     private Result runConcurrently(int n, java.util.function.IntConsumer task) throws Exception {
-        ExecutorService executor = Executors.newFixedThreadPool(Math.min(n, 32));
+        // start 배리어에서 n개 태스크 전원이 풀 스레드를 점유한 채 대기하므로,
+        // 풀 크기가 n 미만이면 ready 가 n까지 내려가지 못해 교착한다 — 반드시 n개.
+        ExecutorService executor = Executors.newFixedThreadPool(n);
         CountDownLatch ready = new CountDownLatch(n);
         CountDownLatch start = new CountDownLatch(1);
         CountDownLatch done = new CountDownLatch(n);
@@ -172,10 +174,11 @@ class CouponConcurrencyIT {
                 }
             });
         }
-        ready.await();
+        boolean allReady = ready.await(30, TimeUnit.SECONDS);
         start.countDown();
         boolean finished = done.await(30, TimeUnit.SECONDS);
         executor.shutdown();
+        assertThat(allReady).as("모든 스레드 30초 내 준비 (교착 방지 타임아웃)").isTrue();
         assertThat(finished).as("모든 스레드 30초 내 완료").isTrue();
         return r;
     }
@@ -206,13 +209,13 @@ class CouponConcurrencyIT {
     }
 
     private int usedCount(Long couponId) {
-        Number n = (Number) em.createNativeQuery("SELECT used_count FROM coupons WHERE id = ?1")
+        Number n = (Number) em.createNativeQuery("SELECT used_count FROM opslab.coupons WHERE id = ?1")
                 .setParameter(1, couponId).getSingleResult();
         return n.intValue();
     }
 
     private long usageRows(Long couponId) {
-        Number n = (Number) em.createNativeQuery("SELECT count(*) FROM coupon_usages WHERE coupon_id = ?1")
+        Number n = (Number) em.createNativeQuery("SELECT count(*) FROM opslab.coupon_usages WHERE coupon_id = ?1")
                 .setParameter(1, couponId).getSingleResult();
         return n.longValue();
     }
