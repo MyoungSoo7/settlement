@@ -41,6 +41,13 @@ subprojects {
         // 안전망 — 모듈당 20분을 넘기면 강제 실패시켜 "어디서 멈췄는지" 리포트를 남긴다.
         // 정상 최장 모듈이 ~10분이므로 여유 2배.
         timeout.set(Duration.ofMinutes(20))
+        // CI 에서만 테스트별 시작 로그 — hang 시 "마지막으로 STARTED 찍힌 테스트" 가 범인.
+        // (타임아웃으로 죽으면 리포트 XML 이 안 남아 콘솔 로그가 유일한 단서다)
+        if (System.getenv("CI") != null) {
+            testLogging {
+                events("started", "failed", "skipped")
+            }
+        }
     }
 
     tasks.named<JacocoReport>("jacocoTestReport") {
