@@ -21,8 +21,18 @@
   "일관되게 틀린 장부"의 두 번째 방어선. 완결 회계연도(Q1~Q4) 자동 파생, 없으면 skip.
   `fetchSummary` 주입 지점으로 네트워크 0 테스트(`crosscheck.test.mjs`), 삼성전자 2025 실공시
   라이브 검증(일치 0% PASS / 매출 부풀림 1.26% FAIL) 완료.
-- `bin/verify-books.mjs` — **불변식 게이트 CLI** (`--data-dir`/`--json`). ceo-risk-recon 워크플로
-  Step 1 — GATE PASS 여야 추론 진입 (doc/회계.md 의 "불변식 먼저, 추론은 그 위" 원칙의 구현).
+- `common/dart-signals.mjs` — **외부(공시) 신호 파생 엔진 (기본 모드의 심장)**. DART 전체
+  재무제표(fnlttSinglAcntAll, 3개년) + 공시 목록에서 외부 신호 E1~E5(수익-채권 괴리 · 재고 적체 ·
+  차입 확대·이자 부담 · 유동성 하락 · 공시 행간)를 임계값 기반으로 판정하고, 채점용 마커를
+  계산값에서 생성한다. account_id(XBRL 표준) 우선 + 계정명 별칭 폴백, 계정 결측 시 evaluable=false
+  (지어내지 않음). 내부 signals.mjs 와 동일한 신호 객체 형태 — 채점기와 그대로 호환.
+- `bin/diagnose-company.mjs` — **2단계 진단 CLI (제품 진입점)**.
+  기본 모드: `--company <기업명>` 만으로 식별(corp_code 확정) → 3개년 재무 → 공시 90일 →
+  ECOS 금리 → 외부 신호 E1~E5. 상세 모드: `--data-dir <내부CSV폴더>` 를 붙이면 불변식 게이트 →
+  내부 신호 S1~S4 → INV-8 공시 대사(확정된 corp_code 자동 배선)가 같은 진단 패킷에 얹힌다.
+  `--json` 출력은 briefing-eval `--signals-file` 의 채점 정답지.
+- `bin/verify-books.mjs` — **불변식 게이트 CLI** (`--data-dir`/`--json`). 상세 모드의 저수준 도구 —
+  GATE PASS 여야 추론 진입 (doc/회계.md 의 "불변식 먼저, 추론은 그 위" 원칙의 구현).
   상장사면 `--dart-corp-code`(+`--dart-year/--dart-fs-div/--dart-unit-scale/--dart-tolerance-pct`)
   또는 analysis-config.json `crosscheck` 섹션으로 INV-8 을 활성화 (INV-1~7 PASS 시에만 실행).
 - `bin/detect-signals.mjs` — **신호 파생 CLI** (`--data-dir`/`--json`). 게이트 통과 후 신호
@@ -54,6 +64,8 @@
   `dart_financial_summary`(주요계정, 당기/전기/전전기) ·
   `dart_financial_full`(전체 재무제표, CFS/OFS) · `dart_status`(키/캐시 점검)
 - `bin/dart-cli.mjs` — 수동 점검용: `node src/bin/dart-cli.mjs search 삼성전자`
+- `bin/dart-to-csv.mjs` — DART 공시 재무제표를 `trial_balance_public.csv` 로 생성.
+  내부 aging/원가배분/원장 분석을 대체하지 않는 공시 기반 요약 CSV.
 - `test/dart-smoke.mjs` — MCP 왕복 + (키 있으면) 라이브 검증
 - `ecos/client.mjs` — 한국은행 ECOS OpenAPI 클라이언트 (zero-dependency,
   ECOS_API_KEY 는 env 우선 + 상위 `.env` 폴백). StatisticSearch/KeyStatisticList 래퍼 +

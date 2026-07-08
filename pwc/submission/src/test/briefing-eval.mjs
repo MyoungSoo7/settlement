@@ -26,6 +26,8 @@
  * 사용:
  *   node test/briefing-eval.mjs <briefing.md>                       # 동봉 샘플 데이터 기준
  *   node test/briefing-eval.mjs --data-dir <회사데이터폴더> <briefing.md>
+ *   node test/briefing-eval.mjs --signals-file <진단패킷.json> <briefing.md>
+ *                                # diagnose-company --json 출력(외부 신호 E1~E5)을 정답지로 채점
  *   node test/briefing-eval.mjs --clean <briefing.md>               # 음성(clean) 채점
  *   node test/briefing-eval.mjs --json <briefing.md>                # 기계가 읽는 JSON
  *   node test/briefing-eval.mjs --self-test                         # 채점기 자체 회귀 테스트
@@ -51,6 +53,23 @@ let defaultSignalsCache = null;
 function defaultSignals() {
   defaultSignalsCache ??= signalsForDataDir(SAMPLE_DIR);
   return defaultSignalsCache;
+}
+
+/**
+ * 직렬화된 진단 패킷(JSON)에서 채점용 신호를 복원한다.
+ * detect-signals/diagnose-company 의 --json 출력은 markers/categoryPattern 을
+ * 정규식 소스 문자열로 직렬화하므로, 여기서 RegExp 로 되살린다.
+ */
+export function signalsFromPacket(parsed) {
+  const arr = Array.isArray(parsed) ? parsed : parsed.signals ?? [];
+  if (!Array.isArray(arr) || arr.length === 0) {
+    throw new Error('진단 패킷에 signals 배열이 없습니다 — detect-signals/diagnose-company 의 --json 출력을 지정하세요.');
+  }
+  return arr.map((s) => ({
+    ...s,
+    markers: (s.markers ?? []).map((src) => new RegExp(src)),
+    categoryPattern: new RegExp(s.categoryPattern ?? '$^'),
+  }));
 }
 
 // 표현 안전성 가드 — 가설-확신도-확인절차 구조를 깨는 단정 표현.
@@ -373,16 +392,22 @@ if (isMain) {
     const clean = args.includes('--clean');
     const asJson = args.includes('--json');
     const dataDir = resolveDataDir(args, SAMPLE_DIR);
-    // 파일 인자 = 플래그(와 --data-dir 값)를 제외한 첫 위치 인자.
+    const signalsFileIdx = args.indexOf('--signals-file');
+    const signalsFile = signalsFileIdx !== -1 ? args[signalsFileIdx + 1] : undefined;
+    // 파일 인자 = 플래그(와 --data-dir / --signals-file 값)를 제외한 첫 위치 인자.
     const dataDirIdx = args.indexOf('--data-dir');
-    const file = args.find((a, i) => !a.startsWith('--') && (dataDirIdx === -1 || i !== dataDirIdx + 1));
+    const file = args.find((a, i) => !a.startsWith('--')
+      && (dataDirIdx === -1 || i !== dataDirIdx + 1)
+      && (signalsFileIdx === -1 || i !== signalsFileIdx + 1));
     if (!file) {
-      console.error('사용법: node test/briefing-eval.mjs [--clean] [--json] [--data-dir <dir>] <briefing.md> | --self-test');
+      console.error('사용법: node test/briefing-eval.mjs [--clean] [--json] [--data-dir <dir> | --signals-file <packet.json>] <briefing.md> | --self-test');
       process.exitCode = 2;
     } else {
-      const signals = signalsForDataDir(dataDir);
+      const signals = signalsFile
+        ? signalsFromPacket(JSON.parse(readFileSync(signalsFile, 'utf8')))
+        : signalsForDataDir(dataDir);
       const result = evaluateBriefing(readFileSync(file, 'utf8'), { mode: clean ? 'clean' : 'normal', signals });
-      if (asJson) console.log(JSON.stringify({ dataDir, ...result }, null, 2));
+      if (asJson) console.log(JSON.stringify({ dataDir: signalsFile ? undefined : dataDir, signalsFile, ...result }, null, 2));
       else printReport(result);
       if (!result.pass) process.exitCode = 1;
     }

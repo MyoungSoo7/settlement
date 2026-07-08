@@ -96,3 +96,6 @@ frontend/*.out.log
 
 ### Claude Code Stop hook 세션 로그 (재생성 가능) ###
 pwc/submission/logs/claude-code/
+
+### DART 공시 기반 생성 CSV (재생성 가능) ###
+pwc/submission/src/data/generated/
