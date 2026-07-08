@@ -94,4 +94,5 @@ pwc/submission/src/data/cache/
 frontend/vite-*.log
 frontend/*.out.log
 
-pwc
+### Claude Code Stop hook 세션 로그 (재생성 가능) ###
+pwc/submission/logs/claude-code/

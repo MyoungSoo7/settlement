@@ -1,7 +1,7 @@
 # Trusted CEO Agent — 5문항 답변
 
 > 삼일PwC AX 인재전쟁 Round 10 제출물(`trusted-ceo-agent` Codex 플러그인)에 대한 심사 5문항 답변.
-> 근거 문서: [`README.md`](./README.md), [`doc/poc-trusted-ceo-accounting-agent.md`](document/poc-trusted-ceo-accounting-agent.md), [`src/.codex-plugin/plugin.json`](./src/.codex-plugin/plugin.json)
+> 근거 문서: [`README.md`](../README.md), [`doc/poc-trusted-ceo-accounting-agent.md`](poc-trusted-ceo-accounting-agent.md), [`src/.codex-plugin/plugin.json`](../src/.codex-plugin/plugin.json)
 
 ---
 
