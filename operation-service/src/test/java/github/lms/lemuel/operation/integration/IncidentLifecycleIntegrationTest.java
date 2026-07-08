@@ -102,10 +102,10 @@ class IncidentLifecycleIntegrationTest {
     }
 
     private static String webhookJson(String status, String fingerprint, String endsAt) {
-        return webhookJson(status, fingerprint, endsAt, "2026-07-06T05:12:00Z");
-    }
-
-    private static String webhookJson(String status, String fingerprint, String endsAt, String startsAt) {
+        // startsAt 을 절대시각으로 박으면 summary(24h window: firstSeenAt >= now-24h) 집계에서
+        // 하루 뒤 CI 부터 인시던트가 창 밖으로 밀려나 byCategory 가 비는 시한폭탄이 된다.
+        // (#138 main CI 실패 원인) — 항상 "5분 전" 상대시각으로 생성.
+        String startsAt = java.time.Instant.now().minusSeconds(300).toString();
         return """
                 {
                   "version": "4",
@@ -253,11 +253,8 @@ class IncidentLifecycleIntegrationTest {
     @Test
     @DisplayName("시나리오5: 목록 필터·summary — ADMIN 조회")
     void listAndSummary() throws Exception {
-        // summary 는 firstSeenAt(=alert startsAt) 이 window(24h) 안에 든 건만 집계하므로,
-        // 고정 과거 시각이 아니라 현재 기준 최근 시각을 startsAt 으로 넣어야 wall-clock 에 안 흔들린다.
-        String recentStart = Instant.now().minusSeconds(3600).toString();
-        postWebhook(webhookJson("firing", "fp-list-1", "0001-01-01T00:00:00Z", recentStart));
-        postWebhook(webhookJson("firing", "fp-list-2", "0001-01-01T00:00:00Z", recentStart));
+        postWebhook(webhookJson("firing", "fp-list-1", "0001-01-01T00:00:00Z"));
+        postWebhook(webhookJson("firing", "fp-list-2", "0001-01-01T00:00:00Z"));
 
         mockMvc.perform(get("/api/ops/incidents").with(admin())
                         .param("status", "OPEN").param("category", "KAFKA_BACKLOG"))
