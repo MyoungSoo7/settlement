@@ -53,7 +53,7 @@ settlement/                       # Gradle 멀티 모듈 루트
 │   └── github.lms.lemuel.operation.*   # Phase 1: Alertmanager webhook → 인시던트 라이프사이클 (docs/design/operation-service-phase1.md)
 ├── market-service/               # 📉 Market 서비스 (port 8094, 자체 DB lemuel_market) — KRX 상장사 시세·시가총액 조회
 │   └── github.lms.lemuel.market.*      # ★ shared-common 미의존 (공개 read-only, 자체 SecurityConfig)
-├── ai-service/                   # 🤖 AI 서비스 (port 8096, 자체 DB lemuel_ai) — 대화형 AI 챗봇 (Spring AI 2.0 + Claude)
+├── ai-service/                   # 🤖 AI 서비스 (port 8096, 자체 DB lemuel_ai) — 대화형 AI 챗봇 (기본 Gemini, provider 스위치로 Anthropic 전환 가능)
 │   └── github.lms.lemuel.ai.*          # shared-common JWT 만 제한 스캔 (LLM 실비용 → 인증 필수, docs/design/ai-service-phase1.md)
 ├── common-data-service/          # 🗂️ Common-Data 서비스 (port 8098, 자체 DB lemuel_commondata) — 공공데이터포털 범용 커넥터
 │   └── github.lms.lemuel.commondata.*  # ★ shared-common 미의존 (공개 read-only, 자체 SecurityConfig)
@@ -72,7 +72,7 @@ settlement/                       # Gradle 멀티 모듈 루트
 | **company-service** | `company` | 기업 뉴스 기사 수집(네이버 뉴스 API, `NAVER_CLIENT_ID/SECRET`)·조회 + Phase 2 평판 스코어 — ADR 0023. 자체 DB(lemuel_company), 기업 식별자(stockCode/corpCode)는 financial 과 공용 비즈니스 키. 기사 본문 미저장(저작권 — 제목·요약·링크만), `url_hash` UNIQUE 멱등 수집. shared-common 미의존(자체 SecurityConfig — GET 공개, `/admin/company/**` 는 X-Internal-Api-Key 게이트) |
 | **operation-service** | `operation` | 운영 관제 — Alertmanager 알람을 webhook(Bearer=INTERNAL_API_KEY)으로 받아 인시던트(OPEN→ACKNOWLEDGED→RESOLVED/FALSE_POSITIVE)로 적재·관리. `(source, correlation_key)` partial unique index 로 활성 중복 0, repeat firing 은 refire 병합(+낙관적 락 재시도). 자체 DB(lemuel_operation, opslab 스키마 재사용 — loan 과 동일 이유), 콘솔 `/api/ops/**` 는 JWT ADMIN 전용. **Phase 2 완료**: `signal` BC — (2a) 도메인 성공 이벤트(order/payment/settlement.created) 구독=분모 + Prometheus 폴링(kafka lag/redis/deadlock/http)=인프라 게이지를 `ops_metric_bucket`(5분, ON CONFLICT UPSERT)에 적재; (2b) 실패 이벤트=분자 — shared-common `common.opssignal`(best-effort Kafka emitter, **절대 throw 안 함·Outbox 미사용**)를 PayoutSingleExecutor(settlement.failed)·RefundLifecycle(payment.failed)·재고 차감 서비스(stock.depleted)·신규 ShippingDelayScanner(shipping.delayed)에 배선, operation 이 `lemuel.ops.*.failed` 구독으로 count_signal 적재 → failure_rate=signal/total 성립. (order.failed 는 단일 실패 지점 부재로 소비자만 준비·미배선). 남은 로드맵: 3 베이스라인 이상탐지 → 4 AI 브리핑 (docs/design/operation-service-phase1.md) |
 | **market-service** | `market` | KRX 상장사 일별 시세·시가총액 공개 조회 — 공공데이터포털 금융위 주식시세정보(getStockPriceInfo) 수집(`KRX_API_KEY`, 날짜 기준 배치 — 하루치 전 종목 페이지네이션) + Flyway 시드 폴백. 자체 DB(lemuel_market), 타 서비스와 코드·DB·이벤트 의존 0. stockCode(6자리)는 financial/company 와 공용 비즈니스 키 — **PER/PBR 은 계산하지 않고 시세·시총만 서빙**(financial import/DB조인 금지, 밸류에이션 조인은 소비측 CEO 브리핑/invest-copilot 몫). shared-common 미의존(자체 최소 SecurityConfig — GET 공개, `/admin/market/**` 는 X-Internal-Api-Key 게이트) |
-| **ai-service** | `ai.chat` | 대화형 AI 챗봇 — Spring AI 2.0(공식 Anthropic SDK 기반) + Claude, 컨텍스트 유지 채팅(`/api/ai/chat`, SSE 스트리밍)·대화 이력 CRUD. 자체 DB(lemuel_ai, `pgvector/pg17` 이미지 — Phase 3 RAG 선점). LLM 실비용이라 **JWT USER 이상 필수** + bucket4j 비용 가드(분5/일100). Spring AI 는 `adapter/out/llm` 에만 격리(ArchUnit 강제), LLM 실패 시 폴백 없이 503+이력 무저장. shared-common 은 `common.config.jwt` 만 제한 스캔. 로드맵: Phase 2 Function Calling(내부 API 호출) → Phase 3 RAG (docs/design/ai-service-phase1.md) |
+| **ai-service** | `ai.chat` | 대화형 AI 챗봇 — 컨텍스트 유지 채팅(`/api/ai/chat`, SSE 스트리밍)·대화 이력 CRUD. **LLM provider 스위치**(`app.ai.provider`, 기본 `gemini`): GeminiChatAdapter(Google Generative Language API 를 `RestClient` 로 직접 호출 — company 감성분석과 동일 패턴, `GEMINI_API_KEY` 공용) / AnthropicChatAdapter(Spring AI 2.0 공식 Anthropic SDK, `app.ai.provider=anthropic`) 중 `@ConditionalOnProperty` 로 정확히 하나만 등록. 자체 DB(lemuel_ai, `pgvector/pg17` 이미지 — Phase 3 RAG 선점). LLM 실비용이라 **JWT USER 이상 필수** + bucket4j 비용 가드(분5/일100). LLM 어댑터는 `adapter/out/llm` 에만 격리(`org.springframework.ai` ArchUnit 강제), LLM 실패 시 폴백 없이 503+이력 무저장, 저장·LLM 전송 전 카드/주민번호 PII 마스킹. shared-common 은 `common.config.jwt` 만 제한 스캔. 로드맵: Phase 2 Function Calling(내부 API 호출) → Phase 3 RAG (docs/design/ai-service-phase1.md) |
 | **common-data-service** | `commondata` | 공공데이터포털(data.go.kr) **범용 커넥터** — 임의의 OpenAPI 를 코드 변경 없이 "데이터소스"로 등록(`POST /admin/commondata/sources`: endpoint·defaultParams·keyFields)하면 표준 봉투(`response.header.resultCode`/`body.items.item[]`/totalCount 페이지네이션)를 파싱해 `data_records` 에 `(source, record_key)` UNIQUE upsert 로 수집(재수집 멱등, payload JSON 원문 보존). 인증키는 계정당 1개인 `DATA_GO_KR_API_KEY` 공용 + Flyway 시드 폴백(한국천문연구원 특일정보=공휴일 예시). 자체 DB(lemuel_commondata), 타 서비스와 코드·DB·이벤트 의존 0. shared-common 미의존(자체 최소 SecurityConfig — GET 공개, `/admin/commondata/**` 는 X-Internal-Api-Key 게이트) (docs/design/common-data-service-phase1.md) |
 | **gateway-service** | (Spring Cloud Gateway) | 라우팅, 인증 필터 |
 | **shared-common** | `common.*` | 전 서비스 공유 — 감사·관측·예외·Outbox·rate limit·JWT·PDF |
@@ -230,7 +230,7 @@ RUNNING → COMPLETED
 - **리버스 프록시**: gateway-service (Spring Cloud Gateway)
 - **모니터링**: Prometheus + Micrometer + Grafana
 - **메시지 브로커**: Redpanda (Kafka 호환)
-- **코드 커버리지**: JaCoCo — CI 게이트 LINE 최소 50%, 핵심 도메인 패키지(payment/order/product/settlement/... domain) INSTRUCTION 80% 강제 (`build.gradle.kts`). adapter in/out 서브패키지 전반은 게이트에서 제외(통합 테스트로 별도 검증)
+- **코드 커버리지**: JaCoCo — CI 게이트 LINE 최소 90%, 핵심 도메인 패키지(payment/order/product/settlement/... domain) INSTRUCTION 80% 강제 (`build.gradle.kts`). adapter in/out 서브패키지 전반은 게이트에서 제외(통합 테스트로 별도 검증)
 
 ## 보안
 

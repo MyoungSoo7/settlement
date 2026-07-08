@@ -50,7 +50,7 @@ flowchart LR
         COM["company :8090<br/>기업 뉴스·평판 (네이버)"]
         OPS["operation :8092<br/>운영 관제·인시던트"]
         MKT["market :8094<br/>KRX 시세·시가총액 (공공데이터)"]
-        AI["ai :8096<br/>AI 챗봇 (Spring AI 2.0 + Claude)"]
+        AI["ai :8096<br/>AI 챗봇 (기본 Gemini · Anthropic 전환 가능)"]
         CDS["common-data :8098<br/>공공데이터포털 범용 커넥터"]
     end
 
@@ -111,7 +111,7 @@ CQRS 로 분리하고, 대사는 order 의 내부 API 를 호출해 cross-DB 연
 | API Gateway | Spring Cloud Gateway 2025 |
 | PG 연동 | Toss Payments |
 | 배치 | Spring Batch |
-| AI/LLM | Spring AI 2.0 (Anthropic Claude — ai-service 챗봇, company 감성분석) |
+| AI/LLM | Google Gemini(기본) · Anthropic Claude(Spring AI 2.0) — provider 스위치. ai-service 챗봇·company 감성분석 |
 | 캐시 | Caffeine (L1) + 선택적 Redis L2 — 2-tier 캐시 (opt-in, Pub/Sub 무효화) |
 | 회복탄력성 | Resilience4j (Circuit Breaker, Retry) |
 | Rate Limiting | Bucket4j |
@@ -191,7 +191,7 @@ settlement/                              # 모노레포 루트
 │   └── src/main/java/.../market/        # 공공데이터포털 금융위 주식시세정보 수집 + 시드 폴백 — 시세·시총만 서빙(PER/PBR 은 소비측 조인)
 │
 ├── ai-service/                          # 🤖 AI 서비스 (port 8096, 자체 DB lemuel_ai — pgvector) — 대화형 AI 챗봇
-│   └── src/main/java/.../ai/chat/       # Spring AI 2.0 + Claude, 컨텍스트 유지 채팅(SSE)·이력 CRUD — JWT USER 이상 + rate limit
+│   └── src/main/java/.../ai/chat/       # LLM provider 스위치(기본 Gemini/RestClient · Anthropic Spring AI), 컨텍스트 채팅(SSE)·이력 CRUD — JWT USER 이상 + rate limit
 │
 ├── common-data-service/                 # 🗂️ Common-Data 서비스 (port 8098, 자체 DB lemuel_commondata)
 │   └── src/main/java/.../commondata/    # 공공데이터포털 범용 커넥터 — 데이터소스 등록만으로 임의 OpenAPI 수집(멱등 upsert)
@@ -633,7 +633,7 @@ CI 에서 k6 thresholds 로 회귀 자동 감지.
 | **외부 API(DART/ECOS/네이버) 키 없이 데모?** | Flyway **시드 폴백** — 각 서비스 `V2__*_seed.sql` 이 대표 데이터를 적재해 키 없이도 조회 동작, 키 설정 시 수집 배치가 UNIQUE upsert 로 실데이터 대체 |
 | **Alertmanager 알람이 인시던트가 되는 과정?** | [IngestAlertService](operation-service/src/main/java/github/lms/lemuel/operation/incident/application/service/IngestAlertService.java) — webhook(Bearer) → `(source, correlation_key)` partial unique 로 활성 중복 0, repeat firing refire 병합 |
 | **위성 서비스도 코드·DB 의존 0?** | ✅ financial/economics/company/market/ai/common-data 는 타 서비스 import·DB 공유 없음(ArchUnit 강제). operation·ai 만 shared-common(JWT) 사용, 신호는 Kafka 이벤트로만 수신 |
-| **AI 챗봇의 LLM 벤더 종속은?** | [ChatCompletionPort](ai-service/src/main/java/github/lms/lemuel/ai/chat/application/port/out/ChatCompletionPort.java) 뒤로 Spring AI 를 `adapter/out/llm` 에만 격리(ArchUnit 강제) — 어댑터 교체로 벤더 전환. LLM 실패 시 폴백 없이 503 + 이력 무저장, bucket4j 로 비용 가드 |
+| **AI 챗봇의 LLM 벤더 종속은?** | [ChatCompletionPort](ai-service/src/main/java/github/lms/lemuel/ai/chat/application/port/out/ChatCompletionPort.java) 뒤로 LLM 을 `adapter/out/llm` 에만 격리(ArchUnit 강제). 실제로 Gemini/Anthropic 두 어댑터를 `app.ai.provider` 로 스위치(기본 Gemini) — 벤더 전환이 설정 한 줄. LLM 실패 시 폴백 없이 503 + 이력 무저장, bucket4j 로 비용 가드 |
 
 ## 운영 환경 확장 포인트
 
