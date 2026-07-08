@@ -150,8 +150,8 @@ class ChatServiceTest {
     }
 
     @Test
-    @DisplayName("LLM 실패 — 예외가 그대로 나가고 아무것도 저장되지 않는다 (§2.4)")
-    void chat_llmFailure_nothingSaved() {
+    @DisplayName("LLM 실패 — 예외가 그대로 나가고, 저장 없음 + 소비한 rate limit 토큰은 환불된다 (§2.4, C-L2)")
+    void chat_llmFailure_nothingSaved_andRefunds() {
         when(chatCompletionPort.isConfigured()).thenReturn(true);
         when(chatCompletionPort.complete(anyString(), any(), anyString()))
                 .thenThrow(new AiUnavailableException("실패", null));
@@ -160,6 +160,9 @@ class ChatServiceTest {
                 .isInstanceOf(AiUnavailableException.class);
 
         verifyNoInteractions(saveConversationPort);
+        // 과금 없이 실패했으므로 acquire 로 소비한 토큰을 되돌려야 한다(장애 중 쿼터 소진 방지).
+        verify(rateLimitPort).acquire(USER_ID);
+        verify(rateLimitPort).refund(USER_ID);
     }
 
     @Test
@@ -181,6 +184,28 @@ class ChatServiceTest {
         assertThat(result.reply()).isEqualTo("답변");
         verify(saveConversationPort).saveExchange(any(), any(), any());
         verify(chatCompletionPort, never()).complete(anyString(), any(), anyString());
+    }
+
+    @Test
+    @DisplayName("PII 마스킹 — 카드번호가 LLM 전송·저장·제목 모두에서 마스킹된다 (Tier C)")
+    void chat_masksPii() {
+        when(chatCompletionPort.isConfigured()).thenReturn(true);
+        when(chatCompletionPort.complete(anyString(), any(), anyString()))
+                .thenReturn(new ChatCompletion("확인했습니다", "claude-test", 10, 5));
+
+        chatService.chat(new ChatCommand(USER_ID, null, "제 카드 4111-1111-1111-1111 로 결제해줘"));
+
+        // 외부 LLM 으로 원문이 나가면 안 된다.
+        ArgumentCaptor<String> llmMessage = ArgumentCaptor.forClass(String.class);
+        verify(chatCompletionPort).complete(anyString(), any(), llmMessage.capture());
+        assertThat(llmMessage.getValue()).doesNotContain("4111").contains("[카드번호 마스킹됨]");
+
+        // 저장되는 user 메시지 content 와 신규 대화 제목도 마스킹본에서 나온다.
+        ArgumentCaptor<Conversation> saved = ArgumentCaptor.forClass(Conversation.class);
+        ArgumentCaptor<ChatMessage> userMsg = ArgumentCaptor.forClass(ChatMessage.class);
+        verify(saveConversationPort).saveExchange(saved.capture(), userMsg.capture(), any());
+        assertThat(userMsg.getValue().content()).doesNotContain("4111");
+        assertThat(saved.getValue().title()).doesNotContain("4111");
     }
 
     @Test

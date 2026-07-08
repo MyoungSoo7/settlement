@@ -151,11 +151,12 @@ class VariantStockConcurrencyIT {
             });
         }
 
-        readyLatch.await();
+        boolean allReady = readyLatch.await(30, TimeUnit.SECONDS);
         startLatch.countDown();         // 폭발적 동시 시작
         boolean finished = doneLatch.await(30, TimeUnit.SECONDS);
         executor.shutdown();
 
+        assertThat(allReady).as("모든 스레드 30 초 내 준비 (교착 방지 타임아웃)").isTrue();
         assertThat(finished).as("모든 스레드 30 초 내 완료").isTrue();
         assertThat(unexpectedErrors).as("InsufficientStock 외 예상치 못한 예외 — 원자 차감 일관성 위반")
                 .isEmpty();

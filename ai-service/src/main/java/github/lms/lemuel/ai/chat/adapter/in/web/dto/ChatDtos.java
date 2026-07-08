@@ -78,4 +78,13 @@ public final class ChatDtos {
 
     public record ErrorResponse(String message) {
     }
+
+    /**
+     * SSE 스트림 도중 실패 시 error 이벤트 페이로드.
+     * code 로 클라이언트가 사유(레이트리밋/미구성/미존재/일반)를 구분한다 —
+     * HTTP 상태(이미 200)가 소실되는 스트리밍 경로의 대체 신호.
+     * message 는 화이트리스트된 안전 문구만 담는다(원본 예외 메시지 노출 금지).
+     */
+    public record StreamError(String code, String message) {
+    }
 }

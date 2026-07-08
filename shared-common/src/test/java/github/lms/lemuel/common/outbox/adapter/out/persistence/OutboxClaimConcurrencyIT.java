@@ -133,8 +133,9 @@ class OutboxClaimConcurrencyIT {
             });
         }
 
-        ready.await();
+        boolean allReady = ready.await(30, TimeUnit.SECONDS);
         start.countDown();
+        assertThat(allReady).as("모든 워커 30초 내 준비 (교착 방지 타임아웃)").isTrue();
         assertThat(done.await(30, TimeUnit.SECONDS)).as("모든 워커 30초 내 완료").isTrue();
         pool.shutdown();
 

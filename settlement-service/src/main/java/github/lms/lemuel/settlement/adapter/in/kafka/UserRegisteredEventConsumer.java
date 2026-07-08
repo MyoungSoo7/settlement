@@ -2,20 +2,17 @@ package github.lms.lemuel.settlement.adapter.in.kafka;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import github.lms.lemuel.common.outbox.adapter.in.kafka.ProcessedEventJpaEntity;
+import github.lms.lemuel.common.outbox.adapter.in.kafka.IdempotentEventConsumer;
 import github.lms.lemuel.common.outbox.adapter.in.kafka.ProcessedEventRepository;
 import github.lms.lemuel.settlement.adapter.out.readmodel.SettlementUserViewJpaEntity;
 import github.lms.lemuel.settlement.adapter.out.readmodel.SettlementUserViewRepository;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -23,27 +20,23 @@ import java.util.UUID;
  * UserRegistered 이벤트 → settlement 소유 사용자 프로젝션(settlement_user_view) 적재 (ADR 0020 Phase 3b).
  *
  * <p>order users(email)를 @Immutable 매핑하던 read-model 을 이벤트 기반 로컬 프로젝션으로 대체.
- * (consumer_group, event_id) 멱등.
+ * 멱등 골격은 {@link IdempotentEventConsumer} 가 소유하고, 여기서는 뷰 매핑만 구현한다.
  */
 @Component
 @ConditionalOnProperty(name = "app.kafka.enabled", havingValue = "true")
-public class UserRegisteredEventConsumer {
+public class UserRegisteredEventConsumer extends IdempotentEventConsumer {
 
-    private static final Logger log = LoggerFactory.getLogger(UserRegisteredEventConsumer.class);
     private static final String CONSUMER_GROUP = "lemuel-settlement";
 
     private final SettlementUserViewRepository userViewRepository;
-    private final ProcessedEventRepository processedEventRepository;
-    private final ObjectMapper objectMapper;
     private final SettlementProjectionMetrics projectionMetrics;
 
     public UserRegisteredEventConsumer(SettlementUserViewRepository userViewRepository,
                                        ProcessedEventRepository processedEventRepository,
                                        ObjectMapper objectMapper,
                                        SettlementProjectionMetrics projectionMetrics) {
+        super(processedEventRepository, objectMapper);
         this.userViewRepository = userViewRepository;
-        this.processedEventRepository = processedEventRepository;
-        this.objectMapper = objectMapper;
         this.projectionMetrics = projectionMetrics;
     }
 
@@ -54,29 +47,21 @@ public class UserRegisteredEventConsumer {
     )
     @Transactional
     public void onUserRegistered(ConsumerRecord<String, String> record, Acknowledgment ack) {
-        UUID eventId = extractEventId(record);
-        if (eventId == null) {
-            log.warn("Skipping user event without event_id header. topic={}, offset={}",
-                    record.topic(), record.offset());
-            ack.acknowledge();
-            return;
-        }
+        consume(record, ack);
+    }
 
-        ProcessedEventJpaEntity.ProcessedEventId key =
-                new ProcessedEventJpaEntity.ProcessedEventId(CONSUMER_GROUP, eventId);
-        if (processedEventRepository.existsById(key)) {
-            log.info("User event already processed, skipping. eventId={}", eventId);
-            ack.acknowledge();
-            return;
-        }
+    @Override
+    protected String consumerGroup() {
+        return CONSUMER_GROUP;
+    }
 
-        JsonNode node;
-        try {
-            node = objectMapper.readTree(record.value());
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-            throw new IllegalArgumentException("Invalid JSON payload, eventId=" + eventId, e);
-        }
+    @Override
+    protected String eventType() {
+        return "UserRegistered";
+    }
 
+    @Override
+    protected void handle(JsonNode node, UUID eventId) {
         if (!node.hasNonNull("userId")) {
             throw new IllegalArgumentException("Missing userId, eventId=" + eventId);
         }
@@ -89,19 +74,11 @@ public class UserRegisteredEventConsumer {
         view.setUpdatedAt(LocalDateTime.now());
         userViewRepository.save(view);
 
-        processedEventRepository.save(new ProcessedEventJpaEntity(CONSUMER_GROUP, eventId, "UserRegistered"));
-        projectionMetrics.recordApply("user", record.timestamp());
         log.info("settlement_user_view upserted. eventId={}, userId={}", eventId, userId);
-        ack.acknowledge();
     }
 
-    private static UUID extractEventId(ConsumerRecord<String, String> record) {
-        var header = record.headers().lastHeader("event_id");
-        if (header == null) return null;
-        try {
-            return UUID.fromString(new String(header.value(), StandardCharsets.UTF_8));
-        } catch (IllegalArgumentException e) {
-            return null;
-        }
+    @Override
+    protected void afterProcessed(ConsumerRecord<String, String> record) {
+        projectionMetrics.recordApply("user", record.timestamp());
     }
 }

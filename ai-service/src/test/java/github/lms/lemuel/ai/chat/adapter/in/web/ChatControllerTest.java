@@ -1,6 +1,8 @@
 package github.lms.lemuel.ai.chat.adapter.in.web;
 
+import github.lms.lemuel.ai.chat.adapter.in.web.dto.ChatDtos.StreamError;
 import github.lms.lemuel.ai.chat.application.exception.AiNotConfiguredException;
+import github.lms.lemuel.ai.chat.application.exception.AiUnavailableException;
 import github.lms.lemuel.ai.chat.application.exception.ConversationNotFoundException;
 import github.lms.lemuel.ai.chat.application.exception.RateLimitExceededException;
 import github.lms.lemuel.ai.chat.application.port.in.ChatUseCase;
@@ -141,5 +143,26 @@ class ChatControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"conversationId\":\"" + otherId + "\",\"message\":\"질문\"}"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("SSE 스트림 에러 매핑 — 도메인 예외는 code+안전메시지, 예기치 못한 예외는 원문 미노출(S-H1)")
+    void toStreamError_mapsSafely() {
+        assertThat(ChatController.toStreamError(new RateLimitExceededException(30)).code())
+                .isEqualTo("RATE_LIMITED");
+        assertThat(ChatController.toStreamError(new ConversationNotFoundException(UUID.randomUUID())).code())
+                .isEqualTo("NOT_FOUND");
+        assertThat(ChatController.toStreamError(new AiNotConfiguredException()).code())
+                .isEqualTo("AI_NOT_CONFIGURED");
+        assertThat(ChatController.toStreamError(new AiUnavailableException("일시적 오류", null)).code())
+                .isEqualTo("AI_UNAVAILABLE");
+
+        // 예기치 못한 예외(DB 제약조건명 등)의 원문은 클라이언트로 새어나가면 안 된다.
+        StreamError generic = ChatController.toStreamError(
+                new IllegalStateException("column secret_col violates unique constraint uk_xyz"));
+        assertThat(generic.code()).isEqualTo("ERROR");
+        assertThat(generic.message())
+                .isEqualTo("AI 응답 처리 중 오류가 발생했습니다.")
+                .doesNotContain("secret_col");
     }
 }

@@ -182,11 +182,12 @@ class IdempotentOrderConcurrencyIT {
                 }
             });
         }
-        ready.await();
+        boolean allReady = ready.await(30, TimeUnit.SECONDS);
         start.countDown();
         boolean finished = done.await(30, TimeUnit.SECONDS);
         pool.shutdown();
 
+        assertThat(allReady).as("모든 스레드 30초 내 준비 (교착 방지 타임아웃)").isTrue();
         assertThat(finished).as("30초 내 완료").isTrue();
         assertThat(unexpected).as("예상치 못한 예외 없음").isEmpty();
 

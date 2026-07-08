@@ -93,8 +93,10 @@ app:
     ttl-seconds: ${JWT_TTL_SECONDS:3600}
 
   ai:
+    # LLM provider 선택 — gemini(기본) | anthropic. 어댑터가 @ConditionalOnProperty 로 정확히 하나만 등록된다.
+    provider: ${APP_AI_PROVIDER:gemini}
     chat:
-      # Anthropic Messages API — company-service 감성분석과 동일 env var 공용.
+      # (provider=anthropic 일 때) Anthropic Messages API — company-service 감성분석과 동일 env var 공용.
       # 미설정 시: 부팅·이력 조회는 정상, 채팅만 503 안내 (economics 의 "키 미설정 → 수집 비활성" 철학).
       api-key: ${ANTHROPIC_API_KEY:}
       model: ${APP_AI_CHAT_MODEL:claude-opus-4-8}
@@ -112,6 +114,14 @@ app:
         단, 사용자의 실제 주문·결제·정산 금액 등 개인 데이터는 아직 조회할 수 없으므로
         절대 지어내지 말고 "곧 조회 기능이 연동될 예정"이라고 안내하세요.
         개인정보(카드번호·주민번호 등)를 입력하지 않도록 안내하세요.
+    gemini:
+      # (provider=gemini, 기본) Google Generative Language API — company-service 감성분석과 동일 키(GEMINI_API_KEY) 공용.
+      # 미설정 시: 부팅·이력 조회는 정상, 채팅만 503 안내.
+      api-key: ${GEMINI_API_KEY:}
+      model: ${APP_AI_GEMINI_MODEL:gemini-2.5-flash}
+      base-url: https://generativelanguage.googleapis.com
+      # 2.5 계열은 thinking 이 출력 예산을 먹을 수 있어 넉넉히 잡는다(빈 응답 방지).
+      max-tokens: 2048
     rate-limit:
       # LLM 비용 가드 — 사용자별 채팅 호출 상한. 초과 시 429 + Retry-After.
       per-minute: ${APP_AI_RATE_PER_MINUTE:5}

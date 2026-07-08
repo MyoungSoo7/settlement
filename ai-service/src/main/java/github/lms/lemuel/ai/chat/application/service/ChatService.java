@@ -1,6 +1,7 @@
 package github.lms.lemuel.ai.chat.application.service;
 
 import github.lms.lemuel.ai.chat.application.exception.AiNotConfiguredException;
+import github.lms.lemuel.ai.chat.application.exception.AiUnavailableException;
 import github.lms.lemuel.ai.chat.application.exception.ConversationNotFoundException;
 import github.lms.lemuel.ai.chat.application.port.in.ChatUseCase;
 import github.lms.lemuel.ai.chat.application.port.out.ChatCompletionPort;
@@ -10,6 +11,7 @@ import github.lms.lemuel.ai.chat.application.port.out.SaveConversationPort;
 import github.lms.lemuel.ai.chat.domain.ChatCompletion;
 import github.lms.lemuel.ai.chat.domain.ChatMessage;
 import github.lms.lemuel.ai.chat.domain.Conversation;
+import github.lms.lemuel.ai.chat.domain.PiiMasker;
 import github.lms.lemuel.ai.config.AiChatProperties;
 import org.springframework.stereotype.Service;
 
@@ -62,6 +64,10 @@ public class ChatService implements ChatUseCase {
         }
         rateLimitPort.acquire(command.userId());
 
+        // PII 마스킹 — 저장(content/title)·외부 LLM 전송 전 단일 초크포인트.
+        // 이후 command.message() 원문 대신 마스킹본만 사용한다(카드번호·주민번호 유출 차단).
+        String userMessageText = PiiMasker.mask(command.message());
+
         Conversation conversation;
         List<ChatMessage> history;
         if (command.conversationId() != null) {
@@ -69,16 +75,24 @@ public class ChatService implements ChatUseCase {
                     .orElseThrow(() -> new ConversationNotFoundException(command.conversationId()));
             history = loadConversationPort.findRecentMessages(conversation.id(), properties.historyWindow());
         } else {
-            conversation = Conversation.start(command.userId(), command.message(), clock.instant());
+            conversation = Conversation.start(command.userId(), userMessageText, clock.instant());
             history = List.of();
         }
 
-        ChatCompletion completion = onDelta == null
-                ? chatCompletionPort.complete(properties.systemPrompt(), history, command.message())
-                : chatCompletionPort.stream(properties.systemPrompt(), history, command.message(), onDelta);
+        ChatCompletion completion;
+        try {
+            completion = onDelta == null
+                    ? chatCompletionPort.complete(properties.systemPrompt(), history, userMessageText)
+                    : chatCompletionPort.stream(properties.systemPrompt(), history, userMessageText, onDelta);
+        } catch (AiUnavailableException e) {
+            // LLM 이 과금 없이 실패(빈 응답·5xx·타임아웃) — 소비한 rate limit 토큰을 되돌린다.
+            // (스트리밍 중 클라이언트 이탈은 UncheckedIOException 이라 여기 걸리지 않음: 이미 과금됨 → 환불 안 함)
+            rateLimitPort.refund(command.userId());
+            throw e;
+        }
 
         Instant now = clock.instant();
-        ChatMessage userMessage = ChatMessage.user(command.message(), now);
+        ChatMessage userMessage = ChatMessage.user(userMessageText, now);
         ChatMessage assistantMessage = ChatMessage.assistant(completion, now);
         conversation.recordExchange(now);
         saveConversationPort.saveExchange(conversation, userMessage, assistantMessage);

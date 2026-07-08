@@ -47,6 +47,16 @@ public class Bucket4jRateLimiter implements RateLimitPort {
         }
     }
 
+    @Override
+    public void refund(Long userId) {
+        // 이미 존재하는 버킷에만 1 토큰을 되돌린다(capacity 상한 초과분은 bucket4j 가 무시).
+        // 버킷이 없으면(만료·축출) 되돌릴 대상이 없으므로 조용히 통과 — best-effort.
+        Bucket bucket = buckets.getIfPresent(userId);
+        if (bucket != null) {
+            bucket.addTokens(1);
+        }
+    }
+
     private Bucket newBucket() {
         return Bucket.builder()
                 .addLimit(Bandwidth.builder()

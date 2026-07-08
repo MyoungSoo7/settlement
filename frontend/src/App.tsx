@@ -136,19 +136,19 @@ function App() {
             <Route path="/admin/system/operation"
               element={<AdminOnlyRoute><SystemLayout><OperationConsolePage /></SystemLayout></AdminOnlyRoute>} />
 
-            {/* ── 최고 관리자 전용: CEO 인사이트 (좌측 사이드바) — 위성 조회 서비스 묶음 ── */}
+            {/* ── CEO 인사이트 (ADMIN·MANAGER, 좌측 사이드바) — 위성 조회 서비스 묶음 ── */}
             <Route path="/admin/ceo"
               element={<Navigate to="/admin/ceo/insight" replace />} />
             <Route path="/admin/ceo/insight"
-              element={<AdminOnlyRoute><CeoLayout><CeoInsightPage /></CeoLayout></AdminOnlyRoute>} />
+              element={<AdminManagerRoute><CeoLayout><CeoInsightPage /></CeoLayout></AdminManagerRoute>} />
             <Route path="/admin/ceo/economics"
-              element={<AdminOnlyRoute><CeoLayout><EconomicsPage /></CeoLayout></AdminOnlyRoute>} />
+              element={<AdminManagerRoute><CeoLayout><EconomicsPage /></CeoLayout></AdminManagerRoute>} />
             <Route path="/admin/ceo/financials"
-              element={<AdminOnlyRoute><CeoLayout><FinancialStatementsPage /></CeoLayout></AdminOnlyRoute>} />
+              element={<AdminManagerRoute><CeoLayout><FinancialStatementsPage /></CeoLayout></AdminManagerRoute>} />
             <Route path="/admin/ceo/companies"
-              element={<AdminOnlyRoute><CeoLayout><CompanyLookupPage /></CeoLayout></AdminOnlyRoute>} />
+              element={<AdminManagerRoute><CeoLayout><CompanyLookupPage /></CeoLayout></AdminManagerRoute>} />
             <Route path="/admin/ceo/loans"
-              element={<AdminOnlyRoute><CeoLayout><LoanPage /></CeoLayout></AdminOnlyRoute>} />
+              element={<AdminManagerRoute><CeoLayout><LoanPage /></CeoLayout></AdminManagerRoute>} />
 
           </Routes>
           </Suspense>

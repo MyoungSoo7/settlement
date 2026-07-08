@@ -2,6 +2,11 @@ package github.lms.lemuel.ai.chat.adapter.in.web;
 
 import github.lms.lemuel.ai.chat.adapter.in.web.dto.ChatDtos.ChatRequest;
 import github.lms.lemuel.ai.chat.adapter.in.web.dto.ChatDtos.ChatResponse;
+import github.lms.lemuel.ai.chat.adapter.in.web.dto.ChatDtos.StreamError;
+import github.lms.lemuel.ai.chat.application.exception.AiNotConfiguredException;
+import github.lms.lemuel.ai.chat.application.exception.AiUnavailableException;
+import github.lms.lemuel.ai.chat.application.exception.ConversationNotFoundException;
+import github.lms.lemuel.ai.chat.application.exception.RateLimitExceededException;
 import github.lms.lemuel.ai.chat.application.port.in.ChatUseCase;
 import github.lms.lemuel.ai.chat.application.port.in.ChatUseCase.ChatCommand;
 import github.lms.lemuel.ai.chat.application.port.in.ChatUseCase.ChatResult;
@@ -72,9 +77,11 @@ public class ChatController {
                 log.debug("SSE 클라이언트 이탈 — 스트림 중단");
                 emitter.completeWithError(clientGone);
             } catch (Exception e) {
-                // 스트림 도중 실패 — error 이벤트로 사유 전달 후 종료 (HTTP 상태는 이미 200)
+                // 스트림 도중 실패 — 원문은 서버 로그에만, 클라이언트에는 화이트리스트된 안전 메시지+code 만.
+                // (HTTP 상태는 이미 200 이므로 code 로 사유를 구분시킨다.)
+                log.warn("SSE 스트림 실패", e);
                 try {
-                    emitter.send(SseEmitter.event().name("error").data(e.getMessage() == null ? "AI 응답 실패" : e.getMessage()));
+                    emitter.send(SseEmitter.event().name("error").data(toStreamError(e)));
                 } catch (IOException ignored) {
                     // 전송조차 불가하면 그대로 종료
                 }
@@ -82,5 +89,20 @@ public class ChatController {
             }
         });
         return emitter;
+    }
+
+    /**
+     * 스트림 실패 예외를 안전한 {@link StreamError} 로 매핑한다.
+     * 알려진 도메인 예외만 그 메시지(우리가 통제하는 문구)를 노출하고,
+     * 그 외(DB 오류 등 예기치 못한 예외)는 제네릭 문구로 치환해 내부 정보 노출을 차단한다.
+     */
+    static StreamError toStreamError(Throwable e) {
+        return switch (e) {
+            case AiNotConfiguredException x -> new StreamError("AI_NOT_CONFIGURED", x.getMessage());
+            case AiUnavailableException x -> new StreamError("AI_UNAVAILABLE", x.getMessage());
+            case ConversationNotFoundException x -> new StreamError("NOT_FOUND", x.getMessage());
+            case RateLimitExceededException x -> new StreamError("RATE_LIMITED", x.getMessage());
+            default -> new StreamError("ERROR", "AI 응답 처리 중 오류가 발생했습니다.");
+        };
     }
 }

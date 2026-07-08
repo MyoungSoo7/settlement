@@ -7,7 +7,7 @@
     "name": "Lemuel — AX 인재전쟁 Round 10 / 삼일PwC 과제"
   },
   "license": "Apache-2.0",
-  "keywords": ["accounting", "risk", "cashflow", "cost-allocation", "ceo", "audit"],
+  "keywords": ["accounting", "risk", "cashflow", "cost-allocation", "ceo", "audit", "news", "reputation", "business-registry"],
   "skills": "./skills/",
   "mcpServers": "./.mcp.json",
   "interface": {
