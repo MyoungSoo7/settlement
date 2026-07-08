@@ -44,6 +44,18 @@ class AiArchitectureTest {
     }
 
     @Test
+    void 도메인은_프레임워크_애노테이션에_의존하지_않는다() {
+        // 도메인 POJO 에 JPA(@Entity/@Column)·Jackson(@JsonProperty)·Spring 이 새어들면
+        // 순수성이 깨진다 — 의존 방향뿐 아니라 프레임워크 오염도 가드한다(회귀 방지).
+        ArchRule rule = noClasses()
+                .that().resideInAPackage("..ai..domain..")
+                .should().dependOnClassesThat()
+                .resideInAnyPackage("jakarta.persistence..", "com.fasterxml.jackson..", "org.springframework..")
+                .allowEmptyShould(true);
+        rule.check(aiClasses);
+    }
+
+    @Test
     void application_은_adapter_에_의존하지_않는다() {
         ArchRule rule = noClasses()
                 .that().resideInAPackage("..ai..application..")

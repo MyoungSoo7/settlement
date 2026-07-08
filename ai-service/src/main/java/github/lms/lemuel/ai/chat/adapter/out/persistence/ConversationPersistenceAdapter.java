@@ -8,6 +8,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -76,14 +77,16 @@ public class ConversationPersistenceAdapter implements LoadConversationPort, Sav
     @Override
     @Transactional
     public void saveExchange(Conversation conversation, ChatMessage userMessage, ChatMessage assistantMessage) {
-        ConversationJpaEntity entity = conversationRepository.findById(conversation.id())
-                .map(existing -> {
-                    existing.applyExchange(conversation);
-                    return existing;
-                })
-                .orElseGet(() -> conversationRepository.save(ConversationJpaEntity.from(conversation)));
-        chatMessageRepository.save(ChatMessageJpaEntity.from(entity.getId(), userMessage));
-        chatMessageRepository.save(ChatMessageJpaEntity.from(entity.getId(), assistantMessage));
+        UUID conversationId = conversation.id();
+        // 한 왕복 = 메시지 2건(user+assistant). 기존 대화는 message_count 를 원자적으로 +2 하여
+        // 동시 왕복 시 로스트 업데이트를 차단한다. 매칭 행이 없으면(0) 신규 대화이므로 INSERT.
+        int updated = conversationRepository.incrementExchange(
+                conversationId, 2, conversation.lastMessageAt(), Instant.now());
+        if (updated == 0) {
+            conversationRepository.save(ConversationJpaEntity.from(conversation));
+        }
+        chatMessageRepository.save(ChatMessageJpaEntity.from(conversationId, userMessage));
+        chatMessageRepository.save(ChatMessageJpaEntity.from(conversationId, assistantMessage));
     }
 
     @Override

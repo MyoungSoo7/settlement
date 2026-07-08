@@ -150,8 +150,8 @@ class ChatServiceTest {
     }
 
     @Test
-    @DisplayName("LLM 실패 — 예외가 그대로 나가고 아무것도 저장되지 않는다 (§2.4)")
-    void chat_llmFailure_nothingSaved() {
+    @DisplayName("LLM 실패 — 예외가 그대로 나가고, 저장 없음 + 소비한 rate limit 토큰은 환불된다 (§2.4, C-L2)")
+    void chat_llmFailure_nothingSaved_andRefunds() {
         when(chatCompletionPort.isConfigured()).thenReturn(true);
         when(chatCompletionPort.complete(anyString(), any(), anyString()))
                 .thenThrow(new AiUnavailableException("실패", null));
@@ -160,6 +160,9 @@ class ChatServiceTest {
                 .isInstanceOf(AiUnavailableException.class);
 
         verifyNoInteractions(saveConversationPort);
+        // 과금 없이 실패했으므로 acquire 로 소비한 토큰을 되돌려야 한다(장애 중 쿼터 소진 방지).
+        verify(rateLimitPort).acquire(USER_ID);
+        verify(rateLimitPort).refund(USER_ID);
     }
 
     @Test

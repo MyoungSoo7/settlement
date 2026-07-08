@@ -21,6 +21,7 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.stereotype.Component;
 
+import java.io.UncheckedIOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -69,6 +70,12 @@ public class AnthropicChatAdapter implements ChatCompletionPort {
         }
     }
 
+    /** 테스트 전용 — 이미 조립된 모델을 주입한다(실 API 미호출). 프로덕션은 위 public 생성자만 사용. */
+    AnthropicChatAdapter(AiChatProperties properties, AnthropicChatModel chatModel) {
+        this.properties = properties;
+        this.chatModel = chatModel;
+    }
+
     @Override
     public boolean isConfigured() {
         return chatModel != null;
@@ -106,6 +113,10 @@ public class AnthropicChatAdapter implements ChatCompletionPort {
                         }
                     })
                     .blockLast();
+        } catch (AiUnavailableException | UncheckedIOException e) {
+            // 빈 응답 등 이미 분류된 LLM 실패, 그리고 클라이언트 이탈(onDelta 유래)은
+            // 그대로 위임한다 — 정상 이탈을 "LLM 실패"로 오분류하지 않기 위함.
+            throw e;
         } catch (RuntimeException e) {
             throw new AiUnavailableException("AI 스트리밍 응답에 실패했습니다. 잠시 후 다시 시도해 주세요.", e);
         }

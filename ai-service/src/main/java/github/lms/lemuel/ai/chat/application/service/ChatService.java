@@ -1,6 +1,7 @@
 package github.lms.lemuel.ai.chat.application.service;
 
 import github.lms.lemuel.ai.chat.application.exception.AiNotConfiguredException;
+import github.lms.lemuel.ai.chat.application.exception.AiUnavailableException;
 import github.lms.lemuel.ai.chat.application.exception.ConversationNotFoundException;
 import github.lms.lemuel.ai.chat.application.port.in.ChatUseCase;
 import github.lms.lemuel.ai.chat.application.port.out.ChatCompletionPort;
@@ -73,9 +74,17 @@ public class ChatService implements ChatUseCase {
             history = List.of();
         }
 
-        ChatCompletion completion = onDelta == null
-                ? chatCompletionPort.complete(properties.systemPrompt(), history, command.message())
-                : chatCompletionPort.stream(properties.systemPrompt(), history, command.message(), onDelta);
+        ChatCompletion completion;
+        try {
+            completion = onDelta == null
+                    ? chatCompletionPort.complete(properties.systemPrompt(), history, command.message())
+                    : chatCompletionPort.stream(properties.systemPrompt(), history, command.message(), onDelta);
+        } catch (AiUnavailableException e) {
+            // LLM 이 과금 없이 실패(빈 응답·5xx·타임아웃) — 소비한 rate limit 토큰을 되돌린다.
+            // (스트리밍 중 클라이언트 이탈은 UncheckedIOException 이라 여기 걸리지 않음: 이미 과금됨 → 환불 안 함)
+            rateLimitPort.refund(command.userId());
+            throw e;
+        }
 
         Instant now = clock.instant();
         ChatMessage userMessage = ChatMessage.user(command.message(), now);

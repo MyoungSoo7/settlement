@@ -50,11 +50,6 @@ public class ConversationJpaEntity {
         return entity;
     }
 
-    void applyExchange(Conversation conversation) {
-        this.messageCount = conversation.messageCount();
-        this.lastMessageAt = conversation.lastMessageAt();
-    }
-
     Conversation toDomain() {
         return Conversation.restore(id, userId, title, messageCount, lastMessageAt, createdAt);
     }
