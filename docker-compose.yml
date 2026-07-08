@@ -197,6 +197,28 @@ services:
       timeout: 3s
       retries: 10
 
+  # ★ DB-per-service: common-data-service 전용 PostgreSQL (공공데이터포털 범용 커넥터)
+  commondata-postgres:
+    image: postgres:17-alpine
+    container_name: lemuel-commondata-db
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      POSTGRES_DB: lemuel_commondata
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "127.0.0.1:5443:5432"
+    volumes:
+      - commondata-postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.17.0
     container_name: lemuel-elasticsearch
@@ -640,6 +662,41 @@ services:
       market-postgres:
         condition: service_healthy
 
+  common-data-service:
+    build:
+      context: .
+      args:
+        MODULE: common-data-service
+    image: ghcr.io/myoungsoo7/lemuel-commondata:latest
+    container_name: lemuel-commondata
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      # 자체 DB(lemuel_commondata) — 공공데이터포털 범용 커넥터, 타 서비스와 코드·DB·이벤트 의존 없음
+      SPRING_DATASOURCE_URL: jdbc:postgresql://commondata-postgres:5432/lemuel_commondata?reWriteBatchedInserts=true
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # 공공데이터포털 인증키(계정당 1개, 활용신청한 모든 API 공용) — 미설정이면 Flyway 시드 데이터로만 동작 (수집 트리거는 409/경고)
+      DATA_GO_KR_API_KEY: ${DATA_GO_KR_API_KEY:-}
+      COMMONDATA_INTERNAL_API_KEY: ${COMMONDATA_INTERNAL_API_KEY:-}
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
+      SERVER_PORT: 8080
+      MANAGEMENT_SERVER_PORT: 8080
+    ports:
+      - "127.0.0.1:8098:8080"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    depends_on:
+      commondata-postgres:
+        condition: service_healthy
+
   ai-service:
     build:
       context: .
@@ -695,6 +752,7 @@ services:
       ECONOMICS_SERVICE_URI: http://economics-service:8080
       COMPANY_SERVICE_URI: http://company-service:8080
       MARKET_SERVICE_URI: http://market-service:8080
+      COMMON_DATA_SERVICE_URI: http://common-data-service:8080
       AI_SERVICE_URI: http://ai-service:8080
       JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
     ports:
@@ -841,6 +899,7 @@ volumes:
   operation-postgres-data:
   economics-postgres-data:
   market-postgres-data:
+  commondata-postgres-data:
   ai-postgres-data:
   elasticsearch-data:
   redpanda-data:

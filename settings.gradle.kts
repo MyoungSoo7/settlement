@@ -12,6 +12,7 @@ include(
     "economics-service",
     "company-service",
     "market-service",
+    "common-data-service",
     "gateway-service",
     "operation-service",
     "ai-service",

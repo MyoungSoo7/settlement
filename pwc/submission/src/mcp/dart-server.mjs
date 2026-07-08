@@ -8,12 +8,15 @@
  *
  * env: DART_API_KEY (없으면 상위 .env 폴백 — client.mjs 참조)
  */
-import { createInterface } from 'node:readline';
 import { company, disclosures, financialSummary, financialFull, API_KEY } from '../dart/client.mjs';
 import { searchCorp, loadCorpCodes } from '../dart/corp-codes.mjs';
+import { safeErrorMessage } from '../common/env.mjs';
+import { startJsonRpcServer } from './json-rpc-stdio.mjs';
 
 const ymd = d => d.toISOString().slice(0, 10).replaceAll('-', '');
 const daysAgo = n => new Date(Date.now() - n * 86_400_000);
+const SERVER_NAME = 'trusted-ceo-agent-dart';
+const SERVER_VERSION = '0.1.0';
 
 const TOOLS = [
   {
@@ -104,63 +107,11 @@ const TOOLS = [
         try {
           const c = await loadCorpCodes();
           cache = { fetchedAt: c.fetchedAt, listedCount: c.listedCount, totalCount: c.totalCount };
-        } catch (e) { cache = { error: e.message }; }
+        } catch (e) { cache = { error: safeErrorMessage(e) }; }
       }
       return { apiKey: hasKey ? 'present' : 'missing (env DART_API_KEY 또는 상위 .env)', corpCodeCache: cache };
     },
   },
 ];
 
-// ── JSON-RPC over stdio (newline-delimited) ──────────────────────────────────
-function send(msg) { process.stdout.write(JSON.stringify(msg) + '\n'); }
-
-function toolResult(id, payload, isError = false) {
-  send({
-    jsonrpc: '2.0', id,
-    result: {
-      content: [{ type: 'text', text: typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2) }],
-      isError,
-    },
-  });
-}
-
-const rl = createInterface({ input: process.stdin, terminal: false });
-rl.on('line', async (line) => {
-  line = line.trim();
-  if (!line) return;
-  let req;
-  try { req = JSON.parse(line); } catch { return; }
-  const { id, method, params } = req;
-
-  try {
-    if (method === 'initialize') {
-      send({
-        jsonrpc: '2.0', id,
-        result: {
-          protocolVersion: params?.protocolVersion ?? '2025-03-26',
-          capabilities: { tools: {} },
-          serverInfo: { name: 'trusted-ceo-agent-dart', version: '0.1.0' },
-        },
-      });
-    } else if (method === 'notifications/initialized' || method?.startsWith('notifications/')) {
-      // no response for notifications
-    } else if (method === 'tools/list') {
-      send({
-        jsonrpc: '2.0', id,
-        result: { tools: TOOLS.map(({ name, description, inputSchema }) => ({ name, description, inputSchema })) },
-      });
-    } else if (method === 'tools/call') {
-      const tool = TOOLS.find(t => t.name === params?.name);
-      if (!tool) return toolResult(id, `unknown tool: ${params?.name}`, true);
-      try {
-        toolResult(id, await tool.run(params?.arguments ?? {}));
-      } catch (e) {
-        toolResult(id, `tool error: ${e.message}`, true);
-      }
-    } else if (id !== undefined) {
-      send({ jsonrpc: '2.0', id, error: { code: -32601, message: `method not found: ${method}` } });
-    }
-  } catch (e) {
-    if (id !== undefined) send({ jsonrpc: '2.0', id, error: { code: -32603, message: e.message } });
-  }
-});
+startJsonRpcServer({ serverName: SERVER_NAME, serverVersion: SERVER_VERSION, tools: TOOLS });
