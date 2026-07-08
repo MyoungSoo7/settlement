@@ -187,6 +187,28 @@ class ChatServiceTest {
     }
 
     @Test
+    @DisplayName("PII 마스킹 — 카드번호가 LLM 전송·저장·제목 모두에서 마스킹된다 (Tier C)")
+    void chat_masksPii() {
+        when(chatCompletionPort.isConfigured()).thenReturn(true);
+        when(chatCompletionPort.complete(anyString(), any(), anyString()))
+                .thenReturn(new ChatCompletion("확인했습니다", "claude-test", 10, 5));
+
+        chatService.chat(new ChatCommand(USER_ID, null, "제 카드 4111-1111-1111-1111 로 결제해줘"));
+
+        // 외부 LLM 으로 원문이 나가면 안 된다.
+        ArgumentCaptor<String> llmMessage = ArgumentCaptor.forClass(String.class);
+        verify(chatCompletionPort).complete(anyString(), any(), llmMessage.capture());
+        assertThat(llmMessage.getValue()).doesNotContain("4111").contains("[카드번호 마스킹됨]");
+
+        // 저장되는 user 메시지 content 와 신규 대화 제목도 마스킹본에서 나온다.
+        ArgumentCaptor<Conversation> saved = ArgumentCaptor.forClass(Conversation.class);
+        ArgumentCaptor<ChatMessage> userMsg = ArgumentCaptor.forClass(ChatMessage.class);
+        verify(saveConversationPort).saveExchange(saved.capture(), userMsg.capture(), any());
+        assertThat(userMsg.getValue().content()).doesNotContain("4111");
+        assertThat(saved.getValue().title()).doesNotContain("4111");
+    }
+
+    @Test
     @DisplayName("커맨드 검증 — userId/message 누락은 생성 시점에 거부된다")
     void command_validation() {
         assertThatThrownBy(() -> new ChatCommand(null, null, "질문"))
