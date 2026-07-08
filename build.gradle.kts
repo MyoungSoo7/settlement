@@ -1,3 +1,5 @@
+import java.time.Duration
+
 plugins {
     java
     id("org.springframework.boot") version "4.0.4" apply false
@@ -35,6 +37,10 @@ subprojects {
     tasks.withType<Test>().configureEach {
         useJUnitPlatform()
         finalizedBy(tasks.named("jacocoTestReport"))
+        // CI 러너에서 테스트가 무한 hang 하는 사건(2026-07-08, order-service:test 90분+ 정지)의
+        // 안전망 — 모듈당 20분을 넘기면 강제 실패시켜 "어디서 멈췄는지" 리포트를 남긴다.
+        // 정상 최장 모듈이 ~10분이므로 여유 2배.
+        timeout.set(Duration.ofMinutes(20))
     }
 
     tasks.named<JacocoReport>("jacocoTestReport") {
