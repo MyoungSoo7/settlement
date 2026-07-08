@@ -42,6 +42,11 @@ spring:
               # 공개 조회 API 만 라우팅 — KRX 시세 수집 트리거(/admin/market/**)는 외부 미노출
               predicates:
                 - Path=/api/market/**
+            - id: common-data-service
+              uri: ${COMMON_DATA_SERVICE_URI:http://localhost:8098}
+              # 공개 조회 API 만 라우팅 — 소스 등록/수집 트리거(/admin/commondata/**)는 외부 미노출
+              predicates:
+                - Path=/api/common-data/**
             - id: ai-service
               uri: ${AI_SERVICE_URI:http://localhost:8096}
               # AI 챗봇 — 채팅/대화 이력. 서비스 자체 보안 체인이 JWT(USER 이상)를 강제
