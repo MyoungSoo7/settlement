@@ -19,6 +19,7 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.io.UncheckedIOException;
@@ -39,6 +40,7 @@ import java.util.function.Consumer;
  * 룰 폴백이 불가능하므로 명시적 실패가 정답이다.
  */
 @Component
+@ConditionalOnProperty(name = "app.ai.provider", havingValue = "anthropic")
 public class AnthropicChatAdapter implements ChatCompletionPort {
 
     private static final Logger log = LoggerFactory.getLogger(AnthropicChatAdapter.class);
