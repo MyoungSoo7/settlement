@@ -15,7 +15,9 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const DATA_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'data', 'sample');
+// VERIFY_BOOKS_DATA_DIR: 테스트가 위반 시나리오 픽스처를 주입하는 지점
+const DATA_DIR = process.env.VERIFY_BOOKS_DATA_DIR
+  || join(dirname(fileURLToPath(import.meta.url)), '..', 'data', 'sample');
 const AMOUNT_TOLERANCE = 0.01;
 
 function readCsv(name) {

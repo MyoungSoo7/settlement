@@ -2,14 +2,12 @@ package github.lms.lemuel.settlement.adapter.in.kafka;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import github.lms.lemuel.common.outbox.adapter.in.kafka.ProcessedEventJpaEntity;
+import github.lms.lemuel.common.outbox.adapter.in.kafka.IdempotentEventConsumer;
 import github.lms.lemuel.common.outbox.adapter.in.kafka.ProcessedEventRepository;
 import github.lms.lemuel.settlement.adapter.out.readmodel.SettlementPaymentViewJpaEntity;
 import github.lms.lemuel.settlement.adapter.out.readmodel.SettlementPaymentViewRepository;
 import github.lms.lemuel.settlement.application.port.in.CreateSettlementFromPaymentUseCase;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -18,7 +16,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -29,7 +26,7 @@ import java.util.UUID;
  *
  * <p>멱등성 3 단 방어:
  *   1. outbox event_id UUID unique — 프로듀서 측 중복 발행 방지
- *   2. processed_events(consumer_group, event_id) PK — 컨슈머 측 재수신 방지
+ *   2. processed_events(consumer_group, event_id) PK — 컨슈머 측 재수신 방지({@link IdempotentEventConsumer})
  *   3. settlements.payment_id UNIQUE (V3) — 스키마 수준 최종 방어
  *
  * <p>장애 처리 (DLT):
@@ -42,15 +39,12 @@ import java.util.UUID;
  */
 @Component
 @ConditionalOnProperty(name = "app.kafka.enabled", havingValue = "true")
-public class PaymentEventKafkaConsumer {
+public class PaymentEventKafkaConsumer extends IdempotentEventConsumer {
 
-    private static final Logger log = LoggerFactory.getLogger(PaymentEventKafkaConsumer.class);
     private static final String CONSUMER_GROUP = "lemuel-settlement";
 
     private final CreateSettlementFromPaymentUseCase createSettlementFromPaymentUseCase;
-    private final ProcessedEventRepository processedEventRepository;
     private final SettlementPaymentViewRepository paymentViewRepository;
-    private final ObjectMapper objectMapper;
     private final SettlementProjectionMetrics projectionMetrics;
 
     /**
@@ -66,10 +60,9 @@ public class PaymentEventKafkaConsumer {
                                      ObjectMapper objectMapper,
                                      SettlementProjectionMetrics projectionMetrics,
                                      @Value("${app.kafka.practice.consumer-delay-ms:0}") long practiceDelayMs) {
+        super(processedEventRepository, objectMapper);
         this.createSettlementFromPaymentUseCase = createSettlementFromPaymentUseCase;
-        this.processedEventRepository = processedEventRepository;
         this.paymentViewRepository = paymentViewRepository;
-        this.objectMapper = objectMapper;
         this.projectionMetrics = projectionMetrics;
         this.practiceDelayMs = practiceDelayMs;
     }
@@ -82,57 +75,41 @@ public class PaymentEventKafkaConsumer {
     @Transactional
     public void onPaymentCaptured(ConsumerRecord<String, String> record, Acknowledgment ack) {
         slowDownForPractice();   // [실습 전용] 기본 0 = no-op
+        consume(record, ack);
+    }
 
-        UUID eventId = extractEventId(record);
-        if (eventId == null) {
-            log.warn("Skipping record without event_id header. topic={}, offset={}",
-                    record.topic(), record.offset());
-            ack.acknowledge();
-            return;
-        }
+    @Override
+    protected String consumerGroup() {
+        return CONSUMER_GROUP;
+    }
 
-        // 1. 컨슈머 멱등 체크: (group, event_id) 이미 처리되었으면 스킵
-        ProcessedEventJpaEntity.ProcessedEventId key =
-                new ProcessedEventJpaEntity.ProcessedEventId(CONSUMER_GROUP, eventId);
-        if (processedEventRepository.existsById(key)) {
-            log.info("Event already processed, skipping. eventId={}", eventId);
-            ack.acknowledge();
-            return;
-        }
+    @Override
+    protected String eventType() {
+        return "PaymentCaptured";
+    }
 
-        // 2. 페이로드 파싱 — JsonProcessingException 은 즉시 DLT (재시도 무의미)
-        JsonNode node;
-        try {
-            node = objectMapper.readTree(record.value());
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-            log.error("Invalid JSON payload (will go to DLT). eventId={}, payload={}", eventId, record.value());
-            throw new IllegalArgumentException("Invalid JSON payload, eventId=" + eventId, e);
-        }
-
+    @Override
+    protected void handle(JsonNode node, UUID eventId) {
         Long paymentId = node.get("paymentId").asLong();
         Long orderId = node.get("orderId").asLong();
 
-        // 3. 금액은 이벤트에 없으면 조회해야 하지만, 정산 서비스가 payment_id 로 조회 가능 —
-        //    이벤트 스키마 확장 시 amount 를 outbox 페이로드에 포함시키는 것이 더 안전.
-        //    현재 단순화를 위해 관례적으로 payload 의 amount 필드 존재 여부로 분기.
+        // 금액은 이벤트에 없으면 조회해야 하지만, 정산 서비스가 payment_id 로 조회 가능 —
+        // 현재 단순화를 위해 관례적으로 payload 의 amount 필드 존재 여부로 분기.
         BigDecimal amount = node.has("amount")
                 ? new BigDecimal(node.get("amount").asText())
                 : BigDecimal.ZERO;  // 0 이면 정산 서비스가 이후 보강 책임
 
-        // 3-b. Event-Carried State Transfer (ADR 0020 Phase 1) — 셀러 메타가 동봉됐으면 사용,
-        //      없으면(구 이벤트/미할당) 정산 서비스가 order DB 조인으로 fallback.
+        // Event-Carried State Transfer (ADR 0020 Phase 1) — 셀러 메타가 동봉됐으면 사용,
+        // 없으면(구 이벤트/미할당) 정산 서비스가 order DB 조인으로 fallback.
         Long sellerId = node.hasNonNull("sellerId") ? node.get("sellerId").asLong() : null;
         String sellerTier = node.hasNonNull("sellerTier") ? node.get("sellerTier").asText() : null;
         String settlementCycle = node.hasNonNull("settlementCycle") ? node.get("settlementCycle").asText() : null;
 
-        // 4. 정산 생성 (내부에서 payment_id unique 로 추가 중복 방어)
-        //    — 도메인 예외(IllegalArgumentException/IllegalStateException) 는 DefaultErrorHandler 가
-        //    재시도 없이 즉시 DLT 로 라우팅. 일시적 예외(DB 락, IO) 는 ExponentialBackOff 재시도.
+        // 정산 생성 (내부에서 payment_id unique 로 추가 중복 방어)
         createSettlementFromPaymentUseCase.createSettlementFromPayment(
                 paymentId, orderId, amount, sellerId, sellerTier, settlementCycle);
 
-        // 4-b. 로컬 결제 프로젝션 적재 (ADR 0020 Phase 2) — 기존 @Immutable read-model 과 dual-run.
-        //      Phase 3 에서 조회(CapturedPaymentsAdapter 등)를 이 프로젝션으로 컷오버한다.
+        // 로컬 결제 프로젝션 적재 (ADR 0020 Phase 2)
         LocalDateTime capturedAt = node.hasNonNull("capturedAt")
                 ? LocalDateTime.parse(node.get("capturedAt").asText())
                 : LocalDateTime.now();
@@ -146,7 +123,6 @@ public class PaymentEventKafkaConsumer {
         view.setSellerId(sellerId);
         view.setSellerTier(sellerTier);
         view.setSettlementCycle(settlementCycle);
-        // Phase 3b-4 — 확장 필드 (ES/QueryDSL 컷오버용)
         view.setPaymentMethod(node.hasNonNull("paymentMethod") ? node.get("paymentMethod").asText() : null);
         view.setPgTransactionId(node.hasNonNull("pgTransactionId") ? node.get("pgTransactionId").asText() : null);
         if (view.getRefundedAmount() == null) {
@@ -155,16 +131,12 @@ public class PaymentEventKafkaConsumer {
         view.setUpdatedAt(LocalDateTime.now());
         paymentViewRepository.save(view);
 
-        // 5. 처리 기록 — 재처리 시 (group, event_id) 멱등 보장
-        processedEventRepository.save(new ProcessedEventJpaEntity(
-                CONSUMER_GROUP,
-                eventId,
-                "PaymentCaptured"
-        ));
-
-        projectionMetrics.recordApply("payment", record.timestamp());
         log.info("Settlement created from Kafka event. eventId={}, paymentId={}", eventId, paymentId);
-        ack.acknowledge();
+    }
+
+    @Override
+    protected void afterProcessed(ConsumerRecord<String, String> record) {
+        projectionMetrics.recordApply("payment", record.timestamp());
     }
 
     /**
@@ -177,16 +149,6 @@ public class PaymentEventKafkaConsumer {
             Thread.sleep(practiceDelayMs);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-        }
-    }
-
-    private static UUID extractEventId(ConsumerRecord<String, String> record) {
-        var header = record.headers().lastHeader("event_id");
-        if (header == null) return null;
-        try {
-            return UUID.fromString(new String(header.value(), StandardCharsets.UTF_8));
-        } catch (IllegalArgumentException e) {
-            return null;
         }
     }
 }

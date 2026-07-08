@@ -50,12 +50,14 @@ CEO가 먼저 알아야 할 한 문장
 | 원가 배분 오류로 인한 보이지 않는 손실 탐지 | `src/skills/cost-allocation-audit/SKILL.md` |
 | 거시 지표(금리·환율·물가) 노출 분석 | `src/skills/macro-exposure/SKILL.md` |
 | 내부 장부 ↔ 외부 공시 대사 | `src/skills/disclosure-crosscheck/SKILL.md` |
+| 뉴스·외부평판 신호 분석 | `src/skills/external-signal/SKILL.md` |
 | 논리적 근거를 자연어로 제시 | `src/skills/ceo-briefing/SKILL.md` |
 | 종합 오케스트레이션 | `src/skills/ceo-risk-recon/SKILL.md` |
 | 추론 전 기계적 정합성 확정 (불변식 게이트) | `src/bin/verify-books.mjs` |
 | 재현율·표현 안전성 자동 채점 | `src/test/briefing-eval.mjs` |
 | 외부 공시 재무 데이터 연결 | `src/mcp/dart-server.mjs` |
 | 거시 경제지표 연결 | `src/mcp/ecos-server.mjs` |
+| 네이버 뉴스 검색 연결 | `src/mcp/news-server.mjs` |
 
 ## 작동 구조
 
@@ -86,6 +88,7 @@ ceo-risk-recon
 외부 읽기 전용 MCP
   - DART: 기업개황, 공시 목록, 재무제표
   - ECOS: 기준금리, 국고채3년, USD/KRW, CPI
+  - Naver News: 기업 뉴스 제목, 요약, 링크, 발행일
         |
         v
 교차 검증
@@ -97,12 +100,86 @@ ceo-briefing
   - CEO 서명용 자연어 보고서 생성
 ```
 
-핵심 원칙은 네 가지입니다.
+핵심 원칙은 다섯 가지입니다.
 
 1. **불변식 먼저**: 대사 일치·검산처럼 기계로 확정 가능한 정합성을 `verify-books` 게이트로 먼저 확정하고, AI 추론은 그 위에서만 시작합니다.
 2. **읽기 전용**: 내부 장부, DART, ECOS는 분석 입력으로만 사용합니다. 플러그인이 원천 데이터를 수정하지 않습니다.
 3. **단정 금지**: "분식입니다"가 아니라 "수익 인식 시점 확인이 필요한 가능성"처럼 가설과 확인 절차를 분리합니다.
 4. **교차 검증**: 단일 숫자로 판단하지 않고 손익, 채권, 현금흐름, 공시, 경제지표를 함께 봅니다.
+5. **정성 신호 보조**: 뉴스와 보도자료는 결론이 아니라 확인할 신호로만 사용합니다. 기사 전문을 저장하지 않고 제목·요약·링크·발행일 메타데이터를 재무 데이터와 교차 검증합니다.
+
+## 데이터 입출력 구조
+
+### 내부 회계·재무 데이터 입력 위치
+
+내부 데이터는 기본적으로 `src/data/sample/` 아래 CSV 파일로 둡니다. 데모와 불변식 게이트가 기대하는 기본 파일명은 다음 3개입니다.
+
+```text
+src/data/sample/
+|-- trial_balance.csv      # 분기별 시산표·손익·현금흐름·차입금·이자비용
+|-- ar_aging.csv           # 분기별·거래처별 매출채권 aging
+`-- cost_allocation.csv    # 제품별 매출·직접원가·공통원가 배부·기계시간 비중
+```
+
+각 파일의 의미는 다음과 같습니다.
+
+| 파일 | 플러그인이 읽는 내용 | 주로 쓰는 스킬 |
+|---|---|---|
+| `trial_balance.csv` | 매출, 매출채권, 재고, 계약부채, 영업이익, 영업현금흐름, 변동금리 차입금, 이자비용 | `accounting-anomaly`, `cashflow-bottleneck`, `macro-exposure` |
+| `ar_aging.csv` | 거래처별 current / 31-60일 / 61-90일 / 90일 초과 채권 | `cashflow-bottleneck` |
+| `cost_allocation.csv` | 제품별 매출, 직접원가, 공통원가 배부액, 매출 기준 배부율, 실제 기계시간 비중 | `cost-allocation-audit` |
+
+샘플이 아닌 실제 회사 데이터를 테스트할 때도 같은 구조를 맞추는 것이 가장 단순합니다. 파일명과 컬럼 구조를 그대로 맞추면 `verify-books` 게이트와 스킬이 바로 사용할 수 있습니다.
+
+### 다른 데이터 폴더를 쓰는 방법
+
+기본 경로를 바꾸고 싶으면 `VERIFY_BOOKS_DATA_DIR` 환경변수에 CSV 3개가 들어 있는 폴더를 지정합니다.
+
+```powershell
+$env:VERIFY_BOOKS_DATA_DIR="C:\path\to\company-data"
+node src/bin/verify-books.mjs
+```
+
+이때 지정한 폴더 안에도 아래 파일명이 있어야 합니다.
+
+```text
+trial_balance.csv
+ar_aging.csv
+cost_allocation.csv
+```
+
+`ceo-risk-recon`에 분석을 요청할 때도 같은 폴더를 명시하면 됩니다.
+
+```text
+C:\path\to\company-data 의 trial_balance.csv, ar_aging.csv, cost_allocation.csv 를 기준으로
+CEO가 놓치고 있는 회계·현금흐름·원가 리스크를 찾아서 브리핑으로 정리해줘.
+```
+
+### 외부 데이터 입력 위치
+
+DART, ECOS, 네이버 뉴스 데이터는 로컬 CSV로 저장하지 않고 MCP 도구가 읽기 전용으로 조회합니다.
+
+| 외부 데이터 | 입력 방식 | 설정 |
+|---|---|---|
+| DART 공시·재무제표 | `src/mcp/dart-server.mjs` MCP 도구가 API 조회 | `DART_API_KEY` |
+| ECOS 금리·환율·물가 | `src/mcp/ecos-server.mjs` MCP 도구가 API 조회 | `ECOS_API_KEY` |
+| 네이버 뉴스 | `src/mcp/news-server.mjs` MCP 도구가 API 조회 | `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET` |
+
+즉 내부 장부는 `src/data/sample/` 또는 사용자가 지정한 CSV 폴더에 두고, 외부 공시·거시·뉴스 데이터는 API 키를 통해 MCP가 가져오는 구조입니다.
+
+### 출력 위치와 노출 방식
+
+분석 결과는 기본적으로 Codex/Claude 대화 응답으로 노출됩니다. 파일로 남기고 싶으면 브리핑을 Markdown 파일로 저장하도록 요청합니다.
+
+```text
+분석 결과를 briefing.md 파일로 저장해줘.
+```
+
+생성된 브리핑은 다음 명령으로 자동 채점할 수 있습니다.
+
+```powershell
+node src/test/briefing-eval.mjs briefing.md
+```
 
 ## CEO 관점 사용 예시
 
@@ -161,6 +238,7 @@ submission/
 |   |   |-- cost-allocation-audit/SKILL.md
 |   |   |-- macro-exposure/SKILL.md
 |   |   |-- disclosure-crosscheck/SKILL.md
+|   |   |-- external-signal/SKILL.md
 |   |   `-- ceo-briefing/SKILL.md
 |   |-- data/sample/
 |   |   |-- trial_balance.csv
@@ -171,9 +249,12 @@ submission/
 |   |   `-- corp-codes.mjs
 |   |-- ecos/
 |   |   `-- client.mjs
+|   |-- naver/
+|   |   `-- client.mjs
 |   |-- mcp/
 |   |   |-- dart-server.mjs
-|   |   `-- ecos-server.mjs
+|   |   |-- ecos-server.mjs
+|   |   `-- news-server.mjs
 |   `-- test/
 |       |-- dart-smoke.mjs
 |       |-- ecos-smoke.mjs
@@ -222,7 +303,7 @@ ceo-risk-recon 스킬을 사용해서 src/data/sample 데이터를 분석해줘.
 CEO가 놓친 리스크를 찾고, ceo-briefing 형식으로 정리해줘.
 ```
 
-## DART / ECOS MCP 도구
+## DART / ECOS / 뉴스 MCP 도구
 
 이 플러그인은 실제 기업 분석으로 확장하기 위해 읽기 전용 MCP 서버를 포함합니다.
 
@@ -271,6 +352,29 @@ node src/test/ecos-smoke.mjs
 ```
 
 API 키가 없으면 MCP 왕복과 도구 등록만 검증하고, 라이브 조회는 생략합니다.
+
+### 네이버 뉴스 MCP
+
+도구:
+
+- `news_search_company`: 기업명 기준 최근 뉴스 검색
+- `news_search_risk`: 기업명 + 리스크 키워드 검색
+- `news_status`: API 키 설정 상태 확인
+
+환경변수:
+
+```powershell
+$env:NAVER_CLIENT_ID="발급받은_NAVER_CLIENT_ID"
+$env:NAVER_CLIENT_SECRET="발급받은_NAVER_CLIENT_SECRET"
+```
+
+스모크 테스트:
+
+```powershell
+node src/test/news-smoke.mjs
+```
+
+네이버 뉴스 검색은 기사 본문 전문을 저장하지 않고, 공식 API가 반환하는 제목·요약·링크·발행일 메타데이터만 사용합니다. 브리핑에서는 "뉴스 신호상 확인 필요"로 표현하고, 정량 재무 데이터·DART·ECOS 결과와 교차 검증합니다.
 
 ## 데모 실행
 

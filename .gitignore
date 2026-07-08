@@ -93,3 +93,5 @@ pwc/submission/src/data/cache/
 ### Vite dev 서버 로그 (재생성 가능) ###
 frontend/vite-*.log
 frontend/*.out.log
+
+pwc

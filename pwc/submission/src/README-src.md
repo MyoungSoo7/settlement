@@ -32,6 +32,13 @@
   `ecos_indicator`(핵심 4지표 시계열+최신값+변화량) · `ecos_series`(임의 통계 원시 조회) ·
   `ecos_key_stats`(100대 통계지표 스냅숏 — 거시 브리핑용) · `ecos_status`(키/카탈로그 점검)
 - `test/ecos-smoke.mjs` — MCP 왕복 + (키 있으면) 라이브 검증
+- `naver/client.mjs` — 네이버 뉴스 검색 OpenAPI 클라이언트(zero-dependency,
+  NAVER_CLIENT_ID/NAVER_CLIENT_SECRET env 우선 + 상위 `.env` 폴백). 기사 본문 전문은 수집하지 않고
+  제목·요약·링크·발행일 메타데이터만 정규화한다.
+- `mcp/news-server.mjs` — 읽기 전용 네이버 뉴스 MCP 서버, 도구 3종:
+  `news_search_company`(기업명 기준 뉴스 검색) · `news_search_risk`(기업명 + 리스크 키워드 검색) ·
+  `news_status`(키/기본 리스크 키워드 상태)
+- `test/news-smoke.mjs` — MCP 왕복 + (키 있으면) 라이브 검증
 
 DART 키 발급: https://opendart.fss.or.kr (무료, 일 20,000건). `DART_API_KEY` env 로 주입.
 ECOS 키 발급: https://ecos.bok.or.kr → Open API (무료). `ECOS_API_KEY` env 로 주입.
@@ -39,6 +46,24 @@ ECOS 키 발급: https://ecos.bok.or.kr → Open API (무료). `ECOS_API_KEY` en
 ECOS 도구는 "거시 환경" 축이다 — 내부 장부 ↔ 공시 재무제표 대사(cross-check)에
 금리(이자 부담)·환율(수입 원가)·CPI(원가 전가 여력) 컨텍스트를 결부지어
 Trusted CEO Agent 의 실데이터 데모 경로를 완성한다.
+
+## 단위 테스트 + 커버리지 (zero-dependency — Node 22 내장 러너)
+
+```bash
+# submission/ 에서 실행. 라인 커버리지 90% 게이트 포함 (현재 ~99%)
+node --test --experimental-test-coverage --test-coverage-lines=90 \
+  --test-coverage-include='src/common/**' --test-coverage-include='src/dart/**' \
+  --test-coverage-include='src/ecos/**'   --test-coverage-include='src/mcp/**' \
+  --test-coverage-include='src/naver/**'  --test-coverage-include='src/bin/**' \
+  --test-coverage-include='src/test/briefing-eval.mjs' \
+  src/test/unit/*.test.mjs
+```
+
+- `test/unit/` — 8개 테스트 파일(48 테스트). 네트워크 0: in-process 는 `fetch` 스텁,
+  자식 프로세스(MCP 서버·CLI)는 `NODE_OPTIONS --import` 프리로드 스텁(`helpers/fetch-preload.mjs`)로 차단.
+- 테스트 주입 지점: `CORP_CODES_CACHE`(실캐시 오염 방지), `VERIFY_BOOKS_DATA_DIR`(위반 시나리오 픽스처).
+- MCP 서버 spawn 테스트는 stdin 을 닫아 자연 종료시켜야 자식 프로세스 커버리지가 flush 된다
+  (`helpers/proc.mjs` — `kill()` 은 커버리지가 유실됨).
 
 ## 스킬 호출 흐름
 
@@ -51,6 +76,7 @@ Trusted CEO Agent 의 실데이터 데모 경로를 완성한다.
        ├─ cost-allocation-audit  (배부표 → 민감도 재계산 + 뒤집힘 탐지)
        ├─ macro-exposure         (ECOS 지표 × 차입/외화/원가 → 노출 민감도)
        ├─ disclosure-crosscheck  (DART 공시 ↔ 내부 장부 대사 + 공시 행간)
+       ├─ external-signal        (네이버 뉴스 ↔ 투자유치/제휴/규제/보안 신호)
        └─ ceo-briefing           (서명용 보고 형식으로 최종 출력)
                 └─ 사후 채점: test/briefing-eval.mjs (재현율 4/4 + 표현 안전성)
 ```

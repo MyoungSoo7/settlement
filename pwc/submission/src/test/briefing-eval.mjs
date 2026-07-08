@@ -12,6 +12,7 @@
  *   node src/test/briefing-eval.mjs --self-test     # 채점기 자체 회귀 테스트
  */
 import { readFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 
 // 정답지 마커 — 정본은 submission/README.md 의 "데모 데이터에 심어둔 이상 신호" 표.
 const SIGNALS = [
@@ -139,14 +140,18 @@ function selfTest() {
   if (failures > 0) process.exitCode = 1;
 }
 
-const arg = process.argv[2];
-if (arg === '--self-test') {
-  selfTest();
-} else if (arg) {
-  const result = evaluateBriefing(readFileSync(arg, 'utf8'));
-  printReport(result);
-  if (!result.pass) process.exitCode = 1;
-} else {
-  console.error('사용법: node src/test/briefing-eval.mjs <briefing.md> | --self-test');
-  process.exitCode = 2;
+// evaluateBriefing 을 라이브러리로 import 할 때는 CLI 디스패치를 건너뛴다
+const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (isMain) {
+  const arg = process.argv[2];
+  if (arg === '--self-test') {
+    selfTest();
+  } else if (arg) {
+    const result = evaluateBriefing(readFileSync(arg, 'utf8'));
+    printReport(result);
+    if (!result.pass) process.exitCode = 1;
+  } else {
+    console.error('사용법: node src/test/briefing-eval.mjs <briefing.md> | --self-test');
+    process.exitCode = 2;
+  }
 }

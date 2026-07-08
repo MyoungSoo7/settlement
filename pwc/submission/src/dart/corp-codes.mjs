@@ -12,7 +12,9 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { corpCodeZip } from './client.mjs';
 
-const CACHE = join(dirname(fileURLToPath(import.meta.url)), '..', 'data', 'cache', 'corp-codes.json');
+// CORP_CODES_CACHE: 테스트가 실캐시를 오염시키지 않도록 경로를 주입하는 지점
+const CACHE = process.env.CORP_CODES_CACHE
+  || join(dirname(fileURLToPath(import.meta.url)), '..', 'data', 'cache', 'corp-codes.json');
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7일 — 고유번호는 자주 안 바뀐다
 const EOCD_SIGNATURE = 0x06054b50;
 const CENTRAL_DIRECTORY_SIGNATURE = 0x02014b50;
