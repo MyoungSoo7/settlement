@@ -3,9 +3,15 @@
 플러그인 런타임 구성:
 
 - `.codex-plugin/plugin.json` — manifest. `skills` 는 공식 문서 형식(`"./skills/"` 디렉토리 참조)을 따른다.
-- `skills/` — 스킬 5개. 진입점은 `ceo-risk-recon` (오케스트레이터), 나머지 4개는 도메인/출력 스킬.
-- `data/sample/` — 합성 데모 데이터. 이상 신호 정답지는 상위 `README.md` 참조.
-- `bin/run-sample.ps1` — 데이터 무결성 확인 + 데모 프롬프트 출력.
+- `skills/` — 스킬 7개. 진입점은 `ceo-risk-recon` (오케스트레이터), 나머지 6개는 도메인/출력 스킬.
+- `data/sample/` — 합성 데모 데이터. 이상 신호 정답지(4개)는 상위 `README.md` 참조.
+- `bin/verify-books.mjs` — **불변식 게이트**: 시산표 파싱 · aging↔시산표 대사 · 원가 배부 검산 ·
+  비중 합 100% 등 7종을 기계 검증(`--json` 지원). ceo-risk-recon 워크플로 Step 0 —
+  GATE PASS 여야 추론 진입 (doc/회계.md 의 "불변식 먼저, 추론은 그 위" 원칙의 구현).
+- `bin/run-sample.ps1` — 데이터 존재 확인 → 불변식 게이트 → 데모 프롬프트 출력.
+- `test/briefing-eval.mjs` — 생성된 브리핑의 **자동 채점기**: 심어둔 신호 4개 재현율(신호당
+  마커 2개 이상), 단정 표현 가드(분식/확실/명백 등), 필수 섹션(결론·근거·확신도·권고 조치)
+  검사. `--self-test` 로 채점기 자체 회귀 검증.
 - `.mcp.json` — DART MCP 서버(`trusted-ceo-agent-dart`) 등록. manifest 의
   `"mcpServers": "./.mcp.json"` 으로 연결됨.
 - `dart/` — DART OpenAPI 클라이언트 (zero-dependency). `client.mjs`(API 래퍼,
@@ -38,9 +44,13 @@ Trusted CEO Agent 의 실데이터 데모 경로를 완성한다.
 
 ```
 사용자: "놓친 리스크 찾아줘"
-  └─ ceo-risk-recon (인벤토리 → 디스패치 → 교차검증 → 중요도 → 브리핑)
+  └─ ceo-risk-recon (불변식 게이트 → 인벤토리 → 디스패치 → 교차검증 → 중요도 → 브리핑)
+       ├─ [Step 0] bin/verify-books.mjs  (GATE PASS 여야 추론 진입)
        ├─ accounting-anomaly     (시산표/분개 → break + 원인 가설)
        ├─ cashflow-bottleneck    (aging/운전자본 → 병목 + 현금 영향)
        ├─ cost-allocation-audit  (배부표 → 민감도 재계산 + 뒤집힘 탐지)
+       ├─ macro-exposure         (ECOS 지표 × 차입/외화/원가 → 노출 민감도)
+       ├─ disclosure-crosscheck  (DART 공시 ↔ 내부 장부 대사 + 공시 행간)
        └─ ceo-briefing           (서명용 보고 형식으로 최종 출력)
+                └─ 사후 채점: test/briefing-eval.mjs (재현율 4/4 + 표현 안전성)
 ```
