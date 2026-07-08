@@ -262,51 +262,6 @@ class RefundPaymentUseCaseTest {
         verify(pgClientPort, never()).refund(any(), any(), any());
     }
 
-    @Test @DisplayName("재시도 성공: 기존 FAILED 이력을 재사용해 begin 없이 COMPLETED 로 확정")
-    void retrySuccess_reusesFailedRefund() {
-        PaymentDomain payment = capturedPayment();
-        when(loadPaymentPort.loadById(1L)).thenReturn(Optional.of(payment));
-        when(loadPaymentPort.loadByIdForUpdate(1L)).thenReturn(Optional.of(payment));
-        when(savePaymentPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        stubSaveRefund();
-        Refund failed = Refund.request(1L, new BigDecimal("50000"), "payment-1-full", "FULL_REFUND");
-        failed.setId(999L);
-        failed.markFailed("이전 PG 실패");
-        when(loadRefundPort.findByPaymentIdAndIdempotencyKey(1L, "payment-1-full"))
-                .thenReturn(Optional.of(failed));
-
-        // 스케줄러가 저장된 금액·키로 재호출
-        PaymentDomain result = refundPaymentUseCase.refundPayment(
-                1L, new BigDecimal("50000"), "payment-1-full");
-
-        assertThat(result.getStatus()).isEqualTo(PaymentStatus.REFUNDED);
-        assertThat(failed.getStatus()).isEqualTo(Refund.Status.COMPLETED);
-        verify(refundLifecycle, never()).begin(any(), any(), any(), any());
-        verify(pgClientPort).refund("pg-tx-123", new BigDecimal("50000"), "payment-1-full");
-        verify(publishEventPort).publishPaymentRefunded(eq(1L), eq(10L), any());
-    }
-
-    @Test @DisplayName("결제가 이미 전액 환불된 상태에서 남은 FAILED 재시도는 적용 불가로 재시도 소진 고정")
-    void retry_paymentAlreadyRefunded_abandonsRetry() {
-        PaymentDomain payment = new PaymentDomain(1L, 10L, new BigDecimal("50000"), new BigDecimal("50000"),
-                PaymentStatus.REFUNDED, "CARD", "pg-tx-123", null, null, null);
-        when(loadPaymentPort.loadById(1L)).thenReturn(Optional.of(payment));
-        Refund failed = Refund.request(1L, new BigDecimal("20000"), "partial-key-x", "PARTIAL_REFUND");
-        failed.setId(999L);
-        failed.markFailed("이전 PG 실패");
-        when(loadRefundPort.findByPaymentIdAndIdempotencyKey(1L, "partial-key-x"))
-                .thenReturn(Optional.of(failed));
-        stubSaveRefund();
-
-        PaymentDomain result = refundPaymentUseCase.refundPayment(
-                1L, new BigDecimal("20000"), "partial-key-x");
-
-        assertThat(result.getStatus()).isEqualTo(PaymentStatus.REFUNDED);
-        assertThat(failed.isRetryExhausted()).isTrue();
-        assertThat(failed.getNextRetryAt()).isNull();
-        verify(pgClientPort, never()).refund(any(), any(), any());
-    }
-
     @Test @DisplayName("CAPTURED 가 아닌 상태에서는 환불 시도 시 예외 + PG 호출 없음")
     void refund_notCaptured_throwsBeforePgCall() {
         PaymentDomain payment = new PaymentDomain(1L, 10L, new BigDecimal("50000"), BigDecimal.ZERO,

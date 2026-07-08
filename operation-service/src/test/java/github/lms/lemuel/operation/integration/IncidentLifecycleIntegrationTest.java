@@ -102,6 +102,10 @@ class IncidentLifecycleIntegrationTest {
     }
 
     private static String webhookJson(String status, String fingerprint, String endsAt) {
+        // startsAt 을 절대시각으로 박으면 summary(24h window: firstSeenAt >= now-24h) 집계에서
+        // 하루 뒤 CI 부터 인시던트가 창 밖으로 밀려나 byCategory 가 비는 시한폭탄이 된다.
+        // (#138 main CI 실패 원인) — 항상 "5분 전" 상대시각으로 생성.
+        String startsAt = java.time.Instant.now().minusSeconds(300).toString();
         return """
                 {
                   "version": "4",
@@ -114,12 +118,12 @@ class IncidentLifecycleIntegrationTest {
                       "fingerprint": "%s",
                       "labels": {"alertname": "OutboxPendingBacklog", "severity": "warning", "component": "outbox"},
                       "annotations": {"summary": "Outbox PENDING 적체", "description": "1000건 초과"},
-                      "startsAt": "2026-07-06T05:12:00Z",
+                      "startsAt": "%s",
                       "endsAt": "%s"
                     }
                   ]
                 }
-                """.formatted(status, status, fingerprint, endsAt);
+                """.formatted(status, status, fingerprint, startsAt, endsAt);
     }
 
     /**
