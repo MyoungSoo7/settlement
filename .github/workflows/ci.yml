@@ -38,6 +38,7 @@ jobs:
   backend-ci:
     name: Backend - Build/Test/JaCoCo/SonarCloud
     runs-on: ubuntu-latest
+    timeout-minutes: 90   # hang 시 러너 6시간 낭비 방지 (정상 55~70분 + 여유)
     needs: changes
     if: needs.changes.outputs.backend == 'true'
     permissions:
