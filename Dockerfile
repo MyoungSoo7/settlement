@@ -22,6 +22,7 @@ COPY operation-service/build.gradle.kts ./operation-service/
 COPY economics-service/build.gradle.kts ./economics-service/
 COPY market-service/build.gradle.kts ./market-service/
 COPY ai-service/build.gradle.kts ./ai-service/
+COPY common-data-service/build.gradle.kts ./common-data-service/
 COPY gateway-service/build.gradle.kts ./gateway-service/
 
 RUN --mount=type=cache,target=/home/gradle/.gradle \
@@ -38,6 +39,7 @@ COPY operation-service ./operation-service
 COPY economics-service ./economics-service
 COPY market-service ./market-service
 COPY ai-service ./ai-service
+COPY common-data-service ./common-data-service
 COPY gateway-service ./gateway-service
 
 RUN --mount=type=cache,target=/home/gradle/.gradle \
