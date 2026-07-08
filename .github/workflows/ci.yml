@@ -116,6 +116,9 @@ jobs:
       - name: Build & Test (JaCoCo gate)
         run: ./gradlew clean build --no-daemon --stacktrace
         env:
+          # ryuk(정리용 유틸 컨테이너) 비활성화 — 러너는 일회용이라 불필요하고,
+          # 이미지 치환과 얽혀 모듈별 test JVM 에서 비결정적 hang 을 유발했다 (2026-07-08).
+          TESTCONTAINERS_RYUK_DISABLED: "true"
           SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/testdb
           SPRING_DATASOURCE_USERNAME: testuser
           SPRING_DATASOURCE_PASSWORD: testpass
