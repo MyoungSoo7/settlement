@@ -110,7 +110,7 @@
 | 보안 | [etc/SECURITY.md](etc/SECURITY.md) |
 | 모니터링/관측 | [etc/MONITORING.md](etc/MONITORING.md) |
 | CI/CD | [etc/CI_CONFIGURATION.md](etc/CI_CONFIGURATION.md), [etc/CI_SETUP_GUIDE.md](etc/CI_SETUP_GUIDE.md) |
-| 배포/인프라 | [etc/DEPLOYMENT.md](etc/DEPLOYMENT.md), [etc/DEVOPS.md](etc/DEVOPS.md), [etc/INFRASTRUCTURE.md](etc/INFRASTRUCTURE.md), [etc/kube.md](etc/kube.md) |
+| 배포/인프라 | [etc/DEPLOYMENT.md](etc/DEPLOYMENT.md), [etc/INFRASTRUCTURE.md](etc/INFRASTRUCTURE.md), [etc/kube.md](etc/kube.md) |
 | 기능/명세 | [etc/functional-spec.md](etc/functional-spec.md), [etc/process-definition.md](etc/process-definition.md), [etc/screen-design.md](etc/screen-design.md) |
 | 시퀀스 | [etc/sequence-diagram.md](etc/sequence-diagram.md), [etc/SEQUENCE_DIAGRAMS.md](etc/SEQUENCE_DIAGRAMS.md), [etc/SEQUENCE-ORDER-VS-REFUND.md](etc/SEQUENCE-ORDER-VS-REFUND.md) |
 | 테스트 | [etc/test-report.md](etc/test-report.md), [etc/troubleshooting.md](etc/troubleshooting.md) |
