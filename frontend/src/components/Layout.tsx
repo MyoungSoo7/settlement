@@ -72,34 +72,23 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     정산
                   </Link>
                   <Link to="/ai/chat" className={adminNavLinkClass('/ai/chat')}>AI 도우미</Link>
-                  {/* MANAGER 는 위성 조회를 개별 링크로 유지 (CEO 그룹은 ADMIN 전용) */}
-                  {user.role === 'MANAGER' && (
-                    <>
-                      <Link to="/loans"     className={adminNavLinkClass('/loans')}>대출관리</Link>
-                      <Link to="/economics" className={adminNavLinkClass('/economics')}>경제지표</Link>
-                    </>
-                  )}
+                  {/* CEO — ADMIN·MANAGER 공통 (경제지표·재무제표·기업조회·대출관리 4개 하위, 좌측 사이드바) */}
+                  <Link to="/admin/ceo/insight" className={adminNavLinkClass('/admin/ceo')}>
+                    CEO
+                  </Link>
+                  {/* 시스템 — ADMIN 전용 */}
                   {user.role === 'ADMIN' && (
-                    <>
-                      {/* CEO — 경제지표·재무제표·기업조회·대출관리 4개 하위 (좌측 사이드바) */}
-                      <Link to="/admin/ceo/insight" className={adminNavLinkClass('/admin/ceo')}>
-                        CEO
-                      </Link>
-                      <Link to="/admin/system/menus" className={adminNavLinkClass('/admin/system')}>
-                        시스템
-                      </Link>
-                    </>
+                    <Link to="/admin/system/menus" className={adminNavLinkClass('/admin/system')}>
+                      시스템
+                    </Link>
                   )}
                 </nav>
               )}
 
-              {/* ── 일반 사용자 내비 ── */}
+              {/* ── 일반 사용자 내비 ── 주문하기 단일 메뉴 */}
               {user && !isAdminOrManager && (
                 <nav className="flex space-x-1">
                   <Link to="/order"        className={navLinkClass('/order')}>주문하기</Link>
-                  <Link to="/loans"        className={navLinkClass('/loans')}>💸 대출하기</Link>
-                  <Link to="/economics"    className={navLinkClass('/economics')}>📈 경제지표</Link>
-                  <Link to="/ai/chat"      className={navLinkClass('/ai/chat')}>🤖 AI 도우미</Link>
                 </nav>
               )}
             </div>
