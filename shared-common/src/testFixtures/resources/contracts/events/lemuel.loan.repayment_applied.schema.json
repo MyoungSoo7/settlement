@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "lemuel.loan.repayment_applied",
+  "description": "loan-service(LoanEventPublisherAdapter) → settlement-service(LoanRepaymentAppliedConsumer). 상환 saga 의 settlement 종착점 — 정산건별 차감액(deducted)을 보존해 payout 시 순지급액으로 지급. 차감 0(대출 없는 셀러)도 정상 발행되므로 minimum 0. deducted 는 JSON number(loan 계열 직렬화 규약).",
+  "type": "object",
+  "properties": {
+    "settlementId": { "type": "integer" },
+    "sellerId": { "type": "integer" },
+    "deducted": { "type": "number", "minimum": 0 }
+  },
+  "required": ["settlementId", "sellerId", "deducted"],
+  "additionalProperties": true
+}

@@ -2,6 +2,7 @@
 // toolchain·repositories·dependency-management·jacoco 를 자체 선언한다.
 plugins {
     `java-library`
+    `java-test-fixtures`   // 이벤트 계약(contract-as-code) 스키마·검증기·정본 샘플 제공 (ADR 0024)
     `maven-publish`
     id("io.spring.dependency-management") version "1.1.7"
     jacoco
@@ -108,6 +109,10 @@ dependencies {
     annotationProcessor("org.projectlombok:lombok:1.18.40")
     testCompileOnly("org.projectlombok:lombok:1.18.40")
     testAnnotationProcessor("org.projectlombok:lombok:1.18.40")
+
+    // 이벤트 계약(contract-as-code) — 소비 서비스가 testFixtures 좌표로 스키마·검증기·샘플을 공유 (ADR 0024)
+    testFixturesImplementation("com.networknt:json-schema-validator:1.5.6")
+    testFixturesImplementation("com.fasterxml.jackson.core:jackson-databind")
 
     // 테스트
     testImplementation("org.springframework.boot:spring-boot-starter-test")

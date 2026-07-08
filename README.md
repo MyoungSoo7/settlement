@@ -1,6 +1,6 @@
 # Lemuel — 이커머스 + 정산 MSA 플랫폼
 
-> **상품·장바구니·주문·결제·배송·정산·선정산대출** 도메인을 **3개 마이크로서비스 + API Gateway** 로 분리한
+> **상품·장바구니·주문·결제·배송·정산·선정산대출·재무제표·경제지표·기업평판·운영관제·주식시세** 도메인을 **8개 마이크로서비스 + API Gateway** 로 분리한
 > 헥사고날 아키텍처 기반 백엔드. 단일 모놀리스 → **Bounded Context 분리** → **이벤트 드리븐** →
 > **DB-per-service + 이벤트 프로젝션 패턴**(ADR 0020 완료) 으로 진화시킨 포트폴리오 프로젝트.
 
@@ -33,6 +33,7 @@ flowchart LR
     GW -->|/api/orders, payments<br/>products, users ...| OS
     GW -->|/api/settlements<br/>reports, ledger ...| SS
     GW -->|/loans/**| LS
+    GW -->|/api/financial · /api/economics<br/>/api/company · /api/ops · /api/market| SAT
 
     subgraph commerce["🛒 Commerce"]
         OS["order-service :8088<br/><br/>user · order · payment · cart<br/>shipping · product · category<br/>coupon · review · game"]
@@ -43,20 +44,34 @@ flowchart LR
     subgraph loan["💸 Loan (DB-per-service)"]
         LS["loan-service :8084<br/><br/>선정산 대출 · 상환 · 자체 원장"]
     end
+    subgraph SAT["🛰️ 독립 위성 서비스 (DB-per-service)"]
+        FIN["financial-statements :8086<br/>코스피 재무제표 (DART)"]
+        ECO["economics :8087<br/>거시 경제지표 (ECOS)"]
+        COM["company :8090<br/>기업 뉴스·평판 (네이버)"]
+        OPS["operation :8092<br/>운영 관제·인시던트"]
+        MKT["market :8094<br/>KRX 시세·시가총액 (공공데이터)"]
+    end
 
     OS -->|Outbox + Kafka| K[(Kafka<br/>Redpanda)]
     K -->|Payment·Order·User·Product 이벤트| SS
     K -->|SettlementCreated / Confirmed| LS
     LS -->|LoanDisbursement / Repayment| K
+    K -.->|성공·실패 신호 이벤트| OPS
 
     OS --- PG[(PostgreSQL opslab<br/>order 전용)]
     SS --- SDB[(settlement_db<br/>이벤트 프로젝션)]
     LS --- LDB[(lemuel_loan)]
     SS --- ES[(Elasticsearch 8.17<br/>settlement search)]
+    FIN --- FDB[(lemuel_financial)]
+    ECO --- EDB[(lemuel_economics)]
+    COM --- CDB[(lemuel_company)]
+    OPS --- ODB[(lemuel_operation)]
+    MKT --- MDB[(lemuel_market)]
 
     style commerce fill:#fff7e6,stroke:#fa8c16
     style settlement fill:#e6f7ff,stroke:#1890ff
     style loan fill:#fff0f6,stroke:#eb2f96
+    style SAT fill:#f6ffed,stroke:#52c41a
 ```
 
 ### 서비스 책임 분리 근거
@@ -69,8 +84,9 @@ flowchart LR
 | **장애 격리** | settlement 다운돼도 결제는 계속 | 정산 배치는 비동기 — 즉시 처리 X |
 | **배포 주기** | 잦음 (UI 변경 동행) | 드뭄 (회계 사이클 단위) |
 
-→ 위 차이점이 명확하므로 **서비스 분리** 가 자연스러운 경계. **4개 서비스 모두 DB-per-service**
-(order=opslab · settlement=settlement_db · loan=lemuel_loan) 로 물리 분리하고,
+→ 위 차이점이 명확하므로 **서비스 분리** 가 자연스러운 경계. **8개 서비스 모두 DB-per-service**
+(order=opslab · settlement=settlement_db · loan=lemuel_loan · financial=lemuel_financial ·
+economics=lemuel_economics · company=lemuel_company · operation=lemuel_operation · market=lemuel_market) 로 물리 분리하고,
 연계는 **Kafka 이벤트로만** 한다. order↔settlement 는 settlement 가 자체 DB 에 이벤트 프로젝션을 적재하는
 CQRS 로 분리하고, 대사는 order 의 내부 API 를 호출해 cross-DB 연결 0 을 유지한다
 ([ADR 0020](docs/adr/0020-order-settlement-db-split.md) — 완료).
@@ -108,9 +124,9 @@ CQRS 로 분리하고, 대사는 order 의 내부 API 를 호출해 cross-DB 연
 
 ```
 settlement/                              # 모노레포 루트
-├── settings.gradle.kts                  # 4 서비스 모듈 선언 (shared-common 은 composite build)
+├── settings.gradle.kts                  # 8 서비스 모듈 선언 (shared-common 은 composite build)
 ├── build.gradle.kts                     # 부모 빌드 (subprojects 공통 설정)
-├── docker-compose.yml                   # opslab+settlement_db+lemuel_loan PG(3) · ES · Redpanda · 4 services
+├── docker-compose.yml                   # PG 8종 · ES · Redpanda · 8 services + gateway
 ├── Dockerfile                           # MODULE 빌드 인자 파라미터화 (모든 서비스 공용)
 │
 ├── shared-common/                       # 📦 라이브러리 모듈 (java-library)
@@ -152,6 +168,21 @@ settlement/                              # 모노레포 루트
 │
 ├── loan-service/                        # 💸 Loan 서비스 (port 8084, 자체 DB lemuel_loan) — 선정산 대출
 │   └── src/main/java/.../loan/          # 한도·선지급·상환 saga·자체 복식부기 — settlement 이벤트로만 연계
+│
+├── financial-statements-service/        # 📊 Financial 서비스 (port 8086, 자체 DB lemuel_financial)
+│   └── src/main/java/.../financial/     # 코스피 상장사 요약 재무제표 조회 — DART OpenAPI 수집 + 시드 폴백
+│
+├── economics-service/                   # 📈 Economics 서비스 (port 8087, 자체 DB lemuel_economics)
+│   └── src/main/java/.../economics/     # ECOS 거시 경제지표(기준금리·국고채3년·USD/KRW·CPI) 조회 — 수집 배치 + 시드 폴백
+│
+├── company-service/                     # 📰 Company 서비스 (port 8090, 자체 DB lemuel_company)
+│   └── src/main/java/.../company/       # 기업 뉴스 수집(네이버) + 평판 스코어 — 본문 미저장, url_hash 멱등 (ADR 0023)
+│
+├── operation-service/                   # 🖥️ Operation 서비스 (port 8092, 자체 DB lemuel_operation) — 운영 관제
+│   └── src/main/java/.../operation/     # Alertmanager 알람 → 인시던트 라이프사이클(ack/resolve/오탐) + 요약(MTTR)
+│
+├── market-service/                      # 📉 Market 서비스 (port 8094, 자체 DB lemuel_market) — KRX 시세·시가총액
+│   └── src/main/java/.../market/        # 공공데이터포털 금융위 주식시세정보 수집 + 시드 폴백 — 시세·시총만 서빙(PER/PBR 은 소비측 조인)
 │
 └── gateway-service/                     # 🚪 API Gateway (port 8080)
     └── src/main/java/.../GatewayServiceApplication.java
@@ -332,9 +363,9 @@ JWT_TTL_SECONDS=3600
 ### 전체 실행
 
 ```bash
-# 1. 인프라 + 4 서비스 모두 빌드/실행
+# 1. 인프라 + 8 서비스 모두 빌드/실행
 #    기동 순서는 compose healthcheck 기반 depends_on 이 보장:
-#    PG 3종·ES·Redpanda → order/settlement/loan → gateway → prometheus/grafana
+#    PG 8종·ES·Redpanda → order/settlement/loan/financial/economics/company/operation/market → gateway → prometheus/grafana
 docker compose up -d --build
 
 # 2. 전체 healthcheck 통과 확인 — 모든 서비스가 healthy 가 될 때까지 대기
@@ -345,6 +376,11 @@ docker compose ps        # STATUS 열이 전부 Up (healthy) 이면 성공
 #    - Order API:   http://localhost:8088/actuator/health (직접 접근, 보통 gateway 경유)
 #    - Settlement:  http://localhost:8082/actuator/health
 #    - Loan:        http://localhost:8084/actuator/health
+#    - Financial:   http://localhost:8086/actuator/health
+#    - Economics:   http://localhost:8087/actuator/health
+#    - Company:     http://localhost:8090/actuator/health
+#    - Operation:   http://localhost:8092/actuator/health
+#    - Market:      http://localhost:8094/actuator/health
 #    - Swagger:     http://localhost:8088/swagger-ui.html
 #                   http://localhost:8082/swagger-ui.html
 ```
@@ -384,13 +420,18 @@ npx newman run docs/demo/postman-e2e-purchase-flow.json -e docs/demo/postman-env
 ### 개별 서비스 실행
 
 ```bash
-# 인프라만 (PG 3종 + ES + Redpanda)
-docker compose up -d postgres settlement-db loan-postgres elasticsearch redpanda
+# 인프라만 (PG 8종 + ES + Redpanda)
+docker compose up -d postgres settlement-db loan-postgres financial-postgres economics-postgres company-postgres operation-postgres market-postgres elasticsearch redpanda
 
 # 각 서비스를 IDE 또는 gradle 로
 ./gradlew :order-service:bootRun
 ./gradlew :settlement-service:bootRun
 ./gradlew :loan-service:bootRun
+./gradlew :financial-statements-service:bootRun
+./gradlew :economics-service:bootRun
+./gradlew :company-service:bootRun
+./gradlew :operation-service:bootRun
+./gradlew :market-service:bootRun
 ./gradlew :gateway-service:bootRun
 ```
 
@@ -408,6 +449,11 @@ docker compose up -d postgres settlement-db loan-postgres elasticsearch redpanda
 docker build --build-arg MODULE=order-service       -t lemuel-order .
 docker build --build-arg MODULE=settlement-service  -t lemuel-settlement .
 docker build --build-arg MODULE=loan-service        -t lemuel-loan .
+docker build --build-arg MODULE=financial-statements-service -t lemuel-financial .
+docker build --build-arg MODULE=economics-service   -t lemuel-economics .
+docker build --build-arg MODULE=company-service     -t lemuel-company .
+docker build --build-arg MODULE=operation-service   -t lemuel-operation .
+docker build --build-arg MODULE=market-service      -t lemuel-market .
 docker build --build-arg MODULE=gateway-service     -t lemuel-gateway .
 ```
 
@@ -423,6 +469,11 @@ docker build --build-arg MODULE=gateway-service     -t lemuel-gateway .
 | `/api/coupons/**`, `/api/reviews/**` | order-service |
 | `/admin/categories/**`, `/admin/pg/**`, `/admin/products/**` | order-service |
 | `/loans/**` | **loan-service** (자체 DB) |
+| `/api/financial/**` | **financial-statements-service** (자체 DB, 공개 조회) |
+| `/api/economics/**` | **economics-service** (자체 DB, 공개 조회) |
+| `/api/company/**` | **company-service** (자체 DB, 공개 조회) |
+| `/api/ops/**` | **operation-service** (자체 DB, 운영 관제 — ADMIN 전용, webhook 은 Bearer 게이트) |
+| `/api/market/**` | **market-service** (자체 DB, 공개 조회 — KRX 시세·시가총액) |
 | `/api/settlements/**`, `/api/reconciliation/**`, `/api/reports/**` | settlement-service |
 | `/api/ledger/**` | settlement-service |
 | `/admin/payouts/**`, `/admin/chargebacks/**` | settlement-service |
@@ -524,6 +575,11 @@ PENDING → READY → SHIPPED → IN_TRANSIT → DELIVERED → (선택) RETURNED
 - [0018 — Chargeback Domain](./docs/adr/0018-chargeback-domain.md)
 - [0020 — order ↔ settlement DB 물리 분리 (이벤트 CQRS)](./docs/adr/0020-order-settlement-db-split.md) *(완료 — settlement_db + 이벤트 프로젝션 + /internal/recon)*
 - [0021 — shared-common 을 버전드 플랫폼 라이브러리로](./docs/adr/0021-shared-common-as-platform-library.md) *(완료 — composite build + maven-publish 1.0.0)*
+- [0022 — Event Schema Registry](./docs/adr/0022-event-schema-registry.md)
+- [0023 — company-service 뉴스·평판 (독립 위성 서비스)](./docs/adr/0023-company-service-news-reputation.md)
+
+> 위성 서비스(financial · economics · company · market)는 **공개 read-only 조회**라 shared-common(JWT/Outbox)을 의존하지 않고
+> 자체 최소 SecurityConfig 를 둔다. operation 은 예외로 shared-common(JWT) 을 쓰며 콘솔은 ADMIN 전용이다.
 
 ---
 
@@ -553,11 +609,16 @@ CI 에서 k6 thresholds 로 회귀 자동 감지.
 | **Outbox 패턴인데 trace context 끊김?** | [TraceContextCapture](shared-common/src/main/java/github/lms/lemuel/common/outbox/application/service/TraceContextCapture.java) + V40 traceparent 컬럼 |
 | **운영 메트릭은?** | [Grafana Dashboard JSON](monitoring/grafana/dashboards/lemuel-business-kpi.json) — 30+ 커스텀 메트릭 |
 | **부하 테스트 결과?** | 위 표 + [load-test/README.md](load-test/README.md) |
+| **왜 재무제표·경제지표·기업평판을 별도 서비스로?** | 공개 read-only 조회라 거래 컨텍스트와 경계가 다름 → DB-per-service + **shared-common(JWT/Outbox) 미의존**, 자체 최소 SecurityConfig ([ADR 0023](docs/adr/0023-company-service-news-reputation.md)) |
+| **외부 API(DART/ECOS/네이버) 키 없이 데모?** | Flyway **시드 폴백** — 각 서비스 `V2__*_seed.sql` 이 대표 데이터를 적재해 키 없이도 조회 동작, 키 설정 시 수집 배치가 UNIQUE upsert 로 실데이터 대체 |
+| **Alertmanager 알람이 인시던트가 되는 과정?** | [IngestAlertService](operation-service/src/main/java/github/lms/lemuel/operation/incident/application/service/IngestAlertService.java) — webhook(Bearer) → `(source, correlation_key)` partial unique 로 활성 중복 0, repeat firing refire 병합 |
+| **위성 서비스도 코드·DB 의존 0?** | ✅ financial/economics/company/market 는 타 서비스 import·DB 공유 없음(ArchUnit 강제). operation 만 shared-common(JWT) 사용, 신호는 Kafka 이벤트로만 수신 |
 
 ## 운영 환경 확장 포인트
 
-현재 구성은 **3개 서비스 모두 DB-per-service** 로 물리 분리돼 있고(order=opslab, settlement=settlement_db,
-loan=lemuel_loan), 이벤트 프로젝션 패턴 덕분에 다음 단계로의 확장이 깨끗합니다:
+현재 구성은 **8개 서비스 모두 DB-per-service** 로 물리 분리돼 있고(order=opslab · settlement=settlement_db ·
+loan=lemuel_loan · financial=lemuel_financial · economics=lemuel_economics · company=lemuel_company ·
+operation=lemuel_operation · market=lemuel_market), 이벤트 프로젝션 패턴 덕분에 다음 단계로의 확장이 깨끗합니다:
 
 1. ~~**DB 분리**~~ — ✅ 완료. settlement 가 자체 `settlement_db` 의 projection 테이블에 Kafka 이벤트 컨슈머가
    직접 INSERT 하고, 대사는 order 내부 API(`/internal/recon`)로 cross-DB 0 ([ADR 0020](docs/adr/0020-order-settlement-db-split.md)).

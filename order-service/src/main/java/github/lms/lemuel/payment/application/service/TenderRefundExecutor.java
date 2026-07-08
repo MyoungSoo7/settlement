@@ -99,10 +99,12 @@ public class TenderRefundExecutor {
      * 계획된 tender 가 모두 성공한 뒤에만 호출되므로, 부분 실패로 중단된 환불은 이벤트를 내지 않는다.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void finalizeRefund(Long paymentId) {
+    public void finalizeRefund(Long paymentId, BigDecimal refundAmount) {
         PaymentDomain payment = loadPaymentPort.loadById(paymentId)
                 .orElseThrow(() -> new PaymentNotFoundException(paymentId));
-        publishEventPort.publishPaymentRefunded(payment.getId(), payment.getOrderId(), payment.getRefundedAmount());
+        // 분할결제 경로는 Refund 엔티티를 만들지 않으므로 refundId=null — 역정산은 수행되고 원장 역분개만 생략된다.
+        publishEventPort.publishPaymentRefunded(payment.getId(), payment.getOrderId(),
+                payment.getRefundedAmount(), refundAmount, null);
         log.info("분할결제 환불 이벤트 발행: paymentId={}, status={}, refunded={}/{}",
                 payment.getId(), payment.getStatus(), payment.getRefundedAmount(), payment.getAmount());
     }

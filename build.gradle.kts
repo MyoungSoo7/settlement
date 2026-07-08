@@ -39,6 +39,11 @@ subprojects {
 
     tasks.named<JacocoReport>("jacocoTestReport") {
         dependsOn(tasks.named("test"))
+        // jacocoTestReport 는 main 소스셋 출력(build/classes/java/main + build/resources/main)을
+        // classDirectories/sourceDirectories 로 읽는다. -x test 로 test 를 건너뛰면
+        // test→classes 경로가 끊겨 Gradle 9 의 implicit-dependency 검증에 걸리므로,
+        // compileJava·processResources 를 aggregate 하는 classes 를 명시적으로 선언한다.
+        dependsOn(tasks.named("classes"))
         reports {
             xml.required.set(true)
             html.required.set(true)
@@ -71,6 +76,7 @@ subprojects {
                     "**/adapter/out/monitoring/**",
                     "**/adapter/out/user/**",
                     "**/adapter/out/pg/**",
+                    "**/adapter/out/llm/**",
                     "**/adapter/in/web/**",
                     "**/adapter/in/kafka/**",
                     "**/adapter/in/batch/**",
@@ -81,6 +87,13 @@ subprojects {
                     "**/LemuelApplication*",
                     "**/SettlementServiceApplication*",
                     "**/GatewayServiceApplication*",
+                    "**/FinancialStatementsApplication*",
+                    "**/CompanyServiceApplication*",
+                    "**/OperationServiceApplication*",
+                    "**/EconomicsApplication*",
+                    "**/MarketApplication*",
+                    "**/CommonDataApplication*",
+                    "**/AiServiceApplication*",
                 )
             }
         })
@@ -103,6 +116,10 @@ subprojects {
                     "github.lms.lemuel.shipping.domain.*",
                     "github.lms.lemuel.settlement.domain.*",
                     "github.lms.lemuel.pgreconciliation.domain.*",
+                    "github.lms.lemuel.economics.domain.*",
+                    "github.lms.lemuel.market.domain.*",
+                    "github.lms.lemuel.commondata.domain.*",
+                    "github.lms.lemuel.ai.chat.domain.*",
                     // common.outbox.domain 게이트는 shared-common 독립 빌드로 이관됨
                 )
                 limit {

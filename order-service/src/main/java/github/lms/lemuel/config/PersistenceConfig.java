@@ -18,6 +18,9 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 @EntityScan(basePackages = {
     "github.lms.lemuel.cart",
     "github.lms.lemuel.category",
+    "github.lms.lemuel.commoncode",
+    "github.lms.lemuel.menu",
+    "github.lms.lemuel.rbac",
     "github.lms.lemuel.chargeback",
     "github.lms.lemuel.common",
     "github.lms.lemuel.coupon",
@@ -35,6 +38,9 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 @EnableJpaRepositories(basePackages = {
     "github.lms.lemuel.cart",
     "github.lms.lemuel.category",
+    "github.lms.lemuel.commoncode",
+    "github.lms.lemuel.menu",
+    "github.lms.lemuel.rbac",
     "github.lms.lemuel.chargeback",
     "github.lms.lemuel.common",
     "github.lms.lemuel.coupon",

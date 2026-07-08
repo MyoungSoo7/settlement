@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "lemuel.product.changed",
+  "description": "order-service(OutboxBackedProductEventPublisher) → settlement-service(ProductEventKafkaConsumer). settlement_product_view 프로젝션 적재 (ADR 0020 Phase 3b). name 은 항상 존재하되 null 허용 — 컨슈머가 null-safe 처리.",
+  "type": "object",
+  "properties": {
+    "productId": { "type": "integer" },
+    "name": { "type": ["string", "null"] }
+  },
+  "required": ["productId", "name"],
+  "additionalProperties": true
+}

@@ -39,12 +39,15 @@ class OrderReconClientTest {
     void dailyTotals_requestsCorrectUriAndParsesResponse() {
         server.expect(requestTo("http://order-test/internal/recon/daily-totals?date=2026-06-17"))
                 .andExpect(method(HttpMethod.GET))
-                .andRespond(withSuccess("{\"capturedPayments\":1000.00,\"completedRefunds\":50.00}", APPLICATION_JSON));
+                .andRespond(withSuccess(
+                        "{\"capturedPayments\":1000.00,\"completedRefunds\":50.00,\"refundedAgainstCaptures\":40.00}",
+                        APPLICATION_JSON));
 
         OrderReconClient.DailyTotals totals = client.dailyTotals(LocalDate.of(2026, 6, 17));
 
         assertThat(totals.capturedPayments()).isEqualByComparingTo("1000.00");
         assertThat(totals.completedRefunds()).isEqualByComparingTo("50.00");
+        assertThat(totals.refundedAgainstCaptures()).isEqualByComparingTo("40.00");
         server.verify();
     }
 

@@ -1,0 +1,118 @@
+spring:
+  profiles:
+    active: local
+
+  application:
+    name: lemuel-ai
+
+  threads:
+    virtual:
+      enabled: true
+
+  # ★ ai-service 는 자체 DB(lemuel_ai) 를 소유한다 (DB-per-service).
+  #   로컬 기본값은 compose 의 호스트 매핑(127.0.0.1:5442 → ai-postgres:5432)을 가리킨다.
+  #   이미지는 pgvector/pgvector:pg17 — Phase 3 RAG 대비 선점(Phase 1 은 확장 미활성).
+  datasource:
+    url: jdbc:postgresql://localhost:5442/lemuel_ai?reWriteBatchedInserts=true
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      pool-name: lemuel-ai-pool
+      maximum-pool-size: ${DB_POOL_MAX:10}
+      minimum-idle: ${DB_POOL_MIN_IDLE:2}
+      connection-timeout: 10000
+      leak-detection-threshold: 30000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+
+  # 자체 DB 마이그레이션을 직접 책임진다 (V1 대화 코어).
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=500,expireAfterWrite=600s
+
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+server:
+  port: 8096
+  shutdown: graceful
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    prometheus:
+      enabled: true
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  health:
+    db:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+      environment: ${ENVIRONMENT:local}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+app:
+  # JWT — shared-common JwtProperties(prefix=app.jwt). common.config.jwt 를 스캔하므로
+  # secret 이 필수다(order-service 와 동일 시크릿 — 토큰 발급은 order, 검증만 여기서).
+  jwt:
+    issuer: ${JWT_ISSUER:lemuel}
+    secret: ${JWT_SECRET}
+    ttl-seconds: ${JWT_TTL_SECONDS:3600}
+
+  ai:
+    chat:
+      # Anthropic Messages API — company-service 감성분석과 동일 env var 공용.
+      # 미설정 시: 부팅·이력 조회는 정상, 채팅만 503 안내 (economics 의 "키 미설정 → 수집 비활성" 철학).
+      api-key: ${ANTHROPIC_API_KEY:}
+      model: ${APP_AI_CHAT_MODEL:claude-opus-4-8}
+      max-tokens: 1024
+      # 컨텍스트 윈도 — LLM 에 실어 보내는 직전 메시지 수 (비용 상한의 1차 장치)
+      history-window: 10
+      timeout-seconds: 30
+      # 시스템 프롬프트 — 실데이터 환각 금지가 핵심 (돈 다루는 플랫폼의 AI 안전 장치).
+      # Phase 2(Function Calling)에서 실데이터 조회 도구가 붙기 전까지는 "모른다"가 정답이다.
+      system-prompt: >-
+        당신은 Lemuel 이커머스·정산 플랫폼의 AI 도우미입니다.
+        Lemuel 은 주문/결제, 셀러 정산(등급별 수수료 NORMAL 3.5%/VIP 2.5%/STRATEGIC 2.0%,
+        정산주기 T+7/T+3/T+1 영업일), 선정산 대출, 재무제표·경제지표·기업뉴스 조회를 제공합니다.
+        일반 지식과 플랫폼 사용 안내에는 친절하고 간결하게 한국어 존댓말로 답하세요.
+        단, 사용자의 실제 주문·결제·정산 금액 등 개인 데이터는 아직 조회할 수 없으므로
+        절대 지어내지 말고 "곧 조회 기능이 연동될 예정"이라고 안내하세요.
+        개인정보(카드번호·주민번호 등)를 입력하지 않도록 안내하세요.
+    rate-limit:
+      # LLM 비용 가드 — 사용자별 채팅 호출 상한. 초과 시 429 + Retry-After.
+      per-minute: ${APP_AI_RATE_PER_MINUTE:5}
+      per-day: ${APP_AI_RATE_PER_DAY:100}

@@ -17,6 +17,7 @@ const ITEMS: SidebarItem[] = [
   { to: '/admin/system/codes', label: '공통코드 관리', icon: '🏷️', desc: '코드 그룹 / 항목' },
   { to: '/admin/system/rbac',  label: 'RBAC 관리',    icon: '🔐', desc: '역할 · 권한 매트릭스' },
   { to: '/admin/system/ecommerce-categories', label: '이커머스 카테고리', icon: '📁', desc: '상품 카테고리 트리' },
+  { to: '/admin/system/operation', label: '운영관리', icon: '🖥️', desc: '인시던트 관제 콘솔' },
 ];
 
 const SystemLayout: React.FC<SystemLayoutProps> = ({ children }) => {

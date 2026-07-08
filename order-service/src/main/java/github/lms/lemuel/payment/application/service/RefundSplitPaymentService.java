@@ -67,7 +67,7 @@ public class RefundSplitPaymentService {
         }
 
         // 3) 계획된 tender 가 모두 성공한 경우에만 종료 이벤트 1회 발행(정산 조정 트리거).
-        tenderRefundExecutor.finalizeRefund(paymentId);
+        tenderRefundExecutor.finalizeRefund(paymentId, totalRefundAmount);
 
         log.info("분할결제 환불 완료: paymentId={}, refundAmount={}, plansApplied={}",
                 paymentId, totalRefundAmount, applied);

@@ -31,12 +31,14 @@ public class InternalReconController {
         this.repository = repository;
     }
 
-    @Operation(summary = "일일 대사 합계 (order 원천)", description = "해당 날짜 CAPTURED 결제·COMPLETED 환불 합계")
+    @Operation(summary = "일일 대사 합계 (order 원천)",
+            description = "해당 날짜 캡처 gross(CAPTURED+REFUNDED)·완료 환불(완료일 기준)·캡처일 기준 반영 환불 합계")
     @GetMapping("/daily-totals")
     public DailyTotals dailyTotals(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return new DailyTotals(
                 repository.sumCapturedPayments(date),
-                repository.sumCompletedRefunds(date));
+                repository.sumCompletedRefunds(date),
+                repository.sumRefundedAgainstCaptures(date));
     }
 
     @Operation(summary = "기간 대사 합계 (order 원천)",
@@ -49,6 +51,25 @@ public class InternalReconController {
                 repository.sumCapturedPayments(from, to),
                 repository.sumCompletedRefunds(from, to),
                 repository.countPaymentCapturedPublished(from, to));
+    }
+
+    @Operation(summary = "일일 대사 건수 (order 원천) — INV-9 건수 축",
+            description = "해당 날짜 캡처 건수(캡처 이력 기준)·COMPLETED 환불 건수(완료일 기준). 금액 합계 대사의 ±상쇄 사각지대 보완")
+    @GetMapping("/daily-counts")
+    public DailyCounts dailyCounts(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return new DailyCounts(
+                repository.countCapturedPayments(date),
+                repository.countCompletedRefunds(date));
+    }
+
+    @Operation(summary = "기간 COMPLETED 환불 목록 (완료일 기준) — INV-8 지연 환불 조정 대사용",
+            description = "refund id·payment id·금액·완료일. settlement 가 settlement_adjustments.refund_id 와 대조해 조정 누락을 감지")
+    @GetMapping("/refunds-completed")
+    public List<ReconQueryRepository.CompletedRefundRow> refundsCompleted(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(defaultValue = "1000") int limit) {
+        return repository.listCompletedRefunds(from, to, Math.min(limit, 5000));
     }
 
     @Operation(summary = "환불 id 집합의 COMPLETED 합계",
@@ -65,7 +86,11 @@ public class InternalReconController {
         return repository.loadCapturedPaymentRows(date);
     }
 
-    public record DailyTotals(BigDecimal capturedPayments, BigDecimal completedRefunds) {
+    public record DailyTotals(BigDecimal capturedPayments, BigDecimal completedRefunds,
+                              BigDecimal refundedAgainstCaptures) {
+    }
+
+    public record DailyCounts(long capturedCount, long completedRefundsCount) {
     }
 
     public record PeriodTotals(BigDecimal capturedPayments, BigDecimal completedRefunds,

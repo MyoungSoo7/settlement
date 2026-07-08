@@ -1,0 +1,146 @@
+spring:
+  profiles:
+    active: local
+
+  application:
+    name: lemuel-company
+
+  threads:
+    virtual:
+      enabled: true
+
+  # ★ company-service 는 자체 DB(lemuel_company) 를 소유한다 (DB-per-service, ADR 0023).
+  #   Phase 1 은 다른 서비스와 코드·DB·이벤트 의존 없음 — 이벤트 연계는 Phase 3.
+  datasource:
+    url: jdbc:postgresql://localhost:5438/lemuel_company?reWriteBatchedInserts=true
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      pool-name: lemuel-company-pool
+      maximum-pool-size: ${DB_POOL_MAX:10}
+      minimum-idle: ${DB_POOL_MIN_IDLE:2}
+      connection-timeout: 10000
+      leak-detection-threshold: 30000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=2000,expireAfterWrite=300s
+
+  # ★ Phase 3: 평판 등급 변동 Outbox 이벤트 발행용 Kafka 프로듀서 (KafkaOutboxPublisher).
+  #   app.kafka.enabled=false(기본) 이면 KafkaOutboxPublisher 대신 ApplicationEventOutboxPublisher
+  #   폴백이 등록돼 in-process no-op 으로 발행 처리된다 — 로컬은 kafka 없이도 부팅된다.
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: lemuel-company
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      properties:
+        isolation.level: read_committed
+    producer:
+      acks: all
+      retries: 5
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+    listener:
+      ack-mode: manual_immediate
+      missing-topics-fatal: false
+
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+server:
+  port: 8090
+  shutdown: graceful
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    prometheus:
+      enabled: true
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  health:
+    db:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+      environment: ${ENVIRONMENT:local}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+app:
+  company:
+    # /admin/company/** 게이트 공유 시크릿 — 미설정 시 통과+경고 (로컬 전용, 운영 필수)
+    internal-api-key: ${COMPANY_INTERNAL_API_KEY:}
+    naver:
+      # developers.naver.com 발급 자격증명 — 미설정이면 수집 비활성(시드 기업 마스터만 조회 가능)
+      client-id: ${NAVER_CLIENT_ID:}
+      client-secret: ${NAVER_CLIENT_SECRET:}
+      base-url: https://openapi.naver.com
+      display: 20                # 기업당 1회 검색 결과 수 (API 최대 100)
+    collect:
+      request-interval-ms: 200   # 네이버 쿼터(일 25,000콜) 보호용 기업 간 호출 간격
+    reputation:
+      window-days: 30            # 평판 스냅샷 산정 대상 기사 윈도우 (발행일시 기준 최근 N일)
+    # 감성분석 제공자 (ADR 0023 Phase 4): keyword(기본, 룰 기반) / llm(Claude) / gemini(Google).
+    #   provider 를 바꿔도 AnalyzeSentimentPort 뒤에서 무중단 교체되고, 키 미설정·호출 실패 시 키워드 폴백.
+    sentiment:
+      provider: ${APP_COMPANY_SENTIMENT_PROVIDER:keyword}
+      claude:
+        api-key: ${ANTHROPIC_API_KEY:}
+        model: ${APP_COMPANY_SENTIMENT_MODEL:claude-opus-4-8}
+        base-url: https://api.anthropic.com
+        version: "2023-06-01"
+        max-tokens: 20
+      gemini:
+        api-key: ${GEMINI_API_KEY:}
+        model: ${APP_COMPANY_SENTIMENT_GEMINI_MODEL:gemini-2.5-flash}
+        base-url: https://generativelanguage.googleapis.com
+        max-tokens: 256
+  # ★ Phase 3: Outbox → Kafka 이벤트 발행 (평판 등급 변동 → loan 리스크 프로젝션)
+  kafka:
+    enabled: ${APP_KAFKA_ENABLED:false}
+    topic:
+      # 발행 (company → loan). Outbox 폴러가 aggregateType="Company"+eventType="CompanyReputationChanged"
+      # 로 자동 라우팅하는 실제 토픽명(snake_case). loan 컨슈머가 이 이름으로 구독한다.
+      reputation-changed: lemuel.company.reputation_changed
+      # 수신 (order → company) — 셀러(회원) 등록을 적재해 기업 링크 대상 목록을 축적 (ADR 0023 Phase 3 후속)
+      user-registered: lemuel.user.registered
+  outbox:
+    polling-delay-ms: ${APP_OUTBOX_POLLING_DELAY_MS:2000}   # OutboxPublisherScheduler 폴링 주기

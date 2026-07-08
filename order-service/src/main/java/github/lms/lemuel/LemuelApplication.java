@@ -21,6 +21,10 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         "github.lms.lemuel.game",
         "github.lms.lemuel.projectionbackfill",
         "github.lms.lemuel.recon",
+        // 관리자 시스템 (RBAC·메뉴·공통코드) — 스캔 누락으로 컨트롤러 미등록이던 것을 배선
+        "github.lms.lemuel.menu",
+        "github.lms.lemuel.commoncode",
+        "github.lms.lemuel.rbac",
         "github.lms.lemuel.common",
         // ADR 0020 Phase 5.5 — settlement 분리 완료. settlement/ledger/payout/chargeback/
         // pgreconciliation 코드는 settlement-service 로 이전돼 order 소스에 존재하지 않으므로

@@ -79,11 +79,16 @@ public class OutboxBackedEventPublisher implements PublishEventPort {
     }
 
     @Override
-    public void publishPaymentRefunded(Long paymentId, Long orderId, BigDecimal refundedAmount) {
+    public void publishPaymentRefunded(Long paymentId, Long orderId, BigDecimal refundedAmount,
+                                       BigDecimal refundAmount, Long refundId) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("paymentId", paymentId);
         payload.put("orderId", orderId);
+        // 누적 환불액 — 프로젝션 뷰(settlement_payment_view) 갱신용
         if (refundedAmount != null) payload.put("refundedAmount", refundedAmount.toPlainString());
+        // 건별 환불액(delta)·환불 ID — 역정산(netAmount 재계산·원장 역분개)용
+        if (refundAmount != null) payload.put("refundAmount", refundAmount.toPlainString());
+        if (refundId != null) payload.put("refundId", refundId);
         writeOutbox(paymentId, "PaymentRefunded", payload);
     }
 

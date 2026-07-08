@@ -38,6 +38,15 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       : `${base} text-gray-600 hover:bg-gray-100`;
   };
 
+  // 정산 그룹(상품관리·정산관리·정산조회) — 세 경로 중 어디에 있어도 활성
+  const settlementNavLinkClass = (() => {
+    const base = 'px-4 py-2 rounded-lg font-medium transition-colors text-sm';
+    const active = isActive('/product') || isActive('/admin/settlement') || isActive('/settlement/search');
+    return active
+      ? `${base} bg-gray-800 text-white`
+      : `${base} text-gray-600 hover:bg-gray-100`;
+  })();
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -55,14 +64,31 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               {user && isAdminOrManager && (
                 <nav className="flex space-x-1">
                   <Link to="/admin"            className={adminNavLinkClass('/admin')}>대시보드</Link>
-                  <Link to="/product"          className={adminNavLinkClass('/product')}>상품관리</Link>
-                  <Link to="/admin/settlement" className={adminNavLinkClass('/admin/settlement')}>정산관리</Link>
-                  <Link to="/settlement/search" className={adminNavLinkClass('/settlement/search')}>정산조회</Link>
-                  <Link to="/loans"            className={adminNavLinkClass('/loans')}>대출관리</Link>
+                  {/* 정산 — 상품관리·정산관리·정산조회 3개 하위 (좌측 사이드바) */}
+                  <Link
+                    to="/admin/settlement"
+                    className={settlementNavLinkClass}
+                  >
+                    정산
+                  </Link>
+                  <Link to="/ai/chat" className={adminNavLinkClass('/ai/chat')}>AI 도우미</Link>
+                  {/* MANAGER 는 위성 조회를 개별 링크로 유지 (CEO 그룹은 ADMIN 전용) */}
+                  {user.role === 'MANAGER' && (
+                    <>
+                      <Link to="/loans"     className={adminNavLinkClass('/loans')}>대출관리</Link>
+                      <Link to="/economics" className={adminNavLinkClass('/economics')}>경제지표</Link>
+                    </>
+                  )}
                   {user.role === 'ADMIN' && (
-                    <Link to="/admin/system/menus" className={adminNavLinkClass('/admin/system')}>
-                      시스템
-                    </Link>
+                    <>
+                      {/* CEO — 경제지표·재무제표·기업조회·대출관리 4개 하위 (좌측 사이드바) */}
+                      <Link to="/admin/ceo/insight" className={adminNavLinkClass('/admin/ceo')}>
+                        CEO
+                      </Link>
+                      <Link to="/admin/system/menus" className={adminNavLinkClass('/admin/system')}>
+                        시스템
+                      </Link>
+                    </>
                   )}
                 </nav>
               )}
@@ -72,6 +98,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <nav className="flex space-x-1">
                   <Link to="/order"        className={navLinkClass('/order')}>주문하기</Link>
                   <Link to="/loans"        className={navLinkClass('/loans')}>💸 대출하기</Link>
+                  <Link to="/economics"    className={navLinkClass('/economics')}>📈 경제지표</Link>
+                  <Link to="/ai/chat"      className={navLinkClass('/ai/chat')}>🤖 AI 도우미</Link>
                 </nav>
               )}
             </div>

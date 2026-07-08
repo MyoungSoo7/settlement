@@ -1,0 +1,13 @@
+# invest-copilot — Codex execpolicy rules (prefix_rule 서브셋).
+# 조회 서비스 DB 클라이언트 접속을 승인 프롬프트로 승격한다. 내용 검사(SQL 안의 쓰기 동사)는
+# prefix 매칭으로 불가능하므로 MCP guard_check + git pre-commit 가드가 담당한다.
+#
+# 검증: codex execpolicy check --rules invest-copilot/codex/readonly-db.rules psql -d lemuel_financial
+
+prefix_rule(
+    pattern = [["psql", "pgcli", "pg_dump"]],
+    decision = "prompt",
+    justification = "financial/economics/company 조회 DB 직접 접속 — 조회는 invest-copilot MCP 도구(fin_statements, econ_latest, reputation_score)를, 데이터 정정은 각 서비스 수집 배치(admin API)를 사용하세요.",
+    match = ["psql -d lemuel_financial", "pg_dump lemuel_company"],
+    not_match = ["git status"],
+)

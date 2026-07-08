@@ -1,36 +1,24 @@
 ---
 name: settlement-integration-test
-description: Write a Spring Boot @SpringBootTest integration test for settlement-service using Testcontainers PostgreSQL. Use when adding any integration test (real DB, JPA, repository, @Transactional service, concurrency/locking, event listener, end-to-end) under settlement-service. settlement-service is library-mode (no prod @SpringBootApplication), so tests need a test-scoped bootstrap and specific properties to boot in isolation. Triggers: "settlement 통합테스트", "settlement-service integration test", "Testcontainers", "정산 동시성 테스트", "@SpringBootTest settlement". NOTE: recipe assumes settlement-service is in library-mode (no prod @SpringBootApplication); discard/update when Phase B standalone boot is introduced.
+description: Write a Spring Boot @SpringBootTest integration test for settlement-service using Testcontainers PostgreSQL. Use when adding any integration test (real DB, JPA, repository, @Transactional service, concurrency/locking, event listener, end-to-end) under settlement-service. settlement-service is standalone (prod @SpringBootApplication in main, own settlement_db + Flyway V1 baseline) but tests still boot with flyway off + create-drop. Triggers: "settlement 통합테스트", "settlement-service integration test", "Testcontainers", "정산 동시성 테스트", "@SpringBootTest settlement".
 tools: Read, Write, Edit, Bash
 ---
 
 # settlement-service Integration Test Bootstrap
 
-> ⚠️ **이 레시피는 settlement-service 가 현재 _라이브러리 모드_(prod `@SpringBootApplication` 없음,
-> 마이그레이션은 order-service 책임)라는 전제에 묶여 있다.** Phase B 에서 standalone 부팅(자체
-> `@SpringBootApplication` + 자체 Flyway 마이그레이션)이 도입되면 아래 부트스트랩·프로퍼티 레시피
-> (test-scoped 부트스트랩, `flyway.enabled=false`, `ddl-auto=create-drop`, `default_schema=public` 등)는
-> **폐기하거나 갱신해야 한다.** 전제가 바뀌었는지부터 확인하고 이 스킬을 적용하라.
+> ℹ️ **2026-07-07 갱신**: settlement-service 는 이제 **standalone** 이다 — prod
+> `@SpringBootApplication` 이 main 에 있고(`github.lms.lemuel.SettlementServiceApplication`),
+> 자체 DB(settlement_db) + 자체 Flyway(V1 베이스라인)를 소유한다 (ADR 0020).
+> 그래도 테스트 레시피는 그대로 유효하다: 테스트는 Flyway 를 끄고 엔티티 기반
+> `create-drop` 으로 스키마를 만들어 컨테이너 1개로 격리 부팅한다.
 
-settlement-service has **no production `@SpringBootApplication`** — `build.gradle.kts` runs it in
-library mode (`bootJar` disabled; it is bundled into order-service's fat jar). To boot it in
-isolation for `@SpringBootTest`, use the **test-scoped** bootstrap below. Never add a prod app class.
+## 1. Bootstrap — main 의 prod 애플리케이션 클래스를 그대로 사용
 
-## 1. Test bootstrap (already exists — reuse, don't recreate)
-
-`settlement-service/src/test/java/github/lms/lemuel/SettlementServiceApplication.java`
-
-```java
-@SpringBootApplication
-public class SettlementServiceApplication {
-    public static void main(String[] args) {
-        org.springframework.boot.SpringApplication.run(SettlementServiceApplication.class, args);
-    }
-}
-```
+`settlement-service/src/main/java/github/lms/lemuel/SettlementServiceApplication.java` 를
+`@SpringBootTest(classes = ...)` 로 지정한다. 별도 test-scoped 부트스트랩을 만들지 마라.
 
 It scans `github.lms.lemuel` → settlement-service main + shared-common only (order-service is **not**
-on the test classpath, so the MSA boundary holds). If it is missing, create it; otherwise reuse it.
+on the test classpath, so the MSA boundary holds).
 
 ## 2. Required `@SpringBootTest` setup
 
@@ -38,7 +26,7 @@ on the test classpath, so the MSA boundary holds). If it is missing, create it; 
 @SpringBootTest(
         classes = SettlementServiceApplication.class,
         properties = {
-                "spring.flyway.enabled=false",                          // migrations are order-service's job
+                "spring.flyway.enabled=false",                          // 테스트는 엔티티 기반 스키마 사용 (Flyway 미적용)
                 "spring.jpa.hibernate.ddl-auto=create-drop",            // build schema from entities
                 "spring.jpa.properties.hibernate.default_schema=public",// override yml's opslab schema
                 "app.kafka.enabled=false",

@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "invest-copilot": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/server/index.mjs"],
+      "env": {
+        "FINANCIAL_BASE_URL": "http://localhost:8086",
+        "ECONOMICS_BASE_URL": "http://localhost:8087",
+        "COMPANY_BASE_URL": "http://localhost:8090"
+      }
+    }
+  }
+}

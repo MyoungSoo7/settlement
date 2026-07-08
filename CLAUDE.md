@@ -2,9 +2,9 @@
 
 ## 프로젝트 개요
 
-주문·결제·정산·선정산대출을 **3개 마이크로서비스 + API Gateway** 로 분리한 헥사고날 아키텍처 백엔드.
-원래 단일 모놀리스였으나 Bounded Context 로 분리. **3개 서비스 모두 DB-per-service**(order=opslab, settlement=settlement_db,
-loan=lemuel_loan) 로 물리 분리돼 있고, 서비스 간 연계는 **Kafka 이벤트로만** 한다.
+주문·결제·정산·선정산대출·재무제표조회·경제지표조회·기업뉴스평판·운영관제·주식시세조회·AI챗봇을 **9개 마이크로서비스 + API Gateway** 로 분리한 헥사고날 아키텍처 백엔드.
+원래 단일 모놀리스였으나 Bounded Context 로 분리. **9개 서비스 모두 DB-per-service**(order=opslab, settlement=settlement_db,
+loan=lemuel_loan, financial=lemuel_financial, economics=lemuel_economics, company=lemuel_company, operation=lemuel_operation, market=lemuel_market, ai=lemuel_ai) 로 물리 분리돼 있고, 서비스 간 연계는 **Kafka 이벤트로만** 한다.
 order↔settlement 는 settlement 가 자체 DB 에 **이벤트 드리븐 프로젝션**(`settlement_*_view`)을 적재하는 CQRS 로 분리하고
 (ADR 0020 완료), 대사(reconciliation)는 order 의 내부 API(`/internal/recon`)를 호출해 cross-DB 연결 0 을 유지한다.
 자세한 사용자용 문서는 [`README.md`](./README.md) 참조.
@@ -33,7 +33,7 @@ order↔settlement 는 settlement 가 자체 DB 에 **이벤트 드리븐 프로
 
 ```
 settlement/                       # Gradle 멀티 모듈 루트
-├── settings.gradle.kts           # 4 서비스 모듈 선언 (shared-common 은 composite build)
+├── settings.gradle.kts           # 9 서비스 모듈 선언 (shared-common 은 composite build)
 ├── build.gradle.kts              # 부모 빌드 (subprojects 공통 설정)
 ├── shared-common/                # 📦 java-library: 전 서비스가 의존
 │   └── github.lms.lemuel.common.{audit, config, exception, outbox, ratelimit, pdf}
@@ -43,6 +43,20 @@ settlement/                       # Gradle 멀티 모듈 루트
 │   └── github.lms.lemuel.{settlement, payout, ledger, chargeback, pgreconciliation, report}
 ├── loan-service/                 # 💸 Loan 서비스 (port 8084, 자체 DB lemuel_loan) — 선정산 대출
 │   └── github.lms.lemuel.loan.*
+├── financial-statements-service/ # 📊 Financial 서비스 (port 8086, 자체 DB lemuel_financial) — 코스피 재무제표 조회
+├── economics-service/            # 📈 Economics 서비스 (port 8087, 자체 DB lemuel_economics) — ECOS 경제지표 공개 조회
+│   └── github.lms.lemuel.economics.*   # ★ shared-common 미의존 (공개 read-only, 자체 SecurityConfig)
+│   └── github.lms.lemuel.financial.*   # ★ shared-common 미의존 (공개 read-only, 자체 SecurityConfig)
+├── company-service/              # 📰 Company 서비스 (port 8090, 자체 DB lemuel_company) — 기업 뉴스·평판 (ADR 0023)
+│   └── github.lms.lemuel.company.*     # ★ shared-common 미의존 (Phase 3 outbox 이벤트 발행 시 추가 예정)
+├── operation-service/            # 🖥️ Operation 서비스 (port 8092, 자체 DB lemuel_operation) — 운영 관제 (인시던트)
+│   └── github.lms.lemuel.operation.*   # Phase 1: Alertmanager webhook → 인시던트 라이프사이클 (docs/design/operation-service-phase1.md)
+├── market-service/               # 📉 Market 서비스 (port 8094, 자체 DB lemuel_market) — KRX 상장사 시세·시가총액 조회
+│   └── github.lms.lemuel.market.*      # ★ shared-common 미의존 (공개 read-only, 자체 SecurityConfig)
+├── ai-service/                   # 🤖 AI 서비스 (port 8096, 자체 DB lemuel_ai) — 대화형 AI 챗봇 (Spring AI 2.0 + Claude)
+│   └── github.lms.lemuel.ai.*          # shared-common JWT 만 제한 스캔 (LLM 실비용 → 인증 필수, docs/design/ai-service-phase1.md)
+├── common-data-service/          # 🗂️ Common-Data 서비스 (port 8098, 자체 DB lemuel_commondata) — 공공데이터포털 범용 커넥터
+│   └── github.lms.lemuel.commondata.*  # ★ shared-common 미의존 (공개 read-only, 자체 SecurityConfig)
 └── gateway-service/              # 🚪 API Gateway (port 8080)
 ```
 
@@ -53,6 +67,13 @@ settlement/                       # Gradle 멀티 모듈 루트
 | **order-service** | `user, order, payment, cart, shipping, product, category, coupon, review, game` (+ `recon`, `projectionbackfill` — ADR 0020 내부 대사 API/프로젝션 백필) | 회원·상품·장바구니·주문·결제·배송 — 거래 컨텍스트. opslab DB 소유, 자기 합계를 `/internal/recon` 으로 노출 |
 | **settlement-service** | `settlement, payout, ledger, chargeback, pgreconciliation, report` (+ `recon` — `OrderReconClient`) | 정산 생성/확정, 지급(payout), 복식부기 원장(ledger), 차지백, PG 대사, ES 색인, PDF, 캐시플로우 리포트. **자체 DB settlement_db** — order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝션(`settlement_*_view`)으로 조회(코드·DB 의존 0) |
 | **loan-service** | `loan` | 선정산 대출 — 셀러의 미확정 정산금을 담보로 선지급. 독립 배포 + 자체 DB(lemuel_loan) + 자체 복식부기 원장. settlement 정산 데이터는 Kafka 이벤트(`settlement.created/confirmed`)로만 수신, 상환은 이벤트 saga 로 연계(코드·DB 의존 0) |
+| **financial-statements-service** | `financial` | 코스피 상장사(~800) 요약 재무제표 공개 조회 — DART OpenAPI 수집(기업/재무제표 배치, `DART_API_KEY`) + Flyway 시드 폴백. 자체 DB(lemuel_financial), 타 서비스와 코드·DB·이벤트 의존 0. shared-common 미의존(자체 최소 SecurityConfig — GET 공개, `/admin/financial/**` 는 X-Internal-Api-Key 게이트) |
+| **economics-service** | `economics` | ECOS 경제지표 공개 조회 — 한국은행 ECOS OpenAPI 수집(기준금리·국고채3년·USD/KRW·CPI, `ECOS_API_KEY`) + Flyway 시드 폴백. 자체 DB(lemuel_economics), 타 서비스와 코드·DB·이벤트 의존 0. shared-common 미의존(자체 최소 SecurityConfig — GET 공개, `/admin/economics/**` 는 X-Internal-Api-Key 게이트) |
+| **company-service** | `company` | 기업 뉴스 기사 수집(네이버 뉴스 API, `NAVER_CLIENT_ID/SECRET`)·조회 + Phase 2 평판 스코어 — ADR 0023. 자체 DB(lemuel_company), 기업 식별자(stockCode/corpCode)는 financial 과 공용 비즈니스 키. 기사 본문 미저장(저작권 — 제목·요약·링크만), `url_hash` UNIQUE 멱등 수집. shared-common 미의존(자체 SecurityConfig — GET 공개, `/admin/company/**` 는 X-Internal-Api-Key 게이트) |
+| **operation-service** | `operation` | 운영 관제 — Alertmanager 알람을 webhook(Bearer=INTERNAL_API_KEY)으로 받아 인시던트(OPEN→ACKNOWLEDGED→RESOLVED/FALSE_POSITIVE)로 적재·관리. `(source, correlation_key)` partial unique index 로 활성 중복 0, repeat firing 은 refire 병합(+낙관적 락 재시도). 자체 DB(lemuel_operation, opslab 스키마 재사용 — loan 과 동일 이유), 콘솔 `/api/ops/**` 는 JWT ADMIN 전용. **Phase 2 완료**: `signal` BC — (2a) 도메인 성공 이벤트(order/payment/settlement.created) 구독=분모 + Prometheus 폴링(kafka lag/redis/deadlock/http)=인프라 게이지를 `ops_metric_bucket`(5분, ON CONFLICT UPSERT)에 적재; (2b) 실패 이벤트=분자 — shared-common `common.opssignal`(best-effort Kafka emitter, **절대 throw 안 함·Outbox 미사용**)를 PayoutSingleExecutor(settlement.failed)·RefundLifecycle(payment.failed)·재고 차감 서비스(stock.depleted)·신규 ShippingDelayScanner(shipping.delayed)에 배선, operation 이 `lemuel.ops.*.failed` 구독으로 count_signal 적재 → failure_rate=signal/total 성립. (order.failed 는 단일 실패 지점 부재로 소비자만 준비·미배선). 남은 로드맵: 3 베이스라인 이상탐지 → 4 AI 브리핑 (docs/design/operation-service-phase1.md) |
+| **market-service** | `market` | KRX 상장사 일별 시세·시가총액 공개 조회 — 공공데이터포털 금융위 주식시세정보(getStockPriceInfo) 수집(`KRX_API_KEY`, 날짜 기준 배치 — 하루치 전 종목 페이지네이션) + Flyway 시드 폴백. 자체 DB(lemuel_market), 타 서비스와 코드·DB·이벤트 의존 0. stockCode(6자리)는 financial/company 와 공용 비즈니스 키 — **PER/PBR 은 계산하지 않고 시세·시총만 서빙**(financial import/DB조인 금지, 밸류에이션 조인은 소비측 CEO 브리핑/invest-copilot 몫). shared-common 미의존(자체 최소 SecurityConfig — GET 공개, `/admin/market/**` 는 X-Internal-Api-Key 게이트) |
+| **ai-service** | `ai.chat` | 대화형 AI 챗봇 — Spring AI 2.0(공식 Anthropic SDK 기반) + Claude, 컨텍스트 유지 채팅(`/api/ai/chat`, SSE 스트리밍)·대화 이력 CRUD. 자체 DB(lemuel_ai, `pgvector/pg17` 이미지 — Phase 3 RAG 선점). LLM 실비용이라 **JWT USER 이상 필수** + bucket4j 비용 가드(분5/일100). Spring AI 는 `adapter/out/llm` 에만 격리(ArchUnit 강제), LLM 실패 시 폴백 없이 503+이력 무저장. shared-common 은 `common.config.jwt` 만 제한 스캔. 로드맵: Phase 2 Function Calling(내부 API 호출) → Phase 3 RAG (docs/design/ai-service-phase1.md) |
+| **common-data-service** | `commondata` | 공공데이터포털(data.go.kr) **범용 커넥터** — 임의의 OpenAPI 를 코드 변경 없이 "데이터소스"로 등록(`POST /admin/commondata/sources`: endpoint·defaultParams·keyFields)하면 표준 봉투(`response.header.resultCode`/`body.items.item[]`/totalCount 페이지네이션)를 파싱해 `data_records` 에 `(source, record_key)` UNIQUE upsert 로 수집(재수집 멱등, payload JSON 원문 보존). 인증키는 계정당 1개인 `DATA_GO_KR_API_KEY` 공용 + Flyway 시드 폴백(한국천문연구원 특일정보=공휴일 예시). 자체 DB(lemuel_commondata), 타 서비스와 코드·DB·이벤트 의존 0. shared-common 미의존(자체 최소 SecurityConfig — GET 공개, `/admin/commondata/**` 는 X-Internal-Api-Key 게이트) (docs/design/common-data-service-phase1.md) |
 | **gateway-service** | (Spring Cloud Gateway) | 라우팅, 인증 필터 |
 | **shared-common** | `common.*` | 전 서비스 공유 — 감사·관측·예외·Outbox·rate limit·JWT·PDF |
 
@@ -185,6 +206,14 @@ RUNNING → COMPLETED
 > 같은 Outbox+Kafka 경로로 `order.created`/`user.registered`/`product.changed`/`payment.refunded` 이벤트도
 > 흐르며, settlement 의 프로젝션 컨슈머가 `settlement_*_view` 에 적재한다(위 ★ 프로젝션 패턴).
 
+**이벤트 계약(contract-as-code, ADR 0024)**: cross-service 8개 토픽(`payment.captured/refunded`,
+`settlement.created/confirmed`, `loan.repayment_applied`, `order.created`, `user.registered`,
+`product.changed`)의 JSON Schema + 정본 샘플이
+`shared-common/src/testFixtures/resources/contracts/events/` 에 단일 출처로 존재.
+프로듀서(실제 발행 페이로드→스키마 검증)·컨슈머(정본 샘플→실제 파싱 코드) **양방향 계약 테스트**가
+계약 드리프트를 런타임(DLT/무성 null)이 아닌 빌드 시점에 차단한다. 소비 좌표:
+`testImplementation(testFixtures("github.lms.lemuel:shared-common:1.0.0"))`. Schema Registry(ADR 0022)의 경량 선행 단계.
+
 ## 코딩 컨벤션
 
 - **아키텍처**: 헥사고날 (Ports & Adapters)
@@ -226,6 +255,13 @@ RUNNING → COMPLETED
 ./gradlew :order-service:compileJava
 ./gradlew :settlement-service:compileJava
 ./gradlew :loan-service:compileJava
+./gradlew :financial-statements-service:compileJava
+./gradlew :economics-service:compileJava
+./gradlew :company-service:compileJava
+./gradlew :operation-service:compileJava
+./gradlew :market-service:compileJava
+./gradlew :common-data-service:compileJava
+./gradlew :ai-service:compileJava
 ./gradlew :gateway-service:compileJava
 
 # 모듈별 테스트
@@ -241,13 +277,15 @@ RUNNING → COMPLETED
 ./gradlew :order-service:bootJar
 
 # Docker Compose
-docker compose up -d                # opslab+settlement_db+lemuel_loan PG(3) · ES · Redpanda · 4 services
+docker compose up -d                # DB-per-service PG 8종 · ES · Redpanda · 8 services + gateway
 docker compose down
 
 # 컨테이너 이미지 (MODULE 빌드 인자로 어떤 서비스인지 지정)
 docker build --build-arg MODULE=order-service       -t lemuel-order .
 docker build --build-arg MODULE=settlement-service  -t lemuel-settlement .
 docker build --build-arg MODULE=loan-service        -t lemuel-loan .
+docker build --build-arg MODULE=financial-statements-service -t lemuel-financial .
+docker build --build-arg MODULE=market-service      -t lemuel-market .
 docker build --build-arg MODULE=gateway-service     -t lemuel-gateway .
 ```
 

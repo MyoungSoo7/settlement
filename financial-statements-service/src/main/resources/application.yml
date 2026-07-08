@@ -1,0 +1,96 @@
+spring:
+  profiles:
+    active: local
+
+  application:
+    name: lemuel-financial
+
+  threads:
+    virtual:
+      enabled: true
+
+  # ★ financial-statements-service 는 자체 DB(lemuel_financial) 를 소유한다 (DB-per-service).
+  #   공개 read-only 조회 서비스 — 다른 서비스와 코드·DB·이벤트 의존 없음.
+  datasource:
+    url: jdbc:postgresql://localhost:5437/lemuel_financial?reWriteBatchedInserts=true
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      pool-name: lemuel-financial-pool
+      maximum-pool-size: ${DB_POOL_MAX:10}
+      minimum-idle: ${DB_POOL_MIN_IDLE:2}
+      connection-timeout: 10000
+      leak-detection-threshold: 30000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=2000,expireAfterWrite=600s
+
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+server:
+  port: 8086
+  shutdown: graceful
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    prometheus:
+      enabled: true
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  health:
+    db:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+      environment: ${ENVIRONMENT:local}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+app:
+  financial:
+    # /admin/financial/** 게이트 공유 시크릿 — 미설정 시 통과+경고 (로컬 전용, 운영 필수)
+    internal-api-key: ${FINANCIAL_INTERNAL_API_KEY:}
+    dart:
+      # opendart.fss.or.kr 발급 인증키 — 미설정이면 수집 비활성(Flyway 시드 데이터로만 동작)
+      api-key: ${DART_API_KEY:}
+      base-url: https://opendart.fss.or.kr/api
+    sync:
+      request-interval-ms: 150   # DART 쿼터(일 2만 콜) 보호용 호출 간격
+      max-companies: 0           # 기업 동기화 상한 (0=무제한, 데모/테스트용 제한)

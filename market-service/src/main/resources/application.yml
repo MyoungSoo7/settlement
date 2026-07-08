@@ -1,0 +1,99 @@
+spring:
+  profiles:
+    active: local
+
+  application:
+    name: lemuel-market
+
+  threads:
+    virtual:
+      enabled: true
+
+  # ★ market-service 는 자체 DB(lemuel_market) 를 소유한다 (DB-per-service).
+  #   공개 read-only 조회 서비스 — 다른 서비스와 코드·DB·이벤트 의존 없음.
+  datasource:
+    url: jdbc:postgresql://localhost:5441/lemuel_market?reWriteBatchedInserts=true
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      pool-name: lemuel-market-pool
+      maximum-pool-size: ${DB_POOL_MAX:10}
+      minimum-idle: ${DB_POOL_MIN_IDLE:2}
+      connection-timeout: 10000
+      idle-timeout: 600000      # 10분
+      max-lifetime: 1800000     # 30분
+      keepalive-time: 300000    # 5분
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=5000,expireAfterWrite=600s
+
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+server:
+  port: 8094
+  shutdown: graceful
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    prometheus:
+      enabled: true
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  health:
+    db:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+      environment: ${ENVIRONMENT:local}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+app:
+  market:
+    # /admin/market/** 게이트 공유 시크릿 — 미설정 시 통과+경고 (로컬 전용, 운영 필수)
+    internal-api-key: ${MARKET_INTERNAL_API_KEY:}
+    krx:
+      # data.go.kr 발급 인증키(Decoding 키) — 미설정이면 수집 비활성(Flyway 시드 데이터로만 동작)
+      api-key: ${KRX_API_KEY:}
+      base-url: https://apis.data.go.kr/1160100/service/GetStockSecuritiesInfoService
+      # 페이지당 행 수 — KRX 상장사 ≈2800, 1000 이면 3콜로 하루치 완주
+      page-size: 1000
+    sync:
+      request-interval-ms: 150   # data.go.kr 쿼터 보호용 페이지 호출 간격

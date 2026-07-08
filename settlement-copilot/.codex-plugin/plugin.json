@@ -1,0 +1,17 @@
+{
+  "name": "settlement-copilot",
+  "version": "0.2.0",
+  "description": "정산 도메인 특화 AI 에이전트 플러그인 — 도메인 규칙(skills) + 읽기 전용 검증 도구(MCP) + 가드레일(hooks)",
+  "author": { "name": "Lemuel Settlement Platform" },
+  "keywords": ["settlement", "reconciliation", "ledger", "fintech", "guardrail"],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "hooks": "./hooks/hooks.json",
+  "interface": {
+    "displayName": "Settlement Copilot",
+    "shortDescription": "정산 대사·원장 불변식·정합성(INV) 검증을 read-only 도구와 러너북으로 수행",
+    "developerName": "Lemuel Settlement Platform",
+    "category": "Productivity",
+    "capabilities": ["Read"]
+  }
+}

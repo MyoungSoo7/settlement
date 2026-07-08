@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0",
+  "name": "kakaopay-sample",
+  "version": "0.1.0",
+  "description": "KakaoPay hackathon sample Codex plugin package.",
+  "skills": [
+    {
+      "name": "kakaopay-sample",
+      "path": "skills/kakaopay-sample/SKILL.md"
+    }
+  ]
+}

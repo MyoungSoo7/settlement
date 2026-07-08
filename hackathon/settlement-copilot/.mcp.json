@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "settlement-copilot": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/server/index.mjs"],
+      "env": {
+        "SETTLEMENT_BASE_URL": "http://localhost:8082",
+        "ORDER_BASE_URL": "http://localhost:8088"
+      }
+    }
+  }
+}

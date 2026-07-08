@@ -16,6 +16,12 @@ COPY shared-common/settings.gradle.kts shared-common/build.gradle.kts ./shared-c
 COPY order-service/build.gradle.kts ./order-service/
 COPY settlement-service/build.gradle.kts ./settlement-service/
 COPY loan-service/build.gradle.kts ./loan-service/
+COPY financial-statements-service/build.gradle.kts ./financial-statements-service/
+COPY company-service/build.gradle.kts ./company-service/
+COPY operation-service/build.gradle.kts ./operation-service/
+COPY economics-service/build.gradle.kts ./economics-service/
+COPY market-service/build.gradle.kts ./market-service/
+COPY ai-service/build.gradle.kts ./ai-service/
 COPY gateway-service/build.gradle.kts ./gateway-service/
 
 RUN --mount=type=cache,target=/home/gradle/.gradle \
@@ -26,6 +32,12 @@ COPY shared-common ./shared-common
 COPY order-service ./order-service
 COPY settlement-service ./settlement-service
 COPY loan-service ./loan-service
+COPY financial-statements-service ./financial-statements-service
+COPY company-service ./company-service
+COPY operation-service ./operation-service
+COPY economics-service ./economics-service
+COPY market-service ./market-service
+COPY ai-service ./ai-service
 COPY gateway-service ./gateway-service
 
 RUN --mount=type=cache,target=/home/gradle/.gradle \

@@ -50,6 +50,25 @@ public class OrderReconClient {
                 .body(DailyTotals.class);
     }
 
+    /** INV-9 건수 대사 축 — 캡처 건수·완료 환불 건수. */
+    public DailyCounts dailyCounts(LocalDate date) {
+        return client.get()
+                .uri(b -> b.path("/internal/recon/daily-counts").queryParam("date", date).build())
+                .retrieve()
+                .body(DailyCounts.class);
+    }
+
+    /** INV-8 지연 환불 조정 대사 — 기간 COMPLETED 환불 목록 (완료일 기준). */
+    public List<CompletedRefundRow> refundsCompleted(LocalDate from, LocalDate to, int limit) {
+        List<CompletedRefundRow> rows = client.get()
+                .uri(b -> b.path("/internal/recon/refunds-completed")
+                        .queryParam("from", from).queryParam("to", to)
+                        .queryParam("limit", limit).build())
+                .retrieve()
+                .body(new ParameterizedTypeReference<>() {});
+        return rows != null ? rows : List.of();
+    }
+
     public PeriodTotals periodTotals(LocalDate from, LocalDate to) {
         return client.get()
                 .uri(b -> b.path("/internal/recon/period-totals")
@@ -80,7 +99,8 @@ public class OrderReconClient {
 
     // ── order /internal/recon 응답 계약 (JSON 매칭, shared-common 외 공유 모듈 없음) ──
 
-    public record DailyTotals(BigDecimal capturedPayments, BigDecimal completedRefunds) {
+    public record DailyTotals(BigDecimal capturedPayments, BigDecimal completedRefunds,
+                              BigDecimal refundedAgainstCaptures) {
     }
 
     public record PeriodTotals(BigDecimal capturedPayments, BigDecimal completedRefunds,
@@ -95,5 +115,12 @@ public class OrderReconClient {
 
     public record ReconPaymentRow(Long paymentId, String pgTransactionId, BigDecimal amount,
                                   BigDecimal refundedAmount, LocalDate capturedDate) {
+    }
+
+    public record DailyCounts(long capturedCount, long completedRefundsCount) {
+    }
+
+    public record CompletedRefundRow(Long refundId, Long paymentId, BigDecimal amount,
+                                     LocalDate completedDate) {
     }
 }

@@ -1,6 +1,7 @@
 package github.lms.lemuel.loan.application.service;
 
 import github.lms.lemuel.loan.application.port.in.RequestLoanUseCase;
+import github.lms.lemuel.loan.application.port.out.LoadSellerReputationPort;
 import github.lms.lemuel.loan.application.port.out.LoadSettlementViewPort;
 import github.lms.lemuel.loan.application.port.out.SaveLoanPort;
 import github.lms.lemuel.loan.domain.LoanAdvance;
@@ -12,18 +13,24 @@ import java.math.BigDecimal;
 /**
  * 대출 신청: 로컬 정산뷰의 미지급 정산예정금(담보)으로 한도를 검증하고 수수료를 산정해
  * REQUESTED 상태로 등록한다. 실제 자금 실행은 {@link DisburseLoanService} 에서 재검증 후 이뤄진다.
+ *
+ * <p>한도 검증에는 셀러(법인)의 뉴스 평판 등급이 반영된다(ADR 0023 Phase 3 후속) —
+ * 등급이 나쁘면 CreditPolicy 가 한도를 haircut 한다. 평판 미상이면 무변동(fail-open).
  */
 @Service
 public class RequestLoanService implements RequestLoanUseCase {
 
     private final LoadSettlementViewPort loadSettlementViewPort;
+    private final LoadSellerReputationPort loadSellerReputationPort;
     private final SaveLoanPort saveLoanPort;
     private final CreditPolicy creditPolicy;
 
     public RequestLoanService(LoadSettlementViewPort loadSettlementViewPort,
+                              LoadSellerReputationPort loadSellerReputationPort,
                               SaveLoanPort saveLoanPort,
                               CreditPolicy creditPolicy) {
         this.loadSettlementViewPort = loadSettlementViewPort;
+        this.loadSellerReputationPort = loadSellerReputationPort;
         this.saveLoanPort = saveLoanPort;
         this.creditPolicy = creditPolicy;
     }
@@ -32,7 +39,8 @@ public class RequestLoanService implements RequestLoanUseCase {
     @Transactional
     public LoanAdvance request(RequestLoanCommand command) {
         BigDecimal unpaidSettlement = loadSettlementViewPort.sumUnpaidBySeller(command.sellerId());
-        creditPolicy.validateWithinLimit(command.principal(), unpaidSettlement);
+        String reputationGrade = loadSellerReputationPort.findGrade(command.sellerId()).orElse(null);
+        creditPolicy.validateWithinLimit(command.principal(), unpaidSettlement, reputationGrade);
 
         BigDecimal fee = creditPolicy.fee(command.principal(), command.financingDays());
         LoanAdvance loan = LoanAdvance.request(command.sellerId(), command.principal(), fee);

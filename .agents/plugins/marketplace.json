@@ -1,0 +1,36 @@
+{
+  "name": "lemuel-copilots",
+  "interface": { "displayName": "Lemuel Domain Copilots" },
+  "plugins": [
+    {
+      "name": "settlement-copilot",
+      "source": { "source": "local", "path": "./settlement-copilot" },
+      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
+      "category": "Productivity"
+    },
+    {
+      "name": "invest-copilot",
+      "source": { "source": "local", "path": "./invest-copilot" },
+      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
+      "category": "Research"
+    },
+    {
+      "name": "fashion-copilot",
+      "source": { "source": "local", "path": "./fashion-copilot" },
+      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
+      "category": "Productivity"
+    },
+    {
+      "name": "trusted-ceo-agent",
+      "source": { "source": "local", "path": "./pwc/submission/src" },
+      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
+      "category": "Productivity"
+    },
+    {
+      "name": "kakaopay-invest-companion",
+      "source": { "source": "local", "path": "./hackathon/kakaopay/submission/src" },
+      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
+      "category": "Research"
+    }
+  ]
+}

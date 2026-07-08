@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "trusted-ceo-agent-dart": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/dart-server.mjs"],
+      "env": {
+        "DART_API_KEY": "${DART_API_KEY}"
+      }
+    },
+    "trusted-ceo-agent-ecos": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/ecos-server.mjs"],
+      "env": {
+        "ECOS_API_KEY": "${ECOS_API_KEY}"
+      }
+    }
+  }
+}

@@ -4,22 +4,37 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 /**
- * 일일 대사용 금액 집계 Outbound Port.
+ * 일일 대사용 금액 집계 Outbound Port — <b>캡처일 기준 양축 대사</b>.
  *
- * 읽기 전용 CQRS 조회로 payments / refunds / settlements 테이블을 가로지른다.
- * 어댑터 구현체는 JDBC aggregate query 로 구현 (JPA 로 도메인 재조립할 필요 없음).
+ * <p>모든 축을 캡처일(= 정산 생성일 {@code created_at}) 하나로 키를 맞춘다. 지급예정일
+ * ({@code settlement_date}, T+N 영업일)이나 환불 완료일로 키를 잡으면 처리 지연·백필에 따라
+ * 대사가 구조적으로 흔들리기 때문이다.
+ *
+ * <ul>
+ *   <li><b>캡처 축</b>: order 캡처 gross == settlement 정산 gross({@code payment_amount})</li>
+ *   <li><b>환불 축</b>: order 캡처분에 반영된 환불 == settlement 정산의 {@code refunded_amount}</li>
+ * </ul>
+ *
+ * gross({@code payment_amount})·{@code refunded_amount} 는 환불로 소급 변동하지 않는 안정 컬럼이라
+ * ({@code net_amount} 는 환불로 실시간 감소하므로 대사 기준에 부적합) 대사가 항상 수렴한다.
  */
 public interface LoadDailyTotalsPort {
 
-    /** 해당 날짜 CAPTURED 된 결제의 원 amount 합계 (환불 반영 전) */
+    /** order: 해당 날짜 캡처된 결제 gross 합계 (CAPTURED+REFUNDED, 이후 환불 무관) */
     BigDecimal sumCapturedPayments(LocalDate date);
 
-    /** 해당 날짜 COMPLETED 된 환불 amount 합계 */
-    BigDecimal sumCompletedRefunds(LocalDate date);
+    /** order: 해당 날짜 캡처분에 반영된 환불액 합계 (캡처일 기준) */
+    BigDecimal sumRefundedAgainstCaptures(LocalDate date);
 
-    /** 해당 날짜 정산의 net_amount 합계 (CANCELED 제외) */
-    BigDecimal sumSettlementNet(LocalDate date);
+    /** settlement: 해당 날짜 생성된 정산의 gross(payment_amount) 합계 */
+    BigDecimal sumSettlementGross(LocalDate date);
 
-    /** 해당 날짜 정산의 commission 합계 (CANCELED 제외) */
-    BigDecimal sumSettlementCommission(LocalDate date);
+    /** settlement: 해당 날짜 생성된 정산의 반영 환불액(refunded_amount) 합계 */
+    BigDecimal sumSettlementRefunded(LocalDate date);
+
+    /** order: 해당 날짜 캡처된 결제 건수 (INV-9 건수 축) */
+    long countCapturedPayments(LocalDate date);
+
+    /** settlement: 해당 날짜 생성된 정산 건수 (INV-9 건수 축) */
+    long countSettlementsCreated(LocalDate date);
 }

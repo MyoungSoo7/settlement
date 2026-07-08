@@ -150,12 +150,14 @@ class RefundApprovalIT {
                                                          java.time.LocalDateTime capturedAt,
                                                          String paymentMethod, String pgTransactionId,
                                                          github.lms.lemuel.payment.application.port.out.SellerSettlementMeta sellerMeta) { }
-            @Override public void publishPaymentRefunded(Long paymentId, Long orderId, BigDecimal refundedAmount) { }
+            @Override public void publishPaymentRefunded(Long paymentId, Long orderId, BigDecimal refundedAmount,
+                                                         BigDecimal refundAmount, Long refundId) { }
         };
 
         // 수동 조립이라 @Transactional(REQUIRES_NEW) 프록시가 없어 begin/fail 은 호출 트랜잭션에서 실행된다.
         // 이 IT 는 PG 성공 경로만 검증하므로(실패 롤백·독립 커밋 미검증) 동작에 문제없다.
-        var refundLifecycle = new RefundLifecycle(refundAdapter, refundAdapter);
+        var refundLifecycle = new RefundLifecycle(refundAdapter, refundAdapter,
+                new github.lms.lemuel.common.opssignal.NoOpOpsSignalPublisher());
         var refundUseCase = new RefundPaymentUseCase(paymentAdapter, paymentAdapter, pgStub,
                 updateOrderStatus, publishPayment, refundAdapter, refundAdapter, refundLifecycle);
         var getPayment = new GetPaymentUseCase(paymentAdapter);

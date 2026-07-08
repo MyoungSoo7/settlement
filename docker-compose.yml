@@ -64,6 +64,161 @@ services:
       timeout: 3s
       retries: 10
 
+  # ★ DB-per-service: financial-statements-service 전용 PostgreSQL (코스피 재무제표 조회)
+  financial-postgres:
+    image: postgres:17-alpine
+    container_name: lemuel-financial-db
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      POSTGRES_DB: lemuel_financial
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "127.0.0.1:5437:5432"
+    volumes:
+      - financial-postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  # ★ DB-per-service: company-service 전용 PostgreSQL (기업 뉴스·평판, ADR 0023)
+  company-postgres:
+    image: postgres:17-alpine
+    container_name: lemuel-company-db
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      POSTGRES_DB: lemuel_company
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "127.0.0.1:5438:5432"
+    volumes:
+      - company-postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  # ★ DB-per-service: operation-service 전용 PostgreSQL (운영 관제 — 인시던트/이상탐지)
+  operation-postgres:
+    image: postgres:17-alpine
+    container_name: lemuel-operation-db
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      POSTGRES_DB: lemuel_operation
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "127.0.0.1:5439:5432"
+    volumes:
+      - operation-postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  # ★ DB-per-service: ai-service 전용 PostgreSQL (AI 챗봇 대화 이력)
+  #   이미지는 pgvector — Phase 3 RAG(임베딩) 대비 선점, postgres:17 완전 호환 (설계 §2.3)
+  ai-postgres:
+    image: pgvector/pgvector:pg17
+    container_name: lemuel-ai-db
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      POSTGRES_DB: lemuel_ai
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "127.0.0.1:5442:5432"
+    volumes:
+      - ai-postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  # ★ DB-per-service: economics-service 전용 PostgreSQL (ECOS 거시 경제지표 조회)
+  economics-postgres:
+    image: postgres:17-alpine
+    container_name: lemuel-economics-db
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      POSTGRES_DB: lemuel_economics
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "127.0.0.1:5440:5432"
+    volumes:
+      - economics-postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  # ★ DB-per-service: market-service 전용 PostgreSQL (KRX 상장사 시세·시가총액 조회)
+  market-postgres:
+    image: postgres:17-alpine
+    container_name: lemuel-market-db
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      POSTGRES_DB: lemuel_market
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "127.0.0.1:5441:5432"
+    volumes:
+      - market-postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  # ★ DB-per-service: common-data-service 전용 PostgreSQL (공공데이터포털 범용 커넥터)
+  commondata-postgres:
+    image: postgres:17-alpine
+    container_name: lemuel-commondata-db
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      POSTGRES_DB: lemuel_commondata
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "127.0.0.1:5443:5432"
+    volumes:
+      - commondata-postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.17.0
     container_name: lemuel-elasticsearch
@@ -254,6 +409,8 @@ services:
       JWT_TTL_SECONDS: ${JWT_TTL_SECONDS}
       # 내부 API 공유 시크릿 — order 와 동일해야 OrderReconClient 호출이 통과한다(#124).
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-lemuel-internal-dev-key}
+      # OrderReconClient 대상 — 컨테이너 안에서 기본값 localhost:8088 은 자기 자신이라 연결 거부(/admin/reconciliation 500).
+      ORDER_SERVICE_URL: http://order-service:8080
       APP_SEARCH_ENABLED: "true"
       JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
       SERVER_PORT: 8080
@@ -319,6 +476,262 @@ services:
       redpanda:
         condition: service_healthy
 
+  financial-statements-service:
+    build:
+      context: .
+      args:
+        MODULE: financial-statements-service
+    image: ghcr.io/myoungsoo7/lemuel-financial:latest
+    container_name: lemuel-financial
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      # 자체 DB(lemuel_financial) — 공개 read-only 조회 서비스, 타 서비스와 코드·DB·이벤트 의존 없음
+      SPRING_DATASOURCE_URL: jdbc:postgresql://financial-postgres:5432/lemuel_financial?reWriteBatchedInserts=true
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # OpenDART 인증키 — 미설정이면 Flyway 시드 데이터로만 동작 (수집 트리거는 409/경고)
+      DART_API_KEY: ${DART_API_KEY:-}
+      FINANCIAL_INTERNAL_API_KEY: ${FINANCIAL_INTERNAL_API_KEY:-}
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
+      SERVER_PORT: 8080
+      MANAGEMENT_SERVER_PORT: 8080
+    ports:
+      - "127.0.0.1:8086:8080"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    depends_on:
+      financial-postgres:
+        condition: service_healthy
+
+  company-service:
+    build:
+      context: .
+      args:
+        MODULE: company-service
+    image: ghcr.io/myoungsoo7/lemuel-company:latest
+    container_name: lemuel-company
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      # 자체 DB(lemuel_company) — 기업 뉴스·평판 조회, Phase 1 은 타 서비스와 코드·DB·이벤트 의존 없음 (ADR 0023)
+      SPRING_DATASOURCE_URL: jdbc:postgresql://company-postgres:5432/lemuel_company?reWriteBatchedInserts=true
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # 네이버 뉴스 검색 API 자격증명 — 미설정이면 수집 비활성 (기업 마스터 시드만 조회 가능)
+      NAVER_CLIENT_ID: ${NAVER_CLIENT_ID:-}
+      NAVER_CLIENT_SECRET: ${NAVER_CLIENT_SECRET:-}
+      COMPANY_INTERNAL_API_KEY: ${COMPANY_INTERNAL_API_KEY:-}
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
+      SERVER_PORT: 8080
+      MANAGEMENT_SERVER_PORT: 8080
+    ports:
+      - "127.0.0.1:8090:8080"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    depends_on:
+      company-postgres:
+        condition: service_healthy
+
+  operation-service:
+    build:
+      context: .
+      args:
+        MODULE: operation-service
+    image: ghcr.io/myoungsoo7/lemuel-operation:latest
+    container_name: lemuel-operation
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      # 자체 DB(lemuel_operation) — 운영 관제 인시던트 저장소. 타 서비스와 코드·DB 의존 0.
+      SPRING_DATASOURCE_URL: jdbc:postgresql://operation-postgres:5432/lemuel_operation?reWriteBatchedInserts=true
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # JWT 시크릿은 order-service 와 동일해야 운영자 토큰 검증 가능
+      JWT_ISSUER: ${JWT_ISSUER}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_TTL_SECONDS: ${JWT_TTL_SECONDS}
+      # Alertmanager webhook Bearer 토큰 — alertmanager.practice.yml 의 credentials 와 동일해야 한다.
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-lemuel-internal-dev-key}
+      # Phase 2 — 신호 수집. 도메인 성공 이벤트 구독(분모) + Prometheus 폴링(인프라 게이지).
+      APP_KAFKA_ENABLED: "true"
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
+      OPS_PROMETHEUS_ENABLED: "true"
+      OPS_PROMETHEUS_URL: http://prometheus:9090
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
+      SERVER_PORT: 8080
+      MANAGEMENT_SERVER_PORT: 8080
+    ports:
+      - "127.0.0.1:8092:8080"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    depends_on:
+      operation-postgres:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+
+  economics-service:
+    build:
+      context: .
+      args:
+        MODULE: economics-service
+    image: ghcr.io/myoungsoo7/lemuel-economics:latest
+    container_name: lemuel-economics
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      # 자체 DB(lemuel_economics) — 공개 read-only 조회 서비스, 타 서비스와 코드·DB·이벤트 의존 없음
+      SPRING_DATASOURCE_URL: jdbc:postgresql://economics-postgres:5432/lemuel_economics?reWriteBatchedInserts=true
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # 한국은행 ECOS 인증키 — 미설정이면 Flyway 시드 데이터로만 동작 (수집 트리거는 409/경고)
+      ECOS_API_KEY: ${ECOS_API_KEY:-}
+      ECONOMICS_INTERNAL_API_KEY: ${ECONOMICS_INTERNAL_API_KEY:-}
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
+      SERVER_PORT: 8080
+      MANAGEMENT_SERVER_PORT: 8080
+    ports:
+      - "127.0.0.1:8087:8080"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    depends_on:
+      economics-postgres:
+        condition: service_healthy
+
+  market-service:
+    build:
+      context: .
+      args:
+        MODULE: market-service
+    image: ghcr.io/myoungsoo7/lemuel-market:latest
+    container_name: lemuel-market
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      # 자체 DB(lemuel_market) — 공개 read-only 조회 서비스, 타 서비스와 코드·DB·이벤트 의존 없음
+      SPRING_DATASOURCE_URL: jdbc:postgresql://market-postgres:5432/lemuel_market?reWriteBatchedInserts=true
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # 공공데이터포털 금융위 주식시세정보 인증키 — 미설정이면 Flyway 시드 데이터로만 동작 (수집 트리거는 409/경고)
+      KRX_API_KEY: ${KRX_API_KEY:-}
+      MARKET_INTERNAL_API_KEY: ${MARKET_INTERNAL_API_KEY:-}
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
+      SERVER_PORT: 8080
+      MANAGEMENT_SERVER_PORT: 8080
+    ports:
+      - "127.0.0.1:8094:8080"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    depends_on:
+      market-postgres:
+        condition: service_healthy
+
+  common-data-service:
+    build:
+      context: .
+      args:
+        MODULE: common-data-service
+    image: ghcr.io/myoungsoo7/lemuel-commondata:latest
+    container_name: lemuel-commondata
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      # 자체 DB(lemuel_commondata) — 공공데이터포털 범용 커넥터, 타 서비스와 코드·DB·이벤트 의존 없음
+      SPRING_DATASOURCE_URL: jdbc:postgresql://commondata-postgres:5432/lemuel_commondata?reWriteBatchedInserts=true
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # 공공데이터포털 인증키(계정당 1개, 활용신청한 모든 API 공용) — 미설정이면 Flyway 시드 데이터로만 동작 (수집 트리거는 409/경고)
+      DATA_GO_KR_API_KEY: ${DATA_GO_KR_API_KEY:-}
+      COMMONDATA_INTERNAL_API_KEY: ${COMMONDATA_INTERNAL_API_KEY:-}
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
+      SERVER_PORT: 8080
+      MANAGEMENT_SERVER_PORT: 8080
+    ports:
+      - "127.0.0.1:8098:8080"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    depends_on:
+      commondata-postgres:
+        condition: service_healthy
+
+  ai-service:
+    build:
+      context: .
+      args:
+        MODULE: ai-service
+    image: ghcr.io/myoungsoo7/lemuel-ai:latest
+    container_name: lemuel-ai
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      # 자체 DB(lemuel_ai) — AI 챗봇 대화 이력. 타 서비스와 코드·DB·이벤트 의존 없음 (Phase 2 부터 내부 API 호출)
+      SPRING_DATASOURCE_URL: jdbc:postgresql://ai-postgres:5432/lemuel_ai?reWriteBatchedInserts=true
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # Anthropic Messages API 키 (company 감성분석과 공용) — 미설정이면 채팅만 503, 이력 조회는 정상
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # JWT 검증 — order-service 발급 토큰을 검증하므로 동일 시크릿 필수
+      JWT_SECRET: ${JWT_SECRET}
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
+      SERVER_PORT: 8080
+    ports:
+      - "127.0.0.1:8096:8080"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    depends_on:
+      ai-postgres:
+        condition: service_healthy
+
   gateway-service:
     build:
       context: .
@@ -334,6 +747,13 @@ services:
       ORDER_SERVICE_URI: http://order-service:8080
       SETTLEMENT_SERVICE_URI: http://settlement-service:8080
       LOAN_SERVICE_URI: http://loan-service:8080
+      FINANCIAL_SERVICE_URI: http://financial-statements-service:8080
+      OPERATION_SERVICE_URI: http://operation-service:8080
+      ECONOMICS_SERVICE_URI: http://economics-service:8080
+      COMPANY_SERVICE_URI: http://company-service:8080
+      MARKET_SERVICE_URI: http://market-service:8080
+      COMMON_DATA_SERVICE_URI: http://common-data-service:8080
+      AI_SERVICE_URI: http://ai-service:8080
       JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
     ports:
       - "127.0.0.1:8080:8080"
@@ -376,6 +796,35 @@ services:
     restart: unless-stopped
     depends_on:
       redpanda:
+        condition: service_healthy
+
+  # postgres-exporter — PostgreSQL 통계(데드락·커넥션·트랜잭션)를 Prometheus 메트릭으로 노출.
+  # operation-service 가 pg_stat_database_deadlocks 를 폴링해 DB_DEADLOCK 신호 게이지로 적재한다.
+  # 대표로 opslab(order) DB 를 관측 — 필요 시 서비스별 exporter 를 늘린다.
+  postgres-exporter:
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.16.0
+    container_name: lemuel-postgres-exporter
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/inter?sslmode=disable"
+    ports:
+      - "127.0.0.1:9187:9187"
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # redis-exporter — Redis 가용성(redis_up)·메모리·연결을 Prometheus 메트릭으로 노출.
+  # operation-service 가 redis_up 을 폴링해 REDIS_FAILURE 신호 게이지로 적재한다.
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.62.0
+    container_name: lemuel-redis-exporter
+    environment:
+      REDIS_ADDR: "redis://redis:6379"
+    ports:
+      - "127.0.0.1:9121:9121"
+    restart: unless-stopped
+    depends_on:
+      redis:
         condition: service_healthy
 
   prometheus:
@@ -445,6 +894,13 @@ volumes:
   postgres-data:
   settlement-db-data:
   loan-postgres-data:
+  financial-postgres-data:
+  company-postgres-data:
+  operation-postgres-data:
+  economics-postgres-data:
+  market-postgres-data:
+  commondata-postgres-data:
+  ai-postgres-data:
   elasticsearch-data:
   redpanda-data:
   redis-data:

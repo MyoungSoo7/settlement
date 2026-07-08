@@ -5,6 +5,8 @@ import { ToastProvider } from './contexts/ToastContext';
 import { CartProvider } from './contexts/CartContext';
 import Layout from './components/Layout';
 import SystemLayout from './components/SystemLayout';
+import CeoLayout from './components/CeoLayout';
+import SettlementLayout from './components/SettlementLayout';
 
 // 공개 페이지 (즉시 로드)
 import Login from './pages/Login';
@@ -20,6 +22,11 @@ const CartPage = lazy(() => import('./pages/CartPage'));
 const MyPage = lazy(() => import('./pages/MyPage'));
 const LoanPage = lazy(() => import('./pages/LoanPage'));
 const TossPaymentSuccess = lazy(() => import('./pages/TossPaymentSuccess'));
+const FinancialStatementsPage = lazy(() => import('./pages/FinancialStatementsPage'));
+const EconomicsPage = lazy(() => import('./pages/EconomicsPage'));
+const CompanyLookupPage = lazy(() => import('./pages/CompanyLookupPage'));
+const CeoInsightPage = lazy(() => import('./pages/CeoInsightPage'));
+const AiChatPage = lazy(() => import('./pages/AiChatPage'));
 
 // 관리자 페이지 (lazy load)
 const ProductPage = lazy(() => import('./pages/ProductPage'));
@@ -29,6 +36,9 @@ const CategoryManagementPage = lazy(() => import('./pages/CategoryManagementPage
 const TagManagementPage = lazy(() => import('./pages/TagManagementPage'));
 const EcommerceCategoryAdmin = lazy(() => import('./pages/EcommerceCategoryAdmin'));
 const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'));
+
+// 운영 관제 (최고 관리자 전용) — operation-service 인시던트 콘솔
+const OperationConsolePage = lazy(() => import('./pages/operation/OperationConsolePage'));
 
 // 시스템 관리 (최고 관리자 전용, 좌측 사이드바)
 const MenuManagementPage = lazy(() => import('./pages/system/MenuManagementPage'));
@@ -83,21 +93,34 @@ function App() {
             <Route path="/forgot-password"    element={<ForgotPassword />} />
             <Route path="/reset-password"     element={<ResetPassword />} />
             <Route path="/order/toss/fail"    element={<TossPaymentFail />} />
+            {/* 코스피 재무제표 — 공시 데이터라 공개 (관리자 헤더 메뉴 '재무제표' 진입, Layout 로 헤더 유지) */}
+            <Route path="/financials"         element={<Layout><FinancialStatementsPage /></Layout>} />
+            {/* 기업 뉴스·평판 조회 (ADR 0023) — 공개 조회 API, 관리자 헤더 메뉴 '기업조회' 진입, Layout 유지 */}
+            <Route path="/companies"          element={<Layout><CompanyLookupPage /></Layout>} />
+            {/* 한국은행 ECOS 경제지표 — 공공 데이터라 공개. 모든 사용자가 헤더 메뉴로 접근·왕복하도록 Layout 유지 */}
+            <Route path="/economics"          element={<Layout><EconomicsPage /></Layout>} />
 
             {/* ── 일반 사용자 (USER + 인증) ── */}
             <Route path="/order"        element={<ProtectedRoute><OrderPage /></ProtectedRoute>} />
             <Route path="/cart"         element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
             <Route path="/mypage"       element={<ProtectedRoute><MyPage /></ProtectedRoute>} />
             <Route path="/loans"        element={<ProtectedRoute><LoanPage /></ProtectedRoute>} />
+            {/* AI 챗봇 (ai-service) — LLM 비용이 들어 인증 필수(USER 이상), 역할 무관 */}
+            <Route path="/ai/chat"      element={<ProtectedRoute><AiChatPage /></ProtectedRoute>} />
             <Route path="/order/toss/success" element={<ProtectedRoute><TossPaymentSuccess /></ProtectedRoute>} />
 
             {/* ── 관리자·매니저 공용 ── */}
             <Route path="/admin"              element={<AdminManagerRoute><AdminDashboardPage /></AdminManagerRoute>} />
-            <Route path="/admin/settlement"   element={<AdminManagerRoute><SettlementAdmin /></AdminManagerRoute>} />
-            <Route path="/settlement/search"   element={<AdminManagerRoute><SettlementDashboard /></AdminManagerRoute>} />
-            <Route path="/product"            element={<AdminManagerRoute><ProductPage /></AdminManagerRoute>} />
+            {/* 정산 그룹 (상품관리·정산관리·정산조회) — 좌측 사이드바(SettlementLayout)로 묶음 */}
+            <Route path="/product"            element={<AdminManagerRoute><SettlementLayout><ProductPage /></SettlementLayout></AdminManagerRoute>} />
+            <Route path="/admin/settlement"   element={<AdminManagerRoute><SettlementLayout><SettlementAdmin /></SettlementLayout></AdminManagerRoute>} />
+            <Route path="/settlement/search"   element={<AdminManagerRoute><SettlementLayout><SettlementDashboard /></SettlementLayout></AdminManagerRoute>} />
             <Route path="/categories"         element={<AdminManagerRoute><CategoryManagementPage /></AdminManagerRoute>} />
             <Route path="/tags"               element={<AdminManagerRoute><TagManagementPage /></AdminManagerRoute>} />
+
+            {/* ── 최고 관리자 전용: 운영 관제 — 시스템 관리(운영관리)로 편입, 구 경로는 리다이렉트 ── */}
+            <Route path="/admin/operation"
+              element={<Navigate to="/admin/system/operation" replace />} />
 
             {/* ── 최고 관리자 전용: 시스템 관리 (좌측 사이드바) ── */}
             <Route path="/admin/system"
@@ -110,6 +133,22 @@ function App() {
               element={<AdminOnlyRoute><SystemLayout><RbacManagementPage /></SystemLayout></AdminOnlyRoute>} />
             <Route path="/admin/system/ecommerce-categories"
               element={<AdminOnlyRoute><SystemLayout><EcommerceCategoryAdmin /></SystemLayout></AdminOnlyRoute>} />
+            <Route path="/admin/system/operation"
+              element={<AdminOnlyRoute><SystemLayout><OperationConsolePage /></SystemLayout></AdminOnlyRoute>} />
+
+            {/* ── 최고 관리자 전용: CEO 인사이트 (좌측 사이드바) — 위성 조회 서비스 묶음 ── */}
+            <Route path="/admin/ceo"
+              element={<Navigate to="/admin/ceo/insight" replace />} />
+            <Route path="/admin/ceo/insight"
+              element={<AdminOnlyRoute><CeoLayout><CeoInsightPage /></CeoLayout></AdminOnlyRoute>} />
+            <Route path="/admin/ceo/economics"
+              element={<AdminOnlyRoute><CeoLayout><EconomicsPage /></CeoLayout></AdminOnlyRoute>} />
+            <Route path="/admin/ceo/financials"
+              element={<AdminOnlyRoute><CeoLayout><FinancialStatementsPage /></CeoLayout></AdminOnlyRoute>} />
+            <Route path="/admin/ceo/companies"
+              element={<AdminOnlyRoute><CeoLayout><CompanyLookupPage /></CeoLayout></AdminOnlyRoute>} />
+            <Route path="/admin/ceo/loans"
+              element={<AdminOnlyRoute><CeoLayout><LoanPage /></CeoLayout></AdminOnlyRoute>} />
 
           </Routes>
           </Suspense>

@@ -37,9 +37,12 @@
   line-height: 1.5;
   font-weight: 400;
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  /* 색을 지정하지 않은 텍스트의 전역 기본값. 과거 Vite 템플릿 잔재로 흰색이라
+     흰 배경(bg-gray-50)에서 글씨가 안 보이던 문제 → gray-900 으로 어둡게 통일.
+     의도된 흰 글씨는 컴포넌트가 text-white 로 명시하므로 영향 없음. */
+  color-scheme: light;
+  color: #111827; /* gray-900 */
+  background-color: #f9fafb; /* gray-50 */
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
