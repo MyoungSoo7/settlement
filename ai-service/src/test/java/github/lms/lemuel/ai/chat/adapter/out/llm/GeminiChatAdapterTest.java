@@ -1,5 +1,6 @@
 package github.lms.lemuel.ai.chat.adapter.out.llm;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import github.lms.lemuel.ai.chat.application.exception.AiUnavailableException;
 import github.lms.lemuel.ai.chat.domain.ChatCompletion;
@@ -58,6 +59,21 @@ class GeminiChatAdapterTest {
     void parse_malformed_throws() {
         assertThatThrownBy(() -> GeminiChatAdapter.parse("not-json{", "gemini-2.5-flash", om))
                 .isInstanceOf(AiUnavailableException.class);
+    }
+
+    @Test
+    @DisplayName("스트리밍 청크 — 텍스트 조각 추출")
+    void extractDelta_ok() throws Exception {
+        JsonNode chunk = om.readTree(
+                "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"정산 주기는\"}],\"role\":\"model\"}}]}");
+        assertThat(GeminiChatAdapter.extractDelta(chunk)).isEqualTo("정산 주기는");
+    }
+
+    @Test
+    @DisplayName("스트리밍 청크 — 텍스트 없는 청크(usage-only/빈 parts)는 빈 문자열")
+    void extractDelta_empty() throws Exception {
+        assertThat(GeminiChatAdapter.extractDelta(om.readTree("{\"usageMetadata\":{\"promptTokenCount\":6}}"))).isEmpty();
+        assertThat(GeminiChatAdapter.extractDelta(om.readTree("{\"candidates\":[{\"content\":{\"role\":\"model\"}}]}"))).isEmpty();
     }
 
     @Test
