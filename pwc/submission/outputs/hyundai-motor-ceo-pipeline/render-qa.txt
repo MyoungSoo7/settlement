@@ -1,0 +1,25 @@
+PNG Render QA
+==============
+
+Date: 2026-07-10
+DOCX: outputs/hyundai-motor-ceo-pipeline/briefing.docx
+PDF: outputs/hyundai-motor-ceo-pipeline/rendered/briefing.pdf
+PNG pages:
+- outputs/hyundai-motor-ceo-pipeline/rendered/page-1.png
+- outputs/hyundai-motor-ceo-pipeline/rendered/page-2.png
+- outputs/hyundai-motor-ceo-pipeline/rendered/page-3.png
+- outputs/hyundai-motor-ceo-pipeline/rendered/page-4.png
+- outputs/hyundai-motor-ceo-pipeline/rendered/page-5.png
+
+Renderer:
+- LibreOffice: C:\Program Files\LibreOffice\program\soffice.exe
+- Poppler pdftoppm: C:\Users\iamip\AppData\Local\Microsoft\WinGet\Packages\oschwartz10612.Poppler_Microsoft.Winget.Source_8wekyb3d8bbwe\poppler-25.07.0\Library\bin\pdftoppm.exe
+
+Visual QA result:
+- PASS
+- Page 2 inspected: executive-summary.png snapshot renders clearly; no clipping or overlap detected.
+- Pages 3-4 inspected: Korean body text renders correctly; no clipping, overlap, broken tables, or missing page content detected.
+- Header/footer render with ASCII text to avoid headless LibreOffice Korean glyph fallback issues.
+
+Notes:
+- LibreOffice prints "Could not find platform independent libraries <prefix>" on stderr, but PDF and PNG artifacts were generated successfully.
