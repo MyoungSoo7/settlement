@@ -382,6 +382,13 @@ export function briefingToDocx(markdown, opts = {}) {
       }));
       continue;
     }
+    // "기업평판/브랜드 이미지:" 같은 콜론 종결 짧은 문단 = 소제목 (라벨 문단은 제외)
+    if (!splitLabel(block.text) && /^[^.]{2,28}:$/.test(block.text)) {
+      body.push(paragraph([runXml({ text: block.text.slice(0, -1), bold: true, color: NAVY, size: 22 })], {
+        spacing: '<w:spacing w:before="240" w:after="80"/>',
+      }));
+      continue;
+    }
     const runs = labelRuns(block.text, toRuns);
     body.push(paragraph(runs, inSummary
       ? { shd: SUMMARY_FILL, border: SUMMARY_BORDER, spacing: SUMMARY_SPACING, ind: SUMMARY_IND, jc: 'both' }

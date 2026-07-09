@@ -8,7 +8,7 @@
 | `identity.json` | 파이프라인 1단계 | 사업자등록번호 202-81-45975 체크섬 + 국세청 상태조회(계속사업자) |
 | `diagnostic-packet.json` | 파이프라인 2단계 | DART 3개년 재무 + 최근 90일 공시 30건에서 파생한 외부 신호 E1~E5 (PRESENT 1건 — E5 공시 행간) |
 | `briefing.md` | 에이전트 (3단계) | 서명용 CEO 브리핑 — PRESENT 1건만 리스크로 다루고 absent 4건은 승격하지 않음 |
-| `briefing.docx` | `documents` 플러그인 | CEO/파트너 제출용 Word 변환본 |
+| `briefing.docx` | 내장 렌더러 (`render-briefing-docx`) | CEO/파트너 제출용 Word — 표지·핵심 리스크 요약표·확신도 배지·러닝 헤더·면책 푸터 포함 |
 
 ## 직접 재검증
 

@@ -165,6 +165,15 @@ test('docx — Executive Summary 표: 표지 다음에 합성 + 확신도 색', 
   assert.ok(!/핵심 리스크 한눈에 보기/.test(none['word/document.xml']));
 });
 
+test('docx — 콜론 종결 짧은 문단은 소제목 승격, 라벨 문단은 제외', () => {
+  const md = '# T\n\n## 뉴스 신호\n\n기업평판/브랜드 이미지:\n- 근거 예시: 민원 기사 감지.\n\n판별 테스트:\n';
+  const doc = readZip(briefingToDocx(md))['word/document.xml'];
+  // 소제목: 콜론 제거 + 22 사이즈 굵은 런
+  assert.match(doc, /<w:sz w:val="22"\/><w:szCs w:val="22"\/><\/w:rPr><w:t xml:space="preserve">기업평판\/브랜드 이미지<\/w:t>/);
+  // "판별 테스트:" 는 LABEL_SET 라벨이므로 소제목이 아니라 라벨 문단
+  assert.match(doc, /판별 테스트\. /);
+});
+
 test('docx — briefingToDocx: 같은 입력이면 바이트 동일 (결정론)', () => {
   const a = briefingToDocx(SAMPLE_MD);
   const b = briefingToDocx(SAMPLE_MD);
