@@ -98,7 +98,10 @@ const CONFIDENCE_TAG = /확신도|가설|가능성|확인\s*필요|확인됨|추
 const CONFIRMED_TAG = /확인됨/;
 const DISCRIMINATION = /판별\s*테스트|확인\s*(필요|절차|해야)|대조|재산정|재계산\s*검증|추가\s*데이터/;
 // 음성 브리핑에서 "이상 없음"을 인정한다는 신호.
-const CLEAN_ACK = /이상\s*없|이상\s*신호[가는]?\s*(확인되지|없|나타나지)|특이사항\s*없|유의미한\s*이상[^가-힣]*(없|아님)/;
+const CLEAN_ACK = /이상\s*없|이상\s*신호[가는]?\s*(확인되지|없|나타나지)|특이사항\s*없|유의미한\s*이상[^가-힣]*(없|아님)|리스크[가는은]?\s*(포착|확인|감지)되지\s*않|발화(\(PRESENT\))?한?\s*(항목|신호)[은이가]?\s*없/;
+// "미발화·임계값 미달" 로 명시 서술된 절은 리스크 주장이 아니다 — 미발화 신호의
+// 정성 요약(투명성)까지 오탐으로 잡으면 좋은 브리핑을 벌점 주게 된다.
+const ABSENT_ACK = /미발화|발화하지\s*않|임계값\s*미달|기준(치|값)?\s*미달|PRESENT\s*(아님|가?\s*아니)/;
 // 과잉 확신·오탐 검사에서 제외할 비(非)리스크 섹션 heading.
 const NON_RISK_HEADING = /확인\s*범위|범위|한계|요약|summary|헤드라인|headline|점검\s*결과|목차|부록/i;
 // 리스크 주장 문맥 — absent 신호의 카테고리 언급을 오탐으로 볼 조건.
@@ -155,6 +158,7 @@ export function evaluateBriefing(text, opts = {}) {
       signal.categoryPattern.test(sec.text)
       && RISK_CONTEXT.test(sec.text)
       && !CLEAN_ACK.test(sec.text)
+      && !ABSENT_ACK.test(sec.text)
       && !NON_RISK_HEADING.test(sec.heading));
     return {
       id: signal.id,
