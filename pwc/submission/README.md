@@ -222,7 +222,7 @@ src/data/sample/
 
 ### 고객 제공 Excel/CSV 전처리 권장 플러그인
 
-고객이 내부 재무 데이터를 Excel 또는 비표준 CSV로 제공하면, Codex의 `spreadsheets` 플러그인을 먼저 사용해 표준 입력 파일로 정리하는 흐름을 권장합니다. 분석이 끝난 뒤에는 Codex의 `documents` 플러그인으로 CEO/파트너 제출용 Word 보고서(`.docx`)를 별도 생성할 수 있습니다.
+고객이 내부 재무 데이터를 Excel 또는 비표준 CSV로 제공하면, Codex의 `spreadsheets` 플러그인을 먼저 사용해 표준 입력 파일로 정리하는 흐름을 권장합니다. 분석이 끝나면 CEO/파트너 제출용 Word 보고서(`.docx`)는 **플러그인 내장 렌더러가 자동 생성**합니다 (표지·핵심 리스크 요약표·확신도 배지·면책 푸터, UTF-8/한글 폰트 보장 — zero-dependency).
 
 ```text
 고객 원본 파일
@@ -255,9 +255,9 @@ verify-books → detect-signals → CEO briefing → Markdown/DOCX report
 | 표준 CSV 3종 생성 | `spreadsheets` | 이 플러그인이 읽는 입력 계약으로 변환 |
 | 정합성 검증 | Trusted CEO Agent | `verify-books` 불변식 게이트 |
 | 리스크 분석 | Trusted CEO Agent | 내부 데이터 + DART/ECOS/뉴스/국세청 교차 검증 |
-| Word 보고서 생성 | `documents` | 최종 분석 결과를 `briefing.docx` 형태의 CEO 브리핑/컨설팅 보고서로 변환 |
+| Word 보고서 생성 | Trusted CEO Agent (내장 `render-briefing-docx`) | `briefing.md` → 표지·요약표·서식을 갖춘 `briefing.docx` 자동 렌더 (브랜드 템플릿이 필요하면 `documents` 플러그인으로 추가 변환 가능) |
 
-즉 `spreadsheets` 는 **입력 데이터 정제/표준화 담당**, Trusted CEO Agent 는 **검증/분석/브리핑 담당**, `documents` 는 **최종 Word 보고서 산출 담당**입니다.
+즉 `spreadsheets` 는 **입력 데이터 정제/표준화 담당**, Trusted CEO Agent 는 **검증/분석/브리핑/Word 산출 담당**입니다.
 
 ### 다른 데이터 폴더를 쓰는 방법 (실제 회사 데이터)
 
@@ -369,13 +369,13 @@ DART, ECOS, 네이버 뉴스 데이터는 로컬 CSV로 저장하지 않고 MCP 
 
 ```text
 분석 결과를 briefing.md 파일로 저장해줘.
-documents 플러그인으로 briefing.docx CEO 보고서도 생성해줘.
+node src/bin/render-briefing-docx.mjs briefing.md   # Word 보고서 생성 (통합 파이프라인은 자동)
 ```
 
 | 산출물 | 용도 | 생성 주체 |
 |---|---|---|
 | `briefing.md` | Codex/Claude 대화에서 검토하기 쉬운 원본 분석 결과, 평가·수정·버전 관리용 | Trusted CEO Agent |
-| `briefing.docx` | CEO/파트너/고객에게 전달하기 쉬운 Word 형식 최종 보고서 | `documents` 플러그인 |
+| `briefing.docx` | CEO/파트너/고객에게 전달하기 쉬운 Word 형식 최종 보고서 (표지·핵심 리스크 요약표·확신도 배지·면책 푸터) | 내장 렌더러 `render-briefing-docx` (zero-dependency, UTF-8/한글 폰트 보장) |
 
 생성된 브리핑은 다음 명령으로 자동 채점할 수 있습니다. 채점 기준(신호·마커)은 채점 시점에
 `--data-dir` 의 데이터에서 파생됩니다 — 브리핑이 근거로 삼은 바로 그 데이터가 정답지입니다.

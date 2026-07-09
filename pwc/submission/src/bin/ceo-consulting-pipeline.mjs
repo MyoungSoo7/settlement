@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { companyIdentityGate } from '../registry/client.mjs';
 import { safeErrorMessage } from '../common/env.mjs';
+import { briefingToDocx } from '../common/docx.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '..', '..');
@@ -47,7 +48,7 @@ Pipeline:
 
 Outputs:
   identity.json / diagnostic-packet.json / pipeline-next-steps.md
-  briefing.md (에이전트 감지 시) / prompt.txt
+  briefing.md + briefing.docx (에이전트 감지 시) / prompt.txt
 `;
 }
 
@@ -141,12 +142,14 @@ ${briefingLine}
 
 ## 4. Documents
 
-\`documents\` 플러그인으로 최종 Word 보고서를 만든다.
+Word 보고서는 파이프라인이 내장 렌더러로 자동 생성한다 (표지·핵심 리스크 요약표·확신도
+배지·면책 푸터 포함, UTF-8/한글 폰트 보장):
 
 \`\`\`text
-${join(outDir, 'briefing.md')} 내용을 바탕으로 CEO/파트너 제출용 Word 보고서 ${join(outDir, 'briefing.docx')} 를 생성해줘.
-표지는 기업명, 분석 기준일, 데이터 출처 요약을 포함하고, 본문은 결론-핵심 리스크-근거-권고 조치-부록 순서로 구성해줘.
+${join(outDir, 'briefing.docx')}   ← 이미 생성됨 (브리핑 수정 후 재생성: node src/bin/render-briefing-docx.mjs ${join(outDir, 'briefing.md')})
 \`\`\`
+
+회사 브랜드 템플릿(로고·표지 규정)이 필요한 경우에만 \`documents\` 플러그인으로 변환한다.
 
 ## Verification
 
@@ -213,9 +216,10 @@ const diagnoseArgs = ['src/bin/diagnose-company.mjs', '--json'];
 const corpCode = flag('--corp-code');
 if (corpCode) diagnoseArgs.push('--corp-code', corpCode);
 else diagnoseArgs.push('--company', companyName);
-for (const name of ['--year', '--dart-unit-scale', '--preset', '--docs-dir']) {
+for (const name of ['--year', '--dart-unit-scale', '--preset', '--docs-dir', '--news-query', '--news-display']) {
   if (flag(name) !== undefined) diagnoseArgs.push(name, flag(name));
 }
+if (has('--with-news')) diagnoseArgs.push('--with-news');
 if (dataDir) diagnoseArgs.push('--data-dir', dataDir);
 
 let packetText;
@@ -294,6 +298,12 @@ const evaluation = spawnSync(process.execPath, [join(HERE, '..', 'test', 'briefi
 process.stdout.write(evaluation.stdout);
 if (evaluation.stderr) process.stderr.write(evaluation.stderr);
 
+// ── 5. Word 보고서 렌더 (내장 zero-dependency — 인코딩·서식 코드 보장) ──
+step(5, 'Word 보고서 렌더 (briefing.docx)');
+const docxPath = join(outDir, 'briefing.docx');
+writeFileSync(docxPath, briefingToDocx(agent.stdout));
+console.log(`  DOCX 생성: ${docxPath}`);
+
 writeFileSync(nextStepsPath, renderNextSteps({
   companyName, businessNumber, dataDir, outDir, identityPath, packetPath, briefingDone: true,
 }), 'utf8');
@@ -302,5 +312,6 @@ console.log(`\nPIPELINE ${evaluation.status === 0 ? 'READY' : 'NEEDS REVIEW'}
 identity: ${identityPath}
 diagnosticPacket: ${packetPath}
 briefing: ${briefingPath}
+briefingDocx: ${docxPath}
 nextSteps: ${nextStepsPath}`);
 process.exit(evaluation.status ?? 1);

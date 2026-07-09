@@ -50,7 +50,7 @@ node src/bin/ceo-consulting-pipeline.mjs `
 | `diagnostic-packet.json` | 생성 가능 |
 | `pipeline-next-steps.md` | 생성 가능 |
 | `briefing.md` | 에이전트 CLI(claude/codex) 감지 시 자동 생성 + `briefing-eval` 자동 채점 (미감지 시 `prompt.txt` 폴백) |
-| `briefing.docx` | `documents` 플러그인 단계에서 생성 |
+| `briefing.docx` | 내장 렌더러(`render-briefing-docx`)가 자동 생성 — 표지·핵심 리스크 요약표·확신도 배지·면책 푸터, UTF-8/한글 폰트 보장 |
 
 ## Data Inputs
 
@@ -104,6 +104,6 @@ README 기준 검증 항목:
 ## Next Useful Work
 
 1. ~~`ceo-consulting-pipeline.mjs`가 `briefing.md` 초안까지 자동 생성하도록 확장~~ (완료 — 에이전트 자동 감지 + 자동 채점)
-2. `documents` 플러그인을 통한 실제 `briefing.docx` 생성 예시 추가
+2. ~~`documents` 플러그인을 통한 실제 `briefing.docx` 생성 예시 추가~~ (대체 완료 — 내장 zero-dependency 렌더러 `src/common/docx.mjs` + 예시 6종 재생성, 실제 Word COM 열림 검증)
 3. `README.md`의 장기 운영 규칙을 `AGENTS.md`로 더 이동해 README를 제출용 소개 문서로 축약
 4. `outputs/` 예시 산출물 폴더와 샘플 `pipeline-next-steps.md` 추가 (`outputs/samsung-ct-ceo-pipeline` 존재)
