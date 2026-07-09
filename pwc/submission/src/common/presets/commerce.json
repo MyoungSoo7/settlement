@@ -1,0 +1,17 @@
+{
+  "description": "이커머스·유통 — 재고 회전이 빠르고 거래처가 많은 업종. 재고·집중도 신호를 민감하게, 이자보상 하한은 얇은 마진을 반영해 상향.",
+  "thresholds": {
+    "concentrationSharePct": 50,
+    "overdueMaterialityPct": 4
+  },
+  "externalThresholds": {
+    "inventoryGapPp": 10,
+    "interestCoverageFloor": 12
+  },
+  "rationale": {
+    "concentrationSharePct": "유통은 거래처가 수십~수백 곳이 정상 — 장기 미수의 절반이 한 곳이면 이미 이례적이므로 60→50 하향(민감).",
+    "overdueMaterialityPct": "회전이 빠른 채권 구조에서는 90일 초과 자체가 드묾 — 전체 채권 대비 4%만 넘어도 중요성 충족으로 5→4 하향.",
+    "inventoryGapPp": "재고 회전이 빠른 업종에서 재고가 매출보다 10%p 이상 빨리 늘면 시즌 재고가 아니라 적체 가능성 — 15→10 하향.",
+    "interestCoverageFloor": "유통 마진(수 % 수준)에서는 이자보상 여유가 빨리 소진되므로 하한 10→12배 상향(보수적)."
+  }
+}

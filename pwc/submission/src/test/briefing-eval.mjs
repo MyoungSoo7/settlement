@@ -29,8 +29,13 @@
  *   node test/briefing-eval.mjs --signals-file <진단패킷.json> <briefing.md>
  *                                # diagnose-company --json 출력(외부 신호 E1~E5)을 정답지로 채점
  *   node test/briefing-eval.mjs --clean <briefing.md>               # 음성(clean) 채점
+ *   node test/briefing-eval.mjs --judge <briefing.md>               # 규칙 PASS 후 LLM Judge(인과 품질, advisory)
  *   node test/briefing-eval.mjs --json <briefing.md>                # 기계가 읽는 JSON
  *   node test/briefing-eval.mjs --self-test                         # 채점기 자체 회귀 테스트
+ *
+ * --judge: 1차 규칙 채점(결정론)이 PASS 인 양성 브리핑에 대해서만 LLM 이 "왜 문제인가"의
+ * 인과 품질(causality/decision/falsifiability, 각 0~2)을 판정한다. advisory — PASS/FAIL 은
+ * 규칙 채점이 결정하며 Judge 는 점수·심사평만 낸다. 키 없으면 자동 생략 (common/judge.mjs).
  */
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -391,6 +396,7 @@ if (isMain) {
   } else {
     const clean = args.includes('--clean');
     const asJson = args.includes('--json');
+    const withJudge = args.includes('--judge');
     const dataDir = resolveDataDir(args, SAMPLE_DIR);
     const signalsFileIdx = args.indexOf('--signals-file');
     const signalsFile = signalsFileIdx !== -1 ? args[signalsFileIdx + 1] : undefined;
@@ -400,15 +406,43 @@ if (isMain) {
       && (dataDirIdx === -1 || i !== dataDirIdx + 1)
       && (signalsFileIdx === -1 || i !== signalsFileIdx + 1));
     if (!file) {
-      console.error('사용법: node test/briefing-eval.mjs [--clean] [--json] [--data-dir <dir> | --signals-file <packet.json>] <briefing.md> | --self-test');
+      console.error('사용법: node test/briefing-eval.mjs [--clean] [--judge] [--json] [--data-dir <dir> | --signals-file <packet.json>] <briefing.md> | --self-test');
       process.exitCode = 2;
     } else {
       const signals = signalsFile
         ? signalsFromPacket(JSON.parse(readFileSync(signalsFile, 'utf8')))
         : signalsForDataDir(dataDir);
-      const result = evaluateBriefing(readFileSync(file, 'utf8'), { mode: clean ? 'clean' : 'normal', signals });
-      if (asJson) console.log(JSON.stringify({ dataDir: signalsFile ? undefined : dataDir, signalsFile, ...result }, null, 2));
-      else printReport(result);
+      const briefingText = readFileSync(file, 'utf8');
+      const result = evaluateBriefing(briefingText, { mode: clean ? 'clean' : 'normal', signals });
+
+      // 2차: LLM Judge — 규칙 채점 PASS 인 양성 브리핑에만 (advisory, PASS/FAIL 불변).
+      let judge = null;
+      if (withJudge) {
+        if (result.pass && !result.negative) {
+          const { judgeBriefing } = await import('../common/judge.mjs');
+          judge = await judgeBriefing(briefingText, signals);
+        } else {
+          judge = { skipped: true, reason: result.negative ? '음성 브리핑 — 인과 판정 대상 아님' : '규칙 채점 FAIL — 1차부터 통과할 것' };
+        }
+      }
+
+      if (asJson) {
+        console.log(JSON.stringify({ dataDir: signalsFile ? undefined : dataDir, signalsFile, ...result, judge }, null, 2));
+      } else {
+        printReport(result);
+        if (judge) {
+          console.log('\n=== 인과 품질 판정 (LLM Judge · advisory) ===');
+          if (judge.skipped) {
+            console.log(`skip  ${judge.reason}`);
+          } else {
+            for (const r of judge.perSignal) {
+              console.log(`  ${r.id}  인과 ${r.causality}/2 · 의사결정 ${r.decision}/2 · 반증가능성 ${r.falsifiability}/2 — ${r.comment}`);
+            }
+            console.log(`\n[종합] ${judge.advisory} (평균: 인과 ${judge.averages.causality} · 의사결정 ${judge.averages.decision} · 반증 ${judge.averages.falsifiability}) — provider: ${judge.provider}`);
+            console.log('(advisory — PASS/FAIL 판정은 위 규칙 채점이 확정)');
+          }
+        }
+      }
       if (!result.pass) process.exitCode = 1;
     }
   }

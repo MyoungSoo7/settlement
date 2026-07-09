@@ -20,7 +20,8 @@
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadBooks, runInvariants, resolveDataDir, BooksLoadError } from '../common/books.mjs';
-import { deriveSignals, loadThresholds } from '../common/signals.mjs';
+import { deriveSignals } from '../common/signals.mjs';
+import { resolveThresholds } from '../common/presets.mjs';
 
 const DEFAULT_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'data', 'sample');
 const argv = process.argv.slice(2);
@@ -50,17 +51,22 @@ if (gate) {
     }
     process.exitCode = 1;
   } else {
-    const thresholds = loadThresholds(DATA_DIR);
+    const presetIdx = argv.indexOf('--preset');
+    const { thresholds, presetUsed } = resolveThresholds({
+      dataDir: DATA_DIR,
+      preset: presetIdx !== -1 ? argv[presetIdx + 1] : undefined,
+      kind: 'internal',
+    });
     const signals = deriveSignals(books, thresholds);
     const presentCount = signals.filter((s) => s.present).length;
 
     if (asJson) {
       // markers(RegExp)는 JSON 직렬화 시 소스 문자열로 노출한다.
       const out = signals.map((s) => ({ ...s, markers: s.markers.map((m) => m.source), categoryPattern: s.categoryPattern.source }));
-      console.log(JSON.stringify({ dataDir: DATA_DIR, gate: 'PASS', thresholds, presentCount, signals: out }, null, 2));
+      console.log(JSON.stringify({ dataDir: DATA_DIR, gate: 'PASS', presetUsed, thresholds, presentCount, signals: out }, null, 2));
     } else {
       console.log(`=== 신호 파생 (detect-signals) — ${DATA_DIR} ===`);
-      console.log(`게이트: PASS / 판정 신호: ${presentCount}건\n`);
+      console.log(`게이트: PASS / 판정 신호: ${presentCount}건${presetUsed ? ` / 프리셋: ${presetUsed}` : ''}\n`);
       for (const s of signals) {
         const badge = !s.evaluable ? 'N/A    ' : s.present ? 'PRESENT' : 'absent ';
         console.log(`[${badge}] ${s.id} ${s.name}${s.note ? ` — ${s.note}` : ''}`);

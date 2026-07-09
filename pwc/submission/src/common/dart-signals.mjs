@@ -25,8 +25,10 @@ export const EXTERNAL_THRESHOLDS = {
   inventoryGapPp: 15,       // E2: (재고 증가율 − 매출 증가율) 최소 격차 %p
   borrowingsGrowthPct: 30,  // E3: 차입금 합계 증가율
   interestCoverageFloor: 10,// E3: 이자보상배율(영업이익/이자지급) 하한
-  currentRatioFloorPct: 120,// E4: 유동비율 절대 하한 %
-  currentRatioWatchPct: 150,// E4: 2년 연속 하락 시 주의 수준 %
+  // E4 유동비율 — 2026-07 코스피 비금융 대형주 15사 캘리브레이션(bin/calibrate.mjs)에서
+  // 120/150 기준 발화율 33%로 과민 판정 → 100(유동부채>유동자산)/130 으로 보정.
+  currentRatioFloorPct: 100,// E4: 유동비율 절대 하한 %
+  currentRatioWatchPct: 130,// E4: 2년 연속 하락 시 주의 수준 %
   correctionsMin: 3,        // E5: 관측 기간 내 정정공시 최소 건수
   clarificationsMin: 1,     // E5: 풍문·보도 해명 최소 건수
 };

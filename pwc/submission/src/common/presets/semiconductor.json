@@ -1,0 +1,15 @@
+{
+  "description": "반도체·대규모 장치산업 — CAPEX 사이클로 차입·재고가 크게 출렁이는 업종. 사이클성 변동을 오탐하지 않도록 차입·재고·현금화 신호를 둔감하게.",
+  "externalThresholds": {
+    "borrowingsGrowthPct": 60,
+    "inventoryGapPp": 25,
+    "ocfToOiFloor": 0.6,
+    "currentRatioWatchPct": 110
+  },
+  "rationale": {
+    "currentRatioWatchPct": "CAPEX 사이클 중 유동비율 하락 추세는 정상 — 중장치 제조와 같은 근거로 130→110 하향(둔감).",
+    "borrowingsGrowthPct": "팹 증설기에 차입 50~100% 증가가 전략적 선택인 업종 — 30→60 상향. 이자보상 저위 조건이 함께 걸려야 발화.",
+    "inventoryGapPp": "다운사이클 재고 축적이 구조적(삼성·하이닉스 3개년 공시로 확인) — 15→25 상향.",
+    "ocfToOiFloor": "감가상각이 커서 OCF/영업이익 비율의 진폭이 큼 — 0.8→0.6 하향(둔감)."
+  }
+}
