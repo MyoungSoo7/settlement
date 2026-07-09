@@ -1,0 +1,140 @@
+{
+  "corp": {
+    "corpCode": "00149655",
+    "name": "삼성물산(주)",
+    "stockCode": "028260",
+    "ceo": "오세철, 이재언, 송규종",
+    "bizrNo": "2028145975"
+  },
+  "year": 2023,
+  "fsDiv": "CFS",
+  "disclosureWindowDays": 90,
+  "macro": {
+    "indicator": "한국은행 기준금리",
+    "latest": {
+      "time": "20260706",
+      "value": 2.5
+    },
+    "changeFromFirst": 0,
+    "unit": "%"
+  },
+  "presetUsed": null,
+  "externalThresholds": {
+    "arGrowthGapPp": 15,
+    "ocfToOiFloor": 0.8,
+    "inventoryGapPp": 15,
+    "borrowingsGrowthPct": 30,
+    "interestCoverageFloor": 10,
+    "currentRatioFloorPct": 120,
+    "currentRatioWatchPct": 150,
+    "correctionsMin": 3,
+    "clarificationsMin": 1
+  },
+  "externalPresent": 1,
+  "signals": [
+    {
+      "id": "E1",
+      "name": "수익-채권 괴리 (이익의 현금화 저조)",
+      "present": false,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "revenueGrowthPct": -2.9,
+        "receivablesGrowthPct": -4.5,
+        "gapPp": -1.5,
+        "receivablesTrillion": "6.7→6.4조",
+        "ocfToOperatingIncome": 0.98
+      },
+      "markers": [],
+      "categoryPattern": "수익\\s*(조기)?\\s*인식|조기\\s*인식|채권.*(급증|괴리)|현금화\\s*저조",
+      "checkHints": [
+        "분기보고서로 채권 증가 시점 좁히기",
+        "대손충당금 설정률 추이",
+        "주석의 매출채권 연령 분석"
+      ]
+    },
+    {
+      "id": "E2",
+      "name": "재고 자산 적체",
+      "present": false,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "revenueGrowthPct": -2.9,
+        "inventoryGrowthPct": 8.8,
+        "gapPp": 11.7,
+        "inventoriesTrillion": "4.1→4.5조"
+      },
+      "markers": [],
+      "categoryPattern": "재고\\s*(자산)?\\s*(적체|급증|과잉)|재고자산.*(증가|부담)",
+      "checkHints": [
+        "재고자산 평가손실(주석) 확인",
+        "제품/재공품/원재료 구성 변화",
+        "재고자산회전율 추이"
+      ]
+    },
+    {
+      "id": "E3",
+      "name": "차입 확대·이자 부담",
+      "present": false,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "borrowingsTrillion": "4.2→3조",
+        "borrowingsGrowthPct": -28.1,
+        "interestCoverage": "17.6→12.1배 (영업이익/이자지급)",
+        "coverageDropPct": 31.5
+      },
+      "markers": [],
+      "categoryPattern": "차입\\s*(확대|급증|의존)|이자\\s*부담|이자보상",
+      "checkHints": [
+        "차입금 만기 구조(주석) 확인",
+        "변동/고정 금리 구성",
+        "약정(covenant) 조건 확인"
+      ]
+    },
+    {
+      "id": "E4",
+      "name": "유동성 하락 (유동비율)",
+      "present": false,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "currentRatioPct": "129.7→123.8→128.6",
+        "fallingTwoYears": false
+      },
+      "markers": [],
+      "categoryPattern": "유동성\\s*(하락|압박|악화)|유동비율.*(하락|저하)",
+      "checkHints": [
+        "단기차입 상환 스케줄",
+        "미사용 여신한도(주석)",
+        "현금성자산 대비 단기부채"
+      ]
+    },
+    {
+      "id": "E5",
+      "name": "공시 행간 (정정·해명 패턴)",
+      "present": true,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "windowDays": 90,
+        "totalDisclosures": 30,
+        "corrections": 7,
+        "clarifications": [],
+        "auditFlags": []
+      },
+      "markers": [
+        "정정",
+        "풍문|해명"
+      ],
+      "categoryPattern": "정정\\s*공시|풍문|해명\\s*공시|공시\\s*(품질|프로세스|커뮤니케이션)",
+      "checkHints": [
+        "정정 사유 분류(단순 오기/수치 변경)",
+        "해명 공시의 대상 보도와 후속 확정 공시",
+        "공시 검수 체인 점검"
+      ]
+    }
+  ],
+  "internal": null
+}

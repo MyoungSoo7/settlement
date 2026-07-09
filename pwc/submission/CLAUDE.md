@@ -12,6 +12,9 @@
 ## 핵심 명령어 (모두 `submission/` 기준, zero-dependency Node 22+)
 
 ```bash
+# 통합 파이프라인 (고객 접수 → 브리핑 채점 완주 — 에이전트 자동 감지, 미감지 시 프롬프트 폴백)
+node src/bin/ceo-consulting-pipeline.mjs --company 삼성전자 --business-number 124-81-00998 [--data-dir <내부CSV>] [--judge] [--agent none]
+
 # 진단 (제품 진입점)
 node src/bin/diagnose-company.mjs --company 삼성전자                    # 기본 모드 (API-only)
 node src/bin/diagnose-company.mjs --company 삼성전자 --data-dir <내부CSV> --dart-unit-scale 1000000  # 상세
@@ -72,6 +75,7 @@ LLM 브리핑 (에이전트: 인과 서술·확신도·판별테스트)  ← 유
 
 해커톤 제출물/진단 프레임워크 관점 9.0 에서 감점 요인으로 분석된 4건을 순차 구현하고 검수했다.
 **전체 127/127 테스트, 커버리지 97.32% (90% 게이트), 신규 모듈 docs/dart-signals 100%.**
+(이후 통합 파이프라인 완주형 전환으로 132/132, 커버리지 97.00% — 아래 "추가 라운드" 참조.)
 
 ## 보완 1 — LLM Judge 층: 인과 품질 채점 (배점 0.4)
 
@@ -137,3 +141,19 @@ LLM 브리핑 (에이전트: 인과 서술·확신도·판별테스트)  ← 유
 자가 평가: 해커톤 제출물/진단 프레임워크 잣대의 감점 4요인을 모두 실행 코드+검증 증거로 해소 —
 **9.0 → 9.8**. 남은 0.2 는 외부인 검증 몫(심사 환경에서의 claude/codex 라이브 데모, Judge
 프롬프트의 장기 안정성)으로 남겨둔다. 미커밋 상태이며, 커밋 시 이 문서가 결과 보고의 정본이다.
+
+---
+
+# 추가 라운드 (2026-07-09) — 통합 파이프라인 완주형 전환
+
+`ceo-consulting-pipeline.mjs`(고객 접수 CLI)가 identity gate → 진단 패킷까지만 자동이고
+브리핑 생성이 수동 프롬프트로 끊겨 있던 것을 완주형으로 전환했다.
+
+- **무엇**: demo-e2e 의 에이전트 자동 감지(claude -p / codex exec)를 파이프라인에 이식 —
+  게이트 → 진단 → 브리핑 생성 → `briefing-eval --signals-file` 자동 채점(+`--judge`)을
+  한 명령으로. 에이전트 미감지/`--agent none` 이면 `prompt.txt` + `pipeline-next-steps.md`
+  (spreadsheets/compliance/documents 후속 안내) 폴백. `--corp-code/--year/--preset/--docs-dir`
+  패스스루.
+- **검수 증거**: 신규 단위 테스트 5건(체크섬 게이트 차단·--agent none 폴백·가짜 에이전트
+  전 구간 EVAL PASS — 국세청/DART fetch 스텁으로 네트워크 0). **전체 132/132, 커버리지
+  97.00% (90% 게이트), 파이프라인 파일 자체 92.16%.** README/CODEX/AGENTS/STATUS 정합화.

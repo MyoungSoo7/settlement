@@ -222,7 +222,7 @@ src/data/sample/
 
 ### 고객 제공 Excel/CSV 전처리 권장 플러그인
 
-고객이 내부 재무 데이터를 Excel 또는 비표준 CSV로 제공하면, Codex의 `spreadsheets` 플러그인을 먼저 사용해 표준 입력 파일로 정리하는 흐름을 권장합니다.
+고객이 내부 재무 데이터를 Excel 또는 비표준 CSV로 제공하면, Codex의 `spreadsheets` 플러그인을 먼저 사용해 표준 입력 파일로 정리하는 흐름을 권장합니다. 분석이 끝난 뒤에는 Codex의 `documents` 플러그인으로 CEO/파트너 제출용 Word 보고서(`.docx`)를 별도 생성할 수 있습니다.
 
 ```text
 고객 원본 파일
@@ -244,7 +244,7 @@ Trusted CEO Agent 표준 입력
   - cost_allocation.csv
         |
         v
-verify-books → detect-signals → CEO briefing
+verify-books → detect-signals → CEO briefing → Markdown/DOCX report
 ```
 
 역할 분담은 다음과 같습니다.
@@ -255,8 +255,9 @@ verify-books → detect-signals → CEO briefing
 | 표준 CSV 3종 생성 | `spreadsheets` | 이 플러그인이 읽는 입력 계약으로 변환 |
 | 정합성 검증 | Trusted CEO Agent | `verify-books` 불변식 게이트 |
 | 리스크 분석 | Trusted CEO Agent | 내부 데이터 + DART/ECOS/뉴스/국세청 교차 검증 |
+| Word 보고서 생성 | `documents` | 최종 분석 결과를 `briefing.docx` 형태의 CEO 브리핑/컨설팅 보고서로 변환 |
 
-즉 `spreadsheets` 는 **입력 데이터 정제/표준화 담당**, Trusted CEO Agent 는 **검증/분석/브리핑 담당**입니다.
+즉 `spreadsheets` 는 **입력 데이터 정제/표준화 담당**, Trusted CEO Agent 는 **검증/분석/브리핑 담당**, `documents` 는 **최종 Word 보고서 산출 담당**입니다.
 
 ### 다른 데이터 폴더를 쓰는 방법 (실제 회사 데이터)
 
@@ -360,11 +361,17 @@ DART, ECOS, 네이버 뉴스 데이터는 로컬 CSV로 저장하지 않고 MCP 
 
 ### 출력 위치와 노출 방식
 
-분석 결과는 기본적으로 Codex/Claude 대화 응답으로 노출됩니다. 파일로 남기고 싶으면 브리핑을 Markdown 파일로 저장하도록 요청합니다.
+분석 결과는 기본적으로 Codex/Claude 대화 응답으로 노출됩니다. 파일로 남기고 싶으면 검토/채점용 Markdown 파일과 제출/공유용 Word 파일을 분리해 생성하도록 요청합니다.
 
 ```text
 분석 결과를 briefing.md 파일로 저장해줘.
+documents 플러그인으로 briefing.docx CEO 보고서도 생성해줘.
 ```
+
+| 산출물 | 용도 | 생성 주체 |
+|---|---|---|
+| `briefing.md` | Codex/Claude 대화에서 검토하기 쉬운 원본 분석 결과, 평가·수정·버전 관리용 | Trusted CEO Agent |
+| `briefing.docx` | CEO/파트너/고객에게 전달하기 쉬운 Word 형식 최종 보고서 | `documents` 플러그인 |
 
 생성된 브리핑은 다음 명령으로 자동 채점할 수 있습니다. 채점 기준(신호·마커)은 채점 시점에
 `--data-dir` 의 데이터에서 파생됩니다 — 브리핑이 근거로 삼은 바로 그 데이터가 정답지입니다.
@@ -375,7 +382,22 @@ node src/test/briefing-eval.mjs --data-dir <데이터폴더> briefing.md
 
 ## CEO 관점 사용 예시
 
-### 0. 기업명만으로 시작 (기본 모드 — 내부 데이터 불필요)
+### 0-a. 컨설팅 전 과정을 한 명령으로 (통합 파이프라인)
+
+기업명과 사업자등록번호만 주면 식별 게이트 → 진단 → 브리핑 생성 → 자동 채점까지
+한 명령으로 완주합니다. 에이전트 CLI(claude/codex)가 설치되어 있으면 브리핑을 자동
+생성·채점하고, 없으면 프롬프트 파일과 수동 절차 안내(`pipeline-next-steps.md`)를 남깁니다.
+
+```powershell
+node src/bin/ceo-consulting-pipeline.mjs --company 삼성전자 --business-number 124-81-00998
+# 옵션: --data-dir <내부CSV> --judge (LLM 인과 채점) --agent none (에이전트 없이 준비만)
+```
+
+실기업(삼성물산) 라이브 실행 산출물 전체(identity → 패킷 → 브리핑 → Word)가
+[`outputs/samsung-ct-ceo-pipeline/`](./outputs/samsung-ct-ceo-pipeline/README.md) 에 동봉되어
+있으며, 채점 명령 한 줄로 지금 바로 재검증할 수 있습니다.
+
+### 0-b. 기업명만으로 시작 (기본 모드 — 내부 데이터 불필요)
 
 ```powershell
 node src/bin/diagnose-company.mjs --company 삼성전자                      # 사람용 진단
@@ -403,6 +425,7 @@ trial_balance.csv, ar_aging.csv, cost_allocation.csv 3개 파일로 정리해줘
 먼저 company_identity_gate 로 기업 식별을 확인한 뒤,
 src/data/sample 데이터를 기준으로 CEO가 놓치고 있는 회계·현금흐름·원가 리스크를 찾아줘.
 근거 숫자와 확인 절차까지 CEO 브리핑 형식으로 정리해줘.
+검토용 briefing.md와 제출용 briefing.docx를 함께 만들어줘.
 ```
 
 ### 2. 특정 기업 외부 공시 확인
