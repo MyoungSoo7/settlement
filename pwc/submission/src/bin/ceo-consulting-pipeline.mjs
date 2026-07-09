@@ -301,7 +301,7 @@ if (evaluation.stderr) process.stderr.write(evaluation.stderr);
 // ── 5. Word 보고서 렌더 (내장 zero-dependency — 인코딩·서식 코드 보장) ──
 step(5, 'Word 보고서 렌더 (briefing.docx)');
 const docxPath = join(outDir, 'briefing.docx');
-writeFileSync(docxPath, briefingToDocx(agent.stdout));
+writeFileSync(docxPath, briefingToDocx(agent.stdout, { date: new Date().toISOString().slice(0, 10) }));
 console.log(`  DOCX 생성: ${docxPath}`);
 
 writeFileSync(nextStepsPath, renderNextSteps({

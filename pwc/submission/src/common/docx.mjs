@@ -305,6 +305,11 @@ export function briefingToDocx(markdown, opts = {}) {
   }));
   if (opts.confidential !== false) {
     body.push(paragraph([runXml({ text: '대외비 · Confidential', bold: true, color: ACCENT, size: 20 })], {
+      spacing: `<w:spacing w:after="${opts.date ? 160 : 600}"/>`,
+    }));
+  }
+  if (opts.date) {
+    body.push(paragraph([runXml({ text: `작성일 ${opts.date}`, color: GRAY, size: 20 })], {
       spacing: '<w:spacing w:after="600"/>',
     }));
   }
@@ -384,9 +389,11 @@ export function briefingToDocx(markdown, opts = {}) {
   }
 
   const sectPr = `<w:sectPr>
+    <w:headerReference w:type="default" r:id="rIdHeader"/>
     <w:footerReference w:type="default" r:id="rIdFooter"/>
     <w:pgSz w:w="11906" w:h="16838"/>
     <w:pgMar w:top="1418" w:right="1418" w:bottom="1418" w:left="1418" w:header="709" w:footer="709" w:gutter="0"/>
+    <w:titlePg/>
   </w:sectPr>`;
 
   const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -463,6 +470,15 @@ function packageEntries({ documentXml, hyperlinks, title, opts }) {
 <w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num>
 </w:numbering>`;
 
+  const headerXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:p><w:pPr><w:pBdr><w:bottom w:val="single" w:sz="4" w:space="4" w:color="D9D9D9"/></w:pBdr>
+  <w:tabs><w:tab w:val="right" w:pos="9070"/></w:tabs><w:spacing w:after="0"/></w:pPr>
+<w:r><w:rPr><w:color w:val="${LIGHT_GRAY}"/><w:sz w:val="16"/></w:rPr><w:t xml:space="preserve">${escapeXml(title)}</w:t></w:r>
+<w:r><w:rPr><w:color w:val="${LIGHT_GRAY}"/><w:sz w:val="16"/></w:rPr><w:tab/></w:r>
+<w:r><w:rPr><w:b/><w:color w:val="${ACCENT}"/><w:sz w:val="16"/></w:rPr><w:t>${opts.confidential !== false ? '대외비' : ''}</w:t></w:r>
+</w:p></w:hdr>`;
+
   const footerXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
 <w:p><w:pPr><w:pBdr><w:top w:val="single" w:sz="4" w:space="4" w:color="D9D9D9"/></w:pBdr>
@@ -480,6 +496,7 @@ function packageEntries({ documentXml, hyperlinks, title, opts }) {
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
 <Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
 <Relationship Id="rIdNumbering" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>
+<Relationship Id="rIdHeader" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>
 <Relationship Id="rIdFooter" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>
 ${linkRels}
 </Relationships>`;
@@ -491,6 +508,7 @@ ${linkRels}
 <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
 <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
 <Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/>
+<Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>
 <Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>
 <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
 <Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>
@@ -524,6 +542,7 @@ ${linkRels}
     { name: 'word/document.xml', data: documentXml },
     { name: 'word/styles.xml', data: stylesXml },
     { name: 'word/numbering.xml', data: numberingXml },
+    { name: 'word/header1.xml', data: headerXml },
     { name: 'word/footer1.xml', data: footerXml },
     { name: 'word/_rels/document.xml.rels', data: documentRels },
     { name: 'docProps/core.xml', data: coreXml },
