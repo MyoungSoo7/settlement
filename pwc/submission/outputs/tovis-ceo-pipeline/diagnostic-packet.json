@@ -1,0 +1,408 @@
+{
+  "corp": {
+    "corpCode": "00390365",
+    "name": "(주)토비스",
+    "stockCode": "051360",
+    "ceo": "김용범",
+    "bizrNo": "1338137806"
+  },
+  "year": 2025,
+  "fsDiv": "CFS",
+  "disclosureWindowDays": 90,
+  "macro": {
+    "indicator": "한국은행 기준금리",
+    "latest": {
+      "time": "20260707",
+      "value": 2.5
+    },
+    "changeFromFirst": 0,
+    "unit": "%"
+  },
+  "presetUsed": null,
+  "externalThresholds": {
+    "arGrowthGapPp": 15,
+    "ocfToOiFloor": 0.8,
+    "inventoryGapPp": 15,
+    "borrowingsGrowthPct": 30,
+    "interestCoverageFloor": 10,
+    "currentRatioFloorPct": 100,
+    "currentRatioWatchPct": 130,
+    "correctionsMin": 3,
+    "clarificationsMin": 1
+  },
+  "externalPresent": 2,
+  "newsSignals": {
+    "enabled": true,
+    "company": "토비스 디스플레이",
+    "searches": [
+      {
+        "query": "토비스 디스플레이",
+        "total": 2801,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      },
+      {
+        "query": "토비스 디스플레이 평판 이미지 브랜드 소비자",
+        "total": 5,
+        "display": 5,
+        "sort": "date",
+        "itemCount": 5
+      },
+      {
+        "query": "토비스 디스플레이 투자 사업 제휴 실적 재무 재고",
+        "total": 0,
+        "display": 0,
+        "sort": "date",
+        "itemCount": 0
+      },
+      {
+        "query": "토비스 디스플레이 규제 소송 보안 장애 구조조정",
+        "total": 0,
+        "display": 0,
+        "sort": "date",
+        "itemCount": 0
+      }
+    ],
+    "totalUniqueItems": 15,
+    "categories": {
+      "reputation": {
+        "id": "reputation",
+        "name": "기업평판/브랜드 이미지",
+        "count": 6,
+        "keywords": [
+          "평판",
+          "이미지",
+          "브랜드",
+          "논란",
+          "불매",
+          "소비자",
+          "고객 불만",
+          "품질",
+          "리콜",
+          "갑질",
+          "민원"
+        ],
+        "examples": [
+          {
+            "title": "디스플레이장비 상장기업 2026년 7월 브랜드평판...서울반도체, 소룩스...",
+            "description": "루멘스, 토비스, 미래컴퍼니, 톱텍, 위지트, 아나패스, 에프엔에스테크, 디바이스이엔지, 우리바이오, 아이씨디, 포인트엔지니어링 순이었다. 디스플레이장비 상장기업 브랜드평판 1위를 기록한...",
+            "pubDate": "Wed, 01 Jul 2026 12:26:00 +0900",
+            "url": "https://www.energy-news.co.kr/news/articleView.html?idxno=226501",
+            "naverUrl": "https://www.energy-news.co.kr/news/articleView.html?idxno=226501"
+          },
+          {
+            "title": "돈 몰리는 디스플레이 상장주(株)… 1400만 데이터가 꼽은 '진짜 1위'",
+            "description": "매달 발표되는 브랜드 평판지수는 기업의 대외적 이미지뿐만 아니라 실제 시장 가치와 소비자 충성도를 가늠하는 주요한 잣대로 활용되고 있다. 디스플레이 장비 업황의 변화 속에서 기업들이 소비자 소통과...",
+            "pubDate": "Wed, 04 Feb 2026 17:52:00 +0900",
+            "url": "https://www.wikitree.co.kr/articles/1115685",
+            "naverUrl": "https://www.wikitree.co.kr/articles/1115685"
+          },
+          {
+            "title": "[브랜드평판] 삼성전자, 스마트폰 상장기업 5월 1위···삼성SDI·LG디스...",
+            "description": "상장기업 브랜드평판 2025년 5월 빅데이터 분석결과, 1위 삼성전자 2위 삼성SDI 3위 LG디스플레이 순으로... 분석하여 소비자들의 브랜드 평판을 분석했다. 지난 4월 스마트폰 상장기업 브랜드 빅데이터 103,313...",
+            "pubDate": "Thu, 01 May 2025 08:46:00 +0900",
+            "url": "https://www.enetnews.co.kr/news/articleView.html?idxno=37534",
+            "naverUrl": "https://www.enetnews.co.kr/news/articleView.html?idxno=37534"
+          },
+          {
+            "title": "[브랜드평판] 삼성전자, 스마트폰 상장기업 3월 1위···삼성SDI·LG이노...",
+            "description": "상장기업 브랜드평판 2025년 3월 빅데이터 분석 30위 순위는 삼성전자, 삼성SDI, LG이노텍, LG디스플레이... 토비스, 유티아이, 노바텍, 이미지스, 나무가 순이었다. ​ 스마트폰 관련 상장기업 브랜드평판 1위를...",
+            "pubDate": "Tue, 04 Mar 2025 08:46:00 +0900",
+            "url": "https://www.enetnews.co.kr/news/articleView.html?idxno=35283",
+            "naverUrl": "https://www.enetnews.co.kr/news/articleView.html?idxno=35283"
+          },
+          {
+            "title": "[브랜드평판] 삼성전자, 스마트폰 상장기업 10월 1위···삼성SDI·LG이노...",
+            "description": "분석하여 소비자들의 브랜드 평판을 분석했다. 지난 9월 스마트폰 상장기업 브랜드 빅데이터 138,961... 평판 2024년 10월 빅데이터 분석 30위 순위는 삼성전자, 삼성SDI, LG이노텍, 이수페타시스, LG디스플레이...",
+            "pubDate": "Wed, 02 Oct 2024 08:46:00 +0900",
+            "url": "https://www.enetnews.co.kr/news/articleView.html?idxno=29856",
+            "naverUrl": "https://www.enetnews.co.kr/news/articleView.html?idxno=29856"
+          }
+        ],
+        "crossCheck": "매출 성장률, 반품/클레임, 고객 이탈, 채널별 매출 변화를 확인"
+      },
+      "industry": {
+        "id": "industry",
+        "name": "관심산업/시장 환경",
+        "count": 7,
+        "keywords": [
+          "업계",
+          "산업",
+          "시장",
+          "트렌드",
+          "수요",
+          "소비동향",
+          "온라인",
+          "플랫폼",
+          "패션",
+          "섬유",
+          "의류"
+        ],
+        "examples": [
+          {
+            "title": "토비스 인적분할 완료…7월20일 재상장",
+            "description": "카지노 디스플레이 전문기업 토비스(TOVIS, 051360)는 지난 2일 인적분할 절차를 마무리하고 독립경영체제를 본격화한다고 밝혔다. 토비스는 이번 인적분할을 통해 카지노·산업용 디스플레이 사업과 차량용 전장...",
+            "pubDate": "Fri, 03 Jul 2026 21:05:00 +0900",
+            "url": "https://www.ppss.kr/news/articleView.html?idxno=300969",
+            "naverUrl": "https://www.ppss.kr/news/articleView.html?idxno=300969"
+          },
+          {
+            "title": "카지노 디스플레이 토비스, 인적분할 완료… 독립경영체제 본격화",
+            "description": "카지노 디스플레이 전문기업 토비스는 인적분할 절차를 마무리하고 독립경영체제를 시작한다고 3일 밝혔다. 회사 측에 따르면 토비스는 이번 인적분할을 통해 카지노·산업용 디스플레이 사업과 차량용 전장 디스플레이...",
+            "pubDate": "Fri, 03 Jul 2026 06:30:00 +0900",
+            "url": "https://www.sedaily.com/article/20063189?ref=naver",
+            "naverUrl": "https://n.news.naver.com/mnews/article/011/0004637708?sid=101"
+          },
+          {
+            "title": "토비스, 카지노·전장 디스플레이 분할 완료",
+            "description": "카지노 디스플레이 전문기업 토비스가 인적분할 절차를 모두 마치고 독립 경영체제를 본격적으로 시작한다고 2일 밝혔다. 이번 인적분할을 통해 카지노·산업용 디스플레이 사업과 차량용 전장 디스플레이 사업이 각각...",
+            "pubDate": "Thu, 02 Jul 2026 17:48:00 +0900",
+            "url": "https://www.newstopkorea.com/news/articleView.html?idxno=45997",
+            "naverUrl": "https://www.newstopkorea.com/news/articleView.html?idxno=45997"
+          },
+          {
+            "title": "토비스, 인적분할 완료…20일 재상장",
+            "description": "카지노·산업용 디스플레이 사업은 토비스가, 차량용 전장 디스플레이 사업은 신설법인 네오뷰가 맡는다. 토비스 변경상장과 네오뷰 재상장 예정일은 7월 20일이다. 토비스는 글로벌 슬롯머신, 카지노 장비 제조사를...",
+            "pubDate": "Thu, 02 Jul 2026 14:18:00 +0900",
+            "url": "https://www.thelec.kr/news/articleView.html?idxno=58960",
+            "naverUrl": "https://www.thelec.kr/news/articleView.html?idxno=58960"
+          },
+          {
+            "title": "토비스, 인적분할 완료…독립경영체제 본격화",
+            "description": "카지노 디스플레이 전문기업 토비스는 인적분할 절차를 마무리하고 독립경영체제를 본격화한다고 2일 밝혔다. 회사 측에 따르면 토비스는 이번 인적분할을 통해 카지노·산업용 디스플레이 사업과 차량용 전장...",
+            "pubDate": "Thu, 02 Jul 2026 14:18:00 +0900",
+            "url": "https://www.newsis.com/view/NISX20260702_0003693477",
+            "naverUrl": "https://n.news.naver.com/mnews/article/003/0014043109?sid=101"
+          }
+        ],
+        "crossCheck": "재고 증가율, 매출 성장률, 사업부별 성장률, ECOS 물가/금리 환경을 확인"
+      },
+      "investment": {
+        "id": "investment",
+        "name": "투자동향/자금소요",
+        "count": 0,
+        "keywords": [
+          "투자",
+          "증설",
+          "설비",
+          "물류",
+          "자동화",
+          "인수",
+          "M&A",
+          "유상증자",
+          "자금조달",
+          "CAPEX"
+        ],
+        "examples": [],
+        "crossCheck": "차입금, 이자보상배율, 투자 현금흐름, 유동비율을 확인"
+      },
+      "business": {
+        "id": "business",
+        "name": "사업동향/제휴/확장",
+        "count": 0,
+        "keywords": [
+          "진출",
+          "제휴",
+          "계약",
+          "수주",
+          "공급",
+          "파트너",
+          "신사업",
+          "출점",
+          "매장",
+          "해외",
+          "브랜드 론칭"
+        ],
+        "examples": [],
+        "crossCheck": "수주/계약 공시, 매출채권 증가, 고객 집중도, 계약부채 변화를 확인"
+      },
+      "finance": {
+        "id": "finance",
+        "name": "재무동향/실적 압박",
+        "count": 0,
+        "keywords": [
+          "실적",
+          "매출",
+          "영업이익",
+          "적자",
+          "흑자",
+          "감소",
+          "증가",
+          "부채",
+          "차입",
+          "이자",
+          "유동성",
+          "재고"
+        ],
+        "examples": [],
+        "crossCheck": "E1~E4 재무 신호, 현금흐름, 차입금, 재고자산 평가손실을 확인"
+      },
+      "risk": {
+        "id": "risk",
+        "name": "규제/소송/보안/운영 리스크",
+        "count": 1,
+        "keywords": [
+          "규제",
+          "제재",
+          "소송",
+          "고발",
+          "조사",
+          "감사",
+          "보안",
+          "장애",
+          "유출",
+          "구조조정",
+          "폐점",
+          "파업"
+        ],
+        "examples": [
+          {
+            "title": "토비스, 인적분할 완료…20일 재상장",
+            "description": "카지노·산업용 디스플레이 사업은 토비스가, 차량용 전장 디스플레이 사업은 신설법인 네오뷰가 맡는다. 토비스 변경상장과 네오뷰 재상장 예정일은 7월 20일이다. 토비스는 글로벌 슬롯머신, 카지노 장비 제조사를...",
+            "pubDate": "Thu, 02 Jul 2026 14:18:00 +0900",
+            "url": "https://www.thelec.kr/news/articleView.html?idxno=58960",
+            "naverUrl": "https://www.thelec.kr/news/articleView.html?idxno=58960"
+          }
+        ],
+        "crossCheck": "공시 정정/해명, 충당부채, 법무 비용, 운영 중단 영향을 확인"
+      }
+    },
+    "advice": [
+      {
+        "category": "reputation",
+        "title": "기업평판/브랜드 이미지",
+        "signal": "6건의 관련 뉴스 메타데이터 감지",
+        "crossCheck": "매출 성장률, 반품/클레임, 고객 이탈, 채널별 매출 변화를 확인",
+        "suggestedAction": "브랜드 훼손 신호는 단기 매출보다 채널별 주문 취소, 반품률, 주요 거래처 반응으로 먼저 검증한다."
+      },
+      {
+        "category": "industry",
+        "title": "관심산업/시장 환경",
+        "signal": "7건의 관련 뉴스 메타데이터 감지",
+        "crossCheck": "재고 증가율, 매출 성장률, 사업부별 성장률, ECOS 물가/금리 환경을 확인",
+        "suggestedAction": "산업 변화 신호는 재고 회전과 제품군별 매출 믹스 변화로 연결해 확인한다."
+      },
+      {
+        "category": "risk",
+        "title": "규제/소송/보안/운영 리스크",
+        "signal": "1건의 관련 뉴스 메타데이터 감지",
+        "crossCheck": "공시 정정/해명, 충당부채, 법무 비용, 운영 중단 영향을 확인",
+        "suggestedAction": "규제와 운영 리스크는 손익 영향보다 발생 가능성과 대응 책임자를 먼저 확정한다."
+      }
+    ],
+    "caveat": "뉴스는 제목, 요약, 발행일, 링크 메타데이터만 사용한 보조 신호이며 확정 사실로 취급하지 않습니다.",
+    "summary": "뉴스는 확정 사실이 아니라 보조 신호입니다. 감지 테마: 기업평판/브랜드 이미지 6건, 관심산업/시장 환경 7건, 규제/소송/보안/운영 리스크 1건. DART PRESENT 신호는 E2, E5이며, 평가된 DART 신호는 E1, E2, E3, E4, E5입니다. 뉴스 테마는 각 카테고리의 crossCheck 항목으로 재무/공시 데이터와 교차 확인해야 합니다."
+  },
+  "docs": null,
+  "signals": [
+    {
+      "id": "E1",
+      "name": "수익-채권 괴리 (이익의 현금화 저조)",
+      "present": false,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "revenueGrowthPct": 2.7,
+        "receivablesGrowthPct": -15.4,
+        "gapPp": -18.1,
+        "receivablesTrillion": "0.1→0.1조",
+        "ocfToOperatingIncome": 0.93
+      },
+      "markers": [],
+      "categoryPattern": "수익\\s*(조기)?\\s*인식|조기\\s*인식|채권.*(급증|괴리)|현금화\\s*저조",
+      "checkHints": [
+        "분기보고서로 채권 증가 시점 좁히기",
+        "대손충당금 설정률 추이",
+        "주석의 매출채권 연령 분석"
+      ]
+    },
+    {
+      "id": "E2",
+      "name": "재고 자산 적체",
+      "present": true,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "revenueGrowthPct": 2.7,
+        "inventoryGrowthPct": 19.4,
+        "gapPp": 16.7,
+        "inventoriesTrillion": "0.1→0.1조"
+      },
+      "markers": [
+        "(?<!\\d)19[.,]4(?!\\d)",
+        "(?<!\\d)2[.,]7(?!\\d)",
+        "재고"
+      ],
+      "categoryPattern": "재고\\s*(자산)?\\s*(적체|급증|과잉)|재고자산.*(증가|부담)",
+      "checkHints": [
+        "재고자산 평가손실(주석) 확인",
+        "제품/재공품/원재료 구성 변화",
+        "재고자산회전율 추이"
+      ]
+    },
+    {
+      "id": "E3",
+      "name": "차입 확대·이자 부담",
+      "present": false,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "borrowingsTrillion": "0.1→0.1조",
+        "borrowingsGrowthPct": -17.3,
+        "interestCoverage": "7.1→9.7배 (영업이익/이자지급)",
+        "coverageDropPct": -37.3
+      },
+      "markers": [],
+      "categoryPattern": "차입\\s*(확대|급증|의존)|이자\\s*부담|이자보상",
+      "checkHints": [
+        "차입금 만기 구조(주석) 확인",
+        "변동/고정 금리 구성",
+        "약정(covenant) 조건 확인"
+      ]
+    },
+    {
+      "id": "E4",
+      "name": "유동성 하락 (유동비율)",
+      "present": false,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "currentRatioPct": "116→125.9→141.3",
+        "fallingTwoYears": false
+      },
+      "markers": [],
+      "categoryPattern": "유동성\\s*(하락|압박|악화)|유동비율.*(하락|저하)",
+      "checkHints": [
+        "단기차입 상환 스케줄",
+        "미사용 여신한도(주석)",
+        "현금성자산 대비 단기부채"
+      ]
+    },
+    {
+      "id": "E5",
+      "name": "공시 행간 (정정·해명 패턴)",
+      "present": true,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "windowDays": 90,
+        "totalDisclosures": 29,
+        "corrections": 8,
+        "clarifications": [],
+        "auditFlags": []
+      },
+      "markers": [
+        "정정",
+        "풍문|해명"
+      ],
+      "categoryPattern": "정정\\s*공시|풍문|해명\\s*공시|공시\\s*(품질|프로세스|커뮤니케이션)",
+      "checkHints": [
+        "정정 사유 분류(단순 오기/수치 변경)",
+        "해명 공시의 대상 보도와 후속 확정 공시",
+        "공시 검수 체인 점검"
+      ]
+    }
+  ],
+  "internal": null
+}

@@ -1,0 +1,472 @@
+{
+  "corp": {
+    "corpCode": "00266961",
+    "name": "네이버(주)",
+    "stockCode": "035420",
+    "ceo": "최수연",
+    "bizrNo": "2208162517"
+  },
+  "year": 2025,
+  "fsDiv": "CFS",
+  "disclosureWindowDays": 90,
+  "macro": {
+    "indicator": "한국은행 기준금리",
+    "latest": {
+      "time": "20260707",
+      "value": 2.5
+    },
+    "changeFromFirst": 0,
+    "unit": "%"
+  },
+  "presetUsed": null,
+  "externalThresholds": {
+    "arGrowthGapPp": 15,
+    "ocfToOiFloor": 0.8,
+    "inventoryGapPp": 15,
+    "borrowingsGrowthPct": 30,
+    "interestCoverageFloor": 10,
+    "currentRatioFloorPct": 100,
+    "currentRatioWatchPct": 130,
+    "correctionsMin": 3,
+    "clarificationsMin": 1
+  },
+  "externalPresent": 1,
+  "newsSignals": {
+    "enabled": true,
+    "company": "네이버 NAVER",
+    "searches": [
+      {
+        "query": "네이버 NAVER",
+        "total": 132415,
+        "display": 20,
+        "sort": "date",
+        "itemCount": 20
+      },
+      {
+        "query": "네이버 NAVER 평판 이미지 브랜드 소비자",
+        "total": 4,
+        "display": 4,
+        "sort": "date",
+        "itemCount": 4
+      },
+      {
+        "query": "네이버 NAVER 투자 사업 제휴 실적 재무 재고",
+        "total": 2,
+        "display": 2,
+        "sort": "date",
+        "itemCount": 2
+      },
+      {
+        "query": "네이버 NAVER 규제 소송 보안 장애 구조조정",
+        "total": 0,
+        "display": 0,
+        "sort": "date",
+        "itemCount": 0
+      }
+    ],
+    "totalUniqueItems": 26,
+    "categories": {
+      "reputation": {
+        "id": "reputation",
+        "name": "기업평판/브랜드 이미지",
+        "count": 5,
+        "keywords": [
+          "평판",
+          "이미지",
+          "브랜드",
+          "논란",
+          "불매",
+          "소비자",
+          "고객 불만",
+          "품질",
+          "리콜",
+          "갑질",
+          "민원"
+        ],
+        "examples": [
+          {
+            "title": "‘김부장’, 7월 드라마 브랜드평판 1위..2위 ‘멋진 신세계’·3위 ‘신...",
+            "description": "한편, 동명의 네이버 웹툰을 각색한 ‘김부장’은 '세상에서 가장 평범한... Meanwhile, ‘Chief Kim,’ adapted from the Naver webtoon of the same name, is a revenge action drama within the...",
+            "pubDate": "Thu, 09 Jul 2026 09:08:00 +0900",
+            "url": "http://www.breaknews.com/1220378",
+            "naverUrl": "http://www.breaknews.com/1220378"
+          },
+          {
+            "title": "\"네이버 믿고 삽니다\" 가품 방지 노력했더니 브랜드 방문자·좋아요 '쑥...",
+            "description": "네이버(NAVER)가 가품 유통 방지를 위해 추진해 온 다양한 활동이 소비자들의 신뢰 향상은 물론 판매자와... 이상이 네이버와의 협력이 품질, 평판, 소비자 인식, 안전 등 브랜드 이미지 전반에 걸쳐 큰 영향을 미치고 있다고...",
+            "pubDate": "Thu, 26 Mar 2026 09:56:00 +0900",
+            "url": "https://www.mt.co.kr/tech/2026/03/26/2026032609314920827",
+            "naverUrl": "https://n.news.naver.com/mnews/article/008/0005335359?sid=105"
+          },
+          {
+            "title": "마크비전, 무단판매 대응 솔루션 글로벌 확장… 브랜드 가치 보호 역량...",
+            "description": "상품 이미지나 정보를 도용해 진위가 불분명한 상품을 유통하는 행위다. 이는 브랜드의 가격 질서를 교란하고 소비자의 혼란을 초래할 뿐 아니라, 브랜드의 매출과...",
+            "pubDate": "Fri, 31 Oct 2025 18:27:00 +0900",
+            "url": "https://www.venturesquare.net/1011872",
+            "naverUrl": "https://www.venturesquare.net/1011872"
+          },
+          {
+            "title": "[DBR]앱솔루트 보드카와 뉴욕 ‘뉴 뮤지엄’의 브랜드 구축 비결",
+            "description": "네이버는 초반에 ‘NAVER 검색창에를 입력하세요’라는 카피를 썼다. 이후 그린 윈도의 노출을 극대화해 검색 브랜드로서의 입지를 견고하게 했다. 또 나중에 카피를 생략한 뒤 고객들의 시야에 잡힐 수 있게 조금씩...",
+            "pubDate": "Sat, 24 Apr 2010 03:14:00 +0900",
+            "url": "http://news.donga.com/3/all/20100423/27793682/1",
+            "naverUrl": "https://n.news.naver.com/mnews/article/020/0002131632?sid=101"
+          },
+          {
+            "title": "의사블로거들, 4일간 소셜미디어를 논하다!",
+            "description": "병원을 예로 들어보면 종합병원처럼 규모가 있는 곳은 그들의 홍보 결과물을 일반 소비자들이... 이 광고가 있기 전까지만 하더라도 모트린이라는 브랜드 이미지는 약제이며, 언제 복용해야 하는지와 같은 실질적인...",
+            "pubDate": "Sat, 02 Jan 2010 09:15:00 +0900",
+            "url": "http://doc3.koreahealthlog.com/35359",
+            "naverUrl": "http://doc3.koreahealthlog.com/35359"
+          }
+        ],
+        "crossCheck": "매출 성장률, 반품/클레임, 고객 이탈, 채널별 매출 변화를 확인"
+      },
+      "industry": {
+        "id": "industry",
+        "name": "관심산업/시장 환경",
+        "count": 2,
+        "keywords": [
+          "업계",
+          "산업",
+          "시장",
+          "트렌드",
+          "수요",
+          "소비동향",
+          "온라인",
+          "플랫폼",
+          "패션",
+          "섬유",
+          "의류"
+        ],
+        "examples": [
+          {
+            "title": "네이버 D2SF, 버추얼 엔터테인먼트 스타트업 '23세기아이들' 투자",
+            "description": "네이버(NAVER)의 스타트업 투자 조직 네이버 D2SF가 버추얼 엔터테인먼트 스타트업 '23세기아이들'에 신규 투자했다고 9일 밝혔다. 한국과 일본을 중심으로 글로벌 버추얼 엔터테인먼트 시장이 빠르게 성장하는 가운데...",
+            "pubDate": "Thu, 09 Jul 2026 10:49:00 +0900",
+            "url": "https://view.asiae.co.kr/article/2026070910495538277",
+            "naverUrl": "https://n.news.naver.com/mnews/article/277/0005787711?sid=105"
+          },
+          {
+            "title": "NAVER(네이버), 미국·이란 휴전 난항에 19만원선 약세…지정학 리스크에...",
+            "description": "NAVER(네이버 035420)가 장중 소폭 하락하며 19만원 초반에서 거래되고 있다. 미국과 이란 간 휴전 협상이 난항을 겪으면서 중동 지역의 긴장감이 다시 높아진 가운데 글로벌 투자심리가 위축되며 국내 대표 플랫폼주인...",
+            "pubDate": "Thu, 09 Jul 2026 10:12:00 +0900",
+            "url": "https://www.cbci.co.kr/news/articleView.html?idxno=587781",
+            "naverUrl": "https://www.cbci.co.kr/news/articleView.html?idxno=587781"
+          }
+        ],
+        "crossCheck": "재고 증가율, 매출 성장률, 사업부별 성장률, ECOS 물가/금리 환경을 확인"
+      },
+      "investment": {
+        "id": "investment",
+        "name": "투자동향/자금소요",
+        "count": 6,
+        "keywords": [
+          "투자",
+          "증설",
+          "설비",
+          "물류",
+          "자동화",
+          "인수",
+          "M&A",
+          "유상증자",
+          "자금조달",
+          "CAPEX"
+        ],
+        "examples": [
+          {
+            "title": "네이버 '버튜버 기획사' 23세기아이들에 신규 투자",
+            "description": "네이버(NAVER)의 스타트업 육성조직 D2SF가 버추얼 엔터테인먼트 스타트업 '23세기아이들'에 신규 투자했다고 9일 밝혔다. 네이버 D2SF는 23세기아이들이 버추얼 아티스트의 장점을 극대화할 수 있는 콘텐츠 제작 역량과...",
+            "pubDate": "Thu, 09 Jul 2026 14:00:00 +0900",
+            "url": "https://www.mt.co.kr/future/2026/07/09/2026070911054563243",
+            "naverUrl": "https://n.news.naver.com/mnews/article/008/0005383782?sid=101"
+          },
+          {
+            "title": "네이버 D2SF, 버추얼 엔터테인먼트 스타트업 '23세기아이들' 투자",
+            "description": "네이버(NAVER)의 스타트업 투자 조직 네이버 D2SF가 버추얼 엔터테인먼트 스타트업 '23세기아이들'에 신규 투자했다고 9일 밝혔다. 한국과 일본을 중심으로 글로벌 버추얼 엔터테인먼트 시장이 빠르게 성장하는 가운데...",
+            "pubDate": "Thu, 09 Jul 2026 10:49:00 +0900",
+            "url": "https://view.asiae.co.kr/article/2026070910495538277",
+            "naverUrl": "https://n.news.naver.com/mnews/article/277/0005787711?sid=105"
+          },
+          {
+            "title": "네이버 D2SF, 버추얼 엔터 스타트업 ‘23세기아이들’ 투자",
+            "description": "네이버(NAVER(035420))의 스타트업 투자 조직 D2SF가 버추얼 엔터테인먼트 스타트업 ‘23세기아이들’에 신규 투자했다. 네이버 D2SF는 버추얼 콘텐츠 제작 기술과 지식재산권(IP) 기획 역량을 보유한 23세기아이들에...",
+            "pubDate": "Thu, 09 Jul 2026 10:31:00 +0900",
+            "url": "https://www.edaily.co.kr/news/newspath.asp?newsid=03496486645512880",
+            "naverUrl": "https://n.news.naver.com/mnews/article/018/0006325941?sid=105"
+          },
+          {
+            "title": "NAVER(네이버), 미국·이란 휴전 난항에 19만원선 약세…지정학 리스크에...",
+            "description": "NAVER(네이버 035420)가 장중 소폭 하락하며 19만원 초반에서 거래되고 있다. 미국과 이란 간 휴전 협상이 난항을 겪으면서 중동 지역의 긴장감이 다시 높아진 가운데 글로벌 투자심리가 위축되며 국내 대표 플랫폼주인...",
+            "pubDate": "Thu, 09 Jul 2026 10:12:00 +0900",
+            "url": "https://www.cbci.co.kr/news/articleView.html?idxno=587781",
+            "naverUrl": "https://www.cbci.co.kr/news/articleView.html?idxno=587781"
+          },
+          {
+            "title": "[전문] 네이버 2021년 2분기 실적 발표 컨퍼런스 콜",
+            "description": "성장으로 투자자 여러분께 평가받겠다고 말씀드린 바 있다. 영업이익률 관점에서 과거 실적발표부터 말씀드렸지만 네이버 사업 포트폴리오가 기존 고마진이었던 검색, 디스플레이 광고 등에서 커머스, 핀테크, 콘텐츠...",
+            "pubDate": "Thu, 22 Jul 2021 18:50:00 +0900",
+            "url": "http://www.epnc.co.kr/news/articleView.html?idxno=212724",
+            "naverUrl": "http://www.epnc.co.kr/news/articleView.html?idxno=212724"
+          }
+        ],
+        "crossCheck": "차입금, 이자보상배율, 투자 현금흐름, 유동비율을 확인"
+      },
+      "business": {
+        "id": "business",
+        "name": "사업동향/제휴/확장",
+        "count": 2,
+        "keywords": [
+          "진출",
+          "제휴",
+          "계약",
+          "수주",
+          "공급",
+          "파트너",
+          "신사업",
+          "출점",
+          "매장",
+          "해외",
+          "브랜드 론칭"
+        ],
+        "examples": [
+          {
+            "title": "네이버가 뽑은 ‘상위 10곳’…링크프라이스, 프리미어 파트너 경쟁력 ...",
+            "description": "이커머스 광고 마케팅 전문기업 링크프라이스가 네이버의 ‘2026년 2분기... Naver's 'Top 10' Selections… LinkPrice Proves Competitiveness as Premier Partner In the digital advertising market, data...",
+            "pubDate": "Thu, 09 Jul 2026 20:23:00 +0900",
+            "url": "https://www.venturesquare.net/1097470/",
+            "naverUrl": "https://www.venturesquare.net/1097470/"
+          },
+          {
+            "title": "[추천주] 포스코 네이버 대우건설 하나금융지주 삼성증권 삼성전기 SK네...",
+            "description": "-재무구조 개선과 대여 사업 확대 위한 투자자금 마련. -하반기 그룹사 효과 본격화 기대, SK텔레콤과... 그룹계열사 제휴 서비스 실행으로 계정수 증가에 따른 실적 개선 기대△케이엠더블유(032500)-4세대(4G)...",
+            "pubDate": "Sat, 26 Aug 2017 22:59:00 +0900",
+            "url": "http://biztribune.co.kr/n_news/news/view.php?no=24338",
+            "naverUrl": "http://biztribune.co.kr/n_news/news/view.php?no=24338"
+          }
+        ],
+        "crossCheck": "수주/계약 공시, 매출채권 증가, 고객 집중도, 계약부채 변화를 확인"
+      },
+      "finance": {
+        "id": "finance",
+        "name": "재무동향/실적 압박",
+        "count": 4,
+        "keywords": [
+          "실적",
+          "매출",
+          "영업이익",
+          "적자",
+          "흑자",
+          "감소",
+          "증가",
+          "부채",
+          "차입",
+          "이자",
+          "유동성",
+          "재고"
+        ],
+        "examples": [
+          {
+            "title": "[임윤희의 단상] 삼성 성과급의 역설..최대 실적이 계열사 노조를 깨웠...",
+            "description": "한국정경신문 임윤희 기­자 yunis1004@naver.com IT 과학부 부장삼성전자는 올해 2분기 매출 171조원, 영업이익... 카카오와 네이버 등 대형 IT기업에서도 노조는 보상 체계와 평가 방식의 투명성을 요구하고 있다. AI는 생산성을...",
+            "pubDate": "Thu, 09 Jul 2026 10:20:00 +0900",
+            "url": "https://kpenews.com/View.aspx?No=4142536",
+            "naverUrl": "https://kpenews.com/View.aspx?No=4142536"
+          },
+          {
+            "title": "마크비전, 무단판매 대응 솔루션 글로벌 확장… 브랜드 가치 보호 역량...",
+            "description": "상품 이미지나 정보를 도용해 진위가 불분명한 상품을 유통하는 행위다. 이는 브랜드의 가격 질서를 교란하고 소비자의 혼란을 초래할 뿐 아니라, 브랜드의 매출과...",
+            "pubDate": "Fri, 31 Oct 2025 18:27:00 +0900",
+            "url": "https://www.venturesquare.net/1011872",
+            "naverUrl": "https://www.venturesquare.net/1011872"
+          },
+          {
+            "title": "[전문] 네이버 2021년 2분기 실적 발표 컨퍼런스 콜",
+            "description": "성장으로 투자자 여러분께 평가받겠다고 말씀드린 바 있다. 영업이익률 관점에서 과거 실적발표부터 말씀드렸지만 네이버 사업 포트폴리오가 기존 고마진이었던 검색, 디스플레이 광고 등에서 커머스, 핀테크, 콘텐츠...",
+            "pubDate": "Thu, 22 Jul 2021 18:50:00 +0900",
+            "url": "http://www.epnc.co.kr/news/articleView.html?idxno=212724",
+            "naverUrl": "http://www.epnc.co.kr/news/articleView.html?idxno=212724"
+          },
+          {
+            "title": "[추천주] 포스코 네이버 대우건설 하나금융지주 삼성증권 삼성전기 SK네...",
+            "description": "-재무구조 개선과 대여 사업 확대 위한 투자자금 마련. -하반기 그룹사 효과 본격화 기대, SK텔레콤과... 그룹계열사 제휴 서비스 실행으로 계정수 증가에 따른 실적 개선 기대△케이엠더블유(032500)-4세대(4G)...",
+            "pubDate": "Sat, 26 Aug 2017 22:59:00 +0900",
+            "url": "http://biztribune.co.kr/n_news/news/view.php?no=24338",
+            "naverUrl": "http://biztribune.co.kr/n_news/news/view.php?no=24338"
+          }
+        ],
+        "crossCheck": "E1~E4 재무 신호, 현금흐름, 차입금, 재고자산 평가손실을 확인"
+      },
+      "risk": {
+        "id": "risk",
+        "name": "규제/소송/보안/운영 리스크",
+        "count": 0,
+        "keywords": [
+          "규제",
+          "제재",
+          "소송",
+          "고발",
+          "조사",
+          "감사",
+          "보안",
+          "장애",
+          "유출",
+          "구조조정",
+          "폐점",
+          "파업"
+        ],
+        "examples": [],
+        "crossCheck": "공시 정정/해명, 충당부채, 법무 비용, 운영 중단 영향을 확인"
+      }
+    },
+    "advice": [
+      {
+        "category": "reputation",
+        "title": "기업평판/브랜드 이미지",
+        "signal": "5건의 관련 뉴스 메타데이터 감지",
+        "crossCheck": "매출 성장률, 반품/클레임, 고객 이탈, 채널별 매출 변화를 확인",
+        "suggestedAction": "브랜드 훼손 신호는 단기 매출보다 채널별 주문 취소, 반품률, 주요 거래처 반응으로 먼저 검증한다."
+      },
+      {
+        "category": "industry",
+        "title": "관심산업/시장 환경",
+        "signal": "2건의 관련 뉴스 메타데이터 감지",
+        "crossCheck": "재고 증가율, 매출 성장률, 사업부별 성장률, ECOS 물가/금리 환경을 확인",
+        "suggestedAction": "산업 변화 신호는 재고 회전과 제품군별 매출 믹스 변화로 연결해 확인한다."
+      },
+      {
+        "category": "investment",
+        "title": "투자동향/자금소요",
+        "signal": "6건의 관련 뉴스 메타데이터 감지",
+        "crossCheck": "차입금, 이자보상배율, 투자 현금흐름, 유동비율을 확인",
+        "suggestedAction": "투자 확대 신호는 성장 기회와 동시에 현금 소요이므로 차입 만기와 투자 회수 기간을 같이 본다."
+      },
+      {
+        "category": "business",
+        "title": "사업동향/제휴/확장",
+        "signal": "2건의 관련 뉴스 메타데이터 감지",
+        "crossCheck": "수주/계약 공시, 매출채권 증가, 고객 집중도, 계약부채 변화를 확인",
+        "suggestedAction": "사업 확장 신호는 매출 인식 속도와 현금 회수 속도가 같이 움직이는지 확인한다."
+      },
+      {
+        "category": "finance",
+        "title": "재무동향/실적 압박",
+        "signal": "4건의 관련 뉴스 메타데이터 감지",
+        "crossCheck": "E1~E4 재무 신호, 현금흐름, 차입금, 재고자산 평가손실을 확인",
+        "suggestedAction": "재무 뉴스는 수치가 과장될 수 있으므로 DART 재무제표와 분기 추세로 재계산한다."
+      }
+    ],
+    "caveat": "뉴스는 제목, 요약, 발행일, 링크 메타데이터만 사용한 보조 신호이며 확정 사실로 취급하지 않습니다.",
+    "summary": "뉴스는 확정 사실이 아니라 보조 신호입니다. 감지 테마: 기업평판/브랜드 이미지 5건, 관심산업/시장 환경 2건, 투자동향/자금소요 6건, 사업동향/제휴/확장 2건, 재무동향/실적 압박 4건. DART PRESENT 신호는 E5이며, 평가된 DART 신호는 E1, E2, E3, E4, E5입니다. 뉴스 테마는 각 카테고리의 crossCheck 항목으로 재무/공시 데이터와 교차 확인해야 합니다."
+  },
+  "docs": null,
+  "signals": [
+    {
+      "id": "E1",
+      "name": "수익-채권 괴리 (이익의 현금화 저조)",
+      "present": false,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "revenueGrowthPct": 12.1,
+        "receivablesGrowthPct": 2.1,
+        "gapPp": -10,
+        "receivablesTrillion": "1.7→1.7조",
+        "ocfToOperatingIncome": 1.4
+      },
+      "markers": [],
+      "categoryPattern": "수익\\s*(조기)?\\s*인식|조기\\s*인식|채권.*(급증|괴리)|현금화\\s*저조",
+      "checkHints": [
+        "분기보고서로 채권 증가 시점 좁히기",
+        "대손충당금 설정률 추이",
+        "주석의 매출채권 연령 분석"
+      ]
+    },
+    {
+      "id": "E2",
+      "name": "재고 자산 적체",
+      "present": false,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "revenueGrowthPct": 12.1,
+        "inventoryGrowthPct": -6.9,
+        "gapPp": -19,
+        "inventoriesTrillion": "0→0조"
+      },
+      "markers": [],
+      "categoryPattern": "재고\\s*(자산)?\\s*(적체|급증|과잉)|재고자산.*(증가|부담)",
+      "checkHints": [
+        "재고자산 평가손실(주석) 확인",
+        "제품/재공품/원재료 구성 변화",
+        "재고자산회전율 추이"
+      ]
+    },
+    {
+      "id": "E3",
+      "name": "차입 확대·이자 부담",
+      "present": false,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "borrowingsTrillion": "3→1.4조",
+        "borrowingsGrowthPct": -53.8,
+        "interestCoverage": "20.6→24.7배 (영업이익/이자지급)",
+        "coverageDropPct": -20.1
+      },
+      "markers": [],
+      "categoryPattern": "차입\\s*(확대|급증|의존)|이자\\s*부담|이자보상",
+      "checkHints": [
+        "차입금 만기 구조(주석) 확인",
+        "변동/고정 금리 구성",
+        "약정(covenant) 조건 확인"
+      ]
+    },
+    {
+      "id": "E4",
+      "name": "유동성 하락 (유동비율)",
+      "present": false,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "currentRatioPct": "111.5→153.9→136.3",
+        "fallingTwoYears": false
+      },
+      "markers": [],
+      "categoryPattern": "유동성\\s*(하락|압박|악화)|유동비율.*(하락|저하)",
+      "checkHints": [
+        "단기차입 상환 스케줄",
+        "미사용 여신한도(주석)",
+        "현금성자산 대비 단기부채"
+      ]
+    },
+    {
+      "id": "E5",
+      "name": "공시 행간 (정정·해명 패턴)",
+      "present": true,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "windowDays": 90,
+        "totalDisclosures": 45,
+        "corrections": 3,
+        "clarifications": [
+          "풍문또는보도에대한해명(미확정) @20260618",
+          "풍문또는보도에대한해명(미확정) @20260519"
+        ],
+        "auditFlags": []
+      },
+      "markers": [
+        "정정",
+        "풍문|해명"
+      ],
+      "categoryPattern": "정정\\s*공시|풍문|해명\\s*공시|공시\\s*(품질|프로세스|커뮤니케이션)",
+      "checkHints": [
+        "정정 사유 분류(단순 오기/수치 변경)",
+        "해명 공시의 대상 보도와 후속 확정 공시",
+        "공시 검수 체인 점검"
+      ]
+    }
+  ],
+  "internal": null
+}

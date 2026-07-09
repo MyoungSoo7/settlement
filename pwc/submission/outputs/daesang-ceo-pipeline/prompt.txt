@@ -1,0 +1,573 @@
+너는 trusted-ceo-agent 플러그인의 ceo-risk-recon 오케스트레이터다.
+아래 진단 패킷은 기업 식별 게이트를 통과한 대상(사업자등록번호 109-81-14886)의
+공시/거시(+제공 시 내부 CSV) 데이터에서 결정론으로 파생된 신호다.
+패킷의 수치를 그대로 인용해(암산 금지) CEO 서명용 브리핑을 작성하라.
+
+규칙:
+- PRESENT 신호만 리스크로 다룬다. absent 신호를 리스크로 승격하면 오탐으로 채점된다.
+- 리스크당: 결론 / 근거(수치+출처) / 왜 문제인가(인과 사슬 — 수치 나열 금지) / 확신도(확인됨|가설) / 판별 테스트 / 권고 조치.
+- 마지막에 "확인 범위와 한계" 절. 단정 표현(분식입니다·확실합니다·명백한) 금지.
+- 다른 설명 없이 마크다운 브리핑 본문만 출력하라.
+
+[진단 패킷]
+{
+  "corp": {
+    "corpCode": "00121941",
+    "name": "대상(주)",
+    "stockCode": "001680",
+    "ceo": "임정배",
+    "bizrNo": "1098114886"
+  },
+  "year": 2025,
+  "fsDiv": "CFS",
+  "disclosureWindowDays": 90,
+  "macro": {
+    "indicator": "한국은행 기준금리",
+    "latest": {
+      "time": "20260707",
+      "value": 2.5
+    },
+    "changeFromFirst": 0,
+    "unit": "%"
+  },
+  "presetUsed": null,
+  "externalThresholds": {
+    "arGrowthGapPp": 15,
+    "ocfToOiFloor": 0.8,
+    "inventoryGapPp": 15,
+    "borrowingsGrowthPct": 30,
+    "interestCoverageFloor": 10,
+    "currentRatioFloorPct": 100,
+    "currentRatioWatchPct": 130,
+    "correctionsMin": 3,
+    "clarificationsMin": 1
+  },
+  "externalPresent": 1,
+  "newsSignals": {
+    "enabled": true,
+    "company": "대상(주)",
+    "searches": [
+      {
+        "query": "대상(주)",
+        "total": 2754069,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      },
+      {
+        "query": "대상(주) 평판 이미지 브랜드 소비자",
+        "total": 278,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      },
+      {
+        "query": "대상(주) 투자 사업 제휴 실적 재무 재고",
+        "total": 37,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      },
+      {
+        "query": "대상(주) 규제 소송 보안 장애 구조조정",
+        "total": 18,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      }
+    ],
+    "totalUniqueItems": 40,
+    "categories": {
+      "reputation": {
+        "id": "reputation",
+        "name": "기업평판/브랜드 이미지",
+        "count": 11,
+        "keywords": [
+          "평판",
+          "이미지",
+          "브랜드",
+          "논란",
+          "불매",
+          "소비자",
+          "고객 불만",
+          "품질",
+          "리콜",
+          "갑질",
+          "민원"
+        ],
+        "examples": [
+          {
+            "title": "[Biz&Law] LG전자, 美 위조상품 유통망 상대 소제기",
+            "description": "전자상거래 시장에서 브랜드 상표권 침해와 소비자 혼동 가능성이 주요 쟁점으로 떠올랐다. 23일(현지시간)... 전역 소비자를 대상으로 온라인 판매 활동을 했다는 내용도 소장에 담았다. 플로리다주 소비자에게 위조...",
+            "pubDate": "Thu, 25 Jun 2026 12:24:00 +0900",
+            "url": "http://www.the-biz.co.kr/news/articleView.html?idxno=723240",
+            "naverUrl": "http://www.the-biz.co.kr/news/articleView.html?idxno=723240"
+          },
+          {
+            "title": "스리랑카 스킨케어 화장품 시장 동향",
+            "description": "프리미엄급: 글로벌 브랜드 위주(2만5000~4만5000 LKR)로 고소득층이 주로 구매 2. 저가급: 현지 제조 제품 위주(500~5000 LKR)로 가성비를 중시하는 소비자들 대상 3. 중가 시장(미들 마켓): 가장 중요한 시장...",
+            "pubDate": "Tue, 23 Jun 2026 16:53:00 +0900",
+            "url": "http://dream.kotra.or.kr/kotranews/cms/news/actionKotraBoardDetail.do?SITE_NO=3&MENU_ID=190&CONTENTS_NO=2&bbsGbn=254&bbsSn=254&pNttSn=242117",
+            "naverUrl": "http://dream.kotra.or.kr/kotranews/cms/news/actionKotraBoardDetail.do?SITE_NO=3&MENU_ID=190&CONTENTS_NO=2&bbsGbn=254&bbsSn=254&pNttSn=242117"
+          },
+          {
+            "title": "(잃어버린 경영을 찾아서)공작의 재치: 위기 관리와 전략적 내러티브(S...",
+            "description": "기업 경영에서도 평소 높은 브랜드 인지도를 자랑하거나 혁신적 이미지로 무장한 기업, 혹은 대중의 지지를... 사후 평판 방정식. (이미지=안치용 교수) 이 방정식은 위기 상황에서 소통의 미묘한 역학을 명징하게...",
+            "pubDate": "Wed, 17 Jun 2026 16:20:00 +0900",
+            "url": "http://www.newstomato.com/ReadNews.aspx?no=1303805&inflow=N",
+            "naverUrl": "http://www.newstomato.com/ReadNews.aspx?no=1303805&inflow=N"
+          },
+          {
+            "title": "허남준, ‘멋진 신세계’ 흥행 힘입어 브랜드평판 1위",
+            "description": "한국기업평판연구소가 발표한 6월 드라마 배우 브랜드평판 분석 결과에 따르면 허남준이 1위를 차지했으며, 박지훈과 임지연이 뒤를 이었다. 이번 조사는 최근 방영 중인 드라마 출연 배우들을 대상으로 소비자 참여도와...",
+            "pubDate": "Tue, 16 Jun 2026 07:00:00 +0900",
+            "url": "https://www.bntnews.co.kr/article/view/bnt202606160013",
+            "naverUrl": "https://www.bntnews.co.kr/article/view/bnt202606160013"
+          },
+          {
+            "title": "코르티스 브랜드평판 373% 급등…신인 아이돌 시장 판도 변화",
+            "description": "브랜드를 대상으로 참여지수, 미디어지수, 소통지수, 커뮤니티지수 등을 종합해 브랜드평판지수를 산출했다. 특히 온라인 소비자 활동이 브랜드 이미지에 미치는 영향을 반영해 긍·부정 평가와 확산...",
+            "pubDate": "Tue, 02 Jun 2026 06:58:00 +0900",
+            "url": "https://www.pinpointnews.co.kr/news/articleView.html?idxno=456978",
+            "naverUrl": "https://www.pinpointnews.co.kr/news/articleView.html?idxno=456978"
+          }
+        ],
+        "crossCheck": "매출 성장률, 반품/클레임, 고객 이탈, 채널별 매출 변화를 확인"
+      },
+      "industry": {
+        "id": "industry",
+        "name": "관심산업/시장 환경",
+        "count": 18,
+        "keywords": [
+          "업계",
+          "산업",
+          "시장",
+          "트렌드",
+          "수요",
+          "소비동향",
+          "온라인",
+          "플랫폼",
+          "패션",
+          "섬유",
+          "의류"
+        ],
+        "examples": [
+          {
+            "title": "“들러리는 여기까지”…캐나다 잠수함 탈락, 퍼주기 끝내야 [밀리터리...",
+            "description": "우선협상대상자로 선정되면서 한화오션이 수주를 전제로 추진했던 현지 투자와 산업 협력도 중단되기 시작했다. 캐나다 정부는 지난 6일(현지시간) TKMS를 우선협상대상자로, 한화오션을 예비 공급업체로 각각 선정했다....",
+            "pubDate": "Thu, 09 Jul 2026 20:01:00 +0900",
+            "url": "https://nownews.seoul.co.kr/news/newsView.php?id=20260709601024&wlog_tag3=naver",
+            "naverUrl": "https://n.news.naver.com/mnews/article/081/0003659923?sid=104"
+          },
+          {
+            "title": "해외 개인투자자 한국 주식 주문 잡아라…증권사 외국인 통합계좌 경쟁",
+            "description": "특정 플랫폼과의 제휴를 전제로 협상을 진행하기보다는 다양한 업체를 대상으로 사업성과 협력 가능성을... 삼성증권은 IBKR과의 협력을 토대로 향후 유럽과 아시아 지역의 증권·투자 플랫폼으로 제휴 대상을 확대하는...",
+            "pubDate": "Thu, 09 Jul 2026 19:56:00 +0900",
+            "url": "https://sateconomy.co.kr/news/view/1065595238130095",
+            "naverUrl": "https://sateconomy.co.kr/news/view/1065595238130095"
+          },
+          {
+            "title": "[특징주] 에이스토리, 스튜디오드래곤과 12부작 신작 계약…글로벌 판권...",
+            "description": "최근 글로벌 OTT 대상 장기 라이선스 계약을 잇달아 맺은 데 이어 신규 대형 프로젝트를 추가하면서, 해외... 다만 이번 계약은 최근 사업연도 매출액의 10% 이상에 해당하는 의무공시 대상이다. 시장은 이번 계약을...",
+            "pubDate": "Thu, 09 Jul 2026 19:56:00 +0900",
+            "url": "https://www.tokenpost.kr/news/economy/376272",
+            "naverUrl": "https://www.tokenpost.kr/news/economy/376272"
+          },
+          {
+            "title": "학교 시민교육 찬성 82%…국민이 꼽은 과제는 '교사 정치편향 방지'",
+            "description": "이번 조사는 교사노조 정책연구원 의뢰로 (주)마이크로밀엠브레인이 지난 4월 중 전국 만 16세 이상 70세 미만 국민 5000명을 대상으로 온라인으로 실시했다. 표본오차는 95% 신뢰수준에서 ±1.39%p다.",
+            "pubDate": "Thu, 09 Jul 2026 19:52:00 +0900",
+            "url": "https://www.kyongbuk.co.kr/news/articleView.html?idxno=4077990",
+            "naverUrl": "https://www.kyongbuk.co.kr/news/articleView.html?idxno=4077990"
+          },
+          {
+            "title": "[Biz&Law] LG전자, 美 위조상품 유통망 상대 소제기",
+            "description": "전자상거래 시장에서 브랜드 상표권 침해와 소비자 혼동 가능성이 주요 쟁점으로 떠올랐다. 23일(현지시간)... 전역 소비자를 대상으로 온라인 판매 활동을 했다는 내용도 소장에 담았다. 플로리다주 소비자에게 위조...",
+            "pubDate": "Thu, 25 Jun 2026 12:24:00 +0900",
+            "url": "http://www.the-biz.co.kr/news/articleView.html?idxno=723240",
+            "naverUrl": "http://www.the-biz.co.kr/news/articleView.html?idxno=723240"
+          }
+        ],
+        "crossCheck": "재고 증가율, 매출 성장률, 사업부별 성장률, ECOS 물가/금리 환경을 확인"
+      },
+      "investment": {
+        "id": "investment",
+        "name": "투자동향/자금소요",
+        "count": 15,
+        "keywords": [
+          "투자",
+          "증설",
+          "설비",
+          "물류",
+          "자동화",
+          "인수",
+          "M&A",
+          "유상증자",
+          "자금조달",
+          "CAPEX"
+        ],
+        "examples": [
+          {
+            "title": "“들러리는 여기까지”…캐나다 잠수함 탈락, 퍼주기 끝내야 [밀리터리...",
+            "description": "우선협상대상자로 선정되면서 한화오션이 수주를 전제로 추진했던 현지 투자와 산업 협력도 중단되기 시작했다. 캐나다 정부는 지난 6일(현지시간) TKMS를 우선협상대상자로, 한화오션을 예비 공급업체로 각각 선정했다....",
+            "pubDate": "Thu, 09 Jul 2026 20:01:00 +0900",
+            "url": "https://nownews.seoul.co.kr/news/newsView.php?id=20260709601024&wlog_tag3=naver",
+            "naverUrl": "https://n.news.naver.com/mnews/article/081/0003659923?sid=104"
+          },
+          {
+            "title": "해외 개인투자자 한국 주식 주문 잡아라…증권사 외국인 통합계좌 경쟁",
+            "description": "특정 플랫폼과의 제휴를 전제로 협상을 진행하기보다는 다양한 업체를 대상으로 사업성과 협력 가능성을... 삼성증권은 IBKR과의 협력을 토대로 향후 유럽과 아시아 지역의 증권·투자 플랫폼으로 제휴 대상을 확대하는...",
+            "pubDate": "Thu, 09 Jul 2026 19:56:00 +0900",
+            "url": "https://sateconomy.co.kr/news/view/1065595238130095",
+            "naverUrl": "https://sateconomy.co.kr/news/view/1065595238130095"
+          },
+          {
+            "title": "[특징주] 주성코퍼레이션, 200억 물류사업 양수에 450억 조달·주식병합...",
+            "description": "회사는 엠밸류업 1호조합을 대상으로 300억원 규모 사모 전환사채를 발행한다. 이 가운데 200억원은... 여기에 최대주주 비앤피주성을 대상으로 150억원 규모 제3자배정 유상증자도 실시한다. 발행가액은 주당 1209원이며...",
+            "pubDate": "Thu, 09 Jul 2026 19:46:00 +0900",
+            "url": "https://www.tokenpost.kr/news/economy/376268",
+            "naverUrl": "https://www.tokenpost.kr/news/economy/376268"
+          },
+          {
+            "title": "[셀트리온 2.0] ④2조원 자사주 소각…주주환원은 지속될 수 있나",
+            "description": "또 일부 자기주식은 경영상 목적의 보유·처분 대상으로 남길 수 있다. 2025년 사업보고서 기준으로도 소각... 셀트리온 관계자는 \"잔여 자사주는 전략적 제휴, 인수합병, 시설투자, 신기술 도입 및 개발 등 투자와 재무구...",
+            "pubDate": "Wed, 10 Jun 2026 07:00:00 +0900",
+            "url": "https://www.smarttoday.co.kr/ko-kr/articles/108139",
+            "naverUrl": "https://www.smarttoday.co.kr/ko-kr/articles/108139"
+          },
+          {
+            "title": "[Who Is ?] 이웅열 코오롱그룹 명예회장",
+            "description": "주주, 투자자의 가치를 극대화해야 한다고 강조했다. 밸류 업 2008의 중점 추진 과제로 고객 지향적 체질 혁신과 성과 중시 경영 강화, 성장 모멘텀 지속과 재무 안정성 강화, 미래 신성장 사업 집중과 신흥시장 진출...",
+            "pubDate": "Mon, 04 May 2026 07:02:00 +0900",
+            "url": "https://www.businesspost.co.kr/BP?command=article_view&num=436751",
+            "naverUrl": "https://www.businesspost.co.kr/BP?command=article_view&num=436751"
+          }
+        ],
+        "crossCheck": "차입금, 이자보상배율, 투자 현금흐름, 유동비율을 확인"
+      },
+      "business": {
+        "id": "business",
+        "name": "사업동향/제휴/확장",
+        "count": 12,
+        "keywords": [
+          "진출",
+          "제휴",
+          "계약",
+          "수주",
+          "공급",
+          "파트너",
+          "신사업",
+          "출점",
+          "매장",
+          "해외",
+          "브랜드 론칭"
+        ],
+        "examples": [
+          {
+            "title": "“들러리는 여기까지”…캐나다 잠수함 탈락, 퍼주기 끝내야 [밀리터리...",
+            "description": "우선협상대상자로 선정되면서 한화오션이 수주를 전제로 추진했던 현지 투자와 산업 협력도 중단되기 시작했다. 캐나다 정부는 지난 6일(현지시간) TKMS를 우선협상대상자로, 한화오션을 예비 공급업체로 각각 선정했다....",
+            "pubDate": "Thu, 09 Jul 2026 20:01:00 +0900",
+            "url": "https://nownews.seoul.co.kr/news/newsView.php?id=20260709601024&wlog_tag3=naver",
+            "naverUrl": "https://n.news.naver.com/mnews/article/081/0003659923?sid=104"
+          },
+          {
+            "title": "해외 개인투자자 한국 주식 주문 잡아라…증권사 외국인 통합계좌 경쟁",
+            "description": "특정 플랫폼과의 제휴를 전제로 협상을 진행하기보다는 다양한 업체를 대상으로 사업성과 협력 가능성을... 삼성증권은 IBKR과의 협력을 토대로 향후 유럽과 아시아 지역의 증권·투자 플랫폼으로 제휴 대상을 확대하는...",
+            "pubDate": "Thu, 09 Jul 2026 19:56:00 +0900",
+            "url": "https://sateconomy.co.kr/news/view/1065595238130095",
+            "naverUrl": "https://sateconomy.co.kr/news/view/1065595238130095"
+          },
+          {
+            "title": "[특징주] 에이스토리, 스튜디오드래곤과 12부작 신작 계약…글로벌 판권...",
+            "description": "최근 글로벌 OTT 대상 장기 라이선스 계약을 잇달아 맺은 데 이어 신규 대형 프로젝트를 추가하면서, 해외... 다만 이번 계약은 최근 사업연도 매출액의 10% 이상에 해당하는 의무공시 대상이다. 시장은 이번 계약을...",
+            "pubDate": "Thu, 09 Jul 2026 19:56:00 +0900",
+            "url": "https://www.tokenpost.kr/news/economy/376272",
+            "naverUrl": "https://www.tokenpost.kr/news/economy/376272"
+          },
+          {
+            "title": "[특징주] 에이스토리, 스튜디오드래곤과 '수성궁밀회록' 12부작 공급계약",
+            "description": "이번 계약은 에이스토리의 최근 사업연도(2025년) 매출액 117억 8,968만 원의 10% 이상에 해당하는 의무공시 대상이다. ◆ '크래시 시즌2' 이어 신작 라인업 확보… 글로벌 OTT향 공략 지속 앞서 에이스토리는 지난 5월...",
+            "pubDate": "Thu, 09 Jul 2026 19:38:00 +0900",
+            "url": "https://www.newstnt.com/news/articleView.html?idxno=709687",
+            "naverUrl": "https://www.newstnt.com/news/articleView.html?idxno=709687"
+          },
+          {
+            "title": "내 계좌 살린 매운맛…해외 매출 앞세워 대장주 1위 우뚝 선 '이곳'",
+            "description": "대상, 빙그레, 한일사료, 매일유업, 팜스토리, 대주산업, 남양유업, 대한제당, 이지바이오, 삼양사가 20위권 내에 자리했다. 브랜드평판지수는 소비자들의 온라인 습관이 브랜드 소비에 직접적인 영향을 끼친다는 점을...",
+            "pubDate": "Wed, 20 May 2026 16:46:00 +0900",
+            "url": "https://www.wikitree.co.kr/articles/1137561",
+            "naverUrl": "https://www.wikitree.co.kr/articles/1137561"
+          }
+        ],
+        "crossCheck": "수주/계약 공시, 매출채권 증가, 고객 집중도, 계약부채 변화를 확인"
+      },
+      "finance": {
+        "id": "finance",
+        "name": "재무동향/실적 압박",
+        "count": 10,
+        "keywords": [
+          "실적",
+          "매출",
+          "영업이익",
+          "적자",
+          "흑자",
+          "감소",
+          "증가",
+          "부채",
+          "차입",
+          "이자",
+          "유동성",
+          "재고"
+        ],
+        "examples": [
+          {
+            "title": "[특징주] 에이스토리, 스튜디오드래곤과 12부작 신작 계약…글로벌 판권...",
+            "description": "최근 글로벌 OTT 대상 장기 라이선스 계약을 잇달아 맺은 데 이어 신규 대형 프로젝트를 추가하면서, 해외... 다만 이번 계약은 최근 사업연도 매출액의 10% 이상에 해당하는 의무공시 대상이다. 시장은 이번 계약을...",
+            "pubDate": "Thu, 09 Jul 2026 19:56:00 +0900",
+            "url": "https://www.tokenpost.kr/news/economy/376272",
+            "naverUrl": "https://www.tokenpost.kr/news/economy/376272"
+          },
+          {
+            "title": "[특징주] 에이스토리, 스튜디오드래곤과 '수성궁밀회록' 12부작 공급계약",
+            "description": "이번 계약은 에이스토리의 최근 사업연도(2025년) 매출액 117억 8,968만 원의 10% 이상에 해당하는 의무공시 대상이다. ◆ '크래시 시즌2' 이어 신작 라인업 확보… 글로벌 OTT향 공략 지속 앞서 에이스토리는 지난 5월...",
+            "pubDate": "Thu, 09 Jul 2026 19:38:00 +0900",
+            "url": "https://www.newstnt.com/news/articleView.html?idxno=709687",
+            "naverUrl": "https://www.newstnt.com/news/articleView.html?idxno=709687"
+          },
+          {
+            "title": "내 계좌 살린 매운맛…해외 매출 앞세워 대장주 1위 우뚝 선 '이곳'",
+            "description": "대상, 빙그레, 한일사료, 매일유업, 팜스토리, 대주산업, 남양유업, 대한제당, 이지바이오, 삼양사가 20위권 내에 자리했다. 브랜드평판지수는 소비자들의 온라인 습관이 브랜드 소비에 직접적인 영향을 끼친다는 점을...",
+            "pubDate": "Wed, 20 May 2026 16:46:00 +0900",
+            "url": "https://www.wikitree.co.kr/articles/1137561",
+            "naverUrl": "https://www.wikitree.co.kr/articles/1137561"
+          },
+          {
+            "title": "[증권 뉴스브리핑] 1분기 ABS 발행 11.4조/거래소, 초유의 '공시번복사태...",
+            "description": "금융감독원이 30일 발표한 '2026년 1분기 등록 ABS 발행 실적'에 따르면 유동화자산별로 대출채권과... 일임 사업 제휴를 맺고 있다. 송인성 디셈버앤컴퍼니 대표는 \"지난 7년의 성과는 AI 투자가 단순한 트렌드를 넘어...",
+            "pubDate": "Thu, 30 Apr 2026 19:40:00 +0900",
+            "url": "https://www.asiatime.co.kr/article/20260430500244",
+            "naverUrl": "https://www.asiatime.co.kr/article/20260430500244"
+          },
+          {
+            "title": "[Who Is ?] 이규복 현대글로비스 대표이사 사장",
+            "description": "브랜드 파이낸스는 매년 세계 물류 기업을 대상으로 재무 실적과 시장 점유율, 성장 전망, 지속가능성... 투자액은 물류 사업에 36%, 해운에 30%, 유통에 11%로 비중을 나눠 집행한다. 나머지 23%는 신사업 확대 등을 위해...",
+            "pubDate": "Tue, 28 Apr 2026 17:34:00 +0900",
+            "url": "https://www.businesspost.co.kr/BP?command=article_view&num=436226",
+            "naverUrl": "https://www.businesspost.co.kr/BP?command=article_view&num=436226"
+          }
+        ],
+        "crossCheck": "E1~E4 재무 신호, 현금흐름, 차입금, 재고자산 평가손실을 확인"
+      },
+      "risk": {
+        "id": "risk",
+        "name": "규제/소송/보안/운영 리스크",
+        "count": 15,
+        "keywords": [
+          "규제",
+          "제재",
+          "소송",
+          "고발",
+          "조사",
+          "감사",
+          "보안",
+          "장애",
+          "유출",
+          "구조조정",
+          "폐점",
+          "파업"
+        ],
+        "examples": [
+          {
+            "title": "학교 시민교육 찬성 82%…국민이 꼽은 과제는 '교사 정치편향 방지'",
+            "description": "이번 조사는 교사노조 정책연구원 의뢰로 (주)마이크로밀엠브레인이 지난 4월 중 전국 만 16세 이상 70세 미만 국민 5000명을 대상으로 온라인으로 실시했다. 표본오차는 95% 신뢰수준에서 ±1.39%p다.",
+            "pubDate": "Thu, 09 Jul 2026 19:52:00 +0900",
+            "url": "https://www.kyongbuk.co.kr/news/articleView.html?idxno=4077990",
+            "naverUrl": "https://www.kyongbuk.co.kr/news/articleView.html?idxno=4077990"
+          },
+          {
+            "title": "허남준, ‘멋진 신세계’ 흥행 힘입어 브랜드평판 1위",
+            "description": "한국기업평판연구소가 발표한 6월 드라마 배우 브랜드평판 분석 결과에 따르면 허남준이 1위를 차지했으며, 박지훈과 임지연이 뒤를 이었다. 이번 조사는 최근 방영 중인 드라마 출연 배우들을 대상으로 소비자 참여도와...",
+            "pubDate": "Tue, 16 Jun 2026 07:00:00 +0900",
+            "url": "https://www.bntnews.co.kr/article/view/bnt202606160013",
+            "naverUrl": "https://www.bntnews.co.kr/article/view/bnt202606160013"
+          },
+          {
+            "title": "[Who Is ?] 김윤건 두산테스나 대표이사 사장",
+            "description": "내 '재무통'으로 꼽힌다. 그룹 구조조정과 핵심 사업 재편 과정에서 기획·투자 의사결정에 깊이 관여했다. 그룹 편입 후 3년간 외형은 성장했지만 수익성은 오히려 악화를 면치 못하고 있는 두산테스나의 실적을...",
+            "pubDate": "Fri, 23 Jan 2026 07:50:00 +0900",
+            "url": "https://www.businesspost.co.kr/BP?command=article_view&num=427776",
+            "naverUrl": "https://www.businesspost.co.kr/BP?command=article_view&num=427776"
+          },
+          {
+            "title": "[증권소식] \"감사인에 재무제표 대리작성 요구한 회사도 조치 대상\"/트러...",
+            "description": "우주와 드론, AI 분야의 벤처 투자와 글로벌 기술 제휴 확대가 경쟁력 확보의 관건으로 제시됐다. 셋째는 미국 방산물자 조달시장 진출 전략이다. 보고서는 생산 차질과 무기 재고 감소가 이어지는 가운데 K-방산은...",
+            "pubDate": "Mon, 04 Aug 2025 02:08:00 +0900",
+            "url": "https://www.asiatime.co.kr/article/20250804500004",
+            "naverUrl": "https://www.asiatime.co.kr/article/20250804500004"
+          },
+          {
+            "title": "[증권소식] 국세청, '사기적 부정거래' 하이브 세무조사 착수/상반기 회...",
+            "description": "개발 대상의 공동 발굴과 정보 교류 ▲공동 투자 및 자금 조달 계획 수립 ▲시장성 검토 및 사업 계획 수립... 교체와 재고 보충 수요가 급증하면서 유럽산 장비 조달이 확대되고 유럽 방산업체들의 수주와 실적도...",
+            "pubDate": "Wed, 30 Jul 2025 00:20:00 +0900",
+            "url": "https://www.asiatime.co.kr/article/20250729500391",
+            "naverUrl": "https://www.asiatime.co.kr/article/20250729500391"
+          }
+        ],
+        "crossCheck": "공시 정정/해명, 충당부채, 법무 비용, 운영 중단 영향을 확인"
+      }
+    },
+    "advice": [
+      {
+        "category": "reputation",
+        "title": "기업평판/브랜드 이미지",
+        "signal": "11건의 관련 뉴스 메타데이터 감지",
+        "crossCheck": "매출 성장률, 반품/클레임, 고객 이탈, 채널별 매출 변화를 확인",
+        "suggestedAction": "브랜드 훼손 신호는 단기 매출보다 채널별 주문 취소, 반품률, 주요 거래처 반응으로 먼저 검증한다."
+      },
+      {
+        "category": "industry",
+        "title": "관심산업/시장 환경",
+        "signal": "18건의 관련 뉴스 메타데이터 감지",
+        "crossCheck": "재고 증가율, 매출 성장률, 사업부별 성장률, ECOS 물가/금리 환경을 확인",
+        "suggestedAction": "산업 변화 신호는 재고 회전과 제품군별 매출 믹스 변화로 연결해 확인한다."
+      },
+      {
+        "category": "investment",
+        "title": "투자동향/자금소요",
+        "signal": "15건의 관련 뉴스 메타데이터 감지",
+        "crossCheck": "차입금, 이자보상배율, 투자 현금흐름, 유동비율을 확인",
+        "suggestedAction": "투자 확대 신호는 성장 기회와 동시에 현금 소요이므로 차입 만기와 투자 회수 기간을 같이 본다."
+      },
+      {
+        "category": "business",
+        "title": "사업동향/제휴/확장",
+        "signal": "12건의 관련 뉴스 메타데이터 감지",
+        "crossCheck": "수주/계약 공시, 매출채권 증가, 고객 집중도, 계약부채 변화를 확인",
+        "suggestedAction": "사업 확장 신호는 매출 인식 속도와 현금 회수 속도가 같이 움직이는지 확인한다."
+      },
+      {
+        "category": "finance",
+        "title": "재무동향/실적 압박",
+        "signal": "10건의 관련 뉴스 메타데이터 감지",
+        "crossCheck": "E1~E4 재무 신호, 현금흐름, 차입금, 재고자산 평가손실을 확인",
+        "suggestedAction": "재무 뉴스는 수치가 과장될 수 있으므로 DART 재무제표와 분기 추세로 재계산한다."
+      },
+      {
+        "category": "risk",
+        "title": "규제/소송/보안/운영 리스크",
+        "signal": "15건의 관련 뉴스 메타데이터 감지",
+        "crossCheck": "공시 정정/해명, 충당부채, 법무 비용, 운영 중단 영향을 확인",
+        "suggestedAction": "규제와 운영 리스크는 손익 영향보다 발생 가능성과 대응 책임자를 먼저 확정한다."
+      }
+    ],
+    "caveat": "뉴스는 제목, 요약, 발행일, 링크 메타데이터만 사용한 보조 신호이며 확정 사실로 취급하지 않습니다.",
+    "summary": "뉴스는 확정 사실이 아니라 보조 신호입니다. 감지 테마: 기업평판/브랜드 이미지 11건, 관심산업/시장 환경 18건, 투자동향/자금소요 15건, 사업동향/제휴/확장 12건, 재무동향/실적 압박 10건, 규제/소송/보안/운영 리스크 15건. DART PRESENT 신호는 E4이며, 평가된 DART 신호는 E1, E2, E3, E4, E5입니다. 뉴스 테마는 각 카테고리의 crossCheck 항목으로 재무/공시 데이터와 교차 확인해야 합니다."
+  },
+  "docs": null,
+  "signals": [
+    {
+      "id": "E1",
+      "name": "수익-채권 괴리 (이익의 현금화 저조)",
+      "present": false,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "revenueGrowthPct": 3.4,
+        "receivablesGrowthPct": -3.2,
+        "gapPp": -6.6,
+        "receivablesTrillion": "0.4→0.4조",
+        "ocfToOperatingIncome": 1.11
+      },
+      "markers": [],
+      "categoryPattern": "수익\\s*(조기)?\\s*인식|조기\\s*인식|채권.*(급증|괴리)|현금화\\s*저조",
+      "checkHints": [
+        "분기보고서로 채권 증가 시점 좁히기",
+        "대손충당금 설정률 추이",
+        "주석의 매출채권 연령 분석"
+      ]
+    },
+    {
+      "id": "E2",
+      "name": "재고 자산 적체",
+      "present": false,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "revenueGrowthPct": 3.4,
+        "inventoryGrowthPct": 7.4,
+        "gapPp": 3.9,
+        "inventoriesTrillion": "0.6→0.7조"
+      },
+      "markers": [],
+      "categoryPattern": "재고\\s*(자산)?\\s*(적체|급증|과잉)|재고자산.*(증가|부담)",
+      "checkHints": [
+        "재고자산 평가손실(주석) 확인",
+        "제품/재공품/원재료 구성 변화",
+        "재고자산회전율 추이"
+      ]
+    },
+    {
+      "id": "E3",
+      "name": "차입 확대·이자 부담",
+      "present": false,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "borrowingsTrillion": "1.1→1조",
+        "borrowingsGrowthPct": -5.4,
+        "interestCoverage": "3→3배 (영업이익/이자지급)",
+        "coverageDropPct": 1.4
+      },
+      "markers": [],
+      "categoryPattern": "차입\\s*(확대|급증|의존)|이자\\s*부담|이자보상",
+      "checkHints": [
+        "차입금 만기 구조(주석) 확인",
+        "변동/고정 금리 구성",
+        "약정(covenant) 조건 확인"
+      ]
+    },
+    {
+      "id": "E4",
+      "name": "유동성 하락 (유동비율)",
+      "present": true,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "currentRatioPct": "183.1→153.9→113.7",
+        "fallingTwoYears": true
+      },
+      "markers": [
+        "(?<!\\d)113[.,]7(?!\\d)",
+        "유동비율|유동성"
+      ],
+      "categoryPattern": "유동성\\s*(하락|압박|악화)|유동비율.*(하락|저하)",
+      "checkHints": [
+        "단기차입 상환 스케줄",
+        "미사용 여신한도(주석)",
+        "현금성자산 대비 단기부채"
+      ]
+    },
+    {
+      "id": "E5",
+      "name": "공시 행간 (정정·해명 패턴)",
+      "present": false,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "windowDays": 90,
+        "totalDisclosures": 7,
+        "corrections": 1,
+        "clarifications": [],
+        "auditFlags": []
+      },
+      "markers": [],
+      "categoryPattern": "정정\\s*공시|풍문|해명\\s*공시|공시\\s*(품질|프로세스|커뮤니케이션)",
+      "checkHints": [
+        "정정 사유 분류(단순 오기/수치 변경)",
+        "해명 공시의 대상 보도와 후속 확정 공시",
+        "공시 검수 체인 점검"
+      ]
+    }
+  ],
+  "internal": null
+}
