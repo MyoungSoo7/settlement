@@ -1,0 +1,12 @@
+{
+  "name": "trusted-ceo-agent-market",
+  "interface": { "displayName": "Trusted CEO Agent (AX 인재전쟁 Round 10 — 삼일PwC)" },
+  "plugins": [
+    {
+      "name": "trusted-ceo-agent",
+      "source": { "source": "local", "path": "./src" },
+      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
+      "category": "Productivity"
+    }
+  ]
+}

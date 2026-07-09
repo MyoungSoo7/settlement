@@ -2,32 +2,23 @@
   "mcpServers": {
     "trusted-ceo-agent-dart": {
       "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/dart-server.mjs"],
-      "env": {
-        "DART_API_KEY": "${DART_API_KEY}"
-      }
+      "args": ["./mcp/dart-server.mjs"],
+      "cwd": "."
     },
     "trusted-ceo-agent-ecos": {
       "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/ecos-server.mjs"],
-      "env": {
-        "ECOS_API_KEY": "${ECOS_API_KEY}"
-      }
+      "args": ["./mcp/ecos-server.mjs"],
+      "cwd": "."
     },
     "trusted-ceo-agent-news": {
       "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/news-server.mjs"],
-      "env": {
-        "NAVER_CLIENT_ID": "${NAVER_CLIENT_ID}",
-        "NAVER_CLIENT_SECRET": "${NAVER_CLIENT_SECRET}"
-      }
+      "args": ["./mcp/news-server.mjs"],
+      "cwd": "."
     },
     "trusted-ceo-agent-registry": {
       "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/registry-server.mjs"],
-      "env": {
-        "DATA_GO_KR_API_KEY": "${DATA_GO_KR_API_KEY}"
-      }
+      "args": ["./mcp/registry-server.mjs"],
+      "cwd": "."
     }
   }
 }

@@ -255,7 +255,7 @@ verify-books → detect-signals → CEO briefing → Markdown/DOCX report
 | 표준 CSV 3종 생성 | `spreadsheets` | 이 플러그인이 읽는 입력 계약으로 변환 |
 | 정합성 검증 | Trusted CEO Agent | `verify-books` 불변식 게이트 |
 | 리스크 분석 | Trusted CEO Agent | 내부 데이터 + DART/ECOS/뉴스/국세청 교차 검증 |
-| Word 보고서 생성 | Trusted CEO Agent (내장 `render-briefing-docx`) | `briefing.md` → 표지·요약표·서식을 갖춘 `briefing.docx` 자동 렌더 (브랜드 템플릿이 필요하면 `documents` 플러그인으로 추가 변환 가능) |
+| Word 보고서 생성 | Trusted CEO Agent (내장 `render-briefing-docx`) | `briefing.md` + `diagnostic-packet.json` → 표지·요약표·스냅샷 PNG·서식을 갖춘 `briefing.docx` 자동 렌더 (브랜드 템플릿이 필요하면 `documents` 플러그인으로 추가 변환 가능) |
 
 즉 `spreadsheets` 는 **입력 데이터 정제/표준화 담당**, Trusted CEO Agent 는 **검증/분석/브리핑/Word 산출 담당**입니다.
 
@@ -375,7 +375,8 @@ node src/bin/render-briefing-docx.mjs briefing.md   # Word 보고서 생성 (통
 | 산출물 | 용도 | 생성 주체 |
 |---|---|---|
 | `briefing.md` | Codex/Claude 대화에서 검토하기 쉬운 원본 분석 결과, 평가·수정·버전 관리용 | Trusted CEO Agent |
-| `briefing.docx` | CEO/파트너/고객에게 전달하기 쉬운 Word 형식 최종 보고서 (표지·핵심 리스크 요약표·확신도 배지·면책 푸터) | 내장 렌더러 `render-briefing-docx` (zero-dependency, UTF-8/한글 폰트 보장) |
+| `executive-summary.png` | 진단 패킷의 DART/뉴스/거시 신호를 한 장으로 요약한 CEO용 시각 스냅샷, DOCX에 자동 삽입 | `render-executive-snapshot.py` |
+| `briefing.docx` | CEO/파트너/고객에게 전달하기 쉬운 Word 형식 최종 보고서 (표지·핵심 리스크 요약표·스냅샷 PNG·확신도 배지·면책 푸터) | 내장 렌더러 `render-briefing-docx` (zero-dependency, UTF-8/한글 폰트 보장) |
 
 생성된 브리핑은 다음 명령으로 자동 채점할 수 있습니다. 채점 기준(신호·마커)은 채점 시점에
 `--data-dir` 의 데이터에서 파생됩니다 — 브리핑이 근거로 삼은 바로 그 데이터가 정답지입니다.
@@ -523,40 +524,38 @@ submission/
 `-- logs/
 ```
 
-## Codex 설치
+## Codex 설치 — 실검증 완료
 
-개인 마켓플레이스에 로컬 플러그인으로 등록합니다.
+이 submission 폴더 자체가 마켓플레이스입니다 (`.agents/plugins/marketplace.json` 내장):
 
 ```bash
-mkdir -p ~/.codex/plugins
-cp -R src ~/.codex/plugins/trusted-ceo-agent
+codex plugin marketplace add <이 submission 폴더 경로 또는 repo>
+codex plugin add trusted-ceo-agent@trusted-ceo-agent-market
 ```
 
-설치 직후 다음 두 명령이 그대로 돌면 정상입니다 (플러그인 루트 기준 경로 — `src/` 접두어 없음).
+이후 2개 파일만 복사하면 MCP 4종(dart/ecos/news/registry)까지 Codex 세션에 뜹니다:
+
+1. **MCP 도구 승인**: `docs/codex-config-snippet.toml` 내용을 `~/.codex/config.toml` 끝에
+   붙여넣기 — 플러그인 id 의 `@마켓플레이스명` 은 설치한 이름에 맞춥니다. 모든 도구가
+   읽기 전용 조회라 approve 가 안전하며, 없으면 비대화 모드에서 MCP 호출이 자동
+   취소됩니다 (실측).
+2. **API 키**: `.env.example` 을 `~/.codex/.env` 로 복사해 값 채우기 — Codex 플러그인
+   MCP 서버는 셸 env 를 상속하지 않으므로 이 위치가 정답입니다 (실측).
+
+> `.mcp.json` 은 Codex 실측 규격(`"cwd": "."` + 상대경로 args)을 따릅니다 —
+> `${CLAUDE_PLUGIN_ROOT}` 치환은 codex-cli 0.142.5 에서 동작하지 않음을 실측 확인.
+> Codex 실세션 E2E 에서 4개 서버 status 도구 실호출까지 검증했습니다.
+
+설치 직후 다음 두 명령이 그대로 돌면 정상입니다 (플러그인 캐시 루트 기준 경로 —
+캐시 위치는 `codex plugin list` 로 확인).
 
 ```bash
-node ~/.codex/plugins/trusted-ceo-agent/bin/verify-books.mjs     # GATE PASS
-node ~/.codex/plugins/trusted-ceo-agent/bin/detect-signals.mjs   # PRESENT 4건 (동봉 데모)
+node <플러그인캐시루트>/bin/verify-books.mjs     # GATE PASS
+node <플러그인캐시루트>/bin/detect-signals.mjs   # PRESENT 4건 (동봉 데모)
 ```
 
 CEO 데이터로 쓸 때는 두 명령에 `--data-dir <회사데이터폴더>` 만 붙입니다. 스킬(`ceo-risk-recon`)도
 같은 규칙으로 플러그인 루트의 `bin/` 스크립트를 호출하도록 작성되어 있어 설치 후 바로 동작합니다.
-
-`~/.agents/plugins/marketplace.json` 예시:
-
-```json
-{
-  "name": "personal-plugins",
-  "plugins": [
-    {
-      "name": "trusted-ceo-agent",
-      "source": { "source": "local", "path": "./.codex/plugins/trusted-ceo-agent" },
-      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
-      "category": "Productivity"
-    }
-  ]
-}
-```
 
 ## Claude Code에서 사용
 
