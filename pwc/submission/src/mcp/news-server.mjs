@@ -47,24 +47,43 @@ const TOOLS = [
   },
   {
     name: 'news_search_risk',
-    description: '기업명 + 리스크 키워드로 네이버 뉴스 검색 — 규제·제재·장애·보안·투자유치·구조조정·제휴 같은 외부 신호를 빠르게 확인한다. keywords 를 주지 않으면 기본 리스크 키워드를 사용한다.',
+    description: '기업명 + 리스크 키워드로 네이버 뉴스 검색 — 규제·제재·장애·보안·투자유치·구조조정·제휴 같은 외부 신호를 빠르게 확인한다. keywords 를 주지 않으면 기본 리스크 키워드를 사용하며, 키워드는 1개씩 개별 검색해 URL 기준으로 병합한다(여러 키워드 AND 결합은 0건이 되기 쉬움).',
     inputSchema: {
       type: 'object',
       properties: {
         company: { type: 'string', description: '검색할 기업명 (예: PFCT)' },
         keywords: { type: 'array', items: { type: 'string' }, description: '리스크 키워드 목록. 생략 시 기본 키워드 사용' },
-        display: { type: 'integer', description: '결과 수 (1~100, 기본 10)' },
+        display: { type: 'integer', description: '키워드당 결과 수 (1~100, 기본 10)' },
         sort: { type: 'string', enum: ['date', 'sim'], description: 'date 최신순 / sim 정확도순 (기본 date)' },
       },
       required: ['company'],
     },
-    run: ({ company, keywords, display, sort }) =>
-      searchCompanyNews({
-        company,
-        keywords: parseKeywords(keywords, DEFAULT_RISK_KEYWORDS),
-        display: limitDisplay(display),
-        sort,
-      }),
+    run: async ({ company, keywords, display, sort }) => {
+      const kws = parseKeywords(keywords, DEFAULT_RISK_KEYWORDS);
+      const perKeyword = [];
+      for (const kw of kws) {
+        perKeyword.push(await searchCompanyNews({
+          company, keywords: [kw], display: limitDisplay(display), sort,
+        }));
+      }
+      const seen = new Set();
+      const items = [];
+      for (const search of perKeyword) {
+        for (const item of search.items ?? []) {
+          const url = item.url || item.naverUrl || item.title;
+          if (seen.has(url)) continue;
+          seen.add(url);
+          items.push(item);
+        }
+      }
+      return {
+        query: perKeyword.map((s) => s.query).join(' | '),
+        keywords: kws,
+        perKeyword: perKeyword.map((s) => ({ query: s.query, total: s.total, itemCount: s.items?.length ?? 0 })),
+        total: items.length,
+        items,
+      };
+    },
   },
   {
     name: 'news_status',

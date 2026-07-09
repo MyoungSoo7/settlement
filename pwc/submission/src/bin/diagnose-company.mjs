@@ -25,6 +25,8 @@ import { deriveSignals } from '../common/signals.mjs';
 import { resolveThresholds } from '../common/presets.mjs';
 import { loadDocs, deriveDocsSignal } from '../common/docs.mjs';
 import { loadCrosscheckConfig, runDartCrosscheck } from '../common/crosscheck.mjs';
+import { searchCompanyNews } from '../naver/client.mjs';
+import { classifyNewsSignals, newsDisabled, buildNewsSignalSummary } from '../common/news-signals.mjs';
 import { safeErrorMessage } from '../common/env.mjs';
 
 const argv = process.argv.slice(2);
@@ -96,6 +98,37 @@ const series = extractFullSeries(fullBody);
 const external = deriveExternalSignals({ series, disclosures: discBody.list ?? [], days }, externalThresholds);
 const externalPresent = external.filter((s) => s.present).length;
 
+let newsSignals = null;
+if (argv.includes('--with-news')) {
+  const newsQuery = flag('--news-query') ?? profile.corp_name ?? flag('--company') ?? corpCode;
+  const display = Math.max(1, Math.min(Number(flag('--news-display') ?? 10), 30));
+  const searches = [];
+  // 키워드는 반드시 1개씩 검색한다 — 네이버 뉴스 검색은 공백을 AND 로 묶어서
+  // "기업명 + 키워드 여러 개"는 사실상 항상 0건이 된다 (신성통상 라이브에서 실측 확인).
+  // 기업명의 법인 접미사((주)·㈜·주식회사)는 buildCompanyQuery 가 제거한다.
+  const newsSearches = [
+    { keywords: [], sort: 'date' },                                     // 기본 최신 기사 풀
+    ...['평판', '브랜드', '소비자',                                       // 기업평판/브랜드 축
+      '투자', '실적', '재무',                                             // 사업/재무 축
+      '규제', '소송', '구조조정',                                          // 규제/리스크 축
+    ].map((kw) => ({ keywords: [kw], sort: 'date' })),
+  ];
+  try {
+    for (const search of newsSearches) {
+      searches.push(await searchCompanyNews({
+        company: newsQuery,
+        keywords: search.keywords,
+        display,
+        sort: search.sort,
+      }));
+    }
+    newsSignals = classifyNewsSignals({ company: newsQuery, searches });
+    newsSignals.summary = buildNewsSignalSummary({ newsSignals, externalSignals: external });
+  } catch (e) {
+    newsSignals = newsDisabled(safeErrorMessage(e));
+  }
+}
+
 // ── 4.5 비정형 문서 축 (옵션 — --docs-dir): 지시문(인젝션) 스캔 = D1 ──
 let docsMeta = null;
 let docsSignal = null;
@@ -151,6 +184,7 @@ if (asJson) {
     year, fsDiv, disclosureWindowDays: days, macro,
     presetUsed, externalThresholds,
     externalPresent,
+    newsSignals,
     docs: docsMeta,
     signals: [...external, ...(docsSignal ? [docsSignal] : [])].map(serialize), // briefing-eval --signals-file 가 읽는 필드
     internal: internal && {
@@ -176,6 +210,21 @@ if (asJson) {
       console.log(`          ${key}: ${typeof value === 'object' ? JSON.stringify(value) : value}`);
     }
     if (s.present) console.log(`          확인 포인트: ${s.checkHints.join(' / ')}`);
+  }
+
+  if (newsSignals) {
+    console.log('\n[뉴스·평판·시장 보조 신호]');
+    if (!newsSignals.enabled) {
+      console.log(`  뉴스 신호 미생성: ${newsSignals.reason}`);
+    } else {
+      console.log(`  검색 기사 메타데이터 ${newsSignals.totalUniqueItems}건 분석`);
+      for (const category of Object.values(newsSignals.categories)) {
+        if (category.count === 0) continue;
+        console.log(`  - ${category.name}: ${category.count}건`);
+        console.log(`    교차확인: ${category.crossCheck}`);
+      }
+      console.log(`  ${newsSignals.summary}`);
+    }
   }
 
   if (docsMeta) {
@@ -211,6 +260,7 @@ if (asJson) {
   }
 
   const totalPresent = externalPresent
+    + (newsSignals?.advice?.length ?? 0)
     + (docsSignal?.present ? 1 : 0)
     + (internal?.signals?.filter((s) => s.present).length ?? 0);
   console.log(totalPresent === 0

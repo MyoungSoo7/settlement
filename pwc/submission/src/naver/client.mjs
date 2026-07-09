@@ -93,8 +93,20 @@ export async function searchNews({ query, display = 10, start = 1, sort = 'date'
   };
 }
 
+/**
+ * 법인 접미사 제거 — "신성통상(주)"·"㈜한빛"·"주식회사 대상" → "신성통상"·"한빛"·"대상".
+ * DART corp_name 을 그대로 쿼리에 쓰면 "(주)+키워드 AND" 조합이 0건으로 떨어지는 문제의 원인.
+ */
+export function cleanCompanyName(company) {
+  const cleaned = String(company ?? '')
+    .replace(/주식회사|\(주\)|㈜|\(유\)|\(합\)/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return cleaned || String(company ?? '').trim();
+}
+
 export function buildCompanyQuery({ company, keywords = [] }) {
-  const name = String(company ?? '').trim();
+  const name = cleanCompanyName(company);
   if (!name) throw new Error('company 는 비어 있을 수 없습니다');
   const parts = [name, ...keywords.map((k) => String(k).trim()).filter(Boolean)];
   return parts.join(' ');
