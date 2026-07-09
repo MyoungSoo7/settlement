@@ -1,0 +1,614 @@
+너는 trusted-ceo-agent 플러그인의 ceo-risk-recon 오케스트레이터다.
+아래 진단 패킷은 기업 식별 게이트를 통과한 신성통상(사업자등록번호 104-81-01106)의
+공시/거시(+제공 시 내부 CSV) 데이터에서 결정론으로 파생된 신호다.
+패킷의 수치를 그대로 인용해(암산 금지) CEO 서명용 브리핑을 작성하라.
+
+규칙:
+- PRESENT 신호만 리스크로 다룬다. absent 신호를 리스크로 승격하면 오탐으로 채점된다.
+- absent(미발화) 신호는 근거 수치(마커)를 인용하지 말고 "임계값 미달로 미발화" 수준의
+  정성 서술로만 언급하라 — 미발화 신호의 수치를 한 절에 2개 이상 옮겨 적으면 포착(오탐)으로 채점된다.
+- 리스크당: 결론 / 근거(수치+출처) / 왜 문제인가(인과 사슬 — 수치 나열 금지) / 확신도(확인됨|가설) / 판별 테스트 / 권고 조치.
+- 마지막에 "확인 범위와 한계" 절. 단정 표현(분식입니다·확실합니다·명백한) 금지.
+- 다른 설명 없이 마크다운 브리핑 본문만 출력하라.
+
+[진단 패킷]
+{
+  "corp": {
+    "corpCode": "00136341",
+    "name": "신성통상(주)",
+    "stockCode": "005390",
+    "ceo": "대표이사 염태순",
+    "bizrNo": "1048101106"
+  },
+  "year": 2025,
+  "fsDiv": "CFS",
+  "disclosureWindowDays": 90,
+  "macro": {
+    "indicator": "한국은행 기준금리",
+    "latest": {
+      "time": "20260707",
+      "value": 2.5
+    },
+    "changeFromFirst": 0,
+    "unit": "%"
+  },
+  "presetUsed": null,
+  "externalThresholds": {
+    "arGrowthGapPp": 15,
+    "ocfToOiFloor": 0.8,
+    "inventoryGapPp": 15,
+    "borrowingsGrowthPct": 30,
+    "interestCoverageFloor": 10,
+    "currentRatioFloorPct": 100,
+    "currentRatioWatchPct": 130,
+    "correctionsMin": 3,
+    "clarificationsMin": 1
+  },
+  "externalPresent": 0,
+  "newsSignals": {
+    "enabled": true,
+    "company": "신성통상(주)",
+    "searches": [
+      {
+        "query": "신성통상",
+        "total": 21710,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      },
+      {
+        "query": "신성통상 평판",
+        "total": 443,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      },
+      {
+        "query": "신성통상 브랜드",
+        "total": 11559,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      },
+      {
+        "query": "신성통상 소비자",
+        "total": 4232,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      },
+      {
+        "query": "신성통상 투자",
+        "total": 4683,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      },
+      {
+        "query": "신성통상 실적",
+        "total": 2591,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      },
+      {
+        "query": "신성통상 재무",
+        "total": 850,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      },
+      {
+        "query": "신성통상 규제",
+        "total": 821,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      },
+      {
+        "query": "신성통상 소송",
+        "total": 174,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      },
+      {
+        "query": "신성통상 구조조정",
+        "total": 429,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      }
+    ],
+    "totalUniqueItems": 76,
+    "categories": {
+      "reputation": {
+        "id": "reputation",
+        "name": "기업평판/브랜드 이미지",
+        "count": 40,
+        "keywords": [
+          "평판",
+          "이미지",
+          "브랜드",
+          "논란",
+          "불매",
+          "소비자",
+          "고객 불만",
+          "품질",
+          "리콜",
+          "갑질",
+          "민원"
+        ],
+        "examples": [
+          {
+            "title": "탑텐 언더웨어 통했다…스타필드 하남점 판매량 69% '쑥'",
+            "description": "9일 신성통상의 SPA 브랜드 탑텐(TOPTEN10)에 따르면 스타필드 하남점의 여성 언더웨어 판매량이 지난 5월 기준 전년 동월보다 69% 증가했다. 속옷을 구매할 때 착용감과 핏, 사이즈를 꼼꼼하게 확인하는 소비자가 늘어나면서...",
+            "pubDate": "Thu, 09 Jul 2026 18:00:00 +0900",
+            "url": "https://www.1conomynews.co.kr/news/articleView.html?idxno=49492",
+            "naverUrl": "https://www.1conomynews.co.kr/news/articleView.html?idxno=49492"
+          },
+          {
+            "title": "'줄자' 하나 뒀을 뿐인데…SPA 언더웨어 판매 '쑥쑥'",
+            "description": "신성통상의 SPA 브랜드 탑텐이 스타필드 하남점 여성 언더웨어의 5월 판매량이 전년 동기 대비 69% 증가했다고 9일 밝혔다. 탑텐은 속옷 구매 시 착용감과 핏 등을 비교하는 소비자가 늘면서 탑텐의 세분화된 제품군과 구매...",
+            "pubDate": "Thu, 09 Jul 2026 17:48:00 +0900",
+            "url": "https://www.shinailbo.co.kr/news/articleView.html?idxno=5039435",
+            "naverUrl": "https://www.shinailbo.co.kr/news/articleView.html?idxno=5039435"
+          },
+          {
+            "title": "탑텐 매장에 '이것' 뒀더니... 속옷 판매량 69% 껑충 뛰었다",
+            "description": "시착이 어려운 속옷의 특성을 고려해 고객이 직접 치수를 측정할 수 있도록 한 서비스 도입 이후 여성 언더웨어 판매가 큰 폭으로 증가했다.9일 신성통상 주력브랜드 탑텐은 스타필드 하남점 여성 언더웨어 5월 판매량이...",
+            "pubDate": "Thu, 09 Jul 2026 17:04:00 +0900",
+            "url": "https://www.insight.co.kr/news/562315",
+            "naverUrl": "https://www.insight.co.kr/news/562315"
+          },
+          {
+            "title": "‘줄자로 쟀더니’…신성통상 탑텐, 언더웨어 판매량 69% 증가",
+            "description": "신성통상의 SPA 브랜드 탑텐(TOPTEN10)은 스타필드 하남점 여성 언더웨어 판매량이 지난 5월 한 달간 전년 동기 대비 69% 증가했다고 밝혔다. 속옷 구매 시 착용감과 핏, 사이즈를 꼼꼼히 따지는 소비자가 늘면서, 탑텐의...",
+            "pubDate": "Thu, 09 Jul 2026 15:52:00 +0900",
+            "url": "https://www.seoul.co.kr/news/economy/2026/07/09/20260709500199?wlog_tag3=naver",
+            "naverUrl": "https://n.news.naver.com/mnews/article/081/0003659845?sid=101"
+          },
+          {
+            "title": "탑텐, 언더웨어 구매 편의 강화…스타필드 하남점 판매량 69%↑",
+            "description": "김경희 기자 | 신성통상의 SPA 브랜드 탑텐(TOPTEN10)은 스타필드 하남점 여성 언더웨어의 지난 5월 판매량이 전년 동기 대비 69% 증가했다고 밝혔다. 최근 언더웨어는 생활 필수품을 넘어 착용감과 핏, 소재 등을 고려해...",
+            "pubDate": "Thu, 09 Jul 2026 11:18:00 +0900",
+            "url": "http://digitalchosun.dizzo.com/site/data/html_dir/2026/07/09/2026070980080.html",
+            "naverUrl": "http://digitalchosun.dizzo.com/site/data/html_dir/2026/07/09/2026070980080.html"
+          }
+        ],
+        "crossCheck": "매출 성장률, 반품/클레임, 고객 이탈, 채널별 매출 변화를 확인"
+      },
+      "industry": {
+        "id": "industry",
+        "name": "관심산업/시장 환경",
+        "count": 35,
+        "keywords": [
+          "업계",
+          "산업",
+          "시장",
+          "트렌드",
+          "수요",
+          "소비동향",
+          "온라인",
+          "플랫폼",
+          "패션",
+          "섬유",
+          "의류"
+        ],
+        "examples": [
+          {
+            "title": "'착용감 따지는' 언더웨어 소비 늘었다...탑텐, 체험형 판매 전략 통했...",
+            "description": "9일 업계에 따르면 신성통상의 SPA 브랜드 탑텐은 스타필드 하남점 여성 언더웨어 판매량이 지난 5월 전년 동기 대비 69% 증가했다고 밝혔다. 판매액도 같은 기간 67% 늘었다. 이 같은 변화는 최근 언더웨어 소비 트렌드와...",
+            "pubDate": "Thu, 09 Jul 2026 11:04:00 +0900",
+            "url": "https://www.asiaa.co.kr/news/articleView.html?idxno=254723",
+            "naverUrl": "https://www.asiaa.co.kr/news/articleView.html?idxno=254723"
+          },
+          {
+            "title": "[패션 뷰티 뉴스픽]형지엘리트·지그재그·탑텐·코스맥스·이미인",
+            "description": "이번 수상은 현지 판매 현황 및 브랜드 평판, 전문기관 인증 등 기초 조사와 함께 약 400만명의 중국 소비자... 탑텐, 글로벌 나눔 활동으로 15개국에 의류 143만점 전달 탑텐(TOPTEN10) 로고 [사진=신성통상] 신성통상의...",
+            "pubDate": "Tue, 13 Jan 2026 17:22:00 +0900",
+            "url": "https://www.ajunews.com/view/20260113134804793",
+            "naverUrl": "https://www.ajunews.com/view/20260113134804793"
+          },
+          {
+            "title": "[AT 패션] 무신사·형지엘리트·신성통상 탑텐",
+            "description": "신성통상의 SPA 브랜드 탑텐(TOPTEN10)은 지난해 15개국 취약계층에 142만9118점의 의류를 전달했다. 무신사, 中... 수상에는 현지 판매 현황 및 브랜드 평판, 전문기관 인증 등 기초 조사와 함께 약 400만명의 중국 소비자가...",
+            "pubDate": "Tue, 13 Jan 2026 17:06:00 +0900",
+            "url": "https://www.asiatime.co.kr/article/20260113500390",
+            "naverUrl": "https://www.asiatime.co.kr/article/20260113500390"
+          },
+          {
+            "title": "효성티앤씨, 스판덱스 독주에도 저평가… 투자자들 '긴 호흡' 필요",
+            "description": "한편 한국기업평판연구소가 분석한 9월 섬유의류 상장기업 브랜드평판 순위는 다음과 같다. F&F, 영원무역, 미스토홀딩스, LF, 한섬, 효성티앤씨, 신성통상, 신세계인터내셔날, 젝시믹스, DI동일, 제이에스티나, 백산, 신원...",
+            "pubDate": "Sat, 20 Sep 2025 07:10:00 +0900",
+            "url": "https://www.pinpointnews.co.kr/news/articleView.html?idxno=378562",
+            "naverUrl": "https://www.pinpointnews.co.kr/news/articleView.html?idxno=378562"
+          },
+          {
+            "title": "섬유의류 상장기업 2025년 9월 브랜드평판...F&F, 영원무역, 미스토홀딩...",
+            "description": "2025년 9월 섬유의류 상장기업 브랜드평판 30위 순위는 F&F, 영원무역, 미스토홀딩스, LF, 한섬, 효성티앤씨, 신성통상, 신세계인터내셔날, 젝시믹스, DI동일, 제이에스티나, 백산, 신원, 코데즈컴바인...",
+            "pubDate": "Thu, 18 Sep 2025 13:04:00 +0900",
+            "url": "https://www.energy-news.co.kr/news/articleView.html?idxno=217891",
+            "naverUrl": "https://www.energy-news.co.kr/news/articleView.html?idxno=217891"
+          }
+        ],
+        "crossCheck": "재고 증가율, 매출 성장률, 사업부별 성장률, ECOS 물가/금리 환경을 확인"
+      },
+      "investment": {
+        "id": "investment",
+        "name": "투자동향/자금소요",
+        "count": 17,
+        "keywords": [
+          "투자",
+          "증설",
+          "설비",
+          "물류",
+          "자동화",
+          "인수",
+          "M&A",
+          "유상증자",
+          "자금조달",
+          "CAPEX"
+        ],
+        "examples": [
+          {
+            "title": "효성티앤씨, 스판덱스 독주에도 저평가… 투자자들 '긴 호흡' 필요",
+            "description": "한편 한국기업평판연구소가 분석한 9월 섬유의류 상장기업 브랜드평판 순위는 다음과 같다. F&F, 영원무역, 미스토홀딩스, LF, 한섬, 효성티앤씨, 신성통상, 신세계인터내셔날, 젝시믹스, DI동일, 제이에스티나, 백산, 신원...",
+            "pubDate": "Sat, 20 Sep 2025 07:10:00 +0900",
+            "url": "https://www.pinpointnews.co.kr/news/articleView.html?idxno=378562",
+            "naverUrl": "https://www.pinpointnews.co.kr/news/articleView.html?idxno=378562"
+          },
+          {
+            "title": "[월요기획] \"러닝 상품 안 팔면 손해?\"... 복종 불문 러닝 시장 활성화",
+            "description": "대대적인 투자를 진행하고 있다. 작년 F/W 시즌 관련 상품군을 18종에서 올 S/S 시즌에는 23종으로 늘렸고 지난... 신성통상(대표 염태순)의 SPA 브랜드 ‘탑텐’도 스포츠 라인 ‘탑텐 밸런스’를 통해 1만~3만원대 기능성...",
+            "pubDate": "Mon, 06 Jul 2026 09:36:00 +0900",
+            "url": "https://www.fashionbiz.co.kr/article/227547",
+            "naverUrl": "https://www.fashionbiz.co.kr/article/227547"
+          },
+          {
+            "title": "스튜디오랩, 아시아 최대 AI 경진대회 '슈퍼AI 2026서' 최종 톱3 선정",
+            "description": "현재 해당 솔루션은 F&F, 신성통상, 하이라이트브랜즈 등 50개 이상 기업과 6000여 개 중소상공인이... 및 투자 논의를 진행했다고 전했다. 강성훈 스튜디오랩 대표는 \"아시아 최대 AI 무대에서 한국의 AI 로보틱스...",
+            "pubDate": "Wed, 17 Jun 2026 18:50:00 +0900",
+            "url": "https://it.chosun.com/news/articleView.html?idxno=2023092164081",
+            "naverUrl": "https://it.chosun.com/news/articleView.html?idxno=2023092164081"
+          },
+          {
+            "title": "진화하는 키즈 시장, 새 성장동력 되나",
+            "description": "출산율 반등과 함께 자녀 한 명에게 더 많은 비용을 투자하는 소비 트렌드가 맞물리면서 유아동 시장에 대한... 신성통상의 탑텐키즈는 유튜브 콘텐츠를 통해 베이비 라인에 대한 관심을 끌어내며 어린이날 연휴 기간...",
+            "pubDate": "Wed, 17 Jun 2026 14:08:00 +0900",
+            "url": "https://www.m-i.kr/news/articleView.html?idxno=1382514",
+            "naverUrl": "https://www.m-i.kr/news/articleView.html?idxno=1382514"
+          },
+          {
+            "title": "“상품 사진 한 장이면 상세페이지 완성”…스튜디오랩, 아시아 최대 AI...",
+            "description": "이어 파이널 라운드에서 글로벌 투자자와 심사위원, 청중을 대상으로 추가 발표를 진행한 뒤 최종 Top 3에 이름을 올렸다. 현재 스튜디오랩의 솔루션은 F&F의 MLB·디스커버리 브랜드를 비롯해 신성통상...",
+            "pubDate": "Tue, 16 Jun 2026 15:33:00 +0900",
+            "url": "https://www.venturesquare.net/1091316/",
+            "naverUrl": "https://www.venturesquare.net/1091316/"
+          }
+        ],
+        "crossCheck": "차입금, 이자보상배율, 투자 현금흐름, 유동비율을 확인"
+      },
+      "business": {
+        "id": "business",
+        "name": "사업동향/제휴/확장",
+        "count": 22,
+        "keywords": [
+          "진출",
+          "제휴",
+          "계약",
+          "수주",
+          "공급",
+          "파트너",
+          "신사업",
+          "출점",
+          "매장",
+          "해외",
+          "브랜드 론칭"
+        ],
+        "examples": [
+          {
+            "title": "탑텐 매장에 '이것' 뒀더니... 속옷 판매량 69% 껑충 뛰었다",
+            "description": "시착이 어려운 속옷의 특성을 고려해 고객이 직접 치수를 측정할 수 있도록 한 서비스 도입 이후 여성 언더웨어 판매가 큰 폭으로 증가했다.9일 신성통상 주력브랜드 탑텐은 스타필드 하남점 여성 언더웨어 5월 판매량이...",
+            "pubDate": "Thu, 09 Jul 2026 17:04:00 +0900",
+            "url": "https://www.insight.co.kr/news/562315",
+            "naverUrl": "https://www.insight.co.kr/news/562315"
+          },
+          {
+            "title": "탑텐, 사이즈 측정 지원으로 언더웨어 판매 확대",
+            "description": "신성통상의 SPA 브랜드 탑텐이 여성 언더웨어 구매 편의성을 높인 매장 서비스와 세분화된 제품군을 앞세워 판매 성과를 확대하고 있다. 탑텐은 스타필드 하남점의 5월 여성 언더웨어 전체 판매량이 전년 동기 대비 69...",
+            "pubDate": "Thu, 09 Jul 2026 10:54:00 +0900",
+            "url": "http://www.ktnews.com/news/articleView.html?idxno=147089",
+            "naverUrl": "http://www.ktnews.com/news/articleView.html?idxno=147089"
+          },
+          {
+            "title": "\"내 몸에 맞는 속옷 찾자\"…탑텐의 언더웨어 매출 성장 비결",
+            "description": "신성통상 SPA 브랜드 탑텐은 체형에 맞는 제품을 고를 수 있도록 매장에 줄자와 사이즈 가이드를 비치한 후 매출이 증가했다고 9일 밝혔다. 탑텐은 스타필드 하남점과 용인유방점에 일회용 줄자와 가이드를 비치해 고객이...",
+            "pubDate": "Thu, 09 Jul 2026 09:54:00 +0900",
+            "url": "https://www.news1.kr/industry/distribution/6222536",
+            "naverUrl": "https://n.news.naver.com/mnews/article/421/0009049365?sid=101"
+          },
+          {
+            "title": "[비바테크 2026-②] \"AI 검색 생태계 선점하라\"... 韓 AI 리테일·커머스...",
+            "description": "더불어 신성통상, F&F, 하이라이트브랜즈 등 주요 패션 대기업 등 국내외 6,000곳 이상의 고객사를 확보하는... 명의 투자자가 한자리에 모인다. 올해의 국가는 독일이며 AI 파트너 국가는 인도가 선정됐다. 올해로...",
+            "pubDate": "Fri, 05 Jun 2026 16:56:00 +0900",
+            "url": "https://kr.aving.net/news/articleView.html?idxno=1811531",
+            "naverUrl": "https://kr.aving.net/news/articleView.html?idxno=1811531"
+          },
+          {
+            "title": "지오지아, 리뉴얼 매장 매출 26% 증가…공간 개선 효과",
+            "description": "김경희 기자 | 신성통상의 어반 라이프스타일 브랜드 지오지아(ZIOZIA)가 전국 매장을 대상으로 진행 중인... 그는 “공간 개선과 함께 소재 개발과 디자인 투자도 지속하며 상품 경쟁력을 강화하고 있다”고 덧붙였다.",
+            "pubDate": "Wed, 27 May 2026 16:36:00 +0900",
+            "url": "http://digitalchosun.dizzo.com/site/data/html_dir/2026/05/27/2026052780168.html",
+            "naverUrl": "http://digitalchosun.dizzo.com/site/data/html_dir/2026/05/27/2026052780168.html"
+          }
+        ],
+        "crossCheck": "수주/계약 공시, 매출채권 증가, 고객 집중도, 계약부채 변화를 확인"
+      },
+      "finance": {
+        "id": "finance",
+        "name": "재무동향/실적 압박",
+        "count": 34,
+        "keywords": [
+          "실적",
+          "매출",
+          "영업이익",
+          "적자",
+          "흑자",
+          "감소",
+          "증가",
+          "부채",
+          "차입",
+          "이자",
+          "유동성",
+          "재고"
+        ],
+        "examples": [
+          {
+            "title": "탑텐 언더웨어 통했다…스타필드 하남점 판매량 69% '쑥'",
+            "description": "9일 신성통상의 SPA 브랜드 탑텐(TOPTEN10)에 따르면 스타필드 하남점의 여성 언더웨어 판매량이 지난 5월 기준 전년 동월보다 69% 증가했다. 속옷을 구매할 때 착용감과 핏, 사이즈를 꼼꼼하게 확인하는 소비자가 늘어나면서...",
+            "pubDate": "Thu, 09 Jul 2026 18:00:00 +0900",
+            "url": "https://www.1conomynews.co.kr/news/articleView.html?idxno=49492",
+            "naverUrl": "https://www.1conomynews.co.kr/news/articleView.html?idxno=49492"
+          },
+          {
+            "title": "'줄자' 하나 뒀을 뿐인데…SPA 언더웨어 판매 '쑥쑥'",
+            "description": "신성통상의 SPA 브랜드 탑텐이 스타필드 하남점 여성 언더웨어의 5월 판매량이 전년 동기 대비 69% 증가했다고 9일 밝혔다. 탑텐은 속옷 구매 시 착용감과 핏 등을 비교하는 소비자가 늘면서 탑텐의 세분화된 제품군과 구매...",
+            "pubDate": "Thu, 09 Jul 2026 17:48:00 +0900",
+            "url": "https://www.shinailbo.co.kr/news/articleView.html?idxno=5039435",
+            "naverUrl": "https://www.shinailbo.co.kr/news/articleView.html?idxno=5039435"
+          },
+          {
+            "title": "탑텐 매장에 '이것' 뒀더니... 속옷 판매량 69% 껑충 뛰었다",
+            "description": "시착이 어려운 속옷의 특성을 고려해 고객이 직접 치수를 측정할 수 있도록 한 서비스 도입 이후 여성 언더웨어 판매가 큰 폭으로 증가했다.9일 신성통상 주력브랜드 탑텐은 스타필드 하남점 여성 언더웨어 5월 판매량이...",
+            "pubDate": "Thu, 09 Jul 2026 17:04:00 +0900",
+            "url": "https://www.insight.co.kr/news/562315",
+            "naverUrl": "https://www.insight.co.kr/news/562315"
+          },
+          {
+            "title": "‘줄자로 쟀더니’…신성통상 탑텐, 언더웨어 판매량 69% 증가",
+            "description": "신성통상의 SPA 브랜드 탑텐(TOPTEN10)은 스타필드 하남점 여성 언더웨어 판매량이 지난 5월 한 달간 전년 동기 대비 69% 증가했다고 밝혔다. 속옷 구매 시 착용감과 핏, 사이즈를 꼼꼼히 따지는 소비자가 늘면서, 탑텐의...",
+            "pubDate": "Thu, 09 Jul 2026 15:52:00 +0900",
+            "url": "https://www.seoul.co.kr/news/economy/2026/07/09/20260709500199?wlog_tag3=naver",
+            "naverUrl": "https://n.news.naver.com/mnews/article/081/0003659845?sid=101"
+          },
+          {
+            "title": "탑텐, 언더웨어 구매 편의 강화…스타필드 하남점 판매량 69%↑",
+            "description": "김경희 기자 | 신성통상의 SPA 브랜드 탑텐(TOPTEN10)은 스타필드 하남점 여성 언더웨어의 지난 5월 판매량이 전년 동기 대비 69% 증가했다고 밝혔다. 최근 언더웨어는 생활 필수품을 넘어 착용감과 핏, 소재 등을 고려해...",
+            "pubDate": "Thu, 09 Jul 2026 11:18:00 +0900",
+            "url": "http://digitalchosun.dizzo.com/site/data/html_dir/2026/07/09/2026070980080.html",
+            "naverUrl": "http://digitalchosun.dizzo.com/site/data/html_dir/2026/07/09/2026070980080.html"
+          }
+        ],
+        "crossCheck": "E1~E4 재무 신호, 현금흐름, 차입금, 재고자산 평가손실을 확인"
+      },
+      "risk": {
+        "id": "risk",
+        "name": "규제/소송/보안/운영 리스크",
+        "count": 28,
+        "keywords": [
+          "규제",
+          "제재",
+          "소송",
+          "고발",
+          "조사",
+          "감사",
+          "보안",
+          "장애",
+          "유출",
+          "구조조정",
+          "폐점",
+          "파업"
+        ],
+        "examples": [
+          {
+            "title": "[재계는 지금] 삼성전자, 플랙트그룹과 MCE 참가 공조 협력 강화 外",
+            "description": "퀘이사는 외부 공격 징후를 실시간으로 식별해 데이터 유출과 평판 훼손을 방지하는 역할을 수행한다.... ◆CJ올리브네트웍스 신성통상 차세대 포스 구축 완료 CJ올리브네트웍스가 신성통상에 차세대 포스 시스템을...",
+            "pubDate": "Tue, 24 Mar 2026 14:42:00 +0900",
+            "url": "https://dealsite.co.kr/articles/158958",
+            "naverUrl": "https://dealsite.co.kr/articles/158958"
+          },
+          {
+            "title": "[패션 뷰티 뉴스픽]형지엘리트·지그재그·탑텐·코스맥스·이미인",
+            "description": "이번 수상은 현지 판매 현황 및 브랜드 평판, 전문기관 인증 등 기초 조사와 함께 약 400만명의 중국 소비자... 탑텐, 글로벌 나눔 활동으로 15개국에 의류 143만점 전달 탑텐(TOPTEN10) 로고 [사진=신성통상] 신성통상의...",
+            "pubDate": "Tue, 13 Jan 2026 17:22:00 +0900",
+            "url": "https://www.ajunews.com/view/20260113134804793",
+            "naverUrl": "https://www.ajunews.com/view/20260113134804793"
+          },
+          {
+            "title": "[AT 패션] 무신사·형지엘리트·신성통상 탑텐",
+            "description": "신성통상의 SPA 브랜드 탑텐(TOPTEN10)은 지난해 15개국 취약계층에 142만9118점의 의류를 전달했다. 무신사, 中... 수상에는 현지 판매 현황 및 브랜드 평판, 전문기관 인증 등 기초 조사와 함께 약 400만명의 중국 소비자가...",
+            "pubDate": "Tue, 13 Jan 2026 17:06:00 +0900",
+            "url": "https://www.asiatime.co.kr/article/20260113500390",
+            "naverUrl": "https://www.asiatime.co.kr/article/20260113500390"
+          },
+          {
+            "title": "[주간스타트업동향] 디노티시아, 창신대와 방산 AI 실무 인재 양성 산학...",
+            "description": "특히 망 분리 규제가 적용되는 금융권 특성상 외부 클라우드 대신 내부망에서 AI를 직접 구동할 수... 현재 F&F, 신성통상, 하이라이트브랜즈 등 국내외 6000개 이상의 고객사가 도입해 활용 중이다. 스튜디오랩은...",
+            "pubDate": "Wed, 27 May 2026 14:10:00 +0900",
+            "url": "https://it.donga.com/108948/",
+            "naverUrl": "https://it.donga.com/108948/"
+          },
+          {
+            "title": "봄바람 타고 커진 운동복 수요…유통가 '웰니스' 쟁탈전",
+            "description": "복장 규제가 완화되면서 편안함과 스타일을 동시에 충족하는 의류에 대한 수요가 꾸준히 증가하는 추세다. SPA 브랜드를 중심으로 한 상품 전략도 이러한 변화에 발맞추고 있다. 신성통상의 탑텐은 4방향 신축성과 허리...",
+            "pubDate": "Sun, 05 Apr 2026 12:00:00 +0900",
+            "url": "https://www.m-i.kr/news/articleView.html?idxno=1361463",
+            "naverUrl": "https://www.m-i.kr/news/articleView.html?idxno=1361463"
+          }
+        ],
+        "crossCheck": "공시 정정/해명, 충당부채, 법무 비용, 운영 중단 영향을 확인"
+      }
+    },
+    "advice": [
+      {
+        "category": "reputation",
+        "title": "기업평판/브랜드 이미지",
+        "signal": "40건의 관련 뉴스 메타데이터 감지",
+        "crossCheck": "매출 성장률, 반품/클레임, 고객 이탈, 채널별 매출 변화를 확인",
+        "suggestedAction": "브랜드 훼손 신호는 단기 매출보다 채널별 주문 취소, 반품률, 주요 거래처 반응으로 먼저 검증한다."
+      },
+      {
+        "category": "industry",
+        "title": "관심산업/시장 환경",
+        "signal": "35건의 관련 뉴스 메타데이터 감지",
+        "crossCheck": "재고 증가율, 매출 성장률, 사업부별 성장률, ECOS 물가/금리 환경을 확인",
+        "suggestedAction": "산업 변화 신호는 재고 회전과 제품군별 매출 믹스 변화로 연결해 확인한다."
+      },
+      {
+        "category": "investment",
+        "title": "투자동향/자금소요",
+        "signal": "17건의 관련 뉴스 메타데이터 감지",
+        "crossCheck": "차입금, 이자보상배율, 투자 현금흐름, 유동비율을 확인",
+        "suggestedAction": "투자 확대 신호는 성장 기회와 동시에 현금 소요이므로 차입 만기와 투자 회수 기간을 같이 본다."
+      },
+      {
+        "category": "business",
+        "title": "사업동향/제휴/확장",
+        "signal": "22건의 관련 뉴스 메타데이터 감지",
+        "crossCheck": "수주/계약 공시, 매출채권 증가, 고객 집중도, 계약부채 변화를 확인",
+        "suggestedAction": "사업 확장 신호는 매출 인식 속도와 현금 회수 속도가 같이 움직이는지 확인한다."
+      },
+      {
+        "category": "finance",
+        "title": "재무동향/실적 압박",
+        "signal": "34건의 관련 뉴스 메타데이터 감지",
+        "crossCheck": "E1~E4 재무 신호, 현금흐름, 차입금, 재고자산 평가손실을 확인",
+        "suggestedAction": "재무 뉴스는 수치가 과장될 수 있으므로 DART 재무제표와 분기 추세로 재계산한다."
+      },
+      {
+        "category": "risk",
+        "title": "규제/소송/보안/운영 리스크",
+        "signal": "28건의 관련 뉴스 메타데이터 감지",
+        "crossCheck": "공시 정정/해명, 충당부채, 법무 비용, 운영 중단 영향을 확인",
+        "suggestedAction": "규제와 운영 리스크는 손익 영향보다 발생 가능성과 대응 책임자를 먼저 확정한다."
+      }
+    ],
+    "caveat": "뉴스는 제목, 요약, 발행일, 링크 메타데이터만 사용한 보조 신호이며 확정 사실로 취급하지 않습니다.",
+    "summary": "뉴스는 확정 사실이 아니라 보조 신호입니다. 감지 테마: 기업평판/브랜드 이미지 40건, 관심산업/시장 환경 35건, 투자동향/자금소요 17건, 사업동향/제휴/확장 22건, 재무동향/실적 압박 34건, 규제/소송/보안/운영 리스크 28건. DART PRESENT 신호는 없음이며, 평가된 DART 신호는 E1, E2, E3, E4, E5입니다. 뉴스 테마는 각 카테고리의 crossCheck 항목으로 재무/공시 데이터와 교차 확인해야 합니다."
+  },
+  "docs": null,
+  "signals": [
+    {
+      "id": "E1",
+      "name": "수익-채권 괴리 (이익의 현금화 저조)",
+      "present": false,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "revenueGrowthPct": -2,
+        "receivablesGrowthPct": -19.3,
+        "gapPp": -17.3,
+        "receivablesTrillion": "0.1→0.1조",
+        "ocfToOperatingIncome": 1.51
+      },
+      "markers": [],
+      "categoryPattern": "수익\\s*(조기)?\\s*인식|조기\\s*인식|채권.*(급증|괴리)|현금화\\s*저조",
+      "checkHints": [
+        "분기보고서로 채권 증가 시점 좁히기",
+        "대손충당금 설정률 추이",
+        "주석의 매출채권 연령 분석"
+      ]
+    },
+    {
+      "id": "E2",
+      "name": "재고 자산 적체",
+      "present": false,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "revenueGrowthPct": -2,
+        "inventoryGrowthPct": 10.1,
+        "gapPp": 12.2,
+        "inventoriesTrillion": "0.3→0.4조"
+      },
+      "markers": [],
+      "categoryPattern": "재고\\s*(자산)?\\s*(적체|급증|과잉)|재고자산.*(증가|부담)",
+      "checkHints": [
+        "재고자산 평가손실(주석) 확인",
+        "제품/재공품/원재료 구성 변화",
+        "재고자산회전율 추이"
+      ]
+    },
+    {
+      "id": "E3",
+      "name": "차입 확대·이자 부담",
+      "present": false,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "borrowingsTrillion": "0.2→0.2조",
+        "borrowingsGrowthPct": 0,
+        "interestCoverage": "3.5→2.3배 (영업이익/이자지급)",
+        "coverageDropPct": 35.1
+      },
+      "markers": [],
+      "categoryPattern": "차입\\s*(확대|급증|의존)|이자\\s*부담|이자보상",
+      "checkHints": [
+        "차입금 만기 구조(주석) 확인",
+        "변동/고정 금리 구성",
+        "약정(covenant) 조건 확인"
+      ]
+    },
+    {
+      "id": "E4",
+      "name": "유동성 하락 (유동비율)",
+      "present": false,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "currentRatioPct": "135→161.3→180.2",
+        "fallingTwoYears": false
+      },
+      "markers": [],
+      "categoryPattern": "유동성\\s*(하락|압박|악화)|유동비율.*(하락|저하)",
+      "checkHints": [
+        "단기차입 상환 스케줄",
+        "미사용 여신한도(주석)",
+        "현금성자산 대비 단기부채"
+      ]
+    },
+    {
+      "id": "E5",
+      "name": "공시 행간 (정정·해명 패턴)",
+      "present": false,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "windowDays": 90,
+        "totalDisclosures": 1,
+        "corrections": 0,
+        "clarifications": [],
+        "auditFlags": []
+      },
+      "markers": [],
+      "categoryPattern": "정정\\s*공시|풍문|해명\\s*공시|공시\\s*(품질|프로세스|커뮤니케이션)",
+      "checkHints": [
+        "정정 사유 분류(단순 오기/수치 변경)",
+        "해명 공시의 대상 보도와 후속 확정 공시",
+        "공시 검수 체인 점검"
+      ]
+    }
+  ],
+  "internal": null
+}
