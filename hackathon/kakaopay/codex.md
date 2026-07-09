@@ -193,6 +193,24 @@ my-skill/
 
 ---
 
+## 4. 플러그인 MCP 실측 규격 (codex-cli 0.142.5, 문서와 다른 부분 — 직접 검증)
+
+kakaopay-invest-companion 제출물 개발 중 `RUST_LOG=codex_rmcp_client=debug codex exec` 와
+프로브 서버로 실측한 결과. **공식 문서만 믿으면 플러그인 MCP 가 조용히 전부 죽는다.**
+
+| 항목 | 문서 | 실측 (0.142.5) |
+|---|---|---|
+| `.mcp.json` 래퍼 | bare map 또는 `mcp_servers` | **`mcpServers`(camelCase) 또는 bare map**. `mcp_servers`(snake)는 "mcp_servers"라는 서버명으로 오인 → `invalid transport` |
+| `${CLAUDE_PLUGIN_ROOT}` in args | (언급 없음) | **치환 안 됨** — 리터럴 그대로 node 에 전달돼 MODULE_NOT_FOUND |
+| 플러그인 루트 참조 | (언급 없음) | **`"cwd": "."` 가 플러그인 캐시 루트로 해석** → args 는 `./mcp/x.mjs` 상대경로 (공식 codex-security 플러그인과 동일 패턴) |
+| env `${VAR}` 치환 | (언급 없음) | **치환 안 됨** — 리터럴 `"${VAR}"` 문자열이 서버 env 로 들어감 (클라이언트에서 방어 필요) |
+| 부모 셸 env 상속 | (언급 없음) | **상속 안 됨** — 키는 파일 폴백(예: `~/.codex/.env` 상향 탐색)으로만 전달 가능 |
+| MCP 도구 승인 | `plugins.<p>.mcp_servers.<s>` 로 튜닝 | 비대화(`codex exec`)에서 기본 정책은 **자동 취소**("user cancelled") — `default_tools_approval_mode = "approve"` 를 넣어야 호출됨 (`--full-auto` 로도 안 풀림) |
+
+검증 순서(재현 가능): ① 스모크로 서버 자체 검증 → ② `codex exec` E2E 에서 "도구 없음" →
+③ debug 로그에서 `invalid transport` / MODULE_NOT_FOUND 발견 → ④ 캐시 `.mcp.json` 을
+진단 서버로 패치해 cwd·env 실측 → ⑤ 승인 정책 발견 → 전 구간 GREEN.
+
 ### 참고 — 이 저장소와의 관련
 
 이 저장소의 `settlement-copilot/`·`invest-copilot/` 은 위 공식 플러그인 규격이 나오기 전

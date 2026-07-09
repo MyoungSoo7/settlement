@@ -6,23 +6,33 @@
 안심시켜 다음 행동으로 이끈다. 종목 추천을 하지 않는다 — "지금 이 결정에서 확인하지
 않은 것"을 짚어주는 동행 도구다.
 
-## 스킬 구성 (6종)
+## 스킬 구성 (7종)
 
 | 스킬 | 역할 |
 |---|---|
 | `anxiety-triage` | 불안 발화를 4유형(손실 공포/FOMO/정보 부족/확신 부족)으로 분류하고 4단계 프로토콜로 응대 |
+| `stock-explorer` | "뭘 사야 할지 모르겠어요" — 관심사 → DART 재무 스크리닝 → 후보 2~3개 비교표. 종목을 골라주는 게 아니라 **좁히는 절차를 가르친다** |
 | `buy-companion` | 매수 직전 5분 체크 — 한 문장 이유 → 사실 확인(DART/ECOS) → 반대 시나리오 → 손절선·비중 규칙 |
 | `sell-companion` | "공포 매도인가 원칙 매도인가" 분리 — 원칙 소환 → 시장/종목 요인 분리 → 판정 매트릭스 |
 | `trade-retrospective` | 매매 내역에서 반복 행동 패턴 탐지(추격매수·물타기·집중·처분효과·과잉회전) → 규칙 1~2개 제안 |
 | `next-step-guide` | 투자 단계(S0~S5) 상태머신 — 상태별 **다음 행동 딱 1개** 제시 (결정 마비 해소) |
 | `trust-explainer` | 모든 판정 전달 시 "결론 → 근거(출처·시점) → **반대 근거** → 한계·고지" 4단 구조 강제 |
 
-## 데이터 축 (읽기 전용 MCP 2종)
+## 데이터 축 (읽기 전용 MCP 4종)
 
 - **DART** (`invest-companion-dart`): 기업 검색·개황·공시 목록·재무제표 — 불안의 실체(악재)가
   공시로 확인되는지, 펀더멘털 훼손 여부 판단. `DART_API_KEY` env.
 - **ECOS** (`invest-companion-ecos`): 기준금리·국고채3년·환율·CPI — 하락이 시장 전체
   요인인지 종목 고유 요인인지 분리. `ECOS_API_KEY` env.
+- **뉴스** (`invest-companion-news`): 네이버 뉴스 검색 — "이 뉴스가 악재인가요?"(불안 4유형 중
+  정보 부족)에 실보도로 답한다. 악재 키워드(유상증자·횡령·거래정지 등) 스캔 포함,
+  **뉴스가 없으면 없다고 말할 근거**가 된다. 기사 본문 미수집(제목·요약·링크만).
+  `NAVER_CLIENT_ID`/`NAVER_CLIENT_SECRET` env.
+- **시세** (`invest-companion-price`): KOSPI/KOSDAQ 현재가·전일대비·52주 고저·연속 상승/하락
+  일수(streak) — "지금 얼마인데?", "사흘 연속 오르는 중 아닌가?"(추격매수 규칙 판정)에 답한다.
+  키 불필요. **데모용 공개 어댑터**(Yahoo Finance, 지연 시세 가능)로, 실서비스에서는
+  `price/client.mjs` 한 파일만 증권사 사내 시세 API 로 교체하면 도구 계약이 유지된다.
+  stockCode 는 DART `dart_corp_search` 와 그대로 조인.
 - 같은 저장소의 invest-copilot MCP(`invest_signal`, `fin_metrics`, `reputation_score`)가
   있으면 병용하고, 도구가 없는 환경에서는 사용자에게 사실을 질문하는 방식으로 우아하게 강등된다.
 
@@ -30,28 +40,62 @@
 
 ```text
 submission/
+|-- .agents/plugins/marketplace.json     # 이 폴더 자체가 codex 마켓플레이스
+|-- .env.example                         # 키 원스톱 셋업 (발급처·부재 시 동작 명시)
+|-- docs/codex-config-snippet.toml       # MCP 도구 승인 설정 (복붙용)
 |-- src/
 |   |-- .codex-plugin/plugin.json        # manifest (skills + mcpServers)
-|   |-- skills/                          # 스킬 6종 (위 표)
-|   |-- mcp/{dart,ecos}-server.mjs       # 읽기 전용 MCP 서버 (zero-dependency stdio)
-|   |-- dart/ ecos/ common/              # OpenAPI 클라이언트 + 공용 모듈
+|   |-- .mcp.json                        # MCP 4종 등록 (Codex 실측 규격 — cwd:"." + 상대경로)
+|   |-- skills/                          # 스킬 7종 (위 표)
+|   |-- mcp/{dart,ecos,news,price}-server.mjs  # 읽기 전용 MCP 서버 (zero-dependency stdio)
+|   |-- dart/ ecos/ naver/ price/ common/      # API 클라이언트 + 공용 모듈
 |   |-- data/sample/                     # 합성 매매내역·보유현황 (정답지 내장)
-|   |-- test/                            # MCP 스모크 테스트
+|   |-- test/                            # 스모크 5종 + 단일 러너 (run-all.mjs)
+|   |-- bin/install-codex.ps1            # 원큐 설치 (등록→설치→승인→키→스모크)
 |   |-- bin/run-sample.ps1               # 데모 부트스트랩
 |   `-- README-src.md
 |-- README.md
-`-- logs/          # Stop 훅이 자동 저장하는 대화 로그 (logs/<tool>/<session>.jsonl)
+`-- logs/          # E2E 검증 증거 (e2e-*.out.md) + Stop 훅 대화 로그
 ```
 
-## 설치 (Codex)
+## 설치 (Codex) — 원큐, 실검증 완료
+
+```powershell
+powershell -ExecutionPolicy Bypass -File src/bin/install-codex.ps1
+```
+
+마켓플레이스 등록 → 플러그인 설치 → MCP 승인 config 병합 → `~/.codex/.env` 스캐폴드 →
+스모크 5종 검증까지 한 번에 (멱등 — 재실행 안전).
+
+<details><summary>수동 설치 (스크립트 없이)</summary>
+
+이 submission 폴더 자체가 마켓플레이스다 (`.agents/plugins/marketplace.json` 내장):
 
 ```bash
-codex plugin marketplace add <repo-or-path>   # 이 저장소를 마켓플레이스로 등록
-codex plugin add kakaopay-invest-companion@<marketplace>
+codex plugin marketplace add <이 submission 폴더 경로 또는 repo>
+codex plugin add kakaopay-invest-companion@kakaopay-invest-companion-market
 ```
 
-키 설정(선택 — 없으면 샘플 데이터 데모만): `DART_API_KEY`(opendart.fss.or.kr),
-`ECOS_API_KEY`(ecos.bok.or.kr) 를 환경변수로 주입.
+이후 2개 파일만 복사:
+
+1. **MCP 도구 승인**: `docs/codex-config-snippet.toml` 내용을 `~/.codex/config.toml` 끝에
+   붙여넣기 (모든 도구가 읽기 전용 조회라 approve 가 안전. 없으면 비대화 모드에서
+   MCP 호출이 자동 취소됨 — 실측).
+2. **API 키**: `.env.example` 을 `~/.codex/.env` 로 복사해 값 채우기 (플러그인 MCP 서버는
+   셸 env 를 상속하지 않으므로 이 위치가 정답 — 실측. 키가 없어도 시세 축과 샘플 데모는 동작).
+
+</details>
+
+> codex-cli 0.142.5 에서 설치 → `installed, enabled` → **Codex 실세션 E2E 에서 MCP 4종
+> 12개 도구 실호출 + 스킬 프로토콜 준수 응답**(`logs/e2e-sell-anxiety2.out.md`)까지 검증했다.
+> 제거는 `codex plugin marketplace remove kakaopay-invest-companion-market`.
+
+키 설정(선택): `.env.example` 을 `.env` 로 복사해 채우면 끝 — 키별 발급처와 부재 시
+동작이 파일 안에 적혀 있다. 키가 없으면 해당 데이터 축만 우아하게 강등되고
+(스킬이 사용자에게 사실을 직접 질문), 샘플 데이터 데모는 키 없이 완전 동작한다.
+
+사전 점검(선택): `node src/test/run-all.mjs` — MCP 3종 + 공용 유틸 스위트 4개가
+ALL GREEN 인지 한 번에 확인 (키 있으면 라이브 검증 포함).
 
 ## 데모 시나리오
 

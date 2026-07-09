@@ -20,7 +20,14 @@ function toolResult(id, payload, isError = false) {
 }
 
 function listTools(tools) {
-  return tools.map(({ name, description, inputSchema }) => ({ name, description, inputSchema }));
+  // 이 패키지의 모든 MCP 도구는 읽기 전용 조회다 — MCP 스펙 annotations 로 명시해
+  // 호스트(Codex/Claude)의 승인 UX 가 안전한 도구임을 알 수 있게 한다.
+  return tools.map(({ name, description, inputSchema, annotations }) => ({
+    name,
+    description,
+    inputSchema,
+    annotations: annotations ?? { readOnlyHint: true, openWorldHint: true },
+  }));
 }
 
 async function handleToolCall(id, params, tools) {

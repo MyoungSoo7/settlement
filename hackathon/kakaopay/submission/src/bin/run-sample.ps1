@@ -28,4 +28,7 @@ Write-Output '   반복되는 행동 패턴을 찾아 근거와 함께 설명하
 Write-Output ""
 Write-Output '  [불안 데모] "한빛전자 물렸는데 더 사서 물타기하면 될까요?"'
 Write-Output ""
-Write-Output "(스킬 명시 호출: `$trade-retrospective, `$anxiety-triage)"
+Write-Output '  [탐색 데모] "주식 처음인데 뭘 사야 할지 모르겠어요."'
+Write-Output ""
+Write-Output "(스킬 명시 호출: `$trade-retrospective, `$anxiety-triage, `$stock-explorer)"
+Write-Output "(사전 점검: node src/test/run-all.mjs — 4개 스위트 ALL GREEN 확인)"
