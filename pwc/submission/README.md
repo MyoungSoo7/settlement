@@ -393,9 +393,12 @@ node src/bin/ceo-consulting-pipeline.mjs --company 삼성전자 --business-numbe
 # 옵션: --data-dir <내부CSV> --judge (LLM 인과 채점) --agent none (에이전트 없이 준비만)
 ```
 
-실기업(삼성물산) 라이브 실행 산출물 전체(identity → 패킷 → 브리핑 → Word)가
-[`outputs/samsung-ct-ceo-pipeline/`](./outputs/samsung-ct-ceo-pipeline/README.md) 에 동봉되어
-있으며, 채점 명령 한 줄로 지금 바로 재검증할 수 있습니다.
+라이브 실행 산출물 두 벌이 동봉되어 있으며, 각각 채점 명령 한 줄로 지금 바로 재검증할 수 있습니다.
+
+| 예시 | 모드 | 결과 |
+|---|---|---|
+| [`outputs/samsung-ct-ceo-pipeline/`](./outputs/samsung-ct-ceo-pipeline/README.md) | 실기업(삼성물산) API-only — identity → 패킷 → 브리핑 → Word | 재현율 1/1 · EVAL PASS |
+| [`outputs/sample-internal-e2e/`](./outputs/sample-internal-e2e/README.md) | 상세 모드(내부 CSV S1~S4) 원커맨드 E2E — claude 라이브 생성 | 재현율 4/4 · EVAL PASS · Judge 전 신호 2/2/2 "우수" |
 
 ### 0-b. 기업명만으로 시작 (기본 모드 — 내부 데이터 불필요)
 
