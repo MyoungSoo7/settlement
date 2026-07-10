@@ -45,4 +45,24 @@ class Bucket4jRateLimiterTest {
 
         assertThatCode(() -> limiter.acquire(2L)).doesNotThrowAnyException();
     }
+
+    @Test
+    @DisplayName("refund — 소진된 토큰을 되돌려 다시 통과할 수 있게 한다")
+    void refundReturnsToken() {
+        Bucket4jRateLimiter limiter = new Bucket4jRateLimiter(1, 100);
+
+        limiter.acquire(1L);   // 한도 1 소진
+        assertThatThrownBy(() -> limiter.acquire(1L)).isInstanceOf(RateLimitExceededException.class);
+
+        limiter.refund(1L);    // 되돌리면 다시 1회 가능
+        assertThatCode(() -> limiter.acquire(1L)).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("refund — 버킷이 없는 사용자면 조용히 통과(best-effort)")
+    void refundOnMissingBucketIsNoop() {
+        Bucket4jRateLimiter limiter = new Bucket4jRateLimiter(1, 100);
+
+        assertThatCode(() -> limiter.refund(999L)).doesNotThrowAnyException();
+    }
 }
