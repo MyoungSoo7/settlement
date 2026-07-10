@@ -208,6 +208,7 @@ settlement/                              # 모노레포 루트
 │
 ├── investment-service/                  # 📈 Investment 서비스 (port 8100, 자체 DB lemuel_investment) — CEO 투자하기
 │   └── src/main/java/.../investment/    # 코스피/코스닥 회계자료 기반 투자점수(수익성35+안정성35+성장성30, AAA~CCC) · 투자주문 · settlement.confirmed 재원 프로젝션 · investment.executed 발행
+│                                        # ※ 투자점수는 정보 제공 목적의 참고 지표로 투자자문이 아니며, 매수·매도 등 투자 판단과 그 결과의 책임은 이용자 본인에게 있음
 │
 ├── account-service/                     # 🏦 Account 서비스 (계정계, port 8102, 자체 DB lemuel_account)
 │   └── src/main/java/.../account/       # loan·investment·settlement 6개 토픽 → 전사 복식부기 GL 집계(대출/투자/정산 잔액 · 시산표), 소비 전용

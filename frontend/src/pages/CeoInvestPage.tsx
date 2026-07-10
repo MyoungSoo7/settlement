@@ -505,6 +505,11 @@ const CeoInvestPage: React.FC = () => {
             </Card>
           </div>
         </div>
+
+        <p className="mt-6 text-xs text-slate-400">
+          ※ 본 투자점수와 지표는 공시 회계자료를 근거로 산출한 정보 제공 목적의 참고 자료이며, 특정 종목의 매수·매도
+          권유나 수익 보장이 아닙니다. 투자 판단과 그 결과에 대한 책임은 이용자 본인에게 있습니다.
+        </p>
       </div>
     </div>
   );
