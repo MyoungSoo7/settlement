@@ -1,0 +1,138 @@
+spring:
+  profiles:
+    active: local
+
+  application:
+    name: lemuel-investment
+
+  threads:
+    virtual:
+      enabled: true
+
+  # ★ investment-service 는 자체 DB(lemuel_investment) 를 소유한다 (DB-per-service).
+  #   재무제표는 financial 공개 API(HTTP), 재원은 settlement 확정 이벤트(Kafka)로만 받는다.
+  datasource:
+    url: jdbc:postgresql://localhost:5444/lemuel_investment?reWriteBatchedInserts=true
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      pool-name: lemuel-investment-pool
+      maximum-pool-size: ${DB_POOL_MAX:20}
+      minimum-idle: ${DB_POOL_MIN_IDLE:5}
+      connection-timeout: 10000
+      leak-detection-threshold: 30000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        # ★ 스키마명은 opslab 을 재사용한다(물리 DB 는 lemuel_investment 로 분리됨).
+        #   shared-common Outbox claim 네이티브 쿼리가 'opslab.outbox_events' 를 하드코딩하므로,
+        #   엔티티의 무스키마 매핑도 opslab 으로 해석되도록 default_schema 를 맞춘다(loan 과 동일).
+        default_schema: opslab
+        jdbc:
+          batch_size: 50
+          batch_versioned_data: true
+        order_inserts: true
+        order_updates: true
+
+  # ★ investment-service 는 자체 DB 마이그레이션을 직접 책임진다.
+  flyway:
+    enabled: true
+    schemas: opslab          # opslab 스키마를 생성·기본 스키마로 사용 (무스키마 DDL 이 여기로 적재됨)
+    locations: classpath:db/migration
+
+  cache:
+    type: caffeine
+    caffeine:
+      # 투자점수 캐시 — financial 조회 비용 절감(10분)
+      spec: maximumSize=500,expireAfterWrite=600s
+
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: lemuel-investment
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      properties:
+        isolation.level: read_committed
+    producer:
+      acks: all
+      retries: 5
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+    listener:
+      ack-mode: manual_immediate
+      missing-topics-fatal: false
+
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+server:
+  port: 8100
+  shutdown: graceful
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    prometheus:
+      enabled: true
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  health:
+    elasticsearch:
+      enabled: false
+    db:
+      enabled: true
+  server:
+    port: 8101
+  metrics:
+    tags:
+      application: ${spring.application.name}
+      environment: ${ENVIRONMENT:local}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+app:
+  # JWT — shared-common JwtProperties(prefix=app.jwt). 루트 @SpringBootApplication 이
+  # common.config.jwt 를 스캔하므로 secret 이 필수다(order-service 와 동일 시크릿).
+  jwt:
+    issuer: ${JWT_ISSUER:lemuel}
+    secret: ${JWT_SECRET}
+    ttl-seconds: ${JWT_TTL_SECONDS:3600}
+
+  # financial-statements-service 공개 API base-url (재무제표 조회)
+  financial:
+    base-url: ${FINANCIAL_BASE_URL:http://localhost:8086}
+
+  kafka:
+    enabled: ${APP_KAFKA_ENABLED:false}
+    consumer:
+      concurrency: ${APP_KAFKA_CONSUMER_CONCURRENCY:3}
+    topic:
+      partitions: ${APP_KAFKA_TOPIC_PARTITIONS:3}
+      # 수신 (settlement → investment) — 확정 정산금을 재원 프로젝션으로 적재
+      settlement-confirmed: lemuel.settlement.confirmed
+      # 발행 (investment → 소비자). Outbox 폴러가 aggregateType="Investment"+eventType 으로
+      # 라우팅하는 실제 토픽명(snake_case).
+      investment-executed: lemuel.investment.executed

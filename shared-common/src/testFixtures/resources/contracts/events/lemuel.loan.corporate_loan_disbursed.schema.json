@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "lemuel.loan.corporate_loan_disbursed",
+  "description": "loan-service(CorporateLoanEventPublisherAdapter) → 소비측(CEO 브리핑/원장 정합성 등). 상장사 기업 신용대출 실행(지급) 사실을 통지한다. principal/fee 는 JSON number(loan 계열 직렬화 규약, payment 계열의 문자열 금액과 비대칭 — 현행 유지). fee 는 0 가능(무수수료 조건)이므로 minimum 0. stockCode 는 6자리 종목코드.",
+  "type": "object",
+  "properties": {
+    "loanId": { "type": "integer" },
+    "stockCode": { "type": "string", "pattern": "^[0-9]{6}$" },
+    "corpName": { "type": "string" },
+    "principal": { "type": "number" },
+    "fee": { "type": "number", "minimum": 0 }
+  },
+  "required": ["loanId", "stockCode", "corpName", "principal", "fee"],
+  "additionalProperties": true
+}

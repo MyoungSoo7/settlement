@@ -87,6 +87,25 @@ class ApplyRepaymentServiceTest {
     }
 
     @Test
+    void 첫_대출이_정산금을_모두_소진하면_나머지_대출은_건너뛴다() {
+        LoanAdvance first = disbursed(1L, new BigDecimal("300000"));
+        LoanAdvance second = disbursed(2L, new BigDecimal("500000"));
+        when(recordRepaymentPort.existsForSettlement(103L)).thenReturn(false);
+        when(loadLoanPort.findDisbursedBySellerForUpdate(7L)).thenReturn(List.of(first, second));
+
+        // 정산금 30만 = first 잔액과 동일 → first 전액 차감 후 remaining 0 → second 는 break 로 스킵
+        service().apply(new ApplyRepaymentCommand(103L, 7L, new BigDecimal("300000")));
+
+        assertThat(first.getOutstanding()).isEqualByComparingTo("0");
+        assertThat(first.getStatus()).isEqualTo(LoanStatus.REPAID);
+        assertThat(second.getOutstanding()).isEqualByComparingTo("500000"); // 손대지 않음
+        assertThat(second.getStatus()).isEqualTo(LoanStatus.DISBURSED);
+        verify(saveLoanPort).save(first);
+        verify(saveLoanPort, never()).save(second);
+        verify(recordRepaymentPort).record(103L, 7L, new BigDecimal("300000"));
+    }
+
+    @Test
     void 이미_처리된_정산건은_멱등_스킵() {
         when(recordRepaymentPort.existsForSettlement(100L)).thenReturn(true);
 

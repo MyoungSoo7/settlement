@@ -26,6 +26,8 @@ const FinancialStatementsPage = lazy(() => import('./pages/FinancialStatementsPa
 const EconomicsPage = lazy(() => import('./pages/EconomicsPage'));
 const CompanyLookupPage = lazy(() => import('./pages/CompanyLookupPage'));
 const CeoInsightPage = lazy(() => import('./pages/CeoInsightPage'));
+const CeoInvestPage = lazy(() => import('./pages/CeoInvestPage'));
+const CeoAccountPage = lazy(() => import('./pages/CeoAccountPage'));
 const AiChatPage = lazy(() => import('./pages/AiChatPage'));
 
 // 관리자 페이지 (lazy load)
@@ -147,8 +149,12 @@ function App() {
               element={<AdminManagerRoute><CeoLayout><FinancialStatementsPage /></CeoLayout></AdminManagerRoute>} />
             <Route path="/admin/ceo/companies"
               element={<AdminManagerRoute><CeoLayout><CompanyLookupPage /></CeoLayout></AdminManagerRoute>} />
+            <Route path="/admin/ceo/invest"
+              element={<AdminManagerRoute><CeoLayout><CeoInvestPage /></CeoLayout></AdminManagerRoute>} />
             <Route path="/admin/ceo/loans"
               element={<AdminManagerRoute><CeoLayout><LoanPage /></CeoLayout></AdminManagerRoute>} />
+            <Route path="/admin/ceo/accounts"
+              element={<AdminManagerRoute><CeoLayout><CeoAccountPage /></CeoLayout></AdminManagerRoute>} />
 
           </Routes>
           </Suspense>

@@ -94,6 +94,8 @@ subprojects {
                     "**/MarketApplication*",
                     "**/CommonDataApplication*",
                     "**/AiServiceApplication*",
+                    "**/InvestmentServiceApplication*",
+                    "**/AccountServiceApplication*",
                 )
             }
         })

@@ -1,0 +1,1 @@
+import{a as i}from"./index-p4JZfgbP.js";const c={companies:async(a,t,n=15)=>{const s=new URLSearchParams({page:String(t),size:String(n)});return a.trim()&&s.set("keyword",a.trim()),(await i.get(`/api/financial/companies?${s}`)).data},statements:async a=>(await i.get(`/api/financial/companies/${a}/statements`)).data};export{c as f};

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "lemuel.investment.executed",
+  "description": "investment-service(InvestmentEventPublisherAdapter) → 소비자. 투자 주문이 집행(EXECUTED)되면 발행된다. stockCode 는 6자리 종목코드 문자열, amount 는 JSON number(investment 계열 직렬화 규약).",
+  "type": "object",
+  "properties": {
+    "orderId": { "type": "integer" },
+    "sellerId": { "type": "integer" },
+    "stockCode": { "type": "string", "pattern": "^[0-9]{6}$" },
+    "amount": { "type": "number", "minimum": 0 }
+  },
+  "required": ["orderId", "sellerId", "stockCode", "amount"],
+  "additionalProperties": true
+}
