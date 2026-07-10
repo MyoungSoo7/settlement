@@ -28,6 +28,9 @@ const responses = await callMcpServer(join(here, '..', 'mcp', 'price-server.mjs'
   toolCall(3, 'price_status'),
   toolCall(4, 'price_quote', { stockCode: '005930' }),
   toolCall(5, 'price_history', { stockCode: '005930', days: 10 }),
+  toolCall(6, 'backtest_stats'),
+  toolCall(7, 'plan_trade', { stockCode: '005930', budget: 3000000 }),
+  toolCall(8, 'universe_list'),
 ], 15_000);
 
 const init = responses.find(r => r.id === 1);
@@ -37,10 +40,22 @@ const quoteRes = responses.find(r => r.id === 4);
 const historyRes = responses.find(r => r.id === 5);
 
 check('initialize 응답', init?.result?.serverInfo?.name === 'invest-companion-price');
-check('tools/list 3개 도구', list?.result?.tools?.length === 3, `got ${list?.result?.tools?.length}`);
-for (const t of ['price_quote', 'price_history', 'price_status']) {
+check('tools/list 6개 도구', list?.result?.tools?.length === 6, `got ${list?.result?.tools?.length}`);
+for (const t of ['price_quote', 'price_history', 'price_status', 'plan_trade', 'backtest_stats', 'universe_list']) {
   check(`도구 등록: ${t}`, (list?.result?.tools ?? []).some(x => x.name === t), `missing ${t}`);
 }
+
+const uni = parseToolPayload(responses.find(r => r.id === 8));
+check('universe_list: 60종목 이상 + 생존편향 주의 문구',
+  (uni?.symbols?.length ?? 0) >= 60 && String(uni?.caveat).includes('생존 편향'));
+
+const bt = parseToolPayload(responses.find(r => r.id === 6));
+check('backtest_stats: 주기 3종 + 표본 수천 건',
+  ['month', 'quarter', 'year'].every(k => (bt?.horizons?.[k]?.samples ?? 0) > 1000));
+check('backtest_stats: 승률이 정직한 범위(40~70%)',
+  ['month', 'quarter', 'year'].every(k => bt.horizons[k].winRate > 0.4 && bt.horizons[k].winRate < 0.7));
+check('backtest_stats: 방법론·한계 서술 포함',
+  (bt?.methodology ?? []).some(m => m.includes('보장하지 않는다')));
 
 const st = parseToolPayload(status);
 check('price_status 응답', st?.apiKey === 'not-required' && Boolean(st?.source));
@@ -56,6 +71,14 @@ if (quoteRes?.result?.isError) {
   check('라이브: history 종가 ≥ 5건', (h?.closes?.length ?? 0) >= 5, JSON.stringify(h?.streak));
   check('라이브: streak 구조(direction/days)',
     ['up', 'down', 'flat'].includes(h?.streak?.direction) && Number.isInteger(h?.streak?.days));
+
+  const plan = parseToolPayload(responses.find(r => r.id === 7));
+  check('라이브: plan_trade 3분할 밴드 + 손절/익절 기준가',
+    plan?.plan?.feasible === true
+      && plan.plan.entries?.length === 3
+      && plan.plan.exits?.stopLoss?.price > 0
+      && plan.plan.exits?.takeProfitFirst?.price > plan.plan.exits.stopLoss.price,
+    JSON.stringify(plan?.plan).slice(0, 200));
 }
 
 finish();

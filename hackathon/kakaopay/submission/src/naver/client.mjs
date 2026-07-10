@@ -70,13 +70,19 @@ export async function searchNews({ query, display = 10, start = 1, sort = 'date'
     start: String(clampInt(start, { min: 1, max: 1000, fallback: 1 })),
     sort: normalizeSort(sort),
   });
-  const res = await fetch(`${BASE}?${params}`, {
+  const doFetch = () => fetch(`${BASE}?${params}`, {
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     headers: {
       'X-Naver-Client-Id': CLIENT_ID,
       'X-Naver-Client-Secret': CLIENT_SECRET,
     },
   });
+  let res = await doFetch();
+  if (res.status === 429) {
+    // 속도 제한 — 한 번만 백오프 후 재시도 (periodic-picks 처럼 다종목 연속 조회 시 발생)
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    res = await doFetch();
+  }
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
     const code = body?.errorCode ? ` ${body.errorCode}` : '';

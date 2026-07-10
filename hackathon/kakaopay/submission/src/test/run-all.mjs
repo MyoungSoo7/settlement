@@ -9,7 +9,10 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const suites = ['common-utils-test', 'dart-smoke', 'ecos-smoke', 'news-smoke', 'price-smoke'];
+const suites = [
+  'common-utils-test', 'backtest-core-test', 'trade-plan-test',
+  'dart-smoke', 'ecos-smoke', 'news-smoke', 'price-smoke',
+];
 
 let failures = 0;
 for (const suite of suites) {

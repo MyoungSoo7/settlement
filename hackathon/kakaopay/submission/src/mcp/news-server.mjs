@@ -67,6 +67,7 @@ const TOOLS = [
         perKeyword.push(await searchCompanyNews({
           company, keywords: [kw], display: limitDisplay(display), sort,
         }));
+        await new Promise((resolve) => setTimeout(resolve, 120)); // 속도 제한 완화
       }
       const seen = new Set();
       const items = [];

@@ -7,8 +7,9 @@
   해석됨) + 상대경로 args. `${CLAUDE_PLUGIN_ROOT}`/`${VAR}` 치환과 셸 env 상속은 codex-cli
   0.142.5 에서 동작하지 않음을 실측 확인 — 키는 `~/.codex/.env` 파일 폴백으로 전달
   (상세: `../../codex.md` §4).
-- `skills/` — 스킬 7종. 응대 계열(anxiety-triage → buy/sell-companion → next-step-guide),
-  탐색(stock-explorer), 전달 형식(trust-explainer), 복기(trade-retrospective).
+- `skills/` — 스킬 8종. 응대 계열(anxiety-triage → buy/sell-companion → next-step-guide),
+  탐색(stock-explorer), 주기 선별(periodic-picks — 백테스트 통계·매매계획 도구 결합),
+  전달 형식(trust-explainer), 복기(trade-retrospective).
 - `dart/`, `ecos/`, `naver/`, `common/`, `mcp/` — pwc 제출물(trusted-ceo-agent)의 검증된
   모듈 재사용. 서버명은 `invest-companion-{dart,ecos,news}` 로 리네이밍, 도구 description 은
   투자자 맥락으로 조정 (ECOS: 시장 요인 vs 종목 요인 분리 / 뉴스: 악재 실체 확인,
@@ -25,6 +26,7 @@
                                       ├─ FOMO    → buy-companion
 "뭐부터 하지?" ────► next-step-guide  ├─ 정보부족 → 뉴스/DART/ECOS 사실 확인
 "뭘 사야 할지…" ──► stock-explorer ──► (후보 좁히기) → buy-companion
+"분기/월/연 3종목+가격" ► periodic-picks (실측승률 → 규칙 스크리닝 → 밴드/손절/익절)
 "지금 살까/팔까?" ─► buy/sell-companion┘
 "내 매매 봐줘" ────► trade-retrospective (패턴 탐지 → 규칙 제안)
                           │

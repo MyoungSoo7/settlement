@@ -39,19 +39,41 @@ async function fetchChart(symbol, { range = '5d', interval = '1d' } = {}) {
   return result;
 }
 
-/** 6자리 코드 → .KS/.KQ 자동 해석. 성공한 result 와 시장 라벨을 반환. */
+const FRESH_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
+
+/** 후보들 중 신선한(최근 14일 내 체결) 것을 우선 선택. 둘 다 낡았으면 더 최근 것 + stale 표시.
+ *  (Yahoo 에는 코스닥 종목의 낡은 .KS 잔재 심볼이 남아 있어 — 예: 058470.KS 가 2024년
+ *  가격을 반환 — 신선도 검증 없이 .KS 우선으로 잡으면 초보자에게 틀린 가격이 나간다.) */
+export function pickFreshest(candidates, nowMs) {
+  if (candidates.length === 0) return null;
+  const withTime = candidates.map((c) => ({
+    ...c,
+    marketTimeMs: (c.result.meta?.regularMarketTime ?? 0) * 1000,
+  }));
+  const fresh = withTime.filter((c) => nowMs - c.marketTimeMs <= FRESH_WINDOW_MS);
+  if (fresh.length > 0) return { ...fresh[0], stale: false };
+  withTime.sort((a, b) => b.marketTimeMs - a.marketTimeMs);
+  return { ...withTime[0], stale: true };
+}
+
+/** 6자리 코드 → .KS/.KQ 자동 해석. 신선도 검증 후 result 와 시장 라벨을 반환. */
 async function resolveChart(stockCode, opts) {
   const code = normalizeStockCode(stockCode);
+  const candidates = [];
   let lastError;
   for (const suffix of ['KS', 'KQ']) {
     try {
       const result = await fetchChart(`${code}.${suffix}`, opts);
-      return { result, market: MARKET_BY_SUFFIX[suffix], symbol: `${code}.${suffix}` };
+      candidates.push({ result, market: MARKET_BY_SUFFIX[suffix], symbol: `${code}.${suffix}` });
     } catch (error) {
       lastError = error;
     }
   }
-  throw new Error(`시세를 찾지 못했습니다 (KOSPI/KOSDAQ 모두 실패): ${lastError?.message}`);
+  const picked = pickFreshest(candidates, Date.now());
+  if (!picked) {
+    throw new Error(`시세를 찾지 못했습니다 (KOSPI/KOSDAQ 모두 실패): ${lastError?.message}`);
+  }
+  return picked;
 }
 
 function toDateString(unixSeconds) {
@@ -87,11 +109,12 @@ export function consecutiveStreak(rows) {
 }
 
 export async function quote(stockCode) {
-  const { result, market, symbol } = await resolveChart(stockCode, { range: '5d', interval: '1d' });
+  const { result, market, symbol, stale } = await resolveChart(stockCode, { range: '5d', interval: '1d' });
   const meta = result.meta;
   const price = meta.regularMarketPrice;
   const prevClose = meta.chartPreviousClose || null;
   return {
+    ...(stale ? { staleWarning: '최근 14일 내 체결이 없는 낡은 시세입니다 — 거래정지 여부를 확인하고 이 가격으로 계획을 세우지 마세요' } : {}),
     stockCode: normalizeStockCode(stockCode),
     symbol,
     market,
@@ -108,8 +131,8 @@ export async function quote(stockCode) {
 }
 
 export async function history(stockCode, { days = 20 } = {}) {
-  const n = Math.max(2, Math.min(Number(days) || 20, 90));
-  const range = n <= 20 ? '1mo' : '6mo';
+  const n = Math.max(2, Math.min(Number(days) || 20, 400));
+  const range = n <= 20 ? '1mo' : n <= 120 ? '6mo' : '2y';
   const { result, market, symbol } = await resolveChart(stockCode, { range, interval: '1d' });
   const rows = extractCloses(result).slice(-n);
   return {
@@ -120,5 +143,16 @@ export async function history(stockCode, { days = 20 } = {}) {
     closes: rows,
     streak: consecutiveStreak(rows),
     source: 'Yahoo Finance chart API (지연 시세 가능 — 데모용 공개 어댑터)',
+  };
+}
+
+/** 백테스트용 장기 일별 종가 (기본 10년). 반환: { stockCode, market, closes: [{date, close}] } */
+export async function dailyCloses(stockCode, { range = '10y' } = {}) {
+  const { result, market, symbol } = await resolveChart(stockCode, { range, interval: '1d' });
+  return {
+    stockCode: normalizeStockCode(stockCode),
+    symbol,
+    market,
+    closes: extractCloses(result),
   };
 }

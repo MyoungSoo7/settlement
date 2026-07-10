@@ -1,6 +1,6 @@
 {
   "name": "kakaopay-invest-companion",
-  "version": "0.7.0",
+  "version": "0.8.4",
   "description": "초보 투자자의 매수·매도 불안을 '감정 인정 → 데이터 사실확인 → 규칙 상기 → 다음 단계 1개' 설득 구조로 안심시키는 Codex 플러그인 — 종목 탐색 동행, 매수/매도 동행 체크, 매매 복기 패턴 탐지, DART·ECOS·뉴스 실데이터 조회 포함 (AX 인재전쟁 — 카카오페이증권 과제)",
   "author": { "name": "AX 인재전쟁 참가자" },
   "license": "Apache-2.0",
@@ -15,7 +15,7 @@
     "category": "Research",
     "capabilities": ["Read"],
     "defaultPrompt": [
-      "src/data/sample 의 매매 내역을 복기해서 반복되는 행동 패턴을 찾아 규칙으로 바꿔줘.",
+      "이번 분기에 뭘 살까? 300만원 예산으로 종목 3개랑 사고팔 가격 알려줘.",
       "삼성전자 어제 5% 빠졌는데 지금이라도 팔아야 하나요? 무서워요.",
       "주식 처음인데 뭘 사야 할지 모르겠어요."
     ],

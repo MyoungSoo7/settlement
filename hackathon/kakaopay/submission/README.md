@@ -6,12 +6,13 @@
 안심시켜 다음 행동으로 이끈다. 종목 추천을 하지 않는다 — "지금 이 결정에서 확인하지
 않은 것"을 짚어주는 동행 도구다.
 
-## 스킬 구성 (7종)
+## 스킬 구성 (8종)
 
 | 스킬 | 역할 |
 |---|---|
 | `anxiety-triage` | 불안 발화를 4유형(손실 공포/FOMO/정보 부족/확신 부족)으로 분류하고 4단계 프로토콜로 응대 |
 | `stock-explorer` | "뭘 사야 할지 모르겠어요" — 관심사 → DART 재무 스크리닝 → 후보 2~3개 비교표. 종목을 골라주는 게 아니라 **좁히는 절차를 가르친다** |
+| `periodic-picks` | "이번 분기(월/연) 뭐 살까 + 얼마에 사고팔까" — 실측 승률(월 51%/분기 54%/연 56%, 10년 백테스트) 기대치 세팅 → 규칙 5종 라이브 스크리닝 상위 3종목 → 종목별 3분할 매입 밴드·손절 -7%·익절 +20% 기준가. **"오를 확률 90%" 는 지어내지 않는다 — 그 요구의 정직한 대체물** |
 | `buy-companion` | 매수 직전 5분 체크 — 한 문장 이유 → 사실 확인(DART/ECOS) → 반대 시나리오 → 손절선·비중 규칙 |
 | `sell-companion` | "공포 매도인가 원칙 매도인가" 분리 — 원칙 소환 → 시장/종목 요인 분리 → 판정 매트릭스 |
 | `trade-retrospective` | 매매 내역에서 반복 행동 패턴 탐지(추격매수·물타기·집중·처분효과·과잉회전) → 규칙 1~2개 제안 |
@@ -33,6 +34,9 @@
   키 불필요. **데모용 공개 어댑터**(Yahoo Finance, 지연 시세 가능)로, 실서비스에서는
   `price/client.mjs` 한 파일만 증권사 사내 시세 API 로 교체하면 도구 계약이 유지된다.
   stockCode 는 DART `dart_corp_search` 와 그대로 조인.
+  - `plan_trade`: 예산 → 3분할 매입 밴드 + 손절/익절 기준가·수량 (KRX 호가단위, 예측이 아닌 규칙)
+  - `backtest_stats`: 유니버스 66종목·10년 실측 승률·수익 분포 (재계산: `node src/bin/backtest.mjs`)
+  - `universe_list`: 스크리닝 후보 풀 (선정 기준·생존 편향 주의 동봉)
 - 같은 저장소의 invest-copilot MCP(`invest_signal`, `fin_metrics`, `reputation_score`)가
   있으면 병용하고, 도구가 없는 환경에서는 사용자에게 사실을 질문하는 방식으로 우아하게 강등된다.
 
@@ -98,6 +102,17 @@ codex plugin add kakaopay-invest-companion@kakaopay-invest-companion-market
 ALL GREEN 인지 한 번에 확인 (키 있으면 라이브 검증 포함).
 
 ## 데모 시나리오
+
+**원샷 리포트** — 한 명령으로 추천 리포트를 `outputs/result-<오늘날짜>.md` 로 저장
+(같은 날 재실행 시 `-2`, `-3` 순번 — 이전 리포트를 덮어쓰지 않음):
+
+```bash
+node src/bin/recommend.mjs                                    # "주식 투자 추천해줘" 기본 실행
+node src/bin/recommend.mjs "이번 분기 300만원, 3종목과 가격"   # 프롬프트 지정 (--out 저장경로)
+```
+
+대화 세션에서도 stock-explorer / periodic-picks 스킬이 최종 리포트를
+`outputs/result-<날짜>.md` 로 저장하고 경로를 알려준다.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File src/bin/run-sample.ps1
