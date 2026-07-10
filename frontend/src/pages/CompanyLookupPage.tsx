@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { companyApi, Company, CompanyPage, Reputation, Article } from '@/api/company';
+import { companyApi, Company, CompanyPage, Reputation, Article, CompanyDocument } from '@/api/company';
 import Card from '@/components/Card';
 import Spinner from '@/components/Spinner';
 
@@ -20,6 +20,20 @@ const CATEGORY_LABEL: Record<string, string> = {
 
 const fmtDate = (iso: string | null) => (iso ? iso.slice(0, 10) : '');
 
+const fmtBytes = (bytes: number) => {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+/** 문서 종류별 아이콘 (contentType 기준) */
+const docIcon = (contentType: string) => {
+  if (contentType.includes('wordprocessingml')) return '📄';
+  if (contentType === 'application/pdf') return '📕';
+  if (contentType === 'image/png') return '🖼️';
+  return '📝';
+};
+
 const CompanyLookupPage: React.FC = () => {
   const [keyword, setKeyword] = useState('');
   const [query, setQuery] = useState('');
@@ -30,6 +44,7 @@ const CompanyLookupPage: React.FC = () => {
   const [selected, setSelected] = useState<Company | null>(null);
   const [reputation, setReputation] = useState<Reputation | null>(null);
   const [articles, setArticles] = useState<Article[]>([]);
+  const [documents, setDocuments] = useState<CompanyDocument[]>([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,16 +65,19 @@ const CompanyLookupPage: React.FC = () => {
     setLoadingDetail(true);
     setError(null);
     try {
-      const [rep, arts] = await Promise.all([
+      const [rep, arts, docs] = await Promise.all([
         companyApi.reputation(company.stockCode),
         companyApi.articles(company.stockCode),
+        companyApi.documents(company.stockCode).catch(() => [] as CompanyDocument[]),
       ]);
       setReputation(rep);
       setArticles(arts.content);
+      setDocuments(docs);
     } catch (err: any) {
       setError(err.response?.data?.message || '기업 상세 조회에 실패했습니다.');
       setReputation(null);
       setArticles([]);
+      setDocuments([]);
     } finally {
       setLoadingDetail(false);
     }
@@ -192,6 +210,36 @@ const CompanyLookupPage: React.FC = () => {
                     </div>
                   ) : (
                     <p className="text-sm text-gray-400">아직 평판이 산정되지 않았습니다 (수집된 기사로 재계산 필요).</p>
+                  )}
+                </div>
+
+                {/* CEO 브리핑 문서함 — 외부 파이프라인 산출물(docx·pdf 등) 다운로드 */}
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-500 mb-2">CEO 브리핑 문서</h3>
+                  {documents.length === 0 ? (
+                    <p className="text-sm text-gray-400">등록된 브리핑 문서가 없습니다.</p>
+                  ) : (
+                    <ul className="grid gap-2 sm:grid-cols-2">
+                      {documents.map((d) => (
+                        <li key={d.id}>
+                          <a
+                            href={companyApi.documentDownloadUrl(d.id)}
+                            download={d.fileName}
+                            className="flex items-center gap-3 bg-gray-50 hover:bg-indigo-50 border border-gray-200 rounded-lg px-3 py-2.5 group"
+                          >
+                            <span className="text-xl">{docIcon(d.contentType)}</span>
+                            <span className="min-w-0">
+                              <span className="block text-sm font-medium text-gray-900 group-hover:text-indigo-700 truncate">
+                                {d.title}
+                              </span>
+                              <span className="block text-xs text-gray-400">
+                                {d.fileName} · {fmtBytes(d.sizeBytes)} · {fmtDate(d.uploadedAt)}
+                              </span>
+                            </span>
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
                   )}
                 </div>
 
