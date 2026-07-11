@@ -12,6 +12,9 @@ public interface LoadCorporateLoanPort {
 
     Optional<CorporateLoan> findById(Long loanId);
 
+    /** 실행(disburse) 전용 — 비관적 락으로 조회해 동시 이중지급을 차단한다. */
+    Optional<CorporateLoan> findByIdForUpdate(Long loanId);
+
     /** 특정 종목의 기업대출 목록(최신순). */
     List<CorporateLoan> findByStockCode(String stockCode);
 
