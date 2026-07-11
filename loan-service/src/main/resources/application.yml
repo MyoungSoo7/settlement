@@ -92,7 +92,7 @@ management:
     prometheus:
       enabled: true
     health:
-      show-details: always
+      show-details: when-authorized
       probes:
         enabled: true
   health:
