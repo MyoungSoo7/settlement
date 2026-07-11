@@ -111,6 +111,9 @@ springdoc:
     path: /swagger-ui.html
 
 app:
+  # CEO 브리핑 문서 등 보호 엔드포인트의 JWT 검증용 — 발급 서비스(order)와 동일 시크릿(운영 필수, 미설정 시 기동 실패)
+  jwt:
+    secret: ${JWT_SECRET}
   company:
     # /admin/company/** 게이트 공유 시크릿 — 미설정 시 통과+경고 (로컬 전용, 운영 필수)
     internal-api-key: ${COMPANY_INTERNAL_API_KEY:}

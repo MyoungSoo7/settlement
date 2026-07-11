@@ -1,9 +1,14 @@
 package github.lms.lemuel.company.config;
 
+import github.lms.lemuel.common.config.jwt.JwtAuthenticationFilter;
+import github.lms.lemuel.common.config.jwt.JwtProperties;
+import github.lms.lemuel.common.config.jwt.JwtUtil;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -27,15 +32,21 @@ import java.util.List;
  */
 @Configuration
 @EnableWebSecurity
+// 전역 SecurityConfig 는 스캔하지 않고 JWT 검증 빈(JwtUtil/JwtAuthenticationFilter/JwtProperties)만
+// 물어, 문서 다운로드 등 보호 엔드포인트를 자체 체인에서 게이팅한다(company 격리 철학 유지).
+@Import({JwtUtil.class, JwtAuthenticationFilter.class})
+@EnableConfigurationProperties(JwtProperties.class)
 public class SecurityConfig {
 
     private final AdminApiKeyFilter adminApiKeyFilter;
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @Value("${cors.origins:${cors.allowed-origins:}}")
     private String corsAllowedOrigins;
 
-    public SecurityConfig(AdminApiKeyFilter adminApiKeyFilter) {
+    public SecurityConfig(AdminApiKeyFilter adminApiKeyFilter, JwtAuthenticationFilter jwtAuthenticationFilter) {
         this.adminApiKeyFilter = adminApiKeyFilter;
+        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
     }
 
     @Bean
@@ -73,7 +84,11 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/", "/error").permitAll()
-                        // 공개 조회 API — 뉴스 메타데이터이므로 무인증
+                        // CEO 브리핑 문서(목록·다운로드)는 기밀 — ADMIN/MANAGER 인증 필요(순차 ID 무인증 열거=IDOR 차단).
+                        // 반드시 아래 공개 /api/company/** 규칙보다 먼저 선언한다(첫 매칭 우선).
+                        .requestMatchers(HttpMethod.GET, "/api/company/documents/*/download",
+                                "/api/company/companies/*/documents").hasAnyRole("ADMIN", "MANAGER")
+                        // 나머지 공개 조회 API — 뉴스 메타데이터이므로 무인증
                         .requestMatchers(HttpMethod.GET, "/api/company/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/health/**",
@@ -88,6 +103,8 @@ public class SecurityConfig {
                         .accessDeniedHandler((request, response, e) ->
                                 response.sendError(HttpServletResponse.SC_FORBIDDEN, "Forbidden"))
                 )
+                // JWT 로 SecurityContext 를 채운 뒤(문서 엔드포인트 인가 평가용), admin 키 필터가 /admin/company 게이팅.
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(adminApiKeyFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
