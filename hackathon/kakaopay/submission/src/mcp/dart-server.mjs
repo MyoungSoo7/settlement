@@ -8,6 +8,9 @@
  *
  * env: DART_API_KEY (없으면 상위 .env 폴백 — client.mjs 참조)
  */
+import { readFileSync, existsSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { company, disclosures, financialSummary, financialFull, API_KEY } from '../dart/client.mjs';
 import { searchCorp, loadCorpCodes } from '../dart/corp-codes.mjs';
 import { safeErrorMessage } from '../common/env.mjs';
@@ -16,7 +19,8 @@ import { startJsonRpcServer } from './json-rpc-stdio.mjs';
 const ymd = d => d.toISOString().slice(0, 10).replaceAll('-', '');
 const daysAgo = n => new Date(Date.now() - n * 86_400_000);
 const SERVER_NAME = 'invest-companion-dart';
-const SERVER_VERSION = '0.1.0';
+const SERVER_VERSION = '0.2.0';
+const SECTOR_MATRIX_PATH = join(dirname(fileURLToPath(import.meta.url)), '..', 'data', 'stats', 'sector-matrix.json');
 
 const TOOLS = [
   {
@@ -95,6 +99,39 @@ const TOOLS = [
     },
     run: ({ corp_code, year, reprt_code, fs_div }) =>
       financialFull({ corpCode: corp_code, year, reprtCode: reprt_code ?? '11011', fsDiv: fs_div ?? 'CFS' }),
+  },
+  {
+    name: 'sector_suitability',
+    description: '산업군×시기 규칙 충족도 매트릭스 — 유니버스 66종목을 12개 산업군으로 묶어 시기별(직전 3개 사업연도 + 최근 분기) 재무 규칙 5종(매출성장·영업이익성장·영업이익률·순이익흑자·부채비율, 금융업은 부채비율 N/A) 충족도를 반환한다. 사전계산 파일 서빙 — 재계산은 node src/bin/sector-matrix.mjs, docx 리포트는 node src/bin/sector-report.mjs. 점수는 투자적합도 예측이 아니라 규칙 충족 개수다. 뉴스 열은 없다 — 뉴스는 소급 조회 불가라 news_search_risk 로 현재 시점만 별도 확인할 것.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        sector: { type: 'string', description: '특정 산업군만 조회 (예: 반도체·IT장비). 생략 시 전체' },
+        include_stocks: { type: 'boolean', description: 'true 면 종목별 상세 판정 포함 (기본 false — 산업군 집계만)' },
+      },
+    },
+    run: ({ sector, include_stocks }) => {
+      if (!existsSync(SECTOR_MATRIX_PATH)) {
+        return { error: '사전계산 파일이 없습니다 — node src/bin/sector-matrix.mjs 를 먼저 실행하세요 (DART_API_KEY 필요, 1~2분)' };
+      }
+      const matrix = JSON.parse(readFileSync(SECTOR_MATRIX_PATH, 'utf8'));
+      const want = String(sector ?? '').trim();
+      const sectors = want ? matrix.sectors.filter(s => s.sector.includes(want)) : matrix.sectors;
+      if (want && !sectors.length) {
+        return { error: `산업군 "${want}" 없음`, availableSectors: matrix.sectors.map(s => s.sector) };
+      }
+      return {
+        generatedAt: matrix.generatedAt,
+        universe: matrix.universe,
+        periods: matrix.periods,
+        rules: matrix.rules,
+        methodology: matrix.methodology,
+        sectors,
+        ...(include_stocks
+          ? { stocks: matrix.stocks.filter(st => !want || st.sector.includes(want)) }
+          : {}),
+      };
+    },
   },
   {
     name: 'dart_status',

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * DART 세팅 스모크 테스트.
- *  [1] MCP 서버 왕복: initialize → tools/list(6) → dart_status
+ *  [1] MCP 서버 왕복: initialize → tools/list(7) → dart_status
  *  [2] (DART_API_KEY 있을 때만) 라이브: corp_search 삼성전자 → 00126380
  * 실행: node src/test/dart-smoke.mjs
  */
@@ -34,9 +34,9 @@ const status = responses.find(r => r.id === 3);
 const search = responses.find(r => r.id === 4);
 
 check('initialize 응답', init?.result?.serverInfo?.name === 'invest-companion-dart');
-check('tools/list 6개 도구', list?.result?.tools?.length === 6, `got ${list?.result?.tools?.length}`);
+check('tools/list 7개 도구', list?.result?.tools?.length === 7, `got ${list?.result?.tools?.length}`);
 for (const t of ['dart_corp_search', 'dart_company', 'dart_disclosures',
-  'dart_financial_summary', 'dart_financial_full', 'dart_status']) {
+  'dart_financial_summary', 'dart_financial_full', 'sector_suitability', 'dart_status']) {
   check(`도구 등록: ${t}`, (list?.result?.tools ?? []).some(x => x.name === t), `missing ${t}`);
 }
 

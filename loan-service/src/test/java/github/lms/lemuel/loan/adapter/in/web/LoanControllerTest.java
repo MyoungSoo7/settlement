@@ -4,6 +4,8 @@ import github.lms.lemuel.common.config.jwt.JwtUtil;
 import github.lms.lemuel.loan.application.port.in.DisburseLoanUseCase;
 import github.lms.lemuel.loan.application.port.in.RequestLoanUseCase;
 import github.lms.lemuel.loan.application.port.out.LoadLoanPort;
+import github.lms.lemuel.loan.domain.LoanAdvance;
+import github.lms.lemuel.loan.domain.LoanStatus;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,9 +15,15 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.math.BigDecimal;
+import java.util.List;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -61,5 +69,48 @@ class LoanControllerTest {
         mockMvc.perform(post("/loans/999/disburse"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value("INVALID_ARGUMENT"));
+    }
+
+    private static LoanAdvance loan() {
+        return LoanAdvance.reconstitute(1L, 7L, new BigDecimal("800000"),
+                new BigDecimal("800"), new BigDecimal("800800"), LoanStatus.DISBURSED);
+    }
+
+    @Test
+    @DisplayName("POST /loans — 신청 성공은 201 + 대출 본문")
+    void requestCreated() throws Exception {
+        when(requestLoanUseCase.request(any())).thenReturn(loan());
+
+        mockMvc.perform(post("/loans")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"sellerId":7,"principal":800000,"financingDays":7}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.sellerId").value(7))
+                .andExpect(jsonPath("$.status").value("DISBURSED"));
+    }
+
+    @Test
+    @DisplayName("POST /loans/{id}/disburse — 실행 성공은 200")
+    void disburseOk() throws Exception {
+        when(disburseLoanUseCase.disburse(1L)).thenReturn(loan());
+
+        mockMvc.perform(post("/loans/1/disburse"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1));
+    }
+
+    @Test
+    @DisplayName("GET /loans?sellerId= — 셀러별 대출 목록")
+    void bySeller() throws Exception {
+        when(loadLoanPort.findBySeller(7L)).thenReturn(List.of(loan()));
+
+        mockMvc.perform(get("/loans").param("sellerId", "7"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].sellerId").value(7));
+
+        verify(loadLoanPort).findBySeller(eq(7L));
     }
 }

@@ -85,10 +85,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 </nav>
               )}
 
-              {/* ── 일반 사용자 내비 ── 주문하기 단일 메뉴 */}
+              {/* ── 일반 사용자 내비 ── 주문하기 + 추천받기 (USER 전용) */}
               {user && !isAdminOrManager && (
                 <nav className="flex space-x-1">
                   <Link to="/order"        className={navLinkClass('/order')}>주문하기</Link>
+                  {user.role === 'USER' && (
+                    <Link to="/recommend"  className={navLinkClass('/recommend')}>추천받기</Link>
+                  )}
                 </nav>
               )}
             </div>

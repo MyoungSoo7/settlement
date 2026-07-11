@@ -1,0 +1,24 @@
+{
+  "eval_cases": [
+    {
+      "query": "/interview-harness 보고서 좀 만들어줘",
+      "should_trigger": true,
+      "expected_behavior": "Runs the Seed Gate, calls socrates only if the top-level ## Seed is missing or incomplete, then iterates evolve-step and ontology until convergence or safety valve."
+    },
+    {
+      "query": "이미 Seed가 있는데 사각지대 후보만 검토해줘",
+      "should_trigger": false,
+      "expected_behavior": "Route to evolve-step because the user only needs Seed blind-spot review."
+    },
+    {
+      "query": "Seed 위에 ontology만 얹어줘",
+      "should_trigger": false,
+      "expected_behavior": "Route to ontology because the user only needs semantic boundary definition."
+    },
+    {
+      "query": "하네스로 돌려줘. ontology가 비슷해질 때까지 확인하면서 seed 닫아줘",
+      "should_trigger": true,
+      "expected_behavior": "Runs the semi-automatic harness and asks the user for adoption and boundary-equivalence decisions."
+    }
+  ]
+}

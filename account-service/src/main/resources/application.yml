@@ -1,0 +1,130 @@
+spring:
+  profiles:
+    active: local
+
+  application:
+    name: lemuel-account
+
+  threads:
+    virtual:
+      enabled: true
+
+  # ★ account-service 는 자체 DB(lemuel_account) 를 소유한다 (DB-per-service).
+  #   loan·investment·settlement 의 이벤트를 Kafka 로만 수신해 전사 GL 로 집계한다(코드·DB 의존 0).
+  datasource:
+    url: jdbc:postgresql://localhost:5445/lemuel_account?reWriteBatchedInserts=true
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      pool-name: lemuel-account-pool
+      maximum-pool-size: ${DB_POOL_MAX:20}
+      minimum-idle: ${DB_POOL_MIN_IDLE:5}
+      connection-timeout: 10000
+      leak-detection-threshold: 30000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        # ★ 물리 DB 는 lemuel_account 로 분리되지만 스키마명은 opslab 을 재사용한다
+        #   (loan-service 와 동일 — 무스키마 엔티티 매핑이 opslab 으로 해석되도록 통일).
+        default_schema: opslab
+        jdbc:
+          batch_size: 50
+          batch_versioned_data: true
+        order_inserts: true
+        order_updates: true
+
+  # ★ account-service 는 자체 DB 마이그레이션을 직접 책임진다.
+  flyway:
+    enabled: true
+    schemas: opslab          # opslab 스키마를 생성·기본 스키마로 사용
+    locations: classpath:db/migration
+
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=500,expireAfterWrite=600s
+
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: lemuel-account
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      properties:
+        isolation.level: read_committed
+    listener:
+      ack-mode: manual_immediate
+      missing-topics-fatal: false
+
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+server:
+  port: 8102
+  shutdown: graceful
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    prometheus:
+      enabled: true
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  health:
+    elasticsearch:
+      enabled: false
+    db:
+      enabled: true
+  server:
+    port: 8103
+  metrics:
+    tags:
+      application: ${spring.application.name}
+      environment: ${ENVIRONMENT:local}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+app:
+  # JWT — shared-common JwtProperties(prefix=app.jwt). 루트 스캔이 common.config.jwt 를 잡으므로 secret 필수
+  # (order-service 와 동일 시크릿 — JWT 인증 API /api/account/**).
+  jwt:
+    issuer: ${JWT_ISSUER:lemuel}
+    secret: ${JWT_SECRET}
+    ttl-seconds: ${JWT_TTL_SECONDS:3600}
+  kafka:
+    # ★ 소비 전용 — 발행 토픽 없음. 아래는 전부 수신(구독) 토픽.
+    enabled: ${APP_KAFKA_ENABLED:false}
+    consumer:
+      concurrency: ${APP_KAFKA_CONSUMER_CONCURRENCY:3}
+    topic:
+      partitions: ${APP_KAFKA_TOPIC_PARTITIONS:3}
+      # 수신 (settlement → account)
+      settlement-created: lemuel.settlement.created
+      settlement-confirmed: lemuel.settlement.confirmed
+      # 수신 (loan → account)
+      loan-disbursement-requested: lemuel.loan.disbursement_requested
+      loan-repayment-applied: lemuel.loan.repayment_applied
+      corporate-loan-disbursed: lemuel.loan.corporate_loan_disbursed
+      # 수신 (investment → account)
+      investment-executed: lemuel.investment.executed

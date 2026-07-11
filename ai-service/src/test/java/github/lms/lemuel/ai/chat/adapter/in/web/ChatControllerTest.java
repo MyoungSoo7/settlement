@@ -23,17 +23,21 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -143,6 +147,56 @@ class ChatControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"conversationId\":\"" + otherId + "\",\"message\":\"질문\"}"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("POST /api/ai/chat/stream — delta 이벤트 반복 후 done 이벤트로 전체 결과 전달")
+    void chatStream_deltasThenDone() throws Exception {
+        UUID conversationId = UUID.randomUUID();
+        // delta 페이로드는 ASCII 로 둔다 — 원시 SSE data 필드는 MockMvc 응답 디코딩에서
+        // 멀티바이트가 깨질 수 있어(전송 메커니즘과 무관), 조각 식별은 ASCII 로 검증한다.
+        when(chatUseCase.chat(any(ChatCommand.class), any())).thenAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            Consumer<String> onDelta = invocation.getArgument(1);
+            onDelta.accept("delta-A");
+            onDelta.accept("delta-B");
+            return new ChatResult(conversationId, "delta-Adelta-B", "claude-test", 100, 20);
+        });
+
+        MvcResult started = mockMvc.perform(post("/api/ai/chat/stream")
+                        .principal(auth)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"message\":\"질문\"}"))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+        started.getAsyncResult(5000);   // 가상 스레드가 emitter.complete() 할 때까지 대기
+
+        String body = mockMvc.perform(asyncDispatch(started))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(body).contains("delta-A").contains("delta-B")
+                .contains("done").contains(conversationId.toString());
+    }
+
+    @Test
+    @DisplayName("POST /api/ai/chat/stream — 도중 실패 시 error 이벤트(code+안전 메시지)로 종료")
+    void chatStream_failureEmitsErrorEvent() throws Exception {
+        when(chatUseCase.chat(any(ChatCommand.class), any()))
+                .thenThrow(new AiUnavailableException("AI 응답 생성에 실패했습니다.", null));
+
+        MvcResult started = mockMvc.perform(post("/api/ai/chat/stream")
+                        .principal(auth)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"message\":\"질문\"}"))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+        started.getAsyncResult(5000);
+
+        String body = mockMvc.perform(asyncDispatch(started))
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(body).contains("error").contains("AI_UNAVAILABLE");
     }
 
     @Test

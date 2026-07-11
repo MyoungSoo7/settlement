@@ -101,7 +101,7 @@ describe('settlementApi', () => {
 
       const result = await settlementApi.searchByPost(request);
 
-      expect(api.get).toHaveBeenCalledWith('/api/settlements/search', { params: request });
+      expect(api.post).toHaveBeenCalledWith('/api/settlements/search', request);
       expect(result).toEqual(mockSearchResponse);
     });
   });

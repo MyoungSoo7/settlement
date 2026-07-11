@@ -1,6 +1,7 @@
 package github.lms.lemuel.menu.adapter.in.web;
 
 import github.lms.lemuel.menu.adapter.in.web.dto.MenuCreateRequest;
+import github.lms.lemuel.menu.adapter.in.web.dto.MenuReorderRequest;
 import github.lms.lemuel.menu.adapter.in.web.dto.MenuResponse;
 import github.lms.lemuel.menu.adapter.in.web.dto.MenuUpdateRequest;
 import github.lms.lemuel.menu.application.port.in.MenuUseCase;
@@ -116,6 +117,28 @@ public class AdminMenuController {
                 request.isActive()
         ));
         return ResponseEntity.ok(MenuResponse.fromFlat(updated));
+    }
+
+    /**
+     * 메뉴 배치 재배치
+     * PATCH /admin/menus/reorder
+     */
+    @Operation(summary = "메뉴 배치 재배치",
+            description = "여러 메뉴의 부모/정렬순서를 한 번에 저장한다. 순환 참조가 생기는 재배치는 전체 거부(400).")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "재배치 성공"),
+            @ApiResponse(responseCode = "400", description = "존재하지 않는 메뉴/부모 또는 순환 참조"),
+            @ApiResponse(responseCode = "403", description = "권한 없음")
+    })
+    @PatchMapping("/reorder")
+    public ResponseEntity<List<MenuResponse>> reorderMenus(
+            @Valid @RequestBody MenuReorderRequest request) {
+        List<Menu> saved = menuUseCase.reorder(request.items().stream()
+                .map(i -> new MenuUseCase.ReorderItemCommand(i.id(), i.parentId(), i.sortOrder()))
+                .collect(Collectors.toList()));
+        return ResponseEntity.ok(saved.stream()
+                .map(MenuResponse::fromFlat)
+                .collect(Collectors.toList()));
     }
 
     /**

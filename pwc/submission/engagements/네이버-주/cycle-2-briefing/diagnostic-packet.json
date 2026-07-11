@@ -1,0 +1,607 @@
+{
+  "corp": {
+    "corpCode": "00266961",
+    "name": "네이버(주)",
+    "stockCode": "035420",
+    "ceo": "최수연",
+    "bizrNo": "2208162517"
+  },
+  "year": 2025,
+  "fsDiv": "CFS",
+  "disclosureWindowDays": 90,
+  "macro": {
+    "indicator": "한국은행 기준금리",
+    "latest": {
+      "time": "20260707",
+      "value": 2.5
+    },
+    "changeFromFirst": 0,
+    "unit": "%"
+  },
+  "presetUsed": null,
+  "externalThresholds": {
+    "arGrowthGapPp": 15,
+    "ocfToOiFloor": 0.8,
+    "inventoryGapPp": 15,
+    "borrowingsGrowthPct": 30,
+    "interestCoverageFloor": 10,
+    "currentRatioFloorPct": 100,
+    "currentRatioWatchPct": 130,
+    "correctionsMin": 3,
+    "clarificationsMin": 1
+  },
+  "externalPresent": 1,
+  "newsSignals": {
+    "enabled": true,
+    "company": "네이버(주)",
+    "searches": [
+      {
+        "query": "네이버",
+        "total": 5293372,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      },
+      {
+        "query": "네이버 평판",
+        "total": 8088,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      },
+      {
+        "query": "네이버 브랜드",
+        "total": 384442,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      },
+      {
+        "query": "네이버 소비자",
+        "total": 318835,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      },
+      {
+        "query": "네이버 투자",
+        "total": 560451,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      },
+      {
+        "query": "네이버 실적",
+        "total": 195303,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      },
+      {
+        "query": "네이버 재무",
+        "total": 57849,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      },
+      {
+        "query": "네이버 규제",
+        "total": 140727,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      },
+      {
+        "query": "네이버 소송",
+        "total": 50898,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      },
+      {
+        "query": "네이버 구조조정",
+        "total": 17870,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      }
+    ],
+    "totalUniqueItems": 84,
+    "categories": {
+      "reputation": {
+        "id": "reputation",
+        "name": "기업평판/브랜드 이미지",
+        "count": 29,
+        "keywords": [
+          "평판",
+          "이미지",
+          "브랜드",
+          "논란",
+          "불매",
+          "소비자",
+          "고객 불만",
+          "품질",
+          "리콜",
+          "갑질",
+          "민원"
+        ],
+        "examples": [
+          {
+            "title": "KCC, 건축자재 브랜드평판 1위…삼표시멘트·동화기업 順",
+            "description": "네이버 증권. 국내 건축자재 상장기업 가운데 KCC가  7월 브랜드평판 1위에 올랐다. 삼표시멘트와 동화기업이 뒤를 이으며 상위권을 형성했다. 다만 건축자재 업종 전반의 온라인 관심도는 전달보다 크게 줄어든...",
+            "pubDate": "Fri, 10 Jul 2026 06:54:00 +0900",
+            "url": "https://www.pinpointnews.co.kr/news/articleView.html?idxno=467188",
+            "naverUrl": "https://www.pinpointnews.co.kr/news/articleView.html?idxno=467188"
+          },
+          {
+            "title": "‘김부장’, 7월 드라마 브랜드평판 1위..2위 ‘멋진 신세계’·3위 ‘신...",
+            "description": "브랜드평판지수 6,685,595로 분석됐다. 한편, 동명의 네이버 웹툰을 각색한 ‘김부장’은 '세상에서 가장 평범한' 아빠가 하나뿐인 딸을 되찾기 위해 '세상에서 가장...",
+            "pubDate": "Thu, 09 Jul 2026 09:08:00 +0900",
+            "url": "http://www.breaknews.com/1220378",
+            "naverUrl": "http://www.breaknews.com/1220378"
+          },
+          {
+            "title": "[오늘의 식탁] CJ제일제당ㆍ롯데웰푸드ㆍ오뚜기ㆍ서울우유ㆍ남양유업ㆍ...",
+            "description": "△CJ더마켓 △네이버 공식 브랜드스토어 △쿠팡 △컬리 등에서 판매한다. ▲롯데웰푸드, 우베 디저트 5종... ▲남양유업, 기업 평판 회복 사례로 논문 수록 남양유업이 기업 평판 회복 대표 사례로 '경영컨설팅연구'의...",
+            "pubDate": "Wed, 08 Jul 2026 10:00:00 +0900",
+            "url": "https://www.dnews.co.kr/uhtml/view.jsp?idxno=202607080832241460334",
+            "naverUrl": "https://www.dnews.co.kr/uhtml/view.jsp?idxno=202607080832241460334"
+          },
+          {
+            "title": "현대카드, 브랜드평판 1위 독주…'애플페이·알파벳카드·호실적' 앞세워...",
+            "description": "현대카드가 소비자의 높은 관심과 화제성을 나타내는 브랜드평판 조사에서 압도적인 수치로 1위를... 현대카드는 이마트, 코스트코, 대한항공, 네이버, 무신사 등 각 분야 선두 기업들과 구축한 데이터 동맹 '도메인...",
+            "pubDate": "Tue, 07 Jul 2026 17:04:00 +0900",
+            "url": "http://www.lkp.news/news/articleView.html?idxno=81635",
+            "naverUrl": "http://www.lkp.news/news/articleView.html?idxno=81635"
+          },
+          {
+            "title": "잡플래닛, '네카라쿠배당토' 이직 선호도 조사…\"이름값보다 조직문화\"",
+            "description": "이번 기획 조사는 대한민국 디지털 생태계를 상징하는 소위 '네카라쿠배당토'(네이버·카카오·라인플러스... 정량적 평판을 종합 필터링해 자신의 커리어 핏(Fit)과 매칭하는 데이터 기반 의사결정이 주류로 안착한 만큼...",
+            "pubDate": "Tue, 07 Jul 2026 09:06:00 +0900",
+            "url": "https://www.thedailypost.kr/news/articleView.html?idxno=114580",
+            "naverUrl": "https://www.thedailypost.kr/news/articleView.html?idxno=114580"
+          }
+        ],
+        "crossCheck": "매출 성장률, 반품/클레임, 고객 이탈, 채널별 매출 변화를 확인"
+      },
+      "industry": {
+        "id": "industry",
+        "name": "관심산업/시장 환경",
+        "count": 23,
+        "keywords": [
+          "업계",
+          "산업",
+          "시장",
+          "트렌드",
+          "수요",
+          "소비동향",
+          "온라인",
+          "플랫폼",
+          "패션",
+          "섬유",
+          "의류"
+        ],
+        "examples": [
+          {
+            "title": "KCC, 건축자재 브랜드평판 1위…삼표시멘트·동화기업 順",
+            "description": "네이버 증권. 국내 건축자재 상장기업 가운데 KCC가  7월 브랜드평판 1위에 올랐다. 삼표시멘트와 동화기업이 뒤를 이으며 상위권을 형성했다. 다만 건축자재 업종 전반의 온라인 관심도는 전달보다 크게 줄어든...",
+            "pubDate": "Fri, 10 Jul 2026 06:54:00 +0900",
+            "url": "https://www.pinpointnews.co.kr/news/articleView.html?idxno=467188",
+            "naverUrl": "https://www.pinpointnews.co.kr/news/articleView.html?idxno=467188"
+          },
+          {
+            "title": "대기업 CEO 리더십의 새 공식, 레거시 콘텐츠와 서번트 리더십",
+            "description": "같은 자리에 함께한 네이버 이해진 의장에 대해서도 \"얼굴을 처음 봤다\"는 반응이 적지 않았다. 국내 산업을... 부산대 황성욱 교수는 기업의 역사적 자산과 CEO PI가 결합한 '레거시 콘텐츠(Legacy Content)'가 평판 형성...",
+            "pubDate": "Mon, 06 Jul 2026 16:42:00 +0900",
+            "url": "https://www.the-pr.co.kr/news/articleView.html?idxno=61819",
+            "naverUrl": "https://www.the-pr.co.kr/news/articleView.html?idxno=61819"
+          },
+          {
+            "title": "7월 7일부터 유튜버·블로거도 허위정보 책임 강화…무엇을 조심해야 하...",
+            "description": "특히 건강, 투자, 부동산, 사고·범죄, 기업 평판처럼 사실관계가 중요한 콘텐츠를 다루는 채널은 출처 확인과... 네이버, 카카오, 유튜브, 메타, X 등 국내외 주요 플랫폼이 모두 영향권에 들어갈 수 있다. 해외 플랫폼의...",
+            "pubDate": "Mon, 06 Jul 2026 16:00:00 +0900",
+            "url": "https://www.e-science.co.kr/news/articleView.html?idxno=131524",
+            "naverUrl": "https://www.e-science.co.kr/news/articleView.html?idxno=131524"
+          },
+          {
+            "title": "K-뷰티·패션 IPO 기대감 '솔솔'… 하반기 대어 부상하나",
+            "description": "거래액 확대와 자체 브랜드(PB) 경쟁력 강화, 글로벌시장 성장세 등이 이어질 경우 상장 추진 과정에서... 네이버로부터 330억원 규모 투자를 유치한 과정에서 기업가치는 2조8000억원으로 평가됐다. 이는 2023년...",
+            "pubDate": "Fri, 10 Jul 2026 10:50:00 +0900",
+            "url": "http://www.the-biz.co.kr/news/articleView.html?idxno=724193",
+            "naverUrl": "http://www.the-biz.co.kr/news/articleView.html?idxno=724193"
+          },
+          {
+            "title": "오리자조금, 복날 맞아 국내산 오리고기 최대 57% 할인",
+            "description": "오리덕몰과 네이버스토어에서 '복날엔 우리 오리-무더위 대비, 복날 보양 든든하게! 국내산 우리 오리 특별기획전'을 개최한다고 밝혔다. 이번 행사는 여름철 보양식 수요가 늘어나는 시기에 소비자의 장바구니 부담을...",
+            "pubDate": "Fri, 10 Jul 2026 10:44:00 +0900",
+            "url": "https://www.livesnews.com/news/article.html?no=62488",
+            "naverUrl": "https://www.livesnews.com/news/article.html?no=62488"
+          }
+        ],
+        "crossCheck": "재고 증가율, 매출 성장률, 사업부별 성장률, ECOS 물가/금리 환경을 확인"
+      },
+      "investment": {
+        "id": "investment",
+        "name": "투자동향/자금소요",
+        "count": 14,
+        "keywords": [
+          "투자",
+          "증설",
+          "설비",
+          "물류",
+          "자동화",
+          "인수",
+          "M&A",
+          "유상증자",
+          "자금조달",
+          "CAPEX"
+        ],
+        "examples": [
+          {
+            "title": "미래에셋벤처투자 주가, 7월 10일 장중 16,670원 10.69% 상승",
+            "description": "10일 오전 11시 11분 기준, 네이버페이 증권에 따르면 미래에셋벤처투자의 주가는 현재 16,670원에 거래되고 있다. 이는 지난 종가 15,060원 대비 1,610원 오른 10.69% 상승한 수치이다. 주가는 15,120원으로...",
+            "pubDate": "Fri, 10 Jul 2026 11:12:00 +0900",
+            "url": "https://www.topstarnews.net/news/articleView.html?idxno=16130531",
+            "naverUrl": "https://www.topstarnews.net/news/articleView.html?idxno=16130531"
+          },
+          {
+            "title": "선가 상승에 해양플랜트 특수까지…삼성중공업, 사상 최대 실적 향해 돛...",
+            "description": "네이버 증권. LNG(액화천연가스) 테마가 10일 강한 오름세를 보이고 있다. 글로벌 LNG 개발 프로젝트 확대와 천연가스 인프라 투자 기대감이 커지는 데다 국내 조선·플랜트 업황 개선 전망까지 더해지면서 관련 종목...",
+            "pubDate": "Fri, 10 Jul 2026 11:12:00 +0900",
+            "url": "https://www.pinpointnews.co.kr/news/articleView.html?idxno=467322",
+            "naverUrl": "https://www.pinpointnews.co.kr/news/articleView.html?idxno=467322"
+          },
+          {
+            "title": "7월 7일부터 유튜버·블로거도 허위정보 책임 강화…무엇을 조심해야 하...",
+            "description": "특히 건강, 투자, 부동산, 사고·범죄, 기업 평판처럼 사실관계가 중요한 콘텐츠를 다루는 채널은 출처 확인과... 네이버, 카카오, 유튜브, 메타, X 등 국내외 주요 플랫폼이 모두 영향권에 들어갈 수 있다. 해외 플랫폼의...",
+            "pubDate": "Mon, 06 Jul 2026 16:00:00 +0900",
+            "url": "https://www.e-science.co.kr/news/articleView.html?idxno=131524",
+            "naverUrl": "https://www.e-science.co.kr/news/articleView.html?idxno=131524"
+          },
+          {
+            "title": "대기업집단 2026년 7월 브랜드평판... 삼성, SK, 두산 順",
+            "description": "2026년 7월 대기업집단 브랜드평판 30위 순위는 삼성, SK, 두산, 현대자동차, LG, KT, 농협, 롯데, 네이버, 한화, 미래에셋, CJ, 쿠팡, GS, 카카오, HD현대, 동원, 한국투자금융, 현대백화점, 포스코, DB...",
+            "pubDate": "Mon, 06 Jul 2026 12:20:00 +0900",
+            "url": "https://www.energy-news.co.kr/news/articleView.html?idxno=226596",
+            "naverUrl": "https://www.energy-news.co.kr/news/articleView.html?idxno=226596"
+          },
+          {
+            "title": "삼성, 대기업집단 브랜드평판 7월 빅데이터 분석 1위...SK·두산·현대자...",
+            "description": "연구소에 따르면 7월 대기업집단 브랜드평판 30위 순위는 삼성, SK, 두산, 현대자동차, LG, KT, 농협, 롯데, 네이버, 한화, 미래에셋, CJ, 쿠팡, GS, 카카오, HD현대, 동원, 한국투자금융 순으로 나타났다. 이어...",
+            "pubDate": "Mon, 06 Jul 2026 10:22:00 +0900",
+            "url": "http://www.thebigdata.co.kr/view.php?ud=202607060813186300d0a8833aad_23",
+            "naverUrl": "http://www.thebigdata.co.kr/view.php?ud=202607060813186300d0a8833aad_23"
+          }
+        ],
+        "crossCheck": "차입금, 이자보상배율, 투자 현금흐름, 유동비율을 확인"
+      },
+      "business": {
+        "id": "business",
+        "name": "사업동향/제휴/확장",
+        "count": 9,
+        "keywords": [
+          "진출",
+          "제휴",
+          "계약",
+          "수주",
+          "공급",
+          "파트너",
+          "신사업",
+          "출점",
+          "매장",
+          "해외",
+          "브랜드 론칭"
+        ],
+        "examples": [
+          {
+            "title": "7월 7일부터 유튜버·블로거도 허위정보 책임 강화…무엇을 조심해야 하...",
+            "description": "특히 건강, 투자, 부동산, 사고·범죄, 기업 평판처럼 사실관계가 중요한 콘텐츠를 다루는 채널은 출처 확인과... 네이버, 카카오, 유튜브, 메타, X 등 국내외 주요 플랫폼이 모두 영향권에 들어갈 수 있다. 해외 플랫폼의...",
+            "pubDate": "Mon, 06 Jul 2026 16:00:00 +0900",
+            "url": "https://www.e-science.co.kr/news/articleView.html?idxno=131524",
+            "naverUrl": "https://www.e-science.co.kr/news/articleView.html?idxno=131524"
+          },
+          {
+            "title": "AI 데이터센터발 전력 대란… LS, 초고압 변압기·직류 배전 수주 '골든...",
+            "description": "네이버 증권. 무선충전기술 테마가 10일 강세를 이어가고 있다. 스마트폰과 웨어러블 기기, 전기차, 산업용... 단기 테마성 매매보다 실적 성장과 기술 경쟁력, 주요 고객사 확보 여부를 함께 살펴보는 전략이 요구된다....",
+            "pubDate": "Fri, 10 Jul 2026 10:50:00 +0900",
+            "url": "https://www.pinpointnews.co.kr/news/articleView.html?idxno=467310",
+            "naverUrl": "https://www.pinpointnews.co.kr/news/articleView.html?idxno=467310"
+          },
+          {
+            "title": "원전 해체 시장 기대감…위드텍 우리기술 한텍 현대건설 우리기술 담아...",
+            "description": "네이버 증권. 원자력발전소 해체 테마가 10일 강세를 이어가고 있다. 글로벌 원전 해체 시장 확대와 국내... 또한 해외 원전 해체 시장 진출 여부와 실제 수주 실적이 향후 기업가치를 좌우하는 핵심 변수로 평가된다. 다만...",
+            "pubDate": "Fri, 10 Jul 2026 10:42:00 +0900",
+            "url": "https://www.pinpointnews.co.kr/news/articleView.html?idxno=467307",
+            "naverUrl": "https://www.pinpointnews.co.kr/news/articleView.html?idxno=467307"
+          },
+          {
+            "title": "\"미 국무부, 허위조작정보 삭제 이행에 물음표 찍어\"",
+            "description": "국내 사업자는 네이버·카카오·네이트·디시인사이드, 해외 사업자는 구글·메타·엑스·틱톡이 규제 대상이다. 방미통위는 해당 사업자들에게 규제 대상이라는 사실을 통지했다고 했다. 10일 MBC라디오 <시선집중...",
+            "pubDate": "Fri, 10 Jul 2026 10:38:00 +0900",
+            "url": "https://www.mediaus.co.kr/news/articleView.html?idxno=317551",
+            "naverUrl": "https://www.mediaus.co.kr/news/articleView.html?idxno=317551"
+          },
+          {
+            "title": "[홈플러스, 그후]①리테일 아포칼립스의 '결정적 장면'",
+            "description": "응답자의 절반은 대형마트 규제를 출발점으로 꼽았고, 이후 MBK파트너스의 경영 방식과 온라인 소비 확산... 홈플러스는 2020년 8월 네이버가 신규 론칭하는 '장보기' 서비스에 입점했다. 최근 컬리가 네이버쇼핑에...",
+            "pubDate": "Fri, 10 Jul 2026 10:00:00 +0900",
+            "url": "https://view.asiae.co.kr/article/2026070721252666911",
+            "naverUrl": "https://n.news.naver.com/mnews/article/277/0005788195?sid=101"
+          }
+        ],
+        "crossCheck": "수주/계약 공시, 매출채권 증가, 고객 집중도, 계약부채 변화를 확인"
+      },
+      "finance": {
+        "id": "finance",
+        "name": "재무동향/실적 압박",
+        "count": 10,
+        "keywords": [
+          "실적",
+          "매출",
+          "영업이익",
+          "적자",
+          "흑자",
+          "감소",
+          "증가",
+          "부채",
+          "차입",
+          "이자",
+          "유동성",
+          "재고"
+        ],
+        "examples": [
+          {
+            "title": "선가 상승에 해양플랜트 특수까지…삼성중공업, 사상 최대 실적 향해 돛...",
+            "description": "네이버 증권. LNG(액화천연가스) 테마가 10일 강한 오름세를 보이고 있다. 글로벌 LNG 개발 프로젝트 확대와 천연가스 인프라 투자 기대감이 커지는 데다 국내 조선·플랜트 업황 개선 전망까지 더해지면서 관련 종목...",
+            "pubDate": "Fri, 10 Jul 2026 11:12:00 +0900",
+            "url": "https://www.pinpointnews.co.kr/news/articleView.html?idxno=467322",
+            "naverUrl": "https://www.pinpointnews.co.kr/news/articleView.html?idxno=467322"
+          },
+          {
+            "title": "현대카드, 브랜드평판 1위 독주…'애플페이·알파벳카드·호실적' 앞세워...",
+            "description": "현대카드가 소비자의 높은 관심과 화제성을 나타내는 브랜드평판 조사에서 압도적인 수치로 1위를... 현대카드는 이마트, 코스트코, 대한항공, 네이버, 무신사 등 각 분야 선두 기업들과 구축한 데이터 동맹 '도메인...",
+            "pubDate": "Tue, 07 Jul 2026 17:04:00 +0900",
+            "url": "http://www.lkp.news/news/articleView.html?idxno=81635",
+            "naverUrl": "http://www.lkp.news/news/articleView.html?idxno=81635"
+          },
+          {
+            "title": "빅테크가 찜한 차세대 에너지…두산에너빌리티, SMR 기자재 제작 역량 ...",
+            "description": "네이버 증권. 원자력발전 테마가 10일 강세를 이어가고 있다. 인공지능(AI) 데이터센터 확산에 따른 전력... 발전설비와 전력기기 수요 확대가 실적 개선으로 이어질 것이라는 기대가 주가에 반영되고 있다. 이 밖에도...",
+            "pubDate": "Fri, 10 Jul 2026 11:04:00 +0900",
+            "url": "https://www.pinpointnews.co.kr/news/articleView.html?idxno=467317",
+            "naverUrl": "https://www.pinpointnews.co.kr/news/articleView.html?idxno=467317"
+          },
+          {
+            "title": "우진비앤지 '흑자 체력' 입증…다음은 R&D 성장 랠리",
+            "description": "안정적인 실적 성장세를 바탕으로 하반기 미래 성장동력 확보에 본격적인 시동을 걸고 있다. 차별화된... [자료=네이버증권] 연결 대상 종속회사들 성과도 주목된다. 프리미엄 펫푸드 전문 종속회사인 바우와우코리아는...",
+            "pubDate": "Fri, 10 Jul 2026 11:02:00 +0900",
+            "url": "https://www.news2day.co.kr/article/20260710500077",
+            "naverUrl": "https://www.news2day.co.kr/article/20260710500077"
+          },
+          {
+            "title": "LFP 배터리 기대감 확산…2차전지 관련주 매수 몰리며 신바람",
+            "description": "네이버 증권. 2차전지(LFP·리튬인산철) 테마가 10일 강세를 이어가고 있다. 전기차 시장의 성장과 함께... 기업들의 실적 개선 기대가 반영되는 모습이다. 한국거래소에 따르면 이날 오전 10시54분 현재 엘앤에프는 11.75...",
+            "pubDate": "Fri, 10 Jul 2026 10:58:00 +0900",
+            "url": "https://www.pinpointnews.co.kr/news/articleView.html?idxno=467316",
+            "naverUrl": "https://www.pinpointnews.co.kr/news/articleView.html?idxno=467316"
+          }
+        ],
+        "crossCheck": "E1~E4 재무 신호, 현금흐름, 차입금, 재고자산 평가손실을 확인"
+      },
+      "risk": {
+        "id": "risk",
+        "name": "규제/소송/보안/운영 리스크",
+        "count": 28,
+        "keywords": [
+          "규제",
+          "제재",
+          "소송",
+          "고발",
+          "조사",
+          "감사",
+          "보안",
+          "장애",
+          "유출",
+          "구조조정",
+          "폐점",
+          "파업"
+        ],
+        "examples": [
+          {
+            "title": "장애인 태권도 메달리스트 사망 파장…김예지 \"충남도, 선수 보호 요청...",
+            "description": "충청남도청사[네이버 거리뷰] \"선수 보호 요청 있었지만 아무 조치 없었다\" 김 의원실이 문화체육관광부와 충남도청, 대한장애인체육회 등으로부터 제출받은 자료를 분석한 결과, 감독에 대한 징계 절차가 진행되는 동안...",
+            "pubDate": "Fri, 10 Jul 2026 11:12:00 +0900",
+            "url": "https://www.ilyoseoul.co.kr/news/articleView.html?idxno=519666",
+            "naverUrl": "https://www.ilyoseoul.co.kr/news/articleView.html?idxno=519666"
+          },
+          {
+            "title": "현대카드, 브랜드평판 1위 독주…'애플페이·알파벳카드·호실적' 앞세워...",
+            "description": "현대카드가 소비자의 높은 관심과 화제성을 나타내는 브랜드평판 조사에서 압도적인 수치로 1위를... 현대카드는 이마트, 코스트코, 대한항공, 네이버, 무신사 등 각 분야 선두 기업들과 구축한 데이터 동맹 '도메인...",
+            "pubDate": "Tue, 07 Jul 2026 17:04:00 +0900",
+            "url": "http://www.lkp.news/news/articleView.html?idxno=81635",
+            "naverUrl": "http://www.lkp.news/news/articleView.html?idxno=81635"
+          },
+          {
+            "title": "잡플래닛, '네카라쿠배당토' 이직 선호도 조사…\"이름값보다 조직문화\"",
+            "description": "이번 기획 조사는 대한민국 디지털 생태계를 상징하는 소위 '네카라쿠배당토'(네이버·카카오·라인플러스... 정량적 평판을 종합 필터링해 자신의 커리어 핏(Fit)과 매칭하는 데이터 기반 의사결정이 주류로 안착한 만큼...",
+            "pubDate": "Tue, 07 Jul 2026 09:06:00 +0900",
+            "url": "https://www.thedailypost.kr/news/articleView.html?idxno=114580",
+            "naverUrl": "https://www.thedailypost.kr/news/articleView.html?idxno=114580"
+          },
+          {
+            "title": "\"미 국무부, 허위조작정보 삭제 이행에 물음표 찍어\"",
+            "description": "국내 사업자는 네이버·카카오·네이트·디시인사이드, 해외 사업자는 구글·메타·엑스·틱톡이 규제 대상이다. 방미통위는 해당 사업자들에게 규제 대상이라는 사실을 통지했다고 했다. 10일 MBC라디오 <시선집중...",
+            "pubDate": "Fri, 10 Jul 2026 10:38:00 +0900",
+            "url": "https://www.mediaus.co.kr/news/articleView.html?idxno=317551",
+            "naverUrl": "https://www.mediaus.co.kr/news/articleView.html?idxno=317551"
+          },
+          {
+            "title": "엔화·가상자산도 폰으로 결제…다날, 디지털자산 플랫폼 사업에 가속도",
+            "description": "네이버 증권. STO(토큰증권 발행) 테마가 10일 강한 상승 흐름을 이어가고 있다. 토큰증권 시장 제도화와... 다만 실제 시장 확대는 제도 정비와 규제 환경에 영향을 받는 만큼 정책 추진 속도가 중요한 변수로 꼽힌다....",
+            "pubDate": "Fri, 10 Jul 2026 10:10:00 +0900",
+            "url": "https://www.pinpointnews.co.kr/news/articleView.html?idxno=467292",
+            "naverUrl": "https://www.pinpointnews.co.kr/news/articleView.html?idxno=467292"
+          }
+        ],
+        "crossCheck": "공시 정정/해명, 충당부채, 법무 비용, 운영 중단 영향을 확인"
+      }
+    },
+    "advice": [
+      {
+        "category": "reputation",
+        "title": "기업평판/브랜드 이미지",
+        "signal": "29건의 관련 뉴스 메타데이터 감지",
+        "crossCheck": "매출 성장률, 반품/클레임, 고객 이탈, 채널별 매출 변화를 확인",
+        "suggestedAction": "브랜드 훼손 신호는 단기 매출보다 채널별 주문 취소, 반품률, 주요 거래처 반응으로 먼저 검증한다."
+      },
+      {
+        "category": "industry",
+        "title": "관심산업/시장 환경",
+        "signal": "23건의 관련 뉴스 메타데이터 감지",
+        "crossCheck": "재고 증가율, 매출 성장률, 사업부별 성장률, ECOS 물가/금리 환경을 확인",
+        "suggestedAction": "산업 변화 신호는 재고 회전과 제품군별 매출 믹스 변화로 연결해 확인한다."
+      },
+      {
+        "category": "investment",
+        "title": "투자동향/자금소요",
+        "signal": "14건의 관련 뉴스 메타데이터 감지",
+        "crossCheck": "차입금, 이자보상배율, 투자 현금흐름, 유동비율을 확인",
+        "suggestedAction": "투자 확대 신호는 성장 기회와 동시에 현금 소요이므로 차입 만기와 투자 회수 기간을 같이 본다."
+      },
+      {
+        "category": "business",
+        "title": "사업동향/제휴/확장",
+        "signal": "9건의 관련 뉴스 메타데이터 감지",
+        "crossCheck": "수주/계약 공시, 매출채권 증가, 고객 집중도, 계약부채 변화를 확인",
+        "suggestedAction": "사업 확장 신호는 매출 인식 속도와 현금 회수 속도가 같이 움직이는지 확인한다."
+      },
+      {
+        "category": "finance",
+        "title": "재무동향/실적 압박",
+        "signal": "10건의 관련 뉴스 메타데이터 감지",
+        "crossCheck": "E1~E4 재무 신호, 현금흐름, 차입금, 재고자산 평가손실을 확인",
+        "suggestedAction": "재무 뉴스는 수치가 과장될 수 있으므로 DART 재무제표와 분기 추세로 재계산한다."
+      },
+      {
+        "category": "risk",
+        "title": "규제/소송/보안/운영 리스크",
+        "signal": "28건의 관련 뉴스 메타데이터 감지",
+        "crossCheck": "공시 정정/해명, 충당부채, 법무 비용, 운영 중단 영향을 확인",
+        "suggestedAction": "규제와 운영 리스크는 손익 영향보다 발생 가능성과 대응 책임자를 먼저 확정한다."
+      }
+    ],
+    "caveat": "뉴스는 제목, 요약, 발행일, 링크 메타데이터만 사용한 보조 신호이며 확정 사실로 취급하지 않습니다.",
+    "summary": "뉴스는 확정 사실이 아니라 보조 신호입니다. 감지 테마: 기업평판/브랜드 이미지 29건, 관심산업/시장 환경 23건, 투자동향/자금소요 14건, 사업동향/제휴/확장 9건, 재무동향/실적 압박 10건, 규제/소송/보안/운영 리스크 28건. DART PRESENT 신호는 E5이며, 평가된 DART 신호는 E1, E2, E3, E4, E5입니다. 뉴스 테마는 각 카테고리의 crossCheck 항목으로 재무/공시 데이터와 교차 확인해야 합니다."
+  },
+  "market": null,
+  "docs": null,
+  "signals": [
+    {
+      "id": "E1",
+      "name": "수익-채권 괴리 (이익의 현금화 저조)",
+      "present": false,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "revenueGrowthPct": 12.1,
+        "receivablesGrowthPct": 2.1,
+        "gapPp": -10,
+        "receivablesTrillion": "1.7→1.7조",
+        "ocfToOperatingIncome": 1.4
+      },
+      "markers": [],
+      "categoryPattern": "수익\\s*(조기)?\\s*인식|조기\\s*인식|채권.*(급증|괴리)|현금화\\s*저조",
+      "checkHints": [
+        "분기보고서로 채권 증가 시점 좁히기",
+        "대손충당금 설정률 추이",
+        "주석의 매출채권 연령 분석"
+      ]
+    },
+    {
+      "id": "E2",
+      "name": "재고 자산 적체",
+      "present": false,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "revenueGrowthPct": 12.1,
+        "inventoryGrowthPct": -6.9,
+        "gapPp": -19,
+        "inventoriesTrillion": "0→0조"
+      },
+      "markers": [],
+      "categoryPattern": "재고\\s*(자산)?\\s*(적체|급증|과잉)|재고자산.*(증가|부담)",
+      "checkHints": [
+        "재고자산 평가손실(주석) 확인",
+        "제품/재공품/원재료 구성 변화",
+        "재고자산회전율 추이"
+      ]
+    },
+    {
+      "id": "E3",
+      "name": "차입 확대·이자 부담",
+      "present": false,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "borrowingsTrillion": "3→1.4조",
+        "borrowingsGrowthPct": -53.8,
+        "interestCoverage": "20.6→24.7배 (영업이익/이자지급)",
+        "coverageDropPct": -20.1
+      },
+      "markers": [],
+      "categoryPattern": "차입\\s*(확대|급증|의존)|이자\\s*부담|이자보상",
+      "checkHints": [
+        "차입금 만기 구조(주석) 확인",
+        "변동/고정 금리 구성",
+        "약정(covenant) 조건 확인"
+      ]
+    },
+    {
+      "id": "E4",
+      "name": "유동성 하락 (유동비율)",
+      "present": false,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "currentRatioPct": "111.5→153.9→136.3",
+        "fallingTwoYears": false
+      },
+      "markers": [],
+      "categoryPattern": "유동성\\s*(하락|압박|악화)|유동비율.*(하락|저하)",
+      "checkHints": [
+        "단기차입 상환 스케줄",
+        "미사용 여신한도(주석)",
+        "현금성자산 대비 단기부채"
+      ]
+    },
+    {
+      "id": "E5",
+      "name": "공시 행간 (정정·해명 패턴)",
+      "present": true,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "windowDays": 90,
+        "totalDisclosures": 43,
+        "corrections": 3,
+        "clarifications": [
+          "풍문또는보도에대한해명(미확정) @20260618",
+          "풍문또는보도에대한해명(미확정) @20260519"
+        ],
+        "auditFlags": []
+      },
+      "markers": [
+        "정정",
+        "풍문|해명"
+      ],
+      "categoryPattern": "정정\\s*공시|풍문|해명\\s*공시|공시\\s*(품질|프로세스|커뮤니케이션)",
+      "checkHints": [
+        "정정 사유 분류(단순 오기/수치 변경)",
+        "해명 공시의 대상 보도와 후속 확정 공시",
+        "공시 검수 체인 점검"
+      ]
+    }
+  ],
+  "internal": null
+}

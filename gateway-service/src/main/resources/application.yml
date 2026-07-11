@@ -57,6 +57,16 @@ spring:
               # 운영 관제 콘솔(인시던트) — JWT ROLE_ADMIN 전용, webhook 은 Bearer 필터가 자체 게이팅
               predicates:
                 - Path=/api/ops/**
+            - id: investment-service
+              uri: ${INVESTMENT_SERVICE_URI:http://localhost:8100}
+              # 투자서비스 — 투자점수/주문/재원. shared-common JWT 체인이 인증 강제
+              predicates:
+                - Path=/api/investment/**
+            - id: account-service
+              uri: ${ACCOUNT_SERVICE_URI:http://localhost:8102}
+              # 계정계 — 대출·투자·정산 GL 집계/시산표. shared-common JWT 체인이 인증 강제
+              predicates:
+                - Path=/api/account/**
             - id: settlement-service
               uri: ${SETTLEMENT_SERVICE_URI:http://localhost:8082}
               # SettlementController 는 /settlements(비-/api), 검색/원장/리포트는 /api, 운영 콘솔은 /admin.

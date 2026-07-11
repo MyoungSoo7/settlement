@@ -1,7 +1,7 @@
 {
   "name": "kakaopay-invest-companion",
-  "version": "0.3.0",
-  "description": "초보 투자자의 매수·매도 불안을 '감정 인정 → 데이터 사실확인 → 규칙 상기 → 다음 단계 1개' 설득 구조로 안심시키는 Codex 플러그인 — 매수/매도 동행 체크, 매매 복기 패턴 탐지, DART·ECOS 실데이터 조회 포함 (AX 인재전쟁 — 카카오페이증권 과제)",
+  "version": "0.10.0",
+  "description": "초보 투자자의 매수·매도 불안을 '감정 인정 → 데이터 사실확인 → 규칙 상기 → 다음 단계 1개' 설득 구조로 안심시키는 Codex 플러그인 — 종목 탐색 동행, 매수/매도 동행 체크, 매매 복기 패턴 탐지, DART·ECOS·뉴스 실데이터 조회 포함 (AX 인재전쟁 — 카카오페이증권 과제)",
   "author": { "name": "AX 인재전쟁 참가자" },
   "license": "Apache-2.0",
   "keywords": ["investment", "beginner", "anxiety", "trust", "compliance", "retrospective", "dart", "ecos"],
@@ -10,13 +10,14 @@
   "interface": {
     "displayName": "KakaoPay Invest Companion",
     "shortDescription": "불안 트리아지 · 매수/매도 동행 · 매매 복기 — 초보 투자자를 안심시켜 다음 행동으로",
-    "longDescription": "종목 추천 대신 '지금 이 결정에서 확인하지 않은 것'을 짚어주는 초보 투자자 동행 플러그인. 불안을 4유형으로 분류해 응대하고(anxiety-triage), 매수·매도 직전 5분 체크(buy/sell-companion)와 매매 내역 행동 패턴 복기(trade-retrospective)를 거쳐, 모든 판정을 근거·반대근거·한계가 붙은 신뢰 구조(trust-explainer)로 전달합니다. DART 공시·재무와 한국은행 ECOS 거시 지표를 읽기 전용 MCP 로 조회합니다.",
+    "longDescription": "종목 추천 대신 '지금 이 결정에서 확인하지 않은 것'을 짚어주는 초보 투자자 동행 플러그인. 불안을 4유형으로 분류해 응대하고(anxiety-triage), '뭘 살지 모르겠다'는 관심사→재무 스크리닝 후보 좁히기로 돕고(stock-explorer), 매수·매도 직전 5분 체크(buy/sell-companion)와 매매 내역 행동 패턴 복기(trade-retrospective)를 거쳐, 모든 판정을 근거·반대근거·한계가 붙은 신뢰 구조(trust-explainer)로 전달합니다. DART 공시·재무, 한국은행 ECOS 거시 지표, 네이버 뉴스(악재 실체 확인), KOSPI/KOSDAQ 시세(추격매수 판정용 연속상승 streak 포함)를 읽기 전용 MCP 로 조회합니다.",
     "developerName": "AX 인재전쟁 참가자",
     "category": "Research",
     "capabilities": ["Read"],
     "defaultPrompt": [
-      "src/data/sample 의 매매 내역을 복기해서 반복되는 행동 패턴을 찾아 규칙으로 바꿔줘.",
-      "삼성전자 어제 5% 빠졌는데 지금이라도 팔아야 하나요? 무서워요."
+      "이번 분기에 뭘 살까? 300만원 예산으로 종목 3개랑 사고팔 가격 알려줘.",
+      "삼성전자 어제 5% 빠졌는데 지금이라도 팔아야 하나요? 무서워요.",
+      "주식 처음인데 뭘 사야 할지 모르겠어요."
     ],
     "brandColor": "#FFCD00"
   }

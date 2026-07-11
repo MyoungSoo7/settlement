@@ -1,0 +1,99 @@
+{
+  "generatedAt": "2026-07-09T22:36:35.184Z",
+  "universe": {
+    "name": "krx-top-demo-universe",
+    "asOf": "2026-07-10",
+    "requested": 66,
+    "used": 66,
+    "dropped": []
+  },
+  "methodology": [
+    "진입 시점 21거래일 간격 롤링, 전방 수익률 = close[t+H]/close[t]-1 (H: 월 21 / 분기 63 / 연 252 거래일)",
+    "승률 = 전방 수익률 > 0 비율. 모멘텀 필터 = 진입 직전 252거래일 수익률 > 0 인 표본만",
+    "한계: 현재 대형주 유니버스라 생존 편향으로 승률 과대 가능 · 배당 제외 · 거래비용 미반영",
+    "과거 승률은 미래 수익을 보장하지 않는다 — 이 통계는 기대치 설정용이지 예측이 아니다"
+  ],
+  "horizons": {
+    "month": {
+      "horizonTradingDays": 21,
+      "samples": 7029,
+      "winRate": 0.5117,
+      "avgReturn": 0.0193,
+      "medianReturn": 0.0037,
+      "p5Return": -0.1659,
+      "p95Return": 0.2581,
+      "momentumFilter": {
+        "samples": 3465,
+        "winRate": 0.5056
+      },
+      "perSymbolWinRateRange": {
+        "min": {
+          "code": "090430",
+          "name": "아모레퍼시픽",
+          "samples": 116,
+          "winRate": 0.3707
+        },
+        "max": {
+          "code": "267260",
+          "name": "HD현대일렉트릭",
+          "samples": 106,
+          "winRate": 0.6415
+        }
+      }
+    },
+    "quarter": {
+      "horizonTradingDays": 63,
+      "samples": 6897,
+      "winRate": 0.5363,
+      "avgReturn": 0.0602,
+      "medianReturn": 0.0143,
+      "p5Return": -0.2455,
+      "p95Return": 0.5,
+      "momentumFilter": {
+        "samples": 3347,
+        "winRate": 0.5273
+      },
+      "perSymbolWinRateRange": {
+        "min": {
+          "code": "293490",
+          "name": "카카오게임즈",
+          "samples": 65,
+          "winRate": 0.3077
+        },
+        "max": {
+          "code": "012450",
+          "name": "한화에어로스페이스",
+          "samples": 114,
+          "winRate": 0.6667
+        }
+      }
+    },
+    "year": {
+      "horizonTradingDays": 252,
+      "samples": 6303,
+      "winRate": 0.5574,
+      "avgReturn": 0.2869,
+      "medianReturn": 0.0521,
+      "p5Return": -0.4214,
+      "p95Return": 1.6993,
+      "momentumFilter": {
+        "samples": 2884,
+        "winRate": 0.5121
+      },
+      "perSymbolWinRateRange": {
+        "min": {
+          "code": "293490",
+          "name": "카카오게임즈",
+          "samples": 56,
+          "winRate": 0.1786
+        },
+        "max": {
+          "code": "277810",
+          "name": "레인보우로보틱스",
+          "samples": 52,
+          "winRate": 0.8462
+        }
+      }
+    }
+  }
+}

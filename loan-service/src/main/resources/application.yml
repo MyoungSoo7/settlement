@@ -135,11 +135,19 @@ app:
       # 실제 토픽명(snake_case). settlement 측 컨슈머(Chunk 7)가 이 이름으로 구독해야 한다.
       loan-disbursement-requested: lemuel.loan.disbursement_requested
       loan-repayment-applied: lemuel.loan.repayment_applied
+      # 발행 (loan → *). 기업 신용대출 실행 이벤트. eventType="CorporateLoanDisbursed" → 이 토픽으로 라우팅.
+      corporate-loan-disbursed: lemuel.loan.corporate_loan_disbursed
 
   # 선정산 대출 정책 (정산예정금 기반 단순 모델 — CreditPolicy 빈에 주입)
   loan:
     ltv: ${APP_LOAN_LTV:0.80}                 # 한도 = 미지급 정산예정금 × LTV
     daily-rate: ${APP_LOAN_DAILY_RATE:0.0002} # 수수료 = 선지급액 × 일할이율 × 일수
+    # 기업 신용대출 (상장사 재무·평판 기반 신용평가 — CorporateCreditPolicy 빈에 주입)
+    corporate:
+      equity-limit-ratio: ${APP_LOAN_CORP_EQUITY_LIMIT_RATIO:0.10}  # 한도 = 자본총계 × 이 비율 × 등급계수
+    # financial-statements-service 공개 API (회사 + 최신 요약 재무제표 조회)
+    financial:
+      base-url: ${APP_LOAN_FINANCIAL_BASE_URL:http://localhost:8086}
     # 평판 등급별 한도 haircut (ADR 0023 Phase 3 후속) — 셀러 법인 뉴스 평판이 나쁠수록 한도 축소.
     # 등급 미상(매핑/이벤트 미수신)이면 1.0(무변동, fail-open).
     reputation:

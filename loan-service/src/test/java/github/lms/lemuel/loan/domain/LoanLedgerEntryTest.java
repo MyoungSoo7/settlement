@@ -33,6 +33,26 @@ class LoanLedgerEntryTest {
     }
 
     @Test
+    void 기업대출_선지급_전표는_대출채권차변_현금대변이고_refType은_CORP_DISBURSE() {
+        LoanLedgerEntry e = LoanLedgerEntry.corporateDisbursement(5001L, new BigDecimal("1000000"));
+        assertThat(e.getDebit()).isEqualTo(LedgerAccount.LOAN_RECEIVABLE);
+        assertThat(e.getCredit()).isEqualTo(LedgerAccount.CASH);
+        assertThat(e.getAmount()).isEqualByComparingTo("1000000");
+        assertThat(e.getRefType()).isEqualTo("CORP_DISBURSE");
+        assertThat(e.getRefId()).isEqualTo(5001L);
+    }
+
+    @Test
+    void 기업대출_수수료_전표는_미수수익차변_수수료수익대변이고_refType은_CORP_FEE() {
+        LoanLedgerEntry e = LoanLedgerEntry.corporateFeeAccrual(5001L, new BigDecimal("660"));
+        assertThat(e.getDebit()).isEqualTo(LedgerAccount.FEE_RECEIVABLE);
+        assertThat(e.getCredit()).isEqualTo(LedgerAccount.FEE_INCOME);
+        assertThat(e.getAmount()).isEqualByComparingTo("660");
+        assertThat(e.getRefType()).isEqualTo("CORP_FEE");
+        assertThat(e.getRefId()).isEqualTo(5001L);
+    }
+
+    @Test
     void 전표금액이_0이하면_예외() {
         assertThatThrownBy(() -> LoanLedgerEntry.disbursement(1L, BigDecimal.ZERO))
                 .isInstanceOf(IllegalArgumentException.class);

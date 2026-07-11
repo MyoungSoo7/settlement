@@ -12,6 +12,8 @@ public interface LoadRbacPort {
 
     Optional<Role> findRoleById(Long id);
 
+    boolean existsRoleByCode(String code);
+
     List<Permission> findAllPermissions();
 
     List<Permission> findPermissionsByIds(List<Long> ids);

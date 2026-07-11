@@ -35,14 +35,6 @@ jobs:
               - '**'
               - '!frontend/**'
 
-  route-contract:
-    name: Route contract (frontend calls ⊂ backend routes)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Check route contract
-        run: bash scripts/check-route-contract.sh
-
   backend-ci:
     name: Backend - Build/Test/JaCoCo/SonarCloud
     runs-on: ubuntu-latest
@@ -202,14 +194,6 @@ jobs:
             image_suffix: ""
           - module: settlement-service
             image_suffix: "-settlement"
-          - module: economics-service
-            image_suffix: "-economics"
-          - module: financial-statements-service
-            image_suffix: "-financial"
-          - module: company-service
-            image_suffix: "-company"
-          - module: ai-service
-            image_suffix: "-ai"
     steps:
       - uses: actions/checkout@v4
 

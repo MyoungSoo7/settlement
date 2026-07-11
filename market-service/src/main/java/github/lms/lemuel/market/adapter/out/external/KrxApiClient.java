@@ -90,7 +90,12 @@ public class KrxApiClient implements KrxClientPort {
     /** 한 페이지 body 노드. NODATA(03)면 null, 그 외 오류 코드는 예외. */
     private JsonNode getBody(String basDt, int pageNo) {
         // serviceKey(Decoding 키)에 '+','/','=' 등이 들어갈 수 있어 queryParam 으로 한 번만 인코딩되게 한다.
-        URI uri = UriComponentsBuilder.fromPath("/getStockPriceInfo")
+        // ★ baseUrl 을 포함한 절대 URI 여야 한다 — 상대 URI(fromPath)를 RestClient.uri(URI) 에 넘기면
+        //   RFC 3986 해석으로 baseUrl 경로(/1160100/service/...)가 통째로 대체되어
+        //   https://apis.data.go.kr/getStockPriceInfo 로 나가고, 게이트웨이가 500 "Unexpected errors" 를
+        //   반환한다 (KRX 키 승인 후 첫 라이브 수집에서 실측으로 드러난 잠복 버그).
+        URI uri = UriComponentsBuilder.fromUriString(properties.baseUrl())
+                .path("/getStockPriceInfo")
                 .queryParam("serviceKey", properties.apiKey())
                 .queryParam("resultType", "json")
                 .queryParam("numOfRows", properties.pageSize())

@@ -1,3 +1,24 @@
 {
-  "mcpServers": {}
+  "mcpServers": {
+    "fashion-first-shop": {
+      "command": "node",
+      "args": ["./mcp/shop-server.mjs"],
+      "cwd": "."
+    },
+    "fashion-first-trend": {
+      "command": "node",
+      "args": ["./mcp/trend-server.mjs"],
+      "cwd": "."
+    },
+    "fashion-first-news": {
+      "command": "node",
+      "args": ["./mcp/news-server.mjs"],
+      "cwd": "."
+    },
+    "fashion-first-weather": {
+      "command": "node",
+      "args": ["./mcp/weather-server.mjs"],
+      "cwd": "."
+    }
+  }
 }

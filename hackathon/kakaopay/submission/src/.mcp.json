@@ -2,17 +2,23 @@
   "mcpServers": {
     "invest-companion-dart": {
       "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/dart-server.mjs"],
-      "env": {
-        "DART_API_KEY": "${DART_API_KEY}"
-      }
+      "args": ["./mcp/dart-server.mjs"],
+      "cwd": "."
     },
     "invest-companion-ecos": {
       "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/ecos-server.mjs"],
-      "env": {
-        "ECOS_API_KEY": "${ECOS_API_KEY}"
-      }
+      "args": ["./mcp/ecos-server.mjs"],
+      "cwd": "."
+    },
+    "invest-companion-news": {
+      "command": "node",
+      "args": ["./mcp/news-server.mjs"],
+      "cwd": "."
+    },
+    "invest-companion-price": {
+      "command": "node",
+      "args": ["./mcp/price-server.mjs"],
+      "cwd": "."
     }
   }
 }

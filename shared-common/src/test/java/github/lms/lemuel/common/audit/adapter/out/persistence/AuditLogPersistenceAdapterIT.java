@@ -2,6 +2,7 @@ package github.lms.lemuel.common.audit.adapter.out.persistence;
 
 import github.lms.lemuel.common.audit.domain.AuditAction;
 import github.lms.lemuel.common.audit.domain.AuditLog;
+import github.lms.lemuel.common.outbox.adapter.out.persistence.OutboxSchema;
 import org.junit.jupiter.api.condition.EnabledIf;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,7 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @EnabledIf(value = "isDockerAvailable", disabledReason = "Docker is not available")
 @DataJpaTest
 @ImportAutoConfiguration(FlywayAutoConfiguration.class)
-@Import(AuditLogPersistenceAdapter.class)
+@Import({AuditLogPersistenceAdapter.class, OutboxSchema.class})
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ActiveProfiles("test")
 class AuditLogPersistenceAdapterIT {

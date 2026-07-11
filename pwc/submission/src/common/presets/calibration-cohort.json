@@ -1,0 +1,20 @@
+{
+  "description": "임계값 캘리브레이션 코호트 — 코스피 비금융 대형주 15사 (금융업은 차입·유동비율 개념이 달라 제외). corp_code 는 2026-07 DART corp_code 캐시 기준.",
+  "companies": [
+    { "name": "삼성전자", "corpCode": "00126380", "stockCode": "005930" },
+    { "name": "SK하이닉스", "corpCode": "00164779", "stockCode": "000660" },
+    { "name": "LG에너지솔루션", "corpCode": "01515323", "stockCode": "373220" },
+    { "name": "삼성바이오로직스", "corpCode": "00877059", "stockCode": "207940" },
+    { "name": "현대자동차", "corpCode": "00164742", "stockCode": "005380" },
+    { "name": "기아", "corpCode": "00106641", "stockCode": "000270" },
+    { "name": "셀트리온", "corpCode": "00413046", "stockCode": "068270" },
+    { "name": "NAVER", "corpCode": "00266961", "stockCode": "035420" },
+    { "name": "POSCO홀딩스", "corpCode": "00155319", "stockCode": "005490" },
+    { "name": "LG화학", "corpCode": "00356361", "stockCode": "051910" },
+    { "name": "삼성SDI", "corpCode": "00126362", "stockCode": "006400" },
+    { "name": "현대모비스", "corpCode": "00164788", "stockCode": "012330" },
+    { "name": "LG전자", "corpCode": "00401731", "stockCode": "066570" },
+    { "name": "카카오", "corpCode": "00258801", "stockCode": "035720" },
+    { "name": "HD현대중공업", "corpCode": "01390344", "stockCode": "329180" }
+  ]
+}

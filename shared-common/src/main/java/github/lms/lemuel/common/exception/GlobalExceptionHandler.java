@@ -117,20 +117,6 @@ public class GlobalExceptionHandler {
         return badRequest(ErrorResponse.of(HttpStatus.BAD_REQUEST, ErrorCode.INVALID_STATE.code(), ex.getMessage()));
     }
 
-    /**
-     * 404 - 존재하지 않는 경로.
-     *
-     * <p>INC-2026-0708 위생 조치: 미존재 경로가 {@link #handleException}(500) 으로 흘러
-     * "서버 고장" 으로 오인되던 문제를 차단한다. 존재하지 않는 리소스는 클라이언트 오류(404)다.
-     */
-    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
-    public ResponseEntity<ErrorResponse> handleNoResourceFound(
-            org.springframework.web.servlet.resource.NoResourceFoundException ex) {
-        log.warn("[NoResourceFound] {}", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(ErrorResponse.of(HttpStatus.NOT_FOUND, "NOT_FOUND", "요청한 경로를 찾을 수 없습니다."));
-    }
-
     // ─── 5xx ────────────────────────────────────────────────────────────────────
 
     /**

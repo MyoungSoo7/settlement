@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "name": "trusted-ceo-agent",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "기업 내부 정형/비정형 데이터의 행간에서 CEO가 놓친 리스크(회계처리 오류·현금흐름 병목·원가배분 왜곡)를 역으로 추출하고, 논리적 근거를 자연어로 제시하는 Codex 플러그인.",
   "author": {
     "name": "Lemuel — AX 인재전쟁 Round 10 / 삼일PwC 과제"

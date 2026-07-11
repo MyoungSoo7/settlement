@@ -1,6 +1,6 @@
 # Lemuel — 이커머스 + 정산 MSA 플랫폼
 
-> **상품·장바구니·주문·결제·배송·정산·선정산대출·재무제표·경제지표·기업평판·운영관제·주식시세·AI챗봇·공공데이터** 도메인을 **10개 마이크로서비스 + API Gateway** 로 분리한
+> **상품·장바구니·주문·결제·배송·정산·선정산/기업대출·투자·계정계·재무제표·경제지표·기업평판·운영관제·주식시세·AI챗봇·공공데이터** 도메인을 **12개 마이크로서비스 + API Gateway** 로 분리한
 > 헥사고날 아키텍처 기반 백엔드. 단일 모놀리스 → **Bounded Context 분리** → **이벤트 드리븐** →
 > **DB-per-service + 이벤트 프로젝션 패턴**(ADR 0020 완료) 으로 진화시킨 포트폴리오 프로젝트.
 
@@ -42,22 +42,29 @@ flowchart LR
         SS["settlement-service :8082<br/><br/>settlement · payout · ledger<br/>chargeback · pgreconciliation · report"]
     end
     subgraph loan["💸 Loan (DB-per-service)"]
-        LS["loan-service :8084<br/><br/>선정산 대출 · 상환 · 자체 원장"]
+        LS["loan-service :8084<br/><br/>선정산 대출 · 기업대출(CEO) · 상환 · 자체 원장"]
+    end
+    subgraph fin2["📈 Investment / 🏦 계정계 (DB-per-service)"]
+        INV["investment-service :8100<br/>투자점수(회계자료) · 투자주문 · 정산 재원"]
+        ACC["account-service :8102<br/>계정계 — 대출·투자·정산 GL 집계 · 시산표"]
     end
     subgraph SAT["🛰️ 독립 위성 서비스 (DB-per-service)"]
-        FIN["financial-statements :8086<br/>코스피 재무제표 (DART)"]
+        FIN["financial-statements :8086<br/>코스피·코스닥 재무제표 (DART)"]
         ECO["economics :8087<br/>거시 경제지표 (ECOS)"]
         COM["company :8090<br/>기업 뉴스·평판 (네이버)"]
         OPS["operation :8092<br/>운영 관제·인시던트"]
         MKT["market :8094<br/>KRX 시세·시가총액 (공공데이터)"]
-        AI["ai :8096<br/>AI 챗봇 (Spring AI 2.0 + Claude)"]
+        AI["ai :8096<br/>AI 챗봇 (기본 Gemini · Anthropic 전환 가능)"]
         CDS["common-data :8098<br/>공공데이터포털 범용 커넥터"]
     end
 
     OS -->|Outbox + Kafka| K[(Kafka<br/>Redpanda)]
     K -->|Payment·Order·User·Product 이벤트| SS
     K -->|SettlementCreated / Confirmed| LS
-    LS -->|LoanDisbursement / Repayment| K
+    LS -->|LoanDisbursement / Repayment / CorporateLoanDisbursed| K
+    K -->|SettlementConfirmed 재원| INV
+    INV -->|InvestmentExecuted| K
+    K -->|loan·investment·settlement 6토픽| ACC
     K -.->|성공·실패 신호 이벤트| OPS
 
     OS --- PG[(PostgreSQL opslab<br/>order 전용)]
@@ -71,10 +78,13 @@ flowchart LR
     MKT --- MDB[(lemuel_market)]
     AI --- AIDB[(lemuel_ai<br/>pgvector)]
     CDS --- CDDB[(lemuel_commondata)]
+    INV --- IDB[(lemuel_investment)]
+    ACC --- ADB[(lemuel_account)]
 
     style commerce fill:#fff7e6,stroke:#fa8c16
     style settlement fill:#e6f7ff,stroke:#1890ff
     style loan fill:#fff0f6,stroke:#eb2f96
+    style fin2 fill:#f0f5ff,stroke:#2f54eb
     style SAT fill:#f6ffed,stroke:#52c41a
 ```
 
@@ -88,10 +98,10 @@ flowchart LR
 | **장애 격리** | settlement 다운돼도 결제는 계속 | 정산 배치는 비동기 — 즉시 처리 X |
 | **배포 주기** | 잦음 (UI 변경 동행) | 드뭄 (회계 사이클 단위) |
 
-→ 위 차이점이 명확하므로 **서비스 분리** 가 자연스러운 경계. **10개 서비스 모두 DB-per-service**
+→ 위 차이점이 명확하므로 **서비스 분리** 가 자연스러운 경계. **12개 서비스 모두 DB-per-service**
 (order=opslab · settlement=settlement_db · loan=lemuel_loan · financial=lemuel_financial ·
 economics=lemuel_economics · company=lemuel_company · operation=lemuel_operation · market=lemuel_market ·
-ai=lemuel_ai · commondata=lemuel_commondata) 로 물리 분리하고,
+ai=lemuel_ai · commondata=lemuel_commondata · investment=lemuel_investment · account=lemuel_account) 로 물리 분리하고,
 연계는 **Kafka 이벤트로만** 한다. order↔settlement 는 settlement 가 자체 DB 에 이벤트 프로젝션을 적재하는
 CQRS 로 분리하고, 대사는 order 의 내부 API 를 호출해 cross-DB 연결 0 을 유지한다
 ([ADR 0020](docs/adr/0020-order-settlement-db-split.md) — 완료).
@@ -111,7 +121,7 @@ CQRS 로 분리하고, 대사는 order 의 내부 API 를 호출해 cross-DB 연
 | API Gateway | Spring Cloud Gateway 2025 |
 | PG 연동 | Toss Payments |
 | 배치 | Spring Batch |
-| AI/LLM | Spring AI 2.0 (Anthropic Claude — ai-service 챗봇, company 감성분석) |
+| AI/LLM | Google Gemini(기본) · Anthropic Claude(Spring AI 2.0) — provider 스위치. ai-service 챗봇·company 감성분석 |
 | 캐시 | Caffeine (L1) + 선택적 Redis L2 — 2-tier 캐시 (opt-in, Pub/Sub 무효화) |
 | 회복탄력성 | Resilience4j (Circuit Breaker, Retry) |
 | Rate Limiting | Bucket4j |
@@ -191,10 +201,17 @@ settlement/                              # 모노레포 루트
 │   └── src/main/java/.../market/        # 공공데이터포털 금융위 주식시세정보 수집 + 시드 폴백 — 시세·시총만 서빙(PER/PBR 은 소비측 조인)
 │
 ├── ai-service/                          # 🤖 AI 서비스 (port 8096, 자체 DB lemuel_ai — pgvector) — 대화형 AI 챗봇
-│   └── src/main/java/.../ai/chat/       # Spring AI 2.0 + Claude, 컨텍스트 유지 채팅(SSE)·이력 CRUD — JWT USER 이상 + rate limit
+│   └── src/main/java/.../ai/chat/       # LLM provider 스위치(기본 Gemini/RestClient · Anthropic Spring AI), 컨텍스트 채팅(SSE)·이력 CRUD — JWT USER 이상 + rate limit
 │
 ├── common-data-service/                 # 🗂️ Common-Data 서비스 (port 8098, 자체 DB lemuel_commondata)
 │   └── src/main/java/.../commondata/    # 공공데이터포털 범용 커넥터 — 데이터소스 등록만으로 임의 OpenAPI 수집(멱등 upsert)
+│
+├── investment-service/                  # 📈 Investment 서비스 (port 8100, 자체 DB lemuel_investment) — CEO 투자하기
+│   └── src/main/java/.../investment/    # 코스피/코스닥 회계자료 기반 투자점수(수익성35+안정성35+성장성30, AAA~CCC) · 투자주문 · settlement.confirmed 재원 프로젝션 · investment.executed 발행
+│                                        # ※ 투자점수는 정보 제공 목적의 참고 지표로 투자자문이 아니며, 매수·매도 등 투자 판단과 그 결과의 책임은 이용자 본인에게 있음
+│
+├── account-service/                     # 🏦 Account 서비스 (계정계, port 8102, 자체 DB lemuel_account)
+│   └── src/main/java/.../account/       # loan·investment·settlement 6개 토픽 → 전사 복식부기 GL 집계(대출/투자/정산 잔액 · 시산표), 소비 전용
 │
 └── gateway-service/                     # 🚪 API Gateway (port 8080)
     └── src/main/java/.../GatewayServiceApplication.java
@@ -372,6 +389,16 @@ JWT_SECRET=local-dev-secret-key-32bytes-min!!   # HS256 — 32바이트 이상
 JWT_TTL_SECONDS=3600
 ```
 
+외부 데이터 수집 키는 전부 선택입니다(미설정 시 해당 서비스는 Flyway 시드 데이터로 동작).
+발급처는 `.env.example` 의 각 항목 주석 참조 — 단, **공공데이터포털 계열 키는 발급만으로는
+동작하지 않습니다**:
+
+| 키 | 발급처 | 주의 |
+|---|---|---|
+| `KRX_API_KEY` (market-service) | [data.go.kr](https://www.data.go.kr) "금융위원회_주식시세정보" | 해당 API **활용신청 → 승인** 후 사용 가능. 승인 전에는 `403 Forbidden` |
+| `DATA_GO_KR_API_KEY` (common-data-service) | [data.go.kr](https://www.data.go.kr) | 계정당 1개 키를 공용하되, **사용할 API 마다 개별 활용신청** 필요 |
+| `DART_API_KEY` / `ECOS_API_KEY` | opendart.fss.or.kr / ecos.bok.or.kr | 발급 즉시 사용 가능 |
+
 ### 전체 실행
 
 ```bash
@@ -395,6 +422,8 @@ docker compose ps        # STATUS 열이 전부 Up (healthy) 이면 성공
 #    - Market:      http://localhost:8094/actuator/health
 #    - AI:          http://localhost:8096/actuator/health
 #    - Common-Data: http://localhost:8098/actuator/health
+#    - Investment: http://localhost:8100/actuator/health
+#    - Account(계정계): http://localhost:8102/actuator/health
 #    - Swagger:     http://localhost:8088/swagger-ui.html
 #                   http://localhost:8082/swagger-ui.html
 ```
@@ -448,6 +477,8 @@ docker compose up -d postgres settlement-db loan-postgres financial-postgres eco
 ./gradlew :market-service:bootRun
 ./gradlew :ai-service:bootRun            # 루트 .env 를 셸에 export 후 실행 (JWT_SECRET 필요)
 ./gradlew :common-data-service:bootRun
+./gradlew :investment-service:bootRun
+./gradlew :account-service:bootRun
 ./gradlew :gateway-service:bootRun
 ```
 
@@ -472,6 +503,8 @@ docker build --build-arg MODULE=operation-service   -t lemuel-operation .
 docker build --build-arg MODULE=market-service      -t lemuel-market .
 docker build --build-arg MODULE=ai-service          -t lemuel-ai .
 docker build --build-arg MODULE=common-data-service -t lemuel-commondata .
+docker build --build-arg MODULE=investment-service  -t lemuel-investment .
+docker build --build-arg MODULE=account-service     -t lemuel-account .
 docker build --build-arg MODULE=gateway-service     -t lemuel-gateway .
 ```
 
@@ -486,7 +519,9 @@ docker build --build-arg MODULE=gateway-service     -t lemuel-gateway .
 | `/api/products/**`, `/api/categories/**`, `/api/tags/**` | order-service |
 | `/api/coupons/**`, `/api/reviews/**` | order-service |
 | `/admin/categories/**`, `/admin/pg/**`, `/admin/products/**` | order-service |
-| `/loans/**` | **loan-service** (자체 DB) |
+| `/loans/**` | **loan-service** (자체 DB — 선정산 대출 + `/loans/corporate/**` 기업대출) |
+| `/api/investment/**` | **investment-service** (자체 DB, JWT — 투자점수·투자주문·재원) |
+| `/api/account/**` | **account-service** (자체 DB, JWT — 계정계 GL 집계·시산표) |
 | `/api/financial/**` | **financial-statements-service** (자체 DB, 공개 조회) |
 | `/api/economics/**` | **economics-service** (자체 DB, 공개 조회) |
 | `/api/company/**` | **company-service** (자체 DB, 공개 조회) |
@@ -633,7 +668,7 @@ CI 에서 k6 thresholds 로 회귀 자동 감지.
 | **외부 API(DART/ECOS/네이버) 키 없이 데모?** | Flyway **시드 폴백** — 각 서비스 `V2__*_seed.sql` 이 대표 데이터를 적재해 키 없이도 조회 동작, 키 설정 시 수집 배치가 UNIQUE upsert 로 실데이터 대체 |
 | **Alertmanager 알람이 인시던트가 되는 과정?** | [IngestAlertService](operation-service/src/main/java/github/lms/lemuel/operation/incident/application/service/IngestAlertService.java) — webhook(Bearer) → `(source, correlation_key)` partial unique 로 활성 중복 0, repeat firing refire 병합 |
 | **위성 서비스도 코드·DB 의존 0?** | ✅ financial/economics/company/market/ai/common-data 는 타 서비스 import·DB 공유 없음(ArchUnit 강제). operation·ai 만 shared-common(JWT) 사용, 신호는 Kafka 이벤트로만 수신 |
-| **AI 챗봇의 LLM 벤더 종속은?** | [ChatCompletionPort](ai-service/src/main/java/github/lms/lemuel/ai/chat/application/port/out/ChatCompletionPort.java) 뒤로 Spring AI 를 `adapter/out/llm` 에만 격리(ArchUnit 강제) — 어댑터 교체로 벤더 전환. LLM 실패 시 폴백 없이 503 + 이력 무저장, bucket4j 로 비용 가드 |
+| **AI 챗봇의 LLM 벤더 종속은?** | [ChatCompletionPort](ai-service/src/main/java/github/lms/lemuel/ai/chat/application/port/out/ChatCompletionPort.java) 뒤로 LLM 을 `adapter/out/llm` 에만 격리(ArchUnit 강제). 실제로 Gemini/Anthropic 두 어댑터를 `app.ai.provider` 로 스위치(기본 Gemini) — 벤더 전환이 설정 한 줄. LLM 실패 시 폴백 없이 503 + 이력 무저장, bucket4j 로 비용 가드 |
 
 ## 운영 환경 확장 포인트
 

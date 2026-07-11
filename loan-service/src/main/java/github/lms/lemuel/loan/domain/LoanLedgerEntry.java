@@ -51,6 +51,18 @@ public class LoanLedgerEntry {
                 amount, "REPAYMENT", settlementId);
     }
 
+    /** 기업 신용대출 실행 전표: 차변 LOAN_RECEIVABLE / 대변 CASH (amount = 원금). */
+    public static LoanLedgerEntry corporateDisbursement(Long loanId, BigDecimal principal) {
+        return new LoanLedgerEntry(null, LedgerAccount.LOAN_RECEIVABLE, LedgerAccount.CASH,
+                principal, "CORP_DISBURSE", loanId);
+    }
+
+    /** 기업 신용대출 수수료 인식 전표: 차변 FEE_RECEIVABLE / 대변 FEE_INCOME (amount = 수수료). */
+    public static LoanLedgerEntry corporateFeeAccrual(Long loanId, BigDecimal fee) {
+        return new LoanLedgerEntry(null, LedgerAccount.FEE_RECEIVABLE, LedgerAccount.FEE_INCOME,
+                fee, "CORP_FEE", loanId);
+    }
+
     public static LoanLedgerEntry reconstitute(Long id, LedgerAccount debit, LedgerAccount credit,
                                                BigDecimal amount, String refType, Long refId) {
         return new LoanLedgerEntry(id, debit, credit, amount, refType, refId);

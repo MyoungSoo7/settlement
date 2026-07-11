@@ -7,155 +7,75 @@
  * 이 게이트가 FAIL 이면 에이전트는 리스크 추론에 진입하지 않고,
  * 실패 항목 자체를 "데이터 품질 리스크"로 보고해야 한다.
  *
+ * 검증 로직은 common/books.mjs(내부 불변식 7종) + common/crosscheck.mjs(INV-8 외부 대사)에 있다.
+ * 특정 분기·특정 회사에 대한 하드코딩 없음 — 어떤 회사 데이터 폴더에도 그대로 적용된다.
+ *
  * 사용:
- *   node src/bin/verify-books.mjs          # 사람이 읽는 표 + exit code
- *   node src/bin/verify-books.mjs --json   # 기계가 읽는 JSON
+ *   node bin/verify-books.mjs                          # 기본: 동봉 샘플 데이터
+ *   node bin/verify-books.mjs --data-dir <회사데이터폴더>  # 임의 회사 데이터
+ *   node bin/verify-books.mjs --json                   # 기계가 읽는 JSON
+ *   (env VERIFY_BOOKS_DATA_DIR 로도 데이터 폴더 지정 가능 — --data-dir 이 우선)
+ *
+ * INV-8 상장사 외부 대사 (선택 — 코스피·코스닥 등 DART 공시 법인일 때):
+ *   node bin/verify-books.mjs --data-dir <폴더> --dart-corp-code 00126380 \
+ *     [--dart-year 2025] [--dart-fs-div OFS|CFS] [--dart-unit-scale 1000000] [--dart-tolerance-pct 1]
+ *   또는 데이터 폴더의 analysis-config.json 에 "crosscheck" 섹션으로 상시 설정 (플래그가 우선).
+ *   내부 불변식(INV-1~7)이 PASS 인 경우에만 실행되며, DART_API_KEY 가 필요하다.
  */
-import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadBooks, runInvariants, resolveDataDir, BooksLoadError } from '../common/books.mjs';
+import { loadCrosscheckConfig, runDartCrosscheck } from '../common/crosscheck.mjs';
 
-// VERIFY_BOOKS_DATA_DIR: 테스트가 위반 시나리오 픽스처를 주입하는 지점
-const DATA_DIR = process.env.VERIFY_BOOKS_DATA_DIR
-  || join(dirname(fileURLToPath(import.meta.url)), '..', 'data', 'sample');
-const AMOUNT_TOLERANCE = 0.01;
-
-function readCsv(name) {
-  const text = readFileSync(join(DATA_DIR, name), 'utf8').trim();
-  const [header, ...rows] = text.split(/\r?\n/);
-  const cols = header.split(',').map((c) => c.trim());
-  return rows.filter(Boolean).map((line) => {
-    const cells = line.split(',').map((c) => c.trim());
-    return Object.fromEntries(cols.map((c, i) => [c, cells[i]]));
-  });
-}
-
-function num(value, label) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) throw new Error(`${label} 가 숫자가 아님: "${value}"`);
-  return n;
-}
-
-const near = (a, b) => Math.abs(a - b) <= AMOUNT_TOLERANCE;
-
-const results = [];
-function check(id, name, fn) {
-  try {
-    const detail = fn();
-    results.push({ id, name, pass: true, detail: detail ?? '' });
-  } catch (error) {
-    results.push({ id, name, pass: false, detail: error.message });
-  }
-}
-
-// ── 데이터 로드 ──────────────────────────────────────────────
-const trialBalance = readCsv('trial_balance.csv');
-const arAging = readCsv('ar_aging.csv');
-const costAllocation = readCsv('cost_allocation.csv');
-
-const tbByQuarter = new Map(trialBalance.map((r) => [r.quarter, r]));
-const AGING_BUCKETS = ['current', 'd31_60', 'd61_90', 'd90_plus'];
-
-// ── INV-1: 시산표 수치 필드 전체 파싱 가능 ──────────────────
-check('INV-1', '시산표 수치 필드가 전부 유효한 숫자', () => {
-  const numericCols = Object.keys(trialBalance[0]).filter((c) => c !== 'quarter');
-  for (const row of trialBalance) {
-    for (const col of numericCols) num(row[col], `trial_balance ${row.quarter}.${col}`);
-  }
-  return `${trialBalance.length}개 분기 × ${numericCols.length}개 컬럼`;
-});
-
-// ── INV-2: 채권 aging 분기 합계 = 시산표 매출채권 (대사) ────
-check('INV-2', '채권 aging 분기 합계 = 시산표 매출채권 (대사 일치)', () => {
-  const agingByQuarter = new Map();
-  for (const row of arAging) {
-    const sum = AGING_BUCKETS.reduce((acc, b) => acc + num(row[b], `ar_aging ${row.quarter}/${row.customer}.${b}`), 0);
-    agingByQuarter.set(row.quarter, (agingByQuarter.get(row.quarter) ?? 0) + sum);
-  }
-  const details = [];
-  for (const [quarter, total] of agingByQuarter) {
-    const tb = tbByQuarter.get(quarter);
-    if (!tb) throw new Error(`aging 의 분기 ${quarter} 가 시산표에 없음`);
-    const expected = num(tb.accounts_receivable, `trial_balance ${quarter}.accounts_receivable`);
-    if (!near(total, expected)) {
-      throw new Error(`${quarter}: aging 합계 ${total} ≠ 시산표 매출채권 ${expected}`);
-    }
-    details.push(`${quarter}=${total}`);
-  }
-  return details.join(', ');
-});
-
-// ── INV-3: 원가표 매출 합계 = 시산표 해당 분기 매출 ─────────
-check('INV-3', '원가배분표 매출 합계 = 시산표 2026Q2 매출', () => {
-  const total = costAllocation.reduce((acc, r) => acc + num(r.sales, `cost_allocation ${r.product}.sales`), 0);
-  const expected = num(tbByQuarter.get('2026Q2').sales, 'trial_balance 2026Q2.sales');
-  if (!near(total, expected)) throw new Error(`원가표 매출 합 ${total} ≠ 시산표 매출 ${expected}`);
-  return `${total}`;
-});
-
-// ── INV-4: 공통원가 배부액이 배부 기준(매출 비중)과 비례 ────
-check('INV-4', '공통원가 배부액 = 공통원가 총액 × 배부 기준 비중', () => {
-  const totalCommon = costAllocation.reduce(
-    (acc, r) => acc + num(r.allocated_common_cost, `cost_allocation ${r.product}.allocated_common_cost`), 0);
-  for (const row of costAllocation) {
-    const expected = (totalCommon * num(row.allocation_basis_sales_pct, `${row.product}.allocation_basis_sales_pct`)) / 100;
-    const actual = num(row.allocated_common_cost, `${row.product}.allocated_common_cost`);
-    if (!near(actual, expected)) {
-      throw new Error(`${row.product}: 배부액 ${actual} ≠ 총액 ${totalCommon} × 비중 → ${expected}`);
-    }
-  }
-  return `공통원가 총액 ${totalCommon}`;
-});
-
-// ── INV-5: 배부 기준 비중 합 100%, 실제 기계시간 비중 합 100% ─
-check('INV-5', '배부 기준 비중 합계 100% / 실제 기계시간 비중 합계 100%', () => {
-  const basisSum = costAllocation.reduce((acc, r) => acc + num(r.allocation_basis_sales_pct, 'basis_pct'), 0);
-  const hoursSum = costAllocation.reduce((acc, r) => acc + num(r.actual_machine_hours_pct, 'hours_pct'), 0);
-  if (!near(basisSum, 100)) throw new Error(`배부 기준 비중 합 ${basisSum} ≠ 100`);
-  if (!near(hoursSum, 100)) throw new Error(`기계시간 비중 합 ${hoursSum} ≠ 100`);
-  return `기준 ${basisSum} / 기계시간 ${hoursSum}`;
-});
-
-// ── INV-6: 제품별 영업이익 = 매출 − 직접원가 − 배부 공통원가 ─
-check('INV-6', '제품별 영업이익 검산 (매출 − 직접원가 − 배부 공통원가)', () => {
-  for (const row of costAllocation) {
-    const expected = num(row.sales, 'sales') - num(row.direct_cost, 'direct_cost')
-      - num(row.allocated_common_cost, 'allocated_common_cost');
-    const actual = num(row.operating_income, `${row.product}.operating_income`);
-    if (!near(actual, expected)) throw new Error(`${row.product}: 영업이익 ${actual} ≠ 검산 ${expected}`);
-  }
-  return costAllocation.map((r) => `${r.product}=${r.operating_income}`).join(', ');
-});
-
-// ── INV-7: 금리 노출 필드(변동금리 차입·이자비용) 유효성 ────
-check('INV-7', '변동금리 차입·이자비용 필드 유효 (이자보상배율 계산 가능)', () => {
-  const details = [];
-  for (const row of trialBalance) {
-    const debt = num(row.variable_rate_debt, `${row.quarter}.variable_rate_debt`);
-    const interest = num(row.interest_expense, `${row.quarter}.interest_expense`);
-    if (debt <= 0 || interest <= 0) throw new Error(`${row.quarter}: 차입 ${debt} / 이자 ${interest} — 양수가 아님`);
-    details.push(`${row.quarter} 이자보상 ${(num(row.operating_income, 'oi') / interest).toFixed(1)}배`);
-  }
-  return details.join(', ');
-});
-
-// ── 출력 ─────────────────────────────────────────────────────
-const failures = results.filter((r) => !r.pass);
-const summary = {
-  gate: failures.length === 0 ? 'PASS' : 'FAIL',
-  checks: results,
+const DEFAULT_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'data', 'sample');
+const argv = process.argv.slice(2);
+const DATA_DIR = resolveDataDir(argv, DEFAULT_DIR);
+const asJson = argv.includes('--json');
+const flag = (name) => {
+  const i = argv.indexOf(name);
+  return i !== -1 && argv[i + 1] !== undefined ? argv[i + 1] : undefined;
 };
 
-if (process.argv.includes('--json')) {
-  console.log(JSON.stringify(summary, null, 2));
-} else {
-  console.log('=== 불변식 게이트 (verify-books) ===');
-  for (const r of results) {
-    console.log(`${r.pass ? '  ok' : 'FAIL'}  ${r.id} ${r.name}${r.detail ? ` — ${r.detail}` : ''}`);
-  }
-  console.log(failures.length === 0
-    ? '\nGATE PASS — 기계적 정합성 확정. 추론 단계 진입 가능.'
-    : `\nGATE FAIL — ${failures.length}건 위반. 리스크 추론에 진입하지 말고 데이터 품질 리스크로 보고할 것.`);
+let summary;
+let books = null;
+try {
+  books = loadBooks(DATA_DIR);
+  summary = runInvariants(books);
+} catch (error) {
+  if (!(error instanceof BooksLoadError)) throw error;
+  summary = { gate: 'FAIL', loadError: error.message, checks: [] };
 }
 
-if (failures.length > 0) process.exitCode = 1;
+// INV-8 외부 대사 — corp_code 가 설정됐고 내부 불변식이 PASS 일 때만 (훼손 장부 위 대사는 무의미).
+if (books && summary.gate === 'PASS') {
+  const cc = loadCrosscheckConfig(DATA_DIR);
+  if (flag('--dart-corp-code')) cc.corpCode = flag('--dart-corp-code');
+  if (flag('--dart-year')) cc.year = flag('--dart-year');
+  if (flag('--dart-fs-div')) cc.fsDiv = flag('--dart-fs-div');
+  if (flag('--dart-unit-scale')) cc.unitScale = Number(flag('--dart-unit-scale'));
+  if (flag('--dart-tolerance-pct')) cc.tolerancePct = Number(flag('--dart-tolerance-pct'));
+  if (cc.corpCode) {
+    const inv8 = await runDartCrosscheck(books, cc);
+    summary.checks.push(inv8);
+    if (!inv8.pass) summary.gate = 'FAIL';
+  }
+}
+
+if (asJson) {
+  console.log(JSON.stringify({ dataDir: DATA_DIR, ...summary }, null, 2));
+} else {
+  console.log(`=== 불변식 게이트 (verify-books) — ${DATA_DIR} ===`);
+  if (summary.loadError) {
+    console.log(`FAIL  LOAD ${summary.loadError}`);
+  }
+  for (const r of summary.checks) {
+    const badge = r.skipped ? 'skip' : r.pass ? '  ok' : 'FAIL';
+    console.log(`${badge}  ${r.id} ${r.name}${r.detail ? ` — ${r.detail}` : ''}`);
+  }
+  const failCount = summary.checks.filter((r) => !r.pass).length + (summary.loadError ? 1 : 0);
+  console.log(summary.gate === 'PASS'
+    ? '\nGATE PASS — 기계적 정합성 확정. 추론 단계 진입 가능.'
+    : `\nGATE FAIL — ${failCount}건 위반. 리스크 추론에 진입하지 말고 데이터 품질 리스크로 보고할 것.`);
+}
+
+if (summary.gate !== 'PASS') process.exitCode = 1;

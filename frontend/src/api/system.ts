@@ -115,6 +115,12 @@ export interface MenuUpdateRequest extends MenuCreateRequest {
   active: boolean;
 }
 
+export interface MenuReorderItem {
+  id: number;
+  parentId: number | null;
+  sortOrder: number;
+}
+
 export const menuApi = {
   /** GET /admin/menus (트리) */
   getTree: async (): Promise<MenuNode[]> =>
@@ -131,6 +137,10 @@ export const menuApi = {
   /** PUT /admin/menus/{id} */
   update: async (id: number, body: MenuUpdateRequest): Promise<MenuNode> =>
     (await api.put<MenuNode>(`/admin/menus/${id}`, body)).data,
+
+  /** PATCH /admin/menus/reorder — 부모/정렬 배치 저장 (순환 참조 시 400) */
+  reorder: async (items: MenuReorderItem[]): Promise<MenuNode[]> =>
+    (await api.patch<MenuNode[]>('/admin/menus/reorder', { items })).data,
 
   /** DELETE /admin/menus/{id} */
   remove: async (id: number): Promise<void> => {
@@ -160,6 +170,16 @@ export interface Permission {
   description?: string | null;
 }
 
+export interface RoleCreateRequest {
+  code: string;
+  name: string;
+  description?: string;
+}
+export interface RoleUpdateRequest {
+  name: string;
+  description?: string;
+}
+
 export const rbacApi = {
   /** GET /admin/rbac/roles */
   getRoles: async (): Promise<Role[]> =>
@@ -176,4 +196,21 @@ export const rbacApi = {
   /** PUT /admin/rbac/roles/{id}/permissions */
   updateRolePermissions: async (id: number, permissionIds: number[]): Promise<Role> =>
     (await api.put<Role>(`/admin/rbac/roles/${id}/permissions`, { permissionIds })).data,
+
+  /** POST /admin/rbac/roles — 커스텀 역할 생성 */
+  createRole: async (body: RoleCreateRequest): Promise<Role> =>
+    (await api.post<Role>('/admin/rbac/roles', body)).data,
+
+  /** PUT /admin/rbac/roles/{id} — 이름/설명 수정 (코드 불변) */
+  updateRole: async (id: number, body: RoleUpdateRequest): Promise<Role> =>
+    (await api.put<Role>(`/admin/rbac/roles/${id}`, body)).data,
+
+  /** DELETE /admin/rbac/roles/{id} — builtin 역할은 400 */
+  deleteRole: async (id: number): Promise<void> => {
+    await api.delete(`/admin/rbac/roles/${id}`);
+  },
+
+  /** POST /admin/rbac/roles/{id}/clone — 권한 매핑까지 복제 */
+  cloneRole: async (id: number, code: string, name?: string): Promise<Role> =>
+    (await api.post<Role>(`/admin/rbac/roles/${id}/clone`, { code, name })).data,
 };

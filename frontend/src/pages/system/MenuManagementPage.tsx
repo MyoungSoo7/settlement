@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { menuApi, MenuNode, MenuCreateRequest } from '@/api/system';
+import React, { useEffect, useMemo, useState } from 'react';
+import { menuApi, rbacApi, MenuNode, MenuCreateRequest, Role } from '@/api/system';
 import Spinner from '@/components/Spinner';
 
 const emptyForm: MenuCreateRequest & { active: boolean } = {
@@ -9,12 +9,14 @@ const emptyForm: MenuCreateRequest & { active: boolean } = {
 const MenuManagementPage: React.FC = () => {
   const [tree, setTree] = useState<MenuNode[]>([]);
   const [flat, setFlat] = useState<MenuNode[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [editing, setEditing] = useState<MenuNode | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [moving, setMoving] = useState(false);
 
   const load = async () => {
     try {
@@ -28,7 +30,11 @@ const MenuManagementPage: React.FC = () => {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    // 역할 목록은 RBAC 관리와 동기화 — 실패해도 메뉴 관리는 동작
+    rbacApi.getRoles().then(setRoles).catch(() => setRoles([]));
+  }, []);
 
   const resetForm = () => { setEditing(null); setForm(emptyForm); };
 
@@ -39,6 +45,30 @@ const MenuManagementPage: React.FC = () => {
       sortOrder: m.sortOrder, requiredRole: m.requiredRole ?? '', visible: m.visible, active: m.active,
     });
   };
+
+  /** 수정 중인 메뉴의 자기 자신 + 모든 자손 ID — 부모로 선택하면 순환 참조라 제외 */
+  const excludedParentIds = useMemo(() => {
+    if (!editing) return new Set<number>();
+    const childrenByParent = new Map<number, number[]>();
+    flat.forEach((m) => {
+      if (m.parentId != null) {
+        if (!childrenByParent.has(m.parentId)) childrenByParent.set(m.parentId, []);
+        childrenByParent.get(m.parentId)!.push(m.id);
+      }
+    });
+    const excluded = new Set<number>([editing.id]);
+    const queue = [editing.id];
+    while (queue.length) {
+      const cur = queue.shift()!;
+      (childrenByParent.get(cur) ?? []).forEach((childId) => {
+        if (!excluded.has(childId)) {
+          excluded.add(childId);
+          queue.push(childId);
+        }
+      });
+    }
+    return excluded;
+  }, [editing, flat]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,36 +108,79 @@ const MenuManagementPage: React.FC = () => {
     }
   };
 
-  const renderNode = (m: MenuNode, depth: number): React.ReactNode => (
-    <React.Fragment key={m.id}>
-      <tr className={`hover:bg-gray-50 ${editing?.id === m.id ? 'bg-blue-50' : ''}`}>
-        <td className="px-4 py-2.5">
-          <span style={{ paddingLeft: depth * 20 }} className="flex items-center gap-1.5">
-            {depth > 0 && <span className="text-gray-300">└</span>}
-            <span>{m.icon || '•'}</span>
-            <span className="font-medium text-gray-800">{m.name}</span>
-          </span>
-        </td>
-        <td className="px-4 py-2.5 font-mono text-xs text-gray-500">{m.path || '-'}</td>
-        <td className="px-4 py-2.5 text-gray-500">{m.sortOrder}</td>
-        <td className="px-4 py-2.5">
-          {m.requiredRole
-            ? <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700">{m.requiredRole}</span>
-            : <span className="text-gray-300 text-xs">-</span>}
-        </td>
-        <td className="px-4 py-2.5">
-          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${m.visible ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-500'}`}>
-            {m.visible ? '노출' : '숨김'}
-          </span>
-        </td>
-        <td className="px-4 py-2.5 space-x-2">
-          <button onClick={() => startEdit(m)} className="text-xs text-blue-600 hover:text-blue-800">수정</button>
-          <button onClick={() => handleDelete(m)} className="text-xs text-red-500 hover:text-red-700">삭제</button>
-        </td>
-      </tr>
-      {m.children?.map((c) => renderNode(c, depth + 1))}
-    </React.Fragment>
-  );
+  /** 형제 목록 안에서 위/아래 이동 — 형제 전체의 sortOrder 를 0..n 으로 재부여해 배치 저장 */
+  const handleMove = async (m: MenuNode, siblings: MenuNode[], direction: -1 | 1) => {
+    const index = siblings.findIndex((s) => s.id === m.id);
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= siblings.length) return;
+    const next = [...siblings];
+    [next[index], next[target]] = [next[target], next[index]];
+    setMoving(true);
+    try {
+      await menuApi.reorder(next.map((s, idx) => ({
+        id: s.id, parentId: m.parentId, sortOrder: idx,
+      })));
+      await load();
+    } catch (err: any) {
+      alert(err.response?.data?.message || '순서 변경 실패');
+    } finally {
+      setMoving(false);
+    }
+  };
+
+  const renderNode = (m: MenuNode, depth: number, siblings: MenuNode[]): React.ReactNode => {
+    const index = siblings.findIndex((s) => s.id === m.id);
+    return (
+      <React.Fragment key={m.id}>
+        <tr className={`hover:bg-gray-50 ${editing?.id === m.id ? 'bg-blue-50' : ''}`}>
+          <td className="px-4 py-2.5">
+            <span style={{ paddingLeft: depth * 20 }} className="flex items-center gap-1.5">
+              {depth > 0 && <span className="text-gray-300">└</span>}
+              <span>{m.icon || '•'}</span>
+              <span className="font-medium text-gray-800">{m.name}</span>
+            </span>
+          </td>
+          <td className="px-4 py-2.5 font-mono text-xs text-gray-500">{m.path || '-'}</td>
+          <td className="px-4 py-2.5">
+            <span className="inline-flex items-center gap-1">
+              <button
+                onClick={() => handleMove(m, siblings, -1)}
+                disabled={moving || index <= 0}
+                title="위로"
+                className="w-6 h-6 text-xs rounded border border-gray-200 text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                ▲
+              </button>
+              <button
+                onClick={() => handleMove(m, siblings, 1)}
+                disabled={moving || index < 0 || index >= siblings.length - 1}
+                title="아래로"
+                className="w-6 h-6 text-xs rounded border border-gray-200 text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                ▼
+              </button>
+              <span className="text-gray-400 text-xs ml-1">{m.sortOrder}</span>
+            </span>
+          </td>
+          <td className="px-4 py-2.5">
+            {m.requiredRole
+              ? <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700">{m.requiredRole}</span>
+              : <span className="text-gray-300 text-xs">-</span>}
+          </td>
+          <td className="px-4 py-2.5">
+            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${m.visible ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-500'}`}>
+              {m.visible ? '노출' : '숨김'}
+            </span>
+          </td>
+          <td className="px-4 py-2.5 space-x-2">
+            <button onClick={() => startEdit(m)} className="text-xs text-blue-600 hover:text-blue-800">수정</button>
+            <button onClick={() => handleDelete(m)} className="text-xs text-red-500 hover:text-red-700">삭제</button>
+          </td>
+        </tr>
+        {m.children?.map((c) => renderNode(c, depth + 1, m.children))}
+      </React.Fragment>
+    );
+  };
 
   if (loading) return <div className="py-20 flex justify-center"><Spinner size="lg" message="메뉴 로드 중..." /></div>;
   if (error)   return <p className="text-red-600 py-10 text-center">{error}</p>;
@@ -116,7 +189,10 @@ const MenuManagementPage: React.FC = () => {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">메뉴 관리</h1>
-        <p className="text-sm text-gray-500 mt-1">네비게이션 메뉴 트리를 관리합니다. (부모 지정 시 하위 메뉴로 등록)</p>
+        <p className="text-sm text-gray-500 mt-1">
+          네비게이션 메뉴 트리를 관리합니다. ▲▼ 로 형제 간 순서를 바꾸고, 부모 지정으로 트리를 재구성합니다.
+          자기 자신·하위 메뉴는 부모로 선택할 수 없습니다(순환 참조 방지).
+        </p>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -136,7 +212,7 @@ const MenuManagementPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {tree.map((m) => renderNode(m, 0))}
+                {tree.map((m) => renderNode(m, 0, tree))}
                 {tree.length === 0 && <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">메뉴가 없습니다.</td></tr>}
               </tbody>
             </table>
@@ -174,7 +250,7 @@ const MenuManagementPage: React.FC = () => {
                 onChange={(e) => setForm((f) => ({ ...f, parentId: e.target.value ? Number(e.target.value) : null }))}
                 className="input">
                 <option value="">(최상위)</option>
-                {flat.filter((m) => m.id !== editing?.id).map((m) => (
+                {flat.filter((m) => !excludedParentIds.has(m.id)).map((m) => (
                   <option key={m.id} value={m.id}>{m.name}</option>
                 ))}
               </select>
@@ -184,9 +260,12 @@ const MenuManagementPage: React.FC = () => {
                 onChange={(e) => setForm((f) => ({ ...f, requiredRole: e.target.value }))}
                 className="input">
                 <option value="">(없음)</option>
-                <option value="ADMIN">ADMIN</option>
-                <option value="MANAGER">MANAGER</option>
-                <option value="USER">USER</option>
+                {(roles.length
+                  ? roles.map((r) => r.code)
+                  : ['ADMIN', 'MANAGER', 'USER']
+                ).map((code) => (
+                  <option key={code} value={code}>{code}</option>
+                ))}
               </select>
             </Field>
             <div className="flex items-center gap-4 pt-1">

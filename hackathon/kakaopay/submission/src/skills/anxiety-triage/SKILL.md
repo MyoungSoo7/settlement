@@ -22,8 +22,11 @@ description: 초보 투자자가 매수·매도와 관련된 불안·망설임·
 1. **감정 인정 (1문장)**: "하락 구간에서 불안한 것은 자연스러운 반응입니다" —
    놀리거나 가볍게 넘기지 마라. 단, 감정 공감은 1문장으로 끝내고 바로 사실로 간다.
 2. **사실 확인**: 판단에 필요한 사실을 데이터로 확보한다.
-   - invest-copilot MCP 도구가 있으면 사용: `invest_signal`(체크리스트), `fin_metrics`(재무),
-     `econ_latest`(거시), `reputation_score`/`news_recent`(악재 실체 확인)
+   - 내장 MCP: `news_search_company`/`news_search_risk`(불안의 계기가 된 뉴스·악재가
+     실제 보도로 존재하는지 — **뉴스가 없으면 없다고 말할 근거**), `dart_disclosures`(공시),
+     `ecos_indicator`(시장 전체 요인 여부).
+   - invest-copilot MCP 도구가 있으면 병용: `invest_signal`(체크리스트), `fin_metrics`(재무),
+     `econ_latest`(거시), `reputation_score`(평판 등급)
    - 도구가 없으면 사용자에게 **구체적으로 질문**: 보유 여부, 매수가, 현재 수익률,
      불안의 계기(뉴스? 하락률?). 추측으로 사실을 만들지 마라.
 3. **규칙 상기**: 사용자가 매수 시점에 정했어야 할 규칙을 소환한다 —

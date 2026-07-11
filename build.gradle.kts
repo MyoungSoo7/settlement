@@ -1,5 +1,3 @@
-import java.time.Duration
-
 plugins {
     java
     id("org.springframework.boot") version "4.0.4" apply false
@@ -37,14 +35,6 @@ subprojects {
     tasks.withType<Test>().configureEach {
         useJUnitPlatform()
         finalizedBy(tasks.named("jacocoTestReport"))
-        // INC-2026-0708 안전망: CI 러너에서 테스트 무한 hang 시 20분에 강제 실패시켜
-        // "어디서 멈췄는지" 리포트를 남긴다 (CouponConcurrencyIT 래치 교착 96분 방치 사례).
-        timeout.set(Duration.ofMinutes(20))
-        // CI 에서만 테스트별 시작 로그 — 타임아웃 강제종료 시 리포트 XML 이 없어
-        // 콘솔의 마지막 STARTED 가 유일한 범인 단서다.
-        if (System.getenv("CI") != null) {
-            testLogging { events("started", "failed", "skipped") }
-        }
     }
 
     tasks.named<JacocoReport>("jacocoTestReport") {
@@ -104,6 +94,8 @@ subprojects {
                     "**/MarketApplication*",
                     "**/CommonDataApplication*",
                     "**/AiServiceApplication*",
+                    "**/InvestmentServiceApplication*",
+                    "**/AccountServiceApplication*",
                 )
             }
         })

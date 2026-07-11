@@ -219,6 +219,50 @@ services:
       timeout: 3s
       retries: 10
 
+  # ★ DB-per-service: investment-service 전용 PostgreSQL (투자서비스 — 투자점수·투자주문·정산재원 프로젝션)
+  investment-postgres:
+    image: postgres:17-alpine
+    container_name: lemuel-investment-db
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      POSTGRES_DB: lemuel_investment
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "127.0.0.1:5444:5432"
+    volumes:
+      - investment-postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  # ★ DB-per-service: account-service 전용 PostgreSQL (계정계 — 전사 복식부기 GL 집계)
+  account-postgres:
+    image: postgres:17-alpine
+    container_name: lemuel-account-db
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      POSTGRES_DB: lemuel_account
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "127.0.0.1:5445:5432"
+    volumes:
+      - account-postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.17.0
     container_name: lemuel-elasticsearch
@@ -452,6 +496,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       APP_KAFKA_ENABLED: "true"
       SPRING_KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
+      # 기업대출 신용평가 — financial 공개 API 를 컨테이너 네트워크로 조회 (app.loan.financial.base-url)
+      APP_LOAN_FINANCIAL_BASE_URL: http://financial-statements-service:8080
       # JWT 시크릿은 order-service 와 동일해야 토큰 검증 가능
       JWT_ISSUER: ${JWT_ISSUER}
       JWT_SECRET: ${JWT_SECRET}
@@ -732,6 +778,92 @@ services:
       ai-postgres:
         condition: service_healthy
 
+  investment-service:
+    build:
+      context: .
+      args:
+        MODULE: investment-service
+    image: ghcr.io/myoungsoo7/lemuel-investment:latest
+    container_name: lemuel-investment
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      # 자체 DB(lemuel_investment) — 정산 재원은 Kafka 이벤트(settlement.confirmed)로만 수신, 회계자료는 financial 공개 API 조회
+      SPRING_DATASOURCE_URL: jdbc:postgresql://investment-postgres:5432/lemuel_investment?reWriteBatchedInserts=true
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      APP_KAFKA_ENABLED: "true"
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
+      # 투자점수 산정 — financial 공개 API 를 컨테이너 네트워크로 조회 (app.investment.financial.base-url)
+      FINANCIAL_BASE_URL: http://financial-statements-service:8080
+      # 초보 투자 체크(R3 악재·R4/R5 시세·거시) — 위성 공개 API 소비측 조인 (원천 장애 시 해당 축만 강등)
+      COMPANY_BASE_URL: http://company-service:8080
+      MARKET_BASE_URL: http://market-service:8080
+      ECONOMICS_BASE_URL: http://economics-service:8080
+      # JWT 시크릿은 order-service 와 동일해야 토큰 검증 가능
+      JWT_ISSUER: ${JWT_ISSUER}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_TTL_SECONDS: ${JWT_TTL_SECONDS}
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
+      SERVER_PORT: 8080
+      MANAGEMENT_SERVER_PORT: 8080
+    ports:
+      - "127.0.0.1:8100:8080"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    depends_on:
+      investment-postgres:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+
+  account-service:
+    build:
+      context: .
+      args:
+        MODULE: account-service
+    image: ghcr.io/myoungsoo7/lemuel-account:latest
+    container_name: lemuel-account
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      # 자체 DB(lemuel_account) — 계정계. loan/investment/settlement 이벤트를 소비해 복식부기 GL 로 집계 (소비 전용)
+      SPRING_DATASOURCE_URL: jdbc:postgresql://account-postgres:5432/lemuel_account?reWriteBatchedInserts=true
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      APP_KAFKA_ENABLED: "true"
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
+      # JWT 시크릿은 order-service 와 동일해야 토큰 검증 가능
+      JWT_ISSUER: ${JWT_ISSUER}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_TTL_SECONDS: ${JWT_TTL_SECONDS}
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
+      SERVER_PORT: 8080
+      MANAGEMENT_SERVER_PORT: 8080
+    ports:
+      - "127.0.0.1:8102:8080"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    depends_on:
+      account-postgres:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+
   gateway-service:
     build:
       context: .
@@ -754,6 +886,8 @@ services:
       MARKET_SERVICE_URI: http://market-service:8080
       COMMON_DATA_SERVICE_URI: http://common-data-service:8080
       AI_SERVICE_URI: http://ai-service:8080
+      INVESTMENT_SERVICE_URI: http://investment-service:8080
+      ACCOUNT_SERVICE_URI: http://account-service:8080
       JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
     ports:
       - "127.0.0.1:8080:8080"
@@ -900,6 +1034,8 @@ volumes:
   economics-postgres-data:
   market-postgres-data:
   commondata-postgres-data:
+  investment-postgres-data:
+  account-postgres-data:
   ai-postgres-data:
   elasticsearch-data:
   redpanda-data:

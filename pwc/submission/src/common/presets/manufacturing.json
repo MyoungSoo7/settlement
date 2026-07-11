@@ -1,0 +1,17 @@
+{
+  "description": "일반 제조 — 설비·재고가 구조적으로 무겁고 공통원가(설비) 배부가 손익을 좌우하는 업종. 재고는 둔감하게, 배부 왜곡은 민감하게.",
+  "thresholds": {
+    "allocationGapPp": 10
+  },
+  "externalThresholds": {
+    "inventoryGapPp": 20,
+    "borrowingsGrowthPct": 40,
+    "currentRatioWatchPct": 110
+  },
+  "rationale": {
+    "allocationGapPp": "제조는 공통원가에서 설비비 비중이 커서 배부 기준 10%p 괴리도 제품 손익을 뒤집을 수 있음 — 15→10 하향(민감).",
+    "inventoryGapPp": "원자재 선매입·재공품 등 구조적 재고가 있어 15%p 는 오탐이 많음 — 20 으로 상향(둔감).",
+    "borrowingsGrowthPct": "설비투자 차입이 일상적이므로 30→40 상향하되, 이자보상 조건은 기본 유지.",
+    "currentRatioWatchPct": "2026-07 코호트 캘리브레이션에서 중장치 제조(배터리·화학·조선)는 선수금·매입채무 구조로 유동비율 110~130 하락 추세가 정상 운영 구간 — 130→110 하향(둔감). 절대 하한 100(유동부채>유동자산)은 유지."
+  }
+}

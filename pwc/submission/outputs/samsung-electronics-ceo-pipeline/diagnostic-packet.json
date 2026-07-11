@@ -1,0 +1,664 @@
+{
+  "corp": {
+    "corpCode": "00126380",
+    "name": "삼성전자(주)",
+    "stockCode": "005930",
+    "ceo": "전영현, 노태문",
+    "bizrNo": "1248100998"
+  },
+  "year": 2025,
+  "fsDiv": "CFS",
+  "disclosureWindowDays": 90,
+  "macro": {
+    "indicator": "한국은행 기준금리",
+    "latest": {
+      "time": "20260707",
+      "value": 2.5
+    },
+    "changeFromFirst": 0,
+    "unit": "%"
+  },
+  "presetUsed": null,
+  "externalThresholds": {
+    "arGrowthGapPp": 15,
+    "ocfToOiFloor": 0.8,
+    "inventoryGapPp": 15,
+    "borrowingsGrowthPct": 30,
+    "interestCoverageFloor": 10,
+    "currentRatioFloorPct": 100,
+    "currentRatioWatchPct": 130,
+    "correctionsMin": 3,
+    "clarificationsMin": 1
+  },
+  "externalPresent": 1,
+  "newsSignals": {
+    "enabled": true,
+    "company": "삼성전자(주)",
+    "searches": [
+      {
+        "query": "삼성전자",
+        "total": 4373466,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      },
+      {
+        "query": "삼성전자 평판",
+        "total": 23361,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      },
+      {
+        "query": "삼성전자 브랜드",
+        "total": 325160,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      },
+      {
+        "query": "삼성전자 소비자",
+        "total": 551656,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      },
+      {
+        "query": "삼성전자 투자",
+        "total": 1359092,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      },
+      {
+        "query": "삼성전자 실적",
+        "total": 746725,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      },
+      {
+        "query": "삼성전자 재무",
+        "total": 105739,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      },
+      {
+        "query": "삼성전자 규제",
+        "total": 188214,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      },
+      {
+        "query": "삼성전자 소송",
+        "total": 111064,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      },
+      {
+        "query": "삼성전자 구조조정",
+        "total": 64403,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      }
+    ],
+    "totalUniqueItems": 82,
+    "categories": {
+      "reputation": {
+        "id": "reputation",
+        "name": "기업평판/브랜드 이미지",
+        "count": 30,
+        "keywords": [
+          "평판",
+          "이미지",
+          "브랜드",
+          "논란",
+          "불매",
+          "소비자",
+          "고객 불만",
+          "품질",
+          "리콜",
+          "갑질",
+          "민원"
+        ],
+        "examples": [
+          {
+            "title": "김용범, '카지노 코스피' 논란에 \"레버리지 ETF, 필요하면 보완\"",
+            "description": "지난 5월 27일 상장한 삼성전자와 SK하이닉스 단일종목 레버리지 ETF는 최근 증시 변동성을 키운 원인으로 지목됐다. 정치권에서는 해당 상품 도입을 주도한 김 실장에게 책임을 묻는 목소리가 커지고 있다. 김 실장은...",
+            "pubDate": "Fri, 10 Jul 2026 11:44:00 +0900",
+            "url": "https://www.newdaily.co.kr/site/data/html/2026/07/10/2026071000128.html",
+            "naverUrl": "https://www.newdaily.co.kr/site/data/html/2026/07/10/2026071000128.html"
+          },
+          {
+            "title": "하나은행, 기보와 1000억 반도체 펀드 조성… 대기업 벤더 수직 계열화...",
+            "description": "삼성전자와 SK하이닉스 등 대기업 메이저 진역에 쏠린 반도체 시장의 온기를 소재·부품·장비(소부장)... ESG 평판을 최고조로 견인하고 있다. 특히 반도체 미세 가공 및 부품 제조는 설비투자 지출 비중이 매우 높아 일시적...",
+            "pubDate": "Fri, 10 Jul 2026 11:40:00 +0900",
+            "url": "https://www.nbntv.kr/news/articleView.html?idxno=340446",
+            "naverUrl": "https://www.nbntv.kr/news/articleView.html?idxno=340446"
+          },
+          {
+            "title": "한화-마시펜 합작 운용사 출범...\"투자 방향과 경영진 관심\"",
+            "description": "양 CEO는 미국 유학파이며 테토 CEO는 토포앤코 운용 입사 전 삼성전자의 기업 인수합병 팀의 설립 멤버라는... 해외 본사의 투자 전문성이나 평판이 높더라도 국내 시장을 잘 아는 한국인 경영진을 함께 두는 것이 영업과...",
+            "pubDate": "Fri, 10 Jul 2026 10:28:00 +0900",
+            "url": "https://www.dailybrief.co.kr/news/articleView.html?idxno=6291",
+            "naverUrl": "https://www.dailybrief.co.kr/news/articleView.html?idxno=6291"
+          },
+          {
+            "title": "[Who Is ?] 백홍주 원익큐엔씨 대표이사",
+            "description": "삼성전자에 입사해 반도체연구소에서 근무했다. 메모리사업부로 옮겨 프로젝트장, 중국법인 법인장... 신뢰와 평판을 얻고 있다. ◆ 사건사고 경북 구미에 위치한 신공장 '캠퍼스S' 전경. <원익큐엔씨> △엑시머...",
+            "pubDate": "Fri, 10 Jul 2026 07:02:00 +0900",
+            "url": "https://www.businesspost.co.kr/BP?command=article_view&num=441495",
+            "naverUrl": "https://www.businesspost.co.kr/BP?command=article_view&num=441495"
+          },
+          {
+            "title": "[비즈톡톡] 中서 화웨이에 밀리자 가격 방어?… 애플이 중국산 메모리 ...",
+            "description": "삼성전자·SK하이닉스·마이크론 등 주요 메모리 업체들이 수익성이 높은 AI·서버용 제품에 생산과 투자를... 있어 평판·규제 리스크가 크다는 점이 핵심 쟁점입니다. 1260H 명단은 미국 국방부가 중국군과 연계됐거나...",
+            "pubDate": "Mon, 06 Jul 2026 16:36:00 +0900",
+            "url": "https://biz.chosun.com/it-science/ict/2026/07/06/F5CC6ZOQVRCWFO27ZCM2EDSAJA/?utm_source=naver&utm_medium=original&utm_campaign=biz",
+            "naverUrl": "https://n.news.naver.com/mnews/article/366/0001177114?sid=105"
+          }
+        ],
+        "crossCheck": "매출 성장률, 반품/클레임, 고객 이탈, 채널별 매출 변화를 확인"
+      },
+      "industry": {
+        "id": "industry",
+        "name": "관심산업/시장 환경",
+        "count": 29,
+        "keywords": [
+          "업계",
+          "산업",
+          "시장",
+          "트렌드",
+          "수요",
+          "소비동향",
+          "온라인",
+          "플랫폼",
+          "패션",
+          "섬유",
+          "의류"
+        ],
+        "examples": [
+          {
+            "title": "청와대 “단일종목 레버리지 ETF 시장 영향 면밀히 점검…필요시 보완”",
+            "description": "청와대는 삼성전자와 SK하이닉스 ‘단일종목 레버리지 상장지수펀드’(ETF)가 국내 증시 변동성을 과도하게 키운다는 지적에 대해 금융 당국에서 시장 상황을 면밀히 살펴보고 있다고 밝혔습니다. 김용범 청와대...",
+            "pubDate": "Fri, 10 Jul 2026 11:43:00 +0900",
+            "url": "https://news.kbs.co.kr/news/pc/view/view.do?ncd=8607504&ref=A",
+            "naverUrl": "https://n.news.naver.com/mnews/article/056/0012215645?sid=100"
+          },
+          {
+            "title": "靑 \"삼전닉스 단일종목 ETF 우려, F4 회의서 면밀히 살필 것\"",
+            "description": "청와대는 10일 삼성전자·SK하이닉스 단일종목 레버리지 상장지수펀드(ETF) 출시 이후 주가 변동성 확대에 따른 우려에 대해 시장 상황을 예의주시하고 있다는 입장을 밝혔다. 김용범 청와대 정책실장은 이날 춘추관에서...",
+            "pubDate": "Fri, 10 Jul 2026 11:42:00 +0900",
+            "url": "https://www.hankookilbo.com/news/article/A2026071011340002796?did=NA",
+            "naverUrl": "https://n.news.naver.com/mnews/article/469/0000941508?sid=100"
+          },
+          {
+            "title": "최원용 평택시장 \"반도체는 속도\"…민선9기 핵심 '평택형 소부장 생태계...",
+            "description": "최원용 평택시장이 삼성전자 평택캠퍼스를 방문해 삼성전자 관계자들과 기념촬영을 하고 있다. (왼쪽부터) 윤태양 삼성전자 글로벌&인프라 총괄 부사장, 최원용 평택시장, 김용관 삼성전자 경영전략총괄 사장. 사진...",
+            "pubDate": "Fri, 10 Jul 2026 11:42:00 +0900",
+            "url": "https://www.m-i.kr/news/articleView.html?idxno=1390297",
+            "naverUrl": "https://www.m-i.kr/news/articleView.html?idxno=1390297"
+          },
+          {
+            "title": "하나은행, 기보와 1000억 반도체 펀드 조성… 대기업 벤더 수직 계열화...",
+            "description": "삼성전자와 SK하이닉스 등 대기업 메이저 진역에 쏠린 반도체 시장의 온기를 소재·부품·장비(소부장)... ESG 평판을 최고조로 견인하고 있다. 특히 반도체 미세 가공 및 부품 제조는 설비투자 지출 비중이 매우 높아 일시적...",
+            "pubDate": "Fri, 10 Jul 2026 11:40:00 +0900",
+            "url": "https://www.nbntv.kr/news/articleView.html?idxno=340446",
+            "naverUrl": "https://www.nbntv.kr/news/articleView.html?idxno=340446"
+          },
+          {
+            "title": "한화-마시펜 합작 운용사 출범...\"투자 방향과 경영진 관심\"",
+            "description": "양 CEO는 미국 유학파이며 테토 CEO는 토포앤코 운용 입사 전 삼성전자의 기업 인수합병 팀의 설립 멤버라는... 해외 본사의 투자 전문성이나 평판이 높더라도 국내 시장을 잘 아는 한국인 경영진을 함께 두는 것이 영업과...",
+            "pubDate": "Fri, 10 Jul 2026 10:28:00 +0900",
+            "url": "https://www.dailybrief.co.kr/news/articleView.html?idxno=6291",
+            "naverUrl": "https://www.dailybrief.co.kr/news/articleView.html?idxno=6291"
+          }
+        ],
+        "crossCheck": "재고 증가율, 매출 성장률, 사업부별 성장률, ECOS 물가/금리 환경을 확인"
+      },
+      "investment": {
+        "id": "investment",
+        "name": "투자동향/자금소요",
+        "count": 26,
+        "keywords": [
+          "투자",
+          "증설",
+          "설비",
+          "물류",
+          "자동화",
+          "인수",
+          "M&A",
+          "유상증자",
+          "자금조달",
+          "CAPEX"
+        ],
+        "examples": [
+          {
+            "title": "“좀 더 버틸까” 삼전닉스 고점론 뒤에 숨겨진 반전",
+            "description": "삼성전자와 SK하이닉스 등 국내 메모리 반도체 기업의 이익이 정점에 달했다는 이른바 ‘반도체 고점론’을 정면으로 반박하는 증권가의 반전 분석이 나왔다. 글로벌 빅테크의 설비투자(CAPEX)축소나 고대역폭메모리(HBM)...",
+            "pubDate": "Fri, 10 Jul 2026 11:41:00 +0900",
+            "url": "https://magazine.hankyung.com/business/article/202607107613b",
+            "naverUrl": "https://n.news.naver.com/mnews/article/050/0000108379?sid=101"
+          },
+          {
+            "title": "하나은행, 기보와 1000억 반도체 펀드 조성… 대기업 벤더 수직 계열화...",
+            "description": "삼성전자와 SK하이닉스 등 대기업 메이저 진역에 쏠린 반도체 시장의 온기를 소재·부품·장비(소부장)... ESG 평판을 최고조로 견인하고 있다. 특히 반도체 미세 가공 및 부품 제조는 설비투자 지출 비중이 매우 높아 일시적...",
+            "pubDate": "Fri, 10 Jul 2026 11:40:00 +0900",
+            "url": "https://www.nbntv.kr/news/articleView.html?idxno=340446",
+            "naverUrl": "https://www.nbntv.kr/news/articleView.html?idxno=340446"
+          },
+          {
+            "title": "한화-마시펜 합작 운용사 출범...\"투자 방향과 경영진 관심\"",
+            "description": "양 CEO는 미국 유학파이며 테토 CEO는 토포앤코 운용 입사 전 삼성전자의 기업 인수합병 팀의 설립 멤버라는... 해외 본사의 투자 전문성이나 평판이 높더라도 국내 시장을 잘 아는 한국인 경영진을 함께 두는 것이 영업과...",
+            "pubDate": "Fri, 10 Jul 2026 10:28:00 +0900",
+            "url": "https://www.dailybrief.co.kr/news/articleView.html?idxno=6291",
+            "naverUrl": "https://www.dailybrief.co.kr/news/articleView.html?idxno=6291"
+          },
+          {
+            "title": "[비즈톡톡] 中서 화웨이에 밀리자 가격 방어?… 애플이 중국산 메모리 ...",
+            "description": "삼성전자·SK하이닉스·마이크론 등 주요 메모리 업체들이 수익성이 높은 AI·서버용 제품에 생산과 투자를... 있어 평판·규제 리스크가 크다는 점이 핵심 쟁점입니다. 1260H 명단은 미국 국방부가 중국군과 연계됐거나...",
+            "pubDate": "Mon, 06 Jul 2026 16:36:00 +0900",
+            "url": "https://biz.chosun.com/it-science/ict/2026/07/06/F5CC6ZOQVRCWFO27ZCM2EDSAJA/?utm_source=naver&utm_medium=original&utm_campaign=biz",
+            "naverUrl": "https://n.news.naver.com/mnews/article/366/0001177114?sid=105"
+          },
+          {
+            "title": "개인정보 유출 집단소송, 정부기관도 '정조준'",
+            "description": "미국에서는 지난달 29일 소비자 14명과 중소 PC 조립·유통업체 3곳이 삼성전자와 SK하이닉스, 마이크론을... 한 민법 전문 변호사는 “집단소송법안이 시행되면 소송 제기 자체만으로도 기업의 평판과 투자에 영향을 미쳐...",
+            "pubDate": "Sun, 05 Jul 2026 18:18:00 +0900",
+            "url": "https://www.hankyung.com/article/2026070563951",
+            "naverUrl": "https://n.news.naver.com/mnews/article/015/0005306383?sid=102"
+          }
+        ],
+        "crossCheck": "차입금, 이자보상배율, 투자 현금흐름, 유동비율을 확인"
+      },
+      "business": {
+        "id": "business",
+        "name": "사업동향/제휴/확장",
+        "count": 12,
+        "keywords": [
+          "진출",
+          "제휴",
+          "계약",
+          "수주",
+          "공급",
+          "파트너",
+          "신사업",
+          "출점",
+          "매장",
+          "해외",
+          "브랜드 론칭"
+        ],
+        "examples": [
+          {
+            "title": "한화-마시펜 합작 운용사 출범...\"투자 방향과 경영진 관심\"",
+            "description": "양 CEO는 미국 유학파이며 테토 CEO는 토포앤코 운용 입사 전 삼성전자의 기업 인수합병 팀의 설립 멤버라는... 해외 본사의 투자 전문성이나 평판이 높더라도 국내 시장을 잘 아는 한국인 경영진을 함께 두는 것이 영업과...",
+            "pubDate": "Fri, 10 Jul 2026 10:28:00 +0900",
+            "url": "https://www.dailybrief.co.kr/news/articleView.html?idxno=6291",
+            "naverUrl": "https://www.dailybrief.co.kr/news/articleView.html?idxno=6291"
+          },
+          {
+            "title": "“중국 칩 쓰게 해달라” 애플, 美정·관계 로비에 나선 속내 [김규환의...",
+            "description": "따라서 전쟁부의 ‘중국 군사기업’ 명단은 미국 내 자본투자 유입을 제한하고 기업에 심각한 평판... 이에 따라 삼성전자와 SK하이닉스 등 메모리 칩 공급사들은 생산 캐파(설비 용량)를 HBM에 집중해 왔다. HBM이 레거시...",
+            "pubDate": "Sun, 05 Jul 2026 07:08:00 +0900",
+            "url": "https://www.dailian.co.kr/news/view/1663339/?sc=Naver",
+            "naverUrl": "https://n.news.naver.com/mnews/article/119/0003107985?sid=104"
+          },
+          {
+            "title": "금호건설, 삼성전자 평택캠퍼스 인접 고덕 민참사업 수주",
+            "description": "금호 건설의 주거 브랜드 아테라(ARTERA)로 지어진다. 양 블록 모두 2026년 12월 착공해 2029년 7월 준공될 예정이다. 단지는 삼성전자 평택캠퍼스와 KG모빌리티, 송탄일반산업단지 등 산업단지와 인접해 배후 수요가...",
+            "pubDate": "Fri, 10 Jul 2026 11:20:00 +0900",
+            "url": "https://www.fetv.co.kr/news/articleView.html?idxno=306194",
+            "naverUrl": "https://www.fetv.co.kr/news/articleView.html?idxno=306194"
+          },
+          {
+            "title": "삼성생명, 즉시연금 충당금 4257억원 환입했는데…이번엔 과징금 충당금...",
+            "description": "이는 삼성전자 특별배당과 지분 매각 이익 등과 함께 1분기 실적 개선을 이끈 핵심 요인으로 작용했다. 한때... 계약은 유효하지만 판매 과정에서 소비자가 핵심 내용을 충분히 이해할 수 있도록 설명했다고 보기 어렵다는...",
+            "pubDate": "Fri, 10 Jul 2026 09:30:00 +0900",
+            "url": "http://www.press9.kr/news/articleView.html?idxno=79239",
+            "naverUrl": "http://www.press9.kr/news/articleView.html?idxno=79239"
+          },
+          {
+            "title": "'삼전닉스 ETF' 개편되나…청와대, 'F4회의에서 면밀하게 살펴볼 것\"",
+            "description": "60%를 삼성전자와 SK하이닉스가 차지하고, 여기에 레버리지를 걸어버리니 일일 리밸런싱 및 차익시도로 시장이 휘청이고 코스피 공포지수는 치솟았다\"고 밝혔다. 이어 \"애초 목표였던 해외 투자자금의 국내 환류와 환율...",
+            "pubDate": "Fri, 10 Jul 2026 11:46:00 +0900",
+            "url": "http://www.ftoday.co.kr/news/articleView.html?idxno=361936",
+            "naverUrl": "http://www.ftoday.co.kr/news/articleView.html?idxno=361936"
+          }
+        ],
+        "crossCheck": "수주/계약 공시, 매출채권 증가, 고객 집중도, 계약부채 변화를 확인"
+      },
+      "finance": {
+        "id": "finance",
+        "name": "재무동향/실적 압박",
+        "count": 17,
+        "keywords": [
+          "실적",
+          "매출",
+          "영업이익",
+          "적자",
+          "흑자",
+          "감소",
+          "증가",
+          "부채",
+          "차입",
+          "이자",
+          "유동성",
+          "재고"
+        ],
+        "examples": [
+          {
+            "title": "[테크家] 갤럭시 ㅣ '언팩 2026' 예고…AI 폴더블·생태계 전략 공개",
+            "description": "카운터포인트리서치는 주요 중국 스마트폰 브랜드의 부진 속에서 삼성전자가 상대적으로 견조한 판매 흐름을 이어갔다고 분석했다. 다만, 출시 6주 차 이후에는 판매량 증가세가 둔화돼 전년도 S25 시리즈에 역전된...",
+            "pubDate": "Fri, 10 Jul 2026 11:14:00 +0900",
+            "url": "https://www.cbci.co.kr/news/articleView.html?idxno=588043",
+            "naverUrl": "https://www.cbci.co.kr/news/articleView.html?idxno=588043"
+          },
+          {
+            "title": "[미리보는 하반기 증시]이진우 메리츠證 센터장 \"반도체 조정은 성장주...",
+            "description": "메리츠증권은 국내 증시 대장주인 삼성전자의 잠정실적을 두 분기 연속 시장에서 가장 근접하게 맞혔다.... 그는 \"소비자를 상대하는 B2C(기업과 소비자 간 거래)는 경기 변동에 민감해 지속 기간이 짧지만 지금은 빅테크가...",
+            "pubDate": "Fri, 10 Jul 2026 10:35:00 +0900",
+            "url": "https://www.imaeil.com/page/view/2026071010161806626",
+            "naverUrl": "https://n.news.naver.com/mnews/article/088/0001018462?sid=101"
+          },
+          {
+            "title": "삼성생명, 즉시연금 충당금 4257억원 환입했는데…이번엔 과징금 충당금...",
+            "description": "이는 삼성전자 특별배당과 지분 매각 이익 등과 함께 1분기 실적 개선을 이끈 핵심 요인으로 작용했다. 한때... 계약은 유효하지만 판매 과정에서 소비자가 핵심 내용을 충분히 이해할 수 있도록 설명했다고 보기 어렵다는...",
+            "pubDate": "Fri, 10 Jul 2026 09:30:00 +0900",
+            "url": "http://www.press9.kr/news/articleView.html?idxno=79239",
+            "naverUrl": "http://www.press9.kr/news/articleView.html?idxno=79239"
+          },
+          {
+            "title": "갤럭시 언팩 앞두고 어깨 무거운 노태문…하반기 수익성 방어 과제",
+            "description": "손인준 유진투자증권 연구원은 \"삼성전자 MX·NW 사업부는 메모리 가격 상승에 따른 원가 부담이 본격화하며 큰 폭의 수익성 감소가 불가피할 전망\"이라며 \"하반기엔 판가 인상과 프리미엄 제품 믹스 확대를 통한 수익성...",
+            "pubDate": "Fri, 10 Jul 2026 11:38:00 +0900",
+            "url": "https://news.tf.co.kr/read/economy/2341966.htm",
+            "naverUrl": "https://n.news.naver.com/mnews/article/629/0000514997?sid=101"
+          },
+          {
+            "title": "SK하이닉스 ADR 상장 기대 타고 오르는 반도체…랠리 지속될까?",
+            "description": "국내 증시가 미국 마이크론의 대규모 투자와 SK하이닉스의 미국 ADR(미국주식예탁증서) 상장을 앞두고... 시총 1위이자 같은 반도체 대표주 삼성전자는 전 거래일 대비 1만2000원(4.32%) 오른 29만원에 거래되고 있다....",
+            "pubDate": "Fri, 10 Jul 2026 11:37:00 +0900",
+            "url": "https://www.mt.co.kr/stock/2026/07/10/2026071011350930101",
+            "naverUrl": "https://n.news.naver.com/mnews/article/008/0005384283?sid=101"
+          }
+        ],
+        "crossCheck": "E1~E4 재무 신호, 현금흐름, 차입금, 재고자산 평가손실을 확인"
+      },
+      "risk": {
+        "id": "risk",
+        "name": "규제/소송/보안/운영 리스크",
+        "count": 29,
+        "keywords": [
+          "규제",
+          "제재",
+          "소송",
+          "고발",
+          "조사",
+          "감사",
+          "보안",
+          "장애",
+          "유출",
+          "구조조정",
+          "폐점",
+          "파업"
+        ],
+        "examples": [
+          {
+            "title": "[비즈톡톡] 中서 화웨이에 밀리자 가격 방어?… 애플이 중국산 메모리 ...",
+            "description": "삼성전자·SK하이닉스·마이크론 등 주요 메모리 업체들이 수익성이 높은 AI·서버용 제품에 생산과 투자를... 있어 평판·규제 리스크가 크다는 점이 핵심 쟁점입니다. 1260H 명단은 미국 국방부가 중국군과 연계됐거나...",
+            "pubDate": "Mon, 06 Jul 2026 16:36:00 +0900",
+            "url": "https://biz.chosun.com/it-science/ict/2026/07/06/F5CC6ZOQVRCWFO27ZCM2EDSAJA/?utm_source=naver&utm_medium=original&utm_campaign=biz",
+            "naverUrl": "https://n.news.naver.com/mnews/article/366/0001177114?sid=105"
+          },
+          {
+            "title": "개인정보 유출 집단소송, 정부기관도 '정조준'",
+            "description": "미국에서는 지난달 29일 소비자 14명과 중소 PC 조립·유통업체 3곳이 삼성전자와 SK하이닉스, 마이크론을... 한 민법 전문 변호사는 “집단소송법안이 시행되면 소송 제기 자체만으로도 기업의 평판과 투자에 영향을 미쳐...",
+            "pubDate": "Sun, 05 Jul 2026 18:18:00 +0900",
+            "url": "https://www.hankyung.com/article/2026070563951",
+            "naverUrl": "https://n.news.naver.com/mnews/article/015/0005306383?sid=102"
+          },
+          {
+            "title": "소비자 지갑 여는 반도체 브랜드…빅데이터가 증명한 '진짜 1위'",
+            "description": "7월 국내 반도체 상장기업 브랜드 평판 조사 결과 삼성전자와 SK하이닉스, 한미반도체가 최상위권을 점유한 가운데 주요 기업들의 실제 주가 역시 강한 변동성을 동반한 흐름을 나타냈다. 전체적인 반도체...",
+            "pubDate": "Sun, 05 Jul 2026 13:26:00 +0900",
+            "url": "https://www.wikitree.co.kr/articles/1144812",
+            "naverUrl": "https://www.wikitree.co.kr/articles/1144812"
+          },
+          {
+            "title": "AI 기술 입혔는데 '변태 안경' 오명…대중화 걸림돌 되나",
+            "description": "게다가 제조사들이 앞다퉈 관련 제품들을 내놓고 있어 소비자와 AI 안경 접점이 넓어지고 있다. 삼성전자는 오는 22일 영국 런던에서 진행하는 신제품 공개 행사 '갤럭시 언팩 2026'에서 첫 AI 안경인 '갤럭시 글래스'(가칭)...",
+            "pubDate": "Fri, 10 Jul 2026 10:45:00 +0900",
+            "url": "https://view.asiae.co.kr/article/2026070916553170064",
+            "naverUrl": "https://n.news.naver.com/mnews/article/277/0005788251?sid=105"
+          },
+          {
+            "title": "SK하이닉스, 나스닥 상장으로 40조원 조달…AI 반도체 투자 확대",
+            "description": "이번에 확보한 자금은 단순한 재무 여력 확보를 넘어, 향후 반도체 주도권 경쟁에서 우위를 굳히기 위한... 최근 시장조사업체 카운터포인트리서치는 올해 2분기 삼성전자와 SK하이닉스, 마이크론 등 글로벌 메모리...",
+            "pubDate": "Fri, 10 Jul 2026 10:34:00 +0900",
+            "url": "https://www.tokenpost.kr/news/market/376462",
+            "naverUrl": "https://www.tokenpost.kr/news/market/376462"
+          }
+        ],
+        "crossCheck": "공시 정정/해명, 충당부채, 법무 비용, 운영 중단 영향을 확인"
+      }
+    },
+    "advice": [
+      {
+        "category": "reputation",
+        "title": "기업평판/브랜드 이미지",
+        "signal": "30건의 관련 뉴스 메타데이터 감지",
+        "crossCheck": "매출 성장률, 반품/클레임, 고객 이탈, 채널별 매출 변화를 확인",
+        "suggestedAction": "브랜드 훼손 신호는 단기 매출보다 채널별 주문 취소, 반품률, 주요 거래처 반응으로 먼저 검증한다."
+      },
+      {
+        "category": "industry",
+        "title": "관심산업/시장 환경",
+        "signal": "29건의 관련 뉴스 메타데이터 감지",
+        "crossCheck": "재고 증가율, 매출 성장률, 사업부별 성장률, ECOS 물가/금리 환경을 확인",
+        "suggestedAction": "산업 변화 신호는 재고 회전과 제품군별 매출 믹스 변화로 연결해 확인한다."
+      },
+      {
+        "category": "investment",
+        "title": "투자동향/자금소요",
+        "signal": "26건의 관련 뉴스 메타데이터 감지",
+        "crossCheck": "차입금, 이자보상배율, 투자 현금흐름, 유동비율을 확인",
+        "suggestedAction": "투자 확대 신호는 성장 기회와 동시에 현금 소요이므로 차입 만기와 투자 회수 기간을 같이 본다."
+      },
+      {
+        "category": "business",
+        "title": "사업동향/제휴/확장",
+        "signal": "12건의 관련 뉴스 메타데이터 감지",
+        "crossCheck": "수주/계약 공시, 매출채권 증가, 고객 집중도, 계약부채 변화를 확인",
+        "suggestedAction": "사업 확장 신호는 매출 인식 속도와 현금 회수 속도가 같이 움직이는지 확인한다."
+      },
+      {
+        "category": "finance",
+        "title": "재무동향/실적 압박",
+        "signal": "17건의 관련 뉴스 메타데이터 감지",
+        "crossCheck": "E1~E4 재무 신호, 현금흐름, 차입금, 재고자산 평가손실을 확인",
+        "suggestedAction": "재무 뉴스는 수치가 과장될 수 있으므로 DART 재무제표와 분기 추세로 재계산한다."
+      },
+      {
+        "category": "risk",
+        "title": "규제/소송/보안/운영 리스크",
+        "signal": "29건의 관련 뉴스 메타데이터 감지",
+        "crossCheck": "공시 정정/해명, 충당부채, 법무 비용, 운영 중단 영향을 확인",
+        "suggestedAction": "규제와 운영 리스크는 손익 영향보다 발생 가능성과 대응 책임자를 먼저 확정한다."
+      }
+    ],
+    "caveat": "뉴스는 제목, 요약, 발행일, 링크 메타데이터만 사용한 보조 신호이며 확정 사실로 취급하지 않습니다.",
+    "summary": "뉴스는 확정 사실이 아니라 보조 신호입니다. 감지 테마: 기업평판/브랜드 이미지 30건, 관심산업/시장 환경 29건, 투자동향/자금소요 26건, 사업동향/제휴/확장 12건, 재무동향/실적 압박 17건, 규제/소송/보안/운영 리스크 29건. DART PRESENT 신호는 E5이며, 평가된 DART 신호는 E1, E2, E3, E4, E5입니다. 뉴스 테마는 각 카테고리의 crossCheck 항목으로 재무/공시 데이터와 교차 확인해야 합니다."
+  },
+  "market": {
+    "enabled": true,
+    "stockCode": "005930",
+    "tradingDays": 100,
+    "lastBasDt": "20260709"
+  },
+  "docs": null,
+  "signals": [
+    {
+      "id": "E1",
+      "name": "수익-채권 괴리 (이익의 현금화 저조)",
+      "present": false,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "revenueGrowthPct": 10.9,
+        "receivablesGrowthPct": 17.2,
+        "gapPp": 6.3,
+        "receivablesTrillion": "43.6→51.1조",
+        "ocfToOperatingIncome": 1.96
+      },
+      "markers": [],
+      "categoryPattern": "수익\\s*(조기)?\\s*인식|조기\\s*인식|채권.*(급증|괴리)|현금화\\s*저조",
+      "checkHints": [
+        "분기보고서로 채권 증가 시점 좁히기",
+        "대손충당금 설정률 추이",
+        "주석의 매출채권 연령 분석"
+      ]
+    },
+    {
+      "id": "E2",
+      "name": "재고 자산 적체",
+      "present": false,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "revenueGrowthPct": 10.9,
+        "inventoryGrowthPct": 1.7,
+        "gapPp": -9.2,
+        "inventoriesTrillion": "51.8→52.6조"
+      },
+      "markers": [],
+      "categoryPattern": "재고\\s*(자산)?\\s*(적체|급증|과잉)|재고자산.*(증가|부담)",
+      "checkHints": [
+        "재고자산 평가손실(주석) 확인",
+        "제품/재공품/원재료 구성 변화",
+        "재고자산회전율 추이"
+      ]
+    },
+    {
+      "id": "E3",
+      "name": "차입 확대·이자 부담",
+      "present": false,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "borrowingsTrillion": "17.1→24.1조",
+        "borrowingsGrowthPct": 40.5,
+        "interestCoverage": "48.5→92.8배 (영업이익/이자지급)",
+        "coverageDropPct": -91.5
+      },
+      "markers": [],
+      "categoryPattern": "차입\\s*(확대|급증|의존)|이자\\s*부담|이자보상",
+      "checkHints": [
+        "차입금 만기 구조(주석) 확인",
+        "변동/고정 금리 구성",
+        "약정(covenant) 조건 확인"
+      ]
+    },
+    {
+      "id": "E4",
+      "name": "유동성 하락 (유동비율)",
+      "present": false,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "currentRatioPct": "258.8→243.3→232.8",
+        "fallingTwoYears": true
+      },
+      "markers": [],
+      "categoryPattern": "유동성\\s*(하락|압박|악화)|유동비율.*(하락|저하)",
+      "checkHints": [
+        "단기차입 상환 스케줄",
+        "미사용 여신한도(주석)",
+        "현금성자산 대비 단기부채"
+      ]
+    },
+    {
+      "id": "E5",
+      "name": "공시 행간 (정정·해명 패턴)",
+      "present": true,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "windowDays": 90,
+        "totalDisclosures": 63,
+        "corrections": 5,
+        "clarifications": [
+          "풍문또는보도에대한해명(미확정) @20260624"
+        ],
+        "auditFlags": []
+      },
+      "markers": [
+        "정정",
+        "풍문|해명"
+      ],
+      "categoryPattern": "정정\\s*공시|풍문|해명\\s*공시|공시\\s*(품질|프로세스|커뮤니케이션)",
+      "checkHints": [
+        "정정 사유 분류(단순 오기/수치 변경)",
+        "해명 공시의 대상 보도와 후속 확정 공시",
+        "공시 검수 체인 점검"
+      ]
+    },
+    {
+      "id": "E6",
+      "name": "시장·현금흐름 괴리 (시총 vs 영업현금흐름)",
+      "present": false,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "windowDays": 90,
+        "marketCapTrillion": "981.5→1625.3조",
+        "marketCapChangePct": 65.6,
+        "ocfGrowthPct": 16.9,
+        "mode": null
+      },
+      "markers": [],
+      "categoryPattern": "시가총액|시총|시장\\s*(평가|가치).{0,12}(괴리|불일치)",
+      "checkHints": [
+        "조달 창구가 열려 있을 때 선제 조달 검토 (증자·회사채 여건)",
+        "현금흐름 악화 원인 분해 (운전자본 vs 수익성)",
+        "12개월 유동성 계획과 시장 조달 계획 통합"
+      ]
+    },
+    {
+      "id": "E7",
+      "name": "공시·주가 정합 (해명 공시 전 이상 변동)",
+      "present": true,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "windowDays": 90,
+        "clarificationCount": 1,
+        "abnormalCount": 1,
+        "events": [
+          {
+            "reportNm": "풍문또는보도에대한해명(미확정)",
+            "date": "20260624",
+            "preMovePct": -10.5,
+            "volumeRatio": 1.01,
+            "abnormal": true
+          }
+        ]
+      },
+      "markers": [
+        "(?<!\\d)10[.,]5(?!\\d)",
+        "해명|풍문",
+        "주가|거래량"
+      ],
+      "categoryPattern": "해명\\s*공시.*(주가|거래량)|(주가|거래량).*(선행|이상\\s*변동|급변)|정보\\s*(유출|관리)\\s*리스크|불공정\\s*거래",
+      "checkHints": [
+        "해명 공시 대상 보도의 최초 유통 경로 확인 (내부 정보 접점 점검)",
+        "공시 전 이상 변동 구간의 대량 매매 주체 확인 (필요 시 시장감시 조회)",
+        "중요 정보 관리 규정·공시 승인 체인 점검"
+      ]
+    }
+  ],
+  "internal": null
+}

@@ -48,6 +48,17 @@ export interface ArticlePage {
   totalPages: number;
 }
 
+/** 기업 문서함 — 외부 파이프라인 산출물(CEO 브리핑 docx 등) 메타데이터 */
+export interface CompanyDocument {
+  id: number;
+  stockCode: string;
+  title: string;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  uploadedAt: string;
+}
+
 export const companyApi = {
   /** 기업 목록/검색. GET /api/company/companies */
   companies: async (keyword: string, page: number, size = 15): Promise<CompanyPage> => {
@@ -69,4 +80,14 @@ export const companyApi = {
     const res = await api.get<ArticlePage>(`/api/company/companies/${stockCode}/articles?${params}`);
     return res.data;
   },
+
+  /** 기업 문서함 목록. GET /api/company/companies/{stockCode}/documents */
+  documents: async (stockCode: string): Promise<CompanyDocument[]> => {
+    const res = await api.get<CompanyDocument[]>(`/api/company/companies/${stockCode}/documents`);
+    return res.data;
+  },
+
+  /** 문서 다운로드 URL (공개 GET — <a href> 로 바로 사용) */
+  documentDownloadUrl: (id: number): string =>
+    `${api.defaults.baseURL || ''}/api/company/documents/${id}/download`,
 };

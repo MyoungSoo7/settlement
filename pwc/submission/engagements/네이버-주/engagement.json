@@ -1,0 +1,51 @@
+{
+  "company": "네이버(주)",
+  "cycle": 2,
+  "phase": "delivered",
+  "baseline": {
+    "sourceDir": "C:\\Users\\iamip\\IdeaProjects\\kubenetis\\settlement\\pwc\\submission\\engagements\\네이버-주\\cycle-2-briefing",
+    "packetPath": "C:\\Users\\iamip\\IdeaProjects\\kubenetis\\settlement\\pwc\\submission\\engagements\\네이버-주\\cycle-2-briefing\\diagnostic-packet.json",
+    "briefingPath": "C:\\Users\\iamip\\IdeaProjects\\kubenetis\\settlement\\pwc\\submission\\engagements\\네이버-주\\cycle-2-briefing\\briefing.md",
+    "deliveredAt": "2026-07-10"
+  },
+  "followUpDue": "2026-08-07",
+  "actions": [
+    {
+      "id": 1,
+      "risk": "공시 행간: 정정·해명 공시 반복 패턴 (E5)",
+      "confidence": "확인됨",
+      "action": "공시 책임 임원에게 정정 3건의 사유 분류 보고를 요구하고, 수치 변경성 정정이 포함되어 있다면 검수 체인에 교차 확인 관문을 추가하십시오.",
+      "status": "pending",
+      "notes": []
+    }
+  ],
+  "history": [
+    {
+      "cycle": 1,
+      "deliveredAt": "2026-07-10",
+      "baseline": {
+        "sourceDir": "C:\\Users\\iamip\\IdeaProjects\\kubenetis\\settlement\\pwc\\submission\\outputs\\naver-ceo-pipeline",
+        "packetPath": "C:\\Users\\iamip\\IdeaProjects\\kubenetis\\settlement\\pwc\\submission\\outputs\\naver-ceo-pipeline\\diagnostic-packet.json",
+        "briefingPath": "C:\\Users\\iamip\\IdeaProjects\\kubenetis\\settlement\\pwc\\submission\\outputs\\naver-ceo-pipeline\\briefing.md",
+        "deliveredAt": "2026-07-10"
+      },
+      "actions": [
+        {
+          "id": 1,
+          "risk": "공시 정정·해명 반복 패턴 (E5)",
+          "confidence": "확인됨",
+          "action": "IR·공시 담당 임원에게 위 판별 테스트 3건의 결과를 2주 내 보고받으십시오.",
+          "status": "in-progress",
+          "notes": [
+            {
+              "date": "2026-07-10",
+              "note": "재진단(2026-07-10) 공시창 기준 해명 2건(6/18·5/19) 모두 여전히 미확정 — 후속 확정 공시 미관찰. IR 내부 보고 수행 여부는 외부 공시로 확인 불가(데모 사이클)"
+            }
+          ]
+        }
+      ],
+      "deltaFile": "C:\\Users\\iamip\\IdeaProjects\\kubenetis\\settlement\\pwc\\submission\\engagements\\네이버-주\\delta-cycle-1.md",
+      "retroPath": "C:\\Users\\iamip\\IdeaProjects\\kubenetis\\settlement\\pwc\\submission\\engagements\\네이버-주\\retro-cycle-1.md"
+    }
+  ]
+}

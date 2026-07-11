@@ -1,4 +1,4 @@
-import { companyApi, type Article, type Company, type Reputation } from './company';
+import { companyApi, type Article, type Company, type CompanyDocument, type Reputation } from './company';
 import { economicsApi, type EconomicIndicator } from './economics';
 import { financialApi, type FinancialCompany, type FinancialStatement } from './financial';
 import { marketApi, type MarketQuote } from './market';
@@ -76,6 +76,7 @@ export interface CeoInsight {
   latestStatement: FinancialStatement | null;
   reputation: Reputation | null;
   articles: Article[];
+  documents: CompanyDocument[];
   indicators: EconomicIndicator[];
   marketQuote: MarketQuote | null;
   valuation: CeoValuation;
@@ -237,10 +238,12 @@ export const ceoApi = {
   searchCompanies: financialApi.companies,
 
   insight: async (company: FinancialCompany): Promise<CeoInsight> => {
-    const [statements, reputation, articlesPage, indicators, marketSnapshot] = await Promise.all([
+    const [statements, reputation, articlesPage, documents, indicators, marketSnapshot] = await Promise.all([
       financialApi.statements(company.stockCode),
       companyApi.reputation(company.stockCode).catch(() => null),
       companyApi.articles(company.stockCode, 0, 5).catch(() => ({ content: [], page: 0, size: 5, totalElements: 0, totalPages: 0 })),
+      // 문서함(외부 파이프라인 CEO 브리핑 docx) — 미등록/장애 시에도 브리핑은 정상 생성
+      companyApi.documents(company.stockCode).catch(() => [] as CompanyDocument[]),
       economicsApi.indicators(),
       // 시세 미적재/미상장 종목은 404 → null. 시총 없이도 브리핑은 정상 생성된다.
       marketApi.latest(company.stockCode).catch(() => null),
@@ -264,6 +267,7 @@ export const ceoApi = {
       latestStatement,
       reputation,
       articles: articlesPage.content,
+      documents,
       indicators,
       marketQuote,
       valuation,

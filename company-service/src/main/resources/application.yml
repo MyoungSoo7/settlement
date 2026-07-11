@@ -65,6 +65,12 @@ spring:
       ack-mode: manual_immediate
       missing-topics-fatal: false
 
+  # 기업 문서함 업로드(/admin/company/documents, multipart) — 도메인 상한 20MB 와 정합
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 25MB
+
   lifecycle:
     timeout-per-shutdown-phase: 30s
 

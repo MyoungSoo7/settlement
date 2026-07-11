@@ -18,6 +18,7 @@ import TossPaymentFail from './pages/TossPaymentFail';
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const OrderPage = lazy(() => import('./pages/OrderPage'));
+const RecommendPage = lazy(() => import('./pages/RecommendPage'));
 const CartPage = lazy(() => import('./pages/CartPage'));
 const MyPage = lazy(() => import('./pages/MyPage'));
 const LoanPage = lazy(() => import('./pages/LoanPage'));
@@ -26,6 +27,8 @@ const FinancialStatementsPage = lazy(() => import('./pages/FinancialStatementsPa
 const EconomicsPage = lazy(() => import('./pages/EconomicsPage'));
 const CompanyLookupPage = lazy(() => import('./pages/CompanyLookupPage'));
 const CeoInsightPage = lazy(() => import('./pages/CeoInsightPage'));
+const CeoInvestPage = lazy(() => import('./pages/CeoInvestPage'));
+const CeoAccountPage = lazy(() => import('./pages/CeoAccountPage'));
 const AiChatPage = lazy(() => import('./pages/AiChatPage'));
 
 // 관리자 페이지 (lazy load)
@@ -102,6 +105,7 @@ function App() {
 
             {/* ── 일반 사용자 (USER + 인증) ── */}
             <Route path="/order"        element={<ProtectedRoute><OrderPage /></ProtectedRoute>} />
+            <Route path="/recommend"    element={<ProtectedRoute><RecommendPage /></ProtectedRoute>} />
             <Route path="/cart"         element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
             <Route path="/mypage"       element={<ProtectedRoute><MyPage /></ProtectedRoute>} />
             <Route path="/loans"        element={<ProtectedRoute><LoanPage /></ProtectedRoute>} />
@@ -147,8 +151,12 @@ function App() {
               element={<AdminManagerRoute><CeoLayout><FinancialStatementsPage /></CeoLayout></AdminManagerRoute>} />
             <Route path="/admin/ceo/companies"
               element={<AdminManagerRoute><CeoLayout><CompanyLookupPage /></CeoLayout></AdminManagerRoute>} />
+            <Route path="/admin/ceo/invest"
+              element={<AdminManagerRoute><CeoLayout><CeoInvestPage /></CeoLayout></AdminManagerRoute>} />
             <Route path="/admin/ceo/loans"
               element={<AdminManagerRoute><CeoLayout><LoanPage /></CeoLayout></AdminManagerRoute>} />
+            <Route path="/admin/ceo/accounts"
+              element={<AdminManagerRoute><CeoLayout><CeoAccountPage /></CeoLayout></AdminManagerRoute>} />
 
           </Routes>
           </Suspense>

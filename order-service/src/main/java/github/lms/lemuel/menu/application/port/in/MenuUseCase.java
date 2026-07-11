@@ -21,6 +21,20 @@ public interface MenuUseCase {
     /** 메뉴 삭제 (자식 있으면 거부) */
     void deleteMenu(Long id);
 
+    /**
+     * 배치 재배치 — 여러 메뉴의 부모/정렬순서를 한 번에 저장한다.
+     * 순환 참조가 발생하는 재배치는 전체 거부된다.
+     *
+     * @return 변경 저장된 메뉴 목록
+     */
+    List<Menu> reorder(List<ReorderItemCommand> items);
+
+    record ReorderItemCommand(
+            Long id,
+            Long parentId,
+            int sortOrder
+    ) {}
+
     record CreateMenuCommand(
             String name,
             String path,

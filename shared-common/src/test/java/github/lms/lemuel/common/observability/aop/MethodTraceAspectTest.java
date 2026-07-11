@@ -1,9 +1,13 @@
 package github.lms.lemuel.common.observability.aop;
 
+import ch.qos.logback.classic.Level;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.aop.aspectj.annotation.AspectJProxyFactory;
 import org.springframework.beans.factory.ObjectProvider;
 
@@ -20,6 +24,22 @@ import static org.mockito.Mockito.when;
  */
 class MethodTraceAspectTest {
 
+    // DEBUG 를 켜야 진입/종료 debug 로그 + argsSuffix/renderArg 경로가 실행된다.
+    private static Level originalLevel;
+
+    @BeforeAll
+    static void enableDebug() {
+        ch.qos.logback.classic.Logger logger =
+                (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(MethodTraceAspect.class);
+        originalLevel = logger.getLevel();
+        logger.setLevel(Level.DEBUG);
+    }
+
+    @AfterAll
+    static void restoreLevel() {
+        ((ch.qos.logback.classic.Logger) LoggerFactory.getLogger(MethodTraceAspect.class)).setLevel(originalLevel);
+    }
+
     /** 포인트컷(applicationService) 매칭을 위한 가짜 서비스 — 패키지 컨벤션을 모사. */
     static class SampleService {
         String greet(String name) {
@@ -29,10 +49,17 @@ class MethodTraceAspectTest {
         void boom() {
             throw new IllegalStateException("kaboom");
         }
+
+        String ping() {
+            return "pong";
+        }
     }
 
     private SampleService proxyWith(MeterRegistry registry) {
-        ObservabilityAopProperties props = new ObservabilityAopProperties();
+        return proxyWith(registry, new ObservabilityAopProperties());
+    }
+
+    private SampleService proxyWith(MeterRegistry registry, ObservabilityAopProperties props) {
         @SuppressWarnings("unchecked")
         ObjectProvider<MeterRegistry> provider = mock(ObjectProvider.class);
         when(provider.getIfAvailable()).thenReturn(registry);
@@ -99,5 +126,26 @@ class MethodTraceAspectTest {
 
         // MeterRegistry 가 없어도 비즈니스 흐름은 정상 동작해야 한다.
         assertThat(Stream.of(service.greet("x")).findFirst()).contains("hi x");
+    }
+
+    @Test
+    void slow_threshold_promotes_to_warn() {
+        ObservabilityAopProperties props = new ObservabilityAopProperties();
+        props.setSlowThresholdMs(0); // 모든 호출을 SLOW 로 간주 → WARN 승격 분기 커버
+        SampleService service = proxyWith(new SimpleMeterRegistry(), props);
+
+        assertThat(service.greet("slow")).isEqualTo("hi slow");
+    }
+
+    @Test
+    void renders_args_when_logArgs_enabled() {
+        ObservabilityAopProperties props = new ObservabilityAopProperties();
+        props.setLogArgs(true);
+        props.setMaxArgLength(2); // 인자 길이 초과 절단 분기 커버
+        SampleService service = proxyWith(new SimpleMeterRegistry(), props);
+
+        // 인자 있는 호출(절단) + 인자 없는 호출(빈 괄호) 두 분기
+        assertThat(service.greet("abcdef")).isEqualTo("hi abcdef");
+        assertThat(service.ping()).isEqualTo("pong");
     }
 }
