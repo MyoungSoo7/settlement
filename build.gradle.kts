@@ -35,6 +35,10 @@ subprojects {
     tasks.withType<Test>().configureEach {
         useJUnitPlatform()
         finalizedBy(tasks.named("jacocoTestReport"))
+        // JWT 서명키는 운영에서 env(JWT_SECRET)로만 주입한다(yaml 기본값 없음 = 미설정 시 기동 실패).
+        // 테스트도 동일하게 env 로 공급해, 풀 컨텍스트(@SpringBootTest) 부팅 시 ${JWT_SECRET} 미해결
+        // 실패를 막는다. 운영 배포는 반드시 강한 JWT_SECRET 을 주입할 것.
+        environment("JWT_SECRET", "test-only-jwt-secret-not-for-production-0123456789")
     }
 
     tasks.named<JacocoReport>("jacocoTestReport") {
