@@ -11,6 +11,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -18,6 +19,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withException;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 /**
@@ -118,6 +120,19 @@ class EcosApiClientTest {
         assertThat(obs).hasSize(1);
         assertThat(obs.get(0).observedDate()).isEqualTo(LocalDate.of(2026, 6, 1));
         server.verify();
+    }
+
+    @Test
+    @DisplayName("네트워크 오류 시 예외 메시지에서 apiKey 를 마스킹한다(로그 유출 방지)")
+    void masksApiKeyOnNetworkError() {
+        // apiKey 가 URL 경로에 있어 I/O 오류 메시지에 전체 URL(키 포함)이 실리는 상황을 재현.
+        server.expect(requestTo(DAILY_URI)).andRespond(withException(new IOException(
+                "Connection refused for " + DAILY_URI)));
+
+        assertThatIllegalStateException()
+                .isThrownBy(() -> client.fetchObservations(baseRate, FROM, TO))
+                .withMessageContaining("statCode=722Y001")
+                .withMessageNotContaining("TESTKEY");
     }
 
     @Test

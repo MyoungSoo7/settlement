@@ -10,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -97,16 +98,37 @@ public class EcosApiClient implements EcosClientPort {
     // ---- 내부 구현 ----
 
     private JsonNode getJson(String statCode, String cycle, String start, String end, String itemCode) {
-        String body = restClient.get()
-                .uri("/StatisticSearch/{apiKey}/json/kr/1/10000/{statCode}/{cycle}/{start}/{end}/{itemCode}",
-                        properties.apiKey(), statCode, cycle, start, end, itemCode)
-                .retrieve()
-                .body(String.class);
+        String body;
+        try {
+            body = restClient.get()
+                    .uri("/StatisticSearch/{apiKey}/json/kr/1/10000/{statCode}/{cycle}/{start}/{end}/{itemCode}",
+                            properties.apiKey(), statCode, cycle, start, end, itemCode)
+                    .retrieve()
+                    .body(String.class);
+        } catch (RestClientException e) {
+            // ★ apiKey 는 URL 경로 세그먼트라, 네트워크 오류(ResourceAccessException 등) 시 예외 메시지에
+            //   전체 URL(키 포함)이 실린다. 원본 예외를 원인으로 체이닝하면 상위 log.warn(...,e) 로 키가
+            //   스택째 유출되므로, 키를 마스킹한 메시지만 남기고 원인은 전파하지 않는다.
+            throw new IllegalStateException(
+                    "ECOS 호출 실패 (statCode=" + statCode + "): " + maskApiKey(e.getMessage()));
+        }
         try {
             return objectMapper.readTree(body == null ? "{}" : body);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("ECOS 응답 JSON 파싱 실패 (statCode=" + statCode + ")", e);
         }
+    }
+
+    /** 로그/예외 메시지에 apiKey 가 실려 유출되지 않도록 마스킹한다. */
+    private String maskApiKey(String message) {
+        if (message == null) {
+            return "";
+        }
+        String key = properties.apiKey();
+        if (key == null || key.isBlank()) {
+            return message;
+        }
+        return message.replace(key, "***");
     }
 
     /**
