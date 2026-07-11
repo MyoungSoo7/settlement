@@ -167,6 +167,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/reports/**").hasAnyRole("ADMIN", "MANAGER")
                         // 원장(Ledger) 조회 — 회계 감사용 (관리자·매니저)
                         .requestMatchers("/api/ledger/**").hasAnyRole("ADMIN", "MANAGER")
+                        // 계정계(GL) 조회 콘솔 — owner 잔액·분개·전사 집계·시산표는 회계 백오피스라 관리자·매니저 전용
+                        // (프론트도 /admin/ceo/accounts 를 AdminManagerRoute 로 보호). 무권한 노출(owner IDOR·전사 집계) 차단.
+                        .requestMatchers("/api/account/**").hasAnyRole("ADMIN", "MANAGER")
                         // 결제 환불 이력 조회 (관리자·매니저·본인) — 더 세밀한 권한은 향후 Audit PR 에서
                         .requestMatchers("/api/payments/*/refunds").hasAnyRole("ADMIN", "MANAGER", "USER")
                         // 환불 실행(직접 PG 환불) — "어드민 승인 후 환불" 원칙에 따라 운영자 전용.
