@@ -47,10 +47,21 @@ class ExecuteInvestmentOrderServiceTest {
         when(loadInvestmentOrderPort.sumExecutedAmountBySeller(7L)).thenReturn(new BigDecimal("500000"));
         when(saveInvestmentOrderPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        InvestmentOrder result = service().execute(5L);
+        InvestmentOrder result = service().execute(5L, 7L);
 
         assertThat(result.getStatus()).isEqualTo(InvestmentOrderStatus.EXECUTED);
         verify(publishInvestmentEventPort).publishExecuted(any());
+    }
+
+    @Test
+    void 타_셀러의_주문을_집행하려_하면_AccessDenied이고_상태변경도_없다() {
+        when(loadInvestmentOrderPort.load(5L)).thenReturn(requested()); // 주문 소유자 = 7
+
+        assertThatThrownBy(() -> service().execute(5L, 999L))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+
+        verify(saveInvestmentOrderPort, never()).save(any());
+        verify(publishInvestmentEventPort, never()).publishExecuted(any());
     }
 
     @Test
@@ -61,7 +72,7 @@ class ExecuteInvestmentOrderServiceTest {
         when(saveInvestmentOrderPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         // available = 100만 - 50만 = 50만, 주문 100만 → 부족
-        assertThatThrownBy(() -> service().execute(5L))
+        assertThatThrownBy(() -> service().execute(5L, 7L))
                 .isInstanceOf(InsufficientFundingException.class);
 
         ArgumentCaptor<InvestmentOrder> captor = ArgumentCaptor.forClass(InvestmentOrder.class);

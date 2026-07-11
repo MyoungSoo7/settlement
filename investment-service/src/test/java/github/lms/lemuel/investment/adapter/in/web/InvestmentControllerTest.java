@@ -1,5 +1,6 @@
 package github.lms.lemuel.investment.adapter.in.web;
 
+import github.lms.lemuel.common.config.jwt.AuthPrincipal;
 import github.lms.lemuel.investment.application.exception.InsufficientFundingException;
 import github.lms.lemuel.investment.application.exception.InvestmentNotFoundException;
 import github.lms.lemuel.investment.application.exception.NotInvestableException;
@@ -24,6 +25,10 @@ import github.lms.lemuel.investment.domain.TradePlanPolicy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -51,6 +56,14 @@ class InvestmentControllerTest {
     private final LoadInvestmentOrderPort loadOrder = mock(LoadInvestmentOrderPort.class);
 
     private MockMvc mvc;
+
+    /** 인증 주체 — userId=sellerId. */
+    private static Authentication auth(long userId) {
+        return new UsernamePasswordAuthenticationToken(
+                new AuthPrincipal(userId, "u" + userId + "@example.com", "USER"),
+                null,
+                List.of(new SimpleGrantedAuthority("ROLE_USER")));
+    }
 
     @BeforeEach
     void setUp() {
@@ -148,13 +161,13 @@ class InvestmentControllerTest {
     }
 
     @Test
-    @DisplayName("POST /orders 201 Created")
+    @DisplayName("POST /orders 201 — sellerId 는 인증 주체에서 파생(바디 미전달)")
     void place201() throws Exception {
         when(place.place(any(PlaceInvestmentOrderCommand.class)))
                 .thenReturn(order(1L, InvestmentOrderStatus.REQUESTED));
 
-        mvc.perform(post("/api/investment/orders").contentType(APPLICATION_JSON).content("""
-                        {"sellerId":7,"stockCode":"005930","amount":1000000}
+        mvc.perform(post("/api/investment/orders").principal(auth(7L)).contentType(APPLICATION_JSON).content("""
+                        {"stockCode":"005930","amount":1000000}
                         """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(1))
@@ -162,10 +175,19 @@ class InvestmentControllerTest {
     }
 
     @Test
+    @DisplayName("POST /orders — 미인증(principal 없음)이면 403")
+    void placeNoAuth403() throws Exception {
+        mvc.perform(post("/api/investment/orders").contentType(APPLICATION_JSON).content("""
+                        {"stockCode":"005930","amount":1000000}
+                        """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     @DisplayName("POST /orders 검증 실패는 400")
     void placeValidation400() throws Exception {
-        mvc.perform(post("/api/investment/orders").contentType(APPLICATION_JSON).content("""
-                        {"sellerId":7,"stockCode":"12","amount":-5}
+        mvc.perform(post("/api/investment/orders").principal(auth(7L)).contentType(APPLICATION_JSON).content("""
+                        {"stockCode":"12","amount":-5}
                         """))
                 .andExpect(status().isBadRequest());
     }
@@ -173,54 +195,78 @@ class InvestmentControllerTest {
     @Test
     @DisplayName("POST /orders/{id}/execute 200")
     void execute200() throws Exception {
-        when(execute.execute(1L)).thenReturn(order(1L, InvestmentOrderStatus.EXECUTED));
+        when(execute.execute(1L, 7L)).thenReturn(order(1L, InvestmentOrderStatus.EXECUTED));
 
-        mvc.perform(post("/api/investment/orders/1/execute"))
+        mvc.perform(post("/api/investment/orders/1/execute").principal(auth(7L)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("EXECUTED"));
     }
 
     @Test
+    @DisplayName("POST /orders/{id}/execute — 타 셀러 주문이면 403")
+    void executeOthers403() throws Exception {
+        when(execute.execute(1L, 9L)).thenThrow(new AccessDeniedException("본인 소유가 아닌 투자 주문입니다. orderId=1"));
+
+        mvc.perform(post("/api/investment/orders/1/execute").principal(auth(9L)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403));
+    }
+
+    @Test
     @DisplayName("POST /orders/{id}/cancel 200")
     void cancel200() throws Exception {
-        when(cancel.cancel(1L)).thenReturn(order(1L, InvestmentOrderStatus.CANCELED));
+        when(cancel.cancel(1L, 7L)).thenReturn(order(1L, InvestmentOrderStatus.CANCELED));
 
-        mvc.perform(post("/api/investment/orders/1/cancel"))
+        mvc.perform(post("/api/investment/orders/1/cancel").principal(auth(7L)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("CANCELED"));
     }
 
     @Test
-    @DisplayName("GET /orders?sellerId 200 목록")
+    @DisplayName("GET /orders?sellerId 200 — 본인 것만")
     void bySeller200() throws Exception {
         when(loadOrder.findBySeller(7L)).thenReturn(List.of(
                 order(1L, InvestmentOrderStatus.REQUESTED),
                 order(2L, InvestmentOrderStatus.EXECUTED)));
 
-        mvc.perform(get("/api/investment/orders").param("sellerId", "7"))
+        mvc.perform(get("/api/investment/orders").principal(auth(7L)).param("sellerId", "7"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[0].id").value(1));
     }
 
     @Test
-    @DisplayName("GET /funding/{sellerId} 200")
+    @DisplayName("GET /orders?sellerId — 타 셀러 조회 시 403")
+    void bySellerOthers403() throws Exception {
+        mvc.perform(get("/api/investment/orders").principal(auth(7L)).param("sellerId", "9"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("GET /funding/{sellerId} 200 — 본인")
     void funding200() throws Exception {
         when(getFunding.getFunding(7L)).thenReturn(
                 SellerFunding.of(7L, new BigDecimal("2000000"), new BigDecimal("500000")));
 
-        mvc.perform(get("/api/investment/funding/7"))
+        mvc.perform(get("/api/investment/funding/7").principal(auth(7L)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.sellerId").value(7))
                 .andExpect(jsonPath("$.available").value(1500000));
     }
 
     @Test
+    @DisplayName("GET /funding/{sellerId} — 타 셀러 재원 조회 시 403")
+    void fundingOthers403() throws Exception {
+        mvc.perform(get("/api/investment/funding/9").principal(auth(7L)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     @DisplayName("NotFound → 404 (예외 핸들러)")
     void notFound404() throws Exception {
-        when(execute.execute(404L)).thenThrow(new InvestmentNotFoundException("없음 orderId=404"));
+        when(execute.execute(404L, 7L)).thenThrow(new InvestmentNotFoundException("없음 orderId=404"));
 
-        mvc.perform(post("/api/investment/orders/404/execute"))
+        mvc.perform(post("/api/investment/orders/404/execute").principal(auth(7L)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.message").value("없음 orderId=404"));
@@ -231,8 +277,8 @@ class InvestmentControllerTest {
     void notInvestable422() throws Exception {
         when(place.place(any())).thenThrow(new NotInvestableException("부적격"));
 
-        mvc.perform(post("/api/investment/orders").contentType(APPLICATION_JSON).content("""
-                        {"sellerId":7,"stockCode":"005930","amount":1000000}
+        mvc.perform(post("/api/investment/orders").principal(auth(7L)).contentType(APPLICATION_JSON).content("""
+                        {"stockCode":"005930","amount":1000000}
                         """))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.status").value(422));
@@ -243,8 +289,8 @@ class InvestmentControllerTest {
     void insufficient422NullMessage() throws Exception {
         when(place.place(any())).thenThrow(new InsufficientFundingException(null));
 
-        mvc.perform(post("/api/investment/orders").contentType(APPLICATION_JSON).content("""
-                        {"sellerId":7,"stockCode":"005930","amount":1000000}
+        mvc.perform(post("/api/investment/orders").principal(auth(7L)).contentType(APPLICATION_JSON).content("""
+                        {"stockCode":"005930","amount":1000000}
                         """))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.message").value(""));

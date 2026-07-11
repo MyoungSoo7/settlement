@@ -7,10 +7,12 @@ import github.lms.lemuel.investment.application.port.out.LoadInvestmentOrderPort
 import github.lms.lemuel.investment.application.port.out.PublishInvestmentEventPort;
 import github.lms.lemuel.investment.application.port.out.SaveInvestmentOrderPort;
 import github.lms.lemuel.investment.domain.InvestmentOrder;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.Objects;
 
 /**
  * 투자 주문 집행: 재원을 재검증(신청 이후 재원이 줄었을 수 있으므로)한 뒤 승인→집행하고
@@ -37,8 +39,13 @@ public class ExecuteInvestmentOrderService implements ExecuteInvestmentOrderUseC
 
     @Override
     @Transactional
-    public InvestmentOrder execute(long orderId) {
+    public InvestmentOrder execute(long orderId, long callerSellerId) {
         InvestmentOrder order = loadInvestmentOrderPort.load(orderId);
+
+        // 소유권 검증 — 타 셀러의 주문을 집행/거절시킬 수 없다(재원 검증보다 먼저).
+        if (!Objects.equals(order.getSellerId(), callerSellerId)) {
+            throw new AccessDeniedException("본인 소유가 아닌 투자 주문입니다. orderId=" + orderId);
+        }
 
         // 집행 시점 재원 재검증 — 집행 완료(EXECUTED) 합만 재원에서 차감하므로 아직 미집행인 이 주문은 제외된다.
         BigDecimal confirmed = loadFundingViewPort.sumConfirmedBySeller(order.getSellerId());

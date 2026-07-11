@@ -7,6 +7,7 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -29,6 +30,12 @@ public class InvestmentExceptionHandler {
     @ExceptionHandler({NotInvestableException.class, InsufficientFundingException.class})
     public ResponseEntity<Map<String, Object>> unprocessable(RuntimeException e) {
         return body(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage());
+    }
+
+    /** 소유권 위반(타 셀러 리소스 접근) → 403. */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Map<String, Object>> forbidden(AccessDeniedException e) {
+        return body(HttpStatus.FORBIDDEN, e.getMessage());
     }
 
     private static ResponseEntity<Map<String, Object>> body(HttpStatus status, String message) {

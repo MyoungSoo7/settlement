@@ -4,8 +4,11 @@ import github.lms.lemuel.investment.application.port.in.CancelInvestmentOrderUse
 import github.lms.lemuel.investment.application.port.out.LoadInvestmentOrderPort;
 import github.lms.lemuel.investment.application.port.out.SaveInvestmentOrderPort;
 import github.lms.lemuel.investment.domain.InvestmentOrder;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Objects;
 
 /**
  * 투자 주문 취소: REQUESTED/APPROVED 주문을 CANCELED 로 확정한다.
@@ -25,8 +28,11 @@ public class CancelInvestmentOrderService implements CancelInvestmentOrderUseCas
 
     @Override
     @Transactional
-    public InvestmentOrder cancel(long orderId) {
+    public InvestmentOrder cancel(long orderId, long callerSellerId) {
         InvestmentOrder order = loadInvestmentOrderPort.load(orderId);
+        if (!Objects.equals(order.getSellerId(), callerSellerId)) {
+            throw new AccessDeniedException("본인 소유가 아닌 투자 주문입니다. orderId=" + orderId);
+        }
         order.cancel();
         return saveInvestmentOrderPort.save(order);
     }
