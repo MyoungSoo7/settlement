@@ -1,5 +1,7 @@
 # 설치 및 트러블슈팅
 
+> ⚠️ **STALE — 모놀리스 시절 설치 가이드.** 아래는 "단일 opslab DB + 단일 앱(`./gradlew bootRun`, :8080) + 단일 `settlement_search` 인덱스" 기준입니다. 현재는 **12개 마이크로서비스 + Gateway** 가 각자 DB-per-service(opslab·settlement_db·lemuel_loan 등 12종) 를 쓰며, 로컬 기동은 `docker compose up -d --build`(PG 12종·ES·Redpanda·전 서비스) 가 표준입니다. 최신 실행법은 루트 [`README.md`](../../README.md) 의 "빠른 시작" 을 참조하세요. (Java 25 / PostgreSQL 17 요구사항은 유효.)
+
 ## 🚀 시작하기
 
 ### 1. 사전 요구사항

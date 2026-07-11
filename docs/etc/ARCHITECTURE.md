@@ -1,5 +1,14 @@
 # 시스템 아키텍처 & 설계
 
+> ⚠️ **STALE — v0.2.0 모놀리스 시절 도메인 스냅샷.** 아래 정산 상태 모델
+> (`PENDING/CONFIRMED/CALCULATED/WAITING_APPROVAL/APPROVED/REJECTED`)과 새벽 2시/3시 배치 흐름은
+> 현재 코드와 다릅니다. 현재 정산 상태머신은 **`REQUESTED → PROCESSING → DONE`(→ FAILED / CANCELED)**
+> (`SettlementStatus`)이고, 정산 생성은 배치가 아니라 **이벤트 드리븐**(`lemuel.payment.captured` →
+> `PaymentEventKafkaConsumer`)이며 확정만 Spring Batch(`SettlementConfirmJobConfig`)로 처리합니다.
+> 또 order↔settlement 는 DB-per-service 로 물리 분리됐습니다(ADR 0020). 최신 구조·상태 전이는 루트
+> [`README.md`](../../README.md) · [`CLAUDE.md`](../../CLAUDE.md) · `docs/adr/0002-settlement-state-machine.md` 참조.
+> 아래는 이력 보존용.
+
 ## 🏗️ 시스템 아키텍처
 
 ```

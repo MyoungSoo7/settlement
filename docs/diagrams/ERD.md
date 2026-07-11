@@ -135,22 +135,25 @@ erDiagram
     SETTLEMENTS {
         bigserial id PK
         bigint payment_id FK_UK
-        bigint seller_id
+        bigint order_id
         date settlement_date
-        numeric gross_amount
+        numeric payment_amount "결제 원금(gross)"
         numeric refunded_amount
         numeric commission
         numeric net_amount
         numeric commission_rate "정산 시점의 수수료율 - 이력 보존"
+        numeric holdback_amount "보류금(등급별)"
         varchar status "REQUESTED/PROCESSING/DONE/FAILED"
     }
 
     SETTLEMENT_ADJUSTMENTS {
         bigserial id PK
         bigint settlement_id FK
-        bigint refund_id FK
-        numeric amount
-        varchar reason
+        bigint refund_id FK "nullable - chargeback 경로는 NULL"
+        bigint chargeback_id FK "nullable - refund 과 양립"
+        numeric amount "역정산 음수 레코드"
+        varchar status "PENDING/..."
+        date adjustment_date
     }
 
     PG_RECONCILIATION_RUNS {

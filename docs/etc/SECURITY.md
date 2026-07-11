@@ -57,13 +57,13 @@ String token = Jwts.builder()
 **파일**: `SecurityConfig.java:30`
 
 - **알고리즘**: BCrypt
-- **라운드**: 기본값 (10)
+- **라운드**: cost 12 (`new BCryptPasswordEncoder(12)`)
 - **Salt**: 자동 생성
 
 ```java
 @Bean
 public PasswordEncoder passwordEncoder() {
-    return new BCryptPasswordEncoder();
+    return new BCryptPasswordEncoder(12);
 }
 ```
 
@@ -528,11 +528,12 @@ public class UserRegisterRequest {
 ### 10. API Rate Limiting
 **위험도**: 🟡 중간
 
-#### 현재 보호 수준: ❌ 미보호
+#### 현재 보호 수준: ✅ 구현됨 (Bucket4j)
+- shared-common `common.ratelimit` 의 `RateLimitFilter`(Bucket4j) 가 전역 적용됨.
 
-#### 권장 개선 사항
+#### 추가 개선 여지 (참고)
 ```java
-// Spring Boot Resilience4j 사용
+// (참고용) Resilience4j 기반 예시 — 실제 구현은 Bucket4j 필터
 @RateLimiter(name = "default")
 @GetMapping("/settlements/search")
 public ResponseEntity<?> search() {
@@ -799,7 +800,7 @@ management:
 5. ⚠️ 환경변수 암호화 (Kubernetes Secret)
 
 ### Phase 2: 중요 (1개월 내)
-1. ❌ Rate Limiting 구현
+1. ✅ Rate Limiting 구현 (Bucket4j — shared-common `common.ratelimit`)
 2. ❌ HttpOnly 쿠키로 토큰 전달
 3. ❌ Refresh Token 도입
 4. ❌ 계정 잠금 정책
