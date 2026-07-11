@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ceoApi, type CeoInsight, type CeoRisk, type CeoSummaryCard } from '@/api/ceo';
+import { companyApi } from '@/api/company';
 import type { FinancialCompany, FinancialCompanyPage } from '@/api/financial';
 import Card from '@/components/Card';
 import Spinner from '@/components/Spinner';
@@ -58,6 +59,20 @@ const severityLabel = (severity: CeoRisk['severity']) => {
   if (severity === 'high') return '높음';
   if (severity === 'medium') return '중간';
   return '낮음';
+};
+
+const fmtBytes = (bytes: number) => {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+/** 문서 종류별 아이콘 (contentType 기준) */
+const docIcon = (contentType: string) => {
+  if (contentType.includes('wordprocessingml')) return '📄';
+  if (contentType === 'application/pdf') return '📕';
+  if (contentType === 'image/png') return '🖼️';
+  return '📝';
 };
 
 const CeoInsightPage: React.FC = () => {
@@ -223,6 +238,39 @@ const CeoInsightPage: React.FC = () => {
                       </div>
                     ))}
                   </div>
+                </Card>
+
+                <Card title="CEO 브리핑 문서">
+                  {insight.documents.length === 0 ? (
+                    <p className="text-sm text-slate-500">
+                      등록된 브리핑 문서가 없습니다. 외부 파이프라인(분기 브리핑 배치)이 산출한 문서가 문서함에 업로드되면 여기서 바로 다운로드할 수 있습니다.
+                    </p>
+                  ) : (
+                    <ul className="grid gap-2 sm:grid-cols-2">
+                      {insight.documents.map((document) => (
+                        <li key={document.id}>
+                          <a
+                            href={companyApi.documentDownloadUrl(document.id)}
+                            download={document.fileName}
+                            className="group flex items-center gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2.5 transition-colors hover:border-slate-400 hover:bg-white"
+                          >
+                            <span className="text-xl">{docIcon(document.contentType)}</span>
+                            <span className="min-w-0">
+                              <span className="block truncate text-sm font-semibold text-slate-900 group-hover:text-slate-700">
+                                {document.title}
+                              </span>
+                              <span className="block text-xs text-slate-400">
+                                {document.fileName} · {fmtBytes(document.sizeBytes)} · {document.uploadedAt.slice(0, 10)}
+                              </span>
+                            </span>
+                            <span className="ml-auto shrink-0 rounded-md bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white group-hover:bg-slate-700">
+                              다운로드
+                            </span>
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </Card>
 
                 <Card title="시세 · 밸류에이션">
