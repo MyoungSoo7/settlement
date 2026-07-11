@@ -1,1 +1,0 @@
-import{a as r}from"./index-D3YFh0Ll.js";const n={indicators:async()=>(await r.get("/api/economics/indicators")).data,series:async(a,t,e)=>{const s=new URLSearchParams;t&&s.set("from",t),e&&s.set("to",e);const i=s.toString();return(await r.get(`/api/economics/indicators/${a}/series${i?`?${i}`:""}`)).data}};export{n as e};
