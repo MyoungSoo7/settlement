@@ -125,6 +125,15 @@ app:
   financial:
     base-url: ${FINANCIAL_BASE_URL:http://localhost:8086}
 
+  # 초보 투자 체크(R3 악재·R4/R5 시세·거시) — 위성 서비스 공개 API 소비측 조인.
+  # 원천 장애 시 해당 축만 UNAVAILABLE 로 강등되므로 필수 의존이 아니다.
+  company:
+    base-url: ${COMPANY_BASE_URL:http://localhost:8090}
+  market:
+    base-url: ${MARKET_BASE_URL:http://localhost:8094}
+  economics:
+    base-url: ${ECONOMICS_BASE_URL:http://localhost:8087}
+
   kafka:
     enabled: ${APP_KAFKA_ENABLED:false}
     consumer:

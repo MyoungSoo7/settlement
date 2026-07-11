@@ -18,6 +18,14 @@ export interface InvestmentAxisScore {
   netIncomeGrowth?: number | null;
 }
 
+/** 투자받기 개선 포인트 — 점수 구간표에서 결정적으로 유도(예측·권유 아님) */
+export interface InvestmentImprovement {
+  axis: 'PROFITABILITY' | 'STABILITY' | 'GROWTH';
+  metric: string;
+  message: string;
+  potentialGain: number;
+}
+
 /** 투자 점수 카드 — GET /api/investment/scores/{stockCode} */
 export interface InvestmentScore {
   stockCode: string;
@@ -30,6 +38,8 @@ export interface InvestmentScore {
   profitability: InvestmentAxisScore;
   stability: InvestmentAxisScore;
   growth: InvestmentAxisScore;
+  /** 전 지표 최상 구간이면 빈 배열 (구버전 응답 호환을 위해 optional) */
+  improvements?: InvestmentImprovement[];
 }
 
 /** 투자 주문 */

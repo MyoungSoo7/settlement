@@ -4,6 +4,7 @@ import {
   type InvestmentAxisScore,
   type InvestmentFunding,
   type InvestmentGrade,
+  type InvestmentImprovement,
   type InvestmentOrder,
   type InvestmentScore,
 } from '@/api/investment';
@@ -44,6 +45,13 @@ const gradeClass = (grade: InvestmentGrade) => {
     default:
       return 'bg-red-600 text-white';
   }
+};
+
+/** 개선 포인트 축 → 한글 라벨·색상 (수익성/안정성/성장성 카드와 동일 팔레트) */
+const improvementAxisMeta: Record<InvestmentImprovement['axis'], { label: string; badge: string }> = {
+  PROFITABILITY: { label: '수익성', badge: 'bg-indigo-100 text-indigo-700' },
+  STABILITY: { label: '안정성', badge: 'bg-sky-100 text-sky-700' },
+  GROWTH: { label: '성장성', badge: 'bg-teal-100 text-teal-700' },
 };
 
 const orderStatusBadge = (status: InvestmentOrder['status']) =>
@@ -376,6 +384,45 @@ const CeoInvestPage: React.FC = () => {
                       </div>
                     );
                   })}
+                </div>
+
+                {/* ── 투자받기 개선 포인트 ── */}
+                <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50/60 p-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-amber-900">💡 투자받기 위해 개선하면 좋을 포인트</span>
+                    {score.improvements && score.improvements.length > 0 && (
+                      <span className="rounded-full bg-amber-200 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                        예상 +{score.improvements.reduce((sum, i) => sum + i.potentialGain, 0)}점
+                      </span>
+                    )}
+                  </div>
+                  {score.improvements && score.improvements.length > 0 ? (
+                    <ul className="mt-3 space-y-2">
+                      {score.improvements.map((imp) => {
+                        const meta = improvementAxisMeta[imp.axis];
+                        return (
+                          <li
+                            key={`${imp.axis}-${imp.metric}`}
+                            className="flex items-start gap-3 rounded-md border border-amber-100 bg-white px-3 py-2.5"
+                          >
+                            <span className={`mt-0.5 shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${meta.badge}`}>
+                              {meta.label}
+                            </span>
+                            <p className="flex-1 text-sm text-slate-700">{imp.message}</p>
+                            <span className="shrink-0 text-sm font-bold text-amber-700">+{imp.potentialGain}점</span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    <p className="mt-2 text-sm text-amber-800">
+                      모든 재무 지표가 최상위 구간입니다. 현재 재무 상태만으로는 추가 개선 여지가 없습니다. 👍
+                    </p>
+                  )}
+                  <p className="mt-3 text-xs text-amber-700/80">
+                    ※ 위 항목은 공시 회계자료를 점수 산정 구간표에 대입해 유도한 참고 정보이며, 실제 재무 개선이나
+                    투자 유치를 보장하지 않습니다.
+                  </p>
                 </div>
               </Card>
             )}

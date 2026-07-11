@@ -14,11 +14,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 class InvestmentConfigTest {
 
     @Test
-    @DisplayName("캐시 매니저는 investmentScores 캐시를 제공한다")
+    @DisplayName("캐시 매니저는 investmentScores + 초보 체크 위성 축 캐시를 제공한다")
     void cacheManagerExposesInvestmentScores() {
         CacheManager manager = new InvestmentCacheConfig().investmentCacheManager();
 
         assertThat(manager.getCache(InvestmentCacheConfig.INVESTMENT_SCORES)).isNotNull();
+        assertThat(manager.getCache(InvestmentCacheConfig.BEGINNER_NEWS_FEED)).isNotNull();
+        assertThat(manager.getCache(InvestmentCacheConfig.BEGINNER_DAILY_CLOSES)).isNotNull();
+        assertThat(manager.getCache(InvestmentCacheConfig.BEGINNER_MACRO_INDICATORS)).isNotNull();
     }
 
     @Test

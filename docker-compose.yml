@@ -798,6 +798,10 @@ services:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
       # 투자점수 산정 — financial 공개 API 를 컨테이너 네트워크로 조회 (app.investment.financial.base-url)
       FINANCIAL_BASE_URL: http://financial-statements-service:8080
+      # 초보 투자 체크(R3 악재·R4/R5 시세·거시) — 위성 공개 API 소비측 조인 (원천 장애 시 해당 축만 강등)
+      COMPANY_BASE_URL: http://company-service:8080
+      MARKET_BASE_URL: http://market-service:8080
+      ECONOMICS_BASE_URL: http://economics-service:8080
       # JWT 시크릿은 order-service 와 동일해야 토큰 검증 가능
       JWT_ISSUER: ${JWT_ISSUER}
       JWT_SECRET: ${JWT_SECRET}

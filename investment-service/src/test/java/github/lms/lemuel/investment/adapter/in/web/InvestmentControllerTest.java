@@ -5,16 +5,22 @@ import github.lms.lemuel.investment.application.exception.InvestmentNotFoundExce
 import github.lms.lemuel.investment.application.exception.NotInvestableException;
 import github.lms.lemuel.investment.application.port.in.CancelInvestmentOrderUseCase;
 import github.lms.lemuel.investment.application.port.in.ExecuteInvestmentOrderUseCase;
+import github.lms.lemuel.investment.application.port.in.GetBeginnerCheckUseCase;
 import github.lms.lemuel.investment.application.port.in.GetFundingUseCase;
 import github.lms.lemuel.investment.application.port.in.GetInvestmentScoreUseCase;
 import github.lms.lemuel.investment.application.port.in.PlaceInvestmentOrderUseCase;
 import github.lms.lemuel.investment.application.port.in.PlaceInvestmentOrderUseCase.PlaceInvestmentOrderCommand;
 import github.lms.lemuel.investment.application.port.out.LoadInvestmentOrderPort;
+import github.lms.lemuel.investment.domain.BeginnerInvestmentCheck;
 import github.lms.lemuel.investment.domain.InvestmentGrade;
 import github.lms.lemuel.investment.domain.InvestmentOrder;
 import github.lms.lemuel.investment.domain.InvestmentOrderStatus;
 import github.lms.lemuel.investment.domain.InvestmentScore;
+import github.lms.lemuel.investment.domain.MacroCheck;
+import github.lms.lemuel.investment.domain.NewsRiskCheck;
+import github.lms.lemuel.investment.domain.PricePositionCheck;
 import github.lms.lemuel.investment.domain.SellerFunding;
+import github.lms.lemuel.investment.domain.TradePlanPolicy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -37,6 +43,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class InvestmentControllerTest {
 
     private final GetInvestmentScoreUseCase getScore = mock(GetInvestmentScoreUseCase.class);
+    private final GetBeginnerCheckUseCase getCheck = mock(GetBeginnerCheckUseCase.class);
     private final PlaceInvestmentOrderUseCase place = mock(PlaceInvestmentOrderUseCase.class);
     private final ExecuteInvestmentOrderUseCase execute = mock(ExecuteInvestmentOrderUseCase.class);
     private final CancelInvestmentOrderUseCase cancel = mock(CancelInvestmentOrderUseCase.class);
@@ -48,7 +55,7 @@ class InvestmentControllerTest {
     @BeforeEach
     void setUp() {
         InvestmentController controller = new InvestmentController(
-                getScore, place, execute, cancel, getFunding, loadOrder);
+                getScore, getCheck, place, execute, cancel, getFunding, loadOrder);
         mvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new InvestmentExceptionHandler())
                 .build();
@@ -78,7 +85,66 @@ class InvestmentControllerTest {
                 .andExpect(jsonPath("$.investable").value(true))
                 .andExpect(jsonPath("$.profitability.maxScore").value(35))
                 .andExpect(jsonPath("$.stability.maxScore").value(35))
-                .andExpect(jsonPath("$.growth.maxScore").value(30));
+                .andExpect(jsonPath("$.growth.maxScore").value(30))
+                // 개선 포인트 — margin 10%(12점)의 다음 구간 15% 도달 시 +4점이 첫 항목
+                .andExpect(jsonPath("$.improvements").isArray())
+                .andExpect(jsonPath("$.improvements[0].axis").value("PROFITABILITY"))
+                .andExpect(jsonPath("$.improvements[0].metric").value("operatingMargin"))
+                .andExpect(jsonPath("$.improvements[0].potentialGain").value(4));
+    }
+
+    @Test
+    @DisplayName("GET /checks/{stockCode} 200 — 4축 + 매매계획 + 고지문")
+    void check200() throws Exception {
+        NewsRiskCheck newsRisk = NewsRiskCheck.of(3, List.of(new NewsRiskCheck.Flag(
+                "유상증자", "유상증자 결정", "https://n/1", java.time.Instant.parse("2026-07-10T00:00:00Z"))));
+        PricePositionCheck pricePosition = new PricePositionCheck(
+                PricePositionCheck.Status.OK, java.time.LocalDate.of(2026, 7, 10), new BigDecimal("63500"),
+                1, false, new BigDecimal("70000"), new BigDecimal("50000"), new BigDecimal("-9.29"), false);
+        MacroCheck macro = MacroCheck.of(List.of(new github.lms.lemuel.investment.domain.EconomicIndicatorSnapshot(
+                "BASE_RATE", "기준금리", "%", new BigDecimal("2.50"),
+                java.time.LocalDate.of(2026, 6, 30), new BigDecimal("-0.25"))));
+        when(getCheck.getCheck("005930", new BigDecimal("3000000"))).thenReturn(new BeginnerInvestmentCheck(
+                "005930", score(), newsRisk, pricePosition, macro,
+                new TradePlanPolicy().plan(new BigDecimal("63500"), new BigDecimal("3000000"))));
+
+        mvc.perform(get("/api/investment/checks/005930").param("budget", "3000000"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.stockCode").value("005930"))
+                .andExpect(jsonPath("$.score.grade").value("AA"))
+                .andExpect(jsonPath("$.newsRisk.status").value("FLAGGED"))
+                .andExpect(jsonPath("$.newsRisk.flags[0].keyword").value("유상증자"))
+                .andExpect(jsonPath("$.pricePosition.status").value("OK"))
+                .andExpect(jsonPath("$.macro.indicators[0].code").value("BASE_RATE"))
+                .andExpect(jsonPath("$.tradePlan.feasible").value(true))
+                .andExpect(jsonPath("$.tradePlan.totalQuantity").value(49))
+                .andExpect(jsonPath("$.tradePlan.stopLossPrice").value(55600))
+                .andExpect(jsonPath("$.disclaimer").value(
+                        github.lms.lemuel.investment.adapter.in.web.dto.BeginnerCheckResponse.DISCLAIMER));
+    }
+
+    @Test
+    @DisplayName("GET /checks/{stockCode} — 시세 축 없으면 tradePlan 은 null 로 내려간다")
+    void checkWithoutTradePlan() throws Exception {
+        when(getCheck.getCheck("005930", null)).thenReturn(new BeginnerInvestmentCheck(
+                "005930", score(), NewsRiskCheck.noData(), PricePositionCheck.unavailable(),
+                MacroCheck.unavailable(), null));
+
+        mvc.perform(get("/api/investment/checks/005930"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.newsRisk.status").value("NO_DATA"))
+                .andExpect(jsonPath("$.pricePosition.status").value("UNAVAILABLE"))
+                .andExpect(jsonPath("$.macro.status").value("UNAVAILABLE"))
+                .andExpect(jsonPath("$.tradePlan").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("GET /checks/{stockCode} — 회계자료 없으면 404 (점수 조회와 동일 규약)")
+    void check404() throws Exception {
+        when(getCheck.getCheck("999999", null)).thenThrow(new InvestmentNotFoundException("재무제표 없음"));
+
+        mvc.perform(get("/api/investment/checks/999999"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
