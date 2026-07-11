@@ -5,6 +5,7 @@ import github.lms.lemuel.payment.application.port.in.CreatePaymentCommand;
 import github.lms.lemuel.payment.application.port.in.CreatePaymentPort;
 import github.lms.lemuel.payment.application.port.out.SavePaymentPort;
 import github.lms.lemuel.payment.domain.PaymentDomain;
+import github.lms.lemuel.payment.domain.PaymentGateway;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import org.slf4j.Logger;
@@ -85,7 +86,10 @@ public class TossPaymentService {
                 new CreatePaymentCommand(dbOrderId, "TOSS_PAYMENTS")
         );
 
-        payment.authorize(paymentKey);
+        // pgTransactionId 는 "PROVIDER:txn" prefix 규칙을 따라야 PgRouter.resolveByTransactionId 가
+            // capture/refund 시 올바른 PG 로 라우팅한다. raw paymentKey 를 그대로 저장하면 prefix 미인식 →
+            // MOCK 폴백 → "어댑터 없음: provider=MOCK" 로 capture 가 죽는다. TOSS: prefix 를 붙인다.
+            payment.authorize(PaymentGateway.TOSS.prefix() + PaymentGateway.TRANSACTION_ID_DELIMITER + paymentKey);
         savePaymentPort.save(payment);
 
         PaymentDomain captured = capturePaymentPort.capturePayment(payment.getId());
@@ -108,7 +112,10 @@ public class TossPaymentService {
             PaymentDomain payment = createPaymentPort.createPayment(
                     new CreatePaymentCommand(orderId, "TOSS_PAYMENTS")
             );
-            payment.authorize(paymentKey);
+            // pgTransactionId 는 "PROVIDER:txn" prefix 규칙을 따라야 PgRouter.resolveByTransactionId 가
+            // capture/refund 시 올바른 PG 로 라우팅한다. raw paymentKey 를 그대로 저장하면 prefix 미인식 →
+            // MOCK 폴백 → "어댑터 없음: provider=MOCK" 로 capture 가 죽는다. TOSS: prefix 를 붙인다.
+            payment.authorize(PaymentGateway.TOSS.prefix() + PaymentGateway.TRANSACTION_ID_DELIMITER + paymentKey);
             savePaymentPort.save(payment);
 
             PaymentDomain captured = capturePaymentPort.capturePayment(payment.getId());
