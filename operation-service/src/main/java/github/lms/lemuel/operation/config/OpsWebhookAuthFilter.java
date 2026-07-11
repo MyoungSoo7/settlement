@@ -6,10 +6,13 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 
 /**
  * Alertmanager webhook({@code /api/ops/webhook/**}) 보호 필터.
@@ -29,10 +32,13 @@ public class OpsWebhookAuthFilter extends OncePerRequestFilter {
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final OpsProperties properties;
+    private final boolean keyRequired;
     private volatile boolean warnedMissingToken = false;
 
-    public OpsWebhookAuthFilter(OpsProperties properties) {
+    public OpsWebhookAuthFilter(OpsProperties properties,
+                                @Value("${app.security.internal-key-required:false}") boolean keyRequired) {
         this.properties = properties;
+        this.keyRequired = keyRequired;
     }
 
     @Override
@@ -43,17 +49,32 @@ public class OpsWebhookAuthFilter extends OncePerRequestFilter {
         if (path != null && path.startsWith(WEBHOOK_PREFIX)) {
             String token = properties.getWebhook().getToken();
             if (token == null || token.isBlank()) {
+                // app.security.internal-key-required=true(운영) → fail-closed
+                if (keyRequired) {
+                    response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized (webhook token not configured)");
+                    return;
+                }
                 if (!warnedMissingToken) {
                     warnedMissingToken = true;
                     log.warn("app.ops.webhook.token 미설정 — webhook 인증이 비활성입니다. "
                             + "운영에서는 INTERNAL_API_KEY 를 operation-service 와 alertmanager 에 동일하게 설정하세요.");
                 }
-            } else if (!token.equals(extractBearer(request))) {
+            } else if (!constantTimeEquals(token, extractBearer(request))) {
                 response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized (webhook)");
                 return;
             }
         }
         chain.doFilter(request, response);
+    }
+
+    /** 타이밍 사이드채널 방지 — 토큰 비교는 상수시간(MessageDigest.isEqual). */
+    private static boolean constantTimeEquals(String expected, String actual) {
+        if (actual == null) {
+            return false;
+        }
+        return MessageDigest.isEqual(
+                expected.getBytes(StandardCharsets.UTF_8),
+                actual.getBytes(StandardCharsets.UTF_8));
     }
 
     private String extractBearer(HttpServletRequest request) {

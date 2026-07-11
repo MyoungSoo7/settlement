@@ -32,10 +32,19 @@ public class InternalApiKeyFilter extends OncePerRequestFilter {
     private static final Logger log = LoggerFactory.getLogger(InternalApiKeyFilter.class);
 
     private final String apiKey;
+    private final boolean keyRequired;
     private volatile boolean warnedMissingKey = false;
 
-    public InternalApiKeyFilter(@Value("${app.internal.api-key:}") String apiKey) {
+    @org.springframework.beans.factory.annotation.Autowired
+    public InternalApiKeyFilter(@Value("${app.internal.api-key:}") String apiKey,
+                                @Value("${app.security.internal-key-required:false}") boolean keyRequired) {
         this.apiKey = apiKey;
+        this.keyRequired = keyRequired;
+    }
+
+    /** 테스트/기본 편의 — keyRequired=false(기존 fail-open 동작). */
+    public InternalApiKeyFilter(String apiKey) {
+        this(apiKey, false);
     }
 
     @Override
@@ -44,6 +53,13 @@ public class InternalApiKeyFilter extends OncePerRequestFilter {
         String path = request.getServletPath();
         if (path != null && path.startsWith(INTERNAL_PREFIX)) {
             if (apiKey == null || apiKey.isBlank()) {
+                // 키 미설정: app.security.internal-key-required=true(운영) 면 fail-closed 로 거부,
+                // 기본(false, 로컬/개발) 이면 1회 경고 후 통과.
+                if (keyRequired) {
+                    response.sendError(HttpServletResponse.SC_UNAUTHORIZED,
+                            "Unauthorized (internal API key not configured)");
+                    return;
+                }
                 if (!warnedMissingKey) {
                     warnedMissingKey = true;
                     log.warn("app.internal.api-key 미설정 — /internal 내부 API 인증이 비활성입니다. "
