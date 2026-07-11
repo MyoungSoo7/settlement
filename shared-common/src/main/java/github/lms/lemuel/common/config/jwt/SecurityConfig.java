@@ -145,6 +145,9 @@ public class SecurityConfig {
                         .requestMatchers("/admin/dlq/**").hasRole("ADMIN")
                         .requestMatchers("/admin/pg/**").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers("/admin/reconciliation/**").hasAnyRole("ADMIN", "MANAGER")
+                        // PG 정산파일 대사 콘솔 — 업로드·승인(역정산 트리거)·거절·조회. 경로가 /admin/pg/** 와
+                        // 불일치해 authenticated() 로 새던 것을 형제 recon 콘솔과 동일하게 ADMIN/MANAGER 로 게이트.
+                        .requestMatchers("/admin/pg-reconciliation/**").hasAnyRole("ADMIN", "MANAGER")
                         // 정합성 검증 콘솔 — 실행 없는 읽기 전용 조회라 MANAGER 도 허용 (Integrity Suite Phase A)
                         .requestMatchers("/admin/integrity/**").hasAnyRole("ADMIN", "MANAGER")
                         // 내부 서비스 간 호출 — order 가 자기 대사 합계를 노출(settlement 가 소비, ADR 0020 Phase 5 self-totals).
