@@ -16,7 +16,26 @@ if ($LASTEXITCODE -ne 0) { Write-Output "plugin add failed"; exit 1 }
 
 Write-Output "== [3/5] MCP approval config =="
 $configPath = Join-Path $codexHome "config.toml"
-$snippet = Get-Content -Raw (Join-Path $submission "docs\codex-config-snippet.toml") -Encoding UTF8
+# 모든 도구가 읽기 전용 조회라 approve 가 안전. 이 블록이 없으면 비대화(codex exec)에서
+# MCP 호출이 자동 취소된다("user cancelled" - 실측). 과거 docs/codex-config-snippet.toml 을 인라인화.
+$snippet = @'
+# kakaopay-invest-companion - Codex MCP tool approval (auto-added by install-codex.ps1)
+[plugins."kakaopay-invest-companion@kakaopay-invest-companion-market".mcp_servers.invest-companion-dart]
+enabled = true
+default_tools_approval_mode = "approve"
+
+[plugins."kakaopay-invest-companion@kakaopay-invest-companion-market".mcp_servers.invest-companion-ecos]
+enabled = true
+default_tools_approval_mode = "approve"
+
+[plugins."kakaopay-invest-companion@kakaopay-invest-companion-market".mcp_servers.invest-companion-news]
+enabled = true
+default_tools_approval_mode = "approve"
+
+[plugins."kakaopay-invest-companion@kakaopay-invest-companion-market".mcp_servers.invest-companion-price]
+enabled = true
+default_tools_approval_mode = "approve"
+'@
 $marker = 'mcp_servers.invest-companion-dart'
 $config = ""
 if (Test-Path $configPath) { $config = Get-Content -Raw $configPath -Encoding UTF8 }

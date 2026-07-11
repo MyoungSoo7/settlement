@@ -64,7 +64,7 @@ for (const corp of companies) {
   }
 }
 
-const SIGNAL_IDS = ['E1', 'E2', 'E3', 'E4', 'E5'];
+const SIGNAL_IDS = ['E1', 'E2', 'E3', 'E4', 'E5', 'E8'];
 const rates = SIGNAL_IDS.map((id) => {
   const evaluable = results.filter((r) => !r.notEvaluable.includes(id));
   const fired = evaluable.filter((r) => r.present.includes(id));
@@ -89,7 +89,7 @@ if (asJson) {
     console.log(`  ${r.name} (${r.year}): ${r.present.length ? r.present.join(', ') : '—'}${r.notEvaluable.length ? ` (판정불가: ${r.notEvaluable.join(', ')})` : ''}`);
   }
   for (const f of failures) console.log(`  FAIL ${f.name}: ${f.error}`);
-  console.log('\n해석 기준: 건전 코호트에서 재무 신호(E1~E4) 발화율이 0~15% 대역이면 임계값이 과민하지 않다는 근거.');
+  console.log('\n해석 기준: 건전 코호트에서 재무 신호(E1~E4, E8) 발화율이 0~15% 대역이면 임계값이 과민하지 않다는 근거.');
   console.log('E5(공시 행간)는 확인 신호라 발화율이 높은 것이 정상 — 리스크 단정이 아니라 점검 지시로 서술된다.');
 }
 if (failures.length === companies.length) process.exitCode = 1;

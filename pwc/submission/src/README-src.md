@@ -22,13 +22,13 @@
   `fetchSummary` 주입 지점으로 네트워크 0 테스트(`crosscheck.test.mjs`), 삼성전자 2025 실공시
   라이브 검증(일치 0% PASS / 매출 부풀림 1.26% FAIL) 완료.
 - `common/dart-signals.mjs` — **외부(공시) 신호 파생 엔진 (기본 모드의 심장)**. DART 전체
-  재무제표(fnlttSinglAcntAll, 3개년) + 공시 목록에서 외부 신호 E1~E5(수익-채권 괴리 · 재고 적체 ·
+  재무제표(fnlttSinglAcntAll, 3개년) + 공시 목록에서 외부 신호 E1~E5·E8(수익-채권 괴리 · 재고 적체 ·
   차입 확대·이자 부담 · 유동성 하락 · 공시 행간)를 임계값 기반으로 판정하고, 채점용 마커를
   계산값에서 생성한다. account_id(XBRL 표준) 우선 + 계정명 별칭 폴백, 계정 결측 시 evaluable=false
   (지어내지 않음). 내부 signals.mjs 와 동일한 신호 객체 형태 — 채점기와 그대로 호환.
 - `bin/diagnose-company.mjs` — **2단계 진단 CLI (제품 진입점)**.
   기본 모드: `--company <기업명>` 만으로 식별(corp_code 확정) → 3개년 재무 → 공시 90일 →
-  ECOS 금리 → 외부 신호 E1~E5. 상세 모드: `--data-dir <내부CSV폴더>` 를 붙이면 불변식 게이트 →
+  ECOS 금리 → 외부 신호 E1~E5·E8. 상세 모드: `--data-dir <내부CSV폴더>` 를 붙이면 불변식 게이트 →
   내부 신호 S1~S4 → INV-8 공시 대사(확정된 corp_code 자동 배선)가 같은 진단 패킷에 얹힌다.
   `--json` 출력은 briefing-eval `--signals-file` 의 채점 정답지.
 - `bin/verify-books.mjs` — **불변식 게이트 CLI** (`--data-dir`/`--json`). 상세 모드의 저수준 도구 —

@@ -10,7 +10,7 @@ import { dirname, join } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const suites = [
-  'common-utils-test', 'backtest-core-test', 'trade-plan-test',
+  'common-utils-test', 'backtest-core-test', 'trade-plan-test', 'sector-report-test',
   'dart-smoke', 'ecos-smoke', 'news-smoke', 'price-smoke',
 ];
 

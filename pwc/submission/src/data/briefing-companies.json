@@ -1,0 +1,22 @@
+[
+  { "name": "삼성전자", "stockCode": "005930", "businessNumber": "124-81-00998" },
+  { "name": "NAVER", "stockCode": "035420", "businessNumber": "220-81-62517" },
+  { "name": "LG에너지솔루션", "stockCode": "373220", "businessNumber": "851-81-02050" },
+  { "name": "KB금융", "stockCode": "105560", "businessNumber": "201-86-08254" },
+  { "name": "LG전자", "stockCode": "066570", "businessNumber": "107-86-14075" },
+  { "name": "LG화학", "stockCode": "051910", "businessNumber": "107-81-98139" },
+  { "name": "POSCO홀딩스", "stockCode": "005490", "businessNumber": "506-81-00017" },
+  { "name": "SK이노베이션", "stockCode": "096770", "businessNumber": "101-86-32319" },
+  { "name": "SK텔레콤", "stockCode": "017670", "businessNumber": "104-81-37225" },
+  { "name": "SK하이닉스", "stockCode": "000660", "businessNumber": "126-81-03725" },
+  { "name": "기아", "stockCode": "000270", "businessNumber": "119-81-02316" },
+  { "name": "삼성SDI", "stockCode": "006400", "businessNumber": "124-81-31282" },
+  { "name": "삼성물산", "stockCode": "028260", "businessNumber": "202-81-45975", "corpCode": "00149655" },
+  { "name": "삼성바이오로직스", "stockCode": "207940", "businessNumber": "131-86-27632" },
+  { "name": "셀트리온", "stockCode": "068270", "businessNumber": "133-81-23603" },
+  { "name": "신한지주", "stockCode": "055550", "businessNumber": "104-81-64625" },
+  { "name": "카카오", "stockCode": "035720", "businessNumber": "120-81-47521" },
+  { "name": "하나금융지주", "stockCode": "086790", "businessNumber": "107-86-71509" },
+  { "name": "현대모비스", "stockCode": "012330", "businessNumber": "101-81-16406" },
+  { "name": "현대자동차", "stockCode": "005380", "businessNumber": "101-81-09147" }
+]

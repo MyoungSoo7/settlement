@@ -206,6 +206,7 @@ kakaopay-invest-companion 제출물 개발 중 `RUST_LOG=codex_rmcp_client=debug
 | env `${VAR}` 치환 | (언급 없음) | **치환 안 됨** — 리터럴 `"${VAR}"` 문자열이 서버 env 로 들어감 (클라이언트에서 방어 필요) |
 | 부모 셸 env 상속 | (언급 없음) | **상속 안 됨** — 키는 파일 폴백(예: `~/.codex/.env` 상향 탐색)으로만 전달 가능 |
 | MCP 도구 승인 | `plugins.<p>.mcp_servers.<s>` 로 튜닝 | 비대화(`codex exec`)에서 기본 정책은 **자동 취소**("user cancelled") — `default_tools_approval_mode = "approve"` 를 넣어야 호출됨 (`--full-auto` 로도 안 풀림) |
+| 비대화 파일 쓰기 | (언급 없음) | `codex exec` 샌드박스가 **read-only 로 뜨는 경우가 있음** (같은 cwd 에서도 세션마다 다르게 관찰됨) — 스킬이 파일 산출물을 남겨야 하면 `-s workspace-write` 명시 필수 |
 
 검증 순서(재현 가능): ① 스모크로 서버 자체 검증 → ② `codex exec` E2E 에서 "도구 없음" →
 ③ debug 로그에서 `invalid transport` / MODULE_NOT_FOUND 발견 → ④ 캐시 `.mcp.json` 을

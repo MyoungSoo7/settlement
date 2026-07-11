@@ -27,6 +27,7 @@ import { loadDocs, deriveDocsSignal } from '../common/docs.mjs';
 import { loadCrosscheckConfig, runDartCrosscheck } from '../common/crosscheck.mjs';
 import { searchCompanyNews } from '../naver/client.mjs';
 import { classifyNewsSignals, newsDisabled, buildNewsSignalSummary } from '../common/news-signals.mjs';
+import { deriveMarketSignals } from '../common/market-signals.mjs';
 import { safeErrorMessage } from '../common/env.mjs';
 
 const argv = process.argv.slice(2);
@@ -129,6 +130,36 @@ if (argv.includes('--with-news')) {
   }
 }
 
+// ── 4.3 시장 축 (옵션 — --with-market): KRX 시세로 E6·E7 대사 ──
+// 주가를 밸류에이션이 아니라 "시장 장부 vs 회계 장부" 대사로만 쓴다 (투자 판단 금지).
+let market = null;
+let marketSignals = [];
+if (argv.includes('--with-market')) {
+  const stockCode = String(profile.stock_code ?? '').trim();
+  if (!/^\d{6}$/.test(stockCode)) {
+    market = { enabled: false, reason: '종목코드 없음(비상장/미확인) — 시장 축 생략' };
+  } else {
+    try {
+      const { fetchDailyPrices } = await import('../krx/client.mjs');
+      // 거래량 기준선(20거래일) 확보를 위해 관찰 창보다 60일 여유를 두고 조회한다.
+      const prices = await fetchDailyPrices({
+        stockCode,
+        beginDate: ymd(new Date(Date.now() - (days + 60) * 86_400_000)),
+        endDate: ymd(new Date()),
+      });
+      marketSignals = deriveMarketSignals({ prices, series, disclosures: discBody.list ?? [], days });
+      market = {
+        enabled: true,
+        stockCode,
+        tradingDays: prices.length,
+        lastBasDt: prices.at(-1)?.basDt ?? null,
+      };
+    } catch (e) {
+      market = { enabled: false, reason: safeErrorMessage(e) };
+    }
+  }
+}
+
 // ── 4.5 비정형 문서 축 (옵션 — --docs-dir): 지시문(인젝션) 스캔 = D1 ──
 let docsMeta = null;
 let docsSignal = null;
@@ -185,8 +216,9 @@ if (asJson) {
     presetUsed, externalThresholds,
     externalPresent,
     newsSignals,
+    market,
     docs: docsMeta,
-    signals: [...external, ...(docsSignal ? [docsSignal] : [])].map(serialize), // briefing-eval --signals-file 가 읽는 필드
+    signals: [...external, ...marketSignals, ...(docsSignal ? [docsSignal] : [])].map(serialize), // briefing-eval --signals-file 가 읽는 필드
     internal: internal && {
       ...internal,
       signals: internal.signals.map(serialize),
@@ -210,6 +242,24 @@ if (asJson) {
       console.log(`          ${key}: ${typeof value === 'object' ? JSON.stringify(value) : value}`);
     }
     if (s.present) console.log(`          확인 포인트: ${s.checkHints.join(' / ')}`);
+  }
+
+  if (market) {
+    console.log('\n[시장 축 — 주가·시총 대사 (E6·E7)]');
+    if (!market.enabled) {
+      console.log(`  시장 신호 미생성: ${market.reason}`);
+    } else {
+      console.log(`  종목 ${market.stockCode} · 거래일 ${market.tradingDays}건 (최종 ${market.lastBasDt})`);
+      for (const s of marketSignals) {
+        const badge = !s.evaluable ? 'N/A    ' : s.present ? 'PRESENT' : 'absent ';
+        console.log(`[${badge}] ${s.id} ${s.name}${s.note ? ` — ${s.note}` : ''}`);
+        for (const [key, value] of Object.entries(s.evidence)) {
+          console.log(`          ${key}: ${typeof value === 'object' ? JSON.stringify(value) : value}`);
+        }
+        if (s.present) console.log(`          확인 포인트: ${s.checkHints.join(' / ')}`);
+      }
+      console.log('  주의: 시장 축은 주가 수준의 평가가 아니라 시장·장부·공시 간 정합성 대사입니다 — 투자 판단 아님.');
+    }
   }
 
   if (newsSignals) {
@@ -260,6 +310,7 @@ if (asJson) {
   }
 
   const totalPresent = externalPresent
+    + marketSignals.filter((s) => s.present).length
     + (newsSignals?.advice?.length ?? 0)
     + (docsSignal?.present ? 1 : 0)
     + (internal?.signals?.filter((s) => s.present).length ?? 0);

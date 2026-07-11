@@ -6,12 +6,14 @@
  * 영업활동현금흐름·차입금·이자지급을 모두 주므로, 내부 signals.mjs 와 같은
  * "임계값 기반 판정 + 계산값 마커" 방식으로 외부 신호 5종을 파생한다.
  *
- * 외부 신호 (E1~E5):
+ * 외부 신호 (E1~E5, E8):
  *   E1 수익-채권 괴리   — 매출채권 증가율이 매출 증가율을 크게 상회 + 영업CF/영업이익 비율 저조
  *   E2 재고 자산 적체   — 재고 증가율이 매출 증가율을 크게 상회
  *   E3 차입 확대·이자 부담 — 차입금(단기+장기+사채) 급증 + 이자보상(영업이익/이자지급) 저위
  *   E4 유동성 하락      — 유동비율 절대 저위 또는 2년 연속 하락 + 주의 수준
  *   E5 공시 행간        — 정정공시 빈발·풍문 해명 등 공시 커뮤니케이션 신호
+ *   E8 발생액 품질      — 당기순이익 대비 영업현금흐름 괴리(총자산 대비 발생액 비율) — 회계학
+ *                         발생액 기반 이익 품질 축 (E6·E7 은 market-signals.mjs 의 시장 축)
  *
  * 한계(정직 고지): 공시는 연간·법인 단위 요약이다. 거래처별 채권 집중(S2)·제품별 원가
  * 배분 왜곡(S3) 같은 상세 축은 내부 CSV(상세 모드)에서만 판정된다.
@@ -31,6 +33,12 @@ export const EXTERNAL_THRESHOLDS = {
   currentRatioWatchPct: 130,// E4: 2년 연속 하락 시 주의 수준 %
   correctionsMin: 3,        // E5: 관측 기간 내 정정공시 최소 건수
   clarificationsMin: 1,     // E5: 풍문·보도 해명 최소 건수
+  // E8 발생액 품질 — Sloan(1996) 이후 발생액 문헌에서 "총자산 대비 총발생액(NI−OCF)" 상위
+  // 십분위가 대략 +10% 부근: 이 수준을 넘는 이익은 현금 뒷받침 없는 발생액 비중이 커서
+  // 이후 이익 반전(감액·대손) 확률이 유의하게 높다. 지속 괴리(2년 연속 흑자인데 OCF 가
+  // 순이익의 절반 미만)는 일회성 아닌 구조적 신호로 별도 OR 조건.
+  accrualRatioCeilingPct: 10, // E8: (당기순이익 − 영업CF) / 총자산 상한 %
+  ocfToNiFloor: 0.5,          // E8: 지속 괴리 판정용 OCF/순이익 하한 (2년 연속)
 };
 
 // fnlttSinglAcntAll 계정 추출 좌표 — 표준 XBRL account_id 우선, 계정명 별칭 폴백.
@@ -55,6 +63,11 @@ const ACCOUNTS = {
     ids: ['ifrs-full_InterestPaidClassifiedAsOperatingActivities', 'ifrs-full_InterestPaidClassifiedAsFinancingActivities'],
     names: ['이자의 지급', '이자지급', '이자의지급'], sj: ['CF'],
   },
+  netIncome: {
+    ids: ['ifrs-full_ProfitLoss'],
+    names: ['당기순이익', '당기순이익(손실)', '당기순손익'], sj: ['IS', 'CIS'],
+  },
+  totalAssets: { ids: ['ifrs-full_Assets'], names: ['자산총계'], sj: ['BS'] },
 };
 
 const toNum = (v) => {
@@ -127,7 +140,9 @@ export function deriveExternalSignals({ series, disclosures, days = 90 }, thresh
   {
     const id = 'E1';
     const name = '수익-채권 괴리 (이익의 현금화 저조)';
-    const categoryPattern = /수익\s*(조기)?\s*인식|조기\s*인식|채권.*(급증|괴리)|현금화\s*저조/;
+    // E1 은 '수익 조기 인식' + '매출채권 급증·괴리' 리스크 — 중립어("수익 인식")나 은행·지주의
+    // 대출채권이 E8 등 다른 축 서술에 등장해 E1 로 오탐되던 것을 막는다(E1 marker 도 /매출채권/).
+    const categoryPattern = /수익\s*조기\s*인식|조기\s*인식|매출\s*채권.*(급증|괴리)|현금화\s*저조/;
     const rev = series.revenue; const recv = series.receivables;
     const oi = series.operatingIncome; const ocf = series.ocf;
     if (!rev || !recv) {
@@ -263,6 +278,46 @@ export function deriveExternalSignals({ series, disclosures, days = 90 }, thresh
         markers: present ? [/정정/, /풍문|해명/] : [],
         categoryPattern,
         checkHints: ['정정 사유 분류(단순 오기/수치 변경)', '해명 공시의 대상 보도와 후속 확정 공시', '공시 검수 체인 점검'],
+      });
+    }
+  }
+
+  // ── E8: 발생액 품질 (이익-현금 괴리) ───────────────────────
+  {
+    const id = 'E8';
+    const name = '발생액 품질 (이익-현금 괴리)';
+    const categoryPattern = /발생액|이익\s*(의)?\s*품질|이익.*현금.*(괴리|뒷받침)|현금\s*뒷받침\s*없는\s*이익/;
+    const ni = series.netIncome; const ocf = series.ocf; const ta = series.totalAssets;
+    if (!ni || !ocf || !ta) {
+      signals.push(notEvaluable(id, name, categoryPattern, '공시에서 당기순이익/영업현금흐름/자산총계 계정을 찾지 못함'));
+    } else {
+      // 총발생액 = 당기순이익 − 영업활동현금흐름 (Sloan 1996 총발생액 근사), 총자산으로 스케일링.
+      const accrualRatio = ta[2] ? ((ni[2] - ocf[2]) / ta[2]) * 100 : null;
+      const accrualRatioPrev = ta[1] ? ((ni[1] - ocf[1]) / ta[1]) * 100 : null;
+      const ocfToNi = ni[2] > 0 && ocf[2] !== null ? ocf[2] / ni[2] : null;
+      const ocfToNiPrev = ni[1] > 0 && ocf[1] !== null ? ocf[1] / ni[1] : null;
+      const persistentGap = ocfToNi !== null && ocfToNiPrev !== null
+        && ocfToNi < t.ocfToNiFloor && ocfToNiPrev < t.ocfToNiFloor;
+      const present = (accrualRatio !== null && accrualRatio >= t.accrualRatioCeilingPct) || persistentGap;
+      signals.push({
+        id, name, present, evaluable: true, note: '',
+        evidence: {
+          netIncomeTrillion: `${toTrillion(ni[1])}→${toTrillion(ni[2])}조`,
+          ocfTrillion: `${toTrillion(ocf[1])}→${toTrillion(ocf[2])}조`,
+          accrualRatioPct: round1(accrualRatio),
+          accrualRatioPrevPct: round1(accrualRatioPrev),
+          ocfToNetIncome: round2(ocfToNi),
+          persistentGapTwoYears: persistentGap,
+        },
+        markers: present
+          ? [...(accrualRatio !== null ? [pctMarker(accrualRatio)] : []), /발생액/, /순이익/, /현금흐름|현금\s*뒷받침/]
+          : [],
+        categoryPattern,
+        checkHints: [
+          '발생액 구성 분해 — 운전자본성(매출채권·재고·매입채무) vs 비운전자본성(충당금·감가상각 정책 변경)',
+          '수익 인식 정책 변경·추정 변경 주석 확인 (회계 정책 변경이 발생액 급증과 겹치는지)',
+          '차기 분기 OCF 실측으로 반증 — 발생액이 정상 회수되면 일시 괴리, 누적되면 이익 품질 리스크',
+        ],
       });
     }
   }

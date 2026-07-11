@@ -154,6 +154,7 @@ node --test --experimental-test-coverage --test-coverage-lines=90 `
   --test-coverage-include='src/common/**' `
   --test-coverage-include='src/dart/**' `
   --test-coverage-include='src/ecos/**' `
+  --test-coverage-include='src/krx/**' `
   --test-coverage-include='src/mcp/**' `
   --test-coverage-include='src/naver/**' `
   --test-coverage-include='src/registry/**' `

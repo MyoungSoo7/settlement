@@ -1,12 +1,26 @@
 {
-  "schema_version": "1.0",
-  "name": "kakaopay-sample",
-  "version": "0.1.0",
-  "description": "KakaoPay hackathon sample Codex plugin package.",
-  "skills": [
-    {
-      "name": "kakaopay-sample",
-      "path": "skills/kakaopay-sample/SKILL.md"
-    }
-  ]
+  "name": "musinsa-fashion-first",
+  "version": "0.6.1",
+  "description": "패션 브랜드 관심 고객의 3대 마찰(브랜드 과부하·가격 불신·실패 구매)을 '데이터 검증 절차 동행'으로 푸는 Codex 플러그인 — 브랜드 실체·평판 카드, 유행 수명 판정, 세일 실체 판정, 예산 쇼핑 플랜, 3-코디 매칭, 사이즈 반품 방지, 옷장 복기 (AX 인재전쟁 — 무신사 과제)",
+  "author": { "name": "AX 인재전쟁 참가자" },
+  "license": "Apache-2.0",
+  "keywords": ["fashion", "brand", "trend", "price", "closet", "styling", "weather", "musinsa"],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Musinsa Fashion First",
+    "shortDescription": "브랜드 검증 · 유행 수명 · 세일 실체 · 3-코디 매칭 · 옷장 복기 — 패션 소비의 판단 근거를 데이터로",
+    "longDescription": "옷을 '추천해서 던지는' 대신, 패션 브랜드에 관심 있는 고객이 스스로 판단할 수 있는 검증 절차를 대신 수행하는 동행 플러그인. 처음 듣는 브랜드의 실체·평판·흐름을 데이터 카드로 만들고(brand-scout), '지금 사면 한 철인가'를 언급량 시계열로 판정하고(trend-check), 표시 할인율 대신 시장 가격 분포에서의 위치로 세일의 실체를 번역하고(price-navigator), 가진 옷과 3가지 조합이 되는지로 '입게 될 옷'만 사게 하고(style-match), 예산이 있으면 빈 고리 우선 배분→브랜드 검증→시장가 대조로 예산이 새는 구멍을 막는 쇼핑 플랜을 짜고(budget-shopper), 브랜드별 핏 시그니처와 실측 대조로 사이즈 반품을 막고(size-safety), 옷장·구매 내역에서 반복 행동 패턴을 복기해 다음 구매 규칙으로 바꿔준다(closet-retrospective). 모든 판정은 결론→근거→반대근거→다음 단계 1개의 신뢰 구조(honest-stylist)로 전달된다. 이 위에 관리자 하네스(closet-ops)가 옷장을 자산 원장으로 유지하며 주간 사이클(플랜→구매 전 dry-run 게이트→4주 트래킹→리포트→회고→52주 루프)로 sub-skill 들을 호출·검수한다. 데이터 축은 읽기 전용 MCP 4종: 상품·가격 분포(쇼핑 검색), 언급량 시계열+데이터랩 실클릭(트렌드), 브랜드 리스크·기회 보도+공정위 공식 리콜 DB(뉴스·평판), 기상청 단기예보 기반 날씨×코디 브리핑(날씨). 무신사의 10년 비전 — '유저가 AI 에이전트에게 옷을 물을 때 가장 먼저 탐색하는 도구' — 의 에이전트 인터페이스 프로토타입으로, 데모는 공개 유통 데이터를 쓰고 실서비스에서는 어댑터 한 파일 교체로 무신사 내부 API 에 연결된다.",
+    "developerName": "AX 인재전쟁 참가자",
+    "category": "Research",
+    "capabilities": ["Read"],
+    "defaultPrompt": [
+      "무신사에서 '쿠어'라는 브랜드 봤는데 처음 들어봐. 어떤 브랜드야, 믿을 만해?",
+      "이 니트 세일가 41,650원(65% 할인)인데 진짜 싼 거야?",
+      "가을 옷 예산 30만원인데 뭐부터 사야 할지 모르겠어. 옷장은 src/data/sample/closet.csv 참고해줘.",
+      "옷장 운영 사이클 시작해줘 — 옷장은 src/data/sample/closet.csv, 예산은 월 20만원.",
+      "src/data/sample 의 옷장이랑 구매 내역(반품 포함) 좀 복기해줘 — 옷은 많은데 왜 입을 게 없지?"
+    ],
+    "brandColor": "#000000"
+  }
 }

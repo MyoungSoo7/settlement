@@ -12,6 +12,9 @@
 ## 핵심 명령어 (모두 `submission/` 기준, zero-dependency Node 22+)
 
 ```bash
+# 환경 진단 (설치 확인 — Node·키·오프라인 셀프테스트·에이전트 감지·MCP 배선, 네트워크 0)
+node src/bin/doctor.mjs [--json]
+
 # 통합 파이프라인 (고객 접수 → 브리핑 채점 완주 — 에이전트 자동 감지, 미감지 시 프롬프트 폴백)
 node src/bin/ceo-consulting-pipeline.mjs --company 삼성전자 --business-number 124-81-00998 [--data-dir <내부CSV>] [--judge] [--agent none]
 
@@ -19,6 +22,11 @@ node src/bin/ceo-consulting-pipeline.mjs --company 삼성전자 --business-numbe
 node src/bin/diagnose-company.mjs --company 삼성전자                    # 기본 모드 (API-only)
 node src/bin/diagnose-company.mjs --company 삼성전자 --data-dir <내부CSV> --dart-unit-scale 1000000  # 상세
 node src/bin/diagnose-company.mjs ... --preset commerce --docs-dir <문서폴더> --json  # 프리셋·비정형·패킷
+node src/bin/diagnose-company.mjs ... --with-news --with-market                       # 뉴스 축 + 시장 축(E6·E7, KRX_API_KEY)
+
+# 엔게이지먼트 사이클 (브리핑 이후 반복 컨설팅 — ceo-engagement-cycle 스킬이 관리자)
+node src/bin/engagement-cycle.mjs init --from <파이프라인 산출폴더>       # 권고 조치 → 추적 액션 파생
+node src/bin/engagement-cycle.mjs status|note|delta|advance --engagement <폴더>  # 이행→델타→회고 상태머신
 
 # 저수준 도구 (상세 모드 구성요소)
 node src/bin/verify-books.mjs   --data-dir <폴더> [--dart-corp-code 8자리 --dart-unit-scale N]  # 게이트+INV-8
@@ -47,7 +55,7 @@ node --test --experimental-test-coverage --test-coverage-lines=90 \
 ```text
 불변식 게이트 INV-1~7 (+상장사 INV-8 공시 대사)   ← 결정론. FAIL 이면 추론 진입 금지
    ↓
-신호 파생: 내부 S1~S4 / 외부 E1~E5 / 문서 D1      ← 결정론. 임계값 판정 + 근거 수치 계산
+신호 파생: 내부 S1~S4 / 외부 E1~E5·E8 / 문서 D1      ← 결정론. 임계값 판정 + 근거 수치 계산
    ↓
 LLM 브리핑 (에이전트: 인과 서술·확신도·판별테스트)  ← 유일한 비결정 구간
    ↓
@@ -157,3 +165,41 @@ LLM 브리핑 (에이전트: 인과 서술·확신도·판별테스트)  ← 유
 - **검수 증거**: 신규 단위 테스트 5건(체크섬 게이트 차단·--agent none 폴백·가짜 에이전트
   전 구간 EVAL PASS — 국세청/DART fetch 스텁으로 네트워크 0). **전체 132/132, 커버리지
   97.00% (90% 게이트), 파이프라인 파일 자체 92.16%.** README/CODEX/AGENTS/STATUS 정합화.
+
+---
+
+# 자율 개선 루프 라운드 (2026-07-10) — 독립 재평가 9.0 의 감점 3요인 해소
+
+직전 라운드들과 별개로 제출물을 독립 기준으로 재평가한 결과(9.0/10)에서 확인된 감점 3요인
+— ① 탐지기가 임계값 휴리스틱뿐(회계학적 발생액 축 부재), ② 자기순환 검증(채점기·에이전트가
+같은 엔진 — 실세계 정답 대조 부재), ③ 문서 수치 드리프트 — 를 해소했다.
+
+## 1 — E8 발생액 품질 신호 (외부 축 확장)
+
+- **무엇**: `dart-signals.mjs` 에 E8 — 총자산 대비 총발생액(당기순이익−영업CF) 비율 ≥10%
+  또는 2년 연속 OCF/순이익 <0.5(지속 괴리)면 발화. Sloan(1996) 발생액 문헌 기반 임계값
+  (주석 rationale), 당기순이익(`ifrs-full_ProfitLoss`)·자산총계(`ifrs-full_Assets`) 계정 추가.
+- **검수 증거**: 단위 2건(비율 발화+계산값 마커 재현, 지속 괴리 단독 발화) + 스트레스/건전
+  픽스처 회귀 갱신. **라이브 캘리브레이션(15사): E8 발화 1/15(6.7%) — 목표 대역(0~15%) 내**,
+  발화 기업(현대자동차)은 E1 과 동시 발화로 정합(채권 급증 ↔ 현금 뒷받침 없는 이익).
+
+## 2 — 실사례 백테스트: 태영건설 워크아웃 사전 포착 (자기순환 탈출)
+
+- **무엇**: 정답 사건(태영건설 워크아웃 신청 2023-12-28)을 **사건 9개월 전 공시(FY2022)만으로**
+  진단 — `diagnose-company --company 태영건설 --year 2022`. 산출물·해석·정직 고지(미발화 신호
+  포함)를 `outputs/taeyoung-backtest-2022/` 로 동봉, README 검증 기준 표에 배선.
+- **결과 (라이브 실측)**: E1(매출 −5.3% vs 채권 +73.5%, OCF/OI −1.58)·E2·E4(유동비율 101.7%,
+  2년 연속 하락) 동시 발화 — 위기 메커니즘(PF 미수·유동성 고갈)과 정합. 건전 코호트 15사 중
+  재무신호 3종 동시 발화 0건(최대 2종) — 우연 대역 밖.
+
+## 3 — doctor 환경 진단 + 문서 정합화
+
+- **무엇**: `bin/doctor.mjs` — Node 버전·API 키 축별 상태(없으면 무엇이 빠지는지 명시)·오프라인
+  셀프테스트(샘플 게이트+신호)·에이전트 CLI 감지·MCP 배선 검사·다음 명령 안내를 한 명령으로
+  (네트워크 0, exit 1 은 "깨진 상태"만). 단위 2건. README 사용 예시 0단계 + 핵심 명령어 배선.
+- **문서 정합화**: E1~E5 표기를 E1~E5·E8 로 전 문서 일괄 갱신, 테스트 수치 실측 갱신.
+
+## 종합 (실측)
+
+**전체 183/183 테스트, 커버리지 라인 96.61% (90% 게이트 통과)** — 이 문서의 이전 라운드
+수치(132/132·97.00%)는 당시 기준의 역사 기록으로 보존한다. 미커밋 상태 유지(제출 폴더 커밋 금지).

@@ -8,6 +8,7 @@
  * DOCX = OPC zip. 여기서 zip 도 직접 쓴다(CRC32 + deflate, node:zlib 만 사용).
  */
 import { deflateRawSync } from 'node:zlib';
+import { readFileSync } from 'node:fs';
 
 // ── 팔레트 (삼일PwC 계열 오렌지 액센트 + 네이비 본문 위계) ──
 const ACCENT = 'D04A02';
@@ -183,6 +184,27 @@ function paragraph(runs, { style, jc, spacing, shd, ind, border, numId, level } 
   return `<w:p>${pPr}${runs.join('')}</w:p>`;
 }
 
+function pngSize(buffer) {
+  if (!Buffer.isBuffer(buffer) || buffer.length < 24) return null;
+  if (buffer.readUInt32BE(0) !== 0x89504e47 || buffer.readUInt32BE(4) !== 0x0d0a1a0a) return null;
+  return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
+}
+
+function imageParagraph({ rId, png, maxWidthIn = 6.5 }) {
+  const size = pngSize(png) ?? { width: 1600, height: 1000 };
+  const cx = Math.round(maxWidthIn * 914400);
+  const cy = Math.round(cx * (size.height / size.width));
+  return `<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="120" w:after="240"/></w:pPr><w:r><w:drawing>
+<wp:inline xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" distT="0" distB="0" distL="0" distR="0">
+<wp:extent cx="${cx}" cy="${cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:docPr id="1" name="Executive Snapshot"/>
+<wp:cNvGraphicFramePr><a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/></wp:cNvGraphicFramePr>
+<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="1" name="executive-summary.png"/><pic:cNvPicPr/></pic:nvPicPr>
+<pic:blipFill><a:blip r:embed="${rId}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>
+<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic>
+</a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`;
+}
+
 const SUMMARY_BORDER = `<w:pBdr><w:left w:val="single" w:sz="24" w:space="8" w:color="${ACCENT}"/></w:pBdr>`;
 const SUMMARY_SPACING = '<w:spacing w:before="60" w:after="120" w:line="276" w:lineRule="auto"/>';
 const SUMMARY_IND = '<w:ind w:left="284" w:right="284"/>';
@@ -205,14 +227,16 @@ function confidenceBadge(text) {
 const NON_RISK_H2 = /^(요약|확인 범위와 한계|출처|참고|다음 단계|부록)/;
 
 /**
- * "라벨: 값" / "**라벨**: 값" 공통 분해 — 에이전트가 라벨을 굵게 감싸는 변형까지 흡수한다.
+ * "라벨: 값" / "**라벨**: 값" / "**라벨**"(단독 줄, 콜론 생략) 공통 분해 —
+ * 에이전트가 라벨을 굵게 감싸거나 콜론을 생략하는 변형까지 흡수한다.
  * 라벨이 LABEL_SET 에 없으면 null.
  */
 export function splitLabel(text) {
   const m = /^\*{0,2}([^*:]{2,24})\*{0,2}:\s*(.*)$/.exec(text ?? '');
-  if (!m) return null;
-  const label = m[1].trim();
-  return LABEL_SET.has(label) ? { label, value: m[2].trim() } : null;
+  if (m && LABEL_SET.has(m[1].trim())) return { label: m[1].trim(), value: m[2].trim() };
+  const bare = /^\*{0,2}([^*:]{2,24})\*{0,2}\s*$/.exec(text ?? '');
+  if (bare && LABEL_SET.has(bare[1].trim())) return { label: bare[1].trim(), value: '' };
+  return null;
 }
 
 /**
@@ -241,8 +265,10 @@ export function extractRiskSummary(bodyBlocks) {
     } else if (parsed?.label === '권고 조치') {
       if (parsed.value && !current.action) current.action = parsed.value;
       else collecting = '권고 조치';
-    } else if (block.type === 'bullet' && collecting === '권고 조치' && !current.action) {
-      current.action = block.text.replace(/\*\*/g, '');
+    } else if (collecting === '권고 조치' && !current.action
+      && (block.type === 'bullet' || (block.type === 'para' && /^\d+[.)]\s+/.test(block.text)))) {
+      // "- 항목" 불릿과 "1. 항목" 번호 목록 둘 다 첫 항목을 최우선 조치로 수집
+      current.action = block.text.replace(/^\d+[.)]\s+/, '').replace(/\*\*/g, '');
       collecting = null;
     } else if (parsed) {
       collecting = null;
@@ -324,6 +350,18 @@ export function briefingToDocx(markdown, opts = {}) {
     color: LIGHT_GRAY, size: 16,
   })], { spacing: '<w:spacing w:before="2400" w:after="0"/>' }));
   body.push('<w:p><w:r><w:br w:type="page"/></w:r></w:p>');
+
+  let snapshotPng = null;
+  if (opts.snapshotImagePath) {
+    try {
+      snapshotPng = readFileSync(opts.snapshotImagePath);
+      body.push(paragraph([runXml({ text: 'Executive Snapshot', bold: true, color: NAVY })], { style: 'Heading1' }));
+      body.push(imageParagraph({ rId: 'rIdSnapshot', png: snapshotPng }));
+      body.push('<w:p><w:r><w:br w:type="page"/></w:r></w:p>');
+    } catch {
+      snapshotPng = null;
+    }
+  }
 
   // ── Executive Summary 표 (리스크 섹션이 있을 때만) ──
   const risks = extractRiskSummary(bodyBlocks);
@@ -408,7 +446,7 @@ export function briefingToDocx(markdown, opts = {}) {
 <w:body>${body.join('\n')}${sectPr}</w:body>
 </w:document>`;
 
-  return buildZip(packageEntries({ documentXml, hyperlinks, title, opts }));
+  return buildZip(packageEntries({ documentXml, hyperlinks, title, opts, snapshotPng }));
 }
 
 /** "결론: ..." / "**결론**: ..." 라벨 문단 → 라벨 굵게 + 확신도는 배지 단어만 착색 */
@@ -431,17 +469,26 @@ function labelRuns(text, toRuns) {
 }
 
 function tableXml(block, toRuns) {
-  const cell = (text, isHead) => `<w:tc><w:tcPr><w:tcW w:w="0" w:type="auto"/>${
+  const contentWidth = 9070;
+  const columnCount = Math.max(1, block.header.length);
+  const widths = columnCount === 3
+    ? [2700, 1200, 5170]
+    : Array.from({ length: columnCount }, (_, index) => {
+        const base = Math.floor(contentWidth / columnCount);
+        return index === columnCount - 1 ? contentWidth - base * (columnCount - 1) : base;
+      });
+  const grid = `<w:tblGrid>${widths.map((width) => `<w:gridCol w:w="${width}"/>`).join('')}</w:tblGrid>`;
+  const cell = (text, isHead, index) => `<w:tc><w:tcPr><w:tcW w:w="${widths[index] ?? widths.at(-1)}" w:type="dxa"/>${
     isHead ? `<w:shd w:val="clear" w:color="auto" w:fill="${TABLE_HEAD_FILL}"/>` : ''
   }</w:tcPr>${paragraph(toRuns(text, isHead ? { bold: true, color: NAVY, size: 19 } : { size: 19 }),
     { spacing: '<w:spacing w:before="40" w:after="40"/>' })}</w:tc>`;
-  const row = (cells, isHead) => `<w:tr>${cells.map((c) => cell(c, isHead)).join('')}</w:tr>`;
-  return `<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="0" w:type="auto"/>
+  const row = (cells, isHead) => `<w:tr>${cells.map((c, index) => cell(c, isHead, index)).join('')}</w:tr>`;
+  return `<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="${contentWidth}" w:type="dxa"/><w:tblLayout w:type="fixed"/>
     <w:tblBorders><w:top w:val="single" w:sz="4" w:color="D9D9D9"/><w:left w:val="single" w:sz="4" w:color="D9D9D9"/><w:bottom w:val="single" w:sz="4" w:color="D9D9D9"/><w:right w:val="single" w:sz="4" w:color="D9D9D9"/><w:insideH w:val="single" w:sz="4" w:color="D9D9D9"/><w:insideV w:val="single" w:sz="4" w:color="D9D9D9"/></w:tblBorders>
-  </w:tblPr>${row(block.header, true)}${block.rows.map((r) => row(r, false)).join('')}</w:tbl>`;
+  </w:tblPr>${grid}${row(block.header, true)}${block.rows.map((r) => row(r, false)).join('')}</w:tbl>`;
 }
 
-function packageEntries({ documentXml, hyperlinks, title, opts }) {
+function packageEntries({ documentXml, hyperlinks, title, opts, snapshotPng }) {
   const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
 <w:docDefaults><w:rPrDefault><w:rPr>
@@ -481,16 +528,16 @@ function packageEntries({ documentXml, hyperlinks, title, opts }) {
 <w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
 <w:p><w:pPr><w:pBdr><w:bottom w:val="single" w:sz="4" w:space="4" w:color="D9D9D9"/></w:pBdr>
   <w:tabs><w:tab w:val="right" w:pos="9070"/></w:tabs><w:spacing w:after="0"/></w:pPr>
-<w:r><w:rPr><w:color w:val="${LIGHT_GRAY}"/><w:sz w:val="16"/></w:rPr><w:t xml:space="preserve">${escapeXml(title)}</w:t></w:r>
+<w:r><w:rPr><w:color w:val="${LIGHT_GRAY}"/><w:sz w:val="16"/></w:rPr><w:t xml:space="preserve">CEO Risk Briefing</w:t></w:r>
 <w:r><w:rPr><w:color w:val="${LIGHT_GRAY}"/><w:sz w:val="16"/></w:rPr><w:tab/></w:r>
-<w:r><w:rPr><w:b/><w:color w:val="${ACCENT}"/><w:sz w:val="16"/></w:rPr><w:t>${opts.confidential !== false ? '대외비' : ''}</w:t></w:r>
+<w:r><w:rPr><w:b/><w:color w:val="${ACCENT}"/><w:sz w:val="16"/></w:rPr><w:t>${opts.confidential !== false ? 'Confidential' : ''}</w:t></w:r>
 </w:p></w:hdr>`;
 
   const footerXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
 <w:p><w:pPr><w:pBdr><w:top w:val="single" w:sz="4" w:space="4" w:color="D9D9D9"/></w:pBdr>
   <w:tabs><w:tab w:val="right" w:pos="9070"/></w:tabs><w:spacing w:after="0"/></w:pPr>
-<w:r><w:rPr><w:color w:val="${LIGHT_GRAY}"/><w:sz w:val="16"/></w:rPr><w:t xml:space="preserve">본 문서는 CEO 경영 판단 보조 자료이며 투자자문·투자권유가 아닙니다 · Trusted CEO Agent</w:t></w:r>
+<w:r><w:rPr><w:color w:val="${LIGHT_GRAY}"/><w:sz w:val="16"/></w:rPr><w:t xml:space="preserve">Management risk briefing | Not investment advice</w:t></w:r>
 <w:r><w:rPr><w:color w:val="${LIGHT_GRAY}"/><w:sz w:val="16"/></w:rPr><w:tab/></w:r>
 <w:r><w:fldChar w:fldCharType="begin"/></w:r>
 <w:r><w:rPr><w:color w:val="${LIGHT_GRAY}"/><w:sz w:val="16"/></w:rPr><w:instrText xml:space="preserve"> PAGE </w:instrText></w:r>
@@ -505,6 +552,7 @@ function packageEntries({ documentXml, hyperlinks, title, opts }) {
 <Relationship Id="rIdNumbering" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>
 <Relationship Id="rIdHeader" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>
 <Relationship Id="rIdFooter" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>
+${snapshotPng ? '<Relationship Id="rIdSnapshot" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/executive-summary.png"/>' : ''}
 ${linkRels}
 </Relationships>`;
 
@@ -512,6 +560,7 @@ ${linkRels}
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
 <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
 <Default Extension="xml" ContentType="application/xml"/>
+${snapshotPng ? '<Default Extension="png" ContentType="image/png"/>' : ''}
 <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
 <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
 <Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/>
@@ -554,5 +603,6 @@ ${linkRels}
     { name: 'word/_rels/document.xml.rels', data: documentRels },
     { name: 'docProps/core.xml', data: coreXml },
     { name: 'docProps/app.xml', data: appXml },
+    ...(snapshotPng ? [{ name: 'word/media/executive-summary.png', data: snapshotPng }] : []),
   ];
 }

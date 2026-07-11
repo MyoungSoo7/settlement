@@ -1,0 +1,49 @@
+Reading additional input from stdin...
+OpenAI Codex v0.144.0
+--------
+workdir: C:\Users\iamip\IdeaProjects\kubenetis\settlement\hackathon\kakaopay\submission
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: none
+session id: 019f4886-e81d-7ab2-9afa-e448835794fa
+--------
+user
+invest-companion MCP 도구 dart_status, ecos_status, news_status, price_status 를 각각 호출해 apiKey/source 필드를 JSON 으로 요약해줘. 셸 명령·웹검색·파일 읽기는 절대 쓰지 마.
+codex
+요청하신 대로 셸, 웹검색, 파일 읽기는 쓰지 않고 MCP 도구만 확인하겠습니다. 우선 연결된 invest-companion 도구 스키마를 찾겠습니다.
+codex
+도구가 확인됐습니다. 네 개 상태 점검 도구를 바로 호출해서 `apiKey`와 `source`만 추려 JSON으로 정리하겠습니다.
+mcp: invest-companion-dart/dart_status started
+mcp: invest-companion-dart/dart_status (completed)
+mcp: invest-companion-price/price_status started
+mcp: invest-companion-price/price_status (completed)
+mcp: invest-companion-news/news_status started
+mcp: invest-companion-news/news_status (completed)
+mcp: invest-companion-ecos/ecos_status started
+mcp: invest-companion-ecos/ecos_status (completed)
+codex
+```json
+{
+  "dart_status": {
+    "apiKey": "present",
+    "source": null
+  },
+  "ecos_status": {
+    "apiKey": "present",
+    "source": null
+  },
+  "news_status": {
+    "apiKey": "present",
+    "source": null
+  },
+  "price_status": {
+    "apiKey": "not-required",
+    "source": "Yahoo Finance chart API — 데모용 공개 어댑터, 지연 시세 가능"
+  }
+}
+```
+tokens used
+21,562

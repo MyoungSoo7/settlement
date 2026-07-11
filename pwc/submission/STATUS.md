@@ -21,6 +21,10 @@
 | CEO 브리핑 포맷 | 구현됨 | `src/skills/ceo-briefing/SKILL.md` |
 | 브리핑 자동 채점 | 구현됨 | `src/test/briefing-eval.mjs` |
 | 통합 파이프라인 CLI (게이트→진단→브리핑→채점 완주) | 구현됨 + 단위 테스트 5건 | `src/bin/ceo-consulting-pipeline.mjs`, `src/test/unit/ceo-consulting-pipeline.test.mjs` |
+| 엔게이지먼트 사이클 (브리핑 이후 반복 컨설팅 — 이행 추적→재진단 델타→회고 환류) | 구현됨 + 단위 테스트 5건 | `src/bin/engagement-cycle.mjs`, `src/skills/ceo-engagement-cycle/` + engagement-followup/review/retro 서브 스킬 |
+| E8 발생액 품질 신호 (이익-현금 괴리, Sloan 발생액 기반) | 구현됨 + 단위 2건 + 라이브 캘리브레이션(발화율 6.7%) | `src/common/dart-signals.mjs`, `src/test/unit/dart-signals.test.mjs` |
+| doctor 환경 진단 (설치 확인 원커맨드 — Node·키·셀프테스트·MCP 배선, 네트워크 0) | 구현됨 + 단위 2건 | `src/bin/doctor.mjs`, `src/test/unit/doctor.test.mjs` |
+| 실사례 백테스트 (태영건설 워크아웃 2023-12 를 FY2022 공시만으로 사전 포착) | 라이브 검증 완료 (재현 명령 동봉) | `outputs/taeyoung-backtest-2022/` |
 | 최종 Word 보고서 흐름 | 문서화됨 | `README.md`, `CODEX.md`, `AGENTS.md` |
 
 ## Recommended Runtime Flow

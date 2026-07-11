@@ -17,6 +17,7 @@ import { spawnSync } from 'node:child_process';
 import { companyIdentityGate } from '../registry/client.mjs';
 import { safeErrorMessage } from '../common/env.mjs';
 import { briefingToDocx } from '../common/docx.mjs';
+import { renderLocalBriefing } from '../common/local-briefing.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '..', '..');
@@ -40,15 +41,15 @@ Usage:
     [--data-dir <표준 CSV 폴더>] [--out-dir <산출물 폴더>] \\
     [--agent none|"<cmd>"] [--judge] \\
     [--corp-code <8자리>] [--year <YYYY>] [--dart-unit-scale <N>] \\
-    [--preset <name>] [--docs-dir <문서폴더>]
+    [--preset <name>] [--docs-dir <문서폴더>] [--with-news] [--with-market]
 
 Pipeline:
-  identity gate -> diagnose-company -> agent briefing -> briefing-eval
+  identity gate -> diagnose-company -> briefing -> briefing-eval
   (spreadsheets / compliance / documents 단계는 pipeline-next-steps.md 로 안내)
 
 Outputs:
   identity.json / diagnostic-packet.json / pipeline-next-steps.md
-  briefing.md + briefing.docx (에이전트 감지 시) / prompt.txt
+  briefing.md + briefing.docx + executive-summary.png / prompt.txt
 `;
 }
 
@@ -220,6 +221,7 @@ for (const name of ['--year', '--dart-unit-scale', '--preset', '--docs-dir', '--
   if (flag(name) !== undefined) diagnoseArgs.push(name, flag(name));
 }
 if (has('--with-news')) diagnoseArgs.push('--with-news');
+if (has('--with-market')) diagnoseArgs.push('--with-market');
 if (dataDir) diagnoseArgs.push('--data-dir', dataDir);
 
 let packetText;
@@ -232,6 +234,12 @@ try {
 const packetPath = join(outDir, 'diagnostic-packet.json');
 writeFileSync(packetPath, packetText, 'utf8');
 console.log(`  진단 패킷 저장: ${packetPath}`);
+let packet;
+try {
+  packet = JSON.parse(packetText);
+} catch (error) {
+  fail(`diagnostic-packet.json 파싱 실패: ${safeErrorMessage(error)}`);
+}
 
 // ── 3. 에이전트 브리핑 생성 ──────────────────────────────────
 const prompt = `너는 trusted-ceo-agent 플러그인의 ceo-risk-recon 오케스트레이터다.
@@ -266,30 +274,30 @@ if (agentFlag && agentFlag !== 'none') {
 }
 
 const nextStepsPath = join(outDir, 'pipeline-next-steps.md');
+const briefingPath = join(outDir, 'briefing.md');
+let briefingText = '';
 
 if (!agentCmd) {
-  writeFileSync(nextStepsPath, renderNextSteps({
-    companyName, businessNumber, dataDir, outDir, identityPath, packetPath, briefingDone: false,
-  }), 'utf8');
-  console.log('에이전트 CLI 미감지(claude/codex) 또는 --agent none — 수동 절차로 전환합니다.');
-  console.log(`  1) 프롬프트 파일을 에이전트에 전달: ${promptPath}`);
-  console.log(`  2) 이후 단계 안내: ${nextStepsPath}`);
-  process.exit(0);
+  console.log('에이전트 CLI 미감지(claude/codex) 또는 --agent none — 로컬 브리핑 생성기로 계속 진행합니다.');
+  briefingText = renderLocalBriefing(packet, {
+    companyName,
+    date: new Date().toISOString().slice(0, 10),
+  });
+} else {
+  console.log(`에이전트: ${agentCmd.join(' ')} (프롬프트는 stdin 으로 전달)`);
+  const agent = spawnSync(agentCmd[0], agentCmd.slice(1), {
+    input: prompt, encoding: 'utf8', shell: process.platform === 'win32',
+    maxBuffer: 10 * 1024 * 1024, timeout: 600_000,
+  });
+  if (agent.status !== 0 || !agent.stdout?.trim()) {
+    console.error(`에이전트 실행 실패 (exit ${agent.status}): ${(agent.stderr ?? '').slice(0, 400)}`);
+    console.error(`수동 절차: 프롬프트 파일 ${promptPath} 를 에이전트에 직접 전달하세요.`);
+    process.exit(1);
+  }
+  briefingText = agent.stdout;
 }
-
-console.log(`에이전트: ${agentCmd.join(' ')} (프롬프트는 stdin 으로 전달)`);
-const agent = spawnSync(agentCmd[0], agentCmd.slice(1), {
-  input: prompt, encoding: 'utf8', shell: process.platform === 'win32',
-  maxBuffer: 10 * 1024 * 1024, timeout: 600_000,
-});
-if (agent.status !== 0 || !agent.stdout?.trim()) {
-  console.error(`에이전트 실행 실패 (exit ${agent.status}): ${(agent.stderr ?? '').slice(0, 400)}`);
-  console.error(`수동 절차: 프롬프트 파일 ${promptPath} 를 에이전트에 직접 전달하세요.`);
-  process.exit(1);
-}
-const briefingPath = join(outDir, 'briefing.md');
-writeFileSync(briefingPath, agent.stdout, 'utf8');
-console.log(`브리핑 저장: ${briefingPath} (${agent.stdout.length}자)`);
+writeFileSync(briefingPath, briefingText, 'utf8');
+console.log(`브리핑 저장: ${briefingPath} (${briefingText.length}자)`);
 
 // ── 4. 자동 채점 ─────────────────────────────────────────────
 step(4, `자동 채점 (briefing-eval${withJudge ? ' + LLM Judge' : ''})`);
@@ -301,9 +309,22 @@ process.stdout.write(evaluation.stdout);
 if (evaluation.stderr) process.stderr.write(evaluation.stderr);
 
 // ── 5. Word 보고서 렌더 (내장 zero-dependency — 인코딩·서식 코드 보장) ──
-step(5, 'Word 보고서 렌더 (briefing.docx)');
+step(5, '스냅샷 PNG + Word 보고서 렌더');
 const docxPath = join(outDir, 'briefing.docx');
-writeFileSync(docxPath, briefingToDocx(agent.stdout, { date: new Date().toISOString().slice(0, 10) }));
+const snapshotPath = join(outDir, 'executive-summary.png');
+const snapshot = spawnSync('python', [join(HERE, 'render-executive-snapshot.py'), packetPath, '--out', snapshotPath], {
+  encoding: 'utf8',
+  maxBuffer: 1024 * 1024,
+});
+if (snapshot.status === 0) {
+  console.log(`  스냅샷 PNG 생성: ${snapshotPath}`);
+} else {
+  console.error(`  스냅샷 PNG 생성 실패 — DOCX는 이미지 없이 생성합니다.\n${snapshot.stderr || snapshot.stdout}`);
+}
+writeFileSync(docxPath, briefingToDocx(briefingText, {
+  date: new Date().toISOString().slice(0, 10),
+  snapshotImagePath: snapshot.status === 0 ? snapshotPath : undefined,
+}));
 console.log(`  DOCX 생성: ${docxPath}`);
 
 writeFileSync(nextStepsPath, renderNextSteps({
@@ -315,5 +336,6 @@ identity: ${identityPath}
 diagnosticPacket: ${packetPath}
 briefing: ${briefingPath}
 briefingDocx: ${docxPath}
+executiveSnapshot: ${snapshot.status === 0 ? snapshotPath : '(not generated)'}
 nextSteps: ${nextStepsPath}`);
 process.exit(evaluation.status ?? 1);

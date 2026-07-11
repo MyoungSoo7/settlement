@@ -98,7 +98,7 @@ const CONFIDENCE_TAG = /확신도|가설|가능성|확인\s*필요|확인됨|추
 const CONFIRMED_TAG = /확인됨/;
 const DISCRIMINATION = /판별\s*테스트|확인\s*(필요|절차|해야)|대조|재산정|재계산\s*검증|추가\s*데이터/;
 // 음성 브리핑에서 "이상 없음"을 인정한다는 신호.
-const CLEAN_ACK = /이상\s*없|이상\s*신호[가는]?\s*(확인되지|없|나타나지)|특이사항\s*없|유의미한\s*이상[^가-힣]*(없|아님)|리스크[가는은]?[^.\n]{0,30}(포착|확인|감지)되지\s*않|리스크\s*(항목|신호)[이가은는]?\s*없|발화(\(PRESENT\))?한?\s*(항목|신호)[은이가]?\s*없/;
+const CLEAN_ACK = /이상\s*없|이상\s*신호[가는]?\s*(확인되지|없|나타나지)|특이사항\s*없|유의미한\s*이상[^가-힣]*(없|아님)|리스크[가는은]?[^.\n]{0,30}(포착|확인|감지)되지\s*않|리스크\s*(항목|신호)[이가은는]?\s*없|발화(\(PRESENT\))?[된한]?[^.\n]{0,20}(항목|신호|안건|리스크)[은는이가]?\s*(0\s*건|없)/;
 // "미발화·임계값 미달" 로 명시 서술된 절은 리스크 주장이 아니다 — 미발화 신호의
 // 정성 요약(투명성)까지 오탐으로 잡으면 좋은 브리핑을 벌점 주게 된다.
 const ABSENT_ACK = /미발화|발화하지\s*않|임계값\s*미달|기준(치|값)?\s*미달|PRESENT\s*(아님|가?\s*아니)/;
@@ -146,10 +146,15 @@ export function evaluateBriefing(text, opts = {}) {
 
   // (1) 재현율 + 근접성: 한 섹션 안에서 마커가 MIN_MARKERS 이상 함께 나와야 포착으로 인정.
   const signals = allSignals.map((signal) => {
-    let best = { hitCount: 0, section: null };
+    // 마커 최다 섹션을 신호의 서술 위치로 본다. 동률이면 확신도 태그가 있는 절을
+    // 우선한다 — 요약이 리스크 절과 같은 수치를 인용해도 본문 절이 채점 대상이 되도록.
+    let best = { hitCount: 0, section: null, tagged: false };
     for (const sec of sections) {
       const hits = signal.markers.filter((m) => m.test(sec.text)).length;
-      if (hits > best.hitCount) best = { hitCount: hits, section: sec };
+      const tagged = CONFIDENCE_TAG.test(sec.text);
+      if (hits > best.hitCount || (hits > 0 && hits === best.hitCount && tagged && !best.tagged)) {
+        best = { hitCount: hits, section: sec, tagged };
+      }
     }
     const detected = best.hitCount >= MIN_MARKERS_PER_SIGNAL;
     const secText = best.section ? best.section.text : '';

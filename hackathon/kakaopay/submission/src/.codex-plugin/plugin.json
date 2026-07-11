@@ -1,6 +1,6 @@
 {
   "name": "kakaopay-invest-companion",
-  "version": "0.8.4",
+  "version": "0.10.0",
   "description": "초보 투자자의 매수·매도 불안을 '감정 인정 → 데이터 사실확인 → 규칙 상기 → 다음 단계 1개' 설득 구조로 안심시키는 Codex 플러그인 — 종목 탐색 동행, 매수/매도 동행 체크, 매매 복기 패턴 탐지, DART·ECOS·뉴스 실데이터 조회 포함 (AX 인재전쟁 — 카카오페이증권 과제)",
   "author": { "name": "AX 인재전쟁 참가자" },
   "license": "Apache-2.0",

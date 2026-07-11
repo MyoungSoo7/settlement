@@ -1,0 +1,164 @@
+{
+  "corp": {
+    "corpCode": "00413046",
+    "name": "(주)셀트리온",
+    "stockCode": "068270",
+    "ceo": "기우성, 서진석",
+    "bizrNo": "1338123603",
+    "searchNote": "동명 후보 3건 중 첫 번째 선택 — 셀트리온(00413046), 셀트리온제약(00541349), 셀트리온헬스케어(00554024)"
+  },
+  "year": 2025,
+  "fsDiv": "CFS",
+  "disclosureWindowDays": 90,
+  "macro": {
+    "indicator": "한국은행 기준금리",
+    "latest": {
+      "time": "20260709",
+      "value": 2.5
+    },
+    "changeFromFirst": 0,
+    "unit": "%"
+  },
+  "presetUsed": null,
+  "externalThresholds": {
+    "arGrowthGapPp": 15,
+    "ocfToOiFloor": 0.8,
+    "inventoryGapPp": 15,
+    "borrowingsGrowthPct": 30,
+    "interestCoverageFloor": 10,
+    "currentRatioFloorPct": 100,
+    "currentRatioWatchPct": 130,
+    "correctionsMin": 3,
+    "clarificationsMin": 1,
+    "accrualRatioCeilingPct": 10,
+    "ocfToNiFloor": 0.5
+  },
+  "externalPresent": 2,
+  "newsSignals": null,
+  "market": null,
+  "docs": null,
+  "signals": [
+    {
+      "id": "E1",
+      "name": "수익-채권 괴리 (이익의 현금화 저조)",
+      "present": true,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "revenueGrowthPct": 17,
+        "receivablesGrowthPct": 47.3,
+        "gapPp": 30.3,
+        "receivablesTrillion": "1.2→1.8조",
+        "ocfToOperatingIncome": 0.55
+      },
+      "markers": [
+        "(?<!\\d)17([.,]0)?(?![\\d.,])",
+        "(?<!\\d)47[.,]3(?!\\d)",
+        "매출채권",
+        "현금흐름|현금화"
+      ],
+      "categoryPattern": "수익\\s*(조기)?\\s*인식|조기\\s*인식|채권.*(급증|괴리)|현금화\\s*저조",
+      "checkHints": [
+        "분기보고서로 채권 증가 시점 좁히기",
+        "대손충당금 설정률 추이",
+        "주석의 매출채권 연령 분석"
+      ]
+    },
+    {
+      "id": "E2",
+      "name": "재고 자산 적체",
+      "present": false,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "revenueGrowthPct": 17,
+        "inventoryGrowthPct": 1.4,
+        "gapPp": -15.7,
+        "inventoriesTrillion": "2.8→2.8조"
+      },
+      "markers": [],
+      "categoryPattern": "재고\\s*(자산)?\\s*(적체|급증|과잉)|재고자산.*(증가|부담)",
+      "checkHints": [
+        "재고자산 평가손실(주석) 확인",
+        "제품/재공품/원재료 구성 변화",
+        "재고자산회전율 추이"
+      ]
+    },
+    {
+      "id": "E3",
+      "name": "차입 확대·이자 부담",
+      "present": false,
+      "evaluable": false,
+      "note": "공시에서 차입금 계정을 찾지 못함",
+      "evidence": {},
+      "markers": [],
+      "categoryPattern": "차입\\s*(확대|급증|의존)|이자\\s*부담|이자보상",
+      "checkHints": []
+    },
+    {
+      "id": "E4",
+      "name": "유동성 하락 (유동비율)",
+      "present": false,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "currentRatioPct": "202.8→175.2→139.3",
+        "fallingTwoYears": true
+      },
+      "markers": [],
+      "categoryPattern": "유동성\\s*(하락|압박|악화)|유동비율.*(하락|저하)",
+      "checkHints": [
+        "단기차입 상환 스케줄",
+        "미사용 여신한도(주석)",
+        "현금성자산 대비 단기부채"
+      ]
+    },
+    {
+      "id": "E5",
+      "name": "공시 행간 (정정·해명 패턴)",
+      "present": true,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "windowDays": 90,
+        "totalDisclosures": 100,
+        "corrections": 5,
+        "clarifications": [],
+        "auditFlags": []
+      },
+      "markers": [
+        "정정",
+        "풍문|해명"
+      ],
+      "categoryPattern": "정정\\s*공시|풍문|해명\\s*공시|공시\\s*(품질|프로세스|커뮤니케이션)",
+      "checkHints": [
+        "정정 사유 분류(단순 오기/수치 변경)",
+        "해명 공시의 대상 보도와 후속 확정 공시",
+        "공시 검수 체인 점검"
+      ]
+    },
+    {
+      "id": "E8",
+      "name": "발생액 품질 (이익-현금 괴리)",
+      "present": false,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "netIncomeTrillion": "0.4→1조",
+        "ocfTrillion": "0.9→0.6조",
+        "accrualRatioPct": 1.7,
+        "accrualRatioPrevPct": -2.3,
+        "ocfToNetIncome": 0.63,
+        "persistentGapTwoYears": false
+      },
+      "markers": [],
+      "categoryPattern": "발생액|이익\\s*(의)?\\s*품질|이익.*현금.*(괴리|뒷받침)|현금\\s*뒷받침\\s*없는\\s*이익",
+      "checkHints": [
+        "발생액 구성 분해 — 운전자본성(매출채권·재고·매입채무) vs 비운전자본성(충당금·감가상각 정책 변경)",
+        "수익 인식 정책 변경·추정 변경 주석 확인 (회계 정책 변경이 발생액 급증과 겹치는지)",
+        "차기 분기 OCF 실측으로 반증 — 발생액이 정상 회수되면 일시 괴리, 누적되면 이익 품질 리스크"
+      ]
+    }
+  ],
+  "internal": null
+}

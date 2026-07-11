@@ -1,0 +1,556 @@
+Reading additional input from stdin...
+2026-07-09T23:28:04.077805Z ERROR codex_core::session::session: failed to load skill C:\Users\iamip\.codex\plugins\cache\musinsa-fashion-first-market\musinsa-fashion-first\0.1.0\skills\style-match\SKILL.md: invalid YAML: did not find expected key at line 2 column 30, while parsing a block mapping
+OpenAI Codex v0.144.0
+--------
+workdir: C:\Users\iamip\IdeaProjects\kubenetis\settlement\hackathon\musinsa\submission
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR]
+reasoning effort: medium
+reasoning summaries: none
+session id: 019f4935-b26e-7620-9b24-1599a95aa791
+--------
+user
+src/data/sample 의 옷장(closet.csv)과 구매 내역(purchases.csv)을 복기해서, 반복되는 구매 패턴을 근거 수치와 함께 찾아내고 다음 구매 규칙을 제안해줘. 옷은 많은데 입을 게 없는 이유가 궁금해. (정답지 파일 README-data.md 는 열지 말고 CSV 만 분석해줘)
+codex
+`closet-retrospective`와 `honest-stylist` 스킬을 적용해서 CSV만 근거로 분석하겠습니다. 먼저 스킬 지침과 데이터 파일 구조를 확인하되, 요청대로 `README-data.md`는 열지 않겠습니다.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw C:\\Users\\iamip\\.codex\\plugins\\cache\\superpowers-marketplace\\superpowers\\6.1.1\\skills\\using-superpowers\\SKILL.md" in C:\Users\iamip\IdeaProjects\kubenetis\settlement\hackathon\musinsa\submission
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw C:\\Users\\iamip\\.codex\\plugins\\cache\\musinsa-fashion-first-market\\musinsa-fashion-first\\0.1.0\\skills\\closet-retrospective\\SKILL.md" in C:\Users\iamip\IdeaProjects\kubenetis\settlement\hackathon\musinsa\submission
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw C:\\Users\\iamip\\.codex\\plugins\\cache\\musinsa-fashion-first-market\\musinsa-fashion-first\\0.1.0\\skills\\honest-stylist\\SKILL.md" in C:\Users\iamip\IdeaProjects\kubenetis\settlement\hackathon\musinsa\submission
+ succeeded in 3978ms:
+---
+name: using-superpowers
+description: Use when starting any conversation - establishes how to find and use skills, requiring skill invocation before ANY response including clarifying questions
+---
+
+<SUBAGENT-STOP>
+If you were dispatched as a subagent to execute a specific task, ignore this skill.
+</SUBAGENT-STOP>
+
+<EXTREMELY-IMPORTANT>
+If you think there is even a 1% chance a skill might apply to what you are doing, you ABSOLUTELY MUST invoke the skill.
+
+IF A SKILL APPLIES TO YOUR TASK, YOU DO NOT HAVE A CHOICE. YOU MUST USE IT.
+
+This is not negotiable. You cannot rationalize your way out of this.
+</EXTREMELY-IMPORTANT>
+
+## The Rule
+
+**Invoke relevant or requested skills BEFORE any response or action** ??including clarifying questions, exploring the codebase, or checking files. If it turns out wrong for the situation, you don't have to use it.
+
+**Before entering plan mode:** if you haven't already brainstormed, invoke the brainstorming skill first.
+
+Then announce "Using [skill] to [purpose]" and follow the skill exactly. If it has a checklist, create a todo per item.
+
+## Skill Priority
+
+When multiple skills apply, process skills come first ??they set the approach, then implementation skills (frontend-design, etc.) carry it out. Brainstorming and systematic-debugging are Superpowers' most common process skills, but the rule holds for any of them.
+
+- "Let's build X" ??superpowers:brainstorming first, then implementation skills.
+- "Fix this bug" ??superpowers:systematic-debugging first, then domain skills.
+
+## Red Flags
+
+These thoughts mean STOP?봸ou're rationalizing:
+
+| Thought | Reality |
+|---------|---------|
+| "This is just a simple question" | Questions are tasks. Check for skills. |
+| "I need more context first" | Skill check comes BEFORE clarifying questions. |
+| "Let me explore the codebase first" | Skills tell you HOW to explore. Check first. |
+| "I can check git/files quickly" | Files lack conversation context. Check for skills. |
+| "Let me gather information first" | Skills tell you HOW to gather information. |
+| "This doesn't need a formal skill" | If a skill exists, use it. |
+| "I remember this skill" | Skills evolve. Read current version. |
+| "This doesn't count as a task" | Action = task. Check for skills. |
+| "The skill is overkill" | Simple things become complex. Use it. |
+| "I'll just do this one thing first" | Check BEFORE doing anything. |
+| "This feels productive" | Undisciplined action wastes time. Skills prevent this. |
+| "I know what that means" | Knowing the concept ??using the skill. Invoke it. |
+
+## Platform Adaptation
+
+If your harness appears here, read its reference file for special instructions:
+
+- Codex: `references/codex-tools.md`
+- Pi: `references/pi-tools.md`
+- Antigravity: `references/antigravity-tools.md`
+
+## User Instructions
+
+User instructions (CLAUDE.md, AGENTS.md, GEMINI.md, etc, direct requests) take precedence over skills, which in turn override default behavior. Only skip skill workflows or instructions when your human partner has explicitly told you to.
+
+
+ succeeded in 4011ms:
+---
+name: closet-retrospective
+description: ?룹옣쨌援щℓ ?댁뿭??二쇰ŉ 蹂듦린/?먭????붿껌????諛쒕룞 ("???뚮퉬 醫 遊먯쨾", "???룹? 留롮????낆쓣 寃??놁??", "??洹몃쭔 ?ъ빞 ?섎굹", ?룹옣/援щℓ CSV쨌???쒓났). ?⑥씪 ?꾩씠?쒖쓽 援щℓ ?먮떒? style-match/price-navigator ?대떦.
+---
+
+# ?룹옣 蹂듦린 (Closet Retrospective)
+
+紐⑺몴: "?룹? 留롮????낆쓣 寃??녿떎"???룹쓽 臾몄젣媛 ?꾨땲??**諛섎났?섎뒗 援щℓ ?⑦꽩**??臾몄젣??
+?룹옣쨌援щℓ ?댁뿭?먯꽌 ?됰룞 ?⑦꽩???먯??섍퀬, ?ㅼ쓬 援щℓ???곸슜??**洹쒖튃 1~2媛?*濡?諛붽퓭以??
+鍮꾨궃???꾨땲??蹂듦린????"??퉬?덈떎"媛 ?꾨땲??"???⑦꽩??諛섎났?섎㈃ ?룹옣???대젃寃??쒕떎"濡?留먰븳??
+
+## Step 1: ?곗씠???뺣━
+
+- ?룹옣(蹂댁쑀)怨?援щℓ ?댁뿭(諛섑뭹 ?ы븿)???쒓컙?쑣룹뭅?뚭퀬由ъ닚?쇰줈 ?ш뎄?깊븳??
+- ?듭떖 吏??怨꾩궛: **李⑹슜??鍮꾩슜**(price_paid 첨 worn_count ??李⑹슜 0?뚮뒗 "臾댄븳?"濡?紐낆떆),
+  移댄뀒怨좊━횞?됱긽 遺꾪룷, ?좎씤?⑤퀎 李⑹슜瑜? 釉뚮옖?쒕퀎 諛섑뭹瑜?
+- ???뚯씪???덉쑝硫?援먯감 寃利앺븳??(?룹옣 ?꾩씠????援щℓ 湲곕줉 ??? 諛섑뭹 嫄??룹옣 遺???뺤씤).
+- ?곕え: `src/data/sample/closet.csv` + `purchases.csv` (?뺣떟吏: `README-data.md`).
+
+## Step 2: ?⑦꽩 ?먯? (媛??⑦꽩留덈떎 ?먮퀎 ?뚯뒪??紐낆떆)
+
+| ?⑦꽩 | ?먮퀎 ?뚯뒪??| ??臾몄젣?멸? |
+|---|---|---|
+| **?몄씪 異⑸룞援щℓ** | 怨좏븷??55%+) 援щℓ援곗쓽 李⑹슜瑜????뺢? 援щℓ援?| ?좎씤?⑥씠 ?몃━嫄곌? ?섎㈃ "?꾩슂"媛 ?꾨땲??"?대뱷媛???????李⑹슜??鍮꾩슜???뺢?蹂대떎 鍮꾩떥吏?|
+| **媛숈? ?????ш린** | ?숈씪 ?됁쀬뭅?뚭퀬由?3踰??댁긽 + ?좉퇋 援щℓ???숈씪 怨꾩뿴 | ?룹옣??鍮?怨녹씠 ?꾨땲???ы솕??怨녹뿉 諛섎났 ?ъ옄 ??"?낆쓣 寃??녿떎"???곗닠???먯씤 |
+| **?ъ씠利??ㅽ뙣 猷⑦봽** | 媛숈? 釉뚮옖??媛숈? ?ъ씠利?諛섎났 諛섑뭹/諛⑹튂 | 諛섑뭹 鍮꾩슜 + 諛⑹튂 鍮꾩슜, 洹쒖튃 ?섎굹濡??딆쓣 ???덈뒗 ?먯떎 |
+| **?좊뱺 ??諛⑹튂** | 蹂댁쑀 6媛쒖썡+ 李⑹슜 0~2???꾩씠??鍮꾩쨷 | ?룹옣 怨듦컙쨌?먮낯 ?좎떇 ??泥섎텇/議고빀 ?щ컻援????|
+| **寃利??ш뎄留?(?뺤긽)** | ?ш뎄留ㅼ씤??李⑹슜瑜??믪쓬 | 臾몄젣 ?꾨떂 ??"媛숈? ?????ш린"? 李⑹슜瑜좊줈 援щ텇??紐낆떆 |
+
+媛??⑦꽩? **?꾩씠??利앷굅**(?덈챸쨌?좎쭨쨌?섏튂)? **湲덉븸 ?곹뼢**(李⑹슜??鍮꾩슜, ?좉릿 湲덉븸, 諛섑뭹 ?잛닔)???④퍡 ?쒖떆?쒕떎. ?대떦 ?녿뒗 ?⑦꽩? "?먭??덉쑝??諛쒓껄?섏? ?딆쓬"?쇰줈 紐낆떆?쒕떎 ??臾몄젣?놁쓬???뺤씤??寃껊룄 ?곗텧臾쇱씠??
+
+## Step 3: 蹂듦린 由ы룷??(異쒕젰)
+
+honest-stylist 4??援ъ“瑜??⑦꽩蹂꾨줈 ?곸슜:
+
+1. **?⑦꽩 ?붿빟** (湲덉븸 ?곹뼢 ??: ?⑦꽩紐?+ ??以?寃곕줎 + ?좉릿 湲덉븸.
+2. **利앷굅**: ?대떦 ?꾩씠???섏뿴 (?좎쭨쨌?덈챸쨌?좎씤?㉱룹갑???잛닔) ???レ옄???ш퀎??媛?ν븯寃?
+3. **諛섎났 ??寃곌낵**: "???⑦꽩??怨꾩냽?섎㈃"???곗닠 (?? ?몄씪 ?쒖쫵留덈떎 16留뚯썝???좉?).
+4. **洹쒖튃 ?쒖븞 (1~2媛쒕쭔)**: ?ㅼ쓬 援щℓ??諛붾줈 ?곸슜 媛?ν븳 ?뺥깭 ??   "?몄씪 ?꾩씠?쒖? ?λ컮援щ땲 24?쒓컙 + 3-肄붾뵒 ?듦낵 ?쒕쭔 寃곗젣",
+   "媛숈? ?됀룹뭅?뚭퀬由?3踰??댁긽?대㈃ ?ㅻⅨ ?ㅻ（???곗꽑",
+   "?뚯씪?щ룆? XL ?먮뒗 ?ㅼ륫 ?뺤씤 ??. 洹쒖튃??留롮쑝硫??꾨Т寃껊룄 ??吏耳쒖쭊??
+
+?섑븳 援щℓ(?믪? 李⑹슜瑜좎쓽 二쇰젰 ?꾩씠??瑜?諛섎뱶???④퍡 吏싲뒗????蹂듦린??紐⑹쟻?
+二꾩콉媛먯씠 ?꾨땲??"**?섏쓽 ???щ뒗 怨듭떇**"??諛쒓껄?섎뒗 寃껋씠??
+
+## 湲덉? ?ы빆
+
+- 怨쇨굅 ?뚮퉬瑜?議곕”?섍굅???⑥젙 ?됯??섏? ?딅뒗??("??퉬踰? 湲덉? ??"???⑦꽩? 李⑹슜瑜좎쓣 ??땅?덈떎").
+- 蹂듦린瑜?洹쇨굅濡??뱀젙 ?곹뭹 援щℓ瑜?沅뚯쑀?섏? ?딅뒗??(鍮?怨좊━ ?쒖븞? 移댄뀒怨좊━ ?섏?源뚯?留?.
+- 泥섎텇 沅뚯쑀 ???좎쨷?섍쾶 ???뺤꽌??媛移섍? ?덈뒗 ?룹? ?곗씠??諛뽰쓽 蹂?섏엫???몄젙?쒕떎.
+
+
+ succeeded in 4053ms:
+---
+name: honest-stylist
+description: ???뚮윭洹몄씤??紐⑤뱺 ?먯젙쨌?쒖븞???꾨떖??????긽 ?④퍡 ?곸슜?섎뒗 ?좊ː 援ъ“. ?ㅻⅨ ?ㅽ궗(brand-scout, trend-check, price-navigator, style-match, size-safety, closet-retrospective)??異쒕젰??留뚮뱾 ?????ㅽ궗??4??援ъ“? 湲덉? 紐⑸줉??媛뺤젣?쒕떎.
+---
+
+# ?뺤쭅???ㅽ??쇰━?ㅽ듃 (Honest Stylist)
+
+紐⑺몴: ?⑥뀡 議곗뼵??湲곕낯媛믪? 怨쇱옣?대떎 ??"臾댁“嫄??덈퍙??, "???湲??밴?", "吏湲????щ㈃ ?덉젅".
+???뚮윭洹몄씤? 諛섎?濡?媛꾨떎: **?먮ℓ?먯쓽 ?몄뼱媛 ?꾨땲??援щℓ?먯쓽 ?몄뼱**濡?
+?뺤떊??洹쇨굅? ?④퍡 **?뺤떊?섏? 紐삵븯??寃?*源뚯? 留먰븳?? ?좊ː??洹몃젃寃뚮쭔 ?볦씤??
+
+## 4??援ъ“ (紐⑤뱺 ?먯젙 異쒕젰??媛뺤젣)
+
+```
+1. 寃곕줎      : ??以? ?됰룞 媛?ν븳 ?뺥깭 ("?섏쐞 12% 媛寃?????寃?留욎쓬", "3-肄붾뵒 誘명넻怨???蹂대쪟 沅뚭퀬")
+2. 洹쇨굅      : ?섏튂쨌異쒖쿂쨌議고쉶 ?쒖젏 ???ъ슜?먭? ?ш?利?媛?ν븯寃?(?꾧뎄 ?대쫫쨌?쒕낯 ???ы븿)
+3. 諛섎? 洹쇨굅쨌?쒓퀎 : ???먯젙???由????덈뒗 ?댁쑀 理쒖냼 1媛????녿떎怨??섏? 留먭퀬 李얠븘???대떎
+4. ?ㅼ쓬 ?④퀎 1媛? : ???섎굹留????좏깮吏 ?섏뿴? 寃곗젙 留덈퉬瑜?留뚮뱺??```
+
+## ?곗씠???뺤쭅??洹쒖튃
+
+- **?놁쑝硫??녿떎怨?留먰븳??*: ?댁뒪 0嫄? ?쒕낯 遺議? coverageComplete=false ???꾨? 洹몃?濡??꾨떖.
+  ?곗씠??怨듬갚??異붿젙?쇰줈 硫붿슦吏 ?딅뒗??
+- **?꾨줉?쒕뒗 ?꾨줉?쒕씪怨?留먰븳??*: ?멸툒?됱? ?섏슂??媛꾩젒 吏?? ?좏넻 ?쒕낯? 怨듭떇 ?쇱씤?낆씠 ?꾨떂.
+- **?쒖젏??諛뺣뒗??*: 媛寃㈑룹옱怨졖룻듃?뚮뱶 ?먯젙?먮뒗 議고쉶 ?쒓컖 湲곗??꾩쓣 紐낆떆?쒕떎.
+- **?ㅽ깘 ?먭?**: 釉뚮옖?쒕챸 ?숇챸?댁씤(?≫솕 ?쇱엯, ?ㅻⅨ ?뚯궗) 媛?μ꽦???뺤씤?섍퀬 ?몄슜?쒕떎.
+
+## ?붾쾿 湲덉? 紐⑸줉
+
+| 湲덉? | ???|
+|---|---|
+| "臾댁“嫄?, "???湲?, "?덉젅 ?꾨컯" (援щℓ ?뺣컯) | 遺꾪룷쨌?쒓퀎???섏튂 |
+| "OO 泥댄삎? 紐??낆뼱?? (諛붾뵒?곗씠諛? | "諛뺤떆 ?륁쓣 ?좏샇?섏떆硫??? (?좏샇???몄뼱) |
+| "洹??섏씠?먮뒗 ?? (?곕졊 洹쒕쾾) | TPO 湲곗? ("異쒓렐?⑹씠?쇰㈃ ??) |
+| "??釉뚮옖??蹂꾨줈?덉슂" (洹쇨굅 ?녿뒗 鍮꾨갑) | 蹂대룄쨌?섏튂 ?몄슜 + ?먮Ц 留곹겕 |
+| "?쒓? 怨⑤씪?쒕┛ 寃??뺣떟" | "?먮떒 洹쇨굅???닿쾬?닿퀬, 理쒖쥌 ?좏깮? 痍⑦뼢" |
+
+## ?댄빐愿怨?怨좎?
+
+- ???뚮윭洹몄씤? ?뱀젙 釉뚮옖?쑣룻뙋留ㅼ쿂濡쒕????媛瑜?諛쏆? ?딆쑝硫? 異붿쿇泥섎읆 蹂댁씠??紐⑤뱺 異쒕젰?
+  怨듦컻 ?곗씠??湲곕컲 ?뺣낫 ?쒓났?대떎. 媛寃㈑룹옱怨좊뒗 蹂?숇맆 ???덇퀬, 援щℓ 寃곗젙怨?寃곌낵??  ?ъ슜?먯뿉寃??덈떎 ???먯젙 異쒕젰??留먮?????以꾨줈 ???ъ떎???④릿??
+  "*媛寃㈑룹옱怨졖룻듃?뚮뱶??議고쉶 ?쒖젏 湲곗??대ŉ, 援щℓ ?먮떒? 痍⑦뼢怨??곹솴???곕씪 ?щ씪吏????덉뒿?덈떎.*"
+
+
+codex
+스킬 파일 인코딩이 일부 깨져 보이지만 핵심 절차는 확인했습니다: 착용당 비용, 할인/반품/방치/중복 구매 패턴을 숫자로 잡고, 마지막에는 바로 적용할 규칙 1~2개로 좁히겠습니다. 이제 `src/data/sample`의 CSV 스키마와 값을 확인합니다.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'rg --files src/data/sample' in C:\Users\iamip\IdeaProjects\kubenetis\settlement\hackathon\musinsa\submission
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content -Raw src/data/sample/closet.csv' in C:\Users\iamip\IdeaProjects\kubenetis\settlement\hackathon\musinsa\submission
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content -Raw src/data/sample/purchases.csv' in C:\Users\iamip\IdeaProjects\kubenetis\settlement\hackathon\musinsa\submission
+ succeeded in 1249ms:
+src/data/sample\README-data.md
+src/data/sample\purchases.csv
+src/data/sample\closet.csv
+
+ succeeded in 1282ms:
+item_id,category,subcategory,brand,item_name,color,size,purchase_date,list_price,price_paid,discount_pct,worn_count_6mo,last_worn
+C01,?곸쓽,?꾨뱶,?대컲裕ㅽ듃,踰좎씠???꾨뱶,釉붾옓,L,2025-03-10,59000,59000,0,38,2026-07-05
+C02,?곸쓽,?꾨뱶,?ㅽ뀒?붾줈??濡쒓퀬 ?꾨뱶,釉붾옓,L,2025-09-20,79000,71100,10,22,2026-06-28
+C03,?곸쓽,?ㅼ썾?몄뀛痢??대컲裕ㅽ듃,?щ（???ㅼ썾??釉붾옓,L,2025-10-05,55000,55000,0,17,2026-06-20
+C04,?곸쓽,?ㅼ썾?몄뀛痢?癒쇰뜲?댄겢濡쒖젽,?ㅻ쾭???ㅼ썾??釉붾옓,L,2025-11-28,89000,35600,60,1,2025-12-25
+C05,?곸쓽,?꾨뱶,洹몃젅?댁뒪耳??洹몃옒???꾨뱶,釉붾옓,L,2025-11-28,98000,39200,60,0,
+C06,?곸쓽,?덊듃,癒쇰뜲?댄겢濡쒖젽,?⑥뒪???덊듃,?щ┝,L,2026-01-15,119000,41650,65,0,
+C07,?곸쓽,?붿툩,?붿씠?몃씪踰??μ뒪?щ뱶 ?붿툩,?붿씠??L,2025-08-14,69000,69000,0,26,2026-07-01
+C08,?곸쓽,?곗뀛痢?臾댁???由대젆?ㅽ븦 ?곗뀛痢??붿씠??L,2026-04-02,29000,29000,0,31,2026-07-08
+C09,?곸쓽,?곗뀛痢?臾댁???由대젆?ㅽ븦 ?곗뀛痢?釉붾옓,L,2026-04-02,29000,29000,0,19,2026-07-03
+C10,?곸쓽,媛?붽굔,?덉씠?대뱶,??媛?붽굔,?ㅼ씠鍮?L,2025-10-20,89000,80100,10,9,2026-05-30
+C11,?곸쓽,?붿툩,?뚯씪?щ룆,?ㅽ듃?쇱씠???붿툩,釉붾（,L,2026-03-15,75000,75000,0,3,2026-04-20
+C12,?곸쓽,?덊듃,?ㅽ뀒?붾줈???섑봽吏??덊듃,釉붾옓,L,2025-12-26,99000,44550,55,1,2026-01-02
+C13,?섏쓽,?곕떂,由щ쾭?ㅻ뜲???ㅽ듃?덉씠???곕떂,?몃뵒怨?32,2025-05-22,89000,89000,0,42,2026-07-07
+C14,?섏쓽,?щ옓???붿씠?몃씪踰???대뱶 ?щ옓??李⑥퐳,32,2025-09-01,65000,58500,10,24,2026-07-02
+C15,?꾩슦??肄뷀듃,?덉씠?대뱶,??諛쒕쭏移?肄뷀듃,移대찞,L,2025-11-05,259000,233100,10,15,2026-03-10
+C16,?꾩슦???ㅼ슫?ы궥,洹몃젅?댁뒪耳??寃쎈웾 ?ㅼ슫,釉붾옓,L,2025-11-10,189000,132300,30,12,2026-02-15
+
+
+ succeeded in 1167ms:
+order_date,brand,item_name,category,color,size,list_price,price_paid,discount_pct,trigger,returned,return_reason
+2025-03-10,?대컲裕ㅽ듃,踰좎씠???꾨뱶,?곸쓽,釉붾옓,L,59000,59000,0,寃??N,
+2025-05-22,由щ쾭?ㅻ뜲???ㅽ듃?덉씠???곕떂,?섏쓽,?몃뵒怨?32,89000,89000,0,寃??N,
+2025-08-14,?붿씠?몃씪踰??μ뒪?щ뱶 ?붿툩,?곸쓽,?붿씠??L,69000,69000,0,寃??N,
+2025-09-01,?붿씠?몃씪踰???대뱶 ?щ옓???섏쓽,李⑥퐳,32,65000,58500,10,?ш뎄留?N,
+2025-09-20,?ㅽ뀒?붾줈??濡쒓퀬 ?꾨뱶,?곸쓽,釉붾옓,L,79000,71100,10,寃??N,
+2025-10-05,?대컲裕ㅽ듃,?щ（???ㅼ썾???곸쓽,釉붾옓,L,55000,55000,0,?ш뎄留?N,
+2025-10-20,?덉씠?대뱶,??媛?붽굔,?곸쓽,?ㅼ씠鍮?L,89000,80100,10,寃??N,
+2025-11-05,?덉씠?대뱶,??諛쒕쭏移?肄뷀듃,?꾩슦??移대찞,L,259000,233100,10,寃??N,
+2025-11-10,洹몃젅?댁뒪耳??寃쎈웾 ?ㅼ슫,?꾩슦??釉붾옓,L,189000,132300,30,?몄씪?뚮┝,N,
+2025-11-28,癒쇰뜲?댄겢濡쒖젽,?ㅻ쾭???ㅼ썾???곸쓽,釉붾옓,L,89000,35600,60,?몄씪?뚮┝,N,
+2025-11-28,洹몃젅?댁뒪耳??洹몃옒???꾨뱶,?곸쓽,釉붾옓,L,98000,39200,60,?몄씪?뚮┝,N,
+2025-12-02,?뚯씪?щ룆,?μ뒪?щ뱶 ?붿툩,?곸쓽,?붿씠??L,78000,78000,0,愿묎퀬,Y,?ъ씠利??묒쓬
+2025-12-26,?ㅽ뀒?붾줈???섑봽吏??덊듃,?곸쓽,釉붾옓,L,99000,44550,55,?몄씪?뚮┝,N,
+2026-01-15,癒쇰뜲?댄겢濡쒖젽,?⑥뒪???덊듃,?곸쓽,?щ┝,L,119000,41650,65,?몄씪?뚮┝,N,
+2026-02-10,?뚯씪?щ룆,?곕떂 ?붿툩,?곸쓽,釉붾（,L,82000,82000,0,寃??Y,?ъ씠利??묒쓬
+2026-03-15,?뚯씪?щ룆,?ㅽ듃?쇱씠???붿툩,?곸쓽,釉붾（,L,75000,75000,0,寃??N,
+2026-04-02,臾댁???由대젆?ㅽ븦 ?곗뀛痢??곸쓽,?붿씠??L,29000,29000,0,?ш뎄留?N,
+2026-04-02,臾댁???由대젆?ㅽ븦 ?곗뀛痢??곸쓽,釉붾옓,L,29000,29000,0,?ш뎄留?N,
+
+
+codex
+CSV 안의 한글 필드는 콘솔에서 깨져 보이지만 숫자, 날짜, ID, 색/사이즈/트리거 구분은 분석 가능합니다. 상품명은 오독 위험이 있어 최종 답변에서는 `item_id`, 날짜, 가격, 할인율, 착용 횟수를 중심으로 근거를 제시하겠습니다.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$closet = Import-Csv src/data/sample/closet.csv; $purchases = Import-Csv src/data/sample/purchases.csv; 
+"closet_count=$($closet.Count) purchase_count=$($purchases.Count)";
+"-- totals --";
+$ownedTotal = ($closet | Measure-Object -Property price_paid -Sum).Sum; $purchaseTotal = ($purchases | Measure-Object -Property price_paid -Sum).Sum; $returnedTotal = ($purchases | Where-Object returned -eq '"'Y' | Measure-Object -Property price_paid -Sum).Sum; \"owned_paid="'$ownedTotal purchased_paid=$purchaseTotal returned_paid=$returnedTotal";
+"-- closet per item --";
+$closet | ForEach-Object { $w=[int]$_.worn_count_6mo; $paid=[decimal]$_.price_paid; [pscustomobject]@{id=$_.item_id; date=$_.purchase_date; paid=[int]$paid; disc=[int]$_.discount_pct; worn=$w; cpw= if($w -gt 0){[math]::Round($paid/$w,0)} else {'"'INF'}; category="'$_.category; sub=$_.subcategory; brand=$_.brand; color=$_.color; size=$_.size; last=$_.last_worn} } | Sort-Object worn, paid | Format-Table -AutoSize;
+"-- by discount band --";
+$closet | Group-Object { if([int]$_.discount_pct -ge 55){'"'55%+'} elseif([int]"'$_.discount_pct -ge 30){'"'30-54%'} elseif([int]"'$_.discount_pct -gt 0){'"'1-29%'} else {'0%'} } | ForEach-Object { "'$items=$_.Group; $paid=($items|Measure price_paid -Sum).Sum; $worn=($items|Measure worn_count_6mo -Sum).Sum; [pscustomobject]@{band=$_.Name; count=$_.Count; paid=[int]$paid; worn=[int]$worn; avg_worn=[math]::Round($worn/$_.Count,1); cpw=if($worn -gt 0){[math]::Round($paid/$worn,0)}else{'"'INF'} } } | Sort-Object band | Format-Table -AutoSize;
+\"-- by trigger --\";
+"'$purchases | Group-Object trigger | ForEach-Object { $items=$_.Group; $paid=($items|Measure price_paid -Sum).Sum; $returns=($items|Where returned -eq '"'Y').Count; [pscustomobject]@{trigger="'$_.Name; count=$_.Count; paid=[int]$paid; returns=$returns; return_rate=[math]::Round($returns/$_.Count*100,1); avg_discount=[math]::Round((($items|Measure discount_pct -Average).Average),1)} } | Format-Table -AutoSize;
+"-- dead/low wear --";
+$closet | Where-Object {[int]$_.worn_count_6mo -le 2} | ForEach-Object {[pscustomobject]@{id=$_.item_id; date=$_.purchase_date; paid=[int]$_.price_paid; disc=[int]$_.discount_pct; worn=[int]$_.worn_count_6mo; last=$_.last_worn; brand=$_.brand; item=$_.item_name}} | Format-Table -AutoSize;
+"-- repeat top black L tops? --";
+$closet | Group-Object category,color,size | ForEach-Object { $items=$_.Group; $paid=($items|Measure price_paid -Sum).Sum; $worn=($items|Measure worn_count_6mo -Sum).Sum; [pscustomobject]@{key=$_.Name; count=$_.Count; paid=[int]$paid; worn=[int]$worn; avg_worn=[math]::Round($worn/$_.Count,1); ids=($items.item_id -join '"',')} } | Sort-Object count -Descending | Format-Table -AutoSize;
+\"-- returns --\";
+"'$purchases | Where-Object returned -eq '"'Y' | Format-Table order_date,brand,item_name,price_paid,discount_pct,trigger,return_reason -AutoSize" in C:\Users\iamip\IdeaProjects\kubenetis\settlement\hackathon\musinsa\submission
+ succeeded in 3654ms:
+closet_count=16 purchase_count=18
+-- totals --
+owned_paid=1141100 purchased_paid=1301100 returned_paid=160000
+-- closet per item --
+
+id  date         paid disc worn cpw   category sub   brand  color
+--  ----         ---- ---- ---- ---   -------- ---   -----  -----
+C05 2025-11-28  39200   60    0 INF   상의       후드    그레이스케일 블랙   
+C06 2026-01-15  41650   65    0 INF   상의       니트    먼데이클로젯 크림   
+C04 2025-11-28  35600   60    1 35600 상의       스웨트셔츠 먼데이클로젯 블랙   
+C12 2025-12-26  44550   55    1 44550 상의       니트    스테디로우  블랙   
+C11 2026-03-15  75000    0    3 25000 상의       셔츠    테일러독   블루   
+C10 2025-10-20  80100   10    9 8900  상의       가디건   레이어드   네이비  
+C16 2025-11-10 132300   30   12 11025 아우터      다운재킷  그레이스케일 블랙   
+C15 2025-11-05 233100   10   15 15540 아우터      코트    레이어드   카멜   
+C03 2025-10-05  55000    0   17 3235  상의       스웨트셔츠 어반뮤트   블랙   
+C09 2026-04-02  29000    0   19 1526  상의       티셔츠   무지톤    블랙   
+C02 2025-09-20  71100   10   22 3232  상의       후드    스테디로우  블랙   
+C14 2025-09-01  58500   10   24 2438  하의       슬랙스   화이트라벨  차콜   
+C07 2025-08-14  69000    0   26 2654  상의       셔츠    화이트라벨  화이트  
+C08 2026-04-02  29000    0   31 935   상의       티셔츠   무지톤    화이트  
+C01 2025-03-10  59000    0   38 1553  상의       후드    어반뮤트   블랙   
+C13 2025-05-22  89000    0   42 2119  하의       데님    리버스데님  인디고  
+
+
+-- by discount band --
+
+band   count   paid worn avg_worn   cpw
+----   -----   ---- ---- --------   ---
+0%         7 405000  176     25.1  2301
+1-29%      4 442800   70     17.5  6326
+30-54%     1 132300   12       12 11025
+55%+       4 161000    2      0.5 80500
+
+
+-- by trigger --
+
+trigger count   paid returns return_rate avg_discount
+------- -----   ---- ------- ----------- ------------
+검색          8 758300                   0          3.8
+재구매         4 171500 0                 0          2.5
+세일알림        5 293300 0                 0           54
+광고          1  78000                   0            0
+
+
+-- dead/low wear --
+
+id  date        paid disc worn last       brand  item   
+--  ----        ---- ---- ---- ----       -----  ----   
+C04 2025-11-28 35600   60    1 2025-12-25 먼데이클로젯 오버핏 스웨트
+C05 2025-11-28 39200   60    0            그레이스케일 그래픽 후드 
+C06 2026-01-15 41650   65    0            먼데이클로젯 램스울 니트 
+C12 2025-12-26 44550   55    1 2026-01-02 스테디로우  하프집 니트 
+
+
+-- repeat top black L tops? --
+
+key         count   paid worn avg_worn ids                        
+---         -----   ---- ---- -------- ---                        
+상의, 블랙, L       7 333450   98       14 C01,C02,C03,C04,C05,C09,C12
+상의, 화이트, L      2  98000   57     28.5 C07,C08                    
+하의, 차콜, 32      1  58500   24       24 C14                        
+아우터, 카멜, L      1 233100   15       15 C15                        
+아우터, 블랙, L      1 132300   12       12 C16                        
+하의, 인디고, 32     1  89000   42       42 C13                        
+상의, 크림, L       1  41650    0        0 C06                        
+상의, 네이비, L      1  80100    9        9 C10                        
+상의, 블루, L       1  75000    3        3 C11                        
+
+
+-- returns --
+
+order_date brand item_name price_paid discount_pct trigger return_reason
+---------- ----- --------- ---------- ------------ ------- -------------
+2025-12-02 테일러독  옥스포드 셔츠   78000      0            광고      사이즈 작음       
+2026-02-10 테일러독  데님 셔츠     82000      0            검색      사이즈 작음       
+
+
+
+codex
+초기 집계를 보면 “세일 알림으로 산 고할인 상의”가 가장 강한 후보입니다. 반품 집계는 PowerShell 필터 구문을 보정해서 다시 계산하고, 구매 트리거별 착용 효율까지 연결해 보겠습니다.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$closet = Import-Csv src/data/sample/closet.csv; $purchases = Import-Csv src/data/sample/purchases.csv;
+function Key($r){ "$($r.purchase_date ?? $r.order_date)|$($r.brand)|$($r.item_name)|$($r.price_paid)" }
+$closetByKey=@{}; foreach($c in $closet){ $closetByKey[(Key $c)]=$c }
+"-- trigger stats corrected --";
+$purchases | Group-Object trigger | ForEach-Object { $items=$_.Group; $paid=($items|Measure-Object price_paid -Sum).Sum; $ret=@($items|Where-Object { $_.returned -eq '"'Y' }); [pscustomobject]@{trigger="'$_.Name; count=$_.Count; paid=[int]$paid; returns=$ret.Count; return_paid=[int](($ret|Measure-Object price_paid -Sum).Sum); return_rate=[math]::Round($ret.Count/$_.Count*100,1); avg_discount=[math]::Round((($items|Measure-Object discount_pct -Average).Average),1)} } | Format-Table -AutoSize;
+"-- trigger + retained wear --";
+$purchases | Where-Object { $_.returned -ne '"'Y' } | ForEach-Object { "'$k=Key $_; if($closetByKey.ContainsKey($k)){ $c=$closetByKey[$k]; [pscustomobject]@{trigger=$_.trigger; paid=[int]$_.price_paid; discount=[int]$_.discount_pct; worn=[int]$c.worn_count_6mo; id=$c.item_id} } else { [pscustomobject]@{trigger=$_.trigger; paid=[int]$_.price_paid; discount=[int]$_.discount_pct; worn=$null; id='"'NO_MATCH'} } } | Group-Object trigger | ForEach-Object { "'$items=$_.Group; $paid=($items|Measure-Object paid -Sum).Sum; $worn=($items|Measure-Object worn -Sum).Sum; [pscustomobject]@{trigger=$_.Name; retained=$_.Count; paid=[int]$paid; worn=[int]$worn; avg_worn=[math]::Round($worn/$_.Count,1); cpw=if($worn -gt 0){[math]::Round($paid/$worn,0)}else{'"'INF'}; ids=("'$items.id -join '"',')} } | Format-Table -AutoSize;
+\"-- useful vs low buckets --\";
+"'$dead=@($closet|Where-Object {[int]$_.worn_count_6mo -le 2}); $low=@($closet|Where-Object {[int]$_.worn_count_6mo -le 3}); $active=@($closet|Where-Object {[int]$_.worn_count_6mo -ge 15});
+[pscustomobject]@{bucket='"'worn<=2'; count="'$dead.Count; paid=[int](($dead|Measure price_paid -Sum).Sum); pct_items=[math]::Round($dead.Count/$closet.Count*100,1); pct_paid=[math]::Round((($dead|Measure price_paid -Sum).Sum)/(($closet|Measure price_paid -Sum).Sum)*100,1); worn=[int](($dead|Measure worn_count_6mo -Sum).Sum)} | Format-List;
+[pscustomobject]@{bucket='"'worn<=3'; count="'$low.Count; paid=[int](($low|Measure price_paid -Sum).Sum); pct_items=[math]::Round($low.Count/$closet.Count*100,1); pct_paid=[math]::Round((($low|Measure price_paid -Sum).Sum)/(($closet|Measure price_paid -Sum).Sum)*100,1); worn=[int](($low|Measure worn_count_6mo -Sum).Sum)} | Format-List;
+[pscustomobject]@{bucket='"'worn>=15'; count="'$active.Count; paid=[int](($active|Measure price_paid -Sum).Sum); pct_items=[math]::Round($active.Count/$closet.Count*100,1); pct_paid=[math]::Round((($active|Measure price_paid -Sum).Sum)/(($closet|Measure price_paid -Sum).Sum)*100,1); worn=[int](($active|Measure worn_count_6mo -Sum).Sum)} | Format-List;' in C:\Users\iamip\IdeaProjects\kubenetis\settlement\hackathon\musinsa\submission
+2026-07-09T23:29:24.160601Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 0.8 seconds
+Output:
+위치 줄:3 문자:39
++ function Key($r){ "$($r.purchase_date ?? $r.order_date)|$($r.brand)|$ ...
++                                       ~~
+식 또는 문에서 예기치 않은 '??' 토큰입니다.
+    + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException
+    + FullyQualifiedErrorId : UnexpectedToken
+ 
+
+ exited 1 in 835ms:
+위치 줄:3 문자:39
++ function Key($r){ "$($r.purchase_date ?? $r.order_date)|$($r.brand)|$ ...
++                                       ~~
+식 또는 문에서 예기치 않은 '??' 토큰입니다.
+    + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException
+    + FullyQualifiedErrorId : UnexpectedToken
+ 
+
+codex
+로컬 PowerShell 버전이 null 병합 연산자를 지원하지 않아 스크립트만 호환 문법으로 바꿔 재실행합니다. 데이터 파일은 그대로 두고 읽기만 하고 있습니다.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$closet = Import-Csv src/data/sample/closet.csv; $purchases = Import-Csv src/data/sample/purchases.csv;
+function Key($r){ $d=$r.purchase_date; if(-not $d){$d=$r.order_date}; "$d|$($r.brand)|$($r.item_name)|$($r.price_paid)" }
+$closetByKey=@{}; foreach($c in $closet){ $closetByKey[(Key $c)]=$c }
+"-- trigger stats corrected --";
+$purchases | Group-Object trigger | ForEach-Object { $items=$_.Group; $paid=($items|Measure-Object price_paid -Sum).Sum; $ret=@($items|Where-Object { $_.returned -eq '"'Y' }); "'$retPaid=0; if($ret.Count -gt 0){$retPaid=($ret|Measure-Object price_paid -Sum).Sum}; [pscustomobject]@{trigger=$_.Name; count=$_.Count; paid=[int]$paid; returns=$ret.Count; return_paid=[int]$retPaid; return_rate=[math]::Round($ret.Count/$_.Count*100,1); avg_discount=[math]::Round((($items|Measure-Object discount_pct -Average).Average),1)} } | Format-Table -AutoSize;
+"-- trigger + retained wear --";
+$purchases | Where-Object { $_.returned -ne '"'Y' } | ForEach-Object { "'$k=Key $_; if($closetByKey.ContainsKey($k)){ $c=$closetByKey[$k]; [pscustomobject]@{trigger=$_.trigger; paid=[int]$_.price_paid; discount=[int]$_.discount_pct; worn=[int]$c.worn_count_6mo; id=$c.item_id} } else { [pscustomobject]@{trigger=$_.trigger; paid=[int]$_.price_paid; discount=[int]$_.discount_pct; worn=$null; id='"'NO_MATCH'} } } | Group-Object trigger | ForEach-Object { "'$items=$_.Group; $paid=($items|Measure-Object paid -Sum).Sum; $worn=($items|Measure-Object worn -Sum).Sum; [pscustomobject]@{trigger=$_.Name; retained=$_.Count; paid=[int]$paid; worn=[int]$worn; avg_worn=[math]::Round($worn/$_.Count,1); cpw=if($worn -gt 0){[math]::Round($paid/$worn,0)}else{'"'INF'}; ids=("'$items.id -join '"',')} } | Format-Table -AutoSize;
+\"-- useful vs low buckets --\";
+"'$dead=@($closet|Where-Object {[int]$_.worn_count_6mo -le 2}); $low=@($closet|Where-Object {[int]$_.worn_count_6mo -le 3}); $active=@($closet|Where-Object {[int]$_.worn_count_6mo -ge 15}); $total=($closet|Measure-Object price_paid -Sum).Sum;
+[pscustomobject]@{bucket='"'worn<=2'; count="'$dead.Count; paid=[int](($dead|Measure price_paid -Sum).Sum); pct_items=[math]::Round($dead.Count/$closet.Count*100,1); pct_paid=[math]::Round((($dead|Measure price_paid -Sum).Sum)/$total*100,1); worn=[int](($dead|Measure worn_count_6mo -Sum).Sum)} | Format-List;
+[pscustomobject]@{bucket='"'worn<=3'; count="'$low.Count; paid=[int](($low|Measure price_paid -Sum).Sum); pct_items=[math]::Round($low.Count/$closet.Count*100,1); pct_paid=[math]::Round((($low|Measure price_paid -Sum).Sum)/$total*100,1); worn=[int](($low|Measure worn_count_6mo -Sum).Sum)} | Format-List;
+[pscustomobject]@{bucket='"'worn>=15'; count="'$active.Count; paid=[int](($active|Measure price_paid -Sum).Sum); pct_items=[math]::Round($active.Count/$closet.Count*100,1); pct_paid=[math]::Round((($active|Measure price_paid -Sum).Sum)/$total*100,1); worn=[int](($active|Measure worn_count_6mo -Sum).Sum)} | Format-List;' in C:\Users\iamip\IdeaProjects\kubenetis\settlement\hackathon\musinsa\submission
+ succeeded in 3644ms:
+-- trigger stats corrected --
+
+trigger count   paid returns return_paid return_rate avg_discount
+------- -----   ---- ------- ----------- ----------- ------------
+검색          8 758300       1       82000        12.5          3.8
+재구매         4 171500       0           0           0          2.5
+세일알림        5 293300       0           0           0           54
+광고          1  78000       1       78000         100            0
+
+
+-- trigger + retained wear --
+
+trigger retained   paid worn avg_worn   cpw ids                        
+------- --------   ---- ---- --------   --- ---                        
+검색             7 676300  155     22.1  4363 C01,C13,C07,C02,C10,C15,C11
+재구매            4 171500   79     19.8  2171 C14,C03,C09,C09            
+세일알림           5 293300   14      2.8 20950 C16,C04,C05,C12,C06        
+
+
+-- useful vs low buckets --
+
+
+bucket    : worn<=2
+count     : 4
+paid      : 161000
+pct_items : 25
+pct_paid  : 14.1
+worn      : 2
+
+
+
+
+
+bucket    : worn<=3
+count     : 5
+paid      : 236000
+pct_items : 31.2
+pct_paid  : 20.7
+worn      : 5
+
+
+
+
+
+bucket    : worn>=15
+count     : 9
+paid      : 692700
+pct_items : 56.2
+pct_paid  : 60.7
+worn      : 234
+
+
+
+
+codex
+한 가지 매칭 이슈를 잡았습니다. 같은 날 같은 무지 티셔츠를 색상만 다르게 산 기록이 있어, 구매-옷장 연결 키에 색상까지 포함해 착용 효율을 다시 계산합니다.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$closet = Import-Csv src/data/sample/closet.csv; $purchases = Import-Csv src/data/sample/purchases.csv;
+function Key($r){ $d=$r.purchase_date; if(-not $d){$d=$r.order_date}; "$d|$($r.brand)|$($r.item_name)|$($r.color)|$($r.price_paid)" }
+$closetByKey=@{}; foreach($c in $closet){ $closetByKey[(Key $c)]=$c }
+"-- trigger + retained wear color-aware --";
+$purchases | Where-Object { $_.returned -ne '"'Y' } | ForEach-Object { "'$k=Key $_; if($closetByKey.ContainsKey($k)){ $c=$closetByKey[$k]; [pscustomobject]@{trigger=$_.trigger; paid=[int]$_.price_paid; discount=[int]$_.discount_pct; worn=[int]$c.worn_count_6mo; id=$c.item_id} } else { [pscustomobject]@{trigger=$_.trigger; paid=[int]$_.price_paid; discount=[int]$_.discount_pct; worn=$null; id='"'NO_MATCH'} } } | Group-Object trigger | ForEach-Object { "'$items=$_.Group; $paid=($items|Measure-Object paid -Sum).Sum; $worn=($items|Measure-Object worn -Sum).Sum; [pscustomobject]@{trigger=$_.Name; retained=$_.Count; paid=[int]$paid; worn=[int]$worn; avg_worn=[math]::Round($worn/$_.Count,1); cpw=if($worn -gt 0){[math]::Round($paid/$worn,0)}else{'"'INF'}; ids=("'$items.id -join '"',')} } | Format-Table -AutoSize;
+\"-- discount 55+ detail --\";
+"'$closet | Where-Object {[int]$_.discount_pct -ge 55} | ForEach-Object { [pscustomobject]@{id=$_.item_id; date=$_.purchase_date; paid=[int]$_.price_paid; disc=[int]$_.discount_pct; worn=[int]$_.worn_count_6mo; cpw=if([int]$_.worn_count_6mo -gt 0){[math]::Round([decimal]$_.price_paid/[int]$_.worn_count_6mo,0)}else{'"'INF'}; category="'$_.category; sub=$_.subcategory; color=$_.color; brand=$_.brand; item=$_.item_name} } | Format-Table -AutoSize;' in C:\Users\iamip\IdeaProjects\kubenetis\settlement\hackathon\musinsa\submission
+ succeeded in 930ms:
+-- trigger + retained wear color-aware --
+
+trigger retained   paid worn avg_worn   cpw ids                        
+------- --------   ---- ---- --------   --- ---                        
+검색             7 676300  155     22.1  4363 C01,C13,C07,C02,C10,C15,C11
+재구매            4 171500   91     22.8  1885 C14,C03,C08,C09            
+세일알림           5 293300   14      2.8 20950 C16,C04,C05,C12,C06        
+
+
+-- discount 55+ detail --
+
+id  date        paid disc worn   cpw category sub   color brand 
+--  ----        ---- ---- ----   --- -------- ---   ----- ----- 
+C04 2025-11-28 35600   60    1 35600 상의       스웨트셔츠 블랙    먼데이클로젯
+C05 2025-11-28 39200   60    0   INF 상의       후드    블랙    그레이스케일
+C06 2026-01-15 41650   65    0   INF 상의       니트    크림    먼데이클로젯
+C12 2025-12-26 44550   55    1 44550 상의       니트    블랙    스테디로우 
+
+
+
+codex
+구매 트리거별 결과가 꽤 선명합니다: 재구매와 검색은 착용당 비용이 낮고, 세일 알림은 구매 수와 금액 대비 착용이 거의 없습니다. 마지막으로 카테고리 쏠림과 “많지만 입을 게 없는” 구조를 수치로 정리합니다.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$closet=Import-Csv src/data/sample/closet.csv;
+"-- category distribution --";
+$closet | Group-Object category | ForEach-Object { $items=$_.Group; $paid=($items|Measure price_paid -Sum).Sum; $worn=($items|Measure worn_count_6mo -Sum).Sum; [pscustomobject]@{category=$_.Name; count=$_.Count; pct_items=[math]::Round($_.Count/$closet.Count*100,1); paid=[int]$paid; pct_paid=[math]::Round($paid/(($closet|Measure price_paid -Sum).Sum)*100,1); worn=[int]$worn; avg_worn=[math]::Round($worn/$_.Count,1)} } | Format-Table -AutoSize;
+"-- subcategory distribution --";
+$closet | Group-Object subcategory | ForEach-Object { $items=$_.Group; $paid=($items|Measure price_paid -Sum).Sum; $worn=($items|Measure worn_count_6mo -Sum).Sum; [pscustomobject]@{sub=$_.Name; count=$_.Count; paid=[int]$paid; worn=[int]$worn; avg_worn=[math]::Round($worn/$_.Count,1); ids=($items.item_id -join '"',')} } | Sort-Object count -Descending | Format-Table -AutoSize;
+\"-- summary total wears --\";
+"'$totalPaid=($closet|Measure price_paid -Sum).Sum; $totalWorn=($closet|Measure worn_count_6mo -Sum).Sum; [pscustomobject]@{items=$closet.Count; paid=[int]$totalPaid; wears=[int]$totalWorn; overall_cpw=[math]::Round($totalPaid/$totalWorn,0)} | Format-List;' in C:\Users\iamip\IdeaProjects\kubenetis\settlement\hackathon\musinsa\submission
+ succeeded in 3589ms:
+-- category distribution --
+
+category count pct_items   paid pct_paid worn avg_worn
+-------- ----- ---------   ---- -------- ---- --------
+상의          12        75 628200     55.1  167     13.9
+하의           2      12.5 147500     12.9   66       33
+아우터          2      12.5 365400       32   27     13.5
+
+
+-- subcategory distribution --
+
+sub   count   paid worn avg_worn ids        
+---   -----   ---- ---- -------- ---        
+후드        3 169300   60       20 C01,C02,C05
+셔츠        2 144000   29     14.5 C07,C11    
+티셔츠       2  58000   50       25 C08,C09    
+스웨트셔츠     2  90600   18        9 C03,C04    
+니트        2  86200    1      0.5 C06,C12    
+코트        1 233100   15       15 C15        
+다운재킷      1 132300   12       12 C16        
+슬랙스       1  58500   24       24 C14        
+가디건       1  80100    9        9 C10        
+데님        1  89000   42       42 C13        
+
+
+-- summary total wears --
+
+
+items       : 16
+paid        : 1141100
+wears       : 260
+overall_cpw : 4389
+
+
+
+
+codex
+README-data.md는 열지 않고 `closet.csv`, `purchases.csv`만 봤습니다.
+
+**결론**
+옷이 많은데 입을 게 없는 핵심 이유는 “필요해서 산 옷”보다 “세일 알림으로 산 비슷한 상의”가 옷장 공간을 먹고 있기 때문입니다. 특히 고할인 상의가 착용으로 전환되지 않았습니다.
+
+**근거**
+보유 옷 16개, 구매가 합계 1,141,100원, 최근 6개월 착용 합계 260회입니다.
+
+가장 강한 패턴은 세일 알림 구매입니다.
+
+| 구매 트리거 | 보유 수 | 지출 | 최근 6개월 착용 | 평균 착용 | 착용당 비용 |
+|---|---:|---:|---:|---:|---:|
+| 재구매 | 4개 | 171,500원 | 91회 | 22.8회 | 1,885원 |
+| 검색 | 7개 | 676,300원 | 155회 | 22.1회 | 4,363원 |
+| 세일알림 | 5개 | 293,300원 | 14회 | 2.8회 | 20,950원 |
+
+특히 할인율 55% 이상인 4개는 161,000원을 썼지만 착용이 총 2회뿐입니다. `C05`, `C06`은 0회, `C04`, `C12`는 각 1회입니다. 이 그룹의 착용당 비용은 80,500원으로, 할인받아 샀지만 실제로는 가장 비싼 구매가 됐습니다.
+
+두 번째 패턴은 “상의, 블랙, L” 중복입니다. 이 조합만 7개로 전체 옷장의 43.8%이고, 333,450원이 묶여 있습니다. 문제는 블랙 상의가 전부 나쁜 게 아니라, 이미 잘 입는 블랙 상의가 있는데 비슷한 영역을 또 산다는 점입니다. `C01`, `C02`, `C03`, `C09`는 잘 입지만, 같은 블랙 상의군의 `C04`, `C05`, `C12`는 거의 안 입었습니다.
+
+세 번째는 카테고리 불균형입니다. 상의가 12개로 전체 75%인데 평균 착용은 13.9회입니다. 반면 하의는 2개뿐인데 평균 착용이 33회입니다. 즉 “입을 옷이 없다”는 느낌은 옷 수 부족이 아니라, 코디를 완성하는 축이 부족하고 상의만 반복해서 늘어난 구조에 가깝습니다.
+
+반품도 힌트가 있습니다. 반품 2건, 160,000원 모두 `사이즈 작음`입니다. 특정 브랜드/셔츠 계열에서 사이즈 실패가 반복된 것으로 보입니다.
+
+**다음 구매 규칙**
+1. **세일알림으로 뜬 상의는 바로 결제 금지.** 24시간 보류하고, 기존 하의 `C13` 데님과 `C14` 슬랙스 기준으로 3코디가 안 나오면 구매하지 않기. 할인율 55% 이상이면 더 엄격하게 적용하세요.
+
+2. **블랙 L 상의는 기존 유사템 착용 검사를 통과해야만 구매.** 같은 색/카테고리의 최근 구매 중 착용 3회 이하가 하나라도 있으면 새 구매 보류. 지금 기준으로는 `C04`, `C05`, `C12`가 걸려서 블랙 상의 추가 구매는 막는 쪽이 맞습니다.
+
+추가로, 다음 구매가 필요하다면 “상의 추가”보다 하의나 기존 상의를 살리는 레이어링/계절 축을 먼저 보는 게 데이터상 더 합리적입니다.
+tokens used
+44,037

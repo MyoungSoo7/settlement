@@ -1,0 +1,30 @@
+{
+  "cycle": 1,
+  "phase": "P2-dry-run",
+  "week": 0,
+  "budget": 3000000,
+  "periodWeeks": 4,
+  "interests": [],
+  "startedAt": "2026-07-10",
+  "lastCheckAt": "2026-07-10",
+  "nextAction": "P2 dry run: choose one candidate from watchlist and create a non-executing trade plan with entry size, split entries, stop-loss, and take-profit rules.",
+  "rules": [
+    "Keep each single stock at or below 10% of total budget.",
+    "Diversify across at least 5 stocks over time.",
+    "Keep 20-30% cash.",
+    "Use 30%-30%-40% split entries and default -7% stop-loss.",
+    "Do not use leverage, margin, or credit trading."
+  ],
+  "history": [
+    {
+      "date": "2026-07-10",
+      "phase": "P0-prep",
+      "summary": "Cycle 1 initialized with budget 3,000,000 KRW, period 4 weeks, no preselected interests."
+    },
+    {
+      "date": "2026-07-10",
+      "phase": "P1-selection",
+      "summary": "Recorded P1 watchlist from local reports: Samsung Electronics(005930), NAVER(035420), Hyundai Motor(005380 watch-only)."
+    }
+  ]
+}

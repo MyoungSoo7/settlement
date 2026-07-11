@@ -11,8 +11,8 @@ spreadsheets
 
 ## Confirmed Inputs
 
-- 기업명: `NAVER`
-- 사업자등록번호: `220-81-62517`
+- 기업명: `네이버`
+- 사업자등록번호: `2208162517`
 - 내부 표준 CSV 폴더: 미제공. DART/ECOS/뉴스 기반 외부 진단 모드로 진행.
 - 식별 게이트 결과: `C:\Users\iamip\IdeaProjects\kubenetis\settlement\pwc\submission\outputs\naver-ceo-pipeline\identity.json`
 - 진단 패킷: `C:\Users\iamip\IdeaProjects\kubenetis\settlement\pwc\submission\outputs\naver-ceo-pipeline\diagnostic-packet.json`
@@ -34,7 +34,7 @@ cost_allocation.csv
 이미 생성·채점됨: `C:\Users\iamip\IdeaProjects\kubenetis\settlement\pwc\submission\outputs\naver-ceo-pipeline\briefing.md` — 아래 프롬프트는 재생성용.
 
 ```text
-기업명 NAVER, 사업자등록번호 220-81-62517 기준으로 identity.json과 diagnostic-packet.json을 근거로 CEO 브리핑을 작성해줘.
+기업명 네이버, 사업자등록번호 2208162517 기준으로 identity.json과 diagnostic-packet.json을 근거로 CEO 브리핑을 작성해줘.
 내부 CSV가 있으면 정합성 게이트와 신호 파생 결과를 우선하고, DART/ECOS/네이버 뉴스 신호를 보조 근거로 결합해줘.
 각 리스크는 결론, 근거 수치, 확신도, 추가 확인 절차, 권고 조치 순서로 작성해줘.
 검토용 산출물은 C:\Users\iamip\IdeaProjects\kubenetis\settlement\pwc\submission\outputs\naver-ceo-pipeline\briefing.md 로 저장해줘.

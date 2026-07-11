@@ -1,0 +1,10 @@
+
+━━ [1] 기업 식별 게이트 (company_identity_gate) ━━
+  주의: 대표자명과 개업일자가 없어 국세청 진위확인은 생략하고 상태조회만 수행했습니다.
+  식별 확인 — 분석 진행 허용 (C:\Users\iamip\IdeaProjects\kubenetis\settlement\pwc\submission\outputs\batch\2026Q2\네이버\identity.json)
+
+━━ [2] 진단 패킷 생성 (diagnose-company) ━━
+
+diagnose-company 실패: src/bin/diagnose-company.mjs --json --company 네이버 --with-news --with-market 실패
+"네이버" 에 해당하는 상장사를 찾지 못했습니다 (DART corp_code 캐시 기준).
+

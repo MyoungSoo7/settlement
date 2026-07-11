@@ -18,6 +18,12 @@
 - `test/` — MCP 스모크(dart-smoke, ecos-smoke) + 공용 유틸 테스트. 실행:
   `node src/test/ecos-smoke.mjs` (키 없으면 프로토콜 검증만, 키 있으면 라이브 포함).
 - `bin/run-sample.ps1` — 데이터 무결성 확인 + 데모 프롬프트 출력 (UTF-8 BOM).
+- `bin/sector-matrix.mjs` → `data/stats/sector-matrix.json` — 산업군(유니버스 수동 태깅
+  12개 군)×시기(3개년+최근분기) 재무 규칙 5종 충족도 사전계산 (backtest.mjs 패턴).
+  MCP `sector_suitability`(dart 서버)가 서빙. 금융업은 부채비율 규칙 N/A.
+- `bin/sector-report.mjs` — 매트릭스 + 현재 시점 뉴스 악재 스캔(30일, 소급 불가 명시) →
+  `outputs/sector-suitability-<날짜-시간>.docx`. docx 는 `common/docx.mjs` 가
+  zero-dependency 로 직접 작성(무압축 OPC zip — corp-codes.mjs 의 zip 해제와 대칭).
 
 ## 스킬 호출 흐름
 
@@ -31,4 +37,9 @@
 "내 매매 봐줘" ────► trade-retrospective (패턴 탐지 → 규칙 제안)
                           │
 모든 판정의 출력 ──► trust-explainer (결론→근거→반대근거→한계·고지)
+
+[하네스] "사이클 시작/주간 점검/지금 뭐 해?" ► invest-cycle (관리자)
+  state.json 단일 진실 ─ P1 선별(periodic-picks) → P2 dry run(plan_trade+buy-companion)
+  → P3 4주 추적(sell-companion/anxiety-triage) → P4 리포트 → P5 회고(trade-retrospective)
+  → 포트폴리오 대장(portfolio.json = 에셋 보관함, P1 과 양방향) → 다음 사이클
 ```
