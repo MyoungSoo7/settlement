@@ -38,6 +38,11 @@ public class MenuService implements MenuUseCase {
 
     @Override
     public Menu createMenu(CreateMenuCommand command) {
+        if (command.parentId() != null) {
+            loadMenuPort.findById(command.parentId())
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "존재하지 않는 부모 메뉴: " + command.parentId()));
+        }
         Menu menu = Menu.create(
                 command.name(),
                 command.path(),
@@ -56,6 +61,7 @@ public class MenuService implements MenuUseCase {
     public Menu updateMenu(Long id, UpdateMenuCommand command) {
         Menu menu = loadMenuPort.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("메뉴를 찾을 수 없습니다: " + id));
+        validateParentChange(id, command.parentId());
         menu.update(
                 command.name(),
                 command.path(),
@@ -80,6 +86,86 @@ public class MenuService implements MenuUseCase {
         }
         saveMenuPort.deleteById(id);
         log.info("메뉴 삭제: id={}", id);
+    }
+
+    @Override
+    public List<Menu> reorder(List<ReorderItemCommand> items) {
+        if (items == null || items.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, Menu> byId = loadMenuPort.findAll().stream()
+                .collect(Collectors.toMap(Menu::getId, m -> m));
+
+        // 1) 변경 적용 (메모리 상 도메인 객체 — 검증 실패 시 저장 없이 전체 거부)
+        for (ReorderItemCommand item : items) {
+            Menu menu = byId.get(item.id());
+            if (menu == null) {
+                throw new IllegalArgumentException("존재하지 않는 메뉴 ID: " + item.id());
+            }
+            if (item.parentId() != null && !byId.containsKey(item.parentId())) {
+                throw new IllegalArgumentException("존재하지 않는 부모 메뉴: " + item.parentId());
+            }
+            if (item.parentId() != null && item.parentId().equals(item.id())) {
+                throw new IllegalArgumentException("자기 자신을 부모로 지정할 수 없습니다: " + item.id());
+            }
+            menu.setParentId(item.parentId());
+            menu.setSortOrder(item.sortOrder());
+            menu.setUpdatedAt(java.time.LocalDateTime.now());
+        }
+
+        // 2) 변경 반영된 그래프 전체에 대해 순환 참조 검증
+        for (Menu menu : byId.values()) {
+            java.util.Set<Long> visited = new java.util.HashSet<>();
+            Long cursor = menu.getParentId();
+            while (cursor != null) {
+                if (cursor.equals(menu.getId()) || !visited.add(cursor)) {
+                    throw new IllegalArgumentException(
+                            "순환 참조가 발생하는 재배치입니다: menuId=" + menu.getId());
+                }
+                Menu current = byId.get(cursor);
+                cursor = current == null ? null : current.getParentId();
+            }
+        }
+
+        // 3) 요청에 포함된 메뉴만 저장
+        List<Menu> changed = items.stream()
+                .map(i -> byId.get(i.id()))
+                .distinct()
+                .collect(Collectors.toList());
+        List<Menu> saved = saveMenuPort.saveAll(changed);
+        log.info("메뉴 재배치: count={}", saved.size());
+        return saved;
+    }
+
+    /**
+     * 부모 변경 검증 — 자기 자신/자손을 부모로 지정하면 순환 참조가 생기므로 거부한다.
+     */
+    private void validateParentChange(Long id, Long newParentId) {
+        if (newParentId == null) {
+            return;
+        }
+        if (newParentId.equals(id)) {
+            throw new IllegalArgumentException("자기 자신을 부모로 지정할 수 없습니다: " + id);
+        }
+        Map<Long, Menu> byId = loadMenuPort.findAll().stream()
+                .collect(Collectors.toMap(Menu::getId, m -> m));
+        if (!byId.containsKey(newParentId)) {
+            throw new IllegalArgumentException("존재하지 않는 부모 메뉴: " + newParentId);
+        }
+        // 새 부모의 조상 체인에 자신이 있으면 자손을 부모로 지정한 것 → 순환
+        java.util.Set<Long> visited = new java.util.HashSet<>();
+        Long cursor = newParentId;
+        while (cursor != null) {
+            if (cursor.equals(id)) {
+                throw new IllegalArgumentException(
+                        "하위 메뉴를 부모로 지정하면 순환 참조가 발생합니다: " + newParentId);
+            }
+            if (!visited.add(cursor)) {
+                break; // 기존 데이터 이상으로 인한 무한루프 방지
+            }
+            Menu current = byId.get(cursor);
+            cursor = current == null ? null : current.getParentId();
+        }
     }
 
     /**

@@ -50,6 +50,37 @@ public class RbacPersistenceAdapter implements LoadRbacPort, SaveRbacPort {
     }
 
     @Override
+    public boolean existsRoleByCode(String code) {
+        return roleRepository.existsByCode(code);
+    }
+
+    @Override
+    public Role saveRole(Role role) {
+        RoleJpaEntity entity;
+        if (role.getId() != null) {
+            // 기존 역할: 이름/설명만 갱신 (권한 매핑은 replaceRolePermissions 전용 경로)
+            entity = roleRepository.findById(role.getId())
+                    .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 역할 ID: " + role.getId()));
+            entity.setName(role.getName());
+            entity.setDescription(role.getDescription());
+        } else {
+            entity = new RoleJpaEntity();
+            entity.setCode(role.getCode());
+            entity.setName(role.getName());
+            entity.setDescription(role.getDescription());
+            entity.setBuiltin(role.isBuiltin());
+            entity.setCreatedAt(role.getCreatedAt());
+        }
+        return toDomain(roleRepository.save(entity));
+    }
+
+    @Override
+    public void deleteRoleById(Long roleId) {
+        rolePermissionRepository.deleteAllByRoleId(roleId);
+        roleRepository.deleteById(roleId);
+    }
+
+    @Override
     public void replaceRolePermissions(Long roleId, List<Long> permissionIds) {
         rolePermissionRepository.deleteAllByRoleId(roleId);
         rolePermissionRepository.flush();

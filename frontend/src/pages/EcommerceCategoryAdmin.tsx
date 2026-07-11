@@ -23,7 +23,28 @@ const EcommerceCategoryAdmin: React.FC = () => {
     slug: '',
     sortOrder: 0,
   });
+  const [editTarget, setEditTarget] = useState<EcommerceCategory | null>(null);
+  const [editForm, setEditForm] = useState({ name: '', slug: '', parentId: '' as string });
+  const [moving, setMoving] = useState(false);
   const { showToast } = useToast();
+
+  /** 트리 → 평면 목록 (부모 변경 셀렉트용) */
+  const flatten = (list: EcommerceCategory[], acc: EcommerceCategory[] = []): EcommerceCategory[] => {
+    list.forEach((c) => {
+      acc.push(c);
+      if (c.children?.length) flatten(c.children, acc);
+    });
+    return acc;
+  };
+
+  /** 자기 자신 + 자손 ID — 부모로 선택하면 순환이라 제외 */
+  const descendantIds = (root: EcommerceCategory): Set<number> => {
+    const ids = new Set<number>([root.id]);
+    const walk = (c: EcommerceCategory) =>
+      c.children?.forEach((child) => { ids.add(child.id); walk(child); });
+    walk(root);
+    return ids;
+  };
 
   useEffect(() => {
     loadCategories();
@@ -86,8 +107,62 @@ const EcommerceCategoryAdmin: React.FC = () => {
     }
   };
 
+  /** 형제 간 ▲▼ 이동 — 표시 순서 기준으로 자리 교환 후 어긋난 항목만 sort 재부여 */
+  const handleMoveSort = async (category: EcommerceCategory, siblings: EcommerceCategory[], direction: -1 | 1) => {
+    const index = siblings.findIndex((s) => s.id === category.id);
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= siblings.length) return;
+    const next = [...siblings];
+    [next[index], next[target]] = [next[target], next[index]];
+    setMoving(true);
+    try {
+      const changed = next
+        .map((c, idx) => ({ c, newOrder: idx }))
+        .filter(({ c, newOrder }) => c.sortOrder !== newOrder);
+      for (const { c, newOrder } of changed) {
+        await api.patch(`/admin/categories/${c.id}/sort`, { sortOrder: newOrder });
+      }
+      loadCategories();
+    } catch (error: any) {
+      showToast(error.response?.data?.message || '순서 변경 실패', 'error');
+    } finally {
+      setMoving(false);
+    }
+  };
+
+  const startEdit = (category: EcommerceCategory) => {
+    setEditTarget(category);
+    setEditForm({
+      name: category.name,
+      slug: category.slug,
+      parentId: category.parentId != null ? String(category.parentId) : '',
+    });
+    setShowCreateForm(false);
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editTarget) return;
+    try {
+      await api.put(`/admin/categories/${editTarget.id}`, {
+        name: editForm.name,
+        slug: editForm.slug || undefined,
+      });
+      const newParentId = editForm.parentId === '' ? null : Number(editForm.parentId);
+      const oldParentId = editTarget.parentId ?? null;
+      if (newParentId !== oldParentId) {
+        await api.patch(`/admin/categories/${editTarget.id}/move`, { newParentId });
+      }
+      showToast('카테고리가 수정되었습니다', 'success');
+      setEditTarget(null);
+      loadCategories();
+    } catch (error: any) {
+      showToast(error.response?.data?.message || '카테고리 수정 실패', 'error');
+    }
+  };
+
   const renderCategoryTree = (categories: EcommerceCategory[], level = 0) => {
-    return categories.map((category) => (
+    return categories.map((category, index) => (
       <div key={category.id} style={{ marginLeft: `${level * 24}px` }}>
         <div className="flex items-center justify-between p-3 border-b hover:bg-gray-50">
           <div className="flex items-center gap-3">
@@ -115,6 +190,22 @@ const EcommerceCategoryAdmin: React.FC = () => {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => handleMoveSort(category, categories, -1)}
+              disabled={moving || index <= 0}
+              title="위로"
+              className="w-7 h-7 text-sm rounded border border-gray-300 text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              ▲
+            </button>
+            <button
+              onClick={() => handleMoveSort(category, categories, 1)}
+              disabled={moving || index >= categories.length - 1}
+              title="아래로"
+              className="w-7 h-7 text-sm rounded border border-gray-300 text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              ▼
+            </button>
             {category.depth < 2 && (
               <button
                 onClick={() => {
@@ -126,6 +217,12 @@ const EcommerceCategoryAdmin: React.FC = () => {
                 + 하위 추가
               </button>
             )}
+            <button
+              onClick={() => startEdit(category)}
+              className="px-3 py-1 text-sm bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
+            >
+              수정
+            </button>
             <button
               onClick={() => handleToggleActive(category.id, category.isActive)}
               className={`px-3 py-1 text-sm rounded ${
@@ -228,6 +325,71 @@ const EcommerceCategoryAdmin: React.FC = () => {
               >
                 생성
               </button>
+            </form>
+          </div>
+        )}
+
+        {editTarget && (
+          <div className="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">
+              카테고리 수정 — #{editTarget.id} {editTarget.name}
+            </h2>
+            <form onSubmit={handleEditSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-1">카테고리명 *</label>
+                <input
+                  type="text"
+                  value={editForm.name}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-1">Slug</label>
+                <input
+                  type="text"
+                  value={editForm.slug}
+                  onChange={(e) => setEditForm({ ...editForm, slug: e.target.value })}
+                  placeholder="소문자, 숫자, 하이픈만"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-1">부모 카테고리</label>
+                <select
+                  value={editForm.parentId}
+                  onChange={(e) => setEditForm({ ...editForm, parentId: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900"
+                >
+                  <option value="">(최상위)</option>
+                  {flatten(categories)
+                    .filter((c) => !descendantIds(editTarget).has(c.id))
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {'─'.repeat(c.depth)} {c.name}
+                      </option>
+                    ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  자기 자신·하위 카테고리는 선택할 수 없습니다 (순환 참조 방지). 최대 3단계(depth 0-2) 제한은 서버가 검증합니다.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                >
+                  저장
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditTarget(null)}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium"
+                >
+                  취소
+                </button>
+              </div>
             </form>
           </div>
         )}

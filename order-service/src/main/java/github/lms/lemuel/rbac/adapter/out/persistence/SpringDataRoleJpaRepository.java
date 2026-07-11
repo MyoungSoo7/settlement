@@ -9,4 +9,6 @@ public interface SpringDataRoleJpaRepository extends JpaRepository<RoleJpaEntity
 
     @Query("SELECT DISTINCT r FROM RoleJpaEntity r LEFT JOIN FETCH r.permissions")
     List<RoleJpaEntity> findAllWithPermissions();
+
+    boolean existsByCode(String code);
 }

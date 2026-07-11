@@ -23,4 +23,22 @@ public interface RbacUseCase {
      * @return 갱신된 역할(권한 포함)
      */
     Role updateRolePermissions(Long roleId, List<Long> permissionIds);
+
+    /** 커스텀 역할 생성 (builtin=false). 코드 중복 시 예외. */
+    Role createRole(CreateRoleCommand command);
+
+    /** 역할 이름/설명 수정. 코드는 불변. */
+    Role updateRole(Long roleId, UpdateRoleCommand command);
+
+    /** 역할 삭제. builtin 역할은 삭제 불가. */
+    void deleteRole(Long roleId);
+
+    /** 기존 역할을 권한 매핑까지 복제해 새 커스텀 역할을 만든다. */
+    Role cloneRole(Long sourceRoleId, CloneRoleCommand command);
+
+    record CreateRoleCommand(String code, String name, String description) {}
+
+    record UpdateRoleCommand(String name, String description) {}
+
+    record CloneRoleCommand(String code, String name) {}
 }

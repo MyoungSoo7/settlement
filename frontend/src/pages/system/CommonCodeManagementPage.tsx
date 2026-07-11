@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   commonCodeApi, CommonCodeGroup, CommonCode,
 } from '@/api/system';
@@ -19,6 +19,32 @@ const CommonCodeManagementPage: React.FC = () => {
   const [codeForm, setCodeForm] = useState(blankCode);
   const [savingGroup, setSavingGroup] = useState(false);
   const [savingCode, setSavingCode] = useState(false);
+
+  const [groupFilter, setGroupFilter] = useState('');
+  const [codeFilter, setCodeFilter] = useState('');
+  const [movingCode, setMovingCode] = useState(false);
+
+  const visibleGroups = useMemo(() => {
+    const keyword = groupFilter.trim().toLowerCase();
+    if (!keyword) return groups;
+    return groups.filter(
+      (g) =>
+        g.groupCode.toLowerCase().includes(keyword) ||
+        g.name.toLowerCase().includes(keyword) ||
+        (g.description ?? '').toLowerCase().includes(keyword),
+    );
+  }, [groups, groupFilter]);
+
+  const visibleCodes = useMemo(() => {
+    const keyword = codeFilter.trim().toLowerCase();
+    if (!keyword) return codes;
+    return codes.filter(
+      (c) =>
+        c.code.toLowerCase().includes(keyword) ||
+        c.label.toLowerCase().includes(keyword) ||
+        (c.extra1 ?? '').toLowerCase().includes(keyword),
+    );
+  }, [codes, codeFilter]);
 
   const loadGroups = async () => {
     try {
@@ -121,6 +147,31 @@ const CommonCodeManagementPage: React.FC = () => {
     } catch { alert('코드 삭제 실패'); }
   };
 
+  /** ▲▼ 이동 — 표시 순서 기준으로 자리 교환 후, 인덱스와 어긋난 항목만 sortOrder 재부여 */
+  const handleMoveCode = async (c: CommonCode, direction: -1 | 1) => {
+    const sorted = [...codes].sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id);
+    const index = sorted.findIndex((x) => x.id === c.id);
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= sorted.length) return;
+    [sorted[index], sorted[target]] = [sorted[target], sorted[index]];
+    setMovingCode(true);
+    try {
+      const changed = sorted
+        .map((x, idx) => ({ item: x, newOrder: idx }))
+        .filter(({ item, newOrder }) => item.sortOrder !== newOrder);
+      for (const { item, newOrder } of changed) {
+        await commonCodeApi.updateCode(item.id, {
+          label: item.label, sortOrder: newOrder, active: item.active, extra1: item.extra1 ?? undefined,
+        });
+      }
+      if (selected) setCodes(await commonCodeApi.getCodes(selected));
+    } catch {
+      alert('순서 변경 실패');
+    } finally {
+      setMovingCode(false);
+    }
+  };
+
   if (loading) return <div className="py-20 flex justify-center"><Spinner size="lg" message="공통코드 로드 중..." /></div>;
   if (error)   return <p className="text-red-600 py-10 text-center">{error}</p>;
 
@@ -136,10 +187,18 @@ const CommonCodeManagementPage: React.FC = () => {
         <div className="xl:col-span-2 bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
             <h3 className="font-bold text-gray-900">코드 그룹</h3>
-            <span className="text-sm text-gray-400">{groups.length}개</span>
+            <span className="text-sm text-gray-400">{visibleGroups.length}/{groups.length}개</span>
+          </div>
+          <div className="px-4 py-2 border-b border-gray-100">
+            <input
+              value={groupFilter}
+              onChange={(e) => setGroupFilter(e.target.value)}
+              placeholder="그룹 검색 (코드 / 이름 / 설명)"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+            />
           </div>
           <ul className="divide-y divide-gray-100 max-h-[360px] overflow-y-auto">
-            {groups.map((g) => (
+            {visibleGroups.map((g) => (
               <li
                 key={g.groupCode}
                 onClick={() => selectGroup(g.groupCode)}
@@ -169,7 +228,11 @@ const CommonCodeManagementPage: React.FC = () => {
                 </div>
               </li>
             ))}
-            {groups.length === 0 && <li className="px-4 py-8 text-center text-gray-400 text-sm">그룹이 없습니다.</li>}
+            {visibleGroups.length === 0 && (
+              <li className="px-4 py-8 text-center text-gray-400 text-sm">
+                {groupFilter ? '검색 결과가 없습니다.' : '그룹이 없습니다.'}
+              </li>
+            )}
           </ul>
           {/* 그룹 추가 폼 */}
           <form onSubmit={handleCreateGroup} className="p-4 border-t border-gray-100 bg-gray-50 space-y-2">
@@ -200,8 +263,18 @@ const CommonCodeManagementPage: React.FC = () => {
             <h3 className="font-bold text-gray-900">
               코드 항목 {selected && <span className="font-mono text-blue-700 text-sm">({selected})</span>}
             </h3>
-            <span className="text-sm text-gray-400">{codes.length}개</span>
+            <span className="text-sm text-gray-400">{visibleCodes.length}/{codes.length}개</span>
           </div>
+          {selected && !codesLoading && (
+            <div className="px-4 py-2 border-b border-gray-100">
+              <input
+                value={codeFilter}
+                onChange={(e) => setCodeFilter(e.target.value)}
+                placeholder="코드 검색 (코드 / 라벨 / extra1) — 검색 중에는 순서 이동이 비활성화됩니다"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              />
+            </div>
+          )}
 
           {!selected ? (
             <p className="px-4 py-10 text-center text-gray-400 text-sm">왼쪽에서 그룹을 선택하세요.</p>
@@ -218,11 +291,27 @@ const CommonCodeManagementPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {codes.map((c) => (
+                  {visibleCodes.map((c, idx) => (
                     <tr key={c.id} className="hover:bg-gray-50">
                       <td className="px-4 py-2.5 font-mono font-semibold text-gray-800">{c.code}</td>
                       <td className="px-4 py-2.5 text-gray-700">{c.label}</td>
-                      <td className="px-4 py-2.5 text-gray-500">{c.sortOrder}</td>
+                      <td className="px-4 py-2.5">
+                        <span className="inline-flex items-center gap-1">
+                          <button
+                            onClick={() => handleMoveCode(c, -1)}
+                            disabled={movingCode || !!codeFilter.trim() || idx <= 0}
+                            title="위로"
+                            className="w-6 h-6 text-xs rounded border border-gray-200 text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                          >▲</button>
+                          <button
+                            onClick={() => handleMoveCode(c, 1)}
+                            disabled={movingCode || !!codeFilter.trim() || idx >= visibleCodes.length - 1}
+                            title="아래로"
+                            className="w-6 h-6 text-xs rounded border border-gray-200 text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                          >▼</button>
+                          <span className="text-gray-400 text-xs ml-1">{c.sortOrder}</span>
+                        </span>
+                      </td>
                       <td className="px-4 py-2.5 text-gray-400">{c.extra1 || '-'}</td>
                       <td className="px-4 py-2.5">
                         <button onClick={() => handleToggleCode(c)}
@@ -238,8 +327,12 @@ const CommonCodeManagementPage: React.FC = () => {
                       </td>
                     </tr>
                   ))}
-                  {codes.length === 0 && (
-                    <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">코드가 없습니다.</td></tr>
+                  {visibleCodes.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                        {codeFilter ? '검색 결과가 없습니다.' : '코드가 없습니다.'}
+                      </td>
+                    </tr>
                   )}
                 </tbody>
               </table>

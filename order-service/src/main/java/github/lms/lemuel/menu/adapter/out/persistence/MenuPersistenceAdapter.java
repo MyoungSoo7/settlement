@@ -41,6 +41,16 @@ public class MenuPersistenceAdapter implements LoadMenuPort, SaveMenuPort {
     }
 
     @Override
+    public List<Menu> saveAll(List<Menu> menus) {
+        List<MenuJpaEntity> entities = menus.stream()
+                .map(this::toEntity)
+                .collect(Collectors.toList());
+        return menuRepository.saveAll(entities).stream()
+                .map(this::toDomain)
+                .collect(Collectors.toList());
+    }
+
+    @Override
     public void deleteById(Long id) {
         menuRepository.deleteById(id);
     }
