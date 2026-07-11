@@ -140,9 +140,9 @@ CQRS 로 분리하고, 대사는 order 의 내부 API 를 호출해 cross-DB 연
 
 ```
 settlement/                              # 모노레포 루트
-├── settings.gradle.kts                  # 10 서비스 모듈 선언 (shared-common 은 composite build)
+├── settings.gradle.kts                  # 12 서비스 모듈 선언 (shared-common 은 composite build)
 ├── build.gradle.kts                     # 부모 빌드 (subprojects 공통 설정)
-├── docker-compose.yml                   # PG 10종 · ES · Redpanda · 10 services + gateway
+├── docker-compose.yml                   # PG 12종 · ES · Redpanda · 12 services + gateway
 ├── Dockerfile                           # MODULE 빌드 인자 파라미터화 (모든 서비스 공용)
 │
 ├── shared-common/                       # 📦 라이브러리 모듈 (java-library)
@@ -402,9 +402,9 @@ JWT_TTL_SECONDS=3600
 ### 전체 실행
 
 ```bash
-# 1. 인프라 + 10 서비스 모두 빌드/실행
+# 1. 인프라 + 12 서비스 모두 빌드/실행
 #    기동 순서는 compose healthcheck 기반 depends_on 이 보장:
-#    PG 10종·ES·Redpanda → order/settlement/loan/financial/economics/company/operation/market/ai/common-data → gateway → prometheus/grafana
+#    PG 12종·ES·Redpanda → order/settlement/loan/financial/economics/company/operation/market/ai/common-data/investment/account → gateway → prometheus/grafana
 docker compose up -d --build
 
 # 2. 전체 healthcheck 통과 확인 — 모든 서비스가 healthy 가 될 때까지 대기
@@ -463,8 +463,8 @@ npx newman run docs/demo/postman-e2e-purchase-flow.json -e docs/demo/postman-env
 ### 개별 서비스 실행
 
 ```bash
-# 인프라만 (PG 10종 + ES + Redpanda)
-docker compose up -d postgres settlement-db loan-postgres financial-postgres economics-postgres company-postgres operation-postgres market-postgres ai-postgres commondata-postgres elasticsearch redpanda
+# 인프라만 (PG 12종 + ES + Redpanda)
+docker compose up -d postgres settlement-db loan-postgres financial-postgres economics-postgres company-postgres operation-postgres market-postgres ai-postgres commondata-postgres investment-postgres account-postgres elasticsearch redpanda
 
 # 각 서비스를 IDE 또는 gradle 로
 ./gradlew :order-service:bootRun
@@ -672,9 +672,10 @@ CI 에서 k6 thresholds 로 회귀 자동 감지.
 
 ## 운영 환경 확장 포인트
 
-현재 구성은 **10개 서비스 모두 DB-per-service** 로 물리 분리돼 있고(order=opslab · settlement=settlement_db ·
+현재 구성은 **12개 서비스 모두 DB-per-service** 로 물리 분리돼 있고(order=opslab · settlement=settlement_db ·
 loan=lemuel_loan · financial=lemuel_financial · economics=lemuel_economics · company=lemuel_company ·
-operation=lemuel_operation · market=lemuel_market · ai=lemuel_ai · commondata=lemuel_commondata),
+operation=lemuel_operation · market=lemuel_market · ai=lemuel_ai · commondata=lemuel_commondata ·
+investment=lemuel_investment · account=lemuel_account),
 이벤트 프로젝션 패턴 덕분에 다음 단계로의 확장이 깨끗합니다:
 
 1. ~~**DB 분리**~~ — ✅ 완료. settlement 가 자체 `settlement_db` 의 projection 테이블에 Kafka 이벤트 컨슈머가
