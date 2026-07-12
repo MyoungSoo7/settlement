@@ -174,3 +174,12 @@ test('runAuditCli is injectable and returns a status without exiting the importe
   assert.equal(await runAuditCli(['--unknown'], { stderr: (s) => errors.push(s) }), 1);
   assert.match(errors.join(''), /unsupported argument/i);
 });
+
+test('repository harness contracts and STATUS match the tracked manifest oracle', () => {
+  const root = process.cwd();
+  const manifest = JSON.parse(execFileSync('git', ['-C', root, 'show', ':scripts/harness/manifest.json'], { encoding: 'utf8' }));
+  const governedErrors = collectAudit(root, manifest).errors.filter((error) =>
+    error.startsWith('STATUS ') || error.startsWith('interview-harness:'),
+  );
+  assert.deepEqual(governedErrors, []);
+});

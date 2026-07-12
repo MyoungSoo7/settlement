@@ -36,7 +36,7 @@ Run 1 to 5 cycles:
 3. Call `ontology`.
 4. Compare previous ontology and current ontology.
 5. Stop if similarity is 0.85 or higher.
-6. Stop if the cycle count exceeds 5.
+6. If cycle 5 is still below the threshold, stop in cycle 5 with `safety_valve`; never start cycle 6.
 
 ## Similarity
 
@@ -79,3 +79,7 @@ stop_reason: convergence | safety_valve
 - Never auto-adopt evolve-step candidates.
 - Never decide boundary equivalence without user confirmation.
 - Do not exceed 5 cycles.
+
+```harness-contract
+{"seedGate.requiredFields":["goal","constraints","acceptance_criteria"],"stageOrder":["evolve-step","ontology","compare"],"similarity.idea":"exact","similarity.boundary":"user-confirmed","similarity.properties":"jaccard","similarity.threshold":0.85,"maxCycles":5,"firstCycleComparison":"skip","candidateAdoption":"explicit-user-approval","canonicalScratch":".symposium/scratch/socrates.md","stopReasons":["convergence","safety_valve"]}
+```

@@ -1,24 +1,8 @@
-{
-  "eval_cases": [
-    {
-      "query": "Run the interview harness on: build a simple task CLI",
-      "should_trigger": true,
-      "expected_behavior": "Runs Seed Gate, then evolves and adds ontology until convergence or safety valve."
-    },
-    {
-      "query": "I only need a Seed from this vague request",
-      "should_trigger": false,
-      "expected_behavior": "Route to socrates."
-    },
-    {
-      "query": "Review this Seed for blind spots only",
-      "should_trigger": false,
-      "expected_behavior": "Route to evolve-step."
-    },
-    {
-      "query": "Converge this request into a final Seed with ontology",
-      "should_trigger": true,
-      "expected_behavior": "Runs the semi-automatic loop and asks for user adoption and boundary equivalence."
-    }
-  ]
-}
+[
+  {"contractCase":"seed-gate-create","expectedTransition":"incomplete-seed->socrates"},
+  {"contractCase":"seed-gate-reuse","expectedTransition":"complete-seed->evolve-step"},
+  {"contractCase":"user-adoption","expectedTransition":"candidate-requires-explicit-user-approval"},
+  {"contractCase":"first-cycle-skip","expectedTransition":"cycle-1->skip-comparison"},
+  {"contractCase":"threshold-boundary","expectedTransition":"similarity>=0.85->convergence"},
+  {"contractCase":"safety-cycle-5","expectedTransition":"cycle-5-not-converged->safety_valve"}
+]
