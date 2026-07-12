@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { chmodSync, cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 
@@ -34,6 +34,35 @@ function createRepo() {
   cpSync(join(projectRoot, 'scripts/harness/hooks/pre-commit'), join(root, 'scripts/harness/hooks/pre-commit'), { recursive: true });
   if (process.platform !== 'win32') chmodSync(join(root, 'scripts/harness/hooks/pre-commit'), 0o755);
   return root;
+}
+
+function createFreshRepositorySnapshot() {
+  const root = mkdtempSync(join(tmpdir(), 'harness-fresh-repository-'));
+  temporaryRoots.push(root);
+  const optionalPluginRoots = ['hackathon/settlement-copilot/', 'hackathon/invest-copilot/'];
+  const tracked = git(projectRoot, 'ls-files', '-z').stdout.split('\0').filter((path) =>
+    path && !optionalPluginRoots.some((prefix) => path.startsWith(prefix)));
+  for (const path of tracked) {
+    const source = join(projectRoot, path);
+    if (existsSync(source)) cpSync(source, join(root, path), { recursive: true });
+  }
+  assert.equal(git(root, 'init').status, 0);
+  assert.equal(git(root, 'config', 'user.name', 'Harness Fresh Repository Test').status, 0);
+  assert.equal(git(root, 'config', 'user.email', 'harness-fresh@example.test').status, 0);
+  assert.equal(git(root, 'add', '--all').status, 0);
+  assert.equal(git(root, 'commit', '--no-verify', '-m', 'fresh repository fixture').status, 0);
+  return root;
+}
+
+function childHarnessTests(root) {
+  const testDirectory = join(root, 'scripts/harness/test');
+  return cpTestPaths(testDirectory).map((path) => relative(root, path).split(sep).join('/'));
+}
+
+function cpTestPaths(directory) {
+  return ['audit.test.mjs', 'guard.test.mjs', 'install.test.mjs']
+    .map((name) => join(directory, name))
+    .filter(existsSync);
 }
 
 test.after(() => {
@@ -97,4 +126,51 @@ test('installed hook propagates failure from a present optional plugin guard', a
   const result = git(root, 'commit', '-m', 'plugin failure');
   assert.notEqual(result.status, 0, result.stdout);
   assert.match(`${result.stdout}\n${result.stderr}`, /plugin rejected commit/);
+});
+
+test('fresh repository reproduces the complete plugin-independent harness contract', {
+  skip: process.env.HARNESS_FRESH_CHILD === '1' && 'outer proof owns recursive fresh-repository coverage',
+}, () => {
+  const root = createFreshRepositorySnapshot();
+  assert.equal(existsSync(join(root, 'hackathon/settlement-copilot')), false);
+  assert.equal(existsSync(join(root, 'hackathon/invest-copilot')), false);
+
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const installed = run(root, process.execPath, ['scripts/harness/install-hooks.mjs']);
+    assert.equal(installed.status, 0, `installer attempt ${attempt}: ${installed.stderr || installed.stdout}`);
+  }
+
+  const tests = run(root, process.execPath, ['--test', ...childHarnessTests(root)], {
+    env: { ...process.env, HARNESS_FRESH_CHILD: '1' },
+  });
+  assert.equal(tests.status, 0, tests.stderr || tests.stdout);
+
+  const selfTest = run(root, process.execPath, ['scripts/harness/guard.mjs', '--self-test']);
+  assert.equal(selfTest.status, 0, selfTest.stderr || selfTest.stdout);
+
+  const audit = run(root, process.execPath, ['scripts/harness/harness-audit.mjs']);
+  assert.equal(audit.status, 0, audit.stderr || audit.stdout);
+  assert.match(audit.stdout, /harness-audit: healthy/i);
+
+  const manifest = JSON.parse(readFileSync(join(root, 'scripts/harness/manifest.json'), 'utf8'));
+  const tracked = git(root, 'ls-files', '--error-unmatch', '--', ...manifest.requiredTrackedFiles);
+  assert.equal(tracked.status, 0, tracked.stderr || tracked.stdout);
+  const clean = git(root, 'diff', '--exit-code');
+  assert.equal(clean.status, 0, clean.stderr || clean.stdout);
+
+  const untrackedRequired = manifest.requiredTrackedFiles.at(-1);
+  assert.equal(git(root, 'rm', '--cached', '--', untrackedRequired).status, 0);
+  const untrackedAudit = run(root, process.execPath, ['scripts/harness/harness-audit.mjs']);
+  assert.notEqual(untrackedAudit.status, 0);
+  assert.match(untrackedAudit.stdout, new RegExp(`${untrackedRequired.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}.*not tracked`, 'i'));
+  assert.equal(git(root, 'reset', '--hard', 'HEAD').status, 0);
+
+  put(root, 'scripts/harness/deleted-reference.mjs', 'export {};\n');
+  put(root, '.claude/commands/deleted-reference-proof.md', 'node scripts/harness/deleted-reference.mjs\n');
+  assert.equal(git(root, 'add', '--all').status, 0);
+  assert.equal(git(root, 'commit', '-m', 'add referenced harness command').status, 0);
+  assert.equal(git(root, 'rm', 'scripts/harness/deleted-reference.mjs').status, 0);
+  const deletedReferenceAudit = run(root, process.execPath, ['scripts/harness/harness-audit.mjs']);
+  assert.notEqual(deletedReferenceAudit.status, 0);
+  assert.match(deletedReferenceAudit.stdout, /broken reference.*deleted-reference\.mjs.*not tracked/i);
 });
