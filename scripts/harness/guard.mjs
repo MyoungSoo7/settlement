@@ -23,6 +23,13 @@ const ALLOWANCE = /harness-guard:\s*allow\s+reason="([^"]*)"\s+issue="([^"]*)"\s
 const ISSUE = /^(ISSUE-\d+|https:\/\/github\.com\/[^/\s]+\/[^/\s]+\/issues\/\d+)$/;
 const OWNER = /^team-[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
+const POLICY_ROOT = /(?:^|\/)((?:hackathon|pwc|settlement-service|account-service|market-service)\/.*)$/;
+
+function policyPath(filePath) {
+  const normalized = String(filePath).replaceAll('\\', '/');
+  return normalized.match(POLICY_ROOT)?.[1] ?? normalized;
+}
+
 // Money-scope = files where BigDecimal / immutable-history rules are non-negotiable.
 const MONEY_SCOPE = /(settlement|ledger|payout|chargeback|loan|payment|investment|account|pgreconciliation|recon)/i;
 const JAVA_KT = /\.(java|kt)$/i;
@@ -102,7 +109,8 @@ export function parseAllowance(line, { now = new Date() } = {}) {
 export function scanText(f, content, { now = new Date() } = {}) {
   const violations = [];
   const allowances = [];
-  if (NO_COMMIT.test(f)) {
+  const comparablePath = policyPath(f);
+  if (NO_COMMIT.test(comparablePath)) {
     violations.push({ file: f, line: 0, id: 'NO-COMMIT', msg: `${f} — hackathon/·pwc/ 경로는 커밋 금지 (add -f 우회 금지)` });
     return { violations, allowances };
   }
@@ -118,7 +126,7 @@ export function scanText(f, content, { now = new Date() } = {}) {
     return allowance;
   });
   for (const rule of RULES) {
-    if (!rule.when(f)) continue;
+    if (!rule.when(comparablePath)) continue;
     lines.forEach((line, i) => {
       if (lineAllowances[i]) return;
       // ignore comment-only lines for code rules (keep SQL/DDL scanning)
@@ -130,7 +138,7 @@ export function scanText(f, content, { now = new Date() } = {}) {
 }
 
 function scanFile(f) {
-  if (NO_COMMIT.test(f)) return scanText(f, '').violations;
+  if (NO_COMMIT.test(policyPath(f))) return scanText(f, '').violations;
   if (!existsSync(f)) return [];
   try { return scanText(f, readFileSync(f, 'utf8')).violations; } catch { return []; }
 }

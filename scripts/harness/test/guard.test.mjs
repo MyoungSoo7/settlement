@@ -69,6 +69,44 @@ describe('guard policy fixtures', () => {
     assert.deepEqual(java.violations, []);
     assert.deepEqual(kotlin.violations, []);
   });
+
+  for (const fixture of [
+    {
+      id: 'MONEY-PRIMITIVE',
+      file: String.raw`C:\workspace\repo\settlement-service\src\main\java\github\lms\lemuel\settlement\domain\Money.java`,
+      content: 'double amount = 1.0;',
+    },
+    {
+      id: 'MONEY-PRIMITIVE',
+      file: '/workspace/repo/settlement-service/src/main/java/github/lms/lemuel/settlement/domain/Money.java',
+      content: 'double amount = 1.0;',
+    },
+    {
+      id: 'ACCOUNT-CONSUME-ONLY',
+      file: String.raw`C:\workspace\repo\account-service\src\main\java\github\lms\lemuel\account\Publisher.java`,
+      content: 'kafkaTemplate.send("ledger", event);',
+    },
+    {
+      id: 'ACCOUNT-CONSUME-ONLY',
+      file: '/workspace/repo/account-service/src/main/java/github/lms/lemuel/account/Publisher.java',
+      content: 'kafkaTemplate.send("ledger", event);',
+    },
+    {
+      id: 'NO-COMMIT',
+      file: String.raw`C:\workspace\repo\pwc\submission\result.json`,
+      content: '{}',
+    },
+    {
+      id: 'NO-COMMIT',
+      file: '/workspace/repo/pwc/submission/result.json',
+      content: '{}',
+    },
+  ]) {
+    test(`${fixture.id} cannot be bypassed with absolute path ${fixture.file}`, () => {
+      const result = scanText(fixture.file, fixture.content, { now: NOW });
+      assert.ok(result.violations.some(({ id }) => id === fixture.id));
+    });
+  }
 });
 
 describe('structured allowances', () => {
