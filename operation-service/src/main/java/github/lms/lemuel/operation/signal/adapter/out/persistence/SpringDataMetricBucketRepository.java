@@ -1,11 +1,13 @@
 package github.lms.lemuel.operation.signal.adapter.out.persistence;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
+import java.util.List;
 
 /**
  * ops_metric_bucket UPSERT 리포지토리.
@@ -46,4 +48,17 @@ public interface SpringDataMetricBucketRepository extends JpaRepository<MetricBu
     void upsertGauge(@Param("metricKey") String metricKey,
                      @Param("bucketStart") Instant bucketStart,
                      @Param("value") double value);
+
+    /**
+     * Phase 3 이상 탐지 입력 — 지정 metric_key 의 마감된(bucket_start &lt; :before) 버킷을
+     * 최신 순으로 최대 Pageable.pageSize 개 조회. idx_metric_bucket_recent(metric_key, bucket_start DESC) 활용.
+     */
+    @Query("""
+            select e from MetricBucketJpaEntity e
+            where e.id.metricKey = :metricKey and e.id.bucketStart < :before
+            order by e.id.bucketStart desc
+            """)
+    List<MetricBucketJpaEntity> findRecentClosed(@Param("metricKey") String metricKey,
+                                                 @Param("before") Instant before,
+                                                 Pageable pageable);
 }
