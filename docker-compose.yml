@@ -263,6 +263,27 @@ services:
       timeout: 3s
       retries: 10
 
+  organization-postgres:
+    image: postgres:17-alpine
+    container_name: lemuel-organization-db
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      POSTGRES_DB: lemuel_organization
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "127.0.0.1:5446:5432"
+    volumes:
+      - organization-postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.17.0
     container_name: lemuel-elasticsearch
@@ -864,6 +885,46 @@ services:
       redpanda:
         condition: service_healthy
 
+  organization-service:
+    build:
+      context: .
+      args:
+        MODULE: organization-service
+    image: ghcr.io/myoungsoo7/lemuel-organization:latest
+    container_name: lemuel-organization
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      # 자체 DB(lemuel_organization) — 조직관리. 셀러/기업 조직·멤버십·역할, 이벤트는 Outbox 발행 전용
+      SPRING_DATASOURCE_URL: jdbc:postgresql://organization-postgres:5432/lemuel_organization?reWriteBatchedInserts=true
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      APP_KAFKA_ENABLED: "true"
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
+      # JWT 시크릿은 order-service 와 동일해야 토큰 검증 가능
+      JWT_ISSUER: ${JWT_ISSUER}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_TTL_SECONDS: ${JWT_TTL_SECONDS}
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
+      SERVER_PORT: 8080
+      MANAGEMENT_SERVER_PORT: 8080
+    ports:
+      - "127.0.0.1:8104:8080"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    depends_on:
+      organization-postgres:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+
   gateway-service:
     build:
       context: .
@@ -888,6 +949,7 @@ services:
       AI_SERVICE_URI: http://ai-service:8080
       INVESTMENT_SERVICE_URI: http://investment-service:8080
       ACCOUNT_SERVICE_URI: http://account-service:8080
+      ORGANIZATION_SERVICE_URI: http://organization-service:8080
       JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
     ports:
       - "127.0.0.1:8080:8080"
@@ -1036,6 +1098,7 @@ volumes:
   commondata-postgres-data:
   investment-postgres-data:
   account-postgres-data:
+  organization-postgres-data:
   ai-postgres-data:
   elasticsearch-data:
   redpanda-data:
