@@ -190,11 +190,15 @@ app:
       min-sample-total: 30                               # 최소 표본(count_total) 게이트
       failure-rate-floor: 0.10                           # 상대임계 하한(실패율 10% 미만은 이상 아님)
       resolve-streak-k: 3                                # 정상 3버킷 연속 시 자동 해제
-      # metric_key → 인시던트 SignalCategory. key 집합이 곧 탐지 대상(실패율 카운터 5종).
+      # metric_key → 인시던트 SignalCategory. key 집합이 곧 탐지 대상.
       # metric_key 는 signal 버킷 키와 동일(DomainEventSignalConsumer/OpsFailureSignalConsumer).
       metric-category:
         settlement: SETTLEMENT_FAILURE
         payment: PAYMENT_FAILURE
-        order: ORDER_FAILURE
         stock: STOCK_SHORTAGE
         shipping: SHIPPING_DELAY
+        # order 는 의도적으로 제외 — order.failed 프로듀서가 아직 미배선이라(Phase 2b §2b.4:
+        # 주문 생성 실패의 단일 catch 지점 부재로 배선 보류) count_signal 이 항상 0 → failure_rate 0 →
+        # 이상 판정이 구조적으로 불가능하다. "감시 중인데 절대 안 울리는" 착시를 피하려 목록에서 뺀다.
+        # order.failed 발행 지점이 확정되면 아래 한 줄을 추가하면 즉시 활성화된다.
+        # order: ORDER_FAILURE
