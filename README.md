@@ -1,8 +1,8 @@
 # Lemuel — 이커머스 + 정산 MSA 플랫폼
 
-> **상품·장바구니·주문·결제·배송·정산·선정산/기업대출·투자·계정계·재무제표·경제지표·기업평판·운영관제·주식시세·AI챗봇·공공데이터** 도메인을 **12개 마이크로서비스 + API Gateway** 로 분리한
-> 헥사고날 아키텍처 기반 백엔드. 단일 모놀리스 → **Bounded Context 분리** → **이벤트 드리븐** →
-> **DB-per-service + 이벤트 프로젝션 패턴**(ADR 0020 완료) 으로 진화시킨 포트폴리오 프로젝트.
+> **이커머스 주문 → 셀러 정산 → 복식부기 원장까지, "정확성을 기계로 강제한" 커머스 백엔드.**
+> 커머스(order)·정산(settlement) 두 축의 **깊이**가 시그니처이고, 그 위에 대출·투자·계정계·재무제표·경제지표·기업평판·운영관제·주식시세·AI챗봇·공공데이터를 **12개 마이크로서비스 + API Gateway** 로 확장해 도메인 확장력을 증명한다.
+> 단일 모놀리스 → **Bounded Context 분리** → **이벤트 드리븐** → **DB-per-service + 이벤트 프로젝션 패턴**(ADR 0020) 으로 진화시킨 헥사고날 백엔드 포트폴리오.
 
 [![Java 25](https://img.shields.io/badge/Java-25-orange)](https://www.oracle.com/java/)
 [![Spring Boot 4](https://img.shields.io/badge/Spring%20Boot-4.0.4-brightgreen)](https://spring.io/projects/spring-boot)
@@ -15,6 +15,7 @@
 
 | 보고 싶은 것 | 한 번에 가는 곳 |
 |---|---|
+| **✅ "정말 작동하나" (5분, 재현 가능)** | **[docs/SETTLEMENT-VERIFICATION.md](docs/SETTLEMENT-VERIFICATION.md)** — 520 테스트·LINE 94.17% + 불변식 매핑 + 한계 |
 | **📄 1장 요약 (이력서 첨부용)** | **[PORTFOLIO.md](PORTFOLIO.md)** |
 | **시스템 전체 구조** | [아키텍처 다이어그램 (본 README)](#아키텍처) |
 | **Architecture Decision Records** | [docs/adr/](docs/adr/) |
