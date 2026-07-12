@@ -127,9 +127,14 @@ class IntegrityPhaseAIntegrationTest {
     void detectsAmountMismatchAndSeparatesGracePending() {
         LocalDateTime now = LocalDateTime.now();
         LocalDate target = now.toLocalDate();
+        // half 는 "grace 경과 + 당일(target) 안" 이어야 한다. now.minusHours(2) 는 자정 직후(예: 00~02시)
+        // 실행 시 전날로 넘어가, 모든 쿼리의 business-day 창(confirmed_at >= target 0시)에서 빠져
+        // amountMismatched 목록에서 사라지는 시간대 의존 flaky 를 유발했다. 당일 시작 직후로 고정해
+        // 항상 당일 + grace(기본 15분) 밖이 되도록 안정화한다.
+        LocalDateTime pastGraceSameDay = target.atStartOfDay().plusMinutes(1);
 
         Long halfId = tx.execute(s -> {
-            SettlementJpaEntity half = settlement(target, now.minusHours(2)); // grace 경과
+            SettlementJpaEntity half = settlement(target, pastGraceSameDay); // grace 경과 + 당일
             em.persist(half);
             em.persist(entry(half.getId(), "SETTLEMENT", new BigDecimal("96500.00"), target)); // 수수료 row 누락
             return half.getId();
