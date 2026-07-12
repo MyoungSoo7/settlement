@@ -43,8 +43,8 @@ class OpslabDecommissionIT {
     private static final List<String> SETTLEMENT_TABLES = List.of(
             "settlement_adjustments", "settlement_loan_deductions", "pg_reconciliation_discrepancies",
             "pg_reconciliation_runs", "ledger_outbox", "ledger_entries", "chargebacks", "payouts",
-            "settlement_index_queue", "settlement_payment_view", "settlement_order_view",
-            "settlement_user_view", "settlement_product_view", "settlements");
+            "settlement_index_queue", "settlement_schedule_config", "settlement_payment_view",
+            "settlement_order_view", "settlement_user_view", "settlement_product_view", "settlements");
 
     /** order 가 계속 사용 — 절대 드롭되면 안 됨(공유 outbox_events 포함). */
     private static final List<String> ORDER_TABLES = List.of(

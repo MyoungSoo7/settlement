@@ -45,6 +45,7 @@ DROP_TABLES=(
   chargebacks
   payouts
   settlement_index_queue
+  settlement_schedule_config   # dead 확정: 레포 코드 참조 0 + settlement_db baseline 부재 (구 REVIEW → DROP 승격). 독립 테이블(FK 무관).
   settlement_payment_view
   settlement_order_view
   settlement_user_view
@@ -54,7 +55,6 @@ DROP_TABLES=(
 
 echo "==> opslab settlement 테이블 decommission (대상 ${#DROP_TABLES[@]}개)"
 echo "    KEEP(공유): outbox_events, processed_events, audit_logs, shedlock, batch_run_history"
-echo "    REVIEW(별도): settlement_schedule_config — settlement_db baseline 부재, 미사용 확인 후 수동 판단"
 echo
 
 count() { psql "$1" -tAc "SELECT count(*) FROM ${2}.${3};" 2>/dev/null || echo "N/A"; }
@@ -108,6 +108,5 @@ cat <<'NEXT'
     - order-service 의 settlement 테이블 생성 마이그레이션(V2/V4/V5/V6/V35/V43~45/V49/
       V20260616120000~160000)은 이력 보존상 남는다. 신규 opslab 부트스트랩 시 빈 테이블이
       재생성되나 order 코드가 사용하지 않으므로 무해(미사용 잔여). 그린필드에선 생략 권장.
-    - settlement_schedule_config 는 별도 검토 후 수동 처리.
     상세: docs/runbook/settlement-db-decommission.md
 NEXT
