@@ -31,6 +31,17 @@ public class CompanyJpaEntity {
     protected CompanyJpaEntity() {
     }
 
+    /** upsert 용 — @Id(stockCode) 기준으로 save() 가 신규 insert / 기존 merge 를 판별한다. */
+    static CompanyJpaEntity fromDomain(Company company, Instant updatedAt) {
+        CompanyJpaEntity entity = new CompanyJpaEntity();
+        entity.stockCode = company.stockCode();
+        entity.corpCode = company.corpCode();
+        entity.name = company.name();
+        entity.market = company.market();
+        entity.updatedAt = updatedAt;
+        return entity;
+    }
+
     Company toDomain() {
         return new Company(stockCode, corpCode, name, market);
     }

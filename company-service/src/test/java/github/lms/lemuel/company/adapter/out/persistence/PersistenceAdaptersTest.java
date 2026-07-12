@@ -178,6 +178,41 @@ class PersistenceAdaptersTest {
                     .thenReturn(List.of(entity()));
             assertEquals(1, adapter.findAll().size());
         }
+
+        @Test
+        @DisplayName("upsertAll — 신규는 registered, 기존은 updated, 제약 위반은 항목만 skip")
+        void upsertAll() {
+            when(repository.existsById("005930")).thenReturn(false); // 신규
+            when(repository.existsById("035420")).thenReturn(true);  // 기존 → 갱신
+            when(repository.existsById("000660")).thenReturn(false); // 신규지만 corpCode 충돌
+            when(repository.saveAndFlush(any())).thenAnswer(inv -> {
+                CompanyJpaEntity e = inv.getArgument(0);
+                if ("000660".equals(stockCodeOf(e))) {
+                    throw new DataIntegrityViolationException("corp_code unique");
+                }
+                return e;
+            });
+
+            var result = adapter.upsertAll(List.of(
+                    new Company("005930", "00126380", "삼성전자", "KOSPI"),
+                    new Company("035420", "00266961", "NAVER", "KOSPI"),
+                    new Company("000660", "00164779", "SK하이닉스", "KOSPI")));
+
+            assertEquals(1, result.registered());
+            assertEquals(1, result.updated());
+            assertEquals(1, result.skipped());
+            verify(repository, org.mockito.Mockito.times(3)).saveAndFlush(any());
+        }
+
+        private String stockCodeOf(CompanyJpaEntity e) {
+            try {
+                Field f = CompanyJpaEntity.class.getDeclaredField("stockCode");
+                f.setAccessible(true);
+                return (String) f.get(e);
+            } catch (Exception ex) {
+                throw new RuntimeException(ex);
+            }
+        }
     }
 
     @Nested

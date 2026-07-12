@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -17,6 +16,7 @@ import java.time.Instant;
 import java.util.Optional;
 
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -55,22 +55,23 @@ class CompanyDocumentSecurityTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    // STATELESS 체인에서는 @WithMockUser(SecurityContextHolder 선설정)가 SecurityContextHolderFilter 에
+    // 빈 컨텍스트로 덮여 무효화된다 — 요청 레벨 .with(user(...)) post-processor(TestSecurityContextRepository
+    // 경유)로 주입해야 인가 평가까지 전달된다.
     @Test
     @DisplayName("문서 다운로드 — USER 권한이면 403")
-    @WithMockUser(roles = "USER")
     void downloadUserForbidden403() throws Exception {
-        mockMvc.perform(get("/api/company/documents/5/download"))
+        mockMvc.perform(get("/api/company/documents/5/download").with(user("u").roles("USER")))
                 .andExpect(status().isForbidden());
     }
 
     @Test
     @DisplayName("문서 다운로드 — ADMIN 은 인가 통과(200)")
-    @WithMockUser(roles = "ADMIN")
     void downloadAdminOk() throws Exception {
         when(getCompanyDocumentsUseCase.download(5L)).thenReturn(
                 Optional.of(new GetCompanyDocumentsUseCase.DocumentDownload(document(), new byte[]{1, 2, 3})));
 
-        mockMvc.perform(get("/api/company/documents/5/download"))
+        mockMvc.perform(get("/api/company/documents/5/download").with(user("admin").roles("ADMIN")))
                 .andExpect(status().isOk());
     }
 }
