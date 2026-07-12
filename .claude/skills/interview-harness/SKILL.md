@@ -62,8 +62,8 @@ sub 스킬 셋(`/socrates`, `/evolve-step`, `/ontology`)을 한 사이클로 묶
 │    4. Stop rule 점검:                                       │
 │       - 직전 ontology vs 이번 ontology 유사도 ≥ 0.85        │
 │         → stop_reason = "convergence", 종료                 │
-│       - cycle > 5                                           │
-│         → stop_reason = "safety_valve", 종료                │
+│       - cycle 5에서도 유사도 < 0.85                         │
+│         → stop_reason = "safety_valve", 종료 (cycle 6 없음) │
 │       - 첫 사이클(직전값 없음)은 비교 스킵, 다음 사이클로    │
 └─────────────────────────────────────────────────────────────┘
    ↓

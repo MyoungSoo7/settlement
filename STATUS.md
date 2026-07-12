@@ -41,7 +41,7 @@
 - 외부 `main` 머지가 `develop` 으로 유입 → push 전 `git pull --rebase` 습관화
 - 운영 배포 필수 주입: 강한 `JWT_SECRET`, `app.security.internal-key-required=true`, 각 서비스 외부 API 키
 
-## 핵심 수치 (2026-07-12 기준 · git-tracked 소스)
+## 핵심 수치 (2026-07-13 기준 · git-tracked 소스)
 > ⚠️ 수치는 `build/`·`.claude/worktrees/` 사본을 **제외한 git ls-files 기준**. 각 줄 끝 명령이 정답 —
 > 드리프트 의심 시 명령을 돌려 재검증하고 이 수치를 갱신할 것(휘발성 수치를 명령 없이 손으로 적지 말 것).
 - 서비스 **13개** + API Gateway — `git ls-files '*/src/main/resources/application.yml' | wc -l` → 14(=13+gateway)

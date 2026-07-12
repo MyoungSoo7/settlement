@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -181,5 +181,13 @@ test('repository harness contracts and STATUS match the tracked manifest oracle'
   const governedErrors = collectAudit(root, manifest).errors.filter((error) =>
     error.startsWith('STATUS ') || error.startsWith('interview-harness:'),
   );
+  for (const path of ['.claude/skills/interview-harness/SKILL.md', '.codex/skills/interview-harness/SKILL.md']) {
+    const skill = readFileSync(join(root, ...path.split('/')), 'utf8');
+    if (/cycle\s*>\s*5/i.test(skill)) governedErrors.push(`${path}: forbidden cycle > 5 contract wording`);
+  }
+  const status = readFileSync(join(root, 'STATUS.md'), 'utf8');
+  const lastUpdated = status.match(/\*\*Last updated:\*\*\s*(\d{4}-\d{2}-\d{2})/)?.[1];
+  const measurementDate = status.match(/## 핵심 수치 \((\d{4}-\d{2}-\d{2}) 기준/)?.[1];
+  if (lastUpdated !== measurementDate) governedErrors.push(`STATUS measurement date mismatch: lastUpdated=${lastUpdated} measurementDate=${measurementDate}`);
   assert.deepEqual(governedErrors, []);
 });
