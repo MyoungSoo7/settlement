@@ -55,6 +55,17 @@ function repo(files, tracked = Object.keys(files)) {
   return root;
 }
 
+function assertPushBeforeFailsClosed(workflow) {
+  const pushBranch = workflow.slice(workflow.indexOf('BEFORE="${{ github.event.before }}"'));
+  assert.match(pushBranch,
+    /if \[\[ ! "\$BEFORE" =~ \^\[0-9a-fA-F\]\{40\}\$ \]\]; then\s+echo "invalid push before SHA: \$BEFORE" >&2\s+exit 1\s+fi/);
+  const beforeValidation = pushBranch.indexOf('[[ ! "$BEFORE" =~ ^[0-9a-fA-F]{40}$ ]]');
+  const zeroShaBranch = pushBranch.indexOf('[ "$BEFORE" = "0000000000000000000000000000000000000000" ]');
+  const beforeLookup = pushBranch.indexOf('git cat-file -e "$BEFORE^{commit}"');
+  assert.ok(beforeValidation < zeroShaBranch && zeroShaBranch < beforeLookup,
+    'invalid revisions must fail before zero-SHA handling and git lookup');
+}
+
 test('validateManifest accepts schema 1 and rejects invalid versions and paths', () => {
   assert.deepEqual(validateManifest(baseManifest(['a/b'])), baseManifest(['a/b']));
   for (const value of [
@@ -180,17 +191,25 @@ test('harness guard workflow uses deterministic bases and ordered reproducibilit
   assert.match(workflow, /fetch-depth:\s*0/);
   assert.match(workflow, /node-version:\s*['"]?22['"]?/);
   assert.match(workflow, /--diff-filter=ACMR/);
-  assert.match(workflow, /git fetch --no-tags origin "\$BASE_REF:refs\/remotes\/origin\/\$BASE_REF"/);
+  assert.match(workflow, /git fetch --no-tags origin "\+refs\/heads\/\$\{BASE_REF\}:refs\/remotes\/origin\/\$\{BASE_REF\}"/);
   assert.match(workflow, /git merge-base HEAD "refs\/remotes\/origin\/\$BASE_REF"/);
   assert.match(workflow, /git cat-file -e "\$BASE\^\{commit\}"/);
   assert.match(workflow, /git cat-file -e "\$BEFORE\^\{commit\}"/);
-  assert.match(workflow, /0{40}/);
+  assertPushBeforeFailsClosed(workflow);
+  for (const invalidBefore of ['', 'abc', 'g'.repeat(40), 'a'.repeat(41)]) {
+    assert.equal(/^[0-9a-fA-F]{40}$/.test(invalidBefore), false);
+  }
+  assert.throws(() => assertPushBeforeFailsClosed(workflow.replace(
+    'echo "invalid push before SHA: $BEFORE" >&2\n              exit 1',
+    'echo "invalid push before SHA: $BEFORE" >&2\n              exit 0',
+  )));
   assert.match(workflow, /git ls-files > changed\.txt/);
   assert.match(workflow, /unsupported event/i);
   assert.doesNotMatch(workflow, /HEAD~1|\|\|\s*git diff/);
 
   const ordered = [
     'Run harness tests',
+    'Compute changed files',
     'Money / architecture guard (changed files)',
     'Harness self-audit',
     'Verify manifest tracking',
