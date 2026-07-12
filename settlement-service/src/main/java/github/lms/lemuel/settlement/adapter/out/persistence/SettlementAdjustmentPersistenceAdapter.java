@@ -22,12 +22,21 @@ public class SettlementAdjustmentPersistenceAdapter implements SaveSettlementAdj
         return toDomain(saved);
     }
 
+    @Override
+    public boolean existsByReconciliationDiscrepancyId(Long discrepancyId) {
+        if (discrepancyId == null) {
+            return false;
+        }
+        return repository.existsByReconciliationDiscrepancyId(discrepancyId);
+    }
+
     private SettlementAdjustmentJpaEntity toEntity(SettlementAdjustment domain) {
         SettlementAdjustmentJpaEntity entity = new SettlementAdjustmentJpaEntity();
         entity.setId(domain.getId());
         entity.setSettlementId(domain.getSettlementId());
         entity.setRefundId(domain.getRefundId());
         entity.setChargebackId(domain.getChargebackId());
+        entity.setReconciliationDiscrepancyId(domain.getReconciliationDiscrepancyId());
         entity.setAmount(domain.getAmount());
         entity.setStatus(domain.getStatus() != null ? domain.getStatus() : "PENDING");
         entity.setAdjustmentDate(domain.getAdjustmentDate());
@@ -43,6 +52,7 @@ public class SettlementAdjustmentPersistenceAdapter implements SaveSettlementAdj
         domain.setSettlementId(entity.getSettlementId());
         domain.setRefundId(entity.getRefundId());
         domain.setChargebackId(entity.getChargebackId());
+        domain.setReconciliationDiscrepancyId(entity.getReconciliationDiscrepancyId());
         domain.setAmount(entity.getAmount());
         domain.setStatus(entity.getStatus());
         domain.setAdjustmentDate(entity.getAdjustmentDate());

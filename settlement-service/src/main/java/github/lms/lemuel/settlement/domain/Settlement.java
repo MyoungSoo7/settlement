@@ -259,6 +259,44 @@ public class Settlement {
         this.updatedAt = LocalDateTime.now();
     }
 
+    /**
+     * PG 대사 승인에 따른 역정산(clawback) 반영 — 셀러가 과다 정산받은 금액을 정산금에서 회수한다.
+     *
+     * <p>{@link #adjustForRefund}와 달리 {@code refundedAmount} running total 은 절대 건드리지 않는다.
+     * 대사 clawback 을 환불 누적치에 섞으면 실제 환불과 이중 계상되거나, 이후 환불 delta 복원 로직
+     * ({@code cumulative − settled})이 오작동한다. 따라서 net 만 clawback 만큼 축소한다.
+     *
+     * <p>DONE 정산은 이미 지급 완료되어 불변 — {@link #adjustForRefund}와 동일하게 예외를 던지고,
+     * 호출자(서비스)가 {@link SettlementAdjustment} 감사 레코드만 남겨 수기 회수로 이관한다.
+     *
+     * <p><b>Scope 경계</b>: 원장 역분개는 후속 과제다. 기존 {@code enqueueReverse}는 refundId 키 기반이라
+     * 대사에 맞지 않고, chargeback 경로와 동일하게 이 단계에서는 원장을 건드리지 않는다.
+     *
+     * @param clawbackAmount 회수 금액 (양수)
+     */
+    public void applyReconciliationClawback(BigDecimal clawbackAmount) {
+        if (clawbackAmount == null || clawbackAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Reconciliation clawback amount must be greater than zero");
+        }
+
+        // DONE 상태는 지급 완료된 정산 → 금액 직접 변경 금지 (adjustForRefund 와 동일한 불변식).
+        if (this.status == SettlementStatus.DONE) {
+            throw new IllegalStateException(
+                "DONE settlement is immutable. Use SettlementAdjustment to record the reconciliation clawback offset.");
+        }
+
+        // net 만 clawback 만큼 축소 — refundedAmount 는 건드리지 않는다.
+        Money net = Money.of(this.netAmount).minus(Money.of(clawbackAmount));
+        this.netAmount = net.toBigDecimal();
+
+        // clawback 으로 정산 금액이 0 이하가 되면 취소 처리 (adjustForRefund 규칙 미러링).
+        if (net.isZeroOrNegative()) {
+            this.status = SettlementStatus.CANCELED;
+        }
+
+        this.updatedAt = LocalDateTime.now();
+    }
+
     // ========== 상태 확인 메서드 ==========
 
     public boolean isConfirmed() {

@@ -199,6 +199,8 @@ app:
       payment-refunded: lemuel.payment.refunded
       # loan → settlement (상환 차감 결과 수신). loan Outbox 자동 라우팅명(snake_case)과 일치.
       loan-repayment-applied: lemuel.loan.repayment_applied
+      # PG 대사 승인 → 역정산(clawback). 자체 Outbox aggregateType=PgReconciliation 자동 라우팅명과 일치.
+      pg-recon-approved: lemuel.pgreconciliation.discrepancy_approved
   search:
     enabled: false
   # 정산 확정 청크 배치 — 한 청크(트랜잭션)에서 확정할 정산 건수. 롱 트랜잭션/락 보유 시간과 처리량의 균형.

@@ -14,7 +14,8 @@ public class SettlementAdjustment {
     private Long settlementId;
     private Long refundId;             // Refund 엔티티 도입 전까지 nullable 허용
     private Long chargebackId;         // V44 — 카드사 분쟁 연결. refund_id 와 양립 (둘 중 하나만)
-    private BigDecimal amount;         // 항상 음수 (환불·분쟁 반영분)
+    private Long reconciliationDiscrepancyId; // PG 대사 승인 clawback 연결. refund_id/chargeback_id 와 배타 (다중 출처 금지)
+    private BigDecimal amount;         // 항상 음수 (환불·분쟁·대사 반영분)
     private String status;
     private LocalDate adjustmentDate;
     private LocalDateTime createdAt;
@@ -57,6 +58,29 @@ public class SettlementAdjustment {
         return adjustment;
     }
 
+    /**
+     * PG 대사 차이(Discrepancy) 승인 → 정산에서 회수(clawback)하는 음수 row.
+     * refund_id/chargeback_id 는 NULL, reconciliationDiscrepancyId 만 채워 3-way 다중출처금지 제약과 일치.
+     */
+    public static SettlementAdjustment ofReconciliation(Long settlementId, Long discrepancyId,
+                                                        BigDecimal clawbackAmount,
+                                                        LocalDate adjustmentDate) {
+        if (discrepancyId == null || discrepancyId <= 0) {
+            throw new IllegalArgumentException("discrepancyId 필수");
+        }
+        if (clawbackAmount == null || clawbackAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Reconciliation clawback amount must be greater than zero");
+        }
+        SettlementAdjustment adjustment = new SettlementAdjustment();
+        adjustment.settlementId = settlementId;
+        adjustment.reconciliationDiscrepancyId = discrepancyId;
+        adjustment.amount = clawbackAmount.negate();   // 감사 규약: 음수 기록
+        adjustment.status = "PENDING";
+        adjustment.adjustmentDate = adjustmentDate;
+        adjustment.createdAt = LocalDateTime.now();
+        return adjustment;
+    }
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -68,6 +92,11 @@ public class SettlementAdjustment {
 
     public Long getChargebackId() { return chargebackId; }
     public void setChargebackId(Long chargebackId) { this.chargebackId = chargebackId; }
+
+    public Long getReconciliationDiscrepancyId() { return reconciliationDiscrepancyId; }
+    public void setReconciliationDiscrepancyId(Long reconciliationDiscrepancyId) {
+        this.reconciliationDiscrepancyId = reconciliationDiscrepancyId;
+    }
 
     public BigDecimal getAmount() { return amount; }
     public void setAmount(BigDecimal amount) { this.amount = amount; }

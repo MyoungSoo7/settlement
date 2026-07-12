@@ -30,6 +30,10 @@ public class SettlementAdjustmentJpaEntity {
     @Column(name = "chargeback_id")
     private Long chargebackId;
 
+    /** PG 대사 승인 clawback 연결. refund_id/chargeback_id 와 배타 (한 row 는 최대 한 출처). */
+    @Column(name = "reconciliation_discrepancy_id")
+    private Long reconciliationDiscrepancyId;
+
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal amount;
 
