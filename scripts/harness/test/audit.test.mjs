@@ -22,6 +22,7 @@ const CASES = [
   ['threshold-boundary', 'similarity>=0.85->convergence'],
   ['safety-cycle-5', 'cycle-5-not-converged->safety_valve'],
 ];
+const CASE_MAP = Object.fromEntries(CASES);
 
 function baseManifest(files = []) {
   return {
@@ -70,6 +71,14 @@ test('validateManifest rejects missing contract files and malformed pair paths',
   const pair = { claude: 'a.md', codex: 'b.md', contract: 'x', facts: {} };
   assert.throws(() => validateManifest({ ...baseManifest(['a.md']), criticalContractPairs: [pair] }), /manifest/i);
   assert.throws(() => validateManifest({ ...baseManifest(['a.md', 'b.md']), criticalContractPairs: [{ ...pair, codex: '..\\b' }] }), /manifest/i);
+});
+
+test('validateManifest requires the canonical six contract transition mappings', () => {
+  const files = ['a.json', 'b.json'];
+  const pair = { claude: 'a.json', codex: 'b.json', contract: 'tests', contractCases: CASE_MAP };
+  assert.deepEqual(validateManifest({ ...baseManifest(files), criticalContractPairs: [pair] }).criticalContractPairs[0], pair);
+  assert.throws(() => validateManifest({ ...baseManifest(files), criticalContractPairs: [{ ...pair, contractCases: { ...CASE_MAP, 'seed-gate-create': '' } }] }), /canonical contract cases/i);
+  assert.throws(() => validateManifest({ ...baseManifest(files), criticalContractPairs: [{ ...pair, contractCases: Object.fromEntries(CASES.slice(1)) }] }), /canonical contract cases/i);
 });
 
 test('contract readers require one valid block and six unique cases', () => {
@@ -131,13 +140,28 @@ test('collectAudit deep-compares both contract blocks and transition cases', () 
     ...baseManifest(Object.keys(files)),
     criticalContractPairs: [
       { claude: 'a.md', codex: 'b.md', contract: 'skills', facts: FACTS },
-      { claude: 'a.json', codex: 'b.json', contract: 'tests' },
+      { claude: 'a.json', codex: 'b.json', contract: 'tests', contractCases: CASE_MAP },
     ],
   };
   const root = repo(files);
   assert.deepEqual(collectAudit(root, manifest).errors, []);
   put(root, 'b.md', skill({ ...FACTS, maxCycles: 6 }));
   assert.match(collectAudit(root, manifest).errors.join('\n'), /facts mismatch/i);
+});
+
+test('collectAudit rejects identical wrong transitions against manifest mappings', () => {
+  const wrong = JSON.stringify(CASES.map(([contractCase, expectedTransition]) => ({
+    contractCase,
+    expectedTransition: contractCase === 'user-adoption' ? '' : expectedTransition,
+  })));
+  const files = { 'a.json': wrong, 'b.json': wrong };
+  const manifest = {
+    ...baseManifest(Object.keys(files)),
+    criticalContractPairs: [{ claude: 'a.json', codex: 'b.json', contract: 'tests', contractCases: CASE_MAP }],
+  };
+  const result = collectAudit(repo(files), manifest);
+  assert.match(result.errors.join('\n'), /tests.*claude.*contract cases mismatch/i);
+  assert.match(result.errors.join('\n'), /tests.*codex.*contract cases mismatch/i);
 });
 
 test('runAuditCli is injectable and returns a status without exiting the importer', async () => {

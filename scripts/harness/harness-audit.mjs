@@ -13,6 +13,14 @@ const REQUIRED_CASES = [
   'threshold-boundary',
   'safety-cycle-5',
 ];
+const CANONICAL_CONTRACT_CASES = {
+  'seed-gate-create': 'incomplete-seed->socrates',
+  'seed-gate-reuse': 'complete-seed->evolve-step',
+  'user-adoption': 'candidate-requires-explicit-user-approval',
+  'first-cycle-skip': 'cycle-1->skip-comparison',
+  'threshold-boundary': 'similarity>=0.85->convergence',
+  'safety-cycle-5': 'cycle-5-not-converged->safety_valve',
+};
 
 function assertPath(value, label) {
   if (typeof value !== 'string' || value.length === 0 || isAbsolute(value) || value.includes('\\') || value.split('/').includes('..')) {
@@ -41,6 +49,9 @@ export function validateManifest(value) {
     assertPath(pair.codex, `${pair.contract}.codex`);
     if (!seen.has(pair.claude) || !seen.has(pair.codex)) {
       throw new Error(`manifest contract files must be required tracked files: ${pair.contract}`);
+    }
+    if (!Object.hasOwn(pair, 'facts') && !deepEqual(pair.contractCases, CANONICAL_CONTRACT_CASES)) {
+      throw new Error(`manifest ${pair.contract} must contain the exact canonical contract cases`);
     }
   }
   return value;
@@ -145,7 +156,8 @@ export function collectAudit(repoRoot, manifest) {
       } else {
         const claude = readContractCases(read(pair.claude));
         const codex = readContractCases(read(pair.codex));
-        if (!deepEqual(claude, codex)) errors.push(`${pair.contract} contract cases mismatch`);
+        if (!deepEqual(claude, pair.contractCases)) errors.push(`${pair.contract} claude contract cases mismatch`);
+        if (!deepEqual(codex, pair.contractCases)) errors.push(`${pair.contract} codex contract cases mismatch`);
       }
     } catch (error) {
       errors.push(`${pair.contract}: ${error.message}`);

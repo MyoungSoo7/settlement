@@ -40,7 +40,15 @@
     {
       "claude": ".claude/skills/interview-harness/test_cases.json",
       "codex": ".codex/skills/interview-harness/test_cases.json",
-      "contract": "interview-harness-tests"
+      "contract": "interview-harness-tests",
+      "contractCases": {
+        "seed-gate-create": "incomplete-seed->socrates",
+        "seed-gate-reuse": "complete-seed->evolve-step",
+        "user-adoption": "candidate-requires-explicit-user-approval",
+        "first-cycle-skip": "cycle-1->skip-comparison",
+        "threshold-boundary": "similarity>=0.85->convergence",
+        "safety-cycle-5": "cycle-5-not-converged->safety_valve"
+      }
     }
   ]
 }
