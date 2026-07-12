@@ -9,13 +9,13 @@
     "scripts/harness/test/guard.test.mjs",
     "scripts/harness/test/audit.test.mjs",
     "scripts/harness/test/install.test.mjs",
-    ".github/workflows/harness-guard.yml",
     ".claude/commands/harness-check.md",
     ".claude/settings.json",
     ".claude/skills/interview-harness/SKILL.md",
     ".claude/skills/interview-harness/test_cases.json",
     ".codex/skills/interview-harness/SKILL.md",
     ".codex/skills/interview-harness/test_cases.json",
+    ".github/workflows/harness-guard.yml",
     "STATUS.md"
   ],
   "criticalContractPairs": [

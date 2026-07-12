@@ -175,6 +175,48 @@ test('runAuditCli is injectable and returns a status without exiting the importe
   assert.match(errors.join(''), /unsupported argument/i);
 });
 
+test('harness guard workflow uses deterministic bases and ordered reproducibility checks', () => {
+  const workflow = readFileSync(join(process.cwd(), '.github/workflows/harness-guard.yml'), 'utf8');
+  assert.match(workflow, /fetch-depth:\s*0/);
+  assert.match(workflow, /node-version:\s*['"]?22['"]?/);
+  assert.match(workflow, /--diff-filter=ACMR/);
+  assert.match(workflow, /git fetch --no-tags origin "\$BASE_REF:refs\/remotes\/origin\/\$BASE_REF"/);
+  assert.match(workflow, /git merge-base HEAD "refs\/remotes\/origin\/\$BASE_REF"/);
+  assert.match(workflow, /git cat-file -e "\$BASE\^\{commit\}"/);
+  assert.match(workflow, /git cat-file -e "\$BEFORE\^\{commit\}"/);
+  assert.match(workflow, /0{40}/);
+  assert.match(workflow, /git ls-files > changed\.txt/);
+  assert.match(workflow, /unsupported event/i);
+  assert.doesNotMatch(workflow, /HEAD~1|\|\|\s*git diff/);
+
+  const ordered = [
+    'Run harness tests',
+    'Money / architecture guard (changed files)',
+    'Harness self-audit',
+    'Verify manifest tracking',
+    'Verify clean working tree',
+  ].map((name) => workflow.indexOf(name));
+  assert.ok(ordered.every((index) => index >= 0));
+  assert.deepEqual(ordered, [...ordered].sort((a, b) => a - b));
+  assert.match(workflow, /node --test scripts\/harness\/test\/\*\.test\.mjs/);
+  assert.match(workflow, /git diff --exit-code/);
+});
+
+test('Claude settings retain only the mandatory repository write guard hook', () => {
+  const settings = JSON.parse(readFileSync(join(process.cwd(), '.claude/settings.json'), 'utf8'));
+  assert.deepEqual(settings, {
+    hooks: {
+      PreToolUse: [{
+        matcher: 'Write|Edit|MultiEdit',
+        hooks: [{
+          type: 'command',
+          command: 'node "$CLAUDE_PROJECT_DIR/scripts/harness/guard.mjs" --hook',
+        }],
+      }],
+    },
+  });
+});
+
 test('repository harness contracts and STATUS match the tracked manifest oracle', () => {
   const root = process.cwd();
   const manifest = JSON.parse(execFileSync('git', ['-C', root, 'show', ':scripts/harness/manifest.json'], { encoding: 'utf8' }));
@@ -190,4 +232,8 @@ test('repository harness contracts and STATUS match the tracked manifest oracle'
   const measurementDate = status.match(/## 핵심 수치 \((\d{4}-\d{2}-\d{2}) 기준/)?.[1];
   if (lastUpdated !== measurementDate) governedErrors.push(`STATUS measurement date mismatch: lastUpdated=${lastUpdated} measurementDate=${measurementDate}`);
   assert.deepEqual(governedErrors, []);
+  assert.match(execFileSync(process.execPath, ['scripts/harness/harness-audit.mjs'], {
+    cwd: root,
+    encoding: 'utf8',
+  }), /harness-audit: healthy/i);
 });
