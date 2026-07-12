@@ -260,70 +260,7 @@ export async function runGuardCli(args, io = {}) {
   } catch (error) { stderr(`guard input failed: ${error.message}`); return 1; }
 }
 
-if (false) {
-function scanFile(f) {
-  if (NO_COMMIT.test(policyPath(f))) return scanText(f, '').violations;
-  if (!existsSync(f)) return [];
-  try { return scanText(f, readFileSync(f, 'utf8')).violations; } catch { return []; }
-}
 
-function stagedFiles() {
-  try {
-    return execSync('git diff --cached --name-only --diff-filter=ACM', { encoding: 'utf8' })
-      .split('\n').map((s) => s.trim()).filter(Boolean);
-  } catch { return []; }
-}
-
-function report(violations) {
-  if (violations.length === 0) {
-    console.log('✅ harness guard: 위반 없음');
-    return 0;
-  }
-  console.error('\n🚫 harness guard: 차단된 위반 ' + violations.length + '건\n');
-  for (const v of violations) {
-    console.error(`  [${v.id}] ${v.file}${v.line ? ':' + v.line : ''}`);
-    console.error(`      → ${v.msg}`);
-  }
-  console.error('\n의도된 예외면 해당 줄에 감사 가능한 구조화 예외를 추가하라.\n');
-  return 1;
-}
-
-function main(argv) {
-  let files = [];
-  if (argv.includes('--staged')) {
-    files = stagedFiles();
-  } else if (argv.includes('--list')) {
-    // Read newline-separated paths from a file (CI diff — avoids argv length limits).
-    const lf = argv[argv.indexOf('--list') + 1];
-    try { files = readFileSync(lf, 'utf8').split('\n').map((s) => s.trim()).filter(Boolean); } catch { files = []; }
-  } else if (argv.includes('--files')) {
-    files = argv.slice(argv.indexOf('--files') + 1);
-  } else if (argv.includes('--hook')) {
-  // Claude Code PreToolUse: {tool_input:{file_path, content|new_string|edits}} on stdin.
-  // Scan the PENDING content (before it lands on disk), not the current file.
-  let raw = '';
-  try { raw = readFileSync(0, 'utf8'); } catch { /* no stdin */ }
-  try {
-    const j = JSON.parse(raw || '{}');
-    const ti = j?.tool_input ?? {};
-    const fp = ti.file_path;
-    if (fp) {
-      const pending = ti.content
-        ?? ti.new_string
-        ?? (Array.isArray(ti.edits) ? ti.edits.map((e) => e.new_string || '').join('\n') : undefined);
-      const all = pending !== undefined ? scanText(fp, pending).violations : scanFile(fp);
-      // PreToolUse blocks on exit code 2 (stderr fed back to the model); 0 = allow.
-      return report(all) ? 2 : 0;
-    }
-  } catch { /* ignore malformed input — do not block */ }
-    return 0;
-  }
-
-  const all = files.flatMap(scanFile);
-  return report(all);
-}
-
-}
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   process.exit(await runGuardCli(process.argv.slice(2)));
 }
