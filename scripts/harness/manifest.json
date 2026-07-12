@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "requiredTrackedFiles": [
+    "scripts/harness/manifest.json",
+    "scripts/harness/guard.mjs",
+    "scripts/harness/harness-audit.mjs",
+    "scripts/harness/install-hooks.mjs",
+    "scripts/harness/hooks/pre-commit",
+    "scripts/harness/test/guard.test.mjs",
+    "scripts/harness/test/audit.test.mjs",
+    "scripts/harness/test/install.test.mjs",
+    ".github/workflows/harness-guard.yml",
+    ".claude/commands/harness-check.md",
+    ".claude/settings.json",
+    ".claude/skills/interview-harness/SKILL.md",
+    ".claude/skills/interview-harness/test_cases.json",
+    ".codex/skills/interview-harness/SKILL.md",
+    ".codex/skills/interview-harness/test_cases.json",
+    "STATUS.md"
+  ],
+  "criticalContractPairs": [
+    {
+      "claude": ".claude/skills/interview-harness/SKILL.md",
+      "codex": ".codex/skills/interview-harness/SKILL.md",
+      "contract": "interview-harness",
+      "facts": {
+        "seedGate.requiredFields": ["goal", "constraints", "acceptance_criteria"],
+        "stageOrder": ["evolve-step", "ontology", "compare"],
+        "similarity.idea": "exact",
+        "similarity.boundary": "user-confirmed",
+        "similarity.properties": "jaccard",
+        "similarity.threshold": 0.85,
+        "maxCycles": 5,
+        "firstCycleComparison": "skip",
+        "candidateAdoption": "explicit-user-approval",
+        "canonicalScratch": ".symposium/scratch/socrates.md",
+        "stopReasons": ["convergence", "safety_valve"]
+      }
+    },
+    {
+      "claude": ".claude/skills/interview-harness/test_cases.json",
+      "codex": ".codex/skills/interview-harness/test_cases.json",
+      "contract": "interview-harness-tests"
+    }
+  ]
+}
