@@ -1,7 +1,29 @@
 import assert from 'node:assert/strict';
-import { describe, test } from 'node:test';
+import { afterEach, describe, test } from 'node:test';
+import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
 
-import { parseAllowance, scanText } from '../guard.mjs';
+import {
+  discoverStagedFiles,
+  normalizeRepoPath,
+  parseAllowance,
+  readUtf8Strict,
+  reconstructPendingContent,
+  runGuardCli,
+  scanText,
+} from '../guard.mjs';
+
+const temporaryDirectories = [];
+async function temporaryRepo() {
+  const directory = await mkdtemp(join(tmpdir(), 'guard-test-'));
+  temporaryDirectories.push(directory);
+  return directory;
+}
+afterEach(async () => {
+  await Promise.all(temporaryDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
+});
 
 const NOW = new Date('2026-07-13T12:00:00Z');
 const marker = (fields = '') => ['harness-guard:', 'allow', fields && ` ${fields}`].join('');
@@ -107,6 +129,104 @@ describe('guard policy fixtures', () => {
       assert.ok(result.violations.some(({ id }) => id === fixture.id));
     });
   }
+});
+
+describe('pending content reconstruction', () => {
+  test('Write returns the complete pending content', async () => {
+    const repoRoot = await temporaryRepo();
+    const file = join(repoRoot, 'Money.java');
+    assert.equal(await reconstructPendingContent({ tool_name: 'Write', tool_input: { file_path: file, content: 'complete' } }, { repoRoot }), 'complete');
+  });
+
+  test('Edit replaces exactly one occurrence in the existing file', async () => {
+    const repoRoot = await temporaryRepo();
+    const file = join(repoRoot, 'Money.java');
+    await writeFile(file, 'before\nold\nafter');
+    const event = { tool_name: 'Edit', tool_input: { file_path: file, old_string: 'old', new_string: 'new' } };
+    assert.equal(await reconstructPendingContent(event, { repoRoot }), 'before\nnew\nafter');
+  });
+
+  test('Edit rejects zero or multiple matches', async () => {
+    const repoRoot = await temporaryRepo();
+    const file = join(repoRoot, 'Money.java');
+    await writeFile(file, 'same same');
+    await assert.rejects(() => reconstructPendingContent({ tool_name: 'Edit', tool_input: { file_path: file, old_string: 'missing', new_string: 'new' } }, { repoRoot }));
+    await assert.rejects(() => reconstructPendingContent({ tool_name: 'Edit', tool_input: { file_path: file, old_string: 'same', new_string: 'new' } }, { repoRoot }));
+  });
+
+  test('MultiEdit applies edits sequentially and rejects empty edits', async () => {
+    const repoRoot = await temporaryRepo();
+    const file = join(repoRoot, 'Money.java');
+    await writeFile(file, 'one two');
+    const event = { tool_name: 'MultiEdit', tool_input: { file_path: file, edits: [
+      { old_string: 'one', new_string: 'two' },
+      { old_string: 'two two', new_string: 'done' },
+    ] } };
+    assert.equal(await reconstructPendingContent(event, { repoRoot }), 'done');
+    await assert.rejects(() => reconstructPendingContent({ tool_name: 'MultiEdit', tool_input: { file_path: file, edits: [] } }, { repoRoot }));
+  });
+
+  test('rejects delete, rename, root paths, and paths outside the repo', async () => {
+    const repoRoot = await temporaryRepo();
+    await assert.rejects(() => reconstructPendingContent({ tool_name: 'Delete', tool_input: { file_path: join(repoRoot, 'x') } }, { repoRoot }));
+    await assert.rejects(() => reconstructPendingContent({ tool_name: 'Write', tool_input: { file_path: join(repoRoot, 'x'), content: '', new_path: 'y' } }, { repoRoot }));
+    await assert.rejects(() => normalizeRepoPath(repoRoot, repoRoot));
+    await assert.rejects(() => normalizeRepoPath(repoRoot, join(repoRoot, '..', 'escape')));
+  });
+
+  test('rejects a symlink escape through the nearest existing ancestor', async () => {
+    const repoRoot = await temporaryRepo();
+    const outside = await temporaryRepo();
+    const link = join(repoRoot, 'link');
+    await symlink(outside, link, process.platform === 'win32' ? 'junction' : 'dir');
+    await assert.rejects(() => normalizeRepoPath(repoRoot, join(link, 'new', 'file.txt')));
+  });
+
+  test('UTF-8 strict reader rejects invalid bytes', async () => {
+    const repoRoot = await temporaryRepo();
+    const file = join(repoRoot, 'invalid.txt');
+    await writeFile(file, Buffer.from([0xc3, 0x28]));
+    await assert.rejects(() => readUtf8Strict(file));
+  });
+});
+
+describe('CLI dispatcher', () => {
+  test('rejects malformed hook input with exit 2', async () => {
+    assert.equal(await runGuardCli(['--hook'], { repoRoot: process.cwd(), stdin: '{', stdout() {}, stderr() {} }), 2);
+  });
+
+  test('hook CLI reads a valid event from stdin', async () => {
+    const result = spawnSync(process.execPath, ['scripts/harness/guard.mjs', '--hook'], {
+      cwd: process.cwd(),
+      input: JSON.stringify({
+        tool_name: 'Write',
+        tool_input: { file_path: 'docs/guard-clean.txt', content: 'clean' },
+      }),
+    });
+    assert.equal(result.status, 0, result.stderr.toString());
+  });
+
+  test('rejects missing list with exit 1 and conflicting modes with exit 2', async () => {
+    assert.equal(await runGuardCli(['--list'], { repoRoot: process.cwd(), stdout() {}, stderr() {} }), 1);
+    assert.equal(await runGuardCli(['--staged', '--files', 'x'], { repoRoot: process.cwd(), stdout() {}, stderr() {} }), 2);
+  });
+
+  test('discovers ACMR staged paths including spaces and renames', async () => {
+    const repoRoot = await temporaryRepo();
+    spawnSync('git', ['init'], { cwd: repoRoot });
+    spawnSync('git', ['config', 'user.email', 'guard@example.com'], { cwd: repoRoot });
+    spawnSync('git', ['config', 'user.name', 'Guard'], { cwd: repoRoot });
+    await writeFile(join(repoRoot, 'old name.txt'), 'old');
+    spawnSync('git', ['add', '.'], { cwd: repoRoot });
+    spawnSync('git', ['commit', '-m', 'base'], { cwd: repoRoot });
+    spawnSync('git', ['mv', 'old name.txt', 'new name.txt'], { cwd: repoRoot });
+    assert.deepEqual(discoverStagedFiles(repoRoot), ['new name.txt']);
+  });
+
+  test('self-test child process exits 0', () => {
+    const result = spawnSync(process.execPath, ['scripts/harness/guard.mjs', '--self-test'], { cwd: process.cwd() });
+    assert.equal(result.status, 0, result.stderr?.toString());
+  });
 });
 
 describe('structured allowances', () => {
