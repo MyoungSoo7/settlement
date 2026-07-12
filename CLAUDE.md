@@ -21,6 +21,11 @@
 - **인가(IDOR)**: 셀러 리소스 식별자를 요청 파라미터로 신뢰 **금지** — JWT 주체(userId)에서 파생 + 소유권 대조(403).
 - **커밋**: `hackathon/`·`pwc/` 커밋 **금지**(.gitignore 의도됨, `add -f` 우회 금지). `main` 직접 push **금지**(보호 브랜치).
 
+> 위 가드레일은 **기계로 강제된다**(문서 규율 아님): 저장소 추적 가드 `scripts/harness/guard.mjs` 가 실시간
+> PreToolUse(exit 2 차단)·git pre-commit(`node scripts/harness/install-hooks.mjs`)·CI(`.github/workflows/harness-guard.yml`) 3중으로
+> 위반을 차단한다(플러그인 독립). 하네스 자기 진단은 `node scripts/harness/harness-audit.mjs`(또는 `/harness-check`) —
+> 문서 드리프트·라우팅·가드 무결성까지 검증. 하네스 구성 정본은 [`HARNESS.md`](./HARNESS.md).
+
 ## 프로젝트 개요
 
 주문·결제·정산·선정산/기업대출·투자·계정계·재무제표·경제지표·기업뉴스평판·운영관제·주식시세·AI챗봇·공공데이터를
@@ -51,7 +56,7 @@ settlement/                       # Gradle 멀티 모듈 루트
 ├── financial-statements-service/ # 📊 Financial (8086, lemuel_financial) — 재무제표 공개조회. ★shared-common 미의존
 ├── economics-service/            # 📈 Economics (8087, lemuel_economics) — ECOS 지표 공개조회. ★shared-common 미의존
 ├── company-service/              # 📰 Company (8090, lemuel_company, ADR 0023) — 뉴스·평판·문서함. shared-common 의존(Outbox + 문서 JWT 게이트)
-├── operation-service/            # 🖥️ Operation (8092, lemuel_operation) — 운영 관제(인시던트·신호). shared-common 제한 스캔
+├── operation-service/            # 🖥️ Operation (8092, lemuel_operation) — 운영 관제(인시던트·신호·이상탐지). shared-common 제한 스캔
 ├── market-service/               # 📉 Market (8094, lemuel_market) — KRX 시세·시총 공개조회. ★shared-common 미의존
 ├── ai-service/                   # 🤖 AI (8096, lemuel_ai) — 챗봇. shared-common JWT 만 제한 스캔
 ├── common-data-service/          # 🗂️ Common-Data (8098, lemuel_commondata) — data.go.kr 범용 커넥터. ★shared-common 미의존

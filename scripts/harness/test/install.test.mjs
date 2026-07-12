@@ -40,6 +40,16 @@ test.after(() => {
   for (const root of temporaryRoots) rmSync(root, { recursive: true, force: true });
 });
 
+test('repository-owned harness documentation does not reference the legacy shell installer', () => {
+  const documentation = ['CLAUDE.md', 'HARNESS.md', '.claude/commands/harness-check.md'];
+  const staleReferences = documentation.flatMap((path) =>
+    readFileSync(join(projectRoot, path), 'utf8')
+      .split(/\r?\n/)
+      .flatMap((line, index) => line.includes('install-hooks.sh') ? [`${path}:${index + 1}`] : []));
+
+  assert.deepEqual(staleReferences, []);
+});
+
 test('findGitRoot resolves the repository from a nested directory', () => {
   const root = createRepo();
   const nested = join(root, 'one', 'two');
