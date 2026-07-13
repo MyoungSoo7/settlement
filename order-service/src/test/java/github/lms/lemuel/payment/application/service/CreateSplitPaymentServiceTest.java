@@ -1,4 +1,5 @@
 package github.lms.lemuel.payment.application.service;
+import github.lms.lemuel.payment.domain.exception.PaymentInvariantViolationException;
 
 import github.lms.lemuel.payment.application.port.in.CreateSplitPaymentUseCase.TenderRequest;
 import github.lms.lemuel.payment.application.port.out.LoadSellerSettlementMetaPort;
@@ -82,13 +83,13 @@ class CreateSplitPaymentServiceTest {
     void createSplit_tooFew() {
         assertThatThrownBy(() -> service.createSplit(1L,
                 List.of(new TenderRequest(TenderType.CARD, new BigDecimal("100")))))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(PaymentInvariantViolationException.class);
     }
 
     @Test
     @DisplayName("tender null 이면 예외")
     void createSplit_null() {
         assertThatThrownBy(() -> service.createSplit(1L, null))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(PaymentInvariantViolationException.class);
     }
 }

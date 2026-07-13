@@ -9,6 +9,8 @@ import github.lms.lemuel.order.domain.Order;
 import github.lms.lemuel.order.domain.OrderItem;
 import github.lms.lemuel.order.domain.OrderStatus;
 import github.lms.lemuel.order.domain.RefundPolicy;
+import github.lms.lemuel.order.domain.exception.InvalidOrderStateException;
+import github.lms.lemuel.order.domain.exception.OrderInvariantViolationException;
 import github.lms.lemuel.order.domain.exception.OrderNotFoundException;
 import github.lms.lemuel.product.application.port.in.IncreaseProductStockUseCase;
 import github.lms.lemuel.product.application.port.in.IncreaseVariantStockUseCase;
@@ -61,8 +63,8 @@ public class ChangeOrderStatusService implements ChangeOrderStatusUseCase {
 
         // 취소 승인은 사용자가 취소를 신청한(CANCELLATION_REQUESTED) 주문에서만 가능하다.
         if (order.getStatus() != OrderStatus.CANCELLATION_REQUESTED) {
-            throw new IllegalStateException(
-                    "취소 승인은 CANCELLATION_REQUESTED 상태에서만 가능합니다. 현재 상태: " + order.getStatus());
+            throw new InvalidOrderStateException(order.getStatus(),
+                    "취소 승인은 CANCELLATION_REQUESTED 상태에서만 가능합니다");
         }
         OrderStatus previous = order.getStatus();
 
@@ -105,8 +107,8 @@ public class ChangeOrderStatusService implements ChangeOrderStatusUseCase {
 
         // 환불 승인은 사용자가 환불을 신청한(REFUND_REQUESTED) 주문에서만 가능하다.
         if (order.getStatus() != OrderStatus.REFUND_REQUESTED) {
-            throw new IllegalStateException(
-                    "환불 승인은 REFUND_REQUESTED 상태에서만 가능합니다. 현재 상태: " + order.getStatus());
+            throw new InvalidOrderStateException(order.getStatus(),
+                    "환불 승인은 REFUND_REQUESTED 상태에서만 가능합니다");
         }
         OrderStatus previous = order.getStatus();
 
@@ -173,7 +175,7 @@ public class ChangeOrderStatusService implements ChangeOrderStatusUseCase {
         if (target != OrderStatus.SHIPPING_PENDING
                 && target != OrderStatus.IN_TRANSIT
                 && target != OrderStatus.DELIVERED) {
-            throw new IllegalArgumentException("배송 상태로 변경할 수 없는 값입니다: " + status);
+            throw new OrderInvariantViolationException("배송 상태로 변경할 수 없는 값입니다: " + status);
         }
         return changeStatus(orderId, target, operator, reason);
     }

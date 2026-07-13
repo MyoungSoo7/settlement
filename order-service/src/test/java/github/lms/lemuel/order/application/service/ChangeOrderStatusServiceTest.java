@@ -1,4 +1,5 @@
 package github.lms.lemuel.order.application.service;
+import github.lms.lemuel.order.domain.exception.InvalidOrderStateException;
 
 import github.lms.lemuel.order.domain.exception.InvalidOrderStateException;
 
@@ -144,7 +145,7 @@ class ChangeOrderStatusServiceTest {
         when(loadOrderPort.findById(1L)).thenReturn(Optional.of(order));
 
         assertThatThrownBy(() -> service.approveRefund(1L, "사유", "admin"))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(InvalidOrderStateException.class);
         verify(refundOrderPaymentPort, never()).refundOrderPaymentFully(anyLong());
     }
 
@@ -184,7 +185,7 @@ class ChangeOrderStatusServiceTest {
         when(loadOrderPort.findById(1L)).thenReturn(Optional.of(order));
 
         assertThatThrownBy(() -> service.approveCancellation(1L, "취소", "admin"))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(InvalidOrderStateException.class);
         verify(refundOrderPaymentPort, never()).refundOrderPaymentFullyIfPresent(anyLong());
     }
 

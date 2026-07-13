@@ -14,4 +14,9 @@ public class InvalidCouponStateException extends BusinessException {
     public InvalidCouponStateException(String message) {
         super(ErrorCode.INVALID_STATE, message);
     }
+
+    /** 동시 사용 UNIQUE 위반 등 원인 예외를 보존하는 경로. */
+    public InvalidCouponStateException(String message, Throwable cause) {
+        super(ErrorCode.INVALID_STATE, message, cause);
+    }
 }

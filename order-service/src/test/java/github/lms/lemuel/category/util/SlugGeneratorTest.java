@@ -1,4 +1,5 @@
 package github.lms.lemuel.category.util;
+import github.lms.lemuel.category.domain.exception.CategoryInvariantViolationException;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -31,10 +32,10 @@ class SlugGeneratorTest {
         // Normalizer.NFD 가 전조합 한글을 결합형 자모로 분해한 뒤 [^a-z0-9-] 제거로 사라져
         // transliterateKorean 의 'ch >= 가' 분기가 실행되지 못한다 → 결과 빈 문자열 → 예외.
         assertThatThrownBy(() -> generator.generate("가나"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(CategoryInvariantViolationException.class)
                 .hasMessageContaining("empty");
         assertThatThrownBy(() -> generator.generate("한글"))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(CategoryInvariantViolationException.class);
     }
 
     @Test
@@ -59,16 +60,16 @@ class SlugGeneratorTest {
     @DisplayName("null/공백 입력은 예외")
     void generate_blankThrows() {
         assertThatThrownBy(() -> generator.generate(null))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(CategoryInvariantViolationException.class);
         assertThatThrownBy(() -> generator.generate("   "))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(CategoryInvariantViolationException.class);
     }
 
     @Test
     @DisplayName("특수문자만 있으면 생성 결과가 비어 예외")
     void generate_onlySpecialThrows() {
         assertThatThrownBy(() -> generator.generate("@#$%"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(CategoryInvariantViolationException.class)
                 .hasMessageContaining("empty");
     }
 

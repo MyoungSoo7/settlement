@@ -22,6 +22,13 @@ public class InvalidOrderStateException extends BusinessException {
         this.to = to;
     }
 
+    /** 현재 상태에서 허용되지 않은 연산(전이 대상이 특정되지 않는 불변식) — Settlement 동형(from, operation). */
+    public InvalidOrderStateException(OrderStatus from, String operation) {
+        super(ErrorCode.INVALID_STATE, operation + " (현재 상태=" + from + ")");
+        this.from = from;
+        this.to = null;
+    }
+
     public OrderStatus getFrom() {
         return from;
     }

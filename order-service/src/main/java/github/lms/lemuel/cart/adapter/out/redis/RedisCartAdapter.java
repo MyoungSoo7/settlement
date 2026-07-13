@@ -61,6 +61,7 @@ public class RedisCartAdapter implements LoadCartPort, SaveCartPort {
         try {
             return objectMapper.writeValueAsString(cart);
         } catch (JsonProcessingException e) {
+            // 직렬화 실패는 발생할 수 없는 인프라 오류(프로그래밍 오류 가드)이므로 generic 유지(사유 명시).
             throw new IllegalStateException("장바구니 직렬화 실패: userId=" + cart.userId(), e);
         }
     }
@@ -69,6 +70,7 @@ public class RedisCartAdapter implements LoadCartPort, SaveCartPort {
         try {
             return objectMapper.readValue(json, RedisCart.class);
         } catch (JsonProcessingException e) {
+            // 역직렬화 실패는 저장 포맷 손상 시의 인프라 오류(프로그래밍 오류 가드)이므로 generic 유지(사유 명시).
             throw new IllegalStateException("장바구니 역직렬화 실패", e);
         }
     }

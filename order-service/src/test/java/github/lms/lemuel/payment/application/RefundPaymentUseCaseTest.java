@@ -1,4 +1,5 @@
 package github.lms.lemuel.payment.application;
+import github.lms.lemuel.payment.domain.exception.InvalidPaymentStateException;
 
 import github.lms.lemuel.payment.application.port.out.LoadPaymentPort;
 import github.lms.lemuel.payment.application.port.out.LoadRefundPort;
@@ -269,7 +270,7 @@ class RefundPaymentUseCaseTest {
         when(loadPaymentPort.loadById(1L)).thenReturn(Optional.of(payment));
 
         assertThatThrownBy(() -> refundPaymentUseCase.refundPayment(1L))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(InvalidPaymentStateException.class);
         verify(refundLifecycle, never()).begin(any(), any(), any(), any());
         verify(pgClientPort, never()).refund(any(), any(), any());
     }

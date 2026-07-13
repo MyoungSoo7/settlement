@@ -14,4 +14,9 @@ public class ProductInvariantViolationException extends BusinessException {
     public ProductInvariantViolationException(String message) {
         super(ErrorCode.INVALID_ARGUMENT, message);
     }
+
+    /** 원인 예외(예: 옵션 트리 JSON 파싱 실패)를 보존하는 경로. */
+    public ProductInvariantViolationException(String message, Throwable cause) {
+        super(ErrorCode.INVALID_ARGUMENT, message, cause);
+    }
 }

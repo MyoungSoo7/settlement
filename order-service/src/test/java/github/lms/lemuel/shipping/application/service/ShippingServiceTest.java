@@ -1,4 +1,5 @@
 package github.lms.lemuel.shipping.application.service;
+import github.lms.lemuel.shipping.domain.exception.ShipmentInvariantViolationException;
 
 import github.lms.lemuel.shipping.application.port.out.LoadShipmentPort;
 import github.lms.lemuel.shipping.application.port.out.SaveShipmentPort;
@@ -41,7 +42,7 @@ class ShippingServiceTest {
     void createForOrder_alreadyExists() {
         when(loadPort.loadByOrderId(1L)).thenReturn(Optional.of(mock(Shipment.class)));
         assertThatThrownBy(() -> service.createForOrder(1L, addr()))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(ShipmentInvariantViolationException.class)
                 .hasMessageContaining("이미 배송이 생성된 주문");
     }
 
@@ -59,7 +60,7 @@ class ShippingServiceTest {
     void mustExist_notFound() {
         when(loadPort.loadByOrderId(99L)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.changeAddress(99L, addr()))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ShipmentInvariantViolationException.class)
                 .hasMessageContaining("배송 없음");
     }
 }

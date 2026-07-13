@@ -1,4 +1,5 @@
 package github.lms.lemuel.commoncode.application.service;
+import github.lms.lemuel.commoncode.domain.exception.CommonCodeInvariantViolationException;
 
 import github.lms.lemuel.commoncode.application.port.in.CommonCodeGroupUseCase.CreateGroupCommand;
 import github.lms.lemuel.commoncode.application.port.in.CommonCodeGroupUseCase.UpdateGroupCommand;
@@ -69,7 +70,7 @@ class CommonCodeServiceTest {
     void updateGroup_missing() {
         when(loadPort.findGroupByCode("X")).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.updateGroup("X", new UpdateGroupCommand("n", "d", true)))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(CommonCodeInvariantViolationException.class);
     }
 
     @Test
@@ -84,7 +85,7 @@ class CommonCodeServiceTest {
     @DisplayName("deleteGroup — 없으면 예외")
     void deleteGroup_missing() {
         when(loadPort.findGroupByCode("X")).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> service.deleteGroup("X")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.deleteGroup("X")).isInstanceOf(CommonCodeInvariantViolationException.class);
     }
 
     // ---- Code ----
@@ -101,7 +102,7 @@ class CommonCodeServiceTest {
     @DisplayName("getCodesByGroup — 그룹 없으면 예외")
     void getCodesByGroup_missing() {
         when(loadPort.findGroupByCode("X")).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> service.getCodesByGroup("X")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.getCodesByGroup("X")).isInstanceOf(CommonCodeInvariantViolationException.class);
     }
 
     @Test
@@ -119,7 +120,7 @@ class CommonCodeServiceTest {
     void createCode_missingGroup() {
         when(loadPort.findGroupByCode("X")).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.createCode(new CreateCodeCommand("X", "c", "l", 0, null)))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(CommonCodeInvariantViolationException.class);
     }
 
     @Test
@@ -138,7 +139,7 @@ class CommonCodeServiceTest {
     void updateCode_missing() {
         when(loadPort.findCodeById(99L)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.updateCode(99L, new UpdateCodeCommand("l", 0, true, null)))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(CommonCodeInvariantViolationException.class);
     }
 
     @Test
@@ -153,6 +154,6 @@ class CommonCodeServiceTest {
     @DisplayName("deleteCode — 없으면 예외")
     void deleteCode_missing() {
         when(loadPort.findCodeById(1L)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> service.deleteCode(1L)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.deleteCode(1L)).isInstanceOf(CommonCodeInvariantViolationException.class);
     }
 }

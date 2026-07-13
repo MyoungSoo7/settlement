@@ -1,4 +1,6 @@
 package github.lms.lemuel.coupon.application.service;
+import github.lms.lemuel.coupon.domain.exception.InvalidCouponStateException;
+import github.lms.lemuel.coupon.domain.exception.CouponInvariantViolationException;
 
 import github.lms.lemuel.coupon.application.port.in.CouponUseCase;
 import github.lms.lemuel.coupon.application.port.out.LoadCouponPort;
@@ -77,7 +79,7 @@ class CouponServiceTest {
         when(coupon.getId()).thenReturn(1L);
         when(saveCouponPort.incrementUsageIfAvailable(1L)).thenReturn(false);
         assertThatThrownBy(() -> service.useCoupon("code", 1L, 100L))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(InvalidCouponStateException.class)
                 .hasMessageContaining("한도");
         verify(saveCouponPort, never()).recordUsage(anyLong(), anyLong(), anyLong());
     }
@@ -86,7 +88,7 @@ class CouponServiceTest {
     void useCoupon_notFound() {
         when(loadCouponPort.findByCode("INVALID")).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.useCoupon("invalid", 1L, 100L))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(CouponInvariantViolationException.class);
     }
 
     @Test @DisplayName("getAllCoupons: 전체 쿠폰 조회")

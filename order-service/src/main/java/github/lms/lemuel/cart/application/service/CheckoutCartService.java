@@ -5,6 +5,7 @@ import github.lms.lemuel.cart.application.port.out.LoadCartPort;
 import github.lms.lemuel.cart.application.port.out.SaveCartPort;
 import github.lms.lemuel.cart.domain.Cart;
 import github.lms.lemuel.cart.domain.CartItem;
+import github.lms.lemuel.cart.domain.exception.CartInvariantViolationException;
 import github.lms.lemuel.order.application.port.in.CreateMultiItemOrderUseCase;
 import github.lms.lemuel.order.domain.Order;
 import org.slf4j.Logger;
@@ -47,9 +48,9 @@ public class CheckoutCartService implements CheckoutCartUseCase {
     @Override
     public Order checkout(Long userId) {
         Cart cart = loadCartPort.loadByUserId(userId)
-                .orElseThrow(() -> new IllegalStateException("장바구니가 없습니다"));
+                .orElseThrow(() -> new CartInvariantViolationException("장바구니가 없습니다"));
         if (cart.isEmpty()) {
-            throw new IllegalStateException("장바구니가 비어있습니다");
+            throw new CartInvariantViolationException("장바구니가 비어있습니다");
         }
 
         List<CreateMultiItemOrderUseCase.Line> lines = cart.getItems().stream()

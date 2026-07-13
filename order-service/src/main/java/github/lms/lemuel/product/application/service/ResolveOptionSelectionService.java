@@ -7,6 +7,7 @@ import github.lms.lemuel.product.application.port.out.LoadProductPort;
 import github.lms.lemuel.product.application.port.out.LoadProductVariantPort;
 import github.lms.lemuel.product.domain.Product;
 import github.lms.lemuel.product.domain.ProductVariant;
+import github.lms.lemuel.product.domain.exception.ProductInvariantViolationException;
 import github.lms.lemuel.product.domain.exception.ProductNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,12 +54,12 @@ public class ResolveOptionSelectionService implements ResolveOptionSelectionUseC
     @Override
     public ProductVariant resolve(Long productId, List<Selection> selections) {
         if (selections == null || selections.isEmpty()) {
-            throw new IllegalArgumentException("옵션 선택이 비어 있습니다");
+            throw new ProductInvariantViolationException("옵션 선택이 비어 있습니다");
         }
         Product product = loadProductPort.findById(productId)
                 .orElseThrow(() -> new ProductNotFoundException(productId));
         if (product.getOptionsJson() == null || product.getOptionsJson().isBlank()) {
-            throw new IllegalArgumentException("옵션 트리가 정의되지 않은 상품입니다: productId=" + productId);
+            throw new ProductInvariantViolationException("옵션 트리가 정의되지 않은 상품입니다: productId=" + productId);
         }
 
         validatePathExists(parse(product.getOptionsJson()), selections);
@@ -70,7 +71,7 @@ public class ResolveOptionSelectionService implements ResolveOptionSelectionUseC
         return loadVariantPort.loadByProductId(productId).stream()
                 .filter(v -> optionName.equals(v.getOptionName()))
                 .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException(
+                .orElseThrow(() -> new ProductInvariantViolationException(
                         "선택한 옵션 조합에 대응하는 SKU 가 없습니다: " + optionName));
     }
 
@@ -78,7 +79,7 @@ public class ResolveOptionSelectionService implements ResolveOptionSelectionUseC
         try {
             return MAPPER.readTree(optionsJson);
         } catch (Exception e) {
-            throw new IllegalArgumentException("옵션 트리 JSON 파싱 실패", e);
+            throw new ProductInvariantViolationException("옵션 트리 JSON 파싱 실패", e);
         }
     }
 
@@ -90,11 +91,11 @@ public class ResolveOptionSelectionService implements ResolveOptionSelectionUseC
         JsonNode level = root;
         for (Selection sel : selections) {
             if (level == null || !level.hasNonNull("name") || !level.has("values")) {
-                throw new IllegalArgumentException("선택 차수가 트리보다 많습니다: " + sel.name());
+                throw new ProductInvariantViolationException("선택 차수가 트리보다 많습니다: " + sel.name());
             }
             String levelName = level.get("name").asText();
             if (!levelName.equals(sel.name())) {
-                throw new IllegalArgumentException(
+                throw new ProductInvariantViolationException(
                         "옵션 차수 이름 불일치: 기대=" + levelName + ", 입력=" + sel.name());
             }
             JsonNode matched = null;
@@ -105,13 +106,13 @@ public class ResolveOptionSelectionService implements ResolveOptionSelectionUseC
                 }
             }
             if (matched == null) {
-                throw new IllegalArgumentException(
+                throw new ProductInvariantViolationException(
                         "존재하지 않는 옵션 값: " + sel.name() + "=" + sel.value());
             }
             level = matched.get("children"); // leaf 면 null
         }
         if (level != null && level.has("values")) {
-            throw new IllegalArgumentException(
+            throw new ProductInvariantViolationException(
                     "옵션 선택이 불완전합니다 — 더 깊은 차수(" + level.get("name").asText() + ") 선택이 필요합니다");
         }
     }

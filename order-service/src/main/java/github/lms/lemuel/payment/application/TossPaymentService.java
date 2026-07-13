@@ -151,6 +151,7 @@ public class TossPaymentService {
 
             if (!response.getStatusCode().is2xxSuccessful()) {
                 String msg = extractTossError(response.getBody());
+                // 외부 PG(Toss) 통합 실패 — 도메인 상태/입력 불변식이 아니라 외부 연동 오류이므로 generic 유지(사유 명시).
                 throw new IllegalStateException("Toss 결제 확인 실패: " + msg);
             }
 

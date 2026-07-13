@@ -1,6 +1,7 @@
 package github.lms.lemuel.product.application.port.in;
 
 import github.lms.lemuel.product.domain.Product;
+import github.lms.lemuel.product.domain.exception.ProductInvariantViolationException;
 
 import java.math.BigDecimal;
 
@@ -19,7 +20,7 @@ public interface UpdateProductUseCase {
     ) {
         public UpdateProductInfoCommand {
             if (productId == null) {
-                throw new IllegalArgumentException("Product ID cannot be null");
+                throw new ProductInvariantViolationException("Product ID cannot be null");
             }
         }
     }
@@ -30,10 +31,10 @@ public interface UpdateProductUseCase {
     ) {
         public UpdateProductPriceCommand {
             if (productId == null) {
-                throw new IllegalArgumentException("Product ID cannot be null");
+                throw new ProductInvariantViolationException("Product ID cannot be null");
             }
             if (newPrice == null || newPrice.compareTo(BigDecimal.ZERO) < 0) {
-                throw new IllegalArgumentException("New price must be zero or greater");
+                throw new ProductInvariantViolationException("New price must be zero or greater");
             }
         }
     }
@@ -45,13 +46,13 @@ public interface UpdateProductUseCase {
     ) {
         public UpdateProductStockCommand {
             if (productId == null) {
-                throw new IllegalArgumentException("Product ID cannot be null");
+                throw new ProductInvariantViolationException("Product ID cannot be null");
             }
             if (quantity <= 0) {
-                throw new IllegalArgumentException("Quantity must be positive");
+                throw new ProductInvariantViolationException("Quantity must be positive");
             }
             if (operation == null) {
-                throw new IllegalArgumentException("Stock operation cannot be null");
+                throw new ProductInvariantViolationException("Stock operation cannot be null");
             }
         }
     }

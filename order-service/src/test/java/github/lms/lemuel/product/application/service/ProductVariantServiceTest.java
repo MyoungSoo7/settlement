@@ -1,4 +1,5 @@
 package github.lms.lemuel.product.application.service;
+import github.lms.lemuel.product.domain.exception.ProductInvariantViolationException;
 
 import github.lms.lemuel.product.application.port.out.LoadProductPort;
 import github.lms.lemuel.product.application.port.out.LoadProductVariantPort;
@@ -50,7 +51,7 @@ class ProductVariantServiceTest {
         when(loadProductPort.findById(1L)).thenReturn(Optional.of(mock(Product.class)));
         when(loadVariantPort.loadBySku("DUP")).thenReturn(Optional.of(mock(ProductVariant.class)));
         assertThatThrownBy(() -> service.create(1L, "DUP", "opt", BigDecimal.ZERO, 10))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ProductInvariantViolationException.class)
                 .hasMessageContaining("이미 사용 중인 SKU");
     }
 

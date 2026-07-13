@@ -5,6 +5,7 @@ import github.lms.lemuel.shipping.application.port.out.LoadShipmentPort;
 import github.lms.lemuel.shipping.application.port.out.SaveShipmentPort;
 import github.lms.lemuel.shipping.domain.Shipment;
 import github.lms.lemuel.shipping.domain.ShippingAddress;
+import github.lms.lemuel.shipping.domain.exception.ShipmentInvariantViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,7 +24,7 @@ public class ShippingService implements ShippingUseCase {
     @Override
     public Shipment createForOrder(Long orderId, ShippingAddress address) {
         loadPort.loadByOrderId(orderId).ifPresent(s -> {
-            throw new IllegalStateException("이미 배송이 생성된 주문: " + orderId);
+            throw new ShipmentInvariantViolationException("이미 배송이 생성된 주문: " + orderId);
         });
         return savePort.save(Shipment.createPending(orderId, address));
     }
@@ -65,6 +66,6 @@ public class ShippingService implements ShippingUseCase {
 
     private Shipment mustExist(Long orderId) {
         return loadPort.loadByOrderId(orderId)
-                .orElseThrow(() -> new IllegalArgumentException("배송 없음: orderId=" + orderId));
+                .orElseThrow(() -> new ShipmentInvariantViolationException("배송 없음: orderId=" + orderId));
     }
 }

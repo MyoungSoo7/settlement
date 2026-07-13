@@ -2,6 +2,7 @@ package github.lms.lemuel.payment.application.port.in;
 
 import github.lms.lemuel.payment.domain.PaymentDomain;
 import github.lms.lemuel.payment.domain.TenderType;
+import github.lms.lemuel.payment.domain.exception.PaymentInvariantViolationException;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -28,9 +29,9 @@ public interface CreateSplitPaymentUseCase {
 
     record TenderRequest(TenderType type, BigDecimal amount) {
         public TenderRequest {
-            if (type == null) throw new IllegalArgumentException("tender type 필수");
+            if (type == null) throw new PaymentInvariantViolationException("tender type 필수");
             if (amount == null || amount.signum() <= 0) {
-                throw new IllegalArgumentException("amount 양수 필수");
+                throw new PaymentInvariantViolationException("amount 양수 필수");
             }
         }
     }

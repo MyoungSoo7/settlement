@@ -4,6 +4,7 @@ import github.lms.lemuel.payment.application.port.out.LoadPaymentPort;
 import github.lms.lemuel.payment.domain.PaymentDomain;
 import github.lms.lemuel.payment.domain.PaymentDomain.TenderRefundPlan;
 import github.lms.lemuel.payment.domain.PaymentStatus;
+import github.lms.lemuel.payment.domain.exception.InvalidPaymentStateException;
 import github.lms.lemuel.payment.domain.exception.PaymentNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,10 +51,10 @@ public class RefundSplitPaymentService {
                 .orElseThrow(() -> new PaymentNotFoundException(paymentId));
 
         if (!snapshot.isSplit()) {
-            throw new IllegalStateException("단일결제는 RefundPaymentUseCase 사용");
+            throw new InvalidPaymentStateException("단일결제는 RefundPaymentUseCase 사용");
         }
         if (snapshot.getStatus() != PaymentStatus.CAPTURED) {
-            throw new IllegalStateException("CAPTURED 결제만 환불 가능: " + snapshot.getStatus());
+            throw new InvalidPaymentStateException("CAPTURED 결제만 환불 가능: " + snapshot.getStatus());
         }
 
         List<TenderRefundPlan> plans = snapshot.planRefundFromTenders(totalRefundAmount);

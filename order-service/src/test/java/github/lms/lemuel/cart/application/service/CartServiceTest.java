@@ -1,4 +1,5 @@
 package github.lms.lemuel.cart.application.service;
+import github.lms.lemuel.cart.domain.exception.CartInvariantViolationException;
 
 import github.lms.lemuel.cart.application.port.out.LoadCartPort;
 import github.lms.lemuel.cart.application.port.out.SaveCartPort;
@@ -65,7 +66,7 @@ class CartServiceTest {
     void changeQuantity_empty() {
         when(loadCartPort.loadByUserId(1L)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.changeQuantity(1L, 10L, 20L, 5))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(CartInvariantViolationException.class);
     }
 
     @Test @DisplayName("removeItem: 상품 제거")
@@ -82,7 +83,7 @@ class CartServiceTest {
     void removeItem_empty() {
         when(loadCartPort.loadByUserId(1L)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.removeItem(1L, 10L, 20L))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(CartInvariantViolationException.class);
     }
 
     @Test @DisplayName("clear: 장바구니 비우기")

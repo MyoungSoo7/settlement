@@ -1,4 +1,6 @@
 package github.lms.lemuel.product.application.service;
+import github.lms.lemuel.product.domain.exception.InvalidProductStateException;
+import github.lms.lemuel.product.domain.exception.ProductInvariantViolationException;
 
 import github.lms.lemuel.product.application.port.out.LoadProductPort;
 import github.lms.lemuel.product.application.port.out.SaveProductPort;
@@ -75,7 +77,7 @@ class DecreaseProductStockServiceTest {
         when(loadPort.findById(1L)).thenReturn(Optional.of(product(50, ProductStatus.DISCONTINUED)));
 
         assertThatThrownBy(() -> service.decrease(1L, 1))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(InvalidProductStateException.class)
                 .hasMessageContaining("단종");
     }
 
@@ -93,7 +95,7 @@ class DecreaseProductStockServiceTest {
     @DisplayName("수량 <= 0: DB 접근 없이 IllegalArgumentException")
     void nonPositiveQuantity() {
         assertThatThrownBy(() -> service.decrease(1L, 0))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(ProductInvariantViolationException.class);
 
         verify(savePort, never()).decreaseStockIfAvailable(anyLong(), anyInt());
     }

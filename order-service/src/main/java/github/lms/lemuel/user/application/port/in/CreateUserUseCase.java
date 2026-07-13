@@ -2,6 +2,7 @@ package github.lms.lemuel.user.application.port.in;
 
 import github.lms.lemuel.user.domain.User;
 import github.lms.lemuel.user.domain.UserRole;
+import github.lms.lemuel.user.domain.exception.UserInvariantViolationException;
 
 public interface CreateUserUseCase {
 
@@ -20,10 +21,10 @@ public interface CreateUserUseCase {
 
         public CreateUserCommand {
             if (email == null || email.isBlank()) {
-                throw new IllegalArgumentException("Email cannot be empty");
+                throw new UserInvariantViolationException("Email cannot be empty");
             }
             if (rawPassword == null || rawPassword.isBlank()) {
-                throw new IllegalArgumentException("Password cannot be empty");
+                throw new UserInvariantViolationException("Password cannot be empty");
             }
             if (role == null) {
                 role = UserRole.USER;

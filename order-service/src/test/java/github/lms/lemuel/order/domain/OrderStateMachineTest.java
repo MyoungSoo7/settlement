@@ -30,16 +30,16 @@ class OrderStateMachineTest {
     }
 
     @Test
-    @DisplayName("전체 인자 생성자 — null status/시각 기본값")
+    @DisplayName("rehydrate 복원 팩토리 — null status/시각 기본값")
     void fullConstructor() {
-        Order o = new Order(5L, 6L, 7L, new BigDecimal("100"), null, null, null);
+        Order o = Order.rehydrate(5L, 6L, 7L, new BigDecimal("100"), null, null, null, null, false);
         assertThat(o.getId()).isEqualTo(5L);
         assertThat(o.getStatus()).isEqualTo(OrderStatus.CREATED);
         assertThat(o.getCreatedAt()).isNotNull();
         assertThat(o.getUpdatedAt()).isNotNull();
 
-        Order o2 = new Order(1L, 2L, 3L, BigDecimal.ONE, OrderStatus.PAID,
-                LocalDateTime.now(), LocalDateTime.now());
+        Order o2 = Order.rehydrate(1L, 2L, 3L, BigDecimal.ONE, OrderStatus.PAID,
+                LocalDateTime.now(), LocalDateTime.now(), null, false);
         assertThat(o2.getStatus()).isEqualTo(OrderStatus.PAID);
     }
 

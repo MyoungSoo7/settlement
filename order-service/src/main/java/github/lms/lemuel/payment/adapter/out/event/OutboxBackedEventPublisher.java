@@ -100,6 +100,7 @@ public class OutboxBackedEventPublisher implements PublishEventPort {
             json = objectMapper.writeValueAsString(ordered);
         } catch (JsonProcessingException e) {
             // 직렬화 실패는 즉시 치명적 — 이벤트 손실보다 예외로 커밋 롤백이 안전
+            // 알려진 페이로드의 직렬화 실패는 발생할 수 없는 인프라 오류(프로그래밍 오류 가드)이므로 generic 유지(사유 명시).
             throw new IllegalStateException("Failed to serialize outbox payload for " + eventType, e);
         }
         // 도메인 트랜잭션 시점의 W3C trace context 캡처 → outbox 영속화 → Kafka 헤더로 복원

@@ -1,4 +1,5 @@
 package github.lms.lemuel.user.application.port.in;
+import github.lms.lemuel.user.domain.exception.UserInvariantViolationException;
 
 import github.lms.lemuel.user.application.port.in.PasswordResetUseCase.ResetPasswordCommand;
 import org.junit.jupiter.api.DisplayName;
@@ -19,16 +20,16 @@ class PasswordResetUseCaseTest {
     @Test @DisplayName("ResetPasswordCommand - 토큰이 비면 예외")
     void command_blankToken() {
         assertThatThrownBy(() -> new ResetPasswordCommand("  ", "password123"))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(UserInvariantViolationException.class);
         assertThatThrownBy(() -> new ResetPasswordCommand(null, "password123"))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(UserInvariantViolationException.class);
     }
 
     @Test @DisplayName("ResetPasswordCommand - 비밀번호가 8자 미만이면 예외")
     void command_shortPassword() {
         assertThatThrownBy(() -> new ResetPasswordCommand("token-123", "short"))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(UserInvariantViolationException.class);
         assertThatThrownBy(() -> new ResetPasswordCommand("token-123", null))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(UserInvariantViolationException.class);
     }
 }

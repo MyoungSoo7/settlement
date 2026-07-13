@@ -8,6 +8,7 @@ import github.lms.lemuel.payment.application.port.out.UpdateOrderStatusPort;
 import github.lms.lemuel.payment.domain.PaymentDomain;
 import github.lms.lemuel.payment.domain.PaymentTender;
 import github.lms.lemuel.payment.domain.TenderType;
+import github.lms.lemuel.payment.domain.exception.PaymentInvariantViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -56,7 +57,7 @@ public class CreateSplitPaymentService implements CreateSplitPaymentUseCase {
     @Override
     public PaymentDomain createSplit(Long orderId, List<TenderRequest> tenderRequests) {
         if (tenderRequests == null || tenderRequests.size() < 2) {
-            throw new IllegalArgumentException("분할결제는 최소 2 개의 지불수단 필요");
+            throw new PaymentInvariantViolationException("분할결제는 최소 2 개의 지불수단 필요");
         }
 
         log.info("분할결제 시작: orderId={}, tenders={}", orderId, tenderRequests.size());

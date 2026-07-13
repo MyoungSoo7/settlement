@@ -1,5 +1,6 @@
 package github.lms.lemuel.category.util;
 
+import github.lms.lemuel.category.domain.exception.CategoryInvariantViolationException;
 import org.springframework.stereotype.Component;
 
 import java.text.Normalizer;
@@ -39,7 +40,7 @@ public class SlugGenerator {
      */
     public String generate(String input) {
         if (input == null || input.trim().isEmpty()) {
-            throw new IllegalArgumentException("Input string cannot be empty");
+            throw new CategoryInvariantViolationException("Input string cannot be empty");
         }
 
         String slug = input.toLowerCase().trim();
@@ -64,7 +65,7 @@ public class SlugGenerator {
         slug = slug.replaceAll("^-|-$", "");
 
         if (slug.isEmpty()) {
-            throw new IllegalArgumentException("Generated slug is empty. Input may contain only special characters.");
+            throw new CategoryInvariantViolationException("Generated slug is empty. Input may contain only special characters.");
         }
 
         return slug;

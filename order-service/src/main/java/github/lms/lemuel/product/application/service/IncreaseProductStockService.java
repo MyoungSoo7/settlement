@@ -2,6 +2,7 @@ package github.lms.lemuel.product.application.service;
 
 import github.lms.lemuel.product.application.port.in.IncreaseProductStockUseCase;
 import github.lms.lemuel.product.application.port.out.SaveProductPort;
+import github.lms.lemuel.product.domain.exception.ProductInvariantViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -31,7 +32,7 @@ public class IncreaseProductStockService implements IncreaseProductStockUseCase 
     @Override
     public boolean increase(Long productId, int quantity) {
         if (quantity <= 0) {
-            throw new IllegalArgumentException("원복 수량은 양수여야 합니다");
+            throw new ProductInvariantViolationException("원복 수량은 양수여야 합니다");
         }
         int affected = savePort.increaseStock(productId, quantity);
         if (affected == 0) {

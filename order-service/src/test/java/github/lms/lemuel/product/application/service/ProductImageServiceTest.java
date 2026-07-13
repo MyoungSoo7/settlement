@@ -1,4 +1,5 @@
 package github.lms.lemuel.product.application.service;
+import github.lms.lemuel.product.domain.exception.ProductInvariantViolationException;
 
 import github.lms.lemuel.product.application.port.out.LoadProductImagePort;
 import github.lms.lemuel.product.application.port.out.SaveProductImagePort;
@@ -62,7 +63,7 @@ class ProductImageServiceTest {
         when(loadPort.findByIdNotDeleted(1L)).thenReturn(Optional.of(img));
 
         assertThatThrownBy(() -> service.setPrimaryImage(10L, 1L))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(ProductInvariantViolationException.class);
     }
 
     @Test @DisplayName("getProductImages - 포트에 위임")
@@ -115,7 +116,7 @@ class ProductImageServiceTest {
         when(loadPort.findByIdNotDeleted(1L)).thenReturn(Optional.of(img));
 
         assertThatThrownBy(() -> service.deleteImage(10L, 1L))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(ProductInvariantViolationException.class);
         verify(fileStorageService, never()).delete(any());
     }
 
@@ -193,7 +194,7 @@ class ProductImageServiceTest {
         when(fileStorageService.isValidImageType("text/plain")).thenReturn(false);
 
         assertThatThrownBy(() -> service.uploadImages(10L, List.of(f)))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ProductInvariantViolationException.class)
                 .hasMessageContaining("Invalid image type");
         verify(savePort, never()).save(any());
     }
@@ -208,7 +209,7 @@ class ProductImageServiceTest {
         when(fileStorageService.isValidFileSize(99_999_999L)).thenReturn(false);
 
         assertThatThrownBy(() -> service.uploadImages(10L, List.of(f)))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ProductInvariantViolationException.class)
                 .hasMessageContaining("5MB");
     }
 

@@ -1,4 +1,5 @@
 package github.lms.lemuel.rbac.application.service;
+import github.lms.lemuel.rbac.domain.exception.RoleInvariantViolationException;
 
 import github.lms.lemuel.rbac.domain.exception.RoleInvariantViolationException;
 
@@ -59,7 +60,7 @@ class RbacServiceTest {
     @DisplayName("getRoleById — 없으면 예외")
     void getRoleById_missing() {
         when(loadRbacPort.findRoleById(9L)).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> service.getRoleById(9L)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.getRoleById(9L)).isInstanceOf(RoleInvariantViolationException.class);
     }
 
     @Test
@@ -87,7 +88,7 @@ class RbacServiceTest {
     void updateRolePermissions_missing() {
         when(loadRbacPort.findRoleById(9L)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.updateRolePermissions(9L, List.of()))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(RoleInvariantViolationException.class);
     }
 
     // ── 역할 CRUD ─────────────────────────────────────────────
@@ -112,7 +113,7 @@ class RbacServiceTest {
         when(loadRbacPort.existsRoleByCode("CS_AGENT")).thenReturn(true);
         assertThatThrownBy(() -> service.createRole(new RbacUseCase.CreateRoleCommand(
                 "CS_AGENT", "CS 상담원", null)))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(RoleInvariantViolationException.class)
                 .hasMessageContaining("이미 존재하는");
         verify(saveRbacPort, never()).saveRole(any());
     }
@@ -158,7 +159,7 @@ class RbacServiceTest {
     void updateRole_missing() {
         when(loadRbacPort.findRoleById(9L)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.updateRole(9L, new RbacUseCase.UpdateRoleCommand("n", null)))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(RoleInvariantViolationException.class);
     }
 
     @Test
@@ -179,7 +180,7 @@ class RbacServiceTest {
         when(loadRbacPort.findRoleById(1L)).thenReturn(Optional.of(builtin));
 
         assertThatThrownBy(() -> service.deleteRole(1L))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(RoleInvariantViolationException.class)
                 .hasMessageContaining("builtin");
         verify(saveRbacPort, never()).deleteRoleById(any());
     }
@@ -189,7 +190,7 @@ class RbacServiceTest {
     void deleteRole_missing() {
         when(loadRbacPort.findRoleById(9L)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.deleteRole(9L))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(RoleInvariantViolationException.class);
     }
 
     // ── 역할 복제 ─────────────────────────────────────────────
@@ -237,7 +238,7 @@ class RbacServiceTest {
     void cloneRole_sourceMissing() {
         when(loadRbacPort.findRoleById(9L)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.cloneRole(9L, new RbacUseCase.CloneRoleCommand("X_ROLE", null)))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(RoleInvariantViolationException.class);
     }
 
     @Test
@@ -248,7 +249,7 @@ class RbacServiceTest {
         when(loadRbacPort.existsRoleByCode("ADMIN")).thenReturn(true);
 
         assertThatThrownBy(() -> service.cloneRole(1L, new RbacUseCase.CloneRoleCommand("ADMIN", null)))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(RoleInvariantViolationException.class);
         verify(saveRbacPort, never()).saveRole(any());
     }
 }

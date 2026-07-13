@@ -5,6 +5,7 @@ import github.lms.lemuel.product.application.port.out.LoadProductPort;
 import github.lms.lemuel.product.application.port.out.LoadProductVariantPort;
 import github.lms.lemuel.product.application.port.out.SaveProductVariantPort;
 import github.lms.lemuel.product.domain.ProductVariant;
+import github.lms.lemuel.product.domain.exception.ProductInvariantViolationException;
 import github.lms.lemuel.product.domain.exception.ProductNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,7 +38,7 @@ public class ProductVariantService implements CreateProductVariantUseCase {
 
         // 2) SKU 중복 검증
         if (loadVariantPort.loadBySku(sku).isPresent()) {
-            throw new IllegalArgumentException("이미 사용 중인 SKU 입니다: " + sku);
+            throw new ProductInvariantViolationException("이미 사용 중인 SKU 입니다: " + sku);
         }
 
         ProductVariant variant = ProductVariant.create(productId, sku, optionName,

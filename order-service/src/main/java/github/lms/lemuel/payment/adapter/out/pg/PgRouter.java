@@ -89,6 +89,7 @@ public class PgRouter {
         }
 
         recordRouting(PaymentGateway.MOCK, "no-candidate", paymentMethod);
+        // 도메인 불변식이 아니라 PG 헬스/설정 인프라 상태 문제이므로 generic 유지(사유 명시).
         throw new IllegalStateException(
                 "결제 가능한 PG 가 없습니다 (모두 unhealthy 또는 결제수단 미지원): method=" + paymentMethod);
     }
@@ -101,6 +102,7 @@ public class PgRouter {
         PaymentGateway pg = PaymentGateway.fromTransactionId(pgTransactionId);
         PaymentGatewayAdapter adapter = adaptersByProvider.get(pg);
         if (adapter == null) {
+            // 등록되지 않은 PG provider — 배선/설정 오류(프로그래밍 오류 가드)이므로 generic 유지(사유 명시).
             throw new IllegalStateException("어댑터 없음: provider=" + pg + ", txnId=" + pgTransactionId);
         }
         return adapter;

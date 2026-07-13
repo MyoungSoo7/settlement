@@ -1,5 +1,6 @@
 package github.lms.lemuel.product.application.service;
 
+import github.lms.lemuel.product.domain.exception.ProductInvariantViolationException;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -63,13 +64,14 @@ public abstract class AbstractDecreaseStockService<T> {
      */
     protected final T doDecrease(Long id, int quantity) {
         if (quantity <= 0) {
-            throw new IllegalArgumentException("차감 수량은 양수여야 합니다");
+            throw new ProductInvariantViolationException("차감 수량은 양수여야 합니다");
         }
         T result = transactionTemplate.execute(status -> {
             int affected = decreaseStockIfAvailable(id, quantity);
             if (affected == 0) {
                 throw classifyFailure(id, quantity);
             }
+            // 재고 차감 성공 직후 같은 트랜잭션 재조회 실패는 발생할 수 없는 내부 불변식이라 generic 유지(프로그래밍 오류 가드).
             return reload(id).orElseThrow(() -> new IllegalStateException(
                     "재고 차감 후 대상 사라짐 (id=" + id + ")"));
         });

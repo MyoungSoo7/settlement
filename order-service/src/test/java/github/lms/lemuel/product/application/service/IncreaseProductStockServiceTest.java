@@ -1,4 +1,5 @@
 package github.lms.lemuel.product.application.service;
+import github.lms.lemuel.product.domain.exception.ProductInvariantViolationException;
 
 import github.lms.lemuel.product.application.port.out.SaveProductPort;
 import org.junit.jupiter.api.DisplayName;
@@ -36,7 +37,7 @@ class IncreaseProductStockServiceTest {
     @Test @DisplayName("수량 0 이하는 예외 — 포트 미호출")
     void increase_rejectsNonPositive() {
         assertThatThrownBy(() -> service.increase(10L, 0))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(ProductInvariantViolationException.class);
         verifyNoInteractions(savePort);
     }
 }

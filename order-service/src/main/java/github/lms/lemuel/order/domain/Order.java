@@ -34,15 +34,15 @@ public class Order {
     private boolean shipped = false;                   // 배송 시작(IN_TRANSIT/DELIVERED 도달) 여부 — 상태 전이와 무관하게 보존.
     private final List<OrderItem> items = new ArrayList<>();
 
-    // 기본 생성자
-    public Order() {
+    // 신규 주문 골격 생성 전용 — 생성/복원은 팩토리(create/createMultiItem/rehydrate)만 통과(Settlement 와 동형)
+    private Order() {
         this.status = OrderStatus.CREATED;
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
     }
 
-    // 전체 생성자
-    public Order(Long id, Long userId, Long productId, BigDecimal amount, OrderStatus status,
+    // 전체 생성자 — 복원 팩토리 rehydrate 전용(외부의 임의 status 주입 봉인)
+    private Order(Long id, Long userId, Long productId, BigDecimal amount, OrderStatus status,
                  LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.id = id;
         this.userId = userId;
@@ -210,9 +210,13 @@ public class Order {
     }
 
     /**
-     * Persistence 어댑터가 DB 부여 PK 를 도메인에 주입할 때 사용(setter 대체).
+     * 영속 후 DB 가 부여한 PK 를 1회만 주입(write-once). setter 우회·재부여를 막는다
+     * (Settlement#assignId 와 동일 인프라 가드 — 재부여는 프로그래밍 오류라 generic IllegalStateException).
      */
     public void assignId(Long id) {
+        if (this.id != null) {
+            throw new IllegalStateException("id 는 1회만 부여할 수 있습니다");
+        }
         this.id = id;
     }
 

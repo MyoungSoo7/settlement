@@ -51,6 +51,7 @@ public class OutboxBackedProductEventPublisher implements PublishProductEventPor
         try {
             json = objectMapper.writeValueAsString(payload);
         } catch (JsonProcessingException e) {
+            // 알려진 페이로드의 직렬화 실패는 발생할 수 없는 인프라 오류(프로그래밍 오류 가드)이므로 generic 유지(사유 명시).
             throw new IllegalStateException("Failed to serialize outbox payload for " + eventType, e);
         }
         String traceParent = traceContextCapture.captureCurrentTraceParent();

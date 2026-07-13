@@ -1,6 +1,7 @@
 package github.lms.lemuel.product.application.port.in;
 
 import github.lms.lemuel.product.domain.ProductVariant;
+import github.lms.lemuel.product.domain.exception.ProductInvariantViolationException;
 
 import java.util.List;
 
@@ -20,7 +21,7 @@ public interface ResolveOptionSelectionUseCase {
      * @param productId  대상 상품
      * @param selections 트리 차수 순서대로의 (옵션명, 선택값) 목록. 예: [(색상,빨강),(사이즈,L)]
      * @return 선택 조합에 대응하는 {@link ProductVariant}
-     * @throws IllegalArgumentException 옵션 트리 미정의 / 차수 이름 불일치 / 없는 값 / 선택 불완전·과다 /
+     * @throws ProductInvariantViolationException 옵션 트리 미정의 / 차수 이름 불일치 / 없는 값 / 선택 불완전·과다 /
      *                                  대응 SKU 부재 / 트리 JSON 파싱 실패
      */
     ProductVariant resolve(Long productId, List<Selection> selections);
@@ -28,8 +29,8 @@ public interface ResolveOptionSelectionUseCase {
     /** 트리 한 차수의 선택 — (옵션명, 선택값). */
     record Selection(String name, String value) {
         public Selection {
-            if (name == null || name.isBlank()) throw new IllegalArgumentException("옵션명 필수");
-            if (value == null || value.isBlank()) throw new IllegalArgumentException("선택값 필수");
+            if (name == null || name.isBlank()) throw new ProductInvariantViolationException("옵션명 필수");
+            if (value == null || value.isBlank()) throw new ProductInvariantViolationException("선택값 필수");
         }
     }
 }

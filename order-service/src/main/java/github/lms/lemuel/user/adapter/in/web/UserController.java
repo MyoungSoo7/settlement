@@ -12,6 +12,7 @@ import github.lms.lemuel.user.application.port.out.PasswordHashPort;
 import github.lms.lemuel.user.application.port.out.SaveUserPort;
 import github.lms.lemuel.user.domain.User;
 import github.lms.lemuel.user.domain.exception.InvalidCredentialsException;
+import github.lms.lemuel.user.domain.exception.UserInvariantViolationException;
 import github.lms.lemuel.user.domain.exception.UserNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -87,7 +88,7 @@ public class UserController {
             throw new InvalidCredentialsException("Current password does not match");
         }
         if (passwordHashPort.matches(request.newPassword(), user.getPasswordHash())) {
-            throw new IllegalArgumentException("New password must be different from current password");
+            throw new UserInvariantViolationException("New password must be different from current password");
         }
         user.updatePassword(passwordHashPort.hash(request.newPassword()));
         saveUserPort.save(user);
