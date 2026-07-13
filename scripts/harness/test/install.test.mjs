@@ -1,5 +1,15 @@
 import assert from 'node:assert/strict';
-import { chmodSync, cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  cpSync,
+  existsSync,
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -16,6 +26,43 @@ function run(cwd, command, args, options = {}) {
 
 function git(cwd, ...args) {
   return run(cwd, 'git', args);
+}
+
+function toPosixPath(path) {
+  return path.split(sep).join('/');
+}
+
+function isPluginOrMcpPath(path) {
+  return /(^|\/)(?:\.claude-plugin|\.codex-plugin|mcp)(?:\/|$)|(^|\/)\.mcp\.json$|^hackathon\/(?:settlement|invest)-copilot(?:\/|$)/.test(
+    toPosixPath(path),
+  );
+}
+
+function readTrackedBytes(path) {
+  const result = spawnSync('git', ['-C', projectRoot, 'cat-file', 'blob', `HEAD:${path}`], {
+    encoding: 'buffer',
+    maxBuffer: 32 * 1024 * 1024,
+  });
+  assert.equal(result.status, 0, result.stderr?.toString() || path);
+  assert.ok(result.stdout instanceof Buffer);
+  return result.stdout;
+}
+
+function collectFilesystemPaths(root, relativeRoot = '') {
+  const absoluteRoot = join(root, relativeRoot);
+  if (!existsSync(absoluteRoot)) return [];
+
+  return readdirSync(absoluteRoot, { withFileTypes: true }).flatMap((entry) => {
+    const relativePath = toPosixPath(join(relativeRoot, entry.name));
+    const absolutePath = join(root, relativePath);
+    if (entry.isDirectory()) {
+      return [relativePath, ...collectFilesystemPaths(root, relativePath)];
+    }
+    if (entry.isSymbolicLink()) {
+      return [relativePath];
+    }
+    return existsSync(absolutePath) ? [relativePath] : [];
+  });
 }
 
 function put(root, path, content) {
@@ -39,18 +86,20 @@ function createRepo() {
 function createFreshRepositorySnapshot() {
   const root = mkdtempSync(join(tmpdir(), 'harness-fresh-repository-'));
   temporaryRoots.push(root);
-  const optionalPluginRoots = ['hackathon/settlement-copilot/', 'hackathon/invest-copilot/'];
-  const tracked = git(projectRoot, 'ls-files', '-z').stdout.split('\0').filter((path) =>
-    path && !optionalPluginRoots.some((prefix) => path.startsWith(prefix)));
+  const tracked = git(projectRoot, 'ls-tree', '-r', '--name-only', '-z', 'HEAD').stdout
+    .split('\0')
+    .filter((path) => path && !isPluginOrMcpPath(path));
   for (const path of tracked) {
-    const source = join(projectRoot, path);
-    if (existsSync(source)) cpSync(source, join(root, path), { recursive: true });
+    const target = join(root, path);
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(target, readTrackedBytes(path));
   }
   assert.equal(git(root, 'init').status, 0);
   assert.equal(git(root, 'config', 'user.name', 'Harness Fresh Repository Test').status, 0);
   assert.equal(git(root, 'config', 'user.email', 'harness-fresh@example.test').status, 0);
   assert.equal(git(root, 'add', '--all').status, 0);
   assert.equal(git(root, 'commit', '--no-verify', '-m', 'fresh repository fixture').status, 0);
+  assert.deepEqual(collectFilesystemPaths(root).filter(isPluginOrMcpPath), []);
   return root;
 }
 
@@ -132,8 +181,8 @@ test('fresh repository reproduces the complete plugin-independent harness contra
   skip: process.env.HARNESS_FRESH_CHILD === '1' && 'outer proof owns recursive fresh-repository coverage',
 }, () => {
   const root = createFreshRepositorySnapshot();
-  assert.equal(existsSync(join(root, 'hackathon/settlement-copilot')), false);
-  assert.equal(existsSync(join(root, 'hackathon/invest-copilot')), false);
+  const childPaths = git(root, 'ls-files', '-z').stdout.split('\0').filter(Boolean);
+  assert.deepEqual(childPaths.filter(isPluginOrMcpPath), []);
 
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     const installed = run(root, process.execPath, ['scripts/harness/install-hooks.mjs']);
@@ -155,8 +204,10 @@ test('fresh repository reproduces the complete plugin-independent harness contra
   const manifest = JSON.parse(readFileSync(join(root, 'scripts/harness/manifest.json'), 'utf8'));
   const tracked = git(root, 'ls-files', '--error-unmatch', '--', ...manifest.requiredTrackedFiles);
   assert.equal(tracked.status, 0, tracked.stderr || tracked.stdout);
+  assert.equal(git(root, 'diff', '--cached', '--exit-code').status, 0);
   const clean = git(root, 'diff', '--exit-code');
   assert.equal(clean.status, 0, clean.stderr || clean.stdout);
+  assert.equal(git(root, 'status', '--porcelain=v1').stdout, '');
 
   const untrackedRequired = manifest.requiredTrackedFiles.at(-1);
   assert.equal(git(root, 'rm', '--cached', '--', untrackedRequired).status, 0);
