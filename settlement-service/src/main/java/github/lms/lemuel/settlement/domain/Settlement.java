@@ -1,5 +1,7 @@
 package github.lms.lemuel.settlement.domain;
 
+import github.lms.lemuel.common.money.Money;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -340,7 +342,19 @@ public class Settlement {
     public void setCommission(BigDecimal commission) { this.commission = commission; }
 
     public BigDecimal getCommissionRate() { return commissionRate != null ? commissionRate : COMMISSION_RATE; }
-    public void setCommissionRate(BigDecimal commissionRate) { this.commissionRate = commissionRate; }
+
+    /**
+     * 영속화된 수수료율 스냅샷 복원 전용(write-once). commission_rate 는 정산 시점 스냅샷이라
+     * 생성 후 변경 금지(V32 이력 보존 원칙) — 이미 값이 있으면 예외로 차단한다.
+     * 매퍼의 {@code @AfterMapping} rehydration 외에는 호출하지 말 것.
+     */
+    public void rehydrateCommissionRate(BigDecimal commissionRate) {
+        if (this.commissionRate != null) {
+            throw new IllegalStateException(
+                    "commission_rate 는 정산 시점 스냅샷 — 생성 후 변경할 수 없습니다");
+        }
+        this.commissionRate = commissionRate;
+    }
     
     public BigDecimal getNetAmount() { return netAmount; }
     public void setNetAmount(BigDecimal netAmount) { this.netAmount = netAmount; }

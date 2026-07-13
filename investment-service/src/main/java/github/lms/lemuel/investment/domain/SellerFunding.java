@@ -1,5 +1,7 @@
 package github.lms.lemuel.investment.domain;
 
+import github.lms.lemuel.common.money.Money;
+
 import java.math.BigDecimal;
 
 /**
@@ -14,6 +16,7 @@ public record SellerFunding(Long sellerId, BigDecimal confirmedTotal, BigDecimal
     public static SellerFunding of(Long sellerId, BigDecimal confirmedTotal, BigDecimal investedTotal) {
         BigDecimal confirmed = confirmedTotal == null ? BigDecimal.ZERO : confirmedTotal;
         BigDecimal invested = investedTotal == null ? BigDecimal.ZERO : investedTotal;
-        return new SellerFunding(sellerId, confirmed, invested, confirmed.subtract(invested));
+        BigDecimal available = Money.of(confirmed).minus(Money.of(invested)).toBigDecimal();
+        return new SellerFunding(sellerId, confirmed, invested, available);
     }
 }

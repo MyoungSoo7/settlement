@@ -1,4 +1,4 @@
-package github.lms.lemuel.settlement.domain;
+package github.lms.lemuel.common.money;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -16,6 +16,15 @@ class MoneyTest {
         assertThat(Money.of("1750").toBigDecimal()).isEqualTo(new BigDecimal("1750.00"));
         assertThat(Money.of("1.005").toBigDecimal()).isEqualTo(new BigDecimal("1.01")); // HALF_UP
         assertThat(Money.won(50000).toBigDecimal()).isEqualTo(new BigDecimal("50000.00"));
+        assertThat(Money.of(new BigDecimal("2.344")).toBigDecimal()).isEqualTo(new BigDecimal("2.34")); // down
+        assertThat(Money.SCALE).isEqualTo(2);
+        assertThat(Money.ZERO.toBigDecimal()).isEqualTo(new BigDecimal("0.00"));
+    }
+
+    @Test
+    @DisplayName("record 접근자 amount() 는 정규화된 값을 노출한다")
+    void accessorReturnsNormalized() {
+        assertThat(Money.of("100").amount()).isEqualTo(new BigDecimal("100.00"));
     }
 
     @Test
@@ -47,21 +56,40 @@ class MoneyTest {
     }
 
     @Test
+    @DisplayName("negate — 부호 반전")
+    void negate() {
+        assertThat(Money.won(100).negate()).isEqualTo(Money.of("-100.00"));
+        assertThat(Money.of("-42.50").negate()).isEqualTo(Money.of("42.50"));
+        assertThat(Money.ZERO.negate()).isEqualTo(Money.ZERO);
+    }
+
+    @Test
     @DisplayName("min/max")
     void minMax() {
         assertThat(Money.won(1000).min(Money.won(300))).isEqualTo(Money.won(300));
         assertThat(Money.won(1000).max(Money.won(300))).isEqualTo(Money.won(1000));
         assertThat(Money.of("-50.00").max(Money.ZERO)).isEqualTo(Money.ZERO);
+        // 동률일 때 min/max 는 수신자(this)를 반환
+        assertThat(Money.won(5).min(Money.won(5))).isEqualTo(Money.won(5));
+        assertThat(Money.won(5).max(Money.won(5))).isEqualTo(Money.won(5));
     }
 
     @Test
     @DisplayName("부호/비교 판별")
     void predicates() {
         assertThat(Money.of("-1.00").isNegative()).isTrue();
+        assertThat(Money.won(1).isNegative()).isFalse();
         assertThat(Money.ZERO.isZeroOrNegative()).isTrue();
+        assertThat(Money.of("-1.00").isZeroOrNegative()).isTrue();
+        assertThat(Money.won(1).isZeroOrNegative()).isFalse();
         assertThat(Money.won(1).isPositive()).isTrue();
+        assertThat(Money.ZERO.isPositive()).isFalse();
+        assertThat(Money.ZERO.isZero()).isTrue();
+        assertThat(Money.won(1).isZero()).isFalse();
         assertThat(Money.won(100).isGreaterThan(Money.won(99))).isTrue();
+        assertThat(Money.won(99).isGreaterThan(Money.won(100))).isFalse();
         assertThat(Money.won(100).isLessThanOrEqualTo(Money.won(100))).isTrue();
+        assertThat(Money.won(101).isLessThanOrEqualTo(Money.won(100))).isFalse();
     }
 
     @Test

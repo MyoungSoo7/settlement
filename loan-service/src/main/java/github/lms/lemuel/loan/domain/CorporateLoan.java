@@ -1,5 +1,7 @@
 package github.lms.lemuel.loan.domain;
 
+import github.lms.lemuel.common.money.Money;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -92,7 +94,7 @@ public class CorporateLoan {
     /** 실행(대출금 지급). 미상환잔액 = 원금 + 수수료. */
     public void disburse() {
         requireStatus(CorporateLoanStatus.APPROVED, "실행");
-        this.outstanding = principal.add(fee);
+        this.outstanding = Money.of(principal).plus(Money.of(fee)).toBigDecimal();
         this.status = CorporateLoanStatus.DISBURSED;
     }
 
@@ -108,12 +110,14 @@ public class CorporateLoan {
         if (amount == null || amount.signum() <= 0) {
             throw new IllegalArgumentException("상환액은 양수여야 합니다: " + amount);
         }
-        BigDecimal deducted = outstanding.min(amount);
-        this.outstanding = outstanding.subtract(deducted);
-        if (outstanding.signum() == 0) {
+        Money remaining = Money.of(outstanding);
+        Money deducted = remaining.min(Money.of(amount));
+        remaining = remaining.minus(deducted);
+        this.outstanding = remaining.toBigDecimal();
+        if (remaining.isZero()) {
             this.status = CorporateLoanStatus.REPAID;
         }
-        return deducted;
+        return deducted.toBigDecimal();
     }
 
     private void requireStatus(CorporateLoanStatus expected, String action) {
