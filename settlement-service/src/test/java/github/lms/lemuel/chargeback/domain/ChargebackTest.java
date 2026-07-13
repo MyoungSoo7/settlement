@@ -1,6 +1,8 @@
 package github.lms.lemuel.chargeback.domain;
 
 import org.junit.jupiter.api.Nested;
+import github.lms.lemuel.chargeback.domain.exception.ChargebackInvariantViolationException;
+import github.lms.lemuel.chargeback.domain.exception.InvalidChargebackStateException;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -30,7 +32,7 @@ class ChargebackTest {
                     1L, null, BigDecimal.valueOf(10_000),
                     ChargebackReason.FRAUD, "fraud notice",
                     ChargebackSource.PG_WEBHOOK, null))
-                    .isInstanceOf(IllegalArgumentException.class)
+                    .isInstanceOf(ChargebackInvariantViolationException.class)
                     .hasMessageContaining("pgChargebackId");
         }
 
@@ -50,7 +52,7 @@ class ChargebackTest {
             assertThatThrownBy(() -> Chargeback.open(1L, null, BigDecimal.valueOf(-1),
                     ChargebackReason.FRAUD, null,
                     ChargebackSource.PG_WEBHOOK, "PG-CB-1"))
-                    .isInstanceOf(IllegalArgumentException.class)
+                    .isInstanceOf(ChargebackInvariantViolationException.class)
                     .hasMessageContaining("양수");
         }
 
@@ -59,7 +61,7 @@ class ChargebackTest {
             assertThatThrownBy(() -> Chargeback.open(1L, null, BigDecimal.ZERO,
                     ChargebackReason.FRAUD, null,
                     ChargebackSource.PG_WEBHOOK, "PG-CB-2"))
-                    .isInstanceOf(IllegalArgumentException.class);
+                    .isInstanceOf(ChargebackInvariantViolationException.class);
         }
     }
 
@@ -98,7 +100,7 @@ class ChargebackTest {
             cb.accept("admin@lemuel.io", "셀러 응답 없음");
 
             assertThatThrownBy(() -> cb.reject("admin@lemuel.io", "마음이 바뀜"))
-                    .isInstanceOf(IllegalStateException.class)
+                    .isInstanceOf(InvalidChargebackStateException.class)
                     .hasMessageContaining("ACCEPTED");
         }
 
@@ -108,7 +110,7 @@ class ChargebackTest {
             cb.reject("admin@lemuel.io", "증빙 충분");
 
             assertThatThrownBy(() -> cb.accept("admin@lemuel.io", "재고려"))
-                    .isInstanceOf(IllegalStateException.class);
+                    .isInstanceOf(InvalidChargebackStateException.class);
         }
 
         @Test
@@ -116,10 +118,10 @@ class ChargebackTest {
             Chargeback cb = openChargeback();
 
             assertThatThrownBy(() -> cb.accept(null, "any"))
-                    .isInstanceOf(IllegalArgumentException.class)
+                    .isInstanceOf(ChargebackInvariantViolationException.class)
                     .hasMessageContaining("decidedBy");
             assertThatThrownBy(() -> cb.accept("  ", "any"))
-                    .isInstanceOf(IllegalArgumentException.class);
+                    .isInstanceOf(ChargebackInvariantViolationException.class);
         }
 
         @Test
@@ -127,7 +129,7 @@ class ChargebackTest {
             Chargeback cb = openChargeback();
 
             assertThatThrownBy(() -> cb.reject("admin", null))
-                    .isInstanceOf(IllegalArgumentException.class)
+                    .isInstanceOf(ChargebackInvariantViolationException.class)
                     .hasMessageContaining("기각 사유");
         }
     }
@@ -155,7 +157,7 @@ class ChargebackTest {
             cb.accept("admin", "ok");
 
             assertThatThrownBy(() -> cb.linkSettlement(200L))
-                    .isInstanceOf(IllegalStateException.class)
+                    .isInstanceOf(InvalidChargebackStateException.class)
                     .hasMessageContaining("종료 상태");
         }
     }

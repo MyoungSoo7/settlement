@@ -1,4 +1,6 @@
 package github.lms.lemuel.category.domain;
+import github.lms.lemuel.category.domain.exception.InvalidCategoryStateException;
+import github.lms.lemuel.category.domain.exception.CategoryInvariantViolationException;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -27,21 +29,21 @@ class EcommerceCategoryTest {
         @Test @DisplayName("name 이 비어있으면 예외")
         void createRoot_emptyName() {
             assertThatThrownBy(() -> EcommerceCategory.createRoot("  ", "electronics", 0))
-                    .isInstanceOf(IllegalArgumentException.class)
+                    .isInstanceOf(CategoryInvariantViolationException.class)
                     .hasMessageContaining("empty");
         }
 
         @Test @DisplayName("slug 가 소문자·숫자·하이픈 외 문자 포함 시 예외")
         void createRoot_invalidSlug() {
             assertThatThrownBy(() -> EcommerceCategory.createRoot("전자제품", "Electronics!", 0))
-                    .isInstanceOf(IllegalArgumentException.class)
+                    .isInstanceOf(CategoryInvariantViolationException.class)
                     .hasMessageContaining("lowercase");
         }
 
         @Test @DisplayName("slug 가 비어있으면 예외")
         void createRoot_emptySlug() {
             assertThatThrownBy(() -> EcommerceCategory.createRoot("전자제품", "", 0))
-                    .isInstanceOf(IllegalArgumentException.class);
+                    .isInstanceOf(CategoryInvariantViolationException.class);
         }
     }
 
@@ -61,14 +63,14 @@ class EcommerceCategoryTest {
         @Test @DisplayName("MAX_DEPTH(2) 초과 시 예외")
         void createChild_exceedsMaxDepth() {
             assertThatThrownBy(() -> EcommerceCategory.createChild("딥", "deep", 1L, 2, 0))
-                    .isInstanceOf(IllegalStateException.class)
+                    .isInstanceOf(InvalidCategoryStateException.class)
                     .hasMessageContaining("depth cannot exceed");
         }
 
         @Test @DisplayName("parentDepth null 이면 예외")
         void createChild_nullParentDepth() {
             assertThatThrownBy(() -> EcommerceCategory.createChild("x", "x", 1L, null, 0))
-                    .isInstanceOf(IllegalArgumentException.class);
+                    .isInstanceOf(CategoryInvariantViolationException.class);
         }
     }
 
@@ -102,7 +104,7 @@ class EcommerceCategoryTest {
             c.softDelete();
 
             assertThatThrownBy(c::activate)
-                    .isInstanceOf(IllegalStateException.class)
+                    .isInstanceOf(InvalidCategoryStateException.class)
                     .hasMessageContaining("deleted");
         }
     }
@@ -115,14 +117,14 @@ class EcommerceCategoryTest {
         void selfAsParent() {
             EcommerceCategory c = new EcommerceCategory(5L, "x", "x", null, 0, 0, true, null, null, null);
             assertThatThrownBy(() -> c.changeParent(5L, 0))
-                    .isInstanceOf(IllegalArgumentException.class);
+                    .isInstanceOf(CategoryInvariantViolationException.class);
         }
 
         @Test @DisplayName("이동 결과 depth 가 MAX_DEPTH 를 초과하면 예외")
         void exceedsMaxDepthOnMove() {
             EcommerceCategory c = EcommerceCategory.createRoot("x", "x", 0);
             assertThatThrownBy(() -> c.changeParent(99L, 2))
-                    .isInstanceOf(IllegalStateException.class)
+                    .isInstanceOf(InvalidCategoryStateException.class)
                     .hasMessageContaining("maximum depth");
         }
 
@@ -145,7 +147,7 @@ class EcommerceCategoryTest {
         void negativeSortOrder() {
             EcommerceCategory c = EcommerceCategory.createRoot("x", "x", 0);
             assertThatThrownBy(() -> c.changeSortOrder(-1))
-                    .isInstanceOf(IllegalArgumentException.class);
+                    .isInstanceOf(CategoryInvariantViolationException.class);
         }
 
         @Test @DisplayName("updateInfo 로 name/slug 부분 수정")
@@ -161,7 +163,7 @@ class EcommerceCategoryTest {
         void updateInfo_invalidSlug() {
             EcommerceCategory c = EcommerceCategory.createRoot("x", "x", 0);
             assertThatThrownBy(() -> c.updateInfo(null, "BAD_SLUG"))
-                    .isInstanceOf(IllegalArgumentException.class);
+                    .isInstanceOf(CategoryInvariantViolationException.class);
         }
     }
 }

@@ -1,4 +1,6 @@
 package github.lms.lemuel.user.domain;
+import github.lms.lemuel.user.domain.exception.InvalidMembershipStateException;
+import github.lms.lemuel.user.domain.exception.UserInvariantViolationException;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -85,7 +87,10 @@ class UserMembershipTest {
         User user = company(); // APPROVED 기본값
 
         assertThatThrownBy(user::approveMembership)
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOfSatisfying(InvalidMembershipStateException.class, ex -> {
+                    assertThat(ex.getFrom()).isEqualTo(MembershipStatus.APPROVED);
+                    assertThat(ex.getTo()).isEqualTo(MembershipStatus.PENDING);
+                })
                 .hasMessageContaining("expected PENDING");
     }
 
@@ -96,7 +101,7 @@ class UserMembershipTest {
         user.markPending();
 
         assertThatThrownBy(user::suspendMembership)
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(InvalidMembershipStateException.class)
                 .hasMessageContaining("expected APPROVED");
     }
 
@@ -106,7 +111,7 @@ class UserMembershipTest {
         User user = company();
 
         assertThatThrownBy(user::reinstateMembership)
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(InvalidMembershipStateException.class)
                 .hasMessageContaining("expected SUSPENDED");
     }
 }

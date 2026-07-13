@@ -1,6 +1,9 @@
 package github.lms.lemuel.ledger.domain;
 
 import org.junit.jupiter.api.Nested;
+import github.lms.lemuel.ledger.domain.exception.InvalidLedgerStateException;
+import github.lms.lemuel.ledger.domain.exception.LedgerInvariantViolationException;
+import github.lms.lemuel.ledger.domain.exception.UnbalancedLedgerEntryException;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -46,14 +49,14 @@ class LedgerEntryTest {
                     LedgerEntryType.SETTLEMENT_CREATED,
                     AccountType.ACCOUNTS_PAYABLE, AccountType.REVENUE,
                     BigDecimal.ZERO, TODAY, null))
-                    .isInstanceOf(IllegalArgumentException.class)
+                    .isInstanceOf(LedgerInvariantViolationException.class)
                     .hasMessageContaining("amount");
 
             assertThatThrownBy(() -> LedgerEntry.of(1L, ReferenceType.SETTLEMENT,
                     LedgerEntryType.SETTLEMENT_CREATED,
                     AccountType.ACCOUNTS_PAYABLE, AccountType.REVENUE,
                     new BigDecimal("-1"), TODAY, null))
-                    .isInstanceOf(IllegalArgumentException.class);
+                    .isInstanceOf(LedgerInvariantViolationException.class);
         }
 
         @Test
@@ -62,7 +65,7 @@ class LedgerEntryTest {
                     LedgerEntryType.SETTLEMENT_CREATED,
                     AccountType.REVENUE, AccountType.REVENUE,
                     new BigDecimal("100"), TODAY, null))
-                    .isInstanceOf(IllegalArgumentException.class)
+                    .isInstanceOf(UnbalancedLedgerEntryException.class)
                     .hasMessageContaining("debit");
         }
 
@@ -72,14 +75,14 @@ class LedgerEntryTest {
                     LedgerEntryType.SETTLEMENT_CREATED,
                     AccountType.ACCOUNTS_PAYABLE, AccountType.REVENUE,
                     new BigDecimal("100"), TODAY, null))
-                    .isInstanceOf(IllegalArgumentException.class)
+                    .isInstanceOf(LedgerInvariantViolationException.class)
                     .hasMessageContaining("referenceId");
 
             assertThatThrownBy(() -> LedgerEntry.of(-5L, ReferenceType.SETTLEMENT,
                     LedgerEntryType.SETTLEMENT_CREATED,
                     AccountType.ACCOUNTS_PAYABLE, AccountType.REVENUE,
                     new BigDecimal("100"), TODAY, null))
-                    .isInstanceOf(IllegalArgumentException.class);
+                    .isInstanceOf(LedgerInvariantViolationException.class);
         }
 
         @Test
@@ -89,28 +92,28 @@ class LedgerEntryTest {
                     LedgerEntryType.SETTLEMENT_CREATED,
                     AccountType.ACCOUNTS_PAYABLE, AccountType.REVENUE,
                     new BigDecimal("100"), TODAY, null))
-                    .isInstanceOf(IllegalArgumentException.class);
+                    .isInstanceOf(LedgerInvariantViolationException.class);
 
             // entryType
             assertThatThrownBy(() -> LedgerEntry.of(1L, ReferenceType.SETTLEMENT,
                     null,
                     AccountType.ACCOUNTS_PAYABLE, AccountType.REVENUE,
                     new BigDecimal("100"), TODAY, null))
-                    .isInstanceOf(IllegalArgumentException.class);
+                    .isInstanceOf(LedgerInvariantViolationException.class);
 
             // debit account
             assertThatThrownBy(() -> LedgerEntry.of(1L, ReferenceType.SETTLEMENT,
                     LedgerEntryType.SETTLEMENT_CREATED,
                     null, AccountType.REVENUE,
                     new BigDecimal("100"), TODAY, null))
-                    .isInstanceOf(IllegalArgumentException.class);
+                    .isInstanceOf(LedgerInvariantViolationException.class);
 
             // settlementDate
             assertThatThrownBy(() -> LedgerEntry.of(1L, ReferenceType.SETTLEMENT,
                     LedgerEntryType.SETTLEMENT_CREATED,
                     AccountType.ACCOUNTS_PAYABLE, AccountType.REVENUE,
                     new BigDecimal("100"), null, null))
-                    .isInstanceOf(IllegalArgumentException.class);
+                    .isInstanceOf(LedgerInvariantViolationException.class);
         }
 
         @Test
@@ -143,8 +146,8 @@ class LedgerEntryTest {
             e.post();
 
             assertThatThrownBy(e::post)
-                    .isInstanceOf(IllegalStateException.class)
-                    .hasMessageContaining("post");
+                    .isInstanceOf(InvalidLedgerStateException.class)
+                    .hasMessageContaining("POSTED");
         }
 
         @Test
@@ -173,8 +176,8 @@ class LedgerEntryTest {
             LedgerEntry e = validEntry();
             e.reverse();
 
-            assertThatThrownBy(e::post).isInstanceOf(IllegalStateException.class);
-            assertThatThrownBy(e::reverse).isInstanceOf(IllegalStateException.class);
+            assertThatThrownBy(e::post).isInstanceOf(InvalidLedgerStateException.class);
+            assertThatThrownBy(e::reverse).isInstanceOf(InvalidLedgerStateException.class);
         }
     }
 }

@@ -6,6 +6,7 @@ import github.lms.lemuel.product.application.port.out.PublishProductEventPort;
 import github.lms.lemuel.product.application.port.out.SaveProductPort;
 import github.lms.lemuel.product.domain.Product;
 import github.lms.lemuel.product.domain.exception.InsufficientStockException;
+import github.lms.lemuel.product.domain.exception.InvalidProductStateException;
 import github.lms.lemuel.product.domain.exception.ProductNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -72,7 +73,7 @@ public class UpdateProductService implements UpdateProductUseCase {
             } else {
                 product.decreaseStock(command.quantity());
             }
-        } catch (IllegalStateException e) {
+        } catch (InvalidProductStateException e) {
             // 재고 부족 예외를 도메인 예외로 변환
             throw new InsufficientStockException(
                     product.getId(),

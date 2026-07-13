@@ -1,4 +1,6 @@
 package github.lms.lemuel.shipping.domain;
+import github.lms.lemuel.shipping.domain.exception.InvalidShipmentStateException;
+import github.lms.lemuel.shipping.domain.exception.ShipmentInvariantViolationException;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -44,21 +46,21 @@ class ShipmentFullTest {
     @DisplayName("ship — carrier/trackingNumber 필수, 잘못된 상태 거부")
     void ship_guards() {
         Shipment s = pending();
-        assertThatThrownBy(() -> s.ship("", "T")).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> s.ship("C", "")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> s.ship("", "T")).isInstanceOf(ShipmentInvariantViolationException.class);
+        assertThatThrownBy(() -> s.ship("C", "")).isInstanceOf(ShipmentInvariantViolationException.class);
         s.ship("C", "T");
-        assertThatThrownBy(() -> s.ship("C", "T2")).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> s.ship("C", "T2")).isInstanceOf(InvalidShipmentStateException.class);
     }
 
     @Test
     @DisplayName("markReady/markInTransit/markDelivered/returnShipment — 잘못된 상태 거부")
     void transition_guards() {
         Shipment s = pending();
-        assertThatThrownBy(s::markInTransit).isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(s::markDelivered).isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(s::returnShipment).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(s::markInTransit).isInstanceOf(InvalidShipmentStateException.class);
+        assertThatThrownBy(s::markDelivered).isInstanceOf(InvalidShipmentStateException.class);
+        assertThatThrownBy(s::returnShipment).isInstanceOf(InvalidShipmentStateException.class);
         s.markReady();
-        assertThatThrownBy(s::markReady).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(s::markReady).isInstanceOf(InvalidShipmentStateException.class);
     }
 
     @Test
@@ -69,7 +71,7 @@ class ShipmentFullTest {
         s.changeAddress(newAddr);
         assertThat(s.getAddress().recipientName()).isEqualTo("김철수");
         s.markReady();
-        assertThatThrownBy(() -> s.changeAddress(newAddr)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> s.changeAddress(newAddr)).isInstanceOf(InvalidShipmentStateException.class);
     }
 
     @Test

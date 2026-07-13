@@ -1,4 +1,6 @@
 package github.lms.lemuel.shipping.domain;
+import github.lms.lemuel.shipping.domain.exception.InvalidShipmentStateException;
+import github.lms.lemuel.shipping.domain.exception.ShipmentInvariantViolationException;
 
 import java.time.LocalDateTime;
 import java.util.Objects;
@@ -63,7 +65,7 @@ public class Shipment {
 
     public void markReady() {
         if (status != ShippingStatus.PENDING) {
-            throw new IllegalStateException("PENDING 상태에서만 READY 로 전이: " + status);
+            throw new InvalidShipmentStateException(status, ShippingStatus.READY);
         }
         status = ShippingStatus.READY;
         touch();
@@ -74,13 +76,13 @@ public class Shipment {
      */
     public void ship(String carrier, String trackingNumber) {
         if (status != ShippingStatus.PENDING && status != ShippingStatus.READY) {
-            throw new IllegalStateException("PENDING/READY 에서만 SHIPPED 로 전이: " + status);
+            throw new InvalidShipmentStateException(status, ShippingStatus.SHIPPED);
         }
         if (carrier == null || carrier.isBlank()) {
-            throw new IllegalArgumentException("carrier 필수");
+            throw new ShipmentInvariantViolationException("carrier 필수");
         }
         if (trackingNumber == null || trackingNumber.isBlank()) {
-            throw new IllegalArgumentException("trackingNumber 필수");
+            throw new ShipmentInvariantViolationException("trackingNumber 필수");
         }
         this.carrier = carrier;
         this.trackingNumber = trackingNumber;
@@ -91,7 +93,7 @@ public class Shipment {
 
     public void markInTransit() {
         if (status != ShippingStatus.SHIPPED) {
-            throw new IllegalStateException("SHIPPED 에서만 IN_TRANSIT 로 전이: " + status);
+            throw new InvalidShipmentStateException(status, ShippingStatus.IN_TRANSIT);
         }
         status = ShippingStatus.IN_TRANSIT;
         touch();
@@ -99,7 +101,7 @@ public class Shipment {
 
     public void markDelivered() {
         if (status != ShippingStatus.SHIPPED && status != ShippingStatus.IN_TRANSIT) {
-            throw new IllegalStateException("SHIPPED/IN_TRANSIT 에서만 DELIVERED 로 전이: " + status);
+            throw new InvalidShipmentStateException(status, ShippingStatus.DELIVERED);
         }
         status = ShippingStatus.DELIVERED;
         deliveredAt = LocalDateTime.now();
@@ -108,7 +110,7 @@ public class Shipment {
 
     public void returnShipment() {
         if (status != ShippingStatus.DELIVERED) {
-            throw new IllegalStateException("DELIVERED 에서만 RETURNED 로 전이: " + status);
+            throw new InvalidShipmentStateException(status, ShippingStatus.RETURNED);
         }
         status = ShippingStatus.RETURNED;
         touch();
@@ -116,7 +118,7 @@ public class Shipment {
 
     public void changeAddress(ShippingAddress newAddress) {
         if (status != ShippingStatus.PENDING) {
-            throw new IllegalStateException("PENDING 상태에서만 배송지 변경 가능: " + status);
+            throw new InvalidShipmentStateException(status, ShippingStatus.PENDING);
         }
         Objects.requireNonNull(newAddress, "newAddress");
         this.address = newAddress;

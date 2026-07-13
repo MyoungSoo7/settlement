@@ -1,5 +1,7 @@
 package github.lms.lemuel.settlement.domain;
 
+import github.lms.lemuel.settlement.domain.exception.SettlementInvariantViolationException;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
@@ -22,10 +24,10 @@ public record HoldbackPolicy(BigDecimal rate, int releaseDays) {
 
     public HoldbackPolicy {
         if (rate == null || rate.signum() < 0 || rate.compareTo(BigDecimal.ONE) > 0) {
-            throw new IllegalArgumentException("rate 는 0~1");
+            throw new SettlementInvariantViolationException("rate 는 0~1");
         }
         if (releaseDays < 0) {
-            throw new IllegalArgumentException("releaseDays 는 0 이상");
+            throw new SettlementInvariantViolationException("releaseDays 는 0 이상");
         }
     }
 

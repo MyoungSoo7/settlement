@@ -1,5 +1,7 @@
 package github.lms.lemuel.account.domain;
 
+import github.lms.lemuel.account.domain.exception.NonPositiveEntryAmountException;
+import github.lms.lemuel.account.domain.exception.UnbalancedAccountEntryException;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -89,15 +91,16 @@ class AccountEntryTest {
     @Test
     void 금액이_0이하면_예외() {
         assertThatThrownBy(() -> AccountEntry.investmentExecuted("55", "ORD-3", BigDecimal.ZERO))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(NonPositiveEntryAmountException.class);
         assertThatThrownBy(() -> AccountEntry.loanDisbursed("55", "L-1", new BigDecimal("-1")))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOfSatisfying(NonPositiveEntryAmountException.class,
+                        ex -> assertThat(ex.getAmount()).isEqualByComparingTo("-1"));
     }
 
     @Test
     void 금액이_null이면_예외() {
         assertThatThrownBy(() -> AccountEntry.settlementCreated("1", "2", null))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(NonPositiveEntryAmountException.class);
     }
 
     @Test
@@ -116,6 +119,7 @@ class AccountEntryTest {
         assertThatThrownBy(() -> AccountEntry.reconstitute(1L, OwnerType.SELLER, "1",
                 GlAccount.CASH, GlAccount.CASH, new BigDecimal("1"),
                 "X", "1", "t", java.time.LocalDateTime.now()))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOfSatisfying(UnbalancedAccountEntryException.class,
+                        ex -> assertThat(ex.getAccount()).isEqualTo(GlAccount.CASH));
     }
 }

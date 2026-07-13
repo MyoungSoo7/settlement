@@ -1,5 +1,8 @@
 package github.lms.lemuel.settlement.domain;
 
+import github.lms.lemuel.settlement.domain.exception.NegativeAdjustmentAmountException;
+import github.lms.lemuel.settlement.domain.exception.SettlementInvariantViolationException;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -35,8 +38,7 @@ public class SettlementAdjustment {
                                  SettlementAdjustmentStatus status, LocalDate adjustmentDate,
                                  LocalDateTime createdAt) {
         if (amount == null || amount.signum() >= 0) {
-            throw new IllegalArgumentException(
-                    "amount 는 항상 음수여야 합니다 (역정산 감사 규약): " + amount);
+            throw new NegativeAdjustmentAmountException(amount);
         }
         this.id = id;
         this.settlementId = settlementId;
@@ -52,7 +54,7 @@ public class SettlementAdjustment {
     public static SettlementAdjustment ofRefund(Long settlementId, Long refundId,
                                                 BigDecimal refundAmount, LocalDate adjustmentDate) {
         if (refundAmount == null || refundAmount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("Refund amount must be greater than zero");
+            throw new SettlementInvariantViolationException("Refund amount must be greater than zero");
         }
         return new SettlementAdjustment(null, settlementId, refundId, null, null,
                 refundAmount.negate(),                          // 감사 규약: 음수 기록
@@ -67,10 +69,10 @@ public class SettlementAdjustment {
                                                      BigDecimal chargebackAmount,
                                                      LocalDate adjustmentDate) {
         if (chargebackId == null || chargebackId <= 0) {
-            throw new IllegalArgumentException("chargebackId 필수");
+            throw new SettlementInvariantViolationException("chargebackId 필수");
         }
         if (chargebackAmount == null || chargebackAmount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("Chargeback amount must be greater than zero");
+            throw new SettlementInvariantViolationException("Chargeback amount must be greater than zero");
         }
         return new SettlementAdjustment(null, settlementId, null, chargebackId, null,
                 chargebackAmount.negate(),
@@ -85,10 +87,10 @@ public class SettlementAdjustment {
                                                         BigDecimal clawbackAmount,
                                                         LocalDate adjustmentDate) {
         if (discrepancyId == null || discrepancyId <= 0) {
-            throw new IllegalArgumentException("discrepancyId 필수");
+            throw new SettlementInvariantViolationException("discrepancyId 필수");
         }
         if (clawbackAmount == null || clawbackAmount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("Reconciliation clawback amount must be greater than zero");
+            throw new SettlementInvariantViolationException("Reconciliation clawback amount must be greater than zero");
         }
         return new SettlementAdjustment(null, settlementId, null, null, discrepancyId,
                 clawbackAmount.negate(),                        // 감사 규약: 음수 기록

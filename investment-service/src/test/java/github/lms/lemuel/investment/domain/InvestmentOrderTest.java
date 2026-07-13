@@ -1,5 +1,7 @@
 package github.lms.lemuel.investment.domain;
 
+import github.lms.lemuel.investment.domain.exception.InvalidInvestmentOrderStateException;
+import github.lms.lemuel.investment.domain.exception.InvestmentInvariantViolationException;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -30,17 +32,17 @@ class InvestmentOrderTest {
     @Test
     void 신청_검증_실패() {
         assertThatThrownBy(() -> InvestmentOrder.request(null, "005930", BigDecimal.TEN, 1, "A"))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(InvestmentInvariantViolationException.class);
         assertThatThrownBy(() -> InvestmentOrder.request(7L, "12345", BigDecimal.TEN, 1, "A"))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(InvestmentInvariantViolationException.class);
         assertThatThrownBy(() -> InvestmentOrder.request(7L, "abcdef", BigDecimal.TEN, 1, "A"))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(InvestmentInvariantViolationException.class);
         assertThatThrownBy(() -> InvestmentOrder.request(7L, "005930", BigDecimal.ZERO, 1, "A"))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(InvestmentInvariantViolationException.class);
         assertThatThrownBy(() -> InvestmentOrder.request(7L, "005930", new BigDecimal("-1"), 1, "A"))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(InvestmentInvariantViolationException.class);
         assertThatThrownBy(() -> InvestmentOrder.request(7L, "005930", null, 1, "A"))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(InvestmentInvariantViolationException.class);
     }
 
     @Test
@@ -72,22 +74,30 @@ class InvestmentOrderTest {
     }
 
     @Test
-    void 비정상_전이는_IllegalState() {
-        assertThatThrownBy(() -> requested().execute()).isInstanceOf(IllegalStateException.class);
+    void 비정상_전이는_InvalidInvestmentOrderState_이고_from_to_를_보존한다() {
+        assertThatThrownBy(() -> requested().execute())
+                .isInstanceOfSatisfying(InvalidInvestmentOrderStateException.class, ex -> {
+                    assertThat(ex.getFrom()).isEqualTo(InvestmentOrderStatus.REQUESTED);
+                    assertThat(ex.getTo()).isEqualTo(InvestmentOrderStatus.EXECUTED);
+                });
 
         InvestmentOrder approvedTwice = requested();
         approvedTwice.approve();
-        assertThatThrownBy(approvedTwice::approve).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(approvedTwice::approve).isInstanceOf(InvalidInvestmentOrderStateException.class);
 
         InvestmentOrder executed = requested();
         executed.approve();
         executed.execute();
-        assertThatThrownBy(executed::cancel).isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(executed::reject).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(executed::cancel)
+                .isInstanceOfSatisfying(InvalidInvestmentOrderStateException.class, ex -> {
+                    assertThat(ex.getFrom()).isEqualTo(InvestmentOrderStatus.EXECUTED);
+                    assertThat(ex.getTo()).isEqualTo(InvestmentOrderStatus.CANCELED);
+                });
+        assertThatThrownBy(executed::reject).isInstanceOf(InvalidInvestmentOrderStateException.class);
 
         InvestmentOrder approved = requested();
         approved.approve();
-        assertThatThrownBy(approved::reject).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(approved::reject).isInstanceOf(InvalidInvestmentOrderStateException.class);
     }
 
     @Test

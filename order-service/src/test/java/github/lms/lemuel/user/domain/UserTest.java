@@ -1,4 +1,6 @@
 package github.lms.lemuel.user.domain;
+import github.lms.lemuel.user.domain.exception.InvalidMembershipStateException;
+import github.lms.lemuel.user.domain.exception.UserInvariantViolationException;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,20 +31,20 @@ class UserTest {
     @Test @DisplayName("이메일 형식 검증 실패")
     void invalidEmail() {
         assertThatThrownBy(() -> User.create("not-an-email", "hash"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(UserInvariantViolationException.class)
                 .hasMessageContaining("Invalid email");
     }
 
     @Test @DisplayName("비어있는 이메일 검증 실패")
     void emptyEmail() {
         assertThatThrownBy(() -> User.create("", "hash"))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(UserInvariantViolationException.class);
     }
 
     @Test @DisplayName("비어있는 비밀번호 해시 검증 실패")
     void emptyPasswordHash() {
         assertThatThrownBy(() -> User.create("a@b.com", ""))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(UserInvariantViolationException.class);
     }
 
     @Test @DisplayName("changeRole / updatePassword 시 updatedAt 갱신")

@@ -1,5 +1,6 @@
 package github.lms.lemuel.investment.domain;
 
+import github.lms.lemuel.investment.domain.exception.InvestmentInvariantViolationException;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -197,8 +198,8 @@ class InvestmentScorePolicyTest {
     @Test
     void 재무제표가_없으면_예외() {
         assertThatThrownBy(() -> policy.score(new CompanyFinancials("005930", "빈", "KOSPI", List.of())))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(InvestmentInvariantViolationException.class);
         assertThatThrownBy(() -> policy.score(null))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(InvestmentInvariantViolationException.class);
     }
 }

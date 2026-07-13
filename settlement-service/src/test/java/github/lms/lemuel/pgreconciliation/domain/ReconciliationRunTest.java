@@ -1,6 +1,7 @@
 package github.lms.lemuel.pgreconciliation.domain;
 
 import org.junit.jupiter.api.DisplayName;
+import github.lms.lemuel.pgreconciliation.domain.exception.InvalidReconciliationStateException;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -70,8 +71,8 @@ class ReconciliationRunTest {
         run.complete(1, 1, 1, List.of());
 
         assertThatThrownBy(() -> run.complete(1, 1, 1, List.of()))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("RUNNING");
+                .isInstanceOf(InvalidReconciliationStateException.class)
+                .hasMessageContaining("COMPLETED");
     }
 
     @Test

@@ -1,6 +1,8 @@
 package github.lms.lemuel.settlement.domain;
 
 import org.junit.jupiter.api.DisplayName;
+import github.lms.lemuel.settlement.domain.exception.InvalidSettlementStateException;
+import github.lms.lemuel.settlement.domain.exception.SettlementInvariantViolationException;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -61,7 +63,7 @@ class SettlementHoldbackTest {
         s.applyHoldback(new BigDecimal("0.30"), LocalDate.of(2026, 5, 31));
 
         assertThatThrownBy(() -> s.releaseHoldback(LocalDate.of(2026, 5, 30)))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(InvalidSettlementStateException.class);
     }
 
     @Test
@@ -132,8 +134,8 @@ class SettlementHoldbackTest {
                 new BigDecimal("100000"), LocalDate.now(), new BigDecimal("0.03"));
 
         assertThatThrownBy(() -> s.applyHoldback(new BigDecimal("1.5"), LocalDate.now()))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(SettlementInvariantViolationException.class);
         assertThatThrownBy(() -> s.applyHoldback(new BigDecimal("-0.1"), LocalDate.now()))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(SettlementInvariantViolationException.class);
     }
 }

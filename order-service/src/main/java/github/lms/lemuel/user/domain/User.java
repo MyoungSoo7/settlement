@@ -1,4 +1,6 @@
 package github.lms.lemuel.user.domain;
+import github.lms.lemuel.user.domain.exception.InvalidMembershipStateException;
+import github.lms.lemuel.user.domain.exception.UserInvariantViolationException;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -79,17 +81,17 @@ public class User {
     // 도메인 규칙: 이메일 유효성 검증
     public void validateEmail() {
         if (email == null || email.isBlank()) {
-            throw new IllegalArgumentException("Email cannot be empty");
+            throw new UserInvariantViolationException("Email cannot be empty");
         }
         if (!email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")) {
-            throw new IllegalArgumentException("Invalid email format");
+            throw new UserInvariantViolationException("Invalid email format");
         }
     }
 
     // 도메인 규칙: 비밀번호 해시 검증
     public void validatePasswordHash() {
         if (passwordHash == null || passwordHash.isBlank()) {
-            throw new IllegalArgumentException("Password hash cannot be empty");
+            throw new UserInvariantViolationException("Password hash cannot be empty");
         }
     }
 
@@ -108,14 +110,14 @@ public class User {
         if (name != null) {
             String trimmed = name.trim();
             if (trimmed.length() > 100) {
-                throw new IllegalArgumentException("Name must not exceed 100 characters");
+                throw new UserInvariantViolationException("Name must not exceed 100 characters");
             }
             this.name = trimmed.isEmpty() ? null : trimmed;
         }
         if (phoneNumber != null) {
             String trimmed = phoneNumber.trim();
             if (!trimmed.isEmpty() && !trimmed.matches("^[0-9+\\-() ]{8,30}$")) {
-                throw new IllegalArgumentException("Invalid phone number format");
+                throw new UserInvariantViolationException("Invalid phone number format");
             }
             this.phoneNumber = trimmed.isEmpty() ? null : trimmed;
         }
@@ -175,8 +177,7 @@ public class User {
 
     private void requireMembership(MembershipStatus expected) {
         if (this.membershipStatus != expected) {
-            throw new IllegalStateException(
-                    "Invalid membership transition: expected " + expected + " but was " + this.membershipStatus);
+            throw new InvalidMembershipStateException(this.membershipStatus, expected);
         }
     }
 

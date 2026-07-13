@@ -1,5 +1,7 @@
 package github.lms.lemuel.investment.domain;
 
+import github.lms.lemuel.investment.domain.exception.InvestmentInvariantViolationException;
+
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.math.RoundingMode;
@@ -35,10 +37,10 @@ public class TradePlanPolicy {
      */
     public TradePlan plan(BigDecimal currentPrice, BigDecimal budget) {
         if (currentPrice == null || currentPrice.signum() <= 0) {
-            throw new IllegalArgumentException("현재가가 유효하지 않습니다: " + currentPrice);
+            throw new InvestmentInvariantViolationException("현재가가 유효하지 않습니다: " + currentPrice);
         }
         if (budget != null && budget.signum() <= 0) {
-            throw new IllegalArgumentException("예산은 0 보다 커야 합니다: " + budget);
+            throw new InvestmentInvariantViolationException("예산은 0 보다 커야 합니다: " + budget);
         }
         if (budget == null) {
             return priceLevelsOnly(currentPrice);

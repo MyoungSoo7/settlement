@@ -1,4 +1,5 @@
 package github.lms.lemuel.rbac.domain;
+import github.lms.lemuel.rbac.domain.exception.RoleInvariantViolationException;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -50,7 +51,7 @@ public class Role {
     /** 역할 이름/설명 수정. 코드·builtin 은 불변. */
     public void rename(String name, String description) {
         if (name == null || name.isBlank()) {
-            throw new IllegalArgumentException("역할 이름은 필수입니다.");
+            throw new RoleInvariantViolationException("역할 이름은 필수입니다.");
         }
         this.name = name.trim();
         this.description = description == null || description.isBlank() ? null : description.trim();
@@ -58,11 +59,11 @@ public class Role {
 
     public static String normalizeCode(String code) {
         if (code == null || code.isBlank()) {
-            throw new IllegalArgumentException("역할 코드는 필수입니다.");
+            throw new RoleInvariantViolationException("역할 코드는 필수입니다.");
         }
         String normalized = code.trim().toUpperCase();
         if (!CODE_PATTERN.matcher(normalized).matches()) {
-            throw new IllegalArgumentException(
+            throw new RoleInvariantViolationException(
                     "역할 코드는 대문자로 시작하는 대문자/숫자/언더스코어 2~30자여야 합니다: " + normalized);
         }
         return normalized;

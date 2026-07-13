@@ -1,4 +1,5 @@
 package github.lms.lemuel.user.domain;
+import github.lms.lemuel.user.domain.exception.UserInvariantViolationException;
 
 import lombok.Getter;
 
@@ -22,13 +23,13 @@ public class MembershipApproval {
 
     public MembershipApproval(Long userId, MembershipAction action, String reason, Long processedBy) {
         if (userId == null) {
-            throw new IllegalArgumentException("userId is required");
+            throw new UserInvariantViolationException("userId is required");
         }
         if (action == null) {
-            throw new IllegalArgumentException("action is required");
+            throw new UserInvariantViolationException("action is required");
         }
         if (processedBy == null) {
-            throw new IllegalArgumentException("processedBy is required");
+            throw new UserInvariantViolationException("processedBy is required");
         }
         this.userId = userId;
         this.action = action;

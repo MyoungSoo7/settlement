@@ -1,4 +1,6 @@
 package github.lms.lemuel.product.domain;
+import github.lms.lemuel.product.domain.exception.InvalidProductStateException;
+import github.lms.lemuel.product.domain.exception.ProductInvariantViolationException;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,33 +22,33 @@ class TagTest {
     @Test @DisplayName("create: null 이름이면 예외")
     void create_nullName() {
         assertThatThrownBy(() -> Tag.create(null, "#FFFFFF"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ProductInvariantViolationException.class)
                 .hasMessage("Tag name cannot be empty");
     }
 
     @Test @DisplayName("create: 빈 이름이면 예외")
     void create_emptyName() {
         assertThatThrownBy(() -> Tag.create("  ", "#FFFFFF"))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(ProductInvariantViolationException.class);
     }
 
     @Test @DisplayName("create: 50자 초과 이름이면 예외")
     void create_longName() {
         assertThatThrownBy(() -> Tag.create("A".repeat(51), "#FFFFFF"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ProductInvariantViolationException.class)
                 .hasMessage("Tag name must not exceed 50 characters");
     }
 
     @Test @DisplayName("create: 잘못된 색상 형식이면 예외")
     void create_invalidColor() {
         assertThatThrownBy(() -> Tag.create("태그", "red"))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(ProductInvariantViolationException.class);
     }
 
     @Test @DisplayName("create: null 색상이면 예외")
     void create_nullColor() {
         assertThatThrownBy(() -> Tag.create("태그", null))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(ProductInvariantViolationException.class);
     }
 
     @Test @DisplayName("기본 생성자: 기본 색상이 #6B7280이다")
@@ -94,7 +96,7 @@ class TagTest {
     void updateInfo_invalidColor() {
         Tag tag = Tag.create("원본", "#000000");
         assertThatThrownBy(() -> tag.updateInfo(null, "invalid"))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(ProductInvariantViolationException.class);
     }
 
     @Test @DisplayName("setter: id 설정")

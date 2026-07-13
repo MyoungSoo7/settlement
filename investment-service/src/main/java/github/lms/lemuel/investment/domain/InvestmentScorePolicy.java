@@ -1,5 +1,7 @@
 package github.lms.lemuel.investment.domain;
 
+import github.lms.lemuel.investment.domain.exception.InvestmentInvariantViolationException;
+
 import java.math.BigDecimal;
 import java.math.MathContext;
 
@@ -23,7 +25,7 @@ public class InvestmentScorePolicy {
     /** {@link CompanyFinancials} 로 투자점수를 산정한다. 재무제표가 없으면 예외(호출측이 사전 검증). */
     public InvestmentScore score(CompanyFinancials financials) {
         if (financials == null || !financials.hasStatements()) {
-            throw new IllegalArgumentException("재무제표가 없어 투자점수를 산정할 수 없습니다");
+            throw new InvestmentInvariantViolationException("재무제표가 없어 투자점수를 산정할 수 없습니다");
         }
         AnnualStatement latest = financials.latest();
         AnnualStatement previous = financials.previous();

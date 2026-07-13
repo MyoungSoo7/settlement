@@ -1,4 +1,5 @@
 package github.lms.lemuel.commoncode.domain;
+import github.lms.lemuel.commoncode.domain.exception.CommonCodeInvariantViolationException;
 
 import java.time.LocalDateTime;
 
@@ -26,13 +27,13 @@ public class CommonCode {
 
     public static CommonCode create(String groupCode, String code, String label, int sortOrder, String extra1) {
         if (groupCode == null || groupCode.isBlank()) {
-            throw new IllegalArgumentException("그룹코드는 필수입니다.");
+            throw new CommonCodeInvariantViolationException("그룹코드는 필수입니다.");
         }
         if (code == null || code.isBlank()) {
-            throw new IllegalArgumentException("코드는 필수입니다.");
+            throw new CommonCodeInvariantViolationException("코드는 필수입니다.");
         }
         if (label == null || label.isBlank()) {
-            throw new IllegalArgumentException("코드명(label)은 필수입니다.");
+            throw new CommonCodeInvariantViolationException("코드명(label)은 필수입니다.");
         }
         CommonCode commonCode = new CommonCode();
         commonCode.groupCode = groupCode.trim().toUpperCase();
@@ -45,7 +46,7 @@ public class CommonCode {
 
     public void update(String label, int sortOrder, boolean active, String extra1) {
         if (label == null || label.isBlank()) {
-            throw new IllegalArgumentException("코드명(label)은 필수입니다.");
+            throw new CommonCodeInvariantViolationException("코드명(label)은 필수입니다.");
         }
         this.label = label.trim();
         this.sortOrder = sortOrder;

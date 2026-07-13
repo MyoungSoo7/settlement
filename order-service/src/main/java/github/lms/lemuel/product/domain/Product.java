@@ -1,4 +1,6 @@
 package github.lms.lemuel.product.domain;
+import github.lms.lemuel.product.domain.exception.InvalidProductStateException;
+import github.lms.lemuel.product.domain.exception.ProductInvariantViolationException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -79,31 +81,31 @@ public class Product {
     // 도메인 규칙: name 검증
     public void validateName() {
         if (name == null || name.trim().isEmpty()) {
-            throw new IllegalArgumentException("Product name cannot be empty");
+            throw new ProductInvariantViolationException("Product name cannot be empty");
         }
         if (name.length() > 200) {
-            throw new IllegalArgumentException("Product name must not exceed 200 characters");
+            throw new ProductInvariantViolationException("Product name must not exceed 200 characters");
         }
     }
 
     // 도메인 규칙: price 검증
     public void validatePrice() {
         if (price == null || price.compareTo(BigDecimal.ZERO) < 0) {
-            throw new IllegalArgumentException("Product price must be zero or greater");
+            throw new ProductInvariantViolationException("Product price must be zero or greater");
         }
     }
 
     // 도메인 규칙: stockQuantity 검증
     public void validateStockQuantity() {
         if (stockQuantity == null || stockQuantity < 0) {
-            throw new IllegalArgumentException("Stock quantity must be zero or greater");
+            throw new ProductInvariantViolationException("Stock quantity must be zero or greater");
         }
     }
 
     // 비즈니스 메서드: 재고 증가
     public void increaseStock(int quantity) {
         if (quantity <= 0) {
-            throw new IllegalArgumentException("Increase quantity must be positive");
+            throw new ProductInvariantViolationException("Increase quantity must be positive");
         }
         this.stockQuantity += quantity;
         this.updatedAt = LocalDateTime.now();
@@ -117,10 +119,10 @@ public class Product {
     // 비즈니스 메서드: 재고 감소
     public void decreaseStock(int quantity) {
         if (quantity <= 0) {
-            throw new IllegalArgumentException("Decrease quantity must be positive");
+            throw new ProductInvariantViolationException("Decrease quantity must be positive");
         }
         if (this.stockQuantity < quantity) {
-            throw new IllegalStateException("Insufficient stock: requested=" + quantity + ", available=" + this.stockQuantity);
+            throw new InvalidProductStateException("Insufficient stock: requested=" + quantity + ", available=" + this.stockQuantity);
         }
         this.stockQuantity -= quantity;
         this.updatedAt = LocalDateTime.now();
@@ -134,7 +136,7 @@ public class Product {
     // 비즈니스 메서드: 가격 변경
     public void changePrice(BigDecimal newPrice) {
         if (newPrice == null || newPrice.compareTo(BigDecimal.ZERO) < 0) {
-            throw new IllegalArgumentException("New price must be zero or greater");
+            throw new ProductInvariantViolationException("New price must be zero or greater");
         }
         this.price = newPrice;
         this.updatedAt = LocalDateTime.now();
@@ -143,7 +145,7 @@ public class Product {
     // 비즈니스 메서드: 상품 활성화
     public void activate() {
         if (this.status == ProductStatus.DISCONTINUED) {
-            throw new IllegalStateException("Cannot activate discontinued product");
+            throw new InvalidProductStateException("Cannot activate discontinued product");
         }
         if (this.stockQuantity == 0) {
             this.status = ProductStatus.OUT_OF_STOCK;
@@ -156,7 +158,7 @@ public class Product {
     // 비즈니스 메서드: 상품 비활성화
     public void deactivate() {
         if (this.status == ProductStatus.DISCONTINUED) {
-            throw new IllegalStateException("Cannot deactivate discontinued product");
+            throw new InvalidProductStateException("Cannot deactivate discontinued product");
         }
         this.status = ProductStatus.INACTIVE;
         this.updatedAt = LocalDateTime.now();
@@ -279,7 +281,7 @@ public class Product {
     // 비즈니스 메서드: 태그 추가
     public void addTag(Long tagId) {
         if (tagId == null) {
-            throw new IllegalArgumentException("Tag ID cannot be null");
+            throw new ProductInvariantViolationException("Tag ID cannot be null");
         }
         if (!this.tagIds.contains(tagId)) {
             this.tagIds.add(tagId);

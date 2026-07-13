@@ -4,6 +4,7 @@ import github.lms.lemuel.investment.application.port.out.LoadInvestmentOrderPort
 import github.lms.lemuel.investment.application.port.out.SaveInvestmentOrderPort;
 import github.lms.lemuel.investment.domain.InvestmentOrder;
 import github.lms.lemuel.investment.domain.InvestmentOrderStatus;
+import github.lms.lemuel.investment.domain.exception.InvalidInvestmentOrderStateException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -55,10 +56,11 @@ class CancelInvestmentOrderServiceTest {
     }
 
     @Test
-    void 이미_집행된_주문_취소는_IllegalState이고_저장하지_않는다() {
+    void 이미_집행된_주문_취소는_InvalidInvestmentOrderState이고_저장하지_않는다() {
         when(loadInvestmentOrderPort.load(5L)).thenReturn(order(InvestmentOrderStatus.EXECUTED));
 
-        assertThatThrownBy(() -> service().cancel(5L, 7L)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> service().cancel(5L, 7L))
+                .isInstanceOf(InvalidInvestmentOrderStateException.class);
         verify(saveInvestmentOrderPort, never()).save(any());
     }
 }

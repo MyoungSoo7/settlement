@@ -1,5 +1,8 @@
 package github.lms.lemuel.account.domain;
 
+import github.lms.lemuel.account.domain.exception.NonPositiveEntryAmountException;
+import github.lms.lemuel.account.domain.exception.UnbalancedAccountEntryException;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -46,10 +49,10 @@ public class AccountEntry {
                          GlAccount debitAccount, GlAccount creditAccount, BigDecimal amount,
                          String refType, String refId, String sourceTopic, LocalDateTime occurredAt) {
         if (amount == null || amount.signum() <= 0) {
-            throw new IllegalArgumentException("전표 금액은 양수여야 합니다: " + amount);
+            throw new NonPositiveEntryAmountException(amount);
         }
         if (debitAccount == creditAccount) {
-            throw new IllegalArgumentException("차변과 대변 계정은 달라야 합니다: " + debitAccount);
+            throw new UnbalancedAccountEntryException(debitAccount);
         }
         this.id = id;
         this.ownerType = ownerType;

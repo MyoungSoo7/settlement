@@ -1,4 +1,5 @@
 package github.lms.lemuel.commoncode.domain;
+import github.lms.lemuel.commoncode.domain.exception.CommonCodeInvariantViolationException;
 
 import java.time.LocalDateTime;
 
@@ -22,10 +23,10 @@ public class CommonCodeGroup {
 
     public static CommonCodeGroup create(String groupCode, String name, String description) {
         if (groupCode == null || groupCode.isBlank()) {
-            throw new IllegalArgumentException("그룹코드는 필수입니다.");
+            throw new CommonCodeInvariantViolationException("그룹코드는 필수입니다.");
         }
         if (name == null || name.isBlank()) {
-            throw new IllegalArgumentException("그룹명은 필수입니다.");
+            throw new CommonCodeInvariantViolationException("그룹명은 필수입니다.");
         }
         CommonCodeGroup group = new CommonCodeGroup();
         group.groupCode = groupCode.trim().toUpperCase();
@@ -36,7 +37,7 @@ public class CommonCodeGroup {
 
     public void update(String name, String description, boolean active) {
         if (name == null || name.isBlank()) {
-            throw new IllegalArgumentException("그룹명은 필수입니다.");
+            throw new CommonCodeInvariantViolationException("그룹명은 필수입니다.");
         }
         this.name = name.trim();
         this.description = description;

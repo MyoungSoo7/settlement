@@ -1,4 +1,6 @@
 package github.lms.lemuel.coupon.domain;
+import github.lms.lemuel.coupon.domain.exception.CouponInvariantViolationException;
+import github.lms.lemuel.coupon.domain.exception.InvalidCouponStateException;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -36,17 +38,17 @@ public class Coupon {
                                 BigDecimal minOrderAmount, BigDecimal maxDiscountAmount,
                                 int maxUses, LocalDateTime expiresAt) {
         if (code == null || code.isBlank()) {
-            throw new IllegalArgumentException("쿠폰 코드는 필수입니다.");
+            throw new CouponInvariantViolationException("쿠폰 코드는 필수입니다.");
         }
         if (type == null) {
-            throw new IllegalArgumentException("쿠폰 타입은 필수입니다.");
+            throw new CouponInvariantViolationException("쿠폰 타입은 필수입니다.");
         }
         if (discountValue == null || discountValue.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("할인 금액은 0보다 커야 합니다.");
+            throw new CouponInvariantViolationException("할인 금액은 0보다 커야 합니다.");
         }
         type.validateDiscountValue(discountValue); // 타입별 제약 검증을 Strategy 에 위임
         if (maxUses <= 0) {
-            throw new IllegalArgumentException("최대 사용 횟수는 1 이상이어야 합니다.");
+            throw new CouponInvariantViolationException("최대 사용 횟수는 1 이상이어야 합니다.");
         }
 
         Coupon coupon = new Coupon();
@@ -64,7 +66,7 @@ public class Coupon {
     public void configureTarget(String targetType, Long targetId) {
         CouponTarget target = CouponTarget.fromInput(targetType);
         if (target.requiresTargetId() && targetId == null) {
-            throw new IllegalArgumentException("특정 대상 쿠폰은 targetId가 필요합니다.");
+            throw new CouponInvariantViolationException("특정 대상 쿠폰은 targetId가 필요합니다.");
         }
         this.targetType = target;
         this.targetId = target == CouponTarget.ALL ? null : targetId;
@@ -72,7 +74,7 @@ public class Coupon {
 
     public void configurePeriod(LocalDateTime startsAt, LocalDateTime expiresAt) {
         if (startsAt != null && expiresAt != null && startsAt.isAfter(expiresAt)) {
-            throw new IllegalArgumentException("쿠폰 시작일은 종료일보다 늦을 수 없습니다.");
+            throw new CouponInvariantViolationException("쿠폰 시작일은 종료일보다 늦을 수 없습니다.");
         }
         this.startsAt = startsAt;
         this.expiresAt = expiresAt;
@@ -83,19 +85,19 @@ public class Coupon {
      */
     public void validate(BigDecimal orderAmount) {
         if (!isActive) {
-            throw new IllegalStateException("비활성화된 쿠폰입니다.");
+            throw new InvalidCouponStateException("비활성화된 쿠폰입니다.");
         }
         if (usedCount >= maxUses) {
-            throw new IllegalStateException("쿠폰 사용 한도를 초과했습니다.");
+            throw new InvalidCouponStateException("쿠폰 사용 한도를 초과했습니다.");
         }
         if (startsAt != null && LocalDateTime.now().isBefore(startsAt)) {
-            throw new IllegalStateException("아직 사용할 수 없는 쿠폰입니다.");
+            throw new InvalidCouponStateException("아직 사용할 수 없는 쿠폰입니다.");
         }
         if (expiresAt != null && LocalDateTime.now().isAfter(expiresAt)) {
-            throw new IllegalStateException("만료된 쿠폰입니다.");
+            throw new InvalidCouponStateException("만료된 쿠폰입니다.");
         }
         if (orderAmount.compareTo(minOrderAmount) < 0) {
-            throw new IllegalStateException(
+            throw new InvalidCouponStateException(
                 String.format("최소 주문 금액(%,.0f원) 이상이어야 합니다.", minOrderAmount));
         }
     }

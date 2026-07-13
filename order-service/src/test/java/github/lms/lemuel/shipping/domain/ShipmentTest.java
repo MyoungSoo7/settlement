@@ -1,4 +1,6 @@
 package github.lms.lemuel.shipping.domain;
+import github.lms.lemuel.shipping.domain.exception.InvalidShipmentStateException;
+import github.lms.lemuel.shipping.domain.exception.ShipmentInvariantViolationException;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -56,7 +58,10 @@ class ShipmentTest {
         s.ship("CJ", "T1");
 
         assertThatThrownBy(() -> s.ship("CJ", "T2"))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOfSatisfying(InvalidShipmentStateException.class, ex -> {
+                    assertThat(ex.getFrom()).isEqualTo(ShippingStatus.SHIPPED);
+                    assertThat(ex.getTo()).isEqualTo(ShippingStatus.SHIPPED);
+                });
     }
 
     @Test
@@ -89,7 +94,7 @@ class ShipmentTest {
     void returnFromInvalidState() {
         Shipment s = Shipment.createPending(1L, ADDRESS);
 
-        assertThatThrownBy(s::returnShipment).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(s::returnShipment).isInstanceOf(InvalidShipmentStateException.class);
     }
 
     @Test
@@ -106,7 +111,7 @@ class ShipmentTest {
 
         s.ship("CJ", "T1");
         assertThatThrownBy(() -> s.changeAddress(ADDRESS))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(InvalidShipmentStateException.class);
     }
 
     @Test
@@ -114,17 +119,17 @@ class ShipmentTest {
     void ship_validation() {
         Shipment s = Shipment.createPending(1L, ADDRESS);
 
-        assertThatThrownBy(() -> s.ship("", "T1")).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> s.ship("CJ", "")).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> s.ship(null, "T1")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> s.ship("", "T1")).isInstanceOf(ShipmentInvariantViolationException.class);
+        assertThatThrownBy(() -> s.ship("CJ", "")).isInstanceOf(ShipmentInvariantViolationException.class);
+        assertThatThrownBy(() -> s.ship(null, "T1")).isInstanceOf(ShipmentInvariantViolationException.class);
     }
 
     @Test
     @DisplayName("ShippingAddress: 필수 필드 비어있으면 즉시 거부")
     void address_validation() {
         assertThatThrownBy(() -> new ShippingAddress("", "010", "12345", "addr", null, null))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(ShipmentInvariantViolationException.class);
         assertThatThrownBy(() -> new ShippingAddress("홍길동", "", "12345", "addr", null, null))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(ShipmentInvariantViolationException.class);
     }
 }

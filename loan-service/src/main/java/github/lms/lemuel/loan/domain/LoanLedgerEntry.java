@@ -1,5 +1,7 @@
 package github.lms.lemuel.loan.domain;
 
+import github.lms.lemuel.loan.domain.exception.LoanInvariantViolationException;
+
 import java.math.BigDecimal;
 
 /**
@@ -26,7 +28,7 @@ public class LoanLedgerEntry {
     private LoanLedgerEntry(Long id, LedgerAccount debit, LedgerAccount credit,
                             BigDecimal amount, String refType, Long refId) {
         if (amount == null || amount.signum() <= 0) {
-            throw new IllegalArgumentException("전표 금액은 양수여야 합니다: " + amount);
+            throw new LoanInvariantViolationException("전표 금액은 양수여야 합니다: " + amount);
         }
         this.id = id;
         this.debit = debit;

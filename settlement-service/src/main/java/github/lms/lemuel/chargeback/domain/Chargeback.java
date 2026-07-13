@@ -1,5 +1,8 @@
 package github.lms.lemuel.chargeback.domain;
 
+import github.lms.lemuel.chargeback.domain.exception.ChargebackInvariantViolationException;
+import github.lms.lemuel.chargeback.domain.exception.InvalidChargebackStateException;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Objects;
@@ -53,11 +56,11 @@ public class Chargeback {
         Objects.requireNonNull(reasonCode, "reasonCode");
         Objects.requireNonNull(source, "source");
         if (amount.signum() <= 0) {
-            throw new IllegalArgumentException("amount 는 양수여야 합니다");
+            throw new ChargebackInvariantViolationException("amount 는 양수여야 합니다");
         }
         if (source == ChargebackSource.PG_WEBHOOK
                 && (pgChargebackId == null || pgChargebackId.isBlank())) {
-            throw new IllegalArgumentException("PG_WEBHOOK 출처는 pgChargebackId 필수 (멱등 키)");
+            throw new ChargebackInvariantViolationException("PG_WEBHOOK 출처는 pgChargebackId 필수 (멱등 키)");
         }
         LocalDateTime now = LocalDateTime.now();
         return new Chargeback(null, paymentId, settlementId, amount, reasonCode, reasonDetail,
@@ -106,7 +109,7 @@ public class Chargeback {
      */
     public void accept(String decidedBy, String note) {
         if (decidedBy == null || decidedBy.isBlank()) {
-            throw new IllegalArgumentException("decidedBy 필수 (감사 추적)");
+            throw new ChargebackInvariantViolationException("decidedBy 필수 (감사 추적)");
         }
         transitionTo(ChargebackStatus.ACCEPTED);
         this.decidedBy = decidedBy;
@@ -120,10 +123,10 @@ public class Chargeback {
      */
     public void reject(String decidedBy, String note) {
         if (decidedBy == null || decidedBy.isBlank()) {
-            throw new IllegalArgumentException("decidedBy 필수 (감사 추적)");
+            throw new ChargebackInvariantViolationException("decidedBy 필수 (감사 추적)");
         }
         if (note == null || note.isBlank()) {
-            throw new IllegalArgumentException("기각 사유 필수 (운영 검토 근거)");
+            throw new ChargebackInvariantViolationException("기각 사유 필수 (운영 검토 근거)");
         }
         transitionTo(ChargebackStatus.REJECTED);
         this.decidedBy = decidedBy;
@@ -138,10 +141,10 @@ public class Chargeback {
      */
     public void linkSettlement(Long settlementId) {
         if (settlementId == null || settlementId <= 0) {
-            throw new IllegalArgumentException("settlementId 는 양수");
+            throw new ChargebackInvariantViolationException("settlementId 는 양수");
         }
         if (this.status.isFinal()) {
-            throw new IllegalStateException("종료 상태에서는 settlementId 변경 불가: " + this.status);
+            throw new InvalidChargebackStateException(this.status, "종료 상태에서는 settlementId 변경 불가");
         }
         this.settlementId = settlementId;
         touch();
@@ -149,8 +152,7 @@ public class Chargeback {
 
     private void transitionTo(ChargebackStatus target) {
         if (!this.status.canTransitionTo(target)) {
-            throw new IllegalStateException(
-                    "Chargeback 상태 전이 불가: " + this.status + " → " + target);
+            throw new InvalidChargebackStateException(this.status, target);
         }
         this.status = target;
     }

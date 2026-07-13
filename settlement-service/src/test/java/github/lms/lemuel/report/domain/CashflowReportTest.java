@@ -1,6 +1,7 @@
 package github.lms.lemuel.report.domain;
 
 import org.junit.jupiter.api.DisplayName;
+import github.lms.lemuel.report.domain.exception.ReportInvariantViolationException;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
@@ -43,17 +44,17 @@ class CashflowReportTest {
     @DisplayName("from 또는 to 가 null 이면 예외")
     void nullRange_throws() {
         assertThatThrownBy(() -> CashflowReport.of(null, TO, BucketGranularity.DAY, List.of()))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ReportInvariantViolationException.class)
                 .hasMessageContaining("from/to are required");
         assertThatThrownBy(() -> CashflowReport.of(FROM, null, BucketGranularity.DAY, List.of()))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(ReportInvariantViolationException.class);
     }
 
     @Test
     @DisplayName("from 이 to 보다 이후면 예외")
     void reversedRange_throws() {
         assertThatThrownBy(() -> CashflowReport.of(TO, FROM, BucketGranularity.DAY, List.of()))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ReportInvariantViolationException.class)
                 .hasMessageContaining("from must be <= to");
     }
 
@@ -61,7 +62,7 @@ class CashflowReportTest {
     @DisplayName("granularity 가 null 이면 예외")
     void nullGranularity_throws() {
         assertThatThrownBy(() -> new CashflowReport(FROM, TO, null, null, null, null))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ReportInvariantViolationException.class)
                 .hasMessageContaining("granularity is required");
     }
 }

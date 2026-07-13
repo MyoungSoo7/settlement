@@ -1,6 +1,7 @@
 package github.lms.lemuel.report.domain;
 
 import org.junit.jupiter.api.DisplayName;
+import github.lms.lemuel.report.domain.exception.ReportInvariantViolationException;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -29,7 +30,7 @@ class BucketGranularityTest {
     @DisplayName("지원하지 않는 값은 예외")
     void from_unsupported_throws() {
         assertThatThrownBy(() -> BucketGranularity.from("year"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ReportInvariantViolationException.class)
                 .hasMessageContaining("Unsupported groupBy");
     }
 }

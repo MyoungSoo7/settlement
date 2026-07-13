@@ -1,5 +1,9 @@
 package github.lms.lemuel.ledger.domain;
 
+import github.lms.lemuel.ledger.domain.exception.InvalidLedgerStateException;
+import github.lms.lemuel.ledger.domain.exception.LedgerInvariantViolationException;
+import github.lms.lemuel.ledger.domain.exception.UnbalancedLedgerEntryException;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -90,26 +94,25 @@ public class LedgerEntry {
 
     private void validate() {
         if (referenceId == null || referenceId <= 0) {
-            throw new IllegalArgumentException("referenceId 는 양수여야 합니다: " + referenceId);
+            throw new LedgerInvariantViolationException("referenceId 는 양수여야 합니다: " + referenceId);
         }
         if (referenceType == null) {
-            throw new IllegalArgumentException("referenceType 필수");
+            throw new LedgerInvariantViolationException("referenceType 필수");
         }
         if (entryType == null) {
-            throw new IllegalArgumentException("entryType 필수");
+            throw new LedgerInvariantViolationException("entryType 필수");
         }
         if (debitAccount == null || creditAccount == null) {
-            throw new IllegalArgumentException("debitAccount, creditAccount 모두 필수");
+            throw new LedgerInvariantViolationException("debitAccount, creditAccount 모두 필수");
         }
         if (debitAccount == creditAccount) {
-            throw new IllegalArgumentException(
-                    "debit 과 credit 은 서로 다른 계정이어야 합니다: " + debitAccount);
+            throw new UnbalancedLedgerEntryException(debitAccount);
         }
         if (amount == null || amount.signum() <= 0) {
-            throw new IllegalArgumentException("amount 는 양수여야 합니다: " + amount);
+            throw new LedgerInvariantViolationException("amount 는 양수여야 합니다: " + amount);
         }
         if (settlementDate == null) {
-            throw new IllegalArgumentException("settlementDate 필수");
+            throw new LedgerInvariantViolationException("settlementDate 필수");
         }
     }
 
@@ -128,8 +131,7 @@ public class LedgerEntry {
     /** PENDING → POSTED. 전기(공식 회계 반영) 완료. */
     public void post() {
         if (!status.canTransitionTo(LedgerStatus.POSTED)) {
-            throw new IllegalStateException(
-                    String.format("Cannot post. Current status: %s", status));
+            throw new InvalidLedgerStateException(status, LedgerStatus.POSTED);
         }
         this.status = LedgerStatus.POSTED;
         this.postedAt = LocalDateTime.now();
@@ -139,8 +141,7 @@ public class LedgerEntry {
     /** PENDING/POSTED → REVERSED. 역분개로 인해 원 entry 무효화 마킹. */
     public void reverse() {
         if (!status.canTransitionTo(LedgerStatus.REVERSED)) {
-            throw new IllegalStateException(
-                    String.format("Cannot reverse. Current status: %s", status));
+            throw new InvalidLedgerStateException(status, LedgerStatus.REVERSED);
         }
         this.status = LedgerStatus.REVERSED;
         this.updatedAt = LocalDateTime.now();

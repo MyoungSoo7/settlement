@@ -1,5 +1,6 @@
 package github.lms.lemuel.loan.domain;
 
+import github.lms.lemuel.loan.domain.exception.LoanInvariantViolationException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -28,18 +29,18 @@ class SellerSettlementViewTest {
     @DisplayName("pending: settlementId/sellerId 가 null 이면 예외")
     void pending_requiresIds() {
         assertThatThrownBy(() -> SellerSettlementView.pending(null, 1L, BigDecimal.TEN, LocalDate.now()))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(LoanInvariantViolationException.class);
         assertThatThrownBy(() -> SellerSettlementView.pending(10L, null, BigDecimal.TEN, LocalDate.now()))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(LoanInvariantViolationException.class);
     }
 
     @Test
     @DisplayName("pending: 금액이 null·음수면 예외")
     void pending_rejectsBadAmount() {
         assertThatThrownBy(() -> SellerSettlementView.pending(10L, 1L, null, LocalDate.now()))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(LoanInvariantViolationException.class);
         assertThatThrownBy(() -> SellerSettlementView.pending(10L, 1L, new BigDecimal("-1"), LocalDate.now()))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(LoanInvariantViolationException.class);
     }
 
     @Test

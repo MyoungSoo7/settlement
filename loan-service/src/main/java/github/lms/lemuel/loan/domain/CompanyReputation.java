@@ -1,5 +1,7 @@
 package github.lms.lemuel.loan.domain;
 
+import github.lms.lemuel.loan.domain.exception.LoanInvariantViolationException;
+
 import java.time.LocalDate;
 
 /**
@@ -22,16 +24,16 @@ public class CompanyReputation {
     public CompanyReputation(String stockCode, int score, String grade,
                              String previousGrade, LocalDate snapshotDate) {
         if (stockCode == null || stockCode.length() != 6) {
-            throw new IllegalArgumentException("종목코드는 6자리여야 합니다: " + stockCode);
+            throw new LoanInvariantViolationException("종목코드는 6자리여야 합니다: " + stockCode);
         }
         if (score < 0 || score > 100) {
-            throw new IllegalArgumentException("점수는 0~100 이어야 합니다: " + score);
+            throw new LoanInvariantViolationException("점수는 0~100 이어야 합니다: " + score);
         }
         if (grade == null || grade.isBlank()) {
-            throw new IllegalArgumentException("등급은 필수입니다");
+            throw new LoanInvariantViolationException("등급은 필수입니다");
         }
         if (snapshotDate == null) {
-            throw new IllegalArgumentException("스냅샷 일자는 필수입니다");
+            throw new LoanInvariantViolationException("스냅샷 일자는 필수입니다");
         }
         this.stockCode = stockCode;
         this.score = score;

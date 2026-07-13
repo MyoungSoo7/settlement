@@ -1,4 +1,5 @@
 package github.lms.lemuel.cart.domain;
+import github.lms.lemuel.cart.domain.exception.CartInvariantViolationException;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

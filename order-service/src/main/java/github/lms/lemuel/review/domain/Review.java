@@ -1,4 +1,5 @@
 package github.lms.lemuel.review.domain;
+import github.lms.lemuel.review.domain.exception.ReviewInvariantViolationException;
 
 import java.time.LocalDateTime;
 
@@ -38,7 +39,7 @@ public class Review {
 
     private static void validateRating(int rating) {
         if (rating < 1 || rating > 5) {
-            throw new IllegalArgumentException("평점은 1점에서 5점 사이여야 합니다.");
+            throw new ReviewInvariantViolationException("평점은 1점에서 5점 사이여야 합니다.");
         }
     }
 

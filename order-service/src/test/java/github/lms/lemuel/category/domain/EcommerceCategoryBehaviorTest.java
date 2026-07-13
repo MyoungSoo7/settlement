@@ -1,4 +1,6 @@
 package github.lms.lemuel.category.domain;
+import github.lms.lemuel.category.domain.exception.InvalidCategoryStateException;
+import github.lms.lemuel.category.domain.exception.CategoryInvariantViolationException;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,7 +28,7 @@ class EcommerceCategoryBehaviorTest {
         assertThat(child.getParentId()).isEqualTo(1L);
 
         assertThatThrownBy(() -> EcommerceCategory.createChild("과함", "toodeep", 5L, 2, 1))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(InvalidCategoryStateException.class);
     }
 
     @Test
@@ -43,7 +45,7 @@ class EcommerceCategoryBehaviorTest {
     void changeParent_self() {
         EcommerceCategory c = root();
         assertThatThrownBy(() -> c.changeParent(1L, 0))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(CategoryInvariantViolationException.class);
     }
 
     @Test
@@ -51,7 +53,7 @@ class EcommerceCategoryBehaviorTest {
     void changeParent_tooDeep() {
         EcommerceCategory c = root();
         assertThatThrownBy(() -> c.changeParent(9L, EcommerceCategory.MAX_DEPTH))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(InvalidCategoryStateException.class);
     }
 
     @Test
@@ -61,9 +63,9 @@ class EcommerceCategoryBehaviorTest {
         c.changeSortOrder(5);
         assertThat(c.getSortOrder()).isEqualTo(5);
         assertThatThrownBy(() -> c.changeSortOrder(-1))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(CategoryInvariantViolationException.class);
         assertThatThrownBy(() -> c.changeSortOrder(null))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(CategoryInvariantViolationException.class);
     }
 
     @Test
@@ -82,7 +84,7 @@ class EcommerceCategoryBehaviorTest {
         c.softDelete();
         assertThat(c.isDeleted()).isTrue();
         assertThat(c.getIsActive()).isFalse();
-        assertThatThrownBy(c::activate).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(c::activate).isInstanceOf(InvalidCategoryStateException.class);
     }
 
     @Test

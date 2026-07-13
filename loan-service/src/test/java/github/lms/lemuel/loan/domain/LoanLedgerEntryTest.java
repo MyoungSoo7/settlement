@@ -1,5 +1,6 @@
 package github.lms.lemuel.loan.domain;
 
+import github.lms.lemuel.loan.domain.exception.LoanInvariantViolationException;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -55,7 +56,7 @@ class LoanLedgerEntryTest {
     @Test
     void 전표금액이_0이하면_예외() {
         assertThatThrownBy(() -> LoanLedgerEntry.disbursement(1L, BigDecimal.ZERO))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(LoanInvariantViolationException.class);
     }
 
     @Test

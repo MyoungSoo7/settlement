@@ -1,5 +1,7 @@
 package github.lms.lemuel.order.application.service;
 
+import github.lms.lemuel.order.domain.exception.InvalidOrderStateException;
+
 import github.lms.lemuel.order.application.port.out.LoadOrderPort;
 import github.lms.lemuel.order.application.port.out.RefundOrderPaymentPort;
 import github.lms.lemuel.order.application.port.out.SaveOrderStatusHistoryPort;
@@ -73,7 +75,7 @@ class ChangeOrderStatusServiceTest {
         when(loadOrderPort.findById(1L)).thenReturn(Optional.of(order));
 
         assertThatThrownBy(() -> service.updateStatus(1L, "DELIVERED"))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(InvalidOrderStateException.class);
         verify(saveOrderPort, never()).save(any());
     }
 
@@ -193,7 +195,7 @@ class ChangeOrderStatusServiceTest {
         when(loadOrderPort.findById(1L)).thenReturn(Optional.of(order));
 
         assertThatThrownBy(() -> service.changeShippingStatus(1L, "DELIVERED", "배송완료", "admin"))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(InvalidOrderStateException.class);
         verify(saveOrderPort, never()).save(any());
     }
 }

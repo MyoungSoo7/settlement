@@ -1,4 +1,5 @@
 package github.lms.lemuel.order.domain;
+import github.lms.lemuel.order.domain.exception.OrderInvariantViolationException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -33,13 +34,13 @@ public class OrderItem {
                                      String productName, BigDecimal unitPrice, int quantity) {
         Objects.requireNonNull(productId, "productId");
         if (productName == null || productName.isBlank()) {
-            throw new IllegalArgumentException("productName 은 필수");
+            throw new OrderInvariantViolationException("productName 은 필수");
         }
         if (unitPrice == null || unitPrice.signum() < 0) {
-            throw new IllegalArgumentException("unitPrice 는 0 이상");
+            throw new OrderInvariantViolationException("unitPrice 는 0 이상");
         }
         if (quantity <= 0) {
-            throw new IllegalArgumentException("quantity 는 양수");
+            throw new OrderInvariantViolationException("quantity 는 양수");
         }
         BigDecimal line = unitPrice.multiply(BigDecimal.valueOf(quantity));
         return new OrderItem(null, null, productId, variantId, sku, productName,

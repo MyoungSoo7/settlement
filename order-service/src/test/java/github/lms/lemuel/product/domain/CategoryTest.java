@@ -1,4 +1,6 @@
 package github.lms.lemuel.product.domain;
+import github.lms.lemuel.product.domain.exception.InvalidProductStateException;
+import github.lms.lemuel.product.domain.exception.ProductInvariantViolationException;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -48,20 +50,20 @@ class CategoryTest {
     @Test @DisplayName("create: null 이름이면 예외")
     void create_nullName() {
         assertThatThrownBy(() -> Category.create(null, "설명", 0))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ProductInvariantViolationException.class)
                 .hasMessage("Category name cannot be empty");
     }
 
     @Test @DisplayName("create: 빈 이름이면 예외")
     void create_emptyName() {
         assertThatThrownBy(() -> Category.create("  ", "설명", 0))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(ProductInvariantViolationException.class);
     }
 
     @Test @DisplayName("create: 100자 초과 이름이면 예외")
     void create_longName() {
         assertThatThrownBy(() -> Category.create("A".repeat(101), "설명", 0))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ProductInvariantViolationException.class)
                 .hasMessage("Category name must not exceed 100 characters");
     }
 
@@ -120,14 +122,14 @@ class CategoryTest {
     void changeDisplayOrder_null() {
         Category cat = Category.create("카테고리", "설명", 0);
         assertThatThrownBy(() -> cat.changeDisplayOrder(null))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(ProductInvariantViolationException.class);
     }
 
     @Test @DisplayName("changeDisplayOrder: 음수이면 예외")
     void changeDisplayOrder_negative() {
         Category cat = Category.create("카테고리", "설명", 0);
         assertThatThrownBy(() -> cat.changeDisplayOrder(-1))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(ProductInvariantViolationException.class);
     }
 
     @Test @DisplayName("changeParent: 부모 변경")
@@ -149,7 +151,7 @@ class CategoryTest {
         Category cat = Category.create("카테고리", "설명", 0);
         cat.setId(7L);
         assertThatThrownBy(() -> cat.changeParent(7L))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(ProductInvariantViolationException.class);
     }
 
     @Test @DisplayName("isRootCategory / isSubCategory")

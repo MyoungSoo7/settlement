@@ -1,4 +1,6 @@
 package github.lms.lemuel.payment.domain;
+import github.lms.lemuel.payment.domain.exception.InvalidPaymentStateException;
+import github.lms.lemuel.payment.domain.exception.PaymentInvariantViolationException;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
@@ -42,7 +44,7 @@ class PaymentDomainTest {
         PaymentDomain p = createReadyPayment();
         p.authorize("pg-1");
         assertThatThrownBy(() -> p.authorize("pg-2"))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(InvalidPaymentStateException.class);
     }
 
     @Test @DisplayName("AUTHORIZED → CAPTURED 성공")
@@ -57,7 +59,7 @@ class PaymentDomainTest {
     @Test @DisplayName("READY에서 capture 실패")
     void capture_fail_notAuthorized() {
         PaymentDomain p = createReadyPayment();
-        assertThatThrownBy(p::capture).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(p::capture).isInstanceOf(InvalidPaymentStateException.class);
     }
 
     @Test @DisplayName("AUTHORIZED → CANCELED (승인취소) 성공")
@@ -71,13 +73,13 @@ class PaymentDomainTest {
     @Test @DisplayName("READY 상태에서 cancel 실패 (AUTHORIZED 만 취소 가능)")
     void cancel_fail_notAuthorized() {
         PaymentDomain p = createReadyPayment();
-        assertThatThrownBy(p::cancel).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(p::cancel).isInstanceOf(InvalidPaymentStateException.class);
     }
 
     @Test @DisplayName("CAPTURED 이후에는 cancel 불가 (refund 경로 사용)")
     void cancel_fail_afterCapture() {
         PaymentDomain p = createCapturedPayment();
-        assertThatThrownBy(p::cancel).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(p::cancel).isInstanceOf(InvalidPaymentStateException.class);
     }
 
     @Test @DisplayName("CAPTURED → REFUNDED 성공")
@@ -90,7 +92,7 @@ class PaymentDomainTest {
     @Test @DisplayName("READY에서 refund 실패")
     void refund_fail_notCaptured() {
         PaymentDomain p = createReadyPayment();
-        assertThatThrownBy(p::refund).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(p::refund).isInstanceOf(InvalidPaymentStateException.class);
     }
 
     @Test @DisplayName("환불 가능 금액 계산")

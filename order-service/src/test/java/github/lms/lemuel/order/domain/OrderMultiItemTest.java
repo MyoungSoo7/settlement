@@ -1,4 +1,6 @@
 package github.lms.lemuel.order.domain;
+import github.lms.lemuel.order.domain.exception.InvalidOrderStateException;
+import github.lms.lemuel.order.domain.exception.OrderInvariantViolationException;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -64,10 +66,10 @@ class OrderMultiItemTest {
                 OrderItem.newItem(1L, null, null, "A", new BigDecimal("10000"), 1));
 
         assertThatThrownBy(() -> Order.createMultiItem(1L, items, new BigDecimal("10000")))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(OrderInvariantViolationException.class)
                 .hasMessageContaining("이상일 수 없습니다");
         assertThatThrownBy(() -> Order.createMultiItem(1L, items, new BigDecimal("15000")))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(OrderInvariantViolationException.class);
     }
 
     @Test
@@ -77,7 +79,7 @@ class OrderMultiItemTest {
                 OrderItem.newItem(1L, null, null, "A", new BigDecimal("10000"), 1));
 
         assertThatThrownBy(() -> Order.createMultiItem(1L, items, new BigDecimal("-1")))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(OrderInvariantViolationException.class)
                 .hasMessageContaining("음수");
     }
 
@@ -85,9 +87,9 @@ class OrderMultiItemTest {
     @DisplayName("createMultiItem: 빈 리스트 → IllegalArgumentException")
     void multiItem_empty() {
         assertThatThrownBy(() -> Order.createMultiItem(1L, List.of()))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(OrderInvariantViolationException.class);
         assertThatThrownBy(() -> Order.createMultiItem(1L, null))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(OrderInvariantViolationException.class);
     }
 
     @Test

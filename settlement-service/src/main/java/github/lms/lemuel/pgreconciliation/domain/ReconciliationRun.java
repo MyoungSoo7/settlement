@@ -1,5 +1,7 @@
 package github.lms.lemuel.pgreconciliation.domain;
 
+import github.lms.lemuel.pgreconciliation.domain.exception.InvalidReconciliationStateException;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -85,7 +87,7 @@ public class ReconciliationRun {
     public void complete(int totalPgRows, int totalInternalRows,
                          int matchedCount, List<ReconciliationDiscrepancy> found) {
         if (this.status != ReconciliationRunStatus.RUNNING) {
-            throw new IllegalStateException("RUNNING 상태에서만 완료 가능합니다: " + status);
+            throw new InvalidReconciliationStateException(status, ReconciliationRunStatus.COMPLETED);
         }
         this.totalPgRows = totalPgRows;
         this.totalInternalRows = totalInternalRows;

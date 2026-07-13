@@ -1,5 +1,7 @@
 package github.lms.lemuel.payout.domain;
 
+import github.lms.lemuel.payout.domain.exception.PayoutInvariantViolationException;
+
 import java.util.Objects;
 
 /**
@@ -17,9 +19,9 @@ public record SellerBankAccount(
         Objects.requireNonNull(bankCode, "bankCode");
         Objects.requireNonNull(bankAccountNumber, "bankAccountNumber");
         Objects.requireNonNull(accountHolderName, "accountHolderName");
-        if (bankCode.isBlank()) throw new IllegalArgumentException("bankCode 필수");
-        if (bankAccountNumber.isBlank()) throw new IllegalArgumentException("bankAccountNumber 필수");
-        if (accountHolderName.isBlank()) throw new IllegalArgumentException("accountHolderName 필수");
+        if (bankCode.isBlank()) throw new PayoutInvariantViolationException("bankCode 필수");
+        if (bankAccountNumber.isBlank()) throw new PayoutInvariantViolationException("bankAccountNumber 필수");
+        if (accountHolderName.isBlank()) throw new PayoutInvariantViolationException("accountHolderName 필수");
     }
 
     /**

@@ -1,4 +1,6 @@
 package github.lms.lemuel.user.domain;
+import github.lms.lemuel.user.domain.exception.InvalidMembershipStateException;
+import github.lms.lemuel.user.domain.exception.UserInvariantViolationException;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,19 +26,19 @@ class MembershipApprovalTest {
     @Test @DisplayName("생성 - userId 가 null 이면 예외")
     void create_nullUserId() {
         assertThatThrownBy(() -> new MembershipApproval(null, MembershipAction.APPROVE, "r", 1L))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(UserInvariantViolationException.class);
     }
 
     @Test @DisplayName("생성 - action 이 null 이면 예외")
     void create_nullAction() {
         assertThatThrownBy(() -> new MembershipApproval(1L, null, "r", 1L))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(UserInvariantViolationException.class);
     }
 
     @Test @DisplayName("생성 - processedBy 가 null 이면 예외")
     void create_nullProcessedBy() {
         assertThatThrownBy(() -> new MembershipApproval(1L, MembershipAction.REJECT, "r", null))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(UserInvariantViolationException.class);
     }
 
     @Test @DisplayName("assignId - 영속화 후 식별자 주입")

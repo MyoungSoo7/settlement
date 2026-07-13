@@ -1,4 +1,6 @@
 package github.lms.lemuel.order.domain;
+import github.lms.lemuel.order.domain.exception.InvalidOrderStateException;
+import github.lms.lemuel.order.domain.exception.OrderInvariantViolationException;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -60,12 +62,12 @@ class RefundPolicyTest {
     @Test @DisplayName("결제 금액 음수는 예외")
     void negativePaid_throws() {
         assertThatThrownBy(() -> RefundPolicy.forOrder(new BigDecimal("-1"), BigDecimal.ZERO, false))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(OrderInvariantViolationException.class);
     }
 
     @Test @DisplayName("배송비 음수는 예외")
     void negativeFee_throws() {
         assertThatThrownBy(() -> RefundPolicy.forOrder(new BigDecimal("30000"), new BigDecimal("-1"), true))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(OrderInvariantViolationException.class);
     }
 }

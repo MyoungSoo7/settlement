@@ -1,5 +1,7 @@
 package github.lms.lemuel.rbac.application.service;
 
+import github.lms.lemuel.rbac.domain.exception.RoleInvariantViolationException;
+
 import github.lms.lemuel.rbac.application.port.in.RbacUseCase;
 import github.lms.lemuel.rbac.application.port.out.LoadRbacPort;
 import github.lms.lemuel.rbac.application.port.out.SaveRbacPort;
@@ -120,13 +122,13 @@ class RbacServiceTest {
     void createRole_invalidCode() {
         assertThatThrownBy(() -> service.createRole(new RbacUseCase.CreateRoleCommand(
                 "cs-agent!", "이름", null)))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(RoleInvariantViolationException.class);
         assertThatThrownBy(() -> service.createRole(new RbacUseCase.CreateRoleCommand(
                 "A", "이름", null)))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(RoleInvariantViolationException.class);
         assertThatThrownBy(() -> service.createRole(new RbacUseCase.CreateRoleCommand(
                 null, "이름", null)))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(RoleInvariantViolationException.class);
     }
 
     @Test
@@ -134,7 +136,7 @@ class RbacServiceTest {
     void createRole_blankName() {
         assertThatThrownBy(() -> service.createRole(new RbacUseCase.CreateRoleCommand(
                 "CS_AGENT", "  ", null)))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(RoleInvariantViolationException.class);
     }
 
     @Test

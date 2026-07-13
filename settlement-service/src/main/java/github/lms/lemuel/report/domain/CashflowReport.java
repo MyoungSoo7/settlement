@@ -1,5 +1,7 @@
 package github.lms.lemuel.report.domain;
 
+import github.lms.lemuel.report.domain.exception.ReportInvariantViolationException;
+
 import java.time.LocalDate;
 import java.util.List;
 
@@ -13,13 +15,13 @@ public record CashflowReport(
 ) {
     public CashflowReport {
         if (from == null || to == null) {
-            throw new IllegalArgumentException("from/to are required");
+            throw new ReportInvariantViolationException("from/to are required");
         }
         if (from.isAfter(to)) {
-            throw new IllegalArgumentException("from must be <= to");
+            throw new ReportInvariantViolationException("from must be <= to");
         }
         if (granularity == null) {
-            throw new IllegalArgumentException("granularity is required");
+            throw new ReportInvariantViolationException("granularity is required");
         }
         if (buckets == null) {
             buckets = List.of();

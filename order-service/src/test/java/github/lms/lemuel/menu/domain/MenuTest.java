@@ -1,4 +1,5 @@
 package github.lms.lemuel.menu.domain;
+import github.lms.lemuel.menu.domain.exception.MenuInvariantViolationException;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,9 +27,9 @@ class MenuTest {
     @Test @DisplayName("create - 이름이 비어 있으면 예외")
     void create_blankName() {
         assertThatThrownBy(() -> Menu.create("  ", "/p", null, null, 0, null, true))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(MenuInvariantViolationException.class);
         assertThatThrownBy(() -> Menu.create(null, "/p", null, null, 0, null, true))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(MenuInvariantViolationException.class);
     }
 
     @Test @DisplayName("update - 필드 전체 갱신")
@@ -50,7 +51,7 @@ class MenuTest {
     void update_blankName() {
         Menu menu = Menu.create("old", "/old", null, null, 0, null, true);
         assertThatThrownBy(() -> menu.update("", "/n", null, null, 0, null, true, true))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(MenuInvariantViolationException.class);
     }
 
     @Test @DisplayName("addChild - 자식 목록에 추가")

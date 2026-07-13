@@ -1,4 +1,6 @@
 package github.lms.lemuel.product.domain;
+import github.lms.lemuel.product.domain.exception.InvalidProductStateException;
+import github.lms.lemuel.product.domain.exception.ProductInvariantViolationException;
 
 import java.time.LocalDateTime;
 
@@ -78,13 +80,13 @@ public class ProductImage {
     // 도메인 규칙: 허용된 이미지 타입만
     public void validateContentType() {
         if (contentType == null) {
-            throw new IllegalArgumentException("Content type cannot be null");
+            throw new ProductInvariantViolationException("Content type cannot be null");
         }
         if (!contentType.equals("image/jpeg") &&
             !contentType.equals("image/jpg") &&
             !contentType.equals("image/png") &&
             !contentType.equals("image/webp")) {
-            throw new IllegalArgumentException("Invalid image type. Only jpg, jpeg, png, webp are allowed");
+            throw new ProductInvariantViolationException("Invalid image type. Only jpg, jpeg, png, webp are allowed");
         }
     }
 
@@ -92,17 +94,17 @@ public class ProductImage {
     public void validateFileSize() {
         long maxSize = 5 * 1024 * 1024; // 5MB
         if (sizeBytes == null || sizeBytes <= 0) {
-            throw new IllegalArgumentException("File size must be greater than 0");
+            throw new ProductInvariantViolationException("File size must be greater than 0");
         }
         if (sizeBytes > maxSize) {
-            throw new IllegalArgumentException("File size exceeds maximum limit of 5MB");
+            throw new ProductInvariantViolationException("File size exceeds maximum limit of 5MB");
         }
     }
 
     // 비즈니스 메서드: 대표 이미지로 지정
     public void markAsPrimary() {
         if (isDeleted()) {
-            throw new IllegalStateException("Cannot mark deleted image as primary");
+            throw new InvalidProductStateException("Cannot mark deleted image as primary");
         }
         this.isPrimary = true;
         this.updatedAt = LocalDateTime.now();
@@ -117,7 +119,7 @@ public class ProductImage {
     // 비즈니스 메서드: 순서 변경
     public void changeOrder(Integer newOrderIndex) {
         if (newOrderIndex == null || newOrderIndex < 0) {
-            throw new IllegalArgumentException("Order index must be zero or greater");
+            throw new ProductInvariantViolationException("Order index must be zero or greater");
         }
         this.orderIndex = newOrderIndex;
         this.updatedAt = LocalDateTime.now();

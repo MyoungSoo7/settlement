@@ -1,5 +1,7 @@
 package github.lms.lemuel.payment.domain;
 
+import github.lms.lemuel.payment.domain.exception.InvalidPaymentStateException;
+import github.lms.lemuel.payment.domain.exception.PaymentInvariantViolationException;
 import lombok.Getter;
 
 import java.math.BigDecimal;
@@ -52,7 +54,7 @@ public class PaymentDomain {
     public static PaymentDomain createSplit(Long orderId, List<PaymentTender> tenders,
                                              String paymentMethod) {
         if (tenders == null || tenders.size() < 2) {
-            throw new IllegalArgumentException("분할결제는 최소 2 개의 지불수단이 필요합니다");
+            throw new PaymentInvariantViolationException("분할결제는 최소 2 개의 지불수단이 필요합니다");
         }
         BigDecimal total = tenders.stream()
                 .map(PaymentTender::getAmount)
@@ -81,7 +83,7 @@ public class PaymentDomain {
     // Business logic: Authorize payment
     public void authorize(String pgTransactionId) {
         if (this.status != PaymentStatus.READY) {
-            throw new IllegalStateException("Payment must be in READY status to authorize");
+            throw new InvalidPaymentStateException(this.status, PaymentStatus.READY);
         }
         this.status = PaymentStatus.AUTHORIZED;
         this.pgTransactionId = pgTransactionId;
@@ -91,7 +93,7 @@ public class PaymentDomain {
     // Business logic: Capture payment
     public void capture() {
         if (this.status != PaymentStatus.AUTHORIZED) {
-            throw new IllegalStateException("Payment must be in AUTHORIZED status to capture");
+            throw new InvalidPaymentStateException(this.status, PaymentStatus.AUTHORIZED);
         }
         this.status = PaymentStatus.CAPTURED;
         this.capturedAt = LocalDateTime.now();
@@ -102,8 +104,7 @@ public class PaymentDomain {
     // capture 이후 자금 회수는 refund 경로를 사용한다(상태머신: AUTHORIZED ↘ CANCELED).
     public void cancel() {
         if (this.status != PaymentStatus.AUTHORIZED) {
-            throw new IllegalStateException(
-                "Payment must be in AUTHORIZED status to cancel. Current: " + this.status);
+            throw new InvalidPaymentStateException(this.status, PaymentStatus.AUTHORIZED);
         }
         this.status = PaymentStatus.CANCELED;
         this.updatedAt = LocalDateTime.now();
@@ -112,7 +113,7 @@ public class PaymentDomain {
     // Business logic: Refund payment
     public void refund() {
         if (this.status != PaymentStatus.CAPTURED) {
-            throw new IllegalStateException("Payment must be in CAPTURED status to refund");
+            throw new InvalidPaymentStateException(this.status, PaymentStatus.CAPTURED);
         }
         this.status = PaymentStatus.REFUNDED;
         this.updatedAt = LocalDateTime.now();
@@ -150,16 +151,16 @@ public class PaymentDomain {
      */
     public List<TenderRefundPlan> planRefundFromTenders(BigDecimal totalToRefund) {
         if (!isSplit()) {
-            throw new IllegalStateException("단일결제는 planRefundFromTenders 호출 불가");
+            throw new InvalidPaymentStateException("단일결제는 planRefundFromTenders 호출 불가");
         }
         if (totalToRefund == null || totalToRefund.signum() <= 0) {
-            throw new IllegalArgumentException("환불 금액은 양수여야 합니다");
+            throw new PaymentInvariantViolationException("환불 금액은 양수여야 합니다");
         }
         BigDecimal totalRefundable = tenders.stream()
                 .map(PaymentTender::getRefundableAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         if (totalToRefund.compareTo(totalRefundable) > 0) {
-            throw new IllegalArgumentException(
+            throw new PaymentInvariantViolationException(
                     "전체 환불 가능액 초과: 요청=" + totalToRefund + ", 잔여=" + totalRefundable);
         }
 
@@ -188,7 +189,7 @@ public class PaymentDomain {
                 .map(PaymentTender::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         if (sum.compareTo(this.amount) != 0) {
-            throw new IllegalStateException(
+            throw new InvalidPaymentStateException(
                     "분할결제 tender 합계가 amount 와 불일치: tenderSum=" + sum + ", amount=" + amount);
         }
     }

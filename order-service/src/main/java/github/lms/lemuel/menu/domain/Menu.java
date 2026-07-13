@@ -1,4 +1,5 @@
 package github.lms.lemuel.menu.domain;
+import github.lms.lemuel.menu.domain.exception.MenuInvariantViolationException;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -35,7 +36,7 @@ public class Menu {
     public static Menu create(String name, String path, String icon,
                               Long parentId, int sortOrder, String requiredRole, boolean visible) {
         if (name == null || name.isBlank()) {
-            throw new IllegalArgumentException("메뉴 이름은 필수입니다.");
+            throw new MenuInvariantViolationException("메뉴 이름은 필수입니다.");
         }
         Menu menu = new Menu();
         menu.name = name.trim();
@@ -52,7 +53,7 @@ public class Menu {
                        Long parentId, int sortOrder, String requiredRole,
                        boolean visible, boolean active) {
         if (name == null || name.isBlank()) {
-            throw new IllegalArgumentException("메뉴 이름은 필수입니다.");
+            throw new MenuInvariantViolationException("메뉴 이름은 필수입니다.");
         }
         this.name = name.trim();
         this.path = path;

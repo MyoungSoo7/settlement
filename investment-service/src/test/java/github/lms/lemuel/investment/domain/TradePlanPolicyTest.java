@@ -6,8 +6,10 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 
+import github.lms.lemuel.investment.domain.exception.InvestmentInvariantViolationException;
+
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * TradePlanPolicy — 3분할 밴드(30/30/40 · 100%/95%/90%)·손절 −7%·익절 +20%·KRX 호가단위 내림의
@@ -98,15 +100,15 @@ class TradePlanPolicyTest {
     }
 
     @Test
-    @DisplayName("현재가·예산이 0 이하이면 IllegalArgumentException")
+    @DisplayName("현재가·예산이 0 이하이면 InvestmentInvariantViolationException")
     void rejectsInvalidInputs() {
-        assertThatIllegalArgumentException()
-                .isThrownBy(() -> policy.plan(BigDecimal.ZERO, new BigDecimal("1000000")));
-        assertThatIllegalArgumentException()
-                .isThrownBy(() -> policy.plan(null, new BigDecimal("1000000")));
-        assertThatIllegalArgumentException()
-                .isThrownBy(() -> policy.plan(new BigDecimal("10000"), BigDecimal.ZERO));
-        assertThatIllegalArgumentException()
-                .isThrownBy(() -> policy.plan(new BigDecimal("10000"), new BigDecimal("-1")));
+        assertThatThrownBy(() -> policy.plan(BigDecimal.ZERO, new BigDecimal("1000000")))
+                .isInstanceOf(InvestmentInvariantViolationException.class);
+        assertThatThrownBy(() -> policy.plan(null, new BigDecimal("1000000")))
+                .isInstanceOf(InvestmentInvariantViolationException.class);
+        assertThatThrownBy(() -> policy.plan(new BigDecimal("10000"), BigDecimal.ZERO))
+                .isInstanceOf(InvestmentInvariantViolationException.class);
+        assertThatThrownBy(() -> policy.plan(new BigDecimal("10000"), new BigDecimal("-1")))
+                .isInstanceOf(InvestmentInvariantViolationException.class);
     }
 }

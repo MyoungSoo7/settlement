@@ -1,12 +1,15 @@
 package github.lms.lemuel.investment.domain;
 
+import github.lms.lemuel.investment.domain.exception.InvalidInvestmentOrderStateException;
+import github.lms.lemuel.investment.domain.exception.InvestmentInvariantViolationException;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
  * 투자 주문 애그리거트 루트 — 순수 POJO(프레임워크 의존 0).
  *
- * <p>상태 전이 불변식을 도메인 내부에서 강제한다(비정상 전이 → {@link IllegalStateException}).
+ * <p>상태 전이 불변식을 도메인 내부에서 강제한다(비정상 전이 → {@link InvalidInvestmentOrderStateException}).
  * 신청 시점의 투자점수·등급(scoreAtOrder/gradeAtOrder)을 스냅샷으로 보존한다 — 이후 재무제표 갱신으로
  * 점수가 바뀌어도 주문 이력은 신청 당시 근거를 유지한다(정산 commission_rate 스냅샷과 동일 철학).
  */
@@ -38,13 +41,13 @@ public class InvestmentOrder {
     public static InvestmentOrder request(Long sellerId, String stockCode, BigDecimal amount,
                                           int scoreAtOrder, String gradeAtOrder) {
         if (sellerId == null) {
-            throw new IllegalArgumentException("sellerId 는 필수입니다");
+            throw new InvestmentInvariantViolationException("sellerId 는 필수입니다");
         }
         if (stockCode == null || !stockCode.matches("\\d{6}")) {
-            throw new IllegalArgumentException("stockCode 는 6자리 숫자여야 합니다: " + stockCode);
+            throw new InvestmentInvariantViolationException("stockCode 는 6자리 숫자여야 합니다: " + stockCode);
         }
         if (amount == null || amount.signum() <= 0) {
-            throw new IllegalArgumentException("투자 금액은 양수여야 합니다: " + amount);
+            throw new InvestmentInvariantViolationException("투자 금액은 양수여야 합니다: " + amount);
         }
         return new InvestmentOrder(null, sellerId, stockCode, amount, scoreAtOrder, gradeAtOrder,
                 InvestmentOrderStatus.REQUESTED, LocalDateTime.now());
@@ -58,31 +61,30 @@ public class InvestmentOrder {
     }
 
     public void approve() {
-        requireStatus(InvestmentOrderStatus.REQUESTED, "승인");
+        requireStatus(InvestmentOrderStatus.REQUESTED, InvestmentOrderStatus.APPROVED);
         this.status = InvestmentOrderStatus.APPROVED;
     }
 
     public void execute() {
-        requireStatus(InvestmentOrderStatus.APPROVED, "집행");
+        requireStatus(InvestmentOrderStatus.APPROVED, InvestmentOrderStatus.EXECUTED);
         this.status = InvestmentOrderStatus.EXECUTED;
     }
 
     public void reject() {
-        requireStatus(InvestmentOrderStatus.REQUESTED, "거절");
+        requireStatus(InvestmentOrderStatus.REQUESTED, InvestmentOrderStatus.REJECTED);
         this.status = InvestmentOrderStatus.REJECTED;
     }
 
     public void cancel() {
         if (status != InvestmentOrderStatus.REQUESTED && status != InvestmentOrderStatus.APPROVED) {
-            throw new IllegalStateException("취소는 REQUESTED 또는 APPROVED 에서만 가능합니다. 현재=" + status);
+            throw new InvalidInvestmentOrderStateException(status, InvestmentOrderStatus.CANCELED);
         }
         this.status = InvestmentOrderStatus.CANCELED;
     }
 
-    private void requireStatus(InvestmentOrderStatus expected, String action) {
+    private void requireStatus(InvestmentOrderStatus expected, InvestmentOrderStatus target) {
         if (status != expected) {
-            throw new IllegalStateException(
-                    action + "은(는) " + expected + " 상태에서만 가능합니다. 현재=" + status);
+            throw new InvalidInvestmentOrderStateException(status, target);
         }
     }
 

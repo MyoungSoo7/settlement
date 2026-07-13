@@ -1,4 +1,6 @@
 package github.lms.lemuel.order.domain;
+import github.lms.lemuel.order.domain.exception.InvalidOrderStateException;
+import github.lms.lemuel.order.domain.exception.OrderInvariantViolationException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -93,11 +95,11 @@ public class Order {
      */
     public static Order createMultiItem(Long userId, List<OrderItem> items, BigDecimal discountAmount) {
         if (items == null || items.isEmpty()) {
-            throw new IllegalArgumentException("다건 주문은 최소 1 개 이상의 아이템이 필요합니다");
+            throw new OrderInvariantViolationException("다건 주문은 최소 1 개 이상의 아이템이 필요합니다");
         }
         BigDecimal discount = discountAmount != null ? discountAmount : BigDecimal.ZERO;
         if (discount.signum() < 0) {
-            throw new IllegalArgumentException("할인 금액은 음수일 수 없습니다");
+            throw new OrderInvariantViolationException("할인 금액은 음수일 수 없습니다");
         }
         Order order = new Order();
         order.userId = userId;
@@ -106,7 +108,7 @@ public class Order {
                 .map(OrderItem::getLineAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         if (discount.compareTo(subtotal) >= 0) {
-            throw new IllegalArgumentException(
+            throw new OrderInvariantViolationException(
                     "할인 금액(" + discount + ") 이 주문 소계(" + subtotal + ") 이상일 수 없습니다");
         }
         order.amount = subtotal.subtract(discount);
@@ -118,14 +120,14 @@ public class Order {
     // 도메인 규칙: userId 검증
     public void validateUserId() {
         if (userId == null || userId <= 0) {
-            throw new IllegalArgumentException("User ID must be a positive number");
+            throw new OrderInvariantViolationException("User ID must be a positive number");
         }
     }
 
     // 도메인 규칙: amount 검증
     public void validateAmount() {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("Amount must be greater than zero");
+            throw new OrderInvariantViolationException("Amount must be greater than zero");
         }
     }
 
@@ -136,14 +138,13 @@ public class Order {
      */
     public void transitionTo(OrderStatus target) {
         if (target == null) {
-            throw new IllegalArgumentException("target status required");
+            throw new OrderInvariantViolationException("target status required");
         }
         if (this.status == target) {
             return; // 멱등: 동일 상태 재적용 무시
         }
         if (!this.status.canTransitionTo(target)) {
-            throw new IllegalStateException(
-                    "허용되지 않은 주문 상태 전이: " + this.status + " → " + target);
+            throw new InvalidOrderStateException(this.status, target);
         }
         this.status = target;
         // 배송이 한 번이라도 시작되면(IN_TRANSIT/DELIVERED) 기록을 남긴다 — 이후 환불 신청으로
@@ -157,7 +158,7 @@ public class Order {
     // 비즈니스 메서드: 주문 취소
     public void cancel() {
         if (this.status != OrderStatus.CREATED) {
-            throw new IllegalStateException("Only CREATED orders can be canceled");
+            throw new InvalidOrderStateException(this.status, OrderStatus.CANCELED);
         }
         this.status = OrderStatus.CANCELED;
         this.updatedAt = LocalDateTime.now();
@@ -166,7 +167,7 @@ public class Order {
     // 비즈니스 메서드: 주문 완료 (결제 완료)
     public void complete() {
         if (this.status != OrderStatus.CREATED) {
-            throw new IllegalStateException("Only CREATED orders can be completed");
+            throw new InvalidOrderStateException(this.status, OrderStatus.PAID);
         }
         this.status = OrderStatus.PAID;
         this.updatedAt = LocalDateTime.now();
@@ -175,7 +176,7 @@ public class Order {
     // 비즈니스 메서드: 환불 처리
     public void refund() {
         if (this.status != OrderStatus.PAID) {
-            throw new IllegalStateException("Only PAID orders can be refunded");
+            throw new InvalidOrderStateException(this.status, OrderStatus.REFUNDED);
         }
         this.status = OrderStatus.REFUNDED;
         this.updatedAt = LocalDateTime.now();

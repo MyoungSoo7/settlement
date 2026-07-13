@@ -6,6 +6,7 @@ import github.lms.lemuel.settlement.application.port.out.SaveSettlementAdjustmen
 import github.lms.lemuel.settlement.application.port.out.SaveSettlementPort;
 import github.lms.lemuel.settlement.domain.Settlement;
 import github.lms.lemuel.settlement.domain.SettlementAdjustment;
+import github.lms.lemuel.settlement.domain.exception.InvalidSettlementStateException;
 import github.lms.lemuel.settlement.domain.exception.SettlementNotFoundException;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
@@ -72,7 +73,7 @@ public class ApplyReconciliationAdjustmentService implements ApplyReconciliation
             // "clawback 을 holdback 에서 먼저 흡수" 의미로 재사용한다.
             settlement.consumeHoldbackForRefund(clawbackAmount);
             settlement.applyReconciliationClawback(clawbackAmount); // DONE 이면 여기서 throw
-        } catch (IllegalStateException done) {
+        } catch (InvalidSettlementStateException done) {
             // DONE 정산: 도메인이 금액 변경을 거부 → 정산은 저장하지 않는다(holdback 변경도 폐기됨).
             // 갭 추적을 위해 감사 레코드만 남기고 정상 반환한다(chargeback 처럼 실제 회수는 이관).
             // payout 은 되돌리지 않는다(scope 밖).

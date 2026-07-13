@@ -1,6 +1,8 @@
 package github.lms.lemuel.settlement.domain;
 
 import org.junit.jupiter.api.DisplayName;
+import github.lms.lemuel.settlement.domain.exception.InvalidSettlementStateException;
+import github.lms.lemuel.settlement.domain.exception.SettlementInvariantViolationException;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -42,7 +44,7 @@ class SettlementReconciliationClawbackTest {
         assertThat(s.isDone()).isTrue();
 
         assertThatThrownBy(() -> s.applyReconciliationClawback(new BigDecimal("1000")))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(InvalidSettlementStateException.class)
                 .hasMessageContaining("DONE settlement is immutable");
     }
 
@@ -72,10 +74,10 @@ class SettlementReconciliationClawbackTest {
     void nonPositiveAmount_rejected() {
         Settlement s = newSettlement();
         assertThatThrownBy(() -> s.applyReconciliationClawback(BigDecimal.ZERO))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(SettlementInvariantViolationException.class);
         assertThatThrownBy(() -> s.applyReconciliationClawback(new BigDecimal("-1")))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(SettlementInvariantViolationException.class);
         assertThatThrownBy(() -> s.applyReconciliationClawback(null))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(SettlementInvariantViolationException.class);
     }
 }

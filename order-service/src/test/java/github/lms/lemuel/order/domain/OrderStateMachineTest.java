@@ -1,4 +1,6 @@
 package github.lms.lemuel.order.domain;
+import github.lms.lemuel.order.domain.exception.InvalidOrderStateException;
+import github.lms.lemuel.order.domain.exception.OrderInvariantViolationException;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -66,7 +68,7 @@ class OrderStateMachineTest {
     @DisplayName("transitionTo — null 대상 예외")
     void transition_null() {
         assertThatThrownBy(() -> paidOrder().transitionTo(null))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(OrderInvariantViolationException.class);
     }
 
     @Test
@@ -74,7 +76,10 @@ class OrderStateMachineTest {
     void transition_illegal() {
         Order o = Order.create(1L, 2L, BigDecimal.TEN);
         assertThatThrownBy(() -> o.transitionTo(OrderStatus.DELIVERED))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOfSatisfying(InvalidOrderStateException.class, ex -> {
+                    assertThat(ex.getFrom()).isEqualTo(OrderStatus.CREATED);
+                    assertThat(ex.getTo()).isEqualTo(OrderStatus.DELIVERED);
+                });
     }
 
     @Test
@@ -84,7 +89,7 @@ class OrderStateMachineTest {
         assertThat(o.isCancelable()).isTrue();
         o.cancel();
         assertThat(o.getStatus()).isEqualTo(OrderStatus.CANCELED);
-        assertThatThrownBy(() -> paidOrder().cancel()).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> paidOrder().cancel()).isInstanceOf(InvalidOrderStateException.class);
     }
 
     @Test
@@ -94,8 +99,8 @@ class OrderStateMachineTest {
         assertThat(o.isRefundable()).isTrue();
         o.refund();
         assertThat(o.getStatus()).isEqualTo(OrderStatus.REFUNDED);
-        assertThatThrownBy(o::complete).isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(o::refund).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(o::complete).isInstanceOf(InvalidOrderStateException.class);
+        assertThatThrownBy(o::refund).isInstanceOf(InvalidOrderStateException.class);
     }
 
     @Test
@@ -130,11 +135,11 @@ class OrderStateMachineTest {
     @DisplayName("createMultiItem — 빈 목록/과다 할인 예외")
     void multiItem_guards() {
         assertThatThrownBy(() -> Order.createMultiItem(1L, java.util.List.of()))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(OrderInvariantViolationException.class);
         OrderItem item = OrderItem.newItem(1L, 1L, "SKU-2", "상품2", new BigDecimal("1000"), 1);
         assertThatThrownBy(() -> Order.createMultiItem(1L, java.util.List.of(item), new BigDecimal("-1")))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(OrderInvariantViolationException.class);
         assertThatThrownBy(() -> Order.createMultiItem(1L, java.util.List.of(item), new BigDecimal("1000")))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(OrderInvariantViolationException.class);
     }
 }

@@ -1,6 +1,7 @@
 package github.lms.lemuel.settlement.domain;
 
 import org.junit.jupiter.api.DisplayName;
+import github.lms.lemuel.settlement.domain.exception.SettlementInvariantViolationException;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -34,10 +35,10 @@ class SettlementAdjustmentReconciliationTest {
     void rejectsNonPositiveAmount() {
         assertThatThrownBy(() -> SettlementAdjustment.ofReconciliation(
                 100L, 55L, BigDecimal.ZERO, LocalDate.now()))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(SettlementInvariantViolationException.class);
         assertThatThrownBy(() -> SettlementAdjustment.ofReconciliation(
                 100L, 55L, new BigDecimal("-1"), LocalDate.now()))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(SettlementInvariantViolationException.class);
     }
 
     @Test
@@ -45,9 +46,9 @@ class SettlementAdjustmentReconciliationTest {
     void rejectsInvalidDiscrepancyId() {
         assertThatThrownBy(() -> SettlementAdjustment.ofReconciliation(
                 100L, null, new BigDecimal("1000"), LocalDate.now()))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(SettlementInvariantViolationException.class);
         assertThatThrownBy(() -> SettlementAdjustment.ofReconciliation(
                 100L, 0L, new BigDecimal("1000"), LocalDate.now()))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(SettlementInvariantViolationException.class);
     }
 }

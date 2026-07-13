@@ -1,6 +1,8 @@
 package github.lms.lemuel.loan.domain;
 
 import github.lms.lemuel.common.money.Money;
+import github.lms.lemuel.loan.domain.exception.InvalidLoanStateException;
+import github.lms.lemuel.loan.domain.exception.LoanInvariantViolationException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -52,22 +54,22 @@ public class CorporateLoan {
     public static CorporateLoan request(String stockCode, String corpName, BigDecimal principal, BigDecimal fee,
                                         int termDays, int creditScore, String creditGrade) {
         if (stockCode == null || stockCode.length() != 6) {
-            throw new IllegalArgumentException("종목코드는 6자리여야 합니다: " + stockCode);
+            throw new LoanInvariantViolationException("종목코드는 6자리여야 합니다: " + stockCode);
         }
         if (principal == null || principal.signum() <= 0) {
-            throw new IllegalArgumentException("대출 원금은 양수여야 합니다: " + principal);
+            throw new LoanInvariantViolationException("대출 원금은 양수여야 합니다: " + principal);
         }
         if (fee == null || fee.signum() < 0) {
-            throw new IllegalArgumentException("수수료는 음수일 수 없습니다: " + fee);
+            throw new LoanInvariantViolationException("수수료는 음수일 수 없습니다: " + fee);
         }
         if (termDays <= 0) {
-            throw new IllegalArgumentException("대출 기간(일)은 양수여야 합니다: " + termDays);
+            throw new LoanInvariantViolationException("대출 기간(일)은 양수여야 합니다: " + termDays);
         }
         if (creditScore < 0 || creditScore > 100) {
-            throw new IllegalArgumentException("신용점수는 0~100 이어야 합니다: " + creditScore);
+            throw new LoanInvariantViolationException("신용점수는 0~100 이어야 합니다: " + creditScore);
         }
         if (creditGrade == null || creditGrade.isBlank()) {
-            throw new IllegalArgumentException("신용등급은 필수입니다");
+            throw new LoanInvariantViolationException("신용등급은 필수입니다");
         }
         return new CorporateLoan(null, stockCode, corpName, principal, fee, BigDecimal.ZERO,
                 termDays, creditScore, creditGrade, CorporateLoanStatus.REQUESTED, LocalDateTime.now());
@@ -82,18 +84,18 @@ public class CorporateLoan {
     }
 
     public void approve() {
-        requireStatus(CorporateLoanStatus.REQUESTED, "승인");
+        requireStatus(CorporateLoanStatus.REQUESTED, CorporateLoanStatus.APPROVED);
         this.status = CorporateLoanStatus.APPROVED;
     }
 
     public void reject() {
-        requireStatus(CorporateLoanStatus.REQUESTED, "거절");
+        requireStatus(CorporateLoanStatus.REQUESTED, CorporateLoanStatus.REJECTED);
         this.status = CorporateLoanStatus.REJECTED;
     }
 
     /** 실행(대출금 지급). 미상환잔액 = 원금 + 수수료. */
     public void disburse() {
-        requireStatus(CorporateLoanStatus.APPROVED, "실행");
+        requireStatus(CorporateLoanStatus.APPROVED, CorporateLoanStatus.DISBURSED);
         this.outstanding = Money.of(principal).plus(Money.of(fee)).toBigDecimal();
         this.status = CorporateLoanStatus.DISBURSED;
     }
@@ -106,9 +108,9 @@ public class CorporateLoan {
      * @return 실제 차감된 금액
      */
     public BigDecimal repay(BigDecimal amount) {
-        requireStatus(CorporateLoanStatus.DISBURSED, "상환");
+        requireStatus(CorporateLoanStatus.DISBURSED, CorporateLoanStatus.REPAID);
         if (amount == null || amount.signum() <= 0) {
-            throw new IllegalArgumentException("상환액은 양수여야 합니다: " + amount);
+            throw new LoanInvariantViolationException("상환액은 양수여야 합니다: " + amount);
         }
         Money remaining = Money.of(outstanding);
         Money deducted = remaining.min(Money.of(amount));
@@ -120,10 +122,9 @@ public class CorporateLoan {
         return deducted.toBigDecimal();
     }
 
-    private void requireStatus(CorporateLoanStatus expected, String action) {
+    private void requireStatus(CorporateLoanStatus expected, CorporateLoanStatus target) {
         if (status != expected) {
-            throw new IllegalStateException(
-                    action + "은(는) " + expected + " 상태에서만 가능합니다. 현재=" + status);
+            throw new InvalidLoanStateException(status, target);
         }
     }
 

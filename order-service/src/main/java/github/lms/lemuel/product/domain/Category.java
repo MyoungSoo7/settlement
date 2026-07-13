@@ -1,4 +1,5 @@
 package github.lms.lemuel.product.domain;
+import github.lms.lemuel.product.domain.exception.ProductInvariantViolationException;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -69,10 +70,10 @@ public class Category {
     // 도메인 규칙: name 검증
     public void validateName() {
         if (name == null || name.trim().isEmpty()) {
-            throw new IllegalArgumentException("Category name cannot be empty");
+            throw new ProductInvariantViolationException("Category name cannot be empty");
         }
         if (name.length() > 100) {
-            throw new IllegalArgumentException("Category name must not exceed 100 characters");
+            throw new ProductInvariantViolationException("Category name must not exceed 100 characters");
         }
     }
 
@@ -103,7 +104,7 @@ public class Category {
     // 비즈니스 메서드: 표시 순서 변경
     public void changeDisplayOrder(Integer newDisplayOrder) {
         if (newDisplayOrder == null || newDisplayOrder < 0) {
-            throw new IllegalArgumentException("Display order must be zero or greater");
+            throw new ProductInvariantViolationException("Display order must be zero or greater");
         }
         this.displayOrder = newDisplayOrder;
         this.updatedAt = LocalDateTime.now();
@@ -112,7 +113,7 @@ public class Category {
     // 비즈니스 메서드: 부모 카테고리 변경
     public void changeParent(Long newParentId) {
         if (newParentId != null && newParentId.equals(this.id)) {
-            throw new IllegalArgumentException("Category cannot be its own parent");
+            throw new ProductInvariantViolationException("Category cannot be its own parent");
         }
         this.parentId = newParentId;
         this.updatedAt = LocalDateTime.now();

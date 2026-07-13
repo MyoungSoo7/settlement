@@ -1,6 +1,7 @@
 package github.lms.lemuel.loan.domain;
 
 import org.junit.jupiter.api.DisplayName;
+import github.lms.lemuel.loan.domain.exception.LoanInvariantViolationException;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
@@ -37,33 +38,33 @@ class CompanyReputationTest {
     @DisplayName("종목코드가 6자리가 아니면 예외")
     void invalidStockCode() {
         assertThatThrownBy(() -> new CompanyReputation("12", 50, "C", "B", LocalDate.now()))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(LoanInvariantViolationException.class);
         assertThatThrownBy(() -> new CompanyReputation(null, 50, "C", "B", LocalDate.now()))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(LoanInvariantViolationException.class);
     }
 
     @Test
     @DisplayName("점수가 0~100 범위를 벗어나면 예외")
     void invalidScore() {
         assertThatThrownBy(() -> new CompanyReputation("005930", -1, "C", "B", LocalDate.now()))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(LoanInvariantViolationException.class);
         assertThatThrownBy(() -> new CompanyReputation("005930", 101, "C", "B", LocalDate.now()))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(LoanInvariantViolationException.class);
     }
 
     @Test
     @DisplayName("등급이 비어 있으면 예외")
     void blankGrade() {
         assertThatThrownBy(() -> new CompanyReputation("005930", 50, " ", "B", LocalDate.now()))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(LoanInvariantViolationException.class);
         assertThatThrownBy(() -> new CompanyReputation("005930", 50, null, "B", LocalDate.now()))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(LoanInvariantViolationException.class);
     }
 
     @Test
     @DisplayName("스냅샷 일자가 null 이면 예외")
     void nullSnapshotDate() {
         assertThatThrownBy(() -> new CompanyReputation("005930", 50, "C", "B", null))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(LoanInvariantViolationException.class);
     }
 }

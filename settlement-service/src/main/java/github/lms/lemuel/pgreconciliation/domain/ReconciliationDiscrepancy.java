@@ -1,5 +1,8 @@
 package github.lms.lemuel.pgreconciliation.domain;
 
+import github.lms.lemuel.pgreconciliation.domain.exception.InvalidReconciliationStateException;
+import github.lms.lemuel.pgreconciliation.domain.exception.PgReconciliationInvariantViolationException;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Objects;
@@ -97,7 +100,7 @@ public class ReconciliationDiscrepancy {
      */
     public void approve(String operatorId, String note) {
         if (status != DiscrepancyStatus.PENDING) {
-            throw new IllegalStateException("PENDING 상태에서만 승인 가능합니다: " + status);
+            throw new InvalidReconciliationStateException(status, DiscrepancyStatus.APPROVED);
         }
         this.status = DiscrepancyStatus.APPROVED;
         this.resolvedBy = operatorId;
@@ -110,10 +113,10 @@ public class ReconciliationDiscrepancy {
      */
     public void reject(String operatorId, String reasonNote) {
         if (status != DiscrepancyStatus.PENDING) {
-            throw new IllegalStateException("PENDING 상태에서만 거절 가능합니다: " + status);
+            throw new InvalidReconciliationStateException(status, DiscrepancyStatus.REJECTED);
         }
         if (reasonNote == null || reasonNote.isBlank()) {
-            throw new IllegalArgumentException("거절 사유는 필수 (감사 추적용)");
+            throw new PgReconciliationInvariantViolationException("거절 사유는 필수 (감사 추적용)");
         }
         this.status = DiscrepancyStatus.REJECTED;
         this.resolvedBy = operatorId;

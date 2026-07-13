@@ -1,4 +1,5 @@
 package github.lms.lemuel.coupon.domain;
+import github.lms.lemuel.coupon.domain.exception.CouponInvariantViolationException;
 
 /**
  * 쿠폰 적용 대상 — <b>enum 기반 Strategy 패턴</b>.
@@ -52,7 +53,7 @@ public enum CouponTarget {
         try {
             return valueOf(value.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("지원하지 않는 쿠폰 적용 대상입니다: " + value);
+            throw new CouponInvariantViolationException("지원하지 않는 쿠폰 적용 대상입니다: " + value);
         }
     }
 

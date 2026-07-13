@@ -1,4 +1,6 @@
 package github.lms.lemuel.order.domain;
+import github.lms.lemuel.order.domain.exception.InvalidOrderStateException;
+import github.lms.lemuel.order.domain.exception.OrderInvariantViolationException;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -33,11 +35,11 @@ class OrderItemTest {
     @DisplayName("validation: 음수 수량 / 음수 가격 / 빈 상품명")
     void validation() {
         assertThatThrownBy(() -> OrderItem.newItem(1L, null, null, "P", BigDecimal.TEN, 0))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(OrderInvariantViolationException.class);
         assertThatThrownBy(() -> OrderItem.newItem(1L, null, null, "P", new BigDecimal("-1"), 1))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(OrderInvariantViolationException.class);
         assertThatThrownBy(() -> OrderItem.newItem(1L, null, null, "", BigDecimal.TEN, 1))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(OrderInvariantViolationException.class);
     }
 
     @Test

@@ -1,6 +1,8 @@
 package github.lms.lemuel.settlement.domain;
 
 import github.lms.lemuel.common.money.Money;
+import github.lms.lemuel.settlement.domain.exception.InvalidSettlementStateException;
+import github.lms.lemuel.settlement.domain.exception.SettlementInvariantViolationException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -157,19 +159,19 @@ public class Settlement {
 
     public void validatePaymentId() {
         if (paymentId == null || paymentId <= 0) {
-            throw new IllegalArgumentException("Payment ID must be a positive number");
+            throw new SettlementInvariantViolationException("Payment ID must be a positive number");
         }
     }
 
     public void validateAmount() {
         if (paymentAmount == null || paymentAmount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("Amount must be greater than zero");
+            throw new SettlementInvariantViolationException("Amount must be greater than zero");
         }
     }
 
     public void validateSettlementDate() {
         if (settlementDate == null) {
-            throw new IllegalArgumentException("Settlement date is required");
+            throw new SettlementInvariantViolationException("Settlement date is required");
         }
     }
 
@@ -191,9 +193,7 @@ public class Settlement {
      */
     public void startProcessing() {
         if (this.status != SettlementStatus.REQUESTED) {
-            throw new IllegalStateException(
-                String.format("Cannot start processing. Current status: %s. Expected: REQUESTED", this.status)
-            );
+            throw new InvalidSettlementStateException(this.status, SettlementStatus.PROCESSING);
         }
         this.status = SettlementStatus.PROCESSING;
         this.updatedAt = LocalDateTime.now();
@@ -205,9 +205,7 @@ public class Settlement {
      */
     public void complete() {
         if (this.status != SettlementStatus.PROCESSING) {
-            throw new IllegalStateException(
-                String.format("Cannot complete. Current status: %s. Expected: PROCESSING", this.status)
-            );
+            throw new InvalidSettlementStateException(this.status, SettlementStatus.DONE);
         }
         this.status = SettlementStatus.DONE;
         this.confirmedAt = LocalDateTime.now();
@@ -220,9 +218,7 @@ public class Settlement {
      */
     public void fail(String reason) {
         if (this.status != SettlementStatus.PROCESSING) {
-            throw new IllegalStateException(
-                String.format("Cannot fail. Current status: %s. Expected: PROCESSING", this.status)
-            );
+            throw new InvalidSettlementStateException(this.status, SettlementStatus.FAILED);
         }
         this.status = SettlementStatus.FAILED;
         this.failureReason = reason;
@@ -235,9 +231,7 @@ public class Settlement {
      */
     public void retry() {
         if (this.status != SettlementStatus.FAILED) {
-            throw new IllegalStateException(
-                String.format("Cannot retry. Current status: %s. Expected: FAILED", this.status)
-            );
+            throw new InvalidSettlementStateException(this.status, SettlementStatus.REQUESTED);
         }
         this.status = SettlementStatus.REQUESTED;
         this.failureReason = null;
@@ -253,9 +247,7 @@ public class Settlement {
             startProcessing();
         }
         if (this.status != SettlementStatus.PROCESSING) {
-            throw new IllegalStateException(
-                String.format("Cannot confirm. Current status: %s. Expected: REQUESTED or PROCESSING", this.status)
-            );
+            throw new InvalidSettlementStateException(this.status, "Cannot confirm — expected REQUESTED or PROCESSING");
         }
         complete();
     }
@@ -265,7 +257,7 @@ public class Settlement {
      */
     public void cancel() {
         if (this.status == SettlementStatus.DONE) {
-            throw new IllegalStateException("DONE settlements cannot be canceled");
+            throw new InvalidSettlementStateException(this.status, "DONE settlements cannot be canceled");
         }
         this.status = SettlementStatus.CANCELED;
         this.updatedAt = LocalDateTime.now();
@@ -279,13 +271,13 @@ public class Settlement {
      */
     public void adjustForRefund(BigDecimal refundAmount) {
         if (refundAmount == null || refundAmount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("Refund amount must be greater than zero");
+            throw new SettlementInvariantViolationException("Refund amount must be greater than zero");
         }
 
         // DONE 상태는 이미 판매자 지급 완료된 정산 → 금액 직접 변경 금지.
         // 환불은 SettlementAdjustment 별도 레코드로만 기록해야 원장 정합성 유지됨.
         if (this.status == SettlementStatus.DONE) {
-            throw new IllegalStateException(
+            throw new InvalidSettlementStateException(this.status,
                 "DONE settlement is immutable. Use SettlementAdjustment to record the refund offset.");
         }
 
@@ -295,7 +287,7 @@ public class Settlement {
 
         BigDecimal newRefunded = this.refundedAmount.add(refundAmount);
         if (newRefunded.compareTo(this.paymentAmount) > 0) {
-            throw new IllegalArgumentException(
+            throw new SettlementInvariantViolationException(
                 "Cumulative refund " + newRefunded + " exceeds payment amount " + this.paymentAmount);
         }
         this.refundedAmount = newRefunded;
@@ -331,12 +323,12 @@ public class Settlement {
      */
     public void applyReconciliationClawback(BigDecimal clawbackAmount) {
         if (clawbackAmount == null || clawbackAmount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("Reconciliation clawback amount must be greater than zero");
+            throw new SettlementInvariantViolationException("Reconciliation clawback amount must be greater than zero");
         }
 
         // DONE 상태는 지급 완료된 정산 → 금액 직접 변경 금지 (adjustForRefund 와 동일한 불변식).
         if (this.status == SettlementStatus.DONE) {
-            throw new IllegalStateException(
+            throw new InvalidSettlementStateException(this.status,
                 "DONE settlement is immutable. Use SettlementAdjustment to record the reconciliation clawback offset.");
         }
 
@@ -416,10 +408,10 @@ public class Settlement {
      */
     public void applyHoldback(BigDecimal rate, LocalDate releaseDate) {
         if (rate == null || rate.signum() < 0 || rate.compareTo(BigDecimal.ONE) > 0) {
-            throw new IllegalArgumentException("보류율은 0 ~ 1 사이여야 합니다: " + rate);
+            throw new SettlementInvariantViolationException("보류율은 0 ~ 1 사이여야 합니다: " + rate);
         }
         if (this.netAmount == null) {
-            throw new IllegalStateException("netAmount 계산 후에만 holdback 적용 가능");
+            throw new InvalidSettlementStateException("netAmount 계산 후에만 holdback 적용 가능");
         }
         this.holdbackRate = rate;
         this.holdbackAmount = Money.of(this.netAmount).times(rate).toBigDecimal();
@@ -438,7 +430,7 @@ public class Settlement {
         if (this.holdbackReleased) return;
         if (this.holdbackReleaseDate == null) return;
         if (today.isBefore(this.holdbackReleaseDate)) {
-            throw new IllegalStateException(
+            throw new InvalidSettlementStateException(
                     "아직 release 시점이 아닙니다. releaseDate=" + holdbackReleaseDate + ", today=" + today);
         }
         this.holdbackReleased = true;
@@ -454,7 +446,7 @@ public class Settlement {
      */
     public BigDecimal consumeHoldbackForRefund(BigDecimal refundAmount) {
         if (refundAmount == null || refundAmount.signum() <= 0) {
-            throw new IllegalArgumentException("refundAmount 양수 필수");
+            throw new SettlementInvariantViolationException("refundAmount 양수 필수");
         }
         if (this.holdbackAmount.signum() <= 0 || this.holdbackReleased) {
             return BigDecimal.ZERO;

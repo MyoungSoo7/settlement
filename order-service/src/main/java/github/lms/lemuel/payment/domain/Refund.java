@@ -1,5 +1,8 @@
 package github.lms.lemuel.payment.domain;
 
+import github.lms.lemuel.payment.domain.exception.InvalidPaymentStateException;
+import github.lms.lemuel.payment.domain.exception.PaymentInvariantViolationException;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -39,12 +42,12 @@ public class Refund {
     public Refund() {}
 
     public static Refund request(Long paymentId, BigDecimal amount, String idempotencyKey, String reason) {
-        if (paymentId == null) throw new IllegalArgumentException("paymentId required");
+        if (paymentId == null) throw new PaymentInvariantViolationException("paymentId required");
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("amount must be > 0");
+            throw new PaymentInvariantViolationException("amount must be > 0");
         }
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
-            throw new IllegalArgumentException("idempotencyKey required");
+            throw new PaymentInvariantViolationException("idempotencyKey required");
         }
         Refund refund = new Refund();
         refund.paymentId = paymentId;
@@ -65,7 +68,7 @@ public class Refund {
      */
     public void markCompleted() {
         if (this.status == Status.COMPLETED) {
-            throw new IllegalStateException("Refund already COMPLETED. id=" + id);
+            throw new InvalidPaymentStateException("Refund already COMPLETED. id=" + id);
         }
         this.status = Status.COMPLETED;
         this.completedAt = LocalDateTime.now();
@@ -81,7 +84,7 @@ public class Refund {
      */
     public void markFailed(String failureReason) {
         if (this.status == Status.COMPLETED) {
-            throw new IllegalStateException("Cannot fail a COMPLETED refund. id=" + id);
+            throw new InvalidPaymentStateException("Cannot fail a COMPLETED refund. id=" + id);
         }
         this.status = Status.FAILED;
         this.reason = failureReason;
@@ -102,7 +105,7 @@ public class Refund {
      */
     public void abandon(String reason) {
         if (this.status == Status.COMPLETED) {
-            throw new IllegalStateException("Cannot abandon a COMPLETED refund. id=" + id);
+            throw new InvalidPaymentStateException("Cannot abandon a COMPLETED refund. id=" + id);
         }
         this.status = Status.FAILED;
         this.reason = reason;

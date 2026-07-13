@@ -1,4 +1,6 @@
 package github.lms.lemuel.category.domain;
+import github.lms.lemuel.category.domain.exception.CategoryInvariantViolationException;
+import github.lms.lemuel.category.domain.exception.InvalidCategoryStateException;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -64,12 +66,12 @@ public class EcommerceCategory {
     // 정적 팩토리 메서드: 하위 카테고리 생성
     public static EcommerceCategory createChild(String name, String slug, Long parentId, Integer parentDepth, Integer sortOrder) {
         if (parentDepth == null) {
-            throw new IllegalArgumentException("Parent depth must not be null");
+            throw new CategoryInvariantViolationException("Parent depth must not be null");
         }
 
         int newDepth = parentDepth + 1;
         if (newDepth > MAX_DEPTH) {
-            throw new IllegalStateException("Category depth cannot exceed " + MAX_DEPTH + " (attempted: " + newDepth + ")");
+            throw new InvalidCategoryStateException("Category depth cannot exceed " + MAX_DEPTH + " (attempted: " + newDepth + ")");
         }
 
         EcommerceCategory category = new EcommerceCategory();
@@ -87,44 +89,44 @@ public class EcommerceCategory {
     // 도메인 규칙: name 검증
     public void validateName() {
         if (name == null || name.trim().isEmpty()) {
-            throw new IllegalArgumentException("Category name cannot be empty");
+            throw new CategoryInvariantViolationException("Category name cannot be empty");
         }
         if (name.length() > 200) {
-            throw new IllegalArgumentException("Category name must not exceed 200 characters");
+            throw new CategoryInvariantViolationException("Category name must not exceed 200 characters");
         }
     }
 
     // 도메인 규칙: slug 검증
     public void validateSlug() {
         if (slug == null || slug.trim().isEmpty()) {
-            throw new IllegalArgumentException("Category slug cannot be empty");
+            throw new CategoryInvariantViolationException("Category slug cannot be empty");
         }
         if (slug.length() > 300) {
-            throw new IllegalArgumentException("Category slug must not exceed 300 characters");
+            throw new CategoryInvariantViolationException("Category slug must not exceed 300 characters");
         }
         if (!slug.matches("^[a-z0-9-]+$")) {
-            throw new IllegalArgumentException("Category slug must contain only lowercase letters, numbers, and hyphens");
+            throw new CategoryInvariantViolationException("Category slug must contain only lowercase letters, numbers, and hyphens");
         }
     }
 
     // 도메인 규칙: parentId 검증 (순환 참조 방지)
     public void validateParentId() {
         if (parentId != null && parentId.equals(id)) {
-            throw new IllegalArgumentException("Category cannot be its own parent (circular reference)");
+            throw new CategoryInvariantViolationException("Category cannot be its own parent (circular reference)");
         }
     }
 
     // 도메인 규칙: depth 검증
     public void validateDepth() {
         if (depth == null || depth < 0 || depth > MAX_DEPTH) {
-            throw new IllegalArgumentException("Category depth must be between 0 and " + MAX_DEPTH);
+            throw new CategoryInvariantViolationException("Category depth must be between 0 and " + MAX_DEPTH);
         }
     }
 
     // 비즈니스 메서드: 부모 변경
     public void changeParent(Long newParentId, Integer newParentDepth) {
         if (newParentId != null && newParentId.equals(this.id)) {
-            throw new IllegalArgumentException("Category cannot be its own parent");
+            throw new CategoryInvariantViolationException("Category cannot be its own parent");
         }
 
         if (newParentId == null) {
@@ -133,7 +135,7 @@ public class EcommerceCategory {
         } else {
             int newDepth = newParentDepth + 1;
             if (newDepth > MAX_DEPTH) {
-                throw new IllegalStateException("Moving category would exceed maximum depth of " + MAX_DEPTH);
+                throw new InvalidCategoryStateException("Moving category would exceed maximum depth of " + MAX_DEPTH);
             }
             this.parentId = newParentId;
             this.depth = newDepth;
@@ -144,7 +146,7 @@ public class EcommerceCategory {
     // 비즈니스 메서드: 정렬 순서 변경
     public void changeSortOrder(Integer newSortOrder) {
         if (newSortOrder == null || newSortOrder < 0) {
-            throw new IllegalArgumentException("Sort order must be zero or greater");
+            throw new CategoryInvariantViolationException("Sort order must be zero or greater");
         }
         this.sortOrder = newSortOrder;
         this.updatedAt = LocalDateTime.now();
@@ -153,7 +155,7 @@ public class EcommerceCategory {
     // 비즈니스 메서드: 활성화
     public void activate() {
         if (isDeleted()) {
-            throw new IllegalStateException("Cannot activate deleted category");
+            throw new InvalidCategoryStateException("Cannot activate deleted category");
         }
         this.isActive = true;
         this.updatedAt = LocalDateTime.now();

@@ -4,6 +4,7 @@ import github.lms.lemuel.coupon.application.port.in.CouponUseCase;
 import github.lms.lemuel.coupon.application.port.out.LoadCouponPort;
 import github.lms.lemuel.coupon.application.port.out.SaveCouponPort;
 import github.lms.lemuel.coupon.domain.Coupon;
+import github.lms.lemuel.coupon.domain.exception.InvalidCouponStateException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -55,7 +56,7 @@ public class CouponService implements CouponUseCase {
 
         try {
             coupon.validate(orderAmount);
-        } catch (IllegalStateException e) {
+        } catch (InvalidCouponStateException e) {
             return new ValidateResult(false, e.getMessage(), BigDecimal.ZERO, orderAmount, null);
         }
 

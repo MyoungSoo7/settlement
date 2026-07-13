@@ -1,5 +1,8 @@
 package github.lms.lemuel.loan.domain;
 
+import github.lms.lemuel.loan.domain.exception.InvalidLoanStateException;
+import github.lms.lemuel.loan.domain.exception.LoanInvariantViolationException;
+
 import java.math.BigDecimal;
 
 /**
@@ -31,10 +34,10 @@ public class LoanAdvance {
     /** 신규 대출 신청. 실행 전이므로 미상환잔액은 0. */
     public static LoanAdvance request(Long sellerId, BigDecimal principal, BigDecimal fee) {
         if (principal == null || principal.signum() <= 0) {
-            throw new IllegalArgumentException("선지급 원금은 양수여야 합니다: " + principal);
+            throw new LoanInvariantViolationException("선지급 원금은 양수여야 합니다: " + principal);
         }
         if (fee == null || fee.signum() < 0) {
-            throw new IllegalArgumentException("수수료는 음수일 수 없습니다: " + fee);
+            throw new LoanInvariantViolationException("수수료는 음수일 수 없습니다: " + fee);
         }
         return new LoanAdvance(null, sellerId, principal, fee, BigDecimal.ZERO, LoanStatus.REQUESTED);
     }
@@ -46,20 +49,20 @@ public class LoanAdvance {
     }
 
     public void approve() {
-        requireStatus(LoanStatus.REQUESTED, "승인");
+        requireStatus(LoanStatus.REQUESTED, LoanStatus.APPROVED);
         this.status = LoanStatus.APPROVED;
     }
 
     public void reject() {
         if (status != LoanStatus.REQUESTED && status != LoanStatus.APPROVED) {
-            throw new IllegalStateException("거절은 REQUESTED 또는 APPROVED 에서만 가능합니다. 현재=" + status);
+            throw new InvalidLoanStateException(status, LoanStatus.REJECTED);
         }
         this.status = LoanStatus.REJECTED;
     }
 
     /** 실행(선지급). 미상환잔액 = 원금 + 수수료. */
     public void disburse() {
-        requireStatus(LoanStatus.APPROVED, "실행");
+        requireStatus(LoanStatus.APPROVED, LoanStatus.DISBURSED);
         this.outstanding = principal.add(fee);
         this.status = LoanStatus.DISBURSED;
     }
@@ -72,10 +75,10 @@ public class LoanAdvance {
      */
     public BigDecimal applyRepayment(BigDecimal available) {
         if (status != LoanStatus.DISBURSED) {
-            throw new IllegalStateException("상환은 DISBURSED 상태에서만 가능합니다. 현재=" + status);
+            throw new InvalidLoanStateException(status, LoanStatus.REPAID);
         }
         if (available == null || available.signum() < 0) {
-            throw new IllegalArgumentException("상환 가용액은 음수일 수 없습니다: " + available);
+            throw new LoanInvariantViolationException("상환 가용액은 음수일 수 없습니다: " + available);
         }
         BigDecimal deducted = outstanding.min(available);
         this.outstanding = outstanding.subtract(deducted);
@@ -85,10 +88,9 @@ public class LoanAdvance {
         return deducted;
     }
 
-    private void requireStatus(LoanStatus expected, String action) {
+    private void requireStatus(LoanStatus expected, LoanStatus target) {
         if (status != expected) {
-            throw new IllegalStateException(
-                    action + "은(는) " + expected + " 상태에서만 가능합니다. 현재=" + status);
+            throw new InvalidLoanStateException(status, target);
         }
     }
 

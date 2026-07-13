@@ -1,6 +1,7 @@
 package github.lms.lemuel.settlement.domain;
 
 import org.junit.jupiter.api.DisplayName;
+import github.lms.lemuel.settlement.domain.exception.SettlementInvariantViolationException;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
@@ -72,6 +73,6 @@ class BusinessDayCalculatorTest {
     @DisplayName("addBusinessDays: 음수 거부")
     void negative() {
         assertThatThrownBy(() -> BusinessDayCalculator.addBusinessDays(LocalDate.now(), -1))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(SettlementInvariantViolationException.class);
     }
 }
