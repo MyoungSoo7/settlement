@@ -12,6 +12,12 @@ import {
   runAuditCli,
   validateManifest,
 } from '../harness-audit.mjs';
+import {
+  compareOntologies,
+  deriveInterviewHarnessTransition,
+  parseInterviewHarnessDoc,
+  runInterviewHarnessCli,
+} from '../interview-harness.mjs';
 
 const FACTS = { maxCycles: 5, canonicalScratch: '.symposium/scratch/socrates.md' };
 const CASES = [
@@ -101,6 +107,153 @@ test('contract readers require one valid block and six unique cases', () => {
   assert.deepEqual(readContractCases(JSON.stringify(CASES.map(([contractCase, expectedTransition]) => ({ contractCase, expectedTransition })))), Object.fromEntries(CASES));
   assert.throws(() => readContractCases(JSON.stringify(CASES.slice(1).map(([contractCase, expectedTransition]) => ({ contractCase, expectedTransition })))), /seed-gate-create/);
   assert.throws(() => readContractCases(JSON.stringify([...CASES, ['extra', 'x']].map(([contractCase, expectedTransition]) => ({ contractCase, expectedTransition })))), /unexpected contract case/i);
+});
+
+test('interview harness parser reads seed and ontology sections', () => {
+  const doc = parseInterviewHarnessDoc([
+    '## Seed',
+    '```yaml',
+    'goal: close the gap',
+    'constraints:',
+    '  - keep it reproducible',
+    '  - keep it automated',
+    'acceptance_criteria:',
+    '  - node --test passes',
+    '```',
+    '## Ontology',
+    '```yaml',
+    'idea: interview harness',
+    'boundary: explicit user approval',
+    'properties:',
+    '  - deterministic',
+    '  - auditable',
+    '```',
+  ].join('\n'));
+  assert.equal(doc.seedComplete, true);
+  assert.equal(doc.ontologyComplete, true);
+  assert.deepEqual(doc.seed.goal, 'close the gap');
+  assert.deepEqual(doc.seed.constraints, ['keep it reproducible', 'keep it automated']);
+  assert.deepEqual(doc.ontology.properties, ['deterministic', 'auditable']);
+});
+
+test('interview harness ontology comparison uses exact idea, user-confirmed boundary, and jaccard properties', () => {
+  assert.deepEqual(compareOntologies(
+    { idea: 'interview harness', properties: ['a', 'b'] },
+    { idea: 'interview harness', properties: ['b', 'c'] },
+    { boundaryConfirmed: true },
+  ), {
+    idea: 1,
+    boundary: 1,
+    properties: 1 / 3,
+    similarity: (1 + 1 + (1 / 3)) / 3,
+  });
+});
+
+test('interview harness transitions follow seed gate, cycle skip, threshold, and safety valve rules', () => {
+  assert.deepEqual(
+    deriveInterviewHarnessTransition({ phase: 'seed-gate', seedComplete: false }),
+    {
+      phase: 'seed-gate',
+      cycle: 0,
+      nextStep: 'socrates',
+      stopReason: null,
+      comparison: null,
+    },
+  );
+  assert.deepEqual(
+    deriveInterviewHarnessTransition({ phase: 'seed-gate', seedComplete: true }),
+    {
+      phase: 'cycle',
+      cycle: 1,
+      nextStep: 'evolve-step',
+      stopReason: null,
+      comparison: null,
+    },
+  );
+  assert.deepEqual(
+    deriveInterviewHarnessTransition({ phase: 'ontology', cycle: 1 }),
+    {
+      phase: 'cycle',
+      cycle: 2,
+      nextStep: 'evolve-step',
+      stopReason: null,
+      comparison: { skipped: true, reason: 'first-cycle-skip' },
+    },
+  );
+  assert.deepEqual(
+    deriveInterviewHarnessTransition({
+      phase: 'compare',
+      cycle: 2,
+      threshold: 0.85,
+      boundaryConfirmed: true,
+      previousOntology: { idea: 'interview harness', properties: ['deterministic', 'auditable'] },
+      currentOntology: { idea: 'interview harness', properties: ['deterministic', 'auditable'] },
+    }),
+    {
+      phase: 'stop',
+      cycle: 2,
+      nextStep: 'stop',
+      stopReason: 'convergence',
+      comparison: { idea: 1, boundary: 1, properties: 1, similarity: 1 },
+    },
+  );
+  assert.deepEqual(
+    deriveInterviewHarnessTransition({
+      phase: 'compare',
+      cycle: 5,
+      threshold: 0.85,
+      previousOntology: { idea: 'a', properties: ['x'] },
+      currentOntology: { idea: 'b', properties: ['y'] },
+    }),
+    {
+      phase: 'stop',
+      cycle: 5,
+      nextStep: 'stop',
+      stopReason: 'safety_valve',
+      comparison: { idea: 0, boundary: 0, properties: 0, similarity: 0 },
+    },
+  );
+});
+
+test('interview harness CLI is injectable and derives state from scratch files', async () => {
+  const root = repo({
+    '.symposium/scratch/socrates.md': [
+      '## Seed',
+      '```yaml',
+      'goal: close the gap',
+      'constraints:',
+      '  - keep it reproducible',
+      'acceptance_criteria:',
+      '  - node --test passes',
+      '```',
+      '## Ontology',
+      '```yaml',
+      'idea: interview harness',
+      'boundary: explicit user approval',
+      'properties:',
+      '  - deterministic',
+      '```',
+    ].join('\n'),
+    '.symposium/scratch/interview-harness.md': [
+      '## Ontology',
+      '```yaml',
+      'idea: interview harness',
+      'boundary: explicit user approval',
+      'properties:',
+      '  - deterministic',
+      '```',
+    ].join('\n'),
+  }, []);
+  const output = [];
+  assert.equal(await runInterviewHarnessCli(['--root', root, '--phase', 'seed-gate'], { stdout: (s) => output.push(s) }), 0);
+  const parsed = JSON.parse(output.join(''));
+  assert.equal(parsed.nextStep, 'evolve-step');
+  assert.equal(parsed.phase, 'cycle');
+  assert.equal(parsed.cycle, 1);
+  assert.equal(parsed.seedComplete, undefined);
+  const errors = [];
+  assert.equal(await runInterviewHarnessCli(['--unknown'], { stderr: (s) => errors.push(s) }), 1);
+  assert.match(errors.join(''), /unsupported argument/i);
 });
 
 test('collectAudit uses tracked files only and reports missing and untracked required files', () => {
