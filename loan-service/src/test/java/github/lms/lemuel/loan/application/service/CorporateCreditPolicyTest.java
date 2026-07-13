@@ -1,6 +1,7 @@
 package github.lms.lemuel.loan.application.service;
 
 import github.lms.lemuel.loan.domain.CorporateFinancials;
+import github.lms.lemuel.loan.domain.exception.LoanInvariantViolationException;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -156,7 +157,7 @@ class CorporateCreditPolicyTest {
     @Test
     void 기간이_음수면_예외() {
         assertThatThrownBy(() -> policy.fee(bd("1000000"), -1, "A"))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(LoanInvariantViolationException.class);
     }
 
     @Nested
