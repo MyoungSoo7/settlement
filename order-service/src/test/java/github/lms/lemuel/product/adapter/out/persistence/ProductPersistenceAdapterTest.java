@@ -160,9 +160,9 @@ class ProductPersistenceAdapterTest {
         ProductJpaEntity e1 = entity(1L);
         ProductJpaEntity e2 = entity(2L);
         Product d1 = Product.create("상품1", "desc", new BigDecimal("1000"), 5);
-        d1.setId(1L);
+        d1.assignId(1L);
         Product d2 = Product.create("상품2", "desc", new BigDecimal("2000"), 5);
-        d2.setId(2L);
+        d2.assignId(2L);
         when(repository.search(null, null)).thenReturn(List.of(e2, e1));
         when(mapper.toDomain(e1)).thenReturn(d1);
         when(mapper.toDomain(e2)).thenReturn(d2);
@@ -177,10 +177,12 @@ class ProductPersistenceAdapterTest {
     void search_byCreatedAt() {
         ProductJpaEntity e1 = entity(1L);
         ProductJpaEntity e2 = entity(2L);
-        Product old = Product.create("old", "desc", new BigDecimal("1000"), 5);
-        old.setCreatedAt(java.time.LocalDateTime.now().minusDays(1));
-        Product recent = Product.create("recent", "desc", new BigDecimal("2000"), 5);
-        recent.setCreatedAt(java.time.LocalDateTime.now());
+        Product old = Product.rehydrate(null, "old", "desc", new BigDecimal("1000"), 5,
+                ProductStatus.ACTIVE, null, null, null,
+                java.time.LocalDateTime.now().minusDays(1), java.time.LocalDateTime.now());
+        Product recent = Product.rehydrate(null, "recent", "desc", new BigDecimal("2000"), 5,
+                ProductStatus.ACTIVE, null, null, null,
+                java.time.LocalDateTime.now(), java.time.LocalDateTime.now());
         when(repository.search(null, null)).thenReturn(List.of(e1, e2));
         when(mapper.toDomain(e1)).thenReturn(old);
         when(mapper.toDomain(e2)).thenReturn(recent);

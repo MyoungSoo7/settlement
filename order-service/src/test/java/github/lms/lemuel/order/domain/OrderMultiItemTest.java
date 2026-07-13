@@ -108,7 +108,7 @@ class OrderMultiItemTest {
                 OrderItem.newItem(2L, null, null, "B", new BigDecimal("2000"), 1)
         );
         Order order = Order.createMultiItem(100L, items);
-        order.setId(42L);
+        order.assignId(42L);
 
         order.attachItemsToOrder();
 

@@ -44,22 +44,31 @@ public class CommonCodeGroup {
         this.updatedAt = LocalDateTime.now();
     }
 
-    // Getters & Setters
+    /**
+     * 영속 레코드 복원 팩토리 — no-arg + setter 대신 이 경로로만 도메인을 재구성한다.
+     */
+    public static CommonCodeGroup rehydrate(String groupCode, String name, String description,
+                                            boolean active, LocalDateTime createdAt, LocalDateTime updatedAt) {
+        CommonCodeGroup group = new CommonCodeGroup();
+        group.groupCode = groupCode;
+        group.name = name;
+        group.description = description;
+        group.active = active;
+        group.createdAt = createdAt;
+        group.updatedAt = updatedAt;
+        return group;
+    }
+
+    // Getters
     public String getGroupCode() { return groupCode; }
-    public void setGroupCode(String groupCode) { this.groupCode = groupCode; }
 
     public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
 
     public String getDescription() { return description; }
-    public void setDescription(String description) { this.description = description; }
 
     public boolean isActive() { return active; }
-    public void setActive(boolean active) { this.active = active; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 }

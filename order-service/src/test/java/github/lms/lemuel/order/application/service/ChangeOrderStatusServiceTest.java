@@ -116,7 +116,7 @@ class ChangeOrderStatusServiceTest {
     void approveRefund_afterShipping_deductsShippingFee() {
         OrderItem line = OrderItem.newItem(100L, null, null, "상품A", new BigDecimal("30000"), 1);
         Order order = Order.createMultiItem(1L, List.of(line)); // amount = 30000
-        order.setShippingFee(new BigDecimal("3000"));
+        order.assignShippingFee(new BigDecimal("3000"));
         order.transitionTo(OrderStatus.PAID);
         order.transitionTo(OrderStatus.SHIPPING_PENDING);
         order.transitionTo(OrderStatus.IN_TRANSIT);          // shipped = true

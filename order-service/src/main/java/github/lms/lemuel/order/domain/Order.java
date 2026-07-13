@@ -54,9 +54,9 @@ public class Order {
     // 정적 팩토리 메서드
     public static Order create(Long userId, Long productId, BigDecimal amount) {
         Order order = new Order();
-        order.setUserId(userId);
-        order.setProductId(productId);
-        order.setAmount(amount);
+        order.userId = userId;
+        order.productId = productId;
+        order.amount = amount;
         order.validateUserId();
         order.validateAmount();
         return order;
@@ -100,7 +100,7 @@ public class Order {
             throw new IllegalArgumentException("할인 금액은 음수일 수 없습니다");
         }
         Order order = new Order();
-        order.setUserId(userId);
+        order.userId = userId;
         order.validateUserId();
         BigDecimal subtotal = items.stream()
                 .map(OrderItem::getLineAmount)
@@ -109,7 +109,7 @@ public class Order {
             throw new IllegalArgumentException(
                     "할인 금액(" + discount + ") 이 주문 소계(" + subtotal + ") 이상일 수 없습니다");
         }
-        order.setAmount(subtotal.subtract(discount));
+        order.amount = subtotal.subtract(discount);
         order.validateAmount();
         order.items.addAll(items);
         return order;
@@ -189,77 +189,68 @@ public class Order {
         return this.status == OrderStatus.PAID;
     }
 
-    // Getters and Setters
-    public Long getId() {
-        return id;
+    /**
+     * 영속 레코드 복원 팩토리. 매퍼가 no-arg + setter 대신 이 경로로만 도메인을 재구성해
+     * 상태 전이 규칙을 우회하는 임의 status 주입을 봉인한다. items 는 별도 로드되어 replaceItems 로 부착.
+     */
+    public static Order rehydrate(Long id, Long userId, Long productId, BigDecimal amount,
+                                  OrderStatus status, LocalDateTime createdAt, LocalDateTime updatedAt,
+                                  BigDecimal shippingFee, boolean shipped) {
+        Order order = new Order(id, userId, productId, amount, status, createdAt, updatedAt);
+        order.shippingFee = shippingFee == null ? BigDecimal.ZERO : shippingFee;
+        order.shipped = shipped;
+        return order;
     }
 
-    public void setId(Long id) {
+    /**
+     * Persistence 어댑터가 DB 부여 PK 를 도메인에 주입할 때 사용(setter 대체).
+     */
+    public void assignId(Long id) {
         this.id = id;
+    }
+
+    /**
+     * 결제에 포함된 배송비 확정(null 은 0 으로 방어). 환불 정책 계산의 입력값.
+     */
+    public void assignShippingFee(BigDecimal shippingFee) {
+        this.shippingFee = shippingFee == null ? BigDecimal.ZERO : shippingFee;
+    }
+
+    // Getters
+    public Long getId() {
+        return id;
     }
 
     public Long getUserId() {
         return userId;
     }
 
-    public void setUserId(Long userId) {
-        this.userId = userId;
-    }
-
     public Long getProductId() {
         return productId;
-    }
-
-    public void setProductId(Long productId) {
-        this.productId = productId;
     }
 
     public BigDecimal getAmount() {
         return amount;
     }
 
-    public void setAmount(BigDecimal amount) {
-        this.amount = amount;
-    }
-
     public OrderStatus getStatus() {
         return status;
-    }
-
-    public void setStatus(OrderStatus status) {
-        this.status = status;
     }
 
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
-
     public LocalDateTime getUpdatedAt() {
         return updatedAt;
-    }
-
-    public void setUpdatedAt(LocalDateTime updatedAt) {
-        this.updatedAt = updatedAt;
     }
 
     public BigDecimal getShippingFee() {
         return shippingFee;
     }
 
-    public void setShippingFee(BigDecimal shippingFee) {
-        this.shippingFee = shippingFee == null ? BigDecimal.ZERO : shippingFee;
-    }
-
     public boolean isShipped() {
         return shipped;
-    }
-
-    public void setShipped(boolean shipped) {
-        this.shipped = shipped;
     }
 
     /**

@@ -108,9 +108,7 @@ public class MenuService implements MenuUseCase {
             if (item.parentId() != null && item.parentId().equals(item.id())) {
                 throw new IllegalArgumentException("자기 자신을 부모로 지정할 수 없습니다: " + item.id());
             }
-            menu.setParentId(item.parentId());
-            menu.setSortOrder(item.sortOrder());
-            menu.setUpdatedAt(java.time.LocalDateTime.now());
+            menu.reorder(item.parentId(), item.sortOrder());
         }
 
         // 2) 변경 반영된 그래프 전체에 대해 순환 참조 검증

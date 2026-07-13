@@ -76,14 +76,13 @@ public class CommonCodePersistenceAdapter implements LoadCommonCodePort, SaveCom
     // ---- Mapping ----
 
     private CommonCodeGroup toDomainGroup(CommonCodeGroupJpaEntity entity) {
-        CommonCodeGroup group = new CommonCodeGroup();
-        group.setGroupCode(entity.getGroupCode());
-        group.setName(entity.getName());
-        group.setDescription(entity.getDescription());
-        group.setActive(entity.isActive());
-        group.setCreatedAt(entity.getCreatedAt());
-        group.setUpdatedAt(entity.getUpdatedAt());
-        return group;
+        return CommonCodeGroup.rehydrate(
+                entity.getGroupCode(),
+                entity.getName(),
+                entity.getDescription(),
+                entity.isActive(),
+                entity.getCreatedAt(),
+                entity.getUpdatedAt());
     }
 
     private CommonCodeGroupJpaEntity toEntityGroup(CommonCodeGroup domain) {
@@ -98,17 +97,16 @@ public class CommonCodePersistenceAdapter implements LoadCommonCodePort, SaveCom
     }
 
     private CommonCode toDomainCode(CommonCodeJpaEntity entity) {
-        CommonCode code = new CommonCode();
-        code.setId(entity.getId());
-        code.setGroupCode(entity.getGroupCode());
-        code.setCode(entity.getCode());
-        code.setLabel(entity.getLabel());
-        code.setSortOrder(entity.getSortOrder());
-        code.setActive(entity.isActive());
-        code.setExtra1(entity.getExtra1());
-        code.setCreatedAt(entity.getCreatedAt());
-        code.setUpdatedAt(entity.getUpdatedAt());
-        return code;
+        return CommonCode.rehydrate(
+                entity.getId(),
+                entity.getGroupCode(),
+                entity.getCode(),
+                entity.getLabel(),
+                entity.getSortOrder(),
+                entity.isActive(),
+                entity.getExtra1(),
+                entity.getCreatedAt(),
+                entity.getUpdatedAt());
     }
 
     private CommonCodeJpaEntity toEntityCode(CommonCode domain) {

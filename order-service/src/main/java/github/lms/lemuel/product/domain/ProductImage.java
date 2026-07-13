@@ -60,16 +60,16 @@ public class ProductImage {
                                        String filePath, String url, String contentType, Long sizeBytes,
                                        Integer width, Integer height, Integer orderIndex) {
         ProductImage image = new ProductImage();
-        image.setProductId(productId);
-        image.setOriginalFileName(originalFileName);
-        image.setStoredFileName(storedFileName);
-        image.setFilePath(filePath);
-        image.setUrl(url);
-        image.setContentType(contentType);
-        image.setSizeBytes(sizeBytes);
-        image.setWidth(width);
-        image.setHeight(height);
-        image.setOrderIndex(orderIndex);
+        image.productId = productId;
+        image.originalFileName = originalFileName;
+        image.storedFileName = storedFileName;
+        image.filePath = filePath;
+        image.url = url;
+        image.contentType = contentType;
+        image.sizeBytes = sizeBytes;
+        image.width = width;
+        image.height = height;
+        image.orderIndex = orderIndex;
         image.validateContentType();
         image.validateFileSize();
         return image;
@@ -135,132 +135,94 @@ public class ProductImage {
         return this.deletedAt != null;
     }
 
-    // Getters and Setters
+    /** Persistence 어댑터가 DB 부여 PK 를 주입할 때 사용(setter 대체). */
+    public void assignId(Long id) {
+        this.id = id;
+    }
+
+    /** 파일 체크섬 확정(업로드 후 계산값 부착). */
+    public void assignChecksum(String checksum) {
+        this.checksum = checksum;
+    }
+
+    // Getters
     public Long getId() {
         return id;
     }
 
-    public void setId(Long id) {
-        this.id = id;
-    }
 
     public Long getProductId() {
         return productId;
     }
 
-    public void setProductId(Long productId) {
-        this.productId = productId;
-    }
 
     public String getOriginalFileName() {
         return originalFileName;
     }
 
-    public void setOriginalFileName(String originalFileName) {
-        this.originalFileName = originalFileName;
-    }
 
     public String getStoredFileName() {
         return storedFileName;
     }
 
-    public void setStoredFileName(String storedFileName) {
-        this.storedFileName = storedFileName;
-    }
 
     public String getFilePath() {
         return filePath;
     }
 
-    public void setFilePath(String filePath) {
-        this.filePath = filePath;
-    }
 
     public String getUrl() {
         return url;
     }
 
-    public void setUrl(String url) {
-        this.url = url;
-    }
 
     public String getContentType() {
         return contentType;
     }
 
-    public void setContentType(String contentType) {
-        this.contentType = contentType;
-    }
 
     public Long getSizeBytes() {
         return sizeBytes;
     }
 
-    public void setSizeBytes(Long sizeBytes) {
-        this.sizeBytes = sizeBytes;
-    }
 
     public Integer getWidth() {
         return width;
     }
 
-    public void setWidth(Integer width) {
-        this.width = width;
-    }
 
     public Integer getHeight() {
         return height;
     }
 
-    public void setHeight(Integer height) {
-        this.height = height;
-    }
 
     public String getChecksum() {
         return checksum;
     }
 
-    public void setChecksum(String checksum) {
-        this.checksum = checksum;
-    }
 
     public Boolean getIsPrimary() {
         return isPrimary;
     }
 
-    public void setIsPrimary(Boolean isPrimary) {
-        this.isPrimary = isPrimary;
-    }
 
     public Integer getOrderIndex() {
         return orderIndex;
     }
 
-    public void setOrderIndex(Integer orderIndex) {
-        this.orderIndex = orderIndex;
-    }
 
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
 
     public LocalDateTime getUpdatedAt() {
         return updatedAt;
     }
 
-    public void setUpdatedAt(LocalDateTime updatedAt) {
-        this.updatedAt = updatedAt;
-    }
 
     public LocalDateTime getDeletedAt() {
         return deletedAt;
     }
 
-    public void setDeletedAt(LocalDateTime deletedAt) {
-        this.deletedAt = deletedAt;
-    }
 }

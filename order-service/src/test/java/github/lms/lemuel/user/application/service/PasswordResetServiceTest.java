@@ -37,9 +37,8 @@ class PasswordResetServiceTest {
     }
 
     private PasswordResetToken validToken(Long userId, String tokenValue) {
-        PasswordResetToken t = PasswordResetToken.create(userId, 30);
-        t.setToken(tokenValue);
-        return t;
+        return new PasswordResetToken(null, userId, tokenValue,
+                java.time.LocalDateTime.now().plusMinutes(30), false, java.time.LocalDateTime.now());
     }
 
     @Test @DisplayName("비밀번호 재설정 요청 - 존재하지 않는 이메일이면 조용히 무시")

@@ -143,49 +143,77 @@ public class Coupon {
         this.updatedAt = LocalDateTime.now();
     }
 
-    // Getters & Setters
+    /**
+     * 쿠폰 활성화/비활성화. 상태 플래그를 setter 로 노출하지 않고 의미 있는 도메인 동작으로만 변경.
+     */
+    public void activate() {
+        this.isActive = true;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public void deactivate() {
+        this.isActive = false;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    /**
+     * 영속 레코드 복원 팩토리. 어댑터가 no-arg + setter 대신 이 경로로만 도메인을 재구성한다.
+     */
+    public static Coupon rehydrate(Long id, String code, CouponType type, BigDecimal discountValue,
+                                   BigDecimal minOrderAmount, BigDecimal maxDiscountAmount,
+                                   int maxUses, int usedCount, CouponTarget targetType, Long targetId,
+                                   LocalDateTime startsAt, LocalDateTime expiresAt, boolean isActive,
+                                   LocalDateTime createdAt, LocalDateTime updatedAt) {
+        Coupon coupon = new Coupon();
+        coupon.id = id;
+        coupon.code = code;
+        coupon.type = type;
+        coupon.discountValue = discountValue;
+        coupon.minOrderAmount = minOrderAmount;
+        coupon.maxDiscountAmount = maxDiscountAmount;
+        coupon.maxUses = maxUses;
+        coupon.usedCount = usedCount;
+        coupon.targetType = targetType;
+        coupon.targetId = targetId;
+        coupon.startsAt = startsAt;
+        coupon.expiresAt = expiresAt;
+        coupon.isActive = isActive;
+        coupon.createdAt = createdAt;
+        coupon.updatedAt = updatedAt;
+        return coupon;
+    }
+
+    /** DB 부여 PK 주입(setter 대체). */
+    public void assignId(Long id) { this.id = id; }
+
+    // Getters
     public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
 
     public String getCode() { return code; }
-    public void setCode(String code) { this.code = code; }
 
     public CouponType getType() { return type; }
-    public void setType(CouponType type) { this.type = type; }
 
     public BigDecimal getDiscountValue() { return discountValue; }
-    public void setDiscountValue(BigDecimal discountValue) { this.discountValue = discountValue; }
 
     public BigDecimal getMinOrderAmount() { return minOrderAmount; }
-    public void setMinOrderAmount(BigDecimal minOrderAmount) { this.minOrderAmount = minOrderAmount; }
 
     public BigDecimal getMaxDiscountAmount() { return maxDiscountAmount; }
-    public void setMaxDiscountAmount(BigDecimal maxDiscountAmount) { this.maxDiscountAmount = maxDiscountAmount; }
 
     public int getMaxUses() { return maxUses; }
-    public void setMaxUses(int maxUses) { this.maxUses = maxUses; }
 
     public int getUsedCount() { return usedCount; }
-    public void setUsedCount(int usedCount) { this.usedCount = usedCount; }
 
     public CouponTarget getTargetType() { return targetType == null ? CouponTarget.ALL : targetType; }
-    public void setTargetType(CouponTarget targetType) { this.targetType = targetType; }
 
     public Long getTargetId() { return targetId; }
-    public void setTargetId(Long targetId) { this.targetId = targetId; }
 
     public LocalDateTime getStartsAt() { return startsAt; }
-    public void setStartsAt(LocalDateTime startsAt) { this.startsAt = startsAt; }
 
     public LocalDateTime getExpiresAt() { return expiresAt; }
-    public void setExpiresAt(LocalDateTime expiresAt) { this.expiresAt = expiresAt; }
 
     public boolean isActive() { return isActive; }
-    public void setActive(boolean active) { isActive = active; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 }

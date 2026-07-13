@@ -49,24 +49,9 @@ class ProductImageFullTest {
     @Test
     @DisplayName("모든 세터 왕복")
     void settersRoundTrip() {
-        ProductImage i = new ProductImage();
         LocalDateTime t = LocalDateTime.now();
-        i.setId(1L);
-        i.setProductId(2L);
-        i.setOriginalFileName("o");
-        i.setStoredFileName("s");
-        i.setFilePath("/f");
-        i.setUrl("/u");
-        i.setContentType("image/jpeg");
-        i.setSizeBytes(10L);
-        i.setWidth(5);
-        i.setHeight(6);
-        i.setChecksum("c");
-        i.setIsPrimary(true);
-        i.setOrderIndex(4);
-        i.setCreatedAt(t);
-        i.setUpdatedAt(t);
-        i.setDeletedAt(t);
+        ProductImage i = new ProductImage(1L, 2L, "o", "s", "/f", "/u", "image/jpeg",
+                10L, 5, 6, "c", true, 4, t, t, t);
 
         assertThat(i.getId()).isEqualTo(1L);
         assertThat(i.getProductId()).isEqualTo(2L);

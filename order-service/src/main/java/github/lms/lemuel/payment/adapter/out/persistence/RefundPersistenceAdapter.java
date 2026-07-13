@@ -75,19 +75,18 @@ public class RefundPersistenceAdapter implements LoadRefundPort, SaveRefundPort 
     }
 
     private Refund toDomain(RefundJpaEntity entity) {
-        Refund domain = new Refund();
-        domain.setId(entity.getId());
-        domain.setPaymentId(entity.getPaymentId());
-        domain.setAmount(entity.getAmount());
-        domain.setStatus(Refund.Status.valueOf(entity.getStatus()));
-        domain.setReason(entity.getReason());
-        domain.setIdempotencyKey(entity.getIdempotencyKey());
-        domain.setRetryCount(entity.getRetryCount());
-        domain.setNextRetryAt(entity.getNextRetryAt());
-        domain.setRequestedAt(entity.getRequestedAt());
-        domain.setCompletedAt(entity.getCompletedAt());
-        domain.setCreatedAt(entity.getCreatedAt());
-        domain.setUpdatedAt(entity.getUpdatedAt());
-        return domain;
+        return Refund.rehydrate(
+                entity.getId(),
+                entity.getPaymentId(),
+                entity.getAmount(),
+                Refund.Status.valueOf(entity.getStatus()),
+                entity.getReason(),
+                entity.getIdempotencyKey(),
+                entity.getRetryCount(),
+                entity.getNextRetryAt(),
+                entity.getRequestedAt(),
+                entity.getCompletedAt(),
+                entity.getCreatedAt(),
+                entity.getUpdatedAt());
     }
 }

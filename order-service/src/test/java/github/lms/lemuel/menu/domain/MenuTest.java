@@ -65,8 +65,8 @@ class MenuTest {
     @Test @DisplayName("setters - 식별자/시간 세팅")
     void setters() {
         Menu menu = new Menu();
-        menu.setId(9L);
-        menu.setChildren(new java.util.ArrayList<>());
+        menu.assignId(9L);
+        menu.replaceChildren(new java.util.ArrayList<>());
         assertThat(menu.getId()).isEqualTo(9L);
         assertThat(menu.getChildren()).isEmpty();
     }

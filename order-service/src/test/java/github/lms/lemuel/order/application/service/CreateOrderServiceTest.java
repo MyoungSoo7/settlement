@@ -38,7 +38,7 @@ class CreateOrderServiceTest {
         when(loadUserForOrderPort.findEmailById(1L)).thenReturn(Optional.of("user@example.com"));
         when(saveOrderPort.save(any())).thenAnswer(inv -> {
             Order o = inv.getArgument(0);
-            o.setId(999L);
+            o.assignId(999L);
             return o;
         });
 

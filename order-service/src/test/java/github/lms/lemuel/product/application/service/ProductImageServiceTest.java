@@ -36,7 +36,7 @@ class ProductImageServiceTest {
     private ProductImage image(Long id, Long productId) {
         ProductImage i = ProductImage.create(productId, "a.jpg", "stored.jpg", "/p", "/u",
                 "image/jpeg", 1024L, 100, 100, 0);
-        i.setId(id);
+        i.assignId(id);
         return i;
     }
 
@@ -153,7 +153,7 @@ class ProductImageServiceTest {
         ProductImage[] holder = new ProductImage[1];
         when(savePort.save(any())).thenAnswer(inv -> {
             ProductImage p = inv.getArgument(0);
-            if (p.getId() == null) p.setId(1L);
+            if (p.getId() == null) p.assignId(1L);
             holder[0] = p;
             return p;
         });

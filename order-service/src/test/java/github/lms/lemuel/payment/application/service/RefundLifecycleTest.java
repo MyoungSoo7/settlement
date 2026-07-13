@@ -82,7 +82,7 @@ class RefundLifecycleTest {
     @DisplayName("fail — FAILED 기록 + ops 신호 emit")
     void fail_records() {
         Refund refund = Refund.request(1L, new BigDecimal("100"), "k", "r");
-        refund.setId(77L);
+        refund.assignId(77L);
         when(loadRefundPort.findById(77L)).thenReturn(Optional.of(refund));
         lifecycle.fail(77L, "PG timeout");
         assertThat(refund.getStatus()).isEqualTo(Refund.Status.FAILED);

@@ -72,14 +72,12 @@ class ProductExtraTest {
     }
 
     @Test
-    @DisplayName("setCategoryId / setOptionsJson: 값 반영 + updatedAt 갱신")
+    @DisplayName("rehydrate: categoryId / optionsJson 값 반영")
     void setters_updateTimestamp() {
-        Product p = Product.create("상품", "설명", new BigDecimal("100"), 1);
+        Product p = Product.rehydrate(1L, "상품", "설명", new BigDecimal("100"), 1,
+                ProductStatus.ACTIVE, 7L, null, "{\"x\":true}", null, null);
 
-        p.setCategoryId(7L);
         assertThat(p.getCategoryId()).isEqualTo(7L);
-
-        p.setOptionsJson("{\"x\":true}");
         assertThat(p.getOptionsJson()).isEqualTo("{\"x\":true}");
     }
 
@@ -133,19 +131,11 @@ class ProductExtraTest {
     }
 
     @Test
-    @DisplayName("setStatus/setId/setPrice/setStockQuantity/setCreatedAt/setUpdatedAt/setName/setDescription 직접 세터")
+    @DisplayName("rehydrate: 전 필드 복원 + 상태 파생")
     void directSetters() {
-        Product p = new Product();
         LocalDateTime now = LocalDateTime.now();
-
-        p.setId(9L);
-        p.setName("이름");
-        p.setDescription("설명");
-        p.setPrice(new BigDecimal("500"));
-        p.setStockQuantity(3);
-        p.setStatus(ProductStatus.DISCONTINUED);
-        p.setCreatedAt(now);
-        p.setUpdatedAt(now);
+        Product p = Product.rehydrate(9L, "이름", "설명", new BigDecimal("500"), 3,
+                ProductStatus.DISCONTINUED, null, null, null, now, now);
 
         assertThat(p.getId()).isEqualTo(9L);
         assertThat(p.getName()).isEqualTo("이름");
@@ -176,7 +166,7 @@ class ProductExtraTest {
         Product p = Product.create("상품", "설명", new BigDecimal("100"), 1);
         p.addTag(1L);
 
-        p.setTagIds(null);
+        p.replaceTags(null);
 
         assertThat(p.getTagIds()).isEmpty();
     }
@@ -186,7 +176,7 @@ class ProductExtraTest {
     void setTagIds_withValues() {
         Product p = Product.create("상품", "설명", new BigDecimal("100"), 1);
 
-        p.setTagIds(List.of(1L, 2L, 3L));
+        p.replaceTags(List.of(1L, 2L, 3L));
 
         assertThat(p.getTagIds()).containsExactly(1L, 2L, 3L);
     }

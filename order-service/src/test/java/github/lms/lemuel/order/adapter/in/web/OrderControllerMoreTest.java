@@ -46,7 +46,7 @@ class OrderControllerMoreTest {
 
     private Order order() {
         Order o = Order.create(1L, 1L, new BigDecimal("10000"));
-        o.setId(7L);
+        o.assignId(7L);
         return o;
     }
 

@@ -99,12 +99,7 @@ class DecreaseProductStockServiceTest {
     }
 
     private static Product product(int stock, ProductStatus status) {
-        Product p = new Product();
-        p.setId(1L);
-        p.setName("상품");
-        p.setPrice(BigDecimal.TEN);
-        p.setStockQuantity(stock);
-        p.setStatus(status);
-        return p;
+        return Product.rehydrate(1L, "상품", null, BigDecimal.TEN, stock, status,
+                null, null, null, null, null);
     }
 }

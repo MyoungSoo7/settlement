@@ -247,7 +247,7 @@ class RefundApprovalIT {
     private void prepareOrder(Long orderId, BigDecimal shippingFee, boolean shipped, OrderStatus target) {
         commit(() -> {
             Order o = orderAdapter.findById(orderId).orElseThrow();
-            o.setShippingFee(shippingFee);
+            o.assignShippingFee(shippingFee);
             o.transitionTo(OrderStatus.PAID);
             if (target == OrderStatus.CANCELLATION_REQUESTED) {
                 o.transitionTo(OrderStatus.CANCELLATION_REQUESTED);

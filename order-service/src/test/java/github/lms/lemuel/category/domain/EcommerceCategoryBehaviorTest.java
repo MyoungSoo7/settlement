@@ -14,7 +14,7 @@ class EcommerceCategoryBehaviorTest {
 
     private EcommerceCategory root() {
         EcommerceCategory c = EcommerceCategory.createRoot("전자제품", "electronics", 1);
-        c.setId(1L);
+        c.assignId(1L);
         return c;
     }
 

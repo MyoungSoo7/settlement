@@ -49,11 +49,10 @@ class CommonCodeTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
-    @Test @DisplayName("setters - 식별자 세팅")
+    @Test @DisplayName("rehydrate/assignId - 식별자 복원")
     void setters() {
-        CommonCode code = new CommonCode();
-        code.setId(1L);
-        code.setCode("X");
+        CommonCode code = CommonCode.rehydrate(1L, "G", "X", "L", 0, true, null,
+                java.time.LocalDateTime.now(), java.time.LocalDateTime.now());
         assertThat(code.getId()).isEqualTo(1L);
         assertThat(code.getCode()).isEqualTo("X");
     }

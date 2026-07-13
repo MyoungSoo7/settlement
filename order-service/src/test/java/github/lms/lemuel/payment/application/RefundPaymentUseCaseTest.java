@@ -70,7 +70,7 @@ class RefundPaymentUseCaseTest {
         when(refundLifecycle.begin(any(), any(), any(), any())).thenAnswer(inv -> {
             Refund r = Refund.request(inv.getArgument(0), inv.getArgument(1),
                     inv.getArgument(2), inv.getArgument(3));
-            r.setId(999L);
+            r.assignId(999L);
             return r;
         });
     }
@@ -181,7 +181,7 @@ class RefundPaymentUseCaseTest {
         PaymentDomain payment = capturedPayment();
         when(loadPaymentPort.loadById(1L)).thenReturn(Optional.of(payment));
         Refund existing = Refund.request(1L, new BigDecimal("50000"), "payment-1-full", "x");
-        existing.setId(999L);
+        existing.assignId(999L);
         existing.markCompleted();
         when(loadRefundPort.findByPaymentIdAndIdempotencyKey(1L, "payment-1-full"))
                 .thenReturn(Optional.of(existing));
@@ -225,7 +225,7 @@ class RefundPaymentUseCaseTest {
         when(savePaymentPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
         stubSaveRefund();
         Refund failed = Refund.request(1L, new BigDecimal("50000"), "payment-1-full", "FULL_REFUND");
-        failed.setId(999L);
+        failed.assignId(999L);
         failed.markFailed("이전 PG 실패");
         when(loadRefundPort.findByPaymentIdAndIdempotencyKey(1L, "payment-1-full"))
                 .thenReturn(Optional.of(failed));
@@ -247,7 +247,7 @@ class RefundPaymentUseCaseTest {
                 PaymentStatus.REFUNDED, "CARD", "pg-tx-123", null, null, null);
         when(loadPaymentPort.loadById(1L)).thenReturn(Optional.of(payment));
         Refund failed = Refund.request(1L, new BigDecimal("20000"), "partial-key-x", "PARTIAL_REFUND");
-        failed.setId(999L);
+        failed.assignId(999L);
         failed.markFailed("이전 PG 실패");
         when(loadRefundPort.findByPaymentIdAndIdempotencyKey(1L, "partial-key-x"))
                 .thenReturn(Optional.of(failed));

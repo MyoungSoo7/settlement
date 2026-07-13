@@ -34,7 +34,7 @@ class AdminRbacControllerTest {
 
     private Role role() {
         Role r = Role.of(1L, "ADMIN", "관리자", "전체권한", true, LocalDateTime.now());
-        r.setPermissions(List.of(Permission.of(11L, "ORDER_READ", "주문조회", "ORDER", "desc")));
+        r.replacePermissions(List.of(Permission.of(11L, "ORDER_READ", "주문조회", "ORDER", "desc")));
         return r;
     }
 

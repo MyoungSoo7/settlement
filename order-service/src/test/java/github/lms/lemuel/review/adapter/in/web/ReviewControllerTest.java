@@ -86,7 +86,7 @@ class ReviewControllerTest {
 
     private static Review review(Long id, Long productId, Long userId, int rating, String content) {
         Review review = Review.create(productId, userId, rating, content);
-        review.setId(id);
+        review.assignId(id);
         return review;
     }
 }

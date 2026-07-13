@@ -32,7 +32,7 @@ class AdminMenuControllerTest {
 
     private Menu menu(long id, String name) {
         Menu m = Menu.create(name, "/admin/" + name, "icon", null, 1, "ADMIN", true);
-        m.setId(id);
+        m.assignId(id);
         return m;
     }
 

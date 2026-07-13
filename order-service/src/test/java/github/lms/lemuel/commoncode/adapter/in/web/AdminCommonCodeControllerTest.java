@@ -39,7 +39,7 @@ class AdminCommonCodeControllerTest {
 
     private CommonCode code() {
         CommonCode c = CommonCode.create("ORDER_STATUS", "PAID", "결제완료", 3, "green");
-        c.setId(10L);
+        c.assignId(10L);
         return c;
     }
 

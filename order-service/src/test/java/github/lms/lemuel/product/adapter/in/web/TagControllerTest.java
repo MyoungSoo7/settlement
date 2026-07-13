@@ -33,7 +33,7 @@ class TagControllerTest {
 
     private static Tag tag(Long id, String name) {
         Tag t = Tag.create(name, "#FF0000");
-        t.setId(id);
+        t.assignId(id);
         return t;
     }
 

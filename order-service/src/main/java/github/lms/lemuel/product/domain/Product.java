@@ -56,10 +56,10 @@ public class Product {
     // 정적 팩토리 메서드
     public static Product create(String name, String description, BigDecimal price, Integer stockQuantity) {
         Product product = new Product();
-        product.setName(name);
-        product.setDescription(description);
-        product.setPrice(price);
-        product.setStockQuantity(stockQuantity);
+        product.name = name;
+        product.description = description;
+        product.price = price;
+        product.stockQuantity = stockQuantity;
         product.validateName();
         product.validatePrice();
         product.validateStockQuantity();
@@ -197,98 +197,84 @@ public class Product {
         return this.status == ProductStatus.DISCONTINUED;
     }
 
-    // Getters and Setters
+    /**
+     * 영속 레코드 복원 팩토리. no-arg + setter 대신 이 경로로만 재구성해 도메인 봉인을 유지한다.
+     */
+    public static Product rehydrate(Long id, String name, String description, BigDecimal price,
+                                    Integer stockQuantity, ProductStatus status, Long categoryId,
+                                    List<Long> tagIds, String optionsJson,
+                                    LocalDateTime createdAt, LocalDateTime updatedAt) {
+        return new Product(id, name, description, price, stockQuantity, status, categoryId,
+                tagIds, optionsJson, createdAt, updatedAt);
+    }
+
+    /** Persistence 어댑터가 DB 부여 PK 를 주입할 때 사용(setter 대체). */
+    public void assignId(Long id) {
+        this.id = id;
+    }
+
+    /** 태그 목록을 통째로 교체(null 은 빈 목록). 방어적 복사로 외부 리스트와 격리. */
+    public void replaceTags(List<Long> tagIds) {
+        this.tagIds = tagIds != null ? new ArrayList<>(tagIds) : new ArrayList<>();
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    // Getters
     public Long getId() {
         return id;
     }
 
-    public void setId(Long id) {
-        this.id = id;
-    }
 
     public String getName() {
         return name;
     }
 
-    public void setName(String name) {
-        this.name = name;
-    }
 
     public String getDescription() {
         return description;
     }
 
-    public void setDescription(String description) {
-        this.description = description;
-    }
 
     public BigDecimal getPrice() {
         return price;
     }
 
-    public void setPrice(BigDecimal price) {
-        this.price = price;
-    }
 
     public Integer getStockQuantity() {
         return stockQuantity;
     }
 
-    public void setStockQuantity(Integer stockQuantity) {
-        this.stockQuantity = stockQuantity;
-    }
 
     public ProductStatus getStatus() {
         return status;
     }
 
-    public void setStatus(ProductStatus status) {
-        this.status = status;
-    }
 
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
 
     public LocalDateTime getUpdatedAt() {
         return updatedAt;
     }
 
-    public void setUpdatedAt(LocalDateTime updatedAt) {
-        this.updatedAt = updatedAt;
-    }
 
     public Long getCategoryId() {
         return categoryId;
     }
 
-    public void setCategoryId(Long categoryId) {
-        this.categoryId = categoryId;
-        this.updatedAt = LocalDateTime.now();
-    }
 
     /** 원본 옵션 트리(JSON 문자열, JSONB 저장). null 이면 옵션 없는 상품. */
     public String getOptionsJson() {
         return optionsJson;
     }
 
-    public void setOptionsJson(String optionsJson) {
-        this.optionsJson = optionsJson;
-        this.updatedAt = LocalDateTime.now();
-    }
 
     public List<Long> getTagIds() {
         return new ArrayList<>(tagIds);
     }
 
-    public void setTagIds(List<Long> tagIds) {
-        this.tagIds = tagIds != null ? new ArrayList<>(tagIds) : new ArrayList<>();
-        this.updatedAt = LocalDateTime.now();
-    }
 
     // 비즈니스 메서드: 태그 추가
     public void addTag(Long tagId) {

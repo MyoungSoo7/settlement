@@ -198,7 +198,7 @@ class RbacServiceTest {
         Permission p1 = Permission.of(10L, "ORDER_READ", "주문 조회", "ORDER", null);
         Permission p2 = Permission.of(20L, "PRODUCT_READ", "상품 조회", "PRODUCT", null);
         Role source = Role.of(1L, "MANAGER", "매니저", "운영 매니저", true, null);
-        source.setPermissions(List.of(p1, p2));
+        source.replacePermissions(List.of(p1, p2));
 
         Role saved = Role.of(7L, "MANAGER_JR", "주니어 매니저", "운영 매니저", false, null);
         when(loadRbacPort.findRoleById(1L)).thenReturn(Optional.of(source));

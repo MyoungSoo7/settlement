@@ -97,7 +97,7 @@ class CouponControllerTest {
     private static Coupon coupon(String code) {
         Coupon coupon = Coupon.create(code, CouponType.FIXED, new BigDecimal("1000"),
                 new BigDecimal("10000"), null, 100, LocalDateTime.now().plusDays(1));
-        coupon.setId(1L);
+        coupon.assignId(1L);
         return coupon;
     }
 }

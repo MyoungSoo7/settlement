@@ -171,7 +171,7 @@ public class RefundPaymentUseCase implements RefundPaymentPort {
         }
 
         // ── Phase 3: 성공 — 이력을 COMPLETED 로 확정하고 결제/주문/이벤트를 원자적으로 커밋 ──
-        refund.setAmount(refundAmount); // 스냅샷과 권위 금액이 다를 경우(동시 부분환불) 최종값으로 정정
+        refund.correctAmount(refundAmount); // 스냅샷과 권위 금액이 다를 경우(동시 부분환불) 최종값으로 정정
         refund.markCompleted();
         Refund completedRefund = saveRefundPort.save(refund);
 

@@ -114,7 +114,7 @@ class CreateMultiItemOrderServiceTest {
         when(loadProductPort.findById(10L)).thenReturn(Optional.of(product));
         when(saveOrderPort.save(any())).thenAnswer(inv -> {
             Order o = inv.getArgument(0);
-            o.setId(500L);
+            o.assignId(500L);
             return o;
         });
         // 소계 20,000 (10,000 x 2) 기준 2,000원 할인

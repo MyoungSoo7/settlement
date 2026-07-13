@@ -52,10 +52,10 @@ public class EcommerceCategory {
     // 정적 팩토리 메서드: 최상위 카테고리 생성
     public static EcommerceCategory createRoot(String name, String slug, Integer sortOrder) {
         EcommerceCategory category = new EcommerceCategory();
-        category.setName(name);
-        category.setSlug(slug);
-        category.setDepth(0);
-        category.setSortOrder(sortOrder);
+        category.name = name;
+        category.slug = slug;
+        category.depth = 0;
+        category.sortOrder = sortOrder;
         category.validateName();
         category.validateSlug();
         return category;
@@ -73,11 +73,11 @@ public class EcommerceCategory {
         }
 
         EcommerceCategory category = new EcommerceCategory();
-        category.setName(name);
-        category.setSlug(slug);
-        category.setParentId(parentId);
-        category.setDepth(newDepth);
-        category.setSortOrder(sortOrder);
+        category.name = name;
+        category.slug = slug;
+        category.parentId = parentId;
+        category.depth = newDepth;
+        category.sortOrder = sortOrder;
         category.validateName();
         category.validateSlug();
         category.validateParentId();
@@ -202,92 +202,60 @@ public class EcommerceCategory {
         this.children.add(child);
     }
 
-    // Getters and Setters
-    public Long getId() {
-        return id;
+    /**
+     * 트리 조립용 children 교체(DB 컬럼 아님, 조회 시 조립). setter 대체.
+     */
+    public void replaceChildren(List<EcommerceCategory> children) {
+        this.children = children != null ? new ArrayList<>(children) : new ArrayList<>();
     }
 
-    public void setId(Long id) {
+    /** DB 부여 PK 주입(setter 대체). */
+    public void assignId(Long id) {
         this.id = id;
+    }
+
+    // Getters
+    public Long getId() {
+        return id;
     }
 
     public String getName() {
         return name;
     }
 
-    public void setName(String name) {
-        this.name = name;
-    }
-
     public String getSlug() {
         return slug;
-    }
-
-    public void setSlug(String slug) {
-        this.slug = slug;
     }
 
     public Long getParentId() {
         return parentId;
     }
 
-    public void setParentId(Long parentId) {
-        this.parentId = parentId;
-    }
-
     public Integer getDepth() {
         return depth;
-    }
-
-    public void setDepth(Integer depth) {
-        this.depth = depth;
     }
 
     public Integer getSortOrder() {
         return sortOrder;
     }
 
-    public void setSortOrder(Integer sortOrder) {
-        this.sortOrder = sortOrder;
-    }
-
     public Boolean getIsActive() {
         return isActive;
-    }
-
-    public void setIsActive(Boolean isActive) {
-        this.isActive = isActive;
     }
 
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
-
     public LocalDateTime getUpdatedAt() {
         return updatedAt;
-    }
-
-    public void setUpdatedAt(LocalDateTime updatedAt) {
-        this.updatedAt = updatedAt;
     }
 
     public LocalDateTime getDeletedAt() {
         return deletedAt;
     }
 
-    public void setDeletedAt(LocalDateTime deletedAt) {
-        this.deletedAt = deletedAt;
-    }
-
     public List<EcommerceCategory> getChildren() {
         return new ArrayList<>(children);
-    }
-
-    public void setChildren(List<EcommerceCategory> children) {
-        this.children = children != null ? new ArrayList<>(children) : new ArrayList<>();
     }
 }

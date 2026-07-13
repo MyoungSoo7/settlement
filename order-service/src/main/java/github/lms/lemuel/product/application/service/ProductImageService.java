@@ -51,7 +51,7 @@ public class ProductImageService {
                         fileInfo.getHeight(),
                         orderIndex++
                 );
-                image.setChecksum(fileInfo.getChecksum());
+                image.assignChecksum(fileInfo.getChecksum());
 
                 images.add(savePort.save(image));
 

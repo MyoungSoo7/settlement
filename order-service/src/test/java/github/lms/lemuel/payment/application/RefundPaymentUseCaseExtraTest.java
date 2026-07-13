@@ -63,7 +63,7 @@ class RefundPaymentUseCaseExtraTest {
         when(refundLifecycle.begin(any(), any(), any(), any())).thenAnswer(inv -> {
             Refund r = Refund.request(inv.getArgument(0), inv.getArgument(1),
                     inv.getArgument(2), inv.getArgument(3));
-            r.setId(555L);
+            r.assignId(555L);
             return r;
         });
         RefundException pgException = new RefundException("PG rejected: insufficient balance");

@@ -31,11 +31,11 @@ class RefundHistoryControllerTest {
     @DisplayName("GET /api/payments/{id}/refunds 는 완료된 환불만 합산해 응답한다")
     void getByPayment_sumsOnlyCompleted() throws Exception {
         Refund completed = Refund.request(1L, new BigDecimal("5000"), "key-1", "고객 요청");
-        completed.setId(1L);
+        completed.assignId(1L);
         completed.markCompleted();
 
         Refund failed = Refund.request(1L, new BigDecimal("2000"), "key-2", "PG 오류");
-        failed.setId(2L);
+        failed.assignId(2L);
         failed.markFailed("PG 5xx");
 
         when(getRefundHistoryUseCase.getRefundsByPaymentId(1L)).thenReturn(List.of(completed, failed));

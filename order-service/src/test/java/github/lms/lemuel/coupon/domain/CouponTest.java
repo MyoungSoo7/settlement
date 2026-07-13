@@ -87,7 +87,7 @@ class CouponTest {
     void validate_inactive() {
         Coupon coupon = Coupon.create("C", CouponType.FIXED, new BigDecimal("1000"),
                 BigDecimal.ZERO, null, 10, null);
-        coupon.setActive(false);
+        coupon.deactivate();
         assertThatThrownBy(() -> coupon.validate(new BigDecimal("50000")))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("비활성");

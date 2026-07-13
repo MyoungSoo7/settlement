@@ -102,14 +102,14 @@ class OrderStateMachineTest {
     @DisplayName("shippingFee 세터 null 방어, shipped 세터")
     void shippingAccessors() {
         Order o = Order.create(1L, 2L, BigDecimal.TEN);
-        o.setShippingFee(null);
+        o.assignShippingFee(null);
         assertThat(o.getShippingFee()).isEqualByComparingTo("0");
-        o.setShippingFee(new BigDecimal("3000"));
+        o.assignShippingFee(new BigDecimal("3000"));
         assertThat(o.getShippingFee()).isEqualByComparingTo("3000");
-        o.setShipped(true);
-        assertThat(o.isShipped()).isTrue();
-        o.setStatus(OrderStatus.PAID);
-        assertThat(o.getStatus()).isEqualTo(OrderStatus.PAID);
+        Order shipped = Order.rehydrate(9L, 1L, 2L, BigDecimal.TEN, OrderStatus.PAID,
+                LocalDateTime.now(), LocalDateTime.now(), BigDecimal.ZERO, true);
+        assertThat(shipped.isShipped()).isTrue();
+        assertThat(shipped.getStatus()).isEqualTo(OrderStatus.PAID);
     }
 
     @Test
@@ -120,7 +120,7 @@ class OrderStateMachineTest {
         assertThat(o.isMultiItem()).isTrue();
         assertThat(o.getAmount()).isEqualByComparingTo("10000");
         assertThatThrownBy(o::attachItemsToOrder).isInstanceOf(IllegalStateException.class);
-        o.setId(50L);
+        o.assignId(50L);
         o.attachItemsToOrder();
         o.replaceItems(null);
         assertThat(o.getItems()).isEmpty();

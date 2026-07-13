@@ -69,40 +69,68 @@ public class Menu {
         this.children.add(child);
     }
 
-    // Getters & Setters
+    /**
+     * 트리 재정렬 시 부모/정렬순서 재배치(setter 대체). updatedAt 갱신까지 한 동작으로 묶는다.
+     */
+    public void reorder(Long parentId, int sortOrder) {
+        this.parentId = parentId;
+        this.sortOrder = sortOrder;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    /**
+     * 트리 조립용 children 교체(DB 컬럼 아님, 조회 시 조립).
+     */
+    public void replaceChildren(List<Menu> children) {
+        this.children = children != null ? children : new ArrayList<>();
+    }
+
+    /**
+     * 영속 레코드 복원 팩토리. 어댑터가 no-arg + setter 대신 이 경로로만 도메인을 재구성한다.
+     */
+    public static Menu rehydrate(Long id, Long parentId, String name, String path, String icon,
+                                 int sortOrder, String requiredRole, boolean visible, boolean active,
+                                 LocalDateTime createdAt, LocalDateTime updatedAt) {
+        Menu menu = new Menu();
+        menu.id = id;
+        menu.parentId = parentId;
+        menu.name = name;
+        menu.path = path;
+        menu.icon = icon;
+        menu.sortOrder = sortOrder;
+        menu.requiredRole = requiredRole;
+        menu.visible = visible;
+        menu.active = active;
+        menu.createdAt = createdAt;
+        menu.updatedAt = updatedAt;
+        return menu;
+    }
+
+    /** DB 부여 PK 주입(setter 대체). */
+    public void assignId(Long id) { this.id = id; }
+
+    // Getters
     public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
 
     public Long getParentId() { return parentId; }
-    public void setParentId(Long parentId) { this.parentId = parentId; }
 
     public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
 
     public String getPath() { return path; }
-    public void setPath(String path) { this.path = path; }
 
     public String getIcon() { return icon; }
-    public void setIcon(String icon) { this.icon = icon; }
 
     public int getSortOrder() { return sortOrder; }
-    public void setSortOrder(int sortOrder) { this.sortOrder = sortOrder; }
 
     public String getRequiredRole() { return requiredRole; }
-    public void setRequiredRole(String requiredRole) { this.requiredRole = requiredRole; }
 
     public boolean isVisible() { return visible; }
-    public void setVisible(boolean visible) { this.visible = visible; }
 
     public boolean isActive() { return active; }
-    public void setActive(boolean active) { this.active = active; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 
     public List<Menu> getChildren() { return children; }
-    public void setChildren(List<Menu> children) { this.children = children; }
 }

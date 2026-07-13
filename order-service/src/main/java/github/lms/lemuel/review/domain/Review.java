@@ -42,25 +42,39 @@ public class Review {
         }
     }
 
-    // ── Getters & Setters ──────────────────────────────────────────────
+    /**
+     * 영속 레코드 복원 팩토리 — no-arg + setter 대신 이 경로로만 도메인을 재구성한다. 평점 규칙은 유지 검증.
+     */
+    public static Review rehydrate(Long id, Long productId, Long userId, int rating, String content,
+                                   LocalDateTime createdAt, LocalDateTime updatedAt) {
+        validateRating(rating);
+        Review review = new Review();
+        review.id        = id;
+        review.productId = productId;
+        review.userId    = userId;
+        review.rating    = rating;
+        review.content   = content;
+        review.createdAt = createdAt;
+        review.updatedAt = updatedAt;
+        return review;
+    }
+
+    /** DB 부여 PK 주입(setter 대체). */
+    public void assignId(Long id)            { this.id = id; }
+
+    // ── Getters ────────────────────────────────────────────────────────
 
     public Long getId()                      { return id; }
-    public void setId(Long id)               { this.id = id; }
 
     public Long getProductId()               { return productId; }
-    public void setProductId(Long productId) { this.productId = productId; }
 
     public Long getUserId()                  { return userId; }
-    public void setUserId(Long userId)       { this.userId = userId; }
 
     public int getRating()                   { return rating; }
 
     public String getContent()               { return content; }
-    public void setContent(String content)   { this.content = content; }
 
     public LocalDateTime getCreatedAt()      { return createdAt; }
-    public void setCreatedAt(LocalDateTime t){ this.createdAt = t; }
 
     public LocalDateTime getUpdatedAt()      { return updatedAt; }
-    public void setUpdatedAt(LocalDateTime t){ this.updatedAt = t; }
 }

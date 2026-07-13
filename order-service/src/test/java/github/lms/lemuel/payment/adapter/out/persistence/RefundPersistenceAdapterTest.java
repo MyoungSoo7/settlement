@@ -114,7 +114,7 @@ class RefundPersistenceAdapterTest {
     @DisplayName("save: 도메인→엔티티→도메인 왕복 매핑 보존")
     void save_roundTripsAllFields() {
         Refund refund = Refund.request(1L, new BigDecimal("7000"), "key-x", "고객 변심");
-        refund.setId(5L);
+        refund.assignId(5L);
 
         when(repository.save(any(RefundJpaEntity.class))).thenAnswer(inv -> {
             RefundJpaEntity e = inv.getArgument(0);

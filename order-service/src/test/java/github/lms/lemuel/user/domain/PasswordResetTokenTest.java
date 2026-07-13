@@ -60,10 +60,10 @@ class PasswordResetTokenTest {
         assertThat(token.getCreatedAt()).isEqualTo(now);
     }
 
-    @Test @DisplayName("setter: id 설정")
+    @Test @DisplayName("assignId: id 설정")
     void setter() {
         var token = new PasswordResetToken();
-        token.setId(99L);
+        token.assignId(99L);
         assertThat(token.getId()).isEqualTo(99L);
     }
 }

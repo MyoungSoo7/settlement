@@ -100,7 +100,7 @@ class TagTest {
     @Test @DisplayName("setter: id 설정")
     void setter_id() {
         Tag tag = new Tag();
-        tag.setId(42L);
+        tag.assignId(42L);
         assertThat(tag.getId()).isEqualTo(42L);
     }
 }

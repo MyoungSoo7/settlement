@@ -74,13 +74,13 @@ public class ReviewPersistenceAdapter implements SaveReviewPort, LoadReviewPort 
     }
 
     private Review toDomain(ReviewJpaEntity entity) {
-        Review review = new Review();
-        review.setId(entity.getId());
-        review.setProductId(entity.getProductId());
-        review.setUserId(entity.getUserId());
-        review.update(entity.getRating(), entity.getContent()); // validates rating
-        review.setCreatedAt(entity.getCreatedAt()); // restore actual DB timestamps
-        review.setUpdatedAt(entity.getUpdatedAt());
-        return review;
+        return Review.rehydrate(
+                entity.getId(),
+                entity.getProductId(),
+                entity.getUserId(),
+                entity.getRating(), // rehydrate validates rating
+                entity.getContent(),
+                entity.getCreatedAt(), // restore actual DB timestamps
+                entity.getUpdatedAt());
     }
 }

@@ -30,7 +30,7 @@ class MenuServiceTest {
 
     private Menu menu(Long id, Long parentId, String name, int sortOrder) {
         Menu m = Menu.create(name, "/" + name, null, parentId, sortOrder, "USER", true);
-        m.setId(id);
+        m.assignId(id);
         return m;
     }
 
@@ -59,7 +59,7 @@ class MenuServiceTest {
     void createMenu() {
         when(saveMenuPort.save(any())).thenAnswer(inv -> {
             Menu m = inv.getArgument(0);
-            m.setId(10L);
+            m.assignId(10L);
             return m;
         });
 

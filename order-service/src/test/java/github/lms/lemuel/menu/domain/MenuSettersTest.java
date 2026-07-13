@@ -13,19 +13,8 @@ class MenuSettersTest {
     @Test
     @DisplayName("모든 세터/게터 왕복")
     void allSetters() {
-        Menu menu = new Menu();
         LocalDateTime t = LocalDateTime.now();
-        menu.setId(1L);
-        menu.setParentId(2L);
-        menu.setName("메뉴");
-        menu.setPath("/path");
-        menu.setIcon("icon");
-        menu.setSortOrder(9);
-        menu.setRequiredRole("ADMIN");
-        menu.setVisible(false);
-        menu.setActive(false);
-        menu.setCreatedAt(t);
-        menu.setUpdatedAt(t);
+        Menu menu = Menu.rehydrate(1L, 2L, "메뉴", "/path", "icon", 9, "ADMIN", false, false, t, t);
 
         assertThat(menu.getId()).isEqualTo(1L);
         assertThat(menu.getParentId()).isEqualTo(2L);
