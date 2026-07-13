@@ -39,7 +39,7 @@ class AdjustSettlementForRefundServiceTest {
 
     private Settlement settlement() {
         Settlement s = Settlement.createFromPayment(1L, 10L, new BigDecimal("50000"), LocalDate.now());
-        s.setId(100L);
+        s.assignId(100L);
         return s;
     }
 

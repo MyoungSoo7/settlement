@@ -25,7 +25,7 @@ class SettlementAdjustmentReconciliationTest {
         assertThat(adj.getAmount()).isEqualByComparingTo("-1000"); // 감사 규약: 음수
         assertThat(adj.getRefundId()).isNull();
         assertThat(adj.getChargebackId()).isNull();
-        assertThat(adj.getStatus()).isEqualTo("PENDING");
+        assertThat(adj.getStatus()).isEqualTo(SettlementAdjustmentStatus.PENDING);
         assertThat(adj.getAdjustmentDate()).isEqualTo(LocalDate.of(2026, 5, 2));
     }
 

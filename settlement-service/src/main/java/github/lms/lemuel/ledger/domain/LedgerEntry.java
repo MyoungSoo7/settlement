@@ -12,8 +12,9 @@ import java.time.LocalDateTime;
  * 묶이는 여러 LedgerEntry row 로 표현될 수 있다. 각 row 는
  * {@code (debitAccount, creditAccount, amount)} 한 쌍을 기록하며 amount 는 항상 양수다.
  *
- * <p>불변(Immutable) 원칙: 일단 작성된 entry 는 status 전이를 제외하고 수정하지 않는다.
- * 정정이 필요하면 역분개({@link #reverse()}) 후 신규 entry 를 추가한다.
+ * <p>불변(Immutable) 원칙: 일단 작성된 entry 는 status 전이({@link #post()}·{@link #reverse()})를
+ * 제외하고 수정하지 않는다. 정정이 필요하면 역분개 후 신규 entry 를 추가한다. public setter 는 두지
+ * 않으며, 영속 레코드 복원은 {@link #rehydrate} 팩토리로만 수행한다.
  */
 public class LedgerEntry {
 
@@ -31,7 +32,7 @@ public class LedgerEntry {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    public LedgerEntry() {
+    private LedgerEntry() {
         this.status = LedgerStatus.PENDING;
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
@@ -60,6 +61,33 @@ public class LedgerEntry {
         return entry;
     }
 
+    /**
+     * 영속 레코드 복원 전용(어댑터의 toDomain 에서만 호출). 저장된 필드를 그대로 재구성한다 —
+     * 이미 전기(POSTED)·역분개(REVERSED)된 상태도 그대로 살려야 하므로 {@link #validate()} 를 재실행하지 않는다.
+     */
+    public static LedgerEntry rehydrate(Long id, Long referenceId, ReferenceType referenceType,
+                                        LedgerEntryType entryType, AccountType debitAccount,
+                                        AccountType creditAccount, BigDecimal amount,
+                                        LedgerStatus status, LocalDate settlementDate,
+                                        LocalDateTime postedAt, String memo,
+                                        LocalDateTime createdAt, LocalDateTime updatedAt) {
+        LedgerEntry entry = new LedgerEntry();
+        entry.id = id;
+        entry.referenceId = referenceId;
+        entry.referenceType = referenceType;
+        entry.entryType = entryType;
+        entry.debitAccount = debitAccount;
+        entry.creditAccount = creditAccount;
+        entry.amount = amount;
+        entry.status = status;
+        entry.settlementDate = settlementDate;
+        entry.postedAt = postedAt;
+        entry.memo = memo;
+        entry.createdAt = createdAt;
+        entry.updatedAt = updatedAt;
+        return entry;
+    }
+
     private void validate() {
         if (referenceId == null || referenceId <= 0) {
             throw new IllegalArgumentException("referenceId 는 양수여야 합니다: " + referenceId);
@@ -83,6 +111,16 @@ public class LedgerEntry {
         if (settlementDate == null) {
             throw new IllegalArgumentException("settlementDate 필수");
         }
+    }
+
+    /**
+     * 영속 후 DB 가 부여한 PK 를 1회만 주입(write-once). setter 우회를 막기 위해 재부여를 차단한다.
+     */
+    public void assignId(Long id) {
+        if (this.id != null) {
+            throw new IllegalStateException("id 는 1회만 부여할 수 있습니다");
+        }
+        this.id = id;
     }
 
     // ========== 상태 전이 ==========
@@ -112,44 +150,31 @@ public class LedgerEntry {
     public boolean isPosted()   { return status == LedgerStatus.POSTED; }
     public boolean isReversed() { return status == LedgerStatus.REVERSED; }
 
-    // ========== Getters / Setters ==========
+    // ========== Getters ==========
 
     public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
 
     public Long getReferenceId() { return referenceId; }
-    public void setReferenceId(Long referenceId) { this.referenceId = referenceId; }
 
     public ReferenceType getReferenceType() { return referenceType; }
-    public void setReferenceType(ReferenceType referenceType) { this.referenceType = referenceType; }
 
     public LedgerEntryType getEntryType() { return entryType; }
-    public void setEntryType(LedgerEntryType entryType) { this.entryType = entryType; }
 
     public AccountType getDebitAccount() { return debitAccount; }
-    public void setDebitAccount(AccountType debitAccount) { this.debitAccount = debitAccount; }
 
     public AccountType getCreditAccount() { return creditAccount; }
-    public void setCreditAccount(AccountType creditAccount) { this.creditAccount = creditAccount; }
 
     public BigDecimal getAmount() { return amount; }
-    public void setAmount(BigDecimal amount) { this.amount = amount; }
 
     public LedgerStatus getStatus() { return status; }
-    public void setStatus(LedgerStatus status) { this.status = status; }
 
     public LocalDate getSettlementDate() { return settlementDate; }
-    public void setSettlementDate(LocalDate settlementDate) { this.settlementDate = settlementDate; }
 
     public LocalDateTime getPostedAt() { return postedAt; }
-    public void setPostedAt(LocalDateTime postedAt) { this.postedAt = postedAt; }
 
     public String getMemo() { return memo; }
-    public void setMemo(String memo) { this.memo = memo; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 }

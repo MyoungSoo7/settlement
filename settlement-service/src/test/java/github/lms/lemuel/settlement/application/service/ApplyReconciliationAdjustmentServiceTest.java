@@ -49,7 +49,7 @@ class ApplyReconciliationAdjustmentServiceTest {
     private Settlement settlementWithNet96500(SettlementStatus status) {
         Settlement s = Settlement.createFromPayment(1L, 10L,
                 new BigDecimal("100000"), LocalDate.of(2026, 5, 1), new BigDecimal("0.0350"));
-        s.setId(500L);
+        s.assignId(500L);
         if (status == SettlementStatus.DONE) {
             s.confirm();
         }

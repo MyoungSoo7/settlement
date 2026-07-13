@@ -27,7 +27,7 @@ class SettlementConfirmItemReaderTest {
 
     private Settlement settlement(long id) {
         Settlement s = Settlement.createFromPayment(id, id + 10, new BigDecimal("10000"), DATE);
-        s.setId(id);
+        s.assignId(id);
         return s;
     }
 

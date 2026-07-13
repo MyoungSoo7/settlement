@@ -2,6 +2,7 @@ package github.lms.lemuel.settlement.adapter.out.persistence;
 
 import github.lms.lemuel.settlement.application.port.out.SaveSettlementAdjustmentPort;
 import github.lms.lemuel.settlement.domain.SettlementAdjustment;
+import github.lms.lemuel.settlement.domain.SettlementAdjustmentStatus;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
@@ -38,7 +39,7 @@ public class SettlementAdjustmentPersistenceAdapter implements SaveSettlementAdj
         entity.setChargebackId(domain.getChargebackId());
         entity.setReconciliationDiscrepancyId(domain.getReconciliationDiscrepancyId());
         entity.setAmount(domain.getAmount());
-        entity.setStatus(domain.getStatus() != null ? domain.getStatus() : "PENDING");
+        entity.setStatus(domain.getStatus().name());
         entity.setAdjustmentDate(domain.getAdjustmentDate());
         LocalDateTime now = LocalDateTime.now();
         entity.setCreatedAt(domain.getCreatedAt() != null ? domain.getCreatedAt() : now);
@@ -47,16 +48,15 @@ public class SettlementAdjustmentPersistenceAdapter implements SaveSettlementAdj
     }
 
     private SettlementAdjustment toDomain(SettlementAdjustmentJpaEntity entity) {
-        SettlementAdjustment domain = new SettlementAdjustment();
-        domain.setId(entity.getId());
-        domain.setSettlementId(entity.getSettlementId());
-        domain.setRefundId(entity.getRefundId());
-        domain.setChargebackId(entity.getChargebackId());
-        domain.setReconciliationDiscrepancyId(entity.getReconciliationDiscrepancyId());
-        domain.setAmount(entity.getAmount());
-        domain.setStatus(entity.getStatus());
-        domain.setAdjustmentDate(entity.getAdjustmentDate());
-        domain.setCreatedAt(entity.getCreatedAt());
-        return domain;
+        return SettlementAdjustment.rehydrate(
+                entity.getId(),
+                entity.getSettlementId(),
+                entity.getRefundId(),
+                entity.getChargebackId(),
+                entity.getReconciliationDiscrepancyId(),
+                entity.getAmount(),
+                SettlementAdjustmentStatus.fromString(entity.getStatus()),
+                entity.getAdjustmentDate(),
+                entity.getCreatedAt());
     }
 }

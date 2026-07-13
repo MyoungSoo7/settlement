@@ -18,7 +18,7 @@ class NoOpSettlementSearchAdapterTest {
     private Settlement buildSettlement() {
         Settlement settlement = Settlement.createFromPayment(
                 1L, 2L, new BigDecimal("10000"), LocalDate.of(2026, 4, 1));
-        settlement.setId(1L);
+        settlement.assignId(1L);
         return settlement;
     }
 

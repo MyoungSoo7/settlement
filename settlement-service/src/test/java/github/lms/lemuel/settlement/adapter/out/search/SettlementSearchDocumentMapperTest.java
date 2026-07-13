@@ -30,7 +30,7 @@ class SettlementSearchDocumentMapperTest {
     private Settlement buildSettlement() {
         Settlement settlement = Settlement.createFromPayment(
                 404L, 202L, new BigDecimal("100000"), LocalDate.of(2026, 4, 1));
-        settlement.setId(1L);
+        settlement.assignId(1L);
         return settlement;
     }
 

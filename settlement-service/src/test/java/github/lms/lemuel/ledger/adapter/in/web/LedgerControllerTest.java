@@ -35,7 +35,7 @@ class LedgerControllerTest {
         LedgerEntry entry = LedgerEntry.of(referenceId, referenceType, LedgerEntryType.SETTLEMENT_CREATED,
                 AccountType.ACCOUNTS_RECEIVABLE, AccountType.REVENUE,
                 new BigDecimal("48500"), LocalDate.of(2026, 4, 1), "정산 생성 분개");
-        entry.setId(1L);
+        entry.assignId(1L);
         return entry;
     }
 

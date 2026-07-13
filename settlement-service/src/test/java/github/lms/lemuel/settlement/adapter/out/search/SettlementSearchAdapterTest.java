@@ -31,7 +31,7 @@ class SettlementSearchAdapterTest {
     private Settlement buildSettlement(Long id) {
         Settlement settlement = Settlement.createFromPayment(
                 id, id + 100, new BigDecimal("10000"), LocalDate.of(2026, 4, 1));
-        settlement.setId(id);
+        settlement.assignId(id);
         return settlement;
     }
 

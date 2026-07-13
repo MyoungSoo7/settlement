@@ -38,7 +38,7 @@ class SettlementConfirmItemWriterTest {
 
     private Settlement confirmed(long id) {
         Settlement s = Settlement.createFromPayment(id, id + 10, new BigDecimal("10000"), LocalDate.now());
-        s.setId(id);
+        s.assignId(id);
         s.confirm();
         return s;
     }

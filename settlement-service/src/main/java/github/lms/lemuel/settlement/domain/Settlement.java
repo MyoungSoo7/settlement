@@ -13,8 +13,11 @@ import java.time.LocalDateTime;
  * 외부(애플리케이션/어댑터)는 이 루트를 통해서만 정산 상태를 변경해야 하며, 종료 상태(DONE)는
  * 불변이라 금액 변경 대신 {@link SettlementAdjustment} 로만 보정한다.
  *
+ * <p>public setter 는 두지 않는다. 상태 전이는 가드된 도메인 메서드(startProcessing/complete/fail 등)로만,
+ * 영속 레코드 복원은 {@link #rehydrate} 팩토리로만, DB 부여 PK 주입은 {@link #assignId} 로만 수행한다.
+ *
  * <p>모든 통화 금액 계산은 {@link Money} 값 객체를 통과시켜 반올림(scale 2, HALF_UP)·부호 규칙을
- * 한곳에 모은다. public getter/setter 는 영속성 경계 호환을 위해 {@link BigDecimal} 표현을 유지한다.
+ * 한곳에 모은다. public getter 는 영속성 경계 호환을 위해 {@link BigDecimal} 표현을 유지한다.
  */
 public class Settlement {
 
@@ -89,10 +92,10 @@ public class Settlement {
                                                BigDecimal paymentAmount, LocalDate settlementDate,
                                                BigDecimal commissionRate) {
         Settlement settlement = new Settlement();
-        settlement.setPaymentId(paymentId);
-        settlement.setOrderId(orderId);
-        settlement.setPaymentAmount(paymentAmount);
-        settlement.setSettlementDate(settlementDate);
+        settlement.paymentId = paymentId;
+        settlement.orderId = orderId;
+        settlement.paymentAmount = paymentAmount;
+        settlement.settlementDate = settlementDate;
         settlement.commissionRate = commissionRate != null ? commissionRate : COMMISSION_RATE;
 
         settlement.validatePaymentId();
@@ -102,6 +105,46 @@ public class Settlement {
         settlement.calculateCommissionAndNetAmount();
 
         return settlement;
+    }
+
+    /**
+     * 영속 레코드 복원 전용(MapStruct 매퍼의 toDomain 에서만 호출). 저장된 필드를 그대로 재구성한다.
+     *
+     * <p>{@code commissionRate} 는 정산 시점 스냅샷(V32 이력 보존 원칙)이라 write-once 여야 한다 —
+     * private 생성 경로 + setter 부재로 재부여 자체가 불가능해 이 팩토리가 그 보장을 대체한다.
+     */
+    public static Settlement rehydrate(Long id, Long paymentId, Long orderId,
+                                       BigDecimal paymentAmount, BigDecimal refundedAmount,
+                                       BigDecimal commission, BigDecimal commissionRate,
+                                       BigDecimal netAmount, SettlementStatus status,
+                                       LocalDate settlementDate, String failureReason,
+                                       LocalDateTime confirmedAt, LocalDateTime createdAt,
+                                       LocalDateTime updatedAt, Long version,
+                                       BigDecimal holdbackAmount, BigDecimal holdbackRate,
+                                       LocalDate holdbackReleaseDate, boolean holdbackReleased,
+                                       LocalDateTime holdbackReleasedAt) {
+        Settlement s = new Settlement();
+        s.id = id;
+        s.paymentId = paymentId;
+        s.orderId = orderId;
+        s.paymentAmount = paymentAmount;
+        s.refundedAmount = refundedAmount != null ? refundedAmount : BigDecimal.ZERO;
+        s.commission = commission;
+        s.commissionRate = commissionRate;
+        s.netAmount = netAmount;
+        s.status = status != null ? status : SettlementStatus.REQUESTED;
+        s.settlementDate = settlementDate;
+        s.failureReason = failureReason;
+        s.confirmedAt = confirmedAt;
+        s.createdAt = createdAt != null ? createdAt : LocalDateTime.now();
+        s.updatedAt = updatedAt != null ? updatedAt : LocalDateTime.now();
+        s.version = version;
+        s.holdbackAmount = holdbackAmount != null ? holdbackAmount : BigDecimal.ZERO;
+        s.holdbackRate = holdbackRate != null ? holdbackRate : BigDecimal.ZERO;
+        s.holdbackReleaseDate = holdbackReleaseDate;
+        s.holdbackReleased = holdbackReleased;
+        s.holdbackReleasedAt = holdbackReleasedAt;
+        return s;
     }
 
     private void calculateCommissionAndNetAmount() {
@@ -128,6 +171,16 @@ public class Settlement {
         if (settlementDate == null) {
             throw new IllegalArgumentException("Settlement date is required");
         }
+    }
+
+    /**
+     * 영속 후 DB 가 부여한 PK 를 1회만 주입(write-once). setter 우회를 막기 위해 재부여를 차단한다.
+     */
+    public void assignId(Long id) {
+        if (this.id != null) {
+            throw new IllegalStateException("id 는 1회만 부여할 수 있습니다");
+        }
+        this.id = id;
     }
 
     // ========== 상태 머신 메서드 ==========
@@ -321,64 +374,37 @@ public class Settlement {
         return this.status == SettlementStatus.DONE;
     }
 
-    // ========== Getters and Setters ==========
-    
+    // ========== Getters ==========
+
     public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    
+
     public Long getPaymentId() { return paymentId; }
-    public void setPaymentId(Long paymentId) { this.paymentId = paymentId; }
-    
+
     public Long getOrderId() { return orderId; }
-    public void setOrderId(Long orderId) { this.orderId = orderId; }
-    
+
     public BigDecimal getPaymentAmount() { return paymentAmount; }
-    public void setPaymentAmount(BigDecimal paymentAmount) { this.paymentAmount = paymentAmount; }
-    
+
     public BigDecimal getRefundedAmount() { return refundedAmount != null ? refundedAmount : BigDecimal.ZERO; }
-    public void setRefundedAmount(BigDecimal refundedAmount) { this.refundedAmount = refundedAmount; }
-    
+
     public BigDecimal getCommission() { return commission; }
-    public void setCommission(BigDecimal commission) { this.commission = commission; }
 
     public BigDecimal getCommissionRate() { return commissionRate != null ? commissionRate : COMMISSION_RATE; }
 
-    /**
-     * 영속화된 수수료율 스냅샷 복원 전용(write-once). commission_rate 는 정산 시점 스냅샷이라
-     * 생성 후 변경 금지(V32 이력 보존 원칙) — 이미 값이 있으면 예외로 차단한다.
-     * 매퍼의 {@code @AfterMapping} rehydration 외에는 호출하지 말 것.
-     */
-    public void rehydrateCommissionRate(BigDecimal commissionRate) {
-        if (this.commissionRate != null) {
-            throw new IllegalStateException(
-                    "commission_rate 는 정산 시점 스냅샷 — 생성 후 변경할 수 없습니다");
-        }
-        this.commissionRate = commissionRate;
-    }
-    
     public BigDecimal getNetAmount() { return netAmount; }
-    public void setNetAmount(BigDecimal netAmount) { this.netAmount = netAmount; }
-    
+
     public SettlementStatus getStatus() { return status; }
-    public void setStatus(SettlementStatus status) { this.status = status; }
-    
+
     public LocalDate getSettlementDate() { return settlementDate; }
-    public void setSettlementDate(LocalDate settlementDate) { this.settlementDate = settlementDate; }
-    
+
     public String getFailureReason() { return failureReason; }
-    public void setFailureReason(String failureReason) { this.failureReason = failureReason; }
-    
+
     public LocalDateTime getConfirmedAt() { return confirmedAt; }
-    public void setConfirmedAt(LocalDateTime confirmedAt) { this.confirmedAt = confirmedAt; }
-    
+
     public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
-    
+
     public LocalDateTime getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 
     public Long getVersion() { return version; }
-    public void setVersion(Long version) { this.version = version; }
 
     // ========== 정산 보류 (Holdback) ==========
 
@@ -460,13 +486,8 @@ public class Settlement {
     }
 
     public BigDecimal getHoldbackAmount() { return holdbackAmount; }
-    public void setHoldbackAmount(BigDecimal v) { this.holdbackAmount = v == null ? BigDecimal.ZERO : v; }
     public BigDecimal getHoldbackRate() { return holdbackRate; }
-    public void setHoldbackRate(BigDecimal v) { this.holdbackRate = v == null ? BigDecimal.ZERO : v; }
     public LocalDate getHoldbackReleaseDate() { return holdbackReleaseDate; }
-    public void setHoldbackReleaseDate(LocalDate v) { this.holdbackReleaseDate = v; }
     public boolean isHoldbackReleased() { return holdbackReleased; }
-    public void setHoldbackReleased(boolean v) { this.holdbackReleased = v; }
     public LocalDateTime getHoldbackReleasedAt() { return holdbackReleasedAt; }
-    public void setHoldbackReleasedAt(LocalDateTime v) { this.holdbackReleasedAt = v; }
 }
