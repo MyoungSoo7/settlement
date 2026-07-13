@@ -4,6 +4,7 @@ import github.lms.lemuel.investment.domain.exception.InvestmentInvariantViolatio
 
 import java.math.BigDecimal;
 import java.math.MathContext;
+import java.util.List;
 
 /**
  * 코스피/코스닥 회계자료 기반 투자점수 산정기 — 순수 도메인(프레임워크 의존 0).
@@ -50,110 +51,47 @@ public class InvestmentScorePolicy {
                 growth);
     }
 
+    // ─── 구간 테이블 (선언적 밴드) ─────────────────────────────────────────────────
+    //
+    // 각 지표의 점수는 임계값 구간 매핑이다. if/else 사슬 대신 (경계값, 점수) 밴드 테이블 +
+    // 단일 조회 메서드({@link #bandScore})로 표현해, 정책 변경을 데이터 수정으로 국한한다.
+    // 매칭 방향은 {@link Match} 로 지정한다: 높을수록 고득점 지표는 AT_LEAST(경계값 이상, 내림차순),
+    // 부채비율처럼 낮을수록 고득점인 지표는 AT_MOST(경계값 이하, 오름차순). 미매칭·null → 0점.
+
+    /** 영업이익률(%) — 최대 20, 경계값 이상 매칭(내림차순). 음수/null → 0. */
+    private static final List<Band> OPERATING_MARGIN_BANDS = List.of(
+            new Band("20", 20), new Band("15", 16), new Band("10", 12), new Band("5", 8), new Band("0", 4));
+
+    /** ROA(%) — 최대 15, 경계값 이상 매칭(내림차순). 음수/null → 0. */
+    private static final List<Band> ROA_BANDS = List.of(
+            new Band("15", 15), new Band("10", 12), new Band("7", 9), new Band("4", 6), new Band("0", 3));
+
+    /** 부채비율(%) — 최대 20, 경계값 이하 매칭(오름차순, 낮을수록 고득점). >300/null → 0. */
+    private static final List<Band> DEBT_RATIO_BANDS = List.of(
+            new Band("50", 20), new Band("100", 16), new Band("150", 12), new Band("200", 8), new Band("300", 4));
+
+    /** 자기자본비율(%) — 최대 15, 경계값 이상 매칭(내림차순, 높을수록 고득점). <20/null → 0. */
+    private static final List<Band> EQUITY_RATIO_BANDS = List.of(
+            new Band("60", 15), new Band("50", 12), new Band("40", 9), new Band("30", 6), new Band("20", 3));
+
+    /** YoY 성장률(%) — 지표당 최대 15, 경계값 이상 매칭(내림차순). <-10/null → 0. 매출·순이익 공용. */
+    private static final List<Band> GROWTH_BANDS = List.of(
+            new Band("20", 15), new Band("10", 12), new Band("5", 9), new Band("0", 6), new Band("-10", 3));
+
     // ─── 수익성 (35) ──────────────────────────────────────────────────────────────
 
     private InvestmentScore.Profitability profitability(AnnualStatement s) {
-        int score = operatingMarginBand(s.operatingMargin()) + roaBand(s.roa());
+        int score = bandScore(s.operatingMargin(), Match.AT_LEAST, OPERATING_MARGIN_BANDS)
+                + bandScore(s.roa(), Match.AT_LEAST, ROA_BANDS);
         return new InvestmentScore.Profitability(score, s.operatingMargin(), s.roa());
-    }
-
-    /** 영업이익률(%) 구간 — 최대 20. */
-    private int operatingMarginBand(BigDecimal margin) {
-        if (margin == null) {
-            return 0;
-        }
-        if (gte(margin, "20")) {
-            return 20;
-        }
-        if (gte(margin, "15")) {
-            return 16;
-        }
-        if (gte(margin, "10")) {
-            return 12;
-        }
-        if (gte(margin, "5")) {
-            return 8;
-        }
-        if (gte(margin, "0")) {
-            return 4;
-        }
-        return 0;
-    }
-
-    /** ROA(%) 구간 — 최대 15. */
-    private int roaBand(BigDecimal roa) {
-        if (roa == null) {
-            return 0;
-        }
-        if (gte(roa, "15")) {
-            return 15;
-        }
-        if (gte(roa, "10")) {
-            return 12;
-        }
-        if (gte(roa, "7")) {
-            return 9;
-        }
-        if (gte(roa, "4")) {
-            return 6;
-        }
-        if (gte(roa, "0")) {
-            return 3;
-        }
-        return 0;
     }
 
     // ─── 안정성 (35) ──────────────────────────────────────────────────────────────
 
     private InvestmentScore.Stability stability(AnnualStatement s) {
-        int score = debtRatioBand(s.debtRatio()) + equityRatioBand(s.equityRatio());
+        int score = bandScore(s.debtRatio(), Match.AT_MOST, DEBT_RATIO_BANDS)
+                + bandScore(s.equityRatio(), Match.AT_LEAST, EQUITY_RATIO_BANDS);
         return new InvestmentScore.Stability(score, s.debtRatio(), s.equityRatio());
-    }
-
-    /** 부채비율(%) 구간 — 낮을수록 고득점, 최대 20. */
-    private int debtRatioBand(BigDecimal debtRatio) {
-        if (debtRatio == null) {
-            return 0;
-        }
-        if (lte(debtRatio, "50")) {
-            return 20;
-        }
-        if (lte(debtRatio, "100")) {
-            return 16;
-        }
-        if (lte(debtRatio, "150")) {
-            return 12;
-        }
-        if (lte(debtRatio, "200")) {
-            return 8;
-        }
-        if (lte(debtRatio, "300")) {
-            return 4;
-        }
-        return 0;
-    }
-
-    /** 자기자본비율(%) 구간 — 높을수록 고득점, 최대 15. */
-    private int equityRatioBand(BigDecimal equityRatio) {
-        if (equityRatio == null) {
-            return 0;
-        }
-        if (gte(equityRatio, "60")) {
-            return 15;
-        }
-        if (gte(equityRatio, "50")) {
-            return 12;
-        }
-        if (gte(equityRatio, "40")) {
-            return 9;
-        }
-        if (gte(equityRatio, "30")) {
-            return 6;
-        }
-        if (gte(equityRatio, "20")) {
-            return 3;
-        }
-        return 0;
     }
 
     // ─── 성장성 (30) ──────────────────────────────────────────────────────────────
@@ -165,7 +103,8 @@ public class InvestmentScorePolicy {
         }
         BigDecimal revenueGrowth = yoyGrowth(latest.revenue(), previous.revenue());
         BigDecimal netIncomeGrowth = yoyGrowth(latest.netIncome(), previous.netIncome());
-        int score = growthBand(revenueGrowth) + growthBand(netIncomeGrowth);
+        int score = bandScore(revenueGrowth, Match.AT_LEAST, GROWTH_BANDS)
+                + bandScore(netIncomeGrowth, Match.AT_LEAST, GROWTH_BANDS);
         return new InvestmentScore.Growth(score, revenueGrowth, netIncomeGrowth);
     }
 
@@ -182,36 +121,39 @@ public class InvestmentScorePolicy {
                 .multiply(BigDecimal.valueOf(100));
     }
 
-    /** YoY 성장률(%) 구간 — 각 지표 최대 15. */
-    private int growthBand(BigDecimal growth) {
-        if (growth == null) {
+    // ─── 밴드 조회 ────────────────────────────────────────────────────────────────
+
+    /** 구간 매칭 방향 — 밴드 경계값을 넘어서는 쪽이 어디인지 정한다. */
+    private enum Match {
+        /** 값이 경계값 이상이면 매칭(높을수록 고득점). 테이블은 경계값 내림차순. */
+        AT_LEAST,
+        /** 값이 경계값 이하이면 매칭(낮을수록 고득점). 테이블은 경계값 오름차순. */
+        AT_MOST
+    }
+
+    /** 구간 테이블 한 칸: 경계값과 매칭 시 부여 점수. */
+    private record Band(BigDecimal threshold, int score) {
+        Band(String threshold, int score) {
+            this(new BigDecimal(threshold), score);
+        }
+    }
+
+    /**
+     * 밴드 테이블에서 값에 해당하는 점수를 찾는 유일한 조회 지점. 테이블 순서대로 첫 매칭 밴드의 점수를
+     * 돌려주고, null 이거나 어떤 밴드에도 걸리지 않으면 0점(보수적)이다.
+     */
+    private static int bandScore(BigDecimal value, Match match, List<Band> bands) {
+        if (value == null) {
             return 0;
         }
-        if (gte(growth, "20")) {
-            return 15;
-        }
-        if (gte(growth, "10")) {
-            return 12;
-        }
-        if (gte(growth, "5")) {
-            return 9;
-        }
-        if (gte(growth, "0")) {
-            return 6;
-        }
-        if (gte(growth, "-10")) {
-            return 3;
+        for (Band band : bands) {
+            boolean matched = match == Match.AT_LEAST
+                    ? value.compareTo(band.threshold()) >= 0
+                    : value.compareTo(band.threshold()) <= 0;
+            if (matched) {
+                return band.score();
+            }
         }
         return 0;
-    }
-
-    // ─── 비교 헬퍼 ────────────────────────────────────────────────────────────────
-
-    private static boolean gte(BigDecimal value, String threshold) {
-        return value.compareTo(new BigDecimal(threshold)) >= 0;
-    }
-
-    private static boolean lte(BigDecimal value, String threshold) {
-        return value.compareTo(new BigDecimal(threshold)) <= 0;
     }
 }

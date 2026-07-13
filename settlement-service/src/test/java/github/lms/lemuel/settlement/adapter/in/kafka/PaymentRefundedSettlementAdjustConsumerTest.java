@@ -133,11 +133,13 @@ class PaymentRefundedSettlementAdjustConsumerTest {
     }
 
     private Settlement settlement(BigDecimal refundedAmount) {
-        return new Settlement(
+        return Settlement.rehydrate(
                 1L, 3L, 30L,
                 new BigDecimal("100000"), refundedAmount,
-                new BigDecimal("3500"), new BigDecimal("96500"),
+                new BigDecimal("3500"), null,
+                new BigDecimal("96500"),
                 github.lms.lemuel.settlement.domain.SettlementStatus.PROCESSING,
-                LocalDate.now(), null, null, null, null);
+                LocalDate.now(), null, null, null, null, null,
+                null, null, null, false, null);
     }
 }

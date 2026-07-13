@@ -55,30 +55,16 @@ public class Settlement {
     private boolean holdbackReleased = false;
     private LocalDateTime holdbackReleasedAt;
 
-    public Settlement() {
+    /**
+     * 신규 정산 골격 생성 전용 — 상태 전이·복원은 팩토리를 통과해야 하므로 private.
+     * 외부는 {@link #createFromPayment}(신규) / {@link #rehydrate}(복원) 만 사용한다
+     * (Payout/Chargeback 과 동형: 생성자 비공개, 팩토리 공개).
+     */
+    private Settlement() {
         this.status = SettlementStatus.REQUESTED; // 초기 상태를 REQUESTED로 변경
         this.refundedAmount = BigDecimal.ZERO;
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
-    }
-
-    public Settlement(Long id, Long paymentId, Long orderId, BigDecimal paymentAmount,
-                      BigDecimal refundedAmount, BigDecimal commission, BigDecimal netAmount,
-                      SettlementStatus status, LocalDate settlementDate, String failureReason,
-                      LocalDateTime confirmedAt, LocalDateTime createdAt, LocalDateTime updatedAt) {
-        this.id = id;
-        this.paymentId = paymentId;
-        this.orderId = orderId;
-        this.paymentAmount = paymentAmount;
-        this.refundedAmount = refundedAmount != null ? refundedAmount : BigDecimal.ZERO;
-        this.commission = commission;
-        this.netAmount = netAmount;
-        this.status = status != null ? status : SettlementStatus.REQUESTED;
-        this.settlementDate = settlementDate;
-        this.failureReason = failureReason;
-        this.confirmedAt = confirmedAt;
-        this.createdAt = createdAt != null ? createdAt : LocalDateTime.now();
-        this.updatedAt = updatedAt != null ? updatedAt : LocalDateTime.now();
     }
 
     public static Settlement createFromPayment(Long paymentId, Long orderId,

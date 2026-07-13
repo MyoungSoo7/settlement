@@ -104,9 +104,15 @@ public class Order {
         Order order = new Order();
         order.userId = userId;
         order.validateUserId();
+        // 라운딩 정책 경계 — 공용 Money VO(shared-common)를 여기서는 의도적으로 쓰지 않는다.
+        // line_amount = unitPrice(scale 0 정수 KRW) × quantity(int) 이고 할인도 정수라 이 합산·차감은
+        // 항상 정확한 정수 연산이다: 반올림 여지가 없어 Money 의 scale 2 HALF_UP 정규화 이득이 0 이다.
+        // 반대로 Money 를 통과시키면 amount 가 scale 2(예: 3088000.00)로 바뀌어, 이 금액이 흘러가는
+        // 결제·정산 프로젝션의 금액 비교(MSA 경계)에 scale drift 만 유발한다. Money javadoc 의
+        // "scale 2 HALF_UP 통화 전용" 경계와 일치하는 판단 — 정수 주문 총액은 raw BigDecimal 로 둔다.
         BigDecimal subtotal = items.stream()
                 .map(OrderItem::getLineAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                .reduce(BigDecimal.ZERO, BigDecimal::add); // 정수 KRW 정확 합산 — Money 미적용(아래 경계 주석)
         if (discount.compareTo(subtotal) >= 0) {
             throw new OrderInvariantViolationException(
                     "할인 금액(" + discount + ") 이 주문 소계(" + subtotal + ") 이상일 수 없습니다");
