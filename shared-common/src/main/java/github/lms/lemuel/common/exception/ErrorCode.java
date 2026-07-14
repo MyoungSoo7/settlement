@@ -57,7 +57,20 @@ public enum ErrorCode {
 
     // ─── settlement / ledger ──────────────────────────────────────────────────
     SETTLEMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "정산을 찾을 수 없습니다."),
-    LEDGER_NOT_FOUND(HttpStatus.NOT_FOUND, "원장 항목을 찾을 수 없습니다.");
+    LEDGER_NOT_FOUND(HttpStatus.NOT_FOUND, "원장 항목을 찾을 수 없습니다."),
+
+    // ─── loan (선정산·기업 신용대출) ─────────────────────────────────────────────
+    CORPORATE_LOAN_NOT_FOUND(HttpStatus.NOT_FOUND, "대출 건 또는 재무자료를 찾을 수 없습니다."),
+    CORPORATE_LOAN_REJECTED(HttpStatus.UNPROCESSABLE_ENTITY, "대출 심사가 거절되었습니다."),
+
+    // ─── investment (CEO 투자하기) ──────────────────────────────────────────────
+    INVESTMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "투자 주문을 찾을 수 없습니다."),
+    NOT_INVESTABLE(HttpStatus.UNPROCESSABLE_ENTITY, "투자 부적격 종목입니다."),
+    INSUFFICIENT_FUNDING(HttpStatus.UNPROCESSABLE_ENTITY, "가용 재원이 부족합니다."),
+
+    // ─── account (계정계 GL) ────────────────────────────────────────────────────
+    NON_POSITIVE_ENTRY_AMOUNT(HttpStatus.BAD_REQUEST, "전표 금액은 양수여야 합니다."),
+    UNBALANCED_ACCOUNT_ENTRY(HttpStatus.BAD_REQUEST, "차변과 대변 계정은 달라야 합니다.");
 
     private final HttpStatus status;
     private final String defaultMessage;

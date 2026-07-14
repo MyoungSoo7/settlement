@@ -1,5 +1,6 @@
 package github.lms.lemuel.loan.adapter.in.web;
 
+import github.lms.lemuel.common.exception.ErrorCode;
 import github.lms.lemuel.common.exception.ErrorResponse;
 import github.lms.lemuel.loan.domain.exception.CorporateLoanNotFoundException;
 import github.lms.lemuel.loan.domain.exception.CorporateLoanRejectedException;
@@ -8,7 +9,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -35,16 +35,16 @@ public class CorporateLoanExceptionHandler {
     @ExceptionHandler(CorporateLoanRejectedException.class)
     public ResponseEntity<ErrorResponse> handleRejected(CorporateLoanRejectedException ex) {
         log.warn("[CorporateLoanRejected] {}", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
-                .body(ErrorResponse.of(HttpStatus.UNPROCESSABLE_ENTITY,
-                        "CORPORATE_LOAN_REJECTED", ex.getMessage()));
+        ErrorCode code = ErrorCode.CORPORATE_LOAN_REJECTED;   // 상태·코드 문자열 단일 출처(카탈로그)
+        return ResponseEntity.status(code.status())
+                .body(ErrorResponse.of(code.status(), code.code(), ex.getMessage()));
     }
 
     @ExceptionHandler(CorporateLoanNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleNotFound(CorporateLoanNotFoundException ex) {
         log.warn("[CorporateLoanNotFound] {}", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(ErrorResponse.of(HttpStatus.NOT_FOUND,
-                        "CORPORATE_LOAN_NOT_FOUND", ex.getMessage()));
+        ErrorCode code = ErrorCode.CORPORATE_LOAN_NOT_FOUND;  // 상태·코드 문자열 단일 출처(카탈로그)
+        return ResponseEntity.status(code.status())
+                .body(ErrorResponse.of(code.status(), code.code(), ex.getMessage()));
     }
 }

@@ -16,6 +16,13 @@ import java.util.List;
  *
  * <p>분할결제(Split Payment) 지원: {@code tenders} 리스트가 채워지면 분할결제, 비어있으면 단일결제.
  * 분할결제의 경우 {@code SUM(tenders.amount) == amount} 가 도메인 불변식.
+ *
+ * <p><b>금액 표현 경계 — raw {@link BigDecimal} 의도적 사용({@code Order.createMultiItem} 과 동일 근거).</b>
+ * 결제 금액({@code amount}·{@code refundedAmount}·tender 합산)은 정수 KRW(scale 0) 위에서의 합산·차감뿐이라
+ * 항상 정확한 정수 연산이다 — 반올림 여지가 없어 공용 Money VO(shared-common)의 scale 2 HALF_UP 정규화 이득이 0 이다.
+ * 반대로 Money 를 통과시키면 amount 가 scale 2(예: 3088000.00)로 바뀌어, 이 금액이 흘러가는 정산 프로젝션의
+ * 금액 비교(MSA 경계, settlement_payment_view)에 scale drift 만 유발한다. Money javadoc 의
+ * "scale 2 HALF_UP 통화 전용" 경계와 일치하는 판단으로, 정수 결제 금액은 raw {@code BigDecimal} 로 둔다.
  */
 @Getter
 public class PaymentDomain {

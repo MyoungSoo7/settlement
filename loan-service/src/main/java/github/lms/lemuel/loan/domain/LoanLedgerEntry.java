@@ -1,5 +1,6 @@
 package github.lms.lemuel.loan.domain;
 
+import github.lms.lemuel.common.money.Money;
 import github.lms.lemuel.loan.domain.exception.LoanInvariantViolationException;
 
 import java.math.BigDecimal;
@@ -27,13 +28,20 @@ public class LoanLedgerEntry {
 
     private LoanLedgerEntry(Long id, LedgerAccount debit, LedgerAccount credit,
                             BigDecimal amount, String refType, Long refId) {
-        if (amount == null || amount.signum() <= 0) {
+        if (amount == null) {
+            throw new LoanInvariantViolationException("전표 금액은 양수여야 합니다: " + amount);
+        }
+        // 금액은 공용 Money VO(scale 2 HALF_UP)로 정규화·검증한다. loan_ledger_entries.amount 는 NUMERIC(19,2)
+        // 라 저장 표현이 동일하고(반올림 정책 일치), 양수 불변식을 Money.isPositive() 단일 지점으로 모은다
+        // (AccountEntry·settlement LedgerEntry 동형).
+        Money money = Money.of(amount);
+        if (!money.isPositive()) {
             throw new LoanInvariantViolationException("전표 금액은 양수여야 합니다: " + amount);
         }
         this.id = id;
         this.debit = debit;
         this.credit = credit;
-        this.amount = amount;
+        this.amount = money.toBigDecimal();   // 영속 경계로는 원시 BigDecimal 로 환원
         this.refType = refType;
         this.refId = refId;
     }

@@ -98,7 +98,7 @@ public class Payout {
      * 펌뱅킹 호출 시작. REQUESTED → SENDING.
      */
     public void startSending() {
-        if (status != PayoutStatus.REQUESTED) {
+        if (!status.canTransitionTo(PayoutStatus.SENDING)) {
             throw new InvalidPayoutStateException(status, PayoutStatus.SENDING);
         }
         this.status = PayoutStatus.SENDING;
@@ -111,7 +111,7 @@ public class Payout {
      * @param firmBankingTransactionId 펌뱅킹 측 거래 ID (필수, 사후 추적용)
      */
     public void markCompleted(String firmBankingTransactionId) {
-        if (status != PayoutStatus.SENDING) {
+        if (!status.canTransitionTo(PayoutStatus.COMPLETED)) {
             throw new InvalidPayoutStateException(status, PayoutStatus.COMPLETED);
         }
         if (firmBankingTransactionId == null || firmBankingTransactionId.isBlank()) {
@@ -127,7 +127,7 @@ public class Payout {
      * 펌뱅킹 응답 — 송금 실패. SENDING → FAILED.
      */
     public void markFailed(String reason) {
-        if (status != PayoutStatus.SENDING) {
+        if (!status.canTransitionTo(PayoutStatus.FAILED)) {
             throw new InvalidPayoutStateException(status, PayoutStatus.FAILED);
         }
         if (reason == null || reason.isBlank()) {
@@ -143,7 +143,7 @@ public class Payout {
      * 운영자 재시도 — FAILED → REQUESTED. retryCount++.
      */
     public void retry(String operatorId) {
-        if (status != PayoutStatus.FAILED) {
+        if (!status.canTransitionTo(PayoutStatus.REQUESTED)) {
             throw new InvalidPayoutStateException(status, PayoutStatus.REQUESTED);
         }
         this.status = PayoutStatus.REQUESTED;
@@ -157,7 +157,7 @@ public class Payout {
      * 운영자 영구 취소 — FAILED 인 경우만. COMPLETED 는 환수 별도 처리.
      */
     public void cancel(String operatorId, String reason) {
-        if (status != PayoutStatus.FAILED && status != PayoutStatus.REQUESTED) {
+        if (!status.canTransitionTo(PayoutStatus.CANCELED)) {
             throw new InvalidPayoutStateException(status, PayoutStatus.CANCELED);
         }
         if (reason == null || reason.isBlank()) {

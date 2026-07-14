@@ -1,5 +1,6 @@
 package github.lms.lemuel.investment.adapter.in.web;
 
+import github.lms.lemuel.common.exception.ErrorCode;
 import github.lms.lemuel.investment.application.exception.InsufficientFundingException;
 import github.lms.lemuel.investment.application.exception.InvestmentNotFoundException;
 import github.lms.lemuel.investment.application.exception.NotInvestableException;
@@ -24,12 +25,17 @@ public class InvestmentExceptionHandler {
 
     @ExceptionHandler(InvestmentNotFoundException.class)
     public ResponseEntity<Map<String, Object>> notFound(InvestmentNotFoundException e) {
-        return body(HttpStatus.NOT_FOUND, e.getMessage());
+        return body(ErrorCode.INVESTMENT_NOT_FOUND.status(), e.getMessage());
     }
 
-    @ExceptionHandler({NotInvestableException.class, InsufficientFundingException.class})
-    public ResponseEntity<Map<String, Object>> unprocessable(RuntimeException e) {
-        return body(HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage());
+    @ExceptionHandler(NotInvestableException.class)
+    public ResponseEntity<Map<String, Object>> notInvestable(NotInvestableException e) {
+        return body(ErrorCode.NOT_INVESTABLE.status(), e.getMessage());
+    }
+
+    @ExceptionHandler(InsufficientFundingException.class)
+    public ResponseEntity<Map<String, Object>> insufficientFunding(InsufficientFundingException e) {
+        return body(ErrorCode.INSUFFICIENT_FUNDING.status(), e.getMessage());
     }
 
     /** 소유권 위반(타 셀러 리소스 접근) → 403. */
