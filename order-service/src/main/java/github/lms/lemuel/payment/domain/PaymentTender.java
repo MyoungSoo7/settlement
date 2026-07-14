@@ -88,7 +88,7 @@ public class PaymentTender {
     }
 
     /**
-     * 부분/전체 환불. 잔여 환불 가능 금액 초과 시 IllegalArgumentException.
+     * 부분/전체 환불. 잔여 환불 가능 금액 초과 시 {@link PaymentInvariantViolationException}.
      */
     public void addRefund(BigDecimal refundAmount) {
         if (refundAmount == null || refundAmount.signum() <= 0) {

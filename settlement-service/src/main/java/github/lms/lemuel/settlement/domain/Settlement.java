@@ -151,19 +151,19 @@ public class Settlement {
         this.netAmount = payment.minus(commissionMoney).toBigDecimal();
     }
 
-    public void validatePaymentId() {
+    private void validatePaymentId() {
         if (paymentId == null || paymentId <= 0) {
             throw new SettlementInvariantViolationException("Payment ID must be a positive number");
         }
     }
 
-    public void validateAmount() {
+    private void validateAmount() {
         if (paymentAmount == null || paymentAmount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new SettlementInvariantViolationException("Amount must be greater than zero");
         }
     }
 
-    public void validateSettlementDate() {
+    private void validateSettlementDate() {
         if (settlementDate == null) {
             throw new SettlementInvariantViolationException("Settlement date is required");
         }

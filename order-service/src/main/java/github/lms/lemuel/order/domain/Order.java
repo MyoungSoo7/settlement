@@ -117,14 +117,14 @@ public class Order {
     }
 
     // 도메인 규칙: userId 검증
-    public void validateUserId() {
+    private void validateUserId() {
         if (userId == null || userId <= 0) {
             throw new OrderInvariantViolationException("User ID must be a positive number");
         }
     }
 
     // 도메인 규칙: amount 검증
-    public void validateAmount() {
+    private void validateAmount() {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new OrderInvariantViolationException("Amount must be greater than zero");
         }
