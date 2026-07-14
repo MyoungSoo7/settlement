@@ -20,6 +20,12 @@ const expectedImageMappings = [
   ["account-service", "-account"],
 ];
 
+const accountManifests = [
+  "k8s/stroage/account-db-pv.yaml",
+  "k8s/base/account-configmap.yaml",
+  "k8s/base/account-deployment.yaml",
+];
+
 for (const workflow of workflows) {
   test(`${workflow.name} publishes every backend deployment image`, () => {
     assert.equal(existsSync(workflow.file), true, `${workflow.file} must exist`);
@@ -44,3 +50,26 @@ for (const workflow of workflows) {
     assert.deepEqual(configuredMappings, expectedImageMappings);
   });
 }
+
+test("production topology deploys the Account service and database", () => {
+  for (const file of accountManifests) {
+    assert.equal(existsSync(file), true, `${file} must exist`);
+  }
+
+  const accountDeployment = readFileSync(accountManifests[2], "utf8");
+  const accountConfig = readFileSync(accountManifests[1], "utf8");
+
+  assert.match(
+    accountDeployment,
+    /image:\s*ghcr\.io\/myoungsoo7\/settlement-account:latest/,
+  );
+  assert.match(accountConfig, /MANAGEMENT_SERVER_PORT:\s*"8080"/);
+  assert.match(
+    accountConfig,
+    /jdbc:postgresql:\/\/account-db-service:5432\/lemuel_account\?reWriteBatchedInserts=true/,
+  );
+  assert.match(
+    accountConfig,
+    /SPRING_KAFKA_BOOTSTRAP_SERVERS:\s*"redpanda:29092"/,
+  );
+});
