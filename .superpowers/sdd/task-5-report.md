@@ -31,3 +31,10 @@
 - `.superpowers/sdd/task-5-report.md`
 
 Commit: `fix(harness): align interview contract facts`.
+
+## Follow-up Findings
+
+- RED: the live-repository assertion failed on both stale surfaces: Claude contained forbidden `cycle > 5` wording and STATUS had `Last updated=2026-07-13` versus measurement basis `2026-07-12`.
+- GREEN: the Claude flow now stops on cycle 5 below `0.85` with `safety_valve` and explicitly starts no cycle 6; the STATUS measurement basis is `2026-07-13`.
+- The assertion reads live SKILL and STATUS content while retaining the tracked manifest as its oracle.
+- Fresh verification: audit tests 10 passed, 0 failed; standalone audit retains only the unrelated untracked workflow failure.

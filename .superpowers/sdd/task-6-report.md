@@ -61,3 +61,11 @@ Changed-file guard over the four implementation paths returned `harness guard: c
 - `.claude/settings.json` retains the mandatory repository-owned write guard and removes legacy installer paths.
 - Manifest inventory includes the finalized workflow and settings paths.
 - No `pwc` path was readied or committed by Task 6.
+
+## Follow-up Findings
+
+RED: the strengthened focused contract produced 11 passed and 1 failed. It rejected the short PR refspec and also required tests before changed-file computation plus strict validation of the push `before` value before zero-SHA handling or Git revision lookup.
+
+GREEN: the workflow now force-fetches `+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}`, rejects any `before` value that is not exactly 40 hexadecimal characters, and orders tests before changed-file computation. The focused suite passed 12/12 after the correction.
+
+Independent follow-up review found the first negative assertion did not bind rejection to a failing exit. The contract test now checks representative empty, short, non-hex, and overlong values and mutation-tests that changing the validation block from `exit 1` to `exit 0` is rejected.

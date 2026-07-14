@@ -25,3 +25,9 @@
 - `git diff --cached --name-only` was inspected before commit.
 - The commit uses explicit pathspecs so pre-staged `SOUL.md` remains staged but is excluded from the Task 4 commit.
 - No `pwc/` path or other unrelated working-tree path is staged or committed by Task 4.
+
+## Blocker Regression
+
+- RED: `node --test scripts/harness/test/install.test.mjs` failed 1/5 with the stale reference reported as `CLAUDE.md:25`.
+- GREEN: after replacing it with `node scripts/harness/install-hooks.mjs`, the installer suite passed 5/5.
+- Full verification: `node --test scripts/harness/test/guard.test.mjs scripts/harness/test/audit.test.mjs scripts/harness/test/install.test.mjs` passed 51/51 across 18 top-level tests and 4 suites.

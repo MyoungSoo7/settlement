@@ -41,7 +41,8 @@
 - **역할**: `ADMIN`, `MANAGER`, `USER`. `anyRequest().authenticated()` 기본 + 경로별 `hasRole`/`hasAnyRole`.
 - **소유권(IDOR 방지)**: 셀러 리소스(투자 주문·재원 등)는 요청 파라미터가 아니라 **JWT 주체(userId)에서 파생**하고
   집행/취소는 소유권을 대조한다(403).
-- **공개 read-only 서비스**(financial·economics·market·commondata·company): shared-common 미의존/제한 스캔 +
+- **공개 read-only 위성 서비스**(financial·economics·market·commondata): shared-common 미의존 +
+  (company 는 Outbox·문서 JWT 로 shared-common 을 제한 의존)
   자체 최소 SecurityConfig — GET 공개, 수집 트리거(`/admin/**`)는 `AdminApiKeyFilter`(X-Internal-Api-Key) 게이트.
   키 미설정 시 기본 통과(개발), `app.security.internal-key-required=true`(운영)면 **fail-closed** 거부.
 - **RBAC 관리**(order-service `AdminRbacController`): 역할·권한 매트릭스 CRUD·복제 — 로그인 역할 위의 권한 레이어.
@@ -63,7 +64,7 @@
 - Micrometer + Prometheus + OTLP 트레이싱. Resilience4j(회로차단), Bucket4j(rate limit).
 
 ---
-``
+
 ## 3. 서비스별 기능 명세
 
 ### 3.1 order-service — 이커머스 거래 컨텍스트 (port 8088)
@@ -81,7 +82,7 @@ DB: opslab. 회원·상품·장바구니·주문·결제·배송 + 정합성 부
 | 내부/정합성 | `/internal/recon`, `/admin/settlement-projection` | order 자기 합계 노출(대사, X-Internal-Api-Key), 프로젝션 백필 |
 
 ### 3.2 settlement-service — 정산 (port 8082, 자체 DB settlement_db)
-정산 생성/확정, 지급(payout), 복식부기 원장, 차지백, PG 대사, ES 색인, PDF 리포트.``
+정산 생성/확정, 지급(payout), 복식부기 원장, 차지백, PG 대사, ES 색인, PDF 리포트.
 order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝션(`settlement_*_view`)으로만 조회(코드·DB 의존 0).
 
 | 도메인 | API | 기능 |
@@ -211,7 +212,7 @@ Investment주문: REQUESTED → APPROVED → EXECUTED / REJECTED / CANCELED
 - **관측**: Prometheus + Micrometer + Grafana + OTLP 트레이싱, 서비스별 헬스/프로브.
 - **테스트**: 도메인→서비스→컨트롤러→통합 순. JaCoCo CI 게이트 **LINE 90%**, 핵심 도메인 INSTRUCTION 80%.
   settlement 통합테스트는 Testcontainers PostgreSQL.
-- **배포**: Docker Compose(로컬, DB-per-service PG 10종+ES+Redpanda+서비스+gateway), Kubernetes(운영), Flyway 마이그레이션.
+- **배포**: Docker Compose(로컬, DB-per-service PG 12종+ES+Redpanda+서비스+gateway), Kubernetes(운영), Flyway 마이그레이션.
 - **운영 필수 설정**: `JWT_SECRET`(강함), `app.security.internal-key-required=true`, 각 서비스 외부 API 키.
 
 ---

@@ -26,9 +26,16 @@ function splitLines(text) {
 }
 
 function extractSection(text, heading) {
-  const pattern = new RegExp(`^##\\s+${escapeRegExp(heading)}\\s*$([\\s\\S]*?)(?=^##\\s+|$)`, 'm');
-  const match = String(text).match(pattern);
-  return match ? match[1] : '';
+  const lines = splitLines(text);
+  const start = lines.findIndex((line) => new RegExp(`^##\\s+${escapeRegExp(heading)}\\s*$`).test(line));
+  if (start === -1) return '';
+  const section = [];
+  for (let index = start + 1; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (/^##\s+/.test(line)) break;
+    section.push(line);
+  }
+  return section.join('\n');
 }
 
 function extractFence(section, fenceName = 'yaml') {
