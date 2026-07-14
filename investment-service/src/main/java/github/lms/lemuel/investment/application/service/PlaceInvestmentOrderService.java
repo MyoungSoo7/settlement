@@ -55,7 +55,8 @@ public class PlaceInvestmentOrderService implements PlaceInvestmentOrderUseCase 
         BigDecimal available = availableFunding(command.sellerId());
         if (available.compareTo(command.amount()) < 0) {
             throw new InsufficientFundingException(
-                    "가용 재원이 부족합니다. available=" + available + ", requested=" + command.amount());
+                    "가용 재원이 부족합니다. available=" + available + ", requested=" + command.amount(),
+                    command.amount(), available);
         }
 
         InvestmentOrder order = InvestmentOrder.request(

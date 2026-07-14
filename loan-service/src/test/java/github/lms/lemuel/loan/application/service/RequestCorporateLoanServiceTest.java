@@ -58,7 +58,7 @@ class RequestCorporateLoanServiceTest {
     void 한도이내_신청은_수수료를_산정해_REQUESTED로_저장한다() {
         when(loadCorporateFinancialPort.loadLatest("005930")).thenReturn(Optional.of(strongCompany()));
         when(loadCompanyReputationPort.findByStockCode("005930")).thenReturn(
-                Optional.of(new CompanyReputation("005930", 78, "B", "B", LocalDate.of(2026, 7, 1))));
+                Optional.of(CompanyReputation.of("005930", 78, "B", "B", LocalDate.of(2026, 7, 1))));
         when(saveCorporateLoanPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         // 한도 100,000. 신청 100,000(경계, 이내), 30일, 등급 A → 수수료 100,000×0.0002×30×1.0 = 600
@@ -83,10 +83,13 @@ class RequestCorporateLoanServiceTest {
         when(loadCorporateFinancialPort.loadLatest("005930")).thenReturn(Optional.of(strongCompany()));
         when(loadCompanyReputationPort.findByStockCode("005930")).thenReturn(Optional.empty());
 
-        // 한도 100,000 인데 100,001 신청 → 초과
+        // 한도 100,000 인데 100,001 신청 → 초과. 요청액/한도를 구조화 필드로 보존한다.
         assertThatThrownBy(() -> service().request(
                 new RequestCorporateLoanCommand("005930", new BigDecimal("100001"), 30)))
-                .isInstanceOf(CorporateLoanRejectedException.class);
+                .isInstanceOfSatisfying(CorporateLoanRejectedException.class, ex -> {
+                    assertThat(ex.getRequested()).isEqualByComparingTo("100001");
+                    assertThat(ex.getLimit()).isEqualByComparingTo("100000");
+                });
 
         verify(saveCorporateLoanPort, never()).save(any());
     }
@@ -95,7 +98,7 @@ class RequestCorporateLoanServiceTest {
     void E등급은_422거절이고_저장하지_않는다() {
         when(loadCorporateFinancialPort.loadLatest("999999")).thenReturn(Optional.of(brokenCompany()));
         when(loadCompanyReputationPort.findByStockCode("999999")).thenReturn(
-                Optional.of(new CompanyReputation("999999", 5, "E", "D", LocalDate.of(2026, 7, 1))));
+                Optional.of(CompanyReputation.of("999999", 5, "E", "D", LocalDate.of(2026, 7, 1))));
 
         assertThatThrownBy(() -> service().request(
                 new RequestCorporateLoanCommand("999999", new BigDecimal("1"), 30)))

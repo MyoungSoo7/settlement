@@ -55,7 +55,8 @@ public class ExecuteInvestmentOrderService implements ExecuteInvestmentOrderUseC
             order.reject();
             saveInvestmentOrderPort.save(order);
             throw new InsufficientFundingException(
-                    "집행 시점 가용 재원이 부족합니다. available=" + available + ", requested=" + order.getAmount());
+                    "집행 시점 가용 재원이 부족합니다. available=" + available + ", requested=" + order.getAmount(),
+                    order.getAmount(), available);
         }
 
         order.approve();

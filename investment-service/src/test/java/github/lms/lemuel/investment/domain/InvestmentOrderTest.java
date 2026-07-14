@@ -46,6 +46,14 @@ class InvestmentOrderTest {
     }
 
     @Test
+    void 음수_금액_위반은_위반값을_구조화_보존한다() {
+        BigDecimal negative = new BigDecimal("-1");
+        assertThatThrownBy(() -> InvestmentOrder.request(7L, "005930", negative, 1, "A"))
+                .isInstanceOfSatisfying(InvestmentInvariantViolationException.class,
+                        ex -> assertThat(ex.getViolatingValue()).isEqualTo(negative));
+    }
+
+    @Test
     void 정상_전이_REQUESTED_APPROVED_EXECUTED() {
         InvestmentOrder o = requested();
         o.approve();

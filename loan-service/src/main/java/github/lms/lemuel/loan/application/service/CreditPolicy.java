@@ -69,7 +69,8 @@ public class CreditPolicy {
                         ? " (평판 등급 " + grade + " haircut 적용)"
                         : "");
             throw new LoanInvariantViolationException(
-                    "신청액이 한도를 초과합니다. requested=" + requested + ", limit=" + limit + reason);
+                    "신청액이 한도를 초과합니다. requested=" + requested + ", limit=" + limit + reason,
+                    requested, limit);
         }
     }
 }

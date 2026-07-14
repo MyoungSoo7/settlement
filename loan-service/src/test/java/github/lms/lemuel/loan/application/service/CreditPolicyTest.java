@@ -42,10 +42,13 @@ class CreditPolicyTest {
 
     @Test
     void 신청액이_한도초과면_예외() {
-        // 한도 초과는 도메인 불변식 위반(typed) — 요청액/한도 컨텍스트를 메시지로 보존한다.
+        // 한도 초과는 도메인 불변식 위반(typed) — 요청액/한도 컨텍스트를 메시지와 구조화 필드로 보존한다.
         assertThatThrownBy(() ->
                 policy.validateWithinLimit(new BigDecimal("900000"), new BigDecimal("1000000"), null))
-                .isInstanceOf(LoanInvariantViolationException.class)
+                .isInstanceOfSatisfying(LoanInvariantViolationException.class, ex -> {
+                    assertThat(ex.getRequested()).isEqualByComparingTo("900000");
+                    assertThat(ex.getLimit()).isEqualByComparingTo("800000");
+                })
                 .hasMessageContaining("requested=900000")
                 .hasMessageContaining("limit=800000");
     }

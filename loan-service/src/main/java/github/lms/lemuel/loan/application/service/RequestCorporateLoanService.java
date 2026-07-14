@@ -56,7 +56,8 @@ public class RequestCorporateLoanService implements RequestCorporateLoanUseCase 
         if (command.principal().compareTo(limit) > 0) {
             throw new CorporateLoanRejectedException(
                     "신청액이 한도를 초과합니다. requested=" + command.principal() + ", limit=" + limit
-                            + " (grade=" + grade + ")");
+                            + " (grade=" + grade + ")",
+                    command.principal(), limit);
         }
 
         BigDecimal fee = creditPolicy.fee(command.principal(), command.termDays(), grade);

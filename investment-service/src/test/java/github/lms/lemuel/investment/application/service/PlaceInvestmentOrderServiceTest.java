@@ -82,10 +82,13 @@ class PlaceInvestmentOrderServiceTest {
         when(loadFundingViewPort.sumConfirmedBySeller(7L)).thenReturn(new BigDecimal("1000000"));
         when(loadInvestmentOrderPort.sumExecutedAmountBySeller(7L)).thenReturn(new BigDecimal("500000"));
 
-        // available = 100만 - 50만 = 50만, 신청 100만 → 부족
+        // available = 100만 - 50만 = 50만, 신청 100만 → 부족. 요청액/가용액을 구조화 필드로 보존한다.
         assertThatThrownBy(() -> service().place(
                 new PlaceInvestmentOrderCommand(7L, "005930", new BigDecimal("1000000"))))
-                .isInstanceOf(InsufficientFundingException.class);
+                .isInstanceOfSatisfying(InsufficientFundingException.class, ex -> {
+                    assertThat(ex.getRequested()).isEqualByComparingTo("1000000");
+                    assertThat(ex.getAvailable()).isEqualByComparingTo("500000");
+                });
 
         verify(saveInvestmentOrderPort, never()).save(any());
     }

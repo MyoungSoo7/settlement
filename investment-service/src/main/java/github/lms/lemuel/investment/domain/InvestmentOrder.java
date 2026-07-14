@@ -1,5 +1,6 @@
 package github.lms.lemuel.investment.domain;
 
+import github.lms.lemuel.common.money.Money;
 import github.lms.lemuel.investment.domain.exception.InvalidInvestmentOrderStateException;
 import github.lms.lemuel.investment.domain.exception.InvestmentInvariantViolationException;
 
@@ -46,8 +47,10 @@ public class InvestmentOrder {
         if (stockCode == null || !stockCode.matches("\\d{6}")) {
             throw new InvestmentInvariantViolationException("stockCode 는 6자리 숫자여야 합니다: " + stockCode);
         }
-        if (amount == null || amount.signum() <= 0) {
-            throw new InvestmentInvariantViolationException("투자 금액은 양수여야 합니다: " + amount);
+        // 통화 금액 규칙(scale 2 HALF_UP·양수)은 Money VO 로 위임한다(SellerFunding 선례 동형).
+        // 저장 표현은 원시 amount 그대로 보존하고, Money 는 양수 불변식 판정에만 쓴다.
+        if (amount == null || Money.of(amount).isZeroOrNegative()) {
+            throw new InvestmentInvariantViolationException("투자 금액은 양수여야 합니다: " + amount, amount);
         }
         return new InvestmentOrder(null, sellerId, stockCode, amount, scoreAtOrder, gradeAtOrder,
                 InvestmentOrderStatus.REQUESTED, LocalDateTime.now());

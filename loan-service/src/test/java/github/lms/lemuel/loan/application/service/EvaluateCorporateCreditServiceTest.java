@@ -43,7 +43,7 @@ class EvaluateCorporateCreditServiceTest {
     void 재무와_평판을_반영해_점수_등급_한도를_반환한다() {
         when(loadCorporateFinancialPort.loadLatest("005930")).thenReturn(Optional.of(samsung()));
         when(loadCompanyReputationPort.findByStockCode("005930")).thenReturn(
-                Optional.of(new CompanyReputation("005930", 78, "B", "A", LocalDate.of(2026, 7, 1))));
+                Optional.of(CompanyReputation.of("005930", 78, "B", "A", LocalDate.of(2026, 7, 1))));
 
         CorporateCreditView view = service().evaluate("005930");
 

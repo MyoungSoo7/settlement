@@ -37,7 +37,7 @@ public class CompanyReputationService implements IngestCompanyReputationUseCase,
     @Override
     @Transactional
     public void ingest(IngestCompanyReputationCommand command) {
-        saveCompanyReputationPort.upsert(new CompanyReputation(
+        saveCompanyReputationPort.upsert(CompanyReputation.of(
                 command.stockCode(),
                 command.score(),
                 command.grade(),

@@ -21,8 +21,14 @@ public class CompanyReputation {
     private final String previousGrade;
     private final LocalDate snapshotDate;
 
-    public CompanyReputation(String stockCode, int score, String grade,
-                             String previousGrade, LocalDate snapshotDate) {
+    /** 평판 스냅샷 생성 — 불변식을 검증한 뒤에만 인스턴스가 존재한다(도메인 팩토리 정합). */
+    public static CompanyReputation of(String stockCode, int score, String grade,
+                                       String previousGrade, LocalDate snapshotDate) {
+        return new CompanyReputation(stockCode, score, grade, previousGrade, snapshotDate);
+    }
+
+    private CompanyReputation(String stockCode, int score, String grade,
+                              String previousGrade, LocalDate snapshotDate) {
         if (stockCode == null || stockCode.length() != 6) {
             throw new LoanInvariantViolationException("종목코드는 6자리여야 합니다: " + stockCode);
         }

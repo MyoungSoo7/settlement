@@ -125,7 +125,7 @@ class LoanPersistenceAdaptersTest {
         @Test
         @DisplayName("upsert 는 도메인을 엔티티로 매핑해 저장(merge)한다")
         void upsert() {
-            CompanyReputation rep = new CompanyReputation("005930", 55, "C", "B", LocalDate.of(2026, 7, 7));
+            CompanyReputation rep = CompanyReputation.of("005930", 55, "C", "B", LocalDate.of(2026, 7, 7));
 
             adapter().upsert(rep);
 
