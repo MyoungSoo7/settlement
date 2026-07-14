@@ -104,3 +104,5 @@ hackathon/kakaopay/submission/outputs/
 ### API 응답 캐시 (재생성 가능 — 이력 제외) ###
 **/submission/src/data/cache/
 
+### Codex isolated worktrees ###
+.worktrees/
