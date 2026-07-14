@@ -154,27 +154,32 @@ public class Order {
         this.updatedAt = LocalDateTime.now();
     }
 
-    // 비즈니스 메서드: 주문 취소
+    // 비즈니스 메서드: 주문 취소 — "결제 전 취소" 의 좁은 의미(CREATED 만).
+    // 전이표 canTransitionTo(CANCELED) 는 CANCELLATION_REQUESTED/APPROVED 도 허용하나(취소승인 흐름은
+    // 서비스가 transitionTo 로 처리), 이 메서드의 의미는 결제 전 취소로 한정되므로 isCancelable() 로 위임한다.
     public void cancel() {
-        if (this.status != OrderStatus.CREATED) {
+        if (!isCancelable()) {
             throw new InvalidOrderStateException(this.status, OrderStatus.CANCELED);
         }
         this.status = OrderStatus.CANCELED;
         this.updatedAt = LocalDateTime.now();
     }
 
-    // 비즈니스 메서드: 주문 완료 (결제 완료)
+    // 비즈니스 메서드: 주문 완료 (결제 완료) — 허용 전이는 전이표 canTransitionTo(PAID) 단일 출처에 위임한다
+    // (CREATED 만 PAID 로 전이 가능 — 인라인 가드와 동형).
     public void complete() {
-        if (this.status != OrderStatus.CREATED) {
+        if (!this.status.canTransitionTo(OrderStatus.PAID)) {
             throw new InvalidOrderStateException(this.status, OrderStatus.PAID);
         }
         this.status = OrderStatus.PAID;
         this.updatedAt = LocalDateTime.now();
     }
 
-    // 비즈니스 메서드: 환불 처리
+    // 비즈니스 메서드: 환불 처리 — "PAID 에서의 단순 환불" 의 좁은 의미(PAID 만).
+    // 전이표 canTransitionTo(REFUNDED) 는 배송단계·취소승인에서의 환불도 허용하나(그 경로는 서비스가
+    // transitionTo 로 처리), 이 메서드의 의미는 PAID 직접 환불로 한정되므로 isRefundable() 로 위임한다.
     public void refund() {
-        if (this.status != OrderStatus.PAID) {
+        if (!isRefundable()) {
             throw new InvalidOrderStateException(this.status, OrderStatus.REFUNDED);
         }
         this.status = OrderStatus.REFUNDED;

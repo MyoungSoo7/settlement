@@ -1,8 +1,8 @@
 package github.lms.lemuel.loan.adapter.in.web;
 
 import github.lms.lemuel.common.exception.ErrorResponse;
-import github.lms.lemuel.loan.domain.CorporateLoanNotFoundException;
-import github.lms.lemuel.loan.domain.CorporateLoanRejectedException;
+import github.lms.lemuel.loan.domain.exception.CorporateLoanNotFoundException;
+import github.lms.lemuel.loan.domain.exception.CorporateLoanRejectedException;
 import io.swagger.v3.oas.annotations.Hidden;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

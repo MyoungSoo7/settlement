@@ -39,7 +39,8 @@ public class Refund {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    public Refund() {}
+    // 생성은 팩토리(request/rehydrate)로만 통과시킨다 — no-arg 생성자 외부 노출 봉인(Order/Settlement 와 동형).
+    private Refund() {}
 
     public static Refund request(Long paymentId, BigDecimal amount, String idempotencyKey, String reason) {
         if (paymentId == null) throw new PaymentInvariantViolationException("paymentId required");
@@ -153,8 +154,17 @@ public class Refund {
     /** Persistence 어댑터가 DB 부여 PK 를 주입할 때 사용(setter 대체). */
     public void assignId(Long id) { this.id = id; }
 
-    /** 동시 부분환불로 스냅샷과 권위 금액이 어긋날 때 최종 확정 금액으로 정정한다. */
-    public void correctAmount(BigDecimal finalAmount) { this.amount = finalAmount; }
+    /**
+     * 동시 부분환불로 스냅샷과 권위 금액이 어긋날 때 최종 확정 금액으로 정정한다.
+     * 환불 금액 불변식({@link #request} 와 동일: 양수)을 여기서도 지켜, 정정을 빌미로 0·음수가 새는 것을 막는다.
+     * (결제 잔액 초과 여부는 결제 애그리거트가 검증하므로 여기서는 부호 불변식만 가드한다.)
+     */
+    public void correctAmount(BigDecimal finalAmount) {
+        if (finalAmount == null || finalAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new PaymentInvariantViolationException("corrected refund amount must be > 0");
+        }
+        this.amount = finalAmount;
+    }
 
     public Long getId() { return id; }
     public Long getPaymentId() { return paymentId; }

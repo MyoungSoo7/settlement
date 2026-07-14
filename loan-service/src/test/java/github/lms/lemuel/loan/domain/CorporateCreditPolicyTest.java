@@ -1,6 +1,5 @@
-package github.lms.lemuel.loan.application.service;
+package github.lms.lemuel.loan.domain;
 
-import github.lms.lemuel.loan.domain.CorporateFinancials;
 import github.lms.lemuel.loan.domain.exception.LoanInvariantViolationException;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;

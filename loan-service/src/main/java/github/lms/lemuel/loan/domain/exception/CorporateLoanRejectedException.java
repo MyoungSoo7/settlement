@@ -1,4 +1,4 @@
-package github.lms.lemuel.loan.domain;
+package github.lms.lemuel.loan.domain.exception;
 
 import java.math.BigDecimal;
 

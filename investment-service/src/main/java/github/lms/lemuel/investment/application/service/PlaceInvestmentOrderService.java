@@ -9,6 +9,7 @@ import github.lms.lemuel.investment.application.port.out.LoadInvestmentOrderPort
 import github.lms.lemuel.investment.application.port.out.SaveInvestmentOrderPort;
 import github.lms.lemuel.investment.domain.InvestmentOrder;
 import github.lms.lemuel.investment.domain.InvestmentScore;
+import github.lms.lemuel.investment.domain.SellerFunding;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -52,11 +53,11 @@ public class PlaceInvestmentOrderService implements PlaceInvestmentOrderUseCase 
                             + ", score=" + score.totalScore() + ", grade=" + score.grade());
         }
 
-        BigDecimal available = availableFunding(command.sellerId());
-        if (available.compareTo(command.amount()) < 0) {
+        SellerFunding funding = loadFunding(command.sellerId());
+        if (!funding.covers(command.amount())) {
             throw new InsufficientFundingException(
-                    "가용 재원이 부족합니다. available=" + available + ", requested=" + command.amount(),
-                    command.amount(), available);
+                    "가용 재원이 부족합니다. available=" + funding.available() + ", requested=" + command.amount(),
+                    command.amount(), funding.available());
         }
 
         InvestmentOrder order = InvestmentOrder.request(
@@ -65,9 +66,9 @@ public class PlaceInvestmentOrderService implements PlaceInvestmentOrderUseCase 
         return saveInvestmentOrderPort.save(order);
     }
 
-    private BigDecimal availableFunding(Long sellerId) {
+    private SellerFunding loadFunding(Long sellerId) {
         BigDecimal confirmed = loadFundingViewPort.sumConfirmedBySeller(sellerId);
         BigDecimal invested = loadInvestmentOrderPort.sumExecutedAmountBySeller(sellerId);
-        return confirmed.subtract(invested);
+        return SellerFunding.of(sellerId, confirmed, invested);
     }
 }

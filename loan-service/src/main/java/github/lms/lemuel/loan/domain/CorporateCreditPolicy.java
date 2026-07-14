@@ -1,6 +1,5 @@
-package github.lms.lemuel.loan.application.service;
+package github.lms.lemuel.loan.domain;
 
-import github.lms.lemuel.loan.domain.CorporateFinancials;
 import github.lms.lemuel.loan.domain.exception.LoanInvariantViolationException;
 
 import java.math.BigDecimal;

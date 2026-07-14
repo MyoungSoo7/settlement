@@ -182,11 +182,11 @@ public class Settlement {
     // ========== 상태 머신 메서드 ==========
 
     /**
-     * 정산 처리 시작
+     * 정산 처리 시작 — 허용 전이는 {@link SettlementStatus#canTransitionTo} 단일 출처에 위임한다(cancel 과 동형).
      * REQUESTED → PROCESSING
      */
     public void startProcessing() {
-        if (this.status != SettlementStatus.REQUESTED) {
+        if (!this.status.canTransitionTo(SettlementStatus.PROCESSING)) {
             throw new InvalidSettlementStateException(this.status, SettlementStatus.PROCESSING);
         }
         this.status = SettlementStatus.PROCESSING;
@@ -194,11 +194,11 @@ public class Settlement {
     }
 
     /**
-     * 정산 완료
+     * 정산 완료 — 허용 전이는 {@link SettlementStatus#canTransitionTo} 단일 출처에 위임한다(cancel 과 동형).
      * PROCESSING → DONE
      */
     public void complete() {
-        if (this.status != SettlementStatus.PROCESSING) {
+        if (!this.status.canTransitionTo(SettlementStatus.DONE)) {
             throw new InvalidSettlementStateException(this.status, SettlementStatus.DONE);
         }
         this.status = SettlementStatus.DONE;
@@ -207,11 +207,11 @@ public class Settlement {
     }
 
     /**
-     * 정산 실패
+     * 정산 실패 — 허용 전이는 {@link SettlementStatus#canTransitionTo} 단일 출처에 위임한다(cancel 과 동형).
      * PROCESSING → FAILED
      */
     public void fail(String reason) {
-        if (this.status != SettlementStatus.PROCESSING) {
+        if (!this.status.canTransitionTo(SettlementStatus.FAILED)) {
             throw new InvalidSettlementStateException(this.status, SettlementStatus.FAILED);
         }
         this.status = SettlementStatus.FAILED;
@@ -220,11 +220,12 @@ public class Settlement {
     }
 
     /**
-     * 재시도 (실패한 정산을 다시 요청 상태로)
+     * 재시도 (실패한 정산을 다시 요청 상태로) — 허용 전이는 {@link SettlementStatus#canTransitionTo} 단일 출처에
+     * 위임한다(cancel 과 동형).
      * FAILED → REQUESTED
      */
     public void retry() {
-        if (this.status != SettlementStatus.FAILED) {
+        if (!this.status.canTransitionTo(SettlementStatus.REQUESTED)) {
             throw new InvalidSettlementStateException(this.status, SettlementStatus.REQUESTED);
         }
         this.status = SettlementStatus.REQUESTED;

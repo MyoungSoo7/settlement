@@ -6,7 +6,7 @@ import github.lms.lemuel.loan.application.port.out.LoadCorporateLoanPort;
 import github.lms.lemuel.loan.application.port.out.PublishCorporateLoanEventPort;
 import github.lms.lemuel.loan.application.port.out.SaveCorporateLoanPort;
 import github.lms.lemuel.loan.domain.CorporateLoan;
-import github.lms.lemuel.loan.domain.CorporateLoanNotFoundException;
+import github.lms.lemuel.loan.domain.exception.CorporateLoanNotFoundException;
 import github.lms.lemuel.loan.domain.LoanLedgerEntry;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

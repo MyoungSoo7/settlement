@@ -4,8 +4,9 @@ import github.lms.lemuel.loan.application.port.in.EvaluateCorporateCreditUseCase
 import github.lms.lemuel.loan.application.port.out.LoadCompanyReputationPort;
 import github.lms.lemuel.loan.application.port.out.LoadCorporateFinancialPort;
 import github.lms.lemuel.loan.domain.CompanyReputation;
+import github.lms.lemuel.loan.domain.CorporateCreditPolicy;
 import github.lms.lemuel.loan.domain.CorporateFinancials;
-import github.lms.lemuel.loan.domain.CorporateLoanNotFoundException;
+import github.lms.lemuel.loan.domain.exception.CorporateLoanNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;

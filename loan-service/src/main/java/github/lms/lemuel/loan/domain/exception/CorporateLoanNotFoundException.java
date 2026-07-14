@@ -1,4 +1,4 @@
-package github.lms.lemuel.loan.domain;
+package github.lms.lemuel.loan.domain.exception;
 
 /**
  * 기업대출/재무자료 조회 실패 — 요청한 대출 건이나 상장사 재무자료가 존재하지 않는 경우.

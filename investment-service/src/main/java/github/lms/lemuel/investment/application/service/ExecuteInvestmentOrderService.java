@@ -7,6 +7,7 @@ import github.lms.lemuel.investment.application.port.out.LoadInvestmentOrderPort
 import github.lms.lemuel.investment.application.port.out.PublishInvestmentEventPort;
 import github.lms.lemuel.investment.application.port.out.SaveInvestmentOrderPort;
 import github.lms.lemuel.investment.domain.InvestmentOrder;
+import github.lms.lemuel.investment.domain.SellerFunding;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,13 +51,13 @@ public class ExecuteInvestmentOrderService implements ExecuteInvestmentOrderUseC
         // 집행 시점 재원 재검증 — 집행 완료(EXECUTED) 합만 재원에서 차감하므로 아직 미집행인 이 주문은 제외된다.
         BigDecimal confirmed = loadFundingViewPort.sumConfirmedBySeller(order.getSellerId());
         BigDecimal invested = loadInvestmentOrderPort.sumExecutedAmountBySeller(order.getSellerId());
-        BigDecimal available = confirmed.subtract(invested);
-        if (available.compareTo(order.getAmount()) < 0) {
+        SellerFunding funding = SellerFunding.of(order.getSellerId(), confirmed, invested);
+        if (!funding.covers(order.getAmount())) {
             order.reject();
             saveInvestmentOrderPort.save(order);
             throw new InsufficientFundingException(
-                    "집행 시점 가용 재원이 부족합니다. available=" + available + ", requested=" + order.getAmount(),
-                    order.getAmount(), available);
+                    "집행 시점 가용 재원이 부족합니다. available=" + funding.available() + ", requested=" + order.getAmount(),
+                    order.getAmount(), funding.available());
         }
 
         order.approve();

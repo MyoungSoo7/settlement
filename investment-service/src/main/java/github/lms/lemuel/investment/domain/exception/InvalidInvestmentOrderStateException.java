@@ -11,8 +11,8 @@ import github.lms.lemuel.investment.domain.InvestmentOrderStatus;
  */
 public class InvalidInvestmentOrderStateException extends InvestmentDomainException {
 
-    private final InvestmentOrderStatus from;
-    private final InvestmentOrderStatus to;
+    private final transient InvestmentOrderStatus from;
+    private final transient InvestmentOrderStatus to;
 
     public InvalidInvestmentOrderStateException(InvestmentOrderStatus from, InvestmentOrderStatus to) {
         super(ErrorCode.INVALID_STATE, "투자 주문 상태 전이 불가: " + from + " → " + to);
