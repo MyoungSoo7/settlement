@@ -184,9 +184,11 @@ jobs:
     permissions:
       contents: read
       packages: write
-    # 배포 단위별 이미지(ADR 0020 — settlement 독립 분리 완료):
-    #   order-service(commerce)   → settlement:latest
-    #   settlement-service(독립 MSA) → settlement-settlement:latest  (k8s settlement-deployment 가 참조)
+    # 배포 단위별 이미지(ADR 0020):
+    #   order-service      → ghcr.io/myoungsoo7/settlement
+    #   settlement-service → ghcr.io/myoungsoo7/settlement-settlement
+    #   gateway-service    → ghcr.io/myoungsoo7/settlement-gateway
+    #   account-service    → ghcr.io/myoungsoo7/settlement-account
     strategy:
       matrix:
         include:
@@ -194,6 +196,10 @@ jobs:
             image_suffix: ""
           - module: settlement-service
             image_suffix: "-settlement"
+          - module: gateway-service
+            image_suffix: "-gateway"
+          - module: account-service
+            image_suffix: "-account"
     steps:
       - uses: actions/checkout@v4
 
@@ -233,7 +239,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           # Dockerfile 의 ARG MODULE 가 비어있으면 'gradle ::bootJar' 처럼 빈 세그먼트가 되어 빌드 실패.
-          # order-service = LemuelApplication(commerce), settlement-service = 독립 MSA.
+          # matrix.module selects the deployable Gradle service built into this image.
           build-args: |
             MODULE=${{ matrix.module }}
           cache-from: type=gha
@@ -437,5 +443,4 @@ jobs:
           name: playwright-report
           path: frontend/playwright-report/
           retention-days: 14
-
 
