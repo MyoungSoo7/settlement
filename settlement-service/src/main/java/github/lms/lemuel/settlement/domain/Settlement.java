@@ -30,18 +30,18 @@ public class Settlement {
     public static final BigDecimal COMMISSION_RATE = new BigDecimal("0.03");
 
     private Long id;
-    private Long paymentId;
-    private Long orderId;
-    private BigDecimal paymentAmount;     // 원 결제 금액
+    private final Long paymentId;
+    private final Long orderId;
+    private final BigDecimal paymentAmount;     // 원 결제 금액
     private BigDecimal refundedAmount;    // 환불 금액
     private BigDecimal commission;        // 수수료
-    private BigDecimal commissionRate;    // 적용된 수수료율 (이력 보존)
+    private final BigDecimal commissionRate;    // 적용된 수수료율 (이력 보존, 정산 시점 스냅샷)
     private BigDecimal netAmount;         // 실 지급액
     private SettlementStatus status;
-    private LocalDate settlementDate;
+    private final LocalDate settlementDate;
     private String failureReason;         // 실패 사유
     private LocalDateTime confirmedAt;
-    private LocalDateTime createdAt;
+    private final LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private Long version;                 // 낙관적 락 버전 (JPA @Version)
 
@@ -56,15 +56,43 @@ public class Settlement {
     private LocalDateTime holdbackReleasedAt;
 
     /**
-     * 신규 정산 골격 생성 전용 — 상태 전이·복원은 팩토리를 통과해야 하므로 private.
-     * 외부는 {@link #createFromPayment}(신규) / {@link #rehydrate}(복원) 만 사용한다
-     * (Payout/Chargeback 과 동형: 생성자 비공개, 팩토리 공개).
+     * 정본 생성자 — 신규/복원 팩토리({@link #createFromPayment}·{@link #rehydrate})만 통과한다
+     * (Payout/Chargeback 과 동형: 생성자 비공개, 팩토리 공개). 불변 식별·스냅샷 필드
+     * (paymentId·orderId·paymentAmount·commissionRate·settlementDate·createdAt)를 여기서 못박아
+     * 이후 어떤 경로로도 재할당할 수 없게 한다.
+     *
+     * <p>null 폴백 정규화(refundedAmount·status·commissionRate·holdback·createdAt/updatedAt)를
+     * 생성 시점 단일 지점으로 모은다 — getter 는 정규화된 값을 그대로 반환한다.
+     * {@code commissionRate == null}(차등 수수료 전환 전 레거시 행)은 {@link #COMMISSION_RATE}(기본율)로
+     * 정규화해 기존 getter 폴백 의미를 보존한다.
      */
-    private Settlement() {
-        this.status = SettlementStatus.REQUESTED; // 초기 상태를 REQUESTED로 변경
-        this.refundedAmount = BigDecimal.ZERO;
-        this.createdAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
+    private Settlement(Long id, Long paymentId, Long orderId, BigDecimal paymentAmount,
+                       BigDecimal refundedAmount, BigDecimal commission, BigDecimal commissionRate,
+                       BigDecimal netAmount, SettlementStatus status, LocalDate settlementDate,
+                       String failureReason, LocalDateTime confirmedAt, LocalDateTime createdAt,
+                       LocalDateTime updatedAt, Long version, BigDecimal holdbackAmount,
+                       BigDecimal holdbackRate, LocalDate holdbackReleaseDate, boolean holdbackReleased,
+                       LocalDateTime holdbackReleasedAt) {
+        this.id = id;
+        this.paymentId = paymentId;
+        this.orderId = orderId;
+        this.paymentAmount = paymentAmount;
+        this.refundedAmount = refundedAmount != null ? refundedAmount : BigDecimal.ZERO;
+        this.commission = commission;
+        this.commissionRate = commissionRate != null ? commissionRate : COMMISSION_RATE;
+        this.netAmount = netAmount;
+        this.status = status != null ? status : SettlementStatus.REQUESTED;
+        this.settlementDate = settlementDate;
+        this.failureReason = failureReason;
+        this.confirmedAt = confirmedAt;
+        this.createdAt = createdAt != null ? createdAt : LocalDateTime.now();
+        this.updatedAt = updatedAt != null ? updatedAt : LocalDateTime.now();
+        this.version = version;
+        this.holdbackAmount = holdbackAmount != null ? holdbackAmount : BigDecimal.ZERO;
+        this.holdbackRate = holdbackRate != null ? holdbackRate : BigDecimal.ZERO;
+        this.holdbackReleaseDate = holdbackReleaseDate;
+        this.holdbackReleased = holdbackReleased;
+        this.holdbackReleasedAt = holdbackReleasedAt;
     }
 
     public static Settlement createFromPayment(Long paymentId, Long orderId,
@@ -79,12 +107,10 @@ public class Settlement {
     public static Settlement createFromPayment(Long paymentId, Long orderId,
                                                BigDecimal paymentAmount, LocalDate settlementDate,
                                                BigDecimal commissionRate) {
-        Settlement settlement = new Settlement();
-        settlement.paymentId = paymentId;
-        settlement.orderId = orderId;
-        settlement.paymentAmount = paymentAmount;
-        settlement.settlementDate = settlementDate;
-        settlement.commissionRate = commissionRate != null ? commissionRate : COMMISSION_RATE;
+        LocalDateTime now = LocalDateTime.now();
+        Settlement settlement = new Settlement(null, paymentId, orderId, paymentAmount,
+                BigDecimal.ZERO, null, commissionRate, null, SettlementStatus.REQUESTED, settlementDate,
+                null, null, now, now, null, BigDecimal.ZERO, BigDecimal.ZERO, null, false, null);
 
         settlement.validatePaymentId();
         settlement.validateAmount();
@@ -99,7 +125,7 @@ public class Settlement {
      * 영속 레코드 복원 전용(MapStruct 매퍼의 toDomain 에서만 호출). 저장된 필드를 그대로 재구성한다.
      *
      * <p>{@code commissionRate} 는 정산 시점 스냅샷(V32 이력 보존 원칙)이라 write-once 여야 한다 —
-     * private 생성 경로 + setter 부재로 재부여 자체가 불가능해 이 팩토리가 그 보장을 대체한다.
+     * {@code final} 필드 + private 생성 경로 + setter 부재로 재부여 자체가 컴파일 단에서 불가능하다.
      */
     public static Settlement rehydrate(Long id, Long paymentId, Long orderId,
                                        BigDecimal paymentAmount, BigDecimal refundedAmount,
@@ -111,34 +137,16 @@ public class Settlement {
                                        BigDecimal holdbackAmount, BigDecimal holdbackRate,
                                        LocalDate holdbackReleaseDate, boolean holdbackReleased,
                                        LocalDateTime holdbackReleasedAt) {
-        Settlement s = new Settlement();
-        s.id = id;
-        s.paymentId = paymentId;
-        s.orderId = orderId;
-        s.paymentAmount = paymentAmount;
-        s.refundedAmount = refundedAmount != null ? refundedAmount : BigDecimal.ZERO;
-        s.commission = commission;
-        s.commissionRate = commissionRate;
-        s.netAmount = netAmount;
-        s.status = status != null ? status : SettlementStatus.REQUESTED;
-        s.settlementDate = settlementDate;
-        s.failureReason = failureReason;
-        s.confirmedAt = confirmedAt;
-        s.createdAt = createdAt != null ? createdAt : LocalDateTime.now();
-        s.updatedAt = updatedAt != null ? updatedAt : LocalDateTime.now();
-        s.version = version;
-        s.holdbackAmount = holdbackAmount != null ? holdbackAmount : BigDecimal.ZERO;
-        s.holdbackRate = holdbackRate != null ? holdbackRate : BigDecimal.ZERO;
-        s.holdbackReleaseDate = holdbackReleaseDate;
-        s.holdbackReleased = holdbackReleased;
-        s.holdbackReleasedAt = holdbackReleasedAt;
-        return s;
+        return new Settlement(id, paymentId, orderId, paymentAmount, refundedAmount, commission,
+                commissionRate, netAmount, status, settlementDate, failureReason, confirmedAt,
+                createdAt, updatedAt, version, holdbackAmount, holdbackRate, holdbackReleaseDate,
+                holdbackReleased, holdbackReleasedAt);
     }
 
     private void calculateCommissionAndNetAmount() {
-        BigDecimal rate = commissionRate != null ? commissionRate : COMMISSION_RATE;
+        // commissionRate 는 생성자에서 non-null 로 정규화된다.
         Money payment = Money.of(paymentAmount);
-        Money commissionMoney = payment.times(rate);
+        Money commissionMoney = payment.times(commissionRate);
         this.commission = commissionMoney.toBigDecimal();
         this.netAmount = payment.minus(commissionMoney).toBigDecimal();
     }
@@ -362,11 +370,11 @@ public class Settlement {
 
     public BigDecimal getPaymentAmount() { return paymentAmount; }
 
-    public BigDecimal getRefundedAmount() { return refundedAmount != null ? refundedAmount : BigDecimal.ZERO; }
+    public BigDecimal getRefundedAmount() { return refundedAmount; }
 
     public BigDecimal getCommission() { return commission; }
 
-    public BigDecimal getCommissionRate() { return commissionRate != null ? commissionRate : COMMISSION_RATE; }
+    public BigDecimal getCommissionRate() { return commissionRate; }
 
     public BigDecimal getNetAmount() { return netAmount; }
 

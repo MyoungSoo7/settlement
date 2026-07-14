@@ -24,24 +24,19 @@ import java.util.List;
 public class Order {
 
     private Long id;
-    private Long userId;
-    private Long productId;
-    private BigDecimal amount;
+    private final Long userId;
+    private final Long productId;
+    private final BigDecimal amount;
     private OrderStatus status;
-    private LocalDateTime createdAt;
+    private final LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private BigDecimal shippingFee = BigDecimal.ZERO;  // 결제에 포함된 배송비(기본 0). 환불 정책 계산에 사용.
     private boolean shipped = false;                   // 배송 시작(IN_TRANSIT/DELIVERED 도달) 여부 — 상태 전이와 무관하게 보존.
     private final List<OrderItem> items = new ArrayList<>();
 
-    // 신규 주문 골격 생성 전용 — 생성/복원은 팩토리(create/createMultiItem/rehydrate)만 통과(Settlement 와 동형)
-    private Order() {
-        this.status = OrderStatus.CREATED;
-        this.createdAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
-    }
-
-    // 전체 생성자 — 복원 팩토리 rehydrate 전용(외부의 임의 status 주입 봉인)
+    // 정본 생성자 — 생성/복원 팩토리(create/createMultiItem/rehydrate)만 통과(Settlement 와 동형).
+    // 불변 식별·금액 필드(userId·productId·amount·createdAt)를 여기서 못박아 재할당을 컴파일 단에서 봉인하고,
+    // 외부의 임의 status 주입도 함께 봉인한다.
     private Order(Long id, Long userId, Long productId, BigDecimal amount, OrderStatus status,
                  LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.id = id;
@@ -55,10 +50,8 @@ public class Order {
 
     // 정적 팩토리 메서드
     public static Order create(Long userId, Long productId, BigDecimal amount) {
-        Order order = new Order();
-        order.userId = userId;
-        order.productId = productId;
-        order.amount = amount;
+        LocalDateTime now = LocalDateTime.now();
+        Order order = new Order(null, userId, productId, amount, OrderStatus.CREATED, now, now);
         order.validateUserId();
         order.validateAmount();
         return order;
@@ -101,9 +94,6 @@ public class Order {
         if (discount.signum() < 0) {
             throw new OrderInvariantViolationException("할인 금액은 음수일 수 없습니다");
         }
-        Order order = new Order();
-        order.userId = userId;
-        order.validateUserId();
         // 라운딩 정책 경계 — 공용 Money VO(shared-common)를 여기서는 의도적으로 쓰지 않는다.
         // line_amount = unitPrice(scale 0 정수 KRW) × quantity(int) 이고 할인도 정수라 이 합산·차감은
         // 항상 정확한 정수 연산이다: 반올림 여지가 없어 Money 의 scale 2 HALF_UP 정규화 이득이 0 이다.
@@ -117,7 +107,10 @@ public class Order {
             throw new OrderInvariantViolationException(
                     "할인 금액(" + discount + ") 이 주문 소계(" + subtotal + ") 이상일 수 없습니다");
         }
-        order.amount = subtotal.subtract(discount);
+        LocalDateTime now = LocalDateTime.now();
+        Order order = new Order(null, userId, null, subtotal.subtract(discount),
+                OrderStatus.CREATED, now, now);
+        order.validateUserId();
         order.validateAmount();
         order.items.addAll(items);
         return order;
