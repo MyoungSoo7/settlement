@@ -56,6 +56,8 @@ The backend image matrix produces four images from the shared Dockerfile:
 
 The emergency image workflow uses the same matrix so recovery cannot silently omit the two new production units. ArgoCD's Application source enables recursive directory discovery because the manifests live under `k8s/base`, `k8s/ingress`, `k8s/security`, and `k8s/stroage`.
 
+The current ArgoCD Application is a plain Directory app and has no supported Image Updater integration. The post-CI production smoke therefore checks only the revision currently deployed after a manifest reconciliation window; it does not prove that a newly built mutable tag was promoted. Subsequent image promotion requires a separate Kustomize-based immutable-tag mechanism. Git writeback and Image Updater are intentionally outside this change.
+
 ## Failure Handling and Rollout
 
 - The account Deployment remains unready until Flyway, JPA validation, and the database health check succeed.

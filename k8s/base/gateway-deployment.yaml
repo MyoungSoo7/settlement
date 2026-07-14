@@ -35,8 +35,6 @@ spec:
           envFrom:
             - configMapRef:
                 name: gateway-config
-            - secretRef:
-                name: lemuel-secret
           resources:
             requests:
               memory: "512Mi"

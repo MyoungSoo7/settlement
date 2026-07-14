@@ -12,6 +12,7 @@ spec:
   accessModes:
     - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
+  # Single-node only: hostPath binds data to one node and is not portable across rescheduling nodes.
   hostPath:
     path: /data/k8s/account-db
     type: DirectoryOrCreate
