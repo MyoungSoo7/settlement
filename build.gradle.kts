@@ -26,6 +26,15 @@ subprojects {
         }
     }
 
+    // -parameters: 메서드 파라미터 이름을 바이트코드에 보존한다.
+    // Spring Data 가 @Param 없이도 @Query 의 이름 파라미터(:name)를 파라미터명으로 추론 →
+    // 파라미터 바인딩 누락으로 인한 런타임 실패(PostgreSQL 42P18 "indeterminate datatype",
+    // 폴링 쿼리 ERROR 폭주로 인한 ELK 색인 과부하) 계열의 1차 방어선.
+    // (2차 방어선: 각 서비스 아키텍처 테스트의 @Query↔@Param 매칭 ArchUnit 룰)
+    tasks.withType<JavaCompile>().configureEach {
+        options.compilerArgs.add("-parameters")
+    }
+
     extensions.configure<io.spring.gradle.dependencymanagement.dsl.DependencyManagementExtension> {
         imports {
             mavenBom("org.springframework.cloud:spring-cloud-dependencies:2025.1.0")

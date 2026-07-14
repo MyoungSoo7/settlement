@@ -28,7 +28,7 @@ public interface SpringDataProductJpaRepository extends JpaRepository<ProductJpa
                    OR LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
                    OR LOWER(COALESCE(p.description, '')) LIKE LOWER(CONCAT('%', :keyword, '%')))
             """)
-    List<ProductJpaEntity> search(String keyword, Long categoryId);
+    List<ProductJpaEntity> search(@Param("keyword") String keyword, @Param("categoryId") Long categoryId);
 
     /**
      * 일반 상품 재고 원자적 차감 — 단일 조건부 UPDATE 로 "재고 검증 + 차감 + 매진 전이" 를 한 번에 처리.
