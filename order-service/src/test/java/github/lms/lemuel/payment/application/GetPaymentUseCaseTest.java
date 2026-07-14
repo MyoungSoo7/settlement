@@ -25,7 +25,7 @@ class GetPaymentUseCaseTest {
 
     @Test @DisplayName("결제 조회 성공")
     void getPayment_success() {
-        PaymentDomain payment = new PaymentDomain(1L, 10L, new BigDecimal("30000"), BigDecimal.ZERO,
+        PaymentDomain payment = PaymentDomain.rehydrate(1L, 10L, new BigDecimal("30000"), BigDecimal.ZERO,
                 PaymentStatus.CAPTURED, "CARD", "pg-tx", null, null, null);
         when(loadPaymentPort.loadById(1L)).thenReturn(Optional.of(payment));
 
@@ -42,7 +42,7 @@ class GetPaymentUseCaseTest {
 
     @Test @DisplayName("주문 ID로 결제 조회 성공")
     void getPaymentByOrderId_success() {
-        PaymentDomain payment = new PaymentDomain(1L, 10L, new BigDecimal("30000"), BigDecimal.ZERO,
+        PaymentDomain payment = PaymentDomain.rehydrate(1L, 10L, new BigDecimal("30000"), BigDecimal.ZERO,
                 PaymentStatus.CAPTURED, "CARD", "pg-tx", null, null, null);
         when(loadPaymentPort.loadByOrderId(10L)).thenReturn(Optional.of(payment));
 
@@ -66,7 +66,7 @@ class GetPaymentUseCaseTest {
 
     @Test @DisplayName("findByOrderId: 결제 있으면 반환")
     void findByOrderId_present() {
-        PaymentDomain payment = new PaymentDomain(1L, 10L, new BigDecimal("30000"), BigDecimal.ZERO,
+        PaymentDomain payment = PaymentDomain.rehydrate(1L, 10L, new BigDecimal("30000"), BigDecimal.ZERO,
                 PaymentStatus.CAPTURED, "CARD", "pg-tx", null, null, null);
         when(loadPaymentPort.loadByOrderId(10L)).thenReturn(Optional.of(payment));
         assertThat(getPaymentUseCase.findByOrderId(10L)).containsSame(payment);

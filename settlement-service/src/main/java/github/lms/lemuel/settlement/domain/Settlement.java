@@ -247,11 +247,12 @@ public class Settlement {
     }
 
     /**
-     * 정산 취소 — 종료 상태(DONE)는 취소 불가
+     * 정산 취소 — 허용 전이는 {@link SettlementStatus#canTransitionTo} 단일 출처를 위임한다.
+     * 종료 상태(DONE·CANCELED)는 전이표가 차단하므로 별도 인라인 가드를 두지 않는다.
      */
     public void cancel() {
-        if (this.status == SettlementStatus.DONE) {
-            throw new InvalidSettlementStateException(this.status, "DONE settlements cannot be canceled");
+        if (!this.status.canTransitionTo(SettlementStatus.CANCELED)) {
+            throw new InvalidSettlementStateException(this.status, SettlementStatus.CANCELED);
         }
         this.status = SettlementStatus.CANCELED;
         this.updatedAt = LocalDateTime.now();

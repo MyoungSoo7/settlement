@@ -19,28 +19,27 @@ import java.util.List;
 @Getter
 public class PaymentDomain {
 
-    private Long id;
-    private Long orderId;
-    private BigDecimal amount;
+    private final Long id;
+    private final Long orderId;
+    private final BigDecimal amount;
     private BigDecimal refundedAmount;
     private PaymentStatus status;
-    private String paymentMethod;
+    private final String paymentMethod;
     private String pgTransactionId;
     private LocalDateTime capturedAt;
-    private LocalDateTime createdAt;
+    private final LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     /** 분할결제 라인. 비어있으면 단일결제 (legacy). */
     private final List<PaymentTender> tenders = new ArrayList<>();
 
-    // Constructor for creating new payment
-    public PaymentDomain(Long orderId, BigDecimal amount, String paymentMethod) {
-        this.orderId = orderId;
-        this.amount = amount;
-        this.paymentMethod = paymentMethod;
-        this.status = PaymentStatus.READY;
-        this.refundedAmount = BigDecimal.ZERO;
-        this.createdAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
+    /**
+     * 신규 결제 생성 팩토리 — 봉인된 정본 생성자에 위임한다(Payment/Settlement 동형: 생성자 비공개, 팩토리 공개).
+     * id·pgTransactionId·capturedAt 는 신규 시점에 없으므로 null, 상태는 READY, 환불 누적은 0 으로 못박는다.
+     */
+    public static PaymentDomain create(Long orderId, BigDecimal amount, String paymentMethod) {
+        LocalDateTime now = LocalDateTime.now();
+        return new PaymentDomain(null, orderId, amount, BigDecimal.ZERO, PaymentStatus.READY,
+                paymentMethod, null, null, now, now);
     }
 
     /**
@@ -59,13 +58,24 @@ public class PaymentDomain {
         BigDecimal total = tenders.stream()
                 .map(PaymentTender::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        PaymentDomain p = new PaymentDomain(orderId, total, paymentMethod);
+        PaymentDomain p = create(orderId, total, paymentMethod);
         p.tenders.addAll(tenders);
         return p;
     }
 
-    // Constructor for reconstitution from persistence
-    public PaymentDomain(Long id, Long orderId, BigDecimal amount, BigDecimal refundedAmount,
+    /**
+     * 영속 레코드 복원 팩토리(MapStruct/매퍼의 toDomain 전용). 저장된 필드를 그대로 재구성한다.
+     * 봉인된 정본 생성자에 위임해 생성 경로를 create/rehydrate 둘로 못박는다.
+     */
+    public static PaymentDomain rehydrate(Long id, Long orderId, BigDecimal amount, BigDecimal refundedAmount,
+                   PaymentStatus status, String paymentMethod, String pgTransactionId,
+                   LocalDateTime capturedAt, LocalDateTime createdAt, LocalDateTime updatedAt) {
+        return new PaymentDomain(id, orderId, amount, refundedAmount, status, paymentMethod,
+                pgTransactionId, capturedAt, createdAt, updatedAt);
+    }
+
+    // 정본 생성자 — create/rehydrate 팩토리만 통과한다.
+    private PaymentDomain(Long id, Long orderId, BigDecimal amount, BigDecimal refundedAmount,
                    PaymentStatus status, String paymentMethod, String pgTransactionId,
                    LocalDateTime capturedAt, LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.id = id;

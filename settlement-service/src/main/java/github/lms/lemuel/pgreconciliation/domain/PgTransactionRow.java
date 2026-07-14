@@ -1,8 +1,9 @@
 package github.lms.lemuel.pgreconciliation.domain;
 
+import github.lms.lemuel.pgreconciliation.domain.exception.PgReconciliationInvariantViolationException;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.Objects;
 
 /**
  * PG 정산파일의 한 줄을 나타내는 도메인 값 객체.
@@ -26,8 +27,8 @@ public record PgTransactionRow(
         LocalDate settledDate       // PG 가 정산할 영업일
 ) {
     public PgTransactionRow {
-        Objects.requireNonNull(pgTransactionId, "pgTransactionId");
-        Objects.requireNonNull(amount, "amount");
+        if (pgTransactionId == null) throw new PgReconciliationInvariantViolationException("pgTransactionId 는 필수입니다");
+        if (amount == null) throw new PgReconciliationInvariantViolationException("amount 는 필수입니다");
         if (refundedAmount == null) refundedAmount = BigDecimal.ZERO;
         if (fee == null) fee = BigDecimal.ZERO;
     }

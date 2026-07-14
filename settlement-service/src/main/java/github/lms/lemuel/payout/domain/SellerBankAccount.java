@@ -2,8 +2,6 @@ package github.lms.lemuel.payout.domain;
 
 import github.lms.lemuel.payout.domain.exception.PayoutInvariantViolationException;
 
-import java.util.Objects;
-
 /**
  * 송금 대상 계좌 — 정산 시점 스냅샷으로 Payout 에 영구 저장된다.
  *
@@ -16,12 +14,9 @@ public record SellerBankAccount(
         String accountHolderName
 ) {
     public SellerBankAccount {
-        Objects.requireNonNull(bankCode, "bankCode");
-        Objects.requireNonNull(bankAccountNumber, "bankAccountNumber");
-        Objects.requireNonNull(accountHolderName, "accountHolderName");
-        if (bankCode.isBlank()) throw new PayoutInvariantViolationException("bankCode 필수");
-        if (bankAccountNumber.isBlank()) throw new PayoutInvariantViolationException("bankAccountNumber 필수");
-        if (accountHolderName.isBlank()) throw new PayoutInvariantViolationException("accountHolderName 필수");
+        if (bankCode == null || bankCode.isBlank()) throw new PayoutInvariantViolationException("bankCode 필수");
+        if (bankAccountNumber == null || bankAccountNumber.isBlank()) throw new PayoutInvariantViolationException("bankAccountNumber 필수");
+        if (accountHolderName == null || accountHolderName.isBlank()) throw new PayoutInvariantViolationException("accountHolderName 필수");
     }
 
     /**

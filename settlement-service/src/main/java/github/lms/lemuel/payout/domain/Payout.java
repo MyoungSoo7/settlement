@@ -5,7 +5,6 @@ import github.lms.lemuel.payout.domain.exception.PayoutInvariantViolationExcepti
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.Objects;
 
 /**
  * 출금(Payout) 도메인 — 정산금을 셀러 계좌로 실제 송금하는 트랜잭션.
@@ -40,9 +39,15 @@ public class Payout {
 
     public static Payout requestFromSettlement(Long settlementId, Long sellerId,
                                                  BigDecimal amount, SellerBankAccount account) {
-        Objects.requireNonNull(sellerId, "sellerId");
-        Objects.requireNonNull(amount, "amount");
-        Objects.requireNonNull(account, "account");
+        if (sellerId == null) {
+            throw new PayoutInvariantViolationException("sellerId 는 필수입니다");
+        }
+        if (amount == null) {
+            throw new PayoutInvariantViolationException("amount 는 필수입니다");
+        }
+        if (account == null) {
+            throw new PayoutInvariantViolationException("account 는 필수입니다");
+        }
         if (amount.signum() <= 0) {
             throw new PayoutInvariantViolationException("amount 는 양수여야 합니다");
         }

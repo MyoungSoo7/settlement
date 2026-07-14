@@ -56,8 +56,9 @@ class ApplyRepaymentServiceTest {
         assertThat(oldest.getOutstanding()).isEqualByComparingTo("0");
         assertThat(oldest.getStatus()).isEqualTo(LoanStatus.REPAID);
         assertThat(newer.getOutstanding()).isEqualByComparingTo("100000"); // 600000 - 500000
-        verify(recordRepaymentPort).record(eq(100L), eq(7L), eq(new BigDecimal("800000")));
-        verify(publishLoanEventPort).publishRepaymentApplied(100L, 7L, new BigDecimal("800000"));
+        // 차감액은 Money(scale 2) 표준형 — 프로덕션 DB(NUMERIC 19,2) 로드값과 동일 스케일.
+        verify(recordRepaymentPort).record(eq(100L), eq(7L), eq(new BigDecimal("800000.00")));
+        verify(publishLoanEventPort).publishRepaymentApplied(100L, 7L, new BigDecimal("800000.00"));
         verify(saveSettlementViewPort).markConfirmed(100L);
     }
 
@@ -82,8 +83,8 @@ class ApplyRepaymentServiceTest {
         service().apply(new ApplyRepaymentCommand(102L, 7L, new BigDecimal("500000")));
 
         assertThat(loan.getOutstanding()).isEqualByComparingTo("0");
-        verify(recordRepaymentPort).record(102L, 7L, new BigDecimal("200000")); // 잔액만큼만
-        verify(publishLoanEventPort).publishRepaymentApplied(102L, 7L, new BigDecimal("200000"));
+        verify(recordRepaymentPort).record(102L, 7L, new BigDecimal("200000.00")); // 잔액만큼만
+        verify(publishLoanEventPort).publishRepaymentApplied(102L, 7L, new BigDecimal("200000.00"));
     }
 
     @Test
@@ -102,7 +103,7 @@ class ApplyRepaymentServiceTest {
         assertThat(second.getStatus()).isEqualTo(LoanStatus.DISBURSED);
         verify(saveLoanPort).save(first);
         verify(saveLoanPort, never()).save(second);
-        verify(recordRepaymentPort).record(103L, 7L, new BigDecimal("300000"));
+        verify(recordRepaymentPort).record(103L, 7L, new BigDecimal("300000.00"));
     }
 
     @Test

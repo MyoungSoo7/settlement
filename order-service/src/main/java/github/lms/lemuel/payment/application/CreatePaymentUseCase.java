@@ -41,7 +41,7 @@ public class CreatePaymentUseCase implements CreatePaymentPort {
         }
 
         // Create payment domain entity
-        PaymentDomain paymentDomain = new PaymentDomain(
+        PaymentDomain paymentDomain = PaymentDomain.create(
             order.getId(),
             order.getAmount(),
             command.getPaymentMethod()

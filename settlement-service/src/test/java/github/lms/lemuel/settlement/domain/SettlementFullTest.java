@@ -122,6 +122,41 @@ class SettlementFullTest {
         assertThat(s.getStatus()).isEqualTo(SettlementStatus.CANCELED);
     }
 
+    @Test @DisplayName("PROCESSING에서 cancel 가능 (전이표 위임)")
+    void cancel_fromProcessing() {
+        Settlement s = createSettlement(new BigDecimal("10000"));
+        s.startProcessing();
+        s.cancel();
+        assertThat(s.getStatus()).isEqualTo(SettlementStatus.CANCELED);
+    }
+
+    @Test @DisplayName("FAILED에서 cancel 가능 (전이표 위임)")
+    void cancel_fromFailed() {
+        Settlement s = createSettlement(new BigDecimal("10000"));
+        s.startProcessing();
+        s.fail("오류");
+        s.cancel();
+        assertThat(s.getStatus()).isEqualTo(SettlementStatus.CANCELED);
+    }
+
+    @Test @DisplayName("CANCELED에서 재-cancel 불가 (종료 상태)")
+    void cancel_fromCanceled_fails() {
+        Settlement s = createSettlement(new BigDecimal("10000"));
+        s.cancel();
+        assertThatThrownBy(s::cancel).isInstanceOf(InvalidSettlementStateException.class);
+    }
+
+    @Test @DisplayName("전이표(canTransitionTo): CANCELED 허용·차단 케이스가 cancel() 가드의 단일 출처")
+    void canTransitionTo_cancelSingleSource() {
+        // 허용: 진행 상태(REQUESTED·PROCESSING·FAILED) → CANCELED
+        assertThat(SettlementStatus.REQUESTED.canTransitionTo(SettlementStatus.CANCELED)).isTrue();
+        assertThat(SettlementStatus.PROCESSING.canTransitionTo(SettlementStatus.CANCELED)).isTrue();
+        assertThat(SettlementStatus.FAILED.canTransitionTo(SettlementStatus.CANCELED)).isTrue();
+        // 차단: 종료 상태(DONE·CANCELED) → CANCELED
+        assertThat(SettlementStatus.DONE.canTransitionTo(SettlementStatus.CANCELED)).isFalse();
+        assertThat(SettlementStatus.CANCELED.canTransitionTo(SettlementStatus.CANCELED)).isFalse();
+    }
+
     // 환불 테스트
     @Test @DisplayName("환불 반영 시 순지급액 재계산")
     void adjustForRefund() {

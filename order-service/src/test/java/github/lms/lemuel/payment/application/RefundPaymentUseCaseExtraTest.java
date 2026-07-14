@@ -50,7 +50,7 @@ class RefundPaymentUseCaseExtraTest {
     @InjectMocks RefundPaymentUseCase refundPaymentUseCase;
 
     private PaymentDomain capturedPayment() {
-        return new PaymentDomain(1L, 10L, new BigDecimal("50000"), BigDecimal.ZERO,
+        return PaymentDomain.rehydrate(1L, 10L, new BigDecimal("50000"), BigDecimal.ZERO,
                 PaymentStatus.CAPTURED, "CARD", "pg-tx-123", null, null, null);
     }
 

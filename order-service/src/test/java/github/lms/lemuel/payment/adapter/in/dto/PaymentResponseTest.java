@@ -15,7 +15,7 @@ class PaymentResponseTest {
     @Test
     @DisplayName("PaymentDomain 으로부터 모든 필드를 매핑한다")
     void constructor_mapsFromDomain() {
-        PaymentDomain domain = new PaymentDomain(1L, 10L, new BigDecimal("15000"), BigDecimal.ZERO,
+        PaymentDomain domain = PaymentDomain.rehydrate(1L, 10L, new BigDecimal("15000"), BigDecimal.ZERO,
                 PaymentStatus.CAPTURED, "CARD", "TOSS:tx-1", null, null, null);
 
         PaymentResponse response = new PaymentResponse(domain);

@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Product 도메인의 생성자/세터/상태 확인 메서드 등, ProductFullTest 에서 다루지 않는 나머지 라인 보강.
@@ -17,7 +18,7 @@ class ProductExtraTest {
     @Test
     @DisplayName("기본 생성자: 초기값 확인")
     void noArgConstructor() {
-        Product p = new Product();
+        Product p = Product.create("상품", "설명", new BigDecimal("100"), 0);
 
         assertThat(p.getStatus()).isEqualTo(ProductStatus.ACTIVE);
         assertThat(p.getStockQuantity()).isZero();
@@ -29,7 +30,7 @@ class ProductExtraTest {
     @Test
     @DisplayName("전체 생성자: null 값들은 기본값으로 대체")
     void fullConstructor_defaultsForNulls() {
-        Product p = new Product(1L, "상품", "설명", new BigDecimal("100"),
+        Product p = Product.rehydrate(1L, "상품", "설명", new BigDecimal("100"),
                 null, null, 5L, null, null, null, null);
 
         assertThat(p.getStockQuantity()).isZero();
@@ -44,7 +45,7 @@ class ProductExtraTest {
     @DisplayName("전체 생성자: 값이 모두 있으면 그대로 보존")
     void fullConstructor_preservesValues() {
         LocalDateTime now = LocalDateTime.now();
-        Product p = new Product(1L, "상품", "설명", new BigDecimal("100"), 10,
+        Product p = Product.rehydrate(1L, "상품", "설명", new BigDecimal("100"), 10,
                 ProductStatus.INACTIVE, 5L, List.of(1L, 2L), "{}", now, now);
 
         assertThat(p.getStockQuantity()).isEqualTo(10);
@@ -179,5 +180,13 @@ class ProductExtraTest {
         p.replaceTags(List.of(1L, 2L, 3L));
 
         assertThat(p.getTagIds()).containsExactly(1L, 2L, 3L);
+    }
+
+    @Test
+    @DisplayName("assignId: 두 번째 부여는 IllegalStateException (write-once)")
+    void assignId_writeOnce() {
+        Product p = Product.create("상품", "설명", new BigDecimal("100"), 1);
+        p.assignId(1L);
+        assertThatThrownBy(() -> p.assignId(2L)).isInstanceOf(IllegalStateException.class);
     }
 }

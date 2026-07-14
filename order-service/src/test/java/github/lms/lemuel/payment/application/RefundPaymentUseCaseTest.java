@@ -57,12 +57,12 @@ class RefundPaymentUseCaseTest {
     @InjectMocks RefundPaymentUseCase refundPaymentUseCase;
 
     private PaymentDomain capturedPayment() {
-        return new PaymentDomain(1L, 10L, new BigDecimal("50000"), BigDecimal.ZERO,
+        return PaymentDomain.rehydrate(1L, 10L, new BigDecimal("50000"), BigDecimal.ZERO,
                 PaymentStatus.CAPTURED, "CARD", "pg-tx-123", null, null, null);
     }
 
     private PaymentDomain partiallyRefundedPayment(BigDecimal alreadyRefunded) {
-        return new PaymentDomain(1L, 10L, new BigDecimal("50000"), alreadyRefunded,
+        return PaymentDomain.rehydrate(1L, 10L, new BigDecimal("50000"), alreadyRefunded,
                 PaymentStatus.CAPTURED, "CARD", "pg-tx-123", null, null, null);
     }
 
@@ -166,7 +166,7 @@ class RefundPaymentUseCaseTest {
 
     @Test @DisplayName("이미 REFUNDED 면 PG 호출 없이 멱등 반환")
     void refund_alreadyRefunded_noPgCall() {
-        PaymentDomain payment = new PaymentDomain(1L, 10L, new BigDecimal("50000"), new BigDecimal("50000"),
+        PaymentDomain payment = PaymentDomain.rehydrate(1L, 10L, new BigDecimal("50000"), new BigDecimal("50000"),
                 PaymentStatus.REFUNDED, "CARD", "pg-tx-123", null, null, null);
         when(loadPaymentPort.loadById(1L)).thenReturn(Optional.of(payment));
 
@@ -244,7 +244,7 @@ class RefundPaymentUseCaseTest {
 
     @Test @DisplayName("결제가 이미 전액 환불된 상태에서 남은 FAILED 재시도는 적용 불가로 재시도 소진 고정")
     void retry_paymentAlreadyRefunded_abandonsRetry() {
-        PaymentDomain payment = new PaymentDomain(1L, 10L, new BigDecimal("50000"), new BigDecimal("50000"),
+        PaymentDomain payment = PaymentDomain.rehydrate(1L, 10L, new BigDecimal("50000"), new BigDecimal("50000"),
                 PaymentStatus.REFUNDED, "CARD", "pg-tx-123", null, null, null);
         when(loadPaymentPort.loadById(1L)).thenReturn(Optional.of(payment));
         Refund failed = Refund.request(1L, new BigDecimal("20000"), "partial-key-x", "PARTIAL_REFUND");
@@ -265,7 +265,7 @@ class RefundPaymentUseCaseTest {
 
     @Test @DisplayName("CAPTURED 가 아닌 상태에서는 환불 시도 시 예외 + PG 호출 없음")
     void refund_notCaptured_throwsBeforePgCall() {
-        PaymentDomain payment = new PaymentDomain(1L, 10L, new BigDecimal("50000"), BigDecimal.ZERO,
+        PaymentDomain payment = PaymentDomain.rehydrate(1L, 10L, new BigDecimal("50000"), BigDecimal.ZERO,
                 PaymentStatus.READY, "CARD", null, null, null, null);
         when(loadPaymentPort.loadById(1L)).thenReturn(Optional.of(payment));
 

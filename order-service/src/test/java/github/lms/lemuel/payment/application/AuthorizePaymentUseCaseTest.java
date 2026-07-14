@@ -28,7 +28,7 @@ class AuthorizePaymentUseCaseTest {
 
     @Test @DisplayName("결제 승인 성공")
     void authorize_success() {
-        PaymentDomain payment = new PaymentDomain(1L, new BigDecimal("20000"), "CARD");
+        PaymentDomain payment = PaymentDomain.create(1L, new BigDecimal("20000"), "CARD");
         when(loadPaymentPort.loadById(1L)).thenReturn(Optional.of(payment));
         when(pgClientPort.authorize(any(), any(), any())).thenReturn("pg-tx-456");
         when(savePaymentPort.save(any())).thenAnswer(inv -> inv.getArgument(0));

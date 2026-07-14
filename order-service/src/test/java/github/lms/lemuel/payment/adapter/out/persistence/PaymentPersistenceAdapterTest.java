@@ -122,7 +122,7 @@ class PaymentPersistenceAdapterTest {
     @DisplayName("save: 단일결제(비분할)는 tender 저장 없이 payment 만 저장")
     void save_nonSplit_savesOnlyPayment() {
         PaymentPersistenceAdapter adapter = adapter();
-        PaymentDomain domain = new PaymentDomain(100L, new BigDecimal("50000"), "CARD");
+        PaymentDomain domain = PaymentDomain.create(100L, new BigDecimal("50000"), "CARD");
         PaymentJpaEntity saved = entity(1L, "READY");
         when(paymentJpaRepository.save(any())).thenReturn(saved);
         when(tenderRepository.findByPaymentIdOrderBySequenceAsc(1L)).thenReturn(List.of());
@@ -165,7 +165,7 @@ class PaymentPersistenceAdapterTest {
         PaymentTender pointTender = PaymentTender.rehydrate(
                 8L, 1L, TenderType.POINT, new BigDecimal("5000"), BigDecimal.ZERO,
                 null, TenderStatus.CAPTURED, 1, LocalDateTime.now(), LocalDateTime.now());
-        PaymentDomain domain = new PaymentDomain(1L, 100L, new BigDecimal("50000"), BigDecimal.ZERO,
+        PaymentDomain domain = PaymentDomain.rehydrate(1L, 100L, new BigDecimal("50000"), BigDecimal.ZERO,
                 PaymentStatus.CAPTURED, "SPLIT", null, null, null, null);
         domain.replaceTenders(List.of(pointTender, existingTender));
 
@@ -199,7 +199,7 @@ class PaymentPersistenceAdapterTest {
         PaymentTender t2 = PaymentTender.rehydrate(
                 8L, 1L, TenderType.POINT, new BigDecimal("5000"), BigDecimal.ZERO,
                 null, TenderStatus.CAPTURED, 1, LocalDateTime.now(), LocalDateTime.now());
-        PaymentDomain domain = new PaymentDomain(1L, 100L, new BigDecimal("50000"), BigDecimal.ZERO,
+        PaymentDomain domain = PaymentDomain.rehydrate(1L, 100L, new BigDecimal("50000"), BigDecimal.ZERO,
                 PaymentStatus.CAPTURED, "SPLIT", null, null, null, null);
         domain.replaceTenders(List.of(t1, t2));
 

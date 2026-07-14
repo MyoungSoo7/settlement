@@ -76,7 +76,7 @@ class PaymentControllerSecurityTest {
     @DisplayName("PATCH /payments/{id}/refund — ADMIN 롤은 통과")
     @WithMockUser(roles = "ADMIN")
     void refund_allowed_forAdmin() throws Exception {
-        PaymentDomain refunded = new PaymentDomain(1L, 10L, new BigDecimal("50000"),
+        PaymentDomain refunded = PaymentDomain.rehydrate(1L, 10L, new BigDecimal("50000"),
                 new BigDecimal("50000"), PaymentStatus.REFUNDED, "CARD", "pg-tx", null, null, null);
         when(refundPaymentPort.refundPayment(eq(1L), any(), any())).thenReturn(refunded);
 

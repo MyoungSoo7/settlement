@@ -29,8 +29,8 @@ public class Product {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    // 기본 생성자
-    public Product() {
+    // 기본 생성자 — create/rehydrate 팩토리만 통과한다(다른 애그리거트 동형: 생성자 비공개).
+    private Product() {
         this.status = ProductStatus.ACTIVE;
         this.stockQuantity = 0;
         this.tagIds = new ArrayList<>();
@@ -38,8 +38,8 @@ public class Product {
         this.updatedAt = LocalDateTime.now();
     }
 
-    // 전체 생성자
-    public Product(Long id, String name, String description, BigDecimal price,
+    // 전체 생성자 — rehydrate 팩토리 전용(비공개).
+    private Product(Long id, String name, String description, BigDecimal price,
                    Integer stockQuantity, ProductStatus status, Long categoryId, List<Long> tagIds,
                    String optionsJson, LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.id = id;
@@ -212,6 +212,9 @@ public class Product {
 
     /** Persistence 어댑터가 DB 부여 PK 를 주입할 때 사용(setter 대체). */
     public void assignId(Long id) {
+        if (this.id != null) {
+            throw new IllegalStateException("id 는 1회만 부여할 수 있습니다");
+        }
         this.id = id;
     }
 

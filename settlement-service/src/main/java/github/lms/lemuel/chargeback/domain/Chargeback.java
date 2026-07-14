@@ -5,7 +5,6 @@ import github.lms.lemuel.chargeback.domain.exception.InvalidChargebackStateExcep
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.Objects;
 
 /**
  * 카드사 분쟁(Chargeback) 도메인 — 환불(Refund)과 별개의 회계 원장.
@@ -51,10 +50,18 @@ public class Chargeback {
     public static Chargeback open(Long paymentId, Long settlementId, BigDecimal amount,
                                    ChargebackReason reasonCode, String reasonDetail,
                                    ChargebackSource source, String pgChargebackId) {
-        Objects.requireNonNull(paymentId, "paymentId");
-        Objects.requireNonNull(amount, "amount");
-        Objects.requireNonNull(reasonCode, "reasonCode");
-        Objects.requireNonNull(source, "source");
+        if (paymentId == null) {
+            throw new ChargebackInvariantViolationException("paymentId 는 필수입니다");
+        }
+        if (amount == null) {
+            throw new ChargebackInvariantViolationException("amount 는 필수입니다");
+        }
+        if (reasonCode == null) {
+            throw new ChargebackInvariantViolationException("reasonCode 는 필수입니다");
+        }
+        if (source == null) {
+            throw new ChargebackInvariantViolationException("source 는 필수입니다");
+        }
         if (amount.signum() <= 0) {
             throw new ChargebackInvariantViolationException("amount 는 양수여야 합니다");
         }

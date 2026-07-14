@@ -1,8 +1,9 @@
 package github.lms.lemuel.pgreconciliation.domain;
 
+import github.lms.lemuel.pgreconciliation.domain.exception.PgReconciliationInvariantViolationException;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.Objects;
 
 /**
  * 내부 payments + refunds 원장에서 PG 매칭용으로 추출한 한 줄.
@@ -18,9 +19,9 @@ public record InternalPaymentRow(
         LocalDate capturedDate
 ) {
     public InternalPaymentRow {
-        Objects.requireNonNull(paymentId, "paymentId");
-        Objects.requireNonNull(pgTransactionId, "pgTransactionId");
-        Objects.requireNonNull(capturedAmount, "capturedAmount");
+        if (paymentId == null) throw new PgReconciliationInvariantViolationException("paymentId 는 필수입니다");
+        if (pgTransactionId == null) throw new PgReconciliationInvariantViolationException("pgTransactionId 는 필수입니다");
+        if (capturedAmount == null) throw new PgReconciliationInvariantViolationException("capturedAmount 는 필수입니다");
         if (refundedAmount == null) refundedAmount = BigDecimal.ZERO;
     }
 

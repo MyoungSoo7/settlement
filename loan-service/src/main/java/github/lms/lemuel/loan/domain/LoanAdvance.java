@@ -1,5 +1,6 @@
 package github.lms.lemuel.loan.domain;
 
+import github.lms.lemuel.common.money.Money;
 import github.lms.lemuel.loan.domain.exception.InvalidLoanStateException;
 import github.lms.lemuel.loan.domain.exception.LoanInvariantViolationException;
 
@@ -63,7 +64,7 @@ public class LoanAdvance {
     /** 실행(선지급). 미상환잔액 = 원금 + 수수료. */
     public void disburse() {
         requireStatus(LoanStatus.APPROVED, LoanStatus.DISBURSED);
-        this.outstanding = principal.add(fee);
+        this.outstanding = Money.of(principal).plus(Money.of(fee)).toBigDecimal();
         this.status = LoanStatus.DISBURSED;
     }
 
@@ -80,12 +81,15 @@ public class LoanAdvance {
         if (available == null || available.signum() < 0) {
             throw new LoanInvariantViolationException("상환 가용액은 음수일 수 없습니다: " + available);
         }
-        BigDecimal deducted = outstanding.min(available);
-        this.outstanding = outstanding.subtract(deducted);
-        if (outstanding.signum() == 0) {
+        // CorporateLoan.repay 동형 — 차감·잔액 계산을 Money(scale 2, HALF_UP) 로 통일한다.
+        Money remaining = Money.of(outstanding);
+        Money deducted = remaining.min(Money.of(available));
+        remaining = remaining.minus(deducted);
+        this.outstanding = remaining.toBigDecimal();
+        if (remaining.isZero()) {
             this.status = LoanStatus.REPAID;
         }
-        return deducted;
+        return deducted.toBigDecimal();
     }
 
     private void requireStatus(LoanStatus expected, LoanStatus target) {

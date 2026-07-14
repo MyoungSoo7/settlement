@@ -236,7 +236,7 @@ class RefundApprovalIT {
         var lines = List.of(new CreateMultiItemOrderUseCase.Line(productId, null, qty));
         Order saved = inNewTx(() -> createOrderService.create(userId, lines, null));
 
-        PaymentDomain pay = new PaymentDomain(null, saved.getId(), saved.getAmount(), BigDecimal.ZERO,
+        PaymentDomain pay = PaymentDomain.rehydrate(null, saved.getId(), saved.getAmount(), BigDecimal.ZERO,
                 PaymentStatus.CAPTURED, "CARD", "pg-" + n,
                 LocalDateTime.now(), LocalDateTime.now(), LocalDateTime.now());
         commit(() -> paymentAdapter.save(pay));

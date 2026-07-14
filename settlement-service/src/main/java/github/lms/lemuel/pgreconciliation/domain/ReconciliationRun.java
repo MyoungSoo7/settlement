@@ -1,12 +1,12 @@
 package github.lms.lemuel.pgreconciliation.domain;
 
 import github.lms.lemuel.pgreconciliation.domain.exception.InvalidReconciliationStateException;
+import github.lms.lemuel.pgreconciliation.domain.exception.PgReconciliationInvariantViolationException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
 /**
  * 1회 PG 정산파일 대사 실행의 집합 루트(aggregate root).
@@ -37,9 +37,9 @@ public class ReconciliationRun {
 
     public static ReconciliationRun start(String pgProvider, LocalDate targetDate,
                                           String fileName, String operatorId) {
-        Objects.requireNonNull(pgProvider, "pgProvider");
-        Objects.requireNonNull(targetDate, "targetDate");
-        Objects.requireNonNull(fileName, "fileName");
+        if (pgProvider == null) throw new PgReconciliationInvariantViolationException("pgProvider 는 필수입니다");
+        if (targetDate == null) throw new PgReconciliationInvariantViolationException("targetDate 는 필수입니다");
+        if (fileName == null) throw new PgReconciliationInvariantViolationException("fileName 는 필수입니다");
         return new ReconciliationRun(null, pgProvider, targetDate, fileName,
                 ReconciliationRunStatus.RUNNING, LocalDateTime.now(), null,
                 0, 0, 0, 0, 0, operatorId, null, new ArrayList<>());

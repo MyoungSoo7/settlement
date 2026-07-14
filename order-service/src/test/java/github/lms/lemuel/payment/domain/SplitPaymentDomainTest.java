@@ -132,7 +132,7 @@ class SplitPaymentDomainTest {
         p.validateTenderSum();
 
         // 불변식 위반 시뮬레이션
-        PaymentDomain corrupted = new PaymentDomain(1L, new BigDecimal("999"), "X");
+        PaymentDomain corrupted = PaymentDomain.create(1L, new BigDecimal("999"), "X");
         corrupted.replaceTenders(tenders);
         assertThatThrownBy(corrupted::validateTenderSum)
                 .isInstanceOf(InvalidPaymentStateException.class)
@@ -142,7 +142,7 @@ class SplitPaymentDomainTest {
     @Test
     @DisplayName("isSplit: tender 비어있으면 false (legacy 단일결제 호환)")
     void isSplit_legacyPayment() {
-        PaymentDomain legacy = new PaymentDomain(1L, new BigDecimal("10000"), "CARD");
+        PaymentDomain legacy = PaymentDomain.create(1L, new BigDecimal("10000"), "CARD");
         assertThat(legacy.isSplit()).isFalse();
     }
 

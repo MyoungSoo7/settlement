@@ -12,7 +12,7 @@ import static org.assertj.core.api.Assertions.*;
 class PaymentDomainTest {
 
     private PaymentDomain createReadyPayment() {
-        return new PaymentDomain(1L, new BigDecimal("10000"), "CARD");
+        return PaymentDomain.create(1L, new BigDecimal("10000"), "CARD");
     }
 
     private PaymentDomain createCapturedPayment() {
@@ -130,7 +130,7 @@ class PaymentDomainTest {
 
     @Test @DisplayName("복원 생성자")
     void reconstitution() {
-        PaymentDomain p = new PaymentDomain(1L, 2L, new BigDecimal("5000"), new BigDecimal("1000"),
+        PaymentDomain p = PaymentDomain.rehydrate(1L, 2L, new BigDecimal("5000"), new BigDecimal("1000"),
                 PaymentStatus.CAPTURED, "CARD", "pg-tx", null, null, null);
         assertThat(p.getId()).isEqualTo(1L);
         assertThat(p.getRefundedAmount()).isEqualByComparingTo("1000");
