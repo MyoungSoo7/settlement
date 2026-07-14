@@ -1,33 +1,54 @@
-# Task 4 Report
+# Task 4 Report: Gateway deployment and public routing
 
-## RED
+## Scope
 
-- Command: `node --test scripts/harness/test/install.test.mjs`
-- Result: failed with `ERR_MODULE_NOT_FOUND` for `scripts/harness/install-hooks.mjs`.
-- Meaning: the test exercised the requested public installer module before implementation existed.
+- Added `gateway-config` with only the three deployed upstream Services.
+- Added `gateway-app` and `gateway-service` using the standard backend rollout, resources, probes, secret, and pull configuration.
+- Routed only `/api/account` through Gateway and preserved `/api` on `lemuel-service`.
+- Added explicit frontend routes for `/admin/ceo`, `/admin/system`, `/admin/operation`, `/admin/settlement`, and `/admin/login`.
+- Enabled recursive plain-directory discovery for the Argo CD Application.
+- Added no blanket `/admin` Gateway route and no Image Updater annotations.
 
-## GREEN
+## RED evidence
 
-- Command: `node --test scripts/harness/test/install.test.mjs`
-- Result: 4/4 passed.
-- Command: `node --test scripts/harness/test/guard.test.mjs scripts/harness/test/audit.test.mjs scripts/harness/test/install.test.mjs`
-- Result: 50/50 passed across 17 top-level tests and 4 suites.
-- Integration coverage uses fresh temporary Git repositories for nested-root discovery, two-run idempotency, clean commit acceptance, `pwc/blocked.txt` rejection, and propagation of a present plugin guard failure.
+Command:
 
-## Commit
+```text
+node --test scripts/k8s/test/production-topology.test.mjs
+```
 
-- Message: `feat(harness): install tracked hooks idempotently`
-- Commit: recorded after this report is written; see `git log -1 --format=%H`.
+Result: exit 1; 3 passed, 1 failed. The new topology test failed at the intended missing feature:
 
-## Scope Proof
+```text
+k8s/base/gateway-configmap.yaml must exist
+false !== true
+```
 
-- Task paths only: `.claude/commands/harness-check.md`, `HARNESS.md`, `scripts/harness/install-hooks.mjs`, `scripts/harness/install-hooks.sh` (deleted), `scripts/harness/hooks/pre-commit`, `scripts/harness/test/install.test.mjs`, and this report.
-- `git diff --cached --name-only` was inspected before commit.
-- The commit uses explicit pathspecs so pre-staged `SOUL.md` remains staged but is excluded from the Task 4 commit.
-- No `pwc/` path or other unrelated working-tree path is staged or committed by Task 4.
+## GREEN evidence
 
-## Blocker Regression
+Commands:
 
-- RED: `node --test scripts/harness/test/install.test.mjs` failed 1/5 with the stale reference reported as `CLAUDE.md:25`.
-- GREEN: after replacing it with `node scripts/harness/install-hooks.mjs`, the installer suite passed 5/5.
-- Full verification: `node --test scripts/harness/test/guard.test.mjs scripts/harness/test/audit.test.mjs scripts/harness/test/install.test.mjs` passed 51/51 across 18 top-level tests and 4 suites.
+```text
+kubectl apply --dry-run=client -f k8s/base/gateway-configmap.yaml -o yaml
+kubectl apply --dry-run=client -f k8s/base/gateway-deployment.yaml -o yaml
+kubectl apply --dry-run=client -f k8s/ingress/ingress.yaml -o yaml
+kubectl apply --dry-run=client -f k8s/argocd/argocd-app.yaml -o yaml --validate=false
+node --test scripts/k8s/test/production-topology.test.mjs
+```
+
+Result: all commands exited 0. The focused topology suite reported 4 tests passed, 0 failed.
+
+`git diff --check` also exited 0.
+
+## Review
+
+An independent read-only review found the manifests aligned with the brief but flagged that the initial path-to-backend regexes could match a backend from a later ingress entry. The test now scopes each assertion to one path block, covers all five required admin SPA paths, and explicitly rejects a blanket `/admin` path and Image Updater configuration. The complete validation set remained green after this correction.
+
+## Constraint review
+
+- `/api/account` targets `gateway-service:8080` and precedes `/api`.
+- `/api` still targets `lemuel-service:8080`.
+- All five requested admin SPA paths target `lemuel-frontend-service:80`.
+- No blanket `/admin` path exists.
+- Argo CD remains a plain `directory` source with `recurse: true`.
+- No Image Updater annotations were introduced.

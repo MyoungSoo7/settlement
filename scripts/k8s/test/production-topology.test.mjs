@@ -26,6 +26,23 @@ const accountManifests = [
   "k8s/base/account-deployment.yaml",
 ];
 
+const gatewayManifests = [
+  "k8s/base/gateway-configmap.yaml",
+  "k8s/base/gateway-deployment.yaml",
+];
+
+function ingressPathBlock(contents, path) {
+  const lines = contents.split(/\r?\n/);
+  const start = lines.findIndex((line) => line.trim() === `- path: ${path}`);
+  assert.notEqual(start, -1, `${path} ingress path must exist`);
+
+  const nextPathOffset = lines
+    .slice(start + 1)
+    .findIndex((line) => line.trim().startsWith("- path:"));
+  const end = nextPathOffset === -1 ? lines.length : start + 1 + nextPathOffset;
+  return lines.slice(start, end).join("\n");
+}
+
 for (const workflow of workflows) {
   test(`${workflow.name} publishes every backend deployment image`, () => {
     assert.equal(existsSync(workflow.file), true, `${workflow.file} must exist`);
@@ -72,4 +89,47 @@ test("production topology deploys the Account service and database", () => {
     accountConfig,
     /SPRING_KAFKA_BOOTSTRAP_SERVERS:\s*"redpanda:29092"/,
   );
+});
+
+test("production topology deploys Gateway and preserves narrow public routing", () => {
+  for (const file of gatewayManifests) {
+    assert.equal(existsSync(file), true, `${file} must exist`);
+  }
+
+  const gatewayConfig = readFileSync(gatewayManifests[0], "utf8");
+  const gatewayDeployment = readFileSync(gatewayManifests[1], "utf8");
+  const ingress = readFileSync("k8s/ingress/ingress.yaml", "utf8");
+  const argocd = readFileSync("k8s/argocd/argocd-app.yaml", "utf8");
+
+  assert.match(
+    gatewayDeployment,
+    /image:\s*ghcr\.io\/myoungsoo7\/settlement-gateway:latest/,
+  );
+  assert.match(
+    gatewayConfig,
+    /ACCOUNT_SERVICE_URI:\s*"http:\/\/account-service:8080"/,
+  );
+  assert.match(argocd, /directory:\s*\n\s+recurse: true/);
+  assert.match(ingressPathBlock(ingress, "/api/account"), /name: gateway-service/);
+  assert.match(ingressPathBlock(ingress, "/api"), /name: lemuel-service/);
+
+  for (const path of [
+    "/admin/ceo",
+    "/admin/system",
+    "/admin/operation",
+    "/admin/settlement",
+    "/admin/login",
+  ]) {
+    assert.match(
+      ingressPathBlock(ingress, path),
+      /name: lemuel-frontend-service/,
+    );
+  }
+
+  assert.equal(
+    ingress.split(/\r?\n/).some((line) => line.trim() === "- path: /admin"),
+    false,
+    "blanket /admin ingress path must not exist",
+  );
+  assert.doesNotMatch(argocd, /(?:argocd-)?image-updater/i);
 });

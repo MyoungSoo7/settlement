@@ -43,6 +43,15 @@ spec:
     - http:
         paths:
           # --- 백엔드 API 경로 (우선순위 높음) ---
+          # Account API만 Gateway를 거쳐 account-service로 전달
+          - path: /api/account
+            pathType: Prefix
+            backend:
+              service:
+                name: gateway-service
+                port:
+                  number: 8080
+
           # REST API 전체 (가장 많이 쓰이는 진입점)
           - path: /api
             pathType: Prefix
@@ -116,6 +125,47 @@ spec:
                   number: 8080
 
           # --- 프론트엔드 (React SPA) ---
+          # 관리자 SPA deep link를 프론트엔드로 명시적으로 전달
+          - path: /admin/ceo
+            pathType: Prefix
+            backend:
+              service:
+                name: lemuel-frontend-service
+                port:
+                  number: 80
+
+          - path: /admin/system
+            pathType: Prefix
+            backend:
+              service:
+                name: lemuel-frontend-service
+                port:
+                  number: 80
+
+          - path: /admin/operation
+            pathType: Prefix
+            backend:
+              service:
+                name: lemuel-frontend-service
+                port:
+                  number: 80
+
+          - path: /admin/settlement
+            pathType: Prefix
+            backend:
+              service:
+                name: lemuel-frontend-service
+                port:
+                  number: 80
+
+          - path: /admin/login
+            pathType: Prefix
+            backend:
+              service:
+                name: lemuel-frontend-service
+                port:
+                  number: 80
+
           # 가장 마지막에 위치해야 다른 경로 규칙이 먼저 매칭됨
           # React Router 사용 시 모든 경로를 index.html로 응답해야 SPA 라우팅 동작
           - path: /
