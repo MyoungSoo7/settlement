@@ -10,18 +10,22 @@ import java.math.BigDecimal;
  */
 public enum SellerTier {
     /** 기본 등급 — 3.5% 수수료, T+7 영업일 정산. */
-    NORMAL("0.0350", SettlementCycle.T_PLUS_7),
+    NORMAL("0.0350", SettlementCycle.T_PLUS_7, "0.30", 30),
     /** VIP — 2.5% 수수료, T+3 영업일 정산. */
-    VIP("0.0250", SettlementCycle.T_PLUS_3),
+    VIP("0.0250", SettlementCycle.T_PLUS_3, "0.10", 14),
     /** STRATEGIC — 2.0% 수수료, T+1 영업일 정산 (대형 전략 파트너). */
-    STRATEGIC("0.0200", SettlementCycle.T_PLUS_1);
+    STRATEGIC("0.0200", SettlementCycle.T_PLUS_1, "0", 0);
 
     private final BigDecimal rate;
     private final SettlementCycle defaultCycle;
+    private final BigDecimal holdbackRate;
+    private final int holdbackReleaseDays;
 
-    SellerTier(String rate, SettlementCycle defaultCycle) {
+    SellerTier(String rate, SettlementCycle defaultCycle, String holdbackRate, int holdbackReleaseDays) {
         this.rate = new BigDecimal(rate);
         this.defaultCycle = defaultCycle;
+        this.holdbackRate = new BigDecimal(holdbackRate);
+        this.holdbackReleaseDays = holdbackReleaseDays;
     }
 
     public BigDecimal rate() {
@@ -34,6 +38,16 @@ public enum SellerTier {
      */
     public SettlementCycle defaultCycle() {
         return defaultCycle;
+    }
+
+    /** 등급별 기본 홀드백(보류) 비율 — NORMAL 30%·VIP 10%·STRATEGIC 0%. */
+    public BigDecimal holdbackRate() {
+        return holdbackRate;
+    }
+
+    /** 등급별 기본 홀드백 해제 기간(영업일) — NORMAL 30·VIP 14·STRATEGIC 0. */
+    public int holdbackReleaseDays() {
+        return holdbackReleaseDays;
     }
 
     public static SellerTier fromStringOrDefault(String value) {

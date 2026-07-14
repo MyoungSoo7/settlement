@@ -1,5 +1,6 @@
 package github.lms.lemuel.loan.application.service;
 
+import github.lms.lemuel.loan.domain.exception.LoanInvariantViolationException;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -41,9 +42,12 @@ class CreditPolicyTest {
 
     @Test
     void 신청액이_한도초과면_예외() {
+        // 한도 초과는 도메인 불변식 위반(typed) — 요청액/한도 컨텍스트를 메시지로 보존한다.
         assertThatThrownBy(() ->
                 policy.validateWithinLimit(new BigDecimal("900000"), new BigDecimal("1000000"), null))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(LoanInvariantViolationException.class)
+                .hasMessageContaining("requested=900000")
+                .hasMessageContaining("limit=800000");
     }
 
     @Test
@@ -52,7 +56,7 @@ class CreditPolicyTest {
         assertThat(policy.creditLimit(new BigDecimal("1000000"), "C")).isEqualByComparingTo("680000");
         assertThatThrownBy(() ->
                 policy.validateWithinLimit(new BigDecimal("700000"), new BigDecimal("1000000"), "C"))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(LoanInvariantViolationException.class);
         // 68만 이내는 통과
         policy.validateWithinLimit(new BigDecimal("680000"), new BigDecimal("1000000"), "C");
     }
@@ -62,13 +66,13 @@ class CreditPolicyTest {
         assertThat(policy.creditLimit(new BigDecimal("1000000"), "E")).isEqualByComparingTo("0");
         assertThatThrownBy(() ->
                 policy.validateWithinLimit(new BigDecimal("1"), new BigDecimal("1000000"), "E"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(LoanInvariantViolationException.class)
                 .hasMessageContaining("등급 E");
     }
 
     @Test
     void 선지급일수가_음수면_예외() {
         assertThatThrownBy(() -> policy.fee(new BigDecimal("800000"), -1))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(LoanInvariantViolationException.class);
     }
 }

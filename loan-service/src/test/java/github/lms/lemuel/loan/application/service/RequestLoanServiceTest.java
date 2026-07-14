@@ -6,6 +6,7 @@ import github.lms.lemuel.loan.application.port.out.LoadSettlementViewPort;
 import github.lms.lemuel.loan.application.port.out.SaveLoanPort;
 import github.lms.lemuel.loan.domain.LoanAdvance;
 import github.lms.lemuel.loan.domain.LoanStatus;
+import github.lms.lemuel.loan.domain.exception.LoanInvariantViolationException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -64,7 +65,7 @@ class RequestLoanServiceTest {
         // 한도 80만인데 90만 신청 → 초과
         assertThatThrownBy(() ->
                 service().request(new RequestLoanCommand(7L, new BigDecimal("900000"), 5)))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(LoanInvariantViolationException.class);
 
         verify(saveLoanPort, never()).save(any());
     }
@@ -77,7 +78,7 @@ class RequestLoanServiceTest {
         // 평판 미상이면 통과할 80만이지만, D등급 한도 = 80만 × 0.70 = 56만 → 초과
         assertThatThrownBy(() ->
                 service().request(new RequestLoanCommand(7L, new BigDecimal("800000"), 5)))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(LoanInvariantViolationException.class);
 
         verify(saveLoanPort, never()).save(any());
     }
