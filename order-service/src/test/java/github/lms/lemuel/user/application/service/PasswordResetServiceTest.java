@@ -32,7 +32,7 @@ class PasswordResetServiceTest {
 
     private User user(Long id, String email) {
         User u = User.createWithRole(email, "oldhash", UserRole.USER);
-        u.setId(id);
+        u.assignId(id);
         return u;
     }
 

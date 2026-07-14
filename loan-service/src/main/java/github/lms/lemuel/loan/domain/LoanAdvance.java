@@ -50,20 +50,18 @@ public class LoanAdvance {
     }
 
     public void approve() {
-        requireStatus(LoanStatus.REQUESTED, LoanStatus.APPROVED);
+        requireTransition(LoanStatus.APPROVED);
         this.status = LoanStatus.APPROVED;
     }
 
     public void reject() {
-        if (status != LoanStatus.REQUESTED && status != LoanStatus.APPROVED) {
-            throw new InvalidLoanStateException(status, LoanStatus.REJECTED);
-        }
+        requireTransition(LoanStatus.REJECTED);
         this.status = LoanStatus.REJECTED;
     }
 
     /** 실행(선지급). 미상환잔액 = 원금 + 수수료. */
     public void disburse() {
-        requireStatus(LoanStatus.APPROVED, LoanStatus.DISBURSED);
+        requireTransition(LoanStatus.DISBURSED);
         this.outstanding = Money.of(principal).plus(Money.of(fee)).toBigDecimal();
         this.status = LoanStatus.DISBURSED;
     }
@@ -75,9 +73,7 @@ public class LoanAdvance {
      * @return 실제 차감된 금액
      */
     public BigDecimal applyRepayment(BigDecimal available) {
-        if (status != LoanStatus.DISBURSED) {
-            throw new InvalidLoanStateException(status, LoanStatus.REPAID);
-        }
+        requireTransition(LoanStatus.REPAID);
         if (available == null || available.signum() < 0) {
             throw new LoanInvariantViolationException("상환 가용액은 음수일 수 없습니다: " + available);
         }
@@ -92,8 +88,9 @@ public class LoanAdvance {
         return deducted.toBigDecimal();
     }
 
-    private void requireStatus(LoanStatus expected, LoanStatus target) {
-        if (status != expected) {
+    // 상태 전이 가드 — 허용 전이는 LoanStatus#canTransitionTo 단일 출처에 위임한다.
+    private void requireTransition(LoanStatus target) {
+        if (!status.canTransitionTo(target)) {
             throw new InvalidLoanStateException(status, target);
         }
     }

@@ -1,6 +1,7 @@
 package github.lms.lemuel.payment.domain;
 import github.lms.lemuel.payment.domain.exception.InvalidPaymentStateException;
 import github.lms.lemuel.payment.domain.exception.PaymentInvariantViolationException;
+import github.lms.lemuel.payment.domain.exception.RefundExceedsPaymentException;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
@@ -117,6 +118,34 @@ class PaymentDomainTest {
         p.addRefundedAmount(new BigDecimal("2000"));
         p.addRefundedAmount(new BigDecimal("3000"));
         assertThat(p.getRefundedAmount()).isEqualByComparingTo("5000");
+    }
+
+    @Test @DisplayName("정확히 전액까지는 환불 누적 허용")
+    void addRefundedAmount_exactlyFull_ok() {
+        PaymentDomain p = createCapturedPayment();
+        p.addRefundedAmount(new BigDecimal("6000"));
+        p.addRefundedAmount(new BigDecimal("4000")); // 누적 10000 == amount
+        assertThat(p.getRefundedAmount()).isEqualByComparingTo("10000");
+        assertThat(p.isFullyRefunded()).isTrue();
+    }
+
+    @Test @DisplayName("누적 초과환불은 도메인이 차단(초과환불 불변식)")
+    void addRefundedAmount_exceedsAmount_blockedByDomain() {
+        PaymentDomain p = createCapturedPayment();
+        p.addRefundedAmount(new BigDecimal("7000"));
+        // 남은 환불 가능액은 3000 인데 4000 을 누적하면 amount(10000) 초과 → 도메인 차단
+        assertThatThrownBy(() -> p.addRefundedAmount(new BigDecimal("4000")))
+                .isInstanceOf(RefundExceedsPaymentException.class);
+        // 위반 시 상태 불변: 누적액은 갱신되지 않는다
+        assertThat(p.getRefundedAmount()).isEqualByComparingTo("7000");
+    }
+
+    @Test @DisplayName("첫 환불부터 amount 초과 시 도메인 차단")
+    void addRefundedAmount_singleExceeds_blockedByDomain() {
+        PaymentDomain p = createCapturedPayment();
+        assertThatThrownBy(() -> p.addRefundedAmount(new BigDecimal("10001")))
+                .isInstanceOf(RefundExceedsPaymentException.class);
+        assertThat(p.getRefundedAmount()).isEqualByComparingTo(BigDecimal.ZERO);
     }
 
     @Test @DisplayName("전체 생명주기: READY → AUTHORIZED → CAPTURED → REFUNDED")

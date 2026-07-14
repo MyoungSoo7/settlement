@@ -39,7 +39,7 @@ class CreateUserServiceTest {
         when(passwordHashPort.hash("raw-pw")).thenReturn("hashed-pw");
         when(saveUserPort.save(any())).thenAnswer(inv -> {
             User u = inv.getArgument(0);
-            u.setId(1L);
+            u.assignId(1L);
             return u;
         });
 

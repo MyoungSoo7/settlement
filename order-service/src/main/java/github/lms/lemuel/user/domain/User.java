@@ -3,7 +3,6 @@ import github.lms.lemuel.user.domain.exception.InvalidMembershipStateException;
 import github.lms.lemuel.user.domain.exception.UserInvariantViolationException;
 
 import lombok.Getter;
-import lombok.Setter;
 import java.time.LocalDateTime;
 
 /**
@@ -11,7 +10,6 @@ import java.time.LocalDateTime;
  * DB 스키마: id, email, password, role, name, phone_number, is_active, created_at, updated_at
  */
 @Getter
-@Setter
 public class User {
 
     private Long id;
@@ -58,8 +56,8 @@ public class User {
     // 정적 팩토리 메서드
     public static User create(String email, String passwordHash) {
         User user = new User();
-        user.setEmail(email);
-        user.setPasswordHash(passwordHash);
+        user.email = email;
+        user.passwordHash = passwordHash;
         user.validateEmail();
         user.validatePasswordHash();
         return user;
@@ -67,8 +65,38 @@ public class User {
 
     public static User createWithRole(String email, String passwordHash, UserRole role) {
         User user = create(email, passwordHash);
-        user.setRole(role);
+        user.role = role;
         return user;
+    }
+
+    /**
+     * 영속 레코드 복원 팩토리(매퍼의 toDomain 전용). 저장된 필드를 그대로 재구성한다.
+     * membershipStatus 를 포함해 DB 값을 그대로 복원한다(생성자는 APPROVED 로 강제하므로 사용 불가).
+     */
+    public static User rehydrate(Long id, String email, String passwordHash, UserRole role,
+                                 String name, String phoneNumber, boolean active,
+                                 MembershipStatus membershipStatus,
+                                 LocalDateTime createdAt, LocalDateTime updatedAt) {
+        User user = new User();
+        user.id = id;
+        user.email = email;
+        user.passwordHash = passwordHash;
+        user.role = role != null ? role : UserRole.USER;
+        user.name = name;
+        user.phoneNumber = phoneNumber;
+        user.active = active;
+        user.membershipStatus = membershipStatus != null ? membershipStatus : MembershipStatus.APPROVED;
+        user.createdAt = createdAt != null ? createdAt : LocalDateTime.now();
+        user.updatedAt = updatedAt != null ? updatedAt : LocalDateTime.now();
+        return user;
+    }
+
+    /** 영속 저장이 부여한 식별자를 1회 부여한다(식별자는 불변 — 이미 부여됐으면 거부). */
+    public void assignId(Long id) {
+        if (this.id != null && !this.id.equals(id)) {
+            throw new UserInvariantViolationException("User id is already assigned and immutable");
+        }
+        this.id = id;
     }
 
     public static User createWithProfile(String email, String passwordHash, UserRole role,

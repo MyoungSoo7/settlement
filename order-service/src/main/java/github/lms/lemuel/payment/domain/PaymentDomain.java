@@ -2,6 +2,7 @@ package github.lms.lemuel.payment.domain;
 
 import github.lms.lemuel.payment.domain.exception.InvalidPaymentStateException;
 import github.lms.lemuel.payment.domain.exception.PaymentInvariantViolationException;
+import github.lms.lemuel.payment.domain.exception.RefundExceedsPaymentException;
 import lombok.Getter;
 
 import java.math.BigDecimal;
@@ -92,9 +93,7 @@ public class PaymentDomain {
 
     // Business logic: Authorize payment
     public void authorize(String pgTransactionId) {
-        if (this.status != PaymentStatus.READY) {
-            throw new InvalidPaymentStateException(this.status, PaymentStatus.READY);
-        }
+        requireTransition(PaymentStatus.AUTHORIZED);
         this.status = PaymentStatus.AUTHORIZED;
         this.pgTransactionId = pgTransactionId;
         this.updatedAt = LocalDateTime.now();
@@ -102,9 +101,7 @@ public class PaymentDomain {
 
     // Business logic: Capture payment
     public void capture() {
-        if (this.status != PaymentStatus.AUTHORIZED) {
-            throw new InvalidPaymentStateException(this.status, PaymentStatus.AUTHORIZED);
-        }
+        requireTransition(PaymentStatus.CAPTURED);
         this.status = PaymentStatus.CAPTURED;
         this.capturedAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
@@ -113,20 +110,23 @@ public class PaymentDomain {
     // Business logic: Cancel authorization (승인취소) — 매입(capture) 전 AUTHORIZED 건만 취소 가능.
     // capture 이후 자금 회수는 refund 경로를 사용한다(상태머신: AUTHORIZED ↘ CANCELED).
     public void cancel() {
-        if (this.status != PaymentStatus.AUTHORIZED) {
-            throw new InvalidPaymentStateException(this.status, PaymentStatus.AUTHORIZED);
-        }
+        requireTransition(PaymentStatus.CANCELED);
         this.status = PaymentStatus.CANCELED;
         this.updatedAt = LocalDateTime.now();
     }
 
     // Business logic: Refund payment
     public void refund() {
-        if (this.status != PaymentStatus.CAPTURED) {
-            throw new InvalidPaymentStateException(this.status, PaymentStatus.CAPTURED);
-        }
+        requireTransition(PaymentStatus.REFUNDED);
         this.status = PaymentStatus.REFUNDED;
         this.updatedAt = LocalDateTime.now();
+    }
+
+    // 상태 전이 가드 — 허용 전이는 PaymentStatus#canTransitionTo 단일 출처에 위임한다.
+    private void requireTransition(PaymentStatus target) {
+        if (!this.status.canTransitionTo(target)) {
+            throw new InvalidPaymentStateException(this.status, target);
+        }
     }
 
     // Business logic: Calculate refundable amount
@@ -140,8 +140,15 @@ public class PaymentDomain {
     }
 
     // Business logic: Add refunded amount
+    // 도메인 불변식(최종 방어선): 누적 환불액은 결제 금액을 초과할 수 없다(초과환불 차단).
+    // Settlement.adjustForRefund 와 동형 — 유스케이스 선행 가드가 아니라 도메인이 불변식을 강제한다.
     public void addRefundedAmount(BigDecimal refundAmount) {
-        this.refundedAmount = this.refundedAmount.add(refundAmount);
+        BigDecimal newRefunded = this.refundedAmount.add(refundAmount);
+        if (newRefunded.compareTo(this.amount) > 0) {
+            throw new RefundExceedsPaymentException(
+                    "Cumulative refund " + newRefunded + " exceeds payment amount " + this.amount);
+        }
+        this.refundedAmount = newRefunded;
         this.updatedAt = LocalDateTime.now();
     }
 

@@ -64,29 +64,28 @@ public class InvestmentOrder {
     }
 
     public void approve() {
-        requireStatus(InvestmentOrderStatus.REQUESTED, InvestmentOrderStatus.APPROVED);
+        requireTransition(InvestmentOrderStatus.APPROVED);
         this.status = InvestmentOrderStatus.APPROVED;
     }
 
     public void execute() {
-        requireStatus(InvestmentOrderStatus.APPROVED, InvestmentOrderStatus.EXECUTED);
+        requireTransition(InvestmentOrderStatus.EXECUTED);
         this.status = InvestmentOrderStatus.EXECUTED;
     }
 
     public void reject() {
-        requireStatus(InvestmentOrderStatus.REQUESTED, InvestmentOrderStatus.REJECTED);
+        requireTransition(InvestmentOrderStatus.REJECTED);
         this.status = InvestmentOrderStatus.REJECTED;
     }
 
     public void cancel() {
-        if (status != InvestmentOrderStatus.REQUESTED && status != InvestmentOrderStatus.APPROVED) {
-            throw new InvalidInvestmentOrderStateException(status, InvestmentOrderStatus.CANCELED);
-        }
+        requireTransition(InvestmentOrderStatus.CANCELED);
         this.status = InvestmentOrderStatus.CANCELED;
     }
 
-    private void requireStatus(InvestmentOrderStatus expected, InvestmentOrderStatus target) {
-        if (status != expected) {
+    // 상태 전이 가드 — 허용 전이는 InvestmentOrderStatus#canTransitionTo 단일 출처에 위임한다.
+    private void requireTransition(InvestmentOrderStatus target) {
+        if (!status.canTransitionTo(target)) {
             throw new InvalidInvestmentOrderStateException(status, target);
         }
     }

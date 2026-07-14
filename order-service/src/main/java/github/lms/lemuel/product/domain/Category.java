@@ -5,14 +5,12 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.Getter;
-import lombok.Setter;
 
-@Getter
-@Setter
 /**
  * Category Domain Entity (순수 POJO)
  * 계층형 카테고리 구조 지원
  */
+@Getter
 public class Category {
 
     private Long id;
@@ -49,9 +47,9 @@ public class Category {
     // 정적 팩토리 메서드: 최상위 카테고리 생성
     public static Category create(String name, String description, Integer displayOrder) {
         Category category = new Category();
-        category.setName(name);
-        category.setDescription(description);
-        category.setDisplayOrder(displayOrder);
+        category.name = name;
+        category.description = description;
+        category.displayOrder = displayOrder;
         category.validateName();
         return category;
     }
@@ -59,12 +57,20 @@ public class Category {
     // 정적 팩토리 메서드: 하위 카테고리 생성
     public static Category createSubCategory(String name, String description, Long parentId, Integer displayOrder) {
         Category category = new Category();
-        category.setName(name);
-        category.setDescription(description);
-        category.setParentId(parentId);
-        category.setDisplayOrder(displayOrder);
+        category.name = name;
+        category.description = description;
+        category.parentId = parentId;
+        category.displayOrder = displayOrder;
         category.validateName();
         return category;
+    }
+
+    /** 영속 저장이 부여한 식별자를 1회 부여한다(식별자는 불변 — 이미 부여됐으면 거부). */
+    public void assignId(Long id) {
+        if (this.id != null && !this.id.equals(id)) {
+            throw new ProductInvariantViolationException("Category id is already assigned and immutable");
+        }
+        this.id = id;
     }
 
     // 도메인 규칙: name 검증

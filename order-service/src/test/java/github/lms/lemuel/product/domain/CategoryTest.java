@@ -149,7 +149,7 @@ class CategoryTest {
     @Test @DisplayName("changeParent: 자기 자신이면 예외")
     void changeParent_self() {
         Category cat = Category.create("카테고리", "설명", 0);
-        cat.setId(7L);
+        cat.assignId(7L);
         assertThatThrownBy(() -> cat.changeParent(7L))
                 .isInstanceOf(ProductInvariantViolationException.class);
     }

@@ -44,7 +44,7 @@ class MembershipControllerTest {
 
     private User member(long id, UserRole role) {
         User u = User.createWithProfile("m" + id + "@b.com", "hash", role, "회원" + id, "010-0000-0000");
-        u.setId(id);
+        u.assignId(id);
         return u;
     }
 

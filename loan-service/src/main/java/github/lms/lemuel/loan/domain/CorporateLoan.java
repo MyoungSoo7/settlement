@@ -84,18 +84,18 @@ public class CorporateLoan {
     }
 
     public void approve() {
-        requireStatus(CorporateLoanStatus.REQUESTED, CorporateLoanStatus.APPROVED);
+        requireTransition(CorporateLoanStatus.APPROVED);
         this.status = CorporateLoanStatus.APPROVED;
     }
 
     public void reject() {
-        requireStatus(CorporateLoanStatus.REQUESTED, CorporateLoanStatus.REJECTED);
+        requireTransition(CorporateLoanStatus.REJECTED);
         this.status = CorporateLoanStatus.REJECTED;
     }
 
     /** 실행(대출금 지급). 미상환잔액 = 원금 + 수수료. */
     public void disburse() {
-        requireStatus(CorporateLoanStatus.APPROVED, CorporateLoanStatus.DISBURSED);
+        requireTransition(CorporateLoanStatus.DISBURSED);
         this.outstanding = Money.of(principal).plus(Money.of(fee)).toBigDecimal();
         this.status = CorporateLoanStatus.DISBURSED;
     }
@@ -108,7 +108,7 @@ public class CorporateLoan {
      * @return 실제 차감된 금액
      */
     public BigDecimal repay(BigDecimal amount) {
-        requireStatus(CorporateLoanStatus.DISBURSED, CorporateLoanStatus.REPAID);
+        requireTransition(CorporateLoanStatus.REPAID);
         if (amount == null || amount.signum() <= 0) {
             throw new LoanInvariantViolationException("상환액은 양수여야 합니다: " + amount);
         }
@@ -122,8 +122,9 @@ public class CorporateLoan {
         return deducted.toBigDecimal();
     }
 
-    private void requireStatus(CorporateLoanStatus expected, CorporateLoanStatus target) {
-        if (status != expected) {
+    // 상태 전이 가드 — 허용 전이는 CorporateLoanStatus#canTransitionTo 단일 출처에 위임한다.
+    private void requireTransition(CorporateLoanStatus target) {
+        if (!status.canTransitionTo(target)) {
             throw new InvalidLoanStateException(status, target);
         }
     }

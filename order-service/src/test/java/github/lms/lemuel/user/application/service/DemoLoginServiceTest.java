@@ -34,7 +34,7 @@ class DemoLoginServiceTest {
     @Test @DisplayName("autoLogin - 기존 데모 계정이 있으면 그대로 토큰 발급")
     void autoLogin_existingUser() {
         User user = User.createWithRole("demo-user@lemuel.local", "h", UserRole.USER);
-        user.setId(5L);
+        user.assignId(5L);
         when(loadUserPort.findByEmail("demo-user@lemuel.local")).thenReturn(Optional.of(user));
         when(tokenProviderPort.generateToken("demo-user@lemuel.local", "USER", 5L)).thenReturn("jwt-token");
 
@@ -52,7 +52,7 @@ class DemoLoginServiceTest {
         when(passwordHashPort.hash(any())).thenReturn("hashed");
         when(saveUserPort.save(any())).thenAnswer(inv -> {
             User u = inv.getArgument(0);
-            u.setId(7L);
+            u.assignId(7L);
             return u;
         });
         when(tokenProviderPort.generateToken("demo-admin@lemuel.local", "ADMIN", 7L)).thenReturn("admin-jwt");
@@ -67,7 +67,7 @@ class DemoLoginServiceTest {
     @Test @DisplayName("autoLogin - 기존 계정의 역할이 다르면 보정 후 저장")
     void autoLogin_correctsRoleMismatch() {
         User user = User.createWithRole("demo-manager@lemuel.local", "h", UserRole.USER);
-        user.setId(3L);
+        user.assignId(3L);
         when(loadUserPort.findByEmail("demo-manager@lemuel.local")).thenReturn(Optional.of(user));
         when(saveUserPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(tokenProviderPort.generateToken("demo-manager@lemuel.local", "MANAGER", 3L)).thenReturn("mgr-jwt");
@@ -82,7 +82,7 @@ class DemoLoginServiceTest {
     @Test @DisplayName("autoLogin - role 이 null 이면 USER 로 기본 처리")
     void autoLogin_nullRoleDefaultsUser() {
         User user = User.createWithRole("demo-user@lemuel.local", "h", UserRole.USER);
-        user.setId(1L);
+        user.assignId(1L);
         when(loadUserPort.findByEmail("demo-user@lemuel.local")).thenReturn(Optional.of(user));
         when(tokenProviderPort.generateToken("demo-user@lemuel.local", "USER", 1L)).thenReturn("t");
 

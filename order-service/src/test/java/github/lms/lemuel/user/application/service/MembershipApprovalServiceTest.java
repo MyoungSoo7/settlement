@@ -43,7 +43,7 @@ class MembershipApprovalServiceTest {
 
     private User pendingCompany() {
         User user = User.createWithProfile("c@x.com", "hash", UserRole.COMPANY, "업체", "010-1111-2222");
-        user.setId(7L);
+        user.assignId(7L);
         user.markPending();
         return user;
     }
