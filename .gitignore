@@ -98,6 +98,9 @@ frontend/*.out.log
 ### 배치 재생성 산출물 (분기 브리핑 배치가 지우고 재생성 — 이력 제외) ###
 pwc/submission/outputs/batch/
 
+### 데모 런타임 산출물 (recommend/sector-report/invest-cycle 이 실행 시 생성 — 이력 제외) ###
+hackathon/kakaopay/submission/outputs/
+
 ### API 응답 캐시 (재생성 가능 — 이력 제외) ###
 **/submission/src/data/cache/
 
