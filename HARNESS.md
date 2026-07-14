@@ -25,6 +25,7 @@
 │   ├── money-safety · ledger-invariants · idempotency-and-events   # 횡단 규칙
 │   ├── recon-playbook · incident-runbooks · compliance-review      # 운영/리뷰
 │   ├── settlement-integration-test                                 # Testcontainers 통합테스트 작성
+│   ├── msa-service-wiring · event-contract-change · projection-view-ops  # 확장 절차 (서비스 배선·이벤트 계약·프로젝션)
 │   └── socrates·wonder·reflect·refine·restate·evolve-step·ontology·interview-harness  # 요구사항 인터뷰 서브하네스
 ├── commands/                          # 슬래시 커맨드 (워크플로 진입점)
 │   ├── settlement-explain · loan-credit-explain · investment-score-explain  # 산정 근거 풀이(CS/CEO)
@@ -56,6 +57,9 @@
 > | 정산 로직 작성·변경 | 📘`settlement-domain-rules`+`money-safety`+`ledger-invariants` → 🤖`settlement-logic-expert` → 🤖`settlement-test-generator` |
 > | 임의 서비스 도메인 작업 | 📘 해당 `{서비스}-rules` 로드 후 구현 → 🤖`hexagonal-arch-reviewer` 경계 검증 |
 > | 이벤트 발행·컨슈머·멱등 | 📘`idempotency-and-events` → 🤖`event-contract-reviewer` (schema↔producer↔consumer 3자 정합·Outbox·멱등) |
+> | cross-service 토픽 추가·페이로드 변경 | 📘`event-contract-change` (스키마·샘플·양방향 계약 테스트 배선) → 🤖`event-contract-reviewer` → 🚦이벤트 계약 테스트 |
+> | 신규 서비스·도메인 추가 / 배선 404 | 📘`msa-service-wiring` (5곳 배선 체크리스트) → 🚦`harness-audit.mjs` 셀프체크 |
+> | 프로젝션 뷰 추가·드리프트·백필 | 📘`projection-view-ops` (ADR 0020) + 📘`recon-playbook`·`incident-runbooks` |
 > | 계정계 GL·시산표·분개 | 🤖`gl-ledger-auditor` (차1대1 균형·6토픽 매핑·2단 멱등·소비전용) + 📘`ledger-invariants`·`account-domain-rules` |
 > | 쿼리·인덱스·ES 매핑·성능 | 🤖`db-query-architect` |
 > | MSA 경계 변경 | 🤖`hexagonal-arch-reviewer` → 🚦ArchUnit (*코드 의존 0 / cross-DB 0* 위반 차단) |
@@ -137,7 +141,7 @@ grep -E '🤖|📘|⌘' HARNESS.md | grep -oE '`[a-z][a-z-]+`' | tr -d '`' | sor
 ## 확장 가이드 (하네스를 늘릴 때)
 - 새 도메인 전용 에이전트·스킬을 만들 땐 관련 **하드스톱 + `*-rules`** 를 프롬프트에 내재화(위 하드스톱 섹션이 정본).
 - 돈 경로(결제·환불·지급·대출·투자) 신규 코드는 멱등(Idempotency-Key)·동시성(비관락)·실패 롤백을 점검 항목에 포함.
-- 새 서비스 추가 시 `{서비스}-rules` 스킬 + 커맨드 + gateway/스캔 배선(5곳)을 함께 배선하고, 라우팅 맵에 트리거 행 1개 추가 후 **셀프체크** 재실행.
+- 새 서비스 추가 시 `{서비스}-rules` 스킬 + 커맨드 + gateway/스캔 배선(5곳, 절차 정본: 📘`msa-service-wiring`)을 함께 배선하고, 라우팅 맵에 트리거 행 1개 추가 후 **셀프체크** 재실행.
 
 ## 관련 문서
 - `CLAUDE.md` — 에이전트 운용 규칙 / 아키텍처 경계·컨벤션
