@@ -13,11 +13,11 @@ const workflows = [
   },
 ];
 
-const imageMappings = [
-  ["order-service", "", "ghcr.io/myoungsoo7/settlement"],
-  ["settlement-service", "-settlement", "ghcr.io/myoungsoo7/settlement-settlement"],
-  ["gateway-service", "-gateway", "ghcr.io/myoungsoo7/settlement-gateway"],
-  ["account-service", "-account", "ghcr.io/myoungsoo7/settlement-account"],
+const expectedImageMappings = [
+  ["order-service", ""],
+  ["settlement-service", "-settlement"],
+  ["gateway-service", "-gateway"],
+  ["account-service", "-account"],
 ];
 
 for (const workflow of workflows) {
@@ -25,15 +25,22 @@ for (const workflow of workflows) {
     assert.equal(existsSync(workflow.file), true, `${workflow.file} must exist`);
     const contents = readFileSync(workflow.file, "utf8");
 
-    for (const [module, imageSuffix] of imageMappings) {
-      assert.match(
-        contents,
-        new RegExp(`module: ${module}[\\s\\S]*?image_suffix: "${imageSuffix}"`),
-      );
-    }
+    assert.match(contents, /^\s*REGISTRY:\s*ghcr\.io\s*$/m);
+    assert.match(
+      contents,
+      /^\s*BACKEND_IMAGE:\s*\$\{\{\s*github\.repository\s*\}\}\s*$/m,
+    );
+    assert.match(
+      contents,
+      /uses:\s*docker\/metadata-action@v5[\s\S]*?images:\s*\$\{\{\s*env\.REGISTRY\s*\}\}\/\$\{\{\s*env\.BACKEND_IMAGE\s*\}\}\$\{\{\s*matrix\.image_suffix\s*\}\}/,
+    );
 
-    for (const [module, , image] of imageMappings) {
-      assert.match(contents, new RegExp(`${module}[^\\n]*${image}`));
-    }
+    const configuredMappings = Array.from(
+      contents.matchAll(
+        /^\s*- module:\s*([^\s]+)\s*\r?\n\s*image_suffix:\s*"([^"]*)"\s*$/gm,
+      ),
+      ([, module, imageSuffix]) => [module, imageSuffix],
+    );
+    assert.deepEqual(configuredMappings, expectedImageMappings);
   });
 }

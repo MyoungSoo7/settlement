@@ -20,46 +20,44 @@
 
 ---
 
-### Task 1: Add a production topology regression test
+### Task 1: Add a CI image publishing regression test
+
+Tasks 1 and 2 are one reviewable TDD unit. The test added here intentionally covers only executable workflow publishing configuration; Kubernetes topology assertions are introduced immediately before their implementations in Tasks 3 and 4.
 
 **Files:**
 - Create: `scripts/k8s/test/production-topology.test.mjs`
 
 **Interfaces:**
-- Consumes: repository YAML and workflow files as text.
-- Produces: `node --test` assertions that fail if CI images, account/Gateway resources, Argo recursion, or narrow Ingress routing disappear.
+- Consumes: GitHub workflow files as text.
+- Produces: `node --test` assertions that fail if the GHCR base configuration, metadata image expression, or backend module/suffix matrix changes.
 
 - [ ] **Step 1: Write the failing test**
 
-Create a Node test using `node:test`, `node:assert/strict`, `readFileSync`, and `existsSync`. It must assert:
+Create a Node test using `node:test`, `node:assert/strict`, `readFileSync`, and `existsSync`. For both workflows, assert executable configuration rather than comments:
 
 ```javascript
-assert.match(ci, /module: gateway-service[\s\S]*image_suffix: "-gateway"/);
-assert.match(ci, /module: account-service[\s\S]*image_suffix: "-account"/);
-assert.match(emergency, /module: gateway-service[\s\S]*image_suffix: "-gateway"/);
-assert.match(emergency, /module: account-service[\s\S]*image_suffix: "-account"/);
-for (const file of requiredManifests) assert.equal(existsSync(file), true, `${file} must exist`);
-assert.match(argocd, /directory:\s*\n\s+recurse: true/);
-assert.match(ingress, /path: \/api\/account[\s\S]*name: gateway-service/);
-assert.match(ingress, /path: \/api\s*[\s\S]*name: lemuel-service/);
-assert.match(ingress, /path: \/admin\/ceo[\s\S]*name: lemuel-frontend-service/);
+assert.match(workflow, /^\s*REGISTRY:\s*ghcr\.io\s*$/m);
+assert.match(workflow, /^\s*BACKEND_IMAGE:\s*\$\{\{\s*github\.repository\s*\}\}\s*$/m);
+assert.match(workflow, /images:\s*\$\{\{\s*env\.REGISTRY\s*\}\}\/\$\{\{\s*env\.BACKEND_IMAGE\s*\}\}\$\{\{\s*matrix\.image_suffix\s*\}\}/);
+assert.deepEqual(configuredMappings, [
+  ["order-service", ""],
+  ["settlement-service", "-settlement"],
+  ["gateway-service", "-gateway"],
+  ["account-service", "-account"],
+]);
 ```
 
-The test must also assert the expected image names, JDBC URL, `MANAGEMENT_SERVER_PORT: "8080"`, Redpanda address, and `ACCOUNT_SERVICE_URI`.
+The suffixes plus the existing repository-scoped `BACKEND_IMAGE` expression produce the expected `ghcr.io/myoungsoo7/settlement-gateway:*` and `ghcr.io/myoungsoo7/settlement-account:*` images when this repository runs the workflow.
 
 - [ ] **Step 2: Run the test to verify RED**
 
 Run: `node --test scripts/k8s/test/production-topology.test.mjs`
 
-Expected: FAIL because Gateway/Account workflow entries and manifests do not exist.
+Expected: FAIL because Gateway/Account workflow entries do not exist.
 
-- [ ] **Step 3: Commit the failing test**
+- [ ] **Step 3: Keep the failing test uncommitted**
 
-```bash
-git add scripts/k8s/test/production-topology.test.mjs
-git commit -m "test(deploy): guard gateway account production topology" \
-  -m "Confidence: high" -m "Scope-risk: narrow"
-```
+Do not commit a permanently red intermediate state. Continue directly to Task 2 and commit the test with its implementation after GREEN.
 
 ### Task 2: Publish Gateway and Account images in both workflows
 
@@ -88,12 +86,13 @@ Update nearby workflow comments so the four image mappings are explicit and remo
 
 Run: `node --test scripts/k8s/test/production-topology.test.mjs`
 
-Expected: workflow assertions PASS; manifest assertions remain FAIL.
+Expected: all focused workflow publishing assertions PASS.
 
-- [ ] **Step 3: Commit the workflow change**
+- [ ] **Step 3: Commit the complete Tasks 1–2 TDD unit**
 
 ```bash
-git add .github/workflows/ci.yml .github/workflows/backend-image-emergency.yml
+git add scripts/k8s/test/production-topology.test.mjs \
+  .github/workflows/ci.yml .github/workflows/backend-image-emergency.yml
 git commit -m "ci(images): publish gateway and account services" \
   -m "Constraint: Keep normal and emergency matrices identical" \
   -m "Confidence: high" -m "Scope-risk: moderate"
@@ -110,7 +109,25 @@ git commit -m "ci(images): publish gateway and account services" \
 - Consumes: `lemuel-secret`, `redpanda:29092`, GHCR account image.
 - Produces: `account-db-service:5432` and `account-service:8080`.
 
-- [ ] **Step 1: Add account database resources**
+- [ ] **Step 1: Extend the topology test with Account assertions**
+
+Before creating Account resources, add assertions that the three required Account manifests exist and verify the Account image, exact JDBC URL, `MANAGEMENT_SERVER_PORT: "8080"`, and Redpanda address from executable manifest data.
+
+```javascript
+for (const file of accountManifests) assert.equal(existsSync(file), true, `${file} must exist`);
+assert.match(accountDeployment, /image:\s*ghcr\.io\/myoungsoo7\/settlement-account:latest/);
+assert.match(accountConfig, /MANAGEMENT_SERVER_PORT:\s*"8080"/);
+assert.match(accountConfig, /jdbc:postgresql:\/\/account-db-service:5432\/lemuel_account\?reWriteBatchedInserts=true/);
+assert.match(accountConfig, /SPRING_KAFKA_BOOTSTRAP_SERVERS:\s*"redpanda:29092"/);
+```
+
+- [ ] **Step 2: Run the focused test to verify RED**
+
+Run: `node --test scripts/k8s/test/production-topology.test.mjs`
+
+Expected: FAIL because the Account manifests do not exist. Do not change the test to accommodate missing resources.
+
+- [ ] **Step 3: Add account database resources**
 
 Clone the settlement DB resource pattern with unique names:
 
@@ -134,7 +151,7 @@ spec:
 
 Use PostgreSQL `17-alpine`, `POSTGRES_DB=lemuel_account`, secret-backed username/password, `PGDATA`, `20Gi` storage, and `pg_isready` liveness/readiness probes. Finish with a headless `account-db-service`.
 
-- [ ] **Step 2: Add account configuration**
+- [ ] **Step 4: Add account configuration**
 
 Create `account-config` with these exact values:
 
@@ -150,11 +167,11 @@ data:
   JWT_TTL_SECONDS: "86400"
 ```
 
-- [ ] **Step 3: Add account Deployment and Service**
+- [ ] **Step 5: Add account Deployment and Service**
 
 Create `account-app` using `ghcr.io/myoungsoo7/settlement-account:latest`, `account-config`, and `lemuel-secret`. Match the settlement Deployment's rolling strategy, resource bounds, image pull secret, graceful shutdown, and probes. Create `account-service` as ClusterIP port `8080`.
 
-- [ ] **Step 4: Validate the three manifests locally**
+- [ ] **Step 6: Validate the manifests and turn the focused test GREEN**
 
 Run:
 
@@ -162,14 +179,16 @@ Run:
 kubectl apply --dry-run=client -f k8s/stroage/account-db-pv.yaml -o yaml >/dev/null
 kubectl apply --dry-run=client -f k8s/base/account-configmap.yaml -o yaml >/dev/null
 kubectl apply --dry-run=client -f k8s/base/account-deployment.yaml -o yaml >/dev/null
+node --test scripts/k8s/test/production-topology.test.mjs
 ```
 
 Expected: all commands exit `0` without contacting a production database.
 
-- [ ] **Step 5: Commit account resources**
+- [ ] **Step 7: Commit account resources and their topology assertions**
 
 ```bash
-git add k8s/stroage/account-db-pv.yaml k8s/base/account-configmap.yaml k8s/base/account-deployment.yaml
+git add scripts/k8s/test/production-topology.test.mjs \
+  k8s/stroage/account-db-pv.yaml k8s/base/account-configmap.yaml k8s/base/account-deployment.yaml
 git commit -m "feat(deploy): provision account service and database" \
   -m "Constraint: Reuse sealed credentials and retain account storage" \
   -m "Confidence: high" -m "Scope-risk: moderate"
@@ -187,7 +206,27 @@ git commit -m "feat(deploy): provision account service and database" \
 - Consumes: `lemuel-service:8080`, `settlement-service:8080`, `account-service:8080`.
 - Produces: `gateway-service:8080`, `/api/account` Gateway ingress, protected admin SPA deep links, recursive Argo discovery.
 
-- [ ] **Step 1: Add Gateway configuration**
+- [ ] **Step 1: Extend the topology test with Gateway and routing assertions**
+
+Before creating or changing Gateway/routing resources, add assertions that the two required Gateway manifests exist and verify the Gateway image, `ACCOUNT_SERVICE_URI`, recursive Argo discovery, narrow Account routing, preserved general API routing, and CEO SPA routing.
+
+```javascript
+for (const file of gatewayManifests) assert.equal(existsSync(file), true, `${file} must exist`);
+assert.match(gatewayDeployment, /image:\s*ghcr\.io\/myoungsoo7\/settlement-gateway:latest/);
+assert.match(gatewayConfig, /ACCOUNT_SERVICE_URI:\s*"http:\/\/account-service:8080"/);
+assert.match(argocd, /directory:\s*\n\s+recurse: true/);
+assert.match(ingress, /path: \/api\/account[\s\S]*name: gateway-service/);
+assert.match(ingress, /path: \/api\s*[\s\S]*name: lemuel-service/);
+assert.match(ingress, /path: \/admin\/ceo[\s\S]*name: lemuel-frontend-service/);
+```
+
+- [ ] **Step 2: Run the focused test to verify RED**
+
+Run: `node --test scripts/k8s/test/production-topology.test.mjs`
+
+Expected: FAIL because Gateway resources and routing/Argo configuration are not implemented. Do not weaken the assertions.
+
+- [ ] **Step 3: Add Gateway configuration**
 
 ```yaml
 data:
@@ -200,15 +239,15 @@ data:
 
 Do not invent DNS names for service modules that have no Kubernetes Service in this repository.
 
-- [ ] **Step 2: Add Gateway Deployment and Service**
+- [ ] **Step 4: Add Gateway Deployment and Service**
 
 Create `gateway-app` using `ghcr.io/myoungsoo7/settlement-gateway:latest` and `gateway-config`. Match the standard rolling strategy, resources, probes, and `ghcr-secret`. Create `gateway-service` as ClusterIP port `8080`.
 
-- [ ] **Step 3: Add narrow and SPA-specific Ingress paths**
+- [ ] **Step 5: Add narrow and SPA-specific Ingress paths**
 
 Insert `/api/account` before `/api`, targeting `gateway-service:8080`. Keep `/api` targeting `lemuel-service:8080`. Add `/admin/ceo`, `/admin/system`, `/admin/operation`, `/admin/settlement`, and `/admin/login` Prefix paths targeting `lemuel-frontend-service:80`. Do not add a blanket `/admin → gateway-service` rule.
 
-- [ ] **Step 4: Enable recursive Argo directory discovery**
+- [ ] **Step 6: Enable recursive Argo directory discovery**
 
 Under `spec.source`, add:
 
@@ -219,7 +258,7 @@ Under `spec.source`, add:
 
 Do not add Image Updater annotations in this task: official Image Updater support expects Helm or Kustomize, while this Application remains a plain recursive directory. New Gateway/Account Deployments will pull their new `:latest` images on initial creation; migration to Kustomize and immutable image automation is separate work.
 
-- [ ] **Step 5: Validate routing manifests**
+- [ ] **Step 7: Validate routing manifests and turn the focused test GREEN**
 
 Run:
 
@@ -233,10 +272,11 @@ node --test scripts/k8s/test/production-topology.test.mjs
 
 Expected: all commands exit `0`; topology test reports all tests passing.
 
-- [ ] **Step 6: Commit routing resources**
+- [ ] **Step 8: Commit routing resources and their topology assertions**
 
 ```bash
-git add k8s/base/gateway-configmap.yaml k8s/base/gateway-deployment.yaml k8s/ingress/ingress.yaml k8s/argocd/argocd-app.yaml
+git add scripts/k8s/test/production-topology.test.mjs \
+  k8s/base/gateway-configmap.yaml k8s/base/gateway-deployment.yaml k8s/ingress/ingress.yaml k8s/argocd/argocd-app.yaml
 git commit -m "feat(deploy): route account API through gateway" \
   -m "Rejected: Cut over all API paths | undeployed upstreams would regress to 502" \
   -m "Confidence: high" -m "Scope-risk: moderate"
