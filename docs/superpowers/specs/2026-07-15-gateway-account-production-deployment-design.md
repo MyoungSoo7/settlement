@@ -9,8 +9,8 @@ Make the production Kubernetes topology match the working local request path for
 - Add `gateway-service` and `account-service` to both normal and emergency backend image workflows.
 - Provision a dedicated `lemuel_account` PostgreSQL instance with retained storage.
 - Deploy `gateway-service` and `account-service` with stable ClusterIP Services.
-- Route production API and backend paths through `gateway-service`.
-- Route `/admin/**` through the frontend Nginx so its existing SPA/backend split handles CEO deep links without sending page requests to Spring Security.
+- Route `/api/account/**` through `gateway-service` as the first production Gateway cutover.
+- Route the known `/admin` SPA prefixes explicitly to the frontend so CEO deep links cannot be captured by a broader backend rule.
 - Make ArgoCD discover manifests in the repository's nested `k8s/` directories.
 - Add static deployment checks that fail when the required images, routes, or resources disappear.
 
@@ -18,11 +18,11 @@ This change does not seed account entries, alter account domain logic, access a 
 
 ## Architecture
 
-The Ingress sends `/api`, `/auth`, and existing non-API commerce paths to the `gateway-service` ClusterIP. The gateway forwards order traffic to the existing `lemuel-service`, settlement traffic to `settlement-service`, and `/api/account/**` to `account-service`. The account service connects only to `account-db-service` and consumes Redpanda events using the existing shared JWT secret.
+The Ingress gives `/api/account` a more-specific rule targeting the `gateway-service` ClusterIP while retaining the existing `/api` rule to `lemuel-service`. The gateway forwards `/api/account/**` to `account-service`. The account service connects only to `account-db-service` and consumes Redpanda events using the existing shared JWT secret.
 
-`/admin/**` goes to `lemuel-frontend-service`. The frontend Nginx already returns `index.html` for `/admin/ceo/**`, `/admin/system/**`, `/admin/operation/**`, `/admin/settlement/**`, and `/admin/login/**`; other `/admin/**` requests are proxied to `gateway-service`. This keeps SPA deep links and backend admin APIs on one public prefix without duplicating a growing allowlist in Ingress.
+Ingress defines frontend rules for `/admin/ceo`, `/admin/system`, `/admin/operation`, `/admin/settlement`, and `/admin/login`, with `/` retaining the general frontend fallback. The frontend Nginx returns `index.html` for those routes. Backend `/admin/**` cutover is intentionally deferred until every required Gateway upstream exists.
 
-The gateway will define explicit Kubernetes URIs for every currently deployed upstream. Routes whose service modules are not yet deployed remain outside this change; the new deployment must not pretend those upstreams exist. Static checks will cover the account route and the existing order/settlement routes that are required for this rollout.
+The gateway defines an explicit `ACCOUNT_SERVICE_URI`. Order and settlement URIs are also set to their existing Kubernetes Services so the Gateway configuration is ready for later route-by-route cutover, but Ingress does not send those public paths to Gateway in this change. Routes whose service modules are not yet deployed remain outside this change.
 
 ## Kubernetes Resources
 
@@ -70,7 +70,7 @@ Repository-level verification will:
 
 1. Parse all changed YAML files successfully.
 2. Assert that normal and emergency CI matrices contain gateway and account modules with the expected image suffixes.
-3. Assert that account DB, account app/service, gateway app/service, ConfigMaps, recursive ArgoCD discovery, and Ingress backend selections exist.
+3. Assert that account DB, account app/service, gateway app/service, ConfigMaps, recursive ArgoCD discovery, the narrow `/api/account` Gateway rule, and explicit frontend SPA rules exist.
 4. Run `:gateway-service:test` and `:account-service:test`.
 5. Build both `:gateway-service:bootJar` and `:account-service:bootJar`.
 
@@ -81,5 +81,5 @@ Production verification after rollout must use HTTP and Kubernetes health/log ev
 - Authenticated requests to all four `/api/account` dashboard endpoints return `200` in production.
 - An empty account database renders zero/empty account dashboard data rather than a query error.
 - Direct navigation and refresh of `/admin/ceo/accounts` returns the frontend SPA instead of `401`.
-- Existing authentication, order, and settlement routes still pass through the gateway.
+- Existing authentication, order, settlement, and general `/api` routes retain their current backend during the account-only Gateway cutover.
 - CI builds and publishes both new images, including through the emergency workflow.
