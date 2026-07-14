@@ -63,6 +63,7 @@
 > | 계정계 GL·시산표·분개 | 🤖`gl-ledger-auditor` (차1대1 균형·6토픽 매핑·2단 멱등·소비전용) + 📘`ledger-invariants`·`account-domain-rules` |
 > | 쿼리·인덱스·ES 매핑·성능 | 🤖`db-query-architect` |
 > | MSA 경계 변경 | 🤖`hexagonal-arch-reviewer` → 🚦ArchUnit (*코드 의존 0 / cross-DB 0* 위반 차단) |
+> | OO 설계 채점·리팩터링 회귀 판정 | 📘`oo-score` (3인 패널 중앙값 ≥9.5) — 결정적 불변식은 🚦`guard.mjs` OO-* + `oo-gate.test.mjs` 가 선차단 |
 > | 금액 다루는 코드 | 📘`money-safety` (BigDecimal 강제·라운딩·직렬화) |
 > | 원장 전표·복식부기 | 📘`ledger-invariants` → ⌘`/ledger-verify`·`/trial-balance-verify` |
 > | 통합테스트 작성 | 📘`settlement-integration-test` (Testcontainers) / 🤖`settlement-test-generator` |
@@ -102,7 +103,8 @@
 - **ArchUnit** — 헥사고날 경계·서비스 간 의존 방향
 - **JaCoCo** — CI LINE 90% / 핵심 도메인 INSTRUCTION 80% (측정은 게이트 태스크가 정답)
 - **이벤트 계약 테스트** — cross-service 10토픽 스키마 드리프트 빌드 시점 차단 (ADR 0024)
-- **돈 경로 가드(저장소 추적)** — `scripts/harness/guard.mjs`: 실시간 PreToolUse(exit 2 차단) + git pre-commit(`core.hooksPath`, `node scripts/harness/install-hooks.mjs`) 이중. 플러그인 독립 — BigDecimal·이력불변·MSA 경계·account 발행금지·market 밸류에이션·hackathon/pwc 커밋 위반 차단. `--no-verify` 우회 금지. copilot 플러그인 가드가 있으면 2차 레이어로 병존.
+- **돈 경로 가드(저장소 추적)** — `scripts/harness/guard.mjs`: 실시간 PreToolUse(exit 2 차단) + git pre-commit(`core.hooksPath`, `node scripts/harness/install-hooks.mjs`) 이중. 플러그인 독립 — BigDecimal·이력불변·MSA 경계·account 발행금지·market 밸류에이션·hackathon/pwc 커밋 + **OO 구조(도메인 public setter·@Setter/@Data·금융 5서비스 generic IAE)** 위반 차단. `--no-verify` 우회 금지. copilot 플러그인 가드가 있으면 2차 레이어로 병존.
+- **OO 구조 게이트** — `scripts/harness/test/oo-gate.test.mjs`: 트리 전수 스캔(도메인 setter 0·@Setter 0·금융 5서비스 IAE 0·코어 애그리거트 17종 생성자 봉인·상태 enum 9종 canTransitionTo 전이표 보유). 2026-07-14 OO 캠페인(패널 중앙값 9.5+)의 구조 정본 회귀 방지 — CI 하네스 테스트에 자동 포함. 점수 재채점(LLM 판정)은 📘`oo-score` 스킬.
 - **하네스 자기 진단** — `scripts/harness/harness-audit.mjs`: 문서 드리프트를 규율이 아닌 **기계 게이트**로 승격(과거 STATUS 3주 방치 재발 방지).
 - **CI 강제** — `.github/workflows/harness-guard.yml`: PR/푸시마다 변경 파일 가드(`guard.mjs --list`) + 자기 진단을 **로컬 설정과 무관하게** 실행(훅 미설치·`--no-verify` 우회를 CI가 재차단). 기존 `ci.yml`(빌드·테스트·커버리지)와 병존.
 

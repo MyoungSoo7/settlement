@@ -67,6 +67,24 @@ const cases = [
     normalFile: 'docs/result.json',
     normal: '{}',
   },
+  {
+    id: 'OO-DOMAIN-SETTER',
+    file: 'order-service/src/main/java/github/lms/lemuel/menu/domain/Menu.java',
+    violation: 'public void setName(String name) { this.name = name; }',
+    normal: 'public static Menu rehydrate(Long id, String name) { return new Menu(id, name); }',
+  },
+  {
+    id: 'OO-DOMAIN-MUTABLE-LOMBOK',
+    file: 'order-service/src/main/java/github/lms/lemuel/menu/domain/Menu.java',
+    violation: '@Setter',
+    normal: '@Getter',
+  },
+  {
+    id: 'OO-DOMAIN-GENERIC-IAE',
+    file: 'loan-service/src/main/java/github/lms/lemuel/loan/domain/CreditPolicy.java',
+    violation: 'throw new IllegalArgumentException("대출 한도 초과");',
+    normal: 'throw new LoanInvariantViolationException("대출 한도 초과: requested=" + requested, requested, limit);',
+  },
 ];
 
 describe('guard policy fixtures', () => {

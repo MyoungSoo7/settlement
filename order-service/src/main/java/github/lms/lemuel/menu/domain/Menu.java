@@ -25,7 +25,7 @@ public class Menu {
     // 트리 조립용 (DB 컬럼 아님)
     private List<Menu> children = new ArrayList<>();
 
-    public Menu() {
+    private Menu() {
         this.visible = true;
         this.active = true;
         this.sortOrder = 0;

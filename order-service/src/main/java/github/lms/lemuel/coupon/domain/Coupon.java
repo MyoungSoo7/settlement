@@ -27,7 +27,7 @@ public class Coupon {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    public Coupon() {
+    private Coupon() {
         this.usedCount = 0;
         this.isActive = true;
         this.createdAt = LocalDateTime.now();

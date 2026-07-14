@@ -44,6 +44,12 @@ const isProd = (f) => !/\/src\/test\//.test(f);
 // Paths that must never be committed (portfolio hygiene — see MEMORY feedback).
 const NO_COMMIT = /^(hackathon|pwc)\//;
 
+// OO invariants — 2026-07-14 OO 캠페인(패널 중앙값 9.5+)을 만든 구조의 회귀 방지.
+// 도메인 프로덕션 소스만 대상. common/audit(감사 인프라 DTO)은 3회 패널 모두 대상 밖 판정.
+const isDomainMain = (f) => JAVA_KT.test(f) && /\/src\/main\/java\/.+\/domain\//.test(f) && !/common\/audit\//.test(f);
+// generic 예외 금지는 캠페인이 청정화를 완료한 5개 금융 서비스에 한정(위성 서비스는 oo-score 스킬로 채점).
+const CAMPAIGN_SERVICES = /(settlement|order|loan|investment|account)-service\//;
+
 const RULES = [
   {
     id: 'MONEY-PRIMITIVE',
@@ -83,6 +89,28 @@ const RULES = [
     when: (f) => JAVA_KT.test(f) && /market-service\//.test(f) && isProd(f),
     test: (line) => /\b(PER|PBR|priceEarnings|priceToBook)\b/.test(line) && /=/.test(line),
     msg: 'market-service 는 PER/PBR 계산 금지 → 시세·시총만 서빙 (밸류에이션 조인은 소비측)',
+  },
+  {
+    id: 'OO-DOMAIN-SETTER',
+    // 도메인 public setter → 상태머신·불변식 우회 경로. 재구성은 rehydrate/팩토리로.
+    when: isDomainMain,
+    test: (line) => /public\s+void\s+set[A-Z]\w*\s*\(/.test(line),
+    msg: '도메인 public setter 금지 → rehydrate/생성 팩토리 + 의미 있는 도메인 메서드 (OO 게이트, oo-score 스킬)',
+  },
+  {
+    id: 'OO-DOMAIN-MUTABLE-LOMBOK',
+    // @Setter/@Data 는 컴파일 타임에 setter 를 생성해 grep 기반 봉인을 우회한다. @Getter 는 허용.
+    when: isDomainMain,
+    test: (line) => /@(Setter|Data)\b/.test(line),
+    msg: '도메인 @Setter/@Data 금지 — Lombok 생성 setter 는 캡슐화 우회 (@Getter 는 허용)',
+  },
+  {
+    id: 'OO-DOMAIN-GENERIC-IAE',
+    // 도메인 규칙 위반은 타입 도메인 예외(InvariantViolation/InvalidState 계열)로. write-once
+    // 인프라 가드는 IllegalStateException 을 쓰므로 이 규칙과 충돌하지 않는다.
+    when: (f) => isDomainMain(f) && CAMPAIGN_SERVICES.test(f),
+    test: (line) => /throw\s+new\s+IllegalArgumentException\s*\(/.test(line),
+    msg: '금융 5서비스 도메인에서 generic IllegalArgumentException throw 금지 → 타입 도메인 예외 (OO 게이트)',
   },
 ];
 
