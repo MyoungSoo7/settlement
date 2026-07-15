@@ -48,6 +48,14 @@ subprojects {
         // 테스트도 동일하게 env 로 공급해, 풀 컨텍스트(@SpringBootTest) 부팅 시 ${JWT_SECRET} 미해결
         // 실패를 막는다. 운영 배포는 반드시 강한 JWT_SECRET 을 주입할 것.
         environment("JWT_SECRET", "test-only-jwt-secret-not-for-production-0123456789")
+        // 지급계좌 PII 암호화 키(Base64 32바이트=AES-256). settlement PayoutFieldEncryptionConverter 는
+        // JWT_SECRET 과 동일하게 env 필수(기본값 없음) — 테스트 부팅 시 미해결 실패를 막기 위해 주입한다.
+        // 운영 배포는 반드시 강한 PAYOUT_ENC_KEY 를 주입할 것. (decode → "test-only-payout-enc-key-0123456")
+        environment("PAYOUT_ENC_KEY", "dGVzdC1vbmx5LXBheW91dC1lbmMta2V5LTAxMjM0NTY=")
+        // 대화 본문 PII 암호화 키(Base64 32바이트=AES-256). ai-service ChatContentEncryptionConverter 는
+        // JWT_SECRET 과 동일하게 env 필수(기본값 없음) — 테스트 부팅 시 미해결 실패를 막기 위해 주입한다.
+        // 운영 배포는 반드시 강한 CHAT_ENC_KEY 를 주입할 것. (decode → "test-only-chat-enc-key-012345678")
+        environment("CHAT_ENC_KEY", "dGVzdC1vbmx5LWNoYXQtZW5jLWtleS0wMTIzNDU2Nzg=")
     }
 
     tasks.named<JacocoReport>("jacocoTestReport") {
