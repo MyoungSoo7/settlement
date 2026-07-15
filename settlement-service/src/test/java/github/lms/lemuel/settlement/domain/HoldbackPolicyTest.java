@@ -1,6 +1,7 @@
 package github.lms.lemuel.settlement.domain;
 
 import org.junit.jupiter.api.DisplayName;
+import github.lms.lemuel.settlement.domain.exception.SettlementInvariantViolationException;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -50,10 +51,10 @@ class HoldbackPolicyTest {
     @DisplayName("validation: rate 범위 + releaseDays 음수")
     void validation() {
         assertThatThrownBy(() -> new HoldbackPolicy(new BigDecimal("-0.1"), 10))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(SettlementInvariantViolationException.class);
         assertThatThrownBy(() -> new HoldbackPolicy(new BigDecimal("1.5"), 10))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(SettlementInvariantViolationException.class);
         assertThatThrownBy(() -> new HoldbackPolicy(new BigDecimal("0.3"), -1))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(SettlementInvariantViolationException.class);
     }
 }

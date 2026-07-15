@@ -1,5 +1,7 @@
 # Lemuel - OpsLab 주문·결제·정산 시스템
 
+> ⚠️ **STALE — 모놀리스 시절(v0.2.0) 문서.** 이 프로젝트는 이후 **12개 마이크로서비스 + API Gateway**(order·settlement·loan·financial·economics·company·operation·market·ai·common-data·investment·account) 로 분리됐고, order↔settlement 는 **DB-per-service + 이벤트 프로젝션**(ADR 0020) 으로 물리 분리됐습니다. 아래 "단일 앱(:8080)·단일 opslab DB·`./gradlew bootRun`" 서술은 현재 구조와 다릅니다. 최신 개요·실행법은 루트 [`README.md`](../../README.md) 와 [`CLAUDE.md`](../../CLAUDE.md) 를 참조하세요. (기술 스택 Java 25 / Spring Boot 4.0.4 / PostgreSQL 17 은 현재도 유효.)
+
 ## 📋 프로젝트 개요
 
 **Lemuel**은 Spring Boot 기반의 엔터프라이즈급 주문·결제·정산 통합 시스템입니다.

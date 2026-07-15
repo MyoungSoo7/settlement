@@ -33,8 +33,8 @@ public class PasswordResetToken {
 
     public static PasswordResetToken create(Long userId, int expiryMinutes) {
         PasswordResetToken resetToken = new PasswordResetToken();
-        resetToken.setUserId(userId);
-        resetToken.setExpiryDate(LocalDateTime.now().plusMinutes(expiryMinutes));
+        resetToken.userId = userId;
+        resetToken.expiryDate = LocalDateTime.now().plusMinutes(expiryMinutes);
         return resetToken;
     }
 
@@ -50,52 +50,33 @@ public class PasswordResetToken {
         this.used = true;
     }
 
-    // Getters and Setters
-    public Long getId() {
-        return id;
+    /** DB 부여 PK 주입(setter 대체). 전체 필드 복원은 전체 생성자 사용. */
+    public void assignId(Long id) {
+        this.id = id;
     }
 
-    public void setId(Long id) {
-        this.id = id;
+    // Getters
+    public Long getId() {
+        return id;
     }
 
     public Long getUserId() {
         return userId;
     }
 
-    public void setUserId(Long userId) {
-        this.userId = userId;
-    }
-
     public String getToken() {
         return token;
-    }
-
-    public void setToken(String token) {
-        this.token = token;
     }
 
     public LocalDateTime getExpiryDate() {
         return expiryDate;
     }
 
-    public void setExpiryDate(LocalDateTime expiryDate) {
-        this.expiryDate = expiryDate;
-    }
-
     public boolean isUsed() {
         return used;
     }
 
-    public void setUsed(boolean used) {
-        this.used = used;
-    }
-
     public LocalDateTime getCreatedAt() {
         return createdAt;
-    }
-
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
     }
 }

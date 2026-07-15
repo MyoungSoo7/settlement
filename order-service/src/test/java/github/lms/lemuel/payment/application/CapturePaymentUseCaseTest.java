@@ -31,7 +31,7 @@ class CapturePaymentUseCaseTest {
 
     @Test @DisplayName("AUTHORIZED → CAPTURED 후 PaymentCaptured 이벤트가 outbox 로 기록된다")
     void capture_success_publishesOutboxEvent() {
-        PaymentDomain payment = new PaymentDomain(1L, 10L, new BigDecimal("30000"), BigDecimal.ZERO,
+        PaymentDomain payment = PaymentDomain.rehydrate(1L, 10L, new BigDecimal("30000"), BigDecimal.ZERO,
                 PaymentStatus.AUTHORIZED, "CARD", "pg-tx", null, null, null);
         when(loadPaymentPort.loadById(1L)).thenReturn(Optional.of(payment));
         when(savePaymentPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -62,7 +62,7 @@ class CapturePaymentUseCaseTest {
      */
     @Test @DisplayName("PG 매입 성공 후 DB 저장 실패 → 이후 단계 미도달(주문상태·이벤트), PG는 보상 필요")
     void capture_dbSaveFailsAfterPgCapture_stopsDownstream() {
-        PaymentDomain payment = new PaymentDomain(1L, 10L, new BigDecimal("30000"), BigDecimal.ZERO,
+        PaymentDomain payment = PaymentDomain.rehydrate(1L, 10L, new BigDecimal("30000"), BigDecimal.ZERO,
                 PaymentStatus.AUTHORIZED, "CARD", "pg-tx", null, null, null);
         when(loadPaymentPort.loadById(1L)).thenReturn(Optional.of(payment));
         doThrow(new DataIntegrityViolationException("결제 저장 실패"))
@@ -90,7 +90,7 @@ class CapturePaymentUseCaseTest {
      */
     @Test @DisplayName("DB 성공 후 이벤트(outbox) 발행 실패 → 예외 전파로 결제·주문까지 원자적 롤백")
     void capture_outboxPublishFails_propagatesForAtomicRollback() {
-        PaymentDomain payment = new PaymentDomain(1L, 10L, new BigDecimal("30000"), BigDecimal.ZERO,
+        PaymentDomain payment = PaymentDomain.rehydrate(1L, 10L, new BigDecimal("30000"), BigDecimal.ZERO,
                 PaymentStatus.AUTHORIZED, "CARD", "pg-tx", null, null, null);
         when(loadPaymentPort.loadById(1L)).thenReturn(Optional.of(payment));
         when(savePaymentPort.save(any())).thenAnswer(inv -> inv.getArgument(0));

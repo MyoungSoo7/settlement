@@ -75,6 +75,15 @@ node src/bin/ceo-consulting-pipeline.mjs `
 
 `company_identity_gate`가 실패하면 후속 분석을 중단합니다. 이 경우 실패 자체를 데이터 품질 또는 식별 리스크로 보고합니다.
 
+여러 기업을 분기 단위로 일괄 처리하려면 배치 CLI 를 사용합니다 (EVAL PASS 브리핑만 문서함 업로드,
+`--resume` 재개·`--concurrency` 병렬). 대상 목록은 기본 큐레이션(`src/data/briefing-companies.json`)
+또는 `build-briefing-universe.mjs` 가 생성한 상장사 전체 목록을 그대로 넘길 수 있습니다.
+
+```powershell
+node src/bin/quarterly-briefing-batch.mjs --period 2026Q2 [--companies <목록JSON>] [--resume] [--no-upload] [--escalate-signals N]
+node src/bin/build-briefing-universe.mjs [--markets KOSPI,KOSDAQ] [--dry-run]   # DART_API_KEY 필요
+```
+
 ## Stage Details
 
 ### 1. Spreadsheets

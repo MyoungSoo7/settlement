@@ -1,4 +1,6 @@
 package github.lms.lemuel.product.domain;
+import github.lms.lemuel.product.domain.exception.InvalidProductStateException;
+import github.lms.lemuel.product.domain.exception.ProductInvariantViolationException;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,7 +27,7 @@ class ProductImageTest {
     void invalidContentType() {
         assertThatThrownBy(() -> ProductImage.create(1L, "a.gif", "s", "/p", "/u",
                 "image/gif", 1024L, 100, 100, 0))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(ProductInvariantViolationException.class);
     }
 
     @Test @DisplayName("5MB 초과 시 예외")
@@ -33,14 +35,14 @@ class ProductImageTest {
         long tooLarge = 6 * 1024 * 1024;
         assertThatThrownBy(() -> ProductImage.create(1L, "a.jpg", "s", "/p", "/u",
                 "image/jpeg", tooLarge, 100, 100, 0))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(ProductInvariantViolationException.class);
     }
 
     @Test @DisplayName("파일 크기 0 이하 예외")
     void zeroFileSize() {
         assertThatThrownBy(() -> ProductImage.create(1L, "a.jpg", "s", "/p", "/u",
                 "image/jpeg", 0L, 100, 100, 0))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(ProductInvariantViolationException.class);
     }
 
     @Test @DisplayName("markAsPrimary / unmarkAsPrimary")
@@ -57,7 +59,7 @@ class ProductImageTest {
         ProductImage i = validImage();
         i.softDelete();
         assertThatThrownBy(i::markAsPrimary)
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(InvalidProductStateException.class);
     }
 
     @Test @DisplayName("softDelete 시 대표 이미지 해제됨")
@@ -74,6 +76,6 @@ class ProductImageTest {
     void changeOrder_negative() {
         ProductImage i = validImage();
         assertThatThrownBy(() -> i.changeOrder(-1))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(ProductInvariantViolationException.class);
     }
 }

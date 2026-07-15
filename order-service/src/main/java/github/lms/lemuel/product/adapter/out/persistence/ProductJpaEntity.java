@@ -24,7 +24,7 @@ public class ProductJpaEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true, length = 200)
+    @Column(nullable = false, length = 200)  // 유일성은 DB UNIQUE(seller_id, name)(V20260715200003)이 강제 — 멀티셀러 동일 상품명 허용
     private String name;
 
     @Column(columnDefinition = "TEXT")

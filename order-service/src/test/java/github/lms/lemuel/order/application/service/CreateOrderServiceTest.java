@@ -1,10 +1,12 @@
 package github.lms.lemuel.order.application.service;
+import github.lms.lemuel.order.domain.exception.OrderInvariantViolationException;
 
 import github.lms.lemuel.order.application.port.in.CreateOrderUseCase;
 import github.lms.lemuel.order.application.port.out.LoadUserForOrderPort;
 import github.lms.lemuel.order.application.port.out.SaveOrderPort;
 import github.lms.lemuel.order.application.port.out.SendOrderNotificationPort;
 import github.lms.lemuel.order.domain.Order;
+import github.lms.lemuel.order.domain.exception.OrderInvariantViolationException;
 import github.lms.lemuel.order.domain.exception.UserNotExistsException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -38,7 +40,7 @@ class CreateOrderServiceTest {
         when(loadUserForOrderPort.findEmailById(1L)).thenReturn(Optional.of("user@example.com"));
         when(saveOrderPort.save(any())).thenAnswer(inv -> {
             Order o = inv.getArgument(0);
-            o.setId(999L);
+            o.assignId(999L);
             return o;
         });
 
@@ -64,21 +66,21 @@ class CreateOrderServiceTest {
     void command_nullUserId() {
         assertThatThrownBy(() -> new CreateOrderUseCase.CreateOrderCommand(
                 null, 10L, new BigDecimal("1000")))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(OrderInvariantViolationException.class);
     }
 
     @Test @DisplayName("Command 검증: productId null")
     void command_nullProductId() {
         assertThatThrownBy(() -> new CreateOrderUseCase.CreateOrderCommand(
                 1L, null, new BigDecimal("1000")))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(OrderInvariantViolationException.class);
     }
 
     @Test @DisplayName("Command 검증: amount null")
     void command_nullAmount() {
         assertThatThrownBy(() -> new CreateOrderUseCase.CreateOrderCommand(
                 1L, 10L, null))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(OrderInvariantViolationException.class);
     }
 
     private static <T> T eq(T value) {

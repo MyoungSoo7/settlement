@@ -1,4 +1,5 @@
 package github.lms.lemuel.order.application.service;
+import github.lms.lemuel.product.domain.exception.ProductInvariantViolationException;
 
 import github.lms.lemuel.coupon.application.port.in.CouponUseCase;
 import github.lms.lemuel.order.application.port.in.CreateMultiItemOrderUseCase;
@@ -114,7 +115,7 @@ class CreateMultiItemOrderServiceTest {
         when(loadProductPort.findById(10L)).thenReturn(Optional.of(product));
         when(saveOrderPort.save(any())).thenAnswer(inv -> {
             Order o = inv.getArgument(0);
-            o.setId(500L);
+            o.assignId(500L);
             return o;
         });
         // 소계 20,000 (10,000 x 2) 기준 2,000원 할인
@@ -198,7 +199,7 @@ class CreateMultiItemOrderServiceTest {
 
         var lines = List.of(new CreateMultiItemOrderUseCase.Line(10L, 20L, 1));
         assertThatThrownBy(() -> service.create(1L, lines))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ProductInvariantViolationException.class)
                 .hasMessageContaining("variant 가 product 에 속하지 않음");
     }
 }

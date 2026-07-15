@@ -31,6 +31,8 @@ spec:
     targetRevision: main
     # 레포 루트(lemuel/) 기준으로 k8s 디렉토리
     path: k8s
+    directory:
+      recurse: true
 
   destination:
     # 현재 클러스터에 배포

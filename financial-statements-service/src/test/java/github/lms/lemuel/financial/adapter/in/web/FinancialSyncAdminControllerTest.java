@@ -3,6 +3,7 @@ package github.lms.lemuel.financial.adapter.in.web;
 import github.lms.lemuel.financial.application.port.in.SyncCompaniesUseCase;
 import github.lms.lemuel.financial.application.port.in.SyncResult;
 import github.lms.lemuel.financial.application.port.in.SyncStatementsUseCase;
+import github.lms.lemuel.financial.audit.application.port.out.RecordAuditPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -14,6 +15,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -42,7 +44,7 @@ class FinancialSyncAdminControllerTest {
     void setUp() {
         TaskExecutor inline = Runnable::run;
         FinancialSyncAdminController controller = new FinancialSyncAdminController(
-                syncCompaniesUseCase, syncStatementsUseCase, tracker, inline);
+                syncCompaniesUseCase, syncStatementsUseCase, tracker, inline, mock(RecordAuditPort.class));
         mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
     }
 

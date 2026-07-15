@@ -1,5 +1,7 @@
 package github.lms.lemuel.user.application.service;
 
+import github.lms.lemuel.user.domain.exception.InvalidMembershipStateException;
+
 import github.lms.lemuel.user.application.port.out.LoadMembersByStatusPort;
 import github.lms.lemuel.user.application.port.out.LoadUserPort;
 import github.lms.lemuel.user.application.port.out.PublishUserEventPort;
@@ -41,7 +43,7 @@ class MembershipApprovalServiceTest {
 
     private User pendingCompany() {
         User user = User.createWithProfile("c@x.com", "hash", UserRole.COMPANY, "업체", "010-1111-2222");
-        user.setId(7L);
+        user.assignId(7L);
         user.markPending();
         return user;
     }
@@ -90,7 +92,7 @@ class MembershipApprovalServiceTest {
         when(loadUserPort.findById(7L)).thenReturn(Optional.of(approved));
 
         assertThatThrownBy(() -> service.approve(7L, 99L))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(InvalidMembershipStateException.class);
 
         verify(saveUserPort, never()).save(any());
         verify(saveMembershipApprovalPort, never()).save(any());

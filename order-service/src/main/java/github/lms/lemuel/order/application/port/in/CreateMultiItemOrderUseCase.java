@@ -1,6 +1,7 @@
 package github.lms.lemuel.order.application.port.in;
 
 import github.lms.lemuel.order.domain.Order;
+import github.lms.lemuel.order.domain.exception.OrderInvariantViolationException;
 
 import java.util.List;
 
@@ -28,8 +29,8 @@ public interface CreateMultiItemOrderUseCase {
      */
     record Line(Long productId, Long variantId, int quantity) {
         public Line {
-            if (productId == null) throw new IllegalArgumentException("productId 필수");
-            if (quantity <= 0) throw new IllegalArgumentException("quantity 는 양수");
+            if (productId == null) throw new OrderInvariantViolationException("productId 필수");
+            if (quantity <= 0) throw new OrderInvariantViolationException("quantity 는 양수");
         }
     }
 }

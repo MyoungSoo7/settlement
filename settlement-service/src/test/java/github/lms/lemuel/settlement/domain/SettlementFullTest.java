@@ -1,5 +1,7 @@
 package github.lms.lemuel.settlement.domain;
 
+import github.lms.lemuel.settlement.domain.exception.InvalidSettlementStateException;
+import github.lms.lemuel.settlement.domain.exception.SettlementInvariantViolationException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 
@@ -25,21 +27,21 @@ class SettlementFullTest {
     @Test @DisplayName("paymentId null이면 예외")
     void createFromPayment_nullPaymentId() {
         assertThatThrownBy(() -> Settlement.createFromPayment(null, 10L, new BigDecimal("1000"), LocalDate.now()))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(SettlementInvariantViolationException.class)
                 .hasMessageContaining("Payment ID");
     }
 
     @Test @DisplayName("금액 0이면 예외")
     void createFromPayment_zeroAmount() {
         assertThatThrownBy(() -> Settlement.createFromPayment(1L, 10L, BigDecimal.ZERO, LocalDate.now()))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(SettlementInvariantViolationException.class)
                 .hasMessageContaining("greater than zero");
     }
 
     @Test @DisplayName("정산일 null이면 예외")
     void createFromPayment_nullDate() {
         assertThatThrownBy(() -> Settlement.createFromPayment(1L, 10L, new BigDecimal("1000"), null))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(SettlementInvariantViolationException.class)
                 .hasMessageContaining("date");
     }
 
@@ -84,25 +86,25 @@ class SettlementFullTest {
         Settlement s = createSettlement(new BigDecimal("10000"));
         s.startProcessing();
         s.complete();
-        assertThatThrownBy(s::startProcessing).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(s::startProcessing).isInstanceOf(InvalidSettlementStateException.class);
     }
 
     @Test @DisplayName("REQUESTED에서 complete 불가")
     void complete_fromRequested_fails() {
         Settlement s = createSettlement(new BigDecimal("10000"));
-        assertThatThrownBy(s::complete).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(s::complete).isInstanceOf(InvalidSettlementStateException.class);
     }
 
     @Test @DisplayName("REQUESTED에서 fail 불가")
     void fail_fromRequested_fails() {
         Settlement s = createSettlement(new BigDecimal("10000"));
-        assertThatThrownBy(() -> s.fail("err")).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> s.fail("err")).isInstanceOf(InvalidSettlementStateException.class);
     }
 
     @Test @DisplayName("REQUESTED에서 retry 불가")
     void retry_fromRequested_fails() {
         Settlement s = createSettlement(new BigDecimal("10000"));
-        assertThatThrownBy(s::retry).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(s::retry).isInstanceOf(InvalidSettlementStateException.class);
     }
 
     @Test @DisplayName("CONFIRMED/DONE에서 cancel 불가")
@@ -110,7 +112,7 @@ class SettlementFullTest {
         Settlement s = createSettlement(new BigDecimal("10000"));
         s.startProcessing();
         s.complete();
-        assertThatThrownBy(s::cancel).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(s::cancel).isInstanceOf(InvalidSettlementStateException.class);
     }
 
     @Test @DisplayName("REQUESTED에서 cancel 가능")
@@ -118,6 +120,41 @@ class SettlementFullTest {
         Settlement s = createSettlement(new BigDecimal("10000"));
         s.cancel();
         assertThat(s.getStatus()).isEqualTo(SettlementStatus.CANCELED);
+    }
+
+    @Test @DisplayName("PROCESSING에서 cancel 가능 (전이표 위임)")
+    void cancel_fromProcessing() {
+        Settlement s = createSettlement(new BigDecimal("10000"));
+        s.startProcessing();
+        s.cancel();
+        assertThat(s.getStatus()).isEqualTo(SettlementStatus.CANCELED);
+    }
+
+    @Test @DisplayName("FAILED에서 cancel 가능 (전이표 위임)")
+    void cancel_fromFailed() {
+        Settlement s = createSettlement(new BigDecimal("10000"));
+        s.startProcessing();
+        s.fail("오류");
+        s.cancel();
+        assertThat(s.getStatus()).isEqualTo(SettlementStatus.CANCELED);
+    }
+
+    @Test @DisplayName("CANCELED에서 재-cancel 불가 (종료 상태)")
+    void cancel_fromCanceled_fails() {
+        Settlement s = createSettlement(new BigDecimal("10000"));
+        s.cancel();
+        assertThatThrownBy(s::cancel).isInstanceOf(InvalidSettlementStateException.class);
+    }
+
+    @Test @DisplayName("전이표(canTransitionTo): CANCELED 허용·차단 케이스가 cancel() 가드의 단일 출처")
+    void canTransitionTo_cancelSingleSource() {
+        // 허용: 진행 상태(REQUESTED·PROCESSING·FAILED) → CANCELED
+        assertThat(SettlementStatus.REQUESTED.canTransitionTo(SettlementStatus.CANCELED)).isTrue();
+        assertThat(SettlementStatus.PROCESSING.canTransitionTo(SettlementStatus.CANCELED)).isTrue();
+        assertThat(SettlementStatus.FAILED.canTransitionTo(SettlementStatus.CANCELED)).isTrue();
+        // 차단: 종료 상태(DONE·CANCELED) → CANCELED
+        assertThat(SettlementStatus.DONE.canTransitionTo(SettlementStatus.CANCELED)).isFalse();
+        assertThat(SettlementStatus.CANCELED.canTransitionTo(SettlementStatus.CANCELED)).isFalse();
     }
 
     // 환불 테스트
@@ -144,14 +181,14 @@ class SettlementFullTest {
     void adjustForRefund_zeroAmount() {
         Settlement s = createSettlement(new BigDecimal("10000"));
         assertThatThrownBy(() -> s.adjustForRefund(BigDecimal.ZERO))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(SettlementInvariantViolationException.class);
     }
 
     @Test @DisplayName("환불 금액 null이면 예외")
     void adjustForRefund_nullAmount() {
         Settlement s = createSettlement(new BigDecimal("10000"));
         assertThatThrownBy(() -> s.adjustForRefund(null))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(SettlementInvariantViolationException.class);
     }
 
     // 상태 확인

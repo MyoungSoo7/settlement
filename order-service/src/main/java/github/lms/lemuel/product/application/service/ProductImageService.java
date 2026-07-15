@@ -3,6 +3,7 @@ package github.lms.lemuel.product.application.service;
 import github.lms.lemuel.product.application.port.out.LoadProductImagePort;
 import github.lms.lemuel.product.application.port.out.SaveProductImagePort;
 import github.lms.lemuel.product.domain.ProductImage;
+import github.lms.lemuel.product.domain.exception.ProductInvariantViolationException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,10 +31,10 @@ public class ProductImageService {
 
         for (MultipartFile file : files) {
             if (!fileStorageService.isValidImageType(file.getContentType())) {
-                throw new IllegalArgumentException("Invalid image type: " + file.getContentType());
+                throw new ProductInvariantViolationException("Invalid image type: " + file.getContentType());
             }
             if (!fileStorageService.isValidFileSize(file.getSize())) {
-                throw new IllegalArgumentException("File size exceeds 5MB limit");
+                throw new ProductInvariantViolationException("File size exceeds 5MB limit");
             }
 
             try {
@@ -51,7 +52,7 @@ public class ProductImageService {
                         fileInfo.getHeight(),
                         orderIndex++
                 );
-                image.setChecksum(fileInfo.getChecksum());
+                image.assignChecksum(fileInfo.getChecksum());
 
                 images.add(savePort.save(image));
 
@@ -72,7 +73,7 @@ public class ProductImageService {
         ProductImage image = getImageById(imageId);
 
         if (!image.getProductId().equals(productId)) {
-            throw new IllegalArgumentException("Image does not belong to product");
+            throw new ProductInvariantViolationException("Image does not belong to product");
         }
 
         loadPort.findPrimaryImageByProductId(productId).ifPresent(current -> {
@@ -93,7 +94,7 @@ public class ProductImageService {
             ProductImage image = getImageById(imageId);
 
             if (!image.getProductId().equals(productId)) {
-                throw new IllegalArgumentException("Image does not belong to product");
+                throw new ProductInvariantViolationException("Image does not belong to product");
             }
 
             image.changeOrder(i);
@@ -108,7 +109,7 @@ public class ProductImageService {
         ProductImage image = getImageById(imageId);
 
         if (!image.getProductId().equals(productId)) {
-            throw new IllegalArgumentException("Image does not belong to product");
+            throw new ProductInvariantViolationException("Image does not belong to product");
         }
 
         boolean wasPrimary = image.getIsPrimary();
@@ -143,6 +144,6 @@ public class ProductImageService {
 
     private ProductImage getImageById(Long imageId) {
         return loadPort.findByIdNotDeleted(imageId)
-                .orElseThrow(() -> new IllegalArgumentException("Image not found: " + imageId));
+                .orElseThrow(() -> new ProductInvariantViolationException("Image not found: " + imageId));
     }
 }

@@ -2,6 +2,7 @@ package github.lms.lemuel.company.adapter.in.web;
 
 import github.lms.lemuel.company.application.port.in.UploadCompanyDocumentUseCase;
 import github.lms.lemuel.company.application.port.in.UploadCompanyDocumentUseCase.UploadCommand;
+import github.lms.lemuel.company.audit.application.port.out.RecordAuditPort;
 import github.lms.lemuel.company.domain.CompanyDocument;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -18,6 +19,7 @@ import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -35,7 +37,7 @@ class CompanyDocumentAdminControllerTest {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new CompanyDocumentAdminController(uploadCompanyDocumentUseCase))
+                .standaloneSetup(new CompanyDocumentAdminController(uploadCompanyDocumentUseCase, mock(RecordAuditPort.class)))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
     }

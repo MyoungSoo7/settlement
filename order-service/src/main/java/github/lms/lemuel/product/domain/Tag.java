@@ -1,4 +1,5 @@
 package github.lms.lemuel.product.domain;
+import github.lms.lemuel.product.domain.exception.ProductInvariantViolationException;
 
 import java.time.LocalDateTime;
 
@@ -30,8 +31,8 @@ public class Tag {
     // 정적 팩토리 메서드
     public static Tag create(String name, String color) {
         Tag tag = new Tag();
-        tag.setName(name);
-        tag.setColor(color);
+        tag.name = name;
+        tag.color = color;
         tag.validateName();
         tag.validateColor();
         return tag;
@@ -40,17 +41,17 @@ public class Tag {
     // 도메인 규칙: name 검증
     public void validateName() {
         if (name == null || name.trim().isEmpty()) {
-            throw new IllegalArgumentException("Tag name cannot be empty");
+            throw new ProductInvariantViolationException("Tag name cannot be empty");
         }
         if (name.length() > 50) {
-            throw new IllegalArgumentException("Tag name must not exceed 50 characters");
+            throw new ProductInvariantViolationException("Tag name must not exceed 50 characters");
         }
     }
 
     // 도메인 규칙: color 검증 (HEX 형식)
     public void validateColor() {
         if (color == null || !color.matches("^#[0-9A-Fa-f]{6}$")) {
-            throw new IllegalArgumentException("Tag color must be a valid HEX color code (e.g., #EF4444)");
+            throw new ProductInvariantViolationException("Tag color must be a valid HEX color code (e.g., #EF4444)");
         }
     }
 
@@ -66,36 +67,29 @@ public class Tag {
         }
     }
 
-    // Getters and Setters
+    /** Persistence 어댑터가 DB 부여 PK 를 주입할 때 사용(setter 대체). */
+    public void assignId(Long id) {
+        this.id = id;
+    }
+
+    // Getters
     public Long getId() {
         return id;
     }
 
-    public void setId(Long id) {
-        this.id = id;
-    }
 
     public String getName() {
         return name;
     }
 
-    public void setName(String name) {
-        this.name = name;
-    }
 
     public String getColor() {
         return color;
     }
 
-    public void setColor(String color) {
-        this.color = color;
-    }
 
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
 }

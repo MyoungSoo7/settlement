@@ -50,7 +50,7 @@ class RefundPaymentUseCaseExtraTest {
     @InjectMocks RefundPaymentUseCase refundPaymentUseCase;
 
     private PaymentDomain capturedPayment() {
-        return new PaymentDomain(1L, 10L, new BigDecimal("50000"), BigDecimal.ZERO,
+        return PaymentDomain.rehydrate(1L, 10L, new BigDecimal("50000"), BigDecimal.ZERO,
                 PaymentStatus.CAPTURED, "CARD", "pg-tx-123", null, null, null);
     }
 
@@ -63,7 +63,7 @@ class RefundPaymentUseCaseExtraTest {
         when(refundLifecycle.begin(any(), any(), any(), any())).thenAnswer(inv -> {
             Refund r = Refund.request(inv.getArgument(0), inv.getArgument(1),
                     inv.getArgument(2), inv.getArgument(3));
-            r.setId(555L);
+            r.assignId(555L);
             return r;
         });
         RefundException pgException = new RefundException("PG rejected: insufficient balance");

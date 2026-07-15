@@ -49,8 +49,9 @@ public class ResolveDiscrepancyService implements ResolveDiscrepancyUseCase {
         log.warn("[PgRecon] APPROVED by operator. discrepancyId={}, operator={}, type={}, diff={}",
                 discrepancyId, operatorId, d.getType(), d.getDifference());
         // 승인 → 같은 트랜잭션 Outbox 에 APPROVED 이벤트 적재 → 커밋 후 폴러가 Kafka 발행.
-        // 후속 보정 핸들러가 type 별(과/소 정산) 부호 규칙으로 정산을 조정한다.
-        // (보정 적용 핸들러는 타입별 부호 규칙 확정 후 추가 — AdjustSettlementForRefundUseCase 와 유사 흐름)
+        // 후속 보정: PgReconciliationApprovedSettlementAdjustConsumer 가 이 이벤트를 구독해
+        // 타입별 부호 규칙(clawback 방향만)으로 정산을 조정한다 — clawback 대상은 net 축소 +
+        // SettlementAdjustment.ofReconciliation 감사 레코드, 그 외 타입은 명시적 skip(메트릭).
         publishPort.publishDiscrepancyApproved(saved);
         return saved;
     }

@@ -1,4 +1,6 @@
 package github.lms.lemuel.product.domain;
+import github.lms.lemuel.product.domain.exception.InvalidProductStateException;
+import github.lms.lemuel.product.domain.exception.ProductInvariantViolationException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -27,8 +29,8 @@ public class Product {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    // 기본 생성자
-    public Product() {
+    // 기본 생성자 — create/rehydrate 팩토리만 통과한다(다른 애그리거트 동형: 생성자 비공개).
+    private Product() {
         this.status = ProductStatus.ACTIVE;
         this.stockQuantity = 0;
         this.tagIds = new ArrayList<>();
@@ -36,8 +38,8 @@ public class Product {
         this.updatedAt = LocalDateTime.now();
     }
 
-    // 전체 생성자
-    public Product(Long id, String name, String description, BigDecimal price,
+    // 전체 생성자 — rehydrate 팩토리 전용(비공개).
+    private Product(Long id, String name, String description, BigDecimal price,
                    Integer stockQuantity, ProductStatus status, Long categoryId, List<Long> tagIds,
                    String optionsJson, LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.id = id;
@@ -56,10 +58,10 @@ public class Product {
     // 정적 팩토리 메서드
     public static Product create(String name, String description, BigDecimal price, Integer stockQuantity) {
         Product product = new Product();
-        product.setName(name);
-        product.setDescription(description);
-        product.setPrice(price);
-        product.setStockQuantity(stockQuantity);
+        product.name = name;
+        product.description = description;
+        product.price = price;
+        product.stockQuantity = stockQuantity;
         product.validateName();
         product.validatePrice();
         product.validateStockQuantity();
@@ -79,31 +81,31 @@ public class Product {
     // 도메인 규칙: name 검증
     public void validateName() {
         if (name == null || name.trim().isEmpty()) {
-            throw new IllegalArgumentException("Product name cannot be empty");
+            throw new ProductInvariantViolationException("Product name cannot be empty");
         }
         if (name.length() > 200) {
-            throw new IllegalArgumentException("Product name must not exceed 200 characters");
+            throw new ProductInvariantViolationException("Product name must not exceed 200 characters");
         }
     }
 
     // 도메인 규칙: price 검증
     public void validatePrice() {
         if (price == null || price.compareTo(BigDecimal.ZERO) < 0) {
-            throw new IllegalArgumentException("Product price must be zero or greater");
+            throw new ProductInvariantViolationException("Product price must be zero or greater");
         }
     }
 
     // 도메인 규칙: stockQuantity 검증
     public void validateStockQuantity() {
         if (stockQuantity == null || stockQuantity < 0) {
-            throw new IllegalArgumentException("Stock quantity must be zero or greater");
+            throw new ProductInvariantViolationException("Stock quantity must be zero or greater");
         }
     }
 
     // 비즈니스 메서드: 재고 증가
     public void increaseStock(int quantity) {
         if (quantity <= 0) {
-            throw new IllegalArgumentException("Increase quantity must be positive");
+            throw new ProductInvariantViolationException("Increase quantity must be positive");
         }
         this.stockQuantity += quantity;
         this.updatedAt = LocalDateTime.now();
@@ -117,10 +119,10 @@ public class Product {
     // 비즈니스 메서드: 재고 감소
     public void decreaseStock(int quantity) {
         if (quantity <= 0) {
-            throw new IllegalArgumentException("Decrease quantity must be positive");
+            throw new ProductInvariantViolationException("Decrease quantity must be positive");
         }
         if (this.stockQuantity < quantity) {
-            throw new IllegalStateException("Insufficient stock: requested=" + quantity + ", available=" + this.stockQuantity);
+            throw new InvalidProductStateException("Insufficient stock: requested=" + quantity + ", available=" + this.stockQuantity);
         }
         this.stockQuantity -= quantity;
         this.updatedAt = LocalDateTime.now();
@@ -134,7 +136,7 @@ public class Product {
     // 비즈니스 메서드: 가격 변경
     public void changePrice(BigDecimal newPrice) {
         if (newPrice == null || newPrice.compareTo(BigDecimal.ZERO) < 0) {
-            throw new IllegalArgumentException("New price must be zero or greater");
+            throw new ProductInvariantViolationException("New price must be zero or greater");
         }
         this.price = newPrice;
         this.updatedAt = LocalDateTime.now();
@@ -143,7 +145,7 @@ public class Product {
     // 비즈니스 메서드: 상품 활성화
     public void activate() {
         if (this.status == ProductStatus.DISCONTINUED) {
-            throw new IllegalStateException("Cannot activate discontinued product");
+            throw new InvalidProductStateException("Cannot activate discontinued product");
         }
         if (this.stockQuantity == 0) {
             this.status = ProductStatus.OUT_OF_STOCK;
@@ -156,7 +158,7 @@ public class Product {
     // 비즈니스 메서드: 상품 비활성화
     public void deactivate() {
         if (this.status == ProductStatus.DISCONTINUED) {
-            throw new IllegalStateException("Cannot deactivate discontinued product");
+            throw new InvalidProductStateException("Cannot deactivate discontinued product");
         }
         this.status = ProductStatus.INACTIVE;
         this.updatedAt = LocalDateTime.now();
@@ -197,103 +199,92 @@ public class Product {
         return this.status == ProductStatus.DISCONTINUED;
     }
 
-    // Getters and Setters
+    /**
+     * 영속 레코드 복원 팩토리. no-arg + setter 대신 이 경로로만 재구성해 도메인 봉인을 유지한다.
+     */
+    public static Product rehydrate(Long id, String name, String description, BigDecimal price,
+                                    Integer stockQuantity, ProductStatus status, Long categoryId,
+                                    List<Long> tagIds, String optionsJson,
+                                    LocalDateTime createdAt, LocalDateTime updatedAt) {
+        return new Product(id, name, description, price, stockQuantity, status, categoryId,
+                tagIds, optionsJson, createdAt, updatedAt);
+    }
+
+    /** Persistence 어댑터가 DB 부여 PK 를 주입할 때 사용(setter 대체). */
+    public void assignId(Long id) {
+        if (this.id != null) {
+            throw new IllegalStateException("id 는 1회만 부여할 수 있습니다");
+        }
+        this.id = id;
+    }
+
+    /** 태그 목록을 통째로 교체(null 은 빈 목록). 방어적 복사로 외부 리스트와 격리. */
+    public void replaceTags(List<Long> tagIds) {
+        this.tagIds = tagIds != null ? new ArrayList<>(tagIds) : new ArrayList<>();
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    // Getters
     public Long getId() {
         return id;
     }
 
-    public void setId(Long id) {
-        this.id = id;
-    }
 
     public String getName() {
         return name;
     }
 
-    public void setName(String name) {
-        this.name = name;
-    }
 
     public String getDescription() {
         return description;
     }
 
-    public void setDescription(String description) {
-        this.description = description;
-    }
 
     public BigDecimal getPrice() {
         return price;
     }
 
-    public void setPrice(BigDecimal price) {
-        this.price = price;
-    }
 
     public Integer getStockQuantity() {
         return stockQuantity;
     }
 
-    public void setStockQuantity(Integer stockQuantity) {
-        this.stockQuantity = stockQuantity;
-    }
 
     public ProductStatus getStatus() {
         return status;
     }
 
-    public void setStatus(ProductStatus status) {
-        this.status = status;
-    }
 
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
 
     public LocalDateTime getUpdatedAt() {
         return updatedAt;
     }
 
-    public void setUpdatedAt(LocalDateTime updatedAt) {
-        this.updatedAt = updatedAt;
-    }
 
     public Long getCategoryId() {
         return categoryId;
     }
 
-    public void setCategoryId(Long categoryId) {
-        this.categoryId = categoryId;
-        this.updatedAt = LocalDateTime.now();
-    }
 
     /** 원본 옵션 트리(JSON 문자열, JSONB 저장). null 이면 옵션 없는 상품. */
     public String getOptionsJson() {
         return optionsJson;
     }
 
-    public void setOptionsJson(String optionsJson) {
-        this.optionsJson = optionsJson;
-        this.updatedAt = LocalDateTime.now();
-    }
 
     public List<Long> getTagIds() {
         return new ArrayList<>(tagIds);
     }
 
-    public void setTagIds(List<Long> tagIds) {
-        this.tagIds = tagIds != null ? new ArrayList<>(tagIds) : new ArrayList<>();
-        this.updatedAt = LocalDateTime.now();
-    }
 
     // 비즈니스 메서드: 태그 추가
     public void addTag(Long tagId) {
         if (tagId == null) {
-            throw new IllegalArgumentException("Tag ID cannot be null");
+            throw new ProductInvariantViolationException("Tag ID cannot be null");
         }
         if (!this.tagIds.contains(tagId)) {
             this.tagIds.add(tagId);

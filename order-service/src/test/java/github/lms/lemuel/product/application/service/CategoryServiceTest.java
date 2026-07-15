@@ -1,4 +1,5 @@
 package github.lms.lemuel.product.application.service;
+import github.lms.lemuel.product.domain.exception.ProductInvariantViolationException;
 
 import github.lms.lemuel.product.application.port.out.LoadCategoryPort;
 import github.lms.lemuel.product.application.port.out.SaveCategoryPort;
@@ -58,7 +59,7 @@ class CategoryServiceTest {
     void getById_notFound() {
         when(loadCategoryPort.findById(1L)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.getCategoryById(1L))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(ProductInvariantViolationException.class);
     }
 
     @Test @DisplayName("조회 위임 - all/active/root/sub")

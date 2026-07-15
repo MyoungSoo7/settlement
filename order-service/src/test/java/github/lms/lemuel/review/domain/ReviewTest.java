@@ -1,4 +1,5 @@
 package github.lms.lemuel.review.domain;
+import github.lms.lemuel.review.domain.exception.ReviewInvariantViolationException;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
@@ -19,9 +20,9 @@ class ReviewTest {
     @Test @DisplayName("평점 1-5 범위 검증")
     void invalidRating() {
         assertThatThrownBy(() -> Review.create(1L, 2L, 0, "내용"))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(ReviewInvariantViolationException.class);
         assertThatThrownBy(() -> Review.create(1L, 2L, 6, "내용"))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(ReviewInvariantViolationException.class);
     }
 
     @Test @DisplayName("리뷰 수정")

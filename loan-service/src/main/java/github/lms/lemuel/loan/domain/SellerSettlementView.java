@@ -2,6 +2,7 @@ package github.lms.lemuel.loan.domain;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import github.lms.lemuel.loan.domain.exception.LoanInvariantViolationException;
 
 /**
  * 셀러별 정산건의 로컬 투영(read model). settlement 의 SettlementCreated/Confirmed 이벤트로
@@ -30,10 +31,10 @@ public class SellerSettlementView {
     public static SellerSettlementView pending(Long settlementId, Long sellerId,
                                                BigDecimal amount, LocalDate dueDate) {
         if (settlementId == null || sellerId == null) {
-            throw new IllegalArgumentException("settlementId/sellerId 는 필수입니다");
+            throw new LoanInvariantViolationException("settlementId/sellerId 는 필수입니다");
         }
         if (amount == null || amount.signum() < 0) {
-            throw new IllegalArgumentException("정산금은 음수일 수 없습니다: " + amount);
+            throw new LoanInvariantViolationException("정산금은 음수일 수 없습니다: " + amount);
         }
         return new SellerSettlementView(settlementId, sellerId, amount, dueDate, SettlementViewStatus.PENDING);
     }

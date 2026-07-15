@@ -1,4 +1,5 @@
 package github.lms.lemuel.commoncode.domain;
+import github.lms.lemuel.commoncode.domain.exception.CommonCodeInvariantViolationException;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,11 +25,11 @@ class CommonCodeTest {
     @Test @DisplayName("create - 필수값 누락 시 예외")
     void create_requiresFields() {
         assertThatThrownBy(() -> CommonCode.create(null, "C", "L", 0, null))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(CommonCodeInvariantViolationException.class);
         assertThatThrownBy(() -> CommonCode.create("G", " ", "L", 0, null))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(CommonCodeInvariantViolationException.class);
         assertThatThrownBy(() -> CommonCode.create("G", "C", "", 0, null))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(CommonCodeInvariantViolationException.class);
     }
 
     @Test @DisplayName("update - label/sortOrder/active/extra 갱신")
@@ -46,14 +47,13 @@ class CommonCodeTest {
     void update_blankLabel() {
         CommonCode code = CommonCode.create("G", "C", "old", 0, null);
         assertThatThrownBy(() -> code.update("  ", 0, true, null))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(CommonCodeInvariantViolationException.class);
     }
 
-    @Test @DisplayName("setters - 식별자 세팅")
+    @Test @DisplayName("rehydrate/assignId - 식별자 복원")
     void setters() {
-        CommonCode code = new CommonCode();
-        code.setId(1L);
-        code.setCode("X");
+        CommonCode code = CommonCode.rehydrate(1L, "G", "X", "L", 0, true, null,
+                java.time.LocalDateTime.now(), java.time.LocalDateTime.now());
         assertThat(code.getId()).isEqualTo(1L);
         assertThat(code.getCode()).isEqualTo("X");
     }

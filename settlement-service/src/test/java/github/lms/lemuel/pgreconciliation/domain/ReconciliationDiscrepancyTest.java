@@ -1,6 +1,8 @@
 package github.lms.lemuel.pgreconciliation.domain;
 
 import org.junit.jupiter.api.DisplayName;
+import github.lms.lemuel.pgreconciliation.domain.exception.InvalidReconciliationStateException;
+import github.lms.lemuel.pgreconciliation.domain.exception.PgReconciliationInvariantViolationException;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -59,7 +61,7 @@ class ReconciliationDiscrepancyTest {
 
         // ROUNDING_DIFF 는 이미 AUTO_CORRECTED 상태
         assertThatThrownBy(() -> d.approve("ops-1", "note"))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(InvalidReconciliationStateException.class);
     }
 
     @Test
@@ -70,9 +72,9 @@ class ReconciliationDiscrepancyTest {
                 new BigDecimal("10000"), new BigDecimal("10500"));
 
         assertThatThrownBy(() -> d.reject("ops-1", null))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(PgReconciliationInvariantViolationException.class);
         assertThatThrownBy(() -> d.reject("ops-1", "  "))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(PgReconciliationInvariantViolationException.class);
     }
 
     @Test

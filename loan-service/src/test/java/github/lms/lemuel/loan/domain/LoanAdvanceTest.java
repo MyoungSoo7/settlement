@@ -1,5 +1,7 @@
 package github.lms.lemuel.loan.domain;
 
+import github.lms.lemuel.loan.domain.exception.InvalidLoanStateException;
+import github.lms.lemuel.loan.domain.exception.LoanInvariantViolationException;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -36,13 +38,13 @@ class LoanAdvanceTest {
     void REQUESTED_가_아닌_상태에서_승인하면_예외() {
         LoanAdvance loan = requested();
         loan.approve();
-        assertThatThrownBy(loan::approve).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(loan::approve).isInstanceOf(InvalidLoanStateException.class);
     }
 
     @Test
     void APPROVED_가_아닌_상태에서_실행하면_예외() {
         LoanAdvance loan = requested();
-        assertThatThrownBy(loan::disburse).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(loan::disburse).isInstanceOf(InvalidLoanStateException.class);
     }
 
     @Test
@@ -85,7 +87,7 @@ class LoanAdvanceTest {
     void DISBURSED_가_아닌_상태에서_상환하면_예외() {
         LoanAdvance loan = requested(); // REQUESTED
         assertThatThrownBy(() -> loan.applyRepayment(new BigDecimal("100")))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(InvalidLoanStateException.class);
     }
 
     @Test
@@ -105,23 +107,23 @@ class LoanAdvanceTest {
         LoanAdvance disbursed = requested();
         disbursed.approve();
         disbursed.disburse();
-        assertThatThrownBy(disbursed::reject).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(disbursed::reject).isInstanceOf(InvalidLoanStateException.class);
     }
 
     @Test
     void 신청_원금이_null이거나_0이하면_예외() {
         assertThatThrownBy(() -> LoanAdvance.request(1L, null, new BigDecimal("100")))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(LoanInvariantViolationException.class);
         assertThatThrownBy(() -> LoanAdvance.request(1L, BigDecimal.ZERO, new BigDecimal("100")))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(LoanInvariantViolationException.class);
     }
 
     @Test
     void 신청_수수료가_null이거나_음수면_예외() {
         assertThatThrownBy(() -> LoanAdvance.request(1L, new BigDecimal("1000"), null))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(LoanInvariantViolationException.class);
         assertThatThrownBy(() -> LoanAdvance.request(1L, new BigDecimal("1000"), new BigDecimal("-1")))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(LoanInvariantViolationException.class);
     }
 
     @Test
@@ -130,9 +132,9 @@ class LoanAdvanceTest {
         loan.approve();
         loan.disburse();
         assertThatThrownBy(() -> loan.applyRepayment(null))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(LoanInvariantViolationException.class);
         assertThatThrownBy(() -> loan.applyRepayment(new BigDecimal("-1")))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(LoanInvariantViolationException.class);
     }
 
     @Test

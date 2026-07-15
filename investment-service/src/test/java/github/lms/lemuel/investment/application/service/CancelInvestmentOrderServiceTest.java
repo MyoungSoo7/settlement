@@ -4,6 +4,7 @@ import github.lms.lemuel.investment.application.port.out.LoadInvestmentOrderPort
 import github.lms.lemuel.investment.application.port.out.SaveInvestmentOrderPort;
 import github.lms.lemuel.investment.domain.InvestmentOrder;
 import github.lms.lemuel.investment.domain.InvestmentOrderStatus;
+import github.lms.lemuel.investment.domain.exception.InvalidInvestmentOrderStateException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -39,17 +40,27 @@ class CancelInvestmentOrderServiceTest {
         when(loadInvestmentOrderPort.load(5L)).thenReturn(order(InvestmentOrderStatus.REQUESTED));
         when(saveInvestmentOrderPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        InvestmentOrder result = service().cancel(5L);
+        InvestmentOrder result = service().cancel(5L, 7L);
 
         assertThat(result.getStatus()).isEqualTo(InvestmentOrderStatus.CANCELED);
         verify(saveInvestmentOrderPort).save(any());
     }
 
     @Test
-    void 이미_집행된_주문_취소는_IllegalState이고_저장하지_않는다() {
+    void 타_셀러의_주문을_취소하려_하면_AccessDenied이고_저장하지_않는다() {
+        when(loadInvestmentOrderPort.load(5L)).thenReturn(order(InvestmentOrderStatus.REQUESTED)); // 소유자 = 7
+
+        assertThatThrownBy(() -> service().cancel(5L, 999L))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verify(saveInvestmentOrderPort, never()).save(any());
+    }
+
+    @Test
+    void 이미_집행된_주문_취소는_InvalidInvestmentOrderState이고_저장하지_않는다() {
         when(loadInvestmentOrderPort.load(5L)).thenReturn(order(InvestmentOrderStatus.EXECUTED));
 
-        assertThatThrownBy(() -> service().cancel(5L)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> service().cancel(5L, 7L))
+                .isInstanceOf(InvalidInvestmentOrderStateException.class);
         verify(saveInvestmentOrderPort, never()).save(any());
     }
 }

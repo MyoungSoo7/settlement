@@ -105,7 +105,7 @@ class CartControllerTest {
     @DisplayName("POST /users/{id}/cart/checkout: 체크아웃 → 주문 요약")
     void checkout() throws Exception {
         Order order = Order.create(1L, 1L, new BigDecimal("20000"));
-        order.setId(99L);
+        order.assignId(99L);
         when(checkoutUseCase.checkout(1L)).thenReturn(order);
 
         mockMvc.perform(post("/users/1/cart/checkout"))

@@ -1,7 +1,8 @@
 # Lemuel — 이커머스 + 정산 MSA 플랫폼
 
-> **상품·장바구니·주문·결제·배송·정산·선정산대출** 도메인을 **헥사고날 + MSA(DB-per-service)** 로 구현한 백엔드 포트폴리오.
-> 이커머스·결제·정산 솔루션 회사 (카페24·메이크샵·아임웹·토스페이먼츠·KG이니시스 등) 면접용.
+> **이커머스 주문 → 셀러 정산 → 복식부기 원장까지, "정확성을 기계로 강제한" 커머스 백엔드.**
+> 핵심은 커머스(order)·정산(settlement) 두 축의 **깊이**이고, 그 위에 대출·투자·계정계·재무·경제·평판·관제·시세·AI·공공데이터 **위성 서비스로 도메인 확장력**을 증명한다.
+> 이커머스·결제·정산 솔루션 회사 (무신사·배민·컬리·오늘의집 · 카페24·아임웹 · 토스페이먼츠·KG이니시스 등) 백엔드 면접용.
 
 🔗 **GitHub**: https://github.com/MyoungSoo7/settlement (`develop` 브랜치)
 
@@ -12,12 +13,30 @@
 | 항목 | 수치 |
 |---|---|
 | **Java / Spring Boot** | 25 / 4.0.4 |
-| **마이크로서비스** | 3 비즈니스(order / settlement / loan) + API Gateway + `shared-common` 라이브러리 |
-| **DB 분리** | DB-per-service — opslab / settlement_db / lemuel_loan (물리 분리, cross-DB 연결 0) |
-| **마이그레이션** | 70 개 (order 63 / settlement 2 / loan 5) |
-| **ADR** | 21 개 (0001 ~ 0022, 0019 결번) |
-| **테스트** | 159 테스트 클래스 (단위 + ArchUnit + Testcontainers 통합 13개) |
+| **마이크로서비스** | **12 비즈니스 서비스 + API Gateway** + `shared-common` 라이브러리 |
+| **DB 분리** | **DB-per-service (12 DB 물리 분리, cross-DB 연결 0)** — opslab / settlement_db / lemuel_loan … |
+| **Flyway 마이그레이션** | **260 개** (order 142 / settlement·loan·company 등 분산) |
+| **ADR** | **25 개** (0001 ~ 0026, 0019 결번) |
+| **테스트** | **테스트 소스 846개 파일** — 핵심 정산 모듈 **520 테스트 실측 통과** |
+| **커버리지 (검증)** | **정산 모듈 LINE 94.17%** (게이트 90%) — [SETTLEMENT-VERIFICATION.md](docs/SETTLEMENT-VERIFICATION.md) |
 | **부하테스트** | 4 시나리오 (k6) |
+
+> **깊이는 의도적으로 배분했다.** order(417 파일)·settlement(247 파일)가 시그니처이고,
+> 위성 서비스(각 26~40 파일)는 공개조회·수집형이라 **얇은 것이 미완성이 아니라 스코프 선택**이다.
+
+---
+
+## ✅ "정말 작동하나?" — 재현 가능한 검증
+
+포트폴리오의 정산은 주장이 아니라 **재현 가능한 테스트·게이트**로 증명된다.
+
+```bash
+./gradlew :settlement-service:test :settlement-service:jacocoTestCoverageVerification
+# → 520 테스트 통과 (실패 0) · LINE 94.17% · BUILD SUCCESSFUL
+```
+
+무엇이 어떤 테스트로 검증되는지(복식부기 균형·멱등 3계층·동시성·정합성 INV-5~11) + **검증되지 않는 한계까지** 정직하게 정리:
+→ **[docs/SETTLEMENT-VERIFICATION.md](docs/SETTLEMENT-VERIFICATION.md)**
 
 ---
 
@@ -85,11 +104,28 @@ settlement.created / settlement.confirmed 이벤트만 수신 (코드·DB 의존
 
 ---
 
+## 위성 서비스 — 도메인 확장력 (얇음은 의도)
+
+핵심 2축(커머스·정산) 외 9개 서비스는 **공개조회·수집·소비 전용**으로, 각각 얇지만 서로 다른 설계 제약을 증명한다.
+
+| 서비스 | 성격 | 증명하는 것 |
+|---|---|---|
+| loan / investment | 비즈니스(saga·점수) | 정산 이벤트로만 연계된 독립 컨텍스트 |
+| account (계정계 GL) | 소비 전용 | 이벤트→복식부기 집계, **발행 코드 없음**(경계 규율) |
+| company / operation | 수집·관제 | Outbox + 문서 JWT / fire-and-forget 신호 |
+| financial / economics / market / commondata | 공개조회 | shared-common 미의존, admin 키 게이트, PER/PBR 미계산 경계 |
+| ai | 챗봇 | provider 스위치 + LLM 격리(ArchUnit) |
+
+> 위성을 다 깊게 파지 않은 것은 **판단**이다 — 시그니처(정산 정확성)에 깊이를 몰아주고, 나머지는 각기 다른 아키텍처 제약을 얇게 증명한다.
+
+---
+
 ## 면접 자주 묻는 질문 → 답변 위치
 
 | 질문 | 답변 |
 |---|---|
 | MSA 인데 DB 공유 아닌가요? | [settlement readmodel 프로젝션](settlement-service/src/main/java/github/lms/lemuel/settlement/adapter/out/readmodel/) + [OrderReconClient](settlement-service/src/main/java/github/lms/lemuel/recon/OrderReconClient.java) |
+| 정산이 정말 정확한가요? | **[SETTLEMENT-VERIFICATION.md](docs/SETTLEMENT-VERIFICATION.md)** — 520 테스트·94% 커버리지 + 불변식 매핑 + 한계 |
 | 결제 PG 장애 시 fallback? | [PgRouter](order-service/src/main/java/github/lms/lemuel/payment/adapter/out/pg/PgRouter.java) — fallback chain |
 | 환불 중 PG 가 죽으면? | [RefundPaymentUseCase](order-service/src/main/java/github/lms/lemuel/payment/application/RefundPaymentUseCase.java) — 예외 변환 + 롤백, 유령 환불 방지 |
 | 이벤트 발행 영구 실패 시? | [DLQ + Admin API](shared-common/src/main/java/github/lms/lemuel/common/outbox/) |
@@ -106,35 +142,12 @@ settlement.created / settlement.confirmed 이벤트만 수신 (코드·DB 의존
 
 ---
 
-## 아키텍처 한 장
-
-```
-   Client → Gateway (Spring Cloud Gateway :8080)
-              ├─→ order-service (:8088)   ── PostgreSQL opslab
-              │     user·product·variant·cart·order·payment·shipping
-              │     coupon·review·game · 관리자(rbac·menu·commoncode)
-              │     └─ Outbox + traceparent → Kafka
-              │
-              ├─→ settlement-service (:8082) ── settlement_db
-              │     settlement·payout·ledger·chargeback·pgreconciliation·report
-              │     이벤트 드리븐 프로젝션(settlement_*_view, 코드·DB 의존 0)
-              │     Kafka Consumer + 멱등 3단 방어 / 대사: /internal/recon 호출
-              │
-              └─→ loan-service (:8084)    ── lemuel_loan
-                    선정산 대출 · 상환 saga · 자체 복식부기 (settlement 이벤트로만 연계)
-
-   Infra: PostgreSQL 17(×3), Elasticsearch 8.17, Redpanda(Kafka), Tempo, Grafana, Prometheus
-```
-
-자세한 구조: [README.md](README.md) 의 아키텍처 다이어그램 · [docs/adr/](docs/adr/)
-
----
-
 ## 운영성 자산
 
 | 자산 | 위치 |
 |---|---|
-| **Architecture Decision Records** 21개 | [docs/adr/](docs/adr/) |
+| **Architecture Decision Records** 25개 | [docs/adr/](docs/adr/) |
+| **정산 정확성 검증 문서** | [docs/SETTLEMENT-VERIFICATION.md](docs/SETTLEMENT-VERIFICATION.md) |
 | **k6 부하테스트** 4 시나리오 | [load-test/](load-test/) |
 | **Grafana 대시보드** + 커스텀 메트릭 | [monitoring/grafana/dashboards/](monitoring/grafana/dashboards/) |
 | **분산 트레이싱** (Tempo + OTLP) | [docker-compose.yml](docker-compose.yml) |
@@ -146,27 +159,26 @@ settlement.created / settlement.confirmed 이벤트만 수신 (코드·DB 의존
 
 ## 적용 가능 회사군
 
+### 이커머스 마켓플레이스 (무신사 / 배민 / 컬리 / 오늘의집 / 29CM / 에이블리)
+**강점**: 커머스 도메인 + SKU 동시성 + 셀러 등급별 차등 정산 + **셀러 정산 사이클 닫힘(Holdback→Payout→원장)** — 커머스의 어려운 뒷단(정산·회계)까지 소유
+
+### 이커머스 솔루션 (카페24 / 아임웹 / NHN커머스)
+**강점**: 균형 잡힌 커머스 도메인 + 장바구니 + 관리자(RBAC/메뉴/공통코드) + 정산
+
 ### 결제 회사 (토스페이먼츠 / KG이니시스 / NICE페이먼츠 / KCP)
 **강점**: 다중 PG + Outbox 멱등 3단 + 분할결제 역순 환불 + 분산 트레이싱
 
-### 이커머스 솔루션 (카페24 / 메이크샵 / 아임웹 / NHN커머스)
-**강점**: 균형 잡힌 커머스 도메인 + SKU 동시성 + 장바구니 + 셀러 등급별 차등 정산 + 관리자(RBAC/메뉴/공통코드)
-
-### 마켓플레이스 (29CM / 무신사 / 에이블리 / 스마트스토어)
-**강점**: 정산 사이클 닫힘 (Holdback → Payout) + PG 대사 + 선정산 대출
-
-### 정산 전문 / 핀테크 (페이히어 / 뱅크샐러드 / 토스B)
+### 정산 전문 / 핀테크 (페이히어 / 세틀뱅크 / 헥토파이낸셜)
 **강점**: 정산 도메인 깊이 (등급·주기·보류·역정산·대사·송금·복식부기) + MSA 경계(코드·DB 의존 0)
 
 ---
 
-## 빠른 둘러보기
+## 빠른 둘러보기 (5분)
 
-5분 만에 시스템 파악:
-1. **[README.md](README.md)** 의 *"면접관용 빠른 둘러보기"* 표 + 아키텍처 다이어그램
-2. **[CLAUDE.md](CLAUDE.md)** — 서비스 책임 분리 + 이벤트 드리븐 프로젝션 패턴
+1. **[docs/SETTLEMENT-VERIFICATION.md](docs/SETTLEMENT-VERIFICATION.md)** — "정말 작동하나"의 재현 가능한 답(520 테스트·94%)
+2. **[README.md](README.md)** 의 *"면접관용 빠른 둘러보기"* + 아키텍처 다이어그램
 3. **[docs/adr/0020-order-settlement-db-split.md](docs/adr/0020-order-settlement-db-split.md)** — DB 물리 분리 결정
-4. **[docs/adr/](docs/adr/)** 21개 — 왜 이렇게 설계했는지
+4. **[docs/adr/](docs/adr/)** 25개 — 왜 이렇게 설계했는지
 
 ---
 

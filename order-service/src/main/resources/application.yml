@@ -162,7 +162,7 @@ management:
     prometheus:
       enabled: true
     health:
-      show-details: always
+      show-details: when-authorized
       show-components: always
       probes:
         enabled: true  # K8s Liveness/Readiness Probe 활성화

@@ -4,6 +4,7 @@ import github.lms.lemuel.category.application.port.out.LoadEcommerceCategoryPort
 import github.lms.lemuel.category.application.port.out.SaveEcommerceCategoryPort;
 import github.lms.lemuel.category.domain.EcommerceCategory;
 import github.lms.lemuel.category.domain.exception.CategoryHasChildrenException;
+import github.lms.lemuel.category.domain.exception.CategoryInvariantViolationException;
 import github.lms.lemuel.category.domain.exception.CategoryHasProductsException;
 import github.lms.lemuel.category.domain.exception.CategoryNotFoundException;
 import github.lms.lemuel.category.domain.exception.CircularReferenceException;
@@ -55,7 +56,7 @@ public class EcommerceCategoryService {
         } else {
             EcommerceCategory parent = getCategoryById(parentId);
             if (parent.isDeleted()) {
-                throw new IllegalArgumentException("Cannot create category under deleted parent");
+                throw new CategoryInvariantViolationException("Cannot create category under deleted parent");
             }
             category = EcommerceCategory.createChild(name, slug, parentId, parent.getDepth(),
                     sortOrder != null ? sortOrder : 0);

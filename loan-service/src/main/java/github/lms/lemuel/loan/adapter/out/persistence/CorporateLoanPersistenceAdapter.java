@@ -30,6 +30,11 @@ public class CorporateLoanPersistenceAdapter implements SaveCorporateLoanPort, L
     }
 
     @Override
+    public Optional<CorporateLoan> findByIdForUpdate(Long loanId) {
+        return repository.findByIdForUpdate(loanId).map(CorporateLoanPersistenceAdapter::toDomain);
+    }
+
+    @Override
     public List<CorporateLoan> findByStockCode(String stockCode) {
         return repository.findByStockCodeOrderByIdDesc(stockCode).stream()
                 .map(CorporateLoanPersistenceAdapter::toDomain)

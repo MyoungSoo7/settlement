@@ -1,4 +1,5 @@
 package github.lms.lemuel.cart.domain;
+import github.lms.lemuel.cart.domain.exception.CartInvariantViolationException;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -71,7 +72,7 @@ class CartTest {
         cart.addItem(1L, null, 5);
 
         assertThatThrownBy(() -> cart.changeQuantity(1L, null, -1))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(CartInvariantViolationException.class);
     }
 
     @Test
@@ -80,7 +81,7 @@ class CartTest {
         Cart cart = Cart.createEmpty(100L);
 
         assertThatThrownBy(() -> cart.changeQuantity(999L, null, 5))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(CartInvariantViolationException.class);
     }
 
     @Test

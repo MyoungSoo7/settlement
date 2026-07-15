@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 public class PaymentMapper {
 
     public PaymentDomain toDomain(PaymentJpaEntity entity) {
-        return new PaymentDomain(
+        return PaymentDomain.rehydrate(
             entity.getId(),
             entity.getOrderId(),
             entity.getAmount(),

@@ -1,5 +1,7 @@
 package github.lms.lemuel.report.domain;
 
+import github.lms.lemuel.report.domain.exception.ReportInvariantViolationException;
+
 public enum BucketGranularity {
     DAY,
     WEEK,
@@ -12,7 +14,7 @@ public enum BucketGranularity {
         try {
             return BucketGranularity.valueOf(raw.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException(
+            throw new ReportInvariantViolationException(
                     "Unsupported groupBy: " + raw + " (expected: day|week|month)");
         }
     }

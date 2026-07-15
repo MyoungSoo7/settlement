@@ -2,6 +2,7 @@ package github.lms.lemuel.order.adapter.out.persistence;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -30,7 +31,10 @@ public interface SpringDataOrderJpaRepository extends JpaRepository<OrderJpaEnti
               AND (CAST(:to AS LocalDateTime) IS NULL OR o.createdAt < :to)
             ORDER BY o.createdAt DESC
             """)
-    List<OrderJpaEntity> findUserOrders(Long userId, String status, LocalDateTime from, LocalDateTime to);
+    List<OrderJpaEntity> findUserOrders(@Param("userId") Long userId,
+                                        @Param("status") String status,
+                                        @Param("from") LocalDateTime from,
+                                        @Param("to") LocalDateTime to);
 
     /** 전체 주문 금액 합계 — cross-DB 금액 대사(ADR 0020 Phase 5.2)의 원천. */
     @Query("SELECT COALESCE(SUM(o.amount), 0) FROM OrderJpaEntity o")

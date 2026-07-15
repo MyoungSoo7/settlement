@@ -1,6 +1,8 @@
 package github.lms.lemuel.payout.domain;
 
 import org.junit.jupiter.api.DisplayName;
+import github.lms.lemuel.payout.domain.exception.InvalidPayoutStateException;
+import github.lms.lemuel.payout.domain.exception.PayoutInvariantViolationException;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -29,9 +31,9 @@ class PayoutTest {
     @DisplayName("requestFromSettlement: amount 0 또는 음수 거부")
     void invalidAmount() {
         assertThatThrownBy(() -> Payout.requestFromSettlement(1L, 1L, BigDecimal.ZERO, ACCOUNT))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(PayoutInvariantViolationException.class);
         assertThatThrownBy(() -> Payout.requestFromSettlement(1L, 1L, new BigDecimal("-1"), ACCOUNT))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(PayoutInvariantViolationException.class);
     }
 
     @Test
@@ -55,8 +57,8 @@ class PayoutTest {
         Payout p = Payout.requestFromSettlement(1L, 1L, new BigDecimal("100"), ACCOUNT);
         p.startSending();
 
-        assertThatThrownBy(() -> p.markCompleted(null)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> p.markCompleted(""))  .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> p.markCompleted(null)).isInstanceOf(PayoutInvariantViolationException.class);
+        assertThatThrownBy(() -> p.markCompleted(""))  .isInstanceOf(PayoutInvariantViolationException.class);
     }
 
     @Test
@@ -84,15 +86,15 @@ class PayoutTest {
     void retry_onlyFromFailed() {
         Payout p = Payout.requestFromSettlement(1L, 1L, new BigDecimal("100"), ACCOUNT);
         // REQUESTED 에서 retry 시도
-        assertThatThrownBy(() -> p.retry("ops")).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> p.retry("ops")).isInstanceOf(InvalidPayoutStateException.class);
 
         p.startSending();
         // SENDING 에서 retry 시도
-        assertThatThrownBy(() -> p.retry("ops")).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> p.retry("ops")).isInstanceOf(InvalidPayoutStateException.class);
 
         p.markCompleted("FB-1");
         // COMPLETED 에서 retry 시도
-        assertThatThrownBy(() -> p.retry("ops")).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> p.retry("ops")).isInstanceOf(InvalidPayoutStateException.class);
     }
 
     @Test
@@ -115,8 +117,8 @@ class PayoutTest {
         Payout p = Payout.requestFromSettlement(1L, 1L, new BigDecimal("100"), ACCOUNT);
         p.startSending(); p.markFailed("err");
 
-        assertThatThrownBy(() -> p.cancel("ops", null)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> p.cancel("ops", " ")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> p.cancel("ops", null)).isInstanceOf(PayoutInvariantViolationException.class);
+        assertThatThrownBy(() -> p.cancel("ops", " ")).isInstanceOf(PayoutInvariantViolationException.class);
     }
 
     @Test
@@ -127,8 +129,8 @@ class PayoutTest {
         p.markCompleted("FB-1");
 
         assertThat(p.isFinal()).isTrue();
-        assertThatThrownBy(() -> p.cancel("ops", "사유")).isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(() -> p.retry("ops")).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> p.cancel("ops", "사유")).isInstanceOf(InvalidPayoutStateException.class);
+        assertThatThrownBy(() -> p.retry("ops")).isInstanceOf(InvalidPayoutStateException.class);
     }
 
     @Test
@@ -147,7 +149,7 @@ class PayoutTest {
         Payout p = Payout.requestFromSettlement(1L, 1L, new BigDecimal("100"), ACCOUNT);
         p.startSending();
         // SENDING 에서 재차 startSending
-        assertThatThrownBy(p::startSending).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(p::startSending).isInstanceOf(InvalidPayoutStateException.class);
     }
 
     @Test
@@ -155,18 +157,18 @@ class PayoutTest {
     void markCompleted_onlyFromSending() {
         Payout p = Payout.requestFromSettlement(1L, 1L, new BigDecimal("100"), ACCOUNT);
         // REQUESTED 에서 바로 완료 시도
-        assertThatThrownBy(() -> p.markCompleted("FB-1")).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> p.markCompleted("FB-1")).isInstanceOf(InvalidPayoutStateException.class);
     }
 
     @Test
     @DisplayName("markFailed: SENDING 이 아니면 거부 + 사유 필수")
     void markFailed_guards() {
         Payout p = Payout.requestFromSettlement(1L, 1L, new BigDecimal("100"), ACCOUNT);
-        assertThatThrownBy(() -> p.markFailed("err")).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> p.markFailed("err")).isInstanceOf(InvalidPayoutStateException.class);
 
         p.startSending();
-        assertThatThrownBy(() -> p.markFailed(null)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> p.markFailed(" ")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> p.markFailed(null)).isInstanceOf(PayoutInvariantViolationException.class);
+        assertThatThrownBy(() -> p.markFailed(" ")).isInstanceOf(PayoutInvariantViolationException.class);
     }
 
     @Test
@@ -186,7 +188,7 @@ class PayoutTest {
         Payout p = Payout.requestFromSettlement(1L, 1L, new BigDecimal("100"), ACCOUNT);
         p.startSending();
 
-        assertThatThrownBy(() -> p.cancel("ops", "사유")).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> p.cancel("ops", "사유")).isInstanceOf(InvalidPayoutStateException.class);
     }
 
     @Test

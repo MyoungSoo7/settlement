@@ -62,7 +62,7 @@ class CompanyReputationServiceTest {
     @Test
     @DisplayName("byStockCode 는 로드 포트에 위임한다")
     void queryDelegates() {
-        CompanyReputation rep = new CompanyReputation("005930", 50, "C", "B", LocalDate.of(2026, 7, 7));
+        CompanyReputation rep = CompanyReputation.of("005930", 50, "C", "B", LocalDate.of(2026, 7, 7));
         when(loadPort.findByStockCode("005930")).thenReturn(Optional.of(rep));
 
         Optional<CompanyReputation> result = service.byStockCode("005930");

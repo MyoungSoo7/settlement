@@ -18,16 +18,16 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 /**
- * User 영속 어댑터 + MapStruct 매퍼(UserPersistenceMapperImpl) 회귀 테스트.
+ * User 영속 어댑터 + 수동 매퍼(UserPersistenceMapper) 회귀 테스트.
  *
- * <p>실제 생성된 매퍼 구현체를 사용해 도메인↔엔티티 매핑(role/active/membershipStatus 표현식 포함)과
+ * <p>매퍼 구현체를 사용해 도메인↔엔티티 매핑(role/active/membershipStatus 변환 포함)과
  * 어댑터의 리포지토리 위임을 함께 검증한다(실 DB 미접속).
  */
 @ExtendWith(MockitoExtension.class)
 class UserPersistenceAdapterTest {
 
     @Mock SpringDataUserJpaRepository repository;
-    private final UserPersistenceMapper mapper = new UserPersistenceMapperImpl();
+    private final UserPersistenceMapper mapper = new UserPersistenceMapper();
 
     private UserPersistenceAdapter adapter() {
         return new UserPersistenceAdapter(repository, mapper);

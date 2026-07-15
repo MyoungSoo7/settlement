@@ -1,4 +1,5 @@
 package github.lms.lemuel.rbac.domain;
+import github.lms.lemuel.rbac.domain.exception.RoleInvariantViolationException;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -50,7 +51,7 @@ public class Role {
     /** 역할 이름/설명 수정. 코드·builtin 은 불변. */
     public void rename(String name, String description) {
         if (name == null || name.isBlank()) {
-            throw new IllegalArgumentException("역할 이름은 필수입니다.");
+            throw new RoleInvariantViolationException("역할 이름은 필수입니다.");
         }
         this.name = name.trim();
         this.description = description == null || description.isBlank() ? null : description.trim();
@@ -58,37 +59,36 @@ public class Role {
 
     public static String normalizeCode(String code) {
         if (code == null || code.isBlank()) {
-            throw new IllegalArgumentException("역할 코드는 필수입니다.");
+            throw new RoleInvariantViolationException("역할 코드는 필수입니다.");
         }
         String normalized = code.trim().toUpperCase();
         if (!CODE_PATTERN.matcher(normalized).matches()) {
-            throw new IllegalArgumentException(
+            throw new RoleInvariantViolationException(
                     "역할 코드는 대문자로 시작하는 대문자/숫자/언더스코어 2~30자여야 합니다: " + normalized);
         }
         return normalized;
     }
 
-    // Getters & Setters
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
+    /** DB 부여 PK 주입(setter 대체). */
+    public void assignId(Long id) { this.id = id; }
 
-    public String getCode() { return code; }
-    public void setCode(String code) { this.code = code; }
-
-    public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
-
-    public String getDescription() { return description; }
-    public void setDescription(String description) { this.description = description; }
-
-    public boolean isBuiltin() { return builtin; }
-    public void setBuiltin(boolean builtin) { this.builtin = builtin; }
-
-    public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
-
-    public List<Permission> getPermissions() { return permissions; }
-    public void setPermissions(List<Permission> permissions) {
+    /** 역할의 권한 목록 복원/치환(null 이면 빈 리스트로 방어). setter 대체 도메인 메서드. */
+    public void replacePermissions(List<Permission> permissions) {
         this.permissions = permissions == null ? new ArrayList<>() : permissions;
     }
+
+    // Getters
+    public Long getId() { return id; }
+
+    public String getCode() { return code; }
+
+    public String getName() { return name; }
+
+    public String getDescription() { return description; }
+
+    public boolean isBuiltin() { return builtin; }
+
+    public LocalDateTime getCreatedAt() { return createdAt; }
+
+    public List<Permission> getPermissions() { return permissions; }
 }

@@ -1,5 +1,7 @@
 package github.lms.lemuel.payment.application.port.in;
 
+import github.lms.lemuel.payment.domain.exception.PaymentInvariantViolationException;
+
 /**
  * Command object for creating a new payment
  */
@@ -9,10 +11,10 @@ public class CreatePaymentCommand {
 
     public CreatePaymentCommand(Long orderId, String paymentMethod) {
         if (orderId == null) {
-            throw new IllegalArgumentException("orderId must not be null");
+            throw new PaymentInvariantViolationException("orderId must not be null");
         }
         if (paymentMethod == null || paymentMethod.isBlank()) {
-            throw new IllegalArgumentException("paymentMethod must not be blank");
+            throw new PaymentInvariantViolationException("paymentMethod must not be blank");
         }
         this.orderId = orderId;
         this.paymentMethod = paymentMethod;

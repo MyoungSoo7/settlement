@@ -1,4 +1,6 @@
 package github.lms.lemuel.coupon.domain;
+import github.lms.lemuel.coupon.domain.exception.InvalidCouponStateException;
+import github.lms.lemuel.coupon.domain.exception.CouponInvariantViolationException;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
@@ -29,7 +31,7 @@ class CouponTest {
     void create_blankCode() {
         assertThatThrownBy(() -> Coupon.create("", CouponType.FIXED, new BigDecimal("1000"),
                 null, null, 10, null))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(CouponInvariantViolationException.class)
                 .hasMessageContaining("코드");
     }
 
@@ -37,14 +39,14 @@ class CouponTest {
     void create_zeroDiscount() {
         assertThatThrownBy(() -> Coupon.create("CODE", CouponType.FIXED, BigDecimal.ZERO,
                 null, null, 10, null))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(CouponInvariantViolationException.class);
     }
 
     @Test @DisplayName("정률 100% 초과 시 예외")
     void create_percentageOver100() {
         assertThatThrownBy(() -> Coupon.create("CODE", CouponType.PERCENTAGE, new BigDecimal("150"),
                 null, null, 10, null))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(CouponInvariantViolationException.class)
                 .hasMessageContaining("100%");
     }
 
@@ -52,7 +54,7 @@ class CouponTest {
     void create_zeroMaxUses() {
         assertThatThrownBy(() -> Coupon.create("CODE", CouponType.FIXED, new BigDecimal("1000"),
                 null, null, 0, null))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(CouponInvariantViolationException.class);
     }
 
     @Test @DisplayName("정액 할인 계산")
@@ -87,9 +89,9 @@ class CouponTest {
     void validate_inactive() {
         Coupon coupon = Coupon.create("C", CouponType.FIXED, new BigDecimal("1000"),
                 BigDecimal.ZERO, null, 10, null);
-        coupon.setActive(false);
+        coupon.deactivate();
         assertThatThrownBy(() -> coupon.validate(new BigDecimal("50000")))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(InvalidCouponStateException.class)
                 .hasMessageContaining("비활성");
     }
 
@@ -99,7 +101,7 @@ class CouponTest {
                 BigDecimal.ZERO, null, 1, null);
         coupon.incrementUsage();
         assertThatThrownBy(() -> coupon.validate(new BigDecimal("50000")))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(InvalidCouponStateException.class)
                 .hasMessageContaining("한도");
     }
 
@@ -108,7 +110,7 @@ class CouponTest {
         Coupon coupon = Coupon.create("C", CouponType.FIXED, new BigDecimal("1000"),
                 new BigDecimal("50000"), null, 10, null);
         assertThatThrownBy(() -> coupon.validate(new BigDecimal("30000")))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(InvalidCouponStateException.class)
                 .hasMessageContaining("최소 주문");
     }
 
@@ -117,7 +119,7 @@ class CouponTest {
         Coupon coupon = Coupon.create("C", CouponType.FIXED, new BigDecimal("1000"),
                 BigDecimal.ZERO, null, 10, LocalDateTime.now().minusDays(1));
         assertThatThrownBy(() -> coupon.validate(new BigDecimal("50000")))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(InvalidCouponStateException.class)
                 .hasMessageContaining("만료");
     }
 
@@ -162,7 +164,7 @@ class CouponTest {
         Coupon coupon = Coupon.create("C", CouponType.FIXED, new BigDecimal("1000"),
                 BigDecimal.ZERO, null, 10, null);
         assertThatThrownBy(() -> coupon.configureTarget("SELLER", 1L))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(CouponInvariantViolationException.class)
                 .hasMessageContaining("지원하지 않는");
     }
 
@@ -171,7 +173,7 @@ class CouponTest {
         Coupon coupon = Coupon.create("C", CouponType.FIXED, new BigDecimal("1000"),
                 BigDecimal.ZERO, null, 10, null);
         assertThatThrownBy(() -> coupon.configureTarget("PRODUCT", null))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(CouponInvariantViolationException.class)
                 .hasMessageContaining("targetId");
     }
 

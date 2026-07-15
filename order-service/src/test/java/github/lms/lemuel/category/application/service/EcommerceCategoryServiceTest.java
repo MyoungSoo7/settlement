@@ -34,7 +34,7 @@ class EcommerceCategoryServiceTest {
 
     private EcommerceCategory root(Long id, String slug) {
         EcommerceCategory c = EcommerceCategory.createRoot("cat-" + id, slug, 0);
-        c.setId(id);
+        c.assignId(id);
         return c;
     }
 
@@ -93,7 +93,7 @@ class EcommerceCategoryServiceTest {
     void tree_buildsHierarchy() {
         EcommerceCategory r = root(1L, "r");
         EcommerceCategory c = EcommerceCategory.createChild("c", "r-c", 1L, 0, 0);
-        c.setId(2L);
+        c.assignId(2L);
         when(loadPort.findAllNotDeleted()).thenReturn(List.of(r, c));
 
         List<EcommerceCategory> tree = service.getAllCategoriesTree();
@@ -116,7 +116,7 @@ class EcommerceCategoryServiceTest {
     void move_circular() {
         EcommerceCategory r = root(1L, "r");
         EcommerceCategory c = EcommerceCategory.createChild("c", "r-c", 1L, 0, 0);
-        c.setId(2L);
+        c.assignId(2L);
         when(loadPort.findByIdNotDeleted(1L)).thenReturn(Optional.of(r));
         // getDescendantIds 가 전체를 1회 로드해 BFS 하므로 findAllNotDeleted 로 스텁
         when(loadPort.findAllNotDeleted()).thenReturn(List.of(r, c));
@@ -130,9 +130,9 @@ class EcommerceCategoryServiceTest {
         // 1 → 2 → 3 체인. 1 을 자신의 손자 3 밑으로 옮기면 순환.
         EcommerceCategory r = root(1L, "r");
         EcommerceCategory c2 = EcommerceCategory.createChild("c2", "r-c2", 1L, 0, 0);
-        c2.setId(2L);
+        c2.assignId(2L);
         EcommerceCategory c3 = EcommerceCategory.createChild("c3", "r-c2-c3", 2L, 1, 0);
-        c3.setId(3L);
+        c3.assignId(3L);
         when(loadPort.findByIdNotDeleted(1L)).thenReturn(Optional.of(r));
         when(loadPort.findAllNotDeleted()).thenReturn(List.of(r, c2, c3));
 

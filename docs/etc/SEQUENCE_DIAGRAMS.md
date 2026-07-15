@@ -109,10 +109,10 @@ sequenceDiagram
             Refund->>DB: order.status = REFUNDED
         end
 
-        Refund->>Event: publishPaymentRefunded(paymentId, orderId)
-        Event->>Kafka: RefundCompleted 이벤트 발행
-        Kafka-->>SetSvc: 이벤트 수신
-        SetSvc->>AdjDB: SettlementAdjustment.ofRefund()<br/>(amount.negate(), status=PENDING)
+        Refund->>Event: publishPaymentRefunded(paymentId, orderId,<br/>refundedAmount, refundAmount, refundId)
+        Event->>Kafka: PaymentRefunded 이벤트 발행 (lemuel.payment.refunded)
+        Kafka-->>SetSvc: PaymentRefundedSettlementAdjustConsumer 수신
+        SetSvc->>AdjDB: SettlementAdjustment.ofRefund()<br/>(음수 레코드, refundId 1:1)
     end
 
     Refund-->>API: PaymentDomain
@@ -134,7 +134,7 @@ sequenceDiagram
     participant API as PgReconciliationController
     participant Svc as ReconcilePgFileService
     participant Parser as CsvPgFileParser
-    participant Internal as InternalPayments<br/>(JDBC read-only)
+    participant Internal as InternalPaymentsForReconJdbcAdapter<br/>(→ OrderReconClient /internal/recon)
     participant Matcher as PgReconciliationMatcher<br/>(순수 도메인)
     participant DB as pg_reconciliation_runs<br/>/ discrepancies
 
@@ -144,6 +144,7 @@ sequenceDiagram
     Parser-->>Svc: List of PgTransactionRow
 
     Svc->>Internal: loadByCapturedDate(date)
+    Note over Internal: order DB 직접 read 아님 — OrderReconClient 로<br/>order 내부 API(/internal/recon) 호출 (ADR 0020, cross-DB 0)
     Internal-->>Svc: List of InternalPaymentRow
 
     Svc->>Matcher: match(pgRows, internalRows)
@@ -155,6 +156,7 @@ sequenceDiagram
         Matcher->>Matcher: 차이 >= 1원 -> AMOUNT_MISMATCH
         Matcher->>Matcher: PG에만 존재 -> MISSING_INTERNAL
         Matcher->>Matcher: 내부에만 존재 -> MISSING_PG
+        Matcher->>Matcher: PG 파일 내 거래키 중복 -> DUPLICATE
     end
 
     Matcher-->>Svc: MatchResult

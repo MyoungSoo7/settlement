@@ -23,9 +23,8 @@
 
 | 분류 | 테이블 | 처리 |
 |---|---|---|
-| **DROP** (settlement_db 로 이관 완료) | `settlements`, `settlement_adjustments`, `settlement_index_queue`, `payouts`, `chargebacks`, `ledger_entries`, `ledger_outbox`, `pg_reconciliation_runs`, `pg_reconciliation_discrepancies`, `settlement_loan_deductions`, `settlement_payment_view`, `settlement_order_view`, `settlement_user_view`, `settlement_product_view` | 스크립트로 제거 |
+| **DROP** (settlement_db 로 이관 완료) | `settlements`, `settlement_adjustments`, `settlement_index_queue`, `settlement_schedule_config`, `payouts`, `chargebacks`, `ledger_entries`, `ledger_outbox`, `pg_reconciliation_runs`, `pg_reconciliation_discrepancies`, `settlement_loan_deductions`, `settlement_payment_view`, `settlement_order_view`, `settlement_user_view`, `settlement_product_view` | 스크립트로 제거 |
 | **KEEP** (order 가 계속 사용) | `outbox_events`, `processed_events`, `audit_logs`, `shedlock`, `batch_run_history` | 유지 |
-| **REVIEW** (settlement_db baseline 부재) | `settlement_schedule_config` | 미사용 확인 후 수동 판단 |
 
 ---
 
@@ -80,5 +79,6 @@ pg_restore --dbname "$OPSLAB_URL" --table=<table> opslab-pre-decommission-*.dump
   재생성되지만 order 코드가 사용하지 않아 무해한 **미사용 잔여**다. 그린필드 설치에선 생략 권장.
   (적용된 Flyway 마이그레이션은 삭제 금지 — 되돌리려면 forward drop 마이그레이션이 필요하나,
   운영 opslab 의 실데이터 보호를 위해 본 정리는 자동 마이그레이션이 아닌 수동 스크립트로 둔다.)
-- `settlement_schedule_config` 는 settlement_db baseline 에 없어 미사용 가능성이 높다. 사용처
-  확인 후 별도 DROP 또는 settlement_db 로 이관.
+- `settlement_schedule_config` 는 dead 로 확정됐다 — 레포 코드 참조 0(order·settlement 어디에도
+  JPA/쿼리 없음) + settlement_db baseline 부재. 따라서 이관이 아니라 **DROP 대상에 포함**했다
+  (구 REVIEW → DROP 승격, 스크립트 `DROP_TABLES`·`OpslabDecommissionIT` 미러 반영).

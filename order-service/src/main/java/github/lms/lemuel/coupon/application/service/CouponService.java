@@ -4,6 +4,8 @@ import github.lms.lemuel.coupon.application.port.in.CouponUseCase;
 import github.lms.lemuel.coupon.application.port.out.LoadCouponPort;
 import github.lms.lemuel.coupon.application.port.out.SaveCouponPort;
 import github.lms.lemuel.coupon.domain.Coupon;
+import github.lms.lemuel.coupon.domain.exception.CouponInvariantViolationException;
+import github.lms.lemuel.coupon.domain.exception.InvalidCouponStateException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -55,7 +57,7 @@ public class CouponService implements CouponUseCase {
 
         try {
             coupon.validate(orderAmount);
-        } catch (IllegalStateException e) {
+        } catch (InvalidCouponStateException e) {
             return new ValidateResult(false, e.getMessage(), BigDecimal.ZERO, orderAmount, null);
         }
 
@@ -80,10 +82,10 @@ public class CouponService implements CouponUseCase {
     @Override
     public void useCoupon(String code, Long userId, Long orderId) {
         Coupon coupon = loadCouponPort.findByCode(code.toUpperCase().trim())
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 쿠폰: " + code));
+                .orElseThrow(() -> new CouponInvariantViolationException("존재하지 않는 쿠폰: " + code));
 
         if (!saveCouponPort.incrementUsageIfAvailable(coupon.getId())) {
-            throw new IllegalStateException("쿠폰 사용 한도를 초과했습니다.");
+            throw new InvalidCouponStateException("쿠폰 사용 한도를 초과했습니다.");
         }
 
         // 1인 1매 한도는 coupon_usages(coupon_id, user_id) UNIQUE 제약으로 강제한다.
@@ -94,7 +96,7 @@ public class CouponService implements CouponUseCase {
             saveCouponPort.recordUsage(coupon.getId(), userId, orderId);
         } catch (DataIntegrityViolationException e) {
             log.warn("쿠폰 중복 사용 차단: code={}, userId={}", code, userId);
-            throw new IllegalStateException("이미 사용한 쿠폰입니다.", e);
+            throw new InvalidCouponStateException("이미 사용한 쿠폰입니다.", e);
         }
 
         log.info("쿠폰 사용 완료: code={}, userId={}, orderId={}", code, userId, orderId);

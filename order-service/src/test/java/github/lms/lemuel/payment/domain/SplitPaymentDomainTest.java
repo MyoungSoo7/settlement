@@ -1,4 +1,6 @@
 package github.lms.lemuel.payment.domain;
+import github.lms.lemuel.payment.domain.exception.InvalidPaymentStateException;
+import github.lms.lemuel.payment.domain.exception.PaymentInvariantViolationException;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -41,10 +43,10 @@ class SplitPaymentDomainTest {
     @DisplayName("createSplit: tender 1 개 또는 0 개는 IllegalArgumentException")
     void createSplit_minTwoTenders() {
         assertThatThrownBy(() -> PaymentDomain.createSplit(1L, List.of(), "X"))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(PaymentInvariantViolationException.class);
         assertThatThrownBy(() -> PaymentDomain.createSplit(1L,
                 List.of(PaymentTender.newTender(TenderType.CARD, BigDecimal.TEN, 1)), "X"))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(PaymentInvariantViolationException.class);
     }
 
     @Test
@@ -114,7 +116,7 @@ class SplitPaymentDomainTest {
         PaymentDomain p = PaymentDomain.createSplit(1L, tenders, "X");
 
         assertThatThrownBy(() -> p.planRefundFromTenders(new BigDecimal("20000")))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(PaymentInvariantViolationException.class);
     }
 
     @Test
@@ -130,17 +132,17 @@ class SplitPaymentDomainTest {
         p.validateTenderSum();
 
         // 불변식 위반 시뮬레이션
-        PaymentDomain corrupted = new PaymentDomain(1L, new BigDecimal("999"), "X");
+        PaymentDomain corrupted = PaymentDomain.create(1L, new BigDecimal("999"), "X");
         corrupted.replaceTenders(tenders);
         assertThatThrownBy(corrupted::validateTenderSum)
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(InvalidPaymentStateException.class)
                 .hasMessageContaining("tender 합계");
     }
 
     @Test
     @DisplayName("isSplit: tender 비어있으면 false (legacy 단일결제 호환)")
     void isSplit_legacyPayment() {
-        PaymentDomain legacy = new PaymentDomain(1L, new BigDecimal("10000"), "CARD");
+        PaymentDomain legacy = PaymentDomain.create(1L, new BigDecimal("10000"), "CARD");
         assertThat(legacy.isSplit()).isFalse();
     }
 

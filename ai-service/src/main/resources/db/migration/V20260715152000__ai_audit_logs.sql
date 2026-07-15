@@ -1,0 +1,136 @@
+-- V20260715152000: ai-service 감사 로그(audit_logs) 신설 — 3인 DB 리뷰 지적 반영
+--
+-- 설계 근거:
+--   ai-service 의 챗봇은 사용자 발화(PII 포함 가능)를 다루고 대화 삭제/열람 같은 소유자 민감 작업이
+--   있으나 자체 DB(lemuel_ai)에 감사 추적 테이블이 전무했다. "누가 언제 어떤 대화를 지웠나/비용가드를
+--   넘겼나"를 재구성할 수 없다는 것이 리뷰 지적. → order-service V34 / operation-service V3 /
+--   loan-service V5 와 동일한 shared-common audit 표준 스키마를 ai 자체 DB(public)에 신설한다.
+--
+-- E3 표준(감사성 강화형): created_at 월별 RANGE 파티션(2026_01~2027_06 + DEFAULT), PK(id, created_at),
+--   append-only 트리거(BEFORE UPDATE/DELETE RAISE), ensure/prune 유지보수 함수. 컬럼 구성은
+--   order-service V34__audit_logs.sql 표준 복제.
+--
+-- ★ 주의(스키마 선행): 테이블만 만든다. ai 는 shared-common JWT 만 제한 스캔하는 서비스라
+--   AuditLogJpaEntity·감사 기록 서비스 Java 배선은 후속 작업(현재 매핑 엔티티 없음 → validate 무관).
+--   ※ chat_messages 의 PII/리텐션은 E3 레인(파티셔닝)이 담당 — 본 파일은 audit_logs 만 신설한다.
+
+-- 파티션 부모 (public.audit_logs)
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id              BIGSERIAL,
+    actor_id        BIGINT,                    -- 로그인 유저 id (시스템 액션이면 NULL)
+    actor_email     VARCHAR(255),
+    action          VARCHAR(50) NOT NULL,      -- AuditAction enum
+    resource_type   VARCHAR(50),               -- Conversation / ChatMessage ...
+    resource_id     VARCHAR(64),               -- 대화 UUID 등 문자열 보관
+    detail_json     JSONB,                     -- 작업 상세 (마스킹된 메타 등)
+    ip_address      VARCHAR(45),               -- IPv4/IPv6
+    user_agent      VARCHAR(500),
+    created_at      TIMESTAMP NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (id, created_at)
+) PARTITION BY RANGE (created_at);
+
+-- 월별 파티션 2026_01 ~ 2027_06 (+ DEFAULT catch-all)
+CREATE TABLE IF NOT EXISTS audit_logs_2026_01 PARTITION OF audit_logs FOR VALUES FROM ('2026-01-01') TO ('2026-02-01');
+CREATE TABLE IF NOT EXISTS audit_logs_2026_02 PARTITION OF audit_logs FOR VALUES FROM ('2026-02-01') TO ('2026-03-01');
+CREATE TABLE IF NOT EXISTS audit_logs_2026_03 PARTITION OF audit_logs FOR VALUES FROM ('2026-03-01') TO ('2026-04-01');
+CREATE TABLE IF NOT EXISTS audit_logs_2026_04 PARTITION OF audit_logs FOR VALUES FROM ('2026-04-01') TO ('2026-05-01');
+CREATE TABLE IF NOT EXISTS audit_logs_2026_05 PARTITION OF audit_logs FOR VALUES FROM ('2026-05-01') TO ('2026-06-01');
+CREATE TABLE IF NOT EXISTS audit_logs_2026_06 PARTITION OF audit_logs FOR VALUES FROM ('2026-06-01') TO ('2026-07-01');
+CREATE TABLE IF NOT EXISTS audit_logs_2026_07 PARTITION OF audit_logs FOR VALUES FROM ('2026-07-01') TO ('2026-08-01');
+CREATE TABLE IF NOT EXISTS audit_logs_2026_08 PARTITION OF audit_logs FOR VALUES FROM ('2026-08-01') TO ('2026-09-01');
+CREATE TABLE IF NOT EXISTS audit_logs_2026_09 PARTITION OF audit_logs FOR VALUES FROM ('2026-09-01') TO ('2026-10-01');
+CREATE TABLE IF NOT EXISTS audit_logs_2026_10 PARTITION OF audit_logs FOR VALUES FROM ('2026-10-01') TO ('2026-11-01');
+CREATE TABLE IF NOT EXISTS audit_logs_2026_11 PARTITION OF audit_logs FOR VALUES FROM ('2026-11-01') TO ('2026-12-01');
+CREATE TABLE IF NOT EXISTS audit_logs_2026_12 PARTITION OF audit_logs FOR VALUES FROM ('2026-12-01') TO ('2027-01-01');
+CREATE TABLE IF NOT EXISTS audit_logs_2027_01 PARTITION OF audit_logs FOR VALUES FROM ('2027-01-01') TO ('2027-02-01');
+CREATE TABLE IF NOT EXISTS audit_logs_2027_02 PARTITION OF audit_logs FOR VALUES FROM ('2027-02-01') TO ('2027-03-01');
+CREATE TABLE IF NOT EXISTS audit_logs_2027_03 PARTITION OF audit_logs FOR VALUES FROM ('2027-03-01') TO ('2027-04-01');
+CREATE TABLE IF NOT EXISTS audit_logs_2027_04 PARTITION OF audit_logs FOR VALUES FROM ('2027-04-01') TO ('2027-05-01');
+CREATE TABLE IF NOT EXISTS audit_logs_2027_05 PARTITION OF audit_logs FOR VALUES FROM ('2027-05-01') TO ('2027-06-01');
+CREATE TABLE IF NOT EXISTS audit_logs_2027_06 PARTITION OF audit_logs FOR VALUES FROM ('2027-06-01') TO ('2027-07-01');
+CREATE TABLE IF NOT EXISTS audit_logs_default PARTITION OF audit_logs DEFAULT;
+
+-- 조회 패턴별 인덱스 3종 (부모에 생성 → 전 파티션 전파)
+CREATE INDEX IF NOT EXISTS idx_audit_logs_actor_time
+    ON audit_logs (actor_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_resource
+    ON audit_logs (resource_type, resource_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_action_time
+    ON audit_logs (action, created_at DESC);
+
+-- append-only 강제: UPDATE/DELETE 시도 시 예외 (감사 로그 불변성)
+-- ※ 함수명·본문은 E3 파티셔닝 레인 표준(audit_logs_block_modify)과 전 서비스 동일 유지
+CREATE OR REPLACE FUNCTION audit_logs_block_modify()
+RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    RAISE EXCEPTION 'audit_logs 는 append-only 입니다: % 연산 불가 (감사 로그 변조 차단)', TG_OP;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_audit_logs_append_only ON audit_logs;
+CREATE TRIGGER trg_audit_logs_append_only
+    BEFORE UPDATE OR DELETE ON audit_logs
+    FOR EACH ROW EXECUTE FUNCTION audit_logs_block_modify();
+
+-- 유지보수 함수 (전 서비스 동일 시그니처 — E3 표준)
+CREATE OR REPLACE FUNCTION ensure_audit_log_partition(months_ahead int DEFAULT 1)
+RETURNS int
+LANGUAGE plpgsql
+SET search_path = public, pg_catalog
+AS $$
+DECLARE
+    i int;
+    start_month date;
+    end_month date;
+    part_name text;
+    created int := 0;
+BEGIN
+    FOR i IN 0..months_ahead LOOP
+        start_month := date_trunc('month', CURRENT_DATE + make_interval(months => i))::date;
+        end_month   := (start_month + interval '1 month')::date;
+        part_name   := 'audit_logs_' || to_char(start_month, 'YYYY_MM');
+        IF to_regclass(part_name) IS NULL THEN
+            EXECUTE format(
+                'CREATE TABLE %I PARTITION OF audit_logs FOR VALUES FROM (%L) TO (%L)',
+                part_name, start_month, end_month);
+            created := created + 1;
+        END IF;
+    END LOOP;
+    RETURN created;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION prune_audit_logs(retain_months int)
+RETURNS int
+LANGUAGE plpgsql
+SET search_path = public, pg_catalog
+AS $$
+DECLARE
+    cutoff date;
+    r record;
+    dropped int := 0;
+BEGIN
+    IF retain_months < 1 THEN
+        RAISE EXCEPTION 'retain_months 는 1 이상이어야 합니다 (요청: %)', retain_months;
+    END IF;
+    cutoff := (date_trunc('month', CURRENT_DATE) - make_interval(months => retain_months))::date;
+    FOR r IN
+        SELECT c.relname AS part_name
+        FROM pg_inherits inh
+        JOIN pg_class c ON c.oid = inh.inhrelid
+        JOIN pg_class p ON p.oid = inh.inhparent
+        WHERE p.relname = 'audit_logs'
+          AND c.relname ~ '^audit_logs_[0-9]{4}_[0-9]{2}$'
+    LOOP
+        IF to_date(right(r.part_name, 7), 'YYYY_MM') < cutoff THEN
+            EXECUTE format('ALTER TABLE audit_logs DETACH PARTITION %I', r.part_name);
+            EXECUTE format('DROP TABLE %I', r.part_name);
+            dropped := dropped + 1;
+        END IF;
+    END LOOP;
+    RETURN dropped;
+END;
+$$;
+
+COMMENT ON TABLE audit_logs IS 'ai 민감 작업(대화 삭제 등) 감사 추적. append-only + 월별 파티션. 기록 배선 완료 — 자체 audit 어댑터(RecordAuditPort→AuditRecordingAdapter)가 실적재.';

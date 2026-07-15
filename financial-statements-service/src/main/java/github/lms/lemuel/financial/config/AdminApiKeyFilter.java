@@ -26,9 +26,18 @@ public class AdminApiKeyFilter extends OncePerRequestFilter {
     static final String HEADER = "X-Internal-Api-Key";
 
     private final String apiKey;
+    private final boolean keyRequired;
 
-    public AdminApiKeyFilter(@Value("${app.financial.internal-api-key:}") String apiKey) {
+    @org.springframework.beans.factory.annotation.Autowired
+    public AdminApiKeyFilter(@Value("${app.financial.internal-api-key:}") String apiKey,
+                             @Value("${app.security.internal-key-required:false}") boolean keyRequired) {
         this.apiKey = apiKey;
+        this.keyRequired = keyRequired;
+    }
+
+    /** 테스트/기본 편의 — keyRequired=false(기존 fail-open 동작). */
+    public AdminApiKeyFilter(String apiKey) {
+        this(apiKey, false);
     }
 
     @Override
@@ -40,6 +49,10 @@ public class AdminApiKeyFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
         if (apiKey == null || apiKey.isBlank()) {
+            if (keyRequired) { // app.security.internal-key-required=true(운영) → fail-closed
+                response.sendError(HttpServletResponse.SC_FORBIDDEN, "internal api key not configured");
+                return;
+            }
             log.warn("app.financial.internal-api-key 미설정 — /admin/financial/** 무게이팅 통과 (로컬 전용, 운영 설정 필수)");
             filterChain.doFilter(request, response);
             return;

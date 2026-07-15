@@ -1,57 +1,17 @@
 package github.lms.lemuel.account.application.port.in;
 
-import github.lms.lemuel.account.domain.AccountEntry;
-import github.lms.lemuel.account.domain.AccountSummary;
-import github.lms.lemuel.account.domain.OwnerType;
-import github.lms.lemuel.account.domain.TrialBalance;
-
-import java.math.BigDecimal;
-import java.util.List;
-
 /**
  * 계정계 조회 인바운드 포트 — owner 잔액·분개 페이지·대출/투자/정산 집계·시산표.
+ *
+ * <p><b>ISP</b>: 조회 축을 응집 역할 인터페이스로 분리했다 — {@link OwnerAccountQuery}(owner 화면),
+ * {@link AccountAggregateQuery}(전사 집계), {@link TrialBalanceQuery}(시산표). 이 포트는 셋을 합성한
+ * 편의 집합이며, 한 축만 필요한 소비처는 해당 역할 인터페이스만 의존하면 된다. 구현 서비스는 이 합성
+ * 포트를 구현해 세 역할을 한 번에 만족시킨다. (중첩 레코드 {@code EntryPage}/{@code LoanAggregate}
+ * 등은 각 역할 인터페이스가 정본으로 선언한다 — {@code OwnerAccountQuery.EntryPage},
+ * {@code AccountAggregateQuery.LoanAggregate} 로 참조한다.)
  */
-public interface AccountQueryUseCase {
-
-    /** owner 별 계정 잔액 요약. */
-    AccountSummary accountSummary(OwnerType ownerType, String ownerId);
-
-    /** owner 별 분개 페이지. */
-    EntryPage entries(OwnerType ownerType, String ownerId, int page, int size);
-
-    /** 대출 집계 — "대출을 제대로 집계하는 계정계"의 핵심. */
-    LoanAggregate loanAggregates();
-
-    /** 투자 집계. */
-    InvestmentAggregate investmentAggregates();
-
-    /** 정산 집계. */
-    SettlementAggregate settlementAggregates();
-
-    /** 전사 시산표. */
-    TrialBalance trialBalance();
-
-    /** 분개 페이지 결과. */
-    record EntryPage(List<AccountEntry> content, long totalElements, int page, int size) { }
-
-    /**
-     * 대출 집계 — 셀러 선정산 대출 + 법인 대출.
-     * outstanding = disbursed − repaid, corporateOutstanding = 법인 상환 이벤트 부재로 corporateDisbursed 와 동일.
-     */
-    record LoanAggregate(
-            BigDecimal disbursedTotal,
-            BigDecimal repaidTotal,
-            BigDecimal outstanding,
-            BigDecimal corporateDisbursedTotal,
-            BigDecimal corporateOutstanding,
-            long entryCount) { }
-
-    /** 투자 집계. */
-    record InvestmentAggregate(BigDecimal investedTotal, long orderCount) { }
-
-    /** 정산 집계 — pendingScheduled = scheduled − confirmed. */
-    record SettlementAggregate(
-            BigDecimal scheduledTotal,
-            BigDecimal confirmedTotal,
-            BigDecimal pendingScheduled) { }
+public interface AccountQueryUseCase
+        extends OwnerAccountQuery,
+                AccountAggregateQuery,
+                TrialBalanceQuery {
 }

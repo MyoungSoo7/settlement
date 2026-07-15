@@ -2,8 +2,14 @@
 #
 # 용도: CI 가 인프라 사정(러너 hang 등)으로 막혔는데 프로덕션 스큐를 즉시 풀어야 할 때.
 # 테스트를 건너뛰므로 *수동 dispatch 전용* — 코드 신뢰도는 직전 CI 결과로 판단할 것.
-# 태그·build-args 는 ci.yml 의 backend-ghcr job 과 동일 (image-updater 가 main-<sha7> 픽업).
+# 태그·build-args 는 ci.yml 의 backend-ghcr job 과 동일하게 유지한다.
 # (2026-07-08: 프론트 main-2f8a180 / 백엔드 main-6468c05 스큐 해소에 사용)
+# 이미지 매핑:
+#   order-service      → ghcr.io/myoungsoo7/settlement
+#   settlement-service → ghcr.io/myoungsoo7/settlement-settlement
+#   gateway-service    → ghcr.io/myoungsoo7/settlement-gateway
+#   account-service    → ghcr.io/myoungsoo7/settlement-account
+#   operation-service  → ghcr.io/myoungsoo7/settlement-operation
 name: Backend image (emergency, no tests)
 
 on:
@@ -27,6 +33,12 @@ jobs:
             image_suffix: ""
           - module: settlement-service
             image_suffix: "-settlement"
+          - module: gateway-service
+            image_suffix: "-gateway"
+          - module: account-service
+            image_suffix: "-account"
+          - module: operation-service
+            image_suffix: "-operation"
     steps:
       - uses: actions/checkout@v4
 

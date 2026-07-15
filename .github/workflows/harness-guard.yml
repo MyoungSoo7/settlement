@@ -1,0 +1,72 @@
+# Harness guard — machine-enforces money/architecture invariants + doc-drift on every PR.
+# Plugin-independent (uses only scripts/harness/*), so it holds even where the copilot
+# plugin / MCP is absent. Complements ci.yml (build/test/coverage), does not replace it.
+name: harness-guard
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # need base for diff
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run harness tests
+        run: node --test scripts/harness/test/*.test.mjs
+
+      - name: Compute changed files
+        id: diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_REF="${{ github.base_ref }}"
+            git fetch --no-tags origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+            BASE="$(git merge-base HEAD "refs/remotes/origin/$BASE_REF")"
+            test -n "$BASE"
+            git cat-file -e "$BASE^{commit}"
+            git diff --name-only --diff-filter=ACMR "$BASE" HEAD > changed.txt
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            BEFORE="${{ github.event.before }}"
+            if [[ ! "$BEFORE" =~ ^[0-9a-fA-F]{40}$ ]]; then
+              echo "invalid push before SHA: $BEFORE" >&2
+              exit 1
+            fi
+            if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+              git ls-files > changed.txt
+            else
+              git cat-file -e "$BEFORE^{commit}"
+              git diff --name-only --diff-filter=ACMR "$BEFORE" HEAD > changed.txt
+            fi
+          else
+            echo "unsupported event: ${{ github.event_name }}" >&2
+            exit 1
+          fi
+          echo "changed files:"
+          cat changed.txt
+
+      - name: Money / architecture guard (changed files)
+        run: node scripts/harness/guard.mjs --list changed.txt
+
+      - name: Harness self-audit (doc drift, routing, guard integrity)
+        run: node scripts/harness/harness-audit.mjs
+
+      - name: Verify manifest tracking
+        shell: bash
+        run: |
+          set -euo pipefail
+          node -e "for (const path of require('./scripts/harness/manifest.json').requiredTrackedFiles) process.stdout.write(path + '\0')" |
+            xargs -0 git ls-files --error-unmatch -- >/dev/null
+
+      - name: Verify clean working tree
+        run: git diff --exit-code

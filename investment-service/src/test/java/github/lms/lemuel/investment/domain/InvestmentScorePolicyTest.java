@@ -1,5 +1,6 @@
 package github.lms.lemuel.investment.domain;
 
+import github.lms.lemuel.investment.domain.exception.InvestmentInvariantViolationException;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -66,6 +67,25 @@ class InvestmentScorePolicyTest {
         assertThat(profitabilityScore(null, "3.99").profitability().score()).isEqualTo(3);
         assertThat(profitabilityScore(null, "0").profitability().score()).isEqualTo(3);
         assertThat(profitabilityScore(null, "-0.01").profitability().score()).isEqualTo(0);
+    }
+
+    @Test
+    void 개별_지표_null_은_해당_밴드만_0점이고_나머지는_정상산정() {
+        // roa 만 null → operatingMargin 20점 유지, roa 밴드만 0
+        assertThat(profitabilityScore("20", null).profitability().score()).isEqualTo(20);
+        // operatingMargin 만 null → roa 15점 유지, margin 밴드만 0
+        assertThat(profitabilityScore(null, "15").profitability().score()).isEqualTo(15);
+        // equityRatio 만 null → debtRatio 20점 유지, equity 밴드만 0
+        assertThat(stabilityScore("50", null).stability().score()).isEqualTo(20);
+        // debtRatio 만 null → equityRatio 15점 유지, debt 밴드만 0
+        assertThat(stabilityScore(null, "60").stability().score()).isEqualTo(15);
+    }
+
+    @Test
+    void 부채비율_AT_MOST_최저구간은_음수도_경계이하로_20점() {
+        // 낮을수록 고득점(AT_MOST) 방향에서 경계값보다 훨씬 낮은 값(0·음수)도 최고 밴드에 매칭.
+        assertThat(stabilityScore("0", null).stability().score()).isEqualTo(20);
+        assertThat(stabilityScore("-5", null).stability().score()).isEqualTo(20);
     }
 
     @Test
@@ -197,8 +217,8 @@ class InvestmentScorePolicyTest {
     @Test
     void 재무제표가_없으면_예외() {
         assertThatThrownBy(() -> policy.score(new CompanyFinancials("005930", "빈", "KOSPI", List.of())))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(InvestmentInvariantViolationException.class);
         assertThatThrownBy(() -> policy.score(null))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(InvestmentInvariantViolationException.class);
     }
 }

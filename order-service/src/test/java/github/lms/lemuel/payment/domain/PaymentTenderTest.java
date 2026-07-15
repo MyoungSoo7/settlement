@@ -1,4 +1,6 @@
 package github.lms.lemuel.payment.domain;
+import github.lms.lemuel.payment.domain.exception.InvalidPaymentStateException;
+import github.lms.lemuel.payment.domain.exception.PaymentInvariantViolationException;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,8 +29,8 @@ class PaymentTenderTest {
     void authorize_externalPg_requiresTxnId() {
         PaymentTender t = PaymentTender.newTender(TenderType.CARD, new BigDecimal("1000"), 1);
 
-        assertThatThrownBy(() -> t.authorize(null)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> t.authorize(""))  .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> t.authorize(null)).isInstanceOf(PaymentInvariantViolationException.class);
+        assertThatThrownBy(() -> t.authorize(""))  .isInstanceOf(PaymentInvariantViolationException.class);
 
         t.authorize("TOSS:abc-123");
         assertThat(t.getStatus()).isEqualTo(TenderStatus.AUTHORIZED);
@@ -66,7 +68,7 @@ class PaymentTenderTest {
         t.authorize("TX-1"); t.capture();
 
         assertThatThrownBy(() -> t.addRefund(new BigDecimal("1500")))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(PaymentInvariantViolationException.class);
     }
 
     @Test
@@ -75,15 +77,15 @@ class PaymentTenderTest {
         PaymentTender t = PaymentTender.newTender(TenderType.CARD, new BigDecimal("1000"), 1);
         // PENDING
         assertThatThrownBy(() -> t.addRefund(new BigDecimal("100")))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(InvalidPaymentStateException.class);
     }
 
     @Test
     @DisplayName("validation: amount 음수 / sequence 0 거부")
     void validation() {
         assertThatThrownBy(() -> PaymentTender.newTender(TenderType.CARD, BigDecimal.ZERO, 1))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(PaymentInvariantViolationException.class);
         assertThatThrownBy(() -> PaymentTender.newTender(TenderType.CARD, new BigDecimal("100"), 0))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(PaymentInvariantViolationException.class);
     }
 }

@@ -4,6 +4,7 @@ import github.lms.lemuel.ledger.application.dto.SettlementSummary;
 import github.lms.lemuel.ledger.application.port.out.LoadLedgerEntryPort;
 import github.lms.lemuel.ledger.application.port.out.LoadSettlementForLedgerPort;
 import github.lms.lemuel.ledger.application.port.out.SaveLedgerEntryPort;
+import github.lms.lemuel.ledger.domain.exception.LedgerInvariantViolationException;
 import github.lms.lemuel.ledger.domain.AccountType;
 import github.lms.lemuel.ledger.domain.LedgerEntry;
 import github.lms.lemuel.ledger.domain.LedgerEntryType;
@@ -94,7 +95,7 @@ class CreateLedgerEntryServiceTest {
                     102L, bd("10000"), bd("300"), bd("9700"), TODAY, "PROCESSING"));
 
             assertThatThrownBy(() -> service.createFromSettlement(102L))
-                    .isInstanceOf(IllegalStateException.class)
+                    .isInstanceOf(LedgerInvariantViolationException.class)
                     .hasMessageContaining("DONE");
         }
 
@@ -112,7 +113,7 @@ class CreateLedgerEntryServiceTest {
                     103L, bd("10000"), bd("300"), bd("9000"), TODAY, "DONE"));
 
             assertThatThrownBy(() -> service.createFromSettlement(103L))
-                    .isInstanceOf(IllegalStateException.class)
+                    .isInstanceOf(LedgerInvariantViolationException.class)
                     .hasMessageContaining("mismatch");
         }
 
@@ -184,7 +185,7 @@ class CreateLedgerEntryServiceTest {
 
         @Override
         public LedgerEntry save(LedgerEntry e) {
-            if (e.getId() == null) e.setId(idSeq.getAndIncrement());
+            if (e.getId() == null) e.assignId(idSeq.getAndIncrement());
             saved.add(e);
             return e;
         }

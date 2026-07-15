@@ -1,7 +1,7 @@
 package github.lms.lemuel.payment.application;
 
 import github.lms.lemuel.payment.domain.PaymentDomain;
-import github.lms.lemuel.payment.domain.exception.InvalidOrderStateException;
+import github.lms.lemuel.payment.domain.exception.InvalidOrderStateForPaymentException;
 import github.lms.lemuel.payment.domain.exception.OrderNotFoundException;
 import github.lms.lemuel.payment.application.port.in.CreatePaymentCommand;
 import github.lms.lemuel.payment.application.port.in.CreatePaymentPort;
@@ -37,11 +37,11 @@ public class CreatePaymentUseCase implements CreatePaymentPort {
         }
 
         if (!order.isCreated()) {
-            throw new InvalidOrderStateException("Order must be in CREATED status to create payment");
+            throw new InvalidOrderStateForPaymentException("Order must be in CREATED status to create payment");
         }
 
         // Create payment domain entity
-        PaymentDomain paymentDomain = new PaymentDomain(
+        PaymentDomain paymentDomain = PaymentDomain.create(
             order.getId(),
             order.getAmount(),
             command.getPaymentMethod()

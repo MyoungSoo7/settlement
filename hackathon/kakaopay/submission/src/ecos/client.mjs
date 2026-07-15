@@ -50,13 +50,28 @@ async function getJson(url) {
   return res.json();
 }
 
+// URL "경로"에 삽입되는 파라미터 — 검증 없이 넣으면 ../ 등으로 경로가 변조될 수 있다.
+// ECOS 코드 체계는 영숫자뿐이므로 (statCode 722Y001, cycle D/M/Q/A, 날짜 20250101/2025Q1)
+// 영숫자 화이트리스트로 막고, 방어선 이중화로 encodeURIComponent 도 함께 적용한다.
+const VALID_CYCLES = new Set(['D', 'M', 'Q', 'A']);
+function pathParam(name, value, { maxLen = 16 } = {}) {
+  const v = String(value ?? '').trim();
+  if (!/^[0-9A-Za-z]+$/.test(v) || v.length > maxLen) {
+    throw new Error(`ECOS ${name} 형식이 올바르지 않습니다 (영숫자만, ${maxLen}자 이내) — got "${v}"`);
+  }
+  return encodeURIComponent(v);
+}
+
 /**
  * StatisticSearch 원시 호출 — 임의의 통계/항목 코드 조회.
  * @returns {Array<{time: string, value: number}>}
  */
 export async function statisticSearch({ statCode, itemCode, cycle, start, end }) {
   requireKey();
-  const url = `${BASE}/StatisticSearch/${API_KEY}/json/kr/1/${STATISTIC_SEARCH_LIMIT}/${statCode}/${cycle}/${start}/${end}/${itemCode}`;
+  const c = String(cycle ?? '').trim().toUpperCase();
+  if (!VALID_CYCLES.has(c)) throw new Error(`ECOS cycle 은 D|M|Q|A 중 하나여야 합니다 — got "${cycle}"`);
+  const url = `${BASE}/StatisticSearch/${API_KEY}/json/kr/1/${STATISTIC_SEARCH_LIMIT}`
+    + `/${pathParam('statCode', statCode)}/${c}/${pathParam('start', start)}/${pathParam('end', end)}/${pathParam('itemCode', itemCode)}`;
   const body = await getJson(url);
 
   const result = body?.RESULT ?? body?.StatisticSearch?.RESULT;

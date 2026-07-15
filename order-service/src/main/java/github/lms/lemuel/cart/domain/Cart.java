@@ -1,5 +1,7 @@
 package github.lms.lemuel.cart.domain;
 
+import github.lms.lemuel.cart.domain.exception.CartInvariantViolationException;
+
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -77,7 +79,7 @@ public class Cart {
             return;
         }
         CartItem item = findItem(productId, variantId)
-                .orElseThrow(() -> new IllegalArgumentException(
+                .orElseThrow(() -> new CartInvariantViolationException(
                         "장바구니에 없는 항목: productId=" + productId + ", variantId=" + variantId));
         item.changeQuantity(newQuantity);
         touch();

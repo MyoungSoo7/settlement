@@ -46,7 +46,7 @@ public class CompanyReputationJpaEntity {
     }
 
     public CompanyReputation toDomain() {
-        return new CompanyReputation(stockCode, score, grade, previousGrade, snapshotDate);
+        return CompanyReputation.of(stockCode, score, grade, previousGrade, snapshotDate);
     }
 
     public String getStockCode() { return stockCode; }

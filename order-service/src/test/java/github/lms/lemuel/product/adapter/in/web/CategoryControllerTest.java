@@ -35,7 +35,7 @@ class CategoryControllerTest {
 
     private static Category category(Long id, String name) {
         Category c = Category.create(name, "설명", 1);
-        c.setId(id);
+        c.assignId(id);
         return c;
     }
 

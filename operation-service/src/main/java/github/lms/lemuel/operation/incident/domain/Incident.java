@@ -23,6 +23,9 @@ public class Incident {
     /** 자동 해제(Alertmanager resolved 수신)의 actor 표기. */
     public static final String AUTO_ACTOR = "alertmanager";
 
+    /** 이상 탐지(Phase 3) 자동 생성/해제의 actor 표기. */
+    public static final String ANOMALY_ACTOR = "anomaly-detector";
+
     private final Long id;
     private final String correlationKey;
     private final IncidentSource source;
@@ -90,6 +93,32 @@ public class Incident {
     }
 
     /**
+     * 베이스라인 이상 탐지(Phase 3)로부터 새 인시던트를 연다.
+     *
+     * <p>correlationKey 는 metric_key(예 "settlement") — (source=ANOMALY, correlationKey) 조합이
+     * uq_incident_active 로 metric 당 활성 1건을 보장한다. Alertmanager 경로(fingerprint)와
+     * 키 공간이 분리되어 채널 간 충돌은 없다.
+     */
+    public static Incident openFromAnomaly(String metricKey, SignalCategory category, IncidentSeverity severity,
+                                           String title, String description, Instant now) {
+        return builder()
+                .correlationKey(metricKey)
+                .source(IncidentSource.ANOMALY)
+                .category(category)
+                .severity(severity)
+                .status(IncidentStatus.OPEN)
+                .title(title)
+                .description(description)
+                .service(metricKey)
+                .labels(Map.of())
+                .annotations(Map.of())
+                .firstSeenAt(now)
+                .lastSeenAt(now)
+                .occurrenceCount(1)
+                .build();
+    }
+
+    /**
      * 활성 인시던트에 대한 firing 재수신 반영.
      *
      * @return 타임라인 기록 필요 여부 + 심각도 승격 여부 — 서비스가 REFIRED 행 기록을 결정하는 재료
@@ -133,9 +162,17 @@ public class Incident {
 
     /** Alertmanager resolved 수신에 의한 자동 해제 — OPEN/ACKNOWLEDGED 어느 쪽에서도 허용. */
     public void autoResolve(Instant resolvedAt) {
+        autoResolve(AUTO_ACTOR, resolvedAt);
+    }
+
+    /**
+     * 시스템에 의한 자동 해제 — actor 를 명시한다(Alertmanager={@link #AUTO_ACTOR},
+     * 이상 탐지 정상복귀={@link #ANOMALY_ACTOR}). OPEN/ACKNOWLEDGED 어느 쪽에서도 허용.
+     */
+    public void autoResolve(String actor, Instant resolvedAt) {
         transitionTo(IncidentStatus.RESOLVED);
         this.resolvedAt = resolvedAt;
-        this.resolvedBy = AUTO_ACTOR;
+        this.resolvedBy = actor;
     }
 
     /** 오탐 처리 — 재발 통계에서 제외할 수 있도록 RESOLVED 와 구분해 보존. */

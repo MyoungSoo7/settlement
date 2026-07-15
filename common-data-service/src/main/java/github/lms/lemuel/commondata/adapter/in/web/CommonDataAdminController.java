@@ -5,6 +5,7 @@ import github.lms.lemuel.commondata.application.port.in.RegisterDataSourceUseCas
 import github.lms.lemuel.commondata.application.port.in.RegisterDataSourceUseCase.RegisterCommand;
 import github.lms.lemuel.commondata.application.port.in.SyncDataSourceUseCase;
 import github.lms.lemuel.commondata.application.port.in.SyncResult;
+import github.lms.lemuel.commondata.audit.application.port.out.RecordAuditPort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -41,15 +42,18 @@ public class CommonDataAdminController {
     private final SyncDataSourceUseCase syncDataSourceUseCase;
     private final SyncStatusTracker tracker;
     private final TaskExecutor executor;
+    private final RecordAuditPort recordAuditPort;
 
     public CommonDataAdminController(RegisterDataSourceUseCase registerDataSourceUseCase,
                                      SyncDataSourceUseCase syncDataSourceUseCase,
                                      SyncStatusTracker tracker,
-                                     @Qualifier("syncTaskExecutor") TaskExecutor executor) {
+                                     @Qualifier("syncTaskExecutor") TaskExecutor executor,
+                                     RecordAuditPort recordAuditPort) {
         this.registerDataSourceUseCase = registerDataSourceUseCase;
         this.syncDataSourceUseCase = syncDataSourceUseCase;
         this.tracker = tracker;
         this.executor = executor;
+        this.recordAuditPort = recordAuditPort;
     }
 
     @PostMapping("/sources")
@@ -57,12 +61,17 @@ public class CommonDataAdminController {
         var saved = registerDataSourceUseCase.register(new RegisterCommand(
                 request.code(), request.name(), request.endpoint(), request.defaultParams(),
                 request.keyFields(), request.pageSize(), request.enabled(), request.description()));
+        recordAuditPort.record("DATASOURCE_REGISTERED", "DataSource", request.code(),
+                Map.of("endpoint", String.valueOf(request.endpoint()),
+                        "enabled", request.enabled() != null && request.enabled()));
         return ResponseEntity.ok(SourceResponse.from(saved));
     }
 
     @PostMapping("/sources/{code}/sync")
     public ResponseEntity<Map<String, String>> sync(@PathVariable String code,
                                                     @RequestParam Map<String, String> overrideParams) {
+        recordAuditPort.record("COLLECT_TRIGGERED", "DataSource", code,
+                Map.of("overrideParams", overrideParams));
         return submit("sync:" + code, () -> syncDataSourceUseCase.sync(code, overrideParams));
     }
 

@@ -7,9 +7,9 @@ import github.lms.lemuel.loan.application.port.in.EvaluateCorporateCreditUseCase
 import github.lms.lemuel.loan.application.port.in.RequestCorporateLoanUseCase;
 import github.lms.lemuel.loan.application.port.out.LoadCorporateLoanPort;
 import github.lms.lemuel.loan.domain.CorporateLoan;
-import github.lms.lemuel.loan.domain.CorporateLoanNotFoundException;
-import github.lms.lemuel.loan.domain.CorporateLoanRejectedException;
 import github.lms.lemuel.loan.domain.CorporateLoanStatus;
+import github.lms.lemuel.loan.domain.exception.CorporateLoanNotFoundException;
+import github.lms.lemuel.loan.domain.exception.CorporateLoanRejectedException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

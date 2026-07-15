@@ -1,4 +1,6 @@
 package github.lms.lemuel.order.domain;
+import github.lms.lemuel.order.domain.exception.InvalidOrderStateException;
+import github.lms.lemuel.order.domain.exception.OrderInvariantViolationException;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -28,16 +30,16 @@ class OrderStateMachineTest {
     }
 
     @Test
-    @DisplayName("전체 인자 생성자 — null status/시각 기본값")
+    @DisplayName("rehydrate 복원 팩토리 — null status/시각 기본값")
     void fullConstructor() {
-        Order o = new Order(5L, 6L, 7L, new BigDecimal("100"), null, null, null);
+        Order o = Order.rehydrate(5L, 6L, 7L, new BigDecimal("100"), null, null, null, null, false);
         assertThat(o.getId()).isEqualTo(5L);
         assertThat(o.getStatus()).isEqualTo(OrderStatus.CREATED);
         assertThat(o.getCreatedAt()).isNotNull();
         assertThat(o.getUpdatedAt()).isNotNull();
 
-        Order o2 = new Order(1L, 2L, 3L, BigDecimal.ONE, OrderStatus.PAID,
-                LocalDateTime.now(), LocalDateTime.now());
+        Order o2 = Order.rehydrate(1L, 2L, 3L, BigDecimal.ONE, OrderStatus.PAID,
+                LocalDateTime.now(), LocalDateTime.now(), null, false);
         assertThat(o2.getStatus()).isEqualTo(OrderStatus.PAID);
     }
 
@@ -66,7 +68,7 @@ class OrderStateMachineTest {
     @DisplayName("transitionTo — null 대상 예외")
     void transition_null() {
         assertThatThrownBy(() -> paidOrder().transitionTo(null))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(OrderInvariantViolationException.class);
     }
 
     @Test
@@ -74,7 +76,10 @@ class OrderStateMachineTest {
     void transition_illegal() {
         Order o = Order.create(1L, 2L, BigDecimal.TEN);
         assertThatThrownBy(() -> o.transitionTo(OrderStatus.DELIVERED))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOfSatisfying(InvalidOrderStateException.class, ex -> {
+                    assertThat(ex.getFrom()).isEqualTo(OrderStatus.CREATED);
+                    assertThat(ex.getTo()).isEqualTo(OrderStatus.DELIVERED);
+                });
     }
 
     @Test
@@ -84,7 +89,7 @@ class OrderStateMachineTest {
         assertThat(o.isCancelable()).isTrue();
         o.cancel();
         assertThat(o.getStatus()).isEqualTo(OrderStatus.CANCELED);
-        assertThatThrownBy(() -> paidOrder().cancel()).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> paidOrder().cancel()).isInstanceOf(InvalidOrderStateException.class);
     }
 
     @Test
@@ -94,22 +99,22 @@ class OrderStateMachineTest {
         assertThat(o.isRefundable()).isTrue();
         o.refund();
         assertThat(o.getStatus()).isEqualTo(OrderStatus.REFUNDED);
-        assertThatThrownBy(o::complete).isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(o::refund).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(o::complete).isInstanceOf(InvalidOrderStateException.class);
+        assertThatThrownBy(o::refund).isInstanceOf(InvalidOrderStateException.class);
     }
 
     @Test
     @DisplayName("shippingFee 세터 null 방어, shipped 세터")
     void shippingAccessors() {
         Order o = Order.create(1L, 2L, BigDecimal.TEN);
-        o.setShippingFee(null);
+        o.assignShippingFee(null);
         assertThat(o.getShippingFee()).isEqualByComparingTo("0");
-        o.setShippingFee(new BigDecimal("3000"));
+        o.assignShippingFee(new BigDecimal("3000"));
         assertThat(o.getShippingFee()).isEqualByComparingTo("3000");
-        o.setShipped(true);
-        assertThat(o.isShipped()).isTrue();
-        o.setStatus(OrderStatus.PAID);
-        assertThat(o.getStatus()).isEqualTo(OrderStatus.PAID);
+        Order shipped = Order.rehydrate(9L, 1L, 2L, BigDecimal.TEN, OrderStatus.PAID,
+                LocalDateTime.now(), LocalDateTime.now(), BigDecimal.ZERO, true);
+        assertThat(shipped.isShipped()).isTrue();
+        assertThat(shipped.getStatus()).isEqualTo(OrderStatus.PAID);
     }
 
     @Test
@@ -120,7 +125,7 @@ class OrderStateMachineTest {
         assertThat(o.isMultiItem()).isTrue();
         assertThat(o.getAmount()).isEqualByComparingTo("10000");
         assertThatThrownBy(o::attachItemsToOrder).isInstanceOf(IllegalStateException.class);
-        o.setId(50L);
+        o.assignId(50L);
         o.attachItemsToOrder();
         o.replaceItems(null);
         assertThat(o.getItems()).isEmpty();
@@ -130,11 +135,11 @@ class OrderStateMachineTest {
     @DisplayName("createMultiItem — 빈 목록/과다 할인 예외")
     void multiItem_guards() {
         assertThatThrownBy(() -> Order.createMultiItem(1L, java.util.List.of()))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(OrderInvariantViolationException.class);
         OrderItem item = OrderItem.newItem(1L, 1L, "SKU-2", "상품2", new BigDecimal("1000"), 1);
         assertThatThrownBy(() -> Order.createMultiItem(1L, java.util.List.of(item), new BigDecimal("-1")))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(OrderInvariantViolationException.class);
         assertThatThrownBy(() -> Order.createMultiItem(1L, java.util.List.of(item), new BigDecimal("1000")))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(OrderInvariantViolationException.class);
     }
 }

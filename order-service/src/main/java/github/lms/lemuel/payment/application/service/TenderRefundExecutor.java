@@ -8,6 +8,7 @@ import github.lms.lemuel.payment.application.port.out.UpdateOrderStatusPort;
 import github.lms.lemuel.payment.domain.PaymentDomain;
 import github.lms.lemuel.payment.domain.PaymentStatus;
 import github.lms.lemuel.payment.domain.PaymentTender;
+import github.lms.lemuel.payment.domain.exception.PaymentInvariantViolationException;
 import github.lms.lemuel.payment.domain.exception.PaymentNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,7 +70,7 @@ public class TenderRefundExecutor {
         PaymentTender tender = payment.getTenders().stream()
                 .filter(t -> tenderId.equals(t.getId()))
                 .findFirst()
-                .orElseThrow(() -> new IllegalStateException(
+                .orElseThrow(() -> new PaymentInvariantViolationException(
                         "Tender not found: paymentId=" + paymentId + ", tenderId=" + tenderId));
 
         if (tender.getType().usesExternalPg()) {

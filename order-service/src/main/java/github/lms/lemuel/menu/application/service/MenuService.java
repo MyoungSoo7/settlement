@@ -4,6 +4,7 @@ import github.lms.lemuel.menu.application.port.in.MenuUseCase;
 import github.lms.lemuel.menu.application.port.out.LoadMenuPort;
 import github.lms.lemuel.menu.application.port.out.SaveMenuPort;
 import github.lms.lemuel.menu.domain.Menu;
+import github.lms.lemuel.menu.domain.exception.MenuInvariantViolationException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -40,7 +41,7 @@ public class MenuService implements MenuUseCase {
     public Menu createMenu(CreateMenuCommand command) {
         if (command.parentId() != null) {
             loadMenuPort.findById(command.parentId())
-                    .orElseThrow(() -> new IllegalArgumentException(
+                    .orElseThrow(() -> new MenuInvariantViolationException(
                             "존재하지 않는 부모 메뉴: " + command.parentId()));
         }
         Menu menu = Menu.create(
@@ -60,7 +61,7 @@ public class MenuService implements MenuUseCase {
     @Override
     public Menu updateMenu(Long id, UpdateMenuCommand command) {
         Menu menu = loadMenuPort.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("메뉴를 찾을 수 없습니다: " + id));
+                .orElseThrow(() -> new MenuInvariantViolationException("메뉴를 찾을 수 없습니다: " + id));
         validateParentChange(id, command.parentId());
         menu.update(
                 command.name(),
@@ -80,9 +81,9 @@ public class MenuService implements MenuUseCase {
     @Override
     public void deleteMenu(Long id) {
         loadMenuPort.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("메뉴를 찾을 수 없습니다: " + id));
+                .orElseThrow(() -> new MenuInvariantViolationException("메뉴를 찾을 수 없습니다: " + id));
         if (loadMenuPort.existsByParentId(id)) {
-            throw new IllegalStateException("하위 메뉴가 존재하여 삭제할 수 없습니다. 하위 메뉴를 먼저 삭제하세요.");
+            throw new MenuInvariantViolationException("하위 메뉴가 존재하여 삭제할 수 없습니다. 하위 메뉴를 먼저 삭제하세요.");
         }
         saveMenuPort.deleteById(id);
         log.info("메뉴 삭제: id={}", id);
@@ -100,17 +101,15 @@ public class MenuService implements MenuUseCase {
         for (ReorderItemCommand item : items) {
             Menu menu = byId.get(item.id());
             if (menu == null) {
-                throw new IllegalArgumentException("존재하지 않는 메뉴 ID: " + item.id());
+                throw new MenuInvariantViolationException("존재하지 않는 메뉴 ID: " + item.id());
             }
             if (item.parentId() != null && !byId.containsKey(item.parentId())) {
-                throw new IllegalArgumentException("존재하지 않는 부모 메뉴: " + item.parentId());
+                throw new MenuInvariantViolationException("존재하지 않는 부모 메뉴: " + item.parentId());
             }
             if (item.parentId() != null && item.parentId().equals(item.id())) {
-                throw new IllegalArgumentException("자기 자신을 부모로 지정할 수 없습니다: " + item.id());
+                throw new MenuInvariantViolationException("자기 자신을 부모로 지정할 수 없습니다: " + item.id());
             }
-            menu.setParentId(item.parentId());
-            menu.setSortOrder(item.sortOrder());
-            menu.setUpdatedAt(java.time.LocalDateTime.now());
+            menu.reorder(item.parentId(), item.sortOrder());
         }
 
         // 2) 변경 반영된 그래프 전체에 대해 순환 참조 검증
@@ -119,7 +118,7 @@ public class MenuService implements MenuUseCase {
             Long cursor = menu.getParentId();
             while (cursor != null) {
                 if (cursor.equals(menu.getId()) || !visited.add(cursor)) {
-                    throw new IllegalArgumentException(
+                    throw new MenuInvariantViolationException(
                             "순환 참조가 발생하는 재배치입니다: menuId=" + menu.getId());
                 }
                 Menu current = byId.get(cursor);
@@ -145,19 +144,19 @@ public class MenuService implements MenuUseCase {
             return;
         }
         if (newParentId.equals(id)) {
-            throw new IllegalArgumentException("자기 자신을 부모로 지정할 수 없습니다: " + id);
+            throw new MenuInvariantViolationException("자기 자신을 부모로 지정할 수 없습니다: " + id);
         }
         Map<Long, Menu> byId = loadMenuPort.findAll().stream()
                 .collect(Collectors.toMap(Menu::getId, m -> m));
         if (!byId.containsKey(newParentId)) {
-            throw new IllegalArgumentException("존재하지 않는 부모 메뉴: " + newParentId);
+            throw new MenuInvariantViolationException("존재하지 않는 부모 메뉴: " + newParentId);
         }
         // 새 부모의 조상 체인에 자신이 있으면 자손을 부모로 지정한 것 → 순환
         java.util.Set<Long> visited = new java.util.HashSet<>();
         Long cursor = newParentId;
         while (cursor != null) {
             if (cursor.equals(id)) {
-                throw new IllegalArgumentException(
+                throw new MenuInvariantViolationException(
                         "하위 메뉴를 부모로 지정하면 순환 참조가 발생합니다: " + newParentId);
             }
             if (!visited.add(cursor)) {

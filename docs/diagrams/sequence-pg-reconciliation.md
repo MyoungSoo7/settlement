@@ -9,7 +9,7 @@ sequenceDiagram
     participant API as PgReconciliation<br/>Controller
     participant Svc as ReconcilePgFile<br/>Service
     participant Parser as CsvPgFileParser<br/>Adapter
-    participant Internal as InternalPayments<br/>JdbcAdapter
+    participant Internal as InternalPaymentsForRecon<br/>JdbcAdapter (→ OrderReconClient)
     participant Match as PgReconciliation<br/>Matcher
     participant DB as pg_reconciliation_*
 
@@ -19,7 +19,7 @@ sequenceDiagram
     Parser-->>Svc: List<PgTransactionRow>
 
     Svc->>Internal: loadByCapturedDate(date)
-    Note over Internal: settlement-service 가<br/>order-service 코드 import 없이<br/>JDBC 로 payments 직접 read
+    Note over Internal: settlement 가 order DB 를 직접 읽지 않고<br/>OrderReconClient 로 order 내부 API(/internal/recon)<br/>호출 → CAPTURED/REFUNDED 합계 수신 (ADR 0020, cross-DB 0)
     Internal-->>Svc: List<InternalPaymentRow>
 
     Svc->>Match: match(pgRows, internalRows)

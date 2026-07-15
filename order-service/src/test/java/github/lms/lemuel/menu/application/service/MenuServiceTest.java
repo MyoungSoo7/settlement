@@ -1,4 +1,5 @@
 package github.lms.lemuel.menu.application.service;
+import github.lms.lemuel.menu.domain.exception.MenuInvariantViolationException;
 
 import github.lms.lemuel.menu.application.port.in.MenuUseCase;
 import github.lms.lemuel.menu.application.port.out.LoadMenuPort;
@@ -30,7 +31,7 @@ class MenuServiceTest {
 
     private Menu menu(Long id, Long parentId, String name, int sortOrder) {
         Menu m = Menu.create(name, "/" + name, null, parentId, sortOrder, "USER", true);
-        m.setId(id);
+        m.assignId(id);
         return m;
     }
 
@@ -59,7 +60,7 @@ class MenuServiceTest {
     void createMenu() {
         when(saveMenuPort.save(any())).thenAnswer(inv -> {
             Menu m = inv.getArgument(0);
-            m.setId(10L);
+            m.assignId(10L);
             return m;
         });
 
@@ -91,7 +92,7 @@ class MenuServiceTest {
 
         assertThatThrownBy(() -> service.updateMenu(404L, new MenuUseCase.UpdateMenuCommand(
                 "n", "/n", null, null, 0, "USER", true, true)))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(MenuInvariantViolationException.class);
     }
 
     @Test @DisplayName("deleteMenu - 자식이 없으면 삭제")
@@ -110,7 +111,7 @@ class MenuServiceTest {
         when(loadMenuPort.existsByParentId(5L)).thenReturn(true);
 
         assertThatThrownBy(() -> service.deleteMenu(5L))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(MenuInvariantViolationException.class);
         verify(saveMenuPort, never()).deleteById(any());
     }
 
@@ -119,7 +120,7 @@ class MenuServiceTest {
         when(loadMenuPort.findById(404L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.deleteMenu(404L))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(MenuInvariantViolationException.class);
     }
 
     // ── 부모 검증 (순환 참조 방지) ────────────────────────────
@@ -130,7 +131,7 @@ class MenuServiceTest {
 
         assertThatThrownBy(() -> service.createMenu(new MenuUseCase.CreateMenuCommand(
                 "메뉴A", "/a", null, 99L, 0, null, true)))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(MenuInvariantViolationException.class);
         verify(saveMenuPort, never()).save(any());
     }
 
@@ -140,7 +141,7 @@ class MenuServiceTest {
 
         assertThatThrownBy(() -> service.updateMenu(5L, new MenuUseCase.UpdateMenuCommand(
                 "a", "/a", null, 5L, 0, null, true, true)))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(MenuInvariantViolationException.class);
         verify(saveMenuPort, never()).save(any());
     }
 
@@ -154,7 +155,7 @@ class MenuServiceTest {
 
         assertThatThrownBy(() -> service.updateMenu(1L, new MenuUseCase.UpdateMenuCommand(
                 "root", "/root", null, 3L, 0, null, true, true)))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(MenuInvariantViolationException.class)
                 .hasMessageContaining("순환");
         verify(saveMenuPort, never()).save(any());
     }
@@ -166,7 +167,7 @@ class MenuServiceTest {
 
         assertThatThrownBy(() -> service.updateMenu(1L, new MenuUseCase.UpdateMenuCommand(
                 "a", "/a", null, 99L, 0, null, true, true)))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(MenuInvariantViolationException.class);
     }
 
     @Test @DisplayName("updateMenu - 정상 부모 변경은 저장")
@@ -218,7 +219,7 @@ class MenuServiceTest {
 
         assertThatThrownBy(() -> service.reorder(List.of(
                 new MenuUseCase.ReorderItemCommand(99L, null, 0))))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(MenuInvariantViolationException.class);
         verify(saveMenuPort, never()).saveAll(any());
     }
 
@@ -228,7 +229,7 @@ class MenuServiceTest {
 
         assertThatThrownBy(() -> service.reorder(List.of(
                 new MenuUseCase.ReorderItemCommand(1L, 99L, 0))))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(MenuInvariantViolationException.class);
         verify(saveMenuPort, never()).saveAll(any());
     }
 
@@ -238,7 +239,7 @@ class MenuServiceTest {
 
         assertThatThrownBy(() -> service.reorder(List.of(
                 new MenuUseCase.ReorderItemCommand(1L, 1L, 0))))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(MenuInvariantViolationException.class);
         verify(saveMenuPort, never()).saveAll(any());
     }
 
@@ -250,7 +251,7 @@ class MenuServiceTest {
 
         assertThatThrownBy(() -> service.reorder(List.of(
                 new MenuUseCase.ReorderItemCommand(1L, 2L, 0)))) // b 는 이미 a 의 자식 → 순환
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(MenuInvariantViolationException.class)
                 .hasMessageContaining("순환");
         verify(saveMenuPort, never()).saveAll(any());
     }

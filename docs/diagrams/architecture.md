@@ -30,7 +30,8 @@ graph TB
     end
 
     subgraph "Infra"
-        PG[(PostgreSQL 17)]
+        PG[(opslab<br/>PostgreSQL 17)]
+        PG2[(settlement_db<br/>PostgreSQL 17)]
         ES[(Elasticsearch 8.17)]
         K[Kafka / Redpanda]
         TM[Tempo]
@@ -57,7 +58,7 @@ graph TB
 
     OOrder --> PG
     OPay --> PG
-    SSet --> PG
+    SSet --> PG2
     SSet --> ES
 
     OPay -- Outbox + traceparent --> K
@@ -128,31 +129,36 @@ graph LR
         OUser --> DB1
     end
 
-    subgraph "settlement-service (참조만)"
-        SRead1[SettlementPaymentReadModel<br/>@Immutable]
-        SRead2[SettlementOrderReadModel<br/>@Immutable]
-        SRead3[SettlementUserReadModel<br/>@Immutable]
+    subgraph "settlement-service (자체 DB settlement_db)"
+        SView1[settlement_payment_view]
+        SView2[settlement_order_view]
+        SView3[settlement_user_view]
+        SDB[(settlement_db)]
         SDom[Settlement domain]
 
-        SRead1 --> SDom
-        SRead2 --> SDom
-        SRead3 --> SDom
+        SView1 --> SDom
+        SView2 --> SDom
+        SView3 --> SDom
+        SView1 --> SDB
+        SView2 --> SDB
+        SView3 --> SDB
     end
 
-    DB1 -.- SRead1
-    DB1 -.- SRead2
-    DB1 -.- SRead3
+    DB1 -. Outbox+Kafka 이벤트 .-> KB[lemuel.order.* / payment.* / user.*]
+    KB -. 프로젝션 컨슈머 .-> SView1
+    KB -. 프로젝션 컨슈머 .-> SView2
+    KB -. 프로젝션 컨슈머 .-> SView3
 
-    style SRead1 fill:#fef3c7
-    style SRead2 fill:#fef3c7
-    style SRead3 fill:#fef3c7
+    style SView1 fill:#fef3c7
+    style SView2 fill:#fef3c7
+    style SView3 fill:#fef3c7
 ```
 
-**Read-only Projection 패턴**:
-- settlement-service 가 `payments` / `orders` / `users` 테이블을 직접 매핑하되 별도 `@Immutable` JPA 엔티티로
+**이벤트 드리븐 프로젝션 패턴 (CQRS, ADR 0020)**:
+- settlement-service 가 자체 DB(settlement_db)에 소유하는 `settlement_*_view` 프로젝션 테이블에 order 가 발행한 Kafka 이벤트를 적재
 - `settlement-service/build.gradle.kts` 에 `implementation(project(":order-service"))` **없음**
 - 비즈니스 로직 변경은 양 서비스가 독립 배포 가능
-- 데이터 일관성은 단일 DB 가 보장 (장기적으로 별도 DB + CDC 로 분리 가능)
+- 대사는 order 내부 API(`/internal/recon`) 호출로 처리 — 양측 모두 자기 DB 만 읽어 cross-DB 연결 0
 
 ## 통신 매트릭스
 
@@ -162,8 +168,8 @@ graph LR
 | Gateway | order/settlement | HTTP | 동기 | Resilience4j |
 | order-service | PG (Toss/KCP/NICE/INICIS) | HTTPS | 동기 | CB + Retry per-PG |
 | order-service | settlement-service | Kafka (lemuel.payment.*) | 비동기 | Outbox + 멱등 3단 |
-| settlement-service | order-service | ❌ 없음 | — | Read-only projection 으로 대체 |
-| order-service | DB | JPA / JDBC | 동기 | Optimistic Lock (Variant), Pessimistic (Refund) |
-| settlement-service | DB | JPA / JDBC | 동기 | 같은 DB, projection만 read |
+| settlement-service | order-service | 내부 대사 API `/internal/recon` (HTTP) | 동기 | 대사 전용, 조회는 이벤트 CQRS 프로젝션으로 대체 |
+| order-service | DB (opslab) | JPA / JDBC | 동기 | Optimistic Lock (Variant), Pessimistic (Refund) |
+| settlement-service | DB (settlement_db) | JPA / JDBC | 동기 | 자체 DB, Kafka 이벤트 프로젝션 적재 |
 | settlement-service | ES | REST | 동기 | 비동기 큐 (settlement_index_queue) |
 | order-service | Tempo | OTLP/HTTP | 비동기 | Sampling 1.0 (개발) |

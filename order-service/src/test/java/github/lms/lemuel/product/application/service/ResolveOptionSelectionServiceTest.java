@@ -1,4 +1,5 @@
 package github.lms.lemuel.product.application.service;
+import github.lms.lemuel.product.domain.exception.ProductInvariantViolationException;
 
 import github.lms.lemuel.product.application.port.in.ResolveOptionSelectionUseCase.Selection;
 import github.lms.lemuel.product.application.port.out.LoadProductPort;
@@ -75,7 +76,7 @@ class ResolveOptionSelectionServiceTest {
         productWithTree(TREE);
         assertThatThrownBy(() -> service.resolve(100L,
                 List.of(new Selection("색상", "초록"))))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ProductInvariantViolationException.class)
                 .hasMessageContaining("존재하지 않는 옵션 값");
     }
 
@@ -85,7 +86,7 @@ class ResolveOptionSelectionServiceTest {
         productWithTree(TREE);
         assertThatThrownBy(() -> service.resolve(100L,
                 List.of(new Selection("사이즈", "빨강"))))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ProductInvariantViolationException.class)
                 .hasMessageContaining("차수 이름 불일치");
     }
 
@@ -95,7 +96,7 @@ class ResolveOptionSelectionServiceTest {
         productWithTree(TREE);
         assertThatThrownBy(() -> service.resolve(100L,
                 List.of(new Selection("색상", "빨강"))))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ProductInvariantViolationException.class)
                 .hasMessageContaining("불완전");
     }
 
@@ -106,7 +107,7 @@ class ResolveOptionSelectionServiceTest {
         assertThatThrownBy(() -> service.resolve(100L,
                 List.of(new Selection("색상", "빨강"), new Selection("사이즈", "L"),
                         new Selection("각인", "있음"))))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ProductInvariantViolationException.class)
                 .hasMessageContaining("선택 차수가 트리보다 많습니다");
     }
 
@@ -115,7 +116,7 @@ class ResolveOptionSelectionServiceTest {
     void resolve_noOptionsJson() {
         productWithTree(null);
         assertThatThrownBy(() -> service.resolve(100L, List.of(new Selection("색상", "빨강"))))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ProductInvariantViolationException.class)
                 .hasMessageContaining("옵션 트리가 정의되지 않은");
     }
 
@@ -128,7 +129,7 @@ class ResolveOptionSelectionServiceTest {
 
         assertThatThrownBy(() -> service.resolve(100L,
                 List.of(new Selection("색상", "빨강"), new Selection("사이즈", "L"))))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ProductInvariantViolationException.class)
                 .hasMessageContaining("대응하는 SKU 가 없습니다");
     }
 

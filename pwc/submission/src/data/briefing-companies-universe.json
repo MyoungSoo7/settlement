@@ -1,0 +1,1512 @@
+{
+  "generatedAt": "2026-07-14T19:20:05.720Z",
+  "markets": [
+    "KOSPI",
+    "KOSDAQ"
+  ],
+  "total": 300,
+  "count": 0,
+  "companies": [],
+  "skipped": [
+    {
+      "name": "한빛네트",
+      "stockCode": "036720",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "엔플렉스",
+      "stockCode": "040130",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "동서정보기술",
+      "stockCode": "055000",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "애드모바일",
+      "stockCode": "032600",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "리더컴",
+      "stockCode": "056140",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "허메스홀딩스",
+      "stockCode": "012400",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "유티엑스",
+      "stockCode": "045880",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "글로포스트",
+      "stockCode": "037830",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "쏠라엔텍",
+      "stockCode": "030390",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "보홍",
+      "stockCode": "041320",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "동북아1호선박투자회사",
+      "stockCode": "078420",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "에듀아크",
+      "stockCode": "046350",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "데코",
+      "stockCode": "013650",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "엘앤씨피",
+      "stockCode": "015390",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "희훈디앤지",
+      "stockCode": "019640",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "퓨쳐인포넷",
+      "stockCode": "058690",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "쓰리디넷",
+      "stockCode": "035400",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "제일저축은행",
+      "stockCode": "024100",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "제일창업투자",
+      "stockCode": "026540",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "현대DSF",
+      "stockCode": "016510",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "네프로아이티",
+      "stockCode": "950030",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "자강",
+      "stockCode": "036790",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "케이엠에스",
+      "stockCode": "038830",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "에버리소스",
+      "stockCode": "020070",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "제이에스",
+      "stockCode": "037110",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "태창기업",
+      "stockCode": "007490",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "에이치비이에너지",
+      "stockCode": "017300",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "코어비트",
+      "stockCode": "056850",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "동북아8호선박투자회사",
+      "stockCode": "082110",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "한국통신데이타",
+      "stockCode": "045760",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "케너텍",
+      "stockCode": "062730",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "다휘",
+      "stockCode": "055250",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "코오롱아이넷",
+      "stockCode": "022520",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "캠브리지코오롱",
+      "stockCode": "004620",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "네오세미테크",
+      "stockCode": "089240",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "디에이치패션",
+      "stockCode": "045260",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "핸디소프트",
+      "stockCode": "032380",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "케이엠에이치",
+      "stockCode": "009690",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "씨엘엘씨디",
+      "stockCode": "035710",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "현대푸드시스템",
+      "stockCode": "114410",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "메리츠종합금융",
+      "stockCode": "012420",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "제넥셀세인",
+      "stockCode": "034660",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "쓰리디월드",
+      "stockCode": "065340",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "스톰이앤에프",
+      "stockCode": "043680",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "소예",
+      "stockCode": "035010",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "엠엔에프씨",
+      "stockCode": "048640",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "하이트맥주",
+      "stockCode": "103150",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "보광티에스",
+      "stockCode": "066690",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "아인스엠앤엠",
+      "stockCode": "040740",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "씨엔씨엔터프라이즈",
+      "stockCode": "038420",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "아이알디",
+      "stockCode": "084810",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "바이나믹",
+      "stockCode": "067850",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "코크렙제7호위탁관리부동산투자회사",
+      "stockCode": "086720",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "엔빅스",
+      "stockCode": "054170",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "선팩테크",
+      "stockCode": "054010",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "마이크로닉스",
+      "stockCode": "001190",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "블루스톤디앤아이",
+      "stockCode": "033720",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "신지소프트",
+      "stockCode": "078700",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "맥쿼리센트럴오피스기업구조조정부동산투자회사",
+      "stockCode": "076850",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "테스텍",
+      "stockCode": "048510",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "중앙디자인",
+      "stockCode": "030030",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "에코페트로시스템",
+      "stockCode": "042870",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "한림창업투자",
+      "stockCode": "021060",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "헤쎄나",
+      "stockCode": "036270",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "미래에셋굿라이프혼합형자녀를위한투자회사10-1",
+      "stockCode": "037510",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "일공공일안경콘택트",
+      "stockCode": "032030",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "지앤알",
+      "stockCode": "043630",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "셀런",
+      "stockCode": "013240",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "한국베트남15-1유전해외자원개발투자회사",
+      "stockCode": "093820",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "에이치원바이오",
+      "stockCode": "052310",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "씨앤중공업",
+      "stockCode": "008400",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "FnC코오롱",
+      "stockCode": "001370",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "제너비오믹스",
+      "stockCode": "017010",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "케드콤",
+      "stockCode": "011050",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "지엔텍홀딩스",
+      "stockCode": "065410",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "동부씨엔아이",
+      "stockCode": "044640",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "아이피에스",
+      "stockCode": "051820",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "에스브이에이치",
+      "stockCode": "046240",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "제이콤",
+      "stockCode": "060750",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "옥션",
+      "stockCode": "043790",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "네이쳐글로벌",
+      "stockCode": "088020",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "GB블루오션베트남주식혼합형투자회사1호",
+      "stockCode": "094950",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "엠씨티티코어",
+      "stockCode": "052210",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "에이스앤파트너스",
+      "stockCode": "032930",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "지앤디윈텍",
+      "stockCode": "061050",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "인터피온반도체",
+      "stockCode": "014010",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "솔로몬저축은행",
+      "stockCode": "007800",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "엠트론스토리지테크놀로지",
+      "stockCode": "046320",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "에스티앤아이",
+      "stockCode": "031800",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "유퍼트",
+      "stockCode": "060670",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "엑스로드",
+      "stockCode": "074140",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "선우중공업",
+      "stockCode": "068770",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "남양",
+      "stockCode": "003020",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "엘지데이콤",
+      "stockCode": "015940",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "LG파워콤",
+      "stockCode": "045820",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "동산진흥",
+      "stockCode": "031960",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "티이씨",
+      "stockCode": "067950",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "한국기술산업",
+      "stockCode": "008320",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "스타맥스",
+      "stockCode": "017050",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "유성티에스아이",
+      "stockCode": "024870",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "네오리소스",
+      "stockCode": "058550",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "케이알",
+      "stockCode": "035950",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "씨앤상선",
+      "stockCode": "000790",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "투미비티",
+      "stockCode": "058900",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "코아정보시스템",
+      "stockCode": "039990",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "케이에스리소스",
+      "stockCode": "066340",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "세계투어",
+      "stockCode": "047600",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "동양밸류오션기업인수목적",
+      "stockCode": "122290",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "케이이엔지",
+      "stockCode": "077960",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "사이버패스",
+      "stockCode": "063280",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "산양전기",
+      "stockCode": "079870",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "으뜸상호저축은행",
+      "stockCode": "032150",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "국제개발",
+      "stockCode": "080570",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "세신",
+      "stockCode": "004230",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "골든브릿지더블유엠경매부동산일호투자회사",
+      "stockCode": "084160",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "엘앤피아너스",
+      "stockCode": "061140",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "에이스일렉트로닉스",
+      "stockCode": "038690",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "디앤샵",
+      "stockCode": "090090",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "더체인지",
+      "stockCode": "054120",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "다산자기관리부동산투자회사",
+      "stockCode": "105380",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "써니트렌드",
+      "stockCode": "035500",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "뉴젠비아이티",
+      "stockCode": "054650",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "룩소네이트",
+      "stockCode": "033880",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "현대오토넷",
+      "stockCode": "042100",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "LG마이크론",
+      "stockCode": "016990",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "서광건설산업",
+      "stockCode": "001600",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "플러스프로핏",
+      "stockCode": "036660",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "한와이어리스",
+      "stockCode": "037020",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "포휴먼",
+      "stockCode": "049690",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "알이네트웍스",
+      "stockCode": "023670",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "케이알제2호개발전문위탁관리부동산투자회사",
+      "stockCode": "101790",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "미래에셋맵스오퍼튜니티베트남주식혼합형투자회사1호",
+      "stockCode": "094520",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "씨티엘테크",
+      "stockCode": "088960",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "이디디컴퍼니",
+      "stockCode": "052650",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "케이티프리텔",
+      "stockCode": "032390",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "메카포럼",
+      "stockCode": "035830",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "에스피코프",
+      "stockCode": "048130",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "이롬텍",
+      "stockCode": "045400",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "이앤텍",
+      "stockCode": "047450",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "맥스브로",
+      "stockCode": "088810",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "토자이홀딩스",
+      "stockCode": "037700",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "우방",
+      "stockCode": "013200",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "동양매직",
+      "stockCode": "023020",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "코웰이홀딩스유한공사",
+      "stockCode": "900020",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "아구스",
+      "stockCode": "078670",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "대한은박지",
+      "stockCode": "007480",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "인스프리트",
+      "stockCode": "073130",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "하이럭스",
+      "stockCode": "079340",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "트리니티",
+      "stockCode": "053070",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "카라반케이디이",
+      "stockCode": "032570",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "더존디지털웨어",
+      "stockCode": "045380",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "디보스",
+      "stockCode": "080140",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "포네이처",
+      "stockCode": "045290",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "테이크시스템즈",
+      "stockCode": "076090",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "폴켐",
+      "stockCode": "033190",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "유리이에스",
+      "stockCode": "007050",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "에프아이투어",
+      "stockCode": "047370",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "모빌탑",
+      "stockCode": "085680",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "올리브나인",
+      "stockCode": "052970",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "디패션",
+      "stockCode": "030420",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "알덱스",
+      "stockCode": "025970",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "오라바이오틱스",
+      "stockCode": "016160",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "시노펙스그린테크",
+      "stockCode": "037320",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "야호커뮤니케이션",
+      "stockCode": "059720",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "브이케이",
+      "stockCode": "048760",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "팬택앤큐리텔",
+      "stockCode": "063350",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "팬텀엔터테인먼트그룹",
+      "stockCode": "025460",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "삼성수산",
+      "stockCode": "052560",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "동북아15호선박투자회사",
+      "stockCode": "084240",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "쌈지",
+      "stockCode": "033260",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "브이오산업",
+      "stockCode": "018890",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "코디콤",
+      "stockCode": "041800",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "제네시스엔알디",
+      "stockCode": "052640",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "동북아6호선박투자회사",
+      "stockCode": "080410",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "인네트",
+      "stockCode": "041450",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "한국월드와이드아시아태평양특별자산1호투자회사",
+      "stockCode": "098150",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "헤파호프코리아",
+      "stockCode": "039350",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "휴리프",
+      "stockCode": "006210",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "하이스마텍",
+      "stockCode": "057100",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "삼성디지털이미징",
+      "stockCode": "108070",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "씨제이인터넷",
+      "stockCode": "037150",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "엠넷미디어",
+      "stockCode": "056200",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "온미디어",
+      "stockCode": "045710",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "유니텍전자",
+      "stockCode": "039040",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "위더스기술금융",
+      "stockCode": "019430",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "클라스타",
+      "stockCode": "037550",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "아시아미디어홀딩스",
+      "stockCode": "052810",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "아이스테이션",
+      "stockCode": "056010",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "동북아21호선박투자회사",
+      "stockCode": "088010",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "에이스디지텍",
+      "stockCode": "036550",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "부산저축은행",
+      "stockCode": "007830",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "에피밸리",
+      "stockCode": "068630",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "오페스",
+      "stockCode": "053470",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "액티투오",
+      "stockCode": "047710",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "에이치에스씨홀딩스",
+      "stockCode": "038920",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "한국고덴시",
+      "stockCode": "027840",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "나리지*온",
+      "stockCode": "036850",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "프로비타",
+      "stockCode": "014420",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "제로원인터랙티브",
+      "stockCode": "069470",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "제일화재해상보험",
+      "stockCode": "000610",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "동북아9호선박투자회사",
+      "stockCode": "083120",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "굿이엠지",
+      "stockCode": "051530",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "아이드림",
+      "stockCode": "066850",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "조인에너지",
+      "stockCode": "004820",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "태광이엔시",
+      "stockCode": "048140",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "렉스엘이앤지",
+      "stockCode": "004790",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "코리아퍼시픽05호선박투자회사",
+      "stockCode": "093400",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "엑큐리스",
+      "stockCode": "048460",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "우경",
+      "stockCode": "025920",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "세미텍",
+      "stockCode": "081220",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "그린손해보험",
+      "stockCode": "000470",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "대양글로벌",
+      "stockCode": "040180",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "엔하이테크",
+      "stockCode": "046720",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "제너시스템즈",
+      "stockCode": "073930",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "엘트온",
+      "stockCode": "015050",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "태산엘시디",
+      "stockCode": "036210",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "성원건설",
+      "stockCode": "012090",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "대우송도개발",
+      "stockCode": "004550",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "현대금속",
+      "stockCode": "018410",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "트라이써클",
+      "stockCode": "034010",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "아이비케이에스스마트에스엠이기업인수목적1호",
+      "stockCode": "126680",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "네스테크",
+      "stockCode": "037540",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "동북아5호선박투자회사",
+      "stockCode": "080980",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "파브코",
+      "stockCode": "101990",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "우리기업인수목적1호",
+      "stockCode": "122750",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "뉴젠아이씨티",
+      "stockCode": "054150",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "인젠",
+      "stockCode": "041630",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "지앤에스티",
+      "stockCode": "036920",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "코크렙제8호위탁관리부동산투자회사",
+      "stockCode": "090540",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "유니온스틸",
+      "stockCode": "003640",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "경남모직",
+      "stockCode": "001670",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "대우증권그린코리아기업인수목적회사",
+      "stockCode": "121910",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "지노시스템",
+      "stockCode": "033850",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "한국투자신성장1호기업인수목적회사",
+      "stockCode": "123290",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "휴먼텍코리아",
+      "stockCode": "066060",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "에스에스씨피",
+      "stockCode": "071660",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "평산",
+      "stockCode": "089480",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "지디코프",
+      "stockCode": "036610",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "아시아퍼시픽2호선박투자회사",
+      "stockCode": "081190",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "무한투자",
+      "stockCode": "034510",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "동부티에스블랙펄기업인수목적",
+      "stockCode": "128910",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "블루젬디앤씨",
+      "stockCode": "053040",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "부국퓨쳐스타즈기업인수목적",
+      "stockCode": "123300",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "예당컴퍼니",
+      "stockCode": "049000",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "터보테크",
+      "stockCode": "032420",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "케이비물산",
+      "stockCode": "008540",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "연합과기공고유한공사",
+      "stockCode": "900030",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "글로스텍",
+      "stockCode": "012410",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "중국고섬공고유한공사",
+      "stockCode": "950070",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "코리아퍼시픽06호선박투자회사",
+      "stockCode": "093410",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "나노트로닉스",
+      "stockCode": "010670",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "미래에셋제1호기업인수목적",
+      "stockCode": "121950",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "에이원마이크로",
+      "stockCode": "037380",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "에이프로테크놀로지",
+      "stockCode": "045470",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "모린스",
+      "stockCode": "110310",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "디지텍시스템스",
+      "stockCode": "091690",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "배명금속",
+      "stockCode": "011800",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "동북아4호선박투자회사",
+      "stockCode": "080970",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "사라콤",
+      "stockCode": "040020",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "폴리플러스",
+      "stockCode": "065610",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "영찬테크",
+      "stockCode": "085990",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "케이비부국제1호개발전문위탁관리부동산투자회사",
+      "stockCode": "149130",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "아시아퍼시픽8호선박투자회사",
+      "stockCode": "081930",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "진흥저축은행",
+      "stockCode": "007200",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "에듀언스",
+      "stockCode": "009010",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "성융광전투자유한공사",
+      "stockCode": "900150",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "샤인시스템",
+      "stockCode": "066300",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "씨모텍",
+      "stockCode": "081090",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "에스컴",
+      "stockCode": "014900",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "아시아퍼시픽1호선박투자회사",
+      "stockCode": "080180",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "아시아퍼시픽3호선박투자회사",
+      "stockCode": "081200",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "한국저축은행",
+      "stockCode": "025610",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "미리넷",
+      "stockCode": "056710",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "3노드디지탈그룹유한공사",
+      "stockCode": "900010",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "유일엔시스",
+      "stockCode": "038720",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "케이피케미칼",
+      "stockCode": "064420",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "이루넷",
+      "stockCode": "041030",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "대신증권그로쓰알파기업인수목적",
+      "stockCode": "123550",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "유에이블",
+      "stockCode": "071530",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "경윤하이드로에너지",
+      "stockCode": "019120",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "롯데미도파",
+      "stockCode": "004010",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "한화에스브이명장제1호기업인수목적",
+      "stockCode": "124050",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "셀텍",
+      "stockCode": "019260",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "에스비아이앤솔로몬드림기업인수목적",
+      "stockCode": "123910",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "위다스",
+      "stockCode": "056810",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "에스와이코퍼레이션",
+      "stockCode": "008080",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "어울림네트웍스",
+      "stockCode": "042820",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "에이디모터스",
+      "stockCode": "038120",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "평안물산",
+      "stockCode": "037240",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "아큐텍",
+      "stockCode": "013780",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "히든챔피언제1호기업인수목적",
+      "stockCode": "123160",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "동북아2호선박투자회사",
+      "stockCode": "080030",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "금강제강",
+      "stockCode": "105070",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "아라온테크",
+      "stockCode": "041060",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "우리금융지주",
+      "stockCode": "053000",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "대국",
+      "stockCode": "042340",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "글로웍스",
+      "stockCode": "034600",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "중국식품포장유한공사",
+      "stockCode": "900060",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "동북아3호선박투자회사",
+      "stockCode": "080960",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    },
+    {
+      "name": "지아이바이오",
+      "stockCode": "035450",
+      "reason": "시장 구분 미상(corp_cls=E)"
+    }
+  ]
+}

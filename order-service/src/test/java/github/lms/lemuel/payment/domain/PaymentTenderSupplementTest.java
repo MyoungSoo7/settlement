@@ -1,4 +1,6 @@
 package github.lms.lemuel.payment.domain;
+import github.lms.lemuel.payment.domain.exception.InvalidPaymentStateException;
+import github.lms.lemuel.payment.domain.exception.PaymentInvariantViolationException;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,7 +29,7 @@ class PaymentTenderSupplementTest {
         t.authorize("TX"); t.capture();
         t.addRefund(new BigDecimal("1000"));
         assertThat(t.getStatus()).isEqualTo(TenderStatus.REFUNDED);
-        assertThatThrownBy(t::capture).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(t::capture).isInstanceOf(InvalidPaymentStateException.class);
     }
 
     @Test
@@ -35,7 +37,7 @@ class PaymentTenderSupplementTest {
     void authorize_wrongState() {
         PaymentTender t = PaymentTender.newTender(TenderType.CARD, new BigDecimal("1000"), 1);
         t.authorize("TX");
-        assertThatThrownBy(() -> t.authorize("TX2")).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> t.authorize("TX2")).isInstanceOf(InvalidPaymentStateException.class);
     }
 
     @Test
@@ -44,8 +46,8 @@ class PaymentTenderSupplementTest {
         PaymentTender t = PaymentTender.newTender(TenderType.CARD, new BigDecimal("1000"), 1);
         t.authorize("TX"); t.capture();
         assertThat(t.isFullyRefunded()).isFalse();
-        assertThatThrownBy(() -> t.addRefund(BigDecimal.ZERO)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> t.addRefund(new BigDecimal("-1"))).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> t.addRefund(BigDecimal.ZERO)).isInstanceOf(PaymentInvariantViolationException.class);
+        assertThatThrownBy(() -> t.addRefund(new BigDecimal("-1"))).isInstanceOf(PaymentInvariantViolationException.class);
     }
 
     @Test

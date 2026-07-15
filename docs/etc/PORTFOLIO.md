@@ -49,7 +49,7 @@
 
 ### 기술
 
-Java 25, Spring Boot 3.5.10, PostgreSQL 17, Elasticsearch 8.17, **Redpanda
+Java 25, Spring Boot 4.0.4, PostgreSQL 17, Elasticsearch 8.17, **Redpanda
 (Apache Kafka 호환) + spring-kafka**, Spring Batch, Flyway V1~V29, Caffeine,
 iText 8, Micrometer + Prometheus + Grafana, Docker, GitHub Actions,
 Kubernetes (ArgoCD + CronJob + StatefulSet), JUnit 5 + Testcontainers

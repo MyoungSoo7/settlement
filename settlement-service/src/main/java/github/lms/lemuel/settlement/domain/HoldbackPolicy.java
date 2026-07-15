@@ -1,5 +1,7 @@
 package github.lms.lemuel.settlement.domain;
 
+import github.lms.lemuel.settlement.domain.exception.SettlementInvariantViolationException;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
@@ -22,20 +24,19 @@ public record HoldbackPolicy(BigDecimal rate, int releaseDays) {
 
     public HoldbackPolicy {
         if (rate == null || rate.signum() < 0 || rate.compareTo(BigDecimal.ONE) > 0) {
-            throw new IllegalArgumentException("rate 는 0~1");
+            throw new SettlementInvariantViolationException("rate 는 0~1");
         }
         if (releaseDays < 0) {
-            throw new IllegalArgumentException("releaseDays 는 0 이상");
+            throw new SettlementInvariantViolationException("releaseDays 는 0 이상");
         }
     }
 
-    /** 등급별 default 정책. */
+    /**
+     * 등급별 default 정책. 보류율·해제기간은 {@link SellerTier} 가 수수료율·정산주기와 동렬로
+     * 데이터로 보유하므로(등급 = 정책값의 단일 출처), 여기서는 그 값으로 정책 객체를 조립하기만 한다.
+     */
     public static HoldbackPolicy forTier(SellerTier tier) {
-        return switch (tier) {
-            case NORMAL    -> new HoldbackPolicy(new BigDecimal("0.30"), 30);
-            case VIP       -> new HoldbackPolicy(new BigDecimal("0.10"), 14);
-            case STRATEGIC -> new HoldbackPolicy(BigDecimal.ZERO, 0);
-        };
+        return new HoldbackPolicy(tier.holdbackRate(), tier.holdbackReleaseDays());
     }
 
     /**

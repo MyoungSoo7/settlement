@@ -1,0 +1,36 @@
+
+━━ [1] 기업 식별 게이트 (company_identity_gate) ━━
+  주의: 대표자명과 개업일자가 없어 국세청 진위확인은 생략하고 상태조회만 수행했습니다.
+  식별 확인 — 분석 진행 허용 (C:\Users\iamip\IdeaProjects\kubenetis\settlement\pwc\submission\outputs\batch\2026Q2\샘표\identity.json)
+
+━━ [2] 진단 패킷 생성 (diagnose-company) ━━
+  진단 패킷 저장: C:\Users\iamip\IdeaProjects\kubenetis\settlement\pwc\submission\outputs\batch\2026Q2\샘표\diagnostic-packet.json
+
+━━ [3] 에이전트 브리핑 생성 ━━
+에이전트: claude -p (프롬프트는 stdin 으로 전달)
+브리핑 저장: C:\Users\iamip\IdeaProjects\kubenetis\settlement\pwc\submission\outputs\batch\2026Q2\샘표\briefing.md (2084자)
+
+━━ [4] 자동 채점 (briefing-eval) ━━
+=== 브리핑 채점 (briefing-eval) ===
+
+[오탐] 지어낸 신호 0건
+[이상 없음 승인] 있음
+
+[정밀도/과잉 확신] 위반 없음
+
+[표현 안전성] 위반 없음
+
+EVAL PASS
+
+━━ [5] 스냅샷 PNG + Word 보고서 렌더 ━━
+  스냅샷 PNG 생성: C:\Users\iamip\IdeaProjects\kubenetis\settlement\pwc\submission\outputs\batch\2026Q2\샘표\executive-summary.png
+  DOCX 생성: C:\Users\iamip\IdeaProjects\kubenetis\settlement\pwc\submission\outputs\batch\2026Q2\샘표\briefing.docx
+
+PIPELINE READY
+identity: C:\Users\iamip\IdeaProjects\kubenetis\settlement\pwc\submission\outputs\batch\2026Q2\샘표\identity.json
+diagnosticPacket: C:\Users\iamip\IdeaProjects\kubenetis\settlement\pwc\submission\outputs\batch\2026Q2\샘표\diagnostic-packet.json
+briefing: C:\Users\iamip\IdeaProjects\kubenetis\settlement\pwc\submission\outputs\batch\2026Q2\샘표\briefing.md
+briefingDocx: C:\Users\iamip\IdeaProjects\kubenetis\settlement\pwc\submission\outputs\batch\2026Q2\샘표\briefing.docx
+executiveSnapshot: C:\Users\iamip\IdeaProjects\kubenetis\settlement\pwc\submission\outputs\batch\2026Q2\샘표\executive-summary.png
+nextSteps: C:\Users\iamip\IdeaProjects\kubenetis\settlement\pwc\submission\outputs\batch\2026Q2\샘표\pipeline-next-steps.md
+

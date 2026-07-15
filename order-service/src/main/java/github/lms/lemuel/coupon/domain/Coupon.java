@@ -1,4 +1,6 @@
 package github.lms.lemuel.coupon.domain;
+import github.lms.lemuel.coupon.domain.exception.CouponInvariantViolationException;
+import github.lms.lemuel.coupon.domain.exception.InvalidCouponStateException;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -25,7 +27,7 @@ public class Coupon {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    public Coupon() {
+    private Coupon() {
         this.usedCount = 0;
         this.isActive = true;
         this.createdAt = LocalDateTime.now();
@@ -36,17 +38,17 @@ public class Coupon {
                                 BigDecimal minOrderAmount, BigDecimal maxDiscountAmount,
                                 int maxUses, LocalDateTime expiresAt) {
         if (code == null || code.isBlank()) {
-            throw new IllegalArgumentException("쿠폰 코드는 필수입니다.");
+            throw new CouponInvariantViolationException("쿠폰 코드는 필수입니다.");
         }
         if (type == null) {
-            throw new IllegalArgumentException("쿠폰 타입은 필수입니다.");
+            throw new CouponInvariantViolationException("쿠폰 타입은 필수입니다.");
         }
         if (discountValue == null || discountValue.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("할인 금액은 0보다 커야 합니다.");
+            throw new CouponInvariantViolationException("할인 금액은 0보다 커야 합니다.");
         }
         type.validateDiscountValue(discountValue); // 타입별 제약 검증을 Strategy 에 위임
         if (maxUses <= 0) {
-            throw new IllegalArgumentException("최대 사용 횟수는 1 이상이어야 합니다.");
+            throw new CouponInvariantViolationException("최대 사용 횟수는 1 이상이어야 합니다.");
         }
 
         Coupon coupon = new Coupon();
@@ -64,7 +66,7 @@ public class Coupon {
     public void configureTarget(String targetType, Long targetId) {
         CouponTarget target = CouponTarget.fromInput(targetType);
         if (target.requiresTargetId() && targetId == null) {
-            throw new IllegalArgumentException("특정 대상 쿠폰은 targetId가 필요합니다.");
+            throw new CouponInvariantViolationException("특정 대상 쿠폰은 targetId가 필요합니다.");
         }
         this.targetType = target;
         this.targetId = target == CouponTarget.ALL ? null : targetId;
@@ -72,7 +74,7 @@ public class Coupon {
 
     public void configurePeriod(LocalDateTime startsAt, LocalDateTime expiresAt) {
         if (startsAt != null && expiresAt != null && startsAt.isAfter(expiresAt)) {
-            throw new IllegalArgumentException("쿠폰 시작일은 종료일보다 늦을 수 없습니다.");
+            throw new CouponInvariantViolationException("쿠폰 시작일은 종료일보다 늦을 수 없습니다.");
         }
         this.startsAt = startsAt;
         this.expiresAt = expiresAt;
@@ -83,19 +85,19 @@ public class Coupon {
      */
     public void validate(BigDecimal orderAmount) {
         if (!isActive) {
-            throw new IllegalStateException("비활성화된 쿠폰입니다.");
+            throw new InvalidCouponStateException("비활성화된 쿠폰입니다.");
         }
         if (usedCount >= maxUses) {
-            throw new IllegalStateException("쿠폰 사용 한도를 초과했습니다.");
+            throw new InvalidCouponStateException("쿠폰 사용 한도를 초과했습니다.");
         }
         if (startsAt != null && LocalDateTime.now().isBefore(startsAt)) {
-            throw new IllegalStateException("아직 사용할 수 없는 쿠폰입니다.");
+            throw new InvalidCouponStateException("아직 사용할 수 없는 쿠폰입니다.");
         }
         if (expiresAt != null && LocalDateTime.now().isAfter(expiresAt)) {
-            throw new IllegalStateException("만료된 쿠폰입니다.");
+            throw new InvalidCouponStateException("만료된 쿠폰입니다.");
         }
         if (orderAmount.compareTo(minOrderAmount) < 0) {
-            throw new IllegalStateException(
+            throw new InvalidCouponStateException(
                 String.format("최소 주문 금액(%,.0f원) 이상이어야 합니다.", minOrderAmount));
         }
     }
@@ -143,49 +145,77 @@ public class Coupon {
         this.updatedAt = LocalDateTime.now();
     }
 
-    // Getters & Setters
+    /**
+     * 쿠폰 활성화/비활성화. 상태 플래그를 setter 로 노출하지 않고 의미 있는 도메인 동작으로만 변경.
+     */
+    public void activate() {
+        this.isActive = true;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public void deactivate() {
+        this.isActive = false;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    /**
+     * 영속 레코드 복원 팩토리. 어댑터가 no-arg + setter 대신 이 경로로만 도메인을 재구성한다.
+     */
+    public static Coupon rehydrate(Long id, String code, CouponType type, BigDecimal discountValue,
+                                   BigDecimal minOrderAmount, BigDecimal maxDiscountAmount,
+                                   int maxUses, int usedCount, CouponTarget targetType, Long targetId,
+                                   LocalDateTime startsAt, LocalDateTime expiresAt, boolean isActive,
+                                   LocalDateTime createdAt, LocalDateTime updatedAt) {
+        Coupon coupon = new Coupon();
+        coupon.id = id;
+        coupon.code = code;
+        coupon.type = type;
+        coupon.discountValue = discountValue;
+        coupon.minOrderAmount = minOrderAmount;
+        coupon.maxDiscountAmount = maxDiscountAmount;
+        coupon.maxUses = maxUses;
+        coupon.usedCount = usedCount;
+        coupon.targetType = targetType;
+        coupon.targetId = targetId;
+        coupon.startsAt = startsAt;
+        coupon.expiresAt = expiresAt;
+        coupon.isActive = isActive;
+        coupon.createdAt = createdAt;
+        coupon.updatedAt = updatedAt;
+        return coupon;
+    }
+
+    /** DB 부여 PK 주입(setter 대체). */
+    public void assignId(Long id) { this.id = id; }
+
+    // Getters
     public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
 
     public String getCode() { return code; }
-    public void setCode(String code) { this.code = code; }
 
     public CouponType getType() { return type; }
-    public void setType(CouponType type) { this.type = type; }
 
     public BigDecimal getDiscountValue() { return discountValue; }
-    public void setDiscountValue(BigDecimal discountValue) { this.discountValue = discountValue; }
 
     public BigDecimal getMinOrderAmount() { return minOrderAmount; }
-    public void setMinOrderAmount(BigDecimal minOrderAmount) { this.minOrderAmount = minOrderAmount; }
 
     public BigDecimal getMaxDiscountAmount() { return maxDiscountAmount; }
-    public void setMaxDiscountAmount(BigDecimal maxDiscountAmount) { this.maxDiscountAmount = maxDiscountAmount; }
 
     public int getMaxUses() { return maxUses; }
-    public void setMaxUses(int maxUses) { this.maxUses = maxUses; }
 
     public int getUsedCount() { return usedCount; }
-    public void setUsedCount(int usedCount) { this.usedCount = usedCount; }
 
     public CouponTarget getTargetType() { return targetType == null ? CouponTarget.ALL : targetType; }
-    public void setTargetType(CouponTarget targetType) { this.targetType = targetType; }
 
     public Long getTargetId() { return targetId; }
-    public void setTargetId(Long targetId) { this.targetId = targetId; }
 
     public LocalDateTime getStartsAt() { return startsAt; }
-    public void setStartsAt(LocalDateTime startsAt) { this.startsAt = startsAt; }
 
     public LocalDateTime getExpiresAt() { return expiresAt; }
-    public void setExpiresAt(LocalDateTime expiresAt) { this.expiresAt = expiresAt; }
 
     public boolean isActive() { return isActive; }
-    public void setActive(boolean active) { isActive = active; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 }

@@ -15,6 +15,7 @@ import github.lms.lemuel.product.application.port.out.LoadProductPort;
 import github.lms.lemuel.product.application.port.out.LoadProductVariantPort;
 import github.lms.lemuel.product.domain.Product;
 import github.lms.lemuel.product.domain.ProductVariant;
+import github.lms.lemuel.product.domain.exception.ProductInvariantViolationException;
 import github.lms.lemuel.product.domain.exception.ProductNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -100,10 +101,10 @@ public class CreateMultiItemOrderService implements CreateMultiItemOrderUseCase 
             // SKU 라인이면 variant 조회 + 재고 차감 + 옵션 단가(추가금·할인) 반영
             if (line.variantId() != null) {
                 ProductVariant variant = loadVariantPort.loadById(line.variantId())
-                        .orElseThrow(() -> new IllegalArgumentException(
+                        .orElseThrow(() -> new ProductInvariantViolationException(
                                 "ProductVariant not found: " + line.variantId()));
                 if (!variant.getProductId().equals(product.getId())) {
-                    throw new IllegalArgumentException(
+                    throw new ProductInvariantViolationException(
                             "variant 가 product 에 속하지 않음: variant=" + line.variantId()
                                     + ", product=" + line.productId());
                 }

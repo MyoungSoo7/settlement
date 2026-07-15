@@ -5,8 +5,8 @@ import github.lms.lemuel.loan.application.port.out.LoadCorporateLoanPort;
 import github.lms.lemuel.loan.application.port.out.PublishCorporateLoanEventPort;
 import github.lms.lemuel.loan.application.port.out.SaveCorporateLoanPort;
 import github.lms.lemuel.loan.domain.CorporateLoan;
-import github.lms.lemuel.loan.domain.CorporateLoanNotFoundException;
 import github.lms.lemuel.loan.domain.CorporateLoanStatus;
+import github.lms.lemuel.loan.domain.exception.CorporateLoanNotFoundException;
 import github.lms.lemuel.loan.domain.LoanLedgerEntry;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -45,7 +45,7 @@ class DisburseCorporateLoanServiceTest {
 
     @Test
     void 실행하면_전표2건과_실행이벤트를_발행하고_DISBURSED() {
-        when(loadCorporateLoanPort.findById(5001L)).thenReturn(
+        when(loadCorporateLoanPort.findByIdForUpdate(5001L)).thenReturn(
                 Optional.of(requested(new BigDecimal("1000000"), new BigDecimal("6000"))));
         when(saveCorporateLoanPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -65,7 +65,7 @@ class DisburseCorporateLoanServiceTest {
 
     @Test
     void 수수료가_0이면_선지급전표_1건만() {
-        when(loadCorporateLoanPort.findById(5001L)).thenReturn(
+        when(loadCorporateLoanPort.findByIdForUpdate(5001L)).thenReturn(
                 Optional.of(requested(new BigDecimal("1000000"), BigDecimal.ZERO)));
         when(saveCorporateLoanPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -77,7 +77,7 @@ class DisburseCorporateLoanServiceTest {
 
     @Test
     void 대출이_없으면_NotFound이고_발행하지_않는다() {
-        when(loadCorporateLoanPort.findById(999L)).thenReturn(Optional.empty());
+        when(loadCorporateLoanPort.findByIdForUpdate(999L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service().disburse(999L))
                 .isInstanceOf(CorporateLoanNotFoundException.class);

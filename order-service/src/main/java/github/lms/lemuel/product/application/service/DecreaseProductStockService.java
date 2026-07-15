@@ -9,6 +9,7 @@ import github.lms.lemuel.common.opssignal.NoOpOpsSignalPublisher;
 import github.lms.lemuel.common.opssignal.OpsSignalCategory;
 import github.lms.lemuel.common.opssignal.OpsSignalPort;
 import github.lms.lemuel.product.domain.exception.InsufficientStockException;
+import github.lms.lemuel.product.domain.exception.InvalidProductStateException;
 import github.lms.lemuel.product.domain.exception.ProductNotFoundException;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -85,7 +86,7 @@ public class DecreaseProductStockService extends AbstractDecreaseStockService<Pr
     @Override
     protected RuntimeException classifyPresent(Product current, Long id, int quantity) {
         if (current.getStatus() == ProductStatus.DISCONTINUED) {
-            return new IllegalStateException("단종된 상품은 차감할 수 없습니다: id=" + id);
+            return new InvalidProductStateException("단종된 상품은 차감할 수 없습니다: id=" + id);
         }
         // 운영 관제 신호 — 구매 시 재고 부족(초과 수요). best-effort(절대 throw 안 함).
         opsSignalPort.emit(OpsSignalCategory.STOCK_DEPLETED, "product", String.valueOf(id),

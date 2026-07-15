@@ -89,6 +89,13 @@ node src/bin/diagnose-company.mjs --company "<기업명>" --data-dir "<데이터
 node src/test/briefing-eval.mjs --signals-file "<산출물폴더>/diagnostic-packet.json" "<산출물폴더>/briefing.md"
 ```
 
+분기 브리핑 배치 (목록 일괄 완주 → EVAL PASS 만 문서함 업로드):
+
+```powershell
+node src/bin/quarterly-briefing-batch.mjs --period 2026Q2 [--companies <목록JSON>] [--only <기업명>] [--resume] [--concurrency N] [--register <base URL>] [--no-upload] [--escalate-signals N]
+node src/bin/build-briefing-universe.mjs [--markets KOSPI,KOSDAQ] [--limit N] [--dry-run]  # 상장사 전체 배치 목록 생성 (DART_API_KEY)
+```
+
 상장사 공시 기반 CSV 생성:
 
 ```powershell

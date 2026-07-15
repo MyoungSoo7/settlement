@@ -72,18 +72,17 @@ public class MenuPersistenceAdapter implements LoadMenuPort, SaveMenuPort {
     }
 
     private Menu toDomain(MenuJpaEntity entity) {
-        Menu menu = new Menu();
-        menu.setId(entity.getId());
-        menu.setParentId(entity.getParentId());
-        menu.setName(entity.getName());
-        menu.setPath(entity.getPath());
-        menu.setIcon(entity.getIcon());
-        menu.setSortOrder(entity.getSortOrder());
-        menu.setRequiredRole(entity.getRequiredRole());
-        menu.setVisible(entity.isVisible());
-        menu.setActive(entity.isActive());
-        menu.setCreatedAt(entity.getCreatedAt());
-        menu.setUpdatedAt(entity.getUpdatedAt());
-        return menu;
+        return Menu.rehydrate(
+                entity.getId(),
+                entity.getParentId(),
+                entity.getName(),
+                entity.getPath(),
+                entity.getIcon(),
+                entity.getSortOrder(),
+                entity.getRequiredRole(),
+                entity.isVisible(),
+                entity.isActive(),
+                entity.getCreatedAt(),
+                entity.getUpdatedAt());
     }
 }

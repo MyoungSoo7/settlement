@@ -3,6 +3,7 @@ package github.lms.lemuel.review.application;
 import github.lms.lemuel.review.application.port.out.LoadReviewPort;
 import github.lms.lemuel.review.application.port.out.SaveReviewPort;
 import github.lms.lemuel.review.domain.Review;
+import github.lms.lemuel.review.domain.exception.ReviewInvariantViolationException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -25,7 +26,7 @@ public class ReviewService {
         log.info("리뷰 작성 시작: productId={}, userId={}, rating={}", productId, userId, rating);
 
         if (loadReviewPort.existsByUserIdAndProductId(userId, productId)) {
-            throw new IllegalStateException("이미 해당 상품에 리뷰를 작성하셨습니다.");
+            throw new ReviewInvariantViolationException("이미 해당 상품에 리뷰를 작성하셨습니다.");
         }
 
         Review review = Review.create(productId, userId, rating, content);
@@ -34,7 +35,7 @@ public class ReviewService {
             log.info("리뷰 작성 완료: reviewId={}", saved.getId());
             return saved;
         } catch (DataIntegrityViolationException e) {
-            throw new IllegalStateException("이미 해당 상품에 리뷰를 작성하셨습니다.");
+            throw new ReviewInvariantViolationException("이미 해당 상품에 리뷰를 작성하셨습니다.");
         }
     }
 
@@ -43,10 +44,10 @@ public class ReviewService {
         log.info("리뷰 수정 시작: reviewId={}, userId={}", reviewId, userId);
 
         Review review = loadReviewPort.findById(reviewId)
-                .orElseThrow(() -> new IllegalArgumentException("리뷰를 찾을 수 없습니다. id=" + reviewId));
+                .orElseThrow(() -> new ReviewInvariantViolationException("리뷰를 찾을 수 없습니다. id=" + reviewId));
 
         if (!review.getUserId().equals(userId)) {
-            throw new IllegalStateException("본인이 작성한 리뷰만 수정할 수 있습니다.");
+            throw new ReviewInvariantViolationException("본인이 작성한 리뷰만 수정할 수 있습니다.");
         }
 
         review.update(rating, content);
@@ -60,10 +61,10 @@ public class ReviewService {
         log.info("리뷰 삭제 시작: reviewId={}, userId={}", reviewId, userId);
 
         Review review = loadReviewPort.findById(reviewId)
-                .orElseThrow(() -> new IllegalArgumentException("리뷰를 찾을 수 없습니다. id=" + reviewId));
+                .orElseThrow(() -> new ReviewInvariantViolationException("리뷰를 찾을 수 없습니다. id=" + reviewId));
 
         if (!review.getUserId().equals(userId)) {
-            throw new IllegalStateException("본인이 작성한 리뷰만 삭제할 수 있습니다.");
+            throw new ReviewInvariantViolationException("본인이 작성한 리뷰만 삭제할 수 있습니다.");
         }
 
         saveReviewPort.deleteById(reviewId);

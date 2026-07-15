@@ -1,5 +1,8 @@
 package github.lms.lemuel.payment.domain;
 
+import github.lms.lemuel.payment.domain.exception.InvalidPaymentStateException;
+import github.lms.lemuel.payment.domain.exception.PaymentInvariantViolationException;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Objects;
@@ -30,10 +33,10 @@ public class PaymentTender {
         Objects.requireNonNull(type, "type");
         Objects.requireNonNull(amount, "amount");
         if (amount.signum() <= 0) {
-            throw new IllegalArgumentException("tender amount 는 양수여야 합니다");
+            throw new PaymentInvariantViolationException("tender amount 는 양수여야 합니다");
         }
         if (sequence <= 0) {
-            throw new IllegalArgumentException("sequence 는 1 이상");
+            throw new PaymentInvariantViolationException("sequence 는 1 이상");
         }
         LocalDateTime now = LocalDateTime.now();
         return new PaymentTender(null, null, type, amount, BigDecimal.ZERO, null,
@@ -65,11 +68,11 @@ public class PaymentTender {
 
     public void authorize(String pgTransactionId) {
         if (status != TenderStatus.PENDING) {
-            throw new IllegalStateException("PENDING 에서만 AUTHORIZED 전이: " + status);
+            throw new InvalidPaymentStateException("PENDING 에서만 AUTHORIZED 전이: " + status);
         }
         // POINT / GIFT_CARD 는 외부 PG 미호출 → pgTransactionId null 허용
         if (type.usesExternalPg() && (pgTransactionId == null || pgTransactionId.isBlank())) {
-            throw new IllegalArgumentException("외부 PG tender 는 pgTransactionId 필수: " + type);
+            throw new PaymentInvariantViolationException("외부 PG tender 는 pgTransactionId 필수: " + type);
         }
         this.pgTransactionId = pgTransactionId;
         this.status = TenderStatus.AUTHORIZED;
@@ -78,25 +81,25 @@ public class PaymentTender {
 
     public void capture() {
         if (status != TenderStatus.AUTHORIZED && status != TenderStatus.PENDING) {
-            throw new IllegalStateException("AUTHORIZED/PENDING 에서만 CAPTURED 전이: " + status);
+            throw new InvalidPaymentStateException("AUTHORIZED/PENDING 에서만 CAPTURED 전이: " + status);
         }
         this.status = TenderStatus.CAPTURED;
         touch();
     }
 
     /**
-     * 부분/전체 환불. 잔여 환불 가능 금액 초과 시 IllegalArgumentException.
+     * 부분/전체 환불. 잔여 환불 가능 금액 초과 시 {@link PaymentInvariantViolationException}.
      */
     public void addRefund(BigDecimal refundAmount) {
         if (refundAmount == null || refundAmount.signum() <= 0) {
-            throw new IllegalArgumentException("환불 금액은 양수여야 합니다");
+            throw new PaymentInvariantViolationException("환불 금액은 양수여야 합니다");
         }
         if (status != TenderStatus.CAPTURED) {
-            throw new IllegalStateException("CAPTURED 상태에서만 환불 가능: " + status);
+            throw new InvalidPaymentStateException("CAPTURED 상태에서만 환불 가능: " + status);
         }
         BigDecimal newRefunded = this.refundedAmount.add(refundAmount);
         if (newRefunded.compareTo(this.amount) > 0) {
-            throw new IllegalArgumentException(
+            throw new PaymentInvariantViolationException(
                     "환불 가능액 초과: 요청=" + refundAmount + ", 잔여=" + getRefundableAmount());
         }
         this.refundedAmount = newRefunded;

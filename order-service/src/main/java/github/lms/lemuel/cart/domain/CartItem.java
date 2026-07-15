@@ -1,4 +1,5 @@
 package github.lms.lemuel.cart.domain;
+import github.lms.lemuel.cart.domain.exception.CartInvariantViolationException;
 
 import java.time.LocalDateTime;
 import java.util.Objects;
@@ -24,7 +25,7 @@ public class CartItem {
     public static CartItem newItem(Long productId, Long variantId, int quantity) {
         Objects.requireNonNull(productId, "productId");
         if (quantity <= 0) {
-            throw new IllegalArgumentException("quantity 는 양수여야 합니다");
+            throw new CartInvariantViolationException("quantity 는 양수여야 합니다");
         }
         return new CartItem(null, null, productId, variantId, quantity, LocalDateTime.now());
     }
@@ -46,14 +47,14 @@ public class CartItem {
 
     void increaseQuantity(int delta) {
         if (delta <= 0) {
-            throw new IllegalArgumentException("증가량은 양수여야 합니다");
+            throw new CartInvariantViolationException("증가량은 양수여야 합니다");
         }
         this.quantity += delta;
     }
 
     void changeQuantity(int newQuantity) {
         if (newQuantity <= 0) {
-            throw new IllegalArgumentException("수량은 양수여야 합니다 (0 은 removeItem 으로 처리)");
+            throw new CartInvariantViolationException("수량은 양수여야 합니다 (0 은 removeItem 으로 처리)");
         }
         this.quantity = newQuantity;
     }

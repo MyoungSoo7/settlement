@@ -1,4 +1,5 @@
 package github.lms.lemuel.order.domain;
+import github.lms.lemuel.order.domain.exception.OrderInvariantViolationException;
 
 import java.math.BigDecimal;
 
@@ -23,11 +24,11 @@ public final class RefundPolicy {
 
     public static RefundOutcome forOrder(BigDecimal paidAmount, BigDecimal shippingFee, boolean shippingStarted) {
         if (paidAmount == null || paidAmount.signum() < 0) {
-            throw new IllegalArgumentException("결제 금액은 0 이상이어야 합니다: " + paidAmount);
+            throw new OrderInvariantViolationException("결제 금액은 0 이상이어야 합니다: " + paidAmount);
         }
         BigDecimal fee = shippingFee == null ? BigDecimal.ZERO : shippingFee;
         if (fee.signum() < 0) {
-            throw new IllegalArgumentException("배송비는 음수일 수 없습니다: " + fee);
+            throw new OrderInvariantViolationException("배송비는 음수일 수 없습니다: " + fee);
         }
 
         if (!shippingStarted) {

@@ -1,5 +1,7 @@
 package github.lms.lemuel.loan.application.service;
 
+import github.lms.lemuel.loan.domain.exception.LoanInvariantViolationException;
+
 import java.math.BigDecimal;
 import java.util.Map;
 
@@ -52,7 +54,7 @@ public class CreditPolicy {
     /** 선지급액과 선지급일수로 수수료를 산정한다. */
     public BigDecimal fee(BigDecimal principal, int days) {
         if (days < 0) {
-            throw new IllegalArgumentException("선지급일수는 음수일 수 없습니다: " + days);
+            throw new LoanInvariantViolationException("선지급일수는 음수일 수 없습니다: " + days);
         }
         return principal.multiply(dailyRate).multiply(BigDecimal.valueOf(days));
     }
@@ -66,8 +68,9 @@ public class CreditPolicy {
                     : (grade != null && haircutFor(grade).compareTo(BigDecimal.ONE) < 0
                         ? " (평판 등급 " + grade + " haircut 적용)"
                         : "");
-            throw new IllegalArgumentException(
-                    "신청액이 한도를 초과합니다. requested=" + requested + ", limit=" + limit + reason);
+            throw new LoanInvariantViolationException(
+                    "신청액이 한도를 초과합니다. requested=" + requested + ", limit=" + limit + reason,
+                    requested, limit);
         }
     }
 }

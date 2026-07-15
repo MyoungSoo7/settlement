@@ -1,4 +1,6 @@
 package github.lms.lemuel.shipping.domain;
+import github.lms.lemuel.shipping.domain.exception.InvalidShipmentStateException;
+import github.lms.lemuel.shipping.domain.exception.ShipmentInvariantViolationException;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -34,7 +36,7 @@ class ShippingAddressTest {
     @Test @DisplayName("빈 recipientName이면 예외")
     void blankRecipientName() {
         assertThatThrownBy(() -> new ShippingAddress("  ", "010", "06234", "서울", null, null))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ShipmentInvariantViolationException.class)
                 .hasMessage("수령인 이름 필수");
     }
 
@@ -47,7 +49,7 @@ class ShippingAddressTest {
     @Test @DisplayName("빈 phone이면 예외")
     void blankPhone() {
         assertThatThrownBy(() -> new ShippingAddress("홍길동", "  ", "06234", "서울", null, null))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ShipmentInvariantViolationException.class)
                 .hasMessage("전화번호 필수");
     }
 
@@ -60,7 +62,7 @@ class ShippingAddressTest {
     @Test @DisplayName("빈 address1이면 예외")
     void blankAddress1() {
         assertThatThrownBy(() -> new ShippingAddress("홍길동", "010", "06234", "  ", null, null))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ShipmentInvariantViolationException.class)
                 .hasMessage("주소 필수");
     }
 

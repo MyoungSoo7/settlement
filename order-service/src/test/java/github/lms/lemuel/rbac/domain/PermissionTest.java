@@ -20,12 +20,7 @@ class PermissionTest {
 
     @Test @DisplayName("setters - 개별 필드 세팅")
     void setters() {
-        Permission p = new Permission();
-        p.setId(2L);
-        p.setCode("C");
-        p.setName("N");
-        p.setCategory("CAT");
-        p.setDescription("D");
+        Permission p = Permission.of(2L, "C", "N", "CAT", "D");
 
         assertThat(p.getId()).isEqualTo(2L);
         assertThat(p.getCode()).isEqualTo("C");

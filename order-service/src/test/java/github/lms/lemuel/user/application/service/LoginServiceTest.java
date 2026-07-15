@@ -1,4 +1,5 @@
 package github.lms.lemuel.user.application.service;
+import github.lms.lemuel.user.domain.exception.UserInvariantViolationException;
 
 import github.lms.lemuel.user.application.port.in.LoginUseCase;
 import github.lms.lemuel.user.application.port.out.LoadUserPort;
@@ -68,12 +69,12 @@ class LoginServiceTest {
     @Test @DisplayName("Command 검증: email 공백")
     void command_blankEmail() {
         assertThatThrownBy(() -> new LoginUseCase.LoginCommand("  ", "pw"))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(UserInvariantViolationException.class);
     }
 
     @Test @DisplayName("Command 검증: password 공백")
     void command_blankPassword() {
         assertThatThrownBy(() -> new LoginUseCase.LoginCommand("u@example.com", ""))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(UserInvariantViolationException.class);
     }
 }

@@ -107,7 +107,7 @@ public class RbacPersistenceAdapter implements LoadRbacPort, SaveRbacPort {
                 entity.getPermissions().stream()
                         .map(this::toPermissionDomain)
                         .collect(Collectors.toList());
-        role.setPermissions(perms);
+        role.replacePermissions(perms);
         return role;
     }
 

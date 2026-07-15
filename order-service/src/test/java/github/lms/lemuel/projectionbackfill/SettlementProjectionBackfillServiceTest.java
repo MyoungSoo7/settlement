@@ -57,7 +57,7 @@ class SettlementProjectionBackfillServiceTest {
         when(loadOrderPort.findAll()).thenReturn(List.of(
                 Order.create(1L, 2L, new BigDecimal("5000"))));
         when(loadPaymentPort.findAllCaptured()).thenReturn(List.of(
-                new PaymentDomain(7L, 8L, new BigDecimal("5000"), BigDecimal.ZERO,
+                PaymentDomain.rehydrate(7L, 8L, new BigDecimal("5000"), BigDecimal.ZERO,
                         PaymentStatus.CAPTURED, "CARD", "pg-x",
                         LocalDateTime.now(), LocalDateTime.now(), LocalDateTime.now())));
         when(loadSellerSettlementMetaPort.findByPaymentId(any())).thenReturn(Optional.empty());

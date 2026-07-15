@@ -53,7 +53,7 @@ class UserControllerTest {
 
     private User user(long id, String email) {
         User u = User.createWithProfile(email, "hash", UserRole.USER, "홍길동", "010-1234-5678");
-        u.setId(id);
+        u.assignId(id);
         return u;
     }
 

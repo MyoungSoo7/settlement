@@ -1,5 +1,6 @@
 package github.lms.lemuel.investment.domain;
 
+import github.lms.lemuel.investment.domain.exception.InvestmentInvariantViolationException;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -21,13 +22,13 @@ class SellerFundingViewTest {
     @Test
     void 필수값_검증() {
         assertThatThrownBy(() -> SellerFundingView.confirmed(null, 1L, BigDecimal.TEN))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(InvestmentInvariantViolationException.class);
         assertThatThrownBy(() -> SellerFundingView.confirmed(1L, null, BigDecimal.TEN))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(InvestmentInvariantViolationException.class);
         assertThatThrownBy(() -> SellerFundingView.confirmed(1L, 1L, null))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(InvestmentInvariantViolationException.class);
         assertThatThrownBy(() -> SellerFundingView.confirmed(1L, 1L, new BigDecimal("-1")))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(InvestmentInvariantViolationException.class);
     }
 
     @Test

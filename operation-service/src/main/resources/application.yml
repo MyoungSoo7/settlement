@@ -88,7 +88,7 @@ management:
     prometheus:
       enabled: true
     health:
-      show-details: always
+      show-details: when-authorized
       probes:
         enabled: true
   health:
@@ -174,3 +174,31 @@ app:
         redis.up: "min(redis_up)"
         db.deadlock.rate: "sum(rate(pg_stat_database_deadlocks[5m]))"
         http.error.ratio: "100 * sum(rate(http_server_requests_seconds_count{status=~\"4..|5..\"}[5m])) / sum(rate(http_server_requests_seconds_count[5m]))"
+
+    # ── Phase 3: 베이스라인 이상 탐지 ────────────────────────────────────
+    # 실패율 카운터 5종을 5분마다 직전 마감 버킷 기준으로 롤링윈도우 z-score 판정,
+    # 이상이면 source=ANOMALY 인시던트 자동 생성/refire, 정상 복귀 K회 연속 시 자동 해제.
+    # 인프라 게이지(kafka lag/redis/deadlock/http)는 Alertmanager 룰이 커버하므로 대상 제외.
+    # 임계는 전부 아래에서 외부화 — 운영 튜닝은 재빌드 없이 재기동만.
+    anomaly:
+      # 기본 off — 로컬/테스트는 스캐너 미기동(테스트는 UseCase 직접 호출). compose/운영에서 true 주입.
+      enabled: ${OPS_ANOMALY_ENABLED:false}
+      scan-interval-ms: ${OPS_ANOMALY_SCAN_MS:300000}   # 버킷 폭(5분)과 일치
+      window-size: 12                                    # 롤링 베이스라인 = 직전 12버킷(1시간)
+      z-threshold: 3.0                                   # 이상 z-score 하한
+      critical-z-threshold: 5.0                          # z>=5 → CRITICAL, 3<=z<5 → WARNING
+      min-sample-total: 30                               # 최소 표본(count_total) 게이트
+      failure-rate-floor: 0.10                           # 상대임계 하한(실패율 10% 미만은 이상 아님)
+      resolve-streak-k: 3                                # 정상 3버킷 연속 시 자동 해제
+      # metric_key → 인시던트 SignalCategory. key 집합이 곧 탐지 대상.
+      # metric_key 는 signal 버킷 키와 동일(DomainEventSignalConsumer/OpsFailureSignalConsumer).
+      metric-category:
+        settlement: SETTLEMENT_FAILURE
+        payment: PAYMENT_FAILURE
+        stock: STOCK_SHORTAGE
+        shipping: SHIPPING_DELAY
+        # order 는 의도적으로 제외 — order.failed 프로듀서가 아직 미배선이라(Phase 2b §2b.4:
+        # 주문 생성 실패의 단일 catch 지점 부재로 배선 보류) count_signal 이 항상 0 → failure_rate 0 →
+        # 이상 판정이 구조적으로 불가능하다. "감시 중인데 절대 안 울리는" 착시를 피하려 목록에서 뺀다.
+        # order.failed 발행 지점이 확정되면 아래 한 줄을 추가하면 즉시 활성화된다.
+        # order: ORDER_FAILURE

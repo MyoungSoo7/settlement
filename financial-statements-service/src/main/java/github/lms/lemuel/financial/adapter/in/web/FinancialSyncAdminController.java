@@ -3,6 +3,7 @@ package github.lms.lemuel.financial.adapter.in.web;
 import github.lms.lemuel.financial.application.port.in.SyncCompaniesUseCase;
 import github.lms.lemuel.financial.application.port.in.SyncResult;
 import github.lms.lemuel.financial.application.port.in.SyncStatementsUseCase;
+import github.lms.lemuel.financial.audit.application.port.out.RecordAuditPort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -34,24 +35,31 @@ public class FinancialSyncAdminController {
     private final SyncStatementsUseCase syncStatementsUseCase;
     private final SyncStatusTracker tracker;
     private final TaskExecutor executor;
+    private final RecordAuditPort recordAuditPort;
 
     public FinancialSyncAdminController(SyncCompaniesUseCase syncCompaniesUseCase,
                                         SyncStatementsUseCase syncStatementsUseCase,
                                         SyncStatusTracker tracker,
-                                        @Qualifier("syncTaskExecutor") TaskExecutor executor) {
+                                        @Qualifier("syncTaskExecutor") TaskExecutor executor,
+                                        RecordAuditPort recordAuditPort) {
         this.syncCompaniesUseCase = syncCompaniesUseCase;
         this.syncStatementsUseCase = syncStatementsUseCase;
         this.tracker = tracker;
         this.executor = executor;
+        this.recordAuditPort = recordAuditPort;
     }
 
     @PostMapping("/companies")
     public ResponseEntity<Map<String, String>> syncCompanies() {
+        recordAuditPort.record("COLLECT_TRIGGERED", "DartSync", "companies",
+                Map.of("job", "companies", "source", "DART"));
         return submit("companies", syncCompaniesUseCase::syncCompanies);
     }
 
     @PostMapping("/statements/{year}")
     public ResponseEntity<Map<String, String>> syncStatements(@PathVariable int year) {
+        recordAuditPort.record("COLLECT_TRIGGERED", "DartSync", "statements-" + year,
+                Map.of("job", "statements", "year", year, "source", "DART"));
         return submit("statements-" + year, () -> syncStatementsUseCase.syncStatements(year));
     }
 

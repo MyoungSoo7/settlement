@@ -34,7 +34,7 @@ class CompanyReputationControllerTest {
     @DisplayName("GET /loans/company-reputation/{stockCode} — 존재하면 200 + 본문")
     void present() throws Exception {
         when(getCompanyReputationUseCase.byStockCode("005930")).thenReturn(Optional.of(
-                new CompanyReputation("005930", 55, "C", "B", LocalDate.of(2026, 7, 7))));
+                CompanyReputation.of("005930", 55, "C", "B", LocalDate.of(2026, 7, 7))));
 
         mockMvc.perform(get("/loans/company-reputation/005930"))
                 .andExpect(status().isOk())

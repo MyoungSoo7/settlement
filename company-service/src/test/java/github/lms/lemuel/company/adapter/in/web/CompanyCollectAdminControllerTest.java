@@ -2,6 +2,7 @@ package github.lms.lemuel.company.adapter.in.web;
 
 import github.lms.lemuel.company.application.port.in.CollectArticlesUseCase;
 import github.lms.lemuel.company.application.port.in.CollectResult;
+import github.lms.lemuel.company.audit.application.port.out.RecordAuditPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -14,6 +15,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.time.Instant;
 
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -37,7 +39,7 @@ class CompanyCollectAdminControllerTest {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new CompanyCollectAdminController(collectArticlesUseCase, tracker, executor))
+                .standaloneSetup(new CompanyCollectAdminController(collectArticlesUseCase, tracker, executor, mock(RecordAuditPort.class)))
                 .build();
     }
 

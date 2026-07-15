@@ -1,8 +1,8 @@
 # Lemuel — 이커머스 + 정산 MSA 플랫폼
 
-> **상품·장바구니·주문·결제·배송·정산·선정산/기업대출·투자·계정계·재무제표·경제지표·기업평판·운영관제·주식시세·AI챗봇·공공데이터** 도메인을 **12개 마이크로서비스 + API Gateway** 로 분리한
-> 헥사고날 아키텍처 기반 백엔드. 단일 모놀리스 → **Bounded Context 분리** → **이벤트 드리븐** →
-> **DB-per-service + 이벤트 프로젝션 패턴**(ADR 0020 완료) 으로 진화시킨 포트폴리오 프로젝트.
+> **이커머스 주문 → 셀러 정산 → 복식부기 원장까지, "정확성을 기계로 강제한" 커머스 백엔드.**
+> 커머스(order)·정산(settlement) 두 축의 **깊이**가 시그니처이고, 그 위에 대출·투자·계정계·재무제표·경제지표·기업평판·운영관제·주식시세·AI챗봇·공공데이터를 **12개 마이크로서비스 + API Gateway** 로 확장해 도메인 확장력을 증명한다.
+> 단일 모놀리스 → **Bounded Context 분리** → **이벤트 드리븐** → **DB-per-service + 이벤트 프로젝션 패턴**(ADR 0020) 으로 진화시킨 헥사고날 백엔드 포트폴리오.
 
 [![Java 25](https://img.shields.io/badge/Java-25-orange)](https://www.oracle.com/java/)
 [![Spring Boot 4](https://img.shields.io/badge/Spring%20Boot-4.0.4-brightgreen)](https://spring.io/projects/spring-boot)
@@ -15,6 +15,7 @@
 
 | 보고 싶은 것 | 한 번에 가는 곳 |
 |---|---|
+| **✅ "정말 작동하나" (5분, 재현 가능)** | **[docs/SETTLEMENT-VERIFICATION.md](docs/SETTLEMENT-VERIFICATION.md)** — 520 테스트·LINE 94.17% + 불변식 매핑 + 한계 |
 | **📄 1장 요약 (이력서 첨부용)** | **[PORTFOLIO.md](PORTFOLIO.md)** |
 | **시스템 전체 구조** | [아키텍처 다이어그램 (본 README)](#아키텍처) |
 | **Architecture Decision Records** | [docs/adr/](docs/adr/) |
@@ -140,9 +141,9 @@ CQRS 로 분리하고, 대사는 order 의 내부 API 를 호출해 cross-DB 연
 
 ```
 settlement/                              # 모노레포 루트
-├── settings.gradle.kts                  # 10 서비스 모듈 선언 (shared-common 은 composite build)
+├── settings.gradle.kts                  # 12 서비스 모듈 선언 (shared-common 은 composite build)
 ├── build.gradle.kts                     # 부모 빌드 (subprojects 공통 설정)
-├── docker-compose.yml                   # PG 10종 · ES · Redpanda · 10 services + gateway
+├── docker-compose.yml                   # PG 12종 · ES · Redpanda · 12 services + gateway
 ├── Dockerfile                           # MODULE 빌드 인자 파라미터화 (모든 서비스 공용)
 │
 ├── shared-common/                       # 📦 라이브러리 모듈 (java-library)
@@ -402,9 +403,9 @@ JWT_TTL_SECONDS=3600
 ### 전체 실행
 
 ```bash
-# 1. 인프라 + 10 서비스 모두 빌드/실행
+# 1. 인프라 + 12 서비스 모두 빌드/실행
 #    기동 순서는 compose healthcheck 기반 depends_on 이 보장:
-#    PG 10종·ES·Redpanda → order/settlement/loan/financial/economics/company/operation/market/ai/common-data → gateway → prometheus/grafana
+#    PG 12종·ES·Redpanda → order/settlement/loan/financial/economics/company/operation/market/ai/common-data/investment/account → gateway → prometheus/grafana
 docker compose up -d --build
 
 # 2. 전체 healthcheck 통과 확인 — 모든 서비스가 healthy 가 될 때까지 대기
@@ -463,8 +464,8 @@ npx newman run docs/demo/postman-e2e-purchase-flow.json -e docs/demo/postman-env
 ### 개별 서비스 실행
 
 ```bash
-# 인프라만 (PG 10종 + ES + Redpanda)
-docker compose up -d postgres settlement-db loan-postgres financial-postgres economics-postgres company-postgres operation-postgres market-postgres ai-postgres commondata-postgres elasticsearch redpanda
+# 인프라만 (PG 12종 + ES + Redpanda)
+docker compose up -d postgres settlement-db loan-postgres financial-postgres economics-postgres company-postgres operation-postgres market-postgres ai-postgres commondata-postgres investment-postgres account-postgres elasticsearch redpanda
 
 # 각 서비스를 IDE 또는 gradle 로
 ./gradlew :order-service:bootRun
@@ -672,9 +673,10 @@ CI 에서 k6 thresholds 로 회귀 자동 감지.
 
 ## 운영 환경 확장 포인트
 
-현재 구성은 **10개 서비스 모두 DB-per-service** 로 물리 분리돼 있고(order=opslab · settlement=settlement_db ·
+현재 구성은 **12개 서비스 모두 DB-per-service** 로 물리 분리돼 있고(order=opslab · settlement=settlement_db ·
 loan=lemuel_loan · financial=lemuel_financial · economics=lemuel_economics · company=lemuel_company ·
-operation=lemuel_operation · market=lemuel_market · ai=lemuel_ai · commondata=lemuel_commondata),
+operation=lemuel_operation · market=lemuel_market · ai=lemuel_ai · commondata=lemuel_commondata ·
+investment=lemuel_investment · account=lemuel_account),
 이벤트 프로젝션 패턴 덕분에 다음 단계로의 확장이 깨끗합니다:
 
 1. ~~**DB 분리**~~ — ✅ 완료. settlement 가 자체 `settlement_db` 의 projection 테이블에 Kafka 이벤트 컨슈머가

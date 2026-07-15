@@ -1,4 +1,5 @@
 package github.lms.lemuel.review.application;
+import github.lms.lemuel.review.domain.exception.ReviewInvariantViolationException;
 
 import github.lms.lemuel.review.application.port.out.LoadReviewPort;
 import github.lms.lemuel.review.application.port.out.SaveReviewPort;
@@ -36,7 +37,7 @@ class ReviewServiceTest {
     void createReview_duplicate() {
         when(loadReviewPort.existsByUserIdAndProductId(1L, 10L)).thenReturn(true);
         assertThatThrownBy(() -> service.createReview(10L, 1L, 5, "좋아요"))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(ReviewInvariantViolationException.class)
                 .hasMessageContaining("이미 해당 상품");
     }
 
@@ -54,7 +55,7 @@ class ReviewServiceTest {
         Review review = Review.create(10L, 1L, 3, "보통");
         when(loadReviewPort.findById(1L)).thenReturn(Optional.of(review));
         assertThatThrownBy(() -> service.updateReview(1L, 99L, 5, "좋아요"))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(ReviewInvariantViolationException.class)
                 .hasMessageContaining("본인이 작성한");
     }
 
@@ -62,7 +63,7 @@ class ReviewServiceTest {
     void updateReview_notFound() {
         when(loadReviewPort.findById(1L)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.updateReview(1L, 1L, 5, "좋아요"))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(ReviewInvariantViolationException.class);
     }
 
     @Test @DisplayName("deleteReview: 성공")
@@ -78,7 +79,7 @@ class ReviewServiceTest {
         Review review = Review.create(10L, 1L, 3, "보통");
         when(loadReviewPort.findById(1L)).thenReturn(Optional.of(review));
         assertThatThrownBy(() -> service.deleteReview(1L, 99L))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(ReviewInvariantViolationException.class);
     }
 
     @Test @DisplayName("getProductReviews: 조회")

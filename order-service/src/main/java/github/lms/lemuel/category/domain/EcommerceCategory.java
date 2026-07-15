@@ -1,4 +1,6 @@
 package github.lms.lemuel.category.domain;
+import github.lms.lemuel.category.domain.exception.CategoryInvariantViolationException;
+import github.lms.lemuel.category.domain.exception.InvalidCategoryStateException;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -52,10 +54,10 @@ public class EcommerceCategory {
     // 정적 팩토리 메서드: 최상위 카테고리 생성
     public static EcommerceCategory createRoot(String name, String slug, Integer sortOrder) {
         EcommerceCategory category = new EcommerceCategory();
-        category.setName(name);
-        category.setSlug(slug);
-        category.setDepth(0);
-        category.setSortOrder(sortOrder);
+        category.name = name;
+        category.slug = slug;
+        category.depth = 0;
+        category.sortOrder = sortOrder;
         category.validateName();
         category.validateSlug();
         return category;
@@ -64,20 +66,20 @@ public class EcommerceCategory {
     // 정적 팩토리 메서드: 하위 카테고리 생성
     public static EcommerceCategory createChild(String name, String slug, Long parentId, Integer parentDepth, Integer sortOrder) {
         if (parentDepth == null) {
-            throw new IllegalArgumentException("Parent depth must not be null");
+            throw new CategoryInvariantViolationException("Parent depth must not be null");
         }
 
         int newDepth = parentDepth + 1;
         if (newDepth > MAX_DEPTH) {
-            throw new IllegalStateException("Category depth cannot exceed " + MAX_DEPTH + " (attempted: " + newDepth + ")");
+            throw new InvalidCategoryStateException("Category depth cannot exceed " + MAX_DEPTH + " (attempted: " + newDepth + ")");
         }
 
         EcommerceCategory category = new EcommerceCategory();
-        category.setName(name);
-        category.setSlug(slug);
-        category.setParentId(parentId);
-        category.setDepth(newDepth);
-        category.setSortOrder(sortOrder);
+        category.name = name;
+        category.slug = slug;
+        category.parentId = parentId;
+        category.depth = newDepth;
+        category.sortOrder = sortOrder;
         category.validateName();
         category.validateSlug();
         category.validateParentId();
@@ -87,44 +89,44 @@ public class EcommerceCategory {
     // 도메인 규칙: name 검증
     public void validateName() {
         if (name == null || name.trim().isEmpty()) {
-            throw new IllegalArgumentException("Category name cannot be empty");
+            throw new CategoryInvariantViolationException("Category name cannot be empty");
         }
         if (name.length() > 200) {
-            throw new IllegalArgumentException("Category name must not exceed 200 characters");
+            throw new CategoryInvariantViolationException("Category name must not exceed 200 characters");
         }
     }
 
     // 도메인 규칙: slug 검증
     public void validateSlug() {
         if (slug == null || slug.trim().isEmpty()) {
-            throw new IllegalArgumentException("Category slug cannot be empty");
+            throw new CategoryInvariantViolationException("Category slug cannot be empty");
         }
         if (slug.length() > 300) {
-            throw new IllegalArgumentException("Category slug must not exceed 300 characters");
+            throw new CategoryInvariantViolationException("Category slug must not exceed 300 characters");
         }
         if (!slug.matches("^[a-z0-9-]+$")) {
-            throw new IllegalArgumentException("Category slug must contain only lowercase letters, numbers, and hyphens");
+            throw new CategoryInvariantViolationException("Category slug must contain only lowercase letters, numbers, and hyphens");
         }
     }
 
     // 도메인 규칙: parentId 검증 (순환 참조 방지)
     public void validateParentId() {
         if (parentId != null && parentId.equals(id)) {
-            throw new IllegalArgumentException("Category cannot be its own parent (circular reference)");
+            throw new CategoryInvariantViolationException("Category cannot be its own parent (circular reference)");
         }
     }
 
     // 도메인 규칙: depth 검증
     public void validateDepth() {
         if (depth == null || depth < 0 || depth > MAX_DEPTH) {
-            throw new IllegalArgumentException("Category depth must be between 0 and " + MAX_DEPTH);
+            throw new CategoryInvariantViolationException("Category depth must be between 0 and " + MAX_DEPTH);
         }
     }
 
     // 비즈니스 메서드: 부모 변경
     public void changeParent(Long newParentId, Integer newParentDepth) {
         if (newParentId != null && newParentId.equals(this.id)) {
-            throw new IllegalArgumentException("Category cannot be its own parent");
+            throw new CategoryInvariantViolationException("Category cannot be its own parent");
         }
 
         if (newParentId == null) {
@@ -133,7 +135,7 @@ public class EcommerceCategory {
         } else {
             int newDepth = newParentDepth + 1;
             if (newDepth > MAX_DEPTH) {
-                throw new IllegalStateException("Moving category would exceed maximum depth of " + MAX_DEPTH);
+                throw new InvalidCategoryStateException("Moving category would exceed maximum depth of " + MAX_DEPTH);
             }
             this.parentId = newParentId;
             this.depth = newDepth;
@@ -144,7 +146,7 @@ public class EcommerceCategory {
     // 비즈니스 메서드: 정렬 순서 변경
     public void changeSortOrder(Integer newSortOrder) {
         if (newSortOrder == null || newSortOrder < 0) {
-            throw new IllegalArgumentException("Sort order must be zero or greater");
+            throw new CategoryInvariantViolationException("Sort order must be zero or greater");
         }
         this.sortOrder = newSortOrder;
         this.updatedAt = LocalDateTime.now();
@@ -153,7 +155,7 @@ public class EcommerceCategory {
     // 비즈니스 메서드: 활성화
     public void activate() {
         if (isDeleted()) {
-            throw new IllegalStateException("Cannot activate deleted category");
+            throw new InvalidCategoryStateException("Cannot activate deleted category");
         }
         this.isActive = true;
         this.updatedAt = LocalDateTime.now();
@@ -202,92 +204,60 @@ public class EcommerceCategory {
         this.children.add(child);
     }
 
-    // Getters and Setters
-    public Long getId() {
-        return id;
+    /**
+     * 트리 조립용 children 교체(DB 컬럼 아님, 조회 시 조립). setter 대체.
+     */
+    public void replaceChildren(List<EcommerceCategory> children) {
+        this.children = children != null ? new ArrayList<>(children) : new ArrayList<>();
     }
 
-    public void setId(Long id) {
+    /** DB 부여 PK 주입(setter 대체). */
+    public void assignId(Long id) {
         this.id = id;
+    }
+
+    // Getters
+    public Long getId() {
+        return id;
     }
 
     public String getName() {
         return name;
     }
 
-    public void setName(String name) {
-        this.name = name;
-    }
-
     public String getSlug() {
         return slug;
-    }
-
-    public void setSlug(String slug) {
-        this.slug = slug;
     }
 
     public Long getParentId() {
         return parentId;
     }
 
-    public void setParentId(Long parentId) {
-        this.parentId = parentId;
-    }
-
     public Integer getDepth() {
         return depth;
-    }
-
-    public void setDepth(Integer depth) {
-        this.depth = depth;
     }
 
     public Integer getSortOrder() {
         return sortOrder;
     }
 
-    public void setSortOrder(Integer sortOrder) {
-        this.sortOrder = sortOrder;
-    }
-
     public Boolean getIsActive() {
         return isActive;
-    }
-
-    public void setIsActive(Boolean isActive) {
-        this.isActive = isActive;
     }
 
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
-
     public LocalDateTime getUpdatedAt() {
         return updatedAt;
-    }
-
-    public void setUpdatedAt(LocalDateTime updatedAt) {
-        this.updatedAt = updatedAt;
     }
 
     public LocalDateTime getDeletedAt() {
         return deletedAt;
     }
 
-    public void setDeletedAt(LocalDateTime deletedAt) {
-        this.deletedAt = deletedAt;
-    }
-
     public List<EcommerceCategory> getChildren() {
         return new ArrayList<>(children);
-    }
-
-    public void setChildren(List<EcommerceCategory> children) {
-        this.children = children != null ? new ArrayList<>(children) : new ArrayList<>();
     }
 }

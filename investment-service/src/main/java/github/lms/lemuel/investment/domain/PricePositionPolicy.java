@@ -38,7 +38,7 @@ public class PricePositionPolicy {
 
         LocalDate windowStart = latest.date().minusDays(FIFTY_TWO_WEEK_DAYS);
         List<BigDecimal> window = sorted.stream()
-                .filter(c -> !c.date().isBefore(windowStart))
+                .filter(c -> c.onOrAfter(windowStart))
                 .map(DailyClose::close)
                 .toList();
         BigDecimal high = window.stream().max(BigDecimal::compareTo).orElseThrow();
@@ -63,7 +63,7 @@ public class PricePositionPolicy {
     private int riseStreak(List<DailyClose> sorted) {
         int streak = 0;
         for (int i = sorted.size() - 1; i > 0; i--) {
-            if (sorted.get(i).close().compareTo(sorted.get(i - 1).close()) > 0) {
+            if (sorted.get(i).roseFrom(sorted.get(i - 1))) {
                 streak++;
             } else {
                 break;

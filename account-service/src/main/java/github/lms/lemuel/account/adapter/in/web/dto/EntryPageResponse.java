@@ -1,6 +1,6 @@
 package github.lms.lemuel.account.adapter.in.web.dto;
 
-import github.lms.lemuel.account.application.port.in.AccountQueryUseCase.EntryPage;
+import github.lms.lemuel.account.application.port.in.OwnerAccountQuery.EntryPage;
 import github.lms.lemuel.account.domain.AccountEntry;
 import github.lms.lemuel.account.domain.GlAccount;
 

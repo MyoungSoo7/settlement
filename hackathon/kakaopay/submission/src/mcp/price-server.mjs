@@ -9,7 +9,7 @@
  *
  * stockCode(6자리)는 DART `dart_corp_search` 결과와 그대로 조인된다.
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { history, quote } from '../price/client.mjs';
@@ -62,13 +62,13 @@ const TOOLS = [
     },
     run: async ({ stockCode, budget }) => {
       const q = await quote(stockCode);
-      if (q.staleWarning) {
-        // 낡은 시세 위에 매매 계획을 세우면 초보자에게 틀린 가격이 나간다 — 계산을 거부한다
+      if (q.staleWarning || q.haltWarning) {
+        // 낡은 시세·거래정지 의심 위에 매매 계획을 세우면 초보자에게 틀린 가격이 나간다 — 계산을 거부한다
         return {
           stockCode: q.stockCode,
           name: q.name,
           feasible: false,
-          reason: q.staleWarning,
+          reason: q.staleWarning ?? q.haltWarning,
           lastKnown: { price: q.price, asOf: q.asOf },
         };
       }
@@ -90,13 +90,23 @@ const TOOLS = [
     name: 'backtest_stats',
     description: 'KRX 대형주 유니버스(66종목, 10년)의 보유기간별(월/분기/연) 실측 승률·수익 분포를 반환한다 — "오를 확률"을 지어내는 대신 인용할 정직한 기저 통계. 승률은 51~56% 수준이고 최악 5% 구간 손실(p5Return)이 함께 있다. 종목 추천 응답에는 반드시 이 기대치와 한계(생존 편향·배당 제외)를 병기하라. 재계산: node src/bin/backtest.mjs',
     inputSchema: { type: 'object', properties: {} },
-    run: () => JSON.parse(readFileSync(STATS_PATH, 'utf8')),
+    run: () => {
+      if (!existsSync(STATS_PATH)) {
+        return { error: '사전계산 파일이 없습니다 — node src/bin/backtest.mjs 를 먼저 실행하세요 (네트워크 필요, 1~2분)' };
+      }
+      return JSON.parse(readFileSync(STATS_PATH, 'utf8'));
+    },
   },
   {
     name: 'universe_list',
     description: '스크리닝 출발점이 되는 KRX 시가총액 상위 데모 유니버스(66종목, 코드·이름)를 반환한다. periodic-picks 스킬의 후보 풀. asOf 와 선정 기준·생존 편향 주의가 함께 온다 — 이 목록 밖 종목도 사용자가 원하면 같은 규칙으로 점검 가능.',
     inputSchema: { type: 'object', properties: {} },
-    run: () => JSON.parse(readFileSync(UNIVERSE_PATH, 'utf8')),
+    run: () => {
+      if (!existsSync(UNIVERSE_PATH)) {
+        return { error: '유니버스 파일이 없습니다 — src/data/universe/krx-top.json 이 패키지에 포함되어야 합니다 (저장소에서 복원하세요)' };
+      }
+      return JSON.parse(readFileSync(UNIVERSE_PATH, 'utf8'));
+    },
   },
   {
     name: 'price_status',

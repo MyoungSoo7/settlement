@@ -1,4 +1,6 @@
 package github.lms.lemuel.product.domain;
+import github.lms.lemuel.product.domain.exception.InvalidProductStateException;
+import github.lms.lemuel.product.domain.exception.ProductInvariantViolationException;
 
 import github.lms.lemuel.product.domain.exception.InsufficientStockException;
 import org.junit.jupiter.api.DisplayName;
@@ -58,8 +60,8 @@ class ProductVariantTest {
     void decrease_invalidQuantity() {
         var v = ProductVariant.create(1L, "SKU", "옵션", BigDecimal.ZERO, 5);
 
-        assertThatThrownBy(() -> v.decreaseStock(0)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> v.decreaseStock(-1)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> v.decreaseStock(0)).isInstanceOf(ProductInvariantViolationException.class);
+        assertThatThrownBy(() -> v.decreaseStock(-1)).isInstanceOf(ProductInvariantViolationException.class);
     }
 
     @Test
@@ -69,7 +71,7 @@ class ProductVariantTest {
         v.discontinue();
 
         assertThatThrownBy(() -> v.decreaseStock(1))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(InvalidProductStateException.class)
                 .hasMessageContaining("단종");
     }
 
@@ -152,10 +154,10 @@ class ProductVariantTest {
     @DisplayName("생성 검증: optionName / sku 비어있으면 IllegalArgumentException")
     void create_validation() {
         assertThatThrownBy(() -> ProductVariant.create(1L, "", "옵션", BigDecimal.ZERO, 1))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(ProductInvariantViolationException.class);
         assertThatThrownBy(() -> ProductVariant.create(1L, "SKU", "", BigDecimal.ZERO, 1))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(ProductInvariantViolationException.class);
         assertThatThrownBy(() -> ProductVariant.create(1L, "SKU", "옵션", BigDecimal.ZERO, -1))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(ProductInvariantViolationException.class);
     }
 }

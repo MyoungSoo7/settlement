@@ -164,6 +164,21 @@ class SecurityFiltersTest {
     }
 
     @Test
+    @DisplayName("키 미설정 + keyRequired=true(운영) → 401 fail-closed")
+    void internalKeyMissingButRequiredRejects() throws Exception {
+        InternalApiKeyFilter filter = new InternalApiKeyFilter("", true);
+        MockHttpServletRequest req = new MockHttpServletRequest("GET", "/internal/recon");
+        req.setServletPath("/internal/recon");
+        MockHttpServletResponse res = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        filter.doFilter(req, res, chain);
+
+        assertThat(res.getStatus()).isEqualTo(HttpServletResponse.SC_UNAUTHORIZED);
+        verify(chain, never()).doFilter(req, res);
+    }
+
+    @Test
     @DisplayName("비-내부 경로는 키 검사 없이 통과")
     void internalKeyIgnoresNonInternalPath() throws Exception {
         InternalApiKeyFilter filter = new InternalApiKeyFilter("secret-key");

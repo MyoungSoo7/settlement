@@ -3,6 +3,7 @@ package github.lms.lemuel.company.adapter.in.web;
 import github.lms.lemuel.company.adapter.in.web.dto.CompanyDocumentResponse;
 import github.lms.lemuel.company.application.port.in.UploadCompanyDocumentUseCase;
 import github.lms.lemuel.company.application.port.in.UploadCompanyDocumentUseCase.UploadCommand;
+import github.lms.lemuel.company.audit.application.port.out.RecordAuditPort;
 import github.lms.lemuel.company.domain.CompanyDocument;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -16,6 +17,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.Map;
 
 /**
  * 기업 문서 업로드 (운영자 전용 — AdminApiKeyFilter 게이팅, gateway 미라우팅).
@@ -29,9 +31,12 @@ import java.io.UncheckedIOException;
 public class CompanyDocumentAdminController {
 
     private final UploadCompanyDocumentUseCase uploadCompanyDocumentUseCase;
+    private final RecordAuditPort recordAuditPort;
 
-    public CompanyDocumentAdminController(UploadCompanyDocumentUseCase uploadCompanyDocumentUseCase) {
+    public CompanyDocumentAdminController(UploadCompanyDocumentUseCase uploadCompanyDocumentUseCase,
+                                          RecordAuditPort recordAuditPort) {
         this.uploadCompanyDocumentUseCase = uploadCompanyDocumentUseCase;
+        this.recordAuditPort = recordAuditPort;
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -47,6 +52,8 @@ public class CompanyDocumentAdminController {
         }
         CompanyDocument saved = uploadCompanyDocumentUseCase.upload(
                 new UploadCommand(stockCode, title, file.getOriginalFilename(), content));
+        recordAuditPort.record("DOCUMENT_UPLOADED", "CompanyDocument", stockCode,
+                Map.of("fileName", String.valueOf(file.getOriginalFilename()), "sizeBytes", content.length));
         return ResponseEntity.status(HttpStatus.CREATED).body(CompanyDocumentResponse.from(saved));
     }
 }

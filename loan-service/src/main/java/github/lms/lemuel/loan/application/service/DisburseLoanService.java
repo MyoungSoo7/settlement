@@ -9,6 +9,7 @@ import github.lms.lemuel.loan.application.port.out.PublishLoanEventPort;
 import github.lms.lemuel.loan.application.port.out.SaveLoanPort;
 import github.lms.lemuel.loan.domain.LoanAdvance;
 import github.lms.lemuel.loan.domain.LoanLedgerEntry;
+import github.lms.lemuel.loan.domain.exception.LoanInvariantViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -60,10 +61,12 @@ public class DisburseLoanService implements DisburseLoanUseCase {
         String grade = loadSellerReputationPort.findGrade(loan.getSellerId()).orElse(null);
         try {
             creditPolicy.validateWithinLimit(loan.getPrincipal(), freshUnpaid, grade);
-        } catch (IllegalArgumentException e) {
+        } catch (LoanInvariantViolationException e) {
+            // 실행 시점 담보 부족(한도 초과) → 대출 거절 상태로 전이·기록 후, 거절 사유(요청액/한도)를
+            // 그대로 담은 도메인 예외를 전파한다(generic 래핑으로 사유를 유실하지 않는다). 웹 계약 400 불변.
             loan.reject();
             saveLoanPort.save(loan);
-            throw new IllegalStateException("실행 시점 담보 부족으로 대출이 거절되었습니다. loanId=" + loanId, e);
+            throw e;
         }
 
         loan.disburse();

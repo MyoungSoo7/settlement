@@ -8,6 +8,7 @@ import github.lms.lemuel.loan.application.port.out.PublishLoanEventPort;
 import github.lms.lemuel.loan.application.port.out.SaveLoanPort;
 import github.lms.lemuel.loan.domain.LoanAdvance;
 import github.lms.lemuel.loan.domain.LoanStatus;
+import github.lms.lemuel.loan.domain.exception.LoanInvariantViolationException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -74,7 +75,10 @@ class DisburseLoanServiceTest {
         when(loadSettlementViewPort.sumUnpaidBySellerForUpdate(7L)).thenReturn(new BigDecimal("500000"));
 
         assertThatThrownBy(() -> service().disburse(1L))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(LoanInvariantViolationException.class)
+                // generic 래핑 없이 거절 사유(요청액/한도) 컨텍스트가 그대로 보존된다
+                .hasMessageContaining("requested=800000")
+                .hasMessageContaining("limit=400000");
 
         verify(publishLoanEventPort, never()).publishDisbursementRequested(any());
         // 거절 상태로 저장됐는지

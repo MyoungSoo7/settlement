@@ -2,20 +2,11 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Write|Edit",
+        "matcher": "Write|Edit|MultiEdit",
         "hooks": [
           {
             "type": "command",
-            "command": "node \"%CLAUDE_PROJECT_DIR%/settlement-copilot/hooks/guards/check-write.mjs\" 2>nul || node \"$CLAUDE_PROJECT_DIR/settlement-copilot/hooks/guards/check-write.mjs\""
-          }
-        ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"%CLAUDE_PROJECT_DIR%/settlement-copilot/hooks/guards/check-command.mjs\" 2>nul || node \"$CLAUDE_PROJECT_DIR/settlement-copilot/hooks/guards/check-command.mjs\""
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/harness/guard.mjs\" --hook"
           }
         ]
       }

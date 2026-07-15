@@ -5,6 +5,7 @@ import github.lms.lemuel.market.application.port.in.GetStocksUseCase;
 import github.lms.lemuel.market.application.port.in.GetStocksUseCase.StockSnapshot;
 import github.lms.lemuel.market.application.port.in.SyncQuotesUseCase;
 import github.lms.lemuel.market.application.port.in.SyncResult;
+import github.lms.lemuel.market.audit.application.port.out.RecordAuditPort;
 import github.lms.lemuel.market.domain.Market;
 import github.lms.lemuel.market.domain.Stock;
 import github.lms.lemuel.market.domain.StockNotFoundException;
@@ -48,7 +49,7 @@ class MarketWebLayerTest {
     void setUp() {
         StockController stockController = new StockController(getStocks, getSeries);
         MarketSyncAdminController adminController =
-                new MarketSyncAdminController(syncQuotes, tracker, inlineExecutor);
+                new MarketSyncAdminController(syncQuotes, tracker, inlineExecutor, mock(RecordAuditPort.class));
         mvc = MockMvcBuilders.standaloneSetup(stockController, adminController)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();

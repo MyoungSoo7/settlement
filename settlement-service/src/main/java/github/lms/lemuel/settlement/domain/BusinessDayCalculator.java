@@ -1,5 +1,7 @@
 package github.lms.lemuel.settlement.domain;
 
+import github.lms.lemuel.settlement.domain.exception.SettlementInvariantViolationException;
+
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.Set;
@@ -38,8 +40,8 @@ public final class BusinessDayCalculator {
      * @param n    더할 영업일 수 (0 이상)
      */
     public static LocalDate addBusinessDays(LocalDate from, int n) {
-        if (from == null) throw new IllegalArgumentException("from 필수");
-        if (n < 0) throw new IllegalArgumentException("n 은 0 이상");
+        if (from == null) throw new SettlementInvariantViolationException("from 필수");
+        if (n < 0) throw new SettlementInvariantViolationException("n 은 0 이상");
 
         LocalDate cursor = from;
         // n=0 인 경우: 시작일이 영업일이 아니면 다음 영업일까지 전진

@@ -90,7 +90,7 @@ class RefundSplitPaymentServiceTest {
                 new BigDecimal("10000"), BigDecimal.ZERO, "PG-1", TenderStatus.CAPTURED, 1, now, now);
         PaymentTender t2 = PaymentTender.rehydrate(102L, 1L, TenderType.CARD,
                 new BigDecimal("20000"), BigDecimal.ZERO, "PG-2", TenderStatus.CAPTURED, 2, now, now);
-        PaymentDomain p = new PaymentDomain(1L, 9L, new BigDecimal("30000"), BigDecimal.ZERO,
+        PaymentDomain p = PaymentDomain.rehydrate(1L, 9L, new BigDecimal("30000"), BigDecimal.ZERO,
                 PaymentStatus.CAPTURED, "SPLIT", null, now, now, now);
         p.replaceTenders(List.of(t1, t2));
         return p;

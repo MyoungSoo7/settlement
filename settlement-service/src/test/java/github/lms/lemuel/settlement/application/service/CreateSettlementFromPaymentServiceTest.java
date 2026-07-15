@@ -68,7 +68,7 @@ class CreateSettlementFromPaymentServiceTest {
         // 발행부가 settlementId(primitive long)를 사용하므로 영속 id 를 부여해 언박싱 NPE 회피
         when(saveSettlementPort.save(any())).thenAnswer(inv -> {
             Settlement s = inv.getArgument(0);
-            s.setId(700L);
+            s.assignId(700L);
             return s;
         });
 
@@ -116,7 +116,7 @@ class CreateSettlementFromPaymentServiceTest {
         when(loadSellerSettlementCyclePort.findCycleByPaymentId(5L)).thenReturn(Optional.of(SettlementCycle.DAILY));
         when(saveSettlementPort.save(any())).thenAnswer(inv -> {
             Settlement s = inv.getArgument(0);
-            s.setId(500L); // DB 가 PK 를 부여하는 것을 흉내 (발행은 savedSettlement.getId() 사용)
+            s.assignId(500L); // DB 가 PK 를 부여하는 것을 흉내 (발행은 savedSettlement.getId() 사용)
             return s;
         });
         when(loadSellerIdPort.findSellerIdByPaymentId(5L)).thenReturn(Optional.of(77L));

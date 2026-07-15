@@ -9,6 +9,8 @@ import github.lms.lemuel.common.opssignal.OpsSignalPort;
 import github.lms.lemuel.product.domain.ProductVariant;
 import github.lms.lemuel.product.domain.ProductVariantStatus;
 import github.lms.lemuel.product.domain.exception.InsufficientStockException;
+import github.lms.lemuel.product.domain.exception.InvalidProductStateException;
+import github.lms.lemuel.product.domain.exception.ProductInvariantViolationException;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -91,13 +93,13 @@ public class DecreaseVariantStockService extends AbstractDecreaseStockService<Pr
 
     @Override
     protected RuntimeException notFound(Long id) {
-        return new IllegalArgumentException("ProductVariant not found: " + id);
+        return new ProductInvariantViolationException("ProductVariant not found: " + id);
     }
 
     @Override
     protected RuntimeException classifyPresent(ProductVariant current, Long id, int quantity) {
         if (current.getStatus() == ProductVariantStatus.DISCONTINUED) {
-            return new IllegalStateException("단종된 SKU 는 차감할 수 없습니다: " + current.getSku());
+            return new InvalidProductStateException("단종된 SKU 는 차감할 수 없습니다: " + current.getSku());
         }
         // 운영 관제 신호 — 구매 시 SKU 재고 부족(초과 수요). best-effort(절대 throw 안 함).
         opsSignalPort.emit(OpsSignalCategory.STOCK_DEPLETED, "variant", String.valueOf(id),

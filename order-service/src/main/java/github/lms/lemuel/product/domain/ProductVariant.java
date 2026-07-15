@@ -1,4 +1,6 @@
 package github.lms.lemuel.product.domain;
+import github.lms.lemuel.product.domain.exception.InvalidProductStateException;
+import github.lms.lemuel.product.domain.exception.ProductInvariantViolationException;
 
 import github.lms.lemuel.product.domain.exception.InsufficientStockException;
 
@@ -40,12 +42,12 @@ public class ProductVariant {
                                          BigDecimal additionalPrice, int initialStock) {
         Objects.requireNonNull(productId, "productId");
         Objects.requireNonNull(sku, "sku");
-        if (sku.isBlank()) throw new IllegalArgumentException("sku 는 필수");
+        if (sku.isBlank()) throw new ProductInvariantViolationException("sku 는 필수");
         if (optionName == null || optionName.isBlank()) {
-            throw new IllegalArgumentException("optionName 은 필수 (예: '색상:빨강/사이즈:L')");
+            throw new ProductInvariantViolationException("optionName 은 필수 (예: '색상:빨강/사이즈:L')");
         }
         if (initialStock < 0) {
-            throw new IllegalArgumentException("초기 재고는 0 이상");
+            throw new ProductInvariantViolationException("초기 재고는 0 이상");
         }
         BigDecimal price = additionalPrice == null ? BigDecimal.ZERO : additionalPrice;
         return new ProductVariant(null, productId, sku, optionName, price, null, null, initialStock,
@@ -94,10 +96,10 @@ public class ProductVariant {
      */
     public void decreaseStock(int quantity) {
         if (quantity <= 0) {
-            throw new IllegalArgumentException("차감 수량은 양수여야 합니다");
+            throw new ProductInvariantViolationException("차감 수량은 양수여야 합니다");
         }
         if (this.status == ProductVariantStatus.DISCONTINUED) {
-            throw new IllegalStateException("단종된 SKU 는 차감할 수 없습니다: " + sku);
+            throw new InvalidProductStateException("단종된 SKU 는 차감할 수 없습니다: " + sku);
         }
         if (this.stockQuantity < quantity) {
             throw new InsufficientStockException(
@@ -138,7 +140,7 @@ public class ProductVariant {
 
     public void increaseStock(int quantity) {
         if (quantity <= 0) {
-            throw new IllegalArgumentException("증가 수량은 양수여야 합니다");
+            throw new ProductInvariantViolationException("증가 수량은 양수여야 합니다");
         }
         this.stockQuantity += quantity;
         if (this.status == ProductVariantStatus.OUT_OF_STOCK && stockQuantity > 0) {

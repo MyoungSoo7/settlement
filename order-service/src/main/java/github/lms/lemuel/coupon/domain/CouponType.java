@@ -1,4 +1,5 @@
 package github.lms.lemuel.coupon.domain;
+import github.lms.lemuel.coupon.domain.exception.CouponInvariantViolationException;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -36,7 +37,7 @@ public enum CouponType {
         @Override
         public void validateDiscountValue(BigDecimal discountValue) {
             if (discountValue.compareTo(HUNDRED) > 0) {
-                throw new IllegalArgumentException("정률 할인은 100%를 초과할 수 없습니다.");
+                throw new CouponInvariantViolationException("정률 할인은 100%를 초과할 수 없습니다.");
             }
         }
     };

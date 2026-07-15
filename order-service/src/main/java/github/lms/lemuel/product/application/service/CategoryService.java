@@ -4,6 +4,7 @@ import github.lms.lemuel.product.application.port.in.CategoryUseCase;
 import github.lms.lemuel.product.application.port.out.LoadCategoryPort;
 import github.lms.lemuel.product.application.port.out.SaveCategoryPort;
 import github.lms.lemuel.product.domain.Category;
+import github.lms.lemuel.product.domain.exception.ProductInvariantViolationException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -36,7 +37,7 @@ public class CategoryService implements CategoryUseCase {
     @Override
     public Category getCategoryById(Long id) {
         return loadCategoryPort.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Category not found: " + id));
+                .orElseThrow(() -> new ProductInvariantViolationException("Category not found: " + id));
     }
 
     @Override

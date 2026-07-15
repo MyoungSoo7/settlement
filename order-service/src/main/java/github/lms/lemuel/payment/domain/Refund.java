@@ -1,5 +1,8 @@
 package github.lms.lemuel.payment.domain;
 
+import github.lms.lemuel.payment.domain.exception.InvalidPaymentStateException;
+import github.lms.lemuel.payment.domain.exception.PaymentInvariantViolationException;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -36,15 +39,16 @@ public class Refund {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    public Refund() {}
+    // 생성은 팩토리(request/rehydrate)로만 통과시킨다 — no-arg 생성자 외부 노출 봉인(Order/Settlement 와 동형).
+    private Refund() {}
 
     public static Refund request(Long paymentId, BigDecimal amount, String idempotencyKey, String reason) {
-        if (paymentId == null) throw new IllegalArgumentException("paymentId required");
+        if (paymentId == null) throw new PaymentInvariantViolationException("paymentId required");
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("amount must be > 0");
+            throw new PaymentInvariantViolationException("amount must be > 0");
         }
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
-            throw new IllegalArgumentException("idempotencyKey required");
+            throw new PaymentInvariantViolationException("idempotencyKey required");
         }
         Refund refund = new Refund();
         refund.paymentId = paymentId;
@@ -65,7 +69,7 @@ public class Refund {
      */
     public void markCompleted() {
         if (this.status == Status.COMPLETED) {
-            throw new IllegalStateException("Refund already COMPLETED. id=" + id);
+            throw new InvalidPaymentStateException("Refund already COMPLETED. id=" + id);
         }
         this.status = Status.COMPLETED;
         this.completedAt = LocalDateTime.now();
@@ -81,7 +85,7 @@ public class Refund {
      */
     public void markFailed(String failureReason) {
         if (this.status == Status.COMPLETED) {
-            throw new IllegalStateException("Cannot fail a COMPLETED refund. id=" + id);
+            throw new InvalidPaymentStateException("Cannot fail a COMPLETED refund. id=" + id);
         }
         this.status = Status.FAILED;
         this.reason = failureReason;
@@ -102,7 +106,7 @@ public class Refund {
      */
     public void abandon(String reason) {
         if (this.status == Status.COMPLETED) {
-            throw new IllegalStateException("Cannot abandon a COMPLETED refund. id=" + id);
+            throw new InvalidPaymentStateException("Cannot abandon a COMPLETED refund. id=" + id);
         }
         this.status = Status.FAILED;
         this.reason = reason;
@@ -123,28 +127,55 @@ public class Refund {
         return status == Status.FAILED && retryCount >= MAX_RETRIES;
     }
 
+    /**
+     * 영속 레코드 복원 팩토리. no-arg + setter 대신 이 경로로만 재구성해 도메인 봉인을 유지한다.
+     */
+    public static Refund rehydrate(Long id, Long paymentId, BigDecimal amount, Status status,
+                                   String reason, String idempotencyKey, int retryCount,
+                                   LocalDateTime nextRetryAt, LocalDateTime requestedAt,
+                                   LocalDateTime completedAt, LocalDateTime createdAt,
+                                   LocalDateTime updatedAt) {
+        Refund r = new Refund();
+        r.id = id;
+        r.paymentId = paymentId;
+        r.amount = amount;
+        r.status = status;
+        r.reason = reason;
+        r.idempotencyKey = idempotencyKey;
+        r.retryCount = retryCount;
+        r.nextRetryAt = nextRetryAt;
+        r.requestedAt = requestedAt;
+        r.completedAt = completedAt;
+        r.createdAt = createdAt;
+        r.updatedAt = updatedAt;
+        return r;
+    }
+
+    /** Persistence 어댑터가 DB 부여 PK 를 주입할 때 사용(setter 대체). */
+    public void assignId(Long id) { this.id = id; }
+
+    /**
+     * 동시 부분환불로 스냅샷과 권위 금액이 어긋날 때 최종 확정 금액으로 정정한다.
+     * 환불 금액 불변식({@link #request} 와 동일: 양수)을 여기서도 지켜, 정정을 빌미로 0·음수가 새는 것을 막는다.
+     * (결제 잔액 초과 여부는 결제 애그리거트가 검증하므로 여기서는 부호 불변식만 가드한다.)
+     */
+    public void correctAmount(BigDecimal finalAmount) {
+        if (finalAmount == null || finalAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new PaymentInvariantViolationException("corrected refund amount must be > 0");
+        }
+        this.amount = finalAmount;
+    }
+
     public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
     public Long getPaymentId() { return paymentId; }
-    public void setPaymentId(Long paymentId) { this.paymentId = paymentId; }
     public BigDecimal getAmount() { return amount; }
-    public void setAmount(BigDecimal amount) { this.amount = amount; }
     public Status getStatus() { return status; }
-    public void setStatus(Status status) { this.status = status; }
     public String getReason() { return reason; }
-    public void setReason(String reason) { this.reason = reason; }
     public String getIdempotencyKey() { return idempotencyKey; }
-    public void setIdempotencyKey(String idempotencyKey) { this.idempotencyKey = idempotencyKey; }
     public int getRetryCount() { return retryCount; }
-    public void setRetryCount(int retryCount) { this.retryCount = retryCount; }
     public LocalDateTime getNextRetryAt() { return nextRetryAt; }
-    public void setNextRetryAt(LocalDateTime nextRetryAt) { this.nextRetryAt = nextRetryAt; }
     public LocalDateTime getRequestedAt() { return requestedAt; }
-    public void setRequestedAt(LocalDateTime requestedAt) { this.requestedAt = requestedAt; }
     public LocalDateTime getCompletedAt() { return completedAt; }
-    public void setCompletedAt(LocalDateTime completedAt) { this.completedAt = completedAt; }
     public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 }

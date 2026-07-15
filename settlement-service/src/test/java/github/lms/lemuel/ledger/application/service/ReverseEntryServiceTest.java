@@ -158,7 +158,7 @@ class ReverseEntryServiceTest {
         List<LedgerEntry> savedAll() { return List.copyOf(saved); }
 
         @Override public LedgerEntry save(LedgerEntry e) {
-            if (e.getId() == null) e.setId(idSeq.getAndIncrement());
+            if (e.getId() == null) e.assignId(idSeq.getAndIncrement());
             saved.add(e);
             return e;
         }

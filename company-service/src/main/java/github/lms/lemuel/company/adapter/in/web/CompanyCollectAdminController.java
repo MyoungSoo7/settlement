@@ -2,6 +2,7 @@ package github.lms.lemuel.company.adapter.in.web;
 
 import github.lms.lemuel.company.application.port.in.CollectArticlesUseCase;
 import github.lms.lemuel.company.application.port.in.CollectResult;
+import github.lms.lemuel.company.audit.application.port.out.RecordAuditPort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -32,22 +33,27 @@ public class CompanyCollectAdminController {
     private final CollectArticlesUseCase collectArticlesUseCase;
     private final CollectStatusTracker tracker;
     private final TaskExecutor executor;
+    private final RecordAuditPort recordAuditPort;
 
     public CompanyCollectAdminController(CollectArticlesUseCase collectArticlesUseCase,
                                          CollectStatusTracker tracker,
-                                         @Qualifier("collectTaskExecutor") TaskExecutor executor) {
+                                         @Qualifier("collectTaskExecutor") TaskExecutor executor,
+                                         RecordAuditPort recordAuditPort) {
         this.collectArticlesUseCase = collectArticlesUseCase;
         this.tracker = tracker;
         this.executor = executor;
+        this.recordAuditPort = recordAuditPort;
     }
 
     @PostMapping
     public ResponseEntity<Map<String, String>> collectAll() {
+        recordAuditPort.record("COLLECT_TRIGGERED", "NewsArticle", "ALL", Map.of("scope", "all"));
         return submit("all", collectArticlesUseCase::collectAll);
     }
 
     @PostMapping("/{stockCode}")
     public ResponseEntity<Map<String, String>> collectOne(@PathVariable String stockCode) {
+        recordAuditPort.record("COLLECT_TRIGGERED", "NewsArticle", stockCode, Map.of("scope", "one"));
         return submit(stockCode, () -> collectArticlesUseCase.collectFor(stockCode));
     }
 

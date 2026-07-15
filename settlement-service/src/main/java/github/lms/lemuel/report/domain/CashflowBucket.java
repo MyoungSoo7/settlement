@@ -1,5 +1,7 @@
 package github.lms.lemuel.report.domain;
 
+import github.lms.lemuel.report.domain.exception.ReportInvariantViolationException;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
@@ -12,7 +14,7 @@ public record CashflowBucket(
         BigDecimal netSettlement
 ) {
     public CashflowBucket {
-        if (bucket == null) throw new IllegalArgumentException("bucket is required");
+        if (bucket == null) throw new ReportInvariantViolationException("bucket is required");
         gmv = nz(gmv);
         refundedAmount = nz(refundedAmount);
         commissionAmount = nz(commissionAmount);

@@ -58,7 +58,7 @@ class TossPaymentServiceTest {
     }
 
     private PaymentDomain readyPayment() {
-        return new PaymentDomain(1L, new BigDecimal("10000"), "TOSS_PAYMENTS");
+        return PaymentDomain.create(1L, new BigDecimal("10000"), "TOSS_PAYMENTS");
     }
 
     @Test
@@ -71,7 +71,7 @@ class TossPaymentServiceTest {
         PaymentDomain created = readyPayment();
         when(createPaymentPort.createPayment(any())).thenReturn(created);
         when(savePaymentPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        PaymentDomain captured = new PaymentDomain(1L, 10L, new BigDecimal("10000"), BigDecimal.ZERO,
+        PaymentDomain captured = PaymentDomain.rehydrate(1L, 10L, new BigDecimal("10000"), BigDecimal.ZERO,
                 github.lms.lemuel.payment.domain.PaymentStatus.CAPTURED, "TOSS_PAYMENTS",
                 "TOSS:tx-1", null, null, null);
         when(capturePaymentPort.capturePayment(any())).thenReturn(captured);
@@ -92,12 +92,12 @@ class TossPaymentServiceTest {
                 .andRespond(withSuccess("{\"status\":\"DONE\"}", MediaType.APPLICATION_JSON));
 
         when(createPaymentPort.createPayment(any())).thenAnswer(inv ->
-                new PaymentDomain(1L, new BigDecimal("5000"), "TOSS_PAYMENTS"));
+                PaymentDomain.create(1L, new BigDecimal("5000"), "TOSS_PAYMENTS"));
         when(savePaymentPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        PaymentDomain captured1 = new PaymentDomain(1L, 100L, new BigDecimal("5000"), BigDecimal.ZERO,
+        PaymentDomain captured1 = PaymentDomain.rehydrate(1L, 100L, new BigDecimal("5000"), BigDecimal.ZERO,
                 github.lms.lemuel.payment.domain.PaymentStatus.CAPTURED, "TOSS_PAYMENTS",
                 "TOSS:tx-1", null, null, null);
-        PaymentDomain captured2 = new PaymentDomain(2L, 200L, new BigDecimal("5000"), BigDecimal.ZERO,
+        PaymentDomain captured2 = PaymentDomain.rehydrate(2L, 200L, new BigDecimal("5000"), BigDecimal.ZERO,
                 github.lms.lemuel.payment.domain.PaymentStatus.CAPTURED, "TOSS_PAYMENTS",
                 "TOSS:tx-2", null, null, null);
         when(capturePaymentPort.capturePayment(any())).thenReturn(captured1, captured2);

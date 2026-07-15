@@ -8,8 +8,8 @@ Lemuel은 정산 시스템을 위한 Spring Boot 애플리케이션으로, Kuber
 
 - **Application**: Spring Boot 4.0.x + Java 25
 - **Framework**: Spring Batch, Spring Data JPA, Spring Security
-- **Database**: PostgreSQL 16
-- **Search Engine**: Elasticsearch 8.11
+- **Database**: PostgreSQL 17
+- **Search Engine**: Elasticsearch 8.17
 - **Container**: Docker + Kubernetes
 - **CI/CD**: GitHub Actions → GitHub Container Registry (GHCR)
 
@@ -121,8 +121,8 @@ ENTRYPOINT ["java", "-jar", "app.jar"]
 4. Gradle 빌드 (`bootJar`)
 5. Docker 이미지 빌드 및 GHCR 푸시
 6. 태그 전략:
-   - `master` 브랜치 → `latest` 태그
-   - 커밋 SHA → `master-abc1234` 태그
+   - `main` 브랜치 → `latest` 태그
+   - 커밋 SHA → `main-abc1234` 태그
    - PR → PR 번호 태그
 
 **이미지 저장소**:
@@ -371,10 +371,10 @@ kubectl logs -f -l app=lemuel -n lemuel
 
 #### GitHub Actions 자동 배포
 ```bash
-# master 브랜치에 푸시하면 자동으로:
+# main 브랜치에 푸시하면 자동으로:
 # 1. Docker 이미지 빌드
 # 2. GHCR에 푸시 (ghcr.io/your-org/lemuel:latest)
-git push origin master
+git push origin main
 ```
 
 #### K8s에서 이미지 업데이트

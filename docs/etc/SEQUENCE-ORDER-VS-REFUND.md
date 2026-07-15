@@ -92,11 +92,11 @@ sequenceDiagram
     end
     Note over ODB: 전액 환불 도달 시에만 Order REFUNDED 전이
 
-    ODB-->>K: (Outbox 폴러) publish PaymentRefunded
+    ODB-->>K: (Outbox 폴러) publish PaymentRefunded<br/>(payload: paymentId·orderId·refundedAmount·refundAmount·refundId)
 
-    Note over K,Adj: ⚠️ 현재 settlement 측 payment-refunded 컨슈머 미연결<br/>+ 이벤트 payload 에 refundAmount/refundId 미포함 (Phase 5 보강 예정)
+    Note over K,Adj: PaymentRefundedSettlementAdjustConsumer<br/>(group=lemuel-settlement-refund-adjust) 가 실제 구독·조정
 
-    K-->>Adj: consume PaymentRefunded (계획)
+    K-->>Adj: consume PaymentRefunded
     rect rgb(255,235,240)
         Note over Adj,Led: 역정산 — 비관적 락으로 lost update 방지
         Adj->>SDB: findByPaymentIdForUpdate (SELECT ... FOR UPDATE)
@@ -132,7 +132,7 @@ sequenceDiagram
 | 원장 | (정상 분개 / POSTED) | **역분개** REFUND_REVERSED, POSTED→REVERSED |
 | 동시성 방어 | 멱등 3단 (outbox·processed·UNIQUE) | + Idempotency-Key + **Pessimistic Lock** + Holdback 우선차감 |
 | 주문 상태 | CREATED→PAID | (전액 시) →REFUNDED |
-| 구현 상태 | ✅ E2E 동작 | ✅ 조정·역분개 로직 구현, ⚠️ 환불 이벤트 컨슈머 연결은 Phase 5 |
+| 구현 상태 | ✅ E2E 동작 | ✅ E2E 동작 — 환불 이벤트 컨슈머(`PaymentRefundedSettlementAdjustConsumer`)까지 연결 |
 
 ---
 
@@ -140,10 +140,13 @@ sequenceDiagram
 
 - **A 흐름**은 order→Kafka→settlement 까지 컨슈머(`PaymentEventKafkaConsumer`)가
   `payment-captured` 토픽을 실제 수신해 동작한다.
-- **B 흐름**의 order-service 측(환불 처리 + `PaymentRefunded` Outbox 발행)은 구현돼 있고,
-  settlement-service 측 역정산 로직(`AdjustSettlementForRefundService`)·역분개
-  (`ReverseEntryService`)도 구현·테스트돼 있다.
-- 다만 **settlement-service 에 `payment-refunded` 토픽 `@KafkaListener` 가 아직 없다**
-  (현재 컨슈머는 captured 전용). 또한 `PaymentRefunded` Outbox payload 는 현재
-  `paymentId`/`orderId` 만 담고 있어 `refundAmount`/`refundId` 가 빠져 있다.
-  → 두 흐름을 잇는 컨슈머 + payload 보강이 Phase 5 과제. (다이어그램의 ⚠️ 구간)
+- **B 흐름**의 order-service 측(환불 처리 + `PaymentRefunded` Outbox 발행)과
+  settlement-service 측 역정산 로직(`AdjustSettlementForRefundService`)·역분개(ledger enqueueReverse)가
+  모두 구현·테스트돼 있고, **두 흐름을 잇는 컨슈머까지 연결돼 E2E 로 동작한다**.
+- settlement-service 에 `lemuel.payment.refunded` 를 구독하는 `@KafkaListener` 가 두 개 있다:
+  `PaymentRefundedSettlementAdjustConsumer`(group=`lemuel-settlement-refund-adjust`, 실제 정산 조정·역분개)와
+  `PaymentRefundedViewConsumer`(group=`lemuel-settlement-payment-view`, 프로젝션 뷰 환불액 갱신) — 그룹을 분리해
+  한쪽 실패가 다른 쪽을 막지 않는다.
+- `PaymentRefunded` Outbox payload 는 `paymentId`·`orderId`·`refundedAmount`·`refundAmount`(건별 delta)·`refundId` 를
+  담는다(`OutboxBackedEventPublisher.publishPaymentRefunded`). 조정 컨슈머는 `refundAmount` 를 우선 사용하고,
+  레거시 페이로드(누적 `refundedAmount` 만)는 정산 기반영치와의 차이로 delta 를 복원한다.

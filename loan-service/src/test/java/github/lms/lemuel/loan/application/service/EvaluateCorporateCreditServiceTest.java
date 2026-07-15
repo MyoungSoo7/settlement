@@ -4,8 +4,9 @@ import github.lms.lemuel.loan.application.port.in.EvaluateCorporateCreditUseCase
 import github.lms.lemuel.loan.application.port.out.LoadCompanyReputationPort;
 import github.lms.lemuel.loan.application.port.out.LoadCorporateFinancialPort;
 import github.lms.lemuel.loan.domain.CompanyReputation;
+import github.lms.lemuel.loan.domain.CorporateCreditPolicy;
 import github.lms.lemuel.loan.domain.CorporateFinancials;
-import github.lms.lemuel.loan.domain.CorporateLoanNotFoundException;
+import github.lms.lemuel.loan.domain.exception.CorporateLoanNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -43,7 +44,7 @@ class EvaluateCorporateCreditServiceTest {
     void 재무와_평판을_반영해_점수_등급_한도를_반환한다() {
         when(loadCorporateFinancialPort.loadLatest("005930")).thenReturn(Optional.of(samsung()));
         when(loadCompanyReputationPort.findByStockCode("005930")).thenReturn(
-                Optional.of(new CompanyReputation("005930", 78, "B", "A", LocalDate.of(2026, 7, 1))));
+                Optional.of(CompanyReputation.of("005930", 78, "B", "A", LocalDate.of(2026, 7, 1))));
 
         CorporateCreditView view = service().evaluate("005930");
 

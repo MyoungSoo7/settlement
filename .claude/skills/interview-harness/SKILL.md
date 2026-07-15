@@ -30,9 +30,9 @@ sub 스킬 셋(`/socrates`, `/evolve-step`, `/ontology`)을 한 사이클로 묶
 
 ## 공유 스크래치 파일
 
-- `.claude/scratch/socrates.md` — canonical 파이프라인. **최신 Seed 한 벌 + 최신 Ontology 한 벌만 유지**. `/socrates`, `/evolve-step`, `/ontology`가 공유한다.
-- `.claude/scratch/evolve-step.md` — `/evolve-step`이 사이클별 사각지대 Q&A audit을 누적.
-- `.claude/scratch/interview-harness.md` — 마스터 하네스 전용. 매 사이클 `/ontology` 호출 직전 직전 ontology를 스냅샷으로 저장하고, 호출 후 새 ontology와 비교한다. socrates.md가 최신 한 벌만 유지하므로 비교용 보존은 이 파일이 책임진다.
+- `.symposium/scratch/socrates.md` — canonical 파이프라인. **최신 Seed 한 벌 + 최신 Ontology 한 벌만 유지**. `/socrates`, `/evolve-step`, `/ontology`가 공유한다.
+- `.symposium/scratch/evolve-step.md` — `/evolve-step`이 사이클별 사각지대 Q&A audit을 누적.
+- `.symposium/scratch/interview-harness.md` — 마스터 하네스 전용. 매 사이클 `/ontology` 호출 직전 직전 ontology를 스냅샷으로 저장하고, 호출 후 새 ontology와 비교한다.
 
 ## 전체 흐름
 
@@ -62,8 +62,8 @@ sub 스킬 셋(`/socrates`, `/evolve-step`, `/ontology`)을 한 사이클로 묶
 │    4. Stop rule 점검:                                       │
 │       - 직전 ontology vs 이번 ontology 유사도 ≥ 0.85        │
 │         → stop_reason = "convergence", 종료                 │
-│       - cycle > 5                                           │
-│         → stop_reason = "safety_valve", 종료                │
+│       - cycle 5에서도 유사도 < 0.85                         │
+│         → stop_reason = "safety_valve", 종료 (cycle 6 없음) │
 │       - 첫 사이클(직전값 없음)은 비교 스킵, 다음 사이클로    │
 └─────────────────────────────────────────────────────────────┘
    ↓
@@ -72,7 +72,7 @@ sub 스킬 셋(`/socrates`, `/evolve-step`, `/ontology`)을 한 사이클로 묶
 
 ## Stage 1 — Seed Gate
 
-`.claude/scratch/socrates.md`를 읽는다.
+`.symposium/scratch/socrates.md`를 읽는다.
 
 - 파일이 없거나, 최상위 `## Seed` 섹션이 없거나, 섹션 안의 YAML에서 `goal` / `constraints` / `acceptance_criteria` 중 하나라도 비어 있거나 `empty`이면:
   → `/socrates` 호출. Seed를 만든 뒤 Stage 2로 넘어간다.
@@ -85,7 +85,7 @@ sub 스킬 셋(`/socrates`, `/evolve-step`, `/ontology`)을 한 사이클로 묶
 
 ### 한 사이클
 
-1. **직전 ontology 스냅샷** — `/ontology`를 호출하기 전에 socrates.md의 현재 `## Ontology` 섹션을 읽어 `.claude/scratch/interview-harness.md`에 `## Previous Ontology (cycle {{n-1}})` 블록으로 저장한다. 첫 사이클이라 `## Ontology`가 아예 없으면 스킵.
+1. **직전 ontology 스냅샷** — `/ontology`를 호출하기 전에 socrates.md의 현재 `## Ontology` 섹션을 읽어 `.symposium/scratch/interview-harness.md`에 `## Previous Ontology (cycle {{n-1}})` 블록으로 저장한다. 첫 사이클이라 `## Ontology`가 아예 없으면 스킵.
 2. **`/evolve-step` 호출** — Seed v_n → Seed v_(n+1). 사각지대 두 질문 + 사용자 채택. socrates.md의 `## Seed` 섹션이 새 Seed로 통째 교체된다. evolve-step.md에 audit 블록이 append된다.
 3. **`/ontology` 호출** — 새 Seed.goal을 idea로, boundary + properties 3개를 사용자에게 받아 socrates.md의 `## Ontology` 섹션을 통째 교체한다.
 4. **Stop rule 점검** (아래).
@@ -106,9 +106,9 @@ sub 스킬 셋(`/socrates`, `/evolve-step`, `/ontology`)을 한 사이클로 묶
 
 첫 사이클(직전 ontology 없음)은 비교 자체를 스킵하고 무조건 다음 사이클로 넘어간다.
 
-**안전밸브 (Cycle > 5)**
+**안전밸브 (Cycle 5)**
 
-사이클 카운터가 5를 넘으면 강제 종료. 현재 Seed를 그대로 반환. `stop_reason = "safety_valve"`.
+5번째 사이클까지 수렴하지 않으면 그 사이클에서 강제 종료한다. 현재 Seed를 그대로 반환하고 `stop_reason = "safety_valve"`로 둔다. 6번째 사이클은 시작하지 않는다.
 
 ### `interview-harness.md` 저장 형식
 
@@ -172,7 +172,7 @@ stop_reason: <"convergence" | "safety_valve">
 2. **socrates.md는 최신 한 벌.** Seed 한 벌 + Ontology 한 벌만 유지(누적 X). 비교용 직전 ontology는 `interview-harness.md`가 책임진다.
 3. **Seed Gate.** Seed가 이미 있으면 Socrates를 스킵한다. 같은 입력을 다시 다듬지 않는다.
 4. **수렴 임계값은 0.85 고정.** 세 항목 평균이 0.85 이상이면 stop.
-5. **Cycle > 5 안전밸브 절대 넘지 않는다.**
+5. **Cycle 5 미수렴 시 안전밸브로 종료하고 6번째 사이클은 시작하지 않는다.**
 6. **사용자 채택 없이 자동 채움 금지.** `/evolve-step`의 사각지대 채택은 사람이 한다.
 7. **boundary 동일성은 사용자에게 확인한다.** 유사도 계산에서 모델이 boundary 의미 동일성을 단독 판정하지 않는다.
 8. **sub 스킬 단독 호출이 그대로 동작해야 한다.** 하네스가 단독성을 깨면 안 된다.
@@ -189,7 +189,7 @@ stop_reason: <"convergence" | "safety_valve">
 - `evolve-step.md`에 사이클별 audit 로그가 누적된다.
 
 **Stop rule 및 출력**
-- 수렴 0.85 + 안전밸브 Cycle > 5 둘 다 명시되어 있다.
+- 수렴 0.85 + 안전밸브 Cycle 5 둘 다 명시되어 있다.
 - 출력이 `final_seed` + `cycles` + `final_similarity` + `stop_reason`을 포함한다.
 
 **회귀**
@@ -198,3 +198,7 @@ stop_reason: <"convergence" | "safety_valve">
 ## 다음 단계
 
 이 마스터 하네스가 떨어뜨린 final_seed(goal + constraints + acceptance_criteria + ontology)는 3장의 입력이 된다. 3장에서는 이 Seed를 실행 하네스(execute · evaluate · evolve)로 옮겨 코드 단계로 진입한다.
+
+```harness-contract
+{"seedGate.requiredFields":["goal","constraints","acceptance_criteria"],"stageOrder":["evolve-step","ontology","compare"],"similarity.idea":"exact","similarity.boundary":"user-confirmed","similarity.properties":"jaccard","similarity.threshold":0.85,"maxCycles":5,"firstCycleComparison":"skip","candidateAdoption":"explicit-user-approval","canonicalScratch":".symposium/scratch/socrates.md","stopReasons":["convergence","safety_valve"]}
+```

@@ -5,6 +5,7 @@ import github.lms.lemuel.commoncode.application.port.in.CommonCodeUseCase;
 import github.lms.lemuel.commoncode.application.port.out.LoadCommonCodePort;
 import github.lms.lemuel.commoncode.application.port.out.SaveCommonCodePort;
 import github.lms.lemuel.commoncode.domain.CommonCode;
+import github.lms.lemuel.commoncode.domain.exception.CommonCodeInvariantViolationException;
 import github.lms.lemuel.commoncode.domain.CommonCodeGroup;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,7 +46,7 @@ public class CommonCodeService implements CommonCodeGroupUseCase, CommonCodeUseC
     @Override
     public CommonCodeGroup updateGroup(String groupCode, UpdateGroupCommand command) {
         CommonCodeGroup group = loadCommonCodePort.findGroupByCode(groupCode)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 그룹코드입니다: " + groupCode));
+                .orElseThrow(() -> new CommonCodeInvariantViolationException("존재하지 않는 그룹코드입니다: " + groupCode));
         group.update(command.name(), command.description(), command.active());
         CommonCodeGroup saved = saveCommonCodePort.saveGroup(group);
         log.info("공통코드 그룹 수정: groupCode={}", groupCode);
@@ -55,7 +56,7 @@ public class CommonCodeService implements CommonCodeGroupUseCase, CommonCodeUseC
     @Override
     public void deleteGroup(String groupCode) {
         loadCommonCodePort.findGroupByCode(groupCode)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 그룹코드입니다: " + groupCode));
+                .orElseThrow(() -> new CommonCodeInvariantViolationException("존재하지 않는 그룹코드입니다: " + groupCode));
         saveCommonCodePort.deleteGroupByCode(groupCode);
         log.info("공통코드 그룹 삭제: groupCode={}", groupCode);
     }
@@ -66,14 +67,14 @@ public class CommonCodeService implements CommonCodeGroupUseCase, CommonCodeUseC
     @Transactional(readOnly = true)
     public List<CommonCode> getCodesByGroup(String groupCode) {
         loadCommonCodePort.findGroupByCode(groupCode)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 그룹코드입니다: " + groupCode));
+                .orElseThrow(() -> new CommonCodeInvariantViolationException("존재하지 않는 그룹코드입니다: " + groupCode));
         return loadCommonCodePort.findCodesByGroupCode(groupCode);
     }
 
     @Override
     public CommonCode createCode(CreateCodeCommand command) {
         loadCommonCodePort.findGroupByCode(command.groupCode())
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 그룹코드입니다: " + command.groupCode()));
+                .orElseThrow(() -> new CommonCodeInvariantViolationException("존재하지 않는 그룹코드입니다: " + command.groupCode()));
         CommonCode code = CommonCode.create(
                 command.groupCode(),
                 command.code(),
@@ -89,7 +90,7 @@ public class CommonCodeService implements CommonCodeGroupUseCase, CommonCodeUseC
     @Override
     public CommonCode updateCode(Long id, UpdateCodeCommand command) {
         CommonCode code = loadCommonCodePort.findCodeById(id)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 코드 ID입니다: " + id));
+                .orElseThrow(() -> new CommonCodeInvariantViolationException("존재하지 않는 코드 ID입니다: " + id));
         code.update(command.label(), command.sortOrder(), command.active(), command.extra1());
         CommonCode saved = saveCommonCodePort.saveCode(code);
         log.info("공통코드 수정: id={}", id);
@@ -99,7 +100,7 @@ public class CommonCodeService implements CommonCodeGroupUseCase, CommonCodeUseC
     @Override
     public void deleteCode(Long id) {
         loadCommonCodePort.findCodeById(id)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 코드 ID입니다: " + id));
+                .orElseThrow(() -> new CommonCodeInvariantViolationException("존재하지 않는 코드 ID입니다: " + id));
         saveCommonCodePort.deleteCodeById(id);
         log.info("공통코드 삭제: id={}", id);
     }

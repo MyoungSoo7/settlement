@@ -11,9 +11,25 @@ import org.mapstruct.Mapping;
 @Mapper(componentModel = "spring", imports = OrderStatus.class)
 public interface OrderPersistenceMapper {
 
-    @Mapping(target = "status", expression = "java(OrderStatus.fromString(entity.getStatus()))")
-    @Mapping(target = "items", ignore = true)
-    Order toDomain(OrderJpaEntity entity);
+    /**
+     * Entity → Domain 복원. no-arg + setter 대신 {@link Order#rehydrate} 팩토리로만 재구성해
+     * 도메인의 상태 전이 봉인을 매퍼가 우회하지 못하게 한다. items 는 어댑터가 별도 로드해 부착.
+     */
+    default Order toDomain(OrderJpaEntity entity) {
+        if (entity == null) {
+            return null;
+        }
+        return Order.rehydrate(
+                entity.getId(),
+                entity.getUserId(),
+                entity.getProductId(),
+                entity.getAmount(),
+                OrderStatus.fromString(entity.getStatus()),
+                entity.getCreatedAt(),
+                entity.getUpdatedAt(),
+                entity.getShippingFee(),
+                entity.isShipped());
+    }
 
     @Mapping(target = "status", expression = "java(domain.getStatus().name())")
     OrderJpaEntity toEntity(Order domain);

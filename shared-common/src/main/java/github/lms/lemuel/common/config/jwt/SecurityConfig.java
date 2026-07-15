@@ -145,6 +145,9 @@ public class SecurityConfig {
                         .requestMatchers("/admin/dlq/**").hasRole("ADMIN")
                         .requestMatchers("/admin/pg/**").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers("/admin/reconciliation/**").hasAnyRole("ADMIN", "MANAGER")
+                        // PG 정산파일 대사 콘솔 — 업로드·승인(역정산 트리거)·거절·조회. 경로가 /admin/pg/** 와
+                        // 불일치해 authenticated() 로 새던 것을 형제 recon 콘솔과 동일하게 ADMIN/MANAGER 로 게이트.
+                        .requestMatchers("/admin/pg-reconciliation/**").hasAnyRole("ADMIN", "MANAGER")
                         // 정합성 검증 콘솔 — 실행 없는 읽기 전용 조회라 MANAGER 도 허용 (Integrity Suite Phase A)
                         .requestMatchers("/admin/integrity/**").hasAnyRole("ADMIN", "MANAGER")
                         // 내부 서비스 간 호출 — order 가 자기 대사 합계를 노출(settlement 가 소비, ADR 0020 Phase 5 self-totals).
@@ -155,6 +158,9 @@ public class SecurityConfig {
                         .requestMatchers("/admin/payouts/**").hasRole("ADMIN")
                         // Chargeback 콘솔 — 셀러 환수 결정은 ADMIN 만
                         .requestMatchers("/admin/chargebacks/**").hasRole("ADMIN")
+                        // 기업 신용대출 실행(실자금 지급) — 승인·실행 권한은 ADMIN 만.
+                        // 신용평가 조회(/credit)·신청(POST /loans/corporate)·목록 조회는 인증 사용자(CEO) 허용.
+                        .requestMatchers(HttpMethod.POST, "/loans/corporate/*/disburse").hasRole("ADMIN")
                         // 환불 콘솔 — 실패/재시도 소진 환불 조회(운영 개입용). 실행 없는 조회라 MANAGER 도 허용
                         .requestMatchers("/admin/refunds/**").hasAnyRole("ADMIN", "MANAGER")
                         // 정산 관련 API (관리자·매니저)
@@ -164,6 +170,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/reports/**").hasAnyRole("ADMIN", "MANAGER")
                         // 원장(Ledger) 조회 — 회계 감사용 (관리자·매니저)
                         .requestMatchers("/api/ledger/**").hasAnyRole("ADMIN", "MANAGER")
+                        // 계정계(GL) 조회 콘솔 — owner 잔액·분개·전사 집계·시산표는 회계 백오피스라 관리자·매니저 전용
+                        // (프론트도 /admin/ceo/accounts 를 AdminManagerRoute 로 보호). 무권한 노출(owner IDOR·전사 집계) 차단.
+                        .requestMatchers("/api/account/**").hasAnyRole("ADMIN", "MANAGER")
                         // 결제 환불 이력 조회 (관리자·매니저·본인) — 더 세밀한 권한은 향후 Audit PR 에서
                         .requestMatchers("/api/payments/*/refunds").hasAnyRole("ADMIN", "MANAGER", "USER")
                         // 환불 실행(직접 PG 환불) — "어드민 승인 후 환불" 원칙에 따라 운영자 전용.

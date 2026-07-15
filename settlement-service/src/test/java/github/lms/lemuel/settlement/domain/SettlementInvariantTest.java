@@ -1,6 +1,8 @@
 package github.lms.lemuel.settlement.domain;
 
 import org.junit.jupiter.api.DisplayName;
+import github.lms.lemuel.settlement.domain.exception.InvalidSettlementStateException;
+import github.lms.lemuel.settlement.domain.exception.SettlementInvariantViolationException;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -64,7 +66,7 @@ class SettlementInvariantTest {
         s.adjustForRefund(new BigDecimal("6000"));
 
         assertThatThrownBy(() -> s.adjustForRefund(new BigDecimal("5000")))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(SettlementInvariantViolationException.class)
                 .hasMessageContaining("exceeds");
     }
 
@@ -76,7 +78,7 @@ class SettlementInvariantTest {
         assertThat(s.getStatus()).isEqualTo(SettlementStatus.DONE);
 
         assertThatThrownBy(() -> s.adjustForRefund(new BigDecimal("1000")))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(InvalidSettlementStateException.class)
                 .hasMessageContaining("immutable");
     }
 
@@ -85,8 +87,8 @@ class SettlementInvariantTest {
         Settlement s = Settlement.createFromPayment(1L, 10L, new BigDecimal("10000"), LocalDate.now());
 
         assertThatThrownBy(() -> s.adjustForRefund(BigDecimal.ZERO))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(SettlementInvariantViolationException.class);
         assertThatThrownBy(() -> s.adjustForRefund(new BigDecimal("-1")))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(SettlementInvariantViolationException.class);
     }
 }

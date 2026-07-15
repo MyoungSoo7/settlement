@@ -78,22 +78,21 @@ public class CouponPersistenceAdapter implements LoadCouponPort, SaveCouponPort 
     }
 
     private Coupon toDomain(CouponJpaEntity entity) {
-        Coupon coupon = new Coupon();
-        coupon.setId(entity.getId());
-        coupon.setCode(entity.getCode());
-        coupon.setType(CouponType.valueOf(entity.getType()));
-        coupon.setDiscountValue(entity.getDiscountValue());
-        coupon.setMinOrderAmount(entity.getMinOrderAmount());
-        coupon.setMaxDiscountAmount(entity.getMaxDiscountAmount());
-        coupon.setMaxUses(entity.getMaxUses());
-        coupon.setUsedCount(entity.getUsedCount());
-        coupon.setTargetType(CouponTarget.fromStorageOrDefault(entity.getTargetType()));
-        coupon.setTargetId(entity.getTargetId());
-        coupon.setStartsAt(entity.getStartsAt());
-        coupon.setExpiresAt(entity.getExpiresAt());
-        coupon.setActive(entity.isActive());
-        coupon.setCreatedAt(entity.getCreatedAt());
-        coupon.setUpdatedAt(entity.getUpdatedAt());
-        return coupon;
+        return Coupon.rehydrate(
+                entity.getId(),
+                entity.getCode(),
+                CouponType.valueOf(entity.getType()),
+                entity.getDiscountValue(),
+                entity.getMinOrderAmount(),
+                entity.getMaxDiscountAmount(),
+                entity.getMaxUses(),
+                entity.getUsedCount(),
+                CouponTarget.fromStorageOrDefault(entity.getTargetType()),
+                entity.getTargetId(),
+                entity.getStartsAt(),
+                entity.getExpiresAt(),
+                entity.isActive(),
+                entity.getCreatedAt(),
+                entity.getUpdatedAt());
     }
 }

@@ -45,7 +45,7 @@ class PaymentControllerTest {
     @DisplayName("POST /payments creates payment")
     void createPayment() throws Exception {
         when(createPaymentPort.createPayment(any()))
-                .thenReturn(new PaymentDomain(1L, new BigDecimal("15000"), "CARD"));
+                .thenReturn(PaymentDomain.create(1L, new BigDecimal("15000"), "CARD"));
 
         mockMvc.perform(post("/payments")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -82,7 +82,7 @@ class PaymentControllerTest {
     @Test
     @DisplayName("PATCH /payments/{id}/refund passes amount and idempotency key")
     void refundPayment() throws Exception {
-        PaymentDomain payment = new PaymentDomain(1L, new BigDecimal("20000"), "CARD");
+        PaymentDomain payment = PaymentDomain.create(1L, new BigDecimal("20000"), "CARD");
         payment.authorize("pg-1");
         payment.capture();
         payment.addRefundedAmount(new BigDecimal("5000"));

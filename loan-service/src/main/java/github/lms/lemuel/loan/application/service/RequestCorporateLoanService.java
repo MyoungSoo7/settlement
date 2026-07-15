@@ -4,9 +4,10 @@ import github.lms.lemuel.loan.application.port.in.RequestCorporateLoanUseCase;
 import github.lms.lemuel.loan.application.port.out.LoadCompanyReputationPort;
 import github.lms.lemuel.loan.application.port.out.LoadCorporateFinancialPort;
 import github.lms.lemuel.loan.application.port.out.SaveCorporateLoanPort;
+import github.lms.lemuel.loan.domain.CorporateCreditPolicy;
 import github.lms.lemuel.loan.domain.CorporateFinancials;
 import github.lms.lemuel.loan.domain.CorporateLoan;
-import github.lms.lemuel.loan.domain.CorporateLoanRejectedException;
+import github.lms.lemuel.loan.domain.exception.CorporateLoanRejectedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -56,7 +57,8 @@ public class RequestCorporateLoanService implements RequestCorporateLoanUseCase 
         if (command.principal().compareTo(limit) > 0) {
             throw new CorporateLoanRejectedException(
                     "신청액이 한도를 초과합니다. requested=" + command.principal() + ", limit=" + limit
-                            + " (grade=" + grade + ")");
+                            + " (grade=" + grade + ")",
+                    command.principal(), limit);
         }
 
         BigDecimal fee = creditPolicy.fee(command.principal(), command.termDays(), grade);

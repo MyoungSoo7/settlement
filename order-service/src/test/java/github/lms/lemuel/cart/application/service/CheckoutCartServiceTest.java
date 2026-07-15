@@ -1,4 +1,5 @@
 package github.lms.lemuel.cart.application.service;
+import github.lms.lemuel.cart.domain.exception.CartInvariantViolationException;
 
 import github.lms.lemuel.cart.application.port.out.LoadCartPort;
 import github.lms.lemuel.cart.application.port.out.SaveCartPort;
@@ -46,7 +47,7 @@ class CheckoutCartServiceTest {
     void checkout_noCart() {
         when(loadCartPort.loadByUserId(1L)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.checkout(1L))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(CartInvariantViolationException.class)
                 .hasMessage("장바구니가 없습니다");
     }
 
@@ -55,7 +56,7 @@ class CheckoutCartServiceTest {
         Cart cart = Cart.createEmpty(1L);
         when(loadCartPort.loadByUserId(1L)).thenReturn(Optional.of(cart));
         assertThatThrownBy(() -> service.checkout(1L))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(CartInvariantViolationException.class)
                 .hasMessage("장바구니가 비어있습니다");
     }
 }

@@ -1,4 +1,5 @@
 package github.lms.lemuel.payment.application;
+import github.lms.lemuel.payment.domain.exception.PaymentInvariantViolationException;
 
 import github.lms.lemuel.payment.application.port.out.LoadRefundPort;
 import github.lms.lemuel.payment.domain.Refund;
@@ -36,8 +37,8 @@ class GetRefundHistoryServiceTest {
     @DisplayName("paymentId 유효성 검증")
     void rejectsInvalidPaymentId() {
         assertThatThrownBy(() -> service.getRefundsByPaymentId(null))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(PaymentInvariantViolationException.class);
         assertThatThrownBy(() -> service.getRefundsByPaymentId(0L))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(PaymentInvariantViolationException.class);
     }
 }

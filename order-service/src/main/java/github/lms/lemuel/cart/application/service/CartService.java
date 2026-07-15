@@ -4,6 +4,7 @@ import github.lms.lemuel.cart.application.port.in.CartUseCase;
 import github.lms.lemuel.cart.application.port.out.LoadCartPort;
 import github.lms.lemuel.cart.application.port.out.SaveCartPort;
 import github.lms.lemuel.cart.domain.Cart;
+import github.lms.lemuel.cart.domain.exception.CartInvariantViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,7 +36,7 @@ public class CartService implements CartUseCase {
     @Override
     public Cart changeQuantity(Long userId, Long productId, Long variantId, int newQuantity) {
         Cart cart = loadCartPort.loadByUserId(userId)
-                .orElseThrow(() -> new IllegalArgumentException("장바구니가 비어있습니다"));
+                .orElseThrow(() -> new CartInvariantViolationException("장바구니가 비어있습니다"));
         cart.changeQuantity(productId, variantId, newQuantity);
         return saveCartPort.save(cart);
     }
@@ -43,7 +44,7 @@ public class CartService implements CartUseCase {
     @Override
     public Cart removeItem(Long userId, Long productId, Long variantId) {
         Cart cart = loadCartPort.loadByUserId(userId)
-                .orElseThrow(() -> new IllegalArgumentException("장바구니가 비어있습니다"));
+                .orElseThrow(() -> new CartInvariantViolationException("장바구니가 비어있습니다"));
         cart.removeItem(productId, variantId);
         return saveCartPort.save(cart);
     }

@@ -47,4 +47,25 @@ public interface SpringDataPayoutRepository extends JpaRepository<PayoutJpaEntit
            "AND p.completedAt >= :from AND p.completedAt < :to")
     BigDecimal sumCompletedBetween(@Param("from") LocalDateTime from,
                                     @Param("to") LocalDateTime to);
+
+    // ── PII 재암호화 백필 (레거시 평문 lazy migration 잔존 청소) ─────────────────────────────
+    // enc:v1 접두는 암호문의 유일한 표식이라 raw 컬럼 LIKE 로 평문/암호문을 판별한다. JPQL 은 컨버터가
+    // 개입해 raw 값을 볼 수 없으므로 nativeQuery 로 저장된 원문을 직접 검사한다. 'enc:v1:%' 리터럴에는
+    // LIKE 메타문자(_ %)가 없어 이스케이프 불필요.
+
+    /** 평문 잔존 행 수 — 두 PII 컬럼 중 하나라도 enc:v1 접두가 아니면 카운트. */
+    @Query(value = "SELECT COUNT(*) FROM payouts " +
+                   "WHERE bank_account_number NOT LIKE 'enc:v1:%' " +
+                   "   OR account_holder_name NOT LIKE 'enc:v1:%'", nativeQuery = true)
+    long countLegacyPlaintext();
+
+    /**
+     * 평문 잔존 행 id 를 최대 :size 건, 오래된 순으로 조회. 재암호화 후 해당 행은 enc:v1 이 되어
+     * 다음 호출에서 다시 선택되지 않으므로 OFFSET 없이 항상 잔존 상단부터 소진한다.
+     */
+    @Query(value = "SELECT id FROM payouts " +
+                   "WHERE bank_account_number NOT LIKE 'enc:v1:%' " +
+                   "   OR account_holder_name NOT LIKE 'enc:v1:%' " +
+                   "ORDER BY id LIMIT :size", nativeQuery = true)
+    List<Long> findLegacyPlaintextIds(@Param("size") int size);
 }

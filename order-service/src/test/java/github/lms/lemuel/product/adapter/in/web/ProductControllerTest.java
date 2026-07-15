@@ -44,7 +44,7 @@ class ProductControllerTest {
 
     private static Product product(Long id, String name) {
         Product p = Product.create(name, "설명", new BigDecimal("1000"), 10);
-        p.setId(id);
+        p.assignId(id);
         return p;
     }
 

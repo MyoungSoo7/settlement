@@ -236,7 +236,7 @@ class RefundApprovalIT {
         var lines = List.of(new CreateMultiItemOrderUseCase.Line(productId, null, qty));
         Order saved = inNewTx(() -> createOrderService.create(userId, lines, null));
 
-        PaymentDomain pay = new PaymentDomain(null, saved.getId(), saved.getAmount(), BigDecimal.ZERO,
+        PaymentDomain pay = PaymentDomain.rehydrate(null, saved.getId(), saved.getAmount(), BigDecimal.ZERO,
                 PaymentStatus.CAPTURED, "CARD", "pg-" + n,
                 LocalDateTime.now(), LocalDateTime.now(), LocalDateTime.now());
         commit(() -> paymentAdapter.save(pay));
@@ -247,7 +247,7 @@ class RefundApprovalIT {
     private void prepareOrder(Long orderId, BigDecimal shippingFee, boolean shipped, OrderStatus target) {
         commit(() -> {
             Order o = orderAdapter.findById(orderId).orElseThrow();
-            o.setShippingFee(shippingFee);
+            o.assignShippingFee(shippingFee);
             o.transitionTo(OrderStatus.PAID);
             if (target == OrderStatus.CANCELLATION_REQUESTED) {
                 o.transitionTo(OrderStatus.CANCELLATION_REQUESTED);

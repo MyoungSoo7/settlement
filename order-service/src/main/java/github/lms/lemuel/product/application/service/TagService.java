@@ -4,6 +4,7 @@ import github.lms.lemuel.product.application.port.in.TagUseCase;
 import github.lms.lemuel.product.application.port.out.LoadTagPort;
 import github.lms.lemuel.product.application.port.out.SaveTagPort;
 import github.lms.lemuel.product.domain.Tag;
+import github.lms.lemuel.product.domain.exception.ProductInvariantViolationException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -31,7 +32,7 @@ public class TagService implements TagUseCase {
     @Override
     public Tag getTagById(Long id) {
         return loadTagPort.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Tag not found: " + id));
+                .orElseThrow(() -> new ProductInvariantViolationException("Tag not found: " + id));
     }
 
     @Override

@@ -15,6 +15,14 @@ import { startJsonRpcServer } from './json-rpc-stdio.mjs';
 const SERVER_NAME = 'invest-companion-news';
 const SERVER_VERSION = '0.1.0';
 
+// 시세 축(source/asOf)과 대칭 — "언제 수집한 검색 결과인지"를 응답에 강제한다.
+// 뉴스는 소급 조회가 불가능하므로 retrievedAt 이 곧 이 결과의 유효 시점이다.
+const withMeta = data => ({
+  source: '네이버 뉴스 검색 OpenAPI (제목·요약·링크만, 본문 미수집)',
+  retrievedAt: new Date().toISOString(),
+  ...data,
+});
+
 // 초보 투자자가 놓치면 치명적인 악재 계열 우선 (지분 희석·신뢰 훼손·거래 제한)
 const DEFAULT_RISK_KEYWORDS = ['유상증자', '횡령', '배임', '거래정지', '상장폐지', '실적', '소송'];
 
@@ -44,8 +52,8 @@ const TOOLS = [
       },
       required: ['company'],
     },
-    run: ({ company, keywords, display, sort }) =>
-      searchCompanyNews({ company, keywords: parseKeywords(keywords), display: limitDisplay(display), sort }),
+    run: async ({ company, keywords, display, sort }) =>
+      withMeta(await searchCompanyNews({ company, keywords: parseKeywords(keywords), display: limitDisplay(display), sort })),
   },
   {
     name: 'news_search_risk',
@@ -79,13 +87,13 @@ const TOOLS = [
           items.push(item);
         }
       }
-      return {
+      return withMeta({
         query: perKeyword.map((s) => s.query).join(' | '),
         keywords: kws,
         perKeyword: perKeyword.map((s) => ({ query: s.query, total: s.total, itemCount: s.items?.length ?? 0 })),
         total: items.length,
         items,
-      };
+      });
     },
   },
   {

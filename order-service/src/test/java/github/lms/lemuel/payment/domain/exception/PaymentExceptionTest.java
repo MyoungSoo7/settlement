@@ -8,9 +8,9 @@ import static org.assertj.core.api.Assertions.*;
 
 class PaymentExceptionTest {
 
-    @Test @DisplayName("InvalidOrderStateException: 메시지가 올바르게 전달된다")
+    @Test @DisplayName("InvalidOrderStateForPaymentException: 메시지가 올바르게 전달된다")
     void invalidOrderStateException_message() {
-        var ex = new InvalidOrderStateException("주문 상태가 유효하지 않습니다");
+        var ex = new InvalidOrderStateForPaymentException("주문 상태가 유효하지 않습니다");
         assertThat(ex).isInstanceOf(RuntimeException.class);
         assertThat(ex.getMessage()).isEqualTo("주문 상태가 유효하지 않습니다");
     }

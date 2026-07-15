@@ -1,4 +1,6 @@
 package github.lms.lemuel.payment.domain;
+import github.lms.lemuel.payment.domain.exception.InvalidPaymentStateException;
+import github.lms.lemuel.payment.domain.exception.PaymentInvariantViolationException;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,27 +26,27 @@ class RefundTest {
     @Test @DisplayName("request: null paymentId이면 예외")
     void request_nullPaymentId() {
         assertThatThrownBy(() -> Refund.request(null, BigDecimal.TEN, "key", "이유"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(PaymentInvariantViolationException.class)
                 .hasMessage("paymentId required");
     }
 
     @Test @DisplayName("request: 0 이하 금액이면 예외")
     void request_zeroAmount() {
         assertThatThrownBy(() -> Refund.request(1L, BigDecimal.ZERO, "key", "이유"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(PaymentInvariantViolationException.class)
                 .hasMessage("amount must be > 0");
     }
 
     @Test @DisplayName("request: null 금액이면 예외")
     void request_nullAmount() {
         assertThatThrownBy(() -> Refund.request(1L, null, "key", "이유"))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(PaymentInvariantViolationException.class);
     }
 
     @Test @DisplayName("request: blank idempotencyKey이면 예외")
     void request_blankKey() {
         assertThatThrownBy(() -> Refund.request(1L, BigDecimal.TEN, "  ", "이유"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(PaymentInvariantViolationException.class)
                 .hasMessage("idempotencyKey required");
     }
 
@@ -62,7 +64,7 @@ class RefundTest {
         Refund refund = Refund.request(1L, BigDecimal.TEN, "key", "이유");
         refund.markCompleted();
         assertThatThrownBy(refund::markCompleted)
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(InvalidPaymentStateException.class)
                 .hasMessageContaining("already COMPLETED");
     }
 
@@ -108,7 +110,7 @@ class RefundTest {
         Refund refund = Refund.request(1L, BigDecimal.TEN, "key", "이유");
         refund.markCompleted();
         assertThatThrownBy(() -> refund.markFailed("실패"))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(InvalidPaymentStateException.class);
     }
 
     @Test @DisplayName("abandon: 적용 불가 실패건을 재시도 소진 상태로 고정")

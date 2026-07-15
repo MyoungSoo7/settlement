@@ -1,4 +1,5 @@
 package github.lms.lemuel.user.application.service;
+import github.lms.lemuel.user.domain.exception.UserInvariantViolationException;
 
 import github.lms.lemuel.user.application.port.in.CreateUserUseCase;
 import github.lms.lemuel.user.application.port.out.LoadUserPort;
@@ -38,7 +39,7 @@ class CreateUserServiceTest {
         when(passwordHashPort.hash("raw-pw")).thenReturn("hashed-pw");
         when(saveUserPort.save(any())).thenAnswer(inv -> {
             User u = inv.getArgument(0);
-            u.setId(1L);
+            u.assignId(1L);
             return u;
         });
 
@@ -66,7 +67,7 @@ class CreateUserServiceTest {
     @Test @DisplayName("Command 검증: email 누락")
     void command_missingEmail() {
         assertThatThrownBy(() -> new CreateUserUseCase.CreateUserCommand("", "pw", UserRole.USER))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(UserInvariantViolationException.class);
     }
 
     @Test @DisplayName("Command 검증: role 누락 시 USER 기본값")

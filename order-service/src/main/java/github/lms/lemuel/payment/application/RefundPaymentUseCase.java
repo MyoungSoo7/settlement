@@ -2,7 +2,9 @@ package github.lms.lemuel.payment.application;
 
 import github.lms.lemuel.common.audit.application.Auditable;
 import github.lms.lemuel.common.audit.domain.AuditAction;
+import github.lms.lemuel.payment.domain.exception.InvalidPaymentStateException;
 import github.lms.lemuel.payment.domain.exception.MissingIdempotencyKeyException;
+import github.lms.lemuel.payment.domain.exception.PaymentInvariantViolationException;
 import github.lms.lemuel.payment.domain.exception.RefundException;
 import github.lms.lemuel.payment.domain.exception.RefundExceedsPaymentException;
 import github.lms.lemuel.payment.application.port.in.RefundPaymentPort;
@@ -113,12 +115,12 @@ public class RefundPaymentUseCase implements RefundPaymentPort {
             return snapshot;
         }
         if (snapshot.getStatus() != PaymentStatus.CAPTURED) {
-            throw new IllegalStateException(
+            throw new InvalidPaymentStateException(
                     "Payment must be in CAPTURED status to refund. Current: " + snapshot.getStatus());
         }
         BigDecimal plannedAmount = isFullRefund ? snapshot.getRefundableAmount() : amount;
         if (plannedAmount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("Refund amount must be greater than zero");
+            throw new PaymentInvariantViolationException("Refund amount must be greater than zero");
         }
         if (plannedAmount.compareTo(snapshot.getRefundableAmount()) > 0) {
             throw new RefundExceedsPaymentException(
@@ -141,7 +143,7 @@ public class RefundPaymentUseCase implements RefundPaymentPort {
             return payment; // 락 대기 중 다른 트랜잭션이 전액 환불 완료 — 멱등 반환
         }
         if (payment.getStatus() != PaymentStatus.CAPTURED) {
-            throw new IllegalStateException(
+            throw new InvalidPaymentStateException(
                     "Payment must be in CAPTURED status to refund. Current: " + payment.getStatus());
         }
         // 락 안에서 권위 금액 재확정(스냅샷 이후 잔액 변동 반영) 및 초과 검증.
@@ -171,7 +173,7 @@ public class RefundPaymentUseCase implements RefundPaymentPort {
         }
 
         // ── Phase 3: 성공 — 이력을 COMPLETED 로 확정하고 결제/주문/이벤트를 원자적으로 커밋 ──
-        refund.setAmount(refundAmount); // 스냅샷과 권위 금액이 다를 경우(동시 부분환불) 최종값으로 정정
+        refund.correctAmount(refundAmount); // 스냅샷과 권위 금액이 다를 경우(동시 부분환불) 최종값으로 정정
         refund.markCompleted();
         Refund completedRefund = saveRefundPort.save(refund);
 

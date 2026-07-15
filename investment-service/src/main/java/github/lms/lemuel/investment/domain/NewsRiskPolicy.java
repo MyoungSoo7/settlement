@@ -20,7 +20,7 @@ public class NewsRiskPolicy {
         List<NewsRiskCheck.Flag> flags = new ArrayList<>();
         for (NewsArticleSummary article : articles) {
             for (String keyword : RISK_KEYWORDS) {
-                if (contains(article.title(), keyword) || contains(article.summary(), keyword)) {
+                if (article.mentions(keyword)) {
                     flags.add(new NewsRiskCheck.Flag(
                             keyword, article.title(), article.url(), article.publishedAt()));
                     break;
@@ -28,9 +28,5 @@ public class NewsRiskPolicy {
             }
         }
         return NewsRiskCheck.of(articles.size(), flags);
-    }
-
-    private static boolean contains(String text, String keyword) {
-        return text != null && text.contains(keyword);
     }
 }

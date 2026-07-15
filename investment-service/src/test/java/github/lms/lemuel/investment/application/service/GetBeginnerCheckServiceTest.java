@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -167,8 +166,8 @@ class GetBeginnerCheckServiceTest {
     @Test
     @DisplayName("budget 이 0 이하이면 IllegalArgumentException(400)")
     void rejectsNonPositiveBudget() {
-        assertThatIllegalArgumentException()
-                .isThrownBy(() -> service.getCheck(STOCK, BigDecimal.ZERO));
+        assertThatThrownBy(() -> service.getCheck(STOCK, BigDecimal.ZERO))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

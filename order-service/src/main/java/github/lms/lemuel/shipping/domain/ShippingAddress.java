@@ -1,4 +1,5 @@
 package github.lms.lemuel.shipping.domain;
+import github.lms.lemuel.shipping.domain.exception.ShipmentInvariantViolationException;
 
 import java.util.Objects;
 
@@ -18,9 +19,9 @@ public record ShippingAddress(
         Objects.requireNonNull(phone, "phone");
         Objects.requireNonNull(postalCode, "postalCode");
         Objects.requireNonNull(address1, "address1");
-        if (recipientName.isBlank()) throw new IllegalArgumentException("수령인 이름 필수");
-        if (phone.isBlank()) throw new IllegalArgumentException("전화번호 필수");
-        if (postalCode.isBlank()) throw new IllegalArgumentException("우편번호 필수");
-        if (address1.isBlank()) throw new IllegalArgumentException("주소 필수");
+        if (recipientName.isBlank()) throw new ShipmentInvariantViolationException("수령인 이름 필수");
+        if (phone.isBlank()) throw new ShipmentInvariantViolationException("전화번호 필수");
+        if (postalCode.isBlank()) throw new ShipmentInvariantViolationException("우편번호 필수");
+        if (address1.isBlank()) throw new ShipmentInvariantViolationException("주소 필수");
     }
 }

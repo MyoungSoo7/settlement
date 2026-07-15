@@ -70,20 +70,19 @@ public class LedgerPersistenceAdapter implements SaveLedgerEntryPort, LoadLedger
     }
 
     private LedgerEntry toDomain(LedgerEntryJpaEntity entity) {
-        LedgerEntry domain = new LedgerEntry();
-        domain.setId(entity.getId());
-        domain.setReferenceId(entity.getReferenceId());
-        domain.setReferenceType(ReferenceType.valueOf(entity.getReferenceType()));
-        domain.setEntryType(LedgerEntryType.valueOf(entity.getEntryType()));
-        domain.setDebitAccount(AccountType.valueOf(entity.getDebitAccount()));
-        domain.setCreditAccount(AccountType.valueOf(entity.getCreditAccount()));
-        domain.setAmount(entity.getAmount());
-        domain.setStatus(LedgerStatus.valueOf(entity.getStatus()));
-        domain.setSettlementDate(entity.getSettlementDate());
-        domain.setPostedAt(entity.getPostedAt());
-        domain.setMemo(entity.getMemo());
-        domain.setCreatedAt(entity.getCreatedAt());
-        domain.setUpdatedAt(entity.getUpdatedAt());
-        return domain;
+        return LedgerEntry.rehydrate(
+                entity.getId(),
+                entity.getReferenceId(),
+                ReferenceType.valueOf(entity.getReferenceType()),
+                LedgerEntryType.valueOf(entity.getEntryType()),
+                AccountType.valueOf(entity.getDebitAccount()),
+                AccountType.valueOf(entity.getCreditAccount()),
+                entity.getAmount(),
+                LedgerStatus.valueOf(entity.getStatus()),
+                entity.getSettlementDate(),
+                entity.getPostedAt(),
+                entity.getMemo(),
+                entity.getCreatedAt(),
+                entity.getUpdatedAt());
     }
 }

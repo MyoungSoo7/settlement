@@ -66,10 +66,10 @@ public class AdjustSettlementForRefundService implements AdjustSettlementForRefu
         LocalDate today = LocalDate.now();
         SettlementAdjustment adjustment = SettlementAdjustment.ofRefund(
                 adjustedSettlement.getId(),
+                refundId,
                 refundAmount,
                 today
         );
-        adjustment.setRefundId(refundId);
         saveSettlementAdjustmentPort.save(adjustment);
 
         log.info("Settlement adjusted for refund. settlementId={}, status={}, netAmount={}, adjustmentAmount={}",

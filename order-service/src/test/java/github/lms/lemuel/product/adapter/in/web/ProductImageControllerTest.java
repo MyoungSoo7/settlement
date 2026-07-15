@@ -36,7 +36,7 @@ class ProductImageControllerTest {
     private static ProductImage image(Long id, Long productId) {
         ProductImage i = ProductImage.create(productId, "a.jpg", "stored.jpg", "/p", "/u",
                 "image/jpeg", 1024L, 100, 100, 0);
-        i.setId(id);
+        i.assignId(id);
         return i;
     }
 

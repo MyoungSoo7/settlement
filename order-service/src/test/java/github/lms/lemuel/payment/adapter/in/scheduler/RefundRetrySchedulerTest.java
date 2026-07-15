@@ -30,7 +30,7 @@ class RefundRetrySchedulerTest {
 
     private Refund failed(Long id, Long paymentId, String amount, String key) {
         Refund r = Refund.request(paymentId, new BigDecimal(amount), key, "FULL_REFUND");
-        r.setId(id);
+        r.assignId(id);
         r.markFailed("이전 PG 실패");
         return r;
     }

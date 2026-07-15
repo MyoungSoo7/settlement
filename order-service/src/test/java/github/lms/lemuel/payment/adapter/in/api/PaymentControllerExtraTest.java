@@ -46,7 +46,7 @@ class PaymentControllerExtraTest {
     @MockitoBean TossPaymentService tossPaymentService;
 
     private PaymentDomain domain(PaymentStatus status) {
-        return new PaymentDomain(1L, 10L, new BigDecimal("15000"), BigDecimal.ZERO,
+        return PaymentDomain.rehydrate(1L, 10L, new BigDecimal("15000"), BigDecimal.ZERO,
                 status, "CARD", "TOSS:tx-1", null, null, null);
     }
 

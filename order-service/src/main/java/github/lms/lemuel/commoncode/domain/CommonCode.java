@@ -1,4 +1,5 @@
 package github.lms.lemuel.commoncode.domain;
+import github.lms.lemuel.commoncode.domain.exception.CommonCodeInvariantViolationException;
 
 import java.time.LocalDateTime;
 
@@ -26,13 +27,13 @@ public class CommonCode {
 
     public static CommonCode create(String groupCode, String code, String label, int sortOrder, String extra1) {
         if (groupCode == null || groupCode.isBlank()) {
-            throw new IllegalArgumentException("그룹코드는 필수입니다.");
+            throw new CommonCodeInvariantViolationException("그룹코드는 필수입니다.");
         }
         if (code == null || code.isBlank()) {
-            throw new IllegalArgumentException("코드는 필수입니다.");
+            throw new CommonCodeInvariantViolationException("코드는 필수입니다.");
         }
         if (label == null || label.isBlank()) {
-            throw new IllegalArgumentException("코드명(label)은 필수입니다.");
+            throw new CommonCodeInvariantViolationException("코드명(label)은 필수입니다.");
         }
         CommonCode commonCode = new CommonCode();
         commonCode.groupCode = groupCode.trim().toUpperCase();
@@ -45,7 +46,7 @@ public class CommonCode {
 
     public void update(String label, int sortOrder, boolean active, String extra1) {
         if (label == null || label.isBlank()) {
-            throw new IllegalArgumentException("코드명(label)은 필수입니다.");
+            throw new CommonCodeInvariantViolationException("코드명(label)은 필수입니다.");
         }
         this.label = label.trim();
         this.sortOrder = sortOrder;
@@ -54,31 +55,44 @@ public class CommonCode {
         this.updatedAt = LocalDateTime.now();
     }
 
-    // Getters & Setters
+    /**
+     * 영속 레코드 복원 팩토리 — no-arg + setter 대신 이 경로로만 도메인을 재구성한다.
+     */
+    public static CommonCode rehydrate(Long id, String groupCode, String code, String label,
+                                       int sortOrder, boolean active, String extra1,
+                                       LocalDateTime createdAt, LocalDateTime updatedAt) {
+        CommonCode c = new CommonCode();
+        c.id = id;
+        c.groupCode = groupCode;
+        c.code = code;
+        c.label = label;
+        c.sortOrder = sortOrder;
+        c.active = active;
+        c.extra1 = extra1;
+        c.createdAt = createdAt;
+        c.updatedAt = updatedAt;
+        return c;
+    }
+
+    /** DB 부여 PK 주입(setter 대체). */
+    public void assignId(Long id) { this.id = id; }
+
+    // Getters
     public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
 
     public String getGroupCode() { return groupCode; }
-    public void setGroupCode(String groupCode) { this.groupCode = groupCode; }
 
     public String getCode() { return code; }
-    public void setCode(String code) { this.code = code; }
 
     public String getLabel() { return label; }
-    public void setLabel(String label) { this.label = label; }
 
     public int getSortOrder() { return sortOrder; }
-    public void setSortOrder(int sortOrder) { this.sortOrder = sortOrder; }
 
     public boolean isActive() { return active; }
-    public void setActive(boolean active) { this.active = active; }
 
     public String getExtra1() { return extra1; }
-    public void setExtra1(String extra1) { this.extra1 = extra1; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 }

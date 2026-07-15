@@ -1,4 +1,7 @@
 package github.lms.lemuel.order.application.service;
+import github.lms.lemuel.order.domain.exception.InvalidOrderStateException;
+
+import github.lms.lemuel.order.domain.exception.InvalidOrderStateException;
 
 import github.lms.lemuel.order.application.port.out.LoadOrderPort;
 import github.lms.lemuel.order.application.port.out.RefundOrderPaymentPort;
@@ -73,7 +76,7 @@ class ChangeOrderStatusServiceTest {
         when(loadOrderPort.findById(1L)).thenReturn(Optional.of(order));
 
         assertThatThrownBy(() -> service.updateStatus(1L, "DELIVERED"))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(InvalidOrderStateException.class);
         verify(saveOrderPort, never()).save(any());
     }
 
@@ -116,7 +119,7 @@ class ChangeOrderStatusServiceTest {
     void approveRefund_afterShipping_deductsShippingFee() {
         OrderItem line = OrderItem.newItem(100L, null, null, "상품A", new BigDecimal("30000"), 1);
         Order order = Order.createMultiItem(1L, List.of(line)); // amount = 30000
-        order.setShippingFee(new BigDecimal("3000"));
+        order.assignShippingFee(new BigDecimal("3000"));
         order.transitionTo(OrderStatus.PAID);
         order.transitionTo(OrderStatus.SHIPPING_PENDING);
         order.transitionTo(OrderStatus.IN_TRANSIT);          // shipped = true
@@ -142,7 +145,7 @@ class ChangeOrderStatusServiceTest {
         when(loadOrderPort.findById(1L)).thenReturn(Optional.of(order));
 
         assertThatThrownBy(() -> service.approveRefund(1L, "사유", "admin"))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(InvalidOrderStateException.class);
         verify(refundOrderPaymentPort, never()).refundOrderPaymentFully(anyLong());
     }
 
@@ -182,7 +185,7 @@ class ChangeOrderStatusServiceTest {
         when(loadOrderPort.findById(1L)).thenReturn(Optional.of(order));
 
         assertThatThrownBy(() -> service.approveCancellation(1L, "취소", "admin"))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(InvalidOrderStateException.class);
         verify(refundOrderPaymentPort, never()).refundOrderPaymentFullyIfPresent(anyLong());
     }
 
@@ -193,7 +196,7 @@ class ChangeOrderStatusServiceTest {
         when(loadOrderPort.findById(1L)).thenReturn(Optional.of(order));
 
         assertThatThrownBy(() -> service.changeShippingStatus(1L, "DELIVERED", "배송완료", "admin"))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(InvalidOrderStateException.class);
         verify(saveOrderPort, never()).save(any());
     }
 }

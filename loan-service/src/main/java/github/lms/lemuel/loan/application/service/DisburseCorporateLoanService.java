@@ -6,7 +6,7 @@ import github.lms.lemuel.loan.application.port.out.LoadCorporateLoanPort;
 import github.lms.lemuel.loan.application.port.out.PublishCorporateLoanEventPort;
 import github.lms.lemuel.loan.application.port.out.SaveCorporateLoanPort;
 import github.lms.lemuel.loan.domain.CorporateLoan;
-import github.lms.lemuel.loan.domain.CorporateLoanNotFoundException;
+import github.lms.lemuel.loan.domain.exception.CorporateLoanNotFoundException;
 import github.lms.lemuel.loan.domain.LoanLedgerEntry;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,7 +37,8 @@ public class DisburseCorporateLoanService implements DisburseCorporateLoanUseCas
     @Override
     @Transactional
     public CorporateLoan disburse(Long loanId) {
-        CorporateLoan loan = loadCorporateLoanPort.findById(loanId)
+        // 비관적 락으로 조회 — 동시 disburse 요청 시 이중지급(전표·이벤트 중복)을 차단한다.
+        CorporateLoan loan = loadCorporateLoanPort.findByIdForUpdate(loanId)
                 .orElseThrow(() -> new CorporateLoanNotFoundException(
                         "기업대출을 찾을 수 없습니다. loanId=" + loanId));
 

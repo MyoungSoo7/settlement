@@ -1,5 +1,7 @@
 package github.lms.lemuel.investment.domain;
 
+import github.lms.lemuel.investment.domain.exception.InvestmentInvariantViolationException;
+
 import java.math.BigDecimal;
 
 /**
@@ -25,10 +27,10 @@ public class SellerFundingView {
     /** settlement.confirmed 수신 — 확정 재원 투영 생성. */
     public static SellerFundingView confirmed(Long settlementId, Long sellerId, BigDecimal amount) {
         if (settlementId == null || sellerId == null) {
-            throw new IllegalArgumentException("settlementId/sellerId 는 필수입니다");
+            throw new InvestmentInvariantViolationException("settlementId/sellerId 는 필수입니다");
         }
         if (amount == null || amount.signum() < 0) {
-            throw new IllegalArgumentException("정산금은 음수일 수 없습니다: " + amount);
+            throw new InvestmentInvariantViolationException("정산금은 음수일 수 없습니다: " + amount);
         }
         return new SellerFundingView(settlementId, sellerId, amount, FundingViewStatus.CONFIRMED);
     }

@@ -128,7 +128,7 @@ management:
     prometheus:
       enabled: true
     health:
-      show-details: always
+      show-details: when-authorized
       show-components: always
       probes:
         enabled: true
@@ -199,6 +199,8 @@ app:
       payment-refunded: lemuel.payment.refunded
       # loan → settlement (상환 차감 결과 수신). loan Outbox 자동 라우팅명(snake_case)과 일치.
       loan-repayment-applied: lemuel.loan.repayment_applied
+      # PG 대사 승인 → 역정산(clawback). 자체 Outbox aggregateType=PgReconciliation 자동 라우팅명과 일치.
+      pg-recon-approved: lemuel.pgreconciliation.discrepancy_approved
   search:
     enabled: false
   # 정산 확정 청크 배치 — 한 청크(트랜잭션)에서 확정할 정산 건수. 롱 트랜잭션/락 보유 시간과 처리량의 균형.
@@ -211,7 +213,8 @@ app:
     poll-delay-ms: ${APP_LEDGER_OUTBOX_POLL_DELAY_MS:5000}
   jwt:
     issuer: ${JWT_ISSUER:lemuel}
-    secret: ${JWT_SECRET:dev-secret-please-override}
+    # 운영 필수 — 기본값 없음(미설정 시 기동 실패, 타 서비스와 동일). 약한 기본값은 토큰 위조 위험이라 제거.
+    secret: ${JWT_SECRET}
     ttl-seconds: ${JWT_TTL_SECONDS:3600}
   # 정산금 출금 (Payout) 정책
   payout:

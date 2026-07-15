@@ -1,4 +1,5 @@
 package github.lms.lemuel.product.application.service;
+import github.lms.lemuel.product.domain.exception.ProductInvariantViolationException;
 
 import github.lms.lemuel.product.application.port.out.LoadTagPort;
 import github.lms.lemuel.product.application.port.out.SaveTagPort;
@@ -42,7 +43,7 @@ class TagServiceTest {
     void getById_notFound() {
         when(loadTagPort.findById(1L)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.getTagById(1L))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(ProductInvariantViolationException.class);
     }
 
     @Test @DisplayName("getAllTags: 전체 태그 조회")

@@ -30,6 +30,7 @@ public class OpsProperties {
     private final Webhook webhook = new Webhook();
     private final Signal signal = new Signal();
     private final Prometheus prometheus = new Prometheus();
+    private final Anomaly anomaly = new Anomaly();
 
     public Map<String, String> getCategoryMapping() {
         return categoryMapping;
@@ -65,6 +66,10 @@ public class OpsProperties {
 
     public Prometheus getPrometheus() {
         return prometheus;
+    }
+
+    public Anomaly getAnomaly() {
+        return anomaly;
     }
 
     public static class Webhook {
@@ -104,6 +109,105 @@ public class OpsProperties {
 
         public void setBucketSeconds(int bucketSeconds) {
             this.bucketSeconds = bucketSeconds;
+        }
+    }
+
+    /**
+     * Phase 3 — 베이스라인 이상 탐지 설정. 판정 임계는 전부 여기서 외부화해 재배포 없이 튜닝한다.
+     *
+     * <p>탐지 대상은 {@link #metricCategory} 의 key 집합(= 실패율 카운터 metric_key) — 값은 이상 시
+     * 생성할 인시던트의 {@code SignalCategory} 이름이다. 인프라 게이지는 Alertmanager 가 커버하므로 제외.
+     */
+    public static class Anomaly {
+        /** 스캐너 빈 토글 — 로컬/테스트 기본 off (Prometheus 폴러와 동일). */
+        private boolean enabled = false;
+        /** 스캔 주기(ms). 버킷 폭(5분)과 일치. */
+        private long scanIntervalMs = 300_000;
+        /** 롤링 베이스라인 윈도우 크기(직전 버킷 수). 12 = 1시간. */
+        private int windowSize = 12;
+        /** 이상으로 볼 z-score 하한. */
+        private double zThreshold = 3.0;
+        /** CRITICAL 승격 z-score 하한 (미만은 WARNING). */
+        private double criticalZThreshold = 5.0;
+        /** 최소 표본 게이트 — 판정 버킷 count_total 하한. */
+        private long minSampleTotal = 30;
+        /** 상대임계 하한 — 판정 버킷 failure_rate 하한(0~1). */
+        private double failureRateFloor = 0.10;
+        /** 정상 복귀 자동해제 조건 — 연속 정상 버킷 수. */
+        private int resolveStreakK = 3;
+        /** metric_key → 인시던트 SignalCategory 이름. key 집합이 곧 탐지 대상 목록. */
+        private Map<String, String> metricCategory = new HashMap<>();
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public long getScanIntervalMs() {
+            return scanIntervalMs;
+        }
+
+        public void setScanIntervalMs(long scanIntervalMs) {
+            this.scanIntervalMs = scanIntervalMs;
+        }
+
+        public int getWindowSize() {
+            return windowSize;
+        }
+
+        public void setWindowSize(int windowSize) {
+            this.windowSize = windowSize;
+        }
+
+        public double getZThreshold() {
+            return zThreshold;
+        }
+
+        public void setZThreshold(double zThreshold) {
+            this.zThreshold = zThreshold;
+        }
+
+        public double getCriticalZThreshold() {
+            return criticalZThreshold;
+        }
+
+        public void setCriticalZThreshold(double criticalZThreshold) {
+            this.criticalZThreshold = criticalZThreshold;
+        }
+
+        public long getMinSampleTotal() {
+            return minSampleTotal;
+        }
+
+        public void setMinSampleTotal(long minSampleTotal) {
+            this.minSampleTotal = minSampleTotal;
+        }
+
+        public double getFailureRateFloor() {
+            return failureRateFloor;
+        }
+
+        public void setFailureRateFloor(double failureRateFloor) {
+            this.failureRateFloor = failureRateFloor;
+        }
+
+        public int getResolveStreakK() {
+            return resolveStreakK;
+        }
+
+        public void setResolveStreakK(int resolveStreakK) {
+            this.resolveStreakK = resolveStreakK;
+        }
+
+        public Map<String, String> getMetricCategory() {
+            return metricCategory;
+        }
+
+        public void setMetricCategory(Map<String, String> metricCategory) {
+            this.metricCategory = metricCategory;
         }
     }
 

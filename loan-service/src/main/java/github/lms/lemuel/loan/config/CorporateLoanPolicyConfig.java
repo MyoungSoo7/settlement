@@ -1,6 +1,6 @@
 package github.lms.lemuel.loan.config;
 
-import github.lms.lemuel.loan.application.service.CorporateCreditPolicy;
+import github.lms.lemuel.loan.domain.CorporateCreditPolicy;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

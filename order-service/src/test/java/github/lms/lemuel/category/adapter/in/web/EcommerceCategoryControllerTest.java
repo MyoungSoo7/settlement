@@ -94,7 +94,7 @@ class EcommerceCategoryControllerTest {
 
     private static EcommerceCategory category(Long id, String name, String slug) {
         EcommerceCategory category = EcommerceCategory.createRoot(name, slug, 0);
-        category.setId(id);
+        category.assignId(id);
         return category;
     }
 }

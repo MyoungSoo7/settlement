@@ -52,11 +52,12 @@ submission/
 |-- src/
 |   |-- .codex-plugin/plugin.json        # manifest (skills + mcpServers)
 |   |-- .mcp.json                        # MCP 4종 등록 (Codex 실측 규격 — cwd:"." + 상대경로)
-|   |-- skills/                          # 스킬 7종 (위 표)
+|   |-- skills/                          # 스킬 9종 (위 표)
 |   |-- mcp/{dart,ecos,news,price}-server.mjs  # 읽기 전용 MCP 서버 (zero-dependency stdio)
 |   |-- dart/ ecos/ naver/ price/ common/      # API 클라이언트 + 공용 모듈
 |   |-- data/sample/                     # 합성 매매내역·보유현황 (정답지 내장)
-|   |-- test/                            # 스모크 5종 + 단일 러너 (run-all.mjs)
+|   |-- test/                            # 결정론 4종 + unit/(네트워크 0) + 스모크 4종 + 단일 러너 (run-all.mjs)
+|   |-- bin/invest-cycle.mjs             # 투자 사이클 상태머신 CLI (전이·게이트 결정론)
 |   |-- bin/install-codex.ps1            # 원큐 설치 (등록→설치→승인→키→스모크)
 |   |-- bin/run-sample.ps1               # 데모 부트스트랩
 |   `-- README-src.md
@@ -71,7 +72,7 @@ powershell -ExecutionPolicy Bypass -File src/bin/install-codex.ps1
 ```
 
 마켓플레이스 등록 → 플러그인 설치 → MCP 승인 config 병합 → `~/.codex/.env` 스캐폴드 →
-스모크 5종 검증까지 한 번에 (멱등 — 재실행 안전).
+테스트 러너(run-all) 검증까지 한 번에 (멱등 — 재실행 안전).
 
 <details><summary>수동 설치 (스크립트 없이)</summary>
 
@@ -101,8 +102,9 @@ codex plugin add kakaopay-invest-companion@kakaopay-invest-companion-market
 동작이 파일 안에 적혀 있다. 키가 없으면 해당 데이터 축만 우아하게 강등되고
 (스킬이 사용자에게 사실을 직접 질문), 샘플 데이터 데모는 키 없이 완전 동작한다.
 
-사전 점검(선택): `node src/test/run-all.mjs` — MCP 3종 + 공용 유틸 스위트 4개가
-ALL GREEN 인지 한 번에 확인 (키 있으면 라이브 검증 포함).
+사전 점검(선택): `node src/test/run-all.mjs` — 결정론 스위트 4개 + 단위(unit, 키·네트워크
+없이 MCP 4종 왕복·오류경로까지 검증) + MCP 스모크 4종이 ALL GREEN 인지 한 번에 확인
+(키 있으면 스모크가 라이브 검증 포함).
 
 ## 데모 시나리오
 
@@ -129,12 +131,14 @@ node src/bin/sector-report.mjs      # → outputs/sector-suitability-<날짜-시
 대신 "현재 기준 최근 30일" 한 칸만 제공한다 (재무 축만 시기별). zero-dependency 원칙은
 docx 생성에도 유지된다(`src/common/docx.mjs` — 무압축 OPC zip 직접 작성).
 
-**투자 사이클 (하네스)** — 상태 파일 기반 루틴 운영. 대화 세션에서:
+**투자 사이클 (하네스)** — 상태머신 CLI(`src/bin/invest-cycle.mjs`) 기반 루틴 운영.
+단계 전이·게이트(빈 단계 건너뛰기 차단)·주차 카운트는 CLI 가 결정론으로 강제하고
+(게이트 실패 exit 1), 스킬은 그 위에서 대화만 담당한다. 대화 세션에서:
 
 ```text
-"투자 사이클 시작해줘. 예산 300만원, 4주 주기."   → P0 준비 + 상태 파일 생성
-"지금 뭐 해야 해?"                              → 상태 파일 읽고 현재 단계 이어가기
-"주간 점검 해줘"                                → P3 추적 (손절선·비중·악재)
+"투자 사이클 시작해줘. 예산 300만원, 4주 주기."   → init (상태 파일 생성, P1 진입)
+"지금 뭐 해야 해?"                              → status 읽고 현재 단계 이어가기
+"주간 점검 해줘"                                → P3 추적: check (손절선·비중 20%·악재)
 ```
 
 비대화(`codex exec`)로 돌릴 때는 `-s workspace-write` 필수 — 샌드박스가 read-only 로

@@ -1,4 +1,5 @@
 package github.lms.lemuel.cart.domain;
+import github.lms.lemuel.cart.domain.exception.CartInvariantViolationException;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,14 +28,14 @@ class CartItemTest {
     @Test @DisplayName("newItem: 수량 0이면 예외")
     void newItem_zeroQuantity() {
         assertThatThrownBy(() -> CartItem.newItem(1L, 1L, 0))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(CartInvariantViolationException.class)
                 .hasMessage("quantity 는 양수여야 합니다");
     }
 
     @Test @DisplayName("newItem: 음수 수량이면 예외")
     void newItem_negativeQuantity() {
         assertThatThrownBy(() -> CartItem.newItem(1L, 1L, -1))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(CartInvariantViolationException.class);
     }
 
     @Test @DisplayName("newItem: variantId null 허용")

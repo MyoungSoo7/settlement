@@ -1,4 +1,5 @@
 package github.lms.lemuel.product.application.service;
+import github.lms.lemuel.product.domain.exception.ProductInvariantViolationException;
 
 import github.lms.lemuel.product.application.port.out.LoadProductImagePort;
 import github.lms.lemuel.product.application.port.out.SaveProductImagePort;
@@ -36,7 +37,7 @@ class ProductImageServiceTest {
     private ProductImage image(Long id, Long productId) {
         ProductImage i = ProductImage.create(productId, "a.jpg", "stored.jpg", "/p", "/u",
                 "image/jpeg", 1024L, 100, 100, 0);
-        i.setId(id);
+        i.assignId(id);
         return i;
     }
 
@@ -62,7 +63,7 @@ class ProductImageServiceTest {
         when(loadPort.findByIdNotDeleted(1L)).thenReturn(Optional.of(img));
 
         assertThatThrownBy(() -> service.setPrimaryImage(10L, 1L))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(ProductInvariantViolationException.class);
     }
 
     @Test @DisplayName("getProductImages - 포트에 위임")
@@ -115,7 +116,7 @@ class ProductImageServiceTest {
         when(loadPort.findByIdNotDeleted(1L)).thenReturn(Optional.of(img));
 
         assertThatThrownBy(() -> service.deleteImage(10L, 1L))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(ProductInvariantViolationException.class);
         verify(fileStorageService, never()).delete(any());
     }
 
@@ -153,7 +154,7 @@ class ProductImageServiceTest {
         ProductImage[] holder = new ProductImage[1];
         when(savePort.save(any())).thenAnswer(inv -> {
             ProductImage p = inv.getArgument(0);
-            if (p.getId() == null) p.setId(1L);
+            if (p.getId() == null) p.assignId(1L);
             holder[0] = p;
             return p;
         });
@@ -193,7 +194,7 @@ class ProductImageServiceTest {
         when(fileStorageService.isValidImageType("text/plain")).thenReturn(false);
 
         assertThatThrownBy(() -> service.uploadImages(10L, List.of(f)))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ProductInvariantViolationException.class)
                 .hasMessageContaining("Invalid image type");
         verify(savePort, never()).save(any());
     }
@@ -208,7 +209,7 @@ class ProductImageServiceTest {
         when(fileStorageService.isValidFileSize(99_999_999L)).thenReturn(false);
 
         assertThatThrownBy(() -> service.uploadImages(10L, List.of(f)))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ProductInvariantViolationException.class)
                 .hasMessageContaining("5MB");
     }
 

@@ -86,8 +86,7 @@ class PaymentRefundedSettlementAdjustConsumerTest {
     @DisplayName("레거시 페이로드(누적만): 정산 기반영 누적치와의 차이로 delta 를 복원해 조정한다")
     void legacyPayload_derivesDeltaFromCumulative() {
         when(processedEventRepository.existsById(any())).thenReturn(false);
-        Settlement settled = settlement(); // refundedAmount 10,000 기반영
-        settled.setRefundedAmount(new BigDecimal("10000"));
+        Settlement settled = settlement(new BigDecimal("10000")); // refundedAmount 10,000 기반영
         when(loadSettlementPort.findByPaymentIdForUpdate(3L)).thenReturn(Optional.of(settled));
         when(adjustUseCase.adjustSettlementForRefund(eq(3L), any(), eq(null))).thenReturn(settled);
 
@@ -104,8 +103,7 @@ class PaymentRefundedSettlementAdjustConsumerTest {
     @DisplayName("레거시 재전송(누적 ≤ 기반영): 조정 없이 processed 마킹 후 ack — 이중 차감 방지")
     void legacyReplay_alreadyApplied_skipsWithoutAdjustment() {
         when(processedEventRepository.existsById(any())).thenReturn(false);
-        Settlement settled = settlement();
-        settled.setRefundedAmount(new BigDecimal("30000"));
+        Settlement settled = settlement(new BigDecimal("30000"));
         when(loadSettlementPort.findByPaymentIdForUpdate(3L)).thenReturn(Optional.of(settled));
 
         Acknowledgment ack = mock(Acknowledgment.class);
@@ -131,11 +129,17 @@ class PaymentRefundedSettlementAdjustConsumerTest {
     }
 
     private Settlement settlement() {
-        return new Settlement(
+        return settlement(BigDecimal.ZERO);
+    }
+
+    private Settlement settlement(BigDecimal refundedAmount) {
+        return Settlement.rehydrate(
                 1L, 3L, 30L,
-                new BigDecimal("100000"), BigDecimal.ZERO,
-                new BigDecimal("3500"), new BigDecimal("96500"),
+                new BigDecimal("100000"), refundedAmount,
+                new BigDecimal("3500"), null,
+                new BigDecimal("96500"),
                 github.lms.lemuel.settlement.domain.SettlementStatus.PROCESSING,
-                LocalDate.now(), null, null, null, null);
+                LocalDate.now(), null, null, null, null, null,
+                null, null, null, false, null);
     }
 }

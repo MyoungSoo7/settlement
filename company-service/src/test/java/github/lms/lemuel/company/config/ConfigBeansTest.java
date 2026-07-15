@@ -41,7 +41,7 @@ class ConfigBeansTest {
     @Test
     @DisplayName("SecurityConfig — CORS 소스는 기본 화이트리스트로 생성된다")
     void corsDefaultOrigins() {
-        SecurityConfig config = new SecurityConfig(new AdminApiKeyFilter(""));
+        SecurityConfig config = new SecurityConfig(new AdminApiKeyFilter(""), null);
         CorsConfigurationSource source = config.corsConfigurationSource();
         assertNotNull(source);
     }
@@ -49,7 +49,7 @@ class ConfigBeansTest {
     @Test
     @DisplayName("SecurityConfig — CORS origins 프로퍼티가 있으면 그 값을 쓴다")
     void corsCustomOrigins() throws Exception {
-        SecurityConfig config = new SecurityConfig(new AdminApiKeyFilter(""));
+        SecurityConfig config = new SecurityConfig(new AdminApiKeyFilter(""), null);
         Field field = SecurityConfig.class.getDeclaredField("corsAllowedOrigins");
         field.setAccessible(true);
         field.set(config, "http://a.example.com,http://b.example.com");

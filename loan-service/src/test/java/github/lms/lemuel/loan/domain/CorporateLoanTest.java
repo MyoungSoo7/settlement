@@ -1,5 +1,7 @@
 package github.lms.lemuel.loan.domain;
 
+import github.lms.lemuel.loan.domain.exception.InvalidLoanStateException;
+import github.lms.lemuel.loan.domain.exception.LoanInvariantViolationException;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -32,39 +34,39 @@ class CorporateLoanTest {
     @Test
     void 종목코드가_6자리가_아니면_예외() {
         assertThatThrownBy(() -> CorporateLoan.request("12345", "X", BigDecimal.TEN, BigDecimal.ZERO, 30, 50, "C"))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(LoanInvariantViolationException.class);
     }
 
     @Test
     void 원금이_0이하면_예외() {
         assertThatThrownBy(() -> CorporateLoan.request("005930", "삼성", BigDecimal.ZERO, BigDecimal.ZERO, 30, 50, "C"))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(LoanInvariantViolationException.class);
     }
 
     @Test
     void 수수료가_음수면_예외() {
         assertThatThrownBy(() -> CorporateLoan.request("005930", "삼성", BigDecimal.TEN, new BigDecimal("-1"), 30, 50, "C"))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(LoanInvariantViolationException.class);
     }
 
     @Test
     void 기간이_0이하면_예외() {
         assertThatThrownBy(() -> CorporateLoan.request("005930", "삼성", BigDecimal.TEN, BigDecimal.ZERO, 0, 50, "C"))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(LoanInvariantViolationException.class);
     }
 
     @Test
     void 신용점수가_범위밖이면_예외() {
         assertThatThrownBy(() -> CorporateLoan.request("005930", "삼성", BigDecimal.TEN, BigDecimal.ZERO, 30, 101, "A"))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(LoanInvariantViolationException.class);
         assertThatThrownBy(() -> CorporateLoan.request("005930", "삼성", BigDecimal.TEN, BigDecimal.ZERO, 30, -1, "A"))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(LoanInvariantViolationException.class);
     }
 
     @Test
     void 신용등급이_비면_예외() {
         assertThatThrownBy(() -> CorporateLoan.request("005930", "삼성", BigDecimal.TEN, BigDecimal.ZERO, 30, 50, " "))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(LoanInvariantViolationException.class);
     }
 
     // ─── 정상 전이 ────────────────────────────────────────────────────────────
@@ -109,27 +111,30 @@ class CorporateLoanTest {
     @Test
     void REQUESTED에서_바로_실행하면_예외() {
         assertThatThrownBy(() -> requested().disburse())
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOfSatisfying(InvalidLoanStateException.class, ex -> {
+                    assertThat(ex.getFrom()).isEqualTo(CorporateLoanStatus.REQUESTED);
+                    assertThat(ex.getTo()).isEqualTo(CorporateLoanStatus.DISBURSED);
+                });
     }
 
     @Test
     void APPROVED에서_다시_승인하면_예외() {
         CorporateLoan loan = requested();
         loan.approve();
-        assertThatThrownBy(loan::approve).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(loan::approve).isInstanceOf(InvalidLoanStateException.class);
     }
 
     @Test
     void APPROVED에서_거절하면_예외() {
         CorporateLoan loan = requested();
         loan.approve();
-        assertThatThrownBy(loan::reject).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(loan::reject).isInstanceOf(InvalidLoanStateException.class);
     }
 
     @Test
     void DISBURSED_전이전에_상환하면_예외() {
         assertThatThrownBy(() -> requested().repay(BigDecimal.TEN))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(InvalidLoanStateException.class);
     }
 
     @Test
@@ -138,9 +143,9 @@ class CorporateLoanTest {
         loan.approve();
         loan.disburse();
         assertThatThrownBy(() -> loan.repay(BigDecimal.ZERO))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(LoanInvariantViolationException.class);
         assertThatThrownBy(() -> loan.repay(null))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(LoanInvariantViolationException.class);
     }
 
     @Test

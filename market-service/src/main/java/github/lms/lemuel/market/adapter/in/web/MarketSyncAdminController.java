@@ -2,6 +2,7 @@ package github.lms.lemuel.market.adapter.in.web;
 
 import github.lms.lemuel.market.application.port.in.SyncQuotesUseCase;
 import github.lms.lemuel.market.application.port.in.SyncResult;
+import github.lms.lemuel.market.audit.application.port.out.RecordAuditPort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -34,19 +35,24 @@ public class MarketSyncAdminController {
     private final SyncQuotesUseCase syncQuotesUseCase;
     private final SyncStatusTracker tracker;
     private final TaskExecutor executor;
+    private final RecordAuditPort recordAuditPort;
 
     public MarketSyncAdminController(SyncQuotesUseCase syncQuotesUseCase,
                                      SyncStatusTracker tracker,
-                                     @Qualifier("syncTaskExecutor") TaskExecutor executor) {
+                                     @Qualifier("syncTaskExecutor") TaskExecutor executor,
+                                     RecordAuditPort recordAuditPort) {
         this.syncQuotesUseCase = syncQuotesUseCase;
         this.tracker = tracker;
         this.executor = executor;
+        this.recordAuditPort = recordAuditPort;
     }
 
     @PostMapping
     public ResponseEntity<Map<String, String>> sync(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate baseDate) {
         String job = "quotes:" + baseDate;
+        recordAuditPort.record("COLLECT_TRIGGERED", "KrxSync", job,
+                Map.of("baseDate", baseDate.toString(), "source", "KRX"));
         return submit(job, () -> syncQuotesUseCase.syncQuotes(baseDate));
     }
 

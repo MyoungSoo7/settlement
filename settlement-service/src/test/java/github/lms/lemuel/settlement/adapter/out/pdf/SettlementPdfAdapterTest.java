@@ -18,13 +18,15 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class SettlementPdfAdapterTest {
 
+    private static final LocalDate BASE_DATE = LocalDate.of(2026, 4, 1);
+
     private final SettlementPdfAdapter adapter = new SettlementPdfAdapter();
 
     @Test
     @DisplayName("REQUESTED 상태 — 환불/실패사유/확정일시 없이 PDF 생성")
     void rendersValidPdfForRequestedStatus() {
-        Settlement settlement = buildSettlement();
-        settlement.setStatus(SettlementStatus.REQUESTED);
+        Settlement settlement = buildSettlement(
+                SettlementStatus.REQUESTED, null, null, BigDecimal.ZERO, BASE_DATE);
 
         byte[] pdf = adapter.render(settlement);
 
@@ -34,8 +36,8 @@ class SettlementPdfAdapterTest {
     @Test
     @DisplayName("PROCESSING 상태 — PDF 생성")
     void rendersValidPdfForProcessingStatus() {
-        Settlement settlement = buildSettlement();
-        settlement.setStatus(SettlementStatus.PROCESSING);
+        Settlement settlement = buildSettlement(
+                SettlementStatus.PROCESSING, null, null, BigDecimal.ZERO, BASE_DATE);
 
         byte[] pdf = adapter.render(settlement);
 
@@ -45,9 +47,8 @@ class SettlementPdfAdapterTest {
     @Test
     @DisplayName("DONE 상태 + 확정일시 포함 — PDF 생성")
     void rendersValidPdfForDoneStatusWithConfirmedAt() {
-        Settlement settlement = buildSettlement();
-        settlement.setStatus(SettlementStatus.DONE);
-        settlement.setConfirmedAt(LocalDateTime.of(2026, 4, 5, 9, 30, 0));
+        Settlement settlement = buildSettlement(
+                SettlementStatus.DONE, LocalDateTime.of(2026, 4, 5, 9, 30, 0), null, BigDecimal.ZERO, BASE_DATE);
 
         byte[] pdf = adapter.render(settlement);
 
@@ -57,9 +58,8 @@ class SettlementPdfAdapterTest {
     @Test
     @DisplayName("DONE 상태 + 확정일시 없음 — PDF 생성 (메타 정보 확정 일시 행 생략)")
     void rendersValidPdfForDoneStatusWithoutConfirmedAt() {
-        Settlement settlement = buildSettlement();
-        settlement.setStatus(SettlementStatus.DONE);
-        settlement.setConfirmedAt(null);
+        Settlement settlement = buildSettlement(
+                SettlementStatus.DONE, null, null, BigDecimal.ZERO, BASE_DATE);
 
         byte[] pdf = adapter.render(settlement);
 
@@ -76,9 +76,8 @@ class SettlementPdfAdapterTest {
     @Test
     @DisplayName("FAILED 상태 + 실패 사유 blank — 실패 사유 섹션 미렌더링 분기 커버")
     void rendersValidPdfForFailedStatusWithBlankFailureReason() {
-        Settlement settlement = buildSettlement();
-        settlement.setStatus(SettlementStatus.FAILED);
-        settlement.setFailureReason("   ");
+        Settlement settlement = buildSettlement(
+                SettlementStatus.FAILED, null, "   ", BigDecimal.ZERO, BASE_DATE);
 
         byte[] pdf = adapter.render(settlement);
 
@@ -88,9 +87,8 @@ class SettlementPdfAdapterTest {
     @Test
     @DisplayName("FAILED 상태 + 실패 사유 null — 실패 사유 섹션 미렌더링 분기 커버")
     void rendersValidPdfForFailedStatusWithNullFailureReason() {
-        Settlement settlement = buildSettlement();
-        settlement.setStatus(SettlementStatus.FAILED);
-        settlement.setFailureReason(null);
+        Settlement settlement = buildSettlement(
+                SettlementStatus.FAILED, null, null, BigDecimal.ZERO, BASE_DATE);
 
         byte[] pdf = adapter.render(settlement);
 
@@ -100,8 +98,8 @@ class SettlementPdfAdapterTest {
     @Test
     @DisplayName("CANCELED 상태 — PDF 생성")
     void rendersValidPdfForCanceledStatus() {
-        Settlement settlement = buildSettlement();
-        settlement.setStatus(SettlementStatus.CANCELED);
+        Settlement settlement = buildSettlement(
+                SettlementStatus.CANCELED, null, null, BigDecimal.ZERO, BASE_DATE);
 
         byte[] pdf = adapter.render(settlement);
 
@@ -111,9 +109,8 @@ class SettlementPdfAdapterTest {
     @Test
     @DisplayName("환불 금액 > 0 — 환불 행 강조 렌더링 분기 커버")
     void rendersValidPdfWithRefundedAmount() {
-        Settlement settlement = buildSettlement();
-        settlement.setStatus(SettlementStatus.PROCESSING);
-        settlement.setRefundedAmount(new BigDecimal("10000"));
+        Settlement settlement = buildSettlement(
+                SettlementStatus.PROCESSING, null, null, new BigDecimal("10000"), BASE_DATE);
 
         byte[] pdf = adapter.render(settlement);
 
@@ -123,9 +120,8 @@ class SettlementPdfAdapterTest {
     @Test
     @DisplayName("환불 금액 == 0 — '—' 텍스트 렌더링 분기 커버")
     void rendersValidPdfWithZeroRefundedAmount() {
-        Settlement settlement = buildSettlement();
-        settlement.setStatus(SettlementStatus.REQUESTED);
-        settlement.setRefundedAmount(BigDecimal.ZERO);
+        Settlement settlement = buildSettlement(
+                SettlementStatus.REQUESTED, null, null, BigDecimal.ZERO, BASE_DATE);
 
         byte[] pdf = adapter.render(settlement);
 
@@ -135,9 +131,8 @@ class SettlementPdfAdapterTest {
     @Test
     @DisplayName("정산일 없음 — 메타 정보 '-' 텍스트 렌더링 분기 커버")
     void rendersValidPdfWithoutSettlementDate() {
-        Settlement settlement = buildSettlement();
-        settlement.setStatus(SettlementStatus.REQUESTED);
-        settlement.setSettlementDate(null);
+        Settlement settlement = buildSettlement(
+                SettlementStatus.REQUESTED, null, null, BigDecimal.ZERO, null);
 
         byte[] pdf = adapter.render(settlement);
 
@@ -154,10 +149,21 @@ class SettlementPdfAdapterTest {
         assertThat(pdf[3]).isEqualTo((byte) 0x46); // F
     }
 
-    private Settlement buildSettlement() {
-        Settlement settlement = Settlement.createFromPayment(
-                101L, 202L, new BigDecimal("100000"), LocalDate.of(2026, 4, 1));
-        settlement.setId(1L);
-        return settlement;
+    /**
+     * 렌더러에 넘길 정산 1건을 원하는 상태로 복원한다. PDF 바이너리 유효성만 검증하므로 금액은
+     * 결제 100,000 @ 3% (commission 3,000 / net 97,000) 스냅샷을 그대로 재사용하고, 테스트별로
+     * 다른 상태·확정일시·실패사유·환불액·정산일만 파라미터로 주입한다.
+     */
+    private Settlement buildSettlement(SettlementStatus status, LocalDateTime confirmedAt,
+                                       String failureReason, BigDecimal refundedAmount,
+                                       LocalDate settlementDate) {
+        return Settlement.rehydrate(
+                1L, 101L, 202L,
+                new BigDecimal("100000"), refundedAmount,
+                new BigDecimal("3000.00"), new BigDecimal("0.03"),
+                new BigDecimal("97000.00"), status, settlementDate,
+                failureReason, confirmedAt,
+                LocalDateTime.now(), LocalDateTime.now(), 0L,
+                BigDecimal.ZERO, BigDecimal.ZERO, null, false, null);
     }
 }

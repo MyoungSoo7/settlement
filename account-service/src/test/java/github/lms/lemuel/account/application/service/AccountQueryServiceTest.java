@@ -1,9 +1,9 @@
 package github.lms.lemuel.account.application.service;
 
-import github.lms.lemuel.account.application.port.in.AccountQueryUseCase.EntryPage;
-import github.lms.lemuel.account.application.port.in.AccountQueryUseCase.InvestmentAggregate;
-import github.lms.lemuel.account.application.port.in.AccountQueryUseCase.LoanAggregate;
-import github.lms.lemuel.account.application.port.in.AccountQueryUseCase.SettlementAggregate;
+import github.lms.lemuel.account.application.port.in.OwnerAccountQuery.EntryPage;
+import github.lms.lemuel.account.application.port.in.AccountAggregateQuery.InvestmentAggregate;
+import github.lms.lemuel.account.application.port.in.AccountAggregateQuery.LoanAggregate;
+import github.lms.lemuel.account.application.port.in.AccountAggregateQuery.SettlementAggregate;
 import github.lms.lemuel.account.application.port.out.LoadAccountEntryPort;
 import github.lms.lemuel.account.domain.AccountEntry;
 import github.lms.lemuel.account.domain.AccountSummary;

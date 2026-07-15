@@ -3,6 +3,11 @@
 - 상태: Accepted
 - 일자: 2026-02-10
 
+> **Update (이후 변경)**: 본문의 모듈 표는 분리 시점(5 서비스)을 기록한다. 이후 `reservation-service`
+> (시공 예약/기사 배정)는 **제거**됐고(모듈·자체 DB·gateway 라우팅·매니페스트 정리), 반대로 loan(기업대출)·
+> financial·economics·company·operation·market·ai·common-data·investment·account 서비스가 추가되어
+> 현재는 **12 서비스 + gateway** 다. Java 25 / Boot 4 / 멀티모듈 분리라는 본 결정은 그대로 유효하다.
+
 ## 컨텍스트
 
 Lemuel 은 본래 단일 모놀리스였다. 주문·결제·정산·시공예약·선정산대출이 한 배포 단위에 묶여 있어

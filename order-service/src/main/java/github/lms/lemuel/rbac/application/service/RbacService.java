@@ -5,6 +5,7 @@ import github.lms.lemuel.rbac.application.port.out.LoadRbacPort;
 import github.lms.lemuel.rbac.application.port.out.SaveRbacPort;
 import github.lms.lemuel.rbac.domain.Permission;
 import github.lms.lemuel.rbac.domain.Role;
+import github.lms.lemuel.rbac.domain.exception.RoleInvariantViolationException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -37,19 +38,20 @@ public class RbacService implements RbacUseCase {
     @Transactional(readOnly = true)
     public Role getRoleById(Long id) {
         return loadRbacPort.findRoleById(id)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 역할 ID: " + id));
+                .orElseThrow(() -> new RoleInvariantViolationException("존재하지 않는 역할 ID: " + id));
     }
 
     @Override
     public Role updateRolePermissions(Long roleId, List<Long> permissionIds) {
         // 역할 존재 여부 확인
         loadRbacPort.findRoleById(roleId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 역할 ID: " + roleId));
+                .orElseThrow(() -> new RoleInvariantViolationException("존재하지 않는 역할 ID: " + roleId));
 
         saveRbacPort.replaceRolePermissions(roleId, permissionIds);
         log.info("역할 권한 갱신 완료: roleId={}, permissionCount={}", roleId,
                 permissionIds == null ? 0 : permissionIds.size());
 
+        // 방금 갱신한 역할을 같은 트랜잭션에서 재조회 — 실패는 발생할 수 없는 내부 불변식이라 generic 유지(프로그래밍 오류 가드).
         return loadRbacPort.findRoleById(roleId)
                 .orElseThrow(() -> new IllegalStateException("역할 재조회 실패: " + roleId));
     }
@@ -66,7 +68,7 @@ public class RbacService implements RbacUseCase {
     @Override
     public Role updateRole(Long roleId, UpdateRoleCommand command) {
         Role role = loadRbacPort.findRoleById(roleId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 역할 ID: " + roleId));
+                .orElseThrow(() -> new RoleInvariantViolationException("존재하지 않는 역할 ID: " + roleId));
         role.rename(command.name(), command.description());
         Role saved = saveRbacPort.saveRole(role);
         log.info("역할 수정: id={}, code={}", saved.getId(), saved.getCode());
@@ -76,9 +78,9 @@ public class RbacService implements RbacUseCase {
     @Override
     public void deleteRole(Long roleId) {
         Role role = loadRbacPort.findRoleById(roleId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 역할 ID: " + roleId));
+                .orElseThrow(() -> new RoleInvariantViolationException("존재하지 않는 역할 ID: " + roleId));
         if (role.isBuiltin()) {
-            throw new IllegalStateException("기본(builtin) 역할은 삭제할 수 없습니다: " + role.getCode());
+            throw new RoleInvariantViolationException("기본(builtin) 역할은 삭제할 수 없습니다: " + role.getCode());
         }
         saveRbacPort.deleteRoleById(roleId);
         log.info("역할 삭제: id={}, code={}", roleId, role.getCode());
@@ -87,7 +89,7 @@ public class RbacService implements RbacUseCase {
     @Override
     public Role cloneRole(Long sourceRoleId, CloneRoleCommand command) {
         Role source = loadRbacPort.findRoleById(sourceRoleId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 역할 ID: " + sourceRoleId));
+                .orElseThrow(() -> new RoleInvariantViolationException("존재하지 않는 역할 ID: " + sourceRoleId));
 
         String name = command.name() == null || command.name().isBlank()
                 ? source.getName() + " (복제)" : command.name();
@@ -102,13 +104,14 @@ public class RbacService implements RbacUseCase {
         log.info("역할 복제: source={}, clone={}, permissionCount={}",
                 source.getCode(), saved.getCode(), permissionIds.size());
 
+        // 방금 저장한 복제 역할을 같은 트랜잭션에서 재조회 — 실패는 발생할 수 없는 내부 불변식이라 generic 유지(프로그래밍 오류 가드).
         return loadRbacPort.findRoleById(saved.getId())
                 .orElseThrow(() -> new IllegalStateException("복제 역할 재조회 실패: " + saved.getId()));
     }
 
     private void assertCodeAvailable(String code) {
         if (loadRbacPort.existsRoleByCode(code)) {
-            throw new IllegalArgumentException("이미 존재하는 역할 코드입니다: " + code);
+            throw new RoleInvariantViolationException("이미 존재하는 역할 코드입니다: " + code);
         }
     }
 }
