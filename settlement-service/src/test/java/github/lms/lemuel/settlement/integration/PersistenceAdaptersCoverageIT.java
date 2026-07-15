@@ -134,6 +134,22 @@ class PersistenceAdaptersCoverageIT {
         jdbc.execute("TRUNCATE TABLE payouts, ledger_entries, settlement_adjustments, settlements RESTART IDENTITY CASCADE");
     }
 
+    /**
+     * 내부 FK 복원(V20260715110000) 이후 payouts/chargebacks/ledger_outbox/settlement_loan_deductions/
+     * settlement_index_queue 의 settlement_id 는 실존 부모 정산을 요구한다 — 자식 행을 만드는 테스트는
+     * 이 헬퍼로 부모 정산을 먼저 시드한다. (payment_id 는 UNIQUE 라 id 와 동일 값 사용.)
+     */
+    private void seedParentSettlement(long settlementId) {
+        jdbc.update("""
+                INSERT INTO settlements
+                  (id, payment_id, order_id, payment_amount, refunded_amount, commission, commission_rate,
+                   net_amount, holdback_amount, holdback_rate, holdback_released, settlement_date, status,
+                   version, created_at, updated_at)
+                VALUES (?, ?, ?, 10000.00, 0.00, 300.00, 0.0300, 9700.00, 0.00, 0.0000, false,
+                        CURRENT_DATE, 'REQUESTED', 0, now(), now())
+                """, settlementId, settlementId, settlementId + 1);
+    }
+
     // ========== Chargeback ==========
 
     @Test
@@ -186,6 +202,7 @@ class PersistenceAdaptersCoverageIT {
     @Test
     @DisplayName("Chargeback: linkSettlement() 후 재저장하면 settlementId 만 갱신되고 상태는 OPEN 유지 (settlementId!=null 보존 분기)")
     void chargeback_linkSettlement_preservesOpenStatus() {
+        seedParentSettlement(777L);
         Chargeback saved = chargebackAdapter.save(
                 Chargeback.open(5004L, null, new BigDecimal("500.00"),
                         ChargebackReason.OTHER, null, ChargebackSource.MANUAL, null));
@@ -206,6 +223,7 @@ class PersistenceAdaptersCoverageIT {
     @Test
     @DisplayName("Payout: 신규 저장 후 findById/findBySettlementId/findByStatus 로 조회된다")
     void payout_save_and_find() {
+        seedParentSettlement(9001L);
         Payout requested = Payout.requestFromSettlement(9001L, 42L, new BigDecimal("70000"), ACCOUNT);
 
         Payout saved = payoutAdapter.save(requested);
@@ -219,6 +237,7 @@ class PersistenceAdaptersCoverageIT {
     @Test
     @DisplayName("Payout: startSending → markCompleted 후 재저장하면 상태/거래ID 가 갱신된다 (update 경로)")
     void payout_lifecycle_update() {
+        seedParentSettlement(9002L);
         Payout saved = payoutAdapter.save(
                 Payout.requestFromSettlement(9002L, 43L, new BigDecimal("30000"), ACCOUNT));
 
@@ -237,6 +256,7 @@ class PersistenceAdaptersCoverageIT {
     @Test
     @DisplayName("Payout: claimForSending 은 REQUESTED 를 원자적으로 SENDING 으로 선점하고, 재호출은 빈 값")
     void payout_claimForSending_atomicClaim() {
+        seedParentSettlement(9003L);
         Payout saved = payoutAdapter.save(
                 Payout.requestFromSettlement(9003L, 44L, new BigDecimal("12000"), ACCOUNT));
 
@@ -255,6 +275,8 @@ class PersistenceAdaptersCoverageIT {
     @DisplayName("Payout: sumCompletedBySellerOn/sumCompletedSystemwideOn 이 당일 COMPLETED 금액만 합산한다")
     void payout_sumCompleted() {
         LocalDate today = LocalDate.now();
+        seedParentSettlement(9004L);
+        seedParentSettlement(9005L);
         Payout p1 = payoutAdapter.save(Payout.requestFromSettlement(9004L, 50L, new BigDecimal("10000"), ACCOUNT));
         p1.startSending(); p1.markCompleted("FB-1");
         payoutAdapter.save(p1);
@@ -403,6 +425,7 @@ class PersistenceAdaptersCoverageIT {
     @Test
     @DisplayName("LedgerOutboxPersistenceAdapter: saveAll 후 findPending 에 나타나고 markDone 후 사라진다")
     void ledgerOutboxPersistenceAdapter_saveAll_findPending_markDone() {
+        seedParentSettlement(8002L);
         ledgerOutboxPersistenceAdapter.saveAll(List.of(LedgerOutboxTask.create(8002L)));
 
         List<LedgerOutboxTask> pending = ledgerOutboxPersistenceAdapter.findPending(10);
@@ -417,6 +440,7 @@ class PersistenceAdaptersCoverageIT {
     @Test
     @DisplayName("LedgerOutboxPersistenceAdapter: markFailed 는 한도 미달이면 PENDING 유지, 한도 도달이면 FAILED 로 전환한다")
     void ledgerOutboxPersistenceAdapter_markFailed_retryVsFailed() {
+        seedParentSettlement(8003L);
         ledgerOutboxPersistenceAdapter.saveAll(List.of(LedgerOutboxTask.create(8003L)));
         Long taskId = ledgerOutboxPersistenceAdapter.findPending(10).get(0).id();
 
@@ -472,6 +496,7 @@ class PersistenceAdaptersCoverageIT {
     @Test
     @DisplayName("SettlementLoanDeductionPersistenceAdapter: record 후 findDeduction 조회, 재기록은 UPSERT 멱등이다")
     void settlementLoanDeduction_record_and_find() {
+        seedParentSettlement(9999L);
         assertThat(loanDeductionAdapter.findDeduction(9999L)).isEmpty();
 
         loanDeductionAdapter.record(9999L, 55L, new BigDecimal("1500.00"));
@@ -487,6 +512,7 @@ class PersistenceAdaptersCoverageIT {
     @Test
     @DisplayName("SettlementIndexQueueJpaEntity: 저장 시 기본값(status=PENDING, retryCount=0, maxRetries=3)과 nextRetryAt 이 설정된다")
     void settlementIndexQueueEntity_defaults() {
+        seedParentSettlement(12345L);
         SettlementIndexQueueJpaEntity entity = new SettlementIndexQueueJpaEntity(12345L, "INDEX");
         LocalDateTime beforeSave = LocalDateTime.now();
 

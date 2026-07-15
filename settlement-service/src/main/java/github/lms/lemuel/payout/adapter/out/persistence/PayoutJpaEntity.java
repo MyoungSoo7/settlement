@@ -30,10 +30,13 @@ public class PayoutJpaEntity {
     @Column(name = "bank_code", nullable = false, length = 10)
     private String bankCode;
 
-    @Column(name = "bank_account_number", nullable = false, length = 50)
+    // 지급계좌 PII — AES-GCM 앱단 암호화(enc:v1 스킴). 컬럼 폭 512 는 V20260716200200 확폭과 일치.
+    @Convert(converter = PayoutFieldEncryptionConverter.class)
+    @Column(name = "bank_account_number", nullable = false, length = 512)
     private String bankAccountNumber;
 
-    @Column(name = "account_holder_name", nullable = false, length = 100)
+    @Convert(converter = PayoutFieldEncryptionConverter.class)
+    @Column(name = "account_holder_name", nullable = false, length = 512)
     private String accountHolderName;
 
     @Enumerated(EnumType.STRING)
@@ -143,5 +146,18 @@ public class PayoutJpaEntity {
         this.completedAt = completedAt;
         this.failedAt = failedAt;
         this.updatedAt = updatedAt;
+    }
+
+    /**
+     * PII 재암호화 백필 전용 — updatedAt 을 갱신해 엔티티를 dirty 로 만든다.
+     *
+     * <p>이 엔티티는 {@code @DynamicUpdate} 가 없어 어떤 필드든 dirty 면 Hibernate 가 <b>전 컬럼 UPDATE</b> 를
+     * 발행한다. 그 UPDATE 에서 {@code bank_account_number}/{@code account_holder_name} 는
+     * {@link PayoutFieldEncryptionConverter#convertToDatabaseColumn} 을 통과하므로, 로드 시 평문으로 읽힌
+     * 값(레거시 평문은 pass-through, 기존 암호문은 복호화된 평문)이 다시 enc:v1 암호문으로 재기록된다.
+     * PII 필드값 자체는 바뀌지 않으므로 이 메서드가 유일한 dirty 유발점이다(값 변경 없이는 flush 가 안 뜬다).
+     */
+    public void markPiiForReencryption(LocalDateTime touchedAt) {
+        this.updatedAt = touchedAt;
     }
 }
