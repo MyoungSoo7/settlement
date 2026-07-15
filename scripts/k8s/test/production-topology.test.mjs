@@ -233,47 +233,134 @@ test("production topology deploys the Operation service and database", () => {
   const operationConfig = readFileSync(operationManifests[1], "utf8");
   const operationDeployment = readFileSync(operationManifests[2], "utf8");
 
-  for (const [kind, name] of [
-    ["PersistentVolume", "operation-db-pv"],
-    ["PersistentVolumeClaim", "operation-db-pvc"],
-    ["StatefulSet", "operation-db"],
-    ["Service", "operation-db-service"],
+  const operationPv = manifestResource(
+    operationDatabase,
+    "PersistentVolume",
+    "operation-db-pv",
+  );
+  const operationPvc = manifestResource(
+    operationDatabase,
+    "PersistentVolumeClaim",
+    "operation-db-pvc",
+  );
+  const operationStatefulSet = manifestResource(
+    operationDatabase,
+    "StatefulSet",
+    "operation-db",
+  );
+  const operationDbService = manifestResource(
+    operationDatabase,
+    "Service",
+    "operation-db-service",
+  );
+  const operationConfigMap = manifestResource(
+    operationConfig,
+    "ConfigMap",
+    "operation-config",
+  );
+  const operationApp = manifestResource(
+    operationDeployment,
+    "Deployment",
+    "operation-app",
+  );
+  const operationService = manifestResource(
+    operationDeployment,
+    "Service",
+    "operation-service",
+  );
+
+  for (const resource of [
+    operationPvc,
+    operationStatefulSet,
+    operationDbService,
+    operationConfigMap,
+    operationApp,
+    operationService,
   ]) {
-    manifestResource(operationDatabase, kind, name);
+    assert.match(resource, /^\s{2}namespace:\s*lemuel\s*$/m);
   }
-  manifestResource(operationConfig, "ConfigMap", "operation-config");
-  manifestResource(operationDeployment, "Deployment", "operation-app");
-  manifestResource(operationDeployment, "Service", "operation-service");
 
   assert.match(
-    operationDeployment,
+    operationApp,
     /image:\s*ghcr\.io\/myoungsoo7\/settlement-operation:latest/,
   );
   assert.match(
-    operationConfig,
+    operationConfigMap,
     /SPRING_DATASOURCE_URL:\s*"jdbc:postgresql:\/\/operation-db-service:5432\/lemuel_operation\?reWriteBatchedInserts=true"/,
   );
-  assert.match(operationDatabase, /name:\s*POSTGRES_DB\s*\r?\n\s*value:\s*lemuel_operation/);
   assert.match(
-    operationConfig,
+    operationConfigMap,
+    /APP_KAFKA_ENABLED:\s*"true"/,
+  );
+  assert.match(
+    operationConfigMap,
     /SPRING_KAFKA_BOOTSTRAP_SERVERS:\s*"redpanda:29092"/,
   );
-  assert.match(operationConfig, /SERVER_PORT:\s*"8080"/);
-  assert.match(operationConfig, /MANAGEMENT_SERVER_PORT:\s*"8080"/);
-  assert.match(operationDeployment, /containerPort:\s*8080/);
-  assert.match(operationDeployment, /port:\s*8080/);
-  assert.match(operationConfig, /JWT_ISSUER:\s*"lemuel-service"/);
-  assert.match(operationConfig, /OPS_PROMETHEUS_ENABLED:\s*"false"/);
-  assert.match(operationConfig, /OPS_ANOMALY_ENABLED:\s*"false"/);
+  assert.match(operationConfigMap, /SERVER_PORT:\s*"8080"/);
+  assert.match(operationConfigMap, /MANAGEMENT_SERVER_PORT:\s*"8080"/);
+  assert.match(operationConfigMap, /JWT_ISSUER:\s*"lemuel-service"/);
+  assert.match(operationConfigMap, /OPS_PROMETHEUS_ENABLED:\s*"false"/);
+  assert.match(operationConfigMap, /OPS_ANOMALY_ENABLED:\s*"false"/);
   assert.match(
-    operationConfig,
+    operationConfigMap,
     /APP_SECURITY_INTERNAL_KEY_REQUIRED:\s*"true"/,
   );
-  assert.match(operationDeployment, /secretRef:\s*\r?\n\s*name:\s*lemuel-secret/);
-  assert.match(operationDatabase, /name:\s*lemuel-secret/);
+
+  assert.match(operationApp, /containerPort:\s*8080/);
   assert.match(
-    operationDatabase,
+    operationApp,
+    /envFrom:\s*\r?\n\s*- configMapRef:\s*\r?\n\s*name:\s*operation-config\s*\r?\n\s*- secretRef:\s*\r?\n\s*name:\s*lemuel-secret/,
+  );
+  assert.match(
+    operationApp,
+    /selector:\s*\r?\n\s*matchLabels:\s*\r?\n\s*app:\s*operation\s*\r?\n\s*tier:\s*backend/,
+  );
+  assert.match(
+    operationService,
+    /selector:\s*\r?\n\s*app:\s*operation\s*\r?\n\s*tier:\s*backend/,
+  );
+  assert.match(
+    operationService,
+    /ports:\s*\r?\n\s*- name:\s*http\s*\r?\n\s*protocol:\s*TCP\s*\r?\n\s*port:\s*8080\s*\r?\n\s*targetPort:\s*8080/,
+  );
+
+  assert.match(operationStatefulSet, /serviceName:\s*operation-db-service/);
+  assert.match(
+    operationStatefulSet,
+    /persistentVolumeClaim:\s*\r?\n\s*claimName:\s*operation-db-pvc/,
+  );
+  assert.match(
+    operationStatefulSet,
+    /name:\s*POSTGRES_DB\s*\r?\n\s*value:\s*lemuel_operation/,
+  );
+  assert.match(
+    operationStatefulSet,
+    /^\s{12}- name:\s*POSTGRES_USER\s*\r?\n\s{14}valueFrom:\s*\r?\n\s{16}secretKeyRef:\s*\r?\n\s{18}name:\s*lemuel-secret\s*\r?\n\s{18}key:\s*POSTGRES_USER\s*$/m,
+  );
+  assert.match(
+    operationStatefulSet,
+    /^\s{12}- name:\s*POSTGRES_PASSWORD\s*\r?\n\s{14}valueFrom:\s*\r?\n\s{16}secretKeyRef:\s*\r?\n\s{18}name:\s*lemuel-secret\s*\r?\n\s{18}key:\s*POSTGRES_PASSWORD\s*$/m,
+  );
+  assert.match(
+    operationStatefulSet,
+    /livenessProbe:\s*\r?\n\s*exec:\s*\r?\n\s*command:\s*\[[^\r\n]*pg_isready/,
+  );
+  assert.match(
+    operationStatefulSet,
+    /readinessProbe:\s*\r?\n\s*exec:\s*\r?\n\s*command:\s*\[[^\r\n]*pg_isready/,
+  );
+
+  assert.match(operationDbService, /clusterIP:\s*None/);
+  assert.match(operationDbService, /selector:\s*\r?\n\s*app:\s*operation-db/);
+  assert.match(
+    operationDbService,
+    /ports:\s*\r?\n\s*- name:\s*postgres\s*\r?\n\s*port:\s*5432\s*\r?\n\s*targetPort:\s*5432/,
+  );
+  assert.match(operationPvc, /matchLabels:\s*\r?\n\s*app:\s*operation-db/);
+  assert.match(operationPv, /^\s{4}app:\s*operation-db\s*$/m);
+  assert.match(
+    operationPv,
     /Single-node only:[^\r\n]*hostPath[^\r\n]*one node/i,
   );
-  assert.match(operationDatabase, /path:\s*\/data\/k8s\/operation-db/);
+  assert.match(operationPv, /path:\s*\/data\/k8s\/operation-db/);
 });
