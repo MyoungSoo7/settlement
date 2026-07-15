@@ -5,11 +5,13 @@ import github.lms.lemuel.investment.adapter.in.web.dto.FundingResponse;
 import github.lms.lemuel.investment.adapter.in.web.dto.InvestmentOrderResponse;
 import github.lms.lemuel.investment.adapter.in.web.dto.InvestmentScoreResponse;
 import github.lms.lemuel.investment.adapter.in.web.dto.PlaceInvestmentOrderRequest;
+import github.lms.lemuel.investment.adapter.in.web.dto.StockRecommendationsResponse;
 import github.lms.lemuel.investment.application.port.in.CancelInvestmentOrderUseCase;
 import github.lms.lemuel.investment.application.port.in.ExecuteInvestmentOrderUseCase;
 import github.lms.lemuel.investment.application.port.in.GetBeginnerCheckUseCase;
 import github.lms.lemuel.investment.application.port.in.GetFundingUseCase;
 import github.lms.lemuel.investment.application.port.in.GetInvestmentScoreUseCase;
+import github.lms.lemuel.investment.application.port.in.GetStockRecommendationsUseCase;
 import github.lms.lemuel.investment.application.port.in.PlaceInvestmentOrderUseCase;
 import github.lms.lemuel.investment.application.port.in.PlaceInvestmentOrderUseCase.PlaceInvestmentOrderCommand;
 import github.lms.lemuel.investment.application.port.out.LoadInvestmentOrderPort;
@@ -44,6 +46,7 @@ public class InvestmentController {
     private final ExecuteInvestmentOrderUseCase executeInvestmentOrderUseCase;
     private final CancelInvestmentOrderUseCase cancelInvestmentOrderUseCase;
     private final GetFundingUseCase getFundingUseCase;
+    private final GetStockRecommendationsUseCase getStockRecommendationsUseCase;
     private final LoadInvestmentOrderPort loadInvestmentOrderPort;
 
     public InvestmentController(GetInvestmentScoreUseCase getInvestmentScoreUseCase,
@@ -52,6 +55,7 @@ public class InvestmentController {
                                 ExecuteInvestmentOrderUseCase executeInvestmentOrderUseCase,
                                 CancelInvestmentOrderUseCase cancelInvestmentOrderUseCase,
                                 GetFundingUseCase getFundingUseCase,
+                                GetStockRecommendationsUseCase getStockRecommendationsUseCase,
                                 LoadInvestmentOrderPort loadInvestmentOrderPort) {
         this.getInvestmentScoreUseCase = getInvestmentScoreUseCase;
         this.getBeginnerCheckUseCase = getBeginnerCheckUseCase;
@@ -59,6 +63,7 @@ public class InvestmentController {
         this.executeInvestmentOrderUseCase = executeInvestmentOrderUseCase;
         this.cancelInvestmentOrderUseCase = cancelInvestmentOrderUseCase;
         this.getFundingUseCase = getFundingUseCase;
+        this.getStockRecommendationsUseCase = getStockRecommendationsUseCase;
         this.loadInvestmentOrderPort = loadInvestmentOrderPort;
     }
 
@@ -72,6 +77,13 @@ public class InvestmentController {
     public ResponseEntity<BeginnerCheckResponse> check(@PathVariable String stockCode,
                                                        @RequestParam(required = false) BigDecimal budget) {
         return ResponseEntity.ok(BeginnerCheckResponse.from(getBeginnerCheckUseCase.getCheck(stockCode, budget)));
+    }
+
+    /** 최신 추천일 기준 종목 추천 세트 — 규칙 스크리닝 산출물(추천일·고지문 필수 포함). */
+    @GetMapping("/recommendations")
+    public ResponseEntity<StockRecommendationsResponse> recommendations() {
+        return ResponseEntity.ok(StockRecommendationsResponse.from(
+                getStockRecommendationsUseCase.getLatestRecommendations()));
     }
 
     @PostMapping("/orders")

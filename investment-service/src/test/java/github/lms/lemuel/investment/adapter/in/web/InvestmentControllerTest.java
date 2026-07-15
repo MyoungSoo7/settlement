@@ -9,6 +9,7 @@ import github.lms.lemuel.investment.application.port.in.ExecuteInvestmentOrderUs
 import github.lms.lemuel.investment.application.port.in.GetBeginnerCheckUseCase;
 import github.lms.lemuel.investment.application.port.in.GetFundingUseCase;
 import github.lms.lemuel.investment.application.port.in.GetInvestmentScoreUseCase;
+import github.lms.lemuel.investment.application.port.in.GetStockRecommendationsUseCase;
 import github.lms.lemuel.investment.application.port.in.PlaceInvestmentOrderUseCase;
 import github.lms.lemuel.investment.application.port.in.PlaceInvestmentOrderUseCase.PlaceInvestmentOrderCommand;
 import github.lms.lemuel.investment.application.port.out.LoadInvestmentOrderPort;
@@ -21,6 +22,7 @@ import github.lms.lemuel.investment.domain.MacroCheck;
 import github.lms.lemuel.investment.domain.NewsRiskCheck;
 import github.lms.lemuel.investment.domain.PricePositionCheck;
 import github.lms.lemuel.investment.domain.SellerFunding;
+import github.lms.lemuel.investment.domain.StockRecommendation;
 import github.lms.lemuel.investment.domain.TradePlanPolicy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -53,6 +55,7 @@ class InvestmentControllerTest {
     private final ExecuteInvestmentOrderUseCase execute = mock(ExecuteInvestmentOrderUseCase.class);
     private final CancelInvestmentOrderUseCase cancel = mock(CancelInvestmentOrderUseCase.class);
     private final GetFundingUseCase getFunding = mock(GetFundingUseCase.class);
+    private final GetStockRecommendationsUseCase getRecommendations = mock(GetStockRecommendationsUseCase.class);
     private final LoadInvestmentOrderPort loadOrder = mock(LoadInvestmentOrderPort.class);
 
     private MockMvc mvc;
@@ -68,7 +71,7 @@ class InvestmentControllerTest {
     @BeforeEach
     void setUp() {
         InvestmentController controller = new InvestmentController(
-                getScore, getCheck, place, execute, cancel, getFunding, loadOrder);
+                getScore, getCheck, place, execute, cancel, getFunding, getRecommendations, loadOrder);
         mvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new InvestmentExceptionHandler())
                 .build();
@@ -104,6 +107,40 @@ class InvestmentControllerTest {
                 .andExpect(jsonPath("$.improvements[0].axis").value("PROFITABILITY"))
                 .andExpect(jsonPath("$.improvements[0].metric").value("operatingMargin"))
                 .andExpect(jsonPath("$.improvements[0].potentialGain").value(4));
+    }
+
+    @Test
+    @DisplayName("GET /recommendations 200 — 추천일·항목(이유/1차매수/손절/익절)·가격규칙·고지문")
+    void recommendations200() throws Exception {
+        when(getRecommendations.getLatestRecommendations()).thenReturn(List.of(
+                StockRecommendation.rehydrate("267260", "HD현대일렉트릭", "전력기기",
+                        "FY2025 매출 +22.8%·영업이익률 24.4%, 규칙 5종 통과",
+                        java.time.LocalDate.of(2026, 7, 15),
+                        new BigDecimal("797000"), new BigDecimal("704000"), new BigDecimal("908000"), 1)));
+
+        mvc.perform(get("/api/investment/recommendations"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recommendedDate").value("2026-07-15"))
+                .andExpect(jsonPath("$.items[0].stockCode").value("267260"))
+                .andExpect(jsonPath("$.items[0].stockName").value("HD현대일렉트릭"))
+                .andExpect(jsonPath("$.items[0].reason").isNotEmpty())
+                .andExpect(jsonPath("$.items[0].entryPrice").value(797000))
+                .andExpect(jsonPath("$.items[0].stopLossPrice").value(704000))
+                .andExpect(jsonPath("$.items[0].takeProfitPrice").value(908000))
+                .andExpect(jsonPath("$.priceRule").isNotEmpty())
+                .andExpect(jsonPath("$.disclaimer").isNotEmpty());
+    }
+
+    @Test
+    @DisplayName("GET /recommendations 200 — 추천 세트 없으면 빈 items + recommendedDate null")
+    void recommendationsEmpty200() throws Exception {
+        when(getRecommendations.getLatestRecommendations()).thenReturn(List.of());
+
+        mvc.perform(get("/api/investment/recommendations"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recommendedDate").doesNotExist())
+                .andExpect(jsonPath("$.items").isEmpty())
+                .andExpect(jsonPath("$.disclaimer").isNotEmpty());
     }
 
     @Test
