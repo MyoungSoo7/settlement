@@ -30,6 +30,12 @@ class RecommendationScreeningPolicyTest {
                 new BigDecimal("820000"), new BigDecimal("500000"), new BigDecimal("-2.8"), false);
     }
 
+    /** CAUTION — 추격 구간(4일 연속 상승) + 52주 고점 근접(-2.8%). */
+    private static PricePositionCheck cautionPrice() {
+        return new PricePositionCheck(PricePositionCheck.Status.CAUTION, LocalDate.of(2026, 7, 15), PRICE,
+                4, true, new BigDecimal("810000"), new BigDecimal("500000"), new BigDecimal("-2.8"), true);
+    }
+
     private static BeginnerInvestmentCheck check(InvestmentScore score, NewsRiskCheck news,
                                                  PricePositionCheck price) {
         TradePlan plan = new TradePlanPolicy().plan(PRICE, null);
@@ -59,11 +65,12 @@ class RecommendationScreeningPolicyTest {
         assertThat(p.stopLossPrice()).isLessThan(p.entryPrice());
         assertThat(p.entryPrice()).isLessThan(p.takeProfitPrice());
         assertThat(p.reason())
-                .contains("규칙 5종 통과")
+                .contains("규칙 통과")
                 .contains("투자점수 82/100(AA)")
                 .contains("영업이익률 24.4%")
                 .contains("매출성장 +22.8%")
-                .contains("최근 뉴스 12건");
+                .contains("최근 뉴스 12건")
+                .doesNotContain("시세 주의");   // OK 는 주의 문구 없음
     }
 
     @Test
@@ -90,17 +97,30 @@ class RecommendationScreeningPolicyTest {
     }
 
     @Test
-    @DisplayName("시세위치 CAUTION(추격/고점근접) — 탈락")
-    void priceCaution() {
-        assertThat(policy.evaluate(check(score(82, InvestmentGrade.AA, true),
-                NewsRiskCheck.of(12, List.of()), price(PricePositionCheck.Status.CAUTION)), SECTOR)).isEmpty();
+    @DisplayName("시세위치 CAUTION(추격/고점근접) — 포함하되 이유문에 '⚠️ 시세 주의' 명시")
+    void priceCautionIncludedWithNote() {
+        Optional<ScreenedPick> pick = policy.evaluate(check(score(82, InvestmentGrade.AA, true),
+                NewsRiskCheck.of(12, List.of()), cautionPrice()), SECTOR);
+
+        assertThat(pick).isPresent();
+        assertThat(pick.get().reason())
+                .contains("⚠️ 시세 주의")
+                .contains("추격 구간(4일 연속 상승)")
+                .contains("52주 고점 근접");
     }
 
     @Test
-    @DisplayName("시세 UNAVAILABLE — 근거 없음, 보수적 탈락")
+    @DisplayName("시세 UNAVAILABLE — 근거 없음(종가 없어 매매계획 불가), 탈락")
     void priceUnavailable() {
         assertThat(policy.evaluate(check(score(82, InvestmentGrade.AA, true),
                 NewsRiskCheck.of(12, List.of()), PricePositionCheck.unavailable()), SECTOR)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("시세 NO_DATA — 종가 없음, 탈락")
+    void priceNoData() {
+        assertThat(policy.evaluate(check(score(82, InvestmentGrade.AA, true),
+                NewsRiskCheck.of(12, List.of()), PricePositionCheck.noData()), SECTOR)).isEmpty();
     }
 
     @Test
