@@ -1,5 +1,6 @@
 package github.lms.lemuel.investment.adapter.out.persistence;
 
+import github.lms.lemuel.investment.domain.StockRecommendation;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -46,6 +47,28 @@ public class StockRecommendationJpaEntity {
     private int displayOrder;
 
     protected StockRecommendationJpaEntity() { }
+
+    private StockRecommendationJpaEntity(LocalDate recommendedDate, String stockCode, String stockName,
+                                         String sector, String reason, BigDecimal entryPrice,
+                                         BigDecimal stopLossPrice, BigDecimal takeProfitPrice,
+                                         int displayOrder) {
+        this.recommendedDate = recommendedDate;
+        this.stockCode = stockCode;
+        this.stockName = stockName;
+        this.sector = sector;
+        this.reason = reason;
+        this.entryPrice = entryPrice;
+        this.stopLossPrice = stopLossPrice;
+        this.takeProfitPrice = takeProfitPrice;
+        this.displayOrder = displayOrder;
+    }
+
+    /** 도메인 추천을 신규 저장 엔티티로 변환한다(id 는 INSERT 시 생성). */
+    public static StockRecommendationJpaEntity fromDomain(StockRecommendation r) {
+        return new StockRecommendationJpaEntity(r.recommendedDate(), r.stockCode(), r.stockName(),
+                r.sector(), r.reason(), r.entryPrice(), r.stopLossPrice(), r.takeProfitPrice(),
+                r.displayOrder());
+    }
 
     public Long getId() { return id; }
     public LocalDate getRecommendedDate() { return recommendedDate; }

@@ -1,8 +1,10 @@
 package github.lms.lemuel;
 
+import github.lms.lemuel.investment.config.ScreeningProperties;
 import io.github.cdimascio.dotenv.Dotenv;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
@@ -21,6 +23,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @SpringBootApplication
 @EnableScheduling
 @EnableCaching
+@EnableConfigurationProperties(ScreeningProperties.class)
 public class InvestmentServiceApplication {
 
     public static void main(String[] args) {

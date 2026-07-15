@@ -145,3 +145,31 @@ app:
       # 발행 (investment → 소비자). Outbox 폴러가 aggregateType="Investment"+eventType 으로
       # 라우팅하는 실제 토픽명(snake_case).
       investment-executed: lemuel.investment.executed
+
+  # 일일 종목 추천 스크리닝 — 평일 장 마감 후 1회, 유니버스를 규칙 스크리닝해 당일 세트를 생성한다.
+  # 외부 서비스가 "전체 종목 리스트" API 를 주지 않아 후보 유니버스를 설정으로 둔다(코스피 대형주 시드).
+  # sector 는 InvestmentScore 에 없어 여기서 지정(세트 표기·업종 분산 기준). 종목 확대는 이 목록만 늘리면 된다.
+  screening:
+    cron: ${APP_SCREENING_CRON:0 0 18 * * MON-FRI}   # 평일 18:00 KST (KRX 15:30 마감 후 시세 확정 여유)
+    zone: ${APP_SCREENING_ZONE:Asia/Seoul}
+    max-picks: ${APP_SCREENING_MAX_PICKS:3}
+    sector-diversify: ${APP_SCREENING_SECTOR_DIVERSIFY:true}
+    universe:
+      - { code: "005930", sector: "반도체" }
+      - { code: "000660", sector: "반도체" }
+      - { code: "267260", sector: "전력기기" }
+      - { code: "068270", sector: "바이오·제약" }
+      - { code: "033780", sector: "필수소비재" }
+      - { code: "005380", sector: "자동차" }
+      - { code: "000270", sector: "자동차" }
+      - { code: "005490", sector: "철강" }
+      - { code: "051910", sector: "화학" }
+      - { code: "006400", sector: "2차전지" }
+      - { code: "035420", sector: "인터넷" }
+      - { code: "035720", sector: "인터넷" }
+      - { code: "105560", sector: "금융" }
+      - { code: "055550", sector: "금융" }
+      - { code: "015760", sector: "유틸리티" }
+      - { code: "012330", sector: "자동차부품" }
+      - { code: "009150", sector: "전자부품" }
+      - { code: "032830", sector: "보험" }
