@@ -52,11 +52,15 @@ async function loadMatrix() {
 
 // ── 2) 뉴스 악재 스캔 (현재 시점 최근 30일 — 소급 불가를 정직하게 명시) ─────
 async function scanNews(matrix) {
-  if (hasFlag('--no-news')) return { skipped: '옵션(--no-news)으로 생략', hitsBySector: {} };
-  if (!CLIENT_ID || !CLIENT_SECRET) return { skipped: 'NAVER 키 없음 — 뉴스 축 생략 (env NAVER_CLIENT_ID/SECRET)', hitsBySector: {} };
+  if (hasFlag('--no-news')) return { skipped: '옵션(--no-news)으로 생략', hitsBySector: {}, failuresBySector: {}, failedCalls: 0, totalCalls: 0 };
+  if (!CLIENT_ID || !CLIENT_SECRET) return { skipped: 'NAVER 키 없음 — 뉴스 축 생략 (env NAVER_CLIENT_ID/SECRET)', hitsBySector: {}, failuresBySector: {}, failedCalls: 0, totalCalls: 0 };
 
   const since = Date.now() - NEWS_WINDOW_DAYS * 86_400_000;
   const hitsBySector = {};
+  // 스캔 "실패"와 "스캔했으나 깨끗"은 다른 결과다 — 실패를 삼키고 '신호 없음'으로
+  // 표기하면 거짓 음성이 된다. 섹터별 실패 콜 수를 집계해 리포트에 함께 표기한다.
+  const failuresBySector = {};
+  let failedCalls = 0;
   const totalCalls = matrix.stocks.length * NEWS_RISK_KEYWORDS.length;
   console.log(`뉴스 악재 스캔 중... (${matrix.stocks.length}종목 × ${NEWS_RISK_KEYWORDS.length}키워드 = ${totalCalls}콜)`);
 
@@ -84,6 +88,8 @@ async function scanNews(matrix) {
           }
         }
       } catch (error) {
+        failedCalls += 1;
+        failuresBySector[stock.sector] = (failuresBySector[stock.sector] ?? 0) + 1;
         console.log(`  ! ${stock.name} ${keyword}: ${String(error.message).slice(0, 60)}`);
       }
       await delay(NEWS_CALL_DELAY_MS);
@@ -97,17 +103,19 @@ async function scanNews(matrix) {
     const seen = new Set();
     hitsBySector[sector] = hitsBySector[sector].filter(h => !seen.has(h.url) && seen.add(h.url));
   }
-  return { skipped: null, hitsBySector };
+  return { skipped: null, hitsBySector, failuresBySector, failedCalls, totalCalls };
 }
 
 // ── 3) docx 조립 ────────────────────────────────────────────────────────────
 function newsCell(news, sector) {
   if (news.skipped) return '생략';
   const hits = news.hitsBySector[sector] ?? [];
-  if (!hits.length) return '신호 없음';
+  const failures = news.failuresBySector?.[sector] ?? 0;
+  // "스캔 실패"는 "신호 없음"이 아니다 — 실패 콜이 있으면 반드시 표기한다 (거짓 음성 방지)
+  if (!hits.length) return failures ? `확인 불가 (스캔 실패 ${failures}콜)` : '신호 없음';
   // 기사 수는 언론 쏠림에 비례해 부풀므로, 신호가 잡힌 "종목 수"를 앞세운다
   const stocks = new Set(hits.map(h => h.code)).size;
-  return `${stocks}종목 (기사 ${hits.length}건)`;
+  return `${stocks}종목 (기사 ${hits.length}건)${failures ? ` · 스캔 실패 ${failures}콜` : ''}`;
 }
 
 function buildBlocks(matrix, news, now) {
@@ -142,6 +150,11 @@ function buildBlocks(matrix, news, now) {
     },
     { type: 'para', text: '▲/▼ 직전 시기 대비 ±0.3 이상 변화 · † 금융업은 부채비율 규칙 제외(4개 규칙 기준 정규화) · 괄호는 종목 수' },
     ...(news.skipped ? [{ type: 'para', text: `뉴스 열: ${news.skipped}`, color: '8A6D3B' }] : []),
+    ...(news.failedCalls > 0 ? [{
+      type: 'para',
+      text: `⚠ 뉴스 스캔 ${news.totalCalls}콜 중 ${news.failedCalls}콜 실패 — 실패한 조회는 "신호 없음"이 아니라 "확인 불가"입니다. 해당 산업군 셀에 실패 콜 수를 표기했으며, 재실행으로 보완하세요.`,
+      color: '8A6D3B',
+    }] : []),
 
     { type: 'heading', level: 2, text: '규칙 정의 (5종)' },
     { type: 'list', items: RULES.map(r => `${r.label} — ${r.detail}`) },
@@ -199,5 +212,6 @@ const outPath = resolveOutPath(now);
 writeFileSync(outPath, docx);
 
 const totalHits = Object.values(news.hitsBySector).reduce((n, hits) => n + hits.length, 0);
-console.log(`\n산업군 ${matrix.sectors.length}개 × 시기 ${matrix.periods.length}개 · 뉴스 악재 ${news.skipped ? '생략' : `${totalHits}건`}`);
+const failNote = news.failedCalls > 0 ? ` · 스캔 실패 ${news.failedCalls}/${news.totalCalls}콜 (리포트에 "확인 불가"로 표기됨)` : '';
+console.log(`\n산업군 ${matrix.sectors.length}개 × 시기 ${matrix.periods.length}개 · 뉴스 악재 ${news.skipped ? '생략' : `${totalHits}건${failNote}`}`);
 console.log(`>>> 저장됨: ${outPath}`);

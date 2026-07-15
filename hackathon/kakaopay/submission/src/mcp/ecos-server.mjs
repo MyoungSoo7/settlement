@@ -15,6 +15,15 @@ import { startJsonRpcServer } from './json-rpc-stdio.mjs';
 const SERVER_NAME = 'invest-companion-ecos';
 const SERVER_VERSION = '0.1.0';
 
+// 시세 축(source/asOf)과 대칭 — 모든 응답에 "언제·어디서" 메타를 강제해
+// trust-explainer 의 근거(출처·시점) 인용을 데이터 계층이 뒷받침한다.
+const ECOS_SOURCE = '한국은행 ECOS OpenAPI (https://ecos.bok.or.kr)';
+const withMeta = data => ({
+  source: ECOS_SOURCE,
+  retrievedAt: new Date().toISOString(),
+  ...(Array.isArray(data) ? { count: data.length, rows: data } : data),
+});
+
 const TOOLS = [
   {
     name: 'ecos_indicator',
@@ -27,8 +36,8 @@ const TOOLS = [
       },
       required: ['code'],
     },
-    run: ({ code, months_back }) =>
-      fetchIndicator(code, { monthsBack: Math.max(1, Math.min(Number(months_back ?? 13), 120)) }),
+    run: async ({ code, months_back }) =>
+      withMeta(await fetchIndicator(code, { monthsBack: Math.max(1, Math.min(Number(months_back ?? 13), 120)) })),
   },
   {
     name: 'ecos_series',
@@ -44,14 +53,14 @@ const TOOLS = [
       },
       required: ['stat_code', 'item_code', 'cycle', 'start', 'end'],
     },
-    run: ({ stat_code, item_code, cycle, start, end }) =>
-      statisticSearch({ statCode: stat_code, itemCode: item_code, cycle, start, end }),
+    run: async ({ stat_code, item_code, cycle, start, end }) =>
+      withMeta(await statisticSearch({ statCode: stat_code, itemCode: item_code, cycle, start, end })),
   },
   {
     name: 'ecos_key_stats',
     description: '한국은행 100대 통계지표 스냅숏 (KeyStatisticList) — GDP·고용·금리·환율·물가 등 거시 환경을 한 번에 훑을 때. 초보 투자자에게 "지금 시장이 어떤 국면인지" 설명하는 브리핑용. 개별 지표 시계열이 필요하면 ecos_indicator / ecos_series 사용.',
     inputSchema: { type: 'object', properties: {} },
-    run: () => keyStatistics(),
+    run: async () => withMeta(await keyStatistics()),
   },
   {
     name: 'ecos_status',

@@ -1,0 +1,25 @@
+{
+  "updatedAt": "2026-07-10",
+  "holdings": [],
+  "watchlist": [
+    {
+      "code": "005930",
+      "name": "Samsung Electronics",
+      "basis": "P1 screen: 2025 revenue and operating profit improved; estimated debt ratio about 29.9%. Candidate for trade-plan dry run.",
+      "cycle": 1
+    },
+    {
+      "code": "035420",
+      "name": "NAVER",
+      "basis": "P1 screen: 2025 revenue and operating profit improved; estimated debt ratio about 41.9%. Candidate for trade-plan dry run.",
+      "cycle": 1
+    },
+    {
+      "code": "005380",
+      "name": "Hyundai Motor",
+      "basis": "P1 watch candidate: revenue improved, but operating profit declined and estimated debt ratio about 188.9%; use conservative review only.",
+      "cycle": 1
+    }
+  ],
+  "excluded": []
+}

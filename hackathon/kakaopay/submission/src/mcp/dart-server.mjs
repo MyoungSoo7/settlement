@@ -18,6 +18,13 @@ import { startJsonRpcServer } from './json-rpc-stdio.mjs';
 
 const ymd = d => d.toISOString().slice(0, 10).replaceAll('-', '');
 const daysAgo = n => new Date(Date.now() - n * 86_400_000);
+// trust-explainer 의 "근거(출처·시점)" 구조를 데이터 계층이 뒷받침한다 —
+// 시세 축(source/asOf)과 대칭으로, DART raw 응답에 언제·어디서 메타를 강제한다.
+const withMeta = data => ({
+  source: 'DART OpenAPI (전자공시시스템, https://opendart.fss.or.kr)',
+  retrievedAt: new Date().toISOString(),
+  ...data,
+});
 const SERVER_NAME = 'invest-companion-dart';
 const SERVER_VERSION = '0.2.0';
 const SECTOR_MATRIX_PATH = join(dirname(fileURLToPath(import.meta.url)), '..', 'data', 'stats', 'sector-matrix.json');
@@ -44,7 +51,7 @@ const TOOLS = [
       properties: { corp_code: { type: 'string', description: 'DART 고유번호 8자리' } },
       required: ['corp_code'],
     },
-    run: ({ corp_code }) => company(corp_code),
+    run: async ({ corp_code }) => withMeta(await company(corp_code)),
   },
   {
     name: 'dart_disclosures',
@@ -59,14 +66,14 @@ const TOOLS = [
       },
       required: ['corp_code'],
     },
-    run: ({ corp_code, days, pblntf_ty, page_count }) => {
+    run: async ({ corp_code, days, pblntf_ty, page_count }) => {
       const n = Math.max(1, Math.min(Number(days ?? 30), 365));
-      return disclosures({
+      return withMeta(await disclosures({
         corpCode: corp_code,
         bgnDe: ymd(daysAgo(n)), endDe: ymd(new Date()),
         pblntfTy: pblntf_ty,
         pageCount: Math.min(Number(page_count ?? 50), 100),
-      });
+      }));
     },
   },
   {
@@ -81,8 +88,8 @@ const TOOLS = [
       },
       required: ['corp_code', 'year'],
     },
-    run: ({ corp_code, year, reprt_code }) =>
-      financialSummary({ corpCode: corp_code, year, reprtCode: reprt_code ?? '11011' }),
+    run: async ({ corp_code, year, reprt_code }) =>
+      withMeta(await financialSummary({ corpCode: corp_code, year, reprtCode: reprt_code ?? '11011' })),
   },
   {
     name: 'dart_financial_full',
@@ -97,8 +104,8 @@ const TOOLS = [
       },
       required: ['corp_code', 'year'],
     },
-    run: ({ corp_code, year, reprt_code, fs_div }) =>
-      financialFull({ corpCode: corp_code, year, reprtCode: reprt_code ?? '11011', fsDiv: fs_div ?? 'CFS' }),
+    run: async ({ corp_code, year, reprt_code, fs_div }) =>
+      withMeta(await financialFull({ corpCode: corp_code, year, reprtCode: reprt_code ?? '11011', fsDiv: fs_div ?? 'CFS' })),
   },
   {
     name: 'sector_suitability',

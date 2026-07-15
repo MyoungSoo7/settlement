@@ -7,12 +7,14 @@
  * zero-dependency zip 해제: EOCD → central directory → local header → inflateRawSync.
  */
 import { inflateRawSync } from 'node:zlib';
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { corpCodeZip } from './client.mjs';
 
-const CACHE = join(dirname(fileURLToPath(import.meta.url)), '..', 'data', 'cache', 'corp-codes.json');
+// CORP_CODES_CACHE env 는 테스트 픽스처 주입용 (네트워크 0 단위테스트 — test/unit 참조)
+const CACHE = process.env.CORP_CODES_CACHE
+  ?? join(dirname(fileURLToPath(import.meta.url)), '..', 'data', 'cache', 'corp-codes.json');
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7일 — 고유번호는 자주 안 바뀐다
 const EOCD_SIGNATURE = 0x06054b50;
 const CENTRAL_DIRECTORY_SIGNATURE = 0x02014b50;
@@ -86,8 +88,13 @@ function rankName(company, keyword) {
 
 export async function loadCorpCodes({ refresh = false, listedOnly = true } = {}) {
   if (!refresh && existsSync(CACHE)) {
-    const cached = JSON.parse(readFileSync(CACHE, 'utf8'));
-    if (Date.now() - new Date(cached.fetchedAt).getTime() < CACHE_TTL_MS) return cached;
+    try {
+      const cached = JSON.parse(readFileSync(CACHE, 'utf8'));
+      if (Date.now() - new Date(cached.fetchedAt).getTime() < CACHE_TTL_MS) return cached;
+    } catch {
+      // 손상된 캐시(쓰기 도중 중단 등)는 miss 로 취급하고 아래에서 재다운로드한다 —
+      // 여기서 throw 하면 수동 삭제 전까지 모든 DART 도구가 영구 실패한다.
+    }
   }
   const zip = await corpCodeZip();
   const xml = unzipSingle(zip).toString('utf8');
@@ -100,7 +107,15 @@ export async function loadCorpCodes({ refresh = false, listedOnly = true } = {})
     companies: listedOnly ? listed : all,
   };
   mkdirSync(dirname(CACHE), { recursive: true });
-  writeFileSync(CACHE, JSON.stringify(data));
+  // 원자적 쓰기 — temp 에 다 쓴 뒤 rename. 프로세스가 도중에 죽어도 부분 JSON 이 남지 않는다.
+  const tmp = `${CACHE}.tmp-${process.pid}`;
+  writeFileSync(tmp, JSON.stringify(data));
+  try {
+    renameSync(tmp, CACHE);
+  } catch (error) {
+    rmSync(tmp, { force: true });   // rename 실패 시 고아 temp 정리 (데이터는 메모리로 반환되므로 동작 지속)
+    throw error;
+  }
   return data;
 }
 
