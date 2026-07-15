@@ -52,6 +52,15 @@ spec:
                 port:
                   number: 8080
 
+          # Operation API만 Gateway를 거쳐 operation-service로 전달
+          - path: /api/ops
+            pathType: Prefix
+            backend:
+              service:
+                name: gateway-service
+                port:
+                  number: 8080
+
           # REST API 전체 (가장 많이 쓰이는 진입점)
           - path: /api
             pathType: Prefix

@@ -236,6 +236,37 @@ test("production topology deploys Gateway and preserves narrow public routing", 
   assert.doesNotMatch(argocd, /(?:argocd-)?image-updater/i);
 });
 
+test("production topology routes the Operation API through Gateway", () => {
+  const gatewayConfig = readFileSync(gatewayManifests[0], "utf8");
+  const ingress = readFileSync("k8s/ingress/ingress.yaml", "utf8");
+  const accountPath = ingressPathBlock(ingress, "/api/account");
+  const operationPath = ingressPathBlock(ingress, "/api/ops");
+  const generalApiPath = ingressPathBlock(ingress, "/api");
+  const ingressLines = ingress.split(/\r?\n/);
+
+  assert.match(
+    gatewayConfig,
+    /OPERATION_SERVICE_URI:\s*"http:\/\/operation-service:8080"/,
+  );
+  assert.match(
+    accountPath,
+    /name:\s*gateway-service[\s\S]*?number:\s*8080/,
+  );
+  assert.match(
+    operationPath,
+    /name:\s*gateway-service[\s\S]*?number:\s*8080/,
+  );
+  assert.match(
+    generalApiPath,
+    /name:\s*lemuel-service[\s\S]*?number:\s*8080/,
+  );
+  assert.ok(
+    ingressLines.findIndex((line) => line.trim() === "- path: /api/ops") <
+      ingressLines.findIndex((line) => line.trim() === "- path: /api"),
+    "/api/ops must appear before the general /api path",
+  );
+});
+
 test("production topology deploys the Operation service and database", () => {
   for (const file of operationManifests) {
     assert.equal(existsSync(file), true, `${file} must exist`);

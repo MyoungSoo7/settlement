@@ -9,3 +9,4 @@ data:
   ORDER_SERVICE_URI: "http://lemuel-service:8080"
   SETTLEMENT_SERVICE_URI: "http://settlement-service:8080"
   ACCOUNT_SERVICE_URI: "http://account-service:8080"
+  OPERATION_SERVICE_URI: "http://operation-service:8080"
