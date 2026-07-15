@@ -77,6 +77,18 @@ function manifestResource(contents, kind, name) {
   return resource;
 }
 
+function manifestContainer(resource, name) {
+  const lines = resource.split(/\r?\n/);
+  const start = lines.findIndex((line) => line === `        - name: ${name}`);
+  assert.notEqual(start, -1, `container/${name} must exist`);
+
+  const nextBlockOffset = lines
+    .slice(start + 1)
+    .findIndex((line) => /^(?: {0,6}\S| {8}- name:)/.test(line));
+  const end = nextBlockOffset === -1 ? lines.length : start + 1 + nextBlockOffset;
+  return lines.slice(start, end).join("\n");
+}
+
 for (const workflow of workflows) {
   test(`${workflow.name} publishes every backend deployment image`, () => {
     assert.equal(existsSync(workflow.file), true, `${workflow.file} must exist`);
@@ -268,6 +280,7 @@ test("production topology deploys the Operation service and database", () => {
     "Service",
     "operation-service",
   );
+  const operationContainer = manifestContainer(operationApp, "operation");
 
   for (const resource of [
     operationPvc,
@@ -281,7 +294,7 @@ test("production topology deploys the Operation service and database", () => {
   }
 
   assert.match(
-    operationApp,
+    operationContainer,
     /image:\s*ghcr\.io\/myoungsoo7\/settlement-operation:latest/,
   );
   assert.match(
@@ -306,25 +319,49 @@ test("production topology deploys the Operation service and database", () => {
     /APP_SECURITY_INTERNAL_KEY_REQUIRED:\s*"true"/,
   );
 
-  assert.match(operationApp, /containerPort:\s*8080/);
+  assert.match(operationContainer, /containerPort:\s*8080/);
   assert.match(
-    operationApp,
+    operationContainer,
     /envFrom:\s*\r?\n\s*- configMapRef:\s*\r?\n\s*name:\s*operation-config\s*\r?\n\s*- secretRef:\s*\r?\n\s*name:\s*lemuel-secret/,
   );
   assert.match(
     operationApp,
-    /selector:\s*\r?\n\s*matchLabels:\s*\r?\n\s*app:\s*operation\s*\r?\n\s*tier:\s*backend/,
+    /selector:\s*\r?\n\s{4}matchLabels:\s*\r?\n\s{6}app:\s*operation\s*\r?\n\s{6}tier:\s*backend\s*\r?\n\s{2}template:/,
+  );
+  assert.match(
+    operationApp,
+    /template:\s*\r?\n\s{4}metadata:\s*\r?\n\s{6}labels:\s*\r?\n\s{8}app:\s*operation\s*\r?\n\s{8}tier:\s*backend\s*\r?\n\s{4}spec:/,
   );
   assert.match(
     operationService,
-    /selector:\s*\r?\n\s*app:\s*operation\s*\r?\n\s*tier:\s*backend/,
+    /selector:\s*\r?\n\s{4}app:\s*operation\s*\r?\n\s{4}tier:\s*backend\s*\r?\n\s{2}ports:/,
   );
   assert.match(
     operationService,
     /ports:\s*\r?\n\s*- name:\s*http\s*\r?\n\s*protocol:\s*TCP\s*\r?\n\s*port:\s*8080\s*\r?\n\s*targetPort:\s*8080/,
   );
+  assert.match(
+    operationContainer,
+    /startupProbe:\s*\r?\n\s*httpGet:\s*\r?\n\s*path:\s*\/actuator\/health\/liveness\s*\r?\n\s*port:\s*8080/,
+  );
+  assert.match(
+    operationContainer,
+    /livenessProbe:\s*\r?\n\s*httpGet:\s*\r?\n\s*path:\s*\/actuator\/health\/liveness\s*\r?\n\s*port:\s*8080/,
+  );
+  assert.match(
+    operationContainer,
+    /readinessProbe:\s*\r?\n\s*httpGet:\s*\r?\n\s*path:\s*\/actuator\/health\/readiness\s*\r?\n\s*port:\s*8080/,
+  );
 
   assert.match(operationStatefulSet, /serviceName:\s*operation-db-service/);
+  assert.match(
+    operationStatefulSet,
+    /selector:\s*\r?\n\s{4}matchLabels:\s*\r?\n\s{6}app:\s*operation-db\s*\r?\n\s{2}template:/,
+  );
+  assert.match(
+    operationStatefulSet,
+    /template:\s*\r?\n\s{4}metadata:\s*\r?\n\s{6}labels:\s*\r?\n\s{8}app:\s*operation-db\s*\r?\n\s{4}spec:/,
+  );
   assert.match(
     operationStatefulSet,
     /persistentVolumeClaim:\s*\r?\n\s*claimName:\s*operation-db-pvc/,
@@ -351,7 +388,10 @@ test("production topology deploys the Operation service and database", () => {
   );
 
   assert.match(operationDbService, /clusterIP:\s*None/);
-  assert.match(operationDbService, /selector:\s*\r?\n\s*app:\s*operation-db/);
+  assert.match(
+    operationDbService,
+    /selector:\s*\r?\n\s{4}app:\s*operation-db\s*\r?\n\s{2}ports:/,
+  );
   assert.match(
     operationDbService,
     /ports:\s*\r?\n\s*- name:\s*postgres\s*\r?\n\s*port:\s*5432\s*\r?\n\s*targetPort:\s*5432/,
