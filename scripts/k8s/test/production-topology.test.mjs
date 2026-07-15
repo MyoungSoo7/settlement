@@ -15,11 +15,12 @@ const workflows = [
   },
 ];
 
-const expectedImageMappings = [
+const expectedImages = [
   ["order-service", ""],
   ["settlement-service", "-settlement"],
   ["gateway-service", "-gateway"],
   ["account-service", "-account"],
+  ["operation-service", "-operation"],
 ];
 
 const accountManifests = [
@@ -92,7 +93,7 @@ for (const workflow of workflows) {
       ),
       ([, module, imageSuffix]) => [module, imageSuffix],
     );
-    assert.deepEqual(configuredMappings, expectedImageMappings);
+    assert.deepEqual(configuredMappings, expectedImages);
 
     assert.match(publishingJob, /^\s*push:\s*true\s*$/m);
     assert.match(

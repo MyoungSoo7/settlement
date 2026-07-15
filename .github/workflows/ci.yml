@@ -197,6 +197,7 @@ jobs:
     #   settlement-service → ghcr.io/myoungsoo7/settlement-settlement
     #   gateway-service    → ghcr.io/myoungsoo7/settlement-gateway
     #   account-service    → ghcr.io/myoungsoo7/settlement-account
+    #   operation-service  → ghcr.io/myoungsoo7/settlement-operation
     strategy:
       matrix:
         include:
@@ -208,6 +209,8 @@ jobs:
             image_suffix: "-gateway"
           - module: account-service
             image_suffix: "-account"
+          - module: operation-service
+            image_suffix: "-operation"
     steps:
       - uses: actions/checkout@v4
 
