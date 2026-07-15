@@ -3,6 +3,7 @@ package github.lms.lemuel.ai.chat.adapter.out.persistence;
 import github.lms.lemuel.ai.chat.domain.ChatMessage;
 import github.lms.lemuel.ai.chat.domain.MessageRole;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -29,6 +30,7 @@ public class ChatMessageJpaEntity {
     @Column(nullable = false, length = 10)
     private MessageRole role;
 
+    @Convert(converter = ChatContentEncryptionConverter.class)
     @Column(nullable = false, columnDefinition = "text")
     private String content;
 
