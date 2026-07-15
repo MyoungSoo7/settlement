@@ -156,4 +156,4 @@ BEGIN
 END;
 $$;
 
-COMMENT ON TABLE audit_logs IS 'commondata 민감 작업(데이터소스 등록=SSRF 게이트·수집 트리거·소스 활성화 토글) 감사 추적. append-only + 월별 파티션. Java 기록 배선은 후속 작업(스키마 선행).';
+COMMENT ON TABLE audit_logs IS 'commondata 민감 작업(데이터소스 등록=SSRF 게이트·수집 트리거·소스 활성화 토글) 감사 추적. append-only + 월별 파티션. 기록 배선 완료 — 자체 audit 어댑터(RecordAuditPort→AuditRecordingAdapter)가 데이터소스 등록(SSRF 짝)·수집 트리거를 실적재.';

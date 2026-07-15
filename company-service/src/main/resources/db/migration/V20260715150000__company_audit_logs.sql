@@ -137,4 +137,4 @@ BEGIN
 END;
 $$;
 
-COMMENT ON TABLE audit_logs IS 'company 민감 작업(문서 업로드/삭제·평판 조작·셀러 링크) 감사 추적. append-only + 월별 파티션. Java 기록 배선은 후속 작업(스키마 선행).';
+COMMENT ON TABLE audit_logs IS 'company 민감 작업(문서 업로드·평판 재계산·수집 트리거) 감사 추적. append-only + 월별 파티션. 기록 배선 완료 — 자체 audit 어댑터(RecordAuditPort→AuditRecordingAdapter)가 실적재.';

@@ -47,8 +47,10 @@ ensure 함수는 존재만으로는 런웨이를 굴리지 못한다 — 호출 
 
 - **order·settlement**: `PartitionMaintenanceScheduler`(`{service}.config`) — `@EventListener(ApplicationReadyEvent)`
   로 부팅 시 1회 + `@Scheduled(월 1회)` + ShedLock `@SchedulerLock` 으로 replicas 중 1개만 롤.
-- **나머지 9개 서비스**(loan·investment·account·operation·company·ai·market·economics·organization):
-  `PartitionMaintenanceRunner implements ApplicationRunner` — 부팅 시 1회 ensure(재배포·재기동 주기로 런웨이 갱신).
+- **나머지 11개 서비스**(loan·investment·account·operation·company·ai·market·economics·organization·
+  financial-statements·common-data): `PartitionMaintenanceRunner implements ApplicationRunner` — 부팅 시 1회
+  + `@Scheduled(월 1회, ensure-cron)` 병행. 단일 인스턴스 전제라 ShedLock 미사용(다중 replicas 확장 시
+  settlement 처럼 `@SchedulerLock` 도입).
 - **fail-open 원칙**: 테스트 DB(create-drop)엔 유지보수 함수가 없어 호출이 실패한다. 유지보수는 보조 작업이므로
   모든 호출을 try-catch(warn 로그)로 감싸 **부팅·스케줄이 절대 실패로 이어지지 않게** 한다.
 - **prune(파기)은 자동 호출하지 않는다**: 금융 감사·원장·멱등 데이터 삭제는 규제·재전송 창을 고려한 운영 판단이라
@@ -85,15 +87,26 @@ ensure 함수는 존재만으로는 런웨이를 굴리지 못한다 — 호출 
 - **레거시 평문 lazy migration**: 복호화 시 `enc:v1:` 접두가 없으면 도입 이전 평문으로 간주해 그대로 반환하고,
   다음 저장 시점(또는 append-only 는 신규 행부터) 암호문으로 전환한다.
 
+### 7. 마스터 데이터 소유권 (companies 3서비스 복제)
+
+상장사 마스터(`companies`)는 financial/company/market 3서비스에 **각 서비스 수집기(DART/뉴스/KRX)가 소유하는
+로컬 스냅샷**으로 복제된다 — DB-per-service 전제상 의도된 설계다.
+
+- **전사 조인키는 `stock_code`**(거래소 종목코드, 불변 자연키). `corp_code`(DART 고유번호)·`name` 은 소스별
+  최신화 시점이 달라 서비스 간 **일시 불일치가 정상 상태**다.
+- 정합 확인은 stock_code 기준 대사(운영 점검 쿼리)로 수행한다. 각 테이블 COMMENT 가 이 계약을 각인한다
+  (financial `V20260718500000` / company `V20260718600000`).
+- 이벤트 기반 마스터 프로젝션(`company.master.updated` 류)으로의 승격은 후속 과제 — 현 규모에선 수집기
+  독립 최신화 + 대사로 충분하다.
+
 ## 결과
 
-- **긍정**: 런웨이 소진 트랩이 배선으로 닫힌다(재기동·월배치가 파티션을 계속 굴림). 파티셔닝/비파티셔닝·리텐션·PK
-  결정이 단일 출처로 고정돼 신규 시계열 테이블 추가 시 판단 기준이 명확하다.
-- **부정/한계**: 부팅 러너 방식(9개 서비스)은 배포 주기가 런웨이보다 길어지면 이론상 소진 가능 —
-  `app.partition.{months,years}-ahead`(기본 월 3 / 연 1)를 넉넉히 잡아 완충한다. 진짜 장기 무중단 운영에서는
-  이들도 스케줄러로 승격하는 것이 다음 단계다.
-- **미적용(후속)**: financial-statements·common-data 서비스도 `ensure_audit_log_partition` 을 보유하나 이번 배선
-  대상에서 제외됐다 — 동일 패턴으로 러너 추가 필요(별도 트랩).
+- **긍정**: 런웨이 소진 트랩이 배선으로 닫힌다 — 전 13개 서비스가 부팅 + 월간 스케줄로 파티션을 굴린다.
+  파티셔닝/비파티셔닝·리텐션·PK·마스터 소유권 결정이 단일 출처로 고정돼 신규 테이블 추가 시 판단 기준이 명확하다.
+- **부정/한계**: 위성 서비스 월간 스케줄은 단일 인스턴스 전제(ShedLock 미사용). ensure 호출은 fail-open(warn)
+  이라 모니터링이 해당 warn 로그와 DEFAULT 파티션 행수를 감시해야 런웨이 문제를 조기 발견한다. 이미 대량
+  적재된 운영 테이블의 최초 파티션 전환(RENAME→전량 복사)은 점검창 전제 — 무중단이 필요하면 ATTACH 기반
+  전환 런북으로 대체한다.
 ```
-설정 키: app.partition.months-ahead(기본 3) · app.partition.years-ahead(기본 1) · app.partition.ensure-cron(order/settlement)
+설정 키: app.partition.months-ahead(기본 3) · app.partition.years-ahead(기본 1) · app.partition.ensure-cron(전 서비스)
 ```
