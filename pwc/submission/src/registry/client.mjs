@@ -50,21 +50,39 @@ export function validateBusinessNumber(value) {
   };
 }
 
+// 재시도 정책: 5xx·네트워크 단절만 최대 3회, 백오프 1s→2s (NTS_RETRY_BASE_MS 로 조정 — 테스트는 1ms).
+// 근거: 배치 실측(2026-07-15, 무작위 50개사)에서 NTS 503 이 21/50(42%) — 서버측 순간 장애·호출 누적
+// 제한 패턴이라 수 초 백오프로 대부분 회수된다. 4xx(키 오류·형식 오류)는 재시도해도 같으므로 즉시 throw.
+const RETRY_ATTEMPTS = 3;
+const retryBaseMs = () => Number(process.env.NTS_RETRY_BASE_MS ?? 1_000);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 async function postJson(path, payload) {
   requireKey();
   const params = new URLSearchParams({ serviceKey: API_KEY });
-  const res = await fetch(`${BASE}/${path}?${params}`, {
-    method: 'POST',
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) {
+  let lastError;
+  for (let attempt = 1; attempt <= RETRY_ATTEMPTS; attempt += 1) {
+    let res;
+    try {
+      res = await fetch(`${BASE}/${path}?${params}`, {
+        method: 'POST',
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+    } catch (error) {
+      lastError = new Error(`NTS business registry ${path} → ${error.message}`);
+      if (attempt < RETRY_ATTEMPTS) { await sleep(retryBaseMs() * attempt); continue; }
+      throw lastError;
+    }
+    const body = await res.json().catch(() => ({}));
+    if (res.ok) return body;
     const message = body?.message ?? body?.errorMessage ?? JSON.stringify(body);
-    throw new Error(`NTS business registry ${path} → HTTP ${res.status}: ${message}`);
+    lastError = new Error(`NTS business registry ${path} → HTTP ${res.status}: ${message}`);
+    if (res.status >= 500 && attempt < RETRY_ATTEMPTS) { await sleep(retryBaseMs() * attempt); continue; }
+    throw lastError;
   }
-  return body;
+  throw lastError;
 }
 
 export async function businessStatusCheck({ businessNumbers }) {

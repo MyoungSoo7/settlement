@@ -28,6 +28,12 @@ node src/bin/diagnose-company.mjs ... --with-news --with-market                 
 node src/bin/engagement-cycle.mjs init --from <파이프라인 산출폴더>       # 권고 조치 → 추적 액션 파생
 node src/bin/engagement-cycle.mjs status|note|delta|advance --engagement <폴더>  # 이행→델타→회고 상태머신
 
+# 분기 브리핑 배치 (목록 일괄 파이프라인 완주 → EVAL PASS 만 company-service 문서함 업로드)
+node src/bin/quarterly-briefing-batch.mjs --period 2026Q2 [--companies <목록JSON>] [--only <기업명>] \
+  [--resume] [--concurrency N --delay-ms ms] [--register <base URL>] [--no-upload] [--judge] \
+  [--escalate-signals N]  # 2단 토큰 절약: 1차 전량 로컬 브리핑(LLM 0) → 재무 신호(E1~E4·E8) N종+ 기업만 LLM 승격
+node src/bin/build-briefing-universe.mjs [--markets KOSPI,KOSDAQ] [--limit N] [--dry-run]  # 상장사 전체 배치 목록 생성 (DART_API_KEY)
+
 # 저수준 도구 (상세 모드 구성요소)
 node src/bin/verify-books.mjs   --data-dir <폴더> [--dart-corp-code 8자리 --dart-unit-scale N]  # 게이트+INV-8
 node src/bin/detect-signals.mjs --data-dir <폴더> [--preset name]                                # 내부 신호 S1~S4
@@ -44,7 +50,8 @@ node src/test/judge-smoke.mjs                                                   
 # 전체 테스트 + 커버리지 게이트 90%
 node --test --experimental-test-coverage --test-coverage-lines=90 \
   --test-coverage-include='src/common/**' --test-coverage-include='src/dart/**' \
-  --test-coverage-include='src/ecos/**'   --test-coverage-include='src/mcp/**' \
+  --test-coverage-include='src/ecos/**'   --test-coverage-include='src/krx/**' \
+  --test-coverage-include='src/mcp/**' \
   --test-coverage-include='src/naver/**'  --test-coverage-include='src/registry/**' \
   --test-coverage-include='src/bin/**' --test-coverage-include='src/test/briefing-eval.mjs' \
   src/test/unit/*.test.mjs
@@ -55,7 +62,7 @@ node --test --experimental-test-coverage --test-coverage-lines=90 \
 ```text
 불변식 게이트 INV-1~7 (+상장사 INV-8 공시 대사)   ← 결정론. FAIL 이면 추론 진입 금지
    ↓
-신호 파생: 내부 S1~S4 / 외부 E1~E5·E8 / 문서 D1      ← 결정론. 임계값 판정 + 근거 수치 계산
+신호 파생: 내부 S1~S4 / 외부 E1~E5·E8 / 시장 E6·E7 / 문서 D1   ← 결정론. 임계값 판정 + 근거 수치 계산
    ↓
 LLM 브리핑 (에이전트: 인과 서술·확신도·판별테스트)  ← 유일한 비결정 구간
    ↓
@@ -203,3 +210,27 @@ LLM 브리핑 (에이전트: 인과 서술·확신도·판별테스트)  ← 유
 
 **전체 183/183 테스트, 커버리지 라인 96.61% (90% 게이트 통과)** — 이 문서의 이전 라운드
 수치(132/132·97.00%)는 당시 기준의 역사 기록으로 보존한다. 미커밋 상태 유지(제출 폴더 커밋 금지).
+
+---
+
+# 문서 정합화 라운드 (2026-07-14) — 유니버스·배치 축 등재 + 제출물 정돈
+
+독립 재조사에서 확인된 제출물 완성도 이슈(깨진 링크·문서 미등재·수치 드리프트·잡물)를 해소했다.
+
+- **깨진 링크 수정**: README 가 링크하던 유령 산출물(`outputs/samsung-ct-ceo-pipeline`,
+  `outputs/sample-internal-e2e`)과 존재하지 않는 `question5.md`·`document/` 참조를 실존
+  산출물(`outputs/삼성전자-ceo-pipeline/` 재현율 2/2·EVAL PASS 재채점 실측, `naver-ceo-pipeline/`
+  EVAL PASS, `outputs/batch/2026Q2/` 20사, 태영건설 백테스트)과 `docs/` 실경로로 교체.
+- **유니버스·배치 축 문서 등재**: `quarterly-briefing-batch.mjs`(병렬화 `--concurrency`·재개
+  `--resume`·기업 마스터 `--register`)와 `build-briefing-universe.mjs`+`dart/universe.mjs` 를
+  이 문서 핵심 명령어·STATUS Implemented 표·README 구조도에 배선. 배치는 큐레이션 배열과
+  유니버스 산출물(`{companies:[...]}`) 두 형태를 모두 소비한다.
+- **커버리지 게이트 정합**: 이 문서의 커버리지 명령에 빠져 있던 `src/krx/**` include 를 추가
+  (AGENTS.md 와 일치화 — 시장 축 E6·E7 코드도 90% 게이트 안). 검증 다이어그램에 시장 E6·E7 등재.
+- **잡물 제거**: Windows `2>nul` 리다이렉트 아티팩트 파일 3개(루트·outputs·batch) 삭제.
+- **남은 보완 후보 (STATUS Next Useful Work 5·6)**: 유니버스 빌더 부분 저장/`--resume`,
+  KRX MCP 서버(현재 시장 축만 CLI 단독). Python(Pillow) 스냅샷 의존은 미설치 시 PNG 만
+  생략되는 선택 의존 — README 요구사항에 고지.
+
+**전체 202/202 테스트, 커버리지 라인 95.56% (90% 게이트 통과, krx include 포함 기준) — 2026-07-14 실측.**
+이전 라운드 수치(183/183·96.61%)는 역사 기록으로 보존한다. 미커밋 상태 유지(제출 폴더 커밋 금지).

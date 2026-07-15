@@ -100,3 +100,38 @@ test('businessStatusCheck — API 오류 응답은 throw, 빈 번호는 거부',
   await assert.rejects(() => registry.businessStatusCheck({ businessNumbers: ['1248100998'] }), /HTTP 401/);
   await assert.rejects(() => registry.businessStatusCheck({ businessNumbers: [] }), /businessNumbers/);
 });
+
+test('postJson 재시도 — 503 이 2회 나와도 3번째 성공을 반환', async () => {
+  process.env.NTS_RETRY_BASE_MS = '1';
+  let calls = 0;
+  stubFetch(() => {
+    calls += 1;
+    if (calls < 3) return jsonRes({ msg: 'API 서버 오류가 발생하였습니다.' }, 503);
+    return jsonRes({ data: [{ b_no: '1248100998', b_stt_cd: '01' }] });
+  });
+  const result = await registry.businessStatusCheck({ businessNumbers: ['1248100998'] });
+  assert.equal(calls, 3);
+  assert.equal(result.data[0].b_stt_cd, '01');
+});
+
+test('postJson 재시도 — 지속 503 은 정확히 3회 시도 후 throw', async () => {
+  process.env.NTS_RETRY_BASE_MS = '1';
+  let calls = 0;
+  stubFetch(() => {
+    calls += 1;
+    return jsonRes({ msg: 'API 서버 오류가 발생하였습니다.' }, 503);
+  });
+  await assert.rejects(() => registry.businessStatusCheck({ businessNumbers: ['1248100998'] }), /HTTP 503/);
+  assert.equal(calls, 3);
+});
+
+test('postJson 재시도 — 4xx 는 재시도 없이 즉시 throw', async () => {
+  process.env.NTS_RETRY_BASE_MS = '1';
+  let calls = 0;
+  stubFetch(() => {
+    calls += 1;
+    return jsonRes({ error: 'bad key' }, 401);
+  });
+  await assert.rejects(() => registry.businessStatusCheck({ businessNumbers: ['1248100998'] }), /HTTP 401/);
+  assert.equal(calls, 1);
+});

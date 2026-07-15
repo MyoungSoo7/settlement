@@ -1,0 +1,41 @@
+
+━━ [1] 기업 식별 게이트 (company_identity_gate) ━━
+  주의: 대표자명과 개업일자가 없어 국세청 진위확인은 생략하고 상태조회만 수행했습니다.
+  식별 확인 — 분석 진행 허용 (C:\Users\iamip\IdeaProjects\kubenetis\settlement\pwc\submission\outputs\batch\2026Q2\에이디테크놀로지\identity.json)
+
+━━ [2] 진단 패킷 생성 (diagnose-company) ━━
+  진단 패킷 저장: C:\Users\iamip\IdeaProjects\kubenetis\settlement\pwc\submission\outputs\batch\2026Q2\에이디테크놀로지\diagnostic-packet.json
+
+━━ [3] 에이전트 브리핑 생성 ━━
+에이전트: claude -p (프롬프트는 stdin 으로 전달)
+브리핑 저장: C:\Users\iamip\IdeaProjects\kubenetis\settlement\pwc\submission\outputs\batch\2026Q2\에이디테크놀로지\briefing.md (2939자)
+
+━━ [4] 자동 채점 (briefing-eval) ━━
+=== 브리핑 채점 (briefing-eval) ===
+
+[재현율] 2/2
+  ok  E3 차입 확대·이자 부담 (마커 4개 @리스크 1 — 차입 확대와 얇은 이자 지급 여력 (E3))
+  ok  E5 공시 행간 (정정·해명 패턴) (마커 2개 @리스크 2 — 정정 공시 반복: 공시 프로세스 품질 신호 (E5))
+
+[확신도 태깅] 포착 신호 모두 태깅됨
+[판별 테스트] 포착 신호 모두 존재
+[구조] 필수 섹션 모두 존재
+
+[정밀도/과잉 확신] 위반 없음
+
+[표현 안전성] 위반 없음
+
+EVAL PASS
+
+━━ [5] 스냅샷 PNG + Word 보고서 렌더 ━━
+  스냅샷 PNG 생성: C:\Users\iamip\IdeaProjects\kubenetis\settlement\pwc\submission\outputs\batch\2026Q2\에이디테크놀로지\executive-summary.png
+  DOCX 생성: C:\Users\iamip\IdeaProjects\kubenetis\settlement\pwc\submission\outputs\batch\2026Q2\에이디테크놀로지\briefing.docx
+
+PIPELINE READY
+identity: C:\Users\iamip\IdeaProjects\kubenetis\settlement\pwc\submission\outputs\batch\2026Q2\에이디테크놀로지\identity.json
+diagnosticPacket: C:\Users\iamip\IdeaProjects\kubenetis\settlement\pwc\submission\outputs\batch\2026Q2\에이디테크놀로지\diagnostic-packet.json
+briefing: C:\Users\iamip\IdeaProjects\kubenetis\settlement\pwc\submission\outputs\batch\2026Q2\에이디테크놀로지\briefing.md
+briefingDocx: C:\Users\iamip\IdeaProjects\kubenetis\settlement\pwc\submission\outputs\batch\2026Q2\에이디테크놀로지\briefing.docx
+executiveSnapshot: C:\Users\iamip\IdeaProjects\kubenetis\settlement\pwc\submission\outputs\batch\2026Q2\에이디테크놀로지\executive-summary.png
+nextSteps: C:\Users\iamip\IdeaProjects\kubenetis\settlement\pwc\submission\outputs\batch\2026Q2\에이디테크놀로지\pipeline-next-steps.md
+

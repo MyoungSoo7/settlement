@@ -1,0 +1,686 @@
+너는 trusted-ceo-agent 플러그인의 ceo-risk-recon 오케스트레이터다.
+아래 진단 패킷은 기업 식별 게이트를 통과한 LG에너지솔루션(사업자등록번호 851-81-02050)의
+공시/거시(+제공 시 내부 CSV) 데이터에서 결정론으로 파생된 신호다.
+패킷의 수치를 그대로 인용해(암산 금지) CEO 서명용 브리핑을 작성하라.
+
+규칙:
+- PRESENT 신호만 리스크로 다룬다. absent 신호를 리스크로 승격하면 오탐으로 채점된다.
+- absent(미발화) 신호는 근거 수치(마커)를 인용하지 말고 "임계값 미달로 미발화" 수준의
+  정성 서술로만 언급하라 — 미발화 신호의 수치를 한 절에 2개 이상 옮겨 적으면 포착(오탐)으로 채점된다.
+- 리스크당: 결론 / 근거(수치+출처) / 왜 문제인가(인과 사슬 — 수치 나열 금지) / 확신도(확인됨|가설) / 판별 테스트 / 권고 조치.
+- 마지막에 "확인 범위와 한계" 절. 단정 표현(분식입니다·확실합니다·명백한) 금지.
+- 다른 설명 없이 마크다운 브리핑 본문만 출력하라.
+
+[진단 패킷]
+{
+  "corp": {
+    "corpCode": "01515323",
+    "name": "(주)엘지에너지솔루션",
+    "stockCode": "373220",
+    "ceo": "김동명",
+    "bizrNo": "8518102050"
+  },
+  "year": 2025,
+  "fsDiv": "CFS",
+  "disclosureWindowDays": 90,
+  "macro": {
+    "indicator": "한국은행 기준금리",
+    "latest": {
+      "time": "20260708",
+      "value": 2.5
+    },
+    "changeFromFirst": 0,
+    "unit": "%"
+  },
+  "presetUsed": null,
+  "externalThresholds": {
+    "arGrowthGapPp": 15,
+    "ocfToOiFloor": 0.8,
+    "inventoryGapPp": 15,
+    "borrowingsGrowthPct": 30,
+    "interestCoverageFloor": 10,
+    "currentRatioFloorPct": 100,
+    "currentRatioWatchPct": 130,
+    "correctionsMin": 3,
+    "clarificationsMin": 1,
+    "accrualRatioCeilingPct": 10,
+    "ocfToNiFloor": 0.5
+  },
+  "externalPresent": 2,
+  "newsSignals": {
+    "enabled": true,
+    "company": "(주)엘지에너지솔루션",
+    "searches": [
+      {
+        "query": "엘지에너지솔루션",
+        "total": 1996,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      },
+      {
+        "query": "엘지에너지솔루션 평판",
+        "total": 8,
+        "display": 8,
+        "sort": "date",
+        "itemCount": 8
+      },
+      {
+        "query": "엘지에너지솔루션 브랜드",
+        "total": 148,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      },
+      {
+        "query": "엘지에너지솔루션 소비자",
+        "total": 120,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      },
+      {
+        "query": "엘지에너지솔루션 투자",
+        "total": 1075,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      },
+      {
+        "query": "엘지에너지솔루션 실적",
+        "total": 408,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      },
+      {
+        "query": "엘지에너지솔루션 재무",
+        "total": 120,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      },
+      {
+        "query": "엘지에너지솔루션 규제",
+        "total": 131,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      },
+      {
+        "query": "엘지에너지솔루션 소송",
+        "total": 64,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      },
+      {
+        "query": "엘지에너지솔루션 구조조정",
+        "total": 28,
+        "display": 10,
+        "sort": "date",
+        "itemCount": 10
+      }
+    ],
+    "totalUniqueItems": 74,
+    "categories": {
+      "reputation": {
+        "id": "reputation",
+        "name": "기업평판/브랜드 이미지",
+        "count": 19,
+        "keywords": [
+          "평판",
+          "이미지",
+          "브랜드",
+          "논란",
+          "불매",
+          "소비자",
+          "고객 불만",
+          "품질",
+          "리콜",
+          "갑질",
+          "민원"
+        ],
+        "examples": [
+          {
+            "title": "[Who Is ?] 장호성 단국대학교 이사장",
+            "description": "QS는 학계 평가(30%), 교수당 논문 피인용수(20%), 졸업생 평판(15%), 교수당 학생 비율(10%), 외국인 교수·학생... 최적의 에너지 관리 솔루션을 도입하기로 했다. 단국대는 \"UN 지속가능발전목표(SDGs) 실천을 선언하는 등...",
+            "pubDate": "Wed, 16 Jul 2025 08:30:00 +0900",
+            "url": "https://www.businesspost.co.kr/BP?command=article_view&num=403561",
+            "naverUrl": "https://www.businesspost.co.kr/BP?command=article_view&num=403561"
+          },
+          {
+            "title": "[이로운 인물탐구] 내달 취임 앞둔 포스코그룹 장인화 회장 후보",
+            "description": "가운데 평판 조회 등을 거친 후보군 22명을 압축해 6명으로 추린 뒤 지난 7일부터 이틀 동안 심층 면접을 진행했다. 최종 후보군에서는 장 전 사장을 비롯해 권영수 전 엘지(LG)에너지솔루션 부회장, 김동섭...",
+            "pubDate": "Mon, 19 Feb 2024 15:18:00 +0900",
+            "url": "https://www.eroun.net/news/articleView.html?idxno=40576",
+            "naverUrl": "https://www.eroun.net/news/articleView.html?idxno=40576"
+          },
+          {
+            "title": "포스코 회장 후보에 장인화 전 사장…“조직문화 개선 기대”",
+            "description": "가운데 평판 조회 등을 거친 후보군 22명을 압축해 6명으로 추린 뒤 지난 7일부터 이틀 동안 심층 면접을 진행했다. 최종 후보군에서는 장 전 사장을 비롯해 권영수 전 엘지(LG)에너지솔루션 부회장, 김동섭 한국석유공사...",
+            "pubDate": "Thu, 08 Feb 2024 18:45:00 +0900",
+            "url": "https://www.hani.co.kr/arti/economy/marketing/1127886.html",
+            "naverUrl": "https://n.news.naver.com/mnews/article/028/0002676408?sid=101"
+          },
+          {
+            "title": "포스코 차기 회장 후보 22명…내부 7명·외부 15명",
+            "description": "5% 이상 보유한 주주와 10개 서치펌으로부터 외부 후보자 20명을 추천받아 1차 심사를 거쳐 ‘외부 평판조회... 그룹 외부에서는 권영수 전 엘지(LG)에너지솔루션 부회장 등이 후보로 거론된다. 다른 후보들과 경합할...",
+            "pubDate": "Wed, 10 Jan 2024 16:33:00 +0900",
+            "url": "https://www.hani.co.kr/arti/economy/marketing/1123812.html",
+            "naverUrl": "https://n.news.naver.com/mnews/article/028/0002672278?sid=101"
+          },
+          {
+            "title": "‘전기차 열등생’ 도요타, 배터리 승부수 주가 급등…파괴력 따져봤다",
+            "description": "실제 엘지(LG)에너지솔루션·삼성에스디아이(SDI)나 중국 시에이티엘(CATL) 등도 전고체 배터리 양산 계획... 물론 도요타는 계획은 예정대로 추진한다는 평판을 갖고 있는데다, 전고체 배터리 관련 기술 특허 등을 가장 많이...",
+            "pubDate": "Wed, 14 Jun 2023 08:03:00 +0900",
+            "url": "https://www.hani.co.kr/arti/economy/car/1095833.html",
+            "naverUrl": "https://n.news.naver.com/mnews/article/028/0002643826?sid=103"
+          }
+        ],
+        "crossCheck": "매출 성장률, 반품/클레임, 고객 이탈, 채널별 매출 변화를 확인"
+      },
+      "industry": {
+        "id": "industry",
+        "name": "관심산업/시장 환경",
+        "count": 24,
+        "keywords": [
+          "업계",
+          "산업",
+          "시장",
+          "트렌드",
+          "수요",
+          "소비동향",
+          "온라인",
+          "플랫폼",
+          "패션",
+          "섬유",
+          "의류"
+        ],
+        "examples": [
+          {
+            "title": "LS일렉트릭, 세계 첫 ‘100%직류 배전 공장’ 가동…AI 전력시장 정조준",
+            "description": "G2는 LS일렉트릭이 LG에너지솔루션과 공동 개발한 차세대 배터리 일체형 ESS PCS로, 직류 전력 제어를... 정기총회에서 LS일렉트릭은 한국전력공사, 한국에너지공대, LS전선, 효성중공업, HD현대일렉트릭, 엘지(LG)전자와...",
+            "pubDate": "Thu, 02 Jul 2026 14:50:00 +0900",
+            "url": "https://www.g-enews.com/view.php?ud=202607021027426822ea14faf6f5_1",
+            "naverUrl": "https://www.g-enews.com/view.php?ud=202607021027426822ea14faf6f5_1"
+          },
+          {
+            "title": "한국거래소, 개별주식 위클리 옵션 상장 연기...시장 안정성 중점 검토",
+            "description": "당초 상장 대상은 삼성전자, 에스케이하이닉스, 현대차, 엘지에너지솔루션을 기초자산으로 하는 4개 상품이었다. 위클리 옵션은 만기가 1주일 단위로 돌아오는 옵션 상품으로, 짧은 기간 주가 변동에 맞춰 투자하거나...",
+            "pubDate": "Thu, 25 Jun 2026 13:54:00 +0900",
+            "url": "https://www.tokenpost.kr/news/market/372670",
+            "naverUrl": "https://www.tokenpost.kr/news/market/372670"
+          },
+          {
+            "title": "2035년까지 배달용 신규 이륜차 60% 이상 '전기이륜차'로 전환",
+            "description": "배달서비스공제조합, 엘지 에너지솔루션, 한국자동차환경협회 등과 배달용 전기이륜차 보급 활성화를 위한... 신뢰와 브랜드 가치를 높일 수 있을 것으로 보인다. 이에 기후부는 전기이륜차 업계 관계자 및 관련...",
+            "pubDate": "Sat, 07 Feb 2026 09:24:00 +0900",
+            "url": "https://www.gukjenews.com/news/articleView.html?idxno=3500547",
+            "naverUrl": "https://www.gukjenews.com/news/articleView.html?idxno=3500547"
+          },
+          {
+            "title": "2035년까지 배달용 신규 이륜차 60% 이상 '전기이륜차'로 전환",
+            "description": "배달서비스공제조합, 엘지 에너지솔루션, 한국자동차환경협회 등과 배달용 전기이륜차 보급 활성화를 위한... 신뢰와 브랜드 가치를 높일 수 있을 것으로 보인다. 이에 기후부는 전기이륜차 업계 관계자 및 관련...",
+            "pubDate": "Fri, 06 Feb 2026 11:00:00 +0900",
+            "url": "http://www.marketnews.co.kr/news/articleView.html?idxno=73862",
+            "naverUrl": "http://www.marketnews.co.kr/news/articleView.html?idxno=73862"
+          },
+          {
+            "title": "배달용 이륜차 전동화로 매연‧소음 저감 나서",
+            "description": "무빙), △배달서비스공제조합, △엘지(LG) 에너지솔루션, △한국자동차환경협회 등과 배달용 전기이륜차... 자사(브랜드)의 가치를 제고할 수 있을 것으로 보인다. 한편, 기후부는 전기이륜차 업계 관계자 및 관련...",
+            "pubDate": "Thu, 05 Feb 2026 17:58:00 +0900",
+            "url": "http://www.ikld.kr/news/articleView.html?idxno=329030",
+            "naverUrl": "http://www.ikld.kr/news/articleView.html?idxno=329030"
+          }
+        ],
+        "crossCheck": "재고 증가율, 매출 성장률, 사업부별 성장률, ECOS 물가/금리 환경을 확인"
+      },
+      "investment": {
+        "id": "investment",
+        "name": "투자동향/자금소요",
+        "count": 16,
+        "keywords": [
+          "투자",
+          "증설",
+          "설비",
+          "물류",
+          "자동화",
+          "인수",
+          "M&A",
+          "유상증자",
+          "자금조달",
+          "CAPEX"
+        ],
+        "examples": [
+          {
+            "title": "코스피 5% 급등에 매수 사이드카…“AI 투자 기대감 회복”",
+            "description": "현대차는 4.83%, 엘지(LG)에너지솔루션은 3.99% 올랐다. 시가총액 상위 50종목 모두가 빨간불을 켰고, 전체 917종목 가운데 830종목이 상승(74종목 하락)하고 있다. 이날 코스피 반등세는 간밤 미국 증시에서 반도체...",
+            "pubDate": "Fri, 10 Jul 2026 13:48:00 +0900",
+            "url": "https://www.hani.co.kr/arti/economy/finance/1267681.html",
+            "naverUrl": "https://n.news.naver.com/mnews/article/028/0002813571?sid=101"
+          },
+          {
+            "title": "한국거래소, 개별주식 위클리 옵션 상장 연기...시장 안정성 중점 검토",
+            "description": "당초 상장 대상은 삼성전자, 에스케이하이닉스, 현대차, 엘지에너지솔루션을 기초자산으로 하는 4개 상품이었다. 위클리 옵션은 만기가 1주일 단위로 돌아오는 옵션 상품으로, 짧은 기간 주가 변동에 맞춰 투자하거나...",
+            "pubDate": "Thu, 25 Jun 2026 13:54:00 +0900",
+            "url": "https://www.tokenpost.kr/news/market/372670",
+            "naverUrl": "https://www.tokenpost.kr/news/market/372670"
+          },
+          {
+            "title": "삼성자산운용, 전고체 배터리와 에너지 저장장치 결합 ETF 출시",
+            "description": "운용 전략의 중심에는 국내 배터리 대표주인 삼성에스디아이와 엘지에너지솔루션이 있다. 삼성자산운용은 이 두 기업에 전체 자산의 50% 비중으로 집중 투자하는 것을 목표로 삼았다. 전고체배터리는 액체 전해질 대신...",
+            "pubDate": "Tue, 23 Jun 2026 11:04:00 +0900",
+            "url": "https://www.tokenpost.kr/news/economy/371939",
+            "naverUrl": "https://www.tokenpost.kr/news/economy/371939"
+          },
+          {
+            "title": "배터리 과잉투자의 숙취…하이브리드차·ESS용 전환으로 속도 내야",
+            "description": "엘지(LG)에너지솔루션(이하 LG엔솔), 파나소닉 등 테슬라에 배터리를 납품하는 회사들의 주가가 급락했다.... 프랑스, 이탈리아 등 주요 자동차 브랜드가 있는 국가들은 전기차 전환 정책에 반기를 들었다. 결국 유럽은...",
+            "pubDate": "Fri, 06 Feb 2026 09:02:00 +0900",
+            "url": "https://www.hani.co.kr/arti/economy/economy_general/1243632.html",
+            "naverUrl": "https://n.news.naver.com/mnews/article/028/0002790281?sid=101"
+          },
+          {
+            "title": "기후부 이호현 2차관, 미국 방문…원자력·전력망·ESS 협력 확대 노력",
+            "description": "이어 ▲국가 전력망 선제 투자(플러그인 그리드) ▲GW급 에너지저장장치 등 유연성 자원 확보 ▲장기계약... 한화에너지, 엘지에너지솔루션(LG에너지솔루션), 삼성중공업, 효성중공업, 엘에스일렉트릭(LS일렉트릭)...",
+            "pubDate": "Fri, 12 Jun 2026 10:20:00 +0900",
+            "url": "http://www.e-platform.net/news/articleView.html?idxno=102970",
+            "naverUrl": "http://www.e-platform.net/news/articleView.html?idxno=102970"
+          }
+        ],
+        "crossCheck": "차입금, 이자보상배율, 투자 현금흐름, 유동비율을 확인"
+      },
+      "business": {
+        "id": "business",
+        "name": "사업동향/제휴/확장",
+        "count": 11,
+        "keywords": [
+          "진출",
+          "제휴",
+          "계약",
+          "수주",
+          "공급",
+          "파트너",
+          "신사업",
+          "출점",
+          "매장",
+          "해외",
+          "브랜드 론칭"
+        ],
+        "examples": [
+          {
+            "title": "삼성SDI 배터리 탑재한 벤츠 전기차 나온다",
+            "description": "독일 완성차 브랜드 메르세데스-벤츠가 삼성에스디아이(SDI)와 차세대 전기차용 고성능 배터리 공급 계약을 체결했다. 엘지에너지솔루션에 이어 삼성에스디아이와도 계약을 맺고 국내 배터리 업체와의 미래 모빌리티...",
+            "pubDate": "Mon, 20 Apr 2026 15:02:00 +0900",
+            "url": "https://www.hani.co.kr/arti/economy/economy_general/1255002.html",
+            "naverUrl": "https://n.news.naver.com/mnews/article/028/0002801538?sid=101"
+          },
+          {
+            "title": "기후부 이호현 2차관, 미국 방문…원자력·전력망·ESS 협력 확대 노력",
+            "description": "이어 ▲국가 전력망 선제 투자(플러그인 그리드) ▲GW급 에너지저장장치 등 유연성 자원 확보 ▲장기계약... 한화에너지, 엘지에너지솔루션(LG에너지솔루션), 삼성중공업, 효성중공업, 엘에스일렉트릭(LS일렉트릭)...",
+            "pubDate": "Fri, 12 Jun 2026 10:20:00 +0900",
+            "url": "http://www.e-platform.net/news/articleView.html?idxno=102970",
+            "naverUrl": "http://www.e-platform.net/news/articleView.html?idxno=102970"
+          },
+          {
+            "title": "한·미, '에너지안보 협력' 강화...기후차관, 원자력협정 70주년 맞아 워...",
+            "description": "국가전력망 선제 투자, 기가와트(GW)급 ESS 등 유연성 자원 확보, 장기계약·유연성 시장 도입, 전력 거버넌스... 한화에너지, 엘지에너지솔루션, 삼성중공업, 효성중공업, 엘에스일렉트릭, 엘에스전선, 두산에너빌리티 등...",
+            "pubDate": "Thu, 11 Jun 2026 15:28:00 +0900",
+            "url": "http://www.metroseoul.co.kr/article/20260611500299",
+            "naverUrl": "http://www.metroseoul.co.kr/article/20260611500299"
+          },
+          {
+            "title": "LG엔솔, 4조원 전기차 배터리도 계약 해지…이달에만 연매출 절반 증발",
+            "description": "지난해 매출 25조6200억원의 53%에 달하는 규모다. 다만, 엘지에너지솔루션은 전용 설비 투자나 연구개발 비용이 투입되지 않았기 때문에 계약 해지에 따른 재무적 타격은 제한적일 것이라고 보고 있다.",
+            "pubDate": "Fri, 26 Dec 2025 17:30:00 +0900",
+            "url": "https://www.hani.co.kr/arti/economy/economy_general/1236725.html",
+            "naverUrl": "https://n.news.naver.com/mnews/article/028/0002783515?sid=101"
+          },
+          {
+            "title": "[기고] 글로벌 기업들이 몰리는 오하이오, 한국 기업의 미국 진출 교두...",
+            "description": "한국에서는 엘지에너지솔루션과 일본 혼다의 합작사, LGES-Honda Battery company 등이 오하이오에 본사와... 최고재무책임자로 일하면서 일군 재산의 일부를 세브란스 병원 설립 기금으로 제공하는 등 오하이오와...",
+            "pubDate": "Tue, 12 Aug 2025 11:44:00 +0900",
+            "url": "http://dream.kotra.or.kr/kotranews/cms/news/actionKotraBoardDetail.do?SITE_NO=3&MENU_ID=130&CONTENTS_NO=1&bbsGbn=246&bbsSn=246&pNttSn=231127",
+            "naverUrl": "http://dream.kotra.or.kr/kotranews/cms/news/actionKotraBoardDetail.do?SITE_NO=3&MENU_ID=130&CONTENTS_NO=1&bbsGbn=246&bbsSn=246&pNttSn=231127"
+          }
+        ],
+        "crossCheck": "수주/계약 공시, 매출채권 증가, 고객 집중도, 계약부채 변화를 확인"
+      },
+      "finance": {
+        "id": "finance",
+        "name": "재무동향/실적 압박",
+        "count": 17,
+        "keywords": [
+          "실적",
+          "매출",
+          "영업이익",
+          "적자",
+          "흑자",
+          "감소",
+          "증가",
+          "부채",
+          "차입",
+          "이자",
+          "유동성",
+          "재고"
+        ],
+        "examples": [
+          {
+            "title": "\"배달용 이륜차 배출가스·소음 저감 줄이자\", 기후부-배달사업자 협약",
+            "description": "무빙), △배달서비스공제조합, △엘지(LG) 에너지솔루션, △한국자동차환경협회 등과 배달용 전기이륜차... 자사(브랜드)의 가치를 제고할 수 있을 것으로 보인다. 한편, 기후부는 전기이륜차 업계 관계자 및 관련...",
+            "pubDate": "Thu, 05 Feb 2026 13:04:00 +0900",
+            "url": "https://www.discoverynews.kr/news/articleView.html?idxno=1084509",
+            "naverUrl": "https://www.discoverynews.kr/news/articleView.html?idxno=1084509"
+          },
+          {
+            "title": "[특징주] 성우테크론, AI 비전검사·이차전지 영토 확장 주목",
+            "description": "성우테크론은 지난 2018년 전지 자동검사기 25대를 납품한 실적을 확보하고 있으며, 인터배터리 전시회에... 주요 거래선으로는 삼성전기, 엘지이노텍, 해성DS, LG에너지솔루션, LS전선 등이 있다.",
+            "pubDate": "Fri, 19 Jun 2026 08:24:00 +0900",
+            "url": "https://www.newstnt.com/news/articleView.html?idxno=706991",
+            "naverUrl": "https://www.newstnt.com/news/articleView.html?idxno=706991"
+          },
+          {
+            "title": "외국인 대규모 매도, 원화 환율 급등에 한국 금융시장 '출렁'",
+            "description": "51%, 엘지에너지솔루션은 1.42% 하락했다. 엔비디아와의 협력 기대감이 있었던 엘지전자도 8.69% 내렸고... 미국 반도체 기업 브로드컴이 시장 기대에 못 미치는 실적을 내놓으면서 기술주 투자 열기에 제동이 걸린...",
+            "pubDate": "Fri, 05 Jun 2026 16:54:00 +0900",
+            "url": "https://www.tokenpost.kr/news/market/366466",
+            "naverUrl": "https://www.tokenpost.kr/news/market/366466"
+          },
+          {
+            "title": "기후부, 재생e·원자력 중심 에너지믹스 확립…탈탄소 사회 구현 '가속...",
+            "description": "전기차는 지난해 약 22만1000대를 보급해 역대 최고 실적을 기록했고 올해는 새롭게 도입된 내연차... 배터리 부문도 에너지저장장치(ESS) 시장 확대에 힘입어 엘지에너지솔루션(LG에너지솔루션), 에스케이온(SK온)...",
+            "pubDate": "Thu, 04 Jun 2026 19:56:00 +0900",
+            "url": "http://www.e-platform.net/news/articleView.html?idxno=102737",
+            "naverUrl": "http://www.e-platform.net/news/articleView.html?idxno=102737"
+          },
+          {
+            "title": "[해설] 국민주권정부 1년, 기후·에너지·환경 분야 주요 성과",
+            "description": "전기차는 2025년 약 22만 1000대를 보급하여 역대 최고 실적을 기록하였고 2026년은 새롭게 도입된 내연차... 배터리 부문도 에너지저장장치(ESS) 시장 확대에 힘입어 엘지에너지솔루션(LG에너지솔루션), 에스케이온(SK온)...",
+            "pubDate": "Thu, 04 Jun 2026 17:50:00 +0900",
+            "url": "https://www.todayenergy.kr/news/articleView.html?idxno=298628",
+            "naverUrl": "https://www.todayenergy.kr/news/articleView.html?idxno=298628"
+          }
+        ],
+        "crossCheck": "E1~E4 재무 신호, 현금흐름, 차입금, 재고자산 평가손실을 확인"
+      },
+      "risk": {
+        "id": "risk",
+        "name": "규제/소송/보안/운영 리스크",
+        "count": 24,
+        "keywords": [
+          "규제",
+          "제재",
+          "소송",
+          "고발",
+          "조사",
+          "감사",
+          "보안",
+          "장애",
+          "유출",
+          "구조조정",
+          "폐점",
+          "파업"
+        ],
+        "examples": [
+          {
+            "title": "중국 공급망에 갇힌 AI 시대…‘팍스 실리카’로 탈출구 찾을까",
+            "description": "유럽연합(EU)은 유럽의 기술 규제 자율성을 훼손할 수 있다는 우려로 참여를 미뤄왔지만, 최근 독일 등에서... 지난해 9월에는 미국 쪽 요구로 조지아주에 배터리 공장을 짓던 현대차·엘지에너지솔루션 협력사 노동자...",
+            "pubDate": "Wed, 10 Jun 2026 06:02:00 +0900",
+            "url": "https://www.hani.co.kr/arti/international/international_general/1262750.html",
+            "naverUrl": "https://n.news.naver.com/mnews/article/028/0002808920?sid=104"
+          },
+          {
+            "title": "［기고］지정학적 리스크 프리미엄/문정빈 고려대 경영대학 교수",
+            "description": "현대차와 엘지 에너지솔루션은 차세대 모빌리티의 핵심 기술인 로보틱스와 배터리에 투자했으며 조선... 미국의 대중 반도체 규제, AI 패권 경쟁, 공급망 재편이 결합되면서 한국 기업들이 지정학적 핵심 노드가 되었기...",
+            "pubDate": "Tue, 02 Jun 2026 10:51:00 +0900",
+            "url": "https://www.mk.co.kr/article/12063870",
+            "naverUrl": "https://n.news.naver.com/mnews/article/009/0005688287?sid=110"
+          },
+          {
+            "title": "코리아 디스카운트 해소 박차: 금융당국의 중복상장 규제 개편",
+            "description": "과거 엘지화학과 엘지에너지솔루션의 물적분할, 두산밥캣과 두산로보틱스를 둘러싼 논란처럼, 기업 재편이 성장 전략으로는 설명되더라도 기존 주주 이익을 훼손할 수 있다는 문제의식이 제도 개선의 배경이 되고...",
+            "pubDate": "Mon, 11 May 2026 06:30:00 +0900",
+            "url": "https://www.tokenpost.kr/news/market/358232",
+            "naverUrl": "https://www.tokenpost.kr/news/market/358232"
+          },
+          {
+            "title": "에너지저장장치 격돌, ‘로봇의 심장’도 엿본다…‘인터배터리 2026’ ...",
+            "description": "엘지에너지솔루션은 국내 전력 인프라와 제도 환경에 맞춘 리튬인산철 기반 전력망용 에너지저장장치... 통상·환경 규제 변화에 대응하기 위한 시장 전략도 주요 논의 주제로 다뤄질 예정이다. 문신학 차관은 이날...",
+            "pubDate": "Wed, 11 Mar 2026 09:20:00 +0900",
+            "url": "https://www.hani.co.kr/arti/economy/economy_general/1248727.html",
+            "naverUrl": "https://n.news.naver.com/mnews/article/028/0002795312?sid=101"
+          },
+          {
+            "title": "[재벌승계지도] LG그룹 ‘장자 우선 원칙’ 구광모 체제서 분기점 맞나",
+            "description": "72%), 엘지마그나이파워트레인(51%) 등을 아래에 두고 있다. LG화학은 LG에너지솔루션 지분 79.38%를 지니고... 구광모 회장은 일감몰아주기 규제 탓에 ㈜LG 외 주요 계열사 주식을 거의 가지고 있지 않다. 대신 LG CNS는 미래...",
+            "pubDate": "Sat, 07 Mar 2026 18:08:00 +0900",
+            "url": "https://www.ekn.kr/web/view.php?key=20260307026414876",
+            "naverUrl": "https://www.ekn.kr/web/view.php?key=20260307026414876"
+          }
+        ],
+        "crossCheck": "공시 정정/해명, 충당부채, 법무 비용, 운영 중단 영향을 확인"
+      }
+    },
+    "advice": [
+      {
+        "category": "reputation",
+        "title": "기업평판/브랜드 이미지",
+        "signal": "19건의 관련 뉴스 메타데이터 감지",
+        "crossCheck": "매출 성장률, 반품/클레임, 고객 이탈, 채널별 매출 변화를 확인",
+        "suggestedAction": "브랜드 훼손 신호는 단기 매출보다 채널별 주문 취소, 반품률, 주요 거래처 반응으로 먼저 검증한다."
+      },
+      {
+        "category": "industry",
+        "title": "관심산업/시장 환경",
+        "signal": "24건의 관련 뉴스 메타데이터 감지",
+        "crossCheck": "재고 증가율, 매출 성장률, 사업부별 성장률, ECOS 물가/금리 환경을 확인",
+        "suggestedAction": "산업 변화 신호는 재고 회전과 제품군별 매출 믹스 변화로 연결해 확인한다."
+      },
+      {
+        "category": "investment",
+        "title": "투자동향/자금소요",
+        "signal": "16건의 관련 뉴스 메타데이터 감지",
+        "crossCheck": "차입금, 이자보상배율, 투자 현금흐름, 유동비율을 확인",
+        "suggestedAction": "투자 확대 신호는 성장 기회와 동시에 현금 소요이므로 차입 만기와 투자 회수 기간을 같이 본다."
+      },
+      {
+        "category": "business",
+        "title": "사업동향/제휴/확장",
+        "signal": "11건의 관련 뉴스 메타데이터 감지",
+        "crossCheck": "수주/계약 공시, 매출채권 증가, 고객 집중도, 계약부채 변화를 확인",
+        "suggestedAction": "사업 확장 신호는 매출 인식 속도와 현금 회수 속도가 같이 움직이는지 확인한다."
+      },
+      {
+        "category": "finance",
+        "title": "재무동향/실적 압박",
+        "signal": "17건의 관련 뉴스 메타데이터 감지",
+        "crossCheck": "E1~E4 재무 신호, 현금흐름, 차입금, 재고자산 평가손실을 확인",
+        "suggestedAction": "재무 뉴스는 수치가 과장될 수 있으므로 DART 재무제표와 분기 추세로 재계산한다."
+      },
+      {
+        "category": "risk",
+        "title": "규제/소송/보안/운영 리스크",
+        "signal": "24건의 관련 뉴스 메타데이터 감지",
+        "crossCheck": "공시 정정/해명, 충당부채, 법무 비용, 운영 중단 영향을 확인",
+        "suggestedAction": "규제와 운영 리스크는 손익 영향보다 발생 가능성과 대응 책임자를 먼저 확정한다."
+      }
+    ],
+    "caveat": "뉴스는 제목, 요약, 발행일, 링크 메타데이터만 사용한 보조 신호이며 확정 사실로 취급하지 않습니다.",
+    "summary": "뉴스는 확정 사실이 아니라 보조 신호입니다. 감지 테마: 기업평판/브랜드 이미지 19건, 관심산업/시장 환경 24건, 투자동향/자금소요 16건, 사업동향/제휴/확장 11건, 재무동향/실적 압박 17건, 규제/소송/보안/운영 리스크 24건. DART PRESENT 신호는 E4, E5이며, 평가된 DART 신호는 E1, E2, E3, E4, E5, E8입니다. 뉴스 테마는 각 카테고리의 crossCheck 항목으로 재무/공시 데이터와 교차 확인해야 합니다."
+  },
+  "market": {
+    "enabled": true,
+    "stockCode": "373220",
+    "tradingDays": 100,
+    "lastBasDt": "20260709"
+  },
+  "docs": null,
+  "signals": [
+    {
+      "id": "E1",
+      "name": "수익-채권 괴리 (이익의 현금화 저조)",
+      "present": false,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "revenueGrowthPct": -7.6,
+        "receivablesGrowthPct": -12.8,
+        "gapPp": -5.2,
+        "receivablesTrillion": "4.9→4.3조",
+        "ocfToOperatingIncome": 3.29
+      },
+      "markers": [],
+      "categoryPattern": "수익\\s*(조기)?\\s*인식|조기\\s*인식|채권.*(급증|괴리)|현금화\\s*저조",
+      "checkHints": [
+        "분기보고서로 채권 증가 시점 좁히기",
+        "대손충당금 설정률 추이",
+        "주석의 매출채권 연령 분석"
+      ]
+    },
+    {
+      "id": "E2",
+      "name": "재고 자산 적체",
+      "present": false,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "revenueGrowthPct": -7.6,
+        "inventoryGrowthPct": -4.4,
+        "gapPp": 3.2,
+        "inventoriesTrillion": "4.6→4.4조"
+      },
+      "markers": [],
+      "categoryPattern": "재고\\s*(자산)?\\s*(적체|급증|과잉)|재고자산.*(증가|부담)",
+      "checkHints": [
+        "재고자산 평가손실(주석) 확인",
+        "제품/재공품/원재료 구성 변화",
+        "재고자산회전율 추이"
+      ]
+    },
+    {
+      "id": "E3",
+      "name": "차입 확대·이자 부담",
+      "present": false,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "borrowingsTrillion": "12.9→15.8조",
+        "borrowingsGrowthPct": 22.7,
+        "interestCoverage": "1→1.5배 (영업이익/이자지급)",
+        "coverageDropPct": -60.9
+      },
+      "markers": [],
+      "categoryPattern": "차입\\s*(확대|급증|의존)|이자\\s*부담|이자보상",
+      "checkHints": [
+        "차입금 만기 구조(주석) 확인",
+        "변동/고정 금리 구성",
+        "약정(covenant) 조건 확인"
+      ]
+    },
+    {
+      "id": "E4",
+      "name": "유동성 하락 (유동비율)",
+      "present": true,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "currentRatioPct": "157.3→127.1→109.7",
+        "fallingTwoYears": true
+      },
+      "markers": [
+        "(?<!\\d)109[.,]7(?!\\d)",
+        "유동비율|유동성"
+      ],
+      "categoryPattern": "유동성\\s*(하락|압박|악화)|유동비율.*(하락|저하)",
+      "checkHints": [
+        "단기차입 상환 스케줄",
+        "미사용 여신한도(주석)",
+        "현금성자산 대비 단기부채"
+      ]
+    },
+    {
+      "id": "E5",
+      "name": "공시 행간 (정정·해명 패턴)",
+      "present": true,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "windowDays": 90,
+        "totalDisclosures": 17,
+        "corrections": 3,
+        "clarifications": [],
+        "auditFlags": []
+      },
+      "markers": [
+        "정정",
+        "풍문|해명"
+      ],
+      "categoryPattern": "정정\\s*공시|풍문|해명\\s*공시|공시\\s*(품질|프로세스|커뮤니케이션)",
+      "checkHints": [
+        "정정 사유 분류(단순 오기/수치 변경)",
+        "해명 공시의 대상 보도와 후속 확정 공시",
+        "공시 검수 체인 점검"
+      ]
+    },
+    {
+      "id": "E8",
+      "name": "발생액 품질 (이익-현금 괴리)",
+      "present": false,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "netIncomeTrillion": "0.3→0.1조",
+        "ocfTrillion": "5.1→4.4조",
+        "accrualRatioPct": -6.5,
+        "accrualRatioPrevPct": -7.9,
+        "ocfToNetIncome": 54.85,
+        "persistentGapTwoYears": false
+      },
+      "markers": [],
+      "categoryPattern": "발생액|이익\\s*(의)?\\s*품질|이익.*현금.*(괴리|뒷받침)|현금\\s*뒷받침\\s*없는\\s*이익",
+      "checkHints": [
+        "발생액 구성 분해 — 운전자본성(매출채권·재고·매입채무) vs 비운전자본성(충당금·감가상각 정책 변경)",
+        "수익 인식 정책 변경·추정 변경 주석 확인 (회계 정책 변경이 발생액 급증과 겹치는지)",
+        "차기 분기 OCF 실측으로 반증 — 발생액이 정상 회수되면 일시 괴리, 누적되면 이익 품질 리스크"
+      ]
+    },
+    {
+      "id": "E6",
+      "name": "시장·현금흐름 괴리 (시총 vs 영업현금흐름)",
+      "present": false,
+      "evaluable": true,
+      "note": "",
+      "evidence": {
+        "windowDays": 90,
+        "marketCapTrillion": "91.4→73.4조",
+        "marketCapChangePct": -19.7,
+        "ocfGrowthPct": -13.3,
+        "mode": null
+      },
+      "markers": [],
+      "categoryPattern": "시가총액|시총|시장\\s*(평가|가치).{0,12}(괴리|불일치)",
+      "checkHints": [
+        "조달 창구가 열려 있을 때 선제 조달 검토 (증자·회사채 여건)",
+        "현금흐름 악화 원인 분해 (운전자본 vs 수익성)",
+        "12개월 유동성 계획과 시장 조달 계획 통합"
+      ]
+    },
+    {
+      "id": "E7",
+      "name": "공시·주가 정합 (해명 공시 전 이상 변동)",
+      "present": false,
+      "evaluable": true,
+      "note": "관찰 창 내 해명·풍문 공시 없음 — 대사 대상 없음",
+      "evidence": {
+        "windowDays": 90,
+        "clarificationCount": 0,
+        "events": []
+      },
+      "markers": [],
+      "categoryPattern": "해명\\s*공시.*(주가|거래량)|(주가|거래량).*(선행|이상\\s*변동|급변)|정보\\s*(유출|관리)\\s*리스크|불공정\\s*거래",
+      "checkHints": []
+    }
+  ],
+  "internal": null
+}

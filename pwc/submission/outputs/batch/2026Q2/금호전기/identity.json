@@ -1,0 +1,40 @@
+{
+  "companyName": "금호전기",
+  "businessNumber": {
+    "input": "105-81-00527",
+    "normalized": "1058100527",
+    "formatValid": true,
+    "checksumValid": true,
+    "valid": true
+  },
+  "identifiers": {
+    "stockCode": null,
+    "dartCorpCode": null,
+    "newsQueryName": "금호전기"
+  },
+  "businessStatus": {
+    "request_cnt": 1,
+    "match_cnt": 1,
+    "status_code": "OK",
+    "data": [
+      {
+        "b_no": "1058100527",
+        "b_stt": "계속사업자",
+        "b_stt_cd": "01",
+        "tax_type": "부가가치세 일반과세자",
+        "tax_type_cd": "01",
+        "end_dt": "",
+        "utcc_yn": "N",
+        "tax_type_change_dt": "",
+        "invoice_apply_dt": "",
+        "rbf_tax_type": "해당없음",
+        "rbf_tax_type_cd": "99"
+      }
+    ]
+  },
+  "businessAuth": null,
+  "analysisAllowed": true,
+  "warnings": [
+    "대표자명과 개업일자가 없어 국세청 진위확인은 생략하고 상태조회만 수행했습니다."
+  ]
+}
