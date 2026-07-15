@@ -39,6 +39,24 @@ jobs:
             image_suffix: "-account"
           - module: operation-service
             image_suffix: "-operation"
+          - module: loan-service
+            image_suffix: "-loan"
+          - module: financial-statements-service
+            image_suffix: "-financial"
+          - module: economics-service
+            image_suffix: "-economics"
+          - module: company-service
+            image_suffix: "-company"
+          - module: market-service
+            image_suffix: "-market"
+          - module: common-data-service
+            image_suffix: "-common-data"
+          - module: ai-service
+            image_suffix: "-ai"
+          - module: investment-service
+            image_suffix: "-investment"
+          - module: organization-service
+            image_suffix: "-organization"
     steps:
       - uses: actions/checkout@v4
 

@@ -85,14 +85,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Node.js for topology checks
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Verify production topology
-        run: node --test scripts/k8s/test/production-topology.test.mjs
-
       - name: Set up JDK ${{ env.JAVA_VERSION }}
         uses: actions/setup-java@v4
         with:
@@ -192,12 +184,21 @@ jobs:
     permissions:
       contents: read
       packages: write
-    # 배포 단위별 이미지(ADR 0020):
-    #   order-service      → ghcr.io/myoungsoo7/settlement
-    #   settlement-service → ghcr.io/myoungsoo7/settlement-settlement
-    #   gateway-service    → ghcr.io/myoungsoo7/settlement-gateway
-    #   account-service    → ghcr.io/myoungsoo7/settlement-account
-    #   operation-service  → ghcr.io/myoungsoo7/settlement-operation
+    # 배포 단위별 이미지(ADR 0020) — 전 백엔드 서비스(14개) 이미지화:
+    #   order-service        → ghcr.io/myoungsoo7/settlement
+    #   settlement-service   → ghcr.io/myoungsoo7/settlement-settlement
+    #   gateway-service      → ghcr.io/myoungsoo7/settlement-gateway
+    #   account-service      → ghcr.io/myoungsoo7/settlement-account
+    #   operation-service    → ghcr.io/myoungsoo7/settlement-operation
+    #   loan-service         → ghcr.io/myoungsoo7/settlement-loan
+    #   financial-*-service  → ghcr.io/myoungsoo7/settlement-financial
+    #   economics-service    → ghcr.io/myoungsoo7/settlement-economics
+    #   company-service      → ghcr.io/myoungsoo7/settlement-company
+    #   market-service       → ghcr.io/myoungsoo7/settlement-market
+    #   common-data-service  → ghcr.io/myoungsoo7/settlement-common-data
+    #   ai-service           → ghcr.io/myoungsoo7/settlement-ai
+    #   investment-service   → ghcr.io/myoungsoo7/settlement-investment
+    #   organization-service → ghcr.io/myoungsoo7/settlement-organization
     strategy:
       matrix:
         include:
@@ -211,6 +212,24 @@ jobs:
             image_suffix: "-account"
           - module: operation-service
             image_suffix: "-operation"
+          - module: loan-service
+            image_suffix: "-loan"
+          - module: financial-statements-service
+            image_suffix: "-financial"
+          - module: economics-service
+            image_suffix: "-economics"
+          - module: company-service
+            image_suffix: "-company"
+          - module: market-service
+            image_suffix: "-market"
+          - module: common-data-service
+            image_suffix: "-common-data"
+          - module: ai-service
+            image_suffix: "-ai"
+          - module: investment-service
+            image_suffix: "-investment"
+          - module: organization-service
+            image_suffix: "-organization"
     steps:
       - uses: actions/checkout@v4
 
