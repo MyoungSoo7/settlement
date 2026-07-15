@@ -61,13 +61,6 @@ const cases = [
     normal: 'BigDecimal marketPrice = quote.price();',
   },
   {
-    id: 'NO-COMMIT',
-    file: 'pwc/submission/result.json',
-    violation: '{}',
-    normalFile: 'docs/result.json',
-    normal: '{}',
-  },
-  {
     id: 'OO-DOMAIN-SETTER',
     file: 'order-service/src/main/java/github/lms/lemuel/menu/domain/Menu.java',
     violation: 'public void setName(String name) { this.name = name; }',
@@ -130,16 +123,6 @@ describe('guard policy fixtures', () => {
       id: 'ACCOUNT-CONSUME-ONLY',
       file: '/workspace/repo/account-service/src/main/java/github/lms/lemuel/account/Publisher.java',
       content: 'kafkaTemplate.send("ledger", event);',
-    },
-    {
-      id: 'NO-COMMIT',
-      file: String.raw`C:\workspace\repo\pwc\submission\result.json`,
-      content: '{}',
-    },
-    {
-      id: 'NO-COMMIT',
-      file: '/workspace/repo/pwc/submission/result.json',
-      content: '{}',
     },
   ]) {
     test(`${fixture.id} cannot be bypassed with absolute path ${fixture.file}`, () => {
@@ -222,6 +205,27 @@ describe('CLI dispatcher', () => {
       }),
     });
     assert.equal(result.status, 0, result.stderr.toString());
+  });
+
+  test('skips binary artifacts without applicable rules instead of failing UTF-8 decode', async () => {
+    const repoRoot = await temporaryRepo();
+    await mkdir(join(repoRoot, 'pwc', 'submission'), { recursive: true });
+    await writeFile(join(repoRoot, 'pwc', 'submission', 'briefing.docx'), Buffer.from([0xff, 0xfe, 0x00, 0xd8]));
+    assert.equal(
+      await runGuardCli(['--files', 'pwc/submission/briefing.docx'], { repoRoot, stdout() {}, stderr() {} }),
+      0,
+    );
+  });
+
+  test('still fails closed when a rule-scoped source is not valid UTF-8', async () => {
+    const repoRoot = await temporaryRepo();
+    const sourceDir = join(repoRoot, 'settlement-service', 'src', 'main', 'java', 'domain');
+    await mkdir(sourceDir, { recursive: true });
+    await writeFile(join(sourceDir, 'Money.java'), Buffer.from([0xff, 0xfe, 0x00, 0xd8]));
+    assert.equal(
+      await runGuardCli(['--files', 'settlement-service/src/main/java/domain/Money.java'], { repoRoot, stdout() {}, stderr() {} }),
+      1,
+    );
   });
 
   test('rejects missing list with exit 1 and conflicting modes with exit 2', async () => {

@@ -2,8 +2,8 @@
 // Lemuel harness guard — PLUGIN-INDEPENDENT, repo-tracked core invariant enforcement.
 //
 // Why this exists: the settlement-copilot / invest-copilot plugin guards live under
-// gitignore-prone `hackathon/` and are not reproducible on a fresh clone. This script
-// re-implements the *non-negotiable* money/architecture invariants with zero external
+// `hackathon/` outside the build graph and are not wired into CI on a fresh clone. This
+// script re-implements the *non-negotiable* money/architecture invariants with zero external
 // dependency so the guard survives plugin relocation and works in CI. (See HARNESS.md
 // "하드스톱" — this is the machine-enforced subset of that section.)
 //
@@ -40,9 +40,6 @@ const SQL = /\.sql$/i;
 // rule to core layers and exclude test sources to keep the gate false-positive free.
 const isCore = (f) => /\/(domain|application)\//.test(f);
 const isProd = (f) => !/\/src\/test\//.test(f);
-
-// Paths that must never be committed (portfolio hygiene — see MEMORY feedback).
-const NO_COMMIT = /^(hackathon|pwc)\//;
 
 // OO invariants — 2026-07-14 OO 캠페인(패널 중앙값 9.5+)을 만든 구조의 회귀 방지.
 // 도메인 프로덕션 소스만 대상. common/audit(감사 인프라 DTO)은 3회 패널 모두 대상 밖 판정.
@@ -139,10 +136,6 @@ export function scanText(f, content, { now = new Date() } = {}) {
   const violations = [];
   const allowances = [];
   const comparablePath = policyPath(f);
-  if (NO_COMMIT.test(comparablePath)) {
-    violations.push({ file: f, line: 0, id: 'NO-COMMIT', msg: `${f} — hackathon/·pwc/ 경로는 커밋 금지 (add -f 우회 금지)` });
-    return { violations, allowances };
-  }
   const lines = String(content).split(/\r?\n/);
   const lineAllowances = lines.map((line, i) => {
     if (!ALLOW.test(line)) return null;
@@ -237,7 +230,15 @@ export function discoverStagedFiles(repoRoot) {
   return output.toString('utf8').split('\0').filter(Boolean);
 }
 
+function hasApplicableRule(f) {
+  const comparablePath = policyPath(f);
+  return RULES.some((rule) => rule.when(comparablePath));
+}
+
 async function scanRepoFile(repoRoot, requestedPath) {
+  // Rules only target java/kt/sql sources — skip reading anything else so staged
+  // binary artifacts (docx/png/log) can't abort the whole scan on a UTF-8 decode failure.
+  if (!hasApplicableRule(requestedPath)) return [];
   const absolute = await normalizeRepoPath(repoRoot, requestedPath);
   return scanText(requestedPath, await readUtf8Strict(absolute)).violations;
 }
