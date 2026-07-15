@@ -45,16 +45,21 @@ The gateway defines an explicit `ACCOUNT_SERVICE_URI`. Order and settlement URIs
 
 The existing `lemuel-secret` is reused. No plaintext credential or new sealed value is introduced.
 
+The retained Account storage is a single-node hostPath choice: rescheduling the database Pod to another node does not move or replicate its data. Before multi-node production, replace it with a CSI-backed storage class and establish tested backup and restore procedures.
+
 ## CI and Delivery
 
-The backend image matrix produces four images from the shared Dockerfile:
+The backend image matrix produces five images from the shared Dockerfile:
 
 - `order-service` → `settlement`
 - `settlement-service` → `settlement-settlement`
 - `gateway-service` → `settlement-gateway`
 - `account-service` → `settlement-account`
+- `operation-service` → `settlement-operation`
 
 The emergency image workflow uses the same matrix so recovery cannot silently omit the two new production units. ArgoCD's Application source enables recursive directory discovery because the manifests live under `k8s/base`, `k8s/ingress`, `k8s/security`, and `k8s/stroage`.
+
+The current ArgoCD Application is a plain Directory app and has no supported Image Updater integration. The post-CI production smoke therefore checks only the revision currently deployed after a manifest reconciliation window; it does not prove that a newly built mutable tag was promoted. Subsequent image promotion requires a separate Kustomize-based immutable-tag mechanism. Git writeback and Image Updater are intentionally outside this change.
 
 ## Failure Handling and Rollout
 
