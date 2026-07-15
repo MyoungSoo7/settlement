@@ -34,6 +34,12 @@ const gatewayManifests = [
   "k8s/base/gateway-deployment.yaml",
 ];
 
+const operationManifests = [
+  "k8s/stroage/operation-db-pv.yaml",
+  "k8s/base/operation-configmap.yaml",
+  "k8s/base/operation-deployment.yaml",
+];
+
 function ingressPathBlock(contents, path) {
   const lines = contents.split(/\r?\n/);
   const start = lines.findIndex((line) => line.trim() === `- path: ${path}`);
@@ -216,4 +222,58 @@ test("production topology deploys Gateway and preserves narrow public routing", 
     "blanket /admin ingress path must not exist",
   );
   assert.doesNotMatch(argocd, /(?:argocd-)?image-updater/i);
+});
+
+test("production topology deploys the Operation service and database", () => {
+  for (const file of operationManifests) {
+    assert.equal(existsSync(file), true, `${file} must exist`);
+  }
+
+  const operationDatabase = readFileSync(operationManifests[0], "utf8");
+  const operationConfig = readFileSync(operationManifests[1], "utf8");
+  const operationDeployment = readFileSync(operationManifests[2], "utf8");
+
+  for (const [kind, name] of [
+    ["PersistentVolume", "operation-db-pv"],
+    ["PersistentVolumeClaim", "operation-db-pvc"],
+    ["StatefulSet", "operation-db"],
+    ["Service", "operation-db-service"],
+  ]) {
+    manifestResource(operationDatabase, kind, name);
+  }
+  manifestResource(operationConfig, "ConfigMap", "operation-config");
+  manifestResource(operationDeployment, "Deployment", "operation-app");
+  manifestResource(operationDeployment, "Service", "operation-service");
+
+  assert.match(
+    operationDeployment,
+    /image:\s*ghcr\.io\/myoungsoo7\/settlement-operation:latest/,
+  );
+  assert.match(
+    operationConfig,
+    /SPRING_DATASOURCE_URL:\s*"jdbc:postgresql:\/\/operation-db-service:5432\/lemuel_operation\?reWriteBatchedInserts=true"/,
+  );
+  assert.match(operationDatabase, /name:\s*POSTGRES_DB\s*\r?\n\s*value:\s*lemuel_operation/);
+  assert.match(
+    operationConfig,
+    /SPRING_KAFKA_BOOTSTRAP_SERVERS:\s*"redpanda:29092"/,
+  );
+  assert.match(operationConfig, /SERVER_PORT:\s*"8080"/);
+  assert.match(operationConfig, /MANAGEMENT_SERVER_PORT:\s*"8080"/);
+  assert.match(operationDeployment, /containerPort:\s*8080/);
+  assert.match(operationDeployment, /port:\s*8080/);
+  assert.match(operationConfig, /JWT_ISSUER:\s*"lemuel-service"/);
+  assert.match(operationConfig, /OPS_PROMETHEUS_ENABLED:\s*"false"/);
+  assert.match(operationConfig, /OPS_ANOMALY_ENABLED:\s*"false"/);
+  assert.match(
+    operationConfig,
+    /APP_SECURITY_INTERNAL_KEY_REQUIRED:\s*"true"/,
+  );
+  assert.match(operationDeployment, /secretRef:\s*\r?\n\s*name:\s*lemuel-secret/);
+  assert.match(operationDatabase, /name:\s*lemuel-secret/);
+  assert.match(
+    operationDatabase,
+    /Single-node only:[^\r\n]*hostPath[^\r\n]*one node/i,
+  );
+  assert.match(operationDatabase, /path:\s*\/data\/k8s\/operation-db/);
 });
