@@ -63,11 +63,11 @@ No HPA or PodDisruptionBudget is added because the approved target is one k3s no
 
 ## Data Topology
 
-A single PostgreSQL StatefulSet is used to fit the approved single-node target. It stores data on a dynamically provisioned PVC using k3s's `local-path` StorageClass. Static manual `hostPath` PersistentVolumes are removed.
+Each database-backed domain service receives a lightweight PostgreSQL StatefulSet and a dynamically provisioned PVC using k3s's `local-path` StorageClass. Static manual `hostPath` PersistentVolumes are removed. Per-database CPU and memory requests are deliberately small for the approved single-node target and can be raised through production overlay patches when node capacity permits.
 
-Every domain service receives a distinct PostgreSQL database and database user. Services may share the PostgreSQL server process, but they do not share schemas, credentials, JPA entities, queries, or application-level database access. Order and settlement remain logically isolated and communicate only through the existing Kafka projection and internal reconciliation API rules.
+Every domain service receives a distinct PostgreSQL database, database user, Secret, Service, StatefulSet, and PVC. Services do not share schemas, credentials, JPA entities, queries, or application-level database access. Order and settlement remain physically and logically isolated and communicate only through the existing Kafka projection and internal reconciliation API rules.
 
-Database initialization is idempotent and creates the service databases and roles before applications start. Flyway remains owned by each service and migrates only its own database. Schema changes must remain backward compatible with the rolling deployment strategy.
+Database initialization uses only the official PostgreSQL image's `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD` first-boot contract. Repository scripts do not generate `psql`, `pgcli`, or other direct production database commands. Flyway remains owned by each service and migrates only its own database. Schema changes must remain backward compatible with the rolling deployment strategy.
 
 Redpanda and Elasticsearch retain single-node storage appropriate to the approved target. Their limitations and backup/restore procedures are documented in the deployment runbook.
 
@@ -92,7 +92,7 @@ Secret-dependent features must not silently fall back to insecure production beh
 
 Ingress uses k3s's Traefik ingress class. NGINX-specific annotations and installation requirements are removed. TLS configuration is represented as a production overlay setting and must reference an operator-provisioned certificate Secret before public production use.
 
-Default-deny NetworkPolicies are applied to application and data workloads. Explicit policies allow Traefik to Gateway, Gateway to domain services, application-to-PostgreSQL, application-to-Redpanda, approved Elasticsearch clients, DNS, and required external egress. The policies must match the CNI capabilities enabled on the target k3s installation; the runbook records the required k3s network-policy controller state.
+Default-deny NetworkPolicies are applied to application and data workloads. Explicit policies allow Traefik to Gateway, Gateway to domain services, each application only to its own PostgreSQL Service, application-to-Redpanda, approved Elasticsearch clients, and DNS. Because standard Kubernetes NetworkPolicy cannot select internet destinations by DNS name, required external HTTPS egress permits TCP 443 outside cluster-private CIDRs; application allowlists continue to constrain the actual provider hostnames. The runbook records this limitation and the required k3s network-policy controller state.
 
 ## Batch Jobs
 
