@@ -67,6 +67,25 @@ export interface InvestmentOrderRequest {
   amount: number;
 }
 
+/** 종목 추천 1건 — 예측이 아니라 규칙 스크리닝 산출물 */
+export interface StockRecommendationItem {
+  stockCode: string;
+  stockName: string;
+  sector: string;
+  reason: string;
+  entryPrice: number;      // 1차 매수가 (현재가 밴드)
+  stopLossPrice: number;   // 손절가 (평균 매수가 -7%)
+  takeProfitPrice: number; // 1차 익절가 (평균 매수가 +20%)
+}
+
+/** 종목 추천 세트 — GET /api/investment/recommendations (세트 없으면 recommendedDate=null + 빈 items) */
+export interface StockRecommendations {
+  recommendedDate: string | null;
+  items: StockRecommendationItem[];
+  priceRule: string;
+  disclaimer: string;
+}
+
 export const investmentApi = {
   /** 종목 투자 점수 조회. GET /api/investment/scores/{stockCode} */
   score: async (stockCode: string): Promise<InvestmentScore> => {
@@ -101,6 +120,12 @@ export const investmentApi = {
   /** 셀러별 투자 주문 목록. GET /api/investment/orders?sellerId= */
   ordersBySeller: async (sellerId: number): Promise<InvestmentOrder[]> => {
     const res = await api.get<InvestmentOrder[]>(`/api/investment/orders?sellerId=${sellerId}`);
+    return res.data;
+  },
+
+  /** 최신 종목 추천 세트 조회. GET /api/investment/recommendations */
+  recommendations: async (): Promise<StockRecommendations> => {
+    const res = await api.get<StockRecommendations>('/api/investment/recommendations');
     return res.data;
   },
 };

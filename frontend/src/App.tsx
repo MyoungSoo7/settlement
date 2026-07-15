@@ -28,6 +28,7 @@ const EconomicsPage = lazy(() => import('./pages/EconomicsPage'));
 const CompanyLookupPage = lazy(() => import('./pages/CompanyLookupPage'));
 const CeoInsightPage = lazy(() => import('./pages/CeoInsightPage'));
 const CeoInvestPage = lazy(() => import('./pages/CeoInvestPage'));
+const CeoInvestRecommendPage = lazy(() => import('./pages/CeoInvestRecommendPage'));
 const CeoAccountPage = lazy(() => import('./pages/CeoAccountPage'));
 const AiChatPage = lazy(() => import('./pages/AiChatPage'));
 
@@ -153,6 +154,8 @@ function App() {
               element={<AdminManagerRoute><CeoLayout><CompanyLookupPage /></CeoLayout></AdminManagerRoute>} />
             <Route path="/admin/ceo/invest"
               element={<AdminManagerRoute><CeoLayout><CeoInvestPage /></CeoLayout></AdminManagerRoute>} />
+            <Route path="/admin/ceo/invest-recommend"
+              element={<AdminManagerRoute><CeoLayout><CeoInvestRecommendPage /></CeoLayout></AdminManagerRoute>} />
             <Route path="/admin/ceo/loans"
               element={<AdminManagerRoute><CeoLayout><LoanPage /></CeoLayout></AdminManagerRoute>} />
             <Route path="/admin/ceo/accounts"
