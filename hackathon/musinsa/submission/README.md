@@ -163,7 +163,7 @@ codex plugin add musinsa-fashion-first@musinsa-fashion-first-market
 
 </details>
 
-사전 점검(선택): `node src/test/run-all.mjs` — 데이터 정합 + MCP 3종 스위트가
+사전 점검(선택): `node src/test/run-all.mjs` — 데이터 정합 + MCP 4종 스위트가
 ALL GREEN 인지 한 번에 확인 (키 있으면 라이브 검증 포함).
 
 ## E2E 검증 증거 (codex 실세션, 2026-07-10)
@@ -212,8 +212,9 @@ powershell -ExecutionPolicy Bypass -File src/bin/run-sample.ps1
 
 - 데모의 데이터 축은 공개 유통 데이터(네이버 쇼핑·뉴스)다. 실서비스에서는
   `src/naver/{shop,trend,news}.mjs` **어댑터 3파일만** 무신사 내부 API(상품 검색,
-  스타일/스냅 트렌드, 리뷰·브랜드 데이터)로 교체하면 12개 도구 계약과 스킬 7종이
-  그대로 동작한다.
+  스타일/스냅 트렌드, 리뷰·브랜드 데이터)로 교체하면 세 축의 12개 도구 계약과 스킬
+  8종+운영 하네스(closet-ops)가 그대로 동작한다 (날씨·공식 리콜 축은 기상청·소비자24
+  공공 API 라 실서비스에서도 그대로).
 - 무신사가 드라이브 중인 **원코어 멀티플랫폼**과 정합: 도구 계약(MCP)을 플랫폼 공용
   코어로 두면 무신사·29CM·솔드아웃 어느 채널의 카탈로그든 같은 에이전트 인터페이스로
   서빙된다 — "AI 에이전트가 가장 먼저 탐색하는 첫 번째 도구"의 기술적 실체.
