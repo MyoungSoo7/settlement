@@ -104,6 +104,433 @@ function manifestContainer(resource, name) {
   return lines.slice(start, end).join("\n");
 }
 
+function accountTopologyInputs() {
+  return {
+    accountDatabase: readFileSync(accountManifests[0], "utf8"),
+    accountConfig: readFileSync(accountManifests[1], "utf8"),
+    accountDeployment: readFileSync(accountManifests[2], "utf8"),
+  };
+}
+
+function gatewayTopologyInputs() {
+  return {
+    gatewayConfig: readFileSync(gatewayManifests[0], "utf8"),
+    gatewayDeployment: readFileSync(gatewayManifests[1], "utf8"),
+  };
+}
+
+function assertNamespace(resource, description) {
+  assert.match(
+    resource,
+    /^\s{2}namespace:\s*lemuel\s*$/m,
+    `${description} namespace must be lemuel`,
+  );
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function assertAppDeploymentTopology({
+  deployment,
+  service,
+  app,
+  containerName,
+  image,
+  configMap,
+  secret,
+}) {
+  const container = manifestContainer(deployment, containerName);
+
+  assertNamespace(deployment, `${app} Deployment`);
+  assertNamespace(service, `${app} Service`);
+  assert.match(deployment, /^\s{2}replicas:\s*1\s*$/m, `${app} must run one replica`);
+  assert.match(
+    deployment,
+    /strategy:\s*\r?\n\s{4}type:\s*RollingUpdate\s*\r?\n\s{4}rollingUpdate:\s*\r?\n\s{6}maxSurge:\s*1\s*\r?\n\s{6}maxUnavailable:\s*0/,
+    `${app} must preserve its zero-downtime rolling strategy`,
+  );
+  assert.match(
+    deployment,
+    new RegExp(
+      `selector:\\s*\\r?\\n\\s{4}matchLabels:\\s*\\r?\\n\\s{6}app:\\s*${app}\\s*\\r?\\n\\s{6}tier:\\s*backend\\s*\\r?\\n\\s{2}template:`,
+    ),
+    `${app} Deployment selector must match app/tier labels`,
+  );
+  assert.match(
+    deployment,
+    new RegExp(
+      `template:\\s*\\r?\\n\\s{4}metadata:\\s*\\r?\\n\\s{6}labels:\\s*\\r?\\n\\s{8}app:\\s*${app}\\s*\\r?\\n\\s{8}tier:\\s*backend\\s*\\r?\\n\\s{4}spec:`,
+    ),
+    `${app} Pod labels must match the Deployment selector`,
+  );
+  assert.match(
+    service,
+    new RegExp(
+      `selector:\\s*\\r?\\n\\s{4}app:\\s*${app}\\s*\\r?\\n\\s{4}tier:\\s*backend\\s*\\r?\\n\\s{2}ports:`,
+    ),
+    `${app} Service selector must match the Pod labels`,
+  );
+  assert.match(
+    container,
+    new RegExp(`^\\s*image:\\s*${escapeRegExp(image)}\\s*$`, "m"),
+    `${app} image must be ${image}`,
+  );
+  assert.match(container, /^\s*imagePullPolicy:\s*Always\s*$/m);
+  assert.match(
+    container,
+    /ports:\s*\r?\n\s*- name:\s*http\s*\r?\n\s*containerPort:\s*8080\s*\r?\n\s*protocol:\s*TCP/,
+    `${app} container must expose TCP port 8080`,
+  );
+  assert.match(
+    service,
+    /ports:\s*\r?\n\s*- name:\s*http\s*\r?\n\s*protocol:\s*TCP\s*\r?\n\s*port:\s*8080\s*\r?\n\s*targetPort:\s*8080/,
+    `${app} Service must target TCP port 8080`,
+  );
+  assert.match(service, /^\s{2}type:\s*ClusterIP\s*$/m);
+  assert.match(
+    container,
+    new RegExp(
+      `envFrom:\\s*\\r?\\n\\s*- configMapRef:\\s*\\r?\\n\\s*name:\\s*${configMap}`,
+    ),
+    `${app} must import ${configMap}`,
+  );
+  if (secret) {
+    assert.match(
+      container,
+      new RegExp(
+        `configMapRef:\\s*\\r?\\n\\s*name:\\s*${configMap}\\s*\\r?\\n\\s*- secretRef:\\s*\\r?\\n\\s*name:\\s*${secret}`,
+      ),
+      `${app} must import ${secret} after its ConfigMap`,
+    );
+  } else {
+    assert.doesNotMatch(container, /\bsecretRef\s*:/, `${app} must not import a Secret`);
+  }
+  assert.match(
+    container,
+    /resources:\s*\r?\n\s*requests:\s*\r?\n\s*memory:\s*"512Mi"\s*\r?\n\s*cpu:\s*"250m"\s*\r?\n\s*limits:\s*\r?\n\s*memory:\s*"2Gi"\s*\r?\n\s*cpu:\s*"1000m"/,
+    `${app} resources must preserve production requests and limits`,
+  );
+  for (const [probe, path] of [
+    ["startupProbe", "/actuator/health/liveness"],
+    ["livenessProbe", "/actuator/health/liveness"],
+    ["readinessProbe", "/actuator/health/readiness"],
+  ]) {
+    assert.match(
+      container,
+      new RegExp(
+        `${probe}:\\s*\\r?\\n\\s*httpGet:\\s*\\r?\\n\\s*path:\\s*${escapeRegExp(path)}\\s*\\r?\\n\\s*port:\\s*8080`,
+      ),
+      `${app} ${probe} must use ${path}:8080`,
+    );
+  }
+  assert.match(
+    deployment,
+    /imagePullSecrets:\s*\r?\n\s*- name:\s*ghcr-secret/,
+    `${app} must use ghcr-secret for image pulls`,
+  );
+}
+
+function assertAccountTopology({
+  accountDatabase,
+  accountConfig,
+  accountDeployment,
+}) {
+  const pv = manifestResource(accountDatabase, "PersistentVolume", "account-db-pv");
+  const pvc = manifestResource(
+    accountDatabase,
+    "PersistentVolumeClaim",
+    "account-db-pvc",
+  );
+  const statefulSet = manifestResource(
+    accountDatabase,
+    "StatefulSet",
+    "account-db",
+  );
+  const dbService = manifestResource(
+    accountDatabase,
+    "Service",
+    "account-db-service",
+  );
+  const configMap = manifestResource(accountConfig, "ConfigMap", "account-config");
+  const deployment = manifestResource(
+    accountDeployment,
+    "Deployment",
+    "account-app",
+  );
+  const service = manifestResource(
+    accountDeployment,
+    "Service",
+    "account-service",
+  );
+  const data = manifestTopLevelBlock(configMap, "data");
+  const dbContainer = manifestContainer(statefulSet, "account-db");
+
+  for (const [resource, description] of [
+    [pvc, "Account PVC"],
+    [statefulSet, "Account StatefulSet"],
+    [dbService, "Account DB Service"],
+    [configMap, "Account ConfigMap"],
+  ]) {
+    assertNamespace(resource, description);
+  }
+
+  assert.match(data, /^  SPRING_PROFILES_ACTIVE:\s*"production"\s*$/m);
+  assert.match(data, /^  SERVER_PORT:\s*"8080"\s*$/m);
+  assert.match(data, /^  MANAGEMENT_SERVER_PORT:\s*"8080"\s*$/m);
+  assert.match(
+    data,
+    /^  SPRING_DATASOURCE_URL:\s*"jdbc:postgresql:\/\/account-db-service:5432\/lemuel_account\?reWriteBatchedInserts=true"\s*$/m,
+  );
+  assert.match(data, /^  APP_KAFKA_ENABLED:\s*"true"\s*$/m);
+  assert.match(
+    data,
+    /^  SPRING_KAFKA_BOOTSTRAP_SERVERS:\s*"redpanda:29092"\s*$/m,
+  );
+  assert.match(data, /^  JWT_ISSUER:\s*"lemuel-service"\s*$/m);
+  assert.match(data, /^  JWT_TTL_SECONDS:\s*"86400"\s*$/m);
+  assertAppDeploymentTopology({
+    deployment,
+    service,
+    app: "account",
+    containerName: "account",
+    image: "ghcr.io/myoungsoo7/settlement-account:latest",
+    configMap: "account-config",
+    secret: "lemuel-secret",
+  });
+
+  assert.match(statefulSet, /^\s{2}serviceName:\s*account-db-service\s*$/m);
+  assert.match(
+    statefulSet,
+    /selector:\s*\r?\n\s{4}matchLabels:\s*\r?\n\s{6}app:\s*account-db\s*\r?\n\s{2}template:/,
+    "Account StatefulSet selector must match its Pod labels",
+  );
+  assert.match(
+    statefulSet,
+    /template:\s*\r?\n\s{4}metadata:\s*\r?\n\s{6}labels:\s*\r?\n\s{8}app:\s*account-db\s*\r?\n\s{4}spec:/,
+    "Account database Pod labels must match the StatefulSet selector",
+  );
+  assert.match(
+    statefulSet,
+    /volumes:\s*\r?\n\s*- name:\s*account-db-storage\s*\r?\n\s*persistentVolumeClaim:\s*\r?\n\s*claimName:\s*account-db-pvc/,
+    "Account StatefulSet must mount account-db-pvc",
+  );
+  assert.match(
+    dbContainer,
+    /name:\s*POSTGRES_DB\s*\r?\n\s*value:\s*lemuel_account/,
+  );
+  assert.match(dbContainer, /^\s*image:\s*postgres:17-alpine\s*$/m);
+  assert.match(
+    dbContainer,
+    /ports:\s*\r?\n\s*- name:\s*postgres\s*\r?\n\s*containerPort:\s*5432/,
+  );
+  assert.match(
+    dbContainer,
+    /name:\s*PGDATA\s*\r?\n\s*value:\s*\/var\/lib\/postgresql\/data\/pgdata/,
+  );
+  assert.match(
+    dbContainer,
+    /volumeMounts:\s*\r?\n\s*- name:\s*account-db-storage\s*\r?\n\s*mountPath:\s*\/var\/lib\/postgresql\/data/,
+    "Account DB container must mount account-db-storage at the PostgreSQL data path",
+  );
+  for (const key of ["POSTGRES_USER", "POSTGRES_PASSWORD"]) {
+    assert.match(
+      dbContainer,
+      new RegExp(
+        `- name:\\s*${key}\\s*\\r?\\n\\s*valueFrom:\\s*\\r?\\n\\s*secretKeyRef:\\s*\\r?\\n\\s*name:\\s*lemuel-secret\\s*\\r?\\n\\s*key:\\s*${key}`,
+      ),
+      `${key} must use the matching lemuel-secret key`,
+    );
+  }
+  for (const probe of ["livenessProbe", "readinessProbe"]) {
+    assert.match(
+      dbContainer,
+      new RegExp(
+        `${probe}:\\s*\\r?\\n\\s*exec:\\s*\\r?\\n\\s*command:\\s*\\[[^\\r\\n]*pg_isready`,
+      ),
+      `Account DB ${probe} must run pg_isready`,
+    );
+  }
+  assert.match(
+    dbContainer,
+    /resources:\s*\r?\n\s*requests:\s*\r?\n\s*memory:\s*"256Mi"\s*\r?\n\s*cpu:\s*"250m"\s*\r?\n\s*limits:\s*\r?\n\s*memory:\s*"1Gi"\s*\r?\n\s*cpu:\s*"1000m"/,
+    "Account DB resources must preserve production requests and limits",
+  );
+  assert.match(dbService, /^\s{2}clusterIP:\s*None\s*$/m);
+  assert.match(
+    dbService,
+    /selector:\s*\r?\n\s{4}app:\s*account-db\s*\r?\n\s{2}ports:/,
+    "Account DB Service selector must match the StatefulSet Pod labels",
+  );
+  assert.match(
+    dbService,
+    /ports:\s*\r?\n\s*- name:\s*postgres\s*\r?\n\s*port:\s*5432\s*\r?\n\s*targetPort:\s*5432\s*\r?\n\s*protocol:\s*TCP/,
+  );
+  assert.match(pv, /^\s{4}app:\s*account-db\s*$/m);
+  assert.match(pvc, /matchLabels:\s*\r?\n\s*app:\s*account-db/);
+  assert.match(pv, /accessModes:\s*\r?\n\s*- ReadWriteOnce/);
+  assert.match(pvc, /accessModes:\s*\r?\n\s*- ReadWriteOnce/);
+  assert.match(pv, /^\s{2}storageClassName:\s*manual\s*$/m);
+  assert.match(pvc, /^\s{2}storageClassName:\s*manual\s*$/m);
+  assert.match(pv, /persistentVolumeReclaimPolicy:\s*Retain/);
+  assert.match(pv, /capacity:\s*\r?\n\s*storage:\s*20Gi/);
+  assert.match(pvc, /requests:\s*\r?\n\s*storage:\s*20Gi/);
+  assert.match(pv, /path:\s*\/data\/k8s\/account-db/);
+  assert.match(pv, /type:\s*DirectoryOrCreate/);
+  assert.match(
+    pv,
+    /Single-node only:[^\r\n]*hostPath[^\r\n]*one node/i,
+    "Account hostPath PV must warn that it is single-node only",
+  );
+}
+
+function assertGatewayTopology({ gatewayConfig, gatewayDeployment }) {
+  const configMap = manifestResource(gatewayConfig, "ConfigMap", "gateway-config");
+  const deployment = manifestResource(
+    gatewayDeployment,
+    "Deployment",
+    "gateway-app",
+  );
+  const service = manifestResource(
+    gatewayDeployment,
+    "Service",
+    "gateway-service",
+  );
+  const data = manifestTopLevelBlock(configMap, "data");
+
+  assertNamespace(configMap, "Gateway ConfigMap");
+  assert.match(data, /^  SPRING_PROFILES_ACTIVE:\s*"production"\s*$/m);
+  assert.match(data, /^  SERVER_PORT:\s*"8080"\s*$/m);
+  for (const [key, uri] of [
+    ["ORDER_SERVICE_URI", "http://lemuel-service:8080"],
+    ["SETTLEMENT_SERVICE_URI", "http://settlement-service:8080"],
+    ["ACCOUNT_SERVICE_URI", "http://account-service:8080"],
+    ["OPERATION_SERVICE_URI", "http://operation-service:8080"],
+  ]) {
+    assert.match(
+      data,
+      new RegExp(`^  ${key}:\\s*"${escapeRegExp(uri)}"\\s*$`, "m"),
+      `${key} must target ${uri}`,
+    );
+  }
+  assertAppDeploymentTopology({
+    deployment,
+    service,
+    app: "gateway",
+    containerName: "gateway",
+    image: "ghcr.io/myoungsoo7/settlement-gateway:latest",
+    configMap: "gateway-config",
+  });
+}
+
+test("Account topology assertions reject cross-wired credentials and Service selectors", () => {
+  const inputs = accountTopologyInputs();
+
+  assert.throws(
+    () =>
+      assertAccountTopology({
+        ...inputs,
+        accountDatabase: inputs.accountDatabase.replace(
+          "key: POSTGRES_USER",
+          "key: WRONG_POSTGRES_USER",
+        ),
+      }),
+    /POSTGRES_USER/,
+  );
+  assert.throws(
+    () =>
+      assertAccountTopology({
+        ...inputs,
+        accountDeployment: inputs.accountDeployment.replace(
+          "    tier: backend\n  ports:",
+          "    tier: frontend\n  ports:",
+        ),
+      }),
+    /Service selector/,
+  );
+  assert.throws(
+    () =>
+      assertAccountTopology({
+        ...inputs,
+        accountDatabase: inputs.accountDatabase.replace(
+          "mountPath: /var/lib/postgresql/data",
+          "mountPath: /wrong/account-data",
+        ),
+      }),
+    /must mount account-db-storage/,
+  );
+  assert.throws(
+    () =>
+      assertAccountTopology({
+        ...inputs,
+        accountConfig: inputs.accountConfig.replace(
+          'APP_KAFKA_ENABLED: "true"',
+          'APP_KAFKA_ENABLED: "false"',
+        ),
+      }),
+    /APP_KAFKA_ENABLED/,
+  );
+});
+
+test("Gateway topology assertions reject wrong upstreams and secret exposure", () => {
+  const inputs = gatewayTopologyInputs();
+
+  assert.throws(
+    () =>
+      assertGatewayTopology({
+        ...inputs,
+        gatewayConfig: inputs.gatewayConfig.replace(
+          "http://operation-service:8080",
+          "http://wrong-operation-service:8080",
+        ),
+      }),
+    /OPERATION_SERVICE_URI/,
+  );
+  assert.throws(
+    () =>
+      assertGatewayTopology({
+        ...inputs,
+        gatewayDeployment: inputs.gatewayDeployment.replace(
+          "            - configMapRef:\n                name: gateway-config",
+          "            - configMapRef:\n                name: gateway-config\n            - secretRef:\n                name: lemuel-secret",
+        ),
+      }),
+    /must not import a Secret/,
+  );
+  assert.throws(
+    () =>
+      assertGatewayTopology({
+        ...inputs,
+        gatewayDeployment: inputs.gatewayDeployment.replace(
+          "path: /actuator/health/readiness",
+          "path: /actuator/health/liveness",
+        ),
+      }),
+    /readinessProbe/,
+  );
+});
+
+test("Ingress documentation orders narrow Gateway routes before general API routing", () => {
+  const ingress = readFileSync("k8s/ingress/ingress.yaml", "utf8");
+  const header = ingress.split("apiVersion:", 1)[0];
+
+  assert.match(
+    header,
+    /\/api\/account, \/api\/ops[^\r\n]*gateway-service[\s\S]*\/api,[^\r\n]*lemuel-service/,
+  );
+});
+
+test("Account storage design gates multi-node production on durable storage and recovery", () => {
+  const design = readFileSync(
+    "docs/superpowers/specs/2026-07-15-gateway-account-production-deployment-design.md",
+    "utf8",
+  );
+
+  assert.match(design, /single-node[^\r\n]*hostPath/i);
+  assert.match(design, /multi-node production[^\r\n]*(?:CSI|storage class)/i);
+  assert.match(design, /backup[^\r\n]*(?:and|\/)[^\r\n]*restore/i);
+});
+
 for (const workflow of workflows) {
   test(`${workflow.name} publishes every backend deployment image`, () => {
     assert.equal(existsSync(workflow.file), true, `${workflow.file} must exist`);
@@ -173,31 +600,7 @@ test("production topology deploys the Account service and database", () => {
   for (const file of accountManifests) {
     assert.equal(existsSync(file), true, `${file} must exist`);
   }
-
-  const accountDeployment = readFileSync(accountManifests[2], "utf8");
-  const accountConfig = readFileSync(accountManifests[1], "utf8");
-  const accountDatabase = readFileSync(accountManifests[0], "utf8");
-
-  manifestResource(accountDatabase, "PersistentVolume", "account-db-pv");
-  manifestResource(accountDatabase, "PersistentVolumeClaim", "account-db-pvc");
-  manifestResource(accountDatabase, "StatefulSet", "account-db");
-  manifestResource(accountDatabase, "Service", "account-db-service");
-  manifestResource(accountDeployment, "Deployment", "account-app");
-  manifestResource(accountDeployment, "Service", "account-service");
-
-  assert.match(
-    accountDeployment,
-    /image:\s*ghcr\.io\/myoungsoo7\/settlement-account:latest/,
-  );
-  assert.match(accountConfig, /MANAGEMENT_SERVER_PORT:\s*"8080"/);
-  assert.match(
-    accountConfig,
-    /jdbc:postgresql:\/\/account-db-service:5432\/lemuel_account\?reWriteBatchedInserts=true/,
-  );
-  assert.match(
-    accountConfig,
-    /SPRING_KAFKA_BOOTSTRAP_SERVERS:\s*"redpanda:29092"/,
-  );
+  assertAccountTopology(accountTopologyInputs());
 });
 
 test("production topology deploys Gateway and preserves narrow public routing", () => {
@@ -205,27 +608,10 @@ test("production topology deploys Gateway and preserves narrow public routing", 
     assert.equal(existsSync(file), true, `${file} must exist`);
   }
 
-  const gatewayConfig = readFileSync(gatewayManifests[0], "utf8");
-  const gatewayDeployment = readFileSync(gatewayManifests[1], "utf8");
   const ingress = readFileSync("k8s/ingress/ingress.yaml", "utf8");
   const argocd = readFileSync("k8s/argocd/argocd-app.yaml", "utf8");
-  const gatewayApp = manifestResource(
-    gatewayDeployment,
-    "Deployment",
-    "gateway-app",
-  );
 
-  manifestResource(gatewayDeployment, "Service", "gateway-service");
-  assert.doesNotMatch(gatewayApp, /\bsecretRef\s*:/);
-
-  assert.match(
-    gatewayDeployment,
-    /image:\s*ghcr\.io\/myoungsoo7\/settlement-gateway:latest/,
-  );
-  assert.match(
-    gatewayConfig,
-    /ACCOUNT_SERVICE_URI:\s*"http:\/\/account-service:8080"/,
-  );
+  assertGatewayTopology(gatewayTopologyInputs());
   assert.match(argocd, /directory:\s*\n\s+recurse: true/);
   assert.match(ingressPathBlock(ingress, "/api/account"), /name: gateway-service/);
   assert.match(ingressPathBlock(ingress, "/api"), /name: lemuel-service/);

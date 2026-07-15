@@ -6,6 +6,7 @@
 # 실제로 트래픽을 처리하는 것은 NGINX Ingress Controller (별도 설치 필요).
 #
 # 라우팅 규칙 (우선순위 순):
+#   /api/account, /api/ops                       → gateway-service (Spring Cloud Gateway :8080)
 #   /api, /auth, /orders, /payments, /refunds  → lemuel-service (Spring Boot :8080)
 #   /actuator, /swagger-ui, /v3/api-docs       → lemuel-service (Spring Boot :8080)
 #   /                                          → lemuel-frontend-service (Nginx :80)
