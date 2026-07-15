@@ -77,6 +77,21 @@ function manifestResource(contents, kind, name) {
   return resource;
 }
 
+function manifestTopLevelBlock(resource, key) {
+  const lines = resource.split(/\r?\n/);
+  const start = lines.findIndex((line) => line === `${key}:`);
+  assert.notEqual(start, -1, `${key} block must exist`);
+
+  const nextTopLevelOffset = lines
+    .slice(start + 1)
+    .findIndex((line) => /^\S/.test(line));
+  const end =
+    nextTopLevelOffset === -1
+      ? lines.length
+      : start + 1 + nextTopLevelOffset;
+  return lines.slice(start, end).join("\n");
+}
+
 function manifestContainer(resource, name) {
   const lines = resource.split(/\r?\n/);
   const start = lines.findIndex((line) => line === `        - name: ${name}`);
@@ -239,14 +254,20 @@ test("production topology deploys Gateway and preserves narrow public routing", 
 test("production topology routes the Operation API through Gateway", () => {
   const gatewayConfig = readFileSync(gatewayManifests[0], "utf8");
   const ingress = readFileSync("k8s/ingress/ingress.yaml", "utf8");
+  const gatewayConfigMap = manifestResource(
+    gatewayConfig,
+    "ConfigMap",
+    "gateway-config",
+  );
+  const gatewayData = manifestTopLevelBlock(gatewayConfigMap, "data");
   const accountPath = ingressPathBlock(ingress, "/api/account");
   const operationPath = ingressPathBlock(ingress, "/api/ops");
   const generalApiPath = ingressPathBlock(ingress, "/api");
   const ingressLines = ingress.split(/\r?\n/);
 
   assert.match(
-    gatewayConfig,
-    /OPERATION_SERVICE_URI:\s*"http:\/\/operation-service:8080"/,
+    gatewayData,
+    /^  OPERATION_SERVICE_URI:\s*"http:\/\/operation-service:8080"\s*$/m,
   );
   assert.match(
     accountPath,
@@ -256,6 +277,7 @@ test("production topology routes the Operation API through Gateway", () => {
     operationPath,
     /name:\s*gateway-service[\s\S]*?number:\s*8080/,
   );
+  assert.match(operationPath, /^\s*pathType:\s*Prefix\s*$/m);
   assert.match(
     generalApiPath,
     /name:\s*lemuel-service[\s\S]*?number:\s*8080/,
