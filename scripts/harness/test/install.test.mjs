@@ -149,7 +149,7 @@ test('installHooks is idempotent and only configures the tracked hook path', asy
   assert.equal(existsSync(join(root, '.git/hooks/pre-commit')), false);
 });
 
-test('installed hook allows a clean commit and rejects a pwc commit', async () => {
+test('installed hook allows clean commits including pwc submission paths', async () => {
   const root = createRepo();
   await installHooks({ cwd: root, stdout: () => {}, stderr: () => {} });
 
@@ -158,11 +158,11 @@ test('installed hook allows a clean commit and rejects a pwc commit', async () =
   const clean = git(root, 'commit', '-m', 'clean');
   assert.equal(clean.status, 0, clean.stderr || clean.stdout);
 
-  put(root, 'pwc/blocked.txt', 'blocked\n');
-  assert.equal(git(root, 'add', 'pwc/blocked.txt').status, 0);
-  const blocked = git(root, 'commit', '-m', 'blocked');
-  assert.notEqual(blocked.status, 0, blocked.stdout);
-  assert.match(`${blocked.stdout}\n${blocked.stderr}`, /pwc|blocking violation/i);
+  // 2026-07-15 정책: 제출물은 원격 실행을 위해 커밋 대상 (구 NO-COMMIT 규칙 제거).
+  put(root, 'pwc/submission/tracked.txt', 'tracked\n');
+  assert.equal(git(root, 'add', 'pwc/submission/tracked.txt').status, 0);
+  const submission = git(root, 'commit', '-m', 'submission');
+  assert.equal(submission.status, 0, submission.stderr || submission.stdout);
 });
 
 test('installed hook propagates failure from a present optional plugin guard', async () => {
