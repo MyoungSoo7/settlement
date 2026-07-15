@@ -6,6 +6,7 @@ import github.lms.lemuel.commondata.application.port.in.GetDataSourcesUseCase;
 import github.lms.lemuel.commondata.application.port.in.RegisterDataSourceUseCase;
 import github.lms.lemuel.commondata.application.port.in.SyncDataSourceUseCase;
 import github.lms.lemuel.commondata.application.port.in.SyncResult;
+import github.lms.lemuel.commondata.audit.application.port.out.RecordAuditPort;
 import github.lms.lemuel.commondata.domain.DataRecord;
 import github.lms.lemuel.commondata.domain.DataSource;
 import github.lms.lemuel.commondata.domain.DataSourceNotFoundException;
@@ -50,7 +51,7 @@ class CommonDataWebLayerTest {
     void setUp() {
         DataSourceController sourceController = new DataSourceController(getSources, getRecords, objectMapper);
         CommonDataAdminController adminController =
-                new CommonDataAdminController(register, sync, tracker, inlineExecutor);
+                new CommonDataAdminController(register, sync, tracker, inlineExecutor, mock(RecordAuditPort.class));
         mvc = MockMvcBuilders.standaloneSetup(sourceController, adminController)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();

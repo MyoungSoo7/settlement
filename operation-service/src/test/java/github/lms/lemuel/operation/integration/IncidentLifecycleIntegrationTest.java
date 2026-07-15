@@ -18,6 +18,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -94,10 +95,14 @@ class IncidentLifecycleIntegrationTest {
     SpringDataIncidentRepository incidentRepository;
     @Autowired
     SpringDataIncidentTimelineRepository timelineRepository;
+    @Autowired
+    JdbcTemplate jdbcTemplate;
 
     @BeforeEach
     void cleanUp() {
-        timelineRepository.deleteAll();
+        // incident_timeline 은 append-only 트리거(V20260715154000)가 DELETE 를 차단한다.
+        // row 트리거는 TRUNCATE 에 발화하지 않으므로 테스트 격리 초기화는 TRUNCATE 로 수행.
+        jdbcTemplate.execute("TRUNCATE TABLE opslab.incident_timeline");
         incidentRepository.deleteAll();
     }
 

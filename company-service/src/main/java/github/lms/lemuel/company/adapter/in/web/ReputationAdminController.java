@@ -2,6 +2,7 @@ package github.lms.lemuel.company.adapter.in.web;
 
 import github.lms.lemuel.company.adapter.in.web.dto.ReputationResponse;
 import github.lms.lemuel.company.application.port.in.RecalcReputationUseCase;
+import github.lms.lemuel.company.audit.application.port.out.RecordAuditPort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,18 +22,23 @@ import java.util.Map;
 public class ReputationAdminController {
 
     private final RecalcReputationUseCase recalcReputationUseCase;
+    private final RecordAuditPort recordAuditPort;
 
-    public ReputationAdminController(RecalcReputationUseCase recalcReputationUseCase) {
+    public ReputationAdminController(RecalcReputationUseCase recalcReputationUseCase,
+                                     RecordAuditPort recordAuditPort) {
         this.recalcReputationUseCase = recalcReputationUseCase;
+        this.recordAuditPort = recordAuditPort;
     }
 
     @PostMapping("/recalc")
     public ResponseEntity<RecalcReputationUseCase.RecalcSummary> recalcAll() {
+        recordAuditPort.record("REPUTATION_RECALC_TRIGGERED", "Reputation", "ALL", Map.of());
         return ResponseEntity.ok(recalcReputationUseCase.recalcAll());
     }
 
     @PostMapping("/recalc/{stockCode}")
     public ResponseEntity<?> recalcOne(@PathVariable String stockCode) {
+        recordAuditPort.record("REPUTATION_RECALC_TRIGGERED", "Reputation", stockCode, Map.of());
         return recalcReputationUseCase.recalcFor(stockCode)
                 .<ResponseEntity<?>>map(score -> ResponseEntity.ok(ReputationResponse.from(score)))
                 .orElseGet(() -> ResponseEntity.ok(Map.of(

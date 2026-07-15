@@ -93,7 +93,9 @@ class AnomalyDetectionIntegrationTest {
 
     @BeforeEach
     void cleanUp() {
-        timelineRepository.deleteAll();
+        // incident_timeline 은 append-only 트리거(V20260715154000)가 DELETE 를 차단한다.
+        // row 트리거는 TRUNCATE 에 발화하지 않으므로 테스트 격리 초기화는 TRUNCATE 로 수행.
+        jdbcTemplate.execute("TRUNCATE TABLE opslab.incident_timeline");
         incidentRepository.deleteAll();
         jdbcTemplate.update("DELETE FROM opslab.ops_metric_bucket");
     }

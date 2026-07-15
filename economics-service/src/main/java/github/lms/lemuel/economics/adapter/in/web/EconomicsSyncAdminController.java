@@ -2,6 +2,7 @@ package github.lms.lemuel.economics.adapter.in.web;
 
 import github.lms.lemuel.economics.application.port.in.SyncIndicatorsUseCase;
 import github.lms.lemuel.economics.application.port.in.SyncResult;
+import github.lms.lemuel.economics.audit.application.port.out.RecordAuditPort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -37,13 +38,16 @@ public class EconomicsSyncAdminController {
     private final SyncIndicatorsUseCase syncIndicatorsUseCase;
     private final SyncStatusTracker tracker;
     private final TaskExecutor executor;
+    private final RecordAuditPort recordAuditPort;
 
     public EconomicsSyncAdminController(SyncIndicatorsUseCase syncIndicatorsUseCase,
                                         SyncStatusTracker tracker,
-                                        @Qualifier("syncTaskExecutor") TaskExecutor executor) {
+                                        @Qualifier("syncTaskExecutor") TaskExecutor executor,
+                                        RecordAuditPort recordAuditPort) {
         this.syncIndicatorsUseCase = syncIndicatorsUseCase;
         this.tracker = tracker;
         this.executor = executor;
+        this.recordAuditPort = recordAuditPort;
     }
 
     @PostMapping
@@ -52,6 +56,8 @@ public class EconomicsSyncAdminController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         String job = (code == null ? "all" : code) + ":" + from + "~" + to;
+        recordAuditPort.record("COLLECT_TRIGGERED", "EcosSync", job,
+                Map.of("code", code == null ? "all" : code, "from", from.toString(), "to", to.toString()));
         return submit(job, () -> syncIndicatorsUseCase.syncIndicators(code, from, to));
     }
 

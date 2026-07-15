@@ -1,0 +1,31 @@
+-- V20260716200300: settlement_adjustments 출처 제약 재검토 결론 문서화 — DB 설계 리뷰 R2 후속 (레인 F2)
+--
+-- 리뷰 지적(A-medium): settlement_adjustments 의 출처 제약이 at-most-one(<=1)이라 무출처(세 출처 컬럼이
+--   모두 NULL) 조정을 허용 — exactly-one 을 강제하는 opslab(order) 쪽과 비대칭이다. exactly-one 으로
+--   승격할 수 있는가?
+--
+-- 결론: 승격하지 않는다(at-most-one 유지). 무출처 조정을 만드는 경로가 실제로 존재하기 때문이다.
+--
+-- 조사(조정 생성 경로 전수):
+--   1) AdjustSettlementForRefundService.adjustSettlementForRefund(paymentId, amount, refundId)
+--        → SettlementAdjustment.ofRefund(settlementId, refundId, ...). ofRefund 는 refundId 의 null 을
+--          허용한다(검증 없음). 그리고 프로덕션 인입 경로인
+--          PaymentRefundedSettlementAdjustConsumer.handle() 이
+--            `Long refundId = node.hasNonNull("refundId") ? ... : null;`
+--          로 refundId 를 뽑는다 → 레거시 lemuel.payment.refunded 페이로드(refundId 필드 없음)를 소비하면
+--          refundId=null 로 조정이 생성되어 refund_id/chargeback_id/reconciliation_discrepancy_id 가 전부
+--          NULL 인 "무출처" 행이 정상 생성된다. (UseCase 에도 refundId=null 을 넘기는 2-arg default
+--          오버로드가 존재.)
+--       → exactly-one 으로 강제하면 이 환불 조정 INSERT 가 런타임 실패 → 환불 미반영(자금 사고)이 된다.
+--   2) ChargebackService.accept → SettlementAdjustment.ofChargeback : chargebackId 필수(검증) → 항상 1출처.
+--   3) ApplyReconciliationAdjustmentService.applyClawback → ofReconciliation : discrepancyId 필수 → 항상 1출처.
+--
+-- 즉 무출처가 나오는 경로는 (1)의 레거시 refundId-less 환불뿐이며 이는 의도된 하위호환 경로다.
+-- 따라서 무결성은 "다중 출처 금지(<=1)" + 각 출처 1:1 부분 유니크(V20260715110400)로 확보하고,
+-- 무출처 레거시 조정은 계속 허용한다. opslab 과의 비대칭은 order 쪽이 항상 refundId 를 갖는 반면
+-- settlement 은 refundId-less 레거시 이벤트를 소비해야 하는 도메인 차이에서 비롯한 의도된 차이다.
+--
+-- 이 마이그레이션은 스키마를 바꾸지 않는다(제약 DROP/재생성 없음). 위 결론을 제약에 각인만 한다.
+
+COMMENT ON CONSTRAINT chk_adjustment_source_at_most_one ON public.settlement_adjustments IS
+    'refund_id/chargeback_id/reconciliation_discrepancy_id 중 최대 1개만 non-null(다중 출처=이중 계상 금지). exactly-one 이 아닌 이유: 레거시 refundId-less lemuel.payment.refunded 소비 시 무출처 환불 조정이 정상 생성되는 경로가 존재(PaymentRefundedSettlementAdjustConsumer → ofRefund(refundId=null)). 승격 시 해당 환불 미반영(자금 사고) → 의도적으로 at-most-one 유지. 각 출처 1:1 은 uq_adjustments_* 로 보완.';

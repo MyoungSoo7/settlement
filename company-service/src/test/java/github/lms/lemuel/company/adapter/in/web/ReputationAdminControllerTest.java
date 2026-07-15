@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import github.lms.lemuel.company.application.port.in.RecalcReputationUseCase;
+import github.lms.lemuel.company.audit.application.port.out.RecordAuditPort;
 import github.lms.lemuel.company.domain.ArticleSentiment;
 import github.lms.lemuel.company.domain.IssueCategory;
 import github.lms.lemuel.company.domain.ReputationScore;
@@ -22,6 +23,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -41,7 +43,7 @@ class ReputationAdminControllerTest {
                 .registerModule(new JavaTimeModule())
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new ReputationAdminController(recalcReputationUseCase))
+                .standaloneSetup(new ReputationAdminController(recalcReputationUseCase, mock(RecordAuditPort.class)))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .build();

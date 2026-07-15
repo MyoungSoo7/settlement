@@ -2,6 +2,7 @@ package github.lms.lemuel.economics.adapter.in.web;
 
 import github.lms.lemuel.economics.application.port.in.SyncIndicatorsUseCase;
 import github.lms.lemuel.economics.application.port.in.SyncResult;
+import github.lms.lemuel.economics.audit.application.port.out.RecordAuditPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -16,6 +17,7 @@ import java.time.LocalDate;
 
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -45,7 +47,7 @@ class EconomicsSyncAdminControllerTest {
     void setUp() {
         TaskExecutor inline = Runnable::run;
         EconomicsSyncAdminController controller =
-                new EconomicsSyncAdminController(syncIndicatorsUseCase, tracker, inline);
+                new EconomicsSyncAdminController(syncIndicatorsUseCase, tracker, inline, mock(RecordAuditPort.class));
         mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
     }
 

@@ -8,6 +8,7 @@ import github.lms.lemuel.ai.chat.application.exception.RateLimitExceededExceptio
 import github.lms.lemuel.ai.chat.application.port.in.ChatUseCase;
 import github.lms.lemuel.ai.chat.application.port.in.ChatUseCase.ChatCommand;
 import github.lms.lemuel.ai.chat.application.port.in.ChatUseCase.ChatResult;
+import github.lms.lemuel.ai.audit.application.port.out.RecordAuditPort;
 import github.lms.lemuel.ai.chat.application.port.in.ConversationQuery;
 import github.lms.lemuel.ai.config.AiChatProperties;
 import github.lms.lemuel.common.config.jwt.AuthPrincipal;
@@ -32,6 +33,7 @@ import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -60,7 +62,7 @@ class ChatControllerTest {
         AiChatProperties properties = new AiChatProperties("key", "claude-test", 1024, 10, 30, "sys");
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new ChatController(chatUseCase, properties),
-                        new ConversationController(conversationQuery))
+                        new ConversationController(conversationQuery, mock(RecordAuditPort.class)))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
     }

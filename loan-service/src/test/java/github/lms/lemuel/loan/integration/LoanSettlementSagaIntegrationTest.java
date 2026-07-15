@@ -27,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -93,6 +94,7 @@ class LoanSettlementSagaIntegrationTest {
     @Autowired LoanRepaymentRepository repaymentRepo;
     @Autowired LoanLedgerEntryRepository ledgerRepo;
     @Autowired SpringDataOutboxEventRepository outboxRepo;
+    @Autowired JdbcTemplate jdbc;
 
     private SettlementCreatedConsumer createdConsumer;
     private SettlementConfirmedConsumer confirmedConsumer;
@@ -102,7 +104,9 @@ class LoanSettlementSagaIntegrationTest {
         createdConsumer = new SettlementCreatedConsumer(ingestSettlementUseCase, processedEventRepository, objectMapper);
         confirmedConsumer = new SettlementConfirmedConsumer(applyRepaymentUseCase, processedEventRepository, objectMapper);
         repaymentRepo.deleteAll();
-        ledgerRepo.deleteAll();
+        // loan_ledger_entries 는 append-only 트리거(V20260717200000)가 UPDATE·DELETE 를 차단한다.
+        // row 트리거는 TRUNCATE 에 발화하지 않으므로 테스트 격리 초기화는 TRUNCATE 로 수행.
+        jdbc.execute("TRUNCATE TABLE opslab.loan_ledger_entries");
         loanRepo.deleteAll();
         viewRepo.deleteAll();
         outboxRepo.deleteAll();
