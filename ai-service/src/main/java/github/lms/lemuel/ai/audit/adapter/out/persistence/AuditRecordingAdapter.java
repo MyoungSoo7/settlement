@@ -1,8 +1,8 @@
 package github.lms.lemuel.ai.audit.adapter.out.persistence;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import github.lms.lemuel.common.config.jwt.AuthPrincipal;
 import github.lms.lemuel.ai.audit.application.port.out.RecordAuditPort;
+import github.lms.lemuel.common.config.jwt.AuthPrincipal;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
