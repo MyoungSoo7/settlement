@@ -1,5 +1,7 @@
 package github.lms.lemuel.chargeback.adapter.in.web;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import github.lms.lemuel.chargeback.application.port.in.DecideChargebackUseCase;
 import github.lms.lemuel.chargeback.application.port.in.OpenChargebackUseCase;
 import github.lms.lemuel.chargeback.application.port.in.OpenChargebackUseCase.OpenChargebackCommand;
@@ -8,8 +10,12 @@ import github.lms.lemuel.chargeback.domain.Chargeback;
 import github.lms.lemuel.chargeback.domain.ChargebackReason;
 import github.lms.lemuel.chargeback.domain.ChargebackSource;
 import github.lms.lemuel.chargeback.domain.ChargebackStatus;
+import github.lms.lemuel.common.audit.application.AuditLogger;
+import github.lms.lemuel.common.audit.domain.AuditAction;
+import github.lms.lemuel.idempotency.adapter.out.persistence.ManualIdempotencyGuard;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -44,13 +50,22 @@ public class ChargebackAdminController {
     private final OpenChargebackUseCase openUseCase;
     private final DecideChargebackUseCase decideUseCase;
     private final LoadChargebackPort loadPort;
+    private final ManualIdempotencyGuard idempotency;
+    private final AuditLogger auditLogger;
+    private final ObjectMapper objectMapper;
 
     public ChargebackAdminController(OpenChargebackUseCase openUseCase,
                                       DecideChargebackUseCase decideUseCase,
-                                      LoadChargebackPort loadPort) {
+                                      LoadChargebackPort loadPort,
+                                      ManualIdempotencyGuard idempotency,
+                                      AuditLogger auditLogger,
+                                      ObjectMapper objectMapper) {
         this.openUseCase = openUseCase;
         this.decideUseCase = decideUseCase;
         this.loadPort = loadPort;
+        this.idempotency = idempotency;
+        this.auditLogger = auditLogger;
+        this.objectMapper = objectMapper;
     }
 
     @Operation(summary = "수동 분쟁 등록 (PG 통지 누락·시연용)")
@@ -85,23 +100,56 @@ public class ChargebackAdminController {
 
     @Operation(summary = "셀러 책임 인정 — settlement_adjustments 음수 row 자동 생성")
     @PostMapping("/{id}/accept")
-    public ResponseEntity<ChargebackResponse> accept(@PathVariable Long id,
-                                                      @RequestBody DecisionRequest req) {
+    public ResponseEntity<ChargebackResponse> accept(
+            @PathVariable Long id,
+            @RequestBody DecisionRequest req,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+        if (isDuplicate(idempotencyKey, "chargeback:accept:" + id)) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).build();
+        }
         Chargeback cb = decideUseCase.accept(id, currentOperator(), req.note());
+        // 셀러 환수(settlement_adjustments 차감) 트리거 — 결정 주체·금액을 감사 기록.
+        auditLogger.record(AuditAction.CHARGEBACK_ACCEPTED, "Chargeback", String.valueOf(id),
+                toJson(Map.of("operator", currentOperator(), "chargebackId", id,
+                        "settlementId", String.valueOf(cb.getSettlementId()),
+                        "amount", cb.getAmount(), "note", String.valueOf(req.note()))));
         return ResponseEntity.ok(ChargebackResponse.from(cb));
     }
 
     @Operation(summary = "셀러 증빙 인정 — 분쟁 종결, 정산 영향 없음. 사유 필수.")
     @PostMapping("/{id}/reject")
-    public ResponseEntity<ChargebackResponse> reject(@PathVariable Long id,
-                                                      @RequestBody DecisionRequest req) {
+    public ResponseEntity<ChargebackResponse> reject(
+            @PathVariable Long id,
+            @RequestBody DecisionRequest req,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+        if (isDuplicate(idempotencyKey, "chargeback:reject:" + id)) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).build();
+        }
         Chargeback cb = decideUseCase.reject(id, currentOperator(), req.note());
+        auditLogger.record(AuditAction.CHARGEBACK_REJECTED, "Chargeback", String.valueOf(id),
+                toJson(Map.of("operator", currentOperator(), "chargebackId", id,
+                        "settlementId", String.valueOf(cb.getSettlementId()),
+                        "amount", cb.getAmount(), "note", String.valueOf(req.note()))));
         return ResponseEntity.ok(ChargebackResponse.from(cb));
+    }
+
+    /** Idempotency-Key 가 있고 이미 선점됐으면 true(중복 → 409). 키가 없으면 항상 false(멱등 미적용). */
+    private boolean isDuplicate(String idempotencyKey, String endpoint) {
+        return idempotencyKey != null && !idempotencyKey.isBlank()
+                && !idempotency.claim(idempotencyKey, endpoint, currentOperator());
     }
 
     private static String currentOperator() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         return auth == null || auth.getName() == null ? "anonymous" : auth.getName();
+    }
+
+    private String toJson(Map<String, Object> payload) {
+        try {
+            return objectMapper.writeValueAsString(payload);
+        } catch (JsonProcessingException e) {
+            return "{\"error\":\"audit_serialization_failed\"}";
+        }
     }
 
     public record OpenManualRequest(

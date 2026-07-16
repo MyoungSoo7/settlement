@@ -50,7 +50,10 @@ spring:
     schemas: public
     default-schema: public
     create-schemas: true
-    validate-on-migrate: false
+    # 마이그레이션 적용 전 저장소 스크립트와 이미 적용된 스키마 이력(checksum·순서)을 대조해
+    # 드리프트(사후 수정·순서 변경)를 기동 시점에 차단한다. settlement 는 자체 V1 베이스라인 이후
+    # 타임스탬프 마이그레이션만 추가하므로 체크섬 충돌이 없다.
+    validate-on-migrate: true
 
   cache:
     type: caffeine
@@ -207,6 +210,10 @@ app:
   settlement:
     confirm:
       chunk-size: ${APP_SETTLEMENT_CONFIRM_CHUNK_SIZE:100}
+    # 하드코딩 공휴일 상수(BusinessDayCalculator) 위에 얹히는 추가 공휴일 — 정부 지정 임시공휴일을
+    # 코드·배포 없이 정산일·홀드백 해제일 계산에 반영한다. 각 항목 yyyy-MM-dd. 기본 빈 목록(현행 캘린더 유지).
+    # 예) extra-holidays: ["2026-04-29", "2026-06-03"]
+    extra-holidays: ${APP_SETTLEMENT_EXTRA_HOLIDAYS:}
   # 원장 전용 트랜잭셔널 아웃박스 로컬 폴러 (Kafka 미경유)
   ledger-outbox:
     enabled: ${APP_LEDGER_OUTBOX_ENABLED:true}

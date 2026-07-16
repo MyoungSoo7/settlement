@@ -18,8 +18,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.OptimisticLockingFailureException;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
@@ -52,7 +54,7 @@ class PayoutServiceTest {
     @BeforeEach
     void setUp() {
         service = new PayoutService(loadPort, savePort, singleExecutor, limitChecker,
-                new SimpleMeterRegistry());
+                new SimpleMeterRegistry(), Clock.system(ZoneId.of("Asia/Seoul")));
     }
 
     private Payout requested(Long id, Long sellerId, String amount) {

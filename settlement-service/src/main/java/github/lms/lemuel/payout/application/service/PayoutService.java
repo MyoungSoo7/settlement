@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -55,16 +56,20 @@ public class PayoutService implements RequestPayoutUseCase, ExecutePayoutUseCase
     private final Counter limitedCounter;
     private final Counter retryCounter;
     private final Counter conflictCounter;
+    /** KST 기준 시각 소스 — 일 한도 판정 기준일이 JVM 타임존에 흔들리지 않게 한다. */
+    private final Clock clock;
 
     public PayoutService(LoadPayoutPort loadPort,
                           SavePayoutPort savePort,
                           PayoutSingleExecutor singleExecutor,
                           PayoutLimitChecker limitChecker,
-                          MeterRegistry meterRegistry) {
+                          MeterRegistry meterRegistry,
+                          Clock clock) {
         this.loadPort = loadPort;
         this.savePort = savePort;
         this.singleExecutor = singleExecutor;
         this.limitChecker = limitChecker;
+        this.clock = clock;
         this.completedCounter = Counter.builder("payout.completed").register(meterRegistry);
         this.failedCounter = Counter.builder("payout.failed").register(meterRegistry);
         this.limitedCounter = Counter.builder("payout.limited").register(meterRegistry);
@@ -90,7 +95,7 @@ public class PayoutService implements RequestPayoutUseCase, ExecutePayoutUseCase
     public ExecutionReport executeAllPending() {
         List<Payout> pending = loadPort.findByStatus(PayoutStatus.REQUESTED, BATCH_SIZE);
         int succeeded = 0, failed = 0, limited = 0, conflicts = 0;
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(clock);
 
         for (Payout p : pending) {
             // 한도 검사 → 미달 시 다음 배치 (다음 영업일) 로 미룸

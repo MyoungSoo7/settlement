@@ -44,6 +44,28 @@ public class LedgerOutboxPersistenceAdapter implements SaveLedgerOutboxPort, Loa
                 .toList();
     }
 
+    @Override
+    public List<LedgerOutboxTask> findFailed(int limit) {
+        return repository.findByStatusOrderByIdAsc("FAILED", PageRequest.of(0, limit)).stream()
+                .map(LedgerOutboxPersistenceAdapter::toDomain)
+                .toList();
+    }
+
+    @Override
+    public long countFailed() {
+        return repository.countByStatus("FAILED");
+    }
+
+    @Override
+    @Transactional
+    public int requeueFailed(int limit) {
+        List<Long> ids = repository.findFailedIds(PageRequest.of(0, limit));
+        if (ids.isEmpty()) {
+            return 0;
+        }
+        return repository.requeueByIds(ids);
+    }
+
     private static LedgerOutboxJpaEntity toEntity(LedgerOutboxTask task) {
         LedgerOutboxJpaEntity e = new LedgerOutboxJpaEntity();
         e.setTaskType(task.type().name());

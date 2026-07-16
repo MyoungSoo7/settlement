@@ -89,6 +89,11 @@ public class LedgerOutboxService implements EnqueueLedgerTaskPort, ProcessLedger
         saveLedgerOutboxPort.markFailed(taskId, truncate(error), MAX_RETRY);
     }
 
+    @Override
+    public int maxRetry() {
+        return MAX_RETRY;
+    }
+
     private static String truncate(String s) {
         if (s == null) return null;
         return s.length() <= MAX_ERROR_LEN ? s : s.substring(0, MAX_ERROR_LEN);

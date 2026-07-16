@@ -7,16 +7,18 @@ import github.lms.lemuel.settlement.application.port.out.SaveSettlementPort;
 import github.lms.lemuel.settlement.domain.Settlement;
 import github.lms.lemuel.settlement.domain.SettlementAdjustment;
 import github.lms.lemuel.settlement.domain.exception.SettlementNotFoundException;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -35,7 +37,15 @@ class AdjustSettlementForRefundServiceTest {
     @Mock SaveSettlementPort saveSettlementPort;
     @Mock SaveSettlementAdjustmentPort saveSettlementAdjustmentPort;
     @Mock EnqueueLedgerTaskPort enqueueLedgerTaskPort;
-    @InjectMocks AdjustSettlementForRefundService service;
+    AdjustSettlementForRefundService service;
+
+    @BeforeEach
+    void setUp() {
+        // 실제 TimeConfig 빈과 동일한 KST 시계를 주입한다 — 조정/역분개 기준일을 KST 로 고정.
+        service = new AdjustSettlementForRefundService(
+                loadSettlementPort, saveSettlementPort, saveSettlementAdjustmentPort, enqueueLedgerTaskPort,
+                Clock.system(ZoneId.of("Asia/Seoul")));
+    }
 
     private Settlement settlement() {
         Settlement s = Settlement.createFromPayment(1L, 10L, new BigDecimal("50000"), LocalDate.now());

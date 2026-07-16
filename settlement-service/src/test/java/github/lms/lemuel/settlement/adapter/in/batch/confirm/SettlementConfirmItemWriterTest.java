@@ -6,10 +6,11 @@ import github.lms.lemuel.settlement.application.port.out.PublishSettlementDomain
 import github.lms.lemuel.settlement.application.port.out.PublishSettlementEventPort;
 import github.lms.lemuel.settlement.application.port.out.SaveSettlementPort;
 import github.lms.lemuel.settlement.domain.Settlement;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.batch.infrastructure.item.Chunk;
@@ -19,6 +20,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -34,7 +36,16 @@ class SettlementConfirmItemWriterTest {
     @Mock PublishSettlementDomainEventPort publishSettlementDomainEventPort;
     @Mock EnqueueLedgerTaskPort enqueueLedgerTaskPort;
     @Mock PublishSettlementEventPort publishSettlementEventPort;
-    @InjectMocks SettlementConfirmItemWriter writer;
+    SimpleMeterRegistry meterRegistry;
+    SettlementConfirmItemWriter writer;
+
+    @BeforeEach
+    void setUp() {
+        meterRegistry = new SimpleMeterRegistry();
+        writer = new SettlementConfirmItemWriter(saveSettlementPort, loadSellerIdPort,
+                publishSettlementDomainEventPort, enqueueLedgerTaskPort, publishSettlementEventPort,
+                meterRegistry);
+    }
 
     private Settlement confirmed(long id) {
         Settlement s = Settlement.createFromPayment(id, id + 10, new BigDecimal("10000"), LocalDate.now());
@@ -60,6 +71,10 @@ class SettlementConfirmItemWriterTest {
         verify(publishSettlementDomainEventPort).publishSettlementConfirmed(eq(2L), eq(92L), any());
         verify(enqueueLedgerTaskPort).enqueueCreate(List.of(1L, 2L));
         verify(publishSettlementEventPort).publishSettlementConfirmedEvent(List.of(1L, 2L));
+        // 확정 건수·금액 메트릭: 2건, net 합은 두 정산의 net_amount 합과 일치.
+        assertThat(meterRegistry.counter("settlement.confirmed.count").count()).isEqualTo(2.0);
+        double expectedNet = s1.getNetAmount().add(s2.getNetAmount()).doubleValue();
+        assertThat(meterRegistry.counter("settlement.confirmed.amount").count()).isEqualTo(expectedNet);
     }
 
     @Test

@@ -1,5 +1,7 @@
 package github.lms.lemuel.settlement.application.service;
 
+import github.lms.lemuel.common.audit.application.AuditLogger;
+import github.lms.lemuel.common.audit.domain.AuditAction;
 import github.lms.lemuel.settlement.application.port.out.LoadSettlementPort;
 import github.lms.lemuel.settlement.application.port.out.SaveSettlementAdjustmentPort;
 import github.lms.lemuel.settlement.application.port.out.SaveSettlementPort;
@@ -17,12 +19,16 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /**
@@ -35,6 +41,7 @@ class ApplyReconciliationAdjustmentServiceTest {
     @Mock LoadSettlementPort loadSettlementPort;
     @Mock SaveSettlementPort saveSettlementPort;
     @Mock SaveSettlementAdjustmentPort saveSettlementAdjustmentPort;
+    @Mock AuditLogger auditLogger;
     SimpleMeterRegistry meterRegistry;
     ApplyReconciliationAdjustmentService service;
 
@@ -42,7 +49,8 @@ class ApplyReconciliationAdjustmentServiceTest {
     void setUp() {
         meterRegistry = new SimpleMeterRegistry();
         service = new ApplyReconciliationAdjustmentService(
-                loadSettlementPort, saveSettlementPort, saveSettlementAdjustmentPort, meterRegistry);
+                loadSettlementPort, saveSettlementPort, saveSettlementAdjustmentPort, meterRegistry,
+                auditLogger, Clock.system(ZoneId.of("Asia/Seoul")));
     }
 
     /** 결제 100,000 / 3.5% → net 96,500, id 설정. */
@@ -75,6 +83,8 @@ class ApplyReconciliationAdjustmentServiceTest {
         assertThat(captor.getValue().getAmount()).isEqualByComparingTo("-1000");
 
         assertThat(meterRegistry.counter("pg.reconciliation.adjustments.applied").count()).isEqualTo(1.0);
+        verify(auditLogger).record(eq(AuditAction.RECON_ADJUSTMENT_APPLIED), eq("Settlement"),
+                eq("500"), contains("\"outcome\":\"APPLIED\""));
     }
 
     @Test
@@ -97,6 +107,9 @@ class ApplyReconciliationAdjustmentServiceTest {
         assertThat(meterRegistry.counter("pg.reconciliation.adjustments.skipped",
                 "reason", "settlement_done_manual_clawback").count()).isEqualTo(1.0);
         assertThat(meterRegistry.counter("pg.reconciliation.adjustments.applied").count()).isEqualTo(0.0);
+        // DONE 정산도 갭 추적을 위해 감사 레코드는 남긴다(outcome=DONE_MANUAL_CLAWBACK).
+        verify(auditLogger).record(eq(AuditAction.RECON_ADJUSTMENT_APPLIED), eq("Settlement"),
+                eq("500"), contains("\"outcome\":\"DONE_MANUAL_CLAWBACK\""));
     }
 
     @Test

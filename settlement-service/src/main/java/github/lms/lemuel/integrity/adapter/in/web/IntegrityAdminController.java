@@ -1,10 +1,12 @@
 package github.lms.lemuel.integrity.adapter.in.web;
 
 import github.lms.lemuel.integrity.application.port.in.IntegrityQueryUseCase;
+import github.lms.lemuel.integrity.application.port.in.ProjectionReconciliationUseCase;
 import github.lms.lemuel.integrity.domain.HoldbackStatusReport;
 import github.lms.lemuel.integrity.domain.LedgerCompletenessReport;
 import github.lms.lemuel.integrity.domain.PayoutReconReport;
 import github.lms.lemuel.integrity.domain.ProcessedEventCount;
+import github.lms.lemuel.integrity.domain.ProjectionDiffReport;
 import github.lms.lemuel.integrity.domain.RefundAdjustmentReport;
 import github.lms.lemuel.integrity.domain.StuckStateReport;
 import io.swagger.v3.oas.annotations.Operation;
@@ -32,9 +34,12 @@ import java.util.List;
 public class IntegrityAdminController {
 
     private final IntegrityQueryUseCase useCase;
+    private final ProjectionReconciliationUseCase projectionUseCase;
 
-    public IntegrityAdminController(IntegrityQueryUseCase useCase) {
+    public IntegrityAdminController(IntegrityQueryUseCase useCase,
+                                    ProjectionReconciliationUseCase projectionUseCase) {
         this.useCase = useCase;
+        this.projectionUseCase = projectionUseCase;
     }
 
     @Operation(summary = "INV-5 원장 완전성 — 확정 정산·환불 조정 ↔ 분개 존재/금액 대조",
@@ -84,5 +89,15 @@ public class IntegrityAdminController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         return useCase.processedEventCounts(from, to);
+    }
+
+    @Operation(summary = "INV-12 프로젝션 행 diff — order 원천 결제 키 ↔ settlement_*_view 키 집합 대조",
+            description = "체크섬 1차 스크리닝 후 불일치 시 누락/고아/금액불일치 id 를 상위 limit 건 특정. entity 는 현재 payment 만")
+    @GetMapping("/projection-diff")
+    public ProjectionDiffReport projectionDiff(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(required = false, defaultValue = "payment") String entity,
+            @RequestParam(required = false) Integer limit) {
+        return projectionUseCase.reconcileProjection(date, entity, limit);
     }
 }

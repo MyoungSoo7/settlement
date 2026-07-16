@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDate;
 
 /**
@@ -29,15 +30,19 @@ public class AdjustSettlementForRefundService implements AdjustSettlementForRefu
     private final SaveSettlementPort saveSettlementPort;
     private final SaveSettlementAdjustmentPort saveSettlementAdjustmentPort;
     private final EnqueueLedgerTaskPort enqueueLedgerTaskPort;
+    /** KST 기준 시각 소스 — 조정/역분개 기준일이 JVM 타임존에 흔들리지 않게 한다. */
+    private final Clock clock;
 
     public AdjustSettlementForRefundService(LoadSettlementPort loadSettlementPort,
                                             SaveSettlementPort saveSettlementPort,
                                             SaveSettlementAdjustmentPort saveSettlementAdjustmentPort,
-                                            EnqueueLedgerTaskPort enqueueLedgerTaskPort) {
+                                            EnqueueLedgerTaskPort enqueueLedgerTaskPort,
+                                            Clock clock) {
         this.loadSettlementPort = loadSettlementPort;
         this.saveSettlementPort = saveSettlementPort;
         this.saveSettlementAdjustmentPort = saveSettlementAdjustmentPort;
         this.enqueueLedgerTaskPort = enqueueLedgerTaskPort;
+        this.clock = clock;
     }
 
     @Override
@@ -63,7 +68,7 @@ public class AdjustSettlementForRefundService implements AdjustSettlementForRefu
         Settlement adjustedSettlement = saveSettlementPort.save(settlement);
 
         // 감사 추적: 별도 음수 금액 레코드로 역정산 이력 보존 — refundId 로 환불과 1:1 매핑
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(clock);
         SettlementAdjustment adjustment = SettlementAdjustment.ofRefund(
                 adjustedSettlement.getId(),
                 refundId,

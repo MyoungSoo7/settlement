@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -38,21 +39,25 @@ public class IntegrityQueryService implements IntegrityQueryUseCase {
     private final LoadCompletedRefundsPort completedRefundsPort;
     private final int defaultGraceMinutes;
     private final int defaultStuckThresholdMinutes;
+    /** KST 기준 시각 소스 — grace/threshold cutoff·오늘 판정이 JVM 타임존에 흔들리지 않게 한다. */
+    private final Clock clock;
 
     public IntegrityQueryService(IntegrityQueryPort queryPort,
                                  LoadCompletedRefundsPort completedRefundsPort,
                                  @Value("${app.integrity.grace-minutes:15}") int defaultGraceMinutes,
-                                 @Value("${app.integrity.stuck-threshold-minutes:60}") int defaultStuckThresholdMinutes) {
+                                 @Value("${app.integrity.stuck-threshold-minutes:60}") int defaultStuckThresholdMinutes,
+                                 Clock clock) {
         this.queryPort = queryPort;
         this.completedRefundsPort = completedRefundsPort;
         this.defaultGraceMinutes = defaultGraceMinutes;
         this.defaultStuckThresholdMinutes = defaultStuckThresholdMinutes;
+        this.clock = clock;
     }
 
     @Override
     public LedgerCompletenessReport checkLedgerCompleteness(LocalDate date, Integer graceMinutesOverride) {
         int grace = positiveOrDefault(graceMinutesOverride, defaultGraceMinutes);
-        LocalDateTime graceCutoff = LocalDateTime.now().minusMinutes(grace);
+        LocalDateTime graceCutoff = LocalDateTime.now(clock).minusMinutes(grace);
         return queryPort.ledgerCompleteness(date, grace, graceCutoff);
     }
 
@@ -63,14 +68,14 @@ public class IntegrityQueryService implements IntegrityQueryUseCase {
 
     @Override
     public HoldbackStatusReport checkHoldbackStatus() {
-        return queryPort.holdbackStatus(LocalDate.now());
+        return queryPort.holdbackStatus(LocalDate.now(clock));
     }
 
     @Override
     public StuckStateReport checkStuckStates(Integer thresholdMinutesOverride) {
         int threshold = positiveOrDefault(thresholdMinutesOverride, defaultStuckThresholdMinutes);
-        LocalDateTime cutoff = LocalDateTime.now().minusMinutes(threshold);
-        return queryPort.stuckStates(threshold, cutoff, LocalDate.now());
+        LocalDateTime cutoff = LocalDateTime.now(clock).minusMinutes(threshold);
+        return queryPort.stuckStates(threshold, cutoff, LocalDate.now(clock));
     }
 
     @Override

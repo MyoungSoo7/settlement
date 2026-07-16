@@ -1,6 +1,8 @@
 package github.lms.lemuel.integrity.adapter.out.persistence;
 
 import github.lms.lemuel.integrity.application.port.out.IntegrityQueryPort;
+import github.lms.lemuel.integrity.application.port.out.KeyChecksum;
+import github.lms.lemuel.integrity.application.port.out.PaymentKey;
 import github.lms.lemuel.integrity.domain.HoldbackStatusReport;
 import github.lms.lemuel.integrity.domain.LedgerCompletenessReport;
 import github.lms.lemuel.integrity.domain.PayoutReconReport;
@@ -315,6 +317,35 @@ public class IntegrityQueryJdbcAdapter implements IntegrityQueryPort {
                 .param("from", from).param("to", to)
                 .query((rs, i) -> new ProcessedEventCount(
                         rs.getString("consumer_group"), rs.getString("event_type"), rs.getLong("cnt")))
+                .list();
+    }
+
+    // ── INV-12 프로젝션 행 diff (settlement_payment_view) ─────────────────
+
+    @Override
+    public KeyChecksum projectionPaymentChecksum(LocalDate date) {
+        return jdbc.sql("""
+                        SELECT count(*) AS cnt,
+                               coalesce(sum(amount), 0) AS amount_sum,
+                               coalesce(md5(string_agg(payment_id::text, ',' ORDER BY payment_id)), '') AS id_checksum
+                        FROM settlement_payment_view
+                        WHERE captured_at::date = :date
+                        """)
+                .param("date", date)
+                .query((rs, i) -> new KeyChecksum(
+                        rs.getLong("cnt"), money(rs, "amount_sum"), rs.getString("id_checksum")))
+                .single();
+    }
+
+    @Override
+    public List<PaymentKey> projectionPaymentKeys(LocalDate date, long afterId, int limit) {
+        return jdbc.sql("""
+                        SELECT payment_id, amount FROM settlement_payment_view
+                        WHERE captured_at::date = :date AND payment_id > :afterId
+                        ORDER BY payment_id LIMIT :limit
+                        """)
+                .param("date", date).param("afterId", afterId).param("limit", limit)
+                .query((rs, i) -> new PaymentKey(rs.getLong("payment_id"), money(rs, "amount")))
                 .list();
     }
 

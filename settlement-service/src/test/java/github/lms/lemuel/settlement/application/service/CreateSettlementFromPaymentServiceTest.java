@@ -1,5 +1,7 @@
 package github.lms.lemuel.settlement.application.service;
 
+import github.lms.lemuel.common.audit.application.AuditLogger;
+import github.lms.lemuel.common.audit.domain.AuditAction;
 import github.lms.lemuel.settlement.application.port.out.LoadSellerIdPort;
 import github.lms.lemuel.settlement.application.port.out.LoadSellerSettlementCyclePort;
 import github.lms.lemuel.settlement.application.port.out.LoadSellerTierPort;
@@ -10,15 +12,19 @@ import github.lms.lemuel.settlement.domain.SellerTier;
 import github.lms.lemuel.settlement.domain.Settlement;
 import github.lms.lemuel.settlement.domain.SettlementCycle;
 import github.lms.lemuel.settlement.domain.SettlementStatus;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
@@ -33,7 +39,22 @@ class CreateSettlementFromPaymentServiceTest {
     @Mock LoadSellerSettlementCyclePort loadSellerSettlementCyclePort;
     @Mock LoadSellerIdPort loadSellerIdPort;
     @Mock PublishSettlementDomainEventPort publishSettlementDomainEventPort;
-    @InjectMocks CreateSettlementFromPaymentService service;
+    @Mock AuditLogger auditLogger;
+    CreateSettlementFromPaymentService service;
+
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+
+    @BeforeEach
+    void setUp() {
+        // 프로덕션 TimeConfig 와 동일한 KST 시계 — 폴백(capturedAt 부재) 경로가 KST '오늘'을 쓰게 한다.
+        service = serviceWith(Clock.system(KST));
+    }
+
+    private CreateSettlementFromPaymentService serviceWith(Clock clock) {
+        return new CreateSettlementFromPaymentService(
+                loadSettlementPort, saveSettlementPort, loadSellerTierPort,
+                loadSellerSettlementCyclePort, loadSellerIdPort, publishSettlementDomainEventPort, auditLogger, clock);
+    }
 
     @Test @DisplayName("정산 생성 성공 — NORMAL 판매자 (기본 3.5%)") void create() {
         when(loadSettlementPort.findByPaymentId(1L)).thenReturn(Optional.empty());
@@ -49,6 +70,9 @@ class CreateSettlementFromPaymentServiceTest {
         // DAILY — 정산일은 오늘 + 1
         assertThat(result.getSettlementDate()).isEqualTo(LocalDate.now().plusDays(1));
         verify(saveSettlementPort).save(any());
+        // 이벤트드리븐 정산 생성 감사 — 정산금 발생 지점을 actor=system 으로 남긴다.
+        verify(auditLogger).record(eq(AuditAction.SETTLEMENT_CREATED), eq("Settlement"), any(),
+                contains("\"paymentId\":1"));
     }
 
     @Test @DisplayName("VIP 판매자는 2.5% 차등 수수료 적용") void create_vipTier() {
@@ -147,6 +171,66 @@ class CreateSettlementFromPaymentServiceTest {
         when(loadSettlementPort.findByPaymentId(1L)).thenReturn(Optional.of(existing));
         Settlement result = service.createSettlementFromPayment(1L, 10L, new BigDecimal("50000"));
         assertThat(result).isSameAs(existing);
+        // 멱등 반환(기존 정산)은 생성 사건이 아니므로 감사 기록도 남기지 않는다.
+        verify(auditLogger, never()).record(any(), any(), any(), any());
         verify(saveSettlementPort, never()).save(any());
+    }
+
+    // ── UTC-JVM 경계·결제일 기준 정산일 계산 (고정 Clock) ─────────────────────────
+
+    @Test @DisplayName("정산일은 소비 시각(now)이 아니라 결제 시각(capturedAt)의 날짜 기준으로 계산된다")
+    void settlementDate_basedOnCapturedAt_notNow() {
+        // 소비 시각은 07-16 이지만 결제는 07-10 — 지연/백필/재처리와 무관하게 정산일은 07-10 기준이어야 한다.
+        Clock now0716 = Clock.fixed(Instant.parse("2026-07-16T01:00:00Z"), KST);
+        when(loadSettlementPort.findByPaymentId(11L)).thenReturn(Optional.empty());
+        when(saveSettlementPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Settlement result = serviceWith(now0716).createSettlementFromPayment(
+                11L, 110L, new BigDecimal("50000"), null, "VIP", "DAILY",
+                LocalDateTime.of(2026, 7, 10, 10, 0));
+
+        assertThat(result.getSettlementDate())
+                .isEqualTo(SettlementCycle.DAILY.resolveSettlementDate(LocalDate.of(2026, 7, 10)))
+                .isNotEqualTo(SettlementCycle.DAILY.resolveSettlementDate(LocalDate.of(2026, 7, 16)));
+    }
+
+    @Test @DisplayName("capturedAt 부재 시 폴백은 UTC 가 아니라 KST 자정 기준일을 쓴다 (off-by-one 방지)")
+    void fallback_usesKstMidnight_notUtc() {
+        // 이 순간 UTC 날짜는 07-15, KST 날짜는 07-16. 폴백 정산 기준일은 KST(07-16) 여야 한다.
+        Clock kstJustAfterMidnight = Clock.fixed(Instant.parse("2026-07-15T15:30:00Z"), KST);
+        when(loadSettlementPort.findByPaymentId(12L)).thenReturn(Optional.empty());
+        when(saveSettlementPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Settlement result = serviceWith(kstJustAfterMidnight).createSettlementFromPayment(
+                12L, 120L, new BigDecimal("50000"), null, "VIP", "DAILY", null);
+
+        assertThat(result.getSettlementDate())
+                .isEqualTo(SettlementCycle.DAILY.resolveSettlementDate(LocalDate.of(2026, 7, 16)));
+    }
+
+    @Test @DisplayName("월말 정산(MONTHLY_LAST)은 결제월의 말일로 계산된다")
+    void monthEnd_resolvesToLastDayOfPaymentMonth() {
+        Clock anyClock = Clock.fixed(Instant.parse("2026-07-16T01:00:00Z"), KST);
+        when(loadSettlementPort.findByPaymentId(13L)).thenReturn(Optional.empty());
+        when(saveSettlementPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Settlement result = serviceWith(anyClock).createSettlementFromPayment(
+                13L, 130L, new BigDecimal("50000"), null, "NORMAL", "MONTHLY_LAST",
+                LocalDateTime.of(2026, 1, 15, 9, 0));
+
+        assertThat(result.getSettlementDate()).isEqualTo(LocalDate.of(2026, 1, 31));
+    }
+
+    @Test @DisplayName("윤년 2월 말일도 정확히 처리된다 (2028-02-29)")
+    void leapYear_februaryLastDay() {
+        Clock anyClock = Clock.fixed(Instant.parse("2028-02-10T01:00:00Z"), KST);
+        when(loadSettlementPort.findByPaymentId(14L)).thenReturn(Optional.empty());
+        when(saveSettlementPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Settlement result = serviceWith(anyClock).createSettlementFromPayment(
+                14L, 140L, new BigDecimal("50000"), null, "NORMAL", "MONTHLY_LAST",
+                LocalDateTime.of(2028, 2, 10, 9, 0));
+
+        assertThat(result.getSettlementDate()).isEqualTo(LocalDate.of(2028, 2, 29));
     }
 }

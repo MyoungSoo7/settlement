@@ -1,12 +1,18 @@
 package github.lms.lemuel.payout.adapter.in.web;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import github.lms.lemuel.common.audit.application.AuditLogger;
+import github.lms.lemuel.common.audit.domain.AuditAction;
 import github.lms.lemuel.payout.application.port.in.ExecutePayoutUseCase;
 import github.lms.lemuel.payout.application.port.in.RetryFailedPayoutUseCase;
 import github.lms.lemuel.payout.application.port.out.LoadPayoutPort;
 import github.lms.lemuel.payout.domain.Payout;
 import github.lms.lemuel.payout.domain.PayoutStatus;
+import github.lms.lemuel.idempotency.adapter.out.persistence.ManualIdempotencyGuard;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -24,13 +30,22 @@ public class PayoutAdminController {
     private final LoadPayoutPort loadPort;
     private final RetryFailedPayoutUseCase retryUseCase;
     private final ExecutePayoutUseCase executeUseCase;
+    private final ManualIdempotencyGuard idempotency;
+    private final AuditLogger auditLogger;
+    private final ObjectMapper objectMapper;
 
     public PayoutAdminController(LoadPayoutPort loadPort,
                                   RetryFailedPayoutUseCase retryUseCase,
-                                  ExecutePayoutUseCase executeUseCase) {
+                                  ExecutePayoutUseCase executeUseCase,
+                                  ManualIdempotencyGuard idempotency,
+                                  AuditLogger auditLogger,
+                                  ObjectMapper objectMapper) {
         this.loadPort = loadPort;
         this.retryUseCase = retryUseCase;
         this.executeUseCase = executeUseCase;
+        this.idempotency = idempotency;
+        this.auditLogger = auditLogger;
+        this.objectMapper = objectMapper;
     }
 
     @Operation(summary = "FAILED 출금 목록")
@@ -58,16 +73,34 @@ public class PayoutAdminController {
 
     @Operation(summary = "FAILED 출금 재시도 — REQUESTED 로 복원하여 다음 배치에 재처리")
     @PostMapping("/{id}/retry")
-    public ResponseEntity<PayoutResponse> retry(@PathVariable Long id) {
+    public ResponseEntity<PayoutResponse> retry(
+            @PathVariable Long id,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+        if (isDuplicate(idempotencyKey, "payout:retry:" + id)) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).build();
+        }
         Payout p = retryUseCase.retry(id, currentOperator());
+        auditLogger.record(AuditAction.PAYOUT_RETRIED, "Payout", String.valueOf(id),
+                toJson(Map.of("operator", currentOperator(), "payoutId", id,
+                        "settlementId", p.getSettlementId(), "amount", p.getAmount(),
+                        "retryCount", p.getRetryCount())));
         return ResponseEntity.ok(PayoutResponse.from(p));
     }
 
     @Operation(summary = "FAILED 출금 영구 취소 — 사유 필수 (감사 추적)")
     @PostMapping("/{id}/cancel")
-    public ResponseEntity<PayoutResponse> cancel(@PathVariable Long id,
-                                                  @RequestBody CancelRequest request) {
+    public ResponseEntity<PayoutResponse> cancel(
+            @PathVariable Long id,
+            @RequestBody CancelRequest request,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+        if (isDuplicate(idempotencyKey, "payout:cancel:" + id)) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).build();
+        }
         Payout p = retryUseCase.cancel(id, currentOperator(), request.reason());
+        auditLogger.record(AuditAction.PAYOUT_CANCELED, "Payout", String.valueOf(id),
+                toJson(Map.of("operator", currentOperator(), "payoutId", id,
+                        "settlementId", p.getSettlementId(), "amount", p.getAmount(),
+                        "reason", String.valueOf(request.reason()))));
         return ResponseEntity.ok(PayoutResponse.from(p));
     }
 
@@ -75,6 +108,12 @@ public class PayoutAdminController {
     @PostMapping("/execute-now")
     public ResponseEntity<Map<String, Object>> executeNow() {
         var report = executeUseCase.executeAllPending();
+        // 실자금 이동 트리거 — 배치 외 수동 집행을 operator·결과와 함께 감사 기록.
+        auditLogger.record(AuditAction.PAYOUT_EXECUTED, "PayoutBatch", "execute-now",
+                toJson(Map.of("operator", currentOperator(),
+                        "succeeded", report.succeeded(),
+                        "failed", report.failed(),
+                        "limitedSkipped", report.limitedSkipped())));
         return ResponseEntity.ok(Map.of(
                 "succeeded", report.succeeded(),
                 "failed", report.failed(),
@@ -82,9 +121,23 @@ public class PayoutAdminController {
         ));
     }
 
+    /** Idempotency-Key 가 있고 이미 선점됐으면 true(중복 → 409). 키가 없으면 항상 false(멱등 미적용). */
+    private boolean isDuplicate(String idempotencyKey, String endpoint) {
+        return idempotencyKey != null && !idempotencyKey.isBlank()
+                && !idempotency.claim(idempotencyKey, endpoint, currentOperator());
+    }
+
     private static String currentOperator() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         return auth == null || auth.getName() == null ? "anonymous" : auth.getName();
+    }
+
+    private String toJson(Map<String, Object> payload) {
+        try {
+            return objectMapper.writeValueAsString(payload);
+        } catch (JsonProcessingException e) {
+            return "{\"error\":\"audit_serialization_failed\"}";
+        }
     }
 
     public record CancelRequest(String reason) { }

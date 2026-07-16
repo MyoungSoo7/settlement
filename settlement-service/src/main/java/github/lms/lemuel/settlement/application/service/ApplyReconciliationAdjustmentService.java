@@ -1,5 +1,7 @@
 package github.lms.lemuel.settlement.application.service;
 
+import github.lms.lemuel.common.audit.application.AuditLogger;
+import github.lms.lemuel.common.audit.domain.AuditAction;
 import github.lms.lemuel.settlement.application.port.in.ApplyReconciliationAdjustmentUseCase;
 import github.lms.lemuel.settlement.application.port.out.LoadSettlementPort;
 import github.lms.lemuel.settlement.application.port.out.SaveSettlementAdjustmentPort;
@@ -15,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDate;
 
 /**
@@ -40,15 +43,22 @@ public class ApplyReconciliationAdjustmentService implements ApplyReconciliation
     private final SaveSettlementPort saveSettlementPort;
     private final SaveSettlementAdjustmentPort saveSettlementAdjustmentPort;
     private final MeterRegistry meterRegistry;
+    private final AuditLogger auditLogger;
+    /** KST 기준 시각 소스 — clawback 조정 기준일이 JVM 타임존에 흔들리지 않게 한다. */
+    private final Clock clock;
 
     public ApplyReconciliationAdjustmentService(LoadSettlementPort loadSettlementPort,
                                                 SaveSettlementPort saveSettlementPort,
                                                 SaveSettlementAdjustmentPort saveSettlementAdjustmentPort,
-                                                MeterRegistry meterRegistry) {
+                                                MeterRegistry meterRegistry,
+                                                AuditLogger auditLogger,
+                                                Clock clock) {
         this.loadSettlementPort = loadSettlementPort;
         this.saveSettlementPort = saveSettlementPort;
         this.saveSettlementAdjustmentPort = saveSettlementAdjustmentPort;
         this.meterRegistry = meterRegistry;
+        this.auditLogger = auditLogger;
+        this.clock = clock;
     }
 
     @Override
@@ -67,7 +77,7 @@ public class ApplyReconciliationAdjustmentService implements ApplyReconciliation
                 .orElseThrow(() -> new SettlementNotFoundException(
                         "Settlement not found for paymentId: " + paymentId));
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(clock);
         try {
             // holdback 우선 차감(clawback 흡수) → net 축소. consumeHoldbackForRefund 는 사실상
             // "clawback 을 holdback 에서 먼저 흡수" 의미로 재사용한다.
@@ -83,6 +93,7 @@ public class ApplyReconciliationAdjustmentService implements ApplyReconciliation
                             + "discrepancyId={}, settlementId={}, clawback={}",
                     discrepancyId, settlement.getId(), clawbackAmount);
             meterRegistry.counter(METRIC_SKIPPED, "reason", "settlement_done_manual_clawback").increment();
+            recordAudit(settlement.getId(), discrepancyId, clawbackAmount, "DONE_MANUAL_CLAWBACK");
             return;
         }
 
@@ -94,5 +105,18 @@ public class ApplyReconciliationAdjustmentService implements ApplyReconciliation
         log.info("[PgRecon] 대사 clawback 적용 완료. discrepancyId={}, settlementId={}, clawback={}, netAmount={}, status={}",
                 discrepancyId, adjusted.getId(), clawbackAmount, adjusted.getNetAmount(), adjusted.getStatus());
         meterRegistry.counter(METRIC_APPLIED).increment();
+        recordAudit(adjusted.getId(), discrepancyId, clawbackAmount, "APPLIED");
+    }
+
+    /**
+     * 대사 clawback 적용을 audit_logs 에 기록. 값은 전부 id/금액이라 주입 위험이 없어 컴팩트 JSON 을 직접 조립한다
+     * (컨슈머 경로라 actor 는 system). AuditLogger 자체가 실패를 삼키므로 본 흐름은 영향받지 않는다.
+     */
+    private void recordAudit(Long settlementId, Long discrepancyId, java.math.BigDecimal clawbackAmount, String outcome) {
+        String detail = String.format(
+                "{\"settlementId\":%d,\"discrepancyId\":%d,\"clawbackAmount\":\"%s\",\"outcome\":\"%s\"}",
+                settlementId, discrepancyId, clawbackAmount.toPlainString(), outcome);
+        auditLogger.record(AuditAction.RECON_ADJUSTMENT_APPLIED, "Settlement",
+                String.valueOf(settlementId), detail);
     }
 }

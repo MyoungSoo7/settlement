@@ -1,5 +1,7 @@
 package github.lms.lemuel.ledger.adapter.in.batch;
 
+import github.lms.lemuel.common.opssignal.OpsSignalCategory;
+import github.lms.lemuel.common.opssignal.OpsSignalPort;
 import github.lms.lemuel.ledger.application.port.in.ProcessLedgerOutboxPort;
 import github.lms.lemuel.ledger.domain.LedgerOutboxTask;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +12,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 원장 아웃박스 로컬 폴러.
@@ -32,6 +35,8 @@ public class LedgerOutboxPoller {
     private static final int BATCH_SIZE = 100;
 
     private final ProcessLedgerOutboxPort processPort;
+    /** 관제 실패 신호(best-effort, 절대 throw 안 함). Kafka 없으면 NoOp 주입. */
+    private final OpsSignalPort opsSignalPort;
 
     @Scheduled(fixedDelayString = "${app.ledger-outbox.poll-delay-ms:5000}")
     @SchedulerLock(name = "ledger-outbox-poller", lockAtMostFor = "PT5M")
@@ -52,6 +57,15 @@ public class LedgerOutboxPoller {
                         task.id(), task.type(), task.settlementId(), task.retryCount(), e.getMessage(), e);
                 processPort.markFailed(task.id(), e.getMessage());
                 failed++;
+                // 이번 실패로 재시도 한도에 도달해 FAILED 로 고정되는 작업만 관제로 알린다(재시도 여지가 남은
+                // 일반 실패는 신호 폭주를 피하려 제외). best-effort — emit 은 절대 throw 하지 않는다.
+                if (task.retryCount() + 1 >= processPort.maxRetry()) {
+                    opsSignalPort.emit(OpsSignalCategory.SETTLEMENT_FAILED, "ledger_outbox",
+                            String.valueOf(task.id()),
+                            Map.of("type", task.type().name(),
+                                    "settlementId", String.valueOf(task.settlementId()),
+                                    "reason", "MAX_RETRY_EXHAUSTED"));
+                }
             }
         }
         log.info("Ledger outbox 처리 완료: done={}, failed={}", done, failed);

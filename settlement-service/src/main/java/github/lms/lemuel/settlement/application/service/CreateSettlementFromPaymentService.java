@@ -1,5 +1,7 @@
 package github.lms.lemuel.settlement.application.service;
 
+import github.lms.lemuel.common.audit.application.AuditLogger;
+import github.lms.lemuel.common.audit.domain.AuditAction;
 import github.lms.lemuel.common.config.observability.MdcKeys;
 import github.lms.lemuel.common.config.observability.MdcScope;
 import github.lms.lemuel.settlement.application.port.in.CreateSettlementFromPaymentUseCase;
@@ -19,7 +21,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 /**
@@ -37,29 +41,43 @@ public class CreateSettlementFromPaymentService implements CreateSettlementFromP
     private final LoadSellerSettlementCyclePort loadSellerSettlementCyclePort;
     private final LoadSellerIdPort loadSellerIdPort;
     private final PublishSettlementDomainEventPort publishSettlementDomainEventPort;
+    private final AuditLogger auditLogger;
+    /** KST 기준 시각 소스 — 결제 시각 부재 시 정산 기준일 폴백에만 사용(정본은 결제 시각). */
+    private final Clock clock;
 
     public CreateSettlementFromPaymentService(LoadSettlementPort loadSettlementPort,
                                               SaveSettlementPort saveSettlementPort,
                                               LoadSellerTierPort loadSellerTierPort,
                                               LoadSellerSettlementCyclePort loadSellerSettlementCyclePort,
                                               LoadSellerIdPort loadSellerIdPort,
-                                              PublishSettlementDomainEventPort publishSettlementDomainEventPort) {
+                                              PublishSettlementDomainEventPort publishSettlementDomainEventPort,
+                                              AuditLogger auditLogger,
+                                              Clock clock) {
         this.loadSettlementPort = loadSettlementPort;
         this.saveSettlementPort = saveSettlementPort;
         this.loadSellerTierPort = loadSellerTierPort;
         this.loadSellerSettlementCyclePort = loadSellerSettlementCyclePort;
         this.loadSellerIdPort = loadSellerIdPort;
         this.publishSettlementDomainEventPort = publishSettlementDomainEventPort;
+        this.auditLogger = auditLogger;
+        this.clock = clock;
     }
 
     @Override
     public Settlement createSettlementFromPayment(Long paymentId, Long orderId, BigDecimal amount) {
-        return createSettlementFromPayment(paymentId, orderId, amount, null, null, null);
+        return createSettlementFromPayment(paymentId, orderId, amount, null, null, null, null);
     }
 
     @Override
     public Settlement createSettlementFromPayment(Long paymentId, Long orderId, BigDecimal amount,
                                                   Long sellerId, String sellerTier, String settlementCycle) {
+        return createSettlementFromPayment(paymentId, orderId, amount, sellerId, sellerTier, settlementCycle, null);
+    }
+
+    @Override
+    public Settlement createSettlementFromPayment(Long paymentId, Long orderId, BigDecimal amount,
+                                                  Long sellerId, String sellerTier, String settlementCycle,
+                                                  LocalDateTime paymentCapturedAt) {
         try (var ignorePayment = MdcScope.of(MdcKeys.PAYMENT_ID, String.valueOf(paymentId));
              var ignoreOrder = MdcScope.of(MdcKeys.ORDER_ID, String.valueOf(orderId))) {
             log.info("Creating settlement from payment. amount={}", amount);
@@ -83,8 +101,11 @@ public class CreateSettlementFromPaymentService implements CreateSettlementFromP
                     : loadSellerSettlementCyclePort.findCycleByPaymentId(paymentId).orElse(tier.defaultCycle());
             log.info("Applying seller tier={}, rate={}, cycle={}", tier, tier.rate(), cycle);
 
-            // 정산 생성 — 주기별 resolveSettlementDate 규칙으로 정산일 계산
-            LocalDate settlementDate = cycle.resolveSettlementDate(LocalDate.now());
+            // 정산일 계산 — 기준은 소비 시각이 아니라 "결제 발생일"이다(SettlementCycle 계약, ADR 0020).
+            // 결제 시각의 날짜를 기준으로 resolveSettlementDate 를 태워, 지연/백필/재처리와 무관하게
+            // 같은 결제는 항상 같은 정산일을 얻게 한다.
+            LocalDate paymentDate = resolvePaymentDate(paymentCapturedAt);
+            LocalDate settlementDate = cycle.resolveSettlementDate(paymentDate);
             Settlement settlement = Settlement.createFromPayment(
                     paymentId, orderId, amount, settlementDate, tier.rate());
 
@@ -100,6 +121,10 @@ public class CreateSettlementFromPaymentService implements CreateSettlementFromP
                     String.valueOf(savedSettlement.getId()))) {
                 log.info("Settlement created successfully. status={}", savedSettlement.getStatus());
             }
+
+            // 이벤트드리븐 정산 생성 감사 — 정산금이 발생하는 지점이라 audit_logs 에 남긴다(멱등 반환 경로는 제외).
+            // 컨슈머 경로라 actor 는 system. 값은 전부 id/금액이라 주입 위험이 없어 컴팩트 JSON 을 직접 조립한다.
+            recordCreated(savedSettlement, paymentId);
 
             // loan-service 로 SettlementCreated 발행 (선정산 대출 담보 = 미지급 정산예정금).
             // 같은 트랜잭션의 Outbox 에 적재 → 폴러가 lemuel.settlement.created 로 발행.
@@ -119,5 +144,35 @@ public class CreateSettlementFromPaymentService implements CreateSettlementFromP
 
             return savedSettlement;
         }
+    }
+
+    /**
+     * 정산 생성을 audit_logs 에 기록. paymentId·settlementId·금액 요약만 담는다(actor 는 system).
+     * AuditLogger 자체가 {@code REQUIRES_NEW} + 예외 흡수라 감사 실패가 정산 생성 트랜잭션을 깨지 않는다.
+     */
+    private void recordCreated(Settlement s, Long paymentId) {
+        String detail = String.format(
+                "{\"paymentId\":%d,\"settlementId\":%s,\"paymentAmount\":\"%s\",\"netAmount\":\"%s\",\"settlementDate\":\"%s\"}",
+                paymentId, s.getId(), s.getPaymentAmount().toPlainString(),
+                s.getNetAmount().toPlainString(), s.getSettlementDate());
+        auditLogger.record(AuditAction.SETTLEMENT_CREATED, "Settlement",
+                String.valueOf(s.getId()), detail);
+    }
+
+    /**
+     * 정산 기준일(결제 발생일) 해석. 정본은 결제 이벤트가 실어 온 결제 시각의 날짜다.
+     *
+     * <p>결제 시각이 없으면(구 이벤트 등) KST {@link Clock} 현재일로 폴백한다 — 이 경우에만 소비 시각에
+     * 의존하므로 경고 로그를 남긴다. 폴백은 {@code LocalDate.now(clock)} 로 반드시 KST 를 통과시켜
+     * UTC JVM 의 자정 off-by-one 을 방지한다.
+     */
+    private LocalDate resolvePaymentDate(LocalDateTime paymentCapturedAt) {
+        if (paymentCapturedAt != null) {
+            return paymentCapturedAt.toLocalDate();
+        }
+        LocalDate fallback = LocalDate.now(clock);
+        log.warn("payment.captured 에 capturedAt 이 없어 정산 기준일을 KST now({})로 폴백 — "
+                + "컨슈머 지연/백필 시 결제일과 어긋날 수 있음", fallback);
+        return fallback;
     }
 }

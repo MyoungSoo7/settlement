@@ -105,21 +105,26 @@ public class PaymentEventKafkaConsumer extends IdempotentEventConsumer {
         String sellerTier = node.hasNonNull("sellerTier") ? node.get("sellerTier").asText() : null;
         String settlementCycle = node.hasNonNull("settlementCycle") ? node.get("settlementCycle").asText() : null;
 
-        // 정산 생성 (내부에서 payment_id unique 로 추가 중복 방어)
-        createSettlementFromPaymentUseCase.createSettlementFromPayment(
-                paymentId, orderId, amount, sellerId, sellerTier, settlementCycle);
-
-        // 로컬 결제 프로젝션 적재 (ADR 0020 Phase 2)
+        // 결제 확정 시각 — 정산일 계산의 기준(결제 발생일)이자 프로젝션 적재값. 페이로드에 없으면 null 로
+        // 넘겨 서비스가 KST 현재일로 폴백하게 한다(소비 시각을 정산일 기준으로 쓰지 않기 위함, ADR 0020).
         LocalDateTime capturedAt = node.hasNonNull("capturedAt")
                 ? LocalDateTime.parse(node.get("capturedAt").asText())
-                : LocalDateTime.now();
+                : null;
+
+        // 정산 생성 (내부에서 payment_id unique 로 추가 중복 방어). 결제 시각을 넘겨 정산일을 결제일 기준으로 계산.
+        createSettlementFromPaymentUseCase.createSettlementFromPayment(
+                paymentId, orderId, amount, sellerId, sellerTier, settlementCycle, capturedAt);
+
+        // 로컬 결제 프로젝션 적재 (ADR 0020 Phase 2). 프로젝션의 capturedAt 은 표시/조회용이라
+        // 부재 시 수신 시각으로 보정한다(정산일 기준과 달리 감사 경계가 아님).
+        LocalDateTime capturedAtForView = capturedAt != null ? capturedAt : LocalDateTime.now();
         SettlementPaymentViewJpaEntity view = paymentViewRepository.findById(paymentId)
                 .orElseGet(SettlementPaymentViewJpaEntity::new);
         view.setPaymentId(paymentId);
         view.setOrderId(orderId);
         view.setAmount(amount);
         view.setStatus("CAPTURED");
-        view.setCapturedAt(capturedAt);
+        view.setCapturedAt(capturedAtForView);
         view.setSellerId(sellerId);
         view.setSellerTier(sellerTier);
         view.setSettlementCycle(settlementCycle);

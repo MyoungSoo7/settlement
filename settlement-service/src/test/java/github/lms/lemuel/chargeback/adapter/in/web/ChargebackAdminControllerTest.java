@@ -7,12 +7,17 @@ import github.lms.lemuel.chargeback.domain.Chargeback;
 import github.lms.lemuel.chargeback.domain.ChargebackReason;
 import github.lms.lemuel.chargeback.domain.ChargebackSource;
 import github.lms.lemuel.chargeback.domain.ChargebackStatus;
+import github.lms.lemuel.common.audit.application.AuditLogger;
+import github.lms.lemuel.common.audit.domain.AuditAction;
+import github.lms.lemuel.common.config.JacksonCompatConfig;
 import github.lms.lemuel.common.config.jwt.JwtUtil;
+import github.lms.lemuel.idempotency.adapter.out.persistence.ManualIdempotencyGuard;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -24,6 +29,8 @@ import java.util.Optional;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -32,6 +39,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(controllers = ChargebackAdminController.class)
 @AutoConfigureMockMvc(addFilters = false)
+@Import(JacksonCompatConfig.class)
 class ChargebackAdminControllerTest {
 
     @Autowired MockMvc mockMvc;
@@ -39,6 +47,8 @@ class ChargebackAdminControllerTest {
     @MockitoBean OpenChargebackUseCase openUseCase;
     @MockitoBean DecideChargebackUseCase decideUseCase;
     @MockitoBean LoadChargebackPort loadPort;
+    @MockitoBean ManualIdempotencyGuard idempotency;
+    @MockitoBean AuditLogger auditLogger;
 
     private static Chargeback sampleChargeback() {
         Chargeback cb = Chargeback.open(10L, 1L, new BigDecimal("50000"),
@@ -118,6 +128,8 @@ class ChargebackAdminControllerTest {
                         .content("{\"note\":\"증빙 부족\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.chargeback.status").value("ACCEPTED"));
+
+        verify(auditLogger).record(eq(AuditAction.CHARGEBACK_ACCEPTED), eq("Chargeback"), eq("7"), anyString());
     }
 
     @Test
@@ -132,5 +144,37 @@ class ChargebackAdminControllerTest {
                         .content("{\"note\":\"증빙 확인됨\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.chargeback.status").value("REJECTED"));
+
+        verify(auditLogger).record(eq(AuditAction.CHARGEBACK_REJECTED), eq("Chargeback"), eq("7"), anyString());
+    }
+
+    @Test
+    @DisplayName("POST accept — 중복 Idempotency-Key 는 409 (조작 미실행)")
+    void accept_duplicateIdempotencyKey_returnsConflict() throws Exception {
+        when(idempotency.claim(eq("cb-accept-1"), anyString(), anyString())).thenReturn(false);
+
+        mockMvc.perform(post("/admin/chargebacks/7/accept")
+                        .header("Idempotency-Key", "cb-accept-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"note\":\"증빙 부족\"}"))
+                .andExpect(status().isConflict());
+
+        verifyNoInteractions(decideUseCase);
+    }
+
+    @Test
+    @DisplayName("POST accept — 새 Idempotency-Key 는 조작 실행 후 200")
+    void accept_freshIdempotencyKey_executes() throws Exception {
+        Chargeback cb = sampleChargeback();
+        cb.accept("admin1", "증빙 부족");
+        when(idempotency.claim(eq("cb-accept-2"), anyString(), anyString())).thenReturn(true);
+        when(decideUseCase.accept(eq(7L), anyString(), any())).thenReturn(cb);
+
+        mockMvc.perform(post("/admin/chargebacks/7/accept")
+                        .header("Idempotency-Key", "cb-accept-2")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"note\":\"증빙 부족\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.chargeback.status").value("ACCEPTED"));
     }
 }
