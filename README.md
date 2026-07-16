@@ -519,6 +519,9 @@ PENDING → READY → SHIPPED → IN_TRANSIT → DELIVERED → (선택) RETURNED
 - 메트릭: `variant.stock.decrease.success` / `variant.stock.decrease.rejected`
 - 엔티티에 `@Version` 컬럼(V36)이 존재하나 핫 차감 경로는 위 조건부 UPDATE 사용 (낙관적 락 재시도 아님)
 
+### 투자점수 고지 (investment-service)
+- 투자점수(수익성35+안정성35+성장성30, AAA~CCC)는 **정보 제공 목적의 참고 지표로 투자자문이 아니며**, 매수·매도 등 **투자 판단과 그 결과의 책임은 이용자 본인에게** 있음
+
 ---
 
 ## 보안

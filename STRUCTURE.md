@@ -47,6 +47,8 @@ settlement/                              # 모노레포 루트
 ├── ai-service/                          # 🤖 AI (8096, lemuel_ai·pgvector) — 챗봇 (Gemini/Anthropic provider 스위치)
 ├── common-data-service/                 # 🗂️ Common-Data (8098, lemuel_commondata) — data.go.kr 범용 커넥터 ★
 ├── investment-service/                  # 📈 Investment (8100/mgmt 8101, lemuel_investment) — CEO 투자하기
+│                                        #    ※ 투자점수는 정보 제공 목적의 참고 지표로 투자자문이 아니며,
+│                                        #      매수·매도 등 투자 판단과 그 결과의 책임은 이용자 본인에게 있음
 ├── account-service/                     # 🏦 Account (8102, lemuel_account) — 계정계 GL 집계 (소비 전용)
 ├── organization-service/                # 👥 Organization (8104, lemuel_organization) — 조직·멤버십 (발행 전용)
 └── gateway-service/                     # 🚪 API Gateway (8080) — 라우팅만 (자체 인증 필터 없음)
