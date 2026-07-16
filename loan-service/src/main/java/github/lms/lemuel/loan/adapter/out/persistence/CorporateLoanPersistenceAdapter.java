@@ -48,6 +48,13 @@ public class CorporateLoanPersistenceAdapter implements SaveCorporateLoanPort, L
                 .toList();
     }
 
+    @Override
+    public List<CorporateLoan> findByOwner(Long ownerUserId, int limit) {
+        return repository.findByOwnerUserIdOrderByIdDesc(ownerUserId, PageRequest.of(0, limit)).stream()
+                .map(CorporateLoanPersistenceAdapter::toDomain)
+                .toList();
+    }
+
     private static CorporateLoanJpaEntity toEntity(CorporateLoan loan) {
         return new CorporateLoanJpaEntity(
                 loan.getId(),
@@ -60,13 +67,14 @@ public class CorporateLoanPersistenceAdapter implements SaveCorporateLoanPort, L
                 loan.getCreditScore(),
                 loan.getCreditGrade(),
                 loan.getStatus(),
-                loan.getCreatedAt() != null ? loan.getCreatedAt() : LocalDateTime.now());
+                loan.getCreatedAt() != null ? loan.getCreatedAt() : LocalDateTime.now(),
+                loan.getOwnerUserId());
     }
 
     private static CorporateLoan toDomain(CorporateLoanJpaEntity e) {
         return CorporateLoan.reconstitute(
                 e.getId(), e.getStockCode(), e.getCorpName(), e.getPrincipal(), e.getFee(),
                 e.getOutstanding(), e.getTermDays(), e.getCreditScore(), e.getCreditGrade(),
-                e.getStatus(), e.getCreatedAt());
+                e.getStatus(), e.getCreatedAt(), e.getOwnerUserId());
     }
 }

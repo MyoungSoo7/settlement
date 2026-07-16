@@ -1,10 +1,13 @@
 package github.lms.lemuel.loan.application.service;
 
+import github.lms.lemuel.common.audit.application.Auditable;
+import github.lms.lemuel.common.audit.domain.AuditAction;
 import github.lms.lemuel.loan.application.port.in.DisburseLoanUseCase;
 import github.lms.lemuel.loan.application.port.out.AppendLedgerPort;
 import github.lms.lemuel.loan.application.port.out.LoadLoanPort;
 import github.lms.lemuel.loan.application.port.out.LoadSellerReputationPort;
 import github.lms.lemuel.loan.application.port.out.LoadSettlementViewPort;
+import github.lms.lemuel.loan.application.port.out.LoanMetricsPort;
 import github.lms.lemuel.loan.application.port.out.PublishLoanEventPort;
 import github.lms.lemuel.loan.application.port.out.SaveLoanPort;
 import github.lms.lemuel.loan.domain.LoanAdvance;
@@ -33,6 +36,7 @@ public class DisburseLoanService implements DisburseLoanUseCase {
     private final CreditPolicy creditPolicy;
     private final PublishLoanEventPort publishLoanEventPort;
     private final AppendLedgerPort appendLedgerPort;
+    private final LoanMetricsPort loanMetricsPort;
 
     public DisburseLoanService(LoadLoanPort loadLoanPort,
                                SaveLoanPort saveLoanPort,
@@ -40,7 +44,8 @@ public class DisburseLoanService implements DisburseLoanUseCase {
                                LoadSellerReputationPort loadSellerReputationPort,
                                CreditPolicy creditPolicy,
                                PublishLoanEventPort publishLoanEventPort,
-                               AppendLedgerPort appendLedgerPort) {
+                               AppendLedgerPort appendLedgerPort,
+                               LoanMetricsPort loanMetricsPort) {
         this.loadLoanPort = loadLoanPort;
         this.saveLoanPort = saveLoanPort;
         this.loadSettlementViewPort = loadSettlementViewPort;
@@ -48,10 +53,17 @@ public class DisburseLoanService implements DisburseLoanUseCase {
         this.creditPolicy = creditPolicy;
         this.publishLoanEventPort = publishLoanEventPort;
         this.appendLedgerPort = appendLedgerPort;
+        this.loanMetricsPort = loanMetricsPort;
     }
 
     @Override
     @Transactional
+    @Auditable(
+            action = AuditAction.LOAN_ADVANCE_DISBURSED,
+            resourceType = "LoanAdvance",
+            resourceId = "#p0 == null ? null : #p0.toString()",
+            detail = "{'loanId': #p0, 'status': #result == null ? null : #result.getStatus().name()}"
+    )
     public LoanAdvance disburse(Long loanId) {
         LoanAdvance loan = loadLoanPort.load(loanId);
         loan.approve();
@@ -66,6 +78,7 @@ public class DisburseLoanService implements DisburseLoanUseCase {
             // 그대로 담은 도메인 예외를 전파한다(generic 래핑으로 사유를 유실하지 않는다). 웹 계약 400 불변.
             loan.reject();
             saveLoanPort.save(loan);
+            loanMetricsPort.advanceRejected();
             throw e;
         }
 
@@ -79,6 +92,7 @@ public class DisburseLoanService implements DisburseLoanUseCase {
         }
 
         publishLoanEventPort.publishDisbursementRequested(saved);
+        loanMetricsPort.advanceDisbursed();
         return saved;
     }
 }

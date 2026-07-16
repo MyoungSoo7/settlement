@@ -1,8 +1,11 @@
 package github.lms.lemuel.loan.application.service;
 
+import github.lms.lemuel.common.audit.application.Auditable;
+import github.lms.lemuel.common.audit.domain.AuditAction;
 import github.lms.lemuel.loan.application.port.in.RequestLoanUseCase;
 import github.lms.lemuel.loan.application.port.out.LoadSellerReputationPort;
 import github.lms.lemuel.loan.application.port.out.LoadSettlementViewPort;
+import github.lms.lemuel.loan.application.port.out.LoanMetricsPort;
 import github.lms.lemuel.loan.application.port.out.SaveLoanPort;
 import github.lms.lemuel.loan.domain.LoanAdvance;
 import org.springframework.stereotype.Service;
@@ -24,19 +27,28 @@ public class RequestLoanService implements RequestLoanUseCase {
     private final LoadSellerReputationPort loadSellerReputationPort;
     private final SaveLoanPort saveLoanPort;
     private final CreditPolicy creditPolicy;
+    private final LoanMetricsPort loanMetricsPort;
 
     public RequestLoanService(LoadSettlementViewPort loadSettlementViewPort,
                               LoadSellerReputationPort loadSellerReputationPort,
                               SaveLoanPort saveLoanPort,
-                              CreditPolicy creditPolicy) {
+                              CreditPolicy creditPolicy,
+                              LoanMetricsPort loanMetricsPort) {
         this.loadSettlementViewPort = loadSettlementViewPort;
         this.loadSellerReputationPort = loadSellerReputationPort;
         this.saveLoanPort = saveLoanPort;
         this.creditPolicy = creditPolicy;
+        this.loanMetricsPort = loanMetricsPort;
     }
 
     @Override
     @Transactional
+    @Auditable(
+            action = AuditAction.LOAN_ADVANCE_REQUESTED,
+            resourceType = "LoanAdvance",
+            resourceId = "#result == null ? null : #result.getId().toString()",
+            detail = "{'sellerId': #p0.sellerId(), 'principal': #p0.principal(), 'financingDays': #p0.financingDays()}"
+    )
     public LoanAdvance request(RequestLoanCommand command) {
         BigDecimal unpaidSettlement = loadSettlementViewPort.sumUnpaidBySeller(command.sellerId());
         String reputationGrade = loadSellerReputationPort.findGrade(command.sellerId()).orElse(null);
@@ -44,6 +56,8 @@ public class RequestLoanService implements RequestLoanUseCase {
 
         BigDecimal fee = creditPolicy.fee(command.principal(), command.financingDays());
         LoanAdvance loan = LoanAdvance.request(command.sellerId(), command.principal(), fee);
-        return saveLoanPort.save(loan);
+        LoanAdvance saved = saveLoanPort.save(loan);
+        loanMetricsPort.advanceRequested();
+        return saved;
     }
 }

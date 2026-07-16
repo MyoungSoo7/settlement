@@ -1,8 +1,11 @@
 package github.lms.lemuel.loan.application.service;
 
+import github.lms.lemuel.common.audit.application.Auditable;
+import github.lms.lemuel.common.audit.domain.AuditAction;
 import github.lms.lemuel.loan.application.port.in.ApplyRepaymentUseCase;
 import github.lms.lemuel.loan.application.port.out.AppendLedgerPort;
 import github.lms.lemuel.loan.application.port.out.LoadLoanPort;
+import github.lms.lemuel.loan.application.port.out.LoanMetricsPort;
 import github.lms.lemuel.loan.application.port.out.PublishLoanEventPort;
 import github.lms.lemuel.loan.application.port.out.RecordRepaymentPort;
 import github.lms.lemuel.loan.application.port.out.SaveLoanPort;
@@ -37,23 +40,32 @@ public class ApplyRepaymentService implements ApplyRepaymentUseCase {
     private final SaveSettlementViewPort saveSettlementViewPort;
     private final PublishLoanEventPort publishLoanEventPort;
     private final AppendLedgerPort appendLedgerPort;
+    private final LoanMetricsPort loanMetricsPort;
 
     public ApplyRepaymentService(LoadLoanPort loadLoanPort,
                                  SaveLoanPort saveLoanPort,
                                  RecordRepaymentPort recordRepaymentPort,
                                  SaveSettlementViewPort saveSettlementViewPort,
                                  PublishLoanEventPort publishLoanEventPort,
-                                 AppendLedgerPort appendLedgerPort) {
+                                 AppendLedgerPort appendLedgerPort,
+                                 LoanMetricsPort loanMetricsPort) {
         this.loadLoanPort = loadLoanPort;
         this.saveLoanPort = saveLoanPort;
         this.recordRepaymentPort = recordRepaymentPort;
         this.saveSettlementViewPort = saveSettlementViewPort;
         this.publishLoanEventPort = publishLoanEventPort;
         this.appendLedgerPort = appendLedgerPort;
+        this.loanMetricsPort = loanMetricsPort;
     }
 
     @Override
     @Transactional
+    @Auditable(
+            action = AuditAction.LOAN_REPAYMENT_APPLIED,
+            resourceType = "LoanRepayment",
+            resourceId = "#p0 == null ? null : #p0.settlementId().toString()",
+            detail = "{'settlementId': #p0.settlementId(), 'sellerId': #p0.sellerId(), 'amount': #p0.amount()}"
+    )
     public void apply(ApplyRepaymentCommand command) {
         long settlementId = command.settlementId();
         if (recordRepaymentPort.existsForSettlement(settlementId)) {
@@ -88,6 +100,7 @@ public class ApplyRepaymentService implements ApplyRepaymentUseCase {
         // 차감이 0(대출 없음)이어도 기록·발행한다 → settlement 가 전액 지급하도록 통지(멱등 보장)
         recordRepaymentPort.record(settlementId, command.sellerId(), totalDeducted);
         publishLoanEventPort.publishRepaymentApplied(settlementId, command.sellerId(), totalDeducted);
+        loanMetricsPort.repaymentApplied(totalDeducted);
 
         log.info("상환 차감 완료. settlementId={}, sellerId={}, deducted={}",
                 settlementId, command.sellerId(), totalDeducted);

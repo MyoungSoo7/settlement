@@ -1,8 +1,11 @@
 package github.lms.lemuel.loan.application.service;
 
+import github.lms.lemuel.common.audit.application.Auditable;
+import github.lms.lemuel.common.audit.domain.AuditAction;
 import github.lms.lemuel.loan.application.port.in.DisburseCorporateLoanUseCase;
 import github.lms.lemuel.loan.application.port.out.AppendLedgerPort;
 import github.lms.lemuel.loan.application.port.out.LoadCorporateLoanPort;
+import github.lms.lemuel.loan.application.port.out.LoanMetricsPort;
 import github.lms.lemuel.loan.application.port.out.PublishCorporateLoanEventPort;
 import github.lms.lemuel.loan.application.port.out.SaveCorporateLoanPort;
 import github.lms.lemuel.loan.domain.CorporateLoan;
@@ -23,19 +26,28 @@ public class DisburseCorporateLoanService implements DisburseCorporateLoanUseCas
     private final SaveCorporateLoanPort saveCorporateLoanPort;
     private final AppendLedgerPort appendLedgerPort;
     private final PublishCorporateLoanEventPort publishCorporateLoanEventPort;
+    private final LoanMetricsPort loanMetricsPort;
 
     public DisburseCorporateLoanService(LoadCorporateLoanPort loadCorporateLoanPort,
                                         SaveCorporateLoanPort saveCorporateLoanPort,
                                         AppendLedgerPort appendLedgerPort,
-                                        PublishCorporateLoanEventPort publishCorporateLoanEventPort) {
+                                        PublishCorporateLoanEventPort publishCorporateLoanEventPort,
+                                        LoanMetricsPort loanMetricsPort) {
         this.loadCorporateLoanPort = loadCorporateLoanPort;
         this.saveCorporateLoanPort = saveCorporateLoanPort;
         this.appendLedgerPort = appendLedgerPort;
         this.publishCorporateLoanEventPort = publishCorporateLoanEventPort;
+        this.loanMetricsPort = loanMetricsPort;
     }
 
     @Override
     @Transactional
+    @Auditable(
+            action = AuditAction.CORPORATE_LOAN_DISBURSED,
+            resourceType = "CorporateLoan",
+            resourceId = "#p0 == null ? null : #p0.toString()",
+            detail = "{'loanId': #p0, 'status': #result == null ? null : #result.getStatus().name()}"
+    )
     public CorporateLoan disburse(Long loanId) {
         // 비관적 락으로 조회 — 동시 disburse 요청 시 이중지급(전표·이벤트 중복)을 차단한다.
         CorporateLoan loan = loadCorporateLoanPort.findByIdForUpdate(loanId)
@@ -53,6 +65,7 @@ public class DisburseCorporateLoanService implements DisburseCorporateLoanUseCas
         }
 
         publishCorporateLoanEventPort.publishDisbursed(saved);
+        loanMetricsPort.corporateDisbursed();
         return saved;
     }
 }

@@ -25,7 +25,7 @@ class JpaEntityGettersTest {
         LocalDateTime now = LocalDateTime.now();
         CorporateLoanJpaEntity e = new CorporateLoanJpaEntity(7L, "005930", "삼성전자",
                 new BigDecimal("1000000"), new BigDecimal("6600"), new BigDecimal("1006600"),
-                30, 82, "A", CorporateLoanStatus.DISBURSED, now);
+                30, 82, "A", CorporateLoanStatus.DISBURSED, now, 42L);
 
         assertThat(e.getId()).isEqualTo(7L);
         assertThat(e.getStockCode()).isEqualTo("005930");
@@ -38,6 +38,7 @@ class JpaEntityGettersTest {
         assertThat(e.getCreditGrade()).isEqualTo("A");
         assertThat(e.getStatus()).isEqualTo(CorporateLoanStatus.DISBURSED);
         assertThat(e.getCreatedAt()).isEqualTo(now);
+        assertThat(e.getOwnerUserId()).isEqualTo(42L);
     }
 
     @Test

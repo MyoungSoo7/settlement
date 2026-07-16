@@ -16,6 +16,8 @@ public interface CorporateLoanRepository extends JpaRepository<CorporateLoanJpaE
 
     List<CorporateLoanJpaEntity> findAllByOrderByIdDesc(Pageable pageable);
 
+    List<CorporateLoanJpaEntity> findByOwnerUserIdOrderByIdDesc(Long ownerUserId, Pageable pageable);
+
     /**
      * 실행(disburse) 전용 — 행 비관적 락(SELECT ... FOR UPDATE). 동시 disburse 요청 시
      * 두 번째 트랜잭션을 첫 커밋까지 블로킹해 이중지급(전표·이벤트 중복)을 차단한다.

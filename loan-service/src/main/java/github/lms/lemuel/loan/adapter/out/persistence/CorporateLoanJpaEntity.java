@@ -52,11 +52,14 @@ public class CorporateLoanJpaEntity {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
+    @Column(name = "owner_user_id")
+    private Long ownerUserId;
+
     protected CorporateLoanJpaEntity() { }
 
     public CorporateLoanJpaEntity(Long id, String stockCode, String corpName, BigDecimal principal, BigDecimal fee,
                                   BigDecimal outstanding, int termDays, int creditScore, String creditGrade,
-                                  CorporateLoanStatus status, LocalDateTime createdAt) {
+                                  CorporateLoanStatus status, LocalDateTime createdAt, Long ownerUserId) {
         this.id = id;
         this.stockCode = stockCode;
         this.corpName = corpName;
@@ -68,6 +71,7 @@ public class CorporateLoanJpaEntity {
         this.creditGrade = creditGrade;
         this.status = status;
         this.createdAt = createdAt;
+        this.ownerUserId = ownerUserId;
     }
 
     public Long getId() { return id; }
@@ -81,4 +85,5 @@ public class CorporateLoanJpaEntity {
     public String getCreditGrade() { return creditGrade; }
     public CorporateLoanStatus getStatus() { return status; }
     public LocalDateTime getCreatedAt() { return createdAt; }
+    public Long getOwnerUserId() { return ownerUserId; }
 }
