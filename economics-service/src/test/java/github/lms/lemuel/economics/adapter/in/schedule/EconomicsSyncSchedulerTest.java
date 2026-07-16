@@ -1,5 +1,7 @@
 package github.lms.lemuel.economics.adapter.in.schedule;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+
 import github.lms.lemuel.economics.adapter.in.web.SyncStatusTracker;
 import github.lms.lemuel.economics.adapter.in.web.SyncStatusTracker.State;
 import github.lms.lemuel.economics.application.port.in.SyncIndicatorsUseCase;
@@ -41,7 +43,7 @@ class EconomicsSyncSchedulerTest {
 
     @BeforeEach
     void setUp() {
-        tracker = new SyncStatusTracker();
+        tracker = new SyncStatusTracker(new SimpleMeterRegistry());
         scheduler = new EconomicsSyncScheduler(syncIndicatorsUseCase, ecosClient, tracker, 30, CLOCK);
     }
 
