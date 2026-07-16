@@ -1,5 +1,7 @@
 package github.lms.lemuel.investment.application.service;
 
+import github.lms.lemuel.common.audit.application.Auditable;
+import github.lms.lemuel.common.audit.domain.AuditAction;
 import github.lms.lemuel.investment.application.port.in.CancelInvestmentOrderUseCase;
 import github.lms.lemuel.investment.application.port.out.LoadInvestmentOrderPort;
 import github.lms.lemuel.investment.application.port.out.SaveInvestmentOrderPort;
@@ -28,6 +30,12 @@ public class CancelInvestmentOrderService implements CancelInvestmentOrderUseCas
 
     @Override
     @Transactional
+    @Auditable(
+            action = AuditAction.INVESTMENT_ORDER_CANCELED,
+            resourceType = "InvestmentOrder",
+            resourceId = "#p0 == null ? null : #p0.toString()",
+            detail = "{'orderId': #p0, 'callerSellerId': #p1, 'status': #result == null ? null : #result.getStatus().name()}"
+    )
     public InvestmentOrder cancel(long orderId, long callerSellerId) {
         InvestmentOrder order = loadInvestmentOrderPort.load(orderId);
         if (!Objects.equals(order.getSellerId(), callerSellerId)) {

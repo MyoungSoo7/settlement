@@ -1,6 +1,7 @@
 package github.lms.lemuel.investment.adapter.in.web;
 
 import github.lms.lemuel.common.config.jwt.AuthPrincipal;
+import github.lms.lemuel.investment.adapter.out.persistence.InvestmentManualIdempotencyGuard;
 import github.lms.lemuel.investment.application.exception.InsufficientFundingException;
 import github.lms.lemuel.investment.application.exception.InvestmentNotFoundException;
 import github.lms.lemuel.investment.application.exception.NotInvestableException;
@@ -39,7 +40,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -57,6 +61,7 @@ class InvestmentControllerTest {
     private final GetFundingUseCase getFunding = mock(GetFundingUseCase.class);
     private final GetStockRecommendationsUseCase getRecommendations = mock(GetStockRecommendationsUseCase.class);
     private final LoadInvestmentOrderPort loadOrder = mock(LoadInvestmentOrderPort.class);
+    private final InvestmentManualIdempotencyGuard idempotency = mock(InvestmentManualIdempotencyGuard.class);
 
     private MockMvc mvc;
 
@@ -71,7 +76,7 @@ class InvestmentControllerTest {
     @BeforeEach
     void setUp() {
         InvestmentController controller = new InvestmentController(
-                getScore, getCheck, place, execute, cancel, getFunding, getRecommendations, loadOrder);
+                getScore, getCheck, place, execute, cancel, getFunding, getRecommendations, loadOrder, idempotency);
         mvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new InvestmentExceptionHandler())
                 .build();
@@ -230,6 +235,22 @@ class InvestmentControllerTest {
     }
 
     @Test
+    @DisplayName("POST /orders — 소수 3자리 amount 는 @Digits 로 400(저장 정밀도 초과 조기 차단)")
+    void placeAmountTooManyDecimals400() throws Exception {
+        mvc.perform(post("/api/investment/orders").principal(auth(7L)).contentType(APPLICATION_JSON).content("""
+                        {"stockCode":"005930","amount":1000.555}
+                        """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("GET /checks/{stockCode} — budget 이 음수/0 이면 400(양수 검증)")
+    void checkNonPositiveBudget400() throws Exception {
+        mvc.perform(get("/api/investment/checks/005930").param("budget", "-100"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     @DisplayName("POST /orders/{id}/execute 200")
     void execute200() throws Exception {
         when(execute.execute(1L, 7L)).thenReturn(order(1L, InvestmentOrderStatus.EXECUTED));
@@ -257,6 +278,72 @@ class InvestmentControllerTest {
         mvc.perform(post("/api/investment/orders/1/cancel").principal(auth(7L)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("CANCELED"));
+    }
+
+    @Test
+    @DisplayName("POST execute — 동일 Idempotency-Key 재요청은 409 + 유스케이스 미호출")
+    void executeDuplicateIdempotencyKey409() throws Exception {
+        // 키 선점 실패(이미 선점됨) → 중복 조작이므로 409, 집행 유스케이스는 호출되지 않는다.
+        when(idempotency.claim(anyString(), anyString(), anyString())).thenReturn(false);
+
+        mvc.perform(post("/api/investment/orders/1/execute").principal(auth(7L))
+                        .header("Idempotency-Key", "dup-key"))
+                .andExpect(status().isConflict());
+
+        verify(execute, never()).execute(any(Long.class), any(Long.class));
+    }
+
+    @Test
+    @DisplayName("POST execute — 신규 Idempotency-Key 는 선점 성공 후 정상 집행(200)")
+    void executeNewIdempotencyKeyProceeds() throws Exception {
+        when(idempotency.claim(anyString(), anyString(), anyString())).thenReturn(true);
+        when(execute.execute(1L, 7L)).thenReturn(order(1L, InvestmentOrderStatus.EXECUTED));
+
+        mvc.perform(post("/api/investment/orders/1/execute").principal(auth(7L))
+                        .header("Idempotency-Key", "new-key"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("EXECUTED"));
+
+        verify(idempotency).claim("new-key", "investment:execute:1", "7");
+    }
+
+    @Test
+    @DisplayName("POST execute — Idempotency-Key 미제공 시 기존 동작(가드 미호출, 200)")
+    void executeNoIdempotencyKeyKeepsLegacyBehavior() throws Exception {
+        when(execute.execute(1L, 7L)).thenReturn(order(1L, InvestmentOrderStatus.EXECUTED));
+
+        mvc.perform(post("/api/investment/orders/1/execute").principal(auth(7L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("EXECUTED"));
+
+        verify(idempotency, never()).claim(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("POST cancel — 동일 Idempotency-Key 재요청은 409 + 유스케이스 미호출")
+    void cancelDuplicateIdempotencyKey409() throws Exception {
+        when(idempotency.claim(anyString(), anyString(), anyString())).thenReturn(false);
+
+        mvc.perform(post("/api/investment/orders/1/cancel").principal(auth(7L))
+                        .header("Idempotency-Key", "dup-key"))
+                .andExpect(status().isConflict());
+
+        verify(cancel, never()).cancel(any(Long.class), any(Long.class));
+    }
+
+    @Test
+    @DisplayName("POST orders(place) — 동일 Idempotency-Key 재요청은 409 + 유스케이스 미호출")
+    void placeDuplicateIdempotencyKey409() throws Exception {
+        when(idempotency.claim(anyString(), anyString(), anyString())).thenReturn(false);
+
+        mvc.perform(post("/api/investment/orders").principal(auth(7L))
+                        .header("Idempotency-Key", "dup-key")
+                        .contentType(APPLICATION_JSON).content("""
+                        {"stockCode":"005930","amount":1000000}
+                        """))
+                .andExpect(status().isConflict());
+
+        verify(place, never()).place(any(PlaceInvestmentOrderCommand.class));
     }
 
     @Test

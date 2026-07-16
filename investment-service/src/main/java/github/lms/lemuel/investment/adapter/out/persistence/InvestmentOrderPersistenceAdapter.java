@@ -45,6 +45,8 @@ public class InvestmentOrderPersistenceAdapter implements SaveInvestmentOrderPor
     }
 
     private static InvestmentOrderJpaEntity toEntity(InvestmentOrder order) {
+        // version 은 load 시점의 DB 값을 그대로 되싣는다 — merge 가 이 값으로 낙관적 충돌을 판정한다
+        // (신규 주문은 null → 영속 시 0 초기화).
         return new InvestmentOrderJpaEntity(
                 order.getId(),
                 order.getSellerId(),
@@ -53,12 +55,13 @@ public class InvestmentOrderPersistenceAdapter implements SaveInvestmentOrderPor
                 order.getScoreAtOrder(),
                 order.getGradeAtOrder(),
                 order.getStatus(),
-                order.getCreatedAt() == null ? LocalDateTime.now() : order.getCreatedAt());
+                order.getCreatedAt() == null ? LocalDateTime.now() : order.getCreatedAt(),
+                order.getVersion());
     }
 
     private static InvestmentOrder toDomain(InvestmentOrderJpaEntity e) {
         return InvestmentOrder.reconstitute(
                 e.getId(), e.getSellerId(), e.getStockCode(), e.getAmount(),
-                e.getScoreAtOrder(), e.getGradeAtOrder(), e.getStatus(), e.getCreatedAt());
+                e.getScoreAtOrder(), e.getGradeAtOrder(), e.getStatus(), e.getCreatedAt(), e.getVersion());
     }
 }
