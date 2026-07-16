@@ -34,7 +34,7 @@ public class LoanDisbursementRequestedConsumer extends IdempotentEventConsumer {
         this.recordAccountEntryUseCase = recordAccountEntryUseCase;
     }
 
-    @KafkaListener(topics = "${app.kafka.topic.loan-disbursement-requested}", groupId = CONSUMER_GROUP)
+    @KafkaListener(topics = "${app.kafka.topic.loan-disbursement-requested}", groupId = CONSUMER_GROUP, containerFactory = "kafkaListenerContainerFactory")
     @Transactional
     public void onLoanDisbursed(ConsumerRecord<String, String> record, Acknowledgment ack) {
         consume(record, ack);

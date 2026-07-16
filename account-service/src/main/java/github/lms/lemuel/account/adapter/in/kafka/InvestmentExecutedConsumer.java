@@ -34,7 +34,7 @@ public class InvestmentExecutedConsumer extends IdempotentEventConsumer {
         this.recordAccountEntryUseCase = recordAccountEntryUseCase;
     }
 
-    @KafkaListener(topics = "${app.kafka.topic.investment-executed}", groupId = CONSUMER_GROUP)
+    @KafkaListener(topics = "${app.kafka.topic.investment-executed}", groupId = CONSUMER_GROUP, containerFactory = "kafkaListenerContainerFactory")
     @Transactional
     public void onInvestmentExecuted(ConsumerRecord<String, String> record, Acknowledgment ack) {
         consume(record, ack);
