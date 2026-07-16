@@ -23,6 +23,8 @@ jobs:
       build_matrix: ${{ steps.setmatrix.outputs.matrix }}
       # 빌드할 서비스가 하나라도 있으면 true (backend-ghcr 실행 게이트)
       build_any: ${{ steps.setmatrix.outputs.any }}
+      # backend-ci 가 실행할 gradle 테스트 태스크 (변경 모듈만 / shared·모호 변경 시 전체 build)
+      test_tasks: ${{ steps.setmatrix.outputs.test_tasks }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -99,6 +101,17 @@ jobs:
           echo "matrix={\"include\":$include}" >> "$GITHUB_OUTPUT"
           echo "any=$([ "$count" -gt 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "이미지 빌드 대상 서비스: ${count}개 → $include"
+          # 테스트 태스크: shared 변경→전체 build, 변경 서비스만 있으면 해당 모듈만,
+          # 그 외(모듈·shared 모두 아닌 모호한 backend 변경)→안전하게 전체 build (게이트 약화 방지)
+          if echo "$CHANGED" | jq -e 'index("shared")' >/dev/null; then
+            test_tasks="build"
+          elif [ "$count" -gt 0 ]; then
+            test_tasks=$(echo "$include" | jq -r '[.[] | ":\(.module):build"] | join(" ")')
+          else
+            test_tasks="build"
+          fi
+          echo "test_tasks=$test_tasks" >> "$GITHUB_OUTPUT"
+          echo "테스트 태스크: $test_tasks"
 
   backend-ci:
     name: Backend - Build/Test/JaCoCo/SonarCloud
@@ -177,10 +190,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # build = compile + test + jacocoTestReport + jacocoTestCoverageVerification (게이트 포함)
+      # build = compile + test + jacocoTestReport + jacocoTestCoverageVerification (게이트 포함, build.gradle.kts:157)
+      # test_tasks = 변경 모듈만(`:<mod>:build`) / shared·모호 변경 시 전체 `build` (changes 잡이 산출)
       # Testcontainers 기반 통합테스트는 러너의 Docker 데몬을 사용한다.
       - name: Build & Test (JaCoCo gate)
-        run: ./gradlew clean build --no-daemon --stacktrace
+        run: ./gradlew clean ${{ needs.changes.outputs.test_tasks }} --no-daemon --stacktrace
         env:
           # ryuk(정리용 유틸 컨테이너) 비활성화 — 러너는 일회용이라 불필요하고,
           # 이미지 치환과 얽혀 모듈별 test JVM 에서 비결정적 hang 을 유발했다 (2026-07-08).
