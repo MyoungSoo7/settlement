@@ -141,6 +141,45 @@ public class ReconQueryRepository {
         return result != null ? result : 0L;
     }
 
+    /**
+     * 해당 날짜 캡처 결제(캡처 이력 기준)의 <b>키셋 체크섬</b> — INV-12 프로젝션 행 diff 의 1차 스크리닝.
+     *
+     * <p>settlement 프로젝션(settlement_payment_view)이 order 원천 행과 id 단위로 일치하는지 확인하되,
+     * 전체 키 목록을 매번 교환하면 데이터량이 부담된다(설계서 §5). 그래서 양측이 자기 DB 에서
+     * {@code count·금액합·정렬 id 의 md5} 3-스칼라만 계산해 교환하고, 이 셋이 어긋날 때만 실제 키 목록을
+     * 페이지네이션으로 diff 한다. md5 는 <b>정렬된 id 집합</b>에만 걸어 순서 무관·집합 동일성만 본다.
+     * 빈 집합은 {@code string_agg}→NULL→md5(NULL)→NULL 이 되므로 양측을 COALESCE('') 로 맞춘다.
+     */
+    public PaymentKeyChecksum paymentKeyChecksum(LocalDate date) {
+        return jdbcTemplate.queryForObject("""
+                SELECT count(*) AS cnt,
+                       COALESCE(SUM(amount), 0) AS amount_sum,
+                       COALESCE(md5(string_agg(id::text, ',' ORDER BY id)), '') AS id_checksum
+                  FROM opslab.payments
+                 WHERE status IN ('CAPTURED', 'REFUNDED') AND captured_at::date = ?
+                """, (rs, n) -> new PaymentKeyChecksum(
+                        rs.getLong("cnt"),
+                        rs.getBigDecimal("amount_sum"),
+                        rs.getString("id_checksum")),
+                date);
+    }
+
+    /**
+     * 해당 날짜 캡처 결제 키 페이지(id 키셋 페이지네이션) — INV-12 diff 용 {@code (id, amount)} 목록.
+     * PII 없음(키+금액만). 체크섬 불일치 시에만 호출되며, {@code afterId} 초과분을 id 오름차순으로 반환한다.
+     * OFFSET 대신 키셋(id > afterId)을 쓰는 이유는 대량 페이지에서도 인덱스 스캔이 일정하기 때문이다.
+     */
+    public List<PaymentKeyRow> listPaymentKeys(LocalDate date, long afterId, int limit) {
+        return jdbcTemplate.query("""
+                SELECT id, amount FROM opslab.payments
+                 WHERE status IN ('CAPTURED', 'REFUNDED') AND captured_at::date = ?
+                   AND id > ?
+                 ORDER BY id
+                 LIMIT ?
+                """, (rs, n) -> new PaymentKeyRow(rs.getLong("id"), rs.getBigDecimal("amount")),
+                date, afterId, limit);
+    }
+
     /** 해당 영업일 CAPTURED/REFUNDED 결제 행 (PG 거래키 보유분) — PG 파일 대사용. */
     public List<ReconPaymentRow> loadCapturedPaymentRows(LocalDate date) {
         return jdbcTemplate.query("""
@@ -171,5 +210,13 @@ public class ReconQueryRepository {
     /** INV-8 지연 환불 대사용 완료 환불 행 DTO (order → settlement 직렬화). */
     public record CompletedRefundRow(Long refundId, Long paymentId, BigDecimal amount,
                                      LocalDate completedDate) {
+    }
+
+    /** INV-12 프로젝션 diff 1차 스크리닝용 키셋 체크섬 (count·금액합·정렬 id md5). */
+    public record PaymentKeyChecksum(long count, BigDecimal amountSum, String idChecksum) {
+    }
+
+    /** INV-12 프로젝션 diff 용 결제 키 행 (키+금액만, PII 없음). */
+    public record PaymentKeyRow(Long paymentId, BigDecimal amount) {
     }
 }

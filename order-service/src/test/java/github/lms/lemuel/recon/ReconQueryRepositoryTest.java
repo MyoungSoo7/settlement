@@ -1,6 +1,8 @@
 package github.lms.lemuel.recon;
 
 import github.lms.lemuel.recon.ReconQueryRepository.CompletedRefundRow;
+import github.lms.lemuel.recon.ReconQueryRepository.PaymentKeyChecksum;
+import github.lms.lemuel.recon.ReconQueryRepository.PaymentKeyRow;
 import github.lms.lemuel.recon.ReconQueryRepository.ReconPaymentRow;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -100,5 +102,24 @@ class ReconQueryRepositoryTest {
         List<ReconPaymentRow> rows = List.of(new ReconPaymentRow(1L, "PG", new BigDecimal("10"), BigDecimal.ZERO, d));
         when(jdbcTemplate.query(anyString(), any(RowMapper.class), any(Object[].class))).thenReturn(rows);
         assertThat(repository.loadCapturedPaymentRows(d)).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("paymentKeyChecksum — count·금액합·id md5 매핑 (INV-12 1차 스크리닝)")
+    void paymentKeyChecksum() {
+        when(jdbcTemplate.queryForObject(anyString(), any(RowMapper.class), any(Object[].class)))
+                .thenReturn(new PaymentKeyChecksum(3L, new BigDecimal("3000"), "hash"));
+        PaymentKeyChecksum c = repository.paymentKeyChecksum(d);
+        assertThat(c.count()).isEqualTo(3L);
+        assertThat(c.amountSum()).isEqualByComparingTo("3000");
+        assertThat(c.idChecksum()).isEqualTo("hash");
+    }
+
+    @Test
+    @DisplayName("listPaymentKeys — 키셋 페이지 행 매핑 반환 (INV-12 diff)")
+    void listPaymentKeys() {
+        List<PaymentKeyRow> rows = List.of(new PaymentKeyRow(3L, new BigDecimal("1000")));
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class), any(Object[].class))).thenReturn(rows);
+        assertThat(repository.listPaymentKeys(d, 2L, 1000)).hasSize(1);
     }
 }
