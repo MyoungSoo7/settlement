@@ -13,7 +13,6 @@ import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.util.UUID;
 
 /**
@@ -48,11 +47,12 @@ public class LoanDisbursementRequestedConsumer extends IdempotentEventConsumer {
 
     @Override
     protected void handle(JsonNode node, UUID eventId) {
+        String loanId = requiredText(node, "loanId", eventId);
         AccountEntry entry = AccountEntry.loanDisbursed(
-                node.get("sellerId").asText(),
-                node.get("loanId").asText(),
-                new BigDecimal(node.get("amount").asText()));
+                requiredText(node, "sellerId", eventId),
+                loanId,
+                requiredDecimal(node, "amount", eventId));
         recordAccountEntryUseCase.record(entry);
-        log.info("선정산 선지급 분개 적재. eventId={}, loanId={}", eventId, node.get("loanId").asText());
+        log.info("선정산 선지급 분개 적재. eventId={}, loanId={}", eventId, loanId);
     }
 }

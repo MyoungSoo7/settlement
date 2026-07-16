@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.support.Acknowledgment;
 
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
@@ -97,6 +98,32 @@ public abstract class IdempotentEventConsumer {
         processedEventRepository.save(new ProcessedEventJpaEntity(consumerGroup(), eventId, eventType()));
         afterProcessed(record);
         ack.acknowledge();
+    }
+
+    /**
+     * 필수 필드 접근 헬퍼 — 누락/null 은 재시도로 복구 불가한 계약 위반이므로
+     * {@link IllegalArgumentException}(에러핸들러 non-retryable)을 던져 즉시 DLT 로 격리한다.
+     * 무검증 {@code node.get(...).asText()} 는 NPE 로 새어 재시도를 낭비하므로 이 헬퍼를 쓴다.
+     */
+    protected static JsonNode required(JsonNode payload, String field, UUID eventId) {
+        JsonNode value = payload.get(field);
+        if (value == null || value.isNull()) {
+            throw new IllegalArgumentException("필수 필드 누락: " + field + ", eventId=" + eventId);
+        }
+        return value;
+    }
+
+    protected static String requiredText(JsonNode payload, String field, UUID eventId) {
+        return required(payload, field, eventId).asText();
+    }
+
+    protected static long requiredLong(JsonNode payload, String field, UUID eventId) {
+        return required(payload, field, eventId).asLong();
+    }
+
+    /** 금액 필드 — 숫자가 아니면 {@link NumberFormatException}(IAE 하위) → 역시 즉시 DLT. */
+    protected static BigDecimal requiredDecimal(JsonNode payload, String field, UUID eventId) {
+        return new BigDecimal(required(payload, field, eventId).asText());
     }
 
     private static UUID extractEventId(ConsumerRecord<String, String> record) {

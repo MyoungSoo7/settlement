@@ -20,6 +20,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -171,6 +172,22 @@ class AccountConsumerParsingTest {
         EventContractValidator.assertValid("lemuel.loan.repayment_applied", payload);
 
         c.onLoanRepaid(recordOf("lemuel.loan.repayment_applied", payload), mock(Acknowledgment.class));
+
+        verify(recordAccountEntryUseCase, never()).record(any());
+    }
+
+    @Test
+    @DisplayName("필수 필드(amount) 누락 → IllegalArgumentException(비재시도, 즉시 DLT) + 분개 미적재")
+    void missingRequiredField_throwsIaeWithoutRecording() {
+        when(processedEventRepository.existsById(any())).thenReturn(false);
+        SettlementConfirmedConsumer c = new SettlementConfirmedConsumer(
+                recordAccountEntryUseCase, processedEventRepository, objectMapper);
+
+        assertThatThrownBy(() -> c.onSettlementConfirmed(
+                recordOf("lemuel.settlement.confirmed", "{\"settlementId\":9001,\"sellerId\":777}"),
+                mock(Acknowledgment.class)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("amount");
 
         verify(recordAccountEntryUseCase, never()).record(any());
     }

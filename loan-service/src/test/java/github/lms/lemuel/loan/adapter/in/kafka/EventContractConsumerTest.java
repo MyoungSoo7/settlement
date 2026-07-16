@@ -23,8 +23,10 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -88,5 +90,21 @@ class EventContractConsumerTest {
 
         verify(ingestCompanyReputationUseCase).ingest(new IngestCompanyReputationCommand(
                 "005930", 55, "C", "B", LocalDate.of(2026, 7, 10), List.of(777L, 1001L)));
+    }
+
+    @Test
+    @DisplayName("필수 필드(amount) 누락 payload → IllegalArgumentException(비재시도, 즉시 DLT) + 커맨드 미호출")
+    void missingRequiredField_throwsIaeWithoutApplying() {
+        when(processedEventRepository.existsById(any())).thenReturn(false);
+        SettlementConfirmedConsumer consumer = new SettlementConfirmedConsumer(
+                applyRepaymentUseCase, processedEventRepository, objectMapper);
+
+        assertThatThrownBy(() -> consumer.onSettlementConfirmed(
+                recordOf("lemuel.settlement.confirmed", "{\"settlementId\":9001,\"sellerId\":777}"),
+                mock(Acknowledgment.class)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("amount");
+
+        verify(applyRepaymentUseCase, never()).apply(any());
     }
 }
