@@ -176,7 +176,19 @@ tasks.named<JacocoReport>("jacocoTestReport") {
 
 tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
     dependsOn(tasks.named("jacocoTestReport"))
+    // common.pdf 는 Ghostscript 외부 바이너리 래퍼 — 루트 게이트가 adapter/out/pdf/** 를 제외하는
+    // 것과 같은 이유(바이너리 없는 환경에서 측정 불가)로 LINE 게이트에서 제외한다.
+    classDirectories.setFrom(classDirectories.files.map { dir ->
+        fileTree(dir) { exclude("**/common/pdf/**") }
+    })
     violationRules {
+        // 서비스 모듈과 동일한 번들 게이트 (루트 build.gradle.kts 의 LINE 90% 와 정합)
+        rule {
+            limit {
+                counter = "LINE"
+                minimum = "0.90".toBigDecimal()
+            }
+        }
         rule {
             element = "PACKAGE"
             includes = listOf("github.lms.lemuel.common.outbox.domain.*")
