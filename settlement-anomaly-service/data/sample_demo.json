@@ -1,0 +1,94 @@
+{
+  "records": [
+    {
+      "id": "n-00000",
+      "merchantId": "M-COFFEE",
+      "amount": 4743.77,
+      "ts": "2026-07-15T15:26:00Z",
+      "type": "SETTLEMENT"
+    },
+    {
+      "id": "n-00020",
+      "merchantId": "M-COFFEE",
+      "amount": 5094.6,
+      "ts": "2026-07-15T09:49:00Z",
+      "type": "SETTLEMENT"
+    },
+    {
+      "id": "n-00040",
+      "merchantId": "M-COFFEE",
+      "amount": 5000.47,
+      "ts": "2026-07-15T12:24:00Z",
+      "type": "SETTLEMENT"
+    },
+    {
+      "id": "n-00060",
+      "merchantId": "M-GROCER",
+      "amount": 41610.67,
+      "ts": "2026-07-15T10:38:00Z",
+      "type": "SETTLEMENT"
+    },
+    {
+      "id": "n-00080",
+      "merchantId": "M-GROCER",
+      "amount": 29004.23,
+      "ts": "2026-07-15T21:13:00Z",
+      "type": "SETTLEMENT"
+    },
+    {
+      "id": "n-00100",
+      "merchantId": "M-GROCER",
+      "amount": 31969.27,
+      "ts": "2026-07-15T14:08:00Z",
+      "type": "SETTLEMENT"
+    },
+    {
+      "id": "n-00120",
+      "merchantId": "M-ELECTRO",
+      "amount": 164108.44,
+      "ts": "2026-07-15T13:31:00Z",
+      "type": "SETTLEMENT"
+    },
+    {
+      "id": "n-00140",
+      "merchantId": "M-ELECTRO",
+      "amount": 312934.2,
+      "ts": "2026-07-15T20:24:00Z",
+      "type": "SETTLEMENT"
+    },
+    {
+      "id": "out-amount-spike",
+      "merchantId": "M-COFFEE",
+      "amount": 180000.0,
+      "ts": "2026-07-15T14:03:00Z",
+      "type": "PAYOUT"
+    },
+    {
+      "id": "out-offhours-big",
+      "merchantId": "M-GROCER",
+      "amount": 210000.0,
+      "ts": "2026-07-15T03:12:00Z",
+      "type": "PAYOUT"
+    },
+    {
+      "id": "out-negative",
+      "merchantId": "M-ELECTRO",
+      "amount": -500000.0,
+      "ts": "2026-07-15T02:40:00Z",
+      "type": "PAYOUT"
+    },
+    {
+      "id": "out-unknown-merchant",
+      "merchantId": "M-UNKNOWN",
+      "amount": 9500000.0,
+      "ts": "2026-07-15T04:01:00Z",
+      "type": "PAYOUT"
+    }
+  ],
+  "outlier_ids": [
+    "out-amount-spike",
+    "out-offhours-big",
+    "out-negative",
+    "out-unknown-merchant"
+  ]
+}

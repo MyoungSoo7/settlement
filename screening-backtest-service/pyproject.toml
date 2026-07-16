@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "screening-backtest-service"
+version = "0.1.0"
+description = "Backtests the investment stock-screening trade-plan rules over historical prices and reports risk/return metrics."
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi==0.115.6",
+    "uvicorn[standard]==0.34.0",
+    "pydantic==2.10.4",
+    "pandas==2.2.3",
+    "numpy==2.2.1",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest==8.3.4",
+    "httpx==0.28.1",
+]
+
+[project.scripts]
+screening-backtest-service = "screening_backtest.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
