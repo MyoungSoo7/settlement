@@ -97,3 +97,7 @@ app:
       page-size: 1000
     sync:
       request-interval-ms: 150   # data.go.kr 쿼터 보호용 페이지 호출 간격
+      schedule:
+        cron: "0 30 7 * * *"     # 매일 07:30 KST 자동 KRX 수집 (data.go.kr T+1 지연 고려)
+        zone: Asia/Seoul
+        lookback-days: 3         # 최근 3일 재조회 (주말/지연 갭 흡수, 거래일 아니면 0건)
