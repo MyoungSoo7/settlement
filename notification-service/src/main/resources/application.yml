@@ -1,0 +1,53 @@
+server:
+  port: ${SERVER_PORT:8130}
+
+spring:
+  application:
+    name: notification-service
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: ${KAFKA_GROUP_ID:notification-service}
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+app:
+  # Kafka listener is OFF by default so the service boots and serves REST/demo
+  # with no broker reachable. Flip to true (APP_KAFKA_ENABLED=true) in a real deploy.
+  kafka:
+    enabled: ${APP_KAFKA_ENABLED:false}
+  dedupe:
+    ttl-minutes: ${APP_DEDUPE_TTL_MINUTES:30}
+  dispatch:
+    per-channel-timeout-ms: ${APP_DISPATCH_TIMEOUT_MS:3000}
+    max-attempts: ${APP_DISPATCH_MAX_ATTEMPTS:3}
+    base-backoff-ms: ${APP_DISPATCH_BACKOFF_MS:50}
+  channels:
+    slack:
+      webhook-url: ${SLACK_WEBHOOK_URL:}
+    email:
+      host: ${MAIL_HOST:smtp.gmail.com}
+      port: ${MAIL_PORT:587}
+      username: ${MAIL_USERNAME:}
+      password: ${MAIL_PASSWORD:}
+      from: ${MAIL_FROM:no-reply@lemuel.co.kr}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+  health:
+    # CRITICAL: don't let a missing Kafka broker flip health to DOWN.
+    kafka:
+      enabled: false
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+  level:
+    github.lms.lemuel.notification: INFO
