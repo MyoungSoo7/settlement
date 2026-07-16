@@ -1,0 +1,77 @@
+name: polyglot-ci
+
+# 신규 polyglot 서비스(Go/Python) 전용 CI. 기존 Java `ci` 워크플로와 독립이며,
+# 변경된 서비스 디렉터리만 빌드·테스트한다(paths 필터). 필수 체크는 아니고(정보성),
+# Java harness-guard/STATUS 카운트에는 영향이 없다(신규 Java/마이그레이션/ADR 없음).
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "market-stream-service/**"
+      - "payment-webhook-service/**"
+      - "screening-backtest-service/**"
+      - "settlement-anomaly-service/**"
+      - "forecast-service/**"
+      - ".github/workflows/polyglot-ci.yml"
+  pull_request:
+    paths:
+      - "market-stream-service/**"
+      - "payment-webhook-service/**"
+      - "screening-backtest-service/**"
+      - "settlement-anomaly-service/**"
+      - "forecast-service/**"
+      - ".github/workflows/polyglot-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    name: Go build & test (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [market-stream-service, payment-webhook-service]
+    defaults:
+      run:
+        working-directory: ${{ matrix.service }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache-dependency-path: ${{ matrix.service }}/go.sum
+      - run: go mod download
+      - run: go build ./...
+      - run: go vet ./...
+      - run: go test -race ./...
+
+  python:
+    name: Python test (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - screening-backtest-service
+          - settlement-anomaly-service
+          - forecast-service
+    defaults:
+      run:
+        working-directory: ${{ matrix.service }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          [ -f requirements.txt ] && pip install -r requirements.txt || true
+          [ -f requirements-dev.txt ] && pip install -r requirements-dev.txt || true
+          pip install pytest httpx
+      - name: Test
+        run: pytest -q
