@@ -5,6 +5,7 @@ import github.lms.lemuel.company.application.port.out.AnalyzeSentimentPort;
 import github.lms.lemuel.company.application.port.out.LoadArticlePort;
 import github.lms.lemuel.company.application.port.out.LoadCompanyPort;
 import github.lms.lemuel.company.application.port.out.LoadReputationPort;
+import github.lms.lemuel.company.application.port.out.SentimentCachePort;
 import github.lms.lemuel.company.domain.Article;
 import github.lms.lemuel.company.domain.ArticleSentiment;
 import github.lms.lemuel.company.domain.Company;
@@ -37,22 +38,28 @@ public class ReputationRecalcService implements RecalcReputationUseCase {
     private final LoadCompanyPort loadCompanyPort;
     private final LoadArticlePort loadArticlePort;
     private final AnalyzeSentimentPort analyzeSentimentPort;
+    private final SentimentCachePort sentimentCachePort;
     private final LoadReputationPort loadReputationPort;
     private final ReputationSnapshotWriter snapshotWriter;
     private final int windowDays;
+    private final String sentimentProvider;
 
     public ReputationRecalcService(LoadCompanyPort loadCompanyPort,
                                    LoadArticlePort loadArticlePort,
                                    AnalyzeSentimentPort analyzeSentimentPort,
+                                   SentimentCachePort sentimentCachePort,
                                    LoadReputationPort loadReputationPort,
                                    ReputationSnapshotWriter snapshotWriter,
-                                   @Value("${app.company.reputation.window-days:30}") int windowDays) {
+                                   @Value("${app.company.reputation.window-days:30}") int windowDays,
+                                   @Value("${app.company.sentiment.provider:keyword}") String sentimentProvider) {
         this.loadCompanyPort = loadCompanyPort;
         this.loadArticlePort = loadArticlePort;
         this.analyzeSentimentPort = analyzeSentimentPort;
+        this.sentimentCachePort = sentimentCachePort;
         this.loadReputationPort = loadReputationPort;
         this.snapshotWriter = snapshotWriter;
         this.windowDays = windowDays;
+        this.sentimentProvider = sentimentProvider;
     }
 
     @Override
@@ -94,7 +101,7 @@ public class ReputationRecalcService implements RecalcReputationUseCase {
             return Outcome.noArticle();
         }
         List<ArticleSentiment> sentiments = articles.stream()
-                .map(a -> analyzeSentimentPort.analyze(a.title(), a.summary()))
+                .map(this::sentimentOf)
                 .toList();
         ReputationScore score = ReputationScore.compute(company.stockCode(), today, sentiments, now);
         // 저장 + 등급 변동 이벤트 발행을 한 트랜잭션으로 (원자성). 오늘자 존재/레이스면 false.
@@ -104,6 +111,16 @@ public class ReputationRecalcService implements RecalcReputationUseCase {
         log.info("평판 스냅샷 저장 stockCode={} score={} grade={} (기사 {}건)",
                 company.stockCode(), score.score(), score.grade(), score.articleCount());
         return Outcome.saved(score);
+    }
+
+    /** 감성 = 캐시 우선. 캐시 미스면 분석하고 (urlHash, provider) 로 저장 — 재계산 반복 시 LLM 재호출 0. */
+    private ArticleSentiment sentimentOf(Article article) {
+        return sentimentCachePort.find(article.urlHash(), sentimentProvider)
+                .orElseGet(() -> {
+                    ArticleSentiment analyzed = analyzeSentimentPort.analyze(article.title(), article.summary());
+                    sentimentCachePort.save(article.urlHash(), sentimentProvider, analyzed);
+                    return analyzed;
+                });
     }
 
     private enum Status { SAVED, NO_ARTICLE, EXISTS }

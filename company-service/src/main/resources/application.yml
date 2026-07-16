@@ -142,6 +142,10 @@ app:
         model: ${APP_COMPANY_SENTIMENT_GEMINI_MODEL:gemini-2.5-flash}
         base-url: https://generativelanguage.googleapis.com
         max-tokens: 256
+        # 무료티어 초과·과금 방지: 일일 호출 상한(도달 시 키워드 폴백) + 호출 간 최소 간격(RPM 보호).
+        # 캐시(article_sentiment)로 평상시 호출량은 신규 기사 수준이라 상한은 안전망이다.
+        daily-quota: ${APP_COMPANY_SENTIMENT_GEMINI_DAILY_QUOTA:200}
+        min-interval-ms: ${APP_COMPANY_SENTIMENT_GEMINI_MIN_INTERVAL_MS:0}
   # ★ Phase 3: Outbox → Kafka 이벤트 발행 (평판 등급 변동 → loan 리스크 프로젝션)
   kafka:
     enabled: ${APP_KAFKA_ENABLED:false}
