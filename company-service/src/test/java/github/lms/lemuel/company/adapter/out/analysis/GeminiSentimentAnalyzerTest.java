@@ -28,7 +28,7 @@ class GeminiSentimentAnalyzerTest {
     private Fixture configuredWith(String responseBody, boolean success) {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        GeminiSentimentProperties props = new GeminiSentimentProperties("test-key", null, null, 0);
+        GeminiSentimentProperties props = new GeminiSentimentProperties("test-key", null, null, 0, 0, 0);
         GeminiSentimentAnalyzer analyzer = new GeminiSentimentAnalyzer(props, builder, objectMapper);
         server.expect(requestTo(endsWith("generateContent")))
                 .andExpect(header("x-goog-api-key", "test-key"))
@@ -41,7 +41,7 @@ class GeminiSentimentAnalyzerTest {
     @Test
     @DisplayName("API 키 미설정이면 호출 없이 키워드 분석기로 폴백한다")
     void fallsBackWhenNotConfigured() {
-        GeminiSentimentProperties props = new GeminiSentimentProperties("", null, null, 0);
+        GeminiSentimentProperties props = new GeminiSentimentProperties("", null, null, 0, 0, 0);
         GeminiSentimentAnalyzer analyzer = new GeminiSentimentAnalyzer(props, RestClient.builder(), objectMapper);
 
         // 키워드 분석기가 '리콜'을 PRODUCT 부정으로 잡는다 — Gemini 호출 없이 동일 결과
