@@ -204,7 +204,8 @@ Boot 3.3 · JDK 21 · 코루틴. **자체 DB 없음**(무영속 MVP) · shared-c
 | `forecast-service` | Python/FastAPI | 8122 | 정산액/매출 시계열 예측 — Holt-Winters + seasonal-naive (statsmodels) |
 
 - 공통 규약: `GET /health`(또는 `/healthz`) → `{"status":"UP"}`, env 설정, 구조적 로깅, 기본값은 시뮬레이션/번들 샘플이라 무-외부의존 단독 실행 가능. Python 은 **3.11 필수**(pinned deps).
-- CI: `.github/workflows/polyglot-ci.yml` — 변경 경로만 Go(build+test)/Python(pytest) 매트릭스. Java `ci`/harness-guard 와 독립.
+- CI: `.github/workflows/polyglot-ci.yml` — `changes` 잡이 **변경 서비스만** Go/Python/Kotlin 동적 매트릭스로
+  테스트·이미지 푸시(서비스 단위 CI, JVM `ci.yml` 과 동일 패턴). Java `ci`/harness-guard 와 독립.
 
 ---
 

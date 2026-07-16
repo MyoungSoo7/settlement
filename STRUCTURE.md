@@ -69,7 +69,8 @@ settlement/                              # 모노레포 루트
 └── reconciliation-service/              # 🅺 Kt  :8131  정산 대사 (sealed Discrepancy·병렬 fetch·19:00 cron)
 ```
 
-- 자체 DB 없음(무영속 MVP) · CI 는 `.github/workflows/polyglot-ci.yml` 분리 · 배포는 전용 차트 격리
+- 자체 DB 없음(무영속 MVP) · CI 는 `.github/workflows/polyglot-ci.yml` 분리(**변경 서비스만** 동적 매트릭스 —
+  JVM ci.yml 과 동일 패턴, 21종 전부 서비스 단위 CI) · 배포는 전용 차트 격리
   (`charts/polyglot-services`, helm-deploy 레포). 정본: [`polyglot-services.md`](./polyglot-services.md).
 
 ## 부속 디렉토리

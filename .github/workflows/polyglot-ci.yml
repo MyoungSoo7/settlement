@@ -1,8 +1,10 @@
 name: polyglot-ci
 
-# 신규 polyglot 서비스(Go/Python) 전용 CI. 기존 Java `ci` 워크플로와 독립이며,
-# 변경된 서비스 디렉터리만 빌드·테스트한다(paths 필터). 필수 체크는 아니고(정보성),
-# Java harness-guard/STATUS 카운트에는 영향이 없다(신규 Java/마이그레이션/ADR 없음).
+# 폴리글랏 서비스(Go 2·Python 3·Kotlin 2) 전용 CI — 기존 Java `ci` 워크플로와 독립.
+# MSA 원칙(ci.yml 의 changes 잡과 동일 패턴): dorny/paths-filter 로 변경된 서비스만 골라
+# 언어별 테스트 매트릭스와 이미지 푸시 매트릭스를 동적으로 계산한다.
+# 이 워크플로 파일 자체가 바뀌면 7종 전부 재검증한다(안전 폴백).
+# 필수 체크는 아니고(정보성), Java harness-guard/STATUS 카운트에는 영향이 없다.
 
 on:
   push:
@@ -35,13 +37,89 @@ env:
   IMAGE_BASE: ${{ github.repository }} # MyoungSoo7/settlement (metadata-action 가 소문자화)
 
 jobs:
+  changes:
+    name: Detect changed services
+    runs-on: ubuntu-latest
+    outputs:
+      go_matrix: ${{ steps.setmatrix.outputs.go_matrix }}
+      go_any: ${{ steps.setmatrix.outputs.go_any }}
+      py_matrix: ${{ steps.setmatrix.outputs.py_matrix }}
+      py_any: ${{ steps.setmatrix.outputs.py_any }}
+      kt_matrix: ${{ steps.setmatrix.outputs.kt_matrix }}
+      kt_any: ${{ steps.setmatrix.outputs.kt_any }}
+      push_matrix: ${{ steps.setmatrix.outputs.push_matrix }}
+      push_any: ${{ steps.setmatrix.outputs.push_any }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Paths filter
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            workflow: ['.github/workflows/polyglot-ci.yml']
+            market-stream-service: ['market-stream-service/**']
+            payment-webhook-service: ['payment-webhook-service/**']
+            screening-backtest-service: ['screening-backtest-service/**']
+            settlement-anomaly-service: ['settlement-anomaly-service/**']
+            forecast-service: ['forecast-service/**']
+            notification-service: ['notification-service/**']
+            reconciliation-service: ['reconciliation-service/**']
+
+      - name: Compute per-service matrices (changed services only)
+        id: setmatrix
+        env:
+          CHANGED: ${{ steps.filter.outputs.changes }} # dorny: 매치된 필터명 JSON 배열
+        run: |
+          set -euo pipefail
+          # 배포 단위 단일 출처: service → image_suffix (build-push 주석의 매핑과 반드시 일치)
+          mapping='{
+            "market-stream-service":"-market-stream",
+            "payment-webhook-service":"-payment-webhook",
+            "screening-backtest-service":"-screening-backtest",
+            "settlement-anomaly-service":"-anomaly",
+            "forecast-service":"-forecast",
+            "notification-service":"-notification",
+            "reconciliation-service":"-reconciliation"
+          }'
+          langs='{
+            "go":["market-stream-service","payment-webhook-service"],
+            "python":["screening-backtest-service","settlement-anomaly-service","forecast-service"],
+            "kotlin":["notification-service","reconciliation-service"]
+          }'
+          if echo "$CHANGED" | jq -e 'index("workflow")' >/dev/null; then
+            # 워크플로 자체 변경 → 7종 전부 재검증
+            services=$(echo "$mapping" | jq -c 'keys')
+          else
+            services=$(echo "$mapping" | jq -c --argjson ch "$CHANGED" 'keys | map(select(. as $k | $ch | index($k)))')
+          fi
+          go_matrix=$(echo "$langs" | jq -c --argjson s "$services" '.go | map(select(. as $k | $s | index($k)))')
+          py_matrix=$(echo "$langs" | jq -c --argjson s "$services" '.python | map(select(. as $k | $s | index($k)))')
+          kt_matrix=$(echo "$langs" | jq -c --argjson s "$services" '.kotlin | map(select(. as $k | $s | index($k)))')
+          include=$(echo "$mapping" | jq -c --argjson s "$services" '[to_entries[] | select(.key as $k | $s | index($k)) | {name:.key, suffix:.value}]')
+          {
+            echo "go_matrix=$go_matrix"
+            echo "go_any=$(echo "$go_matrix" | jq 'length > 0')"
+            echo "py_matrix=$py_matrix"
+            echo "py_any=$(echo "$py_matrix" | jq 'length > 0')"
+            echo "kt_matrix=$kt_matrix"
+            echo "kt_any=$(echo "$kt_matrix" | jq 'length > 0')"
+            echo "push_matrix={\"include\":$include}"
+            echo "push_any=$(echo "$include" | jq 'length > 0')"
+          } >> "$GITHUB_OUTPUT"
+          echo "검증 대상 서비스: $services"
+
   go:
     name: Go build & test (${{ matrix.service }})
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.go_any == 'true'
     strategy:
       fail-fast: false
       matrix:
-        service: [market-stream-service, payment-webhook-service]
+        service: ${{ fromJSON(needs.changes.outputs.go_matrix) }}
     defaults:
       run:
         working-directory: ${{ matrix.service }}
@@ -59,13 +137,12 @@ jobs:
   python:
     name: Python test (${{ matrix.service }})
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.py_any == 'true'
     strategy:
       fail-fast: false
       matrix:
-        service:
-          - screening-backtest-service
-          - settlement-anomaly-service
-          - forecast-service
+        service: ${{ fromJSON(needs.changes.outputs.py_matrix) }}
     defaults:
       run:
         working-directory: ${{ matrix.service }}
@@ -87,10 +164,12 @@ jobs:
   kotlin:
     name: Kotlin build & test (${{ matrix.service }})
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.kt_any == 'true'
     strategy:
       fail-fast: false
       matrix:
-        service: [notification-service, reconciliation-service]
+        service: ${{ fromJSON(needs.changes.outputs.kt_matrix) }}
     defaults:
       run:
         working-directory: ${{ matrix.service }}
@@ -104,35 +183,34 @@ jobs:
       - run: chmod +x gradlew
       - run: ./gradlew build --no-daemon
 
-  # 이미지 빌드 & ghcr 푸시 — push 이벤트(main/develop)에서만. 테스트 통과 후 실행.
+  # 이미지 빌드 & ghcr 푸시 — push 이벤트(main/develop)에서 **변경된 서비스만**. 테스트 통과 후 실행.
   # 각 서비스는 자체 Dockerfile → ghcr.io/myoungsoo7/settlement-<suffix>.
+  #   market-stream-service       → -market-stream
+  #   payment-webhook-service     → -payment-webhook
+  #   screening-backtest-service  → -screening-backtest
+  #   settlement-anomaly-service  → -anomaly
+  #   forecast-service            → -forecast
+  #   notification-service        → -notification
+  #   reconciliation-service      → -reconciliation
   # 태그: <branch> / <branch>-<sha7> / latest(기본브랜치). image-updater 가 <branch>-<sha7> 추적.
+  # 언어 잡이 skipped 인 것은 "그 언어에 변경 없음"이므로 통과 — failure/cancelled 만 차단.
   build-push:
     name: Build & Push (${{ matrix.name }})
     runs-on: ubuntu-latest
-    needs: [go, python, kotlin]
-    if: github.event_name == 'push'
+    needs: [changes, go, python, kotlin]
+    if: |
+      github.event_name == 'push'
+      && !cancelled()
+      && needs.changes.outputs.push_any == 'true'
+      && needs.go.result != 'failure' && needs.go.result != 'cancelled'
+      && needs.python.result != 'failure' && needs.python.result != 'cancelled'
+      && needs.kotlin.result != 'failure' && needs.kotlin.result != 'cancelled'
     permissions:
       contents: read
       packages: write
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - name: market-stream-service
-            suffix: "-market-stream"
-          - name: payment-webhook-service
-            suffix: "-payment-webhook"
-          - name: screening-backtest-service
-            suffix: "-screening-backtest"
-          - name: settlement-anomaly-service
-            suffix: "-anomaly"
-          - name: forecast-service
-            suffix: "-forecast"
-          - name: notification-service
-            suffix: "-notification"
-          - name: reconciliation-service
-            suffix: "-reconciliation"
+      matrix: ${{ fromJSON(needs.changes.outputs.push_matrix) }}
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
