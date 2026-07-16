@@ -40,6 +40,9 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+    # 샘플 시드 마이그레이션 제거 — 기존 DB 를 "missing"으로 관대 처리.
+    # 신규 배포는 시드 없이 실데이터(data.go.kr 수집)로만 채운다.
+    ignore-migration-patterns: "*:missing"
 
   cache:
     type: caffeine
