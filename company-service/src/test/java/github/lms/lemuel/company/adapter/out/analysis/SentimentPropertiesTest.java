@@ -37,27 +37,31 @@ class SentimentPropertiesTest {
     }
 
     @Test
-    @DisplayName("Gemini — 빈/누락 값은 기본값으로 채우고 configured=false")
+    @DisplayName("Gemini — 빈/누락 값은 기본값으로 채우고 configured=false (상한 200·간격 0)")
     void geminiDefaults() {
-        GeminiSentimentProperties props = new GeminiSentimentProperties(null, "", "", 0);
+        GeminiSentimentProperties props = new GeminiSentimentProperties(null, "", "", 0, 0, -5);
 
         assertEquals("gemini-2.5-flash", props.model());
         assertEquals("https://generativelanguage.googleapis.com", props.baseUrl());
         assertEquals(256, props.maxTokens());
         assertEquals("", props.apiKey());
         assertFalse(props.configured());
+        assertEquals(200, props.dailyQuota());   // <=0 → 기본 200
+        assertEquals(0, props.minIntervalMs());   // 음수 → 0
     }
 
     @Test
     @DisplayName("Gemini — 명시 값은 그대로 유지하고 키가 있으면 configured=true")
     void geminiExplicit() {
         GeminiSentimentProperties props = new GeminiSentimentProperties(
-                "goog-key", "gemini-2.5-pro", "https://proxy.local", 128);
+                "goog-key", "gemini-2.5-pro", "https://proxy.local", 128, 50, 1500);
 
         assertEquals("goog-key", props.apiKey());
         assertEquals("gemini-2.5-pro", props.model());
         assertEquals("https://proxy.local", props.baseUrl());
         assertEquals(128, props.maxTokens());
         assertTrue(props.configured());
+        assertEquals(50, props.dailyQuota());
+        assertEquals(1500, props.minIntervalMs());
     }
 }
