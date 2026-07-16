@@ -42,7 +42,8 @@ object NotificationTemplate {
         val key = topicOrType.lowercase()
         return when {
             "settlement.confirmed" in key || key == "settlement_confirmed" -> NotificationType.SETTLEMENT_CONFIRMED
-            "payment.confirmed" in key || key == "payment_confirmed" -> NotificationType.PAYMENT_CONFIRMED
+            "payment.confirmed" in key || "payment.captured" in key || "payment.refunded" in key
+                || key == "payment_confirmed" -> NotificationType.PAYMENT_CONFIRMED
             "investment.executed" in key || key == "investment_executed" -> NotificationType.INVESTMENT_EXECUTED
             else -> NotificationType.GENERIC
         }

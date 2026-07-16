@@ -31,7 +31,9 @@ class DomainEventListener(
     @KafkaListener(
         topics = [
             "lemuel.settlement.confirmed",
-            "lemuel.payment.confirmed",
+            "lemuel.payment.confirmed",   // payment-webhook-service 발행(내부 계약)
+            "lemuel.payment.captured",    // 실 결제 이벤트(기존 Java 결제 파이프라인)
+            "lemuel.payment.refunded",
             "lemuel.investment.executed",
         ],
         groupId = "\${spring.kafka.consumer.group-id:notification-service}",
