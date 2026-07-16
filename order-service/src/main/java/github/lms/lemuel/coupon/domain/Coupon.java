@@ -159,30 +159,38 @@ public class Coupon {
     }
 
     /**
-     * 영속 레코드 복원 팩토리. 어댑터가 no-arg + setter 대신 이 경로로만 도메인을 재구성한다.
+     * 영속 레코드 복원 빌더. 어댑터가 no-arg + setter 대신 이 경로로만 도메인을 재구성한다.
+     *
+     * <p>15개 필드(중 BigDecimal 3개·LocalDateTime 4개)를 포지셔널 인자로 넘기던 방식은 인자 뒤바뀜에
+     * 취약했다 — 이름있는 빌더로 그 위험을 컴파일 단에서 제거한다. 검증은 하지 않는다(저장된 상태를 그대로 복원).
      */
-    public static Coupon rehydrate(Long id, String code, CouponType type, BigDecimal discountValue,
-                                   BigDecimal minOrderAmount, BigDecimal maxDiscountAmount,
-                                   int maxUses, int usedCount, CouponTarget targetType, Long targetId,
-                                   LocalDateTime startsAt, LocalDateTime expiresAt, boolean isActive,
-                                   LocalDateTime createdAt, LocalDateTime updatedAt) {
-        Coupon coupon = new Coupon();
-        coupon.id = id;
-        coupon.code = code;
-        coupon.type = type;
-        coupon.discountValue = discountValue;
-        coupon.minOrderAmount = minOrderAmount;
-        coupon.maxDiscountAmount = maxDiscountAmount;
-        coupon.maxUses = maxUses;
-        coupon.usedCount = usedCount;
-        coupon.targetType = targetType;
-        coupon.targetId = targetId;
-        coupon.startsAt = startsAt;
-        coupon.expiresAt = expiresAt;
-        coupon.isActive = isActive;
-        coupon.createdAt = createdAt;
-        coupon.updatedAt = updatedAt;
-        return coupon;
+    public static Builder rehydrate() {
+        return new Builder();
+    }
+
+    /** {@link #rehydrate()} 전용 빌더 — 필드 대입만 수행(도메인 불변식 재검증 없음). public setter 를 두지 않는다. */
+    public static final class Builder {
+        private final Coupon coupon = new Coupon();
+
+        public Builder id(Long v) { coupon.id = v; return this; }
+        public Builder code(String v) { coupon.code = v; return this; }
+        public Builder type(CouponType v) { coupon.type = v; return this; }
+        public Builder discountValue(BigDecimal v) { coupon.discountValue = v; return this; }
+        public Builder minOrderAmount(BigDecimal v) { coupon.minOrderAmount = v; return this; }
+        public Builder maxDiscountAmount(BigDecimal v) { coupon.maxDiscountAmount = v; return this; }
+        public Builder maxUses(int v) { coupon.maxUses = v; return this; }
+        public Builder usedCount(int v) { coupon.usedCount = v; return this; }
+        public Builder targetType(CouponTarget v) { coupon.targetType = v; return this; }
+        public Builder targetId(Long v) { coupon.targetId = v; return this; }
+        public Builder startsAt(LocalDateTime v) { coupon.startsAt = v; return this; }
+        public Builder expiresAt(LocalDateTime v) { coupon.expiresAt = v; return this; }
+        public Builder active(boolean v) { coupon.isActive = v; return this; }
+        public Builder createdAt(LocalDateTime v) { coupon.createdAt = v; return this; }
+        public Builder updatedAt(LocalDateTime v) { coupon.updatedAt = v; return this; }
+
+        public Coupon build() {
+            return coupon;
+        }
     }
 
     /** DB 부여 PK 주입(setter 대체). */
