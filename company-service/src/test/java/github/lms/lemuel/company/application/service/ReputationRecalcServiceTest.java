@@ -5,6 +5,7 @@ import github.lms.lemuel.company.application.port.out.AnalyzeSentimentPort;
 import github.lms.lemuel.company.application.port.out.LoadArticlePort;
 import github.lms.lemuel.company.application.port.out.LoadCompanyPort;
 import github.lms.lemuel.company.application.port.out.LoadReputationPort;
+import github.lms.lemuel.company.application.port.out.SentimentCachePort;
 import github.lms.lemuel.company.domain.Article;
 import github.lms.lemuel.company.domain.ArticleSentiment;
 import github.lms.lemuel.company.domain.ArticleSource;
@@ -35,10 +36,12 @@ class ReputationRecalcServiceTest {
     private final LoadCompanyPort loadCompanyPort = mock(LoadCompanyPort.class);
     private final LoadArticlePort loadArticlePort = mock(LoadArticlePort.class);
     private final AnalyzeSentimentPort analyzeSentimentPort = mock(AnalyzeSentimentPort.class);
+    private final SentimentCachePort sentimentCachePort = mock(SentimentCachePort.class);
     private final LoadReputationPort loadReputationPort = mock(LoadReputationPort.class);
     private final ReputationSnapshotWriter snapshotWriter = mock(ReputationSnapshotWriter.class);
     private final ReputationRecalcService service = new ReputationRecalcService(
-            loadCompanyPort, loadArticlePort, analyzeSentimentPort, loadReputationPort, snapshotWriter, 30);
+            loadCompanyPort, loadArticlePort, analyzeSentimentPort, sentimentCachePort,
+            loadReputationPort, snapshotWriter, 30, "gemini");
 
     private static final Company SAMSUNG = new Company("005930", null, "삼성전자", null);
 
@@ -98,6 +101,38 @@ class ReputationRecalcServiceTest {
         // 가중합 3, 분모 2*3=6 → 100-50 = 50
         assertEquals(50, result.get().score());
         verify(snapshotWriter).writeIfChanged(any());
+    }
+
+    @Test
+    @DisplayName("감성 캐시 히트면 분석기를 호출하지 않고 저장도 하지 않는다")
+    void usesCacheWhenPresent() {
+        when(loadCompanyPort.findByStockCode("005930")).thenReturn(Optional.of(SAMSUNG));
+        when(loadReputationPort.existsForDate(eq("005930"), any(LocalDate.class))).thenReturn(false);
+        when(loadArticlePort.findForScoring(eq("005930"), any())).thenReturn(List.of(article()));
+        when(sentimentCachePort.find(any(), eq("gemini"))).thenReturn(Optional.of(ArticleSentiment.positive()));
+        when(snapshotWriter.writeIfChanged(any())).thenReturn(true);
+
+        Optional<ReputationScore> result = service.recalcFor("005930");
+
+        assertTrue(result.isPresent());
+        verify(analyzeSentimentPort, never()).analyze(any(), any());
+        verify(sentimentCachePort, never()).save(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("감성 캐시 미스면 분석 후 결과를 (urlHash, provider) 로 캐시 저장한다")
+    void analyzesAndCachesOnMiss() {
+        when(loadCompanyPort.findByStockCode("005930")).thenReturn(Optional.of(SAMSUNG));
+        when(loadReputationPort.existsForDate(eq("005930"), any(LocalDate.class))).thenReturn(false);
+        when(loadArticlePort.findForScoring(eq("005930"), any())).thenReturn(List.of(article()));
+        when(sentimentCachePort.find(any(), eq("gemini"))).thenReturn(Optional.empty());
+        when(analyzeSentimentPort.analyze(any(), any())).thenReturn(ArticleSentiment.neutral());
+        when(snapshotWriter.writeIfChanged(any())).thenReturn(true);
+
+        service.recalcFor("005930");
+
+        verify(analyzeSentimentPort).analyze(any(), any());
+        verify(sentimentCachePort).save(any(), eq("gemini"), any());
     }
 
     @Test
