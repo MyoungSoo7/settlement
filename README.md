@@ -150,99 +150,12 @@ CQRS 로 분리하고, 대사는 order 의 내부 API 를 호출해 cross-DB 연
 
 ## 모듈 구조
 
-```
-settlement/                              # 모노레포 루트
-├── settings.gradle.kts                  # 12 서비스 모듈 선언 (shared-common 은 composite build)
-├── build.gradle.kts                     # 부모 빌드 (subprojects 공통 설정)
-├── docker-compose.yml                   # PG 12종 · ES · Redpanda · 12 services + gateway
-├── Dockerfile                           # MODULE 빌드 인자 파라미터화 (모든 서비스 공용)
-│
-├── shared-common/                       # 📦 라이브러리 모듈 (java-library)
-│   └── src/main/java/.../common/
-│       ├── audit/                       # 감사 로그 (AuditLogger, AuditContext)
-│       ├── config/observability/        # MDC, TraceId 필터, PII 마스킹
-│       ├── config/jwt/                  # JWT 검증, SecurityConfig
-│       ├── exception/                   # 공통 예외 (BusinessException 등)
-│       ├── outbox/                      # Outbox 패턴 (이벤트 발행, 멱등 처리)
-│       ├── ratelimit/                   # Bucket4j 기반 rate limiting
-│       └── pdf/                         # iText PDF 유틸
-│
-├── order-service/                       # 🛒 Commerce 서비스 (port 8088, 자체 DB opslab)
-│   └── src/main/java/.../{user,order,payment,cart,shipping,product,category,coupon,review,game}
-│       ├── adapter/in/web/              # REST 컨트롤러
-│       ├── adapter/out/persistence/     # JPA 엔티티/리포지토리
-│       ├── adapter/out/external/        # Toss PG 클라이언트
-│       ├── adapter/out/event/           # Outbox-backed Kafka publisher
-│       ├── recon/                       # /internal/recon — 자기 합계 노출(settlement 대사용, ADR 0020)
-│       ├── projectionbackfill/          # settlement 프로젝션 백필 (ADR 0020)
-│       └── application/                 # UseCase + ports
-│
-├── settlement-service/                  # 💰 Settlement 서비스 (port 8082, standalone — 자체 DB settlement_db)
-│   └── src/main/java/.../
-│       ├── settlement/                  # 정산 생성/확정·홀드백
-│       │   ├── adapter/in/web/          # 정산 조회/관리 API
-│       │   ├── adapter/in/kafka/        # Payment/Order/User/Product 이벤트 컨슈머 (프로젝션 적재)
-│       │   ├── adapter/in/batch/        # Spring Batch (일/월 정산)
-│       │   ├── adapter/out/persistence/ # Settlement JpaEntity
-│       │   ├── adapter/out/readmodel/   # ★ 이벤트 프로젝션 뷰 (settlement_*_view, 자체 DB 소유)
-│       │   ├── adapter/out/search/      # Elasticsearch 색인
-│       │   └── adapter/out/pdf/         # 정산서 PDF
-│       ├── recon/                       # OrderReconClient — order /internal/recon 호출(cross-DB 0)
-│       ├── payout/                      # 셀러 지급 (펌뱅킹, SellerBankAccount)
-│       ├── ledger/                      # 복식부기 원장 (LedgerEntry, Outbox)
-│       ├── chargeback/                  # 지급 분쟁/거절 처리
-│       ├── pgreconciliation/            # PG 정산파일 대사 + 차액 보정
-│       └── report/                      # 캐시플로우 리포트 도메인
-│
-├── loan-service/                        # 💸 Loan 서비스 (port 8084, 자체 DB lemuel_loan) — 선정산 대출
-│   └── src/main/java/.../loan/          # 한도·선지급·상환 saga·자체 복식부기 — settlement 이벤트로만 연계
-│
-├── financial-statements-service/        # 📊 Financial 서비스 (port 8086, 자체 DB lemuel_financial)
-│   └── src/main/java/.../financial/     # 코스피 상장사 요약 재무제표 조회 — DART OpenAPI 수집 + 시드 폴백
-│
-├── economics-service/                   # 📈 Economics 서비스 (port 8087, 자체 DB lemuel_economics)
-│   └── src/main/java/.../economics/     # ECOS 거시 경제지표(기준금리·국고채3년·USD/KRW·CPI) 조회 — 수집 배치 + 시드 폴백
-│
-├── company-service/                     # 📰 Company 서비스 (port 8090, 자체 DB lemuel_company)
-│   └── src/main/java/.../company/       # 기업 뉴스 수집(네이버) + 평판 스코어 — 본문 미저장, url_hash 멱등 (ADR 0023)
-│
-├── operation-service/                   # 🖥️ Operation 서비스 (port 8092, 자체 DB lemuel_operation) — 운영 관제
-│   └── src/main/java/.../operation/     # Alertmanager 알람 → 인시던트 라이프사이클(ack/resolve/오탐) + 요약(MTTR)
-│
-├── market-service/                      # 📉 Market 서비스 (port 8094, 자체 DB lemuel_market) — KRX 시세·시가총액
-│   └── src/main/java/.../market/        # 공공데이터포털 금융위 주식시세정보 수집 + 시드 폴백 — 시세·시총만 서빙(PER/PBR 은 소비측 조인)
-│
-├── ai-service/                          # 🤖 AI 서비스 (port 8096, 자체 DB lemuel_ai — pgvector) — 대화형 AI 챗봇
-│   └── src/main/java/.../ai/chat/       # LLM provider 스위치(기본 Gemini/RestClient · Anthropic Spring AI), 컨텍스트 채팅(SSE)·이력 CRUD — JWT USER 이상 + rate limit
-│
-├── common-data-service/                 # 🗂️ Common-Data 서비스 (port 8098, 자체 DB lemuel_commondata)
-│   └── src/main/java/.../commondata/    # 공공데이터포털 범용 커넥터 — 데이터소스 등록만으로 임의 OpenAPI 수집(멱등 upsert)
-│
-├── investment-service/                  # 📈 Investment 서비스 (port 8100, 자체 DB lemuel_investment) — CEO 투자하기
-│   └── src/main/java/.../investment/    # 코스피/코스닥 회계자료 기반 투자점수(수익성35+안정성35+성장성30, AAA~CCC) · 투자주문 · settlement.confirmed 재원 프로젝션 · investment.executed 발행
-│                                        # ※ 투자점수는 정보 제공 목적의 참고 지표로 투자자문이 아니며, 매수·매도 등 투자 판단과 그 결과의 책임은 이용자 본인에게 있음
-│
-├── account-service/                     # 🏦 Account 서비스 (계정계, port 8102, 자체 DB lemuel_account)
-│   └── src/main/java/.../account/       # loan·investment·settlement 6개 토픽 → 전사 복식부기 GL 집계(대출/투자/정산 잔액 · 시산표), 소비 전용
-│
-└── gateway-service/                     # 🚪 API Gateway (port 8080)
-    └── src/main/java/.../GatewayServiceApplication.java
-```
+전체 디렉토리·모듈 트리 정본은 **[STRUCTURE.md](STRUCTURE.md)** 로 분리했다.
 
-### 폴리글랏 서비스 (Go · Python · Kotlin) — standalone
-
-JVM 코어가 못 채우는 실시간·데이터·이벤트 공백을 언어별 강점으로 보완. Gradle 모노빌드와 분리된 독립 서비스이며, 전용 `charts/polyglot-services` + `polyglot-services` ArgoCD 앱으로 격리 배포된다. (상세: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md))
-
-```
-polyglot/
-├── market-stream-service/     # 🟢 Go  :8110  실시간 시세 SSE/WebSocket (goroutine Hub 팬아웃)
-├── payment-webhook-service/   # 🟢 Go  :8111  Toss 결제 웹훅 수신(HMAC·멱등) → Kafka 발행
-├── screening-backtest-service/# 🐍 Py  :8120  투자 스크리닝 백테스트 (pandas·numpy)
-├── settlement-anomaly-service/# 🐍 Py  :8121  정산/payout 이상탐지 (scikit-learn)
-├── forecast-service/          # 🐍 Py  :8122  정산액/매출 예측 (statsmodels)
-├── notification-service/      # 🅺 Kt  :8130  이벤트→다채널 알림 (코루틴 팬아웃·멱등)
-└── reconciliation-service/    # 🅺 Kt  :8131  정산 대사 (sealed Discrepancy·병렬 fetch)
-```
+- **JVM 코어**: Gradle 멀티모듈 — Java 13 서비스 + gateway, `shared-common` 은 composite build 라이브러리 (ADR 0021)
+- **폴리글랏 7종**(Go 2 · Python 3 · Kotlin 2, 포트 8110~8131): 루트 레벨 standalone — Gradle·gateway 미포함,
+  `polyglot-ci.yml` 분리 CI, 전용 차트 격리 배포 (정본: [polyglot-services.md](polyglot-services.md))
+- 각 서비스 내부는 헥사고날 고정 골격: `domain/` · `application/port·service/` · `adapter/{in,out}/`
 
 ---
 

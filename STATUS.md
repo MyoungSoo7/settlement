@@ -55,5 +55,5 @@
 ## 참고 문서
 - `SPEC.md` — 전체 기능명세(엔드포인트·도메인 규칙·이벤트 카탈로그)
 - `CLAUDE.md` — 에이전트 운용 가이드 / 아키텍처 경계·컨벤션
-- `README.md` — 프로젝트 구조 및 개요 · `PORTFOLIO.md` — 면접용 1장 요약 · `HARNESS.md` — 개발 하네스 구성
+- `README.md` — 프로젝트 개요 · `STRUCTURE.md` — 모듈·디렉토리 구조 정본 · `PORTFOLIO.md` — 면접용 1장 요약 · `HARNESS.md` — 개발 하네스 구성
 - `docs/adr/` — 아키텍처 결정 기록 26개 · `*-rules` 스킬 — 서비스별 강제 도메인 규칙
