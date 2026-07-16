@@ -24,10 +24,10 @@ class NotificationDispatcher(
     private val perChannelTimeoutMs: Long = 3_000,
     private val maxAttempts: Int = 3,
     private val baseBackoffMs: Long = 50,
-) {
+) : DispatchNotificationUseCase {
     private val log = LoggerFactory.getLogger(javaClass)
 
-    suspend fun dispatch(notification: Notification): DispatchResult {
+    override suspend fun dispatch(notification: Notification): DispatchResult {
         // --- Idempotency gate ---
         notification.eventId?.let { id ->
             if (!dedupe.markIfFirst(id)) {

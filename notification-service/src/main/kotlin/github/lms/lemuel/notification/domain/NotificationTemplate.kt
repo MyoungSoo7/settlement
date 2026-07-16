@@ -7,6 +7,13 @@ package github.lms.lemuel.notification.domain
 object NotificationTemplate {
 
     /**
+     * Recipient of last resort when an event carries no addressable field —
+     * routed to the ops mailbox so no event disappears unnoticed (deliberate
+     * fail-visible default, not a silent drop).
+     */
+    private const val OPS_FALLBACK_RECIPIENT = "ops@lemuel"
+
+    /**
      * Render a one-line plain-text representation of a notification,
      * used by the LogChannel and as a fallback body for other channels.
      */
@@ -25,7 +32,7 @@ object NotificationTemplate {
         eventId: String?,
     ): Notification {
         val type = classify(topicOrType)
-        val recipient = (fields["recipient"] ?: fields["userId"] ?: fields["accountId"] ?: "ops@lemuel")
+        val recipient = (fields["recipient"] ?: fields["userId"] ?: fields["accountId"] ?: OPS_FALLBACK_RECIPIENT)
             .toString()
         val subject = when (type) {
             NotificationType.SETTLEMENT_CONFIRMED -> "정산 확정: ${fields["settlementId"] ?: "?"}"
@@ -38,14 +45,41 @@ object NotificationTemplate {
         return Notification(type, recipient, subject, body, eventId)
     }
 
+    /**
+     * Topic/type → category mapping expressed as a declarative rule table
+     * (substring OR exact-key match) + a single lookup, so adding a mapping is
+     * a data edit, not new branching logic. First matching rule wins; no match
+     * (conservative) → GENERIC.
+     */
+    private val classificationRules: List<ClassificationRule> = listOf(
+        ClassificationRule(
+            NotificationType.SETTLEMENT_CONFIRMED,
+            substrings = listOf("settlement.confirmed"), exactKeys = listOf("settlement_confirmed"),
+        ),
+        ClassificationRule(
+            NotificationType.PAYMENT_CONFIRMED,
+            substrings = listOf("payment.confirmed", "payment.captured", "payment.refunded"),
+            exactKeys = listOf("payment_confirmed"),
+        ),
+        ClassificationRule(
+            NotificationType.INVESTMENT_EXECUTED,
+            substrings = listOf("investment.executed"), exactKeys = listOf("investment_executed"),
+        ),
+    )
+
     fun classify(topicOrType: String): NotificationType {
         val key = topicOrType.lowercase()
-        return when {
-            "settlement.confirmed" in key || key == "settlement_confirmed" -> NotificationType.SETTLEMENT_CONFIRMED
-            "payment.confirmed" in key || "payment.captured" in key || "payment.refunded" in key
-                || key == "payment_confirmed" -> NotificationType.PAYMENT_CONFIRMED
-            "investment.executed" in key || key == "investment_executed" -> NotificationType.INVESTMENT_EXECUTED
-            else -> NotificationType.GENERIC
-        }
+        return classificationRules.firstOrNull { it.matches(key) }?.type
+            ?: NotificationType.GENERIC
+    }
+
+    /** One rule of the classification table: type + the keys that select it. */
+    private data class ClassificationRule(
+        val type: NotificationType,
+        val substrings: List<String>,
+        val exactKeys: List<String>,
+    ) {
+        fun matches(key: String): Boolean =
+            substrings.any { it in key } || exactKeys.any { it == key }
     }
 }

@@ -1,7 +1,7 @@
 package github.lms.lemuel.notification.config
 
+import github.lms.lemuel.notification.adapter.out.dedupe.InMemoryTtlDedupeStore
 import github.lms.lemuel.notification.application.DedupeStore
-import github.lms.lemuel.notification.application.InMemoryTtlDedupeStore
 import github.lms.lemuel.notification.application.NotificationChannel
 import github.lms.lemuel.notification.application.NotificationDispatcher
 import org.springframework.beans.factory.annotation.Value

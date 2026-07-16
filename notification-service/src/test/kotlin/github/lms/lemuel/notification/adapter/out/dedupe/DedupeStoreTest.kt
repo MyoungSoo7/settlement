@@ -1,4 +1,4 @@
-package github.lms.lemuel.notification.application
+package github.lms.lemuel.notification.adapter.out.dedupe
 
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
