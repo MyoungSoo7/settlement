@@ -1,13 +1,21 @@
 # Lemuel — 이커머스 + 정산 MSA 플랫폼
 
 > **이커머스 주문 → 셀러 정산 → 복식부기 원장까지, "정확성을 기계로 강제한" 커머스 백엔드.**
-> 커머스(order)·정산(settlement) 두 축의 **깊이**가 시그니처이고, 그 위에 대출·투자·계정계·재무제표·경제지표·기업평판·운영관제·주식시세·AI챗봇·공공데이터를 **12개 마이크로서비스 + API Gateway** 로 확장해 도메인 확장력을 증명한다.
-> 단일 모놀리스 → **Bounded Context 분리** → **이벤트 드리븐** → **DB-per-service + 이벤트 프로젝션 패턴**(ADR 0020) 으로 진화시킨 헥사고날 백엔드 포트폴리오.
+> 커머스(order)·정산(settlement) 두 축의 **깊이**가 시그니처이고, 그 위에 대출·투자·계정계·조직·재무제표·경제지표·기업평판·운영관제·주식시세·AI챗봇·공공데이터를 **13개 마이크로서비스 + API Gateway**(JVM) 로 확장했다.
+> 여기에 **Go·Python·Kotlin 폴리글랏 7종**(실시간 시세 스트리밍·결제 웹훅·스크리닝 백테스트·이상탐지·예측·알림·정산 대사)을 더해 **총 21개 서비스**의 폴리글랏 MSA 로 도메인·언어 양방향 확장력을 증명한다.
+> 단일 모놀리스 → **Bounded Context 분리** → **이벤트 드리븐** → **DB-per-service + 이벤트 프로젝션 패턴**(ADR 0020) → **폴리글랏 MSA** 로 진화시킨 헥사고날 백엔드 포트폴리오.
+>
+> 📐 **전체 구성·아키텍처·디자인 패턴·기술 스택 한눈에 → [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**
 
 [![Java 25](https://img.shields.io/badge/Java-25-orange)](https://www.oracle.com/java/)
+[![Kotlin 2.0](https://img.shields.io/badge/Kotlin-2.0-purple)](https://kotlinlang.org/)
+[![Go 1.22](https://img.shields.io/badge/Go-1.22-00ADD8)](https://go.dev/)
+[![Python 3.11](https://img.shields.io/badge/Python-3.11-yellow)](https://www.python.org/)
 [![Spring Boot 4](https://img.shields.io/badge/Spring%20Boot-4.0.4-brightgreen)](https://spring.io/projects/spring-boot)
 [![PostgreSQL 17](https://img.shields.io/badge/PostgreSQL-17-blue)](https://www.postgresql.org/)
-[![Kafka](https://img.shields.io/badge/Kafka-Redpanda-red)](https://redpanda.com/)
+[![Kafka](https://img.shields.io/badge/Kafka-Strimzi%2FRedpanda-red)](https://strimzi.io/)
+[![Polyglot MSA](https://img.shields.io/badge/MSA-21%20services%20(Java·Kotlin·Go·Python)-teal)](docs/ARCHITECTURE.md)
+[![GitOps](https://img.shields.io/badge/CD-ArgoCD%20GitOps-orange)](docs/ARCHITECTURE.md#5-cicd-파이프라인)
 [![Hexagonal](https://img.shields.io/badge/Architecture-Hexagonal-purple)](docs/adr/0001-hexagonal-architecture.md)
 [![ArchUnit Enforced](https://img.shields.io/badge/ArchUnit-Enforced-success)](order-service/src/test/java/github/lms/lemuel/architecture/HexagonalArchitectureTest.java)
 
@@ -114,12 +122,14 @@ CQRS 로 분리하고, 대사는 order 의 내부 API 를 호출해 cross-DB 연
 
 | 분류 | 기술 |
 |------|------|
-| 언어 | Java 25 |
-| 프레임워크 | Spring Boot 4.0.4 |
-| 빌드 | Gradle Multi-module (Kotlin DSL) |
-| 데이터베이스 | PostgreSQL 17 |
+| 언어 | **Java 25** (코어 14) · **Kotlin 2.0** (이벤트 서비스 2) · **Go 1.22** (엣지 2) · **Python 3.11** (ML 3) |
+| 프레임워크 | Spring Boot 4.0.4 / Spring 7 (Java) · Spring Boot 3.3 (Kotlin) · FastAPI (Python) · `net/http`(Go) |
+| 빌드 | Gradle Multi-module (Kotlin DSL) · 폴리글랏은 standalone 빌드 |
+| 데이터베이스 | PostgreSQL 17 (DB-per-service) |
 | 검색 엔진 | Elasticsearch 8.17 (Nori 한글 분석기) |
-| 메시지 브로커 | Apache Kafka (Redpanda 호환) |
+| 메시지 브로커 | Apache Kafka — dev: Redpanda 호환 / prod: Strimzi KRaft |
+| ML/데이터 | pandas · numpy · scikit-learn · statsmodels (Python 서비스) |
+| CI/CD | GitHub Actions → GHCR → **ArgoCD + image-updater (GitOps)** |
 | API Gateway | Spring Cloud Gateway 2025 |
 | PG 연동 | Toss Payments |
 | 배치 | Spring Batch |
@@ -217,6 +227,21 @@ settlement/                              # 모노레포 루트
 │
 └── gateway-service/                     # 🚪 API Gateway (port 8080)
     └── src/main/java/.../GatewayServiceApplication.java
+```
+
+### 폴리글랏 서비스 (Go · Python · Kotlin) — standalone
+
+JVM 코어가 못 채우는 실시간·데이터·이벤트 공백을 언어별 강점으로 보완. Gradle 모노빌드와 분리된 독립 서비스이며, 전용 `charts/polyglot-services` + `polyglot-services` ArgoCD 앱으로 격리 배포된다. (상세: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md))
+
+```
+polyglot/
+├── market-stream-service/     # 🟢 Go  :8110  실시간 시세 SSE/WebSocket (goroutine Hub 팬아웃)
+├── payment-webhook-service/   # 🟢 Go  :8111  Toss 결제 웹훅 수신(HMAC·멱등) → Kafka 발행
+├── screening-backtest-service/# 🐍 Py  :8120  투자 스크리닝 백테스트 (pandas·numpy)
+├── settlement-anomaly-service/# 🐍 Py  :8121  정산/payout 이상탐지 (scikit-learn)
+├── forecast-service/          # 🐍 Py  :8122  정산액/매출 예측 (statsmodels)
+├── notification-service/      # 🅺 Kt  :8130  이벤트→다채널 알림 (코루틴 팬아웃·멱등)
+└── reconciliation-service/    # 🅺 Kt  :8131  정산 대사 (sealed Discrepancy·병렬 fetch)
 ```
 
 ---
@@ -603,6 +628,7 @@ PENDING → READY → SHIPPED → IN_TRANSIT → DELIVERED → (선택) RETURNED
 
 | 문서 | 경로 |
 |---|---|
+| **🏛 아키텍처 개요 (서비스·패턴·스택)** | **[`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)** |
 | Claude Code 컨텍스트 | [`CLAUDE.md`](./CLAUDE.md) |
 | ADR (아키텍처 결정 기록) | [`docs/adr/`](./docs/adr/) |
 | Runbook (장애 대응) | [`docs/runbook/`](./docs/runbook/) |
