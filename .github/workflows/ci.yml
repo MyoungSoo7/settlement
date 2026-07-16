@@ -19,6 +19,12 @@ jobs:
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
       frontend: ${{ steps.filter.outputs.frontend }}
+      # 변경된 백엔드 서비스만 담은 이미지 빌드 매트릭스: {"include":[{module,image_suffix},...]}
+      build_matrix: ${{ steps.setmatrix.outputs.matrix }}
+      # 빌드할 서비스가 하나라도 있으면 true (backend-ghcr 실행 게이트)
+      build_any: ${{ steps.setmatrix.outputs.any }}
+      # backend-ci 가 실행할 gradle 테스트 태스크 (변경 모듈만 / shared·모호 변경 시 전체 build)
+      test_tasks: ${{ steps.setmatrix.outputs.test_tasks }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -34,6 +40,78 @@ jobs:
             backend:
               - '**'
               - '!frontend/**'
+            # shared: 전 서비스 이미지에 영향 → 변경 시 14개 전부 재빌드
+            shared:
+              - 'shared-common/**'
+              - 'build.gradle.kts'
+              - 'settings.gradle.kts'
+              - 'gradle.properties'
+              - 'gradle/**'
+              - 'gradlew'
+              - 'gradlew.bat'
+              - 'Dockerfile'
+              - '.github/workflows/ci.yml'
+            order-service: ['order-service/**']
+            settlement-service: ['settlement-service/**']
+            gateway-service: ['gateway-service/**']
+            account-service: ['account-service/**']
+            operation-service: ['operation-service/**']
+            loan-service: ['loan-service/**']
+            financial-statements-service: ['financial-statements-service/**']
+            economics-service: ['economics-service/**']
+            company-service: ['company-service/**']
+            market-service: ['market-service/**']
+            common-data-service: ['common-data-service/**']
+            ai-service: ['ai-service/**']
+            investment-service: ['investment-service/**']
+            organization-service: ['organization-service/**']
+
+      - name: Compute image build matrix (changed services only)
+        id: setmatrix
+        env:
+          CHANGED: ${{ steps.filter.outputs.changes }}   # dorny: 매치된 필터명 JSON 배열
+        run: |
+          set -euo pipefail
+          # 배포 단위 단일 출처: module → image_suffix (아래 backend-ghcr 주석의 매핑과 반드시 일치)
+          mapping='{
+            "order-service":"",
+            "settlement-service":"-settlement",
+            "gateway-service":"-gateway",
+            "account-service":"-account",
+            "operation-service":"-operation",
+            "loan-service":"-loan",
+            "financial-statements-service":"-financial",
+            "economics-service":"-economics",
+            "company-service":"-company",
+            "market-service":"-market",
+            "common-data-service":"-common-data",
+            "ai-service":"-ai",
+            "investment-service":"-investment",
+            "organization-service":"-organization"
+          }'
+          if echo "$CHANGED" | jq -e 'index("shared")' >/dev/null; then
+            # 공용 변경 → 전 서비스 재빌드
+            include=$(echo "$mapping" | jq -c '[to_entries[] | {module:.key, image_suffix:.value}]')
+          else
+            # 변경된 서비스만 (필터명 == 모듈 디렉터리명)
+            include=$(echo "$mapping" | jq -c --argjson ch "$CHANGED" \
+              '[to_entries[] | select(.key as $k | $ch | index($k)) | {module:.key, image_suffix:.value}]')
+          fi
+          count=$(echo "$include" | jq 'length')
+          echo "matrix={\"include\":$include}" >> "$GITHUB_OUTPUT"
+          echo "any=$([ "$count" -gt 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "이미지 빌드 대상 서비스: ${count}개 → $include"
+          # 테스트 태스크: shared 변경→전체 build, 변경 서비스만 있으면 해당 모듈만,
+          # 그 외(모듈·shared 모두 아닌 모호한 backend 변경)→안전하게 전체 build (게이트 약화 방지)
+          if echo "$CHANGED" | jq -e 'index("shared")' >/dev/null; then
+            test_tasks="build"
+          elif [ "$count" -gt 0 ]; then
+            test_tasks=$(echo "$include" | jq -r '[.[] | ":\(.module):build"] | join(" ")')
+          else
+            test_tasks="build"
+          fi
+          echo "test_tasks=$test_tasks" >> "$GITHUB_OUTPUT"
+          echo "테스트 태스크: $test_tasks"
 
   backend-ci:
     name: Backend - Build/Test/JaCoCo/SonarCloud
@@ -112,10 +190,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # build = compile + test + jacocoTestReport + jacocoTestCoverageVerification (게이트 포함)
+      # build = compile + test + jacocoTestReport + jacocoTestCoverageVerification (게이트 포함, build.gradle.kts:157)
+      # test_tasks = 변경 모듈만(`:<mod>:build`) / shared·모호 변경 시 전체 `build` (changes 잡이 산출)
       # Testcontainers 기반 통합테스트는 러너의 Docker 데몬을 사용한다.
       - name: Build & Test (JaCoCo gate)
-        run: ./gradlew clean build --no-daemon --stacktrace
+        run: ./gradlew clean ${{ needs.changes.outputs.test_tasks }} --no-daemon --stacktrace
         env:
           # ryuk(정리용 유틸 컨테이너) 비활성화 — 러너는 일회용이라 불필요하고,
           # 이미지 치환과 얽혀 모듈별 test JVM 에서 비결정적 hang 을 유발했다 (2026-07-08).
@@ -180,11 +259,11 @@ jobs:
     name: Backend - Build & Push to GHCR
     runs-on: ubuntu-latest
     needs: [changes, backend-ci]
-    if: github.event_name != 'pull_request' && needs.changes.outputs.backend == 'true'
+    if: github.event_name != 'pull_request' && needs.changes.outputs.build_any == 'true'
     permissions:
       contents: read
       packages: write
-    # 배포 단위별 이미지(ADR 0020) — 전 백엔드 서비스(14개) 이미지화:
+    # 배포 단위별 이미지(ADR 0020) — 변경된 백엔드 서비스만 이미지화(매트릭스는 changes 잡이 계산).
     #   order-service        → ghcr.io/myoungsoo7/settlement
     #   settlement-service   → ghcr.io/myoungsoo7/settlement-settlement
     #   gateway-service      → ghcr.io/myoungsoo7/settlement-gateway
@@ -199,37 +278,10 @@ jobs:
     #   ai-service           → ghcr.io/myoungsoo7/settlement-ai
     #   investment-service   → ghcr.io/myoungsoo7/settlement-investment
     #   organization-service → ghcr.io/myoungsoo7/settlement-organization
+    # shared-common·루트 빌드파일·Dockerfile·ci.yml 변경 시엔 changes 잡이 14개 전부 매트릭스에 담는다.
     strategy:
-      matrix:
-        include:
-          - module: order-service
-            image_suffix: ""
-          - module: settlement-service
-            image_suffix: "-settlement"
-          - module: gateway-service
-            image_suffix: "-gateway"
-          - module: account-service
-            image_suffix: "-account"
-          - module: operation-service
-            image_suffix: "-operation"
-          - module: loan-service
-            image_suffix: "-loan"
-          - module: financial-statements-service
-            image_suffix: "-financial"
-          - module: economics-service
-            image_suffix: "-economics"
-          - module: company-service
-            image_suffix: "-company"
-          - module: market-service
-            image_suffix: "-market"
-          - module: common-data-service
-            image_suffix: "-common-data"
-          - module: ai-service
-            image_suffix: "-ai"
-          - module: investment-service
-            image_suffix: "-investment"
-          - module: organization-service
-            image_suffix: "-organization"
+      fail-fast: false   # 한 서비스 빌드 실패가 다른 서비스 이미지 푸시를 취소하지 않도록
+      matrix: ${{ fromJSON(needs.changes.outputs.build_matrix) }}
     steps:
       - uses: actions/checkout@v4
 
