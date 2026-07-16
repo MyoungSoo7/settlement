@@ -19,6 +19,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.util.function.Supplier;
 
 /**
  * 초보 투자 체크 조회 — 점수(회계) 축을 앵커로 뉴스(R3)·시세(R4·R5)·거시 축을 소비측 조인한다.
@@ -59,36 +60,43 @@ public class GetBeginnerCheckService implements GetBeginnerCheckUseCase {
         // 점수 축이 앵커 — 회계자료 없으면 InvestmentNotFoundException(404) 전파.
         InvestmentScore score = getInvestmentScoreUseCase.getScore(stockCode);
 
-        NewsRiskCheck newsRisk;
-        try {
-            newsRisk = loadCompanyNewsPort.loadRecentArticles(stockCode)
-                    .map(newsRiskPolicy::scan)
-                    .orElseGet(NewsRiskCheck::noData);
-        } catch (Exception e) {
-            log.warn("초보 투자 체크 — 뉴스 축 강등(UNAVAILABLE): stockCode={}", stockCode, e);
-            newsRisk = NewsRiskCheck.unavailable();
-        }
+        // 위성 3축은 원천 장애 시 해당 축만 UNAVAILABLE 로 강등한다(부분 실패 ≠ 전체 실패).
+        // 축이 늘어도 degrade() 한 줄이면 되고, 강등·로깅은 이 단일 초크포인트에 모인다.
+        NewsRiskCheck newsRisk = degrade("뉴스", stockCode,
+                () -> loadCompanyNewsPort.loadRecentArticles(stockCode)
+                        .map(newsRiskPolicy::scan)
+                        .orElseGet(NewsRiskCheck::noData),
+                NewsRiskCheck::unavailable);
 
-        PricePositionCheck pricePosition;
-        TradePlan tradePlan = null;
-        try {
-            pricePosition = pricePositionPolicy.evaluate(loadDailyClosesPort.loadRecentYear(stockCode));
-            if (pricePosition.hasQuote()) {
-                tradePlan = tradePlanPolicy.plan(pricePosition.latestClose(), budget);
-            }
-        } catch (Exception e) {
-            log.warn("초보 투자 체크 — 시세 축 강등(UNAVAILABLE): stockCode={}", stockCode, e);
-            pricePosition = PricePositionCheck.unavailable();
-        }
+        PriceAxis price = degrade("시세", stockCode,
+                () -> {
+                    PricePositionCheck pos = pricePositionPolicy.evaluate(loadDailyClosesPort.loadRecentYear(stockCode));
+                    TradePlan plan = pos.hasQuote() ? tradePlanPolicy.plan(pos.latestClose(), budget) : null;
+                    return new PriceAxis(pos, plan);
+                },
+                () -> new PriceAxis(PricePositionCheck.unavailable(), null));
 
-        MacroCheck macro;
-        try {
-            macro = MacroCheck.of(loadEconomicIndicatorsPort.loadLatest());
-        } catch (Exception e) {
-            log.warn("초보 투자 체크 — 거시 축 강등(UNAVAILABLE)", e);
-            macro = MacroCheck.unavailable();
-        }
+        MacroCheck macro = degrade("거시", stockCode,
+                () -> MacroCheck.of(loadEconomicIndicatorsPort.loadLatest()),
+                MacroCheck::unavailable);
 
-        return new BeginnerInvestmentCheck(stockCode, score, newsRisk, pricePosition, macro, tradePlan);
+        return new BeginnerInvestmentCheck(stockCode, score, newsRisk, price.position(), macro, price.plan());
+    }
+
+    /**
+     * 위성 축 원천 장애를 해당 축만 우아하게 강등(UNAVAILABLE)하는 단일 초크포인트.
+     * 정상 계산은 {@code compute}, 장애 시 {@code onFailure} 의 축별 UNAVAILABLE 값으로 대체하고 경고만 남긴다.
+     */
+    private <T> T degrade(String axis, String stockCode, Supplier<T> compute, Supplier<T> onFailure) {
+        try {
+            return compute.get();
+        } catch (Exception e) {
+            log.warn("초보 투자 체크 — {} 축 강등(UNAVAILABLE): stockCode={}", axis, stockCode, e);
+            return onFailure.get();
+        }
+    }
+
+    /** 시세 축은 시세위치 + (시세가 있으면) 매매계획 두 값을 한 계산 단위로 묶어 함께 강등한다. */
+    private record PriceAxis(PricePositionCheck position, TradePlan plan) {
     }
 }
