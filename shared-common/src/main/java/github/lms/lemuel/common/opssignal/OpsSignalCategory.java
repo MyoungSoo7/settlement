@@ -11,6 +11,7 @@ package github.lms.lemuel.common.opssignal;
  */
 public enum OpsSignalCategory {
 
+    /** 예약 카테고리 — 프로덕션 emit 지점 미배선(operation 구독만 존재). 주문 실패 신호가 필요해지는 시점에 배선한다. */
     ORDER_FAILED("lemuel.ops.order.failed"),
     PAYMENT_FAILED("lemuel.ops.payment.failed"),
     STOCK_DEPLETED("lemuel.ops.stock.depleted"),

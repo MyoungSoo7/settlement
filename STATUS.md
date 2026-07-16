@@ -50,7 +50,7 @@
 - 서비스 **13개** + API Gateway + Kotlin polyglot 2(notification·reconciliation) — `git ls-files '*/src/main/resources/application.yml' | wc -l` → 16(=13+gateway+kotlin 2)
 - Flyway 마이그레이션 **199개** — `git ls-files '*/src/main/resources/db/migration/*.sql' | wc -l` → 199
 - ADR **26개** (0001~0027, 0019 결번) — `git ls-files 'docs/adr/[0-9]*.md' | wc -l` → 26
-- 테스트 클래스 **601개** (Testcontainers 통합테스트 포함) — `git ls-files '*/src/test/*Test.java' '*/src/test/*Tests.java' '*/src/test/*IT.java' | wc -l` → 601
+- 테스트 클래스 **603개** (Testcontainers 통합테스트 포함) — `git ls-files '*/src/test/*Test.java' '*/src/test/*Tests.java' '*/src/test/*IT.java' | wc -l` → 603
 
 ## 참고 문서
 - `SPEC.md` — 전체 기능명세(엔드포인트·도메인 규칙·이벤트 카탈로그)
