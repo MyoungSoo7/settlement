@@ -8,7 +8,11 @@
 > Phase B — 건수 대사(INV-9, `ReconciliationReport` 건수 축) + 재대사 윈도우(`recon_run window=N`) +
 > 지연 환불 조정 대사(INV-8, `/admin/integrity/refund-adjustments`) + 이벤트 회계(INV-10,
 > `/admin/integrity/processed-count` + MCP `event_accounting`) — 완료 기준(±상쇄·지연 환불 탐지)
-> 은 `ReconcileDailyTotalsServiceTest`·`IntegrityPhaseBIntegrationTest` 로 통과. Phase C 는 설계 상태.
+> 은 `ReconcileDailyTotalsServiceTest`·`IntegrityPhaseBIntegrationTest` 로 통과.
+> Phase C — 행 단위 프로젝션 대사(INV-12, `/admin/integrity/projection-diff` + order `/internal/recon/payment-keys[-checksum]`)
+> **구현 완료**: 하이브리드(키셋 체크섬 1차 스크리닝 → 불일치 시 키 diff)로 데이터량을 방어하며 누락/고아/금액불일치
+> id 를 특정한다. 완료 기준(행 1건 삭제 시 누락 id 특정)은 `IntegrityPhaseCIntegrationTest`·
+> `ProjectionReconciliationServiceTest` 로 통과. INV-13(행 불변식 스캔)은 미착수(후속).
 
 ---
 
@@ -157,8 +161,8 @@ skill(`integrity-invariants`) 문서의 뼈대가 된다.
 | INV-8 (지연 환불 조정) | ⚠️ | | ✅ (재대사 윈도우) | |
 | INV-9 (건수 대사) | ❌ | | ✅ | |
 | INV-10 (이벤트 회계) | ❌ | | ✅ (DLT 건수는 dlt_inspect 선행 필요 — 기존 로드맵 Phase 3 잔여와 합류) | |
-| INV-12 (프로젝션 행 diff) | ❌ | | | ✅ |
-| INV-13 (행 불변식 스캔) | ❌ | | | ✅ |
+| INV-12 (프로젝션 행 diff) | ❌ | | | ✅ (구현 완료 — projection-diff 하이브리드) |
+| INV-13 (행 불변식 스캔) | ❌ | | | ⬜ (후속) |
 
 ### 단계 정의
 
