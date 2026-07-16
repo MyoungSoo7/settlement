@@ -1,0 +1,31 @@
+server:
+  port: ${SERVER_PORT:8131}
+
+spring:
+  application:
+    name: reconciliation-service
+
+app:
+  reconciliation:
+    # Daily post-close reconciliation (19:00 Asia/Seoul). Override via APP_RECONCILIATION_CRON.
+    cron: ${APP_RECONCILIATION_CRON:0 0 19 * * *}
+    tolerance-krw: ${APP_RECONCILIATION_TOLERANCE_KRW:1}
+  sources:
+    # Base URLs for the (skeleton) HTTP sources. Unused by the MVP sample demo.
+    settlement-base-url: ${SETTLEMENT_BASE_URL:http://settlement-service:8082}
+    payment-base-url: ${PAYMENT_BASE_URL:http://order-service:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+  level:
+    github.lms.lemuel.reconciliation: INFO
