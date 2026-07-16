@@ -6,7 +6,7 @@ settlement MSA 에 언어별 강점을 살려 붙인 신규 서비스 7종(Kotli
 |---|---|---|---|---|
 | `notification-service` | Kotlin/Boot | 8130 | 도메인 이벤트 알림 팬아웃 (settlement.confirmed·payment.captured/refunded/confirmed·investment.executed 구독 → 채널 발송) | MVP·green |
 | `reconciliation-service` | Kotlin/Boot | 8131 | 대사 스케줄러 스켈레톤 (HTTP 소스 인터페이스만 — 실소스 빈 미등록) | MVP·skeleton |
-| `market-stream-service` | Go | 8110 | 실시간 시세 스트리밍 (SSE `/stream/{code}` + WS `/ws/{code}`), Hub 팬아웃 | MVP·green |
+| `market-stream-service` | Go | 8110 | 실시간 시세 스트리밍 (SSE `/stream/{code}` + WS `/ws/{code}`), Hub 팬아웃. **7종 중 유일하게 프론트 배선됨** — gateway `/api/market-stream/**`(SSE 만) + docker-compose + CEO 투자 페이지 티커 | MVP·green·프론트 노출 |
 | `payment-webhook-service` | Go | 8111 | Toss 결제 웹훅 수신 (HMAC 서명검증·멱등) → Kafka `lemuel.payment.confirmed` | MVP·green |
 | `screening-backtest-service` | Python/FastAPI | 8120 | 투자 스크리닝 규칙 백테스트 (수익률·MDD·Sharpe·승률) | MVP·green |
 | `settlement-anomaly-service` | Python/FastAPI | 8121 | 정산/payout 이상탐지 (MAD z-score + IsolationForest 앙상블) | MVP·green |

@@ -31,7 +31,8 @@
 주문·결제·정산·선정산/기업대출·투자·계정계·재무제표·경제지표·기업뉴스평판·운영관제·주식시세·AI챗봇·공공데이터·조직/멤버십을
 **13개 마이크로서비스 + API Gateway** 로 분리한 헥사고날 백엔드. 원래 모놀리스였으나 Bounded Context 로 분리.
 여기에 **폴리글랏 7종**(Kotlin 2 알림·대사 / Go 2 스트리밍·웹훅 / Python 3 백테스트·이상탐지·예측 — Gradle 미포함
-standalone, gateway 미라우팅)을 더해 총 21개 서비스(정본: `polyglot-services.md` · `docs/ARCHITECTURE.md`).
+standalone, gateway 미라우팅 — 예외: market-stream 은 `/api/market-stream/**` SSE 만 gateway 라우팅 + compose 배선)을
+더해 총 21개 서비스(정본: `polyglot-services.md` · `docs/ARCHITECTURE.md`).
 
 - **13개 서비스 모두 DB-per-service** — order=opslab, settlement=settlement_db, loan=lemuel_loan,
   financial=lemuel_financial, economics=lemuel_economics, company=lemuel_company, operation=lemuel_operation,

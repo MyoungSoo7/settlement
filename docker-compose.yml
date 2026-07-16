@@ -729,6 +729,25 @@ services:
       market-postgres:
         condition: service_healthy
 
+  # 폴리글랏(Go) 실시간 시세 스트리밍 — 무영속(DB 없음), market-service 폴링 + 시뮬레이션 폴백.
+  # gateway /api/market-stream/** 로만 외부 노출(SSE). distroless 이미지라 셸 헬스체크 불가.
+  market-stream-service:
+    build:
+      context: ./market-stream-service
+    image: ghcr.io/myoungsoo7/lemuel-market-stream:latest
+    container_name: lemuel-market-stream
+    environment:
+      MARKET_STREAM_PORT: "8110"
+      # polling: market-service 시세를 base 가격으로 사용(실패 시 시뮬레이션 폴백)
+      MARKET_STREAM_SOURCE: polling
+      MARKET_BASE_URL: http://market-service:8080
+    ports:
+      - "127.0.0.1:8110:8110"
+    restart: unless-stopped
+    depends_on:
+      market-service:
+        condition: service_healthy
+
   common-data-service:
     build:
       context: .
@@ -950,6 +969,7 @@ services:
       INVESTMENT_SERVICE_URI: http://investment-service:8080
       ACCOUNT_SERVICE_URI: http://account-service:8080
       ORGANIZATION_SERVICE_URI: http://organization-service:8080
+      MARKET_STREAM_SERVICE_URI: http://market-stream-service:8110
       JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
     ports:
       - "127.0.0.1:8080:8080"

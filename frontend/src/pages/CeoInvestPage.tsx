@@ -10,6 +10,7 @@ import {
 } from '@/api/investment';
 import { financialApi, type FinancialCompany, type FinancialCompanyPage } from '@/api/financial';
 import Card from '@/components/Card';
+import LiveQuoteTicker from '@/components/LiveQuoteTicker';
 import Spinner from '@/components/Spinner';
 
 const fmtAmount = (value: number | null | undefined) => {
@@ -308,6 +309,9 @@ const CeoInvestPage: React.FC = () => {
           </Card>
 
           <div className="space-y-6">
+            {/* ── 실시간 시세 (market-stream SSE) — 종목 선택 시 구독, 변경 시 재구독 ── */}
+            {selected && <LiveQuoteTicker stockCode={selected.stockCode} name={selected.name} />}
+
             {/* ── 투자 점수 카드 ── */}
             {!selected && (
               <Card>
