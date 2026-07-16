@@ -5,6 +5,8 @@ import github.lms.lemuel.common.events.contract.EventContractValidator;
 import github.lms.lemuel.common.outbox.adapter.in.kafka.ProcessedEventRepository;
 import github.lms.lemuel.loan.application.port.in.ApplyRepaymentUseCase;
 import github.lms.lemuel.loan.application.port.in.ApplyRepaymentUseCase.ApplyRepaymentCommand;
+import github.lms.lemuel.loan.application.port.in.IngestCompanyReputationUseCase;
+import github.lms.lemuel.loan.application.port.in.IngestCompanyReputationUseCase.IngestCompanyReputationCommand;
 import github.lms.lemuel.loan.application.port.in.IngestSettlementUseCase;
 import github.lms.lemuel.loan.application.port.in.IngestSettlementUseCase.IngestSettlementCommand;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -18,6 +20,7 @@ import org.springframework.kafka.support.Acknowledgment;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -34,6 +37,7 @@ class EventContractConsumerTest {
 
     @Mock IngestSettlementUseCase ingestSettlementUseCase;
     @Mock ApplyRepaymentUseCase applyRepaymentUseCase;
+    @Mock IngestCompanyReputationUseCase ingestCompanyReputationUseCase;
     @Mock ProcessedEventRepository processedEventRepository;
 
     final ObjectMapper objectMapper = new ObjectMapper();
@@ -70,5 +74,19 @@ class EventContractConsumerTest {
 
         verify(applyRepaymentUseCase).apply(new ApplyRepaymentCommand(
                 9001L, 777L, new BigDecimal("43425")));
+    }
+
+    @Test
+    @DisplayName("company.reputation_changed 정본 샘플 → 평판 프로젝션 커맨드에 계약 값 그대로 전달된다")
+    void reputationChangedSample_flowsIntoIngestCommand() {
+        when(processedEventRepository.existsById(any())).thenReturn(false);
+        CompanyReputationChangedConsumer consumer = new CompanyReputationChangedConsumer(
+                ingestCompanyReputationUseCase, processedEventRepository, objectMapper);
+
+        String sample = EventContractValidator.canonicalSample("lemuel.company.reputation_changed");
+        consumer.onReputationChanged(recordOf("lemuel.company.reputation_changed", sample), mock(Acknowledgment.class));
+
+        verify(ingestCompanyReputationUseCase).ingest(new IngestCompanyReputationCommand(
+                "005930", 55, "C", "B", LocalDate.of(2026, 7, 10), List.of(777L, 1001L)));
     }
 }

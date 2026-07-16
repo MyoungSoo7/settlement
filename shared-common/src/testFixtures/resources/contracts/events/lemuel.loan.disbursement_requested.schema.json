@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "lemuel.loan.disbursement_requested",
+  "description": "loan-service(LoanEventPublisherAdapter) → account-service(LoanDisbursementRequestedConsumer). 선정산 대출 실행(셀러 선지급) 통지 — account 가 DR LOAN_RECEIVABLE / CR CASH 분개로 소비하는 money-critical 계약. amount 는 선지급 원금(JSON number, loan 계열 직렬화 규약)으로 도메인 팩토리(LoanAdvance.request)가 양수를 강제하므로 exclusiveMinimum 0.",
+  "type": "object",
+  "properties": {
+    "loanId": { "type": "integer" },
+    "sellerId": { "type": "integer" },
+    "amount": { "type": "number", "exclusiveMinimum": 0 }
+  },
+  "required": ["loanId", "sellerId", "amount"],
+  "additionalProperties": true
+}

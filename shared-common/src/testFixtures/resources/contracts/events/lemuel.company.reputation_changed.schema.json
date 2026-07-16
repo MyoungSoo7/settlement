@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "lemuel.company.reputation_changed",
+  "description": "company-service(CompanyReputationEventPublisherAdapter) → loan-service(CompanyReputationChangedConsumer). 평판 등급 변동 스냅샷 — loan 이 셀러(법인) 신용 리스크 프로젝션으로 materialize 해 여신 심사에 참고한다 (ADR 0023 Phase 3). previousGrade 는 최초 스냅샷이면 null. sellerIds 는 기업에 링크된 셀러 목록(없으면 빈 배열) — loan 의 셀러별 haircut 반영 키. grade 는 company ReputationGrade(A~E) 문자열.",
+  "type": "object",
+  "properties": {
+    "stockCode": { "type": "string", "pattern": "^[0-9]{6}$" },
+    "snapshotDate": { "type": "string", "format": "date" },
+    "score": { "type": "integer", "minimum": 0, "maximum": 100 },
+    "grade": { "type": "string", "enum": ["A", "B", "C", "D", "E"] },
+    "previousGrade": { "type": ["string", "null"], "enum": ["A", "B", "C", "D", "E", null] },
+    "articleCount": { "type": "integer", "minimum": 0 },
+    "negativeCount": { "type": "integer", "minimum": 0 },
+    "sellerIds": { "type": "array", "items": { "type": "integer" } },
+    "calculatedAt": { "type": "string" }
+  },
+  "required": ["stockCode", "snapshotDate", "score", "grade", "sellerIds"],
+  "additionalProperties": true
+}

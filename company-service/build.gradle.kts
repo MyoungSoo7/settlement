@@ -54,6 +54,8 @@ dependencies {
     // Test
     developmentOnly("org.springframework.boot:spring-boot-devtools")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
+    // 이벤트 계약 픽스처(ADR 0024) — reputation_changed 프로듀서 / user.registered 컨슈머 계약 테스트
+    testImplementation(testFixtures("github.lms.lemuel:shared-common:1.0.0"))
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("org.springframework.security:spring-security-test")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
