@@ -71,11 +71,22 @@ public class EcosSyncService implements SyncIndicatorsUseCase {
                 if (observations.isEmpty()) {
                     skipped++;   // ECOS 응답 0건 (결측 구간 등)
                 } else {
+                    LocalDate latestEcos = observations.get(0).observedDate();
                     for (EcosClientPort.Observation obs : observations) {
                         saveIndicatorValuePort.upsert(new IndicatorValue(
                                 null, indicator.code(), obs.observedDate(), obs.value(),
                                 ValueSource.ECOS, null));
                         upserted++;
+                        if (obs.observedDate().isAfter(latestEcos)) {
+                            latestEcos = obs.observedDate();
+                        }
+                    }
+                    // SEED 는 오늘까지 가짜 미래치를 채워둔다 — 실 ECOS 최신일 이후의 후행 SEED 를 잘라
+                    // 헤드라인 최신값이 시드가 아니라 실데이터를 가리키게 한다.
+                    int purged = saveIndicatorValuePort.purgeSeedNewerThan(indicator.code(), latestEcos);
+                    if (purged > 0) {
+                        log.info("후행 SEED {}건 제거 code={} (실 ECOS 최신일 {} 이후)",
+                                purged, indicator.code(), latestEcos);
                     }
                 }
             } catch (RuntimeException e) {

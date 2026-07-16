@@ -95,3 +95,7 @@ app:
       base-url: https://ecos.bok.or.kr/api
     sync:
       request-interval-ms: 150   # ECOS 쿼터 보호용 호출 간격
+      schedule:
+        cron: "0 0 8 * * *"      # 매일 08:00 KST 전체 지표 자동 수집
+        zone: Asia/Seoul
+        lookback-days: 30        # 최근 30일 재조회 (SEED → 실 ECOS 값으로 덮어씀)
