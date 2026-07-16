@@ -1,5 +1,6 @@
 package github.lms.lemuel.loan.adapter.in.web;
 
+import github.lms.lemuel.common.config.jwt.AuthPrincipal;
 import github.lms.lemuel.common.config.jwt.JwtUtil;
 import github.lms.lemuel.loan.application.port.in.DisburseCorporateLoanUseCase;
 import github.lms.lemuel.loan.application.port.in.EvaluateCorporateCreditUseCase;
@@ -16,6 +17,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -26,7 +30,9 @@ import java.util.List;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -36,6 +42,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * 기업대출 도메인 예외 → HTTP 매핑 회귀 가드: 거절 422, NotFound 404
  * (CorporateLoanExceptionHandler). 형식 검증 실패(@Valid)는 공통 400 으로 흐른다.
+ *
+ * <p>추가로 IDOR 회귀 가드: 신청자(ownerUserId)는 JWT 주체에서 파생, 목록은 운영자(ADMIN/MANAGER)만
+ * 전체 조회하고 그 외(CEO)는 본인 신청 건만 — 미인증은 403.
  */
 @WebMvcTest(controllers = CorporateLoanController.class)
 @AutoConfigureMockMvc(addFilters = false)
@@ -48,13 +57,29 @@ class CorporateLoanControllerTest {
     @MockitoBean DisburseCorporateLoanUseCase disburseCorporateLoanUseCase;
     @MockitoBean LoadCorporateLoanPort loadCorporateLoanPort;
 
+    /** 일반(CEO) 주체 — ROLE_USER, 본인 것만 조회 가능. */
+    private static Authentication userAuth(long userId) {
+        return new UsernamePasswordAuthenticationToken(
+                new AuthPrincipal(userId, "u" + userId + "@example.com", "USER"),
+                null,
+                List.of(new SimpleGrantedAuthority("ROLE_USER")));
+    }
+
+    /** 운영자 주체 — ROLE_ADMIN, 전체 목록 조회 허용. */
+    private static Authentication adminAuth(long userId) {
+        return new UsernamePasswordAuthenticationToken(
+                new AuthPrincipal(userId, "admin" + userId + "@example.com", "ADMIN"),
+                null,
+                List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
+    }
+
     @Test
     @DisplayName("POST /loans/corporate — 도메인 거절은 422 로 매핑된다")
     void requestRejectedMapsTo422() throws Exception {
         when(requestCorporateLoanUseCase.request(any()))
                 .thenThrow(new CorporateLoanRejectedException("신청액이 한도를 초과합니다."));
 
-        mockMvc.perform(post("/loans/corporate")
+        mockMvc.perform(post("/loans/corporate").principal(userAuth(7L))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"stockCode":"005930","principal":100000,"termDays":30}
@@ -79,7 +104,7 @@ class CorporateLoanControllerTest {
     @Test
     @DisplayName("POST /loans/corporate — 형식 검증 실패(6자리 아님)는 400 으로 흐른다")
     void requestInvalidFormatMapsTo400() throws Exception {
-        mockMvc.perform(post("/loans/corporate")
+        mockMvc.perform(post("/loans/corporate").principal(userAuth(7L))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"stockCode":"12","principal":100000,"termDays":30}
@@ -109,11 +134,11 @@ class CorporateLoanControllerTest {
     }
 
     @Test
-    @DisplayName("POST /loans/corporate — 신청 성공은 201 + 대출 본문")
+    @DisplayName("POST /loans/corporate — 신청 성공은 201 + 대출 본문 (ownerUserId 는 JWT 주체에서 파생)")
     void requestCreated() throws Exception {
         when(requestCorporateLoanUseCase.request(any())).thenReturn(loan());
 
-        mockMvc.perform(post("/loans/corporate")
+        mockMvc.perform(post("/loans/corporate").principal(userAuth(7L))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"stockCode":"005930","principal":1000000,"termDays":30}
@@ -122,6 +147,87 @@ class CorporateLoanControllerTest {
                 .andExpect(jsonPath("$.id").value(7))
                 .andExpect(jsonPath("$.stockCode").value("005930"))
                 .andExpect(jsonPath("$.status").value("DISBURSED"));
+    }
+
+    @Test
+    @DisplayName("POST /loans/corporate — termDays 경계값(@Max 3650)은 통과해 201")
+    void requestTermDaysAtMaxBoundaryPasses() throws Exception {
+        when(requestCorporateLoanUseCase.request(any())).thenReturn(loan());
+
+        mockMvc.perform(post("/loans/corporate").principal(userAuth(7L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"stockCode":"005930","principal":1000000,"termDays":3650}
+                                """))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    @DisplayName("POST /loans/corporate — termDays 초과(@Max 3650 + 1)는 400 이고 use case 미호출")
+    void requestTermDaysOverMaxIs400() throws Exception {
+        mockMvc.perform(post("/loans/corporate").principal(userAuth(7L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"stockCode":"005930","principal":1000000,"termDays":3651}
+                                """))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(requestCorporateLoanUseCase);
+    }
+
+    @Test
+    @DisplayName("POST /loans/corporate — principal 정수 17자리·소수 2자리(@Digits 상한 근처)는 통과해 201")
+    void requestPrincipalAtDigitsUpperBoundPasses() throws Exception {
+        when(requestCorporateLoanUseCase.request(any())).thenReturn(loan());
+
+        // 99999999999999999.99 — 정수 17자리·소수 2자리(@Digits(17,2) 상한). 형식 검증 통과(한도초과는 mock 우회).
+        mockMvc.perform(post("/loans/corporate").principal(userAuth(7L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"stockCode":"005930","principal":99999999999999999.99,"termDays":30}
+                                """))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    @DisplayName("POST /loans/corporate — principal 정수 18자리(@Digits 초과)는 400 이고 use case 미호출")
+    void requestPrincipalOverIntegerDigitsIs400() throws Exception {
+        // 100000000000000000 — 정수 18자리(@Digits(17,2) 초과) → 형식 400.
+        mockMvc.perform(post("/loans/corporate").principal(userAuth(7L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"stockCode":"005930","principal":100000000000000000,"termDays":30}
+                                """))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(requestCorporateLoanUseCase);
+    }
+
+    @Test
+    @DisplayName("POST /loans/corporate — principal 소수 3자리(@Digits 초과)는 400")
+    void requestPrincipalOverFractionDigitsIs400() throws Exception {
+        mockMvc.perform(post("/loans/corporate").principal(userAuth(7L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"stockCode":"005930","principal":100000.999,"termDays":30}
+                                """))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(requestCorporateLoanUseCase);
+    }
+
+    @Test
+    @DisplayName("POST /loans/corporate — 미인증(principal 없음)이면 403 이고 use case 는 호출되지 않는다")
+    void requestNoAuth403() throws Exception {
+        mockMvc.perform(post("/loans/corporate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"stockCode":"005930","principal":1000000,"termDays":30}
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403));
+
+        verifyNoInteractions(requestCorporateLoanUseCase);
     }
 
     @Test
@@ -135,11 +241,11 @@ class CorporateLoanControllerTest {
     }
 
     @Test
-    @DisplayName("GET /loans/corporate — stockCode 없으면 최근 목록 조회")
-    void listRecent() throws Exception {
+    @DisplayName("GET /loans/corporate — 운영자는 stockCode 없으면 전체 최근 목록 조회")
+    void listRecentAsOperator() throws Exception {
         when(loadCorporateLoanPort.findRecent(anyInt())).thenReturn(List.of(loan()));
 
-        mockMvc.perform(get("/loans/corporate"))
+        mockMvc.perform(get("/loans/corporate").principal(adminAuth(1L)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(7));
 
@@ -147,14 +253,37 @@ class CorporateLoanControllerTest {
     }
 
     @Test
-    @DisplayName("GET /loans/corporate?stockCode= — 종목별 목록 조회")
-    void listByStockCode() throws Exception {
+    @DisplayName("GET /loans/corporate?stockCode= — 운영자는 종목별 목록 조회")
+    void listByStockCodeAsOperator() throws Exception {
         when(loadCorporateLoanPort.findByStockCode("005930")).thenReturn(List.of(loan()));
 
-        mockMvc.perform(get("/loans/corporate").param("stockCode", "005930"))
+        mockMvc.perform(get("/loans/corporate").principal(adminAuth(1L)).param("stockCode", "005930"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].stockCode").value("005930"));
 
         verify(loadCorporateLoanPort).findByStockCode("005930");
+    }
+
+    @Test
+    @DisplayName("GET /loans/corporate — 비운영자(CEO)는 본인 신청 건만 (findByOwner 로 스코핑)")
+    void listOwnAsUser() throws Exception {
+        when(loadCorporateLoanPort.findByOwner(eq(7L), anyInt())).thenReturn(List.of(loan()));
+
+        mockMvc.perform(get("/loans/corporate").principal(userAuth(7L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(7));
+
+        verify(loadCorporateLoanPort).findByOwner(7L, 50);
+        verify(loadCorporateLoanPort, org.mockito.Mockito.never()).findRecent(anyInt());
+    }
+
+    @Test
+    @DisplayName("GET /loans/corporate — 미인증이면 403")
+    void listNoAuth403() throws Exception {
+        mockMvc.perform(get("/loans/corporate"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403));
+
+        verifyNoInteractions(loadCorporateLoanPort);
     }
 }

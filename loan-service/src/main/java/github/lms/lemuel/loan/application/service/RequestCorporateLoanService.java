@@ -1,8 +1,11 @@
 package github.lms.lemuel.loan.application.service;
 
+import github.lms.lemuel.common.audit.application.Auditable;
+import github.lms.lemuel.common.audit.domain.AuditAction;
 import github.lms.lemuel.loan.application.port.in.RequestCorporateLoanUseCase;
 import github.lms.lemuel.loan.application.port.out.LoadCompanyReputationPort;
 import github.lms.lemuel.loan.application.port.out.LoadCorporateFinancialPort;
+import github.lms.lemuel.loan.application.port.out.LoanMetricsPort;
 import github.lms.lemuel.loan.application.port.out.SaveCorporateLoanPort;
 import github.lms.lemuel.loan.domain.CorporateCreditPolicy;
 import github.lms.lemuel.loan.domain.CorporateFinancials;
@@ -12,6 +15,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.LocalDateTime;
 
 /**
  * 기업 신용대출 신청. 신용평가(재무 + 평판) → E등급/한도초과/재무없음 거절(422) → 수수료 산정 →
@@ -25,23 +30,39 @@ public class RequestCorporateLoanService implements RequestCorporateLoanUseCase 
     private final LoadCompanyReputationPort loadCompanyReputationPort;
     private final SaveCorporateLoanPort saveCorporateLoanPort;
     private final CorporateCreditPolicy creditPolicy;
+    private final LoanMetricsPort loanMetricsPort;
+    private final Clock clock;
 
     public RequestCorporateLoanService(LoadCorporateFinancialPort loadCorporateFinancialPort,
                                        LoadCompanyReputationPort loadCompanyReputationPort,
                                        SaveCorporateLoanPort saveCorporateLoanPort,
-                                       CorporateCreditPolicy creditPolicy) {
+                                       CorporateCreditPolicy creditPolicy,
+                                       LoanMetricsPort loanMetricsPort,
+                                       Clock clock) {
         this.loadCorporateFinancialPort = loadCorporateFinancialPort;
         this.loadCompanyReputationPort = loadCompanyReputationPort;
         this.saveCorporateLoanPort = saveCorporateLoanPort;
         this.creditPolicy = creditPolicy;
+        this.loanMetricsPort = loanMetricsPort;
+        this.clock = clock;
     }
 
     @Override
     @Transactional
+    @Auditable(
+            action = AuditAction.CORPORATE_LOAN_REQUESTED,
+            failureAction = "CORPORATE_LOAN_REJECTED",
+            resourceType = "CorporateLoan",
+            resourceId = "#result == null ? null : #result.getId().toString()",
+            detail = "{'stockCode': #p0.stockCode(), 'principal': #p0.principal(), 'termDays': #p0.termDays()}"
+    )
     public CorporateLoan request(RequestCorporateLoanCommand command) {
         CorporateFinancials fin = loadCorporateFinancialPort.loadLatest(command.stockCode())
-                .orElseThrow(() -> new CorporateLoanRejectedException(
-                        "상장사 재무자료가 없어 신용평가를 할 수 없습니다: " + command.stockCode()));
+                .orElseThrow(() -> {
+                    loanMetricsPort.corporateRejected();
+                    return new CorporateLoanRejectedException(
+                            "상장사 재무자료가 없어 신용평가를 할 수 없습니다: " + command.stockCode());
+                });
         String reputationGrade = loadCompanyReputationPort.findByStockCode(command.stockCode())
                 .map(r -> r.getGrade())
                 .orElse(null);
@@ -49,12 +70,14 @@ public class RequestCorporateLoanService implements RequestCorporateLoanUseCase 
         int score = creditPolicy.creditScore(fin, reputationGrade);
         String grade = creditPolicy.creditGrade(score);
         if (creditPolicy.isLoanBlocked(grade)) {
+            loanMetricsPort.corporateRejected();
             throw new CorporateLoanRejectedException(
                     "신용등급 E — 기업 신용대출 불가 (score=" + score + ")");
         }
 
         BigDecimal limit = creditPolicy.creditLimit(fin.totalEquity(), grade);
         if (command.principal().compareTo(limit) > 0) {
+            loanMetricsPort.corporateRejected();
             throw new CorporateLoanRejectedException(
                     "신청액이 한도를 초과합니다. requested=" + command.principal() + ", limit=" + limit
                             + " (grade=" + grade + ")",
@@ -64,7 +87,9 @@ public class RequestCorporateLoanService implements RequestCorporateLoanUseCase 
         BigDecimal fee = creditPolicy.fee(command.principal(), command.termDays(), grade);
         CorporateLoan loan = CorporateLoan.request(
                 fin.stockCode(), fin.corpName(), command.principal(), fee,
-                command.termDays(), score, grade);
-        return saveCorporateLoanPort.save(loan);
+                command.termDays(), score, grade, command.ownerUserId(), LocalDateTime.now(clock));
+        CorporateLoan saved = saveCorporateLoanPort.save(loan);
+        loanMetricsPort.corporateRequested();
+        return saved;
     }
 }

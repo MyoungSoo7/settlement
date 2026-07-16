@@ -131,6 +131,33 @@ class EcosSyncServiceTest {
     }
 
     @Test
+    @DisplayName("upsert 후 실 ECOS 최신일 이후의 후행 SEED 를 제거한다 (헤드라인 실데이터 보장)")
+    void purgesTrailingSeedAfterUpsert() {
+        when(loadIndicatorPort.findByCode("USD_KRW")).thenReturn(Optional.of(
+                new Indicator("USD_KRW", "원/달러 환율", "KRW", IndicatorCycle.D, "731Y001", "0000001", null)));
+        when(ecosClient.fetchObservations(any(), any(), any())).thenReturn(List.of(
+                new Observation(LocalDate.of(2026, 7, 14), new BigDecimal("1375")),
+                new Observation(LocalDate.of(2026, 7, 15), new BigDecimal("1378"))));
+
+        service.syncIndicators("USD_KRW", FROM, TO);
+
+        // 관측치 중 가장 늦은 날(07-15) 이후의 SEED(가짜 07-16 등)를 잘라야 한다
+        verify(saveIndicatorValuePort).purgeSeedNewerThan("USD_KRW", LocalDate.of(2026, 7, 15));
+    }
+
+    @Test
+    @DisplayName("관측치 0건이면 후행 SEED 제거도 하지 않는다 (실데이터 없으면 시드 폴백 보존)")
+    void doesNotPurgeWhenNoObservations() {
+        when(loadIndicatorPort.findByCode("USD_KRW")).thenReturn(Optional.of(
+                new Indicator("USD_KRW", "원/달러 환율", "KRW", IndicatorCycle.D, "731Y001", "0000001", null)));
+        when(ecosClient.fetchObservations(any(), any(), any())).thenReturn(List.of());
+
+        service.syncIndicators("USD_KRW", FROM, TO);
+
+        verify(saveIndicatorValuePort, never()).purgeSeedNewerThan(any(), any());
+    }
+
+    @Test
     @DisplayName("한 지표 fetch 가 예외 → failed 집계 후 나머지 지표는 계속 진행")
     void isolatesPerIndicatorFailure() {
         when(loadIndicatorPort.findAll()).thenReturn(List.of(baseRate, cpi));

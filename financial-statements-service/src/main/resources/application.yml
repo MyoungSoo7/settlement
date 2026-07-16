@@ -38,6 +38,9 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+    # 샘플 시드 마이그레이션 제거 — 기존 DB(이미 적용된 시드)를 "missing"으로 관대 처리.
+    # 신규 배포는 시드 없이 실데이터(DART 자동 수집 스케줄러)로만 채운다.
+    ignore-migration-patterns: "*:missing"
 
   cache:
     type: caffeine
@@ -94,3 +97,8 @@ app:
     sync:
       request-interval-ms: 150   # DART 쿼터(일 2만 콜) 보호용 호출 간격
       max-companies: 0           # 기업 동기화 상한 (0=무제한, 데모/테스트용 제한)
+      schedule:
+        zone: Asia/Seoul
+        statements-cron: "0 0 4 * * SUN"   # 매주 일 04:00 KST 최근 연도 재무제표 갱신
+        companies-cron: "0 0 5 1 * *"      # 매월 1일 05:00 KST 상장사 목록 갱신
+        recent-years: 2                    # 최근 N개 연도 재수집 (당해·전년 — 정정공시 반영)

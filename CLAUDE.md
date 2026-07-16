@@ -30,6 +30,8 @@
 
 주문·결제·정산·선정산/기업대출·투자·계정계·재무제표·경제지표·기업뉴스평판·운영관제·주식시세·AI챗봇·공공데이터·조직/멤버십을
 **13개 마이크로서비스 + API Gateway** 로 분리한 헥사고날 백엔드. 원래 모놀리스였으나 Bounded Context 로 분리.
+여기에 **폴리글랏 7종**(Kotlin 2 알림·대사 / Go 2 스트리밍·웹훅 / Python 3 백테스트·이상탐지·예측 — Gradle 미포함
+standalone, gateway 미라우팅)을 더해 총 21개 서비스(정본: `polyglot-services.md` · `docs/ARCHITECTURE.md`).
 
 - **13개 서비스 모두 DB-per-service** — order=opslab, settlement=settlement_db, loan=lemuel_loan,
   financial=lemuel_financial, economics=lemuel_economics, company=lemuel_company, operation=lemuel_operation,
@@ -42,6 +44,7 @@
 ## 기술 스택 (요지)
 
 **Java 25 · Spring Boot 4.0.4 · Gradle(Kotlin DSL) 멀티모듈 · PostgreSQL 17 · Kafka(Redpanda) · Flyway.**
+폴리글랏: Kotlin 2.0/Boot 3.3(JDK 21) · Go 1.22 · Python 3.11/FastAPI(standalone 빌드, `polyglot-ci.yml`).
 전체 표(검색·PG·배치·캐시·PDF·관측·RateLimit 등) → [`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md).
 
 ## 모듈 구조
@@ -69,7 +72,12 @@ settlement/                       # Gradle 멀티 모듈 루트
 
 - **공개 read-only 위성 서비스**(위 트리 `★` = shared-common 미의존): GET 공개, 수집 트리거 `/admin/**` 는
   `AdminApiKeyFilter`(X-Internal-Api-Key) 게이트. company·operation·ai·account 는 의존이되 제한 스캔(트리 주석 참조).
+- **폴리글랏 7종**(위 트리·settings.gradle 미포함, standalone 디렉토리): notification(8130)·reconciliation(8131, Kotlin) ·
+  market-stream(8110)·payment-webhook(8111, Go) · screening-backtest(8120)·settlement-anomaly(8121)·forecast(8122, Python).
+  자체 DB 없음(무영속 MVP), CI 는 `polyglot-ci.yml` 분리 — 정본 `polyglot-services.md`.
 - 각 서비스의 **책임·API·유스케이스는 [`SPEC.md`](./SPEC.md), 강제 규칙은 `*-rules` 스킬** 참조.
+- 위 트리는 **에이전트용 경계 요약**(포트·DB·shared-common 의존 방식) — 전체 디렉토리·모듈 트리 정본은
+  [`STRUCTURE.md`](./STRUCTURE.md). 로스터 드리프트는 `harness-audit` 가 `settings.gradle.kts` 와 대조해 차단.
 
 ## 헥사고날 아키텍처 (각 서비스 내부)
 

@@ -64,8 +64,30 @@ class CorporateLoanTest {
     }
 
     @Test
+    void 신용점수_경계값_0과_100은_허용된다() {
+        // 범위 [0,100] 의 양 끝값은 유효 — 경계 안쪽만 거부되는 off-by-one 회귀 가드.
+        assertThat(CorporateLoan.request("005930", "삼성", BigDecimal.TEN, BigDecimal.ZERO, 30, 0, "E")
+                .getCreditScore()).isEqualTo(0);
+        assertThat(CorporateLoan.request("005930", "삼성", BigDecimal.TEN, BigDecimal.ZERO, 30, 100, "AAA")
+                .getCreditScore()).isEqualTo(100);
+    }
+
+    @Test
     void 신용등급이_비면_예외() {
         assertThatThrownBy(() -> CorporateLoan.request("005930", "삼성", BigDecimal.TEN, BigDecimal.ZERO, 30, 50, " "))
+                .isInstanceOf(LoanInvariantViolationException.class);
+    }
+
+    @Test
+    void createdAt_오버로드는_넘긴_시각을_그대로_보존하고_null이면_예외() {
+        java.time.LocalDateTime at = java.time.LocalDateTime.of(2026, 7, 16, 9, 30, 0);
+        CorporateLoan loan = CorporateLoan.request("005930", "삼성전자", new BigDecimal("1000000"),
+                new BigDecimal("660"), 30, 82, "A", 7L, at);
+        assertThat(loan.getCreatedAt()).isEqualTo(at);
+        assertThat(loan.getOwnerUserId()).isEqualTo(7L);
+
+        assertThatThrownBy(() -> CorporateLoan.request("005930", "삼성전자", new BigDecimal("1000000"),
+                new BigDecimal("660"), 30, 82, "A", 7L, null))
                 .isInstanceOf(LoanInvariantViolationException.class);
     }
 

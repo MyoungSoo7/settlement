@@ -9,6 +9,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -43,11 +44,16 @@ public class InvestmentOrderJpaEntity {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
+    /** 낙관적 락 카운터 — execute/cancel 동시 진입 시 lost update 를 둘째 커밋 실패로 차단. */
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
+
     protected InvestmentOrderJpaEntity() { }
 
     public InvestmentOrderJpaEntity(Long id, Long sellerId, String stockCode, BigDecimal amount,
                                     int scoreAtOrder, String gradeAtOrder, InvestmentOrderStatus status,
-                                    LocalDateTime createdAt) {
+                                    LocalDateTime createdAt, Long version) {
         this.id = id;
         this.sellerId = sellerId;
         this.stockCode = stockCode;
@@ -56,6 +62,7 @@ public class InvestmentOrderJpaEntity {
         this.gradeAtOrder = gradeAtOrder;
         this.status = status;
         this.createdAt = createdAt;
+        this.version = version;
     }
 
     public Long getId() { return id; }
@@ -66,4 +73,5 @@ public class InvestmentOrderJpaEntity {
     public String getGradeAtOrder() { return gradeAtOrder; }
     public InvestmentOrderStatus getStatus() { return status; }
     public LocalDateTime getCreatedAt() { return createdAt; }
+    public Long getVersion() { return version; }
 }

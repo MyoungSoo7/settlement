@@ -33,4 +33,10 @@ public interface IntegrityQueryPort {
 
     /** processed_events 를 (consumer_group, event_type) 로 묶은 건수 — 기간은 processed_at 기준 (INV-10). */
     List<ProcessedEventCount> processedEventCounts(LocalDateTime from, LocalDateTime to);
+
+    /** 해당 날짜(captured_at 기준) settlement_payment_view 키셋 체크섬 — INV-12 1차 스크리닝. */
+    KeyChecksum projectionPaymentChecksum(LocalDate date);
+
+    /** afterId 초과 프로젝션 결제 키 페이지(payment_id 오름차순, 최대 limit 건) — INV-12 diff. */
+    List<PaymentKey> projectionPaymentKeys(LocalDate date, long afterId, int limit);
 }

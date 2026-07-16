@@ -20,4 +20,7 @@ public interface LoadCorporateLoanPort {
 
     /** 전체 기업대출 최신순 상위 {@code limit} 건. */
     List<CorporateLoan> findRecent(int limit);
+
+    /** 신청자(ownerUserId) 본인 기업대출 최신순 상위 {@code limit} 건 — USER(CEO) 소유권 스코핑용. */
+    List<CorporateLoan> findByOwner(Long ownerUserId, int limit);
 }

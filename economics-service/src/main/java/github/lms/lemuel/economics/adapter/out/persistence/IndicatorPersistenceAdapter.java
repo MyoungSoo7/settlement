@@ -5,6 +5,7 @@ import github.lms.lemuel.economics.application.port.out.LoadIndicatorValuePort;
 import github.lms.lemuel.economics.application.port.out.SaveIndicatorValuePort;
 import github.lms.lemuel.economics.domain.Indicator;
 import github.lms.lemuel.economics.domain.IndicatorValue;
+import github.lms.lemuel.economics.domain.ValueSource;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -69,5 +70,12 @@ public class IndicatorPersistenceAdapter
                 })
                 .orElseGet(() -> IndicatorValueJpaEntity.fromDomain(value));
         indicatorValueRepository.save(entity);
+    }
+
+    @Override
+    @Transactional
+    public int purgeSeedNewerThan(String indicatorCode, LocalDate latestEcosDate) {
+        return indicatorValueRepository
+                .deleteByIndicatorCodeAndSourceNewerThan(indicatorCode, ValueSource.SEED, latestEcosDate);
     }
 }

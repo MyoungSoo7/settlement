@@ -1,5 +1,6 @@
 package github.lms.lemuel.notification.application
 
+import github.lms.lemuel.notification.adapter.out.dedupe.InMemoryTtlDedupeStore
 import github.lms.lemuel.notification.domain.Notification
 import github.lms.lemuel.notification.domain.NotificationType
 import io.mockk.coEvery

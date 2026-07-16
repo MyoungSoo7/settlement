@@ -46,6 +46,9 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+    # 데모 시드 마이그레이션 제거(상품·거래 데모) — 기존 DB 를 "missing"으로 관대 처리.
+    # 로그인/계정·RBAC·메뉴·공통코드 시드는 유지(앱 무결성).
+    ignore-migration-patterns: "*:missing"
     schemas: opslab
     default-schema: opslab
     create-schemas: true

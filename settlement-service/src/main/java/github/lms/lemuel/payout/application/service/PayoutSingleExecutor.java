@@ -1,66 +1,86 @@
 package github.lms.lemuel.payout.application.service;
 
-import github.lms.lemuel.common.opssignal.OpsSignalCategory;
-import github.lms.lemuel.common.opssignal.OpsSignalPort;
+import github.lms.lemuel.common.audit.application.AuditLogger;
+import github.lms.lemuel.common.audit.domain.AuditAction;
 import github.lms.lemuel.payout.application.port.out.FirmBankingPort;
-import github.lms.lemuel.payout.application.port.out.SavePayoutPort;
 import github.lms.lemuel.payout.domain.Payout;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.Map;
 
 /**
- * 단일 Payout 실행 트랜잭션 경계.
+ * 단일 Payout 집행 오케스트레이터 — <b>2-phase 커밋</b> 구조로 펌뱅킹 왕복 동안 DB 커넥션을 점유하지 않는다.
+ *
+ * <p>이 클래스 자체는 <b>비트랜잭션</b>이다. 트랜잭션 경계는 {@link PayoutTxSteps} 의 {@code REQUIRES_NEW}
+ * 단계들이 열고, 이 오케스트레이터는 그 사이(트랜잭션 밖)에서 외부 송금을 호출한다. 상위
+ * {@code PayoutService.executeAllPending()} 은 {@code NOT_SUPPORTED} 라 ambient 트랜잭션도 없다.
+ *
+ * <p><b>3-phase 흐름:</b>
+ * <ol>
+ *   <li>phase1 {@link PayoutTxSteps#claim} — REQUESTED → SENDING 원자 선점을 짧은 tx 로 <i>커밋</i>. 커넥션 즉시 반납.</li>
+ *   <li>phase2 {@code firmBanking.send} — 트랜잭션 밖에서 펌뱅킹 호출. DB 커넥션·행 잠금 미점유.</li>
+ *   <li>phase3 {@link PayoutTxSteps#markCompleted}/{@link PayoutTxSteps#markFailed} — 결과를 별도 짧은 tx 로 확정.</li>
+ * </ol>
+ *
+ * <p><b>보장(기존 대비 회귀 없음):</b>
+ * <ul>
+ *   <li><b>이중 송금 차단</b> — claim 이 {@code WHERE status=REQUESTED} 로 원자 선점. 진 쪽은
+ *       {@link PayoutConcurrentClaimException} 으로 빠져 send 미호출.</li>
+ *   <li><b>send 후 크래시</b> — phase3 커밋 전에 프로세스가 죽어도 행은 SENDING 으로 남는다(REQUESTED 아님).
+ *       REQUESTED 만 조회하는 배치가 다시 집지 않으므로 자동 재송금이 원천 차단된다. SENDING 잔류는 기존
+ *       stuck 감시(integrity {@code StuckStateReport} — 이중지급 위험 1순위)가 잡아 운영자 수동 조치로 넘긴다.
+ *       (예전 구조는 send 후 커밋 실패 시 SENDING 선점이 REQUESTED 로 롤백돼 다음 배치가 재송금하는 창이 있었다.)</li>
+ *   <li><b>실패 기록 durable</b> — 예전 {@code noRollbackFor} 의미를 phase3 markFailed 의 독립 커밋이 대체.
+ *       FAILED 를 커밋한 뒤 이 오케스트레이터가 예외를 재던져 배치가 실패로 집계한다.</li>
+ *   <li><b>referenceId 멱등</b> — {@code PAYOUT-<id>} 불변, 펌뱅킹 측 멱등 추적 유지.</li>
+ * </ul>
  */
 @Service
 public class PayoutSingleExecutor {
 
-    private final SavePayoutPort savePort;
+    private final PayoutTxSteps txSteps;
     private final FirmBankingPort firmBanking;
-    private final OpsSignalPort opsSignalPort;
+    private final AuditLogger auditLogger;
 
-    public PayoutSingleExecutor(SavePayoutPort savePort, FirmBankingPort firmBanking,
-                                OpsSignalPort opsSignalPort) {
-        this.savePort = savePort;
+    public PayoutSingleExecutor(PayoutTxSteps txSteps, FirmBankingPort firmBanking, AuditLogger auditLogger) {
+        this.txSteps = txSteps;
         this.firmBanking = firmBanking;
-        this.opsSignalPort = opsSignalPort;
+        this.auditLogger = auditLogger;
     }
 
     /**
-     * 개별 Payout 실행. REQUIRES_NEW 트랜잭션으로 격리해 한 건 실패가 다른 건에 영향 없게 한다.
-     *
-     * <p>외부 송금 *직전* 에 {@code claimForSending} 으로 REQUESTED → SENDING 선점을 원자적으로
-     * 확정한다. 다른 인스턴스가 이미 선점했다면 {@link PayoutConcurrentClaimException} 으로 빠져
-     * 펌뱅킹을 호출하지 않는다 — 롤링 배포 중첩 구간의 이중 송금을 원천 차단한다.
-     *
-     * <p><b>실패 처리 — {@code noRollbackFor}:</b> 펌뱅킹 실패 시 SENDING → FAILED 로 표기하고
-     * 사유를 영속화한 뒤 예외를 다시 던진다. {@code noRollbackFor} 가 없으면 이 throw 가
-     * REQUIRES_NEW 트랜잭션을 통째로 롤백해 (1) FAILED 기록이 사라지고 (2) SENDING 선점까지
-     * 되돌아가 REQUESTED 로 복귀 → 다음 배치가 같은 건을 재송금한다. 펌뱅킹이 타임아웃으로
-     * 던졌지만 은행에선 실제 이체된 경우 *이중 송금* 으로 이어진다. 따라서 펌뱅킹 예외는
-     * 롤백 대상에서 제외하고 FAILED 를 커밋해, 자동 재시도가 아닌 운영자 {@code retry} 로만
-     * 다시 시도되게 한다 (referenceId 로 펌뱅킹 측 멱등 추적 가능).
+     * 개별 Payout 집행. {@link PayoutConcurrentClaimException}(선점 경합) 또는 펌뱅킹 예외를 던질 수 있으며,
+     * 상위 {@code PayoutService} 배치 루프가 각각 conflict/failed 로 집계한다.
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW,
-            noRollbackFor = FirmBankingPort.FirmBankingException.class)
     public void execute(Payout payout) {
-        Payout sending = savePort.claimForSending(payout.getId())
-                .orElseThrow(() -> new PayoutConcurrentClaimException(payout.getId()));
+        Payout sending = txSteps.claim(payout.getId());   // phase1: 커밋된 SENDING 선점(경합 시 여기서 throw)
 
+        String referenceId = "PAYOUT-" + sending.getId();
+        String txnId;
         try {
-            String referenceId = "PAYOUT-" + sending.getId();
-            String txnId = firmBanking.send(sending.getAccount(), sending.getAmount(), referenceId);
-            sending.markCompleted(txnId);
+            txnId = firmBanking.send(sending.getAccount(), sending.getAmount(), referenceId);  // phase2: 트랜잭션 밖
         } catch (FirmBankingPort.FirmBankingException e) {
-            sending.markFailed(e.getErrorCode() + " " + e.getMessage());
-            savePort.save(sending);
-            // 운영 관제 실패 신호 — best-effort(절대 throw 안 함), 정산금 지급 실패를 operation-service 로 집계.
-            opsSignalPort.emit(OpsSignalCategory.SETTLEMENT_FAILED, "payout", String.valueOf(sending.getId()),
-                    Map.of("reason", "FIRM_BANKING", "errorCode", String.valueOf(e.getErrorCode())));
-            throw e;
+            txSteps.markFailed(sending, e);               // phase3: FAILED 커밋 + ops 실패 신호
+            recordExecuted(sending, "FAILED", e.getErrorCode() + " " + e.getMessage());
+            throw e;                                       // 커밋 이후 재던짐 → 배치 failed 집계, 자동 재송금 없음
         }
-        savePort.save(sending);
+        txSteps.markCompleted(sending, txnId);            // phase3: COMPLETED 커밋
+        recordExecuted(sending, "COMPLETED", txnId);
+    }
+
+    /**
+     * 배치 payout 집행을 audit_logs 에 건별로 남긴다 — 실자금 이동이라 감사 추적 필수.
+     *
+     * <p>배치/컨슈머 경로라 actor 는 system(AuditContext 미설정 시 자동 system). 값은 전부 id/금액/코드라
+     * 주입 위험이 없어 컴팩트 JSON 을 직접 조립한다(펌뱅킹 txnId·에러메시지만 escape). AuditLogger 가
+     * 자체 {@code REQUIRES_NEW} + 예외 흡수라 감사 실패가 집행 흐름을 깨지 않는다.
+     */
+    private void recordExecuted(Payout p, String outcome, String detail) {
+        String json = String.format(
+                "{\"outcome\":\"%s\",\"payoutId\":%d,\"settlementId\":%s,\"sellerId\":%s,\"amount\":\"%s\",\"detail\":\"%s\"}",
+                outcome, p.getId(), p.getSettlementId(), p.getSellerId(), p.getAmount().toPlainString(), escape(detail));
+        auditLogger.record(AuditAction.PAYOUT_EXECUTED, "Payout", String.valueOf(p.getId()), json);
+    }
+
+    private static String escape(String s) {
+        return s == null ? "" : s.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 }

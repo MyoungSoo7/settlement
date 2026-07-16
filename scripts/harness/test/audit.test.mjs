@@ -296,6 +296,23 @@ test('collectAudit validates command-script, settings-hook, STATUS claims, and i
   assert.match(bad.errors.join('\n'), /application\.yml.*claimed=9.*actual=1/i);
 });
 
+test('collectAudit cross-checks gradle module roster against CLAUDE.md and STRUCTURE.md trees', () => {
+  const settings = 'include(\n    "alpha-service",\n    "gateway-service",\n)\n\nincludeBuild("shared-common")\n';
+  const files = {
+    'settings.gradle.kts': settings,
+    'CLAUDE.md': '├── alpha-service/ # A\n└── gateway-service/ # GW\n',
+    'STRUCTURE.md': '├── alpha-service/\n└── gateway-service/\n',
+  };
+  const root = repo(files);
+  assert.deepEqual(collectAudit(root, baseManifest(Object.keys(files))).errors, []);
+
+  put(root, 'CLAUDE.md', '└── gateway-service/ # alpha 누락\n');
+  const bad = collectAudit(root, baseManifest(Object.keys(files))).errors.join('\n');
+  assert.match(bad, /CLAUDE\.md module roster missing: alpha-service/);
+  assert.doesNotMatch(bad, /STRUCTURE\.md/);
+  assert.doesNotMatch(bad, /shared-common/);
+});
+
 test('collectAudit deep-compares both contract blocks and transition cases', () => {
   const skill = (facts) => `prose ignored\n\`\`\`harness-contract\n${JSON.stringify(facts)}\n\`\`\``;
   const cases = JSON.stringify(CASES.map(([contractCase, expectedTransition]) => ({ contractCase, expectedTransition })));

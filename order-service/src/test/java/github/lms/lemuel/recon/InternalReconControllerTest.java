@@ -1,6 +1,8 @@
 package github.lms.lemuel.recon;
 
 import github.lms.lemuel.recon.ReconQueryRepository.CompletedRefundRow;
+import github.lms.lemuel.recon.ReconQueryRepository.PaymentKeyChecksum;
+import github.lms.lemuel.recon.ReconQueryRepository.PaymentKeyRow;
 import github.lms.lemuel.recon.ReconQueryRepository.ReconPaymentRow;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -83,5 +85,24 @@ class InternalReconControllerTest {
         List<ReconPaymentRow> rows = List.of(new ReconPaymentRow(1L, "PG1", new BigDecimal("10"), BigDecimal.ZERO, d));
         when(repository.loadCapturedPaymentRows(d)).thenReturn(rows);
         assertThat(controller.capturedPayments(d)).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("paymentKeyChecksum — INV-12 키셋 체크섬 위임")
+    void paymentKeyChecksum() {
+        when(repository.paymentKeyChecksum(d)).thenReturn(new PaymentKeyChecksum(3L, new BigDecimal("3000"), "hash"));
+        var c = controller.paymentKeyChecksum(d);
+        assertThat(c.count()).isEqualTo(3L);
+        assertThat(c.idChecksum()).isEqualTo("hash");
+    }
+
+    @Test
+    @DisplayName("paymentKeys — limit 2000 상한 클램프 후 키셋 페이지 반환")
+    void paymentKeys() {
+        List<PaymentKeyRow> rows = List.of(new PaymentKeyRow(3L, new BigDecimal("1000")));
+        when(repository.listPaymentKeys(eq(d), eq(2L), eq(2000))).thenReturn(rows);
+        var r = controller.paymentKeys(d, 2L, 999999);
+        assertThat(r).hasSize(1);
+        assertThat(r.get(0).paymentId()).isEqualTo(3L);
     }
 }

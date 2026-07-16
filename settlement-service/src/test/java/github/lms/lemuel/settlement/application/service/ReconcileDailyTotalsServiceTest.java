@@ -2,10 +2,11 @@ package github.lms.lemuel.settlement.application.service;
 
 import github.lms.lemuel.settlement.application.port.out.LoadDailyTotalsPort;
 import github.lms.lemuel.settlement.domain.ReconciliationReport;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -20,7 +21,14 @@ import static org.mockito.Mockito.when;
 class ReconcileDailyTotalsServiceTest {
 
     @Mock LoadDailyTotalsPort loadDailyTotalsPort;
-    @InjectMocks ReconcileDailyTotalsService service;
+    SimpleMeterRegistry meterRegistry;
+    ReconcileDailyTotalsService service;
+
+    @BeforeEach
+    void setUp() {
+        meterRegistry = new SimpleMeterRegistry();
+        service = new ReconcileDailyTotalsService(loadDailyTotalsPort, meterRegistry);
+    }
 
     private static final LocalDate DATE = LocalDate.of(2026, 4, 22);
 
@@ -39,6 +47,9 @@ class ReconcileDailyTotalsServiceTest {
         assertThat(r.captureDiscrepancy()).isEqualByComparingTo("0");
         assertThat(r.refundDiscrepancy()).isEqualByComparingTo("0");
         assertThat(r.discrepancy()).isEqualByComparingTo("0");
+        // 일치 시 runs{matched} 만 오르고 mismatch 계열은 0.
+        assertThat(meterRegistry.counter("settlement.reconciliation.runs", "result", "matched").count()).isEqualTo(1.0);
+        assertThat(meterRegistry.counter("settlement.reconciliation.mismatch", "axis", "refund").count()).isEqualTo(0.0);
     }
 
     @Test @DisplayName("캡처 축 불일치: 캡처했는데 정산이 누락되면 captureDiscrepancy>0")
@@ -69,6 +80,10 @@ class ReconcileDailyTotalsServiceTest {
         assertThat(r.captureDiscrepancy()).isEqualByComparingTo("0");      // 캡처 축은 건강
         assertThat(r.refundDiscrepancy()).isEqualByComparingTo("40000");  // 미반영 환불 감지
         assertThat(r.discrepancy()).isEqualByComparingTo("40000");
+        // refund 축만 어긋났으므로 refund 카운터만 올라간다(capture/count 는 0).
+        assertThat(meterRegistry.counter("settlement.reconciliation.mismatch", "axis", "refund").count()).isEqualTo(1.0);
+        assertThat(meterRegistry.counter("settlement.reconciliation.mismatch", "axis", "capture").count()).isEqualTo(0.0);
+        assertThat(meterRegistry.counter("settlement.reconciliation.runs", "result", "mismatch").count()).isEqualTo(1.0);
     }
 
     @Test @DisplayName("건수 축 불일치(INV-9): 금액이 ±상쇄로 일치해도 건수가 다르면 matched=false")

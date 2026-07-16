@@ -1,5 +1,7 @@
 package github.lms.lemuel.market.adapter.in.web;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+
 import github.lms.lemuel.market.application.port.in.GetStockSeriesUseCase;
 import github.lms.lemuel.market.application.port.in.GetStocksUseCase;
 import github.lms.lemuel.market.application.port.in.GetStocksUseCase.StockSnapshot;
@@ -38,7 +40,7 @@ class MarketWebLayerTest {
     private final GetStocksUseCase getStocks = mock(GetStocksUseCase.class);
     private final GetStockSeriesUseCase getSeries = mock(GetStockSeriesUseCase.class);
     private final SyncQuotesUseCase syncQuotes = mock(SyncQuotesUseCase.class);
-    private final SyncStatusTracker tracker = new SyncStatusTracker();
+    private final SyncStatusTracker tracker = new SyncStatusTracker(new SimpleMeterRegistry());
     private final TaskExecutor inlineExecutor = Runnable::run;
 
     private final Stock samsung = new Stock("005930", "KR7005930003", "삼성전자", Market.KOSPI, Instant.now());

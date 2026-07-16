@@ -54,6 +54,22 @@ class InvestmentOrderTest {
     }
 
     @Test
+    void 신규주문_금액은_scale2_HALF_UP로_정규화된다() {
+        // 소수 3자리 이상이 도메인에 도달해도 통화 규칙(scale 2 HALF_UP)으로 흡수된다.
+        InvestmentOrder o = InvestmentOrder.request(7L, "005930", new BigDecimal("1000.555"), 82, "AA");
+        assertThat(o.getAmount()).isEqualByComparingTo("1000.56");
+        assertThat(o.getAmount().scale()).isEqualTo(2);
+        assertThat(o.getVersion()).isNull();
+    }
+
+    @Test
+    void reconstitute_version_포함_오버로드는_낙관적락_카운터를_보존한다() {
+        InvestmentOrder o = InvestmentOrder.reconstitute(9L, 7L, "005930", new BigDecimal("500"),
+                75, "A", InvestmentOrderStatus.EXECUTED, LocalDateTime.now(), 4L);
+        assertThat(o.getVersion()).isEqualTo(4L);
+    }
+
+    @Test
     void 정상_전이_REQUESTED_APPROVED_EXECUTED() {
         InvestmentOrder o = requested();
         o.approve();

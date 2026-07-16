@@ -40,7 +40,11 @@ public class LoanAdvance {
         if (fee == null || fee.signum() < 0) {
             throw new LoanInvariantViolationException("수수료는 음수일 수 없습니다: " + fee);
         }
-        return new LoanAdvance(null, sellerId, principal, fee, BigDecimal.ZERO, LoanStatus.REQUESTED);
+        // 금액은 도메인 진입 시 Money(scale 2, HALF_UP)로 정규화한다 — 저장·계산 표현을 일관화(money-safety).
+        BigDecimal normalizedPrincipal = Money.of(principal).toBigDecimal();
+        BigDecimal normalizedFee = Money.of(fee).toBigDecimal();
+        return new LoanAdvance(null, sellerId, normalizedPrincipal, normalizedFee,
+                BigDecimal.ZERO, LoanStatus.REQUESTED);
     }
 
     /** 영속화된 상태를 재구성(리포지토리 전용). */
@@ -86,6 +90,32 @@ public class LoanAdvance {
             this.status = LoanStatus.REPAID;
         }
         return deducted.toBigDecimal();
+    }
+
+    /**
+     * 연체 진입. 실행(DISBURSED)된 대출이 상환되지 않아 회수 위험 상태로 전이한다.
+     * 미상환잔액이 남아 있어야 연체가 성립한다(잔액 0이면 이미 REPAID 여야 함).
+     */
+    public void markOverdue() {
+        if (outstanding == null || outstanding.signum() <= 0) {
+            throw new LoanInvariantViolationException(
+                    "미상환잔액이 없는 대출은 연체 처리할 수 없습니다: " + outstanding);
+        }
+        requireTransition(LoanStatus.OVERDUE);
+        this.status = LoanStatus.OVERDUE;
+    }
+
+    /**
+     * 상각(회수 불능 확정). 연체(OVERDUE)된 대출의 미상환잔액을 대손으로 확정하고 종료 상태로 전이한다.
+     * 미상환잔액(=상각 손실액)은 보존해 후속 대손 전표(BAD_DEBT) 산정 근거로 남긴다.
+     *
+     * @return 상각된 손실액(미상환잔액)
+     */
+    public BigDecimal writeOff() {
+        requireTransition(LoanStatus.WRITTEN_OFF);
+        BigDecimal loss = outstanding;
+        this.status = LoanStatus.WRITTEN_OFF;
+        return loss;
     }
 
     // 상태 전이 가드 — 허용 전이는 LoanStatus#canTransitionTo 단일 출처에 위임한다.

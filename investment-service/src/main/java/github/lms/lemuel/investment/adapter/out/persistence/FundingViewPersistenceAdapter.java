@@ -33,4 +33,12 @@ public class FundingViewPersistenceAdapter implements SaveFundingViewPort, LoadF
     public BigDecimal sumConfirmedBySeller(long sellerId) {
         return repository.sumBySellerAndStatus(sellerId, FundingViewStatus.CONFIRMED);
     }
+
+    @Override
+    public BigDecimal sumConfirmedBySellerForUpdate(long sellerId) {
+        // 재원 행을 FOR UPDATE 로 잡아 동시 집행을 직렬화한 뒤 합계를 계산한다(loan 패턴 동형).
+        return repository.findBySellerAndStatusForUpdate(sellerId, FundingViewStatus.CONFIRMED).stream()
+                .map(SellerFundingViewJpaEntity::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
 }

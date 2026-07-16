@@ -39,7 +39,7 @@
 ```
 
 ## 대상 코드베이스
-- **12 마이크로서비스** + API Gateway + `shared-common`(버전드 1.0.0) · **DB-per-service** · 서비스 간 연계는 Kafka 이벤트 + 내부 대사 API 뿐 — **cross-DB 0 · cross-code 0**(이것이 이 하네스가 지키는 핵심 불변식)
+- **13 마이크로서비스** + API Gateway + `shared-common`(버전드 1.0.0) · **DB-per-service** · 서비스 간 연계는 Kafka 이벤트 + 내부 대사 API 뿐 — **cross-DB 0 · cross-code 0**(이것이 이 하네스가 지키는 핵심 불변식)
 - 서비스 로스터·포트·DB·수치 정본 → `STATUS.md` · 모듈 경계·컨벤션 → `CLAUDE.md` · *reservation(시공 예약) 도메인 제거 완료(에이전트·규칙 폐기)*
 
 ## 서비스별 규칙 스킬 (온디맨드 로드)

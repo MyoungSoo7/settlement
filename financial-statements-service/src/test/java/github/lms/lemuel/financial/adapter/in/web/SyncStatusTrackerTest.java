@@ -1,5 +1,7 @@
 package github.lms.lemuel.financial.adapter.in.web;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+
 import github.lms.lemuel.financial.adapter.in.web.SyncStatusTracker.State;
 import github.lms.lemuel.financial.application.port.in.SyncResult;
 import org.junit.jupiter.api.DisplayName;
@@ -16,7 +18,7 @@ class SyncStatusTrackerTest {
     @Test
     @DisplayName("초기 상태는 IDLE")
     void initialIdle() {
-        SyncStatusTracker tracker = new SyncStatusTracker();
+        SyncStatusTracker tracker = new SyncStatusTracker(new SimpleMeterRegistry());
         assertThat(tracker.current().state()).isEqualTo(State.IDLE);
         assertThat(tracker.current().job()).isNull();
     }
@@ -24,7 +26,7 @@ class SyncStatusTrackerTest {
     @Test
     @DisplayName("tryStart → RUNNING 선점, 실행 중 재선점은 거부")
     void tryStartClaimsAndBlocks() {
-        SyncStatusTracker tracker = new SyncStatusTracker();
+        SyncStatusTracker tracker = new SyncStatusTracker(new SimpleMeterRegistry());
 
         assertThat(tracker.tryStart("companies")).isTrue();
         assertThat(tracker.current().state()).isEqualTo(State.RUNNING);
@@ -37,7 +39,7 @@ class SyncStatusTrackerTest {
     @Test
     @DisplayName("complete → DONE + 결과 보존")
     void complete() {
-        SyncStatusTracker tracker = new SyncStatusTracker();
+        SyncStatusTracker tracker = new SyncStatusTracker(new SimpleMeterRegistry());
         tracker.tryStart("companies");
         SyncResult result = new SyncResult(10, 8, 8, 2);
 
@@ -55,7 +57,7 @@ class SyncStatusTrackerTest {
     @Test
     @DisplayName("fail → FAILED + 에러 메시지 보존")
     void fail() {
-        SyncStatusTracker tracker = new SyncStatusTracker();
+        SyncStatusTracker tracker = new SyncStatusTracker(new SimpleMeterRegistry());
         tracker.tryStart("companies");
 
         tracker.fail("DART timeout");

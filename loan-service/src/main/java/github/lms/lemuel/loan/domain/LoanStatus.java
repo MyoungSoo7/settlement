@@ -5,7 +5,8 @@ package github.lms.lemuel.loan.domain;
  *
  * <pre>
  * REQUESTED → APPROVED → DISBURSED → (부분상환) → REPAID
- *                      ↘ REJECTED               ↘ OVERDUE → WRITTEN_OFF
+ *                      ↘ REJECTED   ↘ OVERDUE → REPAID
+ *                                              ↘ WRITTEN_OFF
  * </pre>
  */
 public enum LoanStatus {
@@ -24,10 +25,12 @@ public enum LoanStatus {
      * <pre>
      * REQUESTED → APPROVED → DISBURSED → REPAID
      * REQUESTED/APPROVED ↘ REJECTED
+     * DISBURSED → OVERDUE (연체 진입) → REPAID(연체 후 상환) | WRITTEN_OFF(상각)
      * </pre>
      *
-     * <p>OVERDUE·WRITTEN_OFF 는 아직 도메인 전이 메서드가 없어 어떤 전이의 원천/대상도 아니다
-     * (현행 애그리거트가 수행하는 전이만 표로 옮긴다 — 미구현 전이는 추가하지 않는다).
+     * <p>OVERDUE·WRITTEN_OFF 는 각각 {@code LoanAdvance#markOverdue()}·{@code LoanAdvance#writeOff()}
+     * 도메인 메서드의 대상/원천이다. 연체된 대출도 상환되면 REPAID 로 회수될 수 있고, 회수 불능이면
+     * WRITTEN_OFF(상각, 종료)로 확정된다. WRITTEN_OFF·REPAID·REJECTED 는 종료 상태다.
      */
     public boolean canTransitionTo(LoanStatus target) {
         switch (this) {
@@ -36,12 +39,13 @@ public enum LoanStatus {
             case APPROVED:
                 return target == DISBURSED || target == REJECTED;
             case DISBURSED:
-                return target == REPAID;
+                return target == REPAID || target == OVERDUE;
+            case OVERDUE:
+                return target == REPAID || target == WRITTEN_OFF;
             case REPAID:
             case REJECTED:
-            case OVERDUE:
             case WRITTEN_OFF:
-                return false; // 종료 상태(또는 미구현 전이)
+                return false; // 종료 상태
             default:
                 return false;
         }

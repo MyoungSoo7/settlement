@@ -10,6 +10,7 @@ import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
 import java.sql.Date;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -23,9 +24,14 @@ public class SettlementSearchJdbcRepository {
 
     public SettlementPageResponse search(
             String ordererName, String productName, Boolean isRefunded,
-            String status, String startDate, String endDate,
+            String status, LocalDate startDate, LocalDate endDate,
             int page, int size, String sortBy, String sortDirection
     ) {
+        // 컨트롤러 @Validated 가 1차 방어(page>=0, 1<=size<=200)이지만, 직접 호출·경계값에서도
+        // 0 나눗셈(totalPages)·음수 LIMIT/OFFSET·무상한 스캔이 없도록 리포지토리도 방어적으로 클램프한다.
+        int safeSize = Math.min(Math.max(size, 1), 200);
+        int safePage = Math.max(page, 0);
+
         StringBuilder where = new StringBuilder(" WHERE 1=1");
         List<Object> params = new ArrayList<>();
 
@@ -33,12 +39,12 @@ public class SettlementSearchJdbcRepository {
             where.append(" AND s.status = ?");
             params.add(status);
         }
-        if (startDate != null && !startDate.isBlank()) {
-            where.append(" AND s.settlement_date >= CAST(? AS DATE)");
+        if (startDate != null) {
+            where.append(" AND s.settlement_date >= ?");
             params.add(startDate);
         }
-        if (endDate != null && !endDate.isBlank()) {
-            where.append(" AND s.settlement_date <= CAST(? AS DATE)");
+        if (endDate != null) {
+            where.append(" AND s.settlement_date <= ?");
             params.add(endDate);
         }
         if (ordererName != null && !ordererName.isBlank()) {
@@ -114,8 +120,8 @@ public class SettlementSearchJdbcRepository {
                 " LIMIT ? OFFSET ?";
 
         List<Object> pageArgs = new ArrayList<>(params);
-        pageArgs.add(size);
-        pageArgs.add((long) page * size);
+        pageArgs.add(safeSize);
+        pageArgs.add((long) safePage * safeSize);
 
         List<SettlementSearchItemResponse> items = jdbcTemplate.query(
                 selectSql,
@@ -136,14 +142,15 @@ public class SettlementSearchJdbcRepository {
                 ),
                 pageArgs.toArray());
 
-        int totalPages = (int) Math.ceil((double) totalElements / size);
+        // 정수 상한 나눗셈 — size 는 최소 1 로 클램프돼 0 나눗셈이 불가하다(double 라운딩도 회피).
+        int totalPages = (int) ((totalElements + safeSize - 1) / safeSize);
 
         return new SettlementPageResponse(
                 items,
                 totalElements,
                 totalPages,
-                page,
-                size,
+                safePage,
+                safeSize,
                 new SettlementAggregationsResponse(totalAmount, totalRefundedAmount, totalFinalAmount, statusCounts)
         );
     }

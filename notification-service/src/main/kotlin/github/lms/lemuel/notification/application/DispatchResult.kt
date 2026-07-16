@@ -10,12 +10,17 @@ sealed interface ChannelResult {
 
 /**
  * Aggregate result of fanning one notification out to all enabled channels.
+ * `results` is defensively copied at construction, so a caller-held mutable
+ * list can never mutate a published result.
+ *
  * @param deduped true when the notification was skipped entirely as a duplicate.
  */
-data class DispatchResult(
+class DispatchResult(
     val deduped: Boolean,
-    val results: List<ChannelResult>,
+    results: List<ChannelResult>,
 ) {
+    val results: List<ChannelResult> = results.toList()
+
     val anySucceeded: Boolean get() = results.any { it is ChannelResult.Success }
     val allSucceeded: Boolean get() = results.isNotEmpty() && results.all { it is ChannelResult.Success }
 

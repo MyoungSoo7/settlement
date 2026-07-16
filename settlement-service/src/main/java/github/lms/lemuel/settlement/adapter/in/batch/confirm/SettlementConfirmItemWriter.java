@@ -6,12 +6,13 @@ import github.lms.lemuel.settlement.application.port.out.PublishSettlementDomain
 import github.lms.lemuel.settlement.application.port.out.PublishSettlementEventPort;
 import github.lms.lemuel.settlement.application.port.out.SaveSettlementPort;
 import github.lms.lemuel.settlement.domain.Settlement;
-import lombok.RequiredArgsConstructor;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.infrastructure.item.Chunk;
 import org.springframework.batch.infrastructure.item.ItemWriter;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -24,22 +25,43 @@ import java.util.List;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class SettlementConfirmItemWriter implements ItemWriter<Settlement> {
+
+    /** 확정 정산 누적 건수. */
+    private static final String METRIC_CONFIRMED_COUNT = "settlement.confirmed.count";
+    /** 확정 정산 net_amount 누적 합(관측용 double — 회계값 아님). */
+    private static final String METRIC_CONFIRMED_AMOUNT = "settlement.confirmed.amount";
 
     private final SaveSettlementPort saveSettlementPort;
     private final LoadSellerIdPort loadSellerIdPort;
     private final PublishSettlementDomainEventPort publishSettlementDomainEventPort;
     private final EnqueueLedgerTaskPort enqueueLedgerTaskPort;
     private final PublishSettlementEventPort publishSettlementEventPort;
+    private final MeterRegistry meterRegistry;
+
+    public SettlementConfirmItemWriter(SaveSettlementPort saveSettlementPort,
+                                       LoadSellerIdPort loadSellerIdPort,
+                                       PublishSettlementDomainEventPort publishSettlementDomainEventPort,
+                                       EnqueueLedgerTaskPort enqueueLedgerTaskPort,
+                                       PublishSettlementEventPort publishSettlementEventPort,
+                                       MeterRegistry meterRegistry) {
+        this.saveSettlementPort = saveSettlementPort;
+        this.loadSellerIdPort = loadSellerIdPort;
+        this.publishSettlementDomainEventPort = publishSettlementDomainEventPort;
+        this.enqueueLedgerTaskPort = enqueueLedgerTaskPort;
+        this.publishSettlementEventPort = publishSettlementEventPort;
+        this.meterRegistry = meterRegistry;
+    }
 
     @Override
     public void write(Chunk<? extends Settlement> chunk) {
         List<Long> confirmedIds = new ArrayList<>(chunk.size());
+        BigDecimal confirmedNet = BigDecimal.ZERO;
 
         for (Settlement settlement : chunk) {
             Settlement saved = saveSettlementPort.save(settlement);
             confirmedIds.add(saved.getId());
+            confirmedNet = confirmedNet.add(saved.getNetAmount());
 
             // loan-service 로 SettlementConfirmed 발행(상환 차감 트리거). 판매자 미해석은 발행 생략.
             // 같은 청크 트랜잭션의 Outbox 에 적재 → lemuel.settlement.confirmed.
@@ -52,7 +74,10 @@ public class SettlementConfirmItemWriter implements ItemWriter<Settlement> {
             // 원장 분개 작업을 같은 트랜잭션에 아웃박스로 적재(크래시 내성) + ES 인덱싱 이벤트
             enqueueLedgerTaskPort.enqueueCreate(confirmedIds);
             publishSettlementEventPort.publishSettlementConfirmedEvent(confirmedIds);
-            log.info("정산 확정 청크 처리: confirmed={}", confirmedIds.size());
+            // 확정 처리량·금액을 메트릭으로 노출(정산 성공 지표 — 기존엔 log.info 뿐).
+            meterRegistry.counter(METRIC_CONFIRMED_COUNT).increment(confirmedIds.size());
+            meterRegistry.counter(METRIC_CONFIRMED_AMOUNT).increment(confirmedNet.doubleValue());
+            log.info("정산 확정 청크 처리: confirmed={}, net합={}", confirmedIds.size(), confirmedNet);
         }
     }
 }

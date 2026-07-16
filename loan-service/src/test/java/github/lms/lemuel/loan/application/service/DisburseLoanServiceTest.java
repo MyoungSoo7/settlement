@@ -4,6 +4,7 @@ import github.lms.lemuel.loan.application.port.out.AppendLedgerPort;
 import github.lms.lemuel.loan.application.port.out.LoadLoanPort;
 import github.lms.lemuel.loan.application.port.out.LoadSellerReputationPort;
 import github.lms.lemuel.loan.application.port.out.LoadSettlementViewPort;
+import github.lms.lemuel.loan.application.port.out.LoanMetricsPort;
 import github.lms.lemuel.loan.application.port.out.PublishLoanEventPort;
 import github.lms.lemuel.loan.application.port.out.SaveLoanPort;
 import github.lms.lemuel.loan.domain.LoanAdvance;
@@ -35,6 +36,7 @@ class DisburseLoanServiceTest {
     @Mock LoadSellerReputationPort loadSellerReputationPort;
     @Mock PublishLoanEventPort publishLoanEventPort;
     @Mock AppendLedgerPort appendLedgerPort;
+    @Mock LoanMetricsPort loanMetricsPort;
 
     private final CreditPolicy creditPolicy = new CreditPolicy(new BigDecimal("0.80"), new BigDecimal("0.0002"),
             Map.of("A", BigDecimal.ONE, "B", BigDecimal.ONE, "C", new BigDecimal("0.85"),
@@ -44,7 +46,8 @@ class DisburseLoanServiceTest {
         // 평판 미상 기본(무변동) — 개별 테스트에서 필요 시 재stub
         lenient().when(loadSellerReputationPort.findGrade(7L)).thenReturn(Optional.empty());
         return new DisburseLoanService(loadLoanPort, saveLoanPort, loadSettlementViewPort,
-                loadSellerReputationPort, creditPolicy, publishLoanEventPort, appendLedgerPort);
+                loadSellerReputationPort, creditPolicy, publishLoanEventPort, appendLedgerPort,
+                loanMetricsPort);
     }
 
     private LoanAdvance requestedLoan() {
@@ -66,6 +69,7 @@ class DisburseLoanServiceTest {
         verify(publishLoanEventPort).publishDisbursementRequested(any());
         // 복식부기 전표 2건: 선지급 + 수수료 인식
         verify(appendLedgerPort, org.mockito.Mockito.times(2)).append(any());
+        verify(loanMetricsPort).advanceDisbursed();
     }
 
     @Test
@@ -85,5 +89,6 @@ class DisburseLoanServiceTest {
         org.mockito.ArgumentCaptor<LoanAdvance> captor = org.mockito.ArgumentCaptor.forClass(LoanAdvance.class);
         verify(saveLoanPort).save(captor.capture());
         assertThat(captor.getValue().getStatus()).isEqualTo(LoanStatus.REJECTED);
+        verify(loanMetricsPort).advanceRejected();
     }
 }

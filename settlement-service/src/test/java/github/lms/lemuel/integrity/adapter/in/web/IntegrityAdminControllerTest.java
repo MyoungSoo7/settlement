@@ -2,10 +2,12 @@ package github.lms.lemuel.integrity.adapter.in.web;
 
 import github.lms.lemuel.common.config.jwt.JwtUtil;
 import github.lms.lemuel.integrity.application.port.in.IntegrityQueryUseCase;
+import github.lms.lemuel.integrity.application.port.in.ProjectionReconciliationUseCase;
 import github.lms.lemuel.integrity.domain.HoldbackStatusReport;
 import github.lms.lemuel.integrity.domain.LedgerCompletenessReport;
 import github.lms.lemuel.integrity.domain.PayoutReconReport;
 import github.lms.lemuel.integrity.domain.ProcessedEventCount;
+import github.lms.lemuel.integrity.domain.ProjectionDiffReport;
 import github.lms.lemuel.integrity.domain.RefundAdjustmentReport;
 import github.lms.lemuel.integrity.domain.StuckStateReport;
 import org.junit.jupiter.api.DisplayName;
@@ -35,6 +37,7 @@ class IntegrityAdminControllerTest {
     @Autowired MockMvc mockMvc;
     @MockitoBean JwtUtil jwtUtil;
     @MockitoBean IntegrityQueryUseCase useCase;
+    @MockitoBean ProjectionReconciliationUseCase projectionUseCase;
 
     @Test
     @DisplayName("GET /admin/integrity/ledger-completeness — INV-5")
@@ -152,5 +155,38 @@ class IntegrityAdminControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].consumerGroup").value("settlement-consumer"))
                 .andExpect(jsonPath("$[0].count").value(42));
+    }
+
+    @Test
+    @DisplayName("GET /admin/integrity/projection-diff — INV-12 누락 id 특정")
+    void projectionDiff() throws Exception {
+        LocalDate date = LocalDate.of(2026, 4, 1);
+        ProjectionDiffReport report = ProjectionDiffReport.of(
+                date, "payment", 3L, new BigDecimal("3000"), 2L, new BigDecimal("2000"),
+                List.of(902L), new BigDecimal("1000"), 1L,
+                List.of(), 0L, List.of(), 0L, false);
+        when(projectionUseCase.reconcileProjection(eq(date), eq("payment"), isNull())).thenReturn(report);
+
+        mockMvc.perform(get("/admin/integrity/projection-diff").param("date", "2026-04-01"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ok").value(false))
+                .andExpect(jsonPath("$.checksumMatched").value(false))
+                .andExpect(jsonPath("$.missingInProjectionIds[0]").value(902))
+                .andExpect(jsonPath("$.missingInProjectionCount").value(1));
+    }
+
+    @Test
+    @DisplayName("GET /admin/integrity/projection-diff — 체크섬 일치 시 통과")
+    void projectionDiffMatched() throws Exception {
+        LocalDate date = LocalDate.of(2026, 4, 1);
+        ProjectionDiffReport report = ProjectionDiffReport.matched(date, "payment", 5L, new BigDecimal("5000"));
+        when(projectionUseCase.reconcileProjection(eq(date), eq("payment"), eq(50))).thenReturn(report);
+
+        mockMvc.perform(get("/admin/integrity/projection-diff")
+                        .param("date", "2026-04-01")
+                        .param("limit", "50"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ok").value(true))
+                .andExpect(jsonPath("$.checksumMatched").value(true));
     }
 }

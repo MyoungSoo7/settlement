@@ -2,6 +2,7 @@ package github.lms.lemuel.account.domain;
 
 import github.lms.lemuel.account.domain.exception.NonPositiveEntryAmountException;
 import github.lms.lemuel.account.domain.exception.UnbalancedAccountEntryException;
+import github.lms.lemuel.common.ledger.LedgerInvariants;
 import github.lms.lemuel.common.money.Money;
 
 import java.math.BigDecimal;
@@ -49,18 +50,11 @@ public class AccountEntry {
     private AccountEntry(Long id, OwnerType ownerType, String ownerId,
                          GlAccount debitAccount, GlAccount creditAccount, BigDecimal amount,
                          String refType, String refId, String sourceTopic, LocalDateTime occurredAt) {
-        if (amount == null) {
-            throw new NonPositiveEntryAmountException(null);
-        }
-        // 금액은 공용 Money VO(scale 2 HALF_UP)로 정규화·검증한다. account_entries.amount 는 numeric(19,2)
-        // 라 저장 표현이 동일하고(반올림 정책 일치), 양수 불변식을 Money.isPositive() 단일 지점으로 모은다.
-        Money money = Money.of(amount);
-        if (!money.isPositive()) {
-            throw new NonPositiveEntryAmountException(amount);
-        }
-        if (debitAccount == creditAccount) {
-            throw new UnbalancedAccountEntryException(debitAccount);
-        }
+        // 구성적 균형 불변식(양수 금액 + 차변≠대변)은 공용 LedgerInvariants 단일 출처로 강제한다.
+        // account_entries.amount 는 numeric(19,2) 라 Money(scale 2 HALF_UP) 저장 표현이 동일하다.
+        Money money = LedgerInvariants.requirePositiveAmount(amount, () -> new NonPositiveEntryAmountException(amount));
+        LedgerInvariants.requireDistinctAccounts(debitAccount, creditAccount,
+                () -> new UnbalancedAccountEntryException(debitAccount));
         this.id = id;
         this.ownerType = ownerType;
         this.ownerId = ownerId;

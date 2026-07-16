@@ -25,4 +25,12 @@ public interface ProcessLedgerOutboxPort {
 
     /** 실패 마킹 — retry_count 증가, 한도 초과 시 FAILED (별도 트랜잭션). */
     void markFailed(Long taskId, String error);
+
+    /**
+     * 재시도 한도 — 이 횟수에 도달하면 markFailed 가 작업을 FAILED 로 고정한다.
+     *
+     * <p>폴러가 "이번 실패로 FAILED 로 전환됐는가"를 판정해 관제 신호를 쏘기 위해 노출한다
+     * ({@code task.retryCount() + 1 >= maxRetry()} 이면 FAILED 전환).
+     */
+    int maxRetry();
 }

@@ -78,8 +78,10 @@ class EventContractConsumerTest {
         String sample = EventContractValidator.canonicalSample("lemuel.payment.captured");
         consumer.onPaymentCaptured(recordOf("lemuel.payment.captured", sample), mock(Acknowledgment.class));
 
+        // 결제 시각(capturedAt)까지 정산 생성 UseCase 로 전달돼 정산일이 결제일 기준으로 계산된다.
         verify(createSettlementUseCase).createSettlementFromPayment(
-                1001L, 5001L, new BigDecimal("45000"), 777L, "VIP", "T_PLUS_3");
+                1001L, 5001L, new BigDecimal("45000"), 777L, "VIP", "T_PLUS_3",
+                LocalDateTime.parse("2026-07-01T10:15:30"));
         verify(paymentViewRepository).save(any());
     }
 

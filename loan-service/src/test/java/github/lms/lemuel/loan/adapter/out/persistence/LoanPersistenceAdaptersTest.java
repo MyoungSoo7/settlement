@@ -46,7 +46,7 @@ class LoanPersistenceAdaptersTest {
         private CorporateLoanJpaEntity entity(long id) {
             return new CorporateLoanJpaEntity(id, "005930", "삼성전자",
                     new BigDecimal("1000000"), new BigDecimal("6600"), new BigDecimal("1006600"),
-                    30, 82, "A", CorporateLoanStatus.DISBURSED, LocalDateTime.now());
+                    30, 82, "A", CorporateLoanStatus.DISBURSED, LocalDateTime.now(), 42L);
         }
 
         @Test

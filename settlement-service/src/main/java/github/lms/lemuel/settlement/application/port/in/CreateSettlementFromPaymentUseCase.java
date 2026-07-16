@@ -29,4 +29,18 @@ public interface CreateSettlementFromPaymentUseCase {
      */
     Settlement createSettlementFromPayment(Long paymentId, Long orderId, java.math.BigDecimal amount,
                                            Long sellerId, String sellerTier, String settlementCycle);
+
+    /**
+     * 결제 시각(paymentCapturedAt)을 함께 받아 정산일을 <b>결제일 기준</b>으로 계산하는 정본 경로.
+     *
+     * <p>{@link github.lms.lemuel.settlement.domain.SettlementCycle} 계약은 정산일을
+     * "결제 발생일(paymentDate)" 기준 T+N 으로 정의한다. 소비 시각({@code now()})을 넘기면 컨슈머
+     * 지연·백필·재처리 시 같은 결제가 매번 다른 정산일을 얻어 회계가 흔들린다. 따라서 결제 이벤트가
+     * 실어 온 결제 시각의 날짜(KST)를 기준일로 넘긴다.
+     *
+     * @param paymentCapturedAt 결제 확정 시각(payment.captured 의 capturedAt). null 이면 KST 현재일로 폴백.
+     */
+    Settlement createSettlementFromPayment(Long paymentId, Long orderId, java.math.BigDecimal amount,
+                                           Long sellerId, String sellerTier, String settlementCycle,
+                                           java.time.LocalDateTime paymentCapturedAt);
 }

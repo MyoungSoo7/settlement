@@ -110,6 +110,29 @@ function claimNumber(status, patterns) {
   return null;
 }
 
+export function parseGradleModules(settings) {
+  // "includeBuild(" 은 "include(" 부분문자열을 포함하지 않으므로 오매치 없음
+  const block = String(settings).match(/include\(([\s\S]*?)\)/);
+  if (!block) return [];
+  return [...block[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+}
+
+// settings.gradle.kts 모듈 로스터 ↔ 문서 트리(CLAUDE.md·STRUCTURE.md) 대조 —
+// 서비스 모듈을 추가/삭제하고 문서 트리를 안 고치면 audit 이 실패한다.
+function validateModuleRoster(read, trackedSet, errors) {
+  if (!trackedSet.has('settings.gradle.kts')) return;
+  const modules = parseGradleModules(read('settings.gradle.kts'));
+  for (const doc of ['CLAUDE.md', 'STRUCTURE.md']) {
+    if (!trackedSet.has(doc)) continue;
+    const content = read(doc);
+    for (const module of modules) {
+      if (!content.includes(module)) {
+        errors.push(`${doc} module roster missing: ${module} (declared in settings.gradle.kts)`);
+      }
+    }
+  }
+}
+
 function validateStatus(status, tracked, errors) {
   const checks = [
     ['application.yml', tracked.filter((p) => /\/src\/main\/resources\/application\.yml$/.test(p)).length, [/application\.yml[^\n]*?\*\*(\d[\d,]*)[^\d\n*]*\*\*/i, /application\.yml[^\n]*?→\s*(\d[\d,]*)/i]],
@@ -145,6 +168,7 @@ export function collectAudit(repoRoot, manifest) {
   }
 
   if (trackedSet.has('STATUS.md')) validateStatus(read('STATUS.md'), tracked, errors);
+  validateModuleRoster(read, trackedSet, errors);
 
   for (const pair of manifest.criticalContractPairs) {
     if (!trackedSet.has(pair.claude) || !trackedSet.has(pair.codex)) continue;

@@ -1,5 +1,8 @@
 package github.lms.lemuel.payout.adapter.in.web;
 
+import github.lms.lemuel.common.audit.application.AuditLogger;
+import github.lms.lemuel.common.audit.domain.AuditAction;
+import github.lms.lemuel.common.config.JacksonCompatConfig;
 import github.lms.lemuel.common.config.jwt.JwtUtil;
 import github.lms.lemuel.payout.application.port.in.ExecutePayoutUseCase;
 import github.lms.lemuel.payout.application.port.in.RetryFailedPayoutUseCase;
@@ -7,11 +10,13 @@ import github.lms.lemuel.payout.application.port.out.LoadPayoutPort;
 import github.lms.lemuel.payout.domain.Payout;
 import github.lms.lemuel.payout.domain.PayoutStatus;
 import github.lms.lemuel.payout.domain.SellerBankAccount;
+import github.lms.lemuel.idempotency.adapter.out.persistence.ManualIdempotencyGuard;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -22,6 +27,8 @@ import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -30,6 +37,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(controllers = PayoutAdminController.class)
 @AutoConfigureMockMvc(addFilters = false)
+@Import(JacksonCompatConfig.class)
 class PayoutAdminControllerTest {
 
     @Autowired MockMvc mockMvc;
@@ -37,6 +45,8 @@ class PayoutAdminControllerTest {
     @MockitoBean LoadPayoutPort loadPort;
     @MockitoBean RetryFailedPayoutUseCase retryUseCase;
     @MockitoBean ExecutePayoutUseCase executeUseCase;
+    @MockitoBean ManualIdempotencyGuard idempotency;
+    @MockitoBean AuditLogger auditLogger;
 
     private static Payout samplePayout() {
         SellerBankAccount account = new SellerBankAccount("KB", "1234567890", "홍길동");
@@ -99,6 +109,8 @@ class PayoutAdminControllerTest {
         mockMvc.perform(post("/admin/payouts/100/retry"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.payout.id").value(100));
+
+        verify(auditLogger).record(eq(AuditAction.PAYOUT_RETRIED), eq("Payout"), eq("100"), anyString());
     }
 
     @Test
@@ -110,6 +122,32 @@ class PayoutAdminControllerTest {
         mockMvc.perform(post("/admin/payouts/100/cancel")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"reason\":\"고객 요청\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.payout.id").value(100));
+
+        verify(auditLogger).record(eq(AuditAction.PAYOUT_CANCELED), eq("Payout"), eq("100"), anyString());
+    }
+
+    @Test
+    @DisplayName("POST retry — 중복 Idempotency-Key 는 409 (조작 미실행)")
+    void retry_duplicateIdempotencyKey_returnsConflict() throws Exception {
+        when(idempotency.claim(eq("po-retry-1"), anyString(), anyString())).thenReturn(false);
+
+        mockMvc.perform(post("/admin/payouts/100/retry")
+                        .header("Idempotency-Key", "po-retry-1"))
+                .andExpect(status().isConflict());
+
+        verifyNoInteractions(retryUseCase);
+    }
+
+    @Test
+    @DisplayName("POST retry — 새 Idempotency-Key 는 조작 실행 후 200")
+    void retry_freshIdempotencyKey_executes() throws Exception {
+        when(idempotency.claim(eq("po-retry-2"), anyString(), anyString())).thenReturn(true);
+        when(retryUseCase.retry(eq(100L), anyString())).thenReturn(samplePayout());
+
+        mockMvc.perform(post("/admin/payouts/100/retry")
+                        .header("Idempotency-Key", "po-retry-2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.payout.id").value(100));
     }
@@ -125,5 +163,8 @@ class PayoutAdminControllerTest {
                 .andExpect(jsonPath("$.succeeded").value(3))
                 .andExpect(jsonPath("$.failed").value(1))
                 .andExpect(jsonPath("$.limitedSkipped").value(0));
+
+        verify(auditLogger).record(eq(AuditAction.PAYOUT_EXECUTED), eq("PayoutBatch"),
+                eq("execute-now"), anyString());
     }
 }

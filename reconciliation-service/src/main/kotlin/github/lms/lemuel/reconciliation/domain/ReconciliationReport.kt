@@ -3,17 +3,22 @@ package github.lms.lemuel.reconciliation.domain
 /**
  * Outcome of one reconciliation run.
  *
+ * `discrepancies` is defensively copied at construction, so a caller-held
+ * mutable list can never mutate a published report.
+ *
  * `matchedCount` counts business keys that reconciled cleanly (MATCHED is
  * intentionally omitted from `discrepancies` — we only surface problems).
  * `byType` is a convenience aggregation for summaries/alerting.
  */
-data class ReconciliationReport(
+class ReconciliationReport(
     val expectedCount: Int,
     val actualCount: Int,
     val matchedCount: Int,
-    val discrepancies: List<Discrepancy>,
+    discrepancies: List<Discrepancy>,
     val toleranceKrw: Long,
 ) {
+    val discrepancies: List<Discrepancy> = discrepancies.toList()
+
     val discrepancyCount: Int get() = discrepancies.size
 
     val clean: Boolean get() = discrepancies.isEmpty()

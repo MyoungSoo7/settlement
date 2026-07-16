@@ -42,7 +42,7 @@ public class CompanyReputationChangedConsumer extends IdempotentEventConsumer {
         this.ingestCompanyReputationUseCase = ingestCompanyReputationUseCase;
     }
 
-    @KafkaListener(topics = "${app.kafka.topic.company-reputation-changed}", groupId = CONSUMER_GROUP)
+    @KafkaListener(topics = "${app.kafka.topic.company-reputation-changed}", groupId = CONSUMER_GROUP, containerFactory = "kafkaListenerContainerFactory")
     @Transactional
     public void onReputationChanged(ConsumerRecord<String, String> record, Acknowledgment ack) {
         consume(record, ack);

@@ -2,6 +2,7 @@ package github.lms.lemuel.loan.application.service;
 
 import github.lms.lemuel.loan.application.port.out.AppendLedgerPort;
 import github.lms.lemuel.loan.application.port.out.LoadCorporateLoanPort;
+import github.lms.lemuel.loan.application.port.out.LoanMetricsPort;
 import github.lms.lemuel.loan.application.port.out.PublishCorporateLoanEventPort;
 import github.lms.lemuel.loan.application.port.out.SaveCorporateLoanPort;
 import github.lms.lemuel.loan.domain.CorporateLoan;
@@ -32,10 +33,11 @@ class DisburseCorporateLoanServiceTest {
     @Mock SaveCorporateLoanPort saveCorporateLoanPort;
     @Mock AppendLedgerPort appendLedgerPort;
     @Mock PublishCorporateLoanEventPort publishCorporateLoanEventPort;
+    @Mock LoanMetricsPort loanMetricsPort;
 
     private DisburseCorporateLoanService service() {
         return new DisburseCorporateLoanService(loadCorporateLoanPort, saveCorporateLoanPort,
-                appendLedgerPort, publishCorporateLoanEventPort);
+                appendLedgerPort, publishCorporateLoanEventPort, loanMetricsPort);
     }
 
     private CorporateLoan requested(BigDecimal principal, BigDecimal fee) {
@@ -61,6 +63,7 @@ class DisburseCorporateLoanServiceTest {
                 .containsExactly("CORP_DISBURSE", "CORP_FEE");
 
         verify(publishCorporateLoanEventPort).publishDisbursed(any());
+        verify(loanMetricsPort).corporateDisbursed();
     }
 
     @Test
@@ -85,5 +88,6 @@ class DisburseCorporateLoanServiceTest {
         verify(saveCorporateLoanPort, never()).save(any());
         verify(appendLedgerPort, never()).append(any());
         verify(publishCorporateLoanEventPort, never()).publishDisbursed(any());
+        verify(loanMetricsPort, never()).corporateDisbursed();
     }
 }

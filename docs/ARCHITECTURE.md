@@ -13,19 +13,19 @@
 
 | # | 서비스 | 포트 | 도메인 / 역할 |
 |---|---|---|---|
-| 1 | **order-service** | 8088 | 커머스 코어 — user·order·payment·cart·shipping·product·category·coupon·review. settlement-service 를 라이브러리로 번들 |
+| 1 | **order-service** | 8088 | 커머스 코어 — user·order·payment·cart·shipping·product·category·coupon·review + 정합성 부속(recon·프로젝션 백필) |
 | 2 | **settlement-service** | 8082/8083 | 정산 코어 — 정산 상태머신·Outbox·역정산·원장(복식부기)·payout·정산 검색(ES). ADR 0020 으로 독립 프로세스 분리 |
 | 3 | **gateway-service** | 8080 | API Gateway (Spring Cloud Gateway) — 라우팅·인증·레이트리밋 |
-| 4 | **loan-service** | — | 선정산·기업대출 (settlement 확정 이벤트 수신) |
+| 4 | **loan-service** | 8084 | 선정산·기업대출 (settlement 확정 이벤트 수신) |
 | 5 | **account-service** | 8102 | 계정계 — 집계·시산표·잔액·현금 인식(payout) |
 | 6 | **organization-service** | 8104 | 조직/멤버십 |
-| 7 | **operation-service** | — | 운영관제 콘솔 (ADMIN 전용, ops 이벤트) |
+| 7 | **operation-service** | 8092 | 운영관제 콘솔 (ADMIN 전용, ops 이벤트) |
 | 8 | **investment-service** | 8100/8101 | 투자 — 규칙 스크리닝 추천·투자점수·재원·매매계획 |
 | 9 | **financial-statements-service** | 8086 | 코스피 상장사 재무제표 (DART) |
 | 10 | **economics-service** | 8087 | 경제지표 (한국은행 ECOS) |
 | 11 | **company-service** | 8090 | 기업 뉴스·평판 (LLM 감성분석) |
 | 12 | **market-service** | 8094 | 주식 시세 (일별 종가 시계열) |
-| 13 | **common-data-service** | — | 공공데이터 |
+| 13 | **common-data-service** | 8098 | 공공데이터포털 범용 커넥터 (SSRF 가드) |
 | 14 | **ai-service** | 8096 | AI 챗봇 (Gemini/Claude provider 스위치) |
 
 > **shared-common** — 버전드 플랫폼 라이브러리(ADR 0021, composite build + maven-publish). JWT SecurityConfig · Outbox · 멱등 인프라 · JacksonCompat 등 코어 서비스가 공유. *서비스가 아니라 라이브러리.*

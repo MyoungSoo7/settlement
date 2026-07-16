@@ -2,6 +2,7 @@ package github.lms.lemuel.reconciliation.application
 
 import github.lms.lemuel.reconciliation.domain.ReconRecord
 import github.lms.lemuel.reconciliation.domain.ReconciliationEngine
+import github.lms.lemuel.reconciliation.domain.ReconciliationInvariantViolationException
 import github.lms.lemuel.reconciliation.domain.ReconciliationReport
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -16,7 +17,7 @@ import org.springframework.stereotype.Service
  * sources are fetched in parallel, not serially, then diffed by the pure engine.
  */
 @Service
-class ReconciliationService {
+class ReconciliationService : RunReconciliationUseCase {
 
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -24,7 +25,7 @@ class ReconciliationService {
      * Reconcile pre-supplied record lists (used by POST /reconciliation/run).
      * Engine is instantiated per-call so tolerance is request-scoped.
      */
-    fun reconcileRecords(
+    override fun reconcileRecords(
         expected: List<ReconRecord>,
         actual: List<ReconRecord>,
         toleranceKrw: Long,
@@ -40,13 +41,17 @@ class ReconciliationService {
      * the scope propagates it — callers that must fail-open (the scheduler)
      * wrap this in their own try/catch.
      */
-    suspend fun reconcileFromSources(
+    override suspend fun reconcileFromSources(
         sources: List<ReconciliationSource>,
         period: ReconPeriod,
-        toleranceKrw: Long = 1,
+        toleranceKrw: Long,
     ): ReconciliationReport = coroutineScope {
-        require(sources.any { it.role == SourceRole.EXPECTED }) { "need >=1 EXPECTED source" }
-        require(sources.any { it.role == SourceRole.ACTUAL }) { "need >=1 ACTUAL source" }
+        if (sources.none { it.role == SourceRole.EXPECTED }) {
+            throw ReconciliationInvariantViolationException("need >=1 EXPECTED source")
+        }
+        if (sources.none { it.role == SourceRole.ACTUAL }) {
+            throw ReconciliationInvariantViolationException("need >=1 ACTUAL source")
+        }
 
         // Kick every source off concurrently, keeping its role alongside the Deferred.
         val fetches = sources.map { src ->

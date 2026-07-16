@@ -50,4 +50,26 @@ class FundingViewPersistenceAdapterTest {
 
         assertThat(adapter().sumConfirmedBySeller(777L)).isEqualByComparingTo("2000000");
     }
+
+    @Test
+    @DisplayName("sumConfirmedBySellerForUpdate 는 FOR UPDATE 로 잡은 행들의 amount 를 합산한다")
+    void sumConfirmedForUpdate() {
+        when(repository.findBySellerAndStatusForUpdate(777L, FundingViewStatus.CONFIRMED))
+                .thenReturn(java.util.List.of(
+                        new SellerFundingViewJpaEntity(1L, 777L, new BigDecimal("1200000"),
+                                FundingViewStatus.CONFIRMED, java.time.LocalDateTime.now()),
+                        new SellerFundingViewJpaEntity(2L, 777L, new BigDecimal("800000"),
+                                FundingViewStatus.CONFIRMED, java.time.LocalDateTime.now())));
+
+        assertThat(adapter().sumConfirmedBySellerForUpdate(777L)).isEqualByComparingTo("2000000");
+    }
+
+    @Test
+    @DisplayName("sumConfirmedBySellerForUpdate 는 재원 행이 없으면 0 을 반환한다")
+    void sumConfirmedForUpdateEmpty() {
+        when(repository.findBySellerAndStatusForUpdate(404L, FundingViewStatus.CONFIRMED))
+                .thenReturn(java.util.List.of());
+
+        assertThat(adapter().sumConfirmedBySellerForUpdate(404L)).isEqualByComparingTo("0");
+    }
 }

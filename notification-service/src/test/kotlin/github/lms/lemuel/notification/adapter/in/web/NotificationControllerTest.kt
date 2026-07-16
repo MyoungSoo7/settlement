@@ -48,6 +48,22 @@ class NotificationControllerTest {
     }
 
     @Test
+    fun `blank recipient is rejected as 400 not 500`() {
+        val body = mapOf(
+            "recipient" to " ",
+            "subject" to "s",
+            "body" to "b",
+        )
+        mockMvc.perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/notifications/send")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(body)),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.error").value("BAD_REQUEST"))
+    }
+
+    @Test
     fun `send endpoint accepts a body and dispatches`() {
         val body = mapOf(
             "type" to "PAYMENT_CONFIRMED",

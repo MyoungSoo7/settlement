@@ -1,6 +1,7 @@
 package github.lms.lemuel.investment.application.service;
 
 import github.lms.lemuel.investment.application.exception.InsufficientFundingException;
+import github.lms.lemuel.investment.application.port.out.InvestmentMetricsPort;
 import github.lms.lemuel.investment.application.port.out.LoadFundingViewPort;
 import github.lms.lemuel.investment.application.port.out.LoadInvestmentOrderPort;
 import github.lms.lemuel.investment.application.port.out.PublishInvestmentEventPort;
@@ -29,10 +30,11 @@ class ExecuteInvestmentOrderServiceTest {
     @Mock LoadFundingViewPort loadFundingViewPort;
     @Mock SaveInvestmentOrderPort saveInvestmentOrderPort;
     @Mock PublishInvestmentEventPort publishInvestmentEventPort;
+    @Mock InvestmentMetricsPort investmentMetricsPort;
 
     private ExecuteInvestmentOrderService service() {
         return new ExecuteInvestmentOrderService(loadInvestmentOrderPort, loadFundingViewPort,
-                saveInvestmentOrderPort, publishInvestmentEventPort);
+                saveInvestmentOrderPort, publishInvestmentEventPort, investmentMetricsPort);
     }
 
     private static InvestmentOrder requested() {
@@ -43,7 +45,7 @@ class ExecuteInvestmentOrderServiceTest {
     @Test
     void 재원충분하면_승인집행하고_이벤트를_발행한다() {
         when(loadInvestmentOrderPort.load(5L)).thenReturn(requested());
-        when(loadFundingViewPort.sumConfirmedBySeller(7L)).thenReturn(new BigDecimal("2000000"));
+        when(loadFundingViewPort.sumConfirmedBySellerForUpdate(7L)).thenReturn(new BigDecimal("2000000"));
         when(loadInvestmentOrderPort.sumExecutedAmountBySeller(7L)).thenReturn(new BigDecimal("500000"));
         when(saveInvestmentOrderPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -51,6 +53,7 @@ class ExecuteInvestmentOrderServiceTest {
 
         assertThat(result.getStatus()).isEqualTo(InvestmentOrderStatus.EXECUTED);
         verify(publishInvestmentEventPort).publishExecuted(any());
+        verify(investmentMetricsPort).orderExecuted(new BigDecimal("1000000"));
     }
 
     @Test
@@ -62,12 +65,13 @@ class ExecuteInvestmentOrderServiceTest {
 
         verify(saveInvestmentOrderPort, never()).save(any());
         verify(publishInvestmentEventPort, never()).publishExecuted(any());
+        verify(investmentMetricsPort, never()).orderExecuted(any());
     }
 
     @Test
     void 집행시점_재원부족이면_주문을_REJECTED로_저장하고_예외이며_이벤트를_발행하지_않는다() {
         when(loadInvestmentOrderPort.load(5L)).thenReturn(requested());
-        when(loadFundingViewPort.sumConfirmedBySeller(7L)).thenReturn(new BigDecimal("1000000"));
+        when(loadFundingViewPort.sumConfirmedBySellerForUpdate(7L)).thenReturn(new BigDecimal("1000000"));
         when(loadInvestmentOrderPort.sumExecutedAmountBySeller(7L)).thenReturn(new BigDecimal("500000"));
         when(saveInvestmentOrderPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -79,5 +83,7 @@ class ExecuteInvestmentOrderServiceTest {
         verify(saveInvestmentOrderPort).save(captor.capture());
         assertThat(captor.getValue().getStatus()).isEqualTo(InvestmentOrderStatus.REJECTED);
         verify(publishInvestmentEventPort, never()).publishExecuted(any());
+        verify(investmentMetricsPort).orderExecutionRejectedInsufficientFunding();
+        verify(investmentMetricsPort, never()).orderExecuted(any());
     }
 }

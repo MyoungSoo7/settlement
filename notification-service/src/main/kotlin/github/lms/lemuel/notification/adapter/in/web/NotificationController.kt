@@ -1,8 +1,8 @@
 package github.lms.lemuel.notification.adapter.`in`.web
 
 import github.lms.lemuel.notification.application.ChannelResult
+import github.lms.lemuel.notification.application.DispatchNotificationUseCase
 import github.lms.lemuel.notification.application.DispatchResult
-import github.lms.lemuel.notification.application.NotificationDispatcher
 import github.lms.lemuel.notification.domain.Notification
 import github.lms.lemuel.notification.domain.NotificationType
 import kotlinx.coroutines.runBlocking
@@ -40,7 +40,7 @@ data class DispatchResponse(
 @RestController
 @RequestMapping("/notifications")
 class NotificationController(
-    private val dispatcher: NotificationDispatcher,
+    private val dispatcher: DispatchNotificationUseCase,
 ) {
 
     @PostMapping("/send")

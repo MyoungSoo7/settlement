@@ -1,5 +1,6 @@
 package github.lms.lemuel.ledger.domain;
 
+import github.lms.lemuel.common.ledger.LedgerInvariants;
 import github.lms.lemuel.common.money.Money;
 import github.lms.lemuel.ledger.domain.exception.InvalidLedgerStateException;
 import github.lms.lemuel.ledger.domain.exception.LedgerInvariantViolationException;
@@ -182,12 +183,11 @@ public class LedgerEntry {
         if (debitAccount == null || creditAccount == null) {
             throw new LedgerInvariantViolationException("debitAccount, creditAccount 모두 필수");
         }
-        if (debitAccount == creditAccount) {
-            throw new UnbalancedLedgerEntryException(debitAccount);
-        }
-        if (amount == null || amount.signum() <= 0) {
-            throw new LedgerInvariantViolationException("amount 는 양수여야 합니다: " + amount);
-        }
+        // 구성적 균형(차변≠대변 + 양수 금액)은 공용 LedgerInvariants 단일 출처로 강제한다.
+        LedgerInvariants.requireDistinctAccounts(debitAccount, creditAccount,
+                () -> new UnbalancedLedgerEntryException(debitAccount));
+        LedgerInvariants.requirePositiveAmount(amount,
+                () -> new LedgerInvariantViolationException("amount 는 양수여야 합니다: " + amount));
         if (settlementDate == null) {
             throw new LedgerInvariantViolationException("settlementDate 필수");
         }

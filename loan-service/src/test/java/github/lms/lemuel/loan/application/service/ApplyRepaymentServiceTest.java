@@ -3,6 +3,7 @@ package github.lms.lemuel.loan.application.service;
 import github.lms.lemuel.loan.application.port.in.ApplyRepaymentUseCase.ApplyRepaymentCommand;
 import github.lms.lemuel.loan.application.port.out.AppendLedgerPort;
 import github.lms.lemuel.loan.application.port.out.LoadLoanPort;
+import github.lms.lemuel.loan.application.port.out.LoanMetricsPort;
 import github.lms.lemuel.loan.application.port.out.PublishLoanEventPort;
 import github.lms.lemuel.loan.application.port.out.RecordRepaymentPort;
 import github.lms.lemuel.loan.application.port.out.SaveLoanPort;
@@ -33,10 +34,11 @@ class ApplyRepaymentServiceTest {
     @Mock SaveSettlementViewPort saveSettlementViewPort;
     @Mock PublishLoanEventPort publishLoanEventPort;
     @Mock AppendLedgerPort appendLedgerPort;
+    @Mock LoanMetricsPort loanMetricsPort;
 
     private ApplyRepaymentService service() {
         return new ApplyRepaymentService(loadLoanPort, saveLoanPort, recordRepaymentPort,
-                saveSettlementViewPort, publishLoanEventPort, appendLedgerPort);
+                saveSettlementViewPort, publishLoanEventPort, appendLedgerPort, loanMetricsPort);
     }
 
     private LoanAdvance disbursed(long id, BigDecimal outstanding) {
@@ -60,6 +62,7 @@ class ApplyRepaymentServiceTest {
         verify(recordRepaymentPort).record(eq(100L), eq(7L), eq(new BigDecimal("800000.00")));
         verify(publishLoanEventPort).publishRepaymentApplied(100L, 7L, new BigDecimal("800000.00"));
         verify(saveSettlementViewPort).markConfirmed(100L);
+        verify(loanMetricsPort).repaymentApplied(new BigDecimal("800000.00"));
     }
 
     @Test
@@ -72,6 +75,8 @@ class ApplyRepaymentServiceTest {
         verify(recordRepaymentPort).record(101L, 7L, BigDecimal.ZERO);
         verify(publishLoanEventPort).publishRepaymentApplied(101L, 7L, BigDecimal.ZERO);
         verify(saveLoanPort, never()).save(any());
+        // 차감 0이어도 상환 처리 발생은 카운트한다(멱등 통지 경로).
+        verify(loanMetricsPort).repaymentApplied(BigDecimal.ZERO);
     }
 
     @Test
@@ -116,5 +121,6 @@ class ApplyRepaymentServiceTest {
         verify(saveLoanPort, never()).save(any());
         verify(publishLoanEventPort, never()).publishRepaymentApplied(org.mockito.ArgumentMatchers.anyLong(),
                 org.mockito.ArgumentMatchers.anyLong(), any());
+        verify(loanMetricsPort, never()).repaymentApplied(any());
     }
 }

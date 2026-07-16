@@ -60,4 +60,61 @@ class SettlementSearchControllerTest {
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.aggregations.statusCounts.DONE").value(1));
     }
+
+    @Test
+    @DisplayName("size=0 → 400 (0 나눗셈·무의미 페이지 차단)")
+    void rejectsZeroSize() throws Exception {
+        mockMvc.perform(get("/api/settlements/search").param("size", "0"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("size=-1 → 400 (음수 LIMIT 차단)")
+    void rejectsNegativeSize() throws Exception {
+        mockMvc.perform(get("/api/settlements/search").param("size", "-1"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("size=201 → 400 (상한 200 초과 무상한 스캔 차단)")
+    void rejectsTooLargeSize() throws Exception {
+        mockMvc.perform(get("/api/settlements/search").param("size", "201"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("page=-1 → 400 (음수 OFFSET 차단)")
+    void rejectsNegativePage() throws Exception {
+        mockMvc.perform(get("/api/settlements/search").param("page", "-1"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("startDate > endDate → 400 (기간 역전)")
+    void rejectsReversedDateRange() throws Exception {
+        mockMvc.perform(get("/api/settlements/search")
+                        .param("startDate", "2026-06-30")
+                        .param("endDate", "2026-06-01"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("잘못된 날짜 형식 → 400")
+    void rejectsMalformedDate() throws Exception {
+        mockMvc.perform(get("/api/settlements/search").param("startDate", "notadate"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("size=200 경계값 → 200 OK")
+    void acceptsUpperBoundSize() throws Exception {
+        SettlementAggregationsResponse agg = new SettlementAggregationsResponse(
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, Map.of());
+        when(searchRepository.search(any(), any(), any(), any(), any(), any(),
+                anyInt(), anyInt(), anyString(), anyString()))
+                .thenReturn(new SettlementPageResponse(List.of(), 0L, 0, 0, 200, agg));
+
+        mockMvc.perform(get("/api/settlements/search").param("size", "200"))
+                .andExpect(status().isOk());
+    }
 }

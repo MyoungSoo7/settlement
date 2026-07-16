@@ -79,6 +79,24 @@ public class InternalReconController {
         return new AmountResponse(repository.sumCompletedRefundsByIds(request.refundIds()));
     }
 
+    @Operation(summary = "일일 캡처 결제 키셋 체크섬 — INV-12 프로젝션 diff 1차 스크리닝",
+            description = "count·금액합·정렬 id md5 3-스칼라만 반환. settlement 프로젝션과 이 셋이 어긋날 때만 payment-keys 로 행 diff")
+    @GetMapping("/payment-keys-checksum")
+    public ReconQueryRepository.PaymentKeyChecksum paymentKeyChecksum(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return repository.paymentKeyChecksum(date);
+    }
+
+    @Operation(summary = "일일 캡처 결제 키 페이지 (INV-12 diff 용)",
+            description = "id 키셋 페이지네이션 — afterId 초과분 (id, amount) 목록. PII 없음(키+금액만). limit 상한 2000")
+    @GetMapping("/payment-keys")
+    public List<ReconQueryRepository.PaymentKeyRow> paymentKeys(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(defaultValue = "0") long afterId,
+            @RequestParam(defaultValue = "1000") int limit) {
+        return repository.listPaymentKeys(date, afterId, Math.min(Math.max(limit, 1), 2000));
+    }
+
     @Operation(summary = "영업일 결제 행 (PG 대사용)", description = "CAPTURED/REFUNDED 이면서 pg_transaction_id 보유분")
     @GetMapping("/captured-payments")
     public List<ReconQueryRepository.ReconPaymentRow> capturedPayments(

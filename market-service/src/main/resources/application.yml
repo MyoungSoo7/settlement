@@ -40,6 +40,9 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+    # 샘플 시드 마이그레이션 제거 — 기존 DB(이미 적용된 시드)를 "missing"으로 관대 처리.
+    # 신규 배포는 시드 없이 실데이터(KRX 자동 수집 스케줄러)로만 채운다.
+    ignore-migration-patterns: "*:missing"
 
   cache:
     type: caffeine
@@ -97,3 +100,7 @@ app:
       page-size: 1000
     sync:
       request-interval-ms: 150   # data.go.kr 쿼터 보호용 페이지 호출 간격
+      schedule:
+        cron: "0 30 7 * * *"     # 매일 07:30 KST 자동 KRX 수집 (data.go.kr T+1 지연 고려)
+        zone: Asia/Seoul
+        lookback-days: 3         # 최근 3일 재조회 (주말/지연 갭 흡수, 거래일 아니면 0건)

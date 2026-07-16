@@ -1,7 +1,7 @@
 package github.lms.lemuel.notification.adapter.`in`.kafka
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import github.lms.lemuel.notification.application.NotificationDispatcher
+import github.lms.lemuel.notification.application.DispatchNotificationUseCase
 import github.lms.lemuel.notification.domain.NotificationTemplate
 import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
@@ -23,7 +23,7 @@ import org.springframework.stereotype.Component
 @Component
 @ConditionalOnProperty(prefix = "app.kafka", name = ["enabled"], havingValue = "true")
 class DomainEventListener(
-    private val dispatcher: NotificationDispatcher,
+    private val dispatcher: DispatchNotificationUseCase,
     private val objectMapper: ObjectMapper,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
@@ -44,10 +44,20 @@ class DomainEventListener(
         @Header(name = KafkaHeaders.RECEIVED_KEY, required = false) key: String?,
     ) {
         try {
+            // Parse failure is NOT silently degraded to an empty map: an unparseable
+            // payload on a contract topic means contract drift — surface it (warn with
+            // context) and SKIP, instead of fabricating a spurious GENERIC alert to the
+            // fallback recipient. Poison messages still never kill the container.
             @Suppress("UNCHECKED_CAST")
             val fields: Map<String, Any?> = runCatching {
                 objectMapper.readValue(payload, Map::class.java) as Map<String, Any?>
-            }.getOrElse { emptyMap() }
+            }.getOrElse { parseError ->
+                log.warn(
+                    "unparseable event payload — skipping (contract drift?) topic={} key={} cause={}",
+                    topic, key, parseError.toString(),
+                )
+                return
+            }
 
             // eventId for idempotency: prefer explicit field, then kafka key.
             val eventId = (fields["eventId"] ?: fields["id"] ?: key)?.toString()

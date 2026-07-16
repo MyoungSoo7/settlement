@@ -31,7 +31,7 @@ class InvestmentOrderPersistenceAdapterTest {
 
     private static InvestmentOrderJpaEntity entity(long id, InvestmentOrderStatus status, LocalDateTime createdAt) {
         return new InvestmentOrderJpaEntity(id, 7L, "005930", new BigDecimal("1000000"),
-                82, "AA", status, createdAt);
+                82, "AA", status, createdAt, 0L);
     }
 
     @Test
@@ -107,6 +107,21 @@ class InvestmentOrderPersistenceAdapterTest {
 
         assertThat(orders).hasSize(2);
         assertThat(orders).extracting(InvestmentOrder::getId).containsExactly(1L, 2L);
+    }
+
+    @Test
+    @DisplayName("save 는 load 시점 낙관적 락 version 을 엔티티에 되싣는다(merge 충돌 판정용)")
+    void carriesVersionForOptimisticLock() {
+        LocalDateTime now = LocalDateTime.now();
+        InvestmentOrder loaded = InvestmentOrder.reconstitute(5L, 7L, "005930",
+                new BigDecimal("1000000"), 82, "AA", InvestmentOrderStatus.APPROVED, now, 3L);
+        when(repository.save(any())).thenReturn(entity(5L, InvestmentOrderStatus.APPROVED, now));
+
+        adapter().save(loaded);
+
+        ArgumentCaptor<InvestmentOrderJpaEntity> captor = ArgumentCaptor.forClass(InvestmentOrderJpaEntity.class);
+        org.mockito.Mockito.verify(repository).save(captor.capture());
+        assertThat(captor.getValue().getVersion()).isEqualTo(3L);
     }
 
     @Test

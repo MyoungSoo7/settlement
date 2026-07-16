@@ -3,6 +3,7 @@ package github.lms.lemuel.loan.application.service;
 import github.lms.lemuel.loan.application.port.in.RequestLoanUseCase.RequestLoanCommand;
 import github.lms.lemuel.loan.application.port.out.LoadSellerReputationPort;
 import github.lms.lemuel.loan.application.port.out.LoadSettlementViewPort;
+import github.lms.lemuel.loan.application.port.out.LoanMetricsPort;
 import github.lms.lemuel.loan.application.port.out.SaveLoanPort;
 import github.lms.lemuel.loan.domain.LoanAdvance;
 import github.lms.lemuel.loan.domain.LoanStatus;
@@ -30,13 +31,15 @@ class RequestLoanServiceTest {
     @Mock LoadSettlementViewPort loadSettlementViewPort;
     @Mock LoadSellerReputationPort loadSellerReputationPort;
     @Mock SaveLoanPort saveLoanPort;
+    @Mock LoanMetricsPort loanMetricsPort;
 
     private final CreditPolicy creditPolicy = new CreditPolicy(new BigDecimal("0.80"), new BigDecimal("0.0002"),
             Map.of("A", BigDecimal.ONE, "B", BigDecimal.ONE, "C", new BigDecimal("0.85"),
                     "D", new BigDecimal("0.70"), "E", BigDecimal.ZERO));
 
     private RequestLoanService service() {
-        return new RequestLoanService(loadSettlementViewPort, loadSellerReputationPort, saveLoanPort, creditPolicy);
+        return new RequestLoanService(loadSettlementViewPort, loadSellerReputationPort, saveLoanPort,
+                creditPolicy, loanMetricsPort);
     }
 
     @Test
@@ -55,6 +58,7 @@ class RequestLoanServiceTest {
         assertThat(saved.getPrincipal()).isEqualByComparingTo("800000");
         assertThat(saved.getFee()).isEqualByComparingTo("800");
         assertThat(saved.getStatus()).isEqualTo(LoanStatus.REQUESTED);
+        verify(loanMetricsPort).advanceRequested();
     }
 
     @Test
@@ -68,6 +72,7 @@ class RequestLoanServiceTest {
                 .isInstanceOf(LoanInvariantViolationException.class);
 
         verify(saveLoanPort, never()).save(any());
+        verify(loanMetricsPort, never()).advanceRequested();
     }
 
     @Test
@@ -81,5 +86,6 @@ class RequestLoanServiceTest {
                 .isInstanceOf(LoanInvariantViolationException.class);
 
         verify(saveLoanPort, never()).save(any());
+        verify(loanMetricsPort, never()).advanceRequested();
     }
 }
