@@ -99,10 +99,11 @@ flowchart LR
 | **장애 격리** | settlement 다운돼도 결제는 계속 | 정산 배치는 비동기 — 즉시 처리 X |
 | **배포 주기** | 잦음 (UI 변경 동행) | 드뭄 (회계 사이클 단위) |
 
-→ 위 차이점이 명확하므로 **서비스 분리** 가 자연스러운 경계. **12개 서비스 모두 DB-per-service**
+→ 위 차이점이 명확하므로 **서비스 분리** 가 자연스러운 경계. **13개 서비스 모두 DB-per-service**
 (order=opslab · settlement=settlement_db · loan=lemuel_loan · financial=lemuel_financial ·
 economics=lemuel_economics · company=lemuel_company · operation=lemuel_operation · market=lemuel_market ·
-ai=lemuel_ai · commondata=lemuel_commondata · investment=lemuel_investment · account=lemuel_account) 로 물리 분리하고,
+ai=lemuel_ai · commondata=lemuel_commondata · investment=lemuel_investment · account=lemuel_account ·
+organization=lemuel_organization) 로 물리 분리하고,
 연계는 **Kafka 이벤트로만** 한다. order↔settlement 는 settlement 가 자체 DB 에 이벤트 프로젝션을 적재하는
 CQRS 로 분리하고, 대사는 order 의 내부 API 를 호출해 cross-DB 연결 0 을 유지한다
 ([ADR 0020](docs/adr/0020-order-settlement-db-split.md) — 완료).
@@ -673,10 +674,10 @@ CI 에서 k6 thresholds 로 회귀 자동 감지.
 
 ## 운영 환경 확장 포인트
 
-현재 구성은 **12개 서비스 모두 DB-per-service** 로 물리 분리돼 있고(order=opslab · settlement=settlement_db ·
+현재 구성은 **13개 서비스 모두 DB-per-service** 로 물리 분리돼 있고(order=opslab · settlement=settlement_db ·
 loan=lemuel_loan · financial=lemuel_financial · economics=lemuel_economics · company=lemuel_company ·
 operation=lemuel_operation · market=lemuel_market · ai=lemuel_ai · commondata=lemuel_commondata ·
-investment=lemuel_investment · account=lemuel_account),
+investment=lemuel_investment · account=lemuel_account · organization=lemuel_organization),
 이벤트 프로젝션 패턴 덕분에 다음 단계로의 확장이 깨끗합니다:
 
 1. ~~**DB 분리**~~ — ✅ 완료. settlement 가 자체 `settlement_db` 의 projection 테이블에 Kafka 이벤트 컨슈머가

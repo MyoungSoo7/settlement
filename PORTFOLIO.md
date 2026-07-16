@@ -13,11 +13,11 @@
 | 항목 | 수치 |
 |---|---|
 | **Java / Spring Boot** | 25 / 4.0.4 |
-| **마이크로서비스** | **12 비즈니스 서비스 + API Gateway** + `shared-common` 라이브러리 |
-| **DB 분리** | **DB-per-service (12 DB 물리 분리, cross-DB 연결 0)** — opslab / settlement_db / lemuel_loan … |
-| **Flyway 마이그레이션** | **260 개** (order 142 / settlement·loan·company 등 분산) |
-| **ADR** | **25 개** (0001 ~ 0026, 0019 결번) |
-| **테스트** | **테스트 소스 846개 파일** — 핵심 정산 모듈 **520 테스트 실측 통과** |
+| **마이크로서비스** | **13 비즈니스 서비스 + API Gateway** + `shared-common` 라이브러리 |
+| **DB 분리** | **DB-per-service (13 DB 물리 분리, cross-DB 연결 0)** — opslab / settlement_db / lemuel_loan … |
+| **Flyway 마이그레이션** | **195 개** (order 86 / settlement·loan·company 등 분산) |
+| **ADR** | **26 개** (0001 ~ 0027, 0019 결번) |
+| **테스트** | **테스트 소스 578개 파일** — 핵심 정산 모듈 **520 테스트 실측 통과** |
 | **커버리지 (검증)** | **정산 모듈 LINE 94.17%** (게이트 90%) — [SETTLEMENT-VERIFICATION.md](docs/SETTLEMENT-VERIFICATION.md) |
 | **부하테스트** | 4 시나리오 (k6) |
 

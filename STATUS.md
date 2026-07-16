@@ -11,7 +11,7 @@
   - 공개조회 위성: financial(8086) · economics(8087) · company(8090) · market(8094) · commondata(8098)
   - 부가: operation(8092) · ai(8096) · organization(8104, 셀러/기업 조직·멤버십)
 - **DB:** 13 서비스 모두 물리 분리(DB-per-service) — opslab / settlement_db / lemuel_{loan,financial,economics,company,operation,market,ai,commondata,investment,account,organization}
-- **최근 커밋:** `df52185ce` chore(seed): 데모 콘텐츠 시드 제거 — 로그인/구조 시드만 유지
+- **최근 커밋:** `d90603184` feat(loan): 상환 스케줄 시뮬레이션 — 원금·기간·이자율·상환방식 회차 계산
 
 ## 최근 진척 (2026-06-24 이후)
 - **위성·확장 서비스 9종 추가** — financial·economics·company(ADR 0023)·operation·market·ai·commondata·investment·account.
@@ -50,7 +50,7 @@
 - 서비스 **13개** + API Gateway — `git ls-files '*/src/main/resources/application.yml' | wc -l` → 14(=13+gateway)
 - Flyway 마이그레이션 **195개** — `git ls-files '*/src/main/resources/db/migration/*.sql' | wc -l` → 195
 - ADR **26개** (0001~0027, 0019 결번) — `git ls-files 'docs/adr/[0-9]*.md' | wc -l` → 26
-- 테스트 클래스 **576개** (Testcontainers 통합테스트 포함) — `git ls-files '*/src/test/*Test.java' '*/src/test/*Tests.java' '*/src/test/*IT.java' | wc -l` → 576
+- 테스트 클래스 **578개** (Testcontainers 통합테스트 포함) — `git ls-files '*/src/test/*Test.java' '*/src/test/*Tests.java' '*/src/test/*IT.java' | wc -l` → 578
 
 ## 참고 문서
 - `SPEC.md` — 전체 기능명세(엔드포인트·도메인 규칙·이벤트 카탈로그)
