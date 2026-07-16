@@ -17,7 +17,7 @@ spring:
               # prefix 가 혼재한다: 거래/회원/인증계는 비-/api(/auth,/users,/orders,/payments,/coupons,
               # /reviews,/games,/categories,/memberships,/products), 상품/카테고리/태그/환불이력은 /api.
               predicates:
-                - Path=/auth/**,/users/**,/orders/**,/payments/**,/coupons/**,/reviews/**,/games/**,/categories/**,/memberships/**,/products/**,/api/products/**,/api/categories/**,/api/tags/**,/api/payments/**,/admin/categories/**,/admin/products/**,/admin/pg/**,/admin/menus/**,/admin/common-codes/**,/admin/rbac/**
+                - Path=/auth/**,/users/**,/orders/**,/payments/**,/coupons/**,/reviews/**,/games/**,/categories/**,/memberships/**,/products/**,/api/products/**,/api/categories/**,/api/tags/**,/api/payments/**,/admin/categories/**,/admin/products/**,/admin/pg/**,/admin/menus/**,/admin/common-codes/**,/admin/rbac/**,/admin/settlement-projection/**
             - id: loan-service
               uri: ${LOAN_SERVICE_URI:http://localhost:8084}
               predicates:
@@ -76,7 +76,7 @@ spring:
               uri: ${SETTLEMENT_SERVICE_URI:http://localhost:8082}
               # SettlementController 는 /settlements(비-/api), 검색/원장/리포트는 /api, 운영 콘솔은 /admin.
               predicates:
-                - Path=/settlements/**,/api/settlements/**,/api/ledger/**,/api/reports/**,/admin/payouts/**,/admin/chargebacks/**,/admin/pg-reconciliation/**,/admin/reconciliation/**,/admin/dlq/**,/admin/settlement-projection/**
+                - Path=/settlements/**,/api/settlements/**,/api/ledger/**,/api/reports/**,/admin/payouts/**,/admin/chargebacks/**,/admin/pg-reconciliation/**,/admin/reconciliation/**,/admin/dlq/**
 
 server:
   port: 8080
