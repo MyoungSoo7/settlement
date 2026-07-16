@@ -18,7 +18,11 @@ class ReconciliationEngine(
     private val toleranceKrw: Long = 1,
 ) {
     init {
-        require(toleranceKrw >= 0) { "toleranceKrw must be non-negative, was $toleranceKrw" }
+        if (toleranceKrw < 0) {
+            throw ReconciliationInvariantViolationException(
+                "toleranceKrw must be non-negative, was $toleranceKrw",
+            )
+        }
     }
 
     fun reconcile(expected: List<ReconRecord>, actual: List<ReconRecord>): ReconciliationReport {

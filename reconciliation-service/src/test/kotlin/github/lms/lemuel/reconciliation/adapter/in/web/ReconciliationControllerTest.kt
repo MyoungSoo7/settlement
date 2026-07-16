@@ -35,6 +35,20 @@ class ReconciliationControllerTest(@Autowired val mockMvc: MockMvc) {
     }
 
     @Test
+    fun `negative tolerance is rejected as 400 not 500`() {
+        val body = """
+            {"expected": [], "actual": [], "toleranceKrw": -1}
+        """.trimIndent()
+
+        mockMvc.post("/reconciliation/run") {
+            contentType = MediaType.APPLICATION_JSON
+            content = body
+        }
+            .andExpect { status { isBadRequest() } }
+            .andExpect { jsonPath("$.error") { value("BAD_REQUEST") } }
+    }
+
+    @Test
     fun `run reconciles supplied sets and honors tolerance`() {
         val body = """
             {

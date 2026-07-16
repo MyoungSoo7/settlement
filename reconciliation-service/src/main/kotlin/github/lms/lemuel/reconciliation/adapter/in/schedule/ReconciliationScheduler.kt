@@ -1,8 +1,8 @@
 package github.lms.lemuel.reconciliation.adapter.`in`.schedule
 
 import github.lms.lemuel.reconciliation.application.ReconPeriod
-import github.lms.lemuel.reconciliation.application.ReconciliationService
 import github.lms.lemuel.reconciliation.application.ReconciliationSource
+import github.lms.lemuel.reconciliation.application.RunReconciliationUseCase
 import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Scheduled
@@ -18,7 +18,7 @@ import java.time.LocalDate
  */
 @Component
 class ReconciliationScheduler(
-    private val service: ReconciliationService,
+    private val service: RunReconciliationUseCase,
     private val sources: List<ReconciliationSource>,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
