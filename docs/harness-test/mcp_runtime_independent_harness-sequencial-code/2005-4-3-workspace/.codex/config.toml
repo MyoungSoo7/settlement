@@ -1,0 +1,17 @@
+[features]
+hooks = true
+
+# review_parallel MCP 서버 (Claude Agent SDK ∥ codex exec). Codex 세션에서 tool 로 호출.
+#
+# 주의(실측): `codex mcp list/get` 은 전역 ~/.codex/config.toml 만 읽는다. 이 프로젝트-로컬
+# [mcp_servers] 블록은 codex 가 자동으로 집어가지 않는다. 아래는 portable 템플릿이며,
+# 실제로 Codex 세션에서 쓰려면 전역에 등록한다 (전역 config 를 바꾸는 행위라 사용자가 직접 실행):
+#
+#   codex mcp add meeting-1pager-review -- \
+#     python3 <workspace-절대경로>/review_server.py
+#
+# 등록 확인: codex mcp get meeting-1pager-review
+# (args는 codex가 워크스페이스에서 실행될 때 기준의 상대경로. 전역 등록 시 codex mcp add가 $PWD로 절대경로를 넣는다.)
+[mcp_servers.meeting-1pager-review]
+command = "python3"
+args = ["review_server.py"]

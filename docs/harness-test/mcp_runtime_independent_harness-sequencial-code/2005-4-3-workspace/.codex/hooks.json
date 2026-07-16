@@ -1,0 +1,30 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .codex/hooks/session_start.py",
+            "timeout": 30,
+            "statusMessage": "Loading 2005-4-3 harness v2 state"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .codex/hooks/review_gate.py",
+            "timeout": 30,
+            "statusMessage": "review_gate precheck (handoff)"
+          }
+        ]
+      }
+    ]
+  }
+}

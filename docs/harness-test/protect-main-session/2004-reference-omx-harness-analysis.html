@@ -1,0 +1,877 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>OmX Harness Analysis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" />
+<style>
+/* fastcampus-keynote.css — inlined for standalone reference */
+:root{
+  --bg:#FAFAF7;
+  --bg-2:#F1EEE5;
+  --ink:#0A0A0A;
+  --ink-2:#3A3A38;
+  --ink-3:#7B7B76;
+  --rule:#0A0A0A;
+  --rule-soft:#C9C5B7;
+  --accent:#C73E1D;
+  --deck-scale:1.5;
+  --pretendard:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,monospace;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#1B1916;color:var(--ink);font-family:var(--pretendard);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-feature-settings:'ss01','case','tnum';overflow-x:hidden}
+a{color:inherit}
+
+.toolbar{position:fixed;top:calc(14px * var(--deck-scale));right:calc(18px * var(--deck-scale));z-index:1000;display:flex;gap:calc(8px * var(--deck-scale));font-family:var(--mono);font-size:calc(11px * var(--deck-scale));letter-spacing:.05em;color:#bfb9a8}
+.toolbar button{background:#2a2722;color:#e6e1d2;border:calc(1px * var(--deck-scale)) solid #3d3a32;padding:calc(6px * var(--deck-scale)) calc(10px * var(--deck-scale));border-radius:calc(2px * var(--deck-scale));cursor:pointer;font-family:var(--mono);font-size:calc(11px * var(--deck-scale));letter-spacing:.08em;text-transform:uppercase}
+.toolbar button:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+.helpbar{position:fixed;bottom:calc(14px * var(--deck-scale));left:calc(18px * var(--deck-scale));z-index:1000;font-family:var(--mono);font-size:calc(10px * var(--deck-scale));letter-spacing:.1em;color:#7e7866}
+
+.deck{display:flex;flex-direction:column;align-items:center;padding:calc(48px * var(--deck-scale)) 0 calc(80px * var(--deck-scale));gap:calc(36px * var(--deck-scale))}
+
+.slide{
+  position:relative;width:calc(1280px * var(--deck-scale));height:calc(720px * var(--deck-scale));background:var(--bg);
+  overflow:hidden;
+  box-shadow:0 calc(30px * var(--deck-scale)) calc(80px * var(--deck-scale)) calc(-30px * var(--deck-scale)) rgba(0,0,0,.5),0 calc(6px * var(--deck-scale)) calc(16px * var(--deck-scale)) calc(-6px * var(--deck-scale)) rgba(0,0,0,.3);
+  letter-spacing:-.005em;
+}
+.slide::before{content:'';position:absolute;top:calc(32px * var(--deck-scale));left:calc(64px * var(--deck-scale));right:calc(64px * var(--deck-scale));height:calc(1px * var(--deck-scale));background:var(--rule)}
+.slide::after{content:'';position:absolute;bottom:calc(32px * var(--deck-scale));left:calc(64px * var(--deck-scale));right:calc(64px * var(--deck-scale));height:calc(1px * var(--deck-scale));background:var(--rule)}
+
+.slide .meta-top,.slide .meta-bottom{
+  position:absolute;left:calc(64px * var(--deck-scale));right:calc(64px * var(--deck-scale));display:flex;justify-content:space-between;align-items:center;
+  font-family:var(--mono);font-size:calc(11px * var(--deck-scale));letter-spacing:.16em;text-transform:uppercase;color:var(--ink-2)
+}
+.slide .meta-top{top:calc(40px * var(--deck-scale))}
+.slide .meta-bottom{bottom:calc(40px * var(--deck-scale))}
+.slide .meta-bottom::before{content:'';position:absolute;left:0;bottom:calc(-30px * var(--deck-scale));width:calc(84px * var(--deck-scale));height:calc(18px * var(--deck-scale));background:url("../assets/fastcampus-logo-gray.png") no-repeat left center / contain;opacity:.38;pointer-events:none}
+.slide .meta-top .deck-title{display:flex;align-items:center;gap:calc(12px * var(--deck-scale))}
+.slide .meta-top .mark{width:calc(14px * var(--deck-scale));height:calc(14px * var(--deck-scale));border:calc(1.5px * var(--deck-scale)) solid var(--ink);border-radius:50%;position:relative}
+.slide .meta-top .mark::after{content:'';position:absolute;top:50%;left:50%;width:calc(5px * var(--deck-scale));height:calc(5px * var(--deck-scale));background:var(--accent);border-radius:50%;transform:translate(-50%,-50%)}
+.slide .meta-bottom .num{font-weight:600;color:var(--ink)}
+.slide .meta-bottom .accent{color:var(--accent)}
+.slide .body{position:absolute;top:calc(104px * var(--deck-scale));bottom:calc(104px * var(--deck-scale));left:calc(96px * var(--deck-scale));right:calc(96px * var(--deck-scale));display:flex;flex-direction:column;justify-content:center}
+
+.layout-cover .body{justify-content:space-between}
+.layout-cover .eyebrow{font-family:var(--mono);font-size:calc(12px * var(--deck-scale));letter-spacing:.22em;text-transform:uppercase;color:var(--accent)}
+.layout-cover h1{font-size:calc(104px * var(--deck-scale));font-weight:800;line-height:.98;letter-spacing:-.04em;margin-top:calc(18px * var(--deck-scale))}
+.layout-cover h1.chapter-full-title{font-size:calc(58px * var(--deck-scale));line-height:1.12;letter-spacing:0;max-width:calc(1040px * var(--deck-scale));word-break:keep-all;text-wrap:balance}
+.layout-cover h1 .title-fit{font-size:calc(82px * var(--deck-scale))}
+.layout-cover h1 em{font-style:normal;color:var(--accent)}
+.layout-cover h1 .underline{position:relative;display:inline-block}
+.layout-cover h1 .underline::after{content:'';position:absolute;left:0;right:0;bottom:calc(8px * var(--deck-scale));height:calc(6px * var(--deck-scale));background:var(--accent);z-index:-1;opacity:.85}
+.layout-cover .subtitle{font-size:calc(22px * var(--deck-scale));color:var(--ink-2);font-weight:400;max-width:calc(780px * var(--deck-scale));line-height:1.45;margin-top:calc(28px * var(--deck-scale))}
+.layout-cover .by{display:flex;gap:calc(48px * var(--deck-scale));align-items:flex-end;justify-content:space-between}
+.layout-cover .by .who{display:flex;flex-direction:column;gap:calc(4px * var(--deck-scale))}
+.layout-cover .by .name{font-size:calc(16px * var(--deck-scale));font-weight:600}
+.layout-cover .by .role{font-family:var(--mono);font-size:calc(11px * var(--deck-scale));color:var(--ink-3);letter-spacing:.12em;text-transform:uppercase}
+.layout-cover .by .stamp{font-family:var(--mono);font-size:calc(11px * var(--deck-scale));color:var(--ink-3);letter-spacing:.18em;text-align:right;line-height:1.6}
+.layout-cover .by .stamp.toc-area{font-family:var(--pretendard);font-size:calc(13px * var(--deck-scale));letter-spacing:0;text-align:right;line-height:1.45;max-width:calc(560px * var(--deck-scale));color:var(--ink-2)}
+.layout-cover .by .stamp.toc-area span,
+.layout-cover .by .stamp.toc-area a{display:block}
+.layout-cover .by .stamp.toc-area a{text-decoration:none}
+.layout-cover .by .stamp.toc-area a:hover,
+.layout-cover .by .stamp.toc-area a:focus-visible{color:var(--accent)}
+.layout-cover .by .stamp.toc-area a:focus-visible{outline:calc(1px * var(--deck-scale)) solid var(--accent);outline-offset:calc(3px * var(--deck-scale))}
+.layout-cover .by .stamp.toc-area .toc-label{font-family:var(--mono);font-size:calc(10px * var(--deck-scale));letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:calc(4px * var(--deck-scale))}
+.layout-cover .by .stamp.toc-area .toc-chapter{font-weight:700;color:var(--ink);margin-bottom:calc(6px * var(--deck-scale))}
+.layout-cover .by .stamp.toc-area .toc-module{font-weight:500;color:var(--ink-2)}
+
+.layout-divider .body{justify-content:center;gap:calc(28px * var(--deck-scale))}
+.layout-divider .part{font-family:var(--mono);font-size:calc(13px * var(--deck-scale));color:var(--accent);letter-spacing:.24em;text-transform:uppercase}
+.layout-divider h2{font-size:calc(96px * var(--deck-scale));font-weight:800;line-height:1.02;letter-spacing:-.035em;max-width:calc(1040px * var(--deck-scale))}
+.layout-divider .lede{font-size:calc(20px * var(--deck-scale));color:var(--ink-2);max-width:calc(760px * var(--deck-scale));line-height:1.55;margin-top:calc(8px * var(--deck-scale))}
+.layout-divider .step-reference{display:flex;align-items:center;gap:calc(10px * var(--deck-scale));flex-wrap:wrap;font-family:var(--mono);font-size:calc(11px * var(--deck-scale));letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2)}
+.layout-divider .step-reference a,
+.layout-divider .step-reference strong{display:inline-flex;align-items:center;min-height:calc(32px * var(--deck-scale));padding:calc(7px * var(--deck-scale)) calc(10px * var(--deck-scale));border:calc(1px * var(--deck-scale)) solid var(--rule);background:rgba(241,238,229,.55);text-decoration:none;font-weight:500}
+.layout-divider .step-reference a:hover,
+.layout-divider .step-reference a:focus-visible{color:var(--accent);border-color:var(--accent);outline:none}
+.layout-divider .step-reference strong{color:var(--accent);border-color:var(--accent);background:transparent}
+.layout-divider .step-reference .arrow{color:var(--accent)}
+
+.layout-statement h2{font-size:calc(60px * var(--deck-scale));font-weight:700;line-height:1.16;letter-spacing:-.028em;max-width:calc(1020px * var(--deck-scale))}
+.layout-statement .lede{font-size:calc(26px * var(--deck-scale));font-weight:400;line-height:1.55;color:var(--ink-2);max-width:calc(920px * var(--deck-scale));margin-top:calc(36px * var(--deck-scale))}
+.layout-statement .lede strong{color:var(--ink);font-weight:600}
+.layout-statement .lede em{color:var(--accent);font-style:normal;font-weight:600}
+.layout-statement .lede .br{display:block;height:calc(8px * var(--deck-scale))}
+.layout-statement.huge h2{font-size:calc(84px * var(--deck-scale));letter-spacing:-.035em;line-height:1.05}
+
+.layout-compare h2{font-size:calc(38px * var(--deck-scale));font-weight:700;letter-spacing:-.02em;margin-bottom:calc(24px * var(--deck-scale))}
+.layout-compare .grid{display:grid;grid-template-columns:1fr calc(1px * var(--deck-scale)) 1fr;gap:calc(48px * var(--deck-scale));align-items:start}
+.layout-compare .col .tag{font-family:var(--mono);font-size:calc(12px * var(--deck-scale));letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin-bottom:calc(18px * var(--deck-scale));display:flex;gap:calc(8px * var(--deck-scale));align-items:center}
+.layout-compare .col .tag::before{content:'';width:calc(18px * var(--deck-scale));height:calc(1px * var(--deck-scale));background:var(--accent)}
+.layout-compare .col h3{font-size:calc(30px * var(--deck-scale));font-weight:700;line-height:1.25;margin-bottom:calc(20px * var(--deck-scale));letter-spacing:-.015em}
+.layout-compare .col p{font-size:calc(19px * var(--deck-scale));line-height:1.6;color:var(--ink-2)}
+.layout-compare .col ul{list-style:none;display:flex;flex-direction:column;gap:calc(10px * var(--deck-scale));font-size:calc(18px * var(--deck-scale));color:var(--ink-2);line-height:1.55}
+.layout-compare .col ul li{padding-left:calc(18px * var(--deck-scale));position:relative}
+.layout-compare .col ul li::before{content:'';position:absolute;left:0;top:.7em;width:calc(8px * var(--deck-scale));height:calc(1px * var(--deck-scale));background:var(--ink-2)}
+.layout-compare .vline{background:var(--rule);align-self:stretch}
+.layout-compare .handoff-criteria-table{width:100%;border-collapse:collapse;margin-top:calc(24px * var(--deck-scale));border-top:calc(1.5px * var(--deck-scale)) solid var(--rule);table-layout:fixed}
+.layout-compare .handoff-criteria-table th{text-align:left;padding:calc(9px * var(--deck-scale)) calc(12px * var(--deck-scale));font-family:var(--mono);font-size:calc(10.5px * var(--deck-scale));text-transform:uppercase;color:var(--accent);letter-spacing:.12em;border-bottom:calc(1px * var(--deck-scale)) solid var(--rule-soft);font-weight:500}
+.layout-compare .handoff-criteria-table td{padding:calc(10px * var(--deck-scale)) calc(12px * var(--deck-scale));border-bottom:calc(1px * var(--deck-scale)) solid var(--rule-soft);font-size:calc(14.5px * var(--deck-scale));line-height:1.4;vertical-align:top;color:var(--ink-2)}
+.layout-compare .handoff-criteria-table td.k{font-weight:700;color:var(--ink);width:calc(120px * var(--deck-scale));font-size:calc(15px * var(--deck-scale))}
+.layout-compare .handoff-criteria-table tr:last-child td{border-bottom:none}
+
+.layout-grid h2{font-size:calc(42px * var(--deck-scale));font-weight:700;letter-spacing:-.02em;margin-bottom:calc(44px * var(--deck-scale))}
+.layout-grid .cards{display:grid;gap:calc(28px * var(--deck-scale)) calc(48px * var(--deck-scale))}
+.layout-grid.cols-2 .cards{grid-template-columns:repeat(2,1fr)}
+.layout-grid.cols-3 .cards{grid-template-columns:repeat(3,1fr)}
+.layout-grid.cols-4 .cards{grid-template-columns:repeat(4,1fr)}
+.layout-grid .card{padding-top:calc(18px * var(--deck-scale));border-top:calc(1.5px * var(--deck-scale)) solid var(--rule)}
+.layout-grid .card .num{font-family:var(--mono);font-size:calc(12px * var(--deck-scale));letter-spacing:.16em;color:var(--accent);margin-bottom:calc(8px * var(--deck-scale))}
+.layout-grid .card h3{font-size:calc(24px * var(--deck-scale));font-weight:700;line-height:1.25;margin-bottom:calc(8px * var(--deck-scale));letter-spacing:-.012em}
+.layout-grid .card p{font-size:calc(15px * var(--deck-scale));color:var(--ink-2);line-height:1.55}
+.layout-grid .practice-checklist{margin-top:calc(30px * var(--deck-scale));padding-top:calc(16px * var(--deck-scale));border-top:calc(1.5px * var(--deck-scale)) solid var(--rule)}
+.layout-grid .practice-checklist h3{font-size:calc(19px * var(--deck-scale));font-weight:700;line-height:1.25;margin-bottom:calc(12px * var(--deck-scale))}
+.layout-grid .practice-checklist ul{list-style:none;display:grid;grid-template-columns:repeat(3,1fr);gap:calc(16px * var(--deck-scale))}
+.layout-grid .practice-checklist li{font-size:calc(14.5px * var(--deck-scale));line-height:1.45;color:var(--ink-2)}
+.layout-grid .practice-checklist strong{display:block;font-family:var(--mono);font-size:calc(11px * var(--deck-scale));letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:calc(4px * var(--deck-scale))}
+.layout-grid.compact-practice h2{margin-bottom:calc(32px * var(--deck-scale))}
+.layout-grid.compact-practice .cards{gap:calc(22px * var(--deck-scale)) calc(42px * var(--deck-scale))}
+.layout-grid.compact-practice .practice-checklist{margin-top:calc(24px * var(--deck-scale))}
+.layout-grid .practice-checklist.role-separation ul{grid-template-columns:repeat(4,1fr);gap:calc(14px * var(--deck-scale))}
+.layout-grid .practice-checklist.role-separation li{font-size:calc(13.5px * var(--deck-scale))}
+.layout-grid .practice-checklist.handoff-form li{font-size:calc(12.8px * var(--deck-scale));line-height:1.42}
+.layout-grid .practice-checklist.handoff-form strong{letter-spacing:.1em}
+.layout-grid .practice-checklist.question-cards ul{grid-template-columns:repeat(4,1fr);gap:calc(14px * var(--deck-scale))}
+.layout-grid .practice-checklist.question-cards li{font-size:calc(13.5px * var(--deck-scale))}
+.layout-grid .practice-checklist.requirement-table ul{grid-template-columns:repeat(4,1fr);gap:calc(14px * var(--deck-scale))}
+.layout-grid .practice-checklist.requirement-table li{font-size:calc(13.5px * var(--deck-scale))}
+.playground-roadmap-slide h2{margin-bottom:calc(24px * var(--deck-scale))}
+.playground-roadmap-slide .cards{gap:calc(18px * var(--deck-scale)) calc(40px * var(--deck-scale))}
+.playground-roadmap-slide .card{padding-top:calc(12px * var(--deck-scale))}
+.playground-roadmap-slide .card h3{font-size:calc(20px * var(--deck-scale))}
+.playground-roadmap-slide .card p{font-size:calc(13.2px * var(--deck-scale));line-height:1.42}
+.playground-roadmap-slide .practice-checklist{margin-top:calc(18px * var(--deck-scale));padding-top:calc(12px * var(--deck-scale))}
+.playground-roadmap-slide .practice-checklist h3{font-size:calc(17px * var(--deck-scale));margin-bottom:calc(8px * var(--deck-scale))}
+.playground-roadmap-slide .practice-checklist li{font-size:calc(12.5px * var(--deck-scale));line-height:1.35}
+.playground-roadmap-slide .roadmap-section{display:grid;grid-template-columns:repeat(3,1fr);gap:calc(12px * var(--deck-scale));margin-top:calc(14px * var(--deck-scale));padding-top:calc(12px * var(--deck-scale));border-top:calc(1.5px * var(--deck-scale)) solid var(--rule)}
+.playground-roadmap-slide .roadmap-step{border:calc(1px * var(--deck-scale)) solid var(--rule-soft);padding:calc(10px * var(--deck-scale)) calc(12px * var(--deck-scale));background:rgba(241,238,229,.42)}
+.playground-roadmap-slide .roadmap-step span{display:block;font-family:var(--mono);font-size:calc(10.5px * var(--deck-scale));letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:calc(6px * var(--deck-scale))}
+.playground-roadmap-slide .roadmap-step p{font-size:calc(12.4px * var(--deck-scale));line-height:1.38;color:var(--ink-2)}
+.mcp-necessity-slide h2{margin-bottom:calc(22px * var(--deck-scale))}
+.mcp-necessity-slide .cards{gap:calc(14px * var(--deck-scale)) calc(36px * var(--deck-scale))}
+.mcp-necessity-slide .card{padding-top:calc(10px * var(--deck-scale))}
+.mcp-necessity-slide .card h3{font-size:calc(19px * var(--deck-scale));margin-bottom:calc(5px * var(--deck-scale))}
+.mcp-necessity-slide .card p{font-size:calc(13px * var(--deck-scale));line-height:1.38}
+.mcp-decision-wrap{margin-top:calc(20px * var(--deck-scale));border-top:calc(1.5px * var(--deck-scale)) solid var(--rule);padding-top:calc(12px * var(--deck-scale))}
+.mcp-decision-wrap .table-title{font-family:var(--mono);font-size:calc(11px * var(--deck-scale));letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:calc(8px * var(--deck-scale))}
+.mcp-decision-table{width:100%;border-collapse:collapse;table-layout:fixed}
+.mcp-decision-table th{text-align:left;padding:calc(7px * var(--deck-scale)) calc(10px * var(--deck-scale));font-family:var(--mono);font-size:calc(10px * var(--deck-scale));text-transform:uppercase;color:var(--accent);letter-spacing:.12em;border-bottom:calc(1px * var(--deck-scale)) solid var(--rule-soft);font-weight:500}
+.mcp-decision-table td{padding:calc(8px * var(--deck-scale)) calc(10px * var(--deck-scale));border-bottom:calc(1px * var(--deck-scale)) solid var(--rule-soft);font-size:calc(13.2px * var(--deck-scale));line-height:1.35;vertical-align:top;color:var(--ink-2)}
+.mcp-decision-table td.k{width:calc(130px * var(--deck-scale));font-weight:700;color:var(--ink);font-size:calc(13.5px * var(--deck-scale))}
+.mcp-decision-table th:nth-child(1){width:calc(130px * var(--deck-scale))}
+.mcp-decision-table th:nth-child(3){width:calc(92px * var(--deck-scale))}
+.mcp-decision-table th:nth-child(4){width:calc(185px * var(--deck-scale))}
+.mcp-decision-table tr:last-child td{border-bottom:none}
+.session-architecture-slide h2{margin-bottom:calc(22px * var(--deck-scale))}
+.session-architecture-diagram{display:grid;grid-template-rows:calc(96px * var(--deck-scale)) calc(68px * var(--deck-scale)) calc(142px * var(--deck-scale)) calc(34px * var(--deck-scale));gap:calc(16px * var(--deck-scale))}
+.architecture-main,
+.architecture-rail,
+.arch-worker,
+.architecture-cues span{border:calc(1px * var(--deck-scale)) solid var(--rule);background:rgba(241,238,229,.58)}
+.architecture-main{width:58%;margin:0 auto;padding:calc(15px * var(--deck-scale)) calc(22px * var(--deck-scale));text-align:center;position:relative;display:flex;flex-direction:column;justify-content:center}
+.architecture-main::after{content:'';position:absolute;left:50%;bottom:calc(-17px * var(--deck-scale));width:calc(1px * var(--deck-scale));height:calc(16px * var(--deck-scale));background:var(--rule)}
+.architecture-main strong,
+.arch-worker strong{font-size:calc(21px * var(--deck-scale));line-height:1.25;letter-spacing:-.01em}
+.architecture-main span,
+.arch-worker span{font-size:calc(13.5px * var(--deck-scale));line-height:1.45;color:var(--ink-2);margin-top:calc(6px * var(--deck-scale))}
+.session-architecture-diagram .node-label,
+.session-architecture-diagram .rail-title{font-family:var(--mono);font-size:calc(10.5px * var(--deck-scale));letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:calc(7px * var(--deck-scale))}
+.architecture-rail{display:grid;grid-template-columns:calc(190px * var(--deck-scale)) 1fr;align-items:center;padding:calc(14px * var(--deck-scale)) calc(18px * var(--deck-scale));position:relative}
+.architecture-rail::after{content:'';position:absolute;left:50%;bottom:calc(-17px * var(--deck-scale));width:calc(1px * var(--deck-scale));height:calc(16px * var(--deck-scale));background:var(--rule)}
+.architecture-rail .rail-title{margin-bottom:0}
+.architecture-rail .rail-copy{font-size:calc(15.5px * var(--deck-scale));line-height:1.45;color:var(--ink-2)}
+.architecture-workers{display:grid;grid-template-columns:repeat(3,1fr);gap:calc(18px * var(--deck-scale))}
+.arch-worker{padding:calc(18px * var(--deck-scale)) calc(18px * var(--deck-scale)) calc(16px * var(--deck-scale));position:relative;display:flex;flex-direction:column;justify-content:center;min-height:calc(142px * var(--deck-scale))}
+.arch-worker::before{content:'';position:absolute;top:calc(-17px * var(--deck-scale));left:50%;width:calc(1px * var(--deck-scale));height:calc(16px * var(--deck-scale));background:var(--rule)}
+.architecture-cues{display:grid;grid-template-columns:repeat(3,1fr);gap:calc(18px * var(--deck-scale))}
+.architecture-cues span{display:flex;align-items:center;justify-content:center;padding:calc(7px * var(--deck-scale)) calc(10px * var(--deck-scale));font-family:var(--mono);font-size:calc(10.5px * var(--deck-scale));line-height:1.35;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);text-align:center}
+.layout-grid.work-prep-tree h2{margin-bottom:calc(24px * var(--deck-scale))}
+.layout-grid.work-prep-tree .cards{grid-template-columns:repeat(4,1fr);gap:calc(16px * var(--deck-scale)) calc(24px * var(--deck-scale))}
+.layout-grid.work-prep-tree .card{padding-top:calc(12px * var(--deck-scale))}
+.layout-grid.work-prep-tree .card h3{font-size:calc(18px * var(--deck-scale))}
+.layout-grid.work-prep-tree .card p{font-size:calc(12.5px * var(--deck-scale));line-height:1.45}
+.work-tree-diagram{margin-top:calc(18px * var(--deck-scale));border-top:calc(1.5px * var(--deck-scale)) solid var(--rule);padding-top:calc(14px * var(--deck-scale))}
+.work-tree-diagram .tree-title{font-family:var(--mono);font-size:calc(11px * var(--deck-scale));letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:calc(12px * var(--deck-scale))}
+.work-tree-diagram .tree-flow{display:grid;grid-template-columns:1fr 1.25fr 1.6fr;gap:calc(18px * var(--deck-scale));align-items:stretch}
+.work-tree-diagram .tree-node{border:calc(1px * var(--deck-scale)) solid var(--rule);background:rgba(241,238,229,.58);padding:calc(10px * var(--deck-scale)) calc(12px * var(--deck-scale));min-height:calc(64px * var(--deck-scale));display:flex;flex-direction:column;justify-content:center;position:relative}
+.work-tree-diagram .tree-node::after{content:'';position:absolute;top:50%;right:calc(-18px * var(--deck-scale));width:calc(18px * var(--deck-scale));height:calc(1px * var(--deck-scale));background:var(--rule)}
+.work-tree-diagram .tree-node strong{font-size:calc(15px * var(--deck-scale));line-height:1.25;letter-spacing:-.005em}
+.work-tree-diagram .tree-node span{font-size:calc(12.5px * var(--deck-scale));line-height:1.4;color:var(--ink-2);margin-top:calc(5px * var(--deck-scale))}
+.work-tree-diagram .tree-branch,.work-tree-diagram .tree-leaves{display:grid;gap:calc(8px * var(--deck-scale))}
+.work-tree-diagram .tree-leaves{grid-template-columns:repeat(2,1fr)}
+.work-tree-diagram .tree-leaves .tree-node{min-height:calc(56px * var(--deck-scale));padding:calc(9px * var(--deck-scale)) calc(10px * var(--deck-scale))}
+.work-tree-diagram .tree-leaves .tree-node::after{display:none}
+.work-tree-diagram .tree-leaves .tree-node strong{font-size:calc(13.5px * var(--deck-scale))}
+.work-tree-diagram .tree-leaves .tree-node span{font-size:calc(11.5px * var(--deck-scale))}
+
+.layout-table h2{font-size:calc(42px * var(--deck-scale));font-weight:700;letter-spacing:-.02em;margin-bottom:calc(36px * var(--deck-scale))}
+.layout-table table{width:100%;border-collapse:collapse}
+.layout-table th{text-align:left;padding:calc(14px * var(--deck-scale)) calc(18px * var(--deck-scale));font-family:var(--mono);font-size:calc(11px * var(--deck-scale));text-transform:uppercase;color:var(--accent);letter-spacing:.16em;border-bottom:calc(1.5px * var(--deck-scale)) solid var(--rule);font-weight:500}
+.layout-table td{padding:calc(18px * var(--deck-scale));border-bottom:calc(1px * var(--deck-scale)) solid var(--rule-soft);font-size:calc(18px * var(--deck-scale));line-height:1.45;vertical-align:top;color:var(--ink-2)}
+.layout-table td.k{font-weight:700;color:var(--ink);width:calc(240px * var(--deck-scale));font-size:calc(19px * var(--deck-scale))}
+.layout-table tr:last-child td{border-bottom:none}
+
+.layout-quote .quote{font-size:calc(46px * var(--deck-scale));font-weight:500;line-height:1.3;letter-spacing:-.02em;max-width:calc(1040px * var(--deck-scale));color:var(--ink)}
+.layout-quote .quote::before{content:'\201C';color:var(--accent);font-family:Georgia,serif;font-size:1.1em;line-height:0;vertical-align:-.15em;margin-right:.05em}
+.layout-quote .quote::after{content:'\201D';color:var(--accent);font-family:Georgia,serif;font-size:1.1em;line-height:0;vertical-align:-.45em;margin-left:.05em}
+.layout-quote .attr{font-family:var(--mono);font-size:calc(13px * var(--deck-scale));color:var(--ink-2);margin-top:calc(36px * var(--deck-scale));letter-spacing:.12em;text-transform:uppercase}
+.layout-quote .attr .src{color:var(--accent)}
+
+.layout-story h2{font-size:calc(48px * var(--deck-scale));font-weight:700;letter-spacing:-.025em;margin-bottom:calc(36px * var(--deck-scale));max-width:calc(980px * var(--deck-scale));line-height:1.15}
+.layout-story .stack{display:flex;flex-direction:column;gap:calc(18px * var(--deck-scale));max-width:calc(1020px * var(--deck-scale))}
+.layout-story .row{display:flex;gap:calc(22px * var(--deck-scale));align-items:baseline}
+.layout-story .row .n{font-family:var(--mono);font-size:calc(13px * var(--deck-scale));color:var(--accent);letter-spacing:.16em;flex:0 0 calc(56px * var(--deck-scale))}
+.layout-story .row p{font-size:calc(22px * var(--deck-scale));line-height:1.45;color:var(--ink)}
+
+.layout-image .body{display:grid;grid-template-columns:1fr calc(460px * var(--deck-scale));gap:calc(48px * var(--deck-scale));align-items:center}
+.layout-image h2{font-size:calc(52px * var(--deck-scale));font-weight:750;line-height:1.12;letter-spacing:-.03em}
+.layout-image .lede{font-size:calc(22px * var(--deck-scale));line-height:1.5;color:var(--ink-2);margin-top:calc(26px * var(--deck-scale));max-width:calc(660px * var(--deck-scale))}
+.image-frame{border:calc(1px * var(--deck-scale)) solid var(--rule);background:var(--bg-2);height:calc(360px * var(--deck-scale));overflow:hidden}
+.image-frame img{width:100%;height:100%;object-fit:cover;display:block;filter:grayscale(100%) contrast(1.03)}
+
+.portrait{position:absolute;top:calc(130px * var(--deck-scale));right:calc(96px * var(--deck-scale));width:calc(240px * var(--deck-scale));height:calc(240px * var(--deck-scale));background:var(--bg-2);border:calc(1px * var(--deck-scale)) solid var(--rule);overflow:hidden;display:flex;align-items:center;justify-content:center;filter:grayscale(100%) contrast(1.05)}
+.portrait img{width:100%;height:100%;object-fit:cover;display:block}
+.portrait .credit{position:absolute;bottom:calc(-22px * var(--deck-scale));left:0;right:0;font-family:var(--mono);font-size:calc(9.5px * var(--deck-scale));color:var(--ink-3);letter-spacing:.15em;text-transform:uppercase;text-align:center;white-space:nowrap}
+.has-portrait .body{padding-right:calc(280px * var(--deck-scale))}
+.has-portrait .body h2,.has-portrait .body .quote{max-width:calc(780px * var(--deck-scale))}
+.has-portrait .body .lede{max-width:calc(780px * var(--deck-scale))}
+
+.slide.dark{background:#0A0A0A;color:#F4F1E8}
+.slide.dark::before,.slide.dark::after{background:#F4F1E8;opacity:.18}
+.slide.dark .meta-top,.slide.dark .meta-bottom{color:#bfb9a8}
+.slide.dark .meta-bottom .num{color:#fff}
+.slide.dark .meta-top .mark{border-color:#F4F1E8}
+.slide.dark .layout-cover h1,.slide.dark h1{color:#F4F1E8}
+.slide.dark .by .name{color:#F4F1E8}
+.slide.dark .by .role,.slide.dark .by .stamp{color:#bfb9a8}
+.slide.dark.layout-cover .by .stamp.toc-area .toc-label{color:var(--accent)}
+.slide.dark.layout-cover .by .stamp.toc-area .toc-chapter{color:#F4F1E8}
+.slide.dark.layout-cover .by .stamp.toc-area .toc-module{color:#bfb9a8}
+.slide.dark.layout-cover .by .stamp.toc-area a:hover,
+.slide.dark.layout-cover .by .stamp.toc-area a:focus-visible{color:var(--accent)}
+.slide.dark .meta-bottom::before{opacity:.32}
+.layout-cover.closing .body{right:calc(96px * var(--deck-scale))}
+.layout-cover.closing h1{font-size:calc(76px * var(--deck-scale));line-height:1.05;letter-spacing:-.035em;max-width:calc(840px * var(--deck-scale))}
+.layout-cover.closing .subtitle{color:#bfb9a8;max-width:calc(640px * var(--deck-scale))}
+
+.qr-card{position:absolute;background:#fff;border:calc(1px * var(--deck-scale)) solid rgba(10,10,10,.16);display:flex;align-items:center;justify-content:center}
+.qr-card img{display:block;width:100%;height:100%;object-fit:contain}
+.qr-label{position:absolute;font-family:var(--mono);font-size:calc(9px * var(--deck-scale));letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);white-space:nowrap}
+.speaker-link{font-family:var(--mono);font-size:calc(12px * var(--deck-scale));letter-spacing:.14em;color:var(--ink-3);margin-top:calc(10px * var(--deck-scale));text-transform:none}
+
+.notes{width:calc(1280px * var(--deck-scale));padding:calc(22px * var(--deck-scale)) calc(32px * var(--deck-scale));background:#F1EEE5;border:calc(1px * var(--deck-scale)) solid #D8D4C5;font-size:calc(13.5px * var(--deck-scale));color:#2a2825;line-height:1.65;display:none;border-radius:0}
+.show-notes .notes{display:block}
+.notes .head{display:flex;justify-content:space-between;font-family:var(--mono);font-size:calc(10px * var(--deck-scale));letter-spacing:.18em;text-transform:uppercase;color:#7a7466;margin-bottom:calc(10px * var(--deck-scale))}
+.notes .head .accent{color:var(--accent)}
+.notes h4{font-size:calc(14px * var(--deck-scale));font-weight:700;margin-bottom:calc(6px * var(--deck-scale));color:#1a1815}
+.notes p{margin:0 0 calc(8px * var(--deck-scale))}
+.notes ul{margin:calc(6px * var(--deck-scale)) 0 calc(8px * var(--deck-scale)) calc(18px * var(--deck-scale))}
+.notes a{color:var(--accent);word-break:break-all}
+.notes .cite{font-family:var(--mono);font-size:calc(11px * var(--deck-scale));color:#7a7466;margin-top:calc(6px * var(--deck-scale));letter-spacing:.04em}
+
+.present{background:#0A0A0A;overflow:hidden;height:100vh}
+.present .toolbar,.present .helpbar{display:none}
+.present .deck{padding:0;gap:0;min-height:100vh;height:100vh;justify-content:center;overflow:hidden}
+.present .deck .slide,.present .deck .notes{display:none}
+.present .deck .slide.active{display:block;transform:scale(var(--scale,1));transform-origin:center center}
+.present.show-notes .deck .notes.active{display:block;position:fixed;bottom:calc(24px * var(--deck-scale));left:50%;transform:translateX(-50%);max-width:calc(1100px * var(--deck-scale));background:#1F1D19;color:#E8E3D4;border-color:#2A2722;z-index:50}
+.present.show-notes .deck .notes.active h4{color:#fff}
+.present.show-notes .deck .notes.active{font-size:calc(13px * var(--deck-scale))}
+.present.show-notes .deck .notes.active a{color:#FF7A5A}
+.present.show-notes .deck .notes.active .head,.present.show-notes .deck .notes.active .cite{color:#a59f8c}
+
+@keyframes pulse{0%,100%{opacity:.4}50%{opacity:1}}
+.helpbar .blink{animation:pulse 2s ease-in-out infinite}
+
+@page{size:1920px 1080px;margin:0}
+@media print{
+  html,body{background:#fff}
+  .toolbar,.helpbar,.notes{display:none !important}
+  .deck{padding:0;gap:0}
+  .slide{box-shadow:none;page-break-after:always;break-after:page}
+}
+
+</style>
+<style>
+  :root {
+    --deck-scale: 1;
+  }
+  body, .slide, .notes {
+    word-break: keep-all;
+    overflow-wrap: break-word;
+    line-break: strict;
+  }
+  h1, h2, h3, .lede, .quote {
+    text-wrap: balance;
+  }
+  .source-line {
+    font-family: var(--mono);
+    font-size: calc(11px * var(--deck-scale));
+    color: var(--ink-3);
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    margin-top: calc(18px * var(--deck-scale));
+  }
+  .capability-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: calc(14px * var(--deck-scale));
+    margin-top: calc(34px * var(--deck-scale));
+  }
+  .capability {
+    border-top: calc(1.5px * var(--deck-scale)) solid var(--rule);
+    padding-top: calc(14px * var(--deck-scale));
+  }
+  .capability strong {
+    display: block;
+    font-size: calc(19px * var(--deck-scale));
+    line-height: 1.25;
+    margin-bottom: calc(8px * var(--deck-scale));
+  }
+  .capability span {
+    display: block;
+    color: var(--ink-2);
+    font-size: calc(13.5px * var(--deck-scale));
+    line-height: 1.42;
+  }
+  .compact-table td {
+    font-size: calc(16px * var(--deck-scale));
+    line-height: 1.42;
+    padding: calc(14px * var(--deck-scale)) calc(16px * var(--deck-scale));
+  }
+  .compact-table td.k {
+    width: calc(210px * var(--deck-scale));
+    font-size: calc(17px * var(--deck-scale));
+  }
+  .figure-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    margin-top: calc(22px * var(--deck-scale));
+  }
+  .figure-wrap svg {
+    width: 100%;
+    height: auto;
+    max-width: calc(1080px * var(--deck-scale));
+  }
+  .diagram-title {
+    font-size: 22px;
+    font-weight: 760;
+    fill: #1a1a1a;
+  }
+  .diagram-label {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 1.4px;
+    fill: #9b6b3f;
+  }
+  .diagram-copy {
+    font-size: 13px;
+    fill: #5b5b5b;
+  }
+  .diagram-small {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px;
+    fill: #6f6a5f;
+  }
+  .figure-caption {
+    font-family: var(--mono);
+    font-size: calc(11px * var(--deck-scale));
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    text-align: center;
+    margin-top: calc(12px * var(--deck-scale));
+  }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <button id="btnPresent">Present (P)</button>
+  <button id="btnNotes">Notes (N)</button>
+  <button id="btnPrint">Print PDF</button>
+</div>
+<div class="helpbar"><span class="blink">▸</span>&nbsp; ←/→ navigate · P present · N notes · ESC overview · Cmd+P export PDF</div>
+
+<main class="deck" id="deck">
+
+<section class="slide layout-cover" data-num="1">
+  <div class="meta-top">
+    <span class="deck-title"><span class="mark"></span> FAST CAMPUS · CASE STUDY</span>
+    <span>CHAPTER 04</span>
+  </div>
+  <div class="body">
+    <div>
+      <div class="eyebrow">OMX HARNESS ANALYSIS</div>
+      <h1 class="chapter-full-title">oh-my-codex / OmX<br/>런타임이 소유하는 진실, 그리고 그 경계</h1>
+      <p class="subtitle">OmX는 Codex CLI 위의 workflow layer이면서, dispatch·worker·goal 상태를 event로 소유하는 런타임 코어를 가진다. 관찰 목표는 둘이다 — 어떤 claim이 LLM 판단 없이 런타임 로그로 검증되는가, 그리고 어디서 멈추는가.</p>
+      <div class="source-line">Source: github.com/Yeachan-Heo/oh-my-codex · read-only observation · 2026-06-03</div>
+    </div>
+    <div class="by">
+      <div class="who">
+        <span class="name">4-4 · 프로젝트 2 및 케이스 스터디</span>
+        <span class="role">event-sourcing · evidence-grounded verify · 5장 연결</span>
+      </div>
+      <div class="stamp">CLAIM<br/>vs LOG</div>
+    </div>
+  </div>
+  <div class="meta-bottom"><span>OMX CASE STUDY</span><span><span class="num">01</span> / 10</span></div>
+</section>
+<aside class="notes" data-for="1">
+  <div class="head"><span><span class="accent">●</span> SPEAKER NOTES</span><span>SLIDE 01 / 10</span></div>
+  <p>이전 버전은 OmX를 "runtime surface vs workflow layer"로만 읽고 event-sourcing 코어를 빠뜨렸다. 이번 분석의 한 줄은 "OmX는 런타임이 진실을 소유하는 사례다 — 단 operation·binding 고도까지고, claim을 replay로 재도출하는 일은 5장 Ouroboros가 맡는다"이다.</p>
+</aside>
+
+<section class="slide layout-compare" data-num="2">
+  <div class="meta-top">
+    <span class="deck-title"><span class="mark"></span> OMX HARNESS ANALYSIS</span>
+    <span>POSITIONING</span>
+  </div>
+  <div class="body">
+    <h2>OmX를 무엇으로 볼 것인가</h2>
+    <div class="grid">
+      <div class="col">
+        <div class="tag">IS</div>
+        <h3>런타임이 상태를 소유하는 사례</h3>
+        <ul>
+          <li>Codex CLI 위에 얹는 workflow layer이면서, dispatch·worker·authority를 event로 소유하는 Rust 코어가 있다.</li>
+          <li>delivered·integrated 같은 operation claim은 LLM이 아니라 런타임 상태가 판정한다.</li>
+          <li>goal 완료 claim을 hash로 frozen 상태에 묶는 append-only ledger가 있다.</li>
+        </ul>
+      </div>
+      <div class="vline"></div>
+      <div class="col">
+        <div class="tag">IS NOT</div>
+        <h3>복제할 도구도, 빈 껍데기도 아님</h3>
+        <ul>
+          <li>특정 런타임을 정답으로 두지 않고, 설치·실행·성능을 주장하지 않는다.</li>
+          <li>"OmX엔 event store가 없다"는 틀렸다 — 두 고도에서 이미 event를 소유한다.</li>
+          <li>다만 log를 replay해 claim을 재도출하는 일은 OmX 밖이다. 그건 5장 Ouroboros.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="meta-bottom"><span>READ-ONLY LENS</span><span><span class="num">02</span> / 10</span></div>
+</section>
+<aside class="notes" data-for="2">
+  <div class="head"><span><span class="accent">●</span> SPEAKER NOTES</span><span>SLIDE 02 / 10</span></div>
+  <p>정정 포인트를 분명히 한다. 예전 슬라이드는 event-store·replay를 5장 전용으로 미뤘는데, OmX는 operational 상태기계와 goal ledger 두 군데에서 이미 event를 소유한다. 5장이 더하는 건 "log를 source of truth로 두고 replay로 재도출"하는 부분이다.</p>
+</aside>
+
+<section class="slide layout-grid cols-3" data-num="3">
+  <div class="meta-top">
+    <span class="deck-title"><span class="mark"></span> OMX HARNESS ANALYSIS</span>
+    <span>WHAT OMX ACTUALLY IS</span>
+  </div>
+  <div class="body">
+    <h2>OmX의 실제 구조 — 세 층</h2>
+    <div class="cards">
+      <div class="card"><div class="num">L1 · WORKFLOW</div><h3>Node.js 패키지</h3><p><code>npm i -g oh-my-codex</code> + <code>omx setup</code>. role keyword·skills·<code>$deep-interview → $ralplan → $ultragoal</code> 흐름을 얹는다. CLI/JSON이 canonical control plane, MCP는 옵션.</p></div>
+      <div class="card"><div class="num">L2 · RUNTIME</div><h3>Rust crates</h3><p><code>omx-runtime-core</code>가 dispatch·authority·worker 상태를 event로 소유한다. <code>omx-mux</code>는 tmux 전송. 상태 권위는 여기 있다.</p></div>
+      <div class="card"><div class="num">L3 · ENGINE</div><h3>Codex CLI</h3><p>실제 실행은 Codex가 한다 — OmX가 대체하지 않는다. 별도 prerequisite. OmX는 그 위에서 역할·상태·검수를 조직한다.</p></div>
+    </div>
+    <p class="figure-caption">workflow는 Node, 상태 권위는 Rust, 실행 엔진은 Codex — 세 층이 나뉘어 있다.</p>
+  </div>
+  <div class="meta-bottom"><span>THREE LAYERS</span><span><span class="num">03</span> / 10</span></div>
+</section>
+<aside class="notes" data-for="3">
+  <div class="head"><span><span class="accent">●</span> SPEAKER NOTES</span><span>SLIDE 03 / 10</span></div>
+  <p>중요한 사실 정정 — OmX 본체는 Rust 앱이 아니라 Codex CLI 위의 Node 패키지다. 다만 상태 권위(dispatch·worker·authority)는 Rust 코어 <code>omx-runtime-core</code>가 event-sourcing으로 소유한다. "폴더를 베끼자"가 아니라 "어느 층이 무엇을 진실로 소유하나"를 본다.</p>
+</aside>
+
+<section class="slide layout-statement" data-num="4">
+  <div class="meta-top">
+    <span class="deck-title"><span class="mark"></span> OMX HARNESS ANALYSIS</span>
+    <span>RUNTIME CORE</span>
+  </div>
+  <div class="body">
+    <h2 style="font-size:calc(36px * var(--deck-scale));line-height:1.08;">omx-runtime-core — command이 event가 되고, event가 진실이 된다</h2>
+    <div class="lede"><strong>command은 상태기계가 합법 전이로 받아들일 때만 event가 된다.</strong> 그래서 결과를 지어낼 수 없다 — event가 있다는 건 전이가 실제로 일어났다는 뜻이다. snapshot은 event_log를 replay해 재구성하므로 같은 log면 같은 상태다.</div>
+    <div class="figure-wrap" aria-label="OMX runtime core command-event-snapshot diagram">
+      <svg viewBox="0 0 1080 410" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="omx-runtime-core">
+        <title id="omx-runtime-core">OMX runtime core — command → event → log → snapshot → replay</title>
+        <defs>
+          <marker id="rcArrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#1a1a1a"/></marker>
+          <marker id="rcAccent" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#9b6b3f"/></marker>
+        </defs>
+        <g font-family="Pretendard Variable, Pretendard, sans-serif">
+          <rect x="28" y="56" width="168" height="86" fill="#fff" stroke="#1a1a1a" stroke-width="1.4"/>
+          <text x="112" y="84" text-anchor="middle" class="diagram-label">COMMAND</text>
+          <text x="112" y="108" text-anchor="middle" class="diagram-copy">queue-dispatch ·</text>
+          <text x="112" y="126" text-anchor="middle" class="diagram-copy">mark-delivered</text>
+
+          <line x1="196" y1="99" x2="232" y2="99" stroke="#1a1a1a" stroke-width="1.2" marker-end="url(#rcArrow)"/>
+
+          <rect x="236" y="44" width="226" height="110" fill="rgba(241,238,229,.6)" stroke="#1a1a1a" stroke-width="1.7"/>
+          <text x="349" y="72" text-anchor="middle" class="diagram-label">RUNTIMEENGINE</text>
+          <text x="349" y="98" text-anchor="middle" class="diagram-title" font-size="19">state machine</text>
+          <text x="349" y="122" text-anchor="middle" class="diagram-copy">합법 전이일 때만 통과</text>
+          <text x="349" y="142" text-anchor="middle" class="diagram-small">불법 전이 → InvalidTransition (거부)</text>
+
+          <line x1="462" y1="99" x2="498" y2="99" stroke="#1a1a1a" stroke-width="1.2" marker-end="url(#rcArrow)"/>
+
+          <rect x="502" y="56" width="150" height="86" fill="#fff" stroke="#1a1a1a" stroke-width="1.4"/>
+          <text x="577" y="84" text-anchor="middle" class="diagram-label">RUNTIMEEVENT</text>
+          <text x="577" y="108" text-anchor="middle" class="diagram-copy">dispatch-delivered</text>
+          <text x="577" y="126" text-anchor="middle" class="diagram-copy">worker.recovered</text>
+
+          <line x1="652" y1="99" x2="688" y2="99" stroke="#1a1a1a" stroke-width="1.2" marker-end="url(#rcArrow)"/>
+
+          <rect x="692" y="56" width="150" height="86" fill="#fff" stroke="#1a1a1a" stroke-width="1.4"/>
+          <text x="767" y="84" text-anchor="middle" class="diagram-label">EVENT_LOG</text>
+          <text x="767" y="108" text-anchor="middle" class="diagram-copy">Vec&lt;RuntimeEvent&gt;</text>
+          <text x="767" y="126" text-anchor="middle" class="diagram-copy">in-memory append</text>
+
+          <line x1="842" y1="99" x2="878" y2="99" stroke="#1a1a1a" stroke-width="1.2" marker-end="url(#rcArrow)"/>
+
+          <rect x="882" y="56" width="170" height="86" fill="#fff" stroke="#1a1a1a" stroke-width="1.4"/>
+          <text x="967" y="84" text-anchor="middle" class="diagram-label">SNAPSHOT</text>
+          <text x="967" y="108" text-anchor="middle" class="diagram-copy">backlog · authority</text>
+          <text x="967" y="126" text-anchor="middle" class="diagram-copy">readiness (파생)</text>
+
+          <path d="M767 142 L767 196 L420 196 L420 232" stroke="#1a1a1a" stroke-width="1.2" fill="none" marker-end="url(#rcArrow)"/>
+          <rect x="248" y="232" width="344" height="80" fill="#fff" stroke="#1a1a1a" stroke-width="1.4"/>
+          <text x="420" y="260" text-anchor="middle" class="diagram-label">PERSIST()</text>
+          <text x="420" y="285" text-anchor="middle" class="diagram-copy">events.json + snapshot.json</text>
+          <text x="420" y="303" text-anchor="middle" class="diagram-small">file lock · 통째 rewrite (file-append 아님)</text>
+
+          <line x1="592" y1="272" x2="640" y2="272" stroke="#1a1a1a" stroke-width="1.2" marker-end="url(#rcArrow)"/>
+          <rect x="644" y="232" width="350" height="80" fill="rgba(241,238,229,.6)" stroke="#1a1a1a" stroke-width="1.4"/>
+          <text x="819" y="260" text-anchor="middle" class="diagram-label">LOAD() = REPLAY</text>
+          <text x="819" y="285" text-anchor="middle" class="diagram-copy">replay_event 로 상태 재구성</text>
+          <text x="819" y="303" text-anchor="middle" class="diagram-small">같은 log → 동일 snapshot (round-trip 검증)</text>
+
+          <path d="M819 232 L819 168 L967 168 L967 142" stroke="#9b6b3f" stroke-width="1.3" fill="none" marker-end="url(#rcAccent)"/>
+
+          <text x="540" y="358" text-anchor="middle" class="diagram-small">dispatch lifecycle: pending → notified → delivered | failed   ·   readiness는 Rust 소유 진실에서 파생</text>
+          <text x="540" y="382" text-anchor="middle" class="diagram-small">한계: compact()가 종결 dispatch event를 지운다 → 현재 상태엔 결정적 replay, 영구 불변 audit ledger는 아님</text>
+        </g>
+      </svg>
+    </div>
+    <p class="figure-caption">claim-vs-log: delivered는 의견이 아니라 합법 전이가 남긴 event다.</p>
+  </div>
+  <div class="meta-bottom"><span>EVENT-SOURCED RUNTIME</span><span><span class="num">04</span> / 10</span></div>
+</section>
+<aside class="notes" data-for="4">
+  <div class="head"><span><span class="accent">●</span> SPEAKER NOTES</span><span>SLIDE 04 / 10</span></div>
+  <p>이 한 장이 정정의 핵심이다. <code>RuntimeEngine::process(command)</code>는 단일 변경 지점이고, 상태기계가 전이를 받아들여야만 event 하나가 <code>event_log</code>에 들어간다. <code>load()</code>는 event를 다시 replay해 동일 snapshot을 만든다(round-trip 테스트가 보장). 그래서 "delivered"는 LLM이 아니라 상태기계가 판정한다. 단 <code>events.json</code>은 통째 rewrite이고 <code>compact()</code>가 종결 event를 지우므로, 영구 불변 ledger는 아니다 — 그 부분이 5장이 더할 자리.</p>
+</aside>
+
+<section class="slide layout-table" data-num="5">
+  <div class="meta-top">
+    <span class="deck-title"><span class="mark"></span> OMX HARNESS ANALYSIS</span>
+    <span>TWO ALTITUDES</span>
+  </div>
+  <div class="body">
+    <h2>event를 소유하는 두 고도</h2>
+    <table class="compact-table">
+      <thead><tr><th>항목</th><th>operational · omx-runtime-core</th><th>goal ledger · .gjc/ultragoal</th></tr></thead>
+      <tbody>
+        <tr><td class="k">무엇을 소유</td><td>dispatch · authority · worker 상태기계</td><td>목표 lifecycle + completionVerification</td></tr>
+        <tr><td class="k">로그</td><td>event_log → events.json + snapshot.json</td><td>ledger.jsonl (append-only)</td></tr>
+        <tr><td class="k">결정성</td><td>replay로 현재 snapshot 재구성</td><td>hash로 claim을 frozen 상태에 binding</td></tr>
+        <tr><td class="k">검증되는 claim</td><td>delivered · integrated · 누가 lease 소유</td><td>"goal complete"가 이 quality-gate·snapshot에 묶임</td></tr>
+        <tr><td class="k">한계</td><td>compact()가 종결 event 삭제 → 불변 아님</td><td>테스트 재실행 X · log replay로 재도출 X</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="meta-bottom"><span>OPERATIONAL · GOAL</span><span><span class="num">05</span> / 10</span></div>
+</section>
+<aside class="notes" data-for="5">
+  <div class="head"><span><span class="accent">●</span> SPEAKER NOTES</span><span>SLIDE 05 / 10</span></div>
+  <p>두 고도를 구분한다. 아래(operational)는 런타임 상태기계가 전이를 소유하고 replay로 현재 상태를 재구성한다. 위(goal ledger)는 <code>ledger.jsonl</code>이 plan_created → goal_started → goal_checkpointed를 append-only로 남기고, checkpoint의 completionVerification 영수증이 qualityGateHash·gjcGoalSnapshotHash 등으로 claim을 frozen 상태에 묶는다. 둘 다 결정적이지만 "재도출"은 아니다.</p>
+</aside>
+
+<section class="slide layout-grid cols-3" data-num="6">
+  <div class="meta-top">
+    <span class="deck-title"><span class="mark"></span> OMX HARNESS ANALYSIS</span>
+    <span>VERIFY = EVIDENCE</span>
+  </div>
+  <div class="body">
+    <h2>검수는 LLM 판단이 아니라 evidence에 묶인다</h2>
+    <div class="cards">
+      <div class="card"><div class="num">PLANNER · ask</div><h3>성공 기준을 먼저</h3><p>outcome-first 계획 — success criteria, validation path, stop condition을 정한다.</p></div>
+      <div class="card"><div class="num">EXECUTOR · build</div><h3>증거를 남긴다</h3><p>edit-test-verify 후 무엇이 바뀌었는지 + validation evidence를 보고한다. chat-only 상태는 인정하지 않는다.</p></div>
+      <div class="card"><div class="num">VERIFIER · review</div><h3>claim을 증거로 검사</h3><p>claim → 가장 작은 검증 → 출력 확인 → 증거. 각 claim이 검증 command나 명시적 proof gap으로 추적된다.</p></div>
+    </div>
+    <p class="figure-caption">quality-gate-g001: APPROVE + blockers 0 + npm run build · node --test 844/844 ·  'integrated'는 git reachability(leader HEAD 도달)로 판정 — 의견 아님.</p>
+  </div>
+  <div class="meta-bottom"><span>PLANNER · EXECUTOR · VERIFIER</span><span><span class="num">06</span> / 10</span></div>
+</section>
+<aside class="notes" data-for="6">
+  <div class="head"><span><span class="accent">●</span> SPEAKER NOTES</span><span>SLIDE 06 / 10</span></div>
+  <p>OmX 검수는 산문 판단이 아니다. verifier는 claim을 명시하고 그것을 증명하는 최소 검증을 돌린 뒤 출력을 읽고 증거로 보고하며, 각 claim을 command나 proof gap으로 추적한다. team 통합 성공('integrated')은 git reachability라는 결정적 조건으로 판정한다. 얇은 LLM-기색 층은 리뷰의 APPROVE/CLEAR 권고 자체인데, 그것도 증거 인용과 빈 blocker 목록을 요구한다. ask/build/review 분업이 그대로 매핑된다.</p>
+</aside>
+
+<section class="slide layout-grid cols-3" data-num="7">
+  <div class="meta-top">
+    <span class="deck-title"><span class="mark"></span> OMX HARNESS ANALYSIS</span>
+    <span>C3 CONTROL · STATUS</span>
+  </div>
+  <div class="body">
+    <h2>제어와 상태 표면 — 그리고 그 한계</h2>
+    <div class="cards">
+      <div class="card"><div class="num">HOOKS</div><h3>native + fallback</h3><p>Codex native hook이 있으면 쓰고, 없으면 tmux/runtime fallback. <code>.omx/hooks/*.mjs</code> 플러그인은 정규화된 envelope(source: native|derived)를 쓴다.</p></div>
+      <div class="card"><div class="num">DELIVERY</div><h3>전송은 확인된다</h3><p><code>omx-mux</code>가 pane tail을 잡아 DeliveryConfirmation(Confirmed / Unconfirmed)을 낸다. 키 입력이 닿았는지를 확인하지, 작업이 끝났는지는 아니다.</p></div>
+      <div class="card"><div class="num">HUD STATE</div><h3>가변 JSON의 projection</h3><p>HUD는 session-scoped <code>.omx/state/*.json</code>을 읽는다. 상태마다 권위 owner가 하나, 나머지는 derivative evidence.</p></div>
+    </div>
+    <p class="figure-caption">상태가 가변·세션 한정이라 split-brain을 막는 reconciliation 계획이 따로 있다 — 즉 불변 event log의 projection은 아니다.</p>
+  </div>
+  <div class="meta-bottom"><span>STATUS → ROUTE + STATE</span><span><span class="num">07</span> / 10</span></div>
+</section>
+<aside class="notes" data-for="7">
+  <div class="head"><span><span class="accent">●</span> SPEAKER NOTES</span><span>SLIDE 07 / 10</span></div>
+  <p>"status → route + state log" 줄을 구체화한다. keyword가 route하고, hook이 상태를 갱신하고, HUD가 그 상태를 보여준다. 단 그 상태는 가변 JSON이라, stale·root-fallback을 막는 reconciliation 계획이 존재한다 — 이게 OmX가 HUD 수준에서는 event-sourced가 아니라는 증거다. delivered/integrated 같은 전송·라우팅 claim은 결정적으로 검증되지만, "작업이 목표를 만족했나"는 이 층의 범위 밖이다.</p>
+</aside>
+
+<section class="slide layout-compare" data-num="8">
+  <div class="meta-top">
+    <span class="deck-title"><span class="mark"></span> OMX HARNESS ANALYSIS</span>
+    <span>BRIDGE TO CHAPTER 05</span>
+  </div>
+  <div class="body">
+    <h2>OmX는 claim을 묶고, Ouroboros는 claim을 재도출한다</h2>
+    <div class="grid">
+      <div class="col">
+        <div class="tag">OMX · 4장</div>
+        <h3>claim을 binding</h3>
+        <ul>
+          <li>operation claim(delivered·integrated)은 합법 전이·git reachability로 결정적 검증.</li>
+          <li>goal 완료 claim은 hash-bound ledger가 frozen 상태에 묶는다.</li>
+          <li>한계: 테스트를 재실행하지 않고, log를 replay해 상태를 재도출하지 않는다.</li>
+        </ul>
+      </div>
+      <div class="vline"></div>
+      <div class="col">
+        <div class="tag">OUROBOROS · 5장</div>
+        <h3>claim을 re-derive</h3>
+        <ul>
+          <li>EventStore → EvidenceManifest → TraceGuard(rlm_forge) deliver gate.</li>
+          <li>AC claim이 admissible typed evidence를 인용했는지 구조적으로 검사 — self-report 대체.</li>
+          <li>log가 source of truth라, replay로 결과를 다시 도출한다 + capability graph.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="meta-bottom"><span>BIND vs RE-DERIVE</span><span><span class="num">08</span> / 10</span></div>
+</section>
+<aside class="notes" data-for="8">
+  <div class="head"><span><span class="accent">●</span> SPEAKER NOTES</span><span>SLIDE 08 / 10</span></div>
+  <p>정확한 연결 문장 — "append-only hash-bound ledger that binds claims(OmX, 4장) vs replayable deterministic event store that re-derives claims(Ouroboros, 5장)". 둘 다 'claim-vs-log, not claim-vs-judge'라는 같은 본능인데, OmX는 operation·binding 고도까지고, 5장이 그 규율을 goal/AC 고도로 끌어올려 log를 replay해 재도출한다.</p>
+</aside>
+
+<section class="slide layout-table" data-num="9">
+  <div class="meta-top">
+    <span class="deck-title"><span class="mark"></span> OMX HARNESS ANALYSIS</span>
+    <span>CAPABILITY MAP</span>
+  </div>
+  <div class="body">
+    <h2>관찰 결과를 4장 산출물로</h2>
+    <table class="compact-table">
+      <thead><tr><th>OmX 관찰 렌즈</th><th>역할</th><th>4장 산출물 / 5장으로 넘길 것</th></tr></thead>
+      <tbody>
+        <tr><td class="k">role keyword · skills</td><td>작업 호출 단위와 역할별 책임</td><td>4-1 ask / build / review protocol</td></tr>
+        <tr><td class="k">planner·executor·verifier</td><td>evidence-grounded 검수 분업</td><td>4-3 review gate (단 결정론은 아님)</td></tr>
+        <tr><td class="k">omx-runtime-core</td><td>dispatch·worker 상태를 event로 소유</td><td>4-4 graph의 node·guard·route 근거</td></tr>
+        <tr><td class="k">.gjc/ultragoal ledger</td><td>claim을 hash로 binding</td><td>5장 event store · replay · TraceGuard의 입력</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="meta-bottom"><span>CAPABILITY MAP</span><span><span class="num">09</span> / 10</span></div>
+</section>
+<aside class="notes" data-for="9">
+  <div class="head"><span><span class="accent">●</span> SPEAKER NOTES</span><span>SLIDE 09 / 10</span></div>
+  <p>OmX 관찰을 4장 산출물로 정리하되, 결정론 gate와 replay는 5장으로 넘긴다. 4-3 review gate는 evidence에 묶지만 결정론은 아니라는 점을 한 번 더 짚는다.</p>
+</aside>
+
+<section class="slide dark layout-cover closing" data-num="10">
+  <div class="meta-top">
+    <span class="deck-title"><span class="mark"></span> OMX HARNESS ANALYSIS</span>
+    <span>NEXT</span>
+  </div>
+  <div class="body">
+    <div>
+      <div class="eyebrow">TAKEAWAY</div>
+      <h1>런타임이 어디까지 진실을 소유하나</h1>
+      <p class="subtitle">OmX는 복제할 도구가 아니라, 어떤 claim이 LLM 판단 없이 런타임 로그로 검증되는지 보는 사례다. claim을 묶는 hash-bound ledger까지가 OmX(4장), claim을 replay로 재도출하는 event store가 Ouroboros(5장)다.</p>
+    </div>
+    <div class="by">
+      <div class="who">
+        <span class="name">Next · 5장 Ouroboros TraceGuard</span>
+        <span class="role">EventStore · EvidenceManifest · capability graph</span>
+      </div>
+      <div class="stamp">BIND<br/><span style="color:var(--accent)">RE-DERIVE</span></div>
+    </div>
+  </div>
+  <div class="meta-bottom"><span>END</span><span><span class="num">10</span> / 10</span></div>
+</section>
+<aside class="notes" data-for="10">
+  <div class="head"><span><span class="accent">●</span> SPEAKER NOTES</span><span>SLIDE 10 / 10</span></div>
+  <p>마지막 한 줄 — OmX는 claim을 binding하는 데까지 갔고(4장), claim을 replay로 재도출하는 일은 5장 Ouroboros가 맡는다. 둘 다 같은 규율: claim을 사람·LLM 판단이 아니라 log에 대조한다.</p>
+</aside>
+
+</main>
+
+<script>
+/* presenter.js — inlined for standalone reference */
+(function(){
+  const deck = document.getElementById('deck');
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const notes = Array.from(document.querySelectorAll('.notes'));
+  const total = slides.length;
+  const padWidth = String(total).length < 2 ? 2 : String(total).length;
+  const progressTotal = formatNumber(total);
+  const noteByDataFor = new Map(notes.map(note => [note.dataset.for, note]));
+  const slidePairs = slides.map((slide, index) => {
+    const ordinal = index + 1;
+    const dataNum = slide.dataset.num || String(ordinal);
+    const note = noteByDataFor.get(dataNum) || notes[index] || null;
+    return {slide, note, ordinal};
+  });
+  let idx = 0;
+
+  function formatNumber(value){
+    return String(value).padStart(padWidth, '0');
+  }
+
+  function syncProgress(){
+    slidePairs.forEach(({slide, note, ordinal}) => {
+      const current = formatNumber(ordinal);
+      slide.dataset.num = String(ordinal);
+
+      const progress = slide.querySelector('.meta-bottom > span:last-child');
+      if(progress){
+        const number = progress.querySelector('.num') || document.createElement('span');
+        number.className = 'num';
+        number.textContent = current;
+        progress.replaceChildren(number, document.createTextNode(` / ${progressTotal}`));
+      }
+
+      if(note){
+        note.dataset.for = String(ordinal);
+        const noteProgress = note.querySelector('.head > span:last-child');
+        if(noteProgress){
+          noteProgress.textContent = `SLIDE ${current} / ${progressTotal}`;
+        }
+      }
+    });
+  }
+
+  function activate(i){
+    if(!total) return;
+    idx = Math.max(0, Math.min(total - 1, i));
+    slides.forEach((slide, k) => slide.classList.toggle('active', k === idx));
+    notes.forEach(note => note.classList.remove('active'));
+    slidePairs[idx]?.note?.classList.add('active');
+
+    if(document.body.classList.contains('present')){
+      const slide = slides[idx];
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const slideWidth = slide.offsetWidth || 1920;
+      const slideHeight = slide.offsetHeight || 1080;
+      const margin = document.body.classList.contains('show-notes') ? 260 : 0;
+      const sx = vw / slideWidth;
+      const sy = (vh - margin) / slideHeight;
+      const scale = Math.min(sx, sy) * (document.body.classList.contains('show-notes') ? 0.94 : 1);
+      slide.style.setProperty('--scale', scale.toFixed(3));
+    } else {
+      slides[idx].scrollIntoView({behavior:'smooth', block:'start'});
+    }
+  }
+
+  function togglePresent(){
+    document.body.classList.toggle('present');
+    if(document.body.classList.contains('present')){
+      activate(idx);
+    } else {
+      slides.forEach(slide => slide.style.removeProperty('--scale'));
+    }
+  }
+
+  function toggleNotes(){
+    document.body.classList.toggle('show-notes');
+    activate(idx);
+  }
+
+  document.getElementById('btnPresent')?.addEventListener('click', togglePresent);
+  document.getElementById('btnNotes')?.addEventListener('click', toggleNotes);
+  document.getElementById('btnPrint')?.addEventListener('click', () => window.print());
+
+  document.addEventListener('keydown', (event) => {
+    if(event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') return;
+    switch(event.key){
+      case 'ArrowRight':
+      case 'PageDown':
+      case ' ':
+        event.preventDefault();
+        activate(idx + 1);
+        break;
+      case 'ArrowLeft':
+      case 'PageUp':
+        event.preventDefault();
+        activate(idx - 1);
+        break;
+      case 'Home':
+        event.preventDefault();
+        activate(0);
+        break;
+      case 'End':
+        event.preventDefault();
+        activate(total - 1);
+        break;
+      case 'p':
+      case 'P':
+        togglePresent();
+        break;
+      case 'n':
+      case 'N':
+        toggleNotes();
+        break;
+      case 'Escape':
+        if(document.body.classList.contains('present')) togglePresent();
+        break;
+    }
+  });
+
+  window.addEventListener('resize', () => {
+    if(document.body.classList.contains('present')) activate(idx);
+  });
+
+  deck?.addEventListener('click', (event) => {
+    const anchor = event.target.closest('a[href^="#"]');
+    if(anchor){
+      const target = document.getElementById(anchor.getAttribute('href').slice(1));
+      if(target?.classList.contains('slide')){
+        event.preventDefault();
+        const targetIndex = slides.indexOf(target);
+        if(targetIndex >= 0){
+          activate(targetIndex);
+          history.replaceState(null, '', anchor.getAttribute('href'));
+        }
+        return;
+      }
+    }
+
+    if(!document.body.classList.contains('present')) return;
+    if(event.target.closest('.toolbar') || event.target.closest('.helpbar')) return;
+    activate(idx + 1);
+  });
+
+  syncProgress();
+  activate(0);
+})();
+
+</script>
+</body>
+</html>

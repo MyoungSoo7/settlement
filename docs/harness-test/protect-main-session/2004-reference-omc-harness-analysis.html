@@ -1,0 +1,1064 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>OMC Ralplan Sub Agent Analysis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" />
+<style>
+/* fastcampus-keynote.css — inlined for standalone reference */
+:root{
+  --bg:#FAFAF7;
+  --bg-2:#F1EEE5;
+  --ink:#0A0A0A;
+  --ink-2:#3A3A38;
+  --ink-3:#7B7B76;
+  --rule:#0A0A0A;
+  --rule-soft:#C9C5B7;
+  --accent:#C73E1D;
+  --deck-scale:1.5;
+  --pretendard:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,monospace;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#1B1916;color:var(--ink);font-family:var(--pretendard);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-feature-settings:'ss01','case','tnum';overflow-x:hidden}
+a{color:inherit}
+
+.toolbar{position:fixed;top:calc(14px * var(--deck-scale));right:calc(18px * var(--deck-scale));z-index:1000;display:flex;gap:calc(8px * var(--deck-scale));font-family:var(--mono);font-size:calc(11px * var(--deck-scale));letter-spacing:.05em;color:#bfb9a8}
+.toolbar button{background:#2a2722;color:#e6e1d2;border:calc(1px * var(--deck-scale)) solid #3d3a32;padding:calc(6px * var(--deck-scale)) calc(10px * var(--deck-scale));border-radius:calc(2px * var(--deck-scale));cursor:pointer;font-family:var(--mono);font-size:calc(11px * var(--deck-scale));letter-spacing:.08em;text-transform:uppercase}
+.toolbar button:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+.helpbar{position:fixed;bottom:calc(14px * var(--deck-scale));left:calc(18px * var(--deck-scale));z-index:1000;font-family:var(--mono);font-size:calc(10px * var(--deck-scale));letter-spacing:.1em;color:#7e7866}
+
+.deck{display:flex;flex-direction:column;align-items:center;padding:calc(48px * var(--deck-scale)) 0 calc(80px * var(--deck-scale));gap:calc(36px * var(--deck-scale))}
+
+.slide{
+  position:relative;width:calc(1280px * var(--deck-scale));height:calc(720px * var(--deck-scale));background:var(--bg);
+  overflow:hidden;
+  box-shadow:0 calc(30px * var(--deck-scale)) calc(80px * var(--deck-scale)) calc(-30px * var(--deck-scale)) rgba(0,0,0,.5),0 calc(6px * var(--deck-scale)) calc(16px * var(--deck-scale)) calc(-6px * var(--deck-scale)) rgba(0,0,0,.3);
+  letter-spacing:-.005em;
+}
+.slide::before{content:'';position:absolute;top:calc(32px * var(--deck-scale));left:calc(64px * var(--deck-scale));right:calc(64px * var(--deck-scale));height:calc(1px * var(--deck-scale));background:var(--rule)}
+.slide::after{content:'';position:absolute;bottom:calc(32px * var(--deck-scale));left:calc(64px * var(--deck-scale));right:calc(64px * var(--deck-scale));height:calc(1px * var(--deck-scale));background:var(--rule)}
+
+.slide .meta-top,.slide .meta-bottom{
+  position:absolute;left:calc(64px * var(--deck-scale));right:calc(64px * var(--deck-scale));display:flex;justify-content:space-between;align-items:center;
+  font-family:var(--mono);font-size:calc(11px * var(--deck-scale));letter-spacing:.16em;text-transform:uppercase;color:var(--ink-2)
+}
+.slide .meta-top{top:calc(40px * var(--deck-scale))}
+.slide .meta-bottom{bottom:calc(40px * var(--deck-scale))}
+.slide .meta-bottom::before{content:'';position:absolute;left:0;bottom:calc(-30px * var(--deck-scale));width:calc(84px * var(--deck-scale));height:calc(18px * var(--deck-scale));background:url("../assets/fastcampus-logo-gray.png") no-repeat left center / contain;opacity:.38;pointer-events:none}
+.slide .meta-top .deck-title{display:flex;align-items:center;gap:calc(12px * var(--deck-scale))}
+.slide .meta-top .mark{width:calc(14px * var(--deck-scale));height:calc(14px * var(--deck-scale));border:calc(1.5px * var(--deck-scale)) solid var(--ink);border-radius:50%;position:relative}
+.slide .meta-top .mark::after{content:'';position:absolute;top:50%;left:50%;width:calc(5px * var(--deck-scale));height:calc(5px * var(--deck-scale));background:var(--accent);border-radius:50%;transform:translate(-50%,-50%)}
+.slide .meta-bottom .num{font-weight:600;color:var(--ink)}
+.slide .meta-bottom .accent{color:var(--accent)}
+.slide .body{position:absolute;top:calc(104px * var(--deck-scale));bottom:calc(104px * var(--deck-scale));left:calc(96px * var(--deck-scale));right:calc(96px * var(--deck-scale));display:flex;flex-direction:column;justify-content:center}
+
+.layout-cover .body{justify-content:space-between}
+.layout-cover .eyebrow{font-family:var(--mono);font-size:calc(12px * var(--deck-scale));letter-spacing:.22em;text-transform:uppercase;color:var(--accent)}
+.layout-cover h1{font-size:calc(104px * var(--deck-scale));font-weight:800;line-height:.98;letter-spacing:-.04em;margin-top:calc(18px * var(--deck-scale))}
+.layout-cover h1.chapter-full-title{font-size:calc(58px * var(--deck-scale));line-height:1.12;letter-spacing:0;max-width:calc(1040px * var(--deck-scale));word-break:keep-all;text-wrap:balance}
+.layout-cover h1 .title-fit{font-size:calc(82px * var(--deck-scale))}
+.layout-cover h1 em{font-style:normal;color:var(--accent)}
+.layout-cover h1 .underline{position:relative;display:inline-block}
+.layout-cover h1 .underline::after{content:'';position:absolute;left:0;right:0;bottom:calc(8px * var(--deck-scale));height:calc(6px * var(--deck-scale));background:var(--accent);z-index:-1;opacity:.85}
+.layout-cover .subtitle{font-size:calc(22px * var(--deck-scale));color:var(--ink-2);font-weight:400;max-width:calc(780px * var(--deck-scale));line-height:1.45;margin-top:calc(28px * var(--deck-scale))}
+.layout-cover .by{display:flex;gap:calc(48px * var(--deck-scale));align-items:flex-end;justify-content:space-between}
+.layout-cover .by .who{display:flex;flex-direction:column;gap:calc(4px * var(--deck-scale))}
+.layout-cover .by .name{font-size:calc(16px * var(--deck-scale));font-weight:600}
+.layout-cover .by .role{font-family:var(--mono);font-size:calc(11px * var(--deck-scale));color:var(--ink-3);letter-spacing:.12em;text-transform:uppercase}
+.layout-cover .by .stamp{font-family:var(--mono);font-size:calc(11px * var(--deck-scale));color:var(--ink-3);letter-spacing:.18em;text-align:right;line-height:1.6}
+.layout-cover .by .stamp.toc-area{font-family:var(--pretendard);font-size:calc(13px * var(--deck-scale));letter-spacing:0;text-align:right;line-height:1.45;max-width:calc(560px * var(--deck-scale));color:var(--ink-2)}
+.layout-cover .by .stamp.toc-area span,
+.layout-cover .by .stamp.toc-area a{display:block}
+.layout-cover .by .stamp.toc-area a{text-decoration:none}
+.layout-cover .by .stamp.toc-area a:hover,
+.layout-cover .by .stamp.toc-area a:focus-visible{color:var(--accent)}
+.layout-cover .by .stamp.toc-area a:focus-visible{outline:calc(1px * var(--deck-scale)) solid var(--accent);outline-offset:calc(3px * var(--deck-scale))}
+.layout-cover .by .stamp.toc-area .toc-label{font-family:var(--mono);font-size:calc(10px * var(--deck-scale));letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:calc(4px * var(--deck-scale))}
+.layout-cover .by .stamp.toc-area .toc-chapter{font-weight:700;color:var(--ink);margin-bottom:calc(6px * var(--deck-scale))}
+.layout-cover .by .stamp.toc-area .toc-module{font-weight:500;color:var(--ink-2)}
+
+.layout-divider .body{justify-content:center;gap:calc(28px * var(--deck-scale))}
+.layout-divider .part{font-family:var(--mono);font-size:calc(13px * var(--deck-scale));color:var(--accent);letter-spacing:.24em;text-transform:uppercase}
+.layout-divider h2{font-size:calc(96px * var(--deck-scale));font-weight:800;line-height:1.02;letter-spacing:-.035em;max-width:calc(1040px * var(--deck-scale))}
+.layout-divider .lede{font-size:calc(20px * var(--deck-scale));color:var(--ink-2);max-width:calc(760px * var(--deck-scale));line-height:1.55;margin-top:calc(8px * var(--deck-scale))}
+.layout-divider .step-reference{display:flex;align-items:center;gap:calc(10px * var(--deck-scale));flex-wrap:wrap;font-family:var(--mono);font-size:calc(11px * var(--deck-scale));letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2)}
+.layout-divider .step-reference a,
+.layout-divider .step-reference strong{display:inline-flex;align-items:center;min-height:calc(32px * var(--deck-scale));padding:calc(7px * var(--deck-scale)) calc(10px * var(--deck-scale));border:calc(1px * var(--deck-scale)) solid var(--rule);background:rgba(241,238,229,.55);text-decoration:none;font-weight:500}
+.layout-divider .step-reference a:hover,
+.layout-divider .step-reference a:focus-visible{color:var(--accent);border-color:var(--accent);outline:none}
+.layout-divider .step-reference strong{color:var(--accent);border-color:var(--accent);background:transparent}
+.layout-divider .step-reference .arrow{color:var(--accent)}
+
+.layout-statement h2{font-size:calc(60px * var(--deck-scale));font-weight:700;line-height:1.16;letter-spacing:-.028em;max-width:calc(1020px * var(--deck-scale))}
+.layout-statement .lede{font-size:calc(26px * var(--deck-scale));font-weight:400;line-height:1.55;color:var(--ink-2);max-width:calc(920px * var(--deck-scale));margin-top:calc(36px * var(--deck-scale))}
+.layout-statement .lede strong{color:var(--ink);font-weight:600}
+.layout-statement .lede em{color:var(--accent);font-style:normal;font-weight:600}
+.layout-statement .lede .br{display:block;height:calc(8px * var(--deck-scale))}
+.layout-statement.huge h2{font-size:calc(84px * var(--deck-scale));letter-spacing:-.035em;line-height:1.05}
+
+.layout-compare h2{font-size:calc(38px * var(--deck-scale));font-weight:700;letter-spacing:-.02em;margin-bottom:calc(24px * var(--deck-scale))}
+.layout-compare .grid{display:grid;grid-template-columns:1fr calc(1px * var(--deck-scale)) 1fr;gap:calc(48px * var(--deck-scale));align-items:start}
+.layout-compare .col .tag{font-family:var(--mono);font-size:calc(12px * var(--deck-scale));letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin-bottom:calc(18px * var(--deck-scale));display:flex;gap:calc(8px * var(--deck-scale));align-items:center}
+.layout-compare .col .tag::before{content:'';width:calc(18px * var(--deck-scale));height:calc(1px * var(--deck-scale));background:var(--accent)}
+.layout-compare .col h3{font-size:calc(30px * var(--deck-scale));font-weight:700;line-height:1.25;margin-bottom:calc(20px * var(--deck-scale));letter-spacing:-.015em}
+.layout-compare .col p{font-size:calc(19px * var(--deck-scale));line-height:1.6;color:var(--ink-2)}
+.layout-compare .col ul{list-style:none;display:flex;flex-direction:column;gap:calc(10px * var(--deck-scale));font-size:calc(18px * var(--deck-scale));color:var(--ink-2);line-height:1.55}
+.layout-compare .col ul li{padding-left:calc(18px * var(--deck-scale));position:relative}
+.layout-compare .col ul li::before{content:'';position:absolute;left:0;top:.7em;width:calc(8px * var(--deck-scale));height:calc(1px * var(--deck-scale));background:var(--ink-2)}
+.layout-compare .vline{background:var(--rule);align-self:stretch}
+.layout-compare .handoff-criteria-table{width:100%;border-collapse:collapse;margin-top:calc(24px * var(--deck-scale));border-top:calc(1.5px * var(--deck-scale)) solid var(--rule);table-layout:fixed}
+.layout-compare .handoff-criteria-table th{text-align:left;padding:calc(9px * var(--deck-scale)) calc(12px * var(--deck-scale));font-family:var(--mono);font-size:calc(10.5px * var(--deck-scale));text-transform:uppercase;color:var(--accent);letter-spacing:.12em;border-bottom:calc(1px * var(--deck-scale)) solid var(--rule-soft);font-weight:500}
+.layout-compare .handoff-criteria-table td{padding:calc(10px * var(--deck-scale)) calc(12px * var(--deck-scale));border-bottom:calc(1px * var(--deck-scale)) solid var(--rule-soft);font-size:calc(14.5px * var(--deck-scale));line-height:1.4;vertical-align:top;color:var(--ink-2)}
+.layout-compare .handoff-criteria-table td.k{font-weight:700;color:var(--ink);width:calc(120px * var(--deck-scale));font-size:calc(15px * var(--deck-scale))}
+.layout-compare .handoff-criteria-table tr:last-child td{border-bottom:none}
+
+.layout-grid h2{font-size:calc(42px * var(--deck-scale));font-weight:700;letter-spacing:-.02em;margin-bottom:calc(44px * var(--deck-scale))}
+.layout-grid .cards{display:grid;gap:calc(28px * var(--deck-scale)) calc(48px * var(--deck-scale))}
+.layout-grid.cols-2 .cards{grid-template-columns:repeat(2,1fr)}
+.layout-grid.cols-3 .cards{grid-template-columns:repeat(3,1fr)}
+.layout-grid.cols-4 .cards{grid-template-columns:repeat(4,1fr)}
+.layout-grid .card{padding-top:calc(18px * var(--deck-scale));border-top:calc(1.5px * var(--deck-scale)) solid var(--rule)}
+.layout-grid .card .num{font-family:var(--mono);font-size:calc(12px * var(--deck-scale));letter-spacing:.16em;color:var(--accent);margin-bottom:calc(8px * var(--deck-scale))}
+.layout-grid .card h3{font-size:calc(24px * var(--deck-scale));font-weight:700;line-height:1.25;margin-bottom:calc(8px * var(--deck-scale));letter-spacing:-.012em}
+.layout-grid .card p{font-size:calc(15px * var(--deck-scale));color:var(--ink-2);line-height:1.55}
+.layout-grid .practice-checklist{margin-top:calc(30px * var(--deck-scale));padding-top:calc(16px * var(--deck-scale));border-top:calc(1.5px * var(--deck-scale)) solid var(--rule)}
+.layout-grid .practice-checklist h3{font-size:calc(19px * var(--deck-scale));font-weight:700;line-height:1.25;margin-bottom:calc(12px * var(--deck-scale))}
+.layout-grid .practice-checklist ul{list-style:none;display:grid;grid-template-columns:repeat(3,1fr);gap:calc(16px * var(--deck-scale))}
+.layout-grid .practice-checklist li{font-size:calc(14.5px * var(--deck-scale));line-height:1.45;color:var(--ink-2)}
+.layout-grid .practice-checklist strong{display:block;font-family:var(--mono);font-size:calc(11px * var(--deck-scale));letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:calc(4px * var(--deck-scale))}
+.layout-grid.compact-practice h2{margin-bottom:calc(32px * var(--deck-scale))}
+.layout-grid.compact-practice .cards{gap:calc(22px * var(--deck-scale)) calc(42px * var(--deck-scale))}
+.layout-grid.compact-practice .practice-checklist{margin-top:calc(24px * var(--deck-scale))}
+.layout-grid .practice-checklist.role-separation ul{grid-template-columns:repeat(4,1fr);gap:calc(14px * var(--deck-scale))}
+.layout-grid .practice-checklist.role-separation li{font-size:calc(13.5px * var(--deck-scale))}
+.layout-grid .practice-checklist.handoff-form li{font-size:calc(12.8px * var(--deck-scale));line-height:1.42}
+.layout-grid .practice-checklist.handoff-form strong{letter-spacing:.1em}
+.layout-grid .practice-checklist.question-cards ul{grid-template-columns:repeat(4,1fr);gap:calc(14px * var(--deck-scale))}
+.layout-grid .practice-checklist.question-cards li{font-size:calc(13.5px * var(--deck-scale))}
+.layout-grid .practice-checklist.requirement-table ul{grid-template-columns:repeat(4,1fr);gap:calc(14px * var(--deck-scale))}
+.layout-grid .practice-checklist.requirement-table li{font-size:calc(13.5px * var(--deck-scale))}
+.playground-roadmap-slide h2{margin-bottom:calc(24px * var(--deck-scale))}
+.playground-roadmap-slide .cards{gap:calc(18px * var(--deck-scale)) calc(40px * var(--deck-scale))}
+.playground-roadmap-slide .card{padding-top:calc(12px * var(--deck-scale))}
+.playground-roadmap-slide .card h3{font-size:calc(20px * var(--deck-scale))}
+.playground-roadmap-slide .card p{font-size:calc(13.2px * var(--deck-scale));line-height:1.42}
+.playground-roadmap-slide .practice-checklist{margin-top:calc(18px * var(--deck-scale));padding-top:calc(12px * var(--deck-scale))}
+.playground-roadmap-slide .practice-checklist h3{font-size:calc(17px * var(--deck-scale));margin-bottom:calc(8px * var(--deck-scale))}
+.playground-roadmap-slide .practice-checklist li{font-size:calc(12.5px * var(--deck-scale));line-height:1.35}
+.playground-roadmap-slide .roadmap-section{display:grid;grid-template-columns:repeat(3,1fr);gap:calc(12px * var(--deck-scale));margin-top:calc(14px * var(--deck-scale));padding-top:calc(12px * var(--deck-scale));border-top:calc(1.5px * var(--deck-scale)) solid var(--rule)}
+.playground-roadmap-slide .roadmap-step{border:calc(1px * var(--deck-scale)) solid var(--rule-soft);padding:calc(10px * var(--deck-scale)) calc(12px * var(--deck-scale));background:rgba(241,238,229,.42)}
+.playground-roadmap-slide .roadmap-step span{display:block;font-family:var(--mono);font-size:calc(10.5px * var(--deck-scale));letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:calc(6px * var(--deck-scale))}
+.playground-roadmap-slide .roadmap-step p{font-size:calc(12.4px * var(--deck-scale));line-height:1.38;color:var(--ink-2)}
+.mcp-necessity-slide h2{margin-bottom:calc(22px * var(--deck-scale))}
+.mcp-necessity-slide .cards{gap:calc(14px * var(--deck-scale)) calc(36px * var(--deck-scale))}
+.mcp-necessity-slide .card{padding-top:calc(10px * var(--deck-scale))}
+.mcp-necessity-slide .card h3{font-size:calc(19px * var(--deck-scale));margin-bottom:calc(5px * var(--deck-scale))}
+.mcp-necessity-slide .card p{font-size:calc(13px * var(--deck-scale));line-height:1.38}
+.mcp-decision-wrap{margin-top:calc(20px * var(--deck-scale));border-top:calc(1.5px * var(--deck-scale)) solid var(--rule);padding-top:calc(12px * var(--deck-scale))}
+.mcp-decision-wrap .table-title{font-family:var(--mono);font-size:calc(11px * var(--deck-scale));letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:calc(8px * var(--deck-scale))}
+.mcp-decision-table{width:100%;border-collapse:collapse;table-layout:fixed}
+.mcp-decision-table th{text-align:left;padding:calc(7px * var(--deck-scale)) calc(10px * var(--deck-scale));font-family:var(--mono);font-size:calc(10px * var(--deck-scale));text-transform:uppercase;color:var(--accent);letter-spacing:.12em;border-bottom:calc(1px * var(--deck-scale)) solid var(--rule-soft);font-weight:500}
+.mcp-decision-table td{padding:calc(8px * var(--deck-scale)) calc(10px * var(--deck-scale));border-bottom:calc(1px * var(--deck-scale)) solid var(--rule-soft);font-size:calc(13.2px * var(--deck-scale));line-height:1.35;vertical-align:top;color:var(--ink-2)}
+.mcp-decision-table td.k{width:calc(130px * var(--deck-scale));font-weight:700;color:var(--ink);font-size:calc(13.5px * var(--deck-scale))}
+.mcp-decision-table th:nth-child(1){width:calc(130px * var(--deck-scale))}
+.mcp-decision-table th:nth-child(3){width:calc(92px * var(--deck-scale))}
+.mcp-decision-table th:nth-child(4){width:calc(185px * var(--deck-scale))}
+.mcp-decision-table tr:last-child td{border-bottom:none}
+.session-architecture-slide h2{margin-bottom:calc(22px * var(--deck-scale))}
+.session-architecture-diagram{display:grid;grid-template-rows:calc(96px * var(--deck-scale)) calc(68px * var(--deck-scale)) calc(142px * var(--deck-scale)) calc(34px * var(--deck-scale));gap:calc(16px * var(--deck-scale))}
+.architecture-main,
+.architecture-rail,
+.arch-worker,
+.architecture-cues span{border:calc(1px * var(--deck-scale)) solid var(--rule);background:rgba(241,238,229,.58)}
+.architecture-main{width:58%;margin:0 auto;padding:calc(15px * var(--deck-scale)) calc(22px * var(--deck-scale));text-align:center;position:relative;display:flex;flex-direction:column;justify-content:center}
+.architecture-main::after{content:'';position:absolute;left:50%;bottom:calc(-17px * var(--deck-scale));width:calc(1px * var(--deck-scale));height:calc(16px * var(--deck-scale));background:var(--rule)}
+.architecture-main strong,
+.arch-worker strong{font-size:calc(21px * var(--deck-scale));line-height:1.25;letter-spacing:-.01em}
+.architecture-main span,
+.arch-worker span{font-size:calc(13.5px * var(--deck-scale));line-height:1.45;color:var(--ink-2);margin-top:calc(6px * var(--deck-scale))}
+.session-architecture-diagram .node-label,
+.session-architecture-diagram .rail-title{font-family:var(--mono);font-size:calc(10.5px * var(--deck-scale));letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:calc(7px * var(--deck-scale))}
+.architecture-rail{display:grid;grid-template-columns:calc(190px * var(--deck-scale)) 1fr;align-items:center;padding:calc(14px * var(--deck-scale)) calc(18px * var(--deck-scale));position:relative}
+.architecture-rail::after{content:'';position:absolute;left:50%;bottom:calc(-17px * var(--deck-scale));width:calc(1px * var(--deck-scale));height:calc(16px * var(--deck-scale));background:var(--rule)}
+.architecture-rail .rail-title{margin-bottom:0}
+.architecture-rail .rail-copy{font-size:calc(15.5px * var(--deck-scale));line-height:1.45;color:var(--ink-2)}
+.architecture-workers{display:grid;grid-template-columns:repeat(3,1fr);gap:calc(18px * var(--deck-scale))}
+.arch-worker{padding:calc(18px * var(--deck-scale)) calc(18px * var(--deck-scale)) calc(16px * var(--deck-scale));position:relative;display:flex;flex-direction:column;justify-content:center;min-height:calc(142px * var(--deck-scale))}
+.arch-worker::before{content:'';position:absolute;top:calc(-17px * var(--deck-scale));left:50%;width:calc(1px * var(--deck-scale));height:calc(16px * var(--deck-scale));background:var(--rule)}
+.architecture-cues{display:grid;grid-template-columns:repeat(3,1fr);gap:calc(18px * var(--deck-scale))}
+.architecture-cues span{display:flex;align-items:center;justify-content:center;padding:calc(7px * var(--deck-scale)) calc(10px * var(--deck-scale));font-family:var(--mono);font-size:calc(10.5px * var(--deck-scale));line-height:1.35;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);text-align:center}
+.layout-grid.work-prep-tree h2{margin-bottom:calc(24px * var(--deck-scale))}
+.layout-grid.work-prep-tree .cards{grid-template-columns:repeat(4,1fr);gap:calc(16px * var(--deck-scale)) calc(24px * var(--deck-scale))}
+.layout-grid.work-prep-tree .card{padding-top:calc(12px * var(--deck-scale))}
+.layout-grid.work-prep-tree .card h3{font-size:calc(18px * var(--deck-scale))}
+.layout-grid.work-prep-tree .card p{font-size:calc(12.5px * var(--deck-scale));line-height:1.45}
+.work-tree-diagram{margin-top:calc(18px * var(--deck-scale));border-top:calc(1.5px * var(--deck-scale)) solid var(--rule);padding-top:calc(14px * var(--deck-scale))}
+.work-tree-diagram .tree-title{font-family:var(--mono);font-size:calc(11px * var(--deck-scale));letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:calc(12px * var(--deck-scale))}
+.work-tree-diagram .tree-flow{display:grid;grid-template-columns:1fr 1.25fr 1.6fr;gap:calc(18px * var(--deck-scale));align-items:stretch}
+.work-tree-diagram .tree-node{border:calc(1px * var(--deck-scale)) solid var(--rule);background:rgba(241,238,229,.58);padding:calc(10px * var(--deck-scale)) calc(12px * var(--deck-scale));min-height:calc(64px * var(--deck-scale));display:flex;flex-direction:column;justify-content:center;position:relative}
+.work-tree-diagram .tree-node::after{content:'';position:absolute;top:50%;right:calc(-18px * var(--deck-scale));width:calc(18px * var(--deck-scale));height:calc(1px * var(--deck-scale));background:var(--rule)}
+.work-tree-diagram .tree-node strong{font-size:calc(15px * var(--deck-scale));line-height:1.25;letter-spacing:-.005em}
+.work-tree-diagram .tree-node span{font-size:calc(12.5px * var(--deck-scale));line-height:1.4;color:var(--ink-2);margin-top:calc(5px * var(--deck-scale))}
+.work-tree-diagram .tree-branch,.work-tree-diagram .tree-leaves{display:grid;gap:calc(8px * var(--deck-scale))}
+.work-tree-diagram .tree-leaves{grid-template-columns:repeat(2,1fr)}
+.work-tree-diagram .tree-leaves .tree-node{min-height:calc(56px * var(--deck-scale));padding:calc(9px * var(--deck-scale)) calc(10px * var(--deck-scale))}
+.work-tree-diagram .tree-leaves .tree-node::after{display:none}
+.work-tree-diagram .tree-leaves .tree-node strong{font-size:calc(13.5px * var(--deck-scale))}
+.work-tree-diagram .tree-leaves .tree-node span{font-size:calc(11.5px * var(--deck-scale))}
+
+.layout-table h2{font-size:calc(42px * var(--deck-scale));font-weight:700;letter-spacing:-.02em;margin-bottom:calc(36px * var(--deck-scale))}
+.layout-table table{width:100%;border-collapse:collapse}
+.layout-table th{text-align:left;padding:calc(14px * var(--deck-scale)) calc(18px * var(--deck-scale));font-family:var(--mono);font-size:calc(11px * var(--deck-scale));text-transform:uppercase;color:var(--accent);letter-spacing:.16em;border-bottom:calc(1.5px * var(--deck-scale)) solid var(--rule);font-weight:500}
+.layout-table td{padding:calc(18px * var(--deck-scale));border-bottom:calc(1px * var(--deck-scale)) solid var(--rule-soft);font-size:calc(18px * var(--deck-scale));line-height:1.45;vertical-align:top;color:var(--ink-2)}
+.layout-table td.k{font-weight:700;color:var(--ink);width:calc(240px * var(--deck-scale));font-size:calc(19px * var(--deck-scale))}
+.layout-table tr:last-child td{border-bottom:none}
+
+.layout-quote .quote{font-size:calc(46px * var(--deck-scale));font-weight:500;line-height:1.3;letter-spacing:-.02em;max-width:calc(1040px * var(--deck-scale));color:var(--ink)}
+.layout-quote .quote::before{content:'\201C';color:var(--accent);font-family:Georgia,serif;font-size:1.1em;line-height:0;vertical-align:-.15em;margin-right:.05em}
+.layout-quote .quote::after{content:'\201D';color:var(--accent);font-family:Georgia,serif;font-size:1.1em;line-height:0;vertical-align:-.45em;margin-left:.05em}
+.layout-quote .attr{font-family:var(--mono);font-size:calc(13px * var(--deck-scale));color:var(--ink-2);margin-top:calc(36px * var(--deck-scale));letter-spacing:.12em;text-transform:uppercase}
+.layout-quote .attr .src{color:var(--accent)}
+
+.layout-story h2{font-size:calc(48px * var(--deck-scale));font-weight:700;letter-spacing:-.025em;margin-bottom:calc(36px * var(--deck-scale));max-width:calc(980px * var(--deck-scale));line-height:1.15}
+.layout-story .stack{display:flex;flex-direction:column;gap:calc(18px * var(--deck-scale));max-width:calc(1020px * var(--deck-scale))}
+.layout-story .row{display:flex;gap:calc(22px * var(--deck-scale));align-items:baseline}
+.layout-story .row .n{font-family:var(--mono);font-size:calc(13px * var(--deck-scale));color:var(--accent);letter-spacing:.16em;flex:0 0 calc(56px * var(--deck-scale))}
+.layout-story .row p{font-size:calc(22px * var(--deck-scale));line-height:1.45;color:var(--ink)}
+
+.layout-image .body{display:grid;grid-template-columns:1fr calc(460px * var(--deck-scale));gap:calc(48px * var(--deck-scale));align-items:center}
+.layout-image h2{font-size:calc(52px * var(--deck-scale));font-weight:750;line-height:1.12;letter-spacing:-.03em}
+.layout-image .lede{font-size:calc(22px * var(--deck-scale));line-height:1.5;color:var(--ink-2);margin-top:calc(26px * var(--deck-scale));max-width:calc(660px * var(--deck-scale))}
+.image-frame{border:calc(1px * var(--deck-scale)) solid var(--rule);background:var(--bg-2);height:calc(360px * var(--deck-scale));overflow:hidden}
+.image-frame img{width:100%;height:100%;object-fit:cover;display:block;filter:grayscale(100%) contrast(1.03)}
+
+.portrait{position:absolute;top:calc(130px * var(--deck-scale));right:calc(96px * var(--deck-scale));width:calc(240px * var(--deck-scale));height:calc(240px * var(--deck-scale));background:var(--bg-2);border:calc(1px * var(--deck-scale)) solid var(--rule);overflow:hidden;display:flex;align-items:center;justify-content:center;filter:grayscale(100%) contrast(1.05)}
+.portrait img{width:100%;height:100%;object-fit:cover;display:block}
+.portrait .credit{position:absolute;bottom:calc(-22px * var(--deck-scale));left:0;right:0;font-family:var(--mono);font-size:calc(9.5px * var(--deck-scale));color:var(--ink-3);letter-spacing:.15em;text-transform:uppercase;text-align:center;white-space:nowrap}
+.has-portrait .body{padding-right:calc(280px * var(--deck-scale))}
+.has-portrait .body h2,.has-portrait .body .quote{max-width:calc(780px * var(--deck-scale))}
+.has-portrait .body .lede{max-width:calc(780px * var(--deck-scale))}
+
+.slide.dark{background:#0A0A0A;color:#F4F1E8}
+.slide.dark::before,.slide.dark::after{background:#F4F1E8;opacity:.18}
+.slide.dark .meta-top,.slide.dark .meta-bottom{color:#bfb9a8}
+.slide.dark .meta-bottom .num{color:#fff}
+.slide.dark .meta-top .mark{border-color:#F4F1E8}
+.slide.dark .layout-cover h1,.slide.dark h1{color:#F4F1E8}
+.slide.dark .by .name{color:#F4F1E8}
+.slide.dark .by .role,.slide.dark .by .stamp{color:#bfb9a8}
+.slide.dark.layout-cover .by .stamp.toc-area .toc-label{color:var(--accent)}
+.slide.dark.layout-cover .by .stamp.toc-area .toc-chapter{color:#F4F1E8}
+.slide.dark.layout-cover .by .stamp.toc-area .toc-module{color:#bfb9a8}
+.slide.dark.layout-cover .by .stamp.toc-area a:hover,
+.slide.dark.layout-cover .by .stamp.toc-area a:focus-visible{color:var(--accent)}
+.slide.dark .meta-bottom::before{opacity:.32}
+.layout-cover.closing .body{right:calc(96px * var(--deck-scale))}
+.layout-cover.closing h1{font-size:calc(76px * var(--deck-scale));line-height:1.05;letter-spacing:-.035em;max-width:calc(840px * var(--deck-scale))}
+.layout-cover.closing .subtitle{color:#bfb9a8;max-width:calc(640px * var(--deck-scale))}
+
+.qr-card{position:absolute;background:#fff;border:calc(1px * var(--deck-scale)) solid rgba(10,10,10,.16);display:flex;align-items:center;justify-content:center}
+.qr-card img{display:block;width:100%;height:100%;object-fit:contain}
+.qr-label{position:absolute;font-family:var(--mono);font-size:calc(9px * var(--deck-scale));letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);white-space:nowrap}
+.speaker-link{font-family:var(--mono);font-size:calc(12px * var(--deck-scale));letter-spacing:.14em;color:var(--ink-3);margin-top:calc(10px * var(--deck-scale));text-transform:none}
+
+.notes{width:calc(1280px * var(--deck-scale));padding:calc(22px * var(--deck-scale)) calc(32px * var(--deck-scale));background:#F1EEE5;border:calc(1px * var(--deck-scale)) solid #D8D4C5;font-size:calc(13.5px * var(--deck-scale));color:#2a2825;line-height:1.65;display:none;border-radius:0}
+.show-notes .notes{display:block}
+.notes .head{display:flex;justify-content:space-between;font-family:var(--mono);font-size:calc(10px * var(--deck-scale));letter-spacing:.18em;text-transform:uppercase;color:#7a7466;margin-bottom:calc(10px * var(--deck-scale))}
+.notes .head .accent{color:var(--accent)}
+.notes h4{font-size:calc(14px * var(--deck-scale));font-weight:700;margin-bottom:calc(6px * var(--deck-scale));color:#1a1815}
+.notes p{margin:0 0 calc(8px * var(--deck-scale))}
+.notes ul{margin:calc(6px * var(--deck-scale)) 0 calc(8px * var(--deck-scale)) calc(18px * var(--deck-scale))}
+.notes a{color:var(--accent);word-break:break-all}
+.notes .cite{font-family:var(--mono);font-size:calc(11px * var(--deck-scale));color:#7a7466;margin-top:calc(6px * var(--deck-scale));letter-spacing:.04em}
+
+.present{background:#0A0A0A;overflow:hidden;height:100vh}
+.present .toolbar,.present .helpbar{display:none}
+.present .deck{padding:0;gap:0;min-height:100vh;height:100vh;justify-content:center;overflow:hidden}
+.present .deck .slide,.present .deck .notes{display:none}
+.present .deck .slide.active{display:block;transform:scale(var(--scale,1));transform-origin:center center}
+.present.show-notes .deck .notes.active{display:block;position:fixed;bottom:calc(24px * var(--deck-scale));left:50%;transform:translateX(-50%);max-width:calc(1100px * var(--deck-scale));background:#1F1D19;color:#E8E3D4;border-color:#2A2722;z-index:50}
+.present.show-notes .deck .notes.active h4{color:#fff}
+.present.show-notes .deck .notes.active{font-size:calc(13px * var(--deck-scale))}
+.present.show-notes .deck .notes.active a{color:#FF7A5A}
+.present.show-notes .deck .notes.active .head,.present.show-notes .deck .notes.active .cite{color:#a59f8c}
+
+@keyframes pulse{0%,100%{opacity:.4}50%{opacity:1}}
+.helpbar .blink{animation:pulse 2s ease-in-out infinite}
+
+@page{size:1920px 1080px;margin:0}
+@media print{
+  html,body{background:#fff}
+  .toolbar,.helpbar,.notes{display:none !important}
+  .deck{padding:0;gap:0}
+  .slide{box-shadow:none;page-break-after:always;break-after:page}
+}
+
+</style>
+<style>
+  :root {
+    --deck-scale: 1;
+  }
+  body, .slide, .notes {
+    word-break: keep-all;
+    overflow-wrap: break-word;
+    line-break: strict;
+  }
+  h1, h2, h3, .lede, .quote {
+    text-wrap: balance;
+  }
+  code {
+    font-family: var(--mono);
+  }
+  .source-line {
+    font-family: var(--mono);
+    font-size: calc(11px * var(--deck-scale));
+    color: var(--ink-3);
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    margin-top: calc(18px * var(--deck-scale));
+  }
+  .figure-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    margin-top: calc(18px * var(--deck-scale));
+  }
+  .figure-wrap svg {
+    width: 100%;
+    height: auto;
+    max-width: calc(1080px * var(--deck-scale));
+  }
+  .figure-caption {
+    font-family: var(--mono);
+    font-size: calc(11px * var(--deck-scale));
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    text-align: center;
+    margin-top: calc(12px * var(--deck-scale));
+  }
+  .diagram-title {
+    font-size: 22px;
+    font-weight: 760;
+    fill: #1a1a1a;
+  }
+  .diagram-label {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 1.4px;
+    fill: #9b6b3f;
+  }
+  .diagram-copy {
+    font-size: 13px;
+    fill: #5b5b5b;
+  }
+  .diagram-small {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px;
+    fill: #6f6a5f;
+  }
+  .compact-table td,
+  .compact-table th {
+    font-size: calc(15px * var(--deck-scale));
+    line-height: 1.42;
+    padding: calc(12px * var(--deck-scale)) calc(14px * var(--deck-scale));
+  }
+  .compact-table td.k {
+    width: calc(190px * var(--deck-scale));
+    font-size: calc(16px * var(--deck-scale));
+  }
+  .source-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: calc(18px * var(--deck-scale));
+    margin-top: calc(24px * var(--deck-scale));
+  }
+  .source-card {
+    border-top: calc(1.5px * var(--deck-scale)) solid var(--rule);
+    padding-top: calc(14px * var(--deck-scale));
+  }
+  .source-card strong {
+    display: block;
+    font-family: var(--mono);
+    font-size: calc(13px * var(--deck-scale));
+    line-height: 1.35;
+    margin-bottom: calc(8px * var(--deck-scale));
+  }
+  .source-card span {
+    display: block;
+    color: var(--ink-2);
+    font-size: calc(15px * var(--deck-scale));
+    line-height: 1.45;
+  }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <button id="btnPresent">Present (P)</button>
+  <button id="btnNotes">Notes (N)</button>
+  <button id="btnPrint">Print PDF</button>
+</div>
+<div class="helpbar"><span class="blink">▸</span>&nbsp; ←/→ navigate · P present · N notes · ESC overview · Cmd+P export PDF</div>
+
+<main class="deck" id="deck">
+
+<section class="slide layout-cover" data-num="1">
+  <div class="meta-top">
+    <span class="deck-title"><span class="mark"></span> FAST CAMPUS · CASE STUDY</span>
+    <span>CHAPTER 04</span>
+  </div>
+  <div class="body">
+    <div>
+      <div class="eyebrow">OMC RALPLAN ANALYSIS</div>
+      <h1 class="chapter-full-title">oh-my-claudecode는 <br/>sub agent를 어떻게 쓰고, 어떻게 검수하는가</h1>
+      <p class="subtitle">GitHub 원본 기준으로 `ralplan`을 4C Stack 관점에서 다시 읽는다. 핵심은 agent 숫자가 아니라, 계획·실행·검수 책임을 분리하고 evidence로 다음 route를 정하는 구조다.</p>
+      <div class="source-line">Source: github.com/Yeachan-Heo/oh-my-claudecode · decks/chapter-04.html · checked 2026-06-03</div>
+    </div>
+    <div class="by">
+      <div class="who">
+        <span class="name">4-3 · Ralplan Case</span>
+        <span class="role">4C · planner · architect · critic · verifier</span>
+      </div>
+      <div class="stamp">PLAN<br/>VERIFY</div>
+    </div>
+  </div>
+  <div class="meta-bottom"><span>OMC CASE STUDY</span><span><span class="num">01</span> / 10</span></div>
+</section>
+<aside class="notes" data-for="1">
+  <div class="head"><span><span class="accent">●</span> SPEAKER NOTES</span><span>SLIDE 01 / 10</span></div>
+  <p>이번 버전은 표 설명보다 구조도 중심이다. Ralplan, 검수, 전체 구조를 각각 SVG로 보여주고, 4C Stack과 연결한다.</p>
+</aside>
+
+<section class="slide" data-num="2">
+  <div class="meta-top">
+    <span class="deck-title"><span class="mark"></span> OMC RALPLAN ANALYSIS</span>
+    <span>4C STACK LENS</span>
+  </div>
+  <div class="body">
+    <h2 style="font-size:calc(38px * var(--deck-scale));font-weight:700;letter-spacing:-.02em;margin-bottom:calc(14px * var(--deck-scale));">4C Stack으로 보면 OMC의 핵심은 세션 경계 설계다</h2>
+    <div class="lede" style="font-size:calc(21px * var(--deck-scale));line-height:1.48;color:var(--ink-2);max-width:calc(980px * var(--deck-scale));margin-bottom:calc(12px * var(--deck-scale));">`decks/chapter-04.html`의 4C는 Contract, Context, Control, Confidence다. 4장은 이 네 경계를 세션 단위로 확장한다. OMC의 `ralplan`은 이 중 C1을 계획 계약으로 만들고, 실행 mode는 C2-C4를 handoff, verify, route로 운영한다.</div>
+    <div class="figure-wrap" aria-label="4C Stack과 OMC 매핑">
+      <svg viewBox="0 0 1080 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="four-c-omc">
+        <title id="four-c-omc">4C Stack to OMC Mapping</title>
+        <defs>
+          <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+            <path d="M0,0 L10,5 L0,10 Z" fill="#1a1a1a"/>
+          </marker>
+        </defs>
+        <g font-family="Pretendard Variable, Pretendard, sans-serif">
+          <rect x="20" y="62" width="250" height="190" fill="#fff" stroke="#1a1a1a" stroke-width="1.6"/>
+          <text x="145" y="96" text-anchor="middle" class="diagram-label">C1 · CONTRACT</text>
+          <text x="145" y="131" text-anchor="middle" class="diagram-title">무엇을 할까</text>
+          <text x="145" y="161" text-anchor="middle" class="diagram-copy">ralplan plan contract</text>
+          <text x="145" y="184" text-anchor="middle" class="diagram-copy">원칙 · 결정 기준 · 선택지</text>
+          <text x="145" y="212" text-anchor="middle" class="diagram-small">
+            <tspan x="145" dy="0">planning artifact</tspan>
+            <tspan x="145" dy="14">pending approval</tspan>
+          </text>
+
+          <line x1="270" y1="157" x2="305" y2="157" stroke="#1a1a1a" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+          <rect x="315" y="62" width="250" height="190" fill="#fff" stroke="#1a1a1a" stroke-width="1.6"/>
+          <text x="440" y="96" text-anchor="middle" class="diagram-label">C2 · CONTEXT</text>
+          <text x="440" y="131" text-anchor="middle" class="diagram-title">무엇을 보존할까</text>
+          <text x="440" y="161" text-anchor="middle" class="diagram-copy">plan path · handoff · state</text>
+          <text x="440" y="184" text-anchor="middle" class="diagram-copy">대화 전문이 아니라 결정과 근거</text>
+          <text x="440" y="212" text-anchor="middle" class="diagram-small">
+            <tspan x="440" dy="0">.omc/plans · .omc/handoffs</tspan>
+            <tspan x="440" dy="14">state</tspan>
+          </text>
+
+          <line x1="565" y1="157" x2="600" y2="157" stroke="#1a1a1a" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+          <rect x="610" y="62" width="250" height="190" fill="#fff" stroke="#1a1a1a" stroke-width="1.6"/>
+          <text x="735" y="96" text-anchor="middle" class="diagram-label">C3 · CONTROL</text>
+          <text x="735" y="131" text-anchor="middle" class="diagram-title">어떻게 흐를까</text>
+          <text x="735" y="161" text-anchor="middle" class="diagram-copy">team / ralph execution loop</text>
+          <text x="735" y="184" text-anchor="middle" class="diagram-copy">stage · story · fix loop</text>
+          <text x="735" y="212" text-anchor="middle" class="diagram-small">
+            <tspan x="735" dy="0">team-exec → verify → fix</tspan>
+            <tspan x="735" dy="14">PRD passes</tspan>
+          </text>
+
+          <line x1="860" y1="157" x2="880" y2="157" stroke="#1a1a1a" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+          <rect x="890" y="62" width="160" height="190" fill="#fff" stroke="#1a1a1a" stroke-width="1.6"/>
+          <text x="970" y="96" text-anchor="middle" class="diagram-label">C4</text>
+          <text x="970" y="124" text-anchor="middle" class="diagram-title" font-size="18">CONFIDENCE</text>
+          <text x="970" y="154" text-anchor="middle" class="diagram-copy">fresh evidence</text>
+          <text x="970" y="177" text-anchor="middle" class="diagram-copy">review verdict</text>
+          <text x="970" y="211" text-anchor="middle" class="diagram-small">
+            <tspan x="970" dy="0">pass / rework</tspan>
+            <tspan x="970" dy="14">ask-back / exit</tspan>
+          </text>
+
+          <rect x="155" y="282" width="770" height="36" fill="rgba(241,238,229,.65)" stroke="#cfc7b8" stroke-width="1"/>
+          <text x="540" y="305" text-anchor="middle" font-size="14" fill="#1a1a1a">4C의 목적: main session은 상태판으로 두고, sub agent는 계약과 근거만 남긴 뒤 역할을 끝낸다.</text>
+        </g>
+      </svg>
+    </div>
+    <p class="figure-caption">Chapter 04: C1 leaf/plan contract · C2 handoff · C3 route control · C4 confidence gate</p>
+  </div>
+  <div class="meta-bottom"><span>4C STACK ANALYSIS</span><span><span class="num">02</span> / 10</span></div>
+</section>
+<aside class="notes" data-for="2">
+  <div class="head"><span><span class="accent">●</span> SPEAKER NOTES</span><span>SLIDE 02 / 10</span></div>
+  <p>chapter-04의 4C는 4-1 C1 Contract, 4-2 C2 Context, 4-3 C3 Control + C4 Confidence, 4-4 통합으로 구성된다. OMC case study는 이 구조를 실제 다중 에이전트 오케스트레이션에 대입해 보는 렌즈다.</p>
+</aside>
+
+<section class="slide" data-num="3">
+  <div class="meta-top">
+    <span class="deck-title"><span class="mark"></span> OMC RALPLAN ANALYSIS</span>
+    <span>WHOLE STRUCTURE</span>
+  </div>
+  <div class="body">
+    <h2 style="font-size:calc(38px * var(--deck-scale));font-weight:700;letter-spacing:-.02em;margin-bottom:calc(12px * var(--deck-scale));">전체 구조도 — 모호한 요청을 실행 가능한 검수 루프로 바꾼다</h2>
+    <div class="figure-wrap" aria-label="OMC 전체 구조도">
+      <svg viewBox="0 0 1080 430" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="omc-overall">
+        <title id="omc-overall">OMC Overall Flow from Ralplan to Verification</title>
+        <defs>
+          <marker id="arrow2" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+            <path d="M0,0 L10,5 L0,10 Z" fill="#1a1a1a"/>
+          </marker>
+          <marker id="arrowAccent" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+            <path d="M0,0 L10,5 L0,10 Z" fill="#9b6b3f"/>
+          </marker>
+        </defs>
+        <g font-family="Pretendard Variable, Pretendard, sans-serif">
+          <rect x="35" y="55" width="190" height="82" fill="#fff" stroke="#1a1a1a" stroke-width="1.5"/>
+          <text x="130" y="85" text-anchor="middle" class="diagram-label">USER PROMPT</text>
+          <text x="130" y="113" text-anchor="middle" class="diagram-title" font-size="20">vague execution</text>
+
+          <line x1="225" y1="96" x2="270" y2="96" stroke="#1a1a1a" stroke-width="1.2" marker-end="url(#arrow2)"/>
+
+          <rect x="280" y="38" width="240" height="116" fill="#fff" stroke="#1a1a1a" stroke-width="1.8"/>
+          <text x="400" y="70" text-anchor="middle" class="diagram-label">RALPLAN GATE</text>
+          <text x="400" y="102" text-anchor="middle" class="diagram-title">consensus plan</text>
+          <text x="400" y="128" text-anchor="middle" class="diagram-copy">Planner → Architect → Critic</text>
+
+          <line x1="520" y1="96" x2="570" y2="96" stroke="#1a1a1a" stroke-width="1.2" marker-end="url(#arrow2)"/>
+
+          <rect x="585" y="38" width="210" height="116" fill="rgba(241,238,229,.55)" stroke="#1a1a1a" stroke-width="1.5"/>
+          <text x="690" y="70" text-anchor="middle" class="diagram-label">PLAN ARTIFACT</text>
+          <text x="690" y="102" text-anchor="middle" class="diagram-title" font-size="21">pending approval</text>
+          <text x="690" y="128" text-anchor="middle" class="diagram-copy">ADR · AC · verification steps</text>
+
+          <line x1="795" y1="96" x2="855" y2="96" stroke="#1a1a1a" stroke-width="1.2" marker-end="url(#arrow2)"/>
+
+          <rect x="870" y="38" width="180" height="116" fill="#fff" stroke="#1a1a1a" stroke-width="1.5"/>
+          <text x="960" y="70" text-anchor="middle" class="diagram-label">EXPLICIT APPROVAL</text>
+          <text x="960" y="102" text-anchor="middle" class="diagram-title" font-size="20">team or ralph</text>
+          <text x="960" y="128" text-anchor="middle" class="diagram-copy">planning agent does not code</text>
+
+          <line x1="960" y1="154" x2="960" y2="195" stroke="#1a1a1a" stroke-width="1.2" marker-end="url(#arrow2)"/>
+
+          <rect x="75" y="212" width="420" height="150" fill="#fff" stroke="#1a1a1a" stroke-width="1.5"/>
+          <text x="285" y="236" text-anchor="middle" class="diagram-label">
+            <tspan x="285" dy="0">TEAM PATH</tspan>
+            <tspan x="285" dy="15">PARALLEL STAGED EXECUTION</tspan>
+          </text>
+          <text x="130" y="285" text-anchor="middle" font-size="15" font-weight="700">team-plan</text>
+          <text x="210" y="285" text-anchor="middle" font-size="15" font-weight="700">team-prd</text>
+          <text x="300" y="285" text-anchor="middle" font-size="15" font-weight="700">team-exec</text>
+          <text x="395" y="285" text-anchor="middle" font-size="15" font-weight="700">team-verify</text>
+          <path d="M145 302 H420" stroke="#1a1a1a" stroke-width="1.1" marker-end="url(#arrow2)" fill="none"/>
+          <path d="M420 313 C372 330, 304 330, 260 313" stroke="#9b6b3f" stroke-width="1.3" marker-end="url(#arrowAccent)" fill="none"/>
+          <text x="330" y="357" text-anchor="middle" class="diagram-copy">fail → team-fix → verify loop</text>
+
+          <rect x="585" y="212" width="420" height="150" fill="#fff" stroke="#1a1a1a" stroke-width="1.5"/>
+          <text x="795" y="236" text-anchor="middle" class="diagram-label">
+            <tspan x="795" dy="0">RALPH PATH</tspan>
+            <tspan x="795" dy="15">STORY-BY-STORY PERSISTENCE</tspan>
+          </text>
+          <text x="670" y="282" text-anchor="middle" font-size="15" font-weight="700">prd story</text>
+          <text x="795" y="282" text-anchor="middle" font-size="15" font-weight="700">implement</text>
+          <text x="915" y="282" text-anchor="middle" font-size="15" font-weight="700">reviewer verify</text>
+          <path d="M690 300 H940" stroke="#1a1a1a" stroke-width="1.1" marker-end="url(#arrow2)" fill="none"/>
+          <path d="M930 313 C878 330, 752 330, 690 313" stroke="#9b6b3f" stroke-width="1.3" marker-end="url(#arrowAccent)" fill="none"/>
+          <text x="810" y="357" text-anchor="middle" class="diagram-copy">reject → fix same story → re-verify</text>
+
+          <path d="M285 362 L430 386" stroke="#1a1a1a" stroke-width="1.2" marker-end="url(#arrow2)" fill="none"/>
+          <path d="M795 362 L650 386" stroke="#1a1a1a" stroke-width="1.2" marker-end="url(#arrow2)" fill="none"/>
+          <rect x="300" y="382" width="480" height="48" fill="rgba(241,238,229,.65)" stroke="#cfc7b8" stroke-width="1"/>
+          <text x="540" y="402" text-anchor="middle" font-size="14" fill="#1a1a1a">
+            <tspan x="540" dy="0">Completion claim only after verification evidence</tspan>
+            <tspan x="540" dy="18">and no remaining fix tasks</tspan>
+          </text>
+        </g>
+      </svg>
+    </div>
+    <p class="figure-caption">Overall SVG: ralplan creates the contract; team/ralph execute; verifier/reviewer controls the exit.</p>
+  </div>
+  <div class="meta-bottom"><span>OVERALL STRUCTURE</span><span><span class="num">03</span> / 10</span></div>
+</section>
+<aside class="notes" data-for="3">
+  <div class="head"><span><span class="accent">●</span> SPEAKER NOTES</span><span>SLIDE 03 / 10</span></div>
+  <p>전체 구조도다. ralplan은 실행을 하지 않는다. pending approval plan을 만들고, 승인 이후 team이나 ralph가 실행한다. 검수 루프는 실행 mode 안에서 별도 역할을 맡는다.</p>
+</aside>
+
+<section class="slide" data-num="4">
+  <div class="meta-top">
+    <span class="deck-title"><span class="mark"></span> OMC RALPLAN ANALYSIS</span>
+    <span>RALPLAN SVG</span>
+  </div>
+  <div class="body">
+    <h2 style="font-size:calc(38px * var(--deck-scale));font-weight:700;letter-spacing:-.02em;margin-bottom:calc(12px * var(--deck-scale));">Ralplan 구조도 — 세 agent는 맡는 일이 다르다</h2>
+    <div class="figure-wrap" aria-label="Ralplan consensus loop">
+      <svg viewBox="0 0 1080 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="ralplan-loop">
+        <title id="ralplan-loop">Ralplan Planner Architect Critic Loop</title>
+        <defs>
+          <marker id="arrow3" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+            <path d="M0,0 L10,5 L0,10 Z" fill="#1a1a1a"/>
+          </marker>
+          <marker id="arrow3accent" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+            <path d="M0,0 L10,5 L0,10 Z" fill="#9b6b3f"/>
+          </marker>
+        </defs>
+        <g font-family="Pretendard Variable, Pretendard, sans-serif">
+          <rect x="35" y="55" width="190" height="105" fill="#fff" stroke="#1a1a1a" stroke-width="1.5"/>
+          <text x="130" y="84" text-anchor="middle" class="diagram-label">INPUT</text>
+          <text x="130" y="114" text-anchor="middle" class="diagram-title" font-size="20">task request</text>
+          <text x="130" y="141" text-anchor="middle" class="diagram-copy">vague or high-risk</text>
+
+          <line x1="225" y1="107" x2="285" y2="107" stroke="#1a1a1a" stroke-width="1.2" marker-end="url(#arrow3)"/>
+
+          <rect x="300" y="35" width="210" height="140" fill="#fff" stroke="#1a1a1a" stroke-width="1.8"/>
+          <text x="405" y="68" text-anchor="middle" class="diagram-label">SUB AGENT 1</text>
+          <text x="405" y="100" text-anchor="middle" class="diagram-title">Planner</text>
+          <text x="405" y="126" text-anchor="middle" class="diagram-copy">principles 3-5</text>
+          <text x="405" y="147" text-anchor="middle" class="diagram-copy">drivers top 3</text>
+          <text x="405" y="168" text-anchor="middle" class="diagram-copy">options + AC + tests</text>
+
+          <line x1="510" y1="107" x2="590" y2="107" stroke="#1a1a1a" stroke-width="1.2" marker-end="url(#arrow3)"/>
+
+          <rect x="605" y="35" width="210" height="140" fill="#fff" stroke="#1a1a1a" stroke-width="1.8"/>
+          <text x="710" y="68" text-anchor="middle" class="diagram-label">SUB AGENT 2</text>
+          <text x="710" y="100" text-anchor="middle" class="diagram-title">Architect</text>
+          <text x="710" y="126" text-anchor="middle" class="diagram-copy">steelman antithesis</text>
+          <text x="710" y="147" text-anchor="middle" class="diagram-copy">tradeoff tension</text>
+          <text x="710" y="168" text-anchor="middle" class="diagram-copy">synthesis path</text>
+
+          <line x1="815" y1="107" x2="895" y2="107" stroke="#1a1a1a" stroke-width="1.2" marker-end="url(#arrow3)"/>
+
+          <rect x="900" y="35" width="175" height="140" fill="#fff" stroke="#1a1a1a" stroke-width="1.8"/>
+          <text x="987" y="68" text-anchor="middle" class="diagram-label">SUB AGENT 3</text>
+          <text x="987" y="100" text-anchor="middle" class="diagram-title">Critic</text>
+          <text x="987" y="126" text-anchor="middle" class="diagram-copy">quality verdict</text>
+          <text x="987" y="147" text-anchor="middle" class="diagram-copy">risk + mitigation</text>
+          <text x="987" y="168" text-anchor="middle" class="diagram-copy">verification concrete?</text>
+
+          <path d="M987 175 C987 246, 405 246, 405 180" stroke="#9b6b3f" stroke-width="1.5" marker-end="url(#arrow3accent)" fill="none"/>
+          <text x="705" y="207" text-anchor="middle" font-size="13" fill="#9b6b3f">
+            <tspan x="705" dy="0">ITERATE / REJECT: collect feedback → Planner revises</tspan>
+            <tspan x="705" dy="16">Architect → Critic</tspan>
+          </text>
+
+          <rect x="245" y="260" width="250" height="68" fill="rgba(241,238,229,.65)" stroke="#cfc7b8" stroke-width="1"/>
+          <text x="370" y="287" text-anchor="middle" class="diagram-label">OUTPUT</text>
+          <text x="370" y="313" text-anchor="middle" class="diagram-title" font-size="20">pending approval plan</text>
+
+          <rect x="555" y="260" width="200" height="68" fill="#fff" stroke="#1a1a1a" stroke-width="1.3"/>
+          <text x="655" y="287" text-anchor="middle" class="diagram-label">USER GATE</text>
+          <text x="655" y="313" text-anchor="middle" class="diagram-title" font-size="20">approve route</text>
+
+          <rect x="815" y="260" width="235" height="74" fill="#fff" stroke="#1a1a1a" stroke-width="1.3"/>
+          <text x="932" y="287" text-anchor="middle" class="diagram-label">HANDOFF</text>
+          <text x="932" y="309" text-anchor="middle" class="diagram-title" font-size="18">
+            <tspan x="932" dy="0">Skill(team)</tspan>
+            <tspan x="932" dy="19">Skill(ralph)</tspan>
+          </text>
+
+          <line x1="495" y1="294" x2="540" y2="294" stroke="#1a1a1a" stroke-width="1.2" marker-end="url(#arrow3)"/>
+          <line x1="755" y1="294" x2="800" y2="294" stroke="#1a1a1a" stroke-width="1.2" marker-end="url(#arrow3)"/>
+
+          <text x="540" y="365" text-anchor="middle" class="diagram-small">
+            <tspan x="540" dy="0">Important: Architect and Critic are sequential.</tspan>
+            <tspan x="540" dy="15">Planning mode must not mutate source before explicit execution approval.</tspan>
+          </text>
+        </g>
+      </svg>
+    </div>
+    <p class="figure-caption">Ralplan SVG: authoring, architecture review, and critique are separate lanes.</p>
+  </div>
+  <div class="meta-bottom"><span>RALPLAN STRUCTURE</span><span><span class="num">04</span> / 10</span></div>
+</section>
+<aside class="notes" data-for="4">
+  <div class="head"><span><span class="accent">●</span> SPEAKER NOTES</span><span>SLIDE 04 / 10</span></div>
+  <p>이 슬라이드는 ralplan만 본다. Planner가 만든 초안을 Architect가 먼저 반박하고, 그 다음 Critic이 품질 판정을 한다. 반려되면 다시 Planner로 돌아간다.</p>
+</aside>
+
+<section class="slide" data-num="5">
+  <div class="meta-top">
+    <span class="deck-title"><span class="mark"></span> OMC RALPLAN ANALYSIS</span>
+    <span>VERIFICATION SVG</span>
+  </div>
+  <div class="body">
+    <h2 style="font-size:calc(38px * var(--deck-scale));font-weight:700;letter-spacing:-.02em;margin-bottom:calc(12px * var(--deck-scale));">검수 구조도 — 스스로 “됐다”고 해도 믿지 않고 evidence를 요구한다</h2>
+    <div class="figure-wrap" aria-label="Verification gate SVG">
+      <svg viewBox="0 0 1080 470" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="verification-gate">
+        <title id="verification-gate">Verification Gate Evidence Loop</title>
+        <defs>
+          <marker id="arrow4" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+            <path d="M0,0 L10,5 L0,10 Z" fill="#1a1a1a"/>
+          </marker>
+          <marker id="arrow4accent" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+            <path d="M0,0 L10,5 L0,10 Z" fill="#9b6b3f"/>
+          </marker>
+        </defs>
+        <g font-family="Pretendard Variable, Pretendard, sans-serif">
+          <rect x="40" y="66" width="190" height="92" fill="#fff" stroke="#1a1a1a" stroke-width="1.5"/>
+          <text x="135" y="95" text-anchor="middle" class="diagram-label">CLAIM</text>
+          <text x="135" y="125" text-anchor="middle" class="diagram-title" font-size="20">"done"</text>
+          <text x="135" y="147" text-anchor="middle" class="diagram-copy">not accepted yet</text>
+
+          <line x1="230" y1="112" x2="275" y2="112" stroke="#1a1a1a" stroke-width="1.2" marker-end="url(#arrow4)"/>
+
+          <rect x="290" y="42" width="190" height="140" fill="#fff" stroke="#1a1a1a" stroke-width="1.6"/>
+          <text x="385" y="74" text-anchor="middle" class="diagram-label">GATE 1</text>
+          <text x="385" y="105" text-anchor="middle" class="diagram-title" font-size="20">AC coverage</text>
+          <text x="385" y="132" text-anchor="middle" class="diagram-copy">each criterion</text>
+          <text x="385" y="154" text-anchor="middle" class="diagram-copy">VERIFIED / PARTIAL / MISSING</text>
+
+          <line x1="480" y1="112" x2="525" y2="112" stroke="#1a1a1a" stroke-width="1.2" marker-end="url(#arrow4)"/>
+
+          <rect x="540" y="42" width="190" height="140" fill="#fff" stroke="#1a1a1a" stroke-width="1.6"/>
+          <text x="635" y="74" text-anchor="middle" class="diagram-label">GATE 2</text>
+          <text x="635" y="105" text-anchor="middle" class="diagram-title" font-size="20">fresh checks</text>
+          <text x="635" y="132" text-anchor="middle" class="diagram-copy">tests · build · typecheck</text>
+          <text x="635" y="154" text-anchor="middle" class="diagram-copy">read actual output</text>
+
+          <line x1="730" y1="112" x2="775" y2="112" stroke="#1a1a1a" stroke-width="1.2" marker-end="url(#arrow4)"/>
+
+          <rect x="790" y="42" width="190" height="140" fill="#fff" stroke="#1a1a1a" stroke-width="1.6"/>
+          <text x="885" y="74" text-anchor="middle" class="diagram-label">GATE 3</text>
+          <text x="885" y="105" text-anchor="middle" class="diagram-title" font-size="20">review lane</text>
+          <text x="885" y="132" text-anchor="middle" class="diagram-copy">verifier / architect</text>
+          <text x="885" y="154" text-anchor="middle" class="diagram-copy">critic / reviewer</text>
+
+          <rect x="180" y="242" width="230" height="82" fill="rgba(241,238,229,.65)" stroke="#cfc7b8" stroke-width="1"/>
+          <text x="295" y="273" text-anchor="middle" class="diagram-label">TEAM VERIFY</text>
+          <text x="295" y="301" text-anchor="middle" class="diagram-title" font-size="20">verifier required</text>
+
+          <rect x="490" y="242" width="230" height="82" fill="rgba(241,238,229,.65)" stroke="#cfc7b8" stroke-width="1"/>
+          <text x="605" y="273" text-anchor="middle" class="diagram-label">RALPH VERIFY</text>
+          <text x="605" y="301" text-anchor="middle" class="diagram-title" font-size="20">tiered reviewer</text>
+
+          <rect x="800" y="242" width="230" height="82" fill="rgba(241,238,229,.65)" stroke="#cfc7b8" stroke-width="1"/>
+          <text x="915" y="273" text-anchor="middle" class="diagram-label">ESCALATION</text>
+          <text x="915" y="301" text-anchor="middle" class="diagram-title" font-size="18">security / review</text>
+
+          <path d="M885 182 C885 215, 915 215, 915 237" stroke="#1a1a1a" stroke-width="1.1" marker-end="url(#arrow4)" fill="none"/>
+          <path d="M635 182 C635 215, 605 215, 605 237" stroke="#1a1a1a" stroke-width="1.1" marker-end="url(#arrow4)" fill="none"/>
+          <path d="M385 182 C385 215, 295 215, 295 237" stroke="#1a1a1a" stroke-width="1.1" marker-end="url(#arrow4)" fill="none"/>
+
+          <path d="M915 324 C840 356, 420 356, 295 324" stroke="#9b6b3f" stroke-width="1.4" marker-end="url(#arrow4accent)" fill="none"/>
+          <text x="610" y="382" text-anchor="middle" font-size="14" fill="#9b6b3f">
+            <tspan x="610" dy="0">FAIL / INCOMPLETE: create fix task or continue same story</tspan>
+            <tspan x="610" dy="18">then re-run evidence</tspan>
+          </text>
+
+          <rect x="385" y="425" width="310" height="36" fill="#fff" stroke="#1a1a1a" stroke-width="1"/>
+          <text x="540" y="440" text-anchor="middle" class="diagram-small">
+            <tspan x="540" dy="0">PASS only after evidence</tspan>
+            <tspan x="540" dy="14">otherwise rework / ask-back / exit</tspan>
+          </text>
+        </g>
+      </svg>
+    </div>
+    <p class="figure-caption">Verification SVG: completion is a routed verdict, not an agent's self-report.</p>
+  </div>
+  <div class="meta-bottom"><span>VERIFICATION STRUCTURE</span><span><span class="num">05</span> / 10</span></div>
+</section>
+<aside class="notes" data-for="5">
+  <div class="head"><span><span class="accent">●</span> SPEAKER NOTES</span><span>SLIDE 05 / 10</span></div>
+  <p>검수 구조도다. claim을 바로 믿지 않고 acceptance criteria·fresh checks·separate review lane을 거치게 한다. 실패하면 route가 정해져야 한다.</p>
+</aside>
+
+<section class="slide layout-table" data-num="6">
+  <div class="meta-top">
+    <span class="deck-title"><span class="mark"></span> OMC RALPLAN ANALYSIS</span>
+    <span>SOURCE MAPPING</span>
+  </div>
+  <div class="body">
+    <h2>코드 안에서는 책임 분리가 이렇게 드러난다</h2>
+    <table class="compact-table">
+      <thead><tr><th>근거 파일</th><th>확인한 구조</th><th>강의 해석</th></tr></thead>
+      <tbody>
+        <tr><td class="k"><code>skills/ralplan</code></td><td><code>plan --consensus</code> 별칭. Planner, Architect, Critic 합의 루프. 명시 승인 전 source mutation 금지.</td><td>C1 Contract를 실행 전에 확정한다.</td></tr>
+        <tr><td class="k"><code>skills/plan</code></td><td>Architect와 Critic은 순차 실행. Critic 미승인 시 최대 5회 re-review loop.</td><td>sub agent 병렬 수량보다 review order가 중요하다.</td></tr>
+        <tr><td class="k"><code>skills/team</code></td><td><code>team-plan → team-prd → team-exec → team-verify → team-fix</code>. stage별 specialist routing.</td><td>C2-C3가 stage와 handoff로 남는다.</td></tr>
+        <tr><td class="k"><code>skills/ralph</code></td><td>PRD story별 acceptance criteria, reviewer verification, deslop, regression re-verification.</td><td>C4 Confidence는 fresh evidence까지 요구한다.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="meta-bottom"><span>REPO EVIDENCE</span><span><span class="num">06</span> / 10</span></div>
+</section>
+<aside class="notes" data-for="6">
+  <div class="head"><span><span class="accent">●</span> SPEAKER NOTES</span><span>SLIDE 06 / 10</span></div>
+  <p>이 표는 GitHub 원본에서 가져온 근거와 강의 해석을 분리한다. OMC 자체가 우리 검수 게이트의 구현체라는 주장이 아니라, 4C 관점으로 읽을 수 있는 사례라는 점을 유지한다.</p>
+</aside>
+
+<section class="slide layout-compare" data-num="7">
+  <div class="meta-top">
+    <span class="deck-title"><span class="mark"></span> OMC RALPLAN ANALYSIS</span>
+    <span>ROLE SEPARATION</span>
+  </div>
+  <div class="body">
+    <h2>sub agent를 많이 띄우는 게 아니라, 책임을 나눈다</h2>
+    <div class="grid">
+      <div class="col">
+        <div class="tag">BAD LENS</div>
+        <h3>agent fan-out만 본다</h3>
+        <ul>
+          <li>여러 agent를 동시에 많이 띄운다.</li>
+          <li>생성과 검토가 같은 대화 흐름에 뒤섞인다.</li>
+          <li>완료됐다는 claim을 그대로 통과시킨다.</li>
+          <li>실패 뒤 route가 없어 다시 사람이 수습한다.</li>
+        </ul>
+      </div>
+      <div class="vline"></div>
+      <div class="col">
+        <div class="tag">4C LENS</div>
+        <h3>계약과 검수 lane을 본다</h3>
+        <ul>
+          <li>Planner는 계약을 만든다.</li>
+          <li>Architect는 구조적 반론을 낸다.</li>
+          <li>Critic / Verifier는 evidence 기준으로 판정한다.</li>
+          <li>결과는 pass / rework / ask-back / exit 중 하나로 정해진다.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="meta-bottom"><span>FROM FAN-OUT TO LANES</span><span><span class="num">07</span> / 10</span></div>
+</section>
+<aside class="notes" data-for="7">
+  <div class="head"><span><span class="accent">●</span> SPEAKER NOTES</span><span>SLIDE 07 / 10</span></div>
+  <p>에이전트 수를 늘리는 것이 핵심이 아니다. 각 에이전트가 서로 다른 책임을 맡고, 자기 결과를 자기가 승인하지 않는 구조가 핵심이다.</p>
+</aside>
+
+<section class="slide layout-grid cols-3" data-num="8">
+  <div class="meta-top">
+    <span class="deck-title"><span class="mark"></span> OMC RALPLAN ANALYSIS</span>
+    <span>REVIEW DEPTH</span>
+  </div>
+  <div class="body">
+    <h2>검수 강도는 변경 위험에 따라 올라간다</h2>
+    <div class="cards">
+      <div class="card"><div class="num">STANDARD FLOOR</div><h3>작은 변경도 evidence</h3><p>Ralph는 작은 변경도 최소 STANDARD 검수를 요구한다. “작아서 괜찮다”가 아니라 “작아도 증거가 있다”가 기준이다.</p></div>
+      <div class="card"><div class="num">TEAM VERIFY</div><h3>verifier는 필수</h3><p>Team의 verify stage는 verifier가 기본이다. 보안 변경에는 security-reviewer, 큰 변경에는 code-reviewer를 붙인다.</p></div>
+      <div class="card"><div class="num">POST APPROVAL</div><h3>승인 뒤 재검증</h3><p>Ralph는 reviewer approval 이후에도 deslop pass와 regression re-verification을 거쳐야 비로소 완료로 인정된다.</p></div>
+    </div>
+  </div>
+  <div class="meta-bottom"><span>RISK CONTROLS REVIEW DEPTH</span><span><span class="num">08</span> / 10</span></div>
+</section>
+<aside class="notes" data-for="8">
+  <div class="head"><span><span class="accent">●</span> SPEAKER NOTES</span><span>SLIDE 08 / 10</span></div>
+  <p>검수 강도는 변경 위험이 클수록 단계적으로 올라간다. 팀 path에서는 verify stage에서 specialist가 붙고, ralph path에서는 tiered reviewer와 post-approval regression이 붙는다.</p>
+</aside>
+
+<section class="slide layout-statement" data-num="9">
+  <div class="meta-top">
+    <span class="deck-title"><span class="mark"></span> OMC RALPLAN ANALYSIS</span>
+    <span>CLASS APPLICATION</span>
+  </div>
+  <div class="body">
+    <h2>4C Stack으로 가져갈 실습 포인트</h2>
+    <div class="lede"><strong>C1</strong>은 plan contract로 확정하고, <strong>C2</strong>는 handoff와 state만 남기고, <strong>C3</strong>는 verify/fix loop로 흐름을 제어하고, <strong>C4</strong>는 fresh evidence로 completion claim을 검수한다.<span class="br"></span>OMC에서 가져올 것은 구현 복사가 아니라 이 네 경계의 분리 방식이다.</div>
+  </div>
+  <div class="meta-bottom"><span>4C APPLICATION</span><span><span class="num">09</span> / 10</span></div>
+</section>
+<aside class="notes" data-for="9">
+  <div class="head"><span><span class="accent">●</span> SPEAKER NOTES</span><span>SLIDE 09 / 10</span></div>
+  <p>수업에 어떻게 적용하는지 정리한 슬라이드다. OMC를 따라 설치하거나 기능을 복사하는 장이 아니라, 4C 경계가 실제 오케스트레이션에서 어떤 모습으로 드러나는지 보는 사례다.</p>
+</aside>
+
+<section class="slide dark layout-cover closing" data-num="10">
+  <div class="meta-top">
+    <span class="deck-title"><span class="mark"></span> OMC RALPLAN ANALYSIS</span>
+    <span>TAKEAWAY</span>
+  </div>
+  <div class="body">
+    <div>
+      <div class="eyebrow">CLASS LINE</div>
+      <h1>sub agent orchestration의 핵심은 검수 가능한 경계 설계다</h1>
+      <p class="subtitle">Ralplan은 실행 전 계약을 만든다. Team과 Ralph는 실행 루프를 맡는다. Verifier, Critic, Architect는 claim에 evidence를 요구한다. 4C Stack은 이 분리를 가장 간결하게 설명하는 틀이다.</p>
+      <div class="source-line">Key refs: skills/ralplan · skills/plan · skills/team · skills/ralph · decks/chapter-04.html</div>
+    </div>
+    <div class="by">
+      <div class="who">
+        <span class="name">Next · deterministic review gate</span>
+        <span class="role">계획·실행·검수를 한 context에 섞지 않는다</span>
+      </div>
+      <div class="stamp">SPLIT<br/><span style="color:var(--accent)">LANES</span></div>
+    </div>
+  </div>
+  <div class="meta-bottom"><span>END</span><span><span class="num">10</span> / 10</span></div>
+</section>
+<aside class="notes" data-for="10">
+  <div class="head"><span><span class="accent">●</span> SPEAKER NOTES</span><span>SLIDE 10 / 10</span></div>
+  <p>마지막 슬라이드의 핵심은 책임 분리다. 계획 agent, 실행 agent, 검수 agent가 같은 역할을 하지 않게 만드는 것이 실무적으로 중요한 포인트다.</p>
+</aside>
+
+</main>
+
+<script>
+/* presenter.js — inlined for standalone reference */
+(function(){
+  const deck = document.getElementById('deck');
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const notes = Array.from(document.querySelectorAll('.notes'));
+  const total = slides.length;
+  const padWidth = String(total).length < 2 ? 2 : String(total).length;
+  const progressTotal = formatNumber(total);
+  const noteByDataFor = new Map(notes.map(note => [note.dataset.for, note]));
+  const slidePairs = slides.map((slide, index) => {
+    const ordinal = index + 1;
+    const dataNum = slide.dataset.num || String(ordinal);
+    const note = noteByDataFor.get(dataNum) || notes[index] || null;
+    return {slide, note, ordinal};
+  });
+  let idx = 0;
+
+  function formatNumber(value){
+    return String(value).padStart(padWidth, '0');
+  }
+
+  function syncProgress(){
+    slidePairs.forEach(({slide, note, ordinal}) => {
+      const current = formatNumber(ordinal);
+      slide.dataset.num = String(ordinal);
+
+      const progress = slide.querySelector('.meta-bottom > span:last-child');
+      if(progress){
+        const number = progress.querySelector('.num') || document.createElement('span');
+        number.className = 'num';
+        number.textContent = current;
+        progress.replaceChildren(number, document.createTextNode(` / ${progressTotal}`));
+      }
+
+      if(note){
+        note.dataset.for = String(ordinal);
+        const noteProgress = note.querySelector('.head > span:last-child');
+        if(noteProgress){
+          noteProgress.textContent = `SLIDE ${current} / ${progressTotal}`;
+        }
+      }
+    });
+  }
+
+  function activate(i){
+    if(!total) return;
+    idx = Math.max(0, Math.min(total - 1, i));
+    slides.forEach((slide, k) => slide.classList.toggle('active', k === idx));
+    notes.forEach(note => note.classList.remove('active'));
+    slidePairs[idx]?.note?.classList.add('active');
+
+    if(document.body.classList.contains('present')){
+      const slide = slides[idx];
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const slideWidth = slide.offsetWidth || 1920;
+      const slideHeight = slide.offsetHeight || 1080;
+      const margin = document.body.classList.contains('show-notes') ? 260 : 0;
+      const sx = vw / slideWidth;
+      const sy = (vh - margin) / slideHeight;
+      const scale = Math.min(sx, sy) * (document.body.classList.contains('show-notes') ? 0.94 : 1);
+      slide.style.setProperty('--scale', scale.toFixed(3));
+    } else {
+      slides[idx].scrollIntoView({behavior:'smooth', block:'start'});
+    }
+  }
+
+  function togglePresent(){
+    document.body.classList.toggle('present');
+    if(document.body.classList.contains('present')){
+      activate(idx);
+    } else {
+      slides.forEach(slide => slide.style.removeProperty('--scale'));
+    }
+  }
+
+  function toggleNotes(){
+    document.body.classList.toggle('show-notes');
+    activate(idx);
+  }
+
+  document.getElementById('btnPresent')?.addEventListener('click', togglePresent);
+  document.getElementById('btnNotes')?.addEventListener('click', toggleNotes);
+  document.getElementById('btnPrint')?.addEventListener('click', () => window.print());
+
+  document.addEventListener('keydown', (event) => {
+    if(event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') return;
+    switch(event.key){
+      case 'ArrowRight':
+      case 'PageDown':
+      case ' ':
+        event.preventDefault();
+        activate(idx + 1);
+        break;
+      case 'ArrowLeft':
+      case 'PageUp':
+        event.preventDefault();
+        activate(idx - 1);
+        break;
+      case 'Home':
+        event.preventDefault();
+        activate(0);
+        break;
+      case 'End':
+        event.preventDefault();
+        activate(total - 1);
+        break;
+      case 'p':
+      case 'P':
+        togglePresent();
+        break;
+      case 'n':
+      case 'N':
+        toggleNotes();
+        break;
+      case 'Escape':
+        if(document.body.classList.contains('present')) togglePresent();
+        break;
+    }
+  });
+
+  window.addEventListener('resize', () => {
+    if(document.body.classList.contains('present')) activate(idx);
+  });
+
+  deck?.addEventListener('click', (event) => {
+    const anchor = event.target.closest('a[href^="#"]');
+    if(anchor){
+      const target = document.getElementById(anchor.getAttribute('href').slice(1));
+      if(target?.classList.contains('slide')){
+        event.preventDefault();
+        const targetIndex = slides.indexOf(target);
+        if(targetIndex >= 0){
+          activate(targetIndex);
+          history.replaceState(null, '', anchor.getAttribute('href'));
+        }
+        return;
+      }
+    }
+
+    if(!document.body.classList.contains('present')) return;
+    if(event.target.closest('.toolbar') || event.target.closest('.helpbar')) return;
+    activate(idx + 1);
+  });
+
+  syncProgress();
+  activate(0);
+})();
+
+</script>
+</body>
+</html>

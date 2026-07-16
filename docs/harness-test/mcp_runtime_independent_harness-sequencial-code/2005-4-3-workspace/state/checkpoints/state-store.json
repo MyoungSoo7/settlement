@@ -1,0 +1,10 @@
+{
+  "name": "state-store",
+  "ts": "2026-06-11T19:50:30",
+  "sha256": "a831cc8bcee68d07",
+  "rewind_reason": "",
+  "payload": {
+    "events": 4,
+    "resume_target": null
+  }
+}
