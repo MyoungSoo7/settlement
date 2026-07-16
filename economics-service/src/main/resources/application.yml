@@ -40,6 +40,9 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+    # 샘플 시드 마이그레이션 제거 — 기존 DB(이미 적용된 시드)를 "missing"으로 관대 처리.
+    # 신규 배포는 시드 없이 실데이터(ECOS 자동 수집 스케줄러)로만 채운다.
+    ignore-migration-patterns: "*:missing"
 
   cache:
     type: caffeine

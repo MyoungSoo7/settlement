@@ -45,7 +45,7 @@
 > ⚠️ 수치는 `build/`·`.claude/worktrees/` 사본을 **제외한 git ls-files 기준**. 각 줄 끝 명령이 정답 —
 > 드리프트 의심 시 명령을 돌려 재검증하고 이 수치를 갱신할 것(휘발성 수치를 명령 없이 손으로 적지 말 것).
 - 서비스 **13개** + API Gateway — `git ls-files '*/src/main/resources/application.yml' | wc -l` → 14(=13+gateway)
-- Flyway 마이그레이션 **203개** — `git ls-files '*/src/main/resources/db/migration/*.sql' | wc -l` → 203
+- Flyway 마이그레이션 **199개** — `git ls-files '*/src/main/resources/db/migration/*.sql' | wc -l` → 199
 - ADR **26개** (0001~0027, 0019 결번) — `git ls-files 'docs/adr/[0-9]*.md' | wc -l` → 26
 - 테스트 클래스 **572개** (Testcontainers 통합테스트 포함) — `git ls-files '*/src/test/*Test.java' '*/src/test/*Tests.java' '*/src/test/*IT.java' | wc -l` → 572
 
