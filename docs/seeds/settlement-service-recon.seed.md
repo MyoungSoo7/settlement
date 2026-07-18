@@ -44,7 +44,8 @@ order 는 **자기 DB 만 읽어 자기 합계를 노출**하고, settlement 는
 
 ## Known Issues (발견만 기록)
 
-- **KI-1**: `/internal/recon` REST 계약에 **스키마 정본 없음** — ADR 0024 계약-as-code 는 Kafka 만 커버,
-  REST 경계 필드 드리프트는 빌드 시점 차단 없음 (클라이언트 주석에 '공유 모듈 없음' 명시).
+- **KI-1 (✅ 2026-07-19 해소)**: REST 계약 정본 부재 → 정본 샘플 9종을 shared-common testFixtures
+  `contracts/internal-rest/recon/` 에 두고 양측 `InternalReconRestContractTest`(프로듀서/컨슈머)가 같은
+  샘플을 각자 record 로 역직렬화 — 필드 드리프트 빌드 시점 차단 (ADR 0024 의 REST 확장).
 - **KI-2 (by-design)**: mismatch 자동 조정·재대사 없음 — 감사 기능으로서 사람 개입 전제.
 - **KI-3**: 허용 오차 0 — 정당한 라운딩 차이도 mismatch 집계 가능 (pgrecon 1원 임계와 비대칭).

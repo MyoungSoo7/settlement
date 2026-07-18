@@ -92,8 +92,8 @@ seed:
 
   known_issues:  # 발견만 기록 — 사양은 as-is 유지
     - id: KI-1
-      finding: "/internal/recon REST 계약에 스키마 정본 없음 — 양측 Java record/컨트롤러 코드 매칭만 (ADR 0024 계약-as-code 는 Kafka 토픽만 커버). 필드 드리프트는 빌드 시점이 아니라 런타임/수동 테스트에서 발견됨. 클라이언트 주석에 '공유 모듈 없음' 명시"
-      disposition: recorded-not-fixed (Kafka 계약과 달리 REST 경계는 미커버)
+      finding: "/internal/recon REST 계약에 스키마 정본 없음 — 양측 Java record/컨트롤러 코드 매칭만. 필드 드리프트는 런타임에야 발견"
+      disposition: "RESOLVED 2026-07-19 — 정본 샘플 9종을 shared-common testFixtures contracts/internal-rest/recon/ 에 단일 출처로 두고, 프로듀서(order)·컨슈머(settlement) 양측 InternalReconRestContractTest 가 같은 샘플을 각자 record 로 역직렬화(FAIL_ON_UNKNOWN_PROPERTIES) — 필드 개명·제거 드리프트를 빌드 시점 차단 (ADR 0024 의 REST 확장)"
     - id: KI-2
       finding: "mismatch 시 자동 조정·자동 재대사 없음 — ERROR 로그+메트릭 후 사람 개입 전제 (대사는 감사 기능이라는 설계 의도로 판단)"
       disposition: by-design
