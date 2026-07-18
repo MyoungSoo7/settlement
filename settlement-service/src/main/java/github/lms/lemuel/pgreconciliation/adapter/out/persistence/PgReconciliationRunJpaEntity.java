@@ -23,6 +23,9 @@ public class PgReconciliationRunJpaEntity {
     @Column(name = "file_name", nullable = false, length = 255)
     private String fileName;
 
+    @Column(name = "file_sha256", length = 64)
+    private String fileSha256;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private ReconciliationRunStatus status;
@@ -57,6 +60,7 @@ public class PgReconciliationRunJpaEntity {
     protected PgReconciliationRunJpaEntity() { }
 
     public PgReconciliationRunJpaEntity(Long id, String pgProvider, LocalDate targetDate, String fileName,
+                                        String fileSha256,
                                         ReconciliationRunStatus status, LocalDateTime startedAt,
                                         LocalDateTime finishedAt, int totalPgRows, int totalInternalRows,
                                         int matchedCount, int discrepancyCount, int autoCorrectedCount,
@@ -65,6 +69,7 @@ public class PgReconciliationRunJpaEntity {
         this.pgProvider = pgProvider;
         this.targetDate = targetDate;
         this.fileName = fileName;
+        this.fileSha256 = fileSha256;
         this.status = status;
         this.startedAt = startedAt;
         this.finishedAt = finishedAt;
@@ -81,6 +86,7 @@ public class PgReconciliationRunJpaEntity {
     public String getPgProvider() { return pgProvider; }
     public LocalDate getTargetDate() { return targetDate; }
     public String getFileName() { return fileName; }
+    public String getFileSha256() { return fileSha256; }
     public ReconciliationRunStatus getStatus() { return status; }
     public LocalDateTime getStartedAt() { return startedAt; }
     public LocalDateTime getFinishedAt() { return finishedAt; }

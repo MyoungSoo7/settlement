@@ -88,8 +88,8 @@ seed:
 
   known_issues:  # 발견만 기록 — 사양은 as-is 유지
     - id: KI-1
-      finding: "같은 PG 파일 재업로드에 대한 run 수준 멱등 없음(파일 해시 등 미확인) — 중복 run 이 동일 차이를 새 discrepancy id 로 재생성하고, 양쪽을 각각 승인하면 이중 clawback 가능. uq_adjustments 는 discrepancyId 기준 1:1 이라 파일 중복은 차단 못함 — 운영 규율 의존"
-      disposition: recorded-not-fixed
+      finding: "같은 PG 파일 재업로드에 대한 run 수준 멱등 없음 — 중복 run 을 각각 승인하면 이중 clawback 가능"
+      disposition: "RESOLVED 2026-07-19 — 파일 내용 SHA-256 멱등: 서비스 check-then-act(기존 COMPLETED run 반환, 메트릭 pg.reconciliation.duplicate_file.hit) + DB 부분 UNIQUE uq_pg_recon_runs_file_sha256_completed(V20260719120000, FAILED 는 재시도 허용). 레거시 run 은 해시 NULL 로 판정 제외"
     - id: KI-2
       finding: "과소 정산 방향(내부 < PG — 셀러에게 더 지급해야 하는 경우)은 자동 보정 경로 없음 — clawback 방향만 처리하고 명시적 skip (컨슈머 주석에 문서화)"
       disposition: by-design-documented

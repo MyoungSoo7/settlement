@@ -13,4 +13,7 @@ public interface LoadReconciliationRunPort {
     List<ReconciliationRun> findRecent(int limit);
 
     Optional<ReconciliationDiscrepancy> findDiscrepancyById(Long id);
+
+    /** 같은 파일 내용(SHA-256)으로 이미 COMPLETED 된 run — 재업로드 멱등 판정. FAILED 는 재시도 허용. */
+    Optional<ReconciliationRun> findCompletedByFileSha256(String fileSha256);
 }

@@ -40,7 +40,8 @@
 
 ## Known Issues (발견만 기록)
 
-- **KI-1**: 같은 PG 파일 재업로드에 run 수준 멱등 없음 — 중복 run 의 차이를 각각 승인하면 **이중 clawback 가능**
-  (discrepancyId 1:1 UNIQUE 로는 차단 불가, 운영 규율 의존).
+- **KI-1 (✅ 2026-07-19 해소)**: 파일 재업로드 이중 clawback 갭 → 파일 내용 **SHA-256 멱등** 도입:
+  서비스가 기존 COMPLETED run 을 멱등 반환(`pg.reconciliation.duplicate_file.hit`) + DB 부분 UNIQUE
+  (`uq_pg_recon_runs_file_sha256_completed`, FAILED 는 재시도 허용).
 - **KI-2 (by-design)**: 과소 정산 방향(셀러에게 더 지급)은 자동 보정 없음 — clawback 방향만, 명시적 skip.
 - **KI-3 (by-design)**: 내부 토픽 `discrepancy_approved` 는 JSON Schema 계약 없음 (ADR 0024 는 cross-service 만).

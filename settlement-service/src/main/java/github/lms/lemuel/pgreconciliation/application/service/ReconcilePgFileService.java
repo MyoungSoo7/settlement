@@ -2,6 +2,7 @@ package github.lms.lemuel.pgreconciliation.application.service;
 
 import github.lms.lemuel.pgreconciliation.application.port.in.ReconcilePgFileUseCase;
 import github.lms.lemuel.pgreconciliation.application.port.out.LoadInternalPaymentsForReconciliationPort;
+import github.lms.lemuel.pgreconciliation.application.port.out.LoadReconciliationRunPort;
 import github.lms.lemuel.pgreconciliation.application.port.out.ParsePgFilePort;
 import github.lms.lemuel.pgreconciliation.application.port.out.SaveReconciliationRunPort;
 import github.lms.lemuel.pgreconciliation.domain.*;
@@ -41,15 +42,18 @@ public class ReconcilePgFileService implements ReconcilePgFileUseCase {
     private final ParsePgFilePort parsePgFilePort;
     private final LoadInternalPaymentsForReconciliationPort loadInternalPort;
     private final SaveReconciliationRunPort saveRunPort;
+    private final LoadReconciliationRunPort loadRunPort;
     private final MeterRegistry meterRegistry;
 
     public ReconcilePgFileService(ParsePgFilePort parsePgFilePort,
                                   LoadInternalPaymentsForReconciliationPort loadInternalPort,
                                   SaveReconciliationRunPort saveRunPort,
+                                  LoadReconciliationRunPort loadRunPort,
                                   MeterRegistry meterRegistry) {
         this.parsePgFilePort = parsePgFilePort;
         this.loadInternalPort = loadInternalPort;
         this.saveRunPort = saveRunPort;
+        this.loadRunPort = loadRunPort;
         this.meterRegistry = meterRegistry;
     }
 
@@ -59,10 +63,23 @@ public class ReconcilePgFileService implements ReconcilePgFileUseCase {
         log.info("[PgRecon] start. provider={}, date={}, file={}, operator={}",
                 pgProvider, targetDate, fileName, operatorId);
 
-        ReconciliationRun run = ReconciliationRun.start(pgProvider, targetDate, fileName, operatorId);
+        // 파일 내용 해시 — 같은 파일 재업로드 멱등 판정 키. 중복 run 이 각각 승인되면 같은 결제에
+        // 이중 clawback 이 가능하므로(discrepancyId 1:1 UNIQUE 로는 차단 불가) 여기서 차단한다.
+        byte[] fileBytes = readAllBytes(input);
+        String fileSha256 = sha256Hex(fileBytes);
+
+        var duplicate = loadRunPort.findCompletedByFileSha256(fileSha256);
+        if (duplicate.isPresent()) {
+            meterRegistry.counter("pg.reconciliation.duplicate_file.hit", "provider", pgProvider).increment();
+            log.warn("[PgRecon] 같은 파일 재업로드 — 기존 완료 run 반환(멱등). runId={}, sha256={}, file={}",
+                    duplicate.get().getId(), fileSha256, fileName);
+            return duplicate.get();
+        }
+
+        ReconciliationRun run = ReconciliationRun.start(pgProvider, targetDate, fileName, operatorId, fileSha256);
 
         try {
-            List<PgTransactionRow> pgRows = parsePgFilePort.parse(input);
+            List<PgTransactionRow> pgRows = parsePgFilePort.parse(new java.io.ByteArrayInputStream(fileBytes));
             List<InternalPaymentRow> internalRows = loadInternalPort.loadByCapturedDate(targetDate);
 
             // 매칭 단계에서 runId 가 필요하므로 임시 sentinel 사용 — saveAll 시점에 자식들의 run 참조가 갱신됨
@@ -83,6 +100,28 @@ public class ReconcilePgFileService implements ReconcilePgFileUseCase {
             log.error("[PgRecon] failed. provider={}, date={}, file={}", pgProvider, targetDate, fileName, e);
             run.fail(e.getMessage());
             return saveRunPort.saveAll(run);
+        }
+    }
+
+    /** 업로드 스트림 전체 적재 — 해시 계산과 파싱이 같은 바이트를 보도록 한 번만 읽는다. */
+    private static byte[] readAllBytes(InputStream input) {
+        try {
+            return input.readAllBytes();
+        } catch (java.io.IOException e) {
+            throw new java.io.UncheckedIOException("PG 파일 읽기 실패", e);
+        }
+    }
+
+    private static String sha256Hex(byte[] bytes) {
+        try {
+            byte[] digest = java.security.MessageDigest.getInstance("SHA-256").digest(bytes);
+            StringBuilder sb = new StringBuilder(digest.length * 2);
+            for (byte b : digest) {
+                sb.append(Character.forDigit((b >> 4) & 0xF, 16)).append(Character.forDigit(b & 0xF, 16));
+            }
+            return sb.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 미지원 JVM", e); // 표준 알고리즘 — 발생 불가
         }
     }
 

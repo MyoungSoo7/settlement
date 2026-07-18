@@ -43,7 +43,7 @@ public class PgReconciliationPersistenceAdapter
 
         return ReconciliationRun.rehydrate(
                 savedRun.getId(), savedRun.getPgProvider(), savedRun.getTargetDate(),
-                savedRun.getFileName(), savedRun.getStatus(), savedRun.getStartedAt(),
+                savedRun.getFileName(), savedRun.getFileSha256(), savedRun.getStatus(), savedRun.getStartedAt(),
                 savedRun.getFinishedAt(), savedRun.getTotalPgRows(), savedRun.getTotalInternalRows(),
                 savedRun.getMatchedCount(), savedRun.getDiscrepancyCount(), savedRun.getAutoCorrectedCount(),
                 savedRun.getOperatorId(), savedRun.getNote(), savedDiscrepancies
@@ -81,9 +81,20 @@ public class PgReconciliationPersistenceAdapter
         return discrepancyRepository.findById(id).map(PgReconciliationPersistenceAdapter::toDiscrepancyDomain);
     }
 
+    @Override
+    public Optional<ReconciliationRun> findCompletedByFileSha256(String fileSha256) {
+        if (fileSha256 == null || fileSha256.isBlank()) {
+            return Optional.empty();
+        }
+        return runRepository.findFirstByFileSha256AndStatusOrderByIdDesc(
+                        fileSha256, github.lms.lemuel.pgreconciliation.domain.ReconciliationRunStatus.COMPLETED)
+                .map(e -> toRunDomain(e, List.of()));
+    }
+
     private static PgReconciliationRunJpaEntity toRunEntity(ReconciliationRun run) {
         return new PgReconciliationRunJpaEntity(
                 run.getId(), run.getPgProvider(), run.getTargetDate(), run.getFileName(),
+                run.getFileSha256(),
                 run.getStatus(), run.getStartedAt(), run.getFinishedAt(),
                 run.getTotalPgRows(), run.getTotalInternalRows(),
                 run.getMatchedCount(), run.getDiscrepancyCount(), run.getAutoCorrectedCount(),
@@ -104,7 +115,7 @@ public class PgReconciliationPersistenceAdapter
     private static ReconciliationRun toRunDomain(PgReconciliationRunJpaEntity e,
                                                   List<ReconciliationDiscrepancy> children) {
         return ReconciliationRun.rehydrate(
-                e.getId(), e.getPgProvider(), e.getTargetDate(), e.getFileName(),
+                e.getId(), e.getPgProvider(), e.getTargetDate(), e.getFileName(), e.getFileSha256(),
                 e.getStatus(), e.getStartedAt(), e.getFinishedAt(),
                 e.getTotalPgRows(), e.getTotalInternalRows(),
                 e.getMatchedCount(), e.getDiscrepancyCount(), e.getAutoCorrectedCount(),
