@@ -391,17 +391,26 @@ test('harness guard workflow uses deterministic bases and ordered reproducibilit
   assert.match(workflow, /git diff --exit-code/);
 });
 
-test('Claude settings retain only the mandatory repository write guard hook', () => {
+test('Claude settings retain only the mandatory write guard and advisory skill router hooks', () => {
   const settings = JSON.parse(readFileSync(join(process.cwd(), '.claude/settings.json'), 'utf8'));
   assert.deepEqual(settings, {
     hooks: {
-      PreToolUse: [{
-        matcher: 'Write|Edit|MultiEdit',
-        hooks: [{
-          type: 'command',
-          command: 'node "$CLAUDE_PROJECT_DIR/scripts/harness/guard.mjs" --hook',
-        }],
-      }],
+      PreToolUse: [
+        {
+          matcher: 'Write|Edit|MultiEdit',
+          hooks: [{
+            type: 'command',
+            command: 'node "$CLAUDE_PROJECT_DIR/scripts/harness/guard.mjs" --hook',
+          }],
+        },
+        {
+          matcher: 'Write|Edit|MultiEdit|Skill',
+          hooks: [{
+            type: 'command',
+            command: 'node "$CLAUDE_PROJECT_DIR/scripts/harness/skill-router.mjs" --hook',
+          }],
+        },
+      ],
     },
   });
 });

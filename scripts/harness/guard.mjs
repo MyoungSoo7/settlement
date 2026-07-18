@@ -18,6 +18,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { readFile, realpath, stat } from 'node:fs/promises';
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { logGuardHits } from './telemetry.mjs';
 
 const ALLOW = /harness-guard:\s*allow/i;
 const ALLOWANCE = /harness-guard:\s*allow\s+reason="([^"]*)"\s+issue="([^"]*)"\s+owner="([^"]*)"\s+expires="([^"]*)"\s*$/i;
@@ -47,7 +48,7 @@ const isDomainMain = (f) => JAVA_KT.test(f) && /\/src\/main\/java\/.+\/domain\//
 // generic 예외 금지는 캠페인이 청정화를 완료한 5개 금융 서비스에 한정(위성 서비스는 oo-score 스킬로 채점).
 const CAMPAIGN_SERVICES = /(settlement|order|loan|investment|account)-service\//;
 
-const RULES = [
+export const RULES = [
   {
     id: 'MONEY-PRIMITIVE',
     // double/float primitive or parse in money-scope core java/kt → must use BigDecimal.
@@ -267,7 +268,9 @@ export async function runGuardCli(args, io = {}) {
     try {
       const event = JSON.parse(io.stdin ?? await readStdinUtf8Strict());
       const pending = await reconstructPendingContent(event, { repoRoot });
-      return emitReport(scanText(event.tool_input.file_path, pending).violations, io) ? 2 : 0;
+      const { violations } = scanText(event.tool_input.file_path, pending);
+      await logGuardHits(repoRoot, 'hook', violations); // observability only — never affects the verdict
+      return emitReport(violations, io) ? 2 : 0;
     } catch (error) { stderr(`guard hook rejected input: ${error.message}`); return 2; }
   }
   try {
@@ -285,6 +288,7 @@ export async function runGuardCli(args, io = {}) {
     }
     const violations = [];
     for (const file of files) violations.push(...await scanRepoFile(repoRoot, file));
+    await logGuardHits(repoRoot, mode.slice(2), violations); // observability only — never affects the verdict
     return emitReport(violations, io);
   } catch (error) { stderr(`guard input failed: ${error.message}`); return 1; }
 }
