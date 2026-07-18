@@ -1,0 +1,89 @@
+# Seed: settlement-service chargeback(카드사 분쟁) as-is 사양 (Ouroboros 방법론 — Interview → Seed 결정화)
+# 상태: CONFIRMED (기존 seed 와 동일 방식 지시로 승인 승계, 2026-07-19)
+# 원칙: 현행 코드가 실제로 하는 일의 불변 기술. 결함·미구현은 교정하지 않고 known_issues 로만 기록.
+# 부모 Seed: settlement-service-accounting-core.seed.yaml (조정 트랜잭션 원칙 ADR 0004 공유)
+
+seed:
+  id: settlement-service-chargeback-v1
+  goal: >-
+    settlement-service chargeback 서브도메인(카드사 분쟁 접수·운영자 결정·셀러 환수 조정)의
+    현행 동작을 실행 가능한 게이트에 매핑된 불변 사양으로 결정화해,
+    회귀 기준선 · 면접/포트폴리오 문서 · Phase 3 확장(사전분쟁 백필·ReversePayout)의 베이스로 사용한다.
+
+  scope:
+    included:
+      - chargeback 도메인 (상태머신·불변식·멱등)
+      - ACCEPTED → settlement_adjustments 음수 row 연계 (회계 효과)
+      - /admin/chargebacks API 표면
+    excluded:
+      - Refund 경로 (별개 회계 원장 — order-service seed 의 환불 불변식 참조)
+      - ReversePayout (Payout COMPLETED 후 환수 — Phase 3 미구현, known_issues 기재)
+      - pgreconciliation clawback (별도 seed 예정)
+
+  domain_distinction: >-
+    Refund 와 Chargeback 은 별개 회계 원장 (Chargeback.java:10-16):
+    Refund = 고객→셀러 환불 요청 → 셀러 응답 → 환불 처리.
+    Chargeback = 고객→카드사 신고 → 카드사가 PG 에 강제 차감 → PG 가 운영사 통지.
+
+  invariants:  # as-is 코드 사실 — 파일:라인 근거
+    state_machine:
+      source: settlement-service/src/main/java/github/lms/lemuel/chargeback/domain/ChargebackStatus.java:18-24
+      transitions: "OPEN → ACCEPTED | REJECTED 만 허용. 둘 다 종단 — 재결정·재오픈 불가(재오픈은 새 row 로만)"
+    domain_invariants:
+      source: settlement-service/src/main/java/github/lms/lemuel/chargeback/domain/Chargeback.java
+      rules:
+        - "amount 양수 강제 — 도메인(:65-67) + DB CHECK 이중 방어"
+        - "ACCEPTED/REJECTED 모두 decidedBy 필수 (감사 추적, :117-119,:131-133), REJECT 는 사유(note)도 필수(:135-137)"
+        - "PG_WEBHOOK 출처는 pgChargebackId 필수 (멱등 키, :68-71)"
+        - "settlementId 는 mutable (정산 생성 전 분쟁 가능) — 단 종단 상태에서 linkSettlement 금지(:153-155)"
+        - "봉인 애그리거트: open/rehydrate 팩토리 전용, 전이는 accept/reject/transitionTo 로만"
+    accounting_effect:
+      source: settlement-service/src/main/java/github/lms/lemuel/chargeback/application/service/ChargebackService.java:100-126
+      rules:
+        - "결정은 도메인, 회계 효과는 application service — Chargeback 은 Settlement 도메인 모델을 import 하지 않고 SaveSettlementAdjustmentPort 로만 조정 row 기록 (컨텍스트 경계)"
+        - "ACCEPT + settlementId 존재 시에만 SettlementAdjustment.ofChargeback 음수 row 생성 (SettlementAdjustment.java:68-80, amount.negate)"
+        - "REJECT 는 정산 영향 0 (분쟁 종결만)"
+    idempotency:
+      rules:
+        - "PG_WEBHOOK 멱등: pgChargebackId 조회 후 기존 row 반환 (ChargebackService.java:72-80, chargeback.idempotent.hit 메트릭)"
+        - "DB 최종 방어: idx_chargebacks_pg_id_unique 부분 UNIQUE (V1__settlement_baseline.sql:107)"
+        - "중복 역정산 차단: uq_adjustments_chargeback_id — 분쟁 1건당 조정 1건 (V20260715110400:19-21)"
+    api_surface:
+      source: settlement-service/src/main/java/github/lms/lemuel/chargeback/adapter/in/web/ChargebackAdminController.java
+      endpoints: "POST /admin/chargebacks (등록) · GET /admin/chargebacks[,/{id}] (조회) · POST /{id}/accept · POST /{id}/reject — 관리자 게이트 경로"
+
+  observability:
+    metrics: [chargeback.opened, chargeback.accepted, chargeback.rejected, chargeback.idempotent.hit]
+
+  acceptance_criteria:  # 실행 가능 — 기존 게이트 매핑
+    - id: AC-1
+      criterion: 상태머신·불변식(양수 금액, decidedBy/note 필수, 종단 재결정 불가)이 위 표와 일치
+      gate: "ChargebackTest (도메인) — ./gradlew :settlement-service:test"
+    - id: AC-2
+      criterion: ACCEPT+settlementId 시 음수 조정 1건 생성, REJECT 는 조정 0건, PG_WEBHOOK 중복 통지 멱등
+      gate: "ChargebackServiceTest"
+    - id: AC-3
+      criterion: /admin/chargebacks API 표면이 위 5개 엔드포인트와 일치
+      gate: "ChargebackAdminControllerTest"
+    - id: AC-4
+      criterion: 커버리지 LINE >= 90% (모듈 게이트에 포함)
+      gate: "./gradlew :settlement-service:jacocoTestCoverageVerification"
+    - id: AC-5
+      criterion: 도메인 OO 불변식 (setter 0, 봉인 팩토리, 타입 예외)
+      gate: "guard.mjs OO-* + oo-gate.test.mjs"
+
+  known_issues:  # 발견만 기록 — 사양은 as-is 유지
+    - id: KI-1
+      finding: "정산 前 분쟁을 ACCEPT 하면 조정 row 가 생성되지 않고, '정산 생성 시 chargeback 조회 후 백필' 은 Phase 3 주석만 있고 미구현 (ChargebackService.java:107-108,119-122) — 해당 경로의 셀러 환수 누락 가능. linkSettlement 도메인 메서드는 존재하나 호출 트리거 미배선"
+      disposition: documented-phase3-gap
+    - id: KI-2
+      finding: "Payout COMPLETED 후 환수(ReversePayout) 미구현 — Phase 3 명시 (ChargebackService.java:34)"
+      disposition: documented-phase3-gap
+    - id: KI-3
+      finding: "PG_WEBHOOK 멱등이 check-then-act (조회 후 save) — 동시 중복 통지 시 두 번째 요청이 DB UNIQUE 위반 예외 경로로 빠질 수 있음. 중복 row 는 idx_chargebacks_pg_id_unique 가 차단하므로 데이터 정합은 유지"
+      disposition: recorded-not-fixed
+
+  uses:
+    - regression-baseline
+    - interview-portfolio
+    - phase3-base   # 사전분쟁 백필·ReversePayout 설계 시 이 Seed 가 as-is 기준
