@@ -142,6 +142,8 @@ subprojects {
                     "github.lms.lemuel.economics.domain.*",
                     "github.lms.lemuel.market.domain.*",
                     "github.lms.lemuel.commondata.domain.*",
+                    "github.lms.lemuel.investment.domain.*",
+                    "github.lms.lemuel.financial.domain.*",
                     "github.lms.lemuel.ai.chat.domain.*",
                     // common.outbox.domain 게이트는 shared-common 독립 빌드로 이관됨
                 )
