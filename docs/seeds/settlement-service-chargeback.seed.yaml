@@ -74,8 +74,8 @@ seed:
 
   known_issues:  # 발견만 기록 — 사양은 as-is 유지
     - id: KI-1
-      finding: "정산 前 분쟁을 ACCEPT 하면 조정 row 가 생성되지 않고, '정산 생성 시 chargeback 조회 후 백필' 은 Phase 3 주석만 있고 미구현 (ChargebackService.java:107-108,119-122) — 해당 경로의 셀러 환수 누락 가능. linkSettlement 도메인 메서드는 존재하나 호출 트리거 미배선"
-      disposition: documented-phase3-gap
+      finding: "정산 前 분쟁을 ACCEPT 하면 조정 row 가 생성되지 않고, '정산 생성 시 chargeback 조회 후 백필' 은 Phase 3 주석만 있고 미구현 — 해당 경로의 셀러 환수 누락 가능"
+      disposition: "RESOLVED 2026-07-19 — 정산 생성 시 BackfillChargebackSettlementUseCase 백필 배선(같은 트랜잭션): 미연결 분쟁 링크 + ACCEPTED 건 환수 조정 생성. linkSettlement 는 미연결(null→값) 백필에 한해 종단 상태에서도 허용으로 완화. 메트릭 chargeback.settlement.backfilled"
     - id: KI-2
       finding: "Payout COMPLETED 후 환수(ReversePayout) 미구현 — Phase 3 명시 (ChargebackService.java:34)"
       disposition: documented-phase3-gap

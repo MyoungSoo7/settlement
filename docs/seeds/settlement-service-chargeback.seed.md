@@ -37,6 +37,8 @@ Phase 3 확장(사전분쟁 백필·ReversePayout)의 베이스로 사용한다.
 
 ## Known Issues (발견만 기록)
 
-- **KI-1 (Phase 3 갭)**: 정산 前 분쟁 ACCEPT 시 조정 미생성 — "정산 생성 시 백필" 주석만 있고 미구현, `linkSettlement` 호출 트리거 미배선 → 해당 경로 셀러 환수 누락 가능.
+- **KI-1 (✅ 2026-07-19 해소)**: 정산 前 분쟁 ACCEPT 시 조정 미생성 갭 → 정산 생성 트랜잭션에서
+  `BackfillChargebackSettlementUseCase` 백필 배선(미연결 분쟁 링크 + ACCEPTED 환수 조정 생성,
+  메트릭 `chargeback.settlement.backfilled`). `linkSettlement` 는 미연결 백필에 한해 종단 상태 허용으로 완화.
 - **KI-2 (Phase 3 갭)**: Payout COMPLETED 후 환수(ReversePayout) 미구현 (명시적 스코프 아웃).
 - **KI-3**: 웹훅 멱등이 check-then-act — 동시 중복 통지 시 두 번째가 UNIQUE 위반 예외 경로 가능(데이터 정합은 DB 가 보장).

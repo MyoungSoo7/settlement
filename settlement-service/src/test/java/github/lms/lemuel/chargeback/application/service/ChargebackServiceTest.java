@@ -140,6 +140,57 @@ class ChargebackServiceTest {
     }
 
     @Nested
+    class Backfill_사전분쟁 {
+
+        @Test
+        void ACCEPTED_사전분쟁은_백필_시_링크와_환수_조정_생성() {
+            Chargeback preSettlement = Chargeback.open(
+                    1L, null, BigDecimal.valueOf(12_000),
+                    ChargebackReason.FRAUD, null, ChargebackSource.PG_WEBHOOK, "PG-PRE-1");
+            preSettlement.assignId(60L);
+            preSettlement.accept("admin", "정산 전 확정");
+            when(loadPort.findUnlinkedByPaymentId(1L)).thenReturn(java.util.List.of(preSettlement));
+
+            int linked = service.backfillSettlementLink(1L, 500L);
+
+            assertThat(linked).isEqualTo(1);
+            assertThat(preSettlement.getSettlementId()).isEqualTo(500L);
+            ArgumentCaptor<SettlementAdjustment> captor = ArgumentCaptor.forClass(SettlementAdjustment.class);
+            verify(saveAdjustmentPort, times(1)).save(captor.capture());
+            SettlementAdjustment adj = captor.getValue();
+            assertThat(adj.getSettlementId()).isEqualTo(500L);
+            assertThat(adj.getChargebackId()).isEqualTo(60L);
+            assertThat(adj.getAmount()).isEqualByComparingTo("-12000");
+        }
+
+        @Test
+        void OPEN_사전분쟁은_링크만_하고_조정은_만들지_않는다() {
+            Chargeback open = Chargeback.open(
+                    2L, null, BigDecimal.valueOf(7_000),
+                    ChargebackReason.OTHER, null, ChargebackSource.MANUAL, null);
+            open.assignId(61L);
+            when(loadPort.findUnlinkedByPaymentId(2L)).thenReturn(java.util.List.of(open));
+
+            int linked = service.backfillSettlementLink(2L, 501L);
+
+            assertThat(linked).isEqualTo(1);
+            assertThat(open.getSettlementId()).isEqualTo(501L);
+            verify(saveAdjustmentPort, never()).save(any());
+        }
+
+        @Test
+        void 백필_대상_없으면_0_반환_저장_없음() {
+            when(loadPort.findUnlinkedByPaymentId(3L)).thenReturn(java.util.List.of());
+
+            int linked = service.backfillSettlementLink(3L, 502L);
+
+            assertThat(linked).isZero();
+            verify(savePort, never()).save(any());
+            verify(saveAdjustmentPort, never()).save(any());
+        }
+    }
+
+    @Nested
     class Reject {
 
         @Test

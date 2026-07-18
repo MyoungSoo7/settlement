@@ -13,5 +13,7 @@ public interface SpringDataChargebackRepository extends JpaRepository<Chargeback
 
     List<ChargebackJpaEntity> findByPaymentIdOrderByRaisedAtDesc(Long paymentId);
 
+    List<ChargebackJpaEntity> findByPaymentIdAndSettlementIdIsNullOrderByRaisedAtDesc(Long paymentId);
+
     List<ChargebackJpaEntity> findByStatusOrderByRaisedAtDesc(ChargebackStatus status, Pageable pageable);
 }

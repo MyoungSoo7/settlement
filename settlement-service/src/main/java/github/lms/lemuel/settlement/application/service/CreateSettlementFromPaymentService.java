@@ -5,6 +5,7 @@ import github.lms.lemuel.common.audit.domain.AuditAction;
 import github.lms.lemuel.common.config.observability.MdcKeys;
 import github.lms.lemuel.common.config.observability.MdcScope;
 import github.lms.lemuel.settlement.application.port.in.CreateSettlementFromPaymentUseCase;
+import github.lms.lemuel.settlement.application.port.out.BackfillChargebackSettlementLinkPort;
 import github.lms.lemuel.settlement.application.port.out.LoadSellerIdPort;
 import github.lms.lemuel.settlement.application.port.out.LoadSellerSettlementCyclePort;
 import github.lms.lemuel.settlement.application.port.out.LoadSellerTierPort;
@@ -41,6 +42,7 @@ public class CreateSettlementFromPaymentService implements CreateSettlementFromP
     private final LoadSellerSettlementCyclePort loadSellerSettlementCyclePort;
     private final LoadSellerIdPort loadSellerIdPort;
     private final PublishSettlementDomainEventPort publishSettlementDomainEventPort;
+    private final BackfillChargebackSettlementLinkPort backfillChargebackPort;
     private final AuditLogger auditLogger;
     /** KST 기준 시각 소스 — 결제 시각 부재 시 정산 기준일 폴백에만 사용(정본은 결제 시각). */
     private final Clock clock;
@@ -51,6 +53,7 @@ public class CreateSettlementFromPaymentService implements CreateSettlementFromP
                                               LoadSellerSettlementCyclePort loadSellerSettlementCyclePort,
                                               LoadSellerIdPort loadSellerIdPort,
                                               PublishSettlementDomainEventPort publishSettlementDomainEventPort,
+                                              BackfillChargebackSettlementLinkPort backfillChargebackPort,
                                               AuditLogger auditLogger,
                                               Clock clock) {
         this.loadSettlementPort = loadSettlementPort;
@@ -59,6 +62,7 @@ public class CreateSettlementFromPaymentService implements CreateSettlementFromP
         this.loadSellerSettlementCyclePort = loadSellerSettlementCyclePort;
         this.loadSellerIdPort = loadSellerIdPort;
         this.publishSettlementDomainEventPort = publishSettlementDomainEventPort;
+        this.backfillChargebackPort = backfillChargebackPort;
         this.auditLogger = auditLogger;
         this.clock = clock;
     }
@@ -125,6 +129,15 @@ public class CreateSettlementFromPaymentService implements CreateSettlementFromP
             // 이벤트드리븐 정산 생성 감사 — 정산금이 발생하는 지점이라 audit_logs 에 남긴다(멱등 반환 경로는 제외).
             // 컨슈머 경로라 actor 는 system. 값은 전부 id/금액이라 주입 위험이 없어 컴팩트 JSON 을 직접 조립한다.
             recordCreated(savedSettlement, paymentId);
+
+            // 사전분쟁 백필 — 정산보다 먼저 접수된 분쟁을 연결하고, ACCEPTED 건은 환수 조정을 지금 만든다.
+            // 같은 트랜잭션이라 정산 생성과 원자적(백필 실패 시 함께 롤백 — 반쪽 회계 상태 방지).
+            int linkedChargebacks = backfillChargebackPort.backfillChargebacks(
+                    paymentId, savedSettlement.getId());
+            if (linkedChargebacks > 0) {
+                log.warn("사전분쟁 백필 완료. settlementId={}, linkedChargebacks={}",
+                        savedSettlement.getId(), linkedChargebacks);
+            }
 
             // loan-service 로 SettlementCreated 발행 (선정산 대출 담보 = 미지급 정산예정금).
             // 같은 트랜잭션의 Outbox 에 적재 → 폴러가 lemuel.settlement.created 로 발행.

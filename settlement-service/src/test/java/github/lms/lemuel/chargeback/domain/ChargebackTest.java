@@ -160,6 +160,20 @@ class ChargebackTest {
                     .isInstanceOf(InvalidChargebackStateException.class)
                     .hasMessageContaining("종료 상태");
         }
+
+        @Test
+        void 종료_상태라도_미연결이면_백필_가능() {
+            // 정산 전 접수 → 정산 전 ACCEPT → 정산 생성 시 백필 시나리오.
+            Chargeback cb = Chargeback.open(1L, null, BigDecimal.valueOf(5_000),
+                    ChargebackReason.FRAUD, null,
+                    ChargebackSource.MANUAL, null);
+            cb.accept("admin", "ok");
+            assertThat(cb.getSettlementId()).isNull();
+
+            cb.linkSettlement(300L);
+
+            assertThat(cb.getSettlementId()).isEqualTo(300L);
+        }
     }
 
     @Nested

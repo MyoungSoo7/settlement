@@ -1,5 +1,6 @@
 package github.lms.lemuel.chargeback.application.service;
 
+import github.lms.lemuel.chargeback.application.port.in.BackfillChargebackSettlementUseCase;
 import github.lms.lemuel.chargeback.application.port.in.DecideChargebackUseCase;
 import github.lms.lemuel.chargeback.application.port.in.OpenChargebackUseCase;
 import github.lms.lemuel.chargeback.application.port.out.LoadChargebackPort;
@@ -31,12 +32,15 @@ import java.time.LocalDate;
  * <ul>
  *   <li>{@link SaveSettlementAdjustmentPort} 는 같은 서비스(settlement-service) 내 다른 컨텍스트 포트.
  *       Chargeback 이 Settlement 의 도메인 모델을 직접 import 하지 않고 audit row 만 남긴다.</li>
+ *   <li>정산 전 분쟁은 정산 생성 시 {@link BackfillChargebackSettlementUseCase} 백필로 연결 —
+ *       ACCEPTED 사전분쟁의 환수 조정이 이 경로에서 만들어진다.</li>
  *   <li>이미 Payout COMPLETED 된 정산의 환수(ReversePayout) 는 본 서비스 책임 아님 — Phase 3.</li>
  * </ul>
  */
 @Service
 @Transactional
-public class ChargebackService implements OpenChargebackUseCase, DecideChargebackUseCase {
+public class ChargebackService
+        implements OpenChargebackUseCase, DecideChargebackUseCase, BackfillChargebackSettlementUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(ChargebackService.class);
 
@@ -48,6 +52,7 @@ public class ChargebackService implements OpenChargebackUseCase, DecideChargebac
     private final Counter acceptedCounter;
     private final Counter rejectedCounter;
     private final Counter idempotentHitCounter;
+    private final Counter backfilledCounter;
 
     public ChargebackService(LoadChargebackPort loadPort,
                               SaveChargebackPort savePort,
@@ -64,6 +69,8 @@ public class ChargebackService implements OpenChargebackUseCase, DecideChargebac
                 .description("운영자가 REJECT 한 분쟁 — 분쟁 종결, 정산 영향 없음").register(meterRegistry);
         this.idempotentHitCounter = Counter.builder("chargeback.idempotent.hit")
                 .description("PG webhook 중복 통지로 멱등 hit 된 횟수").register(meterRegistry);
+        this.backfilledCounter = Counter.builder("chargeback.settlement.backfilled")
+                .description("정산 생성 시 백필 연결된 사전분쟁 수").register(meterRegistry);
     }
 
     @Override
@@ -123,6 +130,35 @@ public class ChargebackService implements OpenChargebackUseCase, DecideChargebac
 
         acceptedCounter.increment();
         return saved;
+    }
+
+    /**
+     * 정산 생성 시 사전분쟁 백필 — 같은 결제의 정산 미연결 분쟁을 연결하고,
+     * 이미 ACCEPTED 인 건은 지금 환수 조정을 만든다(accept 시점에 settlementId 가 없어 못 만든 것).
+     * 중복 조정은 {@code uq_adjustments_chargeback_id}(분쟁 1건=조정 1건) 가 DB 에서 최종 차단한다.
+     */
+    @Override
+    public int backfillSettlementLink(Long paymentId, Long settlementId) {
+        var unlinked = loadPort.findUnlinkedByPaymentId(paymentId);
+        if (unlinked.isEmpty()) {
+            return 0;
+        }
+        for (Chargeback chargeback : unlinked) {
+            chargeback.linkSettlement(settlementId);
+            Chargeback saved = savePort.save(chargeback);
+            backfilledCounter.increment();
+            if (saved.isAccepted()) {
+                SettlementAdjustment adjustment = SettlementAdjustment.ofChargeback(
+                        settlementId, saved.getId(), saved.getAmount(), LocalDate.now());
+                saveAdjustmentPort.save(adjustment);
+                log.warn("[Chargeback] 사전분쟁 백필 + 환수 조정 생성. chargebackId={}, settlementId={}, amount={}",
+                        saved.getId(), settlementId, saved.getAmount());
+            } else {
+                log.info("[Chargeback] 사전분쟁 백필 연결. chargebackId={}, settlementId={}, status={}",
+                        saved.getId(), settlementId, saved.getStatus());
+            }
+        }
+        return unlinked.size();
     }
 
     @Override

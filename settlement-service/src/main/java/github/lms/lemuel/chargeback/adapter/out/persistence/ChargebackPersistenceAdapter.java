@@ -37,6 +37,12 @@ public class ChargebackPersistenceAdapter implements LoadChargebackPort, SaveCha
     }
 
     @Override
+    public List<Chargeback> findUnlinkedByPaymentId(Long paymentId) {
+        return repository.findByPaymentIdAndSettlementIdIsNullOrderByRaisedAtDesc(paymentId).stream()
+                .map(ChargebackPersistenceAdapter::toDomain).toList();
+    }
+
+    @Override
     public List<Chargeback> findByStatus(ChargebackStatus status, int limit) {
         return repository.findByStatusOrderByRaisedAtDesc(status, PageRequest.of(0, Math.max(1, limit))).stream()
                 .map(ChargebackPersistenceAdapter::toDomain).toList();
