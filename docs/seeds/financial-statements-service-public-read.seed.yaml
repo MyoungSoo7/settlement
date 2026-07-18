@@ -44,7 +44,7 @@ seed:
     dart_collection:
       source: adapter/out/external/DartApiClient.java:42-44,123-146,200-205 + application/service/DartSyncService.java:47-153
       rule: "corpCode.xml(zip)·company.json·fnlttSinglAcnt.json(11011 연간). status 000=OK/013=empty/그외 예외. XXE 방어(disallow-doctype). CFS 우선, 없으면 OFS. 개별 기업 실패는 집계 후 계속, 호출 간 150ms 쿼터 보호"
-      kospi_only: "fetchProfile 후 isKospi()(corp_cls=='Y') 만 upsert (DartSyncService.java:72-73) — KOSDAQ 신규 수집 경로 없음 (KI-2)"
+      market_mapping: "fetchProfile 후 corp_cls Y→KOSPI / K→KOSDAQ 매핑 upsert, 코넥스(N)·기타(E)는 스킵 (CompanyProfile.marketOrNull + DartSyncService.syncCompanies — 2026-07-19 코스닥 경로 추가)"
       schedule: "재무제표 주간(일 04:00 KST, 최근 2개 연도) · 기업 월간(1일 05:00). DART_API_KEY 미설정 시 스케줄 조용히 skip, 수동 트리거는 IllegalStateException (FinancialSyncScheduler.java:57-81)"
     collection_idempotency:
       source: adapter/out/persistence/{FinancialStatementPersistenceAdapter.java:31-41, CompanyPersistenceAdapter.java:49-57}
@@ -80,8 +80,8 @@ seed:
       finding: "★ DRIFT: 스킬 :43-44 와 SPEC.md:113 이 '시드 폴백(코스피20+코스닥10)'을 정본 주장하나 시드 마이그레이션은 커밋 9d38e0ff5 에서 삭제됨(*:missing 관대 처리). 신규 배포 + DART_API_KEY 미설정이면 DB 완전 빈 채 기동. 스테일 주석 3곳(application.yml:94·DartProperties.java:8·StatementSource.java:5)"
       disposition: doc-drift (스킬·SPEC 갱신 필요)
     - id: KI-2
-      finding: "★ KOSDAQ 수집 경로 부재: 수집기는 isKospi() 만 upsert 인데 SPEC.md:112 는 '코스피·코스닥 조회' 주장, market CHECK 는 KOSDAQ/KONEX 허용. 시드 삭제(KI-1)로 코스닥 데이터 공급 경로가 0 이 됨. Company.java:6 javadoc 은 KOSPI 전용이 by-design 임을 시사 — SPEC 과 모순"
-      disposition: doc-drift-or-gap (by-design 여부 사용자 판단 필요)
+      finding: "(해소 전) KOSDAQ 수집 경로 부재: 수집기가 isKospi() 만 upsert 해 SPEC '코스피·코스닥' 주장과 모순이었음. 시드 삭제(KI-1)와 겹쳐 코스닥 공급 경로 0"
+      disposition: "resolved-2026-07-19 — corp_cls Y/K → KOSPI/KOSDAQ 매핑 upsert 로 수정(사용자 갭 판정). 코드·SPEC·스킬 정합 회복"
     - id: KI-3
       finding: "SEED·DART 혼재 엣지: DART upsert 는 (stock_code,fiscal_year,fs_div) 완전 일치 시만 대체 — SEED 가 CFS 로 심긴 기존 DB 에 DART 가 OFS 로 오면 별개 행 공존, 응답이 두 구분 모두 반환"
       disposition: recorded-not-fixed (기존 DB 한정 엣지)

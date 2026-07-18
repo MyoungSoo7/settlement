@@ -21,7 +21,7 @@ import java.util.Optional;
 /**
  * DART 수집 배치.
  *
- * <p>기업 동기화: corpCode.xml 상장사 → 기업개황으로 유가(Y)만 필터 → 종목코드 기준 upsert.
+ * <p>기업 동기화: corpCode.xml 상장사 → 기업개황으로 유가(Y)·코스닥(K)만 필터 → 종목코드 기준 upsert.
  * 재무제표 동기화: corp_code 보유 기업별 사업보고서 주요계정 → (기업, 연도, 구분) upsert.
  *
  * <p>호출 간 간격(requestIntervalMs)으로 DART 쿼터(일 2만 콜)를 보호하고, 개별 기업 실패는
@@ -69,13 +69,14 @@ public class DartSyncService implements SyncCompaniesUseCase, SyncStatementsUseC
             scanned++;
             try {
                 Optional<DartClientPort.CompanyProfile> profile = dartClient.fetchProfile(candidate.corpCode());
-                if (profile.isEmpty() || !profile.get().isKospi()) {
+                String market = profile.map(DartClientPort.CompanyProfile::marketOrNull).orElse(null);
+                if (market == null) {   // 기업개황 미존재 또는 비수집 시장(코넥스/기타)
                     skipped++;
                 } else {
                     Company merged = loadCompanyPort.findByStockCode(candidate.stockCode())
                             .map(existing -> existing.mergedWith(candidate.corpCode(), candidate.name()))
                             .orElseGet(() -> new Company(candidate.stockCode(), candidate.corpCode(),
-                                    candidate.name(), "KOSPI"));
+                                    candidate.name(), market));
                     saveCompanyPort.upsert(merged);
                     upserted++;
                 }
@@ -86,7 +87,7 @@ public class DartSyncService implements SyncCompaniesUseCase, SyncStatementsUseC
             logProgress("기업", scanned, listed.size(), upserted, failed);
             pause();
         }
-        log.info("기업 동기화 완료 — 스캔 {}, 코스피 upsert {}, 스킵 {}, 실패 {}", scanned, upserted, skipped, failed);
+        log.info("기업 동기화 완료 — 스캔 {}, 상장(코스피/코스닥) upsert {}, 스킵 {}, 실패 {}", scanned, upserted, skipped, failed);
         return new SyncResult(scanned, upserted, skipped, failed);
     }
 

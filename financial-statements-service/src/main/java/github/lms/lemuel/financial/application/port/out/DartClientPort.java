@@ -9,7 +9,7 @@ import java.util.Optional;
 /**
  * 금감원 OpenDART 연동 아웃바운드 포트.
  *
- * <p>구현체는 adapter/out/external/DartApiClient. 코스피 판별(corp_cls == 'Y')과
+ * <p>구현체는 adapter/out/external/DartApiClient. 시장 구분 판별(corp_cls: Y=유가/K=코스닥)과
  * 요약계정 파싱은 어댑터가 흡수하고, 애플리케이션 계층은 이 포트의 시장 중립 모델만 본다.
  */
 public interface DartClientPort {
@@ -30,8 +30,15 @@ public interface DartClientPort {
     }
 
     record CompanyProfile(String corpCode, String corpClass, String name) {
-        public boolean isKospi() {
-            return "Y".equals(corpClass);
+        /** corp_cls → 수집 대상 시장명 매핑. Y=KOSPI, K=KOSDAQ, 그 외(N=코넥스/E=기타)는 null(비수집). */
+        public String marketOrNull() {
+            if ("Y".equals(corpClass)) {
+                return "KOSPI";
+            }
+            if ("K".equals(corpClass)) {
+                return "KOSDAQ";
+            }
+            return null;
         }
     }
 

@@ -3,7 +3,7 @@ package github.lms.lemuel.financial.domain;
 import java.util.Objects;
 
 /**
- * 코스피 상장 기업.
+ * 상장 기업(코스피/코스닥).
  *
  * <p>비즈니스 키는 종목코드(stockCode, 6자리)다 — 시드 단계에서는 DART 고유번호(corpCode, 8자리)를
  * 알 수 없으므로 corpCode 는 nullable 이고, DART 기업 동기화가 나중에 채운다.

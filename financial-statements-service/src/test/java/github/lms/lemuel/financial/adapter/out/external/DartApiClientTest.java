@@ -119,7 +119,7 @@ class DartApiClientTest {
         Optional<CompanyProfile> profile = client.fetchProfile("00126380");
 
         assertThat(profile).contains(new CompanyProfile("00126380", "Y", "삼성전자"));
-        assertThat(profile.get().isKospi()).isTrue();
+        assertThat(profile.get().marketOrNull()).isEqualTo("KOSPI");
         server.verify();
     }
 
