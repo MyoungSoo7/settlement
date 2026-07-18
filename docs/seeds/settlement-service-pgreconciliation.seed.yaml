@@ -1,0 +1,103 @@
+# Seed: settlement-service pgreconciliation(PG 대사) as-is 사양 (Ouroboros 방법론 — Interview → Seed 결정화)
+# 상태: CONFIRMED (기존 seed 와 동일 방식 지시로 승인 승계, 2026-07-19)
+# 원칙: 현행 코드가 실제로 하는 일의 불변 기술. 결함·미구현은 교정하지 않고 known_issues 로만 기록.
+# 부모 Seed: settlement-service-accounting-core.seed.yaml · 자매: settlement-service-chargeback.seed.yaml
+
+seed:
+  id: settlement-service-pgreconciliation-v1
+  goal: >-
+    settlement-service pgreconciliation 서브도메인(PG 정산파일 vs 내부 결제 원장 대사 ·
+    차이 자동 분류 · 운영자 결정 · clawback 역정산)의 현행 동작을
+    실행 가능한 게이트에 매핑된 불변 사양으로 결정화해,
+    회귀 기준선 · 면접/포트폴리오 문서 · 후속 확장의 베이스로 사용한다.
+
+  scope:
+    included:
+      - PG 파일 업로드 → 매칭 → 차이 분류 (ReconciliationRun / Discrepancy)
+      - 운영자 승인/거절 → Outbox → clawback 소비 경로 (settlement 조정 연계 포함)
+      - /admin/pg-reconciliation API 표면
+    excluded:
+      - recon (일일 대사 — order /internal/recon 경로, 별도 seed 예정)
+      - settlement 코어 자체 (부모 seed), chargeback (자매 seed)
+
+  invariants:  # as-is 코드 사실 — 파일:라인 근거
+    matcher:  # 프레임워크 의존 0 순수 도메인 알고리즘
+      source: settlement-service/src/main/java/github/lms/lemuel/pgreconciliation/domain/PgReconciliationMatcher.java
+      matching_key: pg_transaction_id (양쪽 공통, 1:1 보장)
+      classification:  # 우선순위 순
+        - "DUPLICATE: PG 파일 내 동일 거래키 2회 이상 (이중 청구 의심, :31-37,58-67)"
+        - "MISSING_INTERNAL: PG 파일에만 존재 (매출 누락 의심 — 가장 위험, :69-77)"
+        - "MISSING_PG: 내부 원장에만 존재 (PG 누락/정산 지연, :99-108)"
+        - "diff == 0: matched (:80-81)"
+        - "diff < 1.00원: ROUNDING_DIFF — 자동 보정 가능 (ROUNDING_THRESHOLD=1.00, :23-24,82-88)"
+        - "diff >= 1.00원: AMOUNT_MISMATCH — 운영자 검토 (:89-96)"
+    discrepancy_state_machine:
+      source: settlement-service/src/main/java/github/lms/lemuel/pgreconciliation/domain/ReconciliationDiscrepancy.java:47-51,100-121
+      transitions: "PENDING → APPROVED | REJECTED (둘 다 종단, PENDING 외 재결정 불가). ROUNDING_DIFF 는 생성 시 AUTO_CORRECTED 직행(resolvedBy=SYSTEM, 종단)"
+      audit: "REJECT 는 사유 필수. resolvedBy/resolvedAt 기록"
+      run_status: "ReconciliationRun: RUNNING → COMPLETED | FAILED"
+    approve_to_clawback_pipeline:
+      source: settlement-service/src/main/java/github/lms/lemuel/pgreconciliation/application/service/ResolveDiscrepancyService.java:43-57
+      flow: "approve → 같은 tx Outbox 적재(PgReconciliationOutboxEventAdapter) → 폴러 Kafka 발행 → lemuel.pgreconciliation.discrepancy_approved → PgReconciliationApprovedSettlementAdjustConsumer (서비스 내부 self-consume 토픽)"
+      clawback_rules:  # 회수(셀러에게서 환수) 방향만 — 과소 정산(셀러에게 지급)은 명시적 skip
+        source: settlement-service/src/main/java/github/lms/lemuel/settlement/adapter/in/kafka/PgReconciliationApprovedSettlementAdjustConsumer.java:95-145
+        - "AMOUNT_MISMATCH (pg < internal): clawback = |difference|"
+        - "MISSING_PG: clawback = internalAmount 전액"
+        - "그 외/회수 대상 아님: 조용히 버리지 않고 pg.reconciliation.adjustments.skipped{reason} 메트릭 + WARN"
+    clawback_application:
+      source: settlement-service/src/main/java/github/lms/lemuel/settlement/application/service/ApplyReconciliationAdjustmentService.java:65-106
+      rules:
+        - "재전송 멱등: 이미 적용된 discrepancyId 는 스킵 (:69)"
+        - "holdback 우선 흡수 → net 축소 순서 (consumeHoldbackForRefund 재사용, :82-85)"
+        - "DONE 정산은 직접 clawback 불가(도메인 throw) — 감사 레코드만 기록 + settlement_done_manual_clawback 메트릭 + 수기 회수 이관 (:85-96)"
+        - "SettlementAdjustment.ofReconciliation 음수 감사 row + uq partial UNIQUE (reconciliation_discrepancy_id) 1:1 (V20260715110400)"
+        - "기준일은 KST 고정 시각 소스 — JVM 타임존 비의존 (:47)"
+    api_surface:
+      source: settlement-service/src/main/java/github/lms/lemuel/pgreconciliation/adapter/in/web/PgReconciliationController.java
+      endpoints: "POST /admin/pg-reconciliation/files (multipart CSV) · GET /runs · GET /runs/{runId} · POST /discrepancies/{id}/approve · POST /discrepancies/{id}/reject"
+
+  observability:
+    metrics:
+      - pg.reconciliation.discrepancies.approved / .rejected
+      - pg.reconciliation.adjustments.skipped{reason}
+
+  event_contract_note: >-
+    lemuel.pgreconciliation.discrepancy_approved 는 settlement-service 가 발행하고 스스로 소비하는
+    서비스 내부 토픽 — shared-common 계약-as-code(ADR 0024, cross-service 12토픽) 범위 밖이며
+    JSON Schema 정본이 없다. 페이로드 정합은 동일 코드베이스 직렬화로만 보장된다.
+
+  acceptance_criteria:  # 실행 가능 — 기존 게이트 매핑
+    - id: AC-1
+      criterion: 매칭 분류 6분기(DUPLICATE/MISSING_INTERNAL/MISSING_PG/matched/ROUNDING_DIFF/AMOUNT_MISMATCH)가 위 표와 일치
+      gate: "PgReconciliationMatcherTest — ./gradlew :settlement-service:test"
+    - id: AC-2
+      criterion: 상태머신(PENDING→APPROVED|REJECTED 종단, ROUNDING_DIFF AUTO_CORRECTED 직행, REJECT 사유 필수) 일치
+      gate: "ReconciliationDiscrepancyTest · ReconciliationRunTest"
+    - id: AC-3
+      criterion: approve → Outbox 발행, clawback 부호 규칙·skip 메트릭·DONE 수기 이관 동작 일치
+      gate: "ResolveDiscrepancyServiceTest + 컨슈머/적용 서비스 테스트"
+    - id: AC-4
+      criterion: CSV 파싱·API 표면 5개 일치
+      gate: "CsvPgFileParserAdapterTest · PgReconciliationControllerTest"
+    - id: AC-5
+      criterion: 커버리지 LINE >= 90% (모듈 게이트)
+      gate: "./gradlew :settlement-service:jacocoTestCoverageVerification"
+    - id: AC-6
+      criterion: 도메인 OO 불변식 (setter 0, 봉인 팩토리, 타입 예외)
+      gate: "guard.mjs OO-* + oo-gate.test.mjs"
+
+  known_issues:  # 발견만 기록 — 사양은 as-is 유지
+    - id: KI-1
+      finding: "같은 PG 파일 재업로드에 대한 run 수준 멱등 없음(파일 해시 등 미확인) — 중복 run 이 동일 차이를 새 discrepancy id 로 재생성하고, 양쪽을 각각 승인하면 이중 clawback 가능. uq_adjustments 는 discrepancyId 기준 1:1 이라 파일 중복은 차단 못함 — 운영 규율 의존"
+      disposition: recorded-not-fixed
+    - id: KI-2
+      finding: "과소 정산 방향(내부 < PG — 셀러에게 더 지급해야 하는 경우)은 자동 보정 경로 없음 — clawback 방향만 처리하고 명시적 skip (컨슈머 주석에 문서화)"
+      disposition: by-design-documented
+    - id: KI-3
+      finding: "내부 토픽 discrepancy_approved 에 JSON Schema 계약 없음 (ADR 0024 는 cross-service 만) — 페이로드 드리프트는 계약 테스트가 아닌 동일 코드베이스 배포 원자성에 의존"
+      disposition: by-design (내부 토픽)
+
+  uses:
+    - regression-baseline
+    - interview-portfolio
+    - brownfield-base
