@@ -58,3 +58,5 @@ Rules block at the bottom of README.md (already stable, don't duplicate into new
 **Other docs explicitly off-limits for doc-maintainer per repo owner's instruction**: don't
 touch `STATUS.md` when the task is scoped to ADR-only work — confirm scope before touching
 adjacent docs.
+
+- **커밋 규칙(2026-07-22 CI red 재발 방지)**: ADR 추가·삭제는 STATUS.md 핵심 수치(ADR N개)와 HARNESS.md 관련 문서 수치 갱신을 **같은 커밋**에 묶는다 — 분리하면 harness-audit 이 중간 커밋을 CI 에서 차단한다.
