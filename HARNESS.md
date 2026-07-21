@@ -82,6 +82,12 @@
 > | 하네스 자기 진단·드리프트 | ⌘`/harness-check` (audit + 가드 + `--fix` 로 STATUS 수치 자동 갱신) → 🚦`harness-audit.mjs` |
 >
 > **원칙:** 결정적인 것은 🚦게이트로 강제 · 판단 필요한 것은 🤖에이전트로 위임 · 작성과 검증은 분리(자기 승인 금지).
+>
+> **이중 라우팅 경계 (전역 OMC 플러그인 병존 시)**: OMC keyword-detector 의 워크플로 모드(ralph·autopilot·ulw·team 등)는
+> OMC 소유 — 본 하네스는 관여하지 않는다. 반대로 도메인·절차 규율(`*-rules`·`tdd-discipline`·`debugging-discipline`·
+> `verify-before-done`)은 **본 하네스가 정본** — OMC 모드 키워드(tdd·analyze·code-review·security-review)와 겹치면
+> 프로젝트 스킬의 게이트 수치·절차가 우선한다(지침 우선순위: 프로젝트 CLAUDE.md/HARNESS.md > 플러그인 주입).
+> OMC skill-injector 는 omc-learned 디렉토리만 스캔하므로 `.claude/skills/**` 와 충돌하지 않는다(2026-07-22 실사).
 
 ## 도구 접근 (MCP + 플러그인 독립 이중 경로)
 운영/정합 데이터 접근은 **운영 DB 직접 접속 금지** — 아래 두 경로 중 하나만 쓴다. MCP 미설치(CI·새 클론·Codex)에서도 하네스가 죽지 않도록 **저장소 네이티브 경로를 항상 병존**시킨다.
