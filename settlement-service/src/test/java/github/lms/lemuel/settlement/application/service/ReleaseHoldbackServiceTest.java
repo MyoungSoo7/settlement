@@ -1,11 +1,15 @@
 package github.lms.lemuel.settlement.application.service;
 
+import github.lms.lemuel.payout.application.port.in.RequestPayoutUseCase;
+import github.lms.lemuel.payout.domain.PayoutType;
 import github.lms.lemuel.settlement.application.port.out.LoadReleasableHoldbackPort;
+import github.lms.lemuel.settlement.application.port.out.LoadSellerIdPort;
 import github.lms.lemuel.settlement.application.port.out.SaveSettlementPort;
 import github.lms.lemuel.settlement.domain.Settlement;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -13,9 +17,11 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -29,11 +35,13 @@ class ReleaseHoldbackServiceTest {
 
     @Mock LoadReleasableHoldbackPort loadPort;
     @Mock SaveSettlementPort savePort;
+    @Mock LoadSellerIdPort loadSellerIdPort;
+    @Mock RequestPayoutUseCase requestPayoutUseCase;
 
     private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
 
     private ReleaseHoldbackService service() {
-        return new ReleaseHoldbackService(loadPort, savePort, registry);
+        return new ReleaseHoldbackService(loadPort, savePort, loadSellerIdPort, requestPayoutUseCase, registry);
     }
 
     /** release_date == today 이고 holdback 이 살아있는 releasable 정산 1건 생성. */
@@ -74,6 +82,32 @@ class ReleaseHoldbackServiceTest {
         verify(savePort, times(3)).save(any(Settlement.class));
         assertThat(batch).allSatisfy(s -> assertThat(s.isHoldbackReleased()).isTrue());
         assertThat(registry.get("settlement.holdback.released").counter().count()).isEqualTo(3.0);
+    }
+
+    @Test
+    void 해제_시_잔여_보류액으로_HOLDBACK_RELEASE_Payout_을_생성한다() {
+        // 결제 50,000 / 수수료 3% 1,500 / net 48,500 / holdback 30% → 14,550
+        Settlement s = releasable(1L);
+        when(loadPort.findReleasableOn(TODAY, BATCH_SIZE)).thenReturn(List.of(s));
+        when(loadSellerIdPort.findSellerIdByPaymentId(1L)).thenReturn(Optional.of(55L));
+
+        service().releaseAllDueOn(TODAY);
+
+        ArgumentCaptor<BigDecimal> amount = ArgumentCaptor.forClass(BigDecimal.class);
+        verify(requestPayoutUseCase).requestPayoutOfType(
+                any(), eq(55L), amount.capture(), eq(PayoutType.HOLDBACK_RELEASE));
+        assertThat(amount.getValue()).isEqualByComparingTo("14550");
+    }
+
+    @Test
+    void 판매자_미해석이면_HOLDBACK_RELEASE_Payout_을_생성하지_않는다() {
+        Settlement s = releasable(1L);
+        when(loadPort.findReleasableOn(TODAY, BATCH_SIZE)).thenReturn(List.of(s));
+        when(loadSellerIdPort.findSellerIdByPaymentId(1L)).thenReturn(Optional.empty());
+
+        service().releaseAllDueOn(TODAY);
+
+        verify(requestPayoutUseCase, never()).requestPayoutOfType(any(), any(), any(), any());
     }
 
     @Test

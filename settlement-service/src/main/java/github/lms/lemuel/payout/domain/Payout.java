@@ -19,7 +19,8 @@ import java.time.LocalDateTime;
 public class Payout {
 
     private Long id;
-    private final Long settlementId;     // 1 payout = 1 settlement (단순화). 수동 송금은 null
+    private final Long settlementId;     // 1 payout = 1 (settlement, type). 수동 송금은 null
+    private final PayoutType payoutType; // 지급 유형 — 즉시지급/보류해제 구분 (settlement 당 유형별 1건)
     private final Long sellerId;
     private final BigDecimal amount;
     private final SellerBankAccount account;
@@ -37,8 +38,15 @@ public class Payout {
     private final LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    /** 지급 유형 미지정 레거시 호환 — {@link PayoutType#IMMEDIATE} 로 매핑한다(DB 기본값과 동일). */
     public static Payout requestFromSettlement(Long settlementId, Long sellerId,
                                                  BigDecimal amount, SellerBankAccount account) {
+        return requestFromSettlement(settlementId, sellerId, amount, account, PayoutType.IMMEDIATE);
+    }
+
+    public static Payout requestFromSettlement(Long settlementId, Long sellerId,
+                                                 BigDecimal amount, SellerBankAccount account,
+                                                 PayoutType payoutType) {
         if (sellerId == null) {
             throw new PayoutInvariantViolationException("sellerId 는 필수입니다");
         }
@@ -48,15 +56,19 @@ public class Payout {
         if (account == null) {
             throw new PayoutInvariantViolationException("account 는 필수입니다");
         }
+        if (payoutType == null) {
+            throw new PayoutInvariantViolationException("payoutType 은 필수입니다");
+        }
         if (amount.signum() <= 0) {
             throw new PayoutInvariantViolationException("amount 는 양수여야 합니다");
         }
         LocalDateTime now = LocalDateTime.now();
-        return new Payout(null, settlementId, sellerId, amount, account,
+        return new Payout(null, settlementId, payoutType, sellerId, amount, account,
                 PayoutStatus.REQUESTED, null, null, 0, null,
                 now, null, null, null, now, now);
     }
 
+    /** 지급 유형 미지정 레거시 호환 — {@link PayoutType#IMMEDIATE} 로 복원한다. */
     public static Payout rehydrate(Long id, Long settlementId, Long sellerId, BigDecimal amount,
                                     SellerBankAccount account, PayoutStatus status,
                                     String firmBankingTransactionId, String failureReason,
@@ -64,12 +76,25 @@ public class Payout {
                                     LocalDateTime requestedAt, LocalDateTime sentAt,
                                     LocalDateTime completedAt, LocalDateTime failedAt,
                                     LocalDateTime createdAt, LocalDateTime updatedAt) {
-        return new Payout(id, settlementId, sellerId, amount, account, status,
+        return rehydrate(id, settlementId, PayoutType.IMMEDIATE, sellerId, amount, account, status,
                 firmBankingTransactionId, failureReason, retryCount, operatorId,
                 requestedAt, sentAt, completedAt, failedAt, createdAt, updatedAt);
     }
 
-    private Payout(Long id, Long settlementId, Long sellerId, BigDecimal amount,
+    public static Payout rehydrate(Long id, Long settlementId, PayoutType payoutType,
+                                    Long sellerId, BigDecimal amount,
+                                    SellerBankAccount account, PayoutStatus status,
+                                    String firmBankingTransactionId, String failureReason,
+                                    int retryCount, String operatorId,
+                                    LocalDateTime requestedAt, LocalDateTime sentAt,
+                                    LocalDateTime completedAt, LocalDateTime failedAt,
+                                    LocalDateTime createdAt, LocalDateTime updatedAt) {
+        return new Payout(id, settlementId, payoutType, sellerId, amount, account, status,
+                firmBankingTransactionId, failureReason, retryCount, operatorId,
+                requestedAt, sentAt, completedAt, failedAt, createdAt, updatedAt);
+    }
+
+    private Payout(Long id, Long settlementId, PayoutType payoutType, Long sellerId, BigDecimal amount,
                    SellerBankAccount account, PayoutStatus status,
                    String firmBankingTransactionId, String failureReason,
                    int retryCount, String operatorId,
@@ -78,6 +103,7 @@ public class Payout {
                    LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.id = id;
         this.settlementId = settlementId;
+        this.payoutType = payoutType != null ? payoutType : PayoutType.IMMEDIATE;
         this.sellerId = sellerId;
         this.amount = amount;
         this.account = account;
@@ -186,6 +212,7 @@ public class Payout {
 
     public Long getId() { return id; }
     public Long getSettlementId() { return settlementId; }
+    public PayoutType getPayoutType() { return payoutType; }
     public Long getSellerId() { return sellerId; }
     public BigDecimal getAmount() { return amount; }
     public SellerBankAccount getAccount() { return account; }

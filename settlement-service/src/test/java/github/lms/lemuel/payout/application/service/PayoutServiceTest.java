@@ -2,10 +2,12 @@ package github.lms.lemuel.payout.application.service;
 
 import github.lms.lemuel.payout.application.port.in.ExecutePayoutUseCase.ExecutionReport;
 import github.lms.lemuel.payout.application.port.out.LoadPayoutPort;
+import github.lms.lemuel.payout.application.port.out.LoadSellerBankAccountPort;
 import github.lms.lemuel.payout.application.port.out.SavePayoutPort;
 import github.lms.lemuel.payout.application.service.PayoutLimitChecker.Decision;
 import github.lms.lemuel.payout.domain.Payout;
 import github.lms.lemuel.payout.domain.PayoutStatus;
+import github.lms.lemuel.payout.domain.PayoutType;
 import github.lms.lemuel.payout.domain.SellerBankAccount;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,6 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 
 import java.math.BigDecimal;
@@ -46,6 +49,7 @@ class PayoutServiceTest {
 
     @Mock LoadPayoutPort loadPort;
     @Mock SavePayoutPort savePort;
+    @Mock LoadSellerBankAccountPort bankAccountPort;
     @Mock PayoutSingleExecutor singleExecutor;
     @Mock PayoutLimitChecker limitChecker;
 
@@ -53,7 +57,7 @@ class PayoutServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new PayoutService(loadPort, savePort, singleExecutor, limitChecker,
+        service = new PayoutService(loadPort, savePort, bankAccountPort, singleExecutor, limitChecker,
                 new SimpleMeterRegistry(), Clock.system(ZoneId.of("Asia/Seoul")));
     }
 
@@ -67,7 +71,7 @@ class PayoutServiceTest {
     @Test
     @DisplayName("requestForSettlement: 신규 정산은 Payout 을 생성·저장한다")
     void request_createsWhenAbsent() {
-        when(loadPort.findBySettlementId(500L)).thenReturn(Optional.empty());
+        when(loadPort.findBySettlementIdAndType(500L, PayoutType.IMMEDIATE)).thenReturn(Optional.empty());
         when(savePort.save(any(Payout.class))).thenAnswer(inv -> inv.getArgument(0));
 
         Payout result = service.requestForSettlement(500L, 7L, new BigDecimal("50000"), ACCOUNT);
@@ -83,12 +87,79 @@ class PayoutServiceTest {
     @DisplayName("requestForSettlement: 멱등 — 이미 존재하면 저장하지 않고 기존 Payout 반환 (이중 송금 방지)")
     void request_idempotentWhenPresent() {
         Payout existing = requested(9L, 7L, "50000");
-        when(loadPort.findBySettlementId(500L)).thenReturn(Optional.of(existing));
+        when(loadPort.findBySettlementIdAndType(500L, PayoutType.IMMEDIATE)).thenReturn(Optional.of(existing));
 
         Payout result = service.requestForSettlement(500L, 7L, new BigDecimal("50000"), ACCOUNT);
 
         assertThat(result).isSameAs(existing);
         verify(savePort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("requestPayoutOfType: 계좌를 해석해 유형별 Payout 을 생성한다")
+    void requestOfType_createsWithResolvedAccount() {
+        when(loadPort.findBySettlementIdAndType(500L, PayoutType.HOLDBACK_RELEASE))
+                .thenReturn(Optional.empty());
+        when(bankAccountPort.findBySellerId(7L)).thenReturn(Optional.of(ACCOUNT));
+        when(savePort.save(any(Payout.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Optional<Payout> result = service.requestPayoutOfType(
+                500L, 7L, new BigDecimal("14550"), PayoutType.HOLDBACK_RELEASE);
+
+        assertThat(result).isPresent();
+        ArgumentCaptor<Payout> captor = ArgumentCaptor.forClass(Payout.class);
+        verify(savePort).save(captor.capture());
+        assertThat(captor.getValue().getPayoutType()).isEqualTo(PayoutType.HOLDBACK_RELEASE);
+        assertThat(captor.getValue().getAmount()).isEqualByComparingTo("14550");
+    }
+
+    @Test
+    @DisplayName("requestPayoutOfType: 멱등 — 같은 (정산,유형)이 있으면 저장 안 함")
+    void requestOfType_idempotent() {
+        Payout existing = requested(9L, 7L, "14550");
+        when(loadPort.findBySettlementIdAndType(500L, PayoutType.IMMEDIATE))
+                .thenReturn(Optional.of(existing));
+
+        Optional<Payout> result = service.requestPayoutOfType(
+                500L, 7L, new BigDecimal("14550"), PayoutType.IMMEDIATE);
+
+        assertThat(result).contains(existing);
+        verify(savePort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("requestPayoutOfType: 금액 0/음수/null 이면 생성하지 않고 empty")
+    void requestOfType_zeroAmountSkips() {
+        assertThat(service.requestPayoutOfType(500L, 7L, BigDecimal.ZERO, PayoutType.IMMEDIATE)).isEmpty();
+        assertThat(service.requestPayoutOfType(500L, 7L, new BigDecimal("-1"), PayoutType.IMMEDIATE)).isEmpty();
+        assertThat(service.requestPayoutOfType(500L, 7L, null, PayoutType.IMMEDIATE)).isEmpty();
+        verify(savePort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("requestPayoutOfType: 계좌 미해석이면 생성하지 않고 empty (반쪽 지급 방지)")
+    void requestOfType_missingAccountSkips() {
+        when(loadPort.findBySettlementIdAndType(500L, PayoutType.IMMEDIATE)).thenReturn(Optional.empty());
+        when(bankAccountPort.findBySellerId(7L)).thenReturn(Optional.empty());
+
+        Optional<Payout> result = service.requestPayoutOfType(
+                500L, 7L, new BigDecimal("14550"), PayoutType.IMMEDIATE);
+
+        assertThat(result).isEmpty();
+        verify(savePort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("requestPayoutOfType: DB 유니크 경합은 PayoutConcurrentClaimException 으로 표면화(이중 지급 아님)")
+    void requestOfType_uniqueRaceBecomesConflict() {
+        when(loadPort.findBySettlementIdAndType(500L, PayoutType.IMMEDIATE)).thenReturn(Optional.empty());
+        when(bankAccountPort.findBySellerId(7L)).thenReturn(Optional.of(ACCOUNT));
+        when(savePort.save(any(Payout.class)))
+                .thenThrow(new DataIntegrityViolationException("uq_payouts_settlement_type"));
+
+        assertThatThrownBy(() -> service.requestPayoutOfType(
+                500L, 7L, new BigDecimal("14550"), PayoutType.IMMEDIATE))
+                .isInstanceOf(PayoutConcurrentClaimException.class);
     }
 
     @Test

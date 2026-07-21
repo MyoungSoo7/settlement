@@ -1,6 +1,7 @@
 package github.lms.lemuel.payout.adapter.out.persistence;
 
 import github.lms.lemuel.payout.domain.PayoutStatus;
+import github.lms.lemuel.payout.domain.PayoutType;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -15,6 +16,9 @@ import java.util.Optional;
 public interface SpringDataPayoutRepository extends JpaRepository<PayoutJpaEntity, Long> {
 
     Optional<PayoutJpaEntity> findBySettlementId(Long settlementId);
+
+    /** (정산, 지급유형) 멱등 조회 — 확정/홀드백해제 경로가 유형별로 최대 1건임을 서비스 레벨에서 보장한다. */
+    Optional<PayoutJpaEntity> findBySettlementIdAndPayoutType(Long settlementId, PayoutType payoutType);
 
     List<PayoutJpaEntity> findByStatusOrderByRequestedAtAsc(PayoutStatus status, Pageable pageable);
 

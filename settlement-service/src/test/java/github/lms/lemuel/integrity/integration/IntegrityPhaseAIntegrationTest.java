@@ -10,6 +10,7 @@ import github.lms.lemuel.ledger.adapter.out.persistence.LedgerEntryJpaEntity;
 import github.lms.lemuel.ledger.adapter.out.persistence.LedgerOutboxJpaEntity;
 import github.lms.lemuel.payout.adapter.out.persistence.PayoutJpaEntity;
 import github.lms.lemuel.payout.domain.PayoutStatus;
+import github.lms.lemuel.payout.domain.PayoutType;
 import github.lms.lemuel.settlement.adapter.out.persistence.SettlementJpaEntity;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -296,7 +297,7 @@ class IntegrityPhaseAIntegrationTest {
     private static PayoutJpaEntity payout(Long settlementId, BigDecimal amount,
                                           PayoutStatus status, LocalDateTime sentAt) {
         LocalDateTime now = LocalDateTime.now();
-        return new PayoutJpaEntity(null, settlementId, 1L, amount,
+        return new PayoutJpaEntity(null, settlementId, PayoutType.IMMEDIATE, 1L, amount,
                 "004", "9876543210", "테스트셀러",
                 status, null, null, 0, null,
                 now.minusHours(3), sentAt, null, null, now.minusHours(3), now);
