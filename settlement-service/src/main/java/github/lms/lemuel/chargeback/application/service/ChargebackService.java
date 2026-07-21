@@ -7,6 +7,7 @@ import github.lms.lemuel.chargeback.application.port.out.LoadChargebackPort;
 import github.lms.lemuel.chargeback.application.port.out.SaveChargebackPort;
 import github.lms.lemuel.chargeback.domain.Chargeback;
 import github.lms.lemuel.chargeback.domain.ChargebackSource;
+import github.lms.lemuel.ledger.application.port.in.EnqueueLedgerTaskPort;
 import github.lms.lemuel.settlement.application.port.out.SaveSettlementAdjustmentPort;
 import github.lms.lemuel.settlement.domain.SettlementAdjustment;
 import io.micrometer.core.instrument.Counter;
@@ -47,6 +48,7 @@ public class ChargebackService
     private final LoadChargebackPort loadPort;
     private final SaveChargebackPort savePort;
     private final SaveSettlementAdjustmentPort saveAdjustmentPort;
+    private final EnqueueLedgerTaskPort enqueueLedgerTaskPort;
 
     private final Counter openedCounter;
     private final Counter acceptedCounter;
@@ -57,10 +59,12 @@ public class ChargebackService
     public ChargebackService(LoadChargebackPort loadPort,
                               SaveChargebackPort savePort,
                               SaveSettlementAdjustmentPort saveAdjustmentPort,
+                              EnqueueLedgerTaskPort enqueueLedgerTaskPort,
                               MeterRegistry meterRegistry) {
         this.loadPort = loadPort;
         this.savePort = savePort;
         this.saveAdjustmentPort = saveAdjustmentPort;
+        this.enqueueLedgerTaskPort = enqueueLedgerTaskPort;
         this.openedCounter = Counter.builder("chargeback.opened")
                 .description("새로 등록된 분쟁 수").register(meterRegistry);
         this.acceptedCounter = Counter.builder("chargeback.accepted")
@@ -114,13 +118,7 @@ public class ChargebackService
         // 정산이 이미 생성된 분쟁만 즉시 adjustment 기록.
         // 정산 전 분쟁은 정산 생성 시 chargeback 조회 후 백필 (Phase 3).
         if (saved.getSettlementId() != null) {
-            SettlementAdjustment adjustment = SettlementAdjustment.ofChargeback(
-                    saved.getSettlementId(),
-                    saved.getId(),
-                    saved.getAmount(),
-                    LocalDate.now()
-            );
-            saveAdjustmentPort.save(adjustment);
+            recordAdjustmentAndReverse(saved.getSettlementId(), saved.getId(), saved.getAmount());
             log.warn("[Chargeback] accepted + adjustment created. chargebackId={}, settlementId={}, amount={}",
                     saved.getId(), saved.getSettlementId(), saved.getAmount());
         } else {
@@ -130,6 +128,18 @@ public class ChargebackService
 
         acceptedCounter.increment();
         return saved;
+    }
+
+    /**
+     * 차지백 환수 조정(음수 감사 레코드)과 CHARGEBACK 출처 원장 역분개 작업을 같은 트랜잭션에 함께 남긴다.
+     * 조정만 남기고 원장을 안 건드리면 (조정 ↔ 역분개) 1:1 이 깨져 INV-5 가 갭으로 잡는다 —
+     * 환불 경로({@code AdjustSettlementForRefundService})와 동일하게 원자적으로 적재한다.
+     * 이중 적재는 uq_ledger_reference_accounts (reference_id, reference_type=CHARGEBACK) 가 최종 차단한다.
+     */
+    private void recordAdjustmentAndReverse(Long settlementId, Long chargebackId, java.math.BigDecimal amount) {
+        LocalDate today = LocalDate.now();
+        saveAdjustmentPort.save(SettlementAdjustment.ofChargeback(settlementId, chargebackId, amount, today));
+        enqueueLedgerTaskPort.enqueueReverseChargeback(settlementId, chargebackId, amount, today);
     }
 
     /**
@@ -148,9 +158,7 @@ public class ChargebackService
             Chargeback saved = savePort.save(chargeback);
             backfilledCounter.increment();
             if (saved.isAccepted()) {
-                SettlementAdjustment adjustment = SettlementAdjustment.ofChargeback(
-                        settlementId, saved.getId(), saved.getAmount(), LocalDate.now());
-                saveAdjustmentPort.save(adjustment);
+                recordAdjustmentAndReverse(settlementId, saved.getId(), saved.getAmount());
                 log.warn("[Chargeback] 사전분쟁 백필 + 환수 조정 생성. chargebackId={}, settlementId={}, amount={}",
                         saved.getId(), settlementId, saved.getAmount());
             } else {

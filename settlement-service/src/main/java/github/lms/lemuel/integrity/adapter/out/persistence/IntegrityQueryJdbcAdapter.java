@@ -105,13 +105,24 @@ public class IntegrityQueryJdbcAdapter implements IntegrityQueryPort {
                 .param("start", start).param("end", end)
                 .query(Long.class).list();
 
+        // 3개 출처(환불·차지백·PG대사) 조정 각각이 대응 역분개(reference_type 별)를 갖는지 대조한다.
+        // 출처 id 는 서로 다른 id 공간이라 adjustment.id 로 반환해 축 간 충돌 없이 식별한다.
         List<Long> missingReverse = jdbc.sql("""
-                        SELECT a.refund_id FROM settlement_adjustments a
-                        WHERE a.refund_id IS NOT NULL AND a.adjustment_date = :date
-                          AND a.created_at <= :graceCutoff
-                          AND NOT EXISTS (SELECT 1 FROM ledger_entries le
-                                          WHERE le.reference_id = a.refund_id AND le.reference_type = 'REFUND')
-                        ORDER BY a.refund_id LIMIT %d
+                        SELECT a.id FROM settlement_adjustments a
+                        WHERE a.adjustment_date = :date AND a.created_at <= :graceCutoff
+                          AND (
+                                (a.refund_id IS NOT NULL AND NOT EXISTS (
+                                    SELECT 1 FROM ledger_entries le
+                                    WHERE le.reference_id = a.refund_id AND le.reference_type = 'REFUND'))
+                             OR (a.chargeback_id IS NOT NULL AND NOT EXISTS (
+                                    SELECT 1 FROM ledger_entries le
+                                    WHERE le.reference_id = a.chargeback_id AND le.reference_type = 'CHARGEBACK'))
+                             OR (a.reconciliation_discrepancy_id IS NOT NULL AND NOT EXISTS (
+                                    SELECT 1 FROM ledger_entries le
+                                    WHERE le.reference_id = a.reconciliation_discrepancy_id
+                                      AND le.reference_type = 'PG_RECONCILIATION'))
+                          )
+                        ORDER BY a.id LIMIT %d
                         """.formatted(ID_LIMIT))
                 .param("date", date).param("graceCutoff", graceCutoff)
                 .query(Long.class).list();

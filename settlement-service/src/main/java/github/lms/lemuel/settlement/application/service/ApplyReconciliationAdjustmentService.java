@@ -2,6 +2,7 @@ package github.lms.lemuel.settlement.application.service;
 
 import github.lms.lemuel.common.audit.application.AuditLogger;
 import github.lms.lemuel.common.audit.domain.AuditAction;
+import github.lms.lemuel.ledger.application.port.in.EnqueueLedgerTaskPort;
 import github.lms.lemuel.settlement.application.port.in.ApplyReconciliationAdjustmentUseCase;
 import github.lms.lemuel.settlement.application.port.out.LoadSettlementPort;
 import github.lms.lemuel.settlement.application.port.out.SaveSettlementAdjustmentPort;
@@ -42,6 +43,7 @@ public class ApplyReconciliationAdjustmentService implements ApplyReconciliation
     private final LoadSettlementPort loadSettlementPort;
     private final SaveSettlementPort saveSettlementPort;
     private final SaveSettlementAdjustmentPort saveSettlementAdjustmentPort;
+    private final EnqueueLedgerTaskPort enqueueLedgerTaskPort;
     private final MeterRegistry meterRegistry;
     private final AuditLogger auditLogger;
     /** KST 기준 시각 소스 — clawback 조정 기준일이 JVM 타임존에 흔들리지 않게 한다. */
@@ -50,12 +52,14 @@ public class ApplyReconciliationAdjustmentService implements ApplyReconciliation
     public ApplyReconciliationAdjustmentService(LoadSettlementPort loadSettlementPort,
                                                 SaveSettlementPort saveSettlementPort,
                                                 SaveSettlementAdjustmentPort saveSettlementAdjustmentPort,
+                                                EnqueueLedgerTaskPort enqueueLedgerTaskPort,
                                                 MeterRegistry meterRegistry,
                                                 AuditLogger auditLogger,
                                                 Clock clock) {
         this.loadSettlementPort = loadSettlementPort;
         this.saveSettlementPort = saveSettlementPort;
         this.saveSettlementAdjustmentPort = saveSettlementAdjustmentPort;
+        this.enqueueLedgerTaskPort = enqueueLedgerTaskPort;
         this.meterRegistry = meterRegistry;
         this.auditLogger = auditLogger;
         this.clock = clock;
@@ -101,6 +105,11 @@ public class ApplyReconciliationAdjustmentService implements ApplyReconciliation
 
         saveSettlementAdjustmentPort.save(SettlementAdjustment.ofReconciliation(
                 adjusted.getId(), discrepancyId, clawbackAmount, today));
+
+        // PG_RECONCILIATION 출처 원장 역분개를 같은 트랜잭션 Outbox 에 적재 — 조정 ↔ 역분개 1:1 (환불 경로 동형).
+        // DONE 정산(위 catch) 은 지급 완료라 역분개하지 않는다(송금후 회수는 범위 밖). 이중 적재는
+        // uq_ledger_reference_accounts (reference_type=PG_RECONCILIATION) 가 최종 차단한다.
+        enqueueLedgerTaskPort.enqueueReverseReconciliation(adjusted.getId(), discrepancyId, clawbackAmount, today);
 
         log.info("[PgRecon] 대사 clawback 적용 완료. discrepancyId={}, settlementId={}, clawback={}, netAmount={}, status={}",
                 discrepancyId, adjusted.getId(), clawbackAmount, adjusted.getNetAmount(), adjusted.getStatus());

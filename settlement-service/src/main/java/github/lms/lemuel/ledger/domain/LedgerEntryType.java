@@ -12,6 +12,10 @@ public enum LedgerEntryType {
     SETTLEMENT_CONFIRMED,
     /** 환불에 의한 역분개. */
     REFUND_REVERSED,
+    /** 카드사 분쟁(Chargeback) ACCEPTED 에 의한 역분개. */
+    CHARGEBACK_REVERSED,
+    /** PG 대사 clawback 에 의한 역분개. */
+    RECON_REVERSED,
     /** 수수료 인식. */
     COMMISSION_RECOGNIZED,
     /** 실 이체(출금) 실행. */

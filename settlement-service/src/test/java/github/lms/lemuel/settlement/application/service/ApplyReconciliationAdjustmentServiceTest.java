@@ -2,6 +2,7 @@ package github.lms.lemuel.settlement.application.service;
 
 import github.lms.lemuel.common.audit.application.AuditLogger;
 import github.lms.lemuel.common.audit.domain.AuditAction;
+import github.lms.lemuel.ledger.application.port.in.EnqueueLedgerTaskPort;
 import github.lms.lemuel.settlement.application.port.out.LoadSettlementPort;
 import github.lms.lemuel.settlement.application.port.out.SaveSettlementAdjustmentPort;
 import github.lms.lemuel.settlement.application.port.out.SaveSettlementPort;
@@ -41,6 +42,7 @@ class ApplyReconciliationAdjustmentServiceTest {
     @Mock LoadSettlementPort loadSettlementPort;
     @Mock SaveSettlementPort saveSettlementPort;
     @Mock SaveSettlementAdjustmentPort saveSettlementAdjustmentPort;
+    @Mock EnqueueLedgerTaskPort enqueueLedgerTaskPort;
     @Mock AuditLogger auditLogger;
     SimpleMeterRegistry meterRegistry;
     ApplyReconciliationAdjustmentService service;
@@ -49,7 +51,8 @@ class ApplyReconciliationAdjustmentServiceTest {
     void setUp() {
         meterRegistry = new SimpleMeterRegistry();
         service = new ApplyReconciliationAdjustmentService(
-                loadSettlementPort, saveSettlementPort, saveSettlementAdjustmentPort, meterRegistry,
+                loadSettlementPort, saveSettlementPort, saveSettlementAdjustmentPort,
+                enqueueLedgerTaskPort, meterRegistry,
                 auditLogger, Clock.system(ZoneId.of("Asia/Seoul")));
     }
 
@@ -85,6 +88,12 @@ class ApplyReconciliationAdjustmentServiceTest {
         assertThat(meterRegistry.counter("pg.reconciliation.adjustments.applied").count()).isEqualTo(1.0);
         verify(auditLogger).record(eq(AuditAction.RECON_ADJUSTMENT_APPLIED), eq("Settlement"),
                 eq("500"), contains("\"outcome\":\"APPLIED\""));
+
+        // 조정과 함께 PG_RECONCILIATION 출처 원장 역분개가 같은 트랜잭션 Outbox 에 적재된다(discrepancyId 참조).
+        ArgumentCaptor<BigDecimal> amt = ArgumentCaptor.forClass(BigDecimal.class);
+        verify(enqueueLedgerTaskPort).enqueueReverseReconciliation(
+                eq(500L), eq(55L), amt.capture(), any(LocalDate.class));
+        assertThat(amt.getValue()).isEqualByComparingTo("1000");
     }
 
     @Test
@@ -110,6 +119,8 @@ class ApplyReconciliationAdjustmentServiceTest {
         // DONE 정산도 갭 추적을 위해 감사 레코드는 남긴다(outcome=DONE_MANUAL_CLAWBACK).
         verify(auditLogger).record(eq(AuditAction.RECON_ADJUSTMENT_APPLIED), eq("Settlement"),
                 eq("500"), contains("\"outcome\":\"DONE_MANUAL_CLAWBACK\""));
+        // 지급 완료(DONE) 정산의 회수는 송금후 회수 영역 — 원장 역분개를 적재하지 않는다(scope 밖).
+        verify(enqueueLedgerTaskPort, never()).enqueueReverseReconciliation(any(), any(), any(), any());
     }
 
     @Test

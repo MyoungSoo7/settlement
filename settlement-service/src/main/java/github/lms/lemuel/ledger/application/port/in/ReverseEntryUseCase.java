@@ -1,6 +1,7 @@
 package github.lms.lemuel.ledger.application.port.in;
 
 import github.lms.lemuel.ledger.domain.LedgerEntry;
+import github.lms.lemuel.ledger.domain.ReferenceType;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -28,4 +29,15 @@ public interface ReverseEntryUseCase {
      */
     List<LedgerEntry> reverseForRefund(Long settlementId, Long refundId,
                                        BigDecimal refundAmount, LocalDate adjustmentDate);
+
+    /**
+     * 출처별 역분개 row 들을 생성한다(환불·차지백·PG 대사 공통). 계정 매핑·비율 분해는 환불 역분개와 동일하고
+     * {@code referenceType}·entry 유형·메모만 출처에 맞춰 달라진다.
+     *
+     * @param referenceType 원거래 종류 (REFUND / CHARGEBACK / PG_RECONCILIATION)
+     * @param referenceId   출처 식별자 (refundId / chargebackId / discrepancyId) — LedgerEntry.referenceId 가 됨
+     * @return 생성된 row 리스트. 이미 같은 (referenceId, referenceType) 로 작성됐다면 빈 리스트.
+     */
+    List<LedgerEntry> reverseForReference(Long settlementId, Long referenceId, ReferenceType referenceType,
+                                          BigDecimal amount, LocalDate adjustmentDate);
 }
