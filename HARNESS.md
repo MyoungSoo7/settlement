@@ -88,7 +88,7 @@
 - **경로 B — 저장소 네이티브(플러그인 0 의존, CI 가능)**:
   - `node scripts/harness/harness-audit.mjs` — 하네스 자기 진단(STATUS 수치 드리프트·라우팅 dangling·가드 훅 경로 실존·인벤토리)
   - `node scripts/harness/guard.mjs --staged` — 돈/경계/이력 불변식 가드
-  - `node scripts/harness/telemetry-report.mjs` — 가드 발화·스킬 사용/제안 텔레메트리 집계(`.omc/logs`)
+  - `node scripts/harness/telemetry-report.mjs` — 가드 발화·스킬 사용/제안 텔레메트리 집계(`.claude/harness/logs`)
   - `./gradlew :<module>:test`·`:jacocoTestCoverageVerification` — 정합 검증(측정 정답)
   - 서비스 자체 `/admin/integrity`·`/api/account/trial-balance` 조회 API(읽기 전용)
 - **불변식**: psql/pg_dump/kafka produce 로 운영 데이터에 직접 손대는 명령을 만들지 않는다(가드가 `check-command` 로 차단).
@@ -112,7 +112,7 @@
 - **OO 구조 게이트** — `scripts/harness/test/oo-gate.test.mjs`: 트리 전수 스캔(도메인 setter 0·@Setter 0·금융 5서비스 IAE 0·코어 애그리거트 17종 생성자 봉인·상태 enum 9종 canTransitionTo 전이표 보유). 2026-07-14 OO 캠페인(패널 중앙값 9.5+)의 구조 정본 회귀 방지 — CI 하네스 테스트에 자동 포함. 점수 재채점(LLM 판정)은 📘`oo-score` 스킬.
 - **하네스 자기 진단** — `scripts/harness/harness-audit.mjs`: 문서 드리프트를 규율이 아닌 **기계 게이트**로 승격(과거 STATUS 3주 방치 재발 방지).
 - **CI 강제** — `.github/workflows/harness-guard.yml`: PR/푸시마다 변경 파일 가드(`guard.mjs --list`) + 자기 진단을 **로컬 설정과 무관하게** 실행(훅 미설치·`--no-verify` 우회를 CI가 재차단). 기존 `ci.yml`(빌드·테스트·커버리지)와 병존.
-- **하네스 텔레메트리(관측 계층)** — `scripts/harness/telemetry.mjs`: 가드 차단·스킬 사용·라우터 제안을 `.omc/logs/*.jsonl`(gitignore, 비커밋)에 append-only 적재. 집계는 `node scripts/harness/telemetry-report.mjs`(규칙별 발화 횟수·0회=죽은 규칙 후보·스킬 사용률·제안 대비 미로드). 관측 실패가 가드를 깨뜨리지 않는 non-fatal 설계, 킬 스위치 `HARNESS_TELEMETRY=off`.
+- **하네스 텔레메트리(관측 계층)** — `scripts/harness/telemetry.mjs`: 가드 차단·스킬 사용·라우터 제안을 `.claude/harness/logs/*.jsonl`(gitignore, 비커밋 — `.omc` 는 OMC 플러그인 소유·정리 대상이라 하네스 런타임은 프로젝트 소유 `.claude/harness/` 에 격리)에 append-only 적재. 집계는 `node scripts/harness/telemetry-report.mjs`(규칙별 발화 횟수·0회=죽은 규칙 후보·스킬 사용률·제안 대비 미로드). 관측 실패가 가드를 깨뜨리지 않는 non-fatal 설계, 킬 스위치 `HARNESS_TELEMETRY=off`.
 - **스킬 라우터(권장의 기계화)** — `scripts/harness/skill-router.mjs`: PreToolUse 훅(Write/Edit/MultiEdit/Skill)이 편집 대상 경로를 보고 해당 `*-rules`·횡단 스킬 로드를 additionalContext 리마인더로 주입(세션당 스킬별 1회). 라우팅 맵의 "만지면 로드" 규칙을 문서 규율에서 기계 리마인더로 승격 — 가드가 금지를 강제한다면 라우터는 권장을 주입한다. 절대 차단하지 않음(항상 exit 0).
 
 ## 하드스톱 — 절대 금지 (위반 = 회계·아키텍처 손상 · 정본은 CLAUDE `🚫 핵심 가드레일`)

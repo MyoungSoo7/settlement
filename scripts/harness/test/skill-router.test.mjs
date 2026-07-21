@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { decideHookOutput, routeSkills, runRouterCli } from '../skill-router.mjs';
-import { appendJsonl, guardHitRecords } from '../telemetry.mjs';
+import { appendJsonl, guardHitRecords, LOG_DIR_SEGMENTS } from '../telemetry.mjs';
 import { runGuardCli } from '../guard.mjs';
 import { readJsonl, summarize } from '../telemetry-report.mjs';
 
@@ -74,7 +74,7 @@ describe('decideHookOutput', () => {
     assert.match(parsed.hookSpecificOutput.additionalContext, /loan-domain-rules/);
     assert.equal(await decideHookOutput(writeEvent('session-a'), { repoRoot }), null);
     assert.ok(await decideHookOutput(writeEvent('session-b'), { repoRoot }));
-    const suggestions = readJsonl(join(repoRoot, '.omc', 'logs', 'skill-suggestions.jsonl'));
+    const suggestions = readJsonl(join(repoRoot, ...LOG_DIR_SEGMENTS, 'skill-suggestions.jsonl'));
     // 세션당 (loan-domain-rules + tdd-discipline) 2건 × 2세션
     assert.equal(suggestions.length, 4);
   });
@@ -86,7 +86,7 @@ describe('decideHookOutput', () => {
       { repoRoot },
     );
     assert.equal(output, null);
-    const usage = readJsonl(join(repoRoot, '.omc', 'logs', 'skill-usage.jsonl'));
+    const usage = readJsonl(join(repoRoot, ...LOG_DIR_SEGMENTS, 'skill-usage.jsonl'));
     assert.equal(usage.length, 1);
     assert.equal(usage[0].skill, 'settlement-domain-rules');
   });
@@ -110,7 +110,7 @@ describe('telemetry', () => {
     const repoRoot = await temporaryRepo();
     const written = await appendJsonl(repoRoot, 'guard-hits.jsonl', { a: 1 }, { env: { HARNESS_TELEMETRY: 'off' } });
     assert.equal(written, false);
-    assert.equal(existsSync(join(repoRoot, '.omc', 'logs', 'guard-hits.jsonl')), false);
+    assert.equal(existsSync(join(repoRoot, ...LOG_DIR_SEGMENTS, 'guard-hits.jsonl')), false);
   });
 
   test('guard hook mode records blocked violations to guard-hits.jsonl', async () => {
@@ -121,7 +121,7 @@ describe('telemetry', () => {
     const event = { tool_name: 'Write', tool_input: { file_path: file, content: 'double amount = 1.0;\n' } };
     const exitCode = await runGuardCli(['--hook'], { repoRoot, stdin: JSON.stringify(event), stdout: () => {}, stderr: () => {} });
     assert.equal(exitCode, 2);
-    const hits = readJsonl(join(repoRoot, '.omc', 'logs', 'guard-hits.jsonl'));
+    const hits = readJsonl(join(repoRoot, ...LOG_DIR_SEGMENTS, 'guard-hits.jsonl'));
     assert.equal(hits.length, 1);
     assert.equal(hits[0].id, 'MONEY-PRIMITIVE');
     assert.equal(hits[0].mode, 'hook');

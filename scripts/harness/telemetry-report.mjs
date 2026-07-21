@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Lemuel harness telemetry report — .omc/logs/*.jsonl 집계 CLI.
+// Lemuel harness telemetry report — .claude/harness/logs/*.jsonl 집계 CLI.
 //
 //   node scripts/harness/telemetry-report.mjs [--root <repo>] [--days N]
 //

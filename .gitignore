@@ -56,6 +56,7 @@ target/
 ### Local runtime artifacts ###
 .claude/scheduled_tasks.lock
 .claude/worktrees/
+.claude/harness/
 *.stackdump
 build-test-output.log
 

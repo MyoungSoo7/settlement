@@ -54,7 +54,7 @@ export function routeSkills(filePath) {
 
 function stateFilePath(repoRoot, sessionId) {
   const id = String(sessionId ?? '').replace(/[^a-zA-Z0-9-]/g, '').slice(0, 64) || 'global';
-  return resolve(repoRoot, '.omc', 'state', `skill-router-${id}.json`);
+  return resolve(repoRoot, '.claude', 'harness', 'state', `skill-router-${id}.json`);
 }
 
 async function readSuggested(statePath) {
