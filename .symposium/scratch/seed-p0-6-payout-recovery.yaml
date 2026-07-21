@@ -1,0 +1,23 @@
+goal: 이미 송금 완료(COMPLETED)된 Payout 은 취소·수정하지 않고, 별도 채권(receivable)·상계·회수 레코드로 후속 정산에 반영한다.
+constraints:
+  - COMPLETED Payout 의 종결 불변(취소·금액 수정 금지)을 유지한다 — 회수는 신규 레코드로만.
+  - 채권 발생 원천은 차지백·PG 대사 회수분 중 holdback 으로 흡수되지 못한 잔여분으로 한정한다.
+  - 상계는 후속 정산의 net 계산에 반영하되 정산 자체의 append-only 원칙(DONE 불변)을 지킨다.
+  - 원장에는 채권 발생·상계 각각 균형 잡힌 분개를 남긴다.
+  - ./gradlew :settlement-service:test 와 jacocoTestCoverageVerification GREEN 을 유지한다.
+acceptance_criteria:
+  - COMPLETED Payout 정산에 차지백/대사 회수가 발생하면 채권 레코드가 생성되고 Payout·정산 원본은 불변이다.
+  - 동일 판매자의 후속 정산 확정 시 미상계 채권이 지급액에서 상계되고 상계 이력이 남는다.
+  - 채권 발생·상계 각각에 균형 원장 분개가 1:1 로 생성됨을 통합테스트로 증명한다.
+  - 채권 잔액·상계 이력 조회 API 가 제공된다.
+ontology_schema:
+  name: 지급후 회수 채권
+  description: >-
+    "송금 완료 후 회수" 갭(Phase 3 주석)을 채권-상계 모델로 구현한다.
+    속성: 종결 불변·상계 추적·원장 완결.
+  fields: []
+metadata:
+  parent: seed-p0.yaml
+  order: 6
+  covers: [AC-12]
+  depends_on: [seed-p0-1, seed-p0-2]

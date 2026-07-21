@@ -1,0 +1,22 @@
+goal: 정산 확정·홀드백 해제 시 Payout 이 지급유형(IMMEDIATE, HOLDBACK_RELEASE)별로 자동 생성되도록 배선하고, (정산, 지급유형)당 최대 1건 멱등을 보장한다.
+constraints:
+  - 기존 uq_payouts_settlement 제약·PayoutService 멱등·REQUESTED 집행 배치의 하위 호환을 보존한다. 지급유형 도입 시 UNIQUE 는 (settlement_id, payout_type) 부분 유니크로 마이그레이션하고 롤백 조건을 명시한다.
+  - DONE 정산과 POSTED·REVERSED 원장은 수정하지 않는다(append-only).
+  - 검증 정본은 Testcontainers 통합테스트다 — 도커 컴포즈 전체 기동을 요구하지 않는다.
+  - ./gradlew :settlement-service:test 와 jacocoTestCoverageVerification(LINE 90%) GREEN 을 유지한다.
+acceptance_criteria:
+  - 정산 확정 경로(SettlementConfirmItemWriter)에서 IMMEDIATE Payout(미해제 holdback 제외 금액)이 자동 생성된다.
+  - 홀드백 해제 경로(ReleaseHoldbackService)에서 HOLDBACK_RELEASE Payout(환불·차지백·PG 대사로 소비되지 않은 보류 잔액)이 자동 생성된다.
+  - 동일 정산 확정 이벤트의 중복 전달·재시도·동시 2스레드 처리에도 (정산, 지급유형)당 Payout 이 최대 1건임을 통합테스트로 증명한다.
+  - 기존 REQUESTED 집행 배치(PayoutScheduler)와 수동 API(execute-now/retry/cancel)가 회귀 없이 동작한다.
+ontology_schema:
+  name: 정산-지급 자동 배선
+  description: >-
+    정산 확정→Payout 생성의 미배선 갭(호출처 0건)을 닫고 지급유형 개념을 도입한다.
+    속성: 생성 멱등성·지급유형 분리·하위 호환. 송금후 회수(채권/상계)와 원장 연동은 범위 외.
+  fields: []
+metadata:
+  parent: seed-p0.yaml
+  order: 1
+  covers: [AC-1, AC-2, AC-3]
+  depends_on: []

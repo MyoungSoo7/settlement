@@ -1,0 +1,28 @@
+goal: 전체 서비스를 로컬에서 실행해 핵심 정산 시나리오를 종단 간 검증하고, 발견된 코드·테스트·API·문서 불일치를 개선하여 실제 품질과 포트폴리오 전달력을 높인다.
+constraints:
+  - 포트폴리오 표현보다 실제 프로젝트 품질을 우선한다.
+  - 전체 서비스의 로컬 실행 가능성을 검증 범위에 포함한다.
+  - 구현, 테스트, API 명세, README 및 아키텍처 문서의 일관성을 확인한다.
+  - DONE 정산과 POSTED·REVERSED 원장은 수정·삭제하지 않고 adjustment와 신규 역분개로만 정정한다.
+  - 기존 refundId 없는 이벤트, 기존 DONE 정산, 기존 adjustment 및 이벤트 생산자의 하위 호환성을 보존하고 DB·이벤트 변경에 롤백 조건을 둔다.
+  - 향후 흐름 수정뿐 아니라 이미 누락된 Payout과 원장 없는 차지백·PG 대사 adjustment의 탐지 및 멱등 백필을 이번 개선 범위에 포함한다.
+acceptance_criteria:
+  - 정산 확정 후 판매자 계좌 스냅샷과 확정된 대출 차감 결과를 반영한 Payout이 정산·지급유형(IMMEDIATE, HOLDBACK_RELEASE)당 최대 1건 생성된다.
+  - 동일한 정산 확정 이벤트의 중복 전달·재시도·동시 처리에도 Payout이 중복 생성되거나 이중 지급되지 않는다.
+  - IMMEDIATE Payout은 미해제 holdback을 제외하고, HOLDBACK_RELEASE Payout은 해제 시점까지 환불·차지백·PG 대사로 소비되지 않은 보류 잔액만 지급한다.
+  - 환불·차지백·PG 대사로 발생한 모든 금융 adjustment는 REFUND, CHARGEBACK, PG_RECONCILIATION 중 하나의 출처를 가지며 균형 잡힌 원장 분개와 1:1로 연결된다.
+  - DONE 정산의 환불·차지백·PG 대사도 기존 정산·원장을 변경하지 않고 신규 adjustment와 역분개로 반영된다.
+  - event_id 누락·잘못된 UUID·잘못된 payload는 ACK 후 유실되지 않고 PROCESSED, DUPLICATE, QUARANTINED 중 하나의 추적 가능한 결과를 남긴다.
+  - 격리된 이벤트는 원인과 식별 가능한 증거를 보존하며 수정 후 재처리해도 도메인 처리가 정확히 한 번만 적용된다.
+  - 고정 데이터와 단일 명령으로 결제 캡처부터 정산 생성·확정, 원장, Payout, 송금 결과까지 검증하고 정산·adjustment·원장·Payout 불변식을 자동 단언한다.
+  - 기존 미생성 Payout과 원장 없는 adjustment를 탐지하는 보고서가 제공되고, 백필을 반복 실행해도 결과가 변하지 않는다.
+  - adjustment 저장, 원장 역분개 아웃박스 및 Payout 보정 사이의 각 크래시 지점을 재현해도 재시작 후 부분 반영 없이 동일한 상태로 수렴한다.
+  - 정산 확정, 대출 차감, 차지백, PG 대사 및 Payout 실행 이벤트가 역순·중복·동시 도착해도 최종 지급·원장 금액이 동일하게 수렴한다.
+  - 이미 송금 완료된 Payout은 취소·수정하지 않고 별도 채권·상계·회수 레코드로 후속 정산에 반영된다.
+ontology_schema:
+  name: 정산 회계 완결성
+  description: >-
+    결제→정산→원장→Payout의 회계 완결성과 이벤트 복구, 기존 데이터 백필까지 포함하되
+    P1/P2 일반 개선·실제 운영·신규 사업 기능은 제외한다. 속성: 회계 완전성·멱등 복구성·종단 재현성.
+  fields: []
+metadata: {}

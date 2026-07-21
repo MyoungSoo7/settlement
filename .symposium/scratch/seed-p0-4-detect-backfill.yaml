@@ -1,0 +1,23 @@
+goal: 기존 탐지 리포트(INV-5 원장 누락, INV-6 미생성 Payout)를 근거로 과거 데이터의 미생성 Payout 과 원장 없는 adjustment 를 멱등 백필하는 admin 경로를 만든다.
+constraints:
+  - 탐지는 기존 무결성 스위트(INV-5 missing/missingReverse, INV-6 settlementsWithoutPayout)를 재사용한다 — 새 탐지 로직을 중복 작성하지 않는다.
+  - 백필은 append-only — DONE 정산·POSTED 원장을 수정하지 않고 신규 Payout·역분개 생성만 한다.
+  - 백필 반복 실행은 결과 불변(멱등) — 기존 UNIQUE 제약(payouts, uq_ledger_reference_accounts)을 멱등 키로 활용한다.
+  - 페이지 단위 커밋(기존 PayoutPiiReencryptionBackfill 패턴)으로 부분 실패 시 재개 가능해야 한다.
+  - ./gradlew :settlement-service:test 와 jacocoTestCoverageVerification GREEN 을 유지한다.
+acceptance_criteria:
+  - 확정됐지만 Payout 이 없는 과거 정산에 대해 백필이 지급유형별 Payout 을 생성하고, 리포트가 생성 건수·잔여 건수를 보고한다.
+  - 원장 역분개가 없는 차지백·PG 대사 adjustment 에 대해 백필이 역분개를 적재한다.
+  - 두 백필 모두 2회 연속 실행 시 2회차 변경이 0건임을 통합테스트로 증명한다.
+  - 백필 실행 이력(누가·언제·몇 건)이 감사 가능하게 남는다.
+ontology_schema:
+  name: 과거 데이터 멱등 백필
+  description: >-
+    탐지(이미 존재)와 정정(신규)을 분리해, 과거 누락분을 append-only·멱등으로만 보정한다.
+    속성: 멱등성·감사 가능성·append-only.
+  fields: []
+metadata:
+  parent: seed-p0.yaml
+  order: 4
+  covers: [AC-9]
+  depends_on: [seed-p0-1, seed-p0-2]

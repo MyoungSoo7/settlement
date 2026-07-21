@@ -1,0 +1,22 @@
+goal: 소비 이벤트가 유실되지 않도록 격리 추적을 완결한다 — event_id 누락·잘못된 UUID·잘못된 payload 가 ACK 후에도 PROCESSED, DUPLICATE, QUARANTINED 중 하나의 추적 가능한 결과를 남긴다.
+constraints:
+  - 현재 event_id 누락 시 경고 로그 후 skip(유실) 동작을 격리 기록으로 대체하되, 정상 이벤트 처리 처리량·기존 processed_events 멱등 2단은 훼손하지 않는다.
+  - 기존 DLT(.DLT 토픽) 격리·DlqReplayService 재처리 경로와 공존한다(대체가 아니라 DB 추적 계층 추가).
+  - shared-common IdempotentEventConsumer 변경은 소비 서비스 전체에 영향 — 기본 동작 하위 호환(옵트인 또는 무해한 확장)을 보장한다.
+  - ./gradlew :settlement-service:test 와 jacocoTestCoverageVerification GREEN 을 유지한다.
+acceptance_criteria:
+  - event_id 누락·잘못된 UUID 이벤트가 원인·원본 payload 증거와 함께 격리 테이블에 기록되고 ACK 된다(유실 0).
+  - 잘못된 payload(파싱 실패·필수 필드 누락)도 동일하게 QUARANTINED 추적 결과를 남긴다.
+  - 격리 이벤트를 수정 후 재처리하면 도메인 처리가 정확히 한 번만 적용됨을 통합테스트로 증명한다(processed_events 멱등과 합류).
+  - 정상·중복·격리 3분류가 조회 가능한 운영 API(또는 기존 /admin 확장)로 노출된다.
+ontology_schema:
+  name: 이벤트 격리 완결성
+  description: >-
+    at-least-once 소비에서 "조용한 유실" 경로를 제거하고 모든 이벤트에 추적 가능한 종결 상태를 부여한다.
+    속성: 무유실·증거 보존·정확히-한-번 재적용.
+  fields: []
+metadata:
+  parent: seed-p0.yaml
+  order: 3
+  covers: [AC-6, AC-7]
+  depends_on: []
