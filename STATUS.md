@@ -32,6 +32,7 @@
 - **operation-service Phase 3 베이스라인 이상탐지** — 신규 `anomaly` BC: `ops_metric_bucket` 실패율 카운터 5종을 5분마다 롤링윈도우 z-score(최소표본·상대임계·정상복귀 게이트)로 판정 → `source=ANOMALY` 인시던트 자동 생성/refire/자동해제. 마이그레이션 0(기존 인시던트 라이프사이클 재사용), 테스트 16건+합성 백테스트, 로컬 실기동 검증 완료 (docs/design/operation-service-phase1.md §Phase 3).
 
 ## 진행 중
+- P0 시드 3(이벤트 격리) — 병행 세션이 develop 위에 재구현 진행 중(`ConsumedEventQuarantine` 옵트인 훅). 시드 클레임 정본: `.symposium/scratch/seed-claims.md`
 - account-service 시산표 실검증 + 셀러 payout 현금 유출 GL 인식 (ADR 0026 — 회계 결정 대기)
 - operation-service 로드맵: Phase 3 베이스라인 이상탐지 **완료** → 다음은 Phase 4 AI 브리핑
 - 커버리지 게이트 LINE 90% 상향 후속 — 신규 서비스 통합테스트 보강
@@ -46,6 +47,8 @@
 - `DATA_GO_KR_API_KEY` 미보유로 common-data-service 실수집 경로 미검증(소스 등록→조회 전과정은 검증됨)
 - 로컬 `bootRun` 은 cwd=모듈 디렉토리라 루트 `.env` 미로딩 → `--args="--JWT_SECRET=... --POSTGRES_*=..."` 주입 필요
 - 외부 `main` 머지가 `develop` 으로 유입 → push 전 `git pull --rebase` 습관화
+- `codex/settlement-p0-feedback` 브랜치는 **참조용 보존·회수 금지** (2026-07-22 처분 확정): 시드 3 은 develop 재구현이 대체,
+  시드 6·조정분류·Task4/6 은 develop 재작성(역분개 일반화·typed payout)과 돈 경로 핵심 4파일 정면충돌 — 재구현 시 참조만
 - 운영 배포 필수 주입: 강한 `JWT_SECRET`, `app.security.internal-key-required=true`, 각 서비스 외부 API 키
 
 ## 핵심 수치 (2026-07-22 기준 · git-tracked 소스)
@@ -54,7 +57,7 @@
 - 서비스 **13개** + API Gateway + Kotlin polyglot 2(notification·reconciliation) — `git ls-files '*/src/main/resources/application.yml' | wc -l` → 16(=13+gateway+kotlin 2)
 - Flyway 마이그레이션 **202개** — `git ls-files '*/src/main/resources/db/migration/*.sql' | wc -l` → 202
 - ADR **27개** (0001~0028, 0019 결번) — `git ls-files 'docs/adr/[0-9]*.md' | wc -l` → 27
-- 테스트 클래스 **616개** (Testcontainers 통합테스트 포함) — `git ls-files '*/src/test/*Test.java' '*/src/test/*Tests.java' '*/src/test/*IT.java' | wc -l` → 616
+- 테스트 클래스 **617개** (Testcontainers 통합테스트 포함) — `git ls-files '*/src/test/*Test.java' '*/src/test/*Tests.java' '*/src/test/*IT.java' | wc -l` → 617
 
 ## 참고 문서
 - `SPEC.md` — 전체 기능명세(엔드포인트·도메인 규칙·이벤트 카탈로그)
