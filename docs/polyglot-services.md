@@ -1,6 +1,6 @@
 # Polyglot Services (MVP)
 
-settlement MSA 에 언어별 강점을 살려 붙인 신규 서비스 7종(Kotlin 2 + Go 2 + Python 3). 모두 **동작하는 MVP**(핵심 로직 + 헬스체크 + 테스트 + Dockerfile) 이며, 프로덕션 하드닝(실데이터 연동·모델 학습·배포 차트)은 각 README 의 TODO 로 분리했다. 기존 Java(Gradle) 모듈과 별개의 독립 서비스로, `settings.gradle.kts` 에 포함되지 않으므로 Gradle 빌드에 영향이 없다.
+settlement MSA 에 언어별 강점을 살려 붙인 신규 서비스 7종(Kotlin 2 + Go 2 + Python 3). 모두 **동작하는 MVP**(핵심 로직 + 헬스체크 + 테스트 + Dockerfile) 이며, 프로덕션 하드닝(실데이터 연동·모델 학습·배포 차트)은 각 README 의 TODO 로 분리했다. 기존 Java(Gradle) 모듈과 별개의 독립 서비스로, `../settings.gradle.kts` 에 포함되지 않으므로 Gradle 빌드에 영향이 없다.
 
 | 서비스 | 언어 | 포트 | 역할 | 상태 |
 |---|---|---|---|---|
@@ -38,7 +38,7 @@ settlement MSA 에 언어별 강점을 살려 붙인 신규 서비스 7종(Kotli
 - Python: **Python 3.11** 필수(pinned deps 는 3.14 wheel 없음). `python3.11 -m venv .venv && .venv/bin/pip install -r requirements.txt -r requirements-dev.txt && .venv/bin/pytest`
 
 ## CI
-`.github/workflows/polyglot-ci.yml` — `changes` 잡(dorny/paths-filter)이 **변경된 서비스만** 골라
+`../.github/workflows/polyglot-ci.yml` — `changes` 잡(dorny/paths-filter)이 **변경된 서비스만** 골라
 Go(build+vet+test -race) / Python 3.11(pytest) / Kotlin(gradle build) 매트릭스와 이미지 푸시 매트릭스를
 동적으로 계산한다(서비스 단위 CI — ci.yml 의 JVM 14종과 동일 패턴, 워크플로 파일 변경 시엔 7종 전부 폴백).
 기존 Java `ci`/harness-guard 와 독립(신규 Java·마이그레이션·ADR 추가 없어 STATUS 카운트 불변).

@@ -3,7 +3,7 @@
 > 이커머스 + 정산 MSA 플랫폼(21개 서비스)의 **핵심 유스케이스별 시퀀스 다이어그램**.
 > 서비스 간 연계는 Kafka 이벤트로만 이루어지며(코드·DB 직접 의존 0), 비동기 구간은 `-->>` 및 `Note` 로 명시한다.
 >
-> - 정본 근거: [`SPEC.md`](./SPEC.md)(기능·이벤트 카탈로그) · [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)(패턴) · [`docs/adr/`](./docs/adr/)
+> - 정본 근거: [`../SPEC.md`](../SPEC.md)(기능·이벤트 카탈로그) · [`ARCHITECTURE.md`](ARCHITECTURE.md)(패턴) · [`adr`](./docs/adr/)
 > - 최종 갱신: 2026-07-16
 
 ---
@@ -620,5 +620,5 @@ sequenceDiagram
 | `lemuel.organization.created` / `.member_joined` | organization | (소비처 미배선 — 발행 전용) | — |
 | `lemuel.payment.confirmed` (내부 계약) | payment-webhook(Go) | notification | §14 |
 
-> 계약 스키마·정본 샘플: `shared-common/src/testFixtures/resources/contracts/events/` (ADR 0024).
+> 계약 스키마·정본 샘플: `../shared-common/src/testFixtures/resources/contracts/events` (ADR 0024).
 > 모든 컨슈머는 `processed_events` + 도메인 UNIQUE 로 멱등하며, 발행은 Outbox 를 경유한다(직접 발행 예외: payment-webhook 은 Go 엣지 — 자체 TTL 멱등).

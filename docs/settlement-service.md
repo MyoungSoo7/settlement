@@ -1,7 +1,7 @@
 # settlement-service — 구조·기능 조사 문서
 
 > 조사 기준: 2026-07-16 develop 브랜치 코드 실사.
-> 관련 정본: [`SPEC.md`](./SPEC.md) · [`CLAUDE.md`](./CLAUDE.md) · ADR 0020(이벤트 드리븐 프로젝션) · ADR 0024(이벤트 계약-as-code)
+> 관련 정본: [`../SPEC.md`](../SPEC.md) · [`../CLAUDE.md`](../CLAUDE.md) · ADR 0020(이벤트 드리븐 프로젝션) · ADR 0024(이벤트 계약-as-code)
 
 ## 1. 개요
 
@@ -24,7 +24,7 @@
 
 ## 2. 모듈 구조
 
-`settlement-service/src/main/java/github/lms/lemuel/` 하위 **8개 도메인 모듈 + 2개 지원 패키지** (총 285개 자바 파일):
+`../settlement-service/src/main/java/github/lms/lemuel` 하위 **8개 도메인 모듈 + 2개 지원 패키지** (총 285개 자바 파일):
 
 ```
 lemuel/

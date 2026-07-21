@@ -150,11 +150,11 @@ CQRS 로 분리하고, 대사는 order 의 내부 API 를 호출해 cross-DB 연
 
 ## 모듈 구조
 
-전체 디렉토리·모듈 트리 정본은 **[STRUCTURE.md](STRUCTURE.md)** 로 분리했다.
+전체 디렉토리·모듈 트리 정본은 **[STRUCTURE.md](docs/STRUCTURE.md)** 로 분리했다.
 
 - **JVM 코어**: Gradle 멀티모듈 — Java 13 서비스 + gateway, `shared-common` 은 composite build 라이브러리 (ADR 0021)
 - **폴리글랏 7종**(Go 2 · Python 3 · Kotlin 2, 포트 8110~8131): 루트 레벨 standalone — Gradle·gateway 미포함,
-  `polyglot-ci.yml` 분리 CI, 전용 차트 격리 배포 (정본: [polyglot-services.md](polyglot-services.md))
+  `polyglot-ci.yml` 분리 CI, 전용 차트 격리 배포 (정본: [polyglot-services.md](docs/polyglot-services.md))
 - 각 서비스 내부는 헥사고날 고정 골격: `domain/` · `application/port·service/` · `adapter/{in,out}/`
 
 ---

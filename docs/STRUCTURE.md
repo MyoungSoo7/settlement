@@ -1,7 +1,7 @@
 # 모듈 구조 (Module Structure)
 
-> 저장소 전체 디렉토리·모듈 구조의 정본. 서비스 책임·API 는 [`SPEC.md`](./SPEC.md),
-> 아키텍처 개요·패턴은 [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md), 에이전트 지침은 [`CLAUDE.md`](./CLAUDE.md) 참조.
+> 저장소 전체 디렉토리·모듈 구조의 정본. 서비스 책임·API 는 [`../SPEC.md`](../SPEC.md),
+> 아키텍처 개요·패턴은 [`ARCHITECTURE.md`](ARCHITECTURE.md), 에이전트 지침은 [`../CLAUDE.md`](../CLAUDE.md) 참조.
 
 ## JVM 코어 — Gradle 멀티모듈 (Java 13 서비스 + Gateway + shared-common)
 
@@ -69,9 +69,9 @@ settlement/                              # 모노레포 루트
 └── reconciliation-service/              # 🅺 Kt  :8131  정산 대사 (sealed Discrepancy·병렬 fetch·19:00 cron)
 ```
 
-- 자체 DB 없음(무영속 MVP) · CI 는 `.github/workflows/polyglot-ci.yml` 분리(**변경 서비스만** 동적 매트릭스 —
+- 자체 DB 없음(무영속 MVP) · CI 는 `../.github/workflows/polyglot-ci.yml` 분리(**변경 서비스만** 동적 매트릭스 —
   JVM ci.yml 과 동일 패턴, 21종 전부 서비스 단위 CI) · 배포는 전용 차트 격리
-  (`charts/polyglot-services`, helm-deploy 레포). 정본: [`polyglot-services.md`](./polyglot-services.md).
+  (`charts/polyglot-services`, helm-deploy 레포). 정본: [`polyglot-services.md`](polyglot-services.md).
 
 ## 부속 디렉토리
 

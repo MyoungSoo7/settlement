@@ -75,7 +75,7 @@
 ### 9. 장애 복구
 - **컨슈머 DLT 3서비스 동형** (`KafkaErrorHandlerConfig`): 일시 예외 FixedBackOff(2s×3)→DLT, 포이즌(역직렬화/IllegalArgument/IllegalState) **즉시 DLT**, event_id·traceparent 헤더 패스스루(재생 멱등), acks=all+idempotence. Spring 기본(조용한 skip = 유실)을 명시 대체 — settlement.confirmed 유실로 인한 상환차감 누락(실손) 경로 제거.
 - outbox: 실패 재시도(10회) → FAILED 시 정확히 1회 DLQ, 워커 사망 시 리스 만료 회수, DLQ replay 루프 가드(x-replay-count).
-- 러너북 10종(`docs/runbook/`) + `incident-runbooks` 스킬.
+- 러너북 10종(`runbook`) + `incident-runbooks` 스킬.
 
 ### 10. 서비스 간 통신
 - `OrderReconClient`: connect 2s/read 5s 타임아웃(무한 hang 차단) + 타임아웃·5xx 1회 재시도(4xx 즉시 실패) + `OrderReconUnavailableException` 번역 — 대사 run 명시적 실패(스킵+ERROR), 핫패스 무영향.
