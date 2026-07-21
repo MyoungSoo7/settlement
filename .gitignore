@@ -57,6 +57,8 @@ target/
 .claude/scheduled_tasks.lock
 .claude/worktrees/
 .claude/harness/
+# hookify 캡처 규칙은 로컬 전용 — 정본은 guard.mjs (hookify-to-guard 스킬로 이식)
+.claude/hookify.*.local.md
 *.stackdump
 build-test-output.log
 

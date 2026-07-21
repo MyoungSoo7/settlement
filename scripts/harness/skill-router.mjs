@@ -36,6 +36,8 @@ export const ROUTES = [
   [/(\/outbox\/|adapter\/in\/kafka\/|adapter\/out\/event\/)/i, ['idempotency-and-events']],
   [/settlement-service\/.*(readmodel|projection)/i, ['projection-view-ops']],
   [/contracts\/events\//, ['event-contract-change'], true],
+  // hookify 캡처 규칙 파일 → 정본(guard.mjs) 이식 절차 리마인더. 규칙 정본 이원화 방지.
+  [/\.claude\/hookify\..+\.local\.md$/i, ['hookify-to-guard'], true],
   // 절차 규율(플러그인 독립): 세션 첫 소스 편집에 1회 — 테스트 우선 절차 리마인더. 마지막 순위(cap 3에서 도메인 규칙 우선).
   [/\/src\/(main|test)\//, ['tdd-discipline']],
 ];

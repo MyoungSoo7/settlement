@@ -78,6 +78,7 @@
 > | "완료" 선언·커밋 직전 | 📘`verify-before-done` (DoD 게이트 실행·증거 병기·자기 승인 금지) |
 > | 요구사항 모호 | 📘`interview-harness`(=`socrates`+`evolve-step`+`ontology` 루프) |
 > | 전사 역할 산출물 일괄 | ⌘`/ai-dev-team` (+ `commands/agents/*` 서브커맨드) |
+> | hookify 규칙 생성·수정 / "훅 굳혀줘" | 📘`hookify-to-guard` (캡처는 임시, 정본은 guard.mjs 3중 강제 — 이식 후 원본 삭제) — 라우터가 `hookify.*.local.md` 편집 시 주입 |
 > | 하네스 자기 진단·드리프트 | ⌘`/harness-check` (audit + 가드 + `--fix` 로 STATUS 수치 자동 갱신) → 🚦`harness-audit.mjs` |
 >
 > **원칙:** 결정적인 것은 🚦게이트로 강제 · 판단 필요한 것은 🤖에이전트로 위임 · 작성과 검증은 분리(자기 승인 금지).

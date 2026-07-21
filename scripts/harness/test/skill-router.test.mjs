@@ -51,6 +51,10 @@ describe('routeSkills', () => {
   test('event contract fixtures route regardless of extension', () => {
     assert.deepEqual(routeSkills('shared-common/src/testFixtures/resources/contracts/events/order.created.schema.json'), ['event-contract-change']);
   });
+  test('hookify capture rule files route to the guard porting workflow', () => {
+    assert.deepEqual(routeSkills('.claude/hookify.block-raw-sql.local.md'), ['hookify-to-guard']);
+    assert.deepEqual(routeSkills('C:\\repo\\.claude\\hookify.warn-rm.local.md'), ['hookify-to-guard']);
+  });
   test('non-source files stay silent; unmapped-service sources still get tdd-discipline', () => {
     assert.deepEqual(routeSkills('settlement-service/README.md'), []);
     assert.deepEqual(routeSkills('gateway-service/src/main/java/App.java'), ['tdd-discipline']);
