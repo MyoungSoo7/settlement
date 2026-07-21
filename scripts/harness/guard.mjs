@@ -18,7 +18,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { readFile, realpath, stat } from 'node:fs/promises';
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { logGuardHits } from './telemetry.mjs';
+import { appendJsonl, logGuardHits } from './telemetry.mjs';
 
 const ALLOW = /harness-guard:\s*allow/i;
 const ALLOWANCE = /harness-guard:\s*allow\s+reason="([^"]*)"\s+issue="([^"]*)"\s+owner="([^"]*)"\s+expires="([^"]*)"\s*$/i;
@@ -52,12 +52,24 @@ export const RULES = [
   {
     id: 'MONEY-PRIMITIVE',
     // double/float primitive or parse in money-scope core java/kt → must use BigDecimal.
+    // 선언·파라미터·반환타입·배열·캐스트·var 더블 리터럴 추론까지 커버(우회면 봉쇄).
     when: (f) => JAVA_KT.test(f) && MONEY_SCOPE.test(f) && isCore(f) && isProd(f),
     test: (line) =>
-      /\b(double|float)\s+\w+\s*[=;)]/.test(line) ||
+      /\b(double|float)\s+\w+\s*[=;,)(]/.test(line) ||
+      /\b(double|float)\s*\[\]/.test(line) ||
       /\b(Double|Float)\.parse(Double|Float)\s*\(/.test(line) ||
-      /\(\s*(double|float)\s*\)/.test(line), // cast to double/float
+      /\(\s*(double|float)\s*\)/.test(line) || // cast to double/float
+      /\bvar\s+\w+\s*=\s*-?\d[\d_]*\.\d/.test(line), // var fee = 0.035;
+    // 개행 분할 우회(Double\n.parseDouble) 차단 — 파일 단위 멀티라인 스캔.
+    fileTest: /\b(?:Double|Float)\s*\.\s*parse(?:Double|Float)\s*\(/g,
     msg: '금액 스코프에서 double/float 사용 금지 → BigDecimal 사용 (money-safety)',
+  },
+  {
+    id: 'MONEY-BIGDECIMAL-DOUBLE',
+    // new BigDecimal(0.1) 은 이진 부동소수 정밀도 손실을 그대로 흡수한다 → 문자열 생성자만.
+    when: (f) => JAVA_KT.test(f) && MONEY_SCOPE.test(f) && isCore(f) && isProd(f),
+    fileTest: /new\s+BigDecimal\s*\(\s*-?\d[\d_]*\.\d/g,
+    msg: 'new BigDecimal(더블 리터럴) 금지 → new BigDecimal("0.1") 문자열 생성자 (money-safety, 정밀도 손실)',
   },
   {
     id: 'IMMUTABLE-HISTORY',
@@ -154,8 +166,19 @@ export function scanText(f, content, { now = new Date() } = {}) {
       if (lineAllowances[i]) return;
       // ignore comment-only lines for code rules (keep SQL/DDL scanning)
       if (JAVA_KT.test(f) && /^\s*(\/\/|\*|\/\*)/.test(line)) return;
-      if (rule.test(line)) violations.push({ file: f, line: i + 1, id: rule.id, msg: rule.msg });
+      if (rule.test && rule.test(line)) violations.push({ file: f, line: i + 1, id: rule.id, msg: rule.msg });
     });
+    if (!rule.fileTest) continue;
+    // 파일 단위 멀티라인 스캔 — 라인 정규식을 개행 분할로 우회하는 표기를 잡는다.
+    // 매치 시작 라인 기준으로 allowance·주석 판정(라인 스캔과 동일 규약), (id, line) 중복은 병합.
+    const pattern = new RegExp(rule.fileTest.source, rule.fileTest.flags.includes('g') ? rule.fileTest.flags : `${rule.fileTest.flags}g`);
+    for (const match of String(content).matchAll(pattern)) {
+      const lineNumber = String(content).slice(0, match.index).split(/\r?\n/).length;
+      if (lineAllowances[lineNumber - 1]) continue;
+      if (JAVA_KT.test(f) && /^\s*(\/\/|\*|\/\*)/.test(lines[lineNumber - 1] ?? '')) continue;
+      if (violations.some((violation) => violation.id === rule.id && violation.line === lineNumber && violation.file === f)) continue;
+      violations.push({ file: f, line: lineNumber, id: rule.id, msg: rule.msg });
+    }
   }
   return { violations, allowances };
 }
@@ -226,6 +249,16 @@ export async function reconstructPendingContent(event, { repoRoot }) {
   throw new Error('unsupported hook tool');
 }
 
+// DoD 넛지(비차단) — 돈 경로(core/prod) 변경이 테스트 변경 없이 스테이지되면 stderr 리마인더.
+// 차단하지 않는다: TDD 는 판단 영역(리팩터·문서화 커밋 등 정당한 예외 존재) — 게이트는 JaCoCo 가 정답.
+export function dodNudgeMessage(files) {
+  const normalized = files.map(policyPath);
+  const money = normalized.filter((f) => JAVA_KT.test(f) && MONEY_SCOPE.test(f) && isCore(f) && isProd(f));
+  if (money.length === 0) return null;
+  if (normalized.some((f) => JAVA_KT.test(f) && /\/src\/test\//.test(f))) return null;
+  return `DoD 넛지(비차단): 돈 경로 프로덕션 변경 ${money.length}건이 테스트 변경 없이 스테이지됨 — tdd-discipline·verify-before-done 절차와 게이트(:module:test + jacoco LINE 90%) 통과를 확인하고 커밋하세요.`;
+}
+
 export function discoverStagedFiles(repoRoot) {
   const output = execFileSync('git', ['diff', '--cached', '--name-only', '-z', '-M', '--diff-filter=ACMR'], { cwd: repoRoot });
   return output.toString('utf8').split('\0').filter(Boolean);
@@ -289,6 +322,13 @@ export async function runGuardCli(args, io = {}) {
     const violations = [];
     for (const file of files) violations.push(...await scanRepoFile(repoRoot, file));
     await logGuardHits(repoRoot, mode.slice(2), violations); // observability only — never affects the verdict
+    if (mode === '--staged') {
+      const nudge = dodNudgeMessage(files);
+      if (nudge) {
+        stderr(nudge); // advisory only — exit code stays with emitReport
+        await appendJsonl(repoRoot, 'dod-nudges.jsonl', [{ ts: new Date().toISOString(), staged: files.length }]);
+      }
+    }
     return emitReport(violations, io);
   } catch (error) { stderr(`guard input failed: ${error.message}`); return 1; }
 }

@@ -313,6 +313,43 @@ test('collectAudit cross-checks gradle module roster against CLAUDE.md and STRUC
   assert.doesNotMatch(bad, /shared-common/);
 });
 
+test('collectAudit resolves HARNESS.md routing map entrypoints against agents, skills, and commands', () => {
+  const harness = [
+    '> | 정산 로직 | 📘`skill-a`+`skill-b` → 🤖`agent-a` |',
+    '> | 진단 | ⌘`/cmd-a` → 🚦`guard.mjs` 셀프체크 |',
+    '아이콘 없는 줄의 `not-checked` 토큰과 `{서비스}-rules` 플레이스홀더는 무시된다',
+  ].join('\n');
+  const files = {
+    'HARNESS.md': harness,
+    '.claude/agents/agent-a.md': '',
+    '.claude/skills/skill-a/SKILL.md': '',
+    '.claude/skills/skill-b/SKILL.md': '',
+    '.claude/commands/cmd-a.md': '',
+  };
+  const root = repo(files);
+  assert.deepEqual(collectAudit(root, baseManifest(Object.keys(files))).errors, []);
+
+  put(root, 'HARNESS.md', `${harness}\n> | 신규 | 📘\`ghost-skill\` → ⌘\`/ghost-cmd\` |`);
+  const bad = collectAudit(root, baseManifest(Object.keys(files))).errors.join('\n');
+  assert.match(bad, /HARNESS\.md routing map dangling: ghost-skill/);
+  assert.match(bad, /HARNESS\.md routing map dangling: \/ghost-cmd/);
+  assert.doesNotMatch(bad, /guard\.mjs/);
+  assert.doesNotMatch(bad, /not-checked/);
+  assert.doesNotMatch(bad, /skill-a|skill-b|agent-a|cmd-a/);
+});
+
+test('routing map slash tokens resolve only to commands, not skills or agents', () => {
+  const files = {
+    'HARNESS.md': '> | 온콜 | ⌘`/only-skill-exists` |',
+    '.claude/skills/only-skill-exists/SKILL.md': '',
+  };
+  const root = repo(files);
+  assert.match(
+    collectAudit(root, baseManifest(Object.keys(files))).errors.join('\n'),
+    /routing map dangling: \/only-skill-exists/,
+  );
+});
+
 test('collectAudit deep-compares both contract blocks and transition cases', () => {
   const skill = (facts) => `prose ignored\n\`\`\`harness-contract\n${JSON.stringify(facts)}\n\`\`\``;
   const cases = JSON.stringify(CASES.map(([contractCase, expectedTransition]) => ({ contractCase, expectedTransition })));
@@ -391,7 +428,7 @@ test('harness guard workflow uses deterministic bases and ordered reproducibilit
   assert.match(workflow, /git diff --exit-code/);
 });
 
-test('Claude settings retain only the mandatory write guard and advisory skill router hooks', () => {
+test('Claude settings retain the write guard, advisory skill router, and telemetry session hooks', () => {
   const settings = JSON.parse(readFileSync(join(process.cwd(), '.claude/settings.json'), 'utf8'));
   assert.deepEqual(settings, {
     hooks: {
@@ -408,6 +445,14 @@ test('Claude settings retain only the mandatory write guard and advisory skill r
           hooks: [{
             type: 'command',
             command: 'node "$CLAUDE_PROJECT_DIR/scripts/harness/skill-router.mjs" --hook',
+          }],
+        },
+      ],
+      SessionStart: [
+        {
+          hooks: [{
+            type: 'command',
+            command: 'node "$CLAUDE_PROJECT_DIR/scripts/harness/telemetry-report.mjs" --hook',
           }],
         },
       ],
