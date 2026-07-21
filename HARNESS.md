@@ -169,6 +169,6 @@ node scripts/harness/harness-audit.mjs
 ## 관련 문서
 - `CLAUDE.md` — 에이전트 운용 규칙 / 아키텍처 경계·컨벤션
 - `SPEC.md` — 전체 기능명세(엔드포인트·도메인 규칙·이벤트 카탈로그)
-- `STATUS.md` — 프로젝트 상태 (12서비스, 계정계·투자 확장, ADR 25)
+- `STATUS.md` — 프로젝트 상태 (13서비스, 계정계·투자 확장, ADR 27)
 - `docs/PORTFOLIO.md` — 면접용 1장 요약 · `README.md` — 아키텍처 개요
-- `docs/adr/` — 아키텍처 결정 기록 25개
+- `docs/adr/` — 아키텍처 결정 기록 27개

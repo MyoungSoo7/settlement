@@ -52,11 +52,11 @@
 > 드리프트 의심 시 명령을 돌려 재검증하고 이 수치를 갱신할 것(휘발성 수치를 명령 없이 손으로 적지 말 것).
 - 서비스 **13개** + API Gateway + Kotlin polyglot 2(notification·reconciliation) — `git ls-files '*/src/main/resources/application.yml' | wc -l` → 16(=13+gateway+kotlin 2)
 - Flyway 마이그레이션 **202개** — `git ls-files '*/src/main/resources/db/migration/*.sql' | wc -l` → 202
-- ADR **26개** (0001~0027, 0019 결번) — `git ls-files 'docs/adr/[0-9]*.md' | wc -l` → 26
+- ADR **27개** (0001~0028, 0019 결번) — `git ls-files 'docs/adr/[0-9]*.md' | wc -l` → 27
 - 테스트 클래스 **608개** (Testcontainers 통합테스트 포함) — `git ls-files '*/src/test/*Test.java' '*/src/test/*Tests.java' '*/src/test/*IT.java' | wc -l` → 608
 
 ## 참고 문서
 - `SPEC.md` — 전체 기능명세(엔드포인트·도메인 규칙·이벤트 카탈로그)
 - `CLAUDE.md` — 에이전트 운용 가이드 / 아키텍처 경계·컨벤션
 - `README.md` — 프로젝트 개요 · `STRUCTURE.md` — 모듈·디렉토리 구조 정본 · `PORTFOLIO.md` — 면접용 1장 요약 · `HARNESS.md` — 개발 하네스 구성
-- `docs/adr/` — 아키텍처 결정 기록 26개 · `*-rules` 스킬 — 서비스별 강제 도메인 규칙
+- `docs/adr/` — 아키텍처 결정 기록 27개 · `*-rules` 스킬 — 서비스별 강제 도메인 규칙
