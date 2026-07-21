@@ -1,0 +1,7 @@
+docs(harness): superpowers 플러그인 사용법·스킬 카탈로그 소개 문서
+
+v6.1.1 기준 설치·토글 관리, 2층 동작 원리(세션 주입+온디맨드),
+코어 스킬 14종 카탈로그·자주 쓰는 흐름 4종, 이 저장소 우선순위 지침
+(절차 3종은 자체 스킬 정본·A/B 토글 규칙). superpowers-harness.md 와 상호 링크.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>

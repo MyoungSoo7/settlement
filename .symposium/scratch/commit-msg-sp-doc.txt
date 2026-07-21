@@ -1,0 +1,8 @@
+docs(harness): superpowers 하네스 효과 측정 계층(L1~L4) + on/off A/B 프로토콜 정본
+
+- 내재화 이후 superpowers 고유 표면(주입층·잔여 프로세스 스킬) 정리
+- 측정 계층: L1 호출(즉시)·L2 선행 대리지표·L3 결과(귀속 불가)·L4 준실험 상한
+- 2026-07-22 실측 스냅샷(스킬 로드 19회 중 superpowers 0회) + 재현 명령 병기
+- A/B 설계: day-parity 배정·사전 등록 지표 5종·판정 기준 고정·오염원 통제
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>

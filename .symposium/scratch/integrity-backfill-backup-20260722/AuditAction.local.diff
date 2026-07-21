@@ -1,0 +1,14 @@
+diff --git a/shared-common/src/main/java/github/lms/lemuel/common/audit/domain/AuditAction.java b/shared-common/src/main/java/github/lms/lemuel/common/audit/domain/AuditAction.java
+index 92ae1341b..25df03b89 100644
+--- a/shared-common/src/main/java/github/lms/lemuel/common/audit/domain/AuditAction.java
++++ b/shared-common/src/main/java/github/lms/lemuel/common/audit/domain/AuditAction.java
+@@ -28,6 +28,9 @@ public enum AuditAction {
+     SETTLEMENT_CREATED,
+     // 홀드백 해제 배치(actor=system) — 셀러 출금가능액 증가 시점의 감사 추적.
+     HOLDBACK_RELEASED,
++    // 과거 데이터 멱등 백필(INV-5 역분개 누락 / INV-6 Payout 미생성 정정) — 누가·언제·몇 건 감사 추적.
++    INTEGRITY_PAYOUT_BACKFILLED,
++    INTEGRITY_REVERSAL_BACKFILLED,
+ 
+     // ── loan-service (선정산 LoanAdvance · 기업 CorporateLoan) 금전 액션 ──
+     LOAN_ADVANCE_REQUESTED,

@@ -1,0 +1,6 @@
+docs(status): P0-4 과거분 멱등 백필 랜딩 반영 + 테스트 수치 616 갱신
+
+병행 세션 랜딩(367a95f5a) 반영 — 진척에 백필 실행분 추가, 최근 커밋 갱신,
+테스트 클래스 608→616 재측정(harness-audit healthy).
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>

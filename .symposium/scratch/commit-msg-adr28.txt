@@ -1,0 +1,8 @@
+docs(adr): 0028 절차 규율층 플러그인 독립 내재화 + 이중 라우팅 경계
+
+2026-07-22 하네스 결정 5개 축(절차 스킬 3종 내재화·라우터 결정적 트리거·
+런타임 .claude/harness 이전·OMC 이중 라우팅 경계·L1~L4 측정+A/B)을
+대안 3종 기각 근거와 함께 ADR 로 기록, README 인덱스 등재.
+doc-maintainer 에이전트 메모리(ADR 템플릿·채번 규칙) 최초 적재 포함.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>

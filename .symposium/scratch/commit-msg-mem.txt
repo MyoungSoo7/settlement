@@ -1,0 +1,3 @@
+docs(agent-memory): ADR 커밋 시 STATUS 수치 동반 갱신 규칙 추가 (CI red 재발 방지)
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
