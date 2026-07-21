@@ -41,5 +41,11 @@ public enum AuditAction {
     INVESTMENT_ORDER_PLACED,
     INVESTMENT_ORDER_EXECUTED,
     INVESTMENT_ORDER_CANCELED,
-    INVESTMENT_ORDER_REJECTED
+    INVESTMENT_ORDER_REJECTED,
+
+    // ── 과거 데이터 멱등 백필 — 누가·언제·몇 건 감사 추적 ──
+    // 확정(DONE) 정산에서 누락된 Payout 을 append-only 로 신규 생성하는 백필 실행.
+    PAYOUT_BACKFILL_EXECUTED,
+    // 차지백·PG 대사 조정의 역분개 누락분을 ledger_outbox 에 적재하는 백필 실행.
+    LEDGER_REVERSE_BACKFILL_EXECUTED
 }

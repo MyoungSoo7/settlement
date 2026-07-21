@@ -158,6 +158,8 @@ public class SecurityConfig {
                         .requestMatchers("/admin/payouts/**").hasRole("ADMIN")
                         // Chargeback 콘솔 — 셀러 환수 결정은 ADMIN 만
                         .requestMatchers("/admin/chargebacks/**").hasRole("ADMIN")
+                        // 백필 콘솔 — 원장 역분개·Payout 누락 보정 작업은 ADMIN 만
+                        .requestMatchers("/admin/backfill/**").hasRole("ADMIN")
                         // 기업 신용대출 실행(실자금 지급) — 승인·실행 권한은 ADMIN 만.
                         // 신용평가 조회(/credit)·신청(POST /loans/corporate)·목록 조회는 인증 사용자(CEO) 허용.
                         .requestMatchers(HttpMethod.POST, "/loans/corporate/*/disburse").hasRole("ADMIN")
