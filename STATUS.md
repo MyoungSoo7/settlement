@@ -11,7 +11,7 @@
   - 공개조회 위성: financial(8086) · economics(8087) · company(8090) · market(8094) · commondata(8098)
   - 부가: operation(8092) · ai(8096) · organization(8104, 셀러/기업 조직·멤버십)
 - **DB:** 13 서비스 모두 물리 분리(DB-per-service) — opslab / settlement_db / lemuel_{loan,financial,economics,company,operation,market,ai,commondata,investment,account,organization}
-- **최근 커밋:** `ef21852e3` feat(harness): 절차 규율층 플러그인 독립 내재화 — 스킬 3종 + 라우터 주입
+- **최근 커밋:** `367a95f5a` feat(settlement): 과거 데이터 멱등 백필 — Payout 미생성·원장 역분개 누락 정정 (P0-4)
 
 ## 최근 진척 (2026-06-24 이후)
 - **위성·확장 서비스 9종 추가** — financial·economics·company(ADR 0023)·operation·market·ai·commondata·investment·account.
@@ -26,7 +26,8 @@
 - **문서 정비** — 기능명세 `SPEC.md` 추가, 12개 서비스 도메인 규칙 스킬(`*-rules`) + 커맨드 추가, `CLAUDE.md` 에이전트 지침 재구성(SPEC·스킬 위임).
 - **k8s postgres 16→17 정합**.
 - **정산 P0 피드백 사이클 착수 (2026-07-20~)** — 갭 감사 → 시드 6종(payout 배선·조정 원장·이벤트 격리·탐지 백필·E2E·payout 복구) 도출.
-  실행분: 정산 확정·홀드백 해제 → Payout 자동 생성 배선(멱등), 차지백·PG 대사 조정 역분개 1:1 연동, PIT 뮤테이션 베이스라인 배선 + SURVIVED 16건 제거.
+  실행분: 정산 확정·홀드백 해제 → Payout 자동 생성 배선(멱등), 차지백·PG 대사 조정 역분개 1:1 연동, PIT 뮤테이션 베이스라인 배선 + SURVIVED 16건 제거,
+  과거분 멱등 백필(P0-4) — Payout 미생성·역분개 누락 `/admin/backfill/**` 정정(지급유형별·append-only), 2회 실행 2회차 0건 멱등 IT 증명.
 - **하네스 절차 규율층 자체 내재화** — debugging/tdd/verify 스킬 3종 + 라우터 주입(플러그인 독립), 하네스 런타임 `.omc`→`.claude/harness` 이전, 루트 문서 6종 docs/ 이관.
 - **operation-service Phase 3 베이스라인 이상탐지** — 신규 `anomaly` BC: `ops_metric_bucket` 실패율 카운터 5종을 5분마다 롤링윈도우 z-score(최소표본·상대임계·정상복귀 게이트)로 판정 → `source=ANOMALY` 인시던트 자동 생성/refire/자동해제. 마이그레이션 0(기존 인시던트 라이프사이클 재사용), 테스트 16건+합성 백테스트, 로컬 실기동 검증 완료 (docs/design/operation-service-phase1.md §Phase 3).
 
@@ -53,7 +54,7 @@
 - 서비스 **13개** + API Gateway + Kotlin polyglot 2(notification·reconciliation) — `git ls-files '*/src/main/resources/application.yml' | wc -l` → 16(=13+gateway+kotlin 2)
 - Flyway 마이그레이션 **202개** — `git ls-files '*/src/main/resources/db/migration/*.sql' | wc -l` → 202
 - ADR **27개** (0001~0028, 0019 결번) — `git ls-files 'docs/adr/[0-9]*.md' | wc -l` → 27
-- 테스트 클래스 **608개** (Testcontainers 통합테스트 포함) — `git ls-files '*/src/test/*Test.java' '*/src/test/*Tests.java' '*/src/test/*IT.java' | wc -l` → 608
+- 테스트 클래스 **616개** (Testcontainers 통합테스트 포함) — `git ls-files '*/src/test/*Test.java' '*/src/test/*Tests.java' '*/src/test/*IT.java' | wc -l` → 616
 
 ## 참고 문서
 - `SPEC.md` — 전체 기능명세(엔드포인트·도메인 규칙·이벤트 카탈로그)
