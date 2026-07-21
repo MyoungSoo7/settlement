@@ -24,17 +24,23 @@ describe('routeSkills', () => {
   test('settlement ledger source routes ledger-invariants first', () => {
     assert.deepEqual(
       routeSkills('settlement-service/src/main/java/github/lms/lemuel/settlement/ledger/domain/LedgerEntry.java'),
-      ['ledger-invariants', 'settlement-domain-rules'],
+      ['ledger-invariants', 'settlement-domain-rules', 'tdd-discipline'],
     );
   });
-  test('service sources route to their *-rules skill', () => {
-    assert.deepEqual(routeSkills('order-service/src/main/java/github/lms/lemuel/order/domain/Order.java'), ['order-commerce-rules']);
-    assert.deepEqual(routeSkills('account-service/src/main/java/github/lms/lemuel/account/domain/JournalEntry.java'), ['account-domain-rules', 'ledger-invariants']);
+  test('service sources route to their *-rules skill plus tdd-discipline last', () => {
+    assert.deepEqual(routeSkills('order-service/src/main/java/github/lms/lemuel/order/domain/Order.java'), ['order-commerce-rules', 'tdd-discipline']);
+    assert.deepEqual(routeSkills('account-service/src/main/java/github/lms/lemuel/account/domain/JournalEntry.java'), ['account-domain-rules', 'ledger-invariants', 'tdd-discipline']);
   });
   test('kafka consumer path adds idempotency-and-events on top of the service rules', () => {
     assert.deepEqual(
       routeSkills('settlement-service/src/main/java/github/lms/lemuel/settlement/adapter/in/kafka/OrderEventConsumer.java'),
-      ['settlement-domain-rules', 'idempotency-and-events'],
+      ['settlement-domain-rules', 'idempotency-and-events', 'tdd-discipline'],
+    );
+  });
+  test('test sources get the tdd-discipline procedure reminder', () => {
+    assert.deepEqual(
+      routeSkills('settlement-service/src/test/java/github/lms/lemuel/payout/application/service/PayoutServiceTest.java'),
+      ['settlement-domain-rules', 'tdd-discipline'],
     );
   });
   test('suggestions are capped at 3 even when more routes match', () => {
@@ -45,9 +51,9 @@ describe('routeSkills', () => {
   test('event contract fixtures route regardless of extension', () => {
     assert.deepEqual(routeSkills('shared-common/src/testFixtures/resources/contracts/events/order.created.schema.json'), ['event-contract-change']);
   });
-  test('non-source and out-of-scope files stay silent', () => {
+  test('non-source files stay silent; unmapped-service sources still get tdd-discipline', () => {
     assert.deepEqual(routeSkills('settlement-service/README.md'), []);
-    assert.deepEqual(routeSkills('gateway-service/src/main/java/App.java'), []);
+    assert.deepEqual(routeSkills('gateway-service/src/main/java/App.java'), ['tdd-discipline']);
     assert.deepEqual(routeSkills(undefined), []);
   });
 });
@@ -69,7 +75,8 @@ describe('decideHookOutput', () => {
     assert.equal(await decideHookOutput(writeEvent('session-a'), { repoRoot }), null);
     assert.ok(await decideHookOutput(writeEvent('session-b'), { repoRoot }));
     const suggestions = readJsonl(join(repoRoot, '.omc', 'logs', 'skill-suggestions.jsonl'));
-    assert.equal(suggestions.length, 2);
+    // 세션당 (loan-domain-rules + tdd-discipline) 2건 × 2세션
+    assert.equal(suggestions.length, 4);
   });
 
   test('Skill invocations are logged as usage, not suggestions', async () => {

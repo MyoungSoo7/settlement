@@ -2,7 +2,7 @@
 
 > Claude Code 개발 하네스 구성 — 헥사고날 + 정산/결제/금융 도메인 전용 에이전트·스킬·커맨드·가드 구성
 
-**Last updated:** 2026-07-18
+**Last updated:** 2026-07-22
 
 ## 목적
 정산·금융 시스템은 **도메인 복잡도**와 **회계/감사 요건**, **MSA 경계(서비스 간 코드·DB 의존 0)** 때문에 일반 백엔드 에이전트로 커버하기 어렵다. 본 하네스는 (1) 도메인 전문 서브에이전트, (2) 서비스별 강제 규칙 스킬, (3) 운영/설명 커맨드, (4) 돈 경로 가드를 층으로 분리해 운영한다. 원칙: **결정적인 것은 훅·게이트로 강제, 판단이 필요한 것은 에이전트로 위임, 작성과 검증은 분리.**
@@ -24,6 +24,7 @@
 │   ├── {서비스}-rules/                # 12서비스 강제 도메인 규칙 (아래 참조)
 │   ├── money-safety · ledger-invariants · idempotency-and-events   # 횡단 규칙
 │   ├── recon-playbook · incident-runbooks · compliance-review      # 운영/리뷰
+│   ├── debugging-discipline · tdd-discipline · verify-before-done  # 절차 규율(플러그인 독립 — 외부 스킬 위임 금지)
 │   ├── settlement-integration-test                                 # Testcontainers 통합테스트 작성
 │   ├── msa-service-wiring · event-contract-change · projection-view-ops  # 확장 절차 (서비스 배선·이벤트 계약·프로젝션)
 │   └── socrates·wonder·reflect·refine·restate·evolve-step·ontology·interview-harness  # 요구사항 인터뷰 서브하네스
@@ -72,6 +73,9 @@
 > | 온콜·장애·알람 | ⌘`/oncall` + 📘`incident-runbooks` |
 > | 대사 불일치 조사 | ⌘`/recon-check` + 📘`recon-playbook` |
 > | CS/CEO 산정 근거 문의 | ⌘`/settlement-explain`·`/loan-credit-explain`·`/investment-score-explain` |
+> | 기능 구현·버그픽스 착수 | 📘`tdd-discipline` (실패 테스트 먼저 → 🚦JaCoCo 가 정답) — 라우터가 세션 첫 소스 편집에 1회 주입 |
+> | 버그·테스트 실패·예상 밖 동작 | 📘`debugging-discipline` (원인 규명 전 수정 금지 · 가설 3연속 기각 시 중단) |
+> | "완료" 선언·커밋 직전 | 📘`verify-before-done` (DoD 게이트 실행·증거 병기·자기 승인 금지) |
 > | 요구사항 모호 | 📘`interview-harness`(=`socrates`+`evolve-step`+`ontology` 루프) |
 > | 전사 역할 산출물 일괄 | ⌘`/ai-dev-team` (+ `commands/agents/*` 서브커맨드) |
 > | 하네스 자기 진단·드리프트 | ⌘`/harness-check` (audit + 가드 + `--fix` 로 STATUS 수치 자동 갱신) → 🚦`harness-audit.mjs` |
@@ -136,8 +140,8 @@
 **셀프체크** (수치 드리프트 + 라우팅 맵 dangling 진입점을 한 번에 노출 — 하네스 수정 후 실행):
 ```bash
 # 1) STATUS 핵심 수치 재검증
-git ls-files '*/src/main/resources/db/migration/*.sql' | wc -l   # =110
-git ls-files '*/src/test/*Test.java' '*/src/test/*Tests.java' '*/src/test/*IT.java' | wc -l  # =517
+git ls-files '*/src/main/resources/db/migration/*.sql' | wc -l   # STATUS.md#핵심 수치의 값과 일치해야 함(수치는 STATUS 가 단일 출처 — 여기 복제 금지)
+git ls-files '*/src/test/*Test.java' '*/src/test/*Tests.java' '*/src/test/*IT.java' | wc -l  # STATUS.md#핵심 수치의 값과 일치해야 함
 # 2) 라우팅 맵 진입점 존재 검증 — 아이콘(🤖📘⌘) 줄의 backtick 토큰만 스코프 (누락 시 출력, 무출력=정상)
 grep -E '🤖|📘|⌘' HARNESS.md | grep -oE '`[a-z][a-z-]+`' | tr -d '`' | sort -u | while read n; do \
   [ -e ".claude/agents/$n.md" ] || [ -d ".claude/skills/$n" ] || [ -e ".claude/commands/$n.md" ] || echo "DANGLING: $n"; done
@@ -152,5 +156,5 @@ grep -E '🤖|📘|⌘' HARNESS.md | grep -oE '`[a-z][a-z-]+`' | tr -d '`' | sor
 - `CLAUDE.md` — 에이전트 운용 규칙 / 아키텍처 경계·컨벤션
 - `SPEC.md` — 전체 기능명세(엔드포인트·도메인 규칙·이벤트 카탈로그)
 - `STATUS.md` — 프로젝트 상태 (12서비스, 계정계·투자 확장, ADR 25)
-- `PORTFOLIO.md` — 면접용 1장 요약 · `README.md` — 아키텍처 개요
+- `docs/PORTFOLIO.md` — 면접용 1장 요약 · `README.md` — 아키텍처 개요
 - `docs/adr/` — 아키텍처 결정 기록 25개

@@ -36,6 +36,8 @@ export const ROUTES = [
   [/(\/outbox\/|adapter\/in\/kafka\/|adapter\/out\/event\/)/i, ['idempotency-and-events']],
   [/settlement-service\/.*(readmodel|projection)/i, ['projection-view-ops']],
   [/contracts\/events\//, ['event-contract-change'], true],
+  // 절차 규율(플러그인 독립): 세션 첫 소스 편집에 1회 — 테스트 우선 절차 리마인더. 마지막 순위(cap 3에서 도메인 규칙 우선).
+  [/\/src\/(main|test)\//, ['tdd-discipline']],
 ];
 
 export function routeSkills(filePath) {
