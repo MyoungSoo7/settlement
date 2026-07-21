@@ -2,6 +2,7 @@ plugins {
     java
     id("org.springframework.boot")
     id("io.spring.dependency-management")
+    id("info.solidsoft.pitest") version "1.19.0"
 }
 
 // Standalone 모드 (ADR 0020 Phase 0): settlement-service 는 자체 실행가능 jar 로 독립 기동(:8082).
@@ -121,4 +122,19 @@ sourceSets {
     named("main") {
         java.srcDir(querydslDir)
     }
+}
+
+// STEP 0 (품질 씨앗 — 테스트 깊이 측정): settlement 도메인 뮤테이션 베이스라인 측정용 PIT 배선.
+// docs/etc/next.md 6번 계획 반영. targetClasses 는 도메인 패키지로만 한정.
+// 베이스라인 단계라 mutationThreshold(=60 게이트)는 아직 걸지 않는다 — 현재 점수 X 를 있는 그대로 관측.
+pitest {
+    targetClasses.set(listOf("github.lms.lemuel.settlement.domain.*"))
+    targetTests.set(listOf("github.lms.lemuel.settlement.domain.*"))
+    pitestVersion.set("1.22.1")
+    junit5PluginVersion.set("1.2.2")
+    threads.set(Runtime.getRuntime().availableProcessors().coerceAtMost(4))
+    outputFormats.set(listOf("HTML", "XML"))
+    timestampedReports.set(false)
+    // PIT minion JVM 은 test 태스크의 jvmArgs 를 상속하지 않으므로 mockito agent 를 방어적으로 전달
+    jvmArgs.set(listOf("-javaagent:${configurations.getByName("mockitoAgent").asPath}"))
 }
