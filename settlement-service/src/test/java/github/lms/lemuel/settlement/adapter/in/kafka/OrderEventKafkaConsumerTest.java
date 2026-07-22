@@ -39,7 +39,7 @@ class OrderEventKafkaConsumerTest {
     @BeforeEach
     void setUp() {
         consumer = new OrderEventKafkaConsumer(orderViewRepository, processedEventRepository, objectMapper,
-                new SettlementProjectionMetrics(new SimpleMeterRegistry()));
+                new SettlementProjectionMetrics(new SimpleMeterRegistry()), null);
     }
 
     private ConsumerRecord<String, String> orderCreatedRecord(UUID eventId, String json) {

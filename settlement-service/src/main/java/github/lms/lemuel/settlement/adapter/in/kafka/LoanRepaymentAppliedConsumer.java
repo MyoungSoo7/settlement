@@ -2,6 +2,7 @@ package github.lms.lemuel.settlement.adapter.in.kafka;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import github.lms.lemuel.common.outbox.adapter.in.kafka.ConsumedEventQuarantine;
 import github.lms.lemuel.common.outbox.adapter.in.kafka.IdempotentEventConsumer;
 import github.lms.lemuel.common.outbox.adapter.in.kafka.ProcessedEventRepository;
 import github.lms.lemuel.settlement.application.port.in.ApplyLoanDeductionUseCase;
@@ -34,8 +35,9 @@ public class LoanRepaymentAppliedConsumer extends IdempotentEventConsumer {
 
     public LoanRepaymentAppliedConsumer(ApplyLoanDeductionUseCase applyLoanDeductionUseCase,
                                         ProcessedEventRepository processedEventRepository,
-                                        ObjectMapper objectMapper) {
-        super(processedEventRepository, objectMapper);
+                                        ObjectMapper objectMapper,
+                                        ConsumedEventQuarantine quarantine) {
+        super(processedEventRepository, objectMapper, quarantine);
         this.applyLoanDeductionUseCase = applyLoanDeductionUseCase;
     }
 
@@ -57,9 +59,9 @@ public class LoanRepaymentAppliedConsumer extends IdempotentEventConsumer {
 
     @Override
     protected void handle(JsonNode node, UUID eventId) {
-        long settlementId = node.get("settlementId").asLong();
-        long sellerId = node.get("sellerId").asLong();
-        BigDecimal deducted = new BigDecimal(node.get("deducted").asText());
+        long settlementId = requiredLong(node, "settlementId", eventId);
+        long sellerId = requiredLong(node, "sellerId", eventId);
+        BigDecimal deducted = requiredDecimal(node, "deducted", eventId);
 
         applyLoanDeductionUseCase.apply(settlementId, sellerId, deducted);
 

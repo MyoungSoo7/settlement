@@ -38,7 +38,7 @@ class UserRegisteredEventConsumerTest {
     @BeforeEach
     void setUp() {
         consumer = new UserRegisteredEventConsumer(userViewRepository, processedEventRepository, objectMapper,
-                new SettlementProjectionMetrics(new SimpleMeterRegistry()));
+                new SettlementProjectionMetrics(new SimpleMeterRegistry()), null);
     }
 
     private ConsumerRecord<String, String> userRegisteredRecord(UUID eventId, String json) {

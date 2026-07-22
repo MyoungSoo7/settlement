@@ -143,6 +143,8 @@ public class SecurityConfig {
                         // 운영자 전용 — Outbox DLQ / Kafka DLT / PG 라우팅 / PG 정산파일 대사
                         .requestMatchers("/admin/outbox/**").hasRole("ADMIN")
                         .requestMatchers("/admin/dlq/**").hasRole("ADMIN")
+                        // 소비 이벤트 3분류(정상·중복·격리) 추적 콘솔 + 격리 재처리 (P0-3)
+                        .requestMatchers("/admin/event-track/**").hasRole("ADMIN")
                         .requestMatchers("/admin/pg/**").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers("/admin/reconciliation/**").hasAnyRole("ADMIN", "MANAGER")
                         // PG 정산파일 대사 콘솔 — 업로드·승인(역정산 트리거)·거절·조회. 경로가 /admin/pg/** 와
@@ -160,6 +162,8 @@ public class SecurityConfig {
                         .requestMatchers("/admin/chargebacks/**").hasRole("ADMIN")
                         // 백필 콘솔 — 원장 역분개·Payout 누락 보정 작업은 ADMIN 만
                         .requestMatchers("/admin/backfill/**").hasRole("ADMIN")
+                        // 지급후 회수 채권·상계 조회 콘솔 — 읽기 전용이라 MANAGER 도 허용 (seed-p0-6)
+                        .requestMatchers("/admin/recoveries/**").hasAnyRole("ADMIN", "MANAGER")
                         // 기업 신용대출 실행(실자금 지급) — 승인·실행 권한은 ADMIN 만.
                         // 신용평가 조회(/credit)·신청(POST /loans/corporate)·목록 조회는 인증 사용자(CEO) 허용.
                         .requestMatchers(HttpMethod.POST, "/loans/corporate/*/disburse").hasRole("ADMIN")

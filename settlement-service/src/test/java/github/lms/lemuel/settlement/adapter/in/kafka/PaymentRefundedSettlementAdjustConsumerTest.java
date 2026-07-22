@@ -44,7 +44,7 @@ class PaymentRefundedSettlementAdjustConsumerTest {
     @BeforeEach
     void setUp() {
         consumer = new PaymentRefundedSettlementAdjustConsumer(
-                adjustUseCase, loadSettlementPort, processedEventRepository, objectMapper);
+                adjustUseCase, loadSettlementPort, processedEventRepository, objectMapper, null);
     }
 
     private ConsumerRecord<String, String> refundedRecord(UUID eventId, String json) {

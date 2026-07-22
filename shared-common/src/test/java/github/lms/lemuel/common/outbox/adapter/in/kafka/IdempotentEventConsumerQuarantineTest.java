@@ -7,6 +7,8 @@ import org.apache.kafka.common.header.internals.RecordHeader;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.kafka.support.Acknowledgment;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -192,6 +194,57 @@ class IdempotentEventConsumerQuarantineTest {
 
         verify(ack).acknowledge();
         assertThat(consumer.handled).isEmpty();
+    }
+
+    @Test
+    @DisplayName("격리 기록 자체가 실패하면 예외 전파 + ack 없음 — 기록 실패가 유실로 이어지지 않는다")
+    void quarantineFailurePropagatesWithoutAck() {
+        ConsumedEventQuarantine failing = (group, cause, detail, rec, id) -> {
+            throw new IllegalStateException("quarantine store down");
+        };
+        TestConsumer consumer = new TestConsumer(freshRepo(), failing, false);
+        Acknowledgment ack = mock(Acknowledgment.class);
+
+        assertThatThrownBy(() -> consumer.run(record("{\"a\":1}", null), ack))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("quarantine store down");
+        verify(ack, never()).acknowledge();
+    }
+
+    @Test
+    @DisplayName("트랜잭션 활성 시 성공 ack 는 afterCommit 까지 미뤄진다 — 오프셋이 DB 커밋보다 먼저 확정되지 않는다")
+    void successAckIsDeferredUntilAfterCommitWhenTransactional() {
+        RecordingQuarantine q = new RecordingQuarantine();
+        TestConsumer consumer = new TestConsumer(freshRepo(), q, false);
+        Acknowledgment ack = mock(Acknowledgment.class);
+        UUID eventId = UUID.randomUUID();
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            consumer.run(record("{\"a\":1}", eventId.toString()), ack);
+            // 동기화(=트랜잭션) 활성 → 아직 커밋 전이므로 ack 는 미실행 (구현 전이면 여기서 즉시 ack → RED)
+            verify(ack, never()).acknowledge();
+
+            // 커밋 시점 재현 — 등록된 동기화의 afterCommit 발화 후에야 ack
+            List<TransactionSynchronization> syncs = TransactionSynchronizationManager.getSynchronizations();
+            assertThat(syncs).isNotEmpty();
+            syncs.forEach(TransactionSynchronization::afterCommit);
+            verify(ack).acknowledge();
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    @Test
+    @DisplayName("트랜잭션 없으면 성공 ack 는 즉시 실행 — 비트랜잭션 컨슈머 하위호환")
+    void successAckIsImmediateWhenNoTransaction() {
+        RecordingQuarantine q = new RecordingQuarantine();
+        TestConsumer consumer = new TestConsumer(freshRepo(), q, false);
+        Acknowledgment ack = mock(Acknowledgment.class);
+
+        consumer.run(record("{\"a\":1}", UUID.randomUUID().toString()), ack);
+
+        verify(ack).acknowledge();
     }
 
     @Test

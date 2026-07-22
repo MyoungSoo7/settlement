@@ -142,6 +142,7 @@ class SettlementIdempotencyIntegrationTest {
                 createSettlementFromPaymentUseCase, processedEventRepository, paymentViewRepository, objectMapper,
                 new github.lms.lemuel.settlement.adapter.in.kafka.SettlementProjectionMetrics(
                         new io.micrometer.core.instrument.simple.SimpleMeterRegistry()),
+                null,  // 격리 훅 미사용(레거시 동작) — 격리 추적은 QuarantineTrackingIntegrationTest 가 검증
                 0L);   // practiceDelayMs=0 — 실습 지연 비활성(테스트)
         // create-drop 스키마는 컨텍스트 단위라 메서드 간 데이터가 누적된다 — 매 테스트 전 비운다.
         settlementRepo.deleteAll();

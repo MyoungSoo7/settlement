@@ -24,6 +24,8 @@ public enum AuditAction {
     RECON_ADJUSTMENT_APPLIED,
     // ledger_outbox FAILED 항목 운영자 일괄 재큐.
     LEDGER_OUTBOX_REQUEUED,
+    // 격리(quarantined) 소비 이벤트 운영자 재처리 — 원본 토픽 republish, operator·quarantineId·event_id 추적.
+    QUARANTINE_REPLAYED,
     // 이벤트드리븐 정산 생성(payment.captured 컨슈머, actor=system) — 정산금 발생 지점의 감사 추적.
     SETTLEMENT_CREATED,
     // 홀드백 해제 배치(actor=system) — 셀러 출금가능액 증가 시점의 감사 추적.

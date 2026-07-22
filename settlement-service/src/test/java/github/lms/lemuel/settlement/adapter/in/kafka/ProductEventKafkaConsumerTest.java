@@ -38,7 +38,7 @@ class ProductEventKafkaConsumerTest {
     @BeforeEach
     void setUp() {
         consumer = new ProductEventKafkaConsumer(productViewRepository, processedEventRepository, objectMapper,
-                new SettlementProjectionMetrics(new SimpleMeterRegistry()));
+                new SettlementProjectionMetrics(new SimpleMeterRegistry()), null);
     }
 
     private ConsumerRecord<String, String> productChangedRecord(UUID eventId, String json) {

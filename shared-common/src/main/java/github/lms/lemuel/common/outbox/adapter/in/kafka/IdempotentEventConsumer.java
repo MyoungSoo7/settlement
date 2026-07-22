@@ -7,6 +7,8 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.support.Acknowledgment;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -130,7 +132,30 @@ public abstract class IdempotentEventConsumer {
 
         processedEventRepository.save(new ProcessedEventJpaEntity(consumerGroup(), eventId, eventType()));
         afterProcessed(record);
-        ack.acknowledge();
+        ackAfterCommit(ack);
+    }
+
+    /**
+     * 성공 경로 ack — 트랜잭션이 활성이면 <b>커밋 이후로</b> 미룬다.
+     *
+     * <p>{@code MANUAL_IMMEDIATE} 에서 {@code ack.acknowledge()} 는 오프셋을 즉시 커밋한다.
+     * 리스너가 {@code @Transactional} 이면 도메인 변경·{@code processed_events} 저장은 아직
+     * 커밋 전이므로, 오프셋만 먼저 확정된 뒤 DB 커밋이 실패하면 재전달 없이 조용히 유실된다.
+     * afterCommit 에 ack 를 걸어 "DB 커밋 성공 → 오프셋 확정" 순서를 보장한다(롤백 시 ack 미실행 → 재전달).
+     *
+     * <p>트랜잭션이 없으면(비트랜잭션 컨슈머) 기존처럼 즉시 ack — 완전 하위호환.
+     */
+    private void ackAfterCommit(Acknowledgment ack) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    ack.acknowledge();
+                }
+            });
+        } else {
+            ack.acknowledge();
+        }
     }
 
     /**
