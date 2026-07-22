@@ -191,21 +191,38 @@ public class IntegrityQueryJdbcAdapter implements IntegrityQueryPort {
                         money(rs, "amount"), money(rs, "net_amount")))
                 .list();
 
+        // 정상 홀드백 흐름은 (IMMEDIATE, HOLDBACK_RELEASE) 활성 payout 2건이 공존하므로
+        // 이중 판정은 (settlement_id, payout_type) 단위로 한다.
         List<Long> duplicates = jdbc.sql("""
-                        SELECT p.settlement_id FROM payouts p
+                        SELECT DISTINCT p.settlement_id FROM payouts p
                         WHERE p.status <> 'CANCELED'
                           AND p.settlement_id IN (
                               SELECT id FROM settlements
                               WHERE status = 'DONE' AND confirmed_at >= :start AND confirmed_at < :end)
-                        GROUP BY p.settlement_id HAVING count(*) > 1
+                        GROUP BY p.settlement_id, p.payout_type HAVING count(*) > 1
                         LIMIT %d
                         """.formatted(ID_LIMIT))
                 .param("start", start).param("end", end)
                 .query(Long.class).list();
 
+        // 유형별로는 1건씩이어도 합계가 net 을 넘으면 이중 지급 — 유형 분산 이중 지급 탐지.
+        List<PayoutReconReport.OverTotalSettlement> overTotal = jdbc.sql("""
+                        SELECT s.id AS settlement_id, sum(p.amount) AS payout_total, s.net_amount
+                        FROM settlements s
+                        JOIN payouts p ON p.settlement_id = s.id AND p.status <> 'CANCELED'
+                        WHERE s.status = 'DONE' AND s.confirmed_at >= :start AND s.confirmed_at < :end
+                        GROUP BY s.id, s.net_amount
+                        HAVING sum(p.amount) > s.net_amount
+                        ORDER BY s.id LIMIT %d
+                        """.formatted(ID_LIMIT))
+                .param("start", start).param("end", end)
+                .query((rs, i) -> new PayoutReconReport.OverTotalSettlement(
+                        rs.getLong("settlement_id"), money(rs, "payout_total"), money(rs, "net_amount")))
+                .list();
+
         return PayoutReconReport.of(date, confirmed.count(), confirmed.total(),
                 payouts.count(), payouts.total(), payouts.completed(),
-                withoutPayout, overpaid, duplicates);
+                withoutPayout, overpaid, duplicates, overTotal);
     }
 
     // ── INV-7 홀드백 ───────────────────────────────────────────────────────

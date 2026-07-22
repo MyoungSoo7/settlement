@@ -74,7 +74,7 @@ class IntegrityMonitorSchedulerTest {
                 YESTERDAY, 1, new BigDecimal("100"), 1, new BigDecimal("200"), 0,
                 List.of(),
                 List.of(new PayoutReconReport.OverpaidPayout(9L, 1L, new BigDecimal("200"), new BigDecimal("100"))),
-                List.of()));
+                List.of(), List.of()));
 
         scheduler.runDailyChecks();
 
@@ -108,7 +108,7 @@ class IntegrityMonitorSchedulerTest {
 
     private static PayoutReconReport okPayout() {
         return PayoutReconReport.of(YESTERDAY, 0, BigDecimal.ZERO, 0, BigDecimal.ZERO, 0,
-                List.of(), List.of(), List.of());
+                List.of(), List.of(), List.of(), List.of());
     }
 
     private static HoldbackStatusReport okHoldback() {

@@ -76,7 +76,7 @@ class IntegrityAdminControllerTest {
     void payoutRecon() throws Exception {
         PayoutReconReport report = PayoutReconReport.of(
                 LocalDate.of(2026, 4, 1), 5L, new BigDecimal("100000"),
-                5L, new BigDecimal("100000"), 5L, List.of(), List.of(), List.of());
+                5L, new BigDecimal("100000"), 5L, List.of(), List.of(), List.of(), List.of());
         when(useCase.checkPayoutRecon(LocalDate.of(2026, 4, 1))).thenReturn(report);
 
         mockMvc.perform(get("/admin/integrity/payout-recon").param("date", "2026-04-01"))
