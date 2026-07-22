@@ -8,9 +8,9 @@
 |---|---|---|---|
 | P0-1 payout 배선 | ✅ 완료 | — | `7920d5923` |
 | P0-2 조정 원장 | ✅ 완료 | — | `3ca0ec4af` |
-| P0-3 이벤트 격리 | 🔒 진행 중 | 병행 세션 (2026-07-22 07:03~) | develop 재구현 — `ConsumedEventQuarantine` 옵트인 훅. codex 브랜치 버전은 참조만 |
+| P0-3 이벤트 격리 | ✅ 완료 | — | `fcc746fcd`(훅) + `a0641d699`(settlement 격리 테이블·재처리·/admin/event-track). 리뷰 Blocker/Major 반영, 격리 워크트리 타겟 게이트 GREEN |
 | P0-4 탐지 백필 | ✅ 완료 | — | `367a95f5a` (중복 구현 화해: integrity 백업본은 scratch 보존) |
-| P0-5 E2E 하네스 | ⬜ 미착수 | — | depends_on: 1·2·3 — 시드 3 완료 후 착수 가능 |
+| P0-5 E2E 하네스 | ⬜ 미착수 | — | depends_on: 1·2·3 — **차단 해제**(시드 3 완료, 2026-07-22) |
 | P0-6 payout 복구 | 🔒 진행 중 | 메인 세션 (2026-07-22 07:30~) | develop 참조 재구현 — 채권(receivable)·상계·회수. codex c6733e1fd 는 설계 참조만 |
 
 ## codex/settlement-p0-feedback 처분 (2026-07-22 확정)
