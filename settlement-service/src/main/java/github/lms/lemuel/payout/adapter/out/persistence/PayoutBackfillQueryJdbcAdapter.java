@@ -35,6 +35,11 @@ public class PayoutBackfillQueryJdbcAdapter implements PayoutBackfillQueryPort {
      * INV-6 settlementsWithoutPayout SQL 의 페이지 확장판.
      * DONE 정산 중 IMMEDIATE Payout 이 없는 건을 커서 기반 페이지로 조회한다.
      * settlement_payment_view JOIN 으로 seller_id 및 holdback 정보를 함께 가져온다.
+     *
+     * <p>즉시지급액은 항상 {@code net_amount - holdback_amount} 다. holdback 몫은
+     * HOLDBACK_RELEASE Payout 이 별도로 담당하므로(해제 시 holdback_amount 는 보존됨),
+     * holdback_released 여부와 무관하게 net 전액을 IMMEDIATE 로 잡으면 이중지급이 된다.
+     * 환불이 holdback 을 전액 소진한 경우는 holdback_amount=0 이라 net 전액이 맞다.
      */
     @Override
     public List<SettlementForPayout> findDoneWithoutImmediatePayoutPage(
@@ -44,11 +49,8 @@ public class PayoutBackfillQueryJdbcAdapter implements PayoutBackfillQueryPort {
                        s.payment_id,
                        spv.seller_id,
                        s.net_amount,
-                       GREATEST(
-                           s.net_amount - CASE WHEN s.holdback_released = false
-                                              THEN s.holdback_amount ELSE 0 END,
-                           0
-                       )                          AS immediate_payout_amount,
+                       GREATEST(s.net_amount - s.holdback_amount, 0)
+                                                  AS immediate_payout_amount,
                        s.holdback_amount,
                        s.holdback_released
                 FROM settlements s

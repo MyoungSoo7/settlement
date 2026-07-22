@@ -165,13 +165,15 @@ class PayoutBackfillIdempotencyIT {
 
         seedPaymentView(paymentId, sellerId);
 
-        // DONE + holdback_released=true + holdback_amount>0 인 정산 삽입
+        // DONE + holdback_released=true + holdback_amount>0 인 정산 삽입.
+        // net_amount(9700) 는 holdback(2910) 을 포함한 실지급 총액 — 도메인 의미론과 동일
+        // (즉시지급 = net - holdback, 해제 시 holdback_amount 는 보존된다).
         jdbc.update("""
                 INSERT INTO public.settlements
                   (payment_id, order_id, payment_amount, refunded_amount, commission, commission_rate,
                    net_amount, holdback_amount, holdback_rate, holdback_released, settlement_date, status,
                    confirmed_at, version, created_at, updated_at)
-                VALUES (?, ?, 10000.00, 0.00, 300.00, 0.0300, 7000.00, 2700.00, 0.3000, true,
+                VALUES (?, ?, 10000.00, 0.00, 300.00, 0.0300, 9700.00, 2910.00, 0.3000, true,
                         CURRENT_DATE, 'DONE', now(), 0, now(), now())
                 """, paymentId, paymentId + 1);
         long settlementId = jdbc.queryForObject(
@@ -180,11 +182,29 @@ class PayoutBackfillIdempotencyIT {
         // ── 1회차 ────────────────────────────────────────────────────────────
         PayoutBackfillReport firstRun = backfillUseCase.backfill(today, today, null);
 
-        // IMMEDIATE(net=7000) + HOLDBACK_RELEASE(holdback=2700) 두 종류 생성 가능
+        // IMMEDIATE(net-holdback=6790) + HOLDBACK_RELEASE(holdback=2910) 두 종류 생성
         assertThat(firstRun.created())
                 .as("1회차: 최소 1건 이상 생성")
                 .isGreaterThan(0L);
         assertThat(firstRun.remaining()).isZero();
+
+        // 이중지급 회귀 가드: 해제된 정산의 IMMEDIATE 는 net 전액(9700)이 아니라
+        // net - holdback 이어야 한다. 두 payout 합계 = net_amount.
+        java.math.BigDecimal immediateAmt = jdbc.queryForObject(
+                "SELECT amount FROM public.payouts WHERE settlement_id = ? AND payout_type = 'IMMEDIATE'",
+                java.math.BigDecimal.class, settlementId);
+        java.math.BigDecimal holdbackAmt = jdbc.queryForObject(
+                "SELECT amount FROM public.payouts WHERE settlement_id = ? AND payout_type = 'HOLDBACK_RELEASE'",
+                java.math.BigDecimal.class, settlementId);
+        assertThat(immediateAmt)
+                .as("IMMEDIATE 백필 금액 = net(9700) - holdback(2910)")
+                .isEqualByComparingTo("6790.00");
+        assertThat(holdbackAmt)
+                .as("HOLDBACK_RELEASE 백필 금액 = holdback_amount")
+                .isEqualByComparingTo("2910.00");
+        assertThat(immediateAmt.add(holdbackAmt))
+                .as("두 payout 합계는 net_amount 를 넘지 않는다 (이중지급 금지)")
+                .isEqualByComparingTo("9700.00");
 
         long firstRunCreated = firstRun.created();
 
