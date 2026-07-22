@@ -3,6 +3,7 @@ package github.lms.lemuel.settlement.application.service;
 import github.lms.lemuel.common.audit.application.AuditLogger;
 import github.lms.lemuel.common.audit.domain.AuditAction;
 import github.lms.lemuel.ledger.application.port.in.EnqueueLedgerTaskPort;
+import github.lms.lemuel.recovery.application.port.in.RecordPostPayoutRecoveryUseCase;
 import github.lms.lemuel.settlement.application.port.out.LoadSettlementPort;
 import github.lms.lemuel.settlement.application.port.out.SaveSettlementAdjustmentPort;
 import github.lms.lemuel.settlement.application.port.out.SaveSettlementPort;
@@ -43,6 +44,7 @@ class ApplyReconciliationAdjustmentServiceTest {
     @Mock SaveSettlementPort saveSettlementPort;
     @Mock SaveSettlementAdjustmentPort saveSettlementAdjustmentPort;
     @Mock EnqueueLedgerTaskPort enqueueLedgerTaskPort;
+    @Mock RecordPostPayoutRecoveryUseCase recordPostPayoutRecoveryUseCase;
     @Mock AuditLogger auditLogger;
     SimpleMeterRegistry meterRegistry;
     ApplyReconciliationAdjustmentService service;
@@ -52,8 +54,15 @@ class ApplyReconciliationAdjustmentServiceTest {
         meterRegistry = new SimpleMeterRegistry();
         service = new ApplyReconciliationAdjustmentService(
                 loadSettlementPort, saveSettlementPort, saveSettlementAdjustmentPort,
-                enqueueLedgerTaskPort, meterRegistry,
+                enqueueLedgerTaskPort, recordPostPayoutRecoveryUseCase, meterRegistry,
                 auditLogger, Clock.system(ZoneId.of("Asia/Seoul")));
+        // DONE 분기가 저장된 조정의 id 를 채권 발생에 넘긴다 — echo 스텁으로 id 부여.
+        lenient().when(saveSettlementAdjustmentPort.save(any(SettlementAdjustment.class)))
+                .thenAnswer(inv -> {
+                    SettlementAdjustment saved = mock(SettlementAdjustment.class);
+                    lenient().when(saved.getId()).thenReturn(777L);
+                    return saved;
+                });
     }
 
     /** 결제 100,000 / 3.5% → net 96,500, id 설정. */
@@ -119,8 +128,12 @@ class ApplyReconciliationAdjustmentServiceTest {
         // DONE 정산도 갭 추적을 위해 감사 레코드는 남긴다(outcome=DONE_MANUAL_CLAWBACK).
         verify(auditLogger).record(eq(AuditAction.RECON_ADJUSTMENT_APPLIED), eq("Settlement"),
                 eq("500"), contains("\"outcome\":\"DONE_MANUAL_CLAWBACK\""));
-        // 지급 완료(DONE) 정산의 회수는 송금후 회수 영역 — 원장 역분개를 적재하지 않는다(scope 밖).
-        verify(enqueueLedgerTaskPort, never()).enqueueReverseReconciliation(any(), any(), any(), any());
+        // 송금후 회수도 조정 ↔ 역분개 1:1(INV-5) — 역분개를 적재하고, 지급후 채권 발생은
+        // RecordPostPayoutRecoveryUseCase 로 위임한다(저장된 조정 id 전달, seed-p0-6).
+        verify(enqueueLedgerTaskPort).enqueueReverseReconciliation(
+                eq(500L), eq(55L), eq(new BigDecimal("1000")), any());
+        verify(recordPostPayoutRecoveryUseCase).recordIfPostPayout(
+                eq(500L), eq(777L), eq(new BigDecimal("1000")), any());
     }
 
     @Test

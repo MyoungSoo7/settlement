@@ -19,5 +19,9 @@ public enum LedgerEntryType {
     /** 수수료 인식. */
     COMMISSION_RECOGNIZED,
     /** 실 이체(출금) 실행. */
-    PAYOUT_EXECUTED
+    PAYOUT_EXECUTED,
+    /** 지급후 회수 채권 인식 — Dr 미수금(AR) / Cr 미지급금(AP) (seed-p0-6). */
+    RECOVERY_RECOGNIZED,
+    /** 채권 상계 — 후속 정산 지급액 차감. Dr 미지급금(AP) / Cr 미수금(AR). */
+    RECOVERY_OFFSET
 }

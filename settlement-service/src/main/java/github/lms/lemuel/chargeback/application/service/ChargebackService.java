@@ -8,6 +8,7 @@ import github.lms.lemuel.chargeback.application.port.out.SaveChargebackPort;
 import github.lms.lemuel.chargeback.domain.Chargeback;
 import github.lms.lemuel.chargeback.domain.ChargebackSource;
 import github.lms.lemuel.ledger.application.port.in.EnqueueLedgerTaskPort;
+import github.lms.lemuel.recovery.application.port.in.RecordPostPayoutRecoveryUseCase;
 import github.lms.lemuel.settlement.application.port.out.SaveSettlementAdjustmentPort;
 import github.lms.lemuel.settlement.domain.SettlementAdjustment;
 import io.micrometer.core.instrument.Counter;
@@ -35,7 +36,8 @@ import java.time.LocalDate;
  *       Chargeback 이 Settlement 의 도메인 모델을 직접 import 하지 않고 audit row 만 남긴다.</li>
  *   <li>정산 전 분쟁은 정산 생성 시 {@link BackfillChargebackSettlementUseCase} 백필로 연결 —
  *       ACCEPTED 사전분쟁의 환수 조정이 이 경로에서 만들어진다.</li>
- *   <li>이미 Payout COMPLETED 된 정산의 환수(ReversePayout) 는 본 서비스 책임 아님 — Phase 3.</li>
+ *   <li>이미 Payout COMPLETED 된 정산의 환수는 {@link RecordPostPayoutRecoveryUseCase} 로 위임 —
+ *       holdback 흡수 후 잔여를 채권으로 열어 후속 정산에서 상계한다(seed-p0-6).</li>
  * </ul>
  */
 @Service
@@ -49,6 +51,7 @@ public class ChargebackService
     private final SaveChargebackPort savePort;
     private final SaveSettlementAdjustmentPort saveAdjustmentPort;
     private final EnqueueLedgerTaskPort enqueueLedgerTaskPort;
+    private final RecordPostPayoutRecoveryUseCase recordPostPayoutRecoveryUseCase;
 
     private final Counter openedCounter;
     private final Counter acceptedCounter;
@@ -60,11 +63,13 @@ public class ChargebackService
                               SaveChargebackPort savePort,
                               SaveSettlementAdjustmentPort saveAdjustmentPort,
                               EnqueueLedgerTaskPort enqueueLedgerTaskPort,
+                              RecordPostPayoutRecoveryUseCase recordPostPayoutRecoveryUseCase,
                               MeterRegistry meterRegistry) {
         this.loadPort = loadPort;
         this.savePort = savePort;
         this.saveAdjustmentPort = saveAdjustmentPort;
         this.enqueueLedgerTaskPort = enqueueLedgerTaskPort;
+        this.recordPostPayoutRecoveryUseCase = recordPostPayoutRecoveryUseCase;
         this.openedCounter = Counter.builder("chargeback.opened")
                 .description("새로 등록된 분쟁 수").register(meterRegistry);
         this.acceptedCounter = Counter.builder("chargeback.accepted")
@@ -138,8 +143,12 @@ public class ChargebackService
      */
     private void recordAdjustmentAndReverse(Long settlementId, Long chargebackId, java.math.BigDecimal amount) {
         LocalDate today = LocalDate.now();
-        saveAdjustmentPort.save(SettlementAdjustment.ofChargeback(settlementId, chargebackId, amount, today));
+        SettlementAdjustment adjustment = saveAdjustmentPort.save(
+                SettlementAdjustment.ofChargeback(settlementId, chargebackId, amount, today));
         enqueueLedgerTaskPort.enqueueReverseChargeback(settlementId, chargebackId, amount, today);
+        // 송금 완료(payout COMPLETED) 정산의 회수는 net 재계산이 불가능하다 — holdback 흡수 후 잔여를
+        // 채권으로 열어 후속 정산에서 상계한다(seed-p0-6). 대상 아님 판정은 유스케이스가 스스로 한다.
+        recordPostPayoutRecoveryUseCase.recordIfPostPayout(settlementId, adjustment.getId(), amount, today);
     }
 
     /**

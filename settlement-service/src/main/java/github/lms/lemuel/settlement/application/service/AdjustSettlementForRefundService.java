@@ -18,7 +18,11 @@ import java.time.Clock;
 import java.time.LocalDate;
 
 /**
- * 환불 발생 시 정산 조정 서비스
+ * 환불 발생 시 정산 조정 서비스.
+ *
+ * <p><b>지급후 회수 채권(seed-p0-6) 범위 밖</b>: 채권 발생 원천은 차지백·PG 대사 회수로 한정된다
+ * (시드 제약). 구매자 환불이 DONE·지급완료 정산에 닿는 경우는 여기서 채권을 만들지 않는다 —
+ * 그 비대칭이 필요해지면 {@code RecordPostPayoutRecoveryUseCase} 배선을 이 서비스로 확장한다.
  */
 @Service
 @Transactional

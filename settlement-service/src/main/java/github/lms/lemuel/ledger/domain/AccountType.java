@@ -7,7 +7,7 @@ package github.lms.lemuel.ledger.domain;
  * 본 enum 자체는 부호를 갖지 않는다.
  */
 public enum AccountType {
-    /** 미수금 — 셀러가 받을 돈. */
+    /** 미수금(자산) — 플랫폼이 받을 돈. 지급후 회수 채권(seed-p0-6: 셀러에게서 회수할 금액) 등. */
     ACCOUNTS_RECEIVABLE,
     /** 미지급금 — 플랫폼이 셀러에게 지급할 돈. */
     ACCOUNTS_PAYABLE,

@@ -104,3 +104,5 @@ frontend/*.out.log
 
 ### Codex isolated worktrees ###
 .worktrees/
+
+docs/harness

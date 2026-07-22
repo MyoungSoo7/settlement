@@ -7,6 +7,7 @@ import github.lms.lemuel.chargeback.domain.Chargeback;
 import github.lms.lemuel.chargeback.domain.ChargebackReason;
 import github.lms.lemuel.chargeback.domain.ChargebackSource;
 import github.lms.lemuel.ledger.application.port.in.EnqueueLedgerTaskPort;
+import github.lms.lemuel.recovery.application.port.in.RecordPostPayoutRecoveryUseCase;
 import github.lms.lemuel.settlement.application.port.out.SaveSettlementAdjustmentPort;
 import github.lms.lemuel.settlement.domain.SettlementAdjustment;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -43,6 +44,7 @@ class ChargebackServiceTest {
     private SaveChargebackPort savePort;
     private SaveSettlementAdjustmentPort saveAdjustmentPort;
     private EnqueueLedgerTaskPort enqueueLedgerTaskPort;
+    private RecordPostPayoutRecoveryUseCase recordPostPayoutRecoveryUseCase;
     private ChargebackService service;
 
     @BeforeEach
@@ -51,8 +53,16 @@ class ChargebackServiceTest {
         savePort = mock(SaveChargebackPort.class);
         saveAdjustmentPort = mock(SaveSettlementAdjustmentPort.class);
         enqueueLedgerTaskPort = mock(EnqueueLedgerTaskPort.class);
+        recordPostPayoutRecoveryUseCase = mock(RecordPostPayoutRecoveryUseCase.class);
         service = new ChargebackService(loadPort, savePort, saveAdjustmentPort,
-                enqueueLedgerTaskPort, new SimpleMeterRegistry());
+                enqueueLedgerTaskPort, recordPostPayoutRecoveryUseCase, new SimpleMeterRegistry());
+
+        // 조정 저장 echo — 채권 발생 위임이 저장된 조정 id 를 사용한다(seed-p0-6).
+        when(saveAdjustmentPort.save(any(SettlementAdjustment.class))).thenAnswer(inv -> {
+            SettlementAdjustment saved = mock(SettlementAdjustment.class);
+            when(saved.getId()).thenReturn(777L);
+            return saved;
+        });
 
         // savePort 는 입력을 그대로 (id=999 부여 후) 반환하는 echo 스텁
         when(savePort.save(any(Chargeback.class))).thenAnswer(inv -> {

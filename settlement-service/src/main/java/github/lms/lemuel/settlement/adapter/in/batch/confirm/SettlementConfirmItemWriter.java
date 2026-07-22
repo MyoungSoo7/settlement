@@ -3,6 +3,7 @@ package github.lms.lemuel.settlement.adapter.in.batch.confirm;
 import github.lms.lemuel.ledger.application.port.in.EnqueueLedgerTaskPort;
 import github.lms.lemuel.payout.application.port.in.RequestPayoutUseCase;
 import github.lms.lemuel.payout.domain.PayoutType;
+import github.lms.lemuel.recovery.application.port.in.OffsetSellerRecoveryUseCase;
 import github.lms.lemuel.settlement.application.port.out.LoadSellerIdPort;
 import github.lms.lemuel.settlement.application.port.out.PublishSettlementDomainEventPort;
 import github.lms.lemuel.settlement.application.port.out.PublishSettlementEventPort;
@@ -40,6 +41,7 @@ public class SettlementConfirmItemWriter implements ItemWriter<Settlement> {
     private final EnqueueLedgerTaskPort enqueueLedgerTaskPort;
     private final PublishSettlementEventPort publishSettlementEventPort;
     private final RequestPayoutUseCase requestPayoutUseCase;
+    private final OffsetSellerRecoveryUseCase offsetSellerRecoveryUseCase;
     private final MeterRegistry meterRegistry;
 
     public SettlementConfirmItemWriter(SaveSettlementPort saveSettlementPort,
@@ -48,6 +50,7 @@ public class SettlementConfirmItemWriter implements ItemWriter<Settlement> {
                                        EnqueueLedgerTaskPort enqueueLedgerTaskPort,
                                        PublishSettlementEventPort publishSettlementEventPort,
                                        RequestPayoutUseCase requestPayoutUseCase,
+                                       OffsetSellerRecoveryUseCase offsetSellerRecoveryUseCase,
                                        MeterRegistry meterRegistry) {
         this.saveSettlementPort = saveSettlementPort;
         this.loadSellerIdPort = loadSellerIdPort;
@@ -55,6 +58,7 @@ public class SettlementConfirmItemWriter implements ItemWriter<Settlement> {
         this.enqueueLedgerTaskPort = enqueueLedgerTaskPort;
         this.publishSettlementEventPort = publishSettlementEventPort;
         this.requestPayoutUseCase = requestPayoutUseCase;
+        this.offsetSellerRecoveryUseCase = offsetSellerRecoveryUseCase;
         this.meterRegistry = meterRegistry;
     }
 
@@ -73,9 +77,13 @@ public class SettlementConfirmItemWriter implements ItemWriter<Settlement> {
             loadSellerIdPort.findSellerIdByPaymentId(saved.getPaymentId()).ifPresent(sellerId -> {
                 publishSettlementDomainEventPort.publishSettlementConfirmed(
                         saved.getId(), sellerId, saved.getNetAmount());
-                // 즉시지급액 = net − 미해제 holdback. 0 이면 생성하지 않는다((정산, IMMEDIATE) 멱등).
+                // 즉시지급액 = net − 미해제 holdback − 채권 상계(seed-p0-6). 미상계 채권을 오래된 순으로
+                // 소진한 잔액만 Payout 으로 요청한다. 0 이면 생성하지 않는다((정산, IMMEDIATE) 멱등).
+                BigDecimal immediate = saved.getImmediatePayoutAmount();
+                BigDecimal offset = offsetSellerRecoveryUseCase.offsetForConfirmedSettlement(
+                        saved.getId(), sellerId, immediate, saved.getSettlementDate());
                 requestPayoutUseCase.requestPayoutOfType(
-                        saved.getId(), sellerId, saved.getImmediatePayoutAmount(), PayoutType.IMMEDIATE);
+                        saved.getId(), sellerId, immediate.subtract(offset), PayoutType.IMMEDIATE);
             });
         }
 

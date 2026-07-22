@@ -166,6 +166,10 @@ public class IntegrityQueryJdbcAdapter implements IntegrityQueryPort {
                 .query((rs, i) -> new PayoutAgg(rs.getLong("cnt"), money(rs, "total"), rs.getLong("completed")))
                 .single();
 
+        // "payout 미생성" 판정은 유형 무관하게 활성 payout 0건 기준이다(유형별 필수 여부로 보지 않는다).
+        // HOLDBACK_RELEASE payout 은 홀드백>0 정산에만 뒤따르므로(등급별 30%/10%/0% — 0% 등급은
+        // 애초에 HOLDBACK_RELEASE 가 없음), 유형별 "둘 다 있어야" 로 보면 0% 홀드백 정산이 전부 오탐된다.
+        // 따라서 정보성 목록은 활성 payout 이 하나도 없는 정산만 노출한다.
         List<Long> withoutPayout = jdbc.sql("""
                         SELECT s.id FROM settlements s
                         WHERE s.status = 'DONE' AND s.confirmed_at >= :start AND s.confirmed_at < :end
@@ -206,13 +210,15 @@ public class IntegrityQueryJdbcAdapter implements IntegrityQueryPort {
                 .query(Long.class).list();
 
         // 유형별로는 1건씩이어도 합계가 net 을 넘으면 이중 지급 — 유형 분산 이중 지급 탐지.
+        // count(*) > 1 조건: 단일 payout 의 과다 지급(amount > net)은 이미 overpaidPayouts 가 잡으므로
+        // 여기서 제외해 같은 사건을 두 번 계상(reasons 중복)하지 않는다. 2건 이상 합산 초과만 이 탐지의 몫.
         List<PayoutReconReport.OverTotalSettlement> overTotal = jdbc.sql("""
                         SELECT s.id AS settlement_id, sum(p.amount) AS payout_total, s.net_amount
                         FROM settlements s
                         JOIN payouts p ON p.settlement_id = s.id AND p.status <> 'CANCELED'
                         WHERE s.status = 'DONE' AND s.confirmed_at >= :start AND s.confirmed_at < :end
                         GROUP BY s.id, s.net_amount
-                        HAVING sum(p.amount) > s.net_amount
+                        HAVING sum(p.amount) > s.net_amount AND count(*) > 1
                         ORDER BY s.id LIMIT %d
                         """.formatted(ID_LIMIT))
                 .param("start", start).param("end", end)
