@@ -8,6 +8,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Component
@@ -71,6 +72,13 @@ public class AccountEntryPersistenceAdapter implements AppendAccountEntryPort, L
     @Override
     public List<AccountEntry> findAll() {
         return repository.findAll().stream()
+                .map(AccountEntryPersistenceAdapter::toDomain)
+                .toList();
+    }
+
+    @Override
+    public List<AccountEntry> findByOccurredAtBetween(LocalDateTime fromInclusive, LocalDateTime toExclusive) {
+        return repository.findByOccurredAtGreaterThanEqualAndOccurredAtLessThan(fromInclusive, toExclusive).stream()
                 .map(AccountEntryPersistenceAdapter::toDomain)
                 .toList();
     }

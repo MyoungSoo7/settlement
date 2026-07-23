@@ -122,6 +122,15 @@ app:
       # 수신 (settlement → account)
       settlement-created: lemuel.settlement.created
       settlement-confirmed: lemuel.settlement.confirmed
+      payout-completed: lemuel.payout.completed
+      # 수신 (settlement → account) — ADR 0026 Option ① 감액 사건 GL mirror
+      settlement-holdback-released: lemuel.settlement.holdback_released
+      settlement-holdback-consumed: lemuel.settlement.holdback_consumed
+      settlement-adjusted: lemuel.settlement.adjusted
+      settlement-canceled: lemuel.settlement.canceled
+      seller-recovery-opened: lemuel.seller_recovery.opened
+      seller-recovery-offset: lemuel.seller_recovery.offset
+
       # 수신 (loan → account)
       loan-disbursement-requested: lemuel.loan.disbursement_requested
       loan-repayment-applied: lemuel.loan.repayment_applied

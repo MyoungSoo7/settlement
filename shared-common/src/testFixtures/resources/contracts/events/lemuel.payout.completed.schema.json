@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "lemuel.payout.completed",
+  "description": "settlement-service(PayoutKafkaEventPublisherAdapter, PayoutTxSteps.markCompleted 내부 Outbox) → account-service(PayoutCompletedConsumer). 셀러 정산금 실지급(payout) 완료 시 발행되어 GL 에 DR SELLER_PAYABLE / CR CASH(미지급금 상계 + 현금 유출)로 전기된다(ADR 0026 Option A). settlement 계열 직렬화 규약대로 amount 는 JSON number. settlementId 는 수동 송금 시 null 허용.",
+  "type": "object",
+  "properties": {
+    "payoutId": { "type": "integer" },
+    "settlementId": { "type": ["integer", "null"] },
+    "sellerId": { "type": "integer" },
+    "amount": { "type": "number", "minimum": 0 }
+  },
+  "required": ["payoutId", "sellerId", "amount"],
+  "additionalProperties": true
+}

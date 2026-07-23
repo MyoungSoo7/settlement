@@ -60,4 +60,25 @@ public final class AccountSummary {
     public String ownerId() { return ownerId; }
     public List<Balance> balances() { return balances; }
     public int entryCount() { return entryCount; }
+
+    /** 셀러 통제계정(미지급/유보/회수채권). 완전정산 봉합 판정 대상(ADR 0026 Option ①). */
+    private static final java.util.Set<GlAccount> SELLER_CONTROL_ACCOUNTS = java.util.EnumSet.of(
+            GlAccount.SELLER_PAYABLE, GlAccount.HOLDBACK_PAYABLE, GlAccount.SELLER_RECOVERY_RECEIVABLE);
+
+    /**
+     * 완전정산 봉합 여부(ADR 0026 Option ① HIGH-1 제거) — 이 owner 의 세 통제계정
+     * (SELLER_PAYABLE·HOLDBACK_PAYABLE·SELLER_RECOVERY_RECEIVABLE) 순잔액이 모두 0 이면 참.
+     *
+     * <p>완전정산 셀러는 즉시분·유보분이 지급/해제/소진/취소로 전액 discharge 되고 회수채권도 상계 완료돼
+     * 세 통제계정이 산식적으로 0 으로 닫혀야 한다. 등장하지 않은 계정은 0 으로 본다. (CASH 는 플랫폼 전역
+     * 계정이라 셀러 단위 봉합 대상에서 제외 — 회수 미종료 등 정상 사유로 셀러별 0 이 아닐 수 있다.)
+     */
+    public boolean fullySettled() {
+        for (Balance b : balances) {
+            if (SELLER_CONTROL_ACCOUNTS.contains(b.account()) && b.balance().signum() != 0) {
+                return false;
+            }
+        }
+        return true;
+    }
 }

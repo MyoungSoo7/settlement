@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "lemuel.settlement.canceled",
+  "description": "settlement-service → account-service. 정산 자체가 취소될 때 발행되어 잔여 즉시분·유보분을 각각 반제하는 2전표로 전기된다(ADR 0026 Option ①): DR SELLER_PAYABLE / CR CASH(즉시분 잔여) + DR HOLDBACK_PAYABLE / CR CASH(유보분 잔여). settlement 계열 직렬화 규약대로 금액은 모두 JSON number.",
+  "type": "object",
+  "properties": {
+    "settlementId": { "type": "integer" },
+    "sellerId": { "type": "integer" },
+    "immediateAmount": { "type": "number", "minimum": 0 },
+    "holdbackAmount": { "type": "number", "minimum": 0 }
+  },
+  "required": ["settlementId", "sellerId", "immediateAmount", "holdbackAmount"],
+  "additionalProperties": true
+}

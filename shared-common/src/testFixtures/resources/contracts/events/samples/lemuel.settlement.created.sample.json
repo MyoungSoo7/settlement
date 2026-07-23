@@ -1,6 +1,7 @@
 {
   "settlementId": 9001,
   "sellerId": 777,
-  "amount": 43425,
-  "dueDate": "2026-07-10"
+  "amount": 42500,
+  "dueDate": "2026-07-10",
+  "holdbackAmount": 12750
 }

@@ -6,11 +6,13 @@ import github.lms.lemuel.payout.domain.Payout;
 import github.lms.lemuel.payout.domain.PayoutStatus;
 import github.lms.lemuel.payout.domain.PayoutType;
 import github.lms.lemuel.recovery.application.port.out.LoadSellerRecoveryPort;
+import github.lms.lemuel.recovery.application.port.out.PublishSellerRecoveryEventPort;
 import github.lms.lemuel.recovery.application.port.out.SaveSellerRecoveryPort;
 import github.lms.lemuel.recovery.domain.RecoveryStatus;
 import github.lms.lemuel.recovery.domain.SellerRecovery;
 import github.lms.lemuel.settlement.application.port.out.LoadSellerIdPort;
 import github.lms.lemuel.settlement.application.port.out.LoadSettlementPort;
+import github.lms.lemuel.settlement.application.port.out.PublishSettlementDomainEventPort;
 import github.lms.lemuel.settlement.application.port.out.SaveSettlementPort;
 import github.lms.lemuel.settlement.domain.Settlement;
 import org.junit.jupiter.api.BeforeEach;
@@ -50,6 +52,8 @@ class RecoverPostPayoutAdjustmentServiceTest {
     @Mock SaveSettlementPort saveSettlementPort;
     @Mock LoadSellerIdPort loadSellerIdPort;
     @Mock RecoveryEntryUseCase recoveryEntryUseCase;
+    @Mock PublishSettlementDomainEventPort publishSettlementDomainEventPort;
+    @Mock PublishSellerRecoveryEventPort publishSellerRecoveryEventPort;
 
     private RecoverPostPayoutAdjustmentService service;
 
@@ -57,7 +61,7 @@ class RecoverPostPayoutAdjustmentServiceTest {
     void setUp() {
         service = new RecoverPostPayoutAdjustmentService(loadRecoveryPort, saveRecoveryPort,
                 loadPayoutPort, loadSettlementPort, saveSettlementPort, loadSellerIdPort,
-                recoveryEntryUseCase);
+                recoveryEntryUseCase, publishSettlementDomainEventPort, publishSellerRecoveryEventPort);
     }
 
     @Test
@@ -69,7 +73,8 @@ class RecoverPostPayoutAdjustmentServiceTest {
         Optional<SellerRecovery> result = service.recordIfPostPayout(501L, 11L, RECOVERED, DATE);
 
         assertThat(result).isEmpty();
-        verifyNoInteractions(saveRecoveryPort, saveSettlementPort, recoveryEntryUseCase);
+        verifyNoInteractions(saveRecoveryPort, saveSettlementPort, recoveryEntryUseCase,
+                publishSettlementDomainEventPort, publishSellerRecoveryEventPort);
     }
 
     @Test
@@ -88,7 +93,8 @@ class RecoverPostPayoutAdjustmentServiceTest {
         when(loadRecoveryPort.findBySourceAdjustmentId(12L)).thenReturn(Optional.empty());
         assertThat(service.recordIfPostPayout(502L, 12L, RECOVERED, DATE)).isEmpty();
 
-        verifyNoInteractions(saveRecoveryPort, saveSettlementPort, recoveryEntryUseCase);
+        verifyNoInteractions(saveRecoveryPort, saveSettlementPort, recoveryEntryUseCase,
+                publishSettlementDomainEventPort, publishSellerRecoveryEventPort);
     }
 
     @Test
@@ -101,7 +107,8 @@ class RecoverPostPayoutAdjustmentServiceTest {
         assertThat(service.recordIfPostPayout(501L, 11L, RECOVERED, DATE)).isEmpty();
 
         verify(settlement, never()).consumeHoldbackForRefund(any());
-        verifyNoInteractions(saveRecoveryPort, saveSettlementPort, recoveryEntryUseCase);
+        verifyNoInteractions(saveRecoveryPort, saveSettlementPort, recoveryEntryUseCase,
+                publishSettlementDomainEventPort, publishSellerRecoveryEventPort);
     }
 
     @Test
@@ -116,7 +123,9 @@ class RecoverPostPayoutAdjustmentServiceTest {
 
         assertThat(result).isEmpty();
         verify(saveSettlementPort).save(settlement);
-        verifyNoInteractions(saveRecoveryPort, recoveryEntryUseCase);
+        // 전액 흡수 → 유보 소진(현금유출) 이벤트만, 채권(Opened) 은 없음.
+        verify(publishSettlementDomainEventPort).publishHoldbackConsumed(11L, 501L, 7L, RECOVERED);
+        verifyNoInteractions(saveRecoveryPort, recoveryEntryUseCase, publishSellerRecoveryEventPort);
     }
 
     @Test
@@ -141,6 +150,11 @@ class RecoverPostPayoutAdjustmentServiceTest {
         assertThat(result.get().getStatus()).isEqualTo(RecoveryStatus.OPEN);
         verify(saveSettlementPort).save(settlement);
         verify(recoveryEntryUseCase).recognizeReceivable(99L, 501L, new BigDecimal("2000.00"), DATE);
+        // 부분 흡수 1000 → 유보 소진 이벤트, 잔여 2000 → 채권 발생(Opened) 이벤트.
+        verify(publishSettlementDomainEventPort)
+                .publishHoldbackConsumed(11L, 501L, 7L, new BigDecimal("1000.00"));
+        verify(publishSellerRecoveryEventPort)
+                .publishRecoveryOpened(99L, 7L, new BigDecimal("2000.00"));
     }
 
     @Test
@@ -150,7 +164,12 @@ class RecoverPostPayoutAdjustmentServiceTest {
         Settlement settlement = stubSettlement(501L, 100L);
         when(loadSellerIdPort.findSellerIdByPaymentId(100L)).thenReturn(Optional.of(7L));
         when(settlement.consumeHoldbackForRefund(RECOVERED)).thenReturn(BigDecimal.ZERO);
-        when(saveRecoveryPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(saveRecoveryPort.save(any())).thenAnswer(inv -> {
+            SellerRecovery r = inv.getArgument(0);
+            return SellerRecovery.rehydrate(98L, r.getSourceAdjustmentId(), r.getSellerId(),
+                    r.getOriginalAmount(), r.getAllocatedAmount(), r.getStatus(),
+                    r.getCreatedAt(), r.getClosedAt());
+        });
 
         Optional<SellerRecovery> result = service.recordIfPostPayout(501L, 11L, RECOVERED, DATE);
 
@@ -158,6 +177,10 @@ class RecoverPostPayoutAdjustmentServiceTest {
         assertThat(result.get().getOriginalAmount()).isEqualByComparingTo(RECOVERED);
         verify(saveSettlementPort, never()).save(any());
         verify(recoveryEntryUseCase).recognizeReceivable(any(), eq(501L), eq(RECOVERED), eq(DATE));
+        // 흡수 0 → 유보 소진 이벤트 없음, 회수 전액이 채권(Opened) 이벤트로.
+        verify(publishSettlementDomainEventPort, never())
+                .publishHoldbackConsumed(anyLong(), any(), anyLong(), any());
+        verify(publishSellerRecoveryEventPort).publishRecoveryOpened(98L, 7L, RECOVERED);
     }
 
     // ───────────────────────────── fixtures ─────────────────────────────

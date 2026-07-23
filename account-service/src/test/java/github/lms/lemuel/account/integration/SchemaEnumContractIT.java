@@ -97,11 +97,21 @@ class SchemaEnumContractIT {
     }
 
     @Test
-    @DisplayName("chk_account_entry_ref_type == AccountEntry 팩토리 6종의 refType (정확 일치)")
+    @DisplayName("chk_account_entry_ref_type == AccountEntry 팩토리 16종의 refType (정확 일치, ADR 0026 Option ①)")
     void refTypeCheckMatchesFactorySetExactly() {
         Set<String> factoryRefTypes = new LinkedHashSet<>(Arrays.asList(
-                AccountEntry.settlementCreated("s", "1", ONE).getRefType(),
+                AccountEntry.settlementCreatedImmediate("s", "1", ONE).getRefType(),
+                AccountEntry.settlementHoldbackRecognized("s", "1", ONE).getRefType(),
                 AccountEntry.settlementConfirmed("s", "1", ONE).getRefType(),
+                AccountEntry.payoutCompleted("s", "1", ONE).getRefType(),
+                AccountEntry.settlementScheduledClearing("s", ONE).getRefType(),
+                AccountEntry.holdbackReleased("s", "1", ONE).getRefType(),
+                AccountEntry.holdbackConsumed("s", "1", ONE).getRefType(),
+                AccountEntry.settlementAdjusted("s", "1", ONE, GlAccount.SELLER_PAYABLE).getRefType(),
+                AccountEntry.settlementCanceledPayable("s", "1", ONE).getRefType(),
+                AccountEntry.settlementCanceledHoldback("s", "1", ONE).getRefType(),
+                AccountEntry.recoveryOpened("s", "1", ONE).getRefType(),
+                AccountEntry.recoveryOffset("s", "1", ONE).getRefType(),
                 AccountEntry.loanDisbursed("s", "1", ONE).getRefType(),
                 AccountEntry.loanRepaid("s", "1", ONE).getRefType(),
                 AccountEntry.corporateLoanDisbursed("005930", "1", ONE).getRefType(),

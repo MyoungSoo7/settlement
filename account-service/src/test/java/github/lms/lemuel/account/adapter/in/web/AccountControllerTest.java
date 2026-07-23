@@ -139,8 +139,32 @@ class AccountControllerTest {
         mockMvc.perform(get("/api/account/trial-balance"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.balanced").value(true))
+                // 이 표본은 CASH 유출(loan·investment)만 있어 CASH 가 순대변 → 차변성 정상방향 위반(false).
+                // 항등식 balanced 와 달리 방향 검증은 이 이상을 잡아낸다(ADR 0026 3a).
+                .andExpect(jsonPath("$.normalBalanceRespected").value(false))
                 .andExpect(jsonPath("$.totalDebit").value(1050000))
                 .andExpect(jsonPath("$.totalCredit").value(1050000));
+    }
+
+    @Test
+    void trialBalance_는_from_to_기간을_전달한다() throws Exception {
+        when(accountQueryUseCase.trialBalance(
+                eq(java.time.LocalDate.of(2026, 7, 1).atStartOfDay()),
+                eq(java.time.LocalDate.of(2026, 8, 1).atStartOfDay()))) // to(7/31) 익일 자정
+                .thenReturn(TrialBalance.of(List.of(
+                        AccountEntry.settlementCreatedImmediate("777", "S1", new BigDecimal("43425")),
+                        AccountEntry.payoutCompleted("777", "P1", new BigDecimal("43425")))));
+
+        mockMvc.perform(get("/api/account/trial-balance").param("from", "2026-07-01").param("to", "2026-07-31"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.balanced").value(true))
+                .andExpect(jsonPath("$.normalBalanceRespected").value(true));
+    }
+
+    @Test
+    void trialBalance_는_from만_오면_400() throws Exception {
+        mockMvc.perform(get("/api/account/trial-balance").param("from", "2026-07-01"))
+                .andExpect(status().isBadRequest());
     }
 
     /** parseOwnerType 실패(IllegalArgumentException) → 400 매핑용 최소 어드바이스. */

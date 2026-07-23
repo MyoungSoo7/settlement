@@ -13,7 +13,8 @@ public record TrialBalanceResponse(
         List<LineView> accounts,
         BigDecimal totalDebit,
         BigDecimal totalCredit,
-        boolean balanced) {
+        boolean balanced,
+        boolean normalBalanceRespected) {
 
     public record LineView(GlAccount account, BigDecimal debitTotal, BigDecimal creditTotal) { }
 
@@ -21,6 +22,7 @@ public record TrialBalanceResponse(
         List<LineView> accounts = tb.lines().stream()
                 .map(l -> new LineView(l.account(), l.debitTotal(), l.creditTotal()))
                 .toList();
-        return new TrialBalanceResponse(accounts, tb.totalDebit(), tb.totalCredit(), tb.balanced());
+        return new TrialBalanceResponse(accounts, tb.totalDebit(), tb.totalCredit(),
+                tb.balanced(), tb.normalBalanceRespected());
     }
 }

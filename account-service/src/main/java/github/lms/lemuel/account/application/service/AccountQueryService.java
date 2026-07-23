@@ -4,12 +4,14 @@ import github.lms.lemuel.account.application.port.in.AccountQueryUseCase;
 import github.lms.lemuel.account.application.port.out.LoadAccountEntryPort;
 import github.lms.lemuel.account.domain.AccountEntry;
 import github.lms.lemuel.account.domain.AccountSummary;
+import github.lms.lemuel.account.domain.GlAccount;
 import github.lms.lemuel.account.domain.OwnerType;
 import github.lms.lemuel.account.domain.TrialBalance;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -72,5 +74,19 @@ public class AccountQueryService implements AccountQueryUseCase {
     @Override
     public TrialBalance trialBalance() {
         return TrialBalance.of(loadAccountEntryPort.findAll());
+    }
+
+    @Override
+    public TrialBalance trialBalance(LocalDateTime fromInclusive, LocalDateTime toExclusive) {
+        return TrialBalance.of(loadAccountEntryPort.findByOccurredAtBetween(fromInclusive, toExclusive));
+    }
+
+    @Override
+    public ControlRecon controlRecon() {
+        TrialBalance tb = TrialBalance.of(loadAccountEntryPort.findAll());
+        return new ControlRecon(
+                tb.normalBalance(GlAccount.SELLER_PAYABLE),
+                tb.normalBalance(GlAccount.HOLDBACK_PAYABLE),
+                tb.normalBalance(GlAccount.SELLER_RECOVERY_RECEIVABLE));
     }
 }

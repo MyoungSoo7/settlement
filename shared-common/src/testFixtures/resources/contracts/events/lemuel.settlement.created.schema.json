@@ -1,13 +1,14 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "lemuel.settlement.created",
-  "description": "settlement-service(SettlementKafkaEventPublisherAdapter) → loan-service(SettlementCreatedConsumer). 셀러별 미지급 정산예정금(담보) 로컬 뷰 적재. 주의: 이 이벤트 계열은 amount 를 JSON number 로 직렬화한다(payment 계열의 문자열 금액과 비대칭 — 현행 유지, 변경 시 양측 동시 배포 필요). dueDate 는 항상 존재하되 null 허용(ISO-8601 date).",
+  "description": "settlement-service(SettlementKafkaEventPublisherAdapter) → loan-service(SettlementCreatedConsumer). 셀러별 미지급 정산예정금(담보) 로컬 뷰 적재. 주의: 이 이벤트 계열은 amount 를 JSON number 로 직렬화한다(payment 계열의 문자열 금액과 비대칭 — 현행 유지, 변경 시 양측 동시 배포 필요). dueDate 는 항상 존재하되 null 허용(ISO-8601 date). holdbackAmount(optional, ADR 0026 Option ①)는 amount 중 홀드백으로 유보되는 금액 — account-service 도 소비하여 DR CASH / CR SELLER_PAYABLE(즉시분 I=amount−holdbackAmount) + DR CASH / CR HOLDBACK_PAYABLE(유보분 holdbackAmount) 2전표 분할 전기에 사용된다.",
   "type": "object",
   "properties": {
     "settlementId": { "type": "integer" },
     "sellerId": { "type": "integer" },
     "amount": { "type": "number" },
-    "dueDate": { "type": ["string", "null"], "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
+    "dueDate": { "type": ["string", "null"], "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+    "holdbackAmount": { "type": "number", "minimum": 0 }
   },
   "required": ["settlementId", "sellerId", "amount", "dueDate"],
   "additionalProperties": true

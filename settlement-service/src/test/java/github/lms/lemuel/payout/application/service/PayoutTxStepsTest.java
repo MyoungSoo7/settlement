@@ -3,6 +3,7 @@ package github.lms.lemuel.payout.application.service;
 import github.lms.lemuel.common.opssignal.OpsSignalCategory;
 import github.lms.lemuel.common.opssignal.OpsSignalPort;
 import github.lms.lemuel.payout.application.port.out.FirmBankingPort.FirmBankingException;
+import github.lms.lemuel.payout.application.port.out.PublishPayoutEventPort;
 import github.lms.lemuel.payout.application.port.out.SavePayoutPort;
 import github.lms.lemuel.payout.domain.Payout;
 import github.lms.lemuel.payout.domain.PayoutStatus;
@@ -23,6 +24,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -37,12 +39,13 @@ class PayoutTxStepsTest {
 
     @Mock SavePayoutPort savePort;
     @Mock OpsSignalPort opsSignalPort;
+    @Mock PublishPayoutEventPort publishPayoutEventPort;
 
     PayoutTxSteps steps;
 
     @BeforeEach
     void setUp() {
-        steps = new PayoutTxSteps(savePort, opsSignalPort);
+        steps = new PayoutTxSteps(savePort, opsSignalPort, publishPayoutEventPort);
     }
 
     private Payout sending(Long id) {
@@ -75,7 +78,7 @@ class PayoutTxStepsTest {
     }
 
     @Test
-    @DisplayName("markCompleted: SENDING → COMPLETED 로 txnId 를 붙여 저장한다")
+    @DisplayName("markCompleted: SENDING → COMPLETED 로 txnId 를 붙여 저장하고 payout.completed 를 발행한다")
     void markCompleted_persistsCompleted() {
         Payout sending = sending(3L);
 
@@ -85,6 +88,19 @@ class PayoutTxStepsTest {
         assertThat(sending.getFirmBankingTransactionId()).isEqualTo("FB-txn-777");
         verify(savePort).save(sending);
         verify(opsSignalPort, never()).emit(any(), any(), any(), any());
+        // GL 현금 폐루프(ADR 0026 Option A): 상태 저장과 같은 트랜잭션에서 payout.completed 발행
+        verify(publishPayoutEventPort).publishPayoutCompleted(
+                eq(3L), eq(100L), eq(1L), eq(new BigDecimal("50000")));
+    }
+
+    @Test
+    @DisplayName("markFailed 는 payout.completed 를 발행하지 않는다 (실패는 현금 유출 아님)")
+    void markFailed_doesNotPublish() {
+        Payout sending = sending(9L);
+
+        steps.markFailed(sending, new FirmBankingException("BANK_TIMEOUT", "타임아웃"));
+
+        verify(publishPayoutEventPort, never()).publishPayoutCompleted(anyLong(), any(), anyLong(), any());
     }
 
     @Test

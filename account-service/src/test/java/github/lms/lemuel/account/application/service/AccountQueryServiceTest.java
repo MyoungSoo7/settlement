@@ -113,4 +113,54 @@ class AccountQueryServiceTest {
         assertThat(tb.totalDebit()).isEqualByComparingTo("1050000");
         assertThat(tb.totalCredit()).isEqualByComparingTo("1050000");
     }
+
+    @Test
+    void trialBalance_기간_은_occurredAt_반개구간_전표로_시산표를_만든다() {
+        java.time.LocalDateTime from = java.time.LocalDateTime.of(2026, 7, 1, 0, 0);
+        java.time.LocalDateTime to = java.time.LocalDateTime.of(2026, 8, 1, 0, 0);
+        when(loadAccountEntryPort.findByOccurredAtBetween(from, to)).thenReturn(List.of(
+                AccountEntry.settlementCreatedImmediate("777", "S1", new BigDecimal("43425")),
+                AccountEntry.payoutCompleted("777", "P1", new BigDecimal("43425"))));
+
+        TrialBalance tb = service.trialBalance(from, to);
+
+        // created(DR CASH/CR PAYABLE) + payout(DR PAYABLE/CR CASH) → 폐루프, 정상방향 준수
+        assertThat(tb.balanced()).isTrue();
+        assertThat(tb.normalBalanceRespected()).isTrue();
+        assertThat(tb.totalDebit()).isEqualByComparingTo("86850");
+    }
+
+    @Test
+    void controlRecon_완전정산이면_세_통제계정_순잔액_0_balanced_참() {
+        // 즉시 인식·지급, 유보 인식·소진, 회수 발생·상계가 모두 상쇄되는 전표 집합
+        when(loadAccountEntryPort.findAll()).thenReturn(List.of(
+                AccountEntry.settlementCreatedImmediate("777", "A", new BigDecimal("700")),
+                AccountEntry.payoutCompleted("777", "payA", new BigDecimal("700")),
+                AccountEntry.settlementHoldbackRecognized("777", "A", new BigDecimal("300")),
+                AccountEntry.holdbackConsumed("777", "adjA", new BigDecimal("300")),
+                AccountEntry.settlementCreatedImmediate("777", "C", new BigDecimal("200")), // 상계 재원 공급
+                AccountEntry.recoveryOpened("777", "r1", new BigDecimal("200")),
+                AccountEntry.recoveryOffset("777", "al1", new BigDecimal("200"))));
+
+        var recon = service.controlRecon();
+
+        assertThat(recon.sellerPayable()).isEqualByComparingTo("0");
+        assertThat(recon.holdbackPayable()).isEqualByComparingTo("0");
+        assertThat(recon.recoveryReceivable()).isEqualByComparingTo("0");
+        assertThat(recon.balanced()).isTrue();
+    }
+
+    @Test
+    void controlRecon_미해결_유보와_회수는_정상방향_순잔액으로_노출된다() {
+        when(loadAccountEntryPort.findAll()).thenReturn(List.of(
+                AccountEntry.settlementHoldbackRecognized("777", "A", new BigDecimal("300")), // CR HOLDBACK_PAYABLE 300
+                AccountEntry.recoveryOpened("777", "r1", new BigDecimal("200"))));            // DR RECEIVABLE 200
+
+        var recon = service.controlRecon();
+
+        assertThat(recon.holdbackPayable()).isEqualByComparingTo("300");   // 미해제 홀드백
+        assertThat(recon.recoveryReceivable()).isEqualByComparingTo("200"); // OPEN 회수채권
+        assertThat(recon.sellerPayable()).isEqualByComparingTo("0");
+        assertThat(recon.balanced()).isFalse();
+    }
 }

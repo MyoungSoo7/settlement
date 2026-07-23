@@ -57,40 +57,196 @@ class AccountConsumerParsingTest {
         return captor.getValue();
     }
 
-    @Test
-    @DisplayName("settlement.created 정본 샘플 → DR SETTLEMENT_SCHEDULED / CR SELLER_PAYABLE")
-    void settlementCreated() {
-        when(processedEventRepository.existsById(any())).thenReturn(false);
-        SettlementCreatedConsumer c = new SettlementCreatedConsumer(
-                recordAccountEntryUseCase, processedEventRepository, objectMapper);
-
-        c.onSettlementCreated(canonicalRecordOf("lemuel.settlement.created"), mock(Acknowledgment.class));
-
-        AccountEntry e = capture();
-        assertThat(e.getOwnerType()).isEqualTo(OwnerType.SELLER);
-        assertThat(e.getOwnerId()).isEqualTo("777");
-        assertThat(e.getDebitAccount()).isEqualTo(GlAccount.SETTLEMENT_SCHEDULED);
-        assertThat(e.getCreditAccount()).isEqualTo(GlAccount.SELLER_PAYABLE);
-        assertThat(e.getAmount()).isEqualByComparingTo("43425");
-        assertThat(e.getRefId()).isEqualTo("9001");
+    private java.util.List<AccountEntry> captureAll(int times) {
+        ArgumentCaptor<AccountEntry> captor = ArgumentCaptor.forClass(AccountEntry.class);
+        verify(recordAccountEntryUseCase, org.mockito.Mockito.times(times)).record(captor.capture());
+        return captor.getAllValues();
     }
 
     @Test
-    @DisplayName("settlement.confirmed 정본 샘플 → DR SELLER_PAYABLE / CR SETTLEMENT_SCHEDULED (예정 상계)")
-    void settlementConfirmed() {
+    @DisplayName("settlement.created 정본 샘플 → 즉시분(DR CASH/CR SELLER_PAYABLE) + 유보분(DR CASH/CR HOLDBACK_PAYABLE) 2전표 (Option ①)")
+    void settlementCreatedSplitsImmediateAndHoldback() throws Exception {
+        when(processedEventRepository.existsById(any())).thenReturn(false);
+        var node = objectMapper.readTree(EventContractValidator.canonicalSample("lemuel.settlement.created"));
+        java.math.BigDecimal net = new java.math.BigDecimal(node.get("amount").asText());
+        java.math.BigDecimal holdback = node.has("holdbackAmount") && !node.get("holdbackAmount").isNull()
+                ? new java.math.BigDecimal(node.get("holdbackAmount").asText()) : java.math.BigDecimal.ZERO;
+        java.math.BigDecimal immediate = net.subtract(holdback);
+        int expected = (immediate.signum() > 0 ? 1 : 0) + (holdback.signum() > 0 ? 1 : 0);
+
+        SettlementCreatedConsumer c = new SettlementCreatedConsumer(
+                recordAccountEntryUseCase, processedEventRepository, objectMapper);
+        c.onSettlementCreated(canonicalRecordOf("lemuel.settlement.created"), mock(Acknowledgment.class));
+
+        java.util.List<AccountEntry> entries = captureAll(expected);
+        AccountEntry imm = entries.stream().filter(e -> e.getRefType().equals("SETTLEMENT_CREATED")).findFirst().orElseThrow();
+        assertThat(imm.getDebitAccount()).isEqualTo(GlAccount.CASH);
+        assertThat(imm.getCreditAccount()).isEqualTo(GlAccount.SELLER_PAYABLE);
+        assertThat(imm.getAmount()).isEqualByComparingTo(immediate);
+        if (holdback.signum() > 0) {
+            AccountEntry hb = entries.stream().filter(e -> e.getRefType().equals("SETTLEMENT_HOLDBACK_RECOGNIZED")).findFirst().orElseThrow();
+            assertThat(hb.getDebitAccount()).isEqualTo(GlAccount.CASH);
+            assertThat(hb.getCreditAccount()).isEqualTo(GlAccount.HOLDBACK_PAYABLE);
+            assertThat(hb.getAmount()).isEqualByComparingTo(holdback);
+        }
+    }
+
+    @Test
+    @DisplayName("settlement.created holdbackAmount 누락 → 즉시분 1전표만(하위호환)")
+    void settlementCreatedWithoutHoldback_recordsImmediateOnly() {
+        when(processedEventRepository.existsById(any())).thenReturn(false);
+        SettlementCreatedConsumer c = new SettlementCreatedConsumer(
+                recordAccountEntryUseCase, processedEventRepository, objectMapper);
+        String payload = "{\"settlementId\":9001,\"sellerId\":777,\"amount\":43425,\"dueDate\":null}";
+
+        c.onSettlementCreated(recordOf("lemuel.settlement.created", payload), mock(Acknowledgment.class));
+
+        AccountEntry e = capture();
+        assertThat(e.getDebitAccount()).isEqualTo(GlAccount.CASH);
+        assertThat(e.getCreditAccount()).isEqualTo(GlAccount.SELLER_PAYABLE);
+        assertThat(e.getAmount()).isEqualByComparingTo("43425");
+    }
+
+    @Test
+    @DisplayName("settlement.holdback_released 정본 샘플 → DR HOLDBACK_PAYABLE / CR SELLER_PAYABLE")
+    void holdbackReleased() {
+        when(processedEventRepository.existsById(any())).thenReturn(false);
+        SettlementHoldbackReleasedConsumer c = new SettlementHoldbackReleasedConsumer(
+                recordAccountEntryUseCase, processedEventRepository, objectMapper);
+        c.onHoldbackReleased(canonicalRecordOf("lemuel.settlement.holdback_released"), mock(Acknowledgment.class));
+        AccountEntry e = capture();
+        assertThat(e.getDebitAccount()).isEqualTo(GlAccount.HOLDBACK_PAYABLE);
+        assertThat(e.getCreditAccount()).isEqualTo(GlAccount.SELLER_PAYABLE);
+        assertThat(e.getRefType()).isEqualTo("HOLDBACK_RELEASED");
+    }
+
+    @Test
+    @DisplayName("settlement.holdback_consumed 정본 샘플 → DR HOLDBACK_PAYABLE / CR CASH (refId=sourceAdjustmentId)")
+    void holdbackConsumed() {
+        when(processedEventRepository.existsById(any())).thenReturn(false);
+        SettlementHoldbackConsumedConsumer c = new SettlementHoldbackConsumedConsumer(
+                recordAccountEntryUseCase, processedEventRepository, objectMapper);
+        c.onHoldbackConsumed(canonicalRecordOf("lemuel.settlement.holdback_consumed"), mock(Acknowledgment.class));
+        AccountEntry e = capture();
+        assertThat(e.getDebitAccount()).isEqualTo(GlAccount.HOLDBACK_PAYABLE);
+        assertThat(e.getCreditAccount()).isEqualTo(GlAccount.CASH);
+        assertThat(e.getRefType()).isEqualTo("HOLDBACK_CONSUMED");
+        assertThat(e.getRefId()).isEqualTo("5501");
+    }
+
+    @Test
+    @DisplayName("settlement.adjusted 정본 샘플(targetLeg=SELLER_PAYABLE) → DR SELLER_PAYABLE / CR CASH")
+    void settlementAdjusted() {
+        when(processedEventRepository.existsById(any())).thenReturn(false);
+        SettlementAdjustedConsumer c = new SettlementAdjustedConsumer(
+                recordAccountEntryUseCase, processedEventRepository, objectMapper);
+        c.onSettlementAdjusted(canonicalRecordOf("lemuel.settlement.adjusted"), mock(Acknowledgment.class));
+        AccountEntry e = capture();
+        assertThat(e.getDebitAccount()).isEqualTo(GlAccount.SELLER_PAYABLE);
+        assertThat(e.getCreditAccount()).isEqualTo(GlAccount.CASH);
+        assertThat(e.getRefType()).isEqualTo("SETTLEMENT_ADJUSTED");
+    }
+
+    @Test
+    @DisplayName("settlement.adjusted targetLeg=HOLDBACK_PAYABLE → DR HOLDBACK_PAYABLE / CR CASH")
+    void settlementAdjustedHoldbackLeg() {
+        when(processedEventRepository.existsById(any())).thenReturn(false);
+        SettlementAdjustedConsumer c = new SettlementAdjustedConsumer(
+                recordAccountEntryUseCase, processedEventRepository, objectMapper);
+        String payload = "{\"adjustmentId\":5502,\"settlementId\":9001,\"sellerId\":777,\"amount\":5000,\"targetLeg\":\"HOLDBACK_PAYABLE\"}";
+        EventContractValidator.assertValid("lemuel.settlement.adjusted", payload);
+        c.onSettlementAdjusted(recordOf("lemuel.settlement.adjusted", payload), mock(Acknowledgment.class));
+        AccountEntry e = capture();
+        assertThat(e.getDebitAccount()).isEqualTo(GlAccount.HOLDBACK_PAYABLE);
+        assertThat(e.getCreditAccount()).isEqualTo(GlAccount.CASH);
+    }
+
+    @Test
+    @DisplayName("settlement.adjusted 알 수 없는 targetLeg → IllegalArgumentException(즉시 DLT) + 분개 미적재")
+    void settlementAdjustedUnknownLeg_throws() {
+        when(processedEventRepository.existsById(any())).thenReturn(false);
+        SettlementAdjustedConsumer c = new SettlementAdjustedConsumer(
+                recordAccountEntryUseCase, processedEventRepository, objectMapper);
+        String payload = "{\"adjustmentId\":5502,\"sellerId\":777,\"amount\":5000,\"targetLeg\":\"BOGUS\"}";
+        assertThatThrownBy(() -> c.onSettlementAdjusted(recordOf("lemuel.settlement.adjusted", payload), mock(Acknowledgment.class)))
+                .isInstanceOf(IllegalArgumentException.class);
+        verify(recordAccountEntryUseCase, never()).record(any());
+    }
+
+    @Test
+    @DisplayName("settlement.canceled 정본 샘플 → 즉시 잔여·유보 잔여 2전표(DR SELLER_PAYABLE/HOLDBACK_PAYABLE / CR CASH)")
+    void settlementCanceled() {
+        when(processedEventRepository.existsById(any())).thenReturn(false);
+        SettlementCanceledConsumer c = new SettlementCanceledConsumer(
+                recordAccountEntryUseCase, processedEventRepository, objectMapper);
+        c.onSettlementCanceled(canonicalRecordOf("lemuel.settlement.canceled"), mock(Acknowledgment.class));
+        java.util.List<AccountEntry> entries = captureAll(2);
+        assertThat(entries).anySatisfy(e -> {
+            assertThat(e.getDebitAccount()).isEqualTo(GlAccount.SELLER_PAYABLE);
+            assertThat(e.getRefType()).isEqualTo("SETTLEMENT_CANCELED_PAYABLE");
+        });
+        assertThat(entries).anySatisfy(e -> {
+            assertThat(e.getDebitAccount()).isEqualTo(GlAccount.HOLDBACK_PAYABLE);
+            assertThat(e.getRefType()).isEqualTo("SETTLEMENT_CANCELED_HOLDBACK");
+        });
+    }
+
+    @Test
+    @DisplayName("seller_recovery.opened 정본 샘플 → DR SELLER_RECOVERY_RECEIVABLE / CR CASH (refId=recoveryId)")
+    void recoveryOpened() {
+        when(processedEventRepository.existsById(any())).thenReturn(false);
+        SellerRecoveryOpenedConsumer c = new SellerRecoveryOpenedConsumer(
+                recordAccountEntryUseCase, processedEventRepository, objectMapper);
+        c.onRecoveryOpened(canonicalRecordOf("lemuel.seller_recovery.opened"), mock(Acknowledgment.class));
+        AccountEntry e = capture();
+        assertThat(e.getDebitAccount()).isEqualTo(GlAccount.SELLER_RECOVERY_RECEIVABLE);
+        assertThat(e.getCreditAccount()).isEqualTo(GlAccount.CASH);
+        assertThat(e.getRefType()).isEqualTo("RECOVERY_OPENED");
+        assertThat(e.getRefId()).isEqualTo("3001");
+    }
+
+    @Test
+    @DisplayName("seller_recovery.offset 정본 샘플 → DR SELLER_PAYABLE / CR SELLER_RECOVERY_RECEIVABLE (refId=allocationId)")
+    void recoveryOffset() {
+        when(processedEventRepository.existsById(any())).thenReturn(false);
+        SellerRecoveryOffsetConsumer c = new SellerRecoveryOffsetConsumer(
+                recordAccountEntryUseCase, processedEventRepository, objectMapper);
+        c.onRecoveryOffset(canonicalRecordOf("lemuel.seller_recovery.offset"), mock(Acknowledgment.class));
+        AccountEntry e = capture();
+        assertThat(e.getDebitAccount()).isEqualTo(GlAccount.SELLER_PAYABLE);
+        assertThat(e.getCreditAccount()).isEqualTo(GlAccount.SELLER_RECOVERY_RECEIVABLE);
+        assertThat(e.getRefType()).isEqualTo("RECOVERY_OFFSET");
+        assertThat(e.getRefId()).isEqualTo("4001");
+    }
+
+    @Test
+    @DisplayName("settlement.confirmed 정본 샘플 → GL 무전표 (Option A, record 미호출)")
+    void settlementConfirmedIsNoGlEntry() {
         when(processedEventRepository.existsById(any())).thenReturn(false);
         SettlementConfirmedConsumer c = new SettlementConfirmedConsumer(
-                recordAccountEntryUseCase, processedEventRepository, objectMapper);
+                processedEventRepository, objectMapper);
 
         c.onSettlementConfirmed(canonicalRecordOf("lemuel.settlement.confirmed"), mock(Acknowledgment.class));
+
+        verify(recordAccountEntryUseCase, never()).record(any());
+    }
+
+    @Test
+    @DisplayName("payout.completed 정본 샘플 → DR SELLER_PAYABLE / CR CASH (Option A 미지급금 상계+현금 유출)")
+    void payoutCompleted() {
+        when(processedEventRepository.existsById(any())).thenReturn(false);
+        PayoutCompletedConsumer c = new PayoutCompletedConsumer(
+                recordAccountEntryUseCase, processedEventRepository, objectMapper);
+
+        c.onPayoutCompleted(canonicalRecordOf("lemuel.payout.completed"), mock(Acknowledgment.class));
 
         AccountEntry e = capture();
         assertThat(e.getOwnerType()).isEqualTo(OwnerType.SELLER);
         assertThat(e.getOwnerId()).isEqualTo("777");
         assertThat(e.getDebitAccount()).isEqualTo(GlAccount.SELLER_PAYABLE);
-        assertThat(e.getCreditAccount()).isEqualTo(GlAccount.SETTLEMENT_SCHEDULED);
+        assertThat(e.getCreditAccount()).isEqualTo(GlAccount.CASH);
         assertThat(e.getAmount()).isEqualByComparingTo("43425");
-        assertThat(e.getRefId()).isEqualTo("9001");
+        assertThat(e.getRefId()).isEqualTo("7001"); // refId=payoutId (멱등 자연키)
     }
 
     @Test
@@ -180,11 +336,11 @@ class AccountConsumerParsingTest {
     @DisplayName("필수 필드(amount) 누락 → IllegalArgumentException(비재시도, 즉시 DLT) + 분개 미적재")
     void missingRequiredField_throwsIaeWithoutRecording() {
         when(processedEventRepository.existsById(any())).thenReturn(false);
-        SettlementConfirmedConsumer c = new SettlementConfirmedConsumer(
+        SettlementCreatedConsumer c = new SettlementCreatedConsumer(
                 recordAccountEntryUseCase, processedEventRepository, objectMapper);
 
-        assertThatThrownBy(() -> c.onSettlementConfirmed(
-                recordOf("lemuel.settlement.confirmed", "{\"settlementId\":9001,\"sellerId\":777}"),
+        assertThatThrownBy(() -> c.onSettlementCreated(
+                recordOf("lemuel.settlement.created", "{\"settlementId\":9001,\"sellerId\":777,\"dueDate\":null}"),
                 mock(Acknowledgment.class)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("amount");

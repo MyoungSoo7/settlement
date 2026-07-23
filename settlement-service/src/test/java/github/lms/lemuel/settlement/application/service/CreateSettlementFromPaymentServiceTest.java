@@ -125,7 +125,7 @@ class CreateSettlementFromPaymentServiceTest {
         verify(loadSellerSettlementCyclePort, never()).findCycleByPaymentId(any());
         verify(loadSellerIdPort, never()).findSellerIdByPaymentId(any());
         // 이벤트 sellerId 로 SettlementCreated 발행 (port 는 primitive long 시그니처 → anyLong)
-        verify(publishSettlementDomainEventPort).publishSettlementCreated(anyLong(), eq(99L), any(), any());
+        verify(publishSettlementDomainEventPort).publishSettlementCreated(anyLong(), eq(99L), any(), any(), any());
     }
 
     @Test @DisplayName("판매자 매핑 없으면 NORMAL + T+7 default cycle 로 fallback") void create_fallback() {
@@ -165,11 +165,12 @@ class CreateSettlementFromPaymentServiceTest {
 
         service.createSettlementFromPayment(5L, 50L, new BigDecimal("10000"));
 
-        // netAmount = 10000 - 3.5% = 9650, 정산일 = 오늘+1(DAILY)
+        // netAmount = 10000 - 3.5% = 9650, 정산일 = 오늘+1(DAILY), holdback 30% = 2895.00
         verify(publishSettlementDomainEventPort).publishSettlementCreated(
                 eq(500L), eq(77L),
                 argThat(a -> a.compareTo(new BigDecimal("9650.00")) == 0),
-                eq(LocalDate.now().plusDays(1)));
+                eq(LocalDate.now().plusDays(1)),
+                argThat(h -> h.compareTo(new BigDecimal("2895.00")) == 0));
     }
 
     @Test @DisplayName("판매자 미해석이면 발행 생략") void create_skipPublishWhenNoSeller() {

@@ -63,4 +63,19 @@ class AccountArchitectureTest {
                 .allowEmptyShould(true);
         rule.check(accountClasses);
     }
+
+    @Test
+    void account_는_소비전용이라_Outbox_발행머시너리에_의존하지_않는다() {
+        // 이벤트 발행(Outbox) 금지 — payout.completed 등 발행은 settlement 만(ADR 0026 Option A).
+        // (KafkaTemplate 은 DLT 격리 전용으로만 쓰이므로 제외 — KafkaErrorHandlerConfig 참조.
+        //  비즈니스 이벤트 발행 경로인 Outbox 저장/발행 포트 의존만 하드스톱한다.)
+        ArchRule rule = noClasses()
+                .that().resideInAPackage("github.lms.lemuel.account..")
+                .should().dependOnClassesThat()
+                .haveFullyQualifiedName("github.lms.lemuel.common.outbox.application.port.out.SaveOutboxEventPort")
+                .orShould().dependOnClassesThat()
+                .haveFullyQualifiedName("github.lms.lemuel.common.outbox.application.port.out.PublishExternalEventPort")
+                .allowEmptyShould(true);
+        rule.check(accountClasses);
+    }
 }

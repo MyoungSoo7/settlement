@@ -5,6 +5,7 @@ import github.lms.lemuel.payout.domain.PayoutType;
 import github.lms.lemuel.settlement.application.port.in.ReleaseHoldbackUseCase;
 import github.lms.lemuel.settlement.application.port.out.LoadReleasableHoldbackPort;
 import github.lms.lemuel.settlement.application.port.out.LoadSellerIdPort;
+import github.lms.lemuel.settlement.application.port.out.PublishSettlementDomainEventPort;
 import github.lms.lemuel.settlement.application.port.out.SaveSettlementPort;
 import github.lms.lemuel.settlement.domain.Settlement;
 import io.micrometer.core.instrument.Counter;
@@ -35,17 +36,20 @@ public class ReleaseHoldbackService implements ReleaseHoldbackUseCase {
     private final SaveSettlementPort savePort;
     private final LoadSellerIdPort loadSellerIdPort;
     private final RequestPayoutUseCase requestPayoutUseCase;
+    private final PublishSettlementDomainEventPort publishSettlementDomainEventPort;
     private final Counter releasedCounter;
 
     public ReleaseHoldbackService(LoadReleasableHoldbackPort loadPort,
                                    SaveSettlementPort savePort,
                                    LoadSellerIdPort loadSellerIdPort,
                                    RequestPayoutUseCase requestPayoutUseCase,
+                                   PublishSettlementDomainEventPort publishSettlementDomainEventPort,
                                    MeterRegistry meterRegistry) {
         this.loadPort = loadPort;
         this.savePort = savePort;
         this.loadSellerIdPort = loadSellerIdPort;
         this.requestPayoutUseCase = requestPayoutUseCase;
+        this.publishSettlementDomainEventPort = publishSettlementDomainEventPort;
         this.releasedCounter = Counter.builder("settlement.holdback.released")
                 .description("Holdback 해제된 누적 정산 건수")
                 .register(meterRegistry);
@@ -66,9 +70,14 @@ public class ReleaseHoldbackService implements ReleaseHoldbackUseCase {
                 savePort.save(s);
                 // 잔여 보류액을 HOLDBACK_RELEASE Payout 으로 자동 생성 — 판매자 미해석·0원이면 생략.
                 // 같은 트랜잭션에 묶여 해제와 원자적으로 커밋된다((정산, HOLDBACK_RELEASE) 멱등).
-                loadSellerIdPort.findSellerIdByPaymentId(s.getPaymentId()).ifPresent(sellerId ->
-                        requestPayoutUseCase.requestPayoutOfType(
-                                s.getId(), sellerId, amount, PayoutType.HOLDBACK_RELEASE));
+                loadSellerIdPort.findSellerIdByPaymentId(s.getPaymentId()).ifPresent(sellerId -> {
+                    requestPayoutUseCase.requestPayoutOfType(
+                            s.getId(), sellerId, amount, PayoutType.HOLDBACK_RELEASE);
+                    // account 로 유보 해제 재분류 이벤트 발행 — 0원 유보는 회계 전기가 없으므로 생략.
+                    if (amount.signum() > 0) {
+                        publishSettlementDomainEventPort.publishHoldbackReleased(s.getId(), sellerId, amount);
+                    }
+                });
                 totalAmount = totalAmount.add(amount);
                 totalReleased++;
             }
