@@ -64,3 +64,4 @@
 - `CLAUDE.md` — 에이전트 운용 가이드 / 아키텍처 경계·컨벤션
 - `README.md` — 프로젝트 개요 · `STRUCTURE.md` — 모듈·디렉토리 구조 정본 · `PORTFOLIO.md` — 면접용 1장 요약 · `HARNESS.md` — 개발 하네스 구성
 - `docs/adr/` — 아키텍처 결정 기록 27개 · `*-rules` 스킬 — 서비스별 강제 도메인 규칙
+- `docs/ouroboros.md` — Ouroboros(명세 우선 AI 워크플로 엔진) 아키텍처·스킬·핵심 개념 참조
