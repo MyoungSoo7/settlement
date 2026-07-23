@@ -14,6 +14,7 @@ import java.time.LocalDate;
  *   <li>SettlementHoldbackConsumed → lemuel.settlement.holdback_consumed (account: 유보 소진 현금유출)</li>
  *   <li>SettlementAdjusted         → lemuel.settlement.adjusted          (account: 조정 반제)</li>
  *   <li>SettlementCanceled         → lemuel.settlement.canceled          (account: 잔여 즉시분·유보분 2전표 반제)</li>
+ *   <li>SettlementWithholdingAccrued → lemuel.settlement.withholding_accrued (account: Dr SELLER_PAYABLE/Cr WITHHOLDING_PAYABLE)</li>
  * </ul>
  *
  * <p>ADR 0026 Option ① — account-service GL 전기가 이 계약들에 의존한다(amount 는 settlement 계열 규약대로 JSON number).
@@ -47,4 +48,11 @@ public interface PublishSettlementDomainEventPort {
     /** 정산 자체가 취소되어 잔여 즉시분·유보분을 각각 반제해야 할 때. */
     void publishSettlementCanceled(long settlementId, long sellerId,
                                    BigDecimal immediateAmount, BigDecimal holdbackAmount);
+
+    /**
+     * 정산 확정(payout 산정) 시점에 개인 셀러 원천징수가 실제 지급액에서 공제될 때(ADR 0027, 2026-07-24
+     * 정정 — HIGH #4 실지급 통합 봉합). account-service 가 소비해 Dr SELLER_PAYABLE / Cr WITHHOLDING_PAYABLE
+     * 로 전기해 payout 감액으로 남은 SELLER_PAYABLE 잔여를 닫는다(ADR 0026 폐루프의 확장).
+     */
+    void publishWithholdingAccrued(long settlementId, long sellerId, BigDecimal withholdingAmount);
 }

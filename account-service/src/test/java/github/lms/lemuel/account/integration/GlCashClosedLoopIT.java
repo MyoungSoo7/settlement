@@ -233,6 +233,36 @@ class GlCashClosedLoopIT {
     }
 
     @Test
+    @DisplayName("독립 GL 감사 HIGH #4 봉합: 원천징수 payout 감액분을 Cr WITHHOLDING_PAYABLE 로 닫아야 SELLER_PAYABLE 이 0 으로 봉합된다")
+    void withholdingAccrued_closesSellerPayableResidue() {
+        // ADR 0027 §B(2026-07-24 정정) — 개인 셀러 원천징수를 실제 payout 지급액에서 공제한다.
+        // net=100000, holdback=0 → immediate=100000, withholding=3300(3.3%) → 실지급 96700.
+        final String seller = "700003";
+        recordAccountEntryUseCase.record(AccountEntry.settlementCreatedImmediate(seller, "W1", new BigDecimal("100000")));
+        recordAccountEntryUseCase.record(AccountEntry.payoutCompleted(seller, "pay-W1", new BigDecimal("96700")));
+
+        // 봉합 전: WITHHOLDING_ACCRUED 미전기 상태에서는 SELLER_PAYABLE 에 원천징수분(3300)이 잔존한다
+        // (HIGH #4 재현 — 장부만 줄이고 원천징수 반제 전표가 없으면 통제계정이 닫히지 않는다).
+        assertThat(net(seller, GlAccount.SELLER_PAYABLE)).isEqualByComparingTo("3300");
+
+        // 원천징수 예수 반제 전기로 봉합.
+        recordAccountEntryUseCase.record(AccountEntry.withholdingAccrued(seller, "W1", new BigDecimal("3300")));
+
+        assertThat(net(seller, GlAccount.SELLER_PAYABLE)).isEqualByComparingTo("0");
+        // WITHHOLDING_PAYABLE 은 국세청 미납부 예수부채라 셀러 통제계정과 달리 잔존해야 정상(0 이 아님).
+        assertThat(net(seller, GlAccount.WITHHOLDING_PAYABLE)).isEqualByComparingTo("3300");
+
+        TrialBalance tb = accountQueryUseCase.trialBalance();
+        assertThat(tb.balanced()).isTrue();
+        assertThat(tb.normalBalanceRespected()).isTrue();
+
+        // 멱등: 같은 settlementId 재수신 → 분개 1건(자연키 UNIQUE).
+        recordAccountEntryUseCase.record(AccountEntry.withholdingAccrued(seller, "W1", new BigDecimal("3300")));
+        assertThat(countRef("WITHHOLDING_ACCRUED", "W1")).isEqualTo(1L);
+        assertThat(net(seller, GlAccount.WITHHOLDING_PAYABLE)).isEqualByComparingTo("3300"); // 재수신에도 불변
+    }
+
+    @Test
     @DisplayName("기간 확정 시산표는 occurred_at 반개구간 전표만 집계한다")
     void periodTrialBalance_filtersByOccurredAt() {
         // 이 클래스는 컨텍스트를 공유하므로, 기간을 좁혀 이 테스트가 넣은 전표만 대상으로 검증한다.

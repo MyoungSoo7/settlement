@@ -43,10 +43,13 @@ import java.time.LocalDateTime;
  * loanRepaid                  : DR CASH                       / CR LOAN_RECEIVABLE
  * corporateLoanDisbursed      : DR CORPORATE_LOAN_RECEIVABLE  / CR CASH   (owner=CORPORATE)
  * investmentExecuted          : DR INVESTMENT_ASSET           / CR CASH
+ * withholdingAccrued          : DR SELLER_PAYABLE             / CR WITHHOLDING_PAYABLE         W(원천징수반제)   (WITHHOLDING_ACCRUED)
  * </pre>
  *
- * <p><b>완전정산 균형 증명</b>: SELLER_PAYABLE = +I −(I−O) −O +Hr −Hr = 0, HOLDBACK_PAYABLE = +H −Hc −Hr = 0,
- * SELLER_RECOVERY_RECEIVABLE = +R −ΣO = 0, CASH 는 회수 종료 시 0 으로 닫힌다.
+ * <p><b>완전정산 균형 증명</b>: SELLER_PAYABLE = +I −(I−O−W) −O −W +Hr −Hr = 0, HOLDBACK_PAYABLE = +H −Hc −Hr = 0,
+ * SELLER_RECOVERY_RECEIVABLE = +R −ΣO = 0, CASH 는 회수 종료 시 0 으로 닫힌다. (W 는 원천징수 발생 시에만
+ * 항 추가 — payoutCompleted 의 DR 액수가 이미 {@code I−O−W} 로 줄어 있으므로 withholdingAccrued 의 DR W 가
+ * 정확히 이 잔여를 상쇄한다.)
  */
 public class AccountEntry {
 
@@ -59,6 +62,7 @@ public class AccountEntry {
     public static final String TOPIC_SETTLEMENT_CANCELED = "lemuel.settlement.canceled";
     public static final String TOPIC_RECOVERY_OPENED = "lemuel.seller_recovery.opened";
     public static final String TOPIC_RECOVERY_OFFSET = "lemuel.seller_recovery.offset";
+    public static final String TOPIC_WITHHOLDING_ACCRUED = "lemuel.settlement.withholding_accrued";
     public static final String TOPIC_LOAN_DISBURSED = "lemuel.loan.disbursement_requested";
     public static final String TOPIC_LOAN_REPAID = "lemuel.loan.repayment_applied";
     public static final String TOPIC_CORPORATE_LOAN_DISBURSED = "lemuel.loan.corporate_loan_disbursed";
@@ -245,6 +249,18 @@ public class AccountEntry {
         return of(OwnerType.CORPORATE, stockCode,
                 GlAccount.CORPORATE_LOAN_RECEIVABLE, GlAccount.CASH, principal,
                 "CORP_LOAN_DISBURSED", loanId, TOPIC_CORPORATE_LOAN_DISBURSED);
+    }
+
+    /**
+     * 원천징수 예수 반제 → DR SELLER_PAYABLE / CR WITHHOLDING_PAYABLE (ADR 0026 Option ① 확장, ADR 0027 §B
+     * 2026-07-24 정정 — HIGH #4 봉합). settlement 의 payout 산정이 원천징수를 실제 공제하면서 남는
+     * SELLER_PAYABLE 잔여(= withholdingAmount)를 이 전표로 닫는다. 자연키 refId=settlementId(정산 1건당
+     * 원천징수 확정은 1회이므로 멱등).
+     */
+    public static AccountEntry withholdingAccrued(String sellerId, String settlementId, BigDecimal withholdingAmount) {
+        return of(OwnerType.SELLER, sellerId,
+                GlAccount.SELLER_PAYABLE, GlAccount.WITHHOLDING_PAYABLE, withholdingAmount,
+                "WITHHOLDING_ACCRUED", settlementId, TOPIC_WITHHOLDING_ACCRUED);
     }
 
     /** 투자 집행 → DR INVESTMENT_ASSET / CR CASH. */

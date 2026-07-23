@@ -130,6 +130,8 @@ app:
       settlement-canceled: lemuel.settlement.canceled
       seller-recovery-opened: lemuel.seller_recovery.opened
       seller-recovery-offset: lemuel.seller_recovery.offset
+      # 수신 (settlement → account) — ADR 0027 §B 원천징수 실지급 통합(HIGH #4 봉합)
+      settlement-withholding-accrued: lemuel.settlement.withholding_accrued
 
       # 수신 (loan → account)
       loan-disbursement-requested: lemuel.loan.disbursement_requested

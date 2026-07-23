@@ -31,7 +31,15 @@ public enum GlAccount {
     SELLER_RECOVERY_RECEIVABLE(AccountSide.DEBIT),
 
     /** 정산 예정 (자산성 클리어링, 차변성) — cut-over 이전 역사적 클리어링. Option ① 이후 신규 전기 없음(백필 청산 대상). */
-    SETTLEMENT_SCHEDULED(AccountSide.DEBIT);
+    SETTLEMENT_SCHEDULED(AccountSide.DEBIT),
+
+    /**
+     * 원천징수 예수금 (부채, 대변성) — 개인 셀러 사업소득에서 실 지급액 공제로 예수한 원천세
+     * (ADR 0026 Option ① 확장, ADR 0027 §B 2026-07-24 정정 — HIGH #4 실지급 통합 봉합).
+     * settlement 가 payout 산정 시 원천징수를 실제 공제하면서 남는 SELLER_PAYABLE 잔여를
+     * {@code Dr SELLER_PAYABLE / Cr WITHHOLDING_PAYABLE} 로 닫아 통제계정 폐루프를 유지한다.
+     */
+    WITHHOLDING_PAYABLE(AccountSide.CREDIT);
 
     private final AccountSide side;
 

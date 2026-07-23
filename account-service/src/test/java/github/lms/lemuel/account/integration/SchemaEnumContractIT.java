@@ -97,7 +97,7 @@ class SchemaEnumContractIT {
     }
 
     @Test
-    @DisplayName("chk_account_entry_ref_type == AccountEntry 팩토리 16종의 refType (정확 일치, ADR 0026 Option ①)")
+    @DisplayName("chk_account_entry_ref_type == AccountEntry 팩토리 17종의 refType (정확 일치, ADR 0026 Option ① + ADR 0027 §B)")
     void refTypeCheckMatchesFactorySetExactly() {
         Set<String> factoryRefTypes = new LinkedHashSet<>(Arrays.asList(
                 AccountEntry.settlementCreatedImmediate("s", "1", ONE).getRefType(),
@@ -115,7 +115,8 @@ class SchemaEnumContractIT {
                 AccountEntry.loanDisbursed("s", "1", ONE).getRefType(),
                 AccountEntry.loanRepaid("s", "1", ONE).getRefType(),
                 AccountEntry.corporateLoanDisbursed("005930", "1", ONE).getRefType(),
-                AccountEntry.investmentExecuted("s", "1", ONE).getRefType()));
+                AccountEntry.investmentExecuted("s", "1", ONE).getRefType(),
+                AccountEntry.withholdingAccrued("s", "1", ONE).getRefType()));
 
         assertThat(checkValues("chk_account_entry_ref_type"))
                 .containsExactlyInAnyOrderElementsOf(factoryRefTypes);

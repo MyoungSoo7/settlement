@@ -106,6 +106,18 @@ public class SettlementKafkaEventPublisherAdapter implements PublishSettlementDo
                 AGGREGATE_TYPE, String.valueOf(settlementId), "SettlementCanceled", toJson(payload)));
     }
 
+    @Override
+    public void publishWithholdingAccrued(long settlementId, long sellerId, BigDecimal withholdingAmount) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("settlementId", settlementId);
+        payload.put("sellerId", sellerId);
+        payload.put("withholdingAmount", withholdingAmount);
+        // eventType="SettlementWithholdingAccrued" → prefix("Settlement") 제거 후 camel→snake
+        // → "lemuel.settlement.withholding_accrued" (KafkaOutboxPublisher.resolveTopic).
+        saveOutboxEventPort.save(OutboxEvent.pending(
+                AGGREGATE_TYPE, String.valueOf(settlementId), "SettlementWithholdingAccrued", toJson(payload)));
+    }
+
     private String toJson(Map<String, Object> payload) {
         try {
             return objectMapper.writeValueAsString(payload);

@@ -76,7 +76,7 @@ spring:
               uri: ${SETTLEMENT_SERVICE_URI:http://localhost:8082}
               # SettlementController 는 /settlements(비-/api), 검색/원장/리포트는 /api, 운영 콘솔은 /admin.
               predicates:
-                - Path=/settlements/**,/api/settlements/**,/api/ledger/**,/api/reports/**,/admin/payouts/**,/admin/chargebacks/**,/admin/pg-reconciliation/**,/admin/reconciliation/**,/admin/dlq/**,/admin/backfill/**,/admin/event-track/**,/admin/ledger-periods/**
+                - Path=/settlements/**,/api/settlements/**,/api/ledger/**,/api/reports/**,/api/tax-invoices/**,/admin/payouts/**,/admin/chargebacks/**,/admin/pg-reconciliation/**,/admin/reconciliation/**,/admin/dlq/**,/admin/backfill/**,/admin/event-track/**,/admin/ledger-periods/**,/admin/seller-tax-profiles/**,/admin/tax/**
             - id: market-stream-service
               uri: ${MARKET_STREAM_SERVICE_URI:http://localhost:8110}
               # 폴리글랏(Go, 8110) 실시간 시세 SSE — 공개 read-only 스트림만 라우팅.

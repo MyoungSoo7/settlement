@@ -137,6 +137,19 @@ class AccountEntryTest {
     }
 
     @Test
+    void 원천징수예수반제_DR_SELLER_PAYABLE_CR_WITHHOLDING_PAYABLE_ADR0027() {
+        AccountEntry e = AccountEntry.withholdingAccrued("777", "9001", new BigDecimal("3300"));
+        assertThat(e.getOwnerType()).isEqualTo(OwnerType.SELLER);
+        assertThat(e.getOwnerId()).isEqualTo("777");
+        assertThat(e.getDebitAccount()).isEqualTo(GlAccount.SELLER_PAYABLE);
+        assertThat(e.getCreditAccount()).isEqualTo(GlAccount.WITHHOLDING_PAYABLE);
+        assertThat(e.getAmount()).isEqualByComparingTo("3300");
+        assertThat(e.getRefType()).isEqualTo("WITHHOLDING_ACCRUED");
+        assertThat(e.getRefId()).isEqualTo("9001"); // refId=settlementId, 정산당 1회 멱등
+        assertThat(e.getSourceTopic()).isEqualTo("lemuel.settlement.withholding_accrued");
+    }
+
+    @Test
     void 예정금청산백필_DR_CASH_CR_SETTLEMENT_SCHEDULED() {
         AccountEntry e = AccountEntry.settlementScheduledClearing("777", new BigDecimal("50000"));
         assertThat(e.getOwnerType()).isEqualTo(OwnerType.SELLER);
