@@ -55,9 +55,9 @@
 > ⚠️ 수치는 `build/`·`.claude/worktrees/` 사본을 **제외한 git ls-files 기준**. 각 줄 끝 명령이 정답 —
 > 드리프트 의심 시 명령을 돌려 재검증하고 이 수치를 갱신할 것(휘발성 수치를 명령 없이 손으로 적지 말 것).
 - 서비스 **13개** + API Gateway + Kotlin polyglot 2(notification·reconciliation) — `git ls-files '*/src/main/resources/application.yml' | wc -l` → 16(=13+gateway+kotlin 2)
-- Flyway 마이그레이션 **204개** — `git ls-files '*/src/main/resources/db/migration/*.sql' | wc -l` → 204
+- Flyway 마이그레이션 **206개** — `git ls-files '*/src/main/resources/db/migration/*.sql' | wc -l` → 206
 - ADR **27개** (0001~0028, 0019 결번) — `git ls-files 'docs/adr/[0-9]*.md' | wc -l` → 27
-- 테스트 클래스 **624개** (Testcontainers 통합테스트 포함) — `git ls-files '*/src/test/*Test.java' '*/src/test/*Tests.java' '*/src/test/*IT.java' | wc -l` → 624
+- 테스트 클래스 **630개** (Testcontainers 통합테스트 포함) — `git ls-files '*/src/test/*Test.java' '*/src/test/*Tests.java' '*/src/test/*IT.java' | wc -l` → 630
 
 ## 참고 문서
 - `SPEC.md` — 전체 기능명세(엔드포인트·도메인 규칙·이벤트 카탈로그)
