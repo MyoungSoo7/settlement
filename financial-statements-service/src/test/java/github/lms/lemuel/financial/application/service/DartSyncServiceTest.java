@@ -23,11 +23,13 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -63,24 +65,28 @@ class DartSyncServiceTest {
     }
 
     @Test
-    @DisplayName("기업 동기화 — 기업개황 corp_cls=Y(유가)만 upsert, 코스닥(K)은 스킵")
-    void syncCompaniesFiltersKospi() {
+    @DisplayName("기업 동기화 — corp_cls Y(유가)·K(코스닥)는 시장 매핑 upsert, 그 외(코넥스 등)는 스킵")
+    void syncCompaniesUpsertsListedMarkets() {
         when(dartClient.fetchListedCompanies()).thenReturn(List.of(
                 new DartClientPort.ListedCompany("00126380", "005930", "삼성전자"),
-                new DartClientPort.ListedCompany("00256598", "247540", "에코프로비엠")));
+                new DartClientPort.ListedCompany("00256598", "247540", "에코프로비엠"),
+                new DartClientPort.ListedCompany("00999999", "999999", "코넥스기업")));
         when(dartClient.fetchProfile("00126380"))
                 .thenReturn(Optional.of(new DartClientPort.CompanyProfile("00126380", "Y", "삼성전자")));
         when(dartClient.fetchProfile("00256598"))
                 .thenReturn(Optional.of(new DartClientPort.CompanyProfile("00256598", "K", "에코프로비엠")));
+        when(dartClient.fetchProfile("00999999"))
+                .thenReturn(Optional.of(new DartClientPort.CompanyProfile("00999999", "N", "코넥스기업")));
         when(loadCompanyPort.findByStockCode("005930")).thenReturn(Optional.empty());
+        when(loadCompanyPort.findByStockCode("247540")).thenReturn(Optional.empty());
 
         SyncResult result = service.syncCompanies();
 
-        assertThat(result).isEqualTo(new SyncResult(2, 1, 1, 0));
+        assertThat(result).isEqualTo(new SyncResult(3, 2, 1, 0));
         ArgumentCaptor<Company> captor = ArgumentCaptor.forClass(Company.class);
-        verify(saveCompanyPort).upsert(captor.capture());
-        assertThat(captor.getValue().stockCode()).isEqualTo("005930");
-        assertThat(captor.getValue().corpCode()).isEqualTo("00126380");
+        verify(saveCompanyPort, times(2)).upsert(captor.capture());
+        assertThat(captor.getAllValues()).extracting(Company::stockCode, Company::market)
+                .containsExactly(tuple("005930", "KOSPI"), tuple("247540", "KOSDAQ"));
     }
 
     @Test

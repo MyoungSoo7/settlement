@@ -2,6 +2,7 @@ package github.lms.lemuel.settlement.application.service;
 
 import github.lms.lemuel.common.audit.application.AuditLogger;
 import github.lms.lemuel.common.audit.domain.AuditAction;
+import github.lms.lemuel.settlement.application.port.out.BackfillChargebackSettlementLinkPort;
 import github.lms.lemuel.settlement.application.port.out.LoadSellerIdPort;
 import github.lms.lemuel.settlement.application.port.out.LoadSellerSettlementCyclePort;
 import github.lms.lemuel.settlement.application.port.out.LoadSellerTierPort;
@@ -39,6 +40,7 @@ class CreateSettlementFromPaymentServiceTest {
     @Mock LoadSellerSettlementCyclePort loadSellerSettlementCyclePort;
     @Mock LoadSellerIdPort loadSellerIdPort;
     @Mock PublishSettlementDomainEventPort publishSettlementDomainEventPort;
+    @Mock BackfillChargebackSettlementLinkPort backfillChargebackPort;
     @Mock AuditLogger auditLogger;
     CreateSettlementFromPaymentService service;
 
@@ -53,7 +55,8 @@ class CreateSettlementFromPaymentServiceTest {
     private CreateSettlementFromPaymentService serviceWith(Clock clock) {
         return new CreateSettlementFromPaymentService(
                 loadSettlementPort, saveSettlementPort, loadSellerTierPort,
-                loadSellerSettlementCyclePort, loadSellerIdPort, publishSettlementDomainEventPort, auditLogger, clock);
+                loadSellerSettlementCyclePort, loadSellerIdPort, publishSettlementDomainEventPort,
+                backfillChargebackPort, auditLogger, clock);
     }
 
     @Test @DisplayName("정산 생성 성공 — NORMAL 판매자 (기본 3.5%)") void create() {
@@ -73,6 +76,21 @@ class CreateSettlementFromPaymentServiceTest {
         // 이벤트드리븐 정산 생성 감사 — 정산금 발생 지점을 actor=system 으로 남긴다.
         verify(auditLogger).record(eq(AuditAction.SETTLEMENT_CREATED), eq("Settlement"), any(),
                 contains("\"paymentId\":1"));
+        // 사전분쟁 백필 훅 — 정산 생성 트랜잭션 안에서 미연결 chargeback 을 연결한다.
+        verify(backfillChargebackPort).backfillChargebacks(eq(1L), any());
+    }
+
+    @Test @DisplayName("멱등 반환(기존 정산 존재) 경로는 사전분쟁 백필을 다시 호출하지 않는다")
+    void idempotentReturn_skipsChargebackBackfill() {
+        Settlement existing = Settlement.createFromPayment(
+                1L, 10L, new BigDecimal("50000"), LocalDate.now().plusDays(1), SellerTier.NORMAL.rate());
+        when(loadSettlementPort.findByPaymentId(1L)).thenReturn(Optional.of(existing));
+
+        Settlement result = service.createSettlementFromPayment(1L, 10L, new BigDecimal("50000"));
+
+        assertThat(result).isSameAs(existing);
+        verify(backfillChargebackPort, never()).backfillChargebacks(any(), any());
+        verify(saveSettlementPort, never()).save(any());
     }
 
     @Test @DisplayName("VIP 판매자는 2.5% 차등 수수료 적용") void create_vipTier() {

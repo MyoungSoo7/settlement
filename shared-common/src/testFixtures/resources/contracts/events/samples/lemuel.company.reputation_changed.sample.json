@@ -1,0 +1,11 @@
+{
+  "stockCode": "005930",
+  "snapshotDate": "2026-07-10",
+  "score": 55,
+  "grade": "C",
+  "previousGrade": "B",
+  "articleCount": 24,
+  "negativeCount": 9,
+  "sellerIds": [777, 1001],
+  "calculatedAt": "2026-07-10T09:30:00Z"
+}

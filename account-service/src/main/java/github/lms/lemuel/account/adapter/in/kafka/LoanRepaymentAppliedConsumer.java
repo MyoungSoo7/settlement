@@ -36,7 +36,7 @@ public class LoanRepaymentAppliedConsumer extends IdempotentEventConsumer {
         this.recordAccountEntryUseCase = recordAccountEntryUseCase;
     }
 
-    @KafkaListener(topics = "${app.kafka.topic.loan-repayment-applied}", groupId = CONSUMER_GROUP)
+    @KafkaListener(topics = "${app.kafka.topic.loan-repayment-applied}", groupId = CONSUMER_GROUP, containerFactory = "kafkaListenerContainerFactory")
     @Transactional
     public void onLoanRepaid(ConsumerRecord<String, String> record, Acknowledgment ack) {
         consume(record, ack);
@@ -50,16 +50,17 @@ public class LoanRepaymentAppliedConsumer extends IdempotentEventConsumer {
 
     @Override
     protected void handle(JsonNode node, UUID eventId) {
-        BigDecimal deducted = new BigDecimal(node.get("deducted").asText());
+        String settlementId = requiredText(node, "settlementId", eventId);
+        BigDecimal deducted = requiredDecimal(node, "deducted", eventId);
         if (deducted.signum() <= 0) {
-            log.info("차감액 0 — 상환 분개 생략. eventId={}, settlementId={}", eventId, node.get("settlementId").asText());
+            log.info("차감액 0 — 상환 분개 생략. eventId={}, settlementId={}", eventId, settlementId);
             return;
         }
         AccountEntry entry = AccountEntry.loanRepaid(
-                node.get("sellerId").asText(),
-                node.get("settlementId").asText(),
+                requiredText(node, "sellerId", eventId),
+                settlementId,
                 deducted);
         recordAccountEntryUseCase.record(entry);
-        log.info("대출 상환 분개 적재. eventId={}, settlementId={}", eventId, node.get("settlementId").asText());
+        log.info("대출 상환 분개 적재. eventId={}, settlementId={}", eventId, settlementId);
     }
 }

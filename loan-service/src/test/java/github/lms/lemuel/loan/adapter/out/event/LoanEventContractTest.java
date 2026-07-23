@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import github.lms.lemuel.common.events.contract.EventContractValidator;
 import github.lms.lemuel.common.outbox.application.port.out.SaveOutboxEventPort;
 import github.lms.lemuel.common.outbox.domain.OutboxEvent;
+import github.lms.lemuel.loan.domain.LoanAdvance;
+import github.lms.lemuel.loan.domain.LoanStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -53,5 +55,17 @@ class LoanEventContractTest {
         publisher.publishRepaymentApplied(9001L, 777L, BigDecimal.ZERO);
 
         EventContractValidator.assertValid("lemuel.loan.repayment_applied", savedPayload());
+    }
+
+    @Test
+    @DisplayName("LoanDisbursementRequested 페이로드는 lemuel.loan.disbursement_requested 계약을 만족한다")
+    void disbursementRequested_satisfiesContract() {
+        LoanAdvance loan = LoanAdvance.reconstitute(501L, 777L,
+                new BigDecimal("800000"), new BigDecimal("8000"),
+                new BigDecimal("808000"), LoanStatus.REQUESTED);
+
+        publisher.publishDisbursementRequested(loan);
+
+        EventContractValidator.assertValid("lemuel.loan.disbursement_requested", savedPayload());
     }
 }

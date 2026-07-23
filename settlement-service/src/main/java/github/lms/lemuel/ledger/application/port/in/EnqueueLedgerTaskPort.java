@@ -16,7 +16,15 @@ public interface EnqueueLedgerTaskPort {
     /** 정산 확정 분개 작업을 settlementId 별 1건씩 적재. */
     void enqueueCreate(List<Long> settlementIds);
 
-    /** 환불 역분개 작업 1건 적재. */
+    /** 환불 역분개 작업 1건 적재. reference = refundId. */
     void enqueueReverse(Long settlementId, Long refundId,
                         BigDecimal refundAmount, LocalDate adjustmentDate);
+
+    /** 차지백 ACCEPTED 역분개 작업 1건 적재. reference = chargebackId. */
+    void enqueueReverseChargeback(Long settlementId, Long chargebackId,
+                                  BigDecimal amount, LocalDate adjustmentDate);
+
+    /** PG 대사 clawback 역분개 작업 1건 적재. reference = discrepancyId. */
+    void enqueueReverseReconciliation(Long settlementId, Long discrepancyId,
+                                      BigDecimal amount, LocalDate adjustmentDate);
 }

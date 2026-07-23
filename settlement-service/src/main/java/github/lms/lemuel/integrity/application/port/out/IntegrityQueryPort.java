@@ -2,6 +2,7 @@ package github.lms.lemuel.integrity.application.port.out;
 
 import github.lms.lemuel.integrity.domain.HoldbackStatusReport;
 import github.lms.lemuel.integrity.domain.LedgerCompletenessReport;
+import github.lms.lemuel.integrity.domain.PayoutBounceReconReport;
 import github.lms.lemuel.integrity.domain.PayoutReconReport;
 import github.lms.lemuel.integrity.domain.ProcessedEventCount;
 import github.lms.lemuel.integrity.domain.StuckStateReport;
@@ -23,6 +24,9 @@ public interface IntegrityQueryPort {
     LedgerCompletenessReport ledgerCompleteness(LocalDate date, int graceMinutes, LocalDateTime graceCutoff);
 
     PayoutReconReport payoutRecon(LocalDate date);
+
+    /** payout_bounces 체인 ↔ 재지급 payout(settlement_id=NULL) 1:1 대사 (INV-13, Seed D1 후속). */
+    PayoutBounceReconReport payoutBounceRecon();
 
     HoldbackStatusReport holdbackStatus(LocalDate today);
 

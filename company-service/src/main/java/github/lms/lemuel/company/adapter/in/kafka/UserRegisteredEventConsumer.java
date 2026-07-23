@@ -38,7 +38,7 @@ public class UserRegisteredEventConsumer extends IdempotentEventConsumer {
         this.saveSellerPort = saveSellerPort;
     }
 
-    @KafkaListener(topics = "${app.kafka.topic.user-registered:lemuel.user.registered}", groupId = CONSUMER_GROUP)
+    @KafkaListener(topics = "${app.kafka.topic.user-registered:lemuel.user.registered}", groupId = CONSUMER_GROUP, containerFactory = "kafkaListenerContainerFactory")
     @Transactional
     public void onUserRegistered(ConsumerRecord<String, String> record, Acknowledgment ack) {
         consume(record, ack);

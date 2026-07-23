@@ -33,6 +33,13 @@ export default defineConfig({
   server: {
     port: 3000,
     proxy: {
+      // market-stream-service (8110, Go) — 실시간 시세 SSE. dev 는 게이트웨이 없이 직결하므로
+      // 프리픽스를 벗겨 서비스 실경로(/stream/{code})로 전달. /api 보다 먼저 선언해야 우선 매칭.
+      '/api/market-stream': {
+        target: 'http://localhost:8110',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/api\/market-stream/, ''),
+      },
       // ai-service (8096) — /api 보다 먼저 선언해야 우선 매칭 (SSE 스트리밍 포함)
       '/api/ai': {
         target: 'http://localhost:8096',

@@ -63,7 +63,7 @@ class IntegrityReportsTest {
     void payoutReconJudgment() {
         var onlyMissing = PayoutReconReport.of(DATE, 5, new BigDecimal("500000.00"),
                 3, new BigDecimal("300000.00"), 3,
-                List.of(1L, 2L), List.of(), List.of());
+                List.of(1L, 2L), List.of(), List.of(), List.of());
         assertThat(onlyMissing.ok()).isTrue();
         assertThat(onlyMissing.settlementsWithoutPayout()).hasSize(2);
 
@@ -72,14 +72,47 @@ class IntegrityReportsTest {
                 List.of(),
                 List.of(new PayoutReconReport.OverpaidPayout(11L, 1L,
                         new BigDecimal("97000.00"), new BigDecimal("96500.00"))),
-                List.of());
+                List.of(), List.of());
         assertThat(overpaid.ok()).isFalse();
         assertThat(overpaid.reasons()).anySatisfy(r -> assertThat(r).contains("과다 지급"));
 
         var dup = PayoutReconReport.of(DATE, 5, BigDecimal.ZERO,
-                2, BigDecimal.ZERO, 0, List.of(), List.of(), List.of(1L));
+                2, BigDecimal.ZERO, 0, List.of(), List.of(), List.of(1L), List.of());
         assertThat(dup.ok()).isFalse();
         assertThat(dup.reasons()).anySatisfy(r -> assertThat(r).contains("이중 지급"));
+
+        // 유형별 1건씩이어도 payout 합계가 net 을 넘으면 위반 (유형 분산 이중 지급)
+        var overTotal = PayoutReconReport.of(DATE, 5, new BigDecimal("500000.00"),
+                2, new BigDecimal("120000.00"), 0, List.of(), List.of(), List.of(),
+                List.of(new PayoutReconReport.OverTotalSettlement(1L,
+                        new BigDecimal("120000.00"), new BigDecimal("96500.00"))));
+        assertThat(overTotal.ok()).isFalse();
+        assertThat(overTotal.reasons()).anySatisfy(r -> assertThat(r).contains("합계"));
+    }
+
+    // ── PayoutBounceReconReport (INV-13) ────────────────────────────────────
+
+    @Test
+    @DisplayName("INV-13: 미재지급 반송만 있으면 정보성(ok 유지), 금액불일치/settlement_id/고아는 위반")
+    void payoutBounceReconJudgment() {
+        var onlyUnresolved = PayoutBounceReconReport.of(3, 2, 1, List.of(), List.of(), List.of());
+        assertThat(onlyUnresolved.ok()).isTrue();
+        assertThat(onlyUnresolved.unresolvedBounces()).isEqualTo(1);
+
+        var mismatch = PayoutBounceReconReport.of(1, 1, 0,
+                List.of(new PayoutBounceReconReport.AmountMismatch(1L, 500L, 999L,
+                        new BigDecimal("95500.00"), new BigDecimal("90000.00"))),
+                List.of(), List.of());
+        assertThat(mismatch.ok()).isFalse();
+        assertThat(mismatch.reasons()).anySatisfy(r -> assertThat(r).contains("금액 불일치"));
+
+        var withSettlement = PayoutBounceReconReport.of(1, 1, 0, List.of(), List.of(999L), List.of());
+        assertThat(withSettlement.ok()).isFalse();
+        assertThat(withSettlement.reasons()).anySatisfy(r -> assertThat(r).contains("이중지급 가드"));
+
+        var orphan = PayoutBounceReconReport.of(0, 0, 0, List.of(), List.of(), List.of(777L));
+        assertThat(orphan.ok()).isFalse();
+        assertThat(orphan.reasons()).anySatisfy(r -> assertThat(r).contains("고아"));
     }
 
     // ── HoldbackStatusReport (INV-7) ──────────────────────────────────────

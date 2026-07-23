@@ -13,7 +13,6 @@ import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.util.UUID;
 
 /**
@@ -57,9 +56,9 @@ public class SettlementConfirmedConsumer extends IdempotentEventConsumer {
     @Override
     protected void handle(JsonNode node, UUID eventId) {
         IngestConfirmedSettlementCommand command = new IngestConfirmedSettlementCommand(
-                node.get("settlementId").asLong(),
-                node.get("sellerId").asLong(),
-                new BigDecimal(node.get("amount").asText()));
+                requiredLong(node, "settlementId", eventId),
+                requiredLong(node, "sellerId", eventId),
+                requiredDecimal(node, "amount", eventId));
 
         ingestConfirmedSettlementUseCase.ingest(command);
 

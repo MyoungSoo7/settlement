@@ -8,5 +8,9 @@ package github.lms.lemuel.ledger.domain;
  */
 public enum LedgerTaskType {
     CREATE_ENTRY,
-    REVERSE_ENTRY
+    REVERSE_ENTRY,
+    /** 차지백 ACCEPTED 역분개 — refund 필드를 (chargebackId, amount) 로 재사용. */
+    REVERSE_CHARGEBACK,
+    /** PG 대사 clawback 역분개 — refund 필드를 (discrepancyId, amount) 로 재사용. */
+    REVERSE_RECONCILIATION
 }

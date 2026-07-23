@@ -43,7 +43,7 @@ class PgReconciliationApprovedSettlementAdjustConsumerTest {
     void setUp() {
         meterRegistry = new SimpleMeterRegistry();
         consumer = new PgReconciliationApprovedSettlementAdjustConsumer(
-                useCase, processedEventRepository, new ObjectMapper(), meterRegistry);
+                useCase, processedEventRepository, new ObjectMapper(), meterRegistry, null);
         when(processedEventRepository.existsById(any())).thenReturn(false);
     }
 

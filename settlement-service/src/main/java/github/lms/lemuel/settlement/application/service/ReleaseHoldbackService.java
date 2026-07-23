@@ -1,7 +1,10 @@
 package github.lms.lemuel.settlement.application.service;
 
+import github.lms.lemuel.payout.application.port.in.RequestPayoutUseCase;
+import github.lms.lemuel.payout.domain.PayoutType;
 import github.lms.lemuel.settlement.application.port.in.ReleaseHoldbackUseCase;
 import github.lms.lemuel.settlement.application.port.out.LoadReleasableHoldbackPort;
+import github.lms.lemuel.settlement.application.port.out.LoadSellerIdPort;
 import github.lms.lemuel.settlement.application.port.out.SaveSettlementPort;
 import github.lms.lemuel.settlement.domain.Settlement;
 import io.micrometer.core.instrument.Counter;
@@ -30,13 +33,19 @@ public class ReleaseHoldbackService implements ReleaseHoldbackUseCase {
 
     private final LoadReleasableHoldbackPort loadPort;
     private final SaveSettlementPort savePort;
+    private final LoadSellerIdPort loadSellerIdPort;
+    private final RequestPayoutUseCase requestPayoutUseCase;
     private final Counter releasedCounter;
 
     public ReleaseHoldbackService(LoadReleasableHoldbackPort loadPort,
                                    SaveSettlementPort savePort,
+                                   LoadSellerIdPort loadSellerIdPort,
+                                   RequestPayoutUseCase requestPayoutUseCase,
                                    MeterRegistry meterRegistry) {
         this.loadPort = loadPort;
         this.savePort = savePort;
+        this.loadSellerIdPort = loadSellerIdPort;
+        this.requestPayoutUseCase = requestPayoutUseCase;
         this.releasedCounter = Counter.builder("settlement.holdback.released")
                 .description("Holdback 해제된 누적 정산 건수")
                 .register(meterRegistry);
@@ -51,9 +60,15 @@ public class ReleaseHoldbackService implements ReleaseHoldbackUseCase {
             if (batch.isEmpty()) break;
 
             for (Settlement s : batch) {
+                // 해제 시점의 잔여 보류액(환불·차지백·PG 대사로 소비되지 않은 분)을 지급 대상으로 못박는다.
                 BigDecimal amount = s.getHoldbackAmount();
                 s.releaseHoldback(today);
                 savePort.save(s);
+                // 잔여 보류액을 HOLDBACK_RELEASE Payout 으로 자동 생성 — 판매자 미해석·0원이면 생략.
+                // 같은 트랜잭션에 묶여 해제와 원자적으로 커밋된다((정산, HOLDBACK_RELEASE) 멱등).
+                loadSellerIdPort.findSellerIdByPaymentId(s.getPaymentId()).ifPresent(sellerId ->
+                        requestPayoutUseCase.requestPayoutOfType(
+                                s.getId(), sellerId, amount, PayoutType.HOLDBACK_RELEASE));
                 totalAmount = totalAmount.add(amount);
                 totalReleased++;
             }

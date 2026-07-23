@@ -1,6 +1,9 @@
 package github.lms.lemuel.settlement.adapter.in.batch.confirm;
 
 import github.lms.lemuel.ledger.application.port.in.EnqueueLedgerTaskPort;
+import github.lms.lemuel.payout.application.port.in.RequestPayoutUseCase;
+import github.lms.lemuel.payout.domain.PayoutType;
+import github.lms.lemuel.recovery.application.port.in.OffsetSellerRecoveryUseCase;
 import github.lms.lemuel.settlement.application.port.out.LoadSellerIdPort;
 import github.lms.lemuel.settlement.application.port.out.PublishSettlementDomainEventPort;
 import github.lms.lemuel.settlement.application.port.out.PublishSettlementEventPort;
@@ -24,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -36,6 +40,8 @@ class SettlementConfirmItemWriterTest {
     @Mock PublishSettlementDomainEventPort publishSettlementDomainEventPort;
     @Mock EnqueueLedgerTaskPort enqueueLedgerTaskPort;
     @Mock PublishSettlementEventPort publishSettlementEventPort;
+    @Mock RequestPayoutUseCase requestPayoutUseCase;
+    @Mock OffsetSellerRecoveryUseCase offsetSellerRecoveryUseCase;
     SimpleMeterRegistry meterRegistry;
     SettlementConfirmItemWriter writer;
 
@@ -44,7 +50,10 @@ class SettlementConfirmItemWriterTest {
         meterRegistry = new SimpleMeterRegistry();
         writer = new SettlementConfirmItemWriter(saveSettlementPort, loadSellerIdPort,
                 publishSettlementDomainEventPort, enqueueLedgerTaskPort, publishSettlementEventPort,
-                meterRegistry);
+                requestPayoutUseCase, offsetSellerRecoveryUseCase, meterRegistry);
+        // 기본: 상계 없음 — 상계 케이스는 개별 테스트가 재스텁한다.
+        lenient().when(offsetSellerRecoveryUseCase.offsetForConfirmedSettlement(
+                any(), any(), any(), any())).thenReturn(BigDecimal.ZERO);
     }
 
     private Settlement confirmed(long id) {
@@ -69,6 +78,9 @@ class SettlementConfirmItemWriterTest {
         verify(saveSettlementPort).save(s2);
         verify(publishSettlementDomainEventPort).publishSettlementConfirmed(eq(1L), eq(91L), any());
         verify(publishSettlementDomainEventPort).publishSettlementConfirmed(eq(2L), eq(92L), any());
+        // 확정 경로에서 즉시지급 Payout(IMMEDIATE, 홀드백 없어 net 전액)이 정산별로 생성된다.
+        verify(requestPayoutUseCase).requestPayoutOfType(1L, 91L, s1.getImmediatePayoutAmount(), PayoutType.IMMEDIATE);
+        verify(requestPayoutUseCase).requestPayoutOfType(2L, 92L, s2.getImmediatePayoutAmount(), PayoutType.IMMEDIATE);
         verify(enqueueLedgerTaskPort).enqueueCreate(List.of(1L, 2L));
         verify(publishSettlementEventPort).publishSettlementConfirmedEvent(List.of(1L, 2L));
         // 확정 건수·금액 메트릭: 2건, net 합은 두 정산의 net_amount 합과 일치.
@@ -87,6 +99,8 @@ class SettlementConfirmItemWriterTest {
         writer.write(new Chunk<>(List.of(s1)));
 
         verify(publishSettlementDomainEventPort, never()).publishSettlementConfirmed(anyLong(), anyLong(), any());
+        // 판매자 미해석이면 Payout 도 생성하지 않는다(반쪽 지급 방지).
+        verify(requestPayoutUseCase, never()).requestPayoutOfType(anyLong(), anyLong(), any(), any());
         verify(enqueueLedgerTaskPort).enqueueCreate(List.of(1L));
     }
 

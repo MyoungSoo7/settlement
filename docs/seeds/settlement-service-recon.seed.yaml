@@ -1,0 +1,107 @@
+# Seed: settlement-service recon(일일 대사, order /internal/recon 경계) as-is 사양
+# (Ouroboros 방법론 — Interview → Seed 결정화)
+# 상태: CONFIRMED (기존 seed 와 동일 방식 지시로 승인 승계, 2026-07-19)
+# 원칙: 현행 코드가 실제로 하는 일의 불변 기술. 결함·미구현은 교정하지 않고 known_issues 로만 기록.
+# 부모: settlement-service-accounting-core.seed.yaml · 자매: chargeback / pgreconciliation seed
+# 이 Seed 로 settlement-service 체계화 1층(커버리지) 완료.
+
+seed:
+  id: settlement-service-recon-v1
+  goal: >-
+    settlement-service 일일 대사(order /internal/recon self-totals 비교 · 3축 불일치 검출 ·
+    스케줄러)와 그 MSA 경계 계약의 현행 동작을 실행 가능한 게이트에 매핑된
+    불변 사양으로 결정화해, 회귀 기준선 · 면접/포트폴리오 문서 · 후속 확장의 베이스로 사용한다.
+
+  scope:
+    included:
+      - OrderReconClient (재시도·타임아웃·실패 번역 정책)
+      - order InternalReconController 8 엔드포인트 계약 표면 (경계의 반대편)
+      - ReconcileDailyTotalsService + ReconciliationReport 3축 비교
+      - DailyReconciliationScheduler (cron·분산 락)
+      - /admin/reconciliation API 표면
+    excluded:
+      - integrity 스위트 내부 (INV-8/9/12 가 이 클라이언트를 재사용한다는 사실만 기재)
+      - pgreconciliation (자매 seed) · settlement 코어 (부모 seed)
+
+  architecture_principle:  # ADR 0020 Phase 5 self-totals
+    rule: >-
+      order 는 자기 DB 만 읽어 자기 합계를 노출하고, settlement 는 자기 settlement_db 숫자와
+      비교한다 — 양측 모두 자기 DB 만 읽으므로 cross-DB 연결 0. order DB 스키마 변경이
+      settlement 를 깨지 않는다. 대사는 배치/관리 작업 — order 일시 장애 시 해당 대사 run 만
+      실패하고, 정산 생성·조회 핫패스는 order 무의존(이벤트 기반) 유지. (OrderReconClient.java:24-34)
+
+  invariants:  # as-is 코드 사실 — 파일:라인 근거
+    client_resilience:
+      source: settlement-service/src/main/java/github/lms/lemuel/recon/OrderReconClient.java
+      rules:
+        - "타임아웃 명시: connect 2s / read 5s — 대사 스레드 무한 hang 방지 (:54-56)"
+        - "재시도 정책: 일시 순단(타임아웃·연결불가·5xx)만 200ms 백오프 후 1회 재시도(총 2회, :41-42,95-102). 4xx 는 요청 자체 문제 — 재시도 없이 즉시 실패 (:89-94)"
+        - "실패 번역: 소진/기타 전송 예외 → OrderReconUnavailableException — 해당 대사 run 만 명시적 실패 (:103-115)"
+        - "인증: X-Internal-Api-Key 공유 시크릿 (order InternalApiKeyFilter 검증), 미설정 시 헤더 생략(개발 통과) (:58-61)"
+    boundary_contract:  # order /internal/recon — 8 엔드포인트 (InternalReconController.java:25-101)
+      endpoints:
+        - "GET /internal/recon/daily-totals?date → {capturedPayments, completedRefunds, refundedAgainstCaptures}"
+        - "GET /internal/recon/period-totals?from&to → {capturedPayments, completedRefunds, paymentCapturedPublishedCount}"
+        - "GET /internal/recon/daily-counts?date → {capturedCount, completedRefundsCount} (INV-9 건수 축)"
+        - "GET /internal/recon/refunds-completed?from&to&limit → CompletedRefundRow[] (INV-8 지연 환불)"
+        - "POST /internal/recon/refunds-completed-sum {refundIds} → {amount}"
+        - "GET /internal/recon/captured-payments?date → ReconPaymentRow[]"
+        - "GET /internal/recon/payment-keys-checksum?date → {count, amountSum, idChecksum} (INV-12 1차 스크리닝)"
+        - "GET /internal/recon/payment-keys?date&afterId&limit → PaymentKeyRow[] (체크섬 불일치 시에만 페이지 조회)"
+      contract_form: "양측 Java record ↔ JSON 매칭 — 공유 모듈·스키마 정본 없음 (OrderReconClient.java:206 주석 명시)"
+      null_normalization: "리스트 null → 빈 리스트, 체크섬 null → (0, 0, \"\") 정규화 (:153,:190-191)"
+    daily_reconciliation:
+      source: settlement-service/src/main/java/github/lms/lemuel/settlement/application/service/ReconcileDailyTotalsService.java
+      axes:  # ReconciliationReport 3축 (settlement.domain.ReconciliationReport)
+        - "capture 축: order capturedPayments vs settlement gross"
+        - "refund 축: order refundedAgainstCaptures vs settlement refunded"
+        - "count 축: order 건수 vs settlement 건수 (INV-9)"
+      tolerance: "0 — 차이가 0 이 아니면 mismatch (1원 차이도 검출. pgreconciliation 의 1원 자동보정 임계와 의도적 비대칭 — 대사는 검출, PG대사는 보정)"
+      on_mismatch: "자동 조정 없음 — ERROR 로그 + 메트릭만 (사람 개입 전제)"
+    scheduler:
+      source: settlement-service/src/main/java/github/lms/lemuel/settlement/adapter/in/batch/DailyReconciliationScheduler.java:49-54
+      rules:
+        - "cron 기본 05:00 Asia/Seoul (설정 가능), 대상일 = 전일 (KST Clock 주입 — JVM 타임존 비의존)"
+        - "ShedLock 분산 락: settlement-daily-reconciliation, lockAtMostFor=PT15M — 다중 인스턴스 중복 실행 차단"
+    api_surface:
+      settlement_side: "GET /admin/reconciliation (ReconciliationController.java:18-29)"
+      order_side_gate: "/internal/recon/** 은 InternalApiKeyFilter — 운영 fail-closed (app.security.internal-key-required=true)"
+
+  observability:
+    metrics:
+      - "settlement.reconciliation.runs{result=matched|mismatch} — 스케줄러 생존·불일치 발생률"
+      - "settlement.reconciliation.mismatch{axis=capture|refund|count}"
+    reuse_note: "OrderReconClient 는 integrity 스위트(INV-8/9/12 어댑터)도 재사용 — 클라이언트 정책 변경은 대사+정합성 두 소비처에 영향"
+
+  acceptance_criteria:  # 실행 가능 — 기존 게이트 매핑
+    - id: AC-1
+      criterion: 클라이언트 재시도·실패 번역 정책(일시 순단 1회 재시도, 4xx 즉시 실패, 예외 번역)이 위 표와 일치
+      gate: "OrderReconClientTest — ./gradlew :settlement-service:test"
+    - id: AC-2
+      criterion: 3축 비교·mismatch 메트릭 분기가 위 표와 일치
+      gate: "ReconcileDailyTotalsService 테스트 + ReconciliationReport 도메인 테스트"
+    - id: AC-3
+      criterion: order 측 8 엔드포인트 계약이 클라이언트 record 와 일치
+      gate: "order-service 측 recon 테스트 + OrderReconClientTest (MockRestServiceServer) — 각 모듈 test 태스크"
+    - id: AC-4
+      criterion: 커버리지 LINE >= 90% (모듈 게이트)
+      gate: "./gradlew :settlement-service:jacocoTestCoverageVerification"
+    - id: AC-5
+      criterion: 스케줄러 KST 고정·ShedLock 구성 유지
+      gate: "스케줄러 단위 테스트 (Clock 주입) — :settlement-service:test"
+
+  known_issues:  # 발견만 기록 — 사양은 as-is 유지
+    - id: KI-1
+      finding: "/internal/recon REST 계약에 스키마 정본 없음 — 양측 Java record/컨트롤러 코드 매칭만. 필드 드리프트는 런타임에야 발견"
+      disposition: "RESOLVED 2026-07-19 — 정본 샘플 9종을 shared-common testFixtures contracts/internal-rest/recon/ 에 단일 출처로 두고, 프로듀서(order)·컨슈머(settlement) 양측 InternalReconRestContractTest 가 같은 샘플을 각자 record 로 역직렬화(FAIL_ON_UNKNOWN_PROPERTIES) — 필드 개명·제거 드리프트를 빌드 시점 차단 (ADR 0024 의 REST 확장)"
+    - id: KI-2
+      finding: "mismatch 시 자동 조정·자동 재대사 없음 — ERROR 로그+메트릭 후 사람 개입 전제 (대사는 감사 기능이라는 설계 의도로 판단)"
+      disposition: by-design
+    - id: KI-3
+      finding: "허용 오차 0 — 정당한 라운딩 차이도 mismatch 로 집계될 수 있음 (pgreconciliation 1원 임계와 비대칭). 현재까지는 동일 코드베이스 계산이라 실제 발생 여지는 낮음"
+      disposition: recorded-not-fixed
+
+  uses:
+    - regression-baseline
+    - interview-portfolio
+    - brownfield-base

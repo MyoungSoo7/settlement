@@ -32,15 +32,25 @@ object NotificationTemplate {
         eventId: String?,
     ): Notification {
         val type = classify(topicOrType)
-        val recipient = (fields["recipient"] ?: fields["userId"] ?: fields["accountId"] ?: OPS_FALLBACK_RECIPIENT)
-            .toString()
+        // Canonical Outbox events (settlement.confirmed, payment.captured/refunded,
+        // investment.executed) address the seller via `sellerId` — recipient/userId/
+        // accountId are kept for the REST demo path and legacy payloads.
+        val recipient = (
+            fields["recipient"] ?: fields["sellerId"] ?: fields["userId"] ?: fields["accountId"]
+                ?: OPS_FALLBACK_RECIPIENT
+            ).toString()
         val subject = when (type) {
             NotificationType.SETTLEMENT_CONFIRMED -> "정산 확정: ${fields["settlementId"] ?: "?"}"
-            NotificationType.PAYMENT_CONFIRMED -> "결제 확인: ${fields["paymentId"] ?: "?"}"
+            // Go payment-webhook events carry `paymentKey` instead of `paymentId`.
+            NotificationType.PAYMENT_CONFIRMED -> "결제 확인: ${fields["paymentId"] ?: fields["paymentKey"] ?: "?"}"
             NotificationType.INVESTMENT_EXECUTED -> "투자 체결: ${fields["orderId"] ?: "?"}"
             NotificationType.GENERIC -> "알림: $topicOrType"
         }
-        val amount = fields["amount"]?.let { " (금액 $it)" } ?: ""
+        // payment.refunded carries refundAmount/refundedAmount, Go payment.confirmed
+        // carries totalAmount — none of them a plain `amount`.
+        val amountValue = fields["amount"] ?: fields["refundAmount"] ?: fields["refundedAmount"]
+            ?: fields["totalAmount"]
+        val amount = amountValue?.let { " (금액 $it)" } ?: ""
         val body = "$topicOrType 이벤트가 처리되었습니다$amount."
         return Notification(type, recipient, subject, body, eventId)
     }

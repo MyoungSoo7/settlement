@@ -5,6 +5,7 @@ import github.lms.lemuel.integrity.application.port.out.KeyChecksum;
 import github.lms.lemuel.integrity.application.port.out.PaymentKey;
 import github.lms.lemuel.integrity.domain.HoldbackStatusReport;
 import github.lms.lemuel.integrity.domain.LedgerCompletenessReport;
+import github.lms.lemuel.integrity.domain.PayoutBounceReconReport;
 import github.lms.lemuel.integrity.domain.PayoutReconReport;
 import github.lms.lemuel.integrity.domain.ProcessedEventCount;
 import github.lms.lemuel.integrity.domain.StuckStateReport;
@@ -105,13 +106,24 @@ public class IntegrityQueryJdbcAdapter implements IntegrityQueryPort {
                 .param("start", start).param("end", end)
                 .query(Long.class).list();
 
+        // 3개 출처(환불·차지백·PG대사) 조정 각각이 대응 역분개(reference_type 별)를 갖는지 대조한다.
+        // 출처 id 는 서로 다른 id 공간이라 adjustment.id 로 반환해 축 간 충돌 없이 식별한다.
         List<Long> missingReverse = jdbc.sql("""
-                        SELECT a.refund_id FROM settlement_adjustments a
-                        WHERE a.refund_id IS NOT NULL AND a.adjustment_date = :date
-                          AND a.created_at <= :graceCutoff
-                          AND NOT EXISTS (SELECT 1 FROM ledger_entries le
-                                          WHERE le.reference_id = a.refund_id AND le.reference_type = 'REFUND')
-                        ORDER BY a.refund_id LIMIT %d
+                        SELECT a.id FROM settlement_adjustments a
+                        WHERE a.adjustment_date = :date AND a.created_at <= :graceCutoff
+                          AND (
+                                (a.refund_id IS NOT NULL AND NOT EXISTS (
+                                    SELECT 1 FROM ledger_entries le
+                                    WHERE le.reference_id = a.refund_id AND le.reference_type = 'REFUND'))
+                             OR (a.chargeback_id IS NOT NULL AND NOT EXISTS (
+                                    SELECT 1 FROM ledger_entries le
+                                    WHERE le.reference_id = a.chargeback_id AND le.reference_type = 'CHARGEBACK'))
+                             OR (a.reconciliation_discrepancy_id IS NOT NULL AND NOT EXISTS (
+                                    SELECT 1 FROM ledger_entries le
+                                    WHERE le.reference_id = a.reconciliation_discrepancy_id
+                                      AND le.reference_type = 'PG_RECONCILIATION'))
+                          )
+                        ORDER BY a.id LIMIT %d
                         """.formatted(ID_LIMIT))
                 .param("date", date).param("graceCutoff", graceCutoff)
                 .query(Long.class).list();
@@ -155,6 +167,10 @@ public class IntegrityQueryJdbcAdapter implements IntegrityQueryPort {
                 .query((rs, i) -> new PayoutAgg(rs.getLong("cnt"), money(rs, "total"), rs.getLong("completed")))
                 .single();
 
+        // "payout 미생성" 판정은 유형 무관하게 활성 payout 0건 기준이다(유형별 필수 여부로 보지 않는다).
+        // HOLDBACK_RELEASE payout 은 홀드백>0 정산에만 뒤따르므로(등급별 30%/10%/0% — 0% 등급은
+        // 애초에 HOLDBACK_RELEASE 가 없음), 유형별 "둘 다 있어야" 로 보면 0% 홀드백 정산이 전부 오탐된다.
+        // 따라서 정보성 목록은 활성 payout 이 하나도 없는 정산만 노출한다.
         List<Long> withoutPayout = jdbc.sql("""
                         SELECT s.id FROM settlements s
                         WHERE s.status = 'DONE' AND s.confirmed_at >= :start AND s.confirmed_at < :end
@@ -180,21 +196,91 @@ public class IntegrityQueryJdbcAdapter implements IntegrityQueryPort {
                         money(rs, "amount"), money(rs, "net_amount")))
                 .list();
 
+        // 정상 홀드백 흐름은 (IMMEDIATE, HOLDBACK_RELEASE) 활성 payout 2건이 공존하므로
+        // 이중 판정은 (settlement_id, payout_type) 단위로 한다.
         List<Long> duplicates = jdbc.sql("""
-                        SELECT p.settlement_id FROM payouts p
+                        SELECT DISTINCT p.settlement_id FROM payouts p
                         WHERE p.status <> 'CANCELED'
                           AND p.settlement_id IN (
                               SELECT id FROM settlements
                               WHERE status = 'DONE' AND confirmed_at >= :start AND confirmed_at < :end)
-                        GROUP BY p.settlement_id HAVING count(*) > 1
+                        GROUP BY p.settlement_id, p.payout_type HAVING count(*) > 1
                         LIMIT %d
                         """.formatted(ID_LIMIT))
                 .param("start", start).param("end", end)
                 .query(Long.class).list();
 
+        // 유형별로는 1건씩이어도 합계가 net 을 넘으면 이중 지급 — 유형 분산 이중 지급 탐지.
+        // count(*) > 1 조건: 단일 payout 의 과다 지급(amount > net)은 이미 overpaidPayouts 가 잡으므로
+        // 여기서 제외해 같은 사건을 두 번 계상(reasons 중복)하지 않는다. 2건 이상 합산 초과만 이 탐지의 몫.
+        List<PayoutReconReport.OverTotalSettlement> overTotal = jdbc.sql("""
+                        SELECT s.id AS settlement_id, sum(p.amount) AS payout_total, s.net_amount
+                        FROM settlements s
+                        JOIN payouts p ON p.settlement_id = s.id AND p.status <> 'CANCELED'
+                        WHERE s.status = 'DONE' AND s.confirmed_at >= :start AND s.confirmed_at < :end
+                        GROUP BY s.id, s.net_amount
+                        HAVING sum(p.amount) > s.net_amount AND count(*) > 1
+                        ORDER BY s.id LIMIT %d
+                        """.formatted(ID_LIMIT))
+                .param("start", start).param("end", end)
+                .query((rs, i) -> new PayoutReconReport.OverTotalSettlement(
+                        rs.getLong("settlement_id"), money(rs, "payout_total"), money(rs, "net_amount")))
+                .list();
+
         return PayoutReconReport.of(date, confirmed.count(), confirmed.total(),
                 payouts.count(), payouts.total(), payouts.completed(),
-                withoutPayout, overpaid, duplicates);
+                withoutPayout, overpaid, duplicates, overTotal);
+    }
+
+    // ── INV-13 반송 재지급 대사 (Seed D1 후속) ─────────────────────────────
+
+    @Override
+    public PayoutBounceReconReport payoutBounceRecon() {
+        var counts = jdbc.sql("""
+                        SELECT count(*) AS total,
+                               count(*) FILTER (WHERE resolved_payout_id IS NOT NULL) AS resolved
+                        FROM payout_bounces
+                        """)
+                .query((rs, i) -> new BounceCounts(rs.getLong("total"), rs.getLong("resolved")))
+                .single();
+
+        // 재지급 금액이 원 payout 금액과 다른 반송 — 반송-재지급 1:1 정합 위반.
+        List<PayoutBounceReconReport.AmountMismatch> amountMismatches = jdbc.sql("""
+                        SELECT b.id AS bounce_id, b.payout_id, b.resolved_payout_id,
+                               orig.amount AS original_amount, reissued.amount AS reissued_amount
+                        FROM payout_bounces b
+                        JOIN payouts orig ON orig.id = b.payout_id
+                        JOIN payouts reissued ON reissued.id = b.resolved_payout_id
+                        WHERE b.resolved_payout_id IS NOT NULL
+                          AND reissued.amount <> orig.amount
+                        ORDER BY b.id LIMIT %d
+                        """.formatted(ID_LIMIT))
+                .query((rs, i) -> new PayoutBounceReconReport.AmountMismatch(
+                        rs.getLong("bounce_id"), rs.getLong("payout_id"), rs.getLong("resolved_payout_id"),
+                        money(rs, "original_amount"), money(rs, "reissued_amount")))
+                .list();
+
+        // 재지급 payout 은 settlement_id=NULL 이어야 한다(이중지급 가드 슬롯 회피 설계) — non-null 이면 위반.
+        List<Long> reissuedWithSettlement = jdbc.sql("""
+                        SELECT b.resolved_payout_id
+                        FROM payout_bounces b
+                        JOIN payouts reissued ON reissued.id = b.resolved_payout_id
+                        WHERE b.resolved_payout_id IS NOT NULL AND reissued.settlement_id IS NOT NULL
+                        ORDER BY b.resolved_payout_id LIMIT %d
+                        """.formatted(ID_LIMIT))
+                .query(Long.class).list();
+
+        // settlement_id=NULL payout 은 반송 재지급 경로만 만들어 낸다 — 어떤 반송에도 안 걸리면 고아.
+        List<Long> orphans = jdbc.sql("""
+                        SELECT p.id FROM payouts p
+                        WHERE p.settlement_id IS NULL
+                          AND NOT EXISTS (SELECT 1 FROM payout_bounces b WHERE b.resolved_payout_id = p.id)
+                        ORDER BY p.id LIMIT %d
+                        """.formatted(ID_LIMIT))
+                .query(Long.class).list();
+
+        return PayoutBounceReconReport.of(counts.total(), counts.resolved(),
+                counts.total() - counts.resolved(), amountMismatches, reissuedWithSettlement, orphans);
     }
 
     // ── INV-7 홀드백 ───────────────────────────────────────────────────────
@@ -386,6 +472,9 @@ public class IntegrityQueryJdbcAdapter implements IntegrityQueryPort {
     }
 
     private record PayoutAgg(long count, BigDecimal total, long completed) {
+    }
+
+    private record BounceCounts(long total, long resolved) {
     }
 
     private record HoldbackTotals(BigDecimal held, BigDecimal released, LocalDateTime lastReleased) {

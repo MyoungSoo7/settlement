@@ -5,7 +5,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 /**
  * OpenDART 연동 설정.
  *
- * @param apiKey  opendart.fss.or.kr 발급 인증키 — 미설정(빈 문자열)이면 수집 비활성(시드 데이터로만 동작)
+ * @param apiKey  opendart.fss.or.kr 발급 인증키 — 미설정(빈 문자열)이면 수집 비활성(데이터 공급 없음 — 샘플 시드는 제거됨)
  * @param baseUrl 기본 https://opendart.fss.or.kr/api
  */
 @ConfigurationProperties(prefix = "app.financial.dart")

@@ -92,7 +92,7 @@ class PaymentRefundedAdjustWiringIntegrationTest {
         // app.kafka.enabled=false 로 리스너 컨테이너는 뜨지 않으므로, 프로덕션과 동일한 의존
         // (실제 UseCase·포트 빈)으로 컨슈머를 조립해 리스너 메서드를 직접 구동한다.
         consumer = new PaymentRefundedSettlementAdjustConsumer(
-                adjustUseCase, loadSettlementPort, processedEventRepository, new ObjectMapper());
+                adjustUseCase, loadSettlementPort, processedEventRepository, new ObjectMapper(), null);
     }
 
     @Test

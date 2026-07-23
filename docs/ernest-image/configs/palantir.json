@@ -1,0 +1,94 @@
+{
+  "seed": 20260714,
+  "canvas": [16, 9.5],
+  "unit": 0.5,
+  "clusters": [
+    {
+      "id": "ps-top",
+      "center": [0.17, 0.78],
+      "spread": 0.055,
+      "members": [
+        {"shape": "triangle", "count": 4, "size": [0.5, 0.9], "height": [1.6, 2.8],
+         "accent": 0.25, "label": "POINT SOLUTION"},
+        {"shape": "triangle", "count": 2, "size": [0.35, 0.55]}
+      ]
+    },
+    {
+      "id": "ps-bottom",
+      "center": [0.2, 0.22],
+      "spread": 0.05,
+      "members": [
+        {"shape": "triangle", "count": 3, "size": [0.45, 0.8], "label": "POINT SOLUTION"},
+        {"shape": "hexagon", "count": 1, "size": [0.5, 0.7]}
+      ]
+    },
+    {
+      "id": "lake-left",
+      "center": [0.36, 0.6],
+      "spread": 0.05,
+      "members": [
+        {"shape": "hexagon", "count": 3, "size": [0.7, 1.15], "height": [1.5, 2.4],
+         "accent": 0.7, "label": "DATA LAKE"},
+        {"shape": "triangle", "count": 2, "size": [0.35, 0.6]}
+      ]
+    },
+    {
+      "id": "lake-center",
+      "center": [0.55, 0.55],
+      "spread": 0.06,
+      "members": [
+        {"shape": "hexagon", "count": 4, "size": [0.75, 1.25], "height": [1.4, 2.3],
+         "accent": 0.75, "label": "DATA LAKE"},
+        {"shape": "cylinder", "count": 2, "size": [0.4, 0.6]}
+      ]
+    },
+    {
+      "id": "lake-right",
+      "center": [0.76, 0.62],
+      "spread": 0.055,
+      "members": [
+        {"shape": "hexagon", "count": 2, "size": [0.65, 1.0], "accent": 0.7,
+         "label": "DATA LAKE"},
+        {"shape": "cylinder", "count": 3, "size": [0.45, 0.85], "height": [1.6, 2.6]}
+      ]
+    },
+    {
+      "id": "app-top",
+      "center": [0.72, 0.85],
+      "spread": 0.05,
+      "members": [
+        {"shape": "cylinder", "count": 3, "size": [0.45, 0.8],
+         "label": "CUSTOM APPLICATION"}
+      ]
+    },
+    {
+      "id": "app-bottom",
+      "center": [0.55, 0.16],
+      "spread": 0.06,
+      "members": [
+        {"shape": "cylinder", "count": 4, "size": [0.45, 0.85],
+         "label": "CUSTOM APPLICATION"},
+        {"shape": "triangle", "count": 1, "size": [0.35, 0.5]}
+      ]
+    },
+    {
+      "id": "misc-right",
+      "center": [0.9, 0.35],
+      "spread": 0.05,
+      "members": [
+        {"shape": "cylinder", "count": 2, "size": [0.5, 0.8]},
+        {"shape": "hexagon", "count": 1, "size": [0.55, 0.75]}
+      ]
+    }
+  ],
+  "links": [
+    ["ps-top", "lake-left"],
+    ["ps-bottom", "lake-left"],
+    ["lake-left", "lake-center"],
+    ["lake-center", "app-bottom"],
+    ["lake-center", "lake-right"],
+    ["lake-right", "app-top"],
+    ["lake-right", "misc-right"],
+    ["app-bottom", "misc-right"]
+  ]
+}

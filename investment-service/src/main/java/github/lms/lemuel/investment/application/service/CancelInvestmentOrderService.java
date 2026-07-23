@@ -14,7 +14,7 @@ import java.util.Objects;
 
 /**
  * 투자 주문 취소: REQUESTED/APPROVED 주문을 CANCELED 로 확정한다.
- * 이미 집행(EXECUTED)/거절(REJECTED)/취소된 주문 취소는 도메인 불변식 위반({@link IllegalStateException} → 400).
+ * 이미 집행(EXECUTED)/거절(REJECTED)/취소된 주문 취소는 도메인 불변식 위반(InvalidInvestmentOrderStateException → 400).
  */
 @Service
 public class CancelInvestmentOrderService implements CancelInvestmentOrderUseCase {

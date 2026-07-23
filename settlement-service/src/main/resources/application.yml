@@ -195,6 +195,8 @@ app:
     consumer:
       # 리스너 컨테이너 동시성(컨슈머 스레드 수). 파티션 단위 병렬 소비 → 정산 생성 병렬화.
       # 유효 상한은 topic.partitions. 더 올리려면 partitions 와 함께 상향.
+      # 주의: 격리 훅(REQUIRES_NEW)이 스레드당 순간 커넥션 2개를 쓸 수 있다 —
+      # 이 값을 올릴 때 DB_POOL_MAX(기본 20)도 함께 상향할 것 (P0-3).
       concurrency: ${APP_KAFKA_CONSUMER_CONCURRENCY:3}
     topic:
       partitions: ${APP_KAFKA_TOPIC_PARTITIONS:3}

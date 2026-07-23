@@ -7,5 +7,13 @@ package github.lms.lemuel.ledger.domain;
  */
 public enum ReferenceType {
     SETTLEMENT,
-    REFUND
+    REFUND,
+    /** 카드사 분쟁(Chargeback) ACCEPTED 에 따른 역분개의 원거래. reference_id = chargeback_id. */
+    CHARGEBACK,
+    /** PG 대사 차이(Discrepancy) 승인 clawback 에 따른 역분개의 원거래. reference_id = discrepancy_id. */
+    PG_RECONCILIATION,
+    /** 지급후 회수 채권 발생 (seed-p0-6). reference_id = seller_recovery_id. */
+    SELLER_RECOVERY,
+    /** 채권 상계 (후속 정산 확정 시 지급액 차감). reference_id = recovery_allocation_id. */
+    RECOVERY_OFFSET
 }

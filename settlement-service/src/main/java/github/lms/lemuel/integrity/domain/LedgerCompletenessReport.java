@@ -10,7 +10,8 @@ import java.util.List;
  *
  * <p>시산표(차/대 균형)는 분개가 <b>통짜로 누락</b>된 정산을 잡지 못한다(양변이 같이 없으면
  * 균형은 유지). 이 리포트는 확정(DONE) 정산 ↔ {@code reference_type=SETTLEMENT} 분개,
- * 환불 조정 ↔ {@code reference_type=REFUND} 역분개의 존재·금액 일치를 정면으로 대조한다.
+ * 그리고 3개 출처의 조정(환불·차지백·PG 대사) ↔ 각 {@code reference_type}(REFUND·CHARGEBACK·
+ * PG_RECONCILIATION) 역분개의 존재·금액 일치를 정면으로 대조한다.
  *
  * <p>원장 기록은 {@code ledger_outbox} 를 경유하는 비동기 경로이므로, grace window 안의
  * 미처리분은 불일치가 아니라 {@code pendingWithinGrace} 로 구분한다 (오탐 방지).
@@ -25,7 +26,7 @@ public record LedgerCompletenessReport(
         List<Long> missingSettlementIds,    // 분개가 아예 없는 확정 정산 (grace 경과분만, 상한 절단)
         long pendingWithinGrace,            // 분개 없음 but grace 이내 — 정상 대기
         List<Long> amountMismatchedSettlementIds, // 분개는 있는데 합계 ≠ payment_amount (반쪽 분개)
-        List<Long> missingReverseRefundIds, // 조정은 있는데 REFUND 역분개 없는 refund_id (grace 경과분)
+        List<Long> missingReverseAdjustmentIds, // 조정(환불·차지백·PG대사)은 있는데 역분개 없는 adjustment id (grace 경과분)
         long ledgerOutboxPending,
         long ledgerOutboxFailed,
         long ledgerOutboxOldestPendingAgeSec,
@@ -42,7 +43,7 @@ public record LedgerCompletenessReport(
                                               List<Long> missingSettlementIds,
                                               long pendingWithinGrace,
                                               List<Long> amountMismatchedSettlementIds,
-                                              List<Long> missingReverseRefundIds,
+                                              List<Long> missingReverseAdjustmentIds,
                                               long ledgerOutboxPending,
                                               long ledgerOutboxFailed,
                                               long ledgerOutboxOldestPendingAgeSec) {
@@ -55,9 +56,9 @@ public record LedgerCompletenessReport(
             reasons.add("분개 합계가 payment_amount 와 다른 정산 "
                     + amountMismatchedSettlementIds.size() + "건 — 반쪽 분개 의심 (INV-5)");
         }
-        if (!missingReverseRefundIds.isEmpty()) {
-            reasons.add("환불 조정 " + missingReverseRefundIds.size()
-                    + "건에 REFUND 역분개가 없습니다 (grace 경과) — INV-5/INV-8 위반");
+        if (!missingReverseAdjustmentIds.isEmpty()) {
+            reasons.add("조정(환불·차지백·PG대사) " + missingReverseAdjustmentIds.size()
+                    + "건에 대응 역분개가 없습니다 (grace 경과) — INV-5/INV-8 위반");
         }
         if (ledgerOutboxFailed > 0) {
             reasons.add("ledger_outbox FAILED " + ledgerOutboxFailed
@@ -67,7 +68,7 @@ public record LedgerCompletenessReport(
                 confirmedSettlements, confirmedPaymentTotal,
                 ledgerEntryRows, ledgerPostedTotal,
                 List.copyOf(missingSettlementIds), pendingWithinGrace,
-                List.copyOf(amountMismatchedSettlementIds), List.copyOf(missingReverseRefundIds),
+                List.copyOf(amountMismatchedSettlementIds), List.copyOf(missingReverseAdjustmentIds),
                 ledgerOutboxPending, ledgerOutboxFailed, ledgerOutboxOldestPendingAgeSec,
                 reasons.isEmpty(), List.copyOf(reasons));
     }

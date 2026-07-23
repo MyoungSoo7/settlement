@@ -4,14 +4,17 @@ import github.lms.lemuel.payout.application.port.in.ExecutePayoutUseCase;
 import github.lms.lemuel.payout.application.port.in.RequestPayoutUseCase;
 import github.lms.lemuel.payout.application.port.in.RetryFailedPayoutUseCase;
 import github.lms.lemuel.payout.application.port.out.LoadPayoutPort;
+import github.lms.lemuel.payout.application.port.out.LoadSellerBankAccountPort;
 import github.lms.lemuel.payout.application.port.out.SavePayoutPort;
 import github.lms.lemuel.payout.domain.Payout;
 import github.lms.lemuel.payout.domain.PayoutStatus;
+import github.lms.lemuel.payout.domain.PayoutType;
 import github.lms.lemuel.payout.domain.SellerBankAccount;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -21,6 +24,7 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 출금(Payout) 핵심 서비스 — 정산 사이클의 종착점.
@@ -49,6 +53,7 @@ public class PayoutService implements RequestPayoutUseCase, ExecutePayoutUseCase
 
     private final LoadPayoutPort loadPort;
     private final SavePayoutPort savePort;
+    private final LoadSellerBankAccountPort bankAccountPort;
     private final PayoutSingleExecutor singleExecutor;
     private final PayoutLimitChecker limitChecker;
     private final Counter completedCounter;
@@ -56,17 +61,20 @@ public class PayoutService implements RequestPayoutUseCase, ExecutePayoutUseCase
     private final Counter limitedCounter;
     private final Counter retryCounter;
     private final Counter conflictCounter;
+    private final Counter autoCreatedCounter;
     /** KST 기준 시각 소스 — 일 한도 판정 기준일이 JVM 타임존에 흔들리지 않게 한다. */
     private final Clock clock;
 
     public PayoutService(LoadPayoutPort loadPort,
                           SavePayoutPort savePort,
+                          LoadSellerBankAccountPort bankAccountPort,
                           PayoutSingleExecutor singleExecutor,
                           PayoutLimitChecker limitChecker,
                           MeterRegistry meterRegistry,
                           Clock clock) {
         this.loadPort = loadPort;
         this.savePort = savePort;
+        this.bankAccountPort = bankAccountPort;
         this.singleExecutor = singleExecutor;
         this.limitChecker = limitChecker;
         this.clock = clock;
@@ -75,19 +83,62 @@ public class PayoutService implements RequestPayoutUseCase, ExecutePayoutUseCase
         this.limitedCounter = Counter.builder("payout.limited").register(meterRegistry);
         this.retryCounter = Counter.builder("payout.admin.retry").register(meterRegistry);
         this.conflictCounter = Counter.builder("payout.conflict").register(meterRegistry);
+        this.autoCreatedCounter = Counter.builder("payout.auto.created").register(meterRegistry);
     }
 
     @Override
     public Payout requestForSettlement(Long settlementId, Long sellerId,
                                         BigDecimal amount, SellerBankAccount account) {
-        // 멱등성: 같은 정산은 1번만 Payout 생성 — 가장 위험한 사고 (이중 송금) 방지
-        return loadPort.findBySettlementId(settlementId).orElseGet(() -> {
-            Payout newPayout = Payout.requestFromSettlement(settlementId, sellerId, amount, account);
+        // 멱등성: 같은 정산의 IMMEDIATE 지급은 1번만 생성 — 가장 위험한 사고 (이중 송금) 방지
+        return loadPort.findBySettlementIdAndType(settlementId, PayoutType.IMMEDIATE).orElseGet(() -> {
+            Payout newPayout = Payout.requestFromSettlement(
+                    settlementId, sellerId, amount, account, PayoutType.IMMEDIATE);
             Payout saved = savePort.save(newPayout);
             log.info("[Payout] requested: id={}, settlementId={}, sellerId={}, amount={}",
                     saved.getId(), settlementId, sellerId, amount);
             return saved;
         });
+    }
+
+    @Override
+    public Optional<Payout> requestPayoutOfType(Long settlementId, Long sellerId,
+                                                BigDecimal amount, PayoutType payoutType) {
+        if (settlementId == null || sellerId == null || payoutType == null) {
+            return Optional.empty();
+        }
+        // 금액 0(또는 음수)은 지급 자체가 없음 — Payout 을 만들지 않는다(AC: 금액 0 이면 미생성).
+        if (amount == null || amount.signum() <= 0) {
+            return Optional.empty();
+        }
+
+        // 1차 멱등: 이미 (정산, 유형) Payout 이 있으면 그대로 반환(중복 전달·재시도 흡수).
+        Optional<Payout> existing = loadPort.findBySettlementIdAndType(settlementId, payoutType);
+        if (existing.isPresent()) {
+            return existing;
+        }
+
+        SellerBankAccount account = bankAccountPort.findBySellerId(sellerId).orElse(null);
+        if (account == null) {
+            log.warn("[Payout] 셀러 지급수단 미해석 — payout 생성 생략. sellerId={}, settlementId={}, type={}",
+                    sellerId, settlementId, payoutType);
+            return Optional.empty();
+        }
+
+        try {
+            Payout saved = savePort.save(
+                    Payout.requestFromSettlement(settlementId, sellerId, amount, account, payoutType));
+            autoCreatedCounter.increment();
+            log.info("[Payout] auto-created: id={}, settlementId={}, type={}, sellerId={}, amount={}",
+                    saved.getId(), settlementId, payoutType, sellerId, amount);
+            return Optional.of(saved);
+        } catch (DataIntegrityViolationException e) {
+            // 2차 멱등(하드 백스톱): (settlement_id, payout_type) 부분 UNIQUE 경합 — 동시 처리에서
+            // 다른 트랜잭션이 먼저 생성. 이중 지급이 아니라 정상 경합이므로 실패가 아닌 경합으로 표시한다.
+            conflictCounter.increment();
+            log.warn("[Payout] concurrent-create skip: settlementId={}, type={}, reason={}",
+                    settlementId, payoutType, e.toString());
+            throw new PayoutConcurrentClaimException(settlementId);
+        }
     }
 
     @Override

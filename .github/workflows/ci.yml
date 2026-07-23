@@ -25,6 +25,9 @@ jobs:
       build_any: ${{ steps.setmatrix.outputs.any }}
       # backend-ci 가 실행할 gradle 테스트 태스크 (변경 모듈만 / shared·모호 변경 시 전체 build)
       test_tasks: ${{ steps.setmatrix.outputs.test_tasks }}
+      # shared-common(composite included build) 변경 여부 — 루트 build 태스크는 included build 의
+      # test 를 실행하지 않으므로, true 면 backend-ci 가 shared-common 자체 게이트를 별도 실행한다.
+      shared: ${{ steps.filter.outputs.shared }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -189,6 +192,15 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      # shared-common 은 composite included build — 루트 build 태스크는 jar 만 만들 뿐
+      # included build 의 test 를 실행하지 않는다. shared 변경 시 자체 빌드로 직접 실행해
+      # 자체 게이트(LINE 90% + outbox.domain INSTRUCTION 80%, shared-common/build.gradle.kts)를 강제한다.
+      - name: Build & Test shared-common (JaCoCo gate)
+        if: needs.changes.outputs.shared == 'true'
+        run: ./gradlew -p shared-common clean build --no-daemon --stacktrace
+        env:
+          TESTCONTAINERS_RYUK_DISABLED: "true"
 
       # build = compile + test + jacocoTestReport + jacocoTestCoverageVerification (게이트 포함, build.gradle.kts:157)
       # test_tasks = 변경 모듈만(`:<mod>:build`) / shared·모호 변경 시 전체 `build` (changes 잡이 산출)

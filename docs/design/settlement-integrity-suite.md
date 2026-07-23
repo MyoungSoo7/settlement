@@ -87,7 +87,7 @@ skill(`integrity-invariants`) 문서의 뼈대가 된다.
 | API | 응답 (기계 판정 포함) | 대응 불변식 |
 |---|---|---|
 | `GET /admin/integrity/ledger-completeness?date=` | 확정 정산 건수·합계 vs CREATE_ENTRY 건수·합계, `missingSettlementIds[]`(상한 N), 조정 vs REVERSE_ENTRY 동형 비교, ledger_outbox `{pending, failed, oldestAgeSec}`, `ok: boolean` | INV-5 |
-| `GET /admin/integrity/payout-recon?date=` | 지급 대상 정산 (net−holdback±조정) 합 vs payout REQUESTED/COMPLETED 합, `settlementsWithoutPayout[]`, `duplicatePayoutSettlementIds[]`, `ok` | INV-6 |
+| `GET /admin/integrity/payout-recon?date=` | 지급 대상 정산 (net−holdback±조정) 합 vs payout REQUESTED/COMPLETED 합, `settlementsWithoutPayout[]`, `duplicatePayoutSettlementIds[]`((정산,유형) 단위 — IMMEDIATE+HOLDBACK_RELEASE 공존은 정상), `overTotalSettlements[]`(정산별 payout 합계>net), `ok` | INV-6 |
 | `GET /admin/integrity/holdback-status` | `overdueUnreleased[]`(해제일 경과 미해제), 누적 보류/해제액, 마지막 해제 배치 실행 시각, `ok` | INV-7 |
 | `GET /admin/integrity/stuck?thresholdMinutes=` | 상태별 체류 초과 건 (settlement PROCESSING / payout SENDING / pg-recon RUNNING / ledger PENDING·outbox FAILED), `ok` | INV-11 |
 | `GET /admin/integrity/row-invariants?date=&limit=` | INV-13 위반 행 목록 (규칙 id + settlement id + 실측값), `ok` | INV-13 |

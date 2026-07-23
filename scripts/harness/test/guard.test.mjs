@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process';
 
 import {
   discoverStagedFiles,
+  dodNudgeMessage,
   normalizeRepoPath,
   parseAllowance,
   readUtf8Strict,
@@ -130,6 +131,74 @@ describe('guard policy fixtures', () => {
       assert.ok(result.violations.some(({ id }) => id === fixture.id));
     });
   }
+});
+
+describe('money-path hardening (bypass surface)', () => {
+  const file = 'settlement-service/src/main/java/github/lms/lemuel/settlement/domain/Fee.java';
+
+  for (const [name, line] of [
+    ['method return type', 'double calc(BigDecimal base) {'],
+    ['parameter position', 'void apply(double rate, long id) {'],
+    ['array declaration', 'double[] rates = buildRates();'],
+    ['var double literal inference', 'var fee = 0.035;'],
+  ]) {
+    test(`MONEY-PRIMITIVE blocks ${name}`, () => {
+      assert.ok(
+        scanText(file, line, { now: NOW }).violations.some(({ id }) => id === 'MONEY-PRIMITIVE'),
+        `expected MONEY-PRIMITIVE for: ${line}`,
+      );
+    });
+  }
+
+  test('MONEY-PRIMITIVE catches parse split across lines', () => {
+    const result = scanText(file, 'total = Double\n    .parseDouble(raw);', { now: NOW });
+    assert.ok(result.violations.some(({ id }) => id === 'MONEY-PRIMITIVE'));
+  });
+
+  test('MONEY-BIGDECIMAL-DOUBLE blocks double-literal constructor including line splits', () => {
+    for (const content of [
+      'BigDecimal fee = new BigDecimal(0.1);',
+      'BigDecimal fee = new BigDecimal(\n        0.1);',
+    ]) {
+      assert.ok(
+        scanText(file, content, { now: NOW }).violations.some(({ id }) => id === 'MONEY-BIGDECIMAL-DOUBLE'),
+        `expected MONEY-BIGDECIMAL-DOUBLE for: ${JSON.stringify(content)}`,
+      );
+    }
+  });
+
+  test('string constructor, int literals, and BigDecimal vars stay clean', () => {
+    const clean = [
+      'BigDecimal fee = new BigDecimal("0.1");',
+      'BigDecimal count = new BigDecimal(3);',
+      'var count = 3;',
+      'var fee = new BigDecimal("0.1");',
+    ].join('\n');
+    assert.deepEqual(scanText(file, clean, { now: NOW }).violations, []);
+  });
+
+  test('a valid allowance suppresses the double-literal constructor on its own line', () => {
+    const result = scanText(file, `BigDecimal fee = new BigDecimal(0.1); // ${VALID_ALLOWANCE}`, { now: NOW });
+    assert.deepEqual(result.violations, []);
+  });
+});
+
+describe('DoD nudge (money-path commit without tests)', () => {
+  const moneyProd = 'settlement-service/src/main/java/github/lms/lemuel/payout/application/service/PayoutService.java';
+
+  test('nudges when money-scope core prod changes have no staged test change', () => {
+    const message = dodNudgeMessage([moneyProd, 'docs/DEVELOPMENT.md']);
+    assert.match(message, /테스트/);
+  });
+
+  test('stays silent when a test change accompanies the money change', () => {
+    assert.equal(dodNudgeMessage([moneyProd, 'settlement-service/src/test/java/github/lms/lemuel/payout/PayoutServiceTest.java']), null);
+  });
+
+  test('stays silent for non-money or adapter-only changes', () => {
+    assert.equal(dodNudgeMessage(['docs/DEVELOPMENT.md']), null);
+    assert.equal(dodNudgeMessage(['settlement-service/src/main/java/github/lms/lemuel/payout/adapter/out/persistence/PayoutJpaAdapter.java']), null);
+  });
 });
 
 describe('pending content reconstruction', () => {

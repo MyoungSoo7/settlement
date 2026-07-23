@@ -13,7 +13,6 @@ import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -60,9 +59,9 @@ public class SettlementCreatedConsumer extends IdempotentEventConsumer {
     @Override
     protected void handle(JsonNode node, UUID eventId) {
         IngestSettlementCommand command = new IngestSettlementCommand(
-                node.get("settlementId").asLong(),
-                node.get("sellerId").asLong(),
-                new BigDecimal(node.get("amount").asText()),
+                requiredLong(node, "settlementId", eventId),
+                requiredLong(node, "sellerId", eventId),
+                requiredDecimal(node, "amount", eventId),
                 node.hasNonNull("dueDate") ? LocalDate.parse(node.get("dueDate").asText()) : null);
 
         ingestSettlementUseCase.ingest(command);

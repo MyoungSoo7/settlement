@@ -1,0 +1,22 @@
+goal: 차지백·PG 대사 adjustment 도 환불과 동일하게 균형 잡힌 원장 역분개와 1:1 로 연결한다(현재 환불만 연동).
+constraints:
+  - adjustment 저장과 원장 역분개 Outbox 적재는 같은 트랜잭션에서 원자적으로 수행한다(기존 환불 경로 AdjustSettlementForRefundService 패턴).
+  - POSTED·REVERSED 원장 불변 — 정정은 신규 역분개로만. uq_ledger_reference_accounts 멱등 제약을 활용한다.
+  - 기존 환불 역분개·adjustment 출처 제약(chk_adjustment_source_at_most_one, 출처별 부분 UNIQUE)의 하위 호환을 보존한다.
+  - ./gradlew :settlement-service:test 와 jacocoTestCoverageVerification GREEN 을 유지한다.
+acceptance_criteria:
+  - ChargebackService ACCEPT 경로가 adjustment 와 함께 CHARGEBACK 출처 원장 역분개 작업을 같은 트랜잭션의 Outbox 에 적재한다.
+  - ApplyReconciliationAdjustmentService 가 PG_RECONCILIATION 출처 원장 역분개 작업을 같은 트랜잭션의 Outbox 에 적재한다.
+  - 동일 출처 이벤트 재전송·재시도에도 원장 분개가 중복 생성되지 않음을 통합테스트로 증명한다.
+  - INV-5(원장 완전성) 검사가 차지백·PG 대사 조정의 역분개 누락도 감지하도록 확장된다.
+ontology_schema:
+  name: 조정-원장 완결
+  description: >-
+    3개 출처(REFUND/CHARGEBACK/PG_RECONCILIATION) adjustment 전부가 원장 분개 1:1 연결을 갖도록
+    비대칭을 해소한다. 속성: 구성적 균형·출처 완전성·멱등 적재.
+  fields: []
+metadata:
+  parent: seed-p0.yaml
+  order: 2
+  covers: [AC-4, AC-5]
+  depends_on: []

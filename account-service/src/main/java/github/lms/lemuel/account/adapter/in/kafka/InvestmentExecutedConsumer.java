@@ -13,7 +13,6 @@ import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.util.UUID;
 
 /**
@@ -34,7 +33,7 @@ public class InvestmentExecutedConsumer extends IdempotentEventConsumer {
         this.recordAccountEntryUseCase = recordAccountEntryUseCase;
     }
 
-    @KafkaListener(topics = "${app.kafka.topic.investment-executed}", groupId = CONSUMER_GROUP)
+    @KafkaListener(topics = "${app.kafka.topic.investment-executed}", groupId = CONSUMER_GROUP, containerFactory = "kafkaListenerContainerFactory")
     @Transactional
     public void onInvestmentExecuted(ConsumerRecord<String, String> record, Acknowledgment ack) {
         consume(record, ack);
@@ -48,11 +47,12 @@ public class InvestmentExecutedConsumer extends IdempotentEventConsumer {
 
     @Override
     protected void handle(JsonNode node, UUID eventId) {
+        String orderId = requiredText(node, "orderId", eventId);
         AccountEntry entry = AccountEntry.investmentExecuted(
-                node.get("sellerId").asText(),
-                node.get("orderId").asText(),
-                new BigDecimal(node.get("amount").asText()));
+                requiredText(node, "sellerId", eventId),
+                orderId,
+                requiredDecimal(node, "amount", eventId));
         recordAccountEntryUseCase.record(entry);
-        log.info("투자 집행 분개 적재. eventId={}, orderId={}", eventId, node.get("orderId").asText());
+        log.info("투자 집행 분개 적재. eventId={}, orderId={}", eventId, orderId);
     }
 }

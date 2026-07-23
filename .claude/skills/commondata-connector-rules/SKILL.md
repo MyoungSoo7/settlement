@@ -41,7 +41,8 @@ data.go.kr **범용 커넥터**(port 8098, lemuel_commondata). economics/market 
 - 자체 최소 SecurityConfig(shared-common **미의존**). `GET /api/common-data/**` permitAll, `/admin/commondata/**` 은
   `X-Internal-Api-Key`(운영 fail-closed), denyAll. `DATA_GO_KR_API_KEY` 계정당 1개 공용(미설정 → 수집 비활성).
 - admin: `POST /sources`(등록), `POST /sources/{code}/sync`(override 파라미터를 defaultParams 위에), `GET /sync/status`.
-  수집 202+백그라운드, **동시실행 409**(+tracker 항상 해소). 시드 V2 `kasi-rest-days`(천문연 공휴일)로 무키 데모.
+  수집 202+백그라운드, **동시실행 409**(+tracker 항상 해소). 샘플 시드 마이그레이션은 **제거됨**(기존 DB 는
+  Flyway `*:missing` 관대 처리) — 무키 환경은 수집 비활성으로 데이터 0건, 데모하려면 `DATA_GO_KR_API_KEY` 필수.
 
 ## 안티패턴 (발견 시 지적)
 

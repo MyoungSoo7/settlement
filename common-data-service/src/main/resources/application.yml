@@ -94,5 +94,5 @@ app:
     internal-api-key: ${COMMONDATA_INTERNAL_API_KEY:}
     portal:
       # data.go.kr 발급 인증키(Decoding 키) — 계정당 1개로 활용신청한 모든 API 공용.
-      # 미설정이면 수집 비활성(Flyway 시드 데이터로만 동작)
+      # 미설정이면 수집 비활성(수집 데이터 없음 — 샘플 시드는 제거됨)
       api-key: ${DATA_GO_KR_API_KEY:}

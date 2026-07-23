@@ -59,6 +59,7 @@ public class SettlementSearchDocument {
     @Field(type = FieldType.Long)
     private Long userId;
 
+    /** 주문 생성 시점 상태 스냅샷 — order 가 상태 전이 이벤트를 발행하지 않아 이후 전이 미반영(표시용). */
     @Field(type = FieldType.Keyword)
     private String orderStatus;
 

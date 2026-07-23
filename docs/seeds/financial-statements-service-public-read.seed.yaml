@@ -1,0 +1,98 @@
+# Seed: financial-statements-service 재무제표 공개조회 as-is 사양 (Ouroboros 방법론 — Interview → Seed 결정화)
+# 상태: CONFIRMED (order/settlement seed 와 동일 방식 지시로 승인 승계, 2026-07-19)
+# 원칙: 이 Seed 는 "현행 코드가 실제로 하는 일"의 불변 기술이다. 결함은 교정하지 않고 known_issues 로만 기록한다.
+
+seed:
+  id: financial-statements-service-public-read-v1
+  goal: >-
+    financial-statements-service(재무제표 공개조회 — 5개 비율 도메인 계산·DART 수집·
+    PER/PBR 미계산 경계)의 현행 동작을 실행 가능한 게이트에 매핑된 불변 사양으로 결정화해,
+    회귀 기준선 · 면접/포트폴리오 문서 · 후속 기능 베이스로 사용한다.
+
+  scope:
+    included:
+      - 재무제표 도메인 (6계정 저장·5개 비율 계산·균형 검증)
+      - DART 수집 (기업·재무제표 sync·스케줄)
+      - 공개 조회 표면 · 관리 표면 (admin 게이트)
+    excluded:
+      - audit 서브패키지 내부 (파티션·append-only 사실만 경계 기재)
+
+  constraints:
+    - "shared-common 의도적 미의존 — 공개 read-only 위성 (build.gradle.kts:7-10)"
+    - "Kafka 이벤트 발행/소비 없음 — 소비측(loan/investment)은 공개 GET HTTP pull"
+    - "5개 비율은 DB 에 저장하지 않는다 — 도메인 메서드가 단일 계산 지점(SSOT)"
+    - "분자/분모 null·분모 0 → null 반환(N/A) — 예외 금지, 0 이나 폴백값 금지"
+    - "PER/PBR 계산 금지 — 주가·시총 데이터 자체가 코드베이스에 없음 (밸류에이션 조인은 소비측 몫)"
+    - "헥사고날: domain 은 spring/jpa/jackson 을 import 하지 않는다 (ArchUnit 강제)"
+
+  invariants:  # as-is 코드 사실 — 파일:라인 근거 (경로 접두 financial-statements-service/src/main/java/github/lms/lemuel/financial/)
+    five_ratios_domain_calc:
+      source: domain/FinancialStatement.java:65-111
+      table:
+        operatingMargin: "영업이익/매출 ×100 (:65-67)"
+        netMargin: "순이익/매출 ×100 (:70-72)"
+        debtRatio: "부채총계/자본총계 ×100 — 자본잠식(equity signum≤0) null 별도 가드 (:75-80)"
+        equityRatio: "자본총계/자산총계 ×100 (:83-85)"
+        roa: "순이익/자산총계 ×100 (:88-90)"
+      null_policy: "공통 ratio(): 분자 null / 분모 null / 분모 0 → null(예외 아님), HALF_UP 소수 2자리 (:106-111). 마이그레이션에 비율 컬럼 없음 — 6계정만 (V1__financial_core.sql:25-30). 응답 DTO 가 도메인 메서드 직접 호출 (FinancialStatementResponse.java:37-41)"
+    balance_check:
+      source: domain/FinancialStatement.java:96-104
+      rule: "isBalanced(tolerancePct): |자산−(부채+자본)| ≤ 자산×허용오차, 3계정 중 null 있으면 false"
+    domain_invariants:
+      source: domain/{FinancialStatement.java:37-53, Company.java:19-31}
+      rule: "stockCode 6자리·fiscalYear 1990~2100·fsDivision(CFS/OFS)·source(SEED/DART) 필수·currency 기본 KRW. Company: stockCode 정체성, corpCode 8자리 nullable"
+    dart_collection:
+      source: adapter/out/external/DartApiClient.java:42-44,123-146,200-205 + application/service/DartSyncService.java:47-153
+      rule: "corpCode.xml(zip)·company.json·fnlttSinglAcnt.json(11011 연간). status 000=OK/013=empty/그외 예외. XXE 방어(disallow-doctype). CFS 우선, 없으면 OFS. 개별 기업 실패는 집계 후 계속, 호출 간 150ms 쿼터 보호"
+      market_mapping: "fetchProfile 후 corp_cls Y→KOSPI / K→KOSDAQ 매핑 upsert, 코넥스(N)·기타(E)는 스킵 (CompanyProfile.marketOrNull + DartSyncService.syncCompanies — 2026-07-19 코스닥 경로 추가)"
+      schedule: "재무제표 주간(일 04:00 KST, 최근 2개 연도) · 기업 월간(1일 05:00). DART_API_KEY 미설정 시 스케줄 조용히 skip, 수동 트리거는 IllegalStateException (FinancialSyncScheduler.java:57-81)"
+    collection_idempotency:
+      source: adapter/out/persistence/{FinancialStatementPersistenceAdapter.java:31-41, CompanyPersistenceAdapter.java:49-57}
+      rule: "find-then-save upsert. 최종 방어: financial_statements (stock_code, fiscal_year, fs_div) UNIQUE (V1:34) · companies stock_code PK + corp_code UNIQUE (V1:9-10). CHECK: fs_div/source/market (V1:35-36, V20260716308000). 배치 동시실행은 SyncStatusTracker CAS(단일 인메모리)"
+    security_surface:
+      source: config/{SecurityConfig.java:73-84, AdminApiKeyFilter.java:44-58}
+      rule: "GET /api/financial/** permitAll, anyRequest denyAll. /admin/financial/** 은 AdminApiKeyFilter — X-Internal-Api-Key 대조, 키 미설정 + internal-key-required=true(운영) → 403 fail-closed, false(로컬) → 통과+warn. gateway 는 /api/financial/** 만 라우팅"
+
+  event_contracts:
+    published: []  # 없음 — kafka/shared-common 의존 0, adapter/in/kafka·out/event 패키지 부재
+    consumed: []
+    note: "위성 서비스 — loan/investment 가 공개 GET 을 HTTP pull"
+
+  acceptance_criteria:  # 실행 가능 — 각 AC 는 기존 게이트에 매핑
+    - id: AC-1
+      criterion: 5개 비율 공식·null=N/A 정책(분모 0·자본잠식 가드 포함)이 위 invariants 와 일치한다
+      gate: "./gradlew :financial-statements-service:test — FinancialStatementTest 경계 전수"
+    - id: AC-2
+      criterion: PER/PBR·주가 관련 코드 0건 유지 (경계 침범 = 위반)
+      gate: "guard.mjs MARKET-NO-VALUATION 계열 + 코드리뷰 (financial 은 저장 6계정 + 5비율만)"
+    - id: AC-3
+      criterion: 헥사고날 의존 방향 위반 0
+      gate: "HexagonalArchitectureTest (ArchUnit 3룰)"
+    - id: AC-4
+      criterion: 커버리지 LINE >= 90%
+      gate: "./gradlew :financial-statements-service:jacocoTestCoverageVerification (check 편입)"
+    - id: AC-5
+      criterion: DART 수집 멱등 — 같은 (기업,연도,구분) 재수집은 행 증가 0 (upsert)
+      gate: "FinancialPersistenceAdapterTest + DB UNIQUE uq_fs_company_year_div"
+
+  known_issues:  # 발견만 기록 — 사양은 as-is 유지
+    - id: KI-1
+      finding: "★ DRIFT: 스킬 :43-44 와 SPEC.md:113 이 '시드 폴백(코스피20+코스닥10)'을 정본 주장하나 시드 마이그레이션은 커밋 9d38e0ff5 에서 삭제됨(*:missing 관대 처리). 신규 배포 + DART_API_KEY 미설정이면 DB 완전 빈 채 기동. 스테일 주석 3곳(application.yml:94·DartProperties.java:8·StatementSource.java:5)"
+      disposition: doc-drift (스킬·SPEC 갱신 필요)
+    - id: KI-2
+      finding: "(해소 전) KOSDAQ 수집 경로 부재: 수집기가 isKospi() 만 upsert 해 SPEC '코스피·코스닥' 주장과 모순이었음. 시드 삭제(KI-1)와 겹쳐 코스닥 공급 경로 0"
+      disposition: "resolved-2026-07-19 — corp_cls Y/K → KOSPI/KOSDAQ 매핑 upsert 로 수정(사용자 갭 판정). 코드·SPEC·스킬 정합 회복"
+    - id: KI-3
+      finding: "SEED·DART 혼재 엣지: DART upsert 는 (stock_code,fiscal_year,fs_div) 완전 일치 시만 대체 — SEED 가 CFS 로 심긴 기존 DB 에 DART 가 OFS 로 오면 별개 행 공존, 응답이 두 구분 모두 반환"
+      disposition: recorded-not-fixed (기존 DB 한정 엣지)
+    - id: KI-4
+      finding: "jacoco INSTRUCTION 80% 엄격 목록에 financial.domain 미포함 (economics/market/commondata.domain 은 포함 — 위성 간 비대칭, 부모 build.gradle.kts:134-147)"
+      disposition: recorded-not-fixed (게이트 비대칭)
+    - id: KI-5
+      finding: "스케줄러 silent skip(키 미설정 info 로그만)·배치 개별 실패 삼킴·감사 fail-open·트래커 인메모리 단일 인스턴스 — 전부 javadoc/스킬 명문"
+      disposition: by-design-documented
+
+  uses:
+    - regression-baseline
+    - interview-portfolio
+    - brownfield-base

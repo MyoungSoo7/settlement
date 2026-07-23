@@ -5,9 +5,11 @@ import github.lms.lemuel.common.audit.domain.AuditAction;
 import github.lms.lemuel.common.config.JacksonCompatConfig;
 import github.lms.lemuel.common.config.jwt.JwtUtil;
 import github.lms.lemuel.payout.application.port.in.ExecutePayoutUseCase;
+import github.lms.lemuel.payout.application.port.in.RecordPayoutBounceUseCase;
 import github.lms.lemuel.payout.application.port.in.RetryFailedPayoutUseCase;
 import github.lms.lemuel.payout.application.port.out.LoadPayoutPort;
 import github.lms.lemuel.payout.domain.Payout;
+import github.lms.lemuel.payout.domain.PayoutBounce;
 import github.lms.lemuel.payout.domain.PayoutStatus;
 import github.lms.lemuel.payout.domain.SellerBankAccount;
 import github.lms.lemuel.idempotency.adapter.out.persistence.ManualIdempotencyGuard;
@@ -45,6 +47,7 @@ class PayoutAdminControllerTest {
     @MockitoBean LoadPayoutPort loadPort;
     @MockitoBean RetryFailedPayoutUseCase retryUseCase;
     @MockitoBean ExecutePayoutUseCase executeUseCase;
+    @MockitoBean RecordPayoutBounceUseCase bounceUseCase;
     @MockitoBean ManualIdempotencyGuard idempotency;
     @MockitoBean AuditLogger auditLogger;
 
@@ -150,6 +153,38 @@ class PayoutAdminControllerTest {
                         .header("Idempotency-Key", "po-retry-2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.payout.id").value(100));
+    }
+
+    @Test
+    @DisplayName("POST /admin/payouts/{id}/bounce — 반송 기록 + 재발행 payout 응답")
+    void bounce() throws Exception {
+        Payout reissued = samplePayout();
+        PayoutBounce bounce = PayoutBounce.rehydrate(1L, 100L, "ACCOUNT_CLOSED", 100L, "op",
+                java.time.LocalDateTime.now(), java.time.LocalDateTime.now());
+        when(bounceUseCase.recordBounce(eq(100L), eq("ACCOUNT_CLOSED"), anyString()))
+                .thenReturn(new RecordPayoutBounceUseCase.BounceOutcome(bounce, reissued));
+
+        mockMvc.perform(post("/admin/payouts/100/bounce")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"ACCOUNT_CLOSED\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.bouncedPayoutId").value(100))
+                .andExpect(jsonPath("$.reissuedPayoutId").value(100))
+                .andExpect(jsonPath("$.reissued.id").value(100));
+    }
+
+    @Test
+    @DisplayName("POST bounce — 중복 Idempotency-Key 는 409 (조작 미실행)")
+    void bounce_duplicateIdempotencyKey_returnsConflict() throws Exception {
+        when(idempotency.claim(eq("po-bounce-1"), anyString(), anyString())).thenReturn(false);
+
+        mockMvc.perform(post("/admin/payouts/100/bounce")
+                        .header("Idempotency-Key", "po-bounce-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"ACCOUNT_CLOSED\"}"))
+                .andExpect(status().isConflict());
+
+        verifyNoInteractions(bounceUseCase);
     }
 
     @Test

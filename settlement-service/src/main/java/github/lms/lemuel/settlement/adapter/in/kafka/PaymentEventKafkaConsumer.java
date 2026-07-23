@@ -2,6 +2,7 @@ package github.lms.lemuel.settlement.adapter.in.kafka;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import github.lms.lemuel.common.outbox.adapter.in.kafka.ConsumedEventQuarantine;
 import github.lms.lemuel.common.outbox.adapter.in.kafka.IdempotentEventConsumer;
 import github.lms.lemuel.common.outbox.adapter.in.kafka.ProcessedEventRepository;
 import github.lms.lemuel.settlement.adapter.out.readmodel.SettlementPaymentViewJpaEntity;
@@ -59,8 +60,9 @@ public class PaymentEventKafkaConsumer extends IdempotentEventConsumer {
                                      SettlementPaymentViewRepository paymentViewRepository,
                                      ObjectMapper objectMapper,
                                      SettlementProjectionMetrics projectionMetrics,
+                                     ConsumedEventQuarantine quarantine,
                                      @Value("${app.kafka.practice.consumer-delay-ms:0}") long practiceDelayMs) {
-        super(processedEventRepository, objectMapper);
+        super(processedEventRepository, objectMapper, quarantine);
         this.createSettlementFromPaymentUseCase = createSettlementFromPaymentUseCase;
         this.paymentViewRepository = paymentViewRepository;
         this.projectionMetrics = projectionMetrics;
@@ -90,8 +92,8 @@ public class PaymentEventKafkaConsumer extends IdempotentEventConsumer {
 
     @Override
     protected void handle(JsonNode node, UUID eventId) {
-        Long paymentId = node.get("paymentId").asLong();
-        Long orderId = node.get("orderId").asLong();
+        Long paymentId = requiredLong(node, "paymentId", eventId);
+        Long orderId = requiredLong(node, "orderId", eventId);
 
         // 금액은 이벤트에 없으면 조회해야 하지만, 정산 서비스가 payment_id 로 조회 가능 —
         // 현재 단순화를 위해 관례적으로 payload 의 amount 필드 존재 여부로 분기.

@@ -2,6 +2,7 @@ package github.lms.lemuel.settlement.adapter.in.kafka;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import github.lms.lemuel.common.outbox.adapter.in.kafka.ConsumedEventQuarantine;
 import github.lms.lemuel.common.outbox.adapter.in.kafka.IdempotentEventConsumer;
 import github.lms.lemuel.common.outbox.adapter.in.kafka.ProcessedEventRepository;
 import github.lms.lemuel.settlement.adapter.out.readmodel.SettlementPaymentViewJpaEntity;
@@ -37,8 +38,9 @@ public class PaymentRefundedViewConsumer extends IdempotentEventConsumer {
     public PaymentRefundedViewConsumer(SettlementPaymentViewRepository paymentViewRepository,
                                        ProcessedEventRepository processedEventRepository,
                                        ObjectMapper objectMapper,
-                                       SettlementProjectionMetrics projectionMetrics) {
-        super(processedEventRepository, objectMapper);
+                                       SettlementProjectionMetrics projectionMetrics,
+                                       ConsumedEventQuarantine quarantine) {
+        super(processedEventRepository, objectMapper, quarantine);
         this.paymentViewRepository = paymentViewRepository;
         this.projectionMetrics = projectionMetrics;
     }
@@ -65,10 +67,7 @@ public class PaymentRefundedViewConsumer extends IdempotentEventConsumer {
 
     @Override
     protected void handle(JsonNode node, UUID eventId) {
-        if (!node.hasNonNull("paymentId")) {
-            throw new IllegalArgumentException("Missing paymentId, eventId=" + eventId);
-        }
-        Long paymentId = node.get("paymentId").asLong();
+        Long paymentId = requiredLong(node, "paymentId", eventId);
         BigDecimal refundedAmount = node.hasNonNull("refundedAmount")
                 ? new BigDecimal(node.get("refundedAmount").asText())
                 : BigDecimal.ZERO;

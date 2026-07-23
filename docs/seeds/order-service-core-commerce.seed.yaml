@@ -1,0 +1,109 @@
+# Seed: order-service 핵심 커머스 루프 as-is 사양 (Ouroboros 방법론 — Interview → Seed 결정화)
+# 상태: CONFIRMED (Restate 게이트 승인 완료, 2026-07-18)
+# 생성: 2026-07-18, 인터뷰 세션 interview_20260718_093314 (MCP 폴백 → 직접 인터뷰 모드)
+# 원칙: 이 Seed 는 "현행 코드가 실제로 하는 일"의 불변 기술이다. 결함은 교정하지 않고 known_issues 로만 기록한다.
+
+seed:
+  id: order-service-core-commerce-v1
+  goal: >-
+    order-service 핵심 커머스 루프(주문·결제·환불·재고·쿠폰 + 5개 발행 이벤트 계약)의
+    현행 동작을 실행 가능한 게이트에 매핑된 불변 사양으로 결정화해,
+    회귀 기준선 · 계약 드리프트 게이트 · 면접/포트폴리오 문서 · 후속 기능 베이스로 사용한다.
+
+  scope:
+    included:
+      - order (주문 생성·상태머신·멱등 제출)
+      - payment (결제·분할결제 tender·환불)
+      - product 재고 차감/복원 (조건부 UPDATE 경로만)
+      - coupon 적용/사용 제한
+      - 발행 이벤트 계약 표면 5토픽 (user·product 는 이벤트 계약만)
+    excluded:
+      - cart, shipping, review, game, menu, rbac, commoncode, category 서브도메인 내부
+      - user 도메인 내부 (가입/멤버십 로직 — user.registered 계약 표면만 포함)
+      - product 도메인 내부 (상품 관리 — product.changed 계약 표면 + 재고 차감 경로만 포함)
+      - recon, projectionbackfill (settlement 측 대사는 별도 계약)
+
+  constraints:
+    - "MSA 경계: settlement 는 order 를 import 하지 않는다 — 연계는 Kafka 이벤트 + /internal/recon 만 (ADR 0020)"
+    - "헥사고날: domain 은 adapter 를 import 하지 않는다 (ArchUnit 강제)"
+    - "금액은 BigDecimal, 라운딩 정책 보존 (double/float 금지)"
+    - "이벤트 발행은 Outbox 경유만 (직접 kafkaTemplate 발행 금지, ADR 0024 계약-as-code)"
+    - "셀러/사용자 리소스는 JWT 주체 파생 + 소유권 대조 (IDOR 방지)"
+
+  invariants:  # as-is 코드 사실 — 파일:라인 근거
+    order_state_machine:
+      source: order-service/src/main/java/github/lms/lemuel/order/domain/OrderStatus.java:41-54
+      states: [CREATED, PAID, SHIPPING_PENDING, IN_TRANSIT, DELIVERED, CANCELLATION_REQUESTED, CANCELLATION_APPROVED, REFUND_REQUESTED, REFUND_COMPLETED(deprecated), CANCELED, REFUNDED]
+      transitions:
+        CREATED: [PAID, CANCELED, CANCELLATION_REQUESTED]
+        PAID: [SHIPPING_PENDING, REFUND_REQUESTED, REFUNDED, CANCELLATION_REQUESTED]
+        SHIPPING_PENDING: [IN_TRANSIT, REFUND_REQUESTED, REFUNDED]
+        IN_TRANSIT: [DELIVERED, REFUND_REQUESTED, REFUNDED]
+        DELIVERED: [REFUND_REQUESTED, REFUNDED]
+        CANCELLATION_REQUESTED: [CANCELLATION_APPROVED, CANCELED]
+        CANCELLATION_APPROVED: [CANCELED, REFUND_REQUESTED, REFUNDED]
+        REFUND_REQUESTED: [REFUNDED]
+        terminal: [CANCELED, REFUNDED, REFUND_COMPLETED]
+      notes: "환불 완료 종단은 REFUNDED 로 일원화. 결제 후 모든 진행 단계에서 환불 진입 허용."
+    payment_state_machine:
+      source: order-service/src/main/java/github/lms/lemuel/payment/domain/PaymentStatus.java:22-37
+      transitions: "READY→AUTHORIZED→CAPTURED→REFUNDED, AUTHORIZED→CANCELED; FAILED/CANCELED/REFUNDED 종단"
+      tender_states: [PENDING, AUTHORIZED, CAPTURED, REFUNDED, FAILED]
+    refund_invariants:
+      lock: "payment 행 SELECT FOR UPDATE (PaymentJpaRepository.java:32, PESSIMISTIC_WRITE), READ_COMMITTED"
+      over_refund_guard: "3중 — 락 전 스냅샷 검증(RefundPaymentUseCase.java:127) → 락 내 재확정(:153) → 도메인 최종 방어선(PaymentDomain.java:150,188 / tender 단위 PaymentTender.java:103)"
+      history: "환불 이력(REQUESTED)은 payment 락 획득 前 REQUIRES_NEW 로 INSERT (RefundLifecycle — FOR KEY SHARE/FOR UPDATE 데드락 회피)"
+      partial_refund: "허용 — tender 단위 잔여 환불 가능액 검증"
+    order_idempotency:
+      source: order-service/src/main/java/github/lms/lemuel/order/application/service/IdempotentMultiItemOrderService.java
+      mechanism: "Idempotency-Key 헤더 → 분산 락 + order_idempotency DB UNIQUE 2겹, 키 없으면 하위 호환 통과, 충돌 시 기존 주문 replay"
+    stock_decrement:
+      source: order-service/src/main/java/github/lms/lemuel/product/adapter/out/persistence/SpringDataProductJpaRepository.java:42-43 (variant 동형 :30-31)
+      mechanism: "원자적 조건부 UPDATE: SET stock = stock - q WHERE stock >= q AND status <> DISCONTINUED; 0 도달 시 OUT_OF_STOCK, 복원은 역연산(+q, 품절 부활)"
+    coupon:
+      source: order-service/src/main/java/github/lms/lemuel/coupon/domain/Coupon.java:90,144
+      rules: "PERCENTAGE/정액 타입(CouponType), usedCount >= maxUses 차단, 사용 시 usedCount 증가"
+
+  event_contracts:  # 발행 5토픽 — 정본: shared-common/src/testFixtures/resources/contracts/events/
+    topics:
+      - lemuel.order.created
+      - lemuel.payment.captured
+      - lemuel.payment.refunded
+      - lemuel.user.registered
+      - lemuel.product.changed
+    routing: "Outbox 컨벤션 라우팅 (aggregate/eventType → topic, OutboxBackedOrderEventPublisher 계열)"
+    schema_source: shared-common/src/testFixtures/resources/contracts/events/*.schema.json (+samples)
+
+  acceptance_criteria:  # 실행 가능 — 각 AC 는 기존 게이트에 매핑
+    - id: AC-1
+      criterion: 상태머신 전이표가 위 invariants 와 일치한다 (임의 전이 차단)
+      gate: "./gradlew :order-service:test — OrderStatus/PaymentDomain 도메인 테스트"
+    - id: AC-2
+      criterion: 발행 이벤트 5토픽이 JSON Schema 계약과 일치한다 (드리프트 시 빌드 실패)
+      gate: "OrderEventContractTest · PaymentEventContractTest · UserEventContractTest · ProductEventContractTest"
+    - id: AC-3
+      criterion: 헥사고날 의존 방향 위반 0 (domain→adapter import 금지)
+      gate: "HexagonalArchitectureTest (ArchUnit)"
+    - id: AC-4
+      criterion: 커버리지 LINE >= 90%, 핵심 도메인 INSTRUCTION >= 80%
+      gate: "./gradlew :order-service:jacocoTestCoverageVerification (build.gradle.kts:127-150, check 편입)"
+    - id: AC-5
+      criterion: 환불 동시성 — 동시 환불 요청에서 초과 환불 0건
+      gate: "환불 동시성 통합 테스트 (전제: Docker/Testcontainers 가용 환경)"
+    - id: AC-6
+      criterion: 도메인 OO 불변식 (public setter 0, generic IAE 0, 봉인 팩토리)
+      gate: "guard.mjs OO-* (실시간) + oo-gate.test.mjs (CI 전수)"
+
+  known_issues:  # 발견만 기록 — 사양은 as-is 유지, 수정은 별도 백로그
+    - id: KI-1
+      finding: "OrderStatus.fromString 이 파싱 실패 시 예외 대신 CREATED 를 조용히 반환 (OrderStatus.java:69-75) — 잘못된 상태 문자열이 '결제 전 주문'으로 위장될 수 있는 silent default"
+      disposition: recorded-not-fixed
+    - id: KI-2
+      finding: "REFUND_COMPLETED 상태가 @Deprecated 로 잔존 (DB 과거 행 호환) — 신규 전이는 없으나 enum 표면에 남아 있음"
+      disposition: by-design (호환 목적)
+
+  uses:
+    - regression-baseline   # 리팩터링·기능 추가 시 '기존 동작 불변' 판정 정본
+    - contract-drift-gate   # 이벤트/API 계약 변경의 빌드 시점 차단 기준 (ADR 0024 와 연동)
+    - interview-portfolio   # 면접용 as-is 명세 문서
+    - brownfield-base       # 후속 기능 인터뷰 시 brownfield 컨텍스트

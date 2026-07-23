@@ -13,7 +13,6 @@ import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.util.UUID;
 
 /**
@@ -34,7 +33,7 @@ public class SettlementConfirmedConsumer extends IdempotentEventConsumer {
         this.recordAccountEntryUseCase = recordAccountEntryUseCase;
     }
 
-    @KafkaListener(topics = "${app.kafka.topic.settlement-confirmed}", groupId = CONSUMER_GROUP)
+    @KafkaListener(topics = "${app.kafka.topic.settlement-confirmed}", groupId = CONSUMER_GROUP, containerFactory = "kafkaListenerContainerFactory")
     @Transactional
     public void onSettlementConfirmed(ConsumerRecord<String, String> record, Acknowledgment ack) {
         consume(record, ack);
@@ -48,11 +47,12 @@ public class SettlementConfirmedConsumer extends IdempotentEventConsumer {
 
     @Override
     protected void handle(JsonNode node, UUID eventId) {
+        String settlementId = requiredText(node, "settlementId", eventId);
         AccountEntry entry = AccountEntry.settlementConfirmed(
-                node.get("sellerId").asText(),
-                node.get("settlementId").asText(),
-                new BigDecimal(node.get("amount").asText()));
+                requiredText(node, "sellerId", eventId),
+                settlementId,
+                requiredDecimal(node, "amount", eventId));
         recordAccountEntryUseCase.record(entry);
-        log.info("정산확정 분개 적재. eventId={}, settlementId={}", eventId, node.get("settlementId").asText());
+        log.info("정산확정 분개 적재. eventId={}, settlementId={}", eventId, settlementId);
     }
 }

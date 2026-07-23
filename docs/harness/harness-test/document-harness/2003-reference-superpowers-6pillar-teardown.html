@@ -1,0 +1,566 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>참고 자료 — obra/superpowers 구조 분석 (6기둥 매핑)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" />
+<style>
+  :root{
+    --ink:#1a1a18;
+    --ink-2:#3c3c38;
+    --ink-3:#7a7a72;
+    --bg:#f7f5ee;
+    --bg-2:#efece2;
+    --rule:#1a1a18;
+    --rule-soft:#cdc9bd;
+    --accent:#a06a2a;
+    --pillar-1:#a06a2a;
+    --pillar-2:#3a6b3a;
+    --pillar-3:#9a3a3a;
+    --pillar-4:#3a5a8a;
+    --pillar-5:#6a4a8a;
+    --pillar-6:#7a5a2a;
+    --mono:"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, sans-serif;line-height:1.6;word-break:keep-all;overflow-wrap:break-word}
+  .wrap{max-width:1080px;margin:0 auto;padding:72px 56px 120px}
+  .meta-top{display:flex;justify-content:space-between;align-items:baseline;font-family:var(--mono);font-size:11.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink-3);border-bottom:1px solid var(--rule);padding-bottom:14px;margin-bottom:48px}
+  .meta-top .mark{display:inline-block;width:8px;height:8px;background:var(--accent);margin-right:8px;vertical-align:middle}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--accent);margin-bottom:14px}
+  h1{font-size:42px;font-weight:800;line-height:1.2;margin:0 0 18px;letter-spacing:-0.01em;text-wrap:balance}
+  .lede{font-size:18px;color:var(--ink-2);max-width:780px;line-height:1.65}
+  .lede a{color:var(--ink);text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px}
+  h2{font-size:28px;font-weight:700;line-height:1.25;margin:72px 0 18px;padding-top:28px;border-top:1.5px solid var(--rule);letter-spacing:-0.005em}
+  h2 .num{font-family:var(--mono);font-size:13px;letter-spacing:.22em;color:var(--accent);display:block;margin-bottom:8px;font-weight:500}
+  h3{font-size:20px;font-weight:700;line-height:1.3;margin:36px 0 12px}
+  h4{font-size:15px;font-weight:700;line-height:1.4;margin:20px 0 8px;letter-spacing:.01em}
+  p{margin:0 0 14px;color:var(--ink-2)}
+  p strong, li strong{color:var(--ink);font-weight:600}
+
+  /* 6-pillar grid */
+  .pillars{display:grid;grid-template-columns:repeat(3, 1fr);gap:18px;margin:28px 0 8px}
+  .pillar{border:1.5px solid var(--rule);padding:20px 22px;background:var(--bg)}
+  .pillar .lab{font-family:var(--mono);font-size:11px;letter-spacing:.2em;color:var(--accent);margin-bottom:8px}
+  .pillar h4{margin:0 0 6px;font-size:18px;font-weight:700}
+  .pillar p{font-size:13.5px;color:var(--ink-3);margin:0;line-height:1.5}
+
+  /* Big mapping table */
+  table.map{width:100%;border-collapse:collapse;margin:18px 0 8px;font-size:14px}
+  table.map th, table.map td{border:1px solid var(--rule-soft);padding:12px 14px;vertical-align:top;text-align:left}
+  table.map th{background:var(--bg-2);font-family:var(--mono);font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink);font-weight:600}
+  table.map td:first-child{font-weight:700;color:var(--ink);width:14%;white-space:nowrap}
+  table.map td:nth-child(2){width:32%;font-family:var(--mono);font-size:12.5px;color:var(--accent);line-height:1.55}
+  table.map td:nth-child(3){font-size:13.5px;color:var(--ink-2)}
+  table.map tr td:first-child::before{content:"";display:inline-block;width:6px;height:6px;margin-right:8px;background:var(--accent);vertical-align:middle}
+
+  /* Per-skill cards */
+  .skill-card{border:1.5px solid var(--rule);padding:28px 32px;margin:24px 0;background:#fff}
+  .skill-card .head{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid var(--rule-soft);padding-bottom:12px;margin-bottom:18px;gap:16px}
+  .skill-card .head .name{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--ink);letter-spacing:.02em}
+  .skill-card .head .tag{font-family:var(--mono);font-size:11px;letter-spacing:.18em;color:var(--ink-3);text-transform:uppercase;white-space:nowrap}
+  .skill-card .desc{font-size:13.5px;color:var(--ink-3);font-style:italic;margin:0 0 16px;line-height:1.55}
+  .skill-card .row{display:grid;grid-template-columns:90px 1fr;gap:14px 16px;margin:8px 0;padding:10px 0;border-top:1px dashed var(--rule-soft)}
+  .skill-card .row:first-of-type{border-top:none}
+  .skill-card .row .key{font-family:var(--mono);font-size:11.5px;letter-spacing:.16em;color:var(--accent);text-transform:uppercase;padding-top:2px}
+  .skill-card .row .val{font-size:14px;color:var(--ink-2);line-height:1.55}
+  .skill-card .row .val code{font-family:var(--mono);font-size:12.5px;background:var(--bg-2);padding:1px 6px;color:var(--ink);border:1px solid var(--rule-soft)}
+  .skill-card .row .val .quote{display:block;font-family:var(--mono);font-size:12.5px;color:var(--ink);background:var(--bg-2);border-left:3px solid var(--accent);padding:8px 12px;margin-top:6px;line-height:1.55}
+
+  /* Frontmatter sample */
+  pre.code{font-family:var(--mono);font-size:12.5px;line-height:1.65;background:var(--bg-2);border:1px solid var(--rule-soft);padding:18px 20px;overflow-x:auto;color:var(--ink);margin:14px 0}
+  pre.code .yk{color:var(--accent)}
+  pre.code .com{color:var(--ink-3)}
+
+  /* Takeaway list */
+  ul.takeaway{list-style:none;padding:0;margin:18px 0;counter-reset:item}
+  ul.takeaway li{position:relative;padding:14px 0 14px 56px;border-top:1px solid var(--rule-soft);counter-increment:item;font-size:15px;color:var(--ink-2)}
+  ul.takeaway li:first-child{border-top:none}
+  ul.takeaway li::before{content:counter(item, decimal-leading-zero);position:absolute;left:0;top:14px;font-family:var(--mono);font-size:12px;letter-spacing:.18em;color:var(--accent);font-weight:600}
+  ul.takeaway li strong{display:block;color:var(--ink);font-weight:700;font-size:15.5px;margin-bottom:4px}
+
+  /* Footer */
+  .footer{margin-top:80px;padding-top:24px;border-top:1px solid var(--rule);font-family:var(--mono);font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);display:flex;justify-content:space-between}
+
+  /* Pillar accent stripes */
+  .skill-card[data-strong="3"] .row[data-pillar="3"] .key{color:var(--pillar-3)}
+  .skill-card[data-strong="6"] .row[data-pillar="6"] .key{color:var(--pillar-6)}
+
+  @media (max-width:760px){
+    .wrap{padding:40px 24px 80px}
+    h1{font-size:30px}
+    .pillars{grid-template-columns:1fr}
+    .skill-card{padding:20px 18px}
+    .skill-card .row{grid-template-columns:1fr;gap:6px}
+    table.map td:first-child, table.map td:nth-child(2){width:auto}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="meta-top">
+    <span><span class="mark"></span> FAST CAMPUS · CHAPTER 03 · REFERENCE TEARDOWN</span>
+    <span>2026</span>
+  </div>
+
+  <div class="eyebrow">REFERENCE · obra/superpowers</div>
+  <h1>6기둥으로 다시 읽는 superpowers</h1>
+  <p class="lede">
+    Jesse Vincent의 <a href="https://github.com/obra/superpowers" target="_blank" rel="noopener">obra/superpowers</a>는
+    문서형 하네스를 실제로 운영 중인 보기 드문 오픈소스 사례다. SKILL.md 8개를 직접 열어
+    <strong>ROLE · GOAL · FORBID · OUTPUT · EXAMPLE · CHECK</strong> 6기둥에 매핑해 두면,
+    내 규칙서를 짤 때 어느 칸을 비워 두고 있는지 한눈에 보인다.
+    여기에 더해 <code>hooks/</code> 디렉토리가 markdown 밖에서 한 겹을 더 잠그는데,
+    이 레포가 "문서형 + 시스템 레벨" 두 층을 어떻게 합쳤는지도 함께 본다.
+  </p>
+
+  <!-- ============================================================ -->
+  <h2><span class="num">01 · 스캐폴딩</span>6기둥 — 마크다운 하네스의 골격</h2>
+  <p>아래 6칸이 한 SKILL.md 안에 모두 채워져 있어야 AI가 매번 같은 결과를 낸다. 한 칸이라도 비면 그 자리에서 추측이 끼어든다.</p>
+
+  <div class="pillars">
+    <div class="pillar"><div class="lab">1 · ROLE</div><h4>역할</h4><p>누구처럼 · 누구를 위해 · 무엇을</p></div>
+    <div class="pillar"><div class="lab">2 · GOAL</div><h4>목표</h4><p>완료 시점에 남을 한 문장 산출</p></div>
+    <div class="pillar"><div class="lab">3 · FORBID</div><h4>금지</h4><p>추측 금지 · 임의 결정 금지</p></div>
+    <div class="pillar"><div class="lab">4 · OUTPUT</div><h4>출력 형식</h4><p>섹션 · 길이 · 표 모양</p></div>
+    <div class="pillar"><div class="lab">5 · EXAMPLE</div><h4>예시</h4><p>한 줄 견본 — 형식과 톤을 동시에</p></div>
+    <div class="pillar"><div class="lab">6 · CHECK</div><h4>검수</h4><p>출력 후 사람이 확인할 항목</p></div>
+  </div>
+
+  <!-- ============================================================ -->
+  <h2><span class="num">02 · 매핑</span>superpowers의 어느 장치가 어느 기둥인가</h2>
+  <p>각 기둥이 superpowers 레포 안에서 어떤 구문 장치로 구현되어 있는지 정리한다. 같은 기둥이 여러 곳에서 보강되는 것도 패턴이다.</p>
+
+  <table class="map">
+    <thead>
+      <tr><th>기둥</th><th>superpowers의 구문 장치</th><th>역할</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1 · ROLE</td>
+        <td>YAML frontmatter <code>name</code> + <code>description</code><br/>"When to Use" 섹션</td>
+        <td>스킬이 언제 호출되어야 하는지를 한 줄로 잠근다. <code>description</code>이 곧 트리거 조건문 역할을 한다.</td>
+      </tr>
+      <tr>
+        <td>2 · GOAL</td>
+        <td>"Overview" 첫 문장<br/>"Core principle:" 한 줄</td>
+        <td>완료 시점에 남을 단 한 문장을 굵게 박아 둔다. 본문이 흐트러져도 이 한 줄이 척추다.</td>
+      </tr>
+      <tr>
+        <td>3 · FORBID</td>
+        <td>"The Iron Law" 박스<br/>"&lt;HARD-GATE&gt;" / "&lt;EXTREMELY-IMPORTANT&gt;"<br/>"Red Flags - STOP" 목록<br/>"Rationalization Prevention" 표</td>
+        <td>가장 강한 칸. 같은 금지를 4~5개 다른 표현으로 중복 배치해 AI가 빠져나갈 합리화 통로를 모두 막는다.</td>
+      </tr>
+      <tr>
+        <td>4 · OUTPUT</td>
+        <td>"Plan Document Header" 템플릿<br/>저장 경로 규칙: <code>docs/superpowers/plans/YYYY-MM-DD-&lt;name&gt;.md</code><br/>"Task Structure" 마크다운 견본</td>
+        <td>산출물의 파일명·헤더·섹션 순서까지 못 박는다. 빈칸을 채우기만 하면 같은 모양이 나오게 만든다.</td>
+      </tr>
+      <tr>
+        <td>5 · EXAMPLE</td>
+        <td>&lt;Good&gt; / &lt;Bad&gt; 코드 블록<br/>"Common Failures" 표 (Claim → Requires → Not Sufficient)<br/>RED-GREEN-REFACTOR 견본 코드</td>
+        <td>금지/요구를 추상으로 두지 않고, 통과 견본과 탈락 견본을 짝으로 보여 톤까지 학습시킨다.</td>
+      </tr>
+      <tr>
+        <td>6 · CHECK</td>
+        <td>"Checklist" (번호 매긴 단계)<br/>"The Gate Function" (IDENTIFY → RUN → READ → VERIFY)<br/>"Phase 1~4" 강제 순서<br/>verification-before-completion 스킬 통째</td>
+        <td>출력 직후 사람이 — 또는 다른 subagent가 — 한 줄씩 확인할 항목. 단계 사이에 다이아몬드 분기를 둬 통과 못 하면 앞으로 못 간다.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>장치별 분포 — 어느 스킬이 그 장치를 실제로 쓰는가</h3>
+  <p>
+    14개 SKILL.md를 직접 grep으로 훑어 각 장치가 등장하는 파일을 모았다.
+    같은 기둥이라도 장치마다 채택률이 다르다 — frontmatter <code>description</code>은 모든 스킬에 있고,
+    Iron Law는 4개만, Rationalization Prevention 표는 같은 그 4개에 같이 붙는다.
+    어떤 장치가 어떤 스킬과 짝지어지는지 보면 superpowers 작자의 채택 기준이 보인다.
+  </p>
+
+  <table class="map">
+    <thead>
+      <tr><th>기둥 · 장치</th><th>채택 스킬</th><th>관찰</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1 · frontmatter <code>description</code></td>
+        <td>14개 전부 (표준 골격)</td>
+        <td>예외 없음. "Use when ~ before ~" 패턴이 ROLE 기본 트리거.</td>
+      </tr>
+      <tr>
+        <td>1 · "When to Use" 별도 섹션</td>
+        <td>dispatching-parallel-agents, subagent-driven-development, systematic-debugging, test-driven-development, writing-skills</td>
+        <td>호출 조건이 복잡한 스킬에만 별도 섹션을 추가. 단순 스킬은 frontmatter 한 줄로 끝.</td>
+      </tr>
+      <tr>
+        <td>2 · "Core principle:" 한 줄</td>
+        <td>10개 — dispatching-parallel-agents, finishing-a-development-branch, receiving-code-review, requesting-code-review, subagent-driven-development, systematic-debugging, test-driven-development, using-git-worktrees, verification-before-completion, writing-skills</td>
+        <td>GOAL 한 줄을 명시적으로 라벨링한 패턴. 14개 중 10개니 사실상 표준이다.</td>
+      </tr>
+      <tr>
+        <td>3 · "The Iron Law"</td>
+        <td><strong>4개만</strong> — systematic-debugging, test-driven-development, verification-before-completion, writing-skills</td>
+        <td>가장 강한 금지 장치. 모두 "절대 ~ 없이 ~ 금지" 단언형. 이 4개는 모두 Rationalization Prevention 표를 같이 쓴다.</td>
+      </tr>
+      <tr>
+        <td>3 · <code>&lt;HARD-GATE&gt;</code> 태그</td>
+        <td><strong>brainstorming 1개</strong></td>
+        <td>"디자인 승인 전까지 구현 스킬 호출 금지"라는 단일 게이트에만 쓰임. 희소 장치.</td>
+      </tr>
+      <tr>
+        <td>3 · <code>&lt;EXTREMELY_IMPORTANT&gt;</code> 태그</td>
+        <td><strong>using-superpowers 1개</strong> (+ hook 주입 래퍼)</td>
+        <td>메타 스킬 1개에만 쓰임. hook이 매 세션 시작 때 같은 태그로 본문을 다시 감싸 이중 잠금.</td>
+      </tr>
+      <tr>
+        <td>3 · "Red Flags" 목록</td>
+        <td>9개 — finishing-a-development-branch, requesting-code-review, subagent-driven-development, systematic-debugging, test-driven-development, using-git-worktrees, using-superpowers, verification-before-completion, writing-skills</td>
+        <td>가장 널리 쓰이는 FORBID 장치. "이런 말이 나오면 STOP"의 트리거 문구 모음.</td>
+      </tr>
+      <tr>
+        <td>3 · "Rationalization Prevention" 표</td>
+        <td>4개 — systematic-debugging, test-driven-development, verification-before-completion, writing-skills</td>
+        <td>Iron Law를 가진 스킬과 정확히 동일한 4개. 두 장치는 항상 짝으로 등장한다.</td>
+      </tr>
+      <tr>
+        <td>3 · "Anti-Patterns" 섹션</td>
+        <td>brainstorming, test-driven-development, writing-skills</td>
+        <td>"이건 너무 단순해서 ~ 필요 없음" 같은 회피 합리화를 명시적으로 잘라낸다.</td>
+      </tr>
+      <tr>
+        <td>4 · 저장 경로 + 헤더 템플릿</td>
+        <td>brainstorming (<code>docs/superpowers/specs/</code>), writing-plans (<code>docs/superpowers/plans/</code>), subagent-driven-development (output flow 정의)</td>
+        <td>산출물이 파일로 떨어지는 스킬에만 쓰임. 경로 형식까지 못 박는 게 공통.</td>
+      </tr>
+      <tr>
+        <td>4 · TodoWrite 강제 등록</td>
+        <td>executing-plans, subagent-driven-development, using-superpowers, writing-skills</td>
+        <td>단계 진행을 외부 도구(TodoWrite)에 위임해 OUTPUT을 상태 머신으로 만든다.</td>
+      </tr>
+      <tr>
+        <td>5 · <code>&lt;Good&gt;</code> / <code>&lt;Bad&gt;</code> 짝 코드</td>
+        <td>test-driven-development, writing-skills</td>
+        <td>코드 예시가 핵심인 스킬에서만 통과/탈락 견본을 짝으로 제시.</td>
+      </tr>
+      <tr>
+        <td>5 · "Common Failures" 표</td>
+        <td><strong>verification-before-completion 1개</strong></td>
+        <td>Claim/Requires/Not Sufficient 3열 7행 그리드. 이 스킬만의 시그니처 장치.</td>
+      </tr>
+      <tr>
+        <td>5 · Pressure scenarios (TDD mapping)</td>
+        <td><strong>writing-skills 1개</strong> (메타)</td>
+        <td>"스킬 자체를 TDD로 만든다"는 메타 매핑 표. 스킬 작성 가이드 전용.</td>
+      </tr>
+      <tr>
+        <td>6 · 번호 매긴 "Checklist"</td>
+        <td>brainstorming, test-driven-development, writing-skills</td>
+        <td>선형 단계 검수. 스킬당 5~9단계.</td>
+      </tr>
+      <tr>
+        <td>6 · "The Gate Function"</td>
+        <td><strong>verification-before-completion 1개</strong></td>
+        <td>IDENTIFY → RUN → READ → VERIFY → THEN claim. 5단계 모두 통과해야 "완료" 가능.</td>
+      </tr>
+      <tr>
+        <td>6 · "Phase 1~N" 강제 순서</td>
+        <td><strong>systematic-debugging 1개</strong></td>
+        <td>4 Phase 순차 통과. Phase 1만 sub-check 7단계.</td>
+      </tr>
+      <tr>
+        <td>6 · graphviz <code>digraph</code> 분기</td>
+        <td>6개 — brainstorming, dispatching-parallel-agents, subagent-driven-development, test-driven-development, using-superpowers, writing-skills</td>
+        <td>CHECK를 다이아몬드 분기 그래프로 그린 스킬들. 선형 체크리스트보다 우회를 더 잘 막는다.</td>
+      </tr>
+      <tr>
+        <td>6 · "Quick Reference" 요약</td>
+        <td>finishing-a-development-branch, systematic-debugging, using-git-worktrees, writing-skills</td>
+        <td>본문이 긴 스킬은 끝에 한 화면짜리 빠른 참조를 같이 넣는다.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p style="margin-top:18px">
+    <strong>읽는 법:</strong> 같은 칼럼에 여러 스킬이 모이면 그 장치가 사실상 표준이다(예: Red Flags 9/14, Core principle 10/14).
+    <strong>하나만 있는 장치는 시그니처다</strong>(예: Common Failures 표 = verification-before-completion 전용).
+    내 규칙서를 짤 때, 표준 장치는 기본값으로 들고 가고 시그니처 장치는 그 스킬의 목적과 같을 때만 빌려온다.
+  </p>
+
+  <!-- ============================================================ -->
+  <h2><span class="num">03 · 표준 프론트매터</span>스킬 1개의 최소 골격</h2>
+  <p>모든 SKILL.md가 공유하는 머리 모양. <code>description</code>은 곧 ROLE이 된다 — "Use when ~ before ~" 패턴으로 호출 조건과 시점을 한 줄에 묶는다.</p>
+
+<pre class="code"><span class="com">---</span>
+<span class="yk">name:</span> verification-before-completion
+<span class="yk">description:</span> Use when about to claim work is complete, fixed, or passing,
+             before committing or creating PRs — requires running verification
+             commands and confirming output before making any success claims;
+             evidence before assertions always
+<span class="com">---</span>
+
+<span class="com"># Verification Before Completion</span>
+
+<span class="com">## Overview</span>            ← 2 · GOAL (한 줄)
+<span class="com">## The Iron Law</span>         ← 3 · FORBID (가장 굵게)
+<span class="com">## The Gate Function</span>    ← 6 · CHECK (단계화)
+<span class="com">## Common Failures</span>      ← 5 · EXAMPLE (통과/탈락 표)
+<span class="com">## Red Flags - STOP</span>     ← 3 · FORBID 보강
+<span class="com">## Key Patterns</span>         ← 4 · OUTPUT (응답 견본)</pre>
+
+  <p>이 6칸이 한 파일 안에 모두 있고, 같은 기둥이 두세 군데에서 보강되는 게 superpowers의 일관된 패턴이다.</p>
+
+  <!-- ============================================================ -->
+  <h2><span class="num">04 · 8개 스킬 해부</span>각 스킬은 어느 기둥이 강한가</h2>
+  <p>스킬마다 6기둥의 무게중심이 다르다. 어떤 스킬은 FORBID로 시작해 CHECK로 닫고, 어떤 스킬은 OUTPUT 템플릿이 본체다. 내가 짤 규칙서가 어느 종류인지 미리 정해야 한다.</p>
+
+  <!-- using-superpowers -->
+  <div class="skill-card" data-strong="1">
+    <div class="head">
+      <span class="name">using-superpowers</span>
+      <span class="tag">strong · 1 ROLE · 3 FORBID</span>
+    </div>
+    <p class="desc">"Use when starting any conversation — establishes how to find and use skills, requiring Skill tool invocation before ANY response."</p>
+    <div class="row" data-pillar="1"><div class="key">1 ROLE</div><div class="val">세션 시작 시점에 호출되는 메타 스킬. 다른 모든 스킬을 부르는 조건문 역할을 한다.</div></div>
+    <div class="row" data-pillar="3"><div class="key">3 FORBID</div><div class="val">"1% chance라도 적용 가능하면 무조건 호출하라"는 절대 명령. <span class="quote">"This is not negotiable. This is not optional. You cannot rationalize your way out of this."</span></div></div>
+    <div class="row" data-pillar="6"><div class="key">6 CHECK</div><div class="val">graphviz로 그린 분기도 — "User message → Might any skill apply? → Invoke / Respond"의 단계가 코드로 명시되어 있다.</div></div>
+  </div>
+
+  <!-- brainstorming -->
+  <div class="skill-card" data-strong="6">
+    <div class="head">
+      <span class="name">brainstorming</span>
+      <span class="tag">strong · 6 CHECK · 3 FORBID</span>
+    </div>
+    <p class="desc">"Explores user intent, requirements and design before implementation."</p>
+    <div class="row" data-pillar="3"><div class="key">3 FORBID</div><div class="val">&lt;HARD-GATE&gt; — "디자인을 사용자 승인받기 전까지 어떤 구현 스킬도 호출 금지, 어떤 코드도 작성 금지." Anti-Pattern 섹션으로 "이건 너무 단순해서 디자인 필요 없음" 합리화까지 미리 차단.</div></div>
+    <div class="row" data-pillar="6"><div class="key">6 CHECK</div><div class="val">9단계 체크리스트를 TodoWrite 태스크로 강제 등록. 1) 컨텍스트 탐색 → 2) Visual Companion 제안 → 3) 명확화 질문 → … → 9) writing-plans 호출. 각 단계 사이에 사용자 승인 게이트.</div></div>
+    <div class="row" data-pillar="4"><div class="key">4 OUTPUT</div><div class="val">결과물 저장 경로 못 박음: <code>docs/superpowers/specs/YYYY-MM-DD-&lt;topic&gt;-design.md</code></div></div>
+  </div>
+
+  <!-- writing-plans -->
+  <div class="skill-card" data-strong="4">
+    <div class="head">
+      <span class="name">writing-plans</span>
+      <span class="tag">strong · 4 OUTPUT · 5 EXAMPLE</span>
+    </div>
+    <p class="desc">"Use when you have a spec or requirements for a multi-step task, before touching code."</p>
+    <div class="row" data-pillar="1"><div class="key">1 ROLE</div><div class="val">"엔지니어는 우리 코드베이스 컨텍스트가 전혀 없고 취향이 의심스럽다고 가정하라" — 독자(=AI 또는 후속 엔지니어)의 페르소나를 ROLE로 못 박았다.</div></div>
+    <div class="row" data-pillar="4"><div class="key">4 OUTPUT</div><div class="val">플랜 문서 헤더 템플릿(Goal/Architecture/Tech Stack)을 마크다운 통째로 제공. Task Structure도 <code>### Task N</code>, <code>Files:</code>, <code>- [ ] Step 1: Write the failing test</code> 같은 줄까지 견본화.</div></div>
+    <div class="row" data-pillar="5"><div class="key">5 EXAMPLE</div><div class="val">Bite-Sized Task 단계 5개를 그대로 본문에 적어 둠 — "Write the failing test / Run it / Implement / Run tests / Commit." 추상이 아니라 5줄 견본.</div></div>
+  </div>
+
+  <!-- test-driven-development -->
+  <div class="skill-card" data-strong="3">
+    <div class="head">
+      <span class="name">test-driven-development</span>
+      <span class="tag">strong · 3 FORBID · 5 EXAMPLE</span>
+    </div>
+    <p class="desc">"Use when implementing any feature or bugfix, before writing implementation code."</p>
+    <div class="row" data-pillar="3"><div class="key">3 FORBID</div><div class="val">The Iron Law: <span class="quote">NO PRODUCTION CODE WITHOUT A FAILING TEST FIRST</span> 거기에 5가지 합리화("reference로 남겨둘게 / 적응시킬게 / …")를 미리 잡아 차단한다.</div></div>
+    <div class="row" data-pillar="6"><div class="key">6 CHECK</div><div class="val">RED → verify_red → GREEN → verify_green → REFACTOR — graphviz 그래프로 사이클 명시. 각 단계 사이에 다이아몬드 분기.</div></div>
+    <div class="row" data-pillar="5"><div class="key">5 EXAMPLE</div><div class="val">&lt;Good&gt; / &lt;Bad&gt; TypeScript 견본 코드를 짝으로 제공.</div></div>
+  </div>
+
+  <!-- systematic-debugging -->
+  <div class="skill-card" data-strong="6">
+    <div class="head">
+      <span class="name">systematic-debugging</span>
+      <span class="tag">strong · 6 CHECK · 3 FORBID</span>
+    </div>
+    <p class="desc">"Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes."</p>
+    <div class="row" data-pillar="3"><div class="key">3 FORBID</div><div class="val">Iron Law: "NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST." "Don't skip when …" 목록으로 빠져나갈 핑계를 선제 차단(시간 압박·간단해 보임·관리자 압박).</div></div>
+    <div class="row" data-pillar="6"><div class="key">6 CHECK</div><div class="val">4 Phase를 순서대로 통과해야 다음으로 진행 가능. Phase 1만 7단계 sub-check.</div></div>
+  </div>
+
+  <!-- verification-before-completion -->
+  <div class="skill-card" data-strong="6">
+    <div class="head">
+      <span class="name">verification-before-completion</span>
+      <span class="tag">strong · 6 CHECK</span>
+    </div>
+    <p class="desc">"Use when about to claim work is complete — requires running verification commands before any success claims."</p>
+    <div class="row" data-pillar="6"><div class="key">6 CHECK</div><div class="val">The Gate Function: IDENTIFY → RUN → READ → VERIFY → THEN claim. 5단계 모두 마쳐야 "완료" 발화 가능.</div></div>
+    <div class="row" data-pillar="5"><div class="key">5 EXAMPLE</div><div class="val">Common Failures 표 — 클레임 / 요구되는 증거 / 부족한 증거 3열 7행으로 통과/탈락 케이스를 그리드화.</div></div>
+    <div class="row" data-pillar="3"><div class="key">3 FORBID</div><div class="val">Rationalization Prevention 표 — "should work now / I'm confident / just this once" 8개 합리화를 미리 적어 두고 각각 반박.</div></div>
+  </div>
+
+  <!-- subagent-driven-development -->
+  <div class="skill-card" data-strong="1">
+    <div class="head">
+      <span class="name">subagent-driven-development</span>
+      <span class="tag">strong · 1 ROLE · 4 OUTPUT</span>
+    </div>
+    <p class="desc">"Execute plan by dispatching fresh subagent per task, with two-stage review after each."</p>
+    <div class="row" data-pillar="1"><div class="key">1 ROLE</div><div class="val">3개 subagent를 분리: implementer / spec-reviewer / code-quality-reviewer. 각 ROLE의 프롬프트가 별도 파일로 존재(<code>implementer-prompt.md</code> 등).</div></div>
+    <div class="row" data-pillar="4"><div class="key">4 OUTPUT</div><div class="val">매 태스크가 거치는 출력 흐름 자체가 OUTPUT 정의 — 구현 → spec 리뷰 → 통과 못 하면 수정 → quality 리뷰 → 통과 못 하면 수정 → TodoWrite 업데이트.</div></div>
+  </div>
+
+  <!-- writing-skills -->
+  <div class="skill-card" data-strong="2">
+    <div class="head">
+      <span class="name">writing-skills</span>
+      <span class="tag">meta · 2 GOAL · 5 EXAMPLE</span>
+    </div>
+    <p class="desc">"Use when creating new skills, editing existing skills, or verifying skills work before deployment."</p>
+    <div class="row" data-pillar="2"><div class="key">2 GOAL</div><div class="val">한 줄 척추: <span class="quote">"Writing skills IS Test-Driven Development applied to process documentation."</span> 스킬 만들기를 TDD에 매핑한 표가 본체.</div></div>
+    <div class="row" data-pillar="5"><div class="key">5 EXAMPLE</div><div class="val">TDD Mapping 표 — Test case=Pressure scenario, Production code=SKILL.md, RED=베이스라인 실패, … 10행짜리 매핑이 곧 견본.</div></div>
+    <div class="row" data-pillar="3"><div class="key">3 FORBID</div><div class="val">"Don't create for: one-off solutions, project-specific conventions(→ CLAUDE.md), mechanical constraints(→ 자동화)." 잘못된 사용처를 미리 잘라낸다.</div></div>
+  </div>
+
+  <!-- ============================================================ -->
+  <h2><span class="num">05 · Hook 경계</span>markdown으로 못 잠그는 칸을 시스템이 잠근다</h2>
+  <p>
+    SKILL.md를 아무리 빈틈없이 적어도 "AI가 그 파일을 매번 열어 본다"는 보장은 markdown 안에 없다.
+    obra/superpowers는 이 한계를 <code>hooks/</code> 디렉토리로 메운다 — 6기둥이 문서 안 잠금이라면,
+    hook은 그 바깥에서 OS·플러그인 런타임이 거는 잠금이다.
+  </p>
+
+  <h3>레포 안에서 hook이 사는 자리</h3>
+  <p><code>hooks/hooks.json</code>은 한 가지 이벤트만 등록한다. 단순하지만 효과가 크다.</p>
+
+<pre class="code"><span class="com">// hooks/hooks.json</span>
+{
+  <span class="yk">"hooks"</span>: {
+    <span class="yk">"SessionStart"</span>: [
+      {
+        <span class="yk">"matcher"</span>: <span class="yk">"startup|clear|compact"</span>,
+        <span class="yk">"hooks"</span>: [
+          {
+            <span class="yk">"type"</span>: <span class="yk">"command"</span>,
+            <span class="yk">"command"</span>: <span class="yk">"\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" session-start"</span>,
+            <span class="yk">"async"</span>: false
+          }
+        ]
+      }
+    ]
+  }
+}</pre>
+
+  <p>
+    세션이 시작될 때(<code>startup</code>), <code>/clear</code>로 컨텍스트를 비울 때, 자동 압축이 일어날 때(<code>compact</code>) —
+    세 시점 모두에서 <code>session-start</code> 스크립트가 실행된다. 그 스크립트가 하는 일은 한 줄로 줄이면:
+    <strong><code>skills/using-superpowers/SKILL.md</code> 전문을 읽어 <code>additionalContext</code>로 모델에 강제 주입</strong>한다.
+  </p>
+
+  <h3>주입되는 컨텍스트의 모양</h3>
+  <p>모델이 받는 첫 메시지에는 다음과 같은 블록이 강제로 끼어 있다.</p>
+
+<pre class="code"><span class="com">&lt;EXTREMELY_IMPORTANT&gt;</span>
+You have superpowers.
+
+**Below is the full content of your 'superpowers:using-superpowers' skill -
+your introduction to using skills. For all other skills, use the 'Skill' tool:**
+
+{{ using-superpowers/SKILL.md 전문 }}
+
+<span class="com">&lt;/EXTREMELY_IMPORTANT&gt;</span></pre>
+
+  <p>
+    즉 사용자가 입을 떼기 전에 <code>using-superpowers</code> 한 개 스킬은 이미 컨텍스트 안에 들어와 있고,
+    그 안에는 "어떤 메시지든 받기 전에 Skill 도구로 다른 스킬부터 탐색하라"는 메타 규칙이 적혀 있다.
+    나머지 7개 스킬은 markdown 잠금만 받지만, <strong>이 1개 스킬은 hook 잠금까지 이중으로</strong> 받는다.
+  </p>
+
+  <h3>6기둥과 어떻게 짝지어지나</h3>
+
+  <table class="map">
+    <thead>
+      <tr><th>기둥</th><th>markdown 안 잠금</th><th>hook이 더하는 잠금</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1 · ROLE</td>
+        <td>frontmatter <code>description</code>의 "Use when ~ before ~"</td>
+        <td><strong>매 세션 시작 시 무조건 호출</strong>. matcher로 트리거 시점을 OS 이벤트에 묶는다 — 모델이 "지금은 호출 안 해도 되겠지"로 빠져나갈 통로가 사라진다.</td>
+      </tr>
+      <tr>
+        <td>3 · FORBID</td>
+        <td>Iron Law / HARD-GATE / Red Flags 4겹 텍스트</td>
+        <td><code>&lt;EXTREMELY_IMPORTANT&gt;</code> 래퍼로 시스템 레벨 우선순위 부여. 사용자 첫 입력보다 먼저 들어가기 때문에 "사용자가 다른 걸 시켰으니 건너뛴다" 합리화가 막힌다.</td>
+      </tr>
+      <tr>
+        <td>6 · CHECK</td>
+        <td>"Checklist" / "Gate Function" 단계 텍스트</td>
+        <td><strong>사람이 안 끼고도 매번 실행</strong>되는 자동 게이트. <code>/clear</code>·<code>compact</code> 후에도 재주입되어 컨텍스트 유실로 인한 우회가 차단된다.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Polyglot <code>.cmd</code> 래퍼 — 한 진입점, 세 OS</h3>
+  <p>
+    <code>run-hook.cmd</code>는 CMD와 bash 양쪽에서 동시에 유효한 polyglot 스크립트다.
+    Windows에서는 CMD가 <code>:</code>를 라벨로 읽어 bash 영역을 건너뛰고, macOS·Linux에서는 같은 줄이 heredoc 시작이 되어 CMD 영역을 무시한다.
+    OS별로 다른 진입점을 따로 등록할 필요 없이 hooks.json 한 줄로 세 플랫폼을 덮는다.
+    문서로 잠그는 것과 별개로, <strong>"내 플러그인을 받은 모든 사용자 환경에서 동일하게 작동"</strong>이라는 시스템 수준 보장을 hook이 책임진다.
+  </p>
+
+  <h3>여기서 가져갈 것</h3>
+  <p>
+    markdown으로 6기둥을 다 채워도 "AI가 그 파일을 읽었나"는 여전히 확률 게임이다.
+    superpowers는 SessionStart hook 한 개로 그 확률을 1.0으로 만든다. 내 규칙서에서 이 패턴이 필요한 자리는 두 군데다 —
+    <strong>(1) 메타 스킬</strong>(다른 스킬들의 호출 조건을 정의하는 스킬)과 <strong>(2) 절대로 누락되면 안 되는 검수 게이트</strong>.
+    이 둘은 markdown만으로는 부족하니, 4장 분업형 하네스에서 hook·subagent·외부 검증 도구로 한 겹을 더 얹는다.
+  </p>
+
+  <!-- ============================================================ -->
+  <h2><span class="num">06 · 핵심 패턴</span>superpowers에서 가져갈 5가지</h2>
+  <p>레포 전체를 가로지르는 작법 규칙. 내 규칙서를 짤 때 그대로 차용해도 좋다.</p>
+
+  <ul class="takeaway">
+    <li>
+      <strong>같은 금지를 4겹으로 박는다</strong>
+      Iron Law(굵게) → HARD-GATE(태그) → Red Flags 목록 → Rationalization Prevention 표. 한 가지 FORBID를 네 가지 다른 표현으로 중복 배치해 AI가 새어 나갈 구멍을 모두 막는다. 한 번만 적은 금지는 지켜지지 않는다.
+    </li>
+    <li>
+      <strong>frontmatter의 description이 곧 ROLE이다</strong>
+      "Use when X, before Y" 패턴. 호출 조건(when)과 시점(before)을 한 줄에 묶어 두면, 스킬 자체가 자기 트리거를 정의한다. 별도 라우터가 필요 없다.
+    </li>
+    <li>
+      <strong>CHECK는 다이아몬드 분기로 그린다</strong>
+      모든 주요 스킬이 graphviz <code>dot</code> 문법으로 작성된 분기 그래프를 본문에 포함한다. 선형 체크리스트보다 분기형 검수가 통과 못 하면 앞으로 못 가게 만든다.
+    </li>
+    <li>
+      <strong>OUTPUT은 파일명까지 못 박는다</strong>
+      <code>docs/superpowers/plans/YYYY-MM-DD-&lt;name&gt;.md</code> 처럼 저장 경로·파일명 형식·헤더 마크다운을 통째로 견본화. 빈칸 채우기 게임으로 만들어야 매번 같은 결과가 나온다.
+    </li>
+    <li>
+      <strong>EXAMPLE은 통과/탈락 2열로 짝짓는다</strong>
+      &lt;Good&gt;/&lt;Bad&gt; 코드, Common Failures 표(Claim/Requires/Not Sufficient), TDD Mapping 표. 한쪽만 보여 주면 톤이 안 잡힌다. 짝을 보여 줘야 경계가 학습된다.
+    </li>
+  </ul>
+
+  <!-- ============================================================ -->
+  <h2><span class="num">07 · 빈칸 체크</span>내 규칙서에 적용해 보기</h2>
+  <p>지금 쓰고 있는 SKILL.md를 6기둥에 비춰 본다. 한 칸이라도 비었다면 그 자리에서 AI가 매번 다르게 답한다.</p>
+
+  <table class="map">
+    <thead><tr><th>기둥</th><th>이 칸이 비면 일어나는 일</th><th>최소 채울 분량</th></tr></thead>
+    <tbody>
+      <tr><td>1 · ROLE</td><td>스킬이 엉뚱한 상황에서 호출되거나, 호출되어야 할 때 호출 안 됨</td><td>"Use when X, before Y" 한 줄</td></tr>
+      <tr><td>2 · GOAL</td><td>중간에 길을 잃고 본문이 산만해짐. 사용자가 "그래서 뭘 받았지?" 됨</td><td>"Core principle:" 한 문장</td></tr>
+      <tr><td>3 · FORBID</td><td>AI가 합리화 통로로 빠져나감. "시간 없으니 이번엔 건너뛸게요"</td><td>Iron Law 1개 + Rationalization 표 3행</td></tr>
+      <tr><td>4 · OUTPUT</td><td>매번 다른 구조·다른 파일명·다른 섹션. 후속 도구가 못 받음</td><td>저장 경로 + 헤더 마크다운 견본</td></tr>
+      <tr><td>5 · EXAMPLE</td><td>형식은 맞지만 톤이 매번 다름. 산출물이 같은 카테고리로 안 묶임</td><td>&lt;Good&gt;/&lt;Bad&gt; 각 1개</td></tr>
+      <tr><td>6 · CHECK</td><td>"완료했습니다"가 거짓말이 됨. 다음 단계로 미검증 통과</td><td>3~5단계 게이트 + 다이아몬드 분기</td></tr>
+    </tbody>
+  </table>
+
+  <p style="margin-top:24px;color:var(--ink-2);font-size:15px">
+    <strong>실습 연결:</strong> <code>2003-4-1-harness-writing-practice.md</code>에서 본인 규칙서를 작성할 때,
+    이 표를 옆에 펴 두고 6칸을 모두 채웠는지 단계 종료마다 확인한다.
+    빈칸은 다음 클립의 분업형 하네스로 넘기는 게 아니라, markdown으로 잠글 수 있는 만큼 잠그고 한계만 4장으로 넘긴다.
+  </p>
+
+  <div class="footer">
+    <span>FAST CAMPUS · CHAPTER 03 · REFERENCE</span>
+    <span>SOURCE · github.com/obra/superpowers</span>
+  </div>
+
+</div>
+</body>
+</html>

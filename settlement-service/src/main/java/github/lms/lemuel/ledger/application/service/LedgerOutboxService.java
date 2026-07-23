@@ -7,6 +7,7 @@ import github.lms.lemuel.ledger.application.port.in.ReverseEntryUseCase;
 import github.lms.lemuel.ledger.application.port.out.LoadLedgerOutboxPort;
 import github.lms.lemuel.ledger.application.port.out.SaveLedgerOutboxPort;
 import github.lms.lemuel.ledger.domain.LedgerOutboxTask;
+import github.lms.lemuel.ledger.domain.ReferenceType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -61,6 +62,24 @@ public class LedgerOutboxService implements EnqueueLedgerTaskPort, ProcessLedger
                 settlementId, refundId);
     }
 
+    @Override
+    public void enqueueReverseChargeback(Long settlementId, Long chargebackId,
+                                         BigDecimal amount, LocalDate adjustmentDate) {
+        saveLedgerOutboxPort.saveAll(List.of(
+                LedgerOutboxTask.reverseChargeback(settlementId, chargebackId, amount, adjustmentDate)));
+        log.debug("Ledger outbox enqueued: REVERSE_CHARGEBACK settlementId={}, chargebackId={}",
+                settlementId, chargebackId);
+    }
+
+    @Override
+    public void enqueueReverseReconciliation(Long settlementId, Long discrepancyId,
+                                             BigDecimal amount, LocalDate adjustmentDate) {
+        saveLedgerOutboxPort.saveAll(List.of(
+                LedgerOutboxTask.reverseReconciliation(settlementId, discrepancyId, amount, adjustmentDate)));
+        log.debug("Ledger outbox enqueued: REVERSE_RECONCILIATION settlementId={}, discrepancyId={}",
+                settlementId, discrepancyId);
+    }
+
     // ── process (폴러 구동) ────────────────────────────────────────────────────
 
     @Override
@@ -72,8 +91,16 @@ public class LedgerOutboxService implements EnqueueLedgerTaskPort, ProcessLedger
     public void execute(LedgerOutboxTask task) {
         switch (task.type()) {
             case CREATE_ENTRY -> createLedgerEntryUseCase.createFromSettlement(task.settlementId());
-            case REVERSE_ENTRY -> reverseEntryUseCase.reverseForRefund(
-                    task.settlementId(), task.refundId(), task.refundAmount(), task.adjustmentDate());
+            // 역분개 3종은 refund 필드를 출처별 (referenceId, amount) 로 재사용한다(도메인 주석 참조).
+            case REVERSE_ENTRY -> reverseEntryUseCase.reverseForReference(
+                    task.settlementId(), task.refundId(), ReferenceType.REFUND,
+                    task.refundAmount(), task.adjustmentDate());
+            case REVERSE_CHARGEBACK -> reverseEntryUseCase.reverseForReference(
+                    task.settlementId(), task.refundId(), ReferenceType.CHARGEBACK,
+                    task.refundAmount(), task.adjustmentDate());
+            case REVERSE_RECONCILIATION -> reverseEntryUseCase.reverseForReference(
+                    task.settlementId(), task.refundId(), ReferenceType.PG_RECONCILIATION,
+                    task.refundAmount(), task.adjustmentDate());
         }
     }
 

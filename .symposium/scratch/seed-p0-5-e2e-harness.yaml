@@ -1,0 +1,22 @@
+goal: 고정 데이터와 단일 명령으로 결제 캡처→정산 생성·확정→원장→Payout 을 관통 검증하고, 크래시·역순·중복·동시 도착에도 수렴함을 자동 단언하는 E2E 하네스를 만든다.
+constraints:
+  - 실행 환경은 Testcontainers 슬라이스(settlement-service + PostgreSQL, 필요 시 Kafka 컨테이너)가 정본 — 도커 컴포즈 21서비스 기동을 요구하지 않는다.
+  - 하네스는 단일 Gradle 태스크(또는 단일 테스트 클래스)로 실행 가능해야 한다.
+  - 불변식 단언은 기존 무결성 스위트(INV-5/6/7/11)의 판정 로직을 재사용한다.
+  - ./gradlew :settlement-service:test 와 jacocoTestCoverageVerification GREEN 을 유지한다.
+acceptance_criteria:
+  - 단일 명령으로 캡처→정산→확정→원장→Payout 전 구간이 실행되고 정산·adjustment·원장·Payout 불변식이 자동 단언된다.
+  - 크래시 지점 재현(adjustment 저장 후 폴러 처리 전, Payout 생성 전 등 최소 3개 지점)에서 재시작 후 부분 반영 없이 동일 상태로 수렴한다.
+  - 정산 확정·환불·차지백 이벤트의 역순·중복·동시 도착 시나리오에서 최종 지급·원장 금액이 동일하게 수렴한다.
+  - 하네스 실패 시 어떤 불변식이 어떤 데이터로 깨졌는지 진단 가능한 출력이 남는다.
+ontology_schema:
+  name: 종단 재현 하네스
+  description: >-
+    구간별로 분산된 통합테스트를 하나의 결정론적 시나리오로 잇고, 장애 주입·순서 교란까지 포함해
+    수렴을 기계 판정한다. 속성: 재현성·수렴성·진단 가능성.
+  fields: []
+metadata:
+  parent: seed-p0.yaml
+  order: 5
+  covers: [AC-8, AC-10, AC-11]
+  depends_on: [seed-p0-1, seed-p0-2, seed-p0-3]

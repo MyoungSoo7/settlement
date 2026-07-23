@@ -1,6 +1,7 @@
 package github.lms.lemuel.pgreconciliation.application.service;
 
 import github.lms.lemuel.pgreconciliation.application.port.out.LoadInternalPaymentsForReconciliationPort;
+import github.lms.lemuel.pgreconciliation.application.port.out.LoadReconciliationRunPort;
 import github.lms.lemuel.pgreconciliation.application.port.out.ParsePgFilePort;
 import github.lms.lemuel.pgreconciliation.application.port.out.SaveReconciliationRunPort;
 import github.lms.lemuel.pgreconciliation.domain.DiscrepancyType;
@@ -37,6 +38,7 @@ class ReconcilePgFileServiceTest {
     @Mock ParsePgFilePort parsePort;
     @Mock LoadInternalPaymentsForReconciliationPort loadPort;
     @Mock SaveReconciliationRunPort savePort;
+    @Mock LoadReconciliationRunPort loadRunPort;
 
     SimpleMeterRegistry meterRegistry;
     ReconcilePgFileService service;
@@ -44,7 +46,10 @@ class ReconcilePgFileServiceTest {
     @BeforeEach
     void setUp() {
         meterRegistry = new SimpleMeterRegistry();
-        service = new ReconcilePgFileService(parsePort, loadPort, savePort, meterRegistry);
+        service = new ReconcilePgFileService(parsePort, loadPort, savePort, loadRunPort, meterRegistry);
+        // 기본: 같은 파일의 기존 완료 run 없음 — 멱등 경로 테스트가 개별 재정의한다.
+        org.mockito.Mockito.lenient().when(loadRunPort.findCompletedByFileSha256(any()))
+                .thenReturn(java.util.Optional.empty());
     }
 
     private InputStream anyInput() {
@@ -90,5 +95,37 @@ class ReconcilePgFileServiceTest {
         assertThat(run.getStatus()).isEqualTo(ReconciliationRunStatus.FAILED);
         assertThat(run.getNote()).contains("깨진 CSV");
         verify(savePort).saveAll(any(ReconciliationRun.class));
+    }
+
+    @Test
+    @DisplayName("같은 파일 재업로드: 기존 COMPLETED run 을 멱등 반환하고 새 run 을 만들지 않는다 (이중 clawback 차단)")
+    void reconcile_duplicateFile_returnsExistingRun() {
+        ReconciliationRun existing = ReconciliationRun.rehydrate(
+                77L, "TOSS", DATE, "toss.csv", "dummy-sha", ReconciliationRunStatus.COMPLETED,
+                java.time.LocalDateTime.now(), java.time.LocalDateTime.now(),
+                2, 2, 2, 0, 0, "ops-1", null, List.of());
+        when(loadRunPort.findCompletedByFileSha256(any())).thenReturn(java.util.Optional.of(existing));
+
+        ReconciliationRun run = service.reconcile("TOSS", DATE, "toss.csv", anyInput(), "ops-2");
+
+        assertThat(run.getId()).isEqualTo(77L);
+        verify(savePort, org.mockito.Mockito.never()).saveAll(any(ReconciliationRun.class));
+        verify(parsePort, org.mockito.Mockito.never()).parse(any());
+        assertThat(Search.in(meterRegistry).name("pg.reconciliation.duplicate_file.hit")
+                .counter().count()).isEqualTo(1.0);
+    }
+
+    @Test
+    @DisplayName("새 run 에는 파일 SHA-256 이 저장된다 — DB 부분 UNIQUE(COMPLETED) 멱등 키")
+    void reconcile_storesFileSha256() {
+        when(parsePort.parse(any())).thenReturn(List.of());
+        when(loadPort.loadByCapturedDate(DATE)).thenReturn(List.of());
+        when(savePort.saveAll(any(ReconciliationRun.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ReconciliationRun run = service.reconcile("TOSS", DATE, "toss.csv", anyInput(), "ops-1");
+
+        // "file" 바이트의 SHA-256 — 해시가 내용 기준으로 계산돼 저장됨을 고정한다.
+        assertThat(run.getFileSha256())
+                .isEqualTo("3b9c358f36f0a31b6ad3e14f309c7cf198ac9246e8316f9ce543d5b19ac02b80");
     }
 }

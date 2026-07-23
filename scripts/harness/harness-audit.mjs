@@ -133,6 +133,31 @@ function validateModuleRoster(read, trackedSet, errors) {
   }
 }
 
+// HARNESS.md 라우팅 맵(🤖📘⌘ 아이콘 줄)의 backtick 진입점 토큰을 실존 검증 —
+// 에이전트·스킬·커맨드를 삭제/개명하고 라우팅 맵을 안 고치면 audit 이 실패한다.
+// 토큰 규칙: `name`(agents/skills/commands 중 하나) · `/name`(커맨드 전용).
+// 점(.)·슬래시(/)·중괄호가 섞인 토큰(파일명·플레이스홀더)은 대상 밖 — 수동 스니펫과 동일 스코프.
+export function parseRoutingEntrypoints(markdown) {
+  const tokens = new Set();
+  for (const line of String(markdown).split(/\r?\n/)) {
+    if (!/[🤖📘⌘]/u.test(line)) continue;
+    for (const match of line.matchAll(/`(\/?[a-z][a-z0-9-]+)`/g)) tokens.add(match[1]);
+  }
+  return [...tokens];
+}
+
+function validateRoutingMap(read, trackedSet, errors) {
+  if (!trackedSet.has('HARNESS.md')) return;
+  for (const token of parseRoutingEntrypoints(read('HARNESS.md'))) {
+    const name = token.startsWith('/') ? token.slice(1) : token;
+    const command = trackedSet.has(`.claude/commands/${name}.md`);
+    const resolved = token.startsWith('/')
+      ? command
+      : command || trackedSet.has(`.claude/agents/${name}.md`) || trackedSet.has(`.claude/skills/${name}/SKILL.md`);
+    if (!resolved) errors.push(`HARNESS.md routing map dangling: ${token} (진입점이 agents/skills/commands 에 없음)`);
+  }
+}
+
 function validateStatus(status, tracked, errors) {
   const checks = [
     ['application.yml', tracked.filter((p) => /\/src\/main\/resources\/application\.yml$/.test(p)).length, [/application\.yml[^\n]*?\*\*(\d[\d,]*)[^\d\n*]*\*\*/i, /application\.yml[^\n]*?→\s*(\d[\d,]*)/i]],
@@ -169,6 +194,7 @@ export function collectAudit(repoRoot, manifest) {
 
   if (trackedSet.has('STATUS.md')) validateStatus(read('STATUS.md'), tracked, errors);
   validateModuleRoster(read, trackedSet, errors);
+  validateRoutingMap(read, trackedSet, errors);
 
   for (const pair of manifest.criticalContractPairs) {
     if (!trackedSet.has(pair.claude) || !trackedSet.has(pair.codex)) continue;
@@ -188,14 +214,27 @@ export function collectAudit(repoRoot, manifest) {
     }
   }
 
+  // 컨텍스트 예산(KPI-5): 세션마다 강제 로드되는 상주 문서 vs 온디맨드 스킬의 바이트.
+  // 상주 비중이 늘면 온디맨드 설계(스킬 분리)가 무너지고 있다는 신호 — 정보 지표, 게이트 아님.
+  const bytesOf = (path) => {
+    try { return trackedSet.has(path) ? Buffer.byteLength(read(path), 'utf8') : 0; } catch { return 0; }
+  };
+  const skillFiles = tracked.filter((p) => /^\.claude\/skills\/.*\/SKILL\.md$/.test(p));
+  const contextBudget = {
+    residentBytes: bytesOf('CLAUDE.md'),
+    onDemandSkillCount: skillFiles.length,
+    onDemandSkillBytes: skillFiles.reduce((sum, path) => sum + bytesOf(path), 0),
+  };
+
   return {
     checks: [],
     failures: errors,
     errors,
+    contextBudget,
     inventory: {
       trackedFiles: tracked,
       agents: tracked.filter((p) => /^\.claude\/agents\/.*\.md$/.test(p)).length,
-      skills: tracked.filter((p) => /^\.claude\/skills\/.*\/SKILL\.md$/.test(p)).length,
+      skills: skillFiles.length,
       commands: tracked.filter((p) => /^\.claude\/commands\/.*\.md$/.test(p)).length,
     },
   };
@@ -219,6 +258,10 @@ export async function runAuditCli(args, io = {}) {
     const manifest = validateManifest(JSON.parse(readFileSync(resolve(root, ...manifestPath.split('/')), 'utf8')));
     const result = collectAudit(root, manifest);
     for (const error of result.errors) stdout(`FAIL ${error}\n`);
+    const { residentBytes, onDemandSkillCount, onDemandSkillBytes } = result.contextBudget;
+    const totalBytes = residentBytes + onDemandSkillBytes;
+    const kb = (bytes) => `${(bytes / 1024).toFixed(1)}KB`;
+    stdout(`info resident-context: 상주 CLAUDE.md ${kb(residentBytes)} · 온디맨드 스킬 ${onDemandSkillCount}개 ${kb(onDemandSkillBytes)} (상주 비중 ${totalBytes ? Math.round((residentBytes / totalBytes) * 100) : 0}%)\n`);
     stdout(result.errors.length ? `harness-audit: ${result.errors.length} failure(s)\n` : 'harness-audit: healthy\n');
     return result.errors.length ? 1 : 0;
   } catch (error) {

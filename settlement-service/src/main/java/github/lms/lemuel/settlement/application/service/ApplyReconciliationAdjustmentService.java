@@ -2,6 +2,8 @@ package github.lms.lemuel.settlement.application.service;
 
 import github.lms.lemuel.common.audit.application.AuditLogger;
 import github.lms.lemuel.common.audit.domain.AuditAction;
+import github.lms.lemuel.ledger.application.port.in.EnqueueLedgerTaskPort;
+import github.lms.lemuel.recovery.application.port.in.RecordPostPayoutRecoveryUseCase;
 import github.lms.lemuel.settlement.application.port.in.ApplyReconciliationAdjustmentUseCase;
 import github.lms.lemuel.settlement.application.port.out.LoadSettlementPort;
 import github.lms.lemuel.settlement.application.port.out.SaveSettlementAdjustmentPort;
@@ -42,6 +44,8 @@ public class ApplyReconciliationAdjustmentService implements ApplyReconciliation
     private final LoadSettlementPort loadSettlementPort;
     private final SaveSettlementPort saveSettlementPort;
     private final SaveSettlementAdjustmentPort saveSettlementAdjustmentPort;
+    private final EnqueueLedgerTaskPort enqueueLedgerTaskPort;
+    private final RecordPostPayoutRecoveryUseCase recordPostPayoutRecoveryUseCase;
     private final MeterRegistry meterRegistry;
     private final AuditLogger auditLogger;
     /** KST 기준 시각 소스 — clawback 조정 기준일이 JVM 타임존에 흔들리지 않게 한다. */
@@ -50,12 +54,16 @@ public class ApplyReconciliationAdjustmentService implements ApplyReconciliation
     public ApplyReconciliationAdjustmentService(LoadSettlementPort loadSettlementPort,
                                                 SaveSettlementPort saveSettlementPort,
                                                 SaveSettlementAdjustmentPort saveSettlementAdjustmentPort,
+                                                EnqueueLedgerTaskPort enqueueLedgerTaskPort,
+                                                RecordPostPayoutRecoveryUseCase recordPostPayoutRecoveryUseCase,
                                                 MeterRegistry meterRegistry,
                                                 AuditLogger auditLogger,
                                                 Clock clock) {
         this.loadSettlementPort = loadSettlementPort;
         this.saveSettlementPort = saveSettlementPort;
         this.saveSettlementAdjustmentPort = saveSettlementAdjustmentPort;
+        this.enqueueLedgerTaskPort = enqueueLedgerTaskPort;
+        this.recordPostPayoutRecoveryUseCase = recordPostPayoutRecoveryUseCase;
         this.meterRegistry = meterRegistry;
         this.auditLogger = auditLogger;
         this.clock = clock;
@@ -84,12 +92,19 @@ public class ApplyReconciliationAdjustmentService implements ApplyReconciliation
             settlement.consumeHoldbackForRefund(clawbackAmount);
             settlement.applyReconciliationClawback(clawbackAmount); // DONE 이면 여기서 throw
         } catch (InvalidSettlementStateException done) {
-            // DONE 정산: 도메인이 금액 변경을 거부 → 정산은 저장하지 않는다(holdback 변경도 폐기됨).
-            // 갭 추적을 위해 감사 레코드만 남기고 정상 반환한다(chargeback 처럼 실제 회수는 이관).
-            // payout 은 되돌리지 않는다(scope 밖).
-            saveSettlementAdjustmentPort.save(SettlementAdjustment.ofReconciliation(
-                    settlement.getId(), discrepancyId, clawbackAmount, today));
-            log.warn("[PgRecon] DONE 정산 — clawback 직접 적용 불가, 감사 레코드만 기록(수기 회수 이관). "
+            // DONE 정산: 도메인이 net 변경을 거부 → 이 인스턴스는 저장하지 않는다. 단 holdback 흡수는
+            // 폐기로 끝나지 않는다 — recordIfPostPayout 이 fresh load 로 재적용·영속한다(미지급 유보금 감소).
+            // 조정 ↔ 역분개 1:1(INV-5) 은 여기서도 지킨다 — 역분개가 깎는 미지급금(AP)의 반대급부는
+            // 채권 발생 분개(Dr AR / Cr AP)가 미수금으로 전환한다. 송금 완료(payout COMPLETED)면
+            // holdback 흡수 후 잔여를 채권으로 열어 후속 정산에서 상계한다(seed-p0-6).
+            SettlementAdjustment adjustment = saveSettlementAdjustmentPort.save(
+                    SettlementAdjustment.ofReconciliation(
+                            settlement.getId(), discrepancyId, clawbackAmount, today));
+            enqueueLedgerTaskPort.enqueueReverseReconciliation(
+                    settlement.getId(), discrepancyId, clawbackAmount, today);
+            recordPostPayoutRecoveryUseCase.recordIfPostPayout(
+                    settlement.getId(), adjustment.getId(), clawbackAmount, today);
+            log.warn("[PgRecon] DONE 정산 — clawback 직접 적용 불가, 조정·역분개·지급후 채권으로 처리. "
                             + "discrepancyId={}, settlementId={}, clawback={}",
                     discrepancyId, settlement.getId(), clawbackAmount);
             meterRegistry.counter(METRIC_SKIPPED, "reason", "settlement_done_manual_clawback").increment();
@@ -101,6 +116,11 @@ public class ApplyReconciliationAdjustmentService implements ApplyReconciliation
 
         saveSettlementAdjustmentPort.save(SettlementAdjustment.ofReconciliation(
                 adjusted.getId(), discrepancyId, clawbackAmount, today));
+
+        // PG_RECONCILIATION 출처 원장 역분개를 같은 트랜잭션 Outbox 에 적재 — 조정 ↔ 역분개 1:1 (환불 경로 동형).
+        // DONE 정산(위 catch) 은 지급 완료라 역분개하지 않는다(송금후 회수는 범위 밖). 이중 적재는
+        // uq_ledger_reference_accounts (reference_type=PG_RECONCILIATION) 가 최종 차단한다.
+        enqueueLedgerTaskPort.enqueueReverseReconciliation(adjusted.getId(), discrepancyId, clawbackAmount, today);
 
         log.info("[PgRecon] 대사 clawback 적용 완료. discrepancyId={}, settlementId={}, clawback={}, netAmount={}, status={}",
                 discrepancyId, adjusted.getId(), clawbackAmount, adjusted.getNetAmount(), adjusted.getStatus());

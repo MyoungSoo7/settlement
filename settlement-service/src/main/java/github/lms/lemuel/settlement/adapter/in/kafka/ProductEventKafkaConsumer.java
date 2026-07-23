@@ -2,6 +2,7 @@ package github.lms.lemuel.settlement.adapter.in.kafka;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import github.lms.lemuel.common.outbox.adapter.in.kafka.ConsumedEventQuarantine;
 import github.lms.lemuel.common.outbox.adapter.in.kafka.IdempotentEventConsumer;
 import github.lms.lemuel.common.outbox.adapter.in.kafka.ProcessedEventRepository;
 import github.lms.lemuel.settlement.adapter.out.readmodel.SettlementProductViewJpaEntity;
@@ -35,8 +36,9 @@ public class ProductEventKafkaConsumer extends IdempotentEventConsumer {
     public ProductEventKafkaConsumer(SettlementProductViewRepository productViewRepository,
                                      ProcessedEventRepository processedEventRepository,
                                      ObjectMapper objectMapper,
-                                     SettlementProjectionMetrics projectionMetrics) {
-        super(processedEventRepository, objectMapper);
+                                     SettlementProjectionMetrics projectionMetrics,
+                                     ConsumedEventQuarantine quarantine) {
+        super(processedEventRepository, objectMapper, quarantine);
         this.productViewRepository = productViewRepository;
         this.projectionMetrics = projectionMetrics;
     }
@@ -63,10 +65,7 @@ public class ProductEventKafkaConsumer extends IdempotentEventConsumer {
 
     @Override
     protected void handle(JsonNode node, UUID eventId) {
-        if (!node.hasNonNull("productId")) {
-            throw new IllegalArgumentException("Missing productId, eventId=" + eventId);
-        }
-        Long productId = node.get("productId").asLong();
+        Long productId = requiredLong(node, "productId", eventId);
 
         SettlementProductViewJpaEntity view = productViewRepository.findById(productId)
                 .orElseGet(SettlementProductViewJpaEntity::new);

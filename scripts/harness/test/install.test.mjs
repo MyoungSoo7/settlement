@@ -78,6 +78,7 @@ function createRepo() {
   assert.equal(git(root, 'config', 'user.name', 'Harness Test').status, 0);
   assert.equal(git(root, 'config', 'user.email', 'harness@example.test').status, 0);
   cpSync(join(projectRoot, 'scripts/harness/guard.mjs'), join(root, 'scripts/harness/guard.mjs'), { recursive: true });
+  cpSync(join(projectRoot, 'scripts/harness/telemetry.mjs'), join(root, 'scripts/harness/telemetry.mjs'), { recursive: true });
   cpSync(join(projectRoot, 'scripts/harness/hooks/pre-commit'), join(root, 'scripts/harness/hooks/pre-commit'), { recursive: true });
   if (process.platform !== 'win32') chmodSync(join(root, 'scripts/harness/hooks/pre-commit'), 0o755);
   return root;

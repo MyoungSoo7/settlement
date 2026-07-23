@@ -13,7 +13,6 @@ import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.util.UUID;
 
 /**
@@ -36,7 +35,7 @@ public class CorporateLoanDisbursedConsumer extends IdempotentEventConsumer {
         this.recordAccountEntryUseCase = recordAccountEntryUseCase;
     }
 
-    @KafkaListener(topics = "${app.kafka.topic.corporate-loan-disbursed}", groupId = CONSUMER_GROUP)
+    @KafkaListener(topics = "${app.kafka.topic.corporate-loan-disbursed}", groupId = CONSUMER_GROUP, containerFactory = "kafkaListenerContainerFactory")
     @Transactional
     public void onCorporateLoanDisbursed(ConsumerRecord<String, String> record, Acknowledgment ack) {
         consume(record, ack);
@@ -50,12 +49,13 @@ public class CorporateLoanDisbursedConsumer extends IdempotentEventConsumer {
 
     @Override
     protected void handle(JsonNode node, UUID eventId) {
+        String stockCode = requiredText(node, "stockCode", eventId);
+        String loanId = requiredText(node, "loanId", eventId);
         AccountEntry entry = AccountEntry.corporateLoanDisbursed(
-                node.get("stockCode").asText(),
-                node.get("loanId").asText(),
-                new BigDecimal(node.get("principal").asText()));
+                stockCode,
+                loanId,
+                requiredDecimal(node, "principal", eventId));
         recordAccountEntryUseCase.record(entry);
-        log.info("법인 대출 분개 적재. eventId={}, loanId={}, stockCode={}",
-                eventId, node.get("loanId").asText(), node.get("stockCode").asText());
+        log.info("법인 대출 분개 적재. eventId={}, loanId={}, stockCode={}", eventId, loanId, stockCode);
     }
 }

@@ -1,6 +1,7 @@
 package github.lms.lemuel.payout.adapter.out.persistence;
 
 import github.lms.lemuel.payout.domain.PayoutStatus;
+import github.lms.lemuel.payout.domain.PayoutType;
 import jakarta.persistence.*;
 
 import java.math.BigDecimal;
@@ -20,6 +21,10 @@ public class PayoutJpaEntity {
 
     @Column(name = "settlement_id")
     private Long settlementId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payout_type", nullable = false, length = 20)
+    private PayoutType payoutType;
 
     @Column(name = "seller_id", nullable = false)
     private Long sellerId;
@@ -75,7 +80,7 @@ public class PayoutJpaEntity {
 
     protected PayoutJpaEntity() { }
 
-    public PayoutJpaEntity(Long id, Long settlementId, Long sellerId, BigDecimal amount,
+    public PayoutJpaEntity(Long id, Long settlementId, PayoutType payoutType, Long sellerId, BigDecimal amount,
                             String bankCode, String bankAccountNumber, String accountHolderName,
                             PayoutStatus status, String firmBankingTransactionId, String failureReason,
                             int retryCount, String operatorId,
@@ -84,6 +89,7 @@ public class PayoutJpaEntity {
                             LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.id = id;
         this.settlementId = settlementId;
+        this.payoutType = payoutType;
         this.sellerId = sellerId;
         this.amount = amount;
         this.bankCode = bankCode;
@@ -116,6 +122,7 @@ public class PayoutJpaEntity {
     public Long getId() { return id; }
     public Long getVersion() { return version; }
     public Long getSettlementId() { return settlementId; }
+    public PayoutType getPayoutType() { return payoutType; }
     public Long getSellerId() { return sellerId; }
     public BigDecimal getAmount() { return amount; }
     public String getBankCode() { return bankCode; }

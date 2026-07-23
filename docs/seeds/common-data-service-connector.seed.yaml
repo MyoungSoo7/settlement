@@ -1,0 +1,100 @@
+# Seed: common-data-service 범용 커넥터 as-is 사양 (Ouroboros 방법론 — Interview → Seed 결정화)
+# 상태: CONFIRMED (order/settlement seed 와 동일 방식 지시로 승인 승계, 2026-07-19)
+# 원칙: 이 Seed 는 "현행 코드가 실제로 하는 일"의 불변 기술이다. 결함은 교정하지 않고 known_issues 로만 기록한다.
+
+seed:
+  id: common-data-service-connector-v1
+  goal: >-
+    common-data-service(data.go.kr 범용 커넥터 — 데이터소스 레지스트리·표준봉투 파싱·
+    (source,record_key) 멱등 upsert·SSRF 차단)의 현행 동작을 실행 가능한 게이트에 매핑된
+    불변 사양으로 결정화해, 회귀 기준선 · 면접/포트폴리오 문서 · 후속 기능 베이스로 사용한다.
+
+  scope:
+    included:
+      - datasource 레지스트리 (등록 upsert·불변식·SSRF 검증)
+      - 수집 파이프라인 (표준봉투 파싱·페이지네이션·recordKey·payload 원문 보존)
+      - 공개 조회 (캐시·상한)
+      - 관리 표면 (admin 게이트·감사·동시실행 409)
+    excluded:
+      - audit 서브패키지 내부 (파티션·append-only 사실만 경계 기재)
+
+  constraints:
+    - "shared-common 의도적 미의존 (JWT·Outbox·Kafka 무관 — build.gradle.kts:7-12 주석 명문)"
+    - "Kafka 이벤트 발행/소비 없음 — 위성 서비스, 소비측은 HTTP pull"
+    - "payload 는 원문 보존 — 파싱·정규화·필드 선별 금지 (TEXT 컬럼이 의도, COMMENT 명문)"
+    - "데이터소스 등록 시 SSRF 차단 — 내부/사설/링크로컬(메타데이터)/ULA 주소 거부"
+    - "헥사고날: domain 은 spring/jpa/jackson 을 import 하지 않는다 (ArchUnit 강제)"
+    - "GET 공개 / /admin/commondata/** 는 AdminApiKeyFilter (운영 fail-closed)"
+
+  invariants:  # as-is 코드 사실 — 파일:라인 근거 (경로 접두 common-data-service/src/main/java/github/lms/lemuel/commondata/)
+    registry_pattern:
+      source: domain/DataSource.java:8-52
+      rule: "endpoint·defaultParams·keyFields 등록만으로 코드변경 없이 수집. 불변식: code ^[a-z0-9][a-z0-9-]{1,49}$, endpoint http(s) 강제, params/keyFields 불변복사, pageSize clamp(≤0→100, >1000→1000)"
+      upsert: "code 기준 upsert — 기존 소스는 null 필드 기존 값 보존(부분갱신) (DataSourceAdminService.java:37-64)"
+    envelope_parsing:
+      source: adapter/out/external/DataPortalApiClient.java:43-44,119-158
+      rule: "resultCode 00=OK, 03=NODATA(빈 리스트, 예외 아님), 그 외 예외. 아이템 노드 body.items.item[] 배열/단일객체/body.items 모두 지원. 응답이 '<' 시작(XML)이면 _type 등록 확인 명시 예외"
+      pagination: "pageNo 1~MAX_PAGES=100, totalCount 있으면 pageNo*pageSize≥totalCount 종료, 없으면 items<pageSize 종료 (:90-97). serviceKey 는 queryParam 으로 1회만 인코딩 (:107-113)"
+    record_key:
+      source: adapter/out/external/DataPortalApiClient.java:47-48,177-196
+      rule: "keyFields 값 | 조인. 필드 결측/blank 또는 >300자 → payload SHA-256 폴백 (by-design 멱등 수단)"
+    payload_preserve:
+      source: adapter/out/external/DataPortalApiClient.java:172-173
+      rule: "item JSON toString() 그대로 저장 — 파싱·정규화 0. TEXT 컬럼(JSONB 아님)이 의도 (V20260718400000:14-17 COMMENT)"
+    idempotent_upsert:
+      source: adapter/out/persistence/CommonDataPersistenceAdapter.java:84-93 + application/service/PortalSyncService.java:68-85
+      rule: "(source_id, record_key) 조회 → 있으면 payload/collectedAt 갱신, 없으면 생성. 개별 실패는 failed 집계 후 계속, 키/본문 결측은 skipped. 결과 SyncResult(scanned,upserted,skipped,failed)"
+      db: "data_records (source_id, record_key) UNIQUE uq_dr_source_key (V1__commondata_core.sql:31) · data_sources.code UNIQUE (V1:21)"
+    ssrf_block:
+      source: application/service/DataSourceAdminService.java:70-116
+      rule: "호스트명: localhost·.localhost·.local·.internal 차단. 리터럴 IP: loopback/anyLocal/siteLocal(10.x·172.16-31.x·192.168.x)/linkLocal(169.254.x — 클라우드 메타데이터)/IPv6 ULA fc00::/7 차단. DNS 조회는 의도적으로 안 함(javadoc 명문 — rebinding 은 미차단 트레이드오프)"
+    sync_trigger:
+      source: adapter/in/web/{CommonDataAdminController.java:70-103, SyncStatusTracker.java:18-47} + config/AsyncConfig.java:15-20
+      rule: "스케줄 수집 없음 — 수동 admin 트리거만. 202 + 가상스레드 백그라운드, CAS 선점으로 동시 1건(중복 409). catch(Throwable) 로 트래커 항상 해소(영구 RUNNING 방지)"
+    cache_coherency:
+      source: application/service/{DataQueryService.java:26-60, PortalSyncService.java:46, DataSourceAdminService.java:36}
+      rule: "Caffeine 5000건/600s + 수집·등록 후 @CacheEvict allEntries (TTL 만 믿지 않음). 조회 상한 limit ≤500(기본 100), 존재검증(404)이 페이징보다 먼저"
+
+  event_contracts:
+    published: []  # 없음 — Kafka 의존 자체가 빌드에 없음 (build.gradle.kts 의존 목록에 kafka 부재)
+    consumed: []
+    note: "위성 서비스 — 서비스 간 연계는 소비측 HTTP pull 만"
+
+  acceptance_criteria:  # 실행 가능 — 각 AC 는 기존 게이트에 매핑
+    - id: AC-1
+      criterion: DataSource 불변식(code 정규식·http 강제·clamp)과 등록 부분갱신 시맨틱이 일치한다
+      gate: "./gradlew :common-data-service:test — DataSourceTest·DataSourceAdminServiceTest"
+    - id: AC-2
+      criterion: 표준봉투 파싱(00/03/XML 방어)·페이지네이션 종료 조건·recordKey SHA-256 폴백이 일치한다
+      gate: "DataPortalApiClientTest"
+    - id: AC-3
+      criterion: SSRF 차단 목록(호스트명 4종 + IP 클래스 5종) 위반 0
+      gate: "DataSourceAdminServiceTest (SSRF 케이스)"
+    - id: AC-4
+      criterion: 헥사고날 의존 방향 위반 0
+      gate: "HexagonalArchitectureTest (ArchUnit 3룰)"
+    - id: AC-5
+      criterion: 커버리지 LINE >= 90%, commondata.domain INSTRUCTION >= 80%
+      gate: "./gradlew :common-data-service:jacocoTestCoverageVerification (check 편입)"
+
+  known_issues:  # 발견만 기록 — 사양은 as-is 유지
+    - id: KI-1
+      finding: "★ DRIFT: 스킬 :44 의 '시드 V2 kasi-rest-days 무키 데모'는 소멸 — 시드 마이그레이션 제거됨(migration 3파일뿐, application.yml:43-45 가 *:missing 관대 처리 명시). DATA_GO_KR_API_KEY 없으면 신규 배포는 데이터 0건. DataPortalProperties.java:9·application.yml:97 에 시드 잔재 주석"
+      disposition: doc-drift (스킬 갱신 필요) — 실수집 미검증(키 미보유)은 기존 메모리와 일치
+    - id: KI-2
+      finding: "API 키 미설정 sync → IllegalStateException 을 전역 핸들러가 409 CONFLICT 매핑 (PortalSyncService.java:48-51, GlobalExceptionHandler.java:24-27) — 의미상 503/422 가 자연스러움"
+      disposition: recorded-not-fixed (low)
+    - id: KI-3
+      finding: "수집이 최대 100페이지×1000행을 List 전량 메모리 적재 후 저장 — 스트리밍 아님 (DataPortalApiClient.java:73-100)"
+      disposition: recorded-not-fixed (low)
+    - id: KI-4
+      finding: "SyncStatusTracker 인메모리 단일 인스턴스 전제 — 멀티 replica 시 409 게이트 무력 (javadoc 명문). SSRF DNS rebinding 미차단도 javadoc 명문 트레이드오프"
+      disposition: by-design-documented
+    - id: KI-5
+      finding: "명시적 키 마스킹 유틸 부재 — 단 DATA_GO_KR_API_KEY 노출 경로 자체가 없음(URI 미로깅, isConfigured boolean 만 노출)"
+      disposition: by-design (노출 경로 0)
+
+  uses:
+    - regression-baseline
+    - interview-portfolio
+    - brownfield-base

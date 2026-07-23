@@ -30,6 +30,7 @@
 | [0025](0025-company-financial-master-unification.md) | 기업 마스터 단일화 (company ↔ financial) | Proposed |
 | [0026](0026-account-payout-cash-recognition.md) | 계정계 payout 현금흐름 인식 + 시산표 실검증 | Proposed |
 | [0027](0027-db-partitioning-retention-pk-standard.md) | DB 파티셔닝·리텐션·PK 전략 표준 + 유지보수 자동화 | Accepted |
+| [0028](0028-procedural-discipline-plugin-independence.md) | 절차 규율층 플러그인 독립 내재화 + 이중 라우팅 경계 | Accepted |
 
 > **0019 결번**: 0019 번은 ADR 이 작성된 적이 없다(결번). 문서·코드 어디에도 참조가 없어 유실이 아니라
 > 건너뛴 번호로 간주한다. 규칙 1(번호 재사용 금지)에 따라 재할당하지 않는다.

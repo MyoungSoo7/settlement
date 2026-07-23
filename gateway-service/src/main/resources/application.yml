@@ -76,7 +76,15 @@ spring:
               uri: ${SETTLEMENT_SERVICE_URI:http://localhost:8082}
               # SettlementController 는 /settlements(비-/api), 검색/원장/리포트는 /api, 운영 콘솔은 /admin.
               predicates:
-                - Path=/settlements/**,/api/settlements/**,/api/ledger/**,/api/reports/**,/admin/payouts/**,/admin/chargebacks/**,/admin/pg-reconciliation/**,/admin/reconciliation/**,/admin/dlq/**
+                - Path=/settlements/**,/api/settlements/**,/api/ledger/**,/api/reports/**,/admin/payouts/**,/admin/chargebacks/**,/admin/pg-reconciliation/**,/admin/reconciliation/**,/admin/dlq/**,/admin/backfill/**,/admin/event-track/**
+            - id: market-stream-service
+              uri: ${MARKET_STREAM_SERVICE_URI:http://localhost:8110}
+              # 폴리글랏(Go, 8110) 실시간 시세 SSE — 공개 read-only 스트림만 라우팅.
+              # 서비스 실경로는 /stream/{code} 라 프리픽스를 벗겨 전달한다. /ws/** 는 미노출(프론트는 SSE 만 사용).
+              predicates:
+                - Path=/api/market-stream/**
+              filters:
+                - RewritePath=/api/market-stream/(?<segment>.*), /$\{segment}
 
 server:
   port: 8080

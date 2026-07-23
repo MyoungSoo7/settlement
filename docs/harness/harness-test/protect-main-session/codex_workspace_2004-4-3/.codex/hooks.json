@@ -1,0 +1,30 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /Users/jaegyu.lee/Project/fast/practice-materials/chapter-04/codex_workspace_2004-4-3/.codex/hooks/session_start.py",
+            "timeout": 30,
+            "statusMessage": "Loading 2004-4-3 harness state"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /Users/jaegyu.lee/Project/fast/practice-materials/chapter-04/codex_workspace_2004-4-3/.codex/hooks/review_gate.py",
+            "timeout": 30,
+            "statusMessage": "Reviewing handoff artifact"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "route",
+  "ts": "2026-06-11T19:50:44",
+  "sha256": "b9969fa00d605093",
+  "rewind_reason": "",
+  "payload": {
+    "route": "exit",
+    "final": "handoffs/final-1page-draft.md",
+    "preserved_passes": [
+      "L5",
+      "L6"
+    ]
+  }
+}

@@ -3,6 +3,7 @@ package github.lms.lemuel.integrity.adapter.in.batch;
 import github.lms.lemuel.integrity.application.port.in.IntegrityQueryUseCase;
 import github.lms.lemuel.integrity.domain.HoldbackStatusReport;
 import github.lms.lemuel.integrity.domain.LedgerCompletenessReport;
+import github.lms.lemuel.integrity.domain.PayoutBounceReconReport;
 import github.lms.lemuel.integrity.domain.PayoutReconReport;
 import github.lms.lemuel.integrity.domain.RefundAdjustmentReport;
 import github.lms.lemuel.integrity.domain.StuckStateReport;
@@ -53,6 +54,7 @@ class IntegrityMonitorSchedulerTest {
         lenient().when(useCase.checkHoldbackStatus()).thenReturn(okHoldback());
         lenient().when(useCase.checkStuckStates(null)).thenReturn(okStuck());
         lenient().when(useCase.checkRefundAdjustments(YESTERDAY, YESTERDAY)).thenReturn(okRefund());
+        lenient().when(useCase.checkPayoutBounceRecon()).thenReturn(okPayoutBounceRecon());
     }
 
     @Test
@@ -74,7 +76,7 @@ class IntegrityMonitorSchedulerTest {
                 YESTERDAY, 1, new BigDecimal("100"), 1, new BigDecimal("200"), 0,
                 List.of(),
                 List.of(new PayoutReconReport.OverpaidPayout(9L, 1L, new BigDecimal("200"), new BigDecimal("100"))),
-                List.of()));
+                List.of(), List.of()));
 
         scheduler.runDailyChecks();
 
@@ -82,6 +84,21 @@ class IntegrityMonitorSchedulerTest {
                 "check", "payout-recon", "result", "violation").count()).isEqualTo(1.0);
         assertThat(meterRegistry.find("settlement.integrity.violation")
                 .tag("check", "ledger-completeness").counter()).isNull();
+    }
+
+    @Test
+    @DisplayName("INV-13 위반(고아 재지급 payout) → 해당 check 의 violation{result=violation} 만 증가")
+    void payoutBounceReconViolation_incrementsThatCheck() {
+        stubAllOk();
+        when(useCase.checkPayoutBounceRecon()).thenReturn(
+                PayoutBounceReconReport.of(0, 0, 0, List.of(), List.of(), List.of(777L)));
+
+        scheduler.runDailyChecks();
+
+        assertThat(meterRegistry.counter("settlement.integrity.violation",
+                "check", "payout-bounce-recon", "result", "violation").count()).isEqualTo(1.0);
+        assertThat(meterRegistry.find("settlement.integrity.violation")
+                .tag("check", "payout-recon").counter()).isNull();
     }
 
     @Test
@@ -108,7 +125,7 @@ class IntegrityMonitorSchedulerTest {
 
     private static PayoutReconReport okPayout() {
         return PayoutReconReport.of(YESTERDAY, 0, BigDecimal.ZERO, 0, BigDecimal.ZERO, 0,
-                List.of(), List.of(), List.of());
+                List.of(), List.of(), List.of(), List.of());
     }
 
     private static HoldbackStatusReport okHoldback() {
@@ -123,5 +140,9 @@ class IntegrityMonitorSchedulerTest {
     private static RefundAdjustmentReport okRefund() {
         return RefundAdjustmentReport.of(YESTERDAY, YESTERDAY, 0, BigDecimal.ZERO, 0,
                 List.of(), BigDecimal.ZERO, false);
+    }
+
+    private static PayoutBounceReconReport okPayoutBounceRecon() {
+        return PayoutBounceReconReport.of(0, 0, 0, List.of(), List.of(), List.of());
     }
 }

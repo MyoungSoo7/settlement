@@ -2,6 +2,7 @@ package github.lms.lemuel.settlement.adapter.in.kafka;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import github.lms.lemuel.common.outbox.adapter.in.kafka.ConsumedEventQuarantine;
 import github.lms.lemuel.common.outbox.adapter.in.kafka.IdempotentEventConsumer;
 import github.lms.lemuel.common.outbox.adapter.in.kafka.ProcessedEventRepository;
 import github.lms.lemuel.settlement.adapter.out.readmodel.SettlementOrderViewJpaEntity;
@@ -36,8 +37,9 @@ public class OrderEventKafkaConsumer extends IdempotentEventConsumer {
     public OrderEventKafkaConsumer(SettlementOrderViewRepository orderViewRepository,
                                    ProcessedEventRepository processedEventRepository,
                                    ObjectMapper objectMapper,
-                                   SettlementProjectionMetrics projectionMetrics) {
-        super(processedEventRepository, objectMapper);
+                                   SettlementProjectionMetrics projectionMetrics,
+                                   ConsumedEventQuarantine quarantine) {
+        super(processedEventRepository, objectMapper, quarantine);
         this.orderViewRepository = orderViewRepository;
         this.projectionMetrics = projectionMetrics;
     }
@@ -64,10 +66,7 @@ public class OrderEventKafkaConsumer extends IdempotentEventConsumer {
 
     @Override
     protected void handle(JsonNode node, UUID eventId) {
-        if (!node.hasNonNull("orderId")) {
-            throw new IllegalArgumentException("Missing orderId, eventId=" + eventId);
-        }
-        Long orderId = node.get("orderId").asLong();
+        Long orderId = requiredLong(node, "orderId", eventId);
 
         SettlementOrderViewJpaEntity view = orderViewRepository.findById(orderId)
                 .orElseGet(SettlementOrderViewJpaEntity::new);

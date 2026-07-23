@@ -140,6 +140,68 @@ class ReverseEntryServiceTest {
         }
     }
 
+    @Nested
+    class 출처별_역분개 {
+
+        @Test
+        void 차지백_역분개는_환불과_동일_계정매핑_CHARGEBACK_REVERSED() {
+            List<LedgerEntry> rows = service.reverseForReference(
+                    1L, 300L, ReferenceType.CHARGEBACK, bd("10000"), TODAY);
+
+            assertThat(rows).hasSize(2);
+            assertThat(rows.get(0).getReferenceType()).isEqualTo(ReferenceType.CHARGEBACK);
+            assertThat(rows.get(0).getReferenceId()).isEqualTo(300L);
+            assertThat(rows.get(0).getEntryType()).isEqualTo(LedgerEntryType.CHARGEBACK_REVERSED);
+            assertThat(rows.get(0).getDebitAccount()).isEqualTo(AccountType.SALES_REFUND);
+            assertThat(rows.get(0).getCreditAccount()).isEqualTo(AccountType.ACCOUNTS_PAYABLE);
+            assertThat(rows.get(0).getAmount()).isEqualByComparingTo("9700.00");
+            assertThat(rows.get(1).getCreditAccount()).isEqualTo(AccountType.COMMISSION_REVENUE);
+            assertThat(rows.get(1).getAmount()).isEqualByComparingTo("300.00");
+        }
+
+        @Test
+        void PG대사_역분개_RECON_REVERSED_비율분해() {
+            List<LedgerEntry> rows = service.reverseForReference(
+                    1L, 400L, ReferenceType.PG_RECONCILIATION, bd("5000"), TODAY);
+
+            assertThat(rows).hasSize(2);
+            assertThat(rows.get(0).getReferenceType()).isEqualTo(ReferenceType.PG_RECONCILIATION);
+            assertThat(rows.get(0).getEntryType()).isEqualTo(LedgerEntryType.RECON_REVERSED);
+            assertThat(rows.get(0).getAmount()).isEqualByComparingTo("4850.00");
+            assertThat(rows.get(1).getAmount()).isEqualByComparingTo("150.00");
+        }
+
+        @Test
+        void 같은_출처_두번_호출하면_두번째는_빈리스트_멱등() {
+            List<LedgerEntry> first = service.reverseForReference(
+                    1L, 500L, ReferenceType.CHARGEBACK, bd("1000"), TODAY);
+            List<LedgerEntry> second = service.reverseForReference(
+                    1L, 500L, ReferenceType.CHARGEBACK, bd("1000"), TODAY);
+
+            assertThat(first).hasSize(2);
+            assertThat(second).isEmpty();
+        }
+
+        @Test
+        void 같은_id라도_출처타입이_다르면_각각_생성된다() {
+            // refundId=700 REFUND 와 chargebackId=700 CHARGEBACK 은 서로 다른 참조.
+            List<LedgerEntry> refund = service.reverseForReference(
+                    1L, 700L, ReferenceType.REFUND, bd("1000"), TODAY);
+            List<LedgerEntry> chargeback = service.reverseForReference(
+                    1L, 700L, ReferenceType.CHARGEBACK, bd("1000"), TODAY);
+
+            assertThat(refund).hasSize(2);
+            assertThat(chargeback).hasSize(2);
+        }
+
+        @Test
+        void SETTLEMENT_referenceType_은_역분개_불가() {
+            assertThatThrownBy(() -> service.reverseForReference(
+                    1L, 600L, ReferenceType.SETTLEMENT, bd("1000"), TODAY))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+    }
+
     private static BigDecimal bd(String v) { return new BigDecimal(v); }
 
     // ========== fakes (CreateLedgerEntryServiceTest 와 동일 구조) ==========

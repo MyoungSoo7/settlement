@@ -144,13 +144,16 @@ public class Chargeback {
 
     /**
      * 분쟁 발생 후 정산이 생성되면 settlementId 를 백필.
-     * 종료 상태에서는 변경 금지.
+     *
+     * <p>백필(null → 값 채우기)은 종료 상태(ACCEPTED/REJECTED)에서도 허용한다 — 정산 전에 결정이
+     * 끝난 분쟁도 정산 생성 시점에 연결돼야 ACCEPTED 환수 조정이 만들어질 수 있다.
+     * 이미 연결된 값의 <b>변경</b>은 종료 상태에서 금지한다(감사 불변).
      */
     public void linkSettlement(Long settlementId) {
         if (settlementId == null || settlementId <= 0) {
             throw new ChargebackInvariantViolationException("settlementId 는 양수");
         }
-        if (this.status.isFinal()) {
+        if (this.settlementId != null && this.status.isFinal()) {
             throw new InvalidChargebackStateException(this.status, "종료 상태에서는 settlementId 변경 불가");
         }
         this.settlementId = settlementId;

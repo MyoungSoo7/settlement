@@ -1,6 +1,6 @@
 ---
 name: financial-data-rules
-description: 재무제표 공개조회 서비스 규칙 — 5개 비율은 저장 않고 도메인 계산(null=N/A), DART 수집+시드 폴백, GET 공개/admin 게이트, PER/PBR 금지 경계. financial-statements-service 로직 작성·리뷰 시 로드.
+description: 재무제표 공개조회 서비스 규칙 — 5개 비율은 저장 않고 도메인 계산(null=N/A), DART 실수집 전용(샘플 시드 제거됨), GET 공개/admin 게이트, PER/PBR 금지 경계. financial-statements-service 로직 작성·리뷰 시 로드.
 ---
 
 # 재무제표 데이터 규칙 (financial-statements-service)
@@ -24,24 +24,26 @@ loan 기업신용대출·investment 투자점수의 **회계자료 원천(SSOT)*
 
 - 공통 `ratio()`: null 계정·0 분모면 **null 반환(예외 아님)** → 표시계층 N/A. 반올림 `HALF_UP` 소수 2자리.
   **이 null=N/A 시맨틱을 소비측(loan/investment)이 상속** — 예외로 바꾸면 계약 파괴.
-- `isBalanced(tol)`: |자산−(부채+자본)| ≤ 자산×허용오차. 시드는 `자본=자산−부채`로 통과하게 구성.
+- `isBalanced(tol)`: |자산−(부채+자본)| ≤ 자산×허용오차.
 - 생성자 불변식: stockCode 길이=6, fiscalYear 1990~2100, fsDivision·source 필수, currency 기본 KRW.
-- `Company`: 정체성은 **stockCode**(equals/hashCode). corpCode(DART 8자리)는 nullable(시드 단계 미상, 동기화가 채움).
+- `Company`: 정체성은 **stockCode**(equals/hashCode). corpCode(DART 8자리)는 nullable(수집 전 미상, 동기화가 채움).
 
 ## enum
 
 - `FsDivision`: `CFS`(연결)/`OFS`(별도) — DART fs_div 와 동일. UNIQUE `(stockCode, fiscalYear, fsDivision)` → 연결/별도 별개 행.
   DART 파싱은 **CFS 계정 있으면 CFS, 없으면 OFS**.
-- `StatementSource`: `SEED`/`DART`. DART upsert 가 SEED 를 대체.
+- `StatementSource`: `SEED`(레거시 — 제거된 샘플 시드의 기존 DB 잔존 행 호환용)/`DART`. DART upsert 가 SEED 를 대체.
 
-## DART 수집 + 시드 폴백
+## DART 수집 (실데이터 전용 — 샘플 시드는 제거됨)
 
 - `DartApiClient`: corpCode.xml(상장만)·company.json(corp_cls Y=코스피/K=코스닥)·fnlttSinglAcnt(reprt_code=11011 연간).
   status `000`=OK, `013`=데이터없음(empty), 그 외 예외. **XXE 방어**(secure processing + disallow-doctype).
-- `DART_API_KEY` 미설정 → 수집 비활성(시드로만 동작). 쿼터 보호 호출간 150ms sleep, 일 2만콜.
+- 기업 동기화는 corp_cls **Y→KOSPI / K→KOSDAQ 매핑 upsert**, 코넥스(N)·기타(E)는 스킵(`CompanyProfile.marketOrNull`).
+- `DART_API_KEY` 미설정 → 수집 비활성(**데이터 공급 없음** — 스케줄러는 조용히 skip, 수동 트리거는 예외).
+  쿼터 보호 호출간 150ms sleep, 일 2만콜.
 - **개별 기업 실패는 집계만 하고 계속**(배치 전체 중단 금지). admin sync 는 202+백그라운드, 동시실행 409.
-- 시드: V2 코스피 20 + V3 코스닥 10(×2022~2024 CFS), `source='SEED'` 근사치. 금융지주는 revenue=NULL(N/A 검증용).
-  `자본=자산−부채` 정합 유지. DART sync 시 UNIQUE upsert 로 SEED→DART 대체.
+- 샘플 시드 마이그레이션(V2 코스피20+V3 코스닥10)은 **제거됨**(9d38e0ff5) — 기존 DB 는 Flyway
+  `ignore-migration-patterns: "*:missing"` 관대 처리, 신규 배포는 DART 자동 수집으로만 채운다.
 
 ## 보안·경계
 

@@ -5,6 +5,7 @@ import github.lms.lemuel.integrity.application.port.out.IntegrityQueryPort;
 import github.lms.lemuel.integrity.application.port.out.LoadCompletedRefundsPort;
 import github.lms.lemuel.integrity.domain.HoldbackStatusReport;
 import github.lms.lemuel.integrity.domain.LedgerCompletenessReport;
+import github.lms.lemuel.integrity.domain.PayoutBounceReconReport;
 import github.lms.lemuel.integrity.domain.PayoutReconReport;
 import github.lms.lemuel.integrity.domain.ProcessedEventCount;
 import github.lms.lemuel.integrity.domain.RefundAdjustmentReport;
@@ -64,6 +65,11 @@ public class IntegrityQueryService implements IntegrityQueryUseCase {
     @Override
     public PayoutReconReport checkPayoutRecon(LocalDate date) {
         return queryPort.payoutRecon(date);
+    }
+
+    @Override
+    public PayoutBounceReconReport checkPayoutBounceRecon() {
+        return queryPort.payoutBounceRecon();
     }
 
     @Override

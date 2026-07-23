@@ -4,9 +4,13 @@
 - 일자: 2026-07-07
 
 > **Update (이후 확장)**: 본문은 착수 시점의 cross-service 토픽 **8개**를 기준으로 기술한다. 이후
-> investment/account 서비스가 추가되며 `lemuel.investment.executed`, `lemuel.loan.corporate_loan_disbursed`
-> 계약 2개가 같은 패턴으로 편입되어 현재 스키마·정본 샘플은 **총 10개**다
-> (`shared-common/src/testFixtures/resources/contracts/events/`). 결정·구조는 동일하며 커버리지만 넓어졌다.
+> investment/account 서비스 추가로 `lemuel.investment.executed`·`lemuel.loan.corporate_loan_disbursed` 2개,
+> organization 서비스 추가로 `lemuel.organization.created`·`lemuel.organization.member_joined` 2개,
+> 통신면 감사(2026-07-17) 후속으로 `lemuel.loan.disbursement_requested`(loan→account GL 분개)·
+> `lemuel.company.reputation_changed`(company→loan 신용 프로젝션) 2개가 같은 패턴으로 편입되어
+> 현재 스키마·정본 샘플은 **총 14개**다 (`shared-common/src/testFixtures/resources/contracts/events/`).
+> 컨슈머 계약 테스트도 settlement·loan 에 더해 account(`AccountConsumerParsingTest` — 정본 샘플 기반)·
+> company(`EventContractConsumerTest`)로 확장되었다. 결정·구조는 동일하며 커버리지만 넓어졌다.
 
 > ADR 0022(Schema Registry)가 Proposed 로 남긴 "JSON + JSON Schema 검증(경량)" 대안을
 > **선행 단계로 실행**한 결정. SR 마이그레이션(0022 단계 0~5)과 배타적이지 않으며,

@@ -38,7 +38,7 @@ class PaymentRefundedViewConsumerTest {
     @BeforeEach
     void setUp() {
         consumer = new PaymentRefundedViewConsumer(paymentViewRepository, processedEventRepository, objectMapper,
-                new SettlementProjectionMetrics(new SimpleMeterRegistry()));
+                new SettlementProjectionMetrics(new SimpleMeterRegistry()), null);
     }
 
     private ConsumerRecord<String, String> refundedRecord(UUID eventId, String json) {

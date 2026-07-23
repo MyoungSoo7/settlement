@@ -1,0 +1,115 @@
+# Seed: investment-service 투자점수·투자주문 as-is 사양 (Ouroboros 방법론 — Interview → Seed 결정화)
+# 상태: CONFIRMED (order/settlement seed 와 동일 방식 지시로 승인 승계, 2026-07-19)
+# 원칙: 이 Seed 는 "현행 코드가 실제로 하는 일"의 불변 기술이다. 결함은 교정하지 않고 known_issues 로만 기록한다.
+# 자매 Seed: settlement-service-accounting-core (재원의 원천 = 확정 정산금)
+
+seed:
+  id: investment-service-scoring-order-v1
+  goal: >-
+    investment-service(CEO 투자하기 — 투자점수 3축·등급·투자주문·재원 검증)의 현행 동작을
+    실행 가능한 게이트에 매핑된 불변 사양으로 결정화해, 회귀 기준선 · 계약 드리프트 게이트 ·
+    면접/포트폴리오 문서 · 후속 기능 베이스로 사용한다.
+
+  scope:
+    included:
+      - 투자점수 (3축 밴드·등급 AAA~CCC·투자적격 경계)
+      - 투자주문 (상태머신·스냅샷·수동 멱등 키)
+      - 재원 (seller_funding_view 프로젝션·FOR UPDATE 직렬화)
+      - 발행 1토픽 + 소비 1토픽 계약 표면
+    excluded:
+      - 초보 투자 체크(BeginnerInvestmentCheck)·종목 추천 스크리닝 내부 (경계 사실만 기재)
+      - 외부 4서비스 API 클라이언트 페이로드 상세
+
+  constraints:
+    - "금액은 BigDecimal, scale 2 HALF_UP 정규화"
+    - "헥사고날: domain 은 adapter 를 import 하지 않는다 (ArchUnit 강제)"
+    - "이벤트 발행은 Outbox 경유만 — kafkaTemplate 직접 호출 없음 (ADR 0024)"
+    - "sellerId 는 요청 파라미터가 아니라 JWT 주체 파생 + 소유권 대조 403 (IDOR 방지)"
+    - "집행 가능액 = 확정 정산금 합 − EXECUTED 집행 합 — 이 공식 밖의 재원 산정 금지"
+    - "도메인 규칙 위반은 타입 도메인 예외(InvalidInvestmentOrderState/InvestmentInvariantViolation)로"
+
+  invariants:  # as-is 코드 사실 — 파일:라인 근거 (경로 접두 investment-service/src/main/java/github/lms/lemuel/investment/)
+    order_state_machine:
+      source: domain/InvestmentOrderStatus.java:29-42
+      transitions: "REQUESTED→APPROVED|REJECTED|CANCELED, APPROVED→EXECUTED|CANCELED; EXECUTED/REJECTED/CANCELED 종단"
+      enforcement: "도메인 메서드 approve/execute/reject/cancel 로만 전이 (InvestmentOrder.java:95-113), 위반 시 InvalidInvestmentOrderStateException → 400. DB CHECK 로 5개 상태 고정 (V1__investment_core.sql:17-18)"
+    score_policy_3axis:
+      source: domain/InvestmentScorePolicy.java:62-79,145-158
+      total: "0~100 = 수익성 35(영업이익률 20 + ROA 15) + 안정성 35(부채비율 20 AT_MOST + 자기자본비율 15) + 성장성 30(매출 YoY 15 + 순이익 YoY 15 공용 밴드)"
+      null_policy: "null/미매칭 → 0점(보수적). YoY 는 전기 signum≤0 → null → 0점 (:115-122). 직전 연도 전체 부재 → 성장성 중립 50%=15점 (:100-103). 재무제표 부재 → InvestmentInvariantViolationException (:28-30)"
+    grade_bands:
+      source: domain/InvestmentGrade.java:30-44 + domain/InvestmentScorePolicy.java:24,48
+      table: "≥90 AAA · ≥80 AA · ≥70 A · ≥60 BBB · ≥50 BB · ≥40 B · 미만 CCC. 투자적격 경계 = 총점 ≥60 (BBB 이상, INVESTABLE_THRESHOLD=60)"
+    funding_formula:
+      source: domain/SellerFunding.java:14-29
+      rule: "available = confirmedTotal − investedTotal(EXECUTED 합), 판정 covers() 단일 지점"
+      concurrency: "신청·집행 모두 재원 행 FOR UPDATE 직렬화 (PlaceInvestmentOrderService.java:100-105, ExecuteInvestmentOrderService.java:66-71) + investment_orders @Version 낙관적 락 (V20260716600000:15-16)"
+    execute_path_order:
+      source: application/service/ExecuteInvestmentOrderService.java:48-84
+      rule: "① 소유권 검증 먼저(403) → ② FOR UPDATE 재원 재검증 — 부족 시 order.reject() 확정 커밋(noRollbackFor=InsufficientFundingException) + 422 → ③ approve→execute→save→publishExecuted"
+    order_snapshot:
+      source: domain/InvestmentOrder.java:23-24,66-77
+      rule: "신청 시점 scoreAtOrder/gradeAtOrder 영구 보존. stockCode \\d{6}, 금액 양수(Money VO 정규화), DB CHECK amount>0 · score_at_order 0~100 (V20260715142000:18-20)"
+    manual_idempotency:
+      source: adapter/out/persistence/InvestmentManualIdempotencyGuard.java:20,46 + adapter/in/web/InvestmentController.java:108-164
+      rule: "place/execute/cancel 에 Idempotency-Key 선택 헤더 — INSERT ON CONFLICT DO NOTHING 선점, 중복 409. 응답 재생(replay)은 미지원(명시 주석). 키 미제공 시 미적용(하위호환)"
+    ownership:
+      source: adapter/in/web/InvestmentController.java:167-181
+      rule: "sellerId = AuthPrincipal.userId() 파생 (callerSellerId), 조회는 requireSelf 대조 403, 집행/취소는 서비스 계층 재대조"
+
+  event_contracts:
+    published:
+      - topic: lemuel.investment.executed
+        producer: adapter/out/event/InvestmentEventPublisherAdapter.java:33-44 (OutboxEvent.pending, 도메인 트랜잭션 내 저장)
+        payload: orderId·sellerId·stockCode·amount
+        consumer_side: account·notification
+    consumed:
+      - { topic: lemuel.settlement.confirmed, consumer: "SettlementConfirmedConsumer (group lemuel-investment, IdempotentEventConsumer 상속, app.kafka.enabled 조건부 — 기본 false)", effect: seller_funding_view 멱등 UPSERT (settlement_id PK) }
+    idempotency_3tier:
+      - "① outbox_events.event_id UNIQUE (V2__outbox_processed_events.sql:35-36)"
+      - "② processed_events (consumer_group, event_id) PK (V2:48-54)"
+      - "③ 도메인: seller_funding_view.settlement_id PK (V1:26) · stock_recommendations (recommended_date, stock_code) UNIQUE (V20260716500000:21)"
+    schema_source: shared-common/src/testFixtures/resources/contracts/events/lemuel.investment.executed.schema.json (ADR 0024)
+
+  acceptance_criteria:  # 실행 가능 — 각 AC 는 기존 게이트에 매핑
+    - id: AC-1
+      criterion: 투자주문 상태머신 전이표·타입 예외가 위 invariants 와 일치한다
+      gate: "./gradlew :investment-service:test — InvestmentOrderStatusTest·InvestmentOrderBoundaryTest"
+    - id: AC-2
+      criterion: 발행 1토픽·소비 1토픽이 JSON Schema 계약과 일치한다 (양방향)
+      gate: "InvestmentEventContractTest (프로듀서측) + EventContractConsumerTest (컨슈머측)"
+    - id: AC-3
+      criterion: 헥사고날 의존 방향·타 도메인서비스 코드 미의존 위반 0
+      gate: "InvestmentArchitectureTest (ArchUnit 3룰)"
+    - id: AC-4
+      criterion: 커버리지 LINE >= 90%
+      gate: "./gradlew :investment-service:jacocoTestCoverageVerification (check 편입)"
+    - id: AC-5
+      criterion: 3축 밴드 경계값·등급 경계(≥60 적격)·재원 공식이 정본 표와 일치한다
+      gate: "InvestmentScorePolicyTest·InvestmentGradeTest·SellerFundingTest (경계 전수)"
+    - id: AC-6
+      criterion: 동시 신청/집행에서 재원 초과 집행 0 · 수동 멱등 키 중복 409
+      gate: "InvestmentConcurrencyIntegrationTest·InvestmentManualIdempotencyIntegrationTest (Testcontainers — Docker 전제)"
+
+  known_issues:  # 발견만 기록 — 사양은 as-is 유지
+    - id: KI-1
+      finding: "부모 build.gradle.kts:132-150 핵심 도메인 INSTRUCTION 80% 엄격 패키지 목록에 investment.domain.* 미포함 — 금융 도메인인데 상위 게이트 누락 (LINE 90% 는 적용됨)"
+      disposition: recorded-not-fixed (게이트 비대칭)
+    - id: KI-2
+      finding: "app.kafka.enabled 기본 false — 운영 미주입 시 settlement.confirmed 소비가 조용히 중단되어 재원 프로젝션 미적재 (application.yml:138)"
+      disposition: by-design (브로커 없이 기동) — 운영 관점 silent gap
+    - id: KI-3
+      finding: "레거시 request() 오버로드가 LocalDateTime.now() 시스템 존 직접 호출 (InvestmentOrder.java:49-52, 구 경로/테스트 호환 주석) — 신규 경로는 Clock 주입"
+      disposition: by-design-documented (레거시 잔존)
+    - id: KI-4
+      finding: "추천 유니버스 설정 하드코딩(코스피 대형주) + V20260716500000:33-44 에 2026-07-15 추천 세트 데이터 INSERT 박제"
+      disposition: by-design (전체 종목 API 부재) — 시드가 마이그레이션에 박힌 점은 개선 후보
+    - id: KI-5
+      finding: "문서 드리프트(경미): 스킬 :42 와 CancelInvestmentOrderService.java:17 javadoc 이 전이 위반 예외를 IllegalStateException 으로 표기 — 실제는 InvalidInvestmentOrderStateException(400). 동작 동일, 타입명만 스테일. 스킬은 FOR UPDATE 신청 직렬화·@Version·수동 멱등 키도 미기재(코드가 스킬보다 앞섬)"
+      disposition: doc-drift (스킬 갱신 후보)
+
+  uses:
+    - regression-baseline
+    - contract-drift-gate
+    - interview-portfolio
+    - brownfield-base

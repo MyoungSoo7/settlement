@@ -91,7 +91,7 @@ app:
     # /admin/financial/** 게이트 공유 시크릿 — 미설정 시 통과+경고 (로컬 전용, 운영 필수)
     internal-api-key: ${FINANCIAL_INTERNAL_API_KEY:}
     dart:
-      # opendart.fss.or.kr 발급 인증키 — 미설정이면 수집 비활성(Flyway 시드 데이터로만 동작)
+      # opendart.fss.or.kr 발급 인증키 — 미설정이면 수집 비활성(데이터 공급 없음 — 샘플 시드는 제거됨)
       api-key: ${DART_API_KEY:}
       base-url: https://opendart.fss.or.kr/api
     sync:

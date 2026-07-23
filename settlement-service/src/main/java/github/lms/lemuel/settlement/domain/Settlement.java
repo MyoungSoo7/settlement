@@ -435,10 +435,14 @@ public class Settlement {
     }
 
     /**
-     * 환불 시 holdback 에서 우선 차감. holdback 잔액으로 충분하면 셀러 net 에는 영향 없음 —
+     * 환불·회수 시 holdback 에서 우선 차감. holdback 잔액으로 충분하면 셀러 net 에는 영향 없음 —
      * 신뢰도 낮은 셀러를 위한 안전장치 효과.
      *
-     * @return 실제 holdback 에서 차감된 금액 (나머지는 호출자가 일반 환불 흐름으로 처리)
+     * <p><b>DONE 정산에서도 허용되는 의도된 예외</b>(형제 조정 메서드들과 달리 DONE 가드 없음):
+     * holdback 은 아직 지급되지 않은 유보금이라, 지급후 회수(seed-p0-6)가 이를 흡수하는 것은
+     * 확정된 net·즉시지급분을 건드리지 않는다. net 을 바꾸는 조정은 여전히 DONE 에서 거부된다.
+     *
+     * @return 실제 holdback 에서 차감된 금액 (나머지는 호출자가 일반 환불/채권 흐름으로 처리)
      */
     public BigDecimal consumeHoldbackForRefund(BigDecimal refundAmount) {
         if (refundAmount == null || refundAmount.signum() <= 0) {

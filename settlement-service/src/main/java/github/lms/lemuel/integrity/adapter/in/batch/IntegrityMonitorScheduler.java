@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.function.Supplier;
 
 /**
- * 정합성 검증 상시 실행 스케줄러 — Integrity Suite 판정 5종(INV-5·6·7·8·11)을 매일 자동 실행한다.
+ * 정합성 검증 상시 실행 스케줄러 — Integrity Suite 판정 6종(INV-5·6·7·8·11·13)을 매일 자동 실행한다.
  *
  * <p>기존엔 {@code /admin/integrity/**} 또는 MCP 호출식이라 사람이 트리거하지 않으면 위반이 방치됐다.
  * 이 스케줄러가 상시 감시를 보장한다: 각 체크의 {@code ok=false} 는 ERROR 로그(reasons 포함) + 메트릭
@@ -71,6 +71,10 @@ public class IntegrityMonitorScheduler {
         });
         runCheck("refund-adjustments", () -> {
             var r = useCase.checkRefundAdjustments(yesterday, yesterday);
+            return new Verdict(r.ok(), r.reasons());
+        });
+        runCheck("payout-bounce-recon", () -> {
+            var r = useCase.checkPayoutBounceRecon();
             return new Verdict(r.ok(), r.reasons());
         });
 

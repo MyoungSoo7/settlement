@@ -1,0 +1,3 @@
+docs(status): ADR 수치 27개 갱신 (0028 추가 반영, STATUS·HARNESS 상호참조 정합)
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>

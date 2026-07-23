@@ -93,7 +93,7 @@ class PgReconciliationClawbackIntegrationTest {
 
     private PgReconciliationApprovedSettlementAdjustConsumer consumer() {
         return new PgReconciliationApprovedSettlementAdjustConsumer(
-                applyUseCase, processedEventRepository, objectMapper, new SimpleMeterRegistry());
+                applyUseCase, processedEventRepository, objectMapper, new SimpleMeterRegistry(), null);
     }
 
     @Test

@@ -1,0 +1,11 @@
+{
+  "name": "structured-contract",
+  "ts": "2026-06-11T19:50:44",
+  "sha256": "5f32bd373ccbb125",
+  "rewind_reason": "",
+  "payload": {
+    "requirements_sha": "40688366fe39fb72",
+    "spec_sha": "1ee67af37b7cf1d0",
+    "version": "v2"
+  }
+}

@@ -2,6 +2,7 @@ package github.lms.lemuel.settlement.adapter.in.kafka;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import github.lms.lemuel.common.outbox.adapter.in.kafka.ConsumedEventQuarantine;
 import github.lms.lemuel.common.outbox.adapter.in.kafka.IdempotentEventConsumer;
 import github.lms.lemuel.common.outbox.adapter.in.kafka.ProcessedEventRepository;
 import github.lms.lemuel.settlement.application.port.in.AdjustSettlementForRefundUseCase;
@@ -49,8 +50,9 @@ public class PaymentRefundedSettlementAdjustConsumer extends IdempotentEventCons
     public PaymentRefundedSettlementAdjustConsumer(AdjustSettlementForRefundUseCase adjustSettlementForRefundUseCase,
                                                    LoadSettlementPort loadSettlementPort,
                                                    ProcessedEventRepository processedEventRepository,
-                                                   ObjectMapper objectMapper) {
-        super(processedEventRepository, objectMapper);
+                                                   ObjectMapper objectMapper,
+                                                   ConsumedEventQuarantine quarantine) {
+        super(processedEventRepository, objectMapper, quarantine);
         this.adjustSettlementForRefundUseCase = adjustSettlementForRefundUseCase;
         this.loadSettlementPort = loadSettlementPort;
     }
@@ -77,10 +79,7 @@ public class PaymentRefundedSettlementAdjustConsumer extends IdempotentEventCons
 
     @Override
     protected void handle(JsonNode node, UUID eventId) {
-        if (!node.hasNonNull("paymentId")) {
-            throw new IllegalArgumentException("Missing paymentId, eventId=" + eventId);
-        }
-        Long paymentId = node.get("paymentId").asLong();
+        Long paymentId = requiredLong(node, "paymentId", eventId);
         Long refundId = node.hasNonNull("refundId") ? node.get("refundId").asLong() : null;
 
         BigDecimal delta = resolveRefundDelta(node, paymentId, eventId);

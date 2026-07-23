@@ -73,7 +73,7 @@ class EventContractConsumerTest {
         when(paymentViewRepository.findById(anyLong())).thenReturn(Optional.empty());
         PaymentEventKafkaConsumer consumer = new PaymentEventKafkaConsumer(
                 createSettlementUseCase, processedEventRepository, paymentViewRepository,
-                objectMapper, projectionMetrics, 0L);
+                objectMapper, projectionMetrics, null, 0L);
 
         String sample = EventContractValidator.canonicalSample("lemuel.payment.captured");
         consumer.onPaymentCaptured(recordOf("lemuel.payment.captured", sample), mock(Acknowledgment.class));
@@ -92,7 +92,7 @@ class EventContractConsumerTest {
         when(adjustUseCase.adjustSettlementForRefund(eq(1001L), any(), eq(42L)))
                 .thenReturn(mock(Settlement.class));
         PaymentRefundedSettlementAdjustConsumer consumer = new PaymentRefundedSettlementAdjustConsumer(
-                adjustUseCase, loadSettlementPort, processedEventRepository, objectMapper);
+                adjustUseCase, loadSettlementPort, processedEventRepository, objectMapper, null);
 
         String sample = EventContractValidator.canonicalSample("lemuel.payment.refunded");
         consumer.onPaymentRefunded(recordOf("lemuel.payment.refunded", sample), mock(Acknowledgment.class));
@@ -105,7 +105,7 @@ class EventContractConsumerTest {
     void loanRepaymentAppliedSample_flowsIntoApplyLoanDeduction() {
         when(processedEventRepository.existsById(any())).thenReturn(false);
         LoanRepaymentAppliedConsumer consumer = new LoanRepaymentAppliedConsumer(
-                applyLoanDeductionUseCase, processedEventRepository, objectMapper);
+                applyLoanDeductionUseCase, processedEventRepository, objectMapper, null);
 
         String sample = EventContractValidator.canonicalSample("lemuel.loan.repayment_applied");
         consumer.onLoanRepaymentApplied(recordOf("lemuel.loan.repayment_applied", sample), mock(Acknowledgment.class));
@@ -119,7 +119,7 @@ class EventContractConsumerTest {
         when(processedEventRepository.existsById(any())).thenReturn(false);
         when(orderViewRepository.findById(anyLong())).thenReturn(Optional.empty());
         OrderEventKafkaConsumer consumer = new OrderEventKafkaConsumer(
-                orderViewRepository, processedEventRepository, objectMapper, projectionMetrics);
+                orderViewRepository, processedEventRepository, objectMapper, projectionMetrics, null);
 
         String sample = EventContractValidator.canonicalSample("lemuel.order.created");
         consumer.onOrderCreated(recordOf("lemuel.order.created", sample), mock(Acknowledgment.class));
@@ -142,7 +142,7 @@ class EventContractConsumerTest {
         when(processedEventRepository.existsById(any())).thenReturn(false);
         when(userViewRepository.findById(anyLong())).thenReturn(Optional.empty());
         UserRegisteredEventConsumer consumer = new UserRegisteredEventConsumer(
-                userViewRepository, processedEventRepository, objectMapper, projectionMetrics);
+                userViewRepository, processedEventRepository, objectMapper, projectionMetrics, null);
 
         String sample = EventContractValidator.canonicalSample("lemuel.user.registered");
         consumer.onUserRegistered(recordOf("lemuel.user.registered", sample), mock(Acknowledgment.class));
@@ -160,7 +160,7 @@ class EventContractConsumerTest {
         when(processedEventRepository.existsById(any())).thenReturn(false);
         when(productViewRepository.findById(anyLong())).thenReturn(Optional.empty());
         ProductEventKafkaConsumer consumer = new ProductEventKafkaConsumer(
-                productViewRepository, processedEventRepository, objectMapper, projectionMetrics);
+                productViewRepository, processedEventRepository, objectMapper, projectionMetrics, null);
 
         String sample = EventContractValidator.canonicalSample("lemuel.product.changed");
         consumer.onProductChanged(recordOf("lemuel.product.changed", sample), mock(Acknowledgment.class));

@@ -39,7 +39,8 @@ REQUESTED/APPROVED → CANCELED
 ```
 
 - 전이는 도메인 메서드로만: `approve()`(REQUESTED만), `execute()`(APPROVED만), `reject()`(REQUESTED만),
-  `cancel()`(REQUESTED/APPROVED만). 위반 → `IllegalStateException`. setter 로 status 바꾸는 코드 반려.
+  `cancel()`(REQUESTED/APPROVED만). 위반 → `InvalidInvestmentOrderStateException`(ErrorCode `INVALID_STATE`, 400).
+  setter 로 status 바꾸는 코드 반려.
 - 생성 검증: `stockCode` 는 `\d{6}`, `amount` 양수.
 - **스냅샷**: 신청 시점 `scoreAtOrder`/`gradeAtOrder` 보존 — 이후 재무제표 갱신으로 점수가 바뀌어도
   주문 이력은 신청 당시 근거 유지 (정산 commission_rate 스냅샷과 동일 철학, settlement-domain-rules 참조).

@@ -2,6 +2,7 @@ package github.lms.lemuel.settlement.adapter.in.kafka;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import github.lms.lemuel.common.outbox.adapter.in.kafka.ConsumedEventQuarantine;
 import github.lms.lemuel.common.outbox.adapter.in.kafka.IdempotentEventConsumer;
 import github.lms.lemuel.common.outbox.adapter.in.kafka.ProcessedEventRepository;
 import github.lms.lemuel.settlement.application.port.in.ApplyReconciliationAdjustmentUseCase;
@@ -55,8 +56,9 @@ public class PgReconciliationApprovedSettlementAdjustConsumer extends Idempotent
             ApplyReconciliationAdjustmentUseCase applyReconciliationAdjustmentUseCase,
             ProcessedEventRepository processedEventRepository,
             ObjectMapper objectMapper,
-            MeterRegistry meterRegistry) {
-        super(processedEventRepository, objectMapper);
+            MeterRegistry meterRegistry,
+            ConsumedEventQuarantine quarantine) {
+        super(processedEventRepository, objectMapper, quarantine);
         this.applyReconciliationAdjustmentUseCase = applyReconciliationAdjustmentUseCase;
         this.meterRegistry = meterRegistry;
     }
@@ -83,10 +85,7 @@ public class PgReconciliationApprovedSettlementAdjustConsumer extends Idempotent
 
     @Override
     protected void handle(JsonNode node, UUID eventId) {
-        if (!node.hasNonNull("discrepancyId")) {
-            throw new IllegalArgumentException("Missing discrepancyId, eventId=" + eventId);
-        }
-        Long discrepancyId = node.get("discrepancyId").asLong();
+        Long discrepancyId = requiredLong(node, "discrepancyId", eventId);
         String type = node.hasNonNull("type") ? node.get("type").asText() : null;
         Long paymentId = node.hasNonNull("paymentId") ? node.get("paymentId").asLong() : null;
         BigDecimal internalAmount = readAmount(node, "internalAmount");

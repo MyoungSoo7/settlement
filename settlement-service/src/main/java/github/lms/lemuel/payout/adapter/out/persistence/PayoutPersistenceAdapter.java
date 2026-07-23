@@ -4,6 +4,7 @@ import github.lms.lemuel.payout.application.port.out.LoadPayoutPort;
 import github.lms.lemuel.payout.application.port.out.SavePayoutPort;
 import github.lms.lemuel.payout.domain.Payout;
 import github.lms.lemuel.payout.domain.PayoutStatus;
+import github.lms.lemuel.payout.domain.PayoutType;
 import github.lms.lemuel.payout.domain.SellerBankAccount;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
@@ -35,6 +36,12 @@ public class PayoutPersistenceAdapter implements LoadPayoutPort, SavePayoutPort 
     }
 
     @Override
+    public Optional<Payout> findBySettlementIdAndType(Long settlementId, PayoutType payoutType) {
+        return repository.findBySettlementIdAndPayoutType(settlementId, payoutType)
+                .map(PayoutPersistenceAdapter::toDomain);
+    }
+
+    @Override
     public List<Payout> findByStatus(PayoutStatus status, int limit) {
         return repository.findByStatusOrderByRequestedAtAsc(status, PageRequest.of(0, Math.max(1, limit)))
                 .stream().map(PayoutPersistenceAdapter::toDomain).toList();
@@ -57,7 +64,7 @@ public class PayoutPersistenceAdapter implements LoadPayoutPort, SavePayoutPort 
         PayoutJpaEntity entity;
         if (payout.getId() == null) {
             entity = new PayoutJpaEntity(
-                    null, payout.getSettlementId(), payout.getSellerId(), payout.getAmount(),
+                    null, payout.getSettlementId(), payout.getPayoutType(), payout.getSellerId(), payout.getAmount(),
                     payout.getAccount().bankCode(), payout.getAccount().bankAccountNumber(),
                     payout.getAccount().accountHolderName(),
                     payout.getStatus(), payout.getFirmBankingTransactionId(), payout.getFailureReason(),
@@ -93,7 +100,7 @@ public class PayoutPersistenceAdapter implements LoadPayoutPort, SavePayoutPort 
                 e.getBankCode(), e.getBankAccountNumber(), e.getAccountHolderName()
         );
         return Payout.rehydrate(
-                e.getId(), e.getSettlementId(), e.getSellerId(), e.getAmount(), account,
+                e.getId(), e.getSettlementId(), e.getPayoutType(), e.getSellerId(), e.getAmount(), account,
                 e.getStatus(), e.getFirmBankingTransactionId(), e.getFailureReason(),
                 e.getRetryCount(), e.getOperatorId(),
                 e.getRequestedAt(), e.getSentAt(), e.getCompletedAt(), e.getFailedAt(),

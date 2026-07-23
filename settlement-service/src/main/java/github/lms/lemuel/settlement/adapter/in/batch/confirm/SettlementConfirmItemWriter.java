@@ -1,6 +1,9 @@
 package github.lms.lemuel.settlement.adapter.in.batch.confirm;
 
 import github.lms.lemuel.ledger.application.port.in.EnqueueLedgerTaskPort;
+import github.lms.lemuel.payout.application.port.in.RequestPayoutUseCase;
+import github.lms.lemuel.payout.domain.PayoutType;
+import github.lms.lemuel.recovery.application.port.in.OffsetSellerRecoveryUseCase;
 import github.lms.lemuel.settlement.application.port.out.LoadSellerIdPort;
 import github.lms.lemuel.settlement.application.port.out.PublishSettlementDomainEventPort;
 import github.lms.lemuel.settlement.application.port.out.PublishSettlementEventPort;
@@ -37,6 +40,8 @@ public class SettlementConfirmItemWriter implements ItemWriter<Settlement> {
     private final PublishSettlementDomainEventPort publishSettlementDomainEventPort;
     private final EnqueueLedgerTaskPort enqueueLedgerTaskPort;
     private final PublishSettlementEventPort publishSettlementEventPort;
+    private final RequestPayoutUseCase requestPayoutUseCase;
+    private final OffsetSellerRecoveryUseCase offsetSellerRecoveryUseCase;
     private final MeterRegistry meterRegistry;
 
     public SettlementConfirmItemWriter(SaveSettlementPort saveSettlementPort,
@@ -44,12 +49,16 @@ public class SettlementConfirmItemWriter implements ItemWriter<Settlement> {
                                        PublishSettlementDomainEventPort publishSettlementDomainEventPort,
                                        EnqueueLedgerTaskPort enqueueLedgerTaskPort,
                                        PublishSettlementEventPort publishSettlementEventPort,
+                                       RequestPayoutUseCase requestPayoutUseCase,
+                                       OffsetSellerRecoveryUseCase offsetSellerRecoveryUseCase,
                                        MeterRegistry meterRegistry) {
         this.saveSettlementPort = saveSettlementPort;
         this.loadSellerIdPort = loadSellerIdPort;
         this.publishSettlementDomainEventPort = publishSettlementDomainEventPort;
         this.enqueueLedgerTaskPort = enqueueLedgerTaskPort;
         this.publishSettlementEventPort = publishSettlementEventPort;
+        this.requestPayoutUseCase = requestPayoutUseCase;
+        this.offsetSellerRecoveryUseCase = offsetSellerRecoveryUseCase;
         this.meterRegistry = meterRegistry;
     }
 
@@ -63,11 +72,19 @@ public class SettlementConfirmItemWriter implements ItemWriter<Settlement> {
             confirmedIds.add(saved.getId());
             confirmedNet = confirmedNet.add(saved.getNetAmount());
 
-            // loan-service 로 SettlementConfirmed 발행(상환 차감 트리거). 판매자 미해석은 발행 생략.
-            // 같은 청크 트랜잭션의 Outbox 에 적재 → lemuel.settlement.confirmed.
-            loadSellerIdPort.findSellerIdByPaymentId(saved.getPaymentId()).ifPresent(sellerId ->
-                    publishSettlementDomainEventPort.publishSettlementConfirmed(
-                            saved.getId(), sellerId, saved.getNetAmount()));
+            // loan-service 로 SettlementConfirmed 발행(상환 차감 트리거) + 즉시지급 Payout 자동 생성.
+            // 판매자 미해석은 둘 다 생략. 같은 청크 트랜잭션에 묶여 원자적으로 커밋된다.
+            loadSellerIdPort.findSellerIdByPaymentId(saved.getPaymentId()).ifPresent(sellerId -> {
+                publishSettlementDomainEventPort.publishSettlementConfirmed(
+                        saved.getId(), sellerId, saved.getNetAmount());
+                // 즉시지급액 = net − 미해제 holdback − 채권 상계(seed-p0-6). 미상계 채권을 오래된 순으로
+                // 소진한 잔액만 Payout 으로 요청한다. 0 이면 생성하지 않는다((정산, IMMEDIATE) 멱등).
+                BigDecimal immediate = saved.getImmediatePayoutAmount();
+                BigDecimal offset = offsetSellerRecoveryUseCase.offsetForConfirmedSettlement(
+                        saved.getId(), sellerId, immediate, saved.getSettlementDate());
+                requestPayoutUseCase.requestPayoutOfType(
+                        saved.getId(), sellerId, immediate.subtract(offset), PayoutType.IMMEDIATE);
+            });
         }
 
         if (!confirmedIds.isEmpty()) {

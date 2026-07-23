@@ -23,6 +23,8 @@ public class ReconciliationRun {
     private final String pgProvider;
     private final LocalDate targetDate;
     private final String fileName;
+    /** 업로드 파일 내용 SHA-256(hex) — 같은 파일 재업로드 멱등 판정 키. 레거시 run 은 null. */
+    private final String fileSha256;
     private ReconciliationRunStatus status;
     private final LocalDateTime startedAt;
     private LocalDateTime finishedAt;
@@ -37,10 +39,16 @@ public class ReconciliationRun {
 
     public static ReconciliationRun start(String pgProvider, LocalDate targetDate,
                                           String fileName, String operatorId) {
+        return start(pgProvider, targetDate, fileName, operatorId, null);
+    }
+
+    /** 파일 해시 포함 생성 — 같은 파일 재업로드 멱등 판정에 쓰인다. */
+    public static ReconciliationRun start(String pgProvider, LocalDate targetDate,
+                                          String fileName, String operatorId, String fileSha256) {
         if (pgProvider == null) throw new PgReconciliationInvariantViolationException("pgProvider 는 필수입니다");
         if (targetDate == null) throw new PgReconciliationInvariantViolationException("targetDate 는 필수입니다");
         if (fileName == null) throw new PgReconciliationInvariantViolationException("fileName 는 필수입니다");
-        return new ReconciliationRun(null, pgProvider, targetDate, fileName,
+        return new ReconciliationRun(null, pgProvider, targetDate, fileName, fileSha256,
                 ReconciliationRunStatus.RUNNING, LocalDateTime.now(), null,
                 0, 0, 0, 0, 0, operatorId, null, new ArrayList<>());
     }
@@ -52,14 +60,27 @@ public class ReconciliationRun {
                                                int matchedCount, int discrepancyCount,
                                                int autoCorrectedCount, String operatorId, String note,
                                                List<ReconciliationDiscrepancy> discrepancies) {
-        return new ReconciliationRun(id, pgProvider, targetDate, fileName, status,
+        return rehydrate(id, pgProvider, targetDate, fileName, null, status,
+                startedAt, finishedAt, totalPgRows, totalInternalRows,
+                matchedCount, discrepancyCount, autoCorrectedCount, operatorId, note, discrepancies);
+    }
+
+    public static ReconciliationRun rehydrate(Long id, String pgProvider, LocalDate targetDate,
+                                               String fileName, String fileSha256,
+                                               ReconciliationRunStatus status,
+                                               LocalDateTime startedAt, LocalDateTime finishedAt,
+                                               int totalPgRows, int totalInternalRows,
+                                               int matchedCount, int discrepancyCount,
+                                               int autoCorrectedCount, String operatorId, String note,
+                                               List<ReconciliationDiscrepancy> discrepancies) {
+        return new ReconciliationRun(id, pgProvider, targetDate, fileName, fileSha256, status,
                 startedAt, finishedAt, totalPgRows, totalInternalRows,
                 matchedCount, discrepancyCount, autoCorrectedCount, operatorId, note,
                 discrepancies != null ? discrepancies : new ArrayList<>());
     }
 
     private ReconciliationRun(Long id, String pgProvider, LocalDate targetDate, String fileName,
-                              ReconciliationRunStatus status, LocalDateTime startedAt,
+                              String fileSha256, ReconciliationRunStatus status, LocalDateTime startedAt,
                               LocalDateTime finishedAt, int totalPgRows, int totalInternalRows,
                               int matchedCount, int discrepancyCount, int autoCorrectedCount,
                               String operatorId, String note,
@@ -68,6 +89,7 @@ public class ReconciliationRun {
         this.pgProvider = pgProvider;
         this.targetDate = targetDate;
         this.fileName = fileName;
+        this.fileSha256 = fileSha256;
         this.status = status;
         this.startedAt = startedAt;
         this.finishedAt = finishedAt;
@@ -120,6 +142,7 @@ public class ReconciliationRun {
     public String getPgProvider() { return pgProvider; }
     public LocalDate getTargetDate() { return targetDate; }
     public String getFileName() { return fileName; }
+    public String getFileSha256() { return fileSha256; }
     public ReconciliationRunStatus getStatus() { return status; }
     public LocalDateTime getStartedAt() { return startedAt; }
     public LocalDateTime getFinishedAt() { return finishedAt; }

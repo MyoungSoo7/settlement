@@ -1,0 +1,52 @@
+{
+  "run_id": "run-1",
+  "requirements": {
+    "reader": "1page를 받는 의사결정자 + 후속 실무자",
+    "decision": "사내 교육 신청 페이지 개편 방향(강조 화면 + 자동 메일) 채택 여부",
+    "success_signal": "추가 질문 없이 결정으로 넘어간다 / 결정 항목과 확인 질문 분리",
+    "constraints": [
+      "회의록·확인된 요구사항 밖 사실 결론 금지",
+      "한 페이지(7칸) 분량 유지",
+      "미확인 수치(60%) 본문 단정 금지 — 확인 필요 항목으로만",
+      "범위 밖 항목 해결 방향 금지",
+      "미결정 항목 결론 톤 단정 금지"
+    ],
+    "acceptance": {
+      "goal": "회의록 한 건을 1page 7칸 초안으로 옮긴다",
+      "behavioral": "의사결정자가 추가 질문 없이 결정으로 넘어간다",
+      "metric": "다음 회의까지 4주 동안 신청 직후 환불·일정 문의 비율을 15%로 감소",
+      "metric_confirmed": true
+    }
+  },
+  "spec": {
+    "output_contract": "7칸: 제목·배경·문제·사용자·해결 방향·성공 기준·확인 필요 항목",
+    "policy": {
+      "fixed": "확정 값·범위·인용",
+      "remaining": "미결정→확인 필요 항목",
+      "question": "회의록 밖 결정→ask"
+    },
+    "preserve_phrases": [
+      "신청 직후 환불·일정 문의를 줄인다",
+      "페이지 전체 리뉴얼은 이번 범위가 아니다",
+      "환불 기준 자체가 명문화돼 있지 않다"
+    ],
+    "success_cell": "\"신청 직후 환불·일정 문의를 줄인다\" + 다음 회의까지 4주 동안 신청 직후 환불·일정 문의 비율을 15%로 감소"
+  },
+  "frozen": {
+    "requirements": "40688366fe39fb72",
+    "spec": "1ee67af37b7cf1d0"
+  },
+  "retry_count_by_reason": {},
+  "preserved_passes": [
+    "L5",
+    "L6"
+  ],
+  "resume_target": "fill_handoff",
+  "route": "exit",
+  "last_verdict": "L5=통과,L6=통과",
+  "dispatch": [
+    "L1-ask",
+    "L3L4-build"
+  ],
+  "build_path": "/Users/jaegyu.lee/Project/fast1/practice-materials/chapter-05/2005-4-3-workspace/handoffs/handoff-L3L4-build.md"
+}

@@ -12,8 +12,16 @@ public enum LedgerEntryType {
     SETTLEMENT_CONFIRMED,
     /** 환불에 의한 역분개. */
     REFUND_REVERSED,
+    /** 카드사 분쟁(Chargeback) ACCEPTED 에 의한 역분개. */
+    CHARGEBACK_REVERSED,
+    /** PG 대사 clawback 에 의한 역분개. */
+    RECON_REVERSED,
     /** 수수료 인식. */
     COMMISSION_RECOGNIZED,
     /** 실 이체(출금) 실행. */
-    PAYOUT_EXECUTED
+    PAYOUT_EXECUTED,
+    /** 지급후 회수 채권 인식 — Dr 미수금(AR) / Cr 미지급금(AP) (seed-p0-6). */
+    RECOVERY_RECOGNIZED,
+    /** 채권 상계 — 후속 정산 지급액 차감. Dr 미지급금(AP) / Cr 미수금(AR). */
+    RECOVERY_OFFSET
 }

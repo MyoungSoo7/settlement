@@ -56,6 +56,9 @@ target/
 ### Local runtime artifacts ###
 .claude/scheduled_tasks.lock
 .claude/worktrees/
+.claude/harness/
+# hookify 캡처 규칙은 로컬 전용 — 정본은 guard.mjs (hookify-to-guard 스킬로 이식)
+.claude/hookify.*.local.md
 *.stackdump
 build-test-output.log
 
@@ -63,7 +66,11 @@ build-test-output.log
 memory/
 
 ### OMC local runtime state ###
-.omc/
+# .omc/ 통짜 무시 금지 — 디렉토리째 ignore 하면 하위 재포함(!)이 불가능해
+# OMC 4.15.6+ 의 커밋 대상 예외(.omc/skills = 프로젝트 스코프 스킬)가 조용히 누락된다.
+# **/ 접두 필수: 비앵커였던 구 `.omc/` 처럼 모든 깊이의 .omc 런타임 디렉토리를 커버.
+**/.omc/*
+!**/.omc/skills/
 
 
 ### Playwright ###
@@ -97,3 +104,10 @@ frontend/*.out.log
 
 ### Codex isolated worktrees ###
 .worktrees/
+
+docs/harness
+
+### Claude Code 하네스·세션 아티팩트 (실행 중 생성 — 이력 제외) ###
+**/.claude/harness/
+.claude/agent-memory/
+.symposium/scratch/

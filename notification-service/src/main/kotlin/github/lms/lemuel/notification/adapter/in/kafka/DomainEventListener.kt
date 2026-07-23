@@ -42,6 +42,7 @@ class DomainEventListener(
         @Payload payload: String,
         @Header(KafkaHeaders.RECEIVED_TOPIC) topic: String,
         @Header(name = KafkaHeaders.RECEIVED_KEY, required = false) key: String?,
+        @Header(name = "event_id", required = false) eventIdHeader: String?,
     ) {
         try {
             // Parse failure is NOT silently degraded to an empty map: an unparseable
@@ -59,8 +60,13 @@ class DomainEventListener(
                 return
             }
 
-            // eventId for idempotency: prefer explicit field, then kafka key.
-            val eventId = (fields["eventId"] ?: fields["id"] ?: key)?.toString()
+            // eventId for idempotency: the Java Outbox publisher carries the unique
+            // event UUID in the `event_id` HEADER only (payload has no eventId field,
+            // and the kafka key is the aggregateId — shared across events of the same
+            // aggregate, e.g. payment.captured then payment.refunded of one paymentId,
+            // so keying dedupe on it drops the second event). Header first; payload
+            // fields and key remain as fallbacks for non-Outbox producers (Go webhook).
+            val eventId = (eventIdHeader ?: fields["eventId"] ?: fields["id"] ?: key)?.toString()
             val notification = NotificationTemplate.fromEvent(topic, fields, eventId)
 
             val result = runBlocking { dispatcher.dispatch(notification) }

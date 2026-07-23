@@ -43,6 +43,18 @@ subprojects {
 
     tasks.withType<Test>().configureEach {
         useJUnitPlatform()
+        // Testcontainers(Redpanda/ES/PG) + 다수 @SpringBootTest 컨텍스트가 하나의 test JVM 에
+        // 누적되어 기본 힙(러너 RAM 25%)을 초과, OutOfMemoryError→스레드 사망→hang→CI 90분
+        // 타임아웃을 유발했다. 힙 상한을 명시하고, JVM 을 주기적으로 재활용해 누적된 스프링
+        // 컨텍스트 캐시·컨테이너 자원을 방출한다. (OOM 시 원인 규명을 위해 힙덤프 남김)
+        maxHeapSize = "3g"
+        setForkEvery(50)
+        // 프로덕션은 KST Clock 을 주입하는데(TimeConfig) 다수 정산 테스트가 bare LocalDate.now()/
+        // LocalDateTime.now() 로 기준일을 단정한다. CI 러너(UTC)에서 KST 자정~오전9시 창에 날짜가
+        // 하루 어긋나 off-by-one 단정 실패(SettlementDate 등)를 유발했다. 테스트 JVM 을 프로덕션과
+        // 동일한 KST 로 고정해 이 클래스의 타임존 플레이키를 결정적으로 제거한다.
+        systemProperty("user.timezone", "Asia/Seoul")
+        jvmArgs("-XX:+HeapDumpOnOutOfMemoryError", "-XX:HeapDumpPath=build/test-heapdump.hprof")
         finalizedBy(tasks.named("jacocoTestReport"))
         // JWT 서명키는 운영에서 env(JWT_SECRET)로만 주입한다(yaml 기본값 없음 = 미설정 시 기동 실패).
         // 테스트도 동일하게 env 로 공급해, 풀 컨텍스트(@SpringBootTest) 부팅 시 ${JWT_SECRET} 미해결
@@ -142,6 +154,8 @@ subprojects {
                     "github.lms.lemuel.economics.domain.*",
                     "github.lms.lemuel.market.domain.*",
                     "github.lms.lemuel.commondata.domain.*",
+                    "github.lms.lemuel.investment.domain.*",
+                    "github.lms.lemuel.financial.domain.*",
                     "github.lms.lemuel.ai.chat.domain.*",
                     // common.outbox.domain 게이트는 shared-common 독립 빌드로 이관됨
                 )
