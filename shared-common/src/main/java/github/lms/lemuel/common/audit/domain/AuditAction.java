@@ -17,6 +17,10 @@ public enum AuditAction {
     PAYOUT_EXECUTED,
     PAYOUT_RETRIED,
     PAYOUT_CANCELED,
+    // 송금 반송(bounce) 기록 + 정정계좌 재지급 — 실자금 재이동이라 감사 추적 필수.
+    PAYOUT_BOUNCE_RECORDED,
+    // 셀러 지급 계좌 레지스트리 등록·정정 — PII 계좌 변경의 감사 추적.
+    SELLER_BANK_ACCOUNT_REGISTERED,
     // 카드사 분쟁(Chargeback) 결정 — 셀러 환수/면책 판단의 감사 추적.
     CHARGEBACK_ACCEPTED,
     CHARGEBACK_REJECTED,

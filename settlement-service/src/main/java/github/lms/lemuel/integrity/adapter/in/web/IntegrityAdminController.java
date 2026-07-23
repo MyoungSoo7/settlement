@@ -4,6 +4,7 @@ import github.lms.lemuel.integrity.application.port.in.IntegrityQueryUseCase;
 import github.lms.lemuel.integrity.application.port.in.ProjectionReconciliationUseCase;
 import github.lms.lemuel.integrity.domain.HoldbackStatusReport;
 import github.lms.lemuel.integrity.domain.LedgerCompletenessReport;
+import github.lms.lemuel.integrity.domain.PayoutBounceReconReport;
 import github.lms.lemuel.integrity.domain.PayoutReconReport;
 import github.lms.lemuel.integrity.domain.ProcessedEventCount;
 import github.lms.lemuel.integrity.domain.ProjectionDiffReport;
@@ -57,6 +58,13 @@ public class IntegrityAdminController {
     public PayoutReconReport payoutRecon(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return useCase.checkPayoutRecon(date);
+    }
+
+    @Operation(summary = "INV-13 반송 재지급 대사 — payout_bounces 체인 ↔ 재지급 payout(settlement_id=NULL) 1:1 대조",
+            description = "반송-재지급 금액 불일치·이중지급 가드 우회 흔적·고아 수동 payout 은 위반, 미재지급 반송은 정보성")
+    @GetMapping("/payout-bounce-recon")
+    public PayoutBounceReconReport payoutBounceRecon() {
+        return useCase.checkPayoutBounceRecon();
     }
 
     @Operation(summary = "INV-7 홀드백 — 해제 기한 경과 미해제 감지",

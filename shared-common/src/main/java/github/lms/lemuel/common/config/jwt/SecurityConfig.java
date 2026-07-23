@@ -156,8 +156,11 @@ public class SecurityConfig {
                         // gateway 미라우팅이지만 NodePort 직노출 대비 InternalApiKeyFilter 가 X-Internal-Api-Key 공유
                         // 시크릿을 검증(미설정 시 통과+경고). 여기선 permitAll 로 두고 게이팅은 필터가 담당. 운영선 NetworkPolicy/mTLS 추가 권장.
                         .requestMatchers("/internal/**").permitAll()
-                        // Payout 콘솔 — 송금 권한은 ADMIN 만
+                        // Payout 콘솔 — 송금 권한은 ADMIN 만 (반송 기록·재지급 포함)
                         .requestMatchers("/admin/payouts/**").hasRole("ADMIN")
+                        // 셀러 지급 계좌 레지스트리 — 등록·정정(PII). 셀러 식별자를 관리자 입력으로 받으므로
+                        // ADMIN/MANAGER 게이트로 IDOR 방지 (Seed D1).
+                        .requestMatchers("/admin/seller-bank-accounts/**").hasAnyRole("ADMIN", "MANAGER")
                         // Chargeback 콘솔 — 셀러 환수 결정은 ADMIN 만
                         .requestMatchers("/admin/chargebacks/**").hasRole("ADMIN")
                         // 백필 콘솔 — 원장 역분개·Payout 누락 보정 작업은 ADMIN 만

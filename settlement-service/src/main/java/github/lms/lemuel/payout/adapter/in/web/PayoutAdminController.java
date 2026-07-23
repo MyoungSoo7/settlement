@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import github.lms.lemuel.common.audit.application.AuditLogger;
 import github.lms.lemuel.common.audit.domain.AuditAction;
 import github.lms.lemuel.payout.application.port.in.ExecutePayoutUseCase;
+import github.lms.lemuel.payout.application.port.in.RecordPayoutBounceUseCase;
 import github.lms.lemuel.payout.application.port.in.RetryFailedPayoutUseCase;
 import github.lms.lemuel.payout.application.port.out.LoadPayoutPort;
 import github.lms.lemuel.payout.domain.Payout;
@@ -30,6 +31,7 @@ public class PayoutAdminController {
     private final LoadPayoutPort loadPort;
     private final RetryFailedPayoutUseCase retryUseCase;
     private final ExecutePayoutUseCase executeUseCase;
+    private final RecordPayoutBounceUseCase bounceUseCase;
     private final ManualIdempotencyGuard idempotency;
     private final AuditLogger auditLogger;
     private final ObjectMapper objectMapper;
@@ -37,12 +39,14 @@ public class PayoutAdminController {
     public PayoutAdminController(LoadPayoutPort loadPort,
                                   RetryFailedPayoutUseCase retryUseCase,
                                   ExecutePayoutUseCase executeUseCase,
+                                  RecordPayoutBounceUseCase bounceUseCase,
                                   ManualIdempotencyGuard idempotency,
                                   AuditLogger auditLogger,
                                   ObjectMapper objectMapper) {
         this.loadPort = loadPort;
         this.retryUseCase = retryUseCase;
         this.executeUseCase = executeUseCase;
+        this.bounceUseCase = bounceUseCase;
         this.idempotency = idempotency;
         this.auditLogger = auditLogger;
         this.objectMapper = objectMapper;
@@ -104,6 +108,28 @@ public class PayoutAdminController {
         return ResponseEntity.ok(PayoutResponse.from(p));
     }
 
+    @Operation(summary = "송금 반송 기록 — COMPLETED 송금이 은행단에서 반송되면 사유 기록 + 정정계좌 재지급")
+    @PostMapping("/{id}/bounce")
+    public ResponseEntity<Map<String, Object>> bounce(
+            @PathVariable Long id,
+            @RequestBody BounceRequest request,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+        if (isDuplicate(idempotencyKey, "payout:bounce:" + id)) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).build();
+        }
+        // 계좌 정정은 /admin/seller-bank-accounts 로 먼저 하고, 그 다음 이 반송 기록이 정정계좌로 재지급한다.
+        var outcome = bounceUseCase.recordBounce(id, request.reason(), currentOperator());
+        // 감사 추적은 서비스단(RecordPayoutBounceService)이 실자금 경로로 남긴다 — 여기선 응답만 조립.
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("bouncedPayoutId", id);
+        body.put("reason", outcome.bounce().getReason());
+        body.put("reissuedPayoutId", outcome.bounce().getResolvedPayoutId());
+        if (outcome.reissuedPayout() != null) {
+            body.put("reissued", PayoutResponse.from(outcome.reissuedPayout()).payout());
+        }
+        return ResponseEntity.ok(body);
+    }
+
     @Operation(summary = "수동 즉시 실행 — 정기 배치 외 즉시 송금이 필요할 때")
     @PostMapping("/execute-now")
     public ResponseEntity<Map<String, Object>> executeNow() {
@@ -141,6 +167,8 @@ public class PayoutAdminController {
     }
 
     public record CancelRequest(String reason) { }
+
+    public record BounceRequest(String reason) { }
 
     public record PayoutResponse(Map<String, Object> payout) {
         static PayoutResponse from(Payout p) {

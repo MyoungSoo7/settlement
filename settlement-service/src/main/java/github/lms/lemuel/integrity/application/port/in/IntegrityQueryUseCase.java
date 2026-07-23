@@ -2,6 +2,7 @@ package github.lms.lemuel.integrity.application.port.in;
 
 import github.lms.lemuel.integrity.domain.HoldbackStatusReport;
 import github.lms.lemuel.integrity.domain.LedgerCompletenessReport;
+import github.lms.lemuel.integrity.domain.PayoutBounceReconReport;
 import github.lms.lemuel.integrity.domain.PayoutReconReport;
 import github.lms.lemuel.integrity.domain.ProcessedEventCount;
 import github.lms.lemuel.integrity.domain.RefundAdjustmentReport;
@@ -23,6 +24,9 @@ public interface IntegrityQueryUseCase {
 
     /** INV-6 — 그날 확정 정산 ↔ payout 금액·중복 대사. */
     PayoutReconReport checkPayoutRecon(LocalDate date);
+
+    /** INV-13 — payout_bounces 체인 ↔ 재지급 payout(settlement_id=NULL) 1:1 대사 (Seed D1 후속). */
+    PayoutBounceReconReport checkPayoutBounceRecon();
 
     /** INV-7 — 해제 기한 경과 홀드백. */
     HoldbackStatusReport checkHoldbackStatus();

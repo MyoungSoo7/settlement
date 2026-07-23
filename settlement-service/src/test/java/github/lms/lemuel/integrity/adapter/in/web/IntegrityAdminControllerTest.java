@@ -5,6 +5,7 @@ import github.lms.lemuel.integrity.application.port.in.IntegrityQueryUseCase;
 import github.lms.lemuel.integrity.application.port.in.ProjectionReconciliationUseCase;
 import github.lms.lemuel.integrity.domain.HoldbackStatusReport;
 import github.lms.lemuel.integrity.domain.LedgerCompletenessReport;
+import github.lms.lemuel.integrity.domain.PayoutBounceReconReport;
 import github.lms.lemuel.integrity.domain.PayoutReconReport;
 import github.lms.lemuel.integrity.domain.ProcessedEventCount;
 import github.lms.lemuel.integrity.domain.ProjectionDiffReport;
@@ -83,6 +84,19 @@ class IntegrityAdminControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.ok").value(true))
                 .andExpect(jsonPath("$.completedPayouts").value(5));
+    }
+
+    @Test
+    @DisplayName("GET /admin/integrity/payout-bounce-recon — INV-13")
+    void payoutBounceRecon() throws Exception {
+        PayoutBounceReconReport report = PayoutBounceReconReport.of(0, 0, 0, List.of(), List.of(),
+                List.of(777L));
+        when(useCase.checkPayoutBounceRecon()).thenReturn(report);
+
+        mockMvc.perform(get("/admin/integrity/payout-bounce-recon"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ok").value(false))
+                .andExpect(jsonPath("$.orphanNullSettlementPayoutIds[0]").value(777));
     }
 
     @Test

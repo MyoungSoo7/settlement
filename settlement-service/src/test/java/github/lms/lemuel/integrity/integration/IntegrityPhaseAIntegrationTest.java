@@ -4,10 +4,12 @@ import github.lms.lemuel.SettlementServiceApplication;
 import github.lms.lemuel.integrity.application.port.in.IntegrityQueryUseCase;
 import github.lms.lemuel.integrity.domain.HoldbackStatusReport;
 import github.lms.lemuel.integrity.domain.LedgerCompletenessReport;
+import github.lms.lemuel.integrity.domain.PayoutBounceReconReport;
 import github.lms.lemuel.integrity.domain.PayoutReconReport;
 import github.lms.lemuel.integrity.domain.StuckStateReport;
 import github.lms.lemuel.ledger.adapter.out.persistence.LedgerEntryJpaEntity;
 import github.lms.lemuel.ledger.adapter.out.persistence.LedgerOutboxJpaEntity;
+import github.lms.lemuel.payout.adapter.out.persistence.PayoutBounceJpaEntity;
 import github.lms.lemuel.payout.adapter.out.persistence.PayoutJpaEntity;
 import github.lms.lemuel.payout.domain.PayoutStatus;
 import github.lms.lemuel.payout.domain.PayoutType;
@@ -257,6 +259,88 @@ class IntegrityPhaseAIntegrationTest {
                 .noneSatisfy(p -> assertThat(p.payoutId()).isEqualTo(ids.freshPayout()));
         assertThat(report.ledgerOutboxFailed()).isGreaterThanOrEqualTo(1);
         assertThat(report.reasons()).anySatisfy(r -> assertThat(r).contains("이중지급"));
+    }
+
+    // ── INV-13 반송 재지급 대사 (Seed D1 후속) ─────────────────────────────
+
+    /**
+     * {@code payoutBounceRecon()} 은 날짜 스코프가 없는 전수 스캔이라(다른 INV 체크와 달리 target date
+     * 격리가 불가) 클래스 공유 컨테이너 DB 에서 테스트 실행 순서에 따라 다른 테스트의 픽스처가 섞여
+     * 보일 수 있다. 그래서 이 테스트는 {@code report.ok()} 의 전역 참/거짓이 아니라, <b>내가 심은 특정
+     * id 가 올바른 목록에(만) 들어있는지</b>로 단언한다 — 순서 무관 안정성.
+     */
+    @Test
+    @DisplayName("INV-13: 정상 반송은 안전하고, 금액불일치·고아 payout·미재지급은 각각 옳게 분류된다")
+    void payoutBounceReconClassifiesHealthyMismatchAndOrphanCorrectly() {
+        record Ids(Long healthyBounceId, Long healthyReissuedId,
+                   Long mismatchBounceId, Long mismatchReissuedId,
+                   Long orphanPayoutId, Long unresolvedBounceId) {}
+        Ids ids = tx.execute(s -> {
+            // 건강한 반송 — 금액 일치, settlement_id=NULL. 위반 목록 어디에도 나오면 안 된다.
+            SettlementJpaEntity settlement1 = settlement(LocalDate.now(), LocalDateTime.now());
+            em.persist(settlement1);
+            PayoutJpaEntity original1 = payout(settlement1.getId(), new BigDecimal("95500.00"),
+                    PayoutStatus.COMPLETED, LocalDateTime.now());
+            em.persist(original1);
+            PayoutJpaEntity reissued1 = payout(null, new BigDecimal("95500.00"),
+                    PayoutStatus.REQUESTED, null);
+            em.persist(reissued1);
+            PayoutBounceJpaEntity healthyBounce = new PayoutBounceJpaEntity(null, original1.getId(),
+                    "ACCOUNT_CLOSED", reissued1.getId(), "op", LocalDateTime.now(), LocalDateTime.now());
+            em.persist(healthyBounce);
+
+            // 금액 불일치 반송 — amountMismatches 에 잡혀야 한다.
+            SettlementJpaEntity settlement2 = settlement(LocalDate.now(), LocalDateTime.now());
+            em.persist(settlement2);
+            PayoutJpaEntity original2 = payout(settlement2.getId(), new BigDecimal("95500.00"),
+                    PayoutStatus.COMPLETED, LocalDateTime.now());
+            em.persist(original2);
+            PayoutJpaEntity reissued2 = payout(null, new BigDecimal("90000.00"), // 금액 불일치!
+                    PayoutStatus.REQUESTED, null);
+            em.persist(reissued2);
+            PayoutBounceJpaEntity mismatchBounce = new PayoutBounceJpaEntity(null, original2.getId(),
+                    "ACCOUNT_CLOSED", reissued2.getId(), "op", LocalDateTime.now(), LocalDateTime.now());
+            em.persist(mismatchBounce);
+
+            // 어떤 반송에도 연결되지 않은 settlement_id=NULL payout — orphanNullSettlementPayoutIds 에 잡혀야 한다.
+            PayoutJpaEntity orphan = payout(null, new BigDecimal("10000.00"), PayoutStatus.REQUESTED, null);
+            em.persist(orphan);
+
+            // 아직 재지급 전인 반송 — 위반이 아니라 unresolvedBounces 집계에만 반영(정보성).
+            SettlementJpaEntity settlement3 = settlement(LocalDate.now(), LocalDateTime.now());
+            em.persist(settlement3);
+            PayoutJpaEntity original3 = payout(settlement3.getId(), new BigDecimal("50000.00"),
+                    PayoutStatus.COMPLETED, LocalDateTime.now());
+            em.persist(original3);
+            PayoutBounceJpaEntity unresolvedBounce = new PayoutBounceJpaEntity(null, original3.getId(),
+                    "PENDING_ACCOUNT_FIX", null, "op", LocalDateTime.now(), LocalDateTime.now());
+            em.persist(unresolvedBounce);
+
+            return new Ids(healthyBounce.getId(), reissued1.getId(),
+                    mismatchBounce.getId(), reissued2.getId(),
+                    orphan.getId(), unresolvedBounce.getId());
+        });
+
+        PayoutBounceReconReport report = integrity.checkPayoutBounceRecon();
+
+        assertThat(report.amountMismatches())
+                .anySatisfy(m -> {
+                    assertThat(m.bounceId()).isEqualTo(ids.mismatchBounceId());
+                    assertThat(m.originalAmount()).isEqualByComparingTo("95500.00");
+                    assertThat(m.reissuedAmount()).isEqualByComparingTo("90000.00");
+                })
+                .noneSatisfy(m -> assertThat(m.bounceId()).isEqualTo(ids.healthyBounceId()));
+        assertThat(report.orphanNullSettlementPayoutIds())
+                .contains(ids.orphanPayoutId())
+                .doesNotContain(ids.healthyReissuedId(), ids.mismatchReissuedId());
+        assertThat(report.reissuedWithSettlement())
+                .doesNotContain(ids.healthyReissuedId(), ids.mismatchReissuedId());
+        assertThat(report.unresolvedBounces()).isGreaterThanOrEqualTo(1);
+        assertThat(ids.unresolvedBounceId()).isNotNull();
+        // 이 테스트 자체가 위반(금액불일치+고아)을 심었으므로 전체 판정은 false.
+        assertThat(report.ok()).isFalse();
+        assertThat(report.reasons()).anySatisfy(r -> assertThat(r).contains("금액 불일치"));
+        assertThat(report.reasons()).anySatisfy(r -> assertThat(r).contains("고아"));
     }
 
     // ── 픽스처 ───────────────────────────────────────────────────────────

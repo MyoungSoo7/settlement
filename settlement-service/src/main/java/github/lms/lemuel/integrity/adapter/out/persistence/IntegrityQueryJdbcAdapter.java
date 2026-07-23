@@ -5,6 +5,7 @@ import github.lms.lemuel.integrity.application.port.out.KeyChecksum;
 import github.lms.lemuel.integrity.application.port.out.PaymentKey;
 import github.lms.lemuel.integrity.domain.HoldbackStatusReport;
 import github.lms.lemuel.integrity.domain.LedgerCompletenessReport;
+import github.lms.lemuel.integrity.domain.PayoutBounceReconReport;
 import github.lms.lemuel.integrity.domain.PayoutReconReport;
 import github.lms.lemuel.integrity.domain.ProcessedEventCount;
 import github.lms.lemuel.integrity.domain.StuckStateReport;
@@ -231,6 +232,57 @@ public class IntegrityQueryJdbcAdapter implements IntegrityQueryPort {
                 withoutPayout, overpaid, duplicates, overTotal);
     }
 
+    // ── INV-13 반송 재지급 대사 (Seed D1 후속) ─────────────────────────────
+
+    @Override
+    public PayoutBounceReconReport payoutBounceRecon() {
+        var counts = jdbc.sql("""
+                        SELECT count(*) AS total,
+                               count(*) FILTER (WHERE resolved_payout_id IS NOT NULL) AS resolved
+                        FROM payout_bounces
+                        """)
+                .query((rs, i) -> new BounceCounts(rs.getLong("total"), rs.getLong("resolved")))
+                .single();
+
+        // 재지급 금액이 원 payout 금액과 다른 반송 — 반송-재지급 1:1 정합 위반.
+        List<PayoutBounceReconReport.AmountMismatch> amountMismatches = jdbc.sql("""
+                        SELECT b.id AS bounce_id, b.payout_id, b.resolved_payout_id,
+                               orig.amount AS original_amount, reissued.amount AS reissued_amount
+                        FROM payout_bounces b
+                        JOIN payouts orig ON orig.id = b.payout_id
+                        JOIN payouts reissued ON reissued.id = b.resolved_payout_id
+                        WHERE b.resolved_payout_id IS NOT NULL
+                          AND reissued.amount <> orig.amount
+                        ORDER BY b.id LIMIT %d
+                        """.formatted(ID_LIMIT))
+                .query((rs, i) -> new PayoutBounceReconReport.AmountMismatch(
+                        rs.getLong("bounce_id"), rs.getLong("payout_id"), rs.getLong("resolved_payout_id"),
+                        money(rs, "original_amount"), money(rs, "reissued_amount")))
+                .list();
+
+        // 재지급 payout 은 settlement_id=NULL 이어야 한다(이중지급 가드 슬롯 회피 설계) — non-null 이면 위반.
+        List<Long> reissuedWithSettlement = jdbc.sql("""
+                        SELECT b.resolved_payout_id
+                        FROM payout_bounces b
+                        JOIN payouts reissued ON reissued.id = b.resolved_payout_id
+                        WHERE b.resolved_payout_id IS NOT NULL AND reissued.settlement_id IS NOT NULL
+                        ORDER BY b.resolved_payout_id LIMIT %d
+                        """.formatted(ID_LIMIT))
+                .query(Long.class).list();
+
+        // settlement_id=NULL payout 은 반송 재지급 경로만 만들어 낸다 — 어떤 반송에도 안 걸리면 고아.
+        List<Long> orphans = jdbc.sql("""
+                        SELECT p.id FROM payouts p
+                        WHERE p.settlement_id IS NULL
+                          AND NOT EXISTS (SELECT 1 FROM payout_bounces b WHERE b.resolved_payout_id = p.id)
+                        ORDER BY p.id LIMIT %d
+                        """.formatted(ID_LIMIT))
+                .query(Long.class).list();
+
+        return PayoutBounceReconReport.of(counts.total(), counts.resolved(),
+                counts.total() - counts.resolved(), amountMismatches, reissuedWithSettlement, orphans);
+    }
+
     // ── INV-7 홀드백 ───────────────────────────────────────────────────────
 
     @Override
@@ -420,6 +472,9 @@ public class IntegrityQueryJdbcAdapter implements IntegrityQueryPort {
     }
 
     private record PayoutAgg(long count, BigDecimal total, long completed) {
+    }
+
+    private record BounceCounts(long total, long resolved) {
     }
 
     private record HoldbackTotals(BigDecimal held, BigDecimal released, LocalDateTime lastReleased) {
