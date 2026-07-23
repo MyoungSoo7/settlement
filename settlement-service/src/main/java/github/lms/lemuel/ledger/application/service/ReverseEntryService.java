@@ -46,6 +46,7 @@ public class ReverseEntryService implements ReverseEntryUseCase {
     private final LoadSettlementForLedgerPort loadSettlementPort;
     private final LoadLedgerEntryPort loadLedgerPort;
     private final SaveLedgerEntryPort saveLedgerPort;
+    private final LedgerPeriodGuard periodGuard;
 
     @Override
     @Transactional
@@ -98,6 +99,9 @@ public class ReverseEntryService implements ReverseEntryUseCase {
                     "amount " + amount + " exceeds paymentAmount " + payment);
         }
 
+        // 기간 원장 잠금 — 마감 기간을 대상으로 한 역분개는 재개봉하지 않고 다음 OPEN 기간으로 재지정해 전기한다.
+        LocalDate postingDate = periodGuard.resolveOpenPostingDate(adjustmentDate);
+
         LedgerEntryType entryType = entryTypeFor(referenceType);
         String label = labelFor(referenceType);
 
@@ -116,7 +120,7 @@ public class ReverseEntryService implements ReverseEntryUseCase {
                     referenceId, referenceType,
                     entryType,
                     AccountType.SALES_REFUND, AccountType.ACCOUNTS_PAYABLE,
-                    reversedNet, adjustmentDate,
+                    reversedNet, postingDate,
                     label + " 역분개 — 미지급금 환원 (settlement=" + settlementId + ")");
             entry.post();
             created.add(saveLedgerPort.save(entry));
@@ -127,7 +131,7 @@ public class ReverseEntryService implements ReverseEntryUseCase {
                     referenceId, referenceType,
                     entryType,
                     AccountType.SALES_REFUND, AccountType.COMMISSION_REVENUE,
-                    reversedCommission, adjustmentDate,
+                    reversedCommission, postingDate,
                     label + " 역분개 — 수수료수익 환원 (settlement=" + settlementId + ")");
             entry.post();
             created.add(saveLedgerPort.save(entry));

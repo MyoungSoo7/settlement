@@ -58,6 +58,8 @@ public enum ErrorCode {
     // ─── settlement / ledger ──────────────────────────────────────────────────
     SETTLEMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "정산을 찾을 수 없습니다."),
     LEDGER_NOT_FOUND(HttpStatus.NOT_FOUND, "원장 항목을 찾을 수 없습니다."),
+    LEDGER_PERIOD_CLOSED(HttpStatus.CONFLICT, "마감된 원장 기간에는 신규 분개를 작성할 수 없습니다."),
+    LEDGER_PERIOD_IMBALANCE(HttpStatus.UNPROCESSABLE_ENTITY, "시산표 차대가 균형을 이루지 않아 기간을 마감할 수 없습니다."),
 
     // ─── loan (선정산·기업 신용대출) ─────────────────────────────────────────────
     CORPORATE_LOAN_NOT_FOUND(HttpStatus.NOT_FOUND, "대출 건 또는 재무자료를 찾을 수 없습니다."),

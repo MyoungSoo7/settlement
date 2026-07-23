@@ -28,11 +28,14 @@ public class RecoveryEntryService implements RecoveryEntryUseCase {
 
     private final LoadLedgerEntryPort loadLedgerEntryPort;
     private final SaveLedgerEntryPort saveLedgerEntryPort;
+    private final LedgerPeriodGuard periodGuard;
 
     public RecoveryEntryService(LoadLedgerEntryPort loadLedgerEntryPort,
-                                SaveLedgerEntryPort saveLedgerEntryPort) {
+                                SaveLedgerEntryPort saveLedgerEntryPort,
+                                LedgerPeriodGuard periodGuard) {
         this.loadLedgerEntryPort = loadLedgerEntryPort;
         this.saveLedgerEntryPort = saveLedgerEntryPort;
+        this.periodGuard = periodGuard;
     }
 
     @Override
@@ -42,6 +45,8 @@ public class RecoveryEntryService implements RecoveryEntryUseCase {
         if (loadLedgerEntryPort.existsByReference(recoveryId, ReferenceType.SELLER_RECOVERY)) {
             return Optional.empty();
         }
+        // 기간 원장 잠금 — 마감 기간에는 신규 채권 인식 분개를 거부한다.
+        periodGuard.assertOpenForNewEntry(entryDate);
         LedgerEntry entry = LedgerEntry.of(recoveryId, ReferenceType.SELLER_RECOVERY,
                 LedgerEntryType.RECOVERY_RECOGNIZED,
                 AccountType.ACCOUNTS_RECEIVABLE, AccountType.ACCOUNTS_PAYABLE,
@@ -61,6 +66,8 @@ public class RecoveryEntryService implements RecoveryEntryUseCase {
         if (loadLedgerEntryPort.existsByReference(allocationId, ReferenceType.RECOVERY_OFFSET)) {
             return Optional.empty();
         }
+        // 기간 원장 잠금 — 마감 기간에는 신규 상계 분개를 거부한다.
+        periodGuard.assertOpenForNewEntry(entryDate);
         LedgerEntry entry = LedgerEntry.of(allocationId, ReferenceType.RECOVERY_OFFSET,
                 LedgerEntryType.RECOVERY_OFFSET,
                 AccountType.ACCOUNTS_PAYABLE, AccountType.ACCOUNTS_RECEIVABLE,

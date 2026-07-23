@@ -2,11 +2,13 @@ package github.lms.lemuel.ledger.application.service;
 
 import github.lms.lemuel.ledger.application.dto.SettlementSummary;
 import github.lms.lemuel.ledger.application.port.out.LoadLedgerEntryPort;
+import github.lms.lemuel.ledger.application.port.out.LoadLedgerPeriodPort;
 import github.lms.lemuel.ledger.application.port.out.LoadSettlementForLedgerPort;
 import github.lms.lemuel.ledger.application.port.out.SaveLedgerEntryPort;
 import github.lms.lemuel.ledger.domain.AccountType;
 import github.lms.lemuel.ledger.domain.LedgerEntry;
 import github.lms.lemuel.ledger.domain.LedgerEntryType;
+import github.lms.lemuel.ledger.domain.LedgerPeriod;
 import github.lms.lemuel.ledger.domain.LedgerStatus;
 import github.lms.lemuel.ledger.domain.ReferenceType;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,11 +17,14 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -29,6 +34,7 @@ class ReverseEntryServiceTest {
 
     private FakeSettlementPort settlements;
     private FakeLedgerPort ledger;
+    private FakePeriodPort periods;
     private ReverseEntryService service;
 
     private static final LocalDate TODAY = LocalDate.now();
@@ -37,7 +43,8 @@ class ReverseEntryServiceTest {
     void setUp() {
         settlements = new FakeSettlementPort();
         ledger = new FakeLedgerPort();
-        service = new ReverseEntryService(settlements, ledger, ledger);
+        periods = new FakePeriodPort();
+        service = new ReverseEntryService(settlements, ledger, ledger, new LedgerPeriodGuard(periods));
 
         // 표준 settlement: 결제 10,000 / 수수료 300 (3%) / net 9,700
         settlements.put(new SettlementSummary(
@@ -141,6 +148,47 @@ class ReverseEntryServiceTest {
     }
 
     @Nested
+    class 마감기간_역분개_재지정 {
+
+        @Test
+        void 마감기간_대상_역분개는_다음_OPEN_기간_1일로_재지정_전기() {
+            // 2026-03 마감, 2026-04 OPEN. 3월 15일자 역분개 요청 → 4월 1일로 재지정.
+            LocalDate closedMonthDate = LocalDate.of(2026, 3, 15);
+            periods.markClosed(YearMonth.of(2026, 3));
+
+            List<LedgerEntry> rows = service.reverseForRefund(1L, 900L, bd("10000"), closedMonthDate);
+
+            assertThat(rows).hasSize(2);
+            assertThat(rows).allSatisfy(r ->
+                    assertThat(r.getSettlementDate()).isEqualTo(LocalDate.of(2026, 4, 1)));
+        }
+
+        @Test
+        void 연속_마감기간은_그다음_OPEN_기간으로_건너뛰어_재지정() {
+            // 2026-03, 2026-04 모두 마감 → 3월 요청은 5월 1일로.
+            LocalDate closedMonthDate = LocalDate.of(2026, 3, 20);
+            periods.markClosed(YearMonth.of(2026, 3));
+            periods.markClosed(YearMonth.of(2026, 4));
+
+            List<LedgerEntry> rows = service.reverseForRefund(1L, 901L, bd("5000"), closedMonthDate);
+
+            assertThat(rows).allSatisfy(r ->
+                    assertThat(r.getSettlementDate()).isEqualTo(LocalDate.of(2026, 5, 1)));
+        }
+
+        @Test
+        void OPEN_기간_대상_역분개는_요청_일자_그대로_전기() {
+            LocalDate openMonthDate = LocalDate.of(2026, 6, 12);
+            periods.markClosed(YearMonth.of(2026, 3)); // 무관한 달만 마감
+
+            List<LedgerEntry> rows = service.reverseForRefund(1L, 902L, bd("5000"), openMonthDate);
+
+            assertThat(rows).allSatisfy(r ->
+                    assertThat(r.getSettlementDate()).isEqualTo(openMonthDate));
+        }
+    }
+
+    @Nested
     class 출처별_역분개 {
 
         @Test
@@ -211,6 +259,17 @@ class ReverseEntryServiceTest {
         void put(SettlementSummary s) { store.put(s.id(), s); }
         @Override public Optional<SettlementSummary> findById(Long id) {
             return Optional.ofNullable(store.get(id));
+        }
+    }
+
+    private static class FakePeriodPort implements LoadLedgerPeriodPort {
+        private final Set<YearMonth> closed = new HashSet<>();
+        void markClosed(YearMonth ym) { closed.add(ym); }
+        @Override public Optional<LedgerPeriod> findByPeriod(YearMonth period) {
+            return Optional.empty();
+        }
+        @Override public boolean isClosed(YearMonth period) {
+            return closed.contains(period);
         }
     }
 
