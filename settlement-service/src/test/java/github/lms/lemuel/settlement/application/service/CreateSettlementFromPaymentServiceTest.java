@@ -209,6 +209,25 @@ class CreateSettlementFromPaymentServiceTest {
         verifyNoInteractions(publishSettlementDomainEventPort);
     }
 
+    @Test @DisplayName("#9: save 의 DataIntegrityViolation 이 payment_id 경합이 아니면(승자 부재) 원 예외를 그대로 전파한다")
+    void create_nonRaceIntegrityViolation_isRethrownNotMislabeled() {
+        // 사전 체크 미존재로 생성 진행하지만 save 가 payment_id 경합과 무관한 제약 위반(예: NOT NULL/FK/CHECK)을 낸다.
+        // 재조회에도 승자가 없으므로 "경합 수렴" 으로 오분류하지 않고 원 예외를 전파해야 진단이 왜곡되지 않는다.
+        when(loadSettlementPort.findByPaymentId(1L))
+                .thenReturn(Optional.empty())   // 사전 체크: 없음
+                .thenReturn(Optional.empty());  // catch 재조회: 승자 없음 → 경합 아님
+        DataIntegrityViolationException boom =
+                new DataIntegrityViolationException("null value in column \"seller_id\" violates not-null constraint");
+        when(saveSettlementPort.save(any())).thenThrow(boom);
+
+        assertThatThrownBy(() -> service.createSettlementFromPayment(1L, 10L, new BigDecimal("50000")))
+                .isSameAs(boom);
+
+        verify(loadSettlementPort, times(2)).findByPaymentId(1L);
+        verify(backfillChargebackPort, never()).backfillChargebacks(any(), any());
+        verify(auditLogger, never()).record(any(), any(), any(), any());
+    }
+
     @Test @DisplayName("중복 생성 시 기존 반환 (멱등성)") void create_idempotent() {
         Settlement existing = Settlement.createFromPayment(1L, 10L, new BigDecimal("50000"), LocalDate.now());
         when(loadSettlementPort.findByPaymentId(1L)).thenReturn(Optional.of(existing));

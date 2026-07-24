@@ -135,10 +135,16 @@ public class CreateSettlementFromPaymentService implements CreateSettlementFromP
             try {
                 savedSettlement = saveSettlementPort.save(settlement);
             } catch (DataIntegrityViolationException race) {
+                // uk_settlements_payment_id 경합이면 승자 정산이 이미 존재한다 → 재조회해 멱등 수렴한다.
+                // 승자가 없으면 이 예외는 payment_id 유니크 경합이 아니라 다른 제약 위반(예: NOT NULL/FK/CHECK)이므로,
+                // "경합 수렴" 으로 오분류해 로그·진단을 왜곡하지 않고 원 사유를 그대로 전파한다(발견 #9).
+                Optional<Settlement> winner = loadSettlementPort.findByPaymentId(paymentId);
+                if (winner.isEmpty()) {
+                    throw race;
+                }
                 log.warn("동시 정산 생성 경합(uk_settlements_payment_id) — 기존 정산으로 멱등 수렴. "
                         + "paymentId={}, reason={}", paymentId, race.toString());
-                return loadSettlementPort.findByPaymentId(paymentId)
-                        .orElseThrow(() -> race);
+                return winner.get();
             }
             try (var ignoreSettlement = MdcScope.of(MdcKeys.SETTLEMENT_ID,
                     String.valueOf(savedSettlement.getId()))) {
