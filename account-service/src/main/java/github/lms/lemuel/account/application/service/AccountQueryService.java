@@ -66,8 +66,18 @@ public class AccountQueryService implements AccountQueryUseCase {
 
     @Override
     public SettlementAggregate settlementAggregates() {
-        BigDecimal scheduled = loadAccountEntryPort.sumAmountByRefType("SETTLEMENT_CREATED");
-        BigDecimal confirmed = loadAccountEntryPort.sumAmountByRefType("SETTLEMENT_CONFIRMED");
+        // ADR 0026 Option A: 정산 확정(settlement.confirmed)은 GL 무전표라 SETTLEMENT_CONFIRMED 는
+        // 신규 적재되지 않는다(SettlementConfirmedConsumer.handle no-op). 확정을 SETTLEMENT_CONFIRMED 합계로
+        // 읽으면 항상 ~0 이 되어 지급 완료 정산까지 영구 미지급으로 오표기된다.
+        //
+        // scheduled(전체 정산 인식액) = 즉시분(SETTLEMENT_CREATED, I) + 유보분(SETTLEMENT_HOLDBACK_RECOGNIZED, H).
+        //   유보를 포함해야 유보 해제→지급(PAYOUT_COMPLETED 에 합산됨) 시 pending 이 음수로 새지 않는다.
+        // confirmed(실지급) = 실제 현금 유출(PAYOUT_COMPLETED, Option A 지급 시점) + 레거시 cut-over 확정
+        //   (SETTLEMENT_CONFIRMED — 옛 모델 적재분만 남으며, 한 정산은 둘 중 한쪽에만 기여해 이중계상 없음).
+        BigDecimal scheduled = loadAccountEntryPort.sumAmountByRefType("SETTLEMENT_CREATED")
+                .add(loadAccountEntryPort.sumAmountByRefType("SETTLEMENT_HOLDBACK_RECOGNIZED"));
+        BigDecimal confirmed = loadAccountEntryPort.sumAmountByRefType("PAYOUT_COMPLETED")
+                .add(loadAccountEntryPort.sumAmountByRefType("SETTLEMENT_CONFIRMED"));
         return new SettlementAggregate(scheduled, confirmed, scheduled.subtract(confirmed));
     }
 

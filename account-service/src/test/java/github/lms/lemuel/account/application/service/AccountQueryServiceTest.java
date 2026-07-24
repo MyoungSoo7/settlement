@@ -90,15 +90,50 @@ class AccountQueryServiceTest {
     }
 
     @Test
-    void settlementAggregates_는_예정빼기확정으로_pending을_낸다() {
-        when(loadAccountEntryPort.sumAmountByRefType("SETTLEMENT_CREATED")).thenReturn(new BigDecimal("100000"));
-        when(loadAccountEntryPort.sumAmountByRefType("SETTLEMENT_CONFIRMED")).thenReturn(new BigDecimal("40000"));
+    void settlementAggregates_는_생성총액빼기실지급으로_pending을_낸다() {
+        // Option A: scheduled = 즉시(SETTLEMENT_CREATED) + 유보(SETTLEMENT_HOLDBACK_RECOGNIZED) = 전체 정산 인식액.
+        when(loadAccountEntryPort.sumAmountByRefType("SETTLEMENT_CREATED")).thenReturn(new BigDecimal("70000"));
+        when(loadAccountEntryPort.sumAmountByRefType("SETTLEMENT_HOLDBACK_RECOGNIZED")).thenReturn(new BigDecimal("30000"));
+        // confirmed(=실지급) = 실제 현금 유출(PAYOUT_COMPLETED) + 레거시 cut-over 확정(SETTLEMENT_CONFIRMED).
+        when(loadAccountEntryPort.sumAmountByRefType("PAYOUT_COMPLETED")).thenReturn(new BigDecimal("40000"));
+        when(loadAccountEntryPort.sumAmountByRefType("SETTLEMENT_CONFIRMED")).thenReturn(BigDecimal.ZERO);
 
         SettlementAggregate agg = service.settlementAggregates();
 
         assertThat(agg.scheduledTotal()).isEqualByComparingTo("100000");
         assertThat(agg.confirmedTotal()).isEqualByComparingTo("40000");
         assertThat(agg.pendingScheduled()).isEqualByComparingTo("60000");
+    }
+
+    @Test
+    void settlementAggregates_생성후_전액지급되면_pending_0() {
+        // 회귀 가드: Option A 확정은 GL 무전표(SETTLEMENT_CONFIRMED 미적재)라 SETTLEMENT_CONFIRMED 는 영구 0.
+        // 실지급을 PAYOUT_COMPLETED 로 인식하지 않으면 확정·지급 완료 정산이 영구 미지급으로 오표기된다(리뷰어 지적 버그).
+        when(loadAccountEntryPort.sumAmountByRefType("SETTLEMENT_CREATED")).thenReturn(new BigDecimal("100000"));
+        when(loadAccountEntryPort.sumAmountByRefType("SETTLEMENT_HOLDBACK_RECOGNIZED")).thenReturn(BigDecimal.ZERO);
+        when(loadAccountEntryPort.sumAmountByRefType("PAYOUT_COMPLETED")).thenReturn(new BigDecimal("100000"));
+        when(loadAccountEntryPort.sumAmountByRefType("SETTLEMENT_CONFIRMED")).thenReturn(BigDecimal.ZERO);
+
+        SettlementAggregate agg = service.settlementAggregates();
+
+        assertThat(agg.scheduledTotal()).isEqualByComparingTo("100000");
+        assertThat(agg.confirmedTotal()).isEqualByComparingTo("100000");
+        assertThat(agg.pendingScheduled()).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void settlementAggregates_유보해제후_지급되면_pending_음수로_새지_않는다() {
+        // net=1000(즉시 700 + 유보 300). 즉시 지급 700 후 유보 해제→지급 300 → PAYOUT_COMPLETED=1000.
+        // scheduled 가 유보를 포함하지 않으면(700) pending = 700−1000 = −300 으로 새어나간다.
+        when(loadAccountEntryPort.sumAmountByRefType("SETTLEMENT_CREATED")).thenReturn(new BigDecimal("700"));
+        when(loadAccountEntryPort.sumAmountByRefType("SETTLEMENT_HOLDBACK_RECOGNIZED")).thenReturn(new BigDecimal("300"));
+        when(loadAccountEntryPort.sumAmountByRefType("PAYOUT_COMPLETED")).thenReturn(new BigDecimal("1000"));
+        when(loadAccountEntryPort.sumAmountByRefType("SETTLEMENT_CONFIRMED")).thenReturn(BigDecimal.ZERO);
+
+        SettlementAggregate agg = service.settlementAggregates();
+
+        assertThat(agg.scheduledTotal()).isEqualByComparingTo("1000");
+        assertThat(agg.pendingScheduled()).isEqualByComparingTo("0");
     }
 
     @Test
