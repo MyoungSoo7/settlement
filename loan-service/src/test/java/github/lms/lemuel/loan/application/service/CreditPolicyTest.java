@@ -34,6 +34,24 @@ class CreditPolicyTest {
     }
 
     @Test
+    void 한도와_수수료는_scale2로_정규화되어_경계판정이_결정적이다() { // L-7
+        // 100만.33 × 0.80 = 800000.264 → HALF_UP scale2 = 800000.26 (소수 잔차 제거)
+        BigDecimal limit = policy.creditLimit(new BigDecimal("1000000.33"));
+        assertThat(limit.scale()).isEqualTo(2);
+        assertThat(limit).isEqualByComparingTo("800000.26");
+
+        // 등급 반영: 100만.33 × 0.80 × 0.85 = 680000.2244 → 680000.22 (1회만 반올림)
+        BigDecimal graded = policy.creditLimit(new BigDecimal("1000000.33"), "C");
+        assertThat(graded.scale()).isEqualTo(2);
+        assertThat(graded).isEqualByComparingTo("680000.22");
+
+        // 수수료: 800000.55 × 0.0002 × 5 = 800.00055 → 800.00
+        BigDecimal fee = policy.fee(new BigDecimal("800000.55"), 5);
+        assertThat(fee.scale()).isEqualTo(2);
+        assertThat(fee).isEqualByComparingTo("800.00");
+    }
+
+    @Test
     void 등급_모르면_haircut_무변동이라_한도이내면_통과() {
         policy.validateWithinLimit(new BigDecimal("800000"), new BigDecimal("1000000"), null);
         policy.validateWithinLimit(new BigDecimal("800000"), new BigDecimal("1000000"), "A");

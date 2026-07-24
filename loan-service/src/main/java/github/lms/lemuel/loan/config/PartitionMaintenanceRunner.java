@@ -30,7 +30,8 @@ public class PartitionMaintenanceRunner implements ApplicationRunner {
 
     public PartitionMaintenanceRunner(
             JdbcTemplate jdbcTemplate,
-            // 네이티브 SQL 은 hibernate.default_schema 를 무시하므로 함수명을 명시 한정한다(loan=opslab).
+            // 네이티브 SQL 은 hibernate.default_schema 를 자동 적용하지 않으므로 그 설정값을 주입받아
+            // 함수명을 명시 한정한다 — 스키마는 하드코딩이 아니라 default_schema 가 단일 진실이다(L-6).
             @Value("${spring.jpa.properties.hibernate.default_schema:public}") String schema,
             @Value("${app.partition.months-ahead:3}") int monthsAhead) {
         this.jdbcTemplate = jdbcTemplate;
