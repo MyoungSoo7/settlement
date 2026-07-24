@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -23,6 +24,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * 도메인 팩토리/정책 ↔ DB CHECK 값 집합의 계약 테스트 — lemuel_loan(opslab), 실 Flyway 체인.
@@ -84,17 +86,54 @@ class SchemaEnumContractIT {
     }
 
     @Test
-    @DisplayName("chk_loan_ledger_ref_type == LoanLedgerEntry 팩토리 5종의 refType (정확 일치)")
+    @DisplayName("chk_loan_ledger_ref_type == LoanLedgerEntry 팩토리 7종의 refType (정확 일치)")
     void loanLedgerRefTypeCheckMatchesFactorySetExactly() {
         Set<String> factoryRefTypes = new LinkedHashSet<>(java.util.Arrays.asList(
                 LoanLedgerEntry.disbursement(1L, ONE).getRefType(),
                 LoanLedgerEntry.feeAccrual(1L, ONE).getRefType(),
                 LoanLedgerEntry.repayment(1L, ONE).getRefType(),
                 LoanLedgerEntry.corporateDisbursement(1L, ONE).getRefType(),
-                LoanLedgerEntry.corporateFeeAccrual(1L, ONE).getRefType()));
+                LoanLedgerEntry.corporateFeeAccrual(1L, ONE).getRefType(),
+                // 상환·상각 팩토리를 계약에 포함 — 누락 시 실 DB INSERT 가 CHECK 위반으로 500 나던 갭.
+                LoanLedgerEntry.corporateRepayment(1L, ONE).getRefType(),
+                LoanLedgerEntry.badDebtWriteOff(1L, ONE).getRefType()));
 
         assertThat(checkValues("chk_loan_ledger_ref_type"))
                 .containsExactlyInAnyOrderElementsOf(factoryRefTypes);
+    }
+
+    @Test
+    @DisplayName("CORP_REPAYMENT 은 같은 loanId 로 부분상환 N회 기표가 허용된다(유니크 제외)")
+    void corporateRepaymentAllowsMultiplePartialEntriesPerLoan() {
+        String repay = LoanLedgerEntry.corporateRepayment(1L, ONE).getRefType();
+        // 같은 대출(ref_id=9001)에 대해 부분상환 전표를 2회 기표 — 유니크 부분 인덱스가 제외하므로 둘 다 성공한다.
+        insertLedger("CASH", "LOAN_RECEIVABLE", new BigDecimal("500.00"), repay, 9001L);
+        insertLedger("CASH", "LOAN_RECEIVABLE", new BigDecimal("300.00"), repay, 9001L);
+
+        Integer count = jdbc.queryForObject(
+                "SELECT count(*) FROM opslab.loan_ledger_entries WHERE ref_type = ? AND ref_id = 9001",
+                Integer.class, repay);
+        assertThat(count).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("실행/상각 전표는 같은 참조·계정쌍 이중 기표가 여전히 유니크로 차단된다")
+    void nonRepaymentRefTypesStillBlockDuplicateEntries() {
+        String disburse = LoanLedgerEntry.corporateDisbursement(1L, ONE).getRefType();
+        insertLedger("LOAN_RECEIVABLE", "CASH", new BigDecimal("1000.00"), disburse, 9100L);
+
+        assertThatThrownBy(() ->
+                insertLedger("LOAN_RECEIVABLE", "CASH", new BigDecimal("1000.00"), disburse, 9100L))
+                .isInstanceOf(DataIntegrityViolationException.class); // uq_loan_ledger_reference_accounts
+    }
+
+    private void insertLedger(String debit, String credit, BigDecimal amount, String refType, long refId) {
+        // 스키마 한정 필수: 테이블은 opslab 스키마(default_schema=opslab)에 있고 raw JdbcTemplate 은
+        // 커넥션 search_path 기준이라 opslab 을 명시해야 loan_ledger_entries 가 해석된다.
+        jdbc.update("""
+                INSERT INTO opslab.loan_ledger_entries (debit, credit, amount, ref_type, ref_id)
+                VALUES (?, ?, ?, ?, ?)
+                """, debit, credit, amount, refType, refId);
     }
 
     @Test
