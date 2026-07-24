@@ -4,11 +4,14 @@ import github.lms.lemuel.SettlementServiceApplication;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -18,74 +21,118 @@ import static org.junit.jupiter.api.Assertions.fail;
 /**
  * Data Definition Standard 강제 — settlement (근거: ~/wiki/DATA-STANDARD.md).
  *
- * <p><b>N1 (시각)</b>: 순간(instant)은 UTC tz-aware(OffsetDateTime/Instant)만, {@code LocalDateTime} 금지.
+ * <p><b>왜 소스 스캔인가</b>: 이 gradle 셋업에서 ArchUnit {@code ClassFileImporter} 는 어떤 방식으로도
+ * 클래스를 0개 임포트한다(기존 {@code *ArchitectureTest} 가 {@code allowEmptyShould(true)} 로 vacuous
+ * 통과하던 원인). 그래서 클래스패스 비의존 <b>소스 파일 스캔</b> 으로 강제한다.
  *
- * <p><b>왜 소스 스캔인가</b>: 이 gradle 셋업에서 ArchUnit {@code ClassFileImporter}는 어떤 방식으로도
- * 0개 클래스를 임포트한다(기존 arch 테스트가 {@code allowEmptyShould(true)}로 vacuous 통과하던 원인).
- * 그래서 클래스패스에 의존하지 않는 <b>소스 파일 스캔 + baseline 동결(ratchet)</b>로 N1을 강제한다:
- * {@code src/main/java} 에서 {@code LocalDateTime} 을 쓰는 파일 집합이 커밋된 baseline 의 부분집합이어야
- * 하고, <b>신규 파일이 LocalDateTime 을 도입하면 실패</b>한다. 레거시를 제거하면 통과(부분집합 유지).
+ * <ul>
+ *   <li><b>N1(시각)</b>: 순간에 {@code LocalDateTime} 금지. 기존 위반은 baseline 동결(ratchet), 신규만 차단.</li>
+ *   <li><b>N6a(enum)</b>: {@code EnumType.STRING} 저장만. ORDINAL/무인자 {@code @Enumerated} 금지 (현재 0 — 방지 가드).</li>
+ *   <li><b>N6b(enum)</b>: 마이그레이션에 native PG enum({@code CREATE TYPE ... AS ENUM}) 금지 (현재 0 — 방지 가드).</li>
+ * </ul>
  */
 class DataStandardArchTest {
 
-    private static final String NEEDLE = "LocalDateTime";
-    private static final Path BASELINE_REL = Paths.get("src/test/resources/datastandard/n1-localdatetime-baseline.txt");
-
+    // ---------------------- N1: 시각 (ratchet) ----------------------
     @Test
     void n1_noNewLocalDateTime() throws Exception {
-        Path moduleRoot = moduleRoot();
-        Path src = moduleRoot.resolve("src/main/java");
-        assertTrue(Files.isDirectory(src), "src/main/java 없음: " + src);
+        Set<String> current = scan(javaUnder("src/main/java"), c -> c.contains("LocalDateTime"));
+        Path baseline = moduleRoot().resolve("src/test/resources/datastandard/n1-localdatetime-baseline.txt");
+        ratchet("N1", current, baseline,
+                "신규 LocalDateTime 사용 — 순간은 UTC OffsetDateTime/Instant (~/wiki/DATA-STANDARD.md N1)");
+    }
 
-        Set<String> current = scan(src);
-        Path baselineFile = moduleRoot.resolve(BASELINE_REL);
+    // ---------------------- N6a: enum STRING only (must stay 0) ----------------------
+    @Test
+    void n6a_enumStoredAsStringNotOrdinal() throws Exception {
+        Set<String> v = scan(javaUnder("src/main/java"), DataStandardArchTest::usesOrdinalEnum);
+        mustBeZero("N6a", v,
+                "enum은 EnumType.STRING 저장만. ORDINAL/무인자 @Enumerated 금지 (~/wiki/DATA-STANDARD.md N6)");
+    }
 
-        // 최초 실행: baseline 없으면 현재 위반을 동결하고 통과(커밋 필요).
+    // ---------------------- N6b: no native PG enum in migrations (must stay 0) ----------------------
+    @Test
+    void n6b_noNativePostgresEnumInMigrations() throws Exception {
+        Set<String> v = scan(filesUnder("src/main/resources", ".sql"),
+                c -> c.toUpperCase(Locale.ROOT).contains("AS ENUM"));
+        mustBeZero("N6b", v,
+                "마이그레이션 native PG enum(CREATE TYPE ... AS ENUM) 금지 — varchar + EnumType.STRING (~/wiki/DATA-STANDARD.md N6)");
+    }
+
+    // ============================ helpers ============================
+
+    /** @Enumerated 인데 같은 줄에 STRING 없음(=ORDINAL 기본), 또는 명시적 EnumType.ORDINAL. */
+    private static boolean usesOrdinalEnum(String content) {
+        if (content.contains("EnumType.ORDINAL")) return true;
+        for (String line : content.split("\n")) {
+            if (line.contains("@Enumerated") && !line.contains("STRING")) return true;
+        }
+        return false;
+    }
+
+    private static Set<String> scan(List<Path> files, Predicate<String> hit) {
+        Path root = moduleRoot();
+        Set<String> out = new TreeSet<>();
+        for (Path f : files) {
+            try {
+                if (hit.test(Files.readString(f))) {
+                    out.add(root.relativize(f).toString().replace('\\', '/'));
+                }
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+        return out;
+    }
+
+    /** baseline 대비 신규 위반만 실패(ratchet). baseline 없으면 현재 위반을 동결하고 통과(커밋 필요). */
+    private static void ratchet(String id, Set<String> current, Path baselineFile, String message) throws IOException {
         if (!Files.exists(baselineFile)) {
             Files.createDirectories(baselineFile.getParent());
             Files.write(baselineFile, current);
-            System.out.println("N1: baseline 생성(" + current.size() + "건) → 반드시 커밋: " + baselineFile);
+            System.out.println(id + ": baseline 생성(" + current.size() + "건) → 반드시 커밋: " + baselineFile);
             return;
         }
-
         Set<String> baseline = new TreeSet<>(Files.readAllLines(baselineFile));
         Set<String> introduced = new TreeSet<>(current);
         introduced.removeAll(baseline);
-        System.out.println("N1: current=" + current.size() + " baseline=" + baseline.size()
+        System.out.println(id + ": current=" + current.size() + " baseline=" + baseline.size()
                 + " introduced=" + introduced.size());
-
         if (!introduced.isEmpty()) {
-            fail("N1 위반 — 신규 LocalDateTime 사용 파일(순간은 UTC OffsetDateTime/Instant 사용, ~/wiki/DATA-STANDARD.md):\n  "
-                    + String.join("\n  ", introduced));
+            fail(id + " 위반 — " + message + "\n  " + String.join("\n  ", introduced));
         }
     }
 
-    /** src/main/java 아래 .java 중 LocalDateTime 을 쓰는 파일의 모듈상대경로 집합. */
-    private static Set<String> scan(Path src) throws IOException {
-        try (Stream<Path> paths = Files.walk(src)) {
-            return paths
-                    .filter(p -> p.toString().endsWith(".java"))
-                    .filter(DataStandardArchTest::usesNeedle)
-                    .map(p -> src.getParent().getParent().getParent().relativize(p).toString().replace('\\', '/'))
-                    .collect(Collectors.toCollection(TreeSet::new));
+    private static void mustBeZero(String id, Set<String> violations, String message) {
+        System.out.println(id + ": violations=" + violations.size());
+        if (!violations.isEmpty()) {
+            fail(id + " 위반 — " + message + "\n  " + String.join("\n  ", violations));
         }
     }
 
-    private static boolean usesNeedle(Path javaFile) {
+    private static List<Path> javaUnder(String rel) throws IOException {
+        return filesUnder(rel, ".java");
+    }
+
+    private static List<Path> filesUnder(String rel, String ext) throws IOException {
+        Path dir = moduleRoot().resolve(rel);
+        assertTrue(Files.isDirectory(dir), dir + " 없음");
+        try (Stream<Path> s = Files.walk(dir)) {
+            return s.filter(p -> p.toString().endsWith(ext)).collect(Collectors.toList());
+        }
+    }
+
+    /** SettlementServiceApplication code-source 위치에서 위로 올라가 src/main/java 를 가진 모듈 루트. */
+    private static Path moduleRoot() {
         try {
-            return Files.readString(javaFile).contains(NEEDLE);
-        } catch (IOException e) {
-            return false;
+            Path p = Path.of(SettlementServiceApplication.class.getProtectionDomain()
+                    .getCodeSource().getLocation().toURI());
+            if (!Files.isDirectory(p)) p = p.getParent();
+            while (p != null && !Files.isDirectory(p.resolve("src/main/java"))) p = p.getParent();
+            if (p == null) throw new IllegalStateException("모듈 루트 탐색 실패");
+            return p;
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
         }
-    }
-
-    /** SettlementServiceApplication 의 code-source 위치에서 위로 올라가 src/main/java 를 가진 모듈 루트를 찾는다. */
-    private static Path moduleRoot() throws Exception {
-        Path p = Paths.get(SettlementServiceApplication.class.getProtectionDomain()
-                .getCodeSource().getLocation().toURI());
-        if (!Files.isDirectory(p)) p = p.getParent();        // jar 인 경우 그 디렉토리로
-        while (p != null && !Files.isDirectory(p.resolve("src/main/java"))) p = p.getParent();
-        if (p == null) throw new IllegalStateException("모듈 루트(src/main/java 보유) 탐색 실패");
-        return p;
     }
 }
