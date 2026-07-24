@@ -5,6 +5,7 @@ import github.lms.lemuel.common.config.jwt.JwtUtil;
 import github.lms.lemuel.loan.application.port.in.DisburseCorporateLoanUseCase;
 import github.lms.lemuel.loan.application.port.in.EvaluateCorporateCreditUseCase;
 import github.lms.lemuel.loan.application.port.in.EvaluateCorporateCreditUseCase.CorporateCreditView;
+import github.lms.lemuel.loan.application.port.in.RepayCorporateLoanUseCase;
 import github.lms.lemuel.loan.application.port.in.RequestCorporateLoanUseCase;
 import github.lms.lemuel.loan.application.port.out.LoadCorporateLoanPort;
 import github.lms.lemuel.loan.domain.CorporateLoan;
@@ -55,6 +56,7 @@ class CorporateLoanControllerTest {
     @MockitoBean EvaluateCorporateCreditUseCase evaluateCorporateCreditUseCase;
     @MockitoBean RequestCorporateLoanUseCase requestCorporateLoanUseCase;
     @MockitoBean DisburseCorporateLoanUseCase disburseCorporateLoanUseCase;
+    @MockitoBean RepayCorporateLoanUseCase repayCorporateLoanUseCase;
     @MockitoBean LoadCorporateLoanPort loadCorporateLoanPort;
 
     /** 일반(CEO) 주체 — ROLE_USER, 본인 것만 조회 가능. */
@@ -230,14 +232,111 @@ class CorporateLoanControllerTest {
         verifyNoInteractions(requestCorporateLoanUseCase);
     }
 
+    /** 소유자(ownerUserId) 가 지정된 DISBURSED 기업대출 — 상환·소유권 대조 테스트용. */
+    private static CorporateLoan ownedLoan(long ownerUserId) {
+        return CorporateLoan.reconstitute(7L, "005930", "삼성전자",
+                new BigDecimal("1000000"), new BigDecimal("6600"), new BigDecimal("1006600"),
+                30, 82, "A", CorporateLoanStatus.DISBURSED, LocalDateTime.now(), ownerUserId);
+    }
+
     @Test
-    @DisplayName("POST /loans/corporate/{id}/disburse — 실행 성공은 200")
-    void disburseOk() throws Exception {
+    @DisplayName("POST /loans/corporate/{id}/disburse — 운영자 실행은 200 (소유권 대조 우회)")
+    void disburseAsOperatorOk() throws Exception {
         when(disburseCorporateLoanUseCase.disburse(7L)).thenReturn(loan());
 
-        mockMvc.perform(post("/loans/corporate/7/disburse"))
+        mockMvc.perform(post("/loans/corporate/7/disburse").principal(adminAuth(1L)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(7));
+    }
+
+    @Test
+    @DisplayName("POST /loans/corporate/{id}/disburse — 본인 소유 실행은 200")
+    void disburseAsOwnerOk() throws Exception {
+        when(loadCorporateLoanPort.findById(7L)).thenReturn(java.util.Optional.of(ownedLoan(7L)));
+        when(disburseCorporateLoanUseCase.disburse(7L)).thenReturn(loan());
+
+        mockMvc.perform(post("/loans/corporate/7/disburse").principal(userAuth(7L)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("POST /loans/corporate/{id}/disburse — 타인 대출 실행은 403 이고 use case 미호출 (IDOR 가드)")
+    void disburseByNonOwnerForbidden() throws Exception {
+        when(loadCorporateLoanPort.findById(7L)).thenReturn(java.util.Optional.of(ownedLoan(7L)));
+
+        mockMvc.perform(post("/loans/corporate/7/disburse").principal(userAuth(9L)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403));
+
+        verifyNoInteractions(disburseCorporateLoanUseCase);
+    }
+
+    @Test
+    @DisplayName("POST /loans/corporate/{id}/disburse — 미인증이면 403 이고 use case 미호출")
+    void disburseNoAuthForbidden() throws Exception {
+        mockMvc.perform(post("/loans/corporate/7/disburse"))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(disburseCorporateLoanUseCase);
+    }
+
+    @Test
+    @DisplayName("POST /loans/corporate/{id}/repay — 본인 상환은 200 + 갱신 본문")
+    void repayAsOwnerOk() throws Exception {
+        when(loadCorporateLoanPort.findById(7L)).thenReturn(java.util.Optional.of(ownedLoan(7L)));
+        when(repayCorporateLoanUseCase.repay(any())).thenReturn(loan());
+
+        mockMvc.perform(post("/loans/corporate/7/repay").principal(userAuth(7L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"amount":600000}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(7));
+
+        verify(repayCorporateLoanUseCase).repay(any());
+    }
+
+    @Test
+    @DisplayName("POST /loans/corporate/{id}/repay — 타인 대출 상환은 403 이고 use case 미호출 (IDOR 가드)")
+    void repayByNonOwnerForbidden() throws Exception {
+        when(loadCorporateLoanPort.findById(7L)).thenReturn(java.util.Optional.of(ownedLoan(7L)));
+
+        mockMvc.perform(post("/loans/corporate/7/repay").principal(userAuth(9L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"amount":600000}
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403));
+
+        verifyNoInteractions(repayCorporateLoanUseCase);
+    }
+
+    @Test
+    @DisplayName("POST /loans/corporate/{id}/repay — 상환액 0 이하(@Positive)는 400 이고 use case 미호출")
+    void repayNonPositiveAmountIs400() throws Exception {
+        mockMvc.perform(post("/loans/corporate/7/repay").principal(userAuth(7L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"amount":0}
+                                """))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(repayCorporateLoanUseCase);
+    }
+
+    @Test
+    @DisplayName("POST /loans/corporate/{id}/repay — 미인증이면 403 이고 use case 미호출")
+    void repayNoAuthForbidden() throws Exception {
+        mockMvc.perform(post("/loans/corporate/7/repay")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"amount":600000}
+                                """))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(repayCorporateLoanUseCase);
     }
 
     @Test

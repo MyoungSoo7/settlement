@@ -62,10 +62,13 @@ class WebDtoMappingTest {
     }
 
     @Test
-    @DisplayName("LoanResponse.from 은 선정산 대출 필드를 옮긴다")
+    @DisplayName("LoanResponse.from 은 선정산 대출 필드와 실행시각·만기를 옮긴다")
     void loanResponse() {
+        LocalDateTime disbursedAt = LocalDateTime.of(2026, 7, 24, 9, 0);
+        LocalDateTime dueAt = LocalDateTime.of(2026, 7, 31, 9, 0);
         LoanAdvance loan = LoanAdvance.reconstitute(1L, 7L, new BigDecimal("800000"),
-                new BigDecimal("800"), new BigDecimal("800800"), LoanStatus.DISBURSED);
+                new BigDecimal("800"), new BigDecimal("800800"), LoanStatus.DISBURSED,
+                7, disbursedAt, dueAt);
 
         LoanResponse r = LoanResponse.from(loan);
 
@@ -75,5 +78,19 @@ class WebDtoMappingTest {
         assertThat(r.fee()).isEqualByComparingTo("800");
         assertThat(r.outstanding()).isEqualByComparingTo("800800");
         assertThat(r.status()).isEqualTo(LoanStatus.DISBURSED);
+        assertThat(r.disbursedAt()).isEqualTo(disbursedAt);
+        assertThat(r.dueAt()).isEqualTo(dueAt);
+    }
+
+    @Test
+    @DisplayName("LoanResponse.from 은 실행 전/구 데이터의 실행시각·만기를 null 로 옮긴다")
+    void loanResponseNullDueTracking() {
+        LoanAdvance loan = LoanAdvance.reconstitute(1L, 7L, new BigDecimal("800000"),
+                new BigDecimal("800"), BigDecimal.ZERO, LoanStatus.REQUESTED);
+
+        LoanResponse r = LoanResponse.from(loan);
+
+        assertThat(r.disbursedAt()).isNull();
+        assertThat(r.dueAt()).isNull();
     }
 }

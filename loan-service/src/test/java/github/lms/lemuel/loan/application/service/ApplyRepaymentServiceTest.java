@@ -45,12 +45,30 @@ class ApplyRepaymentServiceTest {
         return LoanAdvance.reconstitute(id, 7L, outstanding, BigDecimal.ZERO, outstanding, LoanStatus.DISBURSED);
     }
 
+    private LoanAdvance overdue(long id, BigDecimal outstanding) {
+        return LoanAdvance.reconstitute(id, 7L, outstanding, BigDecimal.ZERO, outstanding, LoanStatus.OVERDUE);
+    }
+
+    @Test
+    void 연체_대출도_상환_recovery_대상이라_새_정산금으로_REPAID_회수된다() {
+        LoanAdvance overdueLoan = overdue(1L, new BigDecimal("300000"));
+        when(recordRepaymentPort.existsForSettlement(104L)).thenReturn(false);
+        when(loadLoanPort.findRepayableBySellerForUpdate(7L)).thenReturn(List.of(overdueLoan));
+
+        service().apply(new ApplyRepaymentCommand(104L, 7L, new BigDecimal("300000")));
+
+        assertThat(overdueLoan.getOutstanding()).isEqualByComparingTo("0");
+        assertThat(overdueLoan.getStatus()).isEqualTo(LoanStatus.REPAID); // OVERDUE → REPAID 자동 회수
+        verify(saveLoanPort).save(overdueLoan);
+        verify(recordRepaymentPort).record(104L, 7L, new BigDecimal("300000.00"));
+    }
+
     @Test
     void 다건대출은_FIFO로_차감되고_총차감액을_발행한다() {
         LoanAdvance oldest = disbursed(1L, new BigDecimal("300000"));
         LoanAdvance newer = disbursed(2L, new BigDecimal("600000"));
         when(recordRepaymentPort.existsForSettlement(100L)).thenReturn(false);
-        when(loadLoanPort.findDisbursedBySellerForUpdate(7L)).thenReturn(List.of(oldest, newer));
+        when(loadLoanPort.findRepayableBySellerForUpdate(7L)).thenReturn(List.of(oldest, newer));
 
         // 정산금 80만 → oldest 30만 전액, newer 50만 부분, 총 80만
         service().apply(new ApplyRepaymentCommand(100L, 7L, new BigDecimal("800000")));
@@ -68,7 +86,7 @@ class ApplyRepaymentServiceTest {
     @Test
     void 대출없는_셀러는_차감0으로_기록하고_발행한다() {
         when(recordRepaymentPort.existsForSettlement(101L)).thenReturn(false);
-        when(loadLoanPort.findDisbursedBySellerForUpdate(7L)).thenReturn(List.of());
+        when(loadLoanPort.findRepayableBySellerForUpdate(7L)).thenReturn(List.of());
 
         service().apply(new ApplyRepaymentCommand(101L, 7L, new BigDecimal("500000")));
 
@@ -83,7 +101,7 @@ class ApplyRepaymentServiceTest {
     void 정산금이_미상환보다_크면_미상환만큼만_차감() {
         LoanAdvance loan = disbursed(1L, new BigDecimal("200000"));
         when(recordRepaymentPort.existsForSettlement(102L)).thenReturn(false);
-        when(loadLoanPort.findDisbursedBySellerForUpdate(7L)).thenReturn(List.of(loan));
+        when(loadLoanPort.findRepayableBySellerForUpdate(7L)).thenReturn(List.of(loan));
 
         service().apply(new ApplyRepaymentCommand(102L, 7L, new BigDecimal("500000")));
 
@@ -97,7 +115,7 @@ class ApplyRepaymentServiceTest {
         LoanAdvance first = disbursed(1L, new BigDecimal("300000"));
         LoanAdvance second = disbursed(2L, new BigDecimal("500000"));
         when(recordRepaymentPort.existsForSettlement(103L)).thenReturn(false);
-        when(loadLoanPort.findDisbursedBySellerForUpdate(7L)).thenReturn(List.of(first, second));
+        when(loadLoanPort.findRepayableBySellerForUpdate(7L)).thenReturn(List.of(first, second));
 
         // 정산금 30만 = first 잔액과 동일 → first 전액 차감 후 remaining 0 → second 는 break 로 스킵
         service().apply(new ApplyRepaymentCommand(103L, 7L, new BigDecimal("300000")));
@@ -117,7 +135,7 @@ class ApplyRepaymentServiceTest {
 
         service().apply(new ApplyRepaymentCommand(100L, 7L, new BigDecimal("800000")));
 
-        verify(loadLoanPort, never()).findDisbursedBySellerForUpdate(any());
+        verify(loadLoanPort, never()).findRepayableBySellerForUpdate(any());
         verify(saveLoanPort, never()).save(any());
         verify(publishLoanEventPort, never()).publishRepaymentApplied(org.mockito.ArgumentMatchers.anyLong(),
                 org.mockito.ArgumentMatchers.anyLong(), any());

@@ -205,7 +205,7 @@ class LoanPersistenceAdaptersTest {
 
         private LoanAdvanceJpaEntity entity(long id) {
             return new LoanAdvanceJpaEntity(id, 7L, new BigDecimal("800000"), new BigDecimal("800"),
-                    new BigDecimal("800800"), LoanStatus.DISBURSED, LocalDateTime.now());
+                    new BigDecimal("800800"), LoanStatus.DISBURSED, 0, null, null, LocalDateTime.now());
         }
 
         @Test
@@ -245,11 +245,17 @@ class LoanPersistenceAdaptersTest {
         }
 
         @Test
-        @DisplayName("findDisbursedBySellerForUpdate 매핑")
-        void findDisbursedForUpdate() {
-            when(repository.findBySellerAndStatusForUpdate(7L, LoanStatus.DISBURSED))
-                    .thenReturn(List.of(entity(1L)));
-            assertThat(adapter().findDisbursedBySellerForUpdate(7L)).hasSize(1);
+        @DisplayName("findRepayableBySellerForUpdate 는 DISBURSED + OVERDUE 를 함께 조회·매핑한다")
+        void findRepayableForUpdate() {
+            LoanAdvanceJpaEntity overdue = new LoanAdvanceJpaEntity(2L, 7L, new BigDecimal("800000"),
+                    new BigDecimal("800"), new BigDecimal("800800"), LoanStatus.OVERDUE, 0, null, null, LocalDateTime.now());
+            when(repository.findBySellerAndStatusesForUpdate(7L,
+                    List.of(LoanStatus.DISBURSED, LoanStatus.OVERDUE)))
+                    .thenReturn(List.of(entity(1L), overdue));
+
+            assertThat(adapter().findRepayableBySellerForUpdate(7L))
+                    .extracting(LoanAdvance::getStatus)
+                    .containsExactly(LoanStatus.DISBURSED, LoanStatus.OVERDUE);
         }
     }
 }

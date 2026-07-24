@@ -108,7 +108,7 @@ class JpaEntityGettersTest {
     void loanAdvance() {
         LocalDateTime now = LocalDateTime.now();
         LoanAdvanceJpaEntity e = new LoanAdvanceJpaEntity(1L, 7L, new BigDecimal("800000"),
-                new BigDecimal("800"), new BigDecimal("800800"), LoanStatus.DISBURSED, now);
+                new BigDecimal("800"), new BigDecimal("800800"), LoanStatus.DISBURSED, 0, null, null, now);
 
         assertThat(e.getId()).isEqualTo(1L);
         assertThat(e.getSellerId()).isEqualTo(7L);

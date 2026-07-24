@@ -19,6 +19,9 @@ import java.math.BigDecimal;
  *
  * <p>한도 검증에는 셀러(법인)의 뉴스 평판 등급이 반영된다(ADR 0023 Phase 3 후속) —
  * 등급이 나쁘면 CreditPolicy 가 한도를 haircut 한다. 평판 미상이면 무변동(fail-open).
+ *
+ * <p>선지급일수(financingDays)는 수수료 산정 근거이자 실행 시 만기(dueAt) 계산의 근거라 애그리거트에
+ * 보존한다(자동 연체/상각 배치가 만기를 스캔).
  */
 @Service
 public class RequestLoanService implements RequestLoanUseCase {
@@ -55,7 +58,9 @@ public class RequestLoanService implements RequestLoanUseCase {
         creditPolicy.validateWithinLimit(command.principal(), unpaidSettlement, reputationGrade);
 
         BigDecimal fee = creditPolicy.fee(command.principal(), command.financingDays());
-        LoanAdvance loan = LoanAdvance.request(command.sellerId(), command.principal(), fee);
+        // 선지급일수를 애그리거트에 보존 — 실행 시 만기(dueAt = disbursedAt + financingDays) 계산의 근거.
+        LoanAdvance loan = LoanAdvance.request(command.sellerId(), command.principal(), fee,
+                command.financingDays());
         LoanAdvance saved = saveLoanPort.save(loan);
         loanMetricsPort.advanceRequested();
         return saved;

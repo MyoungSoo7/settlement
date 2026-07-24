@@ -68,6 +68,24 @@ public class LoanLedgerEntry {
                 fee, "CORP_FEE", loanId);
     }
 
+    /**
+     * 기업 신용대출 상환 전표: 차변 CASH / 대변 LOAN_RECEIVABLE (amount = 차감액).
+     * 선정산 {@link #repayment(Long, BigDecimal)} 과 계정 방향은 동일하나 refId 가 loanId 라 구분한다.
+     */
+    public static LoanLedgerEntry corporateRepayment(Long loanId, BigDecimal amount) {
+        return new LoanLedgerEntry(null, LedgerAccount.CASH, LedgerAccount.LOAN_RECEIVABLE,
+                amount, "CORP_REPAYMENT", loanId);
+    }
+
+    /**
+     * 대손 상각 전표: 차변 BAD_DEBT_EXPENSE / 대변 BAD_DEBT_ALLOWANCE (amount = 상각 손실액=미상환잔액).
+     * 연체(OVERDUE) 대출을 회수 불능으로 확정할 때 손실을 비용/충당금으로 인식한다(ledger-invariants).
+     */
+    public static LoanLedgerEntry badDebtWriteOff(Long loanId, BigDecimal loss) {
+        return new LoanLedgerEntry(null, LedgerAccount.BAD_DEBT_EXPENSE, LedgerAccount.BAD_DEBT_ALLOWANCE,
+                loss, "BAD_DEBT", loanId);
+    }
+
     public static LoanLedgerEntry reconstitute(Long id, LedgerAccount debit, LedgerAccount credit,
                                                BigDecimal amount, String refType, Long refId) {
         return new LoanLedgerEntry(id, debit, credit, amount, refType, refId);

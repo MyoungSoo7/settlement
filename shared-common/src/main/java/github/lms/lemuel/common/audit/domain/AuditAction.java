@@ -42,6 +42,11 @@ public enum AuditAction {
     CORPORATE_LOAN_REJECTED,
     CORPORATE_LOAN_DISBURSED,
     LOAN_REPAYMENT_APPLIED,
+    // 기업 신용대출 상환(미상환잔액 차감) — 실자금 회수라 감사 추적 필수.
+    CORPORATE_LOAN_REPAID,
+    // 선정산 대출 연체 진입·상각(대손 확정) — 회수 리스크 상태 전이의 감사 추적.
+    LOAN_ADVANCE_OVERDUE,
+    LOAN_ADVANCE_WRITTEN_OFF,
 
     // ── investment-service (투자주문) 금전 액션 ──
     INVESTMENT_ORDER_PLACED,

@@ -6,6 +6,7 @@ import {
   type CorporateLoan,
 } from '@/api/loan';
 import { financialApi, type FinancialCompany, type FinancialCompanyPage } from '@/api/financial';
+import { authApi } from '@/api/auth';
 import Card from '@/components/Card';
 import Spinner from '@/components/Spinner';
 
@@ -15,6 +16,9 @@ const fmt = (v: number) =>
 const pct = (v: number | null | undefined) =>
   v === null || v === undefined ? 'N/A' : `${v.toFixed(2)}%`;
 
+const fmtDate = (v?: string | null) =>
+  v ? new Date(v).toLocaleDateString('ko-KR') : '-';
+
 const statusBadge = (s: string) => ({
   REQUESTED: 'bg-yellow-100 text-yellow-800',
   APPROVED:  'bg-blue-100 text-blue-800',
@@ -22,6 +26,7 @@ const statusBadge = (s: string) => ({
   REPAYING:  'bg-indigo-100 text-indigo-800',
   REPAID:    'bg-green-100 text-green-800',
   OVERDUE:   'bg-red-100 text-red-800',
+  WRITTEN_OFF: 'bg-gray-800 text-white',
   REJECTED:  'bg-red-100 text-red-800',
   CANCELED:  'bg-gray-200 text-gray-700',
 }[s] ?? 'bg-gray-100 text-gray-800');
@@ -49,6 +54,9 @@ const SellerLoanSection: React.FC = () => {
   const [loans, setLoans] = useState<LoanResponse[]>([]);
   const [loadingList, setLoadingList] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
+
+  // 연체·상각은 회수 담당자(ADMIN) 전용 조작 — JWT 역할로 노출 여부를 가른다.
+  const isAdmin = authApi.getCurrentUser()?.role === 'ADMIN';
 
   const loadLoans = async (sid: number) => {
     setLoadingList(true);
@@ -89,6 +97,36 @@ const SellerLoanSection: React.FC = () => {
       await loadLoans(querySellerId);
     } catch (err: any) {
       setError(err.response?.data?.message || '대출 실행에 실패했습니다.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleMarkOverdue = async (id: number) => {
+    setBusyId(id);
+    setError(null);
+    setNotice(null);
+    try {
+      await loanApi.markOverdue(id);
+      setNotice(`#${id} 연체 처리 완료`);
+      await loadLoans(querySellerId);
+    } catch (err: any) {
+      setError(err.response?.data?.message || '연체 처리에 실패했습니다.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleWriteOff = async (id: number) => {
+    setBusyId(id);
+    setError(null);
+    setNotice(null);
+    try {
+      await loanApi.writeOff(id);
+      setNotice(`#${id} 상각(대손) 처리 완료`);
+      await loadLoans(querySellerId);
+    } catch (err: any) {
+      setError(err.response?.data?.message || '상각 처리에 실패했습니다.');
     } finally {
       setBusyId(null);
     }
@@ -163,33 +201,65 @@ const SellerLoanSection: React.FC = () => {
                   <th className="py-2 px-2">원금</th>
                   <th className="py-2 px-2">수수료</th>
                   <th className="py-2 px-2">미상환</th>
+                  <th className="py-2 px-2">만기</th>
                   <th className="py-2 px-2">상태</th>
                   <th className="py-2 px-2 text-right">액션</th>
                 </tr>
               </thead>
               <tbody>
-                {loans.map((l) => (
-                  <tr key={l.id} className="border-b last:border-0">
-                    <td className="py-2.5 px-2 font-medium">#{l.id}</td>
-                    <td className="py-2.5 px-2">{fmt(l.principal)}</td>
-                    <td className="py-2.5 px-2 text-gray-600">{fmt(l.fee)}</td>
-                    <td className="py-2.5 px-2 font-semibold">{fmt(l.outstanding)}</td>
-                    <td className="py-2.5 px-2">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${statusBadge(l.status)}`}>
-                        {l.status}
-                      </span>
-                    </td>
-                    <td className="py-2.5 px-2 text-right">
-                      <button
-                        disabled={busyId === l.id}
-                        onClick={() => handleDisburse(l.id)}
-                        className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-40"
-                      >
-                        {busyId === l.id ? '처리중...' : '실행(선지급)'}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {loans.map((l) => {
+                  const canDisburse = l.status === 'REQUESTED' || l.status === 'APPROVED';
+                  const canOverdue = isAdmin && l.status === 'DISBURSED';
+                  const canWriteOff = isAdmin && l.status === 'OVERDUE';
+                  return (
+                    <tr key={l.id} className="border-b last:border-0">
+                      <td className="py-2.5 px-2 font-medium">#{l.id}</td>
+                      <td className="py-2.5 px-2">{fmt(l.principal)}</td>
+                      <td className="py-2.5 px-2 text-gray-600">{fmt(l.fee)}</td>
+                      <td className="py-2.5 px-2 font-semibold">{fmt(l.outstanding)}</td>
+                      <td className="py-2.5 px-2 text-gray-600">{fmtDate(l.dueAt)}</td>
+                      <td className="py-2.5 px-2">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${statusBadge(l.status)}`}>
+                          {l.status}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-2 text-right">
+                        <div className="flex justify-end gap-1.5">
+                          {canDisburse && (
+                            <button
+                              disabled={busyId === l.id}
+                              onClick={() => handleDisburse(l.id)}
+                              className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-40"
+                            >
+                              {busyId === l.id ? '처리중...' : '실행(선지급)'}
+                            </button>
+                          )}
+                          {canOverdue && (
+                            <button
+                              disabled={busyId === l.id}
+                              onClick={() => handleMarkOverdue(l.id)}
+                              className="px-3 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-semibold hover:bg-amber-700 transition-colors disabled:opacity-40"
+                            >
+                              {busyId === l.id ? '처리중...' : '연체'}
+                            </button>
+                          )}
+                          {canWriteOff && (
+                            <button
+                              disabled={busyId === l.id}
+                              onClick={() => handleWriteOff(l.id)}
+                              className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-semibold hover:bg-red-700 transition-colors disabled:opacity-40"
+                            >
+                              {busyId === l.id ? '처리중...' : '상각'}
+                            </button>
+                          )}
+                          {!canDisburse && !canOverdue && !canWriteOff && (
+                            <span className="text-xs text-gray-400">-</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -220,6 +290,10 @@ const CorporateLoanSection: React.FC = () => {
   const [loans, setLoans] = useState<CorporateLoan[]>([]);
   const [busyId, setBusyId] = useState<number | null>(null);
 
+  // 상환 입력(인라인)
+  const [repayId, setRepayId] = useState<number | null>(null);
+  const [repayAmount, setRepayAmount] = useState<number>(0);
+
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -240,6 +314,7 @@ const CorporateLoanSection: React.FC = () => {
     setSelected(company);
     setCredit(null);
     setLoans([]);
+    setRepayId(null);
     setLoadingCredit(true);
     setError(null);
     try {
@@ -286,6 +361,24 @@ const CorporateLoanSection: React.FC = () => {
       setLoans(await loanApi.corporateByStock(selected.stockCode));
     } catch (err: any) {
       setError(err.response?.data?.message || '기업대출 실행에 실패했습니다.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleRepay = async (id: number) => {
+    if (!selected || repayAmount <= 0) return;
+    setBusyId(id);
+    setError(null);
+    setNotice(null);
+    try {
+      await loanApi.repayCorporate(id, repayAmount);
+      setNotice(`#${id} 기업대출 상환 완료 (${fmt(repayAmount)})`);
+      setRepayId(null);
+      setRepayAmount(0);
+      setLoans(await loanApi.corporateByStock(selected.stockCode));
+    } catch (err: any) {
+      setError(err.response?.data?.message || '기업대출 상환에 실패했습니다.');
     } finally {
       setBusyId(null);
     }
@@ -461,6 +554,40 @@ const CorporateLoanSection: React.FC = () => {
                           >
                             {busyId === l.id ? '처리중...' : '실행(선지급)'}
                           </button>
+                        ) : l.status === 'DISBURSED' ? (
+                          repayId === l.id ? (
+                            <div className="flex items-center justify-end gap-1.5">
+                              <input
+                                type="number"
+                                min={1}
+                                step="any"
+                                value={repayAmount}
+                                onChange={(e) => setRepayAmount(Number(e.target.value))}
+                                className="w-28 px-2 py-1 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                placeholder="상환액"
+                              />
+                              <button
+                                disabled={busyId === l.id || repayAmount <= 0}
+                                onClick={() => handleRepay(l.id)}
+                                className="px-2 py-1 bg-emerald-600 text-white rounded text-xs font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-40"
+                              >
+                                {busyId === l.id ? '...' : '확인'}
+                              </button>
+                              <button
+                                onClick={() => { setRepayId(null); setRepayAmount(0); }}
+                                className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs font-semibold hover:bg-gray-300 transition-colors"
+                              >
+                                취소
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => { setRepayId(l.id); setRepayAmount(l.outstanding); }}
+                              className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-700 transition-colors"
+                            >
+                              상환
+                            </button>
+                          )
                         ) : (
                           <span className="text-xs text-gray-400">-</span>
                         )}

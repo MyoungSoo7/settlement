@@ -13,7 +13,9 @@ export interface LoanResponse {
   principal: number;
   fee: number;
   outstanding: number;
-  status: string;          // LoanStatus enum 이름
+  status: string;              // LoanStatus enum 이름 (REQUESTED/APPROVED/DISBURSED/REPAID/REJECTED/OVERDUE/WRITTEN_OFF)
+  disbursedAt?: string | null; // 실행 시각(ISO). 실행 전/구 데이터는 null
+  dueAt?: string | null;       // 만기일(ISO) = 실행시각 + 선지급일수. 자동 연체/상각 기준
 }
 
 /** 기업대출 신용등급 (A 최상 ~ E 최하) */
@@ -76,6 +78,18 @@ export const loanApi = {
     return res.data;
   },
 
+  /** 연체 진입(ADMIN 회수). POST /loans/{id}/overdue */
+  markOverdue: async (id: number): Promise<LoanResponse> => {
+    const res = await api.post<LoanResponse>(`/loans/${id}/overdue`);
+    return res.data;
+  },
+
+  /** 상각(ADMIN 대손 확정). POST /loans/{id}/write-off */
+  writeOff: async (id: number): Promise<LoanResponse> => {
+    const res = await api.post<LoanResponse>(`/loans/${id}/write-off`);
+    return res.data;
+  },
+
   /** 기업 신용평가. GET /loans/corporate/credit/{stockCode} */
   corporateCredit: async (stockCode: string): Promise<CorporateCredit> => {
     const res = await api.get<CorporateCredit>(`/loans/corporate/credit/${stockCode}`);
@@ -91,6 +105,12 @@ export const loanApi = {
   /** 기업대출 실행(선지급). POST /loans/corporate/{id}/disburse */
   disburseCorporate: async (id: number): Promise<CorporateLoan> => {
     const res = await api.post<CorporateLoan>(`/loans/corporate/${id}/disburse`);
+    return res.data;
+  },
+
+  /** 기업대출 상환(미상환잔액 차감). POST /loans/corporate/{id}/repay */
+  repayCorporate: async (id: number, amount: number): Promise<CorporateLoan> => {
+    const res = await api.post<CorporateLoan>(`/loans/corporate/${id}/repay`, { amount });
     return res.data;
   },
 

@@ -39,8 +39,24 @@ public class LoanPersistenceAdapter implements SaveLoanPort, LoadLoanPort {
     }
 
     @Override
-    public List<LoanAdvance> findDisbursedBySellerForUpdate(Long sellerId) {
-        return repository.findBySellerAndStatusForUpdate(sellerId, LoanStatus.DISBURSED).stream()
+    public List<LoanAdvance> findRepayableBySellerForUpdate(Long sellerId) {
+        // 상환 recovery 대상: 미상환 잔액이 남은 DISBURSED + OVERDUE(연체 후 회수). FIFO(id asc)로 락 조회.
+        return repository.findBySellerAndStatusesForUpdate(
+                        sellerId, List.of(LoanStatus.DISBURSED, LoanStatus.OVERDUE)).stream()
+                .map(LoanPersistenceAdapter::toDomain)
+                .toList();
+    }
+
+    @Override
+    public List<LoanAdvance> findOverdueCandidates(LocalDateTime asOf) {
+        return repository.findByStatusAndDueAtBefore(LoanStatus.DISBURSED, asOf).stream()
+                .map(LoanPersistenceAdapter::toDomain)
+                .toList();
+    }
+
+    @Override
+    public List<LoanAdvance> findWriteOffCandidates(LocalDateTime asOf) {
+        return repository.findByStatusAndDueAtBefore(LoanStatus.OVERDUE, asOf).stream()
                 .map(LoanPersistenceAdapter::toDomain)
                 .toList();
     }
@@ -53,12 +69,16 @@ public class LoanPersistenceAdapter implements SaveLoanPort, LoadLoanPort {
                 loan.getFee(),
                 loan.getOutstanding(),
                 loan.getStatus(),
+                loan.getFinancingDays(),
+                loan.getDisbursedAt(),
+                loan.getDueAt(),
                 LocalDateTime.now());
     }
 
     private static LoanAdvance toDomain(LoanAdvanceJpaEntity e) {
         return LoanAdvance.reconstitute(
                 e.getId(), e.getSellerId(), e.getPrincipal(), e.getFee(),
-                e.getOutstanding(), e.getStatus());
+                e.getOutstanding(), e.getStatus(),
+                e.getFinancingDays(), e.getDisbursedAt(), e.getDueAt());
     }
 }

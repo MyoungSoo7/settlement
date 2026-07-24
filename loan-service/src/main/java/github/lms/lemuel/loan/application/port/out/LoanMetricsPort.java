@@ -35,4 +35,21 @@ public interface LoanMetricsPort {
      * @param deductedAmount 이번 정산 확정으로 실제 차감된 상환 금액(0 이상)
      */
     void repaymentApplied(BigDecimal deductedAmount);
+
+    /**
+     * 기업 신용대출 상환. 차감 건수와 차감 금액 합계를 함께 적재한다.
+     *
+     * @param deductedAmount 이번 상환으로 실제 차감된 금액(0 이상)
+     */
+    void corporateRepaid(BigDecimal deductedAmount);
+
+    /** 선정산 대출 연체 진입(DISBURSED → OVERDUE). */
+    void advanceOverdue();
+
+    /**
+     * 선정산 대출 상각(OVERDUE → WRITTEN_OFF). 상각 건수와 대손 손실액 합계를 함께 적재한다.
+     *
+     * @param loss 상각으로 확정된 손실액(미상환잔액, 0 이상)
+     */
+    void advanceWrittenOff(BigDecimal loss);
 }

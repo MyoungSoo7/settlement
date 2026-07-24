@@ -109,7 +109,7 @@ class LoanAuditEmissionTest {
         when(saveLoan.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         DisburseLoanService service = proxied(new DisburseLoanService(loadLoan, saveLoan, settlementView,
-                reputation, creditPolicy, publish, ledger, metrics));
+                reputation, creditPolicy, publish, ledger, metrics, java.time.Clock.systemUTC()));
         service.disburse(1L);
 
         verify(auditLogger).record(eq(AuditAction.LOAN_ADVANCE_DISBURSED), eq("LoanAdvance"), eq("1"), any());
@@ -177,7 +177,7 @@ class LoanAuditEmissionTest {
         PublishLoanEventPort publish = mock(PublishLoanEventPort.class);
         AppendLedgerPort ledger = mock(AppendLedgerPort.class);
         when(recordRepayment.existsForSettlement(100L)).thenReturn(false);
-        when(loadLoan.findDisbursedBySellerForUpdate(7L)).thenReturn(List.of());
+        when(loadLoan.findRepayableBySellerForUpdate(7L)).thenReturn(List.of());
 
         ApplyRepaymentService service = proxied(new ApplyRepaymentService(loadLoan, saveLoan, recordRepayment,
                 saveSettlementView, publish, ledger, metrics));

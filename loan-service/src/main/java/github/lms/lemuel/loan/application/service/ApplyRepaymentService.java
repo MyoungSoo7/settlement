@@ -75,8 +75,8 @@ public class ApplyRepaymentService implements ApplyRepaymentUseCase {
 
         saveSettlementViewPort.markConfirmed(settlementId);
 
-        // 미상환 대출을 FIFO(오래된 순)로 락 조회 후 순차 차감
-        List<LoanAdvance> loans = loadLoanPort.findDisbursedBySellerForUpdate(command.sellerId());
+        // 미상환 대출(DISBURSED·OVERDUE)을 FIFO(오래된 순)로 락 조회 후 순차 차감 — 연체 대출도 자동 회수
+        List<LoanAdvance> loans = loadLoanPort.findRepayableBySellerForUpdate(command.sellerId());
         BigDecimal remaining = command.amount();
         BigDecimal totalDeducted = BigDecimal.ZERO;
 
