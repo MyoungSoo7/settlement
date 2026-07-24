@@ -31,6 +31,14 @@ public interface LoadAccountEntryPort {
     /** refType 별 전표 건수. */
     long countByRefType(String refType);
 
+    /**
+     * 셀러의 현재 SELLER_PAYABLE 순잔액(credit합 − debit합, 없으면 0). 음수 방지 payout 분할용.
+     *
+     * <p>DB 집계(SUM)로 계산해 전표 전량 로드를 피하며, COALESCE 로 매칭 행이 없어도 null 없이 0 을 반환한다
+     * ({@code :param IS NULL OR} 트랩 회피 — owner·계정을 고정 파라미터로 바인딩).
+     */
+    BigDecimal sellerPayableBalance(String sellerId);
+
     /** 전체 전표(시산표 계산용). */
     List<AccountEntry> findAll();
 

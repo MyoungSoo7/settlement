@@ -143,7 +143,10 @@ public class KafkaErrorHandlerConfig {
         handler.addNotRetryableExceptions(
                 JsonProcessingException.class,
                 IllegalArgumentException.class,
-                IllegalStateException.class
+                IllegalStateException.class,
+                // 도메인 입력 계약 위반(양수 금액·소수 자릿수·차대 분리 등)은 재시도로 복구되지 않는다 → 즉시 DLT.
+                // account 도메인은 OO 게이트상 generic IAE 대신 타입 예외(AccountDomainException)를 던지므로 명시 등록한다.
+                github.lms.lemuel.account.domain.exception.AccountDomainException.class
         );
 
         Counter retryCounter = Counter.builder("account.kafka.retry")

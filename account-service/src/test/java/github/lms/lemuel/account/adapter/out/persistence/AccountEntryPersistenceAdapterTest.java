@@ -19,8 +19,10 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -42,36 +44,37 @@ class AccountEntryPersistenceAdapterTest {
     }
 
     @Test
-    void append_는_자연키_선점이_없으면_저장한다() {
+    void append_는_ON_CONFLICT_upsert로_자연키_필드를_전달해_삽입한다() {
+        // LOW-1: check-then-save(existsBy→save) 대신 레이스-세이프 insertIgnoreConflict 로 위임한다.
+        // enum 컬럼은 @Enumerated(STRING) 표현과 맞춰 name() 문자열로 바인딩된다.
         AccountEntry entry = AccountEntry.loanDisbursed("55", "L1", new BigDecimal("800000"));
-        when(repository.existsBySourceTopicAndRefTypeAndRefId(
-                entry.getSourceTopic(), entry.getRefType(), entry.getRefId())).thenReturn(false);
 
         adapter.append(entry);
 
-        ArgumentCaptor<AccountEntryJpaEntity> captor = ArgumentCaptor.forClass(AccountEntryJpaEntity.class);
-        verify(repository).save(captor.capture());
-        AccountEntryJpaEntity saved = captor.getValue();
-        assertThat(saved.getOwnerType()).isEqualTo(OwnerType.SELLER);
-        assertThat(saved.getOwnerId()).isEqualTo("55");
-        assertThat(saved.getDebitAccount()).isEqualTo(GlAccount.LOAN_RECEIVABLE);
-        assertThat(saved.getCreditAccount()).isEqualTo(GlAccount.CASH);
-        assertThat(saved.getAmount()).isEqualByComparingTo("800000");
-        assertThat(saved.getRefType()).isEqualTo("LOAN_DISBURSED");
-        assertThat(saved.getRefId()).isEqualTo("L1");
-        assertThat(saved.getSourceTopic()).isEqualTo(AccountEntry.TOPIC_LOAN_DISBURSED);
-        assertThat(saved.getOccurredAt()).isEqualTo(entry.getOccurredAt());
+        verify(repository).insertIgnoreConflict(
+                eq("SELLER"),                        // ownerType.name()
+                eq("55"),                            // ownerId
+                eq("LOAN_RECEIVABLE"),               // debitAccount.name()
+                eq("CASH"),                          // creditAccount.name()
+                argThat(a -> a.compareTo(new BigDecimal("800000")) == 0), // amount
+                eq("LOAN_DISBURSED"),                // refType
+                eq("L1"),                            // refId
+                eq(AccountEntry.TOPIC_LOAN_DISBURSED), // sourceTopic
+                eq(entry.getOccurredAt()));          // occurredAt
+        verify(repository, never()).save(any());     // 앱레벨 exists 선점 경로 제거됨
     }
 
     @Test
-    void append_는_자연키가_이미_있으면_저장을_건너뛴다() {
+    void append_는_같은_자연키_2회여도_예외없이_멱등_upsert한다() {
+        // 동시 중복 수신을 흉내내 같은 자연키로 두 번 append — ON CONFLICT DO NOTHING 이라 둘째도 예외 없이
+        // no-op(중복 삽입 0건). 실제 원자성·1건만 삽입은 GlCashClosedLoopIT 가 실 PG 로 증명한다.
         AccountEntry entry = AccountEntry.loanDisbursed("55", "L1", new BigDecimal("800000"));
-        when(repository.existsBySourceTopicAndRefTypeAndRefId(
-                entry.getSourceTopic(), entry.getRefType(), entry.getRefId())).thenReturn(true);
 
         adapter.append(entry);
+        adapter.append(entry);   // 예외 없이 통과해야 한다(TOCTOU DataIntegrityViolation 없음)
 
-        verify(repository, never()).save(any());
+        verify(repository, times(2)).insertIgnoreConflict(
+                any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -129,6 +132,15 @@ class AccountEntryPersistenceAdapterTest {
         when(repository.countByRefType("INVESTMENT_EXECUTED")).thenReturn(4L);
 
         assertThat(adapter.countByRefType("INVESTMENT_EXECUTED")).isEqualTo(4L);
+    }
+
+    @Test
+    void sellerPayableBalance_는_SELLER_owner의_SELLER_PAYABLE_순잔액을_위임_조회한다() {
+        when(repository.netBalanceByOwnerAndAccount(OwnerType.SELLER, "777", GlAccount.SELLER_PAYABLE))
+                .thenReturn(new BigDecimal("30000"));
+
+        assertThat(adapter.sellerPayableBalance("777")).isEqualByComparingTo("30000");
+        verify(repository).netBalanceByOwnerAndAccount(OwnerType.SELLER, "777", GlAccount.SELLER_PAYABLE);
     }
 
     @Test

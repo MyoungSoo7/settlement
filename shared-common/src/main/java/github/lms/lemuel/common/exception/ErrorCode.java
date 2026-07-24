@@ -72,7 +72,8 @@ public enum ErrorCode {
 
     // ─── account (계정계 GL) ────────────────────────────────────────────────────
     NON_POSITIVE_ENTRY_AMOUNT(HttpStatus.BAD_REQUEST, "전표 금액은 양수여야 합니다."),
-    UNBALANCED_ACCOUNT_ENTRY(HttpStatus.BAD_REQUEST, "차변과 대변 계정은 달라야 합니다.");
+    UNBALANCED_ACCOUNT_ENTRY(HttpStatus.BAD_REQUEST, "차변과 대변 계정은 달라야 합니다."),
+    ENTRY_AMOUNT_SCALE_EXCEEDED(HttpStatus.BAD_REQUEST, "전표 금액의 소수 자릿수가 허용 범위(2)를 초과했습니다.");
 
     private final HttpStatus status;
     private final String defaultMessage;

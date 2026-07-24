@@ -263,6 +263,23 @@ class GlCashClosedLoopIT {
     }
 
     @Test
+    @DisplayName("LOW-1: 같은 자연키로 2회 append → ON CONFLICT DO NOTHING 으로 예외 없이 1건만 적재(실 PG TOCTOU 제거)")
+    void append_sameNaturalKeyTwice_insertsOnceWithoutException() {
+        // check-then-save 였다면 둘째 append 가 uq_account_entry_natural 위반으로 DataIntegrityViolation 을
+        // 던져 tx 를 rollback-only 오염시켰다. ON CONFLICT DO NOTHING 은 둘째를 조용히 no-op 처리한다.
+        // (공유 컨텍스트 오염 방지: 선지급+상환 쌍으로 LOAN_RECEIVABLE·CASH 를 0 으로 닫아 전역 통제계정 불변.)
+        AccountEntry disbursed = AccountEntry.loanDisbursed("999001", "L-dup", new BigDecimal("7777"));
+
+        appendAccountEntryPort.append(disbursed);
+        appendAccountEntryPort.append(disbursed); // 재수신 — 예외 없이 통과해야 한다
+
+        assertThat(countRef("LOAN_DISBURSED", "L-dup")).isEqualTo(1L); // 스키마 멱등: 정확히 1건
+
+        appendAccountEntryPort.append(AccountEntry.loanRepaid("999001", "L-dup", new BigDecimal("7777"))); // 계정 복원
+        assertThat(accountQueryUseCase.trialBalance().balanced()).isTrue();
+    }
+
+    @Test
     @DisplayName("기간 확정 시산표는 occurred_at 반개구간 전표만 집계한다")
     void periodTrialBalance_filtersByOccurredAt() {
         // 이 클래스는 컨텍스트를 공유하므로, 기간을 좁혀 이 테스트가 넣은 전표만 대상으로 검증한다.

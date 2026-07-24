@@ -3,6 +3,7 @@ package github.lms.lemuel.account.adapter.out.persistence;
 import github.lms.lemuel.account.application.port.out.AppendAccountEntryPort;
 import github.lms.lemuel.account.application.port.out.LoadAccountEntryPort;
 import github.lms.lemuel.account.domain.AccountEntry;
+import github.lms.lemuel.account.domain.GlAccount;
 import github.lms.lemuel.account.domain.OwnerType;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
@@ -22,21 +23,20 @@ public class AccountEntryPersistenceAdapter implements AppendAccountEntryPort, L
 
     @Override
     public void append(AccountEntry entry) {
-        // 자연키 선점 체크(앱 레벨 멱등). 경합 시 최종 방어는 DB UNIQUE(source_topic, ref_type, ref_id).
-        if (repository.existsBySourceTopicAndRefTypeAndRefId(
-                entry.getSourceTopic(), entry.getRefType(), entry.getRefId())) {
-            return;
-        }
-        repository.save(new AccountEntryJpaEntity(
-                entry.getOwnerType(),
+        // LOW-1: 레이스-세이프 멱등 삽입. 과거의 check-then-save(existsBy → save)는 동시 중복 수신 시
+        // 둘째가 자연키 UNIQUE 위반 예외를 던져 @Transactional 을 rollback-only 로 오염시켰다(노이즈·DLT 낭비).
+        // ON CONFLICT DO NOTHING 네이티브 upsert 로 중복을 조용히 no-op 처리해 예외·tx 오염을 없앤다.
+        // 도메인 구성적 균형 불변식은 AccountEntry 생성 시점에 이미 강제됐다.
+        repository.insertIgnoreConflict(
+                entry.getOwnerType().name(),
                 entry.getOwnerId(),
-                entry.getDebitAccount(),
-                entry.getCreditAccount(),
+                entry.getDebitAccount().name(),
+                entry.getCreditAccount().name(),
                 entry.getAmount(),
                 entry.getRefType(),
                 entry.getRefId(),
                 entry.getSourceTopic(),
-                entry.getOccurredAt()));
+                entry.getOccurredAt());
     }
 
     @Override
@@ -67,6 +67,11 @@ public class AccountEntryPersistenceAdapter implements AppendAccountEntryPort, L
     @Override
     public long countByRefType(String refType) {
         return repository.countByRefType(refType);
+    }
+
+    @Override
+    public BigDecimal sellerPayableBalance(String sellerId) {
+        return repository.netBalanceByOwnerAndAccount(OwnerType.SELLER, sellerId, GlAccount.SELLER_PAYABLE);
     }
 
     @Override

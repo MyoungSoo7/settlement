@@ -2,6 +2,7 @@ package github.lms.lemuel.account.adapter.in.kafka;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import github.lms.lemuel.account.application.port.in.RecordAccountEntryUseCase;
+import github.lms.lemuel.account.application.port.in.RecordPayoutUseCase;
 import github.lms.lemuel.account.domain.AccountEntry;
 import github.lms.lemuel.account.domain.GlAccount;
 import github.lms.lemuel.account.domain.OwnerType;
@@ -38,6 +39,7 @@ import static org.mockito.Mockito.when;
 class AccountConsumerParsingTest {
 
     @Mock RecordAccountEntryUseCase recordAccountEntryUseCase;
+    @Mock RecordPayoutUseCase recordPayoutUseCase;
     @Mock ProcessedEventRepository processedEventRepository;
     final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -232,21 +234,20 @@ class AccountConsumerParsingTest {
     }
 
     @Test
-    @DisplayName("payout.completed 정본 샘플 → DR SELLER_PAYABLE / CR CASH (Option A 미지급금 상계+현금 유출)")
+    @DisplayName("payout.completed 정본 샘플 → 파싱값(sellerId·payoutId·amount)을 RecordPayoutUseCase 로 위임(감사 MED-3 채권 라우팅)")
     void payoutCompleted() {
         when(processedEventRepository.existsById(any())).thenReturn(false);
         PayoutCompletedConsumer c = new PayoutCompletedConsumer(
-                recordAccountEntryUseCase, processedEventRepository, objectMapper);
+                recordPayoutUseCase, processedEventRepository, objectMapper);
 
         c.onPayoutCompleted(canonicalRecordOf("lemuel.payout.completed"), mock(Acknowledgment.class));
 
-        AccountEntry e = capture();
-        assertThat(e.getOwnerType()).isEqualTo(OwnerType.SELLER);
-        assertThat(e.getOwnerId()).isEqualTo("777");
-        assertThat(e.getDebitAccount()).isEqualTo(GlAccount.SELLER_PAYABLE);
-        assertThat(e.getCreditAccount()).isEqualTo(GlAccount.CASH);
-        assertThat(e.getAmount()).isEqualByComparingTo("43425");
-        assertThat(e.getRefId()).isEqualTo("7001"); // refId=payoutId (멱등 자연키)
+        // 컨슈머는 파싱·위임만 — 잔액 기준 분할(payable/advance)은 RecordPayoutService 단위테스트가 담당.
+        verify(recordPayoutUseCase).recordPayout(
+                org.mockito.ArgumentMatchers.eq("777"),
+                org.mockito.ArgumentMatchers.eq("7001"), // refId=payoutId (멱등 자연키)
+                org.mockito.ArgumentMatchers.argThat(a -> a.compareTo(new java.math.BigDecimal("43425")) == 0));
+        verify(recordAccountEntryUseCase, never()).record(any());
     }
 
     @Test
@@ -328,6 +329,21 @@ class AccountConsumerParsingTest {
         EventContractValidator.assertValid("lemuel.loan.repayment_applied", payload);
 
         c.onLoanRepaid(recordOf("lemuel.loan.repayment_applied", payload), mock(Acknowledgment.class));
+
+        verify(recordAccountEntryUseCase, never()).record(any());
+    }
+
+    @Test
+    @DisplayName("LOW-3: scale 3 금액(43425.125) → ExcessivePrecisionEntryAmountException(비재시도 DLT) + 분개 미적재(조용한 반올림 금지)")
+    void scaleGreaterThan2Amount_isRejectedNotRounded() {
+        when(processedEventRepository.existsById(any())).thenReturn(false);
+        SettlementCreatedConsumer c = new SettlementCreatedConsumer(
+                recordAccountEntryUseCase, processedEventRepository, objectMapper);
+        String payload = "{\"settlementId\":9001,\"sellerId\":777,\"amount\":43425.125,\"dueDate\":null}";
+
+        assertThatThrownBy(() -> c.onSettlementCreated(
+                recordOf("lemuel.settlement.created", payload), mock(Acknowledgment.class)))
+                .isInstanceOf(github.lms.lemuel.account.domain.exception.ExcessivePrecisionEntryAmountException.class);
 
         verify(recordAccountEntryUseCase, never()).record(any());
     }
