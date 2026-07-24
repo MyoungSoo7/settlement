@@ -8,7 +8,7 @@ import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.core.types.dsl.NumberExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import github.lms.lemuel.settlement.adapter.out.persistence.QSettlementJpaEntity;
-import github.lms.lemuel.settlement.adapter.out.persistence.querydsl.dto.*;
+import github.lms.lemuel.settlement.application.port.out.dto.*;
 import github.lms.lemuel.settlement.adapter.out.readmodel.QSettlementOrderViewJpaEntity;
 import github.lms.lemuel.settlement.adapter.out.readmodel.QSettlementPaymentViewJpaEntity;
 import github.lms.lemuel.settlement.adapter.out.readmodel.QSettlementProductViewJpaEntity;

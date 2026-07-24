@@ -1,12 +1,12 @@
 package github.lms.lemuel.settlement.adapter.in.web;
 
 import github.lms.lemuel.common.config.jwt.JwtUtil;
-import github.lms.lemuel.settlement.adapter.out.persistence.querydsl.dto.ApprovalStatusDto;
-import github.lms.lemuel.settlement.adapter.out.persistence.querydsl.dto.PaymentRefundAggregationDto;
-import github.lms.lemuel.settlement.adapter.out.persistence.querydsl.dto.SettlementCursorPageResponse;
-import github.lms.lemuel.settlement.adapter.out.persistence.querydsl.dto.SettlementDetailDto;
-import github.lms.lemuel.settlement.adapter.out.persistence.querydsl.dto.SettlementReconciliationDto;
-import github.lms.lemuel.settlement.adapter.out.persistence.querydsl.dto.SettlementSummaryDto;
+import github.lms.lemuel.settlement.application.port.out.dto.ApprovalStatusDto;
+import github.lms.lemuel.settlement.application.port.out.dto.PaymentRefundAggregationDto;
+import github.lms.lemuel.settlement.application.port.out.dto.SettlementCursorPageResponse;
+import github.lms.lemuel.settlement.application.port.out.dto.SettlementDetailDto;
+import github.lms.lemuel.settlement.application.port.out.dto.SettlementReconciliationDto;
+import github.lms.lemuel.settlement.application.port.out.dto.SettlementSummaryDto;
 import github.lms.lemuel.settlement.application.service.SettlementQueryService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

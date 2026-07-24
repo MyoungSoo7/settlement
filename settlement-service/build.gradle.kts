@@ -86,7 +86,9 @@ dependencies {
     testImplementation("org.springframework.security:spring-security-test")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testImplementation("org.mockito:mockito-core")
-    testImplementation("com.tngtech.archunit:archunit-junit5:1.3.0")
+    // ArchUnit 1.4.x 부터 Java 25 바이트코드 파싱 지원 — 1.3.0 은 클래스 임포트를 조용히 스킵해
+    // allowEmptyShould(true) 규칙이 공허하게 통과(가드 무력화)한다. account-service 와 동일 버전으로 정렬.
+    testImplementation("com.tngtech.archunit:archunit-junit5:1.4.1")
     testImplementation(platform("org.testcontainers:testcontainers-bom:1.21.4"))
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:postgresql")

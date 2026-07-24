@@ -1,4 +1,4 @@
-package github.lms.lemuel.settlement.adapter.out.persistence.querydsl.dto;
+package github.lms.lemuel.settlement.application.port.out.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
