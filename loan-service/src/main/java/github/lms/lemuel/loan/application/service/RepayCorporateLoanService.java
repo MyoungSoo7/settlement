@@ -19,9 +19,11 @@ import java.math.BigDecimal;
  * 기업 신용대출 상환. 미상환잔액을 차감(clamp)하고, 차감>0 이면 상환 전표(현금/대출채권)를 기록한다.
  * 도메인 저장·전표가 한 트랜잭션이라 원자성이 보장된다.
  *
- * <p>이중상환·경합 방어: {@code findByIdForUpdate} 비관적 락으로 조회해 동시 상환 요청을 직렬화한다
- * (실행 disburse 와 동일한 락 전략). 상환액 검증(양수)·잔액 초과 clamp·상태 전이(DISBURSED→REPAID)는
- * 도메인 {@link CorporateLoan#repay(BigDecimal)} 가 단일 출처로 강제한다.
+ * <p>이중상환 방어는 2층이다: (1) <b>동시</b> 상환 요청은 {@code findByIdForUpdate} 비관적 락으로 직렬화하고
+ * (실행 disburse 와 동일한 락 전략), (2) 앞선 상환이 커밋된 뒤 같은 요청이 다시 도착하는 <b>순차 재제출</b>은
+ * 어댑터 계층의 {@code LoanManualIdempotencyGuard}(Idempotency-Key 선점 → 409)가 상환 실행 앞단에서 막는다.
+ * 상환액 검증(양수)·잔액 초과 clamp·상태 전이(DISBURSED→REPAID)는 도메인
+ * {@link CorporateLoan#repay(BigDecimal)} 가 단일 출처로 강제한다.
  */
 @Service
 public class RepayCorporateLoanService implements RepayCorporateLoanUseCase {

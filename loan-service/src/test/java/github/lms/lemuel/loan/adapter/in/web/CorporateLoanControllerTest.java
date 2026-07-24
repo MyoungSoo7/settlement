@@ -8,6 +8,7 @@ import github.lms.lemuel.loan.application.port.in.EvaluateCorporateCreditUseCase
 import github.lms.lemuel.loan.application.port.in.RepayCorporateLoanUseCase;
 import github.lms.lemuel.loan.application.port.in.RequestCorporateLoanUseCase;
 import github.lms.lemuel.loan.application.port.out.LoadCorporateLoanPort;
+import github.lms.lemuel.loan.adapter.out.persistence.LoanManualIdempotencyGuard;
 import github.lms.lemuel.loan.domain.CorporateLoan;
 import github.lms.lemuel.loan.domain.CorporateLoanStatus;
 import github.lms.lemuel.loan.domain.exception.CorporateLoanNotFoundException;
@@ -58,6 +59,7 @@ class CorporateLoanControllerTest {
     @MockitoBean DisburseCorporateLoanUseCase disburseCorporateLoanUseCase;
     @MockitoBean RepayCorporateLoanUseCase repayCorporateLoanUseCase;
     @MockitoBean LoadCorporateLoanPort loadCorporateLoanPort;
+    @MockitoBean LoanManualIdempotencyGuard idempotencyGuard;
 
     /** 일반(CEO) 주체 — ROLE_USER, 본인 것만 조회 가능. */
     private static Authentication userAuth(long userId) {
@@ -311,6 +313,43 @@ class CorporateLoanControllerTest {
                 .andExpect(jsonPath("$.status").value(403));
 
         verifyNoInteractions(repayCorporateLoanUseCase);
+    }
+
+    @Test
+    @DisplayName("POST /loans/corporate/{id}/repay — 동일 Idempotency-Key 재제출은 409 이고 use case 미호출 (#4)")
+    void repayDuplicateIdempotencyKeyIs409() throws Exception {
+        when(loadCorporateLoanPort.findById(7L)).thenReturn(java.util.Optional.of(ownedLoan(7L)));
+        // 이미 선점된 키 → claim=false(중복) → 두 번째 상환은 차감 없이 409.
+        when(idempotencyGuard.claim(any(), any(), any())).thenReturn(false);
+
+        mockMvc.perform(post("/loans/corporate/7/repay").principal(userAuth(7L))
+                        .header("Idempotency-Key", "dup-key-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"amount":600000}
+                                """))
+                .andExpect(status().isConflict());
+
+        verifyNoInteractions(repayCorporateLoanUseCase);
+    }
+
+    @Test
+    @DisplayName("POST /loans/corporate/{id}/repay — 새 Idempotency-Key 는 선점 후 200 (상환 1회 반영)")
+    void repayFreshIdempotencyKeyProceeds() throws Exception {
+        when(loadCorporateLoanPort.findById(7L)).thenReturn(java.util.Optional.of(ownedLoan(7L)));
+        when(idempotencyGuard.claim(any(), any(), any())).thenReturn(true); // 처음 보는 키 → 선점 성공
+        when(repayCorporateLoanUseCase.repay(any())).thenReturn(loan());
+
+        mockMvc.perform(post("/loans/corporate/7/repay").principal(userAuth(7L))
+                        .header("Idempotency-Key", "fresh-key-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"amount":600000}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(7));
+
+        verify(repayCorporateLoanUseCase).repay(any());
     }
 
     @Test
