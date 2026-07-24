@@ -5,11 +5,14 @@ import github.lms.lemuel.common.audit.domain.AuditAction;
 import github.lms.lemuel.ledger.application.port.in.EnqueueLedgerTaskPort;
 import github.lms.lemuel.recovery.application.port.in.RecordPostPayoutRecoveryUseCase;
 import github.lms.lemuel.settlement.application.port.in.ApplyReconciliationAdjustmentUseCase;
+import github.lms.lemuel.settlement.application.port.out.LoadSellerIdPort;
 import github.lms.lemuel.settlement.application.port.out.LoadSettlementPort;
+import github.lms.lemuel.settlement.application.port.out.PublishSettlementDomainEventPort;
 import github.lms.lemuel.settlement.application.port.out.SaveSettlementAdjustmentPort;
 import github.lms.lemuel.settlement.application.port.out.SaveSettlementPort;
 import github.lms.lemuel.settlement.domain.Settlement;
 import github.lms.lemuel.settlement.domain.SettlementAdjustment;
+import github.lms.lemuel.settlement.domain.SettlementStatus;
 import github.lms.lemuel.settlement.domain.exception.InvalidSettlementStateException;
 import github.lms.lemuel.settlement.domain.exception.SettlementNotFoundException;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -46,6 +49,8 @@ public class ApplyReconciliationAdjustmentService implements ApplyReconciliation
     private final SaveSettlementAdjustmentPort saveSettlementAdjustmentPort;
     private final EnqueueLedgerTaskPort enqueueLedgerTaskPort;
     private final RecordPostPayoutRecoveryUseCase recordPostPayoutRecoveryUseCase;
+    private final LoadSellerIdPort loadSellerIdPort;
+    private final PublishSettlementDomainEventPort publishSettlementDomainEventPort;
     private final MeterRegistry meterRegistry;
     private final AuditLogger auditLogger;
     /** KST 기준 시각 소스 — clawback 조정 기준일이 JVM 타임존에 흔들리지 않게 한다. */
@@ -56,6 +61,8 @@ public class ApplyReconciliationAdjustmentService implements ApplyReconciliation
                                                 SaveSettlementAdjustmentPort saveSettlementAdjustmentPort,
                                                 EnqueueLedgerTaskPort enqueueLedgerTaskPort,
                                                 RecordPostPayoutRecoveryUseCase recordPostPayoutRecoveryUseCase,
+                                                LoadSellerIdPort loadSellerIdPort,
+                                                PublishSettlementDomainEventPort publishSettlementDomainEventPort,
                                                 MeterRegistry meterRegistry,
                                                 AuditLogger auditLogger,
                                                 Clock clock) {
@@ -64,6 +71,8 @@ public class ApplyReconciliationAdjustmentService implements ApplyReconciliation
         this.saveSettlementAdjustmentPort = saveSettlementAdjustmentPort;
         this.enqueueLedgerTaskPort = enqueueLedgerTaskPort;
         this.recordPostPayoutRecoveryUseCase = recordPostPayoutRecoveryUseCase;
+        this.loadSellerIdPort = loadSellerIdPort;
+        this.publishSettlementDomainEventPort = publishSettlementDomainEventPort;
         this.meterRegistry = meterRegistry;
         this.auditLogger = auditLogger;
         this.clock = clock;
@@ -85,11 +94,17 @@ public class ApplyReconciliationAdjustmentService implements ApplyReconciliation
                 .orElseThrow(() -> new SettlementNotFoundException(
                         "Settlement not found for paymentId: " + paymentId));
 
+        // ADR 0026 Option ① 상한(HIGH-A, 환불 경로 AdjustSettlementForRefundService 와 동형) — consumeHoldback
+        // ForRefund 는 DONE 에서도 holdback 을 차감해버리므로, 조정 전 즉시지급 가능액을 반드시 그 호출 이전에
+        // 캡처해 둔다. gross clawback(전액/초과)이 net 전체를 삼켜도 SELLER_PAYABLE 은 이 값 이상 차변되지 않는다.
+        BigDecimal priorImmediate = settlement.getImmediatePayoutAmount();
+
         LocalDate today = LocalDate.now(clock);
+        BigDecimal consumedFromHoldback;
         try {
             // holdback 우선 차감(clawback 흡수) → net 축소. consumeHoldbackForRefund 는 사실상
             // "clawback 을 holdback 에서 먼저 흡수" 의미로 재사용한다.
-            settlement.consumeHoldbackForRefund(clawbackAmount);
+            consumedFromHoldback = settlement.consumeHoldbackForRefund(clawbackAmount);
             settlement.applyReconciliationClawback(clawbackAmount); // DONE 이면 여기서 throw
         } catch (InvalidSettlementStateException done) {
             // DONE 정산: 도메인이 net 변경을 거부 → 이 인스턴스는 저장하지 않는다. 단 holdback 흡수는
@@ -114,13 +129,36 @@ public class ApplyReconciliationAdjustmentService implements ApplyReconciliation
 
         Settlement adjusted = saveSettlementPort.save(settlement);
 
-        saveSettlementAdjustmentPort.save(SettlementAdjustment.ofReconciliation(
+        SettlementAdjustment adjustment = saveSettlementAdjustmentPort.save(SettlementAdjustment.ofReconciliation(
                 adjusted.getId(), discrepancyId, clawbackAmount, today));
 
         // PG_RECONCILIATION 출처 원장 역분개를 같은 트랜잭션 Outbox 에 적재 — 조정 ↔ 역분개 1:1 (환불 경로 동형).
         // DONE 정산(위 catch) 은 지급 완료라 역분개하지 않는다(송금후 회수는 범위 밖). 이중 적재는
         // uq_ledger_reference_accounts (reference_type=PG_RECONCILIATION) 가 최종 차단한다.
         enqueueLedgerTaskPort.enqueueReverseReconciliation(adjusted.getId(), discrepancyId, clawbackAmount, today);
+
+        // account 로 조정 이벤트 발행(ADR 0026 Option ①) — 환불 경로(AdjustSettlementForRefundService)와 동형.
+        // DONE 정산(위 catch)의 회계 이벤트는 recordIfPostPayout(채권 발생·유보 소진)이 소유하므로 여기서는 발행하지 않는다.
+        loadSellerIdPort.findSellerIdByPaymentId(paymentId).ifPresent(sellerId -> {
+            if (consumedFromHoldback.signum() > 0) {
+                publishSettlementDomainEventPort.publishHoldbackConsumed(
+                        adjustment.getId(), adjusted.getId(), sellerId, consumedFromHoldback);
+            }
+            // priorImmediate 상한 캡핑(HIGH-A) — 환불 경로와 동형 이유.
+            BigDecimal payableDelta = clawbackAmount.subtract(consumedFromHoldback).min(priorImmediate);
+            if (payableDelta.signum() > 0) {
+                publishSettlementDomainEventPort.publishSettlementAdjusted(
+                        adjustment.getId(), adjusted.getId(), sellerId, payableDelta, "SELLER_PAYABLE");
+            }
+            // max(0) 가드(HIGH-A) — ②가 priorImmediate 전액을 이미 캡핑 정리한 경우 잔여가 음수가 될 수
+            // 있어 계약(minimum 0) 위반을 막는다.
+            if (adjusted.getStatus() == SettlementStatus.CANCELED) {
+                publishSettlementDomainEventPort.publishSettlementCanceled(
+                        adjusted.getId(), sellerId,
+                        adjusted.getImmediatePayoutAmount().max(BigDecimal.ZERO),
+                        adjusted.getHoldbackAmount().max(BigDecimal.ZERO));
+            }
+        });
 
         log.info("[PgRecon] 대사 clawback 적용 완료. discrepancyId={}, settlementId={}, clawback={}, netAmount={}, status={}",
                 discrepancyId, adjusted.getId(), clawbackAmount, adjusted.getNetAmount(), adjusted.getStatus());

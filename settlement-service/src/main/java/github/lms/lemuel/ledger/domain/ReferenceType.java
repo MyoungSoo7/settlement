@@ -15,5 +15,7 @@ public enum ReferenceType {
     /** 지급후 회수 채권 발생 (seed-p0-6). reference_id = seller_recovery_id. */
     SELLER_RECOVERY,
     /** 채권 상계 (후속 정산 확정 시 지급액 차감). reference_id = recovery_allocation_id. */
-    RECOVERY_OFFSET
+    RECOVERY_OFFSET,
+    /** 정산 연계 세무 전표(부가세·원천징수 예수). reference_id = settlement_id (ADR 0029). */
+    SETTLEMENT_TAX
 }

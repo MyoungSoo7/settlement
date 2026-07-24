@@ -97,15 +97,26 @@ class SchemaEnumContractIT {
     }
 
     @Test
-    @DisplayName("chk_account_entry_ref_type == AccountEntry 팩토리 6종의 refType (정확 일치)")
+    @DisplayName("chk_account_entry_ref_type == AccountEntry 팩토리 17종의 refType (정확 일치, ADR 0026 Option ① + ADR 0029 §B)")
     void refTypeCheckMatchesFactorySetExactly() {
         Set<String> factoryRefTypes = new LinkedHashSet<>(Arrays.asList(
-                AccountEntry.settlementCreated("s", "1", ONE).getRefType(),
+                AccountEntry.settlementCreatedImmediate("s", "1", ONE).getRefType(),
+                AccountEntry.settlementHoldbackRecognized("s", "1", ONE).getRefType(),
                 AccountEntry.settlementConfirmed("s", "1", ONE).getRefType(),
+                AccountEntry.payoutCompleted("s", "1", ONE).getRefType(),
+                AccountEntry.settlementScheduledClearing("s", ONE).getRefType(),
+                AccountEntry.holdbackReleased("s", "1", ONE).getRefType(),
+                AccountEntry.holdbackConsumed("s", "1", ONE).getRefType(),
+                AccountEntry.settlementAdjusted("s", "1", ONE, GlAccount.SELLER_PAYABLE).getRefType(),
+                AccountEntry.settlementCanceledPayable("s", "1", ONE).getRefType(),
+                AccountEntry.settlementCanceledHoldback("s", "1", ONE).getRefType(),
+                AccountEntry.recoveryOpened("s", "1", ONE).getRefType(),
+                AccountEntry.recoveryOffset("s", "1", ONE).getRefType(),
                 AccountEntry.loanDisbursed("s", "1", ONE).getRefType(),
                 AccountEntry.loanRepaid("s", "1", ONE).getRefType(),
                 AccountEntry.corporateLoanDisbursed("005930", "1", ONE).getRefType(),
-                AccountEntry.investmentExecuted("s", "1", ONE).getRefType()));
+                AccountEntry.investmentExecuted("s", "1", ONE).getRefType(),
+                AccountEntry.withholdingAccrued("s", "1", ONE).getRefType()));
 
         assertThat(checkValues("chk_account_entry_ref_type"))
                 .containsExactlyInAnyOrderElementsOf(factoryRefTypes);

@@ -149,7 +149,8 @@ public class CreateSettlementFromPaymentService implements CreateSettlementFromP
             if (resolvedSellerId != null) {
                 publishSettlementDomainEventPort.publishSettlementCreated(
                         savedSettlement.getId(), resolvedSellerId,
-                        savedSettlement.getNetAmount(), savedSettlement.getSettlementDate());
+                        savedSettlement.getNetAmount(), savedSettlement.getSettlementDate(),
+                        savedSettlement.getHoldbackAmount());
             } else {
                 log.debug("판매자 미해석 — SettlementCreated 발행 생략. settlementId={}",
                         savedSettlement.getId());

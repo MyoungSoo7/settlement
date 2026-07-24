@@ -2,7 +2,7 @@
 
 > 이커머스 주문·결제·정산·선정산/기업대출·투자·계정계 + 공개조회 위성(재무제표·경제지표·기업뉴스·시세·공공데이터)·운영관제·AI챗봇 MSA 플랫폼 (Spring Boot 4.0 / Java 25 / 헥사고날)
 
-**Last updated:** 2026-07-22
+**Last updated:** 2026-07-24
 
 ## 현재 상태
 - **활성 브랜치:** `develop` (`main` 은 보호 브랜치 — PR 필수·squash 만·필수 CI 2종)
@@ -51,16 +51,17 @@
   시드 6·조정분류·Task4/6 은 develop 재작성(역분개 일반화·typed payout)과 돈 경로 핵심 4파일 정면충돌 — 재구현 시 참조만
 - 운영 배포 필수 주입: 강한 `JWT_SECRET`, `app.security.internal-key-required=true`, 각 서비스 외부 API 키
 
-## 핵심 수치 (2026-07-22 기준 · git-tracked 소스)
+## 핵심 수치 (2026-07-24 기준 · git-tracked 소스)
 > ⚠️ 수치는 `build/`·`.claude/worktrees/` 사본을 **제외한 git ls-files 기준**. 각 줄 끝 명령이 정답 —
 > 드리프트 의심 시 명령을 돌려 재검증하고 이 수치를 갱신할 것(휘발성 수치를 명령 없이 손으로 적지 말 것).
 - 서비스 **13개** + API Gateway + Kotlin polyglot 2(notification·reconciliation) — `git ls-files '*/src/main/resources/application.yml' | wc -l` → 16(=13+gateway+kotlin 2)
-- Flyway 마이그레이션 **206개** — `git ls-files '*/src/main/resources/db/migration/*.sql' | wc -l` → 206
-- ADR **27개** (0001~0028, 0019 결번) — `git ls-files 'docs/adr/[0-9]*.md' | wc -l` → 27
-- 테스트 클래스 **630개** (Testcontainers 통합테스트 포함) — `git ls-files '*/src/test/*Test.java' '*/src/test/*Tests.java' '*/src/test/*IT.java' | wc -l` → 630
+- Flyway 마이그레이션 **211개** — `git ls-files '*/src/main/resources/db/migration/*.sql' | wc -l` → 211
+- ADR **28개** (0001~0029, 0019 결번 — 세무 ADR 은 0027 충돌로 0029 재부여) — `git ls-files 'docs/adr/[0-9]*.md' | wc -l` → 28
+- 테스트 클래스 **660개** (Testcontainers 통합테스트 포함) — `git ls-files '*/src/test/*Test.java' '*/src/test/*Tests.java' '*/src/test/*IT.java' | wc -l` → 660
 
 ## 참고 문서
 - `SPEC.md` — 전체 기능명세(엔드포인트·도메인 규칙·이벤트 카탈로그)
 - `CLAUDE.md` — 에이전트 운용 가이드 / 아키텍처 경계·컨벤션
 - `README.md` — 프로젝트 개요 · `STRUCTURE.md` — 모듈·디렉토리 구조 정본 · `PORTFOLIO.md` — 면접용 1장 요약 · `HARNESS.md` — 개발 하네스 구성
 - `docs/adr/` — 아키텍처 결정 기록 27개 · `*-rules` 스킬 — 서비스별 강제 도메인 규칙
+- `docs/ouroboros.md` — Ouroboros(명세 우선 AI 워크플로 엔진) 아키텍처·스킬·핵심 개념 참조

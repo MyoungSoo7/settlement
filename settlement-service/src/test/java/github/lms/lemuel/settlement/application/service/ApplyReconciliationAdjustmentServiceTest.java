@@ -4,7 +4,9 @@ import github.lms.lemuel.common.audit.application.AuditLogger;
 import github.lms.lemuel.common.audit.domain.AuditAction;
 import github.lms.lemuel.ledger.application.port.in.EnqueueLedgerTaskPort;
 import github.lms.lemuel.recovery.application.port.in.RecordPostPayoutRecoveryUseCase;
+import github.lms.lemuel.settlement.application.port.out.LoadSellerIdPort;
 import github.lms.lemuel.settlement.application.port.out.LoadSettlementPort;
+import github.lms.lemuel.settlement.application.port.out.PublishSettlementDomainEventPort;
 import github.lms.lemuel.settlement.application.port.out.SaveSettlementAdjustmentPort;
 import github.lms.lemuel.settlement.application.port.out.SaveSettlementPort;
 import github.lms.lemuel.settlement.domain.Settlement;
@@ -45,6 +47,8 @@ class ApplyReconciliationAdjustmentServiceTest {
     @Mock SaveSettlementAdjustmentPort saveSettlementAdjustmentPort;
     @Mock EnqueueLedgerTaskPort enqueueLedgerTaskPort;
     @Mock RecordPostPayoutRecoveryUseCase recordPostPayoutRecoveryUseCase;
+    @Mock LoadSellerIdPort loadSellerIdPort;
+    @Mock PublishSettlementDomainEventPort publishSettlementDomainEventPort;
     @Mock AuditLogger auditLogger;
     SimpleMeterRegistry meterRegistry;
     ApplyReconciliationAdjustmentService service;
@@ -54,7 +58,8 @@ class ApplyReconciliationAdjustmentServiceTest {
         meterRegistry = new SimpleMeterRegistry();
         service = new ApplyReconciliationAdjustmentService(
                 loadSettlementPort, saveSettlementPort, saveSettlementAdjustmentPort,
-                enqueueLedgerTaskPort, recordPostPayoutRecoveryUseCase, meterRegistry,
+                enqueueLedgerTaskPort, recordPostPayoutRecoveryUseCase,
+                loadSellerIdPort, publishSettlementDomainEventPort, meterRegistry,
                 auditLogger, Clock.system(ZoneId.of("Asia/Seoul")));
         // DONE 분기가 저장된 조정의 id 를 채권 발생에 넘긴다 — echo 스텁으로 id 부여.
         lenient().when(saveSettlementAdjustmentPort.save(any(SettlementAdjustment.class)))
@@ -106,6 +111,58 @@ class ApplyReconciliationAdjustmentServiceTest {
     }
 
     @Test
+    @DisplayName("정상 적용 + 셀러 해석: 즉시분(SELLER_PAYABLE) 조정 이벤트를 발행한다(홀드백 0 → 소진 이벤트 없음)")
+    void applied_publishesAdjusted_whenSellerPresent() {
+        when(saveSettlementAdjustmentPort.existsByReconciliationDiscrepancyId(55L)).thenReturn(false);
+        Settlement s = settlementWithNet96500(SettlementStatus.REQUESTED);
+        when(loadSettlementPort.findByPaymentIdForUpdate(1L)).thenReturn(Optional.of(s));
+        when(saveSettlementPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(loadSellerIdPort.findSellerIdByPaymentId(1L)).thenReturn(Optional.of(55L));
+
+        service.applyClawback(1L, 55L, new BigDecimal("1000"));
+
+        // 홀드백 미적용(0) → 유보 소진 이벤트 없음, clawback 전액이 즉시분(SELLER_PAYABLE) 조정.
+        verify(publishSettlementDomainEventPort).publishSettlementAdjusted(
+                eq(777L), eq(500L), eq(55L), eq(new BigDecimal("1000")), eq("SELLER_PAYABLE"));
+        verify(publishSettlementDomainEventPort, never())
+                .publishHoldbackConsumed(anyLong(), any(), anyLong(), any());
+        verify(publishSettlementDomainEventPort, never())
+                .publishSettlementCanceled(anyLong(), anyLong(), any(), any());
+    }
+
+    @Test
+    @DisplayName("HIGH-A(GL 재감사): 초과 clawback으로 net<=0(CANCELED) 시 SELLER_PAYABLE 조정은 priorImmediate 상한을 넘지 않는다")
+    void caps_payableDelta_at_priorImmediate_on_clawback_exceeding_net() {
+        // net=96500, holdback 30%=28950, priorImmediate=67550. clawback=100000(>net, 초과) →
+        // holdback 전액(28950) 흡수 후 잔여(71050)가 즉시분 인식액(67550)을 넘는다. 상한 없이 발행하면
+        // SELLER_PAYABLE=67550-71050=-3500(=수수료만큼 음수 잔존) — 수정 전엔 71050 이 발행되어 실패,
+        // 수정 후엔 67550(=priorImmediate)으로 캡핑돼 통과한다.
+        when(saveSettlementAdjustmentPort.existsByReconciliationDiscrepancyId(55L)).thenReturn(false);
+        Settlement s = settlementWithNet96500(SettlementStatus.REQUESTED);
+        s.applyHoldback(new BigDecimal("0.30"), LocalDate.of(2026, 5, 31));
+        when(loadSettlementPort.findByPaymentIdForUpdate(1L)).thenReturn(Optional.of(s));
+        when(saveSettlementPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(loadSellerIdPort.findSellerIdByPaymentId(1L)).thenReturn(Optional.of(55L));
+
+        service.applyClawback(1L, 55L, new BigDecimal("100000"));
+
+        assertThat(s.getStatus()).isEqualTo(SettlementStatus.CANCELED);
+        verify(publishSettlementDomainEventPort).publishHoldbackConsumed(
+                eq(777L), eq(500L), eq(55L), eq(new BigDecimal("28950.00")));
+        // 상한 캡핑 — priorImmediate(67550.00) 을 넘지 않는다 (버그 시엔 71050.00 이 발행됨).
+        verify(publishSettlementDomainEventPort).publishSettlementAdjusted(
+                eq(777L), eq(500L), eq(55L), eq(new BigDecimal("67550.00")), eq("SELLER_PAYABLE"));
+        // CANCELED 분기 — 음수 잔여를 0 으로 클램프(계약 minimum 0 위반 방지). scale 이 다를 수 있어
+        // eq() 대신 수치 비교(isEqualByComparingTo)로 검증한다.
+        ArgumentCaptor<BigDecimal> immediateCaptor = ArgumentCaptor.forClass(BigDecimal.class);
+        ArgumentCaptor<BigDecimal> holdbackCaptor = ArgumentCaptor.forClass(BigDecimal.class);
+        verify(publishSettlementDomainEventPort).publishSettlementCanceled(
+                eq(500L), eq(55L), immediateCaptor.capture(), holdbackCaptor.capture());
+        assertThat(immediateCaptor.getValue()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(holdbackCaptor.getValue()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
     @DisplayName("DONE 정산: 정산 저장 없이 감사 레코드만 + skipped{settlement_done_manual_clawback}")
     void doneSettlement_auditOnly() {
         when(saveSettlementAdjustmentPort.existsByReconciliationDiscrepancyId(55L)).thenReturn(false);
@@ -134,6 +191,9 @@ class ApplyReconciliationAdjustmentServiceTest {
                 eq(500L), eq(55L), eq(new BigDecimal("1000")), any());
         verify(recordPostPayoutRecoveryUseCase).recordIfPostPayout(
                 eq(500L), eq(777L), eq(new BigDecimal("1000")), any());
+        // DONE 분기의 회계 이벤트(채권 발생·유보 소진)는 recordIfPostPayout 이 소유 —
+        // ApplyReconciliationAdjustmentService 는 이 경로에서 직접 발행하지 않는다(이중 발행 방지).
+        verifyNoInteractions(publishSettlementDomainEventPort);
     }
 
     @Test

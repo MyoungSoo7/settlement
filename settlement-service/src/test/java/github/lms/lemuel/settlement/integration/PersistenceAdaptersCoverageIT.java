@@ -383,7 +383,7 @@ class PersistenceAdaptersCoverageIT {
     @DisplayName("SettlementKafkaEventPublisherAdapter: SettlementCreated/SettlementConfirmed 가 outbox 에 적재된다")
     void settlementKafkaEventPublisherAdapter_savesToOutbox() {
         settlementKafkaEventPublisherAdapter.publishSettlementCreated(
-                701L, 88L, new BigDecimal("9999.00"), LocalDate.of(2026, 7, 1));
+                701L, 88L, new BigDecimal("9999.00"), LocalDate.of(2026, 7, 1), new BigDecimal("3000.00"));
         settlementKafkaEventPublisherAdapter.publishSettlementConfirmed(701L, 88L, new BigDecimal("9999.00"));
 
         Long createdCount = jdbc.queryForObject(

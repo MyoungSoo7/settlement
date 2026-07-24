@@ -37,6 +37,7 @@ public class SingleLedgerEntryWriter {
     private final LoadSettlementForLedgerPort loadSettlementPort;
     private final LoadLedgerEntryPort loadLedgerPort;
     private final SaveLedgerEntryPort saveLedgerPort;
+    private final LedgerPeriodGuard periodGuard;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public List<LedgerEntry> write(Long settlementId) {
@@ -53,6 +54,9 @@ public class SingleLedgerEntryWriter {
         SettlementSummary s = loadSettlementPort.findById(settlementId)
                 .orElseThrow(() -> new IllegalArgumentException(
                         "Settlement not found for ledger creation: id=" + settlementId));
+
+        // 기간 원장 잠금 — 대상 settlement_date 가 마감(CLOSED) 기간이면 신규 원분개를 거부한다.
+        periodGuard.assertOpenForNewEntry(s.settlementDate());
 
         // 차1·대1 균형 쌍 생성 + not-DONE 차단 + 금액 불변식은 도메인 팩토리가 구성적으로 강제한다.
         List<LedgerEntry> pair = LedgerEntry.balancedPairForSettlement(

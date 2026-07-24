@@ -3,6 +3,7 @@ package github.lms.lemuel.recovery.application.service;
 import github.lms.lemuel.ledger.application.port.in.RecoveryEntryUseCase;
 import github.lms.lemuel.recovery.application.port.in.OffsetSellerRecoveryUseCase;
 import github.lms.lemuel.recovery.application.port.out.LoadSellerRecoveryPort;
+import github.lms.lemuel.recovery.application.port.out.PublishSellerRecoveryEventPort;
 import github.lms.lemuel.recovery.application.port.out.RecoveryAllocationPort;
 import github.lms.lemuel.recovery.application.port.out.SaveSellerRecoveryPort;
 import github.lms.lemuel.recovery.domain.RecoveryAllocation;
@@ -29,15 +30,18 @@ public class OffsetSellerRecoveryService implements OffsetSellerRecoveryUseCase 
     private final SaveSellerRecoveryPort saveRecoveryPort;
     private final RecoveryAllocationPort allocationPort;
     private final RecoveryEntryUseCase recoveryEntryUseCase;
+    private final PublishSellerRecoveryEventPort publishSellerRecoveryEventPort;
 
     public OffsetSellerRecoveryService(LoadSellerRecoveryPort loadRecoveryPort,
                                        SaveSellerRecoveryPort saveRecoveryPort,
                                        RecoveryAllocationPort allocationPort,
-                                       RecoveryEntryUseCase recoveryEntryUseCase) {
+                                       RecoveryEntryUseCase recoveryEntryUseCase,
+                                       PublishSellerRecoveryEventPort publishSellerRecoveryEventPort) {
         this.loadRecoveryPort = loadRecoveryPort;
         this.saveRecoveryPort = saveRecoveryPort;
         this.allocationPort = allocationPort;
         this.recoveryEntryUseCase = recoveryEntryUseCase;
+        this.publishSellerRecoveryEventPort = publishSellerRecoveryEventPort;
     }
 
     @Override
@@ -62,6 +66,11 @@ public class OffsetSellerRecoveryService implements OffsetSellerRecoveryUseCase 
             RecoveryAllocation allocation = allocationPort.save(
                     RecoveryAllocation.allocationOf(recovery.getId(), settlementId, consumed));
             recoveryEntryUseCase.offsetReceivable(allocation.id(), recovery.getId(), consumed, settlementDate);
+            // account 로 회수 상계(Offset) 이벤트 발행 — consumed 는 allocate 계약상 항상 양수.
+            if (consumed.signum() > 0) {
+                publishSellerRecoveryEventPort.publishRecoveryOffset(
+                        allocation.id(), recovery.getId(), sellerId, consumed);
+            }
             remaining = remaining.subtract(consumed);
             total = total.add(consumed);
             if (remaining.signum() == 0) {

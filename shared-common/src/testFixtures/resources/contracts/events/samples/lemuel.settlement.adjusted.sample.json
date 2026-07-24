@@ -1,0 +1,7 @@
+{
+  "adjustmentId": 5502,
+  "settlementId": 9001,
+  "sellerId": 777,
+  "amount": 5000,
+  "targetLeg": "SELLER_PAYABLE"
+}

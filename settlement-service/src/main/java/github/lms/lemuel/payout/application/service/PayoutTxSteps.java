@@ -3,6 +3,7 @@ package github.lms.lemuel.payout.application.service;
 import github.lms.lemuel.common.opssignal.OpsSignalCategory;
 import github.lms.lemuel.common.opssignal.OpsSignalPort;
 import github.lms.lemuel.payout.application.port.out.FirmBankingPort;
+import github.lms.lemuel.payout.application.port.out.PublishPayoutEventPort;
 import github.lms.lemuel.payout.application.port.out.SavePayoutPort;
 import github.lms.lemuel.payout.domain.Payout;
 import org.springframework.stereotype.Service;
@@ -26,10 +27,13 @@ public class PayoutTxSteps {
 
     private final SavePayoutPort savePort;
     private final OpsSignalPort opsSignalPort;
+    private final PublishPayoutEventPort publishPayoutEventPort;
 
-    public PayoutTxSteps(SavePayoutPort savePort, OpsSignalPort opsSignalPort) {
+    public PayoutTxSteps(SavePayoutPort savePort, OpsSignalPort opsSignalPort,
+                         PublishPayoutEventPort publishPayoutEventPort) {
         this.savePort = savePort;
         this.opsSignalPort = opsSignalPort;
+        this.publishPayoutEventPort = publishPayoutEventPort;
     }
 
     /**
@@ -53,11 +57,18 @@ public class PayoutTxSteps {
      *
      * <p>{@code save} 는 id 로 현재 행(SENDING)을 다시 읽어 도메인 상태를 반영하므로, phase1 과 다른
      * 트랜잭션에서 호출돼도 무결하다.
+     *
+     * <p><b>GL 현금 폐루프(ADR 0026 Option A):</b> COMPLETED 확정과 <i>같은 트랜잭션</i>에서
+     * {@code lemuel.payout.completed} 를 Outbox 에 기록한다 — account-service 가 소비해
+     * DR SELLER_PAYABLE / CR CASH 로 미지급금을 상계하고 현금 유출을 GL 에 반영한다. 상태 저장과 이벤트
+     * 저장이 한 트랜잭션에 묶여야(원자성) 지급 완료됐는데 GL 에 누락되는 부정합이 생기지 않는다.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markCompleted(Payout sending, String firmBankingTransactionId) {
         sending.markCompleted(firmBankingTransactionId);
         savePort.save(sending);
+        publishPayoutEventPort.publishPayoutCompleted(
+                sending.getId(), sending.getSettlementId(), sending.getSellerId(), sending.getAmount());
     }
 
     /**

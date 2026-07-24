@@ -546,6 +546,7 @@ PENDING → READY → SHIPPED → IN_TRANSIT → DELIVERED → (선택) RETURNED
 |---|---|
 | **🏛 아키텍처 개요 (서비스·패턴·스택)** | **[`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)** |
 | Claude Code 컨텍스트 | [`CLAUDE.md`](./CLAUDE.md) |
+| Ouroboros (명세 우선 AI 워크플로 엔진) | [`docs/ouroboros.md`](./docs/ouroboros.md) |
 | ADR (아키텍처 결정 기록) | [`docs/adr/`](./docs/adr/) |
 | Runbook (장애 대응) | [`docs/runbook/`](./docs/runbook/) |
 | CI/CD | [`.github/workflows/`](./.github/workflows/) |

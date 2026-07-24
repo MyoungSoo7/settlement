@@ -6,10 +6,12 @@ import github.lms.lemuel.payout.domain.PayoutStatus;
 import github.lms.lemuel.payout.domain.PayoutType;
 import github.lms.lemuel.recovery.application.port.in.RecordPostPayoutRecoveryUseCase;
 import github.lms.lemuel.recovery.application.port.out.LoadSellerRecoveryPort;
+import github.lms.lemuel.recovery.application.port.out.PublishSellerRecoveryEventPort;
 import github.lms.lemuel.recovery.application.port.out.SaveSellerRecoveryPort;
 import github.lms.lemuel.recovery.domain.SellerRecovery;
 import github.lms.lemuel.settlement.application.port.out.LoadSellerIdPort;
 import github.lms.lemuel.settlement.application.port.out.LoadSettlementPort;
+import github.lms.lemuel.settlement.application.port.out.PublishSettlementDomainEventPort;
 import github.lms.lemuel.settlement.application.port.out.SaveSettlementPort;
 import github.lms.lemuel.settlement.domain.Settlement;
 import lombok.extern.slf4j.Slf4j;
@@ -38,6 +40,8 @@ public class RecoverPostPayoutAdjustmentService implements RecordPostPayoutRecov
     private final SaveSettlementPort saveSettlementPort;
     private final LoadSellerIdPort loadSellerIdPort;
     private final RecoveryEntryUseCase recoveryEntryUseCase;
+    private final PublishSettlementDomainEventPort publishSettlementDomainEventPort;
+    private final PublishSellerRecoveryEventPort publishSellerRecoveryEventPort;
 
     public RecoverPostPayoutAdjustmentService(LoadSellerRecoveryPort loadRecoveryPort,
                                               SaveSellerRecoveryPort saveRecoveryPort,
@@ -45,7 +49,9 @@ public class RecoverPostPayoutAdjustmentService implements RecordPostPayoutRecov
                                               LoadSettlementPort loadSettlementPort,
                                               SaveSettlementPort saveSettlementPort,
                                               LoadSellerIdPort loadSellerIdPort,
-                                              RecoveryEntryUseCase recoveryEntryUseCase) {
+                                              RecoveryEntryUseCase recoveryEntryUseCase,
+                                              PublishSettlementDomainEventPort publishSettlementDomainEventPort,
+                                              PublishSellerRecoveryEventPort publishSellerRecoveryEventPort) {
         this.loadRecoveryPort = loadRecoveryPort;
         this.saveRecoveryPort = saveRecoveryPort;
         this.loadPayoutPort = loadPayoutPort;
@@ -53,6 +59,8 @@ public class RecoverPostPayoutAdjustmentService implements RecordPostPayoutRecov
         this.saveSettlementPort = saveSettlementPort;
         this.loadSellerIdPort = loadSellerIdPort;
         this.recoveryEntryUseCase = recoveryEntryUseCase;
+        this.publishSettlementDomainEventPort = publishSettlementDomainEventPort;
+        this.publishSellerRecoveryEventPort = publishSellerRecoveryEventPort;
     }
 
     @Override
@@ -86,6 +94,9 @@ public class RecoverPostPayoutAdjustmentService implements RecordPostPayoutRecov
         BigDecimal absorbed = settlement.consumeHoldbackForRefund(recoveredAmount);
         if (absorbed.signum() > 0) {
             saveSettlementPort.save(settlement);
+            // account 로 유보 소진(현금유출) 이벤트 발행 — 회수 조정이 홀드백을 실제로 깎은 만큼.
+            publishSettlementDomainEventPort.publishHoldbackConsumed(
+                    adjustmentId, settlementId, sellerId.get(), absorbed);
         }
         BigDecimal remainder = recoveredAmount.subtract(absorbed);
         if (remainder.signum() <= 0) {
@@ -97,6 +108,8 @@ public class RecoverPostPayoutAdjustmentService implements RecordPostPayoutRecov
         SellerRecovery recovery = saveRecoveryPort.save(
                 SellerRecovery.open(adjustmentId, sellerId.get(), remainder));
         recoveryEntryUseCase.recognizeReceivable(recovery.getId(), settlementId, remainder, adjustmentDate);
+        // account 로 채권 발생(Opened) 이벤트 발행 — remainder 는 위 가드로 항상 양수.
+        publishSellerRecoveryEventPort.publishRecoveryOpened(recovery.getId(), sellerId.get(), remainder);
         log.warn("[Recovery] 지급후 회수 채권 발생. recoveryId={}, settlementId={}, adjustmentId={}, "
                         + "recovered={}, absorbed={}, receivable={}",
                 recovery.getId(), settlementId, adjustmentId, recoveredAmount, absorbed, remainder);

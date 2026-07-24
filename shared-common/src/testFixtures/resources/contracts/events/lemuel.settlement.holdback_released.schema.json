@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "lemuel.settlement.holdback_released",
+  "description": "settlement-service → account-service. 홀드백 보유기간 만료로 유보금이 지급 가능 상태로 재분류될 때 발행되어 GL 에 DR HOLDBACK_PAYABLE / CR SELLER_PAYABLE(유보 해제 재분류)로 전기된다(ADR 0026 Option ①). settlement 계열 직렬화 규약대로 amount 는 JSON number.",
+  "type": "object",
+  "properties": {
+    "settlementId": { "type": "integer" },
+    "sellerId": { "type": "integer" },
+    "amount": { "type": "number", "minimum": 0 }
+  },
+  "required": ["settlementId", "sellerId", "amount"],
+  "additionalProperties": true
+}

@@ -2,9 +2,12 @@ package github.lms.lemuel.ledger.application.service;
 
 import github.lms.lemuel.ledger.application.dto.SettlementSummary;
 import github.lms.lemuel.ledger.application.port.out.LoadLedgerEntryPort;
+import github.lms.lemuel.ledger.application.port.out.LoadLedgerPeriodPort;
 import github.lms.lemuel.ledger.application.port.out.LoadSettlementForLedgerPort;
 import github.lms.lemuel.ledger.application.port.out.SaveLedgerEntryPort;
+import github.lms.lemuel.ledger.domain.LedgerPeriod;
 import github.lms.lemuel.ledger.domain.exception.LedgerInvariantViolationException;
+import github.lms.lemuel.ledger.domain.exception.LedgerPeriodClosedException;
 import github.lms.lemuel.ledger.domain.AccountType;
 import github.lms.lemuel.ledger.domain.LedgerEntry;
 import github.lms.lemuel.ledger.domain.LedgerEntryType;
@@ -16,9 +19,12 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,13 +33,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /**
  * CreateLedgerEntryService 단위 테스트.
  *
- * <p>외부 협력자(LoadSettlementForLedgerPort, LoadLedgerEntryPort, SaveLedgerEntryPort)는
- * 인메모리 fake 로 대체해 도메인 분개 규칙 + 멱등성 + 합계 검증만 격리해 본다.
+ * <p>외부 협력자(LoadSettlementForLedgerPort, LoadLedgerEntryPort, SaveLedgerEntryPort, LoadLedgerPeriodPort)는
+ * 인메모리 fake 로 대체해 도메인 분개 규칙 + 멱등성 + 합계 검증 + 기간 잠금 가드만 격리해 본다.
  */
 class CreateLedgerEntryServiceTest {
 
     private FakeSettlementPort settlements;
     private FakeLedgerPort ledger;
+    private FakePeriodPort periods;
     private CreateLedgerEntryService service;
 
     private static final LocalDate TODAY = LocalDate.now();
@@ -42,7 +49,9 @@ class CreateLedgerEntryServiceTest {
     void setUp() {
         settlements = new FakeSettlementPort();
         ledger = new FakeLedgerPort();
-        service = new CreateLedgerEntryService(new SingleLedgerEntryWriter(settlements, ledger, ledger));
+        periods = new FakePeriodPort();
+        service = new CreateLedgerEntryService(
+                new SingleLedgerEntryWriter(settlements, ledger, ledger, new LedgerPeriodGuard(periods)));
     }
 
     @Nested
@@ -138,6 +147,33 @@ class CreateLedgerEntryServiceTest {
     }
 
     @Nested
+    class 기간_잠금 {
+
+        @Test
+        void 마감된_기간의_settlement_는_신규_분개_거부() {
+            LocalDate closedMonthDate = LocalDate.of(2026, 3, 15);
+            periods.markClosed(YearMonth.of(2026, 3));
+            settlements.put(new SettlementSummary(
+                    300L, bd("10000"), bd("300"), bd("9700"), closedMonthDate, "DONE"));
+
+            assertThatThrownBy(() -> service.createFromSettlement(300L))
+                    .isInstanceOf(LedgerPeriodClosedException.class);
+            assertThat(ledger.savedAll()).isEmpty();
+        }
+
+        @Test
+        void 마감되지_않은_기간은_정상_전기() {
+            LocalDate openMonthDate = LocalDate.of(2026, 4, 10);
+            periods.markClosed(YearMonth.of(2026, 3)); // 다른 달만 마감
+            settlements.put(new SettlementSummary(
+                    301L, bd("10000"), bd("300"), bd("9700"), openMonthDate, "DONE"));
+
+            List<LedgerEntry> rows = service.createFromSettlement(301L);
+            assertThat(rows).hasSize(2);
+        }
+    }
+
+    @Nested
     class 일괄_처리 {
 
         @Test
@@ -174,6 +210,22 @@ class CreateLedgerEntryServiceTest {
         @Override
         public Optional<SettlementSummary> findById(Long id) {
             return Optional.ofNullable(store.get(id));
+        }
+    }
+
+    private static class FakePeriodPort implements LoadLedgerPeriodPort {
+        private final Set<YearMonth> closed = new HashSet<>();
+
+        void markClosed(YearMonth ym) { closed.add(ym); }
+
+        @Override
+        public Optional<LedgerPeriod> findByPeriod(YearMonth period) {
+            return Optional.empty();
+        }
+
+        @Override
+        public boolean isClosed(YearMonth period) {
+            return closed.contains(period);
         }
     }
 

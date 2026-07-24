@@ -23,5 +23,10 @@ public enum LedgerEntryType {
     /** 지급후 회수 채권 인식 — Dr 미수금(AR) / Cr 미지급금(AP) (seed-p0-6). */
     RECOVERY_RECOGNIZED,
     /** 채권 상계 — 후속 정산 지급액 차감. Dr 미지급금(AP) / Cr 미수금(AR). */
-    RECOVERY_OFFSET
+    RECOVERY_OFFSET,
+    /**
+     * 부가세 예수 — Dr 수수료수익(COMMISSION_REVENUE) / Cr 부가세예수금(VAT_PAYABLE) (ADR 0029 포함과세,
+     * 2026-07-24 정정). 원천징수는 이 원장에 전기하지 않는다(account-service GL 로 이관, ADR 0026 확장).
+     */
+    VAT_ACCRUED
 }

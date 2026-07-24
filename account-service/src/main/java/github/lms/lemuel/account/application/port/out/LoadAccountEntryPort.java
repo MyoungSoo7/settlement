@@ -4,6 +4,7 @@ import github.lms.lemuel.account.domain.AccountEntry;
 import github.lms.lemuel.account.domain.OwnerType;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -32,4 +33,7 @@ public interface LoadAccountEntryPort {
 
     /** 전체 전표(시산표 계산용). */
     List<AccountEntry> findAll();
+
+    /** occurred_at 기간 전표(기간 확정 시산표 계산용). from 이상 ~ to 미만(반개구간). */
+    List<AccountEntry> findByOccurredAtBetween(LocalDateTime fromInclusive, LocalDateTime toExclusive);
 }

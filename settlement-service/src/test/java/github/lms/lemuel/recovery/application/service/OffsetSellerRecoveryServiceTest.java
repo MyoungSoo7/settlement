@@ -2,6 +2,7 @@ package github.lms.lemuel.recovery.application.service;
 
 import github.lms.lemuel.ledger.application.port.in.RecoveryEntryUseCase;
 import github.lms.lemuel.recovery.application.port.out.LoadSellerRecoveryPort;
+import github.lms.lemuel.recovery.application.port.out.PublishSellerRecoveryEventPort;
 import github.lms.lemuel.recovery.application.port.out.RecoveryAllocationPort;
 import github.lms.lemuel.recovery.application.port.out.SaveSellerRecoveryPort;
 import github.lms.lemuel.recovery.domain.RecoveryAllocation;
@@ -40,13 +41,14 @@ class OffsetSellerRecoveryServiceTest {
     @Mock SaveSellerRecoveryPort saveRecoveryPort;
     @Mock RecoveryAllocationPort allocationPort;
     @Mock RecoveryEntryUseCase recoveryEntryUseCase;
+    @Mock PublishSellerRecoveryEventPort publishSellerRecoveryEventPort;
 
     private OffsetSellerRecoveryService service;
 
     @BeforeEach
     void setUp() {
         service = new OffsetSellerRecoveryService(loadRecoveryPort, saveRecoveryPort,
-                allocationPort, recoveryEntryUseCase);
+                allocationPort, recoveryEntryUseCase, publishSellerRecoveryEventPort);
     }
 
     @Test
@@ -56,7 +58,8 @@ class OffsetSellerRecoveryServiceTest {
                 .isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(service.offsetForConfirmedSettlement(501L, 7L, null, DATE))
                 .isEqualByComparingTo(BigDecimal.ZERO);
-        verifyNoInteractions(loadRecoveryPort, saveRecoveryPort, allocationPort, recoveryEntryUseCase);
+        verifyNoInteractions(loadRecoveryPort, saveRecoveryPort, allocationPort, recoveryEntryUseCase,
+                publishSellerRecoveryEventPort);
     }
 
     @Test
@@ -68,7 +71,8 @@ class OffsetSellerRecoveryServiceTest {
                 501L, 7L, new BigDecimal("5000.00"), DATE);
 
         assertThat(offset).isEqualByComparingTo("800.00");
-        verifyNoInteractions(loadRecoveryPort, saveRecoveryPort, recoveryEntryUseCase);
+        verifyNoInteractions(loadRecoveryPort, saveRecoveryPort, recoveryEntryUseCase,
+                publishSellerRecoveryEventPort);
         verify(allocationPort, never()).save(any());
     }
 
@@ -80,7 +84,7 @@ class OffsetSellerRecoveryServiceTest {
 
         assertThat(service.offsetForConfirmedSettlement(501L, 7L, new BigDecimal("5000.00"), DATE))
                 .isEqualByComparingTo(BigDecimal.ZERO);
-        verifyNoInteractions(saveRecoveryPort, recoveryEntryUseCase);
+        verifyNoInteractions(saveRecoveryPort, recoveryEntryUseCase, publishSellerRecoveryEventPort);
     }
 
     @Test
@@ -104,6 +108,9 @@ class OffsetSellerRecoveryServiceTest {
         assertThat(captor.getValue().amount()).isEqualByComparingTo("1000.00");
         verify(recoveryEntryUseCase).offsetReceivable(eq(1000L), eq(99L),
                 eq(new BigDecimal("1000.00")), eq(DATE));
+        // account 로 회수 상계(Offset) 이벤트 발행 — allocationId·recoveryId·sellerId·금액.
+        verify(publishSellerRecoveryEventPort).publishRecoveryOffset(
+                eq(1000L), eq(99L), eq(7L), eq(new BigDecimal("1000.00")));
     }
 
     @Test
@@ -125,6 +132,11 @@ class OffsetSellerRecoveryServiceTest {
         assertThat(newer.getAllocatedAmount()).isEqualByComparingTo("500.00");
         verify(recoveryEntryUseCase).offsetReceivable(any(), eq(98L), eq(new BigDecimal("500.00")), eq(DATE));
         verify(recoveryEntryUseCase).offsetReceivable(any(), eq(99L), eq(new BigDecimal("500.00")), eq(DATE));
+        // 두 채권 각각에 대해 Offset 이벤트가 발행된다(allocationId 는 stub 상 1000L 공통).
+        verify(publishSellerRecoveryEventPort)
+                .publishRecoveryOffset(eq(1000L), eq(98L), eq(7L), eq(new BigDecimal("500.00")));
+        verify(publishSellerRecoveryEventPort)
+                .publishRecoveryOffset(eq(1000L), eq(99L), eq(7L), eq(new BigDecimal("500.00")));
     }
 
     @Test

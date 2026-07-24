@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "lemuel.settlement.adjusted",
+  "description": "settlement-service → account-service. 확정 전 정산금 조정(오류 정정·차감 등) 시 발행되어 GL 에 DR {targetLeg} / CR CASH 로 전기된다(ADR 0026 Option ①) — targetLeg 값에 따라 SELLER_PAYABLE(즉시분 조정) 또는 HOLDBACK_PAYABLE(유보분 조정)로 분기한다. settlement 계열 직렬화 규약대로 amount 는 JSON number.",
+  "type": "object",
+  "properties": {
+    "adjustmentId": { "type": "integer" },
+    "settlementId": { "type": "integer" },
+    "sellerId": { "type": "integer" },
+    "amount": { "type": "number", "minimum": 0 },
+    "targetLeg": { "type": "string", "enum": ["SELLER_PAYABLE", "HOLDBACK_PAYABLE"] }
+  },
+  "required": ["adjustmentId", "sellerId", "amount", "targetLeg"],
+  "additionalProperties": true
+}

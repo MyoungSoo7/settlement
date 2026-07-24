@@ -20,5 +20,14 @@ public enum AccountType {
     /** 매출 환불. */
     SALES_REFUND,
     /** 현금 — 실제 이체 시. */
-    CASH
+    CASH,
+    /**
+     * 부가세 예수금(부채, 대변성) — 플랫폼이 수수료(포함과세)에서 갈라낸 VAT 부분, 국세청 납부 전까지 예수
+     * (ADR 0029, 2026-07-24 정정: 외부과세 AR 모델 폐기 → 포함과세로 COMMISSION_REVENUE 에서 분리).
+     *
+     * <p>원천징수 예수금은 이 원장에 없다 — 원천징수는 실제 payout 지급액에서 공제되고, 그 결과 남는
+     * SELLER_PAYABLE 잔여를 닫는 WITHHOLDING_PAYABLE 계정은 <b>account-service GL</b>에 있다
+     * (ADR 0026 폐루프의 확장, settlement 는 이벤트만 발행).
+     */
+    VAT_PAYABLE
 }
