@@ -191,6 +191,31 @@ class SettlementFullTest {
                 .isInstanceOf(SettlementInvariantViolationException.class);
     }
 
+    // L-4: net≤0 자동취소가 전이표 단일 출처(cancel()→canTransitionTo)를 경유하는지 특성화
+    @Test @DisplayName("PROCESSING 정산도 전액 환불 시 CANCELED (전이표 PROCESSING→CANCELED 경유)")
+    void adjustForRefund_fromProcessing_cancelsViaTransitionTable() {
+        Settlement s = createSettlement(new BigDecimal("10000")); // commission 300, net 9700
+        s.startProcessing();
+        assertThat(s.getStatus()).isEqualTo(SettlementStatus.PROCESSING);
+
+        s.adjustForRefund(new BigDecimal("10000")); // net = -300 → CANCELED
+
+        assertThat(s.getStatus()).isEqualTo(SettlementStatus.CANCELED);
+    }
+
+    @Test @DisplayName("CANCELED 이후 추가 부분환불(누적≤결제액) 재호출은 예외 없이 CANCELED 유지 (전이 no-op 멱등)")
+    void adjustForRefund_reInvokeAfterCanceled_isIdempotent() {
+        Settlement s = createSettlement(new BigDecimal("10000")); // commission 300, net 9700
+        s.adjustForRefund(new BigDecimal("9800")); // refunded 9800, net = -100 → CANCELED
+        assertThat(s.getStatus()).isEqualTo(SettlementStatus.CANCELED);
+
+        // 누적 9900 ≤ 결제액 10000 이라 초과환불 가드는 통과 — 이미 CANCELED 라 전이표가 재취소를 막아
+        // 예외 없이 no-op 로 상태 유지(직접 status 대입 시절과 동일한 도달 상태·금액).
+        assertThatCode(() -> s.adjustForRefund(new BigDecimal("100"))).doesNotThrowAnyException();
+        assertThat(s.getStatus()).isEqualTo(SettlementStatus.CANCELED);
+        assertThat(s.getRefundedAmount()).isEqualByComparingTo("9900");
+    }
+
     // 상태 확인
     @Test @DisplayName("상태 확인 메서드")
     void statusChecks() {

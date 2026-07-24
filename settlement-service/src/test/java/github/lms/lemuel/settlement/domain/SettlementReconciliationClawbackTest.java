@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
@@ -66,6 +67,31 @@ class SettlementReconciliationClawbackTest {
 
         s.applyReconciliationClawback(new BigDecimal("100000"));
 
+        assertThat(s.getStatus()).isEqualTo(SettlementStatus.CANCELED);
+    }
+
+    @Test
+    @DisplayName("applyReconciliationClawback: PROCESSING 정산도 net≤0 이면 CANCELED (전이표 PROCESSING→CANCELED 경유, L-4)")
+    void fromProcessing_cancelsViaTransitionTable() {
+        Settlement s = newSettlement(); // net 96,500
+        s.startProcessing();
+        assertThat(s.getStatus()).isEqualTo(SettlementStatus.PROCESSING);
+
+        s.applyReconciliationClawback(new BigDecimal("96500"));
+
+        assertThat(s.getStatus()).isEqualTo(SettlementStatus.CANCELED);
+    }
+
+    @Test
+    @DisplayName("applyReconciliationClawback: 이미 CANCELED 면 재호출도 예외 없이 CANCELED 유지 (전이 no-op 멱등, L-4)")
+    void reInvokeAfterCanceled_isIdempotent() {
+        Settlement s = newSettlement(); // net 96,500
+        s.applyReconciliationClawback(new BigDecimal("96500")); // net 0 → CANCELED
+        assertThat(s.getStatus()).isEqualTo(SettlementStatus.CANCELED);
+
+        // 이미 CANCELED — 전이표가 재취소를 막아 예외 없이 상태 유지(직접 status 대입 시절과 동일).
+        assertThatCode(() -> s.applyReconciliationClawback(new BigDecimal("1000")))
+                .doesNotThrowAnyException();
         assertThat(s.getStatus()).isEqualTo(SettlementStatus.CANCELED);
     }
 
