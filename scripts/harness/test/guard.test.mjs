@@ -119,6 +119,16 @@ describe('guard policy fixtures', () => {
     }
   });
 
+  test('MSA-BOUNDARY blocks `import static` of an order-context symbol too (#7)', () => {
+    const file = 'settlement-service/src/main/java/github/lms/lemuel/settlement/App.java';
+    // static 키워드가 import 와 패키지 사이에 껴도 우회하지 못한다.
+    const blocked = scanText(file, 'import static github.lms.lemuel.order.OrderStatus.PAID;', { now: NOW });
+    assert.deepEqual(blocked.violations.map(({ id }) => id), ['MSA-BOUNDARY']);
+    // 자기 컨텍스트의 static import 는 여전히 허용(false positive 금지).
+    const allowed = scanText(file, 'import static github.lms.lemuel.settlement.domain.Money.ZERO;', { now: NOW });
+    assert.deepEqual(allowed.violations, []);
+  });
+
   for (const fixture of [
     {
       id: 'MONEY-PRIMITIVE',

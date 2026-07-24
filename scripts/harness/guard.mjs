@@ -95,7 +95,8 @@ export const RULES = [
     // denylist 나열 누락 함정이 없다(감사 MED-2). settlement 자체 `recon`(OrderReconClient)은 HTTP 대사라 허용.
     when: (f) => JAVA_KT.test(f) && /settlement-service\//.test(f),
     test: (line) => {
-      const m = /^\s*import\s+github\.lms\.lemuel\.([a-z0-9_]+)\b/.exec(line);
+      // `import static github.lms.lemuel.order...` 도 잡는다 — static 키워드가 사이에 껴도 우회 못 하게(#7).
+      const m = /^\s*import\s+(?:static\s+)?github\.lms\.lemuel\.([a-z0-9_]+)\b/.exec(line);
       return m != null && !SETTLEMENT_OWN_PACKAGES.has(m[1]);
     },
     msg: 'settlement-service 가 타 컨텍스트(order 등) import 금지 → Kafka 프로젝션/내부 대사 API 만 (ADR 0020)',
