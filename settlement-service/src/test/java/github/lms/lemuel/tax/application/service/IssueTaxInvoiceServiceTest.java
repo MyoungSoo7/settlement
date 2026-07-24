@@ -13,6 +13,7 @@ import github.lms.lemuel.tax.domain.exception.TaxInvariantViolationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -50,7 +51,7 @@ class IssueTaxInvoiceServiceTest {
     private void okContext(TaxType type) {
         when(settlementPort.findById(100L)).thenReturn(Optional.of(new TaxSettlementView(
                 100L, new BigDecimal("3500.00"), new BigDecimal("96500.00"), DATE, "DONE",
-                new BigDecimal("96500.00"))));
+                new BigDecimal("96500.00"), 7L)));
         when(profilePort.findBySellerId(7L)).thenReturn(Optional.of(
                 type == TaxType.BUSINESS
                         ? SellerTaxProfile.register(7L, TaxType.BUSINESS, "1234567890")
@@ -88,10 +89,35 @@ class IssueTaxInvoiceServiceTest {
         when(loadInvoicePort.findBySettlementId(100L)).thenReturn(Optional.empty());
         when(settlementPort.findById(100L)).thenReturn(Optional.of(new TaxSettlementView(
                 100L, new BigDecimal("3500.00"), new BigDecimal("96500.00"), DATE, "DONE",
-                new BigDecimal("96500.00"))));
+                new BigDecimal("96500.00"), 7L)));
         when(profilePort.findBySellerId(7L)).thenReturn(Optional.empty());
 
         assertThat(service.issueForSettlement(100L, 7L)).isEmpty();
+    }
+
+    @Test
+    void 소유권_불일치_셀러ID면_거부되고_세금계산서가_영속되지_않는다() {
+        // IDOR — 정산의 실제 소유 셀러(999)와 요청 sellerId(7)가 다르면 세금계산서를 영구 발급해서는 안 된다.
+        when(loadInvoicePort.findBySettlementId(100L)).thenReturn(Optional.empty());
+        when(settlementPort.findById(100L)).thenReturn(Optional.of(new TaxSettlementView(
+                100L, new BigDecimal("3500.00"), new BigDecimal("96500.00"), DATE, "DONE",
+                new BigDecimal("96500.00"), 999L)));
+
+        assertThatThrownBy(() -> service.issueForSettlement(100L, 7L))
+                .isInstanceOf(AccessDeniedException.class);
+
+        verify(saveInvoicePort, never()).save(any());
+    }
+
+    @Test
+    void 소유권_일치하는_정상_셀러ID는_계속_정상_발행된다() {
+        okContext(TaxType.INDIVIDUAL);
+        when(loadInvoicePort.findBySettlementId(100L)).thenReturn(Optional.empty());
+
+        Optional<TaxInvoice> result = service.issueForSettlement(100L, 7L);
+
+        assertThat(result).isPresent();
+        verify(saveInvoicePort).save(any(TaxInvoice.class));
     }
 
     @Test

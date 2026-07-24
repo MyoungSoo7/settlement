@@ -14,6 +14,7 @@ import github.lms.lemuel.tax.domain.TaxType;
 import github.lms.lemuel.tax.domain.exception.TaxInvariantViolationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -53,9 +54,13 @@ class PostSettlementTaxServiceTest {
     }
 
     private void settlement(String status) {
+        settlement(status, 7L);
+    }
+
+    private void settlement(String status, Long sellerId) {
         when(settlementPort.findById(100L)).thenReturn(Optional.of(new TaxSettlementView(
                 100L, new BigDecimal("3500.00"), new BigDecimal("96500.00"), DATE, status,
-                new BigDecimal("96500.00"))));
+                new BigDecimal("96500.00"), sellerId)));
     }
 
     private void profile(TaxType type) {
@@ -123,6 +128,17 @@ class PostSettlementTaxServiceTest {
         TaxPostingResult result = service.postForSettlement(100L, 7L);
 
         assertThat(result.outcome()).isEqualTo(TaxPostingResult.Outcome.SKIPPED_NOT_DONE);
+    }
+
+    @Test
+    void 소유권_불일치_셀러ID면_예외_전파되고_전기되지_않는다() {
+        settlement("DONE", 999L); // 실제 소유 셀러(999) != 요청 sellerId(7)
+        profile(TaxType.INDIVIDUAL);
+
+        assertThatThrownBy(() -> service.postForSettlement(100L, 7L))
+                .isInstanceOf(AccessDeniedException.class);
+
+        verify(saveLedgerPort, never()).save(any());
     }
 
     @Test

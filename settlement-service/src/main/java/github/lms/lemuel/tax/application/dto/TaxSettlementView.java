@@ -10,6 +10,11 @@ import java.time.LocalDate;
  * {@code Settlement.getImmediatePayoutAmount()} 와 동일한 규칙(holdbackReleased ? net : max(net−holdback,0))
  * 으로 어댑터가 미리 계산해 넘긴다 — 세무 3자 대사(TaxReconciliation)가 실제 payout 금액과 교차검증할 때
  * "확정 시점에 기대했던 즉시지급 산정액"의 기준으로 쓴다(ADR 0029, 2026-07-24 정정).
+ *
+ * <p>{@code sellerId} 는 이 정산의 실제 소유 셀러(payment.order_id → orders.product_id → products.seller_id
+ * 로 해석, {@code LoadSellerIdPort} 와 동일 경로)다. IDOR 방지용 — {@link
+ * github.lms.lemuel.tax.application.service.TaxContextResolver} 가 호출자가 넘긴 sellerId 와 대조한다.
+ * 매핑 실패(미할당·미해석)면 {@code null} — 이 경우 소유권 검증은 건너뛴다(2026-07-24, ADR 0029 후속 IDOR 수정).
  */
 public record TaxSettlementView(
         Long id,
@@ -17,7 +22,8 @@ public record TaxSettlementView(
         BigDecimal netAmount,
         LocalDate settlementDate,
         String status,
-        BigDecimal immediatePayoutAmount
+        BigDecimal immediatePayoutAmount,
+        Long sellerId
 ) {
     public boolean isDone() {
         return "DONE".equals(status);

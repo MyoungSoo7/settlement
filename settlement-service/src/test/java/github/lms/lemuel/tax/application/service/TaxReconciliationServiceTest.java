@@ -19,6 +19,7 @@ import github.lms.lemuel.tax.domain.exception.SellerTaxProfileNotRegisteredExcep
 import github.lms.lemuel.tax.domain.exception.TaxInvariantViolationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -54,7 +55,7 @@ class TaxReconciliationServiceTest {
     private void okSettlement() {
         when(settlementPort.findById(100L)).thenReturn(Optional.of(new TaxSettlementView(
                 100L, new BigDecimal("3500.00"), new BigDecimal("96500.00"), DATE, "DONE",
-                new BigDecimal("96500.00"))));
+                new BigDecimal("96500.00"), 7L)));
         when(profilePort.findBySellerId(7L)).thenReturn(Optional.of(
                 SellerTaxProfile.register(7L, TaxType.INDIVIDUAL, null)));
     }
@@ -104,7 +105,7 @@ class TaxReconciliationServiceTest {
     void 미등록_셀러면_예외() {
         when(settlementPort.findById(100L)).thenReturn(Optional.of(new TaxSettlementView(
                 100L, new BigDecimal("3500.00"), new BigDecimal("96500.00"), DATE, "DONE",
-                new BigDecimal("96500.00"))));
+                new BigDecimal("96500.00"), 7L)));
         when(profilePort.findBySellerId(7L)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.reconcile(100L, 7L))
                 .isInstanceOf(SellerTaxProfileNotRegisteredException.class);
@@ -114,11 +115,23 @@ class TaxReconciliationServiceTest {
     void 미확정_정산이면_예외() {
         when(settlementPort.findById(100L)).thenReturn(Optional.of(new TaxSettlementView(
                 100L, new BigDecimal("3500.00"), new BigDecimal("96500.00"), DATE, "PROCESSING",
-                new BigDecimal("96500.00"))));
+                new BigDecimal("96500.00"), 7L)));
         when(profilePort.findBySellerId(7L)).thenReturn(Optional.of(
                 SellerTaxProfile.register(7L, TaxType.INDIVIDUAL, null)));
         assertThatThrownBy(() -> service.reconcile(100L, 7L))
                 .isInstanceOf(TaxInvariantViolationException.class);
+    }
+
+    @Test
+    void 소유권_불일치_셀러ID면_예외_대사가_진행되지_않는다() {
+        // TaxReconciliationService 의 switch 는 default -> OK 라 새 Status 값을 추가했다면 조용히 통과됐을
+        // 케이스 — resolve() 가 직접 던지는 단일 초크포인트로 막는다.
+        when(settlementPort.findById(100L)).thenReturn(Optional.of(new TaxSettlementView(
+                100L, new BigDecimal("3500.00"), new BigDecimal("96500.00"), DATE, "DONE",
+                new BigDecimal("96500.00"), 999L)));
+
+        assertThatThrownBy(() -> service.reconcile(100L, 7L))
+                .isInstanceOf(AccessDeniedException.class);
     }
 
     @Test
