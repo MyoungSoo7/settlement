@@ -54,8 +54,34 @@ class LoanLedgerEntryTest {
     }
 
     @Test
+    void 기업대출_상환_전표는_현금차변_대출채권대변이고_refType은_CORP_REPAYMENT() {
+        LoanLedgerEntry e = LoanLedgerEntry.corporateRepayment(5001L, new BigDecimal("400660"));
+        assertThat(e.getDebit()).isEqualTo(LedgerAccount.CASH);
+        assertThat(e.getCredit()).isEqualTo(LedgerAccount.LOAN_RECEIVABLE);
+        assertThat(e.getAmount()).isEqualByComparingTo("400660");
+        assertThat(e.getRefType()).isEqualTo("CORP_REPAYMENT");
+        assertThat(e.getRefId()).isEqualTo(5001L);
+    }
+
+    @Test
+    void 대손상각_전표는_대손상각비차변_대손충당금대변이고_refType은_BAD_DEBT() {
+        LoanLedgerEntry e = LoanLedgerEntry.badDebtWriteOff(1L, new BigDecimal("800800"));
+        assertThat(e.getDebit()).isEqualTo(LedgerAccount.BAD_DEBT_EXPENSE);
+        assertThat(e.getCredit()).isEqualTo(LedgerAccount.BAD_DEBT_ALLOWANCE);
+        assertThat(e.getAmount()).isEqualByComparingTo("800800");
+        assertThat(e.getRefType()).isEqualTo("BAD_DEBT");
+        assertThat(e.getRefId()).isEqualTo(1L);
+    }
+
+    @Test
     void 전표금액이_0이하면_예외() {
         assertThatThrownBy(() -> LoanLedgerEntry.disbursement(1L, BigDecimal.ZERO))
+                .isInstanceOf(LoanInvariantViolationException.class);
+    }
+
+    @Test
+    void 기업대출_상환전표도_금액이_0이하면_예외() {
+        assertThatThrownBy(() -> LoanLedgerEntry.corporateRepayment(1L, BigDecimal.ZERO))
                 .isInstanceOf(LoanInvariantViolationException.class);
     }
 

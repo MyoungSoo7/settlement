@@ -37,19 +37,35 @@ public class LoanAdvanceJpaEntity {
     @Column(name = "status", nullable = false, length = 20)
     private LoanStatus status;
 
+    /** 선지급일수 — 수수료·만기 계산의 단일 근거. 구 데이터는 0(DEFAULT). */
+    @Column(name = "financing_days", nullable = false)
+    private int financingDays;
+
+    /** 실행 시각. 실행 전/구 데이터는 NULL. */
+    @Column(name = "disbursed_at")
+    private LocalDateTime disbursedAt;
+
+    /** 만기일(= disbursed_at + financing_days). 배치 스캐너의 자동 연체/상각 기준. 구 데이터는 NULL. */
+    @Column(name = "due_at")
+    private LocalDateTime dueAt;
+
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
     protected LoanAdvanceJpaEntity() { }
 
     public LoanAdvanceJpaEntity(Long id, Long sellerId, BigDecimal principal, BigDecimal fee,
-                                BigDecimal outstanding, LoanStatus status, LocalDateTime updatedAt) {
+                                BigDecimal outstanding, LoanStatus status, int financingDays,
+                                LocalDateTime disbursedAt, LocalDateTime dueAt, LocalDateTime updatedAt) {
         this.id = id;
         this.sellerId = sellerId;
         this.principal = principal;
         this.fee = fee;
         this.outstanding = outstanding;
         this.status = status;
+        this.financingDays = financingDays;
+        this.disbursedAt = disbursedAt;
+        this.dueAt = dueAt;
         this.updatedAt = updatedAt;
     }
 
@@ -59,5 +75,8 @@ public class LoanAdvanceJpaEntity {
     public BigDecimal getFee() { return fee; }
     public BigDecimal getOutstanding() { return outstanding; }
     public LoanStatus getStatus() { return status; }
+    public int getFinancingDays() { return financingDays; }
+    public LocalDateTime getDisbursedAt() { return disbursedAt; }
+    public LocalDateTime getDueAt() { return dueAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
 }

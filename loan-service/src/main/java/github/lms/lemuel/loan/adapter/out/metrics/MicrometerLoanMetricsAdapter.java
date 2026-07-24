@@ -35,6 +35,11 @@ public class MicrometerLoanMetricsAdapter implements LoanMetricsPort {
     private final Counter corporateDisbursed;
     private final Counter repaymentApplied;
     private final Counter repaymentAmount;
+    private final Counter corporateRepaid;
+    private final Counter corporateRepaidAmount;
+    private final Counter advanceOverdue;
+    private final Counter advanceWrittenOff;
+    private final Counter advanceWrittenOffLoss;
 
     public MicrometerLoanMetricsAdapter(MeterRegistry registry) {
         this.advanceRequested = Counter.builder("loan.advance.requested")
@@ -54,6 +59,18 @@ public class MicrometerLoanMetricsAdapter implements LoanMetricsPort {
         this.repaymentAmount = Counter.builder("loan.repayment.amount")
                 .baseUnit("KRW")
                 .description("상환 차감 적용 금액 합계").register(registry);
+        this.corporateRepaid = Counter.builder("loan.corporate.repaid")
+                .description("기업 신용대출 상환 적용 건수").register(registry);
+        this.corporateRepaidAmount = Counter.builder("loan.corporate.repaid.amount")
+                .baseUnit("KRW")
+                .description("기업 신용대출 상환 차감 금액 합계").register(registry);
+        this.advanceOverdue = Counter.builder("loan.advance.overdue")
+                .description("선정산 대출 연체 진입 건수").register(registry);
+        this.advanceWrittenOff = Counter.builder("loan.advance.written_off")
+                .description("선정산 대출 상각(대손 확정) 건수").register(registry);
+        this.advanceWrittenOffLoss = Counter.builder("loan.advance.written_off.loss")
+                .baseUnit("KRW")
+                .description("선정산 대출 상각 대손 손실액 합계").register(registry);
     }
 
     @Override
@@ -91,6 +108,27 @@ public class MicrometerLoanMetricsAdapter implements LoanMetricsPort {
         repaymentApplied.increment();
         if (deductedAmount != null && deductedAmount.signum() > 0) {
             repaymentAmount.increment(deductedAmount.doubleValue());
+        }
+    }
+
+    @Override
+    public void corporateRepaid(BigDecimal deductedAmount) {
+        corporateRepaid.increment();
+        if (deductedAmount != null && deductedAmount.signum() > 0) {
+            corporateRepaidAmount.increment(deductedAmount.doubleValue());
+        }
+    }
+
+    @Override
+    public void advanceOverdue() {
+        advanceOverdue.increment();
+    }
+
+    @Override
+    public void advanceWrittenOff(BigDecimal loss) {
+        advanceWrittenOff.increment();
+        if (loss != null && loss.signum() > 0) {
+            advanceWrittenOffLoss.increment(loss.doubleValue());
         }
     }
 }

@@ -3,6 +3,7 @@ package github.lms.lemuel.loan.adapter.in.web;
 import github.lms.lemuel.common.config.jwt.AuthPrincipal;
 import github.lms.lemuel.common.config.jwt.JwtUtil;
 import github.lms.lemuel.loan.application.port.in.DisburseLoanUseCase;
+import github.lms.lemuel.loan.application.port.in.ManageLoanCollectionUseCase;
 import github.lms.lemuel.loan.application.port.in.RequestLoanUseCase;
 import github.lms.lemuel.loan.application.port.out.LoadLoanPort;
 import github.lms.lemuel.loan.domain.LoanAdvance;
@@ -23,7 +24,6 @@ import java.math.BigDecimal;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -48,6 +48,7 @@ class LoanControllerTest {
     @MockitoBean JwtUtil jwtUtil;
     @MockitoBean RequestLoanUseCase requestLoanUseCase;
     @MockitoBean DisburseLoanUseCase disburseLoanUseCase;
+    @MockitoBean ManageLoanCollectionUseCase manageLoanCollectionUseCase;
     @MockitoBean LoadLoanPort loadLoanPort;
 
     /** 인증 주체 — userId=sellerId, ROLE_USER. */
@@ -56,6 +57,14 @@ class LoanControllerTest {
                 new AuthPrincipal(userId, "u" + userId + "@example.com", "USER"),
                 null,
                 List.of(new SimpleGrantedAuthority("ROLE_USER")));
+    }
+
+    /** 운영자 주체 — ROLE_ADMIN. 회수(연체·상각) 조작 허용 대상. */
+    private static Authentication adminAuth(long userId) {
+        return new UsernamePasswordAuthenticationToken(
+                new AuthPrincipal(userId, "admin" + userId + "@example.com", "ADMIN"),
+                null,
+                List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
     }
 
     @Test
@@ -76,14 +85,17 @@ class LoanControllerTest {
     }
 
     @Test
-    @DisplayName("POST /loans/{id}/disburse — IllegalArgumentException 도 400 으로 매핑된다")
+    @DisplayName("POST /loans/{id}/disburse — 없는 대출(IllegalArgumentException)은 400 으로 매핑되고 use case 미호출")
     void disburseInvalidArgumentMapsTo400() throws Exception {
-        when(disburseLoanUseCase.disburse(anyLong()))
-                .thenThrow(new IllegalArgumentException("loan not found"));
+        // 소유권 대조 위해 컨트롤러가 먼저 load 하므로, 없는 대출은 load 단계에서 400 으로 표면화된다.
+        when(loadLoanPort.load(999L))
+                .thenThrow(new IllegalArgumentException("대출을 찾을 수 없습니다. loanId=999"));
 
-        mockMvc.perform(post("/loans/999/disburse"))
+        mockMvc.perform(post("/loans/999/disburse").principal(auth(7L)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value("INVALID_ARGUMENT"));
+
+        verifyNoInteractions(disburseLoanUseCase);
     }
 
     private static LoanAdvance loan() {
@@ -187,13 +199,79 @@ class LoanControllerTest {
     }
 
     @Test
-    @DisplayName("POST /loans/{id}/disburse — 실행 성공은 200")
+    @DisplayName("POST /loans/{id}/disburse — 본인 소유 대출 실행은 200")
     void disburseOk() throws Exception {
+        when(loadLoanPort.load(1L)).thenReturn(loan());          // 대출 셀러=7
         when(disburseLoanUseCase.disburse(1L)).thenReturn(loan());
 
-        mockMvc.perform(post("/loans/1/disburse"))
+        mockMvc.perform(post("/loans/1/disburse").principal(auth(7L)))   // 호출자=7 (본인)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1));
+    }
+
+    @Test
+    @DisplayName("POST /loans/{id}/disburse — 타 셀러 대출 실행은 403 이고 use case 미호출 (IDOR 가드)")
+    void disburseByNonOwnerForbidden() throws Exception {
+        when(loadLoanPort.load(1L)).thenReturn(loan());          // 대출 셀러=7
+
+        mockMvc.perform(post("/loans/1/disburse").principal(auth(9L)))   // 호출자=9 (타인)
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403));
+
+        verifyNoInteractions(disburseLoanUseCase);
+    }
+
+    @Test
+    @DisplayName("POST /loans/{id}/disburse — 미인증이면 403 이고 use case 미호출")
+    void disburseNoAuthForbidden() throws Exception {
+        mockMvc.perform(post("/loans/1/disburse"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403));
+
+        verifyNoInteractions(disburseLoanUseCase);
+    }
+
+    @Test
+    @DisplayName("POST /loans/{id}/overdue — 관리자 연체 진입은 200")
+    void markOverdueAsAdminOk() throws Exception {
+        when(manageLoanCollectionUseCase.markOverdue(1L))
+                .thenReturn(LoanAdvance.reconstitute(1L, 7L, new BigDecimal("800000"),
+                        new BigDecimal("800"), new BigDecimal("800800"), LoanStatus.OVERDUE));
+
+        mockMvc.perform(post("/loans/1/overdue").principal(adminAuth(1L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("OVERDUE"));
+    }
+
+    @Test
+    @DisplayName("POST /loans/{id}/overdue — 비관리자(USER)는 403 이고 use case 미호출")
+    void markOverdueAsUserForbidden() throws Exception {
+        mockMvc.perform(post("/loans/1/overdue").principal(auth(7L)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403));
+
+        verifyNoInteractions(manageLoanCollectionUseCase);
+    }
+
+    @Test
+    @DisplayName("POST /loans/{id}/write-off — 관리자 상각은 200")
+    void writeOffAsAdminOk() throws Exception {
+        when(manageLoanCollectionUseCase.writeOff(1L))
+                .thenReturn(LoanAdvance.reconstitute(1L, 7L, new BigDecimal("800000"),
+                        new BigDecimal("800"), new BigDecimal("800800"), LoanStatus.WRITTEN_OFF));
+
+        mockMvc.perform(post("/loans/1/write-off").principal(adminAuth(1L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("WRITTEN_OFF"));
+    }
+
+    @Test
+    @DisplayName("POST /loans/{id}/write-off — 미인증이면 403 이고 use case 미호출")
+    void writeOffNoAuthForbidden() throws Exception {
+        mockMvc.perform(post("/loans/1/write-off"))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(manageLoanCollectionUseCase);
     }
 
     @Test

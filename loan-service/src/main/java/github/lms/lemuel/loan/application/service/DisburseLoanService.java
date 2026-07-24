@@ -17,14 +17,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.LocalDateTime;
 
 /**
  * 대출 실행(선지급).
  *
  * <p>신청 시점과 실행 시점 사이에 담보(정산예정금)가 변할 수 있으므로, 실행 직전에
  * 비관적 락으로 미지급 합계를 재조회해 한도를 재검증한다(동시 선지급 경합 직렬화).
- * 통과 시 DISBURSED 로 전이하고 LoanDisbursementRequested 를 Outbox 에 기록 →
- * settlement 가 payout 으로 셀러에게 실제 송금한다.
+ * 통과 시 DISBURSED 로 전이하고 실행 시각(KST)을 찍어 만기(dueAt = 실행시각 + financingDays)를 확정한 뒤,
+ * LoanDisbursementRequested 를 Outbox 에 기록 → settlement 가 payout 으로 셀러에게 실제 송금한다.
  */
 @Service
 public class DisburseLoanService implements DisburseLoanUseCase {
@@ -37,6 +39,7 @@ public class DisburseLoanService implements DisburseLoanUseCase {
     private final PublishLoanEventPort publishLoanEventPort;
     private final AppendLedgerPort appendLedgerPort;
     private final LoanMetricsPort loanMetricsPort;
+    private final Clock clock;
 
     public DisburseLoanService(LoadLoanPort loadLoanPort,
                                SaveLoanPort saveLoanPort,
@@ -45,7 +48,8 @@ public class DisburseLoanService implements DisburseLoanUseCase {
                                CreditPolicy creditPolicy,
                                PublishLoanEventPort publishLoanEventPort,
                                AppendLedgerPort appendLedgerPort,
-                               LoanMetricsPort loanMetricsPort) {
+                               LoanMetricsPort loanMetricsPort,
+                               Clock clock) {
         this.loadLoanPort = loadLoanPort;
         this.saveLoanPort = saveLoanPort;
         this.loadSettlementViewPort = loadSettlementViewPort;
@@ -54,6 +58,7 @@ public class DisburseLoanService implements DisburseLoanUseCase {
         this.publishLoanEventPort = publishLoanEventPort;
         this.appendLedgerPort = appendLedgerPort;
         this.loanMetricsPort = loanMetricsPort;
+        this.clock = clock;
     }
 
     @Override
@@ -82,7 +87,8 @@ public class DisburseLoanService implements DisburseLoanUseCase {
             throw e;
         }
 
-        loan.disburse();
+        // 실행 시각(KST)을 도메인에 전달 — disbursedAt·dueAt(= 실행시각 + financingDays) 확정.
+        loan.disburse(LocalDateTime.now(clock));
         LoanAdvance saved = saveLoanPort.save(loan);
 
         // 복식부기: 선지급(대출채권/현금) + 수수료 인식(미수수익/수수료수익)

@@ -16,8 +16,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.Map;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -38,26 +40,29 @@ class DisburseLoanServiceTest {
     @Mock AppendLedgerPort appendLedgerPort;
     @Mock LoanMetricsPort loanMetricsPort;
 
+    // 고정 KST Clock — 실행 시각·만기(dueAt) 계산을 결정적으로 검증.
+    private final Clock clock = Clock.fixed(Instant.parse("2026-07-24T00:00:00Z"), ZoneId.of("Asia/Seoul"));
+
     private final CreditPolicy creditPolicy = new CreditPolicy(new BigDecimal("0.80"), new BigDecimal("0.0002"),
             Map.of("A", BigDecimal.ONE, "B", BigDecimal.ONE, "C", new BigDecimal("0.85"),
                     "D", new BigDecimal("0.70"), "E", BigDecimal.ZERO));
 
     private DisburseLoanService service() {
         // 평판 미상 기본(무변동) — 개별 테스트에서 필요 시 재stub
-        lenient().when(loadSellerReputationPort.findGrade(7L)).thenReturn(Optional.empty());
+        lenient().when(loadSellerReputationPort.findGrade(7L)).thenReturn(java.util.Optional.empty());
         return new DisburseLoanService(loadLoanPort, saveLoanPort, loadSettlementViewPort,
                 loadSellerReputationPort, creditPolicy, publishLoanEventPort, appendLedgerPort,
-                loanMetricsPort);
+                loanMetricsPort, clock);
     }
 
     private LoanAdvance requestedLoan() {
-        // id=1, seller=7, principal=800,000, fee=800
+        // id=1, seller=7, principal=800,000, fee=800, financingDays=7 (만기 추적)
         return LoanAdvance.reconstitute(1L, 7L, new BigDecimal("800000"), new BigDecimal("800"),
-                BigDecimal.ZERO, LoanStatus.REQUESTED);
+                BigDecimal.ZERO, LoanStatus.REQUESTED, 7, null, null);
     }
 
     @Test
-    void 담보충분하면_실행하고_선지급이벤트를_발행한다() {
+    void 담보충분하면_실행하고_선지급이벤트를_발행하며_만기를_확정한다() {
         when(loadLoanPort.load(1L)).thenReturn(requestedLoan());
         when(loadSettlementViewPort.sumUnpaidBySellerForUpdate(7L)).thenReturn(new BigDecimal("1000000"));
         when(saveLoanPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -66,8 +71,10 @@ class DisburseLoanServiceTest {
 
         assertThat(result.getStatus()).isEqualTo(LoanStatus.DISBURSED);
         assertThat(result.getOutstanding()).isEqualByComparingTo("800800"); // 원금+수수료
+        // 실행 시각(KST 2026-07-25 09:00)·만기(+7일) 확정
+        assertThat(result.getDisbursedAt()).isEqualTo(java.time.LocalDateTime.of(2026, 7, 24, 9, 0));
+        assertThat(result.getDueAt()).isEqualTo(java.time.LocalDateTime.of(2026, 7, 31, 9, 0));
         verify(publishLoanEventPort).publishDisbursementRequested(any());
-        // 복식부기 전표 2건: 선지급 + 수수료 인식
         verify(appendLedgerPort, org.mockito.Mockito.times(2)).append(any());
         verify(loanMetricsPort).advanceDisbursed();
     }
@@ -85,7 +92,6 @@ class DisburseLoanServiceTest {
                 .hasMessageContaining("limit=400000");
 
         verify(publishLoanEventPort, never()).publishDisbursementRequested(any());
-        // 거절 상태로 저장됐는지
         org.mockito.ArgumentCaptor<LoanAdvance> captor = org.mockito.ArgumentCaptor.forClass(LoanAdvance.class);
         verify(saveLoanPort).save(captor.capture());
         assertThat(captor.getValue().getStatus()).isEqualTo(LoanStatus.REJECTED);
