@@ -53,6 +53,33 @@ class LoanAdvanceDueTrackingTest {
     }
 
     @Test
+    void 만기추적_실행은_financingDays_0이면_예외() {
+        // financingDays=0(구 데이터 DEFAULT/미지정) 대출을 만기 추적 실행하면 dueAt=disbursedAt 이 되어
+        // 실행 즉시 만기 경과 → 스캐너가 당일 연체·상각으로 오판한다. 실행 시점에 차단한다.
+        LoanAdvance loan = LoanAdvance.request(7L, PRINCIPAL, FEE); // financingDays=0
+        loan.approve();
+        LocalDateTime asOf = LocalDateTime.of(2026, 7, 24, 9, 0);
+
+        assertThatThrownBy(() -> loan.disburse(asOf))
+                .isInstanceOf(LoanInvariantViolationException.class);
+        assertThat(loan.getStatus()).isEqualTo(LoanStatus.APPROVED); // 전이·만기 미확정
+        assertThat(loan.getDueAt()).isNull();
+    }
+
+    @Test
+    void 만기추적_실행은_financingDays_1이면_통과() {
+        // 하한 경계(1일) — dueAt 이 disbursedAt 보다 하루 뒤라 당일 연체 오판이 없다.
+        LoanAdvance loan = LoanAdvance.request(7L, PRINCIPAL, FEE, 1);
+        loan.approve();
+        LocalDateTime asOf = LocalDateTime.of(2026, 7, 24, 9, 0);
+
+        loan.disburse(asOf);
+
+        assertThat(loan.getStatus()).isEqualTo(LoanStatus.DISBURSED);
+        assertThat(loan.getDueAt()).isEqualTo(asOf.plusDays(1));
+    }
+
+    @Test
     void 실행시각이_null이면_예외() {
         LoanAdvance loan = LoanAdvance.request(7L, PRINCIPAL, FEE, 7);
         loan.approve();

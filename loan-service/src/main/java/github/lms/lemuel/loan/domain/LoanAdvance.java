@@ -108,6 +108,13 @@ public class LoanAdvance {
         if (asOf == null) {
             throw new LoanInvariantViolationException("실행 시각(asOf)은 필수입니다");
         }
+        // 만기 추적 실행에는 최소 1일의 여신 기간이 필요하다. financingDays=0(구 데이터 DEFAULT/미지정)이면
+        // dueAt = disbursedAt 이 되어 실행 즉시 만기 경과 → 스캐너가 당일 연체·상각으로 오판한다(실멀쩡 대출을
+        // 대손 처리). 실행 시점에 차단해 잘못된 만기가 확정되지 않게 한다.
+        if (financingDays < 1) {
+            throw new LoanInvariantViolationException(
+                    "만기 추적 실행에는 선지급일수가 최소 1일이어야 합니다: " + financingDays);
+        }
         disburseInternal();
         this.disbursedAt = asOf;
         this.dueAt = asOf.plusDays(financingDays);
