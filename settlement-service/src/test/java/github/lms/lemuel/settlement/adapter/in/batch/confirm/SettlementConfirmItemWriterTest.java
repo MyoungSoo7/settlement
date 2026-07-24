@@ -123,7 +123,7 @@ class SettlementConfirmItemWriterTest {
     }
 
     @Test
-    @DisplayName("ADR 0027 §B(HIGH #4 봉합): 개인 셀러 원천징수는 payout 금액에서 실제 공제되고 이벤트가 발행된다")
+    @DisplayName("ADR 0029 §B(HIGH #4 봉합): 개인 셀러 원천징수는 payout 금액에서 실제 공제되고 이벤트가 발행된다")
     void individualSeller_withholdingDeductedFromPayout_andEventPublished() throws Exception {
         Settlement s1 = confirmed(1L); // paymentAmount=10000, commission 3%=300, net=9700, holdback 없음
         when(saveSettlementPort.save(any())).thenAnswer(inv -> inv.getArgument(0));

@@ -252,7 +252,7 @@ public class AccountEntry {
     }
 
     /**
-     * 원천징수 예수 반제 → DR SELLER_PAYABLE / CR WITHHOLDING_PAYABLE (ADR 0026 Option ① 확장, ADR 0027 §B
+     * 원천징수 예수 반제 → DR SELLER_PAYABLE / CR WITHHOLDING_PAYABLE (ADR 0026 Option ① 확장, ADR 0029 §B
      * 2026-07-24 정정 — HIGH #4 봉합). settlement 의 payout 산정이 원천징수를 실제 공제하면서 남는
      * SELLER_PAYABLE 잔여(= withholdingAmount)를 이 전표로 닫는다. 자연키 refId=settlementId(정산 1건당
      * 원천징수 확정은 1회이므로 멱등).

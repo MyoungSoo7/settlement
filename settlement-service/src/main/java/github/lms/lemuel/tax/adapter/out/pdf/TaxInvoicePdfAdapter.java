@@ -108,7 +108,7 @@ public class TaxInvoicePdfAdapter implements RenderTaxInvoicePdfPort {
             doc.add(table);
 
             renderDivider(doc);
-            doc.add(new Paragraph("본 세금계산서는 전자문서로 자동 생성되었습니다 (ADR 0027, MVP — e-Tax 실연동 별도).")
+            doc.add(new Paragraph("본 세금계산서는 전자문서로 자동 생성되었습니다 (ADR 0029, MVP — e-Tax 실연동 별도).")
                     .setFont(regular).setFontSize(8).setFontColor(COLOR_GRAY)
                     .setTextAlignment(TextAlignment.CENTER));
 

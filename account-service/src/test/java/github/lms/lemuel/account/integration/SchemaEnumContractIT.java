@@ -97,7 +97,7 @@ class SchemaEnumContractIT {
     }
 
     @Test
-    @DisplayName("chk_account_entry_ref_type == AccountEntry 팩토리 17종의 refType (정확 일치, ADR 0026 Option ① + ADR 0027 §B)")
+    @DisplayName("chk_account_entry_ref_type == AccountEntry 팩토리 17종의 refType (정확 일치, ADR 0026 Option ① + ADR 0029 §B)")
     void refTypeCheckMatchesFactorySetExactly() {
         Set<String> factoryRefTypes = new LinkedHashSet<>(Arrays.asList(
                 AccountEntry.settlementCreatedImmediate("s", "1", ONE).getRefType(),

@@ -50,7 +50,7 @@ public interface PublishSettlementDomainEventPort {
                                    BigDecimal immediateAmount, BigDecimal holdbackAmount);
 
     /**
-     * 정산 확정(payout 산정) 시점에 개인 셀러 원천징수가 실제 지급액에서 공제될 때(ADR 0027, 2026-07-24
+     * 정산 확정(payout 산정) 시점에 개인 셀러 원천징수가 실제 지급액에서 공제될 때(ADR 0029, 2026-07-24
      * 정정 — HIGH #4 실지급 통합 봉합). account-service 가 소비해 Dr SELLER_PAYABLE / Cr WITHHOLDING_PAYABLE
      * 로 전기해 payout 감액으로 남은 SELLER_PAYABLE 잔여를 닫는다(ADR 0026 폐루프의 확장).
      */

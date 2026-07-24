@@ -162,7 +162,7 @@ public class SecurityConfig {
                         // ADMIN/MANAGER 게이트로 IDOR 방지 (Seed D1).
                         .requestMatchers("/admin/seller-bank-accounts/**").hasAnyRole("ADMIN", "MANAGER")
                         // 셀러 세무 프로필 레지스트리(PII 사업자등록번호) — 셀러 식별자를 관리자 입력으로 받으므로
-                        // ADMIN/MANAGER 게이트로 IDOR 방지 (Seed B2, ADR 0027).
+                        // ADMIN/MANAGER 게이트로 IDOR 방지 (Seed B2, ADR 0029).
                         .requestMatchers("/admin/seller-tax-profiles/**").hasAnyRole("ADMIN", "MANAGER")
                         // 세무 산출물 운영 콘솔 — 세무 전표 전기·세금계산서 발행·3자 대사 (Seed B2).
                         .requestMatchers("/admin/tax/**").hasAnyRole("ADMIN", "MANAGER")

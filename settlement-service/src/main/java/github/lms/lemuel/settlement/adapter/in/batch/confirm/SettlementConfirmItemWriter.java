@@ -28,7 +28,7 @@ import java.util.List;
  * 청크 트랜잭션과 같은 커밋에 묶인다(아웃박스 패턴 → 크래시 일관성). 하루치 전체를 단일 트랜잭션으로
  * 처리하던 기존 구조와 달리, 청크마다 커밋해 롱 트랜잭션·락 보유 시간을 제한한다.
  *
- * <p><b>2026-07-24 정정(ADR 0027 §B, 독립 GL 감사 HIGH #4 봉합)</b>: 개인 셀러 원천징수를 <b>실제 지급액에서
+ * <p><b>2026-07-24 정정(ADR 0029 §B, 독립 GL 감사 HIGH #4 봉합)</b>: 개인 셀러 원천징수를 <b>실제 지급액에서
  * 공제</b>한다 — payout 금액 = {@code immediate − offset − withholding}. 과거엔 세무 전표(장부)만 원천징수를
  * 줄이고 실제 송금은 net 전액이 나가던 결함이 있었다. 원천징수 확정 지점(= payout 산정 지점)에서
  * {@code lemuel.settlement.withholding_accrued} 를 발행해 account-service GL 이
@@ -88,7 +88,7 @@ public class SettlementConfirmItemWriter implements ItemWriter<Settlement> {
             loadSellerIdPort.findSellerIdByPaymentId(saved.getPaymentId()).ifPresent(sellerId -> {
                 publishSettlementDomainEventPort.publishSettlementConfirmed(
                         saved.getId(), sellerId, saved.getNetAmount());
-                // 즉시지급액 = net − 미해제 holdback − 채권 상계(seed-p0-6) − 원천징수(ADR 0027 §B, HIGH #4 봉합).
+                // 즉시지급액 = net − 미해제 holdback − 채권 상계(seed-p0-6) − 원천징수(ADR 0029 §B, HIGH #4 봉합).
                 // 미상계 채권을 오래된 순으로 소진한 잔액에서 원천징수까지 뺀 최종액만 Payout 으로 요청한다.
                 // 0 이면 생성하지 않는다((정산, IMMEDIATE) 멱등, RequestPayoutUseCase 계약).
                 BigDecimal immediate = saved.getImmediatePayoutAmount();

@@ -9,7 +9,7 @@ import java.time.LocalDate;
  * <p>세무 계산·전기·대사에 필요한 최소 필드만 담는다. {@code immediatePayoutAmount} 는
  * {@code Settlement.getImmediatePayoutAmount()} 와 동일한 규칙(holdbackReleased ? net : max(net−holdback,0))
  * 으로 어댑터가 미리 계산해 넘긴다 — 세무 3자 대사(TaxReconciliation)가 실제 payout 금액과 교차검증할 때
- * "확정 시점에 기대했던 즉시지급 산정액"의 기준으로 쓴다(ADR 0027, 2026-07-24 정정).
+ * "확정 시점에 기대했던 즉시지급 산정액"의 기준으로 쓴다(ADR 0029, 2026-07-24 정정).
  */
 public record TaxSettlementView(
         Long id,

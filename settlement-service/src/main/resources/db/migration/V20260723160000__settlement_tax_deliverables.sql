@@ -1,4 +1,4 @@
--- V20260723160000: 정산 연계 세무 산출물 (Seed B2, ADR 0027, 2026-07-24 정정 반영)
+-- V20260723160000: 정산 연계 세무 산출물 (Seed B2, ADR 0029, 2026-07-24 정정 반영)
 --
 -- 무엇을:
 --   1) seller_tax_profiles  — 셀러 세무유형(개인/사업자)·사업자등록번호 레지스트리(관리자 upsert).
@@ -28,7 +28,7 @@ CREATE TABLE public.seller_tax_profiles (
     CONSTRAINT chk_seller_tax_type CHECK (tax_type IN ('INDIVIDUAL', 'BUSINESS'))
 );
 
-COMMENT ON TABLE public.seller_tax_profiles IS '셀러 세무유형 레지스트리 — 원천징수 판단 입력의 원천 (Seed B2, ADR 0027).';
+COMMENT ON TABLE public.seller_tax_profiles IS '셀러 세무유형 레지스트리 — 원천징수 판단 입력의 원천 (Seed B2, ADR 0029).';
 COMMENT ON COLUMN public.seller_tax_profiles.business_reg_no_enc IS '사업자등록번호 AES-GCM enc:v1 암호문(앱단), 개인 셀러는 NULL.';
 
 CREATE TABLE public.tax_invoices (
@@ -49,7 +49,7 @@ CREATE TABLE public.tax_invoices (
     CONSTRAINT chk_tax_invoice_total  CHECK (total_amount = supply_amount + tax_amount)
 );
 
-COMMENT ON TABLE public.tax_invoices IS '플랫폼→셀러 수수료 세금계산서 — 공급가액=수수료, 세액=부가세 (Seed B2, ADR 0027).';
+COMMENT ON TABLE public.tax_invoices IS '플랫폼→셀러 수수료 세금계산서 — 공급가액=수수료, 세액=부가세 (Seed B2, ADR 0029).';
 
 CREATE INDEX idx_tax_invoice_seller ON public.tax_invoices (seller_id, id);
 

@@ -235,7 +235,7 @@ class GlCashClosedLoopIT {
     @Test
     @DisplayName("독립 GL 감사 HIGH #4 봉합: 원천징수 payout 감액분을 Cr WITHHOLDING_PAYABLE 로 닫아야 SELLER_PAYABLE 이 0 으로 봉합된다")
     void withholdingAccrued_closesSellerPayableResidue() {
-        // ADR 0027 §B(2026-07-24 정정) — 개인 셀러 원천징수를 실제 payout 지급액에서 공제한다.
+        // ADR 0029 §B(2026-07-24 정정) — 개인 셀러 원천징수를 실제 payout 지급액에서 공제한다.
         // net=100000, holdback=0 → immediate=100000, withholding=3300(3.3%) → 실지급 96700.
         final String seller = "700003";
         recordAccountEntryUseCase.record(AccountEntry.settlementCreatedImmediate(seller, "W1", new BigDecimal("100000")));

@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
  *
  * <p>원천징수 판단 입력이 정산·프로젝션에 없으므로, {@code SellerBankAccountRegistration}(payout 계좌
  * 레지스트리)과 <b>동형</b>으로 관리자 CRUD(upsert) 원천을 둔다. 신규 cross-service 프로젝션을 만들지 않고
- * settlement 자체에서 세무유형을 확보한다(ADR 0027 자족형).
+ * settlement 자체에서 세무유형을 확보한다(ADR 0029 자족형).
  *
  * <p>사업자등록번호는 도메인에선 평문으로 다루고, 영속 어댑터({@code PayoutFieldEncryptionConverter})가
  * 저장 시 암호화한다(도메인 무오염). public setter 없음 — 생성·정정은 팩토리/도메인 메서드 전용.

@@ -10,7 +10,7 @@ import java.util.Objects;
  * 세무 계산 값 객체(Value Object) — 정산 1건의 부가세·원천징수·실지급액을 도메인 규칙으로 산출한다.
  *
  * <p>순수 POJO(프레임워크 의존 0)·팩토리 전용·불변. 모든 세무 금액은 {@link TaxRounding} 원단위 절사로
- * 산출하며, 산출 직후 대사 항등식을 자가검증한다(ADR 0027, 2026-07-24 정정 — 독립 GL 감사 HIGH #4 봉합).
+ * 산출하며, 산출 직후 대사 항등식을 자가검증한다(ADR 0029, 2026-07-24 정정 — 독립 GL 감사 HIGH #4 봉합).
  *
  * <pre>
  * (부가세 — 포함과세) vatAmount     = floor(commission × 10/110)     (수수료는 부가세 포함 금액)
@@ -119,7 +119,7 @@ public final class TaxCalculation {
                 : BigDecimal.ZERO;
     }
 
-    /** 대사 항등식 자가검증 — 산출 결과가 ADR 0027 항등식을 만족하는지 구성적으로 확인한다. */
+    /** 대사 항등식 자가검증 — 산출 결과가 ADR 0029 항등식을 만족하는지 구성적으로 확인한다. */
     private void validateIdentities() {
         if (vatAmount.signum() < 0 || withholdingAmount.signum() < 0) {
             throw new TaxInvariantViolationException("세무 예수금은 음수일 수 없습니다");

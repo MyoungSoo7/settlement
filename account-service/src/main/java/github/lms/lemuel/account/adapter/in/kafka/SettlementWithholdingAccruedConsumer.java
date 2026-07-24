@@ -17,7 +17,7 @@ import java.util.UUID;
 
 /**
  * settlement.withholding_accrued → DR SELLER_PAYABLE / CR WITHHOLDING_PAYABLE 분개 적재
- * (ADR 0026 Option ① 확장, ADR 0027 §B 2026-07-24 정정 — 독립 GL 감사 HIGH #4 봉합).
+ * (ADR 0026 Option ① 확장, ADR 0029 §B 2026-07-24 정정 — 독립 GL 감사 HIGH #4 봉합).
  *
  * <p>정산 확정(payout 산정) 시점에 개인 셀러 원천징수가 실제 지급액에서 공제되면 settlement-service 가
  * 발행한다(account 는 소비 전용). 이 전기로 payoutCompleted 의 감액된 DR 이 남긴 SELLER_PAYABLE 잔여를

@@ -12,7 +12,7 @@ import java.util.List;
 
 /**
  * 세무 전표 도메인 팩토리 — 정산 1건의 세무 계산({@link TaxCalculation})을 settlement 자체원장의
- * <b>차1·대1 균형 분개</b>로 전개한다(ADR 0027, {@code LedgerEntry.balancedPairForSettlement} 와 동형).
+ * <b>차1·대1 균형 분개</b>로 전개한다(ADR 0029, {@code LedgerEntry.balancedPairForSettlement} 와 동형).
  *
  * <pre>
  * VAT (수수료>0, 포함과세) : Dr COMMISSION_REVENUE / Cr VAT_PAYABLE = vatAmount
