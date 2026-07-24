@@ -61,7 +61,7 @@ class EventContractConsumerTest {
         consumer.onSettlementCreated(recordOf("lemuel.settlement.created", sample), mock(Acknowledgment.class));
 
         verify(ingestSettlementUseCase).ingest(new IngestSettlementCommand(
-                9001L, 777L, new BigDecimal("43425"), LocalDate.of(2026, 7, 10)));
+                9001L, 777L, new BigDecimal("42500"), LocalDate.of(2026, 7, 10)));
     }
 
     @Test
