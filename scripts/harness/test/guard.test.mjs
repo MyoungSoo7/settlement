@@ -104,6 +104,21 @@ describe('guard policy fixtures', () => {
     assert.deepEqual(kotlin.violations, []);
   });
 
+  test('MSA-BOUNDARY blocks every order-service context, not just the legacy denylist (MED-2)', () => {
+    const file = 'settlement-service/src/main/java/github/lms/lemuel/settlement/App.java';
+    // 구 denylist(order|user|cart|product|coupon|shipping)가 놓치던 order 도메인 — 이제 allowlist 여집합으로 전부 차단
+    for (const pkg of ['payment', 'review', 'game', 'category', 'menu', 'rbac', 'commoncode', 'order', 'user']) {
+      const result = scanText(file, `import github.lms.lemuel.${pkg}.Foo;`, { now: NOW });
+      assert.deepEqual(result.violations.map(({ id }) => id), ['MSA-BOUNDARY'], `${pkg} 는 차단되어야 한다`);
+    }
+    // settlement 자체 바운디드 컨텍스트 + shared-common(common) 은 허용 (false positive 금지)
+    for (const pkg of ['settlement', 'payout', 'ledger', 'chargeback', 'pgreconciliation',
+      'recon', 'recovery', 'report', 'tax', 'idempotency', 'integrity', 'common']) {
+      const result = scanText(file, `import github.lms.lemuel.${pkg}.Foo;`, { now: NOW });
+      assert.deepEqual(result.violations, [], `${pkg} 는 허용되어야 한다`);
+    }
+  });
+
   for (const fixture of [
     {
       id: 'MONEY-PRIMITIVE',
