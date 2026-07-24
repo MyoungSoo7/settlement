@@ -4,6 +4,7 @@ import github.lms.lemuel.loan.application.port.out.LoadLoanPort;
 import github.lms.lemuel.loan.application.port.out.SaveLoanPort;
 import github.lms.lemuel.loan.domain.LoanAdvance;
 import github.lms.lemuel.loan.domain.LoanStatus;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -48,17 +49,13 @@ public class LoanPersistenceAdapter implements SaveLoanPort, LoadLoanPort {
     }
 
     @Override
-    public List<LoanAdvance> findOverdueCandidates(LocalDateTime asOf) {
-        return repository.findByStatusAndDueAtBefore(LoanStatus.DISBURSED, asOf).stream()
-                .map(LoanPersistenceAdapter::toDomain)
-                .toList();
+    public List<Long> findOverdueCandidateIds(LocalDateTime asOf, int limit) {
+        return repository.findIdsByStatusAndDueAtBefore(LoanStatus.DISBURSED, asOf, Pageable.ofSize(limit));
     }
 
     @Override
-    public List<LoanAdvance> findWriteOffCandidates(LocalDateTime asOf) {
-        return repository.findByStatusAndDueAtBefore(LoanStatus.OVERDUE, asOf).stream()
-                .map(LoanPersistenceAdapter::toDomain)
-                .toList();
+    public List<Long> findWriteOffCandidateIds(LocalDateTime asOf, int limit) {
+        return repository.findIdsByStatusAndDueAtBefore(LoanStatus.OVERDUE, asOf, Pageable.ofSize(limit));
     }
 
     private static LoanAdvanceJpaEntity toEntity(LoanAdvance loan) {

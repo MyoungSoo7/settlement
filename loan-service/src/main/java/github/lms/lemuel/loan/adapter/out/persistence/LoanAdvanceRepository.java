@@ -2,6 +2,7 @@ package github.lms.lemuel.loan.adapter.out.persistence;
 
 import github.lms.lemuel.loan.domain.LoanStatus;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -25,14 +26,17 @@ public interface LoanAdvanceRepository extends JpaRepository<LoanAdvanceJpaEntit
                                                                 @Param("statuses") java.util.Collection<LoanStatus> statuses);
 
     /**
-     * 만기(dueAt) 경과분 스캔 — 자동 연체/상각 배치용. dueAt NULL(구 데이터)은 제외되고, 만기 오래된 순으로
-     * 반환한다(오래된 연체부터 처리). 부분 인덱스 idx_loan_advances_due_at_active 가 핫패스를 받친다.
+     * 만기(dueAt) 경과분의 <b>id</b> 스캔 — 자동 연체/상각 배치용. dueAt NULL(구 데이터)은 제외되고, 만기
+     * 오래된 순으로 반환한다(오래된 연체부터 처리). 부분 인덱스 idx_loan_advances_due_at_active 가 핫패스를 받친다.
+     * 배치가 건별 트랜잭션에서 id 로 락 재조회하므로 애그리거트를 하이드레이트하지 않고 id 만 투영한다(발견 #8).
+     * {@link Pageable} 로 1회 스캔량을 제한한다.
      */
     @Query("""
-            select l from LoanAdvanceJpaEntity l
+            select l.id from LoanAdvanceJpaEntity l
             where l.status = :status and l.dueAt is not null and l.dueAt < :asOf
             order by l.dueAt asc
             """)
-    List<LoanAdvanceJpaEntity> findByStatusAndDueAtBefore(@Param("status") LoanStatus status,
-                                                          @Param("asOf") LocalDateTime asOf);
+    List<Long> findIdsByStatusAndDueAtBefore(@Param("status") LoanStatus status,
+                                             @Param("asOf") LocalDateTime asOf,
+                                             Pageable pageable);
 }
