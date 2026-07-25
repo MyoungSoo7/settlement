@@ -110,7 +110,7 @@ order Kafka 이벤트를 컨슈머(`adapter/in/kafka/`)가 받아 로컬 적재�
 - **Outbox**: DB tx 안에서 `outbox_events` INSERT → 멀티워커 폴러(FOR UPDATE SKIP LOCKED, 기본 2s) 가 Kafka 발행.
 - **3단 멱등 방어**: ① `outbox_events.event_id UUID UNIQUE` → ② 컨슈머 `processed_events (consumer_group, event_id)` PK →
   ③ 도메인 UNIQUE(예: `settlements.payment_id`, account `(source_topic, ref_type, ref_id)`).
-- **이벤트 계약-as-code (ADR 0024)**: cross-service 12개 토픽의 JSON Schema + 정본 샘플이
+- **이벤트 계약-as-code (ADR 0024)**: cross-service 토픽(수치 정본 `STATUS.md#핵심 수치`)의 JSON Schema + 정본 샘플이
   `shared-common/src/testFixtures/resources/contracts/events/` 에 단일 출처. 프로듀서·컨슈머 **양방향 계약 테스트**로
   드리프트를 빌드 시점 차단. 소비: `testImplementation(testFixtures("github.lms.lemuel:shared-common:1.0.0"))`.
 - 토픽 목록·프로듀서/컨슈머 매핑 → [`SPEC.md`](./SPEC.md) §5. 이벤트/멱등 코드 작성 규칙 → `idempotency-and-events` 스킬.
