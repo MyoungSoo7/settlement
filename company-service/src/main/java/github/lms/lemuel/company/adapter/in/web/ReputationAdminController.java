@@ -14,8 +14,10 @@ import java.util.Map;
 /**
  * 평판 재계산 트리거 (운영자 전용 — AdminApiKeyFilter 게이팅, gateway 미라우팅).
  *
- * <p>외부 호출 없이 DB 읽기 + 인메모리 분류라 동기 실행하고 결과를 바로 돌려준다(수집과 달리
- * 장시간 배치가 아님). INSERT-only 이므로 오늘자 스냅샷이 이미 있으면 건너뛴다.
+ * <p>신규 기사에 대해 감성분석(provider=gemini 면 Gemini 외부 호출, 실패·지연 시 키워드 폴백)을
+ * 순차 수행 후 결과를 돌려주는 동기 배치다. 각 호출은 {@code HttpClientConfig} 의 read 타임아웃으로
+ * 유계라, 느린 LLM 응답에도 총 소요가 폭주하지 않는다(2026-07-19/20 배치 타임아웃 재발 방지).
+ * INSERT-only 이므로 오늘자 스냅샷이 이미 있으면 건너뛴다.
  */
 @RestController
 @RequestMapping("/admin/company/reputation")
