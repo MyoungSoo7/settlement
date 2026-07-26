@@ -34,6 +34,8 @@ public enum AuditAction {
     SETTLEMENT_CREATED,
     // 홀드백 해제 배치(actor=system) — 셀러 출금가능액 증가 시점의 감사 추적.
     HOLDBACK_RELEASED,
+    // 정체 지급후 회수 채권(seed-p0-6) 수기 이관 배치(actor=system) — 자동 상계 정체 감지 시점의 감사 추적.
+    SELLER_RECOVERY_ESCALATED,
 
     // ── loan-service (선정산 LoanAdvance · 기업 CorporateLoan) 금전 액션 ──
     LOAN_ADVANCE_REQUESTED,

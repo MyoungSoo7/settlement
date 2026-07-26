@@ -8,6 +8,7 @@ import github.lms.lemuel.recovery.domain.RecoveryStatus;
 import github.lms.lemuel.recovery.domain.SellerRecovery;
 import org.springframework.stereotype.Component;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -40,6 +41,13 @@ public class SellerRecoveryPersistenceAdapter
     @Override
     public List<SellerRecovery> findBySellerId(Long sellerId) {
         return recoveryRepository.findBySellerIdOrderByIdDesc(sellerId).stream()
+                .map(SellerRecoveryPersistenceAdapter::toDomain)
+                .toList();
+    }
+
+    @Override
+    public List<SellerRecovery> findStaleOpen(OffsetDateTime cutoff, int limit) {
+        return recoveryRepository.findStaleOpen(cutoff, Math.max(1, limit)).stream()
                 .map(SellerRecoveryPersistenceAdapter::toDomain)
                 .toList();
     }

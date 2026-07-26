@@ -2,6 +2,7 @@ package github.lms.lemuel.recovery.application.port.out;
 
 import github.lms.lemuel.recovery.domain.SellerRecovery;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -15,4 +16,10 @@ public interface LoadSellerRecoveryPort {
 
     /** 조회 API — 셀러의 채권 전체(최신순). */
     List<SellerRecovery> findBySellerId(Long sellerId);
+
+    /**
+     * 정체 스캔 — OPEN 이고 마지막 활동(발생 시각, 상계 이력이 있다면 그중 최신 시각)이 {@code cutoff}
+     * 이전인 채권을 오래된 순(id 오름차순)으로 최대 {@code limit} 건 비관락 로드한다.
+     */
+    List<SellerRecovery> findStaleOpen(OffsetDateTime cutoff, int limit);
 }
