@@ -1,5 +1,6 @@
 package github.lms.lemuel.common.outbox.adapter.out.persistence;
 
+import github.lms.lemuel.common.outbox.domain.OutboxEvent;
 import github.lms.lemuel.common.outbox.domain.OutboxEventStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -13,6 +14,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Entity
@@ -62,6 +64,18 @@ public class OutboxEventJpaEntity {
     @Column(name = "trace_parent", length = 64)
     private String traceParent;
 
+    /** 사건 발생 시각 — UTC(timestamptz). 행 생성 시각인 created_at 과 구분 (N4). */
+    @Column(name = "occurred_at", nullable = false)
+    private OffsetDateTime occurredAt;
+
+    /** 봉투/페이로드 스키마 버전 (N4). */
+    @Column(name = "event_version", nullable = false)
+    private int eventVersion;
+
+    /** 발행 서비스 이름 (N4) — spring.application.name. */
+    @Column(name = "producer", length = 64)
+    private String producer;
+
     protected OutboxEventJpaEntity() { }
 
     public OutboxEventJpaEntity(Long id, String aggregateType, String aggregateId, String eventType,
@@ -75,6 +89,17 @@ public class OutboxEventJpaEntity {
                                 UUID eventId, String payload, OutboxEventStatus status, int retryCount,
                                 String lastError, LocalDateTime createdAt, LocalDateTime publishedAt,
                                 String traceParent) {
+        this(id, aggregateType, aggregateId, eventType, eventId, payload, status, retryCount,
+                lastError, createdAt, publishedAt, traceParent,
+                createdAt == null ? null : createdAt.atOffset(java.time.ZoneOffset.UTC),
+                OutboxEvent.DEFAULT_EVENT_VERSION, null);
+    }
+
+    public OutboxEventJpaEntity(Long id, String aggregateType, String aggregateId, String eventType,
+                                UUID eventId, String payload, OutboxEventStatus status, int retryCount,
+                                String lastError, LocalDateTime createdAt, LocalDateTime publishedAt,
+                                String traceParent, OffsetDateTime occurredAt, int eventVersion,
+                                String producer) {
         this.id = id;
         this.aggregateType = aggregateType;
         this.aggregateId = aggregateId;
@@ -87,6 +112,9 @@ public class OutboxEventJpaEntity {
         this.createdAt = createdAt;
         this.publishedAt = publishedAt;
         this.traceParent = traceParent;
+        this.occurredAt = occurredAt;
+        this.eventVersion = eventVersion;
+        this.producer = producer;
     }
 
     public Long getId() { return id; }
@@ -101,4 +129,7 @@ public class OutboxEventJpaEntity {
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getPublishedAt() { return publishedAt; }
     public String getTraceParent() { return traceParent; }
+    public OffsetDateTime getOccurredAt() { return occurredAt; }
+    public int getEventVersion() { return eventVersion; }
+    public String getProducer() { return producer; }
 }

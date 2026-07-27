@@ -90,6 +90,16 @@ public class KafkaOutboxPublisher implements PublishExternalEventPort {
                 event.getEventType().getBytes(StandardCharsets.UTF_8)));
         record.headers().add(new RecordHeader("aggregate_type",
                 event.getAggregateType().getBytes(StandardCharsets.UTF_8)));
+        // N4 봉투 — 사건 시각(UTC ISO-8601)·스키마 버전·발행자. 페이로드가 아닌 헤더에 싣는 것은
+        // event_id/traceparent 와 같은 결정: 봉투는 전송 메타, 페이로드는 도메인 본문.
+        record.headers().add(new RecordHeader("occurred_at",
+                event.getOccurredAt().toInstant().toString().getBytes(StandardCharsets.UTF_8)));
+        record.headers().add(new RecordHeader("event_version",
+                String.valueOf(event.getEventVersion()).getBytes(StandardCharsets.UTF_8)));
+        if (event.getProducer() != null && !event.getProducer().isBlank()) {
+            record.headers().add(new RecordHeader("producer",
+                    event.getProducer().getBytes(StandardCharsets.UTF_8)));
+        }
         // 도메인 트랜잭션 시점의 W3C trace context 를 헤더로 복원 → 컨슈머가 같은 trace 합류
         if (event.getTraceParent() != null && !event.getTraceParent().isBlank()) {
             record.headers().add(new RecordHeader("traceparent",

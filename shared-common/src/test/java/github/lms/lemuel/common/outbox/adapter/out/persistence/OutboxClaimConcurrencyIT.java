@@ -84,6 +84,8 @@ class OutboxClaimConcurrencyIT {
         registry.add("spring.flyway.create-schemas", () -> "true");
         registry.add("spring.jpa.properties.hibernate.default_schema", () -> "opslab");
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "none");
+        // N4 봉투의 producer 는 이 값에서 채워진다
+        registry.add("spring.application.name", () -> "lemuel-test");
     }
 
     @Autowired OutboxEventPersistenceAdapter adapter;
@@ -100,6 +102,22 @@ class OutboxClaimConcurrencyIT {
             events.add(OutboxEvent.pending("Settlement", "agg-" + i, "SettlementCreated", "{\"i\":" + i + "}"));
         }
         adapter.saveAll(events); // @Transactional → 커밋
+    }
+
+    @Test
+    @DisplayName("N4: 봉투(occurred_at UTC·event_version·producer)가 실제 DDL 을 왕복해도 보존된다")
+    void envelopeRoundTripsThroughPostgres() {
+        OutboxEvent saved = adapter.save(
+                OutboxEvent.pending("Settlement", "agg-n4", "SettlementCreated", "{}"));
+
+        OutboxEvent loaded = adapter.findByEventId(saved.getEventId()).orElseThrow();
+
+        // producer 는 도메인이 아니라 어댑터가 spring.application.name 으로 채운다
+        assertThat(loaded.getProducer()).isEqualTo("lemuel-test");
+        assertThat(loaded.getEventVersion()).isEqualTo(OutboxEvent.DEFAULT_EVENT_VERSION);
+        // timestamptz 왕복 — 저장 시각과 같은 순간이어야 한다(오프셋 표현은 달라질 수 있음)
+        assertThat(loaded.getOccurredAt().toInstant())
+                .isEqualTo(saved.getOccurredAt().toInstant());
     }
 
     @Test
