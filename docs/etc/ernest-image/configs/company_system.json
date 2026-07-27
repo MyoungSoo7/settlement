@@ -1,0 +1,74 @@
+{
+  "seed": 1109,
+  "canvas": [16, 9.5],
+  "unit": 0.5,
+  "clusters": [
+    {
+      "id": "gateway",
+      "center": [0.12, 0.55],
+      "spread": 0.045,
+      "members": [
+        {"shape": "prism:8", "count": 1, "size": [0.95, 1.15], "accent": 1.0,
+         "label": "API GATEWAY"},
+        {"shape": "triangle", "count": 2, "size": [0.4, 0.55]}
+      ]
+    },
+    {
+      "id": "payment",
+      "center": [0.38, 0.7],
+      "spread": 0.06,
+      "members": [
+        {"shape": "hexagon", "count": 2, "size": [0.8, 1.05], "accent": 0.8,
+         "label": "PAYMENT SERVICE"},
+        {"shape": "square", "count": 2, "size": [0.5, 0.7]}
+      ]
+    },
+    {
+      "id": "settlement",
+      "center": [0.62, 0.6],
+      "spread": 0.06,
+      "members": [
+        {"shape": "hexagon", "count": 2, "size": [0.8, 1.05], "accent": 0.8,
+         "label": "SETTLEMENT BATCH"},
+        {"shape": "pentagon", "count": 2, "size": [0.55, 0.75]}
+      ]
+    },
+    {
+      "id": "ledger",
+      "center": [0.85, 0.72],
+      "spread": 0.05,
+      "members": [
+        {"shape": "cylinder", "count": 3, "size": [0.55, 0.9], "accent": 0.5,
+         "label": "LEDGER DB"}
+      ]
+    },
+    {
+      "id": "broker",
+      "center": [0.5, 0.24],
+      "spread": 0.06,
+      "members": [
+        {"shape": "pentagon", "count": 3, "size": [0.55, 0.8], "accent": 0.4,
+         "label": "KAFKA BROKER"}
+      ]
+    },
+    {
+      "id": "warehouse",
+      "center": [0.83, 0.22],
+      "spread": 0.05,
+      "members": [
+        {"shape": "cylinder", "count": 2, "size": [0.6, 0.9],
+         "label": "DATA WAREHOUSE"},
+        {"shape": "hexagon", "count": 1, "size": [0.6, 0.8]}
+      ]
+    }
+  ],
+  "links": [
+    ["gateway", "payment"],
+    ["payment", "settlement"],
+    ["settlement", "ledger"],
+    ["payment", "broker"],
+    ["settlement", "broker"],
+    ["broker", "warehouse"],
+    ["ledger", "warehouse"]
+  ]
+}

@@ -1,0 +1,66 @@
+{
+  "seed": 42,
+  "canvas": [16, 9.5],
+  "unit": 0.5,
+  "title": null,
+  "clusters": [
+    {
+      "id": "control-plane",
+      "center": [0.26, 0.68],
+      "spread": 0.075,
+      "members": [
+        {"shape": "hexagon", "count": 1, "size": [1.1, 1.3], "height": [2.0, 2.4],
+         "accent": 1.0, "label": "API SERVER"},
+        {"shape": "pentagon", "count": 3, "size": [0.6, 0.8], "accent": 0.9,
+         "label": "ETCD"},
+        {"shape": "square", "count": 1, "size": [0.6, 0.75], "label": "SCHEDULER"},
+        {"shape": "square", "count": 1, "size": [0.6, 0.75], "label": "CONTROLLER MANAGER"}
+      ]
+    },
+    {
+      "id": "node-a",
+      "center": [0.62, 0.72],
+      "spread": 0.06,
+      "members": [
+        {"shape": "cylinder", "count": 4, "size": [0.5, 0.85], "label": "POD"},
+        {"shape": "triangle", "count": 1, "size": [0.5, 0.65], "label": "KUBELET"}
+      ]
+    },
+    {
+      "id": "node-b",
+      "center": [0.82, 0.42],
+      "spread": 0.06,
+      "members": [
+        {"shape": "cylinder", "count": 5, "size": [0.45, 0.8]},
+        {"shape": "triangle", "count": 1, "size": [0.5, 0.65]}
+      ]
+    },
+    {
+      "id": "node-c",
+      "center": [0.52, 0.25],
+      "spread": 0.06,
+      "members": [
+        {"shape": "cylinder", "count": 3, "size": [0.5, 0.8]},
+        {"shape": "triangle", "count": 1, "size": [0.45, 0.6]}
+      ]
+    },
+    {
+      "id": "ingress",
+      "center": [0.13, 0.2],
+      "spread": 0.045,
+      "members": [
+        {"shape": "prism:8", "count": 1, "size": [0.9, 1.1], "accent": 1.0,
+         "label": "INGRESS"},
+        {"shape": "square", "count": 1, "size": [0.55, 0.7], "label": "SERVICE"}
+      ]
+    }
+  ],
+  "links": [
+    ["ingress", "control-plane"],
+    ["control-plane", "node-a"],
+    ["control-plane", "node-c"],
+    ["node-a", "node-b"],
+    ["node-b", "node-c"],
+    ["ingress", "node-c"]
+  ]
+}
