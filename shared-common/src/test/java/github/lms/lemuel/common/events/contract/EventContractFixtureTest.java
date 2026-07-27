@@ -78,7 +78,7 @@ class EventContractFixtureTest {
     void additiveField_isNotViolation() {
         Set<String> violations = EventContractValidator.validate(
                 "lemuel.settlement.confirmed",
-                "{\"settlementId\":9001,\"sellerId\":777,\"amount\":43425,\"newOptionalField\":\"x\"}");
+                "{\"settlementId\":9001,\"sellerId\":777,\"amount\":\"43425\",\"newOptionalField\":\"x\"}");
         assertThat(violations).isEmpty();
     }
 
