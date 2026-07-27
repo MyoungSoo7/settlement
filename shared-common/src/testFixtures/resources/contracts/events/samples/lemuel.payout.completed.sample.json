@@ -2,5 +2,5 @@
   "payoutId": 7001,
   "settlementId": 9001,
   "sellerId": 777,
-  "amount": 43425
+  "amount": "43425"
 }

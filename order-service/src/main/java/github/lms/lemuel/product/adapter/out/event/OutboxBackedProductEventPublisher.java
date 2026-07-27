@@ -8,6 +8,7 @@ import github.lms.lemuel.common.outbox.domain.OutboxEvent;
 import github.lms.lemuel.product.application.port.out.PublishProductEventPort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
@@ -31,7 +32,7 @@ public class OutboxBackedProductEventPublisher implements PublishProductEventPor
     private final TraceContextCapture traceContextCapture;
 
     public OutboxBackedProductEventPublisher(SaveOutboxEventPort saveOutboxEventPort,
-                                             ObjectMapper objectMapper,
+                                             @Qualifier("outboxObjectMapper") ObjectMapper objectMapper,
                                              TraceContextCapture traceContextCapture) {
         this.saveOutboxEventPort = saveOutboxEventPort;
         this.objectMapper = objectMapper;

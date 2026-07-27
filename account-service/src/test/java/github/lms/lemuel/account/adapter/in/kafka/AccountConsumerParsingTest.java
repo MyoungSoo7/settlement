@@ -99,7 +99,7 @@ class AccountConsumerParsingTest {
         when(processedEventRepository.existsById(any())).thenReturn(false);
         SettlementCreatedConsumer c = new SettlementCreatedConsumer(
                 recordAccountEntryUseCase, processedEventRepository, objectMapper);
-        String payload = "{\"settlementId\":9001,\"sellerId\":777,\"amount\":43425,\"dueDate\":null}";
+        String payload = "{\"settlementId\":9001,\"sellerId\":777,\"amount\":\"43425\",\"dueDate\":null}";
 
         c.onSettlementCreated(recordOf("lemuel.settlement.created", payload), mock(Acknowledgment.class));
 
@@ -107,6 +107,21 @@ class AccountConsumerParsingTest {
         assertThat(e.getDebitAccount()).isEqualTo(GlAccount.CASH);
         assertThat(e.getCreditAccount()).isEqualTo(GlAccount.SELLER_PAYABLE);
         assertThat(e.getAmount()).isEqualByComparingTo("43425");
+    }
+
+    @Test
+    @DisplayName("settlement.created 금액이 JSON number(구 wire 표현) 여도 파싱된다 — DATA-STANDARD N5 프로듀서 선행 배포 안전성")
+    void settlementCreatedNumericAmount_stillParses() {
+        when(processedEventRepository.existsById(any())).thenReturn(false);
+        SettlementCreatedConsumer c = new SettlementCreatedConsumer(
+                recordAccountEntryUseCase, processedEventRepository, objectMapper);
+        // 정본 계약은 문자열 금액으로 전환됐지만(N5), 소비측은 asText() 파싱이라 number 도 받아야 한다.
+        // 이 관용성이 깨지면 프로듀서 선행 배포 중 미전환 이벤트가 DLT 로 샌다.
+        String payload = "{\"settlementId\":9001,\"sellerId\":777,\"amount\":43425,\"dueDate\":null}";
+
+        c.onSettlementCreated(recordOf("lemuel.settlement.created", payload), mock(Acknowledgment.class));
+
+        assertThat(capture().getAmount()).isEqualByComparingTo("43425");
     }
 
     @Test
@@ -155,7 +170,7 @@ class AccountConsumerParsingTest {
         when(processedEventRepository.existsById(any())).thenReturn(false);
         SettlementAdjustedConsumer c = new SettlementAdjustedConsumer(
                 recordAccountEntryUseCase, processedEventRepository, objectMapper);
-        String payload = "{\"adjustmentId\":5502,\"settlementId\":9001,\"sellerId\":777,\"amount\":5000,\"targetLeg\":\"HOLDBACK_PAYABLE\"}";
+        String payload = "{\"adjustmentId\":5502,\"settlementId\":9001,\"sellerId\":777,\"amount\":\"5000\",\"targetLeg\":\"HOLDBACK_PAYABLE\"}";
         EventContractValidator.assertValid("lemuel.settlement.adjusted", payload);
         c.onSettlementAdjusted(recordOf("lemuel.settlement.adjusted", payload), mock(Acknowledgment.class));
         AccountEntry e = capture();
@@ -169,7 +184,7 @@ class AccountConsumerParsingTest {
         when(processedEventRepository.existsById(any())).thenReturn(false);
         SettlementAdjustedConsumer c = new SettlementAdjustedConsumer(
                 recordAccountEntryUseCase, processedEventRepository, objectMapper);
-        String payload = "{\"adjustmentId\":5502,\"sellerId\":777,\"amount\":5000,\"targetLeg\":\"BOGUS\"}";
+        String payload = "{\"adjustmentId\":5502,\"sellerId\":777,\"amount\":\"5000\",\"targetLeg\":\"BOGUS\"}";
         assertThatThrownBy(() -> c.onSettlementAdjusted(recordOf("lemuel.settlement.adjusted", payload), mock(Acknowledgment.class)))
                 .isInstanceOf(IllegalArgumentException.class);
         verify(recordAccountEntryUseCase, never()).record(any());
@@ -325,7 +340,7 @@ class AccountConsumerParsingTest {
         LoanRepaymentAppliedConsumer c = new LoanRepaymentAppliedConsumer(
                 recordAccountEntryUseCase, processedEventRepository, objectMapper);
 
-        String payload = "{\"settlementId\":9001,\"sellerId\":777,\"deducted\":0}";
+        String payload = "{\"settlementId\":9001,\"sellerId\":777,\"deducted\":\"0\"}";
         EventContractValidator.assertValid("lemuel.loan.repayment_applied", payload);
 
         c.onLoanRepaid(recordOf("lemuel.loan.repayment_applied", payload), mock(Acknowledgment.class));
@@ -339,7 +354,7 @@ class AccountConsumerParsingTest {
         when(processedEventRepository.existsById(any())).thenReturn(false);
         SettlementCreatedConsumer c = new SettlementCreatedConsumer(
                 recordAccountEntryUseCase, processedEventRepository, objectMapper);
-        String payload = "{\"settlementId\":9001,\"sellerId\":777,\"amount\":43425.125,\"dueDate\":null}";
+        String payload = "{\"settlementId\":9001,\"sellerId\":777,\"amount\":\"43425.125\",\"dueDate\":null}";
 
         assertThatThrownBy(() -> c.onSettlementCreated(
                 recordOf("lemuel.settlement.created", payload), mock(Acknowledgment.class)))

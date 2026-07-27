@@ -4,6 +4,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 class OutboxEventTest {
 
@@ -109,6 +110,53 @@ class OutboxEventTest {
         OutboxEvent e = OutboxEvent.pending("Payment", "1", "PaymentCaptured", "{}");
         org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
                 () -> e.skip("이유"));
+    }
+
+    @Test
+    @DisplayName("N4: pending 은 occurredAt 을 UTC 로 찍고 eventVersion=1, producer 는 어댑터 몫으로 비운다")
+    void pendingFillsEnvelope() {
+        OutboxEvent e = OutboxEvent.pending("Payment", "42", "PaymentCaptured", "{}");
+
+        assertThat(e.getOccurredAt()).isNotNull();
+        assertThat(e.getOccurredAt().getOffset()).isEqualTo(java.time.ZoneOffset.UTC);
+        assertThat(e.getOccurredAt().toInstant())
+                .isCloseTo(java.time.Instant.now(), within(10, java.time.temporal.ChronoUnit.SECONDS));
+        assertThat(e.getEventVersion()).isEqualTo(OutboxEvent.DEFAULT_EVENT_VERSION);
+        assertThat(e.getProducer()).isNull();
+    }
+
+    @Test
+    @DisplayName("N4: 페이로드 스키마를 올릴 때 eventVersion 을 지정할 수 있다")
+    void pendingAcceptsExplicitVersion() {
+        OutboxEvent e = OutboxEvent.pending("Payment", "42", "PaymentCaptured", "{}", null, 2);
+
+        assertThat(e.getEventVersion()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("N4: withProducer 는 봉투의 발행자만 채우고 나머지 식별자는 보존한다")
+    void withProducerPreservesIdentity() {
+        OutboxEvent e = OutboxEvent.pending("Payment", "42", "PaymentCaptured", "{}");
+
+        OutboxEvent stamped = e.withProducer("lemuel-settlement");
+
+        assertThat(stamped.getProducer()).isEqualTo("lemuel-settlement");
+        assertThat(stamped.getEventId()).isEqualTo(e.getEventId());
+        assertThat(stamped.getOccurredAt()).isEqualTo(e.getOccurredAt());
+        assertThat(stamped.getPayload()).isEqualTo(e.getPayload());
+    }
+
+    @Test
+    @DisplayName("N4: 봉투 없는 레거시 행 rehydrate 는 createdAt 을 UTC 로 간주해 occurredAt 을 채운다")
+    void legacyRehydrateFallsBackToCreatedAt() {
+        java.time.LocalDateTime createdAt = java.time.LocalDateTime.of(2026, 7, 1, 12, 0);
+
+        OutboxEvent e = OutboxEvent.rehydrate(1L, "Payment", "42", "PaymentCaptured",
+                java.util.UUID.randomUUID(), "{}", OutboxEventStatus.PENDING, 0, null,
+                createdAt, null, null);
+
+        assertThat(e.getOccurredAt()).isEqualTo(createdAt.atOffset(java.time.ZoneOffset.UTC));
+        assertThat(e.getEventVersion()).isEqualTo(OutboxEvent.DEFAULT_EVENT_VERSION);
     }
 
     private static OutboxEvent pushToFailed() {

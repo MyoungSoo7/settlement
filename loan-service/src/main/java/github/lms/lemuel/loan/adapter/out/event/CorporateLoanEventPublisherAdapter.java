@@ -6,6 +6,7 @@ import github.lms.lemuel.common.outbox.application.port.out.SaveOutboxEventPort;
 import github.lms.lemuel.common.outbox.domain.OutboxEvent;
 import github.lms.lemuel.loan.application.port.out.PublishCorporateLoanEventPort;
 import github.lms.lemuel.loan.domain.CorporateLoan;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
@@ -26,7 +27,8 @@ public class CorporateLoanEventPublisherAdapter implements PublishCorporateLoanE
     private final SaveOutboxEventPort saveOutboxEventPort;
     private final ObjectMapper objectMapper;
 
-    public CorporateLoanEventPublisherAdapter(SaveOutboxEventPort saveOutboxEventPort, ObjectMapper objectMapper) {
+    public CorporateLoanEventPublisherAdapter(SaveOutboxEventPort saveOutboxEventPort,
+                                              @Qualifier("outboxObjectMapper") ObjectMapper objectMapper) {
         this.saveOutboxEventPort = saveOutboxEventPort;
         this.objectMapper = objectMapper;
     }

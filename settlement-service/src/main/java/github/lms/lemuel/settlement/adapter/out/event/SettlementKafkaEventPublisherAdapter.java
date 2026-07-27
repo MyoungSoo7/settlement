@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import github.lms.lemuel.common.outbox.application.port.out.SaveOutboxEventPort;
 import github.lms.lemuel.common.outbox.domain.OutboxEvent;
 import github.lms.lemuel.settlement.application.port.out.PublishSettlementDomainEventPort;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -27,7 +28,7 @@ public class SettlementKafkaEventPublisherAdapter implements PublishSettlementDo
     private final ObjectMapper objectMapper;
 
     public SettlementKafkaEventPublisherAdapter(SaveOutboxEventPort saveOutboxEventPort,
-                                                ObjectMapper objectMapper) {
+                                                @Qualifier("outboxObjectMapper") ObjectMapper objectMapper) {
         this.saveOutboxEventPort = saveOutboxEventPort;
         this.objectMapper = objectMapper;
     }

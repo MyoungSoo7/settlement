@@ -1,7 +1,7 @@
 package github.lms.lemuel.investment.adapter.out.event;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import github.lms.lemuel.common.events.contract.EventContractValidator;
+import github.lms.lemuel.common.outbox.OutboxJson;
 import github.lms.lemuel.common.outbox.application.port.out.SaveOutboxEventPort;
 import github.lms.lemuel.common.outbox.domain.OutboxEvent;
 import github.lms.lemuel.investment.domain.InvestmentOrder;
@@ -34,7 +34,7 @@ class InvestmentEventContractTest {
 
     @BeforeEach
     void setUp() {
-        publisher = new InvestmentEventPublisherAdapter(saveOutboxEventPort, new ObjectMapper());
+        publisher = new InvestmentEventPublisherAdapter(saveOutboxEventPort, OutboxJson.mapper());
     }
 
     @Test

@@ -1,6 +1,9 @@
 package github.lms.lemuel.common.outbox.domain;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -11,6 +14,9 @@ import java.util.UUID;
  * OutboxPublisherScheduler 가 주기적으로 읽어 외부 시스템에 발행 후 PUBLISHED 로 전이시킨다.
  */
 public class OutboxEvent {
+
+    /** 봉투 스키마 버전 기본값 (N4). */
+    public static final int DEFAULT_EVENT_VERSION = 1;
 
     private final Long id;
     private final String aggregateType;
@@ -29,6 +35,21 @@ public class OutboxEvent {
      * 트레이싱이 비활성이거나 미캡처면 null.
      */
     private final String traceParent;
+    /**
+     * 사건이 <b>실제로 일어난</b> 시각 — UTC (DATA-STANDARD N4 봉투 필수).
+     *
+     * <p>{@code createdAt}(행 생성 시각, 레거시 LocalDateTime)과 구분한다. 재처리·백필로 나중에
+     * 다시 기록돼도 occurredAt 은 원래 사건 시각을 유지해야 하므로, 순서 판정·지연(lag) 측정·
+     * 늦게 도착한 이벤트 판별은 createdAt 이 아니라 이 필드를 봐야 한다.
+     */
+    private final OffsetDateTime occurredAt;
+    /** 봉투/페이로드 스키마 버전 (N4). 소비측 버전 분기의 근거 — 신규는 1. */
+    private final int eventVersion;
+    /**
+     * 발행 서비스 이름 (N4). 도메인은 자기 이름을 모르므로 null 로 두고, 영속 어댑터가
+     * {@code spring.application.name} 으로 채운다.
+     */
+    private final String producer;
 
     private OutboxEvent(Long id,
                         String aggregateType,
@@ -41,7 +62,10 @@ public class OutboxEvent {
                         String lastError,
                         LocalDateTime createdAt,
                         LocalDateTime publishedAt,
-                        String traceParent) {
+                        String traceParent,
+                        OffsetDateTime occurredAt,
+                        int eventVersion,
+                        String producer) {
         this.id = id;
         this.aggregateType = Objects.requireNonNull(aggregateType, "aggregateType");
         this.aggregateId = Objects.requireNonNull(aggregateId, "aggregateId");
@@ -54,6 +78,9 @@ public class OutboxEvent {
         this.createdAt = Objects.requireNonNull(createdAt, "createdAt");
         this.publishedAt = publishedAt;
         this.traceParent = traceParent;
+        this.occurredAt = Objects.requireNonNull(occurredAt, "occurredAt");
+        this.eventVersion = eventVersion;
+        this.producer = producer;
     }
 
     /**
@@ -70,6 +97,18 @@ public class OutboxEvent {
      */
     public static OutboxEvent pending(String aggregateType, String aggregateId,
                                       String eventType, String payload, String traceParent) {
+        return pending(aggregateType, aggregateId, eventType, payload, traceParent, DEFAULT_EVENT_VERSION);
+    }
+
+    /**
+     * 페이로드 스키마를 바꿔 버전을 올릴 때 쓰는 오버로드 (N4 {@code event_version}).
+     *
+     * <p>occurredAt 은 여기서 UTC 로 찍힌다 — 도메인 트랜잭션 시점이 곧 사건 시각이고,
+     * 폴러가 나중에 집어가는 시각과 구분되어야 한다.
+     */
+    public static OutboxEvent pending(String aggregateType, String aggregateId, String eventType,
+                                      String payload, String traceParent, int eventVersion) {
+        Instant now = Instant.now();
         return new OutboxEvent(
                 null,
                 aggregateType,
@@ -80,9 +119,14 @@ public class OutboxEvent {
                 OutboxEventStatus.PENDING,
                 0,
                 null,
+                // createdAt 은 레거시 의미(로컬 wall-clock)를 그대로 둔다 — 여기서 UTC 로 바꾸면
+                // 기존 행과 9시간 어긋나 폴링 정렬(created_at ASC)이 뒤섞인다. UTC 시각은 occurredAt.
                 LocalDateTime.now(),
                 null,
-                traceParent
+                traceParent,
+                now.atOffset(ZoneOffset.UTC),
+                eventVersion,
+                null   // producer — 영속 어댑터가 spring.application.name 으로 주입
         );
     }
 
@@ -97,13 +141,33 @@ public class OutboxEvent {
                 status, retryCount, lastError, createdAt, publishedAt, null);
     }
 
+    /** 봉투 필드 누락 호환 호출 — occurredAt 은 createdAt 을 UTC 로 간주해 대체한다(레거시 행). */
     public static OutboxEvent rehydrate(Long id, String aggregateType, String aggregateId,
                                         String eventType, UUID eventId, String payload,
                                         OutboxEventStatus status, int retryCount, String lastError,
                                         LocalDateTime createdAt, LocalDateTime publishedAt,
                                         String traceParent) {
+        return rehydrate(id, aggregateType, aggregateId, eventType, eventId, payload,
+                status, retryCount, lastError, createdAt, publishedAt, traceParent,
+                createdAt.atOffset(ZoneOffset.UTC), DEFAULT_EVENT_VERSION, null);
+    }
+
+    public static OutboxEvent rehydrate(Long id, String aggregateType, String aggregateId,
+                                        String eventType, UUID eventId, String payload,
+                                        OutboxEventStatus status, int retryCount, String lastError,
+                                        LocalDateTime createdAt, LocalDateTime publishedAt,
+                                        String traceParent, OffsetDateTime occurredAt,
+                                        int eventVersion, String producer) {
         return new OutboxEvent(id, aggregateType, aggregateId, eventType, eventId, payload,
-                status, retryCount, lastError, createdAt, publishedAt, traceParent);
+                status, retryCount, lastError, createdAt, publishedAt, traceParent,
+                occurredAt, eventVersion, producer);
+    }
+
+    /** 영속 어댑터가 발행 서비스 이름을 채운다 — 도메인은 자기 배포 이름을 알지 못한다. */
+    public OutboxEvent withProducer(String producer) {
+        return new OutboxEvent(id, aggregateType, aggregateId, eventType, eventId, payload,
+                status, retryCount, lastError, createdAt, publishedAt, traceParent,
+                occurredAt, eventVersion, producer);
     }
 
     public void markPublished() {
@@ -178,4 +242,7 @@ public class OutboxEvent {
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getPublishedAt() { return publishedAt; }
     public String getTraceParent() { return traceParent; }
+    public OffsetDateTime getOccurredAt() { return occurredAt; }
+    public int getEventVersion() { return eventVersion; }
+    public String getProducer() { return producer; }
 }

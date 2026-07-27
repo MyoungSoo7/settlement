@@ -2,6 +2,7 @@ package github.lms.lemuel.company.adapter.out.event;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import github.lms.lemuel.common.outbox.OutboxJson;
 import github.lms.lemuel.common.outbox.application.port.out.SaveOutboxEventPort;
 import github.lms.lemuel.common.outbox.domain.OutboxEvent;
 import github.lms.lemuel.company.application.port.out.LoadSellerLinkPort;
@@ -27,7 +28,7 @@ class CompanyReputationEventPublisherAdapterTest {
 
     private final SaveOutboxEventPort saveOutboxEventPort = mock(SaveOutboxEventPort.class);
     private final LoadSellerLinkPort loadSellerLinkPort = mock(LoadSellerLinkPort.class);
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper = OutboxJson.mapper();
     private final CompanyReputationEventPublisherAdapter adapter =
             new CompanyReputationEventPublisherAdapter(saveOutboxEventPort, loadSellerLinkPort, objectMapper);
 

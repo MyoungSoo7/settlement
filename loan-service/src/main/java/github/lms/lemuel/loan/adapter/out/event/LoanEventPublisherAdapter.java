@@ -6,6 +6,7 @@ import github.lms.lemuel.common.outbox.application.port.out.SaveOutboxEventPort;
 import github.lms.lemuel.common.outbox.domain.OutboxEvent;
 import github.lms.lemuel.loan.application.port.out.PublishLoanEventPort;
 import github.lms.lemuel.loan.domain.LoanAdvance;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -24,7 +25,8 @@ public class LoanEventPublisherAdapter implements PublishLoanEventPort {
     private final SaveOutboxEventPort saveOutboxEventPort;
     private final ObjectMapper objectMapper;
 
-    public LoanEventPublisherAdapter(SaveOutboxEventPort saveOutboxEventPort, ObjectMapper objectMapper) {
+    public LoanEventPublisherAdapter(SaveOutboxEventPort saveOutboxEventPort,
+                                     @Qualifier("outboxObjectMapper") ObjectMapper objectMapper) {
         this.saveOutboxEventPort = saveOutboxEventPort;
         this.objectMapper = objectMapper;
     }

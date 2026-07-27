@@ -1,5 +1,5 @@
 {
   "loanId": 501,
   "sellerId": 777,
-  "amount": 800000
+  "amount": "800000"
 }

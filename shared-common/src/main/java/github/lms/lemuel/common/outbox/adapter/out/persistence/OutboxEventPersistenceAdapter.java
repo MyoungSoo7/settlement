@@ -5,12 +5,14 @@ import github.lms.lemuel.common.outbox.application.port.out.LoadOutboxEventPort;
 import github.lms.lemuel.common.outbox.application.port.out.SaveOutboxEventPort;
 import github.lms.lemuel.common.outbox.domain.OutboxEvent;
 import github.lms.lemuel.common.outbox.domain.OutboxEventStatus;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -19,9 +21,13 @@ import java.util.UUID;
 public class OutboxEventPersistenceAdapter implements SaveOutboxEventPort, LoadOutboxEventPort, ClaimOutboxEventPort {
 
     private final SpringDataOutboxEventRepository repository;
+    /** N4 봉투의 producer — 도메인은 자기 배포 이름을 모르므로 어댑터 경계에서 채운다. */
+    private final String producer;
 
-    public OutboxEventPersistenceAdapter(SpringDataOutboxEventRepository repository) {
+    public OutboxEventPersistenceAdapter(SpringDataOutboxEventRepository repository,
+                                         @Value("${spring.application.name:unknown}") String producer) {
         this.repository = repository;
+        this.producer = producer;
     }
 
     @Override
@@ -33,7 +39,7 @@ public class OutboxEventPersistenceAdapter implements SaveOutboxEventPort, LoadO
     @Override
     @Transactional
     public void saveAll(List<OutboxEvent> events) {
-        repository.saveAll(events.stream().map(OutboxEventPersistenceAdapter::toEntity).toList());
+        repository.saveAll(events.stream().map(this::toEntity).toList());
     }
 
     @Override
@@ -82,7 +88,7 @@ public class OutboxEventPersistenceAdapter implements SaveOutboxEventPort, LoadO
         return repository.findByEventId(eventId).map(OutboxEventPersistenceAdapter::toDomain);
     }
 
-    private static OutboxEventJpaEntity toEntity(OutboxEvent event) {
+    private OutboxEventJpaEntity toEntity(OutboxEvent event) {
         return new OutboxEventJpaEntity(
                 event.getId(),
                 event.getAggregateType(),
@@ -95,7 +101,10 @@ public class OutboxEventPersistenceAdapter implements SaveOutboxEventPort, LoadO
                 event.getLastError(),
                 event.getCreatedAt(),
                 event.getPublishedAt(),
-                event.getTraceParent()
+                event.getTraceParent(),
+                event.getOccurredAt(),
+                event.getEventVersion(),
+                event.getProducer() != null ? event.getProducer() : producer
         );
     }
 
@@ -112,7 +121,11 @@ public class OutboxEventPersistenceAdapter implements SaveOutboxEventPort, LoadO
                 e.getLastError(),
                 e.getCreatedAt(),
                 e.getPublishedAt(),
-                e.getTraceParent()
+                e.getTraceParent(),
+                // 마이그레이션 이전에 기록된 행 방어 — occurred_at 은 created_at 을 UTC 로 간주
+                e.getOccurredAt() != null ? e.getOccurredAt() : e.getCreatedAt().atOffset(ZoneOffset.UTC),
+                e.getEventVersion() > 0 ? e.getEventVersion() : OutboxEvent.DEFAULT_EVENT_VERSION,
+                e.getProducer()
         );
     }
 }

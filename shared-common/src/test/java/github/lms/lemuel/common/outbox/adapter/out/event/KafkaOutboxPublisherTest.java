@@ -80,6 +80,30 @@ class KafkaOutboxPublisherTest {
         assertThat(header(rec, "event_id")).isNotBlank();
     }
 
+    @Test
+    @DisplayName("N4: occurred_at(UTC ISO-8601)·event_version·producer 봉투 헤더가 실린다")
+    void carriesEnvelopeHeaders() {
+        OutboxEvent e = OutboxEvent.pending("Order", "100", "OrderCreated", "{}")
+                .withProducer("lemuel-order");
+
+        ProducerRecord<String, String> rec = capturePublish(e);
+
+        // Instant.toString() 은 항상 UTC('Z') — 소비측이 타임존 추정 없이 파싱할 수 있어야 한다
+        assertThat(header(rec, "occurred_at")).endsWith("Z");
+        assertThat(java.time.Instant.parse(header(rec, "occurred_at")))
+                .isEqualTo(e.getOccurredAt().toInstant());
+        assertThat(header(rec, "event_version")).isEqualTo("1");
+        assertThat(header(rec, "producer")).isEqualTo("lemuel-order");
+    }
+
+    @Test
+    @DisplayName("N4: producer 가 없으면 헤더를 아예 싣지 않는다(빈 문자열 금지)")
+    void omitsProducerHeaderWhenUnknown() {
+        ProducerRecord<String, String> rec = capturePublish(event("Order", "100", "OrderCreated"));
+
+        assertThat(header(rec, "producer")).isNull();
+    }
+
     private static String header(ProducerRecord<String, String> rec, String name) {
         var h = rec.headers().lastHeader(name);
         return h == null ? null : new String(h.value(), StandardCharsets.UTF_8);
