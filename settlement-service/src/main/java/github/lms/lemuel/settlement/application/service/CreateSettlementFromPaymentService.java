@@ -16,6 +16,8 @@ import github.lms.lemuel.settlement.domain.HoldbackPolicy;
 import github.lms.lemuel.settlement.domain.SellerTier;
 import github.lms.lemuel.settlement.domain.Settlement;
 import github.lms.lemuel.settlement.domain.SettlementCycle;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -33,6 +35,8 @@ import java.util.Optional;
  */
 @Service
 @Transactional
+@RequiredArgsConstructor
+@Slf4j
 public class CreateSettlementFromPaymentService implements CreateSettlementFromPaymentUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(CreateSettlementFromPaymentService.class);
@@ -47,26 +51,6 @@ public class CreateSettlementFromPaymentService implements CreateSettlementFromP
     private final AuditLogger auditLogger;
     /** KST 기준 시각 소스 — 결제 시각 부재 시 정산 기준일 폴백에만 사용(정본은 결제 시각). */
     private final Clock clock;
-
-    public CreateSettlementFromPaymentService(LoadSettlementPort loadSettlementPort,
-                                              SaveSettlementPort saveSettlementPort,
-                                              LoadSellerTierPort loadSellerTierPort,
-                                              LoadSellerSettlementCyclePort loadSellerSettlementCyclePort,
-                                              LoadSellerIdPort loadSellerIdPort,
-                                              PublishSettlementDomainEventPort publishSettlementDomainEventPort,
-                                              BackfillChargebackSettlementLinkPort backfillChargebackPort,
-                                              AuditLogger auditLogger,
-                                              Clock clock) {
-        this.loadSettlementPort = loadSettlementPort;
-        this.saveSettlementPort = saveSettlementPort;
-        this.loadSellerTierPort = loadSellerTierPort;
-        this.loadSellerSettlementCyclePort = loadSellerSettlementCyclePort;
-        this.loadSellerIdPort = loadSellerIdPort;
-        this.publishSettlementDomainEventPort = publishSettlementDomainEventPort;
-        this.backfillChargebackPort = backfillChargebackPort;
-        this.auditLogger = auditLogger;
-        this.clock = clock;
-    }
 
     @Override
     public Settlement createSettlementFromPayment(Long paymentId, Long orderId, BigDecimal amount) {
