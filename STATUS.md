@@ -2,7 +2,7 @@
 
 > 이커머스 주문·결제·정산·선정산/기업대출·투자·계정계 + 공개조회 위성(재무제표·경제지표·기업뉴스·시세·공공데이터)·운영관제·AI챗봇 MSA 플랫폼 (Spring Boot 4.0 / Java 25 / 헥사고날)
 
-**Last updated:** 2026-07-25
+**Last updated:** 2026-07-28
 
 ## 현재 상태
 - **활성 브랜치:** `develop` (`main` 은 보호 브랜치 — PR 필수·squash 만·필수 CI 2종)
@@ -57,7 +57,7 @@
 - 서비스 **13개** + API Gateway + Kotlin polyglot 2(notification·reconciliation) — `git ls-files '*/src/main/resources/application.yml' | wc -l` → 16(=13+gateway+kotlin 2)
 - Flyway 마이그레이션 **216개** — `git ls-files '*/src/main/resources/db/migration/*.sql' | wc -l` → 216
 - ADR **28개** (0001~0029, 0019 결번 — 세무 ADR 은 0027 충돌로 0029 재부여) — `git ls-files 'docs/adr/[0-9]*.md' | wc -l` → 28
-- 테스트 클래스 **678개** (Testcontainers 통합테스트 포함) — `git ls-files '*/src/test/*Test.java' '*/src/test/*Tests.java' '*/src/test/*IT.java' | wc -l` → 678
+- 테스트 클래스 **679개** (Testcontainers 통합테스트 포함) — `git ls-files '*/src/test/*Test.java' '*/src/test/*Tests.java' '*/src/test/*IT.java' | wc -l` → 679
 - 이벤트 계약 스키마 **22토픽** (ADR 0024, 프로듀서·컨슈머 양방향 테스트) — `git ls-files 'shared-common/src/testFixtures/resources/contracts/events/*.schema.json' | wc -l` → 22
 
 ## 참고 문서
