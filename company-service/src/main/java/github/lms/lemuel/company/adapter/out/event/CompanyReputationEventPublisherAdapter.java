@@ -8,6 +8,7 @@ import github.lms.lemuel.company.application.port.out.LoadSellerLinkPort;
 import github.lms.lemuel.company.application.port.out.PublishReputationEventPort;
 import github.lms.lemuel.company.domain.ReputationGrade;
 import github.lms.lemuel.company.domain.ReputationScore;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
@@ -37,7 +38,7 @@ public class CompanyReputationEventPublisherAdapter implements PublishReputation
 
     public CompanyReputationEventPublisherAdapter(SaveOutboxEventPort saveOutboxEventPort,
                                                   LoadSellerLinkPort loadSellerLinkPort,
-                                                  ObjectMapper objectMapper) {
+                                                  @Qualifier("outboxObjectMapper") ObjectMapper objectMapper) {
         this.saveOutboxEventPort = saveOutboxEventPort;
         this.loadSellerLinkPort = loadSellerLinkPort;
         this.objectMapper = objectMapper;

@@ -1,7 +1,7 @@
 package github.lms.lemuel.company.adapter.out.event;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import github.lms.lemuel.common.events.contract.EventContractValidator;
+import github.lms.lemuel.common.outbox.OutboxJson;
 import github.lms.lemuel.common.outbox.application.port.out.SaveOutboxEventPort;
 import github.lms.lemuel.common.outbox.domain.OutboxEvent;
 import github.lms.lemuel.company.application.port.out.LoadSellerLinkPort;
@@ -44,7 +44,7 @@ class CompanyReputationEventContractTest {
     @BeforeEach
     void setUp() {
         publisher = new CompanyReputationEventPublisherAdapter(
-                saveOutboxEventPort, loadSellerLinkPort, new ObjectMapper());
+                saveOutboxEventPort, loadSellerLinkPort, OutboxJson.mapper());
     }
 
     private String savedPayload() {

@@ -1,7 +1,7 @@
 package github.lms.lemuel.loan.adapter.out.event;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import github.lms.lemuel.common.events.contract.EventContractValidator;
+import github.lms.lemuel.common.outbox.OutboxJson;
 import github.lms.lemuel.common.outbox.application.port.out.SaveOutboxEventPort;
 import github.lms.lemuel.common.outbox.domain.OutboxEvent;
 import github.lms.lemuel.loan.domain.CorporateLoan;
@@ -34,7 +34,7 @@ class CorporateLoanEventContractTest {
 
     @BeforeEach
     void setUp() {
-        publisher = new CorporateLoanEventPublisherAdapter(saveOutboxEventPort, new ObjectMapper());
+        publisher = new CorporateLoanEventPublisherAdapter(saveOutboxEventPort, OutboxJson.mapper());
     }
 
     private CorporateLoan disbursedLoan(BigDecimal fee) {

@@ -1,7 +1,7 @@
 package github.lms.lemuel.organization.adapter.out.event;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import github.lms.lemuel.common.events.contract.EventContractValidator;
+import github.lms.lemuel.common.outbox.OutboxJson;
 import github.lms.lemuel.common.outbox.application.port.out.SaveOutboxEventPort;
 import github.lms.lemuel.common.outbox.domain.OutboxEvent;
 import github.lms.lemuel.organization.domain.Membership;
@@ -36,7 +36,7 @@ class OrganizationEventContractTest {
 
     @BeforeEach
     void setUp() {
-        publisher = new OrganizationEventPublisherAdapter(saveOutboxEventPort, new ObjectMapper());
+        publisher = new OrganizationEventPublisherAdapter(saveOutboxEventPort, OutboxJson.mapper());
     }
 
     @Test

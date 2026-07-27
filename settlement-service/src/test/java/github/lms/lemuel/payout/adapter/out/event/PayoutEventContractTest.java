@@ -1,7 +1,7 @@
 package github.lms.lemuel.payout.adapter.out.event;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import github.lms.lemuel.common.events.contract.EventContractValidator;
+import github.lms.lemuel.common.outbox.OutboxJson;
 import github.lms.lemuel.common.outbox.application.port.out.SaveOutboxEventPort;
 import github.lms.lemuel.common.outbox.domain.OutboxEvent;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,7 +33,7 @@ class PayoutEventContractTest {
 
     @BeforeEach
     void setUp() {
-        publisher = new PayoutKafkaEventPublisherAdapter(saveOutboxEventPort, new ObjectMapper());
+        publisher = new PayoutKafkaEventPublisherAdapter(saveOutboxEventPort, OutboxJson.mapper());
     }
 
     private OutboxEvent saved() {

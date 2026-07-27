@@ -1,7 +1,7 @@
 package github.lms.lemuel.recovery.adapter.out.event;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import github.lms.lemuel.common.events.contract.EventContractValidator;
+import github.lms.lemuel.common.outbox.OutboxJson;
 import github.lms.lemuel.common.outbox.application.port.out.SaveOutboxEventPort;
 import github.lms.lemuel.common.outbox.domain.OutboxEvent;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,7 +35,7 @@ class SellerRecoveryEventContractTest {
 
     @BeforeEach
     void setUp() {
-        publisher = new SellerRecoveryKafkaEventPublisherAdapter(saveOutboxEventPort, new ObjectMapper());
+        publisher = new SellerRecoveryKafkaEventPublisherAdapter(saveOutboxEventPort, OutboxJson.mapper());
     }
 
     private OutboxEvent saved() {

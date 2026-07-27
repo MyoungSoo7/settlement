@@ -7,6 +7,7 @@ import github.lms.lemuel.common.outbox.domain.OutboxEvent;
 import github.lms.lemuel.organization.application.port.out.PublishOrganizationEventPort;
 import github.lms.lemuel.organization.domain.Membership;
 import github.lms.lemuel.organization.domain.Organization;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
@@ -25,7 +26,8 @@ public class OrganizationEventPublisherAdapter implements PublishOrganizationEve
     private final SaveOutboxEventPort saveOutboxEventPort;
     private final ObjectMapper objectMapper;
 
-    public OrganizationEventPublisherAdapter(SaveOutboxEventPort saveOutboxEventPort, ObjectMapper objectMapper) {
+    public OrganizationEventPublisherAdapter(SaveOutboxEventPort saveOutboxEventPort,
+                                             @Qualifier("outboxObjectMapper") ObjectMapper objectMapper) {
         this.saveOutboxEventPort = saveOutboxEventPort;
         this.objectMapper = objectMapper;
     }

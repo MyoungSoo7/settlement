@@ -1,7 +1,7 @@
 package github.lms.lemuel.order.adapter.out.event;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import github.lms.lemuel.common.events.contract.EventContractValidator;
+import github.lms.lemuel.common.outbox.OutboxJson;
 import github.lms.lemuel.common.outbox.application.port.out.SaveOutboxEventPort;
 import github.lms.lemuel.common.outbox.application.service.TraceContextCapture;
 import github.lms.lemuel.common.outbox.domain.OutboxEvent;
@@ -35,7 +35,7 @@ class OrderEventContractTest {
     @BeforeEach
     void setUp() {
         publisher = new OutboxBackedOrderEventPublisher(
-                saveOutboxEventPort, new ObjectMapper(), traceContextCapture);
+                saveOutboxEventPort, OutboxJson.mapper(), traceContextCapture);
     }
 
     private String savedPayload() {

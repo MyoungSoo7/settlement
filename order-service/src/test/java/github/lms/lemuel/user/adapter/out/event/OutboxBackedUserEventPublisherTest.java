@@ -1,6 +1,6 @@
 package github.lms.lemuel.user.adapter.out.event;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import github.lms.lemuel.common.outbox.OutboxJson;
 import github.lms.lemuel.common.outbox.application.port.out.SaveOutboxEventPort;
 import github.lms.lemuel.common.outbox.application.service.TraceContextCapture;
 import github.lms.lemuel.common.outbox.domain.OutboxEvent;
@@ -25,7 +25,7 @@ class OutboxBackedUserEventPublisherTest {
     @Mock TraceContextCapture traceContextCapture;
 
     private OutboxBackedUserEventPublisher publisher() {
-        return new OutboxBackedUserEventPublisher(saveOutboxEventPort, new ObjectMapper(), traceContextCapture);
+        return new OutboxBackedUserEventPublisher(saveOutboxEventPort, OutboxJson.mapper(), traceContextCapture);
     }
 
     @Test
