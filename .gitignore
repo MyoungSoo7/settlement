@@ -111,3 +111,6 @@ docs/harness
 **/.claude/harness/
 .claude/agent-memory/
 .symposium/scratch/
+
+### 공공데이터 원본 대용량 덤프 (repo 밖 보관 — import 배치가 로컬 경로로 읽음) ###
+company-service/src/main/resources/*.csv

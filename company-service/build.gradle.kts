@@ -30,6 +30,10 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-kafka")
     implementation("org.springframework.kafka:spring-kafka")
 
+    // 국민연금 사업장가입자 공개데이터 CSV 임포트 — RFC4180 quoted-field(임베디드 콤마/따옴표)가
+    // 실제로 원본에 존재해 수동 split(",") 로는 파싱이 깨진다.
+    implementation("org.apache.commons:commons-csv:1.12.0")
+
     // SpringDoc OpenAPI
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.2")
 

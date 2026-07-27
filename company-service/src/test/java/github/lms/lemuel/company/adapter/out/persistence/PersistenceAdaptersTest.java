@@ -3,24 +3,34 @@ package github.lms.lemuel.company.adapter.out.persistence;
 import github.lms.lemuel.company.application.port.out.LoadArticlePort;
 import github.lms.lemuel.company.application.port.out.LoadCompanyDocumentPort;
 import github.lms.lemuel.company.application.port.out.LoadCompanyPort;
+import github.lms.lemuel.company.application.port.out.LoadCompanyWorkforcePort;
+import github.lms.lemuel.company.application.port.out.SaveCompanyWorkforcePort;
 import github.lms.lemuel.company.domain.Article;
 import github.lms.lemuel.company.domain.ArticleSentiment;
 import github.lms.lemuel.company.domain.ArticleSource;
 import github.lms.lemuel.company.domain.Company;
 import github.lms.lemuel.company.domain.CompanyDocument;
+import github.lms.lemuel.company.domain.CompanyWorkforce;
 import github.lms.lemuel.company.domain.IssueCategory;
 import github.lms.lemuel.company.domain.ReputationScore;
+
+import java.math.BigDecimal;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.jdbc.core.BatchPreparedStatementSetter;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.lang.reflect.Field;
+import java.sql.PreparedStatement;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
 import java.util.Optional;
 
@@ -29,6 +39,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -394,6 +406,86 @@ class PersistenceAdaptersTest {
 
             List<Long> sellers = adapter.sellersOf("005930");
             assertEquals(List.of(7L, 9L), sellers);
+        }
+    }
+
+    @Nested
+    class WorkforceAdapter {
+
+        private final CompanyWorkforceRepository repository = mock(CompanyWorkforceRepository.class);
+        private final CompanyWorkforcePersistenceAdapter adapter = new CompanyWorkforcePersistenceAdapter(repository);
+
+        private CompanyWorkforceJpaEntity entity() throws Exception {
+            CompanyWorkforceJpaEntity e = new CompanyWorkforceJpaEntity();
+            for (var pair : List.of(new String[]{"workplaceName", "주식회사에고이즘"},
+                    new String[]{"bizRegNoPrefix", "866759"}, new String[]{"industryName", "전자상거래 소매업"},
+                    new String[]{"address", "서울특별시 성동구"}, new String[]{"snapshotMonth", "2026-06"})) {
+                Field f = CompanyWorkforceJpaEntity.class.getDeclaredField(pair[0]);
+                f.setAccessible(true);
+                f.set(e, pair[1]);
+            }
+            Field headcount = CompanyWorkforceJpaEntity.class.getDeclaredField("headcount");
+            headcount.setAccessible(true);
+            headcount.set(e, 50);
+            Field amount = CompanyWorkforceJpaEntity.class.getDeclaredField("monthlyBilledAmount");
+            amount.setAccessible(true);
+            amount.set(e, new BigDecimal("21875000"));
+            Field createdAt = CompanyWorkforceJpaEntity.class.getDeclaredField("createdAt");
+            createdAt.setAccessible(true);
+            createdAt.set(e, Instant.parse("2026-07-24T00:00:00Z"));
+            return e;
+        }
+
+        @Test
+        @DisplayName("search — workplaceName null 이면 findAll, 아니면 search")
+        void search() throws Exception {
+            Page<CompanyWorkforceJpaEntity> page = new PageImpl<>(List.of(entity()), PageRequest.of(0, 20), 1);
+            when(repository.findAll(any(PageRequest.class))).thenReturn(page);
+
+            LoadCompanyWorkforcePort.SearchResult all = adapter.search(null, 0, 20);
+            assertEquals(1, all.content().size());
+            assertEquals("주식회사에고이즘", all.content().get(0).workplaceName());
+            verify(repository, never()).search(any(), any());
+
+            when(repository.search(eq("에고이즘"), any())).thenReturn(page);
+            LoadCompanyWorkforcePort.SearchResult keyword = adapter.search("에고이즘", 0, 20);
+            assertEquals(1, keyword.content().size());
+        }
+    }
+
+    @Nested
+    class WorkforceBulkAdapter {
+
+        private final JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
+        private final CompanyWorkforceBulkPersistenceAdapter adapter =
+                new CompanyWorkforceBulkPersistenceAdapter(jdbcTemplate);
+
+        @Test
+        @DisplayName("batchUpsert — BatchPreparedStatementSetter 로 전 필드를 바인딩하고 처리 건수를 센다")
+        void batchUpsert() throws Exception {
+            CompanyWorkforce workforce = new CompanyWorkforce("주식회사에고이즘", "866759", "전자상거래 소매업",
+                    "서울특별시 성동구", YearMonth.of(2026, 6), 50, new BigDecimal("16406250"));
+            List<CompanyWorkforce> batch = List.of(workforce);
+
+            ArgumentCaptor<BatchPreparedStatementSetter> captor =
+                    ArgumentCaptor.forClass(BatchPreparedStatementSetter.class);
+            when(jdbcTemplate.batchUpdate(anyString(), captor.capture())).thenReturn(new int[]{1});
+
+            SaveCompanyWorkforcePort.UpsertResult result = adapter.batchUpsert(batch);
+
+            assertEquals(1, result.upserted());
+
+            PreparedStatement ps = mock(PreparedStatement.class);
+            BatchPreparedStatementSetter setter = captor.getValue();
+            assertEquals(1, setter.getBatchSize());
+            setter.setValues(ps, 0);
+            verify(ps).setString(1, "주식회사에고이즘");
+            verify(ps).setString(2, "866759");
+            verify(ps).setString(3, "전자상거래 소매업");
+            verify(ps).setString(4, "서울특별시 성동구");
+            verify(ps).setString(5, "2026-06");
+            verify(ps).setInt(6, 50);
+            verify(ps).setBigDecimal(eq(7), argThat(bd -> bd.compareTo(new BigDecimal("16406250")) == 0));
         }
     }
 }
