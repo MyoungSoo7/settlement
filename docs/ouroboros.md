@@ -1,6 +1,6 @@
 # Ouroboros — 명세 우선(spec-first) AI 코딩 워크플로 엔진
 
-> 이 문서는 우리 저장소에 설치된 **Ouroboros 플러그인**(현재 캐시 버전 `0.50.5`, 저장소 `Q00/ouroboros`, MIT)의
+> 이 문서는 우리 저장소에 설치된 **Ouroboros 런타임**(CLI `0.50.6`, 저장소 `Q00/ouroboros`, MIT)의
 > 아키텍처·구조·스킬 쓰임새·핵심 개념을 정리한 참조 문서입니다. "왜 이렇게 설계됐는가"에 초점을 둡니다.
 > - 근거: 플러그인 `README.md` / `docs/architecture.md` / `.claude-plugin/SKILL_CAPABILITY_GUIDE.md` (2026-07 캐시 기준)
 > - 우리 저장소에서의 실행 함정은 맨 아래 [§8 이 저장소에서의 실전 메모](#8-이-저장소에서의-실전-메모) 참조
@@ -271,8 +271,8 @@ CLI · Pi. `create_agent_runtime()`이 `OUROBOROS_AGENT_RUNTIME` 환경변수 �
 
 ## 8. 이 저장소에서의 실전 메모
 
-- **설치 상태**: 플러그인 캐시에 `0.50.3`·`0.50.5` 두 버전 존재(현행 `0.50.5`). 세션에는 ouroboros MCP 도구
-  (`mcp__plugin_ouroboros_ouroboros__ouroboros_*`)와 `ouroboros:*` 스킬이 노출됩니다.
+- **설치 상태**: Python CLI·Codex 런타임은 `0.50.6`. Claude 플러그인 캐시는 upstream marketplace manifest가
+  아직 `0.50.5`를 가리켜 `0.50.3`·`0.50.5`가 남아 있습니다. 세션에는 Ouroboros MCP 도구와 스킬이 노출됩니다.
 - **Windows 실행 함정(과거 관측)**: Windows 네이티브 경로에서 실행이 막혔던 이력이 있고 WSL 경로로는 구축에
   성공했습니다. 시드에 `execution_mode: legacy`가 필요했던 케이스가 있으니, 신버전에서 재검증한 뒤 사용하세요.
   (게이트 GREEN 판정 시 통합테스트 skip=0 확인 필수)
