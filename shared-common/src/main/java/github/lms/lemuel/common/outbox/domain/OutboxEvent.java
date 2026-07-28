@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -108,7 +109,10 @@ public class OutboxEvent {
      */
     public static OutboxEvent pending(String aggregateType, String aggregateId, String eventType,
                                       String payload, String traceParent, int eventVersion) {
-        Instant now = Instant.now();
+        // 저장소(timestamptz)의 해상도가 마이크로초라, 나노초 꼬리를 남기면 메모리 객체와
+        // 영속 후 값이 달라진다(Windows 시계는 100ns 단위 → 대부분의 실행에서 꼬리가 남는다).
+        // 사건 시각의 의미는 마이크로초로 충분하므로 생성 시점에 맞춰 잘라 왕복을 무손실로 만든다.
+        Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
         return new OutboxEvent(
                 null,
                 aggregateType,
