@@ -11,7 +11,7 @@
   - 공개조회 위성: financial(8086) · economics(8087) · company(8090) · market(8094) · commondata(8098)
   - 부가: operation(8092) · ai(8096) · organization(8104, 셀러/기업 조직·멤버십)
 - **DB:** 13 서비스 모두 물리 분리(DB-per-service) — opslab / settlement_db / lemuel_{loan,financial,economics,company,operation,market,ai,commondata,investment,account,organization}
-- **최근 커밋:** `367a95f5a` feat(settlement): 과거 데이터 멱등 백필 — Payout 미생성·원장 역분개 누락 정정 (P0-4)
+- **최근 커밋:** `da4df9336` feat(loan): 상환 스케줄 반올림 정책 주입 + 계약 원금 자동 보정 차단
 
 ## 최근 진척 (2026-06-24 이후)
 - **위성·확장 서비스 9종 추가** — financial·economics·company(ADR 0023)·operation·market·ai·commondata·investment·account.
@@ -28,17 +28,27 @@
 - **정산 P0 피드백 사이클 착수 (2026-07-20~)** — 갭 감사 → 시드 6종(payout 배선·조정 원장·이벤트 격리·탐지 백필·E2E·payout 복구) 도출.
   실행분: 정산 확정·홀드백 해제 → Payout 자동 생성 배선(멱등), 차지백·PG 대사 조정 역분개 1:1 연동, PIT 뮤테이션 베이스라인 배선 + SURVIVED 16건 제거,
   과거분 멱등 백필(P0-4) — Payout 미생성·역분개 누락 `/admin/backfill/**` 정정(지급유형별·append-only), 2회 실행 2회차 0건 멱등 IT 증명.
+- **ADR 0026 Option ① 완료** — payout 현금흐름 GL 폐루프(`2868fb9b2`). 결정(2026-07-23 Accepted) + 구현 병합 완료:
+  계정 3종 추가(`HOLDBACK_PAYABLE`·`SELLER_RECOVERY_RECEIVABLE`·`WITHHOLDING_PAYABLE`), 감액 사건 GL mirror 컨슈머 9종,
+  초과 실지급 분할 라우팅 + 셀러 advisory 락(`RecordPayoutService`), 시산표 실검증 `normalBalanceRespected()`(`balanced()` 는 방어값으로 강등).
 - **하네스 절차 규율층 자체 내재화** — debugging/tdd/verify 스킬 3종 + 라우터 주입(플러그인 독립), 하네스 런타임 `.omc`→`.claude/harness` 이전, 루트 문서 6종 docs/ 이관.
 - **operation-service Phase 3 베이스라인 이상탐지** — 신규 `anomaly` BC: `ops_metric_bucket` 실패율 카운터 5종을 5분마다 롤링윈도우 z-score(최소표본·상대임계·정상복귀 게이트)로 판정 → `source=ANOMALY` 인시던트 자동 생성/refire/자동해제. 마이그레이션 0(기존 인시던트 라이프사이클 재사용), 테스트 16건+합성 백테스트, 로컬 실기동 검증 완료 (docs/design/operation-service-phase1.md §Phase 3).
 
 ## 진행 중
 - P0 시드 3(이벤트 격리) — 병행 세션이 develop 위에 재구현 진행 중(`ConsumedEventQuarantine` 옵트인 훅). 시드 클레임 정본: `.symposium/scratch/seed-claims.md`
-- account-service 시산표 실검증 + 셀러 payout 현금 유출 GL 인식 (ADR 0026 — 회계 결정 대기)
+- account GL 통제계정 **음수 방지 전역화 + 실체화 잔액** — **ADR 0030 초안 작성됨(Proposed, 결정 대기)**.
+  ADR 0026 후속(`74dfa486a` 가 명시 유보한 코드리뷰 #5·#6). 회계 오너 확정 필요 3건 중
+  **HOLDBACK_PAYABLE 초과분 재분류 계정 미정이 Phase 2 블로커**
 - operation-service 로드맵: Phase 3 베이스라인 이상탐지 **완료** → 다음은 Phase 4 AI 브리핑
 - 커버리지 게이트 LINE 90% 상향 후속 — 신규 서비스 통합테스트 보강
 
 ## 다음 할 일
-- [ ] ADR 0026 회계 결정 확정 → account payout 현금흐름 인식 구현 + 시산표 실검증
+- [ ] **ADR 0030 결정 확정** (음수=재분류 vs 금지 / 잔액 정본 / 적용 범위 + HOLDBACK 초과분 재분류 계정) → 구현 Phase 1~3
+- [ ] account GL 통제계정 음수 방지 **전역 불변식** (ADR 0030 §결함 1) — 현재 `RecordPayoutService` 분할 라우팅은 payout 자신의 초과 상계만 막고,
+      `withholding_accrued`·`settlement_canceled`·`recovery.offset` 등 잔액 비의존 무조건 DR 은 통제계정을 음수로 몰 수 있음
+      (advisory 락도 payout-vs-payout 만 직렬화). 해법 = 전 debit 잔액 인식 라우팅 or 실체화 running balance — `74dfa486a` 유보분
+- [ ] `sellerPayableBalance` O(셀러 전표 수) 재합산 해소 — payout 마다 전 이력 재합산 + 락 보유 시간이 이력 길이에 비례. O(1) 은 실체화 잔액 필요
+- [ ] ADR 0026 열린 질문 ④ — 수동 payout(`settlementId=null`) 정책 확정 (MEDIUM, 현재는 `normalBalanceRespected` 가 사후 방어)
 - [ ] payout 파이프라인 실송금 트리거 + 셀러 계좌 레지스트리 (그린필드) — 생성 배선(정산 확정→Payout 멱등 생성)은 완료, 실송금·계좌는 잔여
 - [ ] ADR 0022(이벤트 스키마 레지스트리) 정식 도입 검토 — 현재 계약-as-code(0024)가 경량 선행 단계
 - [ ] commondata 실수집 검증 (`DATA_GO_KR_API_KEY` 확보 시)
@@ -55,9 +65,9 @@
 > ⚠️ 수치는 `build/`·`.claude/worktrees/` 사본을 **제외한 git ls-files 기준**. 각 줄 끝 명령이 정답 —
 > 드리프트 의심 시 명령을 돌려 재검증하고 이 수치를 갱신할 것(휘발성 수치를 명령 없이 손으로 적지 말 것).
 - 서비스 **13개** + API Gateway + Kotlin polyglot 2(notification·reconciliation) — `git ls-files '*/src/main/resources/application.yml' | wc -l` → 16(=13+gateway+kotlin 2)
-- Flyway 마이그레이션 **216개** — `git ls-files '*/src/main/resources/db/migration/*.sql' | wc -l` → 216
-- ADR **28개** (0001~0029, 0019 결번 — 세무 ADR 은 0027 충돌로 0029 재부여) — `git ls-files 'docs/adr/[0-9]*.md' | wc -l` → 28
-- 테스트 클래스 **679개** (Testcontainers 통합테스트 포함) — `git ls-files '*/src/test/*Test.java' '*/src/test/*Tests.java' '*/src/test/*IT.java' | wc -l` → 679
+- Flyway 마이그레이션 **223개** — `git ls-files '*/src/main/resources/db/migration/*.sql' | wc -l` → 223
+- ADR **29개** (0001~0030, 0019 결번 — 세무 ADR 은 0027 충돌로 0029 재부여) — `git ls-files 'docs/adr/[0-9]*.md' | wc -l` → 29
+- 테스트 클래스 **682개** (Testcontainers 통합테스트 포함) — `git ls-files '*/src/test/*Test.java' '*/src/test/*Tests.java' '*/src/test/*IT.java' | wc -l` → 682
 - 이벤트 계약 스키마 **22토픽** (ADR 0024, 프로듀서·컨슈머 양방향 테스트) — `git ls-files 'shared-common/src/testFixtures/resources/contracts/events/*.schema.json' | wc -l` → 22
 
 ## 참고 문서
