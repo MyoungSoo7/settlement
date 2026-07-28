@@ -70,6 +70,17 @@
 - 테스트 클래스 **682개** (Testcontainers 통합테스트 포함) — `git ls-files '*/src/test/*Test.java' '*/src/test/*Tests.java' '*/src/test/*IT.java' | wc -l` → 682
 - 이벤트 계약 스키마 **22토픽** (ADR 0024, 프로듀서·컨슈머 양방향 테스트) — `git ls-files 'shared-common/src/testFixtures/resources/contracts/events/*.schema.json' | wc -l` → 22
 
+## 최근 전체 검증 (2026-07-29 · 커밋 `ffa5e5c98` 기준)
+- `./gradlew build` **전체 통과**(13m46s) — 17개 모듈 합계 테스트 **3,895건**, failure 0 · error 0.
+  skip 은 1건뿐이며 소스에 `@Disabled` 로 명시된 `SettlementControllerTest > GET /settlements/{id}/pdf`
+  (Boot 4 WebMvcTest binary response 이슈). **Docker UP 상태에서 실행** — Testcontainers 통합테스트가
+  조용히 skip 된 건 0(가짜 GREEN 아님).
+- 제출물 플러그인을 **호출 대상 서비스 기준**으로 재배치한 뒤 부트 jar 5종 실물 검사 —
+  `pwc/`·`settlement-copilot/`·`fashion-copilot/`·공공데이터 CSV 엔트리 **0건**(`processResources` exclude 반영).
+  company-service 리소스 산출물 111M → 84K.
+- 하네스 3종: `node --test scripts/harness/test/*.test.mjs` **109/109** · `harness-audit` healthy ·
+  `guard.mjs --staged` clean.
+
 ## 참고 문서
 - `SPEC.md` — 전체 기능명세(엔드포인트·도메인 규칙·이벤트 카탈로그)
 - `CLAUDE.md` — 에이전트 운용 가이드 / 아키텍처 경계·컨벤션
