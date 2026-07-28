@@ -115,5 +115,8 @@ docs/harness2
 ### 공공데이터 원본 대용량 덤프 (repo 밖 보관 — import 배치가 로컬 경로로 읽음) ###
 company-service/src/main/resources/*.csv
 
-docs/harness2
-docs/harness
+### 하네스 실습 자료는 로컬 전용 — 단 해커톤/PwC 제출물은 원격 실행을 위해 추적 ###
+# 디렉토리째(`docs/harness`) 무시 금지: 부모가 제외되면 하위 재포함(!)이 불가능하다.
+docs/harness/*
+!docs/harness/hackathon/
+!docs/harness/omc-harness.md

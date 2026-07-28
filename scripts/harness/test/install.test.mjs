@@ -33,7 +33,7 @@ function toPosixPath(path) {
 }
 
 function isPluginOrMcpPath(path) {
-  return /(^|\/)(?:\.claude-plugin|\.codex-plugin|mcp)(?:\/|$)|(^|\/)\.mcp\.json$|^hackathon\/(?:settlement|invest)-copilot(?:\/|$)/.test(
+  return /(^|\/)(?:\.claude-plugin|\.codex-plugin|mcp)(?:\/|$)|(^|\/)\.mcp\.json$|(?:^|\/)hackathon\/(?:settlement|invest)-copilot(?:\/|$)/.test(
     toPosixPath(path),
   );
 }
@@ -169,7 +169,7 @@ test('installed hook allows clean commits including pwc submission paths', async
 test('installed hook propagates failure from a present optional plugin guard', async () => {
   const root = createRepo();
   await installHooks({ cwd: root, stdout: () => {}, stderr: () => {} });
-  put(root, 'hackathon/settlement-copilot/hooks/guards/pre-commit.mjs', "console.error('plugin rejected commit'); process.exit(23);\n");
+  put(root, 'docs/harness/hackathon/settlement-copilot/hooks/guards/pre-commit.mjs', "console.error('plugin rejected commit'); process.exit(23);\n");
   put(root, 'README.md', 'clean\n');
   assert.equal(git(root, 'add', 'README.md', 'scripts').status, 0);
 
