@@ -16,5 +16,6 @@ import java.math.BigDecimal;
  */
 public record LoanRequest(
         @NotNull @Positive @Digits(integer = 17, fraction = 2) BigDecimal principal,
-        @Min(0) @Max(365) int financingDays) {
+        // 선지급일수는 최소 1일. 0일이면 실행 즉시 만기(dueAt=disbursedAt)가 되어 당일 연체·상각 오판을 부른다.
+        @Min(1) @Max(365) int financingDays) {
 }

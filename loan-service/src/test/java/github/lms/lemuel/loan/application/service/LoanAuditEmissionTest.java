@@ -103,7 +103,7 @@ class LoanAuditEmissionTest {
         PublishLoanEventPort publish = mock(PublishLoanEventPort.class);
         AppendLedgerPort ledger = mock(AppendLedgerPort.class);
         when(loadLoan.load(1L)).thenReturn(LoanAdvance.reconstitute(1L, 7L, new BigDecimal("800000"),
-                new BigDecimal("800"), BigDecimal.ZERO, LoanStatus.REQUESTED));
+                new BigDecimal("800"), BigDecimal.ZERO, LoanStatus.REQUESTED, 7, null, null));
         when(settlementView.sumUnpaidBySellerForUpdate(7L)).thenReturn(new BigDecimal("1000000"));
         when(reputation.findGrade(7L)).thenReturn(Optional.empty());
         when(saveLoan.save(any())).thenAnswer(inv -> inv.getArgument(0));

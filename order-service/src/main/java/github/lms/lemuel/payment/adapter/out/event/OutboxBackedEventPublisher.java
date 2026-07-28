@@ -8,6 +8,7 @@ import github.lms.lemuel.common.outbox.domain.OutboxEvent;
 import github.lms.lemuel.payment.application.port.out.PublishEventPort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -33,7 +34,7 @@ public class OutboxBackedEventPublisher implements PublishEventPort {
     private final TraceContextCapture traceContextCapture;
 
     public OutboxBackedEventPublisher(SaveOutboxEventPort saveOutboxEventPort,
-                                      ObjectMapper objectMapper,
+                                      @Qualifier("outboxObjectMapper") ObjectMapper objectMapper,
                                       TraceContextCapture traceContextCapture) {
         this.saveOutboxEventPort = saveOutboxEventPort;
         this.objectMapper = objectMapper;

@@ -1,6 +1,6 @@
 package github.lms.lemuel.settlement.adapter.in.web;
 
-import github.lms.lemuel.settlement.adapter.out.persistence.querydsl.dto.*;
+import github.lms.lemuel.settlement.application.port.out.dto.*;
 import github.lms.lemuel.settlement.application.service.SettlementQueryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;

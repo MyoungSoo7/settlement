@@ -133,16 +133,30 @@ class LoanControllerTest {
     }
 
     @Test
-    @DisplayName("POST /loans — financingDays 경계값(@Min 0)은 통과해 201")
+    @DisplayName("POST /loans — financingDays 경계값(@Min 1)은 통과해 201")
     void requestFinancingDaysAtMinBoundaryPasses() throws Exception {
         when(requestLoanUseCase.request(any())).thenReturn(loan());
 
         mockMvc.perform(post("/loans").principal(auth(7L))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"principal":800000,"financingDays":0}
+                                {"principal":800000,"financingDays":1}
                                 """))
                 .andExpect(status().isCreated());
+    }
+
+    @Test
+    @DisplayName("POST /loans — financingDays 0(@Min 1 미만)은 400 이고 use case 미호출")
+    void requestFinancingDaysZeroIs400() throws Exception {
+        // 0일 실행은 dueAt=disbursedAt → 당일 연체·상각 오판을 부르므로 신청 단계에서 차단한다.
+        mockMvc.perform(post("/loans").principal(auth(7L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"principal":800000,"financingDays":0}
+                                """))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(requestLoanUseCase);
     }
 
     @Test
@@ -159,7 +173,7 @@ class LoanControllerTest {
     }
 
     @Test
-    @DisplayName("POST /loans — financingDays 음수(@Min 0 - 1)는 400 이고 use case 미호출")
+    @DisplayName("POST /loans — financingDays 음수(@Min 1 미만)는 400 이고 use case 미호출")
     void requestFinancingDaysUnderMinIs400() throws Exception {
         mockMvc.perform(post("/loans").principal(auth(7L))
                         .contentType(MediaType.APPLICATION_JSON)

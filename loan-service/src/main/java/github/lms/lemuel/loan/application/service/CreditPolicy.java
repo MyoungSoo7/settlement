@@ -3,6 +3,7 @@ package github.lms.lemuel.loan.application.service;
 import github.lms.lemuel.loan.domain.exception.LoanInvariantViolationException;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.Map;
 
 /**
@@ -23,6 +24,8 @@ import java.util.Map;
  */
 public class CreditPolicy {
 
+    private static final int MONEY_SCALE = 2;
+
     private final BigDecimal ltv;
     private final BigDecimal dailyRate;
     private final Map<String, BigDecimal> reputationHaircut;
@@ -41,22 +44,24 @@ public class CreditPolicy {
         return reputationHaircut.getOrDefault(grade, BigDecimal.ONE);
     }
 
-    /** 평판 미반영 한도(정산예정금 × LTV). */
+    /** 평판 미반영 한도(정산예정금 × LTV). scale 2(HALF_UP)로 정규화해 경계 판정을 결정적으로 만든다(L-7). */
     public BigDecimal creditLimit(BigDecimal unpaidSettlementTotal) {
-        return unpaidSettlementTotal.multiply(ltv);
+        return unpaidSettlementTotal.multiply(ltv).setScale(MONEY_SCALE, RoundingMode.HALF_UP);
     }
 
-    /** 평판 등급 반영 한도(= 기본 한도 × haircut). */
+    /** 평판 등급 반영 한도(= 정산예정금 × LTV × haircut). 최종 결과를 1회만 scale 2 정규화(이중반올림 회피). */
     public BigDecimal creditLimit(BigDecimal unpaidSettlementTotal, String grade) {
-        return creditLimit(unpaidSettlementTotal).multiply(haircutFor(grade));
+        return unpaidSettlementTotal.multiply(ltv).multiply(haircutFor(grade))
+                .setScale(MONEY_SCALE, RoundingMode.HALF_UP);
     }
 
-    /** 선지급액과 선지급일수로 수수료를 산정한다. */
+    /** 선지급액과 선지급일수로 수수료를 산정한다. scale 2(HALF_UP) 정규화(기업 정책과 일관). */
     public BigDecimal fee(BigDecimal principal, int days) {
         if (days < 0) {
             throw new LoanInvariantViolationException("선지급일수는 음수일 수 없습니다: " + days);
         }
-        return principal.multiply(dailyRate).multiply(BigDecimal.valueOf(days));
+        return principal.multiply(dailyRate).multiply(BigDecimal.valueOf(days))
+                .setScale(MONEY_SCALE, RoundingMode.HALF_UP);
     }
 
     /** 신청액이 평판 반영 한도를 초과하면 예외. */

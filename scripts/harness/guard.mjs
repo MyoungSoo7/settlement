@@ -48,6 +48,15 @@ const isDomainMain = (f) => JAVA_KT.test(f) && /\/src\/main\/java\/.+\/domain\//
 // generic 예외 금지는 캠페인이 청정화를 완료한 5개 금융 서비스에 한정(위성 서비스는 oo-score 스킬로 채점).
 const CAMPAIGN_SERVICES = /(settlement|order|loan|investment|account)-service\//;
 
+// settlement-service 가 import 해도 되는 자기 바운디드 컨텍스트(+shared-common `common`).
+// 이 집합의 여집합(order 컨텍스트: order/user/cart/product/coupon/shipping/payment/review/game/category/menu/rbac…)은
+// MSA 경계 위반. enum denylist 는 신규 order 도메인 누락에 취약하므로 allowlist 여집합으로 강제한다(감사 MED-2).
+const SETTLEMENT_OWN_PACKAGES = new Set([
+  'settlement', 'payout', 'ledger', 'chargeback', 'pgreconciliation',
+  'recon', 'recovery', 'report', 'tax', 'idempotency', 'integrity',
+  'common',
+]);
+
 export const RULES = [
   {
     id: 'MONEY-PRIMITIVE',
@@ -81,10 +90,16 @@ export const RULES = [
   },
   {
     id: 'MSA-BOUNDARY',
-    // settlement-service importing order-service domain code.
+    // settlement-service 는 자기 컨텍스트 + shared-common 외의 github.lms.lemuel.* 를 import 하지 않는다.
+    // order 도메인 전부(payment·review·game·category·menu·rbac 등 신규 포함) 차단 — allowlist 여집합이라
+    // denylist 나열 누락 함정이 없다(감사 MED-2). settlement 자체 `recon`(OrderReconClient)은 HTTP 대사라 허용.
     when: (f) => JAVA_KT.test(f) && /settlement-service\//.test(f),
-    test: (line) => /^\s*import\s+github\.lms\.lemuel\.(order|user|cart|product|coupon|shipping)\b/.test(line),
-    msg: 'settlement-service 가 order 컨텍스트 import 금지 → Kafka 프로젝션/내부 대사 API 만 (ADR 0020)',
+    test: (line) => {
+      // `import static github.lms.lemuel.order...` 도 잡는다 — static 키워드가 사이에 껴도 우회 못 하게(#7).
+      const m = /^\s*import\s+(?:static\s+)?github\.lms\.lemuel\.([a-z0-9_]+)\b/.exec(line);
+      return m != null && !SETTLEMENT_OWN_PACKAGES.has(m[1]);
+    },
+    msg: 'settlement-service 가 타 컨텍스트(order 등) import 금지 → Kafka 프로젝션/내부 대사 API 만 (ADR 0020)',
   },
   {
     id: 'ACCOUNT-CONSUME-ONLY',

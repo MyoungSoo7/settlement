@@ -2,8 +2,7 @@ package github.lms.lemuel.account.adapter.in.kafka;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import github.lms.lemuel.account.application.port.in.RecordAccountEntryUseCase;
-import github.lms.lemuel.account.domain.AccountEntry;
+import github.lms.lemuel.account.application.port.in.RecordPayoutUseCase;
 import github.lms.lemuel.common.outbox.adapter.in.kafka.IdempotentEventConsumer;
 import github.lms.lemuel.common.outbox.adapter.in.kafka.ProcessedEventRepository;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -23,13 +22,13 @@ import java.util.UUID;
  * CASH 가 유출돼 GL 현금 폐루프가 닫힌다.
  * 멱등: {@code processed_events} + {@code account_entries(source_topic, ref_type, ref_id)} UNIQUE(refId=payoutId).
  *
- * <p><b>MEDIUM-B(열린 질문 ④, 정책 미정)</b>: 수동 송금(payload.settlementId=null, 대응하는 settlement.created
- * 크레딧이 없는 payout)은 이 분개가 SELLER_PAYABLE 을 크레딧 없이 차변해 그 계정을 음수로 만들 수 있다.
- * 즉 "완전정산 셀러의 통제계정이 0으로 닫힌다"는 불변식이 수동 payout 대상 셀러에게는 성립하지 않을 수
- * 있다 — 별도 정책(예: 수동 payout 전용 채권 계정 신설, 또는 사전 조정분개 강제) 확정 전까지는 <b>의도적으로
- * 미봉합 상태로 둔다</b>. {@link github.lms.lemuel.account.domain.TrialBalance#normalBalanceRespected()} 와
- * {@link github.lms.lemuel.account.domain.AccountSummary#fullySettled()} 가 이 상태를 탐지하는 가드다(위반
- * 시 false) — 코드로 억지로 봉합하지 말고, 알람으로 다뤄라.
+ * <p><b>감사 MED-3 봉합(채권 라우팅)</b>: 대응하는 SELLER_PAYABLE 크레딧이 없는 실지급(예: 수동 송금)은
+ * 단순 상계 전기만으로는 SELLER_PAYABLE 을 음수로 몰아 "완전정산 통제계정 0" 불변식을 깬다. 이를 막기 위해
+ * 컨슈머는 파싱만 하고 전기를 {@link RecordPayoutUseCase}에 위임한다 — 서비스가 현재 SELLER_PAYABLE 잔액을
+ * 기준으로 payout 차변을 분할해, 잔액 이내분은 {@code payoutCompleted}(DR SELLER_PAYABLE / CR CASH), 초과분은
+ * {@code payoutAdvanceReceivable}(DR SELLER_RECOVERY_RECEIVABLE / CR CASH)로 라우팅한다(음수 없이 CASH 유출
+ * 총액 정확 기록). {@link github.lms.lemuel.account.domain.TrialBalance#normalBalanceRespected()} 와
+ * {@link github.lms.lemuel.account.domain.AccountSummary#fullySettled()} 가 여전히 사후 가드로 남는다.
  */
 @Component
 @ConditionalOnProperty(name = "app.kafka.enabled", havingValue = "true")
@@ -37,13 +36,13 @@ public class PayoutCompletedConsumer extends IdempotentEventConsumer {
 
     static final String CONSUMER_GROUP = "lemuel-account";
 
-    private final RecordAccountEntryUseCase recordAccountEntryUseCase;
+    private final RecordPayoutUseCase recordPayoutUseCase;
 
-    public PayoutCompletedConsumer(RecordAccountEntryUseCase recordAccountEntryUseCase,
+    public PayoutCompletedConsumer(RecordPayoutUseCase recordPayoutUseCase,
                                    ProcessedEventRepository processedEventRepository,
                                    ObjectMapper objectMapper) {
         super(processedEventRepository, objectMapper);
-        this.recordAccountEntryUseCase = recordAccountEntryUseCase;
+        this.recordPayoutUseCase = recordPayoutUseCase;
     }
 
     @KafkaListener(topics = "${app.kafka.topic.payout-completed}", groupId = CONSUMER_GROUP, containerFactory = "kafkaListenerContainerFactory")
@@ -61,11 +60,10 @@ public class PayoutCompletedConsumer extends IdempotentEventConsumer {
     @Override
     protected void handle(JsonNode node, UUID eventId) {
         String payoutId = requiredText(node, "payoutId", eventId);
-        AccountEntry entry = AccountEntry.payoutCompleted(
+        recordPayoutUseCase.recordPayout(
                 requiredText(node, "sellerId", eventId),
                 payoutId,
                 requiredDecimal(node, "amount", eventId));
-        recordAccountEntryUseCase.record(entry);
-        log.info("셀러지급 분개 적재. eventId={}, payoutId={}", eventId, payoutId);
+        log.info("셀러지급 분개 적재(채권 라우팅). eventId={}, payoutId={}", eventId, payoutId);
     }
 }

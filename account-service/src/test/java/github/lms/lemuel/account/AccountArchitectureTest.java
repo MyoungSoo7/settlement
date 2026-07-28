@@ -1,6 +1,8 @@
 package github.lms.lemuel.account;
 
+import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClasses;
+import com.tngtech.archunit.core.domain.JavaMethodCall;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.lang.ArchRule;
@@ -75,6 +77,29 @@ class AccountArchitectureTest {
                 .haveFullyQualifiedName("github.lms.lemuel.common.outbox.application.port.out.SaveOutboxEventPort")
                 .orShould().dependOnClassesThat()
                 .haveFullyQualifiedName("github.lms.lemuel.common.outbox.application.port.out.PublishExternalEventPort")
+                .allowEmptyShould(true);
+        rule.check(accountClasses);
+    }
+
+    @Test
+    void account_는_KafkaTemplate_send_를_직접_호출하지_않는다() {
+        // 소비 전용 경계의 텍스트-매칭 우회(변수명 리네이밍·다른 식별자로 producer.send(...))를 타입 기반으로 차단
+        // — guard grep(`kafkaTemplate.send`)의 사각을 메운다(감사 MED-4). account 자기 코드가 KafkaTemplate.send(..)를
+        // '직접' 호출하면 비즈니스 이벤트 발행으로 간주해 하드스톱한다.
+        // DLT 격리는 DeadLetterPublishingRecoverer(프레임워크)가 send 를 내부 호출하므로 account 코드엔 직접 호출이 없다
+        // → 정상 DLT 배선(KafkaErrorHandlerConfig)을 false-positive 없이 통과한다.
+        DescribedPredicate<JavaMethodCall> callsKafkaTemplateSend =
+                new DescribedPredicate<>("KafkaTemplate.send(..) 를 직접 호출") {
+                    @Override
+                    public boolean test(JavaMethodCall call) {
+                        return "send".equals(call.getTarget().getName())
+                                && "org.springframework.kafka.core.KafkaTemplate"
+                                        .equals(call.getTarget().getOwner().getName());
+                    }
+                };
+        ArchRule rule = noClasses()
+                .that().resideInAPackage("github.lms.lemuel.account..")
+                .should().callMethodWhere(callsKafkaTemplateSend)
                 .allowEmptyShould(true);
         rule.check(accountClasses);
     }

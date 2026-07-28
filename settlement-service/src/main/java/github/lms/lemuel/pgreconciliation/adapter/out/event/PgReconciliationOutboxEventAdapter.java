@@ -6,6 +6,7 @@ import github.lms.lemuel.common.outbox.application.port.out.SaveOutboxEventPort;
 import github.lms.lemuel.common.outbox.domain.OutboxEvent;
 import github.lms.lemuel.pgreconciliation.application.port.out.PublishDiscrepancyResolvedEventPort;
 import github.lms.lemuel.pgreconciliation.domain.ReconciliationDiscrepancy;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
@@ -26,7 +27,7 @@ public class PgReconciliationOutboxEventAdapter implements PublishDiscrepancyRes
     private final ObjectMapper objectMapper;
 
     public PgReconciliationOutboxEventAdapter(SaveOutboxEventPort saveOutboxEventPort,
-                                              ObjectMapper objectMapper) {
+                                              @Qualifier("outboxObjectMapper") ObjectMapper objectMapper) {
         this.saveOutboxEventPort = saveOutboxEventPort;
         this.objectMapper = objectMapper;
     }

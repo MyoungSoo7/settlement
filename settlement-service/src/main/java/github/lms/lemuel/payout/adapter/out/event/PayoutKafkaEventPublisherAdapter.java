@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import github.lms.lemuel.common.outbox.application.port.out.SaveOutboxEventPort;
 import github.lms.lemuel.common.outbox.domain.OutboxEvent;
 import github.lms.lemuel.payout.application.port.out.PublishPayoutEventPort;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -17,7 +18,7 @@ import java.util.Map;
  * shared-common 의 OutboxPublisherScheduler 가 Kafka 로 발행한다.
  *
  * <p>aggregateType="Payout", eventType="PayoutCompleted" → 토픽 lemuel.payout.completed (account 구독).
- * settlement 계열 규약대로 amount 는 JSON number 로 직렬화된다.
+ * DATA-STANDARD N5 에 따라 amount 는 outboxObjectMapper 로 plain string 직렬화된다.
  */
 @Component
 public class PayoutKafkaEventPublisherAdapter implements PublishPayoutEventPort {
@@ -29,7 +30,7 @@ public class PayoutKafkaEventPublisherAdapter implements PublishPayoutEventPort 
     private final ObjectMapper objectMapper;
 
     public PayoutKafkaEventPublisherAdapter(SaveOutboxEventPort saveOutboxEventPort,
-                                            ObjectMapper objectMapper) {
+                                            @Qualifier("outboxObjectMapper") ObjectMapper objectMapper) {
         this.saveOutboxEventPort = saveOutboxEventPort;
         this.objectMapper = objectMapper;
     }

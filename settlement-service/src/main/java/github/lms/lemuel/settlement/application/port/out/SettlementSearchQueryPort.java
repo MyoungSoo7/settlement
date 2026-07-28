@@ -1,9 +1,9 @@
 package github.lms.lemuel.settlement.application.port.out;
 
-import github.lms.lemuel.settlement.adapter.out.persistence.querydsl.dto.ApprovalStatusDto;
-import github.lms.lemuel.settlement.adapter.out.persistence.querydsl.dto.SettlementCursorPageResponse;
-import github.lms.lemuel.settlement.adapter.out.persistence.querydsl.dto.SettlementDetailDto;
-import github.lms.lemuel.settlement.adapter.out.persistence.querydsl.dto.SettlementSearchCondition;
+import github.lms.lemuel.settlement.application.port.out.dto.ApprovalStatusDto;
+import github.lms.lemuel.settlement.application.port.out.dto.SettlementCursorPageResponse;
+import github.lms.lemuel.settlement.application.port.out.dto.SettlementDetailDto;
+import github.lms.lemuel.settlement.application.port.out.dto.SettlementSearchCondition;
 
 import java.util.List;
 

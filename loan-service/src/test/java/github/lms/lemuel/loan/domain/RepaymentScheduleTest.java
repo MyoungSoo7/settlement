@@ -7,6 +7,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -204,6 +205,67 @@ class RepaymentScheduleTest {
         @Test void 방식이_null이면_예외() {
             assertThatThrownBy(() -> RepaymentSchedule.of(bd("1000000"), 12, bd("6.0"), null))
                     .isInstanceOf(LoanInvariantViolationException.class);
+        }
+
+        @Test void 원금에_원단위_미만_소수가_있으면_조용히_보정하지_않고_예외() {
+            assertThatThrownBy(() ->
+                    RepaymentSchedule.of(bd("1000000.5"), 12, bd("6.0"), RepaymentMethod.BULLET))
+                    .isInstanceOf(LoanInvariantViolationException.class)
+                    .hasMessageContaining("1000000.5");
+        }
+
+        @Test void 값이_정수면_소수표기_원금은_허용된다() {
+            RepaymentSchedule s =
+                    RepaymentSchedule.of(bd("1000000.00"), 12, bd("6.0"), RepaymentMethod.BULLET);
+            assertThat(s.principal()).isEqualByComparingTo("1000000");
+        }
+
+        @Test void 반올림정책이_null이면_예외() {
+            assertThatThrownBy(() -> RepaymentSchedule.of(
+                    bd("1000000"), 12, bd("6.0"), RepaymentMethod.BULLET, null))
+                    .isInstanceOf(LoanInvariantViolationException.class);
+        }
+    }
+
+    // ─── 반올림 정책 주입 ─────────────────────────────────────────────────────────
+
+    @Nested
+    class 반올림정책주입 {
+        private static final RoundingPolicy CENTS = new RoundingPolicy(2, RoundingMode.HALF_UP);
+
+        @Test void 정책을_생략하면_원화정책으로_산정된다() {
+            RepaymentSchedule s =
+                    RepaymentSchedule.of(bd("1000000"), 12, bd("5.0"), RepaymentMethod.BULLET);
+            assertThat(s.roundingPolicy()).isEqualTo(RoundingPolicy.KRW);
+        }
+
+        @Test void 주입한_정책의_스케일로_회차금액이_절사된다() {
+            // 월이율 = 5%/12 → 1,000,000 × 0.0041666… = 4,166.666…
+            RepaymentSchedule krw =
+                    RepaymentSchedule.of(bd("1000000"), 12, bd("5.0"), RepaymentMethod.BULLET);
+            RepaymentSchedule cents =
+                    RepaymentSchedule.of(bd("1000000"), 12, bd("5.0"), RepaymentMethod.BULLET, CENTS);
+
+            assertThat(krw.installments().get(0).interest()).isEqualByComparingTo("4167");
+            assertThat(cents.installments().get(0).interest()).isEqualByComparingTo("4166.67");
+            assertThat(cents.roundingPolicy()).isEqualTo(CENTS);
+        }
+
+        @Test void 소수점2자리_정책이면_센트단위_원금도_허용되고_잔여는_마지막이_흡수한다() {
+            RepaymentSchedule s = RepaymentSchedule.of(
+                    bd("1000.25"), 2, bd("0.0"), RepaymentMethod.EQUAL_PRINCIPAL, CENTS);
+
+            assertThat(s.installments().get(0).principalPortion()).isEqualByComparingTo("500.13");
+            assertThat(s.installments().get(1).principalPortion()).isEqualByComparingTo("500.12");
+            assertThat(s.installments().get(1).remainingBalance()).isEqualByComparingTo("0");
+            assertThat(s.totalPrincipal()).isEqualByComparingTo("1000.25");
+        }
+
+        @Test void 원화정책에서는_센트단위_원금이_거부된다() {
+            assertThatThrownBy(() -> RepaymentSchedule.of(
+                    bd("1000.25"), 2, bd("0.0"), RepaymentMethod.EQUAL_PRINCIPAL))
+                    .isInstanceOf(LoanInvariantViolationException.class)
+                    .hasMessageContaining("원 단위 정수");
         }
     }
 

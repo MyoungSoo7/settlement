@@ -3,8 +3,10 @@ package github.lms.lemuel.common.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import github.lms.lemuel.common.outbox.OutboxJson;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 
 /**
  * Jackson 2 ↔ Jackson 3 호환용 브릿지.
@@ -22,12 +24,26 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class JacksonCompatConfig {
 
+    /**
+     * 범용 Jackson 2 ObjectMapper. {@code @Primary} 는 아래 outbox 전용 빈이 추가되면서
+     * 타입 주입(82곳)이 모호해지지 않도록 하는 것 — 기존 주입부의 동작은 그대로다.
+     */
     @Bean
+    @Primary
     public ObjectMapper jacksonLegacyObjectMapper() {
         // JavaTimeModule 미등록 시 java.time 필드 직렬화가 InvalidDefinitionException 으로 실패
         // (RedisCartAdapter 의 LocalDateTime 등). 날짜는 ISO-8601 문자열로 통일.
         return new ObjectMapper()
                 .registerModule(new JavaTimeModule())
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+    }
+
+    /**
+     * Outbox payload 전용 — 금액(BigDecimal)을 plain string 으로 직렬화(DATA-STANDARD N5).
+     * 발행 어댑터만 {@code @Qualifier("outboxObjectMapper")} 로 주입받는다. 근거는 {@link OutboxJson}.
+     */
+    @Bean("outboxObjectMapper")
+    public ObjectMapper outboxObjectMapper() {
+        return OutboxJson.mapper();
     }
 }

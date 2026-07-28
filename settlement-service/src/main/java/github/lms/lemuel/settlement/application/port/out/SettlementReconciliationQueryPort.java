@@ -1,7 +1,7 @@
 package github.lms.lemuel.settlement.application.port.out;
 
-import github.lms.lemuel.settlement.adapter.out.persistence.querydsl.dto.PaymentRefundAggregationDto;
-import github.lms.lemuel.settlement.adapter.out.persistence.querydsl.dto.SettlementReconciliationDto;
+import github.lms.lemuel.settlement.application.port.out.dto.PaymentRefundAggregationDto;
+import github.lms.lemuel.settlement.application.port.out.dto.SettlementReconciliationDto;
 
 import java.time.LocalDate;
 import java.util.List;

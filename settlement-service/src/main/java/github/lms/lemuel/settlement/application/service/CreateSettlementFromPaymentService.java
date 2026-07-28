@@ -16,8 +16,11 @@ import github.lms.lemuel.settlement.domain.HoldbackPolicy;
 import github.lms.lemuel.settlement.domain.SellerTier;
 import github.lms.lemuel.settlement.domain.Settlement;
 import github.lms.lemuel.settlement.domain.SettlementCycle;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +35,8 @@ import java.util.Optional;
  */
 @Service
 @Transactional
+@RequiredArgsConstructor
+@Slf4j
 public class CreateSettlementFromPaymentService implements CreateSettlementFromPaymentUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(CreateSettlementFromPaymentService.class);
@@ -46,26 +51,6 @@ public class CreateSettlementFromPaymentService implements CreateSettlementFromP
     private final AuditLogger auditLogger;
     /** KST 기준 시각 소스 — 결제 시각 부재 시 정산 기준일 폴백에만 사용(정본은 결제 시각). */
     private final Clock clock;
-
-    public CreateSettlementFromPaymentService(LoadSettlementPort loadSettlementPort,
-                                              SaveSettlementPort saveSettlementPort,
-                                              LoadSellerTierPort loadSellerTierPort,
-                                              LoadSellerSettlementCyclePort loadSellerSettlementCyclePort,
-                                              LoadSellerIdPort loadSellerIdPort,
-                                              PublishSettlementDomainEventPort publishSettlementDomainEventPort,
-                                              BackfillChargebackSettlementLinkPort backfillChargebackPort,
-                                              AuditLogger auditLogger,
-                                              Clock clock) {
-        this.loadSettlementPort = loadSettlementPort;
-        this.saveSettlementPort = saveSettlementPort;
-        this.loadSellerTierPort = loadSellerTierPort;
-        this.loadSellerSettlementCyclePort = loadSellerSettlementCyclePort;
-        this.loadSellerIdPort = loadSellerIdPort;
-        this.publishSettlementDomainEventPort = publishSettlementDomainEventPort;
-        this.backfillChargebackPort = backfillChargebackPort;
-        this.auditLogger = auditLogger;
-        this.clock = clock;
-    }
 
     @Override
     public Settlement createSettlementFromPayment(Long paymentId, Long orderId, BigDecimal amount) {
@@ -119,8 +104,32 @@ public class CreateSettlementFromPaymentService implements CreateSettlementFromP
             log.info("Applying holdback: rate={}, amount={}, releaseDate={}",
                     holdback.rate(), settlement.getHoldbackAmount(), settlement.getHoldbackReleaseDate());
 
-            // 저장
-            Settlement savedSettlement = saveSettlementPort.save(settlement);
+            // 저장. check-then-act(findByPaymentId→save)의 TOCTOU 구간을 스키마 UNIQUE
+            // (uk_settlements_payment_id)가 최종 차단한다: 같은 결제를 운반하는 서로 다른 event_id 두 건이
+            // processed_events 를 각자 통과해 동시에 여기 도달하면, 둘째 save 가 제약 위반
+            // (DataIntegrityViolationException)을 낸다. 이 경우 승자의 정산이 이미 존재하므로 재조회해
+            // 멱등 반환한다(중복 정산 생성 0 유지 — 회계 정합). 백필·발행은 승자 트랜잭션의 몫이라 이 경로에서
+            // 건너뛴다(사전분쟁 백필/SettlementCreated 발행은 아래 save 성공 경로에서만 수행).
+            //
+            // save 는 IDENTITY 전략이라 INSERT 가 즉시 실행되어 예외가 저장 호출 시점에 동기적으로 드러난다
+            // (커밋 지연 아님) — SellerBankAccountRegistryService/SellerTaxProfileRegistryService 와 동형의
+            // 낙관적 INSERT-후-경합수렴. 이 catch 는 승자 행을 재조회만 할 뿐 추가 write 를 하지 않아,
+            // 경합 패자가 부수효과를 이어가지 않고 즉시 기존 정산으로 수렴한다.
+            Settlement savedSettlement;
+            try {
+                savedSettlement = saveSettlementPort.save(settlement);
+            } catch (DataIntegrityViolationException race) {
+                // uk_settlements_payment_id 경합이면 승자 정산이 이미 존재한다 → 재조회해 멱등 수렴한다.
+                // 승자가 없으면 이 예외는 payment_id 유니크 경합이 아니라 다른 제약 위반(예: NOT NULL/FK/CHECK)이므로,
+                // "경합 수렴" 으로 오분류해 로그·진단을 왜곡하지 않고 원 사유를 그대로 전파한다(발견 #9).
+                Optional<Settlement> winner = loadSettlementPort.findByPaymentId(paymentId);
+                if (winner.isEmpty()) {
+                    throw race;
+                }
+                log.warn("동시 정산 생성 경합(uk_settlements_payment_id) — 기존 정산으로 멱등 수렴. "
+                        + "paymentId={}, reason={}", paymentId, race.toString());
+                return winner.get();
+            }
             try (var ignoreSettlement = MdcScope.of(MdcKeys.SETTLEMENT_ID,
                     String.valueOf(savedSettlement.getId()))) {
                 log.info("Settlement created successfully. status={}", savedSettlement.getStatus());

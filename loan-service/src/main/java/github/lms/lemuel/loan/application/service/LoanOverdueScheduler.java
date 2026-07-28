@@ -2,7 +2,6 @@ package github.lms.lemuel.loan.application.service;
 
 import github.lms.lemuel.loan.application.port.in.ManageLoanCollectionUseCase;
 import github.lms.lemuel.loan.application.port.out.LoadLoanPort;
-import github.lms.lemuel.loan.domain.LoanAdvance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,17 +34,20 @@ public class LoanOverdueScheduler {
     private final Clock clock;
     private final int graceDays;
     private final int writeOffDays;
+    private final int batchLimit;
 
     public LoanOverdueScheduler(ManageLoanCollectionUseCase collectionUseCase,
                                 LoadLoanPort loadLoanPort,
                                 Clock clock,
                                 @Value("${app.loan.overdue.grace-days:0}") int graceDays,
-                                @Value("${app.loan.overdue.write-off-days:30}") int writeOffDays) {
+                                @Value("${app.loan.overdue.write-off-days:30}") int writeOffDays,
+                                @Value("${app.loan.overdue.scan-batch-limit:1000}") int batchLimit) {
         this.collectionUseCase = collectionUseCase;
         this.loadLoanPort = loadLoanPort;
         this.clock = clock;
         this.graceDays = graceDays;
         this.writeOffDays = writeOffDays;
+        this.batchLimit = batchLimit;
     }
 
     /** 매일 03:00 KST — 만기 경과 연체 승격 + 상각 임계 경과 상각. */
@@ -60,14 +62,15 @@ public class LoanOverdueScheduler {
     /** 만기(+grace) 경과한 DISBURSED 대출을 OVERDUE 로 승격. 처리 건수 반환. */
     int promoteOverdue() {
         LocalDateTime asOf = LocalDateTime.now(clock).minusDays(graceDays);
-        List<LoanAdvance> candidates = loadLoanPort.findOverdueCandidates(asOf);
+        List<Long> candidateIds = loadLoanPort.findOverdueCandidateIds(asOf, batchLimit);
+        warnIfBatchFull(candidateIds.size(), "연체 승격");
         int done = 0;
-        for (LoanAdvance loan : candidates) {
+        for (Long loanId : candidateIds) {
             try {
-                collectionUseCase.markOverdue(loan.getId());
+                collectionUseCase.markOverdue(loanId);
                 done++;
             } catch (RuntimeException e) {
-                log.warn("[LoanOverdueScan] 연체 승격 실패 — 스킵. loanId={}, 사유={}", loan.getId(), e.getMessage());
+                log.warn("[LoanOverdueScan] 연체 승격 실패 — 스킵. loanId={}, 사유={}", loanId, e.getMessage());
             }
         }
         return done;
@@ -76,16 +79,24 @@ public class LoanOverdueScheduler {
     /** 만기 후 writeOffDays 경과한 OVERDUE 대출을 WRITTEN_OFF 로 상각(대손 전표). 처리 건수 반환. */
     int promoteWriteOff() {
         LocalDateTime asOf = LocalDateTime.now(clock).minusDays(writeOffDays);
-        List<LoanAdvance> candidates = loadLoanPort.findWriteOffCandidates(asOf);
+        List<Long> candidateIds = loadLoanPort.findWriteOffCandidateIds(asOf, batchLimit);
+        warnIfBatchFull(candidateIds.size(), "상각");
         int done = 0;
-        for (LoanAdvance loan : candidates) {
+        for (Long loanId : candidateIds) {
             try {
-                collectionUseCase.writeOff(loan.getId());
+                collectionUseCase.writeOff(loanId);
                 done++;
             } catch (RuntimeException e) {
-                log.warn("[LoanOverdueScan] 상각 실패 — 스킵. loanId={}, 사유={}", loan.getId(), e.getMessage());
+                log.warn("[LoanOverdueScan] 상각 실패 — 스킵. loanId={}, 사유={}", loanId, e.getMessage());
             }
         }
         return done;
+    }
+
+    /** 배치 상한에 도달하면 조용한 절단 대신 남은 백로그가 다음 스캔으로 이월됨을 명시적으로 남긴다. */
+    private void warnIfBatchFull(int scanned, String phase) {
+        if (scanned >= batchLimit) {
+            log.warn("[LoanOverdueScan] {} 후보가 배치 상한({})에 도달 — 나머지는 다음 스캔에서 처리(이월)", phase, batchLimit);
+        }
     }
 }

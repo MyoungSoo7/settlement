@@ -2,5 +2,5 @@
   "orderId": 5001,
   "sellerId": 777,
   "stockCode": "005930",
-  "amount": 1000000
+  "amount": "1000000"
 }

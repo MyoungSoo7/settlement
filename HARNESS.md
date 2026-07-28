@@ -2,12 +2,18 @@
 
 > Claude Code 개발 하네스 구성 — 헥사고날 + 정산/결제/금융 도메인 전용 에이전트·스킬·커맨드·가드 구성
 
-**Last updated:** 2026-07-22
+**Last updated:** 2026-07-25
 
 ## 목적
-정산·금융 시스템은 **도메인 복잡도**와 **회계/감사 요건**, **MSA 경계(서비스 간 코드·DB 의존 0)** 때문에 일반 백엔드 에이전트로 커버하기 어렵다. 본 하네스는 (1) 도메인 전문 서브에이전트, (2) 서비스별 강제 규칙 스킬, (3) 운영/설명 커맨드, (4) 돈 경로 가드를 층으로 분리해 운영한다. 원칙: **결정적인 것은 훅·게이트로 강제, 판단이 필요한 것은 에이전트로 위임, 작성과 검증은 분리.**
+정산·금융 시스템은 **도메인 복잡도**와 **회계/감사 요건**, **MSA 경계(서비스 간 코드·DB 의존 0)** 때문에 일반 백엔드 에이전트로 커버하기 어렵다. 본 하네스는 **5계층**으로 분리해 운영한다 — (1) 도메인 전문 서브에이전트(판단 위임), (2) 서비스별 강제 규칙 스킬(온디맨드 지식),
+(3) 운영/설명 커맨드(워크플로 진입점), (4) 돈 경로·경계 가드와 검증 게이트(기계 차단), (5) 라우터·텔레메트리(권장 주입과 관측).
+원칙: **결정적인 것은 훅·게이트로 강제, 판단이 필요한 것은 에이전트로 위임, 작성과 검증은 분리.**
+계층 (4)·(5)는 `scripts/harness/` 에 저장소 추적으로 구현되어 **플러그인·MCP 없이도 동작**한다(이 하네스의 이식성 전제).
 
 ## 디렉토리 구조
+하네스는 **두 축**으로 나뉜다 — `.claude/`(모델에게 주는 지식·역할)와 `scripts/harness/`(기계가 강제하는 실행 코어).
+전자는 플러그인·런타임에 따라 로드가 달라지지만, 후자는 **저장소에 추적되어 CI·새 클론·Codex 에서도 동일하게 동작**한다.
+
 ```
 .claude/
 ├── agents/                            # 서브에이전트 (별도 컨텍스트, 역할 위임)
@@ -27,6 +33,7 @@
 │   ├── debugging-discipline · tdd-discipline · verify-before-done  # 절차 규율(플러그인 독립 — 외부 스킬 위임 금지)
 │   ├── settlement-integration-test                                 # Testcontainers 통합테스트 작성
 │   ├── msa-service-wiring · event-contract-change · projection-view-ops  # 확장 절차 (서비스 배선·이벤트 계약·프로젝션)
+│   ├── oo-score · hookify-to-guard                                 # OO 5축 재채점(LLM 판정) · 훅 규칙 → guard 이식
 │   └── socrates·wonder·reflect·refine·restate·evolve-step·ontology·interview-harness  # 요구사항 인터뷰 서브하네스
 ├── commands/                          # 슬래시 커맨드 (워크플로 진입점)
 │   ├── settlement-explain · loan-credit-explain · investment-score-explain  # 산정 근거 풀이(CS/CEO)
@@ -35,8 +42,21 @@
 │   ├── harness-check                                                        # 하네스 자기 진단(드리프트·가드·라우팅)
 │   ├── ai-dev-team.md                 # 전사 역할 산출물 일괄 생성
 │   └── agents/                        # 역할별 산출물 생성 서브커맨드
-├── settings.json / settings.local.json  # 훅·권한 (PreToolUse/PostToolUse 가드, allowlist)
+├── settings.json / settings.local.json  # 훅·권한 (PreToolUse 가드·라우터, SessionStart 텔레메트리, allowlist)
+├── harness/                           # 하네스 런타임 (gitignore — logs/ 텔레메트리 jsonl, state/ 라우터 세션 상태)
 └── (worktrees/)                       # 격리 작업공간 (병렬 세션 충돌 회피)
+
+scripts/harness/                       # ★ 실행 코어 — 저장소 추적, 플러그인·MCP 0 의존 (CI 에서 그대로 재실행)
+├── guard.mjs · hooks/pre-commit · install-hooks.mjs   # 불변식 가드 3중 강제(실시간·커밋·CI)
+├── skill-router.mjs                   # 편집 경로 → *-rules 스킬 리마인더 주입 (권장의 기계화)
+├── harness-audit.mjs                  # 하네스 자기 진단 (문서 드리프트·라우팅 dangling·훅 무결성)
+├── telemetry.mjs · telemetry-report.mjs · session-metrics.mjs   # 관측 계층 (적재·집계·KPI)
+├── interview-harness.mjs              # 요구사항 인터뷰 루프(Claude/Codex 듀얼 플랫폼 계약)
+├── manifest.json                      # 하네스 구성요소 추적 목록 — CI 가 git ls-files 로 실존 검증
+└── test/*.test.mjs (7종)              # 하네스 자기 테스트 — `node --test scripts/harness/test/*.test.mjs`
+
+.codex/{skills,agents,prompts}/        # Codex 미러 — interview-harness 계열은 Claude/Codex 양쪽 정본 쌍으로
+                                       #   유지되고 manifest 의 criticalContractPairs 가 드리프트를 차단
 ```
 
 ## 대상 코드베이스
@@ -47,6 +67,11 @@
 `order-commerce` · `settlement-domain` · `loan-domain` · `investment-domain` · `account-domain` ·
 `financial-data` · `economics-data` · `market-quotes` · `company-news` · `commondata-connector` ·
 `operation-signal` · `ai-chat` — 각 서비스 로직 작성·수정·리뷰 시 해당 `*-rules` 스킬이 강제 규칙(상태머신·정책·경계)을 로드.
+로드는 규율이 아니라 `skill-router.mjs` 가 편집 경로를 보고 **자동 주입**한다(아래 "강제 지점").
+
+> **커버리지 공백(명시)**: 13서비스 중 `organization-service` 만 전용 `*-rules` 스킬이 없다 — 이벤트 발행 전용이고
+> 소비처가 아직 미배선이라 강제할 상태머신·회계 규칙이 없기 때문. 소비처가 붙는 시점에 `organization-rules` 를
+> 추가하고 라우터 표(`ROUTES`)에 경로 1행을 함께 배선한다(조용한 누락이 아니라 알려진 부채).
 
 > **에이전트 로스터 설계 원칙 (의도된 공백)**: 전용 서브에이전트는 **고위험·상태보존 축**(정산·GL·이벤트 계약·헥사 경계·보안·쿼리)에만 둔다. 공개 read-only 위성(financial·economics·market·commondata)과 부가(operation·ai)는 상태 변이·회계 리스크가 낮아 **`*-rules` 스킬 + ArchUnit 게이트로 커버하는 것이 의도된 설계**다 — 서비스마다 에이전트를 만들지 않는다(로스터 비대화 = 안티패턴).
 
@@ -89,6 +114,32 @@
 > 프로젝트 스킬의 게이트 수치·절차가 우선한다(지침 우선순위: 프로젝트 CLAUDE.md/HARNESS.md > 플러그인 주입).
 > OMC skill-injector 는 omc-learned 디렉토리만 스캔하므로 `.claude/skills/**` 와 충돌하지 않는다(2026-07-22 실사).
 
+## 강제 지점 (하네스가 실제로 개입하는 순간)
+문서 규율이 아니라 **훅으로 배선된 실행 지점**이 정본이다. 배선은 `.claude/settings.json` · `scripts/harness/hooks/pre-commit` ·
+`.github/workflows/harness-guard.yml` 세 곳에만 존재한다.
+
+> | 시점 | 트리거 | 실행 | 실패 시 |
+> |---|---|---|---|
+> | 파일 편집 직전 | PreToolUse `Write\|Edit\|MultiEdit` | `guard.mjs --hook` | **exit 2 = 편집 차단** |
+> | 파일 편집·스킬 호출 직전 | PreToolUse `Write\|Edit\|MultiEdit\|Skill` | `skill-router.mjs --hook` | 차단 없음(항상 exit 0) — 스킬 로드 리마인더 주입 |
+> | 세션 시작 | SessionStart | `telemetry-report.mjs --hook` | 차단 없음 — 최근 차단·라우터 순응률 요약 주입(알릴 것 없으면 침묵) |
+> | `git commit` | `core.hooksPath=scripts/harness/hooks` | `guard.mjs --staged` | **커밋 거부** (`--no-verify` 우회 금지) |
+> | PR·push (develop/main) | `harness-guard.yml` | 하네스 자기 테스트 → `guard.mjs --list` → `harness-audit.mjs` → manifest 추적 검증 → 워킹트리 청결 | **CI 실패** (로컬 훅 미설치·우회를 재차단) |
+>
+> 훅 설치는 `node scripts/harness/install-hooks.mjs` — 미설치 시 로컬 커밋 가드만 비고, 실시간 훅과 CI 는 그대로 산다(3중 구성의 목적).
+
+**guard.mjs 규칙 인벤토리** (전부 차단성 — 발화는 텔레메트리에 규칙 ID 로 적재되어 죽은 규칙을 식별할 수 있다):
+`MONEY-PRIMITIVE` · `MONEY-BIGDECIMAL-DOUBLE`(금액 double/float·`new BigDecimal(더블 리터럴)`) ·
+`IMMUTABLE-HISTORY` · `MSA-BOUNDARY`(settlement→order import, `import static` 포함) · `ACCOUNT-CONSUME-ONLY` ·
+`MARKET-NO-VALUATION` · `OO-DOMAIN-SETTER` · `OO-DOMAIN-MUTABLE-LOMBOK` · `OO-DOMAIN-GENERIC-IAE` ·
+`INVALID-ALLOWANCE`(예외 주석은 reason·issue·owner·미래 expires 필수 — 무기한 면제 금지) · 운영 DB 직접 조작 명령 차단(`check-command`).
+
+**skill-router.mjs 라우트 표** (경로 → 주입 스킬, 세션당 스킬별 1회 · 최대 3개): 13개 서비스 디렉토리 → 각 `{서비스}-rules`
+(settlement `ledger` 경로·account 는 `ledger-invariants` 동반) · `outbox/`·`adapter/in/kafka/`·`adapter/out/event/` →
+`idempotency-and-events` · settlement `readmodel|projection` → `projection-view-ops` · `contracts/events/` →
+`event-contract-change` · `.claude/hookify.*.local.md` → `hookify-to-guard` · 그 외 `src/{main,test}/` 첫 편집 → `tdd-discipline`.
+라우팅 맵 표의 "만지면 로드"와 이 표가 **같은 사실의 두 표현**이므로, 한쪽을 바꾸면 다른 쪽도 바꾼다(`skill-router.test.mjs` 가 회귀 방지).
+
 ## 도구 접근 (MCP + 플러그인 독립 이중 경로)
 운영/정합 데이터 접근은 **운영 DB 직접 접속 금지** — 아래 두 경로 중 하나만 쓴다. MCP 미설치(CI·새 클론·Codex)에서도 하네스가 죽지 않도록 **저장소 네이티브 경로를 항상 병존**시킨다.
 - **경로 A — MCP(리치, 플러그인 설치 시)**: settlement/invest-copilot MCP 도구(`recon_run`·`ledger_entries`·`projection_status`·`outbox_status`·`integrity_check`·`trial_balance` 등). 대화형 조사에 최적.
@@ -115,7 +166,8 @@
 ## 검증 게이트 (ground truth — 모델 주장이 아니라 기계 판정)
 - **ArchUnit** — 헥사고날 경계·서비스 간 의존 방향
 - **JaCoCo** — CI LINE 90% / 핵심 도메인 INSTRUCTION 80% (측정은 게이트 태스크가 정답)
-- **이벤트 계약 테스트** — cross-service 10토픽 스키마 드리프트 빌드 시점 차단 (ADR 0024)
+- **이벤트 계약 테스트** — cross-service 토픽 스키마 드리프트 빌드 시점 차단 (ADR 0024). 계약 토픽 수는 여기 복제하지 않는다 —
+  정본은 `shared-common/src/testFixtures/resources/contracts/events/` (`git ls-files 'shared-common/src/testFixtures/resources/contracts/events/*.schema.json' | wc -l`)
 - **돈 경로 가드(저장소 추적)** — `scripts/harness/guard.mjs`: 실시간 PreToolUse(exit 2 차단) + git pre-commit(`core.hooksPath`, `node scripts/harness/install-hooks.mjs`) 이중. 플러그인 독립 — BigDecimal·이력불변·MSA 경계·account 발행금지·market 밸류에이션 + **OO 구조(도메인 public setter·@Setter/@Data·금융 5서비스 generic IAE)** 위반 차단. `--no-verify` 우회 금지. copilot 플러그인 가드가 있으면 2차 레이어로 병존.
   머니 규칙은 선언·파라미터·반환타입·배열·캐스트·var 더블 리터럴 추론과 `new BigDecimal(더블 리터럴)` 생성자까지 커버하고,
   **라인+파일(멀티라인) 이중 스캔**으로 개행 분할 우회를 차단한다. `--staged` 는 돈 경로 프로덕션 변경이 테스트 변경 없이
@@ -169,6 +221,6 @@ node scripts/harness/harness-audit.mjs
 ## 관련 문서
 - `CLAUDE.md` — 에이전트 운용 규칙 / 아키텍처 경계·컨벤션
 - `SPEC.md` — 전체 기능명세(엔드포인트·도메인 규칙·이벤트 카탈로그)
-- `STATUS.md` — 프로젝트 상태 (13서비스, 계정계·투자 확장, ADR 27)
+- `STATUS.md` — 프로젝트 상태 (13서비스, 계정계·투자 확장) · **모든 휘발성 수치의 단일 출처**
 - `docs/PORTFOLIO.md` — 면접용 1장 요약 · `README.md` — 아키텍처 개요
-- `docs/adr/` — 아키텍처 결정 기록 27개
+- `docs/adr/` — 아키텍처 결정 기록 (개수 정본: `STATUS.md#핵심 수치`)

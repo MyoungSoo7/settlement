@@ -1,0 +1,2616 @@
+diff --git a/frontend/e2e/loan.spec.ts b/frontend/e2e/loan.spec.ts
+new file mode 100644
+index 000000000..711585d1a
+--- /dev/null
++++ b/frontend/e2e/loan.spec.ts
+@@ -0,0 +1,108 @@
++import { test, expect, type Route } from '@playwright/test';
++
++/**
++ * 대출 화면 신규 UI 동작 검증 — 로컬 dev 서버 + route mock.
++ *
++ * dev 는 /loans 프록시가 없고 위성 데이터가 붙지 않으므로(프로젝트 관례), 토큰을 localStorage 에 주입하고
++ * 백엔드 응답을 mock 해 화면 렌더·상호작용만 결정적으로 검증한다. 실제 인가는 백엔드가 강제.
++ *
++ * ⚠️ Playwright 의 glob/정규식/술어 라우트는 쿼리스트링 URL(예: /loans?sellerId=1)을 신뢰성 있게 매칭하지
++ * 못한다(SPA 경로 /loans 와 API 경로 /loans 충돌). 그래서 '**\/*' 단일 catch-all 로 모든 요청을 가로채
++ * URL 로 분기한다 — 매칭이 확정적이고 브라우저 캐시도 우회된다.
++ *
++ * 실행: 로컬 vite(`npm run dev`, 3000) 기동 후 PLAYWRIGHT_BASE_URL=http://localhost:3000 로 이 스펙만 실행.
++ */
++
++const seedAdmin = () => {
++  localStorage.setItem('access_token', 'e2e-dev-token');
++  localStorage.setItem('user_email', 'admin@example.com');
++  localStorage.setItem('user_role', 'ADMIN');
++  localStorage.setItem('login_timestamp', '2026-07-24T09:00:00.000Z');
++};
++
++const json = (route: Route, body: unknown) =>
++  route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) });
++
++// 서비스워커가 XHR 을 가로채면 page.route 가 무력화된다(문서 요청만 잡히고 fetch 는 SW 로 흐름).
++// SW 를 차단해 모든 요청이 네트워크(→ page.route)로 흐르게 한다.
++test.use({ serviceWorkers: 'block' });
++
++test.describe('대출 화면 — 신규 UI (만기 / 연체·상각 / 기업 상환)', () => {
++  test.beforeEach(async ({ page }) => {
++    // HTTP 캐시 비활성화 — dev 서버가 /loans?sellerId= 를 index.html(200)로 응답하면 브라우저가 캐시하고,
++    // 캐시 히트는 page.route 가 가로채지 못한다(요청 이벤트만 발생). CDP 로 캐시를 꺼 모든 요청을 네트워크로 강제.
++    const cdp = await page.context().newCDPSession(page);
++    await cdp.send('Network.setCacheDisabled', { cacheDisabled: true });
++    await page.addInitScript(seedAdmin);
++  });
++
++  test('선정산 목록: 만기 컬럼 + ADMIN 연체/상각 버튼 + 연체 실행', async ({ page }) => {
++    let overdueCalled = false;
++    await page.route('**/*', async (route) => {
++      const url = route.request().url();
++      if (url.includes('/loans/1/overdue')) {
++        overdueCalled = true;
++        return json(route, { id: 1, sellerId: 1, principal: 800000, fee: 800, outstanding: 800800, status: 'OVERDUE', dueAt: '2026-07-17T09:00:00' });
++      }
++      if (url.includes('/loans') && url.includes('sellerId')) {
++        return json(route, [
++          { id: 1, sellerId: 1, principal: 800000, fee: 800, outstanding: 800800, status: 'DISBURSED', disbursedAt: '2026-07-10T09:00:00', dueAt: '2026-07-17T09:00:00' },
++          { id: 2, sellerId: 1, principal: 500000, fee: 500, outstanding: 500500, status: 'OVERDUE', disbursedAt: '2026-06-01T09:00:00', dueAt: '2026-06-08T09:00:00' },
++        ]);
++      }
++      return route.continue();
++    });
++
++    await page.goto('/loans');
++    await page.getByRole('button', { name: '조회' }).click();
++
++    await expect(page.getByRole('columnheader', { name: '만기' })).toBeVisible();
++    await expect(page.getByRole('cell', { name: /2026/ }).first()).toBeVisible();
++    await expect(page.getByText('OVERDUE')).toBeVisible();
++    await expect(page.getByRole('button', { name: '연체' })).toBeVisible();
++    await expect(page.getByRole('button', { name: '상각' })).toBeVisible();
++
++    await page.getByRole('button', { name: '연체' }).click();
++    await expect.poll(() => overdueCalled, { timeout: 5000 }).toBe(true);
++    await expect(page.getByText(/연체 처리 완료/)).toBeVisible();
++
++    await page.screenshot({ path: 'e2e/__screenshots__/loan-seller.png', fullPage: true });
++  });
++
++  test('기업대출: DISBURSED 에 상환 버튼 + 상환 실행(금액 전달)', async ({ page }) => {
++    let repayAmount: number | null = null;
++    await page.route('**/*', async (route) => {
++      const req = route.request();
++      const url = req.url();
++      if (url.includes('/loans/corporate/5001/repay')) {
++        repayAmount = req.postDataJSON()?.amount ?? null;
++        return json(route, { id: 5001, stockCode: '005930', corpName: '삼성전자', principal: 1000000, fee: 6000, outstanding: 406000, termDays: 30, creditScore: 82, creditGrade: 'A', status: 'DISBURSED' });
++      }
++      if (url.includes('/loans/corporate/credit/005930')) {
++        return json(route, { stockCode: '005930', corpName: '삼성전자', market: 'KOSPI', fiscalYear: 2025, creditScore: 82, creditGrade: 'A', limit: 5000000, debtRatio: 40.2, operatingMargin: 15.5, roa: 8.1, reputationGrade: 'B' });
++      }
++      if (url.includes('/loans/corporate') && url.includes('stockCode=005930')) {
++        return json(route, [{ id: 5001, stockCode: '005930', corpName: '삼성전자', principal: 1000000, fee: 6000, outstanding: 1006000, termDays: 30, creditScore: 82, creditGrade: 'A', status: 'DISBURSED' }]);
++      }
++      if (url.includes('/api/financial/companies')) {
++        return json(route, { content: [{ stockCode: '005930', name: '삼성전자', market: 'KOSPI' }], totalElements: 1, totalPages: 1, number: 0, size: 10 });
++      }
++      return route.continue();
++    });
++
++    await page.goto('/loans');
++    await page.getByRole('button', { name: '기업대출' }).click();
++    await page.getByPlaceholder('기업명 또는 종목코드').fill('삼성');
++    await page.getByRole('button', { name: '검색' }).click();
++    await page.getByRole('button', { name: /삼성전자/ }).click();
++
++    const repayBtn = page.getByRole('button', { name: '상환' });
++    await expect(repayBtn).toBeVisible();
++    await repayBtn.click();
++    await page.getByRole('button', { name: '확인' }).click();
++    await expect.poll(() => repayAmount, { timeout: 5000 }).toBe(1006000);
++    await expect(page.getByText(/기업대출 상환 완료/)).toBeVisible();
++
++    await page.screenshot({ path: 'e2e/__screenshots__/loan-corporate.png', fullPage: true });
++  });
++});
+diff --git a/frontend/src/__tests__/api/loan.test.ts b/frontend/src/__tests__/api/loan.test.ts
+new file mode 100644
+index 000000000..6c6d98a6e
+--- /dev/null
++++ b/frontend/src/__tests__/api/loan.test.ts
+@@ -0,0 +1,112 @@
++import { describe, it, expect, vi, beforeEach } from 'vitest';
++import { loanApi, type LoanResponse, type CorporateLoan } from '@/api/loan';
++import api from '@/api/axios';
++
++vi.mock('@/api/axios', () => ({
++  default: {
++    get: vi.fn(),
++    post: vi.fn(),
++  },
++}));
++
++const sellerLoan: LoanResponse = {
++  id: 1,
++  sellerId: 7,
++  principal: 800_000,
++  fee: 800,
++  outstanding: 800_800,
++  status: 'DISBURSED',
++  disbursedAt: '2026-07-24T09:00:00',
++  dueAt: '2026-07-31T09:00:00',
++};
++
++const corporateLoan: CorporateLoan = {
++  id: 5001,
++  stockCode: '005930',
++  corpName: '삼성전자',
++  principal: 1_000_000,
++  fee: 6_000,
++  outstanding: 1_006_000,
++  termDays: 30,
++  creditScore: 82,
++  creditGrade: 'A',
++  status: 'DISBURSED',
++};
++
++describe('loanApi', () => {
++  beforeEach(() => {
++    vi.resetAllMocks();
++  });
++
++  describe('선정산 대출', () => {
++    it('신청은 POST /loans 로 보낸다', async () => {
++      vi.mocked(api.post).mockResolvedValueOnce({ data: sellerLoan });
++
++      const result = await loanApi.request({ sellerId: 7, principal: 800_000, financingDays: 7 });
++
++      expect(api.post).toHaveBeenCalledWith('/loans', { sellerId: 7, principal: 800_000, financingDays: 7 });
++      expect(result.id).toBe(1);
++    });
++
++    it('실행은 POST /loans/{id}/disburse 로 보낸다', async () => {
++      vi.mocked(api.post).mockResolvedValueOnce({ data: sellerLoan });
++
++      await loanApi.disburse(1);
++
++      expect(api.post).toHaveBeenCalledWith('/loans/1/disburse');
++    });
++
++    it('셀러별 목록은 GET /loans?sellerId= 로 조회하고 만기일을 포함한다', async () => {
++      vi.mocked(api.get).mockResolvedValueOnce({ data: [sellerLoan] });
++
++      const result = await loanApi.bySeller(7);
++
++      expect(api.get).toHaveBeenCalledWith('/loans?sellerId=7');
++      expect(result[0].dueAt).toBe('2026-07-31T09:00:00');
++    });
++
++    it('연체 처리는 POST /loans/{id}/overdue 로 보낸다', async () => {
++      vi.mocked(api.post).mockResolvedValueOnce({ data: { ...sellerLoan, status: 'OVERDUE' } });
++
++      const result = await loanApi.markOverdue(1);
++
++      expect(api.post).toHaveBeenCalledWith('/loans/1/overdue');
++      expect(result.status).toBe('OVERDUE');
++    });
++
++    it('상각 처리는 POST /loans/{id}/write-off 로 보낸다', async () => {
++      vi.mocked(api.post).mockResolvedValueOnce({ data: { ...sellerLoan, status: 'WRITTEN_OFF' } });
++
++      const result = await loanApi.writeOff(1);
++
++      expect(api.post).toHaveBeenCalledWith('/loans/1/write-off');
++      expect(result.status).toBe('WRITTEN_OFF');
++    });
++  });
++
++  describe('기업대출', () => {
++    it('상환은 POST /loans/corporate/{id}/repay 로 금액을 함께 보낸다', async () => {
++      vi.mocked(api.post).mockResolvedValueOnce({ data: { ...corporateLoan, outstanding: 406_000 } });
++
++      const result = await loanApi.repayCorporate(5001, 600_000);
++
++      expect(api.post).toHaveBeenCalledWith('/loans/corporate/5001/repay', { amount: 600_000 });
++      expect(result.outstanding).toBe(406_000);
++    });
++
++    it('실행은 POST /loans/corporate/{id}/disburse 로 보낸다', async () => {
++      vi.mocked(api.post).mockResolvedValueOnce({ data: corporateLoan });
++
++      await loanApi.disburseCorporate(5001);
++
++      expect(api.post).toHaveBeenCalledWith('/loans/corporate/5001/disburse');
++    });
++
++    it('API 오류 시 에러를 throw한다', async () => {
++      const error = { response: { status: 403 } };
++      vi.mocked(api.post).mockRejectedValueOnce(error);
++
++      await expect(loanApi.repayCorporate(9999, 1)).rejects.toMatchObject({ response: { status: 403 } });
++    });
++  });
++});
+diff --git a/frontend/src/api/loan.ts b/frontend/src/api/loan.ts
+index 28bfeea0c..52b142e75 100644
+--- a/frontend/src/api/loan.ts
++++ b/frontend/src/api/loan.ts
+@@ -13,7 +13,9 @@ export interface LoanResponse {
+   principal: number;
+   fee: number;
+   outstanding: number;
+-  status: string;          // LoanStatus enum 이름
++  status: string;              // LoanStatus enum 이름 (REQUESTED/APPROVED/DISBURSED/REPAID/REJECTED/OVERDUE/WRITTEN_OFF)
++  disbursedAt?: string | null; // 실행 시각(ISO). 실행 전/구 데이터는 null
++  dueAt?: string | null;       // 만기일(ISO) = 실행시각 + 선지급일수. 자동 연체/상각 기준
+ }
+ 
+ /** 기업대출 신용등급 (A 최상 ~ E 최하) */
+@@ -76,6 +78,18 @@ export const loanApi = {
+     return res.data;
+   },
+ 
++  /** 연체 진입(ADMIN 회수). POST /loans/{id}/overdue */
++  markOverdue: async (id: number): Promise<LoanResponse> => {
++    const res = await api.post<LoanResponse>(`/loans/${id}/overdue`);
++    return res.data;
++  },
++
++  /** 상각(ADMIN 대손 확정). POST /loans/{id}/write-off */
++  writeOff: async (id: number): Promise<LoanResponse> => {
++    const res = await api.post<LoanResponse>(`/loans/${id}/write-off`);
++    return res.data;
++  },
++
+   /** 기업 신용평가. GET /loans/corporate/credit/{stockCode} */
+   corporateCredit: async (stockCode: string): Promise<CorporateCredit> => {
+     const res = await api.get<CorporateCredit>(`/loans/corporate/credit/${stockCode}`);
+@@ -94,6 +108,12 @@ export const loanApi = {
+     return res.data;
+   },
+ 
++  /** 기업대출 상환(미상환잔액 차감). POST /loans/corporate/{id}/repay */
++  repayCorporate: async (id: number, amount: number): Promise<CorporateLoan> => {
++    const res = await api.post<CorporateLoan>(`/loans/corporate/${id}/repay`, { amount });
++    return res.data;
++  },
++
+   /** 종목별 기업대출 목록. GET /loans/corporate?stockCode= */
+   corporateByStock: async (stockCode: string): Promise<CorporateLoan[]> => {
+     const res = await api.get<CorporateLoan[]>(`/loans/corporate?stockCode=${stockCode}`);
+diff --git a/frontend/src/pages/LoanPage.tsx b/frontend/src/pages/LoanPage.tsx
+index 0747ad45e..11dff95d7 100644
+--- a/frontend/src/pages/LoanPage.tsx
++++ b/frontend/src/pages/LoanPage.tsx
+@@ -6,6 +6,7 @@ import {
+   type CorporateLoan,
+ } from '@/api/loan';
+ import { financialApi, type FinancialCompany, type FinancialCompanyPage } from '@/api/financial';
++import { authApi } from '@/api/auth';
+ import Card from '@/components/Card';
+ import Spinner from '@/components/Spinner';
+ 
+@@ -15,6 +16,9 @@ const fmt = (v: number) =>
+ const pct = (v: number | null | undefined) =>
+   v === null || v === undefined ? 'N/A' : `${v.toFixed(2)}%`;
+ 
++const fmtDate = (v?: string | null) =>
++  v ? new Date(v).toLocaleDateString('ko-KR') : '-';
++
+ const statusBadge = (s: string) => ({
+   REQUESTED: 'bg-yellow-100 text-yellow-800',
+   APPROVED:  'bg-blue-100 text-blue-800',
+@@ -22,6 +26,7 @@ const statusBadge = (s: string) => ({
+   REPAYING:  'bg-indigo-100 text-indigo-800',
+   REPAID:    'bg-green-100 text-green-800',
+   OVERDUE:   'bg-red-100 text-red-800',
++  WRITTEN_OFF: 'bg-gray-800 text-white',
+   REJECTED:  'bg-red-100 text-red-800',
+   CANCELED:  'bg-gray-200 text-gray-700',
+ }[s] ?? 'bg-gray-100 text-gray-800');
+@@ -50,6 +55,9 @@ const SellerLoanSection: React.FC = () => {
+   const [loadingList, setLoadingList] = useState(false);
+   const [busyId, setBusyId] = useState<number | null>(null);
+ 
++  // 연체·상각은 회수 담당자(ADMIN) 전용 조작 — JWT 역할로 노출 여부를 가른다.
++  const isAdmin = authApi.getCurrentUser()?.role === 'ADMIN';
++
+   const loadLoans = async (sid: number) => {
+     setLoadingList(true);
+     setError(null);
+@@ -94,6 +102,36 @@ const SellerLoanSection: React.FC = () => {
+     }
+   };
+ 
++  const handleMarkOverdue = async (id: number) => {
++    setBusyId(id);
++    setError(null);
++    setNotice(null);
++    try {
++      await loanApi.markOverdue(id);
++      setNotice(`#${id} 연체 처리 완료`);
++      await loadLoans(querySellerId);
++    } catch (err: any) {
++      setError(err.response?.data?.message || '연체 처리에 실패했습니다.');
++    } finally {
++      setBusyId(null);
++    }
++  };
++
++  const handleWriteOff = async (id: number) => {
++    setBusyId(id);
++    setError(null);
++    setNotice(null);
++    try {
++      await loanApi.writeOff(id);
++      setNotice(`#${id} 상각(대손) 처리 완료`);
++      await loadLoans(querySellerId);
++    } catch (err: any) {
++      setError(err.response?.data?.message || '상각 처리에 실패했습니다.');
++    } finally {
++      setBusyId(null);
++    }
++  };
++
+   return (
+     <div className="space-y-6">
+       {error && (
+@@ -163,33 +201,65 @@ const SellerLoanSection: React.FC = () => {
+                   <th className="py-2 px-2">원금</th>
+                   <th className="py-2 px-2">수수료</th>
+                   <th className="py-2 px-2">미상환</th>
++                  <th className="py-2 px-2">만기</th>
+                   <th className="py-2 px-2">상태</th>
+                   <th className="py-2 px-2 text-right">액션</th>
+                 </tr>
+               </thead>
+               <tbody>
+-                {loans.map((l) => (
+-                  <tr key={l.id} className="border-b last:border-0">
+-                    <td className="py-2.5 px-2 font-medium">#{l.id}</td>
+-                    <td className="py-2.5 px-2">{fmt(l.principal)}</td>
+-                    <td className="py-2.5 px-2 text-gray-600">{fmt(l.fee)}</td>
+-                    <td className="py-2.5 px-2 font-semibold">{fmt(l.outstanding)}</td>
+-                    <td className="py-2.5 px-2">
+-                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${statusBadge(l.status)}`}>
+-                        {l.status}
+-                      </span>
+-                    </td>
+-                    <td className="py-2.5 px-2 text-right">
+-                      <button
+-                        disabled={busyId === l.id}
+-                        onClick={() => handleDisburse(l.id)}
+-                        className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-40"
+-                      >
+-                        {busyId === l.id ? '처리중...' : '실행(선지급)'}
+-                      </button>
+-                    </td>
+-                  </tr>
+-                ))}
++                {loans.map((l) => {
++                  const canDisburse = l.status === 'REQUESTED' || l.status === 'APPROVED';
++                  const canOverdue = isAdmin && l.status === 'DISBURSED';
++                  const canWriteOff = isAdmin && l.status === 'OVERDUE';
++                  return (
++                    <tr key={l.id} className="border-b last:border-0">
++                      <td className="py-2.5 px-2 font-medium">#{l.id}</td>
++                      <td className="py-2.5 px-2">{fmt(l.principal)}</td>
++                      <td className="py-2.5 px-2 text-gray-600">{fmt(l.fee)}</td>
++                      <td className="py-2.5 px-2 font-semibold">{fmt(l.outstanding)}</td>
++                      <td className="py-2.5 px-2 text-gray-600">{fmtDate(l.dueAt)}</td>
++                      <td className="py-2.5 px-2">
++                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${statusBadge(l.status)}`}>
++                          {l.status}
++                        </span>
++                      </td>
++                      <td className="py-2.5 px-2 text-right">
++                        <div className="flex justify-end gap-1.5">
++                          {canDisburse && (
++                            <button
++                              disabled={busyId === l.id}
++                              onClick={() => handleDisburse(l.id)}
++                              className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-40"
++                            >
++                              {busyId === l.id ? '처리중...' : '실행(선지급)'}
++                            </button>
++                          )}
++                          {canOverdue && (
++                            <button
++                              disabled={busyId === l.id}
++                              onClick={() => handleMarkOverdue(l.id)}
++                              className="px-3 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-semibold hover:bg-amber-700 transition-colors disabled:opacity-40"
++                            >
++                              {busyId === l.id ? '처리중...' : '연체'}
++                            </button>
++                          )}
++                          {canWriteOff && (
++                            <button
++                              disabled={busyId === l.id}
++                              onClick={() => handleWriteOff(l.id)}
++                              className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-semibold hover:bg-red-700 transition-colors disabled:opacity-40"
++                            >
++                              {busyId === l.id ? '처리중...' : '상각'}
++                            </button>
++                          )}
++                          {!canDisburse && !canOverdue && !canWriteOff && (
++                            <span className="text-xs text-gray-400">-</span>
++                          )}
++                        </div>
++                      </td>
++                    </tr>
++                  );
++                })}
+               </tbody>
+             </table>
+           </div>
+@@ -220,6 +290,10 @@ const CorporateLoanSection: React.FC = () => {
+   const [loans, setLoans] = useState<CorporateLoan[]>([]);
+   const [busyId, setBusyId] = useState<number | null>(null);
+ 
++  // 상환 입력(인라인)
++  const [repayId, setRepayId] = useState<number | null>(null);
++  const [repayAmount, setRepayAmount] = useState<number>(0);
++
+   const [error, setError] = useState<string | null>(null);
+   const [notice, setNotice] = useState<string | null>(null);
+ 
+@@ -240,6 +314,7 @@ const CorporateLoanSection: React.FC = () => {
+     setSelected(company);
+     setCredit(null);
+     setLoans([]);
++    setRepayId(null);
+     setLoadingCredit(true);
+     setError(null);
+     try {
+@@ -291,6 +366,24 @@ const CorporateLoanSection: React.FC = () => {
+     }
+   };
+ 
++  const handleRepay = async (id: number) => {
++    if (!selected || repayAmount <= 0) return;
++    setBusyId(id);
++    setError(null);
++    setNotice(null);
++    try {
++      await loanApi.repayCorporate(id, repayAmount);
++      setNotice(`#${id} 기업대출 상환 완료 (${fmt(repayAmount)})`);
++      setRepayId(null);
++      setRepayAmount(0);
++      setLoans(await loanApi.corporateByStock(selected.stockCode));
++    } catch (err: any) {
++      setError(err.response?.data?.message || '기업대출 상환에 실패했습니다.');
++    } finally {
++      setBusyId(null);
++    }
++  };
++
+   return (
+     <div className="space-y-6">
+       {error && (
+@@ -461,6 +554,40 @@ const CorporateLoanSection: React.FC = () => {
+                           >
+                             {busyId === l.id ? '처리중...' : '실행(선지급)'}
+                           </button>
++                        ) : l.status === 'DISBURSED' ? (
++                          repayId === l.id ? (
++                            <div className="flex items-center justify-end gap-1.5">
++                              <input
++                                type="number"
++                                min={1}
++                                step="any"
++                                value={repayAmount}
++                                onChange={(e) => setRepayAmount(Number(e.target.value))}
++                                className="w-28 px-2 py-1 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
++                                placeholder="상환액"
++                              />
++                              <button
++                                disabled={busyId === l.id || repayAmount <= 0}
++                                onClick={() => handleRepay(l.id)}
++                                className="px-2 py-1 bg-emerald-600 text-white rounded text-xs font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-40"
++                              >
++                                {busyId === l.id ? '...' : '확인'}
++                              </button>
++                              <button
++                                onClick={() => { setRepayId(null); setRepayAmount(0); }}
++                                className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs font-semibold hover:bg-gray-300 transition-colors"
++                              >
++                                취소
++                              </button>
++                            </div>
++                          ) : (
++                            <button
++                              onClick={() => { setRepayId(l.id); setRepayAmount(l.outstanding); }}
++                              className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-700 transition-colors"
++                            >
++                              상환
++                            </button>
++                          )
+                         ) : (
+                           <span className="text-xs text-gray-400">-</span>
+                         )}
+diff --git a/loan-service/build.gradle.kts b/loan-service/build.gradle.kts
+index b2cdf6375..c6a51c236 100644
+--- a/loan-service/build.gradle.kts
++++ b/loan-service/build.gradle.kts
+@@ -76,7 +76,9 @@ dependencies {
+     testImplementation("org.springframework.security:spring-security-test")
+     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+     testImplementation("org.mockito:mockito-core")
+-    testImplementation("com.tngtech.archunit:archunit-junit5:1.3.0")
++    // ArchUnit 1.4.x 부터 Java 25 바이트코드 파싱 — 1.3.0 은 클래스 임포트를 조용히 스킵해
++    // LoanArchitectureTest 방향 가드가 공허하게 통과(무력화)한다. account/settlement 와 버전 정렬.
++    testImplementation("com.tngtech.archunit:archunit-junit5:1.4.1")
+     testImplementation(platform("org.testcontainers:testcontainers-bom:1.21.4"))
+     testImplementation("org.testcontainers:junit-jupiter")
+     testImplementation("org.testcontainers:postgresql")
+diff --git a/loan-service/src/main/java/github/lms/lemuel/loan/adapter/in/web/CorporateLoanController.java b/loan-service/src/main/java/github/lms/lemuel/loan/adapter/in/web/CorporateLoanController.java
+index 524cf177f..95bac779a 100644
+--- a/loan-service/src/main/java/github/lms/lemuel/loan/adapter/in/web/CorporateLoanController.java
++++ b/loan-service/src/main/java/github/lms/lemuel/loan/adapter/in/web/CorporateLoanController.java
+@@ -1,14 +1,18 @@
+ package github.lms.lemuel.loan.adapter.in.web;
+ 
+ import github.lms.lemuel.loan.adapter.in.web.dto.CorporateCreditResponse;
++import github.lms.lemuel.loan.adapter.in.web.dto.CorporateLoanRepayRequest;
+ import github.lms.lemuel.loan.adapter.in.web.dto.CorporateLoanRequestBody;
+ import github.lms.lemuel.loan.adapter.in.web.dto.CorporateLoanResponse;
+ import github.lms.lemuel.loan.application.port.in.DisburseCorporateLoanUseCase;
+ import github.lms.lemuel.loan.application.port.in.EvaluateCorporateCreditUseCase;
++import github.lms.lemuel.loan.application.port.in.RepayCorporateLoanUseCase;
++import github.lms.lemuel.loan.application.port.in.RepayCorporateLoanUseCase.RepayCorporateLoanCommand;
+ import github.lms.lemuel.loan.application.port.in.RequestCorporateLoanUseCase;
+ import github.lms.lemuel.loan.application.port.in.RequestCorporateLoanUseCase.RequestCorporateLoanCommand;
+ import github.lms.lemuel.loan.application.port.out.LoadCorporateLoanPort;
+ import github.lms.lemuel.loan.domain.CorporateLoan;
++import github.lms.lemuel.loan.domain.exception.CorporateLoanNotFoundException;
+ import github.lms.lemuel.common.config.jwt.AuthPrincipal;
+ import jakarta.validation.Valid;
+ import org.springframework.http.HttpStatus;
+@@ -37,15 +41,18 @@ public class CorporateLoanController {
+     private final EvaluateCorporateCreditUseCase evaluateCorporateCreditUseCase;
+     private final RequestCorporateLoanUseCase requestCorporateLoanUseCase;
+     private final DisburseCorporateLoanUseCase disburseCorporateLoanUseCase;
++    private final RepayCorporateLoanUseCase repayCorporateLoanUseCase;
+     private final LoadCorporateLoanPort loadCorporateLoanPort;
+ 
+     public CorporateLoanController(EvaluateCorporateCreditUseCase evaluateCorporateCreditUseCase,
+                                    RequestCorporateLoanUseCase requestCorporateLoanUseCase,
+                                    DisburseCorporateLoanUseCase disburseCorporateLoanUseCase,
++                                   RepayCorporateLoanUseCase repayCorporateLoanUseCase,
+                                    LoadCorporateLoanPort loadCorporateLoanPort) {
+         this.evaluateCorporateCreditUseCase = evaluateCorporateCreditUseCase;
+         this.requestCorporateLoanUseCase = requestCorporateLoanUseCase;
+         this.disburseCorporateLoanUseCase = disburseCorporateLoanUseCase;
++        this.repayCorporateLoanUseCase = repayCorporateLoanUseCase;
+         this.loadCorporateLoanPort = loadCorporateLoanPort;
+     }
+ 
+@@ -65,10 +72,23 @@ public class CorporateLoanController {
+     }
+ 
+     @PostMapping("/{id}/disburse")
+-    public ResponseEntity<CorporateLoanResponse> disburse(@PathVariable Long id) {
++    public ResponseEntity<CorporateLoanResponse> disburse(@PathVariable Long id, Authentication authentication) {
++        // 집행(실자금 지급)은 소유권 대조를 강제한다: 본인 신청 대출이거나 운영자(ADMIN/MANAGER)여야 실행 가능.
++        // 식별자를 요청 경로가 아니라 JWT 주체에서 파생해 타인 대출 강제 실행을 차단한다(IDOR 가드레일).
++        requireOwnerOrOperator(id, authentication);
+         return ResponseEntity.ok(CorporateLoanResponse.from(disburseCorporateLoanUseCase.disburse(id)));
+     }
+ 
++    @PostMapping("/{id}/repay")
++    public ResponseEntity<CorporateLoanResponse> repay(@PathVariable Long id,
++                                                       @Valid @RequestBody CorporateLoanRepayRequest req,
++                                                       Authentication authentication) {
++        // 상환도 소유권 대조: 본인 대출이거나 운영자여야 상환을 반영할 수 있다(타인 대출 조작 차단).
++        requireOwnerOrOperator(id, authentication);
++        return ResponseEntity.ok(CorporateLoanResponse.from(
++                repayCorporateLoanUseCase.repay(new RepayCorporateLoanCommand(id, req.amount()))));
++    }
++
+     /**
+      * 기업대출 목록. ADMIN/MANAGER 는 전체(운영 콘솔), 그 외(CEO)는 본인 신청 건만 —
+      * 소유권 스코핑은 요청 파라미터가 아니라 JWT 주체에서 파생한다(IDOR 방지 가드레일).
+@@ -91,6 +111,23 @@ public class CorporateLoanController {
+         return ResponseEntity.ok(loans.stream().map(CorporateLoanResponse::from).toList());
+     }
+ 
++    /**
++     * 집행/상환 소유권 대조 — 대상 대출이 인증 주체 본인의 것이거나 주체가 운영자(ADMIN/MANAGER)여야 통과.
++     * 식별자는 요청 경로가 아니라 JWT 주체에서 파생한다(IDOR 가드레일). 대출 없으면 404, 소유권 불일치면 403.
++     */
++    private void requireOwnerOrOperator(Long loanId, Authentication authentication) {
++        Long caller = callerUserId(authentication);   // 미인증/식별불가 → 403
++        if (isOperator(authentication)) {
++            return;
++        }
++        CorporateLoan loan = loadCorporateLoanPort.findById(loanId)
++                .orElseThrow(() -> new CorporateLoanNotFoundException(
++                        "기업대출을 찾을 수 없습니다. loanId=" + loanId));
++        if (!caller.equals(loan.getOwnerUserId())) {
++            throw new AccessDeniedException("본인 소유가 아닌 기업대출입니다. loanId=" + loanId);
++        }
++    }
++
+     /** JWT 인증 주체에서 신청자 식별자(userId)를 추출한다. 미인증/식별불가면 403. */
+     private static Long callerUserId(Authentication authentication) {
+         if (authentication != null
+diff --git a/loan-service/src/main/java/github/lms/lemuel/loan/adapter/in/web/LoanController.java b/loan-service/src/main/java/github/lms/lemuel/loan/adapter/in/web/LoanController.java
+index 847b601db..9e1771619 100644
+--- a/loan-service/src/main/java/github/lms/lemuel/loan/adapter/in/web/LoanController.java
++++ b/loan-service/src/main/java/github/lms/lemuel/loan/adapter/in/web/LoanController.java
+@@ -4,9 +4,11 @@ import github.lms.lemuel.common.config.jwt.AuthPrincipal;
+ import github.lms.lemuel.loan.adapter.in.web.dto.LoanRequest;
+ import github.lms.lemuel.loan.adapter.in.web.dto.LoanResponse;
+ import github.lms.lemuel.loan.application.port.in.DisburseLoanUseCase;
++import github.lms.lemuel.loan.application.port.in.ManageLoanCollectionUseCase;
+ import github.lms.lemuel.loan.application.port.in.RequestLoanUseCase;
+ import github.lms.lemuel.loan.application.port.in.RequestLoanUseCase.RequestLoanCommand;
+ import github.lms.lemuel.loan.application.port.out.LoadLoanPort;
++import github.lms.lemuel.loan.domain.LoanAdvance;
+ import jakarta.validation.Valid;
+ import org.springframework.http.HttpStatus;
+ import org.springframework.http.ResponseEntity;
+@@ -34,13 +36,16 @@ public class LoanController {
+ 
+     private final RequestLoanUseCase requestLoanUseCase;
+     private final DisburseLoanUseCase disburseLoanUseCase;
++    private final ManageLoanCollectionUseCase manageLoanCollectionUseCase;
+     private final LoadLoanPort loadLoanPort;
+ 
+     public LoanController(RequestLoanUseCase requestLoanUseCase,
+                           DisburseLoanUseCase disburseLoanUseCase,
++                          ManageLoanCollectionUseCase manageLoanCollectionUseCase,
+                           LoadLoanPort loadLoanPort) {
+         this.requestLoanUseCase = requestLoanUseCase;
+         this.disburseLoanUseCase = disburseLoanUseCase;
++        this.manageLoanCollectionUseCase = manageLoanCollectionUseCase;
+         this.loadLoanPort = loadLoanPort;
+     }
+ 
+@@ -54,10 +59,39 @@ public class LoanController {
+     }
+ 
+     @PostMapping("/{id}/disburse")
+-    public ResponseEntity<LoanResponse> disburse(@PathVariable Long id) {
++    public ResponseEntity<LoanResponse> disburse(@PathVariable Long id, Authentication authentication) {
++        // 집행(실자금 지급)은 소유권 대조를 강제한다: 대출의 셀러가 인증 주체 본인이어야 실행할 수 있다.
++        // 식별자를 요청 경로가 아니라 JWT 주체(userId)에서 파생해 타인 대출 강제 실행을 차단한다(IDOR 가드레일).
++        Long callerSellerId = callerSellerId(authentication);   // 미인증/식별불가 → 403 (항상 non-null)
++        LoanAdvance loan = loadLoanPort.load(id);               // 없는 대출 → IllegalArgumentException → 400
++        // non-null 인 callerSellerId 를 좌변에 둔다 — 저장된 sellerId 가 null(손상/레거시)이어도 NPE→500 대신
++        // 소유권 불일치(403)로 안전하게 처리(CorporateLoanController 소유권 대조와 동형).
++        if (!callerSellerId.equals(loan.getSellerId())) {
++            throw new AccessDeniedException("본인 소유가 아닌 대출입니다. loanId=" + id);
++        }
+         return ResponseEntity.ok(LoanResponse.from(disburseLoanUseCase.disburse(id)));
+     }
+ 
++    /**
++     * 연체 진입(회수 담당자 조작) — 실행된 대출을 OVERDUE 로 전이한다. 회수 리스크 관제 운영 액션이라
++     * ADMIN 만 허용한다. 상태 전이 불변식(잔액 있는 DISBURSED 만 가능)은 도메인이 강제한다.
++     */
++    @PostMapping("/{id}/overdue")
++    public ResponseEntity<LoanResponse> markOverdue(@PathVariable Long id, Authentication authentication) {
++        requireAdmin(authentication);
++        return ResponseEntity.ok(LoanResponse.from(manageLoanCollectionUseCase.markOverdue(id)));
++    }
++
++    /**
++     * 상각(대손 확정) — 연체 대출을 WRITTEN_OFF 로 전이하고 미상환잔액을 대손 전표로 인식한다.
++     * 손실 확정 액션이라 ADMIN 만 허용한다.
++     */
++    @PostMapping("/{id}/write-off")
++    public ResponseEntity<LoanResponse> writeOff(@PathVariable Long id, Authentication authentication) {
++        requireAdmin(authentication);
++        return ResponseEntity.ok(LoanResponse.from(manageLoanCollectionUseCase.writeOff(id)));
++    }
++
+     @GetMapping
+     public ResponseEntity<List<LoanResponse>> bySeller(@RequestParam Long sellerId,
+                                                        Authentication authentication) {
+@@ -83,4 +117,13 @@ public class LoanController {
+             throw new AccessDeniedException("본인 소유가 아닌 셀러 리소스입니다. sellerId=" + requestedSellerId);
+         }
+     }
++
++    /** 회수(연체·상각) 운영 액션은 ADMIN 전용 — 인증 주체가 ROLE_ADMIN 이 아니면 403. */
++    private static void requireAdmin(Authentication authentication) {
++        boolean admin = authentication != null && authentication.getAuthorities().stream()
++                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
++        if (!admin) {
++            throw new AccessDeniedException("회수(연체·상각) 조작은 관리자만 가능합니다.");
++        }
++    }
+ }
+diff --git a/loan-service/src/main/java/github/lms/lemuel/loan/adapter/in/web/dto/CorporateLoanRepayRequest.java b/loan-service/src/main/java/github/lms/lemuel/loan/adapter/in/web/dto/CorporateLoanRepayRequest.java
+new file mode 100644
+index 000000000..b6162e1fb
+--- /dev/null
++++ b/loan-service/src/main/java/github/lms/lemuel/loan/adapter/in/web/dto/CorporateLoanRepayRequest.java
+@@ -0,0 +1,18 @@
++package github.lms.lemuel.loan.adapter.in.web.dto;
++
++import jakarta.validation.constraints.Digits;
++import jakarta.validation.constraints.NotNull;
++import jakarta.validation.constraints.Positive;
++
++import java.math.BigDecimal;
++
++/**
++ * 기업 신용대출 상환 요청 본문. 상환액만 받는다 — 대출 식별자는 경로변수, 소유권은 JWT 주체에서 파생한다.
++ * 금액 형식 검증(양수·자릿수)은 여기서, 잔액 대비 clamp·상태 검증은 도메인에서 강제한다.
++ */
++public record CorporateLoanRepayRequest(
++        @NotNull(message = "상환액은 필수입니다")
++        @Positive(message = "상환액은 양수여야 합니다")
++        @Digits(integer = 17, fraction = 2, message = "상환액 자릿수가 허용 범위를 벗어났습니다")
++        BigDecimal amount) {
++}
+diff --git a/loan-service/src/main/java/github/lms/lemuel/loan/adapter/in/web/dto/LoanResponse.java b/loan-service/src/main/java/github/lms/lemuel/loan/adapter/in/web/dto/LoanResponse.java
+index 77a2422ba..c2cd2797a 100644
+--- a/loan-service/src/main/java/github/lms/lemuel/loan/adapter/in/web/dto/LoanResponse.java
++++ b/loan-service/src/main/java/github/lms/lemuel/loan/adapter/in/web/dto/LoanResponse.java
+@@ -4,9 +4,11 @@ import github.lms.lemuel.loan.domain.LoanAdvance;
+ import github.lms.lemuel.loan.domain.LoanStatus;
+ 
+ import java.math.BigDecimal;
++import java.time.LocalDateTime;
+ 
+ /**
+- * 선정산 대출 응답.
++ * 선정산 대출 응답. 실행 시각·만기(dueAt)를 함께 노출해 프론트가 만기·연체 임박을 표시할 수 있게 한다
++ * (실행 전/구 데이터는 null).
+  */
+ public record LoanResponse(
+         Long id,
+@@ -14,7 +16,9 @@ public record LoanResponse(
+         BigDecimal principal,
+         BigDecimal fee,
+         BigDecimal outstanding,
+-        LoanStatus status) {
++        LoanStatus status,
++        LocalDateTime disbursedAt,
++        LocalDateTime dueAt) {
+ 
+     public static LoanResponse from(LoanAdvance loan) {
+         return new LoanResponse(
+@@ -23,6 +27,8 @@ public record LoanResponse(
+                 loan.getPrincipal(),
+                 loan.getFee(),
+                 loan.getOutstanding(),
+-                loan.getStatus());
++                loan.getStatus(),
++                loan.getDisbursedAt(),
++                loan.getDueAt());
+     }
+ }
+diff --git a/loan-service/src/main/java/github/lms/lemuel/loan/adapter/out/metrics/MicrometerLoanMetricsAdapter.java b/loan-service/src/main/java/github/lms/lemuel/loan/adapter/out/metrics/MicrometerLoanMetricsAdapter.java
+index 6d124ac65..228f96eb9 100644
+--- a/loan-service/src/main/java/github/lms/lemuel/loan/adapter/out/metrics/MicrometerLoanMetricsAdapter.java
++++ b/loan-service/src/main/java/github/lms/lemuel/loan/adapter/out/metrics/MicrometerLoanMetricsAdapter.java
+@@ -35,6 +35,11 @@ public class MicrometerLoanMetricsAdapter implements LoanMetricsPort {
+     private final Counter corporateDisbursed;
+     private final Counter repaymentApplied;
+     private final Counter repaymentAmount;
++    private final Counter corporateRepaid;
++    private final Counter corporateRepaidAmount;
++    private final Counter advanceOverdue;
++    private final Counter advanceWrittenOff;
++    private final Counter advanceWrittenOffLoss;
+ 
+     public MicrometerLoanMetricsAdapter(MeterRegistry registry) {
+         this.advanceRequested = Counter.builder("loan.advance.requested")
+@@ -54,6 +59,18 @@ public class MicrometerLoanMetricsAdapter implements LoanMetricsPort {
+         this.repaymentAmount = Counter.builder("loan.repayment.amount")
+                 .baseUnit("KRW")
+                 .description("상환 차감 적용 금액 합계").register(registry);
++        this.corporateRepaid = Counter.builder("loan.corporate.repaid")
++                .description("기업 신용대출 상환 적용 건수").register(registry);
++        this.corporateRepaidAmount = Counter.builder("loan.corporate.repaid.amount")
++                .baseUnit("KRW")
++                .description("기업 신용대출 상환 차감 금액 합계").register(registry);
++        this.advanceOverdue = Counter.builder("loan.advance.overdue")
++                .description("선정산 대출 연체 진입 건수").register(registry);
++        this.advanceWrittenOff = Counter.builder("loan.advance.written_off")
++                .description("선정산 대출 상각(대손 확정) 건수").register(registry);
++        this.advanceWrittenOffLoss = Counter.builder("loan.advance.written_off.loss")
++                .baseUnit("KRW")
++                .description("선정산 대출 상각 대손 손실액 합계").register(registry);
+     }
+ 
+     @Override
+@@ -93,4 +110,25 @@ public class MicrometerLoanMetricsAdapter implements LoanMetricsPort {
+             repaymentAmount.increment(deductedAmount.doubleValue());
+         }
+     }
++
++    @Override
++    public void corporateRepaid(BigDecimal deductedAmount) {
++        corporateRepaid.increment();
++        if (deductedAmount != null && deductedAmount.signum() > 0) {
++            corporateRepaidAmount.increment(deductedAmount.doubleValue());
++        }
++    }
++
++    @Override
++    public void advanceOverdue() {
++        advanceOverdue.increment();
++    }
++
++    @Override
++    public void advanceWrittenOff(BigDecimal loss) {
++        advanceWrittenOff.increment();
++        if (loss != null && loss.signum() > 0) {
++            advanceWrittenOffLoss.increment(loss.doubleValue());
++        }
++    }
+ }
+diff --git a/loan-service/src/main/java/github/lms/lemuel/loan/adapter/out/persistence/LoanAdvanceJpaEntity.java b/loan-service/src/main/java/github/lms/lemuel/loan/adapter/out/persistence/LoanAdvanceJpaEntity.java
+index 552d35bfc..76ea9ea47 100644
+--- a/loan-service/src/main/java/github/lms/lemuel/loan/adapter/out/persistence/LoanAdvanceJpaEntity.java
++++ b/loan-service/src/main/java/github/lms/lemuel/loan/adapter/out/persistence/LoanAdvanceJpaEntity.java
+@@ -37,19 +37,35 @@ public class LoanAdvanceJpaEntity {
+     @Column(name = "status", nullable = false, length = 20)
+     private LoanStatus status;
+ 
++    /** 선지급일수 — 수수료·만기 계산의 단일 근거. 구 데이터는 0(DEFAULT). */
++    @Column(name = "financing_days", nullable = false)
++    private int financingDays;
++
++    /** 실행 시각. 실행 전/구 데이터는 NULL. */
++    @Column(name = "disbursed_at")
++    private LocalDateTime disbursedAt;
++
++    /** 만기일(= disbursed_at + financing_days). 배치 스캐너의 자동 연체/상각 기준. 구 데이터는 NULL. */
++    @Column(name = "due_at")
++    private LocalDateTime dueAt;
++
+     @Column(name = "updated_at", nullable = false)
+     private LocalDateTime updatedAt;
+ 
+     protected LoanAdvanceJpaEntity() { }
+ 
+     public LoanAdvanceJpaEntity(Long id, Long sellerId, BigDecimal principal, BigDecimal fee,
+-                                BigDecimal outstanding, LoanStatus status, LocalDateTime updatedAt) {
++                                BigDecimal outstanding, LoanStatus status, int financingDays,
++                                LocalDateTime disbursedAt, LocalDateTime dueAt, LocalDateTime updatedAt) {
+         this.id = id;
+         this.sellerId = sellerId;
+         this.principal = principal;
+         this.fee = fee;
+         this.outstanding = outstanding;
+         this.status = status;
++        this.financingDays = financingDays;
++        this.disbursedAt = disbursedAt;
++        this.dueAt = dueAt;
+         this.updatedAt = updatedAt;
+     }
+ 
+@@ -59,5 +75,8 @@ public class LoanAdvanceJpaEntity {
+     public BigDecimal getFee() { return fee; }
+     public BigDecimal getOutstanding() { return outstanding; }
+     public LoanStatus getStatus() { return status; }
++    public int getFinancingDays() { return financingDays; }
++    public LocalDateTime getDisbursedAt() { return disbursedAt; }
++    public LocalDateTime getDueAt() { return dueAt; }
+     public LocalDateTime getUpdatedAt() { return updatedAt; }
+ }
+diff --git a/loan-service/src/main/java/github/lms/lemuel/loan/adapter/out/persistence/LoanAdvanceRepository.java b/loan-service/src/main/java/github/lms/lemuel/loan/adapter/out/persistence/LoanAdvanceRepository.java
+index 4912e2247..72b2b4e9e 100644
+--- a/loan-service/src/main/java/github/lms/lemuel/loan/adapter/out/persistence/LoanAdvanceRepository.java
++++ b/loan-service/src/main/java/github/lms/lemuel/loan/adapter/out/persistence/LoanAdvanceRepository.java
+@@ -7,19 +7,32 @@ import org.springframework.data.jpa.repository.Lock;
+ import org.springframework.data.jpa.repository.Query;
+ import org.springframework.data.repository.query.Param;
+ 
++import java.time.LocalDateTime;
+ import java.util.List;
+ 
+ public interface LoanAdvanceRepository extends JpaRepository<LoanAdvanceJpaEntity, Long> {
+ 
+     List<LoanAdvanceJpaEntity> findBySellerIdOrderByIdAsc(Long sellerId);
+ 
+-    /** 셀러의 미상환 대출을 FIFO(id 오름차순)로 비관적 락 조회 — 상환 차감용. */
++    /** 셀러의 미상환 대출을 FIFO(id 오름차순)로 비관적 락 조회 — 상환 차감용. 여러 상태(DISBURSED·OVERDUE)를 함께 조회한다. */
+     @Lock(LockModeType.PESSIMISTIC_WRITE)
+     @Query("""
+             select l from LoanAdvanceJpaEntity l
+-            where l.sellerId = :sellerId and l.status = :status
++            where l.sellerId = :sellerId and l.status in :statuses
+             order by l.id asc
+             """)
+-    List<LoanAdvanceJpaEntity> findBySellerAndStatusForUpdate(@Param("sellerId") Long sellerId,
+-                                                              @Param("status") LoanStatus status);
++    List<LoanAdvanceJpaEntity> findBySellerAndStatusesForUpdate(@Param("sellerId") Long sellerId,
++                                                                @Param("statuses") java.util.Collection<LoanStatus> statuses);
++
++    /**
++     * 만기(dueAt) 경과분 스캔 — 자동 연체/상각 배치용. dueAt NULL(구 데이터)은 제외되고, 만기 오래된 순으로
++     * 반환한다(오래된 연체부터 처리). 부분 인덱스 idx_loan_advances_due_at_active 가 핫패스를 받친다.
++     */
++    @Query("""
++            select l from LoanAdvanceJpaEntity l
++            where l.status = :status and l.dueAt is not null and l.dueAt < :asOf
++            order by l.dueAt asc
++            """)
++    List<LoanAdvanceJpaEntity> findByStatusAndDueAtBefore(@Param("status") LoanStatus status,
++                                                          @Param("asOf") LocalDateTime asOf);
+ }
+diff --git a/loan-service/src/main/java/github/lms/lemuel/loan/adapter/out/persistence/LoanPersistenceAdapter.java b/loan-service/src/main/java/github/lms/lemuel/loan/adapter/out/persistence/LoanPersistenceAdapter.java
+index 81f61aaed..8231c4ae4 100644
+--- a/loan-service/src/main/java/github/lms/lemuel/loan/adapter/out/persistence/LoanPersistenceAdapter.java
++++ b/loan-service/src/main/java/github/lms/lemuel/loan/adapter/out/persistence/LoanPersistenceAdapter.java
+@@ -39,8 +39,24 @@ public class LoanPersistenceAdapter implements SaveLoanPort, LoadLoanPort {
+     }
+ 
+     @Override
+-    public List<LoanAdvance> findDisbursedBySellerForUpdate(Long sellerId) {
+-        return repository.findBySellerAndStatusForUpdate(sellerId, LoanStatus.DISBURSED).stream()
++    public List<LoanAdvance> findRepayableBySellerForUpdate(Long sellerId) {
++        // 상환 recovery 대상: 미상환 잔액이 남은 DISBURSED + OVERDUE(연체 후 회수). FIFO(id asc)로 락 조회.
++        return repository.findBySellerAndStatusesForUpdate(
++                        sellerId, List.of(LoanStatus.DISBURSED, LoanStatus.OVERDUE)).stream()
++                .map(LoanPersistenceAdapter::toDomain)
++                .toList();
++    }
++
++    @Override
++    public List<LoanAdvance> findOverdueCandidates(LocalDateTime asOf) {
++        return repository.findByStatusAndDueAtBefore(LoanStatus.DISBURSED, asOf).stream()
++                .map(LoanPersistenceAdapter::toDomain)
++                .toList();
++    }
++
++    @Override
++    public List<LoanAdvance> findWriteOffCandidates(LocalDateTime asOf) {
++        return repository.findByStatusAndDueAtBefore(LoanStatus.OVERDUE, asOf).stream()
+                 .map(LoanPersistenceAdapter::toDomain)
+                 .toList();
+     }
+@@ -53,12 +69,16 @@ public class LoanPersistenceAdapter implements SaveLoanPort, LoadLoanPort {
+                 loan.getFee(),
+                 loan.getOutstanding(),
+                 loan.getStatus(),
++                loan.getFinancingDays(),
++                loan.getDisbursedAt(),
++                loan.getDueAt(),
+                 LocalDateTime.now());
+     }
+ 
+     private static LoanAdvance toDomain(LoanAdvanceJpaEntity e) {
+         return LoanAdvance.reconstitute(
+                 e.getId(), e.getSellerId(), e.getPrincipal(), e.getFee(),
+-                e.getOutstanding(), e.getStatus());
++                e.getOutstanding(), e.getStatus(),
++                e.getFinancingDays(), e.getDisbursedAt(), e.getDueAt());
+     }
+ }
+diff --git a/loan-service/src/main/java/github/lms/lemuel/loan/application/port/in/ManageLoanCollectionUseCase.java b/loan-service/src/main/java/github/lms/lemuel/loan/application/port/in/ManageLoanCollectionUseCase.java
+new file mode 100644
+index 000000000..47fe0670b
+--- /dev/null
++++ b/loan-service/src/main/java/github/lms/lemuel/loan/application/port/in/ManageLoanCollectionUseCase.java
+@@ -0,0 +1,22 @@
++package github.lms.lemuel.loan.application.port.in;
++
++import github.lms.lemuel.loan.domain.LoanAdvance;
++
++/**
++ * 선정산 대출 회수(collection) 관리 인바운드 포트 — 연체 진입·상각(대손 확정).
++ *
++ * <p>운영자(ADMIN) 수동 조작 진입점이다. 실행일/만기일 컬럼 기반의 시간 트리거 자동화는
++ * 스키마 확장이 선행돼야 하므로(후속 과제), 현재는 회수 담당자가 명시적으로 상태를 전이시킨다.
++ * 상태 전이·불변식은 도메인 {@link LoanAdvance} 가 강제한다.
++ */
++public interface ManageLoanCollectionUseCase {
++
++    /** 연체 진입: DISBURSED 대출을 OVERDUE 로 전이한다(미상환잔액이 남아 있어야 성립). */
++    LoanAdvance markOverdue(Long loanId);
++
++    /**
++     * 상각(회수 불능 확정): OVERDUE 대출을 WRITTEN_OFF 로 전이하고, 미상환잔액을 대손
++     * (BAD_DEBT_EXPENSE/BAD_DEBT_ALLOWANCE) 전표로 인식한다.
++     */
++    LoanAdvance writeOff(Long loanId);
++}
+diff --git a/loan-service/src/main/java/github/lms/lemuel/loan/application/port/in/RepayCorporateLoanUseCase.java b/loan-service/src/main/java/github/lms/lemuel/loan/application/port/in/RepayCorporateLoanUseCase.java
+new file mode 100644
+index 000000000..f4b4e84e3
+--- /dev/null
++++ b/loan-service/src/main/java/github/lms/lemuel/loan/application/port/in/RepayCorporateLoanUseCase.java
+@@ -0,0 +1,24 @@
++package github.lms.lemuel.loan.application.port.in;
++
++import github.lms.lemuel.loan.domain.CorporateLoan;
++
++import java.math.BigDecimal;
++
++/**
++ * 기업 신용대출 상환 인바운드 포트. 무담보 신용대출이라 셀러 정산 saga 가 아니라
++ * 명시적 상환(차감)으로 미상환잔액을 줄인다. 소유권 대조는 어댑터(컨트롤러)가 JWT 주체에서
++ * 파생·강제하고, 이 유스케이스는 loanId·금액만 받는다.
++ */
++public interface RepayCorporateLoanUseCase {
++
++    /**
++     * 기업대출 상환. 미상환잔액에서 {@code amount} 만큼 차감(잔액 초과분은 clamp)하고,
++     * 잔액이 0 이 되면 REPAID 로 전이한다. 차감>0 이면 상환 전표(현금/대출채권)를 기록한다.
++     *
++     * @return 상환 반영된 대출(잔액·상태 갱신)
++     */
++    CorporateLoan repay(RepayCorporateLoanCommand command);
++
++    record RepayCorporateLoanCommand(Long loanId, BigDecimal amount) {
++    }
++}
+diff --git a/loan-service/src/main/java/github/lms/lemuel/loan/application/port/out/LoadLoanPort.java b/loan-service/src/main/java/github/lms/lemuel/loan/application/port/out/LoadLoanPort.java
+index e635df5e6..c81da4ae2 100644
+--- a/loan-service/src/main/java/github/lms/lemuel/loan/application/port/out/LoadLoanPort.java
++++ b/loan-service/src/main/java/github/lms/lemuel/loan/application/port/out/LoadLoanPort.java
+@@ -2,6 +2,7 @@ package github.lms.lemuel.loan.application.port.out;
+ 
+ import github.lms.lemuel.loan.domain.LoanAdvance;
+ 
++import java.time.LocalDateTime;
+ import java.util.List;
+ 
+ public interface LoadLoanPort {
+@@ -13,8 +14,20 @@ public interface LoadLoanPort {
+     List<LoanAdvance> findBySeller(Long sellerId);
+ 
+     /**
+-     * 셀러의 미상환(DISBURSED) 대출을 FIFO(오래된 순)로 비관적 락 조회 — 상환 차감용.
+-     * 동시 차감 경합을 직렬화한다.
++     * 셀러의 미상환(DISBURSED·OVERDUE) 대출을 FIFO(오래된 순)로 비관적 락 조회 — 상환 차감용.
++     * 연체(OVERDUE) 대출도 포함해 새 정산금으로 자동 회수한다(OVERDUE→REPAID). 동시 차감 경합을 직렬화한다.
+      */
+-    List<LoanAdvance> findDisbursedBySellerForUpdate(Long sellerId);
++    List<LoanAdvance> findRepayableBySellerForUpdate(Long sellerId);
++
++    /**
++     * 만기 경과한 DISBURSED 대출(자동 연체 대상). {@code dueAt < asOf} 이며 {@code dueAt} 이 NULL 인
++     * 구(舊) 데이터는 제외한다 — 만기 미상 대출을 자동 연체로 오탐하지 않는다.
++     */
++    List<LoanAdvance> findOverdueCandidates(LocalDateTime asOf);
++
++    /**
++     * 상각 임계를 넘긴 OVERDUE 대출(자동 상각 대상). {@code dueAt < asOf}(asOf = now - writeOffDays),
++     * {@code dueAt} NULL 제외.
++     */
++    List<LoanAdvance> findWriteOffCandidates(LocalDateTime asOf);
+ }
+diff --git a/loan-service/src/main/java/github/lms/lemuel/loan/application/port/out/LoanMetricsPort.java b/loan-service/src/main/java/github/lms/lemuel/loan/application/port/out/LoanMetricsPort.java
+index 27cdfe4e7..a3a844de3 100644
+--- a/loan-service/src/main/java/github/lms/lemuel/loan/application/port/out/LoanMetricsPort.java
++++ b/loan-service/src/main/java/github/lms/lemuel/loan/application/port/out/LoanMetricsPort.java
+@@ -35,4 +35,21 @@ public interface LoanMetricsPort {
+      * @param deductedAmount 이번 정산 확정으로 실제 차감된 상환 금액(0 이상)
+      */
+     void repaymentApplied(BigDecimal deductedAmount);
++
++    /**
++     * 기업 신용대출 상환. 차감 건수와 차감 금액 합계를 함께 적재한다.
++     *
++     * @param deductedAmount 이번 상환으로 실제 차감된 금액(0 이상)
++     */
++    void corporateRepaid(BigDecimal deductedAmount);
++
++    /** 선정산 대출 연체 진입(DISBURSED → OVERDUE). */
++    void advanceOverdue();
++
++    /**
++     * 선정산 대출 상각(OVERDUE → WRITTEN_OFF). 상각 건수와 대손 손실액 합계를 함께 적재한다.
++     *
++     * @param loss 상각으로 확정된 손실액(미상환잔액, 0 이상)
++     */
++    void advanceWrittenOff(BigDecimal loss);
+ }
+diff --git a/loan-service/src/main/java/github/lms/lemuel/loan/application/service/ApplyRepaymentService.java b/loan-service/src/main/java/github/lms/lemuel/loan/application/service/ApplyRepaymentService.java
+index 940a193e8..5986c78b1 100644
+--- a/loan-service/src/main/java/github/lms/lemuel/loan/application/service/ApplyRepaymentService.java
++++ b/loan-service/src/main/java/github/lms/lemuel/loan/application/service/ApplyRepaymentService.java
+@@ -75,8 +75,8 @@ public class ApplyRepaymentService implements ApplyRepaymentUseCase {
+ 
+         saveSettlementViewPort.markConfirmed(settlementId);
+ 
+-        // 미상환 대출을 FIFO(오래된 순)로 락 조회 후 순차 차감
+-        List<LoanAdvance> loans = loadLoanPort.findDisbursedBySellerForUpdate(command.sellerId());
++        // 미상환 대출(DISBURSED·OVERDUE)을 FIFO(오래된 순)로 락 조회 후 순차 차감 — 연체 대출도 자동 회수
++        List<LoanAdvance> loans = loadLoanPort.findRepayableBySellerForUpdate(command.sellerId());
+         BigDecimal remaining = command.amount();
+         BigDecimal totalDeducted = BigDecimal.ZERO;
+ 
+diff --git a/loan-service/src/main/java/github/lms/lemuel/loan/application/service/DisburseLoanService.java b/loan-service/src/main/java/github/lms/lemuel/loan/application/service/DisburseLoanService.java
+index 81d53ccd8..422bb967b 100644
+--- a/loan-service/src/main/java/github/lms/lemuel/loan/application/service/DisburseLoanService.java
++++ b/loan-service/src/main/java/github/lms/lemuel/loan/application/service/DisburseLoanService.java
+@@ -17,14 +17,16 @@ import org.springframework.stereotype.Service;
+ import org.springframework.transaction.annotation.Transactional;
+ 
+ import java.math.BigDecimal;
++import java.time.Clock;
++import java.time.LocalDateTime;
+ 
+ /**
+  * 대출 실행(선지급).
+  *
+  * <p>신청 시점과 실행 시점 사이에 담보(정산예정금)가 변할 수 있으므로, 실행 직전에
+  * 비관적 락으로 미지급 합계를 재조회해 한도를 재검증한다(동시 선지급 경합 직렬화).
+- * 통과 시 DISBURSED 로 전이하고 LoanDisbursementRequested 를 Outbox 에 기록 →
+- * settlement 가 payout 으로 셀러에게 실제 송금한다.
++ * 통과 시 DISBURSED 로 전이하고 실행 시각(KST)을 찍어 만기(dueAt = 실행시각 + financingDays)를 확정한 뒤,
++ * LoanDisbursementRequested 를 Outbox 에 기록 → settlement 가 payout 으로 셀러에게 실제 송금한다.
+  */
+ @Service
+ public class DisburseLoanService implements DisburseLoanUseCase {
+@@ -37,6 +39,7 @@ public class DisburseLoanService implements DisburseLoanUseCase {
+     private final PublishLoanEventPort publishLoanEventPort;
+     private final AppendLedgerPort appendLedgerPort;
+     private final LoanMetricsPort loanMetricsPort;
++    private final Clock clock;
+ 
+     public DisburseLoanService(LoadLoanPort loadLoanPort,
+                                SaveLoanPort saveLoanPort,
+@@ -45,7 +48,8 @@ public class DisburseLoanService implements DisburseLoanUseCase {
+                                CreditPolicy creditPolicy,
+                                PublishLoanEventPort publishLoanEventPort,
+                                AppendLedgerPort appendLedgerPort,
+-                               LoanMetricsPort loanMetricsPort) {
++                               LoanMetricsPort loanMetricsPort,
++                               Clock clock) {
+         this.loadLoanPort = loadLoanPort;
+         this.saveLoanPort = saveLoanPort;
+         this.loadSettlementViewPort = loadSettlementViewPort;
+@@ -54,6 +58,7 @@ public class DisburseLoanService implements DisburseLoanUseCase {
+         this.publishLoanEventPort = publishLoanEventPort;
+         this.appendLedgerPort = appendLedgerPort;
+         this.loanMetricsPort = loanMetricsPort;
++        this.clock = clock;
+     }
+ 
+     @Override
+@@ -82,7 +87,8 @@ public class DisburseLoanService implements DisburseLoanUseCase {
+             throw e;
+         }
+ 
+-        loan.disburse();
++        // 실행 시각(KST)을 도메인에 전달 — disbursedAt·dueAt(= 실행시각 + financingDays) 확정.
++        loan.disburse(LocalDateTime.now(clock));
+         LoanAdvance saved = saveLoanPort.save(loan);
+ 
+         // 복식부기: 선지급(대출채권/현금) + 수수료 인식(미수수익/수수료수익)
+diff --git a/loan-service/src/main/java/github/lms/lemuel/loan/application/service/LoanCollectionService.java b/loan-service/src/main/java/github/lms/lemuel/loan/application/service/LoanCollectionService.java
+new file mode 100644
+index 000000000..d9163af52
+--- /dev/null
++++ b/loan-service/src/main/java/github/lms/lemuel/loan/application/service/LoanCollectionService.java
+@@ -0,0 +1,77 @@
++package github.lms.lemuel.loan.application.service;
++
++import github.lms.lemuel.common.audit.application.Auditable;
++import github.lms.lemuel.common.audit.domain.AuditAction;
++import github.lms.lemuel.loan.application.port.in.ManageLoanCollectionUseCase;
++import github.lms.lemuel.loan.application.port.out.AppendLedgerPort;
++import github.lms.lemuel.loan.application.port.out.LoadLoanPort;
++import github.lms.lemuel.loan.application.port.out.LoanMetricsPort;
++import github.lms.lemuel.loan.application.port.out.SaveLoanPort;
++import github.lms.lemuel.loan.domain.LoanAdvance;
++import github.lms.lemuel.loan.domain.LoanLedgerEntry;
++import org.springframework.stereotype.Service;
++import org.springframework.transaction.annotation.Transactional;
++
++import java.math.BigDecimal;
++
++/**
++ * 선정산 대출 회수(collection) — 연체 진입·상각(대손 확정)의 loan 측 유스케이스.
++ *
++ * <p>운영자(ADMIN) 수동 조작 진입점. 상태 전이·불변식(잔액 있는 대출만 연체·상각 가능)은 도메인
++ * {@link LoanAdvance} 가 강제하고, 상각 시 미상환잔액을 대손 전표로 인식한다(ledger-invariants).
++ */
++@Service
++public class LoanCollectionService implements ManageLoanCollectionUseCase {
++
++    private final LoadLoanPort loadLoanPort;
++    private final SaveLoanPort saveLoanPort;
++    private final AppendLedgerPort appendLedgerPort;
++    private final LoanMetricsPort loanMetricsPort;
++
++    public LoanCollectionService(LoadLoanPort loadLoanPort,
++                                 SaveLoanPort saveLoanPort,
++                                 AppendLedgerPort appendLedgerPort,
++                                 LoanMetricsPort loanMetricsPort) {
++        this.loadLoanPort = loadLoanPort;
++        this.saveLoanPort = saveLoanPort;
++        this.appendLedgerPort = appendLedgerPort;
++        this.loanMetricsPort = loanMetricsPort;
++    }
++
++    @Override
++    @Transactional
++    @Auditable(
++            action = AuditAction.LOAN_ADVANCE_OVERDUE,
++            resourceType = "LoanAdvance",
++            resourceId = "#p0 == null ? null : #p0.toString()",
++            detail = "{'loanId': #p0, 'status': #result == null ? null : #result.getStatus().name()}"
++    )
++    public LoanAdvance markOverdue(Long loanId) {
++        LoanAdvance loan = loadLoanPort.load(loanId);
++        loan.markOverdue();
++        LoanAdvance saved = saveLoanPort.save(loan);
++        loanMetricsPort.advanceOverdue();
++        return saved;
++    }
++
++    @Override
++    @Transactional
++    @Auditable(
++            action = AuditAction.LOAN_ADVANCE_WRITTEN_OFF,
++            resourceType = "LoanAdvance",
++            resourceId = "#p0 == null ? null : #p0.toString()",
++            detail = "{'loanId': #p0, 'status': #result == null ? null : #result.getStatus().name()}"
++    )
++    public LoanAdvance writeOff(Long loanId) {
++        LoanAdvance loan = loadLoanPort.load(loanId);
++        BigDecimal loss = loan.writeOff();
++        LoanAdvance saved = saveLoanPort.save(loan);
++
++        // 대손 인식: 상각 손실액(미상환잔액)을 비용/충당금 전표로. 잔액 0(불변식상 불가)이면 전표 없음.
++        if (loss != null && loss.signum() > 0) {
++            appendLedgerPort.append(LoanLedgerEntry.badDebtWriteOff(saved.getId(), loss));
++        }
++        loanMetricsPort.advanceWrittenOff(loss);
++        return saved;
++    }
++}
+diff --git a/loan-service/src/main/java/github/lms/lemuel/loan/application/service/LoanOverdueScheduler.java b/loan-service/src/main/java/github/lms/lemuel/loan/application/service/LoanOverdueScheduler.java
+new file mode 100644
+index 000000000..52b619e2e
+--- /dev/null
++++ b/loan-service/src/main/java/github/lms/lemuel/loan/application/service/LoanOverdueScheduler.java
+@@ -0,0 +1,91 @@
++package github.lms.lemuel.loan.application.service;
++
++import github.lms.lemuel.loan.application.port.in.ManageLoanCollectionUseCase;
++import github.lms.lemuel.loan.application.port.out.LoadLoanPort;
++import github.lms.lemuel.loan.domain.LoanAdvance;
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
++import org.springframework.beans.factory.annotation.Value;
++import org.springframework.scheduling.annotation.Scheduled;
++import org.springframework.stereotype.Component;
++
++import java.time.Clock;
++import java.time.LocalDateTime;
++import java.util.List;
++
++/**
++ * 선정산 대출 자동 회수 배치 — 만기(dueAt) 경과분을 연체(OVERDUE)로, 상각 임계 경과분을 상각(WRITTEN_OFF)으로
++ * 승격시킨다. 수동 회수(LoanController 의 ADMIN ops)와 병행하는 시간 기반 자동화.
++ *
++ * <p>단일 인스턴스 위성 서비스라 노드 경합이 없어 ShedLock 없이 안전하다(다중 replica 로 확장 시
++ * {@code PartitionMaintenanceRunner} 주석대로 {@code @SchedulerLock} 도입 필요). 시각은 KST {@link Clock}
++ * 기준(TimeConfig) — 자정~09시 경계에서 날짜가 어긋나지 않는다.
++ *
++ * <p><b>fail-open 아님(건별 격리):</b> 연체·상각은 금전 상태전이라 실패를 통째로 삼키지 않는다. 대신
++ * 건별 try/catch 로 한 건 실패가 배치 전체를 멈추지 않게 격리하고(예: 스캔~처리 사이 상태가 바뀌어 전이 불가),
++ * 경고 로그로 남긴다. 전이·불변식·전표·감사는 {@link ManageLoanCollectionUseCase} 가 건별 트랜잭션으로 강제한다.
++ */
++@Component
++public class LoanOverdueScheduler {
++
++    private static final Logger log = LoggerFactory.getLogger(LoanOverdueScheduler.class);
++
++    private final ManageLoanCollectionUseCase collectionUseCase;
++    private final LoadLoanPort loadLoanPort;
++    private final Clock clock;
++    private final int graceDays;
++    private final int writeOffDays;
++
++    public LoanOverdueScheduler(ManageLoanCollectionUseCase collectionUseCase,
++                                LoadLoanPort loadLoanPort,
++                                Clock clock,
++                                @Value("${app.loan.overdue.grace-days:0}") int graceDays,
++                                @Value("${app.loan.overdue.write-off-days:30}") int writeOffDays) {
++        this.collectionUseCase = collectionUseCase;
++        this.loadLoanPort = loadLoanPort;
++        this.clock = clock;
++        this.graceDays = graceDays;
++        this.writeOffDays = writeOffDays;
++    }
++
++    /** 매일 03:00 KST — 만기 경과 연체 승격 + 상각 임계 경과 상각. */
++    @Scheduled(cron = "${app.loan.overdue.scan-cron:0 0 3 * * *}", zone = "Asia/Seoul")
++    public void scan() {
++        int overdue = promoteOverdue();
++        int written = promoteWriteOff();
++        log.info("[LoanOverdueScan] 완료 — 연체 승격 {}건, 상각 {}건 (graceDays={}, writeOffDays={})",
++                overdue, written, graceDays, writeOffDays);
++    }
++
++    /** 만기(+grace) 경과한 DISBURSED 대출을 OVERDUE 로 승격. 처리 건수 반환. */
++    int promoteOverdue() {
++        LocalDateTime asOf = LocalDateTime.now(clock).minusDays(graceDays);
++        List<LoanAdvance> candidates = loadLoanPort.findOverdueCandidates(asOf);
++        int done = 0;
++        for (LoanAdvance loan : candidates) {
++            try {
++                collectionUseCase.markOverdue(loan.getId());
++                done++;
++            } catch (RuntimeException e) {
++                log.warn("[LoanOverdueScan] 연체 승격 실패 — 스킵. loanId={}, 사유={}", loan.getId(), e.getMessage());
++            }
++        }
++        return done;
++    }
++
++    /** 만기 후 writeOffDays 경과한 OVERDUE 대출을 WRITTEN_OFF 로 상각(대손 전표). 처리 건수 반환. */
++    int promoteWriteOff() {
++        LocalDateTime asOf = LocalDateTime.now(clock).minusDays(writeOffDays);
++        List<LoanAdvance> candidates = loadLoanPort.findWriteOffCandidates(asOf);
++        int done = 0;
++        for (LoanAdvance loan : candidates) {
++            try {
++                collectionUseCase.writeOff(loan.getId());
++                done++;
++            } catch (RuntimeException e) {
++                log.warn("[LoanOverdueScan] 상각 실패 — 스킵. loanId={}, 사유={}", loan.getId(), e.getMessage());
++            }
++        }
++        return done;
++    }
++}
+diff --git a/loan-service/src/main/java/github/lms/lemuel/loan/application/service/RepayCorporateLoanService.java b/loan-service/src/main/java/github/lms/lemuel/loan/application/service/RepayCorporateLoanService.java
+new file mode 100644
+index 000000000..b0ae5f360
+--- /dev/null
++++ b/loan-service/src/main/java/github/lms/lemuel/loan/application/service/RepayCorporateLoanService.java
+@@ -0,0 +1,67 @@
++package github.lms.lemuel.loan.application.service;
++
++import github.lms.lemuel.common.audit.application.Auditable;
++import github.lms.lemuel.common.audit.domain.AuditAction;
++import github.lms.lemuel.loan.application.port.in.RepayCorporateLoanUseCase;
++import github.lms.lemuel.loan.application.port.out.AppendLedgerPort;
++import github.lms.lemuel.loan.application.port.out.LoadCorporateLoanPort;
++import github.lms.lemuel.loan.application.port.out.LoanMetricsPort;
++import github.lms.lemuel.loan.application.port.out.SaveCorporateLoanPort;
++import github.lms.lemuel.loan.domain.CorporateLoan;
++import github.lms.lemuel.loan.domain.LoanLedgerEntry;
++import github.lms.lemuel.loan.domain.exception.CorporateLoanNotFoundException;
++import org.springframework.stereotype.Service;
++import org.springframework.transaction.annotation.Transactional;
++
++import java.math.BigDecimal;
++
++/**
++ * 기업 신용대출 상환. 미상환잔액을 차감(clamp)하고, 차감>0 이면 상환 전표(현금/대출채권)를 기록한다.
++ * 도메인 저장·전표가 한 트랜잭션이라 원자성이 보장된다.
++ *
++ * <p>이중상환·경합 방어: {@code findByIdForUpdate} 비관적 락으로 조회해 동시 상환 요청을 직렬화한다
++ * (실행 disburse 와 동일한 락 전략). 상환액 검증(양수)·잔액 초과 clamp·상태 전이(DISBURSED→REPAID)는
++ * 도메인 {@link CorporateLoan#repay(BigDecimal)} 가 단일 출처로 강제한다.
++ */
++@Service
++public class RepayCorporateLoanService implements RepayCorporateLoanUseCase {
++
++    private final LoadCorporateLoanPort loadCorporateLoanPort;
++    private final SaveCorporateLoanPort saveCorporateLoanPort;
++    private final AppendLedgerPort appendLedgerPort;
++    private final LoanMetricsPort loanMetricsPort;
++
++    public RepayCorporateLoanService(LoadCorporateLoanPort loadCorporateLoanPort,
++                                     SaveCorporateLoanPort saveCorporateLoanPort,
++                                     AppendLedgerPort appendLedgerPort,
++                                     LoanMetricsPort loanMetricsPort) {
++        this.loadCorporateLoanPort = loadCorporateLoanPort;
++        this.saveCorporateLoanPort = saveCorporateLoanPort;
++        this.appendLedgerPort = appendLedgerPort;
++        this.loanMetricsPort = loanMetricsPort;
++    }
++
++    @Override
++    @Transactional
++    @Auditable(
++            action = AuditAction.CORPORATE_LOAN_REPAID,
++            resourceType = "CorporateLoan",
++            resourceId = "#p0 == null ? null : #p0.loanId().toString()",
++            detail = "{'loanId': #p0.loanId(), 'amount': #p0.amount()}"
++    )
++    public CorporateLoan repay(RepayCorporateLoanCommand command) {
++        CorporateLoan loan = loadCorporateLoanPort.findByIdForUpdate(command.loanId())
++                .orElseThrow(() -> new CorporateLoanNotFoundException(
++                        "기업대출을 찾을 수 없습니다. loanId=" + command.loanId()));
++
++        BigDecimal deducted = loan.repay(command.amount());
++        CorporateLoan saved = saveCorporateLoanPort.save(loan);
++
++        // 복식부기: 상환(현금/대출채권). 차감이 0이면 전표 없음(도메인이 clamp — 실무상 DISBURSED 상환은 항상 >0).
++        if (deducted.signum() > 0) {
++            appendLedgerPort.append(LoanLedgerEntry.corporateRepayment(saved.getId(), deducted));
++        }
++        loanMetricsPort.corporateRepaid(deducted);
++        return saved;
++    }
++}
+diff --git a/loan-service/src/main/java/github/lms/lemuel/loan/application/service/RequestLoanService.java b/loan-service/src/main/java/github/lms/lemuel/loan/application/service/RequestLoanService.java
+index 221d989c8..a9b312e6f 100644
+--- a/loan-service/src/main/java/github/lms/lemuel/loan/application/service/RequestLoanService.java
++++ b/loan-service/src/main/java/github/lms/lemuel/loan/application/service/RequestLoanService.java
+@@ -19,6 +19,9 @@ import java.math.BigDecimal;
+  *
+  * <p>한도 검증에는 셀러(법인)의 뉴스 평판 등급이 반영된다(ADR 0023 Phase 3 후속) —
+  * 등급이 나쁘면 CreditPolicy 가 한도를 haircut 한다. 평판 미상이면 무변동(fail-open).
++ *
++ * <p>선지급일수(financingDays)는 수수료 산정 근거이자 실행 시 만기(dueAt) 계산의 근거라 애그리거트에
++ * 보존한다(자동 연체/상각 배치가 만기를 스캔).
+  */
+ @Service
+ public class RequestLoanService implements RequestLoanUseCase {
+@@ -55,7 +58,9 @@ public class RequestLoanService implements RequestLoanUseCase {
+         creditPolicy.validateWithinLimit(command.principal(), unpaidSettlement, reputationGrade);
+ 
+         BigDecimal fee = creditPolicy.fee(command.principal(), command.financingDays());
+-        LoanAdvance loan = LoanAdvance.request(command.sellerId(), command.principal(), fee);
++        // 선지급일수를 애그리거트에 보존 — 실행 시 만기(dueAt = disbursedAt + financingDays) 계산의 근거.
++        LoanAdvance loan = LoanAdvance.request(command.sellerId(), command.principal(), fee,
++                command.financingDays());
+         LoanAdvance saved = saveLoanPort.save(loan);
+         loanMetricsPort.advanceRequested();
+         return saved;
+diff --git a/loan-service/src/main/java/github/lms/lemuel/loan/domain/LoanAdvance.java b/loan-service/src/main/java/github/lms/lemuel/loan/domain/LoanAdvance.java
+index 23be0ecb1..359dc6b8e 100644
+--- a/loan-service/src/main/java/github/lms/lemuel/loan/domain/LoanAdvance.java
++++ b/loan-service/src/main/java/github/lms/lemuel/loan/domain/LoanAdvance.java
+@@ -5,6 +5,7 @@ import github.lms.lemuel.loan.domain.exception.InvalidLoanStateException;
+ import github.lms.lemuel.loan.domain.exception.LoanInvariantViolationException;
+ 
+ import java.math.BigDecimal;
++import java.time.LocalDateTime;
+ 
+ /**
+  * 선지급(선정산 대출) 애그리거트 루트. 순수 POJO — 프레임워크 의존 0.
+@@ -12,6 +13,10 @@ import java.math.BigDecimal;
+  * <p>상태 전이와 상환 차감의 불변식을 도메인 내부에서 강제한다.
+  * 한도/수수료 산정은 {@link github.lms.lemuel.loan.application.service.CreditPolicy} 의 책임이며,
+  * 이 애그리거트는 산정된 원금(principal)·수수료(fee)를 받아 미상환잔액(outstanding)을 관리한다.
++ *
++ * <p>만기 추적: 신청 시 {@code financingDays}(선지급일수)를 보존하고, 실행 시 {@code disbursedAt} 을 찍어
++ * {@code dueAt = disbursedAt + financingDays} 를 확정한다 — 배치 스캐너가 만기 경과분을 자동 연체/상각한다.
++ * 시각은 도메인이 만들지 않고 응용 계층이 KST {@link java.time.Clock} 으로 만들어 전달한다(off-by-one 방지).
+  */
+ public class LoanAdvance {
+ 
+@@ -21,36 +26,62 @@ public class LoanAdvance {
+     private final BigDecimal fee;
+     private BigDecimal outstanding;
+     private LoanStatus status;
++    private final int financingDays;
++    private LocalDateTime disbursedAt;
++    private LocalDateTime dueAt;
+ 
+     private LoanAdvance(Long id, Long sellerId, BigDecimal principal, BigDecimal fee,
+-                        BigDecimal outstanding, LoanStatus status) {
++                        BigDecimal outstanding, LoanStatus status, int financingDays,
++                        LocalDateTime disbursedAt, LocalDateTime dueAt) {
+         this.id = id;
+         this.sellerId = sellerId;
+         this.principal = principal;
+         this.fee = fee;
+         this.outstanding = outstanding;
+         this.status = status;
++        this.financingDays = financingDays;
++        this.disbursedAt = disbursedAt;
++        this.dueAt = dueAt;
+     }
+ 
+-    /** 신규 대출 신청. 실행 전이므로 미상환잔액은 0. */
++    /** 신규 대출 신청(선지급일수 미지정 — 구 경로/테스트 호환, 만기 추적 없음). */
+     public static LoanAdvance request(Long sellerId, BigDecimal principal, BigDecimal fee) {
++        return request(sellerId, principal, fee, 0);
++    }
++
++    /**
++     * 신규 대출 신청. 실행 전이므로 미상환잔액은 0. {@code financingDays} 는 선지급일수(수수료 산정·만기 계산의
++     * 단일 근거)로 보존한다. 실행 시각·만기는 아직 미정(disbursedAt·dueAt=null).
++     */
++    public static LoanAdvance request(Long sellerId, BigDecimal principal, BigDecimal fee, int financingDays) {
+         if (principal == null || principal.signum() <= 0) {
+             throw new LoanInvariantViolationException("선지급 원금은 양수여야 합니다: " + principal);
+         }
+         if (fee == null || fee.signum() < 0) {
+             throw new LoanInvariantViolationException("수수료는 음수일 수 없습니다: " + fee);
+         }
++        if (financingDays < 0) {
++            throw new LoanInvariantViolationException("선지급일수는 음수일 수 없습니다: " + financingDays);
++        }
+         // 금액은 도메인 진입 시 Money(scale 2, HALF_UP)로 정규화한다 — 저장·계산 표현을 일관화(money-safety).
+         BigDecimal normalizedPrincipal = Money.of(principal).toBigDecimal();
+         BigDecimal normalizedFee = Money.of(fee).toBigDecimal();
+         return new LoanAdvance(null, sellerId, normalizedPrincipal, normalizedFee,
+-                BigDecimal.ZERO, LoanStatus.REQUESTED);
++                BigDecimal.ZERO, LoanStatus.REQUESTED, financingDays, null, null);
+     }
+ 
+-    /** 영속화된 상태를 재구성(리포지토리 전용). */
++    /** 영속화된 상태를 재구성(리포지토리 전용, 만기 추적 없음 — 구 경로/테스트 호환). */
+     public static LoanAdvance reconstitute(Long id, Long sellerId, BigDecimal principal, BigDecimal fee,
+                                            BigDecimal outstanding, LoanStatus status) {
+-        return new LoanAdvance(id, sellerId, principal, fee, outstanding, status);
++        return reconstitute(id, sellerId, principal, fee, outstanding, status, 0, null, null);
++    }
++
++    /** 영속화된 상태를 재구성(리포지토리 전용). financingDays·disbursedAt·dueAt 로 만기 추적을 복원한다. */
++    public static LoanAdvance reconstitute(Long id, Long sellerId, BigDecimal principal, BigDecimal fee,
++                                           BigDecimal outstanding, LoanStatus status, int financingDays,
++                                           LocalDateTime disbursedAt, LocalDateTime dueAt) {
++        return new LoanAdvance(id, sellerId, principal, fee, outstanding, status,
++                financingDays, disbursedAt, dueAt);
+     }
+ 
+     public void approve() {
+@@ -63,8 +94,26 @@ public class LoanAdvance {
+         this.status = LoanStatus.REJECTED;
+     }
+ 
+-    /** 실행(선지급). 미상환잔액 = 원금 + 수수료. */
++    /** 실행(선지급, 만기 추적 없음 — 구 경로/테스트 호환). 미상환잔액 = 원금 + 수수료. */
+     public void disburse() {
++        disburseInternal();
++    }
++
++    /**
++     * 실행(선지급). 미상환잔액 = 원금 + 수수료. 실행 시각을 찍고 만기(= asOf + financingDays)를 확정한다.
++     *
++     * @param asOf 실행 시각(응용 계층이 KST Clock 으로 생성 — 필수)
++     */
++    public void disburse(LocalDateTime asOf) {
++        if (asOf == null) {
++            throw new LoanInvariantViolationException("실행 시각(asOf)은 필수입니다");
++        }
++        disburseInternal();
++        this.disbursedAt = asOf;
++        this.dueAt = asOf.plusDays(financingDays);
++    }
++
++    private void disburseInternal() {
+         requireTransition(LoanStatus.DISBURSED);
+         this.outstanding = Money.of(principal).plus(Money.of(fee)).toBigDecimal();
+         this.status = LoanStatus.DISBURSED;
+@@ -131,4 +180,7 @@ public class LoanAdvance {
+     public BigDecimal getFee() { return fee; }
+     public BigDecimal getOutstanding() { return outstanding; }
+     public LoanStatus getStatus() { return status; }
++    public int getFinancingDays() { return financingDays; }
++    public LocalDateTime getDisbursedAt() { return disbursedAt; }
++    public LocalDateTime getDueAt() { return dueAt; }
+ }
+diff --git a/loan-service/src/main/java/github/lms/lemuel/loan/domain/LoanLedgerEntry.java b/loan-service/src/main/java/github/lms/lemuel/loan/domain/LoanLedgerEntry.java
+index acccab497..68e4865ef 100644
+--- a/loan-service/src/main/java/github/lms/lemuel/loan/domain/LoanLedgerEntry.java
++++ b/loan-service/src/main/java/github/lms/lemuel/loan/domain/LoanLedgerEntry.java
+@@ -68,6 +68,24 @@ public class LoanLedgerEntry {
+                 fee, "CORP_FEE", loanId);
+     }
+ 
++    /**
++     * 기업 신용대출 상환 전표: 차변 CASH / 대변 LOAN_RECEIVABLE (amount = 차감액).
++     * 선정산 {@link #repayment(Long, BigDecimal)} 과 계정 방향은 동일하나 refId 가 loanId 라 구분한다.
++     */
++    public static LoanLedgerEntry corporateRepayment(Long loanId, BigDecimal amount) {
++        return new LoanLedgerEntry(null, LedgerAccount.CASH, LedgerAccount.LOAN_RECEIVABLE,
++                amount, "CORP_REPAYMENT", loanId);
++    }
++
++    /**
++     * 대손 상각 전표: 차변 BAD_DEBT_EXPENSE / 대변 BAD_DEBT_ALLOWANCE (amount = 상각 손실액=미상환잔액).
++     * 연체(OVERDUE) 대출을 회수 불능으로 확정할 때 손실을 비용/충당금으로 인식한다(ledger-invariants).
++     */
++    public static LoanLedgerEntry badDebtWriteOff(Long loanId, BigDecimal loss) {
++        return new LoanLedgerEntry(null, LedgerAccount.BAD_DEBT_EXPENSE, LedgerAccount.BAD_DEBT_ALLOWANCE,
++                loss, "BAD_DEBT", loanId);
++    }
++
+     public static LoanLedgerEntry reconstitute(Long id, LedgerAccount debit, LedgerAccount credit,
+                                                BigDecimal amount, String refType, Long refId) {
+         return new LoanLedgerEntry(id, debit, credit, amount, refType, refId);
+diff --git a/loan-service/src/main/resources/db/migration/V20260724120000__loan_advance_due_tracking.sql b/loan-service/src/main/resources/db/migration/V20260724120000__loan_advance_due_tracking.sql
+new file mode 100644
+index 000000000..ce4b3c27d
+--- /dev/null
++++ b/loan-service/src/main/resources/db/migration/V20260724120000__loan_advance_due_tracking.sql
+@@ -0,0 +1,17 @@
++-- 선정산 대출 만기 추적: 자동 연체/상각 판정 근거.
++--
++-- 지금까지 loan_advances 는 실행일/만기일이 없어 연체 자동화가 불가능했고(수동 markOverdue/writeOff 뿐),
++-- financing_days(선지급일수)는 수수료 계산에만 쓰고 버려졌다. 이제 실행 시점에 disbursed_at 을 찍고
++-- due_at = disbursed_at + financing_days 를 확정해, 배치 스캐너가 만기 경과분을 자동 연체/상각시킨다.
++--
++-- 구(舊) 데이터: financing_days=0(DEFAULT), disbursed_at/due_at=NULL — due_at IS NULL 은 스캐너 대상에서
++-- 제외되므로 과거 대출이 자동 연체로 오탐되지 않는다(안전).
++ALTER TABLE loan_advances
++    ADD COLUMN IF NOT EXISTS financing_days INT       NOT NULL DEFAULT 0,
++    ADD COLUMN IF NOT EXISTS disbursed_at   TIMESTAMP,
++    ADD COLUMN IF NOT EXISTS due_at         TIMESTAMP;
++
++-- 배치 스캐너 핫패스: 활성(DISBURSED/OVERDUE) 대출을 만기일로 스캔. 부분 인덱스로 종료 상태는 제외.
++CREATE INDEX IF NOT EXISTS idx_loan_advances_due_at_active
++    ON loan_advances (due_at)
++    WHERE status IN ('DISBURSED', 'OVERDUE');
+diff --git a/loan-service/src/test/java/github/lms/lemuel/loan/adapter/in/web/CorporateLoanControllerTest.java b/loan-service/src/test/java/github/lms/lemuel/loan/adapter/in/web/CorporateLoanControllerTest.java
+index 492b39bbc..2b27831e9 100644
+--- a/loan-service/src/test/java/github/lms/lemuel/loan/adapter/in/web/CorporateLoanControllerTest.java
++++ b/loan-service/src/test/java/github/lms/lemuel/loan/adapter/in/web/CorporateLoanControllerTest.java
+@@ -5,6 +5,7 @@ import github.lms.lemuel.common.config.jwt.JwtUtil;
+ import github.lms.lemuel.loan.application.port.in.DisburseCorporateLoanUseCase;
+ import github.lms.lemuel.loan.application.port.in.EvaluateCorporateCreditUseCase;
+ import github.lms.lemuel.loan.application.port.in.EvaluateCorporateCreditUseCase.CorporateCreditView;
++import github.lms.lemuel.loan.application.port.in.RepayCorporateLoanUseCase;
+ import github.lms.lemuel.loan.application.port.in.RequestCorporateLoanUseCase;
+ import github.lms.lemuel.loan.application.port.out.LoadCorporateLoanPort;
+ import github.lms.lemuel.loan.domain.CorporateLoan;
+@@ -55,6 +56,7 @@ class CorporateLoanControllerTest {
+     @MockitoBean EvaluateCorporateCreditUseCase evaluateCorporateCreditUseCase;
+     @MockitoBean RequestCorporateLoanUseCase requestCorporateLoanUseCase;
+     @MockitoBean DisburseCorporateLoanUseCase disburseCorporateLoanUseCase;
++    @MockitoBean RepayCorporateLoanUseCase repayCorporateLoanUseCase;
+     @MockitoBean LoadCorporateLoanPort loadCorporateLoanPort;
+ 
+     /** 일반(CEO) 주체 — ROLE_USER, 본인 것만 조회 가능. */
+@@ -230,14 +232,111 @@ class CorporateLoanControllerTest {
+         verifyNoInteractions(requestCorporateLoanUseCase);
+     }
+ 
++    /** 소유자(ownerUserId) 가 지정된 DISBURSED 기업대출 — 상환·소유권 대조 테스트용. */
++    private static CorporateLoan ownedLoan(long ownerUserId) {
++        return CorporateLoan.reconstitute(7L, "005930", "삼성전자",
++                new BigDecimal("1000000"), new BigDecimal("6600"), new BigDecimal("1006600"),
++                30, 82, "A", CorporateLoanStatus.DISBURSED, LocalDateTime.now(), ownerUserId);
++    }
++
++    @Test
++    @DisplayName("POST /loans/corporate/{id}/disburse — 운영자 실행은 200 (소유권 대조 우회)")
++    void disburseAsOperatorOk() throws Exception {
++        when(disburseCorporateLoanUseCase.disburse(7L)).thenReturn(loan());
++
++        mockMvc.perform(post("/loans/corporate/7/disburse").principal(adminAuth(1L)))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.id").value(7));
++    }
++
+     @Test
+-    @DisplayName("POST /loans/corporate/{id}/disburse — 실행 성공은 200")
+-    void disburseOk() throws Exception {
++    @DisplayName("POST /loans/corporate/{id}/disburse — 본인 소유 실행은 200")
++    void disburseAsOwnerOk() throws Exception {
++        when(loadCorporateLoanPort.findById(7L)).thenReturn(java.util.Optional.of(ownedLoan(7L)));
+         when(disburseCorporateLoanUseCase.disburse(7L)).thenReturn(loan());
+ 
++        mockMvc.perform(post("/loans/corporate/7/disburse").principal(userAuth(7L)))
++                .andExpect(status().isOk());
++    }
++
++    @Test
++    @DisplayName("POST /loans/corporate/{id}/disburse — 타인 대출 실행은 403 이고 use case 미호출 (IDOR 가드)")
++    void disburseByNonOwnerForbidden() throws Exception {
++        when(loadCorporateLoanPort.findById(7L)).thenReturn(java.util.Optional.of(ownedLoan(7L)));
++
++        mockMvc.perform(post("/loans/corporate/7/disburse").principal(userAuth(9L)))
++                .andExpect(status().isForbidden())
++                .andExpect(jsonPath("$.status").value(403));
++
++        verifyNoInteractions(disburseCorporateLoanUseCase);
++    }
++
++    @Test
++    @DisplayName("POST /loans/corporate/{id}/disburse — 미인증이면 403 이고 use case 미호출")
++    void disburseNoAuthForbidden() throws Exception {
+         mockMvc.perform(post("/loans/corporate/7/disburse"))
++                .andExpect(status().isForbidden());
++
++        verifyNoInteractions(disburseCorporateLoanUseCase);
++    }
++
++    @Test
++    @DisplayName("POST /loans/corporate/{id}/repay — 본인 상환은 200 + 갱신 본문")
++    void repayAsOwnerOk() throws Exception {
++        when(loadCorporateLoanPort.findById(7L)).thenReturn(java.util.Optional.of(ownedLoan(7L)));
++        when(repayCorporateLoanUseCase.repay(any())).thenReturn(loan());
++
++        mockMvc.perform(post("/loans/corporate/7/repay").principal(userAuth(7L))
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content("""
++                                {"amount":600000}
++                                """))
+                 .andExpect(status().isOk())
+                 .andExpect(jsonPath("$.id").value(7));
++
++        verify(repayCorporateLoanUseCase).repay(any());
++    }
++
++    @Test
++    @DisplayName("POST /loans/corporate/{id}/repay — 타인 대출 상환은 403 이고 use case 미호출 (IDOR 가드)")
++    void repayByNonOwnerForbidden() throws Exception {
++        when(loadCorporateLoanPort.findById(7L)).thenReturn(java.util.Optional.of(ownedLoan(7L)));
++
++        mockMvc.perform(post("/loans/corporate/7/repay").principal(userAuth(9L))
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content("""
++                                {"amount":600000}
++                                """))
++                .andExpect(status().isForbidden())
++                .andExpect(jsonPath("$.status").value(403));
++
++        verifyNoInteractions(repayCorporateLoanUseCase);
++    }
++
++    @Test
++    @DisplayName("POST /loans/corporate/{id}/repay — 상환액 0 이하(@Positive)는 400 이고 use case 미호출")
++    void repayNonPositiveAmountIs400() throws Exception {
++        mockMvc.perform(post("/loans/corporate/7/repay").principal(userAuth(7L))
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content("""
++                                {"amount":0}
++                                """))
++                .andExpect(status().isBadRequest());
++
++        verifyNoInteractions(repayCorporateLoanUseCase);
++    }
++
++    @Test
++    @DisplayName("POST /loans/corporate/{id}/repay — 미인증이면 403 이고 use case 미호출")
++    void repayNoAuthForbidden() throws Exception {
++        mockMvc.perform(post("/loans/corporate/7/repay")
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content("""
++                                {"amount":600000}
++                                """))
++                .andExpect(status().isForbidden());
++
++        verifyNoInteractions(repayCorporateLoanUseCase);
+     }
+ 
+     @Test
+diff --git a/loan-service/src/test/java/github/lms/lemuel/loan/adapter/in/web/LoanControllerTest.java b/loan-service/src/test/java/github/lms/lemuel/loan/adapter/in/web/LoanControllerTest.java
+index 96cc14515..bca4c40c9 100644
+--- a/loan-service/src/test/java/github/lms/lemuel/loan/adapter/in/web/LoanControllerTest.java
++++ b/loan-service/src/test/java/github/lms/lemuel/loan/adapter/in/web/LoanControllerTest.java
+@@ -3,6 +3,7 @@ package github.lms.lemuel.loan.adapter.in.web;
+ import github.lms.lemuel.common.config.jwt.AuthPrincipal;
+ import github.lms.lemuel.common.config.jwt.JwtUtil;
+ import github.lms.lemuel.loan.application.port.in.DisburseLoanUseCase;
++import github.lms.lemuel.loan.application.port.in.ManageLoanCollectionUseCase;
+ import github.lms.lemuel.loan.application.port.in.RequestLoanUseCase;
+ import github.lms.lemuel.loan.application.port.out.LoadLoanPort;
+ import github.lms.lemuel.loan.domain.LoanAdvance;
+@@ -23,7 +24,6 @@ import java.math.BigDecimal;
+ import java.util.List;
+ 
+ import static org.mockito.ArgumentMatchers.any;
+-import static org.mockito.ArgumentMatchers.anyLong;
+ import static org.mockito.ArgumentMatchers.eq;
+ import static org.mockito.Mockito.verify;
+ import static org.mockito.Mockito.verifyNoInteractions;
+@@ -48,6 +48,7 @@ class LoanControllerTest {
+     @MockitoBean JwtUtil jwtUtil;
+     @MockitoBean RequestLoanUseCase requestLoanUseCase;
+     @MockitoBean DisburseLoanUseCase disburseLoanUseCase;
++    @MockitoBean ManageLoanCollectionUseCase manageLoanCollectionUseCase;
+     @MockitoBean LoadLoanPort loadLoanPort;
+ 
+     /** 인증 주체 — userId=sellerId, ROLE_USER. */
+@@ -58,6 +59,14 @@ class LoanControllerTest {
+                 List.of(new SimpleGrantedAuthority("ROLE_USER")));
+     }
+ 
++    /** 운영자 주체 — ROLE_ADMIN. 회수(연체·상각) 조작 허용 대상. */
++    private static Authentication adminAuth(long userId) {
++        return new UsernamePasswordAuthenticationToken(
++                new AuthPrincipal(userId, "admin" + userId + "@example.com", "ADMIN"),
++                null,
++                List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
++    }
++
+     @Test
+     @DisplayName("POST /loans — 도메인 검증 실패(IllegalArgumentException)는 500 이 아닌 400 으로 매핑된다")
+     void requestLoanInvalidArgumentMapsTo400() throws Exception {
+@@ -76,14 +85,17 @@ class LoanControllerTest {
+     }
+ 
+     @Test
+-    @DisplayName("POST /loans/{id}/disburse — IllegalArgumentException 도 400 으로 매핑된다")
++    @DisplayName("POST /loans/{id}/disburse — 없는 대출(IllegalArgumentException)은 400 으로 매핑되고 use case 미호출")
+     void disburseInvalidArgumentMapsTo400() throws Exception {
+-        when(disburseLoanUseCase.disburse(anyLong()))
+-                .thenThrow(new IllegalArgumentException("loan not found"));
++        // 소유권 대조 위해 컨트롤러가 먼저 load 하므로, 없는 대출은 load 단계에서 400 으로 표면화된다.
++        when(loadLoanPort.load(999L))
++                .thenThrow(new IllegalArgumentException("대출을 찾을 수 없습니다. loanId=999"));
+ 
+-        mockMvc.perform(post("/loans/999/disburse"))
++        mockMvc.perform(post("/loans/999/disburse").principal(auth(7L)))
+                 .andExpect(status().isBadRequest())
+                 .andExpect(jsonPath("$.errorCode").value("INVALID_ARGUMENT"));
++
++        verifyNoInteractions(disburseLoanUseCase);
+     }
+ 
+     private static LoanAdvance loan() {
+@@ -187,15 +199,81 @@ class LoanControllerTest {
+     }
+ 
+     @Test
+-    @DisplayName("POST /loans/{id}/disburse — 실행 성공은 200")
++    @DisplayName("POST /loans/{id}/disburse — 본인 소유 대출 실행은 200")
+     void disburseOk() throws Exception {
++        when(loadLoanPort.load(1L)).thenReturn(loan());          // 대출 셀러=7
+         when(disburseLoanUseCase.disburse(1L)).thenReturn(loan());
+ 
+-        mockMvc.perform(post("/loans/1/disburse"))
++        mockMvc.perform(post("/loans/1/disburse").principal(auth(7L)))   // 호출자=7 (본인)
+                 .andExpect(status().isOk())
+                 .andExpect(jsonPath("$.id").value(1));
+     }
+ 
++    @Test
++    @DisplayName("POST /loans/{id}/disburse — 타 셀러 대출 실행은 403 이고 use case 미호출 (IDOR 가드)")
++    void disburseByNonOwnerForbidden() throws Exception {
++        when(loadLoanPort.load(1L)).thenReturn(loan());          // 대출 셀러=7
++
++        mockMvc.perform(post("/loans/1/disburse").principal(auth(9L)))   // 호출자=9 (타인)
++                .andExpect(status().isForbidden())
++                .andExpect(jsonPath("$.status").value(403));
++
++        verifyNoInteractions(disburseLoanUseCase);
++    }
++
++    @Test
++    @DisplayName("POST /loans/{id}/disburse — 미인증이면 403 이고 use case 미호출")
++    void disburseNoAuthForbidden() throws Exception {
++        mockMvc.perform(post("/loans/1/disburse"))
++                .andExpect(status().isForbidden())
++                .andExpect(jsonPath("$.status").value(403));
++
++        verifyNoInteractions(disburseLoanUseCase);
++    }
++
++    @Test
++    @DisplayName("POST /loans/{id}/overdue — 관리자 연체 진입은 200")
++    void markOverdueAsAdminOk() throws Exception {
++        when(manageLoanCollectionUseCase.markOverdue(1L))
++                .thenReturn(LoanAdvance.reconstitute(1L, 7L, new BigDecimal("800000"),
++                        new BigDecimal("800"), new BigDecimal("800800"), LoanStatus.OVERDUE));
++
++        mockMvc.perform(post("/loans/1/overdue").principal(adminAuth(1L)))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.status").value("OVERDUE"));
++    }
++
++    @Test
++    @DisplayName("POST /loans/{id}/overdue — 비관리자(USER)는 403 이고 use case 미호출")
++    void markOverdueAsUserForbidden() throws Exception {
++        mockMvc.perform(post("/loans/1/overdue").principal(auth(7L)))
++                .andExpect(status().isForbidden())
++                .andExpect(jsonPath("$.status").value(403));
++
++        verifyNoInteractions(manageLoanCollectionUseCase);
++    }
++
++    @Test
++    @DisplayName("POST /loans/{id}/write-off — 관리자 상각은 200")
++    void writeOffAsAdminOk() throws Exception {
++        when(manageLoanCollectionUseCase.writeOff(1L))
++                .thenReturn(LoanAdvance.reconstitute(1L, 7L, new BigDecimal("800000"),
++                        new BigDecimal("800"), new BigDecimal("800800"), LoanStatus.WRITTEN_OFF));
++
++        mockMvc.perform(post("/loans/1/write-off").principal(adminAuth(1L)))
++                .andExpect(status().isOk())
++                .andExpect(jsonPath("$.status").value("WRITTEN_OFF"));
++    }
++
++    @Test
++    @DisplayName("POST /loans/{id}/write-off — 미인증이면 403 이고 use case 미호출")
++    void writeOffNoAuthForbidden() throws Exception {
++        mockMvc.perform(post("/loans/1/write-off"))
++                .andExpect(status().isForbidden());
++
++        verifyNoInteractions(manageLoanCollectionUseCase);
++    }
++
+     @Test
+     @DisplayName("GET /loans?sellerId= — 본인 셀러 대출 목록")
+     void bySeller() throws Exception {
+diff --git a/loan-service/src/test/java/github/lms/lemuel/loan/adapter/in/web/dto/WebDtoMappingTest.java b/loan-service/src/test/java/github/lms/lemuel/loan/adapter/in/web/dto/WebDtoMappingTest.java
+index 01742eda3..bb67d790d 100644
+--- a/loan-service/src/test/java/github/lms/lemuel/loan/adapter/in/web/dto/WebDtoMappingTest.java
++++ b/loan-service/src/test/java/github/lms/lemuel/loan/adapter/in/web/dto/WebDtoMappingTest.java
+@@ -62,10 +62,13 @@ class WebDtoMappingTest {
+     }
+ 
+     @Test
+-    @DisplayName("LoanResponse.from 은 선정산 대출 필드를 옮긴다")
++    @DisplayName("LoanResponse.from 은 선정산 대출 필드와 실행시각·만기를 옮긴다")
+     void loanResponse() {
++        LocalDateTime disbursedAt = LocalDateTime.of(2026, 7, 24, 9, 0);
++        LocalDateTime dueAt = LocalDateTime.of(2026, 7, 31, 9, 0);
+         LoanAdvance loan = LoanAdvance.reconstitute(1L, 7L, new BigDecimal("800000"),
+-                new BigDecimal("800"), new BigDecimal("800800"), LoanStatus.DISBURSED);
++                new BigDecimal("800"), new BigDecimal("800800"), LoanStatus.DISBURSED,
++                7, disbursedAt, dueAt);
+ 
+         LoanResponse r = LoanResponse.from(loan);
+ 
+@@ -75,5 +78,19 @@ class WebDtoMappingTest {
+         assertThat(r.fee()).isEqualByComparingTo("800");
+         assertThat(r.outstanding()).isEqualByComparingTo("800800");
+         assertThat(r.status()).isEqualTo(LoanStatus.DISBURSED);
++        assertThat(r.disbursedAt()).isEqualTo(disbursedAt);
++        assertThat(r.dueAt()).isEqualTo(dueAt);
++    }
++
++    @Test
++    @DisplayName("LoanResponse.from 은 실행 전/구 데이터의 실행시각·만기를 null 로 옮긴다")
++    void loanResponseNullDueTracking() {
++        LoanAdvance loan = LoanAdvance.reconstitute(1L, 7L, new BigDecimal("800000"),
++                new BigDecimal("800"), BigDecimal.ZERO, LoanStatus.REQUESTED);
++
++        LoanResponse r = LoanResponse.from(loan);
++
++        assertThat(r.disbursedAt()).isNull();
++        assertThat(r.dueAt()).isNull();
+     }
+ }
+diff --git a/loan-service/src/test/java/github/lms/lemuel/loan/adapter/out/persistence/JpaEntityGettersTest.java b/loan-service/src/test/java/github/lms/lemuel/loan/adapter/out/persistence/JpaEntityGettersTest.java
+index 0cf30a507..670859f95 100644
+--- a/loan-service/src/test/java/github/lms/lemuel/loan/adapter/out/persistence/JpaEntityGettersTest.java
++++ b/loan-service/src/test/java/github/lms/lemuel/loan/adapter/out/persistence/JpaEntityGettersTest.java
+@@ -108,7 +108,7 @@ class JpaEntityGettersTest {
+     void loanAdvance() {
+         LocalDateTime now = LocalDateTime.now();
+         LoanAdvanceJpaEntity e = new LoanAdvanceJpaEntity(1L, 7L, new BigDecimal("800000"),
+-                new BigDecimal("800"), new BigDecimal("800800"), LoanStatus.DISBURSED, now);
++                new BigDecimal("800"), new BigDecimal("800800"), LoanStatus.DISBURSED, 0, null, null, now);
+ 
+         assertThat(e.getId()).isEqualTo(1L);
+         assertThat(e.getSellerId()).isEqualTo(7L);
+diff --git a/loan-service/src/test/java/github/lms/lemuel/loan/adapter/out/persistence/LoanPersistenceAdaptersTest.java b/loan-service/src/test/java/github/lms/lemuel/loan/adapter/out/persistence/LoanPersistenceAdaptersTest.java
+index 69b9f3a77..b65a9b58d 100644
+--- a/loan-service/src/test/java/github/lms/lemuel/loan/adapter/out/persistence/LoanPersistenceAdaptersTest.java
++++ b/loan-service/src/test/java/github/lms/lemuel/loan/adapter/out/persistence/LoanPersistenceAdaptersTest.java
+@@ -205,7 +205,7 @@ class LoanPersistenceAdaptersTest {
+ 
+         private LoanAdvanceJpaEntity entity(long id) {
+             return new LoanAdvanceJpaEntity(id, 7L, new BigDecimal("800000"), new BigDecimal("800"),
+-                    new BigDecimal("800800"), LoanStatus.DISBURSED, LocalDateTime.now());
++                    new BigDecimal("800800"), LoanStatus.DISBURSED, 0, null, null, LocalDateTime.now());
+         }
+ 
+         @Test
+@@ -245,11 +245,17 @@ class LoanPersistenceAdaptersTest {
+         }
+ 
+         @Test
+-        @DisplayName("findDisbursedBySellerForUpdate 매핑")
+-        void findDisbursedForUpdate() {
+-            when(repository.findBySellerAndStatusForUpdate(7L, LoanStatus.DISBURSED))
+-                    .thenReturn(List.of(entity(1L)));
+-            assertThat(adapter().findDisbursedBySellerForUpdate(7L)).hasSize(1);
++        @DisplayName("findRepayableBySellerForUpdate 는 DISBURSED + OVERDUE 를 함께 조회·매핑한다")
++        void findRepayableForUpdate() {
++            LoanAdvanceJpaEntity overdue = new LoanAdvanceJpaEntity(2L, 7L, new BigDecimal("800000"),
++                    new BigDecimal("800"), new BigDecimal("800800"), LoanStatus.OVERDUE, 0, null, null, LocalDateTime.now());
++            when(repository.findBySellerAndStatusesForUpdate(7L,
++                    List.of(LoanStatus.DISBURSED, LoanStatus.OVERDUE)))
++                    .thenReturn(List.of(entity(1L), overdue));
++
++            assertThat(adapter().findRepayableBySellerForUpdate(7L))
++                    .extracting(LoanAdvance::getStatus)
++                    .containsExactly(LoanStatus.DISBURSED, LoanStatus.OVERDUE);
+         }
+     }
+ }
+diff --git a/loan-service/src/test/java/github/lms/lemuel/loan/application/service/ApplyRepaymentServiceTest.java b/loan-service/src/test/java/github/lms/lemuel/loan/application/service/ApplyRepaymentServiceTest.java
+index 0ff20e776..0f1af6629 100644
+--- a/loan-service/src/test/java/github/lms/lemuel/loan/application/service/ApplyRepaymentServiceTest.java
++++ b/loan-service/src/test/java/github/lms/lemuel/loan/application/service/ApplyRepaymentServiceTest.java
+@@ -45,12 +45,30 @@ class ApplyRepaymentServiceTest {
+         return LoanAdvance.reconstitute(id, 7L, outstanding, BigDecimal.ZERO, outstanding, LoanStatus.DISBURSED);
+     }
+ 
++    private LoanAdvance overdue(long id, BigDecimal outstanding) {
++        return LoanAdvance.reconstitute(id, 7L, outstanding, BigDecimal.ZERO, outstanding, LoanStatus.OVERDUE);
++    }
++
++    @Test
++    void 연체_대출도_상환_recovery_대상이라_새_정산금으로_REPAID_회수된다() {
++        LoanAdvance overdueLoan = overdue(1L, new BigDecimal("300000"));
++        when(recordRepaymentPort.existsForSettlement(104L)).thenReturn(false);
++        when(loadLoanPort.findRepayableBySellerForUpdate(7L)).thenReturn(List.of(overdueLoan));
++
++        service().apply(new ApplyRepaymentCommand(104L, 7L, new BigDecimal("300000")));
++
++        assertThat(overdueLoan.getOutstanding()).isEqualByComparingTo("0");
++        assertThat(overdueLoan.getStatus()).isEqualTo(LoanStatus.REPAID); // OVERDUE → REPAID 자동 회수
++        verify(saveLoanPort).save(overdueLoan);
++        verify(recordRepaymentPort).record(104L, 7L, new BigDecimal("300000.00"));
++    }
++
+     @Test
+     void 다건대출은_FIFO로_차감되고_총차감액을_발행한다() {
+         LoanAdvance oldest = disbursed(1L, new BigDecimal("300000"));
+         LoanAdvance newer = disbursed(2L, new BigDecimal("600000"));
+         when(recordRepaymentPort.existsForSettlement(100L)).thenReturn(false);
+-        when(loadLoanPort.findDisbursedBySellerForUpdate(7L)).thenReturn(List.of(oldest, newer));
++        when(loadLoanPort.findRepayableBySellerForUpdate(7L)).thenReturn(List.of(oldest, newer));
+ 
+         // 정산금 80만 → oldest 30만 전액, newer 50만 부분, 총 80만
+         service().apply(new ApplyRepaymentCommand(100L, 7L, new BigDecimal("800000")));
+@@ -68,7 +86,7 @@ class ApplyRepaymentServiceTest {
+     @Test
+     void 대출없는_셀러는_차감0으로_기록하고_발행한다() {
+         when(recordRepaymentPort.existsForSettlement(101L)).thenReturn(false);
+-        when(loadLoanPort.findDisbursedBySellerForUpdate(7L)).thenReturn(List.of());
++        when(loadLoanPort.findRepayableBySellerForUpdate(7L)).thenReturn(List.of());
+ 
+         service().apply(new ApplyRepaymentCommand(101L, 7L, new BigDecimal("500000")));
+ 
+@@ -83,7 +101,7 @@ class ApplyRepaymentServiceTest {
+     void 정산금이_미상환보다_크면_미상환만큼만_차감() {
+         LoanAdvance loan = disbursed(1L, new BigDecimal("200000"));
+         when(recordRepaymentPort.existsForSettlement(102L)).thenReturn(false);
+-        when(loadLoanPort.findDisbursedBySellerForUpdate(7L)).thenReturn(List.of(loan));
++        when(loadLoanPort.findRepayableBySellerForUpdate(7L)).thenReturn(List.of(loan));
+ 
+         service().apply(new ApplyRepaymentCommand(102L, 7L, new BigDecimal("500000")));
+ 
+@@ -97,7 +115,7 @@ class ApplyRepaymentServiceTest {
+         LoanAdvance first = disbursed(1L, new BigDecimal("300000"));
+         LoanAdvance second = disbursed(2L, new BigDecimal("500000"));
+         when(recordRepaymentPort.existsForSettlement(103L)).thenReturn(false);
+-        when(loadLoanPort.findDisbursedBySellerForUpdate(7L)).thenReturn(List.of(first, second));
++        when(loadLoanPort.findRepayableBySellerForUpdate(7L)).thenReturn(List.of(first, second));
+ 
+         // 정산금 30만 = first 잔액과 동일 → first 전액 차감 후 remaining 0 → second 는 break 로 스킵
+         service().apply(new ApplyRepaymentCommand(103L, 7L, new BigDecimal("300000")));
+@@ -117,7 +135,7 @@ class ApplyRepaymentServiceTest {
+ 
+         service().apply(new ApplyRepaymentCommand(100L, 7L, new BigDecimal("800000")));
+ 
+-        verify(loadLoanPort, never()).findDisbursedBySellerForUpdate(any());
++        verify(loadLoanPort, never()).findRepayableBySellerForUpdate(any());
+         verify(saveLoanPort, never()).save(any());
+         verify(publishLoanEventPort, never()).publishRepaymentApplied(org.mockito.ArgumentMatchers.anyLong(),
+                 org.mockito.ArgumentMatchers.anyLong(), any());
+diff --git a/loan-service/src/test/java/github/lms/lemuel/loan/application/service/DisburseLoanServiceTest.java b/loan-service/src/test/java/github/lms/lemuel/loan/application/service/DisburseLoanServiceTest.java
+index ef0b862e3..c748ad560 100644
+--- a/loan-service/src/test/java/github/lms/lemuel/loan/application/service/DisburseLoanServiceTest.java
++++ b/loan-service/src/test/java/github/lms/lemuel/loan/application/service/DisburseLoanServiceTest.java
+@@ -16,8 +16,10 @@ import org.mockito.Mock;
+ import org.mockito.junit.jupiter.MockitoExtension;
+ 
+ import java.math.BigDecimal;
++import java.time.Clock;
++import java.time.Instant;
++import java.time.ZoneId;
+ import java.util.Map;
+-import java.util.Optional;
+ 
+ import static org.assertj.core.api.Assertions.assertThat;
+ import static org.assertj.core.api.Assertions.assertThatThrownBy;
+@@ -38,26 +40,29 @@ class DisburseLoanServiceTest {
+     @Mock AppendLedgerPort appendLedgerPort;
+     @Mock LoanMetricsPort loanMetricsPort;
+ 
++    // 고정 KST Clock — 실행 시각·만기(dueAt) 계산을 결정적으로 검증.
++    private final Clock clock = Clock.fixed(Instant.parse("2026-07-24T00:00:00Z"), ZoneId.of("Asia/Seoul"));
++
+     private final CreditPolicy creditPolicy = new CreditPolicy(new BigDecimal("0.80"), new BigDecimal("0.0002"),
+             Map.of("A", BigDecimal.ONE, "B", BigDecimal.ONE, "C", new BigDecimal("0.85"),
+                     "D", new BigDecimal("0.70"), "E", BigDecimal.ZERO));
+ 
+     private DisburseLoanService service() {
+         // 평판 미상 기본(무변동) — 개별 테스트에서 필요 시 재stub
+-        lenient().when(loadSellerReputationPort.findGrade(7L)).thenReturn(Optional.empty());
++        lenient().when(loadSellerReputationPort.findGrade(7L)).thenReturn(java.util.Optional.empty());
+         return new DisburseLoanService(loadLoanPort, saveLoanPort, loadSettlementViewPort,
+                 loadSellerReputationPort, creditPolicy, publishLoanEventPort, appendLedgerPort,
+-                loanMetricsPort);
++                loanMetricsPort, clock);
+     }
+ 
+     private LoanAdvance requestedLoan() {
+-        // id=1, seller=7, principal=800,000, fee=800
++        // id=1, seller=7, principal=800,000, fee=800, financingDays=7 (만기 추적)
+         return LoanAdvance.reconstitute(1L, 7L, new BigDecimal("800000"), new BigDecimal("800"),
+-                BigDecimal.ZERO, LoanStatus.REQUESTED);
++                BigDecimal.ZERO, LoanStatus.REQUESTED, 7, null, null);
+     }
+ 
+     @Test
+-    void 담보충분하면_실행하고_선지급이벤트를_발행한다() {
++    void 담보충분하면_실행하고_선지급이벤트를_발행하며_만기를_확정한다() {
+         when(loadLoanPort.load(1L)).thenReturn(requestedLoan());
+         when(loadSettlementViewPort.sumUnpaidBySellerForUpdate(7L)).thenReturn(new BigDecimal("1000000"));
+         when(saveLoanPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+@@ -66,8 +71,10 @@ class DisburseLoanServiceTest {
+ 
+         assertThat(result.getStatus()).isEqualTo(LoanStatus.DISBURSED);
+         assertThat(result.getOutstanding()).isEqualByComparingTo("800800"); // 원금+수수료
++        // 실행 시각(KST 2026-07-25 09:00)·만기(+7일) 확정
++        assertThat(result.getDisbursedAt()).isEqualTo(java.time.LocalDateTime.of(2026, 7, 24, 9, 0));
++        assertThat(result.getDueAt()).isEqualTo(java.time.LocalDateTime.of(2026, 7, 31, 9, 0));
+         verify(publishLoanEventPort).publishDisbursementRequested(any());
+-        // 복식부기 전표 2건: 선지급 + 수수료 인식
+         verify(appendLedgerPort, org.mockito.Mockito.times(2)).append(any());
+         verify(loanMetricsPort).advanceDisbursed();
+     }
+@@ -85,7 +92,6 @@ class DisburseLoanServiceTest {
+                 .hasMessageContaining("limit=400000");
+ 
+         verify(publishLoanEventPort, never()).publishDisbursementRequested(any());
+-        // 거절 상태로 저장됐는지
+         org.mockito.ArgumentCaptor<LoanAdvance> captor = org.mockito.ArgumentCaptor.forClass(LoanAdvance.class);
+         verify(saveLoanPort).save(captor.capture());
+         assertThat(captor.getValue().getStatus()).isEqualTo(LoanStatus.REJECTED);
+diff --git a/loan-service/src/test/java/github/lms/lemuel/loan/application/service/LoanAuditEmissionTest.java b/loan-service/src/test/java/github/lms/lemuel/loan/application/service/LoanAuditEmissionTest.java
+index 65053e08f..fc1688b02 100644
+--- a/loan-service/src/test/java/github/lms/lemuel/loan/application/service/LoanAuditEmissionTest.java
++++ b/loan-service/src/test/java/github/lms/lemuel/loan/application/service/LoanAuditEmissionTest.java
+@@ -109,7 +109,7 @@ class LoanAuditEmissionTest {
+         when(saveLoan.save(any())).thenAnswer(inv -> inv.getArgument(0));
+ 
+         DisburseLoanService service = proxied(new DisburseLoanService(loadLoan, saveLoan, settlementView,
+-                reputation, creditPolicy, publish, ledger, metrics));
++                reputation, creditPolicy, publish, ledger, metrics, java.time.Clock.systemUTC()));
+         service.disburse(1L);
+ 
+         verify(auditLogger).record(eq(AuditAction.LOAN_ADVANCE_DISBURSED), eq("LoanAdvance"), eq("1"), any());
+@@ -177,7 +177,7 @@ class LoanAuditEmissionTest {
+         PublishLoanEventPort publish = mock(PublishLoanEventPort.class);
+         AppendLedgerPort ledger = mock(AppendLedgerPort.class);
+         when(recordRepayment.existsForSettlement(100L)).thenReturn(false);
+-        when(loadLoan.findDisbursedBySellerForUpdate(7L)).thenReturn(List.of());
++        when(loadLoan.findRepayableBySellerForUpdate(7L)).thenReturn(List.of());
+ 
+         ApplyRepaymentService service = proxied(new ApplyRepaymentService(loadLoan, saveLoan, recordRepayment,
+                 saveSettlementView, publish, ledger, metrics));
+diff --git a/loan-service/src/test/java/github/lms/lemuel/loan/application/service/LoanCollectionServiceTest.java b/loan-service/src/test/java/github/lms/lemuel/loan/application/service/LoanCollectionServiceTest.java
+new file mode 100644
+index 000000000..6c3503501
+--- /dev/null
++++ b/loan-service/src/test/java/github/lms/lemuel/loan/application/service/LoanCollectionServiceTest.java
+@@ -0,0 +1,81 @@
++package github.lms.lemuel.loan.application.service;
++
++import github.lms.lemuel.loan.application.port.out.AppendLedgerPort;
++import github.lms.lemuel.loan.application.port.out.LoadLoanPort;
++import github.lms.lemuel.loan.application.port.out.LoanMetricsPort;
++import github.lms.lemuel.loan.application.port.out.SaveLoanPort;
++import github.lms.lemuel.loan.domain.LoanAdvance;
++import github.lms.lemuel.loan.domain.LoanLedgerEntry;
++import github.lms.lemuel.loan.domain.LoanStatus;
++import github.lms.lemuel.loan.domain.exception.InvalidLoanStateException;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.extension.ExtendWith;
++import org.mockito.ArgumentCaptor;
++import org.mockito.Mock;
++import org.mockito.junit.jupiter.MockitoExtension;
++
++import java.math.BigDecimal;
++
++import static org.assertj.core.api.Assertions.assertThat;
++import static org.assertj.core.api.Assertions.assertThatThrownBy;
++import static org.mockito.ArgumentMatchers.any;
++import static org.mockito.Mockito.never;
++import static org.mockito.Mockito.verify;
++import static org.mockito.Mockito.when;
++
++@ExtendWith(MockitoExtension.class)
++class LoanCollectionServiceTest {
++
++    @Mock LoadLoanPort loadLoanPort;
++    @Mock SaveLoanPort saveLoanPort;
++    @Mock AppendLedgerPort appendLedgerPort;
++    @Mock LoanMetricsPort loanMetricsPort;
++
++    private LoanCollectionService service() {
++        return new LoanCollectionService(loadLoanPort, saveLoanPort, appendLedgerPort, loanMetricsPort);
++    }
++
++    private LoanAdvance withStatus(LoanStatus status, BigDecimal outstanding) {
++        return LoanAdvance.reconstitute(1L, 7L, new BigDecimal("800000"),
++                new BigDecimal("800"), outstanding, status);
++    }
++
++    @Test
++    void 연체진입은_OVERDUE로_전이하고_전표없이_메트릭만() {
++        when(loadLoanPort.load(1L)).thenReturn(withStatus(LoanStatus.DISBURSED, new BigDecimal("800800")));
++        when(saveLoanPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
++
++        LoanAdvance result = service().markOverdue(1L);
++
++        assertThat(result.getStatus()).isEqualTo(LoanStatus.OVERDUE);
++        verify(loanMetricsPort).advanceOverdue();
++        verify(appendLedgerPort, never()).append(any());   // 연체는 상태전이만 — 전표 없음
++    }
++
++    @Test
++    void 상각은_WRITTEN_OFF로_전이하고_대손전표1건_기록() {
++        when(loadLoanPort.load(1L)).thenReturn(withStatus(LoanStatus.OVERDUE, new BigDecimal("800800")));
++        when(saveLoanPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
++
++        LoanAdvance result = service().writeOff(1L);
++
++        assertThat(result.getStatus()).isEqualTo(LoanStatus.WRITTEN_OFF);
++
++        ArgumentCaptor<LoanLedgerEntry> captor = ArgumentCaptor.forClass(LoanLedgerEntry.class);
++        verify(appendLedgerPort).append(captor.capture());
++        assertThat(captor.getValue().getRefType()).isEqualTo("BAD_DEBT");
++        assertThat(captor.getValue().getAmount()).isEqualByComparingTo("800800"); // 상각 손실=미상환잔액
++        verify(loanMetricsPort).advanceWrittenOff(new BigDecimal("800800"));
++    }
++
++    @Test
++    void DISBURSED에서_바로_상각하면_상태예외이고_저장_전표없음() {
++        when(loadLoanPort.load(1L)).thenReturn(withStatus(LoanStatus.DISBURSED, new BigDecimal("800800")));
++
++        assertThatThrownBy(() -> service().writeOff(1L))
++                .isInstanceOf(InvalidLoanStateException.class);
++
++        verify(saveLoanPort, never()).save(any());
++        verify(appendLedgerPort, never()).append(any());
++    }
++}
+diff --git a/loan-service/src/test/java/github/lms/lemuel/loan/application/service/LoanOverdueSchedulerTest.java b/loan-service/src/test/java/github/lms/lemuel/loan/application/service/LoanOverdueSchedulerTest.java
+new file mode 100644
+index 000000000..1582fa33a
+--- /dev/null
++++ b/loan-service/src/test/java/github/lms/lemuel/loan/application/service/LoanOverdueSchedulerTest.java
+@@ -0,0 +1,98 @@
++package github.lms.lemuel.loan.application.service;
++
++import github.lms.lemuel.loan.application.port.in.ManageLoanCollectionUseCase;
++import github.lms.lemuel.loan.application.port.out.LoadLoanPort;
++import github.lms.lemuel.loan.domain.LoanAdvance;
++import github.lms.lemuel.loan.domain.LoanStatus;
++import github.lms.lemuel.loan.domain.exception.InvalidLoanStateException;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.extension.ExtendWith;
++import org.mockito.Mock;
++import org.mockito.junit.jupiter.MockitoExtension;
++
++import java.math.BigDecimal;
++import java.time.Clock;
++import java.time.Instant;
++import java.time.LocalDateTime;
++import java.time.ZoneId;
++import java.util.List;
++
++import static org.assertj.core.api.Assertions.assertThat;
++import static org.mockito.ArgumentMatchers.eq;
++import static org.mockito.Mockito.never;
++import static org.mockito.Mockito.verify;
++import static org.mockito.Mockito.when;
++
++@ExtendWith(MockitoExtension.class)
++class LoanOverdueSchedulerTest {
++
++    @Mock ManageLoanCollectionUseCase collectionUseCase;
++    @Mock LoadLoanPort loadLoanPort;
++
++    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
++    private final Clock clock = Clock.fixed(Instant.parse("2026-08-30T00:00:00Z"), KST);
++
++    // graceDays=0, writeOffDays=30
++    private LoanOverdueScheduler scheduler() {
++        return new LoanOverdueScheduler(collectionUseCase, loadLoanPort, clock, 0, 30);
++    }
++
++    private LoanAdvance loan(long id, LoanStatus status) {
++        return LoanAdvance.reconstitute(id, 7L, new BigDecimal("800000"), new BigDecimal("800"),
++                new BigDecimal("800800"), status, 7,
++                LocalDateTime.of(2026, 7, 1, 9, 0), LocalDateTime.of(2026, 7, 8, 9, 0));
++    }
++
++    @Test
++    void 연체승격은_만기경과_DISBURSED를_asOf_now로_스캔해_건별_markOverdue() {
++        LocalDateTime expectedAsOf = LocalDateTime.now(clock); // grace 0 → now(KST)
++        when(loadLoanPort.findOverdueCandidates(eq(expectedAsOf)))
++                .thenReturn(List.of(loan(10L, LoanStatus.DISBURSED), loan(11L, LoanStatus.DISBURSED)));
++
++        int done = scheduler().promoteOverdue();
++
++        assertThat(done).isEqualTo(2);
++        verify(collectionUseCase).markOverdue(10L);
++        verify(collectionUseCase).markOverdue(11L);
++    }
++
++    @Test
++    void 연체승격_건별실패는_격리하고_나머지는_계속한다() {
++        when(loadLoanPort.findOverdueCandidates(eq(LocalDateTime.now(clock))))
++                .thenReturn(List.of(loan(10L, LoanStatus.DISBURSED), loan(11L, LoanStatus.DISBURSED)));
++        // 10L 은 스캔~처리 사이 상태가 바뀌어 전이 불가(격리 대상)
++        when(collectionUseCase.markOverdue(10L)).thenThrow(new InvalidLoanStateException(
++                LoanStatus.OVERDUE, LoanStatus.OVERDUE));
++
++        int done = scheduler().promoteOverdue();
++
++        assertThat(done).isEqualTo(1); // 11L 만 성공
++        verify(collectionUseCase).markOverdue(11L);
++    }
++
++    @Test
++    void 상각은_만기후_writeOffDays_경과_OVERDUE를_asOf_now빼기30으로_스캔해_건별_writeOff() {
++        LocalDateTime expectedAsOf = LocalDateTime.now(clock).minusDays(30);
++        when(loadLoanPort.findWriteOffCandidates(eq(expectedAsOf)))
++                .thenReturn(List.of(loan(20L, LoanStatus.OVERDUE)));
++
++        int done = scheduler().promoteWriteOff();
++
++        assertThat(done).isEqualTo(1);
++        verify(collectionUseCase).writeOff(20L);
++        verify(collectionUseCase, never()).markOverdue(20L);
++    }
++
++    @Test
++    void scan은_연체승격과_상각을_모두_수행한다() {
++        when(loadLoanPort.findOverdueCandidates(eq(LocalDateTime.now(clock))))
++                .thenReturn(List.of(loan(10L, LoanStatus.DISBURSED)));
++        when(loadLoanPort.findWriteOffCandidates(eq(LocalDateTime.now(clock).minusDays(30))))
++                .thenReturn(List.of(loan(20L, LoanStatus.OVERDUE)));
++
++        scheduler().scan();
++
++        verify(collectionUseCase).markOverdue(10L);
++        verify(collectionUseCase).writeOff(20L);
++    }
++}
+diff --git a/loan-service/src/test/java/github/lms/lemuel/loan/application/service/RepayCorporateLoanServiceTest.java b/loan-service/src/test/java/github/lms/lemuel/loan/application/service/RepayCorporateLoanServiceTest.java
+new file mode 100644
+index 000000000..42700d0e7
+--- /dev/null
++++ b/loan-service/src/test/java/github/lms/lemuel/loan/application/service/RepayCorporateLoanServiceTest.java
+@@ -0,0 +1,107 @@
++package github.lms.lemuel.loan.application.service;
++
++import github.lms.lemuel.loan.application.port.in.RepayCorporateLoanUseCase.RepayCorporateLoanCommand;
++import github.lms.lemuel.loan.application.port.out.AppendLedgerPort;
++import github.lms.lemuel.loan.application.port.out.LoadCorporateLoanPort;
++import github.lms.lemuel.loan.application.port.out.LoanMetricsPort;
++import github.lms.lemuel.loan.application.port.out.SaveCorporateLoanPort;
++import github.lms.lemuel.loan.domain.CorporateLoan;
++import github.lms.lemuel.loan.domain.CorporateLoanStatus;
++import github.lms.lemuel.loan.domain.LoanLedgerEntry;
++import github.lms.lemuel.loan.domain.exception.CorporateLoanNotFoundException;
++import github.lms.lemuel.loan.domain.exception.LoanInvariantViolationException;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.extension.ExtendWith;
++import org.mockito.ArgumentCaptor;
++import org.mockito.Mock;
++import org.mockito.junit.jupiter.MockitoExtension;
++
++import java.math.BigDecimal;
++import java.util.Optional;
++
++import static org.assertj.core.api.Assertions.assertThat;
++import static org.assertj.core.api.Assertions.assertThatThrownBy;
++import static org.mockito.ArgumentMatchers.any;
++import static org.mockito.Mockito.never;
++import static org.mockito.Mockito.verify;
++import static org.mockito.Mockito.when;
++
++@ExtendWith(MockitoExtension.class)
++class RepayCorporateLoanServiceTest {
++
++    @Mock LoadCorporateLoanPort loadCorporateLoanPort;
++    @Mock SaveCorporateLoanPort saveCorporateLoanPort;
++    @Mock AppendLedgerPort appendLedgerPort;
++    @Mock LoanMetricsPort loanMetricsPort;
++
++    private RepayCorporateLoanService service() {
++        return new RepayCorporateLoanService(loadCorporateLoanPort, saveCorporateLoanPort,
++                appendLedgerPort, loanMetricsPort);
++    }
++
++    /** DISBURSED 상태(미상환잔액=outstanding)의 기업대출. */
++    private CorporateLoan disbursed(BigDecimal outstanding) {
++        return CorporateLoan.reconstitute(5001L, "005930", "삼성전자",
++                new BigDecimal("1000000"), new BigDecimal("6000"), outstanding,
++                30, 82, "A", CorporateLoanStatus.DISBURSED, null);
++    }
++
++    @Test
++    void 부분상환은_잔액을_차감하고_상환전표1건_기록하며_DISBURSED유지() {
++        when(loadCorporateLoanPort.findByIdForUpdate(5001L))
++                .thenReturn(Optional.of(disbursed(new BigDecimal("1006000"))));
++        when(saveCorporateLoanPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
++
++        CorporateLoan result = service().repay(new RepayCorporateLoanCommand(5001L, new BigDecimal("600000")));
++
++        assertThat(result.getStatus()).isEqualTo(CorporateLoanStatus.DISBURSED);
++        assertThat(result.getOutstanding()).isEqualByComparingTo("406000");
++
++        ArgumentCaptor<LoanLedgerEntry> captor = ArgumentCaptor.forClass(LoanLedgerEntry.class);
++        verify(appendLedgerPort).append(captor.capture());
++        assertThat(captor.getValue().getRefType()).isEqualTo("CORP_REPAYMENT");
++        assertThat(captor.getValue().getAmount()).isEqualByComparingTo("600000");
++        // 도메인이 Money(scale 2, HALF_UP)로 정규화하므로 차감액은 600000.00 (Mockito equals 는 scale 구분).
++        verify(loanMetricsPort).corporateRepaid(new BigDecimal("600000.00"));
++    }
++
++    @Test
++    void 잔액초과_상환은_잔액까지만_차감하고_REPAID로_전이() {
++        when(loadCorporateLoanPort.findByIdForUpdate(5001L))
++                .thenReturn(Optional.of(disbursed(new BigDecimal("400660"))));
++        when(saveCorporateLoanPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
++
++        CorporateLoan result = service().repay(new RepayCorporateLoanCommand(5001L, new BigDecimal("999999")));
++
++        assertThat(result.getStatus()).isEqualTo(CorporateLoanStatus.REPAID);
++        assertThat(result.getOutstanding()).isEqualByComparingTo("0");
++
++        ArgumentCaptor<LoanLedgerEntry> captor = ArgumentCaptor.forClass(LoanLedgerEntry.class);
++        verify(appendLedgerPort).append(captor.capture());
++        assertThat(captor.getValue().getAmount()).isEqualByComparingTo("400660"); // clamp
++    }
++
++    @Test
++    void 대출이_없으면_NotFound이고_저장_전표없음() {
++        when(loadCorporateLoanPort.findByIdForUpdate(999L)).thenReturn(Optional.empty());
++
++        assertThatThrownBy(() -> service().repay(new RepayCorporateLoanCommand(999L, BigDecimal.TEN)))
++                .isInstanceOf(CorporateLoanNotFoundException.class);
++
++        verify(saveCorporateLoanPort, never()).save(any());
++        verify(appendLedgerPort, never()).append(any());
++        verify(loanMetricsPort, never()).corporateRepaid(any());
++    }
++
++    @Test
++    void 상환액이_0이하면_도메인예외이고_저장_전표없음() {
++        when(loadCorporateLoanPort.findByIdForUpdate(5001L))
++                .thenReturn(Optional.of(disbursed(new BigDecimal("1006000"))));
++
++        assertThatThrownBy(() -> service().repay(new RepayCorporateLoanCommand(5001L, BigDecimal.ZERO)))
++                .isInstanceOf(LoanInvariantViolationException.class);
++
++        verify(saveCorporateLoanPort, never()).save(any());
++        verify(appendLedgerPort, never()).append(any());
++    }
++}
+diff --git a/loan-service/src/test/java/github/lms/lemuel/loan/domain/LoanAdvanceDueTrackingTest.java b/loan-service/src/test/java/github/lms/lemuel/loan/domain/LoanAdvanceDueTrackingTest.java
+new file mode 100644
+index 000000000..62a6cb55e
+--- /dev/null
++++ b/loan-service/src/test/java/github/lms/lemuel/loan/domain/LoanAdvanceDueTrackingTest.java
+@@ -0,0 +1,73 @@
++package github.lms.lemuel.loan.domain;
++
++import github.lms.lemuel.loan.domain.exception.LoanInvariantViolationException;
++import org.junit.jupiter.api.Test;
++
++import java.math.BigDecimal;
++import java.time.LocalDateTime;
++
++import static org.assertj.core.api.Assertions.assertThat;
++import static org.assertj.core.api.Assertions.assertThatThrownBy;
++
++/**
++ * 만기 추적 불변식: financingDays 보존 + 실행 시 dueAt = disbursedAt + financingDays 확정.
++ * 자동 연체/상각 배치의 스캔 근거가 되는 값이라 경계를 도메인 단위로 고정한다.
++ */
++class LoanAdvanceDueTrackingTest {
++
++    private static final BigDecimal PRINCIPAL = new BigDecimal("800000");
++    private static final BigDecimal FEE = new BigDecimal("800");
++
++    @Test
++    void 신청은_financingDays를_보존하고_실행전_만기는_미정() {
++        LoanAdvance loan = LoanAdvance.request(7L, PRINCIPAL, FEE, 7);
++        assertThat(loan.getFinancingDays()).isEqualTo(7);
++        assertThat(loan.getDisbursedAt()).isNull();
++        assertThat(loan.getDueAt()).isNull();
++        assertThat(loan.getStatus()).isEqualTo(LoanStatus.REQUESTED);
++    }
++
++    @Test
++    void 구경로_신청은_financingDays_0() {
++        LoanAdvance loan = LoanAdvance.request(7L, PRINCIPAL, FEE);
++        assertThat(loan.getFinancingDays()).isEqualTo(0);
++    }
++
++    @Test
++    void 선지급일수가_음수면_예외() {
++        assertThatThrownBy(() -> LoanAdvance.request(7L, PRINCIPAL, FEE, -1))
++                .isInstanceOf(LoanInvariantViolationException.class);
++    }
++
++    @Test
++    void 실행하면_실행시각을_찍고_만기는_실행시각더하기_financingDays() {
++        LoanAdvance loan = LoanAdvance.request(7L, PRINCIPAL, FEE, 7);
++        loan.approve();
++        LocalDateTime asOf = LocalDateTime.of(2026, 7, 24, 9, 0);
++
++        loan.disburse(asOf);
++
++        assertThat(loan.getStatus()).isEqualTo(LoanStatus.DISBURSED);
++        assertThat(loan.getDisbursedAt()).isEqualTo(asOf);
++        assertThat(loan.getDueAt()).isEqualTo(asOf.plusDays(7)); // 2026-07-31T09:00
++    }
++
++    @Test
++    void 실행시각이_null이면_예외() {
++        LoanAdvance loan = LoanAdvance.request(7L, PRINCIPAL, FEE, 7);
++        loan.approve();
++        assertThatThrownBy(() -> loan.disburse((LocalDateTime) null))
++                .isInstanceOf(LoanInvariantViolationException.class);
++    }
++
++    @Test
++    void 구경로_실행은_시각과_만기를_찍지_않는다() {
++        LoanAdvance loan = LoanAdvance.request(7L, PRINCIPAL, FEE, 7);
++        loan.approve();
++        loan.disburse(); // 레거시 오버로드
++
++        assertThat(loan.getStatus()).isEqualTo(LoanStatus.DISBURSED);
++        assertThat(loan.getDisbursedAt()).isNull();
++        assertThat(loan.getDueAt()).isNull();
++    }
++}
+diff --git a/loan-service/src/test/java/github/lms/lemuel/loan/domain/LoanLedgerEntryTest.java b/loan-service/src/test/java/github/lms/lemuel/loan/domain/LoanLedgerEntryTest.java
+index 54c66a47a..1c1531ac4 100644
+--- a/loan-service/src/test/java/github/lms/lemuel/loan/domain/LoanLedgerEntryTest.java
++++ b/loan-service/src/test/java/github/lms/lemuel/loan/domain/LoanLedgerEntryTest.java
+@@ -53,12 +53,38 @@ class LoanLedgerEntryTest {
+         assertThat(e.getRefId()).isEqualTo(5001L);
+     }
+ 
++    @Test
++    void 기업대출_상환_전표는_현금차변_대출채권대변이고_refType은_CORP_REPAYMENT() {
++        LoanLedgerEntry e = LoanLedgerEntry.corporateRepayment(5001L, new BigDecimal("400660"));
++        assertThat(e.getDebit()).isEqualTo(LedgerAccount.CASH);
++        assertThat(e.getCredit()).isEqualTo(LedgerAccount.LOAN_RECEIVABLE);
++        assertThat(e.getAmount()).isEqualByComparingTo("400660");
++        assertThat(e.getRefType()).isEqualTo("CORP_REPAYMENT");
++        assertThat(e.getRefId()).isEqualTo(5001L);
++    }
++
++    @Test
++    void 대손상각_전표는_대손상각비차변_대손충당금대변이고_refType은_BAD_DEBT() {
++        LoanLedgerEntry e = LoanLedgerEntry.badDebtWriteOff(1L, new BigDecimal("800800"));
++        assertThat(e.getDebit()).isEqualTo(LedgerAccount.BAD_DEBT_EXPENSE);
++        assertThat(e.getCredit()).isEqualTo(LedgerAccount.BAD_DEBT_ALLOWANCE);
++        assertThat(e.getAmount()).isEqualByComparingTo("800800");
++        assertThat(e.getRefType()).isEqualTo("BAD_DEBT");
++        assertThat(e.getRefId()).isEqualTo(1L);
++    }
++
+     @Test
+     void 전표금액이_0이하면_예외() {
+         assertThatThrownBy(() -> LoanLedgerEntry.disbursement(1L, BigDecimal.ZERO))
+                 .isInstanceOf(LoanInvariantViolationException.class);
+     }
+ 
++    @Test
++    void 기업대출_상환전표도_금액이_0이하면_예외() {
++        assertThatThrownBy(() -> LoanLedgerEntry.corporateRepayment(1L, BigDecimal.ZERO))
++                .isInstanceOf(LoanInvariantViolationException.class);
++    }
++
+     @Test
+     void 선지급_사이클_전표들의_차변합과_대변합은_계정별로_균형이다() {
+         // 선지급 80만 + 수수료 800 + 전액 상환(80만800)
+diff --git a/shared-common/src/main/java/github/lms/lemuel/common/audit/domain/AuditAction.java b/shared-common/src/main/java/github/lms/lemuel/common/audit/domain/AuditAction.java
+index 80e6765f8..3c1e17386 100644
+--- a/shared-common/src/main/java/github/lms/lemuel/common/audit/domain/AuditAction.java
++++ b/shared-common/src/main/java/github/lms/lemuel/common/audit/domain/AuditAction.java
+@@ -42,6 +42,11 @@ public enum AuditAction {
+     CORPORATE_LOAN_REJECTED,
+     CORPORATE_LOAN_DISBURSED,
+     LOAN_REPAYMENT_APPLIED,
++    // 기업 신용대출 상환(미상환잔액 차감) — 실자금 회수라 감사 추적 필수.
++    CORPORATE_LOAN_REPAID,
++    // 선정산 대출 연체 진입·상각(대손 확정) — 회수 리스크 상태 전이의 감사 추적.
++    LOAN_ADVANCE_OVERDUE,
++    LOAN_ADVANCE_WRITTEN_OFF,
+ 
+     // ── investment-service (투자주문) 금전 액션 ──
+     INVESTMENT_ORDER_PLACED,

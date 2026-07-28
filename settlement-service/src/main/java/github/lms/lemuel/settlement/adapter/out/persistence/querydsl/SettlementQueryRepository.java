@@ -1,6 +1,6 @@
 package github.lms.lemuel.settlement.adapter.out.persistence.querydsl;
 
-import github.lms.lemuel.settlement.adapter.out.persistence.querydsl.dto.*;
+import github.lms.lemuel.settlement.application.port.out.dto.*;
 
 import java.time.LocalDate;
 import java.util.List;

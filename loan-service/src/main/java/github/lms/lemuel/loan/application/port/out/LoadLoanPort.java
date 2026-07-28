@@ -20,14 +20,16 @@ public interface LoadLoanPort {
     List<LoanAdvance> findRepayableBySellerForUpdate(Long sellerId);
 
     /**
-     * 만기 경과한 DISBURSED 대출(자동 연체 대상). {@code dueAt < asOf} 이며 {@code dueAt} 이 NULL 인
-     * 구(舊) 데이터는 제외한다 — 만기 미상 대출을 자동 연체로 오탐하지 않는다.
+     * 만기 경과한 DISBURSED 대출의 <b>id</b>(자동 연체 대상). {@code dueAt < asOf} 이며 {@code dueAt} 이 NULL 인
+     * 구(舊) 데이터는 제외한다 — 만기 미상 대출을 자동 연체로 오탐하지 않는다. 배치는 건별 트랜잭션에서 id 로
+     * 락 재조회하므로 여기서는 애그리거트를 하이드레이트하지 않고 id 만 투영한다(핫패스 낭비 제거, 발견 #8).
+     * {@code limit} 으로 1회 스캔량을 제한한다 — 대량 백로그가 힙을 채우지 않게(초과분은 다음 스캔에서 처리).
      */
-    List<LoanAdvance> findOverdueCandidates(LocalDateTime asOf);
+    List<Long> findOverdueCandidateIds(LocalDateTime asOf, int limit);
 
     /**
-     * 상각 임계를 넘긴 OVERDUE 대출(자동 상각 대상). {@code dueAt < asOf}(asOf = now - writeOffDays),
-     * {@code dueAt} NULL 제외.
+     * 상각 임계를 넘긴 OVERDUE 대출의 <b>id</b>(자동 상각 대상). {@code dueAt < asOf}(asOf = now - writeOffDays),
+     * {@code dueAt} NULL 제외. id 만 투영하고 {@code limit} 으로 1회 스캔량을 제한한다(발견 #8).
      */
-    List<LoanAdvance> findWriteOffCandidates(LocalDateTime asOf);
+    List<Long> findWriteOffCandidateIds(LocalDateTime asOf, int limit);
 }

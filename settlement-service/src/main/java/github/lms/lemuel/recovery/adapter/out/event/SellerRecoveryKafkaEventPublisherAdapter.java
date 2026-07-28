@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import github.lms.lemuel.common.outbox.application.port.out.SaveOutboxEventPort;
 import github.lms.lemuel.common.outbox.domain.OutboxEvent;
 import github.lms.lemuel.recovery.application.port.out.PublishSellerRecoveryEventPort;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -17,7 +18,7 @@ import java.util.Map;
  *
  * <p>aggregateType 은 리터럴 "seller_recovery" — 라우터가 aggregate 세그먼트를 snake 변환하지 않고
  * 소문자화만 하므로, lemuel.seller_recovery.opened / .offset 을 얻으려면 언더스코어를 그대로 실어야 한다
- * (ADR 0026 Option ①). settlement 계열 규약대로 amount 는 JSON number 로 직렬화된다.
+ * (ADR 0026 Option ①). DATA-STANDARD N5 에 따라 amount 는 outboxObjectMapper 로 plain string 직렬화된다.
  */
 @Component
 public class SellerRecoveryKafkaEventPublisherAdapter implements PublishSellerRecoveryEventPort {
@@ -28,7 +29,7 @@ public class SellerRecoveryKafkaEventPublisherAdapter implements PublishSellerRe
     private final ObjectMapper objectMapper;
 
     public SellerRecoveryKafkaEventPublisherAdapter(SaveOutboxEventPort saveOutboxEventPort,
-                                                    ObjectMapper objectMapper) {
+                                                    @Qualifier("outboxObjectMapper") ObjectMapper objectMapper) {
         this.saveOutboxEventPort = saveOutboxEventPort;
         this.objectMapper = objectMapper;
     }

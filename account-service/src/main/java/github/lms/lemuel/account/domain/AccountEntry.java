@@ -1,5 +1,6 @@
 package github.lms.lemuel.account.domain;
 
+import github.lms.lemuel.account.domain.exception.ExcessivePrecisionEntryAmountException;
 import github.lms.lemuel.account.domain.exception.NonPositiveEntryAmountException;
 import github.lms.lemuel.account.domain.exception.UnbalancedAccountEntryException;
 import github.lms.lemuel.common.ledger.LedgerInvariants;
@@ -104,6 +105,13 @@ public class AccountEntry {
     private static AccountEntry of(OwnerType ownerType, String ownerId,
                                    GlAccount debit, GlAccount credit, BigDecimal amount,
                                    String refType, String refId, String sourceTopic) {
+        // LOW-3: account 는 원천 금액을 mirror 한다 — scale>2 유입을 Money(scale 2 HALF_UP)로 조용히
+        // 반올림하면 GL 과 원천 서브원장 사이에 1원 드리프트가 누적된다. 적재 경로(팩토리 진입점)에서
+        // 유효 소수 자릿수 2 초과를 명시적으로 거부한다(반올림 금지). 무의미한 후행 0(100.000 등)은 값이
+        // 변하지 않으므로 통과. null 은 아래 생성자(requirePositiveAmount)가 처리한다.
+        if (amount != null && amount.stripTrailingZeros().scale() > 2) {
+            throw new ExcessivePrecisionEntryAmountException(amount);
+        }
         return new AccountEntry(null, ownerType, ownerId, debit, credit, amount,
                 refType, refId, sourceTopic, LocalDateTime.now());
     }
@@ -214,6 +222,21 @@ public class AccountEntry {
         return of(OwnerType.SELLER, sellerId,
                 GlAccount.SELLER_PAYABLE, GlAccount.CASH, amount,
                 "PAYOUT_COMPLETED", payoutId, TOPIC_PAYOUT_COMPLETED);
+    }
+
+    /**
+     * 셀러 실지급 초과분 회수채권 인식 → DR SELLER_RECOVERY_RECEIVABLE / CR CASH (감사 MED-3 봉합).
+     *
+     * <p>대응하는 SELLER_PAYABLE 크레딧이 없는 실지급(예: 수동 송금)은 {@link #payoutCompleted} 만으로는
+     * SELLER_PAYABLE 을 크레딧 없이 차변해 통제계정을 음수로 몰아 "완전정산 통제계정 0" 불변식을 깬다.
+     * payout 차변을 현재 SELLER_PAYABLE 잔액 기준으로 분할해, 잔액을 초과하는 실지급분(=amount−payable)을
+     * 이 전표로 회수채권 R 에 인식한다({@code RecordPayoutService}가 분할·라우팅). 두 전표(PAYOUT_COMPLETED·
+     * PAYOUT_ADVANCE)는 sourceTopic·refId(=payoutId) 는 같고 refType 으로 자연키가 갈려 각각 멱등이다.
+     */
+    public static AccountEntry payoutAdvanceReceivable(String sellerId, String payoutId, BigDecimal amount) {
+        return of(OwnerType.SELLER, sellerId,
+                GlAccount.SELLER_RECOVERY_RECEIVABLE, GlAccount.CASH, amount,
+                "PAYOUT_ADVANCE", payoutId, TOPIC_PAYOUT_COMPLETED);
     }
 
     /**

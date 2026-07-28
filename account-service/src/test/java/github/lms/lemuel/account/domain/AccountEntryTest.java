@@ -1,5 +1,6 @@
 package github.lms.lemuel.account.domain;
 
+import github.lms.lemuel.account.domain.exception.ExcessivePrecisionEntryAmountException;
 import github.lms.lemuel.account.domain.exception.NonPositiveEntryAmountException;
 import github.lms.lemuel.account.domain.exception.UnbalancedAccountEntryException;
 import org.junit.jupiter.api.Test;
@@ -137,6 +138,25 @@ class AccountEntryTest {
     }
 
     @Test
+    void 실지급초과분_회수채권_DR_SELLER_RECOVERY_RECEIVABLE_CR_CASH_MED3() {
+        AccountEntry e = AccountEntry.payoutAdvanceReceivable("777", "7001", new BigDecimal("5000"));
+        assertThat(e.getOwnerType()).isEqualTo(OwnerType.SELLER);
+        assertThat(e.getOwnerId()).isEqualTo("777");
+        assertThat(e.getDebitAccount()).isEqualTo(GlAccount.SELLER_RECOVERY_RECEIVABLE);
+        assertThat(e.getCreditAccount()).isEqualTo(GlAccount.CASH);
+        assertThat(e.getAmount()).isEqualByComparingTo("5000");
+        assertThat(e.getRefType()).isEqualTo("PAYOUT_ADVANCE");
+        assertThat(e.getRefId()).isEqualTo("7001"); // refId=payoutId, PAYOUT_COMPLETED 와 refType 로만 구분
+        assertThat(e.getSourceTopic()).isEqualTo("lemuel.payout.completed");
+    }
+
+    @Test
+    void 실지급초과분_회수채권_금액이_0이하면_예외() {
+        assertThatThrownBy(() -> AccountEntry.payoutAdvanceReceivable("777", "7001", BigDecimal.ZERO))
+                .isInstanceOf(NonPositiveEntryAmountException.class);
+    }
+
+    @Test
     void 원천징수예수반제_DR_SELLER_PAYABLE_CR_WITHHOLDING_PAYABLE_ADR0027() {
         AccountEntry e = AccountEntry.withholdingAccrued("777", "9001", new BigDecimal("3300"));
         assertThat(e.getOwnerType()).isEqualTo(OwnerType.SELLER);
@@ -235,6 +255,41 @@ class AccountEntryTest {
     void 금액이_null이면_예외() {
         assertThatThrownBy(() -> AccountEntry.settlementCreatedImmediate("1", "2", null))
                 .isInstanceOf(NonPositiveEntryAmountException.class);
+    }
+
+    // ─── LOW-3: scale>2 금액은 조용히 반올림하지 않고 명시적으로 거부(원천 mirror 드리프트 방지) ───
+
+    @Test
+    void 소수_3자리_금액은_반올림하지_않고_거부한다() {
+        // Money(scale 2 HALF_UP)가 43425.125 → 43425.13 으로 조용히 반올림하면 원천과 1원 어긋난다.
+        // 팩토리 진입점에서 유효 소수 3자리를 거부해야 GL 이 원천 서브원장과 정확히 일치한다.
+        assertThatThrownBy(() -> AccountEntry.settlementCreatedImmediate("777", "9001", new BigDecimal("43425.125")))
+                .isInstanceOfSatisfying(ExcessivePrecisionEntryAmountException.class,
+                        ex -> assertThat(ex.getAmount()).isEqualByComparingTo("43425.125"));
+    }
+
+    @Test
+    void 소수_2자리_이하_금액은_정상_적재된다() {
+        assertThat(AccountEntry.payoutCompleted("777", "7001", new BigDecimal("43425.12")).getAmount())
+                .isEqualByComparingTo("43425.12");            // scale 2 통과
+        assertThat(AccountEntry.loanDisbursed("55", "L-1", new BigDecimal("800000")).getAmount())
+                .isEqualByComparingTo("800000");              // scale 0 통과
+    }
+
+    @Test
+    void 값이_변하지_않는_후행0은_거부하지_않는다() {
+        // 100.000 은 유효 소수 자릿수 0(값 불변) — 반올림 드리프트가 없으므로 통과시킨다.
+        assertThat(AccountEntry.investmentExecuted("55", "ORD-3", new BigDecimal("100.000")).getAmount())
+                .isEqualByComparingTo("100");
+    }
+
+    @Test
+    void scale초과_거부는_모든_팩토리_진입점에_적용된다() {
+        // 6개 이벤트 매핑 팩토리가 공통 진입점 of() 를 타므로 한 곳의 검증이 전 매핑에 적용된다.
+        assertThatThrownBy(() -> AccountEntry.corporateLoanDisbursed("005930", "CL-9", new BigDecimal("5000000.001")))
+                .isInstanceOf(ExcessivePrecisionEntryAmountException.class);
+        assertThatThrownBy(() -> AccountEntry.loanRepaid("55", "9001", new BigDecimal("12345.678")))
+                .isInstanceOf(ExcessivePrecisionEntryAmountException.class);
     }
 
     @Test

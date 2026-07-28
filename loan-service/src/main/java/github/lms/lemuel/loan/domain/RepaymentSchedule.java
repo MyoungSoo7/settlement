@@ -15,10 +15,14 @@ import java.util.List;
  *
  * <h4>계산 규칙(money-safety 준수)</h4>
  * <ul>
- *   <li>전 금액은 <b>원(KRW) 단위 정수 스케일 {@link BigDecimal}</b> — 회차별 이자·납입액은 산정 시점에
- *       {@code setScale(0, HALF_UP)} 로 원 단위 반올림한다.</li>
+ *   <li>회차별 금액의 절사 단위는 주입받은 {@link RoundingPolicy} 가 정한다(기본 {@link RoundingPolicy#KRW}
+ *       = 원 단위 정수 HALF_UP). 중간 계산은 고정밀({@code DECIMAL128})로 하고 <b>절사는 회차 금액 산정
+ *       시점에만</b> 적용한다.</li>
  *   <li>이자는 <b>직전 회차 상환 후 남은 잔액 × 월이율</b>(월이율 = 연이율/12). 잔액 기준 후취.</li>
  *   <li><b>마지막 회차가 잔여 원금을 흡수</b>해 원금 합계가 신청 원금과 정확히 일치하도록 라운딩 오차를 정산한다.</li>
+ *   <li><b>계약 원금은 조용히 보정하지 않는다</b> — 정책 단위로 정확히 표현되지 않는 원금(원화에서 {@code 1000000.5})은
+ *       반올림하지 않고 거부한다({@link RoundingPolicy#isExact}). 사용자가 입력한 계약 금액을 시스템이 임의로
+ *       바꾸면 상환표 총액과 계약서가 어긋나기 때문이다.</li>
  * </ul>
  *
  * <h4>상환방식</h4>
@@ -32,6 +36,7 @@ import java.util.List;
  * @param termMonths         기간(개월, ≥1)
  * @param annualRatePercent  연이자율(%) — 예: 5.5 는 연 5.5%
  * @param method             상환방식
+ * @param roundingPolicy     산정에 쓰인 금액 반올림 정책
  * @param monthlyInterestRate 월이율(소수) — 산정에 쓰인 값(참고용, 소수 10자리)
  * @param installments       회차별 상환 내역(불변)
  * @param totalPrincipal     원금 합계(= 신청 원금)
@@ -43,6 +48,7 @@ public record RepaymentSchedule(
         int termMonths,
         BigDecimal annualRatePercent,
         RepaymentMethod method,
+        RoundingPolicy roundingPolicy,
         BigDecimal monthlyInterestRate,
         List<RepaymentInstallment> installments,
         BigDecimal totalPrincipal,
@@ -60,12 +66,25 @@ public record RepaymentSchedule(
     }
 
     /**
-     * 상환 스케줄을 산정한다.
+     * 원화({@link RoundingPolicy#KRW}) 기준으로 상환 스케줄을 산정한다.
      *
-     * @throws LoanInvariantViolationException 원금 ≤ 0, 기간 &lt; 1, 연이율 &lt; 0, 방식 null 인 경우
+     * @throws LoanInvariantViolationException 원금 ≤ 0 · 원 단위 미만 소수 포함, 기간 &lt; 1,
+     *                                         연이율 &lt; 0, 방식 null 인 경우
      */
     public static RepaymentSchedule of(BigDecimal principal, int termMonths,
                                        BigDecimal annualRatePercent, RepaymentMethod method) {
+        return of(principal, termMonths, annualRatePercent, method, RoundingPolicy.KRW);
+    }
+
+    /**
+     * 반올림 정책을 지정해 상환 스케줄을 산정한다(통화·상품별 절사 단위 차이 수용).
+     *
+     * @throws LoanInvariantViolationException 원금 ≤ 0 · 정책 단위로 표현 불가, 기간 &lt; 1,
+     *                                         연이율 &lt; 0, 방식/정책 null 인 경우
+     */
+    public static RepaymentSchedule of(BigDecimal principal, int termMonths,
+                                       BigDecimal annualRatePercent, RepaymentMethod method,
+                                       RoundingPolicy rounding) {
         if (principal == null || principal.signum() <= 0) {
             throw new LoanInvariantViolationException("대출 원금은 양수여야 합니다: " + principal);
         }
@@ -78,14 +97,22 @@ public record RepaymentSchedule(
         if (method == null) {
             throw new LoanInvariantViolationException("상환방식은 필수입니다");
         }
+        if (rounding == null) {
+            throw new LoanInvariantViolationException("반올림 정책은 필수입니다");
+        }
+        // 계약 원금은 조용히 보정하지 않는다 — 정책 단위로 표현 불가하면 반올림 대신 거부.
+        if (!rounding.isExact(principal)) {
+            throw new LoanInvariantViolationException(
+                    "대출 원금은 " + rounding.unitDescription() + " 금액이어야 합니다(자동 보정 안 함): " + principal);
+        }
 
-        BigDecimal principalWon = won(principal);
+        BigDecimal principalAmount = rounding.round(principal);
         BigDecimal monthlyRate = annualRatePercent.divide(HUNDRED, MC).divide(MONTHS_PER_YEAR, MC);
 
         List<RepaymentInstallment> installments = switch (method) {
-            case BULLET -> bullet(principalWon, termMonths, monthlyRate);
-            case EQUAL_PRINCIPAL -> equalPrincipal(principalWon, termMonths, monthlyRate);
-            case EQUAL_PAYMENT -> equalPayment(principalWon, termMonths, monthlyRate);
+            case BULLET -> bullet(principalAmount, termMonths, monthlyRate, rounding);
+            case EQUAL_PRINCIPAL -> equalPrincipal(principalAmount, termMonths, monthlyRate, rounding);
+            case EQUAL_PAYMENT -> equalPayment(principalAmount, termMonths, monthlyRate, rounding);
         };
 
         BigDecimal totalInterest = BigDecimal.ZERO;
@@ -95,56 +122,59 @@ public record RepaymentSchedule(
             totalPayment = totalPayment.add(it.payment());
         }
 
-        return new RepaymentSchedule(principalWon, termMonths, annualRatePercent, method,
+        return new RepaymentSchedule(principalAmount, termMonths, annualRatePercent, method, rounding,
                 monthlyRate.setScale(10, RoundingMode.HALF_UP), installments,
-                principalWon, won(totalInterest), won(totalPayment));
+                principalAmount, rounding.round(totalInterest), rounding.round(totalPayment));
     }
 
     // ─── 방식별 회차 산정 ────────────────────────────────────────────────────────
 
     /** 만기일시상환: 1~n-1 이자만, n 회차 원금 전액 + 이자. */
-    private static List<RepaymentInstallment> bullet(BigDecimal principal, int n, BigDecimal monthlyRate) {
-        BigDecimal monthlyInterest = won(principal.multiply(monthlyRate));
+    private static List<RepaymentInstallment> bullet(BigDecimal principal, int n, BigDecimal monthlyRate,
+                                                     RoundingPolicy rounding) {
+        BigDecimal monthlyInterest = rounding.round(principal.multiply(monthlyRate));
         List<RepaymentInstallment> rows = new ArrayList<>(n);
         for (int k = 1; k <= n; k++) {
             boolean last = k == n;
             BigDecimal principalPortion = last ? principal : BigDecimal.ZERO;
             BigDecimal remaining = last ? BigDecimal.ZERO : principal;
-            rows.add(new RepaymentInstallment(k, scale0(principalPortion), monthlyInterest,
-                    scale0(principalPortion.add(monthlyInterest)), scale0(remaining)));
+            rows.add(new RepaymentInstallment(k, rounding.round(principalPortion), monthlyInterest,
+                    rounding.round(principalPortion.add(monthlyInterest)), rounding.round(remaining)));
         }
         return rows;
     }
 
     /** 원금균등상환: 매기 원금 P/n 동일(마지막이 잔여 흡수), 이자는 잔액 기준 체감. */
-    private static List<RepaymentInstallment> equalPrincipal(BigDecimal principal, int n, BigDecimal monthlyRate) {
-        BigDecimal basePrincipal = won(principal.divide(new BigDecimal(n), MC));
+    private static List<RepaymentInstallment> equalPrincipal(BigDecimal principal, int n, BigDecimal monthlyRate,
+                                                             RoundingPolicy rounding) {
+        BigDecimal basePrincipal = rounding.round(principal.divide(new BigDecimal(n), MC));
         List<RepaymentInstallment> rows = new ArrayList<>(n);
         BigDecimal remaining = principal;
         for (int k = 1; k <= n; k++) {
-            BigDecimal interest = won(remaining.multiply(monthlyRate));
+            BigDecimal interest = rounding.round(remaining.multiply(monthlyRate));
             BigDecimal principalPortion = (k == n) ? remaining : basePrincipal;
             remaining = remaining.subtract(principalPortion);
-            rows.add(new RepaymentInstallment(k, scale0(principalPortion), interest,
-                    scale0(principalPortion.add(interest)), scale0(remaining)));
+            rows.add(new RepaymentInstallment(k, rounding.round(principalPortion), interest,
+                    rounding.round(principalPortion.add(interest)), rounding.round(remaining)));
         }
         return rows;
     }
 
     /** 원리금균등상환: 연금 공식으로 고정 납입액 산정, 마지막이 잔여 원금 흡수. */
-    private static List<RepaymentInstallment> equalPayment(BigDecimal principal, int n, BigDecimal monthlyRate) {
+    private static List<RepaymentInstallment> equalPayment(BigDecimal principal, int n, BigDecimal monthlyRate,
+                                                           RoundingPolicy rounding) {
         BigDecimal fixedPayment;
         if (monthlyRate.signum() == 0) {
-            fixedPayment = won(principal.divide(new BigDecimal(n), MC));
+            fixedPayment = rounding.round(principal.divide(new BigDecimal(n), MC));
         } else {
             BigDecimal factor = BigDecimal.ONE.add(monthlyRate).pow(n, MC); // (1+i)^n
-            fixedPayment = won(principal.multiply(monthlyRate).multiply(factor)
+            fixedPayment = rounding.round(principal.multiply(monthlyRate).multiply(factor)
                     .divide(factor.subtract(BigDecimal.ONE), MC));
         }
         List<RepaymentInstallment> rows = new ArrayList<>(n);
         BigDecimal remaining = principal;
         for (int k = 1; k <= n; k++) {
-            BigDecimal interest = won(remaining.multiply(monthlyRate));
+            BigDecimal interest = rounding.round(remaining.multiply(monthlyRate));
             BigDecimal principalPortion;
             BigDecimal payment;
             if (k == n) {
@@ -155,21 +185,9 @@ public record RepaymentSchedule(
                 payment = fixedPayment;
             }
             remaining = remaining.subtract(principalPortion);
-            rows.add(new RepaymentInstallment(k, scale0(principalPortion), interest,
-                    scale0(payment), scale0(remaining)));
+            rows.add(new RepaymentInstallment(k, rounding.round(principalPortion), interest,
+                    rounding.round(payment), rounding.round(remaining)));
         }
         return rows;
-    }
-
-    // ─── 원 단위 반올림 헬퍼 ──────────────────────────────────────────────────────
-
-    /** 원(KRW) 단위 정수 반올림(HALF_UP). */
-    private static BigDecimal won(BigDecimal v) {
-        return v.setScale(0, RoundingMode.HALF_UP);
-    }
-
-    /** 이미 원 단위인 값의 스케일 정규화(음수 방지 아님 — 표시 일관성용). */
-    private static BigDecimal scale0(BigDecimal v) {
-        return v.setScale(0, RoundingMode.HALF_UP);
     }
 }

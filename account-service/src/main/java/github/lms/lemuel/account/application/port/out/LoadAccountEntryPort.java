@@ -31,6 +31,20 @@ public interface LoadAccountEntryPort {
     /** refType 별 전표 건수. */
     long countByRefType(String refType);
 
+    /**
+     * 셀러의 현재 SELLER_PAYABLE 순잔액(credit합 − debit합, 없으면 0). 음수 방지 payout 분할용.
+     *
+     * <p>DB 집계(SUM)로 계산해 전표 전량을 애플리케이션에 로드하지 않으며, COALESCE 로 매칭 행이 없어도
+     * null 없이 0 을 반환한다({@code :param IS NULL OR} 트랩 회피 — owner·계정을 고정 파라미터로 바인딩).
+     *
+     * <p><b>비용(정직한 한정 — 코드리뷰 #6)</b>: {@code idx_account_entries_owner (owner_type, owner_id, id)}
+     * 로 셀러 행 범위만 스캔하지만(풀 테이블 스캔 아님), payout 마다 그 셀러의 <b>누적 전표 전량을 재합산</b>하므로
+     * 여전히 O(셀러 전표 수)이고, advisory 락을 쥔 채 실행돼 이력이 길수록 락 보유 시간이 늘어난다. O(1) 로 낮추려면
+     * (seller, account)별 <b>실체화 running balance</b> 를 매 전표 insert 시 갱신해야 한다(별도 큰 변경 —
+     * 현재는 인덱스 기반 스캔을 수용).
+     */
+    BigDecimal sellerPayableBalance(String sellerId);
+
     /** 전체 전표(시산표 계산용). */
     List<AccountEntry> findAll();
 

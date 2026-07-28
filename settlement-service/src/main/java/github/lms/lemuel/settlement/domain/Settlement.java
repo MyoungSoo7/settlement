@@ -294,9 +294,13 @@ public class Settlement {
                 .minus(Money.of(this.commission));
         this.netAmount = net.toBigDecimal();
 
-        // 환불로 인해 정산 금액이 0 이하가 되면 취소 처리
-        if (net.isZeroOrNegative()) {
-            this.status = SettlementStatus.CANCELED;
+        // 환불로 인해 정산 금액이 0 이하가 되면 취소 처리.
+        // 전이는 상태머신 단일 출처(cancel()→SettlementStatus.canTransitionTo)를 경유한다 —
+        // this.status 직접 대입 금지(도메인이 전이표를 강제, L-4). 이미 CANCELED(누적 환불 재적용 등)면
+        // 전이표가 CANCELED→CANCELED 를 막으므로 no-op 로 스킵해 기존 멱등 동작을 보존한다
+        // (초과환불 누적 가드와 정합 — 도달 상태·금액은 그대로).
+        if (net.isZeroOrNegative() && this.status.canTransitionTo(SettlementStatus.CANCELED)) {
+            cancel();
         }
 
         this.updatedAt = LocalDateTime.now();
@@ -333,8 +337,10 @@ public class Settlement {
         this.netAmount = net.toBigDecimal();
 
         // clawback 으로 정산 금액이 0 이하가 되면 취소 처리 (adjustForRefund 규칙 미러링).
-        if (net.isZeroOrNegative()) {
-            this.status = SettlementStatus.CANCELED;
+        // 전이는 상태머신 단일 출처(cancel()→SettlementStatus.canTransitionTo)를 경유한다 —
+        // this.status 직접 대입 금지(L-4). 이미 CANCELED 면 전이표가 막으므로 no-op 로 스킵(멱등 보존).
+        if (net.isZeroOrNegative() && this.status.canTransitionTo(SettlementStatus.CANCELED)) {
+            cancel();
         }
 
         this.updatedAt = LocalDateTime.now();

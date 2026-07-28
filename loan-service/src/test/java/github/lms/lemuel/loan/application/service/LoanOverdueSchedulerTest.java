@@ -2,7 +2,6 @@ package github.lms.lemuel.loan.application.service;
 
 import github.lms.lemuel.loan.application.port.in.ManageLoanCollectionUseCase;
 import github.lms.lemuel.loan.application.port.out.LoadLoanPort;
-import github.lms.lemuel.loan.domain.LoanAdvance;
 import github.lms.lemuel.loan.domain.LoanStatus;
 import github.lms.lemuel.loan.domain.exception.InvalidLoanStateException;
 import org.junit.jupiter.api.Test;
@@ -10,7 +9,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -32,22 +30,18 @@ class LoanOverdueSchedulerTest {
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
     private final Clock clock = Clock.fixed(Instant.parse("2026-08-30T00:00:00Z"), KST);
 
-    // graceDays=0, writeOffDays=30
-    private LoanOverdueScheduler scheduler() {
-        return new LoanOverdueScheduler(collectionUseCase, loadLoanPort, clock, 0, 30);
-    }
+    private static final int BATCH_LIMIT = 1000;
 
-    private LoanAdvance loan(long id, LoanStatus status) {
-        return LoanAdvance.reconstitute(id, 7L, new BigDecimal("800000"), new BigDecimal("800"),
-                new BigDecimal("800800"), status, 7,
-                LocalDateTime.of(2026, 7, 1, 9, 0), LocalDateTime.of(2026, 7, 8, 9, 0));
+    // graceDays=0, writeOffDays=30, batchLimit=1000
+    private LoanOverdueScheduler scheduler() {
+        return new LoanOverdueScheduler(collectionUseCase, loadLoanPort, clock, 0, 30, BATCH_LIMIT);
     }
 
     @Test
     void 연체승격은_만기경과_DISBURSED를_asOf_now로_스캔해_건별_markOverdue() {
         LocalDateTime expectedAsOf = LocalDateTime.now(clock); // grace 0 → now(KST)
-        when(loadLoanPort.findOverdueCandidates(eq(expectedAsOf)))
-                .thenReturn(List.of(loan(10L, LoanStatus.DISBURSED), loan(11L, LoanStatus.DISBURSED)));
+        when(loadLoanPort.findOverdueCandidateIds(eq(expectedAsOf), eq(BATCH_LIMIT)))
+                .thenReturn(List.of(10L, 11L));
 
         int done = scheduler().promoteOverdue();
 
@@ -58,8 +52,8 @@ class LoanOverdueSchedulerTest {
 
     @Test
     void 연체승격_건별실패는_격리하고_나머지는_계속한다() {
-        when(loadLoanPort.findOverdueCandidates(eq(LocalDateTime.now(clock))))
-                .thenReturn(List.of(loan(10L, LoanStatus.DISBURSED), loan(11L, LoanStatus.DISBURSED)));
+        when(loadLoanPort.findOverdueCandidateIds(eq(LocalDateTime.now(clock)), eq(BATCH_LIMIT)))
+                .thenReturn(List.of(10L, 11L));
         // 10L 은 스캔~처리 사이 상태가 바뀌어 전이 불가(격리 대상)
         when(collectionUseCase.markOverdue(10L)).thenThrow(new InvalidLoanStateException(
                 LoanStatus.OVERDUE, LoanStatus.OVERDUE));
@@ -73,8 +67,8 @@ class LoanOverdueSchedulerTest {
     @Test
     void 상각은_만기후_writeOffDays_경과_OVERDUE를_asOf_now빼기30으로_스캔해_건별_writeOff() {
         LocalDateTime expectedAsOf = LocalDateTime.now(clock).minusDays(30);
-        when(loadLoanPort.findWriteOffCandidates(eq(expectedAsOf)))
-                .thenReturn(List.of(loan(20L, LoanStatus.OVERDUE)));
+        when(loadLoanPort.findWriteOffCandidateIds(eq(expectedAsOf), eq(BATCH_LIMIT)))
+                .thenReturn(List.of(20L));
 
         int done = scheduler().promoteWriteOff();
 
@@ -85,10 +79,10 @@ class LoanOverdueSchedulerTest {
 
     @Test
     void scan은_연체승격과_상각을_모두_수행한다() {
-        when(loadLoanPort.findOverdueCandidates(eq(LocalDateTime.now(clock))))
-                .thenReturn(List.of(loan(10L, LoanStatus.DISBURSED)));
-        when(loadLoanPort.findWriteOffCandidates(eq(LocalDateTime.now(clock).minusDays(30))))
-                .thenReturn(List.of(loan(20L, LoanStatus.OVERDUE)));
+        when(loadLoanPort.findOverdueCandidateIds(eq(LocalDateTime.now(clock)), eq(BATCH_LIMIT)))
+                .thenReturn(List.of(10L));
+        when(loadLoanPort.findWriteOffCandidateIds(eq(LocalDateTime.now(clock).minusDays(30)), eq(BATCH_LIMIT)))
+                .thenReturn(List.of(20L));
 
         scheduler().scan();
 
