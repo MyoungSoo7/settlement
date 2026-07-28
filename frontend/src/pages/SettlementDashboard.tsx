@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { settlementApi } from '@/api/settlement';
 import { SettlementSearchRequest, SettlementSearchResponse, SettlementSearchItem } from '@/types';
 import { apiErrorMessage } from '@/lib/apiError';
@@ -17,7 +17,7 @@ const SettlementDashboard: React.FC = () => {
   });
 
   // 정산 데이터 조회
-  const fetchSettlements = async () => {
+  const fetchSettlements = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -30,12 +30,12 @@ const SettlementDashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters]);
 
   // 초기 로드 및 필터 변경 시 재조회
   useEffect(() => {
     fetchSettlements();
-  }, [filters]);
+  }, [fetchSettlements]);
 
   // 필터 변경 핸들러
   const handleFilterChange = <K extends keyof SettlementSearchRequest>(key: K, value: SettlementSearchRequest[K]) => {

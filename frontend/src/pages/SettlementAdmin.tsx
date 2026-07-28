@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { settlementApi } from '@/api/settlement';
 import {
   SettlementSearchRequest,
@@ -24,7 +24,7 @@ const SettlementAdmin: React.FC = () => {
   });
 
   // 정산 데이터 조회
-  const fetchSettlements = async () => {
+  const fetchSettlements = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -37,11 +37,11 @@ const SettlementAdmin: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters]);
 
   useEffect(() => {
     fetchSettlements();
-  }, [filters]);
+  }, [fetchSettlements]);
 
   // 정산 상세 조회
   const handleViewDetail = async (id: number) => {

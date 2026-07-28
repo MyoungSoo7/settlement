@@ -145,8 +145,10 @@ const AdminDashboardPage: React.FC = () => {
         setLoading(false);
       }
     };
+    // isAdmin 은 localStorage 의 역할에서 파생된 불리언이라 세션 중 바뀌지 않는다 —
+    // 의존성에 넣어도 재조회는 역할이 실제로 달라질 때만 일어난다.
     load();
-  }, []);
+  }, [isAdmin]);
 
   // ── 통계 계산 ──
   const stats = useMemo(() => {

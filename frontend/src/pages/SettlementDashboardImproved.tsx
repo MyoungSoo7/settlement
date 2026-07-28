@@ -53,8 +53,12 @@ const SettlementDashboard: React.FC = () => {
     }
   };
 
+  // 최초 1회만 조회한다 — 이 화면은 필터를 바꿔도 자동 재조회하지 않고 사용자가 '조회' 버튼을
+  // 눌러야 fetchSettlements() 가 돈다(SettlementAdmin/SettlementDashboard 와 다른 정책).
+  // fetchSettlements 를 의존성에 넣으면 필터 입력마다 자동 검색으로 동작이 바뀌므로 의도적으로 뺀다.
   useEffect(() => {
     fetchSettlements();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleFilterChange = <K extends keyof SettlementSearchRequest>(key: K, value: SettlementSearchRequest[K]) => {

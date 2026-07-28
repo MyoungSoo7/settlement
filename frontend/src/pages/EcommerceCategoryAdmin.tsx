@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/contexts/ToastContext';
 import api from '@/api/axios';
 import { apiErrorMessage } from '@/lib/apiError';
@@ -47,11 +47,7 @@ const EcommerceCategoryAdmin: React.FC = () => {
     return ids;
   };
 
-  useEffect(() => {
-    loadCategories();
-  }, []);
-
-  const loadCategories = async () => {
+  const loadCategories = useCallback(async () => {
     setLoading(true);
     try {
       const response = await api.get<EcommerceCategory[]>('/admin/categories');
@@ -61,7 +57,12 @@ const EcommerceCategoryAdmin: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
+
+  useEffect(() => {
+    loadCategories();
+  }, [loadCategories]);
+
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
