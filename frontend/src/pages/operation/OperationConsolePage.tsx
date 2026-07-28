@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import Spinner from '@/components/Spinner';
-import { useToast } from '@/contexts/ToastContext';
+import { useToast } from '@/contexts/useToast';
 import {
   operationApi,
   Incident,

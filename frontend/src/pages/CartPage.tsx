@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useCart, CartItem } from '@/contexts/CartContext';
+import { useCart, CartItem } from '@/contexts/useCart';
 import { orderApi } from '@/api/order';
 import { paymentApi } from '@/api/payment';
 import { couponApi } from '@/api/coupon';

@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import api from '@/api/axios';
-import { useToast } from '@/contexts/ToastContext';
+import { useToast } from '@/contexts/useToast';
 
 interface ProductImage {
   id: number;

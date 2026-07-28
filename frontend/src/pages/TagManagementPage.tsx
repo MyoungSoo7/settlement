@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { tagApi } from '@/api/tag';
 import { TagResponse } from '@/types';
-import { useToast } from '@/contexts/ToastContext';
+import { useToast } from '@/contexts/useToast';
 
 const TagManagementPage: React.FC = () => {
   const [tags, setTags] = useState<TagResponse[]>([]);

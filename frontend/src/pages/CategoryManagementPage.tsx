@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { categoryApi } from '@/api/category';
 import { CategoryResponse } from '@/types';
-import { useToast } from '@/contexts/ToastContext';
+import { useToast } from '@/contexts/useToast';
 
 const CategoryManagementPage: React.FC = () => {
   const [categories, setCategories] = useState<CategoryResponse[]>([]);

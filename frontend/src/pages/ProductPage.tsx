@@ -5,7 +5,7 @@ import ImageUpload from '@/components/product/ImageUpload';
 import InventoryTab from '@/components/product/InventoryTab';
 import { ProductResponse, ProductImageResponse } from '@/types';
 import { productApi } from '@/api/product';
-import { useToast } from '@/contexts/ToastContext';
+import { useToast } from '@/contexts/useToast';
 import api from '@/api/axios';
 
 const ProductPage: React.FC = () => {

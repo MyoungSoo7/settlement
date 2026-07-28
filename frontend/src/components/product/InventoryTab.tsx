@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ProductResponse, ProductStatus } from '@/types';
 import { productApi } from '@/api/product';
-import { useToast } from '@/contexts/ToastContext';
+import { useToast } from '@/contexts/useToast';
 import Spinner from '@/components/Spinner';
 import { apiErrorMessage } from '@/lib/apiError';
 

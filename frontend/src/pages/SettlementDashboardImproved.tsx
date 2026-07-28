@@ -5,7 +5,7 @@ import StatusBadge from '@/components/StatusBadge';
 import DateRangePicker from '@/components/DateRangePicker';
 import EmptyState from '@/components/EmptyState';
 import LoadingSkeleton from '@/components/LoadingSkeleton';
-import { useToast } from '@/contexts/ToastContext';
+import { useToast } from '@/contexts/useToast';
 import { apiErrorMessage } from '@/lib/apiError';
 
 const SettlementDashboard: React.FC = () => {

@@ -5,7 +5,7 @@ import { productApi } from '@/api/product';
 import { reviewApi } from '@/api/review';
 import { couponApi } from '@/api/coupon';
 import { OrderResponse, PaymentResponse, ProductResponse, ReviewResponse, CouponValidateResponse } from '@/types';
-import { useCart } from '@/contexts/CartContext';
+import { useCart } from '@/contexts/useCart';
 import Card from '@/components/Card';
 import Spinner from '@/components/Spinner';
 import StarRating from '@/components/review/StarRating';
