@@ -79,6 +79,7 @@ const CeoInvestRecommendPage: React.FC = () => {
             {data.recommendedDate ? (
               <p className="text-sm font-semibold text-gray-900">
                 추천일자: {fmtDate(data.recommendedDate)}
+                <span className="ml-1 font-normal text-gray-500">(해당 거래일 종가 기준)</span>
               </p>
             ) : (
               <p className="text-sm text-gray-500">등록된 추천 세트가 없습니다.</p>

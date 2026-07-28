@@ -17,6 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class StockRecommendationPersistenceAdapterTest {
@@ -65,5 +66,22 @@ class StockRecommendationPersistenceAdapterTest {
 
         verify(repository).deleteByRecommendedDate(DATE);
         verify(repository, never()).saveAll(org.mockito.ArgumentMatchers.anyList());
+    }
+
+    @Test
+    @DisplayName("loadLatestDate — 세트 본문을 읽지 않고 최신 추천일만 조회한다")
+    void loadsLatestDateOnly() {
+        when(repository.findLatestRecommendedDate()).thenReturn(java.util.Optional.of(DATE));
+
+        assertThat(adapter().loadLatestDate()).contains(DATE);
+        verify(repository, never()).findByRecommendedDateOrderByDisplayOrderAsc(DATE);
+    }
+
+    @Test
+    @DisplayName("loadLatestDate — 저장된 세트가 없으면 빈 값")
+    void loadsEmptyWhenNoSet() {
+        when(repository.findLatestRecommendedDate()).thenReturn(java.util.Optional.empty());
+
+        assertThat(adapter().loadLatestDate()).isEmpty();
     }
 }

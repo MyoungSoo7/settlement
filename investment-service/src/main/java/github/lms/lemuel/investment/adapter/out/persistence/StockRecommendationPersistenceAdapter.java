@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 @Component
 public class StockRecommendationPersistenceAdapter
@@ -30,6 +31,11 @@ public class StockRecommendationPersistenceAdapter
                         e.getRecommendedDate(), e.getEntryPrice(), e.getStopLossPrice(),
                         e.getTakeProfitPrice(), e.getDisplayOrder()))
                 .toList();
+    }
+
+    @Override
+    public Optional<LocalDate> loadLatestDate() {
+        return repository.findLatestRecommendedDate();
     }
 
     @Override
