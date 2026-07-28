@@ -1,24 +1,53 @@
-import { test, expect, type Route } from '@playwright/test';
+import { test, expect, type Page, type Route } from '@playwright/test';
 
 /**
- * 대출 화면 신규 UI 동작 검증 — 로컬 dev 서버 + route mock.
+ * 대출 화면 신규 UI 동작 검증 — 실제 로그인 + route mock. dev·운영 양쪽에서 동작한다.
  *
- * dev 는 /loans 프록시가 없고 위성 데이터가 붙지 않으므로(프로젝트 관례), 토큰을 localStorage 에 주입하고
- * 백엔드 응답을 mock 해 화면 렌더·상호작용만 결정적으로 검증한다. 실제 인가는 백엔드가 강제.
+ * 백엔드 응답은 mock 해 화면 렌더·상호작용만 결정적으로 검증한다(실제 인가는 백엔드가 강제).
+ * 다만 **인증은 mock 하지 않는다** — 가짜 토큰(`e2e-dev-token`)을 주입하면 운영에서 401 로 튕긴다.
+ *
+ * ⚠️ 운영에서 `page.goto('/loans')` 를 쓰면 안 된다. nginx(frontend/nginx.conf)가 `/loans` 를 **백엔드로
+ * 프록시**하므로 SPA 에 닿지 않고, 문서 내비게이션은 Authorization 헤더를 실을 수 없어 백엔드가 401 →
+ * Whitelabel Error Page 를 반환한다(2026-07-28 main CI smoke 실패 원인). 그래서
+ * ① SPA 진입점 `/login` 에서 실제 JWT 를 발급받고 ② `/loans` 로는 **클라이언트 라우팅**으로만 이동한다.
  *
  * ⚠️ Playwright 의 glob/정규식/술어 라우트는 쿼리스트링 URL(예: /loans?sellerId=1)을 신뢰성 있게 매칭하지
  * 못한다(SPA 경로 /loans 와 API 경로 /loans 충돌). 그래서 '**\/*' 단일 catch-all 로 모든 요청을 가로채
  * URL 로 분기한다 — 매칭이 확정적이고 브라우저 캐시도 우회된다.
  *
- * 실행: 로컬 vite(`npm run dev`, 3000) 기동 후 PLAYWRIGHT_BASE_URL=http://localhost:3000 로 이 스펙만 실행.
+ * 실행: 운영 대상은 PLAYWRIGHT_BASE_URL=https://jen.lemuel.co.kr (CI smoke 와 동일).
+ * 로컬은 vite(`npm run dev`, 3000) + order-service(8088) 기동 후 PLAYWRIGHT_BASE_URL=http://localhost:3000
+ * (vite 가 `/auth` 를 8088 로 프록시하므로 자동로그인이 그대로 동작한다).
  */
 
-const seedAdmin = () => {
-  localStorage.setItem('access_token', 'e2e-dev-token');
-  localStorage.setItem('user_email', 'admin@example.com');
-  localStorage.setItem('user_role', 'ADMIN');
-  localStorage.setItem('login_timestamp', '2026-07-24T09:00:00.000Z');
-};
+/** 데모 자동로그인으로 **실제** ADMIN JWT 를 발급받는다 (auto-login.spec.ts 와 동일 경로). */
+async function loginAsAdmin(page: Page) {
+  const loginResponse = page.waitForResponse(
+    (res) =>
+      res.url().includes('/auth/dev/auto-login?role=ADMIN') && res.request().method() === 'POST',
+  );
+  await page.goto('/login');
+  await page.getByRole('button', { name: '👑 관리자' }).click();
+
+  const response = await loginResponse;
+  expect(response.status(), 'POST /auth/dev/auto-login?role=ADMIN 응답 200 기대').toBe(200);
+  await expect(page).toHaveURL(/\/admin(\/|$|\?)/);
+  await expect
+    .poll(() => page.evaluate(() => window.localStorage.getItem('access_token')), {
+      timeout: 5_000,
+      message: 'localStorage access_token 저장',
+    })
+    .toBeTruthy();
+}
+
+/** SPA 내부 이동 — /loans 로의 **문서 요청을 만들지 않는다**(운영에선 백엔드로 프록시되어 401). */
+async function gotoLoansClientSide(page: Page) {
+  await page.evaluate(() => {
+    window.history.pushState({}, '', '/loans');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  });
+  await expect(page).toHaveURL(/\/loans(\/|$|\?)/);
+}
 
 const json = (route: Route, body: unknown) =>
   route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) });
@@ -33,7 +62,9 @@ test.describe('대출 화면 — 신규 UI (만기 / 연체·상각 / 기업 상
     // 캐시 히트는 page.route 가 가로채지 못한다(요청 이벤트만 발생). CDP 로 캐시를 꺼 모든 요청을 네트워크로 강제.
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('Network.setCacheDisabled', { cacheDisabled: true });
-    await page.addInitScript(seedAdmin);
+    // 인증은 mock 하지 않는다 — 실제 토큰을 발급받아야 운영 백엔드가 401 을 내지 않는다.
+    // 로그인 흐름 자체는 실네트워크로 흘러야 하므로 route mock 은 로그인 이후에 설치한다.
+    await loginAsAdmin(page);
   });
 
   test('선정산 목록: 만기 컬럼 + ADMIN 연체/상각 버튼 + 연체 실행', async ({ page }) => {
@@ -53,7 +84,7 @@ test.describe('대출 화면 — 신규 UI (만기 / 연체·상각 / 기업 상
       return route.continue();
     });
 
-    await page.goto('/loans');
+    await gotoLoansClientSide(page);
     await page.getByRole('button', { name: '조회' }).click();
 
     await expect(page.getByRole('columnheader', { name: '만기' })).toBeVisible();
@@ -90,7 +121,7 @@ test.describe('대출 화면 — 신규 UI (만기 / 연체·상각 / 기업 상
       return route.continue();
     });
 
-    await page.goto('/loans');
+    await gotoLoansClientSide(page);
     await page.getByRole('button', { name: '기업대출' }).click();
     await page.getByPlaceholder('기업명 또는 종목코드').fill('삼성');
     await page.getByRole('button', { name: '검색' }).click();
