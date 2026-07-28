@@ -367,6 +367,12 @@ jobs:
         working-directory: frontend
         run: npm run typecheck
 
+      # 테스트 코드도 타입 검증한다 — 프로덕션 typecheck 만 돌던 동안 테스트 쪽 타입 오류가
+      # 쌓여도 CI 가 잡지 못했다(jest-dom 매처 미배선으로 123건 누적된 전례).
+      - name: TypeScript type check (test code)
+        working-directory: frontend
+        run: npm run typecheck:tests
+
       # 부채(any 83건·exhaustive-deps 10건·react-refresh 2건)를 모두 정리해 현재 0 problems 이므로
       # `--max-warnings 0` 으로 강제한다 — 경고 하나만 새로 생겨도 CI 가 막는다.
       - name: ESLint check
