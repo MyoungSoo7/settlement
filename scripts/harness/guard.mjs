@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // Lemuel harness guard — PLUGIN-INDEPENDENT, repo-tracked core invariant enforcement.
 //
-// Why this exists: the settlement-copilot / invest-copilot plugin guards live under
-// `docs/harness/hackathon/` outside the build graph and are not wired into CI on a fresh clone. This
+// Why this exists: the settlement-copilot / invest-copilot plugin guards live outside the build
+// graph (service `src/main/resources/` — jar-excluded — or `docs/harness/hackathon/`) and are not
+// wired into CI on a fresh clone. This
 // script re-implements the *non-negotiable* money/architecture invariants with zero external
 // dependency so the guard survives plugin relocation and works in CI. (See HARNESS.md
 // "하드스톱" — this is the machine-enforced subset of that section.)

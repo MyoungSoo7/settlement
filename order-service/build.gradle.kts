@@ -120,3 +120,9 @@ sourceSets {
         java.srcDir(querydslDir)
     }
 }
+
+// src/main/resources/fashion-copilot 은 제출물 플러그인(스킬·MCP)으로,
+// 서비스 런타임이 읽는 리소스가 아니다. 배포 jar 에 실리지 않도록 리소스 처리에서 제외한다.
+tasks.named<ProcessResources>("processResources") {
+    exclude("fashion-copilot/**")
+}

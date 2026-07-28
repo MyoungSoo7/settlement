@@ -89,8 +89,8 @@ scripts/sim/.sim_state.json
 ### Vite local env (실제 키 — 커밋 금지) ###
 frontend/.env.production.local
 
-### fashion-copilot 제출물 산출 디렉터리 ###
-fashion-copilot/dist/
+### fashion-copilot 제출물 산출 디렉터리 (재생성 산출물 — 이력 제외) ###
+order-service/src/main/resources/fashion-copilot/dist/
 
 
 ### Vite dev 서버 로그 (재생성 가능) ###
@@ -99,11 +99,14 @@ frontend/*.out.log
 
 ### 세션 전사·실행 로그 (Claude Code 세션이 실행 중 생성 — 이력 제외) ###
 **/submission/logs/
+# 제출물이 서비스 소유로 재배치되면서 submission/ 세그먼트가 사라진 트리
+**/pwc/accounting/logs/
 **/logs/claude-code/
 *.err.log
 
 ### Codex isolated worktrees ###
 .worktrees/
+
 
 docs/harness2
 
@@ -115,8 +118,9 @@ docs/harness2
 ### 공공데이터 원본 대용량 덤프 (repo 밖 보관 — import 배치가 로컬 경로로 읽음) ###
 company-service/src/main/resources/*.csv
 
-### 하네스 실습 자료는 로컬 전용 — 단 해커톤/PwC 제출물은 원격 실행을 위해 추적 ###
+### 하네스 실습 자료는 로컬 전용 — 단 해커톤 제출물은 원격 실행을 위해 추적 ###
 # 디렉토리째(`docs/harness`) 무시 금지: 부모가 제외되면 하위 재포함(!)이 불가능하다.
 docs/harness/*
 !docs/harness/hackathon/
 !docs/harness/omc-harness.md
+
