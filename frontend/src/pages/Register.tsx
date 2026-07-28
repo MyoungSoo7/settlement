@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authApi } from '@/api/auth';
 import { RegisterRequest } from '@/types';
+import { apiErrorData, apiErrorStatus, errorDetail } from '@/lib/apiError';
 
 const Register: React.FC = () => {
   const navigate = useNavigate();
@@ -45,14 +46,14 @@ const Register: React.FC = () => {
         alert('회원가입은 성공했으나 자동 로그인에 실패했습니다. 로그인 페이지로 이동합니다.');
         navigate('/login');
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('Register error:', err);
-      console.error('Error response:', err.response?.data);
-      console.error('Error status:', err.response?.status);
-      if (err.response?.status === 409) {
+      console.error('Error response:', apiErrorData(err));
+      console.error('Error status:', apiErrorStatus(err));
+      if (apiErrorStatus(err) === 409) {
         setError('이미 사용 중인 이메일입니다.');
       } else {
-        const errorMsg = err.response?.data?.message || err.response?.data || err.message || '회원가입에 실패했습니다.';
+        const errorMsg = errorDetail(err, '회원가입에 실패했습니다.');
         setError(typeof errorMsg === 'string' ? errorMsg : JSON.stringify(errorMsg));
       }
     } finally {

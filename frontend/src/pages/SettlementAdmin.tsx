@@ -8,6 +8,7 @@ import {
 } from '@/types';
 import Card from '@/components/Card';
 import Spinner from '@/components/Spinner';
+import { apiErrorMessage } from '@/lib/apiError';
 
 const SettlementAdmin: React.FC = () => {
   const [data, setData] = useState<SettlementSearchResponse | null>(null);
@@ -30,8 +31,8 @@ const SettlementAdmin: React.FC = () => {
     try {
       const response = await settlementApi.search(filters);
       setData(response);
-    } catch (err: any) {
-      setError(err.response?.data?.message || '데이터를 불러오는데 실패했습니다.');
+    } catch (err) {
+      setError(apiErrorMessage(err, '데이터를 불러오는데 실패했습니다.'));
       console.error('Settlement search error:', err);
     } finally {
       setLoading(false);
@@ -47,8 +48,8 @@ const SettlementAdmin: React.FC = () => {
     try {
       const detail = await settlementApi.getSettlement(id);
       setSelectedSettlement(detail);
-    } catch (err: any) {
-      setError(err.response?.data?.message || '상세 정보를 불러오는데 실패했습니다.');
+    } catch (err) {
+      setError(apiErrorMessage(err, '상세 정보를 불러오는데 실패했습니다.'));
     }
   };
 

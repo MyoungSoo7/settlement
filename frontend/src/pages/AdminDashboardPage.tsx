@@ -7,6 +7,7 @@ import { couponApi } from '@/api/coupon';
 import { authApi } from '@/api/auth';
 import { OrderResponse, ProductResponse, CouponResponse, CouponType, CouponCreateRequest } from '@/types';
 import Spinner from '@/components/Spinner';
+import { apiErrorMessage } from '@/lib/apiError';
 
 type Tab = 'overview' | 'orders' | 'products' | 'users' | 'coupons';
 
@@ -200,8 +201,8 @@ const AdminDashboardPage: React.FC = () => {
       setCoupons((prev) => [created, ...prev]);
       setCouponSuccess(`쿠폰 "${created.code}" 생성 완료!`);
       setCouponForm({ code: '', type: 'PERCENTAGE', discountValue: 10, minOrderAmount: 0, maxUses: 100 });
-    } catch (err: any) {
-      setCouponError(err.response?.data?.message || '쿠폰 생성에 실패했습니다.');
+    } catch (err) {
+      setCouponError(apiErrorMessage(err, '쿠폰 생성에 실패했습니다.'));
     } finally {
       setCreatingCoupon(false);
     }

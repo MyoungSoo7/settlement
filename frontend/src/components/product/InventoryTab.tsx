@@ -3,6 +3,7 @@ import { ProductResponse, ProductStatus } from '@/types';
 import { productApi } from '@/api/product';
 import { useToast } from '@/contexts/ToastContext';
 import Spinner from '@/components/Spinner';
+import { apiErrorMessage } from '@/lib/apiError';
 
 const fmt = (v: number) =>
   new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(v);
@@ -66,8 +67,8 @@ const AdjustPanel: React.FC<AdjustPanelProps> = ({ product, onDone }) => {
       showToast(`${product.name}: ${amount}개 ${label} 완료`, 'success');
       setQty('');
       onDone(updated);
-    } catch (err: any) {
-      showToast(err.response?.data?.message || '재고 조정에 실패했습니다.', 'error');
+    } catch (err) {
+      showToast(apiErrorMessage(err, '재고 조정에 실패했습니다.'), 'error');
     } finally {
       setLoading(false);
     }
@@ -124,8 +125,8 @@ const StatusActions: React.FC<StatusActionsProps> = ({ product, onDone }) => {
       const labels = { activate: '활성화', deactivate: '비활성화', discontinue: '단종' };
       showToast(`${product.name}: ${labels[action]} 완료`, 'success');
       onDone(updated);
-    } catch (err: any) {
-      showToast(err.response?.data?.message || '상태 변경에 실패했습니다.', 'error');
+    } catch (err) {
+      showToast(apiErrorMessage(err, '상태 변경에 실패했습니다.'), 'error');
     } finally {
       setLoading(false);
     }

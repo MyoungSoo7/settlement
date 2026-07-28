@@ -11,6 +11,7 @@ import Spinner from '@/components/Spinner';
 import StarRating from '@/components/review/StarRating';
 import ReviewList from '@/components/review/ReviewList';
 import CouponInput from '@/components/coupon/CouponInput';
+import { apiErrorMessage, errorDetail } from '@/lib/apiError';
 
 const PRODUCTS_PER_PAGE = 5;
 const TOSS_CLIENT_KEY = import.meta.env.VITE_TOSS_CLIENT_KEY as string;
@@ -103,8 +104,8 @@ const OrderFormTab: React.FC = () => {
         setStep('order-created');
         setLoading(false);
       }
-    } catch (err: any) {
-      setError(err.response?.data?.message || '주문 생성에 실패했습니다.');
+    } catch (err) {
+      setError(apiErrorMessage(err, '주문 생성에 실패했습니다.'));
       setLoading(false);
     }
   };
@@ -124,8 +125,8 @@ const OrderFormTab: React.FC = () => {
         failUrl: `${window.location.origin}/order/toss/fail`,
       });
       // 페이지가 리다이렉트되므로 이 이후 코드는 실행되지 않음
-    } catch (err: any) {
-      setError(err.message || '토스페이먼츠 결제창을 열 수 없습니다.');
+    } catch (err) {
+      setError(errorDetail(err, '토스페이먼츠 결제창을 열 수 없습니다.'));
       setLoading(false);
     }
   };
@@ -138,8 +139,8 @@ const OrderFormTab: React.FC = () => {
       const paymentRes = await paymentApi.createPayment({ orderId: order.id, paymentMethod });
       setPayment(paymentRes);
       setStep('payment-ready');
-    } catch (err: any) {
-      setError(err.response?.data?.message || '결제 생성에 실패했습니다.');
+    } catch (err) {
+      setError(apiErrorMessage(err, '결제 생성에 실패했습니다.'));
     } finally {
       setLoading(false);
     }
@@ -153,8 +154,8 @@ const OrderFormTab: React.FC = () => {
       const authorized = await paymentApi.authorizePayment(payment.id);
       setPayment(authorized);
       setTimeout(() => handleCapturePayment(authorized.id), 1000);
-    } catch (err: any) {
-      setError(err.response?.data?.message || '결제 승인에 실패했습니다.');
+    } catch (err) {
+      setError(apiErrorMessage(err, '결제 승인에 실패했습니다.'));
       setLoading(false);
     }
   };
@@ -164,8 +165,8 @@ const OrderFormTab: React.FC = () => {
       const captured = await paymentApi.capturePayment(paymentId);
       setPayment(captured);
       setStep('completed');
-    } catch (err: any) {
-      setError(err.response?.data?.message || '결제 확정에 실패했습니다.');
+    } catch (err) {
+      setError(apiErrorMessage(err, '결제 확정에 실패했습니다.'));
     } finally {
       setLoading(false);
     }

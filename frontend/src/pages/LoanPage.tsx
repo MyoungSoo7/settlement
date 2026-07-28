@@ -9,6 +9,7 @@ import { financialApi, type FinancialCompany, type FinancialCompanyPage } from '
 import { authApi } from '@/api/auth';
 import Card from '@/components/Card';
 import Spinner from '@/components/Spinner';
+import { apiErrorMessage } from '@/lib/apiError';
 
 const fmt = (v: number) =>
   new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(v);
@@ -63,8 +64,8 @@ const SellerLoanSection: React.FC = () => {
     setError(null);
     try {
       setLoans(await loanApi.bySeller(sid));
-    } catch (err: any) {
-      setError(err.response?.data?.message || '대출 목록 조회에 실패했습니다.');
+    } catch (err) {
+      setError(apiErrorMessage(err, '대출 목록 조회에 실패했습니다.'));
     } finally {
       setLoadingList(false);
     }
@@ -80,8 +81,8 @@ const SellerLoanSection: React.FC = () => {
       setNotice(`대출 신청 완료 — #${created.id} (수수료 ${fmt(created.fee)}, 미상환 ${fmt(created.outstanding)})`);
       setQuerySellerId(sellerId);
       await loadLoans(sellerId);
-    } catch (err: any) {
-      setError(err.response?.data?.message || '대출 신청에 실패했습니다.');
+    } catch (err) {
+      setError(apiErrorMessage(err, '대출 신청에 실패했습니다.'));
     } finally {
       setSubmitting(false);
     }
@@ -95,8 +96,8 @@ const SellerLoanSection: React.FC = () => {
       await loanApi.disburse(id);
       setNotice(`#${id} 대출 실행(선지급) 완료`);
       await loadLoans(querySellerId);
-    } catch (err: any) {
-      setError(err.response?.data?.message || '대출 실행에 실패했습니다.');
+    } catch (err) {
+      setError(apiErrorMessage(err, '대출 실행에 실패했습니다.'));
     } finally {
       setBusyId(null);
     }
@@ -110,8 +111,8 @@ const SellerLoanSection: React.FC = () => {
       await loanApi.markOverdue(id);
       setNotice(`#${id} 연체 처리 완료`);
       await loadLoans(querySellerId);
-    } catch (err: any) {
-      setError(err.response?.data?.message || '연체 처리에 실패했습니다.');
+    } catch (err) {
+      setError(apiErrorMessage(err, '연체 처리에 실패했습니다.'));
     } finally {
       setBusyId(null);
     }
@@ -125,8 +126,8 @@ const SellerLoanSection: React.FC = () => {
       await loanApi.writeOff(id);
       setNotice(`#${id} 상각(대손) 처리 완료`);
       await loadLoans(querySellerId);
-    } catch (err: any) {
-      setError(err.response?.data?.message || '상각 처리에 실패했습니다.');
+    } catch (err) {
+      setError(apiErrorMessage(err, '상각 처리에 실패했습니다.'));
     } finally {
       setBusyId(null);
     }
@@ -303,8 +304,8 @@ const CorporateLoanSection: React.FC = () => {
     setError(null);
     try {
       setCompanies(await financialApi.companies(keyword, 0, 10));
-    } catch (err: any) {
-      setError(err.response?.data?.message || '기업 검색에 실패했습니다.');
+    } catch (err) {
+      setError(apiErrorMessage(err, '기업 검색에 실패했습니다.'));
     } finally {
       setSearching(false);
     }
@@ -324,8 +325,8 @@ const CorporateLoanSection: React.FC = () => {
       ]);
       setCredit(creditRes);
       setLoans(loansRes);
-    } catch (err: any) {
-      setError(err.response?.data?.message || '기업 신용평가 조회에 실패했습니다.');
+    } catch (err) {
+      setError(apiErrorMessage(err, '기업 신용평가 조회에 실패했습니다.'));
     } finally {
       setLoadingCredit(false);
     }
@@ -343,8 +344,8 @@ const CorporateLoanSection: React.FC = () => {
       const created = await loanApi.requestCorporate({ stockCode: selected.stockCode, principal, termDays });
       setNotice(`기업대출 신청 완료 — #${created.id} (${created.creditGrade}, 수수료 ${fmt(created.fee)})`);
       setLoans(await loanApi.corporateByStock(selected.stockCode));
-    } catch (err: any) {
-      setError(err.response?.data?.message || '기업대출 신청에 실패했습니다.');
+    } catch (err) {
+      setError(apiErrorMessage(err, '기업대출 신청에 실패했습니다.'));
     } finally {
       setSubmitting(false);
     }
@@ -359,8 +360,8 @@ const CorporateLoanSection: React.FC = () => {
       await loanApi.disburseCorporate(id);
       setNotice(`#${id} 기업대출 실행(선지급) 완료`);
       setLoans(await loanApi.corporateByStock(selected.stockCode));
-    } catch (err: any) {
-      setError(err.response?.data?.message || '기업대출 실행에 실패했습니다.');
+    } catch (err) {
+      setError(apiErrorMessage(err, '기업대출 실행에 실패했습니다.'));
     } finally {
       setBusyId(null);
     }
@@ -377,8 +378,8 @@ const CorporateLoanSection: React.FC = () => {
       setRepayId(null);
       setRepayAmount(0);
       setLoans(await loanApi.corporateByStock(selected.stockCode));
-    } catch (err: any) {
-      setError(err.response?.data?.message || '기업대출 상환에 실패했습니다.');
+    } catch (err) {
+      setError(apiErrorMessage(err, '기업대출 상환에 실패했습니다.'));
     } finally {
       setBusyId(null);
     }

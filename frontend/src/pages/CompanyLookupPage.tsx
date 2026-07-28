@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { companyApi, Company, CompanyPage, Reputation, Article, CompanyDocument } from '@/api/company';
 import Card from '@/components/Card';
 import Spinner from '@/components/Spinner';
+import { apiErrorMessage } from '@/lib/apiError';
 
 /** 평판 등급별 뱃지 색 */
 const gradeClass = (grade: string) => {
@@ -55,7 +56,7 @@ const CompanyLookupPage: React.FC = () => {
     companyApi
       .companies(query, page)
       .then((data) => { if (!cancelled) setCompanies(data); })
-      .catch((err: any) => { if (!cancelled) setError(err.response?.data?.message || '기업 목록 조회에 실패했습니다.'); })
+      .catch((err: unknown) => { if (!cancelled) setError(apiErrorMessage(err, '기업 목록 조회에 실패했습니다.')); })
       .finally(() => { if (!cancelled) setLoadingList(false); });
     return () => { cancelled = true; };
   }, [query, page]);
@@ -73,8 +74,8 @@ const CompanyLookupPage: React.FC = () => {
       setReputation(rep);
       setArticles(arts.content);
       setDocuments(docs);
-    } catch (err: any) {
-      setError(err.response?.data?.message || '기업 상세 조회에 실패했습니다.');
+    } catch (err) {
+      setError(apiErrorMessage(err, '기업 상세 조회에 실패했습니다.'));
       setReputation(null);
       setArticles([]);
       setDocuments([]);

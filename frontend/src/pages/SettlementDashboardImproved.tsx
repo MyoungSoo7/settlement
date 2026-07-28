@@ -6,6 +6,7 @@ import DateRangePicker from '@/components/DateRangePicker';
 import EmptyState from '@/components/EmptyState';
 import LoadingSkeleton from '@/components/LoadingSkeleton';
 import { useToast } from '@/contexts/ToastContext';
+import { apiErrorMessage } from '@/lib/apiError';
 
 const SettlementDashboard: React.FC = () => {
   const [data, setData] = useState<SettlementSearchResponse | null>(null);
@@ -42,8 +43,8 @@ const SettlementDashboard: React.FC = () => {
     try {
       const response = await settlementApi.search(filters);
       setData(response);
-    } catch (err: any) {
-      const errorMsg = err.response?.data?.message || '데이터를 불러오는데 실패했습니다.';
+    } catch (err) {
+      const errorMsg = apiErrorMessage(err, '데이터를 불러오는데 실패했습니다.');
       setError(errorMsg);
       showToast(errorMsg, 'error');
       console.error('Settlement search error:', err);

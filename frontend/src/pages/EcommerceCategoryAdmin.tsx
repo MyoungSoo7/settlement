@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useToast } from '@/contexts/ToastContext';
 import api from '@/api/axios';
+import { apiErrorMessage } from '@/lib/apiError';
 
 interface EcommerceCategory {
   id: number;
@@ -76,8 +77,8 @@ const EcommerceCategoryAdmin: React.FC = () => {
       setFormData({ name: '', slug: '', sortOrder: 0 });
       setSelectedParent(null);
       loadCategories();
-    } catch (error: any) {
-      const message = error.response?.data?.message || '카테고리 생성 실패';
+    } catch (error) {
+      const message = apiErrorMessage(error, '카테고리 생성 실패');
       showToast(message, 'error');
     }
   };
@@ -101,8 +102,8 @@ const EcommerceCategoryAdmin: React.FC = () => {
       await api.delete(`/admin/categories/${id}`);
       showToast('카테고리가 삭제되었습니다', 'success');
       loadCategories();
-    } catch (error: any) {
-      const message = error.response?.data?.message || '카테고리 삭제 실패';
+    } catch (error) {
+      const message = apiErrorMessage(error, '카테고리 삭제 실패');
       showToast(message, 'error');
     }
   };
@@ -123,8 +124,8 @@ const EcommerceCategoryAdmin: React.FC = () => {
         await api.patch(`/admin/categories/${c.id}/sort`, { sortOrder: newOrder });
       }
       loadCategories();
-    } catch (error: any) {
-      showToast(error.response?.data?.message || '순서 변경 실패', 'error');
+    } catch (error) {
+      showToast(apiErrorMessage(error, '순서 변경 실패'), 'error');
     } finally {
       setMoving(false);
     }
@@ -156,8 +157,8 @@ const EcommerceCategoryAdmin: React.FC = () => {
       showToast('카테고리가 수정되었습니다', 'success');
       setEditTarget(null);
       loadCategories();
-    } catch (error: any) {
-      showToast(error.response?.data?.message || '카테고리 수정 실패', 'error');
+    } catch (error) {
+      showToast(apiErrorMessage(error, '카테고리 수정 실패'), 'error');
     }
   };
 

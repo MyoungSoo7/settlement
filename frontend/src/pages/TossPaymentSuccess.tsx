@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { paymentApi } from '@/api/payment';
 import { PaymentResponse } from '@/types';
 import Spinner from '@/components/Spinner';
+import { apiErrorMessage } from '@/lib/apiError';
 
 const TossPaymentSuccess: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -42,7 +43,7 @@ const TossPaymentSuccess: React.FC = () => {
         })
         .then((res) => setPayments(res))
         .catch((err) => {
-          setError(err.response?.data?.message || '결제 확인 중 오류가 발생했습니다.');
+          setError(apiErrorMessage(err, '결제 확인 중 오류가 발생했습니다.'));
         })
         .finally(() => setLoading(false));
     } else if (dbOrderId) {
@@ -56,7 +57,7 @@ const TossPaymentSuccess: React.FC = () => {
         })
         .then((res) => setPayments([res]))
         .catch((err) => {
-          setError(err.response?.data?.message || '결제 확인 중 오류가 발생했습니다.');
+          setError(apiErrorMessage(err, '결제 확인 중 오류가 발생했습니다.'));
         })
         .finally(() => setLoading(false));
     } else {

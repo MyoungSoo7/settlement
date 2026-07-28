@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { economicsApi, EconomicIndicator, IndicatorSeries } from '@/api/economics';
 import Card from '@/components/Card';
 import Spinner from '@/components/Spinner';
+import { apiErrorMessage } from '@/lib/apiError';
 
 const fmtValue = (v: number | null | undefined, unit: string) => {
   if (v === null || v === undefined) return 'N/A';
@@ -40,7 +41,7 @@ const EconomicsPage: React.FC = () => {
     economicsApi
       .indicators()
       .then((data) => { if (!cancelled) setIndicators(data); })
-      .catch((err: any) => { if (!cancelled) setError(err.response?.data?.message || '경제지표 조회에 실패했습니다.'); })
+      .catch((err: unknown) => { if (!cancelled) setError(apiErrorMessage(err, '경제지표 조회에 실패했습니다.')); })
       .finally(() => { if (!cancelled) setLoadingList(false); });
     return () => { cancelled = true; };
   }, []);
@@ -51,8 +52,8 @@ const EconomicsPage: React.FC = () => {
     setError(null);
     try {
       setSeries(await economicsApi.series(indicator.code));
-    } catch (err: any) {
-      setError(err.response?.data?.message || '시계열 조회에 실패했습니다.');
+    } catch (err) {
+      setError(apiErrorMessage(err, '시계열 조회에 실패했습니다.'));
       setSeries(null);
     } finally {
       setLoadingSeries(false);

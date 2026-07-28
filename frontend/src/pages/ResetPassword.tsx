@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '@/api/axios';
+import { apiErrorMessage } from '@/lib/apiError';
 
 const ResetPassword: React.FC = () => {
   const navigate = useNavigate();
@@ -44,8 +45,8 @@ const ResetPassword: React.FC = () => {
         newPassword,
       });
       setSuccess(true);
-    } catch (err: any) {
-      setError(err.response?.data?.message || '비밀번호 재설정에 실패했습니다.');
+    } catch (err) {
+      setError(apiErrorMessage(err, '비밀번호 재설정에 실패했습니다.'));
       console.error('Password reset error:', err);
     } finally {
       setLoading(false);

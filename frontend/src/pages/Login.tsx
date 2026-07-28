@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authApi } from '@/api/auth';
 import { LoginRequest } from '@/types';
+import { apiErrorMessage, apiErrorStatus } from '@/lib/apiError';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -24,8 +25,8 @@ const Login: React.FC = () => {
         authApi.saveToken(response);
         navigate('/order');
       }
-    } catch (err: any) {
-      setError(err.response?.data?.message || '이메일 또는 비밀번호가 올바르지 않습니다.');
+    } catch (err) {
+      setError(apiErrorMessage(err, '이메일 또는 비밀번호가 올바르지 않습니다.'));
     } finally {
       setLoading(false);
     }
@@ -39,11 +40,11 @@ const Login: React.FC = () => {
       const response = await authApi.autoLogin(role);
       authApi.saveToken(response);
       navigate(role === 'USER' ? '/order' : '/admin');
-    } catch (err: any) {
-      if (err.response?.status === 404) {
+    } catch (err) {
+      if (apiErrorStatus(err) === 404) {
         setError('데모 모드가 비활성 상태입니다. (lemuel.demo.enabled=true 필요)');
       } else {
-        setError(err.response?.data?.message || '자동 로그인에 실패했습니다.');
+        setError(apiErrorMessage(err, '자동 로그인에 실패했습니다.'));
       }
     } finally {
       setLoading(false);
@@ -58,11 +59,11 @@ const Login: React.FC = () => {
       const response = await authApi.guestLogin();
       authApi.saveToken(response);
       navigate('/');
-    } catch (err: any) {
-      if (err.response?.status === 404) {
+    } catch (err) {
+      if (apiErrorStatus(err) === 404) {
         setError('게스트 모드가 비활성 상태입니다.');
       } else {
-        setError(err.response?.data?.message || '게스트 진입에 실패했습니다.');
+        setError(apiErrorMessage(err, '게스트 진입에 실패했습니다.'));
       }
     } finally {
       setLoading(false);

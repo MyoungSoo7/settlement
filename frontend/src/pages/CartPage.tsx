@@ -7,6 +7,7 @@ import { couponApi } from '@/api/coupon';
 import { CouponValidateResponse } from '@/types';
 import Spinner from '@/components/Spinner';
 import CouponInput from '@/components/coupon/CouponInput';
+import { errorDetail } from '@/lib/apiError';
 
 const USER_ID = 1;
 const TOSS_CLIENT_KEY = import.meta.env.VITE_TOSS_CLIENT_KEY as string;
@@ -141,8 +142,8 @@ const CartPage: React.FC = () => {
         const authorized = await paymentApi.authorizePayment(payment.id);
         await paymentApi.capturePayment(authorized.id);
         completed.push({ productName: product.name, orderId: order.id, amount: order.amount });
-      } catch (err: any) {
-        const msg = err.response?.data?.message || err.message || '알 수 없는 오류';
+      } catch (err) {
+        const msg = errorDetail(err, '알 수 없는 오류');
         setError(`"${product.name}" 주문 실패: ${msg}`);
         setResults(completed);
         setCheckoutStep('done');
@@ -179,8 +180,8 @@ const CartPage: React.FC = () => {
           amount: product.price * quantity,
         });
         orderIds.push(order.id);
-      } catch (err: any) {
-        const msg = err.response?.data?.message || err.message || '알 수 없는 오류';
+      } catch (err) {
+        const msg = errorDetail(err, '알 수 없는 오류');
         setError(`"${product.name}" 주문 생성 실패: ${msg}`);
         setCheckoutStep('cart');
         return;
@@ -212,8 +213,8 @@ const CartPage: React.FC = () => {
         failUrl: `${window.location.origin}/order/toss/fail`,
       });
       // 리다이렉트 발생 — 이후 코드 실행 안 됨
-    } catch (err: any) {
-      setError(err.message || '토스페이먼츠 결제창을 열 수 없습니다.');
+    } catch (err) {
+      setError(errorDetail(err, '토스페이먼츠 결제창을 열 수 없습니다.'));
       setCheckoutStep('cart');
     }
   };

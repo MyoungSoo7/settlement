@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authApi } from '@/api/auth';
 import { RegisterRequest } from '@/types';
+import { apiErrorMessage, apiErrorStatus, errorDetail } from '@/lib/apiError';
 
 type Tab = 'login' | 'register';
 
@@ -33,8 +34,8 @@ const AdminLoginPage: React.FC = () => {
       }
       authApi.saveToken(response);
       navigate('/admin');
-    } catch (err: any) {
-      setError(err.response?.data?.message || '이메일 또는 비밀번호가 올바르지 않습니다.');
+    } catch (err) {
+      setError(apiErrorMessage(err, '이메일 또는 비밀번호가 올바르지 않습니다.'));
     } finally {
       setLoading(false);
     }
@@ -61,12 +62,11 @@ const AdminLoginPage: React.FC = () => {
       setRegForm({ email: '', password: '', role: 'MANAGER' });
       setConfirmPassword('');
       setTab('login');
-    } catch (err: any) {
-      if (err.response?.status === 409) {
+    } catch (err) {
+      if (apiErrorStatus(err) === 409) {
         setError('이미 사용 중인 이메일입니다.');
       } else {
-        const msg = err.response?.data?.message || err.response?.data || err.message || '회원가입에 실패했습니다.';
-        setError(typeof msg === 'string' ? msg : JSON.stringify(msg));
+        setError(errorDetail(err, '회원가입에 실패했습니다.'));
       }
     } finally {
       setLoading(false);

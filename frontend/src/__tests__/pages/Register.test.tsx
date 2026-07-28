@@ -135,7 +135,7 @@ describe('Register', () => {
 
     it('제출 중에는 버튼이 비활성화된다', async () => {
       const user = userEvent.setup();
-      let resolveRegister!: (v: any) => void;
+      let resolveRegister!: (v: unknown) => void;
       vi.mocked(authApi.register).mockImplementationOnce(
         () => new Promise(r => { resolveRegister = r; })
       );
