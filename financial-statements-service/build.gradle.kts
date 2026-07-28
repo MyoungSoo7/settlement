@@ -64,3 +64,4 @@ tasks.named<Test>("test") {
     useJUnitPlatform()
     jvmArgs("-javaagent:${mockitoAgent.asPath}")
 }
+

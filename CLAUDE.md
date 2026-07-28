@@ -19,7 +19,10 @@
 - **account**: 이벤트 **발행** 코드 추가 **금지**(소비 전용 — Outbox 발행 머시너리 배제됨).
 - **market**: PER/PBR 계산 **금지**(시세·시총만 서빙, 밸류에이션 조인은 소비측 몫).
 - **인가(IDOR)**: 셀러 리소스 식별자를 요청 파라미터로 신뢰 **금지** — JWT 주체(userId)에서 파생 + 소유권 대조(403).
-- **커밋**: `main` 직접 push **금지**(보호 브랜치). `hackathon/`·`pwc/` 제출물은 원격 실행을 위해 커밋 대상(재생성 산출물은 .gitignore 유지).
+- **커밋**: `main` 직접 push **금지**(보호 브랜치). 제출물 플러그인은 원격 실행을 위해 커밋 대상(재생성 산출물은 .gitignore 유지).
+  배치 기준은 **호출 대상 서비스**: settlement-copilot→`settlement-service/`, pwc(trusted-ceo)→`company-service/`,
+  fashion-copilot→`order-service/` (각 `src/main/resources/` 아래, jar 에는 `processResources` exclude 로 미포함).
+  자사 서비스를 호출하지 않거나(kakaopay·musinsa) 소유 서비스가 단일하지 않은 것(invest-copilot)은 `docs/harness/hackathon/`.
 
 > 위 가드레일은 **기계로 강제된다**(문서 규율 아님): 저장소 추적 가드 `scripts/harness/guard.mjs` 가 실시간
 > PreToolUse(exit 2 차단)·git pre-commit(`node scripts/harness/install-hooks.mjs`)·CI(`.github/workflows/harness-guard.yml`) 3중으로

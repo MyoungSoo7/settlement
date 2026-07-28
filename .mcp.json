@@ -2,7 +2,7 @@
   "mcpServers": {
     "settlement-copilot": {
       "command": "node",
-      "args": ["settlement-copilot/mcp/server/index.mjs"],
+      "args": ["settlement-service/src/main/resources/settlement-copilot/mcp/server/index.mjs"],
       "env": {
         "SETTLEMENT_BASE_URL": "http://127.0.0.1:8082",
         "ORDER_BASE_URL": "http://127.0.0.1:8088",

@@ -33,7 +33,9 @@ function toPosixPath(path) {
 }
 
 function isPluginOrMcpPath(path) {
-  return /(^|\/)(?:\.claude-plugin|\.codex-plugin|mcp)(?:\/|$)|(^|\/)\.mcp\.json$|^hackathon\/(?:settlement|invest)-copilot(?:\/|$)/.test(
+  // copilot 플러그인 트리는 서비스 소유 기준으로 재배치될 수 있으므로 부모 경로를 고정하지 않는다
+  // (settlement-copilot → settlement-service/src/main/resources/, invest-copilot → docs/harness/hackathon/).
+  return /(^|\/)(?:\.claude-plugin|\.codex-plugin|mcp)(?:\/|$)|(^|\/)\.mcp\.json$|(?:^|\/)(?:settlement|invest)-copilot(?:\/|$)/.test(
     toPosixPath(path),
   );
 }
@@ -169,7 +171,7 @@ test('installed hook allows clean commits including pwc submission paths', async
 test('installed hook propagates failure from a present optional plugin guard', async () => {
   const root = createRepo();
   await installHooks({ cwd: root, stdout: () => {}, stderr: () => {} });
-  put(root, 'hackathon/settlement-copilot/hooks/guards/pre-commit.mjs', "console.error('plugin rejected commit'); process.exit(23);\n");
+  put(root, 'settlement-service/src/main/resources/settlement-copilot/hooks/guards/pre-commit.mjs', "console.error('plugin rejected commit'); process.exit(23);\n");
   put(root, 'README.md', 'clean\n');
   assert.equal(git(root, 'add', 'README.md', 'scripts').status, 0);
 

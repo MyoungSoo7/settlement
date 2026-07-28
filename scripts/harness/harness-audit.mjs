@@ -158,6 +158,26 @@ function validateRoutingMap(read, trackedSet, errors) {
   }
 }
 
+// pre-commit Layer 2(copilot 플러그인 가드) 경로 ↔ 실제 추적 위치 대조 —
+// 훅은 미존재 경로를 조용히 skip 하므로(`[ -f ]`), 플러그인 트리를 옮기고 훅 목록을 안 고치면
+// 가드가 사라진 것도 모른 채 커밋이 통과한다. 플러그인이 추적되지 않는 저장소(플러그인 독립
+// fresh clone)에서는 대조 대상이 없으므로 건너뛴다.
+export function parseHookPluginGuards(hook) {
+  return [...String(hook).matchAll(/"([\w./-]*pre-commit\.mjs)"/g)].map((m) => m[1]);
+}
+
+function validatePluginGuardPaths(read, tracked, trackedSet, errors) {
+  if (!trackedSet.has('scripts/harness/hooks/pre-commit')) return;
+  const guards = tracked.filter((p) => /(?:^|\/)(?:settlement|invest)-copilot\/hooks\/guards\/pre-commit\.mjs$/.test(p));
+  if (guards.length === 0) return;
+  const referenced = new Set(parseHookPluginGuards(read('scripts/harness/hooks/pre-commit')));
+  for (const guard of guards) {
+    if (!referenced.has(guard)) {
+      errors.push(`pre-commit Layer 2 경로 드리프트: ${guard} (훅 목록에 없어 조용히 skip 됨)`);
+    }
+  }
+}
+
 function validateStatus(status, tracked, errors) {
   const checks = [
     ['application.yml', tracked.filter((p) => /\/src\/main\/resources\/application\.yml$/.test(p)).length, [/application\.yml[^\n]*?\*\*(\d[\d,]*)[^\d\n*]*\*\*/i, /application\.yml[^\n]*?→\s*(\d[\d,]*)/i]],
@@ -195,6 +215,7 @@ export function collectAudit(repoRoot, manifest) {
   if (trackedSet.has('STATUS.md')) validateStatus(read('STATUS.md'), tracked, errors);
   validateModuleRoster(read, trackedSet, errors);
   validateRoutingMap(read, trackedSet, errors);
+  validatePluginGuardPaths(read, tracked, trackedSet, errors);
 
   for (const pair of manifest.criticalContractPairs) {
     if (!trackedSet.has(pair.claude) || !trackedSet.has(pair.codex)) continue;

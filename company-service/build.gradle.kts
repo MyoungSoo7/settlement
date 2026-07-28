@@ -77,3 +77,14 @@ tasks.named<Test>("test") {
     useJUnitPlatform()
     jvmArgs("-javaagent:${mockitoAgent.asPath}")
 }
+
+// 서비스 런타임이 읽지 않는 리소스는 배포 jar 에서 제외한다.
+//  - pwc/         : trusted-ceo-agent 제출물(이 서비스의 문서함 API 8090 을 소비하는 외부 파이프라인)
+//  - *.csv        : 공공데이터 원본 덤프(110MB+). 임포트 배치는 클래스패스가 아니라 관리자 API 요청의
+//                   파일시스템 경로(`Path.of(request.path())`)로 읽으므로 jar 에 실을 이유가 없다.
+//  - .claude/     : 하네스·세션 아티팩트(실행 중 생성, .gitignore 대상)
+tasks.named<ProcessResources>("processResources") {
+    exclude("pwc/**")
+    exclude("*.csv")
+    exclude(".claude/**")
+}

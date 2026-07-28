@@ -21,14 +21,14 @@
 
 ## 면접관용 빠른 둘러보기
 
-| 보고 싶은 것 | 한 번에 가는 곳 |
-|---|---|
+| 보고 싶은 것 | 한 번에 가는 곳                                                                                                      |
+|---|----------------------------------------------------------------------------------------------------------------------|
 | **✅ "정말 작동하나" (5분, 재현 가능)** | **[docs/SETTLEMENT-VERIFICATION.md](docs/SETTLEMENT-VERIFICATION.md)** — 520 테스트·LINE 94.17% + 불변식 매핑 + 한계 |
-| **📄 1장 요약 (이력서 첨부용)** | **[PORTFOLIO.md](PORTFOLIO.md)** |
-| **시스템 전체 구조** | [아키텍처 다이어그램 (본 README)](#아키텍처) |
-| **Architecture Decision Records** | [docs/adr/](docs/adr/) |
-| **부하 테스트 시나리오 4종** | [load-test/](load-test/) |
-| **Grafana 비즈니스 KPI 대시보드** | [monitoring/grafana/dashboards/](monitoring/grafana/dashboards/) |
+| **📄 1장 요약 (이력서 첨부용)** | **[PORTFOLIO.md](docs/PORTFOLIO.md)**                                                                                |
+| **시스템 전체 구조** | [아키텍처 다이어그램 (본 README)](#아키텍처)                                                                         |
+| **Architecture Decision Records** | [docs/adr/](docs/adr/)                                                                                               |
+| **부하 테스트 시나리오 4종** | [load-test/](load-test/)                                                                                             |
+| **Grafana 비즈니스 KPI 대시보드** | [monitoring/grafana/dashboards/](monitoring/grafana/dashboards/)                                                     |
 
 ---
 

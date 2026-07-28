@@ -140,3 +140,9 @@ pitest {
     // PIT minion JVM 은 test 태스크의 jvmArgs 를 상속하지 않으므로 mockito agent 를 방어적으로 전달
     jvmArgs.set(listOf("-javaagent:${configurations.getByName("mockitoAgent").asPath}"))
 }
+
+// src/main/resources/settlement-copilot 은 settlement(8082)·order(8088) 공개 API 를 소비하는 제출물 플러그인(MCP·스킬·가드)이다.
+// 서비스 런타임이 읽는 리소스가 아니므로 배포 jar 에 실리지 않도록 리소스 처리에서 제외한다.
+tasks.named<ProcessResources>("processResources") {
+    exclude("settlement-copilot/**")
+}

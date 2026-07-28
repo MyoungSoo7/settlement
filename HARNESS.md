@@ -30,6 +30,7 @@
 │   ├── {서비스}-rules/                # 12서비스 강제 도메인 규칙 (아래 참조)
 │   ├── money-safety · ledger-invariants · idempotency-and-events   # 횡단 규칙
 │   ├── recon-playbook · incident-runbooks · compliance-review      # 운영/리뷰
+│   ├── delta-review                                                # diff 위험축 트리아지(어디를 먼저 볼지) — 리뷰 진입 기준
 │   ├── debugging-discipline · tdd-discipline · verify-before-done  # 절차 규율(플러그인 독립 — 외부 스킬 위임 금지)
 │   ├── settlement-integration-test                                 # Testcontainers 통합테스트 작성
 │   ├── msa-service-wiring · event-contract-change · projection-view-ops  # 확장 절차 (서비스 배선·이벤트 계약·프로젝션)
@@ -38,7 +39,7 @@
 ├── commands/                          # 슬래시 커맨드 (워크플로 진입점)
 │   ├── settlement-explain · loan-credit-explain · investment-score-explain  # 산정 근거 풀이(CS/CEO)
 │   ├── recon-check · oncall · ledger-verify · trial-balance-verify          # 운영 진단·검증
-│   ├── fee-audit · compliance-scan                                          # 감사
+│   ├── fee-audit · compliance-scan · delta-review                           # 감사·리뷰
 │   ├── harness-check                                                        # 하네스 자기 진단(드리프트·가드·라우팅)
 │   ├── ai-dev-team.md                 # 전사 역할 산출물 일괄 생성
 │   └── agents/                        # 역할별 산출물 생성 서브커맨드
@@ -93,6 +94,7 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 > | 금액 다루는 코드 | 📘`money-safety` (BigDecimal 강제·라운딩·직렬화) |
 > | 원장 전표·복식부기 | 📘`ledger-invariants` → ⌘`/ledger-verify`·`/trial-balance-verify` |
 > | 통합테스트 작성 | 📘`settlement-integration-test` (Testcontainers) / 🤖`settlement-test-generator` |
+> | PR·브랜치 diff 리뷰 착수 ("어디부터 볼까") | 📘`delta-review` (경로 시그널 → P0~P2 위험축 A~K, 세로=안에서 밖으로·가로=프로듀서/계약/컨슈머 3자) → ⌘`/delta-review` → 축별 🤖위임 |
 > | 릴리즈 전 보안·컴플라이언스 | 🤖`security-auditor` + ⌘`/compliance-scan` (diff PII/이력/감사/권한) |
 > | 수수료·홀드백 감사 | ⌘`/fee-audit` (도메인 정책 + simulate 교차검증) |
 > | 온콜·장애·알람 | ⌘`/oncall` + 📘`incident-runbooks` |
@@ -147,7 +149,7 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
   - `node scripts/harness/harness-audit.mjs` — 하네스 자기 진단(STATUS 수치 드리프트·라우팅 dangling·가드 훅 경로 실존·인벤토리)
   - `node scripts/harness/guard.mjs --staged` — 돈/경계/이력 불변식 가드
   - `node scripts/harness/telemetry-report.mjs` — 가드 발화·스킬 사용/제안 텔레메트리 + 가드 카나리아(`.claude/harness/logs`)
-  - `node scripts/harness/session-metrics.mjs` — OMC 세션·미션 완주율·재작업률 KPI 리포트(`.omc` 읽기 전용 관측 — KPI 정본은 [`docs/omc-harness.md`](docs/omc-harness.md))
+  - `node scripts/harness/session-metrics.mjs` — OMC 세션·미션 완주율·재작업률 KPI 리포트(`.omc` 읽기 전용 관측 — KPI 정본은 [`docs/harness/omc-harness.md`](docs/harness/omc-harness.md))
   - `./gradlew :<module>:test`·`:jacocoTestCoverageVerification` — 정합 검증(측정 정답)
   - 서비스 자체 `/admin/integrity`·`/api/account/trial-balance` 조회 API(읽기 전용)
 - **불변식**: psql/pg_dump/kafka produce 로 운영 데이터에 직접 손대는 명령을 만들지 않는다(가드가 `check-command` 로 차단).
