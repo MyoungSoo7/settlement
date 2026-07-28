@@ -70,11 +70,21 @@
 - 테스트 클래스 **682개** (Testcontainers 통합테스트 포함) — `git ls-files '*/src/test/*Test.java' '*/src/test/*Tests.java' '*/src/test/*IT.java' | wc -l` → 682
 - 이벤트 계약 스키마 **22토픽** (ADR 0024, 프로듀서·컨슈머 양방향 테스트) — `git ls-files 'shared-common/src/testFixtures/resources/contracts/events/*.schema.json' | wc -l` → 22
 
-## 최근 전체 검증 (2026-07-29 · 커밋 `ffa5e5c98` 기준)
-- `./gradlew build` **전체 통과**(13m46s) — 17개 모듈 합계 테스트 **3,895건**, failure 0 · error 0.
-  skip 은 1건뿐이며 소스에 `@Disabled` 로 명시된 `SettlementControllerTest > GET /settlements/{id}/pdf`
-  (Boot 4 WebMvcTest binary response 이슈). **Docker UP 상태에서 실행** — Testcontainers 통합테스트가
-  조용히 skip 된 건 0(가짜 GREEN 아님).
+## 최근 전체 검증 (2026-07-29)
+> ⚠️ 테스트 건수를 인용할 때는 **그 빌드에서 실제로 실행된 태스크만** 센다. `test` 가 UP-TO-DATE 면
+> `build/test-results/` 의 XML 은 과거 실행분이라, 통째로 합산하면 낡은 수치가 섞인 가짜 GREEN 이 된다.
+- `./gradlew build` **전체 통과**(15m01s, Docker UP) — 이번 실행에서 `test` 가 **실제 실행된 10개 모듈**
+  합계 **3,534건**, failure 0 · error 0. skip 1건은 소스에 `@Disabled` 로 명시된
+  `SettlementControllerTest > GET /settlements/{id}/pdf`(Boot 4 WebMvcTest binary response 이슈)이며,
+  Testcontainers 통합테스트가 조용히 skip 된 건 0.
+  (order 1153 · settlement 987 · loan 367 · company 242 · shared-common 225 · investment 212 ·
+  account 134 · operation 92 · ai 85 · organization 37)
+- UP-TO-DATE 로 재실행되지 않은 5개 모듈(**shared-common 미의존 공개 위성** — 이번 변경의 영향권 밖):
+  financial 89 · economics 88 · commondata 87 · market 74 · gateway 2 = 340건, 최종 green 2026-07-24.
+  → 저장소 전체 합계는 3,874건이다.
+- 검증 중 발견·수정: `OutboxEvent.pending()` 이 `Instant.now()` 를 나노초째 담아 `timestamptz`
+  (마이크로초 해상도) 왕복이 무손실이 아니었다(`OutboxClaimConcurrencyIT` N4 실패). 어서션을 완화하는
+  대신 생성 시점에 `truncatedTo(MICROS)` 로 잘라 왕복을 무손실로 만들었다.
 - 제출물 플러그인을 **호출 대상 서비스 기준**으로 재배치한 뒤 부트 jar 5종 실물 검사 —
   `pwc/`·`settlement-copilot/`·`fashion-copilot/`·공공데이터 CSV 엔트리 **0건**(`processResources` exclude 반영).
   company-service 리소스 산출물 111M → 84K.
