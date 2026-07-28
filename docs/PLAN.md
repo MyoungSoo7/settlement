@@ -1,7 +1,7 @@
 # PLAN — Lemuel 구현 계획 (기능 기반)
 
-> [`SPEC.md`](./SPEC.md) 의 기능을 **구현 단위(Phase)로 분해한 계획서**. 완료 판정 기준은 [`DONE_CRITERIA.md`](./DONE_CRITERIA.md).
-> 실시간 진척·미결 현황은 [`STATUS.md`](./STATUS.md) 가 정본 — 이 문서는 "무엇을 어떤 순서·의존으로 짓는가"의 지도.
+> [`../SPEC.md`](../SPEC.md) 의 기능을 **구현 단위(Phase)로 분해한 계획서**. 완료 판정 기준은 [`DONE_CRITERIA.md`](DONE_CRITERIA.md).
+> 실시간 진척·미결 현황은 [`../STATUS.md`](../STATUS.md) 가 정본 — 이 문서는 "무엇을 어떤 순서·의존으로 짓는가"의 지도.
 
 - 기준 시점: 2026-07-24 (SPEC 2026-07-16, STATUS 2026-07-22 기준)
 - **주의**: SPEC 은 *현행 코드 기준 요약 명세*다. 이 계획은 그린필드 신규 착수가 아니라, 이미 구현된 것을
@@ -143,7 +143,7 @@
 ---
 
 ## Phase 8 — 잔여 작업 (Open) — STATUS "다음 할 일" 정본
-> 아래만 열려 있다. 각 항목의 완료 기준은 [`DONE_CRITERIA.md`](./DONE_CRITERIA.md) §잔여 참조.
+> 아래만 열려 있다. 각 항목의 완료 기준은 [`DONE_CRITERIA.md`](DONE_CRITERIA.md) §잔여 참조.
 
 | # | 작업 | 선행 | 상태 |
 |---|------|------|------|
