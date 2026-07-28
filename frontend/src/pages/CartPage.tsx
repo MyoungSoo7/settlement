@@ -17,7 +17,7 @@ const fmt = (v: number) =>
 
 const loadTossScript = (): Promise<void> =>
   new Promise((resolve, reject) => {
-    if ((window as any).TossPayments) { resolve(); return; }
+    if (window.TossPayments) { resolve(); return; }
     const script = document.createElement('script');
     script.src = 'https://js.tosspayments.com/v1/payment';
     script.onload = () => resolve();
@@ -192,7 +192,8 @@ const CartPage: React.FC = () => {
     setProcessingMsg('토스페이먼츠 결제창 여는 중...');
     try {
       await loadTossScript();
-      const tossPayments = (window as any).TossPayments(TOSS_CLIENT_KEY);
+      const tossPayments = window.TossPayments?.(TOSS_CLIENT_KEY);
+      if (!tossPayments) throw new Error('토스페이먼츠 스크립트를 불러오지 못했습니다.');
       const tossOrderId = `CART-${Date.now()}`;
       const firstName = items[0].product.name;
       const orderName = items.length > 1

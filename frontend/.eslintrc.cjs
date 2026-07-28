@@ -39,11 +39,9 @@ module.exports = {
       'error',
       { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
     ],
-    // 기존 부채라 error → warn 으로 낮춘다(recommended 기본값은 error).
-    // 도입 당시 83건 → catch 절 부채(72건)는 `@/lib/apiError` 헬퍼로 정리 완료, 남은 11건은
-    // 성격이 다르다: TossPayments SDK 전역 캐스팅(4)·정산 필터 value(3)·테스트 목 캐스팅(4).
-    // 이것들까지 걷어내면 이 줄을 지워 recommended 의 error 로 복귀시킨다.
-    '@typescript-eslint/no-explicit-any': 'warn',
+    // no-explicit-any 는 recommended 의 기본값(error)을 그대로 쓴다 — 도입 당시 83건이던 부채를
+    // 전부 정리했다(catch 절은 @/lib/apiError, 토스 전역은 types/tosspayments.d.ts,
+    // 정산 필터는 제네릭 키, 인터셉터 테스트는 최소 타입). 다시 warn 으로 낮추지 말 것.
   },
   overrides: [
     {

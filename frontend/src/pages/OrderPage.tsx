@@ -18,7 +18,7 @@ const TOSS_CLIENT_KEY = import.meta.env.VITE_TOSS_CLIENT_KEY as string;
 
 const loadTossScript = (): Promise<void> =>
   new Promise((resolve, reject) => {
-    if ((window as any).TossPayments) { resolve(); return; }
+    if (window.TossPayments) { resolve(); return; }
     const script = document.createElement('script');
     script.src = 'https://js.tosspayments.com/v1/payment';
     script.onload = () => resolve();
@@ -113,7 +113,8 @@ const OrderFormTab: React.FC = () => {
   const handleTossPayment = async (orderRes: OrderResponse) => {
     try {
       await loadTossScript();
-      const tossPayments = (window as any).TossPayments(TOSS_CLIENT_KEY);
+      const tossPayments = window.TossPayments?.(TOSS_CLIENT_KEY);
+      if (!tossPayments) throw new Error('토스페이먼츠 스크립트를 불러오지 못했습니다.');
       const tossOrderId = `ORDER-${orderRes.id}-${Date.now()}`;
 
       await tossPayments.requestPayment('카드', {

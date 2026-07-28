@@ -1,10 +1,31 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import api, { setGlobalToast } from '@/api/axios';
 
-const requestFulfilled = () => (api.interceptors.request as any).handlers[0].fulfilled;
-const requestRejected = () => (api.interceptors.request as any).handlers[0].rejected;
-const responseFulfilled = () => (api.interceptors.response as any).handlers[0].fulfilled;
-const responseRejected = () => (api.interceptors.response as any).handlers[0].rejected;
+/**
+ * 인터셉터를 직접 꺼내 호출하기 위한 최소 타입.
+ *
+ * <p>`handlers` 는 axios 의 내부 필드라 공개 타입(InterceptorManager)에 없다. `as any` 로 지우면
+ * 호출 인자·반환 형태까지 검증이 사라지므로, 이 테스트가 실제로 쓰는 표면만 좁혀서 선언한다.
+ */
+interface InterceptorHandlers<TValue> {
+  handlers: Array<{
+    fulfilled: (value: TValue) => TValue;
+    rejected: (error: unknown) => Promise<never>;
+  }>;
+}
+
+type RequestConfigLike = { headers: Record<string, string> };
+type ResponseLike = { data: unknown };
+
+const requestHandler = () =>
+  (api.interceptors.request as unknown as InterceptorHandlers<RequestConfigLike>).handlers[0];
+const responseHandler = () =>
+  (api.interceptors.response as unknown as InterceptorHandlers<ResponseLike>).handlers[0];
+
+const requestFulfilled = () => requestHandler().fulfilled;
+const requestRejected = () => requestHandler().rejected;
+const responseFulfilled = () => responseHandler().fulfilled;
+const responseRejected = () => responseHandler().rejected;
 
 describe('axios interceptors', () => {
   beforeEach(() => {

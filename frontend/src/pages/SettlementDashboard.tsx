@@ -38,7 +38,7 @@ const SettlementDashboard: React.FC = () => {
   }, [filters]);
 
   // 필터 변경 핸들러
-  const handleFilterChange = (key: keyof SettlementSearchRequest, value: any) => {
+  const handleFilterChange = <K extends keyof SettlementSearchRequest>(key: K, value: SettlementSearchRequest[K]) => {
     setFilters((prev) => ({
       ...prev,
       [key]: value,
@@ -104,7 +104,7 @@ const SettlementDashboard: React.FC = () => {
             <select
               className="w-full px-3 py-2 border border-gray-300 rounded-md"
               value={filters.status || ''}
-              onChange={(e) => handleFilterChange('status', e.target.value || undefined)}
+              onChange={(e) => handleFilterChange('status', (e.target.value || undefined) as SettlementSearchRequest['status'])}
             >
               <option value="">전체</option>
               <option value="PENDING">대기</option>
