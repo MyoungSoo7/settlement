@@ -367,10 +367,12 @@ jobs:
         working-directory: frontend
         run: npm run typecheck
 
+      # 설정 부재로 그동안 무조건 실패하던 단계 — 설정을 붙였으므로 이제 강제한다.
+      # error 만 빌드를 깨고 warning(기존 부채: no-explicit-any 등)은 통과시킨다.
+      # 부채 정리 후 `npm run lint:strict`(--max-warnings 0)로 올린다.
       - name: ESLint check
         working-directory: frontend
         run: npm run lint
-        continue-on-error: true
 
       # Build production bundle
       - name: Build production bundle
