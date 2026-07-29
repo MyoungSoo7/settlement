@@ -1,0 +1,9 @@
+{
+  "loanId": 7001,
+  "productType": "MORTGAGE",
+  "borrowerUserId": 42,
+  "borrowerType": "INDIVIDUAL",
+  "principal": "300000000.00",
+  "annualRatePercent": "4.30",
+  "termMonths": 360
+}

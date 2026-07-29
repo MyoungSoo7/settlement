@@ -3,6 +3,7 @@ package github.lms.lemuel.loan.application.service;
 import github.lms.lemuel.loan.application.port.in.RepaySecuredLoanUseCase;
 import github.lms.lemuel.loan.application.port.out.AppendLedgerPort;
 import github.lms.lemuel.loan.application.port.out.LoadSecuredLoanPort;
+import github.lms.lemuel.loan.application.port.out.LoanMetricsPort;
 import github.lms.lemuel.loan.application.port.out.PublishSecuredLoanEventPort;
 import github.lms.lemuel.loan.application.port.out.SaveSecuredLoanPort;
 import github.lms.lemuel.loan.domain.Collateral;
@@ -38,15 +39,18 @@ public class RepaySecuredLoanService implements RepaySecuredLoanUseCase {
     private final SaveSecuredLoanPort saveSecuredLoanPort;
     private final AppendLedgerPort appendLedgerPort;
     private final PublishSecuredLoanEventPort publishSecuredLoanEventPort;
+    private final LoanMetricsPort loanMetricsPort;
 
     public RepaySecuredLoanService(LoadSecuredLoanPort loadSecuredLoanPort,
                                    SaveSecuredLoanPort saveSecuredLoanPort,
                                    AppendLedgerPort appendLedgerPort,
-                                   PublishSecuredLoanEventPort publishSecuredLoanEventPort) {
+                                   PublishSecuredLoanEventPort publishSecuredLoanEventPort,
+                                   LoanMetricsPort loanMetricsPort) {
         this.loadSecuredLoanPort = loadSecuredLoanPort;
         this.saveSecuredLoanPort = saveSecuredLoanPort;
         this.appendLedgerPort = appendLedgerPort;
         this.publishSecuredLoanEventPort = publishSecuredLoanEventPort;
+        this.loanMetricsPort = loanMetricsPort;
     }
 
     @Override
@@ -73,6 +77,7 @@ public class RepaySecuredLoanService implements RepaySecuredLoanUseCase {
         if (saved.getStatus() == SecuredLoanStatus.REPAID) {
             publishSecuredLoanEventPort.publishRepaid(saved, interestPortion);
         }
+        loanMetricsPort.securedRepaid(deducted);
         return saved;
     }
 

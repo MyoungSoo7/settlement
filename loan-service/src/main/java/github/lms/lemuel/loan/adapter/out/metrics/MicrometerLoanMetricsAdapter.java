@@ -40,6 +40,11 @@ public class MicrometerLoanMetricsAdapter implements LoanMetricsPort {
     private final Counter advanceOverdue;
     private final Counter advanceWrittenOff;
     private final Counter advanceWrittenOffLoss;
+    private final Counter securedRequested;
+    private final Counter securedRejected;
+    private final Counter securedDisbursed;
+    private final Counter securedRepaid;
+    private final Counter securedRepaidAmount;
 
     public MicrometerLoanMetricsAdapter(MeterRegistry registry) {
         this.advanceRequested = Counter.builder("loan.advance.requested")
@@ -71,6 +76,17 @@ public class MicrometerLoanMetricsAdapter implements LoanMetricsPort {
         this.advanceWrittenOffLoss = Counter.builder("loan.advance.written_off.loss")
                 .baseUnit("KRW")
                 .description("선정산 대출 상각 대손 손실액 합계").register(registry);
+        this.securedRequested = Counter.builder("loan.secured.requested")
+                .description("담보/개인신용 대출 신청 성공 건수").register(registry);
+        this.securedRejected = Counter.builder("loan.secured.rejected")
+                .description("담보/개인신용 대출 심사 거절 건수").register(registry);
+        this.securedDisbursed = Counter.builder("loan.secured.disbursed")
+                .description("담보/개인신용 대출 실행 성공 건수").register(registry);
+        this.securedRepaid = Counter.builder("loan.secured.repaid")
+                .description("담보/개인신용 대출 회차 상환 건수").register(registry);
+        this.securedRepaidAmount = Counter.builder("loan.secured.repaid.amount")
+                .baseUnit("KRW")
+                .description("담보/개인신용 대출 상환 원금 차감 합계").register(registry);
     }
 
     @Override
@@ -129,6 +145,29 @@ public class MicrometerLoanMetricsAdapter implements LoanMetricsPort {
         advanceWrittenOff.increment();
         if (loss != null && loss.signum() > 0) {
             advanceWrittenOffLoss.increment(loss.doubleValue());
+        }
+    }
+
+    @Override
+    public void securedRequested() {
+        securedRequested.increment();
+    }
+
+    @Override
+    public void securedRejected() {
+        securedRejected.increment();
+    }
+
+    @Override
+    public void securedDisbursed() {
+        securedDisbursed.increment();
+    }
+
+    @Override
+    public void securedRepaid(BigDecimal deductedAmount) {
+        securedRepaid.increment();
+        if (deductedAmount != null && deductedAmount.signum() > 0) {
+            securedRepaidAmount.increment(deductedAmount.doubleValue());
         }
     }
 }

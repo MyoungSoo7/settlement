@@ -3,6 +3,7 @@ package github.lms.lemuel.loan.application.service;
 import github.lms.lemuel.loan.application.port.in.DisburseSecuredLoanUseCase;
 import github.lms.lemuel.loan.application.port.out.AppendLedgerPort;
 import github.lms.lemuel.loan.application.port.out.LoadSecuredLoanPort;
+import github.lms.lemuel.loan.application.port.out.LoanMetricsPort;
 import github.lms.lemuel.loan.application.port.out.PublishSecuredLoanEventPort;
 import github.lms.lemuel.loan.application.port.out.SaveSecuredLoanPort;
 import github.lms.lemuel.loan.domain.Collateral;
@@ -29,15 +30,18 @@ public class DisburseSecuredLoanService implements DisburseSecuredLoanUseCase {
     private final SaveSecuredLoanPort saveSecuredLoanPort;
     private final AppendLedgerPort appendLedgerPort;
     private final PublishSecuredLoanEventPort publishSecuredLoanEventPort;
+    private final LoanMetricsPort loanMetricsPort;
 
     public DisburseSecuredLoanService(LoadSecuredLoanPort loadSecuredLoanPort,
                                       SaveSecuredLoanPort saveSecuredLoanPort,
                                       AppendLedgerPort appendLedgerPort,
-                                      PublishSecuredLoanEventPort publishSecuredLoanEventPort) {
+                                      PublishSecuredLoanEventPort publishSecuredLoanEventPort,
+                                      LoanMetricsPort loanMetricsPort) {
         this.loadSecuredLoanPort = loadSecuredLoanPort;
         this.saveSecuredLoanPort = saveSecuredLoanPort;
         this.appendLedgerPort = appendLedgerPort;
         this.publishSecuredLoanEventPort = publishSecuredLoanEventPort;
+        this.loanMetricsPort = loanMetricsPort;
     }
 
     @Override
@@ -69,6 +73,7 @@ public class DisburseSecuredLoanService implements DisburseSecuredLoanUseCase {
         appendLedgerPort.append(
                 LoanLedgerEntry.securedDisbursement(saved.getId(), saved.getPrincipal()));
         publishSecuredLoanEventPort.publishDisbursed(saved);
+        loanMetricsPort.securedDisbursed();
         return saved;
     }
 

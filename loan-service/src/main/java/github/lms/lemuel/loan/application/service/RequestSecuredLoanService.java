@@ -3,6 +3,7 @@ package github.lms.lemuel.loan.application.service;
 import github.lms.lemuel.loan.application.port.in.RequestSecuredLoanUseCase;
 import github.lms.lemuel.loan.application.port.out.BaseRatePort;
 import github.lms.lemuel.loan.application.port.out.CollateralValuationPort;
+import github.lms.lemuel.loan.application.port.out.LoanMetricsPort;
 import github.lms.lemuel.loan.application.port.out.SaveSecuredLoanPort;
 import github.lms.lemuel.loan.domain.Borrower;
 import github.lms.lemuel.loan.domain.Collateral;
@@ -38,18 +39,21 @@ public class RequestSecuredLoanService implements RequestSecuredLoanUseCase {
     private final SaveSecuredLoanPort saveSecuredLoanPort;
     private final CollateralValuationPort collateralValuationPort;
     private final BaseRatePort baseRatePort;
+    private final LoanMetricsPort loanMetricsPort;
     private final BigDecimal realEstateLtvRatio;
     private final Clock clock;
 
     public RequestSecuredLoanService(SaveSecuredLoanPort saveSecuredLoanPort,
                                      CollateralValuationPort collateralValuationPort,
                                      BaseRatePort baseRatePort,
+                                     LoanMetricsPort loanMetricsPort,
                                      @Value("${app.loan.secured.real-estate-ltv:0.70}")
                                      BigDecimal realEstateLtvRatio,
                                      Clock clock) {
         this.saveSecuredLoanPort = saveSecuredLoanPort;
         this.collateralValuationPort = collateralValuationPort;
         this.baseRatePort = baseRatePort;
+        this.loanMetricsPort = loanMetricsPort;
         this.realEstateLtvRatio = realEstateLtvRatio;
         this.clock = clock;
     }
@@ -66,16 +70,18 @@ public class RequestSecuredLoanService implements RequestSecuredLoanUseCase {
                 command.collateralDescription(), appraised, now);
 
         // 한도 = 유효담보가치 × LTV. 초과하면 담보를 저장하기 전에 거절한다.
-        policy.validateWithinLimit(command.principal(),
+        validateOrCountRejection(policy, command.principal(),
                 policy.mortgageLimit(collateral.effectiveValue(), CollateralType.REAL_ESTATE));
 
-        Collateral saved = saveSecuredLoanPort.saveCollateral(collateral);
+        Collateral savedCollateral = saveSecuredLoanPort.saveCollateral(collateral);
         SecuredLoan loan = SecuredLoan.requestMortgage(
                 borrowerOf(command.borrowerUserId(), command.borrowerName(), command.registrationNo()),
-                saved, command.principal(), command.termMonths(),
+                savedCollateral, command.principal(), command.termMonths(),
                 policy.annualRatePercent(LoanProductType.MORTGAGE, null),
                 command.repaymentMethod(), now);
-        return saveSecuredLoanPort.save(loan);
+        SecuredLoan saved = saveSecuredLoanPort.save(loan);
+        loanMetricsPort.securedRequested();
+        return saved;
     }
 
     @Override
@@ -86,17 +92,30 @@ public class RequestSecuredLoanService implements RequestSecuredLoanUseCase {
 
         String grade = policy.creditGrade(command.cbScore());
         if (policy.isLoanBlocked(grade)) {
+            loanMetricsPort.securedRejected();
             throw new SecuredLoanRejectedException(
                     "신용등급이 대출 가능 기준에 미달합니다: 점수 " + command.cbScore() + " / 등급 " + grade);
         }
-        policy.validateWithinLimit(command.principal(), policy.personalCreditLimit(grade));
+        validateOrCountRejection(policy, command.principal(), policy.personalCreditLimit(grade));
 
         SecuredLoan loan = SecuredLoan.requestPersonalCredit(
                 borrowerOf(command.borrowerUserId(), command.borrowerName(), command.registrationNo()),
                 command.principal(), command.termMonths(),
                 policy.annualRatePercent(LoanProductType.PERSONAL_CREDIT, grade),
                 command.repaymentMethod(), command.cbScore(), grade, now);
-        return saveSecuredLoanPort.save(loan);
+        SecuredLoan saved = saveSecuredLoanPort.save(loan);
+        loanMetricsPort.securedRequested();
+        return saved;
+    }
+
+    /** 한도 검증 — 거절은 관측 지표로 계상한 뒤 그대로 전파한다(거절률 산정 분자). */
+    private void validateOrCountRejection(SecuredLoanPolicy policy, BigDecimal requested, BigDecimal limit) {
+        try {
+            policy.validateWithinLimit(requested, limit);
+        } catch (SecuredLoanRejectedException ex) {
+            loanMetricsPort.securedRejected();
+            throw ex;
+        }
     }
 
     /** 신청 시점의 기준금리로 정책을 구성한다(금리 스냅샷의 출처). */

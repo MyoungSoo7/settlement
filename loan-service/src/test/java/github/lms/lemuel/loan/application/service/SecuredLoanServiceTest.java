@@ -6,6 +6,7 @@ import github.lms.lemuel.loan.application.port.out.AppendLedgerPort;
 import github.lms.lemuel.loan.application.port.out.BaseRatePort;
 import github.lms.lemuel.loan.application.port.out.CollateralValuationPort;
 import github.lms.lemuel.loan.application.port.out.LoadSecuredLoanPort;
+import github.lms.lemuel.loan.application.port.out.LoanMetricsPort;
 import github.lms.lemuel.loan.application.port.out.PublishSecuredLoanEventPort;
 import github.lms.lemuel.loan.application.port.out.SaveSecuredLoanPort;
 import github.lms.lemuel.loan.domain.BorrowerType;
@@ -54,6 +55,7 @@ class SecuredLoanServiceTest {
     private FakeSecuredLoanStore store;
     private RecordingLedgerPort ledger;
     private RecordingEventPort events;
+    private CountingMetricsPort metrics;
     private RequestSecuredLoanService requestService;
     private DisburseSecuredLoanService disburseService;
     private RepaySecuredLoanService repayService;
@@ -64,12 +66,13 @@ class SecuredLoanServiceTest {
         store = new FakeSecuredLoanStore();
         ledger = new RecordingLedgerPort();
         events = new RecordingEventPort();
+        metrics = new CountingMetricsPort();
         CollateralValuationPort valuation = (type, description, declared) -> declared;
         BaseRatePort baseRate = () -> BASE_RATE;
 
-        requestService = new RequestSecuredLoanService(store, valuation, baseRate, LTV, FIXED_CLOCK);
-        disburseService = new DisburseSecuredLoanService(store, store, ledger, events);
-        repayService = new RepaySecuredLoanService(store, store, ledger, events);
+        requestService = new RequestSecuredLoanService(store, valuation, baseRate, metrics, LTV, FIXED_CLOCK);
+        disburseService = new DisburseSecuredLoanService(store, store, ledger, events, metrics);
+        repayService = new RepaySecuredLoanService(store, store, ledger, events, metrics);
         collectionService = new SecuredLoanCollectionService(store, store);
     }
 
@@ -396,5 +399,60 @@ class SecuredLoanServiceTest {
     void 담보유형은_부동산이다() {
         SecuredLoan loan = requestService.requestMortgage(mortgageCommand(new BigDecimal("100000000")));
         assertThat(loan.getCollateral().getType()).isEqualTo(CollateralType.REAL_ESTATE);
+    }
+
+    /** 관측 지표 — 거절률 산정의 분모/분자가 실제로 올라가는지. */
+    private static final class CountingMetricsPort implements LoanMetricsPort {
+        private int securedRequested;
+        private int securedRejected;
+        private int securedDisbursed;
+        private int securedRepaid;
+
+        @Override public void securedRequested() { securedRequested++; }
+        @Override public void securedRejected() { securedRejected++; }
+        @Override public void securedDisbursed() { securedDisbursed++; }
+        @Override public void securedRepaid(BigDecimal deductedAmount) { securedRepaid++; }
+
+        // 담보대출과 무관한 기존 지표 — 이 테스트에서는 관찰하지 않는다.
+        @Override public void advanceRequested() { }
+        @Override public void advanceDisbursed() { }
+        @Override public void advanceRejected() { }
+        @Override public void corporateRequested() { }
+        @Override public void corporateRejected() { }
+        @Override public void corporateDisbursed() { }
+        @Override public void repaymentApplied(BigDecimal deductedAmount) { }
+        @Override public void corporateRepaid(BigDecimal deductedAmount) { }
+        @Override public void advanceOverdue() { }
+        @Override public void advanceWrittenOff(BigDecimal loss) { }
+    }
+
+    @Test
+    void 신청_성공과_거절이_각각_지표로_계상된다() {
+        requestService.requestMortgage(mortgageCommand(new BigDecimal("300000000")));
+        assertThat(metrics.securedRequested).isEqualTo(1);
+        assertThat(metrics.securedRejected).isZero();
+
+        assertThatThrownBy(() -> requestService.requestMortgage(mortgageCommand(new BigDecimal("350000001"))))
+                .isInstanceOf(SecuredLoanRejectedException.class);
+        assertThat(metrics.securedRejected).isEqualTo(1);
+        assertThat(metrics.securedRequested).isEqualTo(1);   // 거절은 신청 성공으로 세지 않는다
+    }
+
+    @Test
+    void 등급미달_거절도_지표로_계상된다() {
+        assertThatThrownBy(() -> requestService.requestPersonalCredit(
+                personalCommand(new BigDecimal("1000000"), 500)))
+                .isInstanceOf(SecuredLoanRejectedException.class);
+        assertThat(metrics.securedRejected).isEqualTo(1);
+    }
+
+    @Test
+    void 실행과_상환이_지표로_계상된다() {
+        SecuredLoan loan = disbursedMortgage();
+        assertThat(metrics.securedDisbursed).isEqualTo(1);
+
+        repayService.repay(loan.getId(), 42L, new BigDecimal("1000000"), BigDecimal.ZERO);
+        repayService.repay(loan.getId(), 42L, new BigDecimal("1000000"), BigDecimal.ZERO);
+        assertThat(metrics.securedRepaid).isEqualTo(2);   // 장기 분할상환은 회차마다 계상된다
     }
 }
