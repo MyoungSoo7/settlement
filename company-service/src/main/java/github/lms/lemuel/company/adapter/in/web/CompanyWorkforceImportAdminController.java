@@ -42,7 +42,9 @@ public class CompanyWorkforceImportAdminController {
         // resourceId 는 파일명만 — 전체 경로는 detail 에 넣는다(사유는 auditResourceId 참조).
         recordAuditPort.record("WORKFORCE_IMPORTED", "CompanyWorkforce", auditResourceId(request.path()),
                 Map.of("path", request.path(), "received", result.received(),
-                        "imported", result.imported(), "skipped", result.skipped()));
+                        "imported", result.imported(), "skipped", result.skipped(),
+                        "unattributed", result.unattributed(),
+                        "aggregatedMonths", result.aggregatedMonths()));
         return ResponseEntity.ok(result);
     }
 

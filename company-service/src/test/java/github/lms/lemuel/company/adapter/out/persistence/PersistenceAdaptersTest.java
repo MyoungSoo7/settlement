@@ -463,8 +463,9 @@ class PersistenceAdaptersTest {
         @Test
         @DisplayName("batchUpsert — BatchPreparedStatementSetter 로 전 필드를 바인딩하고 처리 건수를 센다")
         void batchUpsert() throws Exception {
-            CompanyWorkforce workforce = new CompanyWorkforce("주식회사에고이즘", "866759", "전자상거래 소매업",
-                    "서울특별시 성동구", YearMonth.of(2026, 6), 50, new BigDecimal("16406250"));
+            CompanyWorkforce workforce = new CompanyWorkforce("주식회사에고이즘", "866759", "525101",
+                    "전자상거래 소매업", "서울특별시 성동구 연무장19길", YearMonth.of(2026, 6), 50,
+                    new BigDecimal("16406250"));
             List<CompanyWorkforce> batch = List.of(workforce);
 
             ArgumentCaptor<BatchPreparedStatementSetter> captor =
@@ -481,11 +482,15 @@ class PersistenceAdaptersTest {
             setter.setValues(ps, 0);
             verify(ps).setString(1, "주식회사에고이즘");
             verify(ps).setString(2, "866759");
-            verify(ps).setString(3, "전자상거래 소매업");
-            verify(ps).setString(4, "서울특별시 성동구");
-            verify(ps).setString(5, "2026-06");
-            verify(ps).setInt(6, 50);
-            verify(ps).setBigDecimal(eq(7), argThat(bd -> bd.compareTo(new BigDecimal("16406250")) == 0));
+            verify(ps).setString(3, "525101");
+            verify(ps).setString(4, "전자상거래 소매업");
+            verify(ps).setString(5, "서울특별시 성동구 연무장19길");
+            // 지역은 적재 시점에 도메인 파서로 파생해 저장한다 — 집계 SQL 이 이 컬럼을 GROUP BY 한다.
+            verify(ps).setString(6, "서울특별시");
+            verify(ps).setString(7, "성동구");
+            verify(ps).setString(8, "2026-06");
+            verify(ps).setInt(9, 50);
+            verify(ps).setBigDecimal(eq(10), argThat(bd -> bd.compareTo(new BigDecimal("16406250")) == 0));
         }
     }
 }

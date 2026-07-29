@@ -38,8 +38,8 @@ class CompanyWorkforceQueryServiceTest {
     @Test
     @DisplayName("공백 검색어는 null 로 정규화하고 totalPages 를 계산한다")
     void normalizesKeywordAndComputesTotalPages() {
-        CompanyWorkforce workforce = new CompanyWorkforce("주식회사에고이즘", "866759", "전자상거래 소매업",
-                "서울특별시 성동구", YearMonth.of(2026, 6), 50, new BigDecimal("21875000"));
+        CompanyWorkforce workforce = new CompanyWorkforce("주식회사에고이즘", "866759", "525101",
+                "전자상거래 소매업", "서울특별시 성동구", YearMonth.of(2026, 6), 50, new BigDecimal("21875000"));
         when(loadCompanyWorkforcePort.search(eq(null), anyInt(), anyInt()))
                 .thenReturn(new LoadCompanyWorkforcePort.SearchResult(List.of(workforce), 41));
 
