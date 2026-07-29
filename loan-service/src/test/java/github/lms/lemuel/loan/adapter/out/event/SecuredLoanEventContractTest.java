@@ -55,14 +55,14 @@ class SecuredLoanEventContractTest {
         return SecuredLoan.reconstitute(7001L, Borrower.individual(42L, "홍길동"),
                 LoanProductType.MORTGAGE, collateral, new BigDecimal("300000000.00"), 360,
                 new BigDecimal("4.30"), RepaymentMethod.EQUAL_PAYMENT, null, null,
-                outstanding, status, NOW);
+                outstanding, status, NOW, NOW);
     }
 
     private SecuredLoan personalCredit(SecuredLoanStatus status, BigDecimal outstanding) {
         return SecuredLoan.reconstitute(7002L, Borrower.corporate(7L, "레무엘커머스", "1234567890"),
                 LoanProductType.PERSONAL_CREDIT, null, new BigDecimal("30000000.00"), 36,
                 new BigDecimal("6.00"), RepaymentMethod.EQUAL_PAYMENT, 780, "B",
-                outstanding, status, NOW);
+                outstanding, status, NOW, NOW);
     }
 
     // ─── 실행 ────────────────────────────────────────────────────────────────

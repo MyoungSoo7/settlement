@@ -6,6 +6,7 @@ import github.lms.lemuel.loan.domain.exception.LoanInvariantViolationException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 
 /**
  * 담보/개인신용 대출 애그리거트 루트. 순수 POJO — 프레임워크 의존 0.
@@ -42,6 +43,7 @@ public class SecuredLoan {
     private BigDecimal outstanding;
     private SecuredLoanStatus status;
     private final LocalDateTime createdAt;
+    private LocalDateTime disbursedAt;
 
     private SecuredLoan(Long id, Borrower borrower, LoanProductType productType, Collateral collateral,
                         BigDecimal principal, int termMonths, BigDecimal annualRatePercent,
@@ -104,9 +106,12 @@ public class SecuredLoan {
                                            Collateral collateral, BigDecimal principal, int termMonths,
                                            BigDecimal annualRatePercent, RepaymentMethod repaymentMethod,
                                            Integer creditScore, String creditGrade, BigDecimal outstanding,
-                                           SecuredLoanStatus status, LocalDateTime createdAt) {
-        return new SecuredLoan(id, borrower, productType, collateral, principal, termMonths, annualRatePercent,
-                repaymentMethod, creditScore, creditGrade, outstanding, status, createdAt);
+                                           SecuredLoanStatus status, LocalDateTime createdAt,
+                                           LocalDateTime disbursedAt) {
+        SecuredLoan loan = new SecuredLoan(id, borrower, productType, collateral, principal, termMonths,
+                annualRatePercent, repaymentMethod, creditScore, creditGrade, outstanding, status, createdAt);
+        loan.disbursedAt = disbursedAt;
+        return loan;
     }
 
     // ─── 생명주기 ────────────────────────────────────────────────────────────
@@ -127,11 +132,55 @@ public class SecuredLoan {
      * <p>담보형 상품은 담보가 <b>유효(ACTIVE)</b>해야만 실행된다. 설정 진행 중(PLEDGED)인 담보로 돈이
      * 나가면 무담보 대출이 되어 버리므로 상태 가드로 막는다.
      */
-    public void disburse() {
+    public void disburse(LocalDateTime disbursedAt) {
         requireTransition(SecuredLoanStatus.DISBURSED);
         requireActiveCollateral();
+        if (disbursedAt == null) {
+            throw new LoanInvariantViolationException("실행 시각(disbursedAt)은 필수입니다");
+        }
         this.outstanding = principal;
+        this.disbursedAt = disbursedAt;
         this.status = SecuredLoanStatus.DISBURSED;
+    }
+
+    /**
+     * 중도상환 — 약정 회차와 무관하게 원금을 앞당겨 갚는다. <b>정상(DISBURSED) 상태 전용</b>.
+     *
+     * <p>연체·기한이익상실 중 납입은 연체 해소({@link #repay}) 경로다 — 수수료가 붙는 중도상환으로
+     * 받으면 연체자에게 수수료까지 물리게 되므로 상태머신이 막는다. 수수료 산정은 정책
+     * ({@code SecuredLoanPolicy#earlyRepaymentFee})의 몫이고, 이 애그리거트는 잔액·상태만 강제한다.
+     *
+     * @return 실제 차감된 금액(수수료 산정의 기준)
+     */
+    public BigDecimal prepay(BigDecimal amount) {
+        if (status != SecuredLoanStatus.DISBURSED) {
+            throw new InvalidLoanStateException(status, SecuredLoanStatus.DISBURSED);
+        }
+        return repay(amount);
+    }
+
+    /**
+     * 약정 총일수 = 기산일 → 기산일 + 약정개월. 중도상환수수료의 분모다.
+     *
+     * <p>기산일은 <b>실행일</b>이다. {@code disbursed_at} 도입 이전에 실행된 구(舊) 행은 실행 시각이
+     * 없으므로 신청 시각으로 폴백한다 — 신청일이 실행일보다 이르므로 면제(경과 3년) 판정이 차주에게
+     * 불리해지지 않는 방향의 근사다.
+     */
+    public int contractDays() {
+        LocalDateTime anchor = feeAnchor();
+        return (int) ChronoUnit.DAYS.between(anchor.toLocalDate(), anchor.toLocalDate().plusMonths(termMonths));
+    }
+
+    /** 잔존일수 = 기준시각 → 만기. 만기를 지났으면 0 (수수료 산식의 분자라 음수가 되면 안 된다). */
+    public int remainingDays(LocalDateTime now) {
+        LocalDateTime anchor = feeAnchor();
+        long remaining = ChronoUnit.DAYS.between(now.toLocalDate(), anchor.toLocalDate().plusMonths(termMonths));
+        return (int) Math.max(0, remaining);
+    }
+
+    /** 약정기간 기산점 — 실행 시각, 없으면(구 데이터) 신청 시각. */
+    private LocalDateTime feeAnchor() {
+        return disbursedAt != null ? disbursedAt : createdAt;
     }
 
     /**
@@ -251,4 +300,5 @@ public class SecuredLoan {
     public BigDecimal getOutstanding() { return outstanding; }
     public SecuredLoanStatus getStatus() { return status; }
     public LocalDateTime getCreatedAt() { return createdAt; }
+    public LocalDateTime getDisbursedAt() { return disbursedAt; }
 }

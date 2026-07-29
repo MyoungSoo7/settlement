@@ -295,10 +295,14 @@ public class SecuredLoanPolicy {
      * <p>잔존기간에 비례시키는 이유: 만기 직전 상환은 대주가 잃는 이자가 거의 없어 정률 부과가
      * 비합리적이다. <b>경과 3년(1095일) 이후는 면제</b>한다.
      *
+     * <p><b>정적(static)</b>이다 — 주입값(기준금리·LTV)과 무관한 상수 테이블 순수 함수라, 중도상환
+     * 경로가 기준금리 조달(Phase 2: economics-service 원격 호출)에 결합되지 않게 한다. 기준금리 장애가
+     * 중도상환을 막으면 안 된다.
+     *
      * @param remainingDays 잔존일수 — 약정일수를 넘으면 약정일수로 clamp
      * @param contractDays  약정 총일수(0 이하면 수수료 없음)
      */
-    public BigDecimal earlyRepaymentFee(BigDecimal prepaidAmount, int remainingDays, int contractDays) {
+    public static BigDecimal earlyRepaymentFee(BigDecimal prepaidAmount, int remainingDays, int contractDays) {
         if (prepaidAmount == null || prepaidAmount.signum() <= 0 || contractDays <= 0) {
             return zero();
         }

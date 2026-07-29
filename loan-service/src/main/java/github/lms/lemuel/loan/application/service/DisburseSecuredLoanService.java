@@ -13,6 +13,9 @@ import github.lms.lemuel.loan.domain.exception.SecuredLoanNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.LocalDateTime;
+
 /**
  * 담보/개인신용 대출 승인·거절·실행.
  *
@@ -31,17 +34,20 @@ public class DisburseSecuredLoanService implements DisburseSecuredLoanUseCase {
     private final AppendLedgerPort appendLedgerPort;
     private final PublishSecuredLoanEventPort publishSecuredLoanEventPort;
     private final LoanMetricsPort loanMetricsPort;
+    private final Clock clock;
 
     public DisburseSecuredLoanService(LoadSecuredLoanPort loadSecuredLoanPort,
                                       SaveSecuredLoanPort saveSecuredLoanPort,
                                       AppendLedgerPort appendLedgerPort,
                                       PublishSecuredLoanEventPort publishSecuredLoanEventPort,
-                                      LoanMetricsPort loanMetricsPort) {
+                                      LoanMetricsPort loanMetricsPort,
+                                      Clock clock) {
         this.loadSecuredLoanPort = loadSecuredLoanPort;
         this.saveSecuredLoanPort = saveSecuredLoanPort;
         this.appendLedgerPort = appendLedgerPort;
         this.publishSecuredLoanEventPort = publishSecuredLoanEventPort;
         this.loanMetricsPort = loanMetricsPort;
+        this.clock = clock;
     }
 
     @Override
@@ -66,7 +72,8 @@ public class DisburseSecuredLoanService implements DisburseSecuredLoanUseCase {
     @Transactional
     public SecuredLoan disburse(Long loanId) {
         SecuredLoan loan = require(loanId);
-        loan.disburse();
+        // 실행 시각은 응용 계층의 Clock 으로 스냅샷한다 — 중도상환수수료 면제(3년)의 기산점이 된다.
+        loan.disburse(LocalDateTime.now(clock));
         SecuredLoan saved = saveSecuredLoanPort.save(loan);
 
         // 복식부기: 대출채권/현금 (amount = 원금). 이자는 회차 수취 시점에 인식하므로 여기서는 없다.

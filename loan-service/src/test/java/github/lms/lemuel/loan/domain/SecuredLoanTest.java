@@ -153,7 +153,7 @@ class SecuredLoanTest {
     void 승인후_실행하면_미상환잔액은_원금이다() {
         SecuredLoan loan = mortgage();
         loan.approve();
-        loan.disburse();
+        loan.disburse(NOW);
 
         assertThat(loan.getStatus()).isEqualTo(SecuredLoanStatus.DISBURSED);
         // 장기 분할상환이라 이자는 회차별로 발생한다 — 실행 시점 잔액은 원금뿐이다.
@@ -161,8 +161,27 @@ class SecuredLoanTest {
     }
 
     @Test
+    void 실행하면_실행시각이_스냅샷된다() {
+        // 약정기간(중도상환수수료 면제 3년 등)의 기산점은 신청일이 아니라 실행일이다 —
+        // 승인이 늦어진 대출이 신청일 기산으로 면제 기간을 앞당겨 받으면 안 된다.
+        SecuredLoan loan = mortgage();
+        loan.approve();
+        loan.disburse(NOW.plusDays(3));
+
+        assertThat(loan.getDisbursedAt()).isEqualTo(NOW.plusDays(3));
+    }
+
+    @Test
+    void 실행시각없이_실행하면_예외() {
+        SecuredLoan loan = mortgage();
+        loan.approve();
+        assertThatThrownBy(() -> loan.disburse(null))
+                .isInstanceOf(LoanInvariantViolationException.class);
+    }
+
+    @Test
     void 승인없이_실행할_수_없다() {
-        assertThatThrownBy(mortgage()::disburse).isInstanceOf(InvalidLoanStateException.class);
+        assertThatThrownBy(() -> mortgage().disburse(NOW)).isInstanceOf(InvalidLoanStateException.class);
     }
 
     @Test
@@ -174,7 +193,7 @@ class SecuredLoanTest {
                 RepaymentMethod.EQUAL_PAYMENT, NOW);
         loan.approve();
 
-        assertThatThrownBy(loan::disburse).isInstanceOf(InvalidLoanStateException.class);
+        assertThatThrownBy(() -> loan.disburse(NOW)).isInstanceOf(InvalidLoanStateException.class);
     }
 
     @Test
@@ -190,7 +209,7 @@ class SecuredLoanTest {
     private static SecuredLoan disbursed() {
         SecuredLoan loan = mortgage();
         loan.approve();
-        loan.disburse();
+        loan.disburse(NOW);
         return loan;
     }
 
@@ -224,6 +243,85 @@ class SecuredLoanTest {
     void 실행전에는_상환할_수_없다() {
         assertThatThrownBy(() -> mortgage().repay(new BigDecimal("1000")))
                 .isInstanceOf(InvalidLoanStateException.class);
+    }
+
+    // ─── 중도상환 ─────────────────────────────────────────────────────────────
+
+    @Test
+    void 중도상환은_잔액을_차감한다() {
+        SecuredLoan loan = disbursed();
+        BigDecimal deducted = loan.prepay(new BigDecimal("100000000"));
+
+        assertThat(deducted).isEqualByComparingTo("100000000");
+        assertThat(loan.getOutstanding()).isEqualByComparingTo("200000000");
+        assertThat(loan.getStatus()).isEqualTo(SecuredLoanStatus.DISBURSED);
+    }
+
+    @Test
+    void 전액_중도상환하면_완제된다() {
+        SecuredLoan loan = disbursed();
+        BigDecimal deducted = loan.prepay(new BigDecimal("300000000"));
+
+        assertThat(deducted).isEqualByComparingTo("300000000");
+        assertThat(loan.getStatus()).isEqualTo(SecuredLoanStatus.REPAID);
+    }
+
+    @Test
+    void 연체상태에서는_중도상환할_수_없다() {
+        // 연체 중 납입은 연체 해소(회차 상환) 경로다 — 수수료가 붙는 중도상환으로 받으면
+        // 연체자에게 수수료까지 물리는 셈이라 상태머신이 막는다.
+        SecuredLoan loan = disbursed();
+        loan.markOverdue();
+
+        assertThatThrownBy(() -> loan.prepay(new BigDecimal("1000")))
+                .isInstanceOf(InvalidLoanStateException.class);
+    }
+
+    @Test
+    void 실행전에는_중도상환할_수_없다() {
+        assertThatThrownBy(() -> mortgage().prepay(new BigDecimal("1000")))
+                .isInstanceOf(InvalidLoanStateException.class);
+    }
+
+    @Test
+    void 중도상환액이_0이하면_예외() {
+        assertThatThrownBy(() -> disbursed().prepay(BigDecimal.ZERO))
+                .isInstanceOf(LoanInvariantViolationException.class);
+    }
+
+    // ─── 약정·잔존일수 (중도상환수수료 산정 근거) ─────────────────────────────────
+
+    private static SecuredLoan disbursedPersonalCredit() {
+        SecuredLoan loan = personalCredit();
+        loan.approve();
+        loan.disburse(NOW);
+        return loan;
+    }
+
+    @Test
+    void 약정일수는_실행일부터_만기까지다() {
+        // 36개월(2026-07-30 → 2029-07-30), 2028 윤년 포함 = 1096일.
+        assertThat(disbursedPersonalCredit().contractDays()).isEqualTo(1096);
+    }
+
+    @Test
+    void 잔존일수는_기준시각부터_만기까지다() {
+        assertThat(disbursedPersonalCredit().remainingDays(NOW.plusDays(30))).isEqualTo(1066);
+    }
+
+    @Test
+    void 만기이후_잔존일수는_0이다() {
+        assertThat(disbursedPersonalCredit().remainingDays(NOW.plusMonths(37))).isEqualTo(0);
+    }
+
+    @Test
+    void 실행시각이_없으면_신청시각이_기산점이다() {
+        // disbursed_at 컬럼 도입 이전에 실행된 구(舊) 행 호환 — 기산점을 신청시각으로 폴백한다.
+        SecuredLoan legacy = SecuredLoan.reconstitute(11L, INDIVIDUAL, LoanProductType.PERSONAL_CREDIT, null,
+                new BigDecimal("10000000.00"), 36, new BigDecimal("8.0"), RepaymentMethod.EQUAL_PAYMENT,
+                780, "B", new BigDecimal("5000000.00"), SecuredLoanStatus.DISBURSED, NOW, null);
+
+        assertThat(legacy.contractDays()).isEqualTo(1096);
     }
 
     // ─── 연체 · 기한이익상실 ───────────────────────────────────────────────────
@@ -282,10 +380,11 @@ class SecuredLoanTest {
     void 영속상태를_재구성한다() {
         SecuredLoan loan = SecuredLoan.reconstitute(11L, INDIVIDUAL, LoanProductType.PERSONAL_CREDIT, null,
                 new BigDecimal("10000000.00"), 36, new BigDecimal("8.0"), RepaymentMethod.EQUAL_PAYMENT,
-                780, "B", new BigDecimal("5000000.00"), SecuredLoanStatus.DISBURSED, NOW);
+                780, "B", new BigDecimal("5000000.00"), SecuredLoanStatus.DISBURSED, NOW, NOW.plusDays(1));
 
         assertThat(loan.getId()).isEqualTo(11L);
         assertThat(loan.getStatus()).isEqualTo(SecuredLoanStatus.DISBURSED);
         assertThat(loan.getOutstanding()).isEqualByComparingTo("5000000");
+        assertThat(loan.getDisbursedAt()).isEqualTo(NOW.plusDays(1));
     }
 }

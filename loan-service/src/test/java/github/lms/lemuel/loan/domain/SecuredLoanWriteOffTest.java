@@ -27,7 +27,7 @@ class SecuredLoanWriteOffTest {
                 new BigDecimal("300000000"), 360, new BigDecimal("4.30"),
                 RepaymentMethod.EQUAL_PAYMENT, NOW);
         loan.approve();
-        loan.disburse();
+        loan.disburse(NOW);
         loan.markOverdue();
         loan.accelerate();
         return loan;
@@ -73,7 +73,7 @@ class SecuredLoanWriteOffTest {
                 new BigDecimal("300000000"), 360, new BigDecimal("4.30"),
                 RepaymentMethod.EQUAL_PAYMENT, NOW);
         loan.approve();
-        loan.disburse();
+        loan.disburse(NOW);
         assertThatThrownBy(loan::writeOff).isInstanceOf(InvalidLoanStateException.class);
 
         loan.markOverdue();

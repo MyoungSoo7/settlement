@@ -63,7 +63,8 @@ class EnforceCollateralServiceTest {
         return store.save(SecuredLoan.reconstitute(null, Borrower.individual(BORROWER, "홍길동"),
                 LoanProductType.MORTGAGE, collateral, new BigDecimal("100000000.00"), 120,
                 new BigDecimal("4.30"), RepaymentMethod.EQUAL_PAYMENT, null, null,
-                new BigDecimal("100000000.00"), SecuredLoanStatus.DEFAULTED, LocalDateTime.now(CLOCK)));
+                new BigDecimal("100000000.00"), SecuredLoanStatus.DEFAULTED, LocalDateTime.now(CLOCK),
+                LocalDateTime.now(CLOCK)));
     }
 
     private List<LoanLedgerEntry> entriesOf(String refType) {
@@ -179,7 +180,7 @@ class EnforceCollateralServiceTest {
                 Borrower.individual(BORROWER, "홍길동"), LoanProductType.MORTGAGE, collateral,
                 new BigDecimal("100000000.00"), 120, new BigDecimal("4.30"),
                 RepaymentMethod.EQUAL_PAYMENT, null, null, new BigDecimal("100000000.00"),
-                SecuredLoanStatus.OVERDUE, LocalDateTime.now(CLOCK)));
+                SecuredLoanStatus.OVERDUE, LocalDateTime.now(CLOCK), LocalDateTime.now(CLOCK)));
 
         assertThatThrownBy(() -> service.dispose(loan.getId(), new BigDecimal("100000000")))
                 .isInstanceOf(IllegalStateException.class);
@@ -214,7 +215,7 @@ class EnforceCollateralServiceTest {
             SecuredLoan stored = SecuredLoan.reconstitute(id, loan.getBorrower(), loan.getProductType(),
                     collateral, loan.getPrincipal(), loan.getTermMonths(), loan.getAnnualRatePercent(),
                     loan.getRepaymentMethod(), loan.getCreditScore(), loan.getCreditGrade(),
-                    loan.getOutstanding(), loan.getStatus(), loan.getCreatedAt());
+                    loan.getOutstanding(), loan.getStatus(), loan.getCreatedAt(), loan.getDisbursedAt());
             loans.put(id, stored);
             return stored;
         }

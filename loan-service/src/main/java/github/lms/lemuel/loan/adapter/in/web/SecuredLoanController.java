@@ -1,12 +1,16 @@
 package github.lms.lemuel.loan.adapter.in.web;
 
 import github.lms.lemuel.common.config.jwt.AuthPrincipal;
+import github.lms.lemuel.loan.adapter.out.persistence.LoanManualIdempotencyGuard;
+import github.lms.lemuel.loan.adapter.in.web.dto.SecuredLoanPrepayResponse;
 import github.lms.lemuel.loan.adapter.in.web.dto.SecuredLoanRequestBodies.MortgageRequestBody;
 import github.lms.lemuel.loan.adapter.in.web.dto.SecuredLoanRequestBodies.PersonalCreditRequestBody;
+import github.lms.lemuel.loan.adapter.in.web.dto.SecuredLoanRequestBodies.SecuredLoanPrepayRequest;
 import github.lms.lemuel.loan.adapter.in.web.dto.SecuredLoanRequestBodies.SecuredLoanRepayRequest;
 import github.lms.lemuel.loan.adapter.in.web.dto.SecuredLoanResponse;
 import github.lms.lemuel.loan.application.port.in.DisburseSecuredLoanUseCase;
 import github.lms.lemuel.loan.application.port.in.ManageSecuredLoanCollectionUseCase;
+import github.lms.lemuel.loan.application.port.in.PrepaySecuredLoanUseCase;
 import github.lms.lemuel.loan.application.port.in.RepaySecuredLoanUseCase;
 import github.lms.lemuel.loan.application.port.in.RequestSecuredLoanUseCase;
 import github.lms.lemuel.loan.application.port.in.RequestSecuredLoanUseCase.MortgageCommand;
@@ -23,6 +27,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -44,19 +49,25 @@ public class SecuredLoanController {
     private final RequestSecuredLoanUseCase requestSecuredLoanUseCase;
     private final DisburseSecuredLoanUseCase disburseSecuredLoanUseCase;
     private final RepaySecuredLoanUseCase repaySecuredLoanUseCase;
+    private final PrepaySecuredLoanUseCase prepaySecuredLoanUseCase;
     private final ManageSecuredLoanCollectionUseCase manageSecuredLoanCollectionUseCase;
     private final LoadSecuredLoanPort loadSecuredLoanPort;
+    private final LoanManualIdempotencyGuard idempotencyGuard;
 
     public SecuredLoanController(RequestSecuredLoanUseCase requestSecuredLoanUseCase,
                                  DisburseSecuredLoanUseCase disburseSecuredLoanUseCase,
                                  RepaySecuredLoanUseCase repaySecuredLoanUseCase,
+                                 PrepaySecuredLoanUseCase prepaySecuredLoanUseCase,
                                  ManageSecuredLoanCollectionUseCase manageSecuredLoanCollectionUseCase,
-                                 LoadSecuredLoanPort loadSecuredLoanPort) {
+                                 LoadSecuredLoanPort loadSecuredLoanPort,
+                                 LoanManualIdempotencyGuard idempotencyGuard) {
         this.requestSecuredLoanUseCase = requestSecuredLoanUseCase;
         this.disburseSecuredLoanUseCase = disburseSecuredLoanUseCase;
         this.repaySecuredLoanUseCase = repaySecuredLoanUseCase;
+        this.prepaySecuredLoanUseCase = prepaySecuredLoanUseCase;
         this.manageSecuredLoanCollectionUseCase = manageSecuredLoanCollectionUseCase;
         this.loadSecuredLoanPort = loadSecuredLoanPort;
+        this.idempotencyGuard = idempotencyGuard;
     }
 
     // ─── 신청(차주) ───────────────────────────────────────────────────────────
@@ -145,12 +156,47 @@ public class SecuredLoanController {
 
     /** 회차 상환 — 원금·이자 분리 납입. 소유권은 서비스에서도 재검증한다(이중 방어). */
     @PostMapping("/{loanId}/repay")
-    public ResponseEntity<SecuredLoanResponse> repay(@PathVariable Long loanId,
-                                                     @Valid @RequestBody SecuredLoanRepayRequest body,
-                                                     Authentication authentication) {
-        SecuredLoan loan = repaySecuredLoanUseCase.repay(loanId, callerUserId(authentication),
+    public ResponseEntity<SecuredLoanResponse> repay(
+            @PathVariable Long loanId,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+            @Valid @RequestBody SecuredLoanRepayRequest body,
+            Authentication authentication) {
+        Long caller = callerUserId(authentication);
+        if (isDuplicate(idempotencyKey, "loan:secured:repay:" + loanId, caller)) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).build();
+        }
+        SecuredLoan loan = repaySecuredLoanUseCase.repay(loanId, caller,
                 body.principalPortion(), body.interestPortion());
         return ResponseEntity.ok(SecuredLoanResponse.from(loan));
+    }
+
+    /**
+     * 중도상환 — 정상(DISBURSED) 상태 전용, 수수료(잔존기간 비례·경과 3년 면제)는 서버가 산정해
+     * 응답에 명시한다. 연체 중 납입은 회차 상환({@code /repay}) 경로다.
+     */
+    @PostMapping("/{loanId}/prepay")
+    public ResponseEntity<SecuredLoanPrepayResponse> prepay(
+            @PathVariable Long loanId,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+            @Valid @RequestBody SecuredLoanPrepayRequest body,
+            Authentication authentication) {
+        Long caller = callerUserId(authentication);
+        if (isDuplicate(idempotencyKey, "loan:secured:prepay:" + loanId, caller)) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).build();
+        }
+        return ResponseEntity.ok(SecuredLoanPrepayResponse.from(
+                prepaySecuredLoanUseCase.prepay(loanId, caller, body.amount())));
+    }
+
+    /**
+     * 순차 재제출 멱등 가드 — 서비스의 비관적 락은 동시 요청 직렬화만 하고, 앞선 상환이 커밋된 뒤
+     * 같은 요청이 다시 오는 재제출은 막지 못한다. 상환·중도상환 전표는 회차성이라 원장 유니크에서도
+     * 제외돼 있으므로 키 선점이 유일한 방어선이다({@code CorporateLoanController} 상환 #4 선례와 동형).
+     * 키가 없으면 멱등 미적용(하위호환).
+     */
+    private boolean isDuplicate(String idempotencyKey, String endpoint, Long callerUserId) {
+        return idempotencyKey != null && !idempotencyKey.isBlank()
+                && !idempotencyGuard.claim(idempotencyKey, endpoint, String.valueOf(callerUserId));
     }
 
     // ─── 인가 헬퍼 ────────────────────────────────────────────────────────────

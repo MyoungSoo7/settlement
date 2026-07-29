@@ -3,6 +3,8 @@ package github.lms.lemuel.loan.integration;
 import github.lms.lemuel.LoanServiceApplication;
 import github.lms.lemuel.loan.application.port.in.DisburseSecuredLoanUseCase;
 import github.lms.lemuel.loan.application.port.in.ManageSecuredLoanCollectionUseCase;
+import github.lms.lemuel.loan.application.port.in.PrepaySecuredLoanUseCase;
+import github.lms.lemuel.loan.application.port.in.PrepaySecuredLoanUseCase.PrepayResult;
 import github.lms.lemuel.loan.application.port.in.RepaySecuredLoanUseCase;
 import github.lms.lemuel.loan.application.port.in.RequestSecuredLoanUseCase;
 import github.lms.lemuel.loan.application.port.in.RequestSecuredLoanUseCase.MortgageCommand;
@@ -11,6 +13,7 @@ import github.lms.lemuel.loan.domain.CollateralStatus;
 import github.lms.lemuel.loan.domain.RepaymentMethod;
 import github.lms.lemuel.loan.domain.SecuredLoan;
 import github.lms.lemuel.loan.domain.SecuredLoanStatus;
+import github.lms.lemuel.loan.domain.exception.InvalidLoanStateException;
 import github.lms.lemuel.loan.domain.exception.SecuredLoanRejectedException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -74,6 +77,7 @@ class SecuredLoanLifecycleIT {
     @Autowired RequestSecuredLoanUseCase requestUseCase;
     @Autowired DisburseSecuredLoanUseCase disburseUseCase;
     @Autowired RepaySecuredLoanUseCase repayUseCase;
+    @Autowired PrepaySecuredLoanUseCase prepayUseCase;
     @Autowired ManageSecuredLoanCollectionUseCase collectionUseCase;
     @Autowired JdbcTemplate jdbc;
 
@@ -191,6 +195,59 @@ class SecuredLoanLifecycleIT {
         SecuredLoan repaid = repayUseCase.repay(loan.getId(), BORROWER,
                 new BigDecimal("30000000"), new BigDecimal("150000"));
         assertThat(repaid.getStatus()).isEqualTo(SecuredLoanStatus.REPAID);
+    }
+
+    // ─── 중도상환 (Phase 2-6) ─────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("중도상환 2회(부분→전액)가 수수료 전표와 함께 실 DB 를 완주한다 — SEC_EARLY_FEE N회 허용")
+    void prepayPartialThenFull() {
+        SecuredLoan loan = requestMortgage(new BigDecimal("300000000"), 360);
+        disburseUseCase.approve(loan.getId());
+        SecuredLoan disbursed = disburseUseCase.disburse(loan.getId());
+        long loanId = disbursed.getId();
+
+        // 실행 시각이 DB 에 스냅샷된다 — 수수료 약정기간의 기산점.
+        Integer withDisbursedAt = jdbc.queryForObject(
+                "SELECT count(*) FROM opslab.secured_loans WHERE id = ? AND disbursed_at IS NOT NULL",
+                Integer.class, loanId);
+        assertThat(withDisbursedAt).isEqualTo(1);
+
+        // 실행 당일 중도상환 — 잔존=약정이라 수수료는 정확히 1.2% 정률이다(날짜 무관 결정적).
+        PrepayResult partial = prepayUseCase.prepay(loanId, BORROWER, new BigDecimal("100000000"));
+        assertThat(partial.prepaidAmount()).isEqualByComparingTo("100000000");
+        assertThat(partial.fee()).isEqualByComparingTo("1200000.00");
+        assertThat(partial.loan().getStatus()).isEqualTo(SecuredLoanStatus.DISBURSED);
+
+        // 잔여 전액 중도상환 → 완제 + 담보 말소. 수수료 전표가 2번째로 쌓인다 —
+        // uq_loan_ledger_reference_accounts 가 SEC_EARLY_FEE 를 제외하지 않으면 여기서 터진다.
+        PrepayResult full = prepayUseCase.prepay(loanId, BORROWER, new BigDecimal("999999999"));
+        assertThat(full.prepaidAmount()).isEqualByComparingTo("200000000");
+        assertThat(full.fee()).isEqualByComparingTo("2400000.00");
+        assertThat(full.loan().getStatus()).isEqualTo(SecuredLoanStatus.REPAID);
+        assertThat(full.loan().getCollateral().getStatus()).isEqualTo(CollateralStatus.RELEASED);
+
+        assertThat(ledgerCount(loanId, "SEC_REPAYMENT")).isEqualTo(2);
+        assertThat(ledgerCount(loanId, "SEC_EARLY_FEE")).isEqualTo(2);
+
+        // 완제 이벤트는 회차 상환과 같은 계약으로 Outbox 에 적재된다.
+        Integer outboxRows = jdbc.queryForObject(
+                "SELECT count(*) FROM opslab.outbox_events WHERE aggregate_type = 'Loan' "
+                        + "AND aggregate_id = ? AND event_type = 'SecuredLoanRepaid'",
+                Integer.class, String.valueOf(loanId));
+        assertThat(outboxRows).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("연체된 대출의 중도상환은 상태머신이 거부한다 — 연체 납입은 회차 상환 경로")
+    void prepayRejectedWhenOverdue() {
+        SecuredLoan loan = requestMortgage(new BigDecimal("100000000"), 120);
+        disburseUseCase.approve(loan.getId());
+        disburseUseCase.disburse(loan.getId());
+        collectionUseCase.markOverdue(loan.getId());
+
+        assertThatThrownBy(() -> prepayUseCase.prepay(loan.getId(), BORROWER, new BigDecimal("1000")))
+                .isInstanceOf(InvalidLoanStateException.class);
     }
 
     // ─── 연체·기한이익상실 ─────────────────────────────────────────────────────

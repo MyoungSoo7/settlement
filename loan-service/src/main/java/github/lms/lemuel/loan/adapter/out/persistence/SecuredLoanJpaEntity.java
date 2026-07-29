@@ -83,12 +83,17 @@ public class SecuredLoanJpaEntity {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
+    /** 실행 시각 스냅샷 — 중도상환수수료 기산점. 컬럼 도입 이전 실행분은 NULL(도메인이 created_at 폴백). */
+    @Column(name = "disbursed_at")
+    private LocalDateTime disbursedAt;
+
     protected SecuredLoanJpaEntity() { }
 
     private SecuredLoanJpaEntity(Long id, Borrower borrower, LoanProductType productType, Long collateralId,
                                  BigDecimal principal, int termMonths, BigDecimal annualRatePercent,
                                  RepaymentMethod repaymentMethod, Integer creditScore, String creditGrade,
-                                 BigDecimal outstanding, SecuredLoanStatus status, LocalDateTime createdAt) {
+                                 BigDecimal outstanding, SecuredLoanStatus status, LocalDateTime createdAt,
+                                 LocalDateTime disbursedAt) {
         this.id = id;
         this.borrowerType = borrower.type();
         this.borrowerUserId = borrower.userId();
@@ -105,6 +110,7 @@ public class SecuredLoanJpaEntity {
         this.outstanding = outstanding;
         this.status = status;
         this.createdAt = createdAt;
+        this.disbursedAt = disbursedAt;
     }
 
     public static SecuredLoanJpaEntity from(SecuredLoan loan) {
@@ -112,7 +118,7 @@ public class SecuredLoanJpaEntity {
         return new SecuredLoanJpaEntity(loan.getId(), loan.getBorrower(), loan.getProductType(), collateralId,
                 loan.getPrincipal(), loan.getTermMonths(), loan.getAnnualRatePercent(),
                 loan.getRepaymentMethod(), loan.getCreditScore(), loan.getCreditGrade(),
-                loan.getOutstanding(), loan.getStatus(), loan.getCreatedAt());
+                loan.getOutstanding(), loan.getStatus(), loan.getCreatedAt(), loan.getDisbursedAt());
     }
 
     /**
@@ -122,7 +128,8 @@ public class SecuredLoanJpaEntity {
     public SecuredLoan toDomain(Collateral collateral) {
         Borrower borrower = new Borrower(borrowerType, borrowerUserId, borrowerName, borrowerRegistrationNo);
         return SecuredLoan.reconstitute(id, borrower, productType, collateral, principal, termMonths,
-                annualRatePercent, repaymentMethod, creditScore, creditGrade, outstanding, status, createdAt);
+                annualRatePercent, repaymentMethod, creditScore, creditGrade, outstanding, status, createdAt,
+                disbursedAt);
     }
 
     public Long getId() { return id; }

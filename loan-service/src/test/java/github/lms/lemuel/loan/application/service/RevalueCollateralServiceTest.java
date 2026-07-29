@@ -67,7 +67,7 @@ class RevalueCollateralServiceTest {
                 LoanProductType.MORTGAGE, collateral, new BigDecimal("100000000.00"), 36,
                 new BigDecimal("4.30"), RepaymentMethod.EQUAL_PAYMENT, null, null,
                 new BigDecimal("100000000.00"), SecuredLoanStatus.DISBURSED,
-                java.time.LocalDateTime.now(CLOCK));
+                java.time.LocalDateTime.now(CLOCK), java.time.LocalDateTime.now(CLOCK));
         return store.save(loan);
     }
 
@@ -182,7 +182,8 @@ class RevalueCollateralServiceTest {
                 Borrower.individual(BORROWER, "홍길동"), LoanProductType.MORTGAGE, realEstate,
                 new BigDecimal("400000000.00"), 360, new BigDecimal("4.30"),
                 RepaymentMethod.EQUAL_PAYMENT, null, null, new BigDecimal("400000000.00"),
-                SecuredLoanStatus.DISBURSED, java.time.LocalDateTime.now(CLOCK)));
+                SecuredLoanStatus.DISBURSED, java.time.LocalDateTime.now(CLOCK),
+                java.time.LocalDateTime.now(CLOCK)));
 
         // 유지비율 1.0 로 크게 미달이지만 주택담보는 마진콜하지 않는다.
         RevaluationResult result = service.revalue(loan.getId(), new BigDecimal("400000000"), "MANUAL");
@@ -198,7 +199,8 @@ class RevalueCollateralServiceTest {
                 Borrower.individual(BORROWER, "홍길동"), LoanProductType.PERSONAL_CREDIT, null,
                 new BigDecimal("10000000.00"), 36, new BigDecimal("6.00"),
                 RepaymentMethod.EQUAL_PAYMENT, 780, "B", new BigDecimal("10000000.00"),
-                SecuredLoanStatus.DISBURSED, java.time.LocalDateTime.now(CLOCK)));
+                SecuredLoanStatus.DISBURSED, java.time.LocalDateTime.now(CLOCK),
+                java.time.LocalDateTime.now(CLOCK)));
 
         assertThatThrownBy(() -> service.revalue(loan.getId(), new BigDecimal("1"), "MANUAL"))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -231,7 +233,7 @@ class RevalueCollateralServiceTest {
             SecuredLoan stored = SecuredLoan.reconstitute(id, loan.getBorrower(), loan.getProductType(),
                     collateral, loan.getPrincipal(), loan.getTermMonths(), loan.getAnnualRatePercent(),
                     loan.getRepaymentMethod(), loan.getCreditScore(), loan.getCreditGrade(),
-                    loan.getOutstanding(), loan.getStatus(), loan.getCreatedAt());
+                    loan.getOutstanding(), loan.getStatus(), loan.getCreatedAt(), loan.getDisbursedAt());
             loans.put(id, stored);
             return stored;
         }

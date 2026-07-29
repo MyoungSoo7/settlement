@@ -71,7 +71,7 @@ class SecuredLoanServiceTest {
         BaseRatePort baseRate = () -> BASE_RATE;
 
         requestService = new RequestSecuredLoanService(store, valuation, baseRate, metrics, LTV, FIXED_CLOCK);
-        disburseService = new DisburseSecuredLoanService(store, store, ledger, events, metrics);
+        disburseService = new DisburseSecuredLoanService(store, store, ledger, events, metrics, FIXED_CLOCK);
         repayService = new RepaySecuredLoanService(store, store, ledger, events, metrics);
         collectionService = new SecuredLoanCollectionService(store, store);
     }
@@ -354,7 +354,7 @@ class SecuredLoanServiceTest {
             SecuredLoan stored = SecuredLoan.reconstitute(id, loan.getBorrower(), loan.getProductType(),
                     collateral, loan.getPrincipal(), loan.getTermMonths(), loan.getAnnualRatePercent(),
                     loan.getRepaymentMethod(), loan.getCreditScore(), loan.getCreditGrade(),
-                    loan.getOutstanding(), loan.getStatus(), loan.getCreatedAt());
+                    loan.getOutstanding(), loan.getStatus(), loan.getCreatedAt(), loan.getDisbursedAt());
             loans.put(id, stored);
             return stored;
         }
