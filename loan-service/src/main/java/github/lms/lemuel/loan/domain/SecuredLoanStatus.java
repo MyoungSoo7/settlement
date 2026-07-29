@@ -27,7 +27,9 @@ public enum SecuredLoanStatus {
     /** 기한이익상실 — 잔여 원금 전액을 즉시 청구한다. */
     DEFAULTED,
     REPAID,
-    REJECTED;
+    REJECTED,
+    /** 상각 — 담보 실행 후 회수 부족분을 손실로 확정. 종료 상태. */
+    WRITTEN_OFF;
 
     /**
      * 허용 상태 전이 단일 출처({@code CorporateLoanStatus#canTransitionTo} 동형). 애그리거트
@@ -44,9 +46,11 @@ public enum SecuredLoanStatus {
             case OVERDUE:
                 return target == REPAID || target == DEFAULTED;
             case DEFAULTED:
-                return target == REPAID; // 기한이익상실 후에도 전액 회수되면 완제
+                // 담보 실행 결과: 전액 회수되면 완제, 부족분이 남으면 상각으로 종결.
+                return target == REPAID || target == WRITTEN_OFF;
             case REPAID:
             case REJECTED:
+            case WRITTEN_OFF:
                 return false; // 종료 상태
             default:
                 return false;

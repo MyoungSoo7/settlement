@@ -23,8 +23,9 @@ class SecuredLoanStatusTest {
             case APPROVED -> EnumSet.of(SecuredLoanStatus.DISBURSED, SecuredLoanStatus.REJECTED);
             case DISBURSED -> EnumSet.of(SecuredLoanStatus.REPAID, SecuredLoanStatus.OVERDUE);
             case OVERDUE -> EnumSet.of(SecuredLoanStatus.REPAID, SecuredLoanStatus.DEFAULTED);
-            case DEFAULTED -> EnumSet.of(SecuredLoanStatus.REPAID);
-            case REPAID, REJECTED -> EnumSet.noneOf(SecuredLoanStatus.class);
+            // 기한이익상실 이후 담보 실행 결과: 전액 회수면 완제, 부족분이 남으면 상각.
+            case DEFAULTED -> EnumSet.of(SecuredLoanStatus.REPAID, SecuredLoanStatus.WRITTEN_OFF);
+            case REPAID, REJECTED, WRITTEN_OFF -> EnumSet.noneOf(SecuredLoanStatus.class);
         };
     }
 
@@ -41,8 +42,17 @@ class SecuredLoanStatusTest {
     }
 
     @Test
+    void 상각은_담보실행_이후에만_도달한다() {
+        // 실행 전·연체 중에는 상각할 수 없다 — 담보 실행으로 회수 부족이 확정돼야 손실이 성립한다.
+        assertThat(SecuredLoanStatus.DISBURSED.canTransitionTo(SecuredLoanStatus.WRITTEN_OFF)).isFalse();
+        assertThat(SecuredLoanStatus.OVERDUE.canTransitionTo(SecuredLoanStatus.WRITTEN_OFF)).isFalse();
+        assertThat(SecuredLoanStatus.DEFAULTED.canTransitionTo(SecuredLoanStatus.WRITTEN_OFF)).isTrue();
+    }
+
+    @Test
     void 종료상태는_어디로도_가지_못한다() {
-        for (SecuredLoanStatus terminal : EnumSet.of(SecuredLoanStatus.REPAID, SecuredLoanStatus.REJECTED)) {
+        for (SecuredLoanStatus terminal : EnumSet.of(SecuredLoanStatus.REPAID,
+                SecuredLoanStatus.REJECTED, SecuredLoanStatus.WRITTEN_OFF)) {
             for (SecuredLoanStatus target : SecuredLoanStatus.values()) {
                 assertThat(terminal.canTransitionTo(target)).as("%s → %s", terminal, target).isFalse();
             }

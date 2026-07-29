@@ -168,6 +168,23 @@ public class SecuredLoan {
         this.status = SecuredLoanStatus.DEFAULTED;
     }
 
+    /**
+     * 상각 — 담보 실행으로 회수하지 못한 잔여분을 손실로 확정한다.
+     *
+     * <p><b>기한이익상실(DEFAULTED) 이후에만</b> 가능하다. 그 전에 상각하면 아직 회수 가능한 채권을
+     * 손실로 털어 버리므로 상태머신이 막는다. 전액 회수돼 이미 REPAID 라면 상각할 잔액이 없어
+     * 역시 전이가 거부된다.
+     *
+     * @return 상각된 금액(직전 미상환잔액)
+     */
+    public BigDecimal writeOff() {
+        requireTransition(SecuredLoanStatus.WRITTEN_OFF);
+        BigDecimal loss = outstanding;
+        this.outstanding = Money.of(BigDecimal.ZERO).toBigDecimal();
+        this.status = SecuredLoanStatus.WRITTEN_OFF;
+        return loss;
+    }
+
     // ─── 파생 계산 ────────────────────────────────────────────────────────────
 
     /**
