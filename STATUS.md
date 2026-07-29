@@ -2,7 +2,7 @@
 
 > 이커머스 주문·결제·정산·선정산/기업대출·투자·계정계 + 공개조회 위성(재무제표·경제지표·기업뉴스·시세·공공데이터)·운영관제·AI챗봇 MSA 플랫폼 (Spring Boot 4.0 / Java 25 / 헥사고날)
 
-**Last updated:** 2026-07-29
+**Last updated:** 2026-07-30
 
 ## 현재 상태
 - **활성 브랜치:** `develop` (`main` 은 보호 브랜치 — PR 필수·squash 만·필수 CI 2종)
@@ -11,10 +11,11 @@
   - 공개조회 위성: financial(8086) · economics(8087) · company(8090) · market(8094) · commondata(8098)
   - 부가: operation(8092) · ai(8096) · organization(8104, 셀러/기업 조직·멤버십)
 - **DB:** 13 서비스 모두 물리 분리(DB-per-service) — opslab / settlement_db / lemuel_{loan,financial,economics,company,operation,market,ai,commondata,investment,account,organization}
-- **최근 커밋:** `2acff1417` feat(account): 통제계정 잔액 실체화 — ADR 0030 Phase 1
+- **최근 커밋:** `8e89cf7d1` feat(loan): 기준금리 economics 실연동 (설정값 폴백) — P2-7a
 
 ## 최근 진척 (2026-06-24 이후)
-- **loan 담보/개인신용 대출 Phase 1** — 주택담보(`/loans/secured/mortgage`)·개인신용(`/personal`) 2종 추가. `Borrower`(개인·법인 공통 차주 VO) + `Collateral`(평가액 스냅샷, 설정→유효→말소) + `SecuredLoan`(담보 optional) 신규 애그리거트로 분리 — 기존 `LoanAdvance`·`CorporateLoan` 무수정(상장사 종목코드에 차주가 묶여 개인 표현 불가). 장기 분할상환 상품이라 연체·기한이익상실을 상태머신에 처음부터 포함. 원장은 기존 6계정만 사용하되 회차성 전표(SEC_REPAYMENT·SEC_INTEREST)를 중복분개 유니크에서 제외(미조치 시 2회차 상환부터 실패). `secured_loan_disbursed`/`.repaid` 발행(소비처는 Phase 2). **Phase 2 이월**: 보증부·금융자산 담보, 담보권 순위, 재평가·마진콜, 담보 실행, 중도상환수수료, 위성 서비스 실연동(포트만 정의·스텁 구현), account GL 소비.
+- **loan 담보/개인신용 대출 Phase 1** — 주택담보(`/loans/secured/mortgage`)·개인신용(`/personal`) 2종 추가. `Borrower`(개인·법인 공통 차주 VO) + `Collateral`(평가액 스냅샷, 설정→유효→말소) + `SecuredLoan`(담보 optional) 신규 애그리거트로 분리 — 기존 `LoanAdvance`·`CorporateLoan` 무수정(상장사 종목코드에 차주가 묶여 개인 표현 불가). 장기 분할상환 상품이라 연체·기한이익상실을 상태머신에 처음부터 포함. 원장은 기존 6계정만 사용하되 회차성 전표(SEC_REPAYMENT·SEC_INTEREST)를 중복분개 유니크에서 제외(미조치 시 2회차 상환부터 실패). `secured_loan_disbursed`/`.repaid` 발행(소비처는 Phase 2).
+- **loan 담보대출 Phase 2 (P2-1~P2-7a, 2026-07-30)** — 담보유형 5종(부동산+보증·예금·채권·주식, Category 계열 행위)·담보권 순위(선순위 차감·0 clamp)·원장 계정 3종+실행 전표 7종·재평가 append-only 이력+마진콜(부분 유니크로 중복 차단)·담보 실행(처분/대위변제 경로별 손실 계정 분리)+상각(WRITTEN_OFF)·중도상환(실행시각 스냅샷 기산 수수료, 잔존비례·3년 면제, `/prepay`+Idempotency-Key 멱등)·기준금리 economics 실연동(BASE_RATE latest, 실패 시 설정값 폴백). gl-ledger-auditor 감사로 순차 재제출 멱등 공백(치명) 봉합. **잔여 이월**: market/commondata 담보평가 실연동(금융자산 담보 신청 경로 선행 필요), account GL 소비 매핑(repaid 이벤트에 수수료 필드 확장 선행), 수수료 taper 분모 정본 확정.
 - **위성·확장 서비스 9종 추가** — financial·economics·company(ADR 0023)·operation·market·ai·commondata·investment·account.
   공개조회 위성은 shared-common 미의존/제한 스캔 + 자체 최소 SecurityConfig(GET 공개, `/admin/**` 는 X-Internal-Api-Key 게이트).
 - **금융 계정계 확장** — investment(CEO 투자하기: 투자점수·투자주문) + account(전사 복식부기 GL 집계, 소비 전용) + loan 기업대출(CorporateLoan) + CEO 프론트 메뉴.
