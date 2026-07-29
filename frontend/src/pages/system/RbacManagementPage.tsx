@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { rbacApi, Role, Permission } from '@/api/system';
 import Spinner from '@/components/Spinner';
+import { apiErrorMessage } from '@/lib/apiError';
 
 type RoleFormMode = 'create' | 'edit' | 'clone';
 
@@ -98,8 +99,8 @@ const RbacManagementPage: React.FC = () => {
       setSelectedRole(updated);
       setDraft(new Set(updated.permissionIds));
       setSavedMsg('권한이 저장되었습니다.');
-    } catch (err: any) {
-      alert(err.response?.data?.message || '저장 실패');
+    } catch (err) {
+      alert(apiErrorMessage(err, '저장 실패'));
     } finally {
       setSaving(false);
     }
@@ -155,8 +156,8 @@ const RbacManagementPage: React.FC = () => {
         pickRole(cloned);
       }
       setFormMode(null);
-    } catch (err: any) {
-      alert(err.response?.data?.message || '역할 저장 실패');
+    } catch (err) {
+      alert(apiErrorMessage(err, '역할 저장 실패'));
     } finally {
       setRoleSaving(false);
     }
@@ -175,8 +176,8 @@ const RbacManagementPage: React.FC = () => {
         }
         return next;
       });
-    } catch (err: any) {
-      alert(err.response?.data?.message || '역할 삭제 실패');
+    } catch (err) {
+      alert(apiErrorMessage(err, '역할 삭제 실패'));
     }
   };
 

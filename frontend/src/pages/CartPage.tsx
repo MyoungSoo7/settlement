@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useCart, CartItem } from '@/contexts/CartContext';
+import { useCart, CartItem } from '@/contexts/useCart';
 import { orderApi } from '@/api/order';
 import { paymentApi } from '@/api/payment';
 import { couponApi } from '@/api/coupon';
 import { CouponValidateResponse } from '@/types';
 import Spinner from '@/components/Spinner';
 import CouponInput from '@/components/coupon/CouponInput';
+import { errorDetail } from '@/lib/apiError';
 
 const USER_ID = 1;
 const TOSS_CLIENT_KEY = import.meta.env.VITE_TOSS_CLIENT_KEY as string;
@@ -16,7 +17,7 @@ const fmt = (v: number) =>
 
 const loadTossScript = (): Promise<void> =>
   new Promise((resolve, reject) => {
-    if ((window as any).TossPayments) { resolve(); return; }
+    if (window.TossPayments) { resolve(); return; }
     const script = document.createElement('script');
     script.src = 'https://js.tosspayments.com/v1/payment';
     script.onload = () => resolve();
@@ -141,8 +142,8 @@ const CartPage: React.FC = () => {
         const authorized = await paymentApi.authorizePayment(payment.id);
         await paymentApi.capturePayment(authorized.id);
         completed.push({ productName: product.name, orderId: order.id, amount: order.amount });
-      } catch (err: any) {
-        const msg = err.response?.data?.message || err.message || '알 수 없는 오류';
+      } catch (err) {
+        const msg = errorDetail(err, '알 수 없는 오류');
         setError(`"${product.name}" 주문 실패: ${msg}`);
         setResults(completed);
         setCheckoutStep('done');
@@ -179,8 +180,8 @@ const CartPage: React.FC = () => {
           amount: product.price * quantity,
         });
         orderIds.push(order.id);
-      } catch (err: any) {
-        const msg = err.response?.data?.message || err.message || '알 수 없는 오류';
+      } catch (err) {
+        const msg = errorDetail(err, '알 수 없는 오류');
         setError(`"${product.name}" 주문 생성 실패: ${msg}`);
         setCheckoutStep('cart');
         return;
@@ -191,7 +192,8 @@ const CartPage: React.FC = () => {
     setProcessingMsg('토스페이먼츠 결제창 여는 중...');
     try {
       await loadTossScript();
-      const tossPayments = (window as any).TossPayments(TOSS_CLIENT_KEY);
+      const tossPayments = window.TossPayments?.(TOSS_CLIENT_KEY);
+      if (!tossPayments) throw new Error('토스페이먼츠 스크립트를 불러오지 못했습니다.');
       const tossOrderId = `CART-${Date.now()}`;
       const firstName = items[0].product.name;
       const orderName = items.length > 1
@@ -212,8 +214,8 @@ const CartPage: React.FC = () => {
         failUrl: `${window.location.origin}/order/toss/fail`,
       });
       // 리다이렉트 발생 — 이후 코드 실행 안 됨
-    } catch (err: any) {
-      setError(err.message || '토스페이먼츠 결제창을 열 수 없습니다.');
+    } catch (err) {
+      setError(errorDetail(err, '토스페이먼츠 결제창을 열 수 없습니다.'));
       setCheckoutStep('cart');
     }
   };

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { authApi } from '@/api/auth';
-import { useCart } from '@/contexts/CartContext';
+import { useCart } from '@/contexts/useCart';
 
 interface LayoutProps {
   children: React.ReactNode;

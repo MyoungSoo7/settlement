@@ -4,7 +4,9 @@
     "noEmit": true
   },
   "include": [
-    "src/__tests__/**",
+    // 앰비언트 선언(vite/client 의 import.meta.env, 토스 전역)은 테스트가 끌어오는 소스에도 필요하다.
+    "src/**/*.d.ts",
+    "src/__tests__/**/*",
     "**/*.test.ts",
     "**/*.test.tsx",
     "**/*.spec.ts",

@@ -9,4 +9,5 @@ public interface LoadStockRecommendationPort {
 
     /** 최신 추천일의 추천 세트를 display_order 순으로. 데이터가 없으면 빈 리스트. */
     List<StockRecommendation> loadLatest();
+
 }

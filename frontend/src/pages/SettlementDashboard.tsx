@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { settlementApi } from '@/api/settlement';
 import { SettlementSearchRequest, SettlementSearchResponse, SettlementSearchItem } from '@/types';
+import { apiErrorMessage } from '@/lib/apiError';
 
 const SettlementDashboard: React.FC = () => {
   const [data, setData] = useState<SettlementSearchResponse | null>(null);
@@ -16,28 +17,28 @@ const SettlementDashboard: React.FC = () => {
   });
 
   // 정산 데이터 조회
-  const fetchSettlements = async () => {
+  const fetchSettlements = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
       const response = await settlementApi.search(filters);
       setData(response);
-    } catch (err: any) {
-      setError(err.response?.data?.message || '데이터를 불러오는데 실패했습니다.');
+    } catch (err) {
+      setError(apiErrorMessage(err, '데이터를 불러오는데 실패했습니다.'));
       console.error('Settlement search error:', err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters]);
 
   // 초기 로드 및 필터 변경 시 재조회
   useEffect(() => {
     fetchSettlements();
-  }, [filters]);
+  }, [fetchSettlements]);
 
   // 필터 변경 핸들러
-  const handleFilterChange = (key: keyof SettlementSearchRequest, value: any) => {
+  const handleFilterChange = <K extends keyof SettlementSearchRequest>(key: K, value: SettlementSearchRequest[K]) => {
     setFilters((prev) => ({
       ...prev,
       [key]: value,
@@ -103,7 +104,7 @@ const SettlementDashboard: React.FC = () => {
             <select
               className="w-full px-3 py-2 border border-gray-300 rounded-md"
               value={filters.status || ''}
-              onChange={(e) => handleFilterChange('status', e.target.value || undefined)}
+              onChange={(e) => handleFilterChange('status', (e.target.value || undefined) as SettlementSearchRequest['status'])}
             >
               <option value="">전체</option>
               <option value="PENDING">대기</option>

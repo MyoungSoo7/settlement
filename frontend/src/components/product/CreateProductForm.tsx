@@ -3,6 +3,7 @@ import { ProductCreateRequest, ProductResponse, ProductImageResponse } from '@/t
 import { productApi } from '@/api/product';
 import ImageUpload from './ImageUpload';
 import api from '@/api/axios';
+import { apiErrorMessage } from '@/lib/apiError';
 
 interface CreateProductFormProps {
   onSuccess?: () => void;
@@ -91,8 +92,8 @@ const CreateProductForm: React.FC<CreateProductFormProps> = ({ onSuccess, onCanc
         price: 0,
         stockQuantity: 0,
       });
-    } catch (error: any) {
-      const message = error.response?.data?.message || '상품 등록에 실패했습니다.';
+    } catch (error) {
+      const message = apiErrorMessage(error, '상품 등록에 실패했습니다.');
       setErrorMessage(message);
       console.error('상품 등록 실패:', error);
     } finally {

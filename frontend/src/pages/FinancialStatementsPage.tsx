@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { financialApi, FinancialCompany, FinancialCompanyPage, FinancialStatement } from '@/api/financial';
 import Card from '@/components/Card';
 import Spinner from '@/components/Spinner';
+import { apiErrorMessage } from '@/lib/apiError';
 
 /** 조/억 단위 축약 표기 (원 단위 금액) */
 const fmtAmount = (v: number | null) => {
@@ -36,7 +37,7 @@ const FinancialStatementsPage: React.FC = () => {
     financialApi
       .companies(query, page)
       .then((data) => { if (!cancelled) setCompanies(data); })
-      .catch((err: any) => { if (!cancelled) setError(err.response?.data?.message || '기업 목록 조회에 실패했습니다.'); })
+      .catch((err: unknown) => { if (!cancelled) setError(apiErrorMessage(err, '기업 목록 조회에 실패했습니다.')); })
       .finally(() => { if (!cancelled) setLoadingList(false); });
     return () => { cancelled = true; };
   }, [query, page]);
@@ -47,8 +48,8 @@ const FinancialStatementsPage: React.FC = () => {
     setError(null);
     try {
       setStatements(await financialApi.statements(company.stockCode));
-    } catch (err: any) {
-      setError(err.response?.data?.message || '재무제표 조회에 실패했습니다.');
+    } catch (err) {
+      setError(apiErrorMessage(err, '재무제표 조회에 실패했습니다.'));
       setStatements([]);
     } finally {
       setLoadingDetail(false);

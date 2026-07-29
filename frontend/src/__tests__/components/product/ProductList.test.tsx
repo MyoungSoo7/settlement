@@ -102,7 +102,7 @@ describe('ProductList', () => {
       await waitFor(() => screen.getByText('사과'));
 
       // 상품 카드 내에서 배지 확인 (select 옵션과 구분)
-      const card = screen.getByText('사과').closest('div.bg-white.rounded-lg');
+      const card = screen.getByText('사과').closest<HTMLElement>('div.bg-white.rounded-lg');
       expect(within(card!).getByText('판매중')).toBeInTheDocument();
     });
 
@@ -114,7 +114,7 @@ describe('ProductList', () => {
 
       await waitFor(() => screen.getByText('바나나'));
 
-      const card = screen.getByText('바나나').closest('div.bg-white.rounded-lg');
+      const card = screen.getByText('바나나').closest<HTMLElement>('div.bg-white.rounded-lg');
       expect(within(card!).getByText('판매중지')).toBeInTheDocument();
     });
 
@@ -126,7 +126,7 @@ describe('ProductList', () => {
 
       await waitFor(() => screen.getByText('오렌지'));
 
-      const card = screen.getByText('오렌지').closest('div.bg-white.rounded-lg');
+      const card = screen.getByText('오렌지').closest<HTMLElement>('div.bg-white.rounded-lg');
       expect(within(card!).getByText('품절')).toBeInTheDocument();
     });
 
@@ -138,7 +138,7 @@ describe('ProductList', () => {
 
       await waitFor(() => screen.getByText('포도'));
 
-      const card = screen.getByText('포도').closest('div.bg-white.rounded-lg');
+      const card = screen.getByText('포도').closest<HTMLElement>('div.bg-white.rounded-lg');
       expect(within(card!).getByText('단종')).toBeInTheDocument();
     });
 

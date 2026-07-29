@@ -32,6 +32,7 @@ public class StockRecommendationPersistenceAdapter
                 .toList();
     }
 
+
     @Override
     @Transactional
     public void replaceForDate(LocalDate recommendedDate, List<StockRecommendation> recommendations) {

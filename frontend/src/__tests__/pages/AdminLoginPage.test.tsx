@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import AdminLoginPage from '@/pages/AdminLoginPage';
 import { authApi } from '@/api/auth';
+import { LoginResponse, UserResponse } from '@/types';
 
 vi.mock('@/api/auth', () => ({
   authApi: {
@@ -158,7 +159,7 @@ describe('AdminLoginPage', () => {
 
     it('로그인 중에는 submit 버튼이 비활성화된다', async () => {
       const user = userEvent.setup();
-      let resolveLogin!: (v: any) => void;
+      let resolveLogin!: (value: LoginResponse) => void;
       vi.mocked(authApi.login).mockImplementationOnce(() => new Promise(r => { resolveLogin = r; }));
       renderPage();
 
@@ -238,7 +239,7 @@ describe('AdminLoginPage', () => {
 
     it('가입 중에는 submit 버튼이 비활성화된다', async () => {
       const user = userEvent.setup();
-      let resolveRegister!: (v: any) => void;
+      let resolveRegister!: (value: UserResponse) => void;
       vi.mocked(authApi.register).mockImplementationOnce(
         () => new Promise(r => { resolveRegister = r; })
       );

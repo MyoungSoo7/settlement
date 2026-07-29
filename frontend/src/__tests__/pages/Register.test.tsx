@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import Register from '@/pages/Register';
 import { authApi } from '@/api/auth';
+import { UserResponse } from '@/types';
 
 vi.mock('@/api/auth', () => ({
   authApi: {
@@ -135,7 +136,7 @@ describe('Register', () => {
 
     it('제출 중에는 버튼이 비활성화된다', async () => {
       const user = userEvent.setup();
-      let resolveRegister!: (v: any) => void;
+      let resolveRegister!: (value: UserResponse) => void;
       vi.mocked(authApi.register).mockImplementationOnce(
         () => new Promise(r => { resolveRegister = r; })
       );

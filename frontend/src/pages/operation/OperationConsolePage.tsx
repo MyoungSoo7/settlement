@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import Spinner from '@/components/Spinner';
-import { useToast } from '@/contexts/ToastContext';
+import { useToast } from '@/contexts/useToast';
 import {
   operationApi,
   Incident,
@@ -17,6 +17,7 @@ import {
   SEVERITY_BADGE,
   CATEGORY_LABEL,
 } from '@/api/operation';
+import { apiErrorStatus } from '@/lib/apiError';
 
 const PAGE_SIZE = 20;
 
@@ -123,8 +124,8 @@ const OperationConsolePage: React.FC = () => {
       setDetail(updated);
       showToast(successMsg, 'success');
       refresh();
-    } catch (err: any) {
-      const status = err?.response?.status;
+    } catch (err) {
+      const status = apiErrorStatus(err);
       showToast(status === 409 ? '현재 상태에서 처리할 수 없습니다 (상태 충돌).' : '처리에 실패했습니다.', 'error');
     }
   };

@@ -1,22 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { CartContext, CartItem } from '@/contexts/useCart';
 import { ProductResponse } from '@/types';
-
-export interface CartItem {
-  product: ProductResponse;
-  quantity: number;
-}
-
-interface CartContextType {
-  items: CartItem[];
-  addItem: (product: ProductResponse) => void;
-  removeItem: (productId: number) => void;
-  updateQuantity: (productId: number, quantity: number) => void;
-  clearCart: () => void;
-  totalAmount: number;
-  totalCount: number;
-}
-
-const CartContext = createContext<CartContextType | null>(null);
 
 const STORAGE_KEY = 'lemuel_cart';
 
@@ -74,10 +58,4 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       {children}
     </CartContext.Provider>
   );
-};
-
-export const useCart = (): CartContextType => {
-  const ctx = useContext(CartContext);
-  if (!ctx) throw new Error('useCart must be used within CartProvider');
-  return ctx;
 };

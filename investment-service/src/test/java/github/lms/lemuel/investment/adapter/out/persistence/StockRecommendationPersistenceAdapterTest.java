@@ -17,6 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class StockRecommendationPersistenceAdapterTest {
@@ -66,4 +67,6 @@ class StockRecommendationPersistenceAdapterTest {
         verify(repository).deleteByRecommendedDate(DATE);
         verify(repository, never()).saveAll(org.mockito.ArgumentMatchers.anyList());
     }
+
+
 }

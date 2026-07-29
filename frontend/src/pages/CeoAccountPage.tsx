@@ -10,6 +10,7 @@ import {
 } from '@/api/account';
 import Card from '@/components/Card';
 import Spinner from '@/components/Spinner';
+import { apiErrorMessage } from '@/lib/apiError';
 
 const fmtAmount = (value: number | null | undefined) => {
   if (value === null || value === undefined) return 'N/A';
@@ -57,8 +58,8 @@ const CeoAccountPage: React.FC = () => {
         setSettlementAgg(settlement);
         setTrialBalance(tb);
       })
-      .catch((err: any) => {
-        if (!cancelled) setError(err.response?.data?.message || '계정계 집계 조회에 실패했습니다.');
+      .catch((err: unknown) => {
+        if (!cancelled) setError(apiErrorMessage(err, '계정계 집계 조회에 실패했습니다.'));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -74,8 +75,8 @@ const CeoAccountPage: React.FC = () => {
     setOwner(null);
     try {
       setOwner(await accountApi.ownerAccounts(ownerType, ownerId));
-    } catch (err: any) {
-      setOwnerError(err.response?.data?.message || '계정 잔액 조회에 실패했습니다.');
+    } catch (err) {
+      setOwnerError(apiErrorMessage(err, '계정 잔액 조회에 실패했습니다.'));
     } finally {
       setLoadingOwner(false);
     }

@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { tagApi } from '@/api/tag';
 import { TagResponse } from '@/types';
-import { useToast } from '@/contexts/ToastContext';
+import { useToast } from '@/contexts/useToast';
 
 const TagManagementPage: React.FC = () => {
   const [tags, setTags] = useState<TagResponse[]>([]);
@@ -24,11 +24,7 @@ const TagManagementPage: React.FC = () => {
     { name: '회색', value: '#6B7280' },
   ];
 
-  useEffect(() => {
-    loadTags();
-  }, []);
-
-  const loadTags = async () => {
+  const loadTags = useCallback(async () => {
     setLoading(true);
     try {
       const data = await tagApi.getAllTags();
@@ -38,7 +34,12 @@ const TagManagementPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
+
+  useEffect(() => {
+    loadTags();
+  }, [loadTags]);
+
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();

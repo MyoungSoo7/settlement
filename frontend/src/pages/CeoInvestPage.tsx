@@ -12,6 +12,7 @@ import { financialApi, type FinancialCompany, type FinancialCompanyPage } from '
 import Card from '@/components/Card';
 import LiveQuoteTicker from '@/components/LiveQuoteTicker';
 import Spinner from '@/components/Spinner';
+import { apiErrorMessage, apiErrorStatus } from '@/lib/apiError';
 
 const fmtAmount = (value: number | null | undefined) => {
   if (value === null || value === undefined) return 'N/A';
@@ -136,8 +137,8 @@ const CeoInvestPage: React.FC = () => {
       .then((data) => {
         if (!cancelled) setCompanies(data);
       })
-      .catch((err: any) => {
-        if (!cancelled) setError(err.response?.data?.message || '기업 목록 조회에 실패했습니다.');
+      .catch((err: unknown) => {
+        if (!cancelled) setError(apiErrorMessage(err, '기업 목록 조회에 실패했습니다.'));
       })
       .finally(() => {
         if (!cancelled) setLoadingList(false);
@@ -160,8 +161,8 @@ const CeoInvestPage: React.FC = () => {
     setError(null);
     try {
       setScore(await investmentApi.score(company.stockCode));
-    } catch (err: any) {
-      setError(err.response?.data?.message || '투자 점수 조회에 실패했습니다.');
+    } catch (err) {
+      setError(apiErrorMessage(err, '투자 점수 조회에 실패했습니다.'));
     } finally {
       setLoadingScore(false);
     }
@@ -172,8 +173,8 @@ const CeoInvestPage: React.FC = () => {
     setError(null);
     try {
       setFunding(await investmentApi.funding(sid));
-    } catch (err: any) {
-      setError(err.response?.data?.message || '투자 재원 조회에 실패했습니다.');
+    } catch (err) {
+      setError(apiErrorMessage(err, '투자 재원 조회에 실패했습니다.'));
     } finally {
       setLoadingFunding(false);
     }
@@ -182,8 +183,8 @@ const CeoInvestPage: React.FC = () => {
   const loadOrders = async (sid: number) => {
     try {
       setOrders(await investmentApi.ordersBySeller(sid));
-    } catch (err: any) {
-      setError(err.response?.data?.message || '투자 주문 목록 조회에 실패했습니다.');
+    } catch (err) {
+      setError(apiErrorMessage(err, '투자 주문 목록 조회에 실패했습니다.'));
     }
   };
 
@@ -204,11 +205,11 @@ const CeoInvestPage: React.FC = () => {
       const created = await investmentApi.createOrder({ sellerId, stockCode: selected.stockCode, amount });
       setNotice(`투자 주문 생성 — #${created.id} (${created.gradeAtOrder}, ${fmtWon(created.amount)})`);
       await Promise.all([loadFunding(sellerId), loadOrders(sellerId)]);
-    } catch (err: any) {
-      if (err.response?.status === 422) {
-        setError(err.response?.data?.message || '투자 부적격 또는 재원 부족으로 주문이 거절되었습니다.');
+    } catch (err) {
+      if (apiErrorStatus(err) === 422) {
+        setError(apiErrorMessage(err, '투자 부적격 또는 재원 부족으로 주문이 거절되었습니다.'));
       } else {
-        setError(err.response?.data?.message || '투자 주문 생성에 실패했습니다.');
+        setError(apiErrorMessage(err, '투자 주문 생성에 실패했습니다.'));
       }
     } finally {
       setSubmitting(false);
@@ -223,11 +224,11 @@ const CeoInvestPage: React.FC = () => {
       const updated = action === 'execute' ? await investmentApi.execute(id) : await investmentApi.cancel(id);
       setNotice(`#${id} ${action === 'execute' ? '집행' : '취소'} 완료 — ${updated.status}`);
       await Promise.all([loadFunding(sellerId), loadOrders(sellerId)]);
-    } catch (err: any) {
-      if (err.response?.status === 422) {
-        setError(err.response?.data?.message || '처리 조건을 충족하지 못했습니다.');
+    } catch (err) {
+      if (apiErrorStatus(err) === 422) {
+        setError(apiErrorMessage(err, '처리 조건을 충족하지 못했습니다.'));
       } else {
-        setError(err.response?.data?.message || '주문 처리에 실패했습니다.');
+        setError(apiErrorMessage(err, '주문 처리에 실패했습니다.'));
       }
     } finally {
       setBusyId(null);

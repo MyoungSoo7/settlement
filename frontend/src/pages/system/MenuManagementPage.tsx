@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { menuApi, rbacApi, MenuNode, MenuCreateRequest, Role } from '@/api/system';
 import Spinner from '@/components/Spinner';
+import { apiErrorMessage } from '@/lib/apiError';
 
 const emptyForm: MenuCreateRequest & { active: boolean } = {
   name: '', path: '', icon: '', parentId: null, sortOrder: 0, requiredRole: '', visible: true, active: true,
@@ -90,8 +91,8 @@ const MenuManagementPage: React.FC = () => {
       }
       resetForm();
       await load();
-    } catch (err: any) {
-      alert(err.response?.data?.message || '저장 실패');
+    } catch (err) {
+      alert(apiErrorMessage(err, '저장 실패'));
     } finally {
       setSaving(false);
     }
@@ -103,8 +104,8 @@ const MenuManagementPage: React.FC = () => {
       await menuApi.remove(m.id);
       if (editing?.id === m.id) resetForm();
       await load();
-    } catch (err: any) {
-      alert(err.response?.data?.message || '하위 메뉴가 있어 삭제할 수 없습니다.');
+    } catch (err) {
+      alert(apiErrorMessage(err, '하위 메뉴가 있어 삭제할 수 없습니다.'));
     }
   };
 
@@ -121,8 +122,8 @@ const MenuManagementPage: React.FC = () => {
         id: s.id, parentId: m.parentId, sortOrder: idx,
       })));
       await load();
-    } catch (err: any) {
-      alert(err.response?.data?.message || '순서 변경 실패');
+    } catch (err) {
+      alert(apiErrorMessage(err, '순서 변경 실패'));
     } finally {
       setMoving(false);
     }

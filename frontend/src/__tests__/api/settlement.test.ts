@@ -24,6 +24,7 @@ const mockSearchResponse: SettlementSearchResponse = {
       status: 'DONE',
       isRefunded: false,
       settlementDate: '2026-01-15',
+      createdAt: '2026-01-15T09:00:00',
     },
   ],
   totalElements: 1,

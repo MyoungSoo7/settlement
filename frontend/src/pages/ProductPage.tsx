@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import CreateProductForm from '@/components/product/CreateProductForm';
 import ProductList from '@/components/product/ProductList';
 import ImageUpload from '@/components/product/ImageUpload';
 import InventoryTab from '@/components/product/InventoryTab';
 import { ProductResponse, ProductImageResponse } from '@/types';
 import { productApi } from '@/api/product';
-import { useToast } from '@/contexts/ToastContext';
+import { useToast } from '@/contexts/useToast';
 import api from '@/api/axios';
 
 const ProductPage: React.FC = () => {
@@ -27,7 +27,7 @@ const ProductPage: React.FC = () => {
     setActiveTab('list');
   };
 
-  const fetchProductImages = async (productId: number) => {
+  const fetchProductImages = useCallback(async (productId: number) => {
     try {
       const response = await api.get<ProductImageResponse[]>(`/admin/products/${productId}/images`);
       setProductImages(response.data);
@@ -35,7 +35,7 @@ const ProductPage: React.FC = () => {
       console.error('이미지 로딩 오류:', error);
       setProductImages([]);
     }
-  };
+  }, []);
 
   const handleProductSelect = (product: ProductResponse) => {
     setSelectedProduct(product);
@@ -49,12 +49,14 @@ const ProductPage: React.FC = () => {
     fetchProductImages(product.id);
   };
 
-  // Load images when product is selected
+  // Load images when product is selected — 의존성은 객체가 아니라 id 값으로 둔다
+  // (같은 상품을 다시 선택해 객체 identity 만 바뀌었을 때 재조회하지 않기 위함).
+  const selectedProductId = selectedProduct?.id;
   useEffect(() => {
-    if (selectedProduct) {
-      fetchProductImages(selectedProduct.id);
+    if (selectedProductId) {
+      fetchProductImages(selectedProductId);
     }
-  }, [selectedProduct?.id]);
+  }, [selectedProductId, fetchProductImages]);
 
   const handleEditToggle = () => {
     if (isEditing && selectedProduct) {

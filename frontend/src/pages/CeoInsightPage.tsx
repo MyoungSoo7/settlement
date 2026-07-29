@@ -4,6 +4,7 @@ import { companyApi } from '@/api/company';
 import type { FinancialCompany, FinancialCompanyPage } from '@/api/financial';
 import Card from '@/components/Card';
 import Spinner from '@/components/Spinner';
+import { apiErrorMessage } from '@/lib/apiError';
 
 const fmtAmount = (value: number | null | undefined) => {
   if (value === null || value === undefined) return 'N/A';
@@ -95,8 +96,8 @@ const CeoInsightPage: React.FC = () => {
       .then((data) => {
         if (!cancelled) setCompanies(data);
       })
-      .catch((err: any) => {
-        if (!cancelled) setError(err.response?.data?.message || '기업 목록 조회에 실패했습니다.');
+      .catch((err: unknown) => {
+        if (!cancelled) setError(apiErrorMessage(err, '기업 목록 조회에 실패했습니다.'));
       })
       .finally(() => {
         if (!cancelled) setLoadingList(false);
@@ -119,8 +120,8 @@ const CeoInsightPage: React.FC = () => {
     setError(null);
     try {
       setInsight(await ceoApi.insight(company));
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'CEO 인사이트 조회에 실패했습니다.');
+    } catch (err) {
+      setError(apiErrorMessage(err, 'CEO 인사이트 조회에 실패했습니다.'));
     } finally {
       setLoadingInsight(false);
     }

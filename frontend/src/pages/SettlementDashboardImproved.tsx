@@ -5,7 +5,8 @@ import StatusBadge from '@/components/StatusBadge';
 import DateRangePicker from '@/components/DateRangePicker';
 import EmptyState from '@/components/EmptyState';
 import LoadingSkeleton from '@/components/LoadingSkeleton';
-import { useToast } from '@/contexts/ToastContext';
+import { useToast } from '@/contexts/useToast';
+import { apiErrorMessage } from '@/lib/apiError';
 
 const SettlementDashboard: React.FC = () => {
   const [data, setData] = useState<SettlementSearchResponse | null>(null);
@@ -42,8 +43,8 @@ const SettlementDashboard: React.FC = () => {
     try {
       const response = await settlementApi.search(filters);
       setData(response);
-    } catch (err: any) {
-      const errorMsg = err.response?.data?.message || '데이터를 불러오는데 실패했습니다.';
+    } catch (err) {
+      const errorMsg = apiErrorMessage(err, '데이터를 불러오는데 실패했습니다.');
       setError(errorMsg);
       showToast(errorMsg, 'error');
       console.error('Settlement search error:', err);
@@ -52,11 +53,15 @@ const SettlementDashboard: React.FC = () => {
     }
   };
 
+  // 최초 1회만 조회한다 — 이 화면은 필터를 바꿔도 자동 재조회하지 않고 사용자가 '조회' 버튼을
+  // 눌러야 fetchSettlements() 가 돈다(SettlementAdmin/SettlementDashboard 와 다른 정책).
+  // fetchSettlements 를 의존성에 넣으면 필터 입력마다 자동 검색으로 동작이 바뀌므로 의도적으로 뺀다.
   useEffect(() => {
     fetchSettlements();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleFilterChange = (key: keyof SettlementSearchRequest, value: any) => {
+  const handleFilterChange = <K extends keyof SettlementSearchRequest>(key: K, value: SettlementSearchRequest[K]) => {
     setFilters((prev) => ({
       ...prev,
       [key]: value,
@@ -132,7 +137,7 @@ const SettlementDashboard: React.FC = () => {
             <select
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
               value={filters.status || ''}
-              onChange={(e) => handleFilterChange('status', e.target.value || undefined)}
+              onChange={(e) => handleFilterChange('status', (e.target.value || undefined) as SettlementSearchRequest['status'])}
             >
               <option value="">전체</option>
               <option value="REQUESTED">요청됨</option>

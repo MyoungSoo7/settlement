@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { paymentApi } from '@/api/payment';
 import { PaymentResponse } from '@/types';
 import Spinner from '@/components/Spinner';
+import { apiErrorMessage } from '@/lib/apiError';
 
 const TossPaymentSuccess: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -14,16 +15,18 @@ const TossPaymentSuccess: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [countdown, setCountdown] = useState(3);
 
-  const goToHistory = () => navigate('/mypage');
+  const goToHistory = useCallback(() => navigate('/mypage'), [navigate]);
+
+  // 쿼리 파라미터는 effect 밖에서 읽는다 — 의존성을 searchParams 객체가 아니라 문자열 값으로 두기
+  // 위해서다. 객체를 의존성에 넣으면 identity 가 바뀔 때 결제 확인 POST 가 재실행될 수 있다.
+  const paymentKey  = searchParams.get('paymentKey');
+  const tossOrderId = searchParams.get('orderId');
+  const amountStr   = searchParams.get('amount');
+  const type        = searchParams.get('type');        // 'cart' | null
+  const dbOrderIds  = searchParams.get('dbOrderIds');  // 장바구니: '1,2,3'
+  const dbOrderId   = searchParams.get('dbOrderId');   // 단건: '1'
 
   useEffect(() => {
-    const paymentKey  = searchParams.get('paymentKey');
-    const tossOrderId = searchParams.get('orderId');
-    const amountStr   = searchParams.get('amount');
-    const type        = searchParams.get('type');        // 'cart' | null
-    const dbOrderIds  = searchParams.get('dbOrderIds');  // 장바구니: '1,2,3'
-    const dbOrderId   = searchParams.get('dbOrderId');   // 단건: '1'
-
     if (!paymentKey || !tossOrderId || !amountStr) {
       setError('결제 정보가 올바르지 않습니다.');
       setLoading(false);
@@ -42,7 +45,7 @@ const TossPaymentSuccess: React.FC = () => {
         })
         .then((res) => setPayments(res))
         .catch((err) => {
-          setError(err.response?.data?.message || '결제 확인 중 오류가 발생했습니다.');
+          setError(apiErrorMessage(err, '결제 확인 중 오류가 발생했습니다.'));
         })
         .finally(() => setLoading(false));
     } else if (dbOrderId) {
@@ -56,14 +59,14 @@ const TossPaymentSuccess: React.FC = () => {
         })
         .then((res) => setPayments([res]))
         .catch((err) => {
-          setError(err.response?.data?.message || '결제 확인 중 오류가 발생했습니다.');
+          setError(apiErrorMessage(err, '결제 확인 중 오류가 발생했습니다.'));
         })
         .finally(() => setLoading(false));
     } else {
       setError('결제 정보가 올바르지 않습니다.');
       setLoading(false);
     }
-  }, []);
+  }, [paymentKey, tossOrderId, amountStr, type, dbOrderIds, dbOrderId]);
 
   /* 결제 성공 후 3초 카운트다운 → 주문 상품 탭으로 자동 이동 */
   useEffect(() => {
@@ -79,7 +82,7 @@ const TossPaymentSuccess: React.FC = () => {
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, [payments]);
+  }, [payments, goToHistory]);
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(value);

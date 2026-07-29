@@ -5,6 +5,7 @@ import {
 } from '@/api/aichat';
 import Card from '@/components/Card';
 import Spinner from '@/components/Spinner';
+import { apiErrorMessage, errorDetail } from '@/lib/apiError';
 
 interface ChatBubble {
   role: 'USER' | 'ASSISTANT';
@@ -46,8 +47,8 @@ const AiChatPage: React.FC = () => {
     try {
       const detail = await aiChatApi.conversation(id);
       setMessages(detail.messages.map((m) => ({ role: m.role, content: m.content })));
-    } catch (err: any) {
-      setError(err.response?.data?.message || '대화를 불러오지 못했습니다.');
+    } catch (err) {
+      setError(apiErrorMessage(err, '대화를 불러오지 못했습니다.'));
     } finally {
       setLoadingHistory(false);
     }
@@ -64,8 +65,8 @@ const AiChatPage: React.FC = () => {
       await aiChatApi.deleteConversation(id);
       if (activeId === id) startNewConversation();
       await refreshConversations();
-    } catch (err: any) {
-      setError(err.response?.data?.message || '대화 삭제에 실패했습니다.');
+    } catch (err) {
+      setError(apiErrorMessage(err, '대화 삭제에 실패했습니다.'));
     }
   };
 
@@ -95,9 +96,9 @@ const AiChatPage: React.FC = () => {
       let result;
       try {
         result = await aiChatApi.chatStream(message, activeId ?? undefined, appendDelta);
-      } catch (streamErr: any) {
+      } catch (streamErr) {
         // 스트리밍 경로 실패 시(프록시가 SSE 를 못 넘기는 환경 등) 동기 API 로 1회 폴백
-        if (streamErr?.message?.includes('잦습니다')) throw streamErr;   // 429 는 폴백해도 같은 결과
+        if (errorDetail(streamErr, '').includes('잦습니다')) throw streamErr;   // 429 는 폴백해도 같은 결과
         const fallback = await aiChatApi.chat(message, activeId ?? undefined);
         appendDelta(fallback.reply);
         result = fallback;
@@ -110,10 +111,10 @@ const AiChatPage: React.FC = () => {
       });
       setActiveId(result.conversationId);
       await refreshConversations();
-    } catch (err: any) {
+    } catch (err) {
       setMessages((prev) => prev.slice(0, -2));   // 실패한 왕복은 서버에도 저장되지 않는다 — 화면도 원복
       setInput(message);                           // 재전송 유도
-      setError(err.response?.data?.message || err.message || 'AI 응답에 실패했습니다.');
+      setError(errorDetail(err, 'AI 응답에 실패했습니다.'));
     } finally {
       setSending(false);
     }

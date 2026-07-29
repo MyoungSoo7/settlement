@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import StarRating from './StarRating';
 import { reviewApi } from '@/api/review';
 import { ReviewResponse } from '@/types';
+import { apiErrorMessage } from '@/lib/apiError';
 
 interface ReviewFormProps {
   productId: number;
@@ -34,8 +35,8 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
         result = await reviewApi.createReview({ productId, userId, rating, content });
       }
       onSuccess(result);
-    } catch (err: any) {
-      setError(err.response?.data?.message || '리뷰 저장에 실패했습니다.');
+    } catch (err) {
+      setError(apiErrorMessage(err, '리뷰 저장에 실패했습니다.'));
     } finally {
       setLoading(false);
     }

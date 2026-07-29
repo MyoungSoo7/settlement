@@ -3,6 +3,7 @@ import {
   commonCodeApi, CommonCodeGroup, CommonCode,
 } from '@/api/system';
 import Spinner from '@/components/Spinner';
+import { apiErrorMessage } from '@/lib/apiError';
 
 const blankGroup = { groupCode: '', name: '', description: '' };
 const blankCode = { code: '', label: '', sortOrder: 0, extra1: '' };
@@ -84,8 +85,8 @@ const CommonCodeManagementPage: React.FC = () => {
       setGroups((g) => [...g, created]);
       setGroupForm(blankGroup);
       selectGroup(created.groupCode);
-    } catch (err: any) {
-      alert(err.response?.data?.message || '그룹 생성 실패');
+    } catch (err) {
+      alert(apiErrorMessage(err, '그룹 생성 실패'));
     } finally {
       setSavingGroup(false);
     }
@@ -123,8 +124,8 @@ const CommonCodeManagementPage: React.FC = () => {
       });
       setCodes((c) => [...c, created].sort((a, b) => a.sortOrder - b.sortOrder));
       setCodeForm(blankCode);
-    } catch (err: any) {
-      alert(err.response?.data?.message || '코드 생성 실패');
+    } catch (err) {
+      alert(apiErrorMessage(err, '코드 생성 실패'));
     } finally {
       setSavingCode(false);
     }

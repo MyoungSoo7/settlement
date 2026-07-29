@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '@/api/axios';
+import { apiErrorMessage } from '@/lib/apiError';
 
 const ForgotPassword: React.FC = () => {
   const navigate = useNavigate();
@@ -19,8 +20,8 @@ const ForgotPassword: React.FC = () => {
       await api.post('/users/password-reset/request', { email });
       setSuccess(true);
       setEmail('');
-    } catch (err: any) {
-      setError(err.response?.data?.message || '비밀번호 재설정 요청에 실패했습니다.');
+    } catch (err) {
+      setError(apiErrorMessage(err, '비밀번호 재설정 요청에 실패했습니다.'));
       console.error('Password reset request error:', err);
     } finally {
       setLoading(false);

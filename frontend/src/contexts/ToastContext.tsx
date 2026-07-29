@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
+import React, { useState, useCallback, ReactNode, useEffect } from 'react';
 import Toast, { ToastType } from '@/components/Toast';
 import { setGlobalToast } from '@/api/axios';
+import { ToastContext } from '@/contexts/useToast';
 
 interface ToastMessage {
   id: string;
@@ -8,19 +9,6 @@ interface ToastMessage {
   type: ToastType;
 }
 
-interface ToastContextType {
-  showToast: (message: string, type?: ToastType) => void;
-}
-
-const ToastContext = createContext<ToastContextType | undefined>(undefined);
-
-export const useToast = () => {
-  const context = useContext(ToastContext);
-  if (!context) {
-    throw new Error('useToast must be used within ToastProvider');
-  }
-  return context;
-};
 
 interface ToastProviderProps {
   children: ReactNode;

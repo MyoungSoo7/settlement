@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { categoryApi } from '@/api/category';
 import { CategoryResponse } from '@/types';
-import { useToast } from '@/contexts/ToastContext';
+import { useToast } from '@/contexts/useToast';
 
 const CategoryManagementPage: React.FC = () => {
   const [categories, setCategories] = useState<CategoryResponse[]>([]);
@@ -14,11 +14,7 @@ const CategoryManagementPage: React.FC = () => {
   });
   const { showToast } = useToast();
 
-  useEffect(() => {
-    loadCategories();
-  }, []);
-
-  const loadCategories = async () => {
+  const loadCategories = useCallback(async () => {
     setLoading(true);
     try {
       const data = await categoryApi.getAllCategories();
@@ -28,7 +24,12 @@ const CategoryManagementPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
+
+  useEffect(() => {
+    loadCategories();
+  }, [loadCategories]);
+
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();

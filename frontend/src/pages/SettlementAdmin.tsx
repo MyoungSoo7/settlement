@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { settlementApi } from '@/api/settlement';
 import {
   SettlementSearchRequest,
@@ -8,6 +8,7 @@ import {
 } from '@/types';
 import Card from '@/components/Card';
 import Spinner from '@/components/Spinner';
+import { apiErrorMessage } from '@/lib/apiError';
 
 const SettlementAdmin: React.FC = () => {
   const [data, setData] = useState<SettlementSearchResponse | null>(null);
@@ -23,37 +24,37 @@ const SettlementAdmin: React.FC = () => {
   });
 
   // 정산 데이터 조회
-  const fetchSettlements = async () => {
+  const fetchSettlements = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
       const response = await settlementApi.search(filters);
       setData(response);
-    } catch (err: any) {
-      setError(err.response?.data?.message || '데이터를 불러오는데 실패했습니다.');
+    } catch (err) {
+      setError(apiErrorMessage(err, '데이터를 불러오는데 실패했습니다.'));
       console.error('Settlement search error:', err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters]);
 
   useEffect(() => {
     fetchSettlements();
-  }, [filters]);
+  }, [fetchSettlements]);
 
   // 정산 상세 조회
   const handleViewDetail = async (id: number) => {
     try {
       const detail = await settlementApi.getSettlement(id);
       setSelectedSettlement(detail);
-    } catch (err: any) {
-      setError(err.response?.data?.message || '상세 정보를 불러오는데 실패했습니다.');
+    } catch (err) {
+      setError(apiErrorMessage(err, '상세 정보를 불러오는데 실패했습니다.'));
     }
   };
 
   // 필터 변경
-  const handleFilterChange = (key: keyof SettlementSearchRequest, value: any) => {
+  const handleFilterChange = <K extends keyof SettlementSearchRequest>(key: K, value: SettlementSearchRequest[K]) => {
     setFilters((prev) => ({
       ...prev,
       [key]: value,
@@ -122,7 +123,7 @@ const SettlementAdmin: React.FC = () => {
               <select
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-900"
                 value={filters.status || ''}
-                onChange={(e) => handleFilterChange('status', e.target.value || undefined)}
+                onChange={(e) => handleFilterChange('status', (e.target.value || undefined) as SettlementSearchRequest['status'])}
               >
                 <option value="">전체</option>
                 <option value="REQUESTED">요청됨</option>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ProductResponse, ProductStatus } from '@/types';
 import { productApi } from '@/api/product';
+import { apiErrorMessage } from '@/lib/apiError';
 
 interface ProductListProps {
   onProductSelect?: (product: ProductResponse) => void;
@@ -23,8 +24,8 @@ const ProductList: React.FC<ProductListProps> = ({ onProductSelect, refreshTrigg
       const data = await productApi.getAllProducts();
       setProducts(data);
       setFilteredProducts(data);
-    } catch (err: any) {
-      const message = err.response?.data?.message || '상품 목록을 불러오는데 실패했습니다.';
+    } catch (err) {
+      const message = apiErrorMessage(err, '상품 목록을 불러오는데 실패했습니다.');
       setError(message);
       console.error('상품 목록 조회 실패:', err);
     } finally {

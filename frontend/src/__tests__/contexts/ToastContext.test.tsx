@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
-import { ToastProvider, useToast } from '@/contexts/ToastContext';
+import { ToastProvider } from '@/contexts/ToastContext';
+import { useToast } from '@/contexts/useToast';
 
 const Consumer = () => {
   const { showToast } = useToast();
