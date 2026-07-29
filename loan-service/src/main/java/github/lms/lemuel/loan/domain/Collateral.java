@@ -12,8 +12,12 @@ import java.time.LocalDateTime;
  *
  * <p>평가액은 <b>설정 시점의 값을 영구 보존</b>한다(정산의 {@code commission_rate} 스냅샷과 같은 이력
  * 재현성 철학) — 사후에 시세가 변해도 이미 실행된 대출의 심사 근거는 재현 가능해야 하기 때문이다.
- * 따라서 이 애그리거트에는 평가액을 바꾸는 메서드가 없다. 주기적 재평가·마진콜은 Phase 2 이월이며,
- * 도입되더라도 평가액 <em>이력 행 추가</em>로 표현해야지 이 값을 덮어쓰면 안 된다.
+ * 따라서 이 애그리거트에는 평가액을 바꾸는 메서드가 없다. 주기적 재평가는 이 값을 덮어쓰지 않고
+ * 별도 이력({@code CollateralRevaluation})으로 쌓는다.
+ *
+ * <p><b>유효담보가치 = 평가액 − 선순위채권액</b>. 앞선 근저당이 있으면 그 몫은 이미 남의 담보력이므로
+ * 우리 한도 계산에서 빼야 한다. 초과 선순위는 음수가 아니라 0으로 clamp 한다 — 담보가치가 마이너스가
+ * 될 수는 없고, 초과분은 우리 채권과 무관하기 때문이다.
  *
  * <p><b>LTV 는 여기서 계산하지 않는다</b> — 담보는 "얼마짜리인가"(유효담보가치)까지만 알고, "얼마를
  * 빌려줄 수 있는가"는 {@code SecuredLoanPolicy} 의 책임이다. 정책 밖 인라인 계산은 경계값 테스트를
@@ -25,15 +29,17 @@ public class Collateral {
     private final CollateralType type;
     private final String description;
     private final BigDecimal appraisedValue;
+    private final BigDecimal seniorClaimAmount;
     private final LocalDateTime appraisedAt;
     private CollateralStatus status;
 
     private Collateral(Long id, CollateralType type, String description, BigDecimal appraisedValue,
-                       LocalDateTime appraisedAt, CollateralStatus status) {
+                       BigDecimal seniorClaimAmount, LocalDateTime appraisedAt, CollateralStatus status) {
         this.id = id;
         this.type = type;
         this.description = description;
         this.appraisedValue = appraisedValue;
+        this.seniorClaimAmount = seniorClaimAmount;
         this.appraisedAt = appraisedAt;
         this.status = status;
     }
@@ -48,6 +54,17 @@ public class Collateral {
      */
     public static Collateral pledge(CollateralType type, String description, BigDecimal appraisedValue,
                                     LocalDateTime appraisedAt) {
+        return pledge(type, description, appraisedValue, BigDecimal.ZERO, appraisedAt);
+    }
+
+    /**
+     * 선순위 채권액을 지정해 담보를 설정한다.
+     *
+     * @param seniorClaimAmount 선순위 채권액(0 이상) — 유효담보가치에서 차감된다.
+     *                          평가액을 넘어도 예외가 아니며 유효담보가치가 0 이 된다(담보력 없음).
+     */
+    public static Collateral pledge(CollateralType type, String description, BigDecimal appraisedValue,
+                                    BigDecimal seniorClaimAmount, LocalDateTime appraisedAt) {
         if (type == null) {
             throw new LoanInvariantViolationException("담보 유형은 필수입니다");
         }
@@ -60,16 +77,27 @@ public class Collateral {
         if (appraisedAt == null) {
             throw new LoanInvariantViolationException("담보 평가 시각은 필수입니다");
         }
+        if (seniorClaimAmount == null || seniorClaimAmount.signum() < 0) {
+            throw new LoanInvariantViolationException(
+                    "선순위 채권액은 0 이상이어야 합니다: " + seniorClaimAmount);
+        }
         // 금액은 도메인 진입 시 Money(scale 2, HALF_UP)로 정규화한다(money-safety).
         return new Collateral(null, type, description.trim(), Money.of(appraisedValue).toBigDecimal(),
-                appraisedAt, CollateralStatus.PLEDGED);
+                Money.of(seniorClaimAmount).toBigDecimal(), appraisedAt, CollateralStatus.PLEDGED);
     }
 
     /** 영속화된 상태를 재구성(리포지토리 전용). */
     public static Collateral reconstitute(Long id, CollateralType type, String description,
                                           BigDecimal appraisedValue, LocalDateTime appraisedAt,
                                           CollateralStatus status) {
-        return new Collateral(id, type, description, appraisedValue, appraisedAt, status);
+        return reconstitute(id, type, description, appraisedValue, BigDecimal.ZERO, appraisedAt, status);
+    }
+
+    /** 영속화된 상태를 재구성(리포지토리 전용). */
+    public static Collateral reconstitute(Long id, CollateralType type, String description,
+                                          BigDecimal appraisedValue, BigDecimal seniorClaimAmount,
+                                          LocalDateTime appraisedAt, CollateralStatus status) {
+        return new Collateral(id, type, description, appraisedValue, seniorClaimAmount, appraisedAt, status);
     }
 
     /** 담보 설정 완료 — 대출 실행의 전제 조건. */
@@ -85,13 +113,13 @@ public class Collateral {
     }
 
     /**
-     * 유효담보가치 — 한도 산정의 기준액.
+     * 유효담보가치 — 한도 산정의 기준액. {@code max(0, 평가액 − 선순위채권액)}.
      *
-     * <p>Phase 1 은 선순위 채권이 없다고 보므로 평가액과 같다. 선순위 차감(Phase 2)이 도입되면
-     * {@code 평가액 − 선순위채권액}이 되며, 호출 측(정책)은 이 메서드만 보므로 영향받지 않는다.
+     * <p>호출 측(정책)은 이 메서드만 보므로, 선순위 개념이 추가돼도 LTV 산정 코드는 수정되지 않는다.
      */
     public BigDecimal effectiveValue() {
-        return appraisedValue;
+        Money remaining = Money.of(appraisedValue).minus(Money.of(seniorClaimAmount).min(Money.of(appraisedValue)));
+        return remaining.toBigDecimal();
     }
 
     /** 담보력이 있는 상태인지 — 대출 실행 가드가 참조한다. */
@@ -110,6 +138,7 @@ public class Collateral {
     public CollateralType getType() { return type; }
     public String getDescription() { return description; }
     public BigDecimal getAppraisedValue() { return appraisedValue; }
+    public BigDecimal getSeniorClaimAmount() { return seniorClaimAmount; }
     public LocalDateTime getAppraisedAt() { return appraisedAt; }
     public CollateralStatus getStatus() { return status; }
 }

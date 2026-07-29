@@ -36,6 +36,9 @@ public class CollateralJpaEntity {
     @Column(name = "appraised_value", nullable = false, precision = 19, scale = 2)
     private BigDecimal appraisedValue;
 
+    @Column(name = "senior_claim_amount", nullable = false, precision = 19, scale = 2)
+    private BigDecimal seniorClaimAmount;
+
     @Column(name = "appraised_at", nullable = false)
     private LocalDateTime appraisedAt;
 
@@ -49,11 +52,13 @@ public class CollateralJpaEntity {
     protected CollateralJpaEntity() { }
 
     private CollateralJpaEntity(Long id, CollateralType type, String description, BigDecimal appraisedValue,
-                                LocalDateTime appraisedAt, CollateralStatus status, LocalDateTime createdAt) {
+                                BigDecimal seniorClaimAmount, LocalDateTime appraisedAt,
+                                CollateralStatus status, LocalDateTime createdAt) {
         this.id = id;
         this.type = type;
         this.description = description;
         this.appraisedValue = appraisedValue;
+        this.seniorClaimAmount = seniorClaimAmount;
         this.appraisedAt = appraisedAt;
         this.status = status;
         this.createdAt = createdAt;
@@ -61,12 +66,13 @@ public class CollateralJpaEntity {
 
     public static CollateralJpaEntity from(Collateral collateral) {
         return new CollateralJpaEntity(collateral.getId(), collateral.getType(), collateral.getDescription(),
-                collateral.getAppraisedValue(), collateral.getAppraisedAt(), collateral.getStatus(),
-                LocalDateTime.now());
+                collateral.getAppraisedValue(), collateral.getSeniorClaimAmount(),
+                collateral.getAppraisedAt(), collateral.getStatus(), LocalDateTime.now());
     }
 
     public Collateral toDomain() {
-        return Collateral.reconstitute(id, type, description, appraisedValue, appraisedAt, status);
+        return Collateral.reconstitute(id, type, description, appraisedValue, seniorClaimAmount,
+                appraisedAt, status);
     }
 
     public Long getId() { return id; }

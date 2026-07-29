@@ -107,6 +107,34 @@ class SchemaEnumContractIT {
     }
 
     @Test
+    @DisplayName("chk_collateral_type == CollateralType enum 전체 (정확 일치)")
+    void collateralTypeCheckMatchesEnumExactly() {
+        // 담보 유형은 Phase 2 에서 1종 → 5종으로 늘었다. CHECK 를 같이 확장하지 않으면 신규 유형
+        // INSERT 가 전부 check_violation 으로 실패한다 — ref_type 이 두 번 당한 갭과 같은 종류다.
+        Set<String> enumValues = new LinkedHashSet<>();
+        for (github.lms.lemuel.loan.domain.CollateralType type
+                : github.lms.lemuel.loan.domain.CollateralType.values()) {
+            enumValues.add(type.name());
+        }
+
+        assertThat(checkValues("chk_collateral_type"))
+                .containsExactlyInAnyOrderElementsOf(enumValues);
+    }
+
+    @Test
+    @DisplayName("chk_secured_loan_status == SecuredLoanStatus enum 전체 (정확 일치)")
+    void securedLoanStatusCheckMatchesEnumExactly() {
+        Set<String> enumValues = new LinkedHashSet<>();
+        for (github.lms.lemuel.loan.domain.SecuredLoanStatus status
+                : github.lms.lemuel.loan.domain.SecuredLoanStatus.values()) {
+            enumValues.add(status.name());
+        }
+
+        assertThat(checkValues("chk_secured_loan_status"))
+                .containsExactlyInAnyOrderElementsOf(enumValues);
+    }
+
+    @Test
     @DisplayName("담보대출 회차성 전표(원금·이자)는 같은 loanId 로 N회 기표가 허용된다(유니크 제외)")
     void securedInstallmentEntriesAllowMultiplePerLoan() {
         String principalRepay = LoanLedgerEntry.securedPrincipalRepayment(1L, ONE).getRefType();
