@@ -16,6 +16,7 @@ import org.springframework.data.domain.Sort;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -34,7 +35,15 @@ import static org.mockito.Mockito.when;
 class AccountEntryPersistenceAdapterTest {
 
     @Mock AccountEntryRepository repository;
+    @Mock AccountBalanceRepository balanceRepository;
     @InjectMocks AccountEntryPersistenceAdapter adapter;
+
+    /** 실체화 잔액 행 스텁 — 어댑터가 balance 만 읽으므로 리플렉션 없이 값만 채운다. */
+    private static AccountBalanceJpaEntity balance(BigDecimal value) {
+        AccountBalanceJpaEntity stub = org.mockito.Mockito.mock(AccountBalanceJpaEntity.class);
+        when(stub.getBalance()).thenReturn(value);
+        return stub;
+    }
 
     private static AccountEntryJpaEntity entity(OwnerType ownerType, String ownerId,
                                                 GlAccount debit, GlAccount credit, String amount,
@@ -135,12 +144,54 @@ class AccountEntryPersistenceAdapterTest {
     }
 
     @Test
-    void sellerPayableBalance_는_SELLER_owner의_SELLER_PAYABLE_순잔액을_위임_조회한다() {
-        when(repository.netBalanceByOwnerAndAccount(OwnerType.SELLER, "777", GlAccount.SELLER_PAYABLE))
-                .thenReturn(new BigDecimal("30000"));
+    void sellerPayableBalance_는_실체화_잔액을_PK로_조회한다_재합산하지_않는다() {
+        // ADR 0030 Phase 1 — O(셀러 전표 수) 재합산을 (owner, account) 유일키 조회로 교체했다.
+        AccountBalanceJpaEntity row = balance(new BigDecimal("30000"));
+        when(balanceRepository.findByOwnerTypeAndOwnerIdAndAccount(
+                OwnerType.SELLER, "777", GlAccount.SELLER_PAYABLE))
+                .thenReturn(Optional.of(row));
 
         assertThat(adapter.sellerPayableBalance("777")).isEqualByComparingTo("30000");
-        verify(repository).netBalanceByOwnerAndAccount(OwnerType.SELLER, "777", GlAccount.SELLER_PAYABLE);
+        verify(repository, never()).netBalanceByOwnerAndAccount(any(), any(), any());
+    }
+
+    @Test
+    void sellerPayableBalance_는_잔액행이_없으면_0을_돌려준다() {
+        when(balanceRepository.findByOwnerTypeAndOwnerIdAndAccount(
+                OwnerType.SELLER, "empty", GlAccount.SELLER_PAYABLE))
+                .thenReturn(Optional.empty());
+
+        assertThat(adapter.sellerPayableBalance("empty")).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void append_는_삽입에_성공하면_대변_플러스_차변_마이너스로_잔액을_누적한다() {
+        // 전표 한 행 = 차변 1 · 대변 1 이므로 잔액도 두 레그를 같은 tx 에서 함께 움직인다.
+        // 부호 규약은 credit-positive (balance = Σcredit − Σdebit).
+        AccountEntry entry = AccountEntry.loanDisbursed("55", "L1", new BigDecimal("800000"));
+        when(repository.insertIgnoreConflict(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(1);
+
+        adapter.append(entry);
+
+        // BigDecimal 은 스케일까지 보는 equals 대신 compareTo 로 비교한다(800000 vs 800000.00).
+        verify(balanceRepository).upsertDelta(eq("SELLER"), eq("55"), eq("CASH"),
+                argThat(d -> d.compareTo(new BigDecimal("800000")) == 0));
+        verify(balanceRepository).upsertDelta(eq("SELLER"), eq("55"), eq("LOAN_RECEIVABLE"),
+                argThat(d -> d.compareTo(new BigDecimal("-800000")) == 0));
+    }
+
+    @Test
+    void append_는_중복_수신이면_잔액을_건드리지_않는다() {
+        // ★ 이 가드가 빠지면 재수신마다 잔액이 부풀어 원장과 파생 캐시가 어긋난다.
+        //   insertIgnoreConflict 가 0행(ON CONFLICT DO NOTHING)일 때는 기표가 없었던 것이다.
+        AccountEntry entry = AccountEntry.loanDisbursed("55", "L1", new BigDecimal("800000"));
+        when(repository.insertIgnoreConflict(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(0);
+
+        adapter.append(entry);
+
+        verify(balanceRepository, never()).upsertDelta(any(), any(), any(), any());
     }
 
     @Test
