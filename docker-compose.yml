@@ -519,6 +519,8 @@ services:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
       # 기업대출 신용평가 — financial 공개 API 를 컨테이너 네트워크로 조회 (app.loan.financial.base-url)
       APP_LOAN_FINANCIAL_BASE_URL: http://financial-statements-service:8080
+      # 담보/개인신용 금리 산정 — economics 공개 API 로 한국은행 기준금리(BASE_RATE) 조회, 실패 시 설정값 폴백
+      APP_LOAN_ECONOMICS_BASE_URL: http://economics-service:8080
       # JWT 시크릿은 order-service 와 동일해야 토큰 검증 가능
       JWT_ISSUER: ${JWT_ISSUER}
       JWT_SECRET: ${JWT_SECRET}

@@ -148,6 +148,13 @@ app:
     # financial-statements-service 공개 API (회사 + 최신 요약 재무제표 조회)
     financial:
       base-url: ${APP_LOAN_FINANCIAL_BASE_URL:http://localhost:8086}
+    # economics-service 공개 API (한국은행 기준금리 BASE_RATE 최신값 — 담보/개인신용 금리 산정)
+    economics:
+      base-url: ${APP_LOAN_ECONOMICS_BASE_URL:http://localhost:8087}
+    # 담보/개인신용 대출 (SecuredLoanPolicy) — base-rate-percent 는 economics 미가용 시 폴백 겸 기본값
+    secured:
+      base-rate-percent: ${APP_LOAN_SECURED_BASE_RATE:3.5}
+      real-estate-ltv: ${APP_LOAN_SECURED_REAL_ESTATE_LTV:0.70}
     # 평판 등급별 한도 haircut (ADR 0023 Phase 3 후속) — 셀러 법인 뉴스 평판이 나쁠수록 한도 축소.
     # 등급 미상(매핑/이벤트 미수신)이면 1.0(무변동, fail-open).
     reputation:

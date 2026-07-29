@@ -46,7 +46,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
         classes = LoanServiceApplication.class,
         properties = {
                 "app.kafka.enabled=false",
-                "app.jwt.secret=integration-test-secret-key-32-bytes-min-OK"
+                "app.jwt.secret=integration-test-secret-key-32-bytes-min-OK",
+                // 기준금리는 폴백(3.5%) 경로로 고정한다 — 로컬에 economics 가 떠 있으면 실측 금리가
+                // 섞여 테스트가 비결정적이 된다. 9번 포트(discard)는 즉시 접속 실패한다.
+                "app.loan.economics.base-url=http://localhost:9"
         }
 )
 @Testcontainers
