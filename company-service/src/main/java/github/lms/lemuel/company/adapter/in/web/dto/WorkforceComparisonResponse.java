@@ -1,7 +1,5 @@
 package github.lms.lemuel.company.adapter.in.web.dto;
 
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import github.lms.lemuel.company.domain.ComparisonLevel;
 import github.lms.lemuel.company.domain.ComparisonUnavailableReason;
 import github.lms.lemuel.company.domain.CompanyWorkforce;
@@ -15,9 +13,15 @@ import java.math.BigDecimal;
 /**
  * 사업장 단건 상세 + 업종·지역 비교 응답.
  *
- * <p><b>금액 필드는 소수 문자열로 직렬화한다</b>({@code estimatedAnnualSalary}, {@code salaryCapMonthlyAmount},
+ * <p><b>금액 필드는 소수 문자열이다</b>({@code estimatedAnnualSalary}, {@code salaryCapMonthlyAmount},
  * 그리고 금액 지표의 {@code median}·{@code difference}). 부동소수 수치로 나가면 클라이언트 파싱 단계에서
  * 정밀도가 깨질 수 있어서다. 비율(증감률·백분위)과 건수(인원수·표본수)는 금액이 아니므로 수치로 나간다.
+ *
+ * <p>★ 문자열화는 <b>필드 타입 자체를 String 으로 두고 {@code toPlainString()}</b> 으로 만든다
+ * (Outbox 페이로드와 같은 컨벤션). 직렬화기 애너테이션에 맡기지 않는 이유: Boot 4 런타임의 HTTP 메시지
+ * 변환은 Jackson 3({@code tools.jackson})이라 Jackson 2 의 {@code @JsonSerialize/ToStringSerializer} 를
+ * 무시한다 — 실제로 애너테이션 방식은 단위 테스트(Jackson 2 컨버터 수동 배선)만 통과하고 실기동에서는
+ * 금액이 수치로 나갔다(2026-07-30 실적재 검증에서 발견).
  *
  * <p>기존 목록 검색 응답({@link CompanyWorkforceResponse})은 손대지 않는다 — 별개 계약이다.
  *
@@ -30,11 +34,9 @@ import java.math.BigDecimal;
 public record WorkforceComparisonResponse(String workplaceName, String bizRegNoPrefix, String snapshotMonth,
                                           String industryCode, String industryName, String address,
                                           String sido, String sigungu, int headcount,
-                                          @JsonSerialize(using = ToStringSerializer.class)
-                                          BigDecimal estimatedAnnualSalary,
+                                          String estimatedAnnualSalary,
                                           boolean salaryCapReached,
-                                          @JsonSerialize(using = ToStringSerializer.class)
-                                          BigDecimal salaryCapMonthlyAmount,
+                                          String salaryCapMonthlyAmount,
                                           GroupComparisonResponse industryComparison,
                                           GroupComparisonResponse regionComparison,
                                           String note) {
@@ -56,12 +58,17 @@ public record WorkforceComparisonResponse(String workplaceName, String bizRegNoP
                 region.sido(),
                 region.sigungu(),
                 workforce.headcount(),
-                workforce.estimatedAnnualSalary().orElse(null),
+                money(workforce.estimatedAnnualSalary().orElse(null)),
                 workforce.salaryCapReached(),
-                workforce.salaryCapMonthlyAmount().orElse(null),
+                money(workforce.salaryCapMonthlyAmount().orElse(null)),
                 GroupComparisonResponse.from(comparison.industryComparison()),
                 GroupComparisonResponse.from(comparison.regionComparison()),
                 CAP_DISCLAIMER);
+    }
+
+    /** 금액 → 소수 문자열. null 은 그대로 null(JSON null). */
+    private static String money(BigDecimal amount) {
+        return amount == null ? null : amount.toPlainString();
     }
 
     /** 한 비교축의 판정 결과. 표본수·비교단계·사유는 축마다 하나뿐이다(두 지표가 같은 집단을 공유). */
@@ -89,13 +96,12 @@ public record WorkforceComparisonResponse(String workplaceName, String bizRegNoP
     }
 
     /** 금액 지표 — median·difference 는 소수 문자열, 비율은 수치. */
-    public record MoneyMetricResponse(@JsonSerialize(using = ToStringSerializer.class) BigDecimal median,
-                                      @JsonSerialize(using = ToStringSerializer.class) BigDecimal difference,
+    public record MoneyMetricResponse(String median, String difference,
                                       BigDecimal differenceRate, BigDecimal percentile) {
 
         static MoneyMetricResponse from(MetricComparison metric) {
-            return metric == null ? null : new MoneyMetricResponse(metric.median(), metric.difference(),
-                    metric.differenceRate(), metric.percentile());
+            return metric == null ? null : new MoneyMetricResponse(money(metric.median()),
+                    money(metric.difference()), metric.differenceRate(), metric.percentile());
         }
     }
 }

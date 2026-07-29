@@ -10,18 +10,24 @@ import java.util.Set;
  * <p>파싱 규칙을 SQL 과 Java 에 이중 구현하면 집계와 조회가 서로 다른 집단을 가리키게 되므로,
  * 파생은 적재 시점에 이 클래스로 한 번만 하고 결과를 컬럼에 저장한다(집계 SQL 은 그 컬럼만 GROUP BY).
  *
- * <p>첫 토큰이 시도 명칭 목록에 없으면 파싱 불가로 본다. 접미사(…시/…도) 규칙보다 목록 대조가
- * 안전하다 — 정부 원본에는 {@code "주소"}·{@code "0"} 같은 이형 값이 실제로 존재하고, 접미사 규칙은
- * 그런 값이나 시군구만 적힌 주소를 시도로 오인해 엉뚱한 집단을 만든다.
+ * <p>첫 토큰은 <b>광역 단위 접미사</b>로 판정한다(특별시·광역시·특별자치시·특별자치도, 그리고 3자 이상의
+ * …도). 이 규칙은 {@code "주소"}·{@code "0"} 같은 원본 이형이나 시군구만 적힌 주소({@code "성동구 …"})를
+ * 거부하면서, 행정구역 개편으로 생기는 새 명칭도 그대로 받아들인다.
+ *
+ * <p>★ 처음에는 광역단체 명칭 <b>목록 대조</b>로 구현했는데, 55만 행 실적재 검증에서 목록에 없는
+ * {@code 전남광역통합특별시} 계열 명칭 때문에 3만 4천 건(6.2%)이 통째로 파싱 불가로 떨어졌다.
+ * 명칭 목록은 행정통합·개편이 있을 때마다 조용히 낡아 한 지역의 비교가 전부 사라지는 실패 모드를 갖는다 —
+ * 접미사 규칙은 그 실패 모드가 없고, 실데이터 18종 시도 값을 모두 커버한다(개편 전 강원도·전라북도 포함).
+ * 바깥 접미사만 쓰는 이유: 맨 "시"를 허용하면 {@code 경기도 광주시} 의 {@code 광주시} 같은 시군구가 시도로
+ * 오인될 여지가 생긴다.
  */
 public record WorkplaceRegion(String sido, String sigungu) {
 
-    /** 광역자치단체 17개 + 행정구역 개편 전 명칭(과거 스냅샷 재적재 대비). */
-    private static final Set<String> SIDO_NAMES = Set.of(
-            "서울특별시", "부산광역시", "대구광역시", "인천광역시", "광주광역시", "대전광역시", "울산광역시",
-            "세종특별자치시", "경기도", "강원특별자치도", "충청북도", "충청남도", "전북특별자치도", "전라남도",
-            "경상북도", "경상남도", "제주특별자치도",
-            "강원도", "전라북도", "제주도");
+    /** 광역자치단체 접미사. */
+    private static final Set<String> SIDO_SUFFIXES = Set.of("특별시", "광역시", "특별자치시", "특별자치도");
+
+    /** …도(경기도·충청남도·강원도)는 접미사가 1자라 최소 길이로 오탐을 막는다. */
+    private static final int MIN_DO_LENGTH = 3;
 
     private static final WorkplaceRegion UNPARSEABLE = new WorkplaceRegion(null, null);
 
@@ -37,11 +43,16 @@ public record WorkplaceRegion(String sido, String sigungu) {
             return UNPARSEABLE;
         }
         String[] tokens = address.strip().split("\\s+");
-        if (!SIDO_NAMES.contains(tokens[0])) {
+        if (!isSido(tokens[0])) {
             return UNPARSEABLE;
         }
         String sigungu = tokens.length >= 2 && isSigungu(tokens[1]) ? tokens[1] : null;
         return new WorkplaceRegion(tokens[0], sigungu);
+    }
+
+    private static boolean isSido(String token) {
+        return SIDO_SUFFIXES.stream().anyMatch(token::endsWith)
+                || (token.endsWith("도") && token.length() >= MIN_DO_LENGTH);
     }
 
     private static boolean isSigungu(String token) {

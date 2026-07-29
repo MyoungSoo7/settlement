@@ -66,10 +66,29 @@ class WorkplaceRegionTest {
     }
 
     @Test
-    @DisplayName("행정구역 개편 전 명칭(강원도·전라북도)도 시도로 인정한다 — 과거 스냅샷 재적재 대비")
-    void acceptsLegacySidoNames() {
-        assertTrue(WorkplaceRegion.parse("강원도 원주시 서원대로").isParseable());
-        assertTrue(WorkplaceRegion.parse("전라북도 전주시 백제대로").isParseable());
+    @DisplayName("실데이터에 등장하는 시도 18종을 전부 인정한다 — 개편 전 명칭(강원도·전라북도)과 "
+            + "행정통합으로 새로 생긴 명칭(전남광주통합특별시)까지 (명칭 목록 방식이 3만4천건을 "
+            + "파싱 불가로 떨어뜨린 회귀를 고정)")
+    void acceptsEverySidoSeenInRealData() {
+        for (String sido : new String[]{"경기도", "서울특별시", "전남광주통합특별시", "경상남도", "부산광역시",
+                "인천광역시", "경상북도", "충청남도", "충청북도", "대구광역시", "전북특별자치도",
+                "강원특별자치도", "대전광역시", "울산광역시", "제주특별자치도", "세종특별자치시",
+                "전라북도", "강원도"}) {
+            WorkplaceRegion region = WorkplaceRegion.parse(sido + " 순천시 율촌산단4로");
+
+            assertTrue(region.isParseable(), "시도로 인정하지 못함: " + sido);
+            assertEquals(sido, region.sido());
+            assertEquals("순천시", region.sigungu());
+        }
+    }
+
+    @Test
+    @DisplayName("시군구·2자 이하 토큰은 시도로 오인하지 않는다 — '광주시'가 첫 토큰이어도 시도가 아니다")
+    void doesNotMistakeSigunguForSido() {
+        for (String notSido : new String[]{"광주시", "성동구", "순천군", "대도", "주소"}) {
+            assertFalse(WorkplaceRegion.parse(notSido + " 어딘가로 1").isParseable(),
+                    "시도로 오인: " + notSido);
+        }
     }
 
     @Test

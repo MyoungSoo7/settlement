@@ -28,8 +28,10 @@ import java.time.YearMonth;
 import java.util.List;
 import java.util.NoSuchElementException;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -117,6 +119,13 @@ class CompanyWorkforceControllerTest {
                 .andExpect(jsonPath("$.sido").value("서울특별시"))
                 .andExpect(jsonPath("$.sigungu").value("성동구"))
                 // 금액은 소수 문자열 — 부동소수 수치로 나가지 않는다.
+                // ★ jsonPath().value("43750000") 는 수치 43750000 에도 통과할 수 있어(타입 강제 없음)
+                //   원시 JSON 에서 따옴표까지 확인한다. 애너테이션 기반 문자열화가 Jackson 3 런타임에서
+                //   무시돼 수치로 나갔던 결함(2026-07-30)을 이 어서션이 잡는다.
+                .andExpect(content().string(containsString("\"estimatedAnnualSalary\":\"43750000\"")))
+                .andExpect(content().string(containsString("\"salaryCapMonthlyAmount\":\"6370000\"")))
+                .andExpect(content().string(containsString("\"median\":\"35000000\"")))
+                .andExpect(content().string(containsString("\"difference\":\"8750000\"")))
                 .andExpect(jsonPath("$.estimatedAnnualSalary").value("43750000"))
                 .andExpect(jsonPath("$.salaryCapMonthlyAmount").value("6370000"))
                 .andExpect(jsonPath("$.salaryCapReached").value(false))
