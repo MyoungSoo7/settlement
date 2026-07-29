@@ -61,7 +61,7 @@ public final class SecuredLoanRequestBodies {
 
     /**
      * 중도상환. 이자 필드가 없다 — 회차 이자와 별개로 원금만 앞당겨 갚는 경로이며,
-     * 수수료는 서버가 정책(잔존기간 비례·경과 3년 면제)으로 산정해 응답에 알려준다.
+     * 수수료는 서버가 정책(부과기간 1095일 잔여 비례·경과 3년 면제)으로 산정해 응답에 알려준다.
      */
     public record SecuredLoanPrepayRequest(
             @NotNull @DecimalMin(value = "0", inclusive = false) BigDecimal amount) {

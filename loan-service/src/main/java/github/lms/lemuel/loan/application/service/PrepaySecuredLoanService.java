@@ -25,7 +25,7 @@ import java.time.LocalDateTime;
  * 담보/개인신용 대출 중도상환.
  *
  * <p>회차 상환({@link RepaySecuredLoanService})과 달리 이자 납입이 없고 <b>중도상환수수료</b>가 붙는다.
- * 수수료 산식(잔존기간 비례·경과 3년 면제)은 정책의 정적 순수 함수라 기준금리 조달이 필요 없다 —
+ * 수수료 산식(부과기간 1095일 잔여 비례·경과 3년 면제)은 정책의 정적 순수 함수라 기준금리 조달이 필요 없다 —
  * 중도상환 경로가 economics-service 장애에 결합되면 안 되기 때문이다(Phase 2 기준금리 연동 대비).
  *
  * <p>잔존일수 산정은 도메인의 실행 시각 스냅샷({@code disbursedAt})을 기산점으로 쓰고, "지금"은
@@ -69,9 +69,9 @@ public class PrepaySecuredLoanService implements PrepaySecuredLoanUseCase {
 
         BigDecimal deducted = loan.prepay(amount);
         // 수수료는 실제 차감액 기준이다 — 요청액이 잔액을 넘으면 clamp 된 금액에만 부과해야
-        // 과다 청구가 없다. 잔존일수는 차감 이전이든 이후든 동일(상태와 무관한 날짜 계산).
+        // 과다 청구가 없다. 경과일수는 차감 이전이든 이후든 동일(상태와 무관한 날짜 계산).
         BigDecimal fee = SecuredLoanPolicy.earlyRepaymentFee(
-                deducted, loan.remainingDays(LocalDateTime.now(clock)), loan.contractDays());
+                deducted, loan.elapsedDays(LocalDateTime.now(clock)));
 
         releaseCollateralIfSettled(loan);
         SecuredLoan saved = saveSecuredLoanPort.save(loan);

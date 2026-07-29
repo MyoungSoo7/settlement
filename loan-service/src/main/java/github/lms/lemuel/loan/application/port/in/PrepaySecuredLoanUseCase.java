@@ -8,7 +8,7 @@ import java.math.BigDecimal;
  * 담보/개인신용 대출 중도상환 인바운드 포트.
  *
  * <p>회차 상환({@link RepaySecuredLoanUseCase})과 분리한 이유: 중도상환은 이자 납입이 없는 대신
- * <b>중도상환수수료</b>(잔존기간 비례, 경과 3년 면제)가 붙는 별개의 요금 체계라, 한 포트에 합치면
+ * <b>중도상환수수료</b>(부과기간 1095일 잔여 비례, 경과 3년 면제)가 붙는 별개의 요금 체계라, 한 포트에 합치면
  * 호출 측이 수수료 유무를 분기해야 해 요금 정책이 응용 밖으로 샌다.
  */
 public interface PrepaySecuredLoanUseCase {

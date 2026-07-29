@@ -160,27 +160,16 @@ public class SecuredLoan {
     }
 
     /**
-     * 약정 총일수 = 기산일 → 기산일 + 약정개월. 중도상환수수료의 분모다.
+     * 경과일수 = 기산일 → 기준시각. 중도상환수수료(부과기간 1095일 잔여 비례)의 입력이다.
      *
      * <p>기산일은 <b>실행일</b>이다. {@code disbursed_at} 도입 이전에 실행된 구(舊) 행은 실행 시각이
-     * 없으므로 신청 시각으로 폴백한다 — 신청일이 실행일보다 이르므로 면제(경과 3년) 판정이 차주에게
-     * 불리해지지 않는 방향의 근사다.
+     * 없으므로 신청 시각으로 폴백한다 — 신청일이 실행일보다 이르므로 경과가 길게 계산돼 면제(경과
+     * 3년)가 빨리 오는, 차주에게 불리하지 않은 방향의 근사다. 기준시각이 기산일보다 이르면(시계 역행)
+     * 0 으로 clamp 한다 — 음수 경과가 새면 수수료가 요율 전액을 넘을 수 있다.
      */
-    public int contractDays() {
-        LocalDateTime anchor = feeAnchor();
-        return (int) ChronoUnit.DAYS.between(anchor.toLocalDate(), anchor.toLocalDate().plusMonths(termMonths));
-    }
-
-    /** 잔존일수 = 기준시각 → 만기. 만기를 지났으면 0 (수수료 산식의 분자라 음수가 되면 안 된다). */
-    public int remainingDays(LocalDateTime now) {
-        LocalDateTime anchor = feeAnchor();
-        long remaining = ChronoUnit.DAYS.between(now.toLocalDate(), anchor.toLocalDate().plusMonths(termMonths));
-        return (int) Math.max(0, remaining);
-    }
-
-    /** 약정기간 기산점 — 실행 시각, 없으면(구 데이터) 신청 시각. */
-    private LocalDateTime feeAnchor() {
-        return disbursedAt != null ? disbursedAt : createdAt;
+    public int elapsedDays(LocalDateTime now) {
+        LocalDateTime anchor = disbursedAt != null ? disbursedAt : createdAt;
+        return (int) Math.max(0, ChronoUnit.DAYS.between(anchor.toLocalDate(), now.toLocalDate()));
     }
 
     /**

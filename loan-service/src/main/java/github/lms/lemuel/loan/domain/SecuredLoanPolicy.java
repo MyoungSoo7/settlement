@@ -56,7 +56,7 @@ public class SecuredLoanPolicy {
 
     /** 중도상환수수료 요율. */
     private static final BigDecimal EARLY_REPAYMENT_FEE_RATE = new BigDecimal("0.012");
-    /** 중도상환수수료 면제 경과일수(3년). */
+    /** 중도상환수수료 부과기간(일) — 이 기간이 지나면 면제이며, taper 산식의 분모이기도 하다. */
     private static final int EARLY_REPAYMENT_EXEMPT_DAYS = 1095;
 
     /** 담보 유형별 인정비율 — 부동산은 주입값이라 이 표에 없다. */
@@ -290,29 +290,30 @@ public class SecuredLoanPolicy {
     // ─── Phase 2: 중도상환수수료 ───────────────────────────────────────────────
 
     /**
-     * 중도상환수수료 = 중도상환액 × 요율(1.2%) × (잔존일수 / 약정일수).
+     * 중도상환수수료 = 중도상환액 × 요율(1.2%) × (부과기간 잔여일수 / 부과기간 1095일).
      *
-     * <p>잔존기간에 비례시키는 이유: 만기 직전 상환은 대주가 잃는 이자가 거의 없어 정률 부과가
-     * 비합리적이다. <b>경과 3년(1095일) 이후는 면제</b>한다.
+     * <p>분모가 약정 전체가 아니라 <b>부과기간(면제에 도달하는 3년 = 1095일)</b>이다 — 약정 전체를
+     * 분모로 쓰면 장기(360개월) 상품에서 taper 가 사실상 작동하지 않고, 면제 직전 1일 사이에 수백만원
+     * 계단이 생긴다. 부과기간을 분모로 두면 <b>면제가 taper 의 자연스러운 끝점</b>이 되어(잔여 0 → 수수료
+     * 0) 계단이 사라진다. 2026-07-30 원장 감사(R-1)로 확정된 정본 산식.
      *
      * <p><b>정적(static)</b>이다 — 주입값(기준금리·LTV)과 무관한 상수 테이블 순수 함수라, 중도상환
-     * 경로가 기준금리 조달(Phase 2: economics-service 원격 호출)에 결합되지 않게 한다. 기준금리 장애가
+     * 경로가 기준금리 조달(economics-service 원격 호출)에 결합되지 않게 한다. 기준금리 장애가
      * 중도상환을 막으면 안 된다.
      *
-     * @param remainingDays 잔존일수 — 약정일수를 넘으면 약정일수로 clamp
-     * @param contractDays  약정 총일수(0 이하면 수수료 없음)
+     * @param elapsedDays 실행일부터의 경과일수 — 음수는 0 으로 clamp(부과기간 전체가 남은 것으로 본다)
      */
-    public static BigDecimal earlyRepaymentFee(BigDecimal prepaidAmount, int remainingDays, int contractDays) {
-        if (prepaidAmount == null || prepaidAmount.signum() <= 0 || contractDays <= 0) {
+    public static BigDecimal earlyRepaymentFee(BigDecimal prepaidAmount, int elapsedDays) {
+        if (prepaidAmount == null || prepaidAmount.signum() <= 0) {
             return zero();
         }
-        int remaining = Math.max(0, Math.min(remainingDays, contractDays));
-        if (contractDays - remaining >= EARLY_REPAYMENT_EXEMPT_DAYS) {
+        int chargeDaysLeft = EARLY_REPAYMENT_EXEMPT_DAYS - Math.max(0, elapsedDays);
+        if (chargeDaysLeft <= 0) {
             return zero();
         }
         return prepaidAmount.multiply(EARLY_REPAYMENT_FEE_RATE)
-                .multiply(BigDecimal.valueOf(remaining))
-                .divide(BigDecimal.valueOf(contractDays), MC)
+                .multiply(BigDecimal.valueOf(chargeDaysLeft))
+                .divide(BigDecimal.valueOf(EARLY_REPAYMENT_EXEMPT_DAYS), MC)
                 .setScale(SCALE, RoundingMode.HALF_UP);
     }
 

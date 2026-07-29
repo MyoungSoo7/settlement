@@ -171,7 +171,7 @@ public class SecuredLoanController {
     }
 
     /**
-     * 중도상환 — 정상(DISBURSED) 상태 전용, 수수료(잔존기간 비례·경과 3년 면제)는 서버가 산정해
+     * 중도상환 — 정상(DISBURSED) 상태 전용, 수수료(부과기간 1095일 잔여 비례·경과 3년 면제)는 서버가 산정해
      * 응답에 명시한다. 연체 중 납입은 회차 상환({@code /repay}) 경로다.
      */
     @PostMapping("/{loanId}/prepay")

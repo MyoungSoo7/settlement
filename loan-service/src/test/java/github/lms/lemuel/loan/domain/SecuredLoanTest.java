@@ -289,39 +289,33 @@ class SecuredLoanTest {
                 .isInstanceOf(LoanInvariantViolationException.class);
     }
 
-    // ─── 약정·잔존일수 (중도상환수수료 산정 근거) ─────────────────────────────────
+    // ─── 경과일수 (중도상환수수료 부과기간 산정 근거) ─────────────────────────────
 
-    private static SecuredLoan disbursedPersonalCredit() {
-        SecuredLoan loan = personalCredit();
-        loan.approve();
-        loan.disburse(NOW);
-        return loan;
+    @Test
+    void 경과일수는_실행일부터_기준시각까지다() {
+        assertThat(disbursed().elapsedDays(NOW.plusDays(30))).isEqualTo(30);
     }
 
     @Test
-    void 약정일수는_실행일부터_만기까지다() {
-        // 36개월(2026-07-30 → 2029-07-30), 2028 윤년 포함 = 1096일.
-        assertThat(disbursedPersonalCredit().contractDays()).isEqualTo(1096);
+    void 실행_당일_경과일수는_0이다() {
+        assertThat(disbursed().elapsedDays(NOW)).isEqualTo(0);
     }
 
     @Test
-    void 잔존일수는_기준시각부터_만기까지다() {
-        assertThat(disbursedPersonalCredit().remainingDays(NOW.plusDays(30))).isEqualTo(1066);
-    }
-
-    @Test
-    void 만기이후_잔존일수는_0이다() {
-        assertThat(disbursedPersonalCredit().remainingDays(NOW.plusMonths(37))).isEqualTo(0);
+    void 기준시각이_실행일보다_이르면_경과일수는_0으로_clamp() {
+        // 시계 역행·잘못된 입력 방어 — 음수 경과가 새면 수수료가 요율 전액을 넘을 수 있다.
+        assertThat(disbursed().elapsedDays(NOW.minusDays(1))).isEqualTo(0);
     }
 
     @Test
     void 실행시각이_없으면_신청시각이_기산점이다() {
         // disbursed_at 컬럼 도입 이전에 실행된 구(舊) 행 호환 — 기산점을 신청시각으로 폴백한다.
+        // 신청일이 실행일보다 이르므로 경과가 길게 계산돼 면제가 빨리 온다 — 차주에게 불리하지 않다.
         SecuredLoan legacy = SecuredLoan.reconstitute(11L, INDIVIDUAL, LoanProductType.PERSONAL_CREDIT, null,
                 new BigDecimal("10000000.00"), 36, new BigDecimal("8.0"), RepaymentMethod.EQUAL_PAYMENT,
                 780, "B", new BigDecimal("5000000.00"), SecuredLoanStatus.DISBURSED, NOW, null);
 
-        assertThat(legacy.contractDays()).isEqualTo(1096);
+        assertThat(legacy.elapsedDays(NOW.plusDays(10))).isEqualTo(10);
     }
 
     // ─── 연체 · 기한이익상실 ───────────────────────────────────────────────────

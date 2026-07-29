@@ -132,53 +132,51 @@ class SecuredLoanPolicyPhase2Test {
                 .isEqualByComparingTo("0");
     }
 
-    // ─── 중도상환수수료 (잔존기간 비례) ────────────────────────────────────────
+    // ─── 중도상환수수료 (부과기간 1095일 잔여 비례) ─────────────────────────────
+    // 분모가 약정 전체가 아니라 부과기간(면제 도달까지의 3년)이다 — 약정 전체를 분모로 쓰면
+    // 장기(360개월) 상품에서 taper 가 사실상 작동하지 않고, 면제 직전 1일 사이에
+    // 수백만원의 계단이 생긴다(2026-07-30 원장 감사 R-1로 확정된 정본).
 
     @Test
-    void 중도상환수수료는_잔존기간에_비례한다() {
-        // 1억 × 1.2% × (잔존 500 / 약정 1000) = 60만
-        assertThat(policy.earlyRepaymentFee(new BigDecimal("100000000"), 500, 1000))
-                .isEqualByComparingTo("600000");
+    void 실행_당일_중도상환은_요율_전액이다() {
+        // 경과 0 → 1억 × 1.2% × 1095/1095 = 1,200,000
+        assertThat(SecuredLoanPolicy.earlyRepaymentFee(new BigDecimal("100000000"), 0))
+                .isEqualByComparingTo("1200000");
     }
 
     @Test
-    void 약정_초기_중도상환은_요율_전액에_가깝다() {
-        // 잔존 990/1000 → 1억 × 1.2% × 0.99 = 1,188,000
-        assertThat(policy.earlyRepaymentFee(new BigDecimal("100000000"), 990, 1000))
-                .isEqualByComparingTo("1188000");
+    void 수수료는_부과기간_잔여일수에_비례한다() {
+        // 경과 365 → 잔여 730/1095(=2/3) → 1억 × 1.2% × 2/3 = 800,000
+        assertThat(SecuredLoanPolicy.earlyRepaymentFee(new BigDecimal("100000000"), 365))
+                .isEqualByComparingTo("800000");
     }
 
     @Test
-    void 만기_직전_중도상환은_수수료가_0에_수렴한다() {
-        assertThat(policy.earlyRepaymentFee(new BigDecimal("100000000"), 0, 1000))
+    void 면제_직전에는_수수료가_0에_수렴한다() {
+        // 경과 1094 → 잔여 1/1095 → 1,200,000/1095 = 1,095.89 — 면제 직전 1일 계단이 없다.
+        // (구 산식은 여기서 약 108만원이 나와 하루 차이로 수백만원 계단이 생겼다 — 회귀 가드)
+        assertThat(SecuredLoanPolicy.earlyRepaymentFee(new BigDecimal("100000000"), 1094))
+                .isEqualByComparingTo("1095.89");
+    }
+
+    @Test
+    void 경과_3년이면_면제다() {
+        assertThat(SecuredLoanPolicy.earlyRepaymentFee(new BigDecimal("100000000"), 1095))
+                .isEqualByComparingTo("0");
+        assertThat(SecuredLoanPolicy.earlyRepaymentFee(new BigDecimal("100000000"), 1096))
                 .isEqualByComparingTo("0");
     }
 
     @Test
-    void 경과_3년이_지나면_중도상환수수료는_면제다() {
-        // 약정 7300일(20년) 중 1095일(3년) 경과 → 잔존 6205일이지만 면제
-        assertThat(policy.earlyRepaymentFee(new BigDecimal("100000000"), 6205, 7300))
-                .isEqualByComparingTo("0");
-        // 3년에서 1일 부족하면 면제되지 않는다
-        assertThat(policy.earlyRepaymentFee(new BigDecimal("100000000"), 6206, 7300))
-                .isGreaterThan(BigDecimal.ZERO);
-    }
-
-    @Test
-    void 잔존일수가_약정일수를_넘으면_약정일수로_clamp() {
-        assertThat(policy.earlyRepaymentFee(new BigDecimal("100000000"), 2000, 1000))
+    void 경과일수가_음수면_0으로_clamp_한다() {
+        // 시계 역행 등 비정상 입력 — 부과기간 전체가 남은 것으로 보고 요율 전액.
+        assertThat(SecuredLoanPolicy.earlyRepaymentFee(new BigDecimal("100000000"), -1))
                 .isEqualByComparingTo("1200000");
     }
 
     @Test
     void 중도상환액이_0이하면_수수료는_0() {
-        assertThat(policy.earlyRepaymentFee(BigDecimal.ZERO, 500, 1000)).isEqualByComparingTo("0");
-        assertThat(policy.earlyRepaymentFee(new BigDecimal("-1"), 500, 1000)).isEqualByComparingTo("0");
-    }
-
-    @Test
-    void 약정일수가_0이면_수수료는_0() {
-        assertThat(policy.earlyRepaymentFee(new BigDecimal("100000000"), 0, 0))
-                .isEqualByComparingTo("0");
+        assertThat(SecuredLoanPolicy.earlyRepaymentFee(BigDecimal.ZERO, 500)).isEqualByComparingTo("0");
+        assertThat(SecuredLoanPolicy.earlyRepaymentFee(new BigDecimal("-1"), 500)).isEqualByComparingTo("0");
     }
 }
