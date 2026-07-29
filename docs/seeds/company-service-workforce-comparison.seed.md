@@ -1,9 +1,11 @@
-# Seed — company-service 국민연금 사업장 업종·지역 비교 조회 (to-be)
+# Seed — company-service 국민연금 사업장 업종·지역 비교 조회
 
-> **상태: PROPOSED** (2026-07-30) · 정본 데이터: [`company-service-workforce-comparison.seed.yaml`](./company-service-workforce-comparison.seed.yaml)
-> ⚠️ 이 폴더의 다른 Seed 는 전부 **as-is(현행 코드 기술) CONFIRMED** 다. 이것만 **to-be** —
-> 아직 코드가 없다. 회귀 기준선으로 쓰면 안 되고, 구현 시 인수 기준으로 쓴다.
-> Ouroboros Interview → Seed 로 결정화 (`interview_20260729_095356`, ambiguity 0.047).
+> **상태: IMPLEMENTED** (2026-07-30 구현 완료) · 정본 데이터: [`company-service-workforce-comparison.seed.yaml`](./company-service-workforce-comparison.seed.yaml)
+> Ouroboros Interview → Seed 로 결정화 (`interview_20260729_095356`, ambiguity 0.047) → 직접 TDD 구현.
+> (Ouroboros 실행 경로는 Windows 에서 MCP 백그라운드 잡이 `WinError 87` 로 죽어 인수 기준으로만 사용했다.)
+> 게이트: `:company-service:test` + `jacocoTestCoverageVerification`(LINE 90%) + `HexagonalArchitectureTest` +
+> `guard.mjs` 통과. 집계·조회 SQL 은 어댑터 소스에서 추출한 원문을 실 PostgreSQL 17 에 걸어 검증
+> (AC-5 표본수 대사 불일치 **0건**, 백분위 분모 = 표본수, 동률 동일 백분위, 추정연봉 SQL 역산 = 도메인 계산).
 
 ## Goal (한 줄)
 
@@ -77,21 +79,28 @@
 `:company-service:jacocoTestCoverageVerification`(LINE ≥ 90%) · `HexagonalArchitectureTest` ·
 `guard.mjs` OO-*/MONEY-* 규칙.
 
-## 구현 전 결정해야 할 것 (deferred)
+## 구현 시 확정한 미결 7항목
 
-QA 정련에서 지적됐으나 Seed 에 반영하지 않기로 명시 결정한 항목들. **결함이 아니라 "아직 정하지
-않은 것"** 이므로, 구현 착수 시 TDD 로 흡수한다.
+Seed 작성 시점엔 "아직 정하지 않은 것"이었고, 구현(2026-07-30)에서 아래로 확정했다.
+근거·부속 규칙 전문은 정본 YAML 의 `deferred_to_implementation` / `implementation_decisions` 참조.
 
-1. `required` 와 `nullable` 의 구분 표기 — `industryCode`·`sido`·`sigungu`·비교 객체는 null 이 될 수
-   있는데 온톨로지에는 모두 `required: true` 로 선언돼 있다.
-2. `ErrorResponse` 스키마·오류 코드·검증 우선순위, 경계 입력(빈 값·길이 상한·중복 파라미터·잘못된
-   URL 인코딩) 동작.
-3. **"적격 레코드" 판정 기준** — null·0·음수·중복·거부 행을 집계 모집단에 넣는지. 이게 안 정해지면
-   `sampleSize`·중앙값·백분위·`sourceRowCount` 가 구현마다 달라진다.
-4. 나눗셈 스케일 값 (`differenceRate`·`percentile` 의 소수 자릿수).
-5. 상한 고시표 범위(`2022-07`~`2027-06`) **밖** snapshot_month 의 동작 — 거부인지, 상한 필드 null 인지.
-6. 빌드 세대 식별자·중단 복구·stale `BUILDING` 정리·직전 `COMPLETE` 보존 규칙.
-7. **세종특별자치시처럼 시군구 계층이 없는 1토큰 주소**의 파싱 예외.
+| # | 항목 | 결정 |
+|---|------|------|
+| 1 | required vs nullable | 비교 **객체는 항상 존재**(사유코드 운반). null 은 지표 하위객체·`industryCode`·`sido`/`sigungu`·`level`/`groupKey`(집단 부재)·`unavailableReason`(성공)·`differenceRate`(중앙값 0)·`salaryCapMonthlyAmount`(고시표 밖) |
+| 2 | ErrorResponse | 기존 `{"message"}` 계약 재사용(IAE→400, NoSuchElement→404). 검증 순서 누락 → 형식 → 길이, 파라미터 순 name → bizRegNoPrefix → snapshotMonth. 중복 파라미터는 콤마 병합 → 404 |
+| 3 | 적격 레코드 | `headcount > 0 AND monthly_billed_amount > 0`. 거부 행은 미저장, 중복은 UNIQUE 로 불가, 축 그룹키 없는 행은 **그 축만** 제외 |
+| 4 | 나눗셈 스케일 | 금액 0자리 · 인원수 1자리 · 비율/백분위 2자리, 전부 HALF_UP |
+| 5 | 고시표 밖 월 | 거부하지 않음 — `salaryCapMonthlyAmount=null`, `salaryCapReached=false` |
+| 6 | 빌드 세대·복구 | 세대 식별자 없음. 단일 트랜잭션 `BUILDING`→교체→`COMPLETE`, 중단 시 롤백으로 직전 COMPLETE 보존·stale 없음 |
+| 7 | 세종시 1토큰 주소 | 시도만 있으면 EXACT 건너뛰고 BROADENED 직행. 시도 판정은 **명칭 목록 대조**(접미사 규칙은 `"주소"`·`"0"` 이형을 시도로 오인) |
+
+## 구현에서 잡은 결함 (실 PostgreSQL 검증)
+
+집계 SQL 은 로직이 전부 SQL 안에 있어 목(mock) 단위 테스트로는 증명되지 않는다. 어댑터 소스에서
+SQL 원문을 추출해 실 PG 17 에 걸어 확인하는 과정에서 **백분위 분모 불일치**를 잡았다 —
+`WHERE biz_reg_no_prefix <> ''` 를 창 함수와 같은 질의에 두었더니 SQL 의 평가 순서(WHERE → 윈도우) 때문에
+`cume_dist` 분모가 14가 아니라 12가 되어 중앙값 모집단과 백분위 모집단이 어긋났다. 필터를 바깥 질의로
+옮겨 수정하고, 회귀 방지로 "공란 필터는 `) ranked` 이후에만 등장해야 한다"를 어댑터 테스트에 고정했다.
 
 ## 산출 이력
 

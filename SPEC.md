@@ -127,9 +127,22 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
 |--------|------|------|
 | 뉴스·기업 | `/api/company/companies` | 기업 뉴스 기사(제목·요약·링크만, 본문 미저장) + 기업 마스터 공개 조회 |
 | 문서함 | `/api/company` (문서 목록·다운로드 — **ADMIN/MANAGER JWT 게이트**) | CEO 브리핑 docx 업로드/다운로드 |
-| 수집/관리 | `/admin/company/collect`, `/admin/company/documents`, `/admin/company/reputation`, `/admin/company/sellers`, `/admin/company/companies` | 네이버 뉴스 수집(`NAVER_*`)·감성분석(keyword/Claude/Gemini)·평판 스코어·셀러 링크 |
+| 사업장 인력 | `/api/company/workforce` (목록), `/api/company/workforce/detail` (단건+비교) | 국민연금 사업장가입자 공개데이터 기반 인원수·추정연봉 조회 + 업종·지역 집단 비교 |
+| 수집/관리 | `/admin/company/collect`, `/admin/company/documents`, `/admin/company/reputation`, `/admin/company/sellers`, `/admin/company/companies`, `/admin/company/workforce/import` | 네이버 뉴스 수집(`NAVER_*`)·감성분석(keyword/Claude/Gemini)·평판 스코어·셀러 링크·사업장 CSV 적재 |
 
 기업 식별자(stockCode/corpCode)는 financial 과 공용 비즈니스 키. Phase 3 평판 변동 Outbox 발행.
+
+**사업장 업종·지역 비교**(Seed: `docs/seeds/company-service-workforce-comparison.seed.yaml`) — 사업자등록번호가 앞
+6자리만 공개돼 타 서비스와 자동 조인이 불가하므로 company-service 단독으로 완결한다.
+- 상세 조회는 내부 id 가 아니라 **복합키 query parameter**(`name`·`bizRegNoPrefix`·`snapshotMonth`) — 실제 데이터에
+  따옴표·느낌표가 든 사업장명이 있어 path variable 은 안전하지 않다. 미매칭 404 / 형식 위반 400.
+- 비교는 **업종축(6자리 → 앞3자리)과 지역축(시도+시군구 → 시도)이 독립**, 각 축 최대 2단계 폴백, 최소 표본 10건.
+  중앙값은 `percentile_cont(0.5)`, 백분위는 `cume_dist`. 평균·업종×지역 교차는 제공하지 않는다.
+- 사유 코드 3종: `SAMPLE_TOO_SMALL` · `INDUSTRY_CODE_MISSING`(원본 공란) · `REGION_UNPARSEABLE`.
+- **조회 경로는 집계를 계산하지 않는다** — CSV 적재 후 월별 중앙값·표본수·사업장별 백분위를 단일 트랜잭션으로
+  통째 교체(`BUILDING`→`COMPLETE`)하고, 조회는 COMPLETE 인 월만 읽는다. 대사: `source = accepted + rejected`.
+- 기준소득월액 상한 도달은 실패 사유가 아닌 **신뢰도 플래그**(`salaryCapReached`, 고시표 범위 밖이면 상한액 null).
+- 금액 필드는 JSON 에서 소수 문자열, 비율·건수는 수치.
 
 ### 3.7 operation-service — 운영 관제 (port 8092, lemuel_operation)
 - `/api/ops/webhook` — Alertmanager 알람 수신(Bearer=INTERNAL_API_KEY, 상수시간 비교). key 미설정 시 프로파일 게이트.

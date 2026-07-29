@@ -1,7 +1,12 @@
 # Seed: company-service 국민연금 사업장 업종·지역 비교 조회 (Ouroboros 방법론 — Interview → Seed)
-# 상태: PROPOSED (미구현 to-be 사양, 2026-07-30)
-#   ★ 이 폴더의 다른 Seed 는 전부 as-is(현행 코드 기술) CONFIRMED 이다. 이것만 to-be 다 —
-#     아직 코드가 없으며, 구현 시 이 사양이 인수 기준이 된다. 회귀 기준선으로 쓰면 안 된다.
+# 상태: IMPLEMENTED (2026-07-30 구현 완료 — 이제 회귀 기준선으로 쓸 수 있다)
+#   구현 산출물: company-service {domain/(Comparison*·Workplace*·Nps*·Metric*·Group*·AggregateRowTally),
+#     application/{port,service}/*Workforce*Comparison*, adapter/out/persistence/Workforce*Adapter,
+#     adapter/in/web/CompanyWorkforceController#detail, resources/db/migration/V20260730120000__workforce_comparison.sql}
+#   게이트: :company-service:test + jacocoTestCoverageVerification(LINE 90%) + HexagonalArchitectureTest + guard.mjs 통과.
+#   집계·조회 SQL 은 실 PostgreSQL 17 에 어댑터 소스에서 추출한 원문 그대로 걸어 검증
+#     (AC-5 표본수 대사 불일치 0건 · 백분위 분모 = 표본수 · 동률 동일 백분위 · 추정연봉 SQL 역산 = 도메인 계산).
+#   미결 7항목의 구현 결정은 이 파일 하단 deferred_to_implementation 참조.
 # 산출: interview_20260729_095356 (ambiguity 0.047) → seed_031a1527dd6a
 # QA: ouroboros_qa 5회 정련, 최종 0.82 (임계값 0.90 미달 상태로 사용자 명시 수용)
 #     정련 이력·미해결 항목: ~/.ouroboros/seed-revisions/interview_20260729_095356.md
@@ -289,16 +294,49 @@ exit_conditions:
   description: 표본 미달·업종코드 누락·지역 파싱 실패가 정확한 null 및 사유 코드로 처리됨
   criteria: 세 사유 코드와 독립 비교 경로 검증 완료
 
-# 구현 착수 시 TDD 로 흡수할 잔여 항목 (QA 가 지적했으나 Seed 에 반영하지 않기로 명시 결정한 것들).
-# 이것들은 결함이 아니라 "아직 정하지 않은 것"이다 — 구현 전에 결정해야 한다.
+# 구현 시점(2026-07-30)에 결정된 잔여 항목. Seed 작성 당시엔 "아직 정하지 않은 것"이었고, 아래가 확정 답이다.
 deferred_to_implementation:
-- required 와 nullable 의 구분 표기 (industryCode·sido·sigungu·비교객체는 null 가능한데 모두 required 로 선언되어 있음)
-- ErrorResponse 스키마·오류 코드·검증 우선순위, 경계 입력(빈 값·길이 상한·중복 파라미터·잘못된 URL 인코딩) 동작
-- 적격·유효 레코드의 판정 기준 (null·0·음수·중복·거부 행을 집계 모집단에 포함하는지)
-- 나눗셈 스케일 값 (differenceRate·percentile 의 소수 자릿수)
-- 상한 고시표 범위(2022-07~2027-06) 밖 snapshot_month 의 동작 (거부인지, 상한 필드 null 인지)
-- 빌드 세대 식별자·중단 복구·stale BUILDING 정리·직전 COMPLETE 보존 규칙
-- 세종특별자치시처럼 시군구 계층이 없는 1토큰 주소의 파싱 예외
+- 항목: required 와 nullable 의 구분 표기
+  결정: 비교 객체(industryComparison·regionComparison)는 사유 코드를 운반해야 하므로 항상 존재한다. null 이 되는 것은
+    지표 하위 객체(headcount·estimatedAnnualSalary), industryCode, sido·sigungu, GroupComparison.level·groupKey(집단 부재),
+    unavailableReason(비교 성공), differenceRate(중앙값 0), estimatedAnnualSalary(가입자수 0), salaryCapMonthlyAmount(고시표 밖).
+- 항목: ErrorResponse 스키마·오류 코드·검증 우선순위
+  결정: company-service 기존 계약 {"message": ...} 재사용(GlobalExceptionHandler — IAE 400 / NoSuchElement 404). 새 오류 봉투를
+    만들지 않는다(기존 엔드포인트 응답이 바뀌므로). 검증 순서는 누락 → 형식 → 길이로 고정하고 파라미터 순서는
+    name → bizRegNoPrefix → snapshotMonth. 빈 문자열·공백은 누락 취급, 사업장명 상한 200자(컬럼 폭), 상세 파라미터는
+    required=false 로 받아 WorkplaceKey 가 검증한다(프레임워크 기본 오류 본문 회피). 같은 파라미터 중복은 Spring 이 콤마로
+    합치므로 어느 레코드와도 매칭되지 않아 404.
+- 항목: 적격·유효 레코드의 판정 기준
+  결정: headcount > 0 AND monthly_billed_amount > 0 (추정연봉 산출 가능). 음수는 도메인 생성자가 차단, 중복은 UNIQUE 로 불가,
+    거부 행은 애초에 저장되지 않아 모집단 밖. 축 그룹키가 없는 행(업종코드 공란·주소 파싱 실패)은 그 축에서만 제외된다.
+    도메인 CompanyWorkforce.eligibleForComparison() 과 집계 SQL 의 WHERE 가 같은 규칙을 쓴다.
+- 항목: 나눗셈 스케일 값
+  결정: 금액 median·difference 0자리, 인원수 median·difference 1자리, differenceRate·percentile 2자리. 전부 HALF_UP.
+- 항목: 상한 고시표 범위 밖 snapshot_month 동작
+  결정: 조회를 거부하지 않는다. salaryCapMonthlyAmount = null(판정 근거 없음), salaryCapReached = false.
+    없는 상한을 추정해 플래그를 켜지 않는다.
+- 항목: 빌드 세대 식별자·중단 복구·stale BUILDING 정리
+  결정: 세대 식별자를 두지 않는다. 단일 트랜잭션에서 BUILDING 표시 → 해당 월 전량 삭제 → 재삽입 → COMPLETE 로 수행하면
+    중단 시 트랜잭션째 롤백되어 직전 COMPLETE 가 보존되고 stale BUILDING 이 원천적으로 남지 않는다. 조회는 빌드 테이블을
+    status='COMPLETE' 로 조인해 완성된 집계만 읽는다.
+- 항목: 세종특별자치시처럼 시군구 계층이 없는 1토큰 주소
+  결정: 시도만 파싱되면 EXACT 단계를 건너뛰고 BROADENED(시도) 집단으로 직행한다(EXACT 조회를 시도조차 하지 않는다).
+    주소에서 시도조차 못 뽑으면 REGION_UNPARSEABLE. 시도 판정은 접미사 규칙이 아니라 명칭 목록 대조다 — 원본에 "주소"·"0"
+    같은 이형이 실재해 접미사 규칙은 엉뚱한 집단을 만든다. 행정구역 개편 전 명칭(강원도·전라북도 등)도 목록에 포함.
+
+# 구현 중 추가로 내린 결정 (Seed 에 없던 것)
+implementation_decisions:
+- sido·sigungu 를 company_workforce 컬럼으로 파생 저장한다. 주소 파싱을 SQL 과 Java 에 이중 구현하면 집계와 조회가 서로
+  다른 집단을 가리키게 되므로, 적재 시 도메인 파서(WorkplaceRegion)로 한 번만 파생하고 집계 SQL 은 그 컬럼만 GROUP BY 한다.
+- 백분위는 사업자등록번호 앞자리가 공란인 행에 대해 저장하지 않는다(정규화 복합키 충돌 회피 — 원본 UNIQUE 가 NULL 을 서로
+  다르게 보므로 같은 사업장명+공란이 한 달에 여러 건 가능). 단 순위 계산 모집단에는 포함한다 — SQL 은 WHERE 를 윈도우 함수보다
+  먼저 적용하므로 필터를 바깥 질의에 두어야 cume_dist 분모가 표본수와 일치한다(실 PG 검증에서 14 대 12 불일치로 재현·수정).
+- 집단은 성립했으나 대상 값이나 사전 계산 백분위가 없으면(가입자수 0 등) 그 지표만 null 로 둔다. 사유 코드는 3종뿐이므로
+  없는 사유를 발명하지 않고, 조회 시점에 순위를 다시 세지도 않는다.
+- 자료생성년월을 못 읽은 CSV 행은 어느 월 대사에도 귀속시키지 않고 ImportResult.unattributed 로 별도 보고한다
+  (월별 source = accepted + rejected 등식 보존).
+- 월별 집계 트리거는 CSV 적재 직후 적재된 월마다 별개 트랜잭션으로 수행한다 — 한 달의 실패가 다른 달 집계를 되돌리지 않는다.
+- ⚠ 기존 적재분은 industry_code·sido·sigungu 가 NULL 이므로 CSV 전량 재적재가 필요하다(Seed 제약).
 
 metadata:
   seed_id: seed_031a1527dd6a
