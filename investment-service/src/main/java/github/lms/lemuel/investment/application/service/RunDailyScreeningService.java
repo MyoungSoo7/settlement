@@ -3,7 +3,8 @@ package github.lms.lemuel.investment.application.service;
 import github.lms.lemuel.investment.application.port.in.RunDailyScreeningUseCase;
 import github.lms.lemuel.investment.application.port.in.ScreenRecommendationsUseCase;
 import github.lms.lemuel.investment.application.port.out.LoadDailyClosesPort;
-import github.lms.lemuel.investment.application.port.out.LoadStockRecommendationPort;
+import github.lms.lemuel.investment.application.port.out.LoadScreeningRunPort;
+import github.lms.lemuel.investment.application.port.out.RecordScreeningRunPort;
 import github.lms.lemuel.investment.config.ScreeningProperties;
 import github.lms.lemuel.investment.domain.DailyClose;
 import github.lms.lemuel.investment.domain.ScreeningTrigger;
@@ -32,30 +33,40 @@ public class RunDailyScreeningService implements RunDailyScreeningUseCase {
 
     private final ScreenRecommendationsUseCase screenRecommendationsUseCase;
     private final LoadDailyClosesPort loadDailyClosesPort;
-    private final LoadStockRecommendationPort loadStockRecommendationPort;
+    private final LoadScreeningRunPort loadScreeningRunPort;
+    private final RecordScreeningRunPort recordScreeningRunPort;
     private final ScreeningProperties properties;
     private final ScreeningTriggerPolicy policy = new ScreeningTriggerPolicy();
 
     public RunDailyScreeningService(ScreenRecommendationsUseCase screenRecommendationsUseCase,
                                     LoadDailyClosesPort loadDailyClosesPort,
-                                    LoadStockRecommendationPort loadStockRecommendationPort,
+                                    LoadScreeningRunPort loadScreeningRunPort,
+                                    RecordScreeningRunPort recordScreeningRunPort,
                                     ScreeningProperties properties) {
         this.screenRecommendationsUseCase = screenRecommendationsUseCase;
         this.loadDailyClosesPort = loadDailyClosesPort;
-        this.loadStockRecommendationPort = loadStockRecommendationPort;
+        this.loadScreeningRunPort = loadScreeningRunPort;
+        this.recordScreeningRunPort = recordScreeningRunPort;
         this.properties = properties;
     }
 
+    /**
+     * 판정 기준은 <b>추천 산출물이 아니라 실행 기록</b>이다 — 통과 종목 0건이면 추천 행이 남지 않아
+     * 산출물로는 "이미 돌았음"을 표현할 수 없고, 같은 기준일을 매일 재스크리닝하게 된다.
+     */
     @Override
     public DailyScreeningReport run() {
         ScreeningTrigger trigger = policy.decide(
                 universeCloses(),
-                loadStockRecommendationPort.loadLatestDate().orElse(null));
+                loadScreeningRunPort.loadLatestScreenedDate().orElse(null));
         if (!trigger.shouldScreen()) {
             return DailyScreeningReport.skipped(trigger);
         }
-        return DailyScreeningReport.screened(trigger,
-                screenRecommendationsUseCase.screen(trigger.quoteBaseDate()));
+        int screenedCount = screenRecommendationsUseCase.screen(trigger.quoteBaseDate());
+        // 통과 종목이 0건이어도 기록한다 — 이 한 줄이 빠지면 빈 세트인 날의 기준일이 사라져
+        // 다음 실행이 같은 기준일을 다시 스크리닝한다(휴장일 스킵 무력화).
+        recordScreeningRunPort.record(trigger.quoteBaseDate(), screenedCount);
+        return DailyScreeningReport.screened(trigger, screenedCount);
     }
 
     /** 유니버스 전 종목의 종가를 모은다 — 조회 실패 종목은 제외하고 나머지로 기준일을 정한다. */
