@@ -14,10 +14,11 @@
 - **최근 커밋:** `2acff1417` feat(account): 통제계정 잔액 실체화 — ADR 0030 Phase 1
 
 ## 최근 진척 (2026-06-24 이후)
+- **loan 담보/개인신용 대출 Phase 1** — 주택담보(`/loans/secured/mortgage`)·개인신용(`/personal`) 2종 추가. `Borrower`(개인·법인 공통 차주 VO) + `Collateral`(평가액 스냅샷, 설정→유효→말소) + `SecuredLoan`(담보 optional) 신규 애그리거트로 분리 — 기존 `LoanAdvance`·`CorporateLoan` 무수정(상장사 종목코드에 차주가 묶여 개인 표현 불가). 장기 분할상환 상품이라 연체·기한이익상실을 상태머신에 처음부터 포함. 원장은 기존 6계정만 사용하되 회차성 전표(SEC_REPAYMENT·SEC_INTEREST)를 중복분개 유니크에서 제외(미조치 시 2회차 상환부터 실패). `secured_loan_disbursed`/`.repaid` 발행(소비처는 Phase 2). **Phase 2 이월**: 보증부·금융자산 담보, 담보권 순위, 재평가·마진콜, 담보 실행, 중도상환수수료, 위성 서비스 실연동(포트만 정의·스텁 구현), account GL 소비.
 - **위성·확장 서비스 9종 추가** — financial·economics·company(ADR 0023)·operation·market·ai·commondata·investment·account.
   공개조회 위성은 shared-common 미의존/제한 스캔 + 자체 최소 SecurityConfig(GET 공개, `/admin/**` 는 X-Internal-Api-Key 게이트).
 - **금융 계정계 확장** — investment(CEO 투자하기: 투자점수·투자주문) + account(전사 복식부기 GL 집계, 소비 전용) + loan 기업대출(CorporateLoan) + CEO 프론트 메뉴.
-- **이벤트 계약-as-code (ADR 0024)** — cross-service 22개 토픽 JSON Schema + 정본 샘플을 `shared-common/testFixtures` 에 단일 출처화, 프로듀서·컨슈머 양방향 계약 테스트로 드리프트 빌드 시점 차단.
+- **이벤트 계약-as-code (ADR 0024)** — cross-service 24개 토픽 JSON Schema + 정본 샘플을 `shared-common/testFixtures` 에 단일 출처화, 프로듀서·컨슈머 양방향 계약 테스트로 드리프트 빌드 시점 차단.
 - **organization-service 추가(13번째)** — 셀러/기업 조직·멤버십(OWNER/MANAGER/STAFF), 이벤트 발행 전용(`lemuel.organization.created`/`member_joined`, 소비처 미배선).
 - **실데이터 자동수집 전환** — DART·KRX·ECOS 자동 수집 스케줄러 + 동기화 신선도 Prometheus 메트릭(선별 복구), 위성 샘플·데모 시드 제거(실데이터로만 적재).
 - **loan 상환 시뮬레이션** — `POST /loans/repayment/simulate`: 원금·기간·이자율·상환방식(만기일시/원리금균등/원금균등)으로 회차별 상환표를 미리 계산하는 순수 미리보기(부수효과·영속화 없음).
@@ -77,9 +78,9 @@
 > ⚠️ 수치는 `build/`·`.claude/worktrees/` 사본을 **제외한 git ls-files 기준**. 각 줄 끝 명령이 정답 —
 > 드리프트 의심 시 명령을 돌려 재검증하고 이 수치를 갱신할 것(휘발성 수치를 명령 없이 손으로 적지 말 것).
 - 서비스 **13개** + API Gateway + Kotlin polyglot 2(notification·reconciliation) — `git ls-files '*/src/main/resources/application.yml' | wc -l` → 16(=13+gateway+kotlin 2)
-- Flyway 마이그레이션 **225개** — `git ls-files '*/src/main/resources/db/migration/*.sql' | wc -l` → 225
+- Flyway 마이그레이션 **226개** — `git ls-files '*/src/main/resources/db/migration/*.sql' | wc -l` → 226
 - ADR **29개** (0001~0030, 0019 결번 — 세무 ADR 은 0027 충돌로 0029 재부여) — `git ls-files 'docs/adr/[0-9]*.md' | wc -l` → 29
-- 테스트 클래스 **687개** (Testcontainers 통합테스트 포함) — `git ls-files '*/src/test/*Test.java' '*/src/test/*Tests.java' '*/src/test/*IT.java' | wc -l` → 687
+- 테스트 클래스 **696개** (Testcontainers 통합테스트 포함) — `git ls-files '*/src/test/*Test.java' '*/src/test/*Tests.java' '*/src/test/*IT.java' | wc -l` → 696
 - 이벤트 계약 스키마 **22토픽** (ADR 0024, 프로듀서·컨슈머 양방향 테스트) — `git ls-files 'shared-common/src/testFixtures/resources/contracts/events/*.schema.json' | wc -l` → 22
 
 ## 최근 전체 검증 (2026-07-29)
