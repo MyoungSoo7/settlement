@@ -86,6 +86,36 @@ public class LoanLedgerEntry {
                 loss, "BAD_DEBT", loanId);
     }
 
+    /**
+     * 담보/개인신용 대출 실행 전표: 차변 LOAN_RECEIVABLE / 대변 CASH (amount = 원금).
+     * 대출 1건당 1회라 {@code uq_loan_ledger_reference_accounts} 유니크 대상으로 남아 이중지급을 막는다.
+     */
+    public static LoanLedgerEntry securedDisbursement(Long loanId, BigDecimal principal) {
+        return new LoanLedgerEntry(null, LedgerAccount.LOAN_RECEIVABLE, LedgerAccount.CASH,
+                principal, "SEC_DISBURSE", loanId);
+    }
+
+    /**
+     * 담보/개인신용 대출 원금 상환 전표: 차변 CASH / 대변 LOAN_RECEIVABLE (amount = 원금 차감액).
+     * 장기 분할상환이라 회차 수만큼 반복되므로 중복 기표 유니크에서 제외된다.
+     */
+    public static LoanLedgerEntry securedPrincipalRepayment(Long loanId, BigDecimal principalPortion) {
+        return new LoanLedgerEntry(null, LedgerAccount.CASH, LedgerAccount.LOAN_RECEIVABLE,
+                principalPortion, "SEC_REPAYMENT", loanId);
+    }
+
+    /**
+     * 담보/개인신용 대출 이자 수익 전표: 차변 CASH / 대변 FEE_INCOME (amount = 회차 이자).
+     *
+     * <p>단기 상품이 실행 시점에 수수료를 한 번에 인식({@link #corporateFeeAccrual})하는 것과 달리,
+     * 장기 분할상환은 이자가 회차마다 잔액 기준으로 발생하므로 <b>수취 시점에 회차별로</b> 인식한다.
+     * 따라서 회차 수만큼 반복되며 중복 기표 유니크에서 제외된다.
+     */
+    public static LoanLedgerEntry securedInterestIncome(Long loanId, BigDecimal interest) {
+        return new LoanLedgerEntry(null, LedgerAccount.CASH, LedgerAccount.FEE_INCOME,
+                interest, "SEC_INTEREST", loanId);
+    }
+
     public static LoanLedgerEntry reconstitute(Long id, LedgerAccount debit, LedgerAccount credit,
                                                BigDecimal amount, String refType, Long refId) {
         return new LoanLedgerEntry(id, debit, credit, amount, refType, refId);
