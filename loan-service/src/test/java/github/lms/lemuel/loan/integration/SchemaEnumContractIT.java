@@ -86,7 +86,7 @@ class SchemaEnumContractIT {
     }
 
     @Test
-    @DisplayName("chk_loan_ledger_ref_type == LoanLedgerEntry 팩토리 10종의 refType (정확 일치)")
+    @DisplayName("chk_loan_ledger_ref_type == LoanLedgerEntry 팩토리 17종의 refType (정확 일치)")
     void loanLedgerRefTypeCheckMatchesFactorySetExactly() {
         Set<String> factoryRefTypes = new LinkedHashSet<>(java.util.Arrays.asList(
                 LoanLedgerEntry.disbursement(1L, ONE).getRefType(),
@@ -100,7 +100,15 @@ class SchemaEnumContractIT {
                 // 담보/개인신용 대출 3종(Phase 1) — 같은 갭이 재발하지 않도록 계약에 포함한다.
                 LoanLedgerEntry.securedDisbursement(1L, ONE).getRefType(),
                 LoanLedgerEntry.securedPrincipalRepayment(1L, ONE).getRefType(),
-                LoanLedgerEntry.securedInterestIncome(1L, ONE).getRefType()));
+                LoanLedgerEntry.securedInterestIncome(1L, ONE).getRefType(),
+                // Phase 2 7종 — 보증료·중도상환수수료·담보 실행·상각.
+                LoanLedgerEntry.securedGuaranteeFee(1L, ONE).getRefType(),
+                LoanLedgerEntry.securedEarlyRepaymentFee(1L, ONE).getRefType(),
+                LoanLedgerEntry.securedCollateralDisposal(1L, ONE).getRefType(),
+                LoanLedgerEntry.securedDisposalShortfall(1L, ONE).getRefType(),
+                LoanLedgerEntry.securedDisposalSurplus(1L, ONE).getRefType(),
+                LoanLedgerEntry.securedSubrogation(1L, ONE).getRefType(),
+                LoanLedgerEntry.securedWriteOff(1L, ONE).getRefType()));
 
         assertThat(checkValues("chk_loan_ledger_ref_type"))
                 .containsExactlyInAnyOrderElementsOf(factoryRefTypes);
@@ -149,6 +157,51 @@ class SchemaEnumContractIT {
         Integer count = jdbc.queryForObject(
                 "SELECT count(*) FROM opslab.loan_ledger_entries WHERE ref_id = 9200", Integer.class);
         assertThat(count).isEqualTo(4);
+    }
+
+    @Test
+    @DisplayName("중도상환수수료는 같은 loanId 로 N회 기표가 허용된다(유니크 제외)")
+    void securedEarlyRepaymentFeeAllowsMultiplePerLoan() {
+        String earlyFee = LoanLedgerEntry.securedEarlyRepaymentFee(1L, ONE).getRefType();
+        insertLedger("CASH", "FEE_INCOME", new BigDecimal("50000.00"), earlyFee, 9400L);
+        insertLedger("CASH", "FEE_INCOME", new BigDecimal("40000.00"), earlyFee, 9400L);
+
+        Integer count = jdbc.queryForObject(
+                "SELECT count(*) FROM opslab.loan_ledger_entries WHERE ref_type = ? AND ref_id = 9400",
+                Integer.class, earlyFee);
+        assertThat(count).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("담보 처분·대위변제·상각은 1회성이라 이중 기표가 유니크로 차단된다")
+    void securedRecoveryRefTypesBlockDuplicateEntries() {
+        // 이중 회수·이중 상각은 손익을 두 번 인식하므로 반드시 막혀야 한다.
+        String disposal = LoanLedgerEntry.securedCollateralDisposal(1L, ONE).getRefType();
+        insertLedger("CASH", "LOAN_RECEIVABLE", new BigDecimal("1000.00"), disposal, 9500L);
+        assertThatThrownBy(() ->
+                insertLedger("CASH", "LOAN_RECEIVABLE", new BigDecimal("1000.00"), disposal, 9500L))
+                .isInstanceOf(org.springframework.dao.DuplicateKeyException.class);
+
+        String subrogation = LoanLedgerEntry.securedSubrogation(1L, ONE).getRefType();
+        insertLedger("CASH", "LOAN_RECEIVABLE", new BigDecimal("2000.00"), subrogation, 9501L);
+        assertThatThrownBy(() ->
+                insertLedger("CASH", "LOAN_RECEIVABLE", new BigDecimal("2000.00"), subrogation, 9501L))
+                .isInstanceOf(org.springframework.dao.DuplicateKeyException.class);
+    }
+
+    @Test
+    @DisplayName("신규 계정과목도 debit/credit 컬럼(VARCHAR 30)에 적재된다")
+    void newLedgerAccountsFitColumn() {
+        String guaranteeFee = LoanLedgerEntry.securedGuaranteeFee(1L, ONE).getRefType();
+        insertLedger("GUARANTEE_FEE_EXPENSE", "CASH", new BigDecimal("120000.00"), guaranteeFee, 9600L);
+
+        String loss = LoanLedgerEntry.securedDisposalShortfall(1L, ONE).getRefType();
+        insertLedger("COLLATERAL_DISPOSAL_LOSS", "LOAN_RECEIVABLE",
+                new BigDecimal("300000.00"), loss, 9600L);
+
+        Integer count = jdbc.queryForObject(
+                "SELECT count(*) FROM opslab.loan_ledger_entries WHERE ref_id = 9600", Integer.class);
+        assertThat(count).isEqualTo(2);
     }
 
     @Test
