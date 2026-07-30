@@ -1,6 +1,6 @@
 # Seed — company-service 사업장 월별 시계열 추이 조회
 
-> **상태: DRAFT** (2026-07-30 인터뷰 결정화 · 구현 착수)
+> **상태: IMPLEMENTED** (2026-07-30 인터뷰 결정화 → 당일 TDD 구현 완료 — 백엔드 `f435c51ab` · 프런트 `9d87df432`)
 > Ouroboros Interview Path B(플러그인 폴백 — MCP 질문 생성기 크레딧 부족으로 2회 실패) → 직접 결정화.
 > 인터뷰 전문: `.claude/scratch/interview-workforce-history.md` (Q1~Q7 결정 이력 포함).
 > 게이트: `:company-service:test` + `jacocoTestCoverageVerification`(LINE 90%) + `HexagonalArchitectureTest` +
