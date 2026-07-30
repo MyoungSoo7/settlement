@@ -142,3 +142,10 @@ app:
       secured-loan-repaid: lemuel.loan.secured_loan_repaid
       # 수신 (investment → account)
       investment-executed: lemuel.investment.executed
+  # ADR 0030 Phase 3 — 실체화 잔액(account_balances) 정기 대사.
+  # 드리프트 게이지 account.balance.recon.drift.count 가 0 이 아니면 파생 캐시 오염(원장이 정본).
+  recon:
+    balance:
+      enabled: ${APP_RECON_BALANCE_ENABLED:true}
+      interval-ms: ${APP_RECON_BALANCE_INTERVAL_MS:600000}      # 10분
+      initial-delay-ms: ${APP_RECON_BALANCE_INITIAL_DELAY_MS:60000}

@@ -2,6 +2,7 @@ package github.lms.lemuel.account.application.service;
 
 import github.lms.lemuel.account.application.port.in.AccountQueryUseCase;
 import github.lms.lemuel.account.application.port.out.LoadAccountEntryPort;
+import github.lms.lemuel.account.application.port.out.ReconcileBalancesPort;
 import github.lms.lemuel.account.domain.AccountEntry;
 import github.lms.lemuel.account.domain.AccountSummary;
 import github.lms.lemuel.account.domain.GlAccount;
@@ -21,10 +22,16 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class AccountQueryService implements AccountQueryUseCase {
 
-    private final LoadAccountEntryPort loadAccountEntryPort;
+    /** 드리프트 보고 상한 — 캐시 전면 오염 시에도 응답이 폭주하지 않게 캡한다(건수는 driftCount 가 정본). */
+    private static final int DRIFT_REPORT_LIMIT = 100;
 
-    public AccountQueryService(LoadAccountEntryPort loadAccountEntryPort) {
+    private final LoadAccountEntryPort loadAccountEntryPort;
+    private final ReconcileBalancesPort reconcileBalancesPort;
+
+    public AccountQueryService(LoadAccountEntryPort loadAccountEntryPort,
+                               ReconcileBalancesPort reconcileBalancesPort) {
         this.loadAccountEntryPort = loadAccountEntryPort;
+        this.reconcileBalancesPort = reconcileBalancesPort;
     }
 
     @Override
@@ -97,6 +104,18 @@ public class AccountQueryService implements AccountQueryUseCase {
         return new ControlRecon(
                 tb.normalBalance(GlAccount.SELLER_PAYABLE),
                 tb.normalBalance(GlAccount.HOLDBACK_PAYABLE),
-                tb.normalBalance(GlAccount.SELLER_RECOVERY_RECEIVABLE));
+                tb.normalBalance(GlAccount.SELLER_RECOVERY_RECEIVABLE),
+                balanceRecon());
+    }
+
+    @Override
+    public BalanceRecon balanceRecon() {
+        // 건수·상세는 포트가 단일 문장 스냅샷으로 묶어 돌려준다(read_committed 자기모순 방지 — MED-3).
+        var snapshot = reconcileBalancesPort.reconcileBalances(DRIFT_REPORT_LIMIT);
+        List<BalanceDrift> drifts = snapshot.drifts().stream()
+                .map(row -> new BalanceDrift(row.ownerType(), row.ownerId(), row.account(),
+                        row.materialized(), row.recomputed()))
+                .toList();
+        return new BalanceRecon(snapshot.checkedPairs(), snapshot.driftCount(), drifts);
     }
 }

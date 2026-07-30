@@ -181,12 +181,15 @@ class GlCashClosedLoopIT {
         assertThat(tb.balanced()).isTrue();
         assertThat(tb.normalBalanceRespected()).isTrue();
 
-        // ── /control-recon: 세 통제계정 GL 순잔액 0(전역 폐루프) ──
+        // ── /control-recon: 세 통제계정 GL 순잔액 0(전역 폐루프) + 파생 캐시 정합(ADR 0030 Phase 3) ──
         var recon = accountQueryUseCase.controlRecon();
         assertThat(recon.sellerPayable()).isEqualByComparingTo("0");
         assertThat(recon.holdbackPayable()).isEqualByComparingTo("0");
         assertThat(recon.recoveryReceivable()).isEqualByComparingTo("0");
         assertThat(recon.balanced()).isTrue();
+        // balanced 는 원장 축만 본다 — 실체화 캐시 드리프트까지 포함한 종합 판정은 healthy (감사 MED-2).
+        assertThat(recon.materializedRecon().consistent()).isTrue();
+        assertThat(recon.healthy()).isTrue();
 
         // ── 멱등: 신규 이벤트 유형 재수신 → 분개 1건(자연키 UNIQUE) ──
         recordAccountEntryUseCase.record(AccountEntry.holdbackConsumed(seller, "adjD", new BigDecimal("400")));
