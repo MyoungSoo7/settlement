@@ -22,9 +22,9 @@ import java.util.Map;
  * {@code lemuel.loan.secured_loan_disbursed} (KafkaOutboxPublisher.resolveTopic 의 camel→snake 규칙).
  * "SecuredLoanRepaid" → {@code lemuel.loan.secured_loan_repaid}.
  *
- * <p>Phase 1 에는 <b>소비자가 없다</b> — account-service GL 매핑은 Phase 2 이월이다. 그래도 지금
- * 발행해 두는 이유는 계약(스키마·페이로드)을 상품 도입 시점에 확정해야 나중에 소비자를 붙일 때
- * 프로듀서를 고치지 않아도 되기 때문이다.
+ * <p>소비자는 account-service — 두 이벤트를 차주(BORROWER) 원장 {@code SECURED_LOAN_RECEIVABLE}
+ * 분개로 소비한다(원금만). 완제 이벤트의 {@code prepaymentFee} 는 중도상환 완제에 부과된 수수료
+ * 실액(회차 완제는 0)으로, GL 분개에는 쓰이지 않지만 계약 완결성을 위해 싣는다.
  */
 @Component
 public class SecuredLoanEventPublisherAdapter implements PublishSecuredLoanEventPort {
@@ -50,10 +50,11 @@ public class SecuredLoanEventPublisherAdapter implements PublishSecuredLoanEvent
     }
 
     @Override
-    public void publishRepaid(SecuredLoan loan, BigDecimal totalInterestPaid) {
+    public void publishRepaid(SecuredLoan loan, BigDecimal totalInterestPaid, BigDecimal prepaymentFee) {
         Map<String, Object> payload = basePayload(loan);
         payload.put("principal", loan.getPrincipal());
         payload.put("interestPaid", totalInterestPaid);
+        payload.put("prepaymentFee", prepaymentFee);
         save(loan, "SecuredLoanRepaid", payload);
     }
 

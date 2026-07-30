@@ -224,6 +224,31 @@ class AccountEntryTest {
     }
 
     @Test
+    void 담보대출실행_BORROWER_DR_SECURED_LOAN_RECEIVABLE_CR_CASH() {
+        AccountEntry e = AccountEntry.securedLoanDisbursed("42", "7001", new BigDecimal("300000000.00"));
+        assertThat(e.getOwnerType()).isEqualTo(OwnerType.BORROWER);
+        assertThat(e.getOwnerId()).isEqualTo("42");
+        assertThat(e.getDebitAccount()).isEqualTo(GlAccount.SECURED_LOAN_RECEIVABLE);
+        assertThat(e.getCreditAccount()).isEqualTo(GlAccount.CASH);
+        assertThat(e.getRefType()).isEqualTo("SECURED_LOAN_DISBURSED");
+        assertThat(e.getRefId()).isEqualTo("7001");
+        assertThat(e.getSourceTopic()).isEqualTo("lemuel.loan.secured_loan_disbursed");
+    }
+
+    @Test
+    void 담보대출완제_BORROWER_DR_CASH_CR_SECURED_LOAN_RECEIVABLE() {
+        // 완제 이벤트의 principal 은 계약 원금 — 실행 전표와 동액이라 채권 잔액이 0 으로 닫힌다.
+        AccountEntry e = AccountEntry.securedLoanRepaid("42", "7001", new BigDecimal("300000000.00"));
+        assertThat(e.getOwnerType()).isEqualTo(OwnerType.BORROWER);
+        assertThat(e.getOwnerId()).isEqualTo("42");
+        assertThat(e.getDebitAccount()).isEqualTo(GlAccount.CASH);
+        assertThat(e.getCreditAccount()).isEqualTo(GlAccount.SECURED_LOAN_RECEIVABLE);
+        assertThat(e.getRefType()).isEqualTo("SECURED_LOAN_REPAID");
+        assertThat(e.getRefId()).isEqualTo("7001");
+        assertThat(e.getSourceTopic()).isEqualTo("lemuel.loan.secured_loan_repaid");
+    }
+
+    @Test
     void 투자집행_DR_INVESTMENT_ASSET_CR_CASH() {
         AccountEntry e = AccountEntry.investmentExecuted("55", "ORD-3", new BigDecimal("250000"));
         assertThat(e.getOwnerType()).isEqualTo(OwnerType.SELLER);

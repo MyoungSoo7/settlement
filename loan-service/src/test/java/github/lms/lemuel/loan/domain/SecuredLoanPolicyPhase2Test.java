@@ -39,6 +39,13 @@ class SecuredLoanPolicyPhase2Test {
     }
 
     @Test
+    void 금융자산담보_금리는_담보형_고정_가산이다() {
+        // 담보가 위험을 흡수하므로 주택담보와 동일한 고정 가산(0.8%p) — 등급 무관.
+        assertThat(policy.annualRatePercent(LoanProductType.FINANCIAL_ASSET, null))
+                .isEqualByComparingTo("4.30");
+    }
+
+    @Test
     void 보증서는_보증금액_전액이_한도다() {
         assertThat(policy.collateralLimit(new BigDecimal("100000000"), CollateralType.GUARANTEE))
                 .isEqualByComparingTo("100000000");

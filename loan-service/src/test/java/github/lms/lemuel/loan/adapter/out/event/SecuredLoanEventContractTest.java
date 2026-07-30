@@ -80,6 +80,23 @@ class SecuredLoanEventContractTest {
     }
 
     @Test
+    @DisplayName("금융자산담보(FINANCIAL_ASSET) 실행 페이로드도 계약을 만족한다 — Phase 2 실연동 상품")
+    void disbursed_financialAsset_satisfiesContract() {
+        Collateral equity = Collateral.reconstitute(3002L, CollateralType.EQUITY, "삼성전자 1,000주",
+                new BigDecimal("71000000.00"), NOW, CollateralStatus.ACTIVE);
+        SecuredLoan loan = SecuredLoan.reconstitute(7003L, Borrower.individual(42L, "홍길동"),
+                LoanProductType.FINANCIAL_ASSET, equity, new BigDecimal("40000000.00"), 12,
+                new BigDecimal("4.30"), RepaymentMethod.BULLET, null, null,
+                new BigDecimal("40000000.00"), SecuredLoanStatus.DISBURSED, NOW, NOW);
+
+        publisher.publishDisbursed(loan);
+
+        String payload = capture().getPayload();
+        assertThat(payload).contains("\"productType\":\"FINANCIAL_ASSET\"");
+        EventContractValidator.assertValid("lemuel.loan.secured_loan_disbursed", payload);
+    }
+
+    @Test
     @DisplayName("담보 없는 개인신용 실행 페이로드도 계약을 만족한다 — 담보는 페이로드에 없다")
     void disbursed_personalCredit_satisfiesContract() {
         publisher.publishDisbursed(personalCredit(SecuredLoanStatus.DISBURSED, new BigDecimal("30000000.00")));
@@ -95,7 +112,7 @@ class SecuredLoanEventContractTest {
     @DisplayName("SecuredLoanRepaid 페이로드는 lemuel.loan.secured_loan_repaid 계약을 만족한다")
     void repaid_satisfiesContract() {
         publisher.publishRepaid(mortgage(SecuredLoanStatus.REPAID, BigDecimal.ZERO),
-                new BigDecimal("1075000.00"));
+                new BigDecimal("1075000.00"), BigDecimal.ZERO);
 
         OutboxEvent event = capture();
         assertThat(event.getAggregateType()).isEqualTo("Loan");
@@ -106,9 +123,39 @@ class SecuredLoanEventContractTest {
     @Test
     @DisplayName("이자 0 완제 페이로드도 계약을 만족한다 — 비음수 패턴 허용")
     void repaid_zeroInterest_satisfiesContract() {
-        publisher.publishRepaid(mortgage(SecuredLoanStatus.REPAID, BigDecimal.ZERO), BigDecimal.ZERO);
+        publisher.publishRepaid(mortgage(SecuredLoanStatus.REPAID, BigDecimal.ZERO),
+                BigDecimal.ZERO, BigDecimal.ZERO);
 
         EventContractValidator.assertValid("lemuel.loan.secured_loan_repaid", capture().getPayload());
+    }
+
+    @Test
+    @DisplayName("금융자산담보 완제 페이로드도 계약을 만족한다 — disbursed 와 enum 커버리지 대칭")
+    void repaid_financialAsset_satisfiesContract() {
+        Collateral equity = Collateral.reconstitute(3002L, CollateralType.EQUITY, "삼성전자 1,000주",
+                new BigDecimal("71000000.00"), NOW, CollateralStatus.RELEASED);
+        SecuredLoan loan = SecuredLoan.reconstitute(7003L, Borrower.individual(42L, "홍길동"),
+                LoanProductType.FINANCIAL_ASSET, equity, new BigDecimal("40000000.00"), 12,
+                new BigDecimal("4.30"), RepaymentMethod.BULLET, null, null,
+                BigDecimal.ZERO, SecuredLoanStatus.REPAID, NOW, NOW);
+
+        publisher.publishRepaid(loan, new BigDecimal("143000.00"), BigDecimal.ZERO);
+
+        String payload = capture().getPayload();
+        assertThat(payload).contains("\"productType\":\"FINANCIAL_ASSET\"");
+        EventContractValidator.assertValid("lemuel.loan.secured_loan_repaid", payload);
+    }
+
+    @Test
+    @DisplayName("중도상환 완제 페이로드는 prepaymentFee 를 싣는다 — account GL 소비 선행 요건")
+    void repaid_carriesPrepaymentFee() {
+        publisher.publishRepaid(mortgage(SecuredLoanStatus.REPAID, BigDecimal.ZERO),
+                BigDecimal.ZERO, new BigDecimal("3600000.00"));
+
+        String payload = capture().getPayload();
+        // 금액 wire 표준(N5): BigDecimal 은 JSON string 으로 직렬화된다.
+        assertThat(payload).contains("\"prepaymentFee\":\"3600000.00\"");
+        EventContractValidator.assertValid("lemuel.loan.secured_loan_repaid", payload);
     }
 
     // ─── 소비측이 상품·차주를 구분할 수 있어야 GL 매핑이 가능하다 ──────────────────

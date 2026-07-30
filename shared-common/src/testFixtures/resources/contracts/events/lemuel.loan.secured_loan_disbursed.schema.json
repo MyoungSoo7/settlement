@@ -1,11 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "lemuel.loan.secured_loan_disbursed",
-  "description": "loan-service(SecuredLoanEventPublisherAdapter) → 소비측(Phase 2 account-service GL 매핑 예정, Phase 1 소비자 없음). 담보/개인신용 대출 실행(지급) 사실을 통지한다. principal/annualRatePercent 는 BigDecimal 이므로 JSON string(BigDecimal.toPlainString, DATA-STANDARD N5 — 전 계열 통일). productType 으로 담보형/신용형을 구분하고, borrowerType 으로 개인/법인을 구분한다 — 소비측이 상품·차주별로 다른 계정에 매핑할 수 있어야 하기 때문이다. termMonths 는 장기 분할상환이라 최대 360 급으로 커질 수 있다.",
+  "description": "loan-service(SecuredLoanEventPublisherAdapter) → account-service(GL 분개 DR SECURED_LOAN_RECEIVABLE / CR CASH, owner=BORROWER, 원금만). 담보/개인신용 대출 실행(지급) 사실을 통지한다. principal/annualRatePercent 는 BigDecimal 이므로 JSON string(BigDecimal.toPlainString, DATA-STANDARD N5 — 전 계열 통일). productType 으로 담보형/신용형을 구분하고, borrowerType 으로 개인/법인을 구분한다 — 소비측이 상품·차주별로 다른 계정에 매핑할 수 있어야 하기 때문이다. termMonths 는 장기 분할상환이라 최대 360 급으로 커질 수 있다.",
   "type": "object",
   "properties": {
     "loanId": { "type": "integer" },
-    "productType": { "type": "string", "enum": ["MORTGAGE", "PERSONAL_CREDIT"] },
+    "productType": { "type": "string", "enum": ["MORTGAGE", "FINANCIAL_ASSET", "PERSONAL_CREDIT"] },
     "borrowerUserId": { "type": "integer" },
     "borrowerType": { "type": "string", "enum": ["INDIVIDUAL", "CORPORATE"] },
     "principal": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?$" },

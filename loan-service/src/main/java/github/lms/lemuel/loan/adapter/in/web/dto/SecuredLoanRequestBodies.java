@@ -1,5 +1,6 @@
 package github.lms.lemuel.loan.adapter.in.web.dto;
 
+import github.lms.lemuel.loan.domain.CollateralType;
 import github.lms.lemuel.loan.domain.RepaymentMethod;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
@@ -23,14 +24,43 @@ public final class SecuredLoanRequestBodies {
      * 주택담보대출 신청.
      *
      * @param registrationNo          사업자등록번호(선택) — 있으면 법인 차주로 해석된다
-     * @param declaredCollateralValue 제시 담보 평가액. Phase 1 은 이 값이 그대로 확정되며,
-     *                                Phase 2 에서 위성 서비스 조회값으로 대체된다
+     * @param declaredCollateralValue 제시 담보 평가액 — 실거래가 조회 불가 시 폴백으로 확정된다
+     * @param dealRecordKey           실거래가 조회 키(선택, commondata recordKey 접두어) — 없으면 제시값 확정
      */
     public record MortgageRequestBody(
             @NotBlank String borrowerName,
             String registrationNo,
             @NotBlank String collateralDescription,
             @NotNull @DecimalMin(value = "0", inclusive = false) BigDecimal declaredCollateralValue,
+            @NotNull @DecimalMin(value = "0", inclusive = false) BigDecimal principal,
+            @Min(1) int termMonths,
+            @NotNull RepaymentMethod repaymentMethod,
+            String dealRecordKey) {
+
+        /** 실거래가 조회 키 없는 신청(기존 호출부 호환). */
+        public MortgageRequestBody(String borrowerName, String registrationNo, String collateralDescription,
+                                   BigDecimal declaredCollateralValue, BigDecimal principal,
+                                   int termMonths, RepaymentMethod repaymentMethod) {
+            this(borrowerName, registrationNo, collateralDescription, declaredCollateralValue,
+                    principal, termMonths, repaymentMethod, null);
+        }
+    }
+
+    /**
+     * 금융자산담보대출 신청(Phase 2 실연동).
+     *
+     * @param collateralType 금융자산 계열 담보 유형(DEPOSIT·BOND·EQUITY) — 그 외 유형은 도메인이 거부한다
+     * @param assetCode      위성 시세 조회 키(선택) — EQUITY 는 종목코드 6자리. 없으면 제시값 확정
+     * @param quantity       수량(선택, 주식 수) — EQUITY 시가 평가(단가×수량)에 사용
+     */
+    public record FinancialAssetRequestBody(
+            @NotBlank String borrowerName,
+            String registrationNo,
+            @NotNull CollateralType collateralType,
+            @NotBlank String collateralDescription,
+            @NotNull @DecimalMin(value = "0", inclusive = false) BigDecimal declaredCollateralValue,
+            String assetCode,
+            @Min(1) Long quantity,
             @NotNull @DecimalMin(value = "0", inclusive = false) BigDecimal principal,
             @Min(1) int termMonths,
             @NotNull RepaymentMethod repaymentMethod) {

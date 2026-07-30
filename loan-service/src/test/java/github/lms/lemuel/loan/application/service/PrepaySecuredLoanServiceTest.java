@@ -70,7 +70,7 @@ class PrepaySecuredLoanServiceTest {
         ledger = new RecordingLedgerPort();
         events = new RecordingEventPort();
         metrics = new CountingMetricsPort();
-        CollateralValuationPort valuation = (type, description, declared) -> declared;
+        CollateralValuationPort valuation = claim -> claim.declaredValue();
         BaseRatePort baseRate = () -> BASE_RATE;
 
         requestService = new RequestSecuredLoanService(store, valuation, baseRate, metrics, LTV, FIXED_CLOCK);
@@ -146,6 +146,9 @@ class PrepaySecuredLoanServiceTest {
         assertThat(result.loan().getStatus()).isEqualTo(SecuredLoanStatus.REPAID);
         assertThat(result.loan().getCollateral().getStatus()).isEqualTo(CollateralStatus.RELEASED);
         assertThat(events.repaid).hasSize(1);
+        // 완제 이벤트에는 이 중도상환에 부과된 수수료 실액이 실린다 — 3억 × 1.2% × 1 = 3,600,000
+        assertThat(events.repaidFees).hasSize(1);
+        assertThat(events.repaidFees.get(0)).isEqualByComparingTo("3600000.00");
     }
 
     @Test
@@ -262,6 +265,7 @@ class PrepaySecuredLoanServiceTest {
     private static final class RecordingEventPort implements PublishSecuredLoanEventPort {
         private final List<SecuredLoan> disbursed = new ArrayList<>();
         private final List<SecuredLoan> repaid = new ArrayList<>();
+        private final List<BigDecimal> repaidFees = new ArrayList<>();
 
         @Override
         public void publishDisbursed(SecuredLoan loan) {
@@ -269,8 +273,9 @@ class PrepaySecuredLoanServiceTest {
         }
 
         @Override
-        public void publishRepaid(SecuredLoan loan, BigDecimal totalInterestPaid) {
+        public void publishRepaid(SecuredLoan loan, BigDecimal totalInterestPaid, BigDecimal prepaymentFee) {
             repaid.add(loan);
+            repaidFees.add(prepaymentFee);
         }
     }
 

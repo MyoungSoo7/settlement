@@ -78,6 +78,42 @@ class SecuredLoanControllerTest {
                 new BigDecimal("5000000.00"), SecuredLoanStatus.DISBURSED, NOW, NOW);
     }
 
+    // ─── 신청: 금융자산담보 ────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("POST /loans/secured/financial-asset — 201, 차주는 JWT 주체에서 파생된다(IDOR)")
+    void requestFinancialAssetCreated() throws Exception {
+        github.lms.lemuel.loan.domain.Collateral collateral =
+                github.lms.lemuel.loan.domain.Collateral.reconstitute(31L,
+                        github.lms.lemuel.loan.domain.CollateralType.EQUITY, "삼성전자 1,000주",
+                        new BigDecimal("71000000.00"), NOW,
+                        github.lms.lemuel.loan.domain.CollateralStatus.PLEDGED);
+        SecuredLoan loan = SecuredLoan.reconstitute(9L, Borrower.individual(42L, "홍길동"),
+                LoanProductType.FINANCIAL_ASSET, collateral, new BigDecimal("40000000.00"), 12,
+                new BigDecimal("4.30"), RepaymentMethod.BULLET, null, null,
+                BigDecimal.ZERO, SecuredLoanStatus.REQUESTED, NOW, null);
+        when(requestSecuredLoanUseCase.requestFinancialAsset(any())).thenReturn(loan);
+
+        mockMvc.perform(post("/loans/secured/financial-asset").principal(userAuth(42L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"borrowerName":"홍길동","collateralType":"EQUITY",
+                                 "collateralDescription":"삼성전자 1,000주",
+                                 "declaredCollateralValue":50000000,"assetCode":"005930","quantity":1000,
+                                 "principal":40000000,"termMonths":12,"repaymentMethod":"BULLET"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.productType").value("FINANCIAL_ASSET"));
+
+        // 차주 식별자는 바디가 아니라 JWT 주체(42)에서 파생되어야 한다.
+        org.mockito.ArgumentCaptor<RequestSecuredLoanUseCase.FinancialAssetCommand> captor =
+                org.mockito.ArgumentCaptor.forClass(RequestSecuredLoanUseCase.FinancialAssetCommand.class);
+        verify(requestSecuredLoanUseCase).requestFinancialAsset(captor.capture());
+        org.assertj.core.api.Assertions.assertThat(captor.getValue().borrowerUserId()).isEqualTo(42L);
+        org.assertj.core.api.Assertions.assertThat(captor.getValue().assetCode()).isEqualTo("005930");
+        org.assertj.core.api.Assertions.assertThat(captor.getValue().quantity()).isEqualTo(1000L);
+    }
+
     // ─── 중도상환 멱등 ────────────────────────────────────────────────────────
 
     @Test

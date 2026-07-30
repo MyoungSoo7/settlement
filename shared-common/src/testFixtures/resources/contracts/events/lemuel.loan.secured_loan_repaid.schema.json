@@ -1,15 +1,16 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "lemuel.loan.secured_loan_repaid",
-  "description": "loan-service(SecuredLoanEventPublisherAdapter) → 소비측(Phase 2 account-service GL 매핑 예정, Phase 1 소비자 없음). 담보/개인신용 대출 완제 사실을 통지한다. 완제 시점에만 발행되며 회차 상환마다 발행하지 않는다. principal 은 계약 원금(누적 상환액이 아님), interestPaid 는 완제 회차에서 수취한 이자다. 둘 다 BigDecimal 이므로 JSON string(DATA-STANDARD N5). interestPaid 는 0 가능(무이자 완제 회차)이라 비음수 패턴.",
+  "description": "loan-service(SecuredLoanEventPublisherAdapter) → account-service(GL 분개 DR CASH / CR SECURED_LOAN_RECEIVABLE, 원금만). 담보/개인신용 대출 완제 사실을 통지한다. 완제 시점에만 발행되며 회차 상환마다 발행하지 않는다. principal 은 계약 원금(누적 상환액이 아님), interestPaid 는 완제 회차에서 수취한 이자다. 금액은 전부 BigDecimal 이므로 JSON string(DATA-STANDARD N5). interestPaid 는 0 가능(무이자 완제 회차), prepaymentFee 는 완제가 중도상환일 때 부과된 중도상환수수료(회차 완제·면제 구간은 0) — 하위호환을 위해 optional(ADR 0022) 이며 구독측은 부재를 0 으로 해석한다.",
   "type": "object",
   "properties": {
     "loanId": { "type": "integer" },
-    "productType": { "type": "string", "enum": ["MORTGAGE", "PERSONAL_CREDIT"] },
+    "productType": { "type": "string", "enum": ["MORTGAGE", "FINANCIAL_ASSET", "PERSONAL_CREDIT"] },
     "borrowerUserId": { "type": "integer" },
     "borrowerType": { "type": "string", "enum": ["INDIVIDUAL", "CORPORATE"] },
     "principal": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?$" },
-    "interestPaid": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?$" }
+    "interestPaid": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?$" },
+    "prepaymentFee": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?$" }
   },
   "required": ["loanId", "productType", "borrowerUserId", "borrowerType", "principal", "interestPaid"],
   "additionalProperties": true

@@ -1,6 +1,7 @@
 package github.lms.lemuel.company.application.port.out;
 
 import github.lms.lemuel.company.domain.CompanyWorkforce;
+import github.lms.lemuel.company.domain.WorkplaceSeriesKey;
 
 import java.util.List;
 
@@ -8,6 +9,9 @@ import java.util.List;
 public interface LoadCompanyWorkforcePort {
 
     SearchResult search(String workplaceName, int page, int size);
+
+    /** 시계열 키(사업장명+앞6자리)의 전 스냅샷 — 정렬은 도메인({@code WorkforceHistory})이 책임진다. */
+    List<CompanyWorkforce> findSeries(WorkplaceSeriesKey key);
 
     record SearchResult(List<CompanyWorkforce> content, long totalElements) {
     }

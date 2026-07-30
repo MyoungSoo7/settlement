@@ -22,6 +22,14 @@ spring:
       minimum-idle: ${DB_POOL_MIN_IDLE:5}
       connection-timeout: 10000
       leak-detection-threshold: 30000
+      # 커넥션이 조용히 죽는 것을 막는다 (2026-07-30).
+      # 파드와 postgres 가 서로 다른 노드에 있어 유휴 커넥션이 CNI/conntrack 상태 만료로
+      # 소리 없이 끊긴다. 그러면 다음 borrow 때 SQLState 08003(connection does not exist)나
+      # 'Connection is not available … (total=0)' 로 터진다 — settlement-service 의 outbox 폴러가
+      # 이틀간 46회 이렇게 실패했다. keepalive 로 주기적으로 살아있음을 확인하고,
+      # max-lifetime 으로 오래된 커넥션을 선제 교체한다. (economics/market/common-data 는 이미 적용됨)
+      max-lifetime: 1800000     # 30분
+      keepalive-time: 300000    # 5분
 
   jpa:
     hibernate:
@@ -137,5 +145,15 @@ app:
       loan-disbursement-requested: lemuel.loan.disbursement_requested
       loan-repayment-applied: lemuel.loan.repayment_applied
       corporate-loan-disbursed: lemuel.loan.corporate_loan_disbursed
+      # 수신 (loan → account) — 담보/개인신용 대출 GL 매핑 (담보대출 Phase 2 잔여 이월)
+      secured-loan-disbursed: lemuel.loan.secured_loan_disbursed
+      secured-loan-repaid: lemuel.loan.secured_loan_repaid
       # 수신 (investment → account)
       investment-executed: lemuel.investment.executed
+  # ADR 0030 Phase 3 — 실체화 잔액(account_balances) 정기 대사.
+  # 드리프트 게이지 account.balance.recon.drift.count 가 0 이 아니면 파생 캐시 오염(원장이 정본).
+  recon:
+    balance:
+      enabled: ${APP_RECON_BALANCE_ENABLED:true}
+      interval-ms: ${APP_RECON_BALANCE_INTERVAL_MS:600000}      # 10분
+      initial-delay-ms: ${APP_RECON_BALANCE_INITIAL_DELAY_MS:60000}

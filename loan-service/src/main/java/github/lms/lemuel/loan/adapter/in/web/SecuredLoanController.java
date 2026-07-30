@@ -3,6 +3,7 @@ package github.lms.lemuel.loan.adapter.in.web;
 import github.lms.lemuel.common.config.jwt.AuthPrincipal;
 import github.lms.lemuel.loan.adapter.out.persistence.LoanManualIdempotencyGuard;
 import github.lms.lemuel.loan.adapter.in.web.dto.SecuredLoanPrepayResponse;
+import github.lms.lemuel.loan.adapter.in.web.dto.SecuredLoanRequestBodies.FinancialAssetRequestBody;
 import github.lms.lemuel.loan.adapter.in.web.dto.SecuredLoanRequestBodies.MortgageRequestBody;
 import github.lms.lemuel.loan.adapter.in.web.dto.SecuredLoanRequestBodies.PersonalCreditRequestBody;
 import github.lms.lemuel.loan.adapter.in.web.dto.SecuredLoanRequestBodies.SecuredLoanPrepayRequest;
@@ -13,6 +14,7 @@ import github.lms.lemuel.loan.application.port.in.ManageSecuredLoanCollectionUse
 import github.lms.lemuel.loan.application.port.in.PrepaySecuredLoanUseCase;
 import github.lms.lemuel.loan.application.port.in.RepaySecuredLoanUseCase;
 import github.lms.lemuel.loan.application.port.in.RequestSecuredLoanUseCase;
+import github.lms.lemuel.loan.application.port.in.RequestSecuredLoanUseCase.FinancialAssetCommand;
 import github.lms.lemuel.loan.application.port.in.RequestSecuredLoanUseCase.MortgageCommand;
 import github.lms.lemuel.loan.application.port.in.RequestSecuredLoanUseCase.PersonalCreditCommand;
 import github.lms.lemuel.loan.application.port.out.LoadSecuredLoanPort;
@@ -79,6 +81,18 @@ public class SecuredLoanController {
         SecuredLoan loan = requestSecuredLoanUseCase.requestMortgage(new MortgageCommand(
                 callerUserId(authentication), body.borrowerName(), body.registrationNo(),
                 body.collateralDescription(), body.declaredCollateralValue(),
+                body.principal(), body.termMonths(), body.repaymentMethod(), body.dealRecordKey()));
+        return ResponseEntity.status(HttpStatus.CREATED).body(SecuredLoanResponse.from(loan));
+    }
+
+    /** 금융자산담보대출 신청 — EQUITY 는 market 시가(단가×수량) 평가, 유형별 인정비율 한도 심사. 초과면 422. */
+    @PostMapping("/financial-asset")
+    public ResponseEntity<SecuredLoanResponse> requestFinancialAsset(
+            @Valid @RequestBody FinancialAssetRequestBody body, Authentication authentication) {
+        SecuredLoan loan = requestSecuredLoanUseCase.requestFinancialAsset(new FinancialAssetCommand(
+                callerUserId(authentication), body.borrowerName(), body.registrationNo(),
+                body.collateralType(), body.collateralDescription(), body.declaredCollateralValue(),
+                body.assetCode(), body.quantity(),
                 body.principal(), body.termMonths(), body.repaymentMethod()));
         return ResponseEntity.status(HttpStatus.CREATED).body(SecuredLoanResponse.from(loan));
     }

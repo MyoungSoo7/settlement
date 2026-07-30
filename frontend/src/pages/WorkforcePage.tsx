@@ -5,6 +5,8 @@ import {
   WorkforcePage as WorkforcePageData,
   WorkforceComparison,
   WorkforceGroupComparison,
+  WorkforceHistory,
+  WorkforceTrendPoint,
   ComparisonUnavailableReason,
 } from '@/api/company';
 import Card from '@/components/Card';
@@ -131,6 +133,63 @@ const ComparisonCard: React.FC<{
   </div>
 );
 
+/** 증감 셀 — 값이 null(첫 월·결측 갭)이면 대시, 부호별 색상 */
+const ChangeCell: React.FC<{ change: string | number | null; rate: number | null; isMoney?: boolean }> = ({
+  change, rate, isMoney,
+}) => {
+  if (change === null) return <span className="text-gray-300">—</span>;
+  const n = typeof change === 'string' ? Number(change) : change;
+  const color = n > 0 ? 'text-blue-700' : n < 0 ? 'text-red-600' : 'text-gray-500';
+  return (
+    <span className={color}>
+      {fmtSigned(change, isMoney ? '원' : '명')}
+      {rate !== null && <span className="text-xs ml-1">({fmtSigned(rate, '%')})</span>}
+    </span>
+  );
+};
+
+/** 월별 추이 섹션 — 결측 월은 보간 없이 빠진 채 노출, 증감은 연속 인접 월만 */
+const TrendSection: React.FC<{ history: WorkforceHistory }> = ({ history }) => (
+  <div className="border border-gray-200 rounded-xl p-4 space-y-3">
+    <div className="flex flex-wrap items-center gap-2">
+      <h4 className="text-sm font-semibold text-gray-700">월별 추이</h4>
+      <span className="text-xs text-gray-400">{history.series.length}개월</span>
+    </div>
+    {history.series.length === 1 && (
+      <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+        추이 데이터가 아직 1개월뿐입니다 — 다음 월 스냅샷이 적재되면 전월 대비 증감이 표시됩니다.
+      </p>
+    )}
+    <div className="overflow-x-auto">
+      <table className="min-w-full text-sm">
+        <thead>
+          <tr className="text-left text-gray-500 border-b text-xs">
+            <th className="py-1.5 pr-4">기준월</th>
+            <th className="py-1.5 pr-4 text-right">인원수</th>
+            <th className="py-1.5 pr-4 text-right">전월 대비</th>
+            <th className="py-1.5 pr-4 text-right">추정연봉</th>
+            <th className="py-1.5 text-right">전월 대비</th>
+          </tr>
+        </thead>
+        <tbody>
+          {history.series.map((p: WorkforceTrendPoint) => (
+            <tr key={p.snapshotMonth} className="border-b last:border-0">
+              <td className="py-1.5 pr-4 font-mono text-gray-700">
+                {p.snapshotMonth}
+                {p.salaryCapReached && <span title="기준소득월액 상한 도달" className="ml-1">⚠️</span>}
+              </td>
+              <td className="py-1.5 pr-4 text-right text-gray-900">{p.headcount.toLocaleString()}명</td>
+              <td className="py-1.5 pr-4 text-right"><ChangeCell change={p.headcountChange} rate={p.headcountChangeRate} /></td>
+              <td className="py-1.5 pr-4 text-right text-gray-900">{fmtWon(p.estimatedAnnualSalary)}</td>
+              <td className="py-1.5 text-right"><ChangeCell change={p.salaryChange} rate={p.salaryChangeRate} isMoney /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </div>
+);
+
 const WorkforcePage: React.FC = () => {
   const [keyword, setKeyword] = useState('');
   const [query, setQuery] = useState('');
@@ -139,6 +198,7 @@ const WorkforcePage: React.FC = () => {
   const [loadingList, setLoadingList] = useState(false);
 
   const [detail, setDetail] = useState<WorkforceComparison | null>(null);
+  const [history, setHistory] = useState<WorkforceHistory | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -158,11 +218,17 @@ const WorkforcePage: React.FC = () => {
     setLoadingDetail(true);
     setError(null);
     try {
-      const data = await companyApi.workforceDetail(row.workplaceName, row.bizRegNoPrefix, row.snapshotMonth);
+      // 추이는 부가 정보 — 실패해도 비교 조회를 막지 않는다
+      const [data, hist] = await Promise.all([
+        companyApi.workforceDetail(row.workplaceName, row.bizRegNoPrefix, row.snapshotMonth),
+        companyApi.workforceHistory(row.workplaceName, row.bizRegNoPrefix).catch(() => null),
+      ]);
       setDetail(data);
+      setHistory(hist);
     } catch (err) {
       setError(apiErrorMessage(err, '사업장 비교 조회에 실패했습니다.'));
       setDetail(null);
+      setHistory(null);
     } finally {
       setLoadingDetail(false);
     }
@@ -276,7 +342,7 @@ const WorkforcePage: React.FC = () => {
                       ({detail.bizRegNoPrefix}-**-***** · {detail.snapshotMonth})
                     </span>
                   </h2>
-                  <button onClick={() => setDetail(null)} className="text-sm text-gray-400 hover:text-gray-600">닫기 ✕</button>
+                  <button onClick={() => { setDetail(null); setHistory(null); }} className="text-sm text-gray-400 hover:text-gray-600">닫기 ✕</button>
                 </div>
 
                 {/* 기본 정보 */}
@@ -318,6 +384,9 @@ const WorkforcePage: React.FC = () => {
                   <ComparisonCard title="업종 비교" axis="industry" comparison={detail.industryComparison} />
                   <ComparisonCard title="지역 비교" axis="region" comparison={detail.regionComparison} />
                 </div>
+
+                {/* 월별 추이 — 시리즈 키(사업장명+앞6자리) 고정, 결측 월 보간 없음 */}
+                {history && <TrendSection history={history} />}
 
                 <p className="text-xs text-gray-400">{detail.note}</p>
               </div>

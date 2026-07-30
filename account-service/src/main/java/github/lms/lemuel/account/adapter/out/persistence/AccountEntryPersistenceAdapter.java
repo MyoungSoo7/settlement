@@ -2,6 +2,7 @@ package github.lms.lemuel.account.adapter.out.persistence;
 
 import github.lms.lemuel.account.application.port.out.AppendAccountEntryPort;
 import github.lms.lemuel.account.application.port.out.LoadAccountEntryPort;
+import github.lms.lemuel.account.application.port.out.ReconcileBalancesPort;
 import github.lms.lemuel.account.domain.AccountEntry;
 import github.lms.lemuel.account.domain.GlAccount;
 import github.lms.lemuel.account.domain.OwnerType;
@@ -14,7 +15,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Component
-public class AccountEntryPersistenceAdapter implements AppendAccountEntryPort, LoadAccountEntryPort {
+public class AccountEntryPersistenceAdapter
+        implements AppendAccountEntryPort, LoadAccountEntryPort, ReconcileBalancesPort {
 
     private final AccountEntryRepository repository;
     private final AccountBalanceRepository balanceRepository;
@@ -97,6 +99,30 @@ public class AccountEntryPersistenceAdapter implements AppendAccountEntryPort, L
      * 그 집계를 돌아 락 보유시간이 이력 길이에 비례했다. 부호 규약이 이전 재합산식과 동일해
      * (Σcredit − Σdebit) 반환 의미는 바뀌지 않는다.
      */
+    // ─── ADR 0030 Phase 3 — 대사(실체화 잔액 vs 원장 재합산) ─────────────────
+
+    @Override
+    public BalanceReconSnapshot reconcileBalances(int driftLimit) {
+        List<Object[]> rows = balanceRepository.findBalanceReconRows(driftLimit);
+        if (rows.isEmpty()) {
+            // 드리프트 0 — 요약(쌍 총수)만 보충한다. 별도 문장이지만 드리프트 관련 값이 아니라
+            // 스냅샷 자기모순(MED-3)의 대상이 아니다.
+            return new BalanceReconSnapshot(balanceRepository.countBalancePairs(), 0L, List.of());
+        }
+        Object[] first = rows.get(0);
+        long driftCount = ((Number) first[5]).longValue();
+        long checkedPairs = ((Number) first[6]).longValue();
+        List<BalanceDriftRow> drifts = rows.stream()
+                .map(row -> new BalanceDriftRow(
+                        OwnerType.valueOf((String) row[0]),
+                        (String) row[1],
+                        GlAccount.valueOf((String) row[2]),
+                        (BigDecimal) row[3],
+                        (BigDecimal) row[4]))
+                .toList();
+        return new BalanceReconSnapshot(checkedPairs, driftCount, drifts);
+    }
+
     @Override
     public BigDecimal sellerPayableBalance(String sellerId) {
         return balanceRepository

@@ -1,6 +1,8 @@
 package github.lms.lemuel.company.adapter.out.persistence;
 
 import github.lms.lemuel.company.application.port.out.LoadCompanyWorkforcePort;
+import github.lms.lemuel.company.domain.CompanyWorkforce;
+import github.lms.lemuel.company.domain.WorkplaceSeriesKey;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -14,6 +16,14 @@ public class CompanyWorkforcePersistenceAdapter implements LoadCompanyWorkforceP
 
     public CompanyWorkforcePersistenceAdapter(CompanyWorkforceRepository repository) {
         this.repository = repository;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public java.util.List<CompanyWorkforce> findSeries(WorkplaceSeriesKey key) {
+        return repository.findByWorkplaceNameAndBizRegNoPrefixOrderBySnapshotMonthAsc(
+                        key.workplaceName(), key.bizRegNoPrefix())
+                .stream().map(CompanyWorkforceJpaEntity::toDomain).toList();
     }
 
     @Override

@@ -71,6 +71,50 @@ class SecuredLoanTest {
         assertThat(mortgage().getCreditScore()).isNull();
     }
 
+    // ─── 생성: 금융자산담보 ────────────────────────────────────────────────────
+
+    private static Collateral activeEquityCollateral() {
+        Collateral collateral = Collateral.pledge(CollateralType.EQUITY, "삼성전자 005930 1,000주",
+                new BigDecimal("80000000"), NOW);
+        collateral.activate();
+        return collateral;
+    }
+
+    @Test
+    void 금융자산담보대출은_담보를_갖고_REQUESTED_로_시작한다() {
+        SecuredLoan loan = SecuredLoan.requestFinancialAsset(INDIVIDUAL, activeEquityCollateral(),
+                new BigDecimal("40000000"), 12, new BigDecimal("4.3"),
+                RepaymentMethod.BULLET, NOW);
+
+        assertThat(loan.getStatus()).isEqualTo(SecuredLoanStatus.REQUESTED);
+        assertThat(loan.getProductType()).isEqualTo(LoanProductType.FINANCIAL_ASSET);
+        assertThat(loan.getCollateral()).isNotNull();
+        assertThat(loan.getCreditScore()).isNull();
+        assertThat(loan.getOutstanding()).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void 금융자산담보대출에_담보가_없으면_예외() {
+        assertThatThrownBy(() -> SecuredLoan.requestFinancialAsset(INDIVIDUAL, null,
+                new BigDecimal("40000000"), 12, new BigDecimal("4.3"),
+                RepaymentMethod.BULLET, NOW))
+                .isInstanceOf(LoanInvariantViolationException.class);
+    }
+
+    @Test
+    void 금융자산담보대출의_담보는_금융자산_계열이어야_한다() {
+        // 부동산·보증서 담보를 금융자산 상품에 끼워 넣으면 유형별 인정비율·마진콜 규칙이 어긋난다.
+        assertThatThrownBy(() -> SecuredLoan.requestFinancialAsset(INDIVIDUAL, activeCollateral(),
+                new BigDecimal("40000000"), 12, new BigDecimal("4.3"),
+                RepaymentMethod.BULLET, NOW))
+                .isInstanceOf(LoanInvariantViolationException.class);
+    }
+
+    @Test
+    void 금융자산담보_상품은_담보가_필수다() {
+        assertThat(LoanProductType.FINANCIAL_ASSET.requiresCollateral()).isTrue();
+    }
+
     // ─── 생성: 개인신용 ────────────────────────────────────────────────────────
 
     @Test

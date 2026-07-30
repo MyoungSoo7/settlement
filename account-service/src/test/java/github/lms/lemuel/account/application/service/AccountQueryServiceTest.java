@@ -5,6 +5,8 @@ import github.lms.lemuel.account.application.port.in.AccountAggregateQuery.Inves
 import github.lms.lemuel.account.application.port.in.AccountAggregateQuery.LoanAggregate;
 import github.lms.lemuel.account.application.port.in.AccountAggregateQuery.SettlementAggregate;
 import github.lms.lemuel.account.application.port.out.LoadAccountEntryPort;
+import github.lms.lemuel.account.application.port.out.ReconcileBalancesPort;
+import github.lms.lemuel.account.application.port.out.ReconcileBalancesPort.BalanceDriftRow;
 import github.lms.lemuel.account.domain.AccountEntry;
 import github.lms.lemuel.account.domain.AccountSummary;
 import github.lms.lemuel.account.domain.GlAccount;
@@ -26,6 +28,7 @@ import static org.mockito.Mockito.when;
 class AccountQueryServiceTest {
 
     @Mock LoadAccountEntryPort loadAccountEntryPort;
+    @Mock ReconcileBalancesPort reconcileBalancesPort;
     @InjectMocks AccountQueryService service;
 
     @Test
@@ -167,6 +170,8 @@ class AccountQueryServiceTest {
 
     @Test
     void controlRecon_완전정산이면_세_통제계정_순잔액_0_balanced_참() {
+        when(reconcileBalancesPort.reconcileBalances(100)).thenReturn(
+                new ReconcileBalancesPort.BalanceReconSnapshot(0L, 0L, List.of()));
         // 즉시 인식·지급, 유보 인식·소진, 회수 발생·상계가 모두 상쇄되는 전표 집합
         when(loadAccountEntryPort.findAll()).thenReturn(List.of(
                 AccountEntry.settlementCreatedImmediate("777", "A", new BigDecimal("700")),
@@ -187,6 +192,8 @@ class AccountQueryServiceTest {
 
     @Test
     void controlRecon_미해결_유보와_회수는_정상방향_순잔액으로_노출된다() {
+        when(reconcileBalancesPort.reconcileBalances(100)).thenReturn(
+                new ReconcileBalancesPort.BalanceReconSnapshot(0L, 0L, List.of()));
         when(loadAccountEntryPort.findAll()).thenReturn(List.of(
                 AccountEntry.settlementHoldbackRecognized("777", "A", new BigDecimal("300")), // CR HOLDBACK_PAYABLE 300
                 AccountEntry.recoveryOpened("777", "r1", new BigDecimal("200"))));            // DR RECEIVABLE 200
@@ -197,5 +204,66 @@ class AccountQueryServiceTest {
         assertThat(recon.recoveryReceivable()).isEqualByComparingTo("200"); // OPEN 회수채권
         assertThat(recon.sellerPayable()).isEqualByComparingTo("0");
         assertThat(recon.balanced()).isFalse();
+    }
+
+    // ─── ADR 0030 Phase 3 — 실체화 잔액 대사 ─────────────────────────────────
+
+    @Test
+    void balanceRecon_정합이면_consistent() {
+        when(reconcileBalancesPort.reconcileBalances(100)).thenReturn(
+                new ReconcileBalancesPort.BalanceReconSnapshot(7L, 0L, List.of()));
+
+        var recon = service.balanceRecon();
+
+        assertThat(recon.consistent()).isTrue();
+        assertThat(recon.checkedPairs()).isEqualTo(7L);
+        assertThat(recon.drifts()).isEmpty();
+    }
+
+    @Test
+    void balanceRecon_드리프트는_파생_델타와_함께_보고된다() {
+        when(reconcileBalancesPort.reconcileBalances(100)).thenReturn(
+                new ReconcileBalancesPort.BalanceReconSnapshot(7L, 1L, List.of(
+                        new BalanceDriftRow(OwnerType.SELLER, "55", GlAccount.SELLER_PAYABLE,
+                                new BigDecimal("120000"), new BigDecimal("100000")))));
+
+        var recon = service.balanceRecon();
+
+        assertThat(recon.consistent()).isFalse();
+        assertThat(recon.driftCount()).isEqualTo(1L);
+        assertThat(recon.drifts()).hasSize(1);
+        var drift = recon.drifts().get(0);
+        assertThat(drift.account()).isEqualTo(GlAccount.SELLER_PAYABLE);
+        assertThat(drift.materialized()).isEqualByComparingTo("120000");
+        assertThat(drift.recomputed()).isEqualByComparingTo("100000");
+        assertThat(drift.delta()).isEqualByComparingTo("20000");   // 실체화 − 정답지 (파생값)
+    }
+
+    @Test
+    void controlRecon_은_실체화_대사를_함께_노출하고_healthy_는_두_축을_함께_본다() {
+        when(loadAccountEntryPort.findAll()).thenReturn(List.of());
+        when(reconcileBalancesPort.reconcileBalances(100)).thenReturn(
+                new ReconcileBalancesPort.BalanceReconSnapshot(3L, 0L, List.of()));
+
+        var recon = service.controlRecon();
+
+        assertThat(recon.materializedRecon().checkedPairs()).isEqualTo(3L);
+        assertThat(recon.materializedRecon().consistent()).isTrue();
+        assertThat(recon.healthy()).isTrue();
+    }
+
+    @Test
+    void 원장이_폐루프여도_캐시가_오염이면_healthy_는_거짓이다() {
+        // 감사 MED-2 — balanced 단독 판정이 캐시 드리프트를 놓치는 함정을 healthy 가 막는다.
+        when(loadAccountEntryPort.findAll()).thenReturn(List.of());
+        when(reconcileBalancesPort.reconcileBalances(100)).thenReturn(
+                new ReconcileBalancesPort.BalanceReconSnapshot(3L, 1L, List.of(
+                        new BalanceDriftRow(OwnerType.SELLER, "55", GlAccount.CASH,
+                                new BigDecimal("99999"), new BigDecimal("0")))));
+
+        var recon = service.controlRecon();
+
+        assertThat(recon.balanced()).isTrue();           // 원장 축은 폐루프
+        assertThat(recon.healthy()).isFalse();           // 그러나 캐시 축이 오염
     }
 }

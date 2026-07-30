@@ -1,6 +1,7 @@
 package github.lms.lemuel.loan.application.service;
 
 import github.lms.lemuel.loan.application.port.in.RequestSecuredLoanUseCase.MortgageCommand;
+import github.lms.lemuel.loan.application.port.in.RequestSecuredLoanUseCase.FinancialAssetCommand;
 import github.lms.lemuel.loan.application.port.in.RequestSecuredLoanUseCase.PersonalCreditCommand;
 import github.lms.lemuel.loan.application.port.out.AppendLedgerPort;
 import github.lms.lemuel.loan.application.port.out.BaseRatePort;
@@ -67,7 +68,7 @@ class SecuredLoanServiceTest {
         ledger = new RecordingLedgerPort();
         events = new RecordingEventPort();
         metrics = new CountingMetricsPort();
-        CollateralValuationPort valuation = (type, description, declared) -> declared;
+        CollateralValuationPort valuation = claim -> claim.declaredValue();
         BaseRatePort baseRate = () -> BASE_RATE;
 
         requestService = new RequestSecuredLoanService(store, valuation, baseRate, metrics, LTV, FIXED_CLOCK);
@@ -153,6 +154,57 @@ class SecuredLoanServiceTest {
         assertThatThrownBy(() -> requestService.requestPersonalCredit(
                 personalCommand(new BigDecimal("50000001"), 780)))
                 .isInstanceOf(SecuredLoanRejectedException.class);
+    }
+
+    // ─── 신청: 금융자산담보 ────────────────────────────────────────────────────
+
+    private static FinancialAssetCommand equityCommand(BigDecimal principal) {
+        return new FinancialAssetCommand(42L, "홍길동", null, CollateralType.EQUITY,
+                "삼성전자 1,000주", new BigDecimal("50000000"), "005930", 1000L,
+                principal, 12, RepaymentMethod.BULLET);
+    }
+
+    /** 위성 시가 평가를 흉내내는 서비스 — 조회 키가 있으면 시가(8천만), 없으면 제시값. */
+    private RequestSecuredLoanService marketBackedRequestService() {
+        CollateralValuationPort marketValuation = claim ->
+                claim.marketRef() != null ? new BigDecimal("80000000") : claim.declaredValue();
+        return new RequestSecuredLoanService(store, marketValuation, () -> BASE_RATE, metrics,
+                LTV, FIXED_CLOCK);
+    }
+
+    @Test
+    void 금융자산_신청은_시가평가액을_담보에_스냅샷하고_담보형_금리를_확정한다() {
+        SecuredLoan loan = marketBackedRequestService()
+                .requestFinancialAsset(equityCommand(new BigDecimal("40000000")));
+
+        assertThat(loan.getProductType()).isEqualTo(LoanProductType.FINANCIAL_ASSET);
+        // 제시값 5천만이 아니라 위성 시가 8천만이 확정 평가액이다.
+        assertThat(loan.getCollateral().getAppraisedValue()).isEqualByComparingTo("80000000");
+        assertThat(loan.getCollateral().getStatus()).isEqualTo(CollateralStatus.PLEDGED);
+        assertThat(loan.getAnnualRatePercent()).isEqualByComparingTo("4.30");   // 3.5 + 담보형 0.8
+        assertThat(loan.getCreditScore()).isNull();
+    }
+
+    @Test
+    void 금융자산_한도는_시가_곱하기_주식_인정비율이다() {
+        // 시가 8천만 × EQUITY 60% = 4,800만 — 경계값은 통과, +1 은 거절.
+        RequestSecuredLoanService service = marketBackedRequestService();
+
+        assertThat(service.requestFinancialAsset(equityCommand(new BigDecimal("48000000")))).isNotNull();
+        assertThatThrownBy(() -> service.requestFinancialAsset(equityCommand(new BigDecimal("48000001"))))
+                .isInstanceOf(SecuredLoanRejectedException.class);
+    }
+
+    @Test
+    void 금융자산_조회키가_없으면_제시값으로_심사한다() {
+        FinancialAssetCommand declaredOnly = new FinancialAssetCommand(42L, "홍길동", null,
+                CollateralType.DEPOSIT, "정기예금", new BigDecimal("50000000"), null, null,
+                new BigDecimal("40000000"), 12, RepaymentMethod.BULLET);
+
+        SecuredLoan loan = marketBackedRequestService().requestFinancialAsset(declaredOnly);
+
+        // 제시값 5천만 스냅샷, 한도 = 5천만 × DEPOSIT 95% = 4,750만 ≥ 신청 4천만
+        assertThat(loan.getCollateral().getAppraisedValue()).isEqualByComparingTo("50000000");
     }
 
     // ─── 승인 · 실행 ──────────────────────────────────────────────────────────
@@ -255,6 +307,9 @@ class SecuredLoanServiceTest {
         assertThat(repaid.getStatus()).isEqualTo(SecuredLoanStatus.REPAID);
         assertThat(repaid.getCollateral().getStatus()).isEqualTo(CollateralStatus.RELEASED);
         assertThat(events.repaid).hasSize(1);
+        // 회차 상환 완제에는 중도상환수수료가 없다 — 이벤트의 prepaymentFee 는 0 이어야 한다.
+        assertThat(events.repaidFees).hasSize(1);
+        assertThat(events.repaidFees.get(0)).isEqualByComparingTo("0");
     }
 
     @Test
@@ -382,6 +437,7 @@ class SecuredLoanServiceTest {
     private static final class RecordingEventPort implements PublishSecuredLoanEventPort {
         private final List<SecuredLoan> disbursed = new ArrayList<>();
         private final List<SecuredLoan> repaid = new ArrayList<>();
+        private final List<BigDecimal> repaidFees = new ArrayList<>();
 
         @Override
         public void publishDisbursed(SecuredLoan loan) {
@@ -389,8 +445,9 @@ class SecuredLoanServiceTest {
         }
 
         @Override
-        public void publishRepaid(SecuredLoan loan, BigDecimal totalInterestPaid) {
+        public void publishRepaid(SecuredLoan loan, BigDecimal totalInterestPaid, BigDecimal prepaymentFee) {
             repaid.add(loan);
+            repaidFees.add(prepaymentFee);
         }
     }
 

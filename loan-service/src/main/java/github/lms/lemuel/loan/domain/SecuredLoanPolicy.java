@@ -144,9 +144,9 @@ public class SecuredLoanPolicy {
                 .setScale(SCALE, RoundingMode.HALF_UP);
     }
 
-    /** 가산금리(%p) — 담보형은 고정, 신용형은 등급별(미상은 0 이나 그 전에 차단된다). */
+    /** 가산금리(%p) — 담보형(주택·금융자산)은 고정, 신용형은 등급별(미상은 0 이나 그 전에 차단된다). */
     private BigDecimal surchargePercent(LoanProductType productType, String grade) {
-        if (productType == LoanProductType.MORTGAGE) {
+        if (productType != null && productType.requiresCollateral()) {
             return SECURED_SURCHARGE_PERCENT;
         }
         BigDecimal surcharge = grade == null ? null : CREDIT_SURCHARGE_PERCENTS.get(grade);

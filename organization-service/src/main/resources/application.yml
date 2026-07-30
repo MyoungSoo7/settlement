@@ -22,6 +22,14 @@ spring:
       minimum-idle: ${DB_POOL_MIN_IDLE:5}
       connection-timeout: 10000
       leak-detection-threshold: 30000
+      # 커넥션이 조용히 죽는 것을 막는다 (2026-07-30).
+      # 파드와 postgres 가 서로 다른 노드에 있어 유휴 커넥션이 CNI/conntrack 상태 만료로
+      # 소리 없이 끊긴다. 그러면 다음 borrow 때 SQLState 08003(connection does not exist)나
+      # 'Connection is not available … (total=0)' 로 터진다 — settlement-service 의 outbox 폴러가
+      # 이틀간 46회 이렇게 실패했다. keepalive 로 주기적으로 살아있음을 확인하고,
+      # max-lifetime 으로 오래된 커넥션을 선제 교체한다. (economics/market/common-data 는 이미 적용됨)
+      max-lifetime: 1800000     # 30분
+      keepalive-time: 300000    # 5분
 
   jpa:
     hibernate:

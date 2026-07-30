@@ -18,6 +18,9 @@ public enum GlAccount {
     /** 법인(상장사) 대출채권 (자산, 차변성). */
     CORPORATE_LOAN_RECEIVABLE(AccountSide.DEBIT),
 
+    /** 담보/개인신용 대출채권 (자산, 차변성) — SecuredLoan(주담대·개인신용) 계약 원금, owner=BORROWER. */
+    SECURED_LOAN_RECEIVABLE(AccountSide.DEBIT),
+
     /** 투자자산 (자산, 차변성) — 주식 등 투자 집행 결과. */
     INVESTMENT_ASSET(AccountSide.DEBIT),
 

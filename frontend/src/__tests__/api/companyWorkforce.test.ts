@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { companyApi, WorkforceComparison, WorkforcePage } from '@/api/company';
+import { companyApi, WorkforceComparison, WorkforceHistory, WorkforcePage } from '@/api/company';
 import api from '@/api/axios';
 
 vi.mock('@/api/axios', () => ({
@@ -117,5 +117,42 @@ describe('companyApi.workforceDetail', () => {
     const params = new URLSearchParams(calledUrl.split('?')[1]);
     expect(params.get('name')).toBe(quoted); // 왕복(인코딩→디코딩) 무손실
     expect(params.get('bizRegNoPrefix')).toBe('418851');
+  });
+});
+
+describe('companyApi.workforceHistory', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('2요소 키(월 없음)를 query parameter 로 보내고 시계열을 반환한다', async () => {
+    const history: WorkforceHistory = {
+      workplaceName: '주식회사에고이즘',
+      bizRegNoPrefix: '866759',
+      series: [
+        {
+          snapshotMonth: '2026-05', headcount: 50, estimatedAnnualSalary: '43750000',
+          salaryCapReached: false, headcountChange: null, headcountChangeRate: null,
+          salaryChange: null, salaryChangeRate: null,
+        },
+        {
+          snapshotMonth: '2026-06', headcount: 60, estimatedAnnualSalary: '40000000',
+          salaryCapReached: false, headcountChange: 10, headcountChangeRate: 20.0,
+          salaryChange: '-3750000', salaryChangeRate: -8.57,
+        },
+      ],
+      note: '증감은 연속된 인접 월 사이에서만 계산됩니다.',
+    };
+    vi.mocked(api.get).mockResolvedValueOnce({ data: history });
+
+    const result = await companyApi.workforceHistory('주식회사에고이즘', '866759');
+
+    expect(api.get).toHaveBeenCalledWith(
+      `/api/company/workforce/history?name=${encodeURIComponent('주식회사에고이즘')}&bizRegNoPrefix=866759`
+    );
+    // 금액은 문자열 계약 그대로, 첫 월 증감은 null
+    expect(result.series[0].salaryChange).toBeNull();
+    expect(result.series[1].salaryChange).toBe('-3750000');
+    expect(result.series[1].headcountChange).toBe(10);
   });
 });
