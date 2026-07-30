@@ -82,8 +82,8 @@ public class PrepaySecuredLoanService implements PrepaySecuredLoanUseCase {
             appendLedgerPort.append(LoanLedgerEntry.securedEarlyRepaymentFee(saved.getId(), fee));
         }
         if (saved.getStatus() == SecuredLoanStatus.REPAID) {
-            // 중도상환에는 회차 이자가 없다 — 완제 이벤트의 이자 합계는 0.
-            publishSecuredLoanEventPort.publishRepaid(saved, BigDecimal.ZERO);
+            // 중도상환에는 회차 이자가 없다 — 완제 이벤트의 이자 합계는 0. 수수료는 이 완제에 부과된 실액.
+            publishSecuredLoanEventPort.publishRepaid(saved, BigDecimal.ZERO, fee);
         }
         loanMetricsPort.securedRepaid(deducted);
         return new PrepayResult(saved, deducted, fee);

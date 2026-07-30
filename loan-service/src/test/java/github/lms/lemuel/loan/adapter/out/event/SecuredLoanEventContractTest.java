@@ -95,7 +95,7 @@ class SecuredLoanEventContractTest {
     @DisplayName("SecuredLoanRepaid 페이로드는 lemuel.loan.secured_loan_repaid 계약을 만족한다")
     void repaid_satisfiesContract() {
         publisher.publishRepaid(mortgage(SecuredLoanStatus.REPAID, BigDecimal.ZERO),
-                new BigDecimal("1075000.00"));
+                new BigDecimal("1075000.00"), BigDecimal.ZERO);
 
         OutboxEvent event = capture();
         assertThat(event.getAggregateType()).isEqualTo("Loan");
@@ -106,9 +106,22 @@ class SecuredLoanEventContractTest {
     @Test
     @DisplayName("이자 0 완제 페이로드도 계약을 만족한다 — 비음수 패턴 허용")
     void repaid_zeroInterest_satisfiesContract() {
-        publisher.publishRepaid(mortgage(SecuredLoanStatus.REPAID, BigDecimal.ZERO), BigDecimal.ZERO);
+        publisher.publishRepaid(mortgage(SecuredLoanStatus.REPAID, BigDecimal.ZERO),
+                BigDecimal.ZERO, BigDecimal.ZERO);
 
         EventContractValidator.assertValid("lemuel.loan.secured_loan_repaid", capture().getPayload());
+    }
+
+    @Test
+    @DisplayName("중도상환 완제 페이로드는 prepaymentFee 를 싣는다 — account GL 소비 선행 요건")
+    void repaid_carriesPrepaymentFee() {
+        publisher.publishRepaid(mortgage(SecuredLoanStatus.REPAID, BigDecimal.ZERO),
+                BigDecimal.ZERO, new BigDecimal("3600000.00"));
+
+        String payload = capture().getPayload();
+        // 금액 wire 표준(N5): BigDecimal 은 JSON string 으로 직렬화된다.
+        assertThat(payload).contains("\"prepaymentFee\":\"3600000.00\"");
+        EventContractValidator.assertValid("lemuel.loan.secured_loan_repaid", payload);
     }
 
     // ─── 소비측이 상품·차주를 구분할 수 있어야 GL 매핑이 가능하다 ──────────────────

@@ -255,6 +255,9 @@ class SecuredLoanServiceTest {
         assertThat(repaid.getStatus()).isEqualTo(SecuredLoanStatus.REPAID);
         assertThat(repaid.getCollateral().getStatus()).isEqualTo(CollateralStatus.RELEASED);
         assertThat(events.repaid).hasSize(1);
+        // 회차 상환 완제에는 중도상환수수료가 없다 — 이벤트의 prepaymentFee 는 0 이어야 한다.
+        assertThat(events.repaidFees).hasSize(1);
+        assertThat(events.repaidFees.get(0)).isEqualByComparingTo("0");
     }
 
     @Test
@@ -382,6 +385,7 @@ class SecuredLoanServiceTest {
     private static final class RecordingEventPort implements PublishSecuredLoanEventPort {
         private final List<SecuredLoan> disbursed = new ArrayList<>();
         private final List<SecuredLoan> repaid = new ArrayList<>();
+        private final List<BigDecimal> repaidFees = new ArrayList<>();
 
         @Override
         public void publishDisbursed(SecuredLoan loan) {
@@ -389,8 +393,9 @@ class SecuredLoanServiceTest {
         }
 
         @Override
-        public void publishRepaid(SecuredLoan loan, BigDecimal totalInterestPaid) {
+        public void publishRepaid(SecuredLoan loan, BigDecimal totalInterestPaid, BigDecimal prepaymentFee) {
             repaid.add(loan);
+            repaidFees.add(prepaymentFee);
         }
     }
 
