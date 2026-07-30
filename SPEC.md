@@ -103,7 +103,7 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
 |--------|------|------|
 | 선정산 대출 | `/loans` | 셀러 미확정 정산금 담보 선지급, 상환은 정산 이벤트 saga 연계 |
 | 기업 신용대출 | `/loans/corporate` | 상장사(stockCode) CEO 신청 → `CorporateCreditPolicy` 가 재무제표+평판으로 creditScore(0~100)/등급(A~E)/한도 산정. **신청(request) 시점에 E등급·한도초과 422**. 실행(disburse)은 ADMIN 전용 + 비관적 락(이중지급 방지) |
-| 담보/개인신용 대출 | `/loans/secured` | **주택담보**(`/mortgage`) 와 **개인신용**(`/personal`) 2종. `SecuredLoan` 단일 애그리거트가 담보 optional 로 둘을 수용한다. 한도는 담보형=유효담보가치×LTV(기본 0.70), 신용형=외부 CB 점수→등급(≥850 A/≥750 B/≥650 C/≥550 D, 미만 E 불가)별 정액. 금리=기준금리+가산(담보형 고정 0.8%p / 신용형 A1.5·B2.5·C4.0·D6.0%p). 신청 시점 **422**(한도초과·등급미달). 승인 시 담보 유효화, 실행은 운영자 전용+비관적 락. 장기 분할상환이라 **연체·기한이익상실**이 상태머신에 포함(`DISBURSED→OVERDUE→DEFAULTED`, 직행 금지) |
+| 담보/개인신용 대출 | `/loans/secured` | **주택담보**(`/mortgage`)·**금융자산담보**(`/financial-asset`, 예금·채권·주식)·**개인신용**(`/personal`) 3종. `SecuredLoan` 단일 애그리거트가 담보 optional 로 셋을 수용한다. 한도는 담보형=유효담보가치×유형별 인정비율(부동산 LTV 기본 0.70 주입 / 보증 100%·예금 95%·채권 80%·주식 60%), 신용형=외부 CB 점수→등급(≥850 A/≥750 B/≥650 C/≥550 D, 미만 E 불가)별 정액. 담보평가는 위성 실연동(EQUITY=market 종가×수량, REAL_ESTATE=commondata 실거래가) + 실패·키 부재 시 제시값 폴백. 금리=기준금리+가산(담보형 고정 0.8%p / 신용형 A1.5·B2.5·C4.0·D6.0%p). 신청 시점 **422**(한도초과·등급미달). 승인 시 담보 유효화, 실행은 운영자 전용+비관적 락. 장기 분할상환이라 **연체·기한이익상실**이 상태머신에 포함(`DISBURSED→OVERDUE→DEFAULTED`, 직행 금지) |
 | 평판 | `/loans/company-reputation` | 신용평가용 기업 평판 프로젝션 조회 |
 | 상환 시뮬레이션 | `POST /loans/repayment/simulate` | 원금·기간·연이자율·상환방식(만기일시 BULLET / 원리금균등 EQUAL_PAYMENT / 원금균등 EQUAL_PRINCIPAL)으로 회차별 상환표를 미리 계산하는 **순수 미리보기**(부수효과·영속화 없음). 원 단위 반올림·마지막 회차 잔여 흡수로 원금 합 일치 |
 
@@ -111,7 +111,7 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
 
 담보/개인신용 대출은 기존 6계정만 쓴다(계정과목 확장 없음): 실행 `SEC_DISBURSE`(대출채권/현금), 회차 상환 `SEC_REPAYMENT`(현금/대출채권) + `SEC_INTEREST`(현금/수수료수익). 장기 분할상환이라 상환·이자 전표는 대출 1건당 N회 발생하므로 중복분개 유니크(`uq_loan_ledger_reference_accounts`)에서 제외된다. `lemuel.loan.secured_loan_disbursed` / `.secured_loan_repaid` 발행 — account-service 가 차주(BORROWER) 원장 `SECURED_LOAN_RECEIVABLE` 분개로 소비한다(원금만, 완제 이벤트에 `prepaymentFee` 옵셔널 필드 포함).
 
-**잔여 이월**: market·commondata 담보평가 실연동(금융자산 담보 **신청 경로** 신설 선행 — 현재 평가액은 신청 시 입력값 스냅샷). 그 외 Phase 2 항목은 완료 — 담보유형 5종·담보권 순위(P2-1·2), 원장 계정·실행 전표(P2-3), 재평가·마진콜(P2-4), 담보 실행·상각(P2-5), 중도상환+수수료(P2-6), economics 기준금리 실연동(P2-7a), account-service GL 소비 매핑(2026-07-30).
+**Phase 2 완료(2026-07-30)** — 담보유형 5종·담보권 순위(P2-1·2), 원장 계정·실행 전표(P2-3), 재평가·마진콜(P2-4), 담보 실행·상각(P2-5), 중도상환+수수료(P2-6), economics 기준금리 실연동(P2-7a), account-service GL 소비 매핑, **담보평가 실연동(P2-7b)**: 금융자산담보 상품(`FINANCIAL_ASSET`, `POST /loans/secured/financial-asset`, 예금·채권·주식 담보 + 유형별 인정비율 한도) 신설, EQUITY 는 market-service 종가×수량, REAL_ESTATE 는 commondata 실거래가(수집 소스 설정 시), 조달 실패·키 부재는 제시값 폴백(신청 가용성 우선 — 기준금리와 동일 원칙).
 
 ### 3.4 financial-statements-service — 재무제표 조회 (port 8086, lemuel_financial)
 - `/api/financial/companies` — 코스피·코스닥 상장사 요약 재무제표 공개 조회(부채비율·영업이익률·ROA·자본총계).
