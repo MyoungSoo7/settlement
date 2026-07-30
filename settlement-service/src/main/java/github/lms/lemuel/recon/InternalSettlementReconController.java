@@ -31,13 +31,16 @@ public class InternalSettlementReconController {
         this.repository = repository;
     }
 
-    @Operation(summary = "캡처일 기준 정산 행 (settlement 원천)",
+    @Operation(summary = "캡처일 기준 정산 행 (settlement 원천, 커서 페이지네이션)",
             description = "payment_id · (결제금액-환불금액) · PAID/REFUNDED. 상대편 order 의 captured-payments 와 "
-                    + "같은 기준일(캡처일)·같은 금액 정의라 그대로 대사할 수 있다. settlement_date(T+1 지급예정일) 아님.")
+                    + "같은 기준일(결제 캡처 시각)·같은 금액 정의라 그대로 대사할 수 있다. "
+                    + "settlement_date(T+1 지급예정일) 아님. afterPaymentId 커서로 소진될 때까지 호출한다 — "
+                    + "단일 limit 절단은 초과분을 전부 EXTRA 로 둔갑시킨다.")
     @GetMapping("/settlements")
     public List<SettlementReconQueryRepository.SettlementReconRow> settlements(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
-            @RequestParam(defaultValue = "5000") int limit) {
-        return repository.listByCapturedDate(date, limit);
+            @RequestParam(defaultValue = "0") long afterPaymentId,
+            @RequestParam(defaultValue = "1000") int limit) {
+        return repository.listByCapturedDate(date, afterPaymentId, limit);
     }
 }
