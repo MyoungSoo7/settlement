@@ -11,9 +11,12 @@ app:
     cron: ${APP_RECONCILIATION_CRON:0 0 19 * * *}
     tolerance-krw: ${APP_RECONCILIATION_TOLERANCE_KRW:1}
   sources:
-    # Base URLs for the (skeleton) HTTP sources. Unused by the MVP sample demo.
+    # 실 원천 주소. 기본 프로파일에서는 이 둘로 EXPECTED/ACTUAL 소스가 등록된다.
+    # (demo 프로파일에서는 대신 번들 샘플이 등록된다 — SourceConfig 참조)
     settlement-base-url: ${SETTLEMENT_BASE_URL:http://settlement-service:8082}
     payment-base-url: ${PAYMENT_BASE_URL:http://order-service:8080}
+    # order/settlement 과 동일한 공유 시크릿. 상대 서비스가 app.security.internal-key-required=true 면 필수.
+    internal-api-key: ${INTERNAL_API_KEY:}
 
 management:
   endpoints:
