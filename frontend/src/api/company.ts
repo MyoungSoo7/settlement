@@ -132,6 +132,26 @@ export interface WorkforceComparison {
   note: string;
 }
 
+/** 시계열 1개월 지점 — 증감 4종은 연속 인접 월에만 존재(첫 월·결측 갭·전월값 0/부재면 null) */
+export interface WorkforceTrendPoint {
+  snapshotMonth: string;               // YYYY-MM
+  headcount: number;
+  estimatedAnnualSalary: string | null;  // 금액 소수 문자열 계약
+  salaryCapReached: boolean;
+  headcountChange: number | null;
+  headcountChangeRate: number | null;
+  salaryChange: string | null;           // 금액 소수 문자열 계약
+  salaryChangeRate: number | null;
+}
+
+/** 사업장 월별 시계열 — 키(사업장명+앞6자리) 고정, 월 오름차순 */
+export interface WorkforceHistory {
+  workplaceName: string;
+  bizRegNoPrefix: string;
+  series: WorkforceTrendPoint[];
+  note: string;
+}
+
 export const companyApi = {
   /** 기업 목록/검색. GET /api/company/companies */
   companies: async (keyword: string, page: number, size = 15): Promise<CompanyPage> => {
@@ -184,6 +204,16 @@ export const companyApi = {
   ): Promise<WorkforceComparison> => {
     const params = new URLSearchParams({ name, bizRegNoPrefix, snapshotMonth });
     const res = await api.get<WorkforceComparison>(`/api/company/workforce/detail?${params}`);
+    return res.data;
+  },
+
+  /**
+   * 사업장 월별 시계열. GET /api/company/workforce/history
+   * 상세와 달리 기준월이 없는 2요소 키(사업장명+앞6자리) — 인코딩은 URLSearchParams 가 책임진다.
+   */
+  workforceHistory: async (name: string, bizRegNoPrefix: string): Promise<WorkforceHistory> => {
+    const params = new URLSearchParams({ name, bizRegNoPrefix });
+    const res = await api.get<WorkforceHistory>(`/api/company/workforce/history?${params}`);
     return res.data;
   },
 };
