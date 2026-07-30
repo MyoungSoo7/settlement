@@ -148,6 +148,7 @@ app:
       # 수신 (loan → account) — 담보/개인신용 대출 GL 매핑 (담보대출 Phase 2 잔여 이월)
       secured-loan-disbursed: lemuel.loan.secured_loan_disbursed
       secured-loan-repaid: lemuel.loan.secured_loan_repaid
+      secured-loan-principal-repaid: lemuel.loan.secured_loan_principal_repaid
       # 수신 (investment → account)
       investment-executed: lemuel.investment.executed
   # ADR 0030 Phase 3 — 실체화 잔액(account_balances) 정기 대사.

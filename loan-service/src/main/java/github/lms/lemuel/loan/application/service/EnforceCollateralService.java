@@ -3,6 +3,7 @@ package github.lms.lemuel.loan.application.service;
 import github.lms.lemuel.loan.application.port.in.EnforceCollateralUseCase;
 import github.lms.lemuel.loan.application.port.out.AppendLedgerPort;
 import github.lms.lemuel.loan.application.port.out.LoadSecuredLoanPort;
+import github.lms.lemuel.loan.application.port.out.PublishSecuredLoanEventPort;
 import github.lms.lemuel.loan.application.port.out.SaveSecuredLoanPort;
 import github.lms.lemuel.loan.domain.Collateral;
 import github.lms.lemuel.loan.domain.CollateralStatus;
@@ -36,6 +37,7 @@ public class EnforceCollateralService implements EnforceCollateralUseCase {
     private final LoadSecuredLoanPort loadSecuredLoanPort;
     private final SaveSecuredLoanPort saveSecuredLoanPort;
     private final AppendLedgerPort appendLedgerPort;
+    private final PublishSecuredLoanEventPort publishSecuredLoanEventPort;
     private final BigDecimal baseRatePercent;
     private final BigDecimal realEstateLtvRatio;
     private final Clock clock;
@@ -43,6 +45,7 @@ public class EnforceCollateralService implements EnforceCollateralUseCase {
     public EnforceCollateralService(LoadSecuredLoanPort loadSecuredLoanPort,
                                     SaveSecuredLoanPort saveSecuredLoanPort,
                                     AppendLedgerPort appendLedgerPort,
+                                    PublishSecuredLoanEventPort publishSecuredLoanEventPort,
                                     @Value("${app.loan.secured.base-rate-percent:3.5}")
                                     BigDecimal baseRatePercent,
                                     @Value("${app.loan.secured.real-estate-ltv:0.70}")
@@ -51,6 +54,7 @@ public class EnforceCollateralService implements EnforceCollateralUseCase {
         this.loadSecuredLoanPort = loadSecuredLoanPort;
         this.saveSecuredLoanPort = saveSecuredLoanPort;
         this.appendLedgerPort = appendLedgerPort;
+        this.publishSecuredLoanEventPort = publishSecuredLoanEventPort;
         this.baseRatePercent = baseRatePercent;
         this.realEstateLtvRatio = realEstateLtvRatio;
         this.clock = clock;
@@ -72,6 +76,10 @@ public class EnforceCollateralService implements EnforceCollateralUseCase {
         BigDecimal outstandingBefore = loan.getOutstanding();
         BigDecimal recovered = loan.repay(proceeds);   // 잔액을 넘어서 차감되지 않는다(clamp)
         appendLedgerPort.append(LoanLedgerEntry.securedCollateralDisposal(loan.getId(), recovered));
+        // 원금 감소는 건별로 알린다 — 완제 이벤트만으로는 계정계가 기중 잔액을 모른다(#183).
+        if (recovered.signum() > 0) {
+            publishSecuredLoanEventPort.publishPrincipalRepaid(loan, recovered, "COLLATERAL_DISPOSAL");
+        }
 
         BigDecimal surplus = proceeds.subtract(outstandingBefore);
         if (surplus.signum() > 0) {
@@ -104,6 +112,10 @@ public class EnforceCollateralService implements EnforceCollateralUseCase {
         BigDecimal claim = policy.subrogationRecovery(loan.getOutstanding());
         BigDecimal recovered = loan.repay(claim);
         appendLedgerPort.append(LoanLedgerEntry.securedSubrogation(loan.getId(), recovered));
+        // 원금 감소는 건별로 알린다 — 완제 이벤트만으로는 계정계가 기중 잔액을 모른다(#183).
+        if (recovered.signum() > 0) {
+            publishSecuredLoanEventPort.publishPrincipalRepaid(loan, recovered, "SUBROGATION");
+        }
 
         // 미보증분은 처분 없이 회수 불능이 확정된 몫이라 대손으로 인식한다.
         BigDecimal writtenOff = BigDecimal.ZERO;

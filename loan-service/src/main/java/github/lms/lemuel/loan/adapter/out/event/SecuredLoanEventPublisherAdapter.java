@@ -21,6 +21,7 @@ import java.util.Map;
  * <p>토픽 라우팅: aggregateType="Loan" + eventType="SecuredLoanDisbursed" →
  * {@code lemuel.loan.secured_loan_disbursed} (KafkaOutboxPublisher.resolveTopic 의 camel→snake 규칙).
  * "SecuredLoanRepaid" → {@code lemuel.loan.secured_loan_repaid}.
+ * "SecuredLoanPrincipalRepaid" → {@code lemuel.loan.secured_loan_principal_repaid}.
  *
  * <p>소비자는 account-service — 두 이벤트를 차주(BORROWER) 원장 {@code SECURED_LOAN_RECEIVABLE}
  * 분개로 소비한다(원금만). 완제 이벤트의 {@code prepaymentFee} 는 중도상환 완제에 부과된 수수료
@@ -56,6 +57,15 @@ public class SecuredLoanEventPublisherAdapter implements PublishSecuredLoanEvent
         payload.put("interestPaid", totalInterestPaid);
         payload.put("prepaymentFee", prepaymentFee);
         save(loan, "SecuredLoanRepaid", payload);
+    }
+
+    @Override
+    public void publishPrincipalRepaid(SecuredLoan loan, BigDecimal principalRepaid, String reason) {
+        Map<String, Object> payload = basePayload(loan);
+        payload.put("principalRepaid", principalRepaid);
+        payload.put("outstandingAfter", loan.getOutstanding());
+        payload.put("reason", reason);
+        save(loan, "SecuredLoanPrincipalRepaid", payload);
     }
 
     /** 두 이벤트가 공유하는 식별 필드 — 소비자가 상품·차주를 구분할 수 있어야 GL 매핑이 가능하다. */

@@ -266,6 +266,8 @@ class PrepaySecuredLoanServiceTest {
         private final List<SecuredLoan> disbursed = new ArrayList<>();
         private final List<SecuredLoan> repaid = new ArrayList<>();
         private final List<BigDecimal> repaidFees = new ArrayList<>();
+        private final List<BigDecimal> principalRepayments = new ArrayList<>();
+        private final List<String> principalRepaymentReasons = new ArrayList<>();
 
         @Override
         public void publishDisbursed(SecuredLoan loan) {
@@ -276,6 +278,13 @@ class PrepaySecuredLoanServiceTest {
         public void publishRepaid(SecuredLoan loan, BigDecimal totalInterestPaid, BigDecimal prepaymentFee) {
             repaid.add(loan);
             repaidFees.add(prepaymentFee);
+        }
+
+        /** #183 — 원금 감소 건별 발행. 금액이 실제 차감액인지 검증하려고 기록해 둔다. */
+        @Override
+        public void publishPrincipalRepaid(SecuredLoan loan, BigDecimal principalRepaid, String reason) {
+            principalRepayments.add(principalRepaid);
+            principalRepaymentReasons.add(reason);
         }
     }
 
