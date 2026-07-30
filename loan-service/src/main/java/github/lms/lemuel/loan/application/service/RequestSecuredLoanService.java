@@ -64,8 +64,9 @@ public class RequestSecuredLoanService implements RequestSecuredLoanUseCase {
         LocalDateTime now = LocalDateTime.now(clock);
         SecuredLoanPolicy policy = policy();
 
-        BigDecimal appraised = collateralValuationPort.appraise(CollateralType.REAL_ESTATE,
-                command.collateralDescription(), command.declaredCollateralValue());
+        BigDecimal appraised = collateralValuationPort.appraise(new CollateralValuationPort.ValuationClaim(
+                CollateralType.REAL_ESTATE, command.collateralDescription(),
+                command.declaredCollateralValue(), command.dealRecordKey(), null));
         Collateral collateral = Collateral.pledge(CollateralType.REAL_ESTATE,
                 command.collateralDescription(), appraised, now);
 
@@ -78,6 +79,34 @@ public class RequestSecuredLoanService implements RequestSecuredLoanUseCase {
                 borrowerOf(command.borrowerUserId(), command.borrowerName(), command.registrationNo()),
                 savedCollateral, command.principal(), command.termMonths(),
                 policy.annualRatePercent(LoanProductType.MORTGAGE, null),
+                command.repaymentMethod(), now);
+        SecuredLoan saved = saveSecuredLoanPort.save(loan);
+        loanMetricsPort.securedRequested();
+        return saved;
+    }
+
+    @Override
+    @Transactional
+    public SecuredLoan requestFinancialAsset(FinancialAssetCommand command) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        SecuredLoanPolicy policy = policy();
+
+        // EQUITY 는 market-service 시가(단가×수량), 그 외·조회 실패는 제시값 폴백 — 어댑터가 판단한다.
+        BigDecimal appraised = collateralValuationPort.appraise(new CollateralValuationPort.ValuationClaim(
+                command.collateralType(), command.collateralDescription(),
+                command.declaredCollateralValue(), command.assetCode(), command.quantity()));
+        Collateral collateral = Collateral.pledge(command.collateralType(),
+                command.collateralDescription(), appraised, now);
+
+        // 한도 = 유효담보가치 × 유형별 인정비율(주식 60% 등). 초과하면 담보 저장 전에 거절한다.
+        validateOrCountRejection(policy, command.principal(),
+                policy.collateralLimit(collateral.effectiveValue(), command.collateralType()));
+
+        Collateral savedCollateral = saveSecuredLoanPort.saveCollateral(collateral);
+        SecuredLoan loan = SecuredLoan.requestFinancialAsset(
+                borrowerOf(command.borrowerUserId(), command.borrowerName(), command.registrationNo()),
+                savedCollateral, command.principal(), command.termMonths(),
+                policy.annualRatePercent(LoanProductType.FINANCIAL_ASSET, null),
                 command.repaymentMethod(), now);
         SecuredLoan saved = saveSecuredLoanPort.save(loan);
         loanMetricsPort.securedRequested();

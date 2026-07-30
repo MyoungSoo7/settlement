@@ -83,6 +83,27 @@ public class SecuredLoan {
     }
 
     /**
+     * 금융자산담보대출 신청(Phase 2). 담보가 필수이며 <b>금융자산 계열</b>(예금·채권·주식)이어야 한다 —
+     * 부동산·보증서를 이 상품에 끼워 넣으면 유형별 인정비율·마진콜(시가 변동 감시) 규칙이 어긋난다.
+     */
+    public static SecuredLoan requestFinancialAsset(Borrower borrower, Collateral collateral,
+                                                    BigDecimal principal, int termMonths,
+                                                    BigDecimal annualRatePercent,
+                                                    RepaymentMethod repaymentMethod, LocalDateTime createdAt) {
+        if (collateral == null) {
+            throw new LoanInvariantViolationException("금융자산담보대출은 담보가 필수입니다");
+        }
+        if (collateral.getType().category() != CollateralType.Category.FINANCIAL_ASSET) {
+            throw new LoanInvariantViolationException(
+                    "금융자산담보대출의 담보는 금융자산 계열이어야 합니다: " + collateral.getType());
+        }
+        validateCommon(borrower, principal, termMonths, annualRatePercent, repaymentMethod, createdAt);
+        return new SecuredLoan(null, borrower, LoanProductType.FINANCIAL_ASSET, collateral,
+                Money.of(principal).toBigDecimal(), termMonths, annualRatePercent, repaymentMethod,
+                null, null, BigDecimal.ZERO, SecuredLoanStatus.REQUESTED, createdAt);
+    }
+
+    /**
      * 개인신용대출 신청. 담보가 없으므로 외부 CB 점수·등급 스냅샷이 심사의 유일한 근거이며 필수다.
      */
     public static SecuredLoan requestPersonalCredit(Borrower borrower, BigDecimal principal, int termMonths,

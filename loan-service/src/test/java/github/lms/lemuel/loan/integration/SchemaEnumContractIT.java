@@ -130,6 +130,21 @@ class SchemaEnumContractIT {
     }
 
     @Test
+    @DisplayName("chk_secured_loan_product == LoanProductType enum 전체 (정확 일치)")
+    void securedLoanProductCheckMatchesEnumExactly() {
+        // FINANCIAL_ASSET 이 Phase 2 실연동에서 합류했다 — 담보유형·원장 ref_type 이 당한 갭과
+        // 같은 종류라 enum↔CHECK 정합을 여기서 빌드 시점에 고정한다.
+        Set<String> enumValues = new LinkedHashSet<>();
+        for (github.lms.lemuel.loan.domain.LoanProductType type
+                : github.lms.lemuel.loan.domain.LoanProductType.values()) {
+            enumValues.add(type.name());
+        }
+
+        assertThat(checkValues("chk_secured_loan_product"))
+                .containsExactlyInAnyOrderElementsOf(enumValues);
+    }
+
+    @Test
     @DisplayName("chk_secured_loan_status == SecuredLoanStatus enum 전체 (정확 일치)")
     void securedLoanStatusCheckMatchesEnumExactly() {
         Set<String> enumValues = new LinkedHashSet<>();

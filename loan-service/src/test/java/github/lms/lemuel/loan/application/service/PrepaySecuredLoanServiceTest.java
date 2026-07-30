@@ -70,7 +70,7 @@ class PrepaySecuredLoanServiceTest {
         ledger = new RecordingLedgerPort();
         events = new RecordingEventPort();
         metrics = new CountingMetricsPort();
-        CollateralValuationPort valuation = (type, description, declared) -> declared;
+        CollateralValuationPort valuation = claim -> claim.declaredValue();
         BaseRatePort baseRate = () -> BASE_RATE;
 
         requestService = new RequestSecuredLoanService(store, valuation, baseRate, metrics, LTV, FIXED_CLOCK);
