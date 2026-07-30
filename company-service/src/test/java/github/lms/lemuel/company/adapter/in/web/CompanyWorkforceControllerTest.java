@@ -47,6 +47,9 @@ class CompanyWorkforceControllerTest {
     @Mock
     private GetWorkforceComparisonUseCase getWorkforceComparisonUseCase;
 
+    @Mock
+    private github.lms.lemuel.company.application.port.in.GetWorkforceHistoryUseCase getWorkforceHistoryUseCase;
+
     private MockMvc mockMvc;
 
     private CompanyWorkforce workforce() {
@@ -62,7 +65,7 @@ class CompanyWorkforceControllerTest {
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new CompanyWorkforceController(getCompanyWorkforceUseCase,
-                        getWorkforceComparisonUseCase))
+                        getWorkforceComparisonUseCase, getWorkforceHistoryUseCase))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .build();
@@ -179,6 +182,68 @@ class CompanyWorkforceControllerTest {
                         .param("name", "주식회사에고이즘")
                         .param("bizRegNoPrefix", "866759")
                         .param("snapshotMonth", "202606"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("GET /history — 월 오름차순 시리즈 + 인접 월 증감, 금액은 소수 문자열로 직렬화한다")
+    void history() throws Exception {
+        github.lms.lemuel.company.domain.WorkforceHistory hist =
+                github.lms.lemuel.company.domain.WorkforceHistory.of(List.of(
+                        new CompanyWorkforce("주식회사에고이즘", "866759", "525101", "전자상거래 소매업",
+                                "서울특별시 성동구 연무장19길", YearMonth.of(2026, 5), 50,
+                                new BigDecimal("16406250")),
+                        new CompanyWorkforce("주식회사에고이즘", "866759", "525101", "전자상거래 소매업",
+                                "서울특별시 성동구 연무장19길", YearMonth.of(2026, 6), 60,
+                                new BigDecimal("18000000"))));
+        when(getWorkforceHistoryUseCase.get(
+                github.lms.lemuel.company.domain.WorkplaceSeriesKey.of("주식회사에고이즘", "866759")))
+                .thenReturn(hist);
+
+        mockMvc.perform(get("/api/company/workforce/history")
+                        .param("name", "주식회사에고이즘")
+                        .param("bizRegNoPrefix", "866759"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.workplaceName").value("주식회사에고이즘"))
+                .andExpect(jsonPath("$.bizRegNoPrefix").value("866759"))
+                .andExpect(jsonPath("$.series.length()").value(2))
+                .andExpect(jsonPath("$.series[0].snapshotMonth").value("2026-05"))
+                .andExpect(jsonPath("$.series[1].snapshotMonth").value("2026-06"))
+                // 첫 월의 증감은 전부 없음(null 미직렬화)
+                .andExpect(jsonPath("$.series[0].headcountChange").doesNotExist())
+                .andExpect(jsonPath("$.series[0].salaryChangeRate").doesNotExist())
+                // 금액은 소수 문자열 — 원시 JSON 의 따옴표까지 확인(Jackson 3 수치화 결함 가드)
+                .andExpect(content().string(containsString("\"estimatedAnnualSalary\":\"43750000\"")))
+                .andExpect(content().string(containsString("\"salaryChange\":\"-3750000\"")))
+                .andExpect(jsonPath("$.series[1].headcount").value(60))
+                .andExpect(jsonPath("$.series[1].headcountChange").value(10))
+                .andExpect(jsonPath("$.series[1].headcountChangeRate").value(20.00))
+                .andExpect(jsonPath("$.series[1].salaryChange").value("-3750000"))
+                .andExpect(jsonPath("$.series[1].salaryChangeRate").value(-8.57))
+                .andExpect(jsonPath("$.series[1].salaryCapReached").value(false))
+                .andExpect(jsonPath("$.note").exists());
+    }
+
+    @Test
+    @DisplayName("GET /history — 미매칭 404, 필수 누락·형식 위반 400 (기존 오류 계약)")
+    void historyNotFoundAndBadRequest() throws Exception {
+        when(getWorkforceHistoryUseCase.get(any(github.lms.lemuel.company.domain.WorkplaceSeriesKey.class)))
+                .thenThrow(new NoSuchElementException("해당 사업장 시계열을 찾을 수 없습니다"));
+
+        mockMvc.perform(get("/api/company/workforce/history")
+                        .param("name", "없는회사")
+                        .param("bizRegNoPrefix", "999999"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").exists());
+
+        mockMvc.perform(get("/api/company/workforce/history")
+                        .param("bizRegNoPrefix", "866759"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("사업장명(name)은 필수입니다"));
+
+        mockMvc.perform(get("/api/company/workforce/history")
+                        .param("name", "주식회사에고이즘")
+                        .param("bizRegNoPrefix", "86675"))
                 .andExpect(status().isBadRequest());
     }
 

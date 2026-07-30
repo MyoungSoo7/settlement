@@ -3,9 +3,12 @@ package github.lms.lemuel.company.adapter.in.web;
 import github.lms.lemuel.company.adapter.in.web.dto.CompanyWorkforceResponse;
 import github.lms.lemuel.company.adapter.in.web.dto.PageResponse;
 import github.lms.lemuel.company.adapter.in.web.dto.WorkforceComparisonResponse;
+import github.lms.lemuel.company.adapter.in.web.dto.WorkforceHistoryResponse;
 import github.lms.lemuel.company.application.port.in.GetCompanyWorkforceUseCase;
 import github.lms.lemuel.company.application.port.in.GetWorkforceComparisonUseCase;
+import github.lms.lemuel.company.application.port.in.GetWorkforceHistoryUseCase;
 import github.lms.lemuel.company.domain.WorkplaceKey;
+import github.lms.lemuel.company.domain.WorkplaceSeriesKey;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -22,11 +25,14 @@ public class CompanyWorkforceController {
 
     private final GetCompanyWorkforceUseCase getCompanyWorkforceUseCase;
     private final GetWorkforceComparisonUseCase getWorkforceComparisonUseCase;
+    private final GetWorkforceHistoryUseCase getWorkforceHistoryUseCase;
 
     public CompanyWorkforceController(GetCompanyWorkforceUseCase getCompanyWorkforceUseCase,
-                                      GetWorkforceComparisonUseCase getWorkforceComparisonUseCase) {
+                                      GetWorkforceComparisonUseCase getWorkforceComparisonUseCase,
+                                      GetWorkforceHistoryUseCase getWorkforceHistoryUseCase) {
         this.getCompanyWorkforceUseCase = getCompanyWorkforceUseCase;
         this.getWorkforceComparisonUseCase = getWorkforceComparisonUseCase;
+        this.getWorkforceHistoryUseCase = getWorkforceHistoryUseCase;
     }
 
     @GetMapping
@@ -58,5 +64,17 @@ public class CompanyWorkforceController {
             @RequestParam(required = false) String snapshotMonth) {
         WorkplaceKey key = WorkplaceKey.of(name, bizRegNoPrefix, snapshotMonth);
         return ResponseEntity.ok(WorkforceComparisonResponse.from(getWorkforceComparisonUseCase.get(key)));
+    }
+
+    /**
+     * 월별 시계열 — 상세와 달리 기준월이 없는 2요소 키(사업장명+앞6자리)다. 파라미터 수령·검증
+     * 방식은 {@link #detail} 과 동일한 이유로 query parameter + 도메인 키 검증이다.
+     */
+    @GetMapping("/history")
+    public ResponseEntity<WorkforceHistoryResponse> history(
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) String bizRegNoPrefix) {
+        WorkplaceSeriesKey key = WorkplaceSeriesKey.of(name, bizRegNoPrefix);
+        return ResponseEntity.ok(WorkforceHistoryResponse.from(key, getWorkforceHistoryUseCase.get(key)));
     }
 }
