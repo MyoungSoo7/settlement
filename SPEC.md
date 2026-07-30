@@ -109,9 +109,9 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
 
 자체 복식부기 원장 2전표 + `lemuel.loan.corporate_loan_disbursed` 발행.
 
-담보/개인신용 대출은 기존 6계정만 쓴다(계정과목 확장 없음): 실행 `SEC_DISBURSE`(대출채권/현금), 회차 상환 `SEC_REPAYMENT`(현금/대출채권) + `SEC_INTEREST`(현금/수수료수익). 장기 분할상환이라 상환·이자 전표는 대출 1건당 N회 발생하므로 중복분개 유니크(`uq_loan_ledger_reference_accounts`)에서 제외된다. `lemuel.loan.secured_loan_disbursed` / `.secured_loan_repaid` 발행(Phase 1 소비처 미배선).
+담보/개인신용 대출은 기존 6계정만 쓴다(계정과목 확장 없음): 실행 `SEC_DISBURSE`(대출채권/현금), 회차 상환 `SEC_REPAYMENT`(현금/대출채권) + `SEC_INTEREST`(현금/수수료수익). 장기 분할상환이라 상환·이자 전표는 대출 1건당 N회 발생하므로 중복분개 유니크(`uq_loan_ledger_reference_accounts`)에서 제외된다. `lemuel.loan.secured_loan_disbursed` / `.secured_loan_repaid` 발행 — account-service 가 차주(BORROWER) 원장 `SECURED_LOAN_RECEIVABLE` 분개로 소비한다(원금만, 완제 이벤트에 `prepaymentFee` 옵셔널 필드 포함).
 
-**Phase 2 이월**: 보증부·금융자산 담보유형, 담보권 순위, 재평가·마진콜, 담보 실행(처분·대위변제), 중도상환수수료, 위성 서비스 실연동(market·commondata 담보평가 / economics 기준금리 — 현재는 포트만 정의하고 입력값·설정값 스텁), account-service GL 소비 매핑.
+**잔여 이월**: market·commondata 담보평가 실연동(금융자산 담보 **신청 경로** 신설 선행 — 현재 평가액은 신청 시 입력값 스냅샷). 그 외 Phase 2 항목은 완료 — 담보유형 5종·담보권 순위(P2-1·2), 원장 계정·실행 전표(P2-3), 재평가·마진콜(P2-4), 담보 실행·상각(P2-5), 중도상환+수수료(P2-6), economics 기준금리 실연동(P2-7a), account-service GL 소비 매핑(2026-07-30).
 
 ### 3.4 financial-statements-service — 재무제표 조회 (port 8086, lemuel_financial)
 - `/api/financial/companies` — 코스피·코스닥 상장사 요약 재무제표 공개 조회(부채비율·영업이익률·ROA·자본총계).
@@ -264,8 +264,8 @@ Membership   : INVITED → ACTIVE ⇄ SUSPENDED, 각 상태 → REMOVED(터미�
 | `lemuel.loan.repayment_applied` | loan | settlement · account |
 | `lemuel.loan.disbursement_requested` | loan | account |
 | `lemuel.loan.corporate_loan_disbursed` | loan | account |
-| `lemuel.loan.secured_loan_disbursed` | loan | (소비처 미배선 — account GL 매핑은 Phase 2) |
-| `lemuel.loan.secured_loan_repaid` | loan | (소비처 미배선 — account GL 매핑은 Phase 2) |
+| `lemuel.loan.secured_loan_disbursed` | loan | account |
+| `lemuel.loan.secured_loan_repaid` | loan | account |
 | `lemuel.company.reputation_changed` | company | loan(신용 리스크 프로젝션) |
 | `lemuel.investment.executed` | investment | account · notification |
 | `lemuel.organization.created` / `.member_joined` | organization | (소비처 미배선 — 발행 전용) |

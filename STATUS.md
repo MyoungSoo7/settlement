@@ -11,11 +11,12 @@
   - 공개조회 위성: financial(8086) · economics(8087) · company(8090) · market(8094) · commondata(8098)
   - 부가: operation(8092) · ai(8096) · organization(8104, 셀러/기업 조직·멤버십)
 - **DB:** 13 서비스 모두 물리 분리(DB-per-service) — opslab / settlement_db / lemuel_{loan,financial,economics,company,operation,market,ai,commondata,investment,account,organization}
-- **최근 커밋:** `8e89cf7d1` feat(loan): 기준금리 economics 실연동 (설정값 폴백) — P2-7a
+- **최근 커밋:** `7ee1f44e0` feat(account): 담보/개인신용 대출 GL 소비 매핑 — 담보대출 Phase 2 잔여 이월 마감
 
 ## 최근 진척 (2026-06-24 이후)
 - **loan 담보/개인신용 대출 Phase 1** — 주택담보(`/loans/secured/mortgage`)·개인신용(`/personal`) 2종 추가. `Borrower`(개인·법인 공통 차주 VO) + `Collateral`(평가액 스냅샷, 설정→유효→말소) + `SecuredLoan`(담보 optional) 신규 애그리거트로 분리 — 기존 `LoanAdvance`·`CorporateLoan` 무수정(상장사 종목코드에 차주가 묶여 개인 표현 불가). 장기 분할상환 상품이라 연체·기한이익상실을 상태머신에 처음부터 포함. 원장은 기존 6계정만 사용하되 회차성 전표(SEC_REPAYMENT·SEC_INTEREST)를 중복분개 유니크에서 제외(미조치 시 2회차 상환부터 실패). `secured_loan_disbursed`/`.repaid` 발행(소비처는 Phase 2).
-- **loan 담보대출 Phase 2 (P2-1~P2-7a, 2026-07-30)** — 담보유형 5종(부동산+보증·예금·채권·주식, Category 계열 행위)·담보권 순위(선순위 차감·0 clamp)·원장 계정 3종+실행 전표 7종·재평가 append-only 이력+마진콜(부분 유니크로 중복 차단)·담보 실행(처분/대위변제 경로별 손실 계정 분리)+상각(WRITTEN_OFF)·중도상환(실행시각 스냅샷 기산 수수료, 잔존비례·3년 면제, `/prepay`+Idempotency-Key 멱등)·기준금리 economics 실연동(BASE_RATE latest, 실패 시 설정값 폴백). gl-ledger-auditor 감사로 순차 재제출 멱등 공백(치명) 봉합. **잔여 이월**: market/commondata 담보평가 실연동(금융자산 담보 신청 경로 선행 필요), account GL 소비 매핑(repaid 이벤트에 수수료 필드 확장 선행). 수수료 taper 분모는 부과기간 1095일로 확정(2026-07-30).
+- **loan 담보대출 Phase 2 (P2-1~P2-7a, 2026-07-30)** — 담보유형 5종(부동산+보증·예금·채권·주식, Category 계열 행위)·담보권 순위(선순위 차감·0 clamp)·원장 계정 3종+실행 전표 7종·재평가 append-only 이력+마진콜(부분 유니크로 중복 차단)·담보 실행(처분/대위변제 경로별 손실 계정 분리)+상각(WRITTEN_OFF)·중도상환(실행시각 스냅샷 기산 수수료, 잔존비례·3년 면제, `/prepay`+Idempotency-Key 멱등)·기준금리 economics 실연동(BASE_RATE latest, 실패 시 설정값 폴백). gl-ledger-auditor 감사로 순차 재제출 멱등 공백(치명) 봉합. **잔여 이월**: market/commondata 담보평가 실연동(금융자산 담보 신청 경로 선행 필요)만 남음. 수수료 taper 분모는 부과기간 1095일로 확정(2026-07-30).
+- **loan 담보대출 account GL 소비 매핑 완료 (2026-07-30)** — `secured_loan_repaid` 에 `prepaymentFee` 옵셔널 필드 확장(중도상환 완제 실액·회차 완제 0, N5 string) 후 account-service 가 두 토픽을 소비: 신규 `OwnerType.BORROWER`(개인·법인 공통 차주 userId) + `GlAccount.SECURED_LOAN_RECEIVABLE`, 실행 DR 채권/CR 현금·완제 DR 현금/CR 채권 **원금만** 분개(둘 다 계약 원금이라 경로 무관 채권 0 마감, 이자·수수료는 loan 원장 소관 — 법인대출 선례 동형). 컨슈머 2종 멱등 2단 + CHECK 4종 확장 마이그레이션(`V20260730120000`, SchemaEnumContractIT 팩토리 20종 동기화). 게이트 loan 602·account 144·shared-common 전부 GREEN(**Docker 다운 가짜 GREEN 1회 적발 후 IT skip 0 재검증**), event-contract-reviewer MED 1·LOW 2 → 전건 수정.
 - **위성·확장 서비스 9종 추가** — financial·economics·company(ADR 0023)·operation·market·ai·commondata·investment·account.
   공개조회 위성은 shared-common 미의존/제한 스캔 + 자체 최소 SecurityConfig(GET 공개, `/admin/**` 는 X-Internal-Api-Key 게이트).
 - **금융 계정계 확장** — investment(CEO 투자하기: 투자점수·투자주문) + account(전사 복식부기 GL 집계, 소비 전용) + loan 기업대출(CorporateLoan) + CEO 프론트 메뉴.
@@ -79,7 +80,7 @@
 > ⚠️ 수치는 `build/`·`.claude/worktrees/` 사본을 **제외한 git ls-files 기준**. 각 줄 끝 명령이 정답 —
 > 드리프트 의심 시 명령을 돌려 재검증하고 이 수치를 갱신할 것(휘발성 수치를 명령 없이 손으로 적지 말 것).
 - 서비스 **13개** + API Gateway + Kotlin polyglot 2(notification·reconciliation) — `git ls-files '*/src/main/resources/application.yml' | wc -l` → 16(=13+gateway+kotlin 2)
-- Flyway 마이그레이션 **232개** — `git ls-files '*/src/main/resources/db/migration/*.sql' | wc -l` → 232
+- Flyway 마이그레이션 **233개** — `git ls-files '*/src/main/resources/db/migration/*.sql' | wc -l` → 233
 - ADR **29개** (0001~0030, 0019 결번 — 세무 ADR 은 0027 충돌로 0029 재부여) — `git ls-files 'docs/adr/[0-9]*.md' | wc -l` → 29
 - 테스트 클래스 **712개** (Testcontainers 통합테스트 포함) — `git ls-files '*/src/test/*Test.java' '*/src/test/*Tests.java' '*/src/test/*IT.java' | wc -l` → 712
 - 이벤트 계약 스키마 **24토픽** (ADR 0024, 프로듀서·컨슈머 양방향 테스트 — 담보대출 2종 포함) — `git ls-files 'shared-common/src/testFixtures/resources/contracts/events/*.schema.json' | wc -l` → 24
