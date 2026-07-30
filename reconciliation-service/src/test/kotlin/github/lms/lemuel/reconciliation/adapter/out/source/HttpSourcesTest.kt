@@ -23,11 +23,15 @@ class HttpSourcesTest {
     private val date = LocalDate.of(2026, 7, 30)
     private val period = ReconPeriod.day(date)
 
+    private fun settlementUri(after: Long) =
+        "http://settlement/internal/recon/settlements?date=2026-07-30" +
+            "&afterPaymentId=$after&limit=${SettlementHttpSource.PAGE_SIZE}"
+
     @Test
     fun `settlement 소스는 정산 행을 EXPECTED 레코드로 매핑한다`() = runTest {
         val builder = RestClient.builder().baseUrl("http://settlement")
         val server = MockRestServiceServer.bindTo(builder).build()
-        server.expect(requestTo("http://settlement/internal/recon/settlements?date=2026-07-30"))
+        server.expect(requestTo(settlementUri(0)))
             .andRespond(
                 withSuccess(
                     """[{"paymentId":1314,"netPaidAmount":2990000.00,"status":"PAID"}]""",
@@ -43,6 +47,37 @@ class HttpSourcesTest {
         assertEquals("1314", records[0].businessKey)
         assertEquals(2_990_000L, records[0].amountKrw)
         assertEquals("PAID", records[0].status)
+        server.verify()
+    }
+
+    /**
+     * 절단은 침묵하면 안 된다 — 한 페이지가 가득 차면 커서를 밀어 다음 페이지를 마저 읽는다.
+     * 이걸 안 하면 상한 초과분이 통째로 빠지고, 상대편은 전건을 돌려주므로 그 차이가 전부
+     * EXTRA 로 보고된다.
+     */
+    @Test
+    fun `settlement 소스는 페이지가 가득 차면 소진할 때까지 커서를 민다`() = runTest {
+        val page = SettlementHttpSource.PAGE_SIZE
+        val firstPage = (1..page).joinToString(",") {
+            """{"paymentId":$it,"netPaidAmount":1000.00,"status":"PAID"}"""
+        }
+        val builder = RestClient.builder().baseUrl("http://settlement")
+        val server = MockRestServiceServer.bindTo(builder).build()
+        server.expect(requestTo(settlementUri(0)))
+            .andRespond(withSuccess("[$firstPage]", MediaType.APPLICATION_JSON))
+        server.expect(requestTo(settlementUri(page.toLong())))
+            .andRespond(
+                withSuccess(
+                    """[{"paymentId":${page + 1},"netPaidAmount":2000.00,"status":"REFUNDED"}]""",
+                    MediaType.APPLICATION_JSON,
+                ),
+            )
+
+        val records = SettlementHttpSource(builder.build()).fetch(period)
+
+        assertEquals(page + 1, records.size)
+        assertEquals("${page + 1}", records.last().businessKey)
+        assertEquals("REFUNDED", records.last().status)
         server.verify()
     }
 

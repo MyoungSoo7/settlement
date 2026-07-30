@@ -46,18 +46,46 @@ class SettlementHttpSource(
     private data class Row(val paymentId: Long?, val netPaidAmount: BigDecimal?, val status: String?)
 
     override suspend fun fetch(period: ReconPeriod): List<ReconRecord> = withContext(Dispatchers.IO) {
-        period.days().flatMap { date ->
+        period.days().flatMap { date -> fetchDay(date) }
+    }
+
+    /**
+     * 커서 페이지네이션으로 하루치를 **소진할 때까지** 읽는다.
+     *
+     * 단일 요청으로 자르면 상한을 넘는 날에 초과분이 조용히 빠지고, 상대편(order)은 전건을
+     * 돌려주므로 그 차이가 전부 EXTRA 로 보고된다 — 대사가 없애야 할 거짓 불일치를 대사가
+     * 만들어내는 셈이다.
+     */
+    private fun fetchDay(date: LocalDate): List<ReconRecord> {
+        val out = mutableListOf<ReconRecord>()
+        var after = 0L
+        while (true) {
             val rows = client.get()
-                .uri { it.path("/internal/recon/settlements").queryParam("date", date).build() }
+                .uri {
+                    it.path("/internal/recon/settlements")
+                        .queryParam("date", date)
+                        .queryParam("afterPaymentId", after)
+                        .queryParam("limit", PAGE_SIZE)
+                        .build()
+                }
                 .retrieve()
                 .body(Array<Row>::class.java) ?: emptyArray()
-            log.debug("settlement-http: {} rows for {}", rows.size, date)
-            rows.mapNotNull { row ->
+            if (rows.isEmpty()) break
+            rows.forEach { row ->
                 row.paymentId?.let {
-                    ReconRecord(it.toString(), row.netPaidAmount.toKrw(), row.status ?: "UNKNOWN")
+                    out += ReconRecord(it.toString(), row.netPaidAmount.toKrw(), row.status ?: "UNKNOWN")
                 }
             }
+            after = rows.mapNotNull { it.paymentId }.maxOrNull() ?: break
+            if (rows.size < PAGE_SIZE) break
         }
+        log.debug("settlement-http: {} rows for {}", out.size, date)
+        return out
+    }
+
+    companion object {
+        /** 서버 상한(2000)보다 작게 잡아 한 페이지가 잘리지 않게 한다. */
+        const val PAGE_SIZE = 1000
     }
 }
 

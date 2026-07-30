@@ -16,8 +16,8 @@ import java.util.List;
 @Repository
 public class SettlementReconQueryRepository {
 
-    /** 한 번에 내보내는 행 상한 — 대사 배치가 메모리를 통째로 먹지 않게 자른다. */
-    private static final int MAX_ROWS = 5000;
+    /** 한 페이지 상한 — 대사 배치가 하루치를 통째로 메모리에 올리지 않게 자른다. */
+    private static final int MAX_PAGE = 2000;
 
     private final JdbcClient jdbc;
 
@@ -26,28 +26,38 @@ public class SettlementReconQueryRepository {
     }
 
     /**
-     * <b>캡처일</b> 기준 정산 행. 대사 상대인 order 의 {@code /internal/recon/captured-payments} 가
-     * {@code captured_at::date} 로 자르므로 이쪽도 정산 생성 시각({@code created_at})으로 맞춘다.
+     * <b>캡처 시각</b> 기준 정산 행을 payment_id 커서로 페이지네이션해 돌려준다.
      *
-     * <p>{@code settlement_date} 로 자르면 안 된다 — 그건 지급 예정일(T+1)이라 같은 결제가 하루
-     * 밀린 채로 비교돼 전 건이 어긋난 것처럼 보인다.
+     * <p><b>왜 {@code settlements.created_at} 이 아니라 프로젝션의 {@code captured_at} 인가:</b>
+     * {@code created_at} 은 컨슈머가 이벤트를 처리해 행을 넣은 시각이다. 자정 직후 처리되거나
+     * 재처리(replay)되면 같은 결제가 order 쪽 기준일({@code payments.captured_at})과 다른 날로
+     * 잡혀, 한쪽에서는 MISSING·다른 쪽에서는 EXTRA 로 이중 계상된다. 대사가 없애야 할 거짓
+     * 불일치를 대사가 만들어내는 셈이다. 이벤트의 실제 캡처 시각은 {@code settlement_payment_view}
+     * 가 이미 들고 있으므로 그것으로 자른다.
      *
-     * <p>금액은 {@code payment_amount - refunded_amount}, 상태는 환불 반영 여부만 PAID/REFUNDED 로
-     * 정규화한다. 정산 자체의 라이프사이클 상태(PENDING/DONE 등)는 결제 원천에 대응물이 없어
-     * 그대로 비교하면 상시 STATUS_MISMATCH 가 된다.
+     * <p><b>왜 커서 페이지네이션인가:</b> 단일 limit 로 자르면 하루 정산이 상한을 넘는 순간
+     * 초과분이 조용히 사라지고, 상대편(order)은 전건을 돌려주므로 그 차이가 전부 EXTRA 로
+     * 보고된다. 호출자가 소진할 때까지 페이지를 돌 수 있어야 절단이 침묵하지 않는다.
+     *
+     * @param afterPaymentId 이 값보다 큰 payment_id 부터 (첫 페이지는 0)
      */
-    public List<SettlementReconRow> listByCapturedDate(LocalDate date, int limit) {
+    public List<SettlementReconRow> listByCapturedDate(LocalDate date, long afterPaymentId, int limit) {
         return jdbc.sql("""
-                        select payment_id,
-                               (payment_amount - coalesce(refunded_amount, 0)) as net_paid_amount,
-                               case when coalesce(refunded_amount, 0) > 0 then 'REFUNDED' else 'PAID' end as status
-                          from settlements
-                         where created_at::date = :date
-                         order by payment_id
+                        select s.payment_id,
+                               (s.payment_amount - coalesce(s.refunded_amount, 0)) as net_paid_amount,
+                               case when coalesce(s.refunded_amount, 0) > 0 then 'REFUNDED' else 'PAID' end as status
+                          from settlements s
+                          join settlement_payment_view v on v.payment_id = s.payment_id
+                         where v.captured_at >= :dayStart
+                           and v.captured_at < :dayEnd
+                           and s.payment_id > :afterPaymentId
+                         order by s.payment_id
                          limit :limit
                         """)
-                .param("date", date)
-                .param("limit", Math.min(Math.max(limit, 1), MAX_ROWS))
+                .param("dayStart", date.atStartOfDay())
+                .param("dayEnd", date.plusDays(1).atStartOfDay())
+                .param("afterPaymentId", afterPaymentId)
+                .param("limit", Math.min(Math.max(limit, 1), MAX_PAGE))
                 .query((rs, rowNum) -> new SettlementReconRow(
                         rs.getLong("payment_id"),
                         rs.getBigDecimal("net_paid_amount"),
