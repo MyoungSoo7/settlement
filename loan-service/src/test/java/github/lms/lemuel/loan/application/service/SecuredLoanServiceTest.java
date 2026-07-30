@@ -286,6 +286,25 @@ class SecuredLoanServiceTest {
         assertThat(interestEntry.getAmount()).isEqualByComparingTo("1075000");
     }
 
+    /**
+     * #183 — 회차 상환은 완제 전이라 완제 이벤트가 없다. 그럼에도 계정계가 채권을 줄일 수 있어야
+     * 하므로, 감소분이 건별 이벤트로 나가야 한다. 금액은 계약 원금이 아니라 이번 차감액이다.
+     */
+    @Test
+    void 부분상환은_완제이벤트_없이_실제_차감액을_건별로_발행한다() {
+        SecuredLoan loan = disbursedMortgage();
+        events.principalRepayments.clear();
+        events.principalRepaymentReasons.clear();
+        events.repaid.clear();
+
+        repayService.repay(loan.getId(), 42L, new BigDecimal("500000"), BigDecimal.ZERO);
+
+        assertThat(events.repaid).isEmpty();                       // 아직 완제가 아니다
+        assertThat(events.principalRepayments).hasSize(1);
+        assertThat(events.principalRepayments.get(0)).isEqualByComparingTo("500000");
+        assertThat(events.principalRepaymentReasons).containsExactly("INSTALLMENT");
+    }
+
     @Test
     void 이자가_0인_회차는_이자전표를_남기지_않는다() {
         SecuredLoan loan = disbursedMortgage();
@@ -438,6 +457,8 @@ class SecuredLoanServiceTest {
         private final List<SecuredLoan> disbursed = new ArrayList<>();
         private final List<SecuredLoan> repaid = new ArrayList<>();
         private final List<BigDecimal> repaidFees = new ArrayList<>();
+        private final List<BigDecimal> principalRepayments = new ArrayList<>();
+        private final List<String> principalRepaymentReasons = new ArrayList<>();
 
         @Override
         public void publishDisbursed(SecuredLoan loan) {
@@ -448,6 +469,13 @@ class SecuredLoanServiceTest {
         public void publishRepaid(SecuredLoan loan, BigDecimal totalInterestPaid, BigDecimal prepaymentFee) {
             repaid.add(loan);
             repaidFees.add(prepaymentFee);
+        }
+
+        /** #183 — 원금 감소 건별 발행. 금액이 실제 차감액인지 검증하려고 기록해 둔다. */
+        @Override
+        public void publishPrincipalRepaid(SecuredLoan loan, BigDecimal principalRepaid, String reason) {
+            principalRepayments.add(principalRepaid);
+            principalRepaymentReasons.add(reason);
         }
     }
 

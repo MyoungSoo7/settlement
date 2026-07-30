@@ -74,6 +74,10 @@ public class RepaySecuredLoanService implements RepaySecuredLoanUseCase {
         if (interestPortion.signum() > 0) {
             appendLedgerPort.append(LoanLedgerEntry.securedInterestIncome(saved.getId(), interestPortion));
         }
+        // 원금 감소는 건별로 알린다 — 완제 이벤트만으로는 계정계가 기중 잔액을 모른다(#183).
+        if (deducted.signum() > 0) {
+            publishSecuredLoanEventPort.publishPrincipalRepaid(saved, deducted, "INSTALLMENT");
+        }
         if (saved.getStatus() == SecuredLoanStatus.REPAID) {
             // 회차 상환 완제에는 중도상환수수료가 없다 — 수수료는 prepay 경로에서만 부과된다.
             publishSecuredLoanEventPort.publishRepaid(saved, interestPortion, BigDecimal.ZERO);

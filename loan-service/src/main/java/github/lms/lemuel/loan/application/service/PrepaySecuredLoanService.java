@@ -81,6 +81,10 @@ public class PrepaySecuredLoanService implements PrepaySecuredLoanUseCase {
             // 면제(경과 3년)·0원 수수료는 기표하지 않는다 — 원장 전표는 양수 금액 불변식이 있다.
             appendLedgerPort.append(LoanLedgerEntry.securedEarlyRepaymentFee(saved.getId(), fee));
         }
+        // 원금 감소는 건별로 알린다 — 완제 이벤트만으로는 계정계가 기중 잔액을 모른다(#183).
+        if (deducted.signum() > 0) {
+            publishSecuredLoanEventPort.publishPrincipalRepaid(saved, deducted, "PREPAYMENT");
+        }
         if (saved.getStatus() == SecuredLoanStatus.REPAID) {
             // 중도상환에는 회차 이자가 없다 — 완제 이벤트의 이자 합계는 0. 수수료는 이 완제에 부과된 실액.
             publishSecuredLoanEventPort.publishRepaid(saved, BigDecimal.ZERO, fee);
