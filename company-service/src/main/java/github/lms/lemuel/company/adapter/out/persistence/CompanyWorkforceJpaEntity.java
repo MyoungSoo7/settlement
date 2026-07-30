@@ -26,6 +26,9 @@ public class CompanyWorkforceJpaEntity {
     @Column(name = "biz_reg_no_prefix", length = 6)
     private String bizRegNoPrefix;
 
+    @Column(name = "industry_code", length = 6)
+    private String industryCode;
+
     @Column(name = "industry_name", length = 100)
     private String industryName;
 
@@ -48,7 +51,7 @@ public class CompanyWorkforceJpaEntity {
     }
 
     CompanyWorkforce toDomain() {
-        return new CompanyWorkforce(workplaceName, bizRegNoPrefix, industryName, address,
+        return new CompanyWorkforce(workplaceName, bizRegNoPrefix, industryCode, industryName, address,
                 YearMonth.parse(snapshotMonth), headcount, monthlyBilledAmount);
     }
 }

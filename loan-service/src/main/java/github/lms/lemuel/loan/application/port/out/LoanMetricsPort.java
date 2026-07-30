@@ -43,6 +43,22 @@ public interface LoanMetricsPort {
      */
     void corporateRepaid(BigDecimal deductedAmount);
 
+    /** 담보/개인신용 대출 신청 성공(REQUESTED 등록). */
+    void securedRequested();
+
+    /** 담보/개인신용 대출 심사 거절(LTV 한도 초과·CB 등급 미달). */
+    void securedRejected();
+
+    /** 담보/개인신용 대출 실행 성공(DISBURSED). */
+    void securedDisbursed();
+
+    /**
+     * 담보/개인신용 대출 회차 상환. 장기 분할상환이라 대출 1건당 여러 번 계상된다.
+     *
+     * @param deductedAmount 이번 회차에서 실제 차감된 원금(0 이상)
+     */
+    void securedRepaid(BigDecimal deductedAmount);
+
     /** 선정산 대출 연체 진입(DISBURSED → OVERDUE). */
     void advanceOverdue();
 

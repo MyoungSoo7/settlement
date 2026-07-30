@@ -65,6 +65,10 @@ public enum ErrorCode {
     CORPORATE_LOAN_NOT_FOUND(HttpStatus.NOT_FOUND, "대출 건 또는 재무자료를 찾을 수 없습니다."),
     CORPORATE_LOAN_REJECTED(HttpStatus.UNPROCESSABLE_ENTITY, "대출 심사가 거절되었습니다."),
 
+    // ─── loan (담보·개인신용 대출) ───────────────────────────────────────────────
+    SECURED_LOAN_NOT_FOUND(HttpStatus.NOT_FOUND, "담보/개인신용 대출을 찾을 수 없습니다."),
+    SECURED_LOAN_REJECTED(HttpStatus.UNPROCESSABLE_ENTITY, "담보/개인신용 대출 심사가 거절되었습니다."),
+
     // ─── investment (CEO 투자하기) ──────────────────────────────────────────────
     INVESTMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "투자 주문을 찾을 수 없습니다."),
     NOT_INVESTABLE(HttpStatus.UNPROCESSABLE_ENTITY, "투자 부적격 종목입니다."),

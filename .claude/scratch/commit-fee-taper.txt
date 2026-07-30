@@ -1,0 +1,23 @@
+fix(loan): 중도상환수수료 taper 분모를 부과기간 1095일로 확정 — 감사 R-1
+
+- 산식: 중도상환액 × 1.2% × max(0, 1095 − 경과일수) / 1095.
+  ★ 구 산식(분모=약정 전체일수)은 장기(360개월) 상품에서 taper 가 사실상 작동하지
+    않고(경과 2년에도 1.12%), 면제 직전 1일 사이에 수백만원 계단이 생겼다
+    (경과 1094일 108만원 → 1095일 0원). 분모를 부과기간으로 두면 면제가 taper 의
+    자연스러운 끝점이 되어(잔여 0 → 수수료 0) 계단이 사라진다.
+    회귀 가드: 경과 1094일 = 1,095.89원 테스트가 계단 재발을 막는다.
+- SecuredLoanPolicy.earlyRepaymentFee(prepaidAmount, elapsedDays) 로 재정의 —
+  입력이 잔존/약정 2값에서 경과일수 1값으로 줄어 호출측 실수 표면도 줄었다.
+- SecuredLoan: contractDays()/remainingDays() 를 elapsedDays(now) 로 대체(신산식에서
+  약정일수는 수수료와 무관해짐 — 죽은 코드로 남기지 않는다). 기산점(실행일,
+  구 행은 신청시각 폴백)과 음수 clamp(시계 역행 방어)는 유지.
+- 실행 당일(경과 0) 수수료는 요율 전액(1.2%)으로 기존과 동일 — 서비스·IT 기대값
+  무변경이 산식 호환의 회귀 증거다.
+
+검증: :loan-service:test + jacocoTestCoverageVerification(LINE 90%) 통과.
+SecuredLoanPolicyPhase2Test 21/21(경계 전수: 경과 0·365·1094·1095·1096·음수) ·
+SecuredLoanTest 38/38 · PrepaySecuredLoanServiceTest 8/8 · SecuredLoanLifecycleIT 9/9
+(skipped=0).
+TDD: 정책 4건 · 도메인 경과일수 2건 RED 목격 후 GREEN.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>

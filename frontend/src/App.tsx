@@ -26,6 +26,7 @@ const TossPaymentSuccess = lazy(() => import('./pages/TossPaymentSuccess'));
 const FinancialStatementsPage = lazy(() => import('./pages/FinancialStatementsPage'));
 const EconomicsPage = lazy(() => import('./pages/EconomicsPage'));
 const CompanyLookupPage = lazy(() => import('./pages/CompanyLookupPage'));
+const WorkforcePage = lazy(() => import('./pages/WorkforcePage'));
 const CeoInsightPage = lazy(() => import('./pages/CeoInsightPage'));
 const CeoInvestPage = lazy(() => import('./pages/CeoInvestPage'));
 const CeoInvestRecommendPage = lazy(() => import('./pages/CeoInvestRecommendPage'));
@@ -101,6 +102,8 @@ function App() {
             <Route path="/financials"         element={<Layout><FinancialStatementsPage /></Layout>} />
             {/* 기업 뉴스·평판 조회 (ADR 0023) — 공개 조회 API, 관리자 헤더 메뉴 '기업조회' 진입, Layout 유지 */}
             <Route path="/companies"          element={<Layout><CompanyLookupPage /></Layout>} />
+            {/* 국민연금 사업장 인원·연봉 비교 — 공공 데이터라 공개, Layout 유지 */}
+            <Route path="/workforce"          element={<Layout><WorkforcePage /></Layout>} />
             {/* 한국은행 ECOS 경제지표 — 공공 데이터라 공개. 모든 사용자가 헤더 메뉴로 접근·왕복하도록 Layout 유지 */}
             <Route path="/economics"          element={<Layout><EconomicsPage /></Layout>} />
 
@@ -152,6 +155,8 @@ function App() {
               element={<AdminManagerRoute><CeoLayout><FinancialStatementsPage /></CeoLayout></AdminManagerRoute>} />
             <Route path="/admin/ceo/companies"
               element={<AdminManagerRoute><CeoLayout><CompanyLookupPage /></CeoLayout></AdminManagerRoute>} />
+            <Route path="/admin/ceo/workforce"
+              element={<AdminManagerRoute><CeoLayout><WorkforcePage /></CeoLayout></AdminManagerRoute>} />
             <Route path="/admin/ceo/invest"
               element={<AdminManagerRoute><CeoLayout><CeoInvestPage /></CeoLayout></AdminManagerRoute>} />
             <Route path="/admin/ceo/invest-recommend"

@@ -46,7 +46,7 @@ class CompanyWorkforceImportAdminControllerTest {
     @DisplayName("POST /admin/company/workforce/import — 경로를 위임하고 결과를 반환 + 감사기록")
     void importCsv() throws Exception {
         when(importCompanyWorkforceUseCase.importFrom(Path.of("/data/workforce.csv")))
-                .thenReturn(new ImportResult(5, 3, 2));
+                .thenReturn(new ImportResult(5, 3, 2, 0, java.util.List.of("2026-06")));
 
         mockMvc.perform(post("/admin/company/workforce/import")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -54,7 +54,8 @@ class CompanyWorkforceImportAdminControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.received").value(5))
                 .andExpect(jsonPath("$.imported").value(3))
-                .andExpect(jsonPath("$.skipped").value(2));
+                .andExpect(jsonPath("$.skipped").value(2))
+                .andExpect(jsonPath("$.aggregatedMonths[0]").value("2026-06"));
 
         verify(recordAuditPort).record(any(), any(), any(), any());
     }
@@ -68,7 +69,7 @@ class CompanyWorkforceImportAdminControllerTest {
         String longPath = "C:\\Users\\iamip\\IdeaProjects\\kubenetis\\settlement\\company-service\\src\\main\\"
                 + "resources\\국민연금공단_국민연금 가입 사업장 내역_20260723.csv";
         when(importCompanyWorkforceUseCase.importFrom(Path.of(longPath)))
-                .thenReturn(new ImportResult(1, 1, 0));
+                .thenReturn(new ImportResult(1, 1, 0, 0, java.util.List.of("2026-06")));
 
         mockMvc.perform(post("/admin/company/workforce/import")
                         .contentType(MediaType.APPLICATION_JSON)

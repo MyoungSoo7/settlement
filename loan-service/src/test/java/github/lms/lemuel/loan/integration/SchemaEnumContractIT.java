@@ -86,7 +86,7 @@ class SchemaEnumContractIT {
     }
 
     @Test
-    @DisplayName("chk_loan_ledger_ref_type == LoanLedgerEntry 팩토리 7종의 refType (정확 일치)")
+    @DisplayName("chk_loan_ledger_ref_type == LoanLedgerEntry 팩토리 17종의 refType (정확 일치)")
     void loanLedgerRefTypeCheckMatchesFactorySetExactly() {
         Set<String> factoryRefTypes = new LinkedHashSet<>(java.util.Arrays.asList(
                 LoanLedgerEntry.disbursement(1L, ONE).getRefType(),
@@ -96,10 +96,123 @@ class SchemaEnumContractIT {
                 LoanLedgerEntry.corporateFeeAccrual(1L, ONE).getRefType(),
                 // 상환·상각 팩토리를 계약에 포함 — 누락 시 실 DB INSERT 가 CHECK 위반으로 500 나던 갭.
                 LoanLedgerEntry.corporateRepayment(1L, ONE).getRefType(),
-                LoanLedgerEntry.badDebtWriteOff(1L, ONE).getRefType()));
+                LoanLedgerEntry.badDebtWriteOff(1L, ONE).getRefType(),
+                // 담보/개인신용 대출 3종(Phase 1) — 같은 갭이 재발하지 않도록 계약에 포함한다.
+                LoanLedgerEntry.securedDisbursement(1L, ONE).getRefType(),
+                LoanLedgerEntry.securedPrincipalRepayment(1L, ONE).getRefType(),
+                LoanLedgerEntry.securedInterestIncome(1L, ONE).getRefType(),
+                // Phase 2 7종 — 보증료·중도상환수수료·담보 실행·상각.
+                LoanLedgerEntry.securedGuaranteeFee(1L, ONE).getRefType(),
+                LoanLedgerEntry.securedEarlyRepaymentFee(1L, ONE).getRefType(),
+                LoanLedgerEntry.securedCollateralDisposal(1L, ONE).getRefType(),
+                LoanLedgerEntry.securedDisposalShortfall(1L, ONE).getRefType(),
+                LoanLedgerEntry.securedDisposalSurplus(1L, ONE).getRefType(),
+                LoanLedgerEntry.securedSubrogation(1L, ONE).getRefType(),
+                LoanLedgerEntry.securedWriteOff(1L, ONE).getRefType()));
 
         assertThat(checkValues("chk_loan_ledger_ref_type"))
                 .containsExactlyInAnyOrderElementsOf(factoryRefTypes);
+    }
+
+    @Test
+    @DisplayName("chk_collateral_type == CollateralType enum 전체 (정확 일치)")
+    void collateralTypeCheckMatchesEnumExactly() {
+        // 담보 유형은 Phase 2 에서 1종 → 5종으로 늘었다. CHECK 를 같이 확장하지 않으면 신규 유형
+        // INSERT 가 전부 check_violation 으로 실패한다 — ref_type 이 두 번 당한 갭과 같은 종류다.
+        Set<String> enumValues = new LinkedHashSet<>();
+        for (github.lms.lemuel.loan.domain.CollateralType type
+                : github.lms.lemuel.loan.domain.CollateralType.values()) {
+            enumValues.add(type.name());
+        }
+
+        assertThat(checkValues("chk_collateral_type"))
+                .containsExactlyInAnyOrderElementsOf(enumValues);
+    }
+
+    @Test
+    @DisplayName("chk_secured_loan_status == SecuredLoanStatus enum 전체 (정확 일치)")
+    void securedLoanStatusCheckMatchesEnumExactly() {
+        Set<String> enumValues = new LinkedHashSet<>();
+        for (github.lms.lemuel.loan.domain.SecuredLoanStatus status
+                : github.lms.lemuel.loan.domain.SecuredLoanStatus.values()) {
+            enumValues.add(status.name());
+        }
+
+        assertThat(checkValues("chk_secured_loan_status"))
+                .containsExactlyInAnyOrderElementsOf(enumValues);
+    }
+
+    @Test
+    @DisplayName("담보대출 회차성 전표(원금·이자)는 같은 loanId 로 N회 기표가 허용된다(유니크 제외)")
+    void securedInstallmentEntriesAllowMultiplePerLoan() {
+        String principalRepay = LoanLedgerEntry.securedPrincipalRepayment(1L, ONE).getRefType();
+        String interest = LoanLedgerEntry.securedInterestIncome(1L, ONE).getRefType();
+
+        // 장기 분할상환은 회차마다 같은 4-튜플이 반복된다 — 부분 인덱스가 제외하므로 전부 성공해야 한다.
+        insertLedger("CASH", "LOAN_RECEIVABLE", new BigDecimal("500.00"), principalRepay, 9200L);
+        insertLedger("CASH", "LOAN_RECEIVABLE", new BigDecimal("500.00"), principalRepay, 9200L);
+        insertLedger("CASH", "FEE_INCOME", new BigDecimal("120.00"), interest, 9200L);
+        insertLedger("CASH", "FEE_INCOME", new BigDecimal("118.00"), interest, 9200L);
+
+        Integer count = jdbc.queryForObject(
+                "SELECT count(*) FROM opslab.loan_ledger_entries WHERE ref_id = 9200", Integer.class);
+        assertThat(count).isEqualTo(4);
+    }
+
+    @Test
+    @DisplayName("중도상환수수료는 같은 loanId 로 N회 기표가 허용된다(유니크 제외)")
+    void securedEarlyRepaymentFeeAllowsMultiplePerLoan() {
+        String earlyFee = LoanLedgerEntry.securedEarlyRepaymentFee(1L, ONE).getRefType();
+        insertLedger("CASH", "FEE_INCOME", new BigDecimal("50000.00"), earlyFee, 9400L);
+        insertLedger("CASH", "FEE_INCOME", new BigDecimal("40000.00"), earlyFee, 9400L);
+
+        Integer count = jdbc.queryForObject(
+                "SELECT count(*) FROM opslab.loan_ledger_entries WHERE ref_type = ? AND ref_id = 9400",
+                Integer.class, earlyFee);
+        assertThat(count).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("담보 처분·대위변제·상각은 1회성이라 이중 기표가 유니크로 차단된다")
+    void securedRecoveryRefTypesBlockDuplicateEntries() {
+        // 이중 회수·이중 상각은 손익을 두 번 인식하므로 반드시 막혀야 한다.
+        String disposal = LoanLedgerEntry.securedCollateralDisposal(1L, ONE).getRefType();
+        insertLedger("CASH", "LOAN_RECEIVABLE", new BigDecimal("1000.00"), disposal, 9500L);
+        assertThatThrownBy(() ->
+                insertLedger("CASH", "LOAN_RECEIVABLE", new BigDecimal("1000.00"), disposal, 9500L))
+                .isInstanceOf(org.springframework.dao.DuplicateKeyException.class);
+
+        String subrogation = LoanLedgerEntry.securedSubrogation(1L, ONE).getRefType();
+        insertLedger("CASH", "LOAN_RECEIVABLE", new BigDecimal("2000.00"), subrogation, 9501L);
+        assertThatThrownBy(() ->
+                insertLedger("CASH", "LOAN_RECEIVABLE", new BigDecimal("2000.00"), subrogation, 9501L))
+                .isInstanceOf(org.springframework.dao.DuplicateKeyException.class);
+    }
+
+    @Test
+    @DisplayName("신규 계정과목도 debit/credit 컬럼(VARCHAR 30)에 적재된다")
+    void newLedgerAccountsFitColumn() {
+        String guaranteeFee = LoanLedgerEntry.securedGuaranteeFee(1L, ONE).getRefType();
+        insertLedger("GUARANTEE_FEE_EXPENSE", "CASH", new BigDecimal("120000.00"), guaranteeFee, 9600L);
+
+        String loss = LoanLedgerEntry.securedDisposalShortfall(1L, ONE).getRefType();
+        insertLedger("COLLATERAL_DISPOSAL_LOSS", "LOAN_RECEIVABLE",
+                new BigDecimal("300000.00"), loss, 9600L);
+
+        Integer count = jdbc.queryForObject(
+                "SELECT count(*) FROM opslab.loan_ledger_entries WHERE ref_id = 9600", Integer.class);
+        assertThat(count).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("담보대출 실행 전표는 대출 1건당 1회라 이중 기표가 유니크로 차단된다")
+    void securedDisbursementStillBlocksDuplicateEntries() {
+        String disburse = LoanLedgerEntry.securedDisbursement(1L, ONE).getRefType();
+        insertLedger("LOAN_RECEIVABLE", "CASH", new BigDecimal("1000.00"), disburse, 9300L);
+
+        assertThatThrownBy(() ->
+                insertLedger("LOAN_RECEIVABLE", "CASH", new BigDecimal("1000.00"), disburse, 9300L))
+                .isInstanceOf(org.springframework.dao.DuplicateKeyException.class);
     }
 
     @Test

@@ -17,6 +17,7 @@ const ITEMS: SidebarItem[] = [
   { to: '/admin/ceo/economics',  label: '경제지표', icon: '📈', desc: '한국은행 ECOS 지표' },
   { to: '/admin/ceo/financials', label: '재무제표', icon: '📊', desc: '코스피 상장사 재무제표' },
   { to: '/admin/ceo/companies',  label: '기업조회', icon: '📰', desc: '기업 뉴스 · 평판' },
+  { to: '/admin/ceo/workforce',  label: '사업장비교', icon: '🏢', desc: '국민연금 인원 · 연봉' },
   { to: '/admin/ceo/invest',     label: '투자하기', icon: '💹', desc: '재무점수 기반 투자' },
   { to: '/admin/ceo/invest-recommend', label: '투자 추천', icon: '🧭', desc: '규칙 스크리닝 추천 종목' },
   { to: '/admin/ceo/loans',      label: '대출관리', icon: '💸', desc: '선정산 · 기업대출' },

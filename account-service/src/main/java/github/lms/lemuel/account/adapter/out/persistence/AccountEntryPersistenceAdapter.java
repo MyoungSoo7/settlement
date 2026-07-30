@@ -7,6 +7,7 @@ import github.lms.lemuel.account.domain.GlAccount;
 import github.lms.lemuel.account.domain.OwnerType;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -16,18 +17,29 @@ import java.util.List;
 public class AccountEntryPersistenceAdapter implements AppendAccountEntryPort, LoadAccountEntryPort {
 
     private final AccountEntryRepository repository;
+    private final AccountBalanceRepository balanceRepository;
 
-    public AccountEntryPersistenceAdapter(AccountEntryRepository repository) {
+    public AccountEntryPersistenceAdapter(AccountEntryRepository repository,
+                                          AccountBalanceRepository balanceRepository) {
         this.repository = repository;
+        this.balanceRepository = balanceRepository;
     }
 
+    /**
+     * 전표를 적재하고, <b>실제로 삽입됐을 때만</b> 실체화 잔액을 갱신한다(ADR 0030 Phase 1).
+     *
+     * <p>원장과 파생 캐시가 같은 트랜잭션에서 함께 움직여야 둘이 어긋나지 않는다. 중복 수신은
+     * {@code ON CONFLICT DO NOTHING} 이 0행으로 알려주므로, 그 경우 잔액도 건드리지 않는다 —
+     * 이 분기가 없으면 재수신마다 잔액이 부풀어 원장 재합산과 영구히 벌어진다.
+     */
     @Override
+    @Transactional
     public void append(AccountEntry entry) {
         // LOW-1: 레이스-세이프 멱등 삽입. 과거의 check-then-save(existsBy → save)는 동시 중복 수신 시
         // 둘째가 자연키 UNIQUE 위반 예외를 던져 @Transactional 을 rollback-only 로 오염시켰다(노이즈·DLT 낭비).
         // ON CONFLICT DO NOTHING 네이티브 upsert 로 중복을 조용히 no-op 처리해 예외·tx 오염을 없앤다.
         // 도메인 구성적 균형 불변식은 AccountEntry 생성 시점에 이미 강제됐다.
-        repository.insertIgnoreConflict(
+        int inserted = repository.insertIgnoreConflict(
                 entry.getOwnerType().name(),
                 entry.getOwnerId(),
                 entry.getDebitAccount().name(),
@@ -37,6 +49,15 @@ public class AccountEntryPersistenceAdapter implements AppendAccountEntryPort, L
                 entry.getRefId(),
                 entry.getSourceTopic(),
                 entry.getOccurredAt());
+        if (inserted == 0) {
+            return;   // 중복 수신 — 기표가 없었으므로 잔액도 불변
+        }
+        // credit-positive 규약: 대변 계정은 +amount, 차변 계정은 −amount.
+        // 전표가 구성적으로 균형(차1·대1·금액1)이라 두 레그의 델타 합은 항상 0 — 총합 불변식이 보존된다.
+        String ownerType = entry.getOwnerType().name();
+        String ownerId = entry.getOwnerId();
+        balanceRepository.upsertDelta(ownerType, ownerId, entry.getCreditAccount().name(), entry.getAmount());
+        balanceRepository.upsertDelta(ownerType, ownerId, entry.getDebitAccount().name(), entry.getAmount().negate());
     }
 
     @Override
@@ -69,9 +90,19 @@ public class AccountEntryPersistenceAdapter implements AppendAccountEntryPort, L
         return repository.countByRefType(refType);
     }
 
+    /**
+     * 실체화 잔액을 (owner, account) 유일키로 조회한다 — O(1)(ADR 0030 Phase 1).
+     *
+     * <p>이전에는 셀러의 누적 전표 전량을 재합산했고(O(셀러 전표 수)), payout 이 advisory 락을 쥔 채
+     * 그 집계를 돌아 락 보유시간이 이력 길이에 비례했다. 부호 규약이 이전 재합산식과 동일해
+     * (Σcredit − Σdebit) 반환 의미는 바뀌지 않는다.
+     */
     @Override
     public BigDecimal sellerPayableBalance(String sellerId) {
-        return repository.netBalanceByOwnerAndAccount(OwnerType.SELLER, sellerId, GlAccount.SELLER_PAYABLE);
+        return balanceRepository
+                .findByOwnerTypeAndOwnerIdAndAccount(OwnerType.SELLER, sellerId, GlAccount.SELLER_PAYABLE)
+                .map(AccountBalanceJpaEntity::getBalance)
+                .orElse(BigDecimal.ZERO);
     }
 
     @Override

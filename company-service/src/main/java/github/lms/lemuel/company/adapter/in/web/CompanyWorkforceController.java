@@ -2,7 +2,10 @@ package github.lms.lemuel.company.adapter.in.web;
 
 import github.lms.lemuel.company.adapter.in.web.dto.CompanyWorkforceResponse;
 import github.lms.lemuel.company.adapter.in.web.dto.PageResponse;
+import github.lms.lemuel.company.adapter.in.web.dto.WorkforceComparisonResponse;
 import github.lms.lemuel.company.application.port.in.GetCompanyWorkforceUseCase;
+import github.lms.lemuel.company.application.port.in.GetWorkforceComparisonUseCase;
+import github.lms.lemuel.company.domain.WorkplaceKey;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -18,9 +21,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class CompanyWorkforceController {
 
     private final GetCompanyWorkforceUseCase getCompanyWorkforceUseCase;
+    private final GetWorkforceComparisonUseCase getWorkforceComparisonUseCase;
 
-    public CompanyWorkforceController(GetCompanyWorkforceUseCase getCompanyWorkforceUseCase) {
+    public CompanyWorkforceController(GetCompanyWorkforceUseCase getCompanyWorkforceUseCase,
+                                      GetWorkforceComparisonUseCase getWorkforceComparisonUseCase) {
         this.getCompanyWorkforceUseCase = getCompanyWorkforceUseCase;
+        this.getWorkforceComparisonUseCase = getWorkforceComparisonUseCase;
     }
 
     @GetMapping
@@ -32,5 +38,25 @@ public class CompanyWorkforceController {
         return ResponseEntity.ok(new PageResponse<>(
                 result.content().stream().map(CompanyWorkforceResponse::from).toList(),
                 result.page(), result.size(), result.totalElements(), result.totalPages()));
+    }
+
+    /**
+     * 단건 상세 + 동종 업종·동일 지역 집단 대비 비교.
+     *
+     * <p>식별자는 내부 id 가 아니라 업무 복합키다. 실제 데이터에 따옴표·느낌표가 든 사업장명이 있어
+     * path variable 로는 안전하지 않으므로 <b>query parameter</b> 로 받아 표준 URL 인코딩에 맡긴다.
+     *
+     * <p>파라미터는 {@code required = false} 로 받아 누락 검증까지 {@link WorkplaceKey} 에서 한다 —
+     * 프레임워크 기본 오류 대신 이 서비스의 오류 본문({@code {"message": ...}})으로 일관되게 응답하려는 것이다.
+     * 검증 위반은 400, 복합키 미매칭은 404 (둘 다 {@code GlobalExceptionHandler} 경유).
+     * 같은 파라미터가 중복으로 오면 Spring 이 콤마로 합치므로 어느 레코드와도 매칭되지 않아 404 가 된다.
+     */
+    @GetMapping("/detail")
+    public ResponseEntity<WorkforceComparisonResponse> detail(
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) String bizRegNoPrefix,
+            @RequestParam(required = false) String snapshotMonth) {
+        WorkplaceKey key = WorkplaceKey.of(name, bizRegNoPrefix, snapshotMonth);
+        return ResponseEntity.ok(WorkforceComparisonResponse.from(getWorkforceComparisonUseCase.get(key)));
     }
 }

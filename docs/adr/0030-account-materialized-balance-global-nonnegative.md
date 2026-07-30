@@ -1,6 +1,9 @@
 # ADR 0030 — 계정계 통제계정 실체화 잔액 + 잔액 인식 라우팅 전역화
 
 - 상태: **Proposed** (결정 대기 — 회계 오너 확정 필요 항목 3건)
+  - **Phase 1(잔액 실체화 기반)은 선행 랜딩 완료** — ADR 이 "단독 랜딩 안전(읽기 소스 교체까지)"으로 규정한
+    범위이며, 결정 포인트 1~3 과 무관하게 동작이 바뀌지 않는다(잔액 값의 의미·부호 규약 보존). Phase 2 는
+    여전히 결정 확정 + HOLDBACK 초과분 재분류 계정 확정 이후에만 착수한다.
 - 일자: 2026-07-28
 - 관련: ADR 0026(payout 현금흐름 인식 Option ①), ADR 0029(세무 산출물), `account-domain-rules`·`ledger-invariants` 스킬
 - 배경: ADR 0026 Option ① 구현(`2868fb9b2`) 후 코드리뷰 #5·#6 이 남긴 유보분. 커밋 `74dfa486a` 가
@@ -90,7 +93,11 @@ SELECT 절 CASE 에 있다. 즉 **그 셀러의 전 계정·전 이력 전표를
 
 ## 구현 범위 (결정 확정 후)
 
-**Phase 1 — 잔액 실체화 기반** (단독 랜딩 안전: 읽기 소스 교체까지만)
+**Phase 1 — 잔액 실체화 기반** (단독 랜딩 안전: 읽기 소스 교체까지만) — ✅ **완료**
+> 구현: `V20260729130000__account_balances.sql`(테이블 + 재합산 백필) · `AccountBalance{JpaEntity,Repository}` ·
+> `AccountEntryPersistenceAdapter`(삽입 1행일 때만 양 레그 델타 UPSERT / 잔액 PK 조회) ·
+> `MaterializedBalanceIT`(실체화 == 원장 재합산, 중복 수신 잔액 불변). 부호 규약은 credit-positive 로
+> 기존 `netBalanceByOwnerAndAccount` 식과 동일 — 그 쿼리는 Phase 3 대사의 정답지로 보존한다.
 1. 마이그레이션: `account_balances` 생성 + 기존 전표 재합산 백필(`INSERT ... SELECT`, 단일 tx).
 2. `AppendAccountEntryPort.append` → insert 가 실제로 1행을 넣었을 때**만** 잔액 UPSERT.
    **반환값 사용 회귀 테스트를 가드로 고정**(중복 수신 시 잔액 불변).

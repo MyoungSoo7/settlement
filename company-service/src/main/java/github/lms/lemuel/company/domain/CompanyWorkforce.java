@@ -17,16 +17,20 @@ public class CompanyWorkforce {
     /** 국민연금 보험료율(사용자+근로자 합산, 국민연금법 고정) — 당월고지금액에서 소득월액을 역산하는 데 쓴다. */
     private static final BigDecimal NPS_CONTRIBUTION_RATE = new BigDecimal("0.09");
 
+    /** 업종코드 롤업 단위 — 국세청 업종코드 연계표 기준 앞 3자리. */
+    private static final int INDUSTRY_ROLLUP_LENGTH = 3;
+
     private final String workplaceName;
     private final String bizRegNoPrefix;
+    private final String industryCode;
     private final String industryName;
     private final String address;
     private final YearMonth snapshotMonth;
     private final int headcount;
     private final BigDecimal monthlyBilledAmount;
 
-    public CompanyWorkforce(String workplaceName, String bizRegNoPrefix, String industryName, String address,
-                             YearMonth snapshotMonth, int headcount, BigDecimal monthlyBilledAmount) {
+    public CompanyWorkforce(String workplaceName, String bizRegNoPrefix, String industryCode, String industryName,
+                             String address, YearMonth snapshotMonth, int headcount, BigDecimal monthlyBilledAmount) {
         if (workplaceName == null || workplaceName.isBlank()) {
             throw new IllegalArgumentException("사업장명은 필수입니다");
         }
@@ -38,6 +42,7 @@ public class CompanyWorkforce {
         }
         this.workplaceName = workplaceName;
         this.bizRegNoPrefix = bizRegNoPrefix;
+        this.industryCode = industryCode;
         this.industryName = industryName;
         this.address = address;
         this.snapshotMonth = snapshotMonth;
@@ -59,8 +64,73 @@ public class CompanyWorkforce {
         return Optional.of(annualBilled.divide(denominator, 0, RoundingMode.HALF_UP));
     }
 
+    /**
+     * 세부 업종 집단 키 = 원본 CSV 의 6자리 사업장 업종코드. 미신고 사업장은 공란이라 null·빈 문자열이
+     * 실제로 온다("사업장의 미신고로 업종코드 등 공란존재" — 원문 유의사항) — 이때 업종 비교는
+     * {@link ComparisonUnavailableReason#INDUSTRY_CODE_MISSING} 으로 떨어진다.
+     */
+    public Optional<String> industryGroupKey() {
+        return industryCode == null || industryCode.isBlank()
+                ? Optional.empty() : Optional.of(industryCode.strip());
+    }
+
+    /**
+     * 상위 업종 집단 키(앞 3자리, 국세청 업종코드 연계표의 롤업 단위) — 세부 업종 표본이 미달일 때
+     * 한 단계 넓히는 대상. 코드가 3자리 이하면 코드 자체가 상위 키다.
+     */
+    public Optional<String> industryRollupKey() {
+        return industryGroupKey().map(code -> code.length() <= INDUSTRY_ROLLUP_LENGTH
+                ? code : code.substring(0, INDUSTRY_ROLLUP_LENGTH));
+    }
+
+    /**
+     * 지표별 대상 값. 추정연봉은 산출 불가(가입자수 0)일 수 있어 Optional 이다 — 호출측이 지표별
+     * 매핑을 알 필요 없게 도메인이 답한다.
+     */
+    public Optional<BigDecimal> valueOf(WorkforceMetric metric) {
+        return switch (metric) {
+            case HEADCOUNT -> Optional.of(BigDecimal.valueOf(headcount));
+            case ESTIMATED_ANNUAL_SALARY -> estimatedAnnualSalary();
+        };
+    }
+
+    /** 주소에서 파생한 지역 집단. */
+    public WorkplaceRegion region() {
+        return WorkplaceRegion.parse(address);
+    }
+
+    /**
+     * 추정연봉이 기준소득월액 상한액의 12배 이상인지 — 비교 성패·사유 코드와 무관하게 항상 제공되는
+     * 신뢰도 플래그다. 상한에 걸린 사업장은 고지금액이 같은 값에 몰려 백분위 해석력이 떨어진다.
+     *
+     * <p>고시표 범위 밖 기준월은 판정 근거가 없어 false 이고, 그 사실은
+     * {@link #salaryCapMonthlyAmount()} 가 빈 값인 것으로 드러난다(없는 상한을 추정하지 않는다).
+     */
+    public boolean salaryCapReached() {
+        Optional<BigDecimal> estimated = estimatedAnnualSalary();
+        Optional<BigDecimal> annualCap = NpsIncomeCap.annualCapOf(snapshotMonth);
+        return estimated.isPresent() && annualCap.isPresent()
+                && estimated.get().compareTo(annualCap.get()) >= 0;
+    }
+
+    public Optional<BigDecimal> salaryCapMonthlyAmount() {
+        return NpsIncomeCap.monthlyCapOf(snapshotMonth);
+    }
+
+    /**
+     * 집계 모집단 적격 여부. 추정연봉을 산출할 수 없는 행(가입자수 0 또는 당월고지금액 0)은 두 지표 중
+     * 하나를 만들 수 없으므로 중앙값·백분위 모집단에서 제외한다 — 표본수 대사의 기준도 이 판정이다.
+     */
+    public boolean eligibleForComparison() {
+        return headcount > 0 && monthlyBilledAmount.signum() > 0;
+    }
+
     public String workplaceName() {
         return workplaceName;
+    }
+
+    public String industryCode() {
+        return industryCode;
     }
 
     public String bizRegNoPrefix() {

@@ -70,6 +70,11 @@ public interface AccountEntryRepository extends JpaRepository<AccountEntryJpaEnt
     /**
      * owner 의 특정 계정 순잔액(credit합 − debit합). 한 전표 안에서 계정이 차변/대변 어느 쪽에 나와도
      * CASE 로 부호를 잡아 집계한다. 매칭 행이 없어도 COALESCE 로 0 반환(null 미노출).
+     *
+     * <p><b>핫패스에서는 더 이상 쓰지 않는다</b> — ADR 0030 Phase 1 이후 잔액 조회는 실체화 테이블
+     * ({@code account_balances}) PK 조회로 대체됐다. 이 재합산은 <b>파생 캐시를 증명하는 정답지</b>로
+     * 남겨 둔다: Phase 3 의 주기 대사가 "실체화 잔액 == 원장 재합산"을 이 쿼리로 대조한다.
+     * 호출부가 없다고 지우지 마라 — 지우면 캐시 드리프트를 검출할 수단이 사라진다.
      */
     @Query("""
             select coalesce(sum(case when e.creditAccount = :account then e.amount else 0 end), 0)

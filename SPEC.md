@@ -51,7 +51,7 @@
 ### 2.2 이벤트·멱등 (Outbox + Kafka)
 - **Outbox 패턴**: DB 트랜잭션 안에서 `outbox_events` 에 기록 → 멀티워커 폴러(FOR UPDATE SKIP LOCKED)가 Kafka 발행.
 - **3단 멱등 방어**: `outbox_events.event_id UNIQUE` → 컨슈머 `processed_events(group,event_id)` PK → 도메인 UNIQUE 제약.
-- **이벤트 계약-as-code (ADR 0024)**: cross-service 12개 토픽의 JSON Schema + 정본 샘플이
+- **이벤트 계약-as-code (ADR 0024)**: cross-service 24개 토픽의 JSON Schema + 정본 샘플이
   `shared-common/src/testFixtures/resources/contracts/events/` 에 단일 출처로 존재. 프로듀서·컨슈머 양방향 계약 테스트로 드리프트 차단.
 - **이벤트 드리븐 프로젝션 (ADR 0020)**: settlement 가 order 이벤트를 소비해 자체 DB 에 `settlement_*_view` 적재
   (cross-DB 연결 0). 대사는 order 내부 API `/internal/recon` 호출로 양측이 자기 DB 만 읽는다.
@@ -98,15 +98,20 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
 **수수료(등급별 스냅샷 보존)**: NORMAL 3.5% / VIP 2.5% / STRATEGIC 2.0%. **정산주기**: T+7 / T+3 / T+1 영업일.
 **홀드백**: NORMAL 30%/30일, VIP 10%/14일, STRATEGIC 0%.
 
-### 3.3 loan-service — 선정산 + 기업대출 (port 8084, 자체 DB lemuel_loan)
+### 3.3 loan-service — 선정산 + 기업대출 + 담보/개인신용 대출 (port 8084, 자체 DB lemuel_loan)
 | 도메인 | API | 기능 |
 |--------|------|------|
 | 선정산 대출 | `/loans` | 셀러 미확정 정산금 담보 선지급, 상환은 정산 이벤트 saga 연계 |
 | 기업 신용대출 | `/loans/corporate` | 상장사(stockCode) CEO 신청 → `CorporateCreditPolicy` 가 재무제표+평판으로 creditScore(0~100)/등급(A~E)/한도 산정. **신청(request) 시점에 E등급·한도초과 422**. 실행(disburse)은 ADMIN 전용 + 비관적 락(이중지급 방지) |
+| 담보/개인신용 대출 | `/loans/secured` | **주택담보**(`/mortgage`) 와 **개인신용**(`/personal`) 2종. `SecuredLoan` 단일 애그리거트가 담보 optional 로 둘을 수용한다. 한도는 담보형=유효담보가치×LTV(기본 0.70), 신용형=외부 CB 점수→등급(≥850 A/≥750 B/≥650 C/≥550 D, 미만 E 불가)별 정액. 금리=기준금리+가산(담보형 고정 0.8%p / 신용형 A1.5·B2.5·C4.0·D6.0%p). 신청 시점 **422**(한도초과·등급미달). 승인 시 담보 유효화, 실행은 운영자 전용+비관적 락. 장기 분할상환이라 **연체·기한이익상실**이 상태머신에 포함(`DISBURSED→OVERDUE→DEFAULTED`, 직행 금지) |
 | 평판 | `/loans/company-reputation` | 신용평가용 기업 평판 프로젝션 조회 |
 | 상환 시뮬레이션 | `POST /loans/repayment/simulate` | 원금·기간·연이자율·상환방식(만기일시 BULLET / 원리금균등 EQUAL_PAYMENT / 원금균등 EQUAL_PRINCIPAL)으로 회차별 상환표를 미리 계산하는 **순수 미리보기**(부수효과·영속화 없음). 원 단위 반올림·마지막 회차 잔여 흡수로 원금 합 일치 |
 
 자체 복식부기 원장 2전표 + `lemuel.loan.corporate_loan_disbursed` 발행.
+
+담보/개인신용 대출은 기존 6계정만 쓴다(계정과목 확장 없음): 실행 `SEC_DISBURSE`(대출채권/현금), 회차 상환 `SEC_REPAYMENT`(현금/대출채권) + `SEC_INTEREST`(현금/수수료수익). 장기 분할상환이라 상환·이자 전표는 대출 1건당 N회 발생하므로 중복분개 유니크(`uq_loan_ledger_reference_accounts`)에서 제외된다. `lemuel.loan.secured_loan_disbursed` / `.secured_loan_repaid` 발행(Phase 1 소비처 미배선).
+
+**Phase 2 이월**: 보증부·금융자산 담보유형, 담보권 순위, 재평가·마진콜, 담보 실행(처분·대위변제), 중도상환수수료, 위성 서비스 실연동(market·commondata 담보평가 / economics 기준금리 — 현재는 포트만 정의하고 입력값·설정값 스텁), account-service GL 소비 매핑.
 
 ### 3.4 financial-statements-service — 재무제표 조회 (port 8086, lemuel_financial)
 - `/api/financial/companies` — 코스피·코스닥 상장사 요약 재무제표 공개 조회(부채비율·영업이익률·ROA·자본총계).
@@ -122,9 +127,22 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
 |--------|------|------|
 | 뉴스·기업 | `/api/company/companies` | 기업 뉴스 기사(제목·요약·링크만, 본문 미저장) + 기업 마스터 공개 조회 |
 | 문서함 | `/api/company` (문서 목록·다운로드 — **ADMIN/MANAGER JWT 게이트**) | CEO 브리핑 docx 업로드/다운로드 |
-| 수집/관리 | `/admin/company/collect`, `/admin/company/documents`, `/admin/company/reputation`, `/admin/company/sellers`, `/admin/company/companies` | 네이버 뉴스 수집(`NAVER_*`)·감성분석(keyword/Claude/Gemini)·평판 스코어·셀러 링크 |
+| 사업장 인력 | `/api/company/workforce` (목록), `/api/company/workforce/detail` (단건+비교) | 국민연금 사업장가입자 공개데이터 기반 인원수·추정연봉 조회 + 업종·지역 집단 비교 |
+| 수집/관리 | `/admin/company/collect`, `/admin/company/documents`, `/admin/company/reputation`, `/admin/company/sellers`, `/admin/company/companies`, `/admin/company/workforce/import` | 네이버 뉴스 수집(`NAVER_*`)·감성분석(keyword/Claude/Gemini)·평판 스코어·셀러 링크·사업장 CSV 적재 |
 
 기업 식별자(stockCode/corpCode)는 financial 과 공용 비즈니스 키. Phase 3 평판 변동 Outbox 발행.
+
+**사업장 업종·지역 비교**(Seed: `docs/seeds/company-service-workforce-comparison.seed.yaml`) — 사업자등록번호가 앞
+6자리만 공개돼 타 서비스와 자동 조인이 불가하므로 company-service 단독으로 완결한다.
+- 상세 조회는 내부 id 가 아니라 **복합키 query parameter**(`name`·`bizRegNoPrefix`·`snapshotMonth`) — 실제 데이터에
+  따옴표·느낌표가 든 사업장명이 있어 path variable 은 안전하지 않다. 미매칭 404 / 형식 위반 400.
+- 비교는 **업종축(6자리 → 앞3자리)과 지역축(시도+시군구 → 시도)이 독립**, 각 축 최대 2단계 폴백, 최소 표본 10건.
+  중앙값은 `percentile_cont(0.5)`, 백분위는 `cume_dist`. 평균·업종×지역 교차는 제공하지 않는다.
+- 사유 코드 3종: `SAMPLE_TOO_SMALL` · `INDUSTRY_CODE_MISSING`(원본 공란) · `REGION_UNPARSEABLE`.
+- **조회 경로는 집계를 계산하지 않는다** — CSV 적재 후 월별 중앙값·표본수·사업장별 백분위를 단일 트랜잭션으로
+  통째 교체(`BUILDING`→`COMPLETE`)하고, 조회는 COMPLETE 인 월만 읽는다. 대사: `source = accepted + rejected`.
+- 기준소득월액 상한 도달은 실패 사유가 아닌 **신뢰도 플래그**(`salaryCapReached`, 고시표 범위 밖이면 상한액 null).
+- 금액 필드는 JSON 에서 소수 문자열, 비율·건수는 수치.
 
 ### 3.7 operation-service — 운영 관제 (port 8092, lemuel_operation)
 - `/api/ops/webhook` — Alertmanager 알람 수신(Bearer=INTERNAL_API_KEY, 상수시간 비교). key 미설정 시 프로파일 게이트.
@@ -246,6 +264,8 @@ Membership   : INVITED → ACTIVE ⇄ SUSPENDED, 각 상태 → REMOVED(터미�
 | `lemuel.loan.repayment_applied` | loan | settlement · account |
 | `lemuel.loan.disbursement_requested` | loan | account |
 | `lemuel.loan.corporate_loan_disbursed` | loan | account |
+| `lemuel.loan.secured_loan_disbursed` | loan | (소비처 미배선 — account GL 매핑은 Phase 2) |
+| `lemuel.loan.secured_loan_repaid` | loan | (소비처 미배선 — account GL 매핑은 Phase 2) |
 | `lemuel.company.reputation_changed` | company | loan(신용 리스크 프로젝션) |
 | `lemuel.investment.executed` | investment | account · notification |
 | `lemuel.organization.created` / `.member_joined` | organization | (소비처 미배선 — 발행 전용) |

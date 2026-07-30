@@ -1,13 +1,15 @@
 package github.lms.lemuel.company.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import github.lms.lemuel.common.config.JacksonCompatConfig;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.annotation.Import;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.cors.CorsConfigurationSource;
 
 import java.lang.reflect.Field;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -28,14 +30,24 @@ class ConfigBeansTest {
     }
 
     @Test
-    @DisplayName("HttpClientConfig — RestClient.Builder·ObjectMapper 빈 제공")
+    @DisplayName("HttpClientConfig — RestClient.Builder 빈 제공")
     void httpClientConfig() {
         HttpClientConfig config = new HttpClientConfig();
         RestClient.Builder builder = config.restClientBuilder();
-        ObjectMapper objectMapper = config.newsObjectMapper();
         assertNotNull(builder);
         assertNotNull(builder.build());
-        assertNotNull(objectMapper);
+    }
+
+    @Test
+    @DisplayName("HttpClientConfig — ObjectMapper 는 shared-common JacksonCompatConfig 를 @Import 해서 얻는다 "
+            + "(제한 스캔이라 common.config 가 스캔에 안 걸린다. 이 @Import 가 없으면 outbox 발행 어댑터의 "
+            + "@Qualifier(\"outboxObjectMapper\") 주입이 실패해 서비스가 기동조차 못 한다)")
+    void importsJacksonCompatConfigForOutboxObjectMapper() {
+        Import imported = HttpClientConfig.class.getAnnotation(Import.class);
+
+        assertNotNull(imported, "HttpClientConfig 에 @Import 가 없다");
+        assertTrue(List.of(imported.value()).contains(JacksonCompatConfig.class));
+        assertNotNull(new JacksonCompatConfig().outboxObjectMapper());
     }
 
     @Test

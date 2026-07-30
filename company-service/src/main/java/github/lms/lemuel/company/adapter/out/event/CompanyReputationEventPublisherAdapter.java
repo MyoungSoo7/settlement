@@ -23,8 +23,8 @@ import java.util.Map;
  * <p>토픽 라우팅: aggregateType="Company" + eventType="CompanyReputationChanged"
  *   → {@code lemuel.company.reputation_changed} (KafkaOutboxPublisher 규칙).
  *
- * <p>페이로드는 String/숫자만 담는다 — company 의 ObjectMapper 는 JavaTimeModule 미등록이라
- * java.time 값은 직접 문자열화한다.
+ * <p>페이로드는 String/숫자만 담는다 — java.time 값은 계약(ISO-8601 문자열)을 코드에서 눈으로 확인할 수
+ * 있도록 직접 문자열화한다(직렬화기 설정에 의존하지 않는다).
  */
 @Component
 public class CompanyReputationEventPublisherAdapter implements PublishReputationEventPort {
