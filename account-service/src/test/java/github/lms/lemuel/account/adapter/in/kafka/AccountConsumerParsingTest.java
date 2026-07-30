@@ -301,6 +301,42 @@ class AccountConsumerParsingTest {
     }
 
     @Test
+    @DisplayName("loan.secured_loan_disbursed 정본 샘플 → BORROWER, DR SECURED_LOAN_RECEIVABLE / CR CASH (원금만)")
+    void securedLoanDisbursed() {
+        when(processedEventRepository.existsById(any())).thenReturn(false);
+        SecuredLoanDisbursedConsumer c = new SecuredLoanDisbursedConsumer(
+                recordAccountEntryUseCase, processedEventRepository, objectMapper);
+
+        c.onSecuredLoanDisbursed(canonicalRecordOf("lemuel.loan.secured_loan_disbursed"), mock(Acknowledgment.class));
+
+        AccountEntry e = capture();
+        assertThat(e.getOwnerType()).isEqualTo(OwnerType.BORROWER);
+        assertThat(e.getOwnerId()).isEqualTo("42");
+        assertThat(e.getDebitAccount()).isEqualTo(GlAccount.SECURED_LOAN_RECEIVABLE);
+        assertThat(e.getCreditAccount()).isEqualTo(GlAccount.CASH);
+        assertThat(e.getRefId()).isEqualTo("7001");
+        assertThat(e.getAmount()).isEqualByComparingTo("300000000.00"); // principal 만, annualRatePercent 무시
+    }
+
+    @Test
+    @DisplayName("loan.secured_loan_repaid 정본 샘플 → BORROWER, DR CASH / CR SECURED_LOAN_RECEIVABLE (계약 원금 — 이자·수수료 무시)")
+    void securedLoanRepaid() {
+        when(processedEventRepository.existsById(any())).thenReturn(false);
+        SecuredLoanRepaidConsumer c = new SecuredLoanRepaidConsumer(
+                recordAccountEntryUseCase, processedEventRepository, objectMapper);
+
+        c.onSecuredLoanRepaid(canonicalRecordOf("lemuel.loan.secured_loan_repaid"), mock(Acknowledgment.class));
+
+        AccountEntry e = capture();
+        assertThat(e.getOwnerType()).isEqualTo(OwnerType.BORROWER);
+        assertThat(e.getOwnerId()).isEqualTo("42");
+        assertThat(e.getDebitAccount()).isEqualTo(GlAccount.CASH);
+        assertThat(e.getCreditAccount()).isEqualTo(GlAccount.SECURED_LOAN_RECEIVABLE);
+        assertThat(e.getRefId()).isEqualTo("7001");
+        assertThat(e.getAmount()).isEqualByComparingTo("300000000.00"); // 계약 원금만, interestPaid·prepaymentFee 무시
+    }
+
+    @Test
     @DisplayName("investment.executed 정본 샘플 → DR INVESTMENT_ASSET / CR CASH")
     void investmentExecuted() {
         when(processedEventRepository.existsById(any())).thenReturn(false);

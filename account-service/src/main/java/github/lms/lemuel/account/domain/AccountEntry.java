@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
  * <p>한 전표 = 차변 1 계정 + 대변 1 계정 + 금액 1 로 구성된 균형 분개다. 한 전표 안에서
  * 차변금액 = 대변금액(=amount) 이므로 차대 균형이 구성적으로 보장된다(loan {@code LoanLedgerEntry} 패턴).
  *
- * <p>정적 팩토리 6종이 loan·investment·settlement 이벤트를 계정과목 조합으로 매핑한다 — 이 매핑이
+ * <p>정적 팩토리 20종이 loan·investment·settlement 이벤트를 계정과목 조합으로 매핑한다 — 이 매핑이
  * 계정계의 핵심 도메인 규칙이다. {@code sourceTopic}·{@code refType}·{@code refId} 는 전표의 자연키를
  * 이루어(=중복 수신 시 스키마 UNIQUE 로 멱등) 어느 이벤트에서 파생됐는지 추적한다.
  *
@@ -43,6 +43,8 @@ import java.time.LocalDateTime;
  * loanDisbursed               : DR LOAN_RECEIVABLE            / CR CASH
  * loanRepaid                  : DR CASH                       / CR LOAN_RECEIVABLE
  * corporateLoanDisbursed      : DR CORPORATE_LOAN_RECEIVABLE  / CR CASH   (owner=CORPORATE)
+ * securedLoanDisbursed        : DR SECURED_LOAN_RECEIVABLE    / CR CASH   (owner=BORROWER, 원금만)
+ * securedLoanRepaid           : DR CASH                       / CR SECURED_LOAN_RECEIVABLE (완제 — 계약 원금)
  * investmentExecuted          : DR INVESTMENT_ASSET           / CR CASH
  * withholdingAccrued          : DR SELLER_PAYABLE             / CR WITHHOLDING_PAYABLE         W(원천징수반제)   (WITHHOLDING_ACCRUED)
  * </pre>
@@ -67,6 +69,8 @@ public class AccountEntry {
     public static final String TOPIC_LOAN_DISBURSED = "lemuel.loan.disbursement_requested";
     public static final String TOPIC_LOAN_REPAID = "lemuel.loan.repayment_applied";
     public static final String TOPIC_CORPORATE_LOAN_DISBURSED = "lemuel.loan.corporate_loan_disbursed";
+    public static final String TOPIC_SECURED_LOAN_DISBURSED = "lemuel.loan.secured_loan_disbursed";
+    public static final String TOPIC_SECURED_LOAN_REPAID = "lemuel.loan.secured_loan_repaid";
     public static final String TOPIC_INVESTMENT_EXECUTED = "lemuel.investment.executed";
     /** 백필 청산 분개의 합성 source_topic — 실제 Kafka 토픽이 아니라 자연키 구성용(멱등). */
     public static final String SOURCE_SCHEDULED_CLEARING = "lemuel.account.backfill";
@@ -272,6 +276,27 @@ public class AccountEntry {
         return of(OwnerType.CORPORATE, stockCode,
                 GlAccount.CORPORATE_LOAN_RECEIVABLE, GlAccount.CASH, principal,
                 "CORP_LOAN_DISBURSED", loanId, TOPIC_CORPORATE_LOAN_DISBURSED);
+    }
+
+    /**
+     * 담보/개인신용 대출 실행(원금만) → DR SECURED_LOAN_RECEIVABLE / CR CASH (owner=BORROWER).
+     * 이자·수수료는 loan 자체 원장 소관이라 계정계 분개에 포함하지 않는다(법인 대출 선례와 동형).
+     */
+    public static AccountEntry securedLoanDisbursed(String borrowerUserId, String loanId, BigDecimal principal) {
+        return of(OwnerType.BORROWER, borrowerUserId,
+                GlAccount.SECURED_LOAN_RECEIVABLE, GlAccount.CASH, principal,
+                "SECURED_LOAN_DISBURSED", loanId, TOPIC_SECURED_LOAN_DISBURSED);
+    }
+
+    /**
+     * 담보/개인신용 대출 완제 → DR CASH / CR SECURED_LOAN_RECEIVABLE (owner=BORROWER).
+     * 이벤트는 완제 시점에만 발행되고 principal 은 계약 원금이다 — 실행 전표와 동액이라 회차·중도상환
+     * 경로와 무관하게 채권 잔액이 0 으로 닫힌다. interestPaid·prepaymentFee 는 분개하지 않는다(원금만).
+     */
+    public static AccountEntry securedLoanRepaid(String borrowerUserId, String loanId, BigDecimal principal) {
+        return of(OwnerType.BORROWER, borrowerUserId,
+                GlAccount.CASH, GlAccount.SECURED_LOAN_RECEIVABLE, principal,
+                "SECURED_LOAN_REPAID", loanId, TOPIC_SECURED_LOAN_REPAID);
     }
 
     /**

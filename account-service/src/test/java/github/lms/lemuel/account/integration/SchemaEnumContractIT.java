@@ -97,7 +97,7 @@ class SchemaEnumContractIT {
     }
 
     @Test
-    @DisplayName("chk_account_entry_ref_type == AccountEntry 팩토리 18종의 refType (정확 일치, ADR 0026 Option ① + ADR 0029 §B + 감사 MED-3)")
+    @DisplayName("chk_account_entry_ref_type == AccountEntry 팩토리 20종의 refType (정확 일치, ADR 0026 Option ① + ADR 0029 §B + 감사 MED-3 + 담보대출 GL 소비)")
     void refTypeCheckMatchesFactorySetExactly() {
         Set<String> factoryRefTypes = new LinkedHashSet<>(Arrays.asList(
                 AccountEntry.settlementCreatedImmediate("s", "1", ONE).getRefType(),
@@ -116,6 +116,8 @@ class SchemaEnumContractIT {
                 AccountEntry.loanDisbursed("s", "1", ONE).getRefType(),
                 AccountEntry.loanRepaid("s", "1", ONE).getRefType(),
                 AccountEntry.corporateLoanDisbursed("005930", "1", ONE).getRefType(),
+                AccountEntry.securedLoanDisbursed("42", "1", ONE).getRefType(),
+                AccountEntry.securedLoanRepaid("42", "1", ONE).getRefType(),
                 AccountEntry.investmentExecuted("s", "1", ONE).getRefType(),
                 AccountEntry.withholdingAccrued("s", "1", ONE).getRefType()));
 
