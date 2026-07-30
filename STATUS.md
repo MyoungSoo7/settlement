@@ -49,26 +49,35 @@
 
 ## 진행 중
 - P0 시드 3(이벤트 격리) — 병행 세션이 develop 위에 재구현 진행 중(`ConsumedEventQuarantine` 옵트인 훅). 시드 클레임 정본: `.symposium/scratch/seed-claims.md`
-- account GL 통제계정 **음수 방지 전역화 + 실체화 잔액** — ADR 0030(Proposed, 결정 대기).
-  **Phase 1(잔액 실체화 기반) 완료**(`2acff1417`) — `account_balances` + 재합산 백필, 삽입 1행일 때만
-  양 레그 델타 UPSERT(중복 수신 잔액 불변), `sellerPayableBalance` O(1) 조회.
-  ADR 0026 후속(`74dfa486a` 가 명시 유보한 코드리뷰 #5·#6). 회계 오너 확정 필요 3건 중
-  **HOLDBACK_PAYABLE 초과분 재분류 계정 미정이 Phase 2 블로커**(라우팅 전역화는 그 확정 후 착수)
+- account GL 통제계정 **음수 방지 전역화** — ADR 0030(Proposed, 결정 대기).
+  **Phase 1(잔액 실체화, `2acff1417`)·Phase 3(대사, `59a7c5227`) 완료 — 남은 것은 결정 + Phase 2(라우팅 전역화)뿐.**
+  회계 오너 확정 필요 3건 중 **HOLDBACK_PAYABLE 초과분 재분류 계정 미정이 Phase 2 블로커**
+  (ADR 0026 후속, `74dfa486a` 가 명시 유보한 코드리뷰 #5·#6)
 - operation-service 로드맵: Phase 3 베이스라인 이상탐지 **완료** → 다음은 Phase 4 AI 브리핑
 - 커버리지 게이트 LINE 90% 상향 후속 — 신규 서비스 통합테스트 보강
 
 ## 다음 할 일
-- [ ] **ADR 0030 결정 확정** (음수=재분류 vs 금지 / 잔액 정본 / 적용 범위 + HOLDBACK 초과분 재분류 계정) → 구현 Phase 1~3
-- [ ] account GL 통제계정 음수 방지 **전역 불변식** (ADR 0030 §결함 1) — 현재 `RecordPayoutService` 분할 라우팅은 payout 자신의 초과 상계만 막고,
-      `withholding_accrued`·`settlement_canceled`·`recovery.offset` 등 잔액 비의존 무조건 DR 은 통제계정을 음수로 몰 수 있음
-      (advisory 락도 payout-vs-payout 만 직렬화). 해법 = 전 debit 잔액 인식 라우팅 or 실체화 running balance — `74dfa486a` 유보분
-- [x] `sellerPayableBalance` O(셀러 전표 수) 재합산 해소 — 실체화 잔액(`account_balances`) PK 조회로 교체 (ADR 0030 Phase 1, `2acff1417`)
-- [x] ADR 0030 **Phase 3 — 대사** 완료(2026-07-30): `balanceRecon()`(FULL OUTER JOIN, 오염 3유형 검출) + `/control-recon` 확장 +
-      `BalanceReconScheduler`(10분) + 게이지 `account.balance.recon.drift.count`. 드리프트 시 자동 정정 없음(관측이 방어선)
+
+**다음 세션 추천 착수(사용자 결정 불필요·범위 명확 순):**
+- [ ] **payout 파이프라인 실송금 트리거 + 셀러 계좌 레지스트리** (그린필드, 규모 M) — 생성 배선(정산 확정→Payout 멱등 생성)은
+      완료, 실송금·계좌 레지스트리만 잔여. 계좌정보 암호화(`PAYOUT_ENC_KEY`)·PII → `security-auditor` 검수 권장
+- [ ] operation-service **Phase 4 AI 브리핑** (Phase 3 베이스라인 이상탐지까지 완료, 로드맵 docs/design/operation-service-phase1.md)
+- [ ] 커버리지 게이트 90% 후속 — 신규 서비스 통합테스트 보강
+
+**사용자(회계 오너) 결정이 선행인 것:**
+- [ ] **ADR 0030 결정 확정** → Phase 2(라우팅 전역화) 착수. Phase 1(실체화)·Phase 3(대사)는 완료(2026-07-30) —
+      남은 결정: 음수=재분류 vs 금지 / 잔액 정본 / **HOLDBACK_PAYABLE 초과분 재분류 계정**(Phase 2 블로커)
+- [ ] account GL 통제계정 음수 방지 **전역 불변식** (ADR 0030 §결함 1, Phase 2 본체) — `withholding_accrued`·`settlement_canceled`·
+      `recovery.offset` 등 잔액 비의존 무조건 DR 이 통제계정을 음수로 몰 수 있음. 위 결정 확정 후 착수
 - [ ] ADR 0026 열린 질문 ④ — 수동 payout(`settlementId=null`) 정책 확정 (MEDIUM, 현재는 `normalBalanceRespected` 가 사후 방어)
-- [ ] payout 파이프라인 실송금 트리거 + 셀러 계좌 레지스트리 (그린필드) — 생성 배선(정산 확정→Payout 멱등 생성)은 완료, 실송금·계좌는 잔여
+
+**외부 조건 대기:**
+- [ ] commondata 실수집 검증 (`DATA_GO_KR_API_KEY` 확보 시) — 확보되면 loan 주택담보 실거래가 평가도
+      `app.loan.commondata.real-estate-source` 설정으로 활성화(코드는 P2-7b 로 완료, 폴백은 제시값)
 - [ ] ADR 0022(이벤트 스키마 레지스트리) 정식 도입 검토 — 현재 계약-as-code(0024)가 경량 선행 단계
-- [ ] commondata 실수집 검증 (`DATA_GO_KR_API_KEY` 확보 시)
+
+**완료(2026-07-30 마감분):** `sellerPayableBalance` O(1) 교체(Phase 1) · ADR 0030 Phase 3 대사 ·
+담보대출 account GL 소비 매핑 · 담보평가 실연동 P2-7b(담보대출 Phase 2 전량 소진) — 상세는 `## 최근 진척`
 
 ## 주요 위험/메모
 - `DATA_GO_KR_API_KEY` 미보유로 common-data-service 실수집 경로 미검증(소스 등록→조회 전과정은 검증됨)
