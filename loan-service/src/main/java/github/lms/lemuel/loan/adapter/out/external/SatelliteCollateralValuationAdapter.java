@@ -75,19 +75,27 @@ public class SatelliteCollateralValuationAdapter implements CollateralValuationP
 
     @Override
     public BigDecimal appraise(ValuationClaim claim) {
-        if (claim.marketRef() == null || claim.marketRef().isBlank()) {
-            return fallback(claim, "no_market_ref");
-        }
+        // 서류값이 정본인 유형(예금·채권·보증서)을 먼저 갈라낸다. 이들은 marketRef 가 없는 게
+        // 정상이라 폴백이 아니다 — 여기서 걸러내지 않으면 정상 트래픽이 폴백 지표를 부풀려
+        // 알림을 오탐으로 만든다(코드리뷰 지적).
         return switch (claim.type()) {
             case EQUITY -> appraiseEquity(claim);
             case REAL_ESTATE -> appraiseRealEstate(claim);
-            // 예금·채권·보증서는 서류값이 정본 — 위성 조회 대상이 아니다.
             default -> claim.declaredValue();
         };
     }
 
+    /** 외부 평가가 필요한 유형에서만 조회 키 부재를 폴백으로 계량한다. */
+    private boolean lacksMarketRef(ValuationClaim claim) {
+        return claim.marketRef() == null || claim.marketRef().isBlank();
+    }
+
     /** 주식: market-service 최신 종가 × 수량. */
     private BigDecimal appraiseEquity(ValuationClaim claim) {
+        if (lacksMarketRef(claim)) {
+            log.warn("주식 담보 종목코드 부재 — 제시값 폴백");
+            return fallback(claim, "no_market_ref");
+        }
         if (claim.quantity() == null || claim.quantity() <= 0) {
             log.warn("주식 담보 수량 부재 — 제시값 폴백. marketRef={}", claim.marketRef());
             return fallback(claim, "no_quantity");
@@ -116,6 +124,10 @@ public class SatelliteCollateralValuationAdapter implements CollateralValuationP
 
     /** 주택: commondata 실거래가 최신 레코드의 거래금액 × 단위 배수. */
     private BigDecimal appraiseRealEstate(ValuationClaim claim) {
+        if (lacksMarketRef(claim)) {
+            log.warn("주택 담보 조회 키(단지 식별자) 부재 — 제시값 폴백");
+            return fallback(claim, "no_market_ref");
+        }
         if (realEstateSourceCode == null || realEstateSourceCode.isBlank()) {
             log.warn("실거래가 수집 소스 미설정(app.loan.commondata.real-estate-source) — 제시값 폴백");
             return fallback(claim, "source_not_configured");
