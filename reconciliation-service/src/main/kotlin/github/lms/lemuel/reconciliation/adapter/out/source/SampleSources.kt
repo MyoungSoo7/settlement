@@ -5,7 +5,6 @@ import github.lms.lemuel.reconciliation.application.ReconciliationSource
 import github.lms.lemuel.reconciliation.application.SourceRole
 import github.lms.lemuel.reconciliation.domain.ReconRecord
 import kotlinx.coroutines.delay
-import org.springframework.stereotype.Component
 
 /**
  * Bundled EXPECTED source (settlement's view). Deterministic data crafted so the
@@ -13,8 +12,11 @@ import org.springframework.stereotype.Component
  *
  * A small `delay` simulates network latency — with the ACTUAL source also
  * delaying, concurrent fetch is observably faster than serial.
+ *
+ * NOT a `@Component`: registered only under the `demo` profile via
+ * [github.lms.lemuel.reconciliation.adapter.out.source.SourceConfig.DemoSources].
+ * 프로덕션에서 이게 뜨면 대사 전체가 허구가 된다.
  */
-@Component
 class SampleExpectedSource : ReconciliationSource {
     override val name = "sample-expected"
     override val role = SourceRole.EXPECTED
@@ -38,7 +40,6 @@ class SampleExpectedSource : ReconciliationSource {
  * [SampleExpectedSource] so a demo run yields MISSING, EXTRA, AMOUNT_MISMATCH
  * and STATUS_MISMATCH.
  */
-@Component
 class SampleActualSource : ReconciliationSource {
     override val name = "sample-actual"
     override val role = SourceRole.ACTUAL

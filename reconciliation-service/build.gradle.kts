@@ -23,6 +23,10 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
 
+    // Prometheus 레지스트리 — 없으면 actuator 가 /actuator/prometheus 를 아예 만들지 않는다.
+    // application.yml 의 exposure 에 prometheus 가 적혀 있었지만 레지스트리가 없어 404 였다.
+    runtimeOnly("io.micrometer:micrometer-registry-prometheus")
+
     // Kotlin essentials
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
