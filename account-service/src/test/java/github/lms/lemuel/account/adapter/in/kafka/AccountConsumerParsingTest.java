@@ -319,21 +319,36 @@ class AccountConsumerParsingTest {
     }
 
     @Test
-    @DisplayName("loan.secured_loan_repaid 정본 샘플 → BORROWER, DR CASH / CR SECURED_LOAN_RECEIVABLE (계약 원금 — 이자·수수료 무시)")
+    @DisplayName("loan.secured_loan_repaid 정본 샘플 → 완제 신호만 소비하고 분개는 만들지 않는다 (#183 이중계상 방지)")
     void securedLoanRepaid() {
         when(processedEventRepository.existsById(any())).thenReturn(false);
-        SecuredLoanRepaidConsumer c = new SecuredLoanRepaidConsumer(
-                recordAccountEntryUseCase, processedEventRepository, objectMapper);
+        SecuredLoanRepaidConsumer c = new SecuredLoanRepaidConsumer(processedEventRepository, objectMapper);
 
         c.onSecuredLoanRepaid(canonicalRecordOf("lemuel.loan.secured_loan_repaid"), mock(Acknowledgment.class));
+
+        // 원금은 감소 건별로 이미 전기됐다. 여기서 또 계약 원금을 대변 처리하면 채권이 음수가 된다.
+        org.mockito.Mockito.verify(recordAccountEntryUseCase, org.mockito.Mockito.never())
+                .record(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    @DisplayName("loan.secured_loan_principal_repaid 정본 샘플 → BORROWER, DR CASH / CR SECURED_LOAN_RECEIVABLE (실제 차감액)")
+    void securedLoanPrincipalRepaid() {
+        when(processedEventRepository.existsById(any())).thenReturn(false);
+        SecuredLoanPrincipalRepaidConsumer c = new SecuredLoanPrincipalRepaidConsumer(
+                recordAccountEntryUseCase, processedEventRepository, objectMapper);
+
+        c.onSecuredLoanPrincipalRepaid(
+                canonicalRecordOf("lemuel.loan.secured_loan_principal_repaid"), mock(Acknowledgment.class));
 
         AccountEntry e = capture();
         assertThat(e.getOwnerType()).isEqualTo(OwnerType.BORROWER);
         assertThat(e.getOwnerId()).isEqualTo("42");
         assertThat(e.getDebitAccount()).isEqualTo(GlAccount.CASH);
         assertThat(e.getCreditAccount()).isEqualTo(GlAccount.SECURED_LOAN_RECEIVABLE);
-        assertThat(e.getRefId()).isEqualTo("7001");
-        assertThat(e.getAmount()).isEqualByComparingTo("300000000.00"); // 계약 원금만, interestPaid·prepaymentFee 무시
+        // 자연키 UNIQUE(source_topic, ref_type, ref_id) 때문에 refId 는 대출당이 아니라 상환 건당 유일해야 한다.
+        assertThat(e.getRefId()).startsWith("7001#");
+        assertThat(e.getAmount()).isEqualByComparingTo("50000000.00"); // 계약 원금(3억)이 아니라 이번 차감액
     }
 
     @Test
