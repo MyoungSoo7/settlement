@@ -2,6 +2,7 @@ package github.lms.lemuel.loan.application.service;
 
 import github.lms.lemuel.loan.application.port.in.EnforceCollateralUseCase.EnforcementResult;
 import github.lms.lemuel.loan.application.port.out.AppendLedgerPort;
+import github.lms.lemuel.loan.application.port.out.PublishSecuredLoanEventPort;
 import github.lms.lemuel.loan.application.port.out.LoadSecuredLoanPort;
 import github.lms.lemuel.loan.application.port.out.SaveSecuredLoanPort;
 import github.lms.lemuel.loan.domain.Borrower;
@@ -46,13 +47,15 @@ class EnforceCollateralServiceTest {
 
     private FakeStore store;
     private RecordingLedger ledger;
+    private RecordingEnforcementEventPort events;
     private EnforceCollateralService service;
 
     @BeforeEach
     void setUp() {
         store = new FakeStore();
         ledger = new RecordingLedger();
-        service = new EnforceCollateralService(store, store, ledger,
+        events = new RecordingEnforcementEventPort();
+        service = new EnforceCollateralService(store, store, ledger, events,
                 new BigDecimal("3.5"), new BigDecimal("0.70"), CLOCK);
     }
 
@@ -239,6 +242,26 @@ class EnforceCollateralServiceTest {
         @Override
         public void append(LoanLedgerEntry entry) {
             entries.add(entry);
+        }
+    }
+
+    /** #183 — 담보 처분·대위변제 회수분도 계정계에 건별로 알려야 채권이 닫힌다. */
+    private static final class RecordingEnforcementEventPort implements PublishSecuredLoanEventPort {
+        private final List<BigDecimal> principalRepayments = new ArrayList<>();
+        private final List<String> reasons = new ArrayList<>();
+
+        @Override
+        public void publishDisbursed(SecuredLoan loan) {
+        }
+
+        @Override
+        public void publishRepaid(SecuredLoan loan, BigDecimal totalInterestPaid, BigDecimal prepaymentFee) {
+        }
+
+        @Override
+        public void publishPrincipalRepaid(SecuredLoan loan, BigDecimal principalRepaid, String reason) {
+            principalRepayments.add(principalRepaid);
+            reasons.add(reason);
         }
     }
 }

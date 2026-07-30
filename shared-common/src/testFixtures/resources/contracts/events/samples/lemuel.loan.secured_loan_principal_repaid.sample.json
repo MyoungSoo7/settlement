@@ -1,0 +1,9 @@
+{
+  "loanId": 7001,
+  "productType": "MORTGAGE",
+  "borrowerUserId": 42,
+  "borrowerType": "INDIVIDUAL",
+  "principalRepaid": "50000000.00",
+  "outstandingAfter": "250000000.00",
+  "reason": "INSTALLMENT"
+}

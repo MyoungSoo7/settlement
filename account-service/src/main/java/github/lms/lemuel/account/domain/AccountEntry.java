@@ -71,6 +71,7 @@ public class AccountEntry {
     public static final String TOPIC_CORPORATE_LOAN_DISBURSED = "lemuel.loan.corporate_loan_disbursed";
     public static final String TOPIC_SECURED_LOAN_DISBURSED = "lemuel.loan.secured_loan_disbursed";
     public static final String TOPIC_SECURED_LOAN_REPAID = "lemuel.loan.secured_loan_repaid";
+    public static final String TOPIC_SECURED_LOAN_PRINCIPAL_REPAID = "lemuel.loan.secured_loan_principal_repaid";
     public static final String TOPIC_INVESTMENT_EXECUTED = "lemuel.investment.executed";
     /** 백필 청산 분개의 합성 source_topic — 실제 Kafka 토픽이 아니라 자연키 구성용(멱등). */
     public static final String SOURCE_SCHEDULED_CLEARING = "lemuel.account.backfill";
@@ -289,10 +290,33 @@ public class AccountEntry {
     }
 
     /**
-     * 담보/개인신용 대출 완제 → DR CASH / CR SECURED_LOAN_RECEIVABLE (owner=BORROWER).
-     * 이벤트는 완제 시점에만 발행되고 principal 은 계약 원금이다 — 실행 전표와 동액이라 회차·중도상환
-     * 경로와 무관하게 채권 잔액이 0 으로 닫힌다. interestPaid·prepaymentFee 는 분개하지 않는다(원금만).
+     * 담보/개인신용 대출 <b>원금 감소 건별</b> → DR CASH / CR SECURED_LOAN_RECEIVABLE (owner=BORROWER).
+     *
+     * <p>완제 시점에 계약 원금 전액을 한 번에 대변 처리하던 방식을 대체한다(#183). 그 방식은
+     * 회차 상환·중도상환으로 loan 쪽 채권이 줄어드는 동안 계정계는 최초 원금 그대로를 들고 있어,
+     * 완제 전까지 시산·실체화 잔액이 계속 틀린 값이었다.
+     *
+     * <p>자연키가 {@code UNIQUE(source_topic, ref_type, ref_id)} 이므로 refId 는 대출당 1회가 아니라
+     * <b>상환 건당</b> 유일해야 한다. 그래서 {@code loanId#eventId} 를 쓴다 — 대출 추적성을 남기면서
+     * outbox 이벤트 단위 유일성(=소비 멱등키와 동일 단위)을 만족한다.
+     *
+     * @param principalRepaid 이번에 실제로 차감된 원금(요청액이 아니라 clamp 이후 값)
      */
+    public static AccountEntry securedLoanPrincipalRepaid(String borrowerUserId, String loanId,
+                                                          String eventId, BigDecimal principalRepaid) {
+        return of(OwnerType.BORROWER, borrowerUserId,
+                GlAccount.CASH, GlAccount.SECURED_LOAN_RECEIVABLE, principalRepaid,
+                "SECURED_LOAN_PRINCIPAL_REPAID", loanId + "#" + eventId, TOPIC_SECURED_LOAN_PRINCIPAL_REPAID);
+    }
+
+    /**
+     * 담보/개인신용 대출 완제 → DR CASH / CR SECURED_LOAN_RECEIVABLE (owner=BORROWER).
+     *
+     * @deprecated #183. 완제 시점에 계약 원금 전액을 대변 처리하면 기중 잔액이 최초 원금으로 고정된다.
+     *             원금 감소는 {@link #securedLoanPrincipalRepaid} 로 건별 전기하며, 완제 이벤트는
+     *             더 이상 GL 분개를 만들지 않는다(완결 신호로만 소비). 잔여 참조를 위해 남겨둔다.
+     */
+    @Deprecated(since = "2026-07-30", forRemoval = true)
     public static AccountEntry securedLoanRepaid(String borrowerUserId, String loanId, BigDecimal principal) {
         return of(OwnerType.BORROWER, borrowerUserId,
                 GlAccount.CASH, GlAccount.SECURED_LOAN_RECEIVABLE, principal,
