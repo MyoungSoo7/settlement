@@ -109,10 +109,18 @@ SELECT 절 CASE 에 있다. 즉 **그 셀러의 전 계정·전 이력 전표를
 5. 무조건 debit 5종(+ HOLDBACK 계열 4종)을 라우터 경유로 전환.
 6. advisory 락 제거(행 잠금으로 대체) — **5 완료 후에만**. 먼저 제거하면 보호 공백이 생긴다.
 
-**Phase 3 — 검증**
-7. `/control-recon` 확장: `account_balances` vs 원장 재합산을 전 계정 대조, 불일치 보고.
-8. 정기 대사 배치 + Prometheus 게이지(드리프트 건수).
-9. IT: 중복 수신 잔액 불변 / 동시 payout+withholding 경합 / 백필 멱등.
+**Phase 3 — 검증** *(구현 완료 2026-07-30 — Phase 2 와 독립 랜딩)*
+7. ✅ `/control-recon` 확장: `account_balances` vs 원장 재합산을 전 계정 대조, 불일치 보고
+   (`TrialBalanceQuery.balanceRecon()` — FULL OUTER JOIN 으로 값 왜곡·캐시 행 유실·고아 캐시 행 3유형 검출,
+   드리프트 상세는 |델타| 내림차순 상한 100 캡, 건수 정본은 count).
+8. ✅ 정기 대사 배치(`BalanceReconScheduler`, 기본 10분) + Prometheus 게이지 3종
+   `account.balance.recon.{drift.count, checked.pairs, last.success.epoch}` — drift.count 는 −1(첫 성공 전
+   미검증)·0(정합)·N(오염)을 구별하고, 실행 실패는 예외를 삼키되 게이지를 건드리지 않아
+   last.success.epoch 정체가 실패 알람 축이다(관측이 방어선이려면 관측 자체의 생존 신호가 필요).
+   자동 정정 없음 — 정정은 원인 규명 후 Phase 1 백필 쿼리 재실행(운영 판단). 종합 판정은
+   `/control-recon` 의 `healthy()`(원장 폐루프 ∧ 캐시 정합) — `balanced()` 는 원장 축만 본다.
+9. ✅ IT: 중복 수신 잔액 불변(`MaterializedBalanceIT`) / 오염 3유형 검출(`BalanceReconIT`) / 백필 멱등.
+   동시 payout+withholding 경합은 `PayoutConcurrencyIT` 가 커버.
 
 ## 미결 항목 (Phase 2 블로커)
 
