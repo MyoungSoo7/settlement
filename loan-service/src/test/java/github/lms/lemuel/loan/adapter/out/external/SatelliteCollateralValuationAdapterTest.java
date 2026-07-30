@@ -38,7 +38,8 @@ class SatelliteCollateralValuationAdapterTest {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         SatelliteCollateralValuationAdapter adapter = new SatelliteCollateralValuationAdapter(
-                builder, MARKET, COMMON, realEstateSource, "dealAmount", new BigDecimal("10000"), 100);
+                builder, new io.micrometer.core.instrument.simple.SimpleMeterRegistry(),
+                MARKET, COMMON, realEstateSource, "dealAmount", new BigDecimal("10000"), 100);
         return new Fixture(adapter, server);
     }
 
@@ -113,10 +114,10 @@ class SatelliteCollateralValuationAdapterTest {
         f.server().expect(requestTo(COMMON + "/api/common-data/sources/molit-apt-trade/records?limit=100"))
                 .andExpect(method(GET))
                 .andRespond(withSuccess("""
-                        {"code":"molit-apt-trade","count":3,"records":[
-                          {"recordKey":"11680-래미안-2026-05","collectedAt":"2026-06-01T09:00:00","payload":{"dealAmount":"79,000"}},
-                          {"recordKey":"11680-래미안-2026-06","collectedAt":"2026-07-01T09:00:00","payload":{"dealAmount":"84,000"}},
-                          {"recordKey":"11500-다른단지-2026-06","collectedAt":"2026-07-02T09:00:00","payload":{"dealAmount":"120,000"}}
+                        {"sourceCode":"molit-apt-trade","count":3,"records":[
+                          {"recordKey":"11680-래미안-2026-05","collectedAt":"2026-06-01T09:00:00Z","data":{"dealAmount":"79,000"}},
+                          {"recordKey":"11680-래미안-2026-06","collectedAt":"2026-07-01T09:00:00Z","data":{"dealAmount":"84,000"}},
+                          {"recordKey":"11500-다른단지-2026-06","collectedAt":"2026-07-02T09:00:00Z","data":{"dealAmount":"120,000"}}
                         ]}
                         """, MediaType.APPLICATION_JSON));
         ValuationClaim claim = new ValuationClaim(CollateralType.REAL_ESTATE, "서울시 강남구 래미안",
@@ -144,8 +145,8 @@ class SatelliteCollateralValuationAdapterTest {
         Fixture f = newAdapter("molit-apt-trade");
         f.server().expect(requestTo(COMMON + "/api/common-data/sources/molit-apt-trade/records?limit=100"))
                 .andRespond(withSuccess("""
-                        {"code":"molit-apt-trade","count":1,"records":[
-                          {"recordKey":"11500-다른단지-2026-06","collectedAt":"2026-07-02T09:00:00","payload":{"dealAmount":"120,000"}}
+                        {"sourceCode":"molit-apt-trade","count":1,"records":[
+                          {"recordKey":"11500-다른단지-2026-06","collectedAt":"2026-07-02T09:00:00Z","data":{"dealAmount":"120,000"}}
                         ]}
                         """, MediaType.APPLICATION_JSON));
         ValuationClaim claim = new ValuationClaim(CollateralType.REAL_ESTATE, "서울시 강남구 래미안",
@@ -160,8 +161,8 @@ class SatelliteCollateralValuationAdapterTest {
         Fixture f = newAdapter("molit-apt-trade");
         f.server().expect(requestTo(COMMON + "/api/common-data/sources/molit-apt-trade/records?limit=100"))
                 .andRespond(withSuccess("""
-                        {"code":"molit-apt-trade","count":1,"records":[
-                          {"recordKey":"11680-래미안-2026-06","collectedAt":"2026-07-01T09:00:00","payload":{"dealAmount":"비공개"}}
+                        {"sourceCode":"molit-apt-trade","count":1,"records":[
+                          {"recordKey":"11680-래미안-2026-06","collectedAt":"2026-07-01T09:00:00Z","data":{"dealAmount":"비공개"}}
                         ]}
                         """, MediaType.APPLICATION_JSON));
         ValuationClaim claim = new ValuationClaim(CollateralType.REAL_ESTATE, "서울시 강남구 래미안",

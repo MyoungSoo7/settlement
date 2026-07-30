@@ -1,6 +1,7 @@
 package github.lms.lemuel.loan.adapter.out.external;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import io.micrometer.core.instrument.MeterRegistry;
 import github.lms.lemuel.loan.application.port.out.CollateralValuationPort;
 import github.lms.lemuel.loan.domain.CollateralType;
 import org.slf4j.Logger;
@@ -12,7 +13,7 @@ import org.springframework.web.client.RestClientException;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -34,7 +35,11 @@ import java.util.Map;
  *
  * <p><b>폴백 경로가 넓다</b>(기준금리 {@link EconomicsBaseRateAdapter} 와 동일 원칙): 위성 미기동·
  * 404·데이터 부재·조회 키 부재·파싱 실패 어느 경우든 <b>평가 조달 실패가 대출 신청을 막으면 안 되므로</b>
- * 신청자 제시값으로 폴백하고 경고만 남긴다. 폴백 사용 사실은 로그로 추적한다.
+ * 신청자 제시값으로 폴백한다.
+ *
+ * <p>다만 폴백은 <b>조용하면 안 된다</b> — 제시값을 쓴다는 건 담보를 신청인 주장대로 인정한다는
+ * 뜻이고, 과소평가된 담보로 대출이 승인될 수 있다. 로그만으로는 아무도 모르므로
+ * {@code loan_collateral_valuation_fallback_total{type,reason}} 카운터로도 노출한다.
  */
 @Component
 public class SatelliteCollateralValuationAdapter implements CollateralValuationPort {
@@ -42,6 +47,7 @@ public class SatelliteCollateralValuationAdapter implements CollateralValuationP
     private static final Logger log = LoggerFactory.getLogger(SatelliteCollateralValuationAdapter.class);
     private static final int SCALE = 2;
 
+    private final MeterRegistry meterRegistry;
     private final RestClient marketClient;
     private final RestClient commonDataClient;
     private final String realEstateSourceCode;
@@ -51,12 +57,14 @@ public class SatelliteCollateralValuationAdapter implements CollateralValuationP
 
     public SatelliteCollateralValuationAdapter(
             RestClient.Builder loanRestClientBuilder,
+            MeterRegistry meterRegistry,
             @Value("${app.loan.market.base-url:http://localhost:8094}") String marketBaseUrl,
             @Value("${app.loan.commondata.base-url:http://localhost:8098}") String commonDataBaseUrl,
             @Value("${app.loan.commondata.real-estate-source:}") String realEstateSourceCode,
             @Value("${app.loan.commondata.price-field:dealAmount}") String realEstatePriceField,
             @Value("${app.loan.commondata.price-unit-multiplier:10000}") BigDecimal realEstatePriceUnitMultiplier,
             @Value("${app.loan.commondata.records-limit:100}") int realEstateRecordsLimit) {
+        this.meterRegistry = meterRegistry;
         this.marketClient = loanRestClientBuilder.clone().baseUrl(marketBaseUrl).build();
         this.commonDataClient = loanRestClientBuilder.clone().baseUrl(commonDataBaseUrl).build();
         this.realEstateSourceCode = realEstateSourceCode;
@@ -68,7 +76,7 @@ public class SatelliteCollateralValuationAdapter implements CollateralValuationP
     @Override
     public BigDecimal appraise(ValuationClaim claim) {
         if (claim.marketRef() == null || claim.marketRef().isBlank()) {
-            return claim.declaredValue();
+            return fallback(claim, "no_market_ref");
         }
         return switch (claim.type()) {
             case EQUITY -> appraiseEquity(claim);
@@ -82,7 +90,7 @@ public class SatelliteCollateralValuationAdapter implements CollateralValuationP
     private BigDecimal appraiseEquity(ValuationClaim claim) {
         if (claim.quantity() == null || claim.quantity() <= 0) {
             log.warn("주식 담보 수량 부재 — 제시값 폴백. marketRef={}", claim.marketRef());
-            return claim.declaredValue();
+            return fallback(claim, "no_quantity");
         }
         try {
             StockSnapshotDto snapshot = marketClient.get()
@@ -92,7 +100,7 @@ public class SatelliteCollateralValuationAdapter implements CollateralValuationP
             if (snapshot == null || snapshot.latest() == null || snapshot.latest().closePrice() == null
                     || snapshot.latest().closePrice().signum() <= 0) {
                 log.warn("market 시세 관측치 없음(latest=null) — 제시값 폴백. code={}", claim.marketRef());
-                return claim.declaredValue();
+                return fallback(claim, "no_quote");
             }
             BigDecimal appraised = snapshot.latest().closePrice()
                     .multiply(BigDecimal.valueOf(claim.quantity()))
@@ -102,7 +110,7 @@ public class SatelliteCollateralValuationAdapter implements CollateralValuationP
             return appraised;
         } catch (RestClientException e) {
             log.warn("market 시세 조회 실패 — 제시값 폴백. code={}: {}", claim.marketRef(), e.getMessage());
-            return claim.declaredValue();
+            return fallback(claim, "fetch_failed");
         }
     }
 
@@ -110,7 +118,7 @@ public class SatelliteCollateralValuationAdapter implements CollateralValuationP
     private BigDecimal appraiseRealEstate(ValuationClaim claim) {
         if (realEstateSourceCode == null || realEstateSourceCode.isBlank()) {
             log.warn("실거래가 수집 소스 미설정(app.loan.commondata.real-estate-source) — 제시값 폴백");
-            return claim.declaredValue();
+            return fallback(claim, "source_not_configured");
         }
         try {
             RecordsDto records = commonDataClient.get()
@@ -120,7 +128,7 @@ public class SatelliteCollateralValuationAdapter implements CollateralValuationP
                     .body(RecordsDto.class);
             if (records == null || records.records() == null) {
                 log.warn("commondata 실거래 레코드 없음 — 제시값 폴백. source={}", realEstateSourceCode);
-                return claim.declaredValue();
+                return fallback(claim, "no_records");
             }
             return records.records().stream()
                     .filter(r -> r.recordKey() != null && r.recordKey().startsWith(claim.marketRef()))
@@ -134,21 +142,31 @@ public class SatelliteCollateralValuationAdapter implements CollateralValuationP
                     })
                     .orElseGet(() -> {
                         log.warn("실거래 레코드 매칭 실패 — 제시값 폴백. key={}", claim.marketRef());
-                        return claim.declaredValue();
+                        return fallback(claim, "no_match");
                     });
         } catch (RestClientException e) {
             log.warn("commondata 실거래가 조회 실패 — 제시값 폴백. key={}: {}",
                     claim.marketRef(), e.getMessage());
-            return claim.declaredValue();
+            return fallback(claim, "fetch_failed");
         }
     }
 
-    /** 레코드 payload 의 거래금액 필드 파싱 — 만원 단위 콤마 문자열("84,000")·숫자 모두 수용. */
+    /**
+     * 제시값 폴백 — 담보를 신청인 주장대로 인정한다는 뜻이라 반드시 계량한다.
+     * reason 이 {@code no_match}·{@code no_records} 로 지속되면 계약 드리프트나 수집 중단을 의심할 것.
+     */
+    private BigDecimal fallback(ValuationClaim claim, String reason) {
+        meterRegistry.counter("loan.collateral.valuation.fallback",
+                "type", claim.type().name(), "reason", reason).increment();
+        return claim.declaredValue();
+    }
+
+    /** 레코드 data 의 거래금액 필드 파싱 — 만원 단위 콤마 문자열("84,000")·숫자 모두 수용. */
     private BigDecimal dealPrice(RecordDto record) {
-        if (record.payload() == null) {
+        if (!(record.data() instanceof Map<?, ?> data)) {
             return null;
         }
-        Object raw = record.payload().get(realEstatePriceField);
+        Object raw = data.get(realEstatePriceField);
         try {
             BigDecimal amount = switch (raw) {
                 case null -> null;
@@ -172,11 +190,23 @@ public class SatelliteCollateralValuationAdapter implements CollateralValuationP
     private record QuoteDto(BigDecimal closePrice) {
     }
 
+    /**
+     * common-data {@code GET /api/common-data/sources/{code}/records} 응답.
+     *
+     * <p><b>필드 이름·타입은 프로듀서(DataSourceController.RecordsResponse/RecordResponse)가 정본이다.</b>
+     * 예전에는 이 record 가 {@code code}/{@code payload}/{@code LocalDateTime} 이라고 지레짐작해,
+     * 프로듀서가 정상 응답해도 {@code payload} 가 항상 null 이 되어 실거래가가 한 번도 쓰이지
+     * 않았다 — 조용히 신청인 제시값으로 폴백해 담보가 과소평가될 수 있었다. 테스트마저 실제
+     * 계약이 아니라 이 지레짐작한 스키마를 목킹해서 드리프트를 못 잡았다.
+     * 이제 정본 샘플(shared-common {@code contracts/internal-rest/common-data/records.sample.json})을
+     * 양측이 같이 읽는 계약 테스트로 고정한다.
+     */
     @JsonIgnoreProperties(ignoreUnknown = true)
-    private record RecordsDto(String code, List<RecordDto> records) {
+    record RecordsDto(String sourceCode, int count, List<RecordDto> records) {
     }
 
+    /** {@code data} 는 수집 원문(JSON 오브젝트면 Map, 아니면 문자열)이라 Object 로 받는다. */
     @JsonIgnoreProperties(ignoreUnknown = true)
-    private record RecordDto(String recordKey, LocalDateTime collectedAt, Map<String, Object> payload) {
+    record RecordDto(String recordKey, Instant collectedAt, Object data) {
     }
 }
