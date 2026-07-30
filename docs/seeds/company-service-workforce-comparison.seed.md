@@ -137,7 +137,9 @@ Seed 작성 시점엔 "아직 정하지 않은 것"이었고, 구현(2026-07-30)
 shared-common 빈 추가 시 `@Import` 필요" 함정이 실제로 발화한 사례다. `HttpClientConfig` 에
 `@Import(JacksonCompatConfig.class)` 를 붙여 해소하고, 중복이 된 로컬 `newsObjectMapper` 빈은 제거했다
 (공용 빈이 상위집합). 회귀 가드로 `ConfigBeansTest` 가 `@Import` 존재를 어서트한다.
-⚠️ ai-service·account-service 등 다른 제한 스캔 서비스도 같은 점검이 필요하다(미확인).
+다른 제한 스캔 서비스는 2026-07-30 점검 완료 — ai·account·operation 은 Outbox 발행 어댑터
+자체가 없어(`outboxObjectMapper` 미사용) 해당 없음, 발행 서비스(loan·investment·organization 등)는
+전역 스캔 또는 기존 배선으로 정상이다.
 
 ## 산출 이력
 
@@ -157,3 +159,10 @@ QA 정련 중 잡은 실제 결함 2건:
 
 정련 이력 전문(채택·기각 결정 포함)은 `~/.ouroboros/seed-revisions/interview_20260729_095356.md`
 (로컬, 미추적).
+
+## 후속 — 프런트엔드 배선 (2026-07-30)
+
+- 목록 검색 응답에 `bizRegNoPrefix` 추가(하위호환 확장) — 상세 복합키 3요소를 목록만으로 채우기
+  위함. AC-1 의 "목록 응답 불변"은 구현 당시 기존 소비자 보호 조건이었고, 필드 추가는 이를 깨지 않는다.
+- `frontend` 에 사업장 검색·상세 비교 화면 신규(`WorkforcePage`) — 공개 `/workforce` + CEO 사이드바
+  `/admin/ceo/workforce`(사업장비교). 금액은 문자열 계약 그대로 수신해 표시 시에만 수치화한다.

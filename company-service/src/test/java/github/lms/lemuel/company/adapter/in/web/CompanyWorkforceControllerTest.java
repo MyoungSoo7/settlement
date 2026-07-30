@@ -77,6 +77,8 @@ class CompanyWorkforceControllerTest {
         mockMvc.perform(get("/api/company/workforce").param("name", "에고이즘"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].workplaceName").value("주식회사에고이즘"))
+                // 상세(/detail) 복합키 3요소가 목록 응답에 모두 있어야 화면이 상세로 진입할 수 있다.
+                .andExpect(jsonPath("$.content[0].bizRegNoPrefix").value("866759"))
                 .andExpect(jsonPath("$.content[0].headcount").value(50))
                 .andExpect(jsonPath("$.content[0].estimatedAnnualSalary").value(43750000))
                 .andExpect(jsonPath("$.content[0].snapshotMonth").value("2026-06"))
