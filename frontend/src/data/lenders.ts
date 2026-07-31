@@ -51,7 +51,13 @@ export interface LenderTier {
 export const LEGAL_MAX_RATE_PERCENT = 20;
 
 /** 예금자보호법 시행령 등 6개 대통령령 — 1억원 (2025.9.1 시행) */
-export const DEPOSIT_PROTECTION_LIMIT_KRW = 100_000_000;
+/**
+ * 예금자보호 한도. 표시용 문자열로 둔다 — 금액을 JS number 로 들고 나눗셈하면
+ * safe-integer 범위와 부동소수 오차에 노출된다(리포 money 불변식). 화면은 이 문자열을
+ * 그대로 쓰고, 계산이 필요해지면 그때 decimal 문자열로 다룬다.
+ * 출처: 금융위원회 보도자료(2025.7.22) — 2025.9.1 부터 5천만원 → 1억원
+ */
+export const DEPOSIT_PROTECTION_LIMIT_LABEL = '1억원';
 export const DEPOSIT_PROTECTION_SINCE = "2025-09-01";
 
 export const LENDER_TIERS: LenderTier[] = [
