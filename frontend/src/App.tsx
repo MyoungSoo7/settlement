@@ -31,6 +31,8 @@ const CeoInsightPage = lazy(() => import('./pages/CeoInsightPage'));
 const CeoInvestPage = lazy(() => import('./pages/CeoInvestPage'));
 const CeoInvestRecommendPage = lazy(() => import('./pages/CeoInvestRecommendPage'));
 const CeoAccountPage = lazy(() => import('./pages/CeoAccountPage'));
+const CeoLoanGuidePage = lazy(() => import('./pages/CeoLoanGuidePage'));
+const CeoLenderGuidePage = lazy(() => import('./pages/CeoLenderGuidePage'));
 const AiChatPage = lazy(() => import('./pages/AiChatPage'));
 
 // 관리자 페이지 (lazy load)
@@ -163,6 +165,11 @@ function App() {
               element={<AdminManagerRoute><CeoLayout><CeoInvestRecommendPage /></CeoLayout></AdminManagerRoute>} />
             <Route path="/admin/ceo/loans"
               element={<AdminManagerRoute><CeoLayout><LoanPage /></CeoLayout></AdminManagerRoute>} />
+            <Route path="/admin/ceo/loan-guide"
+              element={<AdminManagerRoute><CeoLayout><CeoLoanGuidePage /></CeoLayout></AdminManagerRoute>} />
+            {/* 대출기관 안내 — 은행·저축은행·캐피탈·대부업 업권 비교 (정적 콘텐츠, API 없음) */}
+            <Route path="/admin/ceo/lender-guide"
+              element={<AdminManagerRoute><CeoLayout><CeoLenderGuidePage /></CeoLayout></AdminManagerRoute>} />
             <Route path="/admin/ceo/accounts"
               element={<AdminManagerRoute><CeoLayout><CeoAccountPage /></CeoLayout></AdminManagerRoute>} />
 
