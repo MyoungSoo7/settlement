@@ -31,15 +31,42 @@ class SatelliteCollateralValuationAdapterTest {
     private static final String COMMON = "http://localhost:8098";
     private static final BigDecimal DECLARED = new BigDecimal("50000000");
 
-    private record Fixture(SatelliteCollateralValuationAdapter adapter, MockRestServiceServer server) {
+    private record Fixture(SatelliteCollateralValuationAdapter adapter, MockRestServiceServer server,
+                           io.micrometer.core.instrument.MeterRegistry registry) {
+        /** 폴백 계량 총합 — 제시값 폴백은 담보를 신청인 주장대로 인정한다는 뜻이라 지표로 드러나야 한다. */
+        double fallbackCount() {
+            return registry.find("loan.collateral.valuation.fallback").counters().stream()
+                    .mapToDouble(io.micrometer.core.instrument.Counter::count).sum();
+        }
     }
 
     private Fixture newAdapter(String realEstateSource) {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        io.micrometer.core.instrument.MeterRegistry registry =
+                new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
         SatelliteCollateralValuationAdapter adapter = new SatelliteCollateralValuationAdapter(
-                builder, MARKET, COMMON, realEstateSource, "dealAmount", new BigDecimal("10000"), 100);
-        return new Fixture(adapter, server);
+                builder, registry,
+                MARKET, COMMON, realEstateSource, "dealAmount", new BigDecimal("10000"), 100);
+        return new Fixture(adapter, server, registry);
+    }
+
+    /**
+     * 서류값이 정본인 담보(예금·채권·보증서)는 marketRef 가 없는 게 정상이다 — 폴백이 아니다.
+     * 여기서 계량하면 정상 트래픽이 폴백 지표를 부풀려 알림을 오탐으로 만든다(코드리뷰 지적).
+     */
+    @Test
+    @DisplayName("서류값 정본 담보는 조회 키가 없어도 폴백으로 계량하지 않는다")
+    void documentValuedTypes_doNotCountAsFallback() {
+        Fixture f = newAdapter("");
+
+        for (CollateralType type : new CollateralType[]{
+                CollateralType.DEPOSIT, CollateralType.BOND, CollateralType.GUARANTEE}) {
+            BigDecimal appraised = f.adapter().appraise(
+                    new ValuationClaim(type, "서류 담보", DECLARED, null, null));
+            assertThat(appraised).isEqualByComparingTo(DECLARED);
+        }
+        assertThat(f.fallbackCount()).isZero();
     }
 
     private static ValuationClaim equityClaim(Long quantity) {
@@ -113,10 +140,10 @@ class SatelliteCollateralValuationAdapterTest {
         f.server().expect(requestTo(COMMON + "/api/common-data/sources/molit-apt-trade/records?limit=100"))
                 .andExpect(method(GET))
                 .andRespond(withSuccess("""
-                        {"code":"molit-apt-trade","count":3,"records":[
-                          {"recordKey":"11680-래미안-2026-05","collectedAt":"2026-06-01T09:00:00","payload":{"dealAmount":"79,000"}},
-                          {"recordKey":"11680-래미안-2026-06","collectedAt":"2026-07-01T09:00:00","payload":{"dealAmount":"84,000"}},
-                          {"recordKey":"11500-다른단지-2026-06","collectedAt":"2026-07-02T09:00:00","payload":{"dealAmount":"120,000"}}
+                        {"sourceCode":"molit-apt-trade","count":3,"records":[
+                          {"recordKey":"11680-래미안-2026-05","collectedAt":"2026-06-01T09:00:00Z","data":{"dealAmount":"79,000"}},
+                          {"recordKey":"11680-래미안-2026-06","collectedAt":"2026-07-01T09:00:00Z","data":{"dealAmount":"84,000"}},
+                          {"recordKey":"11500-다른단지-2026-06","collectedAt":"2026-07-02T09:00:00Z","data":{"dealAmount":"120,000"}}
                         ]}
                         """, MediaType.APPLICATION_JSON));
         ValuationClaim claim = new ValuationClaim(CollateralType.REAL_ESTATE, "서울시 강남구 래미안",
@@ -144,8 +171,8 @@ class SatelliteCollateralValuationAdapterTest {
         Fixture f = newAdapter("molit-apt-trade");
         f.server().expect(requestTo(COMMON + "/api/common-data/sources/molit-apt-trade/records?limit=100"))
                 .andRespond(withSuccess("""
-                        {"code":"molit-apt-trade","count":1,"records":[
-                          {"recordKey":"11500-다른단지-2026-06","collectedAt":"2026-07-02T09:00:00","payload":{"dealAmount":"120,000"}}
+                        {"sourceCode":"molit-apt-trade","count":1,"records":[
+                          {"recordKey":"11500-다른단지-2026-06","collectedAt":"2026-07-02T09:00:00Z","data":{"dealAmount":"120,000"}}
                         ]}
                         """, MediaType.APPLICATION_JSON));
         ValuationClaim claim = new ValuationClaim(CollateralType.REAL_ESTATE, "서울시 강남구 래미안",
@@ -160,8 +187,8 @@ class SatelliteCollateralValuationAdapterTest {
         Fixture f = newAdapter("molit-apt-trade");
         f.server().expect(requestTo(COMMON + "/api/common-data/sources/molit-apt-trade/records?limit=100"))
                 .andRespond(withSuccess("""
-                        {"code":"molit-apt-trade","count":1,"records":[
-                          {"recordKey":"11680-래미안-2026-06","collectedAt":"2026-07-01T09:00:00","payload":{"dealAmount":"비공개"}}
+                        {"sourceCode":"molit-apt-trade","count":1,"records":[
+                          {"recordKey":"11680-래미안-2026-06","collectedAt":"2026-07-01T09:00:00Z","data":{"dealAmount":"비공개"}}
                         ]}
                         """, MediaType.APPLICATION_JSON));
         ValuationClaim claim = new ValuationClaim(CollateralType.REAL_ESTATE, "서울시 강남구 래미안",

@@ -145,6 +145,11 @@ public class AccountEntryPersistenceAdapter
                 .toList();
     }
 
+    @Override
+    public boolean hasPrincipalRepaidEntry(String loanId) {
+        return repository.existsByRefTypeAndRefIdStartingWith("SECURED_LOAN_PRINCIPAL_REPAID", loanId + "#");
+    }
+
     private static AccountEntry toDomain(AccountEntryJpaEntity e) {
         return AccountEntry.reconstitute(
                 e.getId(), e.getOwnerType(), e.getOwnerId(),

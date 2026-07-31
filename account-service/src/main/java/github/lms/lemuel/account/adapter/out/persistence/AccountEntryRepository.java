@@ -15,6 +15,9 @@ import java.util.List;
 
 public interface AccountEntryRepository extends JpaRepository<AccountEntryJpaEntity, Long> {
 
+    /** #183 — 해당 대출의 원금 건별 전표 존재 여부. refId 규약은 {@code loanId#eventId}. */
+    boolean existsByRefTypeAndRefIdStartingWith(String refType, String refIdPrefix);
+
     /**
      * 레이스-세이프 멱등 삽입 (LOW-1) — 자연키 {@code (source_topic, ref_type, ref_id)} 충돌 시
      * {@code ON CONFLICT DO NOTHING} 으로 원자적 no-op. check-then-save 의 TOCTOU(동시 중복 수신 시

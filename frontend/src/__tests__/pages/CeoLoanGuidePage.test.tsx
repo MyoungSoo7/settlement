@@ -83,6 +83,31 @@ describe("CeoLoanGuidePage", () => {
     expect(screen.getByText(/1,095일|3년/)).toBeInTheDocument();
   });
 
+  /**
+   * 이 화면의 수치는 loan-service 기본값을 옮긴 것이고, 배포에서 덮어쓰면
+   * 실제 적용값과 달라진다. 리터럴만 단언하는 테스트는 그 드리프트를 잡지 못하므로,
+   * "기본값이며 배포 설정으로 덮인다"는 고지 자체를 단언해 문구가 조용히
+   * "현재 운영값" 으로 되돌아가는 것을 막는다. (PR #193 코드리뷰 P1 반영)
+   */
+  it("수치가 기본값이며 배포 설정으로 덮일 수 있음을 고지한다", () => {
+    renderPage();
+    expect(screen.getByText(/기본값으로 설정된 정책값/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/app\.loan\.secured\.base-rate-percent/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/app\.loan\.secured\.real-estate-ltv/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: /인정비율\(기본값\)/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("현재 운영값이라고 단정하지 않는다", () => {
+    renderPage();
+    expect(screen.queryByText(/현재 운영 중인 정책값/)).not.toBeInTheDocument();
+  });
+
   it("아직 열리지 않은 기능을 구현 현황으로 구분해 표시한다", () => {
     renderPage();
     expect(

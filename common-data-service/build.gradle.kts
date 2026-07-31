@@ -55,6 +55,8 @@ dependencies {
     testImplementation("org.mockito:mockito-core")
     // 1.4.x — Java 25 클래스파일(major 69) 파싱 지원 (1.3.0 은 전부 스킵되어 no-classes 실패)
     testImplementation("com.tngtech.archunit:archunit-junit5:1.4.1")
+    // REST 계약 정본 샘플 (contracts/internal-rest/common-data) — 컨슈머(loan)와 같은 샘플을 본다
+    testImplementation(testFixtures("github.lms.lemuel:shared-common:1.0.0"))
 }
 
 val mockitoAgent = configurations.create("mockitoAgent")

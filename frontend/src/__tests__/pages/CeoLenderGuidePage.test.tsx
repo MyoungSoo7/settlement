@@ -7,7 +7,7 @@ import {
   RATE_RULES,
   SOURCES,
   LEGAL_MAX_RATE_PERCENT,
-  DEPOSIT_PROTECTION_LIMIT_KRW,
+  DEPOSIT_PROTECTION_LIMIT_LABEL,
 } from "@/data/lenders";
 
 /**
@@ -37,7 +37,7 @@ describe("CeoLenderGuidePage", () => {
       screen.getByText(`연 ${LEGAL_MAX_RATE_PERCENT}%`),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(`${DEPOSIT_PROTECTION_LIMIT_KRW / 100_000_000}억원`),
+      screen.getByText(DEPOSIT_PROTECTION_LIMIT_LABEL),
     ).toBeInTheDocument();
   });
 
