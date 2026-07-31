@@ -124,3 +124,9 @@ docs/harness/*
 !docs/harness/hackathon/
 !docs/harness/omc-harness.md
 
+# 프론트 빌드 산출물 — 배포에 쓰이지 않으므로 추적하지 않는다 (2026-08-01).
+#   frontend/Dockerfile 은 COPY . . 후 `npm run build` 로 소스에서 다시 빌드하고,
+#   ci.yml 도 `npm run build` 결과를 아티팩트로 올린다. 커밋된 dist 를 쓰는 경로가 없다.
+#   그동안 기능 커밋마다 "chore(frontend): dist 갱신" 을 따라붙였으나(20커밋, 55파일),
+#   해시 파일명이라 매번 전량 교체돼 diff 를 뒤덮고 머지 충돌만 만들었다.
+frontend/dist/

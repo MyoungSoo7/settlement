@@ -990,6 +990,10 @@ services:
     image: nginx:1.25-alpine
     container_name: lemuel-frontend
     volumes:
+      # 2026-08-01: frontend/dist 는 더 이상 git 에 추적되지 않는다(빌드 산출물).
+      # 이 컴포즈를 쓰기 전에 반드시 `cd frontend && npm ci && npm run build` 를 한 번
+      # 돌려야 한다. 안 하면 이 마운트가 빈 디렉터리가 되어 nginx 가 404 만 낸다.
+      # (프로덕션은 frontend/Dockerfile 이 이미지 안에서 빌드하므로 영향 없다)
       - ./frontend/dist:/usr/share/nginx/html:ro
       # compose 전용 conf — gateway 재생성 시 stale DNS 로 전 API 500 나는 문제를
       # 도커 내장 DNS 재해석으로 방지 (k8s 이미지는 기존 nginx.conf 사용)
