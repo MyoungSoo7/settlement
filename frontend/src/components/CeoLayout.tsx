@@ -21,6 +21,7 @@ const ITEMS: SidebarItem[] = [
   { to: '/admin/ceo/invest',     label: '투자하기', icon: '💹', desc: '재무점수 기반 투자' },
   { to: '/admin/ceo/invest-recommend', label: '투자 추천', icon: '🧭', desc: '규칙 스크리닝 추천 종목' },
   { to: '/admin/ceo/loans',      label: '대출관리', icon: '💸', desc: '선정산 · 기업대출' },
+  { to: '/admin/ceo/lender-guide', label: '대출기관 안내', icon: '🏦', desc: '은행 · 저축은행 · 캐피탈 · 대부업' },
   { to: '/admin/ceo/accounts',   label: '계정계 현황', icon: '🧮', desc: '집계 · 시산표 · 잔액' },
 ];
 
