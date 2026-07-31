@@ -50,4 +50,13 @@ public interface LoadAccountEntryPort {
 
     /** occurred_at 기간 전표(기간 확정 시산표 계산용). from 이상 ~ to 미만(반개구간). */
     List<AccountEntry> findByOccurredAtBetween(LocalDateTime fromInclusive, LocalDateTime toExclusive);
+
+    /**
+     * 해당 대출에 <b>원금 건별 전기</b>가 한 건이라도 있는지 (#183 롤아웃 호환 판정).
+     *
+     * <p>refId 규약이 {@code loanId#eventId} 라 접두 일치로 본다. loan/account 를 독립 롤아웃할 때
+     * 어느 쪽이 먼저 뜨든 채권이 어긋나지 않게 하는 유일한 판단 근거다 — 자세한 사정은
+     * {@code SecuredLoanRepaidConsumer} 주석 참조.
+     */
+    boolean hasPrincipalRepaidEntry(String loanId);
 }

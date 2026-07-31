@@ -5,7 +5,7 @@ import {
   RATE_RULES,
   SOURCES,
   LEGAL_MAX_RATE_PERCENT,
-  DEPOSIT_PROTECTION_LIMIT_KRW,
+  DEPOSIT_PROTECTION_LIMIT_LABEL,
   type LenderTier,
 } from "@/data/lenders";
 
@@ -19,9 +19,6 @@ const groupBadgeClass = (group: LenderTier["group"]) => {
       return "bg-red-100 text-red-800";
   }
 };
-
-const fmtEok = (won: number) =>
-  `${(won / 100_000_000).toLocaleString("ko-KR")}억원`;
 
 const YesNo: React.FC<{ value: boolean }> = ({ value }) => (
   <span className={value ? "text-emerald-700 font-semibold" : "text-slate-400"}>
@@ -59,7 +56,7 @@ const CeoLenderGuidePage: React.FC = () => {
         <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
           <p className="text-xs font-semibold text-blue-700">예금자보호 한도</p>
           <p className="mt-1 text-2xl font-bold text-blue-900">
-            {fmtEok(DEPOSIT_PROTECTION_LIMIT_KRW)}
+            {DEPOSIT_PROTECTION_LIMIT_LABEL}
           </p>
           <p className="mt-1 text-xs text-blue-800">
             2025년 9월 1일부터 상향되었습니다. 저축은행도 은행과 동일합니다.

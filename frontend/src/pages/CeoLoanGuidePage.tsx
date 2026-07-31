@@ -95,9 +95,12 @@ const CeoLoanGuidePage: React.FC = () => {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">대출 상품 안내</h1>
         <p className="text-sm text-gray-500 mt-1">
-          개인신용대출과 주택담보대출의 심사 기준·한도 산정식·금리 구조. 아래
-          수치는 현재 운영 중인 정책값이며, 정책이 바뀌면 이 화면도 함께
-          갱신된다.
+          개인신용대출과 주택담보대출의 심사 기준·한도 산정식·금리 구조.
+          <br />
+          아래 수치는 loan-service 에{" "}
+          <span className="font-medium">기본값으로 설정된 정책값</span>이다. 배포
+          환경에서 설정을 덮어쓰면 실제 적용값이 달라질 수 있으므로, 대외 고지나
+          계약에 쓰기 전에는 운영 설정을 확인해야 한다.
         </p>
       </div>
 
@@ -116,9 +119,11 @@ const CeoLoanGuidePage: React.FC = () => {
             <Formula>연이율 = 기준금리 + 가산금리</Formula>
             <p className="text-sm text-gray-600 mt-2">
               기준금리는 <span className="font-medium">한국은행 기준금리</span>
-              를 매 신청 시점에 조회해 적용한다. 조회에 실패하면 설정된 폴백값{" "}
-              <span className="font-medium">3.5%</span>가 쓰이며, 확정된 이율은
-              신청 시점에 고정돼 이후 기준금리가 움직여도 소급되지 않는다.
+              를 매 신청 시점에 조회해 적용한다. 조회에 실패하면 폴백값이 쓰이는데,
+              그 기본값은 <span className="font-medium">3.5%</span>이며 배포 설정
+              (<code className="text-xs">app.loan.secured.base-rate-percent</code>)으로
+              덮어쓸 수 있다. 확정된 이율은 신청 시점에 고정돼 이후 기준금리가 움직여도
+              소급되지 않는다.
             </p>
           </div>
 
@@ -275,7 +280,7 @@ const CeoLoanGuidePage: React.FC = () => {
       </Card>
 
       {/* ── 담보 유형별 비교 ──────────────────────────────────────── */}
-      <Card title="담보 유형별 인정비율">
+      <Card title="담보 유형별 인정비율(기본값)">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -298,6 +303,11 @@ const CeoLoanGuidePage: React.FC = () => {
             </tbody>
           </table>
         </div>
+        <p className="text-xs text-gray-500 mt-3">
+          부동산 인정비율은 배포 설정
+          (<code>app.loan.secured.real-estate-ltv</code>)으로 덮어쓸 수 있는 기본값이다.
+          나머지 유형은 코드에 고정된 정책 상수다.
+        </p>
         <p className="text-sm text-gray-600 mt-4">
           금융자산담보는 담보가치가 잔액 대비 일정 수준 아래로 내려가면 관리
           대상이 된다. 유지비율이 <span className="font-medium">140%</span>{" "}
