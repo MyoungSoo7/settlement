@@ -2,7 +2,7 @@
 
 > 이커머스 주문·결제·정산·선정산/기업대출·투자·계정계 + 공개조회 위성(재무제표·경제지표·기업뉴스·시세·공공데이터)·운영관제·AI챗봇 MSA 플랫폼 (Spring Boot 4.0 / Java 25 / 헥사고날)
 
-**Last updated:** 2026-07-30
+**Last updated:** 2026-08-02
 
 ## 현재 상태
 - **활성 브랜치:** `develop` (`main` 은 보호 브랜치 — PR 필수·squash 만·필수 CI 2종)
@@ -14,6 +14,14 @@
 - **최근 커밋:** `59a7c5227` feat(account): ADR 0030 Phase 3 — 실체화 잔액 대사·정기 배치·드리프트 게이지
 
 ## 최근 진척 (2026-06-24 이후)
+- **payout 셀러 셀프서비스 계좌 API + STATUS 드리프트 정정 (2026-08-02)** — `PUT/GET /api/seller/bank-account` 신설:
+  셀러 식별자를 요청(본문·경로)에서 받지 않고 JWT 주체(userId)에서만 파생(IDOR 원천 차단, 본문 sellerId 스푸핑 무시 테스트 실증),
+  기존 레지스트리 스택(도메인·서비스·`PayoutFieldEncryptionConverter` 암호화) 전부 재사용. gateway settlement 라우트의
+  기존 누락 `/admin/seller-bank-accounts/**` 도 배선. security-auditor 검수 HIGH 0·MED 2·LOW 1 전건 반영
+  (감사로그 `channel=SELF/ADMIN_CONSOLE` 구분, 유스케이스 "인가는 호출 어댑터 책임" 계약 명문화, 비셀러 행 무해 근거 문서화).
+  ⚠️ 드리프트 정정: 과거 "실송금·계좌 레지스트리 잔여" 표기는 stale — 실송금 3-phase 실행기·계좌 레지스트리·반송 재지급은
+  `b169f7226`(Seed D1)·`2868fb9b2`(ADR 0026 Option ①)로 이미 완료돼 있었다. 실제 잔여는 실 은행/PG 이체 어댑터뿐(아래 외부 조건 대기).
+  게이트: settlement 995(fail 0·IT skip 0, Docker UP)·shared-common 231·gateway 2 GREEN + JaCoCo LINE 90% 통과.
 - **loan 담보/개인신용 대출 Phase 1** — 주택담보(`/loans/secured/mortgage`)·개인신용(`/personal`) 2종 추가. `Borrower`(개인·법인 공통 차주 VO) + `Collateral`(평가액 스냅샷, 설정→유효→말소) + `SecuredLoan`(담보 optional) 신규 애그리거트로 분리 — 기존 `LoanAdvance`·`CorporateLoan` 무수정(상장사 종목코드에 차주가 묶여 개인 표현 불가). 장기 분할상환 상품이라 연체·기한이익상실을 상태머신에 처음부터 포함. 원장은 기존 6계정만 사용하되 회차성 전표(SEC_REPAYMENT·SEC_INTEREST)를 중복분개 유니크에서 제외(미조치 시 2회차 상환부터 실패). `secured_loan_disbursed`/`.repaid` 발행(소비처는 Phase 2).
 - **loan 담보대출 Phase 2 (P2-1~P2-7a, 2026-07-30)** — 담보유형 5종(부동산+보증·예금·채권·주식, Category 계열 행위)·담보권 순위(선순위 차감·0 clamp)·원장 계정 3종+실행 전표 7종·재평가 append-only 이력+마진콜(부분 유니크로 중복 차단)·담보 실행(처분/대위변제 경로별 손실 계정 분리)+상각(WRITTEN_OFF)·중도상환(실행시각 스냅샷 기산 수수료, 잔존비례·3년 면제, `/prepay`+Idempotency-Key 멱등)·기준금리 economics 실연동(BASE_RATE latest, 실패 시 설정값 폴백). gl-ledger-auditor 감사로 순차 재제출 멱등 공백(치명) 봉합. 수수료 taper 분모는 부과기간 1095일로 확정(2026-07-30). **잔여 이월 전량 소진(2026-07-30)** — 아래 GL 소비 매핑·담보평가 실연동(P2-7b) 항목 참조. Phase 2 전 항목 완료.
 - **ADR 0030 Phase 3 — 실체화 잔액 대사 완료 (2026-07-30)** — `account_balances`(파생 캐시) vs 원장 재합산(정답지, Phase 1 백필과 동일 credit-positive 식)을 전 (owner, account) 쌍 FULL OUTER JOIN **단일 문장 스냅샷**으로 대조(read_committed 자기모순 방지·원장 스캔 1회 — 감사 MED-3). `TrialBalanceQuery.balanceRecon()` + `/control-recon` 응답 확장(`materializedRecon`) + **`healthy()` 종합 판정**(원장 폐루프 ∧ 캐시 정합 — balanced 단독 판정의 캐시 오염 사각 봉합, 감사 MED-2). 정기 배치 `BalanceReconScheduler`(기본 10분, `app.recon.balance.*`) + 게이지 3종 `account.balance.recon.{drift.count(−1=미검증), checked.pairs, last.success.epoch}` — 실행 실패는 게이지 불변+epoch 정체로 드러난다(실패의 '정합 0' 위장 차단, 감사 MED-1). **오염 3유형(값 왜곡·캐시 행 유실·고아 캐시 행)을 실 PG 주입으로 검출 실증**(`BalanceReconIT`). 자동 정정 없음 — 정정은 원인 규명 후 Phase 1 백필 재실행(운영 판단). gl-ledger-auditor 감사 HIGH 0·MED 3·LOW 4 중 MED 전건+LOW 2건 반영. Phase 2(전역 라우팅)는 여전히 HOLDBACK 재분류 계정 확정 대기.
@@ -59,8 +67,6 @@
 ## 다음 할 일
 
 **다음 세션 추천 착수(사용자 결정 불필요·범위 명확 순):**
-- [ ] **payout 파이프라인 실송금 트리거 + 셀러 계좌 레지스트리** (그린필드, 규모 M) — 생성 배선(정산 확정→Payout 멱등 생성)은
-      완료, 실송금·계좌 레지스트리만 잔여. 계좌정보 암호화(`PAYOUT_ENC_KEY`)·PII → `security-auditor` 검수 권장
 - [ ] operation-service **Phase 4 AI 브리핑** (Phase 3 베이스라인 이상탐지까지 완료, 로드맵 docs/design/operation-service-phase1.md)
 - [ ] 커버리지 게이트 90% 후속 — 신규 서비스 통합테스트 보강
 
@@ -72,12 +78,15 @@
 - [ ] ADR 0026 열린 질문 ④ — 수동 payout(`settlementId=null`) 정책 확정 (MEDIUM, 현재는 `normalBalanceRespected` 가 사후 방어)
 
 **외부 조건 대기:**
+- [ ] payout **실 은행/PG 이체 어댑터** — `FirmBankingPort` 실 HTTP 구현(+Resilience4j 서킷브레이커).
+      실 은행 API 계약 미확보라 현재는 `MockFirmBankingAdapter` 가 유일 구현(사변적 스캐폴드 지양, 계약 확보 시 착수)
 - [ ] commondata 실수집 검증 (`DATA_GO_KR_API_KEY` 확보 시) — 확보되면 loan 주택담보 실거래가 평가도
       `app.loan.commondata.real-estate-source` 설정으로 활성화(코드는 P2-7b 로 완료, 폴백은 제시값)
 - [ ] ADR 0022(이벤트 스키마 레지스트리) 정식 도입 검토 — 현재 계약-as-code(0024)가 경량 선행 단계
 
 **완료(2026-07-30 마감분):** `sellerPayableBalance` O(1) 교체(Phase 1) · ADR 0030 Phase 3 대사 ·
 담보대출 account GL 소비 매핑 · 담보평가 실연동 P2-7b(담보대출 Phase 2 전량 소진) — 상세는 `## 최근 진척`
+**완료(2026-08-02 마감분):** 셀러 셀프서비스 지급 계좌 API(+gateway 라우팅 갭·ADR 0026 N5 표기 정정) — 상세는 `## 최근 진척`
 
 ## 주요 위험/메모
 - `DATA_GO_KR_API_KEY` 미보유로 common-data-service 실수집 경로 미검증(소스 등록→조회 전과정은 검증됨)
@@ -93,7 +102,7 @@
 - 서비스 **14개** + API Gateway + Kotlin polyglot 2(notification·reconciliation) — `git ls-files '*/src/main/resources/application.yml' | wc -l` → 17(=14+gateway+kotlin 2)
 - Flyway 마이그레이션 **237개** — `git ls-files '*/src/main/resources/db/migration/*.sql' | wc -l` → 237
 - ADR **29개** (0001~0030, 0019 결번 — 세무 ADR 은 0027 충돌로 0029 재부여) — `git ls-files 'docs/adr/[0-9]*.md' | wc -l` → 29
-- 테스트 클래스 **732개** (Testcontainers 통합테스트 포함) — `git ls-files '*/src/test/*Test.java' '*/src/test/*Tests.java' '*/src/test/*IT.java' | wc -l` → 732
+- 테스트 클래스 **733개** (Testcontainers 통합테스트 포함) — `git ls-files '*/src/test/*Test.java' '*/src/test/*Tests.java' '*/src/test/*IT.java' | wc -l` → 733
 - 이벤트 계약 스키마 **27토픽** (ADR 0024, 프로듀서·컨슈머 양방향 테스트 — 담보대출 2종·organization 멤버 2종 포함) — `git ls-files 'shared-common/src/testFixtures/resources/contracts/events/*.schema.json' | wc -l` → 27
 
 ## 최근 전체 검증 (2026-07-29)
