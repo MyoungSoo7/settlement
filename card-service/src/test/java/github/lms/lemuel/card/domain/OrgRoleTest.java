@@ -4,6 +4,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * organization-service 이벤트 페이로드 문자열({@code "OWNER"} 등)을 card-service 가 자체
@@ -16,5 +17,17 @@ class OrgRoleTest {
     void hasThreeRolesParsedFromString() {
         assertThat(OrgRole.values()).containsExactly(OrgRole.OWNER, OrgRole.MANAGER, OrgRole.STAFF);
         assertThat(OrgRole.valueOf("OWNER")).isEqualTo(OrgRole.OWNER);
+    }
+
+    @Test
+    @DisplayName("from 은 계약 밖 역할 문자열을 원문과 함께 거부한다 — 상류가 역할을 추가해도 조용히 적재되지 않는다")
+    void from_rejectsUnknownRole() {
+        assertThat(OrgRole.from("STAFF")).isEqualTo(OrgRole.STAFF);
+
+        assertThatThrownBy(() -> OrgRole.from("ACCOUNTANT"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("ACCOUNTANT");
+        assertThatThrownBy(() -> OrgRole.from(null))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }
