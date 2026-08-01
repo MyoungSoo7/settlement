@@ -11,9 +11,19 @@
   - 공개조회 위성: financial(8086) · economics(8087) · company(8090) · market(8094) · commondata(8098)
   - 부가: operation(8092) · ai(8096) · organization(8104, 셀러/기업 조직·멤버십)
 - **DB:** 13 서비스 모두 물리 분리(DB-per-service) — opslab / settlement_db / lemuel_{loan,financial,economics,company,operation,market,ai,commondata,investment,account,organization}
-- **최근 커밋:** `59a7c5227` feat(account): ADR 0030 Phase 3 — 실체화 잔액 대사·정기 배치·드리프트 게이지
+- **최근 커밋:** `7be9f6815` feat(card): 카드계정·카드 영속 계층과 활성 슬롯 유니크 제약 (Task 6 잔여)
 
 ## 최근 진척 (2026-06-24 이후)
+- **card-service Task 3 잔여·6·7 완료 (2026-08-02)** — ① organization 멤버 이벤트 2종 잔여 배선 마감(`ca5217f5a`:
+  토픽 레지스트리·SPEC·STATUS — 발행 라우팅은 KafkaOutboxPublisher 컨벤션이라 코드 동작 무관). ② Task 7 이벤트 소비
+  프로젝션(`a2c802cf2`+`dab20ebc8`): V4 마이그레이션(카드 코어+프로젝션 3테이블) + 컨슈머 5종(organization 4종·company
+  평판, `lemuel-card` 그룹, IdempotentEventConsumer 멱등 2단) + KafkaErrorHandlerConfig(loan 동형 — 계획서 누락분,
+  없으면 Acknowledgment 시그니처로 기동 불가). created 는 소유자 member_joined 미발행이므로 소유자 OWNER 멤버십을
+  함께 적재, 멤버 제거는 active=false 툼스톤(순서 역전 안전). event-contract-reviewer 검토 HIGH 2건(계약 테스트
+  5토픽 전체 커버·SPEC 소비처 현행화) 전건 반영. ③ Task 6 잔여(`7be9f6815`): 카드계정·카드 JPA 계층 — 포트 4종·
+  detached merge 규약(감사 컬럼 DB DEFAULT 위임)·@Version 낙관 락·findByIdForUpdate 비관적 락, CardPersistenceIT 로
+  스냅샷 왕복·uq 2종·CANCELED 슬롯 해제 실증. 게이트: :card-service:test 91건 skip 0 + JaCoCo GREEN.
+  다음은 Task 8(account 재원 조회 어댑터) → 9~15.
 - **payout 셀러 셀프서비스 계좌 API + STATUS 드리프트 정정 (2026-08-02)** — `PUT/GET /api/seller/bank-account` 신설:
   셀러 식별자를 요청(본문·경로)에서 받지 않고 JWT 주체(userId)에서만 파생(IDOR 원천 차단, 본문 sellerId 스푸핑 무시 테스트 실증),
   기존 레지스트리 스택(도메인·서비스·`PayoutFieldEncryptionConverter` 암호화) 전부 재사용. gateway settlement 라우트의
