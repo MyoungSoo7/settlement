@@ -97,20 +97,29 @@ public class Card {
         return value;
     }
 
-    // PAN(카드 실번호)은 통상 13~19자리 — 10자리 이상 연속 숫자가 있으면 마스킹되지 않은
-    // 원본이 그대로 들어온 것으로 간주해 거부한다. "1234-****-****-5678" 처럼 마스킹된 값은
-    // 4자리씩 끊기므로 연속 숫자가 최대 4자리라 통과한다.
-    private static final Pattern UNMASKED_PAN = Pattern.compile("\\d{10,}");
+    // ★ "연속 숫자 N자리"만 보면 구분자(공백·대시)로 4자리씩 묶인 미마스킹 PAN을 놓친다
+    // ("5678 9012 3456 7890", "5678-9012-3456-7890" 모두 연속 숫자는 4자리뿐이라 통과해버림 —
+    // 실제 카드가 표시되는 표준 형태가 그대로 이 게이트를 통과하는 거짓 음성). 그래서 구분자를
+    // 전부 제거한 뒤 남은 숫자 개수로 판단한다.
+    //
+    // 임계값 12 인 이유: PAN(카드 실번호)은 통상 13~19자리라 숫자 12자리 이하는 나올 수 없다.
+    // 반대로 PCI 가 허용하는 표시 형식 중 "첫6자리+마지막4자리"(예: "123456******7890")는 숫자가
+    // 정확히 10자리인 정당한 마스킹이라 반드시 통과해야 한다(거짓 양성 금지). 13(PAN 최소)과
+    // 10(PCI 표시 최대) 사이인 12를 기준으로 "12자리 이상이면 거부"로 두면 양쪽을 다 만족한다.
+    private static final Pattern NON_DIGIT = Pattern.compile("\\D");
+    private static final int UNMASKED_PAN_DIGIT_THRESHOLD = 12;
 
     /**
-     * 마스킹된 카드번호만 허용 — 연속 숫자 10자리 이상이면 원본 PAN 유출로 간주해 거부한다.
+     * 마스킹된 카드번호만 허용 — 구분자를 제거한 뒤 남은 숫자가
+     * {@value #UNMASKED_PAN_DIGIT_THRESHOLD}자리 이상이면 원본 PAN 유출로 간주해 거부한다.
      * PAN 은 이 도메인에 들어오지 않아야 한다(PCI 스코프 축소, 클래스 javadoc 참조).
      */
     private static String requireMasked(String maskedCardNo) {
         if (maskedCardNo == null || maskedCardNo.isBlank()) {
             throw new IllegalArgumentException("마스킹된 카드번호는 필수입니다");
         }
-        if (UNMASKED_PAN.matcher(maskedCardNo).find()) {
+        String digitsOnly = NON_DIGIT.matcher(maskedCardNo).replaceAll("");
+        if (digitsOnly.length() >= UNMASKED_PAN_DIGIT_THRESHOLD) {
             throw new IllegalArgumentException("마스킹되지 않은 카드번호(PAN)로 추정되어 거부합니다");
         }
         return maskedCardNo;

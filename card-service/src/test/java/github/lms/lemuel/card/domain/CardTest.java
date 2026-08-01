@@ -3,10 +3,13 @@ package github.lms.lemuel.card.domain;
 import github.lms.lemuel.card.domain.exception.InvalidCardTransitionException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class CardTest {
@@ -80,12 +83,28 @@ class CardTest {
         assertThat(card.getMaskedCardNo()).isEqualTo("1234-****-****-5678");
     }
 
-    @Test
-    @DisplayName("마스킹되지 않은 카드번호(PAN, 연속 숫자 10자리 이상)는 발급 시점에 거부된다 — PAN 유출 방지(I5)")
-    void unmaskedPanRejectedOnIssue() {
-        assertThatThrownBy(() ->
-                Card.issue(1L, 888L, "5678901234567890", new BigDecimal("500000")))
-                .isInstanceOf(IllegalArgumentException.class);
+    // ★ 재리뷰(I5) 회귀 — "연속 숫자 N자리"만 보는 정규식은 구분자(공백·대시)로 4자리씩 끊긴
+    // 미마스킹 PAN 을 통과시킨다(거짓 음성). 구분자를 제거한 뒤 숫자 자릿수로 판단해야 한다.
+    // 임계값 12 는 PAN 최소자리(13)와 PCI 표시형식(첫6+끝4=숫자10자리) 사이에 둬서, PCI 표시
+    // 형식(123456******7890)은 통과시키면서(거짓 양성 금지) 실제 PAN 은 구분자 형태와 무관하게
+    // 전부 거부한다(거짓 음성 금지).
+    @ParameterizedTest(name = "[{index}] \"{0}\" → 마스킹통과={1}")
+    @DisplayName("마스킹 판정 경계값 5종 — 거짓 양성·거짓 음성 회귀(I5 재리뷰)")
+    @CsvSource({
+            "1234-****-****-5678, true",     // 정상 마스킹(숫자 8자리) → 통과
+            "123456******7890, true",        // PCI 표시형식 첫6+끝4(숫자 10자리) → 통과, 거짓 양성 금지
+            "'5678 9012 3456 7890', false",  // 공백 구분 PAN(숫자 16자리) → 거부, 거짓 음성 금지
+            "5678-9012-3456-7890, false",    // 대시 구분 PAN(숫자 16자리) → 거부, 거짓 음성 금지
+            "5678901234567890, false",       // 구분자 없는 PAN(숫자 16자리) → 거부
+    })
+    void maskingBoundaryCases(String candidate, boolean accepted) {
+        if (accepted) {
+            assertThatCode(() -> Card.issue(1L, 888L, candidate, new BigDecimal("500000")))
+                    .doesNotThrowAnyException();
+        } else {
+            assertThatThrownBy(() -> Card.issue(1L, 888L, candidate, new BigDecimal("500000")))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
     }
 
     @Test
