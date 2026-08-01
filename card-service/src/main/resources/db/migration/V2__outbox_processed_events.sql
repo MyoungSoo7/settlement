@@ -11,9 +11,9 @@
 
 CREATE TABLE IF NOT EXISTS outbox_events (
     id                BIGSERIAL PRIMARY KEY,
-    aggregate_type    VARCHAR(50)  NOT NULL,      -- 예: "CardAccount"
+    aggregate_type    VARCHAR(50)  NOT NULL,      -- 예: "Card" (KafkaOutboxPublisher.resolveTopic 이 소문자화해 토픽 접두어로 씀 — "CardAccount" 아님, §3.4/application.yml 참조)
     aggregate_id      VARCHAR(64)  NOT NULL,
-    event_type        VARCHAR(100) NOT NULL,      -- 예: "CardAccountOpened"
+    event_type        VARCHAR(100) NOT NULL,      -- 예: "CardAccountOpened" (aggregate_type prefix 제거 후 snake_case 변환 → lemuel.card.account_opened)
     event_id          UUID         NOT NULL,      -- 전역 고유 — 컨슈머 측 멱등 키
     payload           JSONB        NOT NULL,
     status            VARCHAR(20)  NOT NULL DEFAULT 'PENDING',  -- PENDING / PUBLISHED / FAILED
