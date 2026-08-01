@@ -2259,7 +2259,7 @@ git commit -am "feat(card): 카드계정·카드 영속 계층과 활성 슬롯 
   - `LoadReputationPort.gradeOf(String sellerId) : ReputationGrade` (없으면 `ReputationGrade.unknownDefault()`)
   - 컨슈머 그룹은 전부 `"lemuel-card"`
 
-- [ ] **Step 1: 컨슈머 계약 테스트 작성 — 정본 샘플이 그대로 흘러야 한다**
+- [x] **Step 1: 컨슈머 계약 테스트 작성 — 정본 샘플이 그대로 흘러야 한다**
 
 loan-service `EventContractConsumerTest` 패턴을 그대로 쓴다.
 
@@ -2363,7 +2363,7 @@ class EventContractConsumerTest {
 }
 ```
 
-- [ ] **Step 2: 실패 확인 → 컨슈머 5종 구현**
+- [x] **Step 2: 실패 확인 → 컨슈머 5종 구현**
 
 전부 `IdempotentEventConsumer` 를 상속하고 `@ConditionalOnProperty(name = "app.kafka.enabled", havingValue = "true")` 를 붙인다. 예시:
 
@@ -2435,12 +2435,12 @@ public class OrganizationMemberRemovedConsumer extends IdempotentEventConsumer {
 
 `OrganizationCreatedConsumer` 는 **`type != SELLER` 면 무시**한다 (CORPORATE 조직은 1단계 대상이 아니다). `CompanyReputationChangedConsumer` 는 평판 등급을 `reputation_projection` 에 upsert 한다.
 
-- [ ] **Step 3: 프로젝션 서비스·어댑터 구현 → 통과 확인**
+- [x] **Step 3: 프로젝션 서비스·어댑터 구현 → 통과 확인**
 
 Run: `./gradlew :card-service:test --tests '*EventContractConsumerTest'`
 Expected: PASS
 
-- [ ] **Step 4: 커밋**
+- [x] **Step 4: 커밋**
 
 ```bash
 git commit -am "feat(card): 조직·멤버·평판 이벤트 프로젝션 컨슈머 5종"
@@ -2471,7 +2471,7 @@ git commit -am "feat(card): 조직·멤버·평판 이벤트 프로젝션 컨슈
 >
 > **전례 대비 개선 1건:** `OrderReconClientTest` 는 `X-Internal-Api-Key` 헤더가 실제로 실리는지 검증하지 않는다(테스트가 패키지-프라이빗 생성자로 우회). 여기서는 헤더 검증 테스트를 반드시 추가한다.
 
-- [ ] **Step 1: 실패 테스트 작성**
+- [x] **Step 1: 실패 테스트 작성**
 
 ```java
 package github.lms.lemuel.card.adapter.out.external;
@@ -2606,7 +2606,7 @@ class AccountFundingAdapterTest {
 
 > 마지막 테스트가 중요하다. 응답을 못 읽었을 때 `null` 을 0 으로 정규화하면 **재원 0 = 심사 탈락**이 되어 장애가 "이 셀러는 자격 미달"로 둔갑한다. 실패는 실패여야 한다.
 
-- [ ] **Step 2: 실패 확인 → 어댑터 구현**
+- [x] **Step 2: 실패 확인 → 어댑터 구현**
 
 ```java
     @Autowired
@@ -2625,7 +2625,7 @@ class AccountFundingAdapterTest {
     }
 ```
 
-- [ ] **Step 3: 통과 확인 → 커밋**
+- [x] **Step 3: 통과 확인 → 커밋**
 
 Run: `./gradlew :card-service:test --tests '*AccountFundingAdapterTest'`
 
@@ -2661,7 +2661,7 @@ git commit -am "feat(card): account 재원 조회 어댑터 — 재시도 후 �
   - `POST /api/cards/accounts` → 201 + `CardAccountResponse`
   - 토픽 `lemuel.card.account_opened` — `{cardAccountId:int, organizationId:int, sellerId:str, masterLimit:str, reputationGrade:str}`
 
-- [ ] **Step 1: 서비스 실패 테스트 작성**
+- [x] **Step 1: 서비스 실패 테스트 작성**
 
 ```java
     @Test
@@ -2761,7 +2761,7 @@ git commit -am "feat(card): account 재원 조회 어댑터 — 재시도 후 �
 
 > 마지막 테스트의 의미: 재원을 모를 때는 **아무 상태도 남기지 않는다.** REJECTED 로 기록하면 "심사 탈락"이라는 사실이 아닌 기록이 남는다.
 
-- [ ] **Step 2: 실패 확인 → `CardOrgAuthorizer` 구현**
+- [x] **Step 2: 실패 확인 → `CardOrgAuthorizer` 구현**
 
 ```java
 /**
@@ -2788,13 +2788,13 @@ public class CardOrgAuthorizer {
 }
 ```
 
-- [ ] **Step 3: `OpenCardAccountService` 구현**
+- [x] **Step 3: `OpenCardAccountService` 구현**
 
 순서를 지킨다: **인가 → 조직 검증 → 중복 검증 → 재원 조회 → 평판 조회 → 산정 → 저장 → 발행.** 재원 조회는 외부 호출이라 인가·검증을 통과한 뒤에만 한다.
 
 `@Transactional` 안에서 저장과 Outbox 기록이 함께 커밋되어야 한다.
 
-- [ ] **Step 4: 계약 스키마 + 프로듀서 계약 테스트**
+- [x] **Step 4: 계약 스키마 + 프로듀서 계약 테스트**
 
 `lemuel.card.account_opened.schema.json` — 금액은 문자열(`^[0-9]+(\\.[0-9]+)?$`).
 
@@ -2811,7 +2811,7 @@ public class CardOrgAuthorizer {
     }
 ```
 
-- [ ] **Step 5: 컨트롤러 + 예외 핸들러**
+- [x] **Step 5: 컨트롤러 + 예외 핸들러**
 
 `CardExceptionHandler` 는 `@Order(Ordered.HIGHEST_PRECEDENCE)` — shared-common 핸들러(LOWEST)보다 먼저 도메인 예외를 잡아야 한다.
 
@@ -2840,7 +2840,7 @@ public class CardExceptionHandler {
 
 컨트롤러 테스트는 `@WebMvcTest(controllers = CardController.class)` + `@AutoConfigureMockMvc(addFilters = false)` + `@MockitoBean JwtUtil` (loan-service `RepaymentControllerTest` 패턴). 역할별 403/422 를 검증한다.
 
-- [ ] **Step 6: 통과 확인 → 커밋**
+- [x] **Step 6: 통과 확인 → 커밋**
 
 Run: `./gradlew :card-service:test`
 
@@ -2868,7 +2868,7 @@ git commit -am "feat(card): 카드계정 개설·심사 유스케이스와 REST 
   - `IssueCardUseCase.issue(IssueCardCommand) : Card` — `record IssueCardCommand(Long cardAccountId, Long holderUserId, BigDecimal subLimit, Long requesterUserId)`
   - `CardIssuerPort.issue(Long cardAccountId, Long holderUserId) : IssuedCard` — `record IssuedCard(String maskedCardNo)`
 
-- [ ] **Step 1: 서비스 실패 테스트**
+- [x] **Step 1: 서비스 실패 테스트**
 
 ```java
     @Test
@@ -2939,7 +2939,7 @@ git commit -am "feat(card): 카드계정 개설·심사 유스케이스와 REST 
     }
 ```
 
-- [ ] **Step 2: 실패 확인 → 서비스 구현**
+- [x] **Step 2: 실패 확인 → 서비스 구현**
 
 ```java
     @Override
@@ -2970,7 +2970,7 @@ git commit -am "feat(card): 카드계정 개설·심사 유스케이스와 REST 
     }
 ```
 
-- [ ] **Step 3: 동시성 IT 작성 — 이 계획의 핵심**
+- [x] **Step 3: 동시성 IT 작성 — 이 계획의 핵심**
 
 ```java
     @Test
@@ -3058,7 +3058,7 @@ git commit -am "feat(card): 카드계정 개설·심사 유스케이스와 REST 
 
 > 두 번째 테스트가 없으면 "전부 실패시키는 락"도 첫 테스트를 통과한다. 불변식을 지키는 것과 처리량을 죽이는 것은 다르다.
 
-- [ ] **Step 4: 통과 확인 → 커밋**
+- [x] **Step 4: 통과 확인 → 커밋**
 
 Run: `./gradlew :card-service:test --tests '*CardIssuanceLimitConcurrencyIT'`
 
@@ -3256,6 +3256,7 @@ git commit -am "feat(card): 조직 이탈자 카드 자동 정지"
 
 - Create: `.../application/port/in/RecalculateCardLimitsUseCase.java` · `.../application/service/RecalculateCardLimitsService.java`
 - Create: `.../adapter/in/schedule/CardLimitRecalculationScheduler.java`
+- **Modify: `.../domain/CardAccount.java`** — 재심사 메서드 추가 (아래 참조)
 - Test: `.../application/service/RecalculateCardLimitsServiceTest.java`
 - Test: `.../integration/LimitRecalculationClampIT.java`
 
@@ -3263,6 +3264,13 @@ git commit -am "feat(card): 조직 이탈자 카드 자동 정지"
 
 - Consumes: Task 5 정책, Task 8 재원 조회, Task 4 `changeMasterLimit`
 - Produces: `RecalculateCardLimitsUseCase.recalculateAll() : int` (변경 건수)
+- **Produces: `CardAccount.rescreen(BigDecimal newLimit, LimitSnapshot snapshot, BigDecimal currentSubLimitSum) : LimitChangeResult`**
+
+> **계획 결함 정정 (Task 6 리뷰에서 발견, 2026-08-02).** Task 4 가 만든 도메인에는 **ACTIVE 상태에서 `LimitSnapshot` 을 교체하는 public 메서드가 없다** — 스냅샷은 `activate()`/`reject()` 로 SCREENING 에서 나올 때만 설정된다. 그런데 재산정은 한도뿐 아니라 **산정 근거도 함께 갱신해야** 한다(근거가 옛 재원·옛 평판이면 `screened_at` 과 스냅샷이 서로 다른 심사를 가리키게 된다).
+>
+> `CardAccount.Builder` 로 새 인스턴스를 조립하는 우회는 쓰지 마라 — 빌더는 영속 계층의 재구성 전용이라 **상태 전이 가드를 건너뛰어** ACTIVE 가 아닌 계정도 임의로 재심사할 수 있게 된다. 도메인에 `rescreen(...)` 을 추가해 (a) ACTIVE 여야 하고, (b) 한도 변경은 기존 `changeMasterLimit` 의 클램프 규칙을 그대로 따르며, (c) 스냅샷은 non-null 이어야 한다는 불변식을 강제하라.
+>
+> 영속 계층은 이미 대비돼 있다 — `CardAccountPersistenceAdapter.save()` 가 스냅샷 5개 필드를 `compareTo` 로 비교해, 실제로 바뀐 재심사에서만 `screened_at` 을 갱신한다.
 
 - [ ] **Step 1: 실패 테스트**
 
