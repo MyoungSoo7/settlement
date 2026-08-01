@@ -788,6 +788,7 @@ git commit -m "feat(common): card 에러코드·감사액션·인가 규칙 추�
 - Produces:
   - `GET /internal/account/sellers/{sellerId}/funding` → `{"sellerId":123,"sellerPayable":"170000.00","holdbackPayable":"10000.00"}` (금액은 JSON 문자열)
   - `LoadAccountEntryPort.balanceOf(OwnerType ownerType, String ownerId, GlAccount account) : BigDecimal`
+  - **두 계정 잔액은 반드시 단일 SQL 문으로 읽는다** (리뷰 후 정정, 2026-08-01). `SELLER_PAYABLE` 과 `HOLDBACK_PAYABLE` 을 SELECT 두 번으로 나눠 읽으면 READ_COMMITTED 에서 문장마다 스냅샷이 갱신되므로, 그 사이 홀드백 해제(HOLDBACK_PAYABLE→SELLER_PAYABLE 재분류)가 커밋되면 합계가 일시적으로 어긋난다 — 이 API 의 존재 이유("카드 한도와 회계 장부가 어긋나지 않는다")와 정면으로 충돌한다. 같은 리포의 `AccountBalanceRepository#findBalanceReconRows` 가 동일 사유(감사 MED-3)로 이미 단일 문장을 채택했다. 잔액 행이 없는 계정은 `BigDecimal.ZERO` 로 정규화한다.
   - `AccountQueryUseCase.sellerFunding(String sellerId) : SellerFunding` — `record SellerFunding(String sellerId, BigDecimal sellerPayable, BigDecimal holdbackPayable)`
 
 > **왜 account-service 를 고치는가:** 카드 재원 `F = Σconfirmed − Σpayout − Σholdback_consumed − Σrecovery_offset − Σwithholding` 는 account-service 가 이미 `SELLER_PAYABLE` + `HOLDBACK_PAYABLE` 잔액으로 유지하고 있다(실체화 테이블 `account_balances` + `BalanceReconScheduler` 정합 배치). card-service 가 같은 계산을 재구현하면 진실의 원천이 둘로 갈라진다.
