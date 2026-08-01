@@ -2259,7 +2259,7 @@ git commit -am "feat(card): 카드계정·카드 영속 계층과 활성 슬롯 
   - `LoadReputationPort.gradeOf(String sellerId) : ReputationGrade` (없으면 `ReputationGrade.unknownDefault()`)
   - 컨슈머 그룹은 전부 `"lemuel-card"`
 
-- [ ] **Step 1: 컨슈머 계약 테스트 작성 — 정본 샘플이 그대로 흘러야 한다**
+- [x] **Step 1: 컨슈머 계약 테스트 작성 — 정본 샘플이 그대로 흘러야 한다**
 
 loan-service `EventContractConsumerTest` 패턴을 그대로 쓴다.
 
@@ -2363,7 +2363,7 @@ class EventContractConsumerTest {
 }
 ```
 
-- [ ] **Step 2: 실패 확인 → 컨슈머 5종 구현**
+- [x] **Step 2: 실패 확인 → 컨슈머 5종 구현**
 
 전부 `IdempotentEventConsumer` 를 상속하고 `@ConditionalOnProperty(name = "app.kafka.enabled", havingValue = "true")` 를 붙인다. 예시:
 
@@ -2435,12 +2435,12 @@ public class OrganizationMemberRemovedConsumer extends IdempotentEventConsumer {
 
 `OrganizationCreatedConsumer` 는 **`type != SELLER` 면 무시**한다 (CORPORATE 조직은 1단계 대상이 아니다). `CompanyReputationChangedConsumer` 는 평판 등급을 `reputation_projection` 에 upsert 한다.
 
-- [ ] **Step 3: 프로젝션 서비스·어댑터 구현 → 통과 확인**
+- [x] **Step 3: 프로젝션 서비스·어댑터 구현 → 통과 확인**
 
 Run: `./gradlew :card-service:test --tests '*EventContractConsumerTest'`
 Expected: PASS
 
-- [ ] **Step 4: 커밋**
+- [x] **Step 4: 커밋**
 
 ```bash
 git commit -am "feat(card): 조직·멤버·평판 이벤트 프로젝션 컨슈머 5종"
