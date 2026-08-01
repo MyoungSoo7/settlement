@@ -168,6 +168,9 @@ public class SecurityConfig {
                         .requestMatchers("/admin/tax/**").hasAnyRole("ADMIN", "MANAGER")
                         // 세금계산서 셀러 다운로드 — JWT 주체(userId) 파생 + 소유권 대조(403)로 IDOR 방지.
                         .requestMatchers("/api/tax-invoices/**").hasAnyRole("ADMIN", "MANAGER", "USER")
+                        // 셀러 지급 계좌 셀프서비스 — 셀러 식별자를 요청에서 받지 않고 JWT 주체(userId)에서만
+                        // 파생하므로 인증 사용자(USER) 허용으로 IDOR 원천 차단 (관리자 대행은 /admin/seller-bank-accounts).
+                        .requestMatchers("/api/seller/bank-account").hasAnyRole("ADMIN", "MANAGER", "USER")
                         // Chargeback 콘솔 — 셀러 환수 결정은 ADMIN 만
                         .requestMatchers("/admin/chargebacks/**").hasRole("ADMIN")
                         // 백필 콘솔 — 원장 역분개·Payout 누락 보정 작업은 ADMIN 만

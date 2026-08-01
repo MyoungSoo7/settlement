@@ -89,7 +89,8 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
 | 도메인 | API | 기능 |
 |--------|------|------|
 | 정산 | `/settlements`, `/api/settlements`, `/api/settlements/query` | 정산 조회/검색(ES) — **REST 는 조회 전용**. 생성은 `payment.captured` 컨슈머, 확정은 Spring Batch(`SettlementConfirmJob`)로 비동기 처리 |
-| 지급 | `/admin/payouts` (ADMIN) | 셀러 지급 실행·재시도(펌뱅킹 mock) |
+| 지급 | `/admin/payouts` (ADMIN) | 셀러 지급 실행·재시도(펌뱅킹 mock), 반송(bounce) 기록·재지급 |
+| 지급 계좌 | `/admin/seller-bank-accounts` (ADMIN/MANAGER) · `/api/seller/bank-account` (셀러 본인) | 지급 계좌 레지스트리 — 관리자 대행 등록·정정과 셀러 셀프서비스 upsert/조회. 셀러 경로는 식별자를 JWT 주체(userId)에서만 파생(IDOR 차단), 계좌번호는 저장 시 암호화(`PAYOUT_ENC_KEY`)·노출 시 마스킹 |
 | 원장/리포트 | `/api/ledger`, `/api/reports` (ADMIN/MANAGER) | 복식부기 원장 조회, 캐시플로우 리포트(PDF) |
 | 차지백 | `/admin/chargebacks` (ADMIN) | 지급 거절/분쟁 처리 |
 | PG 대사 | `/admin/pg-reconciliation`, `/admin/reconciliation` (ADMIN/MANAGER) | PG 정산파일 업로드→대사→차이 승인/거절(역정산 트리거) |
