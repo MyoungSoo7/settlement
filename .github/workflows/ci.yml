@@ -43,7 +43,7 @@ jobs:
             backend:
               - '**'
               - '!frontend/**'
-            # shared: 전 서비스 이미지에 영향 → 변경 시 14개 전부 재빌드
+            # shared: 전 서비스 이미지에 영향 → 변경 시 15개 전부 재빌드
             shared:
               - 'shared-common/**'
               - 'build.gradle.kts'

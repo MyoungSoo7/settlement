@@ -44,7 +44,7 @@ public record ScreeningResult(boolean approved, BigDecimal masterLimit, LimitSna
         return new ScreeningResult(true, limit, snapshot, null);
     }
 
-    /** 심사 탈락. masterLimit 은 근거를 남기지 않기 위해 0으로 고정한다. */
+    /** 심사 탈락. masterLimit 은 탈락에 한도를 남기지 않기 위해 0으로 고정한다. */
     public static ScreeningResult rejected(LimitSnapshot snapshot, String reason) {
         return new ScreeningResult(false, BigDecimal.ZERO, snapshot, reason);
     }

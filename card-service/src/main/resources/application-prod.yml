@@ -1,6 +1,8 @@
-# 운영(prod) 프로파일. card-service 는 /internal/** 를 호스팅하지 않지만,
-# account-service 의 내부 API 를 호출하므로 INTERNAL_API_KEY 주입이 필수다.
-# 키가 없으면 헤더가 생략되어 account 가 fail-closed 로 401 을 반환한다(Task 2).
+# 운영(prod) 프로파일. app.security.internal-key-required 는 *인바운드* /internal/** 요청에만
+# 작용하는 설정이다 — card-service 는 /internal 엔드포인트를 호스팅하지 않으므로 현재는 무영향이지만,
+# 전 서비스 prod 프로파일 규약(fail-closed 기본값)을 동형으로 따르기 위해 둔다.
+# account-service 호출(아웃바운드)에 실제로 필요한 것은 INTERNAL_API_KEY 주입이며, 그것은 이 설정과
+# 별개다 — 키가 없으면 헤더가 생략되어 account 가 fail-closed 로 401 을 반환한다(Task 2).
 app:
   security:
     internal-key-required: true
