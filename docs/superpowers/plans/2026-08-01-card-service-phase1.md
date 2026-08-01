@@ -3272,7 +3272,7 @@ git commit -am "feat(card): 조직 이탈자 카드 자동 정지"
 >
 > 영속 계층은 이미 대비돼 있다 — `CardAccountPersistenceAdapter.save()` 가 스냅샷 5개 필드를 `compareTo` 로 비교해, 실제로 바뀐 재심사에서만 `screened_at` 을 갱신한다.
 
-- [ ] **Step 1: 실패 테스트**
+- [x] **Step 1: 실패 테스트**
 
 ```java
     @Test
@@ -3362,7 +3362,7 @@ git commit -am "feat(card): 조직 이탈자 카드 자동 정지"
     }
 ```
 
-- [ ] **Step 2: 스케줄러 구현**
+- [x] **Step 2: 스케줄러 구현**
 
 ```java
     @Scheduled(cron = "${app.card.limit.recalculation-cron:0 30 3 * * *}", zone = "Asia/Seoul")
@@ -3378,7 +3378,7 @@ git commit -am "feat(card): 조직 이탈자 카드 자동 정지"
 
 > `shedlock` 테이블은 Task 0 의 V2 에서 이미 만들었다. 없으면 다중 인스턴스에서 재산정이 중복 실행되어 한도가 요동친다.
 
-- [ ] **Step 3: 통과 → 커밋**
+- [x] **Step 3: 통과 → 커밋**
 
 ```bash
 git commit -am "feat(card): 일 1회 한도 재산정 — 상향 반영·하향 클램프"
