@@ -3181,7 +3181,7 @@ git commit -am "feat(card): 서브한도·카드 상태 변경과 조회 API"
 - Consumes: Task 7 `OrganizationMemberRemovedConsumer`, Task 4 `Card#suspend`(멱등)
 - Produces: `member_removed` 수신 시 해당 임직원의 활성 카드가 `SUSPENDED` 로 전이되고 `card.status_changed` 발행
 
-- [ ] **Step 1: IT 작성 — 실패 먼저**
+- [x] **Step 1: IT 작성 — 실패 먼저**
 
 ```java
     @Test
@@ -3242,7 +3242,7 @@ git commit -am "feat(card): 서브한도·카드 상태 변경과 조회 API"
     }
 ```
 
-- [ ] **Step 2: 구현 → 통과 → 커밋**
+- [x] **Step 2: 구현 → 통과 → 커밋**
 
 ```bash
 git commit -am "feat(card): 조직 이탈자 카드 자동 정지"
