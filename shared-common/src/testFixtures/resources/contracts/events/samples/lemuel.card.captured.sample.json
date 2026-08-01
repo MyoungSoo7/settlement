@@ -1,0 +1,10 @@
+{
+  "captureId": "CAP-20260802-0001",
+  "authorizationId": "AUTH-20260802-0001",
+  "cardId": 9001,
+  "cardAccountId": 5001,
+  "holderUserId": 888,
+  "amount": "45000",
+  "merchantName": "스타벅스 강남점",
+  "capturedAt": "2026-08-02T23:50:00Z"
+}

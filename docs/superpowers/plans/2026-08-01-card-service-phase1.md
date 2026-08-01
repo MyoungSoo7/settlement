@@ -3401,7 +3401,7 @@ git commit -am "feat(card): 일 1회 한도 재산정 — 상향 반영·하향 
 
 > 스펙 §3.4 의 합의 사항이다. 발행 코드는 1단계에 없지만 **스키마와 정본 샘플은 지금 확정**한다. 나중에 필드를 바꾸면 하위호환 규칙(ADR 0022) 때문에 신규 토픽 버전을 파야 한다.
 
-- [ ] **Step 1: 스키마 작성**
+- [x] **Step 1: 스키마 작성**
 
 ```json
 {
@@ -3436,7 +3436,7 @@ git commit -am "feat(card): 일 1회 한도 재산정 — 상향 반영·하향 
 
 `lemuel.card.captured` 는 `captureId` · `authorizationId` · `cardId` · `amount` · `capturedAt` 필수.
 
-- [ ] **Step 2: 스키마·샘플 정합 테스트**
+- [x] **Step 2: 스키마·샘플 정합 테스트**
 
 ```java
     @Test
@@ -3449,7 +3449,7 @@ git commit -am "feat(card): 일 1회 한도 재산정 — 상향 반영·하향 
     }
 ```
 
-- [ ] **Step 3: 통과 → 커밋**
+- [x] **Step 3: 통과 → 커밋**
 
 ```bash
 git commit -am "feat(card): 2단계 승인·매입 이벤트 계약 선확정"
