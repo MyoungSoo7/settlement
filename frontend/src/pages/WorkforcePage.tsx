@@ -12,20 +12,19 @@ import {
 import Card from '@/components/Card';
 import Spinner from '@/components/Spinner';
 import { apiErrorMessage } from '@/lib/apiError';
+import { decimalSign, formatDecimal } from '@/lib/decimal';
 
 /** 금액(소수 문자열 또는 수치) → "43,750,000원". null 은 표시 불가 대시 */
 const fmtWon = (amount: string | number | null): string => {
-  if (amount === null || amount === undefined) return '—';
-  const n = typeof amount === 'string' ? Number(amount) : amount;
-  return Number.isFinite(n) ? `${n.toLocaleString('ko-KR')}원` : '—';
+  const formatted = formatDecimal(amount);
+  return formatted === null ? '—' : `${formatted}원`;
 };
 
 /** 차이값에 부호를 붙인다 (+는 내 사업장이 집단 중앙값보다 높음) */
 const fmtSigned = (value: string | number | null, unit: string): string => {
-  if (value === null || value === undefined) return '—';
-  const n = typeof value === 'string' ? Number(value) : value;
-  if (!Number.isFinite(n)) return '—';
-  return `${n > 0 ? '+' : ''}${n.toLocaleString('ko-KR')}${unit}`;
+  const formatted = formatDecimal(value);
+  if (formatted === null) return '—';
+  return `${decimalSign(value) === 1 ? '+' : ''}${formatted}${unit}`;
 };
 
 const UNAVAILABLE_MESSAGE: Record<ComparisonUnavailableReason, string> = {
@@ -137,9 +136,9 @@ const ComparisonCard: React.FC<{
 const ChangeCell: React.FC<{ change: string | number | null; rate: number | null; isMoney?: boolean }> = ({
   change, rate, isMoney,
 }) => {
-  if (change === null) return <span className="text-gray-300">—</span>;
-  const n = typeof change === 'string' ? Number(change) : change;
-  const color = n > 0 ? 'text-blue-700' : n < 0 ? 'text-red-600' : 'text-gray-500';
+  const sign = decimalSign(change);
+  if (sign === null) return <span className="text-gray-300">—</span>;
+  const color = sign > 0 ? 'text-blue-700' : sign < 0 ? 'text-red-600' : 'text-gray-500';
   return (
     <span className={color}>
       {fmtSigned(change, isMoney ? '원' : '명')}
