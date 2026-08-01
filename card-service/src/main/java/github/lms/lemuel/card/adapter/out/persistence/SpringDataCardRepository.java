@@ -13,6 +13,9 @@ public interface SpringDataCardRepository extends JpaRepository<CardJpaEntity, L
 
     List<CardJpaEntity> findByCardAccountId(Long cardAccountId);
 
+    /** "내 카드" 조회 — 카드계정을 가로질러 한 임직원의 카드를 모은다(idx_card_holder). */
+    List<CardJpaEntity> findByHolderUserId(Long holderUserId);
+
     /**
      * 임직원의 활성 슬롯 점유자 — status &lt;&gt; CANCELED. uq_card_active_holder 부분 유니크
      * 인덱스와 동일한 판정 기준이라, "재발급 가능한가"를 발급 전에 이 메서드로 선검증한다.

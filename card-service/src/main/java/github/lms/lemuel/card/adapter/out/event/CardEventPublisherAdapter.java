@@ -5,11 +5,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import github.lms.lemuel.card.application.port.out.PublishCardEventPort;
 import github.lms.lemuel.card.domain.Card;
 import github.lms.lemuel.card.domain.CardAccount;
+import github.lms.lemuel.card.domain.CardStatus;
 import github.lms.lemuel.common.outbox.application.port.out.SaveOutboxEventPort;
 import github.lms.lemuel.common.outbox.domain.OutboxEvent;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -68,6 +70,58 @@ public class CardEventPublisherAdapter implements PublishCardEventPort {
                 AGGREGATE_TYPE,
                 String.valueOf(account.getId()),
                 "CardIssued",
+                toJson(payload)));
+    }
+
+    /**
+     * 서브한도 변경 — 토픽 {@code lemuel.card.limit_changed}.
+     *
+     * <p>{@code scope} 를 명시하는 이유는 마스터 한도 변경(Task 13)이 <b>같은 토픽</b>으로 나가기
+     * 때문이다. 구분자가 없으면 소비자가 "cardId 가 있으면 서브겠지" 같은 모양 추측으로 분기하게
+     * 되고, 그 추측은 페이로드에 필드 하나가 추가되는 순간 조용히 틀린다.
+     *
+     * <p>{@code clamped} 는 서브한도에선 항상 false 다 — 클램프는 마스터 하향이 Σ서브한도 하한에
+     * 걸릴 때만 일어난다. 그래도 필드를 빼지 않는 것은, 소비자가 scope 별로 다른 스키마를 다루지
+     * 않게 하기 위해서다(한 토픽 = 한 모양).
+     */
+    @Override
+    public void publishSubLimitChanged(Card card, CardAccount account, BigDecimal previousSubLimit) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("cardAccountId", account.getId());
+        payload.put("cardId", card.getId());
+        payload.put("organizationId", account.getOrganizationId());
+        payload.put("previousLimit", previousSubLimit.toPlainString());
+        payload.put("newLimit", card.getSubLimit().toPlainString());
+        payload.put("clamped", false);
+        payload.put("scope", "SUB");
+        saveOutboxEventPort.save(OutboxEvent.pending(
+                AGGREGATE_TYPE,
+                String.valueOf(account.getId()),
+                "CardLimitChanged",
+                toJson(payload)));
+    }
+
+    /**
+     * 카드 상태 변경 — 토픽 {@code lemuel.card.status_changed}.
+     *
+     * <p>파티션 키는 여기서도 카드계정이다 — 같은 계정의 발급·한도변경·상태변경이 한 파티션에
+     * 순서대로 떨어져야 소비자가 "정지된 카드에 한도를 올렸다" 같은 뒤집힌 이력을 보지 않는다.
+     */
+    @Override
+    public void publishStatusChanged(Card card, CardAccount account,
+                                     CardStatus previousStatus, String reason) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("cardId", card.getId());
+        payload.put("cardAccountId", account.getId());
+        payload.put("organizationId", account.getOrganizationId());
+        payload.put("holderUserId", card.getHolderUserId());
+        payload.put("previousStatus", previousStatus.name());
+        payload.put("newStatus", card.getStatus().name());
+        payload.put("reason", reason);
+        saveOutboxEventPort.save(OutboxEvent.pending(
+                AGGREGATE_TYPE,
+                String.valueOf(account.getId()),
+                "CardStatusChanged",
                 toJson(payload)));
     }
 

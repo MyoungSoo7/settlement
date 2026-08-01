@@ -16,6 +16,13 @@ public interface LoadCardPort {
     List<Card> findByCardAccountId(Long cardAccountId);
 
     /**
+     * 한 임직원이 보유한 카드 전체 — "내 카드" 조회 전용. 카드계정을 가로지른다(한 사람이
+     * 여러 법인에 소속될 수 있다). CANCELED 도 포함한다 — 해지 이력은 본인에게 숨길 이유가 없고,
+     * 오히려 "왜 안 되는지"를 설명하는 화면이 필요하다.
+     */
+    List<Card> findByHolderUserId(Long holderUserId);
+
+    /**
      * 임직원의 "활성 슬롯 점유자" 조회 — {@code status <> CANCELED} 인 카드.
      * uq_card_active_holder 부분 유니크 인덱스와 동일한 판정 기준이다(WHERE status &lt;&gt; 'CANCELED').
      * CANCELED 카드는 슬롯을 비우므로 재발급 가능 여부 사전 검증에 이 메서드를 쓴다.

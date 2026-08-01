@@ -120,4 +120,47 @@ class CardEventContractTest {
         assertThat(event.getEventType()).isEqualTo("CardIssued");
         assertThat(event.getAggregateId()).isEqualTo("5001");
     }
+
+    @Test
+    @DisplayName("서브한도 변경 페이로드는 계약을 만족하고 이전·이후 금액을 문자열로 싣는다")
+    void subLimitChanged_satisfiesContract() {
+        publisher.publishSubLimitChanged(issuedCard(), activeAccount(), new BigDecimal("50000"));
+
+        verify(saveOutboxEventPort).save(outboxCaptor.capture());
+        String payload = outboxCaptor.getValue().getPayload();
+        EventContractValidator.assertValid("lemuel.card.limit_changed", payload);
+        assertThat(payload).contains("\"previousLimit\":\"50000\"");
+        assertThat(payload).contains("\"newLimit\":\"100000\"");
+        assertThat(payload).contains("\"scope\":\"SUB\"");
+        assertThat(outboxCaptor.getValue().getEventType()).isEqualTo("CardLimitChanged");
+    }
+
+    /**
+     * 마스터 한도 변경도 같은 토픽으로 나가므로 {@code scope} 가 유일한 구분자다.
+     * 소비자가 "어느 한도가 바뀌었나"를 페이로드 모양 추측으로 판단하게 두지 않는다.
+     */
+    @Test
+    @DisplayName("서브한도 변경의 scope 는 SUB 이고 cardId 가 실린다")
+    void subLimitChangedCarriesScopeAndCardId() {
+        publisher.publishSubLimitChanged(issuedCard(), activeAccount(), new BigDecimal("50000"));
+
+        verify(saveOutboxEventPort).save(outboxCaptor.capture());
+        assertThat(outboxCaptor.getValue().getPayload()).contains("\"cardId\":9001");
+        assertThat(outboxCaptor.getValue().getAggregateId()).isEqualTo("5001");
+    }
+
+    @Test
+    @DisplayName("상태 변경 페이로드는 계약을 만족하고 이전 상태·사유를 남긴다")
+    void statusChanged_satisfiesContract() {
+        publisher.publishStatusChanged(issuedCard(), activeAccount(),
+                github.lms.lemuel.card.domain.CardStatus.SUSPENDED, "휴직");
+
+        verify(saveOutboxEventPort).save(outboxCaptor.capture());
+        String payload = outboxCaptor.getValue().getPayload();
+        EventContractValidator.assertValid("lemuel.card.status_changed", payload);
+        assertThat(payload).contains("\"previousStatus\":\"SUSPENDED\"");
+        assertThat(payload).contains("\"newStatus\":\"ISSUED\"");
+        assertThat(payload).contains("\"reason\":\"휴직\"");
+        assertThat(outboxCaptor.getValue().getEventType()).isEqualTo("CardStatusChanged");
+    }
 }
