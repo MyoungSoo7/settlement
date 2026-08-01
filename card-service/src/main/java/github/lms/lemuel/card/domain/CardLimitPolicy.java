@@ -2,6 +2,7 @@ package github.lms.lemuel.card.domain;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Objects;
 
 /**
  * 법인카드 한도 산정 정책 — 부수효과 없는 순수 도메인 정책.
@@ -38,6 +39,9 @@ public class CardLimitPolicy {
 
     public ScreeningResult screen(BigDecimal sellerPayable, BigDecimal holdbackPayable,
                                   ReputationGrade grade) {
+        // grade.haircut() 을 그대로 호출하면 NPE 로 죽는다 — 도메인 정책이 익명 NPE 보다는
+        // 명시적 계약 위반(어떤 인자가 왜 잘못됐는지)으로 실패하는 편이 호출자 디버깅에 낫다.
+        Objects.requireNonNull(grade, "평판 등급은 필수입니다");
         BigDecimal payable = nonNegative(sellerPayable);
         BigDecimal holdback = nonNegative(holdbackPayable);
         LimitSnapshot snapshot =

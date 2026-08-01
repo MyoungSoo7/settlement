@@ -127,4 +127,12 @@ class CardLimitPolicyTest {
                 () -> new CardLimitPolicy(new BigDecimal("0.70"), new BigDecimal("-1"))))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    @DisplayName("평판 등급이 null 이면 NPE 대신 명시적 계약 위반으로 거부한다")
+    void nullGradeRejected() {
+        assertThat(catchThrowable(
+                () -> policy.screen(new BigDecimal("1000000"), BigDecimal.ZERO, null)))
+                .isInstanceOf(NullPointerException.class);
+    }
 }
