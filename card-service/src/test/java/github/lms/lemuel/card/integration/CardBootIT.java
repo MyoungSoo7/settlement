@@ -14,6 +14,8 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -63,6 +65,27 @@ class CardBootIT {
         assertThat(tableExists("processed_events")).isTrue();
         assertThat(tableExists("shedlock")).isTrue();
         assertThat(tableExists("audit_logs")).isTrue();
+    }
+
+    @Test
+    @DisplayName("Flyway 가 V4 카드 코어(card_accounts·cards·프로젝션 3종)를 만든다")
+    void flywayCreatesCardCoreTables() {
+        assertThat(tableExists("card_accounts")).isTrue();
+        assertThat(tableExists("cards")).isTrue();
+        assertThat(tableExists("org_projection")).isTrue();
+        assertThat(tableExists("org_member_projection")).isTrue();
+        assertThat(tableExists("reputation_projection")).isTrue();
+    }
+
+    @Test
+    @DisplayName("Flyway 마이그레이션이 V2 → V3 → V4 순서로 적용된다")
+    void flywayAppliesMigrationsInOrder() {
+        List<String> versions = jdbc.queryForList("""
+                SELECT version FROM opslab.flyway_schema_history
+                 WHERE version IS NOT NULL
+                 ORDER BY installed_rank
+                """, String.class);
+        assertThat(versions).containsExactly("2", "3", "4");
     }
 
     private boolean tableExists(String table) {
