@@ -16,6 +16,7 @@ import org.springframework.data.domain.Sort;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -162,6 +163,43 @@ class AccountEntryPersistenceAdapterTest {
                 .thenReturn(Optional.empty());
 
         assertThat(adapter.sellerPayableBalance("empty")).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void balancesOf_는_여러_계정_잔액을_단일_조회로_함께_읽는다() {
+        // 코드리뷰 Important 회귀 방지 — balanceOf 를 계정 수만큼 여러 번 호출하던 read-skew 취약
+        // 경로 대신, findByOwnerTypeAndOwnerIdAndAccountIn 단일 SELECT 로 두 계정을 함께 읽는지 고정한다.
+        AccountBalanceJpaEntity payableRow = balance(new BigDecimal("170000.00"));
+        when(payableRow.getAccount()).thenReturn(GlAccount.SELLER_PAYABLE);
+        AccountBalanceJpaEntity holdbackRow = balance(new BigDecimal("10000.00"));
+        when(holdbackRow.getAccount()).thenReturn(GlAccount.HOLDBACK_PAYABLE);
+        when(balanceRepository.findByOwnerTypeAndOwnerIdAndAccountIn(
+                OwnerType.SELLER, "777", List.of(GlAccount.SELLER_PAYABLE, GlAccount.HOLDBACK_PAYABLE)))
+                .thenReturn(List.of(payableRow, holdbackRow));
+
+        Map<GlAccount, BigDecimal> result = adapter.balancesOf(
+                OwnerType.SELLER, "777", List.of(GlAccount.SELLER_PAYABLE, GlAccount.HOLDBACK_PAYABLE));
+
+        assertThat(result.get(GlAccount.SELLER_PAYABLE)).isEqualByComparingTo("170000.00");
+        assertThat(result.get(GlAccount.HOLDBACK_PAYABLE)).isEqualByComparingTo("10000.00");
+        verify(balanceRepository, never()).findByOwnerTypeAndOwnerIdAndAccount(any(), any(), any());
+    }
+
+    @Test
+    void balancesOf_는_잔액행이_없는_계정을_0으로_채운다() {
+        // IN 쿼리는 잔액 행이 없는 계정을 아예 반환하지 않는다 — 어댑터가 누락분을 0 으로 정규화해야
+        // NPE 나 잘못된(과소) 재원을 피한다.
+        AccountBalanceJpaEntity payableRow = balance(new BigDecimal("50000"));
+        when(payableRow.getAccount()).thenReturn(GlAccount.SELLER_PAYABLE);
+        when(balanceRepository.findByOwnerTypeAndOwnerIdAndAccountIn(
+                OwnerType.SELLER, "888", List.of(GlAccount.SELLER_PAYABLE, GlAccount.HOLDBACK_PAYABLE)))
+                .thenReturn(List.of(payableRow));   // HOLDBACK_PAYABLE 행 없음
+
+        Map<GlAccount, BigDecimal> result = adapter.balancesOf(
+                OwnerType.SELLER, "888", List.of(GlAccount.SELLER_PAYABLE, GlAccount.HOLDBACK_PAYABLE));
+
+        assertThat(result.get(GlAccount.SELLER_PAYABLE)).isEqualByComparingTo("50000");
+        assertThat(result.get(GlAccount.HOLDBACK_PAYABLE)).isEqualByComparingTo("0");
     }
 
     @Test

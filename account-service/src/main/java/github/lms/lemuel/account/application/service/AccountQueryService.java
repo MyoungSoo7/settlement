@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 계정계 조회 유스케이스 — 합계/건수는 포트의 DB 집계로, 잔액/시산표/요약은 도메인 계산으로 산출한다.
@@ -124,12 +125,19 @@ public class AccountQueryService implements AccountQueryUseCase {
      * card-service 법인카드 한도 입력 — 셀러 재원 = SELLER_PAYABLE 잔액 + HOLDBACK_PAYABLE 잔액.
      * 원장 전량 재합산({@link #accountSummary}) 이 아니라 실체화 테이블(O(1)) 을 읽어 내부 API
      * 핫패스에 적합하다.
+     *
+     * <p><b>단일 조회(코드리뷰 Important)</b>: 두 계정을 {@code balanceOf} 로 따로따로 두 번 읽으면
+     * {@code READ_COMMITTED} 라도 문장마다 스냅샷이 갱신되어, 두 SELECT 사이에 홀드백 해제
+     * (HOLDBACK_PAYABLE→SELLER_PAYABLE 재분류) 커밋이 끼어들 때 합계가 일시적으로 실제보다 작게
+     * 보고될 수 있다(read skew). {@code balancesOf} 로 두 계정을 한 문장에 담아 스냅샷을 고정한다.
      */
     @Override
     public SellerFunding sellerFunding(String sellerId) {
+        Map<GlAccount, BigDecimal> balances = loadAccountEntryPort.balancesOf(
+                OwnerType.SELLER, sellerId, List.of(GlAccount.SELLER_PAYABLE, GlAccount.HOLDBACK_PAYABLE));
         return new SellerFunding(
                 sellerId,
-                loadAccountEntryPort.balanceOf(OwnerType.SELLER, sellerId, GlAccount.SELLER_PAYABLE),
-                loadAccountEntryPort.balanceOf(OwnerType.SELLER, sellerId, GlAccount.HOLDBACK_PAYABLE));
+                balances.get(GlAccount.SELLER_PAYABLE),
+                balances.get(GlAccount.HOLDBACK_PAYABLE));
     }
 }
