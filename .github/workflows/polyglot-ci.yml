@@ -40,6 +40,11 @@ jobs:
   changes:
     name: Detect changed services
     runs-on: ubuntu-latest
+    # ci.yml 의 changes 잡과 같은 이유 — dorny/paths-filter 가 pull_request 에서 GitHub API 를
+    # 쓰므로 워크플로 수준 `permissions: contents: read` 만으로는 부족하다. 잡 수준에서 보강한다.
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
       go_matrix: ${{ steps.setmatrix.outputs.go_matrix }}
       go_any: ${{ steps.setmatrix.outputs.go_any }}
