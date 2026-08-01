@@ -16,6 +16,14 @@ jobs:
   changes:
     name: Detect changed paths
     runs-on: ubuntu-latest
+    # dorny/paths-filter 는 pull_request 이벤트에서 변경 파일 목록을 GitHub API(listFiles)로 읽는다.
+    # 리포의 default workflow permissions 가 read 로 내려가 있으면 이 잡만 조용히 실패하고,
+    # 뒤따르는 backend/frontend 잡이 전부 skipping 이 되어 *게이트 없이 초록불*이 된다
+    # (2026-08-01 PR #199 에서 실측: "Resource not accessible by integration").
+    # 리포 기본 설정과 무관하게 돌도록 최소 권한을 명시한다.
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
       frontend: ${{ steps.filter.outputs.frontend }}
