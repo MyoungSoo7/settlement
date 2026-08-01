@@ -1,5 +1,6 @@
 package github.lms.lemuel.card.adapter.out.external;
 
+import github.lms.lemuel.card.application.port.out.FundingUnavailableException;
 import github.lms.lemuel.card.application.port.out.LoadSellerFundingPort;
 import github.lms.lemuel.common.config.jwt.InternalApiKeyFilter;
 import org.slf4j.Logger;

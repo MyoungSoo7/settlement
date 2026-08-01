@@ -12,9 +12,12 @@ import java.math.BigDecimal;
 public interface LoadSellerFundingPort {
 
     /**
-     * 재원을 확인하지 못하면 어댑터가 {@code FundingUnavailableException} 을 던진다(타입 이름만
-     * 적는다 — application 은 adapter 패키지를 import 하지 않는다). <b>폴백하지 않는다</b> —
-     * 재원을 모르는 상태에서 추정 한도를 부여하면 그 자체가 여신 사고다.
+     * <b>폴백하지 않는다</b> — 재원을 모르는 상태에서 추정 한도를 부여하면 그 자체가 여신 사고다.
+     *
+     * @throws FundingUnavailableException 재원을 확인하지 못한 모든 경우. 이 예외가 어댑터가 아니라
+     *         <b>포트 옆</b>에 사는 이유는 실패 방식이 구현 세부가 아니라 포트 계약의 일부이고,
+     *         유스케이스가 이를 잡아 번역해야 하는데 ArchUnit 이 application→adapter 의존을
+     *         금지하기 때문이다(어댑터가 안쪽을 향해 의존하는 것은 허용).
      */
     SellerFunding load(String sellerId);
 

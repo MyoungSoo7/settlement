@@ -1,4 +1,4 @@
-package github.lms.lemuel.card.adapter.out.external;
+package github.lms.lemuel.card.application.port.out;
 
 /**
  * 셀러 재원을 확인하지 못했음을 나타낸다 — 재시도 소진·4xx·응답 불량 전부 포함.

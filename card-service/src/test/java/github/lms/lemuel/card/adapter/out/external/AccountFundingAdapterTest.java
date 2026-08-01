@@ -1,5 +1,6 @@
 package github.lms.lemuel.card.adapter.out.external;
 
+import github.lms.lemuel.card.application.port.out.FundingUnavailableException;
 import github.lms.lemuel.card.application.port.out.LoadSellerFundingPort.SellerFunding;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
