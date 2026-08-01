@@ -46,7 +46,7 @@ class CardAccountTest {
     @DisplayName("REJECTED 는 터미널 — 어떤 전이도 불가")
     void rejectedIsTerminal() {
         CardAccount account = screening();
-        account.reject();
+        account.reject("심사 기준 미달", snapshot());
 
         assertThat(account.getStatus()).isEqualTo(CardAccountStatus.REJECTED);
         assertThatThrownBy(() -> account.activate(new BigDecimal("100000"), snapshot()))
@@ -164,24 +164,29 @@ class CardAccountTest {
     // ── 그 외 계약(Produces 절 시그니처) ──
 
     @Test
-    @DisplayName("근거(LimitSnapshot) 없이는 ACTIVE 로 전이할 수 없다")
-    void activateRequiresSnapshot() {
+    @DisplayName("근거(LimitSnapshot) 없이 activate 가 실패해도 SCREENING 에 남고, 유효한 인자로 재시도하면 성공한다")
+    void activateFailureDoesNotCorruptStateAndAllowsRetry() {
         CardAccount account = screening();
 
+        // 검증(스냅샷 필수)이 상태 전이보다 먼저 일어나야 한다 — 반대 순서면 status 가 ACTIVE 로
+        // 바뀐 채 예외가 던져져 masterLimit=0·limitSnapshot=null 인 반쯤 깨진 상태가 되고,
+        // ACTIVE→ACTIVE 전이가 금지돼 있어 재시도조차 불가능해진다.
         assertThatThrownBy(() -> account.activate(new BigDecimal("100000"), null))
                 .isInstanceOf(IllegalArgumentException.class);
-    }
-
-    @Test
-    @DisplayName("reject(reason) — 사유만 남기고 근거 스냅샷 없이 탈락")
-    void rejectWithReasonOnly() {
-        CardAccount account = screening();
-
-        account.reject("재무제표 미제출");
-
-        assertThat(account.getStatus()).isEqualTo(CardAccountStatus.REJECTED);
-        assertThat(account.getRejectReason()).isEqualTo("재무제표 미제출");
+        assertThat(account.getStatus()).isEqualTo(CardAccountStatus.SCREENING);
+        assertThat(account.getMasterLimit()).isEqualByComparingTo("0");
         assertThat(account.getLimitSnapshot()).isNull();
+
+        // 같은 이유로 음수 한도 실패도 상태를 건드리지 않아야 한다.
+        assertThatThrownBy(() -> account.activate(new BigDecimal("-1"), snapshot()))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(account.getStatus()).isEqualTo(CardAccountStatus.SCREENING);
+
+        account.activate(new BigDecimal("100000"), snapshot());   // 재시도 성공
+
+        assertThat(account.getStatus()).isEqualTo(CardAccountStatus.ACTIVE);
+        assertThat(account.getMasterLimit()).isEqualByComparingTo("100000");
+        assertThat(account.getLimitSnapshot()).isNotNull();
     }
 
     @Test

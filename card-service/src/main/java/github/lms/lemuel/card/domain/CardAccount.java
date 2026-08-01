@@ -34,7 +34,7 @@ public class CardAccount {
         this.organizationId = Objects.requireNonNull(b.organizationId, "organizationId");
         this.sellerId = Objects.requireNonNull(b.sellerId, "sellerId");
         this.status = Objects.requireNonNull(b.status, "status");
-        this.masterLimit = Objects.requireNonNull(b.masterLimit, "masterLimit");
+        this.masterLimit = requireNonNegative(b.masterLimit);
         this.limitSnapshot = b.limitSnapshot;
         this.rejectReason = b.rejectReason;
         this.version = b.version;
@@ -54,31 +54,28 @@ public class CardAccount {
      * 심사 통과 → ACTIVE. 산정된 마스터 한도와 그 근거({@link LimitSnapshot})를 함께 남긴다 —
      * 근거 없는 한도를 남기지 않는다는 원칙(LimitSnapshot 자체의 compact 생성자가 강제)을
      * 애그리거트 차원에서도 지킨다.
+     *
+     * <p><b>검증을 상태 전이보다 먼저 한다</b> — 반대 순서였다면 snapshot 이 null 이라 예외가
+     * 던져져도 status 는 이미 ACTIVE 로 바뀐 채 남아, masterLimit=0·limitSnapshot=null 인
+     * "ACTIVE 인데 근거 없는" 반쯤 깨진 상태가 되고 재시도(ACTIVE→ACTIVE 는 금지 전이)도 불가능해진다.
+     * 검증을 먼저 해서 실패 시 SCREENING 에 그대로 남겨 재시도를 가능하게 한다.
      */
     public void activate(BigDecimal masterLimit, LimitSnapshot snapshot) {
-        transitionTo(CardAccountStatus.ACTIVE);
         requireNonNegative(masterLimit);
         if (snapshot == null) {
             throw new IllegalArgumentException("ACTIVE 전이는 한도 산정 근거(LimitSnapshot)가 필수입니다");
         }
+        transitionTo(CardAccountStatus.ACTIVE);
         this.masterLimit = masterLimit;
         this.limitSnapshot = snapshot;
     }
 
-    /** 심사 탈락(사유·근거 없음) — 운영 편의를 위한 최소 오버로드. */
-    public void reject() {
-        reject(null, null);
-    }
-
-    /** 심사 탈락 + 사유. */
-    public void reject(String reason) {
-        reject(reason, null);
-    }
-
     /**
-     * 심사 탈락 + 사유 + 산정 근거. 탈락도 {@link LimitSnapshot} 을 남길 수 있다 —
+     * 심사 탈락 + 사유 + 산정 근거. 탈락도 {@link LimitSnapshot} 을 항상 남긴다 —
      * "재원·평판을 계산은 했지만 기준 미달로 떨어졌다"는 근거를 사후에 재현하기 위해서다
-     * (근거 없는 거절을 남기지 않는다).
+     * (근거 없는 거절을 남기지 않는다). Task 5 {@code CardLimitPolicy.screen()} 은 승인·탈락
+     * 어느 쪽이든 항상 LimitSnapshot 을 반환하므로, 이 시그니처가 유일한 정본이다
+     * (reason/snapshot 을 생략하는 오버로드는 실사용처가 없어 제거했다).
      */
     public void reject(String reason, LimitSnapshot snapshot) {
         transitionTo(CardAccountStatus.REJECTED);
@@ -143,10 +140,11 @@ public class CardAccount {
         }
     }
 
-    private static void requireNonNegative(BigDecimal value) {
+    private static BigDecimal requireNonNegative(BigDecimal value) {
         if (value == null || value.signum() < 0) {
             throw new IllegalArgumentException("한도는 음수일 수 없습니다: " + value);
         }
+        return value;
     }
 
     // ── getter ──
