@@ -2,9 +2,9 @@ name: ci
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
   pull_request:
-    branches: [main]
+    branches: [ main ]
 
 env:
   JAVA_VERSION: "25"
@@ -73,7 +73,7 @@ jobs:
       - name: Compute image build matrix (changed services only)
         id: setmatrix
         env:
-          CHANGED: ${{ steps.filter.outputs.changes }} # dorny: 매치된 필터명 JSON 배열
+          CHANGED: ${{ steps.filter.outputs.changes }}   # dorny: 매치된 필터명 JSON 배열
         run: |
           set -euo pipefail
           # 배포 단위 단일 출처: module → image_suffix (아래 backend-ghcr 주석의 매핑과 반드시 일치)
@@ -121,7 +121,7 @@ jobs:
   backend-ci:
     name: Backend - Build/Test/JaCoCo/SonarCloud
     runs-on: ubuntu-latest
-    timeout-minutes: 90 # hang 시 러너 6시간 낭비 방지 (정상 55~70분 + 여유)
+    timeout-minutes: 90   # hang 시 러너 6시간 낭비 방지 (정상 55~70분 + 여유)
     needs: changes
     if: needs.changes.outputs.backend == 'true'
     permissions:
@@ -129,7 +129,7 @@ jobs:
       pull-requests: write
       checks: write
       security-events: write
-      packages: read # ghcr 미러 이미지 pull (mirror-testcontainers.yml 참고)
+      packages: read   # ghcr 미러 이미지 pull (mirror-testcontainers.yml 참고)
     services:
       postgres:
         # Docker Hub rate limit 회피 — ghcr 미러 사용 (mirror-testcontainers.yml 로 갱신)
@@ -295,7 +295,7 @@ jobs:
     #   card-service         → ghcr.io/myoungsoo7/settlement-card
     # shared-common·루트 빌드파일·Dockerfile·ci.yml 변경 시엔 changes 잡이 15개 전부 매트릭스에 담는다.
     strategy:
-      fail-fast: false # 한 서비스 빌드 실패가 다른 서비스 이미지 푸시를 취소하지 않도록
+      fail-fast: false   # 한 서비스 빌드 실패가 다른 서비스 이미지 푸시를 취소하지 않도록
       matrix: ${{ fromJSON(needs.changes.outputs.build_matrix) }}
     steps:
       - uses: actions/checkout@v4
@@ -417,7 +417,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: changes
     # Only run if explicitly triggered or if RUN_TESTS env var is set
-    if: false # Change to 'needs.changes.outputs.frontend == true' to enable
+    if: false  # Change to 'needs.changes.outputs.frontend == true' to enable
     steps:
       - uses: actions/checkout@v4
 
