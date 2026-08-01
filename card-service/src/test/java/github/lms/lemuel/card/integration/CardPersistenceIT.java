@@ -26,6 +26,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -88,6 +89,17 @@ class CardPersistenceIT {
                 new BigDecimal("0.7000"), ReputationGrade.B, "seller*0.7");
         account.activate(masterLimit, snapshot);
         return saveCardAccountPort.save(account);
+    }
+
+    /** card_accounts.screened_at 원시값 조회 — 도메인/포트는 이 컬럼을 노출하지 않아 raw SQL 로 확인한다. */
+    private Instant readScreenedAt(Long accountId) {
+        return jdbc.queryForObject(
+                "select screened_at from opslab.card_accounts where id = ?",
+                (rs, rowNum) -> {
+                    var ts = rs.getTimestamp("screened_at");
+                    return ts == null ? null : ts.toInstant();
+                },
+                accountId);
     }
 
     @Test
@@ -173,5 +185,77 @@ class CardPersistenceIT {
         saveCardPort.save(Card.issue(account.getId(), 12L, "m2", new BigDecimal("200000")));
 
         assertThat(loadCardPort.sumActiveSubLimits(account.getId())).isEqualByComparingTo("500000");
+    }
+
+    @Test
+    @DisplayName("신규 카드계정을 스냅샷과 함께 저장하면 screened_at 이 찍힌다")
+    void screenedAtStampedOnInsert() {
+        CardAccount account = saveActiveAccount(5001L, "seller-5001", new BigDecimal("1000000"));
+
+        assertThat(readScreenedAt(account.getId())).isNotNull();
+    }
+
+    @Test
+    @DisplayName("스냅샷을 그대로 두고 다른 상태만 바꿔 재저장하면 screened_at 이 갱신되지 않는다")
+    void screenedAtPreservedWhenSnapshotUnchanged() throws InterruptedException {
+        CardAccount account = saveActiveAccount(5002L, "seller-5002", new BigDecimal("1000000"));
+        Instant firstScreenedAt = readScreenedAt(account.getId());
+        assertThat(firstScreenedAt).isNotNull();
+
+        // Instant.now() 해상도 차이로 두 저장이 같은 순간에 찍히는 것을 방지 — 버그가 재발하면
+        // 이 sleep 이 있어야 "값이 달라짐"을 확실히 관측할 수 있다.
+        Thread.sleep(10);
+
+        // 스냅샷과 무관한 상태 변경(suspend) — Task 13 재산정 스케줄러가 반복 재저장하는 것과 동형.
+        CardAccount reloaded = loadCardAccountPort.findById(account.getId()).orElseThrow();
+        reloaded.suspend();
+        saveCardAccountPort.save(reloaded);
+
+        assertThat(readScreenedAt(account.getId())).isEqualTo(firstScreenedAt);
+    }
+
+    @Test
+    @DisplayName("스냅샷이 실제로 바뀌어 재저장되면(재산정) screened_at 이 갱신된다")
+    void screenedAtUpdatedWhenSnapshotChanges() throws InterruptedException {
+        CardAccount account = saveActiveAccount(5003L, "seller-5003", new BigDecimal("1000000"));
+        Instant firstScreenedAt = readScreenedAt(account.getId());
+
+        Thread.sleep(10);
+
+        // CardAccount 공개 API 는 ACTIVE 상태에서 스냅샷만 다시 바꾸는 메서드를 아직 두지 않는다
+        // (activate/reject 는 SCREENING 전용, changeMasterLimit 은 스냅샷을 건드리지 않음).
+        // Builder 는 "정적 팩토리와 영속성 재구성이 공용"하도록 설계됐으므로(Task 4), 재산정 유스케이스가
+        // 만들어낼 결과 상태를 여기서 직접 구성해 어댑터의 diff 판정 자체를 검증한다.
+        CardAccount reloaded = loadCardAccountPort.findById(account.getId()).orElseThrow();
+        LimitSnapshot changedSnapshot = new LimitSnapshot(new BigDecimal("2000000.00"), BigDecimal.ZERO,
+                new BigDecimal("0.8000"), ReputationGrade.A, "재산정-formula");
+        CardAccount reScreened = CardAccount.builder()
+                .id(reloaded.getId())
+                .organizationId(reloaded.getOrganizationId())
+                .sellerId(reloaded.getSellerId())
+                .status(reloaded.getStatus())
+                .masterLimit(reloaded.getMasterLimit())
+                .limitSnapshot(changedSnapshot)
+                .rejectReason(reloaded.getRejectReason())
+                .version(reloaded.getVersion())
+                .build();
+        saveCardAccountPort.save(reScreened);
+
+        assertThat(readScreenedAt(account.getId())).isAfter(firstScreenedAt);
+    }
+
+    @Test
+    @DisplayName("음수 sellerPayable(과지급) 도 부호 그대로 왕복 보존된다 — 원장 재현성의 핵심")
+    void negativeSellerPayableRoundTripsWithSignPreserved() {
+        LimitSnapshot snapshot = new LimitSnapshot(new BigDecimal("-500000.00"), BigDecimal.ZERO,
+                new BigDecimal("0.7000"), ReputationGrade.C, "과지급 재현");
+        CardAccount account = CardAccount.open(5004L, "seller-5004");
+        account.activate(BigDecimal.ZERO, snapshot);
+
+        CardAccount saved = saveCardAccountPort.save(account);
+        CardAccount reloaded = loadCardAccountPort.findById(saved.getId()).orElseThrow();
+
+        assertThat(reloaded.getLimitSnapshot().sellerPayable()).isEqualByComparingTo("-500000.00");
+        assertThat(reloaded.getLimitSnapshot().funding()).isEqualByComparingTo("-500000.00");
     }
 }

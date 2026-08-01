@@ -17,6 +17,7 @@ import jakarta.persistence.Version;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Objects;
 
 /**
  * card_accounts 테이블 매핑 (V4). created_at/updated_at 은 DB DEFAULT NOW() 에 위임(insertable=false) —
@@ -95,10 +96,10 @@ public class CardAccountJpaEntity {
         LimitSnapshot snapshot = a.getLimitSnapshot();
         if (snapshot != null) {
             // ★ 도메인 LimitSnapshot 은 산정 "시각"을 보관하지 않는다(activate/reject 는 시각을 받지 않음).
-            //   저장 시점을 근사치로 남긴다 — 근거 필드(재원·비율·등급·산식)가 이 시점의 값이라는 뜻이다.
-            //   같은 스냅샷을 담은 채로 다시 저장돼도(예: suspend 후 재조회·재저장) screened_at 이 갱신되는
-            //   한계가 있다 — 정확한 "최초 심사 시각" 보존이 필요해지면 Task 9 가 도메인에 시각 필드를
-            //   추가하거나, 어댑터가 기존 행을 먼저 읽어 스냅샷 동일 여부로 보존 여부를 판단해야 한다.
+            //   여기서는 일단 "지금"으로 잠정 채운다 — 실제로 기존 행과 스냅샷이 같은지 비교해
+            //   screened_at 을 보존할지 갱신할지 최종 결정하는 것은 어댑터(CardAccountPersistenceAdapter)의
+            //   책임이다(hasSameLimitSnapshot/getScreenedAt/setScreenedAt 참조). fromDomain 단독으로는
+            //   "이게 기존과 같은 스냅샷인지" 알 수 없어(비교 대상 없음) 여기서 최종 판단을 못 내린다.
             e.screenedAt = Instant.now();
             e.sellerPayableSnap = snapshot.sellerPayable();
             e.holdbackPayableSnap = snapshot.holdbackPayable();
@@ -109,6 +110,39 @@ public class CardAccountJpaEntity {
         e.rejectReason = a.getRejectReason();
         e.version = a.getVersion();
         return e;
+    }
+
+    /**
+     * 스냅샷 근거 5개 필드가 {@code other} 와 동일한지 비교한다 — 어댑터가 "재심사로 실제 값이
+     * 바뀐 저장"과 "심사와 무관한 상태 변경(suspend/resume/close/changeMasterLimit)으로 인한
+     * 재저장"을 구별해 {@code screened_at} 을 보존할지 갱신할지 판단하는 데 쓴다.
+     *
+     * <p>금액 필드는 {@link BigDecimal#compareTo}로 비교한다 — {@code equals}는 scale(소수 자릿수)이
+     * 다르면 값이 같아도 false 를 반환하는데, DB 왕복 후(NUMERIC(19,2))에는 저장 전 값과 scale 이
+     * 달라질 수 있어(예: "0.7" vs "0.7000") equals 를 쓰면 사실상 항상 "달라짐"으로 오판, 이 비교
+     * 자체가 무의미해진다.
+     */
+    boolean hasSameLimitSnapshot(CardAccountJpaEntity other) {
+        return bigDecimalEquals(this.sellerPayableSnap, other.sellerPayableSnap)
+                && bigDecimalEquals(this.holdbackPayableSnap, other.holdbackPayableSnap)
+                && bigDecimalEquals(this.appliedRatio, other.appliedRatio)
+                && Objects.equals(this.reputationGrade, other.reputationGrade)
+                && Objects.equals(this.limitFormula, other.limitFormula);
+    }
+
+    private static boolean bigDecimalEquals(BigDecimal a, BigDecimal b) {
+        if (a == null || b == null) {
+            return a == b;
+        }
+        return a.compareTo(b) == 0;
+    }
+
+    Instant getScreenedAt() {
+        return screenedAt;
+    }
+
+    void setScreenedAt(Instant v) {
+        this.screenedAt = v;
     }
 
     public CardAccount toDomain() {
