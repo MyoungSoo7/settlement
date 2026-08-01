@@ -115,11 +115,11 @@ Task 8 은 이 전례를 따른다. Resilience4j 도입은 리포 최초 도입�
 - Create: `card-service/build.gradle.kts`
 - Create: `card-service/src/main/java/github/lms/lemuel/CardServiceApplication.java`
 - Create: `card-service/src/main/resources/application.yml`
-- Create: `card-service/src/main/resources/db/migration/V1__card_core.sql` (빈 스켈레톤은 만들지 않는다 — Task 6 에서 작성. 여기서는 V2/V3 만)
 - Create: `card-service/src/main/resources/db/migration/V2__outbox_processed_events.sql`
 - Create: `card-service/src/main/resources/db/migration/V3__audit_logs.sql`
 - Create: `card-service/src/test/java/github/lms/lemuel/card/CardArchitectureTest.java`
 - Create: `card-service/src/test/java/github/lms/lemuel/card/integration/CardBootIT.java`
+- **`V1__card_core.sql` 은 이 태스크에서 만들지 않는다** — Task 6 이 작성한다. Flyway 는 V2 부터 시작해도 정상 동작한다(버전 번호는 순서만 정한다).
 - Modify: `settings.gradle.kts:8-23`
 - Modify: `Dockerfile` (COPY 2곳)
 - Modify: `docker-compose.yml`
