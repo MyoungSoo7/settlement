@@ -20,6 +20,14 @@ const fmtWon = (amount: string | number | null): string => {
   return formatted === null ? '—' : `${formatted}원`;
 };
 
+/** 차이값 색 — 판정 불가는 중립색. Number() 를 태우면 파싱실패(NaN)·언더플로(-0) 에서
+ *  표시 문자열과 색이 어긋난다(대시인데 빨강, 음수인데 파랑). */
+const diffColor = (value: string | number | null): string => {
+  const sign = decimalSign(value);
+  if (sign === null) return 'text-gray-500';
+  return sign < 0 ? 'text-red-600' : 'text-blue-700';
+};
+
 /** 차이값에 부호를 붙인다 (+는 내 사업장이 집단 중앙값보다 높음) */
 const fmtSigned = (value: string | number | null, unit: string): string => {
   const formatted = formatDecimal(value);
@@ -57,7 +65,7 @@ const MetricRow: React.FC<{
     </div>
     <div>
       <div className="text-xs text-gray-400">차이</div>
-      <div className={`font-medium ${Number(difference) >= 0 ? 'text-blue-700' : 'text-red-600'}`}>
+      <div className={`font-medium ${diffColor(difference)}`}>
         {fmtSigned(difference, isMoney ? '원' : unit)}
       </div>
     </div>
