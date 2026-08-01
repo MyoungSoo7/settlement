@@ -132,6 +132,14 @@ public class AccountEntryPersistenceAdapter
     }
 
     @Override
+    public BigDecimal balanceOf(OwnerType ownerType, String ownerId, GlAccount account) {
+        return balanceRepository
+                .findByOwnerTypeAndOwnerIdAndAccount(ownerType, ownerId, account)
+                .map(AccountBalanceJpaEntity::getBalance)
+                .orElse(BigDecimal.ZERO);
+    }
+
+    @Override
     public List<AccountEntry> findAll() {
         return repository.findAll().stream()
                 .map(AccountEntryPersistenceAdapter::toDomain)

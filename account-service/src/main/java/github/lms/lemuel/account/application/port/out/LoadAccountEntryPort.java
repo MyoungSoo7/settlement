@@ -1,6 +1,7 @@
 package github.lms.lemuel.account.application.port.out;
 
 import github.lms.lemuel.account.domain.AccountEntry;
+import github.lms.lemuel.account.domain.GlAccount;
 import github.lms.lemuel.account.domain.OwnerType;
 
 import java.math.BigDecimal;
@@ -44,6 +45,14 @@ public interface LoadAccountEntryPort {
      * 현재는 인덱스 기반 스캔을 수용).
      */
     BigDecimal sellerPayableBalance(String sellerId);
+
+    /**
+     * owner 의 특정 계정 잔액(정상방향 순잔액)을 실체화 테이블에서 읽는다.
+     *
+     * <p>기존 {@code sellerPayableBalance} 는 SELLER_PAYABLE 하나로 하드코딩돼 있어 재원 조회
+     * (SELLER_PAYABLE + HOLDBACK_PAYABLE)에 쓸 수 없다. 잔액 행이 없으면 {@code BigDecimal.ZERO}.
+     */
+    BigDecimal balanceOf(OwnerType ownerType, String ownerId, GlAccount account);
 
     /** 전체 전표(시산표 계산용). */
     List<AccountEntry> findAll();

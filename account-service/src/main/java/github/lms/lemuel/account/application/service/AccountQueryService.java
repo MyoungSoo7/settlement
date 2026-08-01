@@ -1,6 +1,7 @@
 package github.lms.lemuel.account.application.service;
 
 import github.lms.lemuel.account.application.port.in.AccountQueryUseCase;
+import github.lms.lemuel.account.application.port.in.SellerFundingQuery.SellerFunding;
 import github.lms.lemuel.account.application.port.out.LoadAccountEntryPort;
 import github.lms.lemuel.account.application.port.out.ReconcileBalancesPort;
 import github.lms.lemuel.account.domain.AccountEntry;
@@ -117,5 +118,18 @@ public class AccountQueryService implements AccountQueryUseCase {
                         row.materialized(), row.recomputed()))
                 .toList();
         return new BalanceRecon(snapshot.checkedPairs(), snapshot.driftCount(), drifts);
+    }
+
+    /**
+     * card-service 법인카드 한도 입력 — 셀러 재원 = SELLER_PAYABLE 잔액 + HOLDBACK_PAYABLE 잔액.
+     * 원장 전량 재합산({@link #accountSummary}) 이 아니라 실체화 테이블(O(1)) 을 읽어 내부 API
+     * 핫패스에 적합하다.
+     */
+    @Override
+    public SellerFunding sellerFunding(String sellerId) {
+        return new SellerFunding(
+                sellerId,
+                loadAccountEntryPort.balanceOf(OwnerType.SELLER, sellerId, GlAccount.SELLER_PAYABLE),
+                loadAccountEntryPort.balanceOf(OwnerType.SELLER, sellerId, GlAccount.HOLDBACK_PAYABLE));
     }
 }

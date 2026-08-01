@@ -906,6 +906,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       APP_KAFKA_ENABLED: "true"
       SPRING_KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
+      # 내부 API 공유 시크릿 — card-service(AccountFundingAdapter)가 이 값으로 /internal/account/** 를 호출한다(Task 2).
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-lemuel-internal-dev-key}
       # JWT 시크릿은 order-service 와 동일해야 토큰 검증 가능
       JWT_ISSUER: ${JWT_ISSUER}
       JWT_SECRET: ${JWT_SECRET}

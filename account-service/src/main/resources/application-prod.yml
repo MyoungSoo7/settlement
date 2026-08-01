@@ -1,0 +1,10 @@
+# 운영(prod) 프로파일 — SPRING_PROFILES_ACTIVE=prod 로 활성.
+#
+# account-service 는 /internal/account/** 로 셀러 재원 잔액을 노출한다(card-service 소비).
+# 기본 프로파일은 키 미설정 시 fail-open(경고 후 통과)으로 개발 편의를 보존하지만, 운영에서는
+# fail-closed 로 전환한다 — INTERNAL_API_KEY 가 없으면 401 로 거부한다(InternalApiKeyFilter).
+# 재원 잔액은 여신 판단의 입력이라 무방비 노출이 곧 한도 조작 경로가 된다.
+# (order/settlement/loan/investment 의 application-prod.yml 과 동형)
+app:
+  security:
+    internal-key-required: true

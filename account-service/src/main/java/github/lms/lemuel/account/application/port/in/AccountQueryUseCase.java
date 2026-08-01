@@ -9,9 +9,14 @@ package github.lms.lemuel.account.application.port.in;
  * 포트를 구현해 세 역할을 한 번에 만족시킨다. (중첩 레코드 {@code EntryPage}/{@code LoanAggregate}
  * 등은 각 역할 인터페이스가 정본으로 선언한다 — {@code OwnerAccountQuery.EntryPage},
  * {@code AccountAggregateQuery.LoanAggregate} 로 참조한다.)
+ *
+ * <p>{@link SellerFundingQuery} 는 card-service 가 법인카드 한도 산정에 쓰는 셀러 재원(SELLER_PAYABLE +
+ * HOLDBACK_PAYABLE) 조회 축이다 — 내부 API({@code InternalAccountController}) 전용 소비처라 별도
+ * 역할 인터페이스로 뒀다.
  */
 public interface AccountQueryUseCase
         extends OwnerAccountQuery,
                 AccountAggregateQuery,
-                TrialBalanceQuery {
+                TrialBalanceQuery,
+                SellerFundingQuery {
 }
