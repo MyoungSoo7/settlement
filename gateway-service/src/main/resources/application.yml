@@ -72,6 +72,10 @@ spring:
               # 조직관리 — 셀러/기업 조직·멤버십·역할. shared-common JWT 체인이 인증 강제
               predicates:
                 - Path=/api/organizations/**
+            - id: card-service
+              uri: ${CARD_SERVICE_URI:http://localhost:8106}
+              predicates:
+                - Path=/api/cards/**
             - id: settlement-service
               uri: ${SETTLEMENT_SERVICE_URI:http://localhost:8082}
               # SettlementController 는 /settlements(비-/api), 검색/원장/리포트는 /api, 운영 콘솔은 /admin.

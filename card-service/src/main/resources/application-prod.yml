@@ -1,0 +1,6 @@
+# 운영(prod) 프로파일. card-service 는 /internal/** 를 호스팅하지 않지만,
+# account-service 의 내부 API 를 호출하므로 INTERNAL_API_KEY 주입이 필수다.
+# 키가 없으면 헤더가 생략되어 account 가 fail-closed 로 401 을 반환한다(Task 2).
+app:
+  security:
+    internal-key-required: true
