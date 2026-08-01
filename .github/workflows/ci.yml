@@ -459,7 +459,9 @@ jobs:
   frontend-ghcr:
     name: Frontend - Build & Push to GHCR
     runs-on: ubuntu-latest
-    needs: [changes, frontend-ci]
+    # frontend-tests 를 needs 에 넣지 않으면 Vitest 가 실패해도 이미지가 그대로 푸시된다
+    # (테스트는 빨간불, 배포는 진행 — 게이트를 켠 의미가 없어진다).
+    needs: [changes, frontend-ci, frontend-tests]
     if: github.event_name != 'pull_request' && needs.changes.outputs.frontend == 'true'
     permissions:
       contents: read
@@ -512,13 +514,14 @@ jobs:
   production-revision-smoke:
     name: Currently deployed production revision smoke
     runs-on: ubuntu-latest
-    needs: [frontend-ci, frontend-ghcr, backend-ci, backend-ghcr]
+    needs: [frontend-ci, frontend-tests, frontend-ghcr, backend-ci, backend-ghcr]
     if: |
       github.event_name == 'push'
       && github.ref == 'refs/heads/main'
       && always()
       && !cancelled()
       && (needs.frontend-ci.result == 'success' || needs.frontend-ci.result == 'skipped')
+      && (needs.frontend-tests.result == 'success' || needs.frontend-tests.result == 'skipped')
       && (needs.backend-ci.result == 'success' || needs.backend-ci.result == 'skipped')
       && (needs.frontend-ghcr.result == 'success' || needs.frontend-ghcr.result == 'skipped')
       && (needs.backend-ghcr.result == 'success' || needs.backend-ghcr.result == 'skipped')
