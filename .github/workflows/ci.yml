@@ -416,13 +416,18 @@ jobs:
         with:
           sarif_file: snyk.sarif
 
-  # Optional: Separate test job (disabled by default)
+  # 프론트 단위/컴포넌트 테스트 게이트.
+  # 2026-08-02 까지 `if: false` 로 꺼져 있었고 frontend-ci 에도 `npm test` 가 없어서,
+  # Vitest 가 *어느 브랜치에서도 CI 에서 한 번도 돌지 않았다*. 회귀 테스트를 붙여도
+  # 게이트가 되지 못했다는 뜻이라(#184 금액 정밀도 수정에서 실측) 켠다.
+  # 켜기 전 실측: develop 27 파일 297 테스트 전부 통과, 27초.
   frontend-tests:
-    name: Frontend - Tests (Optional)
+    name: Frontend - Tests
     runs-on: ubuntu-latest
     needs: changes
-    # Only run if explicitly triggered or if RUN_TESTS env var is set
-    if: false  # Change to 'needs.changes.outputs.frontend == true' to enable
+    if: needs.changes.outputs.frontend == 'true'
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -437,9 +442,11 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      # coverage 를 켜서 아래 업로드 스텝이 실제로 뭔가를 올리게 한다
+      # (test:run 은 coverage/ 를 만들지 않아 업로드가 늘 빈손이었다)
       - name: Run tests
         working-directory: frontend
-        run: npm run test:run
+        run: npm run test:coverage
 
       - name: Upload test coverage
         uses: actions/upload-artifact@v4
