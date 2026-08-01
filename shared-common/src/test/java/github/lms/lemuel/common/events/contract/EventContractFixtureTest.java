@@ -33,6 +33,8 @@ class EventContractFixtureTest {
             "lemuel.investment.executed",
             "lemuel.organization.created",
             "lemuel.organization.member_joined",
+            "lemuel.organization.member_role_changed",
+            "lemuel.organization.member_removed",
             "lemuel.settlement.holdback_released",
             "lemuel.settlement.holdback_consumed",
             "lemuel.settlement.adjusted",

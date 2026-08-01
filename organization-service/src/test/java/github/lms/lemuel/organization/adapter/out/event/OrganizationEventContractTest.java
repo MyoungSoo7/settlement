@@ -19,6 +19,7 @@ import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 
 /**
@@ -72,5 +73,44 @@ class OrganizationEventContractTest {
 
         verify(saveOutboxEventPort).save(outboxCaptor.capture());
         EventContractValidator.assertValid("lemuel.organization.member_joined", outboxCaptor.getValue().getPayload());
+    }
+
+    @Test
+    @DisplayName("MemberRemoved 페이로드는 lemuel.organization.member_removed 계약을 만족한다")
+    void memberRemoved_satisfiesContract() {
+        Membership membership = Membership.builder()
+                .id(9001L)
+                .organizationId(3001L)
+                .userId(888L)
+                .role(OrgRole.STAFF)
+                .status(MembershipStatus.REMOVED)
+                .invitedBy(777L)
+                .build();
+
+        publisher.publishMemberRemoved(membership);
+
+        verify(saveOutboxEventPort).save(outboxCaptor.capture());
+        EventContractValidator.assertValid(
+                "lemuel.organization.member_removed", outboxCaptor.getValue().getPayload());
+    }
+
+    @Test
+    @DisplayName("MemberRoleChanged 페이로드는 이전/신규 역할을 모두 싣는다")
+    void memberRoleChanged_satisfiesContract() {
+        Membership membership = Membership.builder()
+                .id(9001L)
+                .organizationId(3001L)
+                .userId(888L)
+                .role(OrgRole.MANAGER)
+                .status(MembershipStatus.ACTIVE)
+                .invitedBy(777L)
+                .build();
+
+        publisher.publishMemberRoleChanged(membership, OrgRole.STAFF);
+
+        verify(saveOutboxEventPort).save(outboxCaptor.capture());
+        String payload = outboxCaptor.getValue().getPayload();
+        EventContractValidator.assertValid("lemuel.organization.member_role_changed", payload);
+        assertThat(payload).contains("\"previousRole\":\"STAFF\"").contains("\"newRole\":\"MANAGER\"");
     }
 }
