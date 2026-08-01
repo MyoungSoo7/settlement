@@ -3086,7 +3086,7 @@ git commit -am "feat(card): 임직원 카드 발급 — 비관적 락으로 한�
   - 토픽 `lemuel.card.limit_changed` — `{cardAccountId, cardId(nullable), previousLimit:str, newLimit:str, clamped:bool, scope:"MASTER"|"SUB"}`
   - 토픽 `lemuel.card.status_changed` — `{cardId, cardAccountId, previousStatus, newStatus, reason}`
 
-- [ ] **Step 1: 실패 테스트 — 서브한도 상향도 락이 필요하다**
+- [x] **Step 1: 실패 테스트 — 서브한도 상향도 락이 필요하다**
 
 ```java
     @Test
@@ -3161,7 +3161,7 @@ git commit -am "feat(card): 임직원 카드 발급 — 비관적 락으로 한�
 
 > 첫 테스트가 잡는 버그: 상향 검증에서 `sum + newLimit` 을 쓰면 자기 자신의 기존 한도가 이중 계상되어 정상 요청이 거부된다. `sum - currentSubLimit + newLimit` 이어야 한다.
 
-- [ ] **Step 2: 구현 → 통과 → 커밋**
+- [x] **Step 2: 구현 → 통과 → 커밋**
 
 ```bash
 git commit -am "feat(card): 서브한도·카드 상태 변경과 조회 API"
