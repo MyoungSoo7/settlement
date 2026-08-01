@@ -24,6 +24,7 @@ const ITEMS: SidebarItem[] = [
   // 경로를 /admin/ceo/loans/guide 로 두면 위 '대출관리' 의 isActive 가 startsWith(to + '/')
   // 라서 두 항목이 동시에 활성으로 보인다. 그래서 형제 경로로 뺀다.
   { to: '/admin/ceo/loan-guide', label: '대출 상품 안내', icon: '📖', desc: '개인신용 · 주택담보' },
+  { to: '/admin/ceo/loan-process', label: '대출 심사·상환 안내', icon: '🧾', desc: '심사 · 신용평가 · 상환' },
   { to: '/admin/ceo/lender-guide', label: '대출기관 안내', icon: '🏦', desc: '은행 · 저축은행 · 캐피탈 · 대부업' },
   { to: '/admin/ceo/fund-guide', label: '자산운용펀드 안내', icon: '🧺', desc: '부동산 · 주식 · 채권 펀드' },
   { to: '/admin/ceo/accounts',   label: '계정계 현황', icon: '🧮', desc: '집계 · 시산표 · 잔액' },
