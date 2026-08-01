@@ -12,7 +12,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 
 @Component
 public class AccountEntryPersistenceAdapter
@@ -129,6 +132,28 @@ public class AccountEntryPersistenceAdapter
                 .findByOwnerTypeAndOwnerIdAndAccount(OwnerType.SELLER, sellerId, GlAccount.SELLER_PAYABLE)
                 .map(AccountBalanceJpaEntity::getBalance)
                 .orElse(BigDecimal.ZERO);
+    }
+
+    @Override
+    public BigDecimal balanceOf(OwnerType ownerType, String ownerId, GlAccount account) {
+        return balanceRepository
+                .findByOwnerTypeAndOwnerIdAndAccount(ownerType, ownerId, account)
+                .map(AccountBalanceJpaEntity::getBalance)
+                .orElse(BigDecimal.ZERO);
+    }
+
+    /**
+     * 단일 SELECT(IN 절)로 여러 계정 잔액을 함께 읽어 read skew 를 막는다 — 코드리뷰 Important 반영.
+     * IN 쿼리는 잔액 행이 없는 계정을 아예 반환하지 않으므로, 먼저 요청한 계정 전부를 0 으로
+     * 선채운 뒤 실제 조회 결과로 덮어써 누락 계정도 반드시 0 으로 응답에 포함시킨다(null 미노출).
+     */
+    @Override
+    public Map<GlAccount, BigDecimal> balancesOf(OwnerType ownerType, String ownerId, Collection<GlAccount> accounts) {
+        Map<GlAccount, BigDecimal> result = new EnumMap<>(GlAccount.class);
+        accounts.forEach(account -> result.put(account, BigDecimal.ZERO));
+        balanceRepository.findByOwnerTypeAndOwnerIdAndAccountIn(ownerType, ownerId, accounts)
+                .forEach(row -> result.put(row.getAccount(), row.getBalance()));
+        return result;
     }
 
     @Override

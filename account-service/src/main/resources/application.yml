@@ -120,6 +120,10 @@ app:
     issuer: ${JWT_ISSUER:lemuel}
     secret: ${JWT_SECRET}
     ttl-seconds: ${JWT_TTL_SECONDS:3600}
+  # 내부 API(/internal/**) 공유 시크릿 — InternalApiKeyFilter 가 X-Internal-Api-Key 를 검증.
+  # card-service(AccountFundingAdapter)의 INTERNAL_API_KEY 와 동일해야 한다. 미설정 시 검증 비활성(개발)+경고.
+  internal:
+    api-key: ${INTERNAL_API_KEY:}
   kafka:
     # ★ 소비 전용 — 발행 토픽 없음. 아래는 전부 수신(구독) 토픽.
     enabled: ${APP_KAFKA_ENABLED:false}

@@ -140,6 +140,17 @@ class MembershipCommandServiceTest {
     }
 
     @Test
+    @DisplayName("역할 변경 성공 시 member_role_changed 를 이전 역할과 함께 발행한다")
+    void changeRole_publishesEventWithPreviousRole() {
+        when(loadMembership.findActiveMember(1L, 100L)).thenReturn(Optional.of(activeMember(100L, OrgRole.OWNER)));
+        when(loadMembership.countActiveOwners(1L)).thenReturn(2L);
+
+        service.changeRole(new ChangeRoleCommand(1L, 100L, OrgRole.MANAGER, 100L));
+
+        verify(publish).publishMemberRoleChanged(any(), eq(OrgRole.OWNER));
+    }
+
+    @Test
     @DisplayName("마지막 OWNER 제거는 422")
     void remove_lastOwnerBlocked() {
         when(loadMembership.findSlotOccupant(1L, 100L)).thenReturn(Optional.of(activeMember(100L, OrgRole.OWNER)));
@@ -160,6 +171,28 @@ class MembershipCommandServiceTest {
 
         assertThat(staff.getStatus()).isEqualTo(MembershipStatus.REMOVED);
         verify(saveMembership).save(staff);
+    }
+
+    @Test
+    @DisplayName("멤버 제거 성공 시 member_removed 를 발행한다 — 소비측이 카드를 정지시킨다")
+    void remove_publishesEvent() {
+        Membership staff = activeMember(200L, OrgRole.STAFF);
+        when(loadMembership.findSlotOccupant(1L, 200L)).thenReturn(Optional.of(staff));
+
+        service.remove(1L, 200L, 100L);
+
+        verify(publish).publishMemberRemoved(staff);
+    }
+
+    @Test
+    @DisplayName("마지막 OWNER 제거가 차단되면 이벤트를 발행하지 않는다")
+    void remove_blocked_publishesNothing() {
+        when(loadMembership.findSlotOccupant(1L, 100L)).thenReturn(Optional.of(activeMember(100L, OrgRole.OWNER)));
+        when(loadMembership.countActiveOwners(1L)).thenReturn(1L);
+
+        assertThatThrownBy(() -> service.remove(1L, 100L, 100L))
+                .isInstanceOf(LastOwnerException.class);
+        verify(publish, never()).publishMemberRemoved(any());
     }
 
     @Test

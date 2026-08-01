@@ -71,6 +71,7 @@ settlement/                       # Gradle 멀티 모듈 루트
 ├── investment-service/           # 📈 Investment (8100, lemuel_investment) — CEO 투자하기. shared-common 의존
 ├── account-service/              # 🏦 Account (8102, lemuel_account) — 계정계 GL 집계. shared-common 제한 스캔(소비 전용)
 ├── organization-service/         # 👥 Organization (8104, lemuel_organization) — 셀러/기업 조직·멤버십(OWNER/MANAGER/STAFF). shared-common 의존, 이벤트 발행 전용(소비처 미배선)
+├── card-service/                 # 💳 Card (8106/mgmt 8107, lemuel_card) — 법인카드 카드계정·카드(마스터/서브 한도). shared-common 의존, 도메인·정책만(영속·REST·스케줄러는 Task 6~15 미구현)
 └── gateway-service/              # 🚪 API Gateway (8080) — 라우팅만(자체 인증 필터 없음)
 ```
 

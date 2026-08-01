@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "lemuel.organization.member_role_changed",
+  "description": "organization-service(OrganizationEventPublisherAdapter) → card-service. 활성 멤버의 역할이 변경되면 발행된다. previousRole/newRole 은 OWNER|MANAGER|STAFF. 소비측은 권한 판정용 멤버 프로젝션의 역할을 갱신한다.",
+  "type": "object",
+  "properties": {
+    "organizationId": { "type": "integer" },
+    "userId": { "type": "integer" },
+    "membershipId": { "type": "integer" },
+    "previousRole": { "type": "string", "enum": ["OWNER", "MANAGER", "STAFF"] },
+    "newRole": { "type": "string", "enum": ["OWNER", "MANAGER", "STAFF"] }
+  },
+  "required": [
+    "organizationId",
+    "userId",
+    "membershipId",
+    "previousRole",
+    "newRole"
+  ],
+  "additionalProperties": true
+}
