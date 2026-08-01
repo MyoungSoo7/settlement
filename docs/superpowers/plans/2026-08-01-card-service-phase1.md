@@ -2661,7 +2661,7 @@ git commit -am "feat(card): account 재원 조회 어댑터 — 재시도 후 �
   - `POST /api/cards/accounts` → 201 + `CardAccountResponse`
   - 토픽 `lemuel.card.account_opened` — `{cardAccountId:int, organizationId:int, sellerId:str, masterLimit:str, reputationGrade:str}`
 
-- [ ] **Step 1: 서비스 실패 테스트 작성**
+- [x] **Step 1: 서비스 실패 테스트 작성**
 
 ```java
     @Test
@@ -2761,7 +2761,7 @@ git commit -am "feat(card): account 재원 조회 어댑터 — 재시도 후 �
 
 > 마지막 테스트의 의미: 재원을 모를 때는 **아무 상태도 남기지 않는다.** REJECTED 로 기록하면 "심사 탈락"이라는 사실이 아닌 기록이 남는다.
 
-- [ ] **Step 2: 실패 확인 → `CardOrgAuthorizer` 구현**
+- [x] **Step 2: 실패 확인 → `CardOrgAuthorizer` 구현**
 
 ```java
 /**
@@ -2788,13 +2788,13 @@ public class CardOrgAuthorizer {
 }
 ```
 
-- [ ] **Step 3: `OpenCardAccountService` 구현**
+- [x] **Step 3: `OpenCardAccountService` 구현**
 
 순서를 지킨다: **인가 → 조직 검증 → 중복 검증 → 재원 조회 → 평판 조회 → 산정 → 저장 → 발행.** 재원 조회는 외부 호출이라 인가·검증을 통과한 뒤에만 한다.
 
 `@Transactional` 안에서 저장과 Outbox 기록이 함께 커밋되어야 한다.
 
-- [ ] **Step 4: 계약 스키마 + 프로듀서 계약 테스트**
+- [x] **Step 4: 계약 스키마 + 프로듀서 계약 테스트**
 
 `lemuel.card.account_opened.schema.json` — 금액은 문자열(`^[0-9]+(\\.[0-9]+)?$`).
 
@@ -2811,7 +2811,7 @@ public class CardOrgAuthorizer {
     }
 ```
 
-- [ ] **Step 5: 컨트롤러 + 예외 핸들러**
+- [x] **Step 5: 컨트롤러 + 예외 핸들러**
 
 `CardExceptionHandler` 는 `@Order(Ordered.HIGHEST_PRECEDENCE)` — shared-common 핸들러(LOWEST)보다 먼저 도메인 예외를 잡아야 한다.
 
@@ -2840,7 +2840,7 @@ public class CardExceptionHandler {
 
 컨트롤러 테스트는 `@WebMvcTest(controllers = CardController.class)` + `@AutoConfigureMockMvc(addFilters = false)` + `@MockitoBean JwtUtil` (loan-service `RepaymentControllerTest` 패턴). 역할별 403/422 를 검증한다.
 
-- [ ] **Step 6: 통과 확인 → 커밋**
+- [x] **Step 6: 통과 확인 → 커밋**
 
 Run: `./gradlew :card-service:test`
 
