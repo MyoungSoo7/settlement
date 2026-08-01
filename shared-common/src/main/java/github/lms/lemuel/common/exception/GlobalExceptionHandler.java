@@ -7,6 +7,7 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -115,6 +116,21 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleIllegalState(IllegalStateException ex) {
         log.warn("[IllegalStateException] {}", ex.getMessage());
         return badRequest(ErrorResponse.of(HttpStatus.BAD_REQUEST, ErrorCode.INVALID_STATE.code(), ex.getMessage()));
+    }
+
+    /**
+     * 403 - 인가 거부(소유권 불일치 등 IDOR 방어).
+     *
+     * <p>보안 필터 밖(컨트롤러/서비스)에서 던진 {@link AccessDeniedException} 은 MVC 예외 해석기가
+     * {@code ExceptionTranslationFilter} 보다 먼저 잡으므로, 이 매핑이 없으면 아래 catch-all(500)로
+     * 새어 문서화된 403 계약이 깨진다(+ IDOR 시도가 error 스택트레이스 노이즈로 기록). 서비스 로컬
+     * advice(예: investment)가 있으면 그쪽이 우선하고, 없는 서비스는 이 공통 매핑이 403 을 보장한다.
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex) {
+        log.warn("[AccessDeniedException] {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ErrorResponse.of(HttpStatus.FORBIDDEN, ErrorCode.ACCESS_DENIED.code(), ex.getMessage()));
     }
 
     // ─── 5xx ────────────────────────────────────────────────────────────────────

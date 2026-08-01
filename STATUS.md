@@ -24,6 +24,12 @@
   detached merge 규약(감사 컬럼 DB DEFAULT 위임)·@Version 낙관 락·findByIdForUpdate 비관적 락, CardPersistenceIT 로
   스냅샷 왕복·uq 2종·CANCELED 슬롯 해제 실증. 게이트: :card-service:test 91건 skip 0 + JaCoCo GREEN.
   다음은 Task 8(account 재원 조회 어댑터) → 9~15.
+- **IDOR 403 계약 500 누수 중앙 수정 (2026-08-02)** — 컨트롤러가 던지는 `AccessDeniedException` 을 shared-common
+  `GlobalExceptionHandler` catch-all(`Exception`→500)이 보안 필터보다 먼저 가로채 문서화된 403 계약이 500 으로 새던 버그
+  (tax 셀러 다운로드에서 재현 테스트로 실증: 기대 403 → 실제 500). `ErrorCode.ACCESS_DENIED`(403) + 전용
+  `@ExceptionHandler` 를 catch-all 앞에 추가해 중앙 수정 — 로컬 advice 보유 서비스(investment)는 로컬이 계속 우선.
+  회귀 가드 `TaxInvoiceSellerControllerTest` 3건. 게이트: 전체 빌드 12모듈 3,990건 fail 0(settlement 998·IT skip 0,
+  skip 1은 기지 `@Disabled` PDF) + shared-common 231건 수정 후 재실행 GREEN.
 - **payout 셀러 셀프서비스 계좌 API + STATUS 드리프트 정정 (2026-08-02)** — `PUT/GET /api/seller/bank-account` 신설:
   셀러 식별자를 요청(본문·경로)에서 받지 않고 JWT 주체(userId)에서만 파생(IDOR 원천 차단, 본문 sellerId 스푸핑 무시 테스트 실증),
   기존 레지스트리 스택(도메인·서비스·`PayoutFieldEncryptionConverter` 암호화) 전부 재사용. gateway settlement 라우트의
@@ -112,7 +118,7 @@
 - 서비스 **14개** + API Gateway + Kotlin polyglot 2(notification·reconciliation) — `git ls-files '*/src/main/resources/application.yml' | wc -l` → 17(=14+gateway+kotlin 2)
 - Flyway 마이그레이션 **238개** — `git ls-files '*/src/main/resources/db/migration/*.sql' | wc -l` → 238
 - ADR **29개** (0001~0030, 0019 결번 — 세무 ADR 은 0027 충돌로 0029 재부여) — `git ls-files 'docs/adr/[0-9]*.md' | wc -l` → 29
-- 테스트 클래스 **738개** (Testcontainers 통합테스트 포함) — `git ls-files '*/src/test/*Test.java' '*/src/test/*Tests.java' '*/src/test/*IT.java' | wc -l` → 738
+- 테스트 클래스 **739개** (Testcontainers 통합테스트 포함) — `git ls-files '*/src/test/*Test.java' '*/src/test/*Tests.java' '*/src/test/*IT.java' | wc -l` → 739
 - 이벤트 계약 스키마 **27토픽** (ADR 0024, 프로듀서·컨슈머 양방향 테스트 — 담보대출 2종·organization 멤버 2종 포함) — `git ls-files 'shared-common/src/testFixtures/resources/contracts/events/*.schema.json' | wc -l` → 27
 
 ## 최근 전체 검증 (2026-07-29)
