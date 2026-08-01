@@ -2868,7 +2868,7 @@ git commit -am "feat(card): 카드계정 개설·심사 유스케이스와 REST 
   - `IssueCardUseCase.issue(IssueCardCommand) : Card` — `record IssueCardCommand(Long cardAccountId, Long holderUserId, BigDecimal subLimit, Long requesterUserId)`
   - `CardIssuerPort.issue(Long cardAccountId, Long holderUserId) : IssuedCard` — `record IssuedCard(String maskedCardNo)`
 
-- [ ] **Step 1: 서비스 실패 테스트**
+- [x] **Step 1: 서비스 실패 테스트**
 
 ```java
     @Test
@@ -2939,7 +2939,7 @@ git commit -am "feat(card): 카드계정 개설·심사 유스케이스와 REST 
     }
 ```
 
-- [ ] **Step 2: 실패 확인 → 서비스 구현**
+- [x] **Step 2: 실패 확인 → 서비스 구현**
 
 ```java
     @Override
@@ -2970,7 +2970,7 @@ git commit -am "feat(card): 카드계정 개설·심사 유스케이스와 REST 
     }
 ```
 
-- [ ] **Step 3: 동시성 IT 작성 — 이 계획의 핵심**
+- [x] **Step 3: 동시성 IT 작성 — 이 계획의 핵심**
 
 ```java
     @Test
@@ -3058,7 +3058,7 @@ git commit -am "feat(card): 카드계정 개설·심사 유스케이스와 REST 
 
 > 두 번째 테스트가 없으면 "전부 실패시키는 락"도 첫 테스트를 통과한다. 불변식을 지키는 것과 처리량을 죽이는 것은 다르다.
 
-- [ ] **Step 4: 통과 확인 → 커밋**
+- [x] **Step 4: 통과 확인 → 커밋**
 
 Run: `./gradlew :card-service:test --tests '*CardIssuanceLimitConcurrencyIT'`
 
