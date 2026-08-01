@@ -42,13 +42,19 @@ public class CardLimitPolicy {
         // grade.haircut() 을 그대로 호출하면 NPE 로 죽는다 — 도메인 정책이 익명 NPE 보다는
         // 명시적 계약 위반(어떤 인자가 왜 잘못됐는지)으로 실패하는 편이 호출자 디버깅에 낫다.
         Objects.requireNonNull(grade, "평판 등급은 필수입니다");
-        BigDecimal payable = nonNegative(sellerPayable);
-        BigDecimal holdback = nonNegative(holdbackPayable);
+        // ★ 스냅샷에는 부호 있는 원본값을 그대로 보존한다 — 근거(시산표)로 한도를 재현하려면
+        // sellerPayable=-500000 같은 과지급 사실이 남아 있어야 한다. 각 항을 개별로 0 바닥치면
+        // (구 버전) 실 재원보다 큰 여신이 나간다: sellerPayable=-500000, holdbackPayable=1000000 이면
+        // 진짜 재원은 500000 인데 0+1000000=1000000 으로 계산돼 한도가 부풀려진다.
         LimitSnapshot snapshot =
-                new LimitSnapshot(payable, holdback, recognitionRatio, grade, FORMULA);
+                new LimitSnapshot(sellerPayable, holdbackPayable, recognitionRatio, grade, FORMULA);
+
+        // ★ 클램프는 합계(F)에만 적용한다 — 회계상 음수 잔액(과지급)이 다른 항의 흑자를 상쇄한
+        // "이후"에도 남는 음수만 0 으로 본다. 개별 항을 먼저 0 바닥치면 재원을 과대 산정한다.
+        BigDecimal funding = nonNegative(snapshot.funding());
 
         // 원 단위 절사(FLOOR) — 반올림으로 1원이라도 더 주지 않는다.
-        BigDecimal limit = snapshot.funding()
+        BigDecimal limit = funding
                 .multiply(recognitionRatio)
                 .multiply(grade.haircut())
                 .setScale(0, RoundingMode.FLOOR);

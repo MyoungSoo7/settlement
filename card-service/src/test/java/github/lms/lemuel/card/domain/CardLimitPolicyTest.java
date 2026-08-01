@@ -103,12 +103,30 @@ class CardLimitPolicyTest {
     }
 
     @Test
-    @DisplayName("음수 재원은 0 으로 본다 — 회계상 음수 잔액이 한도를 만들지 않는다")
+    @DisplayName("음수 재원 합계는 0 으로 본다 — 회계상 음수 잔액이 한도를 만들지 않는다 (홀드백이 0 이라 합계 자체가 음수)")
     void negativeFundingTreatedAsZero() {
         ScreeningResult r = policy.screen(
                 new BigDecimal("-500000"), BigDecimal.ZERO, ReputationGrade.A);
         assertThat(r.approved()).isFalse();
         assertThat(r.masterLimit()).isEqualByComparingTo("0");
+        // 스냅샷은 원본 부호값을 그대로 보존한다 — 근거 재현을 위해 클램프하지 않는다.
+        assertThat(r.snapshot().sellerPayable()).isEqualByComparingTo("-500000");
+    }
+
+    @Test
+    @DisplayName("음수 sellerPayable 이 있어도 클램프는 합계에만 적용한다 — 각 항을 개별로 0 바닥치지 않는다 (회귀, I1)")
+    void negativeSellerPayableClampedOnSumNotPerField() {
+        // sellerPayable=-500000(과지급), holdbackPayable=1,000,000 이면 진짜 재원은 500,000.
+        // 각 항을 개별로 0 바닥치면(구 버전 버그) 0+1,000,000=1,000,000 으로 과대 산정된다.
+        ScreeningResult r = policy.screen(
+                new BigDecimal("-500000"), new BigDecimal("1000000"), ReputationGrade.A);
+
+        assertThat(r.approved()).isTrue();
+        // F = max(0, -500000 + 1000000) = 500000 → 500000 x 0.70 = 350000
+        assertThat(r.masterLimit()).isEqualByComparingTo("350000");
+        // 스냅샷은 원본 부호값을 그대로 보존한다 — 원장으로 한도를 재현할 수 있어야 한다.
+        assertThat(r.snapshot().sellerPayable()).isEqualByComparingTo("-500000");
+        assertThat(r.snapshot().holdbackPayable()).isEqualByComparingTo("1000000");
     }
 
     @Test
@@ -129,7 +147,7 @@ class CardLimitPolicyTest {
     }
 
     @Test
-    @DisplayName("평판 등급이 null 이면 NPE 대신 명시적 계약 위반으로 거부한다")
+    @DisplayName("평판 등급이 null 이면 NPE(Objects.requireNonNull, 명시적 계약 위반 메시지 포함)로 거부한다")
     void nullGradeRejected() {
         assertThat(catchThrowable(
                 () -> policy.screen(new BigDecimal("1000000"), BigDecimal.ZERO, null)))
