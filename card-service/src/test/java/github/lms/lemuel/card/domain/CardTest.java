@@ -77,7 +77,30 @@ class CardTest {
     @DisplayName("카드번호는 마스킹된 값만 보관한다")
     void onlyMaskedNumberStored() {
         Card card = Card.issue(1L, 888L, "1234-****-****-5678", new BigDecimal("500000"));
-        assertThat(card.getMaskedCardNo()).doesNotContain("5678901234");
+        assertThat(card.getMaskedCardNo()).isEqualTo("1234-****-****-5678");
+    }
+
+    @Test
+    @DisplayName("마스킹되지 않은 카드번호(PAN, 연속 숫자 10자리 이상)는 발급 시점에 거부된다 — PAN 유출 방지(I5)")
+    void unmaskedPanRejectedOnIssue() {
+        assertThatThrownBy(() ->
+                Card.issue(1L, 888L, "5678901234567890", new BigDecimal("500000")))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("Builder 재구성 경로에서도 마스킹되지 않은 카드번호는 거부된다")
+    void unmaskedPanRejectedOnBuilder() {
+        assertThatThrownBy(() -> Card.builder()
+                .id(9L)
+                .cardAccountId(1L)
+                .holderUserId(888L)
+                .maskedCardNo("5678901234567890")
+                .subLimit(new BigDecimal("300000"))
+                .status(CardStatus.ISSUED)
+                .version(2L)
+                .build())
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

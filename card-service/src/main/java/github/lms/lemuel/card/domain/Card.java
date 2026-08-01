@@ -4,6 +4,7 @@ import github.lms.lemuel.card.domain.exception.InvalidCardTransitionException;
 
 import java.math.BigDecimal;
 import java.util.Objects;
+import java.util.regex.Pattern;
 
 /**
  * 임직원 카드 애그리거트(순수 POJO — 프레임워크 의존 0). CardAccount(마스터 한도) 아래에서
@@ -96,9 +97,21 @@ public class Card {
         return value;
     }
 
+    // PAN(카드 실번호)은 통상 13~19자리 — 10자리 이상 연속 숫자가 있으면 마스킹되지 않은
+    // 원본이 그대로 들어온 것으로 간주해 거부한다. "1234-****-****-5678" 처럼 마스킹된 값은
+    // 4자리씩 끊기므로 연속 숫자가 최대 4자리라 통과한다.
+    private static final Pattern UNMASKED_PAN = Pattern.compile("\\d{10,}");
+
+    /**
+     * 마스킹된 카드번호만 허용 — 연속 숫자 10자리 이상이면 원본 PAN 유출로 간주해 거부한다.
+     * PAN 은 이 도메인에 들어오지 않아야 한다(PCI 스코프 축소, 클래스 javadoc 참조).
+     */
     private static String requireMasked(String maskedCardNo) {
         if (maskedCardNo == null || maskedCardNo.isBlank()) {
             throw new IllegalArgumentException("마스킹된 카드번호는 필수입니다");
+        }
+        if (UNMASKED_PAN.matcher(maskedCardNo).find()) {
+            throw new IllegalArgumentException("마스킹되지 않은 카드번호(PAN)로 추정되어 거부합니다");
         }
         return maskedCardNo;
     }
