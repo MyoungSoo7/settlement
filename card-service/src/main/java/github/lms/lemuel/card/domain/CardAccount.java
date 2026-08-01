@@ -76,8 +76,20 @@ public class CardAccount {
      * (근거 없는 거절을 남기지 않는다). Task 5 {@code CardLimitPolicy.screen()} 은 승인·탈락
      * 어느 쪽이든 항상 LimitSnapshot 을 반환하므로, 이 시그니처가 유일한 정본이다
      * (reason/snapshot 을 생략하는 오버로드는 실사용처가 없어 제거했다).
+     *
+     * <p><b>검증을 상태 전이보다 먼저 한다</b> — {@link #activate} 와 동형의 이유다: snapshot·reason
+     * 없이 상태만 REJECTED 로 바뀐 채 예외가 던져지면 "근거 없는 거절"이 만들어지고, REJECTED 는
+     * 터미널 상태라 재시도도 불가능해진다. 검증을 먼저 해서 실패 시 SCREENING 에 남겨 재시도를 가능하게 한다.
+     * ({@code ScreeningResult} 를 거치지 않는 거절 경로 — 예: type≠SELLER, externalRef 해석 실패 —
+     * 가 생기더라도 이 게이트가 근거 없는 거절을 막는다.)
      */
     public void reject(String reason, LimitSnapshot snapshot) {
+        if (snapshot == null) {
+            throw new IllegalArgumentException("REJECTED 전이는 한도 산정 근거(LimitSnapshot)가 필수입니다");
+        }
+        if (reason == null || reason.isBlank()) {
+            throw new IllegalArgumentException("REJECTED 전이는 거절 사유가 필수입니다");
+        }
         transitionTo(CardAccountStatus.REJECTED);
         this.rejectReason = reason;
         this.limitSnapshot = snapshot;

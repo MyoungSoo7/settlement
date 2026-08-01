@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class CardAccountTest {
@@ -97,7 +98,8 @@ class CardAccountTest {
         CardAccount account = screening();
         account.activate(new BigDecimal("100000"), snapshot());
 
-        account.assertCanIssue(new BigDecimal("90000"), new BigDecimal("10000"));  // 예외 없음
+        assertThatCode(() -> account.assertCanIssue(new BigDecimal("90000"), new BigDecimal("10000")))
+                .doesNotThrowAnyException();
     }
 
     @Test
@@ -199,6 +201,37 @@ class CardAccountTest {
         assertThat(account.getStatus()).isEqualTo(CardAccountStatus.REJECTED);
         assertThat(account.getRejectReason()).isEqualTo("평판등급 기준 미달");
         assertThat(account.getLimitSnapshot().reputationGrade()).isEqualTo(ReputationGrade.B);
+    }
+
+    @Test
+    @DisplayName("snapshot 없이 거절하면 거부되고, 상태는 SCREENING 에 남아 재시도 가능하다 (회귀, I6)")
+    void rejectWithoutSnapshotRejectedAndAllowsRetry() {
+        CardAccount account = screening();
+
+        assertThatThrownBy(() -> account.reject("평판등급 기준 미달", null))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(account.getStatus()).isEqualTo(CardAccountStatus.SCREENING);
+        assertThat(account.getRejectReason()).isNull();
+
+        account.reject("평판등급 기준 미달", snapshot());   // 재시도 성공
+        assertThat(account.getStatus()).isEqualTo(CardAccountStatus.REJECTED);
+    }
+
+    @Test
+    @DisplayName("사유 없이(null/blank) 거절하면 거부되고, 상태는 SCREENING 에 남아 재시도 가능하다 (회귀, I6)")
+    void rejectWithoutReasonRejectedAndAllowsRetry() {
+        CardAccount account = screening();
+
+        assertThatThrownBy(() -> account.reject(null, snapshot()))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(account.getStatus()).isEqualTo(CardAccountStatus.SCREENING);
+
+        assertThatThrownBy(() -> account.reject("   ", snapshot()))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(account.getStatus()).isEqualTo(CardAccountStatus.SCREENING);
+
+        account.reject("평판등급 기준 미달", snapshot());   // 재시도 성공
+        assertThat(account.getStatus()).isEqualTo(CardAccountStatus.REJECTED);
     }
 
     @Test
