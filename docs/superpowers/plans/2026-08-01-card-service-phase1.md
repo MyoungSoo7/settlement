@@ -54,7 +54,7 @@
 | `card/adapter/out/event/CardEventPublisherAdapter.java`         | Outbox 발행                                               |
 | `card/adapter/out/external/AccountFundingAdapter.java`          | account-service 재원 조회                                 |
 | `card/adapter/out/external/MockCardIssuerAdapter.java`          | 카드 채번 mock                                            |
-| `src/main/resources/db/migration/V1__card_core.sql` 외 3종      | Flyway                                                    |
+| `src/main/resources/db/migration/V4__card_core.sql` 외 3종      | Flyway                                                    |
 
 ### 기존 파일 수정
 
@@ -119,7 +119,12 @@ Task 8 은 이 전례를 따른다. Resilience4j 도입은 리포 최초 도입�
 - Create: `card-service/src/main/resources/db/migration/V3__audit_logs.sql`
 - Create: `card-service/src/test/java/github/lms/lemuel/card/CardArchitectureTest.java`
 - Create: `card-service/src/test/java/github/lms/lemuel/card/integration/CardBootIT.java`
-- **`V1__card_core.sql` 은 이 태스크에서 만들지 않는다** — Task 6 이 작성한다. Flyway 는 V2 부터 시작해도 정상 동작한다(버전 번호는 순서만 정한다).
+- **코어 스키마 마이그레이션은 이 태스크에서 만들지 않는다** — Task 6 이 `V4__card_core.sql` 로 작성한다.
+  Flyway 는 V2 부터 시작해도 **빈 DB 에서는** 정상 동작한다(버전 번호는 순서만 정한다) — 하지만 이 리포는
+  `docker-compose.yml` 에 영속 볼륨(`card-postgres-data`)을 두므로, 이 브랜치로 한 번이라도 `docker compose up`
+  한 개발자의 DB 에는 V2·V3 만 기록된 채 남는다. 그 뒤 코어 스키마를 V1 로 끼워 넣으면 `validateOnMigrate=true`/
+  `outOfOrder=false`(둘 다 기본값)에서 "Detected resolved migration not applied to database: 1" 로 부팅이 깨진다.
+  그래서 Task 6 은 V1 이 아니라 **후행 버전 V4** 를 쓴다 — 기존에 부팅된 DB 에도 안전하게 추가된다.
 - Modify: `settings.gradle.kts:8-23`
 - Modify: `Dockerfile` (COPY 2곳)
 - Modify: `docker-compose.yml`
@@ -786,7 +791,7 @@ git commit -m "feat(common): card 에러코드·감사액션·인가 규칙 추�
 
 - Consumes: Task 1 없음 (독립)
 - Produces:
-  - `GET /internal/account/sellers/{sellerId}/funding` → `{"sellerId":123,"sellerPayable":"170000.00","holdbackPayable":"10000.00"}` (금액은 JSON 문자열)
+  - `GET /internal/account/sellers/{sellerId}/funding` → `{"sellerId":"123","sellerPayable":"170000.00","holdbackPayable":"10000.00"}` (구현은 `String sellerId` — Task 8 이 이 텍스트로 DTO 를 만들면 역직렬화가 어긋나므로 코드가 정본, 여기를 정정)
   - `LoadAccountEntryPort.balanceOf(OwnerType ownerType, String ownerId, GlAccount account) : BigDecimal`
   - **두 계정 잔액은 반드시 단일 SQL 문으로 읽는다** (리뷰 후 정정, 2026-08-01). `SELLER_PAYABLE` 과 `HOLDBACK_PAYABLE` 을 SELECT 두 번으로 나눠 읽으면 READ_COMMITTED 에서 문장마다 스냅샷이 갱신되므로, 그 사이 홀드백 해제(HOLDBACK_PAYABLE→SELLER_PAYABLE 재분류)가 커밋되면 합계가 일시적으로 어긋난다 — 이 API 의 존재 이유("카드 한도와 회계 장부가 어긋나지 않는다")와 정면으로 충돌한다. 같은 리포의 `AccountBalanceRepository#findBalanceReconRows` 가 동일 사유(감사 MED-3)로 이미 단일 문장을 채택했다. 잔액 행이 없는 계정은 `BigDecimal.ZERO` 로 정규화한다.
   - `AccountQueryUseCase.sellerFunding(String sellerId) : SellerFunding` — `record SellerFunding(String sellerId, BigDecimal sellerPayable, BigDecimal holdbackPayable)`
@@ -2027,11 +2032,11 @@ git commit -m "feat(card): 재원·평판 기반 한도 산정 정책"
 
 ---
 
-## Task 6: 영속 계층 (Flyway V1 + JPA 어댑터)
+## Task 6: 영속 계층 (Flyway V4 + JPA 어댑터)
 
 **Files:**
 
-- Create: `card-service/src/main/resources/db/migration/V1__card_core.sql`
+- Create: `card-service/src/main/resources/db/migration/V4__card_core.sql`
 - Create: `card-service/src/main/java/github/lms/lemuel/card/adapter/out/persistence/CardAccountJpaEntity.java`
 - Create: `.../persistence/CardJpaEntity.java`
 - Create: `.../persistence/SpringDataCardAccountRepository.java`
@@ -2053,10 +2058,10 @@ git commit -m "feat(card): 재원·평판 기반 한도 산정 정책"
 
 > **매핑 규약(organization-service 와 동일):** `created_at`/`updated_at` 은 DB `DEFAULT NOW()` 에 위임하고 엔티티에서 `insertable = false` 로 둔다. 어댑터가 도메인 스냅샷으로 detached 엔티티를 재구성해 merge 하므로, 이 조합이 아니면 감사 컬럼이 null 로 덮인다. `@Version` 낙관 락 컬럼도 함께 둔다.
 
-- [ ] **Step 1: `V1__card_core.sql` 작성**
+- [ ] **Step 1: `V4__card_core.sql` 작성** (V1 이 아니라 V4 — Task 0 절 참조: 영속 볼륨이 있는 기존 DB 를 깨지 않기 위함)
 
 ```sql
--- V1: card-service 자체 DB(lemuel_card) — 카드계정·카드 코어
+-- V4: card-service 자체 DB(lemuel_card) — 카드계정·카드 코어
 --
 -- 셀러 법인의 카드계정(마스터 한도)과 임직원 카드(서브한도)를 둔다.
 -- 조직·임직원은 organization-service 소유라 여기서는 비검증 비즈니스 키(organization_id, holder_user_id)로만 참조한다.
