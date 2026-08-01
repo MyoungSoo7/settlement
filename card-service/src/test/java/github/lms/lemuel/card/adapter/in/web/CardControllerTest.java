@@ -1,11 +1,15 @@
 package github.lms.lemuel.card.adapter.in.web;
 
+import github.lms.lemuel.card.application.port.in.IssueCardUseCase;
 import github.lms.lemuel.card.application.port.in.OpenCardAccountUseCase;
 import github.lms.lemuel.card.application.port.out.FundingUnavailableException;
+import github.lms.lemuel.card.domain.Card;
 import github.lms.lemuel.card.domain.CardAccount;
 import github.lms.lemuel.card.domain.CardAccountStatus;
+import github.lms.lemuel.card.domain.CardStatus;
 import github.lms.lemuel.card.domain.LimitSnapshot;
 import github.lms.lemuel.card.domain.ReputationGrade;
+import github.lms.lemuel.card.domain.exception.SubLimitExceededException;
 import github.lms.lemuel.common.config.jwt.AuthPrincipal;
 import github.lms.lemuel.common.config.jwt.JwtUtil;
 import github.lms.lemuel.common.exception.BusinessException;
@@ -48,6 +52,7 @@ class CardControllerTest {
     @Autowired MockMvc mockMvc;
     @MockitoBean JwtUtil jwtUtil;
     @MockitoBean OpenCardAccountUseCase openCardAccountUseCase;
+    @MockitoBean IssueCardUseCase issueCardUseCase;
 
     private static final String BODY = "{\"organizationId\":3001}";
 
@@ -182,5 +187,118 @@ class CardControllerTest {
                 .andExpect(status().isBadRequest());
 
         verify(openCardAccountUseCase, never()).open(any());
+    }
+
+    // ── 카드 발급 (POST /accounts/{id}/cards) ──
+
+    private static final String ISSUE_BODY = "{\"holderUserId\":888,\"subLimit\":100000}";
+
+    private static Card issuedCard() {
+        return Card.builder()
+                .id(9001L)
+                .cardAccountId(5001L)
+                .holderUserId(888L)
+                .maskedCardNo("****-****-****-1234")
+                .subLimit(new BigDecimal("100000"))
+                .status(CardStatus.ISSUED)
+                .build();
+    }
+
+    @Test
+    @DisplayName("발급 성공은 201 과 마스킹된 번호를 돌려준다")
+    void issueCardReturns201() throws Exception {
+        when(issueCardUseCase.issue(any())).thenReturn(issuedCard());
+
+        mockMvc.perform(post("/api/cards/accounts/5001/cards").principal(userAuth(100L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(ISSUE_BODY))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(9001))
+                .andExpect(jsonPath("$.holderUserId").value(888))
+                .andExpect(jsonPath("$.maskedCardNo").value("****-****-****-1234"))
+                .andExpect(jsonPath("$.subLimit").value(100000))
+                .andExpect(jsonPath("$.status").value("ISSUED"));
+    }
+
+    /**
+     * 발급은 세 값의 출처가 다르다 — 카드계정은 경로, 대상은 본문, 요청자는 JWT.
+     * 본문의 requesterUserId 를 흘려 넣어도 무시돼야 한다(권한 상승 경로 차단).
+     */
+    @Test
+    @DisplayName("대상은 본문·요청자는 JWT 에서 온다 — 본문의 requesterUserId 는 무시된다")
+    void holderFromBodyRequesterFromPrincipal() throws Exception {
+        when(issueCardUseCase.issue(any())).thenReturn(issuedCard());
+
+        mockMvc.perform(post("/api/cards/accounts/5001/cards").principal(userAuth(100L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"holderUserId\":888,\"subLimit\":100000,\"requesterUserId\":1}"))
+                .andExpect(status().isCreated());
+
+        verify(issueCardUseCase).issue(new IssueCardUseCase.IssueCardCommand(
+                5001L, 888L, new BigDecimal("100000"), 100L));
+    }
+
+    @Test
+    @DisplayName("대상이 조직 구성원이 아니면 422 + CARD_HOLDER_NOT_MEMBER")
+    void holderNotMemberIs422() throws Exception {
+        when(issueCardUseCase.issue(any()))
+                .thenThrow(new BusinessException(ErrorCode.CARD_HOLDER_NOT_MEMBER));
+
+        mockMvc.perform(post("/api/cards/accounts/5001/cards").principal(userAuth(100L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(ISSUE_BODY))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errorCode").value("CARD_HOLDER_NOT_MEMBER"));
+    }
+
+    @Test
+    @DisplayName("이미 활성 카드가 있으면 409 + CARD_ALREADY_ISSUED")
+    void alreadyIssuedIs409() throws Exception {
+        when(issueCardUseCase.issue(any()))
+                .thenThrow(new BusinessException(ErrorCode.CARD_ALREADY_ISSUED));
+
+        mockMvc.perform(post("/api/cards/accounts/5001/cards").principal(userAuth(100L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(ISSUE_BODY))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("CARD_ALREADY_ISSUED"));
+    }
+
+    /** 도메인 예외({@code SubLimitExceededException})가 CardExceptionHandler 로 422 가 되는 경로. */
+    @Test
+    @DisplayName("마스터 한도 초과는 422 + CARD_SUB_LIMIT_EXCEEDED 이고 한도 수치가 메시지에 남는다")
+    void subLimitExceededIs422() throws Exception {
+        when(issueCardUseCase.issue(any())).thenThrow(new SubLimitExceededException(
+                new BigDecimal("1000000"), new BigDecimal("950000"), new BigDecimal("100000")));
+
+        mockMvc.perform(post("/api/cards/accounts/5001/cards").principal(userAuth(100L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(ISSUE_BODY))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errorCode").value("CARD_SUB_LIMIT_EXCEEDED"))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("1000000")));
+    }
+
+    @Test
+    @DisplayName("subLimit 이 없으면 400 — 유스케이스까지 가지 않는다")
+    void missingSubLimitIs400() throws Exception {
+        mockMvc.perform(post("/api/cards/accounts/5001/cards").principal(userAuth(100L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"holderUserId\":888}"))
+                .andExpect(status().isBadRequest());
+
+        verify(issueCardUseCase, never()).issue(any());
+    }
+
+    @Test
+    @DisplayName("발급도 인증 주체가 없으면 403 이고 유스케이스를 호출하지 않는다")
+    void issueWithoutPrincipalIsForbidden() throws Exception {
+        mockMvc.perform(post("/api/cards/accounts/5001/cards")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(ISSUE_BODY))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("ACCESS_DENIED"));
+
+        verify(issueCardUseCase, never()).issue(any());
     }
 }

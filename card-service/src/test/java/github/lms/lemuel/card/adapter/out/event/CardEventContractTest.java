@@ -1,5 +1,6 @@
 package github.lms.lemuel.card.adapter.out.event;
 
+import github.lms.lemuel.card.domain.Card;
 import github.lms.lemuel.card.domain.CardAccount;
 import github.lms.lemuel.card.domain.LimitSnapshot;
 import github.lms.lemuel.card.domain.ReputationGrade;
@@ -79,6 +80,44 @@ class CardEventContractTest {
         OutboxEvent event = outboxCaptor.getValue();
         assertThat(event.getAggregateType()).isEqualTo("Card");
         assertThat(event.getEventType()).isEqualTo("CardAccountOpened");
+        assertThat(event.getAggregateId()).isEqualTo("5001");
+    }
+
+    private static Card issuedCard() {
+        return Card.builder()
+                .id(9001L)
+                .cardAccountId(5001L)
+                .holderUserId(888L)
+                .maskedCardNo("****-****-****-1234")
+                .subLimit(new BigDecimal("100000"))
+                .status(github.lms.lemuel.card.domain.CardStatus.ISSUED)
+                .build();
+    }
+
+    @Test
+    @DisplayName("issued 페이로드는 계약을 만족하고 조직 식별자·마스킹 번호를 싣는다")
+    void issued_satisfiesContract() {
+        publisher.publishIssued(issuedCard(), activeAccount());
+
+        verify(saveOutboxEventPort).save(outboxCaptor.capture());
+        String payload = outboxCaptor.getValue().getPayload();
+        EventContractValidator.assertValid("lemuel.card.issued", payload);
+        assertThat(payload).contains("\"subLimit\":\"100000\"");
+        assertThat(payload).contains("\"organizationId\":3001");
+    }
+
+    /**
+     * 발급 이벤트의 파티션 키는 카드가 아니라 <b>카드계정</b>이다. cardId 로 잡으면 같은 계정의
+     * 발급·한도변경이 서로 다른 파티션에 흩어져 소비자가 한도 배분 순서를 뒤집힌 채로 본다.
+     */
+    @Test
+    @DisplayName("issued 는 cardAccountId 로 파티셔닝된다 — cardId 가 아니다")
+    void issuedIsPartitionedByAccount() {
+        publisher.publishIssued(issuedCard(), activeAccount());
+
+        verify(saveOutboxEventPort).save(outboxCaptor.capture());
+        OutboxEvent event = outboxCaptor.getValue();
+        assertThat(event.getEventType()).isEqualTo("CardIssued");
         assertThat(event.getAggregateId()).isEqualTo("5001");
     }
 }

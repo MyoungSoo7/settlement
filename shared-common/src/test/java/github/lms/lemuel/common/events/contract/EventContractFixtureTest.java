@@ -42,7 +42,8 @@ class EventContractFixtureTest {
             "lemuel.seller_recovery.opened",
             "lemuel.seller_recovery.offset",
             "lemuel.settlement.withholding_accrued",
-            "lemuel.card.account_opened"
+            "lemuel.card.account_opened",
+            "lemuel.card.issued"
     })
     @DisplayName("모든 토픽의 정본 샘플은 자기 계약 스키마를 통과한다")
     void canonicalSamples_areValidAgainstTheirSchemas(String topic) {
