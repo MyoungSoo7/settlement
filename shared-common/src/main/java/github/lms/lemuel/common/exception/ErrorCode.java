@@ -77,7 +77,19 @@ public enum ErrorCode {
     // ─── account (계정계 GL) ────────────────────────────────────────────────────
     NON_POSITIVE_ENTRY_AMOUNT(HttpStatus.BAD_REQUEST, "전표 금액은 양수여야 합니다."),
     UNBALANCED_ACCOUNT_ENTRY(HttpStatus.BAD_REQUEST, "차변과 대변 계정은 달라야 합니다."),
-    ENTRY_AMOUNT_SCALE_EXCEEDED(HttpStatus.BAD_REQUEST, "전표 금액의 소수 자릿수가 허용 범위(2)를 초과했습니다.");
+    ENTRY_AMOUNT_SCALE_EXCEEDED(HttpStatus.BAD_REQUEST, "전표 금액의 소수 자릿수가 허용 범위(2)를 초과했습니다."),
+
+    // ─── card (법인카드) ───
+    CARD_ACCOUNT_NOT_FOUND(HttpStatus.NOT_FOUND, "카드계정을 찾을 수 없습니다."),
+    CARD_NOT_FOUND(HttpStatus.NOT_FOUND, "카드를 찾을 수 없습니다."),
+    CARD_ACCOUNT_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 카드계정이 존재하는 조직입니다."),
+    CARD_ALREADY_ISSUED(HttpStatus.CONFLICT, "이미 활성 카드를 보유한 임직원입니다."),
+    CARD_SCREENING_REJECTED(HttpStatus.UNPROCESSABLE_ENTITY, "카드 심사 기준을 충족하지 못했습니다."),
+    CARD_SUB_LIMIT_EXCEEDED(HttpStatus.UNPROCESSABLE_ENTITY, "임직원 한도 합계가 법인 마스터 한도를 초과합니다."),
+    CARD_HOLDER_NOT_MEMBER(HttpStatus.UNPROCESSABLE_ENTITY, "해당 조직의 활성 구성원이 아닙니다."),
+    CARD_FORBIDDEN(HttpStatus.FORBIDDEN, "이 작업을 수행할 권한이 없습니다."),
+    // 재원 조회 실패는 폴백 없이 명시적 실패시킨다 — 재원을 모른 채 추정 한도를 주면 그 자체가 여신 사고다.
+    CARD_FUNDING_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "재원 조회에 실패했습니다. 잠시 후 다시 시도해주세요.");
 
     private final HttpStatus status;
     private final String defaultMessage;
