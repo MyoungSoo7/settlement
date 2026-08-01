@@ -2,7 +2,9 @@ package github.lms.lemuel.card.application.port.out;
 
 import github.lms.lemuel.card.domain.Card;
 import github.lms.lemuel.card.domain.CardAccount;
+import github.lms.lemuel.card.domain.CardAccountStatus;
 import github.lms.lemuel.card.domain.CardStatus;
+import github.lms.lemuel.card.domain.LimitChangeResult;
 
 import java.math.BigDecimal;
 
@@ -49,4 +51,24 @@ public interface PublishCardEventPort {
      * 이벤트(Task 12)마다 소비자가 일어나지 않은 변화를 통지받는다.
      */
     void publishStatusChanged(Card card, CardAccount account, CardStatus previousStatus, String reason);
+
+    /**
+     * 법인 마스터 한도 변경 — 토픽 {@code lemuel.card.limit_changed}, {@code scope=MASTER}.
+     * 서브한도 변경과 같은 토픽·같은 파티션 키(cardAccountId)를 쓴다 — 한 계정의 마스터·서브
+     * 변경이 순서를 잃으면 소비자가 한도 배분을 뒤집힌 채로 보게 된다.
+     *
+     * <p>{@code clamped=true} 는 하향이 Σ서브한도 하한에 걸려 <b>요청보다 덜 내려갔음</b>을 뜻한다.
+     * 이 값을 싣지 않으면 소비자는 "재산정이 도는데 한도가 안 내려간다"를 버그로 신고하게 된다 —
+     * 실제로는 발급된 카드를 조용히 죽이지 않으려는 도메인 규칙이 작동한 것이다.
+     */
+    void publishMasterLimitChanged(CardAccount account, BigDecimal previousLimit, LimitChangeResult result);
+
+    /**
+     * 카드계정 상태 변경 — 토픽 {@code lemuel.card.account_status_changed}.
+     *
+     * <p>임직원 카드의 {@code status_changed} 와 <b>토픽을 나눈다</b>. 계정과 카드는 상태 enum 도
+     * 소비자도 다르다(계정 정지는 법인 여신 사건, 카드 정지는 개인 사건). 한 토픽에 섞으면
+     * cardId·holderUserId 가 있는 페이로드와 없는 페이로드를 소비자가 런타임에 분기해야 한다.
+     */
+    void publishAccountStatusChanged(CardAccount account, CardAccountStatus previousStatus, String reason);
 }
