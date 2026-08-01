@@ -3471,7 +3471,7 @@ git commit -am "feat(card): 2단계 승인·매입 이벤트 계약 선확정"
 - Consumes: Task 0~14 전부
 - Produces: `harness-audit.mjs` 통과, 문서 정합
 
-- [ ] **Step 1: `card-service-rules` 스킬 작성**
+- [x] **Step 1: `card-service-rules` 스킬 작성**
 
 다른 `*-domain-rules` 스킬 형식을 따른다. 반드시 담을 내용:
 
@@ -3481,18 +3481,18 @@ git commit -am "feat(card): 2단계 승인·매입 이벤트 계약 선확정"
 - 재원 조회 실패에 폴백을 두지 않는 이유
 - `sumActiveSubLimits` 가 SUSPENDED 를 포함하는 이유
 
-- [ ] **Step 2: `HARNESS.md` 라우팅 행 추가 후 감사**
+- [x] **Step 2: `HARNESS.md` 라우팅 행 추가 후 감사**
 
 Run: `node scripts/harness/harness-audit.mjs`
 Expected: 라우팅 dangling 0
 
-- [ ] **Step 3: `SPEC.md` 갱신**
+- [x] **Step 3: `SPEC.md` 갱신**
 
 - §1 개요 표의 서비스 수 21 → 22, 도메인 목록에 "법인카드" 추가
 - §5 토픽 표에 card 발행 4종 + 2단계 예약 2종, organization 신설 2종
 - §3 에 `3.15 card-service` 절 신설 (다른 서비스 절과 같은 형식: 포트·DB·도메인 표·정책 요약)
 
-- [ ] **Step 4: 전체 게이트 통과 확인**
+- [x] **Step 4: 전체 게이트 통과 확인**
 
 ```bash
 ./gradlew :shared-common:test \
@@ -3503,7 +3503,7 @@ Expected: 라우팅 dangling 0
 
 Expected: 전부 PASS. **커버리지 미달 시 어서션을 완화하거나 제외 설정을 넓히지 않는다** — 테스트를 더 쓴다.
 
-- [ ] **Step 5: 3층 경로 실검증**
+- [x] **Step 5: 3층 경로 실검증**
 
 ```bash
 docker compose up -d
@@ -3516,7 +3516,7 @@ curl -s -H "Authorization: Bearer $TOKEN" localhost:8080/api/cards/cards/me
 curl -s -H "Authorization: Bearer $TOKEN" localhost:3000/api/cards/cards/me
 ```
 
-- [ ] **Step 6: 종단 시나리오 수동 검증**
+- [x] **Step 6: 종단 시나리오 수동 검증**
 
 1. 셀러 조직 생성(organization) → OWNER 확인
 2. 정산 확정 이벤트로 account 에 `SELLER_PAYABLE` 적재
@@ -3526,7 +3526,7 @@ curl -s -H "Authorization: Bearer $TOKEN" localhost:3000/api/cards/cards/me
 6. 임직원 제거(organization) → 카드가 SUSPENDED 로 바뀌는지
 7. `GET /api/account/trial-balance` 로 카드 한도의 근거가 시산표와 맞는지 확인
 
-- [ ] **Step 7: 최종 커밋**
+- [x] **Step 7: 최종 커밋**
 
 ```bash
 git add .claude/skills/card-service-rules HARNESS.md SPEC.md README.md
@@ -3537,10 +3537,10 @@ git commit -m "docs(card): card-service 하네스·명세 배선"
 
 ## 완료 정의
 
-- [ ] 16개 태스크 전부 커밋됨
-- [ ] `./gradlew test` 전 모듈 통과 + JaCoCo LINE 90% 통과
-- [ ] `CardIssuanceLimitConcurrencyIT` 두 케이스 모두 통과 (불변식 유지 + 처리량 미저해)
-- [ ] `harness-audit.mjs` 통과
-- [ ] 직접 포트·gateway·nginx 3층 모두 200
-- [ ] 종단 시나리오 7단계 수동 확인
-- [ ] 스펙 §2.1 의 한계(재원 이중 사용)가 `card-service-rules` 스킬에 기록되어 3단계 담당자에게 전달됨
+- [x] 16개 태스크 전부 커밋됨
+- [x] `./gradlew test` 전 모듈 통과 + JaCoCo LINE 90% 통과
+- [x] `CardIssuanceLimitConcurrencyIT` 두 케이스 모두 통과 (불변식 유지 + 처리량 미저해)
+- [x] `harness-audit.mjs` 통과
+- [x] 직접 포트·gateway·nginx 3층 모두 200
+- [x] 종단 시나리오 7단계 수동 확인
+- [x] 스펙 §2.1 의 한계(재원 이중 사용)가 `card-service-rules` 스킬에 기록되어 3단계 담당자에게 전달됨
