@@ -3256,6 +3256,7 @@ git commit -am "feat(card): 조직 이탈자 카드 자동 정지"
 
 - Create: `.../application/port/in/RecalculateCardLimitsUseCase.java` · `.../application/service/RecalculateCardLimitsService.java`
 - Create: `.../adapter/in/schedule/CardLimitRecalculationScheduler.java`
+- **Modify: `.../domain/CardAccount.java`** — 재심사 메서드 추가 (아래 참조)
 - Test: `.../application/service/RecalculateCardLimitsServiceTest.java`
 - Test: `.../integration/LimitRecalculationClampIT.java`
 
@@ -3263,6 +3264,13 @@ git commit -am "feat(card): 조직 이탈자 카드 자동 정지"
 
 - Consumes: Task 5 정책, Task 8 재원 조회, Task 4 `changeMasterLimit`
 - Produces: `RecalculateCardLimitsUseCase.recalculateAll() : int` (변경 건수)
+- **Produces: `CardAccount.rescreen(BigDecimal newLimit, LimitSnapshot snapshot, BigDecimal currentSubLimitSum) : LimitChangeResult`**
+
+> **계획 결함 정정 (Task 6 리뷰에서 발견, 2026-08-02).** Task 4 가 만든 도메인에는 **ACTIVE 상태에서 `LimitSnapshot` 을 교체하는 public 메서드가 없다** — 스냅샷은 `activate()`/`reject()` 로 SCREENING 에서 나올 때만 설정된다. 그런데 재산정은 한도뿐 아니라 **산정 근거도 함께 갱신해야** 한다(근거가 옛 재원·옛 평판이면 `screened_at` 과 스냅샷이 서로 다른 심사를 가리키게 된다).
+>
+> `CardAccount.Builder` 로 새 인스턴스를 조립하는 우회는 쓰지 마라 — 빌더는 영속 계층의 재구성 전용이라 **상태 전이 가드를 건너뛰어** ACTIVE 가 아닌 계정도 임의로 재심사할 수 있게 된다. 도메인에 `rescreen(...)` 을 추가해 (a) ACTIVE 여야 하고, (b) 한도 변경은 기존 `changeMasterLimit` 의 클램프 규칙을 그대로 따르며, (c) 스냅샷은 non-null 이어야 한다는 불변식을 강제하라.
+>
+> 영속 계층은 이미 대비돼 있다 — `CardAccountPersistenceAdapter.save()` 가 스냅샷 5개 필드를 `compareTo` 로 비교해, 실제로 바뀐 재심사에서만 `screened_at` 을 갱신한다.
 
 - [ ] **Step 1: 실패 테스트**
 
