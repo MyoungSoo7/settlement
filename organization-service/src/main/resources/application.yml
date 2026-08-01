@@ -136,3 +136,5 @@ app:
       # 라우팅하는 실제 토픽명(snake_case).
       organization-created: lemuel.organization.created
       organization-member-joined: lemuel.organization.member_joined
+      organization-member-role-changed: lemuel.organization.member_role_changed
+      organization-member-removed: lemuel.organization.member_removed

@@ -193,8 +193,10 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
 - **타입/역할**: `OrganizationType`=SELLER·CORPORATE, `OrgRole`=OWNER>MANAGER>STAFF. 인가는 요청 파라미터가 아니라
   JWT 주체(userId)의 조직 내 역할로 판정(IDOR 방지, `OrgAuthorizer`).
 - **상태머신**: Organization ACTIVE⇄SUSPENDED. Membership INVITED→ACTIVE⇄SUSPENDED, 각 상태→REMOVED(터미널).
-- **이벤트 발행**(Outbox, `aggregateType="Organization"`): `lemuel.organization.created`, `lemuel.organization.member_joined`.
-  현재 **소비처 미배선**(발행 전용 — 계약 스키마는 존재). shared-common 의존(JWT·Outbox·멱등컨슈머).
+- **이벤트 발행**(Outbox, `aggregateType="Organization"`): `lemuel.organization.created`, `lemuel.organization.member_joined`,
+  `lemuel.organization.member_role_changed`, `lemuel.organization.member_removed`.
+  현재 **소비처 미배선**(발행 전용 — 계약 스키마는 존재, role_changed/removed 는 card-service 멤버 프로젝션이 소비 예정).
+  shared-common 의존(JWT·Outbox·멱등컨슈머).
 
 ### 3.14 gateway-service — API Gateway (port 8080)
 - Spring Cloud Gateway(WebFlux). 서비스별 경로 predicate 라우팅. 위성 8종은 공개 조회 API 만 라우팅(수집 트리거
@@ -268,14 +270,14 @@ Membership   : INVITED → ACTIVE ⇄ SUSPENDED, 각 상태 → REMOVED(터미�
 | `lemuel.loan.secured_loan_repaid` | loan | account |
 | `lemuel.company.reputation_changed` | company | loan(신용 리스크 프로젝션) |
 | `lemuel.investment.executed` | investment | account · notification |
-| `lemuel.organization.created` / `.member_joined` | organization | (소비처 미배선 — 발행 전용) |
+| `lemuel.organization.created` / `.member_joined` / `.member_role_changed` / `.member_removed` | organization | (소비처 미배선 — `.member_role_changed`/`.member_removed` 는 card-service 멤버 프로젝션 소비 예정) |
 
 부가(계약 스키마 없음): `lemuel.ops.*.failed`, `lemuel.pgreconciliation.discrepancy_approved`,
 `lemuel.payment.confirmed`(payment-webhook-service(Go) 발행 → notification 소비 — 내부 계약).
 
 발행 전용(소비처 미배선 — 의도된 상태, 소비자가 생기면 ADR 0024 절차로 계약 편입):
 `lemuel.payment.created` / `lemuel.payment.authorized`(결제 라이프사이클 관측용),
-`lemuel.user.membership_changed`, `lemuel.organization.created` / `.member_joined`.
+`lemuel.user.membership_changed`, `lemuel.organization.created` / `.member_joined` / `.member_role_changed` / `.member_removed`.
 역방향 예약: `lemuel.ops.order.failed` 는 operation 이 구독하지만 emit 지점 미배선(OpsSignalCategory 주석 참조).
 
 ---
