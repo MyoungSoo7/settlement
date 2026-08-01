@@ -2471,7 +2471,7 @@ git commit -am "feat(card): 조직·멤버·평판 이벤트 프로젝션 컨슈
 >
 > **전례 대비 개선 1건:** `OrderReconClientTest` 는 `X-Internal-Api-Key` 헤더가 실제로 실리는지 검증하지 않는다(테스트가 패키지-프라이빗 생성자로 우회). 여기서는 헤더 검증 테스트를 반드시 추가한다.
 
-- [ ] **Step 1: 실패 테스트 작성**
+- [x] **Step 1: 실패 테스트 작성**
 
 ```java
 package github.lms.lemuel.card.adapter.out.external;
@@ -2606,7 +2606,7 @@ class AccountFundingAdapterTest {
 
 > 마지막 테스트가 중요하다. 응답을 못 읽었을 때 `null` 을 0 으로 정규화하면 **재원 0 = 심사 탈락**이 되어 장애가 "이 셀러는 자격 미달"로 둔갑한다. 실패는 실패여야 한다.
 
-- [ ] **Step 2: 실패 확인 → 어댑터 구현**
+- [x] **Step 2: 실패 확인 → 어댑터 구현**
 
 ```java
     @Autowired
@@ -2625,7 +2625,7 @@ class AccountFundingAdapterTest {
     }
 ```
 
-- [ ] **Step 3: 통과 확인 → 커밋**
+- [x] **Step 3: 통과 확인 → 커밋**
 
 Run: `./gradlew :card-service:test --tests '*AccountFundingAdapterTest'`
 
