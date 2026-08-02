@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import github.lms.lemuel.commondata.application.port.out.DataPortalClientPort;
+import github.lms.lemuel.commondata.domain.DataProvider;
 import github.lms.lemuel.commondata.domain.DataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,11 +13,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
-import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,8 +41,6 @@ public class DataPortalApiClient implements DataPortalClientPort {
     private static final String NO_DATA_CODE = "03";
     /** pageNo 를 무시하고 같은 페이지를 반복하는 API 로부터의 무한 루프 방지 상한. */
     private static final int MAX_PAGES = 100;
-    private static final String KEY_JOIN = "|";
-    private static final int MAX_KEY_LENGTH = 300;
 
     private final DataPortalProperties properties;
     private final RestClient restClient;
@@ -56,6 +51,11 @@ public class DataPortalApiClient implements DataPortalClientPort {
         this.properties = properties;
         this.restClient = restClientBuilder.build();
         this.objectMapper = objectMapper;
+    }
+
+    @Override
+    public DataProvider provider() {
+        return DataProvider.DATA_GO_KR;
     }
 
     @Override
@@ -170,37 +170,6 @@ public class DataPortalApiClient implements DataPortalClientPort {
             return null;
         }
         String payload = item.toString();
-        return new PortalItem(resolveKey(item, keyFields, payload), payload);
-    }
-
-    /** keyFields 값 조인 — 결측/과대 키는 payload SHA-256 으로 폴백해 멱등성을 지킨다. */
-    private static String resolveKey(JsonNode item, List<String> keyFields, String payload) {
-        if (!keyFields.isEmpty()) {
-            List<String> values = new ArrayList<>(keyFields.size());
-            for (String field : keyFields) {
-                String value = item.path(field).asText("");
-                if (value.isBlank()) {
-                    values = null;
-                    break;
-                }
-                values.add(value);
-            }
-            if (values != null) {
-                String key = String.join(KEY_JOIN, values);
-                if (key.length() <= MAX_KEY_LENGTH) {
-                    return key;
-                }
-            }
-        }
-        return sha256(payload);
-    }
-
-    private static String sha256(String payload) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            return HexFormat.of().formatHex(digest.digest(payload.getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 미지원 JVM", e);
-        }
+        return new PortalItem(RecordKeys.resolve(item, keyFields, payload), payload);
     }
 }

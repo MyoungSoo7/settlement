@@ -43,7 +43,7 @@ class CommonDataWebLayerTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private final DataSource source = new DataSource(1L, "kasi-rest-days", "특일정보", "https://x.test",
-            Map.of("_type", "json"), List.of("locdate"), 100, true, "공휴일", Instant.now());
+            null, Map.of("_type", "json"), List.of("locdate"), 100, true, "공휴일", Instant.now());
 
     private MockMvc mvc;
 
@@ -74,6 +74,7 @@ class CommonDataWebLayerTest {
         mvc.perform(get("/api/common-data/sources/kasi-rest-days"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("kasi-rest-days"))
+                .andExpect(jsonPath("$.provider").value("DATA_GO_KR"))
                 .andExpect(jsonPath("$.enabled").value(true));
     }
 
@@ -106,12 +107,18 @@ class CommonDataWebLayerTest {
         when(register.register(any())).thenReturn(source);
         String body = """
                 {"code":"kasi-rest-days","name":"특일정보","endpoint":"https://x.test",
+                 "provider":"SEOUL_OPENAPI",
                  "defaultParams":{"_type":"json"},"keyFields":["locdate"],
                  "pageSize":100,"enabled":true,"description":"공휴일"}""";
 
         mvc.perform(post("/admin/commondata/sources").contentType(APPLICATION_JSON).content(body))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("kasi-rest-days"));
+
+        var captor = org.mockito.ArgumentCaptor.forClass(
+                RegisterDataSourceUseCase.RegisterCommand.class);
+        org.mockito.Mockito.verify(register).register(captor.capture());
+        assertThat(captor.getValue().provider()).isEqualTo("SEOUL_OPENAPI");
     }
 
     @Test

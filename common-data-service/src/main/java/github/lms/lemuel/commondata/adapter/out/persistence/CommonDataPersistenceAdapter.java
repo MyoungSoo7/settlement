@@ -7,6 +7,7 @@ import github.lms.lemuel.commondata.application.port.out.LoadDataRecordPort;
 import github.lms.lemuel.commondata.application.port.out.LoadDataSourcePort;
 import github.lms.lemuel.commondata.application.port.out.SaveDataRecordPort;
 import github.lms.lemuel.commondata.application.port.out.SaveDataSourcePort;
+import github.lms.lemuel.commondata.domain.DataProvider;
 import github.lms.lemuel.commondata.domain.DataRecord;
 import github.lms.lemuel.commondata.domain.DataSource;
 import org.springframework.data.domain.Limit;
@@ -61,7 +62,8 @@ public class CommonDataPersistenceAdapter
     public DataSource upsert(DataSource source) {
         DataSourceJpaEntity entity = dataSourceRepository.findByCode(source.code())
                 .orElseGet(() -> DataSourceJpaEntity.create(source.code()));
-        entity.apply(source.name(), source.endpoint(), writeParams(source.defaultParams()),
+        entity.apply(source.name(), source.endpoint(), source.provider().name(),
+                writeParams(source.defaultParams()),
                 source.keyFields().isEmpty() ? null : String.join(",", source.keyFields()),
                 source.pageSize(), source.enabled(), source.description());
         return toDomain(dataSourceRepository.save(entity));
@@ -96,7 +98,8 @@ public class CommonDataPersistenceAdapter
 
     private DataSource toDomain(DataSourceJpaEntity entity) {
         return new DataSource(entity.getId(), entity.getCode(), entity.getName(),
-                entity.getEndpoint(), readParams(entity.getDefaultParams()),
+                entity.getEndpoint(), DataProvider.parse(entity.getProvider()),
+                readParams(entity.getDefaultParams()),
                 splitKeyFields(entity.getKeyFields()), entity.getPageSize(), entity.isEnabled(),
                 entity.getDescription(), entity.getUpdatedAt());
     }

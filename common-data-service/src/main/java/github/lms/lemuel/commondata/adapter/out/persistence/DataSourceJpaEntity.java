@@ -32,6 +32,10 @@ public class DataSourceJpaEntity {
     @Column(name = "endpoint", nullable = false, length = 500)
     private String endpoint;
 
+    /** 제공처 구분(DATA_GO_KR/SEOUL_OPENAPI) — 도메인 enum name 문자열. */
+    @Column(name = "provider", nullable = false, length = 20)
+    private String provider;
+
     /** 호출 시 항상 붙는 쿼리 파라미터 JSON 오브젝트 원문. */
     @JdbcTypeCode(Types.LONGVARCHAR)
     @Column(name = "default_params", nullable = false)
@@ -72,6 +76,10 @@ public class DataSourceJpaEntity {
         return endpoint;
     }
 
+    String getProvider() {
+        return provider;
+    }
+
     String getDefaultParams() {
         return defaultParams;
     }
@@ -102,10 +110,11 @@ public class DataSourceJpaEntity {
         return entity;
     }
 
-    void apply(String name, String endpoint, String defaultParams, String keyFields,
+    void apply(String name, String endpoint, String provider, String defaultParams, String keyFields,
                int pageSize, boolean enabled, String description) {
         this.name = name;
         this.endpoint = endpoint;
+        this.provider = provider;
         this.defaultParams = defaultParams;
         this.keyFields = keyFields;
         this.pageSize = pageSize;

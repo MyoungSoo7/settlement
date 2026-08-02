@@ -35,7 +35,7 @@ class DataPortalApiClientTest {
     }
 
     private static DataSource source(List<String> keyFields, int pageSize) {
-        return new DataSource(1L, "kasi-rest-days", "특일정보", ENDPOINT,
+        return new DataSource(1L, "kasi-rest-days", "특일정보", ENDPOINT, null,
                 Map.of("_type", "json"), keyFields, pageSize, true, "공휴일", null);
     }
 
@@ -49,6 +49,8 @@ class DataPortalApiClientTest {
     void isConfigured_는_키설정여부를_반영한다() {
         assertThat(clientWith("").isConfigured()).isFalse();
         assertThat(clientWith("KEY").isConfigured()).isTrue();
+        assertThat(clientWith("KEY").provider())
+                .isEqualTo(github.lms.lemuel.commondata.domain.DataProvider.DATA_GO_KR);
     }
 
     @Test

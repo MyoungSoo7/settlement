@@ -1,6 +1,7 @@
 package github.lms.lemuel.commondata.adapter.out.persistence;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import github.lms.lemuel.commondata.domain.DataProvider;
 import github.lms.lemuel.commondata.domain.DataRecord;
 import github.lms.lemuel.commondata.domain.DataSource;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,7 +36,8 @@ class CommonDataPersistenceAdapterTest {
 
     private static DataSourceJpaEntity entity(String code, String defaultParams, String keyFields) {
         DataSourceJpaEntity e = DataSourceJpaEntity.create(code);
-        e.apply("특일정보", "https://apis.data.go.kr/x", defaultParams, keyFields, 100, true, "설명");
+        e.apply("특일정보", "https://apis.data.go.kr/x", "DATA_GO_KR", defaultParams, keyFields,
+                100, true, "설명");
         return e;
     }
 
@@ -84,12 +86,15 @@ class CommonDataPersistenceAdapterTest {
         when(sourceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         DataSource result = adapter.upsert(new DataSource(null, "src-a", "이름", "https://x.test",
-                Map.of("_type", "json"), List.of("locdate"), 100, true, "설명", null));
+                DataProvider.SEOUL_OPENAPI, Map.of("_type", "json"), List.of("locdate"),
+                100, true, "설명", null));
 
         assertThat(result.code()).isEqualTo("src-a");
+        assertThat(result.provider()).isEqualTo(DataProvider.SEOUL_OPENAPI);   // 저장·복원 라운드트립
         ArgumentCaptor<DataSourceJpaEntity> captor = ArgumentCaptor.forClass(DataSourceJpaEntity.class);
         verify(sourceRepository).save(captor.capture());
         assertThat(captor.getValue().getEndpoint()).isEqualTo("https://x.test");
+        assertThat(captor.getValue().getProvider()).isEqualTo("SEOUL_OPENAPI");
     }
 
     @Test
@@ -99,7 +104,7 @@ class CommonDataPersistenceAdapterTest {
         when(sourceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         adapter.upsert(new DataSource(1L, "src-a", "새이름", "https://x.test",
-                Map.of(), List.of(), 200, false, null, null));
+                null, Map.of(), List.of(), 200, false, null, null));
 
         verify(sourceRepository).save(existing);
         assertThat(existing.getName()).isEqualTo("새이름");

@@ -13,7 +13,8 @@ public interface RegisterDataSourceUseCase {
      */
     DataSource register(RegisterCommand command);
 
-    record RegisterCommand(String code, String name, String endpoint,
+    /** @param provider DATA_GO_KR(기본)/SEOUL_OPENAPI — null 이면 기존 값 보존(신규는 기본값) */
+    record RegisterCommand(String code, String name, String endpoint, String provider,
                            Map<String, String> defaultParams, List<String> keyFields,
                            Integer pageSize, Boolean enabled, String description) { }
 }
