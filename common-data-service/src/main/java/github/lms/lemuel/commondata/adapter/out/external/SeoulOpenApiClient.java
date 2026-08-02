@@ -48,6 +48,9 @@ public class SeoulOpenApiClient implements DataPortalClientPort {
     static final String PARAM_PATH = "path";
     /** START/END 를 무시하고 같은 구간을 반복하는 API 로부터의 무한 루프 방지 상한. */
     private static final int MAX_PAGES = 100;
+    private static final String RESULT_FIELD = "RESULT";
+    private static final String ROW_FIELD = "row";
+    private static final String TOTAL_COUNT_FIELD = "list_total_count";
 
     private final SeoulOpenApiProperties properties;
     private final RestClient restClient;
@@ -123,7 +126,7 @@ public class SeoulOpenApiClient implements DataPortalClientPort {
         String rawBody = restClient.get().uri(uri).retrieve().body(String.class);
         JsonNode root = readTree(rawBody, source.code());
 
-        JsonNode serviceNode = root.path(service);
+        JsonNode serviceNode = serviceNode(root, service);
         String code = resultCode(root, serviceNode);
         if (NO_DATA_CODE.equals(code)) {
             return null;
@@ -132,8 +135,38 @@ public class SeoulOpenApiClient implements DataPortalClientPort {
             throw new IllegalStateException("서울 열린데이터광장 API 오류 CODE=%s MESSAGE=%s (source=%s)"
                     .formatted(code, resultMessage(root, serviceNode), source.code()));
         }
-        return new Page(extractRows(root, serviceNode),
-                serviceNode.path("list_total_count").asInt(0));
+        // list_total_count 는 래퍼 안(표준)에도, 루트(citydata)에도 온다.
+        int totalCount = serviceNode.path(TOTAL_COUNT_FIELD)
+                .asInt(root.path(TOTAL_COUNT_FIELD).asInt(0));
+        return new Page(extractRows(root, serviceNode), totalCount);
+    }
+
+    /**
+     * 봉투 래퍼 노드 탐색. 래퍼 키가 <b>URL 서비스명과 다른</b> API 가 있어(실측:
+     * {@code tbCycleStationInfo} 요청 → 래퍼 {@code stationInfo}) 이름 일치를 먼저 보되,
+     * 없으면 구조로 찾는다 — {@code RESULT}/{@code row}/{@code list_total_count} 중 하나를
+     * 품은 루트 객체 필드가 래퍼다. 못 찾으면 MissingNode(루트 직접 해석 경로).
+     */
+    private static JsonNode serviceNode(JsonNode root, String service) {
+        JsonNode byName = root.path(service);
+        if (!byName.isMissingNode()) {
+            return byName;
+        }
+        for (Map.Entry<String, JsonNode> entry : root.properties()) {
+            JsonNode value = entry.getValue();
+            if (RESULT_FIELD.equals(entry.getKey()) || !value.isObject()) {
+                continue;
+            }
+            if (isEnvelopeWrapper(value)) {
+                return value;
+            }
+        }
+        return byName;
+    }
+
+    /** 래퍼(메타 보유)와 데이터 객체(citydata 의 CITYDATA)를 구분하는 판별식. */
+    private static boolean isEnvelopeWrapper(JsonNode node) {
+        return node.has(ROW_FIELD) || node.has(RESULT_FIELD) || node.has(TOTAL_COUNT_FIELD);
     }
 
     /** 경로형 URL 조립 — 한글 장소명 등 비 ASCII 세그먼트는 percent-encode 된다. */
@@ -167,25 +200,28 @@ public class SeoulOpenApiClient implements DataPortalClientPort {
     }
 
     /**
-     * RESULT 코드 해석 — 네 가지 봉투 변형 지원:
-     * ① {@code {서비스명:{RESULT:{CODE}}}}(표준) ② {@code {RESULT:{CODE}}}(오류/데이터없음)
+     * RESULT 코드 해석 — 다섯 가지 봉투 변형 지원:
+     * ① {@code {래퍼:{RESULT:{CODE}}}}(표준) ② {@code {RESULT:{CODE}}}(오류/데이터없음)
      * ③ {@code {RESULT:{"RESULT.CODE": ..}}}(citydata 실측 — 점 포함 키가 RESULT 객체 안)
-     * ④ {@code {"RESULT.CODE": ..}}(플랫 루트 키).
+     * ④ {@code {"RESULT.CODE": ..}}(플랫 루트 키)
+     * ⑤ {@code {"CODE": ..}}(RESULT 래퍼 없는 평평한 형태 — 실측: 범위 밖 조회의 INFO-200).
      */
     private static String resultCode(JsonNode root, JsonNode serviceNode) {
         return firstNonEmpty(
-                serviceNode.path("RESULT").path("CODE").asText(""),
-                root.path("RESULT").path("CODE").asText(""),
-                root.path("RESULT").path("RESULT.CODE").asText(""),
-                root.path("RESULT.CODE").asText(""));
+                serviceNode.path(RESULT_FIELD).path("CODE").asText(""),
+                root.path(RESULT_FIELD).path("CODE").asText(""),
+                root.path(RESULT_FIELD).path("RESULT.CODE").asText(""),
+                root.path("RESULT.CODE").asText(""),
+                root.path("CODE").asText(""));
     }
 
     private static String resultMessage(JsonNode root, JsonNode serviceNode) {
         return firstNonEmpty(
-                serviceNode.path("RESULT").path("MESSAGE").asText(""),
-                root.path("RESULT").path("MESSAGE").asText(""),
-                root.path("RESULT").path("RESULT.MESSAGE").asText(""),
-                root.path("RESULT.MESSAGE").asText(""));
+                serviceNode.path(RESULT_FIELD).path("MESSAGE").asText(""),
+                root.path(RESULT_FIELD).path("MESSAGE").asText(""),
+                root.path(RESULT_FIELD).path("RESULT.MESSAGE").asText(""),
+                root.path("RESULT.MESSAGE").asText(""),
+                root.path("MESSAGE").asText(""));
     }
 
     private static String firstNonEmpty(String... candidates) {
@@ -198,11 +234,13 @@ public class SeoulOpenApiClient implements DataPortalClientPort {
     }
 
     /**
-     * 아이템 배열 추출 — 표준은 {@code {서비스명}.row[]}, citydata 계열은 서비스명과 다른
+     * 아이템 배열 추출 — 표준은 {@code {래퍼}.row[]}, citydata_ppltn 계열은 서비스명과 다른
      * 루트 배열 키(예: {@code SeoulRtd.citydata_ppltn})라 루트의 첫 배열 필드로 폴백한다.
+     * citydata 는 배열이 아예 없고 <b>단일 데이터 객체</b>({@code CITYDATA})로 오므로,
+     * 메타(row/RESULT/list_total_count)를 안 가진 루트 객체를 1 레코드로 취급한다.
      */
     private static List<JsonNode> extractRows(JsonNode root, JsonNode serviceNode) {
-        JsonNode row = serviceNode.path("row");
+        JsonNode row = serviceNode.path(ROW_FIELD);
         if (row.isArray()) {
             return toList(row);
         }
@@ -212,6 +250,12 @@ public class SeoulOpenApiClient implements DataPortalClientPort {
         for (Map.Entry<String, JsonNode> entry : root.properties()) {
             if (entry.getValue().isArray()) {
                 return toList(entry.getValue());
+            }
+        }
+        for (Map.Entry<String, JsonNode> entry : root.properties()) {
+            JsonNode value = entry.getValue();
+            if (!RESULT_FIELD.equals(entry.getKey()) && value.isObject() && !isEnvelopeWrapper(value)) {
+                return List.of(value);
             }
         }
         return List.of();
