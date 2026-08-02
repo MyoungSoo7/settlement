@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -19,6 +20,20 @@ public interface AccountBalanceRepository extends JpaRepository<AccountBalanceJp
     Optional<AccountBalanceJpaEntity> findByOwnerTypeAndOwnerIdAndAccount(OwnerType ownerType,
                                                                           String ownerId,
                                                                           GlAccount account);
+
+    /**
+     * owner 의 여러 계정 잔액을 <b>단일 SELECT</b> 로 함께 읽는다({@code account IN (...)}).
+     *
+     * <p>코드리뷰 지적(Important) — 계정별로 {@link #findByOwnerTypeAndOwnerIdAndAccount} 를 여러 번
+     * 호출해 조회를 쪼개면, {@code READ_COMMITTED} 트랜잭션이라도 <b>문장마다 스냅샷이 갱신</b>되므로
+     * 문장 사이에 재분류 커밋(예: holdbackReleased 의 HOLDBACK_PAYABLE→SELLER_PAYABLE 이동)이 끼어들면
+     * 합계가 일시적으로 어긋난다(read skew) — {@link #findBalanceReconRows} 의 MED-3 대사 스냅샷과
+     * 정확히 같은 문제다. 여러 계정을 함께 읽어야 하는 소비처(예: 셀러 재원 = SELLER_PAYABLE +
+     * HOLDBACK_PAYABLE)는 이 메서드로 한 문장에 담아 스냅샷을 하나로 고정해야 한다.
+     */
+    List<AccountBalanceJpaEntity> findByOwnerTypeAndOwnerIdAndAccountIn(OwnerType ownerType,
+                                                                        String ownerId,
+                                                                        Collection<GlAccount> accounts);
 
     /**
      * 잔액에 델타를 <b>누적</b>한다(행이 없으면 델타를 초기값으로 생성).

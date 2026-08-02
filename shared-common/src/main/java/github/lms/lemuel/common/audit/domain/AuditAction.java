@@ -60,5 +60,11 @@ public enum AuditAction {
     // 확정(DONE) 정산에서 누락된 Payout 을 append-only 로 신규 생성하는 백필 실행.
     PAYOUT_BACKFILL_EXECUTED,
     // 차지백·PG 대사 조정의 역분개 누락분을 ledger_outbox 에 적재하는 백필 실행.
-    LEDGER_REVERSE_BACKFILL_EXECUTED
+    LEDGER_REVERSE_BACKFILL_EXECUTED,
+
+    // ── card-service (법인카드) 금전·상태 액션 ──
+    CARD_ACCOUNT_OPENED,
+    CARD_ISSUED,
+    CARD_LIMIT_CHANGED,
+    CARD_STATUS_CHANGED
 }

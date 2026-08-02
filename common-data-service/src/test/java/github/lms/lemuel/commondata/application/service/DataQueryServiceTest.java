@@ -35,7 +35,7 @@ class DataQueryServiceTest {
     private DataQueryService service;
 
     private final DataSource source = new DataSource(1L, "kasi-rest-days", "특일정보",
-            "https://apis.data.go.kr/x", null, null, 100, true, null, null);
+            "https://apis.data.go.kr/x", null, null, null, 100, true, null, null);
 
     @BeforeEach
     void setUp() {

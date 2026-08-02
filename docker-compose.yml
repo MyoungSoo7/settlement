@@ -284,6 +284,28 @@ services:
       timeout: 3s
       retries: 10
 
+  # ★ DB-per-service: card-service 전용 PostgreSQL (셀러 법인카드·임직원 카드 한도 관리)
+  card-postgres:
+    image: postgres:17-alpine
+    container_name: lemuel-card-db
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      POSTGRES_DB: lemuel_card
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "127.0.0.1:5447:5432"
+    volumes:
+      - card-postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.17.0
     container_name: lemuel-elasticsearch
@@ -768,6 +790,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       # 공공데이터포털 인증키(계정당 1개, 활용신청한 모든 API 공용) — 미설정이면 Flyway 시드 데이터로만 동작 (수집 트리거는 409/경고)
       DATA_GO_KR_API_KEY: ${DATA_GO_KR_API_KEY:-}
+      # 서울 열린데이터광장 인증키(별도 발급, URL 경로형) — 미설정이면 SEOUL_OPENAPI provider 소스 수집 비활성
+      SEOUL_OPENAPI_KEY: ${SEOUL_OPENAPI_KEY:-}
       COMMONDATA_INTERNAL_API_KEY: ${COMMONDATA_INTERNAL_API_KEY:-}
       JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
       SERVER_PORT: 8080
@@ -884,6 +908,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       APP_KAFKA_ENABLED: "true"
       SPRING_KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
+      # 내부 API 공유 시크릿 — card-service(AccountFundingAdapter)가 이 값으로 /internal/account/** 를 호출한다(Task 2).
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-lemuel-internal-dev-key}
       # JWT 시크릿은 order-service 와 동일해야 토큰 검증 가능
       JWT_ISSUER: ${JWT_ISSUER}
       JWT_SECRET: ${JWT_SECRET}
@@ -946,6 +972,51 @@ services:
       redpanda:
         condition: service_healthy
 
+  card-service:
+    build:
+      context: .
+      args:
+        MODULE: card-service
+    image: ghcr.io/myoungsoo7/lemuel-card:latest
+    container_name: lemuel-card
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      # 자체 DB(lemuel_card) — 셀러 법인카드(마스터 한도)·임직원 카드(서브한도) 관리. 재원은 account-service
+      # 내부 REST 로 조회하고, 조직·평판은 Kafka 이벤트 프로젝션으로만 받는다(코드·DB 의존 0).
+      SPRING_DATASOURCE_URL: jdbc:postgresql://card-postgres:5432/lemuel_card?reWriteBatchedInserts=true
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      APP_KAFKA_ENABLED: "true"
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
+      # account-service 내부 재원 조회 (Task 8)
+      ACCOUNT_SERVICE_URL: http://account-service:8080
+      # 내부 API 공유 시크릿 — account 가 prod 프로파일에서 fail-closed 로 401 을 반환한다(Task 2).
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-lemuel-internal-dev-key}
+      # JWT 시크릿은 order-service 와 동일해야 토큰 검증 가능
+      JWT_ISSUER: ${JWT_ISSUER}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_TTL_SECONDS: ${JWT_TTL_SECONDS}
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
+      SERVER_PORT: 8080
+      MANAGEMENT_SERVER_PORT: 8080
+    ports:
+      - "127.0.0.1:8106:8080"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    depends_on:
+      card-postgres:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+
   gateway-service:
     build:
       context: .
@@ -971,6 +1042,7 @@ services:
       INVESTMENT_SERVICE_URI: http://investment-service:8080
       ACCOUNT_SERVICE_URI: http://account-service:8080
       ORGANIZATION_SERVICE_URI: http://organization-service:8080
+      CARD_SERVICE_URI: http://card-service:8080
       MARKET_STREAM_SERVICE_URI: http://market-stream-service:8110
       JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
     ports:
@@ -990,6 +1062,10 @@ services:
     image: nginx:1.25-alpine
     container_name: lemuel-frontend
     volumes:
+      # 2026-08-01: frontend/dist 는 더 이상 git 에 추적되지 않는다(빌드 산출물).
+      # 이 컴포즈를 쓰기 전에 반드시 `cd frontend && npm ci && npm run build` 를 한 번
+      # 돌려야 한다. 안 하면 이 마운트가 빈 디렉터리가 되어 nginx 가 404 만 낸다.
+      # (프로덕션은 frontend/Dockerfile 이 이미지 안에서 빌드하므로 영향 없다)
       - ./frontend/dist:/usr/share/nginx/html:ro
       # compose 전용 conf — gateway 재생성 시 stale DNS 로 전 API 500 나는 문제를
       # 도커 내장 DNS 재해석으로 방지 (k8s 이미지는 기존 nginx.conf 사용)
@@ -1121,6 +1197,7 @@ volumes:
   investment-postgres-data:
   account-postgres-data:
   organization-postgres-data:
+  card-postgres-data:
   ai-postgres-data:
   elasticsearch-data:
   redpanda-data:

@@ -17,7 +17,17 @@ class DataSourceTest {
 
     private static DataSource source(String code, String name, String endpoint,
                                      Map<String, String> params, List<String> keyFields, int pageSize) {
-        return new DataSource(null, code, name, endpoint, params, keyFields, pageSize, true, null, null);
+        return new DataSource(null, code, name, endpoint, null, params, keyFields, pageSize, true, null, null);
+    }
+
+    @Test
+    @DisplayName("provider null 은 기본 DATA_GO_KR 로 정규화, 명시값은 보존")
+    void defaultsProvider() {
+        assertEquals(DataProvider.DATA_GO_KR,
+                source("src-1", "이름", "https://apis.data.go.kr/x", null, null, 100).provider());
+        assertEquals(DataProvider.SEOUL_OPENAPI,
+                new DataSource(null, "seoul-src", "서울", "http://openapi.seoul.go.kr:8088",
+                        DataProvider.SEOUL_OPENAPI, null, null, 100, true, null, null).provider());
     }
 
     @Test

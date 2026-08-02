@@ -51,6 +51,7 @@ settlement/                              # 모노레포 루트
 │                                        #      매수·매도 등 투자 판단과 그 결과의 책임은 이용자 본인에게 있음
 ├── account-service/                     # 🏦 Account (8102, lemuel_account) — 계정계 GL 집계 (소비 전용)
 ├── organization-service/                # 👥 Organization (8104, lemuel_organization) — 조직·멤버십 (발행 전용)
+├── card-service/                        # 💳 Card (8106/mgmt 8107, lemuel_card) — 법인카드 카드계정·카드 (도메인·정책만, 영속/REST/스케줄러 미구현)
 └── gateway-service/                     # 🚪 API Gateway (8080) — 라우팅만 (자체 인증 필터 없음)
 ```
 

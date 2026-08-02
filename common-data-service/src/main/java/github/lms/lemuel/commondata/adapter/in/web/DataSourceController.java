@@ -78,13 +78,13 @@ public class DataSourceController {
 
     // ----- 응답 DTO (컨트롤러 내부 record) -----
 
-    record SourceResponse(String code, String name, String endpoint,
+    record SourceResponse(String code, String name, String endpoint, String provider,
                           Map<String, String> defaultParams, List<String> keyFields,
                           int pageSize, boolean enabled, String description, Instant updatedAt) {
         static SourceResponse from(DataSource source) {
             return new SourceResponse(source.code(), source.name(), source.endpoint(),
-                    source.defaultParams(), source.keyFields(), source.pageSize(),
-                    source.enabled(), source.description(), source.updatedAt());
+                    source.provider().name(), source.defaultParams(), source.keyFields(),
+                    source.pageSize(), source.enabled(), source.description(), source.updatedAt());
         }
     }
 

@@ -3,6 +3,7 @@ package github.lms.lemuel.commondata.application.service;
 import github.lms.lemuel.commondata.application.port.in.RegisterDataSourceUseCase.RegisterCommand;
 import github.lms.lemuel.commondata.application.port.out.LoadDataSourcePort;
 import github.lms.lemuel.commondata.application.port.out.SaveDataSourcePort;
+import github.lms.lemuel.commondata.domain.DataProvider;
 import github.lms.lemuel.commondata.domain.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -47,25 +48,66 @@ class DataSourceAdminServiceTest {
         when(saveDataSourcePort.upsert(any())).thenAnswer(inv -> inv.getArgument(0));
 
         DataSource saved = service.register(new RegisterCommand(
-                "new-source", "새 소스", "https://apis.data.go.kr/x",
+                "new-source", "새 소스", "https://apis.data.go.kr/x", null,
                 Map.of("_type", "json"), List.of("id"), null, null, "설명"));
 
         assertNull(saved.id());
         assertEquals(DataSource.DEFAULT_PAGE_SIZE, saved.pageSize());
         assertTrue(saved.enabled());
+        assertEquals(DataProvider.DATA_GO_KR, saved.provider());
         assertEquals(Map.of("_type", "json"), saved.defaultParams());
+    }
+
+    @Test
+    @DisplayName("SEOUL_OPENAPI provider 지정 등록 — 명시값 반영")
+    void registersSeoulProvider() {
+        when(loadDataSourcePort.findByCode("seoul-living-pop")).thenReturn(Optional.empty());
+        when(saveDataSourcePort.upsert(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        DataSource saved = service.register(new RegisterCommand(
+                "seoul-living-pop", "서울 생활인구", "http://openapi.seoul.go.kr:8088",
+                "SEOUL_OPENAPI", Map.of("service", "SPOP_LOCL_RESD_DONG"), List.of(),
+                null, null, null));
+
+        assertEquals(DataProvider.SEOUL_OPENAPI, saved.provider());
+    }
+
+    @Test
+    @DisplayName("부분 갱신에서 provider null 은 기존 값 보존, 명시하면 변경")
+    void mergesProviderOnUpdate() {
+        DataSource existing = new DataSource(7L, "seoul-living-pop", "서울 생활인구",
+                "http://openapi.seoul.go.kr:8088", DataProvider.SEOUL_OPENAPI,
+                Map.of(), List.of(), 100, true, null, null);
+        when(loadDataSourcePort.findByCode("seoul-living-pop")).thenReturn(Optional.of(existing));
+        when(saveDataSourcePort.upsert(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        DataSource kept = service.register(new RegisterCommand(
+                "seoul-living-pop", null, null, null, null, null, null, null, null));
+        assertEquals(DataProvider.SEOUL_OPENAPI, kept.provider());
+
+        DataSource changed = service.register(new RegisterCommand(
+                "seoul-living-pop", null, null, "DATA_GO_KR", null, null, null, null, null));
+        assertEquals(DataProvider.DATA_GO_KR, changed.provider());
+    }
+
+    @Test
+    @DisplayName("미지원 provider 문자열은 400 유도(IAE)")
+    void rejectsUnknownProvider() {
+        assertThrows(IllegalArgumentException.class, () -> service.register(new RegisterCommand(
+                "bad-provider", "이름", "https://apis.data.go.kr/x", "gyeonggi",
+                null, null, null, null, null)));
     }
 
     @Test
     @DisplayName("기존 소스 부분 갱신 — null 필드는 기존 값 보존, id 유지")
     void updatesExistingSourcePartially() {
         DataSource existing = new DataSource(7L, "kasi-rest-days", "특일정보",
-                "https://apis.data.go.kr/x", Map.of("solYear", "2026"), List.of("locdate", "seq"),
-                50, true, "기존 설명", null);
+                "https://apis.data.go.kr/x", null, Map.of("solYear", "2026"),
+                List.of("locdate", "seq"), 50, true, "기존 설명", null);
         when(loadDataSourcePort.findByCode("kasi-rest-days")).thenReturn(Optional.of(existing));
 
         service.register(new RegisterCommand(
-                "kasi-rest-days", null, null, null, null, 200, false, null));
+                "kasi-rest-days", null, null, null, null, null, 200, false, null));
 
         ArgumentCaptor<DataSource> captor = ArgumentCaptor.forClass(DataSource.class);
         verify(saveDataSourcePort).upsert(captor.capture());
@@ -84,14 +126,14 @@ class DataSourceAdminServiceTest {
         when(loadDataSourcePort.findByCode("incomplete")).thenReturn(Optional.empty());
 
         assertThrows(IllegalArgumentException.class, () -> service.register(new RegisterCommand(
-                "incomplete", null, null, null, null, null, null, null)));
+                "incomplete", null, null, null, null, null, null, null, null)));
     }
 
     @Test
     @DisplayName("code 누락 거부")
     void rejectsNullCode() {
         assertThrows(IllegalArgumentException.class, () -> service.register(new RegisterCommand(
-                null, "이름", "https://apis.data.go.kr/x", null, null, null, null, null)));
+                null, "이름", "https://apis.data.go.kr/x", null, null, null, null, null, null)));
         assertThrows(IllegalArgumentException.class, () -> service.register(null));
     }
 
@@ -109,7 +151,7 @@ class DataSourceAdminServiceTest {
                 "http://[::1]/x",                           // IPv6 루프백
                 "http://svc.internal/x")) {                 // 내부 도메인
             assertThrows(IllegalArgumentException.class, () -> service.register(new RegisterCommand(
-                    "ssrf-src", "SSRF", badEndpoint, null, null, null, null, null)),
+                    "ssrf-src", "SSRF", badEndpoint, null, null, null, null, null, null)),
                     "차단되어야 함: " + badEndpoint);
         }
     }
@@ -122,8 +164,8 @@ class DataSourceAdminServiceTest {
 
         // 공인 리터럴 IP (DNS 불필요) + 정상 호스트명(호스트명은 getByName 미호출 → 오프라인 안전)
         service.register(new RegisterCommand("ext", "외부", "http://8.8.8.8/api",
-                null, null, null, null, null));
+                null, null, null, null, null, null));
         service.register(new RegisterCommand("ext", "외부", "https://apis.data.go.kr/x",
-                null, null, null, null, null));
+                null, null, null, null, null, null));
     }
 }

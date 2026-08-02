@@ -10,14 +10,18 @@ import java.util.regex.Pattern;
  *
  * <p>표준 data.go.kr 응답 봉투({@code response.header.resultCode} + {@code body.items.item[]})를
  * 따르는 API 라면 endpoint·기본 파라미터·자연키 필드만 등록해 코드 변경 없이 수집한다.
+ * 서울 열린데이터광장 등 다른 봉투는 {@link DataProvider} 로 구분해 제공처별 클라이언트가 담당한다.
  *
+ * @param provider      응답 봉투·인증 방식 구분 — null 이면 기본 {@link DataProvider#DATA_GO_KR}
  * @param defaultParams 호출 시 항상 붙는 쿼리 파라미터 — JSON 응답 형식 지정({@code _type}/
- *                      {@code resultType})이 API 마다 달라 여기서 소스별로 선언한다
+ *                      {@code resultType})이 API 마다 달라 여기서 소스별로 선언한다.
+ *                      SEOUL_OPENAPI 는 예약 키 {@code service}(필수)·{@code path}(선택 후행 경로)를 여기서 선언
  * @param keyFields     아이템의 자연키 필드명 목록 — 값을 {@code |} 로 조인해 recordKey 로 쓴다.
  *                      비어 있으면 payload SHA-256 해시가 대체(멱등 재수집의 기준)
- * @param pageSize      numOfRows — 기본 {@value #DEFAULT_PAGE_SIZE}, 상한 {@value #MAX_PAGE_SIZE}
+ * @param pageSize      numOfRows(또는 START/END 윈도우 크기) — 기본 {@value #DEFAULT_PAGE_SIZE},
+ *                      상한 {@value #MAX_PAGE_SIZE}
  */
-public record DataSource(Long id, String code, String name, String endpoint,
+public record DataSource(Long id, String code, String name, String endpoint, DataProvider provider,
                          Map<String, String> defaultParams, List<String> keyFields,
                          int pageSize, boolean enabled, String description, Instant updatedAt) {
 
@@ -37,6 +41,9 @@ public record DataSource(Long id, String code, String name, String endpoint,
         if (endpoint == null
                 || !(endpoint.startsWith("http://") || endpoint.startsWith("https://"))) {
             throw new IllegalArgumentException("endpoint 는 http(s) URL 이어야 합니다: " + endpoint);
+        }
+        if (provider == null) {
+            provider = DataProvider.DATA_GO_KR;
         }
         defaultParams = defaultParams == null ? Map.of() : Map.copyOf(defaultParams);
         keyFields = keyFields == null ? List.of()

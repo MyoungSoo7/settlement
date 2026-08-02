@@ -1,0 +1,9 @@
+{
+  "cardAccountId": 5001,
+  "organizationId": 3001,
+  "sellerId": "SELLER-777",
+  "previousStatus": "ACTIVE",
+  "newStatus": "SUSPENDED",
+  "masterLimit": "500000",
+  "reason": "평판 등급 E 는 카드 발급 대상이 아닙니다."
+}

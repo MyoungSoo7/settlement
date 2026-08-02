@@ -1,11 +1,14 @@
 package github.lms.lemuel.account.application.port.out;
 
 import github.lms.lemuel.account.domain.AccountEntry;
+import github.lms.lemuel.account.domain.GlAccount;
 import github.lms.lemuel.account.domain.OwnerType;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 /**
  * GL 분개 조회 아웃바운드 포트.
@@ -44,6 +47,26 @@ public interface LoadAccountEntryPort {
      * 현재는 인덱스 기반 스캔을 수용).
      */
     BigDecimal sellerPayableBalance(String sellerId);
+
+    /**
+     * owner 의 특정 계정 잔액(정상방향 순잔액)을 실체화 테이블에서 읽는다.
+     *
+     * <p>기존 {@code sellerPayableBalance} 는 SELLER_PAYABLE 하나로 하드코딩돼 있어 재원 조회
+     * (SELLER_PAYABLE + HOLDBACK_PAYABLE)에 쓸 수 없다. 잔액 행이 없으면 {@code BigDecimal.ZERO}.
+     */
+    BigDecimal balanceOf(OwnerType ownerType, String ownerId, GlAccount account);
+
+    /**
+     * owner 의 여러 계정 잔액을 <b>단일 조회</b>로 함께 읽는다(실체화 테이블, {@code account IN (...)}).
+     *
+     * <p>코드리뷰 지적(Important) — {@link #balanceOf} 를 계정 수만큼 여러 번 호출해 합산하면,
+     * {@code READ_COMMITTED} 트랜잭션에서도 문장마다 스냅샷이 갱신되므로 호출 사이에 재분류 커밋이
+     * 끼어들 때 합계가 일시적으로 어긋난다(read skew — {@code AccountBalanceRepository.findBalanceReconRows}
+     * 의 MED-3 대사 스냅샷과 동일 문제). 두 계정 이상을 함께 읽어야 하는 소비처(예: 셀러 재원 =
+     * SELLER_PAYABLE + HOLDBACK_PAYABLE)는 반드시 이 메서드를 써야 한다. 요청한 계정 중 잔액 행이
+     * 없는 계정도 결과 Map 에 {@code BigDecimal.ZERO} 로 채워 반환한다 — null 을 노출하지 않는다.
+     */
+    Map<GlAccount, BigDecimal> balancesOf(OwnerType ownerType, String ownerId, Collection<GlAccount> accounts);
 
     /** 전체 전표(시산표 계산용). */
     List<AccountEntry> findAll();

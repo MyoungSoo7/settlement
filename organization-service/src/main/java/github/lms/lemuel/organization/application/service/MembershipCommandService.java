@@ -85,8 +85,14 @@ public class MembershipCommandService implements MembershipCommandUseCase {
             throw new LastOwnerException(command.organizationId());
         }
 
+        // 발행 시점에는 도메인 객체가 이미 새 역할로 바뀌어 있으므로, 바꾸기 직전에 이전 역할을 별도로 포착해둔다.
+        OrgRole previousRole = target.getRole();
         target.changeRole(command.newRole());
         Membership saved = saveMembershipPort.save(target);
+        // 같은 역할로의 "변경" 요청은 실제 상태 전이가 아니므로 소비측에 의미 없는 이벤트를 보내지 않는다.
+        if (previousRole != saved.getRole()) {
+            publishPort.publishMemberRoleChanged(saved, previousRole);
+        }
         log.info("역할 변경: org={} target={} → {}",
                 command.organizationId(), command.targetUserId(), command.newRole());
         return saved;
@@ -107,7 +113,8 @@ public class MembershipCommandService implements MembershipCommandUseCase {
         }
 
         target.remove();
-        saveMembershipPort.save(target);
+        Membership saved = saveMembershipPort.save(target);
+        publishPort.publishMemberRemoved(saved);
         log.info("멤버 제거: org={} target={} by={}", organizationId, targetUserId, actingUserId);
     }
 }

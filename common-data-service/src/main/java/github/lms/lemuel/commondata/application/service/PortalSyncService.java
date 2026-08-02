@@ -15,6 +15,7 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -29,14 +30,14 @@ public class PortalSyncService implements SyncDataSourceUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(PortalSyncService.class);
 
-    private final DataPortalClientPort portalClient;
+    private final List<DataPortalClientPort> portalClients;
     private final LoadDataSourcePort loadDataSourcePort;
     private final SaveDataRecordPort saveDataRecordPort;
 
-    public PortalSyncService(DataPortalClientPort portalClient,
+    public PortalSyncService(List<DataPortalClientPort> portalClients,
                              LoadDataSourcePort loadDataSourcePort,
                              SaveDataRecordPort saveDataRecordPort) {
-        this.portalClient = portalClient;
+        this.portalClients = portalClients;
         this.loadDataSourcePort = loadDataSourcePort;
         this.saveDataRecordPort = saveDataRecordPort;
     }
@@ -45,14 +46,21 @@ public class PortalSyncService implements SyncDataSourceUseCase {
     // 레코드 upsert 후 조회 캐시를 비워 정합 유지 — TTL(600s) 만 믿지 않는다.
     @CacheEvict(cacheNames = {"dataSources", "dataRecords"}, allEntries = true)
     public SyncResult sync(String sourceCode, Map<String, String> overrideParams) {
-        if (!portalClient.isConfigured()) {
-            throw new IllegalStateException(
-                    "공공데이터포털 인증키가 설정되지 않았습니다 (DATA_GO_KR_API_KEY)");
-        }
         DataSource source = loadDataSourcePort.findByCode(sourceCode)
                 .orElseThrow(() -> new DataSourceNotFoundException(sourceCode));
         if (!source.enabled()) {
             throw new IllegalStateException("비활성 데이터소스입니다: " + sourceCode);
+        }
+        DataPortalClientPort portalClient = portalClients.stream()
+                .filter(client -> client.provider() == source.provider())
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException(
+                        "provider %s 를 담당하는 수집 클라이언트가 없습니다 (source=%s)"
+                                .formatted(source.provider(), sourceCode)));
+        if (!portalClient.isConfigured()) {
+            throw new IllegalStateException(
+                    "provider %s 인증키가 설정되지 않았습니다 (source=%s) — DATA_GO_KR_API_KEY/SEOUL_OPENAPI_KEY 확인"
+                            .formatted(source.provider(), sourceCode));
         }
 
         var items = portalClient.fetchItems(source,

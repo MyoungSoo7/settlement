@@ -75,7 +75,9 @@ payout 은 현금 유출. `COMMISSION_REVENUE` 등 계정 추가. 가장 정확�
 - **`settlement.confirmed` 처리**: 컨슈머·토픽 **유지**(loan 상환 saga 가 여전히 소비), 단 GL **무전표**(멱등 마커만). 토픽 삭제 금지.
 - **과거 GL 백필**: 신규 전기 규칙은 **cut-over 이후 이벤트에만** 적용. 과거분은 전면 재처리하지 않고, 잔존 `SETTLEMENT_SCHEDULED` 잔액을 **마감 조정분개로 청산**. 전면 재처리는 필요 시 별도 백필 배치.
 - **마감 후 조정**(settlement 자체원장 월마감 관련): 마감된(CLOSED) 기간은 재개봉 금지 — CLOSED 기간 대상 역분개는 차단하지 않고 **다음 OPEN 기간으로 `adjustmentDate` 재지정**해 전기(회계 관행).
-- **`payout.completed` 직렬화**: settlement 계열 규약대로 `amount` 는 JSON number, 계약 스키마 `"type":"number"`.
+- **`payout.completed` 직렬화**: ~~settlement 계열 규약대로 `amount` 는 JSON number, 계약 스키마 `"type":"number"`~~
+  **(2026-07-28 DATA-STANDARD N5 로 대체)** — cross-service 금액 wire 는 JSON **string**(`BigDecimal.toPlainString`)으로
+  전환됨(`659b7a560`). 현재 계약 스키마는 `"type":"string"` 이 정본.
 
 > 되돌리기 어려운 회계 결정이므로, 구현은 매핑 변경·신규 이벤트·백필을 **한 릴리스로 원자 배선**한다(부분 배선 시 CASH 반쪽). Phase 0–3 은 함께 랜딩.
 

@@ -33,13 +33,22 @@ class EventContractFixtureTest {
             "lemuel.investment.executed",
             "lemuel.organization.created",
             "lemuel.organization.member_joined",
+            "lemuel.organization.member_role_changed",
+            "lemuel.organization.member_removed",
             "lemuel.settlement.holdback_released",
             "lemuel.settlement.holdback_consumed",
             "lemuel.settlement.adjusted",
             "lemuel.settlement.canceled",
             "lemuel.seller_recovery.opened",
             "lemuel.seller_recovery.offset",
-            "lemuel.settlement.withholding_accrued"
+            "lemuel.settlement.withholding_accrued",
+            "lemuel.card.account_opened",
+            "lemuel.card.issued",
+            "lemuel.card.limit_changed",
+            "lemuel.card.status_changed",
+            "lemuel.card.account_status_changed",
+            "lemuel.card.authorized",
+            "lemuel.card.captured"
     })
     @DisplayName("모든 토픽의 정본 샘플은 자기 계약 스키마를 통과한다")
     void canonicalSamples_areValidAgainstTheirSchemas(String topic) {

@@ -79,7 +79,8 @@ public class SellerBankAccountAdminController {
         // PII 계좌 변경 — 실자금 경로의 선행 조작이라 감사 추적. 계좌번호 원문은 남기지 않고 마스킹만.
         auditLogger.record(AuditAction.SELLER_BANK_ACCOUNT_REGISTERED, "SellerBankAccount",
                 String.valueOf(sellerId),
-                toJson(Map.of("operator", currentOperator(), "sellerId", sellerId,
+                toJson(Map.of("operator", currentOperator(), "channel", "ADMIN_CONSOLE",
+                        "sellerId", sellerId,
                         "bank", saved.getBankCode(),
                         "account", saved.toBankAccount().maskedAccountNumber())));
         return ResponseEntity.ok(view(saved));

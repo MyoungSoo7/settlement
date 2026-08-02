@@ -59,8 +59,9 @@ public class CommonDataAdminController {
     @PostMapping("/sources")
     public ResponseEntity<SourceResponse> register(@RequestBody RegisterRequest request) {
         var saved = registerDataSourceUseCase.register(new RegisterCommand(
-                request.code(), request.name(), request.endpoint(), request.defaultParams(),
-                request.keyFields(), request.pageSize(), request.enabled(), request.description()));
+                request.code(), request.name(), request.endpoint(), request.provider(),
+                request.defaultParams(), request.keyFields(), request.pageSize(),
+                request.enabled(), request.description()));
         recordAuditPort.record("DATASOURCE_REGISTERED", "DataSource", request.code(),
                 Map.of("endpoint", String.valueOf(request.endpoint()),
                         "enabled", request.enabled() != null && request.enabled()));
@@ -102,7 +103,7 @@ public class CommonDataAdminController {
                 "statusUrl", "/admin/commondata/sync/status"));
     }
 
-    record RegisterRequest(String code, String name, String endpoint,
+    record RegisterRequest(String code, String name, String endpoint, String provider,
                            Map<String, String> defaultParams, List<String> keyFields,
                            Integer pageSize, Boolean enabled, String description) { }
 }

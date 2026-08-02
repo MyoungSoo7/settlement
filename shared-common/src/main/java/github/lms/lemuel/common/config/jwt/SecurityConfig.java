@@ -168,6 +168,9 @@ public class SecurityConfig {
                         .requestMatchers("/admin/tax/**").hasAnyRole("ADMIN", "MANAGER")
                         // 세금계산서 셀러 다운로드 — JWT 주체(userId) 파생 + 소유권 대조(403)로 IDOR 방지.
                         .requestMatchers("/api/tax-invoices/**").hasAnyRole("ADMIN", "MANAGER", "USER")
+                        // 셀러 지급 계좌 셀프서비스 — 셀러 식별자를 요청에서 받지 않고 JWT 주체(userId)에서만
+                        // 파생하므로 인증 사용자(USER) 허용으로 IDOR 원천 차단 (관리자 대행은 /admin/seller-bank-accounts).
+                        .requestMatchers("/api/seller/bank-account").hasAnyRole("ADMIN", "MANAGER", "USER")
                         // Chargeback 콘솔 — 셀러 환수 결정은 ADMIN 만
                         .requestMatchers("/admin/chargebacks/**").hasRole("ADMIN")
                         // 백필 콘솔 — 원장 역분개·Payout 누락 보정 작업은 ADMIN 만
@@ -189,6 +192,9 @@ public class SecurityConfig {
                         // 계정계(GL) 조회 콘솔 — owner 잔액·분개·전사 집계·시산표는 회계 백오피스라 관리자·매니저 전용
                         // (프론트도 /admin/ceo/accounts 를 AdminManagerRoute 로 보호). 무권한 노출(owner IDOR·전사 집계) 차단.
                         .requestMatchers("/api/account/**").hasAnyRole("ADMIN", "MANAGER")
+                        // 법인카드 — 인증만 요구하고, 조직 역할(OWNER/MANAGER/STAFF) 판정은
+                        // card-service 의 CardOrgAuthorizer 가 멤버십 프로젝션으로 수행한다(IDOR 방지).
+                        .requestMatchers("/api/cards/**").authenticated()
                         // 결제 환불 이력 조회 (관리자·매니저·본인) — 더 세밀한 권한은 향후 Audit PR 에서
                         .requestMatchers("/api/payments/*/refunds").hasAnyRole("ADMIN", "MANAGER", "USER")
                         // 환불 실행(직접 PG 환불) — "어드민 승인 후 환불" 원칙에 따라 운영자 전용.

@@ -1,16 +1,21 @@
 package github.lms.lemuel.commondata.application.port.out;
 
+import github.lms.lemuel.commondata.domain.DataProvider;
 import github.lms.lemuel.commondata.domain.DataSource;
 
 import java.util.List;
 import java.util.Map;
 
 /**
- * 공공데이터포털(data.go.kr) 표준 봉투 HTTP 클라이언트 포트.
+ * 공공데이터 수집 HTTP 클라이언트 포트 — 제공처({@link DataProvider})별 구현이 1개씩 있고,
+ * 수집 시 소스의 provider 와 일치하는 구현이 선택된다.
  */
 public interface DataPortalClientPort {
 
-    /** 인증키(DATA_GO_KR_API_KEY) 설정 여부 — 미설정이면 수집 비활성(시드로만 동작). */
+    /** 이 클라이언트가 담당하는 제공처. */
+    DataProvider provider();
+
+    /** 제공처 인증키 설정 여부 — 미설정이면 해당 provider 수집 비활성. */
     boolean isConfigured();
 
     /**

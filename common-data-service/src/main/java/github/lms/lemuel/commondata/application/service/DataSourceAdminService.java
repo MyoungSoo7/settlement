@@ -3,6 +3,7 @@ package github.lms.lemuel.commondata.application.service;
 import github.lms.lemuel.commondata.application.port.in.RegisterDataSourceUseCase;
 import github.lms.lemuel.commondata.application.port.out.LoadDataSourcePort;
 import github.lms.lemuel.commondata.application.port.out.SaveDataSourcePort;
+import github.lms.lemuel.commondata.domain.DataProvider;
 import github.lms.lemuel.commondata.domain.DataSource;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
@@ -49,6 +50,8 @@ public class DataSourceAdminService implements RegisterDataSourceUseCase {
                         : existing != null ? existing.name() : null,
                 command.endpoint() != null ? command.endpoint()
                         : existing != null ? existing.endpoint() : null,
+                command.provider() != null ? DataProvider.parse(command.provider())
+                        : existing != null ? existing.provider() : null,
                 command.defaultParams() != null ? command.defaultParams()
                         : existing != null ? existing.defaultParams() : Map.of(),
                 command.keyFields() != null ? command.keyFields()
