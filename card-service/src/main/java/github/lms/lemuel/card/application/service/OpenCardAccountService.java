@@ -99,7 +99,8 @@ public class OpenCardAccountService implements OpenCardAccountUseCase {
                     "조직 " + organizationId + " 에 셀러 식별자(externalRef)가 없어 재원을 조회할 수 없습니다.");
         }
 
-        // 3) 중복 검증 — 조직당 1개(uq_card_account_org). DB 제약이 최종 방어선이고 여기선 친절한 409.
+        // 3) 중복 검증 — 살아 있는(비-REJECTED) 계정은 조직당 1개(V5 부분 인덱스가 최종 방어선,
+        //    여기선 친절한 409). 과거 심사 탈락(REJECTED) 이력은 재신청을 막지 않는다.
         if (loadCardAccountPort.findByOrganizationId(organizationId).isPresent()) {
             throw new BusinessException(ErrorCode.CARD_ACCOUNT_ALREADY_EXISTS,
                     "조직 " + organizationId + " 에는 이미 카드계정이 있습니다.");

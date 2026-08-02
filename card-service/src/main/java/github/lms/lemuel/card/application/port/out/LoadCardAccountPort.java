@@ -11,7 +11,10 @@ import java.util.Optional;
  */
 public interface LoadCardAccountPort {
 
-    /** 조직당 카드계정 1개(uq_card_account_org) — 개설 여부·중복 개설 검증에 쓴다. */
+    /**
+     * 조직의 살아 있는(비-REJECTED) 카드계정 — 조직당 1개(부분 인덱스 uq_card_account_org, V5).
+     * 개설 여부·중복 개설 검증에 쓴다. 심사 탈락(REJECTED) 이력은 재신청을 막지 않도록 제외된다.
+     */
     Optional<CardAccount> findByOrganizationId(Long organizationId);
 
     /** 단순 조회 — 락 없음. */

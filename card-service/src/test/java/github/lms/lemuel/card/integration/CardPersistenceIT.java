@@ -135,6 +135,23 @@ class CardPersistenceIT {
     }
 
     @Test
+    @DisplayName("심사 탈락(REJECTED)은 조직 슬롯을 점유하지 않는다 — 재신청 계정 생성 가능 (V5)")
+    void rejectedAccountDoesNotBlockReapplication() {
+        CardAccount rejected = CardAccount.open(4009L, "seller-9");
+        rejected.reject("재원 부족", new LimitSnapshot(new BigDecimal("100000.00"), BigDecimal.ZERO,
+                new BigDecimal("0.7000"), ReputationGrade.E, "E등급 haircut 0"));
+        saveCardAccountPort.save(rejected);
+
+        // 재신청 중복 검증이 보는 조회 — 터미널 REJECTED 이력은 보이지 않아야 한다
+        assertThat(loadCardAccountPort.findByOrganizationId(4009L)).isEmpty();
+
+        // 새 계정 생성이 부분 유니크 인덱스(WHERE status <> 'REJECTED')를 통과한다
+        CardAccount reapplied = saveActiveAccount(4009L, "seller-9", new BigDecimal("1000000.00"));
+        assertThat(loadCardAccountPort.findByOrganizationId(4009L).orElseThrow().getId())
+                .isEqualTo(reapplied.getId());
+    }
+
+    @Test
     @DisplayName("같은 임직원에게 활성 카드 2장 발급 시 uq_card_active_holder 위반")
     void duplicateActiveCardViolatesUniqueConstraint() {
         CardAccount account = saveActiveAccount(4003L, "seller-3", new BigDecimal("1000000"));

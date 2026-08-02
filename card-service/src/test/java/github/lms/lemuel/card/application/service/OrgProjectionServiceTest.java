@@ -58,16 +58,16 @@ class OrgProjectionServiceTest {
 
     @Test
     void upsertMember_delegatesToSavePort() {
-        service.upsertMember(new MemberCommand(3001L, 888L, "MANAGER"));
+        service.upsertMember(new MemberCommand(3001L, 888L, "MANAGER", 9001L));
 
-        verify(saveOrgProjectionPort).upsertMember(3001L, 888L, "MANAGER");
+        verify(saveOrgProjectionPort).upsertMember(3001L, 888L, "MANAGER", 9001L);
     }
 
     @Test
     void removeMember_delegatesToDeactivate() {
-        service.removeMember(3001L, 888L);
+        service.removeMember(3001L, 888L, 9001L);
 
-        verify(saveOrgProjectionPort).deactivateMember(3001L, 888L);
+        verify(saveOrgProjectionPort).deactivateMember(3001L, 888L, 9001L);
     }
 
     @Test
@@ -78,10 +78,10 @@ class OrgProjectionServiceTest {
         when(loadCardPort.findActiveByHolder(1L, 888L)).thenReturn(Optional.of(card));
         when(saveCardPort.save(card)).thenReturn(card);
 
-        service.removeMember(3001L, 888L);
+        service.removeMember(3001L, 888L, 9001L);
 
         assertThat(card.getStatus()).isEqualTo(CardStatus.SUSPENDED);
-        verify(saveOrgProjectionPort).deactivateMember(3001L, 888L);
+        verify(saveOrgProjectionPort).deactivateMember(3001L, 888L, 9001L);
         verify(publishCardEventPort).publishStatusChanged(
                 eq(card), eq(account), eq(CardStatus.ISSUED),
                 org.mockito.ArgumentMatchers.contains("member_removed"));
@@ -99,7 +99,7 @@ class OrgProjectionServiceTest {
         when(loadCardPort.findActiveByHolder(1L, 888L)).thenReturn(Optional.of(card));
         when(saveCardPort.save(card)).thenReturn(card);
 
-        service.removeMember(3001L, 888L);
+        service.removeMember(3001L, 888L, 9001L);
 
         assertThat(card.getStatus()).isNotEqualTo(CardStatus.CANCELED);
     }
@@ -112,9 +112,9 @@ class OrgProjectionServiceTest {
         card.suspend();
         when(loadCardPort.findActiveByHolder(1L, 888L)).thenReturn(Optional.of(card));
 
-        service.removeMember(3001L, 888L);
+        service.removeMember(3001L, 888L, 9001L);
 
-        verify(saveOrgProjectionPort).deactivateMember(3001L, 888L);
+        verify(saveOrgProjectionPort).deactivateMember(3001L, 888L, 9001L);
         verify(saveCardPort, never()).save(any());
         verifyNoInteractions(publishCardEventPort);
     }
@@ -128,9 +128,9 @@ class OrgProjectionServiceTest {
     void removeMember_withoutCardAccount_skipsCardLookup() {
         when(loadCardAccountPort.findByOrganizationId(3001L)).thenReturn(Optional.empty());
 
-        service.removeMember(3001L, 888L);
+        service.removeMember(3001L, 888L, 9001L);
 
-        verify(saveOrgProjectionPort).deactivateMember(3001L, 888L);
+        verify(saveOrgProjectionPort).deactivateMember(3001L, 888L, 9001L);
         verifyNoInteractions(loadCardPort, saveCardPort, publishCardEventPort);
     }
 
@@ -155,7 +155,7 @@ class OrgProjectionServiceTest {
      */
     @Test
     void upsertMember_unknownRole_rejectedAtIngest() {
-        assertThatThrownBy(() -> service.upsertMember(new MemberCommand(3001L, 888L, "ACCOUNTANT")))
+        assertThatThrownBy(() -> service.upsertMember(new MemberCommand(3001L, 888L, "ACCOUNTANT", 9001L)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("ACCOUNTANT");
 
@@ -164,7 +164,7 @@ class OrgProjectionServiceTest {
 
     @Test
     void upsertMember_nullRole_rejectedAtIngest() {
-        assertThatThrownBy(() -> service.upsertMember(new MemberCommand(3001L, 888L, null)))
+        assertThatThrownBy(() -> service.upsertMember(new MemberCommand(3001L, 888L, null, 9001L)))
                 .isInstanceOf(IllegalArgumentException.class);
 
         verifyNoInteractions(saveOrgProjectionPort);

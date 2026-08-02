@@ -57,8 +57,9 @@ public class OrganizationMemberJoinedConsumer extends IdempotentEventConsumer {
         long organizationId = requiredLong(node, "organizationId", eventId);
         long userId = requiredLong(node, "userId", eventId);
         String role = requiredText(node, "role", eventId);
+        long membershipId = requiredLong(node, "membershipId", eventId);
 
-        useCase.upsertMember(new MemberCommand(organizationId, userId, role));
+        useCase.upsertMember(new MemberCommand(organizationId, userId, role, membershipId));
 
         log.info("멤버 합류 반영. eventId={}, orgId={}, userId={}, role={}",
                 eventId, organizationId, userId, role);

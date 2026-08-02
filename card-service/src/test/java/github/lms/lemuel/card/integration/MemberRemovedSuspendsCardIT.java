@@ -98,7 +98,7 @@ class MemberRemovedSuspendsCardIT {
         saveMemberProjection(3001L, 888L, OrgRole.STAFF);
         Card card = saveCardPort.save(Card.issue(account.getId(), 888L, "m", new BigDecimal("100000")));
 
-        orgProjectionService.removeMember(3001L, 888L);
+        orgProjectionService.removeMember(3001L, 888L, 9001L);
 
         assertThat(loadCardPort.findById(card.getId()))
                 .map(Card::getStatus).contains(CardStatus.SUSPENDED);
@@ -113,8 +113,8 @@ class MemberRemovedSuspendsCardIT {
         saveMemberProjection(3003L, 888L, OrgRole.STAFF);
         Card card = saveCardPort.save(Card.issue(account.getId(), 888L, "m", new BigDecimal("100000")));
 
-        orgProjectionService.removeMember(3003L, 888L);
-        orgProjectionService.removeMember(3003L, 888L);   // 리플레이
+        orgProjectionService.removeMember(3003L, 888L, 9001L);
+        orgProjectionService.removeMember(3003L, 888L, 9001L);   // 리플레이
 
         assertThat(loadCardPort.findById(card.getId()))
                 .map(Card::getStatus).contains(CardStatus.SUSPENDED);
@@ -130,7 +130,7 @@ class MemberRemovedSuspendsCardIT {
         saveCardPort.save(Card.issue(account.getId(), 888L, "m", new BigDecimal("400000")));
         BigDecimal before = loadCardPort.sumActiveSubLimits(account.getId());
 
-        orgProjectionService.removeMember(3004L, 888L);
+        orgProjectionService.removeMember(3004L, 888L, 9001L);
 
         assertThat(loadCardPort.sumActiveSubLimits(account.getId()))
                 .isEqualByComparingTo(before)
@@ -143,7 +143,7 @@ class MemberRemovedSuspendsCardIT {
         saveActiveAccount(3005L, "781", new BigDecimal("1000000"));
         saveMemberProjection(3005L, 888L, OrgRole.STAFF);
 
-        assertThatCode(() -> orgProjectionService.removeMember(3005L, 888L))
+        assertThatCode(() -> orgProjectionService.removeMember(3005L, 888L, 9001L))
                 .doesNotThrowAnyException();
         assertThat(loadOrgProjectionPort.findMemberRole(3005L, 888L)).isEmpty();
         assertThat(outboxCountOf("CardStatusChanged")).isZero();
@@ -158,7 +158,7 @@ class MemberRemovedSuspendsCardIT {
     void removalWithoutCardAccountIsNoop() {
         saveMemberProjection(3006L, 888L, OrgRole.STAFF);
 
-        assertThatCode(() -> orgProjectionService.removeMember(3006L, 888L))
+        assertThatCode(() -> orgProjectionService.removeMember(3006L, 888L, 9001L))
                 .doesNotThrowAnyException();
         assertThat(loadOrgProjectionPort.findMemberRole(3006L, 888L)).isEmpty();
         assertThat(outboxCountOf("CardStatusChanged")).isZero();
@@ -177,7 +177,7 @@ class MemberRemovedSuspendsCardIT {
         issued.cancel();
         Card card = saveCardPort.save(issued);
 
-        assertThatCode(() -> orgProjectionService.removeMember(3007L, 888L))
+        assertThatCode(() -> orgProjectionService.removeMember(3007L, 888L, 9001L))
                 .doesNotThrowAnyException();
 
         assertThat(loadCardPort.findById(card.getId()))
@@ -196,7 +196,7 @@ class MemberRemovedSuspendsCardIT {
     }
 
     private void saveMemberProjection(Long organizationId, Long userId, OrgRole role) {
-        saveOrgProjectionPort.upsertMember(organizationId, userId, role.name());
+        saveOrgProjectionPort.upsertMember(organizationId, userId, role.name(), 9001L);
     }
 
     private int outboxCountOf(String eventType) {

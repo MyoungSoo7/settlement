@@ -62,7 +62,7 @@ class EventContractConsumerTest {
 
         verify(ingestOrgProjectionUseCase)
                 .createOrg(new OrgCommand(3001L, "무신사 스토어", "SELLER", "SELLER-777"));
-        verify(ingestOrgProjectionUseCase).upsertMember(new MemberCommand(3001L, 777L, "OWNER"));
+        verify(ingestOrgProjectionUseCase).upsertMember(new MemberCommand(3001L, 777L, "OWNER", null));
     }
 
     @Test
@@ -93,7 +93,7 @@ class EventContractConsumerTest {
         consumer.onMemberJoined(
                 recordOf("lemuel.organization.member_joined", sample), mock(Acknowledgment.class));
 
-        verify(ingestOrgProjectionUseCase).upsertMember(new MemberCommand(3001L, 888L, "MANAGER"));
+        verify(ingestOrgProjectionUseCase).upsertMember(new MemberCommand(3001L, 888L, "MANAGER", 9001L));
     }
 
     // ── OrganizationMemberRoleChangedConsumer ──
@@ -109,7 +109,7 @@ class EventContractConsumerTest {
         consumer.onMemberRoleChanged(
                 recordOf("lemuel.organization.member_role_changed", sample), mock(Acknowledgment.class));
 
-        verify(ingestOrgProjectionUseCase).upsertMember(new MemberCommand(3001L, 888L, "MANAGER"));
+        verify(ingestOrgProjectionUseCase).upsertMember(new MemberCommand(3001L, 888L, "MANAGER", 9001L));
     }
 
     // ── OrganizationMemberRemovedConsumer ──
@@ -125,7 +125,7 @@ class EventContractConsumerTest {
         consumer.onMemberRemoved(
                 recordOf("lemuel.organization.member_removed", sample), mock(Acknowledgment.class));
 
-        verify(ingestOrgProjectionUseCase).removeMember(3001L, 888L);
+        verify(ingestOrgProjectionUseCase).removeMember(3001L, 888L, 9001L);
     }
 
     @Test
@@ -139,7 +139,7 @@ class EventContractConsumerTest {
         consumer.onMemberRemoved(
                 recordOf("lemuel.organization.member_removed", sample), mock(Acknowledgment.class));
 
-        verify(ingestOrgProjectionUseCase, never()).removeMember(any(Long.class), any(Long.class));
+        verify(ingestOrgProjectionUseCase, never()).removeMember(any(Long.class), any(Long.class), any(Long.class));
     }
 
     @Test
@@ -155,7 +155,7 @@ class EventContractConsumerTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("userId");
 
-        verify(ingestOrgProjectionUseCase, never()).removeMember(any(Long.class), any(Long.class));
+        verify(ingestOrgProjectionUseCase, never()).removeMember(any(Long.class), any(Long.class), any(Long.class));
     }
 
     // ── CompanyReputationChangedConsumer ──

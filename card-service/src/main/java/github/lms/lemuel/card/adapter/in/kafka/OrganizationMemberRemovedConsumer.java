@@ -58,8 +58,9 @@ public class OrganizationMemberRemovedConsumer extends IdempotentEventConsumer {
     protected void handle(JsonNode node, UUID eventId) {
         long organizationId = requiredLong(node, "organizationId", eventId);
         long userId = requiredLong(node, "userId", eventId);
-        useCase.removeMember(organizationId, userId);
-        log.info("조직 이탈 반영 — 멤버 프로젝션 비활성화. eventId={}, orgId={}, userId={}",
-                eventId, organizationId, userId);
+        long membershipId = requiredLong(node, "membershipId", eventId);
+        useCase.removeMember(organizationId, userId, membershipId);
+        log.info("조직 이탈 반영 — 멤버 프로젝션 비활성화. eventId={}, orgId={}, userId={}, membershipId={}",
+                eventId, organizationId, userId, membershipId);
     }
 }

@@ -186,6 +186,54 @@ class OrgProjectionIntegrationIT {
         assertThat(loadOrgProjectionPort.findMemberRole(orgId, userId)).isEmpty();
     }
 
+    @Test
+    @DisplayName("★토픽 간 순서 역전 — 제거 뒤에 도착한 같은 세대 role_changed 는 멤버를 부활시키지 못한다")
+    void staleRoleChangeAfterRemoval_doesNotResurrect() {
+        long orgId = 5005L;
+        long userId = 666L;
+
+        // 합류(세대 9001) → 제거(세대 9001)
+        send(roleChangedConsumer::onMemberRoleChanged, "lemuel.organization.member_role_changed",
+                "{\"organizationId\":" + orgId + ",\"userId\":" + userId + ",\"membershipId\":9001,"
+                        + "\"previousRole\":\"STAFF\",\"newRole\":\"STAFF\"}");
+        send(removedConsumer::onMemberRemoved, "lemuel.organization.member_removed",
+                "{\"organizationId\":" + orgId + ",\"userId\":" + userId + ",\"membershipId\":9001}");
+        assertThat(loadOrgProjectionPort.findMemberRole(orgId, userId)).isEmpty();
+
+        // 다른 토픽에서 늦게 도착한 같은 세대 role_changed — 부활 금지
+        send(roleChangedConsumer::onMemberRoleChanged, "lemuel.organization.member_role_changed",
+                "{\"organizationId\":" + orgId + ",\"userId\":" + userId + ",\"membershipId\":9001,"
+                        + "\"previousRole\":\"STAFF\",\"newRole\":\"MANAGER\"}");
+        assertThat(loadOrgProjectionPort.findMemberRole(orgId, userId)).isEmpty();
+
+        // 진짜 재합류(새 세대 9002)만 다시 활성화한다
+        send(roleChangedConsumer::onMemberRoleChanged, "lemuel.organization.member_role_changed",
+                "{\"organizationId\":" + orgId + ",\"userId\":" + userId + ",\"membershipId\":9002,"
+                        + "\"previousRole\":\"STAFF\",\"newRole\":\"STAFF\"}");
+        assertThat(loadOrgProjectionPort.findMemberRole(orgId, userId)).contains(OrgRole.STAFF);
+
+        // 재합류 뒤 늦게 도착한 과거 세대 제거 — 무시
+        send(removedConsumer::onMemberRemoved, "lemuel.organization.member_removed",
+                "{\"organizationId\":" + orgId + ",\"userId\":" + userId + ",\"membershipId\":9001}");
+        assertThat(loadOrgProjectionPort.findMemberRole(orgId, userId)).contains(OrgRole.STAFF);
+    }
+
+    @Test
+    @DisplayName("★제거가 합류보다 먼저 도착 — 톰스톤이 남아 늦은 같은 세대 합류를 막는다 (실 DB 제약 통과)")
+    void removalArrivingBeforeJoin_leavesTombstoneBlockingLateJoin() {
+        long orgId = 5006L;
+        long userId = 555L;
+
+        send(removedConsumer::onMemberRemoved, "lemuel.organization.member_removed",
+                "{\"organizationId\":" + orgId + ",\"userId\":" + userId + ",\"membershipId\":9001}");
+
+        send(roleChangedConsumer::onMemberRoleChanged, "lemuel.organization.member_role_changed",
+                "{\"organizationId\":" + orgId + ",\"userId\":" + userId + ",\"membershipId\":9001,"
+                        + "\"previousRole\":\"STAFF\",\"newRole\":\"MANAGER\"}");
+
+        assertThat(loadOrgProjectionPort.findMemberRole(orgId, userId)).isEmpty();
+    }
+
     // ---- helpers ----
 
     private interface ConsumeFn {

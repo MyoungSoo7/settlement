@@ -48,28 +48,69 @@ public class OrgProjectionPersistenceAdapter implements LoadOrgProjectionPort, S
     }
 
     @Override
-    public void upsertMember(Long organizationId, Long userId, String role) {
+    public void upsertMember(Long organizationId, Long userId, String role, Long membershipId) {
         OrgMemberProjectionJpaEntity.OrgMemberProjectionId id =
                 new OrgMemberProjectionJpaEntity.OrgMemberProjectionId(organizationId, userId);
         OrgMemberProjectionJpaEntity entity = memberRepository.findById(id).orElse(null);
         if (entity == null) {
-            memberRepository.save(new OrgMemberProjectionJpaEntity(organizationId, userId, role, true));
+            OrgMemberProjectionJpaEntity fresh =
+                    new OrgMemberProjectionJpaEntity(organizationId, userId, role, true);
+            fresh.setMembershipId(membershipId);
+            memberRepository.save(fresh);
+            return;
+        }
+        if (isStale(membershipId, entity)) {
+            return;   // 과거 세대의 늦은 이벤트 — 제거를 되살리면 안 된다
+        }
+        // 같은 세대인데 이미 제거됨 → REMOVED 는 멤버십의 터미널이라, 같은 세대의 joined/
+        // role_changed 는 전부 제거 이전에 발행된 과거 이벤트다. 부활 금지.
+        if (entity.getMembershipId() != null && entity.getMembershipId().equals(membershipId)
+                && !entity.isActive()) {
+            return;
+        }
+        // 세대 없는(created 경유 OWNER) 등록은 톰스톤을 이기지 못한다 — created 재전송이
+        // 제거된 오너를 되살리는 경로를 막는다.
+        if (membershipId == null && !entity.isActive()) {
             return;
         }
         entity.setRole(role);
         entity.setActive(true);
+        if (membershipId != null) {
+            entity.setMembershipId(membershipId);
+        }
         memberRepository.save(entity);
     }
 
     @Override
-    public void deactivateMember(Long organizationId, Long userId) {
+    public void deactivateMember(Long organizationId, Long userId, Long membershipId) {
         OrgMemberProjectionJpaEntity.OrgMemberProjectionId id =
                 new OrgMemberProjectionJpaEntity.OrgMemberProjectionId(organizationId, userId);
-        memberRepository.findById(id).ifPresent(m -> {
-            m.setActive(false);
-            memberRepository.save(m);
-        });
-        // 프로젝션에 없는 멤버의 제거 이벤트는 무해한 no-op — 이벤트 도착 순서가 어긋난 경우를
-        // 방어한다(예: created/member_joined 유실·지연 상태에서 member_removed 가 먼저 옴).
+        OrgMemberProjectionJpaEntity entity = memberRepository.findById(id).orElse(null);
+        if (entity == null) {
+            // 제거가 합류보다 먼저 도착 — 역할 미상의 톰스톤을 남겨, 늦게 올 같은 세대
+            // joined 가 부활하지 못하게 한다(행이 없으면 늦은 joined 가 신규 활성으로 들어간다).
+            OrgMemberProjectionJpaEntity tombstone =
+                    new OrgMemberProjectionJpaEntity(organizationId, userId, null, false);
+            tombstone.setMembershipId(membershipId);
+            memberRepository.save(tombstone);
+            return;
+        }
+        if (isStale(membershipId, entity)) {
+            return;   // 재합류(새 세대) 뒤에 도착한 과거 제거 — 무시
+        }
+        entity.setActive(false);
+        if (membershipId != null) {
+            entity.setMembershipId(membershipId);
+        }
+        memberRepository.save(entity);
+    }
+
+    /** 저장된 세대보다 낮은(또는 세대 없는 이벤트가 세대 있는 행을 만난) 경우 = 과거 이벤트. */
+    private static boolean isStale(Long incoming, OrgMemberProjectionJpaEntity entity) {
+        Long stored = entity.getMembershipId();
+        if (stored == null) {
+            return false;   // V5 이전 레거시 행 — 비교 불가, 새 이벤트를 그대로 적용
+        }
+        return incoming != null && incoming < stored;
     }
 }

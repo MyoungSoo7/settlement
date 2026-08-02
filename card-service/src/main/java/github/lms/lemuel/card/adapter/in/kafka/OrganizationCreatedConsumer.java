@@ -76,7 +76,9 @@ public class OrganizationCreatedConsumer extends IdempotentEventConsumer {
         }
 
         useCase.createOrg(new OrgCommand(organizationId, name, type, externalRef));
-        useCase.upsertMember(new MemberCommand(organizationId, ownerUserId, "OWNER"));
+        // created 페이로드에는 membershipId 가 없다 — null 세대는 비교에서 항상 열위라
+        // 이미 제거된 오너를 부활시키지 못한다(늦게 도착한 created 재전송 방어).
+        useCase.upsertMember(new MemberCommand(organizationId, ownerUserId, "OWNER", null));
 
         log.info("조직 프로젝션 적재 완료. eventId={}, orgId={}, ownerUserId={}",
                 eventId, organizationId, ownerUserId);

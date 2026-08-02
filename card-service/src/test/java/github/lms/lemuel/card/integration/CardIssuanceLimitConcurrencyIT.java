@@ -94,7 +94,7 @@ class CardIssuanceLimitConcurrencyIT {
     }
 
     private void saveMemberProjection(Long organizationId, Long userId, OrgRole role) {
-        saveOrgProjectionPort.upsertMember(organizationId, userId, role.name());
+        saveOrgProjectionPort.upsertMember(organizationId, userId, role.name(), 9001L);
     }
 
     /**

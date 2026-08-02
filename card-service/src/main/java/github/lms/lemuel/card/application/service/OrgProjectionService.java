@@ -63,7 +63,8 @@ public class OrgProjectionService implements IngestOrgProjectionUseCase {
         // 계약 밖 역할이면 여기서 IAE 가 나고 IdempotentEventConsumer 가 non-retryable 로 보아
         // 격리·DLT 로 보낸다. enum 이름으로 정규화해 저장하므로 읽는 쪽 valueOf 는 절대 실패하지 않는다.
         OrgRole role = OrgRole.from(command.role());
-        saveOrgProjectionPort.upsertMember(command.organizationId(), command.userId(), role.name());
+        saveOrgProjectionPort.upsertMember(
+                command.organizationId(), command.userId(), role.name(), command.membershipId());
     }
 
     /**
@@ -79,8 +80,8 @@ public class OrgProjectionService implements IngestOrgProjectionUseCase {
      */
     @Override
     @Transactional
-    public void removeMember(Long organizationId, Long userId) {
-        saveOrgProjectionPort.deactivateMember(organizationId, userId);
+    public void removeMember(Long organizationId, Long userId, Long membershipId) {
+        saveOrgProjectionPort.deactivateMember(organizationId, userId, membershipId);
         suspendCardOf(organizationId, userId);
     }
 

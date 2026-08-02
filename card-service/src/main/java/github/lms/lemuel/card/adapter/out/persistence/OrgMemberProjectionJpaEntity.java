@@ -26,11 +26,19 @@ public class OrgMemberProjectionJpaEntity {
     @EmbeddedId
     private OrgMemberProjectionId id;
 
-    @Column(nullable = false, length = 20)
+    /** 톰스톤(제거 선착) 행은 역할을 모른 채 만들어질 수 있어 nullable — 활성 행은 항상 채운다. */
+    @Column(length = 20)
     private String role;
 
     @Column(nullable = false)
     private boolean active;
+
+    /**
+     * organization-service 멤버십 id — 토픽 간 순서 역전 방어의 세대 번호.
+     * REMOVED 는 멤버십의 터미널이고 재합류는 새(더 큰) id 를 받는다. V5 이전 적재분은 null.
+     */
+    @Column(name = "membership_id")
+    private Long membershipId;
 
     @Column(name = "updated_at", insertable = false)
     private Instant updatedAt;
@@ -61,12 +69,20 @@ public class OrgMemberProjectionJpaEntity {
         return active;
     }
 
+    public Long getMembershipId() {
+        return membershipId;
+    }
+
     void setRole(String role) {
         this.role = role;
     }
 
     void setActive(boolean active) {
         this.active = active;
+    }
+
+    void setMembershipId(Long membershipId) {
+        this.membershipId = membershipId;
     }
 
     @Embeddable

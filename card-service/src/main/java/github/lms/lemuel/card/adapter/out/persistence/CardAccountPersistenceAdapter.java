@@ -20,7 +20,10 @@ public class CardAccountPersistenceAdapter implements LoadCardAccountPort, SaveC
 
     @Override
     public Optional<CardAccount> findByOrganizationId(Long organizationId) {
-        return repository.findByOrganizationId(organizationId).map(CardAccountJpaEntity::toDomain);
+        // REJECTED(터미널 탈락 이력)는 제외 — 재신청 중복 검증·이탈자 카드 정지 모두
+        // "살아 있는 계정"만 봐야 하고, V5 부분 인덱스가 비-REJECTED 1개를 보장한다.
+        return repository.findByOrganizationIdAndStatusNot(organizationId, CardAccountStatus.REJECTED)
+                .map(CardAccountJpaEntity::toDomain);
     }
 
     @Override

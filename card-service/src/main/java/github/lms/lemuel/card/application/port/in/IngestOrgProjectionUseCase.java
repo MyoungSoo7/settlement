@@ -3,10 +3,7 @@ package github.lms.lemuel.card.application.port.in;
 /**
  * organization-service 이벤트(created/member_joined/member_role_changed/member_removed)를
  * 조직·멤버 프로젝션으로 적재하는 인바운드 포트 — Task 7 컨슈머 4종의 공용 진입점.
- *
- * <p>{@link #removeMember(Long, Long)} 은 멤버 프로젝션을 비활성화하는 데까지만 한다 — 카드 정지는
- * Task 12 가 이 메서드 호출 지점에 이어붙인다(브리프 리졸루션 #2). 이 태스크에서 카드를 건드리면
- * Task 12 구현과 충돌하므로 의도적으로 하지 않는다.
+ * 이탈({@link #removeMember(Long, Long, Long)})은 프로젝션 비활성화와 카드 정지를 한 트랜잭션으로 잇는다.
  */
 public interface IngestOrgProjectionUseCase {
 
@@ -27,12 +24,22 @@ public interface IngestOrgProjectionUseCase {
      */
     void upsertMember(MemberCommand command);
 
-    /** member_removed 반영 — 멤버 프로젝션 비활성화(카드 정지는 Task 12). */
-    void removeMember(Long organizationId, Long userId);
+    /**
+     * member_removed 반영 — 멤버 프로젝션 비활성화 + 이탈자 카드 정지(같은 트랜잭션).
+     *
+     * @param membershipId 제거된 멤버십의 id — 토픽 간 순서 역전 방어의 기준
+     *                     (REMOVED 는 멤버십 생애주기의 터미널이라, 같은 membershipId 의
+     *                     joined/role_changed 가 늦게 도착해도 부활시키면 안 된다)
+     */
+    void removeMember(Long organizationId, Long userId, Long membershipId);
 
     record OrgCommand(Long organizationId, String name, String type, String externalRef) {
     }
 
-    record MemberCommand(Long organizationId, Long userId, String role) {
+    /**
+     * @param membershipId 이벤트가 속한 멤버십 id — 재합류는 새(더 큰) membershipId 를 가진다.
+     *                     organization.created 경유 OWNER 등록처럼 멤버십 id 가 없는 경로는 null.
+     */
+    record MemberCommand(Long organizationId, Long userId, String role, Long membershipId) {
     }
 }

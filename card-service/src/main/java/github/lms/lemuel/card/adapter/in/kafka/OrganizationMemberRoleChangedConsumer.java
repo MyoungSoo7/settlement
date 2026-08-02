@@ -58,8 +58,9 @@ public class OrganizationMemberRoleChangedConsumer extends IdempotentEventConsum
         long organizationId = requiredLong(node, "organizationId", eventId);
         long userId = requiredLong(node, "userId", eventId);
         String newRole = requiredText(node, "newRole", eventId);
+        long membershipId = requiredLong(node, "membershipId", eventId);
 
-        useCase.upsertMember(new MemberCommand(organizationId, userId, newRole));
+        useCase.upsertMember(new MemberCommand(organizationId, userId, newRole, membershipId));
 
         log.info("멤버 역할 변경 반영. eventId={}, orgId={}, userId={}, newRole={}",
                 eventId, organizationId, userId, newRole);
