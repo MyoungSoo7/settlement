@@ -6,12 +6,12 @@
 
 ## 현재 상태
 - **활성 브랜치:** `develop` (`main` 은 보호 브랜치 — PR 필수·squash 만·필수 CI 2종)
-- **구성:** **13 마이크로서비스** + API Gateway + `shared-common` 공유 라이브러리(버전드 1.0.0)
-  - 거래/금융: order(8088) · settlement(8082) · loan(8084) · investment(8100) · account(8102)
+- **구성:** **14 마이크로서비스** + API Gateway + `shared-common` 공유 라이브러리(버전드 1.0.0)
+  - 거래/금융: order(8088) · settlement(8082) · loan(8084) · investment(8100) · account(8102) · card(8106, 법인카드)
   - 공개조회 위성: financial(8086) · economics(8087) · company(8090) · market(8094) · commondata(8098)
   - 부가: operation(8092) · ai(8096) · organization(8104, 셀러/기업 조직·멤버십)
-- **DB:** 13 서비스 모두 물리 분리(DB-per-service) — opslab / settlement_db / lemuel_{loan,financial,economics,company,operation,market,ai,commondata,investment,account,organization}
-- **최근 커밋:** `7be9f6815` feat(card): 카드계정·카드 영속 계층과 활성 슬롯 유니크 제약 (Task 6 잔여)
+- **DB:** 14 서비스 모두 물리 분리(DB-per-service) — opslab / settlement_db / lemuel_{loan,financial,economics,company,operation,market,ai,commondata,investment,account,organization,card}
+- **최근 커밋:** `d8ff56e31` merge: origin/develop → develop — card 이중 편집 정리(PR 정제본 채택)
 
 ## 최근 진척 (2026-06-24 이후)
 - **card-service Task 3 잔여·6·7 완료 (2026-08-02)** — ① organization 멤버 이벤트 2종 잔여 배선 마감(`ca5217f5a`:
@@ -23,7 +23,11 @@
   5토픽 전체 커버·SPEC 소비처 현행화) 전건 반영. ③ Task 6 잔여(`7be9f6815`): 카드계정·카드 JPA 계층 — 포트 4종·
   detached merge 규약(감사 컬럼 DB DEFAULT 위임)·@Version 낙관 락·findByIdForUpdate 비관적 락, CardPersistenceIT 로
   스냅샷 왕복·uq 2종·CANCELED 슬롯 해제 실증. 게이트: :card-service:test 91건 skip 0 + JaCoCo GREEN.
-  다음은 Task 8(account 재원 조회 어댑터) → 9~15.
+  **⚠️ 현행화(2026-08-02, d8ff56e31)**: 위 로컬 판은 이후 feature 브랜치 PR 머지(`4bd6fff8d`, **Task 6~10 완료** —
+  web 컨트롤러·account 재원 조회 어댑터·심사/한도 포함)로 대체됐다. 이중 편집 정리 머지에서 card 는 전건 PR 정제본을
+  채택했고, PR 판에 동등물이 없는 로컬 전용 2파일(`KafkaErrorHandlerConfig`·`CardProjectionPersistenceIT`)은 제거
+  (PR 판은 자체 `CardBootIT`·`OrgProjectionIntegrationIT` 로 기동·프로젝션 검증, 게이트 159건 skip 0 GREEN).
+  **다음은 Task 11~15.**
 - **IDOR 403 계약 500 누수 중앙 수정 (2026-08-02)** — 컨트롤러가 던지는 `AccessDeniedException` 을 shared-common
   `GlobalExceptionHandler` catch-all(`Exception`→500)이 보안 필터보다 먼저 가로채 문서화된 403 계약이 500 으로 새던 버그
   (tax 셀러 다운로드에서 재현 테스트로 실증: 기대 403 → 실제 500). `ErrorCode.ACCESS_DENIED`(403) + 전용
