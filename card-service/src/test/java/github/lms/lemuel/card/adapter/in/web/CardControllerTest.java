@@ -1,7 +1,10 @@
 package github.lms.lemuel.card.adapter.in.web;
 
+import github.lms.lemuel.card.application.port.in.ChangeCardStatusUseCase;
+import github.lms.lemuel.card.application.port.in.ChangeSubLimitUseCase;
 import github.lms.lemuel.card.application.port.in.IssueCardUseCase;
 import github.lms.lemuel.card.application.port.in.OpenCardAccountUseCase;
+import github.lms.lemuel.card.application.port.in.QueryCardUseCase;
 import github.lms.lemuel.card.application.port.out.FundingUnavailableException;
 import github.lms.lemuel.card.domain.Card;
 import github.lms.lemuel.card.domain.CardAccount;
@@ -9,6 +12,7 @@ import github.lms.lemuel.card.domain.CardAccountStatus;
 import github.lms.lemuel.card.domain.CardStatus;
 import github.lms.lemuel.card.domain.LimitSnapshot;
 import github.lms.lemuel.card.domain.ReputationGrade;
+import github.lms.lemuel.card.domain.exception.InvalidCardTransitionException;
 import github.lms.lemuel.card.domain.exception.SubLimitExceededException;
 import github.lms.lemuel.common.config.jwt.AuthPrincipal;
 import github.lms.lemuel.common.config.jwt.JwtUtil;
@@ -34,6 +38,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -53,6 +59,9 @@ class CardControllerTest {
     @MockitoBean JwtUtil jwtUtil;
     @MockitoBean OpenCardAccountUseCase openCardAccountUseCase;
     @MockitoBean IssueCardUseCase issueCardUseCase;
+    @MockitoBean ChangeSubLimitUseCase changeSubLimitUseCase;
+    @MockitoBean ChangeCardStatusUseCase changeCardStatusUseCase;
+    @MockitoBean QueryCardUseCase queryCardUseCase;
 
     private static final String BODY = "{\"organizationId\":3001}";
 
@@ -300,5 +309,152 @@ class CardControllerTest {
                 .andExpect(jsonPath("$.errorCode").value("ACCESS_DENIED"));
 
         verify(issueCardUseCase, never()).issue(any());
+    }
+
+    // ── 서브한도 변경 (PATCH /cards/{cardId}/limit) ──
+
+    private static Card cardWithLimit(BigDecimal subLimit, CardStatus status) {
+        return Card.builder()
+                .id(9001L).cardAccountId(5001L).holderUserId(888L)
+                .maskedCardNo("****-****-****-1234")
+                .subLimit(subLimit).status(status)
+                .build();
+    }
+
+    @Test
+    @DisplayName("한도 변경 성공은 200 과 변경된 한도를 돌려준다")
+    void changeLimitReturns200() throws Exception {
+        when(changeSubLimitUseCase.change(any()))
+                .thenReturn(cardWithLimit(new BigDecimal("300000"), CardStatus.ISSUED));
+
+        mockMvc.perform(patch("/api/cards/cards/9001/limit").principal(userAuth(100L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"subLimit\":300000}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(9001))
+                .andExpect(jsonPath("$.subLimit").value(300000));
+
+        verify(changeSubLimitUseCase).change(new ChangeSubLimitUseCase.ChangeSubLimitCommand(
+                9001L, new BigDecimal("300000"), 100L));
+    }
+
+    @Test
+    @DisplayName("한도 상향이 마스터를 넘으면 422 + CARD_SUB_LIMIT_EXCEEDED")
+    void changeLimitExceededIs422() throws Exception {
+        when(changeSubLimitUseCase.change(any())).thenThrow(new SubLimitExceededException(
+                new BigDecimal("1000000"), new BigDecimal("900000"), new BigDecimal("200000")));
+
+        mockMvc.perform(patch("/api/cards/cards/9001/limit").principal(userAuth(100L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"subLimit\":200000}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errorCode").value("CARD_SUB_LIMIT_EXCEEDED"));
+    }
+
+    @Test
+    @DisplayName("음수 한도는 400 — 유스케이스까지 가지 않는다")
+    void negativeLimitIs400() throws Exception {
+        mockMvc.perform(patch("/api/cards/cards/9001/limit").principal(userAuth(100L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"subLimit\":-1}"))
+                .andExpect(status().isBadRequest());
+
+        verify(changeSubLimitUseCase, never()).change(any());
+    }
+
+    // ── 상태 변경 (PATCH /cards/{cardId}/status) ──
+
+    @Test
+    @DisplayName("상태 변경 성공은 200 과 바뀐 상태를 돌려준다")
+    void changeStatusReturns200() throws Exception {
+        when(changeCardStatusUseCase.change(any()))
+                .thenReturn(cardWithLimit(new BigDecimal("100000"), CardStatus.SUSPENDED));
+
+        mockMvc.perform(patch("/api/cards/cards/9001/status").principal(userAuth(100L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"SUSPENDED\",\"reason\":\"휴직\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SUSPENDED"));
+
+        verify(changeCardStatusUseCase).change(new ChangeCardStatusUseCase.ChangeCardStatusCommand(
+                9001L, CardStatus.SUSPENDED, "휴직", 100L));
+    }
+
+    /** 사유 없는 정지·해지를 받지 않는다는 계약이 REST 표면에서도 지켜지는지. */
+    @Test
+    @DisplayName("사유가 없으면 400 — 근거 없는 상태 변경은 표면에서 막는다")
+    void statusWithoutReasonIs400() throws Exception {
+        mockMvc.perform(patch("/api/cards/cards/9001/status").principal(userAuth(100L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"SUSPENDED\"}"))
+                .andExpect(status().isBadRequest());
+
+        verify(changeCardStatusUseCase, never()).change(any());
+    }
+
+    /**
+     * 전이 위반은 400 이다 — 422 가 아니다. {@code ErrorCode.INVALID_STATE} 는 loan·settlement·
+     * chargeback 의 상태머신이 모두 공유하는 카탈로그 항목이고, 카드만 다른 상태코드로 나가면
+     * 게이트웨이·클라이언트의 재시도 정책이 서비스마다 갈린다. 한도 초과(422)와는 다른 층위다 —
+     * 한도는 "값이 처리 불가", 전이는 "요청 자체가 지금 성립하지 않음"이다.
+     */
+    @Test
+    @DisplayName("허용되지 않은 전이(CANCELED→SUSPENDED)는 400 + INVALID_STATE")
+    void invalidTransitionIs400() throws Exception {
+        when(changeCardStatusUseCase.change(any())).thenThrow(
+                new InvalidCardTransitionException(CardStatus.CANCELED, CardStatus.SUSPENDED));
+
+        mockMvc.perform(patch("/api/cards/cards/9001/status").principal(userAuth(100L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"SUSPENDED\",\"reason\":\"복구 시도\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_STATE"));
+    }
+
+    // ── 조회 (GET 3종) ──
+
+    @Test
+    @DisplayName("계정 조회는 200 과 한도·산정 근거를 돌려준다")
+    void getAccountReturns200() throws Exception {
+        when(queryCardUseCase.getAccount(5001L, 100L)).thenReturn(activeAccount());
+
+        mockMvc.perform(get("/api/cards/accounts/5001").principal(userAuth(100L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.masterLimit").value(700000))
+                .andExpect(jsonPath("$.reputationGrade").value("B"));
+    }
+
+    @Test
+    @DisplayName("계정의 카드 목록은 200 과 배열을 돌려준다")
+    void listCardsReturns200() throws Exception {
+        when(queryCardUseCase.listCards(5001L, 100L)).thenReturn(List.of(issuedCard()));
+
+        mockMvc.perform(get("/api/cards/accounts/5001/cards").principal(userAuth(100L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(9001))
+                .andExpect(jsonPath("$[0].maskedCardNo").value("****-****-****-1234"));
+    }
+
+    /** 조회 대상이 경로가 아니라 주체에서 나온다는 것이 이 엔드포인트의 전부다. */
+    @Test
+    @DisplayName("내 카드 조회는 JWT 주체 uid 로만 조회한다")
+    void listMyCardsUsesPrincipal() throws Exception {
+        when(queryCardUseCase.listMyCards(888L)).thenReturn(List.of(issuedCard()));
+
+        mockMvc.perform(get("/api/cards/cards/me").principal(userAuth(888L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].holderUserId").value(888));
+
+        verify(queryCardUseCase).listMyCards(888L);
+    }
+
+    @Test
+    @DisplayName("내 카드 조회도 인증 주체가 없으면 403")
+    void listMyCardsWithoutPrincipalIsForbidden() throws Exception {
+        mockMvc.perform(get("/api/cards/cards/me"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value("ACCESS_DENIED"));
+
+        verify(queryCardUseCase, never()).listMyCards(any());
     }
 }

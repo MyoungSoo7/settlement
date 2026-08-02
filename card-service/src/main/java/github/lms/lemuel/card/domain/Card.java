@@ -54,8 +54,19 @@ public class Card {
 
     /** 서브한도 변경. CardAccount.assertCanIssue 로 마스터 한도와의 불변식은 응용 계층이 먼저 검증한다. */
     public void changeSubLimit(BigDecimal newSubLimit) {
-        requireMutable();
+        assertLimitMutable();
         this.subLimit = requireNonNegative(newSubLimit);
+    }
+
+    /**
+     * 한도를 바꿀 수 있는 상태인지 — CANCELED 는 불가.
+     *
+     * <p>{@link #changeSubLimit} 이 이미 같은 가드를 걸지만 <b>공개</b>해 둔다. 응용 계층은
+     * 한도 검증을 위해 카드계정을 잠그고 서브한도 합계를 집계해야 하는데, 어차피 바꿀 수 없는
+     * 카드라면 그 집계 자체가 낭비다. 규칙을 서비스에 복제하지 않고 도메인에 물어보게 한다.
+     */
+    public void assertLimitMutable() {
+        requireMutable();
     }
 
     /** 정지 — 멱등. 이미 SUSPENDED 면 아무 일도 하지 않는다(이벤트 재수신 대비). */

@@ -2,27 +2,51 @@ package github.lms.lemuel.card.application.service;
 
 import github.lms.lemuel.card.application.port.in.IngestOrgProjectionUseCase.MemberCommand;
 import github.lms.lemuel.card.application.port.in.IngestOrgProjectionUseCase.OrgCommand;
+import github.lms.lemuel.card.application.port.out.LoadCardAccountPort;
+import github.lms.lemuel.card.application.port.out.LoadCardPort;
+import github.lms.lemuel.card.application.port.out.PublishCardEventPort;
+import github.lms.lemuel.card.application.port.out.SaveCardPort;
 import github.lms.lemuel.card.application.port.out.SaveOrgProjectionPort;
+import github.lms.lemuel.card.domain.Card;
+import github.lms.lemuel.card.domain.CardAccount;
+import github.lms.lemuel.card.domain.CardAccountStatus;
+import github.lms.lemuel.card.domain.CardStatus;
+import github.lms.lemuel.card.domain.LimitSnapshot;
+import github.lms.lemuel.card.domain.ReputationGrade;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class OrgProjectionServiceTest {
 
     @Mock SaveOrgProjectionPort saveOrgProjectionPort;
+    @Mock LoadCardAccountPort loadCardAccountPort;
+    @Mock LoadCardPort loadCardPort;
+    @Mock SaveCardPort saveCardPort;
+    @Mock PublishCardEventPort publishCardEventPort;
 
     OrgProjectionService service;
 
     @BeforeEach
     void setUp() {
-        service = new OrgProjectionService(saveOrgProjectionPort);
+        service = new OrgProjectionService(saveOrgProjectionPort, loadCardAccountPort,
+                loadCardPort, saveCardPort, publishCardEventPort);
     }
 
     @Test
@@ -44,6 +68,84 @@ class OrgProjectionServiceTest {
         service.removeMember(3001L, 888L);
 
         verify(saveOrgProjectionPort).deactivateMember(3001L, 888L);
+    }
+
+    @Test
+    @DisplayName("이탈자의 활성 카드는 정지되고 사유가 실린 상태 변경 이벤트가 나간다")
+    void removeMember_suspendsActiveCard() {
+        CardAccount account = stubActiveAccount();
+        Card card = Card.issue(1L, 888L, "m", new BigDecimal("100000"));
+        when(loadCardPort.findActiveByHolder(1L, 888L)).thenReturn(Optional.of(card));
+        when(saveCardPort.save(card)).thenReturn(card);
+
+        service.removeMember(3001L, 888L);
+
+        assertThat(card.getStatus()).isEqualTo(CardStatus.SUSPENDED);
+        verify(saveOrgProjectionPort).deactivateMember(3001L, 888L);
+        verify(publishCardEventPort).publishStatusChanged(
+                eq(card), eq(account), eq(CardStatus.ISSUED),
+                org.mockito.ArgumentMatchers.contains("member_removed"));
+    }
+
+    /**
+     * 해지는 되돌릴 수 없고 이탈은 번복된다(휴직·전출·오발행 정정). 되돌릴 수 있는 사실에
+     * 터미널 전이를 붙이면 복직 경로 자체가 사라진다.
+     */
+    @Test
+    @DisplayName("이탈은 정지지 해지가 아니다")
+    void removeMember_suspendsNotCancels() {
+        stubActiveAccount();
+        Card card = Card.issue(1L, 888L, "m", new BigDecimal("100000"));
+        when(loadCardPort.findActiveByHolder(1L, 888L)).thenReturn(Optional.of(card));
+        when(saveCardPort.save(card)).thenReturn(card);
+
+        service.removeMember(3001L, 888L);
+
+        assertThat(card.getStatus()).isNotEqualTo(CardStatus.CANCELED);
+    }
+
+    @Test
+    @DisplayName("이미 정지된 카드는 다시 저장·발행하지 않는다 — 리플레이 노이즈 차단")
+    void removeMember_alreadySuspendedPublishesNothing() {
+        stubActiveAccount();
+        Card card = Card.issue(1L, 888L, "m", new BigDecimal("100000"));
+        card.suspend();
+        when(loadCardPort.findActiveByHolder(1L, 888L)).thenReturn(Optional.of(card));
+
+        service.removeMember(3001L, 888L);
+
+        verify(saveOrgProjectionPort).deactivateMember(3001L, 888L);
+        verify(saveCardPort, never()).save(any());
+        verifyNoInteractions(publishCardEventPort);
+    }
+
+    /**
+     * organization-service 는 상대가 카드를 쓰는지 모르고 이탈 이벤트를 보낸다 —
+     * 카드계정 없음은 예외가 아니라 정상 경로다.
+     */
+    @Test
+    @DisplayName("카드계정이 없는 조직이면 카드 조회 자체를 하지 않는다")
+    void removeMember_withoutCardAccount_skipsCardLookup() {
+        when(loadCardAccountPort.findByOrganizationId(3001L)).thenReturn(Optional.empty());
+
+        service.removeMember(3001L, 888L);
+
+        verify(saveOrgProjectionPort).deactivateMember(3001L, 888L);
+        verifyNoInteractions(loadCardPort, saveCardPort, publishCardEventPort);
+    }
+
+    private CardAccount stubActiveAccount() {
+        CardAccount account = CardAccount.builder()
+                .id(1L)
+                .organizationId(3001L)
+                .sellerId("777")
+                .status(CardAccountStatus.SCREENING)
+                .masterLimit(BigDecimal.ZERO)
+                .build();
+        account.activate(new BigDecimal("1000000"), new LimitSnapshot(new BigDecimal("1000000"),
+                BigDecimal.ZERO, new BigDecimal("0.7000"), ReputationGrade.B, "seller*0.7"));
+        when(loadCardAccountPort.findByOrganizationId(3001L)).thenReturn(Optional.of(account));
+        return account;
     }
 
     /**

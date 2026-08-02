@@ -2,13 +2,19 @@ package github.lms.lemuel.card.application.port.out;
 
 import github.lms.lemuel.card.domain.Card;
 import github.lms.lemuel.card.domain.CardAccount;
+import github.lms.lemuel.card.domain.CardAccountStatus;
+import github.lms.lemuel.card.domain.CardStatus;
+import github.lms.lemuel.card.domain.LimitChangeResult;
+
+import java.math.BigDecimal;
 
 /**
  * 카드 도메인 이벤트 발행 포트 — 구현은 Transactional Outbox 기록이라 도메인 트랜잭션과
  * 같은 트랜잭션에서 커밋된다(발행과 상태 변경이 갈라지지 않는다).
  *
- * <p>Task 11~12 의 한도변경·상태변경 이벤트는 각 유스케이스와 함께 이 포트에 추가된다 —
- * 소비자도 테스트도 없는 시그니처를 미리 열어 두지 않는다.
+ * <p>시그니처는 유스케이스가 생길 때 함께 추가한다 — 소비자도 테스트도 없는 시그니처를 미리
+ * 열어 두지 않는다. 마스터 한도 변경({@code scope=MASTER})은 아직 호출자가 없어(Task 13
+ * 재산정 스케줄러) 여기 없다.
  */
 public interface PublishCardEventPort {
 
@@ -26,4 +32,43 @@ public interface PublishCardEventPort {
      * 잠가 둔 계정을 그대로 넘기면 추가 조회 없이 실릴 수 있다.
      */
     void publishIssued(Card card, CardAccount account);
+
+    /**
+     * 임직원 서브한도 변경 — 토픽 {@code lemuel.card.limit_changed}, {@code scope=SUB}.
+     *
+     * <p>이전 한도를 별도로 받는 이유는 {@code card} 가 이미 <b>변경된 뒤</b>이기 때문이다.
+     * 감사·알림 소비자는 "얼마가 됐나"가 아니라 "얼마에서 얼마로"에 반응한다 —
+     * 이후 값만 실으면 소비자가 직전 값을 자체 보관해야 하고, 그 순간 유실·순서 문제가
+     * 우리 문제에서 소비자 문제로 넘어갈 뿐 사라지지 않는다.
+     */
+    void publishSubLimitChanged(Card card, CardAccount account, BigDecimal previousSubLimit);
+
+    /**
+     * 카드 상태 변경 — 토픽 {@code lemuel.card.status_changed}.
+     *
+     * <p>호출자는 <b>상태가 실제로 바뀐 경우에만</b> 부른다. {@code suspend()} 는 멱등이라
+     * 이미 정지된 카드를 다시 정지해도 변화가 없는데, 그때까지 발행하면 재수신되는 이탈
+     * 이벤트(Task 12)마다 소비자가 일어나지 않은 변화를 통지받는다.
+     */
+    void publishStatusChanged(Card card, CardAccount account, CardStatus previousStatus, String reason);
+
+    /**
+     * 법인 마스터 한도 변경 — 토픽 {@code lemuel.card.limit_changed}, {@code scope=MASTER}.
+     * 서브한도 변경과 같은 토픽·같은 파티션 키(cardAccountId)를 쓴다 — 한 계정의 마스터·서브
+     * 변경이 순서를 잃으면 소비자가 한도 배분을 뒤집힌 채로 보게 된다.
+     *
+     * <p>{@code clamped=true} 는 하향이 Σ서브한도 하한에 걸려 <b>요청보다 덜 내려갔음</b>을 뜻한다.
+     * 이 값을 싣지 않으면 소비자는 "재산정이 도는데 한도가 안 내려간다"를 버그로 신고하게 된다 —
+     * 실제로는 발급된 카드를 조용히 죽이지 않으려는 도메인 규칙이 작동한 것이다.
+     */
+    void publishMasterLimitChanged(CardAccount account, BigDecimal previousLimit, LimitChangeResult result);
+
+    /**
+     * 카드계정 상태 변경 — 토픽 {@code lemuel.card.account_status_changed}.
+     *
+     * <p>임직원 카드의 {@code status_changed} 와 <b>토픽을 나눈다</b>. 계정과 카드는 상태 enum 도
+     * 소비자도 다르다(계정 정지는 법인 여신 사건, 카드 정지는 개인 사건). 한 토픽에 섞으면
+     * cardId·holderUserId 가 있는 페이로드와 없는 페이로드를 소비자가 런타임에 분기해야 한다.
+     */
+    void publishAccountStatusChanged(CardAccount account, CardAccountStatus previousStatus, String reason);
 }

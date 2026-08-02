@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "lemuel.card.account_status_changed",
+  "description": "card-service(CardEventPublisherAdapter) → 소비자. 법인 카드계정의 상태가 바뀌면 발행된다. 임직원 카드의 lemuel.card.status_changed 와 토픽을 나눈 이유는 상태 enum 도 소비자도 다르기 때문이다 — 계정 정지는 법인 여신 사건(재산정 강등·수동 조치), 카드 정지는 개인 사건(이탈·분실)이다. 한 토픽에 섞으면 cardId·holderUserId 가 있는 페이로드와 없는 페이로드를 소비자가 런타임에 분기해야 한다. masterLimit 을 함께 싣는 이유: 재산정 강등은 한도를 0 이 아니라 Σ서브한도로 클램프한 채 정지시키므로, 값이 없으면 소비자가 '정지인데 한도가 왜 살아 있나'를 되물어야 한다. reason 은 필수다 — 근거 없는 여신 정지를 남기지 않는다. 파티션 키(aggregateId)는 cardAccountId 로, 같은 계정의 한도변경·상태변경이 순서를 잃지 않는다.",
+  "type": "object",
+  "properties": {
+    "cardAccountId": { "type": "integer" },
+    "organizationId": { "type": "integer" },
+    "sellerId": { "type": "string" },
+    "previousStatus": {
+      "type": "string",
+      "enum": ["SCREENING", "ACTIVE", "SUSPENDED", "CLOSED", "REJECTED"]
+    },
+    "newStatus": {
+      "type": "string",
+      "enum": ["SCREENING", "ACTIVE", "SUSPENDED", "CLOSED", "REJECTED"]
+    },
+    "masterLimit": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?$" },
+    "reason": { "type": "string", "minLength": 1 }
+  },
+  "required": [
+    "cardAccountId",
+    "organizationId",
+    "sellerId",
+    "previousStatus",
+    "newStatus",
+    "masterLimit",
+    "reason"
+  ],
+  "additionalProperties": true
+}

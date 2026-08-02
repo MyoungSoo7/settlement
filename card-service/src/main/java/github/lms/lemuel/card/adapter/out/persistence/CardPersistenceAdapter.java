@@ -32,6 +32,13 @@ public class CardPersistenceAdapter implements LoadCardPort, SaveCardPort {
     }
 
     @Override
+    public List<Card> findByHolderUserId(Long holderUserId) {
+        return repository.findByHolderUserId(holderUserId).stream()
+                .map(CardJpaEntity::toDomain)
+                .toList();
+    }
+
+    @Override
     public Optional<Card> findActiveByHolder(Long cardAccountId, Long holderUserId) {
         return repository.findFirstByCardAccountIdAndHolderUserIdAndStatusNot(
                         cardAccountId, holderUserId, CardStatus.CANCELED)

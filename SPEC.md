@@ -14,15 +14,15 @@
 
 | 항목 | 내용 |
 |------|------|
-| 도메인 | 주문·결제·정산·선정산/기업대출·투자·계정계·재무제표·경제지표·기업뉴스평판·운영관제·주식시세·AI챗봇·공공데이터·조직/멤버십 + 알림·정산대사·실시간시세·결제웹훅·백테스트·이상탐지·시계열예측 |
-| 서비스 수 | **21개** — 코어 Java 13 + API Gateway + Kotlin 2(알림·대사) + Go 2(스트리밍·웹훅) + Python 3(백테스트·이상탐지·예측) |
+| 도메인 | 주문·결제·정산·선정산/기업대출·투자·계정계·재무제표·경제지표·기업뉴스평판·운영관제·주식시세·AI챗봇·공공데이터·조직/멤버십·법인카드 + 알림·정산대사·실시간시세·결제웹훅·백테스트·이상탐지·시계열예측 |
+| 서비스 수 | **22개** — 코어 Java 14 + API Gateway + Kotlin 2(알림·대사) + Go 2(스트리밍·웹훅) + Python 3(백테스트·이상탐지·예측) |
 | 아키텍처 | 헥사고날(Ports & Adapters), DB-per-service, 이벤트 드리븐(CQRS 프로젝션) |
 | 서비스 간 연계 | **Kafka 이벤트로만** (코드·DB 직접 의존 0) + 내부 대사 API(`/internal/recon`) |
 
 ### 기술 스택
 | 구분 | 기술 |
 |------|------|
-| 언어 / 프레임워크 | **Java 25 / Spring Boot 4.0.4**(코어 13+gateway) · Kotlin 2.0 / Boot 3.3·JDK 21(이벤트 2종) · Go 1.22 `net/http`(엣지 2종) · Python 3.11 / FastAPI(ML 3종) |
+| 언어 / 프레임워크 | **Java 25 / Spring Boot 4.0.4**(코어 14+gateway) · Kotlin 2.0 / Boot 3.3·JDK 21(이벤트 2종) · Go 1.22 `net/http`(엣지 2종) · Python 3.11 / FastAPI(ML 3종) |
 | 빌드 | Gradle 멀티모듈 (Kotlin DSL), shared-common 은 composite build. **폴리글랏 7종은 standalone 빌드**(settings.gradle 미포함, `polyglot-ci.yml` 별도 CI) |
 | Gateway | Spring Cloud Gateway 2025 (WebFlux) |
 | DB / 검색 | PostgreSQL 17 (DB-per-service) / Elasticsearch 8.17 |
@@ -199,13 +199,40 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
   4종 전부 **card-service 가 소비**(조직·멤버 프로젝션, 컨슈머 그룹 `lemuel-card`).
   shared-common 의존(JWT·Outbox·멱등컨슈머).
 
-### 3.14 gateway-service — API Gateway (port 8080)
+### 3.14 card-service — 법인카드 (port 8106, 자체 DB lemuel_card)
+
+셀러 조직에 **마스터 한도**를 부여하고, 그 한도 안에서 임직원별 **서브한도** 카드를 발급한다. 1단계 범위는
+발급·한도·상태까지 — 승인/매입(2단계)과 청구·상계(3단계)는 미구현이며 이벤트 계약만 선확정돼 있다.
+
+| 도메인 | API (base `/api/cards`, **JWT 인증 필수**) | 기능 |
+|--------|------|------|
+| 카드계정 | `POST /accounts`, `GET /accounts/{id}`, `POST /accounts/{id}/recalculate` | 개설(심사 후 마스터한도 산정) / 조회 / 수동 재산정(ADMIN) |
+| 카드 | `POST /accounts/{id}/cards`, `GET /cards/me`, `PATCH /cards/{cardId}/limit`, `PATCH /cards/{cardId}/status` | 발급(서브한도 검증) / 내 카드 조회 / 서브한도 변경 / 정지·재개·해지 |
+
+- **한도 산정**: `masterLimit = floor((sellerPayable + holdbackPayable) × R × H)` — `R`=인정비율(기본 0.70,
+  `app.card.limit.recognition-ratio`), `H`=평판 haircut(A·B 1.00 / C 0.85 / D 0.70 / E 0.00). 재원은 account-service
+  GL 통제계정에 조회(ADR 0030 — card 는 재원을 복제하지 않는다). 최소한도(기본 300,000) 미달·E등급이면 발급 거절.
+- **핵심 불변식**: `master_limit >= Σ sub_limit`. 서로 다른 애그리거트라 DB 제약으로 표현 불가 —
+  `findByIdForUpdate`(PESSIMISTIC_WRITE) **후** `sumActiveSubLimits` 재계산이 유일한 방어(`CardIssuanceLimitConcurrencyIT` 가 게이트).
+- **상태머신**: CardAccount ACTIVE⇄SUSPENDED→CLOSED. Card ACTIVE⇄SUSPENDED→CANCELED(터미널).
+  `sumActiveSubLimits` 는 `status <> 'CANCELED'` — **정지 카드도 한도를 계속 점유**한다(복직 시 한도 충돌 방지).
+- **재원 조회 실패**: 폴백 없음 → `CARD_FUNDING_UNAVAILABLE`(**503**). 추정으로 여신을 내주지 않는다.
+- **배치**: 매일 03:30 KST 한도 재산정(정산 확정 배치 03:00 이후), ShedLock `card-limit-recalculation`(PT30M).
+  계정 1건 = 트랜잭션 1건(`REQUIRES_NEW`) — 한 계정 실패가 배치를 무너뜨리지 않는다. 하향은 Σ서브한도에서
+  **클램프**되고 그 사실이 이벤트 `clamped=true` 로 나간다. 강등(E등급·최소한도 미달)은 계정 SUSPENDED.
+- **조직 연동**: `lemuel.organization.member_removed` 소비 → 이탈자 카드 자동 정지(멱등 컨슈머).
+- **이벤트 발행**(Outbox, `aggregateType="Card"`, **파티션 키는 항상 cardAccountId**): `account_opened`·`issued`·
+  `limit_changed`·`status_changed`·`account_status_changed`. `authorized`·`captured` 는 2단계용 **계약만 선확정**(발행 코드 없음).
+- **알려진 한계(1단계)**: 카드 이용과 정산 지급이 같은 재원을 두 번 쓸 수 있다 — 실제 상계는 3단계(청구 사이클)의
+  몫이고 그때까지 인정비율 `R` 이 그 위험을 흡수한다. 3단계에서 `R` 재조정 필요.
+
+### 3.15 gateway-service — API Gateway (port 8080)
 - Spring Cloud Gateway(WebFlux). 서비스별 경로 predicate 라우팅. 위성 8종은 공개 조회 API 만 라우팅(수집 트리거
   `/admin/**` 외부 미노출). organization 은 `/api/organizations/**`(JWT 필수)를 라우팅.
 - 자체 인증 필터 없음 — 인증·인가는 각 서비스 SecurityConfig 가 강제.
-- **폴리글랏 7종(§3.15~3.16)은 gateway 미라우팅** — 독립 포트로 직접 노출(내부/데모 용도).
+- **폴리글랏 7종(§3.16~3.17)은 gateway 미라우팅** — 독립 포트로 직접 노출(내부/데모 용도).
 
-### 3.15 Kotlin 이벤트 서비스 2종 — notification(8130) · reconciliation(8131)
+### 3.16 Kotlin 이벤트 서비스 2종 — notification(8130) · reconciliation(8131)
 Boot 3.3 · JDK 21 · 코루틴. **자체 DB 없음**(무영속 MVP) · shared-common 미의존 · gateway 미라우팅.
 
 | 서비스 | API / 트리거 | 기능 |
@@ -213,7 +240,7 @@ Boot 3.3 · JDK 21 · 코루틴. **자체 DB 없음**(무영속 MVP) · shared-c
 | **notification-service** (8130) | `POST /notifications/send`, `GET /notifications/demo` + Kafka 리스너 | 도메인 이벤트 5토픽(`settlement.confirmed`·`payment.confirmed/captured/refunded`·`investment.executed`) → 다채널(log/Slack/email) 알림. **코루틴 I/O 팬아웃 + 채널별 타임아웃(3s)/재시도(3회) 격리**, eventId 멱등(TTL 30분). Kafka 리스너는 기본 OFF(`APP_KAFKA_ENABLED=true` 로 활성) — 브로커 없이도 기동·데모 가능 |
 | **reconciliation-service** (8131) | `POST /reconciliation/run`, `GET /reconciliation/demo` + `@Scheduled`(매일 19:00 KST) | 정산 대사 — settlement·payment 소스 **코루틴 병렬 fetch** 후 대조, sealed `Discrepancy`(MISSING/EXTRA/AMOUNT/STATUS) 분류, 허용오차 1원(`tolerance-krw`). 소스 base-url 은 env 주입(기본 샘플 시뮬레이션) |
 
-### 3.16 Polyglot 서비스 5종 — Go 2 + Python 3 (정본: [`docs/polyglot-services.md`](docs/polyglot-services.md))
+### 3.17 Polyglot 서비스 5종 — Go 2 + Python 3 (정본: [`docs/polyglot-services.md`](docs/polyglot-services.md))
 언어별 강점 배치: **Go**=동시성·저지연 엣지, **Python**=데이터/ML/퀀트. 모두 동작 MVP(핵심 로직+헬스체크+테스트+멀티스테이지 Dockerfile, non-root), Gradle 빌드와 독립.
 
 | 서비스 | 언어 | 포트 | 역할 |
@@ -251,9 +278,10 @@ Membership   : INVITED → ACTIVE ⇄ SUSPENDED, 각 상태 → REMOVED(터미�
 
 ---
 
-## 5. 이벤트 카탈로그 (cross-service 14개 계약 토픽)
+## 5. 이벤트 카탈로그 (cross-service 34개 계약 토픽)
 
-계약 스키마·정본 샘플: `shared-common/src/testFixtures/resources/contracts/events/` (14개, ADR 0024).
+계약 스키마·정본 샘플: `shared-common/src/testFixtures/resources/contracts/events/` (34개, ADR 0024).
+> 수치 검증: `git ls-files 'shared-common/src/testFixtures/resources/contracts/events/*.schema.json' | wc -l` → 34
 
 | 토픽 | 프로듀서 | 주요 컨슈머 |
 |------|----------|-------------|
@@ -267,18 +295,24 @@ Membership   : INVITED → ACTIVE ⇄ SUSPENDED, 각 상태 → REMOVED(터미�
 | `lemuel.loan.repayment_applied` | loan | settlement · account |
 | `lemuel.loan.disbursement_requested` | loan | account |
 | `lemuel.loan.corporate_loan_disbursed` | loan | account |
-| `lemuel.loan.secured_loan_disbursed` | loan | account |
-| `lemuel.loan.secured_loan_repaid` | loan | account |
-| `lemuel.company.reputation_changed` | company | loan(신용 리스크 프로젝션) · card(셀러 평판 프로젝션) |
 | `lemuel.investment.executed` | investment | account · notification |
-| `lemuel.organization.created` / `.member_joined` / `.member_role_changed` / `.member_removed` | organization | card(조직·멤버 프로젝션 — created 는 SELLER 만, 소유자 OWNER 멤버십 포함 적재) |
+| `lemuel.loan.secured_loan_disbursed` / `.secured_loan_repaid` / `.secured_loan_principal_repaid` | loan | account |
+| `lemuel.settlement.holdback_released` / `.holdback_consumed` | settlement | account(GL 홀드백 유보·소멸) |
+| `lemuel.settlement.adjusted` / `.canceled` | settlement | account(GL 조정·역정산 분개) |
+| `lemuel.settlement.withholding_accrued` | settlement | account(원천징수 부채 계상) |
+| `lemuel.seller_recovery.opened` / `.offset` | settlement | account(미수채권 개설·상계) |
+| `lemuel.company.reputation_changed` | company | loan(신용 리스크 프로젝션) · card(평판 프로젝션 → haircut) |
+| `lemuel.organization.created` / `.member_joined` / `.member_role_changed` | organization | card(조직·멤버 프로젝션 — created 는 SELLER 만, 소유자 OWNER 멤버십 포함 적재) |
+| `lemuel.organization.member_removed` | organization | card(이탈자 카드 자동 정지) |
+| `lemuel.card.account_opened` / `.issued` / `.limit_changed` / `.status_changed` / `.account_status_changed` | card | (소비처 미배선 — 발행 전용) |
+| `lemuel.card.authorized` / `.captured` | (2단계 예약 — 발행 코드 없음) | 계약만 선확정(ADR 0022 — required 추가는 breaking) |
 
 부가(계약 스키마 없음): `lemuel.ops.*.failed`, `lemuel.pgreconciliation.discrepancy_approved`,
 `lemuel.payment.confirmed`(payment-webhook-service(Go) 발행 → notification 소비 — 내부 계약).
 
 발행 전용(소비처 미배선 — 의도된 상태, 소비자가 생기면 ADR 0024 절차로 계약 편입):
 `lemuel.payment.created` / `lemuel.payment.authorized`(결제 라이프사이클 관측용),
-`lemuel.user.membership_changed`.
+`lemuel.user.membership_changed`, `lemuel.card.*`(5종 — 청구 사이클 3단계에서 소비 예정).
 역방향 예약: `lemuel.ops.order.failed` 는 operation 이 구독하지만 emit 지점 미배선(OpsSignalCategory 주석 참조).
 
 ---

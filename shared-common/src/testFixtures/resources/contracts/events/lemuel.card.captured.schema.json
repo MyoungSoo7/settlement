@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "lemuel.card.captured",
+  "description": "card-service → account-service (2단계, 발행 코드는 아직 없음 — 계약만 선확정). 승인된 거래가 매입(청구 확정)되면 발행된다. authorizationId 가 required 인 이유는 승인 없는 매입이 존재하지 않기 때문이다 — 상계할 대상이 없고, 부분 매입·취소를 나중에 붙일 때 연결 고리를 새로 만들 수도 없다(required 추가 = 파괴적 변경). captureId 는 매입 자연키로 멱등 수신의 근거다: 같은 승인이 여러 번 매입될 수 있으므로(부분 매입) authorizationId 만으로는 중복을 구분하지 못한다. amount 는 승인액이 아니라 실제 매입액이며 JSON string(N5)이다 — 부분 매입에서 둘은 다르고, 장부에 실리는 값은 매입액이다. cardAccountId 는 파티션 키이자 법인 단위 채권의 귀속처라 required 다. capturedAt 은 카드사 매입 확정 시각으로, 우리 수신 시각과 다를 수 있어 별도로 싣는다(정산 귀속월 판단의 기준).",
+  "type": "object",
+  "properties": {
+    "captureId": { "type": "string", "minLength": 1 },
+    "authorizationId": { "type": "string", "minLength": 1 },
+    "cardId": { "type": "integer" },
+    "cardAccountId": { "type": "integer" },
+    "holderUserId": { "type": "integer" },
+    "amount": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?$" },
+    "merchantName": { "type": "string" },
+    "capturedAt": { "type": "string", "format": "date-time" }
+  },
+  "required": [
+    "captureId",
+    "authorizationId",
+    "cardId",
+    "cardAccountId",
+    "amount",
+    "capturedAt"
+  ],
+  "additionalProperties": true
+}

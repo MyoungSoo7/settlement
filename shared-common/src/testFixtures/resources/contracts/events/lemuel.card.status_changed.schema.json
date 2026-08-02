@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "lemuel.card.status_changed",
+  "description": "card-service(CardEventPublisherAdapter) → 소비자. 임직원 카드의 상태가 실제로 바뀌었을 때만 발행된다 — suspend() 는 멱등이라 이미 SUSPENDED 인 카드를 다시 정지해도 상태 변화가 없고, 그때는 발행하지 않는다(이탈 이벤트 재수신으로 인한 소비자 노이즈 차단). reason 은 필수다: 카드 정지·해지는 감사 대상이라 근거 없는 상태 변경을 남기지 않는다. holderUserId 를 함께 싣는 이유는 알림 소비자가 카드가 아니라 사람에게 반응하기 때문이다. 파티션 키(aggregateId)는 cardAccountId 다(lemuel.card.issued 와 동일).",
+  "type": "object",
+  "properties": {
+    "cardId": { "type": "integer" },
+    "cardAccountId": { "type": "integer" },
+    "organizationId": { "type": "integer" },
+    "holderUserId": { "type": "integer" },
+    "previousStatus": {
+      "type": "string",
+      "enum": ["ISSUED", "SUSPENDED", "CANCELED"]
+    },
+    "newStatus": {
+      "type": "string",
+      "enum": ["ISSUED", "SUSPENDED", "CANCELED"]
+    },
+    "reason": { "type": "string", "minLength": 1, "maxLength": 200 }
+  },
+  "required": [
+    "cardId",
+    "cardAccountId",
+    "organizationId",
+    "holderUserId",
+    "previousStatus",
+    "newStatus",
+    "reason"
+  ],
+  "additionalProperties": true
+}

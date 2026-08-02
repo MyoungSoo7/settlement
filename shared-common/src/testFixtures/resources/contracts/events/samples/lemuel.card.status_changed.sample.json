@@ -1,0 +1,9 @@
+{
+  "cardId": 9001,
+  "cardAccountId": 5001,
+  "organizationId": 3001,
+  "holderUserId": 888,
+  "previousStatus": "ISSUED",
+  "newStatus": "SUSPENDED",
+  "reason": "조직 이탈로 자동 정지"
+}

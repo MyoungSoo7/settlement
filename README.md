@@ -1,8 +1,8 @@
 # Lemuel — 이커머스 + 정산 MSA 플랫폼
 
 > **이커머스 주문 → 셀러 정산 → 복식부기 원장까지, "정확성을 기계로 강제한" 커머스 백엔드.**
-> 커머스(order)·정산(settlement) 두 축의 **깊이**가 시그니처이고, 그 위에 대출·투자·계정계·조직·재무제표·경제지표·기업평판·운영관제·주식시세·AI챗봇·공공데이터를 **13개 마이크로서비스 + API Gateway**(JVM) 로 확장했다.
-> 여기에 **Go·Python·Kotlin 폴리글랏 7종**(실시간 시세 스트리밍·결제 웹훅·스크리닝 백테스트·이상탐지·예측·알림·정산 대사)을 더해 **총 21개 서비스**의 폴리글랏 MSA 로 도메인·언어 양방향 확장력을 증명한다.
+> 커머스(order)·정산(settlement) 두 축의 **깊이**가 시그니처이고, 그 위에 대출·투자·계정계·조직·재무제표·경제지표·기업평판·운영관제·주식시세·AI챗봇·공공데이터·법인카드를 **14개 마이크로서비스 + API Gateway**(JVM) 로 확장했다.
+> 여기에 **Go·Python·Kotlin 폴리글랏 7종**(실시간 시세 스트리밍·결제 웹훅·스크리닝 백테스트·이상탐지·예측·알림·정산 대사)을 더해 **총 22개 서비스**의 폴리글랏 MSA 로 도메인·언어 양방향 확장력을 증명한다.
 > 단일 모놀리스 → **Bounded Context 분리** → **이벤트 드리븐** → **DB-per-service + 이벤트 프로젝션 패턴**(ADR 0020) → **폴리글랏 MSA** 로 진화시킨 헥사고날 백엔드 포트폴리오.
 >
 > 📐 **전체 구성·아키텍처·디자인 패턴·기술 스택 한눈에 → [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**
@@ -107,11 +107,11 @@ flowchart LR
 | **장애 격리** | settlement 다운돼도 결제는 계속 | 정산 배치는 비동기 — 즉시 처리 X |
 | **배포 주기** | 잦음 (UI 변경 동행) | 드뭄 (회계 사이클 단위) |
 
-→ 위 차이점이 명확하므로 **서비스 분리** 가 자연스러운 경계. **13개 서비스 모두 DB-per-service**
+→ 위 차이점이 명확하므로 **서비스 분리** 가 자연스러운 경계. **14개 서비스 모두 DB-per-service**
 (order=opslab · settlement=settlement_db · loan=lemuel_loan · financial=lemuel_financial ·
 economics=lemuel_economics · company=lemuel_company · operation=lemuel_operation · market=lemuel_market ·
 ai=lemuel_ai · commondata=lemuel_commondata · investment=lemuel_investment · account=lemuel_account ·
-organization=lemuel_organization) 로 물리 분리하고,
+organization=lemuel_organization · card=lemuel_card) 로 물리 분리하고,
 연계는 **Kafka 이벤트로만** 한다. order↔settlement 는 settlement 가 자체 DB 에 이벤트 프로젝션을 적재하는
 CQRS 로 분리하고, 대사는 order 의 내부 API 를 호출해 cross-DB 연결 0 을 유지한다
 ([ADR 0020](docs/adr/0020-order-settlement-db-split.md) — 완료).
@@ -152,7 +152,7 @@ CQRS 로 분리하고, 대사는 order 의 내부 API 를 호출해 cross-DB 연
 
 전체 디렉토리·모듈 트리 정본은 **[STRUCTURE.md](docs/STRUCTURE.md)** 로 분리했다.
 
-- **JVM 코어**: Gradle 멀티모듈 — Java 13 서비스 + gateway, `shared-common` 은 composite build 라이브러리 (ADR 0021)
+- **JVM 코어**: Gradle 멀티모듈 — Java 14 서비스 + gateway, `shared-common` 은 composite build 라이브러리 (ADR 0021)
 - **폴리글랏 7종**(Go 2 · Python 3 · Kotlin 2, 포트 8110~8131): 루트 레벨 standalone — Gradle·gateway 미포함,
   `polyglot-ci.yml` 분리 CI, 전용 차트 격리 배포 (정본: [polyglot-services.md](docs/polyglot-services.md))
 - 각 서비스 내부는 헥사고날 고정 골격: `domain/` · `application/port·service/` · `adapter/{in,out}/`
@@ -617,10 +617,10 @@ CI 에서 k6 thresholds 로 회귀 자동 감지.
 
 ## 운영 환경 확장 포인트
 
-현재 구성은 **13개 서비스 모두 DB-per-service** 로 물리 분리돼 있고(order=opslab · settlement=settlement_db ·
+현재 구성은 **14개 서비스 모두 DB-per-service** 로 물리 분리돼 있고(order=opslab · settlement=settlement_db ·
 loan=lemuel_loan · financial=lemuel_financial · economics=lemuel_economics · company=lemuel_company ·
 operation=lemuel_operation · market=lemuel_market · ai=lemuel_ai · commondata=lemuel_commondata ·
-investment=lemuel_investment · account=lemuel_account · organization=lemuel_organization),
+investment=lemuel_investment · account=lemuel_account · organization=lemuel_organization · card=lemuel_card),
 이벤트 프로젝션 패턴 덕분에 다음 단계로의 확장이 깨끗합니다:
 
 1. ~~**DB 분리**~~ — ✅ 완료. settlement 가 자체 `settlement_db` 의 projection 테이블에 Kafka 이벤트 컨슈머가

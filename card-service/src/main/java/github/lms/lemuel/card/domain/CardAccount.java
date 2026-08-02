@@ -135,6 +135,39 @@ public class CardAccount {
         return new LimitChangeResult(applied, clamped);
     }
 
+    /**
+     * 일 1회 재심사 — 새 한도와 <b>그 근거를 함께</b> 갱신한다.
+     *
+     * <p>{@link #changeMasterLimit} 만으로는 부족한 이유가 근거다. 재산정은 어제와 다른 재원·평판으로
+     * 계산한 결과인데 한도만 바꾸면 {@code limitSnapshot} 은 개설 시점 근거로 남아, 사후에 "왜 이
+     * 한도였나"를 물었을 때 <b>서로 다른 심사를 가리키는 두 값</b>이 나온다. 영속 계층이
+     * {@code screened_at} 을 스냅샷 변화로 판정하므로(변한 재심사만 시각 갱신) 그 어긋남은
+     * 그대로 감사 기록의 거짓말이 된다.
+     *
+     * <p>{@link Builder} 로 새 인스턴스를 조립하는 우회를 쓰지 않는 이유: 빌더는 영속 계층의
+     * 재구성 전용이라 상태 전이 가드를 통째로 건너뛴다. 그 길을 열면 CLOSED·REJECTED 계정도
+     * 배치가 조용히 되살릴 수 있게 된다.
+     *
+     * <p>ACTIVE 만 허용한다(SUSPENDED 도 제외). 정지는 사람이 판단해 건 것이거나 재심사가 강등한
+     * 결과인데, 배치가 자동으로 한도를 다시 얹으면 정지 사유가 해소됐는지 아무도 확인하지 않은 채
+     * 여신이 되살아난다 — 복귀는 명시적인 {@link #resume} 을 거쳐야 한다.
+     *
+     * @param currentSubLimitSum 이미 배분된 Σ서브한도. 하향은 이 값을 하한으로 클램프된다.
+     */
+    public LimitChangeResult rescreen(BigDecimal newLimit, LimitSnapshot snapshot,
+                                      BigDecimal currentSubLimitSum) {
+        if (status != CardAccountStatus.ACTIVE) {
+            throw new InvalidCardTransitionException(
+                    "ACTIVE 카드계정만 재심사할 수 있습니다. 현재=" + status);
+        }
+        if (snapshot == null) {
+            throw new IllegalArgumentException("재심사는 한도 산정 근거(LimitSnapshot)가 필수입니다");
+        }
+        LimitChangeResult result = changeMasterLimit(newLimit, currentSubLimitSum);
+        this.limitSnapshot = snapshot;
+        return result;
+    }
+
     // ── 상태 전이 가드 ──
 
     private void transitionTo(CardAccountStatus target) {

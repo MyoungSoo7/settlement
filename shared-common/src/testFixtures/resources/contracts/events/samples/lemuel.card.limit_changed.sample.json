@@ -1,0 +1,9 @@
+{
+  "cardAccountId": 5001,
+  "cardId": 9001,
+  "organizationId": 3001,
+  "previousLimit": "50000",
+  "newLimit": "100000",
+  "clamped": false,
+  "scope": "SUB"
+}
