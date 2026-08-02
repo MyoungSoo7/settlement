@@ -1,10 +1,17 @@
 name: ci
 
+# develop 도 게이트한다 (2026-08-02).
+#   그동안 이 워크플로는 main 에서만 돌았다. 그래서 develop 에는 Java 빌드·테스트 게이트가
+#   아예 없었고(로컬에서 돌리는 수밖에 없었다), develop-<sha> 이미지도 만들어지지 않아
+#   운영 전에 통과시킬 staging 배포 대상 자체가 없었다. 5월 hotfix 5건이 전부 운영에서
+#   처음 드러난 구조적 이유다.
+#   develop push 는 backend-ci/frontend-ci 로 게이트되고 develop-<sha> 이미지를 만든다.
+#   운영 도메인을 때리는 production-revision-smoke 는 ref == main 조건이 그대로라 안 돈다.
 on:
   push:
-    branches: [ main ]
+    branches: [ main, develop ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, develop ]
 
 env:
   JAVA_VERSION: "25"
