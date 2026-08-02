@@ -96,3 +96,7 @@ app:
       # data.go.kr 발급 인증키(Decoding 키) — 계정당 1개로 활용신청한 모든 API 공용.
       # 미설정이면 수집 비활성(수집 데이터 없음 — 샘플 시드는 제거됨)
       api-key: ${DATA_GO_KR_API_KEY:}
+    seoul:
+      # 서울 열린데이터광장(data.seoul.go.kr) 인증키 — data.go.kr 키와 별개, URL 경로에 포함.
+      # 미설정이면 SEOUL_OPENAPI provider 데이터소스 수집 비활성
+      api-key: ${SEOUL_OPENAPI_KEY:}

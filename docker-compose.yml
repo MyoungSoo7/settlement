@@ -790,6 +790,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       # 공공데이터포털 인증키(계정당 1개, 활용신청한 모든 API 공용) — 미설정이면 Flyway 시드 데이터로만 동작 (수집 트리거는 409/경고)
       DATA_GO_KR_API_KEY: ${DATA_GO_KR_API_KEY:-}
+      # 서울 열린데이터광장 인증키(별도 발급, URL 경로형) — 미설정이면 SEOUL_OPENAPI provider 소스 수집 비활성
+      SEOUL_OPENAPI_KEY: ${SEOUL_OPENAPI_KEY:-}
       COMMONDATA_INTERNAL_API_KEY: ${COMMONDATA_INTERNAL_API_KEY:-}
       JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
       SERVER_PORT: 8080
