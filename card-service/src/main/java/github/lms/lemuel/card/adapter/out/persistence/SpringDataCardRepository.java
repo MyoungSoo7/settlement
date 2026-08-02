@@ -1,5 +1,6 @@
 package github.lms.lemuel.card.adapter.out.persistence;
 
+import github.lms.lemuel.card.domain.CardStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -12,17 +13,19 @@ public interface SpringDataCardRepository extends JpaRepository<CardJpaEntity, L
 
     List<CardJpaEntity> findByCardAccountId(Long cardAccountId);
 
-    /** 활성(CANCELED 아님) 카드 — partial unique {@code uq_card_active_holder} 와 같은 기준. */
-    @Query("""
-            select c from CardJpaEntity c
-             where c.cardAccountId = :cardAccountId
-               and c.holderUserId = :holderUserId
-               and c.status <> 'CANCELED'
-            """)
-    Optional<CardJpaEntity> findActiveByHolder(@Param("cardAccountId") Long cardAccountId,
-                                               @Param("holderUserId") Long holderUserId);
+    /**
+     * 임직원의 활성 슬롯 점유자 — status &lt;&gt; CANCELED. uq_card_active_holder 부분 유니크
+     * 인덱스와 동일한 판정 기준이라, "재발급 가능한가"를 발급 전에 이 메서드로 선검증한다.
+     */
+    Optional<CardJpaEntity> findFirstByCardAccountIdAndHolderUserIdAndStatusNot(
+            Long cardAccountId, Long holderUserId, CardStatus status);
 
-    /** SUSPENDED 포함(재개되면 그 한도를 다시 쓴다) — CANCELED 만 제외. */
+    /**
+     * 활성(≠CANCELED) 서브한도 합계. SUSPENDED 도 포함한다 — {@link
+     * github.lms.lemuel.card.application.port.out.LoadCardPort#sumActiveSubLimits} 참조.
+     * 문자열 리터럴 'CANCELED' 비교는 status 가 @Enumerated(STRING) 이라 Hibernate 가
+     * CardStatus.CANCELED 로 해석한다(엔티티가 없으면 이 리포지토리를 결코 컴파일할 수 없다).
+     */
     @Query("""
             select coalesce(sum(c.subLimit), 0)
               from CardJpaEntity c

@@ -158,3 +158,47 @@ describe('WorkforcePage 금액 표시', () => {
     expect(rendered.length).toBeGreaterThan(0);
   });
 });
+
+/**
+ * 색상 판정도 `Number()` 를 태우면 표시 문자열과 어긋난다.
+ * - 언더플로: 배정밀도 아래의 음수는 `-0` 이 되어 `Number(v) >= 0` 이 *참* → 음수인데 파란색
+ * - 파싱실패: 계약을 벗어난 문자열은 `NaN` 이 되어 그 비교가 *거짓* → 대시인데 빨간색(음수 의미)
+ */
+const withSalaryDifference = (difference: string): WorkforceComparison => ({
+  ...detail,
+  industryComparison: {
+    ...detail.industryComparison,
+    estimatedAnnualSalary: {
+      median: '43750000.00',
+      difference,
+      differenceRate: null,
+      percentile: 61,
+    },
+  },
+});
+
+describe('WorkforcePage 차이값 색상', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    workforce.mockResolvedValue(listPage);
+    workforceHistory.mockResolvedValue(history);
+  });
+
+  it('배정밀도 아래로 작은 음수도 음수 색으로 보여준다', async () => {
+    const tiny = `-0.${'0'.repeat(400)}1`;
+    workforceDetail.mockResolvedValue(withSalaryDifference(tiny));
+    await openComparison();
+    const cell = await screen.findByText(`${tiny}원`);
+    expect(cell).toHaveClass('text-red-600');
+  });
+
+  it('해석 불가한 차이값은 음수 색이 아니라 중립 색으로 보여준다', async () => {
+    workforceDetail.mockResolvedValue(withSalaryDifference('알수없음'));
+    await openComparison();
+    // 표시는 대시인데 빨간색이면 "감소" 로 오독된다
+    const cells = await screen.findAllByText('—');
+    const neutral = cells.filter((el) => el.classList.contains('text-gray-500'));
+    expect(neutral.length).toBeGreaterThan(0);
+    expect(cells.some((el) => el.classList.contains('text-red-600'))).toBe(false);
+  });
+});

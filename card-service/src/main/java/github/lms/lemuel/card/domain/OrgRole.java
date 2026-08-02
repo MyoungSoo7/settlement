@@ -11,5 +11,22 @@ package github.lms.lemuel.card.domain;
 public enum OrgRole {
     OWNER,
     MANAGER,
-    STAFF
+    STAFF;
+
+    /**
+     * 이벤트 페이로드의 역할 문자열을 파싱한다. 계약 밖 값은 원문을 담아 거부한다 —
+     * 상류가 역할을 추가했는데 card 가 아직 모르면 <b>적재 시점</b>에 막혀 DLT 로 가야 한다.
+     * 그대로 저장하면 실패가 카드 발급 심사(읽는 시점)로 밀려 500 이 되고 원인 이벤트도 남지 않는다.
+     */
+    public static OrgRole from(String raw) {
+        if (raw == null) {
+            throw new IllegalArgumentException("역할이 없습니다 — organization 이벤트 계약 위반");
+        }
+        try {
+            return valueOf(raw);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException(
+                    "알 수 없는 역할입니다: " + raw + " (허용: OWNER|MANAGER|STAFF)", e);
+        }
+    }
 }

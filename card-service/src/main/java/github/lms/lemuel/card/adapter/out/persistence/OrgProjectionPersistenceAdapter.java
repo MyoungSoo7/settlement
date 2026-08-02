@@ -5,20 +5,16 @@ import github.lms.lemuel.card.application.port.out.SaveOrgProjectionPort;
 import github.lms.lemuel.card.domain.OrgRole;
 import org.springframework.stereotype.Component;
 
-import java.time.Instant;
 import java.util.Optional;
 
 /**
- * 조직·멤버 프로젝션 영속 어댑터 — PK 기준 JPA merge 로 멱등 upsert 를 구현한다.
- *
- * <p>비활성화는 행 삭제가 아니라 {@code active=false} 툼스톤이다. 한 번도 적재된 적 없는
- * 멤버의 제거 이벤트도 툼스톤을 남겨, 순서 역전·리플레이에도 "제거됨"이 보존된다.
+ * 조직·멤버 프로젝션 어댑터. 자연키(organization_id / (organization_id,user_id)) 라
+ * 우선 조회 후 있으면 갱신·없으면 신규 생성하는 방식으로 UPSERT 한다(카드계정처럼 @Version
+ * 낙관적 락을 두지 않음 — 프로젝션은 소스가 이벤트 순서로 이미 직렬화돼 있어 동시 충돌 위험이 낮고,
+ * 최후 수신값 승리(last-write-wins)면 충분하다).
  */
 @Component
 public class OrgProjectionPersistenceAdapter implements LoadOrgProjectionPort, SaveOrgProjectionPort {
-
-    /** 툼스톤 행의 역할 표기 — 실제 역할을 모른 채 제거만 안 사실을 남길 때 쓴다. */
-    private static final String TOMBSTONE_ROLE = "STAFF";
 
     private final SpringDataOrgProjectionRepository orgRepository;
     private final SpringDataOrgMemberProjectionRepository memberRepository;
@@ -30,34 +26,50 @@ public class OrgProjectionPersistenceAdapter implements LoadOrgProjectionPort, S
     }
 
     @Override
-    public void upsertOrg(Long organizationId, String name, String type, String externalRef) {
-        orgRepository.save(new OrgProjectionJpaEntity(organizationId, name, type, externalRef, Instant.now()));
-    }
-
-    @Override
-    public void upsertMember(Long organizationId, Long userId, OrgRole role) {
-        memberRepository.save(new OrgMemberProjectionJpaEntity(
-                organizationId, userId, role.name(), true, Instant.now()));
-    }
-
-    @Override
-    public void deactivateMember(Long organizationId, Long userId) {
-        String role = memberRepository.findById(new OrgMemberProjectionJpaEntity.MemberKey(organizationId, userId))
-                .map(OrgMemberProjectionJpaEntity::getRole)
-                .orElse(TOMBSTONE_ROLE);
-        memberRepository.save(new OrgMemberProjectionJpaEntity(
-                organizationId, userId, role, false, Instant.now()));
-    }
-
-    @Override
-    public Optional<OrgView> findOrg(Long organizationId) {
-        return orgRepository.findById(organizationId)
-                .map(e -> new OrgView(e.getOrganizationId(), e.getType(), e.getExternalRef()));
+    public Optional<LoadOrgProjectionPort.OrgView> findOrg(Long organizationId) {
+        return orgRepository.findById(organizationId).map(OrgProjectionJpaEntity::toView);
     }
 
     @Override
     public Optional<OrgRole> findMemberRole(Long organizationId, Long userId) {
-        return memberRepository.findByOrganizationIdAndUserIdAndActiveTrue(organizationId, userId)
-                .map(e -> OrgRole.valueOf(e.getRole()));
+        return memberRepository.findActiveMember(organizationId, userId)
+                .map(m -> OrgRole.from(m.getRole()));
+    }
+
+    @Override
+    public void saveOrg(Long organizationId, String name, String type, String externalRef) {
+        OrgProjectionJpaEntity entity = orgRepository.findById(organizationId).orElse(null);
+        if (entity == null) {
+            orgRepository.save(new OrgProjectionJpaEntity(organizationId, name, type, externalRef));
+            return;
+        }
+        entity.update(name, type, externalRef);
+        orgRepository.save(entity);
+    }
+
+    @Override
+    public void upsertMember(Long organizationId, Long userId, String role) {
+        OrgMemberProjectionJpaEntity.OrgMemberProjectionId id =
+                new OrgMemberProjectionJpaEntity.OrgMemberProjectionId(organizationId, userId);
+        OrgMemberProjectionJpaEntity entity = memberRepository.findById(id).orElse(null);
+        if (entity == null) {
+            memberRepository.save(new OrgMemberProjectionJpaEntity(organizationId, userId, role, true));
+            return;
+        }
+        entity.setRole(role);
+        entity.setActive(true);
+        memberRepository.save(entity);
+    }
+
+    @Override
+    public void deactivateMember(Long organizationId, Long userId) {
+        OrgMemberProjectionJpaEntity.OrgMemberProjectionId id =
+                new OrgMemberProjectionJpaEntity.OrgMemberProjectionId(organizationId, userId);
+        memberRepository.findById(id).ifPresent(m -> {
+            m.setActive(false);
+            memberRepository.save(m);
+        });
+        // 프로젝션에 없는 멤버의 제거 이벤트는 무해한 no-op — 이벤트 도착 순서가 어긋난 경우를
+        // 방어한다(예: created/member_joined 유실·지연 상태에서 member_removed 가 먼저 옴).
     }
 }

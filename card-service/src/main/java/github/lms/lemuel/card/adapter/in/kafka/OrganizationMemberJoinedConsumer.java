@@ -16,7 +16,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.UUID;
 
 /**
- * 멤버 합류 수신 → 멤버 프로젝션 upsert. 재합류(REMOVED 후 재초대)도 같은 키 upsert 로 복원된다.
+ * 초대 수락으로 멤버가 조직에 합류(ACTIVE)한 이벤트 수신 → 멤버 프로젝션에 반영.
+ * 카드 발급/권한 판정이 이 프로젝션을 근거로 하므로, 합류를 놓치면 정당한 멤버가 카드를
+ * 신청·보유할 수 없다.
  */
 @Component
 @ConditionalOnProperty(name = "app.kafka.enabled", havingValue = "true")
@@ -54,7 +56,11 @@ public class OrganizationMemberJoinedConsumer extends IdempotentEventConsumer {
     protected void handle(JsonNode node, UUID eventId) {
         long organizationId = requiredLong(node, "organizationId", eventId);
         long userId = requiredLong(node, "userId", eventId);
-        useCase.upsertMember(new MemberCommand(organizationId, userId, requiredText(node, "role", eventId)));
-        log.info("멤버 합류 반영. eventId={}, orgId={}, userId={}", eventId, organizationId, userId);
+        String role = requiredText(node, "role", eventId);
+
+        useCase.upsertMember(new MemberCommand(organizationId, userId, role));
+
+        log.info("멤버 합류 반영. eventId={}, orgId={}, userId={}, role={}",
+                eventId, organizationId, userId, role);
     }
 }

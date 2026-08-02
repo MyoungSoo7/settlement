@@ -16,8 +16,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.UUID;
 
 /**
- * 멤버 역할 변경 수신 → 멤버 프로젝션의 역할 갱신(newRole 기준 upsert).
- * previousRole 은 검증·감사용 정보라 프로젝션에는 최신 역할만 남긴다.
+ * 활성 멤버의 역할 변경 이벤트 수신 → 멤버 프로젝션의 역할 갱신.
+ *
+ * <p>이벤트에는 {@code previousRole}·{@code newRole} 이 둘 다 있지만, 프로젝션에는
+ * {@code newRole} 만 반영한다(브리프 리졸루션 #3) — 프로젝션은 "지금 이 순간의 역할"만 필요하다.
  */
 @Component
 @ConditionalOnProperty(name = "app.kafka.enabled", havingValue = "true")
@@ -28,8 +30,8 @@ public class OrganizationMemberRoleChangedConsumer extends IdempotentEventConsum
     private final IngestOrgProjectionUseCase useCase;
 
     public OrganizationMemberRoleChangedConsumer(IngestOrgProjectionUseCase useCase,
-                                                 ProcessedEventRepository processedEventRepository,
-                                                 ObjectMapper objectMapper) {
+                                                  ProcessedEventRepository processedEventRepository,
+                                                  ObjectMapper objectMapper) {
         super(processedEventRepository, objectMapper);
         this.useCase = useCase;
     }
@@ -55,7 +57,11 @@ public class OrganizationMemberRoleChangedConsumer extends IdempotentEventConsum
     protected void handle(JsonNode node, UUID eventId) {
         long organizationId = requiredLong(node, "organizationId", eventId);
         long userId = requiredLong(node, "userId", eventId);
-        useCase.upsertMember(new MemberCommand(organizationId, userId, requiredText(node, "newRole", eventId)));
-        log.info("멤버 역할 갱신. eventId={}, orgId={}, userId={}", eventId, organizationId, userId);
+        String newRole = requiredText(node, "newRole", eventId);
+
+        useCase.upsertMember(new MemberCommand(organizationId, userId, newRole));
+
+        log.info("멤버 역할 변경 반영. eventId={}, orgId={}, userId={}, newRole={}",
+                eventId, organizationId, userId, newRole);
     }
 }

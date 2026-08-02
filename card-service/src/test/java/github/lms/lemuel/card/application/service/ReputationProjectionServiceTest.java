@@ -2,54 +2,71 @@ package github.lms.lemuel.card.application.service;
 
 import github.lms.lemuel.card.application.port.in.IngestReputationUseCase.ReputationCommand;
 import github.lms.lemuel.card.application.port.out.SaveReputationPort;
-import github.lms.lemuel.card.domain.ReputationGrade;
-import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
-/**
- * 평판 프로젝션 적재 서비스 — company 이벤트의 sellerIds 팬아웃이 셀러별 등급 upsert 로 매핑되는지 검증한다.
- */
 @ExtendWith(MockitoExtension.class)
 class ReputationProjectionServiceTest {
 
     @Mock SaveReputationPort saveReputationPort;
-    @InjectMocks ReputationProjectionService service;
 
-    @Test
-    @DisplayName("sellerIds 전원에게 등급을 팬아웃 upsert 한다")
-    void ingest_fansOutToEverySeller() {
-        service.ingest(new ReputationCommand("C", List.of(777L, 1001L)));
+    ReputationProjectionService service;
 
-        verify(saveReputationPort).upsertGrade("777", ReputationGrade.C);
-        verify(saveReputationPort).upsertGrade("1001", ReputationGrade.C);
+    @BeforeEach
+    void setUp() {
+        service = new ReputationProjectionService(saveReputationPort);
     }
 
     @Test
-    @DisplayName("sellerIds 가 비어 있으면 아무것도 저장하지 않는다 — 기업에 링크된 셀러가 없는 정상 케이스")
-    void ingest_emptySellersIsNoOp() {
-        service.ingest(new ReputationCommand("A", List.of()));
+    void ingest_fansOutEachSellerId() {
+        service.ingest(new ReputationCommand(List.of(777L, 1001L), "C"));
+
+        verify(saveReputationPort).upsertGrade("777", "C");
+        verify(saveReputationPort).upsertGrade("1001", "C");
+    }
+
+    @Test
+    void ingest_emptySellerIds_noPortCalls() {
+        service.ingest(new ReputationCommand(List.of(), "B"));
 
         verifyNoInteractions(saveReputationPort);
     }
 
     @Test
-    @DisplayName("알 수 없는 등급 문자열은 IllegalArgumentException — 즉시 DLT 격리 대상")
-    void ingest_unknownGradeThrows() {
-        assertThatThrownBy(() -> service.ingest(new ReputationCommand("Z", List.of(777L))))
+    void ingest_nullSellerIds_treatedAsEmpty() {
+        service.ingest(new ReputationCommand(null, "A"));
+
+        verify(saveReputationPort, never()).upsertGrade(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString());
+    }
+
+    /**
+     * 등급을 검증하지 않으면 심사의 {@code gradeOf} 가 읽는 시점에 터진다 — haircut 계수를
+     * 못 구해 카드 발급 전체가 500 이 된다. 적재 시점에 막아 DLT 로 보낸다.
+     */
+    @Test
+    void ingest_unknownGrade_rejectedBeforeAnyFanOut() {
+        assertThatThrownBy(() -> service.ingest(new ReputationCommand(List.of(777L, 1001L), "F")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("F");
+
+        verifyNoInteractions(saveReputationPort);
+    }
+
+    @Test
+    void ingest_nullGrade_rejectedAtIngest() {
+        assertThatThrownBy(() -> service.ingest(new ReputationCommand(List.of(777L), null)))
                 .isInstanceOf(IllegalArgumentException.class);
 
-        verify(saveReputationPort, never()).upsertGrade(any(), any());
+        verifyNoInteractions(saveReputationPort);
     }
 }

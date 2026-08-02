@@ -18,10 +18,16 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * company 평판 등급 변동 수신 → 셀러별 평판 프로젝션 upsert (loan 동형 소비).
+ * company 의 평판 등급 변동 이벤트 수신 → 셀러별 평판 프로젝션 적재.
  *
- * <p>한도 산정({@code CardLimitPolicy})의 haircut 입력이 여기서 낡으면
- * 평판 악화 법인에 과대 한도가 유지된다 — 일 1회 재산정(Task 13)이 이 프로젝션을 읽는다.
+ * <p><b>sellerId 매핑(브리프 리졸루션 #4 확인 결과):</b> {@code lemuel.company.reputation_changed}
+ * 스키마에는 단일 {@code sellerId} 필드가 없다. 식별자는 {@code stockCode}(기업)이고,
+ * {@code sellerIds}(정수 배열, 기업에 링크된 셀러 목록, 없으면 빈 배열)만 동봉된다 — 정본 샘플
+ * ({@code sellerIds: [777, 1001]})과 스키마 설명("loan 의 셀러별 haircut 반영 키")으로 직접 확인했다.
+ * card-service 의 {@code reputation_projection.seller_id} 는 VARCHAR PK 이므로, 배열의 각 원소를
+ * {@code String.valueOf()} 로 변환해 개별 UPSERT 한다. 이 팬아웃 방식은 loan-service 의 동일 이벤트
+ * 소비 선례(CompanyReputationService.ingest → SaveSellerReputationPort.upsert, ADR 0023 Phase 3)를
+ * 그대로 따른 것이다.
  */
 @Component
 @ConditionalOnProperty(name = "app.kafka.enabled", havingValue = "true")
@@ -58,11 +64,16 @@ public class CompanyReputationChangedConsumer extends IdempotentEventConsumer {
     @Override
     protected void handle(JsonNode node, UUID eventId) {
         String grade = requiredText(node, "grade", eventId);
-        JsonNode sellerIdsNode = required(node, "sellerIds", eventId);
-        List<Long> sellerIds = new ArrayList<>();
-        sellerIdsNode.forEach(n -> sellerIds.add(n.asLong()));
 
-        useCase.ingest(new ReputationCommand(grade, sellerIds));
-        log.info("평판 프로젝션 적재. eventId={}, grade={}, sellers={}", eventId, grade, sellerIds.size());
+        List<Long> sellerIds = new ArrayList<>();
+        JsonNode sellerIdsNode = node.get("sellerIds");
+        if (sellerIdsNode != null && sellerIdsNode.isArray()) {
+            sellerIdsNode.forEach(n -> sellerIds.add(n.asLong()));
+        }
+
+        useCase.ingest(new ReputationCommand(sellerIds, grade));
+
+        log.info("평판 프로젝션 적재 완료. eventId={}, grade={}, sellerCount={}",
+                eventId, grade, sellerIds.size());
     }
 }

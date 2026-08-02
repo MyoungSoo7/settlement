@@ -4,9 +4,12 @@ import github.lms.lemuel.card.domain.Card;
 import github.lms.lemuel.card.domain.CardStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 
@@ -14,8 +17,9 @@ import java.math.BigDecimal;
 import java.time.Instant;
 
 /**
- * 임직원 카드 영속 엔티티 — 매핑 규약은 {@link CardAccountJpaEntity} 와 동일.
- * 활성 카드 1장 불변식은 partial unique {@code uq_card_active_holder} 가 DB 차원에서 이중 방어한다.
+ * cards 테이블 매핑 (V4). created_at/updated_at 은 DB DEFAULT NOW() 에 위임(insertable=false) —
+ * {@code CardAccountJpaEntity} 와 동일 관례. card_account_id 는 FK 컬럼을 원시값으로만 보관한다
+ * (연관관계 매핑 없음 — organization-service {@code MembershipJpaEntity} 와 동형).
  */
 @Entity
 @Table(name = "cards")
@@ -37,42 +41,53 @@ public class CardJpaEntity {
     @Column(name = "sub_limit", nullable = false, precision = 19, scale = 2)
     private BigDecimal subLimit;
 
-    @Column(name = "status", nullable = false, length = 20)
-    private String status;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private CardStatus status;
 
     @Column(name = "created_at", insertable = false, updatable = false)
     private Instant createdAt;
 
-    @Column(name = "updated_at", insertable = false, updatable = false)
+    @Column(name = "updated_at", insertable = false)
     private Instant updatedAt;
 
     @Version
-    @Column(name = "version", nullable = false)
+    @Column(nullable = false)
     private long version;
 
-    protected CardJpaEntity() { }
+    protected CardJpaEntity() {
+    }
 
-    static CardJpaEntity from(Card card) {
+    @PreUpdate
+    void onUpdate() {
+        this.updatedAt = Instant.now();
+    }
+
+    public static CardJpaEntity fromDomain(Card c) {
         CardJpaEntity e = new CardJpaEntity();
-        e.id = card.getId();
-        e.cardAccountId = card.getCardAccountId();
-        e.holderUserId = card.getHolderUserId();
-        e.maskedCardNo = card.getMaskedCardNo();
-        e.subLimit = card.getSubLimit();
-        e.status = card.getStatus().name();
-        e.version = card.getVersion();
+        e.id = c.getId();
+        e.cardAccountId = c.getCardAccountId();
+        e.holderUserId = c.getHolderUserId();
+        e.maskedCardNo = c.getMaskedCardNo();
+        e.subLimit = c.getSubLimit();
+        e.status = c.getStatus();
+        e.version = c.getVersion();
         return e;
     }
 
-    Card toDomain() {
+    public Card toDomain() {
         return Card.builder()
                 .id(id)
                 .cardAccountId(cardAccountId)
                 .holderUserId(holderUserId)
                 .maskedCardNo(maskedCardNo)
                 .subLimit(subLimit)
-                .status(CardStatus.valueOf(status))
+                .status(status)
                 .version(version)
                 .build();
+    }
+
+    public Long getId() {
+        return id;
     }
 }

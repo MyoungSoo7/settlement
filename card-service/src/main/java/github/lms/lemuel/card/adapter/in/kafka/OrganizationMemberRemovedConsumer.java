@@ -15,10 +15,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.UUID;
 
 /**
- * 조직 이탈 수신 → 멤버 프로젝션 비활성화 + 해당 임직원 카드 자동 정지(Task 12).
+ * 조직 이탈 수신 → 멤버 프로젝션 비활성화. 카드 자동 정지는 Task 12 가
+ * {@code IngestOrgProjectionUseCase.removeMember} 호출 지점에 이어붙인다(브리프 리졸루션 #2) —
+ * 이 태스크에서 카드를 직접 건드리면 Task 12 구현과 충돌한다.
  *
- * <p>이 컨슈머가 없으면 조직에서 제거된 임직원의 카드가 유효한 채로 남는다.
- * 멱등: 이미 정지된 카드를 다시 정지해도 무해하다(Card#suspend 는 멱등).
+ * <p>이 컨슈머가 없으면(또는 지연되면) 조직에서 제거된 임직원의 카드가 유효한 채로 남는다 —
+ * 이 태스크 전체가 막으려는 실패 모드.
  */
 @Component
 @ConditionalOnProperty(name = "app.kafka.enabled", havingValue = "true")
@@ -57,7 +59,7 @@ public class OrganizationMemberRemovedConsumer extends IdempotentEventConsumer {
         long organizationId = requiredLong(node, "organizationId", eventId);
         long userId = requiredLong(node, "userId", eventId);
         useCase.removeMember(organizationId, userId);
-        log.info("조직 이탈 반영 — 카드 정지 대상. eventId={}, orgId={}, userId={}",
+        log.info("조직 이탈 반영 — 멤버 프로젝션 비활성화. eventId={}, orgId={}, userId={}",
                 eventId, organizationId, userId);
     }
 }

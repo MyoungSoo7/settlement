@@ -7,14 +7,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 조직·멤버 프로젝션 적재 서비스.
+ * organization-service 이벤트를 조직·멤버 프로젝션으로 적재한다.
  *
- * <p>컨슈머 트랜잭션 안에서 호출된다(멱등 마커와 같은 tx — 마커만 커밋되고 프로젝션이
- * 롤백되면 이벤트 유실이다). 역할 문자열이 계약 밖이면 {@link IllegalArgumentException}
- * 으로 즉시 DLT 격리된다.
+ * <p>{@code @Transactional} 은 컨슈머의 {@code @KafkaListener} 메서드에도 이미 걸려 있어(REQUIRED
+ * 전파로 합류) 실질적으로는 방어적 중복이지만, 이 서비스가 컨슈머 밖(예: 관리자 백필 API)에서
+ * 단독 호출되는 경우에도 트랜잭션 경계가 스스로 성립하도록 유지한다.
  */
 @Service
-@Transactional
 public class OrgProjectionService implements IngestOrgProjectionUseCase {
 
     private final SaveOrgProjectionPort saveOrgProjectionPort;
@@ -24,21 +23,25 @@ public class OrgProjectionService implements IngestOrgProjectionUseCase {
     }
 
     @Override
-    public void registerOrg(OrgCommand command) {
-        saveOrgProjectionPort.upsertOrg(
+    @Transactional
+    public void createOrg(OrgCommand command) {
+        saveOrgProjectionPort.saveOrg(
                 command.organizationId(), command.name(), command.type(), command.externalRef());
-        // created 이벤트는 소유자의 member_joined 를 따로 발행하지 않는다(계약: ownerUserId 는 자동 OWNER).
-        saveOrgProjectionPort.upsertMember(command.organizationId(), command.ownerUserId(), OrgRole.OWNER);
     }
 
     @Override
+    @Transactional
     public void upsertMember(MemberCommand command) {
-        OrgRole role = OrgRole.valueOf(command.role());
-        saveOrgProjectionPort.upsertMember(command.organizationId(), command.userId(), role);
+        // 계약 밖 역할이면 여기서 IAE 가 나고 IdempotentEventConsumer 가 non-retryable 로 보아
+        // 격리·DLT 로 보낸다. enum 이름으로 정규화해 저장하므로 읽는 쪽 valueOf 는 절대 실패하지 않는다.
+        OrgRole role = OrgRole.from(command.role());
+        saveOrgProjectionPort.upsertMember(command.organizationId(), command.userId(), role.name());
     }
 
     @Override
-    public void removeMember(long organizationId, long userId) {
+    @Transactional
+    public void removeMember(Long organizationId, Long userId) {
+        // 카드 정지는 Task 12 가 이 지점에 이어붙인다 — 여기서는 프로젝션 비활성화까지만.
         saveOrgProjectionPort.deactivateMember(organizationId, userId);
     }
 }

@@ -1,9 +1,10 @@
 package github.lms.lemuel.card.adapter.out.persistence;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Embeddable;
+import jakarta.persistence.EmbeddedId;
 import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.IdClass;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
 import java.io.Serializable;
@@ -11,67 +12,97 @@ import java.time.Instant;
 import java.util.Objects;
 
 /**
- * organization-service 멤버십 이벤트의 읽기 전용 프로젝션 행.
- * 복합 PK = (organization_id, user_id). 제거는 행 삭제가 아니라 {@code active=false}
- * 툼스톤으로 남겨 순서 역전·재수신에 안전하다.
+ * org_member_projection 테이블 매핑 (V4). 복합 PK(organization_id, user_id) — organization-service
+ * membership_id 가 아니라 (조직, 사용자) 쌍이 이 프로젝션의 자연키다(shared-common
+ * {@code ProcessedEventJpaEntity.ProcessedEventId} 와 동일한 {@code @EmbeddedId} 관례).
+ *
+ * <p>{@code active=false} 는 "조직에서 제거됨"을 뜻한다 — 행을 삭제하지 않는 이유는 이력 보존
+ * (누가 언제 어떤 역할이었는지)과, 재합류 시 멱등 UPSERT 를 단순하게 유지하기 위함이다.
  */
 @Entity
 @Table(name = "org_member_projection")
-@IdClass(OrgMemberProjectionJpaEntity.MemberKey.class)
 public class OrgMemberProjectionJpaEntity {
 
-    @Id
-    @Column(name = "organization_id")
-    private Long organizationId;
+    @EmbeddedId
+    private OrgMemberProjectionId id;
 
-    @Id
-    @Column(name = "user_id")
-    private Long userId;
-
-    @Column(name = "role", nullable = false, length = 20)
+    @Column(nullable = false, length = 20)
     private String role;
 
-    @Column(name = "active", nullable = false)
+    @Column(nullable = false)
     private boolean active;
 
-    @Column(name = "updated_at", nullable = false)
+    @Column(name = "updated_at", insertable = false)
     private Instant updatedAt;
 
-    protected OrgMemberProjectionJpaEntity() { }
-
-    public OrgMemberProjectionJpaEntity(Long organizationId, Long userId, String role,
-                                        boolean active, Instant updatedAt) {
-        this.organizationId = organizationId;
-        this.userId = userId;
-        this.role = role;
-        this.active = active;
-        this.updatedAt = updatedAt;
+    protected OrgMemberProjectionJpaEntity() {
     }
 
-    public Long getOrganizationId() { return organizationId; }
-    public Long getUserId() { return userId; }
-    public String getRole() { return role; }
-    public boolean isActive() { return active; }
-    public Instant getUpdatedAt() { return updatedAt; }
+    public OrgMemberProjectionJpaEntity(Long organizationId, Long userId, String role, boolean active) {
+        this.id = new OrgMemberProjectionId(organizationId, userId);
+        this.role = role;
+        this.active = active;
+    }
 
-    /** 복합 키 — JPA @IdClass 계약(기본 생성자·equals/hashCode). */
-    public static class MemberKey implements Serializable {
+    @PreUpdate
+    void onUpdate() {
+        this.updatedAt = Instant.now();
+    }
+
+    public OrgMemberProjectionId getId() {
+        return id;
+    }
+
+    public String getRole() {
+        return role;
+    }
+
+    public boolean isActive() {
+        return active;
+    }
+
+    void setRole(String role) {
+        this.role = role;
+    }
+
+    void setActive(boolean active) {
+        this.active = active;
+    }
+
+    @Embeddable
+    public static class OrgMemberProjectionId implements Serializable {
+
+        @Column(name = "organization_id")
         private Long organizationId;
+
+        @Column(name = "user_id")
         private Long userId;
 
-        public MemberKey() { }
+        protected OrgMemberProjectionId() {
+        }
 
-        public MemberKey(Long organizationId, Long userId) {
+        public OrgMemberProjectionId(Long organizationId, Long userId) {
             this.organizationId = organizationId;
             this.userId = userId;
         }
 
+        public Long getOrganizationId() {
+            return organizationId;
+        }
+
+        public Long getUserId() {
+            return userId;
+        }
+
         @Override
         public boolean equals(Object o) {
-            if (this == o) return true;
-            if (!(o instanceof MemberKey that)) return false;
-            return Objects.equals(organizationId, that.organizationId)
-                    && Objects.equals(userId, that.userId);
+            if (this == o) {
+                return true;
+            }
+            if (!(o instanceof OrgMemberProjectionId that)) {
+                return false;
+            }
+            return Objects.equals(organizationId, that.organizationId) && Objects.equals(userId, that.userId);
         }
 
         @Override

@@ -3,6 +3,7 @@ package github.lms.lemuel.card.adapter.in.kafka;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import github.lms.lemuel.card.application.port.in.IngestOrgProjectionUseCase;
+import github.lms.lemuel.card.application.port.in.IngestOrgProjectionUseCase.MemberCommand;
 import github.lms.lemuel.card.application.port.in.IngestOrgProjectionUseCase.OrgCommand;
 import github.lms.lemuel.common.outbox.adapter.in.kafka.IdempotentEventConsumer;
 import github.lms.lemuel.common.outbox.adapter.in.kafka.ProcessedEventRepository;
@@ -16,16 +17,23 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.UUID;
 
 /**
- * 조직 생성 수신 → 조직 프로젝션 + 소유자 OWNER 멤버십 적재.
+ * 조직 생성 수신 → 조직 프로젝션 적재 (+ 생성자를 OWNER 멤버로 등록).
  *
- * <p>CORPORATE 조직은 1단계 카드 대상이 아니므로 무시한다(멱등 마커는 남겨 재수신을 차단).
- * created 는 소유자의 member_joined 를 따로 발행하지 않으므로 소유자 적재는 유스케이스가 책임진다.
+ * <p><b>type 필터:</b> {@code type != SELLER} 면 무시한다(브리프 리졸루션 #1) — CORPORATE 조직은
+ * 1단계 카드 발급 대상이 아니다. 무시는 정상 흐름이라 예외를 던지지 않고 로그만 남긴다.
+ *
+ * <p><b>오너 멤버 등록:</b> organization-service 는 조직 생성 시 {@code OrganizationCreated} 만
+ * 발행하고, 오너용 {@code member_joined} 를 별도로 발행하지 않는다(초대 수락 전용 이벤트라서다 —
+ * {@code OrganizationCommandService} 확인). 그래서 이 컨슈머가 오너 멤버 등록까지 하지 않으면
+ * 조직 생성자가 영구히 멤버 프로젝션에 없는 상태로 남는다. 이벤트 스키마 설명이 {@code ownerUserId}를
+ * "생성자(자동 OWNER)"라고 명시한 것도 바로 이 목적이다.
  */
 @Component
 @ConditionalOnProperty(name = "app.kafka.enabled", havingValue = "true")
 public class OrganizationCreatedConsumer extends IdempotentEventConsumer {
 
     private static final String CONSUMER_GROUP = "lemuel-card";
+    private static final String SELLER_TYPE = "SELLER";
 
     private final IngestOrgProjectionUseCase useCase;
 
@@ -39,7 +47,7 @@ public class OrganizationCreatedConsumer extends IdempotentEventConsumer {
     @KafkaListener(topics = "${app.kafka.topic.organization-created}",
             groupId = CONSUMER_GROUP, containerFactory = "kafkaListenerContainerFactory")
     @Transactional
-    public void onCreated(ConsumerRecord<String, String> record, Acknowledgment ack) {
+    public void onOrganizationCreated(ConsumerRecord<String, String> record, Acknowledgment ack) {
         consume(record, ack);
     }
 
@@ -55,19 +63,22 @@ public class OrganizationCreatedConsumer extends IdempotentEventConsumer {
 
     @Override
     protected void handle(JsonNode node, UUID eventId) {
-        String type = requiredText(node, "type", eventId);
         long organizationId = requiredLong(node, "organizationId", eventId);
-        if (!"SELLER".equals(type)) {
-            log.info("SELLER 아님 — 카드 대상 외 조직 스킵. eventId={}, orgId={}, type={}",
+        String name = requiredText(node, "name", eventId);
+        String type = requiredText(node, "type", eventId);
+        long ownerUserId = requiredLong(node, "ownerUserId", eventId);
+        String externalRef = node.hasNonNull("externalRef") ? node.get("externalRef").asText() : null;
+
+        if (!SELLER_TYPE.equals(type)) {
+            log.info("CORPORATE 조직 무시(1단계 카드 발급 대상 아님). eventId={}, orgId={}, type={}",
                     eventId, organizationId, type);
             return;
         }
-        useCase.registerOrg(new OrgCommand(
-                organizationId,
-                requiredText(node, "name", eventId),
-                type,
-                node.hasNonNull("externalRef") ? node.get("externalRef").asText() : null,
-                requiredLong(node, "ownerUserId", eventId)));
-        log.info("조직 프로젝션 적재. eventId={}, orgId={}", eventId, organizationId);
+
+        useCase.createOrg(new OrgCommand(organizationId, name, type, externalRef));
+        useCase.upsertMember(new MemberCommand(organizationId, ownerUserId, "OWNER"));
+
+        log.info("조직 프로젝션 적재 완료. eventId={}, orgId={}, ownerUserId={}",
+                eventId, organizationId, ownerUserId);
     }
 }
