@@ -143,6 +143,84 @@ class SeoulOpenApiClientTest {
         assertThat(items).hasSize(1);
     }
 
+    /**
+     * 실측(2026-08-02): 표준 봉투의 래퍼 키는 URL 서비스명과 <b>다를 수 있다</b> —
+     * {@code tbCycleStationInfo} 를 호출하면 래퍼가 {@code stationInfo} 로 온다.
+     * 서비스명으로만 래퍼를 찾으면 RESULT 를 못 읽어 CODE 공백 예외로 수집 전체가 죽는다.
+     */
+    @Test
+    void 표준봉투_래퍼키가_URL_서비스명과_달라도_수집한다() {
+        SeoulOpenApiClient client = clientWith("SEOULKEY");
+        server.expect(requestTo(containsString("/json/tbCycleStationInfo/1/2")))
+                .andRespond(withSuccess(envelope("stationInfo", 2,
+                        "[{\"RENT_ID\":\"ST-10\",\"RENT_NM\":\"서교동 사거리\"},"
+                                + "{\"RENT_ID\":\"ST-11\",\"RENT_NM\":\"망원역 1번출구 앞\"}]"),
+                        APPLICATION_JSON));
+
+        List<PortalItem> items = client.fetchItems(
+                source(Map.of("service", "tbCycleStationInfo"), List.of("RENT_ID"), 2), Map.of());
+
+        assertThat(items).hasSize(2);
+        assertThat(items.get(0).recordKey()).isEqualTo("ST-10");
+        server.verify();
+    }
+
+    /**
+     * 실측(2026-08-02 광화문·덕수궁): {@code citydata} 는 row 배열이 아니라 <b>단일 객체</b>
+     * ({@code CITYDATA})로 오고 {@code list_total_count}·{@code RESULT} 는 루트에 있다.
+     * 12시간 예측(FCST_PPLTN)이 이 객체 안에 있어, 객체형을 1 레코드로 못 받으면 0건 수집된다.
+     */
+    @Test
+    void citydata_객체형_봉투는_단일레코드로_수집하고_12시간예측을_보존한다() {
+        SeoulOpenApiClient client = clientWith("SEOULKEY");
+        String body = "{\"list_total_count\":1,"
+                + "\"RESULT\":{\"RESULT.CODE\":\"INFO-000\",\"RESULT.MESSAGE\":\"정상 처리되었습니다.\"},"
+                + "\"CITYDATA\":{\"AREA_NM\":\"광화문·덕수궁\",\"AREA_CD\":\"POI009\","
+                + "\"LIVE_PPLTN_STTS\":[{\"AREA_CONGEST_LVL\":\"여유\",\"FCST_PPLTN\":["
+                + "{\"FCST_TIME\":\"2026-08-02 21:00\",\"FCST_PPLTN_MIN\":\"14000\"},"
+                + "{\"FCST_TIME\":\"2026-08-03 08:00\",\"FCST_PPLTN_MIN\":\"12000\"}]}]}}";
+        server.expect(requestTo(containsString("/json/citydata/1/5/")))
+                .andRespond(withSuccess(body, APPLICATION_JSON));
+
+        List<PortalItem> items = client.fetchItems(
+                source(Map.of("service", "citydata", "path", "광화문·덕수궁"),
+                        List.of("AREA_CD"), 5), Map.of());
+
+        assertThat(items).hasSize(1);
+        assertThat(items.get(0).recordKey()).isEqualTo("POI009");
+        assertThat(items.get(0).payloadJson()).contains("FCST_PPLTN", "2026-08-03 08:00");
+        server.verify();
+    }
+
+    /** 실측: 범위 밖 조회는 RESULT 래퍼 없이 {@code {"CODE":"INFO-200"}} 로 평평하게 온다. */
+    @Test
+    void INFO_200_은_RESULT_래퍼없는_평평한_형태도_빈리스트() {
+        SeoulOpenApiClient client = clientWith("SEOULKEY");
+        server.expect(requestTo(containsString("/json/tbCycleStationInfo/")))
+                .andRespond(withSuccess(
+                        "{\"CODE\":\"INFO-200\",\"MESSAGE\":\"해당하는 데이터가 없습니다.\"}",
+                        APPLICATION_JSON));
+
+        assertThat(client.fetchItems(
+                source(Map.of("service", "tbCycleStationInfo"), List.of(), 100), Map.of()))
+                .isEmpty();
+    }
+
+    /** 실측: 1회 1000건 초과 요청은 ERROR-336 — 원인 코드가 메시지에 드러나야 한다. */
+    @Test
+    void ERROR_336_요청범위초과는_코드가_드러나는_예외() {
+        SeoulOpenApiClient client = clientWith("SEOULKEY");
+        server.expect(requestTo(containsString("/json/tbCycleStationInfo/")))
+                .andRespond(withSuccess("{\"RESULT\":{\"CODE\":\"ERROR-336\","
+                        + "\"MESSAGE\":\"데이터요청은 한번에 최대 1,000건을 넘을 수 없습니다.\"}}",
+                        APPLICATION_JSON));
+
+        assertThatThrownBy(() -> client.fetchItems(
+                source(Map.of("service", "tbCycleStationInfo"), List.of(), 1000), Map.of()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("ERROR-336");
+    }
+
     @Test
     void INFO_200_데이터없음은_빈리스트() {
         SeoulOpenApiClient client = clientWith("SEOULKEY");

@@ -5,7 +5,8 @@ description: 공공데이터 범용 커넥터 규칙 — 데이터소스 등록�
 
 # 공공데이터 커넥터 규칙 (common-data-service)
 
-data.go.kr **범용 커넥터**(port 8098, lemuel_commondata). economics/market 이 API 마다 서비스를 신설한 것과 달리,
+공공데이터 **범용 커넥터**(port 8098, lemuel_commondata) — data.go.kr + 서울 열린데이터광장을 `DataSource.provider`
+축으로 함께 수용한다. economics/market 이 API 마다 서비스를 신설한 것과 달리,
 표준 봉투를 따르는 API 면 **코드 변경 없이 "데이터소스" 등록만으로** 수집·저장·공개조회. shared-common 미의존.
 
 ## 데이터소스 모델 (`DataSource`)
@@ -21,7 +22,7 @@ data.go.kr **범용 커넥터**(port 8098, lemuel_commondata). economics/market 
 
 - `DataPortalApiClient`: `{endpoint}?serviceKey=..&numOfRows=..&pageNo=..&{defaultParams}`. serviceKey 는 `queryParam` 으로 **한 번만 인코딩**.
   resultCode `00`=OK, `03`=NODATA(빈 리스트, 예외 아님), 그 외 예외. `body.items.item[]`(배열/단일객체/`body.items` 배열 모두 지원).
-  **XML 방어**: 응답이 `<` 로 시작(인증키 오류/형식 파라미터 누락 시 XML) → 명시적 예외("_type/resultType 등록 확인").
+  **XML 방어**: 응답이 `<` 로 시작(인증키 오류/형식 파라미터 누락 시 XML) → 명시적 예외("\_type/resultType 등록 확인").
 - 페이지네이션: `pageNo=1`부터 `MAX_PAGES=100` 상한. `totalCount>0` 이면 `pageNo*pageSize≥totalCount` 종료,
   미제공 API 는 `items.size()<pageSize` 로 종료(같은 페이지 반복 API 대비).
 - **recordKey**: keyFields 조인 → **결측/과대(>300)/부재면 payload SHA-256 폴백**(폴백은 멱등성 보장 수단, 버그 아님).
@@ -43,6 +44,25 @@ data.go.kr **범용 커넥터**(port 8098, lemuel_commondata). economics/market 
 - admin: `POST /sources`(등록), `POST /sources/{code}/sync`(override 파라미터를 defaultParams 위에), `GET /sync/status`.
   수집 202+백그라운드, **동시실행 409**(+tracker 항상 해소). 샘플 시드 마이그레이션은 **제거됨**(기존 DB 는
   Flyway `*:missing` 관대 처리) — 무키 환경은 수집 비활성으로 데이터 0건, 데모하려면 `DATA_GO_KR_API_KEY` 필수.
+
+## SEOUL_OPENAPI 프로바이더 (`DataSource.provider`, 실측 2026-08-02)
+
+`provider` 가 축이다 — null/미지정은 `DATA_GO_KR`(기존 경로 무변경). 서울 열린데이터광장은 봉투가 **전부** 다르다.
+
+- URL `{endpoint}/{KEY}/json/{service}/{START}/{END}[/{path}..]` — **키가 경로**다. `endpoint` 는 키 없는 베이스
+  (`http://openapi.seoul.go.kr:8088`)만 저장할 것. **공개 `GET /api/common-data/sources` 가 endpoint 를 그대로
+  노출**하므로 키를 endpoint 에 넣으면 인증키가 공개된다. `service`(필수)·`path`(후행 경로)는 defaultParams 예약 키.
+- 페이지네이션은 START/END 인덱스(1-base 양끝 포함). 1회 **1000건 초과 시 ERROR-336** — `MAX_PAGE_SIZE` 와 일치.
+- **★ 래퍼 키가 URL 서비스명과 다르다** — `tbCycleStationInfo` 요청 → 래퍼 `stationInfo`. 서비스명으로만 찾으면
+  RESULT 를 못 읽어 `CODE=` 공백 예외로 수집 전체가 죽는다. 이름 일치 → 실패 시 **구조로**(`row`/`RESULT`/
+  `list_total_count` 보유 객체) 찾을 것.
+- **행 모양 3종**: ① 표준 `{래퍼:{row:[..]}}` ② `citydata_ppltn` 루트 배열(`SeoulRtd.citydata_ppltn`)
+  ③ **`citydata` 는 배열이 아니라 단일 객체(`CITYDATA`)** — 12시간 예측(`FCST_PPLTN`)이 이 안에 있어
+  객체형을 1 레코드로 안 받으면 **0건 수집**된다. `list_total_count` 도 래퍼가 아닌 루트에 온다.
+- **결과코드 위치 5종**: `래퍼.RESULT.CODE` / `RESULT.CODE` / `RESULT["RESULT.CODE"]`(citydata) /
+  루트 `"RESULT.CODE"` / **RESULT 래퍼 없는 루트 `CODE`**(범위 밖 조회의 INFO-200). 하나라도 빠지면 오탐 예외.
+- `INFO-200`(데이터 없음)은 예외 아님 — 빈 리스트(data.go.kr `resultCode=03` 과 동일 취급). 인증키 오류(`INFO-100`)는
+  json 을 요청해도 **XML 로** 떨어진다 → XML 방어가 두 프로바이더 모두에 필요.
 
 ## 안티패턴 (발견 시 지적)
 
