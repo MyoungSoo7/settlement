@@ -23,6 +23,17 @@
   ④ **AC4 지출관리 SaaS**: `ExpenseReport`(DRAFT→SUBMITTED→{APPROVED,REJECTED}) + 부서 예산 소진율(`DepartmentBudget`), `CardCapturedExpenseConsumer`(Kafka 소비 → 경비보고서 자동 생성, captureId L3 멱등), 지출 워크플로 REST(`POST submit/approve/reject`), 승인 경로 완전 비결합(`AuthorizationLatencyTest` p99≤300ms, `ExpenseWorkflowDecouplingTest` ArchUnit). V9 마이그레이션.
   게이트: `:card-service:test` 전건 fail 0 + JaCoCo LINE ≥ 90% GREEN. 이벤트 계약 스키마 1종 추가(`lemuel.card.statement.paid`, ADR 0022 하위호환 신규 토픽).
 
+- **CEO 사업장비교 기준월 데이터 시드 (2026-08-04)** — 사업장비교 메뉴가 인원·추정연봉을 전혀 못 그리던 원인은
+  두 가지였다: ① 비교 컬럼(`industry_code`/`sido`/`sigungu`)을 추가한 `V20260730120000` 이전에 전량 임포트가 끝난
+  DB 는 55.4만 행 전부 그 컬럼이 NULL 이라 집계 모집단이 비고, ② 사전 집계(`workforce_aggregate`)는 관리자 임포트
+  API(gateway 미라우팅) 실행 시점에만 만들어져 fresh DB 에서는 아예 없다. `V20260804090000` 이 국민연금공단
+  CSV(2026-07-23 배포본, 자료생성년월 **2026-06**)에서 뽑은 4,247행을 벌크 어댑터와 동일한 DO UPDATE 로 적재하고
+  이어서 `WorkforceAggregatePersistenceAdapter.rebuild` 와 동일한 SQL 로 집계 1,618행·백분위 33,930행을 만든 뒤
+  COMPLETE 로 표시한다. 표본은 유명기업 앵커 234곳 + 앵커가 속한 업종 EXACT 114집단·지역 EXACT 62집단의 **균등
+  간격 추출**(집단당 최대 24, MIN_SAMPLE_SIZE=10 충족)이라 중앙값·백분위가 상위 편향되지 않는다. 실 DB 실기동 검증:
+  삼성전자·카카오·네이버·기아 모두 업종·지역 EXACT 비교 성립(표본 27~105), 시드 4,247행 중 업종 3,538·지역 3,800행이
+  EXACT 표본을 충족. 생성 스크립트는 `scripts/etl/gen-workforce-seed.py`(행 필터·지역 파싱을 Java 정본과 동형 —
+  새 월 CSV 는 `MONTH`·`OUT_PATH` 만 바꿔 재생성). `:company-service:test` 325건 skip 0 + JaCoCo 게이트 GREEN.
 - **card-service Task 3 잔여·6·7 완료 (2026-08-02)** — ① organization 멤버 이벤트 2종 잔여 배선 마감(`ca5217f5a`:
   토픽 레지스트리·SPEC·STATUS — 발행 라우팅은 KafkaOutboxPublisher 컨벤션이라 코드 동작 무관). ② Task 7 이벤트 소비
   프로젝션(`a2c802cf2`+`dab20ebc8`): V4 마이그레이션(카드 코어+프로젝션 3테이블) + 컨슈머 5종(organization 4종·company
