@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
 /**
  * 로깅 + 성능 추적을 담당하는 핵심 Aspect.
  *
- * <p>{@link LemuelPointcuts#traceable()} (웹 어댑터 · 애플리케이션 서비스 · Kafka 컨슈머) 에 대해:
+ * <p>{@link LemuelPointcuts#traceable()} (웹 어댑터 · 애플리케이션 서비스 · Kafka 컨슈머 · 배치 어댑터) 에 대해:
  * <ul>
  *   <li>진입 시 DEBUG 로그 ({@code → Layer Class.method})</li>
  *   <li>실행 시간 측정 후 종료 로그 ({@code ← ... (12ms)})</li>
@@ -113,6 +113,9 @@ public class MethodTraceAspect {
         }
         if (declaringClassName.contains(".adapter.in.kafka")) {
             return "kafka";
+        }
+        if (declaringClassName.contains(".adapter.in.batch")) {
+            return "batch";
         }
         if (declaringClassName.contains(".application.service")) {
             return "service";
