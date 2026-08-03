@@ -1,5 +1,6 @@
 package github.lms.lemuel.card.application.port.out;
 
+import github.lms.lemuel.card.domain.AuthorizationHold;
 import github.lms.lemuel.card.domain.Card;
 import github.lms.lemuel.card.domain.CardAccount;
 import github.lms.lemuel.card.domain.CardAccountStatus;
@@ -71,4 +72,19 @@ public interface PublishCardEventPort {
      * cardId·holderUserId 가 있는 페이로드와 없는 페이로드를 소비자가 런타임에 분기해야 한다.
      */
     void publishAccountStatusChanged(CardAccount account, CardAccountStatus previousStatus, String reason);
+
+    /**
+     * 카드 승인(authorization) — 토픽 {@code lemuel.card.authorized}.
+     *
+     * <p>파티션 키는 1단계 카드 이벤트와 같은 {@code cardAccountId} 다 — 같은 계정의
+     * 발급·한도변경·승인이 같은 파티션에 순서대로 떨어져야 소비자가 상태를 일관되게 본다.
+     *
+     * <p>금액은 {@code BigDecimal.toPlainString()} 으로 직렬화한다(DATA-STANDARD N5) —
+     * 이 이벤트는 GL 분개까지 흘러가므로 float 파싱 오차가 장부 오차가 된다.
+     *
+     * @param hold    저장된 승인 홀드(authorizationId · amount · authorizedAt 포함)
+     * @param card    승인 대상 카드(서브한도 계산에 쓴다)
+     * @param account 카드계정(파티션 키 · 잔여 마스터한도 계산에 쓴다)
+     */
+    void publishAuthorized(AuthorizationHold hold, Card card, CardAccount account);
 }
