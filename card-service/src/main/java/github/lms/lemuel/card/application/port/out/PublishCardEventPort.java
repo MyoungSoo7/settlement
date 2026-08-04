@@ -105,4 +105,22 @@ public interface PublishCardEventPort {
      * @param hold    승인 홀드(authorizationId 포함)
      */
     void publishCaptured(CardCapture capture, AuthorizationHold hold);
+
+    /**
+     * 청구서 전액 납부 완료 — 토픽 {@code lemuel.card.statement.paid}.
+     *
+     * <p>계약 스키마({@code lemuel.card.statement.paid.schema.json}) required 필드:
+     * statementId · cardAccountId · billingYearMonth · paidAmount · paymentId · paidAt.
+     *
+     * <p>파티션 키: {@code cardAccountId} — 1단계 카드 이벤트·2단계 승인·매입과 동일.
+     * 같은 계정의 발급·승인·매입·청구 이벤트가 같은 파티션에 순서대로 떨어져야 소비자(GL 분개)가
+     * 일관된 순서를 본다.
+     *
+     * <p>금액({@code paidAmount})은 반드시 {@link java.math.BigDecimal#toPlainString()} 으로
+     * 직렬화한다(DATA-STANDARD N5).
+     *
+     * @param statement 전액 납부된 명세서
+     * @param paymentId 이번 납부 멱등 키
+     */
+    void publishStatementPaid(github.lms.lemuel.card.domain.CardStatement statement, String paymentId);
 }

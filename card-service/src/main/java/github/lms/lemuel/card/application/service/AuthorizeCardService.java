@@ -96,10 +96,11 @@ public class AuthorizeCardService implements AuthorizeCardUseCase {
         CardAccount account = loadCardAccountPort.findByIdForUpdate(card.getCardAccountId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.CARD_ACCOUNT_NOT_FOUND));
 
-        // 4. 계정 상태 검증
+        // 4. 계정 상태 검증 — SUSPENDED·CLOSED·DELINQUENT 는 모두 CARD_SUSPENDED 로 거절
         if (account.getStatus() == CardAccountStatus.SUSPENDED
-                || account.getStatus() == CardAccountStatus.CLOSED) {
-            log.debug("[CardAuthorization] 거절(계정정지) cardAccountId={} status={}",
+                || account.getStatus() == CardAccountStatus.CLOSED
+                || account.getStatus() == CardAccountStatus.DELINQUENT) {
+            log.debug("[CardAuthorization] 거절(계정정지/연체) cardAccountId={} status={}",
                     account.getId(), account.getStatus());
             return AuthorizationResult.declined(DeclineReason.CARD_SUSPENDED);
         }
