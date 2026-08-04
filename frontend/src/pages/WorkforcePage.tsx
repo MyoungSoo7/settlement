@@ -101,9 +101,7 @@ const MetricRow: React.FC<{
 }> = ({ label, median, difference, differenceRate, percentile, unit, isMoney }) => {
   const rate = rateText(differenceRate);
   return (
-    // 백분위는 "100%" 가 최대라 다른 칸보다 좁아도 된다 — 그 여유를 증감률에 넘겨
-    // 백만 % 단위 값이 한 줄에 들어가게 한다(4등분이면 부호+7자리에서 줄이 갈린다).
-    <div className="grid grid-cols-2 sm:grid-cols-[1fr_1fr_1fr_0.7fr] gap-2 text-sm bg-gray-50 rounded-lg px-3 py-2.5">
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm bg-gray-50 rounded-lg px-3 py-2.5">
       <MetricCell
         label={`${label} 중앙값`}
         value={isMoney ? fmtWon(median) : `${median}${unit}`}
@@ -427,8 +425,12 @@ const WorkforcePage: React.FC = () => {
                   </div>
                 )}
 
-                {/* 비교 2축 — 업종·지역 각각 독립 판정 */}
-                <div className="grid gap-4 lg:grid-cols-2">
+                {/* 비교 2축 — 업종·지역 각각 독립 판정.
+                    카드를 나란히 놓지 않고 세로로 쌓는다: 컨테이너가 max-w-6xl(1152px)이라 2열이면
+                    카드가 550px 안쪽이고, 그 안에서 지표 4칸을 나누면 칸당 90px 남짓이라 금액이
+                    "42,934,857 / 원" 처럼 단위만 다음 줄로 떨어진다. 1열이면 칸당 190px 이 나와
+                    억 단위 금액도 한 줄에 들어간다 — 화면 높이보다 값 가독성을 택한 것. */}
+                <div className="grid gap-4">
                   <ComparisonCard title="업종 비교" axis="industry" comparison={detail.industryComparison} />
                   <ComparisonCard title="지역 비교" axis="region" comparison={detail.regionComparison} />
                 </div>
