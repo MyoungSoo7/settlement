@@ -3,9 +3,11 @@ package github.lms.lemuel.card.adapter.out.event;
 import github.lms.lemuel.card.domain.Card;
 import github.lms.lemuel.card.domain.CardAccount;
 import github.lms.lemuel.card.domain.CardAccountStatus;
+import github.lms.lemuel.card.domain.CardStatement;
 import github.lms.lemuel.card.domain.LimitChangeResult;
 import github.lms.lemuel.card.domain.LimitSnapshot;
 import github.lms.lemuel.card.domain.ReputationGrade;
+import github.lms.lemuel.card.domain.StatementStatus;
 import github.lms.lemuel.common.events.contract.EventContractValidator;
 import github.lms.lemuel.common.outbox.OutboxJson;
 import github.lms.lemuel.common.outbox.application.port.out.SaveOutboxEventPort;
@@ -20,6 +22,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.YearMonth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
@@ -223,5 +227,79 @@ class CardEventContractTest {
         assertThat(payload).contains("\"masterLimit\":\"700000\"");
         assertThat(outboxCaptor.getValue().getEventType()).isEqualTo("CardAccountStatusChanged");
         assertThat(outboxCaptor.getValue().getAggregateId()).isEqualTo("5001");
+    }
+
+    // ── lemuel.card.statement.paid 계약 테스트 (Phase 2 AC3) ──────────────────
+
+    private static CardStatement paidStatement() {
+        CardStatement s = CardStatement.openFor(5001L, YearMonth.of(2026, 8),
+                LocalDate.of(2026, 9, 10));
+        // 매입 금액 추가 후 마감 → 납부 → PAID
+        s.addCharge(new BigDecimal("350000"));
+        s.close();
+        s.applyPayment(new BigDecimal("350000"));
+        // 영속 id 설정(빌더 직접 재구성 — 계약 테스트 전용)
+        return CardStatement.builder()
+                .id(10001L)
+                .cardAccountId(5001L)
+                .billingYearMonth(YearMonth.of(2026, 8))
+                .status(StatementStatus.PAID)
+                .totalAmount(new BigDecimal("350000.00"))
+                .paidAmount(new BigDecimal("350000.00"))
+                .dueDate(LocalDate.of(2026, 9, 10))
+                .build();
+    }
+
+    @Test
+    @DisplayName("statement.paid 정본 샘플이 스키마를 통과한다")
+    void statementPaidSampleSatisfiesSchema() {
+        EventContractValidator.assertValid("lemuel.card.statement.paid",
+                EventContractValidator.canonicalSample("lemuel.card.statement.paid"));
+    }
+
+    @Test
+    @DisplayName("statement.paid 페이로드는 계약을 만족하고 금액이 문자열이다")
+    void statementPaid_satisfiesContract() {
+        publisher.publishStatementPaid(paidStatement(), "PAY-20260901-0001");
+
+        verify(saveOutboxEventPort).save(outboxCaptor.capture());
+        String payload = outboxCaptor.getValue().getPayload();
+        EventContractValidator.assertValid("lemuel.card.statement.paid", payload);
+        assertThat(payload).contains("\"paidAmount\":\"350000.00\"");
+        assertThat(payload).contains("\"paymentId\":\"PAY-20260901-0001\"");
+        assertThat(payload).contains("\"billingYearMonth\":\"2026-08\"");
+    }
+
+    @Test
+    @DisplayName("statement.paid 는 cardAccountId 로 파티셔닝된다")
+    void statementPaidIsPartitionedByAccount() {
+        publisher.publishStatementPaid(paidStatement(), "PAY-20260901-0001");
+
+        verify(saveOutboxEventPort).save(outboxCaptor.capture());
+        OutboxEvent event = outboxCaptor.getValue();
+        assertThat(event.getEventType()).isEqualTo("CardStatementPaid");
+        assertThat(event.getAggregateId()).isEqualTo("5001");
+    }
+
+    @Test
+    @DisplayName("paidAmount 를 숫자로 실으면 계약 위반이다 — 금액은 JSON string(N5)")
+    void numericPaidAmount_isStatementPaidViolation() {
+        var violations = EventContractValidator.validate("lemuel.card.statement.paid", """
+                {"statementId":10001,"cardAccountId":5001,
+                 "billingYearMonth":"2026-08","paidAmount":350000,
+                 "paymentId":"PAY-1","paidAt":"2026-09-01T09:00:00Z"}
+                """);
+        assertThat(violations).isNotEmpty();
+    }
+
+    @Test
+    @DisplayName("paymentId 가 없으면 statement.paid 계약 위반이다 — 멱등 자연키")
+    void statementPaidWithoutPaymentId_isViolation() {
+        var violations = EventContractValidator.validate("lemuel.card.statement.paid", """
+                {"statementId":10001,"cardAccountId":5001,
+                 "billingYearMonth":"2026-08","paidAmount":"350000.00",
+                 "paidAt":"2026-09-01T09:00:00Z"}
+                """);
+        assertThat(violations).isNotEmpty();
     }
 }

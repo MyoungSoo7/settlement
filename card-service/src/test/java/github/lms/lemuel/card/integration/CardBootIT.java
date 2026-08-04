@@ -91,14 +91,21 @@ class CardBootIT {
     }
 
     @Test
-    @DisplayName("Flyway 마이그레이션이 V2 → V3 → V4 → V5 → V6 → V7 순서로 적용된다")
+    @DisplayName("Flyway 가 V8 명세서·납부 테이블을 만든다")
+    void flywayCreatesStatementTables() {
+        assertThat(tableExists("card_statements")).isTrue();
+        assertThat(tableExists("statement_payments")).isTrue();
+    }
+
+    @Test
+    @DisplayName("Flyway 마이그레이션이 V2 → V3 → V4 → V5 → V6 → V7 → V8 → V9 순서로 적용된다")
     void flywayAppliesMigrationsInOrder() {
         List<String> versions = jdbc.queryForList("""
                 SELECT version FROM opslab.flyway_schema_history
                  WHERE version IS NOT NULL
                  ORDER BY installed_rank
                 """, String.class);
-        assertThat(versions).containsExactly("2", "3", "4", "5", "6", "7");
+        assertThat(versions).containsExactly("2", "3", "4", "5", "6", "7", "8", "9");
     }
 
     private boolean tableExists(String table) {
