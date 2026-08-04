@@ -2,18 +2,27 @@
 
 > 이커머스 주문·결제·정산·선정산/기업대출·투자·계정계 + 공개조회 위성(재무제표·경제지표·기업뉴스·시세·공공데이터)·운영관제·AI챗봇 MSA 플랫폼 (Spring Boot 4.0 / Java 25 / 헥사고날)
 
-**Last updated:** 2026-08-02
+**Last updated:** 2026-08-04
 
 ## 현재 상태
+
 - **활성 브랜치:** `develop` (`main` 은 보호 브랜치 — PR 필수·squash 만·필수 CI 2종)
 - **구성:** **14 마이크로서비스** + API Gateway + `shared-common` 공유 라이브러리(버전드 1.0.0)
   - 거래/금융: order(8088) · settlement(8082) · loan(8084) · investment(8100) · account(8102) · card(8106, 법인카드)
   - 공개조회 위성: financial(8086) · economics(8087) · company(8090) · market(8094) · commondata(8098)
   - 부가: operation(8092) · ai(8096) · organization(8104, 셀러/기업 조직·멤버십)
 - **DB:** 14 서비스 모두 물리 분리(DB-per-service) — opslab / settlement_db / lemuel_{loan,financial,economics,company,operation,market,ai,commondata,investment,account,organization,card}
-- **최근 커밋:** `d8ff56e31` merge: origin/develop → develop — card 이중 편집 정리(PR 정제본 채택)
+- **최근 커밋:** `0c470e95` test(card): Phase2 AC4 ExpenseWorkflowIT·지출관리 비결합·승인지연 테스트 추가
 
 ## 최근 진척 (2026-06-24 이후)
+
+- **card-service Phase 2 AC1~AC4 완료 (2026-08-04, feat/card-service-phase2-gowid)** — 고위드형 법인카드 플랫폼 2단계 완성.
+  ① **AC1 실시간 승인 + 가맹점/MCC 정책**: `AuthorizationHold`(ACTIVE/CAPTURED/PARTIALLY_CAPTURED/VOIDED/EXPIRED 생명주기) + `DeclineReason` 4종 도메인 타입, 가용한도 불변식(master−Σ홀드−Σ매입) 비관적 락 적용, `MerchantPolicy`(허용/차단 MCC·1회·일·월 한도·해외/온라인 토글), Outbox 발행(`lemuel.card.authorized`), 동시 승인 경합 테스트(`ConcurrentAuthorizationIT`). V6 마이그레이션.
+  ② **AC2 매입·부분매입·취소·환불·홀드 만료**: `CardCapture`, `CaptureService`(홀드 소진/부분 소진), `VoidService`(홀드 취소·한도 원복), `RefundService`(매입 후 환불·한도 원복), 미매입 홀드 만료 배치(`HoldExpiryScheduler`, ShedLock), Outbox 발행(`lemuel.card.captured`). V7 마이그레이션.
+  ③ **AC3 명세서·청구·상환·연체**: `CardStatement`(OPEN→CLOSED→{PARTIALLY_PAID,PAID,DELINQUENT}→PAID) + 청구주기 마감 배치(`CloseStatementScheduler`), 상환 REST(`POST /internal/api/v1/statements/{id}/payments`, `paymentId` L3 멱등), 전액 납부→PAID + `lemuel.card.statement.paid` Outbox 발행, 연체 배치(`DelinquencyBatchScheduler`) + `DELINQUENT` 승인 거절(`CARD_SUSPENDED`), 전액 납부 시 ACTIVE 자동 복구. 자기 호출 anti-pattern 방지용 `DelinquentStatementProcessor`(REQUIRES_NEW) 별도 빈. V8 마이그레이션.
+  ④ **AC4 지출관리 SaaS**: `ExpenseReport`(DRAFT→SUBMITTED→{APPROVED,REJECTED}) + 부서 예산 소진율(`DepartmentBudget`), `CardCapturedExpenseConsumer`(Kafka 소비 → 경비보고서 자동 생성, captureId L3 멱등), 지출 워크플로 REST(`POST submit/approve/reject`), 승인 경로 완전 비결합(`AuthorizationLatencyTest` p99≤300ms, `ExpenseWorkflowDecouplingTest` ArchUnit). V9 마이그레이션.
+  게이트: `:card-service:test` 전건 fail 0 + JaCoCo LINE ≥ 90% GREEN. 이벤트 계약 스키마 1종 추가(`lemuel.card.statement.paid`, ADR 0022 하위호환 신규 토픽).
+
 - **card-service Task 3 잔여·6·7 완료 (2026-08-02)** — ① organization 멤버 이벤트 2종 잔여 배선 마감(`ca5217f5a`:
   토픽 레지스트리·SPEC·STATUS — 발행 라우팅은 KafkaOutboxPublisher 컨벤션이라 코드 동작 무관). ② Task 7 이벤트 소비
   프로젝션(`a2c802cf2`+`dab20ebc8`): V4 마이그레이션(카드 코어+프로젝션 3테이블) + 컨슈머 5종(organization 4종·company
@@ -76,6 +85,7 @@
 - **operation-service Phase 3 베이스라인 이상탐지** — 신규 `anomaly` BC: `ops_metric_bucket` 실패율 카운터 5종을 5분마다 롤링윈도우 z-score(최소표본·상대임계·정상복귀 게이트)로 판정 → `source=ANOMALY` 인시던트 자동 생성/refire/자동해제. 마이그레이션 0(기존 인시던트 라이프사이클 재사용), 테스트 16건+합성 백테스트, 로컬 실기동 검증 완료 (docs/design/operation-service-phase1.md §Phase 3).
 
 ## 진행 중
+
 - P0 시드 3(이벤트 격리) — 병행 세션이 develop 위에 재구현 진행 중(`ConsumedEventQuarantine` 옵트인 훅). 시드 클레임 정본: `.symposium/scratch/seed-claims.md`
 - account GL 통제계정 **음수 방지 전역화** — ADR 0030(Proposed, 결정 대기).
   **Phase 1(잔액 실체화, `2acff1417`)·Phase 3(대사, `59a7c5227`) 완료 — 남은 것은 결정 + Phase 2(라우팅 전역화)뿐.**
@@ -87,10 +97,12 @@
 ## 다음 할 일
 
 **다음 세션 추천 착수(사용자 결정 불필요·범위 명확 순):**
+
 - [ ] operation-service **Phase 4 AI 브리핑** (Phase 3 베이스라인 이상탐지까지 완료, 로드맵 docs/design/operation-service-phase1.md)
 - [ ] 커버리지 게이트 90% 후속 — 신규 서비스 통합테스트 보강
 
 **사용자(회계 오너) 결정이 선행인 것:**
+
 - [ ] **ADR 0030 결정 확정** → Phase 2(라우팅 전역화) 착수. Phase 1(실체화)·Phase 3(대사)는 완료(2026-07-30) —
       남은 결정: 음수=재분류 vs 금지 / 잔액 정본 / **HOLDBACK_PAYABLE 초과분 재분류 계정**(Phase 2 블로커)
 - [ ] account GL 통제계정 음수 방지 **전역 불변식** (ADR 0030 §결함 1, Phase 2 본체) — `withholding_accrued`·`settlement_canceled`·
@@ -98,6 +110,7 @@
 - [ ] ADR 0026 열린 질문 ④ — 수동 payout(`settlementId=null`) 정책 확정 (MEDIUM, 현재는 `normalBalanceRespected` 가 사후 방어)
 
 **외부 조건 대기:**
+
 - [ ] payout **실 은행/PG 이체 어댑터** — `FirmBankingPort` 실 HTTP 구현(+Resilience4j 서킷브레이커).
       실 은행 API 계약 미확보라 현재는 `MockFirmBankingAdapter` 가 유일 구현(사변적 스캐폴드 지양, 계약 확보 시 착수)
 - [ ] commondata 실수집 검증 (`DATA_GO_KR_API_KEY` 확보 시) — 확보되면 loan 주택담보 실거래가 평가도
@@ -109,6 +122,7 @@
 **완료(2026-08-02 마감분):** 셀러 셀프서비스 지급 계좌 API(+gateway 라우팅 갭·ADR 0026 N5 표기 정정) — 상세는 `## 최근 진척`
 
 ## 주요 위험/메모
+
 - `DATA_GO_KR_API_KEY` 미보유로 common-data-service 실수집 경로 미검증(소스 등록→조회 전과정은 검증됨)
 - 로컬 `bootRun` 은 cwd=모듈 디렉토리라 루트 `.env` 미로딩 → `--args="--JWT_SECRET=... --POSTGRES_*=..."` 주입 필요
 - 외부 `main` 머지가 `develop` 으로 유입 → push 전 `git pull --rebase` 습관화
@@ -117,17 +131,21 @@
 - 운영 배포 필수 주입: 강한 `JWT_SECRET`, `app.security.internal-key-required=true`, 각 서비스 외부 API 키
 
 ## 핵심 수치 (2026-08-02 기준 · git-tracked 소스)
+
 > ⚠️ 수치는 `build/`·`.claude/worktrees/` 사본을 **제외한 git ls-files 기준**. 각 줄 끝 명령이 정답 —
 > 드리프트 의심 시 명령을 돌려 재검증하고 이 수치를 갱신할 것(휘발성 수치를 명령 없이 손으로 적지 말 것).
+
 - 서비스 **14개** + API Gateway + Kotlin polyglot 2(notification·reconciliation) — `git ls-files '*/src/main/resources/application.yml' | wc -l` → 17(=14+gateway+kotlin 2)
-- Flyway 마이그레이션 **240개** — `git ls-files '*/src/main/resources/db/migration/*.sql' | wc -l` → 240
+- Flyway 마이그레이션 **244개** — `git ls-files '*/src/main/resources/db/migration/*.sql' | wc -l` → 244
 - ADR **29개** (0001~0030, 0019 결번 — 세무 ADR 은 0027 충돌로 0029 재부여) — `git ls-files 'docs/adr/[0-9]*.md' | wc -l` → 29
-- 테스트 클래스 **758개** (Testcontainers 통합테스트 포함) — `git ls-files '*/src/test/*Test.java' '*/src/test/*Tests.java' '*/src/test/*IT.java' | wc -l` → 758
-- 이벤트 계약 스키마 **34토픽** (ADR 0024, 프로듀서·컨슈머 양방향 테스트 — 담보대출 2종·organization 멤버 2종·카드 7종(2단계 선확정 2종 포함)) — `git ls-files 'shared-common/src/testFixtures/resources/contracts/events/*.schema.json' | wc -l` → 34
+- 테스트 클래스 **773개** (Testcontainers 통합테스트 포함) — `git ls-files '*/src/test/*Test.java' '*/src/test/*Tests.java' '*/src/test/*IT.java' | wc -l` → 773
+- 이벤트 계약 스키마 **35토픽** (ADR 0024, 프로듀서·컨슈머 양방향 테스트 — 담보대출 2종·organization 멤버 2종·카드 8종(2단계 authorized·captured·statement.paid 포함)) — `git ls-files 'shared-common/src/testFixtures/resources/contracts/events/*.schema.json' | wc -l` → 35
 
 ## 최근 전체 검증 (2026-07-29)
+
 > ⚠️ 테스트 건수를 인용할 때는 **그 빌드에서 실제로 실행된 태스크만** 센다. `test` 가 UP-TO-DATE 면
 > `build/test-results/` 의 XML 은 과거 실행분이라, 통째로 합산하면 낡은 수치가 섞인 가짜 GREEN 이 된다.
+
 - `./gradlew build` **전체 통과**(15m01s, Docker UP) — 이번 실행에서 `test` 가 **실제 실행된 10개 모듈**
   합계 **3,534건**, failure 0 · error 0. skip 1건은 소스에 `@Disabled` 로 명시된
   `SettlementControllerTest > GET /settlements/{id}/pdf`(Boot 4 WebMvcTest binary response 이슈)이며,
@@ -147,6 +165,7 @@
   `guard.mjs --staged` clean.
 
 ## 참고 문서
+
 - `SPEC.md` — 전체 기능명세(엔드포인트·도메인 규칙·이벤트 카탈로그)
 - `CLAUDE.md` — 에이전트 운용 가이드 / 아키텍처 경계·컨벤션
 - `README.md` — 프로젝트 개요 · `STRUCTURE.md` — 모듈·디렉토리 구조 정본 · `PORTFOLIO.md` — 면접용 1장 요약 · `HARNESS.md` — 개발 하네스 구성

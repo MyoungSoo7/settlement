@@ -3,9 +3,12 @@ package github.lms.lemuel.card.adapter.out.event;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import github.lms.lemuel.card.application.port.out.PublishCardEventPort;
+import github.lms.lemuel.card.domain.AuthorizationHold;
 import github.lms.lemuel.card.domain.Card;
 import github.lms.lemuel.card.domain.CardAccount;
 import github.lms.lemuel.card.domain.CardAccountStatus;
+import github.lms.lemuel.card.domain.CardCapture;
+import github.lms.lemuel.card.domain.CardStatement;
 import github.lms.lemuel.card.domain.CardStatus;
 import github.lms.lemuel.card.domain.LimitChangeResult;
 import github.lms.lemuel.common.outbox.application.port.out.SaveOutboxEventPort;
@@ -174,6 +177,113 @@ public class CardEventPublisherAdapter implements PublishCardEventPort {
                 AGGREGATE_TYPE,
                 String.valueOf(account.getId()),
                 "CardAccountStatusChanged",
+                toJson(payload)));
+    }
+
+    /**
+     * 카드 승인 — 토픽 {@code lemuel.card.authorized}.
+     *
+     * <p>파티션 키: {@code cardAccountId}(1단계 카드 이벤트와 동일) — 같은 계정의
+     * 발급·한도변경·승인이 같은 파티션에 순서대로 떨어져야 소비자가 상태를 일관되게 본다.
+     *
+     * <p>금액은 반드시 {@link java.math.BigDecimal#toPlainString()} 으로 직렬화한다
+     * (DATA-STANDARD N5, 계약 {@code lemuel.card.authorized.schema.json} 강제).
+     * 숫자로 실으면 소비자 언어에 따라 double 로 파싱돼 원 단위가 소리 없이 어긋난다 —
+     * 이 이벤트는 GL 분개까지 흘러가므로 그 오차가 곧 장부 오차다.
+     *
+     * <p>{@code remainingSubLimit} 은 optional 이지만 승인 경로에서 계산 가능하므로 실는다 —
+     * 소비자가 자체 재계산 없이 한도 현황을 즉시 알 수 있다.
+     */
+    @Override
+    public void publishAuthorized(AuthorizationHold hold, Card card, CardAccount account) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("authorizationId", hold.getAuthorizationId());
+        payload.put("cardId", hold.getCardId());
+        payload.put("cardAccountId", hold.getCardAccountId());
+        payload.put("holderUserId", hold.getHolderUserId());
+        payload.put("amount", hold.getAmount().toPlainString());
+        // 잔여 서브한도 = 서브한도 - 이 승인 금액(이미 저장된 홀드가 가용한도에서 차감됨)
+        // 정확한 잔여 서브한도는 다른 ACTIVE 홀드를 모두 합산해야 하지만, 승인 직후라
+        // card.getSubLimit() - hold.getAmount() 가 "이 승인만 반영된" 근사값이다.
+        // 소비자가 검증용으로 쓸 수 있도록 optional 필드로 싣는다(계약상 optional 임).
+        BigDecimal remaining = card.getSubLimit().subtract(hold.getAmount());
+        if (remaining.signum() >= 0) {
+            payload.put("remainingSubLimit", remaining.toPlainString());
+        }
+        if (hold.getMerchantName() != null) {
+            payload.put("merchantName", hold.getMerchantName());
+        }
+        payload.put("authorizedAt", hold.getAuthorizedAt().toString());
+
+        saveOutboxEventPort.save(OutboxEvent.pending(
+                AGGREGATE_TYPE,
+                String.valueOf(hold.getCardAccountId()),   // 파티션 키 = cardAccountId
+                "CardAuthorized",                          // → 토픽 lemuel.card.authorized
+                toJson(payload)));
+    }
+
+    /**
+     * 카드 매입(capture) — 토픽 {@code lemuel.card.captured}.
+     *
+     * <p>계약 스키마({@code lemuel.card.captured.schema.json}) required 필드:
+     * captureId · authorizationId · cardId · cardAccountId · amount · capturedAt.
+     *
+     * <p>파티션 키: {@code cardAccountId} — 1단계 카드 이벤트·2단계 승인 이벤트와 동일.
+     * 같은 계정의 발급·승인·매입이 같은 파티션에 순서대로 떨어져야 소비자가 일관된 순서를 본다.
+     *
+     * <p>금액({@code amount})은 반드시 {@link java.math.BigDecimal#toPlainString()} 으로
+     * 직렬화한다(DATA-STANDARD N5, 계약 강제) — 부동소수 파싱 오차가 GL 분개 오차가 된다.
+     */
+    @Override
+    public void publishCaptured(CardCapture capture, AuthorizationHold hold) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("captureId", capture.getCaptureId());
+        payload.put("authorizationId", capture.getAuthorizationId());
+        payload.put("cardId", capture.getCardId());
+        payload.put("cardAccountId", capture.getCardAccountId());
+        payload.put("holderUserId", capture.getHolderUserId());
+        // amount = 이번 매입 금액(부분 매입에서 승인 금액과 다를 수 있다) — DATA-STANDARD N5
+        payload.put("amount", capture.getCapturedAmount().toPlainString());
+        if (capture.getMerchantName() != null) {
+            payload.put("merchantName", capture.getMerchantName());
+        }
+        payload.put("capturedAt", capture.getCapturedAt().toString());
+
+        saveOutboxEventPort.save(OutboxEvent.pending(
+                AGGREGATE_TYPE,
+                String.valueOf(capture.getCardAccountId()),   // 파티션 키 = cardAccountId
+                "CardCaptured",                               // → 토픽 lemuel.card.captured
+                toJson(payload)));
+    }
+
+    /**
+     * 청구서 전액 납부 — 토픽 {@code lemuel.card.statement.paid}.
+     *
+     * <p>계약 스키마({@code lemuel.card.statement.paid.schema.json}) required 필드:
+     * statementId · cardAccountId · billingYearMonth · paidAmount · paymentId · paidAt.
+     *
+     * <p>파티션 키: {@code cardAccountId} — 1단계 카드 이벤트·2단계 승인·매입과 동일.
+     * 같은 계정의 발급·승인·매입·청구 이벤트가 같은 파티션에 순서대로 떨어져야 소비자(GL 분개)가
+     * 일관된 순서를 본다.
+     *
+     * <p>금액({@code paidAmount})은 반드시 {@code toPlainString()} 으로 직렬화한다(DATA-STANDARD N5).
+     */
+    @Override
+    public void publishStatementPaid(CardStatement statement, String paymentId) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("statementId", statement.getId());
+        payload.put("cardAccountId", statement.getCardAccountId());
+        payload.put("billingYearMonth", statement.getBillingYearMonth().toString());
+        // paidAmount = 전체 납부 금액(누적) — DATA-STANDARD N5
+        payload.put("paidAmount", statement.getPaidAmount().toPlainString());
+        payload.put("totalAmount", statement.getTotalAmount().toPlainString());
+        payload.put("paymentId", paymentId);
+        payload.put("paidAt", java.time.Instant.now().toString());
+
+        saveOutboxEventPort.save(OutboxEvent.pending(
+                AGGREGATE_TYPE,
+                String.valueOf(statement.getCardAccountId()),  // 파티션 키 = cardAccountId
+                "CardStatementPaid",                           // → 토픽 lemuel.card.statement.paid
                 toJson(payload)));
     }
 
