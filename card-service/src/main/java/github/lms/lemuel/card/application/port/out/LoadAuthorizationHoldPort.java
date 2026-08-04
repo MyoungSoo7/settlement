@@ -3,8 +3,10 @@ package github.lms.lemuel.card.application.port.out;
 import github.lms.lemuel.card.domain.AuthorizationHold;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -21,6 +23,12 @@ public interface LoadAuthorizationHoldPort {
      * 재전송·리플레이 감지 및 중복 승인 방어에 쓴다.
      */
     Optional<AuthorizationHold> findByAuthorizationId(String authorizationId);
+
+    /**
+     * 비관적 락({@code PESSIMISTIC_WRITE})으로 홀드 조회.
+     * 매입·취소·환불 시 동시 상태 변경 경합을 방어한다.
+     */
+    Optional<AuthorizationHold> findByAuthorizationIdForUpdate(String authorizationId);
 
     /**
      * 카드계정의 ACTIVE 홀드 합계 — master 가용한도 계산용.
@@ -44,4 +52,12 @@ public interface LoadAuthorizationHoldPort {
      * 가맹점 정책의 월 한도 평가에 쓴다.
      */
     BigDecimal sumHoldsByCardAndMonth(Long cardId, YearMonth month);
+
+    /**
+     * 특정 시각 이전에 생성된 ACTIVE 홀드 목록 — 미매입 만료 배치 전용.
+     *
+     * @param before 이 시각보다 이전에 {@code authorized_at} 된 ACTIVE 홀드
+     * @return 만료 대상 홀드 목록
+     */
+    List<AuthorizationHold> findAllActiveAuthorizedBefore(Instant before);
 }

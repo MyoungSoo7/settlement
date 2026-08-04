@@ -72,6 +72,44 @@ public class AuthorizationHold {
     }
 
     /**
+     * 매입(전액 또는 부분) — capturedAmount == amount 이면 CAPTURED, 미만이면 PARTIALLY_CAPTURED.
+     *
+     * <p>ACTIVE 또는 PARTIALLY_CAPTURED 상태에서만 가능하다. 호출자는 {@code capturedAmount} 가
+     * 양수이고 {@code amount} 를 초과하지 않음을 보장해야 한다.
+     *
+     * @param capturedAmount 이번 매입 금액(양수, ≤ amount)
+     * @return true if full capture (CAPTURED), false if partial (PARTIALLY_CAPTURED)
+     */
+    public boolean capture(BigDecimal capturedAmount) {
+        if (status != HoldStatus.ACTIVE && status != HoldStatus.PARTIALLY_CAPTURED) {
+            throw new IllegalStateException(
+                    "ACTIVE 또는 PARTIALLY_CAPTURED 홀드만 매입할 수 있습니다. 현재=" + status);
+        }
+        if (capturedAmount == null || capturedAmount.signum() <= 0) {
+            throw new IllegalArgumentException("매입 금액은 양수여야 합니다: " + capturedAmount);
+        }
+        if (capturedAmount.compareTo(this.amount) > 0) {
+            throw new IllegalArgumentException(
+                    "매입 금액이 승인 금액을 초과합니다: " + capturedAmount + " > " + this.amount);
+        }
+        boolean full = capturedAmount.compareTo(this.amount) >= 0;
+        this.status = full ? HoldStatus.CAPTURED : HoldStatus.PARTIALLY_CAPTURED;
+        return full;
+    }
+
+    /**
+     * 환불 — 매입 후 한도 원복.
+     * CAPTURED 또는 PARTIALLY_CAPTURED 상태에서만 가능하다.
+     */
+    public void refund() {
+        if (status != HoldStatus.CAPTURED && status != HoldStatus.PARTIALLY_CAPTURED) {
+            throw new IllegalStateException(
+                    "CAPTURED 또는 PARTIALLY_CAPTURED 홀드만 환불할 수 있습니다. 현재=" + status);
+        }
+        this.status = HoldStatus.REFUNDED;
+    }
+
+    /**
      * 홀드 전액 취소 — 가용한도 복구.
      * ACTIVE 또는 PARTIALLY_CAPTURED 상태에서만 가능하다.
      */
