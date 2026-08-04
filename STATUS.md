@@ -2,7 +2,7 @@
 
 > 이커머스 주문·결제·정산·선정산/기업대출·투자·계정계 + 공개조회 위성(재무제표·경제지표·기업뉴스·시세·공공데이터)·운영관제·AI챗봇 MSA 플랫폼 (Spring Boot 4.0 / Java 25 / 헥사고날)
 
-**Last updated:** 2026-08-02
+**Last updated:** 2026-08-04
 
 ## 현재 상태
 
@@ -12,9 +12,16 @@
   - 공개조회 위성: financial(8086) · economics(8087) · company(8090) · market(8094) · commondata(8098)
   - 부가: operation(8092) · ai(8096) · organization(8104, 셀러/기업 조직·멤버십)
 - **DB:** 14 서비스 모두 물리 분리(DB-per-service) — opslab / settlement_db / lemuel_{loan,financial,economics,company,operation,market,ai,commondata,investment,account,organization,card}
-- **최근 커밋:** `d8ff56e31` merge: origin/develop → develop — card 이중 편집 정리(PR 정제본 채택)
+- **최근 커밋:** `0c470e95` test(card): Phase2 AC4 ExpenseWorkflowIT·지출관리 비결합·승인지연 테스트 추가
 
 ## 최근 진척 (2026-06-24 이후)
+
+- **card-service Phase 2 AC1~AC4 완료 (2026-08-04, feat/card-service-phase2-gowid)** — 고위드형 법인카드 플랫폼 2단계 완성.
+  ① **AC1 실시간 승인 + 가맹점/MCC 정책**: `AuthorizationHold`(ACTIVE/CAPTURED/PARTIALLY_CAPTURED/VOIDED/EXPIRED 생명주기) + `DeclineReason` 4종 도메인 타입, 가용한도 불변식(master−Σ홀드−Σ매입) 비관적 락 적용, `MerchantPolicy`(허용/차단 MCC·1회·일·월 한도·해외/온라인 토글), Outbox 발행(`lemuel.card.authorized`), 동시 승인 경합 테스트(`ConcurrentAuthorizationIT`). V6 마이그레이션.
+  ② **AC2 매입·부분매입·취소·환불·홀드 만료**: `CardCapture`, `CaptureService`(홀드 소진/부분 소진), `VoidService`(홀드 취소·한도 원복), `RefundService`(매입 후 환불·한도 원복), 미매입 홀드 만료 배치(`HoldExpiryScheduler`, ShedLock), Outbox 발행(`lemuel.card.captured`). V7 마이그레이션.
+  ③ **AC3 명세서·청구·상환·연체**: `CardStatement`(OPEN→CLOSED→{PARTIALLY_PAID,PAID,DELINQUENT}→PAID) + 청구주기 마감 배치(`CloseStatementScheduler`), 상환 REST(`POST /internal/api/v1/statements/{id}/payments`, `paymentId` L3 멱등), 전액 납부→PAID + `lemuel.card.statement.paid` Outbox 발행, 연체 배치(`DelinquencyBatchScheduler`) + `DELINQUENT` 승인 거절(`CARD_SUSPENDED`), 전액 납부 시 ACTIVE 자동 복구. 자기 호출 anti-pattern 방지용 `DelinquentStatementProcessor`(REQUIRES_NEW) 별도 빈. V8 마이그레이션.
+  ④ **AC4 지출관리 SaaS**: `ExpenseReport`(DRAFT→SUBMITTED→{APPROVED,REJECTED}) + 부서 예산 소진율(`DepartmentBudget`), `CardCapturedExpenseConsumer`(Kafka 소비 → 경비보고서 자동 생성, captureId L3 멱등), 지출 워크플로 REST(`POST submit/approve/reject`), 승인 경로 완전 비결합(`AuthorizationLatencyTest` p99≤300ms, `ExpenseWorkflowDecouplingTest` ArchUnit). V9 마이그레이션.
+  게이트: `:card-service:test` 전건 fail 0 + JaCoCo LINE ≥ 90% GREEN. 이벤트 계약 스키마 1종 추가(`lemuel.card.statement.paid`, ADR 0022 하위호환 신규 토픽).
 
 - **card-service Task 3 잔여·6·7 완료 (2026-08-02)** — ① organization 멤버 이벤트 2종 잔여 배선 마감(`ca5217f5a`:
   토픽 레지스트리·SPEC·STATUS — 발행 라우팅은 KafkaOutboxPublisher 컨벤션이라 코드 동작 무관). ② Task 7 이벤트 소비
@@ -132,7 +139,7 @@
 - Flyway 마이그레이션 **242개** — `git ls-files '*/src/main/resources/db/migration/*.sql' | wc -l` → 242
 - ADR **29개** (0001~0030, 0019 결번 — 세무 ADR 은 0027 충돌로 0029 재부여) — `git ls-files 'docs/adr/[0-9]*.md' | wc -l` → 29
 - 테스트 클래스 **767개** (Testcontainers 통합테스트 포함) — `git ls-files '*/src/test/*Test.java' '*/src/test/*Tests.java' '*/src/test/*IT.java' | wc -l` → 767
-- 이벤트 계약 스키마 **34토픽** (ADR 0024, 프로듀서·컨슈머 양방향 테스트 — 담보대출 2종·organization 멤버 2종·카드 7종(2단계 선확정 2종 포함)) — `git ls-files 'shared-common/src/testFixtures/resources/contracts/events/*.schema.json' | wc -l` → 34
+- 이벤트 계약 스키마 **35토픽** (ADR 0024, 프로듀서·컨슈머 양방향 테스트 — 담보대출 2종·organization 멤버 2종·카드 8종(2단계 authorized·captured·statement.paid 포함)) — `git ls-files 'shared-common/src/testFixtures/resources/contracts/events/*.schema.json' | wc -l` → 35
 
 ## 최근 전체 검증 (2026-07-29)
 

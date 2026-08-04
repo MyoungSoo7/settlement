@@ -1,12 +1,100 @@
 ---
 name: card-service-rules
-description: 법인카드 도메인 핵심 규칙 — 재원 F 공식과 account-service 조회, master_limit >= Σ sub_limit 불변식과 비관적 락, 하향 클램프, 재원 조회 폴백 금지, sumActiveSubLimits 가 SUSPENDED 를 포함하는 이유. card-service 로직을 작성·수정·리뷰할 때 로드.
+description: 법인카드 도메인 핵심 규칙 — 재원 F 공식과 account-service 조회, master_limit >= Σ sub_limit 불변식과 비관적 락, 하향 클램프, 재원 조회 폴백 금지, sumActiveSubLimits 가 SUSPENDED 를 포함하는 이유, Phase 2(승인/매입/명세서/지출관리) 도메인 규칙. card-service 로직을 작성·수정·리뷰할 때 로드.
 ---
 
 # 법인카드 도메인 규칙 (card-service)
 
 셀러 조직에 **마스터 한도**를 주고, 그 안에서 임직원별 **서브한도** 카드를 발급한다.
-1단계는 발급·한도·상태까지다 — 승인·매입(2단계)과 청구·상계(3단계)는 아직 없다.
+**1단계**(발급·한도·상태·프로젝션)는 완료. **2단계**(실시간 승인·매입·명세서·지출관리)도 완료(2026-08-04).
+
+## Phase 2 도메인 규칙 — 승인(Authorization)
+
+### 가용한도 불변식
+
+```
+가용한도 = masterLimit − sumActiveHoldsByAccount − sumCapturesByAccount
+```
+
+- `AuthorizeCardService` 는 **반드시** `findByIdForUpdate` 비관적 락 후 한도를 검증한다.
+- 동시 승인 경합은 `ConcurrentAuthorizationIT` 로 실증됨.
+- `authorizationId` 는 VAN 멱등키 — `findByAuthorizationId` 로 선조회, 존재하면 기존 홀드 반환(멱등).
+
+### DeclineReason enum 확정값 (4개 — 추가 금지)
+
+| 값                          | 의미                                          |
+| --------------------------- | --------------------------------------------- |
+| `LIMIT_EXCEEDED`            | 카드/계정 한도 초과                           |
+| `CARD_SUSPENDED`            | 카드 또는 계정 정지/연체 상태                 |
+| `MEMBER_INACTIVE`           | 조직에서 비활성화된 임직원                    |
+| `MERCHANT_POLICY_VIOLATION` | MCC 차단·1회/일/월 한도·해외/온라인 정책 위반 |
+
+- **DELINQUENT 계정 승인 거절 코드는 `CARD_SUSPENDED`** — 별도 `DELINQUENT` 코드 추가 금지.
+- DeclineReason 을 추가하면 ADR 0022 파괴적 변경이다(스키마 enum 변경).
+
+### HoldStatus 생명주기
+
+```
+ACTIVE → CAPTURED (전액 매입)
+ACTIVE → PARTIALLY_CAPTURED (부분 매입, 잔여 홀드 계속 ACTIVE)
+ACTIVE → VOIDED (취소)
+ACTIVE → EXPIRED (만료 배치 — HoldExpiryScheduler)
+```
+
+- EXPIRED 배치는 ShedLock(`lockAtMostFor=PT1H`), 일 1회.
+
+## Phase 2 도메인 규칙 — 매입(Capture)·취소·환불
+
+- **매입(Capture)**: 홀드 소진 + `CardCapture` 생성. 부분 매입은 홀드 `PARTIALLY_CAPTURED` + 잔여 홀드 감소.
+- **취소(Void)**: 홀드 `VOIDED` + masterLimit 원복(Outbox `CardVoided`).
+- **환불(Refund)**: 매입 후 환불 — `CardCapture` 상태 `REFUNDED` + masterLimit 원복. `refundId` L3 멱등.
+- 금액은 전부 `BigDecimal`, Outbox 이벤트에선 `toPlainString()`(DATA-STANDARD N5).
+
+## Phase 2 도메인 규칙 — 명세서·청구(Statement/Billing)
+
+### StatementStatus 생명주기
+
+```
+OPEN → CLOSED (마감 배치 — CloseStatementScheduler)
+CLOSED → PARTIALLY_PAID (일부 납부)
+CLOSED / PARTIALLY_PAID → PAID (전액 납부)
+CLOSED / PARTIALLY_PAID → DELINQUENT (연체 배치 — DelinquencyBatchScheduler)
+DELINQUENT → PAID (전액 납부 후 ACTIVE 복구)
+```
+
+### 상환(Payment) 멱등
+
+- `paymentId` = L3 멱등키 (`statement_payments.payment_id UNIQUE`).
+- 전액 납부(`paidAmount >= totalAmount`) → `StatementStatus.PAID` + `lemuel.card.statement.paid` Outbox 발행.
+- 계정 복구: DELINQUENT 명세서의 전액 납부 시 `CardAccount.recoverFromDelinquency()` → ACTIVE.
+
+### 연체(Delinquency) 배치
+
+- **명세서 1건 = 트랜잭션 1건** (`DelinquentStatementProcessor`, `REQUIRES_NEW` — self-invocation 안티패턴 참조).
+- DELINQUENT 계정 승인: `DeclineReason.CARD_SUSPENDED` 반환.
+- 이미 DELINQUENT 인 계정에 중복 전이 시도 → 스킵(멱등).
+
+## Phase 2 도메인 규칙 — 지출관리 SaaS
+
+### ExpenseReportStatus 생명주기
+
+```
+DRAFT → SUBMITTED (임직원 제출)
+SUBMITTED → APPROVED (관리자 승인)
+SUBMITTED → REJECTED (관리자 반려)
+REJECTED → SUBMITTED (재제출 가능)
+```
+
+### 비결합 원칙 (핵심)
+
+- `AuthorizeCardService` 는 `ExpenseReport` 를 참조하지 않는다 — `AuthorizationLatencyTest` p99 ≤ 300ms + `ExpenseWorkflowDecouplingTest`(ArchUnit) 로 기계 강제.
+- 경비보고서 생성은 `CardCaptured` Kafka 이벤트를 `CardCapturedExpenseConsumer` 가 소비해 사후 처리.
+- `captureId` 는 L3 멱등키 (`expense_reports.capture_id UNIQUE`).
+
+### 부서 예산
+
+- `DepartmentBudget`: 부서별 월 예산 총액·소진액. 지출 승인 워크플로와 별도로 집계만 제공.
+- 예산 초과 시 승인 거절은 **범위 밖** — 이 시스템은 지출 후 증빙/카테고리 관리 SaaS다.
 
 ## 재원 F — 왜 account-service 에 물어보는가
 
@@ -79,14 +167,16 @@ CardAccount 와 Card 는 **다른 애그리거트**다. Postgres 는 CHECK 절�
 - 토픽은 `aggregateType + eventType` 에서 파생된다. **파티션 키(aggregateId)는 언제나 cardAccountId** —
   cardId 로 잡으면 같은 계정의 발급·한도변경이 다른 파티션으로 흩어져 소비자가 순서를 잃는다.
 
-| eventType                | 토픽                                              | 비고                                                       |
-| ------------------------ | ------------------------------------------------- | ---------------------------------------------------------- |
-| CardAccountOpened        | `lemuel.card.account_opened`                      |                                                            |
-| CardIssued               | `lemuel.card.issued`                              |                                                            |
-| CardLimitChanged         | `lemuel.card.limit_changed`                       | `scope` 가 MASTER/SUB 유일 구분자, MASTER 는 `cardId=null` |
-| CardStatusChanged        | `lemuel.card.status_changed`                      | 임직원 카드(개인 사건 — 이탈·분실)                         |
-| CardAccountStatusChanged | `lemuel.card.account_status_changed`              | 법인 계정(여신 사건 — 재산정 강등·수동 조치)               |
-| (2단계 예약)             | `lemuel.card.authorized` · `lemuel.card.captured` | 발행 코드 없음, 계약만 선확정                              |
+| eventType                | 토픽                                 | 비고                                                       |
+| ------------------------ | ------------------------------------ | ---------------------------------------------------------- |
+| CardAccountOpened        | `lemuel.card.account_opened`         |                                                            |
+| CardIssued               | `lemuel.card.issued`                 |                                                            |
+| CardLimitChanged         | `lemuel.card.limit_changed`          | `scope` 가 MASTER/SUB 유일 구분자, MASTER 는 `cardId=null` |
+| CardStatusChanged        | `lemuel.card.status_changed`         | 임직원 카드(개인 사건 — 이탈·분실)                         |
+| CardAccountStatusChanged | `lemuel.card.account_status_changed` | 법인 계정(여신 사건 — 재산정 강등·수동 조치)               |
+| CardAuthorized           | `lemuel.card.authorized`             | 승인 홀드 생성 (Phase 2)                                   |
+| CardCaptured             | `lemuel.card.captured`               | 매입 확정 (Phase 2)                                        |
+| CardStatementPaid        | `lemuel.card.statement.paid`         | 명세서 전액 납부 완료 (Phase 2)                            |
 
 - 카드 상태와 계정 상태를 **한 토픽에 섞지 않는다**: 상태 enum 도 소비자도 다르고, 섞으면 cardId 가
   있는 페이로드와 없는 페이로드를 소비자가 런타임에 분기해야 한다.
@@ -115,3 +205,7 @@ CardAccount 와 Card 는 **다른 애그리거트**다. Postgres 는 CHECK 절�
 - 재산정 탈락을 한도 0 으로만 표현하고 계정 상태를 그대로 둠.
 - 계정 상태 변경을 `lemuel.card.status_changed` 로 발행 (토픽 혼선).
 - 이벤트 파티션 키를 cardId 로 사용.
+- **[Phase 2]** DeclineReason 에 DELINQUENT·PENDING_APPROVAL 등 추가 — ADR 0022 파괴적 변경 (스키마 enum 변경 → 소비자 파싱 실패).
+- **[Phase 2]** 연체 배치를 단일 서비스 빈 self-invocation 으로 구현 — REQUIRES_NEW 트랜잭션이 적용 안 됨 (별도 `DelinquentStatementProcessor` 빈 필수).
+- **[Phase 2]** `AuthorizeCardService` 에서 `ExpenseReport`·`ExpenseWorkflowService` 를 직접 참조 — 승인 경로 오염 (ArchUnit + AuthorizationLatencyTest 로 기계 강제).
+- **[Phase 2]** 납부 금액을 `int`/`long` 으로 다루거나 JSON 에서 number 로 직렬화 — DATA-STANDARD N5 위반 (BigDecimal·toPlainString 강제).
