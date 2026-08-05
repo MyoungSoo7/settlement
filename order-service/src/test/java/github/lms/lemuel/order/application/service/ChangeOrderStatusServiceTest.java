@@ -199,4 +199,61 @@ class ChangeOrderStatusServiceTest {
                 .isInstanceOf(InvalidOrderStateException.class);
         verify(saveOrderPort, never()).save(any());
     }
+
+    // ───────── 미입금 만료에 따른 주문 취소 (payment 컨텍스트가 호출) ─────────
+
+    @Test @DisplayName("미결제 주문 취소: CANCELED 전이 + 이력 + 재고 원복까지 수행하고 true")
+    void cancelUnpaidOrder_cancelsAndRestoresStock() {
+        OrderItem skuLine = OrderItem.newItem(100L, 500L, "SKU-1", "상품A", new BigDecimal("10000"), 2);
+        OrderItem plainLine = OrderItem.newItem(200L, null, null, "상품B", new BigDecimal("5000"), 3);
+        Order order = Order.createMultiItem(1L, List.of(skuLine, plainLine));
+        when(loadOrderPort.findById(1L)).thenReturn(Optional.of(order));
+        when(saveOrderPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        boolean cancelled = service.cancelUnpaidOrder(1L, "입금 기한 경과");
+
+        assertThat(cancelled).isTrue();
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELED);
+        // 주문 생성 시 차감한 재고를 되돌린다 — 만료의 존재 이유가 재고 회수다.
+        verify(increaseVariantStockUseCase).increase(500L, 2);
+        verify(increaseProductStockUseCase).increase(200L, 3);
+        verify(historyPort).save(eq(1L), eq(OrderStatus.CREATED.name()),
+                eq(OrderStatus.CANCELED.name()), eq("system"), eq("입금 기한 경과"));
+    }
+
+    @Test @DisplayName("미결제 주문 취소: 이미 결제된 주문은 손대지 않고 false")
+    void cancelUnpaidOrder_paidOrder_untouched() {
+        Order order = Order.create(1L, 1L, new BigDecimal("10000"));
+        order.transitionTo(OrderStatus.PAID);
+        when(loadOrderPort.findById(1L)).thenReturn(Optional.of(order));
+
+        boolean cancelled = service.cancelUnpaidOrder(1L, "입금 기한 경과");
+
+        assertThat(cancelled).isFalse();
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
+        verify(saveOrderPort, never()).save(any());
+        verifyNoInteractions(increaseProductStockUseCase, increaseVariantStockUseCase);
+    }
+
+    @Test @DisplayName("미결제 주문 취소: 이미 취소된 주문은 재고를 두 번 원복하지 않는다(멱등)")
+    void cancelUnpaidOrder_alreadyCanceled_idempotent() {
+        OrderItem line = OrderItem.newItem(100L, null, null, "상품A", new BigDecimal("10000"), 1);
+        Order order = Order.createMultiItem(1L, List.of(line));
+        order.transitionTo(OrderStatus.CANCELED);
+        when(loadOrderPort.findById(1L)).thenReturn(Optional.of(order));
+
+        boolean cancelled = service.cancelUnpaidOrder(1L, "입금 기한 경과");
+
+        assertThat(cancelled).isFalse();
+        verify(saveOrderPort, never()).save(any());
+        verifyNoInteractions(increaseProductStockUseCase, increaseVariantStockUseCase);
+    }
+
+    @Test @DisplayName("미결제 주문 취소: 주문이 없으면 타입 예외")
+    void cancelUnpaidOrder_missingOrder() {
+        when(loadOrderPort.findById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.cancelUnpaidOrder(99L, "입금 기한 경과"))
+                .isInstanceOf(OrderNotFoundException.class);
+    }
 }

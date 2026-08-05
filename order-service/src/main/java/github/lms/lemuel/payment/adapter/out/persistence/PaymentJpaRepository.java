@@ -35,6 +35,13 @@ public interface PaymentJpaRepository extends JpaRepository<PaymentJpaEntity, Lo
 
     List<PaymentJpaEntity> findByStatus(String status);
 
+    /**
+     * 입금 대기(READY)로 cutoff 이전에 생성된 결제 — 미입금 만료 배치의 구동 쿼리.
+     * 부분 인덱스 {@code idx_payments_pending_expiry (created_at) WHERE status='READY'} 가 커버한다.
+     */
+    @Query("SELECT p FROM PaymentJpaEntity p WHERE p.status = 'READY' AND p.createdAt < :cutoff ORDER BY p.createdAt ASC")
+    List<PaymentJpaEntity> findPendingCreatedBefore(@Param("cutoff") LocalDateTime cutoff, Pageable pageable);
+
     /** 상태별 건수 — settlement 프로젝션 cross-DB 대사(ADR 0020 Phase 5.2)의 원천 카운트. */
     long countByStatus(String status);
 

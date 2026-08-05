@@ -24,4 +24,15 @@ public interface ChangeOrderStatusUseCase {
      * 타 바운디드 컨텍스트(예: payment)에서 상태 변경을 요청할 때 사용.
      */
     Order updateStatus(Long orderId, String status);
+
+    /**
+     * 미결제 주문 취소 — 입금 기한이 지난 결제(payment 컨텍스트)가 요청한다.
+     *
+     * <p>결제 전(CREATED) 주문만 취소하고 주문 생성 시 차감한 재고를 원복한다. 이미 결제·취소·환불된
+     * 주문이면 <b>아무 것도 바꾸지 않고</b> {@code false} 를 돌려준다 — 잔류 결제 정리가 정상 주문을
+     * 건드리는 일은 없어야 한다.
+     *
+     * @return 실제로 취소했으면 true
+     */
+    boolean cancelUnpaidOrder(Long orderId, String reason);
 }

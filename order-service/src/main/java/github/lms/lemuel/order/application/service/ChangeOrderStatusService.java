@@ -195,6 +195,31 @@ public class ChangeOrderStatusService implements ChangeOrderStatusUseCase {
         return saved;
     }
 
+    /**
+     * 미결제 주문 취소 — 입금 기한이 지난 결제(payment 컨텍스트)의 요청.
+     *
+     * <p>{@code CREATED} 만 취소하고 재고를 원복한다. 그 외 상태(결제 완료·이미 취소·환불 등)는
+     * <b>예외 없이</b> false 로 알린다 — 잔류 결제 정리가 정상 주문을 건드리면 안 되고, 배치가 한 건 때문에
+     * 멈춰서도 안 되기 때문이다. 재취소 요청이 재고를 두 번 되돌리지 않는 멱등성도 이 가드가 보장한다.
+     */
+    @Override
+    @Transactional
+    public boolean cancelUnpaidOrder(Long orderId, String reason) {
+        Order order = loadOrderPort.findById(orderId)
+                .orElseThrow(() -> new OrderNotFoundException(orderId));
+
+        if (order.getStatus() != OrderStatus.CREATED) {
+            log.info("미결제 취소 대상 아님 — 손대지 않음: orderId={}, status={}", orderId, order.getStatus());
+            return false;
+        }
+
+        order.transitionTo(OrderStatus.CANCELED);
+        Order saved = saveOrderPort.save(order);
+        historyPort.save(orderId, OrderStatus.CREATED.name(), saved.getStatus().name(), "system", reason);
+        restoreStock(saved);
+        return true;
+    }
+
     private Order changeStatus(Long orderId, OrderStatus target, String changedBy, String reason) {
         Order order = loadOrderPort.findById(orderId)
                 .orElseThrow(() -> new OrderNotFoundException(orderId));
