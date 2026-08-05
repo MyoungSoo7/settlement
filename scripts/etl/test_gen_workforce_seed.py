@@ -1,0 +1,161 @@
+import csv
+import hashlib
+import importlib.util
+import tempfile
+import unittest
+from pathlib import Path
+
+
+MODULE_PATH = Path(__file__).with_name("gen-workforce-seed.py")
+SPEC = importlib.util.spec_from_file_location("gen_workforce_seed", MODULE_PATH)
+generator = importlib.util.module_from_spec(SPEC)
+assert SPEC.loader is not None
+SPEC.loader.exec_module(generator)
+
+
+HEADER = [
+    "자료생성년월", "사업장명", "사업자등록번호", "사업장가입상태코드 1 등록 2 탈퇴",
+    "가입자수", "사업장지번상세주소", "사업장도로명상세주소", "우편번호", "사업장전화번호",
+    "사업장팩스번호", "사업장전자우편주소", "사업장홈페이지", "사업장등록일", "사업장업종코드",
+    "사업장업종코드명", "사업장형태구분코드", "사업장형태구분코드명", "가입자수증감", "가입자수",
+    "당월고지금액", "신규취득자수", "상실가입자수",
+]
+
+
+def row(**overrides):
+    values = {
+        "자료생성년월": "2026-06",
+        "사업장명": "서울 소프트웨어",
+        "사업자등록번호": "123456",
+        "사업장가입상태코드 1 등록 2 탈퇴": "1",
+        "사업장지번상세주소": "서울특별시 성동구 연무장길 1",
+        "사업장도로명상세주소": "서울특별시 성동구 왕십리로 1",
+        "사업장업종코드": "722000",
+        "사업장업종코드명": "응용 소프트웨어 개발 및 공급업",
+        "가입자수": "10",
+        "당월고지금액": "950000",
+    }
+    values.update(overrides)
+    return [values.get(column, "") for column in HEADER]
+
+
+class WorkforceSeedGeneratorTest(unittest.TestCase):
+    def write_csv(self, directory, *rows):
+        path = Path(directory) / "fixture.csv"
+        with path.open("w", encoding="cp949", newline="") as handle:
+            writer = csv.writer(handle)
+            writer.writerow(HEADER)
+            writer.writerows(rows)
+        return path
+
+    def load(self, path):
+        return generator.load_source(path, "2026-06")
+
+    def test_accepts_seoul_road_address_software_row(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result = self.load(self.write_csv(directory, row()))
+
+        self.assertEqual(1, result.candidate_count)
+        self.assertEqual(1, result.accepted_count)
+        self.assertEqual("서울특별시 성동구 왕십리로 1", result.rows[0].address)
+        self.assertEqual("서울특별시", result.rows[0].sido)
+
+    def test_accepts_lot_address_when_road_address_is_blank(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result = self.load(self.write_csv(directory, row(
+                **{"사업장도로명상세주소": "", "사업장지번상세주소": "서울특별시 강남구 테헤란로 2",
+                   "사업장업종코드": "724000"}
+            )))
+
+        self.assertEqual(1, result.accepted_count)
+        self.assertEqual("서울특별시 강남구 테헤란로 2", result.rows[0].address)
+
+    def test_rejects_gyeonggi_row_outside_seoul_scope(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result = self.load(self.write_csv(directory, row(
+                **{"사업장도로명상세주소": "경기도 성남시 분당구 판교로 1",
+                   "사업장지번상세주소": "경기도 성남시 분당구 판교동 1"}
+            )))
+
+        self.assertEqual(0, result.candidate_count)
+        self.assertEqual(0, result.accepted_count)
+        self.assertEqual(0, result.rejected_count)
+
+    def test_rejects_computer_retail_even_when_in_seoul(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result = self.load(self.write_csv(directory, row(**{"사업장업종코드": "523532"})))
+
+        self.assertEqual(0, result.candidate_count)
+        self.assertEqual(0, result.accepted_count)
+
+    def test_rejects_withdrawn_status(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result = self.load(self.write_csv(directory, row(
+                **{"사업장가입상태코드 1 등록 2 탈퇴": "2"}
+            )))
+
+        self.assertEqual(0, result.candidate_count)
+        self.assertEqual(0, result.accepted_count)
+
+    def test_rejects_non_positive_billed_amount_and_counts_candidate_rejection(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result = self.load(self.write_csv(directory, row(**{"당월고지금액": "0"})))
+
+        self.assertEqual(1, result.candidate_count)
+        self.assertEqual(0, result.accepted_count)
+        self.assertEqual(1, result.rejected_count)
+
+    def test_duplicate_name_and_prefix_uses_last_row_and_counts_rejection(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result = self.load(self.write_csv(
+                directory,
+                row(**{"당월고지금액": "950000"}),
+                row(**{"당월고지금액": "1900000"}),
+            ))
+
+        self.assertEqual(2, result.candidate_count)
+        self.assertEqual(1, result.accepted_count)
+        self.assertEqual(1, result.rejected_count)
+        self.assertEqual(1900000, result.rows[0].monthly_billed_amount)
+
+    def test_aborts_when_any_source_row_uses_a_different_snapshot_month(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = self.write_csv(directory, row(), row(**{"자료생성년월": "2026-05"}))
+            with self.assertRaisesRegex(ValueError, "2026-05"):
+                self.load(path)
+
+    def test_refuses_to_overwrite_existing_output(self):
+        with tempfile.TemporaryDirectory() as directory:
+            csv_path = self.write_csv(directory, row())
+            output = Path(directory) / "existing.sql"
+            output.write_text("keep me", encoding="utf-8")
+
+            with self.assertRaises(FileExistsError):
+                generator.generate(csv_path, output, "2026-07-23", "2026-06")
+
+            self.assertEqual("keep me", output.read_text(encoding="utf-8"))
+
+    def test_rendered_sql_has_fixture_provenance_scope_rate_and_exact_numeric_median(self):
+        with tempfile.TemporaryDirectory() as directory:
+            csv_path = self.write_csv(directory, row(), row(**{"사업장명": "서울 데이터", "사업자등록번호": "654321",
+                                                               "사업장업종코드": "724000"}))
+            source = self.load(csv_path)
+            rendered = generator.render_sql(source, "2026-07-23", "2026-06")
+            expected_hash = hashlib.sha256(csv_path.read_bytes()).hexdigest().upper()
+        self.assertIn("snapshot_month = '2026-06'", rendered)
+        self.assertIn("'2026-06'", rendered)
+        self.assertIn("0.095", rendered)
+        self.assertIn("SEOUL_IT_FULL", rendered)
+        self.assertIn("SOFTWARE_IT_SERVICE", rendered)
+        self.assertIn(expected_hash, rendered)
+        self.assertIn("raw_source_row_count = 2", rendered)
+        self.assertIn("accepted_row_count = 2", rendered)
+        self.assertIn("ROW_NUMBER() OVER", rendered)
+        self.assertIn("WHERE row_number IN ((group_count + 1) / 2, (group_count + 2) / 2)", rendered)
+        self.assertNotIn("double precision", rendered.lower())
+        self.assertNotIn("C:\\Users", rendered)
+        self.assertNotIn(str(csv_path), rendered)
+
+
+if __name__ == "__main__":
+    unittest.main()
