@@ -50,13 +50,30 @@ class CompanyWorkforceTest {
         CompanyWorkforce workforce = valid(4, "943140");
         Optional<BigDecimal> estimated = workforce.estimatedAnnualSalary();
         assertTrue(estimated.isPresent());
-        assertEquals(0, new BigDecimal("31438000").compareTo(estimated.get()));
+        assertEquals(0, new BigDecimal("29783368").compareTo(estimated.get()));
+    }
+
+    @Test
+    @DisplayName("2026년 6월은 인상된 국민연금 보험료율로 추정연봉을 계산한다")
+    void estimatesAnnualSalaryUsing2026NpsContributionRate() {
+        CompanyWorkforce workforce = valid(10, "950000");
+
+        assertEquals(Optional.of(new BigDecimal("12000000")), workforce.estimatedAnnualSalary());
     }
 
     @Test
     @DisplayName("가입자수 0이면 추정연봉을 계산하지 않는다")
     void noEstimateWhenHeadcountZero() {
         CompanyWorkforce workforce = valid(0, "0");
+        assertEquals(Optional.empty(), workforce.estimatedAnnualSalary());
+    }
+
+    @Test
+    @DisplayName("보험료율 지원 범위 밖 기준월이면 추정연봉을 계산하지 않는다")
+    void noEstimateWhenSnapshotMonthHasNoSupportedRate() {
+        CompanyWorkforce workforce = new CompanyWorkforce("미래회사", "111111", "525101", "업종", "서울특별시 성동구",
+                YearMonth.of(2027, 1), 1, new BigDecimal("950000"));
+
         assertEquals(Optional.empty(), workforce.estimatedAnnualSalary());
     }
 
@@ -99,8 +116,8 @@ class CompanyWorkforceTest {
     @DisplayName("추정연봉이 기준소득월액 상한액×12 에 도달하면 상한 도달로 표시한다")
     void salaryCapReachedAtExactlyTwelveTimesCap() {
         // 2026-06 상한액 6,370,000(2025-07~ 구간) → 연 76,440,000.
-        // 가입자 1명 · 고지 573,300 이면 추정연봉이 정확히 상한 = 경계값.
-        CompanyWorkforce atCap = valid(1, "573300");
+        // 가입자 1명 · 고지 605,150 이면 추정연봉이 정확히 상한 = 경계값.
+        CompanyWorkforce atCap = valid(1, "605150");
 
         assertEquals(0, new BigDecimal("76440000").compareTo(atCap.estimatedAnnualSalary().orElseThrow()));
         assertTrue(atCap.salaryCapReached());
@@ -110,7 +127,7 @@ class CompanyWorkforceTest {
     @Test
     @DisplayName("상한 미달이면 false — 1원 차이도 경계 밖")
     void salaryCapNotReached() {
-        assertFalse(valid(1, "573299").salaryCapReached());
+        assertFalse(valid(1, "605149").salaryCapReached());
         assertFalse(valid(4, "943140").salaryCapReached());
     }
 
@@ -130,7 +147,7 @@ class CompanyWorkforceTest {
         CompanyWorkforce workforce = valid(4, "943140");
 
         assertEquals(Optional.of(new BigDecimal("4")), workforce.valueOf(WorkforceMetric.HEADCOUNT));
-        assertEquals(0, new BigDecimal("31438000")
+        assertEquals(0, new BigDecimal("29783368")
                 .compareTo(workforce.valueOf(WorkforceMetric.ESTIMATED_ANNUAL_SALARY).orElseThrow()));
         assertEquals(Optional.empty(), valid(0, "0").valueOf(WorkforceMetric.ESTIMATED_ANNUAL_SALARY));
     }

@@ -14,9 +14,6 @@ import java.util.Optional;
  */
 public class CompanyWorkforce {
 
-    /** 국민연금 보험료율(사용자+근로자 합산, 국민연금법 고정) — 당월고지금액에서 소득월액을 역산하는 데 쓴다. */
-    private static final BigDecimal NPS_CONTRIBUTION_RATE = new BigDecimal("0.09");
-
     /** 업종코드 롤업 단위 — 국세청 업종코드 연계표 기준 앞 3자리. */
     private static final int INDUSTRY_ROLLUP_LENGTH = 3;
 
@@ -60,8 +57,9 @@ public class CompanyWorkforce {
             return Optional.empty();
         }
         BigDecimal annualBilled = monthlyBilledAmount.multiply(BigDecimal.valueOf(12));
-        BigDecimal denominator = BigDecimal.valueOf(headcount).multiply(NPS_CONTRIBUTION_RATE);
-        return Optional.of(annualBilled.divide(denominator, 0, RoundingMode.HALF_UP));
+        return NpsContributionRate.rateOf(snapshotMonth)
+                .map(contributionRate -> annualBilled.divide(
+                        BigDecimal.valueOf(headcount).multiply(contributionRate), 0, RoundingMode.HALF_UP));
     }
 
     /**
