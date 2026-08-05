@@ -147,9 +147,9 @@
 > 드리프트 의심 시 명령을 돌려 재검증하고 이 수치를 갱신할 것(휘발성 수치를 명령 없이 손으로 적지 말 것).
 
 - 서비스 **14개** + API Gateway + Kotlin polyglot 2(notification·reconciliation) — `git ls-files '*/src/main/resources/application.yml' | wc -l` → 17(=14+gateway+kotlin 2)
-- Flyway 마이그레이션 **245개** — `git ls-files '*/src/main/resources/db/migration/*.sql' | wc -l` → 245
-- ADR **29개** (0001~0030, 0019 결번 — 세무 ADR 은 0027 충돌로 0029 재부여) — `git ls-files 'docs/adr/[0-9]*.md' | wc -l` → 29
-- 테스트 클래스 **775개** (Testcontainers 통합테스트 포함) — `git ls-files '*/src/test/*Test.java' '*/src/test/*Tests.java' '*/src/test/*IT.java' | wc -l` → 775
+- Flyway 마이그레이션 **246개** — `git ls-files '*/src/main/resources/db/migration/*.sql' | wc -l` → 246
+- ADR **31개** (0001~0032, 0019 결번 — 세무 ADR 은 0027 충돌로 0029 재부여) — `git ls-files 'docs/adr/[0-9]*.md' | wc -l` → 31
+- 테스트 클래스 **786개** (Testcontainers 통합테스트 포함) — `git ls-files '*/src/test/*Test.java' '*/src/test/*Tests.java' '*/src/test/*IT.java' | wc -l` → 786
 - 이벤트 계약 스키마 **35토픽** (ADR 0024, 프로듀서·컨슈머 양방향 테스트 — 담보대출 2종·organization 멤버 2종·카드 8종(2단계 authorized·captured·statement.paid 포함)) — `git ls-files 'shared-common/src/testFixtures/resources/contracts/events/*.schema.json' | wc -l` → 35
 
 ## 최근 전체 검증 (2026-07-29)
