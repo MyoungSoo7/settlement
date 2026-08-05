@@ -53,7 +53,7 @@ class CompanyWorkforceControllerTest {
     private MockMvc mockMvc;
 
     private CompanyWorkforce workforce() {
-        // 추정연봉 = (16,406,250 × 12) / (50 × 0.09) = 43,750,000
+        // 추정연봉 = (16,406,250 × 12) / (50 × 0.095) = 41,447,368.421... → HALF_UP 41,447,368
         return new CompanyWorkforce("주식회사에고이즘", "866759", "525101", "전자상거래 소매업",
                 "서울특별시 성동구 연무장19길", YearMonth.of(2026, 6), 50, new BigDecimal("16406250"));
     }
@@ -83,7 +83,7 @@ class CompanyWorkforceControllerTest {
                 // 상세(/detail) 복합키 3요소가 목록 응답에 모두 있어야 화면이 상세로 진입할 수 있다.
                 .andExpect(jsonPath("$.content[0].bizRegNoPrefix").value("866759"))
                 .andExpect(jsonPath("$.content[0].headcount").value(50))
-                .andExpect(jsonPath("$.content[0].estimatedAnnualSalary").value(43750000))
+                .andExpect(jsonPath("$.content[0].estimatedAnnualSalary").value(41447368))
                 .andExpect(jsonPath("$.content[0].snapshotMonth").value("2026-06"))
                 .andExpect(jsonPath("$.content[0].note").exists())
                 .andExpect(jsonPath("$.totalElements").value(1));
@@ -127,11 +127,11 @@ class CompanyWorkforceControllerTest {
                 // ★ jsonPath().value("43750000") 는 수치 43750000 에도 통과할 수 있어(타입 강제 없음)
                 //   원시 JSON 에서 따옴표까지 확인한다. 애너테이션 기반 문자열화가 Jackson 3 런타임에서
                 //   무시돼 수치로 나갔던 결함(2026-07-30)을 이 어서션이 잡는다.
-                .andExpect(content().string(containsString("\"estimatedAnnualSalary\":\"43750000\"")))
+                .andExpect(content().string(containsString("\"estimatedAnnualSalary\":\"41447368\"")))
                 .andExpect(content().string(containsString("\"salaryCapMonthlyAmount\":\"6370000\"")))
                 .andExpect(content().string(containsString("\"median\":\"35000000\"")))
                 .andExpect(content().string(containsString("\"difference\":\"8750000\"")))
-                .andExpect(jsonPath("$.estimatedAnnualSalary").value("43750000"))
+                .andExpect(jsonPath("$.estimatedAnnualSalary").value("41447368"))
                 .andExpect(jsonPath("$.salaryCapMonthlyAmount").value("6370000"))
                 .andExpect(jsonPath("$.salaryCapReached").value(false))
                 .andExpect(jsonPath("$.industryComparison.comparisonLevel").value("EXACT"))
@@ -215,12 +215,12 @@ class CompanyWorkforceControllerTest {
                 .andExpect(jsonPath("$.series[0].headcountChange").doesNotExist())
                 .andExpect(jsonPath("$.series[0].salaryChangeRate").doesNotExist())
                 // 금액은 소수 문자열 — 원시 JSON 의 따옴표까지 확인(Jackson 3 수치화 결함 가드)
-                .andExpect(content().string(containsString("\"estimatedAnnualSalary\":\"43750000\"")))
-                .andExpect(content().string(containsString("\"salaryChange\":\"-3750000\"")))
+                .andExpect(content().string(containsString("\"estimatedAnnualSalary\":\"41447368\"")))
+                .andExpect(content().string(containsString("\"salaryChange\":\"-3552631\"")))
                 .andExpect(jsonPath("$.series[1].headcount").value(60))
                 .andExpect(jsonPath("$.series[1].headcountChange").value(10))
                 .andExpect(jsonPath("$.series[1].headcountChangeRate").value(20.00))
-                .andExpect(jsonPath("$.series[1].salaryChange").value("-3750000"))
+                .andExpect(jsonPath("$.series[1].salaryChange").value("-3552631"))
                 .andExpect(jsonPath("$.series[1].salaryChangeRate").value(-8.57))
                 .andExpect(jsonPath("$.series[1].salaryCapReached").value(false))
                 .andExpect(jsonPath("$.note").exists());
