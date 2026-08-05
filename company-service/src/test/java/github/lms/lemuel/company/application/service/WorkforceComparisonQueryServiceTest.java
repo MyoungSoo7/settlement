@@ -39,7 +39,7 @@ class WorkforceComparisonQueryServiceTest {
     private final LoadWorkforceComparisonPort port = mock(LoadWorkforceComparisonPort.class);
     private final WorkforceComparisonQueryService service = new WorkforceComparisonQueryService(port);
 
-    /** 가입자 50명 · 고지 16,406,250 → 추정연봉 43,750,000. */
+    /** 가입자 50명 · 고지 16,406,250 → 2026년 보험료율 9.5% 적용 추정연봉 41,447,368. */
     private CompanyWorkforce workforce(String industryCode, String address) {
         return new CompanyWorkforce("주식회사에고이즘", "866759", industryCode, "전자상거래 소매업",
                 address, YearMonth.of(2026, 6), 50, new BigDecimal("16406250"));
@@ -82,8 +82,8 @@ class WorkforceComparisonQueryServiceTest {
         assertEquals("525101", industry.groupKey());
         assertEquals(12, industry.sampleSize());
         assertEquals("35000000", industry.estimatedAnnualSalary().median().toPlainString());
-        assertEquals("8750000", industry.estimatedAnnualSalary().difference().toPlainString());
-        assertEquals("25.00", industry.estimatedAnnualSalary().differenceRate().toPlainString());
+        assertEquals("6447368", industry.estimatedAnnualSalary().difference().toPlainString());
+        assertEquals("18.42", industry.estimatedAnnualSalary().differenceRate().toPlainString());
         assertEquals("82.50", industry.estimatedAnnualSalary().percentile().toPlainString());
         assertEquals("12.5", industry.headcount().median().toPlainString());
         assertEquals("37.5", industry.headcount().difference().toPlainString());
