@@ -90,6 +90,51 @@ class WorkforceFlywayPostgresIT {
                 """, BigDecimal.class);
         assertThat(storedMedian).isEqualByComparingTo(independentlyCalculatedMedian);
         assertThat(storedMedian).isEqualByComparingTo("43265152.00");
+
+        assertThat(jdbc.queryForObject("""
+                SELECT COUNT(*) FROM workforce_percentile WHERE snapshot_month = '2026-06'
+                """, Integer.class)).isEqualTo(90_504);
+        assertThat(jdbc.queryForObject("""
+                SELECT COUNT(*)
+                FROM (
+                    SELECT workforce.workplace_name, workforce.biz_reg_no_prefix
+                    FROM company_workforce workforce
+                    LEFT JOIN workforce_percentile percentile
+                      ON percentile.snapshot_month = workforce.snapshot_month
+                     AND percentile.workplace_name = workforce.workplace_name
+                     AND percentile.biz_reg_no_prefix = workforce.biz_reg_no_prefix
+                    WHERE workforce.snapshot_month = '2026-06'
+                    GROUP BY workforce.workplace_name, workforce.biz_reg_no_prefix, workforce.sigungu
+                    HAVING COUNT(percentile.metric) <> 6 + CASE WHEN workforce.sigungu IS NULL THEN 0 ELSE 2 END
+                ) incomplete
+                """, Integer.class)).isZero();
+
+        BigDecimal storedRepresentativePercentile = jdbc.queryForObject("""
+                SELECT percentile FROM workforce_percentile
+                WHERE snapshot_month = '2026-06'
+                  AND workplace_name = '(사)전국지방의료원연합회'
+                  AND biz_reg_no_prefix = '116820'
+                  AND axis = 'REGION' AND level = 'BROADENED' AND metric = 'HEADCOUNT'
+                """, BigDecimal.class);
+        BigDecimal independentlyCalculatedPercentile = jdbc.queryForObject("""
+                WITH target AS (
+                    SELECT headcount
+                    FROM company_workforce
+                    WHERE snapshot_month = '2026-06'
+                      AND workplace_name = '(사)전국지방의료원연합회'
+                      AND biz_reg_no_prefix = '116820'
+                )
+                SELECT ROUND(
+                    COUNT(*) FILTER (WHERE workforce.headcount <= target.headcount)::numeric
+                    * 100 / COUNT(*), 2)
+                FROM company_workforce workforce
+                CROSS JOIN target
+                WHERE workforce.snapshot_month = '2026-06' AND workforce.sido = '서울특별시'
+                GROUP BY target.headcount
+                """, BigDecimal.class);
+        assertThat(storedRepresentativePercentile)
+                .isEqualByComparingTo(independentlyCalculatedPercentile)
+                .isEqualByComparingTo("85.29");
     }
 
     @Test
