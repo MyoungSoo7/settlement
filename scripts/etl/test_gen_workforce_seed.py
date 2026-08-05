@@ -1,5 +1,6 @@
 import csv
 import hashlib
+import io
 import importlib.util
 import tempfile
 import unittest
@@ -97,6 +98,16 @@ class WorkforceSeedGeneratorTest(unittest.TestCase):
         self.assertEqual(0, result.candidate_count)
         self.assertEqual(0, result.accepted_count)
 
+    def test_rejects_unknown_or_blank_status_instead_of_treating_it_as_active(self):
+        with tempfile.TemporaryDirectory() as directory:
+            for status in ("", "9"):
+                with self.subTest(status=status):
+                    result = self.load(self.write_csv(
+                        directory, row(**{"사업장가입상태코드 1 등록 2 탈퇴": status})
+                    ))
+                    self.assertEqual(0, result.candidate_count)
+                    self.assertEqual(0, result.accepted_count)
+
     def test_rejects_non_positive_billed_amount_and_counts_candidate_rejection(self):
         with tempfile.TemporaryDirectory() as directory:
             result = self.load(self.write_csv(directory, row(**{"당월고지금액": "0"})))
@@ -155,6 +166,47 @@ class WorkforceSeedGeneratorTest(unittest.TestCase):
         self.assertNotIn("double precision", rendered.lower())
         self.assertNotIn("C:\\Users", rendered)
         self.assertNotIn(str(csv_path), rendered)
+
+    def test_refuses_malformed_or_injectable_snapshot_month_before_rendering(self):
+        with tempfile.TemporaryDirectory() as directory:
+            csv_path = self.write_csv(directory, row())
+            source = self.load(csv_path)
+
+            for invalid_month in ("0000-06", "2026-6", "2026-13", "2026-06'; DROP TABLE company_workforce; --"):
+                with self.subTest(invalid_month=invalid_month):
+                    with self.assertRaises(ValueError):
+                        generator.render_sql(source, "2026-07-23", invalid_month)
+
+    def test_refuses_malformed_or_injectable_release_date_before_rendering(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = self.load(self.write_csv(directory, row()))
+
+            for invalid_date in ("2026-7-23", "2026-02-30", "2026-07-23'; COMMIT; --"):
+                with self.subTest(invalid_date=invalid_date):
+                    with self.assertRaises(ValueError):
+                        generator.render_sql(source, invalid_date, "2026-06")
+
+    def test_parses_and_hashes_a_single_immutable_source_payload(self):
+        payload = io.BytesIO()
+        text = io.TextIOWrapper(payload, encoding="cp949", newline="")
+        writer = csv.writer(text)
+        writer.writerow(HEADER)
+        writer.writerow(row())
+        text.flush()
+        source_bytes = payload.getvalue()
+        text.detach()
+
+        class PayloadOnlyPath:
+            def read_bytes(self):
+                return source_bytes
+
+            def open(self, *args, **kwargs):
+                raise AssertionError("source must be parsed from the immutable byte payload")
+
+        result = generator.load_source(PayloadOnlyPath(), "2026-06")
+
+        self.assertEqual(hashlib.sha256(source_bytes).hexdigest().upper(), result.source_sha256)
+        self.assertEqual(1, result.accepted_count)
 
 
 if __name__ == "__main__":

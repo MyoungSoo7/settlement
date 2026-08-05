@@ -5,8 +5,10 @@
 import argparse
 import csv
 import hashlib
+import io
 import re
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 
 
@@ -19,6 +21,8 @@ CHUNK_SIZE = 500
 RATE_LITERAL = "0.095"
 KNOWN_SEED_COUNT = 4247
 SIDO_SUFFIXES = ("특별시", "광역시", "특별자치시", "특별자치도")
+MONTH_PATTERN = re.compile(r"\d{4}-\d{2}")
+DATE_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 COL_MONTH = "자료생성년월"
 COL_NAME = "사업장명"
@@ -76,16 +80,32 @@ def _value(record: dict[str | None, str | list[str] | None], column: str) -> str
     return value.strip() if isinstance(value, str) else ""
 
 
-def _source_hash(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest().upper()
+def validate_snapshot_month(snapshot_month: str) -> None:
+    if not MONTH_PATTERN.fullmatch(snapshot_month):
+        raise ValueError(f"snapshot month must be YYYY-MM: {snapshot_month!r}")
+    year, month = (int(part) for part in snapshot_month.split("-"))
+    if year < 1 or not 1 <= month <= 12:
+        raise ValueError(f"snapshot month is not calendar-valid: {snapshot_month!r}")
+
+
+def validate_release_date(release_date: str) -> None:
+    if not DATE_PATTERN.fullmatch(release_date):
+        raise ValueError(f"release date must be YYYY-MM-DD: {release_date!r}")
+    try:
+        date.fromisoformat(release_date)
+    except ValueError as exc:
+        raise ValueError(f"release date is not calendar-valid: {release_date!r}") from exc
 
 
 def load_source(csv_path: Path, snapshot_month: str) -> SourceData:
     """Read one strict-CP949 source file and return the scoped unique cohort."""
+    validate_snapshot_month(snapshot_month)
+    source_bytes = csv_path.read_bytes()
+    source_sha256 = hashlib.sha256(source_bytes).hexdigest().upper()
     rows_by_key: dict[tuple[str, str], WorkforceRow] = {}
     raw_source_count = candidate_count = rejected_count = 0
 
-    with csv_path.open("r", encoding=SOURCE_ENCODING, newline="") as source:
+    with io.TextIOWrapper(io.BytesIO(source_bytes), encoding=SOURCE_ENCODING, newline="") as source:
         reader = csv.DictReader(source)
         required = {
             COL_MONTH, COL_NAME, COL_PREFIX, COL_STATUS, COL_LOT_ADDRESS,
@@ -104,7 +124,7 @@ def load_source(csv_path: Path, snapshot_month: str) -> SourceData:
                     f"snapshot month mismatch at CSV line {line_number}: "
                     f"expected {snapshot_month}, got {row_month or '<blank>'}"
                 )
-            if _value(record, COL_STATUS) == "2":
+            if _value(record, COL_STATUS) != "1":
                 continue
             industry_code = _value(record, COL_INDUSTRY_CODE)
             if industry_code not in ALLOWED_INDUSTRY_CODES:
@@ -145,7 +165,7 @@ def load_source(csv_path: Path, snapshot_month: str) -> SourceData:
     ordered_rows = tuple(rows_by_key[key] for key in sorted(rows_by_key))
     return SourceData(
         rows=ordered_rows,
-        source_sha256=_source_hash(csv_path),
+        source_sha256=source_sha256,
         raw_source_count=raw_source_count,
         candidate_count=candidate_count,
         accepted_count=len(ordered_rows),
@@ -266,6 +286,8 @@ WHERE biz_reg_no_prefix <> '';"""
 
 def render_sql(source: SourceData, release_date: str, snapshot_month: str) -> str:
     """Render a byte-stable forward-only Flyway migration without source paths."""
+    validate_release_date(release_date)
+    validate_snapshot_month(snapshot_month)
     metadata = f"""-- Description: Replace the known workforce sample with the complete Seoul software/IT-service cohort
 -- Author: Codex
 -- Date: {release_date}
