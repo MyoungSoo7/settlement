@@ -158,6 +158,9 @@ public class SecurityConfig {
                         .requestMatchers("/internal/**").permitAll()
                         // Payout 콘솔 — 송금 권한은 ADMIN 만 (반송 기록·재지급 포함)
                         .requestMatchers("/admin/payouts/**").hasRole("ADMIN")
+                        // 정산 배치 재실행 콘솔 — 확정·홀드백 해제·지급 실행을 수동 트리거하므로
+                        // 조회 콘솔과 달리 MANAGER 에게 열지 않는다. 일자 게이트(미래·소급 상한)는 도메인이 강제.
+                        .requestMatchers("/admin/settlements/**").hasRole("ADMIN")
                         // 셀러 지급 계좌 레지스트리 — 등록·정정(PII). 셀러 식별자를 관리자 입력으로 받으므로
                         // ADMIN/MANAGER 게이트로 IDOR 방지 (Seed D1).
                         .requestMatchers("/admin/seller-bank-accounts/**").hasAnyRole("ADMIN", "MANAGER")
