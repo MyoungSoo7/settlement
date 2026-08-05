@@ -295,15 +295,13 @@ def render_sql(source: SourceData, release_date: str, snapshot_month: str) -> st
 -- Source SHA-256: {source.source_sha256}
 -- raw_source_row_count = {source.raw_source_count}; source_row_count = {source.candidate_count}; accepted_row_count = {source.accepted_count}; rejected_row_count = {source.rejected_count}
 -- Coverage: SEOUL_IT_FULL; region: SEOUL; industry scope: SOFTWARE_IT_SERVICE
-
-BEGIN;
-
-ALTER TABLE workforce_aggregate_build ADD COLUMN IF NOT EXISTS source_release_date DATE;
-ALTER TABLE workforce_aggregate_build ADD COLUMN IF NOT EXISTS source_sha256 VARCHAR(64);
-ALTER TABLE workforce_aggregate_build ADD COLUMN IF NOT EXISTS raw_source_row_count BIGINT;
-ALTER TABLE workforce_aggregate_build ADD COLUMN IF NOT EXISTS coverage_scope VARCHAR(32);
-ALTER TABLE workforce_aggregate_build ADD COLUMN IF NOT EXISTS region_scope VARCHAR(32);
-ALTER TABLE workforce_aggregate_build ADD COLUMN IF NOT EXISTS industry_scope VARCHAR(64);
+-- Flyway owns this migration's transaction boundary.
+-- Block concurrent inserts, deletes, updates, and rebuilds while preserving existing read queries.
+LOCK TABLE company_workforce,
+           workforce_aggregate_build,
+           workforce_aggregate,
+           workforce_percentile
+IN SHARE ROW EXCLUSIVE MODE;
 
 DO $$
 BEGIN
@@ -328,8 +326,6 @@ VALUES
     complete = f"""UPDATE workforce_aggregate_build
 SET status = 'COMPLETE', built_at = NOW()
 WHERE snapshot_month = '{snapshot_month}';
-
-COMMIT;
 """
     return "\n".join([metadata, build_start, *_insert_chunks(source.rows, snapshot_month),
                       _aggregate_sql(snapshot_month), complete])

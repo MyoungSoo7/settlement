@@ -117,14 +117,21 @@ public class WorkforceAggregatePersistenceAdapter implements BuildWorkforceAggre
 
     private static final String MARK_BUILDING = """
             INSERT INTO workforce_aggregate_build
-                (snapshot_month, status, source_row_count, accepted_row_count, rejected_row_count, built_at)
-            VALUES (?, 'BUILDING', ?, ?, ?, NOW())
+                (snapshot_month, status, source_row_count, accepted_row_count, rejected_row_count, built_at,
+                 source_release_date, source_sha256, raw_source_row_count, coverage_scope, region_scope, industry_scope)
+            VALUES (?, 'BUILDING', ?, ?, ?, NOW(), NULL, NULL, NULL, NULL, NULL, NULL)
             ON CONFLICT (snapshot_month)
             DO UPDATE SET status = 'BUILDING',
                           source_row_count = EXCLUDED.source_row_count,
                           accepted_row_count = EXCLUDED.accepted_row_count,
                           rejected_row_count = EXCLUDED.rejected_row_count,
-                          built_at = EXCLUDED.built_at
+                          built_at = EXCLUDED.built_at,
+                          source_release_date = NULL,
+                          source_sha256 = NULL,
+                          raw_source_row_count = NULL,
+                          coverage_scope = NULL,
+                          region_scope = NULL,
+                          industry_scope = NULL
             """;
 
     private static final String MARK_COMPLETE =

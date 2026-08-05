@@ -22,6 +22,7 @@ class WorkforceFlywayMigrationTest {
     private static final Path REPOSITORY_ROOT = locateRepositoryRoot();
     private static final Path MIGRATION_DIRECTORY = REPOSITORY_ROOT.resolve("company-service/src/main/resources/db/migration");
     private static final Path OLD_MIGRATION = MIGRATION_DIRECTORY.resolve("V20260804090000__seed_workforce_2026_06.sql");
+    private static final Path PROVENANCE_DDL_MIGRATION = MIGRATION_DIRECTORY.resolve("V20260806110000__add_workforce_dataset_provenance.sql");
     private static final Path NEW_MIGRATION = MIGRATION_DIRECTORY.resolve("V20260806120000__replace_workforce_with_seoul_it_2026_06.sql");
     private static final String OLD_SHA_256 = "F5A243FC9C3F46F2788199432592F524718465E57866F60D511FCE445558E95F";
     private static final String SOURCE_SHA_256 = "2AAC48EF155D268D544EB8A5BA04CCA201A1E1806A847C5772307775B4657F2B";
@@ -33,6 +34,14 @@ class WorkforceFlywayMigrationTest {
             "\\('((?:''|[^'])*)', '([0-9]{6})', '([0-9]{6})', "
                     + "'(?:''|[^'])*', '(?:''|[^'])*', '([^']*)', "
                     + "(?:'(?:''|[^'])*'|NULL), '([^']*)', [0-9]+, [0-9]+\\)");
+    private static final Pattern BUILD_METADATA_TUPLE = Pattern.compile("""
+            INSERT\\s+INTO\\s+workforce_aggregate_build
+            \\s*\\(snapshot_month,\\s*status,\\s*source_row_count,\\s*accepted_row_count,\\s*rejected_row_count,\\s*built_at,
+            \\s*source_release_date,\\s*source_sha256,\\s*raw_source_row_count,\\s*coverage_scope,\\s*region_scope,\\s*industry_scope\\)
+            \\s*VALUES\\s*\\(
+            \\s*'([^']+)',\\s*'BUILDING',\\s*(\\d+),\\s*(\\d+),\\s*(\\d+),\\s*NOW\\(\\),
+            \\s*DATE\\s*'([^']+)',\\s*'([A-F0-9]{64})',\\s*(\\d+),\\s*'([^']+)',\\s*'([^']+)',\\s*'([^']+)'\\)
+            """, Pattern.CASE_INSENSITIVE | Pattern.COMMENTS);
 
     @Test
     void replacementMigrationPreservesTheFrozenSeoulItCohortContract() throws Exception {
@@ -55,6 +64,12 @@ class WorkforceFlywayMigrationTest {
         }
 
         assertThat(Files.exists(NEW_MIGRATION)).isTrue();
+        assertThat(Files.exists(PROVENANCE_DDL_MIGRATION)).isTrue();
+        String ddl = Files.readString(PROVENANCE_DDL_MIGRATION, StandardCharsets.UTF_8);
+        for (String column : List.of("source_release_date", "source_sha256", "raw_source_row_count",
+                "coverage_scope", "region_scope", "industry_scope")) {
+            assertThat(ddl).contains("ADD COLUMN IF NOT EXISTS " + column, "COMMENT ON COLUMN workforce_aggregate_build." + column);
+        }
         byte[] bytes = Files.readAllBytes(NEW_MIGRATION);
         assertThat(bytes).hasSizeLessThan(10 * 1024 * 1024);
         String sql = new String(bytes, StandardCharsets.UTF_8);
@@ -75,22 +90,35 @@ class WorkforceFlywayMigrationTest {
         assertThat(businessKeys).hasSize(11_313);
         assertThat(industryCodes).containsExactlyInAnyOrderElementsOf(ALLOWED_INDUSTRY_CODES);
 
-        assertThat(sql).contains("Source SHA-256: " + SOURCE_SHA_256);
-        assertThat(sql).contains("raw_source_row_count = 593127; source_row_count = 11318; accepted_row_count = 11313; rejected_row_count = 5");
-        assertThat(sql).contains("'SEOUL_IT_FULL', 'SEOUL', 'SOFTWARE_IT_SERVICE'");
-        assertThat(sql).contains("DATE '2026-07-23'");
-        assertThat(sql).contains("'2026-06'");
+        Matcher metadata = BUILD_METADATA_TUPLE.matcher(sql);
+        assertThat(metadata.find()).isTrue();
+        assertThat(metadata.group(1)).isEqualTo("2026-06");
+        assertThat(metadata.group(2)).isEqualTo("11318");
+        assertThat(metadata.group(3)).isEqualTo("11313");
+        assertThat(metadata.group(4)).isEqualTo("5");
+        assertThat(metadata.group(5)).isEqualTo("2026-07-23");
+        assertThat(metadata.group(6)).isEqualTo(SOURCE_SHA_256);
+        assertThat(metadata.group(7)).isEqualTo("593127");
+        assertThat(metadata.group(8)).isEqualTo("SEOUL_IT_FULL");
+        assertThat(metadata.group(9)).isEqualTo("SEOUL");
+        assertThat(metadata.group(10)).isEqualTo("SOFTWARE_IT_SERVICE");
+        assertThat(metadata.find()).isFalse();
         assertThat(sql).contains("0.095::numeric");
+        assertThat(sql).doesNotContain("ALTER TABLE workforce_aggregate_build");
+        assertThat(Pattern.compile("(?im)^\\s*(?:BEGIN|COMMIT)\\s*;").matcher(sql).find()).isFalse();
         assertThat(Pattern.compile("\\b(?:double\\s+precision|real)\\b", Pattern.CASE_INSENSITIVE).matcher(sql).find()).isFalse();
         assertThat(sql.toLowerCase(Locale.ROOT)).doesNotContain("c:\\users");
         assertThat(sql).doesNotContain("국민연금공단_국민연금 가입 사업장 내역_20260723.csv");
 
+        int lock = sql.indexOf("LOCK TABLE company_workforce,");
         int precondition = sql.indexOf("<> 4247");
         int workforceDelete = sql.indexOf("DELETE FROM company_workforce WHERE snapshot_month = '2026-06'");
         int buildStart = sql.indexOf("INSERT INTO workforce_aggregate_build");
         int cohortInsert = sql.indexOf("INSERT INTO company_workforce");
         int completion = sql.indexOf("SET status = 'COMPLETE'");
-        assertThat(precondition).isGreaterThanOrEqualTo(0);
+        assertThat(sql).contains("IN SHARE ROW EXCLUSIVE MODE;");
+        assertThat(lock).isGreaterThanOrEqualTo(0);
+        assertThat(precondition).isGreaterThan(lock);
         assertThat(workforceDelete).isGreaterThan(precondition);
         assertThat(buildStart).isGreaterThan(workforceDelete);
         assertThat(cohortInsert).isGreaterThan(buildStart);

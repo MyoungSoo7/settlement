@@ -5,15 +5,13 @@
 -- Source SHA-256: 2AAC48EF155D268D544EB8A5BA04CCA201A1E1806A847C5772307775B4657F2B
 -- raw_source_row_count = 593127; source_row_count = 11318; accepted_row_count = 11313; rejected_row_count = 5
 -- Coverage: SEOUL_IT_FULL; region: SEOUL; industry scope: SOFTWARE_IT_SERVICE
-
-BEGIN;
-
-ALTER TABLE workforce_aggregate_build ADD COLUMN IF NOT EXISTS source_release_date DATE;
-ALTER TABLE workforce_aggregate_build ADD COLUMN IF NOT EXISTS source_sha256 VARCHAR(64);
-ALTER TABLE workforce_aggregate_build ADD COLUMN IF NOT EXISTS raw_source_row_count BIGINT;
-ALTER TABLE workforce_aggregate_build ADD COLUMN IF NOT EXISTS coverage_scope VARCHAR(32);
-ALTER TABLE workforce_aggregate_build ADD COLUMN IF NOT EXISTS region_scope VARCHAR(32);
-ALTER TABLE workforce_aggregate_build ADD COLUMN IF NOT EXISTS industry_scope VARCHAR(64);
+-- Flyway owns this migration's transaction boundary.
+-- Block concurrent inserts, deletes, updates, and rebuilds while preserving existing read queries.
+LOCK TABLE company_workforce,
+           workforce_aggregate_build,
+           workforce_aggregate,
+           workforce_percentile
+IN SHARE ROW EXCLUSIVE MODE;
 
 DO $$
 BEGIN
@@ -11524,5 +11522,3 @@ WHERE biz_reg_no_prefix <> '';
 UPDATE workforce_aggregate_build
 SET status = 'COMPLETE', built_at = NOW()
 WHERE snapshot_month = '2026-06';
-
-COMMIT;

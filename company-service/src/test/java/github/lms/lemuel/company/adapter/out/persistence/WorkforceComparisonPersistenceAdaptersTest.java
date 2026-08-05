@@ -164,6 +164,27 @@ class WorkforceComparisonPersistenceAdaptersTest {
         }
 
         @Test
+        @DisplayName("rebuild — 일반 관리자 재빌드는 고정 시드 provenance 를 NULL 로 초기화한다")
+        void rebuildClearsFrozenDatasetProvenance() {
+            adapter.rebuild(YearMonth.of(2026, 6), new AggregateRowTally(100, 90, 10));
+
+            verify(jdbcTemplate).update(argThat(sql -> sql.contains("INSERT INTO workforce_aggregate_build")
+                            && sql.contains("source_release_date")
+                            && sql.contains("source_sha256")
+                            && sql.contains("raw_source_row_count")
+                            && sql.contains("coverage_scope")
+                            && sql.contains("region_scope")
+                            && sql.contains("industry_scope")
+                            && sql.contains("source_release_date = NULL")
+                            && sql.contains("source_sha256 = NULL")
+                            && sql.contains("raw_source_row_count = NULL")
+                            && sql.contains("coverage_scope = NULL")
+                            && sql.contains("region_scope = NULL")
+                            && sql.contains("industry_scope = NULL")),
+                    eq("2026-06"), eq(100L), eq(90L), eq(10L));
+        }
+
+        @Test
         @DisplayName("rebuild — NUMERIC 값의 행 순위로 연속 중앙값을 만들고 날짜별 보험료율을 바인딩한다")
         void aggregateUsesNumericMedianAndDateEffectiveRate() {
             adapter.rebuild(YearMonth.of(2026, 6), new AggregateRowTally(1, 1, 0));
