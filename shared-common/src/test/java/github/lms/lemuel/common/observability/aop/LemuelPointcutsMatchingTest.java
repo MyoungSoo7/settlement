@@ -1,13 +1,19 @@
 package github.lms.lemuel.common.observability.aop;
 
+import github.lms.lemuel.common.config.observability.MdcKeys;
 import github.lms.lemuel.tracefixture.adapter.in.batch.SampleBatchAdapter;
+import github.lms.lemuel.tracefixture.adapter.in.kafka.SampleKafkaConsumer;
+import github.lms.lemuel.tracefixture.adapter.in.web.SampleWebAdapter;
 import github.lms.lemuel.tracefixture.application.service.SampleAppService;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
+import org.slf4j.MDC;
 import org.springframework.aop.aspectj.annotation.AspectJProxyFactory;
 import org.springframework.beans.factory.ObjectProvider;
+
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -50,6 +56,58 @@ class LemuelPointcutsMatchingTest {
                 .as("adapter.in.batch 스케줄러/폴러가 traceable() 에 포함되어야 한다")
                 .isNotNull();
         assertThat(timer.count()).isEqualTo(1);
+    }
+
+    @Test
+    void web_adapter_is_traceable_with_web_layer_tag() {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        SampleWebAdapter proxy = realAspectProxy(new SampleWebAdapter(), registry);
+
+        assertThat(proxy.handleRequest()).isEqualTo("ok");
+
+        Timer timer = registry.find("lemuel.method.execution")
+                .tag("layer", "web")
+                .tag("class", "SampleWebAdapter")
+                .tag("method", "handleRequest")
+                .tag("outcome", "success")
+                .timer();
+        assertThat(timer)
+                .as("adapter.in.web 컨트롤러가 traceable() 에 포함되어야 한다")
+                .isNotNull();
+        assertThat(timer.count()).isEqualTo(1);
+    }
+
+    @Test
+    void kafka_consumer_is_traceable_and_gets_execution_scoped_trace_id() {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        SampleKafkaConsumer proxy = realAspectProxy(new SampleKafkaConsumer(), registry);
+
+        MDC.remove(MdcKeys.TRACE_ID);
+        AtomicReference<String> observed = new AtomicReference<>();
+        try {
+            assertThat(proxy.consume(observed)).isEqualTo("consumed");
+        } finally {
+            MDC.remove(MdcKeys.TRACE_ID);
+        }
+
+        Timer timer = registry.find("lemuel.method.execution")
+                .tag("layer", "kafka")
+                .tag("class", "SampleKafkaConsumer")
+                .tag("method", "consume")
+                .tag("outcome", "success")
+                .timer();
+        assertThat(timer)
+                .as("adapter.in.kafka 컨슈머가 traceable() 에 포함되어야 한다")
+                .isNotNull();
+        assertThat(timer.count()).isEqualTo(1);
+
+        // 서블릿 필터 밖(Kafka 리스너 스레드)에서도 실행 단위 traceId 가 붙는다 —
+        // 이 보장은 kafka 포인트컷이 실제로 매칭될 때만 성립하므로 여기서 함께 못박는다.
+        assertThat(observed.get())
+                .as("Kafka 컨슈머 진입 시 MDC traceId 가 부여되어야 한다")
+                .isNotBlank();
+        // 스레드 풀 재사용 대비 — 호출이 끝나면 제거된다.
+        assertThat(MDC.get(MdcKeys.TRACE_ID)).isNull();
     }
 
     @Test
