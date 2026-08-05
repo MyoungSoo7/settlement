@@ -29,11 +29,15 @@ import java.util.List;
  *
  * <p>인가: {@code /admin/tax/**} 는 SecurityConfig 가 ADMIN/MANAGER 로 게이트한다. 그 위에 {@code sellerId}
  * IDOR 방지(2026-07-24, ADR 0029 후속 수정) — {@code TaxContextResolver} 가 요청 sellerId 와 정산의 실제
- * 소유 셀러를 대조해 불일치 시 {@link AccessDeniedException} 을 던진다. shared-common
- * {@code GlobalExceptionHandler} 에는 {@link AccessDeniedException} 전용 매핑이 없어 catch-all(500)로
- * 새므로, 이 컨트롤러 로컬 핸들러로 403 을 명시한다(로컬 핸들러가 advice 보다 우선 —
- * {@code SettlementSearchController} 의 날짜 파라미터 로컬 핸들러와 동형, {@code TaxInvoiceSellerController}
- * 의 IDOR 403 의도와 동형).
+ * 소유 셀러를 대조해 불일치 시 {@link AccessDeniedException} 을 던진다.
+ *
+ * <p>403 은 <b>이중으로</b> 보장된다 — shared-common {@code GlobalExceptionHandler} 가
+ * {@link AccessDeniedException} → 403 을 공통 매핑하고(2026-08-02 IDOR 403 계약 500 누수 중앙 수정),
+ * 그 위에 이 컨트롤러 로컬 핸들러가 같은 계약을 엔드포인트 가까이에서 한 번 더 못박는다.
+ * {@code @ExceptionHandler} 는 <b>로컬 핸들러가 {@code @ControllerAdvice} 보다 우선</b>하므로
+ * 공통 매핑이 나중에 바뀌어도 이 엔드포인트의 403 계약은 흔들리지 않는다
+ * ({@code SettlementSearchController} 의 날짜 파라미터 로컬 핸들러와 동형,
+ * {@code TaxInvoiceSellerController} 의 IDOR 403 의도와 동형).
  */
 @Tag(name = "Settlement Tax Deliverables", description = "정산 연계 세무 전표·세금계산서·대사 운영자 콘솔")
 @RestController
