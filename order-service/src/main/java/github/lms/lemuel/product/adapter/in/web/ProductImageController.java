@@ -3,7 +3,9 @@ package github.lms.lemuel.product.adapter.in.web;
 import github.lms.lemuel.product.adapter.in.web.dto.ImageReorderRequest;
 import github.lms.lemuel.product.adapter.in.web.dto.ProductImageResponse;
 import github.lms.lemuel.product.application.service.ProductImageService;
+import github.lms.lemuel.product.domain.ImageUpload;
 import github.lms.lemuel.product.domain.ProductImage;
+import github.lms.lemuel.product.domain.exception.ImageStorageException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -16,6 +18,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -46,11 +49,29 @@ public class ProductImageController {
             return ResponseEntity.badRequest().build();
         }
 
-        List<ProductImage> images = imageService.uploadImages(productId, files);
+        List<ProductImage> images = imageService.uploadImages(productId, toUploads(files));
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(images.stream()
                         .map(ProductImageResponse::from)
                         .collect(Collectors.toList()));
+    }
+
+    /**
+     * 멀티파트 요청을 도메인 값 오브젝트로 옮긴다 — {@code MultipartFile} 은 이 web 어댑터가 끝이다.
+     *
+     * <p>본문을 읽다 발생하는 {@code IOException}(체크 예외)도 여기서 끊는다. 응용 서비스로
+     * {@code throws} 를 전파하는 대신 의미 있는 언체크 예외로 번역한다.
+     */
+    private List<ImageUpload> toUploads(List<MultipartFile> files) {
+        return files.stream().map(file -> {
+            try {
+                return ImageUpload.of(file.getOriginalFilename(), file.getContentType(),
+                        file.getSize(), file.getBytes());
+            } catch (IOException e) {
+                throw new ImageStorageException(
+                        "업로드 파일 본문을 읽지 못했습니다: " + file.getOriginalFilename(), e);
+            }
+        }).collect(Collectors.toList());
     }
 
     /**

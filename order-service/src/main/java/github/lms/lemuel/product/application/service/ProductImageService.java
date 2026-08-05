@@ -2,14 +2,15 @@ package github.lms.lemuel.product.application.service;
 
 import github.lms.lemuel.product.application.port.out.LoadProductImagePort;
 import github.lms.lemuel.product.application.port.out.SaveProductImagePort;
+import github.lms.lemuel.product.application.port.out.StoreProductImagePort;
+import github.lms.lemuel.product.application.port.out.StoredImageFile;
+import github.lms.lemuel.product.domain.ImageUpload;
 import github.lms.lemuel.product.domain.ProductImage;
 import github.lms.lemuel.product.domain.exception.ProductInvariantViolationException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -20,45 +21,40 @@ public class ProductImageService {
 
     private final LoadProductImagePort loadPort;
     private final SaveProductImagePort savePort;
-    private final FileStorageService fileStorageService;
+    private final StoreProductImagePort storagePort;
 
+    /**
+     * 이미지 다중 업로드.
+     *
+     * <p>형식·크기 정책은 {@link ImageUpload} 생성 시점에 이미 강제되었다 — 여기서 재검증하지 않는다.
+     * 저장 실패는 포트가 {@code ImageStorageException} 으로 번역해 올리므로 이 메서드에는
+     * {@code try-catch} 도 {@code throws} 도 없다.
+     */
     @Transactional
-    public List<ProductImage> uploadImages(Long productId, List<MultipartFile> files) {
+    public List<ProductImage> uploadImages(Long productId, List<ImageUpload> uploads) {
         List<ProductImage> images = new ArrayList<>();
 
         long currentCount = loadPort.countByProductIdNotDeleted(productId);
         int orderIndex = (int) currentCount;
 
-        for (MultipartFile file : files) {
-            if (!fileStorageService.isValidImageType(file.getContentType())) {
-                throw new ProductInvariantViolationException("Invalid image type: " + file.getContentType());
-            }
-            if (!fileStorageService.isValidFileSize(file.getSize())) {
-                throw new ProductInvariantViolationException("File size exceeds 5MB limit");
-            }
+        for (ImageUpload upload : uploads) {
+            StoredImageFile stored = storagePort.store(productId, upload);
 
-            try {
-                FileStorageService.StoredFileInfo fileInfo = fileStorageService.store(file, productId);
+            ProductImage image = ProductImage.create(
+                    productId,
+                    upload.getOriginalFilename(),
+                    stored.storedFileName(),
+                    stored.filePath(),
+                    stored.url(),
+                    upload.getContentType(),
+                    upload.getSizeBytes(),
+                    stored.width(),
+                    stored.height(),
+                    orderIndex++
+            );
+            image.assignChecksum(stored.checksum());
 
-                ProductImage image = ProductImage.create(
-                        productId,
-                        file.getOriginalFilename(),
-                        fileInfo.getStoredFileName(),
-                        fileInfo.getFilePath(),
-                        fileInfo.getUrl(),
-                        file.getContentType(),
-                        file.getSize(),
-                        fileInfo.getWidth(),
-                        fileInfo.getHeight(),
-                        orderIndex++
-                );
-                image.assignChecksum(fileInfo.getChecksum());
-
-                images.add(savePort.save(image));
-
-            } catch (IOException e) {
-                throw new RuntimeException("Failed to upload image: " + file.getOriginalFilename(), e);
-            }
+            images.add(savePort.save(image));
         }
 
         if (currentCount == 0 && !images.isEmpty()) {
@@ -117,7 +113,7 @@ public class ProductImageService {
         image.softDelete();
         savePort.save(image);
 
-        fileStorageService.delete(image.getFilePath());
+        storagePort.delete(image.getFilePath());
 
         if (wasPrimary) {
             List<ProductImage> remaining = loadPort.findByProductIdNotDeleted(productId);
