@@ -34,6 +34,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class WorkforceComparisonPersistenceAdaptersTest {
@@ -156,23 +157,30 @@ class WorkforceComparisonPersistenceAdaptersTest {
             order.verify(jdbcTemplate).update(contains("DELETE FROM workforce_aggregate"), eq("2026-06"));
             order.verify(jdbcTemplate).update(contains("DELETE FROM workforce_percentile"), eq("2026-06"));
             order.verify(jdbcTemplate).update(contains("INSERT INTO workforce_aggregate"),
-                    eq("2026-06"), eq("2026-06"), eq("2026-06"));
+                    eq(new BigDecimal("0.095")), eq("2026-06"), eq("2026-06"));
             order.verify(jdbcTemplate).update(contains("INSERT INTO workforce_percentile"),
-                    eq("2026-06"), eq("2026-06"), eq("2026-06"));
+                    eq(new BigDecimal("0.095")), eq("2026-06"), eq("2026-06"));
             order.verify(jdbcTemplate).update(contains("'COMPLETE'"), eq("2026-06"));
         }
 
         @Test
-        @DisplayName("rebuild — 집계 모집단은 도메인 적격 판정과 같은 조건(가입자수·고지금액 > 0)으로 좁히고, "
-                + "중앙값은 percentile_cont, 업종 폴백은 앞3자리다")
-        void eligibilityAndMedianMatchDomainRules() {
+        @DisplayName("rebuild — NUMERIC 값의 행 순위로 연속 중앙값을 만들고 날짜별 보험료율을 바인딩한다")
+        void aggregateUsesNumericMedianAndDateEffectiveRate() {
             adapter.rebuild(YearMonth.of(2026, 6), new AggregateRowTally(1, 1, 0));
 
             verify(jdbcTemplate).update(argThat(sql -> sql.contains("INSERT INTO workforce_aggregate")
                             && sql.contains("headcount > 0 AND monthly_billed_amount > 0")
-                            && sql.contains("percentile_cont(0.5)")
-                            && sql.contains("LEFT(industry_code, 3)")),
-                    eq("2026-06"), eq("2026-06"), eq("2026-06"));
+                            && sql.contains("metric_values(axis, level, group_key, metric, metric_value)")
+                            && sql.contains("ROW_NUMBER()")
+                            && sql.contains("COUNT(*)")
+                            && sql.contains("(group_count + 1) / 2")
+                            && sql.contains("(group_count + 2) / 2")
+                            && sql.contains("ROUND(AVG(metric_value), 2)")
+                            && sql.contains("MAX(group_count)")
+                            && sql.contains("LEFT(industry_code, 3)")
+                            && !sql.contains("double precision")
+                            && !sql.contains("headcount * 0.09")),
+                    eq(new BigDecimal("0.095")), eq("2026-06"), eq("2026-06"));
         }
 
         @Test
@@ -189,7 +197,16 @@ class WorkforceComparisonPersistenceAdaptersTest {
                 int rankedBoundary = sql.indexOf(") ranked");
                 int blankFilter = sql.indexOf("biz_reg_no_prefix <> ''");
                 return rankedBoundary > 0 && blankFilter > rankedBoundary;
-            }), eq("2026-06"), eq("2026-06"), eq("2026-06"));
+            }), eq(new BigDecimal("0.095")), eq("2026-06"), eq("2026-06"));
+        }
+
+        @Test
+        @DisplayName("rebuild — 지원하지 않는 기준월은 어떤 빌드 상태 변경도 하기 전에 거부한다")
+        void rejectsUnsupportedMonthBeforeAnyJdbcUpdate() {
+            org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+                    () -> adapter.rebuild(YearMonth.of(2027, 1), new AggregateRowTally(1, 1, 0)));
+
+            verifyNoInteractions(jdbcTemplate);
         }
     }
 }
