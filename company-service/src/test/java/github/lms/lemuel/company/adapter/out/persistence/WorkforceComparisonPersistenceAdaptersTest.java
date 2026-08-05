@@ -117,6 +117,10 @@ class WorkforceComparisonPersistenceAdaptersTest {
             // 대상 사업장이 적격 모집단에 없으면 백분위 행이 없다 → null 로 흘려보낸다.
             assertNull(statistics.get().byMetric()
                     .get(WorkforceMetric.ESTIMATED_ANNUAL_SALARY).percentile());
+            verify(jdbcTemplate).query(argThat(sql -> sql.contains("b.status = 'COMPLETE'")
+                            && sql.contains("b.coverage_scope = 'SEOUL_IT_FULL'")),
+                    any(RowMapper.class), eq("주식회사에고이즘"), eq("866759"), eq("2026-06"),
+                    eq("INDUSTRY"), eq("EXACT"), eq("525101"));
         }
 
         @Test

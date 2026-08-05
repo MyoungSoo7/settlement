@@ -146,6 +146,8 @@ class CompanyWorkforceControllerTest {
                 .andExpect(jsonPath("$.industryComparison.headcount.percentile").value(91.20))
                 .andExpect(jsonPath("$.regionComparison.unavailableReason").value("SAMPLE_TOO_SMALL"))
                 .andExpect(jsonPath("$.regionComparison.headcount").doesNotExist())
+                .andExpect(jsonPath("$.note").value(containsString("2026년 7월 23일 배포본")))
+                .andExpect(jsonPath("$.note").value(containsString("서울 소프트웨어·IT 서비스 사업장")))
                 .andExpect(jsonPath("$.note").exists());
     }
 
