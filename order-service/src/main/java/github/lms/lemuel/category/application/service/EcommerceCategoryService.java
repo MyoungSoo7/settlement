@@ -39,7 +39,7 @@ public class EcommerceCategoryService {
     public EcommerceCategory createCategory(String name, String slug, Long parentId, Integer sortOrder) {
         if (slug == null || slug.trim().isEmpty()) {
             if (parentId != null) {
-                EcommerceCategory parent = getCategoryById(parentId);
+                EcommerceCategory parent = loadCategory(parentId);
                 slug = slugGenerator.generateWithParent(parent.getSlug(), name);
             } else {
                 slug = slugGenerator.generate(name);
@@ -54,7 +54,7 @@ public class EcommerceCategoryService {
         if (parentId == null) {
             category = EcommerceCategory.createRoot(name, slug, sortOrder != null ? sortOrder : 0);
         } else {
-            EcommerceCategory parent = getCategoryById(parentId);
+            EcommerceCategory parent = loadCategory(parentId);
             if (parent.isDeleted()) {
                 throw new CategoryInvariantViolationException("Cannot create category under deleted parent");
             }
@@ -67,6 +67,19 @@ public class EcommerceCategoryService {
 
     @Cacheable(value = "ecommerce-categories", key = "'id:' + #id")
     public EcommerceCategory getCategoryById(Long id) {
+        return loadCategory(id);
+    }
+
+    /**
+     * 캐시를 거치지 않는 <b>쓰기 경로 전용</b> 단건 조회.
+     *
+     * <p>쓰기 메서드가 {@link #getCategoryById(Long)} 을 직접 부르면 스프링 AOP 프록시를 타지 않아
+     * 어차피 캐시가 걸리지 않는다(고급편 §14 프록시와 내부 호출). 그 <b>암묵적</b> 우회에 기대는 대신
+     * 의도를 코드로 드러낸다 — 수정 대상 엔티티는 캐시 스냅샷이 아니라 <b>DB 현재 상태</b>여야
+     * lost update 가 없다. 누군가 "자기호출 버그"로 오해해 자기 자신 주입으로 '고치면' 오히려
+     * 낡은 캐시 엔티티를 저장하게 된다.
+     */
+    private EcommerceCategory loadCategory(Long id) {
         return loadPort.findByIdNotDeleted(id)
                 .orElseThrow(() -> new CategoryNotFoundException(id));
     }
@@ -113,7 +126,7 @@ public class EcommerceCategoryService {
     @Transactional
     @CacheEvict(value = "ecommerce-categories", allEntries = true)
     public EcommerceCategory updateCategory(Long id, String name, String slug) {
-        EcommerceCategory category = getCategoryById(id);
+        EcommerceCategory category = loadCategory(id);
 
         if (slug != null && !slug.equals(category.getSlug())) {
             if (loadPort.findBySlug(slug).isPresent()) {
@@ -128,7 +141,7 @@ public class EcommerceCategoryService {
     @Transactional
     @CacheEvict(value = "ecommerce-categories", allEntries = true)
     public EcommerceCategory moveCategory(Long categoryId, Long newParentId) {
-        EcommerceCategory category = getCategoryById(categoryId);
+        EcommerceCategory category = loadCategory(categoryId);
 
         validateNoCircularReference(categoryId, newParentId);
 
@@ -136,7 +149,7 @@ public class EcommerceCategoryService {
         if (newParentId == null) {
             newParentDepth = null;
         } else {
-            EcommerceCategory newParent = getCategoryById(newParentId);
+            EcommerceCategory newParent = loadCategory(newParentId);
             newParentDepth = newParent.getDepth();
         }
 
@@ -196,7 +209,7 @@ public class EcommerceCategoryService {
     @Transactional
     @CacheEvict(value = "ecommerce-categories", allEntries = true)
     public EcommerceCategory changeSortOrder(Long id, Integer sortOrder) {
-        EcommerceCategory category = getCategoryById(id);
+        EcommerceCategory category = loadCategory(id);
         category.changeSortOrder(sortOrder);
         return savePort.save(category);
     }
@@ -204,7 +217,7 @@ public class EcommerceCategoryService {
     @Transactional
     @CacheEvict(value = "ecommerce-categories", allEntries = true)
     public EcommerceCategory activateCategory(Long id) {
-        EcommerceCategory category = getCategoryById(id);
+        EcommerceCategory category = loadCategory(id);
         category.activate();
         return savePort.save(category);
     }
@@ -212,7 +225,7 @@ public class EcommerceCategoryService {
     @Transactional
     @CacheEvict(value = "ecommerce-categories", allEntries = true)
     public EcommerceCategory deactivateCategory(Long id) {
-        EcommerceCategory category = getCategoryById(id);
+        EcommerceCategory category = loadCategory(id);
         category.deactivate();
         return savePort.save(category);
     }
@@ -220,7 +233,7 @@ public class EcommerceCategoryService {
     @Transactional
     @CacheEvict(value = "ecommerce-categories", allEntries = true)
     public void deleteCategory(Long id) {
-        EcommerceCategory category = getCategoryById(id);
+        EcommerceCategory category = loadCategory(id);
 
         long childCount = loadPort.countChildrenByParentId(id);
         if (childCount > 0) {
