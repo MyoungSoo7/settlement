@@ -45,7 +45,7 @@ class CompanyWorkforceTest {
     }
 
     @Test
-    @DisplayName("추정연봉 = (당월고지금액×12) / (가입자수×9%) — 국민연금 대납 보험료 역산")
+    @DisplayName("추정연봉 = (당월고지금액×12) / (가입자수×기준월 보험료율) — 국민연금 대납 보험료 역산")
     void estimatesAnnualSalaryFromPensionContribution() {
         CompanyWorkforce workforce = valid(4, "943140");
         Optional<BigDecimal> estimated = workforce.estimatedAnnualSalary();
