@@ -16,8 +16,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 국민연금 사업장가입자 공개데이터 기반 인원수/추정연봉 조회 (서울 소프트웨어·IT 서비스 사업장 — 기존
+ * 국민연금 사업장가입자 공개데이터 기반 인원수/추정연봉 내부 조회 (서울 소프트웨어·IT 서비스 사업장 — 기존
  * {@code /api/company/companies}(상장사 stockCode 체계)와 무관한 독립 검색).
+ * 세 GET 경로 모두 JWT {@code ADMIN} 또는 {@code MANAGER} 권한이 필요하다.
  */
 @RestController
 @RequestMapping("/api/company/workforce")

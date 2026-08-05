@@ -8,7 +8,7 @@
 
 ## Goal (한 줄)
 
-**company-service에 사업장 키(사업장명+사업자번호 앞6자리) 고정 월별 시계열을 반환하는 공개
+**company-service에 사업장 키(사업장명+사업자번호 앞6자리) 고정 월별 시계열을 반환하는 내부 인증
 GET `/api/company/workforce/history`를 신설해 — 월 오름차순 원시값(인원·추정연봉·상한 플래그)과
 연속 인접 월에만 계산되는 전월 대비 증감(결측 갭·첫 월 null, HALF_UP)을 제공하고 WorkforcePage
 상세에 추이 섹션을 추가하되(단월이면 안내 문구), 보간·명칭변경 재연결·랭킹·집단 추이·이벤트 발행은
@@ -25,7 +25,7 @@ GET `/api/company/workforce/history`를 신설해 — 월 오름차순 원시값
 
 | 포함 | 제외 (인터뷰 Q6에서 전부 명시 제외) |
 |------|------|
-| 신규 GET `/api/company/workforce/history` (공개) | 증감 랭킹 TOP N |
+| 신규 GET `/api/company/workforce/history` (JWT ADMIN/MANAGER) | 증감 랭킹 TOP N |
 | 월 오름차순 시리즈 + 전월 대비 증감 서버 계산 | 업종/지역 집단 추이 |
 | WorkforcePage 상세 추이 섹션 (단월 안내 포함) | 신규/소멸 사업장 탐지 |
 | — | Kafka 이벤트 발행 |
@@ -52,7 +52,7 @@ GET `/api/company/workforce/history`를 신설해 — 월 오름차순 원시값
 
 | AC | 기준 |
 |----|------|
-| AC-1 | 신규 GET `/api/company/workforce/history?name&bizRegNoPrefix`(공개) — 월 오름차순 시리즈(월·인원·추정연봉 문자열·상한 도달 플래그), 미매칭 404 / 형식 위반 400(기존 `{"message"}` 계약, 검증 순서 name → bizRegNoPrefix) |
+| AC-1 | 신규 GET `/api/company/workforce/history?name&bizRegNoPrefix`(JWT ADMIN/MANAGER) — 월 오름차순 시리즈(월·인원·추정연봉 문자열·상한 도달 플래그), 미매칭 404 / 형식 위반 400(기존 `{"message"}` 계약, 검증 순서 name → bizRegNoPrefix) |
 | AC-2 | 증감은 연속 인접 월만 — headcountChange(명)·headcountChangeRate(%)·salaryChange(원 문자열)·salaryChangeRate(%), 결측 갭·첫 월 null, HALF_UP(비율 2자리·금액 0자리), 전월 값 0이면 rate null |
 | AC-3 | 시리즈 키 (사업장명+앞6자리) 고정 — 명칭 변경 단절·보간·재연결 없음을 테스트로 고정 |
 | AC-4 | 단월(길이 1) 시리즈 정상 반환(증감 전부 null) + 화면은 "추이 데이터 1개월" 안내 |
