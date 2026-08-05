@@ -104,6 +104,8 @@ class WorkforceFlywayMigrationTest {
         assertThat(metadata.group(10)).isEqualTo("SOFTWARE_IT_SERVICE");
         assertThat(metadata.find()).isFalse();
         assertThat(sql).contains("0.095::numeric");
+        assertThat(sql).contains("actual_fingerprint", "246de1b02d14f86ccf751c96d3956059");
+        assertThat(sql).doesNotContain("COUNT(*) FROM company_workforce WHERE snapshot_month = '2026-06') <> 4247");
         assertThat(sql).doesNotContain("ALTER TABLE workforce_aggregate_build");
         assertThat(Pattern.compile("(?im)^\\s*(?:BEGIN|COMMIT)\\s*;").matcher(sql).find()).isFalse();
         assertThat(Pattern.compile("\\b(?:double\\s+precision|real)\\b", Pattern.CASE_INSENSITIVE).matcher(sql).find()).isFalse();
@@ -111,7 +113,7 @@ class WorkforceFlywayMigrationTest {
         assertThat(sql).doesNotContain("국민연금공단_국민연금 가입 사업장 내역_20260723.csv");
 
         int lock = sql.indexOf("LOCK TABLE company_workforce,");
-        int precondition = sql.indexOf("<> 4247");
+        int precondition = sql.indexOf("actual_fingerprint IS DISTINCT FROM");
         int workforceDelete = sql.indexOf("DELETE FROM company_workforce WHERE snapshot_month = '2026-06'");
         int buildStart = sql.indexOf("INSERT INTO workforce_aggregate_build");
         int cohortInsert = sql.indexOf("INSERT INTO company_workforce");

@@ -20,6 +20,10 @@ SOURCE_ENCODING = "cp949"
 CHUNK_SIZE = 500
 RATE_LITERAL = "0.095"
 KNOWN_SEED_COUNT = 4247
+KNOWN_SEED_MIGRATION = (
+    Path(__file__).parents[2]
+    / "company-service/src/main/resources/db/migration/V20260804090000__seed_workforce_2026_06.sql"
+)
 SIDO_SUFFIXES = ("특별시", "광역시", "특별자치시", "특별자치도")
 MONTH_PATTERN = re.compile(r"\d{4}-\d{2}")
 DATE_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}")
@@ -57,6 +61,100 @@ class SourceData:
     candidate_count: int
     accepted_count: int
     rejected_count: int
+
+
+@dataclass(frozen=True)
+class SeedFingerprint:
+    row_count: int
+    md5: str
+
+
+def _parse_values_tuples(values_sql: str) -> list[tuple[str | None, ...]]:
+    rows: list[tuple[str | None, ...]] = []
+    fields: list[str | None] = []
+    token: list[str] = []
+    token_was_quoted = False
+    in_quote = False
+    depth = 0
+    index = 0
+
+    def finish_field() -> None:
+        nonlocal token, token_was_quoted
+        value = "".join(token) if token_was_quoted else "".join(token).strip()
+        fields.append(None if not token_was_quoted and value.upper() == "NULL" else value)
+        token = []
+        token_was_quoted = False
+
+    while index < len(values_sql):
+        char = values_sql[index]
+        if in_quote:
+            if char == "'" and index + 1 < len(values_sql) and values_sql[index + 1] == "'":
+                token.append("'")
+                index += 2
+                continue
+            if char == "'":
+                in_quote = False
+            else:
+                token.append(char)
+        elif char == "'":
+            if not token_was_quoted and all(part.isspace() for part in token):
+                token = []
+            in_quote = True
+            token_was_quoted = True
+        elif char == "(":
+            if depth == 0:
+                fields = []
+                token = []
+                token_was_quoted = False
+            else:
+                token.append(char)
+            depth += 1
+        elif char == "," and depth == 1:
+            finish_field()
+        elif char == ")" and depth == 1:
+            finish_field()
+            rows.append(tuple(fields))
+            depth = 0
+        elif depth and not (token_was_quoted and char.isspace()):
+            token.append(char)
+        index += 1
+
+    if in_quote or depth:
+        raise ValueError("unterminated SQL tuple in known seed migration")
+    return rows
+
+
+def _canonical_field(value: str | None) -> str:
+    if value is None:
+        return "-1:"
+    return f"{len(value.encode('utf-8'))}:{value}"
+
+
+def fingerprint_seed_migration(migration_path: Path, snapshot_month: str) -> SeedFingerprint:
+    """Fingerprint every persisted business column in the immutable old seed."""
+    sql = migration_path.read_text(encoding="utf-8")
+    insert_marker = "INSERT INTO company_workforce"
+    row_fingerprints: list[str] = []
+    position = 0
+    while True:
+        insert_at = sql.find(insert_marker, position)
+        if insert_at < 0:
+            break
+        values_at = sql.index("VALUES", insert_at) + len("VALUES")
+        conflict_at = sql.index("ON CONFLICT", values_at)
+        for row in _parse_values_tuples(sql[values_at:conflict_at]):
+            if len(row) != 10:
+                raise ValueError(f"known seed tuple must contain 10 columns, got {len(row)}")
+            if row[7] != snapshot_month:
+                raise ValueError(f"known seed contains unexpected snapshot month: {row[7]!r}")
+            canonical_row = "".join(_canonical_field(value) for value in row)
+            row_fingerprints.append(hashlib.md5(canonical_row.encode("utf-8")).hexdigest())
+        position = conflict_at + len("ON CONFLICT")
+
+    if not row_fingerprints:
+        raise ValueError("known seed migration contains no company_workforce rows")
+    complete_fingerprint = hashlib.md5("".join(sorted(row_fingerprints)).encode("ascii")).hexdigest()
+    return SeedFingerprint(len(row_fingerprints), complete_fingerprint)
 
 
 def parse_region(address: str) -> tuple[str | None, str | None]:
@@ -288,6 +386,11 @@ def render_sql(source: SourceData, release_date: str, snapshot_month: str) -> st
     """Render a byte-stable forward-only Flyway migration without source paths."""
     validate_release_date(release_date)
     validate_snapshot_month(snapshot_month)
+    known_seed = fingerprint_seed_migration(KNOWN_SEED_MIGRATION, snapshot_month)
+    if known_seed.row_count != KNOWN_SEED_COUNT:
+        raise ValueError(
+            f"known seed row count changed: expected {KNOWN_SEED_COUNT}, got {known_seed.row_count}"
+        )
     metadata = f"""-- Description: Replace the known workforce sample with the complete Seoul software/IT-service cohort
 -- Author: Codex
 -- Date: {release_date}
@@ -304,9 +407,31 @@ LOCK TABLE company_workforce,
 IN SHARE ROW EXCLUSIVE MODE;
 
 DO $$
+DECLARE
+    actual_count BIGINT;
+    actual_fingerprint TEXT;
 BEGIN
-    IF EXISTS (SELECT 1 FROM company_workforce WHERE snapshot_month = '{snapshot_month}')
-       AND (SELECT COUNT(*) FROM company_workforce WHERE snapshot_month = '{snapshot_month}') <> {KNOWN_SEED_COUNT} THEN
+    SELECT COUNT(*), MD5(STRING_AGG(row_fingerprint, '' ORDER BY row_fingerprint COLLATE "C"))
+    INTO actual_count, actual_fingerprint
+    FROM (
+        SELECT MD5(
+            OCTET_LENGTH(CONVERT_TO(workplace_name, 'UTF8'))::text || ':' || workplace_name ||
+            CASE WHEN biz_reg_no_prefix IS NULL THEN '-1:' ELSE OCTET_LENGTH(CONVERT_TO(biz_reg_no_prefix, 'UTF8'))::text || ':' || biz_reg_no_prefix END ||
+            CASE WHEN industry_code IS NULL THEN '-1:' ELSE OCTET_LENGTH(CONVERT_TO(industry_code, 'UTF8'))::text || ':' || industry_code END ||
+            CASE WHEN industry_name IS NULL THEN '-1:' ELSE OCTET_LENGTH(CONVERT_TO(industry_name, 'UTF8'))::text || ':' || industry_name END ||
+            CASE WHEN address IS NULL THEN '-1:' ELSE OCTET_LENGTH(CONVERT_TO(address, 'UTF8'))::text || ':' || address END ||
+            CASE WHEN sido IS NULL THEN '-1:' ELSE OCTET_LENGTH(CONVERT_TO(sido, 'UTF8'))::text || ':' || sido END ||
+            CASE WHEN sigungu IS NULL THEN '-1:' ELSE OCTET_LENGTH(CONVERT_TO(sigungu, 'UTF8'))::text || ':' || sigungu END ||
+            OCTET_LENGTH(CONVERT_TO(snapshot_month, 'UTF8'))::text || ':' || snapshot_month ||
+            OCTET_LENGTH(CONVERT_TO(headcount::text, 'UTF8'))::text || ':' || headcount::text ||
+            OCTET_LENGTH(CONVERT_TO(monthly_billed_amount::text, 'UTF8'))::text || ':' || monthly_billed_amount::text
+        ) AS row_fingerprint
+        FROM company_workforce
+        WHERE snapshot_month = '{snapshot_month}'
+    ) known_seed_rows;
+
+    IF actual_count <> {known_seed.row_count}
+       OR actual_fingerprint IS DISTINCT FROM '{known_seed.md5}' THEN
         RAISE EXCEPTION 'Refusing to replace unknown workforce dataset for {snapshot_month}';
     END IF;
 END $$;

@@ -8,6 +8,8 @@ from pathlib import Path
 
 
 MODULE_PATH = Path(__file__).with_name("gen-workforce-seed.py")
+REPOSITORY_ROOT = MODULE_PATH.parents[2]
+OLD_MIGRATION = REPOSITORY_ROOT / "company-service/src/main/resources/db/migration/V20260804090000__seed_workforce_2026_06.sql"
 SPEC = importlib.util.spec_from_file_location("gen_workforce_seed", MODULE_PATH)
 generator = importlib.util.module_from_spec(SPEC)
 assert SPEC.loader is not None
@@ -172,6 +174,20 @@ class WorkforceSeedGeneratorTest(unittest.TestCase):
         self.assertNotIn("double precision", rendered.lower())
         self.assertNotIn("C:\\Users", rendered)
         self.assertNotIn(str(csv_path), rendered)
+
+    def test_fingerprints_every_known_old_seed_column_deterministically(self):
+        fingerprint = generator.fingerprint_seed_migration(OLD_MIGRATION, "2026-06")
+
+        self.assertEqual(4247, fingerprint.row_count)
+        self.assertEqual("246de1b02d14f86ccf751c96d3956059", fingerprint.md5)
+
+        with tempfile.TemporaryDirectory() as directory:
+            source = self.load(self.write_csv(directory, row()))
+            rendered = generator.render_sql(source, "2026-07-23", "2026-06")
+
+        self.assertIn("actual_fingerprint", rendered)
+        self.assertIn("246de1b02d14f86ccf751c96d3956059", rendered)
+        self.assertNotIn("COUNT(*) FROM company_workforce WHERE snapshot_month = '2026-06') <> 4247", rendered)
 
     def test_refuses_malformed_or_injectable_snapshot_month_before_rendering(self):
         with tempfile.TemporaryDirectory() as directory:

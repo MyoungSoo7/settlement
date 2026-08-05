@@ -14,9 +14,31 @@ LOCK TABLE company_workforce,
 IN SHARE ROW EXCLUSIVE MODE;
 
 DO $$
+DECLARE
+    actual_count BIGINT;
+    actual_fingerprint TEXT;
 BEGIN
-    IF EXISTS (SELECT 1 FROM company_workforce WHERE snapshot_month = '2026-06')
-       AND (SELECT COUNT(*) FROM company_workforce WHERE snapshot_month = '2026-06') <> 4247 THEN
+    SELECT COUNT(*), MD5(STRING_AGG(row_fingerprint, '' ORDER BY row_fingerprint COLLATE "C"))
+    INTO actual_count, actual_fingerprint
+    FROM (
+        SELECT MD5(
+            OCTET_LENGTH(CONVERT_TO(workplace_name, 'UTF8'))::text || ':' || workplace_name ||
+            CASE WHEN biz_reg_no_prefix IS NULL THEN '-1:' ELSE OCTET_LENGTH(CONVERT_TO(biz_reg_no_prefix, 'UTF8'))::text || ':' || biz_reg_no_prefix END ||
+            CASE WHEN industry_code IS NULL THEN '-1:' ELSE OCTET_LENGTH(CONVERT_TO(industry_code, 'UTF8'))::text || ':' || industry_code END ||
+            CASE WHEN industry_name IS NULL THEN '-1:' ELSE OCTET_LENGTH(CONVERT_TO(industry_name, 'UTF8'))::text || ':' || industry_name END ||
+            CASE WHEN address IS NULL THEN '-1:' ELSE OCTET_LENGTH(CONVERT_TO(address, 'UTF8'))::text || ':' || address END ||
+            CASE WHEN sido IS NULL THEN '-1:' ELSE OCTET_LENGTH(CONVERT_TO(sido, 'UTF8'))::text || ':' || sido END ||
+            CASE WHEN sigungu IS NULL THEN '-1:' ELSE OCTET_LENGTH(CONVERT_TO(sigungu, 'UTF8'))::text || ':' || sigungu END ||
+            OCTET_LENGTH(CONVERT_TO(snapshot_month, 'UTF8'))::text || ':' || snapshot_month ||
+            OCTET_LENGTH(CONVERT_TO(headcount::text, 'UTF8'))::text || ':' || headcount::text ||
+            OCTET_LENGTH(CONVERT_TO(monthly_billed_amount::text, 'UTF8'))::text || ':' || monthly_billed_amount::text
+        ) AS row_fingerprint
+        FROM company_workforce
+        WHERE snapshot_month = '2026-06'
+    ) known_seed_rows;
+
+    IF actual_count <> 4247
+       OR actual_fingerprint IS DISTINCT FROM '246de1b02d14f86ccf751c96d3956059' THEN
         RAISE EXCEPTION 'Refusing to replace unknown workforce dataset for 2026-06';
     END IF;
 END $$;
