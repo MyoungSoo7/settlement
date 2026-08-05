@@ -26,7 +26,7 @@ public class WorkforceAggregatePersistenceAdapter implements BuildWorkforceAggre
      * ({@code CompanyWorkforce.eligibleForComparison()})과 같은 규칙이다 — 가입자수 0 이나 고지금액 0 은
      * 추정연봉을 산출할 수 없어 두 지표 중 하나를 만들 수 없으므로 모집단에서 뺀다.
      *
-     * <p>추정연봉 역산식도 도메인과 같다: (당월고지금액 × 12) / (가입자수 × 9%), 원 단위 HALF_UP.
+     * <p>추정연봉 역산식도 도메인과 같다: (당월고지금액 × 12) / (가입자수 × 해당월 보험료율), 원 단위 HALF_UP.
      * PostgreSQL {@code round(numeric)} 은 0.5 를 0 에서 먼 쪽으로 올리므로 Java HALF_UP 과 일치한다.
      */
     private static final String ELIGIBLE_GROUPS = """
@@ -150,7 +150,7 @@ public class WorkforceAggregatePersistenceAdapter implements BuildWorkforceAggre
         jdbcTemplate.update(DELETE_AGGREGATE, month);
         jdbcTemplate.update(DELETE_PERCENTILE, month);
         jdbcTemplate.update(INSERT_AGGREGATE, contributionRate, month, month);
-        jdbcTemplate.update(INSERT_PERCENTILE, contributionRate, month, month);
+        jdbcTemplate.update(INSERT_PERCENTILE, contributionRate, month, month, month);
         jdbcTemplate.update(MARK_COMPLETE, month);
     }
 }

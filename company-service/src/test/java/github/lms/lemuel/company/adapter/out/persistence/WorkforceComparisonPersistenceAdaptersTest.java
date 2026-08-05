@@ -159,7 +159,7 @@ class WorkforceComparisonPersistenceAdaptersTest {
             order.verify(jdbcTemplate).update(contains("INSERT INTO workforce_aggregate"),
                     eq(new BigDecimal("0.095")), eq("2026-06"), eq("2026-06"));
             order.verify(jdbcTemplate).update(contains("INSERT INTO workforce_percentile"),
-                    eq(new BigDecimal("0.095")), eq("2026-06"), eq("2026-06"));
+                    eq(new BigDecimal("0.095")), eq("2026-06"), eq("2026-06"), eq("2026-06"));
             order.verify(jdbcTemplate).update(contains("'COMPLETE'"), eq("2026-06"));
         }
 
@@ -197,7 +197,7 @@ class WorkforceComparisonPersistenceAdaptersTest {
                 int rankedBoundary = sql.indexOf(") ranked");
                 int blankFilter = sql.indexOf("biz_reg_no_prefix <> ''");
                 return rankedBoundary > 0 && blankFilter > rankedBoundary;
-            }), eq(new BigDecimal("0.095")), eq("2026-06"), eq("2026-06"));
+            }), eq(new BigDecimal("0.095")), eq("2026-06"), eq("2026-06"), eq("2026-06"));
         }
 
         @Test
