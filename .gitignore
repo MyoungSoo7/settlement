@@ -84,6 +84,8 @@ frontend/playwright/.cache/
 frontend/repro-*.mjs
 
 ### Python sim artifacts ###
+__pycache__/
+*.pyc
 scripts/sim/__pycache__/
 scripts/sim/.sim_state.json
 
