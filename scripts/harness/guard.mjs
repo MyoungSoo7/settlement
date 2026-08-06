@@ -275,6 +275,45 @@ export function dodNudgeMessage(files) {
   return `DoD 넛지(비차단): 돈 경로 프로덕션 변경 ${money.length}건이 테스트 변경 없이 스테이지됨 — tdd-discipline·verify-before-done 절차와 게이트(:module:test + jacoco LINE 90%) 통과를 확인하고 커밋하세요.`;
 }
 
+// 하네스 자체를 이루는 경로 — 여기가 지워지면 가드·스킬·규율이 통째로 사라진다.
+// 실제로 PR #210 에 섞인 삭제 커밋 3개가 .claude(81)·.codex(41)·docs/harness(148) 를 날렸고,
+// 기존 스테이징 스캔이 --diff-filter=ACMR 로 삭제를 아예 보지 않아 그대로 통과했다.
+const PROTECTED_DELETE_ROOTS = ['.claude/', '.codex/', 'scripts/harness/', 'docs/harness/'];
+
+// 위 루트 안이지만 재생성 가능한 세션 상태 — 삭제를 막을 이유가 없다(정리 작업을 방해하지 않는다).
+const PROTECTED_DELETE_EXEMPT = [
+  '.claude/scratch/', '.claude/agent-memory/', '.claude/worktrees/', '.claude/harness/',
+];
+
+/**
+ * 스테이징된 삭제 중 하네스 보호 경로에 해당하는 것을 위반으로 보고한다.
+ *
+ * <p>임계치를 두지 않는다 — "대량이면 막는다"는 규칙은 한 파일씩 여러 커밋으로 나누면 그대로
+ * 뚫린다. 보호 경로의 삭제는 항상 의도적이어야 하므로 1건도 막고, 진짜 지울 때는
+ * {@code HARNESS_ALLOW_DELETE=1} 로 명시적으로 opt-in 한다(그 사실이 실행 기록에 남는다).
+ */
+export function checkProtectedDeletions(deletedFiles, options = {}) {
+  const allowDelete = options.allowDelete ?? process.env.HARNESS_ALLOW_DELETE === '1';
+  if (allowDelete) return [];
+  const violations = [];
+  for (const file of deletedFiles ?? []) {
+    const path = policyPath(file);
+    if (PROTECTED_DELETE_EXEMPT.some((prefix) => path.startsWith(prefix))) continue;
+    if (!PROTECTED_DELETE_ROOTS.some((prefix) => path.startsWith(prefix))) continue;
+    violations.push({
+      file,
+      id: 'HARNESS-DELETE',
+      msg: '하네스 경로 삭제 금지 — 스킬·가드·규율이 사라진다. 의도한 삭제면 HARNESS_ALLOW_DELETE=1 로 실행',
+    });
+  }
+  return violations;
+}
+
+export function discoverStagedDeletions(repoRoot) {
+  const output = execFileSync('git', ['diff', '--cached', '--name-only', '-z', '--diff-filter=D'], { cwd: repoRoot });
+  return output.toString('utf8').split('\0').filter(Boolean);
+}
+
 export function discoverStagedFiles(repoRoot) {
   const output = execFileSync('git', ['diff', '--cached', '--name-only', '-z', '-M', '--diff-filter=ACMR'], { cwd: repoRoot });
   return output.toString('utf8').split('\0').filter(Boolean);
@@ -305,12 +344,22 @@ function emitReport(violations, io = {}) {
 export async function runGuardCli(args, io = {}) {
   const repoRoot = io.repoRoot ?? process.cwd();
   const stderr = io.stderr ?? ((message) => console.error(message));
-  const modes = ['--staged', '--list', '--files', '--hook', '--self-test'].filter((mode) => args.includes(mode));
+  const modes = ['--staged', '--list', '--deleted-list', '--files', '--hook', '--self-test'].filter((mode) => args.includes(mode));
   if (modes.length !== 1) { stderr('exactly one guard mode is required'); return 2; }
   const mode = modes[0];
   if (mode === '--self-test') {
     if (args.length !== 1) return 2;
     return spawnSync(process.execPath, ['--test', fileURLToPath(new URL('./test/guard.test.mjs', import.meta.url))], { cwd: repoRoot, stdio: 'inherit' }).status ?? 2;
+  }
+  if (mode === '--deleted-list') {
+    // CI 는 삭제를 --diff-filter=ACMR 로 걸러 changed.txt 에 담지 않는다. 삭제 목록을 따로 받아
+    // 하네스 보호 경로가 지워졌는지 검사한다 — PR 로 들어온 대량 삭제를 막는 유일한 지점이다.
+    if (args.length !== 2) return 2;
+    try {
+      const listPath = await normalizeRepoPath(repoRoot, args[1]);
+      const deleted = (await readUtf8Strict(listPath)).split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
+      return emitReport(checkProtectedDeletions(deleted), io);
+    } catch (error) { stderr(`guard input failed: ${error.message}`); return 1; }
   }
   if (mode === '--hook') {
     if (args.length !== 1) return 2;
@@ -337,6 +386,8 @@ export async function runGuardCli(args, io = {}) {
     }
     const violations = [];
     for (const file of files) violations.push(...await scanRepoFile(repoRoot, file));
+    // 삭제는 내용 스캔으로 잡히지 않는다(스테이징 목록이 ACMR 로 D 를 빼고 온다) — 별도로 확인한다.
+    if (mode === '--staged') violations.push(...checkProtectedDeletions(discoverStagedDeletions(repoRoot)));
     await logGuardHits(repoRoot, mode.slice(2), violations); // observability only — never affects the verdict
     if (mode === '--staged') {
       const nudge = dodNudgeMessage(files);

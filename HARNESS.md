@@ -132,8 +132,12 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 > | 파일 편집 직전           | PreToolUse `Write\|Edit\|MultiEdit`        | `guard.mjs --hook`                                                                                 | **exit 2 = 편집 차단**                                             |
 > | 파일 편집·스킬 호출 직전 | PreToolUse `Write\|Edit\|MultiEdit\|Skill` | `skill-router.mjs --hook`                                                                          | 차단 없음(항상 exit 0) — 스킬 로드 리마인더 주입                   |
 > | 세션 시작                | SessionStart                               | `telemetry-report.mjs --hook`                                                                      | 차단 없음 — 최근 차단·라우터 순응률 요약 주입(알릴 것 없으면 침묵) |
-> | `git commit`             | `core.hooksPath=scripts/harness/hooks`     | `guard.mjs --staged`                                                                               | **커밋 거부** (`--no-verify` 우회 금지)                            |
-> | PR·push (develop/main)   | `harness-guard.yml`                        | 하네스 자기 테스트 → `guard.mjs --list` → `harness-audit.mjs` → manifest 추적 검증 → 워킹트리 청결 | **CI 실패** (로컬 훅 미설치·우회를 재차단)                         |
+> | `git commit`             | `core.hooksPath=scripts/harness/hooks`     | `guard.mjs --staged` (내용 스캔 + 하네스 경로 삭제 검사)                                           | **커밋 거부** (`--no-verify` 우회 금지)                            |
+> | PR·push (develop/main)   | `harness-guard.yml`                        | 하네스 자기 테스트 → `guard.mjs --list` → `guard.mjs --deleted-list` → `harness-audit.mjs` → manifest 추적 검증 → 워킹트리 청결 | **CI 실패** (로컬 훅 미설치·우회를 재차단)                         |
+>
+> 삭제는 내용 스캔으로 잡히지 않는다 — 스테이징·CI 파일 목록이 `--diff-filter=ACMR` 로 삭제(D)를 빼고 오기 때문이다.
+> 그래서 `--staged`/`--deleted-list` 가 삭제 목록을 따로 받아 하네스 경로를 지키고, 실시간 훅(PreToolUse)은
+> Write/Edit 만 보므로 삭제 축은 커밋·CI 2중이 담당한다.
 >
 > 훅 설치는 `node scripts/harness/install-hooks.mjs` — 미설치 시 로컬 커밋 가드만 비고, 실시간 훅과 CI 는 그대로 산다(3중 구성의 목적).
 
@@ -141,7 +145,10 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 `MONEY-PRIMITIVE` · `MONEY-BIGDECIMAL-DOUBLE`(금액 double/float·`new BigDecimal(더블 리터럴)`) ·
 `IMMUTABLE-HISTORY` · `MSA-BOUNDARY`(settlement→order import, `import static` 포함) · `ACCOUNT-CONSUME-ONLY` ·
 `MARKET-NO-VALUATION` · `OO-DOMAIN-SETTER` · `OO-DOMAIN-MUTABLE-LOMBOK` · `OO-DOMAIN-GENERIC-IAE` ·
-`INVALID-ALLOWANCE`(예외 주석은 reason·issue·owner·미래 expires 필수 — 무기한 면제 금지) · 운영 DB 직접 조작 명령 차단(`check-command`).
+`INVALID-ALLOWANCE`(예외 주석은 reason·issue·owner·미래 expires 필수 — 무기한 면제 금지) ·
+`HARNESS-DELETE`(`.claude/`·`.codex/`·`scripts/harness/`·`docs/harness/` 삭제 — 1건도 차단, 재생성 가능한
+`scratch`·`agent-memory`·`worktrees`·`harness` 는 예외. 의도한 삭제는 `HARNESS_ALLOW_DELETE=1`) ·
+운영 DB 직접 조작 명령 차단(`check-command`).
 
 **skill-router.mjs 라우트 표** (경로 → 주입 스킬, 세션당 스킬별 1회 · 최대 3개): 14개 서비스 디렉토리 → 각 `{서비스}-rules`
 (settlement `ledger` 경로·account 는 `ledger-invariants` 동반) · `outbox/`·`adapter/in/kafka/`·`adapter/out/event/` →
