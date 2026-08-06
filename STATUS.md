@@ -2,17 +2,18 @@
 
 > 이커머스 주문·결제·정산·선정산/기업대출·투자·계정계 + 공개조회 위성(재무제표·경제지표·기업뉴스·시세·공공데이터)·운영관제·AI챗봇 MSA 플랫폼 (Spring Boot 4.0 / Java 25 / 헥사고날)
 
-**Last updated:** 2026-08-04
+**Last updated:** 2026-08-06
 
 ## 현재 상태
 
 - **활성 브랜치:** `develop` (`main` 은 보호 브랜치 — PR 필수·squash 만·필수 CI 2종)
-- **구성:** **14 마이크로서비스** + API Gateway + `shared-common` 공유 라이브러리(버전드 1.0.0)
+- **구성:** **15 마이크로서비스** + API Gateway + `shared-common` 공유 라이브러리(버전드 1.0.0)
   - 거래/금융: order(8088) · settlement(8082) · loan(8084) · investment(8100) · account(8102) · card(8106, 법인카드)
   - 공개조회 위성: financial(8086) · economics(8087) · company(8090) · market(8094) · commondata(8098)
   - 부가: operation(8092) · ai(8096) · organization(8104, 셀러/기업 조직·멤버십)
-- **DB:** 14 서비스 모두 물리 분리(DB-per-service) — opslab / settlement_db / lemuel_{loan,financial,economics,company,operation,market,ai,commondata,investment,account,organization,card}
-- **최근 커밋:** `0c470e95` test(card): Phase2 AC4 ExpenseWorkflowIT·지출관리 비결합·승인지연 테스트 추가
+  - 보험: insurance(8108, GA 보험대리점 플랫폼 — 상담·청약·계약·유지변경·수수료정산)
+- **DB:** 15 서비스 모두 물리 분리(DB-per-service) — opslab / settlement_db / lemuel_{loan,financial,economics,company,operation,market,ai,commondata,investment,account,organization,card,insurance}
+- **최근 커밋:** `fd0fdcbc` feat(insurance): AC9 배포 배선 + 설계 문서
 
 ## 최근 진척 (2026-06-24 이후)
 
@@ -135,10 +136,10 @@
 > ⚠️ 수치는 `build/`·`.claude/worktrees/` 사본을 **제외한 git ls-files 기준**. 각 줄 끝 명령이 정답 —
 > 드리프트 의심 시 명령을 돌려 재검증하고 이 수치를 갱신할 것(휘발성 수치를 명령 없이 손으로 적지 말 것).
 
-- 서비스 **14개** + API Gateway + Kotlin polyglot 2(notification·reconciliation) — `git ls-files '*/src/main/resources/application.yml' | wc -l` → 17(=14+gateway+kotlin 2)
-- Flyway 마이그레이션 **244개** — `git ls-files '*/src/main/resources/db/migration/*.sql' | wc -l` → 244
+- 서비스 **15개** + API Gateway + Kotlin polyglot 2(notification·reconciliation) — `git ls-files '*/src/main/resources/application.yml' | wc -l` → 18(=15+gateway+kotlin 2)
+- Flyway 마이그레이션 **247개** — `git ls-files '*/src/main/resources/db/migration/*.sql' | wc -l` → 247
 - ADR **29개** (0001~0030, 0019 결번 — 세무 ADR 은 0027 충돌로 0029 재부여) — `git ls-files 'docs/adr/[0-9]*.md' | wc -l` → 29
-- 테스트 클래스 **773개** (Testcontainers 통합테스트 포함) — `git ls-files '*/src/test/*Test.java' '*/src/test/*Tests.java' '*/src/test/*IT.java' | wc -l` → 773
+- 테스트 클래스 **791개** (Testcontainers 통합테스트 포함) — `git ls-files '*/src/test/*Test.java' '*/src/test/*Tests.java' '*/src/test/*IT.java' | wc -l` → 791
 - 이벤트 계약 스키마 **35토픽** (ADR 0024, 프로듀서·컨슈머 양방향 테스트 — 담보대출 2종·organization 멤버 2종·카드 8종(2단계 authorized·captured·statement.paid 포함)) — `git ls-files 'shared-common/src/testFixtures/resources/contracts/events/*.schema.json' | wc -l` → 35
 
 ## 최근 전체 검증 (2026-07-29)
