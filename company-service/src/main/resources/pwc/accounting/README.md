@@ -433,13 +433,15 @@ node src/bin/ceo-consulting-pipeline.mjs --company 삼성전자 --business-numbe
 
 > **산출물은 저장소에 포함하지 않습니다.** `outputs/` 는 실존 상장사에 대한 AI 생성 부실징후 진단이라
 > 원문을 공개 저장소에 두지 않고, 실행하면 로컬에 재생성되는 로컬 전용 디렉터리로 둡니다.
+> 예외는 아래 **태영건설 백테스트** 한 벌 — 이미 확정·공개된 과거 사건(2023-12 워크아웃)의 사후
+> 방법론 검증이라 성격이 다르고, 신호 정의의 외부 정답 대조 증거라 동봉합니다.
 
 | 예시 | 모드 | 결과 |
 |---|---|---|
 | `outputs/삼성전자-ceo-pipeline` | 실기업(삼성전자) API-only — identity → 패킷 → 브리핑 → Word | 재현율 2/2 · EVAL PASS |
 | `outputs/naver-ceo-pipeline` | 실기업(NAVER) API-only 파이프라인 완주 | EVAL PASS |
 | `outputs/batch/2026Q2` | 분기 브리핑 배치(`quarterly-briefing-batch`) — 코스피 대형주 20사 일괄 완주 | 기업별 `briefing.md`+`pipeline-next-steps.md` |
-| `outputs/taeyoung-backtest-2022` | 실사례 백테스트 — 태영건설 워크아웃 9개월 전 공시(FY2022)만으로 진단 | E1·E2·E4 동시 발화 |
+| [`outputs/taeyoung-backtest-2022`](outputs/taeyoung-backtest-2022/README.md) ★동봉 | 실사례 백테스트 — 태영건설 워크아웃 9개월 전 공시(FY2022)만으로 진단 | E1·E2·E4 동시 발화 |
 
 ```powershell
 # 산출물 재검증 (네트워크 0 — 위 명령으로 생성된 로컬 패킷 기준)
@@ -513,7 +515,8 @@ submission/
 |-- docs/
 |   |-- poc-trusted-ceo-accounting-agent.md   # PoC 제안서
 |   `-- plugin-evaluation-report.md
-|-- outputs/                        # 라이브 실행 산출물 (로컬 전용 — 저장소 미포함, 실행 시 재생성)
+|-- outputs/                        # 라이브 실행 산출물 (로컬 전용 — 실행 시 재생성)
+|   `-- taeyoung-backtest-2022/     #   예외: 외부 정답 대조 백테스트만 동봉
 |-- engagements/                    # 엔게이지먼트 사이클 상태 (네이버 사이클 1 완주 실증)
 |-- src/
 |   |-- .codex-plugin/plugin.json
@@ -796,7 +799,7 @@ node src/bin/detect-signals.mjs --data-dir src/data/fixtures/clean   # 판정 �
 | 표현 안전성 | 단정 대신 가설, 확신도, 추가 확인 절차로 분리하는가 — `briefing-eval.mjs` 가 단정 표현을 기계 검출 |
 | 도구 연결성 | `dart-smoke.mjs`, `ecos-smoke.mjs`에서 MCP initialize/tools/list/status가 통과하는가 |
 | CEO 적합성 | CEO가 읽어도 "무엇을 결정해야 하는지"가 보이는가 — 사용자는 CEO 한 사람 |
-| **실사례 백테스트** | 신호 정의가 실세계 위기를 사전 포착하는가 — 태영건설 워크아웃(2023-12)을 **사건 9개월 전 공시(FY2022)만으로** 진단해 E1(채권 +73.5% vs 매출 −5.3%)·E2·E4 동시 발화 실측. 건전 코호트 15사에서 재무신호 3종 동시 발화 0건 — `outputs/taeyoung-backtest-2022`(로컬 재생성) |
+| **실사례 백테스트** | 신호 정의가 실세계 위기를 사전 포착하는가 — 태영건설 워크아웃(2023-12)을 **사건 9개월 전 공시(FY2022)만으로** 진단해 E1(채권 +73.5% vs 매출 −5.3%)·E2·E4 동시 발화 실측. 건전 코호트 15사에서 재무신호 3종 동시 발화 0건 — [`outputs/taeyoung-backtest-2022`](outputs/taeyoung-backtest-2022/README.md) |
 | 이익 품질(발생액) | E8: 총자산 대비 발생액(순이익−영업CF) 비율·지속 괴리를 파생 — Sloan(1996) 발생액 문헌 기반 임계값, 건전 코호트 발화율 6.7% 실측(`bin/calibrate.mjs`) |
 
 ## 관련 문서
