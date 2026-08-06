@@ -1,0 +1,7 @@
+{
+  "name": "invest-copilot",
+  "version": "0.1.0",
+  "description": "초보 투자자 매수·매도 기준 AI 플러그인 — 재무제표·경제지표·기업평판 3개 MSA 기반 체크리스트(skills) + 읽기 전용 조회 도구(MCP) + 표현 컴플라이언스 가드(hooks)",
+  "author": { "name": "Lemuel Investment Platform" },
+  "keywords": ["investment", "stock", "fundamentals", "macro", "compliance", "guardrail"]
+}

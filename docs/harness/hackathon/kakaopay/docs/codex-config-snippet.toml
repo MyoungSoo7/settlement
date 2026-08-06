@@ -1,0 +1,20 @@
+# kakaopay-invest-companion — Codex MCP 도구 승인 설정
+# ~/.codex/config.toml 끝에 이 블록을 그대로 붙여넣으세요.
+# (모든 도구가 읽기 전용 조회이므로 approve 가 안전합니다.
+#  비대화 codex exec 에서는 이 설정이 없으면 MCP 호출이 자동 취소됩니다 — 실측 확인)
+
+[plugins."kakaopay-invest-companion@kakaopay-invest-companion-market".mcp_servers.invest-companion-dart]
+enabled = true
+default_tools_approval_mode = "approve"
+
+[plugins."kakaopay-invest-companion@kakaopay-invest-companion-market".mcp_servers.invest-companion-ecos]
+enabled = true
+default_tools_approval_mode = "approve"
+
+[plugins."kakaopay-invest-companion@kakaopay-invest-companion-market".mcp_servers.invest-companion-news]
+enabled = true
+default_tools_approval_mode = "approve"
+
+[plugins."kakaopay-invest-companion@kakaopay-invest-companion-market".mcp_servers.invest-companion-price]
+enabled = true
+default_tools_approval_mode = "approve"

@@ -1,0 +1,24 @@
+{
+  "eval_cases": [
+    {
+      "query": "/ontology 현재 Seed 위에 의미 경계 얹어줘",
+      "should_trigger": true,
+      "expected_behavior": "Reads top-level ## Seed, uses goal as idea, asks boundary and exactly three properties, then replaces top-level ## Ontology."
+    },
+    {
+      "query": "이 goal이 어디까지를 가리키는지 boundary와 property 3개로 정해줘",
+      "should_trigger": true,
+      "expected_behavior": "Creates a single latest ontology layer without asking for action or data types."
+    },
+    {
+      "query": "Seed를 v1에서 v2로 바꿔줘",
+      "should_trigger": false,
+      "expected_behavior": "Route to evolve-step because the user asks to change Seed content."
+    },
+    {
+      "query": "막연한 요청을 goal과 성공기준으로 닫아줘",
+      "should_trigger": false,
+      "expected_behavior": "Route to socrates because the user asks for Seed generation before ontology."
+    }
+  ]
+}

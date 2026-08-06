@@ -1,0 +1,4093 @@
+{
+  "generatedAt": "2026-07-10T16:32:04.584Z",
+  "universe": {
+    "name": "krx-top-demo-universe",
+    "asOf": "2026-07-10",
+    "requested": 66,
+    "used": 66
+  },
+  "periods": [
+    {
+      "key": "FY2023",
+      "year": 2023,
+      "reprtCode": "11011",
+      "label": "2023 연간"
+    },
+    {
+      "key": "FY2024",
+      "year": 2024,
+      "reprtCode": "11011",
+      "label": "2024 연간"
+    },
+    {
+      "key": "FY2025",
+      "year": 2025,
+      "reprtCode": "11011",
+      "label": "2025 연간"
+    },
+    {
+      "key": "RECENT_Q",
+      "year": 2026,
+      "reprtCode": "11013",
+      "label": "2026 1분기"
+    }
+  ],
+  "rules": [
+    {
+      "key": "revenueGrowth",
+      "label": "매출 성장",
+      "detail": "당기 매출(영업수익) > 전기"
+    },
+    {
+      "key": "opGrowth",
+      "label": "영업이익 성장",
+      "detail": "당기 영업이익 > 전기"
+    },
+    {
+      "key": "opMargin",
+      "label": "영업이익률 ≥ 5%",
+      "detail": "영업이익 / 매출 ≥ 5%"
+    },
+    {
+      "key": "netPositive",
+      "label": "순이익 흑자",
+      "detail": "당기순이익 > 0"
+    },
+    {
+      "key": "debtRatio",
+      "label": "부채비율 ≤ 200%",
+      "detail": "부채총계/자본총계 ≤ 200% (금융업 N/A)"
+    }
+  ],
+  "methodology": [
+    "점수 = 재무 규칙 5종 중 충족 개수를 5점 만점으로 정규화한 산업군 평균 (판정 불가 규칙은 분모에서 제외)",
+    "재무 출처: DART 요약재무(fnlttSinglAcnt) — 연결(CFS) 우선, 없으면 별도(OFS)",
+    "금융업(은행·보험·금융지주)은 부채비율 규칙 N/A — 예대·보험부채가 영업의 본질",
+    "한계: 유니버스가 현재 대형주 66종목(생존 편향) · 규칙은 과거 공시 재무 기준 · 점수는 예측이 아니라 규칙 충족 서술"
+  ],
+  "dropped": [],
+  "sectors": [
+    {
+      "sector": "반도체·IT장비",
+      "isFinancial": false,
+      "stockCount": 6,
+      "periods": {
+        "FY2023": {
+          "avgScore5": 2.5,
+          "ratedCount": 6,
+          "totalCount": 6
+        },
+        "FY2024": {
+          "avgScore5": 4.6,
+          "ratedCount": 6,
+          "totalCount": 6
+        },
+        "FY2025": {
+          "avgScore5": 4.7,
+          "ratedCount": 6,
+          "totalCount": 6
+        },
+        "RECENT_Q": {
+          "avgScore5": 4.7,
+          "ratedCount": 6,
+          "totalCount": 6
+        }
+      }
+    },
+    {
+      "sector": "2차전지",
+      "isFinancial": false,
+      "stockCount": 5,
+      "periods": {
+        "FY2023": {
+          "avgScore5": 3.6,
+          "ratedCount": 5,
+          "totalCount": 5
+        },
+        "FY2024": {
+          "avgScore5": 1.4,
+          "ratedCount": 5,
+          "totalCount": 5
+        },
+        "FY2025": {
+          "avgScore5": 3.2,
+          "ratedCount": 5,
+          "totalCount": 5
+        },
+        "RECENT_Q": {
+          "avgScore5": 3.2,
+          "ratedCount": 5,
+          "totalCount": 5
+        }
+      }
+    },
+    {
+      "sector": "바이오·제약",
+      "isFinancial": false,
+      "stockCount": 7,
+      "periods": {
+        "FY2023": {
+          "avgScore5": 3.7,
+          "ratedCount": 7,
+          "totalCount": 7
+        },
+        "FY2024": {
+          "avgScore5": 4.1,
+          "ratedCount": 7,
+          "totalCount": 7
+        },
+        "FY2025": {
+          "avgScore5": 4.6,
+          "ratedCount": 7,
+          "totalCount": 7
+        },
+        "RECENT_Q": {
+          "avgScore5": 4.1,
+          "ratedCount": 7,
+          "totalCount": 7
+        }
+      }
+    },
+    {
+      "sector": "자동차",
+      "isFinancial": false,
+      "stockCount": 4,
+      "periods": {
+        "FY2023": {
+          "avgScore5": 4.8,
+          "ratedCount": 4,
+          "totalCount": 4
+        },
+        "FY2024": {
+          "avgScore5": 4.5,
+          "ratedCount": 4,
+          "totalCount": 4
+        },
+        "FY2025": {
+          "avgScore5": 4.5,
+          "ratedCount": 4,
+          "totalCount": 4
+        },
+        "RECENT_Q": {
+          "avgScore5": 4.5,
+          "ratedCount": 4,
+          "totalCount": 4
+        }
+      }
+    },
+    {
+      "sector": "플랫폼·IT서비스",
+      "isFinancial": false,
+      "stockCount": 3,
+      "periods": {
+        "FY2023": {
+          "avgScore5": 3.7,
+          "ratedCount": 3,
+          "totalCount": 3
+        },
+        "FY2024": {
+          "avgScore5": 4.3,
+          "ratedCount": 3,
+          "totalCount": 3
+        },
+        "FY2025": {
+          "avgScore5": 5,
+          "ratedCount": 3,
+          "totalCount": 3
+        },
+        "RECENT_Q": {
+          "avgScore5": 4,
+          "ratedCount": 3,
+          "totalCount": 3
+        }
+      }
+    },
+    {
+      "sector": "소재·화학",
+      "isFinancial": false,
+      "stockCount": 5,
+      "periods": {
+        "FY2023": {
+          "avgScore5": 2.4,
+          "ratedCount": 5,
+          "totalCount": 5
+        },
+        "FY2024": {
+          "avgScore5": 2.4,
+          "ratedCount": 5,
+          "totalCount": 5
+        },
+        "FY2025": {
+          "avgScore5": 2.6,
+          "ratedCount": 5,
+          "totalCount": 5
+        },
+        "RECENT_Q": {
+          "avgScore5": 3.8,
+          "ratedCount": 5,
+          "totalCount": 5
+        }
+      }
+    },
+    {
+      "sector": "금융",
+      "isFinancial": true,
+      "stockCount": 10,
+      "periods": {
+        "FY2023": {
+          "avgScore5": 4,
+          "ratedCount": 10,
+          "totalCount": 10
+        },
+        "FY2024": {
+          "avgScore5": 4.5,
+          "ratedCount": 10,
+          "totalCount": 10
+        },
+        "FY2025": {
+          "avgScore5": 4.5,
+          "ratedCount": 10,
+          "totalCount": 10
+        },
+        "RECENT_Q": {
+          "avgScore5": 4.4,
+          "ratedCount": 10,
+          "totalCount": 10
+        }
+      }
+    },
+    {
+      "sector": "지주·상사·운송",
+      "isFinancial": false,
+      "stockCount": 4,
+      "periods": {
+        "FY2023": {
+          "avgScore5": 3,
+          "ratedCount": 4,
+          "totalCount": 4
+        },
+        "FY2024": {
+          "avgScore5": 3.8,
+          "ratedCount": 4,
+          "totalCount": 4
+        },
+        "FY2025": {
+          "avgScore5": 3.3,
+          "ratedCount": 4,
+          "totalCount": 4
+        },
+        "RECENT_Q": {
+          "avgScore5": 3.8,
+          "ratedCount": 4,
+          "totalCount": 4
+        }
+      }
+    },
+    {
+      "sector": "가전·소비재",
+      "isFinancial": false,
+      "stockCount": 3,
+      "periods": {
+        "FY2023": {
+          "avgScore5": 3,
+          "ratedCount": 3,
+          "totalCount": 3
+        },
+        "FY2024": {
+          "avgScore5": 4.3,
+          "ratedCount": 3,
+          "totalCount": 3
+        },
+        "FY2025": {
+          "avgScore5": 4.3,
+          "ratedCount": 3,
+          "totalCount": 3
+        },
+        "RECENT_Q": {
+          "avgScore5": 5,
+          "ratedCount": 3,
+          "totalCount": 3
+        }
+      }
+    },
+    {
+      "sector": "통신·유틸리티",
+      "isFinancial": false,
+      "stockCount": 3,
+      "periods": {
+        "FY2023": {
+          "avgScore5": 3.7,
+          "ratedCount": 3,
+          "totalCount": 3
+        },
+        "FY2024": {
+          "avgScore5": 4,
+          "ratedCount": 3,
+          "totalCount": 3
+        },
+        "FY2025": {
+          "avgScore5": 4,
+          "ratedCount": 3,
+          "totalCount": 3
+        },
+        "RECENT_Q": {
+          "avgScore5": 3.3,
+          "ratedCount": 3,
+          "totalCount": 3
+        }
+      }
+    },
+    {
+      "sector": "조선·방산·기계",
+      "isFinancial": false,
+      "stockCount": 9,
+      "periods": {
+        "FY2023": {
+          "avgScore5": 3.6,
+          "ratedCount": 9,
+          "totalCount": 9
+        },
+        "FY2024": {
+          "avgScore5": 4,
+          "ratedCount": 9,
+          "totalCount": 9
+        },
+        "FY2025": {
+          "avgScore5": 4.2,
+          "ratedCount": 9,
+          "totalCount": 9
+        },
+        "RECENT_Q": {
+          "avgScore5": 4.4,
+          "ratedCount": 9,
+          "totalCount": 9
+        }
+      }
+    },
+    {
+      "sector": "게임·엔터",
+      "isFinancial": false,
+      "stockCount": 7,
+      "periods": {
+        "FY2023": {
+          "avgScore5": 3.6,
+          "ratedCount": 7,
+          "totalCount": 7
+        },
+        "FY2024": {
+          "avgScore5": 3.4,
+          "ratedCount": 7,
+          "totalCount": 7
+        },
+        "FY2025": {
+          "avgScore5": 3.1,
+          "ratedCount": 7,
+          "totalCount": 7
+        },
+        "RECENT_Q": {
+          "avgScore5": 4,
+          "ratedCount": 7,
+          "totalCount": 7
+        }
+      }
+    }
+  ],
+  "stocks": [
+    {
+      "code": "005930",
+      "name": "삼성전자",
+      "sector": "반도체·IT장비",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 2,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "000660",
+      "name": "SK하이닉스",
+      "sector": "반도체·IT장비",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": false,
+            "debtRatio": true
+          },
+          "satisfied": 1,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "373220",
+      "name": "LG에너지솔루션",
+      "sector": "2차전지",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 2,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": false,
+            "debtRatio": true
+          },
+          "satisfied": 1,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "207940",
+      "name": "삼성바이오로직스",
+      "sector": "바이오·제약",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "005380",
+      "name": "현대차",
+      "sector": "자동차",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": false,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": false,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": false,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "000270",
+      "name": "기아",
+      "sector": "자동차",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": false,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": false,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "068270",
+      "name": "셀트리온",
+      "sector": "바이오·제약",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": false,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "035420",
+      "name": "NAVER",
+      "sector": "플랫폼·IT서비스",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "035720",
+      "name": "카카오",
+      "sector": "플랫폼·IT서비스",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": false,
+            "opMargin": true,
+            "netPositive": false,
+            "debtRatio": true
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": false,
+            "opMargin": true,
+            "netPositive": false,
+            "debtRatio": true
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "005490",
+      "name": "POSCO홀딩스",
+      "sector": "소재·화학",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 2,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 2,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 2,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": false,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "051910",
+      "name": "LG화학",
+      "sector": "소재·화학",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 2,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": true,
+            "opMargin": false,
+            "netPositive": false,
+            "debtRatio": true
+          },
+          "satisfied": 2,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": false,
+            "debtRatio": true
+          },
+          "satisfied": 1,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "006400",
+      "name": "삼성SDI",
+      "sector": "2차전지",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": false,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 2,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": false,
+            "debtRatio": true
+          },
+          "satisfied": 1,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": false,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "105560",
+      "name": "KB금융",
+      "sector": "금융",
+      "isFinancial": true,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": null,
+            "opGrowth": true,
+            "opMargin": null,
+            "netPositive": true,
+            "debtRatio": null
+          },
+          "satisfied": 2,
+          "applicable": 2,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": null,
+            "opGrowth": true,
+            "opMargin": null,
+            "netPositive": true,
+            "debtRatio": null
+          },
+          "satisfied": 2,
+          "applicable": 2,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": null,
+            "opGrowth": true,
+            "opMargin": null,
+            "netPositive": true,
+            "debtRatio": null
+          },
+          "satisfied": 2,
+          "applicable": 2,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": null,
+            "opGrowth": true,
+            "opMargin": null,
+            "netPositive": true,
+            "debtRatio": null
+          },
+          "satisfied": 2,
+          "applicable": 2,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "055550",
+      "name": "신한지주",
+      "sector": "금융",
+      "isFinancial": true,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": null,
+            "opGrowth": true,
+            "opMargin": null,
+            "netPositive": true,
+            "debtRatio": null
+          },
+          "satisfied": 2,
+          "applicable": 2,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": null,
+            "opGrowth": true,
+            "opMargin": null,
+            "netPositive": true,
+            "debtRatio": null
+          },
+          "satisfied": 2,
+          "applicable": 2,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": null,
+            "opGrowth": true,
+            "opMargin": null,
+            "netPositive": true,
+            "debtRatio": null
+          },
+          "satisfied": 2,
+          "applicable": 2,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": null,
+            "opGrowth": true,
+            "opMargin": null,
+            "netPositive": true,
+            "debtRatio": null
+          },
+          "satisfied": 2,
+          "applicable": 2,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "086790",
+      "name": "하나금융지주",
+      "sector": "금융",
+      "isFinancial": true,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": null,
+            "opGrowth": true,
+            "opMargin": null,
+            "netPositive": true,
+            "debtRatio": null
+          },
+          "satisfied": 2,
+          "applicable": 2,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": null,
+            "opGrowth": true,
+            "opMargin": null,
+            "netPositive": true,
+            "debtRatio": null
+          },
+          "satisfied": 2,
+          "applicable": 2,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": null,
+            "opGrowth": true,
+            "opMargin": null,
+            "netPositive": true,
+            "debtRatio": null
+          },
+          "satisfied": 2,
+          "applicable": 2,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": null,
+            "opGrowth": true,
+            "opMargin": null,
+            "netPositive": true,
+            "debtRatio": null
+          },
+          "satisfied": 2,
+          "applicable": 2,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "316140",
+      "name": "우리금융지주",
+      "sector": "금융",
+      "isFinancial": true,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": null,
+            "opGrowth": false,
+            "opMargin": null,
+            "netPositive": true,
+            "debtRatio": null
+          },
+          "satisfied": 1,
+          "applicable": 2,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": null,
+            "opGrowth": true,
+            "opMargin": null,
+            "netPositive": true,
+            "debtRatio": null
+          },
+          "satisfied": 2,
+          "applicable": 2,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": null,
+            "opGrowth": false,
+            "opMargin": null,
+            "netPositive": true,
+            "debtRatio": null
+          },
+          "satisfied": 1,
+          "applicable": 2,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": null,
+            "opGrowth": false,
+            "opMargin": null,
+            "netPositive": true,
+            "debtRatio": null
+          },
+          "satisfied": 1,
+          "applicable": 2,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "032830",
+      "name": "삼성생명",
+      "sector": "금융",
+      "isFinancial": true,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": null,
+            "opGrowth": true,
+            "opMargin": null,
+            "netPositive": true,
+            "debtRatio": null
+          },
+          "satisfied": 2,
+          "applicable": 2,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": null,
+            "opGrowth": true,
+            "opMargin": null,
+            "netPositive": true,
+            "debtRatio": null
+          },
+          "satisfied": 2,
+          "applicable": 2,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": null,
+            "opGrowth": true,
+            "opMargin": null,
+            "netPositive": true,
+            "debtRatio": null
+          },
+          "satisfied": 2,
+          "applicable": 2,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": null,
+            "opGrowth": true,
+            "opMargin": null,
+            "netPositive": true,
+            "debtRatio": null
+          },
+          "satisfied": 2,
+          "applicable": 2,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "000810",
+      "name": "삼성화재",
+      "sector": "금융",
+      "isFinancial": true,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": null,
+            "opGrowth": true,
+            "opMargin": null,
+            "netPositive": true,
+            "debtRatio": null
+          },
+          "satisfied": 2,
+          "applicable": 2,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": null,
+            "opGrowth": true,
+            "opMargin": null,
+            "netPositive": true,
+            "debtRatio": null
+          },
+          "satisfied": 2,
+          "applicable": 2,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": null,
+            "opGrowth": true,
+            "opMargin": null,
+            "netPositive": true,
+            "debtRatio": null
+          },
+          "satisfied": 2,
+          "applicable": 2,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": null,
+            "opGrowth": true,
+            "opMargin": null,
+            "netPositive": true,
+            "debtRatio": null
+          },
+          "satisfied": 2,
+          "applicable": 2,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "012330",
+      "name": "현대모비스",
+      "sector": "자동차",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": false,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "028260",
+      "name": "삼성물산",
+      "sector": "지주·상사·운송",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": false,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "066570",
+      "name": "LG전자",
+      "sector": "가전·소비재",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "034730",
+      "name": "SK",
+      "sector": "지주·상사·운송",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": false,
+            "debtRatio": true
+          },
+          "satisfied": 1,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 2,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 2,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "015760",
+      "name": "한국전력",
+      "sector": "통신·유틸리티",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": false,
+            "netPositive": false,
+            "debtRatio": false
+          },
+          "satisfied": 2,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": false
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": false
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": false
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "017670",
+      "name": "SK텔레콤",
+      "sector": "통신·유틸리티",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "030200",
+      "name": "KT",
+      "sector": "통신·유틸리티",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": false,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "033780",
+      "name": "KT&G",
+      "sector": "가전·소비재",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": false,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "003550",
+      "name": "LG",
+      "sector": "지주·상사·운송",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": false,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": false,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "096770",
+      "name": "SK이노베이션",
+      "sector": "소재·화학",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 2,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": false,
+            "debtRatio": true
+          },
+          "satisfied": 1,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": false,
+            "netPositive": false,
+            "debtRatio": true
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "011200",
+      "name": "HMM",
+      "sector": "지주·상사·운송",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "009150",
+      "name": "삼성전기",
+      "sector": "반도체·IT장비",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "018260",
+      "name": "삼성에스디에스",
+      "sector": "플랫폼·IT서비스",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 2,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "010130",
+      "name": "고려아연",
+      "sector": "소재·화학",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "034020",
+      "name": "두산에너빌리티",
+      "sector": "조선·방산·기계",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "042660",
+      "name": "한화오션",
+      "sector": "조선·방산·기계",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": false,
+            "netPositive": true,
+            "debtRatio": false
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": false,
+            "netPositive": true,
+            "debtRatio": false
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": false
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": false
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "009540",
+      "name": "HD한국조선해양",
+      "sector": "조선·방산·기계",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": false,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "329180",
+      "name": "HD현대중공업",
+      "sector": "조선·방산·기계",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": false,
+            "netPositive": true,
+            "debtRatio": false
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": false,
+            "netPositive": true,
+            "debtRatio": false
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "012450",
+      "name": "한화에어로스페이스",
+      "sector": "조선·방산·기계",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": false
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": false
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": false
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": false
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "064350",
+      "name": "현대로템",
+      "sector": "조선·방산·기계",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": false
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": false
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "010140",
+      "name": "삼성중공업",
+      "sector": "조선·방산·기계",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": false,
+            "netPositive": false,
+            "debtRatio": false
+          },
+          "satisfied": 2,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": false
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": false
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": false
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "267260",
+      "name": "HD현대일렉트릭",
+      "sector": "조선·방산·기계",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "000100",
+      "name": "유한양행",
+      "sector": "바이오·제약",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": false,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": false,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": false,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "128940",
+      "name": "한미약품",
+      "sector": "바이오·제약",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": false,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": false,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "090430",
+      "name": "아모레퍼시픽",
+      "sector": "가전·소비재",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 2,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "161390",
+      "name": "한국타이어앤테크놀로지",
+      "sector": "자동차",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "011170",
+      "name": "롯데케미칼",
+      "sector": "소재·화학",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": true,
+            "opMargin": false,
+            "netPositive": false,
+            "debtRatio": true
+          },
+          "satisfied": 2,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": false,
+            "debtRatio": true
+          },
+          "satisfied": 2,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": false,
+            "debtRatio": true
+          },
+          "satisfied": 1,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": false,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "024110",
+      "name": "기업은행",
+      "sector": "금융",
+      "isFinancial": true,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": null,
+            "opGrowth": false,
+            "opMargin": null,
+            "netPositive": true,
+            "debtRatio": null
+          },
+          "satisfied": 1,
+          "applicable": 2,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": null,
+            "opGrowth": true,
+            "opMargin": null,
+            "netPositive": true,
+            "debtRatio": null
+          },
+          "satisfied": 2,
+          "applicable": 2,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": null,
+            "opGrowth": true,
+            "opMargin": null,
+            "netPositive": true,
+            "debtRatio": null
+          },
+          "satisfied": 2,
+          "applicable": 2,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": null,
+            "opGrowth": false,
+            "opMargin": null,
+            "netPositive": true,
+            "debtRatio": null
+          },
+          "satisfied": 1,
+          "applicable": 2,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "138040",
+      "name": "메리츠금융지주",
+      "sector": "금융",
+      "isFinancial": true,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": null
+          },
+          "satisfied": 3,
+          "applicable": 4,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": null
+          },
+          "satisfied": 3,
+          "applicable": 4,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": null,
+            "opGrowth": false,
+            "opMargin": null,
+            "netPositive": true,
+            "debtRatio": null
+          },
+          "satisfied": 1,
+          "applicable": 2,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": null,
+            "opGrowth": true,
+            "opMargin": null,
+            "netPositive": true,
+            "debtRatio": null
+          },
+          "satisfied": 2,
+          "applicable": 2,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "323410",
+      "name": "카카오뱅크",
+      "sector": "금융",
+      "isFinancial": true,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": null
+          },
+          "satisfied": 4,
+          "applicable": 4,
+          "basis": "OFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": null
+          },
+          "satisfied": 4,
+          "applicable": 4,
+          "basis": "OFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": null
+          },
+          "satisfied": 4,
+          "applicable": 4,
+          "basis": "OFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": false,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": null
+          },
+          "satisfied": 3,
+          "applicable": 4,
+          "basis": "OFS"
+        }
+      }
+    },
+    {
+      "code": "377300",
+      "name": "카카오페이",
+      "sector": "금융",
+      "isFinancial": true,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": false,
+            "debtRatio": null
+          },
+          "satisfied": 1,
+          "applicable": 4,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": false,
+            "debtRatio": null
+          },
+          "satisfied": 1,
+          "applicable": 4,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": null
+          },
+          "satisfied": 4,
+          "applicable": 4,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": null
+          },
+          "satisfied": 4,
+          "applicable": 4,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "259960",
+      "name": "크래프톤",
+      "sector": "게임·엔터",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": false,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "036570",
+      "name": "엔씨소프트",
+      "sector": "게임·엔터",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 2,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": true,
+            "opMargin": false,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "251270",
+      "name": "넷마블",
+      "sector": "게임·엔터",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": true,
+            "opMargin": false,
+            "netPositive": false,
+            "debtRatio": true
+          },
+          "satisfied": 2,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "352820",
+      "name": "하이브",
+      "sector": "게임·엔터",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": false,
+            "opMargin": true,
+            "netPositive": false,
+            "debtRatio": true
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": false,
+            "debtRatio": true
+          },
+          "satisfied": 2,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": false,
+            "debtRatio": true
+          },
+          "satisfied": 2,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "003670",
+      "name": "포스코퓨처엠",
+      "sector": "2차전지",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": false,
+            "debtRatio": true
+          },
+          "satisfied": 1,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": true,
+            "opMargin": false,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": true,
+            "opMargin": false,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "247540",
+      "name": "에코프로비엠",
+      "sector": "2차전지",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": false,
+            "debtRatio": true
+          },
+          "satisfied": 1,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": true,
+            "opMargin": false,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "086520",
+      "name": "에코프로",
+      "sector": "2차전지",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": false,
+            "debtRatio": true
+          },
+          "satisfied": 1,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": false,
+            "debtRatio": true
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "196170",
+      "name": "알테오젠",
+      "sector": "바이오·제약",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": false,
+            "netPositive": false,
+            "debtRatio": true
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "028300",
+      "name": "HLB",
+      "sector": "바이오·제약",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": false,
+            "debtRatio": true
+          },
+          "satisfied": 1,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": false,
+            "netPositive": false,
+            "debtRatio": true
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": false,
+            "netPositive": false,
+            "debtRatio": true
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": false,
+            "netPositive": false,
+            "debtRatio": true
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "068760",
+      "name": "셀트리온제약",
+      "sector": "바이오·제약",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": false,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "OFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "OFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "OFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "OFS"
+        }
+      }
+    },
+    {
+      "code": "277810",
+      "name": "레인보우로보틱스",
+      "sector": "조선·방산·기계",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": false,
+            "debtRatio": true
+          },
+          "satisfied": 2,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": false,
+            "netPositive": null,
+            "debtRatio": true
+          },
+          "satisfied": 3,
+          "applicable": 4,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": false,
+            "netPositive": null,
+            "debtRatio": true
+          },
+          "satisfied": 3,
+          "applicable": 4,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": null,
+            "debtRatio": true
+          },
+          "satisfied": 2,
+          "applicable": 4,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "035900",
+      "name": "JYP Ent.",
+      "sector": "게임·엔터",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": false,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "293490",
+      "name": "카카오게임즈",
+      "sector": "게임·엔터",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": true,
+            "netPositive": false,
+            "debtRatio": true
+          },
+          "satisfied": 2,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": false,
+            "debtRatio": true
+          },
+          "satisfied": 1,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": false,
+            "debtRatio": true
+          },
+          "satisfied": 1,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": false,
+            "debtRatio": true
+          },
+          "satisfied": 1,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "263750",
+      "name": "펄어비스",
+      "sector": "게임·엔터",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": null,
+            "opGrowth": false,
+            "opMargin": null,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 2,
+          "applicable": 3,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": false,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": false,
+            "debtRatio": true
+          },
+          "satisfied": 2,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "058470",
+      "name": "리노공업",
+      "sector": "반도체·IT장비",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "OFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "OFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "OFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "OFS"
+        }
+      }
+    },
+    {
+      "code": "240810",
+      "name": "원익IPS",
+      "sector": "반도체·IT장비",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": false,
+            "netPositive": false,
+            "debtRatio": true
+          },
+          "satisfied": 1,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": false,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 4,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "CFS"
+        }
+      }
+    },
+    {
+      "code": "403870",
+      "name": "HPSP",
+      "sector": "반도체·IT장비",
+      "isFinancial": false,
+      "periods": {
+        "FY2023": {
+          "verdicts": {
+            "revenueGrowth": true,
+            "opGrowth": true,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 5,
+          "applicable": 5,
+          "basis": "OFS"
+        },
+        "FY2024": {
+          "verdicts": {
+            "revenueGrowth": null,
+            "opGrowth": false,
+            "opMargin": null,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 2,
+          "applicable": 3,
+          "basis": "OFS"
+        },
+        "FY2025": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "OFS"
+        },
+        "RECENT_Q": {
+          "verdicts": {
+            "revenueGrowth": false,
+            "opGrowth": false,
+            "opMargin": true,
+            "netPositive": true,
+            "debtRatio": true
+          },
+          "satisfied": 3,
+          "applicable": 5,
+          "basis": "OFS"
+        }
+      }
+    }
+  ]
+}
