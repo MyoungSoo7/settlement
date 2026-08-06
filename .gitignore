@@ -133,6 +133,14 @@ docs/harness/*
 !docs/harness/hackathon/
 !docs/harness/omc-harness.md
 
+# 제출물 라이브 산출물은 추적 제외 (2026-08-06). 플러그인 코드·스킬은 원격 실행을 위해 계속 추적하되,
+#   ① outputs/ 는 실행하면 재생성되는 산출물이고, 개별 종목의 매수 밴드·손절가가 담긴 리포트가
+#      공개 저장소에 실명으로 남는 형태라 유사투자자문으로 오독될 여지가 있다.
+#   ② submission.zip 은 추적 트리와 중복인 데다, 안에 세션 전사·E2E 로그를 품고 있어
+#      위 `**/submission/logs/` 방어를 우회한다(재압축 때 .env 가 섞여 들어가기 쉬운 구조).
+docs/harness/hackathon/kakaopay/submission/outputs/
+docs/harness/hackathon/musinsa/submission.zip
+
 # 프론트 빌드 산출물 — 배포에 쓰이지 않으므로 추적하지 않는다 (2026-08-01).
 #   frontend/Dockerfile 은 COPY . . 후 `npm run build` 로 소스에서 다시 빌드하고,
 #   ci.yml 도 `npm run build` 결과를 아티팩트로 올린다. 커밋된 dist 를 쓰는 경로가 없다.
