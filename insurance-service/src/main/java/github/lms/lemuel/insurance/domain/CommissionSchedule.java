@@ -17,8 +17,8 @@ import java.util.UUID;
  * <p><b>D6 — 환수(clawback)</b>: 정책 상태 변화 시 환수액 계산.
  * 계약 효력일부터 종료일까지 경과 개월 m:
  * <ul>
- *   <li>m >= 24 → 환수액 0</li>
- *   <li>m < 24 → 환수액 = 기지급 합계 × (24 - m) / 24</li>
+ *   <li>m >= W → 환수액 0 (W = {@link CommissionConstants#CLAWBACK_WINDOW_MONTHS})</li>
+ *   <li>m < W → 환수액 = 기지급 합계 × (W - m) / W</li>
  *   <li>CANCELLED → 전액 환수 (m 무관)</li>
  * </ul>
  *

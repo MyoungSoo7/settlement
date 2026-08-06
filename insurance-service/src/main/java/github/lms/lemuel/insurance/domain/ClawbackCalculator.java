@@ -14,14 +14,14 @@ import java.util.Objects;
  * <p><b>정책</b>:
  * <ul>
  *   <li>계약 효력일부터 종료일까지 완료된 개월 수 m (내림 기준)</li>
- *   <li>m >= 24 → 환수액 0 (24개월 창구 종료)</li>
- *   <li>m < 24 → 환수액 = 기지급 합계 × (24 - m) / 24, 통화 최소단위 절사(DOWN)</li>
+ *   <li>m >= W → 환수액 0 (환수 창구 종료)</li>
+ *   <li>m < W → 환수액 = 기지급 합계 × (W - m) / W, 통화 최소단위 절사(DOWN)</li>
  *   <li>CANCELLED 상태 → m 무관 전액 환수</li>
  *   <li>환수 트리거 상태: SURRENDERED, CANCELLED, EXPIRED(부활기간 도과 소멸)</li>
  * </ul>
  *
- * <p><b>상수 규율 (D6)</b>: 공식의 "24"는 {@link CommissionConstants#CLAWBACK_WINDOW_MONTHS} 로부터만 참조.
- * 매직넘버 금지.
+ * <p><b>상수 규율 (D6)</b>: 공식의 창구 W 는 {@link CommissionConstants#CLAWBACK_WINDOW_MONTHS} 로부터만
+ * 참조한다. 매직넘버 금지 — 리터럴은 그 상수 선언 한 줄에만 존재한다.
  */
 public final class ClawbackCalculator {
 
@@ -68,11 +68,11 @@ public final class ClawbackCalculator {
         int clawbackWindow = CommissionConstants.CLAWBACK_WINDOW_MONTHS;
 
         if (elapsedMonths >= clawbackWindow) {
-            // m >= 24 → 환수액 0
+            // m >= W → 환수액 0 (창구 종료)
             return BigDecimal.ZERO;
         }
 
-        // m < 24 → 환수액 = paidTotal × (24 - m) / 24
+        // m < W → 환수액 = paidTotal × (W - m) / W
         BigDecimal remainingMonths = BigDecimal.valueOf(clawbackWindow - elapsedMonths);
         BigDecimal totalMonths = BigDecimal.valueOf(clawbackWindow);
 

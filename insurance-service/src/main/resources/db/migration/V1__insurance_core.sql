@@ -149,7 +149,7 @@ CREATE TABLE insurance_policies (
     -- 일자
     effective_date               DATE          NOT NULL,   -- 계약 효력일 — D6 환수 기산점, D7 청약철회 기산점
     maturity_date                DATE,                     -- 만기일 — 도래 시 ACTIVE→EXPIRED (D7)
-    lapsed_at                    DATE,                     -- 실효일 — 부활가능기간(24개월) 기산점 (D7)
+    lapsed_at                    DATE,                     -- 실효일 — 부활가능기간(REINSTATEMENT_WINDOW_MONTHS) 기산점 (D7)
 
     -- D7: 연속 납입 실패 횟수 — 2회 연속에서만 ACTIVE→LAPSED (1회로는 전이 없음)
     consecutive_premium_failures INTEGER       NOT NULL DEFAULT 0,
@@ -228,7 +228,7 @@ CREATE TRIGGER trg_servicing_changes_append_only
     FOR EACH ROW EXECUTE FUNCTION servicing_changes_block_modify();
 
 -- ─────────────────────────────────────────────
--- 9. 수수료 스케줄 (D4: 선지급 12회 = 12행, D5: nullable 계층 컬럼, D6: 환수 24개월)
+-- 9. 수수료 스케줄 (D4: 선지급 12회 = 12행, D5: nullable 계층 컬럼, D6: 환수 CLAWBACK_WINDOW_MONTHS)
 -- ─────────────────────────────────────────────
 CREATE TABLE commission_schedules (
     id                   BIGSERIAL      PRIMARY KEY,
@@ -290,4 +290,4 @@ COMMENT ON TABLE insurance_applications IS '청약 언더라이팅. 상태머신
 COMMENT ON TABLE insurance_policies IS '계약 SoR. D7 상태머신 7개 전이만 허용(그 외 InvalidPolicyTransitionException). policy_number 자연키(3단 멱등성 L3).';
 COMMENT ON TABLE policy_coverages IS '계약 보장 내역. coverage_amount 는 loan/investment 가 신용보강 관점으로 이벤트 소비.';
 COMMENT ON TABLE servicing_changes IS '유지·변경 append-only 이력. UPDATE 절대 금지 — trg_servicing_changes_append_only 가 강제.';
-COMMENT ON TABLE commission_schedules IS '수수료 선지급 스케줄. D4: 12회 = 12행, UNIQUE(policy_id,recipient_type,fc_id,installment_no). D5: recipient_type·parent_commission_id nullable (계층 수수료 여지, 계산 로직 미구현). D6: CLAWBACK_WINDOW_MONTHS=24.';
+COMMENT ON TABLE commission_schedules IS '수수료 선지급 스케줄. D4: 12회 = 12행, UNIQUE(policy_id,recipient_type,fc_id,installment_no). D5: recipient_type·parent_commission_id nullable (계층 수수료 여지, 계산 로직 미구현). D6: 환수 창구는 도메인 상수 CLAWBACK_WINDOW_MONTHS 하나로 통일.';

@@ -11,8 +11,8 @@ import java.util.Set;
  * <p>허용 전이는 아래 7개뿐이다:
  * <ol>
  *   <li>ACTIVE → LAPSED : 보험료 납입 2회 연속 실패</li>
- *   <li>LAPSED → ACTIVE : 부활 (실효일로부터 24개월 이내 + 연체 전액 납입)</li>
- *   <li>LAPSED → EXPIRED : 실효일로부터 24개월 경과 소멸</li>
+ *   <li>LAPSED → ACTIVE : 부활 (실효일로부터 부활 창구 이내 + 연체 전액 납입)</li>
+ *   <li>LAPSED → EXPIRED : 실효일로부터 부활 창구 경과 소멸</li>
  *   <li>ACTIVE → SURRENDERED : 계약자 임의 해지</li>
  *   <li>ACTIVE → EXPIRED : 만기일 도래</li>
  *   <li>ACTIVE → CANCELLED : 청약철회 (효력일로부터 15일 이내)</li>
@@ -27,7 +27,7 @@ public enum PolicyStatus {
     /** 유효 계약. 납입·보장 정상. */
     ACTIVE,
 
-    /** 실효. 납입 2회 연속 실패로 전이. 부활 가능 기간(24개월) 동안 ACTIVE 로 복귀 가능. */
+    /** 실효. 납입 2회 연속 실패로 전이. 부활 가능 기간({@code Policy.REINSTATEMENT_WINDOW_MONTHS}) 동안 ACTIVE 로 복귀 가능. */
     LAPSED,
 
     /** 해지 (terminal). 계약자 임의 해지. */

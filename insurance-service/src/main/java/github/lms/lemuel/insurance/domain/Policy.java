@@ -19,8 +19,8 @@ import java.util.Objects;
  * <pre>
  *             [2회 연속 납입 실패]
  *   ACTIVE ────────────────────→ LAPSED
- *     │  ←──────────────────────── │    (부활: 실효일 24개월 이내)
- *     │          [만기]            │    [24개월 경과 소멸]
+ *     │  ←──────────────────────── │    (부활: 실효일부터 부활창구 이내)
+ *     │          [만기]            │    [부활창구 경과 소멸]
  *     │ ──────→ EXPIRED  ←──────── │
  *     │ [해지]                     │
  *     └──────→ SURRENDERED         │
@@ -38,8 +38,11 @@ public class Policy {
     /**
      * D7: 부활 가능 창구 (실효일로부터 이 개월 수 미만까지).
      * 이 기간이 경과하면 LAPSED → EXPIRED 소멸 처리가 가능하다.
+     *
+     * <p><b>D6 상수 규율</b>: 개월 수 자체는 {@link CommissionConstants#CLAWBACK_WINDOW_MONTHS} 한 곳에서만
+     * 선언된다. 부활 창구와 환수 창구는 같은 값을 공유하며, 여기서 리터럴을 다시 적지 않는다.
      */
-    public static final int REINSTATEMENT_WINDOW_MONTHS = 24;
+    public static final int REINSTATEMENT_WINDOW_MONTHS = CommissionConstants.CLAWBACK_WINDOW_MONTHS;
 
     private Long id;
     private final String policyNumber;          // 도메인 자연키 UNIQUE
@@ -111,7 +114,7 @@ public class Policy {
      * 부활 횟수 제한 없음.
      *
      * @param today 부활 처리일
-     * @throws InvalidPolicyTransitionException LAPSED 가 아니거나 24개월 경과 시
+     * @throws InvalidPolicyTransitionException LAPSED 가 아니거나 부활 창구 경과 시
      */
     public void reinstate(LocalDate today) {
         Objects.requireNonNull(today, "today");
@@ -122,7 +125,8 @@ public class Policy {
         long monthsElapsed = ChronoUnit.MONTHS.between(lapsedAt, today);
         if (monthsElapsed >= REINSTATEMENT_WINDOW_MONTHS) {
             throw new InvalidPolicyTransitionException(
-                    "실효일(" + lapsedAt + ")로부터 24개월이 경과해 부활 불가능합니다. 경과=" + monthsElapsed + "개월");
+                    "실효일(" + lapsedAt + ")로부터 " + REINSTATEMENT_WINDOW_MONTHS
+                            + "개월이 경과해 부활 불가능합니다. 경과=" + monthsElapsed + "개월");
         }
         consecutivePremiumFailures = 0;
         transitionTo(PolicyStatus.ACTIVE);
@@ -134,7 +138,7 @@ public class Policy {
      * <p>D7: 실효일로부터 {@value #REINSTATEMENT_WINDOW_MONTHS}개월 경과 후에만 호출 가능.
      *
      * @param today 소멸 판정일
-     * @throws InvalidPolicyTransitionException LAPSED 가 아니거나 24개월 미경과 시
+     * @throws InvalidPolicyTransitionException LAPSED 가 아니거나 부활 창구 미경과 시
      */
     public void expireAfterLapse(LocalDate today) {
         Objects.requireNonNull(today, "today");
@@ -145,7 +149,8 @@ public class Policy {
         long monthsElapsed = ChronoUnit.MONTHS.between(lapsedAt, today);
         if (monthsElapsed < REINSTATEMENT_WINDOW_MONTHS) {
             throw new InvalidPolicyTransitionException(
-                    "실효일(" + lapsedAt + ")로부터 24개월이 경과하지 않아 소멸 처리할 수 없습니다. 경과=" + monthsElapsed + "개월");
+                    "실효일(" + lapsedAt + ")로부터 " + REINSTATEMENT_WINDOW_MONTHS
+                            + "개월이 경과하지 않아 소멸 처리할 수 없습니다. 경과=" + monthsElapsed + "개월");
         }
         transitionTo(PolicyStatus.EXPIRED);
     }
