@@ -3,13 +3,13 @@
 > 저장소 전체 디렉토리·모듈 구조의 정본. 서비스 책임·API 는 [`../SPEC.md`](../SPEC.md),
 > 아키텍처 개요·패턴은 [`ARCHITECTURE.md`](ARCHITECTURE.md), 에이전트 지침은 [`../CLAUDE.md`](../CLAUDE.md) 참조.
 
-## JVM 코어 — Gradle 멀티모듈 (Java 13 서비스 + Gateway + shared-common)
+## JVM 코어 — Gradle 멀티모듈 (Java 14 서비스 + Gateway + shared-common)
 
 ```
 settlement/                              # 모노레포 루트
-├── settings.gradle.kts                  # 13 서비스 + gateway 모듈 선언 (shared-common 은 composite build)
+├── settings.gradle.kts                  # 14 서비스 + gateway 모듈 선언 (shared-common 은 composite build)
 ├── build.gradle.kts                     # 부모 빌드 (subprojects 공통 설정, JaCoCo LINE 90% 게이트)
-├── docker-compose.yml                   # PG 13종 · ES · Redpanda · 13 services + gateway
+├── docker-compose.yml                   # PG 14종 · ES · Redpanda · 14 services + gateway
 ├── Dockerfile                           # MODULE 빌드 인자 파라미터화 (JVM 서비스 공용)
 │
 ├── shared-common/                       # 📦 버전드 플랫폼 라이브러리 (java-library, ADR 0021)
@@ -52,6 +52,7 @@ settlement/                              # 모노레포 루트
 ├── account-service/                     # 🏦 Account (8102, lemuel_account) — 계정계 GL 집계 (소비 전용)
 ├── organization-service/                # 👥 Organization (8104, lemuel_organization) — 조직·멤버십 (발행 전용)
 ├── card-service/                        # 💳 Card (8106/mgmt 8107, lemuel_card) — 법인카드 카드계정·카드 (도메인·정책만, 영속/REST/스케줄러 미구현)
+├── insurance-service/                   # 🛡️ Insurance (8108/mgmt 8109, lemuel_insurance) — GA 보험대리점 플랫폼: 상담·청약·계약·유지변경·수수료정산. shared-common 의존
 └── gateway-service/                     # 🚪 API Gateway (8080) — 라우팅만 (자체 인증 필터 없음)
 ```
 

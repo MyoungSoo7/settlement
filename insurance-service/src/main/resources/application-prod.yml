@@ -1,0 +1,3 @@
+app:
+  security:
+    internal-key-required: true
