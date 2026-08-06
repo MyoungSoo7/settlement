@@ -108,7 +108,7 @@ frontend/*.out.log
 ### Codex isolated worktrees ###
 .worktrees/
 
-
+docs/inflearn
 docs/harness2
 
 ### Claude Code 하네스·세션 아티팩트 (실행 중 생성 — 이력 제외) ###
