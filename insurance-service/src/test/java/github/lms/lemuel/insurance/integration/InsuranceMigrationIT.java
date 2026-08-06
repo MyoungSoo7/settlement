@@ -16,13 +16,16 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  *
  * <p>검증 항목:
  * <ul>
- *   <li>D4: commission_schedules 의 UNIQUE(policy_id, recipient_type, fc_id, installment_no) 제약</li>
+ *   <li>D4: commission_schedules 의 installment_no 범위 CHECK 제약(1~12)</li>
  *   <li>D5: recipient_type, parent_commission_id 가 NULL 허용 컬럼임을 확인</li>
  *   <li>D7: insurance_policies 의 status CHECK 제약 (5개 상태만 허용)</li>
  *   <li>D2: consultations 의 status CHECK 제약 (5개 상태만 허용)</li>
  *   <li>servicing_changes 의 append-only 트리거 (UPDATE 거부)</li>
  *   <li>policy_number 의 UNIQUE 제약 (3단 멱등성 L3)</li>
  * </ul>
+ *
+ * <p>D4 의 UNIQUE(policy_id, recipient_type, fc_id, installment_no) 제약은
+ * {@link CommissionScheduleUniqueConstraintIT} 가 전담한다(네 컬럼의 식별력·폐기안 부재까지).
  */
 class InsuranceMigrationIT extends InsuranceIntegrationTestSupport {
 
@@ -30,57 +33,8 @@ class InsuranceMigrationIT extends InsuranceIntegrationTestSupport {
     JdbcTemplate jdbc;
 
     // ────────────────────────────────────────────────────────────────────
-    // D4: 수수료 스케줄 UNIQUE 제약 검증
+    // D4: 수수료 회차 범위 CHECK 제약 (UNIQUE 제약은 CommissionScheduleUniqueConstraintIT 담당)
     // ────────────────────────────────────────────────────────────────────
-
-    @Test
-    @DisplayName("D4: commission_schedules — UNIQUE(policy_id, recipient_type, fc_id, installment_no) 위반 시 DataIntegrityViolationException")
-    void d4CommissionUniqueConstraintEnforced() {
-        UUID policyId = UUID.randomUUID();
-        UUID commId1 = UUID.randomUUID();
-        UUID commId2 = UUID.randomUUID();
-
-        // 첫 번째 row 삽입 (installment_no=1)
-        jdbc.update("""
-                INSERT INTO opslab.commission_schedules
-                    (commission_id, policy_id, fc_id, recipient_type, installment_no,
-                     installment_amount, first_year_total, due_date, status)
-                VALUES (?, ?, 'fc-001', 'FC', 1, 100000.00, 1200000.00, '2026-09-01', 'SCHEDULED')
-                """, commId1, policyId);
-
-        // 같은 (policy_id, recipient_type, fc_id, installment_no) 로 두 번째 row — 위반
-        assertThatThrownBy(() -> jdbc.update("""
-                INSERT INTO opslab.commission_schedules
-                    (commission_id, policy_id, fc_id, recipient_type, installment_no,
-                     installment_amount, first_year_total, due_date, status)
-                VALUES (?, ?, 'fc-001', 'FC', 1, 100000.00, 1200000.00, '2026-09-01', 'SCHEDULED')
-                """, commId2, policyId))
-                .isInstanceOf(DataIntegrityViolationException.class);
-    }
-
-    @Test
-    @DisplayName("D4: 같은 policy_id·fc_id 라도 installment_no 가 다르면 12행 모두 삽입 가능")
-    void d4TwelveInstallmentsCanCoexist() {
-        UUID policyId = UUID.randomUUID();
-
-        // 12회차 모두 삽입
-        for (int i = 1; i <= 12; i++) {
-            final int installmentNo = i;
-            // 나머지는 마지막 회차에 가산 (D6) — 11회 × 100000 + 마지막 1회 100012 = 1200012? 여기선 테스트 단순화
-            long amount = (installmentNo < 12) ? 100000L : 100000L;
-            jdbc.update("""
-                    INSERT INTO opslab.commission_schedules
-                        (commission_id, policy_id, fc_id, recipient_type, installment_no,
-                         installment_amount, first_year_total, due_date, status)
-                    VALUES (?, ?, 'fc-twin', 'FC', ?, ?, 1200000.00, '2026-09-01', 'SCHEDULED')
-                    """, UUID.randomUUID(), policyId, installmentNo, new java.math.BigDecimal(amount));
-        }
-
-        Long count = jdbc.queryForObject(
-                "SELECT count(*) FROM opslab.commission_schedules WHERE policy_id = ?",
-                Long.class, policyId);
-        assertThat(count).isEqualTo(12L);
-    }
 
     @Test
     @DisplayName("D4: installment_no 범위 위반 (0, 13) 시 CHECK 제약 실패")
