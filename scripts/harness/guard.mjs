@@ -34,7 +34,7 @@ function policyPath(filePath) {
 }
 
 // Money-scope = files where BigDecimal / immutable-history rules are non-negotiable.
-const MONEY_SCOPE = /(settlement|ledger|payout|chargeback|loan|payment|investment|account|pgreconciliation|recon)/i;
+const MONEY_SCOPE = /(settlement|ledger|payout|chargeback|loan|payment|investment|account|insurance|pgreconciliation|recon)/i;
 const JAVA_KT = /\.(java|kt)$/i;
 const SQL = /\.sql$/i;
 // Money math lives in domain/application; adapters legitimately use double for
@@ -47,7 +47,7 @@ const isProd = (f) => !/\/src\/test\//.test(f);
 // 도메인 프로덕션 소스만 대상. common/audit(감사 인프라 DTO)은 3회 패널 모두 대상 밖 판정.
 const isDomainMain = (f) => JAVA_KT.test(f) && /\/src\/main\/java\/.+\/domain\//.test(f) && !/common\/audit\//.test(f);
 // generic 예외 금지는 캠페인이 청정화를 완료한 5개 금융 서비스에 한정(위성 서비스는 oo-score 스킬로 채점).
-const CAMPAIGN_SERVICES = /(settlement|order|loan|investment|account)-service\//;
+const CAMPAIGN_SERVICES = /(settlement|order|loan|investment|account|insurance)-service\//;
 
 // settlement-service 가 import 해도 되는 자기 바운디드 컨텍스트(+shared-common `common`).
 // 이 집합의 여집합(order 컨텍스트: order/user/cart/product/coupon/shipping/payment/review/game/category/menu/rbac…)은

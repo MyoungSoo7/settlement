@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  테스트 전용 로깅 설정 — 로그를 콘솔이 아니라 파일로 보낸다.
+
+  가독성 때문이 아니라 빌드 안정성 때문이다. Gradle 은 테스트가 뿜은 stdout/stderr 를
+  build/test-results/test/binary/output.bin 한 파일에 이어 쓰고, 클래스별 (offset, length)
+  구간을 output.bin.idx 에 적어 두었다가 리포트 단계에서 그 구간을 되읽어 JUnit XML 의
+  <system-out> 에 심는다. 이 저장소가 어긋나면 테스트는 전부 통과했는데도
+  'Could not write XML test results ... EOFException' 으로 test 태스크가 통째로 실패한다
+  (원인을 찾기 어려운 형태의 빨간불이다).
+
+  스프링 컨텍스트를 띄우는 통합테스트는 부팅 로그만 12KB 를 넘기고, 컨텍스트 기동 실패를
+  일부러 유도하는 테스트는 실패 리포트를 stderr 로 크게 쏟는다. 콘솔로 나가지 않으면
+  output.bin 에 구간 자체가 생기지 않으므로 이 실패 모드가 성립하지 않는다.
+
+  로그를 버리는 것이 아니라 build/test-logs/insurance-test.log 로 옮기는 것이다. 실패 원인을
+  파고들 때는 그 파일을 보면 되고, 로그로 단정하는 테스트는 이 모듈에 없다
+  (OutputCaptureExtension 미사용).
+-->
+<configuration>
+
+    <appender name="FILE" class="ch.qos.logback.core.FileAppender">
+        <file>build/test-logs/insurance-test.log</file>
+        <append>false</append>
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="FILE"/>
+    </root>
+
+</configuration>

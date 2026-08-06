@@ -68,6 +68,10 @@ subprojects {
         // JWT_SECRET 과 동일하게 env 필수(기본값 없음) — 테스트 부팅 시 미해결 실패를 막기 위해 주입한다.
         // 운영 배포는 반드시 강한 CHAT_ENC_KEY 를 주입할 것. (decode → "test-only-chat-enc-key-012345678")
         environment("CHAT_ENC_KEY", "dGVzdC1vbmx5LWNoYXQtZW5jLWtleS0wMTIzNDU2Nzg=")
+        // 보험 PII 암호화 키(Base64 32바이트=AES-256). insurance-service PiiEncryptionConverter 는
+        // JWT_SECRET 과 동일하게 env 필수(기본값 없음) — 테스트 부팅 시 미해결 실패를 막기 위해 주입한다.
+        // 운영 배포는 반드시 강한 INSURANCE_ENC_KEY 를 주입할 것. (decode → "test-only-ins-enc-key-0123456789")
+        environment("INSURANCE_ENC_KEY", "dGVzdC1vbmx5LWlucy1lbmMta2V5LTAxMjM0NTY3ODk=")
     }
 
     tasks.named<JacocoReport>("jacocoTestReport") {
@@ -129,6 +133,7 @@ subprojects {
                     "**/AiServiceApplication*",
                     "**/InvestmentServiceApplication*",
                     "**/AccountServiceApplication*",
+                    "**/InsuranceServiceApplication*",
                 )
             }
         })
@@ -157,6 +162,7 @@ subprojects {
                     "github.lms.lemuel.investment.domain.*",
                     "github.lms.lemuel.financial.domain.*",
                     "github.lms.lemuel.ai.chat.domain.*",
+                    "github.lms.lemuel.insurance.domain.*",
                     // common.outbox.domain 게이트는 shared-common 독립 빌드로 이관됨
                 )
                 limit {
