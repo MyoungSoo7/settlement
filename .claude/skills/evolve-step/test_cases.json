@@ -1,0 +1,24 @@
+{
+  "eval_cases": [
+    {
+      "query": "/evolve-step 현재 Seed의 사각지대 검토",
+      "should_trigger": true,
+      "expected_behavior": "Reads the top-level ## Seed, generates exactly six blind-spot candidates, waits for user ☑/☒ adoption, updates top-level ## Seed, and appends audit to evolve-step.md."
+    },
+    {
+      "query": "Seed v1을 v2로 진화시켜줘. 채택한 것만 반영해",
+      "should_trigger": true,
+      "expected_behavior": "Preserves v1, applies only user-adopted candidates, and writes a one-line transferred meaning."
+    },
+    {
+      "query": "막연한 요청에서 처음부터 Seed 만들어줘",
+      "should_trigger": false,
+      "expected_behavior": "Route to socrates because no existing Seed is provided."
+    },
+    {
+      "query": "Seed의 의미 boundary와 properties 3개를 정해줘",
+      "should_trigger": false,
+      "expected_behavior": "Route to ontology because the user asks for semantic boundary, not Seed evolution."
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "eval_cases": [
+    {
+      "query": "/socrates task 관리 CLI 만들고 싶다",
+      "should_trigger": true,
+      "expected_behavior": "Runs Wonder, Reflect, Refine, and Restate under ## Cycle N sections, then writes the latest Seed to the top-level ## Seed section."
+    },
+    {
+      "query": "막연한 요청을 goal, constraints, acceptance_criteria로 닫아줘",
+      "should_trigger": true,
+      "expected_behavior": "Creates a Seed without guessing missing slots; marks unresolved slots as empty after the safety valve."
+    },
+    {
+      "query": "이 Seed의 사각지대만 봐줘",
+      "should_trigger": false,
+      "expected_behavior": "Route to evolve-step because a Seed already exists and only blind spots are requested."
+    },
+    {
+      "query": "온톨로지 경계만 정해줘",
+      "should_trigger": false,
+      "expected_behavior": "Route to ontology because the user is not asking for Seed generation."
+    }
+  ]
+}
