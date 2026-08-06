@@ -1,6 +1,7 @@
 # ADR 0032 — 수수료율 유효기간 정책 (effective-dated rate + scope 우선순위)
 
 - 상태: **Proposed** (결정 대기 — 오너 확정 필요 항목 4건)
+  - 기술 선행조건이던 `btree_gist` 가용성은 **해소됨**(2026-08-07 실기동 확인, §4-1). 남은 대기는 정책 판단뿐이다.
 - 일자: 2026-08-06
 - 관련: ADR 0014(등급별 요율 — 본 ADR 이 **확장**하는 대상), ADR 0004(DONE 정산 불변),
   ADR 0020(프로젝션 CQRS — CATEGORY scope 제약의 원인), ADR 0031(셀러 등급 라이프사이클),
@@ -130,6 +131,19 @@ ResolvedRate resolve(List<CommissionRatePolicy> candidates, SellerTier tier, Loc
 `DEFAULT`). 셀러 문의 시 "왜 3.5% 인가"에 정확히 답하기 위한 최소 정보이며, `settlement-explain` 스킬의
 설명 품질이 이 컬럼에 직접 의존한다. 기존 행은 NULL → `DEFAULT` 로 해석한다.
 
+### 4-1. EXCLUDE 제약 실증 (2026-08-07)
+
+설계 전체가 "기간 중첩을 DB 가 거부한다"에 걸려 있어, 스키마를 실제 PG17 에 올려 확인했다.
+
+| 시나리오 | 결과 |
+|---|---|
+| 인접 구간 2건(`[01-01, 09-01)` + `[09-01, ∞)`) | 통과 — 경계 접촉은 중첩이 아니다(`[)` 반열림) |
+| 같은 `(scope, scope_key)` 중첩 삽입 | **거부** — `conflicting key value violates exclusion constraint` |
+| 다른 `scope_key` 로 같은 기간 | 통과 — scope 별로 독립 |
+
+`COALESCE(effective_to, '9999-12-31')` 로 무기한(NULL)을 표현한 부분도 중첩 판정에 정상 참여한다
+(무기한 행이 이후 삽입을 막는 것을 확인).
+
 ### 5. 불변식 (테스트로 못박을 것)
 
 1. 요율은 `BigDecimal`. `double`/`float` 금지 — 사례 코드베이스가 `Float` 로 한 바로 그 지점.
@@ -159,7 +173,8 @@ GET    /admin/commission-rates/simulate?sellerId=&at=     # 해석 결과 + sour
 - 적용 근거(`commission_rate_source`)가 정산 문의 대응에 직접 쓰인다.
 
 ### 트레이드오프 / 리스크
-- `btree_gist` extension 의존 추가 — settlement_db 한정. Testcontainers 이미지에서 사용 가능 여부 **선확인 필요**.
+- `btree_gist` extension 의존 추가 — settlement_db 한정. **가용성 확인 완료(2026-08-07)**: `postgres:17-alpine`
+  (Testcontainers·compose 가 쓰는 바로 그 이미지)에 `btree_gist 1.7` 이 번들돼 `CREATE EXTENSION` 이 즉시 통과한다.
 - 정책 오등록의 영향이 즉각적이다(다음 정산부터 반영). → `simulate` + dryRun 을 운영 절차로 강제.
 - 요율 해석 쿼리가 정산 생성 경로에 1건 추가된다. 캐시는 **넣지 않는다**(발효일 경계에서 stale 위험 > 이득).
 - CATEGORY scope 미지원이 1단계 한계로 남는다(결정 포인트 4).
@@ -176,7 +191,7 @@ GET    /admin/commission-rates/simulate?sellerId=&at=     # 해석 결과 + sour
 
 ## 구현 체크리스트
 
-- [ ] `btree_gist` 가용성 확인 (로컬 · Testcontainers · 운영 PG17)
+- [x] `btree_gist` 가용성 확인 — `postgres:17-alpine` 에 1.7 번들(2026-08-07 실기동 확인). 운영도 같은 이미지 계열
 - [ ] Flyway `V{timestamp}__commission_rate_policy.sql` (+ `settlements.commission_rate_source`)
 - [ ] `resolve()` 순수 함수 단위 테스트 — 우선순위·경계일(`[from, to)`)·폴백·빈 테이블
 - [ ] EXCLUDE 제약 통합 테스트 — 중첩 INSERT 가 **DB 레벨에서** 거부되는지 (Testcontainers)
