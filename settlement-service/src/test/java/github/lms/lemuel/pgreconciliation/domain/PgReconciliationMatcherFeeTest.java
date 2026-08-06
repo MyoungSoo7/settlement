@@ -63,7 +63,7 @@ class PgReconciliationMatcherFeeTest {
     }
 
     @Test
-    @DisplayName("FEE_MISMATCH 는 신고 실입금과 계산 실입금을 양쪽 다 보존 — 운영자가 차액 원인을 본다")
+    @DisplayName("FEE_MISMATCH 는 신고·계산 실입금을 양쪽 다 보존하고, 차액 부호로 방향까지 남긴다")
     void feeMismatchKeepsBothSides() {
         var pg = List.of(pgWithDeposit("TX-1", "10000",
                 PgFeeBreakdown.legacy(new BigDecimal("300")), "9500"));   // 계산 9700
@@ -73,7 +73,22 @@ class PgReconciliationMatcherFeeTest {
 
         assertThat(d.getInternalAmount()).isEqualByComparingTo("9700");  // 우리 계산 = 정답지
         assertThat(d.getPgAmount()).isEqualByComparingTo("9500");        // PG 신고
-        assertThat(d.getDifference()).isEqualByComparingTo("200");
+        // 기존 규약 difference = pgAmount − internalAmount. 음수 = PG 가 계산보다 덜 신고(자금 부족),
+        // 양수 = 더 신고. 절대값만 남기면 "덜 들어왔는지 더 들어왔는지"가 사라진다.
+        assertThat(d.getDifference()).isEqualByComparingTo("-200");
+    }
+
+    @Test
+    @DisplayName("과다 입금은 차액이 양수 — 부족과 과다를 부호로 구분한다")
+    void depositExcessKeepsPositiveSign() {
+        var pg = List.of(pgWithDeposit("TX-1", "10000",
+                PgFeeBreakdown.legacy(new BigDecimal("300")), "9800"));   // 계산 9700
+        var internal = List.of(internal(1L, "TX-1", "10000"));
+
+        var d = PgReconciliationMatcher.match(RUN, pg, internal).discrepancies().getFirst();
+
+        assertThat(d.getType()).isEqualTo(DiscrepancyType.FEE_MISMATCH);
+        assertThat(d.getDifference()).isEqualByComparingTo("100");
     }
 
     @Test
