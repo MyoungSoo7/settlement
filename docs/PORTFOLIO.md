@@ -2,7 +2,7 @@
 
 > **이커머스 주문 → 셀러 정산 → 복식부기 원장까지, "정확성을 기계로 강제한" 커머스 백엔드.**
 > 핵심은 커머스(order)·정산(settlement) 두 축의 **깊이**이고, 그 위에 대출·투자·계정계·재무·경제·평판·관제·시세·AI·공공데이터 **위성 서비스로 도메인 확장력**을 증명한다.
-> 이커머스·결제·정산 솔루션 회사 (무신사·배민·컬리·오늘의집 · 카페24·아임웹 · 토스페이먼츠·KG이니시스 등) 백엔드 면접용.
+> 이커머스 플랫폼 · 커머스 SaaS · 결제/정산 솔루션 도메인의 백엔드 포지션을 염두에 둔 1장 요약.
 
 🔗 **GitHub**: https://github.com/MyoungSoo7/settlement (`develop` 브랜치)
 
@@ -13,16 +13,18 @@
 | 항목 | 수치 |
 |---|---|
 | **Java / Spring Boot** | 25 / 4.0.4 |
-| **마이크로서비스** | **13 비즈니스 서비스 + API Gateway** + `shared-common` 라이브러리 |
-| **DB 분리** | **DB-per-service (13 DB 물리 분리, cross-DB 연결 0)** — opslab / settlement_db / lemuel_loan … |
-| **Flyway 마이그레이션** | **195 개** (order 86 / settlement·loan·company 등 분산) |
-| **ADR** | **26 개** (0001 ~ 0027, 0019 결번) |
-| **테스트** | **테스트 소스 578개 파일** — 핵심 정산 모듈 **520 테스트 실측 통과** |
-| **커버리지 (검증)** | **정산 모듈 LINE 94.17%** (게이트 90%) — [SETTLEMENT-VERIFICATION.md](SETTLEMENT-VERIFICATION.md) |
+| **마이크로서비스** | **14 비즈니스 서비스 + API Gateway** + `shared-common` 라이브러리 |
+| **DB 분리** | **DB-per-service (14 DB 물리 분리, cross-DB 연결 0)** — opslab / settlement_db / lemuel_loan … |
+| **Flyway 마이그레이션** | **248 개** (order·settlement·loan·company 등 분산) |
+| **ADR** | **31 개** (0001 ~ 0032, 0019 결번) |
+| **테스트** | **테스트 클래스 792개** — 핵심 정산 모듈 **520 테스트 실측 통과**(2026-07-12 측정) |
+| **커버리지 (검증)** | **정산 모듈 LINE 94.17%** (게이트 90%, 2026-07-12 측정) — [SETTLEMENT-VERIFICATION.md](SETTLEMENT-VERIFICATION.md) |
 | **부하테스트** | 4 시나리오 (k6) |
 
-> **깊이는 의도적으로 배분했다.** order(417 파일)·settlement(247 파일)가 시그니처이고,
-> 위성 서비스(각 26~40 파일)는 공개조회·수집형이라 **얇은 것이 미완성이 아니라 스코프 선택**이다.
+> 휘발성 수치는 문서에 박제하지 않는다 — 각 수치 옆의 `git ls-files` 명령을 그때그때 실행한 결과가 정답이다.
+
+> **깊이는 의도적으로 배분했다.** order(449 파일)·settlement(453 파일)가 시그니처이고,
+> 위성 서비스(각 39~44 파일)는 공개조회·수집형이라 **얇은 것이 미완성이 아니라 스코프 선택**이다.
 
 ---
 
@@ -158,18 +160,18 @@ settlement.created / settlement.confirmed 이벤트만 수신 (코드·DB 의존
 
 ---
 
-## 적용 가능 회사군
+## 도메인별로 무엇이 강점인가
 
-### 이커머스 마켓플레이스 (무신사 / 배민 / 컬리 / 오늘의집 / 29CM / 에이블리)
+### 이커머스 마켓플레이스
 **강점**: 커머스 도메인 + SKU 동시성 + 셀러 등급별 차등 정산 + **셀러 정산 사이클 닫힘(Holdback→Payout→원장)** — 커머스의 어려운 뒷단(정산·회계)까지 소유
 
-### 이커머스 솔루션 (카페24 / 아임웹 / NHN커머스)
+### 이커머스 솔루션 / 커머스 SaaS
 **강점**: 균형 잡힌 커머스 도메인 + 장바구니 + 관리자(RBAC/메뉴/공통코드) + 정산
 
-### 결제 회사 (토스페이먼츠 / KG이니시스 / NICE페이먼츠 / KCP)
+### 결제(PG)
 **강점**: 다중 PG + Outbox 멱등 3단 + 분할결제 역순 환불 + 분산 트레이싱
 
-### 정산 전문 / 핀테크 (페이히어 / 세틀뱅크 / 헥토파이낸셜)
+### 정산 전문 / 핀테크
 **강점**: 정산 도메인 깊이 (등급·주기·보류·역정산·대사·송금·복식부기) + MSA 경계(코드·DB 의존 0)
 
 ---
@@ -179,11 +181,10 @@ settlement.created / settlement.confirmed 이벤트만 수신 (코드·DB 의존
 1. **[docs/SETTLEMENT-VERIFICATION.md](SETTLEMENT-VERIFICATION.md)** — "정말 작동하나"의 재현 가능한 답(520 테스트·94%)
 2. **[README.md](../README.md)** 의 *"면접관용 빠른 둘러보기"* + 아키텍처 다이어그램
 3. **[docs/adr/0020-order-settlement-db-split.md](adr/0020-order-settlement-db-split.md)** — DB 물리 분리 결정
-4. **[docs/adr/](adr/)** 25개 — 왜 이렇게 설계했는지
+4. **[docs/adr/](adr/)** 31개 — 왜 이렇게 설계했는지
 
 ---
 
 ## 연락
 
-- 이메일: iamipro@naver.com
-- GitHub: [MyoungSoo7](https://github.com/MyoungSoo7)
+- GitHub: [MyoungSoo7](https://github.com/MyoungSoo7) — 연락처는 프로필 참조

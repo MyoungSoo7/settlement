@@ -28,6 +28,8 @@ class ShippingServiceTransitionsTest {
 
     @Mock LoadShipmentPort loadPort;
     @Mock SaveShipmentPort savePort;
+    // 반품 회수 시 order 재고 원복을 요청하는 포트 — 전이 자체를 보는 이 테스트에서는 호출만 흡수한다.
+    @Mock github.lms.lemuel.shipping.application.port.out.RestoreReturnedOrderStockPort restoreStockPort;
     @InjectMocks ShippingService service;
 
     private ShippingAddress addr() {

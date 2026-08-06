@@ -5,6 +5,7 @@ import github.lms.lemuel.cart.application.port.in.CheckoutCartUseCase;
 import github.lms.lemuel.cart.domain.Cart;
 import github.lms.lemuel.cart.domain.CartItem;
 import github.lms.lemuel.order.domain.Order;
+import github.lms.lemuel.web.security.ResourceOwnership;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Min;
@@ -32,6 +33,7 @@ public class CartController {
     @Operation(summary = "장바구니 조회 (없으면 자동 생성)")
     @GetMapping
     public ResponseEntity<CartResponse> get(@PathVariable Long userId) {
+        ResourceOwnership.requireSelfOrAdmin(userId);
         return ResponseEntity.ok(CartResponse.from(cartUseCase.getOrCreate(userId)));
     }
 
@@ -40,6 +42,7 @@ public class CartController {
     @PostMapping("/items")
     public ResponseEntity<CartResponse> addItem(@PathVariable Long userId,
                                                  @RequestBody AddItemRequest request) {
+        ResourceOwnership.requireSelfOrAdmin(userId);
         Cart cart = cartUseCase.addItem(userId, request.productId(), request.variantId(), request.quantity());
         return ResponseEntity.ok(CartResponse.from(cart));
     }
@@ -48,6 +51,7 @@ public class CartController {
     @PatchMapping("/items")
     public ResponseEntity<CartResponse> changeQuantity(@PathVariable Long userId,
                                                         @RequestBody ChangeQuantityRequest request) {
+        ResourceOwnership.requireSelfOrAdmin(userId);
         Cart cart = cartUseCase.changeQuantity(userId, request.productId(), request.variantId(),
                 request.quantity());
         return ResponseEntity.ok(CartResponse.from(cart));
@@ -58,6 +62,7 @@ public class CartController {
     public ResponseEntity<CartResponse> removeItem(@PathVariable Long userId,
                                                     @RequestParam Long productId,
                                                     @RequestParam(required = false) Long variantId) {
+        ResourceOwnership.requireSelfOrAdmin(userId);
         Cart cart = cartUseCase.removeItem(userId, productId, variantId);
         return ResponseEntity.ok(CartResponse.from(cart));
     }
@@ -65,6 +70,7 @@ public class CartController {
     @Operation(summary = "장바구니 비우기")
     @DeleteMapping
     public ResponseEntity<CartResponse> clear(@PathVariable Long userId) {
+        ResourceOwnership.requireSelfOrAdmin(userId);
         Cart cart = cartUseCase.clear(userId);
         return ResponseEntity.ok(CartResponse.from(cart));
     }
@@ -73,6 +79,7 @@ public class CartController {
             description = "재고 차감 후 Order 생성 → 장바구니 자동 clear. 실패 시 장바구니 유지.")
     @PostMapping("/checkout")
     public ResponseEntity<Map<String, Object>> checkout(@PathVariable Long userId) {
+        ResourceOwnership.requireSelfOrAdmin(userId);
         Order order = checkoutUseCase.checkout(userId);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("orderId", order.getId());

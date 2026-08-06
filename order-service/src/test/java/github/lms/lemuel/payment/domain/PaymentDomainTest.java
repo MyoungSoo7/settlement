@@ -83,6 +83,33 @@ class PaymentDomainTest {
         assertThatThrownBy(p::cancel).isInstanceOf(InvalidPaymentStateException.class);
     }
 
+    @Test @DisplayName("READY → EXPIRED (미입금 만료) 성공")
+    void expire_success() {
+        PaymentDomain p = PaymentDomain.create(1L, new BigDecimal("10000"), "VIRTUAL_ACCOUNT");
+        p.expire();
+        assertThat(p.getStatus()).isEqualTo(PaymentStatus.EXPIRED);
+    }
+
+    @Test @DisplayName("승인된 결제는 만료 불가 (승인취소 경로 사용)")
+    void expire_fail_afterAuthorize() {
+        PaymentDomain p = createReadyPayment();
+        p.authorize("pg-tx");
+        assertThatThrownBy(p::expire).isInstanceOf(InvalidPaymentStateException.class);
+    }
+
+    @Test @DisplayName("매입된 결제는 만료 불가 (환불 경로 사용)")
+    void expire_fail_afterCapture() {
+        PaymentDomain p = createCapturedPayment();
+        assertThatThrownBy(p::expire).isInstanceOf(InvalidPaymentStateException.class);
+    }
+
+    @Test @DisplayName("만료는 종단 — 두 번째 만료는 차단된다")
+    void expire_twice_blocked() {
+        PaymentDomain p = PaymentDomain.create(1L, new BigDecimal("10000"), "VIRTUAL_ACCOUNT");
+        p.expire();
+        assertThatThrownBy(p::expire).isInstanceOf(InvalidPaymentStateException.class);
+    }
+
     @Test @DisplayName("CAPTURED → REFUNDED 성공")
     void refund_success() {
         PaymentDomain p = createCapturedPayment();

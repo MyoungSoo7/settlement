@@ -61,6 +61,8 @@ public enum AuditAction {
     PAYOUT_BACKFILL_EXECUTED,
     // 차지백·PG 대사 조정의 역분개 누락분을 ledger_outbox 에 적재하는 백필 실행.
     LEDGER_REVERSE_BACKFILL_EXECUTED,
+    // 운영자가 정산 배치(확정·홀드백 해제·지급 실행)를 수동 재실행. 자금 이동 단계 포함 여부가 상세에 남는다.
+    SETTLEMENT_BATCH_RERUN,
 
     // ── card-service (법인카드) 금전·상태 액션 ──
     CARD_ACCOUNT_OPENED,

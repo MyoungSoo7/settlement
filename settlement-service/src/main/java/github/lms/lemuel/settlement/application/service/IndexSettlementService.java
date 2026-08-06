@@ -10,7 +10,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * 정산 인덱싱 서비스
@@ -59,11 +58,8 @@ public class IndexSettlementService implements IndexSettlementUseCase {
         log.info("벌크 인덱싱 시작: count={}", settlementIds.size());
 
         try {
-            // 정산 조회
-            List<Settlement> settlements = settlementIds.stream()
-                    .map(id -> loadSettlementPort.findById(id).orElse(null))
-                    .filter(settlement -> settlement != null)
-                    .collect(Collectors.toList());
+            // 정산 조회 — 배치 IN 조회 1회(id 당 findById 반복 = N+1 회피).
+            List<Settlement> settlements = loadSettlementPort.findAllByIds(settlementIds);
 
             if (settlements.isEmpty()) {
                 log.warn("인덱싱할 정산이 없음");

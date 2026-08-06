@@ -13,6 +13,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Slf4j
@@ -23,6 +25,8 @@ public class CouponService implements CouponUseCase {
 
     private final LoadCouponPort loadCouponPort;
     private final SaveCouponPort saveCouponPort;
+    /** 쿠폰 기간 판정의 시간 소스 — KST({@code TimeConfig}). 도메인에 시각을 값으로 넘긴다. */
+    private final Clock clock;
 
     @Override
     public Coupon createCoupon(CreateCouponCommand command) {
@@ -56,7 +60,7 @@ public class CouponService implements CouponUseCase {
         }
 
         try {
-            coupon.validate(orderAmount);
+            coupon.validate(orderAmount, LocalDateTime.now(clock));
         } catch (InvalidCouponStateException e) {
             return new ValidateResult(false, e.getMessage(), BigDecimal.ZERO, orderAmount, null);
         }

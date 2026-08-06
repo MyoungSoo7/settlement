@@ -1,18 +1,20 @@
 package github.lms.lemuel.company.config;
 
-import github.lms.lemuel.common.config.JacksonCompatConfig;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import github.lms.lemuel.common.autoconfigure.JacksonCompatAutoConfiguration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.context.annotation.Import;
+import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.cors.CorsConfigurationSource;
 
 import java.lang.reflect.Field;
-import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -39,15 +41,17 @@ class ConfigBeansTest {
     }
 
     @Test
-    @DisplayName("HttpClientConfig — ObjectMapper 는 shared-common JacksonCompatConfig 를 @Import 해서 얻는다 "
-            + "(제한 스캔이라 common.config 가 스캔에 안 걸린다. 이 @Import 가 없으면 outbox 발행 어댑터의 "
-            + "@Qualifier(\"outboxObjectMapper\") 주입이 실패해 서비스가 기동조차 못 한다)")
-    void importsJacksonCompatConfigForOutboxObjectMapper() {
-        Import imported = HttpClientConfig.class.getAnnotation(Import.class);
-
-        assertNotNull(imported, "HttpClientConfig 에 @Import 가 없다");
-        assertTrue(List.of(imported.value()).contains(JacksonCompatConfig.class));
-        assertNotNull(new JacksonCompatConfig().outboxObjectMapper());
+    @DisplayName("스캔을 좁힌 이 서비스에서도 outbox 매퍼가 채워진다 — shared-common 자동 구성이 보장한다 "
+            + "(예전에는 HttpClientConfig 가 JacksonCompatConfig 를 손수 @Import 했고, 그 배선을 빠뜨리면 "
+            + "outboxObjectMapper 한정자 주입 실패로 서비스가 기동조차 못 했다)")
+    void outboxObjectMapperIsProvidedWithoutManualWiring() {
+        // company 처럼 common.config 가 스캔에 걸리지 않는 컨텍스트를 재현한다.
+        new ApplicationContextRunner()
+                .withConfiguration(AutoConfigurations.of(JacksonCompatAutoConfiguration.class))
+                .run(context -> {
+                    assertThat(context).hasBean("outboxObjectMapper").hasBean("jacksonLegacyObjectMapper");
+                    assertThat(context.getBean("outboxObjectMapper")).isInstanceOf(ObjectMapper.class);
+                });
     }
 
     @Test

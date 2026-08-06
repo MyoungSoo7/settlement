@@ -220,6 +220,10 @@ app:
   settlement:
     confirm:
       chunk-size: ${APP_SETTLEMENT_CONFIRM_CHUNK_SIZE:100}
+    # 운영자 배치 재실행(/admin/settlements/rerun) 허용 소급 일수. 이 범위를 벗어난 targetDate 는
+    # 도메인이 400 으로 거부한다 — "1 년 전 일자로 대량 재정산"이 오타 한 번으로 실행되는 사고를 막는다.
+    rerun:
+      max-lookback-days: ${APP_SETTLEMENT_RERUN_MAX_LOOKBACK_DAYS:90}
     # 하드코딩 공휴일 상수(BusinessDayCalculator) 위에 얹히는 추가 공휴일 — 정부 지정 임시공휴일을
     # 코드·배포 없이 정산일·홀드백 해제일 계산에 반영한다. 각 항목 yyyy-MM-dd. 기본 빈 목록(현행 캘린더 유지).
     # 예) extra-holidays: ["2026-04-29", "2026-06-03"]

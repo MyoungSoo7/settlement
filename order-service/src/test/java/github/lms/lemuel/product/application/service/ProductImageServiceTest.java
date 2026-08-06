@@ -3,14 +3,17 @@ import github.lms.lemuel.product.domain.exception.ProductInvariantViolationExcep
 
 import github.lms.lemuel.product.application.port.out.LoadProductImagePort;
 import github.lms.lemuel.product.application.port.out.SaveProductImagePort;
+import github.lms.lemuel.product.application.port.out.StoreProductImagePort;
+import github.lms.lemuel.product.application.port.out.StoredImageFile;
+import github.lms.lemuel.product.domain.ImageUpload;
 import github.lms.lemuel.product.domain.ProductImage;
+import github.lms.lemuel.product.domain.exception.ImageStorageException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.List;
@@ -31,7 +34,7 @@ class ProductImageServiceTest {
 
     @Mock LoadProductImagePort loadPort;
     @Mock SaveProductImagePort savePort;
-    @Mock FileStorageService fileStorageService;
+    @Mock StoreProductImagePort storagePort;
     @InjectMocks ProductImageService service;
 
     private ProductImage image(Long id, Long productId) {
@@ -117,7 +120,7 @@ class ProductImageServiceTest {
 
         assertThatThrownBy(() -> service.deleteImage(10L, 1L))
                 .isInstanceOf(ProductInvariantViolationException.class);
-        verify(fileStorageService, never()).delete(any());
+        verify(storagePort, never()).delete(any());
     }
 
     @Test @DisplayName("deleteImage - 대표였다면 다른 이미지를 대표로 승격")
@@ -132,25 +135,19 @@ class ProductImageServiceTest {
         service.deleteImage(10L, 1L);
 
         assertThat(remaining.getIsPrimary()).isTrue();
-        verify(fileStorageService).delete("/p");
+        verify(storagePort).delete("/p");
     }
 
-    private MultipartFile file(String contentType, long size, String name) {
-        MultipartFile f = mock(MultipartFile.class);
-        when(f.getContentType()).thenReturn(contentType);
-        when(f.getSize()).thenReturn(size);
-        when(f.getOriginalFilename()).thenReturn(name);
-        return f;
+    private ImageUpload upload(String contentType, long size, String name) {
+        return ImageUpload.of(name, contentType, size, new byte[]{1, 2, 3});
     }
 
     @Test @DisplayName("uploadImages - 첫 이미지는 대표 이미지로 자동 승격")
-    void upload_firstBecomesPrimary() throws Exception {
-        MultipartFile f = file("image/jpeg", 1024L, "a.jpg");
+    void upload_firstBecomesPrimary() {
+        ImageUpload up = upload("image/jpeg", 1024L, "a.jpg");
         when(loadPort.countByProductIdNotDeleted(10L)).thenReturn(0L);
-        when(fileStorageService.isValidImageType("image/jpeg")).thenReturn(true);
-        when(fileStorageService.isValidFileSize(1024L)).thenReturn(true);
-        when(fileStorageService.store(f, 10L)).thenReturn(
-                new FileStorageService.StoredFileInfo("s.jpg", "/p/s.jpg", "/u/s.jpg", 100, 100, "chk"));
+        when(storagePort.store(10L, up)).thenReturn(
+                new StoredImageFile("s.jpg", "/p/s.jpg", "/u/s.jpg", 100, 100, "chk"));
         ProductImage[] holder = new ProductImage[1];
         when(savePort.save(any())).thenAnswer(inv -> {
             ProductImage p = inv.getArgument(0);
@@ -161,68 +158,55 @@ class ProductImageServiceTest {
         when(loadPort.findByIdNotDeleted(1L)).thenAnswer(inv -> Optional.of(holder[0]));
         when(loadPort.findPrimaryImageByProductId(10L)).thenReturn(Optional.empty());
 
-        List<ProductImage> result = service.uploadImages(10L, List.of(f));
+        List<ProductImage> result = service.uploadImages(10L, List.of(up));
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getChecksum()).isEqualTo("chk");
         assertThat(result.get(0).getIsPrimary()).isTrue();
-        verify(fileStorageService).store(f, 10L);
+        verify(storagePort).store(10L, up);
     }
 
     @Test @DisplayName("uploadImages - 기존 이미지가 있으면 대표 승격 없이 뒤 순번으로 추가")
-    void upload_appendsAfterExisting() throws Exception {
-        MultipartFile f = file("image/png", 2048L, "b.png");
+    void upload_appendsAfterExisting() {
+        ImageUpload up = upload("image/png", 2048L, "b.png");
         when(loadPort.countByProductIdNotDeleted(10L)).thenReturn(3L);
-        when(fileStorageService.isValidImageType("image/png")).thenReturn(true);
-        when(fileStorageService.isValidFileSize(2048L)).thenReturn(true);
-        when(fileStorageService.store(f, 10L)).thenReturn(
-                new FileStorageService.StoredFileInfo("s.png", "/p/s.png", "/u/s.png", 50, 50, "c2"));
+        when(storagePort.store(10L, up)).thenReturn(
+                new StoredImageFile("s.png", "/p/s.png", "/u/s.png", 50, 50, "c2"));
         when(savePort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        List<ProductImage> result = service.uploadImages(10L, List.of(f));
+        List<ProductImage> result = service.uploadImages(10L, List.of(up));
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getOrderIndex()).isEqualTo(3);
         verify(loadPort, never()).findPrimaryImageByProductId(anyLong());
     }
 
-    @Test @DisplayName("uploadImages - 허용되지 않은 타입이면 예외 & 저장 안 함")
-    void upload_invalidType() {
-        MultipartFile f = mock(MultipartFile.class);
-        when(f.getContentType()).thenReturn("text/plain");
+    @Test @DisplayName("uploadImages - 저장 실패(ImageStorageException)는 그대로 전파되고 DB 저장 안 함")
+    void upload_storageFailurePropagates() {
+        ImageUpload up = upload("image/jpeg", 1024L, "a.jpg");
         when(loadPort.countByProductIdNotDeleted(10L)).thenReturn(0L);
-        when(fileStorageService.isValidImageType("text/plain")).thenReturn(false);
+        when(storagePort.store(10L, up))
+                .thenThrow(new ImageStorageException("이미지 저장 실패", new IOException("disk full")));
 
-        assertThatThrownBy(() -> service.uploadImages(10L, List.of(f)))
-                .isInstanceOf(ProductInvariantViolationException.class)
-                .hasMessageContaining("Invalid image type");
+        assertThatThrownBy(() -> service.uploadImages(10L, List.of(up)))
+                .isInstanceOf(ImageStorageException.class)
+                .hasRootCauseInstanceOf(IOException.class);
         verify(savePort, never()).save(any());
     }
 
-    @Test @DisplayName("uploadImages - 5MB 초과면 예외")
-    void upload_invalidSize() {
-        MultipartFile f = mock(MultipartFile.class);
-        when(f.getContentType()).thenReturn("image/jpeg");
-        when(f.getSize()).thenReturn(99_999_999L);
-        when(loadPort.countByProductIdNotDeleted(10L)).thenReturn(0L);
-        when(fileStorageService.isValidImageType("image/jpeg")).thenReturn(true);
-        when(fileStorageService.isValidFileSize(99_999_999L)).thenReturn(false);
+    @Test @DisplayName("uploadImages - 여러 건은 순번이 이어진다")
+    void upload_multipleKeepsOrder() {
+        ImageUpload first = upload("image/jpeg", 1024L, "a.jpg");
+        ImageUpload second = upload("image/png", 2048L, "b.png");
+        when(loadPort.countByProductIdNotDeleted(10L)).thenReturn(1L);
+        when(storagePort.store(10L, first)).thenReturn(
+                new StoredImageFile("s1.jpg", "/p/1", "/u/1", 10, 10, "c1"));
+        when(storagePort.store(10L, second)).thenReturn(
+                new StoredImageFile("s2.png", "/p/2", "/u/2", 20, 20, "c2"));
+        when(savePort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        assertThatThrownBy(() -> service.uploadImages(10L, List.of(f)))
-                .isInstanceOf(ProductInvariantViolationException.class)
-                .hasMessageContaining("5MB");
-    }
+        List<ProductImage> result = service.uploadImages(10L, List.of(first, second));
 
-    @Test @DisplayName("uploadImages - 파일 저장 IOException 은 RuntimeException 으로 래핑")
-    void upload_ioError() throws Exception {
-        MultipartFile f = file("image/jpeg", 1024L, "a.jpg");
-        when(loadPort.countByProductIdNotDeleted(10L)).thenReturn(0L);
-        when(fileStorageService.isValidImageType("image/jpeg")).thenReturn(true);
-        when(fileStorageService.isValidFileSize(1024L)).thenReturn(true);
-        when(fileStorageService.store(f, 10L)).thenThrow(new IOException("disk full"));
-
-        assertThatThrownBy(() -> service.uploadImages(10L, List.of(f)))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("Failed to upload");
+        assertThat(result).extracting(ProductImage::getOrderIndex).containsExactly(1, 2);
     }
 }

@@ -147,7 +147,7 @@ For each matched pair, verify:\r
 \r
 # Persistent Agent Memory\r
 \r
-You have a persistent memory directory at `C:\\Users\\iamip\\IdeaProjects\\kubenetis\\settlement\\.Codex\\agent-memory\\settlement-reconciliation\\`. Its contents persist across conversations.\r
+You have a persistent memory directory at `.claude/agent-memory/settlement-reconciliation/`. Its contents persist across conversations.\r
 \r
 As you work, consult your memory files to build on previous experience.\r
 \r

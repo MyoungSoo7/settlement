@@ -5,6 +5,7 @@ import github.lms.lemuel.review.adapter.in.web.dto.ReviewResponse;
 import github.lms.lemuel.review.adapter.in.web.dto.ReviewUpdateRequest;
 import github.lms.lemuel.review.application.ReviewService;
 import github.lms.lemuel.review.domain.Review;
+import github.lms.lemuel.web.security.ResourceOwnership;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -78,6 +79,7 @@ public class ReviewController {
     @GetMapping("/user/{userId}")
     public ResponseEntity<List<ReviewResponse>> getUserReviews(
             @Parameter(description = "사용자 ID", required = true) @PathVariable @Positive(message = "유저 ID는 양수여야 합니다") Long userId) {
+        ResourceOwnership.requireSelfOrAdmin(userId);
         List<ReviewResponse> reviews = reviewService.getUserReviews(userId)
                 .stream().map(ReviewResponse::new).collect(Collectors.toList());
         return ResponseEntity.ok(reviews);

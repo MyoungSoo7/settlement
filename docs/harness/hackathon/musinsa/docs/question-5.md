@@ -1,7 +1,8 @@
 # Musinsa Fashion First — 5문항 답변
 
 > AX 인재전쟁 무신사 과제 제출물(`musinsa-fashion-first` Codex 플러그인)에 대한 심사 5문항 답변.
-> 근거 문서: [`README.md`](./README.md), [`src/.codex-plugin/plugin.json`](./src/.codex-plugin/plugin.json), E2E 로그: [`logs/`](./logs/)
+> 근거 문서: [`README.md`](../submission/README.md), [`src/.codex-plugin/plugin.json`](../submission/src/.codex-plugin/plugin.json).
+> E2E 로그 `submission/logs/` 는 실행 시 생성되는 로컬 전용 산출물이라 저장소에 포함하지 않는다.
 
 ---
 

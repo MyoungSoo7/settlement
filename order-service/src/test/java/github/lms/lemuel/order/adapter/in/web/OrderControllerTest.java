@@ -1,17 +1,25 @@
 package github.lms.lemuel.order.adapter.in.web;
 
+import github.lms.lemuel.common.config.jwt.AuthPrincipal;
 import github.lms.lemuel.common.config.jwt.JwtUtil;
+import github.lms.lemuel.common.exception.GlobalExceptionHandler;
 import github.lms.lemuel.order.application.port.in.ChangeOrderStatusUseCase;
 import github.lms.lemuel.order.application.port.in.CreateOrderUseCase;
 import github.lms.lemuel.order.application.port.in.IdempotentMultiItemOrderUseCase;
 import github.lms.lemuel.order.application.port.in.GetOrderUseCase;
 import github.lms.lemuel.order.domain.Order;
 import github.lms.lemuel.order.domain.exception.OrderNotFoundException;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -25,6 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(controllers = OrderController.class)
 @AutoConfigureMockMvc(addFilters = false)
+@Import(GlobalExceptionHandler.class)
 class OrderControllerTest {
 
     @Autowired MockMvc mockMvc;
@@ -33,6 +42,20 @@ class OrderControllerTest {
     @MockitoBean IdempotentMultiItemOrderUseCase createMultiItemOrderUseCase;
     @MockitoBean GetOrderUseCase getOrderUseCase;
     @MockitoBean ChangeOrderStatusUseCase changeOrderStatusUseCase;
+
+    /** JWT 주체를 SecurityContext 에 직접 세팅(addFilters=false 슬라이스 대응). */
+    private static void login(long uid, String role) {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(
+                        new AuthPrincipal(uid, uid + "@x.com", role),
+                        null,
+                        List.of(new SimpleGrantedAuthority("ROLE_" + role))));
+    }
+
+    @AfterEach
+    void clearContext() {
+        SecurityContextHolder.clearContext();
+    }
 
     @Test @DisplayName("GET /orders/{id} - 성공") void getOrder() throws Exception {
         Order order = Order.create(1L, 1L, new BigDecimal("10000"));
@@ -50,12 +73,27 @@ class OrderControllerTest {
                 .andExpect(status().isNotFound());
     }
 
-    @Test @DisplayName("GET /orders/user/{userId}") void getUserOrders() throws Exception {
-        when(getOrderUseCase.getOrdersByUserId(1L)).thenReturn(List.of());
+    @Test @DisplayName("GET /orders/user/{userId} - 본인 조회") void getUserOrders() throws Exception {
+        login(1L, "USER");
+        when(getOrderUseCase.getOrdersByUserId(1L, null, null, null)).thenReturn(List.of());
 
         mockMvc.perform(get("/orders/user/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray());
+    }
+
+    @Test @DisplayName("GET /orders/user/{userId} - 타인 조회는 403 (IDOR)") void getUserOrders_otherForbidden() throws Exception {
+        login(2L, "USER");
+        mockMvc.perform(get("/orders/user/1"))
+                .andExpect(status().isForbidden());
+        verify(getOrderUseCase, never()).getOrdersByUserId(anyLong(), any(), any(), any());
+    }
+
+    @Test @DisplayName("GET /orders/user/{userId} - ADMIN 은 타인도 조회") void getUserOrders_adminBypass() throws Exception {
+        login(999L, "ADMIN");
+        when(getOrderUseCase.getOrdersByUserId(1L, null, null, null)).thenReturn(List.of());
+        mockMvc.perform(get("/orders/user/1"))
+                .andExpect(status().isOk());
     }
 
     @Test @DisplayName("POST /orders - 생성") void createOrder() throws Exception {

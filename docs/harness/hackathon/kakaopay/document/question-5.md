@@ -1,7 +1,8 @@
 # KakaoPay Invest Companion — 5문항 답변
 
 > 카카오페이증권 AX 인재전쟁 Round 10 제출물(`kakaopay-invest-companion` Codex 플러그인)에 대한 심사 5문항 답변.
-> 근거 문서: [`README.md`](./README.md), [`src/.codex-plugin/plugin.json`](./src/.codex-plugin/plugin.json), 검증 로그 [`logs/`](./logs), 라이브 산출물 [`outputs/`](./outputs)
+> 근거 문서: [`README.md`](../submission/README.md), [`src/.codex-plugin/plugin.json`](../submission/src/.codex-plugin/plugin.json).
+> 검증 로그 `submission/logs/` 와 라이브 산출물 `submission/outputs/` 는 실행 시 생성되는 로컬 전용 산출물이라 저장소에 포함하지 않는다.
 
 ---
 
@@ -89,7 +90,7 @@ node src/bin/backtest.mjs          # 승률 통계 재계산 (약 1~2분, 방법
 
 **2. 설치 E2E** — 원큐 스크립트(`src/bin/install-codex.ps1`: 마켓플레이스 등록→설치→MCP 승인 병합→키 스캐폴드→스모크)를 실제 codex-cli 0.142.5 에서 멱등 실행으로 검증했습니다.
 
-**3. Codex 실세션 E2E — 대화가 곧 테스트** ([`logs/e2e-*.out.md`](./logs) 전부 동봉)
+**3. Codex 실세션 E2E — 대화가 곧 테스트** (`submission/logs/e2e-*.out.md` 전부 동봉)
 
 | 시나리오 | 확인한 것 |
 |---|---|

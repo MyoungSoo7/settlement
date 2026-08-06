@@ -1,20 +1,30 @@
 package github.lms.lemuel.review.adapter.in.web;
 
+import github.lms.lemuel.common.config.jwt.AuthPrincipal;
 import github.lms.lemuel.common.config.jwt.JwtUtil;
+import github.lms.lemuel.common.exception.GlobalExceptionHandler;
 import github.lms.lemuel.review.application.ReviewService;
 import github.lms.lemuel.review.domain.Review;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -24,11 +34,26 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(controllers = ReviewController.class)
 @AutoConfigureMockMvc(addFilters = false)
+@Import(GlobalExceptionHandler.class)
 class ReviewControllerTest {
 
     @Autowired MockMvc mockMvc;
     @MockitoBean JwtUtil jwtUtil;
     @MockitoBean ReviewService reviewService;
+
+    /** JWT 주체를 SecurityContext 에 직접 세팅(addFilters=false 슬라이스 대응). */
+    private static void login(long uid, String role) {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(
+                        new AuthPrincipal(uid, uid + "@x.com", role),
+                        null,
+                        List.of(new SimpleGrantedAuthority("ROLE_" + role))));
+    }
+
+    @AfterEach
+    void clearContext() {
+        SecurityContextHolder.clearContext();
+    }
 
     @Test
     @DisplayName("POST /reviews creates review")
@@ -82,6 +107,34 @@ class ReviewControllerTest {
         mockMvc.perform(delete("/reviews/10").param("userId", "2"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.message").value("forbidden"));
+    }
+
+    @Test
+    @DisplayName("GET /reviews/user/{userId} - 본인 조회")
+    void getUserReviews_self() throws Exception {
+        login(2L, "USER");
+        when(reviewService.getUserReviews(2L)).thenReturn(List.of());
+        mockMvc.perform(get("/reviews/user/2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray());
+    }
+
+    @Test
+    @DisplayName("GET /reviews/user/{userId} - 타인 조회는 403 (IDOR)")
+    void getUserReviews_otherForbidden() throws Exception {
+        login(3L, "USER");
+        mockMvc.perform(get("/reviews/user/2"))
+                .andExpect(status().isForbidden());
+        verify(reviewService, never()).getUserReviews(any());
+    }
+
+    @Test
+    @DisplayName("GET /reviews/user/{userId} - ADMIN 은 타인도 조회")
+    void getUserReviews_adminBypass() throws Exception {
+        login(999L, "ADMIN");
+        when(reviewService.getUserReviews(2L)).thenReturn(List.of());
+        mockMvc.perform(get("/reviews/user/2"))
+                .andExpect(status().isOk());
     }
 
     private static Review review(Long id, Long productId, Long userId, int rating, String content) {

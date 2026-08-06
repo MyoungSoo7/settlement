@@ -79,6 +79,17 @@ public final class PgReconciliationMatcher {
             BigDecimal diff = pg.netAmount().subtract(internal.netAmount()).abs();
             if (diff.compareTo(BigDecimal.ZERO) == 0) {
                 matched++;
+                // 매출이 일치해도 자금이 일치한다는 뜻은 아니다 — 공제까지 반영한 실입금을 검증한다.
+                // 여기서 걸리는 건이 "대사는 통과했는데 통장에 돈이 덜 들어온" 바로 그 케이스다.
+                // 매출이 이미 어긋난 건에는 이 검사를 하지 않는다 — 원인 하나에 보고 하나.
+                if (pg.hasDepositMismatch()) {
+                    discrepancies.add(ReconciliationDiscrepancy.newDiscrepancy(
+                            runId, DiscrepancyType.FEE_MISMATCH,
+                            internal.paymentId(), pgKey,
+                            pg.expectedNetDeposit(),   // 우리 계산 = 정답지
+                            pg.netDeposit()            // PG 신고
+                    ));
+                }
             } else if (diff.compareTo(ROUNDING_THRESHOLD) < 0) {
                 // 1원 미만 — 반올림 차이로 자동 보정 가능
                 discrepancies.add(ReconciliationDiscrepancy.newDiscrepancy(

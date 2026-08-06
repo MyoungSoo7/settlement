@@ -43,6 +43,10 @@ public class OrderJpaEntity {
     @Column(name = "shipped", nullable = false)
     private boolean shipped;
 
+    /** 재고 원복 완료 — 취소/환불/반품 회수 경로의 이중 원복을 막는 멱등 플래그. */
+    @Column(name = "stock_restored", nullable = false)
+    private boolean stockRestored;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

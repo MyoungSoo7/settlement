@@ -111,7 +111,9 @@ class RefundPaymentUseCaseTest {
                 1L, new BigDecimal("20000"), "partial-key-1");
 
         assertThat(result.getStatus()).isEqualTo(PaymentStatus.CAPTURED);
-        assertThat(result.getRefundedAmount()).isEqualTo(new BigDecimal("20000"));
+        // BigDecimal 은 equals 가 scale 까지 비교한다 — 20000 과 20000.00 이 불일치로 잡힌다.
+        // 금액이 맞는데 테스트가 깨지는 걸 막으려면 값 비교(compareTo)를 써야 한다.
+        assertThat(result.getRefundedAmount()).isEqualByComparingTo(new BigDecimal("20000"));
         verify(pgClientPort).refund("pg-tx-123", new BigDecimal("20000"), "partial-key-1");
         verify(updateOrderStatusPort, never()).updateOrderStatus(any(), any());
         verify(publishEventPort).publishPaymentRefunded(eq(1L), eq(10L), any(), any(), any());

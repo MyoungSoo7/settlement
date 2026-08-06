@@ -3,6 +3,7 @@ package github.lms.lemuel.payment.adapter.out.persistence;
 import github.lms.lemuel.order.application.port.in.ChangeOrderStatusUseCase;
 import github.lms.lemuel.order.application.port.in.GetOrderUseCase;
 import github.lms.lemuel.order.domain.Order;
+import github.lms.lemuel.payment.application.port.out.CancelUnpaidOrderPort;
 import github.lms.lemuel.payment.application.port.out.LoadOrderPort;
 import github.lms.lemuel.payment.application.port.out.LoadOrderPort.OrderInfo;
 import github.lms.lemuel.payment.application.port.out.UpdateOrderStatusPort;
@@ -13,7 +14,7 @@ import org.springframework.stereotype.Component;
  * Order 의 JPA 엔티티·리포지토리를 직접 참조하지 않고 Order 의 inbound use case 만 호출한다.
  */
 @Component
-public class OrderAdapter implements LoadOrderPort, UpdateOrderStatusPort {
+public class OrderAdapter implements LoadOrderPort, UpdateOrderStatusPort, CancelUnpaidOrderPort {
 
     private final GetOrderUseCase getOrderUseCase;
     private final ChangeOrderStatusUseCase changeOrderStatusUseCase;
@@ -37,5 +38,10 @@ public class OrderAdapter implements LoadOrderPort, UpdateOrderStatusPort {
     @Override
     public void updateOrderStatus(Long orderId, String status) {
         changeOrderStatusUseCase.updateStatus(orderId, status);
+    }
+
+    @Override
+    public boolean cancelUnpaidOrder(Long orderId, String reason) {
+        return changeOrderStatusUseCase.cancelUnpaidOrder(orderId, reason);
     }
 }

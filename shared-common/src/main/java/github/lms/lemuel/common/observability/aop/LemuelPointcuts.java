@@ -25,8 +25,12 @@ public final class LemuelPointcuts {
     @Pointcut("execution(public * github.lms.lemuel..adapter.in.kafka..*.*(..))")
     public void kafkaConsumer() {}
 
-    /** 추적 대상 전체: 웹 + 서비스 + 카프카 컨슈머. */
-    @Pointcut("webAdapter() || applicationService() || kafkaConsumer()")
+    /** 배치 인바운드 어댑터 — 스케줄러·아웃박스 폴러 (정산 확정·홀드백 해제 등 금전 경로 진입점). */
+    @Pointcut("execution(public * github.lms.lemuel..adapter.in.batch..*.*(..))")
+    public void batchAdapter() {}
+
+    /** 추적 대상 전체: 웹 + 서비스 + 카프카 컨슈머 + 배치 어댑터. */
+    @Pointcut("webAdapter() || applicationService() || kafkaConsumer() || batchAdapter()")
     public void traceable() {}
 
     /** Spring {@code @Transactional} 이 메서드 또는 타입에 선언된 지점. */

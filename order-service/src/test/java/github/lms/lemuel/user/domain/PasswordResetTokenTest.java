@@ -19,32 +19,70 @@ class PasswordResetTokenTest {
 
     @Test @DisplayName("create: userId와 만료 시간 설정")
     void create() {
-        var token = PasswordResetToken.create(42L, 30);
+        var token = PasswordResetToken.create(42L, 30, T);
         assertThat(token.getUserId()).isEqualTo(42L);
         assertThat(token.getToken()).isNotBlank();
         assertThat(token.isUsed()).isFalse();
-        assertThat(token.getExpiryDate()).isAfter(LocalDateTime.now().plusMinutes(29));
+        assertThat(token.getExpiryDate()).isAfter(T.plusMinutes(29));
     }
 
     @Test @DisplayName("isValid: 미사용 + 미만료이면 true")
     void isValid_true() {
-        var token = PasswordResetToken.create(1L, 30);
-        assertThat(token.isValid()).isTrue();
+        var token = PasswordResetToken.create(1L, 30, T);
+        assertThat(token.isValid(T.plusMinutes(29))).isTrue();
     }
 
     @Test @DisplayName("isValid: 사용됨이면 false")
     void isValid_used() {
-        var token = PasswordResetToken.create(1L, 30);
+        var token = PasswordResetToken.create(1L, 30, T);
         token.markAsUsed();
-        assertThat(token.isValid()).isFalse();
+        assertThat(token.isValid(T)).isFalse();
         assertThat(token.isUsed()).isTrue();
     }
 
     @Test @DisplayName("isExpired: 만료된 토큰")
     void isExpired() {
-        var token = new PasswordResetToken(1L, 1L, "tok", LocalDateTime.now().minusMinutes(1), false, LocalDateTime.now());
-        assertThat(token.isExpired()).isTrue();
-        assertThat(token.isValid()).isFalse();
+        var token = new PasswordResetToken(1L, 1L, "tok", T.minusMinutes(1), false, T.minusMinutes(31));
+        assertThat(token.isExpired(T)).isTrue();
+        assertThat(token.isValid(T)).isFalse();
+    }
+
+    // ── 만료 판정은 시스템 시계가 아니라 주입된 시각을 따른다 ──────────────────────────
+
+    private static final LocalDateTime T = LocalDateTime.of(2026, 3, 1, 0, 0, 0);
+
+    @Test @DisplayName("만료 경계: 만료 시각과 정확히 같은 순간은 아직 유효")
+    void isExpired_atExactExpiry_false() {
+        var token = new PasswordResetToken(1L, 1L, "tok", T, false, T.minusMinutes(30));
+        assertThat(token.isExpired(T)).isFalse();
+        assertThat(token.isValid(T)).isTrue();
+    }
+
+    @Test @DisplayName("만료 경계: 만료 시각 1나노 뒤는 만료")
+    void isExpired_oneNanoAfterExpiry_true() {
+        var token = new PasswordResetToken(1L, 1L, "tok", T, false, T.minusMinutes(30));
+        assertThat(token.isExpired(T.plusNanos(1))).isTrue();
+        assertThat(token.isValid(T.plusNanos(1))).isFalse();
+    }
+
+    @Test @DisplayName("create: 주입된 시각 기준으로 만료 시각을 정확히 계산")
+    void create_withInjectedNow_setsExactExpiry() {
+        var token = PasswordResetToken.create(42L, 30, T);
+        assertThat(token.getExpiryDate()).isEqualTo(T.plusMinutes(30));
+        assertThat(token.getCreatedAt()).isEqualTo(T);
+    }
+
+    @Test @DisplayName("만료 판정은 시스템 시계에 의존하지 않는다 — 오래전 토큰도 그 이전 시각으로 판정하면 유효")
+    void isValid_doesNotDependOnSystemClock() {
+        var expiry = LocalDateTime.of(2020, 1, 1, 0, 30);
+        var token = new PasswordResetToken(1L, 1L, "tok", expiry, false, expiry.minusMinutes(30));
+        assertThat(token.isValid(LocalDateTime.of(2020, 1, 1, 0, 10))).isTrue();
+    }
+
+    @Test @DisplayName("사용된 토큰은 미만료여도 무효")
+    void isValid_usedTokenInvalid() {
+        var token = new PasswordResetToken(1L, 1L, "tok", T, true, T.minusMinutes(30));
+        assertThat(token.isValid(T)).isFalse();
     }
 
     @Test @DisplayName("전체 생성자: 모든 필드 설정")
