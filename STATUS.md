@@ -2,7 +2,7 @@
 
 > 이커머스 주문·결제·정산·선정산/기업대출·투자·계정계 + 공개조회 위성(재무제표·경제지표·기업뉴스·시세·공공데이터)·운영관제·AI챗봇 MSA 플랫폼 (Spring Boot 4.0 / Java 25 / 헥사고날)
 
-**Last updated:** 2026-08-04
+**Last updated:** 2026-08-06
 
 ## 현재 상태
 
@@ -15,6 +15,37 @@
 - **최근 커밋:** `0c470e95` test(card): Phase2 AC4 ExpenseWorkflowIT·지출관리 비결합·승인지연 테스트 추가
 
 ## 최근 진척 (2026-06-24 이후)
+
+- **스프링 AOP·자동 구성 정합화 (2026-08-06)** — 김영한 「스프링 핵심 원리 - 고급편」 외 4개 강의를 저장소와 1:1 대조해
+  **선언은 있는데 실제로는 안 걸리는** 배선 3건을 찾아 고치고, 같은 실수를 기계로 막았다.
+  ① **결제 PG 복원력 결함(운영 영향)** — `TossPaymentService.confirmTossPayment()` 가 같은 클래스의
+  `callTossConfirmApi()` 를 자기호출해 선언된 `@Retry`·`@CircuitBreaker` 가 **한 번도 동작하지 않았다**(프록시 미통과).
+  PG 순단에도 재시도 없이 실패, 장애가 길어져도 서킷 미개방. ADR 0006 의 리스크 항목이 경고했던 사고다. 기존
+  `TossPaymentResilienceTest` 는 Resilience4j 를 프로그래매틱 API 로만 검증해 "설정은 옳지만 경로에 안 걸림"을 못 봤다.
+  강의 대안 3(구조 변경)대로 `TossConfirmApiClient` 별도 빈으로 분리 — 인스턴스명·4xx 제외·타임아웃·폴백 동작 불변
+  (`application.yml` 무수정). ADR 0006 에 개정 이력 추가.
+  ② **회귀 가드 2종 신설**(CI 의 `node --test scripts/harness/test/*.test.mjs` 자동 수집) —
+  `aop-proxy-gate`: `@Cacheable`/`@Retry`/`@CircuitBreaker`/`@Async`/`@PreAuthorize` 등 **우회 시 기능이 사라지는**
+  애노테이션의 자기호출 무관용 0건, `@Transactional` 은 근거 기록 허용목록 안에서만, `REQUIRES_NEW` 는 무조건 금지.
+  최초 실행 11건 RED(실결함 2 + 의도적 우회 9). `tx-rollback-gate`: 스프링은 **체크 예외에 롤백하지 않고 커밋**하므로
+  도메인 예외 96개 전수 언체크 + `@Transactional`+체크예외 throws 시 `rollbackFor` 필수를 잠금. 두 규칙 모두 현재
+  위반 0건이라 **탐지력 자체를 합성 픽스처로 자기검증**하는 테스트를 함께 넣었다(초록불이 무의미해지는 것 방지).
+  ③ **관측 보강** — `MethodTraceAspect` 에 호출 깊이 계단식 로그 + **비웹 실행 단위 traceId**(Kafka 컨슈머·스케줄러·
+  아웃박스 폴러는 서블릿 필터 밖이라 traceId 가 없었음). 부여한 쪽이 종료 시 제거 — 스레드 풀 재사용 시 남의 traceId 를
+  물려받는 오염 차단. web·kafka 포인트컷 **매칭 검증 공백**도 메웠다(패키지 컨벤션이 바뀌면 추적이 조용히 꺼지는 구조였음).
+  ④ **shared-common 자동 구성 라이브러리화** — 빈 등록이 소비 서비스의 스캔 범위에 얹혀 있어, 스캔을 좁힌 서비스는
+  새 공용 빈마다 `@Import` 를 손으로 달아야 했다(company-service 가 이걸 빠뜨려 실제로 기동 불가였던 이력).
+  `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports` + 자동 구성 2종
+  (Jackson2 호환 매퍼 · 관측 Aspect)으로 라이브러리가 스스로 채운다. **함정**: 조건을 빈 타입에 걸면
+  스캔된 `@Bean` 정의가 다음 파싱 라운드에 등록되는 탓에 자동 구성이 먼저 자리를 잡아
+  `BeanDefinitionOverrideException` 으로 account-service 기동이 깨진다(19건 실패로 실측) — 조건을 **스캔된 설정
+  클래스 빈**에 걸어야 한다. `ImportCandidates` 로 부트 표준 탐색 경로 발견 여부까지 테스트로 고정(리소스가 jar 에
+  안 실리면 여기서만 잡힘). company-service 의 수동 `@Import` 제거로 함정 제거를 실증. 보안 빈은 격리 의도를 지키려
+  명시 배선으로 유지.
+  **검증**: shared-common 소비 서비스 전수 **11개 모듈 4,154건 통과·실패 0**(ai·company·account·operation·
+  organization·card·investment·loan·order·settlement + shared-common), `:shared-common:test` 256건 + 커버리지
+  게이트 통과, 하네스 게이트 10/10, `harness-audit: healthy`. 강의별 적용 감사 기록은 `docs/inflearn/spring.md`
+  (미추적 학습 노트).
 
 - **card-service Phase 2 AC1~AC4 완료 (2026-08-04, feat/card-service-phase2-gowid)** — 고위드형 법인카드 플랫폼 2단계 완성.
   ① **AC1 실시간 승인 + 가맹점/MCC 정책**: `AuthorizationHold`(ACTIVE/CAPTURED/PARTIALLY_CAPTURED/VOIDED/EXPIRED 생명주기) + `DeclineReason` 4종 도메인 타입, 가용한도 불변식(master−Σ홀드−Σ매입) 비관적 락 적용, `MerchantPolicy`(허용/차단 MCC·1회·일·월 한도·해외/온라인 토글), Outbox 발행(`lemuel.card.authorized`), 동시 승인 경합 테스트(`ConcurrentAuthorizationIT`). V6 마이그레이션.
@@ -141,15 +172,15 @@
   시드 6·조정분류·Task4/6 은 develop 재작성(역분개 일반화·typed payout)과 돈 경로 핵심 4파일 정면충돌 — 재구현 시 참조만
 - 운영 배포 필수 주입: 강한 `JWT_SECRET`, `app.security.internal-key-required=true`, 각 서비스 외부 API 키
 
-## 핵심 수치 (2026-08-02 기준 · git-tracked 소스)
+## 핵심 수치 (2026-08-06 기준 · git-tracked 소스)
 
 > ⚠️ 수치는 `build/`·`.claude/worktrees/` 사본을 **제외한 git ls-files 기준**. 각 줄 끝 명령이 정답 —
 > 드리프트 의심 시 명령을 돌려 재검증하고 이 수치를 갱신할 것(휘발성 수치를 명령 없이 손으로 적지 말 것).
 
 - 서비스 **14개** + API Gateway + Kotlin polyglot 2(notification·reconciliation) — `git ls-files '*/src/main/resources/application.yml' | wc -l` → 17(=14+gateway+kotlin 2)
-- Flyway 마이그레이션 **246개** — `git ls-files '*/src/main/resources/db/migration/*.sql' | wc -l` → 246
+- Flyway 마이그레이션 **248개** — `git ls-files '*/src/main/resources/db/migration/*.sql' | wc -l` → 248
 - ADR **31개** (0001~0032, 0019 결번 — 세무 ADR 은 0027 충돌로 0029 재부여) — `git ls-files 'docs/adr/[0-9]*.md' | wc -l` → 31
-- 테스트 클래스 **786개** (Testcontainers 통합테스트 포함) — `git ls-files '*/src/test/*Test.java' '*/src/test/*Tests.java' '*/src/test/*IT.java' | wc -l` → 786
+- 테스트 클래스 **792개** (Testcontainers 통합테스트 포함) — `git ls-files '*/src/test/*Test.java' '*/src/test/*Tests.java' '*/src/test/*IT.java' | wc -l` → 792
 - 이벤트 계약 스키마 **35토픽** (ADR 0024, 프로듀서·컨슈머 양방향 테스트 — 담보대출 2종·organization 멤버 2종·카드 8종(2단계 authorized·captured·statement.paid 포함)) — `git ls-files 'shared-common/src/testFixtures/resources/contracts/events/*.schema.json' | wc -l` → 35
 
 ## 최근 전체 검증 (2026-07-29)
