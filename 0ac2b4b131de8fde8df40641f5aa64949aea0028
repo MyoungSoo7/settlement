@@ -1,0 +1,50 @@
+[분할 근거 — 이 커밋은 원래 3개로 나뉘어야 했다]
+
+한 세션이 스테이징 영역을 통째로 커밋하면서 세 갈래 변경이 하나로 묶였다. 히스토리는 이미
+푸시돼 재작성하지 않고, 각 갈래의 설계 근거를 여기에 남긴다.
+
+────────────────────────────────────────────────────────────
+[1/3] feat(ops): 회수 지연에 전용 신호 카테고리를 낸다
+      shared-common: OpsSignalCategory.STOCK_RECLAIM_DELAYED
+      operation-service: OpsFailureSignalConsumer + 그 테스트
+
+기존 STOCK_DEPLETED 로 보내면 대시보드에서 "재고 부족"과 "회수 지연"이 한 버킷에 섞인다.
+부족은 매입·발주로 해소되고 지연은 택배 회수 독촉으로 해소되므로 원인도 조치도 다르다.
+섞이면 그 버킷의 실패율이 무엇을 뜻하는지 알 수 없게 된다. 소비측도 같은 이유로 stock 이 아닌
+stock-reclaim metricKey 에 적재한다.
+
+소비 배선을 같은 갈래로 묶은 이유: 카테고리만 추가하고 구독을 안 붙이면 신호가 갈 곳이 없어
+반쪽이 된다. 발행과 소비는 함께 서야 의미가 있다.
+
+ops.* 는 계약 스키마가 없는 best-effort 관측 신호라 ADR 0024 절차 대상이 아니다.
+
+────────────────────────────────────────────────────────────
+[2/3] feat(order): 임계를 갓 넘긴 회수 대기 건을 구간으로 조회한다
+      LoadPendingStockReclaimPort.findStockReclaimCrossedBetween
+      SpringDataOrderJpaRepository / OrderPersistenceAdapter
+
+전체 대기 건이 아니라 (from, to] 구간만 돌려준다. 매 주기 전량을 훑으면 같은 건이 계속
+재발행돼 인시던트가 노이즈가 되고, 그 안에 진짜 신규 지연이 묻힌다.
+
+기존 부분 인덱스(idx_orders_awaiting_stock_reclaim)가 그대로 커버한다 — 정렬 컬럼 updated_at 이
+키에 있어 구간 스캔이 인덱스 범위 스캔으로 끝나고, 구간이 좁아 매 주기 비용이 일정하다.
+
+────────────────────────────────────────────────────────────
+[3/3] feat(order): 회수가 오지 않는 재고를 운영 신호로 드러낸다
+      StockReclaimDelayScanner + 그 테스트
+
+/admin/stock-reclaim 조회는 능동적으로 열어봐야 알 수 있는 창이라, 잊히면 팔 수 있는 물건이
+조용히 묶인 채 남는다. 임계(기본 14일)를 넘긴 건에 신호를 쏴 인시던트로 잡히게 한다.
+
+구간 폭과 스캔 주기를 같은 프로퍼티(scan-interval-ms)에서 읽는다 — 둘로 나누면 한쪽만 바뀌었을 때
+구간이 주기보다 좁아져 그 사이에 임계를 넘긴 건을 영영 놓친다.
+
+신호 대상 판정은 여기서도 도메인(Order.isAwaitingStockReclaim)이 한다 — 쿼리 조건이 규칙과
+어긋나도 엉뚱한 건에 인시던트가 열리지 않는다.
+
+발행 실패는 건별로 삼키고 스캔 실패는 스케줄러 스레드를 지킨다: 관측 신호가 이후 주기를 통째로
+멈추게 해선 안 된다.
+
+────────────────────────────────────────────────────────────
+검증: order 1,259 · operation 93 · shared-common 256 (실패 0 · skip 0, Docker UP)
+      JaCoCo LINE 90%(order·operation) 통과 · harness-audit healthy
