@@ -17,15 +17,16 @@ import java.util.UUID;
  *
  * <p><b>분할 알고리즘</b>:
  * <ul>
- *   <li>기본 몫: baseAmount = P / 12 (내림, 소수점 2자리)</li>
- *   <li>처음 11회: baseAmount</li>
- *   <li>마지막 회차: P - (baseAmount × 11) — 나머지 전부 포함</li>
+ *   <li>기본 몫: baseAmount = P / 12, 통화 최소단위 절사</li>
+ *   <li>나머지: remainder = P - (baseAmount × 12) — 절사로 버려진 잔액</li>
+ *   <li>1~11회: baseAmount / 12회: baseAmount + remainder</li>
  * </ul>
  *
- * <p>예시: P = 100,000원 (100000 / 12 = 8333.33 내림)
+ * <p>예시: P = 100,000원 (100000 / 12 = 8333.3333... → 절사 8333.33)
  * <ul>
+ *   <li>나머지: 100,000 - (8,333.33 × 12) = 0.04</li>
  *   <li>1~11회: 8,333.33원</li>
- *   <li>12회: 100,000 - (8,333.33 × 11) = 8,333.37원</li>
+ *   <li>12회: 8,333.33 + 0.04 = 8,333.37원</li>
  *   <li>합계: 8,333.33 × 11 + 8,333.37 = 100,000.00 ✓</li>
  * </ul>
  *
@@ -75,6 +76,19 @@ public final class CommissionScheduleFactory {
         if (firstYearTotal.compareTo(BigDecimal.ZERO) <= 0) {
             throw new InvalidCommissionScheduleException(
                     "firstYearTotal 은 0보다 커야 합니다: " + firstYearTotal
+            );
+        }
+
+        // 12회로 쪼갰을 때 회차액이 0원이 되면 V1 의
+        // chk_commission_installment_amount_positive (installment_amount > 0) 를 위반한다.
+        // 최소 총액 = 12 × 통화 최소단위.
+        BigDecimal minimumTotal = BigDecimal.ONE
+                .movePointLeft(CommissionConstants.AMOUNT_SCALE)
+                .multiply(BigDecimal.valueOf(CommissionConstants.INSTALLMENT_COUNT));
+        if (firstYearTotal.compareTo(minimumTotal) < 0) {
+            throw new InvalidCommissionScheduleException(
+                    "firstYearTotal 은 회차당 최소 1단위가 되도록 " + minimumTotal
+                            + " 이상이어야 합니다: " + firstYearTotal
             );
         }
 
