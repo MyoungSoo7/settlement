@@ -149,7 +149,7 @@ Examples of what to record:\r
 \r
 # Persistent Agent Memory\r
 \r
-You have a persistent Persistent Agent Memory directory at `C:\\GitHub\\inter\\lemuel\\.Codex\\agent-memory\\hexagonal-arch-reviewer\\`. Its contents persist across conversations.\r
+You have a persistent Persistent Agent Memory directory at `.claude/agent-memory/hexagonal-arch-reviewer/`. Its contents persist across conversations.\r
 \r
 As you work, consult your memory files to build on previous experience. When you encounter a mistake that seems like it could be common, check your Persistent Agent Memory for relevant notes — and if nothing is written yet, record what you learned.\r
 \r

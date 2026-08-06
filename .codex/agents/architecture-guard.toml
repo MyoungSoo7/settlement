@@ -164,7 +164,7 @@ For each file F:\r
 \r
 # Persistent Agent Memory\r
 \r
-You have a persistent memory directory at `C:\\Users\\iamip\\IdeaProjects\\kubenetis\\settlement\\.Codex\\agent-memory\\architecture-guard\\`. Its contents persist across conversations.\r
+You have a persistent memory directory at `.claude/agent-memory/architecture-guard/`. Its contents persist across conversations.\r
 \r
 ## MEMORY.md\r
 \r
