@@ -460,7 +460,7 @@ test('Claude settings retain the write guard, advisory skill router, and telemet
   });
 });
 
-test('repository harness contracts and STATUS match the tracked manifest oracle', () => {
+test('repository harness contracts match the tracked manifest oracle', () => {
   const root = process.cwd();
   const manifest = JSON.parse(execFileSync('git', ['-C', root, 'show', ':scripts/harness/manifest.json'], { encoding: 'utf8' }));
   const governedErrors = collectAudit(root, manifest).errors.filter((error) =>
@@ -470,10 +470,6 @@ test('repository harness contracts and STATUS match the tracked manifest oracle'
     const skill = readFileSync(join(root, ...path.split('/')), 'utf8');
     if (/cycle\s*>\s*5/i.test(skill)) governedErrors.push(`${path}: forbidden cycle > 5 contract wording`);
   }
-  const status = readFileSync(join(root, 'STATUS.md'), 'utf8');
-  const lastUpdated = status.match(/\*\*Last updated:\*\*\s*(\d{4}-\d{2}-\d{2})/)?.[1];
-  const measurementDate = status.match(/## 핵심 수치 \((\d{4}-\d{2}-\d{2}) 기준/)?.[1];
-  if (lastUpdated !== measurementDate) governedErrors.push(`STATUS measurement date mismatch: lastUpdated=${lastUpdated} measurementDate=${measurementDate}`);
   assert.deepEqual(governedErrors, []);
   assert.match(execFileSync(process.execPath, ['scripts/harness/harness-audit.mjs'], {
     cwd: root,

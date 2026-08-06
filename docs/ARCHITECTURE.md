@@ -130,7 +130,7 @@
 ```
 
 - JVM 코어는 `charts/settlement`·`charts/settlement-msa`, 폴리글랏 7종은 전용 `charts/polyglot-services` + `polyglot-services` ArgoCD 앱으로 **격리 배포**(기존 서비스 리스크 0).
-- 거버넌스: `harness-guard` 가 STATUS.md 정본(서비스·테스트클래스·마이그레이션·ADR 수)을 실제와 대조해 문서-코드 드리프트를 CI 에서 차단.
+- 거버넌스: `harness-guard` 가 라우팅 맵·가드 훅 경로·모듈 로스터를 실제와 대조해 문서-코드 드리프트를 CI 에서 차단.
 
 ---
 

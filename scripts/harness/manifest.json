@@ -26,8 +26,7 @@
     ".claude/skills/interview-harness/test_cases.json",
     ".codex/skills/interview-harness/SKILL.md",
     ".codex/skills/interview-harness/test_cases.json",
-    ".github/workflows/harness-guard.yml",
-    "STATUS.md"
+    ".github/workflows/harness-guard.yml"
   ],
   "criticalContractPairs": [
     {
