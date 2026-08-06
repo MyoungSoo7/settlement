@@ -1,19 +1,10 @@
 package github.lms.lemuel.insurance.integration;
 
-import github.lms.lemuel.InsuranceServiceApplication;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIf;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.DockerClientFactory;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.util.UUID;
 
@@ -33,38 +24,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  *   <li>policy_number 의 UNIQUE 제약 (3단 멱등성 L3)</li>
  * </ul>
  */
-@SpringBootTest(
-        classes = InsuranceServiceApplication.class,
-        properties = {
-                "app.kafka.enabled=false",
-                "app.jwt.secret=integration-test-secret-key-32-bytes-min-OK"
-        }
-)
-@Testcontainers
-@EnabledIf(value = "isDockerAvailable", disabledReason = "Docker is not available")
-class InsuranceMigrationIT {
-
-    static boolean isDockerAvailable() {
-        try {
-            DockerClientFactory.instance().client();
-            return true;
-        } catch (Throwable ex) {
-            return false;
-        }
-    }
-
-    @Container
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17-alpine")
-            .withDatabaseName("insurance_test_migration").withUsername("test").withPassword("test");
-
-    @DynamicPropertySource
-    static void props(DynamicPropertyRegistry r) {
-        r.add("spring.datasource.url", POSTGRES::getJdbcUrl);
-        r.add("spring.datasource.username", POSTGRES::getUsername);
-        r.add("spring.datasource.password", POSTGRES::getPassword);
-        r.add("POSTGRES_USER", POSTGRES::getUsername);
-        r.add("POSTGRES_PASSWORD", POSTGRES::getPassword);
-    }
+class InsuranceMigrationIT extends InsuranceIntegrationTestSupport {
 
     @Autowired
     JdbcTemplate jdbc;

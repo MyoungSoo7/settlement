@@ -1,22 +1,13 @@
 package github.lms.lemuel.insurance.integration;
 
-import github.lms.lemuel.InsuranceServiceApplication;
 import github.lms.lemuel.insurance.adapter.out.persistence.ContractorPiiJpaEntity;
 import github.lms.lemuel.insurance.adapter.out.persistence.ContractorPiiRepository;
 import github.lms.lemuel.insurance.adapter.out.persistence.InsuredPersonPiiJpaEntity;
 import github.lms.lemuel.insurance.adapter.out.persistence.InsuredPersonPiiRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIf;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.DockerClientFactory;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.util.Base64;
 import java.util.List;
@@ -43,49 +34,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>키는 env {@code INSURANCE_ENC_KEY}(루트 {@code build.gradle.kts} 의 {@code tasks.withType<Test>}
  * env 블록에서 주입)에서 로드된다. 복호화가 성공한다는 것 자체가 그 배선이 살아있다는 증거다.
  */
-@SpringBootTest(
-        classes = InsuranceServiceApplication.class,
-        properties = {
-                "app.kafka.enabled=false",
-                "app.jwt.secret=integration-test-secret-key-32-bytes-min-OK",
-                // Outbox 폴러(shared-common, 기본 2초 fixedDelay)를 사실상 정지시킨다.
-                // 이 클래스의 컨테이너가 내려간 뒤에도 캐시된 스프링 컨텍스트의 폴러가 계속 돌면
-                // 죽은 DB 로 커넥션을 시도하며 stdout 에 에러를 뿜는다. 그 출력이 "이미 끝난 테스트
-                // 클래스"에 귀속되어 Gradle TestOutputStore 의 인덱스가 어긋나고,
-                // "Could not write XML test results ... Buffer underflow" 로 test 태스크가 깨진다.
-                // 이 테스트들은 폴러를 검증하지 않으므로 주기를 1시간으로 늘려 무력화한다.
-                "app.outbox.polling-delay-ms=3600000"
-        }
-)
-@Testcontainers
-@EnabledIf(value = "isDockerAvailable", disabledReason = "Docker is not available")
-class PiiEncryptionIT {
+class PiiEncryptionIT extends InsuranceIntegrationTestSupport {
 
     /** 검증용 평문 — DB 어디에도 이 문자열이 나타나면 안 된다. */
     private static final String PLAIN_RRN = "900101-1234567";
     private static final String PLAIN_PHONE = "010-9876-5432";
-
-    static boolean isDockerAvailable() {
-        try {
-            DockerClientFactory.instance().client();
-            return true;
-        } catch (Throwable ex) {
-            return false;
-        }
-    }
-
-    @Container
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17-alpine")
-            .withDatabaseName("insurance_test_pii").withUsername("test").withPassword("test");
-
-    @DynamicPropertySource
-    static void props(DynamicPropertyRegistry r) {
-        r.add("spring.datasource.url", POSTGRES::getJdbcUrl);
-        r.add("spring.datasource.username", POSTGRES::getUsername);
-        r.add("spring.datasource.password", POSTGRES::getPassword);
-        r.add("POSTGRES_USER", POSTGRES::getUsername);
-        r.add("POSTGRES_PASSWORD", POSTGRES::getPassword);
-    }
 
     @Autowired
     JdbcTemplate jdbc;
