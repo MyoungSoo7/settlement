@@ -2,6 +2,7 @@ package github.lms.lemuel.pgreconciliation.adapter.in.web;
 
 import github.lms.lemuel.common.config.jwt.JwtUtil;
 import github.lms.lemuel.pgreconciliation.application.port.in.ReconcilePgFileUseCase;
+import github.lms.lemuel.pgreconciliation.application.port.in.CloseReconciliationRunUseCase;
 import github.lms.lemuel.pgreconciliation.application.port.in.ResolveDiscrepancyUseCase;
 import github.lms.lemuel.pgreconciliation.application.port.out.LoadReconciliationRunPort;
 import github.lms.lemuel.pgreconciliation.domain.DiscrepancyType;
@@ -41,6 +42,7 @@ class PgReconciliationControllerTest {
     @MockitoBean JwtUtil jwtUtil;
     @MockitoBean ReconcilePgFileUseCase reconcileUseCase;
     @MockitoBean ResolveDiscrepancyUseCase resolveUseCase;
+    @MockitoBean CloseReconciliationRunUseCase closeUseCase;
     @MockitoBean LoadReconciliationRunPort loadPort;
 
     private static ReconciliationRun sampleRun() {

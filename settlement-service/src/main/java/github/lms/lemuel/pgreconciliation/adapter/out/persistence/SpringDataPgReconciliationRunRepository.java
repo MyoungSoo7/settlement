@@ -15,6 +15,12 @@ public interface SpringDataPgReconciliationRunRepository
     List<PgReconciliationRunJpaEntity> findRecent(Pageable pageable);
 
     /** 같은 파일(SHA-256) 로 이미 완료된 run — 재업로드 멱등 판정. FAILED 는 재시도 허용 위해 제외. */
+    /** 같은 (PG, 날짜)로 마감된 run — 새 대사 차단 판정. 여러 건이면 최근 것. */
+    Optional<PgReconciliationRunJpaEntity> findFirstByPgProviderAndTargetDateAndStatusOrderByIdDesc(
+            String pgProvider,
+            java.time.LocalDate targetDate,
+            github.lms.lemuel.pgreconciliation.domain.ReconciliationRunStatus status);
+
     Optional<PgReconciliationRunJpaEntity> findFirstByFileSha256AndStatusOrderByIdDesc(
             String fileSha256, ReconciliationRunStatus status);
 }

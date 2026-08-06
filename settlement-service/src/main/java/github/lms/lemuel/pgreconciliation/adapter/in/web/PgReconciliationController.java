@@ -1,5 +1,6 @@
 package github.lms.lemuel.pgreconciliation.adapter.in.web;
 
+import github.lms.lemuel.pgreconciliation.application.port.in.CloseReconciliationRunUseCase;
 import github.lms.lemuel.pgreconciliation.application.port.in.ReconcilePgFileUseCase;
 import github.lms.lemuel.pgreconciliation.application.port.in.ResolveDiscrepancyUseCase;
 import github.lms.lemuel.pgreconciliation.application.port.out.LoadReconciliationRunPort;
@@ -38,13 +39,16 @@ public class PgReconciliationController {
 
     private final ReconcilePgFileUseCase reconcileUseCase;
     private final ResolveDiscrepancyUseCase resolveUseCase;
+    private final CloseReconciliationRunUseCase closeUseCase;
     private final LoadReconciliationRunPort loadPort;
 
     public PgReconciliationController(ReconcilePgFileUseCase reconcileUseCase,
                                        ResolveDiscrepancyUseCase resolveUseCase,
+                                       CloseReconciliationRunUseCase closeUseCase,
                                        LoadReconciliationRunPort loadPort) {
         this.reconcileUseCase = reconcileUseCase;
         this.resolveUseCase = resolveUseCase;
+        this.closeUseCase = closeUseCase;
         this.loadPort = loadPort;
     }
 
@@ -99,6 +103,18 @@ public class PgReconciliationController {
         return ResponseEntity.ok(DiscrepancyResponse.from(d));
     }
 
+    @Operation(summary = "대사 마감 — 해당 (PG, 날짜) 기간을 잠근다",
+            description = "COMPLETED 상태이고 미결(PENDING) 불일치가 0 건일 때만 마감된다. "
+                    + "마감 후에는 같은 (PG, 날짜)로 새 대사를 열 수 없어, 확정된 기간에 새 조정이 생기는 것을 막는다. "
+                    + "CLOSED 는 종착 상태 — 재개방 경로는 없다.")
+    @PostMapping("/runs/{id}/close")
+    public ResponseEntity<RunResponse> close(@PathVariable Long id,
+                                             @RequestBody(required = false) ResolveRequest request) {
+        ReconciliationRun run = closeUseCase.close(id, currentOperatorId(),
+                request == null ? null : request.note());
+        return ResponseEntity.ok(RunResponse.from(run));
+    }
+
     private static String currentOperatorId() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || auth.getName() == null) return "anonymous";
@@ -123,6 +139,9 @@ public class PgReconciliationController {
             body.put("discrepancyCount", r.getDiscrepancyCount());
             body.put("autoCorrectedCount", r.getAutoCorrectedCount());
             body.put("operatorId", r.getOperatorId());
+            body.put("closed", r.isClosed());
+            body.put("closedBy", r.getClosedBy());
+            body.put("closedAt", r.getClosedAt());
             return new RunResponse(body);
         }
     }

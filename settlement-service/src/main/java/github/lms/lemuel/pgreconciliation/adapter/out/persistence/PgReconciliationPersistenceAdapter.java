@@ -46,7 +46,8 @@ public class PgReconciliationPersistenceAdapter
                 savedRun.getFileName(), savedRun.getFileSha256(), savedRun.getStatus(), savedRun.getStartedAt(),
                 savedRun.getFinishedAt(), savedRun.getTotalPgRows(), savedRun.getTotalInternalRows(),
                 savedRun.getMatchedCount(), savedRun.getDiscrepancyCount(), savedRun.getAutoCorrectedCount(),
-                savedRun.getOperatorId(), savedRun.getNote(), savedDiscrepancies
+                savedRun.getOperatorId(), savedRun.getNote(), savedDiscrepancies,
+                savedRun.getClosedBy(), savedRun.getClosedAt()
         );
     }
 
@@ -91,6 +92,18 @@ public class PgReconciliationPersistenceAdapter
                 .map(e -> toRunDomain(e, List.of()));
     }
 
+    @Override
+    public Optional<ReconciliationRun> findClosedByProviderAndDate(String pgProvider,
+                                                                   java.time.LocalDate targetDate) {
+        if (pgProvider == null || targetDate == null) {
+            return Optional.empty();
+        }
+        return runRepository.findFirstByPgProviderAndTargetDateAndStatusOrderByIdDesc(
+                        pgProvider, targetDate,
+                        github.lms.lemuel.pgreconciliation.domain.ReconciliationRunStatus.CLOSED)
+                .map(e -> toRunDomain(e, List.of()));
+    }
+
     private static PgReconciliationRunJpaEntity toRunEntity(ReconciliationRun run) {
         return new PgReconciliationRunJpaEntity(
                 run.getId(), run.getPgProvider(), run.getTargetDate(), run.getFileName(),
@@ -98,7 +111,8 @@ public class PgReconciliationPersistenceAdapter
                 run.getStatus(), run.getStartedAt(), run.getFinishedAt(),
                 run.getTotalPgRows(), run.getTotalInternalRows(),
                 run.getMatchedCount(), run.getDiscrepancyCount(), run.getAutoCorrectedCount(),
-                run.getOperatorId(), run.getNote()
+                run.getOperatorId(), run.getNote(),
+                run.getClosedBy(), run.getClosedAt()
         );
     }
 
@@ -119,7 +133,8 @@ public class PgReconciliationPersistenceAdapter
                 e.getStatus(), e.getStartedAt(), e.getFinishedAt(),
                 e.getTotalPgRows(), e.getTotalInternalRows(),
                 e.getMatchedCount(), e.getDiscrepancyCount(), e.getAutoCorrectedCount(),
-                e.getOperatorId(), e.getNote(), children
+                e.getOperatorId(), e.getNote(), children,
+                e.getClosedBy(), e.getClosedAt()
         );
     }
 
