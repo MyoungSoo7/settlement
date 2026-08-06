@@ -107,6 +107,9 @@ frontend/*.out.log
 **/logs/claude-code/
 *.err.log
 
+## https 폴더제외
+https
+
 ### Codex isolated worktrees ###
 .worktrees/
 
@@ -117,6 +120,7 @@ docs/harness2
 **/.claude/harness/
 .claude/agent-memory/
 .claude/scratch/
+.superpowers/sdd/
 .symposium/scratch/
 .ouroboros/
 
