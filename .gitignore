@@ -116,7 +116,9 @@ docs/harness2
 ### Claude Code 하네스·세션 아티팩트 (실행 중 생성 — 이력 제외) ###
 **/.claude/harness/
 .claude/agent-memory/
+.claude/scratch/
 .symposium/scratch/
+.ouroboros/
 
 ### 공공데이터 원본 대용량 덤프 (repo 밖 보관 — import 배치가 로컬 경로로 읽음) ###
 company-service/src/main/resources/*.csv
