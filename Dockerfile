@@ -27,6 +27,7 @@ COPY investment-service/build.gradle.kts ./investment-service/
 COPY account-service/build.gradle.kts ./account-service/
 COPY organization-service/build.gradle.kts ./organization-service/
 COPY card-service/build.gradle.kts ./card-service/
+COPY insurance-service/build.gradle.kts ./insurance-service/
 COPY gateway-service/build.gradle.kts ./gateway-service/
 
 RUN --mount=type=cache,target=/home/gradle/.gradle \
@@ -48,6 +49,7 @@ COPY investment-service ./investment-service
 COPY account-service ./account-service
 COPY organization-service ./organization-service
 COPY card-service ./card-service
+COPY insurance-service ./insurance-service
 COPY gateway-service ./gateway-service
 
 RUN --mount=type=cache,target=/home/gradle/.gradle \
