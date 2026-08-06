@@ -46,6 +46,9 @@ public class ChangeOrderStatusService implements ChangeOrderStatusUseCase {
 
         Order saved = saveOrderPort.save(order);
         historyPort.save(orderId, OrderStatus.CREATED.name(), saved.getStatus().name(), "system", "cancelOrder");
+        // 주문 생성 시 차감한 재고를 되돌린다 — 취소 승인·환불 승인 경로와 동일한 역연산.
+        // 이 호출이 없으면 직접 취소된 수량만큼 재고가 영구히 판매 불가 상태로 남는다.
+        restoreStock(saved);
         return saved;
     }
 

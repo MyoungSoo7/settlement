@@ -52,6 +52,22 @@ class ChangeOrderStatusServiceTest {
                 eq(OrderStatus.CANCELED.name()), eq("system"), eq("cancelOrder"));
     }
 
+    @Test @DisplayName("주문 취소: 다건 주문은 라인별로 재고를 원복한다(생성 시 차감의 역연산)")
+    void cancelOrder_restoresStockPerLine() {
+        OrderItem skuLine = OrderItem.newItem(100L, 500L, "SKU-1", "상품A", new BigDecimal("10000"), 2);
+        OrderItem plainLine = OrderItem.newItem(200L, null, null, "상품B", new BigDecimal("5000"), 3);
+        Order order = Order.createMultiItem(1L, List.of(skuLine, plainLine));
+        when(loadOrderPort.findById(1L)).thenReturn(Optional.of(order));
+        when(saveOrderPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.cancelOrder(1L);
+
+        // 취소 승인(approveCancellation)·환불 승인 경로와 동일해야 한다 — 직접 취소만 재고가 새면
+        // 그 수량은 영구히 판매 불가로 남는다.
+        verify(increaseVariantStockUseCase).increase(500L, 2);
+        verify(increaseProductStockUseCase).increase(200L, 3);
+    }
+
     @Test @DisplayName("주문 미존재 시 예외")
     void cancelOrder_notFound() {
         when(loadOrderPort.findById(999L)).thenReturn(Optional.empty());
