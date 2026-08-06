@@ -107,6 +107,12 @@ frontend/*.out.log
 **/logs/claude-code/
 *.err.log
 
+### 제출물 플러그인의 라이브 실행 산출물 (재생성 가능 — 이력 제외, 2026-08-06) ###
+# pwc 배치는 실존 상장사 70곳에 대한 AI 생성 부실징후 진단(브리핑 docx/md·패킷·프롬프트·로그)이라
+# 공개 저장소에 원문을 두지 않는다. 플러그인 코드·스킬·테스트는 계속 추적하며,
+# 산출물은 README 의 재현 명령으로 로컬에서 다시 만들 수 있다.
+company-service/src/main/resources/pwc/accounting/outputs/
+
 ## https 폴더제외
 https
 
