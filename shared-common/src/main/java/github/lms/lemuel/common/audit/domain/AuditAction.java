@@ -26,6 +26,8 @@ public enum AuditAction {
     CHARGEBACK_REJECTED,
     // PG 대사 승인 → 정산 역정산(clawback) 적용.
     RECON_ADJUSTMENT_APPLIED,
+    // 운영자가 PG 대사를 마감 — 해당 (PG, 날짜) 기간이 잠기고 새 대사가 차단된다.
+    PG_RECONCILIATION_CLOSED,
     // ledger_outbox FAILED 항목 운영자 일괄 재큐.
     LEDGER_OUTBOX_REQUEUED,
     // 격리(quarantined) 소비 이벤트 운영자 재처리 — 원본 토픽 republish, operator·quarantineId·event_id 추적.
