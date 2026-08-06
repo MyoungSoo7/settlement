@@ -26,8 +26,7 @@ public class NoOpCarrierPolicyStatusService implements ReceiveCarrierPolicyStatu
      */
     @Override
     public void onCarrierPolicyStatusReceived(String policyNumber, String carrierStatus) {
-        log.info("[D1 no-op] 보험사 상태 통보 수신 — policyNumber={}, carrierStatus={}",
-                policyNumber, carrierStatus);
+        log.info("[D1 no-op] 보험사 상태 통보 수신 — carrierStatus={}", carrierStatus);
         // D1: 외부 보험사 연동 없음. 훗날 이 메서드에서 도메인 상태를 업데이트한다.
     }
 }

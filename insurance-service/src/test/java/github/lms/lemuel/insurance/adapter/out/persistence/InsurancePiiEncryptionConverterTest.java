@@ -6,7 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * InsurancePiiEncryptionConverter 단위 테스트 — AES-256 GCM 암호화 왕복 / 레거시 평문 통과 / enc:v1 접두 구분.
+ * InsurancePiiEncryptionConverter 단위 테스트 — AES-256 GCM 암호화 왕복 / 평문 거부 / enc:v1 접두 구분.
  *
  * <p>고정 키 주입용 package-private 생성자를 사용해 env(INSURANCE_ENC_KEY) 의존 없이 검증한다.
  * PayoutFieldEncryptionConverter 와 동형.
@@ -60,14 +60,12 @@ class InsurancePiiEncryptionConverterTest {
     }
 
     @Test
-    void legacy_plaintext_without_enc_v1_prefix_passes_through_unchanged() {
-        // enc:v1 도입 이전 평문 데이터 — lazy migration 패턴: 복호화 없이 그대로 반환.
-        // 이는 기존 평문 데이터를 암호화로 강제 전환하지 않고 사용 시점에 암호화하도록 해줌.
+    void plaintext_without_enc_v1_prefix_is_rejected() {
         String legacyPlaintext = "880301-1111111";
 
-        String result = converter.convertToEntityAttribute(legacyPlaintext);
-
-        assertThat(result).isEqualTo(legacyPlaintext);
+        assertThatThrownBy(() -> converter.convertToEntityAttribute(legacyPlaintext))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("enc:v1:");
     }
 
     @Test

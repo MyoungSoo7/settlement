@@ -1,5 +1,6 @@
 package github.lms.lemuel.insurance.domain;
 
+import github.lms.lemuel.insurance.domain.exception.InvalidClawbackInputException;
 import github.lms.lemuel.insurance.domain.exception.InvalidClawbackStateException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -309,6 +310,42 @@ class ClawbackCalculatorTest {
                 .isInstanceOf(NullPointerException.class);
     }
 
+    @Test
+    @DisplayName("D6-18: 음수 기지급 합계는 거부")
+    void clawback_negativePaidTotal_throws() {
+        assertThatThrownBy(() -> ClawbackCalculator.calculate(
+                new BigDecimal("-0.01"),
+                EFFECTIVE,
+                EFFECTIVE,
+                PolicyStatus.SURRENDERED))
+                .isInstanceOf(InvalidClawbackInputException.class)
+                .hasMessageContaining("paidTotal");
+    }
+
+    @Test
+    @DisplayName("D6-19: 0 기지급 합계는 경계값으로 허용")
+    void clawback_zeroPaidTotal_isAllowed() {
+        BigDecimal result = ClawbackCalculator.calculate(
+                BigDecimal.ZERO,
+                EFFECTIVE,
+                EFFECTIVE.plusMonths(1),
+                PolicyStatus.SURRENDERED);
+
+        assertThat(result).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    @DisplayName("D6-20: 종료일이 효력일보다 빠르면 CANCELLED도 거부")
+    void clawback_endDateBeforeEffectiveDate_throwsForCancelled() {
+        assertThatThrownBy(() -> ClawbackCalculator.calculate(
+                PAID_TOTAL,
+                EFFECTIVE,
+                EFFECTIVE.minusDays(1),
+                PolicyStatus.CANCELLED))
+                .isInstanceOf(InvalidClawbackInputException.class)
+                .hasMessageContaining("endDate");
+    }
+
     /**
      * D6 상수 규율 검증: CLAWBACK_WINDOW_MONTHS 를 소비하고 있음을 확인.
      */
@@ -323,7 +360,7 @@ class ClawbackCalculatorTest {
      * 이는 서비스 레이어 책임이지만, calculator 자체는 단일 행 기준.
      */
     @Test
-    @DisplayName("D6-18: 다중 스케줄 환수 합계 시뮬레이션")
+    @DisplayName("D6-21: 다중 스케줄 환수 합계 시뮬레이션")
     void clawback_multi_schedule_total() {
         List<BigDecimal> paidAmounts = Arrays.asList(
                 new BigDecimal("100.00"),

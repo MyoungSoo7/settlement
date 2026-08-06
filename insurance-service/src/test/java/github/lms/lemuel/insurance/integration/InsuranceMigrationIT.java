@@ -32,6 +32,18 @@ class InsuranceMigrationIT extends InsuranceIntegrationTestSupport {
     @Autowired
     JdbcTemplate jdbc;
 
+    @Test
+    @DisplayName("V4: 보험 보안 강화 migration이 적용된다")
+    void v4InsuranceSecurityHardeningMigrationIsApplied() {
+        Boolean applied = jdbc.queryForObject("""
+                SELECT success
+                FROM opslab.flyway_schema_history
+                WHERE version = '4'
+                """, Boolean.class);
+
+        assertThat(applied).isTrue();
+    }
+
     // ────────────────────────────────────────────────────────────────────
     // D4: 수수료 회차 범위 CHECK 제약 (UNIQUE 제약은 CommissionScheduleUniqueConstraintIT 담당)
     // ────────────────────────────────────────────────────────────────────
@@ -198,5 +210,55 @@ class InsuranceMigrationIT extends InsuranceIntegrationTestSupport {
 
         assertThatThrownBy(() -> jdbc.update(sql, UUID.randomUUID().toString(), eventId))
                 .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    @DisplayName("V1: PII 테이블은 enc:v1 암호문 접두가 없는 값을 거부한다")
+    void v1PiiColumnsRejectPlaintext() {
+        assertThatThrownBy(() -> jdbc.update("""
+                INSERT INTO opslab.insured_person_pii (application_id, encrypted_rrn)
+                VALUES (?, '900101-1234567')
+                """, UUID.randomUUID()))
+                .isInstanceOf(DataIntegrityViolationException.class);
+
+        assertThatThrownBy(() -> jdbc.update("""
+                INSERT INTO opslab.contractor_pii (application_id, encrypted_phone)
+                VALUES (?, '010-1234-5678')
+                """, UUID.randomUUID()))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    @DisplayName("V2: quarantine 좌표는 consumer group/topic/partition/offset 단위로 유일하다")
+    void v2QuarantinedEventCoordinatesAreUnique() {
+        String sql = """
+                INSERT INTO opslab.quarantined_events
+                    (consumer_group, topic, kafka_partition, kafka_offset, cause, payload)
+                VALUES ('lemuel-insurance', 'carrier-status', 0, 42, 'MISSING_EVENT_ID', '{}')
+                """;
+        jdbc.update(sql);
+
+        assertThatThrownBy(() -> jdbc.update(sql))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    @DisplayName("V3: 파티션 제거 함수는 PUBLIC 실행 권한을 부여하지 않는다")
+    void v3PruneAuditLogsIsNotExecutableByPublic() {
+        Boolean publicCanExecute = jdbc.queryForObject("""
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM pg_proc p
+                    JOIN pg_namespace n ON n.oid = p.pronamespace
+                    CROSS JOIN LATERAL aclexplode(
+                        COALESCE(p.proacl, acldefault('f', p.proowner))) acl
+                    WHERE n.nspname = 'opslab'
+                      AND p.proname = 'prune_audit_logs'
+                      AND acl.grantee = 0
+                      AND acl.privilege_type = 'EXECUTE'
+                )
+                """, Boolean.class);
+
+        assertThat(publicCanExecute).isFalse();
     }
 }

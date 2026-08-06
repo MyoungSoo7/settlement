@@ -28,7 +28,7 @@ import java.util.Base64;
 @Converter
 public class InsurancePiiEncryptionConverter implements AttributeConverter<String, String> {
 
-    /** 암호화 스킴 버전 접두 — 이 접두가 없으면 레거시 평문. */
+    /** 암호화 스킴 버전 접두 — 이 접두가 없는 저장값은 평문으로 간주해 거부한다. */
     static final String PREFIX = "enc:v1:";
 
     private static final String ENV_KEY = "INSURANCE_ENC_KEY";
@@ -95,8 +95,8 @@ public class InsurancePiiEncryptionConverter implements AttributeConverter<Strin
             return null;
         }
         if (!dbData.startsWith(PREFIX)) {
-            // 레거시 평문 — lazy migration: 그대로 반환.
-            return dbData;
+            throw new IllegalStateException(
+                    "보험 PII 저장값은 " + PREFIX + " 암호문이어야 합니다 (평문 복호화 거부)");
         }
         try {
             byte[] blob = Base64.getDecoder().decode(dbData.substring(PREFIX.length()));

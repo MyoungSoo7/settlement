@@ -2,6 +2,7 @@ package github.lms.lemuel.insurance.adapter.in.kafka;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import github.lms.lemuel.common.outbox.adapter.in.kafka.ConsumedEventQuarantine;
 import github.lms.lemuel.common.outbox.adapter.in.kafka.IdempotentEventConsumer;
 import github.lms.lemuel.common.outbox.adapter.in.kafka.ProcessedEventRepository;
 import github.lms.lemuel.insurance.application.port.in.ReceiveCarrierPolicyStatusPort;
@@ -36,8 +37,9 @@ public class CarrierPolicyStatusConsumer extends IdempotentEventConsumer {
 
     public CarrierPolicyStatusConsumer(ReceiveCarrierPolicyStatusPort receivePort,
                                        ProcessedEventRepository processedEventRepository,
-                                       ObjectMapper objectMapper) {
-        super(processedEventRepository, objectMapper);
+                                       ObjectMapper objectMapper,
+                                       ConsumedEventQuarantine quarantine) {
+        super(processedEventRepository, objectMapper, quarantine);
         this.receivePort = receivePort;
     }
 
@@ -73,7 +75,7 @@ public class CarrierPolicyStatusConsumer extends IdempotentEventConsumer {
 
         receivePort.onCarrierPolicyStatusReceived(policyNumber, carrierStatus);
 
-        log.info("보험사 상태 통보 처리 완료. eventId={}, policyNumber={}, carrierStatus={}",
-                eventId, policyNumber, carrierStatus);
+        log.info("보험사 상태 통보 처리 완료. eventId={}, carrierStatus={}",
+                eventId, carrierStatus);
     }
 }

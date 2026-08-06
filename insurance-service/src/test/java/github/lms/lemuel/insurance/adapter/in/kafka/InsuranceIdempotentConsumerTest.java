@@ -1,6 +1,10 @@
 package github.lms.lemuel.insurance.adapter.in.kafka;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import github.lms.lemuel.common.outbox.adapter.in.kafka.ConsumedEventQuarantine;
 import github.lms.lemuel.common.outbox.adapter.in.kafka.ProcessedEventJpaEntity;
 import github.lms.lemuel.common.outbox.adapter.in.kafka.ProcessedEventRepository;
 import github.lms.lemuel.insurance.application.port.in.ReceiveCarrierPolicyStatusPort;
@@ -11,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 import org.springframework.kafka.support.Acknowledgment;
 
 import java.nio.charset.StandardCharsets;
@@ -24,6 +29,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doThrow;
 
 /**
  * CarrierPolicyStatusConsumer 의 멱등성 단위 테스트.
@@ -48,13 +54,17 @@ class InsuranceIdempotentConsumerTest {
     @Mock
     ProcessedEventRepository processedEventRepository;
 
+    @Mock
+    ConsumedEventQuarantine quarantine;
+
     CarrierPolicyStatusConsumer consumer;
 
     final ObjectMapper objectMapper = new ObjectMapper();
 
     @BeforeEach
     void setUp() {
-        consumer = new CarrierPolicyStatusConsumer(receivePort, processedEventRepository, objectMapper);
+        consumer = new CarrierPolicyStatusConsumer(
+                receivePort, processedEventRepository, objectMapper, quarantine);
     }
 
     // ── 테스트 헬퍼 ───────────────────────────────────────────────────────────
@@ -64,6 +74,11 @@ class InsuranceIdempotentConsumerTest {
                 new ConsumerRecord<>("lemuel.insurance.carrier_policy_status", 0, 0L, null, json);
         record.headers().add("event_id", eventId.getBytes(StandardCharsets.UTF_8));
         return record;
+    }
+
+    private static ConsumerRecord<String, String> recordWithoutEventId(String json) {
+        return new ConsumerRecord<>(
+                "lemuel.insurance.carrier_policy_status", 0, 0L, null, json);
     }
 
     private static String validPayload(String policyNumber, String status) {
@@ -86,6 +101,7 @@ class InsuranceIdempotentConsumerTest {
 
         verify(receivePort, times(1))
                 .onCarrierPolicyStatusReceived("INS-2026-000001", "IN_FORCE");
+        verify(quarantine, never()).quarantine(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -141,6 +157,47 @@ class InsuranceIdempotentConsumerTest {
         verify(processedEventRepository, times(1)).save(any(ProcessedEventJpaEntity.class));
     }
 
+    @Test
+    @DisplayName("비즈니스 처리가 실패하면 processed marker와 ack를 남기지 않는다")
+    void businessFailure_doesNotSaveMarkerOrAck() {
+        when(processedEventRepository.existsById(any())).thenReturn(false);
+        doThrow(new IllegalStateException("business failure"))
+                .when(receivePort).onCarrierPolicyStatusReceived(any(), any());
+        Acknowledgment ack = mock(Acknowledgment.class);
+
+        assertThatThrownBy(() -> consumer.onCarrierPolicyStatus(
+                recordWith(UUID.randomUUID().toString(),
+                        validPayload("INS-2026-FAIL", "IN_FORCE")),
+                ack))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("business failure");
+
+        verify(processedEventRepository, never()).save(any());
+        verify(ack, never()).acknowledge();
+    }
+
+    @Test
+    @DisplayName("처리 완료 로그에 평문 policyNumber를 남기지 않는다")
+    void successfulHandlingLog_doesNotContainPlaintextPolicyNumber() {
+        when(processedEventRepository.existsById(any())).thenReturn(false);
+        Logger logger = (Logger) LoggerFactory.getLogger(CarrierPolicyStatusConsumer.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            consumer.onCarrierPolicyStatus(
+                    recordWith(UUID.randomUUID().toString(),
+                            validPayload("INS-SECRET-654321", "IN_FORCE")),
+                    mock(Acknowledgment.class));
+
+            assertThat(appender.list)
+                    .extracting(ILoggingEvent::getFormattedMessage)
+                    .noneMatch(message -> message.contains("INS-SECRET-654321"));
+        } finally {
+            logger.detachAppender(appender);
+        }
+    }
+
     // ── 오류 흐름 ─────────────────────────────────────────────────────────────
 
     @Test
@@ -172,6 +229,62 @@ class InsuranceIdempotentConsumerTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("carrierStatus");
 
+        verify(receivePort, never()).onCarrierPolicyStatusReceived(any(), any());
+    }
+
+    @Test
+    @DisplayName("event_id 누락 레코드는 durable quarantine 후 ack하고 비즈니스 처리를 하지 않는다")
+    void missingEventId_isQuarantinedBeforeAck() {
+        Acknowledgment ack = mock(Acknowledgment.class);
+        ConsumerRecord<String, String> record = recordWithoutEventId(
+                validPayload("INS-2026-000004", "IN_FORCE"));
+
+        consumer.onCarrierPolicyStatus(record, ack);
+
+        verify(quarantine).quarantine(
+                CarrierPolicyStatusConsumer.CONSUMER_GROUP,
+                ConsumedEventQuarantine.Cause.MISSING_EVENT_ID,
+                null,
+                record,
+                null);
+        verify(ack).acknowledge();
+        verify(receivePort, never()).onCarrierPolicyStatusReceived(any(), any());
+        verify(processedEventRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("불량 UUID event_id는 원문을 보존해 quarantine한다")
+    void invalidEventId_isQuarantinedWithRawHeader() {
+        Acknowledgment ack = mock(Acknowledgment.class);
+        ConsumerRecord<String, String> record = recordWith(
+                "not-a-uuid", validPayload("INS-2026-000005", "IN_FORCE"));
+
+        consumer.onCarrierPolicyStatus(record, ack);
+
+        verify(quarantine).quarantine(
+                CarrierPolicyStatusConsumer.CONSUMER_GROUP,
+                ConsumedEventQuarantine.Cause.INVALID_EVENT_ID,
+                "not-a-uuid",
+                record,
+                null);
+        verify(ack).acknowledge();
+        verify(receivePort, never()).onCarrierPolicyStatusReceived(any(), any());
+    }
+
+    @Test
+    @DisplayName("quarantine 저장 실패는 전파되어 ack하지 않는다")
+    void quarantineFailure_isPropagatedWithoutAck() {
+        Acknowledgment ack = mock(Acknowledgment.class);
+        ConsumerRecord<String, String> record = recordWithoutEventId(
+                validPayload("INS-2026-000006", "IN_FORCE"));
+        org.mockito.Mockito.doThrow(new IllegalStateException("quarantine unavailable"))
+                .when(quarantine).quarantine(any(), any(), any(), any(), any());
+
+        assertThatThrownBy(() -> consumer.onCarrierPolicyStatus(record, ack))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("quarantine unavailable");
+
+        verify(ack, never()).acknowledge();
         verify(receivePort, never()).onCarrierPolicyStatusReceived(any(), any());
     }
 

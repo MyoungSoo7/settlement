@@ -1121,7 +1121,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       APP_KAFKA_ENABLED: "true"
       SPRING_KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
-      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-lemuel-internal-dev-key}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY is required for insurance-service}
       JWT_ISSUER: ${JWT_ISSUER}
       JWT_SECRET: ${JWT_SECRET}
       JWT_TTL_SECONDS: ${JWT_TTL_SECONDS}

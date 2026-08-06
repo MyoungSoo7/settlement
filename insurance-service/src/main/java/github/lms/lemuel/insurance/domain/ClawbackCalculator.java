@@ -1,5 +1,6 @@
 package github.lms.lemuel.insurance.domain;
 
+import github.lms.lemuel.insurance.domain.exception.InvalidClawbackInputException;
 import github.lms.lemuel.insurance.domain.exception.InvalidClawbackStateException;
 
 import java.math.BigDecimal;
@@ -38,6 +39,7 @@ public final class ClawbackCalculator {
      * @param status 계약 상태 — SURRENDERED|CANCELLED|EXPIRED(소멸) 만 허용
      * @return 환수액 (BigDecimal, >= 0)
      * @throws NullPointerException 입력값이 null 이면
+     * @throws InvalidClawbackInputException 기지급 합계가 음수이거나 종료일이 효력일보다 빠르면
      * @throws InvalidClawbackStateException 상태가 환수 대상이 아니면
      */
     public static BigDecimal calculate(
@@ -50,6 +52,15 @@ public final class ClawbackCalculator {
         Objects.requireNonNull(effectiveDate, "effectiveDate");
         Objects.requireNonNull(endDate, "endDate");
         Objects.requireNonNull(status, "status");
+
+        if (paidTotal.signum() < 0) {
+            throw new InvalidClawbackInputException(
+                    "paidTotal must be greater than or equal to zero");
+        }
+        if (endDate.isBefore(effectiveDate)) {
+            throw new InvalidClawbackInputException(
+                    "endDate must be on or after effectiveDate");
+        }
 
         // 환수 트리거 상태 검증
         if (!isClawbackTriggered(status)) {
