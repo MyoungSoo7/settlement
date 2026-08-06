@@ -23,6 +23,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.List;
 import java.util.Optional;
 
@@ -139,6 +142,47 @@ public class PayoutService implements RequestPayoutUseCase, ExecutePayoutUseCase
                     settlementId, payoutType, e.toString());
             throw new PayoutConcurrentClaimException(settlementId);
         }
+    }
+
+    /**
+     * 송금 미리보기 — 아무것도 보내지 않고 "이번 배치가 무엇을 얼마나 보낼지"만 산출한다.
+     *
+     * <p>실행 경로는 건별 송금이 COMPLETED 되면서 일 한도가 자연히 소진되지만, 미리보기는 아무것도
+     * 완료시키지 않아 DB 합계가 고정이다. 그대로 건별 판정하면 같은 셀러의 여러 건이 전부 "보낼 수 있음"
+     * 으로 잡혀 <b>실제보다 많이 나간다고 약속</b>하게 된다. 그래서 나갈 예정 금액을 누적해 다음 건 판정에
+     * 넘긴다 — 밀릴 건의 금액은 실제로 나가지 않으므로 누적에 넣지 않는다.
+     */
+    @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public PayoutPreview previewPending() {
+        List<Payout> pending = loadPort.findByStatus(PayoutStatus.REQUESTED, BATCH_SIZE);
+        LocalDate today = LocalDate.now(clock);
+
+        List<PayoutPreviewLine> lines = new ArrayList<>();
+        Map<Long, BigDecimal> projectedBySeller = new HashMap<>();
+        BigDecimal projectedSystem = BigDecimal.ZERO;
+        BigDecimal sendableAmount = BigDecimal.ZERO;
+        BigDecimal limitedAmount = BigDecimal.ZERO;
+        int sendable = 0;
+        int limited = 0;
+
+        for (Payout p : pending) {
+            BigDecimal sellerProjected = projectedBySeller.getOrDefault(p.getSellerId(), BigDecimal.ZERO);
+            var decision = limitChecker.canSend(p.getSellerId(), p.getAmount(), today,
+                    sellerProjected, projectedSystem);
+            lines.add(new PayoutPreviewLine(p.getId(), p.getSellerId(), p.getAmount(),
+                    decision.allowed(), decision.reason()));
+            if (decision.allowed()) {
+                sendable++;
+                sendableAmount = sendableAmount.add(p.getAmount());
+                projectedBySeller.put(p.getSellerId(), sellerProjected.add(p.getAmount()));
+                projectedSystem = projectedSystem.add(p.getAmount());
+            } else {
+                limited++;
+                limitedAmount = limitedAmount.add(p.getAmount());
+            }
+        }
+        return new PayoutPreview(sendable, sendableAmount, limited, limitedAmount, List.copyOf(lines));
     }
 
     @Override

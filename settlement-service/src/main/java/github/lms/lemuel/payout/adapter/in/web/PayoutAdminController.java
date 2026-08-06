@@ -130,6 +130,14 @@ public class PayoutAdminController {
         return ResponseEntity.ok(body);
     }
 
+    @Operation(summary = "송금 미리보기 — 실행 없이 이번 배치가 보낼 건수·총액과 밀릴 사유를 본다",
+            description = "펌뱅킹은 되돌리기 어려운 외부 송금이라, 확정 전에 규모를 확인할 수 있어야 한다. "
+                    + "아무 상태도 바꾸지 않으므로 감사 기록도 남기지 않는다(실집행만 기록).")
+    @GetMapping("/preview")
+    public ResponseEntity<ExecutePayoutUseCase.PayoutPreview> preview() {
+        return ResponseEntity.ok(executeUseCase.previewPending());
+    }
+
     @Operation(summary = "수동 즉시 실행 — 정기 배치 외 즉시 송금이 필요할 때")
     @PostMapping("/execute-now")
     public ResponseEntity<Map<String, Object>> executeNow() {
