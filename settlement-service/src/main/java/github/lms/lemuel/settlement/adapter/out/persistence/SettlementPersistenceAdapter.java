@@ -32,6 +32,18 @@ public class SettlementPersistenceAdapter
     }
 
     @Override
+    public List<Settlement> findAllByIds(List<Long> settlementIds) {
+        if (settlementIds == null || settlementIds.isEmpty()) {
+            return List.of();
+        }
+        // Spring Data 의 findAllById 는 단일 IN 쿼리로 조회한다(id 당 findById 반복 = N+1 회피).
+        return settlementJpaRepository.findAllById(settlementIds)
+                .stream()
+                .map(mapper::toDomain)
+                .collect(Collectors.toList());
+    }
+
+    @Override
     public Optional<Settlement> findByPaymentId(Long paymentId) {
         return settlementJpaRepository.findByPaymentId(paymentId)
                 .map(mapper::toDomain);
