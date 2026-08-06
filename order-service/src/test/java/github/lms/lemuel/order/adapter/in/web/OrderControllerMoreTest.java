@@ -28,6 +28,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import github.lms.lemuel.common.config.jwt.AuthPrincipal;
+import org.junit.jupiter.api.AfterEach;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 /**
  * OrderController 보완 테스트 — 기존 OrderControllerTest 가 다루지 않는
@@ -43,6 +48,20 @@ class OrderControllerMoreTest {
     @MockitoBean IdempotentMultiItemOrderUseCase createMultiItemOrderUseCase;
     @MockitoBean GetOrderUseCase getOrderUseCase;
     @MockitoBean ChangeOrderStatusUseCase changeOrderStatusUseCase;
+
+    /** JWT 주체를 SecurityContext 에 직접 세팅(addFilters=false 슬라이스 대응 — OrderControllerTest 와 동일). */
+    private static void login(long uid, String role) {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(
+                        new AuthPrincipal(uid, uid + "@x.com", role),
+                        null,
+                        java.util.List.of(new SimpleGrantedAuthority("ROLE_" + role))));
+    }
+
+    @AfterEach
+    void clearContext() {
+        SecurityContextHolder.clearContext();
+    }
 
     private Order order() {
         Order o = Order.create(1L, 1L, new BigDecimal("10000"));
@@ -71,6 +90,7 @@ class OrderControllerMoreTest {
     @Test
     @DisplayName("GET /orders/user/{id}: status·from·to 필터 전달")
     void getUserOrders_withFilters() throws Exception {
+        login(1L, "USER");   // 소유권 대조(ResourceOwnership) 통과 — 본인 조회
         when(getOrderUseCase.getOrdersByUserId(eq(1L), eq("PAID"), any(), any()))
                 .thenReturn(List.of(order()));
 
