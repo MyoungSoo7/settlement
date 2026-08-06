@@ -3,10 +3,9 @@ package github.lms.lemuel.insurance.domain;
 import github.lms.lemuel.insurance.domain.exception.InvalidCommissionScheduleException;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -79,53 +78,48 @@ public final class CommissionScheduleFactory {
             );
         }
 
-        // D4: 기본 몫 = total / 12 (내림, 소수점 2자리)
+        final int count = CommissionConstants.INSTALLMENT_COUNT;
+        final BigDecimal countBd = BigDecimal.valueOf(count);
+
+        // D6: 각 회차액 = 초년도총액 / 12, 통화 최소단위 절사
         BigDecimal baseAmount = firstYearTotal.divide(
-                new BigDecimal("12"),
-                2,
-                java.math.RoundingMode.DOWN
+                countBd,
+                CommissionConstants.AMOUNT_SCALE,
+                RoundingMode.DOWN
         );
 
-        List<CommissionSchedule> schedules = new ArrayList<>(CommissionConstants.INSTALLMENT_COUNT);
+        // 절사로 버려진 나머지 = P - (기본 몫 × 12).
+        // D6: 이 나머지를 마지막 회차에 가산해 12회분 합계를 P 와 정확히 일치시킨다.
+        BigDecimal remainder = firstYearTotal.subtract(baseAmount.multiply(countBd));
+        BigDecimal lastAmount = baseAmount.add(remainder);
 
-        // 처음 11회: 기본 몫
-        for (int i = 1; i <= 11; i++) {
-            schedules.add(
-                    CommissionSchedule.builder()
-                            .commissionId(UUID.randomUUID().toString())
-                            .policyId(policyId)
-                            .fcId(fcId)
-                            .recipientType("FC")  // D5: 이번 범위는 FC 만
-                            .parentCommissionId(null)  // D5: 계층 계산 미구현
-                            .installmentNo(i)
-                            .installmentAmount(baseAmount)
-                            .firstYearTotal(firstYearTotal)
-                            .dueDate(null)  // 호출자가 설정 (비즈니스 규칙에 따라)
-                            .status("SCHEDULED")
-                            .build()
-            );
+        List<CommissionSchedule> schedules = new ArrayList<>(count);
+        for (int installmentNo = 1; installmentNo <= count; installmentNo++) {
+            BigDecimal amount = (installmentNo == count) ? lastAmount : baseAmount;
+            schedules.add(newInstallment(policyId, fcId, installmentNo, amount, firstYearTotal));
         }
 
-        // 마지막(12회): 나머지 전부 포함
-        // = total - (baseAmount × 11)
-        BigDecimal lastAmount = firstYearTotal.subtract(
-                baseAmount.multiply(new BigDecimal("11"))
-        );
-        schedules.add(
-                CommissionSchedule.builder()
-                        .commissionId(UUID.randomUUID().toString())
-                        .policyId(policyId)
-                        .fcId(fcId)
-                        .recipientType("FC")  // D5: 이번 범위는 FC 만
-                        .parentCommissionId(null)  // D5: 계층 계산 미구현
-                        .installmentNo(12)
-                        .installmentAmount(lastAmount)
-                        .firstYearTotal(firstYearTotal)
-                        .dueDate(null)  // 호출자가 설정
-                        .status("SCHEDULED")
-                        .build()
-        );
-
         return schedules;
+    }
+
+    private static CommissionSchedule newInstallment(
+            String policyId,
+            String fcId,
+            int installmentNo,
+            BigDecimal installmentAmount,
+            BigDecimal firstYearTotal
+    ) {
+        return CommissionSchedule.builder()
+                .commissionId(UUID.randomUUID().toString())
+                .policyId(policyId)
+                .fcId(fcId)
+                .recipientType(CommissionConstants.RECIPIENT_TYPE_FC)  // D5: 이번 범위는 FC 만
+                .parentCommissionId(null)                              // D5: 계층 계산 미구현
+                .installmentNo(installmentNo)
+                .installmentAmount(installmentAmount)
+                .firstYearTotal(firstYearTotal)
+                .dueDate(null)                                         // 호출자가 설정
+                .status("SCHEDULED")
+                .build();
     }
 }

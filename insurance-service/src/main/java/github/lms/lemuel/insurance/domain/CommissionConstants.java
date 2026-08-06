@@ -21,8 +21,17 @@ public final class CommissionConstants {
      */
     public static final int CLAWBACK_WINDOW_MONTHS = 24;
 
-    /** 선지급 회차 수 (고정값). */
+    /** D4: 선지급 회차 수 — 초년도 총액은 정확히 이 개수의 행으로 분할된다. */
     public static final int INSTALLMENT_COUNT = 12;
+
+    /**
+     * 금액 스케일 — 통화 최소단위 절사 기준.
+     * V1 마이그레이션의 commission_schedule.installment_amount NUMERIC(19,2) 와 일치한다.
+     */
+    public static final int AMOUNT_SCALE = 2;
+
+    /** D5: 이번 범위의 유일한 수수료 수령 주체. 계층(오버라이딩) 계산은 미구현. */
+    public static final String RECIPIENT_TYPE_FC = "FC";
 
     private CommissionConstants() {
         // static utility
