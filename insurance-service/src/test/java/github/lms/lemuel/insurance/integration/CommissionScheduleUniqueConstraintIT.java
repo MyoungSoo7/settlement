@@ -2,8 +2,6 @@ package github.lms.lemuel.insurance.integration;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -40,8 +38,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * </ul>
  */
 class CommissionScheduleUniqueConstraintIT extends InsuranceIntegrationTestSupport {
-
-    private static final Logger log = LoggerFactory.getLogger(CommissionScheduleUniqueConstraintIT.class);
 
     /** D4 로 확정된 유일한 유니크 제약. */
     private static final String D4_CONSTRAINT = "uq_commission_schedule";
