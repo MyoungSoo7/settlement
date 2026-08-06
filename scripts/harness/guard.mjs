@@ -2,7 +2,7 @@
 // Lemuel harness guard — PLUGIN-INDEPENDENT, repo-tracked core invariant enforcement.
 //
 // Why this exists: the settlement-copilot / invest-copilot plugin guards live outside the build
-// graph (service `src/main/resources/` — jar-excluded — or `docs/harness/hackathon/`) and are not
+// graph (service `src/main/resources/` — jar-excluded) and are not
 // wired into CI on a fresh clone. This
 // script re-implements the *non-negotiable* money/architecture invariants with zero external
 // dependency so the guard survives plugin relocation and works in CI. (See HARNESS.md
@@ -278,7 +278,11 @@ export function dodNudgeMessage(files) {
 // 하네스 자체를 이루는 경로 — 여기가 지워지면 가드·스킬·규율이 통째로 사라진다.
 // 실제로 PR #210 에 섞인 삭제 커밋 3개가 .claude(81)·.codex(41)·docs/harness(148) 를 날렸고,
 // 기존 스테이징 스캔이 --diff-filter=ACMR 로 삭제를 아예 보지 않아 그대로 통과했다.
-const PROTECTED_DELETE_ROOTS = ['.claude/', '.codex/', 'scripts/harness/', 'docs/harness/'];
+//
+// docs/harness 는 목록에 넣지 않는다 — 그 사고에 함께 휩쓸렸을 뿐 하네스 기계장치가 아니라
+// 해커톤 제출물 보관함이고, 공개 저장소 위생상 의도적으로 비우는 대상이다(CLAUDE.md 배치 기준:
+// 소유 서비스가 없는 제출물은 저장소에 두지 않는다). 보호 대상은 실행되는 하네스로 한정한다.
+const PROTECTED_DELETE_ROOTS = ['.claude/', '.codex/', 'scripts/harness/'];
 
 // 위 루트 안이지만 재생성 가능한 세션 상태 — 삭제를 막을 이유가 없다(정리 작업을 방해하지 않는다).
 const PROTECTED_DELETE_EXEMPT = [

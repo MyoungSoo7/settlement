@@ -408,11 +408,10 @@ describe('protected harness path deletion', () => {
       '.claude/skills/tdd-discipline/SKILL.md',
       '.codex/config.toml',
       'scripts/harness/guard.mjs',
-      'docs/harness/README.md',
     ]);
 
     assert.deepEqual(violations.map(({ id }) => id),
-      ['HARNESS-DELETE', 'HARNESS-DELETE', 'HARNESS-DELETE', 'HARNESS-DELETE']);
+      ['HARNESS-DELETE', 'HARNESS-DELETE', 'HARNESS-DELETE']);
   });
 
   test('ignores deletions outside protected paths', () => {
@@ -420,6 +419,16 @@ describe('protected harness path deletion', () => {
       'settlement-service/src/main/java/Foo.java',
       'docs/adr/0001-x.md',
       'README.md',
+    ]), []);
+  });
+
+  // docs/harness 는 하네스 기계장치가 아니라 해커톤 제출물 보관함이다 — PR #210 사고 때 세 경로가
+  // 한 묶음으로 지워져 보호 목록에 함께 들어갔을 뿐이다. 공개 저장소 위생상 의도적으로 비우는
+  // 대상이므로(CLAUDE.md 배치 기준) 보호하지 않는다. 진짜 하네스는 scripts/harness·.claude·.codex 다.
+  test('docs/harness is submission storage, not harness machinery — deletion is allowed', () => {
+    assert.deepEqual(checkProtectedDeletions([
+      'docs/harness/hackathon/kakaopay/submission/README.md',
+      'docs/harness/omc-harness.md',
     ]), []);
   });
 
