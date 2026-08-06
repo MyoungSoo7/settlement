@@ -83,7 +83,5 @@ settlement/                              # 모노레포 루트
 ├── monitoring/                          # 📊 Prometheus·Grafana 대시보드(비즈니스 KPI)·alert rules
 ├── load-test/                           # 🔥 k6 부하 시나리오 4종
 ├── scripts/harness/                     # 🛡️ 저장소 가드(guard.mjs)·자기진단(harness-audit.mjs)·git hook 설치
-├── docs/harness/hackathon/              # 🏆 소유 서비스가 없는 제출물(kakaopay·musinsa·invest-copilot 3축)
-│                                        #    나머지는 호출 대상 서비스의 src/main/resources/ 아래(jar 제외 처리)
 └── https/ · gradle/                     # 로컬 TLS · Gradle wrapper
 ```

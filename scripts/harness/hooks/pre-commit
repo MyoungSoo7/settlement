@@ -10,8 +10,7 @@ node "$ROOT/scripts/harness/guard.mjs" --staged || exit 1
 # 경로 정본은 여기 — 플러그인 트리를 옮기면 이 목록도 함께 옮긴다(미존재 시 조용히 skip 되므로
 # harness-audit 의 plugin-guard-path 점검이 드리프트를 잡는다).
 for g in \
-  "settlement-service/src/main/resources/settlement-copilot/hooks/guards/pre-commit.mjs" \
-  "docs/harness/hackathon/invest-copilot/hooks/guards/pre-commit.mjs" ; do
+  "settlement-service/src/main/resources/settlement-copilot/hooks/guards/pre-commit.mjs" ; do
   p="$ROOT/$g"
   [ -f "$p" ] && { node "$p" || exit 1; }
 done

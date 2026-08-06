@@ -34,7 +34,7 @@ function toPosixPath(path) {
 
 function isPluginOrMcpPath(path) {
   // copilot 플러그인 트리는 서비스 소유 기준으로 재배치될 수 있으므로 부모 경로를 고정하지 않는다
-  // (settlement-copilot → settlement-service/src/main/resources/, invest-copilot → docs/harness/hackathon/).
+  // (settlement-copilot → settlement-service/src/main/resources/. 소유 서비스가 없는 제출물은 저장소 미포함.)
   return /(^|\/)(?:\.claude-plugin|\.codex-plugin|mcp)(?:\/|$)|(^|\/)\.mcp\.json$|(?:^|\/)(?:settlement|invest)-copilot(?:\/|$)/.test(
     toPosixPath(path),
   );
