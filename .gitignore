@@ -54,9 +54,9 @@ target/
 **/*.class
 
 ### Local runtime artifacts ###
+# .claude/ 세션·런타임 디렉토리는 아래 "AI 도구 로컬 설정·세션 아티팩트" 블록에 모아 둔다
+# (worktrees·harness 는 그쪽이 정본 — 여기 중복 선언하지 말 것).
 .claude/scheduled_tasks.lock
-.claude/worktrees/
-.claude/harness/
 # hookify 캡처 규칙은 로컬 전용 — 정본은 guard.mjs (hookify-to-guard 스킬로 이식)
 .claude/hookify.*.local.md
 *.stackdump
