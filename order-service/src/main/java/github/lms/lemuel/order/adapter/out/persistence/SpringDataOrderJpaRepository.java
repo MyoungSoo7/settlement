@@ -52,6 +52,23 @@ public interface SpringDataOrderJpaRepository extends JpaRepository<OrderJpaEnti
             """)
     List<OrderJpaEntity> findAwaitingStockReclaim(Pageable pageable);
 
+    /**
+     * 회수 지연 임계를 갓 넘긴 구간의 대기 건 — 지연 신호 발행 전용.
+     * 같은 부분 인덱스가 커버하며, 구간이 좁아 매 주기 스캔 비용이 일정하다.
+     */
+    @Query("""
+            SELECT o FROM OrderJpaEntity o
+            WHERE o.shipped = true
+              AND o.stockRestored = false
+              AND o.status IN ('REFUNDED', 'CANCELED')
+              AND o.updatedAt > :from
+              AND o.updatedAt <= :to
+            ORDER BY o.updatedAt ASC
+            """)
+    List<OrderJpaEntity> findStockReclaimCrossedBetween(@Param("from") LocalDateTime from,
+                                                        @Param("to") LocalDateTime to,
+                                                        Pageable pageable);
+
     /** 전체 주문 금액 합계 — cross-DB 금액 대사(ADR 0020 Phase 5.2)의 원천. */
     @Query("SELECT COALESCE(SUM(o.amount), 0) FROM OrderJpaEntity o")
     java.math.BigDecimal sumAmount();

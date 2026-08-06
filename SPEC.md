@@ -338,7 +338,7 @@ Membership   : INVITED → ACTIVE ⇄ SUSPENDED, 각 상태 → REMOVED(터미�
 | `lemuel.card.captured`                                                                                      | card         | Phase 2 완료 — 매입 확정(Phase2ContractPlaceholderTest + CardEventContractTest 계약 검증)      |
 | `lemuel.card.statement.paid`                                                                                | card         | Phase 2 완료 — 명세서 전액 납부(ADR 0022 신규 토픽, 하위호환)                                  |
 
-부가(계약 스키마 없음): `lemuel.ops.*.failed`, `lemuel.pgreconciliation.discrepancy_approved`,
+부가(계약 스키마 없음): `lemuel.ops.*`(실패 신호 `*.failed` + `lemuel.ops.stock.reclaim_delayed`), `lemuel.pgreconciliation.discrepancy_approved`,
 `lemuel.payment.confirmed`(payment-webhook-service(Go) 발행 → notification 소비 — 내부 계약).
 
 발행 전용(소비처 미배선 — 의도된 상태, 소비자가 생기면 ADR 0024 절차로 계약 편입):

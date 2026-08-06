@@ -14,4 +14,13 @@ import java.util.List;
 public interface LoadPendingStockReclaimPort {
 
     List<Order> findAwaitingStockReclaim(int limit);
+
+    /**
+     * 회수 지연 임계를 <b>갓 넘긴</b> 구간의 대기 건 — 지연 신호 발행 전용.
+     *
+     * <p>전체 대기 건이 아니라 {@code (from, to]} 구간만 돌려준다. 매 주기 전량을 훑으면 같은 건이
+     * 계속 재발행돼 인시던트가 노이즈가 된다.
+     */
+    List<Order> findStockReclaimCrossedBetween(java.time.LocalDateTime from,
+                                               java.time.LocalDateTime to, int limit);
 }

@@ -97,6 +97,17 @@ public class OrderPersistenceAdapter implements LoadOrderPort, SaveOrderPort, Lo
                 .toList();
     }
 
+    @Override
+    public List<Order> findStockReclaimCrossedBetween(java.time.LocalDateTime from,
+                                                      java.time.LocalDateTime to, int limit) {
+        return orderJpaRepository
+                .findStockReclaimCrossedBetween(from, to,
+                        org.springframework.data.domain.PageRequest.of(0, limit))
+                .stream()
+                .map(this::toDomainWithItems)
+                .toList();
+    }
+
     private Order toDomainWithItems(OrderJpaEntity entity) {
         Order order = mapper.toDomain(entity);
         List<OrderItem> items = orderItemRepository.findByOrderIdOrderByIdAsc(entity.getId())

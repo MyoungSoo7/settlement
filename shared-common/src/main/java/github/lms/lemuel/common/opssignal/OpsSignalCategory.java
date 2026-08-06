@@ -16,6 +16,8 @@ public enum OpsSignalCategory {
     PAYMENT_FAILED("lemuel.ops.payment.failed"),
     STOCK_DEPLETED("lemuel.ops.stock.depleted"),
     SHIPPING_DELAYED("lemuel.ops.shipping.delayed"),
+    /** 배송 후 환불로 보류된 재고가 회수되지 않고 임계를 넘김 — 팔 수 있는 물건이 묶인 상태. */
+    STOCK_RECLAIM_DELAYED("lemuel.ops.stock.reclaim_delayed"),
     SETTLEMENT_FAILED("lemuel.ops.settlement.failed");
 
     private final String topic;
