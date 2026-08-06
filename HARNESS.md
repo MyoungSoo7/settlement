@@ -186,6 +186,9 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
   **라인+파일(멀티라인) 이중 스캔**으로 개행 분할 우회를 차단한다. `--staged` 는 돈 경로 프로덕션 변경이 테스트 변경 없이
   스테이지되면 **비차단 DoD 넛지**를 stderr 로 출력한다(차단 안 함 — 완료 판정은 JaCoCo 게이트가 정답, 발화는 텔레메트리 적재).
 - **OO 구조 게이트** — `scripts/harness/test/oo-gate.test.mjs`: 트리 전수 스캔(도메인 setter 0·@Setter 0·금융 5서비스 IAE 0·코어 애그리거트 17종 생성자 봉인·상태 enum 9종 canTransitionTo 전이표 보유). 2026-07-14 OO 캠페인(패널 중앙값 9.5+)의 구조 정본 회귀 방지 — CI 하네스 테스트에 자동 포함. 점수 재채점(LLM 판정)은 📘`oo-score` 스킬.
+- **스케줄러 락 이름 유일성** — `scripts/harness/test/scheduler-lock-gate.test.mjs`: 같은 `@SchedulerLock`
+  이름을 두 배치가 쓰면 락 보유 기간 동안 나머지가 **조용히 스킵**된다(예외·로그 없음 → 컴파일도 CI 도 못 잡음).
+  리포 전수로 잠근다. 의도적 공유가 필요하면 게이트의 `ALLOWED_SHARED` 에 근거와 함께 등록.
 - **하네스 자기 진단** — `scripts/harness/harness-audit.mjs`: 문서 드리프트를 규율이 아닌 **기계 게이트**로 승격(과거 문서 3주 방치 재발 방지).
   라우팅 맵 dangling 도 기계 검증한다 — 🤖📘⌘ 아이콘 줄의 backtick 진입점 토큰을 agents/skills/commands 실존과 대조
   (에이전트·스킬·커맨드를 삭제/개명하고 라우팅 맵을 안 고치면 audit FAIL → CI 차단).
