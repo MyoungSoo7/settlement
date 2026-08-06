@@ -205,6 +205,45 @@ class CommissionScheduleFactoryTest {
         ).isInstanceOf(InvalidCommissionScheduleException.class);
     }
 
+    /**
+     * 통화 최소단위보다 잘게 쪼개진 총액은 거부한다.
+     *
+     * <p>허용하면 나머지 가산으로 마지막 회차 스케일이 2를 넘고(100.005 → 8.375),
+     * V1 의 NUMERIC(19,2) 저장 시 반올림되어 "12행 합계 == P" 가 DB 에서 깨진다.
+     */
+    @ParameterizedTest(name = "총액 {0} 거부")
+    @ValueSource(strings = {"100.005", "120000.001", "1000.0700001"})
+    @DisplayName("통화 최소단위보다 잘게 쪼개진 총액 거부")
+    void createSchedule_rejectTotalFinerThanCurrencyMinorUnit(String totalText) {
+        assertThatThrownBy(() ->
+                CommissionScheduleFactory.createFirstYearSchedule(
+                        "policy-009", "fc-009", new BigDecimal(totalText), new BigDecimal("0.03")
+                )
+        ).isInstanceOf(InvalidCommissionScheduleException.class);
+    }
+
+    /**
+     * 스케일이 2보다 작은 총액(정수 표기·후행 0)은 정상 처리되어야 한다 —
+     * 위 거부 규칙이 과잉 차단하지 않음을 못박는다.
+     */
+    @ParameterizedTest(name = "총액 {0} 허용 + 합계 일치")
+    @ValueSource(strings = {"100000", "120000", "1000.0", "100000.00"})
+    @DisplayName("스케일 0~2 총액은 허용하고 12행 합계가 총액과 일치")
+    void createSchedule_acceptTotalWithinCurrencyMinorUnit(String totalText) {
+        BigDecimal total = new BigDecimal(totalText);
+
+        List<CommissionSchedule> schedules = CommissionScheduleFactory.createFirstYearSchedule(
+                "policy-010", "fc-010", total, new BigDecimal("0.03")
+        );
+
+        assertThat(schedules).hasSize(CommissionConstants.INSTALLMENT_COUNT);
+        assertThat(sumOf(schedules)).isEqualByComparingTo(total);
+        // 모든 회차가 NUMERIC(19,2) 에 무손실로 들어간다
+        assertThat(schedules)
+                .extracting(s -> s.getInstallmentAmount().scale())
+                .containsOnly(CommissionConstants.AMOUNT_SCALE);
+    }
+
     private static BigDecimal sumOf(List<CommissionSchedule> schedules) {
         return schedules.stream()
                 .map(CommissionSchedule::getInstallmentAmount)

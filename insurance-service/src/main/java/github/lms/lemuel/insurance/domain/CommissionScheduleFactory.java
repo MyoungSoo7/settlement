@@ -79,6 +79,17 @@ public final class CommissionScheduleFactory {
             );
         }
 
+        // 통화 최소단위보다 잘게 쪼개진 총액은 거부한다.
+        // 허용하면 나머지 가산으로 마지막 회차의 스케일이 AMOUNT_SCALE 를 넘고
+        // (예: 100.005 → 12회차 8.375), V1 의 NUMERIC(19,2) 저장 시 반올림되어
+        // "12행 합계 == P" 불변식이 DB 에서 깨진다.
+        if (firstYearTotal.stripTrailingZeros().scale() > CommissionConstants.AMOUNT_SCALE) {
+            throw new InvalidCommissionScheduleException(
+                    "firstYearTotal 은 통화 최소단위(소수점 " + CommissionConstants.AMOUNT_SCALE
+                            + "자리)보다 잘게 쪼갤 수 없습니다: " + firstYearTotal.toPlainString()
+            );
+        }
+
         // 12회로 쪼갰을 때 회차액이 0원이 되면 V1 의
         // chk_commission_installment_amount_positive (installment_amount > 0) 를 위반한다.
         // 최소 총액 = 12 × 통화 최소단위.
