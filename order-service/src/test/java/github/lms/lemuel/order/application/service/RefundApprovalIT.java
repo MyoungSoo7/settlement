@@ -11,6 +11,7 @@ import github.lms.lemuel.order.application.port.out.RefundOrderPaymentPort;
 import github.lms.lemuel.order.application.port.out.SaveOrderStatusHistoryPort;
 import github.lms.lemuel.order.application.port.out.SendOrderNotificationPort;
 import github.lms.lemuel.order.domain.Order;
+import github.lms.lemuel.order.application.port.in.GetPendingStockReclaimUseCase.PendingReclaim;
 import github.lms.lemuel.order.domain.OrderStatus;
 import github.lms.lemuel.payment.adapter.out.persistence.PaymentMapper;
 import github.lms.lemuel.payment.adapter.out.persistence.PaymentPersistenceAdapter;
@@ -234,6 +235,38 @@ class RefundApprovalIT {
         em.clear();   // 캐시된 100 이 아니라 커밋된 값을 본다(어서션이 무의미해지지 않도록)
         assertThat(productAdapter.findById(f.productId).orElseThrow().getStockQuantity())
                 .as("중복 회수 신호에도 불변").isEqualTo(100);
+    }
+
+    @Test
+    @DisplayName("회수 대기 조회: 보류된 주문만 잡히고, 회수되면 목록에서 빠진다")
+    void pendingStockReclaimQuery() {
+        Fixture shippedRefund = seedPaidOrder(100, new BigDecimal("10000"), 2);
+        prepareOrder(shippedRefund.orderId, new BigDecimal("3000"), /*ship*/true, OrderStatus.REFUND_REQUESTED);
+        inNewTx(() -> changeStatusService.approveRefund(shippedRefund.orderId, "배송후 반품", "admin"));
+
+        // 대조군 — 배송 전 환불이라 이미 원복됐고, 회수 대기가 아니다.
+        Fixture beforeShipping = seedPaidOrder(100, new BigDecimal("10000"), 1);
+        prepareOrder(beforeShipping.orderId, BigDecimal.ZERO, /*ship*/false, OrderStatus.REFUND_REQUESTED);
+        inNewTx(() -> changeStatusService.approveRefund(beforeShipping.orderId, "변심", "admin"));
+        em.clear();
+
+        var reclaimService = new GetPendingStockReclaimService(orderAdapter);
+        var pending = inNewTx(() -> reclaimService.findPending(LocalDateTime.now(), 100));
+
+        assertThat(pending).extracting(PendingReclaim::orderId)
+                .as("배송 후 환불만 회수 대기").contains(shippedRefund.orderId)
+                .doesNotContain(beforeShipping.orderId);
+        assertThat(pending.stream()
+                .filter(r -> r.orderId().equals(shippedRefund.orderId)).findFirst().orElseThrow()
+                .totalQuantity()).as("묶인 수량").isEqualTo(2);
+
+        // 택배 회수가 확정되면 재고가 돌아오고 목록에서도 빠진다.
+        inNewTx(() -> changeStatusService.restoreStockOnReturn(shippedRefund.orderId));
+        em.clear();
+
+        assertThat(inNewTx(() -> reclaimService.findPending(LocalDateTime.now(), 100)))
+                .extracting(PendingReclaim::orderId)
+                .as("회수 후 목록에서 제외").doesNotContain(shippedRefund.orderId);
     }
 
     @Test

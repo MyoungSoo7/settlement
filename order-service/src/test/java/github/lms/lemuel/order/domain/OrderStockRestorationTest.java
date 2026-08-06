@@ -101,6 +101,49 @@ class OrderStockRestorationTest {
         assertThat(order.claimStockRestorationOnReturn()).isEmpty();
     }
 
+    // ───────── 회수 대기 판정 (관리자 조회) ─────────
+
+    @Test @DisplayName("배송 후 환불로 원복이 보류된 주문은 회수 대기다")
+    void shippedAndRefunded_isAwaitingReclaim() {
+        Order order = shippedOrder();
+        order.transitionTo(OrderStatus.REFUNDED);
+        order.claimStockRestorationOnCancel();   // 배송됨 → 보류
+
+        assertThat(order.isAwaitingStockReclaim()).isTrue();
+    }
+
+    @Test @DisplayName("배송 전 취소로 이미 원복된 주문은 회수 대기가 아니다")
+    void restoredOrder_isNotAwaiting() {
+        Order order = multiItemOrder();
+        order.claimStockRestorationOnCancel();   // 원복 완료
+
+        assertThat(order.isAwaitingStockReclaim()).isFalse();
+    }
+
+    @Test @DisplayName("아직 종단에 도달하지 않은 배송 중 주문은 회수 대기가 아니다")
+    void inTransitOrder_isNotAwaiting() {
+        Order order = shippedOrder();            // IN_TRANSIT — 환불도 취소도 아님
+
+        assertThat(order.isAwaitingStockReclaim()).isFalse();
+    }
+
+    @Test @DisplayName("배송된 적 없는 주문은 회수할 물건이 없다")
+    void neverShipped_isNotAwaiting() {
+        Order order = multiItemOrder();
+        order.transitionTo(OrderStatus.PAID);
+        order.transitionTo(OrderStatus.REFUNDED);
+
+        assertThat(order.isAwaitingStockReclaim()).isFalse();
+    }
+
+    @Test @DisplayName("라인이 없는 단건 레거시 주문은 회수 대기 대상이 아니다")
+    void legacyOrder_isNotAwaiting() {
+        Order order = Order.rehydrate(9L, 1L, 1L, new BigDecimal("10000"),
+                OrderStatus.REFUNDED, null, null, BigDecimal.ZERO, true, false);
+
+        assertThat(order.isAwaitingStockReclaim()).isFalse();
+    }
+
     // ───────── 복원(rehydrate) 경계 ─────────
 
     @Test @DisplayName("이미 원복된 것으로 복원된 주문은 다시 원복되지 않는다(재기동 후에도 멱등)")

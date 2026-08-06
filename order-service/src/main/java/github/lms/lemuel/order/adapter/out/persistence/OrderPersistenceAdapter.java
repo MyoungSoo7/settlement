@@ -1,6 +1,7 @@
 package github.lms.lemuel.order.adapter.out.persistence;
 
 import github.lms.lemuel.order.application.port.out.LoadOrderPort;
+import github.lms.lemuel.order.application.port.out.LoadPendingStockReclaimPort;
 import github.lms.lemuel.order.application.port.out.SaveOrderPort;
 import github.lms.lemuel.order.domain.Order;
 import github.lms.lemuel.order.domain.OrderItem;
@@ -19,7 +20,7 @@ import java.util.stream.Collectors;
  */
 @Repository
 @RequiredArgsConstructor
-public class OrderPersistenceAdapter implements LoadOrderPort, SaveOrderPort {
+public class OrderPersistenceAdapter implements LoadOrderPort, SaveOrderPort, LoadPendingStockReclaimPort {
 
     private final SpringDataOrderJpaRepository orderJpaRepository;
     private final SpringDataOrderItemRepository orderItemRepository;
@@ -85,6 +86,15 @@ public class OrderPersistenceAdapter implements LoadOrderPort, SaveOrderPort {
             result.replaceItems(reloaded);
         }
         return result;
+    }
+
+    @Override
+    public List<Order> findAwaitingStockReclaim(int limit) {
+        return orderJpaRepository
+                .findAwaitingStockReclaim(org.springframework.data.domain.PageRequest.of(0, limit))
+                .stream()
+                .map(this::toDomainWithItems)
+                .toList();
     }
 
     private Order toDomainWithItems(OrderJpaEntity entity) {

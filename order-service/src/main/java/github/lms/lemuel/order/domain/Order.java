@@ -216,6 +216,20 @@ public class Order {
         return order;
     }
 
+    /**
+     * 회수 대기 재고를 가진 주문인지 — 배송된 물건에 대해 환불·취소가 끝났는데 아직 물건이 돌아오지 않은 상태.
+     *
+     * <p>이 상태의 수량은 <b>어느 쪽에도 잡혀 있지 않다</b>: 판매 가능 재고로는 복귀하지 않았고(회수 미확인),
+     * 고객에게는 이미 환불됐다. 방치하면 팔 수 있는 물건이 영영 묶이므로 운영자가 추적해야 한다
+     * (반품 회수가 확정되면 {@link #claimStockRestorationOnReturn()} 로 복귀).
+     */
+    public boolean isAwaitingStockReclaim() {
+        return shipped
+                && !stockRestored
+                && !items.isEmpty()
+                && (status == OrderStatus.REFUNDED || status == OrderStatus.CANCELED);
+    }
+
     /** 이 주문의 재고가 이미 원복됐는지. */
     public boolean isStockRestored() {
         return stockRestored;

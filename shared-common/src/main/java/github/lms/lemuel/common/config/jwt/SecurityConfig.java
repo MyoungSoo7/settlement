@@ -138,6 +138,9 @@ public class SecurityConfig {
                         .requestMatchers("/users/admin/all").hasRole("ADMIN")
                         // 관리자 전용 카테고리 API
                         .requestMatchers("/admin/categories/**").hasRole("ADMIN")
+                        // 회수 대기 재고 조회 — 배송 후 환불로 원복이 보류된 주문 목록.
+                        // 실행 없는 읽기 전용이라 조회 콘솔들과 동일하게 MANAGER 도 허용.
+                        .requestMatchers("/admin/stock-reclaim/**").hasAnyRole("ADMIN", "MANAGER")
                         // 운영자 전용 — settlement 프로젝션 백필 (Phase 4 Chunk 3)
                         .requestMatchers("/admin/settlement-projection/**").hasRole("ADMIN")
                         // 운영자 전용 — Outbox DLQ / Kafka DLT / PG 라우팅 / PG 정산파일 대사
