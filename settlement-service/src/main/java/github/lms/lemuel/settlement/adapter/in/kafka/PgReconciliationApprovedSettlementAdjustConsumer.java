@@ -125,7 +125,8 @@ public class PgReconciliationApprovedSettlementAdjustConsumer extends Idempotent
                 // 내부에만 존재(PG 미송금) → 내부 금액 전액 회수.
                 return (internalAmount != null && internalAmount.signum() > 0) ? internalAmount : null;
             default:
-                // MISSING_INTERNAL / DUPLICATE / ROUNDING_DIFF / unknown → 회수 없음
+                // MISSING_INTERNAL / DUPLICATE / ROUNDING_DIFF / FEE_MISMATCH / unknown → 회수 없음.
+                // FEE_MISMATCH 는 PG 측 수수료 오차라 셀러 정산을 깎으면 손실을 애먼 쪽에 전가한다.
                 return null;
         }
     }
@@ -149,6 +150,10 @@ public class PgReconciliationApprovedSettlementAdjustConsumer extends Idempotent
                 return "duplicate_pg_side";
             case "ROUNDING_DIFF":
                 return "rounding_diff";
+            case "FEE_MISMATCH":
+                // 실입금 불일치는 PG 수수료 구조 오인/파일 오류에서 난다 — 셀러가 과다 정산을 받은 게
+                // 아니므로 셀러에게서 회수하지 않는다. unknown_type 으로 찍히면 미처리 버그로 오인된다.
+                return "fee_mismatch_pg_side";
             case "MISSING_PG":
                 return "missing_pg_no_internal_amount";
             default:
