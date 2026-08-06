@@ -35,4 +35,14 @@ public interface ChangeOrderStatusUseCase {
      * @return 실제로 취소했으면 true
      */
     boolean cancelUnpaidOrder(Long orderId, String reason);
+
+    /**
+     * 반품 회수 완료에 따른 재고 원복 — 배송(shipping) 컨텍스트가 요청한다.
+     *
+     * <p>배송 후 환불은 물건이 고객 손에 있어 재고를 되돌리지 않는다. 물건이 실제로 돌아온 것이
+     * 확인되는 이 시점에 비로소 판매 가능 재고로 복귀한다. 이미 원복된 주문이면 no-op(멱등).
+     *
+     * @return 실제로 재고를 되돌렸으면 true
+     */
+    boolean restoreStockOnReturn(Long orderId);
 }

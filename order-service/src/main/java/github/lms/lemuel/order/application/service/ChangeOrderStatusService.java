@@ -20,6 +20,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 /**
  * 주문 상태 변경 서비스
  */
@@ -155,20 +157,50 @@ public class ChangeOrderStatusService implements ChangeOrderStatusUseCase {
     }
 
     /**
-     * 주문 라인 아이템 수량만큼 상품/SKU 재고를 원복한다. 환불·취소 승인 후 공통 사용.
-     * 개별 라인 원복 실패(단종 등)는 조용히 스킵되며(하위 서비스가 예외 대신 로그), 전체 흐름을 막지 않는다.
+     * 반품 회수 완료에 따른 재고 원복 — 배송된 주문도 대상이다(물건이 실제로 돌아왔다).
+     * 배송 전 취소·환불로 이미 원복된 주문이면 도메인이 빈 목록을 돌려주어 no-op 이 된다.
+     */
+    @Override
+    @Transactional
+    public boolean restoreStockOnReturn(Long orderId) {
+        Order order = loadOrderPort.findById(orderId)
+                .orElseThrow(() -> new OrderNotFoundException(orderId));
+
+        List<OrderItem> claimed = order.claimStockRestorationOnReturn();
+        if (claimed.isEmpty()) {
+            log.info("반품 회수 재고 원복 대상 아님(이미 원복됨·라인 없음): orderId={}", orderId);
+            return false;
+        }
+        applyStockRestoration(order, claimed);
+        return true;
+    }
+
+    /**
+     * 취소·환불로 종단에 도달한 주문의 재고를 되돌린다 — <b>재고 원복의 단일 초크포인트</b>.
+     *
+     * <p>원복 여부는 도메인이 정한다({@link Order#claimStockRestorationOnCancel()}): 배송이 시작된
+     * 주문은 물건이 고객 손에 있어 제외되고, 이미 원복된 주문은 두 번 나오지 않는다. 그래서 여러 경로가
+     * 겹쳐 호출해도(관리자 환불 승인 + payment 의 REFUNDED 전이) 재고는 한 번만 늘어난다.
+     *
+     * <p>개별 라인 원복 실패(단종 등)는 조용히 스킵되며(하위 서비스가 예외 대신 로그), 전체 흐름을 막지 않는다.
      */
     private void restoreStock(Order order) {
-        for (OrderItem item : order.getItems()) {
+        applyStockRestoration(order, order.claimStockRestorationOnCancel());
+    }
+
+    private void applyStockRestoration(Order order, List<OrderItem> claimedLines) {
+        if (claimedLines.isEmpty()) {
+            return;
+        }
+        for (OrderItem item : claimedLines) {
             if (item.getVariantId() != null) {
                 increaseVariantStockUseCase.increase(item.getVariantId(), item.getQuantity());
             } else {
                 increaseProductStockUseCase.increase(item.getProductId(), item.getQuantity());
             }
         }
-        if (!order.getItems().isEmpty()) {
-            log.info("주문 재고 원복 완료: orderId={}, lines={}", order.getId(), order.getItems().size());
-        }
+        saveOrderPort.save(order);   // 원복 완료 플래그를 영속화해 재기동 후에도 멱등을 유지한다.
+        log.info("주문 재고 원복 완료: orderId={}, lines={}", order.getId(), claimedLines.size());
     }
 
     @Override
@@ -195,6 +227,11 @@ public class ChangeOrderStatusService implements ChangeOrderStatusUseCase {
 
         Order saved = saveOrderPort.save(order);
         historyPort.save(orderId, previous.name(), saved.getStatus().name(), "system", "updateStatus");
+        // payment 가 전액 환불·취소로 주문을 종단에 올린 경우에도 재고를 되돌린다
+        // (PATCH /payments/{id}/refund 직접 경로). 관리자 승인 경로와 겹쳐도 도메인 멱등이 이중 원복을 막는다.
+        if (target == OrderStatus.REFUNDED || target == OrderStatus.CANCELED) {
+            restoreStock(saved);
+        }
         return saved;
     }
 

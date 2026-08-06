@@ -68,6 +68,20 @@ class ChangeOrderStatusServiceTest {
         verify(increaseProductStockUseCase).increase(200L, 3);
     }
 
+    @Test @DisplayName("주문 취소: 두 번 취소해도 재고는 한 번만 원복된다(멱등)")
+    void cancelOrder_doesNotRestoreTwice() {
+        OrderItem line = OrderItem.newItem(100L, null, null, "상품A", new BigDecimal("10000"), 2);
+        Order order = Order.createMultiItem(1L, List.of(line));
+        when(loadOrderPort.findById(1L)).thenReturn(Optional.of(order));
+        when(saveOrderPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.cancelOrder(1L);
+        // 두 번째 취소는 도메인 전이 가드가 막지만, 설령 원복만 다시 요청돼도 늘어나선 안 된다.
+        order.claimStockRestorationOnCancel();
+
+        verify(increaseProductStockUseCase, times(1)).increase(100L, 2);
+    }
+
     @Test @DisplayName("주문 미존재 시 예외")
     void cancelOrder_notFound() {
         when(loadOrderPort.findById(999L)).thenReturn(Optional.empty());
@@ -129,6 +143,24 @@ class ChangeOrderStatusServiceTest {
 
         verify(increaseVariantStockUseCase).increase(500L, 2);
         verify(increaseProductStockUseCase).increase(200L, 3);
+    }
+
+    @Test @DisplayName("환불 승인(배송 시작 후): 재고를 원복하지 않는다 — 물건이 고객 손에 있다")
+    void approveRefund_afterShipping_doesNotRestoreStock() {
+        OrderItem line = OrderItem.newItem(100L, 500L, "SKU-1", "상품A", new BigDecimal("30000"), 1);
+        Order order = Order.createMultiItem(1L, List.of(line));
+        order.transitionTo(OrderStatus.PAID);
+        order.transitionTo(OrderStatus.SHIPPING_PENDING);
+        order.transitionTo(OrderStatus.IN_TRANSIT);          // shipped = true
+        order.transitionTo(OrderStatus.REFUND_REQUESTED);
+        when(loadOrderPort.findById(1L)).thenReturn(Optional.of(order));
+        when(saveOrderPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.approveRefund(1L, "배송후 반품", "admin");
+
+        // 실제 회수(반품)가 확인될 때 비로소 재고로 돌아온다 — 여기서 되돌리면 장부 > 실재고.
+        verifyNoInteractions(increaseVariantStockUseCase, increaseProductStockUseCase);
+        assertThat(order.isStockRestored()).isFalse();
     }
 
     @Test @DisplayName("환불 승인(배송 시작 후): 배송비를 차감한 부분 환불 후 REFUNDED 확정")
@@ -214,6 +246,50 @@ class ChangeOrderStatusServiceTest {
         assertThatThrownBy(() -> service.changeShippingStatus(1L, "DELIVERED", "배송완료", "admin"))
                 .isInstanceOf(InvalidOrderStateException.class);
         verify(saveOrderPort, never()).save(any());
+    }
+
+    // ───────── payment 직접 환불(PATCH /payments/{id}/refund) 경로 ─────────
+
+    @Test @DisplayName("updateStatus(REFUNDED): 배송 전이면 재고를 원복한다")
+    void updateStatus_refunded_beforeShipping_restoresStock() {
+        OrderItem line = OrderItem.newItem(100L, null, null, "상품A", new BigDecimal("10000"), 2);
+        Order order = Order.createMultiItem(1L, List.of(line));
+        order.transitionTo(OrderStatus.PAID);
+        when(loadOrderPort.findById(1L)).thenReturn(Optional.of(order));
+        when(saveOrderPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.updateStatus(1L, "REFUNDED");
+
+        verify(increaseProductStockUseCase).increase(100L, 2);
+    }
+
+    @Test @DisplayName("updateStatus(PAID): 종단이 아니면 재고를 건드리지 않는다")
+    void updateStatus_paid_doesNotTouchStock() {
+        OrderItem line = OrderItem.newItem(100L, null, null, "상품A", new BigDecimal("10000"), 2);
+        Order order = Order.createMultiItem(1L, List.of(line));
+        when(loadOrderPort.findById(1L)).thenReturn(Optional.of(order));
+        when(saveOrderPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.updateStatus(1L, "PAID");
+
+        verifyNoInteractions(increaseProductStockUseCase, increaseVariantStockUseCase);
+    }
+
+    @Test @DisplayName("환불 승인 경로는 payment 의 updateStatus 와 겹쳐도 재고를 두 번 원복하지 않는다")
+    void approveRefund_withPaymentDrivenTransition_restoresOnce() {
+        OrderItem line = OrderItem.newItem(100L, null, null, "상품A", new BigDecimal("10000"), 2);
+        Order order = Order.createMultiItem(1L, List.of(line));
+        order.transitionTo(OrderStatus.PAID);
+        order.transitionTo(OrderStatus.REFUND_REQUESTED);
+        when(loadOrderPort.findById(1L)).thenReturn(Optional.of(order));
+        when(saveOrderPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        // payment 가 전액 환불로 주문을 REFUNDED 전이시키는 실제 흐름을 재현한다.
+        doAnswer(inv -> { service.updateStatus(1L, "REFUNDED"); return null; })
+                .when(refundOrderPaymentPort).refundOrderPaymentFully(1L);
+
+        service.approveRefund(1L, "변심", "admin");
+
+        verify(increaseProductStockUseCase, times(1)).increase(100L, 2);
     }
 
     // ───────── 미입금 만료에 따른 주문 취소 (payment 컨텍스트가 호출) ─────────

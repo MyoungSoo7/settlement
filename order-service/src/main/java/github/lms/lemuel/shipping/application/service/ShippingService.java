@@ -2,6 +2,7 @@ package github.lms.lemuel.shipping.application.service;
 
 import github.lms.lemuel.shipping.application.port.in.ShippingUseCase;
 import github.lms.lemuel.shipping.application.port.out.LoadShipmentPort;
+import github.lms.lemuel.shipping.application.port.out.RestoreReturnedOrderStockPort;
 import github.lms.lemuel.shipping.application.port.out.SaveShipmentPort;
 import github.lms.lemuel.shipping.domain.Shipment;
 import github.lms.lemuel.shipping.domain.ShippingAddress;
@@ -15,10 +16,13 @@ public class ShippingService implements ShippingUseCase {
 
     private final LoadShipmentPort loadPort;
     private final SaveShipmentPort savePort;
+    private final RestoreReturnedOrderStockPort restoreStockPort;
 
-    public ShippingService(LoadShipmentPort loadPort, SaveShipmentPort savePort) {
+    public ShippingService(LoadShipmentPort loadPort, SaveShipmentPort savePort,
+                           RestoreReturnedOrderStockPort restoreStockPort) {
         this.loadPort = loadPort;
         this.savePort = savePort;
+        this.restoreStockPort = restoreStockPort;
     }
 
     @Override
@@ -61,7 +65,11 @@ public class ShippingService implements ShippingUseCase {
     public Shipment markReturned(Long orderId) {
         Shipment s = mustExist(orderId);
         s.returnShipment();
-        return savePort.save(s);
+        Shipment saved = savePort.save(s);
+        // 물건이 실제로 돌아온 것이 확인되는 유일한 지점 — 배송 후 환불로 보류됐던 재고를 여기서 되돌린다.
+        // 이미 원복된 주문이면 order 도메인이 no-op 처리한다(멱등).
+        restoreStockPort.restoreReturnedOrderStock(orderId);
+        return saved;
     }
 
     private Shipment mustExist(Long orderId) {
