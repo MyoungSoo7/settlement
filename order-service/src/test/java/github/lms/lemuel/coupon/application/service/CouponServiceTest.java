@@ -7,15 +7,17 @@ import github.lms.lemuel.coupon.application.port.out.LoadCouponPort;
 import github.lms.lemuel.coupon.application.port.out.SaveCouponPort;
 import github.lms.lemuel.coupon.domain.Coupon;
 import github.lms.lemuel.coupon.domain.CouponType;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
@@ -28,7 +30,18 @@ class CouponServiceTest {
 
     @Mock LoadCouponPort loadCouponPort;
     @Mock SaveCouponPort saveCouponPort;
-    @InjectMocks CouponService service;
+
+    /** 쿠폰 기간 판정을 결정적으로 만들기 위한 고정 시각(KST) — 프로덕션은 TimeConfig 의 시스템 Clock. */
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+    private static final LocalDateTime NOW = LocalDateTime.of(2026, 3, 1, 12, 0);
+    private final Clock clock = Clock.fixed(NOW.atZone(KST).toInstant(), KST);
+
+    private CouponService service;
+
+    @BeforeEach
+    void setUp() {
+        service = new CouponService(loadCouponPort, saveCouponPort, clock);
+    }
 
     @Test @DisplayName("createCoupon: 쿠폰 생성")
     void createCoupon() {

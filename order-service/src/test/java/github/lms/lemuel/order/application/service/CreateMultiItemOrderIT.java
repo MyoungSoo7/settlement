@@ -108,7 +108,8 @@ class CreateMultiItemOrderIT {
                 new TransactionTemplate(txManager), new SimpleMeterRegistry());
         var decProduct = new DecreaseProductStockService(productAdapter, productAdapter,
                 new TransactionTemplate(txManager), new SimpleMeterRegistry());
-        var couponService = new CouponService(couponAdapter, couponAdapter);
+        var couponService = new CouponService(couponAdapter, couponAdapter,
+                java.time.Clock.system(java.time.ZoneId.of("Asia/Seoul")));
 
         // 사이드이펙트 포트는 통합 검증 범위 밖이라 무해한 스텁으로 대체 (이메일/알림/이벤트 발행)
         LoadUserForOrderPort loadUser = new LoadUserForOrderPort() {
