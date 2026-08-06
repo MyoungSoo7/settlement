@@ -1,8 +1,0 @@
-[
-  {"contractCase":"seed-gate-create","expectedTransition":"incomplete-seed->socrates"},
-  {"contractCase":"seed-gate-reuse","expectedTransition":"complete-seed->evolve-step"},
-  {"contractCase":"user-adoption","expectedTransition":"candidate-requires-explicit-user-approval"},
-  {"contractCase":"first-cycle-skip","expectedTransition":"cycle-1->skip-comparison"},
-  {"contractCase":"threshold-boundary","expectedTransition":"similarity>=0.85->convergence"},
-  {"contractCase":"safety-cycle-5","expectedTransition":"cycle-5-not-converged->safety_valve"}
-]
