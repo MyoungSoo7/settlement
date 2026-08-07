@@ -43,6 +43,7 @@ class CreateSettlementFromPaymentServiceTest {
     @Mock PublishSettlementDomainEventPort publishSettlementDomainEventPort;
     @Mock BackfillChargebackSettlementLinkPort backfillChargebackPort;
     @Mock AuditLogger auditLogger;
+    @Mock github.lms.lemuel.settlement.application.port.out.LoadCommissionRatePolicyPort ratePolicyPort;
     CreateSettlementFromPaymentService service;
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
@@ -57,7 +58,7 @@ class CreateSettlementFromPaymentServiceTest {
         return new CreateSettlementFromPaymentService(
                 loadSettlementPort, saveSettlementPort, loadSellerTierPort,
                 loadSellerSettlementCyclePort, loadSellerIdPort, publishSettlementDomainEventPort,
-                backfillChargebackPort, auditLogger, clock);
+                backfillChargebackPort, auditLogger, clock, ratePolicyPort);
     }
 
     @Test @DisplayName("정산 생성 성공 — NORMAL 판매자 (기본 3.5%)") void create() {
@@ -294,5 +295,43 @@ class CreateSettlementFromPaymentServiceTest {
                 LocalDateTime.of(2028, 2, 10, 9, 0));
 
         assertThat(result.getSettlementDate()).isEqualTo(LocalDate.of(2028, 2, 29));
+    }
+
+    // ---------- 수수료율 정책 (ADR 0032) ----------
+
+    @Test @DisplayName("정책 테이블이 비면 등급 기본율 그대로 — 도입 전과 동일 금액")
+    void noPolicy_keepsTierRate() {
+        when(loadSettlementPort.findByPaymentId(1L)).thenReturn(Optional.empty());
+        when(saveSettlementPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(ratePolicyPort.findEffectiveCandidates(any(), any(), any())).thenReturn(java.util.List.of());
+
+        Settlement s = service.createSettlementFromPayment(1L, 10L, new BigDecimal("100000"),
+                null, "VIP", null);
+
+        assertThat(s.getCommissionRate()).isEqualByComparingTo(SellerTier.VIP.rate());
+        assertThat(s.getCommissionRateSource()).isEqualTo("DEFAULT_TIER");
+    }
+
+    @Test @DisplayName("셀러 계약 요율이 있으면 그것을 적용하고 근거를 남긴다")
+    void sellerPolicyApplied() {
+        when(loadSettlementPort.findByPaymentId(1L)).thenReturn(Optional.empty());
+        // 셀러가 있으면 발행 경로가 타므로 영속 정산처럼 PK 를 부여한다.
+        when(saveSettlementPort.save(any())).thenAnswer(inv -> {
+            Settlement saved = inv.getArgument(0);
+            if (saved.getId() == null) saved.assignId(500L);
+            return saved;
+        });
+        when(ratePolicyPort.findEffectiveCandidates(any(), any(), any())).thenReturn(java.util.List.of(
+                github.lms.lemuel.settlement.domain.CommissionRatePolicy.rehydrate(
+                        1L, github.lms.lemuel.settlement.domain.RateScope.SELLER, "77",
+                        new BigDecimal("0.01800"), java.time.LocalDate.now().minusDays(30), null)));
+
+        Settlement s = service.createSettlementFromPayment(1L, 10L, new BigDecimal("100000"),
+                77L, "VIP", null);
+
+        assertThat(s.getCommissionRate()).isEqualByComparingTo("0.01800");
+        assertThat(s.getCommissionRateSource()).isEqualTo("SELLER:77");
+        // 수수료 = 100000 x 1.8% = 1800
+        assertThat(s.getCommission()).isEqualByComparingTo("1800");
     }
 }

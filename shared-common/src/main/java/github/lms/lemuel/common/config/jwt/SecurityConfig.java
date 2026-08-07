@@ -168,6 +168,8 @@ public class SecurityConfig {
                         .requestMatchers("/admin/payment-expiry/**").hasRole("ADMIN")
                         // 정산 배치 재실행 콘솔 — 확정·홀드백 해제·지급 실행을 수동 트리거하므로
                         // 조회 콘솔과 달리 MANAGER 에게 열지 않는다. 일자 게이트(미래·소급 상한)는 도메인이 강제.
+                        // 수수료율 정책 — 정산 금액을 직접 바꾸므로 조회 콘솔과 달리 ADMIN 만.
+                        .requestMatchers("/admin/commission-rates/**").hasRole("ADMIN")
                         .requestMatchers("/admin/settlements/**").hasRole("ADMIN")
                         // 셀러 지급 계좌 레지스트리 — 등록·정정(PII). 셀러 식별자를 관리자 입력으로 받으므로
                         // ADMIN/MANAGER 게이트로 IDOR 방지 (Seed D1).

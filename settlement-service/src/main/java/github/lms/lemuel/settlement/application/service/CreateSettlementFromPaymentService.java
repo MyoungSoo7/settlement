@@ -52,6 +52,9 @@ public class CreateSettlementFromPaymentService implements CreateSettlementFromP
     /** KST 기준 시각 소스 — 결제 시각 부재 시 정산 기준일 폴백에만 사용(정본은 결제 시각). */
     private final Clock clock;
 
+    /** 요율 정책 후보 조회 (ADR 0032). 비면 등급 기본율로 폴백한다. */
+    private final github.lms.lemuel.settlement.application.port.out.LoadCommissionRatePolicyPort ratePolicyPort;
+
     @Override
     public Settlement createSettlementFromPayment(Long paymentId, Long orderId, BigDecimal amount) {
         return createSettlementFromPayment(paymentId, orderId, amount, null, null, null, null);
@@ -95,8 +98,15 @@ public class CreateSettlementFromPaymentService implements CreateSettlementFromP
             // 같은 결제는 항상 같은 정산일을 얻게 한다.
             LocalDate paymentDate = resolvePaymentDate(paymentCapturedAt);
             LocalDate settlementDate = cycle.resolveSettlementDate(paymentDate);
+            // 요율은 등급 기본값이 아니라 정책 해석 결과다(ADR 0032). 정책이 없으면 등급 기본율로
+            // 폴백하므로, 표가 비어 있으면 도입 전과 동일한 금액이 나온다.
+            var resolved = github.lms.lemuel.settlement.domain.CommissionRatePolicy.resolve(
+                    ratePolicyPort.findEffectiveCandidates(sellerId, tier, settlementDate),
+                    tier, sellerId, settlementDate);
+            log.info("Resolved commission rate={} from {}", resolved.rate(), resolved.sourceLabel());
+
             Settlement settlement = Settlement.createFromPayment(
-                    paymentId, orderId, amount, settlementDate, tier.rate());
+                    paymentId, orderId, amount, settlementDate, resolved.rate(), resolved.sourceLabel());
 
             // 셀러 등급별 보류 정책 적용 (NORMAL=30%/30일, VIP=10%/14일, STRATEGIC=0%)
             HoldbackPolicy holdback = HoldbackPolicy.forTier(tier);
