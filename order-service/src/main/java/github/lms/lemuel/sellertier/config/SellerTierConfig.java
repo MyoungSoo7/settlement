@@ -2,9 +2,8 @@ package github.lms.lemuel.sellertier.config;
 
 import github.lms.lemuel.sellertier.application.port.out.LoadSellerNetSalesPort;
 import github.lms.lemuel.sellertier.application.port.out.LoadTierAssignmentPort;
-import github.lms.lemuel.sellertier.application.port.out.SaveTierAssignmentPort;
-import github.lms.lemuel.sellertier.application.port.out.SaveTierHistoryPort;
 import github.lms.lemuel.sellertier.application.service.EvaluateSellerTiersService;
+import github.lms.lemuel.sellertier.application.service.SellerTierChangeProcessor;
 import github.lms.lemuel.sellertier.domain.SellerTierPolicy;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -37,12 +36,9 @@ public class SellerTierConfig {
     public EvaluateSellerTiersService evaluateSellerTiersService(
             LoadSellerNetSalesPort netSalesPort,
             LoadTierAssignmentPort loadPort,
-            SaveTierAssignmentPort savePort,
-            SaveTierHistoryPort historyPort,
+            SellerTierChangeProcessor processor,
             SellerTierPolicy policy,
-            @Value("${app.seller-tier.miss-threshold:2}") int missThreshold,
-            @Value("${app.seller-tier.guard-months:3}") int guardMonths) {
-        return new EvaluateSellerTiersService(netSalesPort, loadPort, savePort, historyPort,
-                policy, missThreshold, guardMonths);
+            @Value("${app.seller-tier.miss-threshold:2}") int missThreshold) {
+        return new EvaluateSellerTiersService(netSalesPort, loadPort, processor, policy, missThreshold);
     }
 }

@@ -45,6 +45,7 @@ class EvaluateSellerTiersServiceTest {
     @Mock LoadTierAssignmentPort loadPort;
     @Mock SaveTierAssignmentPort savePort;
     @Mock SaveTierHistoryPort historyPort;
+    @Mock github.lms.lemuel.sellertier.application.port.out.PublishSellerTierEventPort eventPort;
 
     private EvaluateSellerTiersService service;
 
@@ -52,8 +53,11 @@ class EvaluateSellerTiersServiceTest {
     void setUp() {
         SellerTierPolicy policy = SellerTierPolicy.of(
                 new BigDecimal("500000000"), new BigDecimal("3000000000"));
-        service = new EvaluateSellerTiersService(netSalesPort, loadPort, savePort, historyPort,
-                policy, /*missThreshold*/ 2, /*guardMonths*/ 3);
+        // 반영기는 실물을 쓴다 — 목으로 대체하면 "무엇을 저장/발행하는가"라는 이 테스트의 관심사가
+        // 통째로 사라진다. 트랜잭션 경계만 프록시가 담당하고 로직은 여기서 그대로 검증된다.
+        service = new EvaluateSellerTiersService(netSalesPort, loadPort,
+                new SellerTierChangeProcessor(savePort, historyPort, eventPort),
+                policy, /*missThreshold*/ 2);
     }
 
     private void sellers(SellerNetSales... rows) {
