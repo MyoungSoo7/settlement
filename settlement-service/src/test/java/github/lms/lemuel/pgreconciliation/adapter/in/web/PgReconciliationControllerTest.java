@@ -44,6 +44,7 @@ class PgReconciliationControllerTest {
     @MockitoBean ResolveDiscrepancyUseCase resolveUseCase;
     @MockitoBean CloseReconciliationRunUseCase closeUseCase;
     @MockitoBean LoadReconciliationRunPort loadPort;
+    @MockitoBean github.lms.lemuel.pgreconciliation.application.port.in.PreviewClawbackImpactUseCase previewClawbackImpactUseCase;
 
     private static ReconciliationRun sampleRun() {
         ReconciliationRun run = ReconciliationRun.start("TOSS", LocalDate.of(2026, 4, 1), "toss-0401.csv", "op1");

@@ -1,6 +1,7 @@
 package github.lms.lemuel.pgreconciliation.adapter.in.web;
 
 import github.lms.lemuel.pgreconciliation.application.port.in.CloseReconciliationRunUseCase;
+import github.lms.lemuel.pgreconciliation.application.port.in.PreviewClawbackImpactUseCase;
 import github.lms.lemuel.pgreconciliation.application.port.in.ReconcilePgFileUseCase;
 import github.lms.lemuel.pgreconciliation.application.port.in.ResolveDiscrepancyUseCase;
 import github.lms.lemuel.pgreconciliation.application.port.out.LoadReconciliationRunPort;
@@ -41,15 +42,18 @@ public class PgReconciliationController {
     private final ResolveDiscrepancyUseCase resolveUseCase;
     private final CloseReconciliationRunUseCase closeUseCase;
     private final LoadReconciliationRunPort loadPort;
+    private final PreviewClawbackImpactUseCase previewClawbackImpactUseCase;
 
     public PgReconciliationController(ReconcilePgFileUseCase reconcileUseCase,
                                        ResolveDiscrepancyUseCase resolveUseCase,
                                        CloseReconciliationRunUseCase closeUseCase,
-                                       LoadReconciliationRunPort loadPort) {
+                                       LoadReconciliationRunPort loadPort,
+                                       PreviewClawbackImpactUseCase previewClawbackImpactUseCase) {
         this.reconcileUseCase = reconcileUseCase;
         this.resolveUseCase = resolveUseCase;
         this.closeUseCase = closeUseCase;
         this.loadPort = loadPort;
+        this.previewClawbackImpactUseCase = previewClawbackImpactUseCase;
     }
 
     @Operation(summary = "PG 정산파일 업로드 + 즉시 대사 실행",
@@ -85,6 +89,14 @@ public class PgReconciliationController {
                 .map(RunDetailResponse::from)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    @Operation(summary = "승인 전 회수 영향 미리보기 — 승인하면 얼마가 셀러에게서 회수되는지",
+            description = "아무 상태도 바꾸지 않는다. 미처리(PENDING) 차이만 집계하며, 회수가 없는 유형도 "
+                    + "건수로 보여준다(승인해도 돈이 안 움직인다는 사실 자체가 판단에 필요하다).")
+    @GetMapping("/runs/{id}/clawback-preview")
+    public ResponseEntity<PreviewClawbackImpactUseCase.ClawbackImpact> clawbackPreview(@PathVariable Long id) {
+        return ResponseEntity.ok(previewClawbackImpactUseCase.previewRun(id));
     }
 
     @Operation(summary = "차이 승인 — 후속 SettlementAdjustment(역정산) 트리거")

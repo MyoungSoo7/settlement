@@ -14,6 +14,7 @@ import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import github.lms.lemuel.settlement.domain.ClawbackPolicy;
 import java.math.BigDecimal;
 import java.util.UUID;
 
@@ -91,7 +92,7 @@ public class PgReconciliationApprovedSettlementAdjustConsumer extends Idempotent
         BigDecimal internalAmount = readAmount(node, "internalAmount");
         BigDecimal difference = readAmount(node, "difference"); // pgAmount - internalAmount (signed)
 
-        BigDecimal clawback = computeClawback(type, internalAmount, difference);
+        BigDecimal clawback = ClawbackPolicy.computeFor(type, internalAmount, difference);
         if (clawback == null || clawback.signum() <= 0) {
             skip(skipReason(type, difference), discrepancyId, type, eventId);
             return;
@@ -106,30 +107,8 @@ public class PgReconciliationApprovedSettlementAdjustConsumer extends Idempotent
         applyReconciliationAdjustmentUseCase.applyClawback(paymentId, discrepancyId, clawback);
     }
 
-    /**
-     * 타입별 clawback(회수액) 산정. 회수 대상이 아니면 null.
-     * clawback 방향(셀러에게서 회수)만 처리하고, 과소 정산(셀러에게 더 줘야 함)은 대상이 아니다.
-     */
-    private static BigDecimal computeClawback(String type, BigDecimal internalAmount, BigDecimal difference) {
-        if (type == null) {
-            return null;
-        }
-        switch (type) {
-            case "AMOUNT_MISMATCH":
-                // difference = pgAmount - internalAmount. < 0 이면 pg < internal → 셀러 과다 정산 → 회수.
-                if (difference != null && difference.signum() < 0) {
-                    return difference.abs();
-                }
-                return null; // diff >= 0: 과소 정산/동일 → 회수 없음
-            case "MISSING_PG":
-                // 내부에만 존재(PG 미송금) → 내부 금액 전액 회수.
-                return (internalAmount != null && internalAmount.signum() > 0) ? internalAmount : null;
-            default:
-                // MISSING_INTERNAL / DUPLICATE / ROUNDING_DIFF / FEE_MISMATCH / unknown → 회수 없음.
-                // FEE_MISMATCH 는 PG 측 수수료 오차라 셀러 정산을 깎으면 손실을 애먼 쪽에 전가한다.
-                return null;
-        }
-    }
+    // 회수액 산정 규칙은 도메인(ClawbackPolicy)이 단일 출처다 — 승인 미리보기와 실제 적용이
+    // 같은 규칙을 봐야 "미리보기와 다르게 회수됐다"가 생기지 않는다.
 
     private void skip(String reason, Long discrepancyId, String type, UUID eventId) {
         meterRegistry.counter(METRIC_SKIPPED, "reason", reason).increment();
