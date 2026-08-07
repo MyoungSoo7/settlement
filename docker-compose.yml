@@ -2,6 +2,24 @@ services:
   postgres:
     image: postgres:17-alpine
     container_name: lemuel-postgres
+    # 쿼리 단위 실측 도구 (DB 성능 감사 ④): pg_stat_statements 누적 통계 + auto_explain 이
+    # 200ms 초과 쿼리의 실제 실행계획(EXPLAIN ANALYZE 상당)을 서버 로그로 남긴다.
+    # 인덱스 유무는 추정이 아니라 실행계획으로 판정한다 — pg_stat_statements 뷰는 필요 DB 에서
+    # CREATE EXTENSION 후 사용(settlement_db 는 Flyway 가 생성, opslab 은 필요 시 수동).
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_preload_libraries=pg_stat_statements,auto_explain"
+      - "-c"
+      - "pg_stat_statements.track=all"
+      - "-c"
+      - "auto_explain.log_min_duration=200ms"
+      - "-c"
+      - "auto_explain.log_analyze=on"
+      - "-c"
+      - "auto_explain.log_buffers=on"
+      - "-c"
+      - "auto_explain.log_nested_statements=on"
     env_file:
       - path: .env
         required: false
@@ -24,6 +42,21 @@ services:
   settlement-db:
     image: postgres:17-alpine
     container_name: lemuel-settlement-db
+    # postgres 서비스와 동일한 실측 배선 (감사 ④) — 확장 생성은 V20260807130000 마이그레이션.
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_preload_libraries=pg_stat_statements,auto_explain"
+      - "-c"
+      - "pg_stat_statements.track=all"
+      - "-c"
+      - "auto_explain.log_min_duration=200ms"
+      - "-c"
+      - "auto_explain.log_analyze=on"
+      - "-c"
+      - "auto_explain.log_buffers=on"
+      - "-c"
+      - "auto_explain.log_nested_statements=on"
     env_file:
       - path: .env
         required: false
