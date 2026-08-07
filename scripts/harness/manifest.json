@@ -29,6 +29,7 @@
     ".codex/skills/interview-harness/test_cases.json",
     ".github/workflows/harness-guard.yml"
   ],
+  "docLinkIgnorePrefixes": [],
   "criticalContractPairs": [
     {
       "claude": ".claude/skills/interview-harness/SKILL.md",

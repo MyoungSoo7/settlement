@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import {
   collectAudit,
   extractHarnessContract,
+  parseDocLinks,
   readContractCases,
   runAuditCli,
   validateManifest,
@@ -458,6 +459,65 @@ test('Claude settings retain the write guard, advisory skill router, and telemet
       ],
     },
   });
+});
+
+test('parseDocLinks collects markdown link targets and skips non-path links', () => {
+  const md = [
+    '[tracked](docs/a.md) [dir](docs/) [anchor](#section)',
+    '[ext](https://example.com/x) [mail](mailto:a@b.c)',
+    '[title](docs/b.md "제목") [placeholder](docs/<name>.md)',
+    '[query](docs/c.md#frag) `[notalink](x)` 는 인라인 코드가 아니라 링크로 본다',
+  ].join('\n');
+  assert.deepEqual(parseDocLinks(md), ['docs/a.md', 'docs/', 'docs/b.md', 'docs/c.md#frag', 'x']);
+});
+
+// 문서 → 저장소 노드 간선. 오늘의 사고 유형 그대로:
+// 삭제된 경로를 가리키는 링크(완전 없음)와, 디스크에는 있지만 추적되지 않는 경로를 "정본"으로
+// 가리키는 링크(로컬만 존재)를 구분해 보고한다. 후자가 더 위험하다 — 작성자 화면에서는 열리고
+// clone 한 사람에게만 깨지므로 육안 리뷰로는 잡히지 않는다.
+test('collectAudit reports doc links that leave the tracked graph', () => {
+  const files = {
+    'manifest.json': JSON.stringify(baseManifest(['manifest.json'])),
+    'README.md': [
+      '[ok-file](docs/kept.md)',
+      '[ok-dir](docs/)',
+      '[gone](docs/deleted.md)',
+      '[local-only](docs/local.md)',
+      '[external](https://example.com)',
+      '[anchor](#top)',
+    ].join('\n'),
+    'docs/kept.md': '# kept',
+    'docs/local.md': '# 디스크에는 있지만 추적되지 않는다',
+  };
+  const root = repo(files, ['manifest.json', 'README.md', 'docs/kept.md']);
+  const errors = collectAudit(root, baseManifest(['manifest.json'])).errors.filter((e) => e.startsWith('doc link'));
+
+  assert.equal(errors.length, 2, errors.join('\n'));
+  assert.match(errors.join('\n'), /doc link dangling: README\.md → docs\/deleted\.md/);
+  assert.match(errors.join('\n'), /doc link untracked: README\.md → docs\/local\.md.*로컬/);
+});
+
+// 에이전트 지시서(.claude/·.codex/)의 링크는 저장소 참조가 아니라 "이런 파일을 만들어라"는
+// 산출물 명세인 경우가 많다(ai-dev-team 커맨드의 산출물 목차 등). 여기까지 검사하면 템플릿마다
+// 예외를 등록하게 되고, 예외 목록이 길어지면 검사 자체가 의미를 잃는다. 이 트리의 참조 무결성은
+// 별도 검사(broken reference in ...)가 scripts/harness 경로에 대해 이미 담당한다.
+test('collectAudit skips agent instruction trees — their links are output specs', () => {
+  const root = repo({
+    'manifest.json': JSON.stringify(baseManifest(['manifest.json'])),
+    '.claude/commands/agents/docs.md': '[산출물](docs/generated/01-output.json)',
+    '.codex/skills/x/SKILL.md': '[산출물](docs/generated/02-output.md)',
+  });
+  assert.deepEqual(collectAudit(root, baseManifest(['manifest.json'])).errors.filter((e) => e.startsWith('doc link')), []);
+});
+
+test('collectAudit honours manifest docLinkIgnorePrefixes', () => {
+  const manifest = { ...baseManifest(['manifest.json']), docLinkIgnorePrefixes: ['docs/generated/'] };
+  const root = repo({
+    'manifest.json': JSON.stringify(manifest),
+    'README.md': '[runtime output](docs/generated/report.md) [gone](docs/deleted.md)',
+  });
+  const errors = collectAudit(root, manifest).errors.filter((e) => e.startsWith('doc link'));
+  assert.deepEqual(errors.map((e) => e.replace(/ \(.*/, '')), ['doc link dangling: README.md → docs/deleted.md']);
 });
 
 test('repository harness contracts match the tracked manifest oracle', () => {
