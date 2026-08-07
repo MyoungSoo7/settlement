@@ -48,10 +48,12 @@ public class CommissionRateAdminController {
         this.simulateUseCase = simulateUseCase;
     }
 
+    // @Valid 없이는 아래 @NotNull 이 장식으로만 남아, 요율이 빠진 요청이 그대로 통과한다
+    // (DB NOT NULL 이 500 으로 잡아 400 계약이 깨진다).
     @Operation(summary = "요율 정책 등록",
             description = "이미 정산이 생성된 구간으로 소급 등록하면 400 으로 거부된다(ADR 0032 결정 ⑤).")
     @PostMapping
-    public ResponseEntity<CommissionRatePolicy> register(@RequestBody RegisterRequest request) {
+    public ResponseEntity<CommissionRatePolicy> register(@jakarta.validation.Valid @RequestBody RegisterRequest request) {
         return ResponseEntity.ok(registerUseCase.register(request.toCommand(), LocalDate.now()));
     }
 
