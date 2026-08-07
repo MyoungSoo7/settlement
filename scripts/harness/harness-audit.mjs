@@ -323,6 +323,41 @@ function validateServiceWiring(read, tracked, trackedSet, errors) {
   }
 }
 
+// 제출물 → 소유 서비스 간선. CLAUDE.md 배치 기준을 기계로 옮긴다.
+// 제출물은 플러그인 매니페스트(.claude-plugin/.codex-plugin)로 식별한다 — 디렉토리 이름 규칙은
+// 제출물마다 달라 신뢰할 수 없지만 매니페스트는 어느 플러그인에나 있다.
+export function parseSubmissionRoots(tracked, modules) {
+  const known = new Set(modules);
+  const roots = new Map();
+  for (const path of tracked) {
+    if (!/\.(claude|codex)-plugin\/plugin\.json$/.test(path)) continue;
+    const match = path.match(/^([\w-]+)\/src\/main\/resources\/([^/]+)\//);
+    if (!match || !known.has(match[1])) {
+      roots.set(path, null); // 소유 서비스 밖 — 위치 위반
+      continue;
+    }
+    roots.set(`${match[1]}::${match[2]}`, { module: match[1], root: match[2] });
+  }
+  return [...roots].map(([key, value]) => value ?? { module: null, root: null, path: key });
+}
+
+function validateSubmissionPlacement(read, tracked, trackedSet, errors) {
+  if (!trackedSet.has('settings.gradle.kts')) return;
+  const modules = parseGradleModules(read('settings.gradle.kts'));
+  for (const entry of parseSubmissionRoots(tracked, modules)) {
+    if (entry.module === null) {
+      errors.push(`submission placement: ${entry.path} (소유 서비스의 src/main/resources 밖 — 소유 서비스가 없는 제출물은 저장소에 두지 않는다)`);
+      continue;
+    }
+    // jar 에 실리면 이미지가 부풀고 제출물이 배포물에 섞인다(company-service 실측 111M → 84K).
+    const gradle = `${entry.module}/build.gradle.kts`;
+    if (!trackedSet.has(gradle)) continue;
+    if (!read(gradle).includes(`exclude("${entry.root}/**")`)) {
+      errors.push(`submission jar leak: ${entry.module} → ${entry.root} (processResources exclude 누락 — 부트 jar 에 제출물이 실린다)`);
+    }
+  }
+}
+
 function validateStatus(status, tracked, errors) {
   const checks = [
     ['application.yml', tracked.filter((p) => /\/src\/main\/resources\/application\.yml$/.test(p)).length, [/application\.yml[^\n]*?\*\*(\d[\d,]*)[^\d\n*]*\*\*/i, /application\.yml[^\n]*?→\s*(\d[\d,]*)/i]],
@@ -363,6 +398,7 @@ export function collectAudit(repoRoot, manifest) {
   validatePluginGuardPaths(read, tracked, trackedSet, errors);
   validateDocLinks(root, read, tracked, trackedSet, manifest, errors);
   validateServiceWiring(read, tracked, trackedSet, errors);
+  validateSubmissionPlacement(read, tracked, trackedSet, errors);
 
   for (const pair of manifest.criticalContractPairs) {
     if (!trackedSet.has(pair.claude) || !trackedSet.has(pair.codex)) continue;

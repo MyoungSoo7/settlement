@@ -576,6 +576,42 @@ test('collectAudit accepts fully wired modules', () => {
   assert.deepEqual(collectAudit(repo(files), baseManifest(['manifest.json'])).errors.filter((e) => e.startsWith('service wiring')), []);
 });
 
+// 제출물 → 소유 서비스 간선. CLAUDE.md 배치 기준을 기계로 옮긴다: 소유 서비스가 있는 제출물은
+// 그 서비스의 src/main/resources/ 아래에 두고, jar 에는 processResources exclude 로 넣지 않는다.
+// 오늘 이 기준이 문서·가드·트리에서 서로 달라 세 번 왕복했다 — 문서 규율로 두면 또 어긋난다.
+test('collectAudit reports submissions outside their owning service and unexcluded from the jar', () => {
+  const files = {
+    'manifest.json': JSON.stringify(baseManifest(['manifest.json'])),
+    'settings.gradle.kts': `include(
+  "order-service",
+)`,
+    'order-service/build.gradle.kts': `tasks.named<ProcessResources>("processResources") {
+}`,
+    'order-service/src/main/resources/fashion-copilot/.claude-plugin/plugin.json': '{}',
+    'docs/harness/hackathon/kakaopay/submission/src/.codex-plugin/plugin.json': '{}',
+  };
+  const errors = collectAudit(repo(files), baseManifest(['manifest.json'])).errors.filter((e) => e.startsWith('submission'));
+
+  assert.equal(errors.length, 2, errors.join('\n'));
+  assert.match(errors.join('\n'), /submission placement: docs[/]harness[/]hackathon[/]kakaopay/);
+  assert.match(errors.join('\n'), /submission jar leak: order-service . fashion-copilot/);
+});
+
+test('collectAudit accepts a submission owned by a service and excluded from its jar', () => {
+  const files = {
+    'manifest.json': JSON.stringify(baseManifest(['manifest.json'])),
+    'settings.gradle.kts': `include(
+  "order-service",
+)`,
+    'order-service/build.gradle.kts': `tasks.named<ProcessResources>("processResources") {
+    exclude("fashion-copilot/**")
+}`,
+    'order-service/src/main/resources/fashion-copilot/.claude-plugin/plugin.json': '{}',
+    'order-service/src/main/resources/fashion-copilot/.codex-plugin/plugin.json': '{}',
+  };
+  assert.deepEqual(collectAudit(repo(files), baseManifest(['manifest.json'])).errors.filter((e) => e.startsWith('submission')), []);
+});
+
 test('repository harness contracts match the tracked manifest oracle', () => {
   const root = process.cwd();
   const manifest = JSON.parse(execFileSync('git', ['-C', root, 'show', ':scripts/harness/manifest.json'], { encoding: 'utf8' }));
