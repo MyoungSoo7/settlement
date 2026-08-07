@@ -5,6 +5,8 @@
     사실상 아무도 승급하지 못하는 크기다 — 승인 전에는 등급이 바뀌지 않는다(무행동 착지).
   - 결정 ①(임계 거래액)·②(유예 수치)가 확정되면 **설정만 바꾸면 된다**. 코드 변경·배포 불필요.
   - 판단 근거는 `scripts/sim/tier_threshold_simulation.sql` 로 뽑는다.
+  - 이벤트(`lemuel.seller.tier_changed`)와 관리자 지정 API 까지 착지 완료 — 남은 것은 수치 결정과
+    정합성 스위트 1건, settlement 측 등급 초기 백필뿐이다(아래 체크리스트).
 - 일자: 2026-08-06
 - 관련: ADR 0014(등급별 T+N 정산 주기 — 등급을 **소비**하는 쪽), ADR 0015(등급별 홀드백),
   ADR 0020(order↔settlement DB 분리), ADR 0024(이벤트 계약-as-code), ADR 0032(수수료율 유효기간 정책),
@@ -158,10 +160,11 @@ CREATE INDEX idx_sth_seller ON opslab.seller_tier_history (seller_id, changed_at
 2. **강등은 두 조건을 모두 만족해야 한다** — `today > demotionGuardUntil` **AND** `consecutiveMissCount >= K`.
    하나라도 불만족이면 `GUARDED` 로 기록만 남기고 등급은 유지한다(이력에 남겨 "왜 안 내려갔는지" 설명 가능).
 3. **관리자 override 는 유예를 재설정한다** — 수동 승급 후 다음 평가에서 곧바로 강등되는 사고 방지.
-4. **판정은 순수 함수다** — `SellerTierPolicy.decide(current, aggregate, today)` 는 DB·시계에 접근하지 않는다.
+4. **판정은 순수 함수다** — `SellerTierPolicy.tierFor(net12m)` + `TierAssignment.decide(target, today,
+   missThreshold)` 는 DB·시계에 접근하지 않고 상태도 바꾸지 않는다(미리보기와 실행이 같은 판정을 본다).
    (사례 조사 대상 코드베이스는 이 판정을 80줄 UNION 중첩 SQL 에 넣어 테스트가 불가능했다 — 반면교사.)
 5. 금액은 전부 `BigDecimal`. 등급 임계·거래액에 `double`/`float` 금지.
-6. `TierAssignment` 는 public setter 금지 — 전이 메서드(`promoteTo`/`demoteTo`/`markMiss`)만 노출 (OO 게이트).
+6. `TierAssignment` 는 public setter 금지 — 전이 메서드(`apply`/`overrideTo`)만 노출 (OO 게이트).
 
 ### 4. 이벤트
 
@@ -224,11 +227,20 @@ CREATE INDEX idx_sth_seller ON opslab.seller_tier_history (seller_id, changed_at
 
 ## 구현 체크리스트 (완료 판정은 게이트가 정답)
 
-- [ ] `SellerTierPolicy.decide()` 순수 함수 단위 테스트 — 승급/강등/유예/경계값
-- [ ] `TierAssignment` 불변식 테스트 — 유예 중 강등 차단, override 시 유예 재설정
-- [ ] Flyway `V{timestamp}__seller_tier_lifecycle.sql`
-- [ ] `lemuel.seller.tier_changed` 스키마 + 정본 샘플 + 양방향 계약 테스트 (ADR 0024)
-- [ ] ShedLock 이름 유일성 게이트 테스트
-- [ ] dryRun 응답 계약 테스트
+- [x] `SellerTierPolicy` 순수 함수 단위 테스트 — 승급/강등/유예/경계값 (`SellerTierPolicyTest`)
+- [x] `TierAssignment` 불변식 테스트 — 유예 중 강등 차단, override 시 유예 재설정 (`TierAssignmentTest`)
+- [x] Flyway `V20260808100000__seller_tier_lifecycle.sql`
+- [x] `lemuel.seller.tier_changed` 스키마 + 정본 샘플 + 양방향 계약 테스트 (ADR 0024) —
+      프로듀서 `SellerTierEventContractTest`, 컨슈머 `EventContractConsumerTest`(settlement),
+      소비측 컬럼 `V20260808110000__settlement_user_view_seller_tier.sql`
+- [x] 관리자 지정 API — `POST /admin/seller-tiers/{sellerId}/override`(사유 필수, 유예 재설정)
+- [x] ShedLock 이름 유일성 게이트 테스트 (`scripts/harness/test/scheduler-lock-gate.test.mjs`)
+- [x] dryRun 응답 계약 테스트 (`AdminSellerTierControllerTest`)
 - [ ] `users.seller_tier` 캐시 정합 검사(정합성 스위트 1건 추가)
-- [ ] `./gradlew :order-service:test :order-service:jacocoTestCoverageVerification` (LINE 90%) 통과
+- [ ] settlement 측 등급 컬럼 초기 백필 — 통지가 오기 전까지 NULL 로 남는다(조회 전용이라 무해하나,
+      리포트를 켜기 전에는 채워야 한다)
+- [x] `./gradlew :order-service:test :order-service:jacocoTestCoverageVerification` (LINE 90%) 통과
+
+> **미결(운영 승인 대기)**: 임계 금액(VIP/STRATEGIC)과 유예 값(개월·연속 미달 횟수)은 재무 승인 사항이라
+> 코드에 확정값을 넣지 않았다. 기본값은 사실상 아무도 승급하지 못하는 크기라, 값을 명시하기 전에는
+> 자동 승급이 일어나지 않는다(무행동 착지). 승인 후 `app.seller-tier.*` 로 주입한다.

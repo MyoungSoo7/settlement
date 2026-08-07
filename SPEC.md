@@ -306,11 +306,11 @@ Membership   : INVITED → ACTIVE ⇄ SUSPENDED, 각 상태 → REMOVED(터미�
 
 ---
 
-## 5. 이벤트 카탈로그 (cross-service 34개 계약 토픽)
+## 5. 이벤트 카탈로그 (cross-service 36개 계약 토픽)
 
-계약 스키마·정본 샘플: `shared-common/src/testFixtures/resources/contracts/events/` (34개, ADR 0024).
+계약 스키마·정본 샘플: `shared-common/src/testFixtures/resources/contracts/events/` (36개, ADR 0024).
 
-> 수치 검증: `git ls-files 'shared-common/src/testFixtures/resources/contracts/events/*.schema.json' | wc -l` → 34
+> 수치 검증: `git ls-files 'shared-common/src/testFixtures/resources/contracts/events/*.schema.json' | wc -l` → 36
 
 | 토픽                                                                                                        | 프로듀서     | 주요 컨슈머                                                                                    |
 | ----------------------------------------------------------------------------------------------------------- | ------------ | ---------------------------------------------------------------------------------------------- |
@@ -318,6 +318,7 @@ Membership   : INVITED → ACTIVE ⇄ SUSPENDED, 각 상태 → REMOVED(터미�
 | `lemuel.order.created`                                                                                      | order        | settlement(프로젝션)                                                                           |
 | `lemuel.user.registered`                                                                                    | order        | settlement(프로젝션) · company(셀러 생성)                                                      |
 | `lemuel.product.changed`                                                                                    | order        | settlement(프로젝션)                                                                           |
+| `lemuel.seller.tier_changed`                                                                                | order        | settlement(프로젝션 — 조회·리포트용. **정산 계산 미사용**, 결제 시점 등급이 정본, ADR 0031)     |
 | `lemuel.settlement.created`                                                                                 | settlement   | loan · account                                                                                 |
 | `lemuel.settlement.confirmed`                                                                               | settlement   | loan · investment · account · notification                                                     |
 | `lemuel.payout.completed`                                                                                   | settlement   | account(GL 현금 폐루프 — DR SELLER_PAYABLE / CR CASH, ADR 0026 Option A)                       |
