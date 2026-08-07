@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import github.lms.lemuel.common.outbox.application.port.out.SaveOutboxEventPort;
 import github.lms.lemuel.common.outbox.domain.OutboxEvent;
 import github.lms.lemuel.insurance.application.port.out.PublishInsuranceEventPort;
+import github.lms.lemuel.insurance.domain.BancaRuleEvaluator.BancaRuleViolation;
+import github.lms.lemuel.insurance.domain.CommissionClosing;
 import github.lms.lemuel.insurance.domain.CommissionSchedule;
 import github.lms.lemuel.insurance.domain.Policy;
 import github.lms.lemuel.insurance.domain.PolicyStatus;
@@ -12,6 +14,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.time.Year;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -68,6 +71,10 @@ public class InsurancePolicyEventPublisherAdapter implements PublishInsuranceEve
         }
         payload.put("premiumAmount",   policy.getPremiumAmount().toPlainString());
         payload.put("coverageAmount",  coverageAmount.toPlainString());
+        payload.put("salesChannel",    policy.getSalesChannel().name());
+        if (policy.getPartnerBankCode() != null) {
+            payload.put("partnerBankCode", policy.getPartnerBankCode());
+        }
 
         saveOutboxEventPort.save(OutboxEvent.pending(
                 AGGREGATE_TYPE,
@@ -130,6 +137,90 @@ public class InsurancePolicyEventPublisherAdapter implements PublishInsuranceEve
                 AGGREGATE_TYPE,
                 policyNumber,                       // 파티션 키
                 "InsuranceCommissionConfirmed",     // → lemuel.insurance.commission_confirmed
+                toJson(payload)));
+    }
+
+    /**
+     * 수수료 회차 지급 — 토픽 {@code lemuel.insurance.commission_paid}.
+     */
+    @Override
+    public void publishCommissionPaid(Policy policy, CommissionSchedule schedule) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("policyNumber",      policy.getPolicyNumber());
+        payload.put("commissionId",      schedule.getCommissionId());
+        payload.put("fcId",              schedule.getFcId());
+        payload.put("installmentNo",     schedule.getInstallmentNo());
+        payload.put("paidAmount",        schedule.getPaidAmount().toPlainString());
+        payload.put("paidAt",            schedule.getPaidAt().toString());
+
+        saveOutboxEventPort.save(OutboxEvent.pending(
+                AGGREGATE_TYPE,
+                policy.getPolicyNumber(),        // 파티션 키
+                "InsuranceCommissionPaid",       // → lemuel.insurance.commission_paid
+                toJson(payload)));
+    }
+
+    /**
+     * 환수 트리거 — 토픽 {@code lemuel.insurance.commission_clawback_triggered}.
+     *
+     * <p>D6: 계약 단위 1건 — 회차별이 아니라 환수액 총액으로 발행한다.
+     */
+    @Override
+    public void publishCommissionClawbackTriggered(
+            Policy policy, BigDecimal paidTotal, BigDecimal clawbackAmount) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("policyNumber",    policy.getPolicyNumber());
+        payload.put("fcId",            policy.getFcId());
+        payload.put("terminalStatus",  policy.getStatus().name());
+        payload.put("effectiveDate",   policy.getEffectiveDate().toString());
+        payload.put("paidTotal",       paidTotal.toPlainString());
+        payload.put("clawbackAmount",  clawbackAmount.toPlainString());
+
+        saveOutboxEventPort.save(OutboxEvent.pending(
+                AGGREGATE_TYPE,
+                policy.getPolicyNumber(),                     // 파티션 키
+                "InsuranceCommissionClawbackTriggered",       // → lemuel.insurance.commission_clawback_triggered
+                toJson(payload)));
+    }
+
+    /**
+     * 월 수수료 마감 — 토픽 {@code lemuel.insurance.commission_monthly_closed}.
+     *
+     * <p>파티션 키는 fcId — 한 FC 의 월별 마감 이벤트가 순서대로 떨어진다.
+     */
+    @Override
+    public void publishCommissionMonthlyClosed(CommissionClosing closing) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("closingId",        closing.getClosingId());
+        payload.put("fcId",             closing.getFcId());
+        payload.put("closingMonth",     closing.getClosingMonth().toString());
+        payload.put("totalPaidAmount",  closing.getTotalPaidAmount().toPlainString());
+        payload.put("installmentCount", closing.getInstallmentCount());
+
+        saveOutboxEventPort.save(OutboxEvent.pending(
+                AGGREGATE_TYPE,
+                closing.getFcId(),                        // 파티션 키
+                "InsuranceCommissionMonthlyClosed",       // → lemuel.insurance.commission_monthly_closed
+                toJson(payload)));
+    }
+
+    /**
+     * 방카 25%룰 위반 — 토픽 {@code lemuel.insurance.banca_rule_violated}.
+     */
+    @Override
+    public void publishBancaRuleViolated(Year year, BancaRuleViolation violation) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("year",              year.toString());
+        payload.put("bankCode",          violation.bankCode());
+        payload.put("insurerCode",       violation.insurerCode());
+        payload.put("share",             violation.share().toPlainString());
+        payload.put("insurerPremiumSum", violation.insurerPremiumSum().toPlainString());
+        payload.put("bankPremiumTotal",  violation.bankPremiumTotal().toPlainString());
+
+        saveOutboxEventPort.save(OutboxEvent.pending(
+                AGGREGATE_TYPE,
+                violation.bankCode(),                 // 파티션 키 — 은행 단위 순서 보장
+                "InsuranceBancaRuleViolated",         // → lemuel.insurance.banca_rule_violated
                 toJson(payload)));
     }
 

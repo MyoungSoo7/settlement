@@ -63,4 +63,49 @@ public interface PublishInsuranceEventPort {
      * @param schedules    12개 회차 스케줄 목록
      */
     void publishCommissionConfirmed(String policyNumber, List<CommissionSchedule> schedules);
+
+    /**
+     * 수수료 회차 지급 — 토픽 {@code lemuel.insurance.commission_paid}.
+     *
+     * <p>지급 배치가 due_date 도래 회차를 지급(PAID)할 때마다 발행한다.
+     * settlement/account 가 FC 수수료 지급 회계 처리를 위해 소비한다.
+     *
+     * @param policy   대상 계약 (policyNumber 파티션 키)
+     * @param schedule 지급된 회차 (paidAt·paidAmount 세팅 완료 상태)
+     */
+    void publishCommissionPaid(Policy policy, CommissionSchedule schedule);
+
+    /**
+     * 환수 트리거 — 토픽 {@code lemuel.insurance.commission_clawback_triggered}.
+     *
+     * <p>D6: terminal 종료 계약의 기지급 수수료가 환수 대기로 전환될 때 계약 단위로 1건 발행한다.
+     * 금액은 DATA-STANDARD N5(plain string).
+     *
+     * @param policy         종료된 계약
+     * @param paidTotal      기지급 합계 (환수 계산의 분모 기준)
+     * @param clawbackAmount D6 공식으로 산정된 환수액 (&gt; 0)
+     */
+    void publishCommissionClawbackTriggered(Policy policy, BigDecimal paidTotal, BigDecimal clawbackAmount);
+
+    /**
+     * 월 수수료 마감 — 토픽 {@code lemuel.insurance.commission_monthly_closed}.
+     *
+     * <p>FC 단위 1건 — 파티션 키는 fcId (한 FC 의 월별 마감이 순서대로 떨어진다).
+     * 금액은 DATA-STANDARD N5(plain string).
+     *
+     * @param closing 확정된 마감 스냅샷
+     */
+    void publishCommissionMonthlyClosed(github.lms.lemuel.insurance.domain.CommissionClosing closing);
+
+    /**
+     * 방카 25%룰 위반 탐지 — 토픽 {@code lemuel.insurance.banca_rule_violated}.
+     *
+     * <p>모니터링 배치가 위반 1건당 발행한다. 파티션 키는 은행 코드.
+     * 컴플라이언스/운영 관제가 소비해 신규 인수 중지 등 조치를 트리거한다.
+     *
+     * @param year      집계 연도
+     * @param violation 위반 내용 (은행·원수사·비중·금액)
+     */
+    void publishBancaRuleViolated(java.time.Year year,
+            github.lms.lemuel.insurance.domain.BancaRuleEvaluator.BancaRuleViolation violation);
 }

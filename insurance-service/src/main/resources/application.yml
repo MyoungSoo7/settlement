@@ -130,6 +130,18 @@ app:
   insurance:
     enc-key: ${INSURANCE_ENC_KEY}
 
+    # ── 배치 크론 (KST) — 실행 순서가 곧 정합성이다:
+    #   02:00 만기·실효소멸 판정 → 03:30 환수 스윕(미지급 소멸+환수 전환) → 04:00 회차 지급.
+    #   지급이 스윕보다 먼저 돌면 terminal 계약의 회차가 지급될 수 있다.
+    batch:
+      policy-expiry-cron: "0 0 2 * * *"
+      clawback-sweep-cron: "0 30 3 * * *"
+      commission-payout-cron: "0 0 4 * * *"
+      # 매월 1일 05:00 — 일 배치 3종 이후, 전월 지급분 마감
+      monthly-closing-cron: "0 0 5 1 * *"
+      # 매월 2일 06:00 — 당해연도 방카 25%룰 누적 점검
+      banca-rule-cron: "0 0 6 2 * *"
+
   kafka:
     enabled: ${APP_KAFKA_ENABLED:false}
     consumer:
@@ -140,4 +152,8 @@ app:
       policy-issued: lemuel.insurance.policy_issued
       policy-status-changed: lemuel.insurance.policy_status_changed
       coverage-bound: lemuel.insurance.coverage_bound
+      commission-confirmed: lemuel.insurance.commission_confirmed
+      commission-paid: lemuel.insurance.commission_paid
       commission-clawback-triggered: lemuel.insurance.commission_clawback_triggered
+      commission-monthly-closed: lemuel.insurance.commission_monthly_closed
+      banca-rule-violated: lemuel.insurance.banca_rule_violated
