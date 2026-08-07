@@ -21,7 +21,8 @@ import java.util.Optional;
  */
 @Component
 public class ProductAndDisclosurePersistenceAdapter
-        implements LoadInsuranceProductPort, SaveDisclosureDeliveryPort, LoadBancaSalesPort {
+        implements LoadInsuranceProductPort, SaveDisclosureDeliveryPort,
+        github.lms.lemuel.insurance.application.port.out.LoadDisclosureDeliveryPort, LoadBancaSalesPort {
 
     private final SpringDataInsuranceProductRepository productRepository;
     private final SpringDataDisclosureDeliveryRepository deliveryRepository;
@@ -50,6 +51,11 @@ public class ProductAndDisclosurePersistenceAdapter
         return deliveryRepository.saveAndFlush(
                         DisclosureDeliveryJpaEntity.fromDomain(delivery, snapshotJson(productAtDelivery)))
                 .toDomain();
+    }
+
+    @Override
+    public boolean existsForApplication(String applicationId) {
+        return deliveryRepository.existsByApplicationId(java.util.UUID.fromString(applicationId));
     }
 
     @Override

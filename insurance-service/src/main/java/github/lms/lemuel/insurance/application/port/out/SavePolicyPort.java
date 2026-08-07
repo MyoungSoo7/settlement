@@ -17,4 +17,23 @@ public interface SavePolicyPort {
      * @return 저장 후 재구성된 도메인 (version 반영)
      */
     Policy save(Policy policy);
+
+    /**
+     * 계약 발행 INSERT — 청약 승인 경로 전용.
+     *
+     * <p>도메인 {@link Policy} 가 들고 있지 않는 SoR 컬럼은 {@code attributes} 로 함께 전달한다.
+     *
+     * @return 저장 후 재구성된 도메인 (id 채번 반영)
+     */
+    Policy insertIssued(Policy policy, PolicyIssuanceAttributes attributes);
+
+    /**
+     * @param applicationId      발행 근거 청약 (insurance_policies.application_id)
+     * @param productCode        상품 코드
+     * @param coverageAmount     보장금액 (청약 승인 조건)
+     * @param paymentCycleMonths 납입 주기 (개월)
+     */
+    record PolicyIssuanceAttributes(String applicationId, String productCode,
+                                    java.math.BigDecimal coverageAmount, int paymentCycleMonths) {
+    }
 }

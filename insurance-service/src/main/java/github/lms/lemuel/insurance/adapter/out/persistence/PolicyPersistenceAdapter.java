@@ -53,6 +53,17 @@ public class PolicyPersistenceAdapter implements LoadPolicyPort, SavePolicyPort 
     }
 
     @Override
+    public Policy insertIssued(Policy policy, PolicyIssuanceAttributes attributes) {
+        return repository.saveAndFlush(PolicyJpaEntity.fromIssued(
+                        policy,
+                        UUID.fromString(attributes.applicationId()),
+                        attributes.productCode(),
+                        attributes.coverageAmount(),
+                        attributes.paymentCycleMonths()))
+                .toDomain();
+    }
+
+    @Override
     public Policy save(Policy policy) {
         // 배치 전이는 항상 기존 행 대상 — 신규 발행 경로가 생기면 별도 INSERT 경로를 연다.
         PolicyJpaEntity entity = repository.findById(policy.getId())

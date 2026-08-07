@@ -277,3 +277,29 @@ ArchUnit 4룰 강제:
 
 V1 core → V2 outbox/processed/shedlock → V3 audit → V4 PII 하드닝 → V5 commission_closings →
 V6 sales_channel/banca → V7 disclosure_deliveries.
+
+## 12. 언더라이팅 (청약 접수 → 심사 → 승인/반려)
+
+상태머신: `SUBMITTED → UNDER_REVIEW → APPROVED | REJECTED` (3개 전이만,
+그 외 `InvalidApplicationTransitionException`). REST:
+
+| API                                             | 하는 일                                                       |
+| ----------------------------------------------- | ------------------------------------------------------------- |
+| POST `/api/insurance/applications`              | 접수 — PII(RRN·연락처)는 분리 테이블에 AES 암호화 저장        |
+| POST `/api/insurance/applications/{id}/review`  | 심사 착수 (reviewed_at 스탬프)                                |
+| POST `/api/insurance/applications/{id}/approve` | 승인 — 아래 승인 트랜잭션                                     |
+| POST `/api/insurance/applications/{id}/reject`  | 반려 — 사유 필수 (decided_at 스탬프)                          |
+
+**승인 트랜잭션(돈 경로)** — 전부 한 tx, 실패 시 전체 롤백:
+
+1. **완전판매 게이트**: 해당 청약의 상품설명서 교부 증빙(disclosure_deliveries)이 없으면
+   `DisclosureNotDeliveredException`(409) — 청약은 UNDER_REVIEW 로 남는다. 차단이 아니라 순서 강제.
+2. 청약 APPROVED 전이 → 계약 발행 `Policy.issue`(ACTIVE, 효력일=승인일 KST,
+   증권번호 `POL-yyyyMMdd-xxxxxxxx`, 만기 미지정=종신형 취급).
+3. 초년도 수수료 총액 = 연 보험료 × 상품 초년도 수수료율(통화 최소단위 절사) →
+   D4 12회 스케줄 확정, 회차 n due = 효력일 + (n-1)개월(1회차 즉시 due).
+   수령 주체는 채널이 결정(FC→설계사 / BANCA→판매 은행).
+4. `policy_issued` + `commission_confirmed` Outbox 발행 + `INSURANCE_POLICY_ISSUED` 감사.
+
+이 경로가 배치 5종이 소비하는 `insurance_policies`·`commission_schedules` 행의 생성 지점이다 —
+발행(§12) → 지급/환수/마감(§8) → 소멸(§8)로 계약 전 생애가 시스템 안에서 닫힌다.

@@ -102,6 +102,29 @@ public class PolicyJpaEntity {
         this.updatedAt = Instant.now();
     }
 
+    /** 계약 발행 INSERT 용 — 청약 승인 경로 전용. SoR 전용 컬럼은 attributes 로 받는다. */
+    public static PolicyJpaEntity fromIssued(
+            Policy policy, java.util.UUID applicationId, String productCode,
+            BigDecimal coverageAmount, int paymentCycleMonths) {
+        PolicyJpaEntity e = new PolicyJpaEntity();
+        e.policyId = java.util.UUID.fromString(policy.getPolicyId());
+        e.policyNumber = policy.getPolicyNumber();
+        e.applicationId = applicationId;
+        e.fcId = policy.getFcId();
+        e.productCode = productCode;
+        e.status = policy.getStatus();
+        e.premiumAmount = policy.getPremiumAmount();
+        e.coverageAmount = coverageAmount;
+        e.paymentCycleMonths = paymentCycleMonths;
+        e.effectiveDate = policy.getEffectiveDate();
+        e.maturityDate = policy.getMaturityDate();
+        e.lapsedAt = policy.getLapsedAt();
+        e.consecutivePremiumFailures = policy.getConsecutivePremiumFailures();
+        e.salesChannel = policy.getSalesChannel();
+        e.partnerBankCode = policy.getPartnerBankCode();
+        return e;
+    }
+
     /** DB 행 → 도메인 재구성. 전이 로직은 도메인이 강제한다. */
     public Policy toDomain() {
         return Policy.builder()

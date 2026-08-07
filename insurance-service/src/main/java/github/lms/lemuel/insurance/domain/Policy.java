@@ -80,6 +80,41 @@ public class Policy {
     }
 
     // ─────────────────────────────────────────────────────────────────────
+    // 발행 팩토리 — 청약 승인 경로 전용
+    // ─────────────────────────────────────────────────────────────────────
+
+    /**
+     * 계약 발행 — 청약 승인(UNDER_REVIEW→APPROVED) 시 호출된다.
+     *
+     * <p>policyId(UUID)와 증권번호를 채번하고 ACTIVE 로 시작한다.
+     * 증권번호 형식: {@code POL-yyyyMMdd-} + UUID 앞 8자 — 사람이 읽는 자연키,
+     * 전역 유일성은 DB UNIQUE({@code uq_policy_number})가 최후 방어한다.
+     *
+     * @param effectiveDate 효력일 (승인일) — 청약철회·환수 창구의 기산점
+     * @param maturityDate  만기일 (nullable — 종신형은 만기 없음, 만기 배치 스캔에서 제외됨)
+     */
+    public static Policy issue(LocalDate effectiveDate, LocalDate maturityDate,
+                               BigDecimal premiumAmount, String fcId,
+                               SalesChannel salesChannel, String partnerBankCode) {
+        Objects.requireNonNull(effectiveDate, "effectiveDate");
+        String policyId = java.util.UUID.randomUUID().toString();
+        String policyNumber = "POL-"
+                + effectiveDate.format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE)
+                + "-" + policyId.substring(0, 8);
+        return builder()
+                .policyId(policyId)
+                .policyNumber(policyNumber)
+                .status(PolicyStatus.ACTIVE)
+                .effectiveDate(effectiveDate)
+                .maturityDate(maturityDate)
+                .premiumAmount(premiumAmount)
+                .fcId(fcId)
+                .salesChannel(salesChannel)
+                .partnerBankCode(partnerBankCode)
+                .build();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
     // D7 상태 전이 메서드
     // ─────────────────────────────────────────────────────────────────────
 

@@ -36,6 +36,9 @@ public class InsuranceProductJpaEntity {
     @Column(name = "coverage_amount", nullable = false, precision = 19, scale = 2)
     private BigDecimal coverageAmount;
 
+    @Column(name = "first_year_commission_rate", nullable = false, precision = 7, scale = 6)
+    private BigDecimal firstYearCommissionRate;
+
     @Column(name = "insurer_code", length = 32)
     private String insurerCode;
 
@@ -47,7 +50,7 @@ public class InsuranceProductJpaEntity {
 
     public ProductSnapshot toSnapshot() {
         return new ProductSnapshot(productCode, productName, productType,
-                annualPremium, coverageAmount, insurerCode, active);
+                annualPremium, coverageAmount, firstYearCommissionRate, insurerCode, active);
     }
 
     public String getProductCode() {

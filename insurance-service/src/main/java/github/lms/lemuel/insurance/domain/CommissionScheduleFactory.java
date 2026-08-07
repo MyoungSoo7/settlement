@@ -77,6 +77,25 @@ public final class CommissionScheduleFactory {
             BigDecimal rate,
             SalesChannel channel
     ) {
+        return createFirstYearSchedule(policyId, recipientId, firstYearTotal, rate, channel, null);
+    }
+
+    /**
+     * 지급 예정일까지 확정하는 스케줄 생성 — 청약 승인(계약 발행) 경로 전용.
+     *
+     * <p>회차 n 의 지급 예정일 = {@code firstDueDate + (n-1)개월}. 선지급이므로 1회차는
+     * 발행 즉시(firstDueDate = 효력일) due 가 되는 것이 기본이다.
+     *
+     * @param firstDueDate 1회차 지급 예정일 (null 이면 미확정 — 호출자가 별도 설정)
+     */
+    public static List<CommissionSchedule> createFirstYearSchedule(
+            String policyId,
+            String recipientId,
+            BigDecimal firstYearTotal,
+            BigDecimal rate,
+            SalesChannel channel,
+            java.time.LocalDate firstDueDate
+    ) {
         // Validation — null check
         if (policyId == null) {
             throw new InvalidCommissionScheduleException("policyId 는 null 일 수 없습니다");
@@ -143,7 +162,10 @@ public final class CommissionScheduleFactory {
         List<CommissionSchedule> schedules = new ArrayList<>(count);
         for (int installmentNo = 1; installmentNo <= count; installmentNo++) {
             BigDecimal amount = (installmentNo == count) ? lastAmount : baseAmount;
-            schedules.add(newInstallment(policyId, recipientId, channel, installmentNo, amount, firstYearTotal));
+            java.time.LocalDate dueDate = firstDueDate != null
+                    ? firstDueDate.plusMonths(installmentNo - 1L) : null;
+            schedules.add(newInstallment(
+                    policyId, recipientId, channel, installmentNo, amount, firstYearTotal, dueDate));
         }
 
         return schedules;
@@ -155,7 +177,8 @@ public final class CommissionScheduleFactory {
             SalesChannel channel,
             int installmentNo,
             BigDecimal installmentAmount,
-            BigDecimal firstYearTotal
+            BigDecimal firstYearTotal,
+            java.time.LocalDate dueDate
     ) {
         return CommissionSchedule.builder()
                 .commissionId(UUID.randomUUID().toString())
@@ -166,7 +189,7 @@ public final class CommissionScheduleFactory {
                 .installmentNo(installmentNo)
                 .installmentAmount(installmentAmount)
                 .firstYearTotal(firstYearTotal)
-                .dueDate(null)                                         // 호출자가 설정
+                .dueDate(dueDate)                                      // null 이면 호출자가 설정
                 .status(CommissionStatus.SCHEDULED)
                 .build();
     }

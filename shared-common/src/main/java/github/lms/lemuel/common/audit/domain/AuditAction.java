@@ -84,5 +84,7 @@ public enum AuditAction {
     // 상품설명서 교부 — 완전판매 증빙(누가·언제·어떤 버전) 기록의 감사 추적.
     INSURANCE_DISCLOSURE_DELIVERED,
     // 방카 25%룰 모니터링 실행 — 위반 0건이어도 "점검했음" 자체가 규제 증빙.
-    INSURANCE_BANCA_RULE_CHECKED
+    INSURANCE_BANCA_RULE_CHECKED,
+    // 청약 승인 → 계약 발행 — 보장 개시 + 초년도 수수료 확정의 금전적 사건, 건 단위 감사.
+    INSURANCE_POLICY_ISSUED
 }

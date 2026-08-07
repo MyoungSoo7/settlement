@@ -52,7 +52,8 @@ class ProductDisclosureServiceTest {
 
     private static ProductSnapshot product(boolean active) {
         return new ProductSnapshot("PROD-1", "레무엘 종신보험", "LIFE",
-                new BigDecimal("1200000.00"), new BigDecimal("100000000.00"), "INS-A", active);
+                new BigDecimal("1200000.00"), new BigDecimal("100000000.00"),
+                new BigDecimal("0.035000"), "INS-A", active);
     }
 
     private static String sha256Of(byte[] bytes) throws Exception {
