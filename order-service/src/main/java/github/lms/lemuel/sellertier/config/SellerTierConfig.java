@@ -2,7 +2,11 @@ package github.lms.lemuel.sellertier.config;
 
 import github.lms.lemuel.sellertier.application.port.out.LoadSellerNetSalesPort;
 import github.lms.lemuel.sellertier.application.port.out.LoadTierAssignmentPort;
+import github.lms.lemuel.sellertier.application.port.out.SaveTierAssignmentPort;
+import github.lms.lemuel.sellertier.application.port.out.PublishSellerTierEventPort;
+import github.lms.lemuel.sellertier.application.port.out.SaveTierHistoryPort;
 import github.lms.lemuel.sellertier.application.service.EvaluateSellerTiersService;
+import github.lms.lemuel.sellertier.application.service.OverrideSellerTierService;
 import github.lms.lemuel.sellertier.application.service.SellerTierChangeProcessor;
 import github.lms.lemuel.sellertier.domain.SellerTierPolicy;
 import org.springframework.beans.factory.annotation.Value;
@@ -40,5 +44,19 @@ public class SellerTierConfig {
             SellerTierPolicy policy,
             @Value("${app.seller-tier.miss-threshold:2}") int missThreshold) {
         return new EvaluateSellerTiersService(netSalesPort, loadPort, processor, policy, missThreshold);
+    }
+
+    /**
+     * 관리자 지정도 <b>같은 유예 값</b>을 쓴다 — 지정과 자동 판정이 서로 다른 보호 기간을 쓰면
+     * "왜 이 셀러만 다음 달에 내려갔나"를 설명할 수 없다.
+     */
+    @Bean
+    public OverrideSellerTierService overrideSellerTierService(
+            LoadTierAssignmentPort loadPort,
+            SaveTierAssignmentPort savePort,
+            SaveTierHistoryPort historyPort,
+            PublishSellerTierEventPort eventPort,
+            @Value("${app.seller-tier.guard-months:3}") int guardMonths) {
+        return new OverrideSellerTierService(loadPort, savePort, historyPort, eventPort, guardMonths);
     }
 }

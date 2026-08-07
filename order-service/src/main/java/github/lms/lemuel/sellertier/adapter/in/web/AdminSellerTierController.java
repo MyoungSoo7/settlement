@@ -2,17 +2,26 @@ package github.lms.lemuel.sellertier.adapter.in.web;
 
 import github.lms.lemuel.sellertier.application.port.in.EvaluateSellerTiersUseCase;
 import github.lms.lemuel.sellertier.application.port.in.EvaluateSellerTiersUseCase.TierEvaluationReport;
+import github.lms.lemuel.sellertier.application.port.in.OverrideSellerTierUseCase;
+import github.lms.lemuel.sellertier.domain.SellerTierGrade;
 import github.lms.lemuel.sellertier.domain.SellerTierPolicy;
+import github.lms.lemuel.sellertier.domain.TierAssignment;
 import io.swagger.v3.oas.annotations.Operation;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
+import java.security.Principal;
 import java.time.LocalDate;
 
 /**
@@ -21,6 +30,7 @@ import java.time.LocalDate;
  * <pre>
  *   POST /admin/seller-tiers/evaluate                 미리보기(무변경)
  *   POST /admin/seller-tiers/evaluate?dryRun=false    실제 재산정
+ *   POST /admin/seller-tiers/{sellerId}/override      관리자 지정(사유 필수)
  *   GET  /admin/seller-tiers/policy                   적용 중인 임계 확인
  * </pre>
  *
@@ -40,10 +50,14 @@ public class AdminSellerTierController {
     private static final int DEFAULT_LIMIT = 1000;
 
     private final EvaluateSellerTiersUseCase useCase;
+    private final OverrideSellerTierUseCase overrideUseCase;
     private final SellerTierPolicy policy;
 
-    public AdminSellerTierController(EvaluateSellerTiersUseCase useCase, SellerTierPolicy policy) {
+    public AdminSellerTierController(EvaluateSellerTiersUseCase useCase,
+                                     OverrideSellerTierUseCase overrideUseCase,
+                                     SellerTierPolicy policy) {
         this.useCase = useCase;
+        this.overrideUseCase = overrideUseCase;
         this.policy = policy;
     }
 
@@ -59,6 +73,21 @@ public class AdminSellerTierController {
                 useCase.evaluate(date == null ? LocalDate.now() : date, dryRun, limit));
     }
 
+    @Operation(summary = "관리자 등급 지정 — 사유 필수, 보호 기간이 함께 걸린다",
+            description = "자동 판정으로 담을 수 없는 사정(계약·보상·합의)을 반영한다. "
+                    + "지정에는 강등 유예가 따라붙어 다음 재산정이 곧바로 되돌리지 못한다.")
+    @PostMapping("/{sellerId}/override")
+    public ResponseEntity<AssignmentView> override(@PathVariable("sellerId") Long sellerId,
+                                                   @Valid @RequestBody OverrideRequest request,
+                                                   Principal principal) {
+        // 지정자는 요청 본문이 아니라 인증 주체에서 딴다 — 감사 이력의 작성자를 호출자가 정하게 두면
+        // 남의 이름으로 등급을 바꿀 수 있다.
+        String changedBy = principal == null ? "admin" : principal.getName();
+        TierAssignment assignment = overrideUseCase.override(
+                sellerId, request.tier(), request.memo(), changedBy, LocalDate.now());
+        return ResponseEntity.ok(AssignmentView.of(assignment));
+    }
+
     @Operation(summary = "적용 중인 등급 임계 확인 — 미리보기 결과를 해석하려면 기준을 알아야 한다")
     @GetMapping("/policy")
     public ResponseEntity<PolicyView> policy() {
@@ -66,4 +95,15 @@ public class AdminSellerTierController {
     }
 
     public record PolicyView(BigDecimal vipThreshold, BigDecimal strategicThreshold) { }
+
+    /** @param memo 변경 근거 — 필수. 근거 없는 등급 변경이 이력에 쌓이면 감사가 의미를 잃는다 */
+    public record OverrideRequest(@NotNull SellerTierGrade tier, @NotBlank String memo) { }
+
+    public record AssignmentView(Long sellerId, String tier, LocalDate effectiveFrom,
+                                 LocalDate demotionGuardUntil) {
+        static AssignmentView of(TierAssignment a) {
+            return new AssignmentView(a.getSellerId(), a.getTier().name(),
+                    a.getEffectiveFrom(), a.getDemotionGuardUntil());
+        }
+    }
 }
