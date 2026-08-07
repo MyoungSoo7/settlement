@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "lemuel.seller.tier_changed",
+  "description": "order-service(SellerTierEventPublisher) → settlement-service(SellerTierChangedEventConsumer). 셀러 등급 변경 통지 (ADR 0031). 소비측은 조회·리포트용 뷰 갱신에만 쓴다 — 정산 계산은 결제 시점 등급(PaymentCaptured 동봉값)을 그대로 쓰며, 등급 변경은 미래 정산에만 반영된다(비소급, ADR 0014 §4). prevTier 는 최초 부여 시 null.",
+  "type": "object",
+  "properties": {
+    "sellerId": { "type": "integer" },
+    "prevTier": { "type": ["string", "null"], "enum": ["NORMAL", "VIP", "STRATEGIC", null] },
+    "newTier": { "type": "string", "enum": ["NORMAL", "VIP", "STRATEGIC"] },
+    "reason": { "type": "string", "enum": ["AUTO_PROMOTION", "AUTO_DEMOTION", "ADMIN_OVERRIDE"] },
+    "effectiveFrom": { "type": "string", "format": "date" },
+    "basisAmount": { "type": ["string", "null"], "description": "판정 근거 12개월 결제 순액. 정밀도 손실 방지를 위해 문자열(toPlainString). 관리자 지정은 null" },
+    "occurredAt": { "type": "string" }
+  },
+  "required": ["sellerId", "prevTier", "newTier", "reason", "effectiveFrom", "occurredAt"],
+  "additionalProperties": true
+}

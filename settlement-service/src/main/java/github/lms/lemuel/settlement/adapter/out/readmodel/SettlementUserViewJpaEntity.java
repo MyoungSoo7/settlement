@@ -8,7 +8,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
 
 /**
  * settlement 소유 사용자 프로젝션 (ADR 0020 Phase 3b).
@@ -29,6 +30,20 @@ public class SettlementUserViewJpaEntity {
     @Column(length = 255)
     private String email;
 
+    /**
+     * 셀러 등급 (ADR 0031 통지 반영) — <b>조회·리포트 전용</b>이다.
+     *
+     * <p>정산 금액 계산에는 쓰지 않는다. 정산은 결제 시점 등급({@code PaymentCaptured} 동봉값 →
+     * {@code settlement_payment_view.seller_tier})을 쓰며, 등급 변경은 이후 결제분부터 반영된다
+     * (비소급). 여기 값을 계산에 끌어다 쓰면 과거 정산이 조용히 재해석된다.
+     */
+    @Column(name = "seller_tier", length = 20)
+    private String sellerTier;
+
+    @Column(name = "tier_effective_from")
+    private LocalDate tierEffectiveFrom;
+
     @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
+    /** 적재된 "순간" — 시간대를 잃지 않게 timestamptz/OffsetDateTime (DATA-STANDARD N1). */
+    private OffsetDateTime updatedAt;
 }
