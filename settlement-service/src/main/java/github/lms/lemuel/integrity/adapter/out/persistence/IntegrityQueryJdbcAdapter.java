@@ -407,6 +407,8 @@ public class IntegrityQueryJdbcAdapter implements IntegrityQueryPort {
     }
 
     // ── INV-12 프로젝션 행 diff (settlement_payment_view) ─────────────────
+    // captured_at::date = :date 는 컬럼 캐스트로 idx_settlement_payment_view_captured 를 못 탄다
+    // (sargable 위반). 동치인 반개구간 [date, date+1) 술어로 인덱스 탐색을 살린다.
 
     @Override
     public KeyChecksum projectionPaymentChecksum(LocalDate date) {
@@ -415,9 +417,9 @@ public class IntegrityQueryJdbcAdapter implements IntegrityQueryPort {
                                coalesce(sum(amount), 0) AS amount_sum,
                                coalesce(md5(string_agg(payment_id::text, ',' ORDER BY payment_id)), '') AS id_checksum
                         FROM settlement_payment_view
-                        WHERE captured_at::date = :date
+                        WHERE captured_at >= :dayStart AND captured_at < :dayEnd
                         """)
-                .param("date", date)
+                .param("dayStart", date).param("dayEnd", date.plusDays(1))
                 .query((rs, i) -> new KeyChecksum(
                         rs.getLong("cnt"), money(rs, "amount_sum"), rs.getString("id_checksum")))
                 .single();
@@ -427,10 +429,11 @@ public class IntegrityQueryJdbcAdapter implements IntegrityQueryPort {
     public List<PaymentKey> projectionPaymentKeys(LocalDate date, long afterId, int limit) {
         return jdbc.sql("""
                         SELECT payment_id, amount FROM settlement_payment_view
-                        WHERE captured_at::date = :date AND payment_id > :afterId
+                        WHERE captured_at >= :dayStart AND captured_at < :dayEnd AND payment_id > :afterId
                         ORDER BY payment_id LIMIT :limit
                         """)
-                .param("date", date).param("afterId", afterId).param("limit", limit)
+                .param("dayStart", date).param("dayEnd", date.plusDays(1))
+                .param("afterId", afterId).param("limit", limit)
                 .query((rs, i) -> new PaymentKey(rs.getLong("payment_id"), money(rs, "amount")))
                 .list();
     }

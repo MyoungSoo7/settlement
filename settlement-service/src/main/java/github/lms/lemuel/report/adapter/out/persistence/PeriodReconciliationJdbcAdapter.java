@@ -82,11 +82,13 @@ public class PeriodReconciliationJdbcAdapter implements LoadPeriodReconciliation
 
     @Override
     public long countSettlementsCreated(LocalDate from, LocalDate to) {
+        // created_at::date BETWEEN 은 컬럼 캐스트로 인덱스를 못 탄다(sargable 위반) — 컬럼은 그대로
+        // 두고 [from, to+1) 반개구간으로 재작성해 idx_settlements_created_at 탐색을 살린다.
         Long result = jdbcTemplate.queryForObject("""
                 SELECT COUNT(*)
                 FROM settlements
-                WHERE created_at::date BETWEEN ? AND ?
-                """, Long.class, from, to);
+                WHERE created_at >= ? AND created_at < ?
+                """, Long.class, from, to.plusDays(1));
         return result != null ? result : 0L;
     }
 
