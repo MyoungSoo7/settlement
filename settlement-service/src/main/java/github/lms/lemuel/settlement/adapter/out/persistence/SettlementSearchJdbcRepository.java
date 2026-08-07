@@ -73,31 +73,30 @@ public class SettlementSearchJdbcRepository {
 
         Object[] baseArgs = params.toArray();
 
-        // 총 건수
-        Long totalElements = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*)" + fromClause, Long.class, baseArgs);
-        if (totalElements == null) totalElements = 0L;
-
-        // 합계 집계
-        BigDecimal totalAmount = BigDecimal.ZERO;
-        BigDecimal totalRefundedAmount = BigDecimal.ZERO;
-        BigDecimal totalFinalAmount = BigDecimal.ZERO;
-        List<BigDecimal[]> aggRows = jdbcTemplate.query(
-                "SELECT COALESCE(SUM(s.payment_amount),0), COALESCE(SUM(s.refunded_amount),0), COALESCE(SUM(s.net_amount),0)" + fromClause,
-                (rs, n) -> new BigDecimal[]{rs.getBigDecimal(1), rs.getBigDecimal(2), rs.getBigDecimal(3)},
-                baseArgs);
-        if (!aggRows.isEmpty()) {
-            totalAmount = aggRows.get(0)[0];
-            totalRefundedAmount = aggRows.get(0)[1];
-            totalFinalAmount = aggRows.get(0)[2];
-        }
-
-        // 상태별 건수
+        // 집계 4중 스캔 → 2 스캔: 총건수 COUNT / 3개 SUM / 상태별 COUNT 는 전부 같은 WHERE 의
+        // 재스캔이었다. 상태별 GROUP BY 한 번으로 병합해 총건수(Σcnt)·금액 합계(Σsum)·상태별
+        // 건수를 동시에 얻는다 (남는 스캔은 이 집계 1회 + 페이지 본문 1회).
         Map<String, Long> statusCounts = new HashMap<>();
+        long[] countAcc = {0L};
+        BigDecimal[] sumAcc = {BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO};
         jdbcTemplate.query(
-                "SELECT s.status, COUNT(*) AS cnt" + fromClause + " GROUP BY s.status",
-                (RowCallbackHandler) rs -> statusCounts.put(rs.getString("status"), rs.getLong("cnt")),
+                "SELECT s.status, COUNT(*) AS cnt," +
+                        " COALESCE(SUM(s.payment_amount),0) AS amt," +
+                        " COALESCE(SUM(s.refunded_amount),0) AS refunded," +
+                        " COALESCE(SUM(s.net_amount),0) AS net" +
+                        fromClause + " GROUP BY s.status",
+                (RowCallbackHandler) rs -> {
+                    statusCounts.put(rs.getString("status"), rs.getLong("cnt"));
+                    countAcc[0] += rs.getLong("cnt");
+                    sumAcc[0] = sumAcc[0].add(rs.getBigDecimal("amt"));
+                    sumAcc[1] = sumAcc[1].add(rs.getBigDecimal("refunded"));
+                    sumAcc[2] = sumAcc[2].add(rs.getBigDecimal("net"));
+                },
                 baseArgs);
+        long totalElements = countAcc[0];
+        BigDecimal totalAmount = sumAcc[0];
+        BigDecimal totalRefundedAmount = sumAcc[1];
+        BigDecimal totalFinalAmount = sumAcc[2];
 
         // 정렬 컬럼
         String orderColumn = switch (sortBy != null ? sortBy : "createdAt") {
@@ -107,6 +106,12 @@ public class SettlementSearchJdbcRepository {
             default               -> "s.created_at";
         };
         String orderDir = "ASC".equalsIgnoreCase(sortDirection) ? "ASC" : "DESC";
+        // 동점 행 비결정 정렬 방지: 정렬키(created_at·settlement_date·amount)는 중복 값이 흔해
+        // 실행계획이 바뀌면 페이지 경계에서 행 누락/중복이 생긴다. 유니크한 s.id 를 2차 정렬로
+        // 명시해 순서를 확정한다(정렬키가 id 자체면 불필요).
+        String orderBy = "s.id".equals(orderColumn)
+                ? orderColumn + " " + orderDir
+                : orderColumn + " " + orderDir + ", s.id " + orderDir;
 
         // 페이지 조회
         String selectSql =
@@ -116,7 +121,7 @@ public class SettlementSearchJdbcRepository {
                 " s.payment_amount, s.refunded_amount, s.net_amount," +
                 " s.status, s.settlement_date" +
                 fromClause +
-                " ORDER BY " + orderColumn + " " + orderDir +
+                " ORDER BY " + orderBy +
                 " LIMIT ? OFFSET ?";
 
         List<Object> pageArgs = new ArrayList<>(params);
