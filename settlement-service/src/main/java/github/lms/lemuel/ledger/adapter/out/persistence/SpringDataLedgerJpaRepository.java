@@ -18,6 +18,12 @@ public interface SpringDataLedgerJpaRepository extends JpaRepository<LedgerEntry
     /**
      * 기간 확정 시산표 — POSTED 분개의 차변계정별 amount 합계.
      * 반환: {@code [debitAccount(String), sum(BigDecimal)]} 행 목록.
+     *
+     * <p>차변/대변 2쿼리는 의도적 유지 — 각각 커버링 인덱스
+     * {@code idx_ledger_date_debit/credit (settlement_date, 계정) INCLUDE (amount, status)}
+     * (V20260807120000)의 Index-Only Scan 을 탄다. LATERAL 언피벗 단일 스캔 병합은 커버링을
+     * 포기하고 힙을 읽어 2M 행 실측에서 오히려 느렸다(2스캔 합 ~50ms vs 병합 88ms —
+     * docs/inflearn/db-perf.md 실측).
      */
     @Query("""
             select e.debitAccount, sum(e.amount)

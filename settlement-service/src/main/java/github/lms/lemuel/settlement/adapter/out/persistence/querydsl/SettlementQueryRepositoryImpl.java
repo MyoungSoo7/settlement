@@ -217,7 +217,7 @@ public class SettlementQueryRepositoryImpl implements SettlementQueryRepository 
 
     /**
      * 승인 상태 추적 (Cursor 기반)
-     * INDEX: idx_settlements_approval_status (partial index)
+     * INDEX: idx_settlements_approval_id (partial index — V20260807120000)
      */
     @Override
     public SettlementCursorPageResponse<ApprovalStatusDto> findByApprovalStatus(
