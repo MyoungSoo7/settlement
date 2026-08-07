@@ -1,9 +1,10 @@
 package github.lms.lemuel.insurance.domain;
 
+import github.lms.lemuel.insurance.domain.exception.InvalidCommissionTransitionException;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Objects;
-import java.util.UUID;
 
 /**
  * 수수료 선지급 스케줄 — 순수 POJO, 프레임워크 의존 0.
@@ -22,6 +23,10 @@ import java.util.UUID;
  *   <li>CANCELLED → 전액 환수 (m 무관)</li>
  * </ul>
  *
+ * <p><b>상태머신</b>: {@link CommissionStatus} 전이표 4개만 허용 —
+ * 지급({@link #markPaid}), 미지급 소멸({@link #cancelRemaining}),
+ * 환수 트리거({@link #flagClawbackPending}), 환수 수납({@link #confirmClawedBack}).
+ *
  * @see CommissionScheduleFactory 초년도 스케줄 생성
  */
 public class CommissionSchedule {
@@ -38,7 +43,7 @@ public class CommissionSchedule {
     private final LocalDate dueDate;             // 지급 예정일
     private LocalDate paidAt;                    // 지급일 (nullable)
     private BigDecimal paidAmount;               // 실제 지급액 (nullable)
-    private String status;                       // SCHEDULED, PAID, CLAWBACK_PENDING, CLAWED_BACK, CANCELLED
+    private CommissionStatus status;             // 전이표는 CommissionStatus 가 강제
 
     private CommissionSchedule(Builder b) {
         this.id                  = b.id;
@@ -53,7 +58,60 @@ public class CommissionSchedule {
         this.dueDate             = b.dueDate;  // nullable — 서비스 레이어에서 설정
         this.paidAt              = b.paidAt;
         this.paidAmount          = b.paidAmount;
-        this.status              = b.status != null ? b.status : "SCHEDULED";
+        this.status              = b.status != null ? b.status : CommissionStatus.SCHEDULED;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // 상태 전이 메서드 — CommissionStatus 전이표 4개만 허용
+    // ─────────────────────────────────────────────────────────────────────
+
+    /**
+     * 지급 — SCHEDULED → PAID.
+     *
+     * <p>지급 배치가 due_date 도래 회차를 지급 처리한다.
+     * 지급액은 회차액(installmentAmount) 전액 — 부분 지급 없음.
+     *
+     * @param paidAt 지급일
+     */
+    public void markPaid(LocalDate paidAt) {
+        Objects.requireNonNull(paidAt, "paidAt");
+        transitionTo(CommissionStatus.PAID);
+        this.paidAt = paidAt;
+        this.paidAmount = installmentAmount;
+    }
+
+    /**
+     * 미지급 회차 소멸 — SCHEDULED → CANCELLED.
+     *
+     * <p>계약 종료(해지·철회·소멸) 시 아직 지급되지 않은 회차를 소멸시킨다.
+     * 이미 지급된 회차는 이 경로가 아니라 환수({@link #flagClawbackPending})로만 회수한다.
+     */
+    public void cancelRemaining() {
+        transitionTo(CommissionStatus.CANCELLED);
+    }
+
+    /**
+     * 환수 트리거 — PAID → CLAWBACK_PENDING.
+     *
+     * <p>D6: 계약이 SURRENDERED·CANCELLED·LAPSED→EXPIRED 로 종료되면
+     * 기지급 회차가 환수 대기로 전이된다. 환수액 산정은 {@link ClawbackCalculator} 몫.
+     */
+    public void flagClawbackPending() {
+        transitionTo(CommissionStatus.CLAWBACK_PENDING);
+    }
+
+    /**
+     * 환수 수납 확인 — CLAWBACK_PENDING → CLAWED_BACK (terminal).
+     */
+    public void confirmClawedBack() {
+        transitionTo(CommissionStatus.CLAWED_BACK);
+    }
+
+    private void transitionTo(CommissionStatus target) {
+        if (!status.canTransitionTo(target)) {
+            throw new InvalidCommissionTransitionException(status, target);
+        }
+        this.status = target;
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -108,7 +166,7 @@ public class CommissionSchedule {
         return paidAmount;
     }
 
-    public String getStatus() {
+    public CommissionStatus getStatus() {
         return status;
     }
 
@@ -133,7 +191,7 @@ public class CommissionSchedule {
         private LocalDate dueDate;
         private LocalDate paidAt;
         private BigDecimal paidAmount;
-        private String status;
+        private CommissionStatus status;
 
         public Builder id(Long v) {
             this.id = v;
@@ -195,7 +253,7 @@ public class CommissionSchedule {
             return this;
         }
 
-        public Builder status(String v) {
+        public Builder status(CommissionStatus v) {
             this.status = v;
             return this;
         }

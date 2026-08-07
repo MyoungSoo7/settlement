@@ -70,5 +70,19 @@ public enum AuditAction {
     CARD_ACCOUNT_OPENED,
     CARD_ISSUED,
     CARD_LIMIT_CHANGED,
-    CARD_STATUS_CHANGED
+    CARD_STATUS_CHANGED,
+
+    // ── insurance-service (GA 보험) 배치·금전 액션 (actor=system 배치 감사) ──
+    // 만기·실효소멸 판정 배치 — 계약 상태를 EXPIRED 로 종결시키는 자동 전이의 감사 추적.
+    INSURANCE_POLICY_EXPIRY_BATCH,
+    // 수수료 회차 지급 배치 — FC 수수료 실지급 시점의 감사 추적.
+    INSURANCE_COMMISSION_PAID,
+    // 환수 스윕 배치 — 기지급 수수료를 환수 대기로 전환(금전 회수 개시)한 감사 추적.
+    INSURANCE_COMMISSION_CLAWBACK_FLAGGED,
+    // 월 수수료 마감 배치 — FC별 당월 지급분 확정 스냅샷 생성의 감사 추적.
+    INSURANCE_COMMISSION_MONTHLY_CLOSED,
+    // 상품설명서 교부 — 완전판매 증빙(누가·언제·어떤 버전) 기록의 감사 추적.
+    INSURANCE_DISCLOSURE_DELIVERED,
+    // 방카 25%룰 모니터링 실행 — 위반 0건이어도 "점검했음" 자체가 규제 증빙.
+    INSURANCE_BANCA_RULE_CHECKED
 }

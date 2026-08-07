@@ -1,6 +1,7 @@
 package github.lms.lemuel.insurance.domain;
 
 import github.lms.lemuel.insurance.domain.exception.InvalidPolicyTransitionException;
+import github.lms.lemuel.insurance.domain.exception.InvalidSalesChannelException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -45,6 +46,7 @@ public class Policy {
     public static final int REINSTATEMENT_WINDOW_MONTHS = CommissionConstants.CLAWBACK_WINDOW_MONTHS;
 
     private Long id;
+    private final String policyId;              // UUID — commission_schedules.policy_id 가 참조 (재구성 시 세팅)
     private final String policyNumber;          // 도메인 자연키 UNIQUE
     private PolicyStatus status;
     private final LocalDate effectiveDate;      // 효력일 — 청약철회 기산점
@@ -53,9 +55,12 @@ public class Policy {
     private int consecutivePremiumFailures;     // 연속 납입 실패 횟수
     private final BigDecimal premiumAmount;     // 보험료
     private final String fcId;                  // 설계사 식별자
+    private final SalesChannel salesChannel;    // V6: 판매채널 (FC | BANCA)
+    private final String partnerBankCode;       // V6: BANCA 판매 은행 코드 (FC 채널이면 null)
 
     private Policy(Builder b) {
         this.id            = b.id;
+        this.policyId      = b.policyId;  // nullable — 영속 어댑터 재구성 시 세팅
         this.policyNumber  = Objects.requireNonNull(b.policyNumber, "policyNumber");
         this.status        = Objects.requireNonNull(b.status, "status");
         this.effectiveDate = Objects.requireNonNull(b.effectiveDate, "effectiveDate");
@@ -64,6 +69,14 @@ public class Policy {
         this.consecutivePremiumFailures = b.consecutivePremiumFailures;
         this.premiumAmount = Objects.requireNonNull(b.premiumAmount, "premiumAmount");
         this.fcId          = Objects.requireNonNull(b.fcId, "fcId");
+        this.salesChannel  = b.salesChannel != null ? b.salesChannel : SalesChannel.FC;
+        this.partnerBankCode = b.partnerBankCode;
+        // V6 불변식 — chk_policy_banca_bank 와 동일: BANCA ↔ 판매 은행 존재
+        if ((this.salesChannel == SalesChannel.BANCA) != (this.partnerBankCode != null)) {
+            throw new InvalidSalesChannelException(
+                    "BANCA 채널은 판매 은행 코드가 필수이고, FC 채널은 판매 은행을 가질 수 없습니다: "
+                            + "channel=" + this.salesChannel + ", partnerBankCode=" + this.partnerBankCode);
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -227,6 +240,10 @@ public class Policy {
         return id;
     }
 
+    public String getPolicyId() {
+        return policyId;
+    }
+
     public String getPolicyNumber() {
         return policyNumber;
     }
@@ -259,6 +276,21 @@ public class Policy {
         return fcId;
     }
 
+    public SalesChannel getSalesChannel() {
+        return salesChannel;
+    }
+
+    public String getPartnerBankCode() {
+        return partnerBankCode;
+    }
+
+    /**
+     * 이 계약의 수수료 수령 주체 식별자 — FC 채널은 설계사, BANCA 채널은 판매 은행.
+     */
+    public String commissionRecipientId() {
+        return salesChannel == SalesChannel.BANCA ? partnerBankCode : fcId;
+    }
+
     // ─────────────────────────────────────────────────────────────────────
     // Builder (영속성 어댑터 재구성 + 정적 팩토리 공용)
     // ─────────────────────────────────────────────────────────────────────
@@ -269,6 +301,7 @@ public class Policy {
 
     public static class Builder {
         private Long id;
+        private String policyId;
         private String policyNumber;
         private PolicyStatus status;
         private LocalDate effectiveDate;
@@ -277,9 +310,16 @@ public class Policy {
         private int consecutivePremiumFailures;
         private BigDecimal premiumAmount;
         private String fcId;
+        private SalesChannel salesChannel;
+        private String partnerBankCode;
 
         public Builder id(Long v) {
             this.id = v;
+            return this;
+        }
+
+        public Builder policyId(String v) {
+            this.policyId = v;
             return this;
         }
 
@@ -320,6 +360,16 @@ public class Policy {
 
         public Builder fcId(String v) {
             this.fcId = v;
+            return this;
+        }
+
+        public Builder salesChannel(SalesChannel v) {
+            this.salesChannel = v;
+            return this;
+        }
+
+        public Builder partnerBankCode(String v) {
+            this.partnerBankCode = v;
             return this;
         }
 

@@ -32,8 +32,11 @@ public final class CommissionConstants {
      */
     public static final int AMOUNT_SCALE = 2;
 
-    /** D5: 이번 범위의 유일한 수수료 수령 주체. 계층(오버라이딩) 계산은 미구현. */
+    /** D5: FC 채널의 수수료 수령 주체. 계층(오버라이딩) 계산은 미구현. */
     public static final String RECIPIENT_TYPE_FC = "FC";
+
+    /** V6: 방카(BANCA) 채널의 수수료 수령 주체 — 판매 은행. */
+    public static final String RECIPIENT_TYPE_BANK = "BANK";
 
     private CommissionConstants() {
         // static utility

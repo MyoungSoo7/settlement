@@ -43,7 +43,7 @@ class CommissionScheduleTest {
                 .dueDate(dueDate)
                 .paidAt(paidAt)
                 .paidAmount(new BigDecimal("8333.33"))
-                .status("PAID")
+                .status(CommissionStatus.PAID)
                 .build();
 
         // Assert
@@ -59,7 +59,7 @@ class CommissionScheduleTest {
         assertThat(schedule.getDueDate()).isEqualTo(dueDate);
         assertThat(schedule.getPaidAt()).isEqualTo(paidAt);
         assertThat(schedule.getPaidAmount()).isEqualTo(new BigDecimal("8333.33"));
-        assertThat(schedule.getStatus()).isEqualTo("PAID");
+        assertThat(schedule.getStatus()).isEqualTo(CommissionStatus.PAID);
     }
 
     /**
@@ -84,7 +84,7 @@ class CommissionScheduleTest {
     @Test
     @DisplayName("status 미지정 시 기본값 SCHEDULED")
     void builder_defaultsStatusToScheduled() {
-        assertThat(newMinimalBuilder().build().getStatus()).isEqualTo("SCHEDULED");
+        assertThat(newMinimalBuilder().build().getStatus()).isEqualTo(CommissionStatus.SCHEDULED);
     }
 
     /**

@@ -58,12 +58,34 @@ public final class CommissionScheduleFactory {
             BigDecimal firstYearTotal,
             BigDecimal rate
     ) {
+        return createFirstYearSchedule(policyId, fcId, firstYearTotal, rate, SalesChannel.FC);
+    }
+
+    /**
+     * 판매채널 인지 스케줄 생성 (V6 방카) — 채널이 수수료 수령 주체를 결정한다.
+     *
+     * <p>FC 채널: recipientId = 설계사(fcId), recipient_type = 'FC'.
+     * BANCA 채널: recipientId = 판매 은행 코드, recipient_type = 'BANK'.
+     *
+     * @param recipientId 수수료 수령 주체 식별자 — {@code Policy.commissionRecipientId()} 와 동일 규칙
+     * @param channel     판매채널 (null 불가)
+     */
+    public static List<CommissionSchedule> createFirstYearSchedule(
+            String policyId,
+            String recipientId,
+            BigDecimal firstYearTotal,
+            BigDecimal rate,
+            SalesChannel channel
+    ) {
         // Validation — null check
         if (policyId == null) {
             throw new InvalidCommissionScheduleException("policyId 는 null 일 수 없습니다");
         }
-        if (fcId == null) {
-            throw new InvalidCommissionScheduleException("fcId 는 null 일 수 없습니다");
+        if (recipientId == null) {
+            throw new InvalidCommissionScheduleException("recipientId(fcId/은행코드) 는 null 일 수 없습니다");
+        }
+        if (channel == null) {
+            throw new InvalidCommissionScheduleException("channel 은 null 일 수 없습니다");
         }
         if (firstYearTotal == null) {
             throw new InvalidCommissionScheduleException("firstYearTotal 은 null 일 수 없습니다");
@@ -121,7 +143,7 @@ public final class CommissionScheduleFactory {
         List<CommissionSchedule> schedules = new ArrayList<>(count);
         for (int installmentNo = 1; installmentNo <= count; installmentNo++) {
             BigDecimal amount = (installmentNo == count) ? lastAmount : baseAmount;
-            schedules.add(newInstallment(policyId, fcId, installmentNo, amount, firstYearTotal));
+            schedules.add(newInstallment(policyId, recipientId, channel, installmentNo, amount, firstYearTotal));
         }
 
         return schedules;
@@ -129,7 +151,8 @@ public final class CommissionScheduleFactory {
 
     private static CommissionSchedule newInstallment(
             String policyId,
-            String fcId,
+            String recipientId,
+            SalesChannel channel,
             int installmentNo,
             BigDecimal installmentAmount,
             BigDecimal firstYearTotal
@@ -137,14 +160,14 @@ public final class CommissionScheduleFactory {
         return CommissionSchedule.builder()
                 .commissionId(UUID.randomUUID().toString())
                 .policyId(policyId)
-                .fcId(fcId)
-                .recipientType(CommissionConstants.RECIPIENT_TYPE_FC)  // D5: 이번 범위는 FC 만
+                .fcId(recipientId)
+                .recipientType(channel.commissionRecipientType())      // V6: 채널이 수령 주체를 결정
                 .parentCommissionId(null)                              // D5: 계층 계산 미구현
                 .installmentNo(installmentNo)
                 .installmentAmount(installmentAmount)
                 .firstYearTotal(firstYearTotal)
                 .dueDate(null)                                         // 호출자가 설정
-                .status("SCHEDULED")
+                .status(CommissionStatus.SCHEDULED)
                 .build();
     }
 }
