@@ -140,6 +140,8 @@ public class SecurityConfig {
                         .requestMatchers("/admin/categories/**").hasRole("ADMIN")
                         // 송장 일괄 업로드 - 다건 출고를 한 번에 반영. dryRun 기본값이라 파라미터 누락 호출은 미리보기로 떨어진다.
                         .requestMatchers("/admin/shipments/**").hasAnyRole("ADMIN", "MANAGER")
+                        // 셀러 등급 콘솔 - 등급은 수수료/정산주기/홀드백을 동시에 바꾸므로 ADMIN 만.
+                        .requestMatchers("/admin/seller-tiers/**").hasRole("ADMIN")
                         // 회수 대기 재고 조회 — 배송 후 환불로 원복이 보류된 주문 목록.
                         // 실행 없는 읽기 전용이라 조회 콘솔들과 동일하게 MANAGER 도 허용.
                         .requestMatchers("/admin/stock-reclaim/**").hasAnyRole("ADMIN", "MANAGER")
