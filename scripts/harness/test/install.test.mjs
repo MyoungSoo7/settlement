@@ -35,7 +35,12 @@ function toPosixPath(path) {
 function isPluginOrMcpPath(path) {
   // copilot 플러그인 트리는 서비스 소유 기준으로 재배치될 수 있으므로 부모 경로를 고정하지 않는다
   // (settlement-copilot → settlement-service/src/main/resources/. 소유 서비스가 없는 제출물은 저장소 미포함.)
-  return /(^|\/)(?:\.claude-plugin|\.codex-plugin|mcp)(?:\/|$)|(^|\/)\.mcp\.json$|(?:^|\/)(?:settlement|invest)-copilot(?:\/|$)/.test(
+  //
+  // 로스터는 CLAUDE.md 의 배치 기준이 정본이다 — settlement-copilot·fashion-copilot·pwc(trusted-ceo)
+  // 는 서비스 resources 아래, invest-copilot 은 docs/harness/hackathon 아래. 하나라도 빠뜨리면
+  // fresh-repo 증명이 "플러그인 없이 선다"를 못 보이고, 남은 플러그인 문서가 걷어낸 플러그인을
+  // 가리켜 링크가 끊긴다(실사고: fashion-copilot → settlement-copilot).
+  return /(^|\/)(?:\.claude-plugin|\.codex-plugin|mcp)(?:\/|$)|(^|\/)\.mcp\.json$|(?:^|\/)(?:settlement|invest|fashion)-copilot(?:\/|$)|(?:^|\/)pwc(?:\/|$)/.test(
     toPosixPath(path),
   );
 }
@@ -227,4 +232,27 @@ test('fresh repository reproduces the complete plugin-independent harness contra
   const deletedReferenceAudit = run(root, process.execPath, ['scripts/harness/harness-audit.mjs']);
   assert.notEqual(deletedReferenceAudit.status, 0);
   assert.match(deletedReferenceAudit.stdout, /broken reference.*deleted-reference\.mjs.*not tracked/i);
+});
+
+// fresh-repo 증명은 "플러그인 없이도 하네스가 선다"를 보이는 것이므로, 플러그인 트리를 하나라도
+// 남기면 증명이 약해진다. 실제로 fashion-copilot 이 남아 settlement-copilot 링크가 끊겼다
+// (필터가 settlement/invest 만 알고 fashion·pwc 를 몰랐다). 로스터는 CLAUDE.md 배치 기준이 정본.
+test('plugin filter strips every tracked plugin tree, not just some', () => {
+  for (const path of [
+    'settlement-service/src/main/resources/settlement-copilot/README.md',
+    'order-service/src/main/resources/fashion-copilot/README.md',
+    'company-service/src/main/resources/pwc/README.md',
+    'docs/harness/hackathon/invest-copilot/README.md',
+  ]) {
+    assert.ok(isPluginOrMcpPath(path), `플러그인 경로인데 걸러지지 않음: ${path}`);
+  }
+
+  for (const path of [
+    'settlement-service/src/main/java/github/lms/lemuel/settlement/domain/Settlement.java',
+    'order-service/src/main/resources/templates/mail.html',
+    'scripts/harness/guard.mjs',
+    'docs/polyglot-services.md',
+  ]) {
+    assert.ok(!isPluginOrMcpPath(path), `플러그인이 아닌데 걸러짐: ${path}`);
+  }
 });
