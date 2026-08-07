@@ -2,6 +2,7 @@
 
 > GA(법인보험대리점) 플랫폼 — 설계사(FC)가 매일 쓰는 업무 시스템.
 > 상담 → 청약 → 계약 → 유지·변경 → 수수료 정산을 하나로 잇는다.
+> V6+ 방카슈랑스 확장: 판매채널(FC/BANCA)·대면 상품설명서 교부 증빙·25%룰 모니터링·배치 5종.
 
 ## 1. 도메인 모델
 
@@ -235,3 +236,44 @@ ArchUnit 4룰 강제:
 2. `..insurance.application..` → `..adapter..` 의존 금지
 3. `github.lms.lemuel.insurance..` → 타 서비스 컨텍스트(order/settlement/loan/investment/account/organization/card) 의존 금지
 4. `..insurance.domain..` → `jakarta.persistence..`/`org.springframework..` 의존 금지
+
+## 8. 배치 시스템 (adapter/in/schedule — ShedLock 분산 락, KST Clock 주입)
+
+실행 순서가 곧 정합성이다 — 앞 배치의 산출이 뒤 배치의 전제다.
+
+| 배치                            | 스케줄 (KST)  | 하는 일                                                                                                        |
+| ------------------------------- | ------------- | -------------------------------------------------------------------------------------------------------------- |
+| PolicyExpiryScheduler           | 매일 02:00    | D7 전이 5(ACTIVE→EXPIRED 만기)·전이 3(LAPSED→EXPIRED 부활창구 도과) 자동 집행 + 상태변경 이벤트                |
+| CommissionClawbackSweepScheduler| 매일 03:30    | terminal 계약의 SCHEDULED 회차 소멸(CANCELLED) + PAID 회차 환수 대기 전환(D6 계산) + clawback 이벤트           |
+| CommissionPayoutScheduler       | 매일 04:00    | due_date 도래 SCHEDULED 회차 지급(PAID) — ACTIVE 계약만, LAPSED 보류 + commission_paid 이벤트                  |
+| MonthlyCommissionClosingScheduler| 매월 1일 05:00| 전월 지급 실적(paid_at 기준)을 FC별 append-only 마감 스냅샷(commission_closings, V5)으로 확정 + 이벤트          |
+| BancaConcentrationScheduler     | 매월 2일 06:00| 당해연도 방카 25%룰 점검(은행×원수사 비중) — 위반 시 banca_rule_violated 이벤트, 위반 0건도 감사 기록          |
+
+- 전이는 반드시 도메인 메서드를 통과한다 — 배치가 status 를 직접 UPDATE 하지 않는다.
+- 모든 이벤트는 같은 tx 의 Outbox 로 기록(커밋-발행 원자성). 배치 실행은 잡 단위로 audit_logs 에 남는다.
+- CommissionSchedule 상태머신(전이 4개만): SCHEDULED→PAID, SCHEDULED→CANCELLED,
+  PAID→CLAWBACK_PENDING, CLAWBACK_PENDING→CLAWED_BACK. 그 외 `InvalidCommissionTransitionException`.
+
+## 9. 판매채널 — 방카슈랑스 (V6)
+
+- `sales_channel`: `FC`(설계사 대면) | `BANCA`(은행 창구). BANCA ↔ `partner_bank_code` 존재를
+  도메인(`InvalidSalesChannelException`)과 DB CHECK(`chk_policy_banca_bank`)가 이중 강제.
+- 채널이 수수료 수령 주체를 결정: FC→`recipient_type='FC'`(설계사), BANCA→`'BANK'`(판매 은행).
+  `Policy.commissionRecipientId()` / `CommissionScheduleFactory.createFirstYearSchedule(..., channel)`.
+- `insurance_products.insurer_code`(원수사) — 25%룰 집계 기준.
+
+## 10. 대면 상품설명서 + 25%룰 (V7)
+
+- **상품설명서 PDF**: iText 온디맨드 렌더링 (`adapter/out/pdf`). GET `/api/insurance/products/{code}/disclosure`(미리보기),
+  POST `/api/insurance/disclosures`(교부 = 문서 발급 + 증빙 기록의 단일 행위 — 응답 PDF 의 SHA-256 이
+  저장된 증빙과 동일, `X-Document-Sha256` 헤더).
+- **교부 이력**(`disclosure_deliveries`): append-only(트리거 강제) 완전판매 증빙 — 교부자·채널·계약자·
+  문서 SHA-256·교부 시점 상품 조건 JSONB 스냅샷. 해시는 서버가 계산(클라이언트 불신).
+- **25%룰**: 은행별 특정 원수사 신계약 보험료 비중 > 25% 면 위반(정확히 25% 허용).
+  판정은 `BancaRuleEvaluator`(순수 도메인, 상한 `CONCENTRATION_LIMIT` 단일 선언), 배치는 탐지·통보만
+  (차단 아님 — 조치는 이벤트 소비자 몫).
+
+## 11. 마이그레이션
+
+V1 core → V2 outbox/processed/shedlock → V3 audit → V4 PII 하드닝 → V5 commission_closings →
+V6 sales_channel/banca → V7 disclosure_deliveries.
