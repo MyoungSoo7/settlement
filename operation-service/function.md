@@ -8,7 +8,7 @@
 > - **의존 경계**: `shared-common:1.0.0` 만 의존. order/settlement/loan import 0 (연계는 Kafka 이벤트로만)
 > - **아키텍처**: 헥사고날 (Ports & Adapters), 도메인 순수 POJO
 > - **로드맵 진행**: Phase 1(인시던트) ✅ · Phase 2a(신호 분모+인프라 게이지) ✅ · Phase 2b(실패 분자) ✅ · Phase 3(이상 탐지)·Phase 4(AI 브리핑) 예정
-> - **상세 설계**: [`../docs/harness2/etc/design-pattern/design/operation-service-phase1.md`](../docs/harness2/etc/design-pattern/design/operation-service-phase1.md)
+> - **상세 설계**: `docs/harness2/etc/design-pattern/design/operation-service-phase1.md`(로컬 전용, 저장소 미포함)
 
 ---
 

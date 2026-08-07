@@ -2,7 +2,7 @@
 
 정산 도메인 특화 AI 에이전트 플러그인 — Lemuel 정산 플랫폼의 도메인 규칙·검증 도구·가드레일을
 **OpenAI Codex CLI** 와 **Claude Code** 에 주입한다.
-설계 문서: [`docs/design/settlement-codex-plugin.md`](../../docs/design/settlement-codex-plugin.md)
+설계 문서: `docs/design/settlement-codex-plugin.md`(저장소 미포함)
 
 ```
 settlement-copilot/
