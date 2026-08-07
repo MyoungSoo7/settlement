@@ -165,7 +165,7 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
   - `node scripts/harness/harness-audit.mjs` — 하네스 자기 진단(라우팅 dangling·가드 훅 경로 실존·모듈 로스터·인벤토리)
   - `node scripts/harness/guard.mjs --staged` — 돈/경계/이력 불변식 가드
   - `node scripts/harness/telemetry-report.mjs` — 가드 발화·스킬 사용/제안 텔레메트리 + 가드 카나리아(`.claude/harness/logs`)
-  - `node scripts/harness/session-metrics.mjs` — OMC 세션·미션 완주율·재작업률 KPI 리포트(`.omc` 읽기 전용 관측 — KPI 정본은 [`docs/harness/omc-harness.md`](docs/harness/omc-harness.md))
+  - `node scripts/harness/session-metrics.mjs` — OMC 세션·미션 완주율·재작업률 KPI 리포트(`.omc` 읽기 전용 관측 — KPI 정본은 `docs/harness/omc-harness.md` — 로컬 전용, 저장소 미포함)
   - `./gradlew :<module>:test`·`:jacocoTestCoverageVerification` — 정합 검증(측정 정답)
   - 서비스 자체 `/admin/integrity`·`/api/account/trial-balance` 조회 API(읽기 전용)
 - **불변식**: psql/pg_dump/kafka produce 로 운영 데이터에 직접 손대는 명령을 만들지 않는다(가드가 `check-command` 로 차단).

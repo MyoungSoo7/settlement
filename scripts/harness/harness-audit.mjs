@@ -178,6 +178,75 @@ function validatePluginGuardPaths(read, tracked, trackedSet, errors) {
   }
 }
 
+// 문서 → 저장소 노드 간선. 마크다운 링크 `[텍스트](경로)` 의 대상이 추적 그래프 안에 있는지 본다.
+// 링크 대상만 보고 backtick 경로는 보지 않는다 — 산문 속 경로는 예시·플레이스홀더가 섞여 소음이 크다.
+// 제목(`[x](a.md "제목")`)은 잘라내고, 외부 URL·앵커·플레이스홀더(<>{}*$)는 대상이 아니다.
+export function parseDocLinks(markdown) {
+  const targets = [];
+  for (const match of String(markdown).matchAll(/\]\(([^)\n]+)\)/g)) {
+    const target = match[1].trim().split(/\s+/)[0];
+    if (!target || target.startsWith('#')) continue;
+    if (target.includes('://') || target.startsWith('mailto:')) continue;
+    if (/[<>{}*$]/.test(target)) continue;
+    targets.push(target);
+  }
+  return targets;
+}
+
+// 문서 기준 상대경로를 저장소 루트 기준으로 접는다. OS 경로 API 를 쓰지 않는다 —
+// 저장소 경로는 항상 POSIX 이고, Windows 에서 path.join 을 태우면 구분자가 섞인다.
+function resolveDocTarget(doc, target) {
+  const out = [];
+  for (const segment of [...doc.split('/').slice(0, -1), ...target.split('/')]) {
+    if (!segment || segment === '.') continue;
+    if (segment === '..') {
+      if (out.length === 0) return null; // 저장소 밖 — 판정 대상 아님
+      out.pop();
+      continue;
+    }
+    out.push(segment);
+  }
+  return out.join('/');
+}
+
+/**
+ * 링크가 추적 그래프를 벗어나면 보고한다. 두 유형을 구분하는 것이 이 검사의 핵심이다.
+ *
+ * <p>`dangling` 은 대상이 아예 없는 경우고, `untracked` 는 디스크에는 있지만 추적되지 않는 경우다.
+ * 후자가 더 위험하다 — 작성자 화면에서는 링크가 열리므로 육안 리뷰로 절대 잡히지 않고,
+ * clone 한 사람에게만 깨진다. 실제로 gitignore 된 경로를 "정본"으로 가리키는 문서가 나왔다.
+ */
+function validateDocLinks(root, read, tracked, trackedSet, manifest, errors) {
+  const ignorePrefixes = manifest.docLinkIgnorePrefixes ?? [];
+  const dirs = new Set();
+  for (const path of tracked) {
+    const parts = path.split('/');
+    for (let i = 1; i < parts.length; i += 1) dirs.add(parts.slice(0, i).join('/'));
+  }
+  // 에이전트 지시서(.claude/·.codex/)는 스캔하지 않는다 — 그 링크는 저장소 참조가 아니라
+  // "이런 파일을 만들어라"는 산출물 명세인 경우가 많아, 검사하면 템플릿마다 예외를 등록하게 된다.
+  // 그 트리의 참조 무결성은 위 referenceSources 검사(scripts/harness 경로)가 담당한다.
+  for (const doc of tracked.filter((p) => p.endsWith('.md') && !/^\.(claude|codex)\//.test(p))) {
+    let text;
+    try {
+      text = read(doc);
+    } catch {
+      continue;
+    }
+    for (const raw of parseDocLinks(text)) {
+      const target = raw.split('#')[0].split('?')[0];
+      if (!target) continue;
+      const resolved = resolveDocTarget(doc, target);
+      if (resolved === null || resolved === '') continue;
+      if (ignorePrefixes.some((prefix) => resolved.startsWith(prefix))) continue;
+      if (trackedSet.has(resolved) || dirs.has(resolved)) continue;
+      errors.push(existsSync(resolve(root, ...resolved.split('/')))
+        ? `doc link untracked: ${doc} → ${target} (디스크에만 존재 — 로컬에서만 열리고 clone 하면 깨진다)`
+        : `doc link dangling: ${doc} → ${target} (대상 없음)`);
+    }
+  }
+}
+
 function validateStatus(status, tracked, errors) {
   const checks = [
     ['application.yml', tracked.filter((p) => /\/src\/main\/resources\/application\.yml$/.test(p)).length, [/application\.yml[^\n]*?\*\*(\d[\d,]*)[^\d\n*]*\*\*/i, /application\.yml[^\n]*?→\s*(\d[\d,]*)/i]],
@@ -216,6 +285,7 @@ export function collectAudit(repoRoot, manifest) {
   validateModuleRoster(read, trackedSet, errors);
   validateRoutingMap(read, trackedSet, errors);
   validatePluginGuardPaths(read, tracked, trackedSet, errors);
+  validateDocLinks(root, read, tracked, trackedSet, manifest, errors);
 
   for (const pair of manifest.criticalContractPairs) {
     if (!trackedSet.has(pair.claude) || !trackedSet.has(pair.codex)) continue;

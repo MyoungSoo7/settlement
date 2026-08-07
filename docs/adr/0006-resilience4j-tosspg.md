@@ -90,9 +90,9 @@ read 5s 타임아웃을 직접 설정해 스레드 점유 상한을 둔다. 서�
   (별도 스프링 빈). 호출이 외부 호출이 되어 프록시를 통과한다.
 - 인스턴스명(`tossPg`)·4xx 제외 정책·타임아웃·폴백 동작은 **변경 없음** — `application.yml` 수정 불필요.
 - **회귀 차단**: `scripts/harness/test/aop-proxy-gate.test.mjs` 가 리포 전수로 프록시 의존 애노테이션의
-  자기호출을 0건으로 강제한다(CI 필수). 경위·근거는 [docs/inflearn/spring.md](../inflearn/spring.md).
+  자기호출을 0건으로 강제한다(CI 필수). 경위·근거는 `docs/inflearn/spring.md`(로컬 전용, 저장소 미포함).
 
 ## 참조
 
 - [0010 — 다중 PG 라우팅 + Bulkhead](0010-multi-pg-routing-and-bulkhead.md)
-- [docs/inflearn/spring.md](../inflearn/spring.md) — 프록시 내부 호출 결함의 발견·수정 기록
+- `docs/inflearn/spring.md`(로컬 전용, 저장소 미포함) — 프록시 내부 호출 결함의 발견·수정 기록

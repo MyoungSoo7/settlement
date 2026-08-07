@@ -126,20 +126,20 @@ settlement.created / settlement.confirmed 이벤트만 수신 (코드·DB 의존
 
 | 질문 | 답변 |
 |---|---|
-| MSA 인데 DB 공유 아닌가요? | [settlement readmodel 프로젝션](settlement-service/src/main/java/github/lms/lemuel/settlement/adapter/out/readmodel/) + [OrderReconClient](../settlement-service/src/main/java/github/lms/lemuel/recon/OrderReconClient.java) |
+| MSA 인데 DB 공유 아닌가요? | [settlement readmodel 프로젝션](../settlement-service/src/main/java/github/lms/lemuel/settlement/adapter/out/readmodel/) + [OrderReconClient](../settlement-service/src/main/java/github/lms/lemuel/recon/OrderReconClient.java) |
 | 정산이 정말 정확한가요? | **[SETTLEMENT-VERIFICATION.md](SETTLEMENT-VERIFICATION.md)** — 520 테스트·94% 커버리지 + 불변식 매핑 + 한계 |
 | 결제 PG 장애 시 fallback? | [PgRouter](../order-service/src/main/java/github/lms/lemuel/payment/adapter/out/pg/PgRouter.java) — fallback chain |
 | 환불 중 PG 가 죽으면? | [RefundPaymentUseCase](../order-service/src/main/java/github/lms/lemuel/payment/application/RefundPaymentUseCase.java) — 예외 변환 + 롤백, 유령 환불 방지 |
-| 이벤트 발행 영구 실패 시? | [DLQ + Admin API](shared-common/src/main/java/github/lms/lemuel/common/outbox/) |
-| PG 정산 누락 발견 어떻게? | [PG Reconciliation](settlement-service/src/main/java/github/lms/lemuel/pgreconciliation/) — 5종 분류 + 승인 시 보정 이벤트 |
+| 이벤트 발행 영구 실패 시? | [DLQ + Admin API](../shared-common/src/main/java/github/lms/lemuel/common/outbox/) |
+| PG 정산 누락 발견 어떻게? | [PG Reconciliation](../settlement-service/src/main/java/github/lms/lemuel/pgreconciliation/) — 5종 분류 + 승인 시 보정 이벤트 |
 | 재고 100개에 110건 동시? | [DecreaseVariantStockService](../order-service/src/main/java/github/lms/lemuel/product/application/service/DecreaseVariantStockService.java) — 조건부 원자 UPDATE |
 | 포인트+카드 분할결제 일부 환불? | [PaymentDomain.planRefundFromTenders](../order-service/src/main/java/github/lms/lemuel/payment/domain/PaymentDomain.java) — seq 역순 |
 | Outbox 패턴인데 trace 끊김? | [KafkaOutboxPublisher](../shared-common/src/main/java/github/lms/lemuel/common/outbox/adapter/out/event/KafkaOutboxPublisher.java) — traceparent 헤더 복원 |
 | 주문 상태 잘못된 전이 막나요? | [OrderStatus.canTransitionTo / Order.transitionTo](../order-service/src/main/java/github/lms/lemuel/order/domain/OrderStatus.java) — 상태머신 가드 |
 | 정산 주말·공휴일? | [BusinessDayCalculator](../settlement-service/src/main/java/github/lms/lemuel/settlement/domain/BusinessDayCalculator.java) — T+N 영업일 |
 | 신뢰도 낮은 셀러 환불 다발? | [HoldbackPolicy](../settlement-service/src/main/java/github/lms/lemuel/settlement/domain/HoldbackPolicy.java) |
-| 정산해서 셀러 입금까지? | [Payout 도메인](settlement-service/src/main/java/github/lms/lemuel/payout/) — 펌뱅킹 + 운영자 콘솔 |
-| 선정산 대출은 어떻게 연계? | [loan-service](loan-service/src/main/java/github/lms/lemuel/loan/) — settlement 이벤트 saga |
+| 정산해서 셀러 입금까지? | [Payout 도메인](../settlement-service/src/main/java/github/lms/lemuel/payout/) — 펌뱅킹 + 운영자 콘솔 |
+| 선정산 대출은 어떻게 연계? | [loan-service](../loan-service/src/main/java/github/lms/lemuel/loan/) — settlement 이벤트 saga |
 | 이중 송금/상환 어떻게 막나요? | settlement_id / payment_id UNIQUE + 도메인 멱등 검증 |
 
 ---
@@ -151,7 +151,7 @@ settlement.created / settlement.confirmed 이벤트만 수신 (코드·DB 의존
 | **Architecture Decision Records** 25개 | [docs/adr/](adr/)                                                |
 | **정산 정확성 검증 문서** | [docs/SETTLEMENT-VERIFICATION.md](SETTLEMENT-VERIFICATION.md)    |
 | **k6 부하테스트** 4 시나리오 | [load-test/](../load-test/)                                      |
-| **Grafana 대시보드** + 커스텀 메트릭 | [monitoring/grafana/dashboards/](monitoring/grafana/dashboards/) |
+| **Grafana 대시보드** + 커스텀 메트릭 | [monitoring/grafana/dashboards/](../monitoring/grafana/dashboards/) |
 | **분산 트레이싱** (Tempo + OTLP) | [docker-compose.yml](../docker-compose.yml)                      |
 | **장애 대응 Runbook** | [docs/runbook/](runbook/)                                        |
 | **CI/CD** GitHub Actions | [.github/workflows/](../.github/workflows/)                      |

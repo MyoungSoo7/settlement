@@ -4,7 +4,7 @@
 반품·드랍 재고·리뷰·쿠폰 도메인 규칙·검증 도구·가드레일을
 **OpenAI Codex CLI** 와 **Claude Code** 에 주입한다.
 [`settlement-copilot`](../../../../../settlement-service/src/main/resources/settlement-copilot/README.md) 의 자매편.
-설계 문서: [`docs/design/fashion-copilot-codex-plugin.md`](../docs/design/fashion-copilot-codex-plugin.md)
+설계 문서: `docs/design/fashion-copilot-codex-plugin.md`(저장소 미포함)
 
 ## ⚡ 퀵스타트 (30초)
 
