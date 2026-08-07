@@ -9,6 +9,9 @@ import {
   collectAudit,
   extractHarnessContract,
   parseDocLinks,
+  parseDockerfileModules,
+  parseGatewayRouteIds,
+  parseScanBasePackages,
   readContractCases,
   runAuditCli,
   validateManifest,
@@ -518,6 +521,59 @@ test('collectAudit honours manifest docLinkIgnorePrefixes', () => {
   });
   const errors = collectAudit(root, manifest).errors.filter((e) => e.startsWith('doc link'));
   assert.deepEqual(errors.map((e) => e.replace(/ \(.*/, '')), ['doc link dangling: README.md → docs/deleted.md']);
+});
+
+test('wiring parsers read Dockerfile copies, gateway route ids, and scanned packages', () => {
+  assert.deepEqual(parseDockerfileModules([
+    'COPY order-service/build.gradle.kts ./order-service/',
+    'COPY order-service ./order-service',
+    'COPY card-service/build.gradle.kts ./card-service/',
+  ].join('\n')), ['order-service']); // 의존 COPY 만 있고 소스 COPY 가 없으면 배선된 것이 아니다
+  assert.deepEqual(parseGatewayRouteIds('routes:\n  - id: order-service-orders\n    uri: x\n  - id: card-service\n'),
+    ['order-service-orders', 'card-service']);
+  assert.deepEqual(parseScanBasePackages('@SpringBootApplication(scanBasePackages = {"github.lms.lemuel.order", "github.lms.lemuel.common"})'),
+    ['github.lms.lemuel.order', 'github.lms.lemuel.common']);
+  assert.deepEqual(parseScanBasePackages('@SpringBootApplication(scanBasePackages = "github.lms.lemuel")'), ['github.lms.lemuel']);
+  assert.deepEqual(parseScanBasePackages('@SpringBootApplication'), []);
+});
+
+// 서비스 → 배선 간선. 배선 누락은 컴파일이 잡아주지 않고 런타임에 조용히 404/500 으로 나타난다
+// (실사고 36ac0234: 코드는 있는데 5곳 미배선으로 프론트 3개 페이지 크래시).
+test('collectAudit reports missing module and package wiring', () => {
+  const files = {
+    'manifest.json': JSON.stringify(baseManifest(['manifest.json'])),
+    'settings.gradle.kts': 'include(\n  "order-service",\n  "card-service",\n  "gateway-service",\n)',
+    'Dockerfile': 'COPY order-service/build.gradle.kts ./order-service/\nCOPY order-service ./order-service\n'
+      + 'COPY gateway-service/build.gradle.kts ./gateway-service/\nCOPY gateway-service ./gateway-service\n',
+    'gateway-service/src/main/resources/application.yml': 'routes:\n  - id: order-service-orders\n    uri: x\n',
+    'order-service/src/main/java/github/lms/lemuel/LemuelApplication.java':
+      '@SpringBootApplication(scanBasePackages = {"github.lms.lemuel.order"})\npublic class LemuelApplication {}',
+    'order-service/src/main/java/github/lms/lemuel/order/OrderController.java': '@RestController\nclass OrderController {}',
+    'order-service/src/main/java/github/lms/lemuel/menu/MenuController.java': '@RestController\nclass MenuController {}',
+    'order-service/src/main/java/github/lms/lemuel/web/Marker.java': 'interface Marker {}',
+  };
+  const errors = collectAudit(repo(files), baseManifest(['manifest.json'])).errors.filter((e) => e.startsWith('service wiring'));
+
+  assert.equal(errors.length, 3, errors.join('\n'));
+  assert.match(errors.join('\n'), /Dockerfile COPY 누락: card-service/);
+  assert.match(errors.join('\n'), /gateway 라우트 누락: card-service/);
+  assert.match(errors.join('\n'), /scanBasePackages 누락: order-service → github\.lms\.lemuel\.menu/);
+  // 스프링 스테레오타입이 없는 패키지는 스캔 대상이 아니다 — 요구하면 마커·DTO 패키지마다 오탐이 난다
+  assert.doesNotMatch(errors.join('\n'), /lemuel\.web/);
+});
+
+test('collectAudit accepts fully wired modules', () => {
+  const files = {
+    'manifest.json': JSON.stringify(baseManifest(['manifest.json'])),
+    'settings.gradle.kts': 'include(\n  "order-service",\n  "gateway-service",\n)',
+    'Dockerfile': 'COPY order-service/build.gradle.kts ./order-service/\nCOPY order-service ./order-service\n'
+      + 'COPY gateway-service/build.gradle.kts ./gateway-service/\nCOPY gateway-service ./gateway-service\n',
+    'gateway-service/src/main/resources/application.yml': 'routes:\n  - id: order-service-orders\n    uri: x\n',
+    'order-service/src/main/java/github/lms/lemuel/LemuelApplication.java':
+      '@SpringBootApplication(scanBasePackages = {"github.lms.lemuel.order"})\npublic class LemuelApplication {}',
+    'order-service/src/main/java/github/lms/lemuel/order/OrderController.java': '@RestController\nclass OrderController {}',
+  };
+  assert.deepEqual(collectAudit(repo(files), baseManifest(['manifest.json'])).errors.filter((e) => e.startsWith('service wiring')), []);
 });
 
 test('repository harness contracts match the tracked manifest oracle', () => {

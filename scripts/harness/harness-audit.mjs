@@ -247,6 +247,82 @@ function validateDocLinks(root, read, tracked, trackedSet, manifest, errors) {
   }
 }
 
+// 서비스 → 배선 간선. 배선 누락은 컴파일이 잡아주지 않고 런타임에 조용히 404/500 으로 나온다
+// (📘msa-service-wiring, 실사고 36ac0234). 5곳 중 기계로 확정 가능한 3곳만 본다 —
+// nginx 는 배포 형태가 여러 벌이라 단일 정본이 없고, JPA 스캔은 제한 스캔 서비스마다 정책이 달라
+// 오탐이 난다. 나머지 2곳은 스킬 체크리스트가 담당한다.
+
+// 루트 Dockerfile 은 의존 COPY(build.gradle.kts)와 소스 COPY 두 벌을 요구한다.
+// 소스 COPY 가 빠지면 settings 평가는 통과하고 빌드가 뒤에서 깨진다 — 둘 다 있어야 배선이다.
+export function parseDockerfileModules(dockerfile) {
+  const text = String(dockerfile);
+  const deps = new Set([...text.matchAll(/^COPY\s+([\w-]+)\/build\.gradle\.kts/gm)].map((m) => m[1]));
+  const sources = new Set([...text.matchAll(/^COPY\s+([\w-]+)\s+\.\/[\w-]+/gm)].map((m) => m[1]));
+  return [...deps].filter((module) => sources.has(module));
+}
+
+export function parseGatewayRouteIds(yaml) {
+  return [...String(yaml).matchAll(/^\s*-\s*id:\s*(\S+)/gm)].map((m) => m[1]);
+}
+
+export function parseScanBasePackages(java) {
+  const match = String(java).match(/scanBasePackages\s*=\s*(\{[^}]*\}|"[^"]+")/);
+  return match ? [...match[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]) : [];
+}
+
+const SPRING_STEREOTYPE = /@(RestController|Controller|Component|Service|Repository|Configuration|ControllerAdvice|ConfigurationProperties)\b/;
+const DOMAIN_BASE = 'src/main/java/github/lms/lemuel/';
+
+function validateServiceWiring(read, tracked, trackedSet, errors) {
+  if (!trackedSet.has('settings.gradle.kts')) return;
+  const modules = parseGradleModules(read('settings.gradle.kts'));
+
+  if (trackedSet.has('Dockerfile')) {
+    const copied = new Set(parseDockerfileModules(read('Dockerfile')));
+    for (const module of modules) {
+      if (!copied.has(module)) {
+        errors.push(`service wiring: Dockerfile COPY 누락: ${module} (settings 평가가 실패해 전체 이미지 빌드가 깨진다)`);
+      }
+    }
+  }
+
+  const gatewayYml = 'gateway-service/src/main/resources/application.yml';
+  if (trackedSet.has(gatewayYml)) {
+    const ids = parseGatewayRouteIds(read(gatewayYml));
+    for (const module of modules) {
+      if (module === 'gateway-service') continue;
+      // 라우트 id 는 모듈명 그대로이거나 접미가 붙는다(order-service-orders 처럼 경로군 분리).
+      if (!ids.some((id) => id === module || id.startsWith(`${module}-`))) {
+        errors.push(`service wiring: gateway 라우트 누락: ${module} (직접 포트는 되고 8080 경유만 404)`);
+      }
+    }
+  }
+
+  // 스프링 빈을 가진 도메인 패키지가 scanBasePackages 에 없으면 핸들러가 등록되지 않는다.
+  // 스테레오타입이 없는 패키지(마커·DTO·순수 도메인)는 요구하지 않는다 — 요구하면 오탐만 는다.
+  for (const module of modules) {
+    const appPath = tracked.find((p) => p.startsWith(`${module}/src/main/java/`) && p.endsWith('Application.java'));
+    if (!appPath) continue;
+    const scanned = parseScanBasePackages(read(appPath));
+    if (scanned.length === 0) continue; // 미선언 = 애플리케이션 패키지 이하 기본 스캔
+    const base = `${module}/${DOMAIN_BASE}`;
+    const packages = new Set();
+    for (const path of tracked) {
+      if (!path.startsWith(base) || !path.endsWith('.java')) continue;
+      const rest = path.slice(base.length).split('/');
+      if (rest.length > 1) packages.add(rest[0]);
+    }
+    for (const pkg of [...packages].sort()) {
+      const full = `github.lms.lemuel.${pkg}`;
+      if (scanned.some((s) => s === full || s === 'github.lms.lemuel' || full.startsWith(`${s}.`))) continue;
+      const owned = tracked.filter((p) => p.startsWith(`${base + pkg}/`) && p.endsWith('.java'));
+      if (owned.some((p) => SPRING_STEREOTYPE.test(read(p)))) {
+        errors.push(`service wiring: scanBasePackages 누락: ${module} → ${full} (빈 미등록 — 핸들러 404 / 리포지토리 500)`);
+      }
+    }
+  }
+}
+
 function validateStatus(status, tracked, errors) {
   const checks = [
     ['application.yml', tracked.filter((p) => /\/src\/main\/resources\/application\.yml$/.test(p)).length, [/application\.yml[^\n]*?\*\*(\d[\d,]*)[^\d\n*]*\*\*/i, /application\.yml[^\n]*?→\s*(\d[\d,]*)/i]],
@@ -286,6 +362,7 @@ export function collectAudit(repoRoot, manifest) {
   validateRoutingMap(read, trackedSet, errors);
   validatePluginGuardPaths(read, tracked, trackedSet, errors);
   validateDocLinks(root, read, tracked, trackedSet, manifest, errors);
+  validateServiceWiring(read, tracked, trackedSet, errors);
 
   for (const pair of manifest.criticalContractPairs) {
     if (!trackedSet.has(pair.claude) || !trackedSet.has(pair.codex)) continue;
