@@ -23,7 +23,7 @@ public interface SpringDataLedgerJpaRepository extends JpaRepository<LedgerEntry
      * {@code idx_ledger_date_debit/credit (settlement_date, 계정) INCLUDE (amount, status)}
      * (V20260807120000)의 Index-Only Scan 을 탄다. LATERAL 언피벗 단일 스캔 병합은 커버링을
      * 포기하고 힙을 읽어 2M 행 실측에서 오히려 느렸다(2스캔 합 ~50ms vs 병합 88ms —
-     * docs/inflearn/db-perf.md 실측).
+     * docs/inflearn/db.md 실측).
      */
     @Query("""
             select e.debitAccount, sum(e.amount)
