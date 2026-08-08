@@ -250,6 +250,19 @@ app:
     manual-escalation-days: ${APP_RECOVERY_MANUAL_ESCALATION_DAYS:30}
     # 홀드백 해제 배치(03:00) 직후 — 해제로 새로 생긴 지급 기회를 먼저 반영한 뒤 정체 여부를 판정한다.
     manual-escalation-cron: "0 30 3 * * *"
-  # 펌뱅킹 mock — 0.0 = 항상 성공. 시연용으로 0.1 (10% 실패) 으로 설정해 운영자 retry 워크플로 검증
+  # 펌뱅킹 어댑터 선택: mock(기본, 랜덤 실패 시뮬) | fep(고정길이 전문 TCP 소켓 — FepFirmBankingAdapter)
   firmbanking:
+    mode: ${FIRMBANKING_MODE:mock}
+    # mock 전용 — 0.0 = 항상 성공. 시연용으로 0.1 (10% 실패) 으로 설정해 운영자 retry 워크플로 검증
     failure-rate: ${APP_FIRMBANKING_FAILURE_RATE:0.0}
+  # FEP 대외계 접속 (mode=fep 일 때만 사용) — 고정길이 전문·EUC-KR·4바이트 길이 프레이밍
+  fep:
+    host: ${FEP_HOST:localhost}
+    port: ${FEP_PORT:9410}
+    connect-timeout-ms: ${FEP_CONNECT_TIMEOUT_MS:2000}
+    read-timeout-ms: ${FEP_READ_TIMEOUT_MS:3000}
+    # 시연·개발용 모의 은행 서버 — 운영 기본 비활성
+    mock-bank:
+      enabled: ${FEP_MOCK_BANK_ENABLED:false}
+      port: ${FEP_MOCK_BANK_PORT:9410}
+      slow-delay-ms: ${FEP_MOCK_BANK_SLOW_DELAY_MS:5000}
