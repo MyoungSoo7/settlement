@@ -43,19 +43,20 @@ public interface SpringDataPolicyRepository extends JpaRepository<PolicyJpaEntit
             @Param("paidStatus") CommissionStatus paidStatus);
 
     /**
-     * 방카 25%룰 집계 — [from, to) 효력 개시 BANCA 신계약 보험료를 (은행, 원수사)로 합산.
-     * 원수사 미지정(insurer_code NULL) 상품은 제외 (카탈로그 정비 대상).
+     * 방카 25%룰 집계 — [from, to) 효력 개시 BANCA 신계약 보험료를 (은행, 부문, 원수사)로 합산.
+     * 원수사(insurer_code)·부문(insurer_sector) 미지정 상품은 제외 (카탈로그 정비 대상).
      */
     @Query("""
             select new github.lms.lemuel.insurance.domain.BancaRuleEvaluator$BankInsurerPremium(
-                p.partnerBankCode, pr.insurerCode, sum(p.premiumAmount))
+                p.partnerBankCode, pr.insurerSector, pr.insurerCode, sum(p.premiumAmount))
             from PolicyJpaEntity p, InsuranceProductJpaEntity pr
             where p.productCode = pr.productCode
               and p.salesChannel = github.lms.lemuel.insurance.domain.SalesChannel.BANCA
               and p.effectiveDate >= :fromInclusive and p.effectiveDate < :toExclusive
               and pr.insurerCode is not null
-            group by p.partnerBankCode, pr.insurerCode
-            order by p.partnerBankCode, pr.insurerCode
+              and pr.insurerSector is not null
+            group by p.partnerBankCode, pr.insurerSector, pr.insurerCode
+            order by p.partnerBankCode, pr.insurerSector, pr.insurerCode
             """)
     List<github.lms.lemuel.insurance.domain.BancaRuleEvaluator.BankInsurerPremium>
     aggregateBancaPremiumsByBankAndInsurer(

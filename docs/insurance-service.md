@@ -247,7 +247,7 @@ ArchUnit 4룰 강제:
 | CommissionClawbackSweepScheduler| 매일 03:30    | terminal 계약의 SCHEDULED 회차 소멸(CANCELLED) + PAID 회차 환수 대기 전환(D6 계산) + clawback 이벤트           |
 | CommissionPayoutScheduler       | 매일 04:00    | due_date 도래 SCHEDULED 회차 지급(PAID) — ACTIVE 계약만, LAPSED 보류 + commission_paid 이벤트                  |
 | MonthlyCommissionClosingScheduler| 매월 1일 05:00| 전월 지급 실적(paid_at 기준)을 FC별 append-only 마감 스냅샷(commission_closings, V5)으로 확정 + 이벤트          |
-| BancaConcentrationScheduler     | 매월 2일 06:00| 당해연도 방카 25%룰 점검(은행×원수사 비중) — 위반 시 banca_rule_violated 이벤트, 위반 0건도 감사 기록          |
+| BancaConcentrationScheduler     | 매월 2일 06:00| 당해연도 방카 25%룰 점검(은행×부문×원수사 비중, 자산 2조 미만 면제) — 위반 시 banca_rule_violated 이벤트, 위반 0건도 감사 기록 |
 
 - 전이는 반드시 도메인 메서드를 통과한다 — 배치가 status 를 직접 UPDATE 하지 않는다.
 - 모든 이벤트는 같은 tx 의 Outbox 로 기록(커밋-발행 원자성). 배치 실행은 잡 단위로 audit_logs 에 남는다.
@@ -260,7 +260,7 @@ ArchUnit 4룰 강제:
   도메인(`InvalidSalesChannelException`)과 DB CHECK(`chk_policy_banca_bank`)가 이중 강제.
 - 채널이 수수료 수령 주체를 결정: FC→`recipient_type='FC'`(설계사), BANCA→`'BANK'`(판매 은행).
   `Policy.commissionRecipientId()` / `CommissionScheduleFactory.createFirstYearSchedule(..., channel)`.
-- `insurance_products.insurer_code`(원수사) — 25%룰 집계 기준.
+- `insurance_products.insurer_code`(원수사)·`insurer_sector`(V8, LIFE/NON_LIFE) — 25%룰 집계 기준.
 
 ## 10. 대면 상품설명서 + 25%룰 (V7)
 
@@ -269,14 +269,18 @@ ArchUnit 4룰 강제:
   저장된 증빙과 동일, `X-Document-Sha256` 헤더).
 - **교부 이력**(`disclosure_deliveries`): append-only(트리거 강제) 완전판매 증빙 — 교부자·채널·계약자·
   문서 SHA-256·교부 시점 상품 조건 JSONB 스냅샷. 해시는 서버가 계산(클라이언트 불신).
-- **25%룰**: 은행별 특정 원수사 신계약 보험료 비중 > 25% 면 위반(정확히 25% 허용).
-  판정은 `BancaRuleEvaluator`(순수 도메인, 상한 `CONCENTRATION_LIMIT` 단일 선언), 배치는 탐지·통보만
-  (차단 아님 — 조치는 이벤트 소비자 몫).
+- **25%룰**: 은행별·**부문(생보/손보)별**(V8) 특정 원수사 신계약 보험료 비중 > 25% 면 위반(정확히 25% 허용) —
+  분모는 (은행, 부문) 풀 총액. 판정은 `BancaRuleEvaluator`(순수 도메인, 상한 `CONCENTRATION_LIMIT` 단일 선언),
+  배치는 탐지·통보만 (차단 아님 — 조치는 이벤트 소비자 몫).
+- **자산 2조 적용 요건**(V8): `banca_partner_banks` 자산 레지스트리 기준, 자산총액 2조원 이상 은행만
+  적용 대상(경계 포함, `ASSET_APPLICABILITY_THRESHOLD` 단일 선언). 2조 미만 등록 은행은 면제,
+  **미등록 은행은 적용 대상**(fail-closed — 위반 누락이 면제 오탐보다 나쁘다). 면제 은행 수는
+  배치 감사 JSON(`exemptBanks`)에 남는다.
 
 ## 11. 마이그레이션
 
 V1 core → V2 outbox/processed/shedlock → V3 audit → V4 PII 하드닝 → V5 commission_closings →
-V6 sales_channel/banca → V7 disclosure_deliveries.
+V6 sales_channel/banca → V7 disclosure_deliveries → V8 insurer_sector + banca_partner_banks.
 
 ## 12. 언더라이팅 (청약 접수 → 심사 → 승인/반려)
 

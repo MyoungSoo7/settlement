@@ -1,8 +1,11 @@
 package github.lms.lemuel.insurance.adapter.out.persistence;
 
 import github.lms.lemuel.insurance.application.port.out.LoadInsuranceProductPort.ProductSnapshot;
+import github.lms.lemuel.insurance.domain.InsurerSector;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -11,7 +14,7 @@ import jakarta.persistence.Table;
 import java.math.BigDecimal;
 
 /**
- * insurance_products 테이블 매핑 (V1 + V6 insurer_code) — 상품설명서 렌더링 입력 조회 전용.
+ * insurance_products 테이블 매핑 (V1 + V6 insurer_code + V8 insurer_sector) — 상품설명서 렌더링 입력 조회 전용.
  */
 @Entity
 @Table(name = "insurance_products", schema = "opslab")
@@ -41,6 +44,10 @@ public class InsuranceProductJpaEntity {
 
     @Column(name = "insurer_code", length = 32)
     private String insurerCode;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "insurer_sector", length = 10)
+    private InsurerSector insurerSector;
 
     @Column(nullable = false)
     private boolean active;

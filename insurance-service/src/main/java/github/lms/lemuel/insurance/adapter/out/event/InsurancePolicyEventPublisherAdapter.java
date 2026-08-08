@@ -210,12 +210,13 @@ public class InsurancePolicyEventPublisherAdapter implements PublishInsuranceEve
     @Override
     public void publishBancaRuleViolated(Year year, BancaRuleViolation violation) {
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("year",              year.toString());
-        payload.put("bankCode",          violation.bankCode());
-        payload.put("insurerCode",       violation.insurerCode());
-        payload.put("share",             violation.share().toPlainString());
-        payload.put("insurerPremiumSum", violation.insurerPremiumSum().toPlainString());
-        payload.put("bankPremiumTotal",  violation.bankPremiumTotal().toPlainString());
+        payload.put("year",               year.toString());
+        payload.put("bankCode",           violation.bankCode());
+        payload.put("sector",             violation.sector().name());
+        payload.put("insurerCode",        violation.insurerCode());
+        payload.put("share",              violation.share().toPlainString());
+        payload.put("insurerPremiumSum",  violation.insurerPremiumSum().toPlainString());
+        payload.put("sectorPremiumTotal", violation.sectorPremiumTotal().toPlainString());
 
         saveOutboxEventPort.save(OutboxEvent.pending(
                 AGGREGATE_TYPE,

@@ -27,16 +27,19 @@ public class ProductAndDisclosurePersistenceAdapter
     private final SpringDataInsuranceProductRepository productRepository;
     private final SpringDataDisclosureDeliveryRepository deliveryRepository;
     private final SpringDataPolicyRepository policyRepository;
+    private final SpringDataBancaPartnerBankRepository partnerBankRepository;
     private final ObjectMapper objectMapper;
 
     public ProductAndDisclosurePersistenceAdapter(
             SpringDataInsuranceProductRepository productRepository,
             SpringDataDisclosureDeliveryRepository deliveryRepository,
             SpringDataPolicyRepository policyRepository,
+            SpringDataBancaPartnerBankRepository partnerBankRepository,
             @Qualifier("outboxObjectMapper") ObjectMapper objectMapper) {
         this.productRepository = productRepository;
         this.deliveryRepository = deliveryRepository;
         this.policyRepository = policyRepository;
+        this.partnerBankRepository = partnerBankRepository;
         this.objectMapper = objectMapper;
     }
 
@@ -61,6 +64,15 @@ public class ProductAndDisclosurePersistenceAdapter
     @Override
     public List<BankInsurerPremium> aggregateBancaPremiums(LocalDate fromInclusive, LocalDate toExclusive) {
         return policyRepository.aggregateBancaPremiumsByBankAndInsurer(fromInclusive, toExclusive);
+    }
+
+    @Override
+    public Map<String, java.math.BigDecimal> loadPartnerBankAssets() {
+        Map<String, java.math.BigDecimal> assets = new LinkedHashMap<>();
+        for (BancaPartnerBankJpaEntity bank : partnerBankRepository.findAll()) {
+            assets.put(bank.getBankCode(), bank.getTotalAssets());
+        }
+        return assets;
     }
 
     /** 교부 시점 상품 조건을 JSONB 스냅샷으로 고정한다 — 금액은 plain string (N5). */

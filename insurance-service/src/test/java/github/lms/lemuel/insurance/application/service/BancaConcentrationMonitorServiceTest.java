@@ -5,6 +5,7 @@ import github.lms.lemuel.insurance.application.port.out.LoadBancaSalesPort;
 import github.lms.lemuel.insurance.application.port.out.PublishInsuranceEventPort;
 import github.lms.lemuel.insurance.domain.BancaRuleEvaluator.BancaRuleViolation;
 import github.lms.lemuel.insurance.domain.BancaRuleEvaluator.BankInsurerPremium;
+import github.lms.lemuel.insurance.domain.InsurerSector;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -53,12 +54,13 @@ class BancaConcentrationMonitorServiceTest {
     @DisplayName("위반 1건당 banca_rule_violated 이벤트를 발행한다")
     void publishesEventPerViolation() {
         when(loadBancaSalesPort.aggregateBancaPremiums(any(), any())).thenReturn(List.of(
-                new BankInsurerPremium("BANK-KB", "INS-A", new BigDecimal("900000.00")),
-                new BankInsurerPremium("BANK-KB", "INS-B", new BigDecimal("100000.00"))));
+                new BankInsurerPremium("BANK-KB", InsurerSector.LIFE, "INS-A", new BigDecimal("900000.00")),
+                new BankInsurerPremium("BANK-KB", InsurerSector.LIFE, "INS-B", new BigDecimal("100000.00"))));
 
         BancaMonitorResult result = service().checkYear(Year.of(2026));
 
         assertThat(result.aggregatedPairs()).isEqualTo(2);
+        assertThat(result.exemptBankCount()).isZero();
         assertThat(result.violations()).hasSize(1);
 
         ArgumentCaptor<BancaRuleViolation> violation = ArgumentCaptor.forClass(BancaRuleViolation.class);
@@ -71,14 +73,30 @@ class BancaConcentrationMonitorServiceTest {
     @DisplayName("위반이 없으면 이벤트도 없다")
     void publishesNothingWhenCompliant() {
         when(loadBancaSalesPort.aggregateBancaPremiums(any(), any())).thenReturn(List.of(
-                new BankInsurerPremium("BANK-KB", "INS-A", new BigDecimal("250000.00")),
-                new BankInsurerPremium("BANK-KB", "INS-B", new BigDecimal("250000.00")),
-                new BankInsurerPremium("BANK-KB", "INS-C", new BigDecimal("250000.00")),
-                new BankInsurerPremium("BANK-KB", "INS-D", new BigDecimal("250000.00"))));
+                new BankInsurerPremium("BANK-KB", InsurerSector.LIFE, "INS-A", new BigDecimal("250000.00")),
+                new BankInsurerPremium("BANK-KB", InsurerSector.LIFE, "INS-B", new BigDecimal("250000.00")),
+                new BankInsurerPremium("BANK-KB", InsurerSector.LIFE, "INS-C", new BigDecimal("250000.00")),
+                new BankInsurerPremium("BANK-KB", InsurerSector.LIFE, "INS-D", new BigDecimal("250000.00"))));
 
         BancaMonitorResult result = service().checkYear(Year.of(2026));
 
         assertThat(result.violations()).isEmpty();
+        verify(publishPort, never()).publishBancaRuleViolated(any(), any());
+    }
+
+    @Test
+    @DisplayName("자산 2조 미만 등록 은행은 면제 — 이벤트 없이 면제 수만 남긴다")
+    void exemptsRegisteredBankUnderAssetThreshold() {
+        when(loadBancaSalesPort.aggregateBancaPremiums(any(), any())).thenReturn(List.of(
+                new BankInsurerPremium("BANK-SMALL", InsurerSector.LIFE, "INS-A",
+                        new BigDecimal("900000.00"))));
+        when(loadBancaSalesPort.loadPartnerBankAssets()).thenReturn(
+                java.util.Map.of("BANK-SMALL", new BigDecimal("1000000000000")));
+
+        BancaMonitorResult result = service().checkYear(Year.of(2026));
+
+        assertThat(result.violations()).isEmpty();
+        assertThat(result.exemptBankCount()).isEqualTo(1);
         verify(publishPort, never()).publishBancaRuleViolated(any(), any());
     }
 }

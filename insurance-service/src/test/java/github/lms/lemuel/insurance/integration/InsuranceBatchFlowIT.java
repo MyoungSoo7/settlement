@@ -245,16 +245,17 @@ class InsuranceBatchFlowIT extends InsuranceIntegrationTestSupport {
     // ────────────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("방카 25%룰: 은행 × 원수사 집계가 위반을 찾아내고 이벤트를 남긴다")
+    @DisplayName("방카 25%룰: 은행 × 부문 × 원수사 집계가 위반을 찾아내고 이벤트를 남긴다 — 자산 미등록 은행은 fail-closed 적용")
     void detectsBancaConcentrationViolation() {
-        // 전용 상품 2개 (원수사 A/B) — 전용 연도(2025)로 다른 테스트와 격리
+        // 전용 상품 2개 (원수사 A/B, 생보) — 전용 연도(2025)로 다른 테스트와 격리.
+        // 은행은 자산 레지스트리에 미등록 → 적용 대상(fail-closed).
         String prodA = "PROD-BC-A-" + UUID.randomUUID().toString().substring(0, 8);
         String prodB = "PROD-BC-B-" + UUID.randomUUID().toString().substring(0, 8);
         String bank = "BANK-IT-" + UUID.randomUUID().toString().substring(0, 8);
         insertProduct(prodA, "INS-IT-A");
         insertProduct(prodB, "INS-IT-B");
         LocalDate effective = LocalDate.of(2025, 3, 1);
-        // 은행 총 100만: INS-A 90만(90% → 위반) / INS-B 10만
+        // 은행 생보 풀 총 100만: INS-A 90만(90% → 위반) / INS-B 10만
         insertPolicy("ACTIVE", effective, null, null, "fc-it-bc", prodA,
                 new BigDecimal("900000.00"), "BANCA", bank);
         insertPolicy("ACTIVE", effective, null, null, "fc-it-bc", prodB,
@@ -265,6 +266,7 @@ class InsuranceBatchFlowIT extends InsuranceIntegrationTestSupport {
         assertThat(result.violations())
                 .anySatisfy(v -> {
                     assertThat(v.bankCode()).isEqualTo(bank);
+                    assertThat(v.sector()).isEqualTo(github.lms.lemuel.insurance.domain.InsurerSector.LIFE);
                     assertThat(v.insurerCode()).isEqualTo("INS-IT-A");
                     assertThat(v.share()).isEqualByComparingTo(new BigDecimal("0.9000"));
                 });
@@ -274,13 +276,41 @@ class InsuranceBatchFlowIT extends InsuranceIntegrationTestSupport {
         assertThat(events).isEqualTo(1);
     }
 
+    @Test
+    @DisplayName("방카 25%룰: 자산 2조 미만으로 등록된 은행은 면제 — 100% 집중이어도 이벤트가 없다")
+    void exemptsBankRegisteredUnderAssetThreshold() {
+        String prod = "PROD-BC-EX-" + UUID.randomUUID().toString().substring(0, 8);
+        String bank = "BANK-EX-" + UUID.randomUUID().toString().substring(0, 8);
+        insertProduct(prod, "INS-IT-EX");
+        insertPartnerBank(bank, "1000000000000.00");   // 1조 — 적용 하한(2조) 미만
+        insertPolicy("ACTIVE", LocalDate.of(2025, 5, 1), null, null, "fc-it-ex", prod,
+                new BigDecimal("500000.00"), "BANCA", bank);   // 단일 원수사 100% 집중
+
+        var result = monitorBanca.checkYear(java.time.Year.of(2025));
+
+        assertThat(result.violations()).noneMatch(v -> v.bankCode().equals(bank));
+        assertThat(result.exemptBankCount()).isGreaterThanOrEqualTo(1);
+        Integer events = jdbc.queryForObject(
+                "SELECT count(*) FROM opslab.outbox_events WHERE event_type = 'InsuranceBancaRuleViolated' AND aggregate_id = ?",
+                Integer.class, bank);
+        assertThat(events).isZero();
+    }
+
     private void insertProduct(String productCode, String insurerCode) {
         jdbc.update("""
                 INSERT INTO opslab.insurance_products
                     (product_code, product_name, product_type, annual_premium, coverage_amount,
-                     first_year_commission_rate, subsequent_year_commission_rate, active, insurer_code)
-                VALUES (?, 'IT 상품', 'LIFE', 1200000.00, 100000000.00, 0.035000, 0.010000, TRUE, ?)
+                     first_year_commission_rate, subsequent_year_commission_rate, active,
+                     insurer_code, insurer_sector)
+                VALUES (?, 'IT 상품', 'LIFE', 1200000.00, 100000000.00, 0.035000, 0.010000, TRUE, ?, 'LIFE')
                 """, productCode, insurerCode);
+    }
+
+    private void insertPartnerBank(String bankCode, String totalAssets) {
+        jdbc.update("""
+                INSERT INTO opslab.banca_partner_banks (bank_code, bank_name, total_assets, as_of_date)
+                VALUES (?, 'IT 은행', ?::numeric, '2025-12-31')
+                """, bankCode, totalAssets);
     }
 
     @Test

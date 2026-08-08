@@ -44,12 +44,13 @@ public class BancaConcentrationScheduler {
         Year year = Year.from(LocalDate.now(clock));
         log.info("[BancaRule] 시작: year={}", year);
         BancaMonitorResult result = useCase.checkYear(year);
-        log.info("[BancaRule] 완료: 집계조합={} 위반={}",
-                result.aggregatedPairs(), result.violations().size());
+        log.info("[BancaRule] 완료: 집계조합={} 면제은행={} 위반={}",
+                result.aggregatedPairs(), result.exemptBankCount(), result.violations().size());
 
         auditLogger.record(AuditAction.INSURANCE_BANCA_RULE_CHECKED,
                 "BancaRuleMonitorJob", year.toString(),
-                String.format("{\"year\":\"%s\",\"aggregatedPairs\":%d,\"violations\":%d}",
-                        year, result.aggregatedPairs(), result.violations().size()));
+                String.format("{\"year\":\"%s\",\"aggregatedPairs\":%d,\"exemptBanks\":%d,\"violations\":%d}",
+                        year, result.aggregatedPairs(), result.exemptBankCount(),
+                        result.violations().size()));
     }
 }
