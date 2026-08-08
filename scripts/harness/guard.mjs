@@ -54,7 +54,7 @@ const CAMPAIGN_SERVICES = /(settlement|order|loan|investment|account|insurance)-
 // MSA 경계 위반. enum denylist 는 신규 order 도메인 누락에 취약하므로 allowlist 여집합으로 강제한다(감사 MED-2).
 const SETTLEMENT_OWN_PACKAGES = new Set([
   'settlement', 'payout', 'ledger', 'chargeback', 'pgreconciliation',
-  'recon', 'recovery', 'report', 'tax', 'idempotency', 'integrity',
+  'recon', 'recovery', 'report', 'tax', 'idempotency', 'integrity', 'closing',
   'common',
 ]);
 
