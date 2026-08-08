@@ -1,6 +1,8 @@
 # ADR 0032 — 수수료율 유효기간 정책 (effective-dated rate + scope 우선순위)
 
-- 상태: **Accepted** (2026-08-07 결정 확정 — 구현 착수)
+- 상태: **Accepted (착지 완료)** — 2026-08-07 결정 확정, 2026-08-08 체크리스트 전 항목 완료
+  - **무행동 착지**: `commission_rate_policies` 가 비어 있으면 등급 기본율 그대로라 도입 전과 금액이
+    완전히 같다. 정책을 넣기 전에는 어떤 정산도 달라지지 않는다.
 - 일자: 2026-08-06
 - 관련: ADR 0014(등급별 요율 — 본 ADR 이 **확장**하는 대상), ADR 0004(DONE 정산 불변),
   ADR 0020(프로젝션 CQRS — CATEGORY scope 제약의 원인), ADR 0031(셀러 등급 라이프사이클),
@@ -198,10 +200,18 @@ GET    /admin/commission-rates/simulate?sellerId=&at=     # 해석 결과 + sour
 ## 구현 체크리스트
 
 - [x] `btree_gist` 가용성 확인 — `postgres:17-alpine` 에 1.7 번들(2026-08-07 실기동 확인). 운영도 같은 이미지 계열
-- [ ] Flyway `V{timestamp}__commission_rate_policy.sql` (+ `settlements.commission_rate_source`)
-- [ ] `resolve()` 순수 함수 단위 테스트 — 우선순위·경계일(`[from, to)`)·폴백·빈 테이블
-- [ ] EXCLUDE 제약 통합 테스트 — 중첩 INSERT 가 **DB 레벨에서** 거부되는지 (Testcontainers)
-- [ ] 회귀 테스트: 정책 테이블이 비면 기존 정산 금액과 **완전 동일**
-- [ ] 회귀 테스트: 정산 생성 후 정책 변경 → 기존 정산 불변 (ADR 0014 §4)
-- [ ] `fee-audit` 스킬에 `simulate` 교차검증 추가
-- [ ] `./gradlew :settlement-service:test :settlement-service:jacocoTestCoverageVerification` 통과
+- [x] Flyway `V20260807140000__commission_rate_policy.sql` (+ `settlements.commission_rate_source`)
+- [x] `resolve()` 순수 함수 단위 테스트 — 우선순위·경계일(`[from, to)`)·폴백·빈 테이블
+      (`CommissionRateResolutionTest`, 14건)
+- [x] EXCLUDE 제약 통합 테스트 — 중첩 INSERT 가 **DB 레벨에서** 거부되는지
+      (`CommissionRatePolicyConstraintIT`, Testcontainers 8건)
+- [x] 회귀 테스트: 정책 테이블이 비면 기존 정산 금액과 **완전 동일**
+      (`CreateSettlementFromPaymentServiceTest#noPolicy_keepsTierRate`)
+- [x] 회귀 테스트: 정산 생성 후 정책 변경 → 기존 정산 불변 (ADR 0014 §4) —
+      값 비교보다 **요율 정책을 다시 조회조차 하지 않음**을 검증한다(조회가 없으면 정책 변경이 과거 정산에
+      닿을 수 없다). 멱등 조기반환을 제거하면 실패함을 확인했다.
+- [x] 요율 결정 근거를 스킬에 반영 — `settlement-domain-rules` 의 스냅샷·검증도구 절에
+      `resolve()` 우선순위와 `/admin/commission-rates/simulate` 교차검증 절차를 넣었다
+      (기존 계획의 `fee-audit` 스킬은 존재하지 않아, 요율 규칙의 실제 소유 스킬로 옮겼다).
+- [x] `./gradlew :settlement-service:test :settlement-service:jacocoTestCoverageVerification` 통과
+      (2026-08-08: 225 클래스 · 1188 테스트 · 실패 0)
