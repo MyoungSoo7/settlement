@@ -334,4 +334,40 @@ class CreateSettlementFromPaymentServiceTest {
         // 수수료 = 100000 x 1.8% = 1800
         assertThat(s.getCommission()).isEqualByComparingTo("1800");
     }
+
+    @Test @DisplayName("정산 생성 후 요율 정책이 바뀌어도 기존 정산은 재계산되지 않는다 (ADR 0014 §4 비소급)")
+    void policyChangeAfterCreation_doesNotRecomputeExistingSettlement() {
+        // 1) 1.8% 정책 아래에서 정산이 만들어졌다.
+        when(loadSettlementPort.findByPaymentId(1L)).thenReturn(Optional.empty());
+        when(saveSettlementPort.save(any())).thenAnswer(inv -> {
+            Settlement saved = inv.getArgument(0);
+            if (saved.getId() == null) saved.assignId(500L);
+            return saved;
+        });
+        when(ratePolicyPort.findEffectiveCandidates(any(), any(), any())).thenReturn(java.util.List.of(
+                github.lms.lemuel.settlement.domain.CommissionRatePolicy.rehydrate(
+                        1L, github.lms.lemuel.settlement.domain.RateScope.SELLER, "77",
+                        new BigDecimal("0.01800"), java.time.LocalDate.now().minusDays(30), null)));
+
+        Settlement created = service.createSettlementFromPayment(1L, 10L, new BigDecimal("100000"),
+                77L, "VIP", null);
+
+        // 2) 이후 계약이 바뀌었다고 하자. 같은 결제가 재전달되면(이벤트 재처리·리플레이) 과거 정산은
+        //    저장된 스냅샷 그대로 반환돼야 한다.
+        when(loadSettlementPort.findByPaymentId(1L)).thenReturn(Optional.of(created));
+
+        Settlement again = service.createSettlementFromPayment(1L, 10L, new BigDecimal("100000"),
+                77L, "VIP", null);
+
+        assertThat(again.getCommissionRate()).isEqualByComparingTo("0.01800");
+        assertThat(again.getCommissionRateSource()).isEqualTo("SELLER:77");
+        assertThat(again.getCommission()).isEqualByComparingTo("1800");
+
+        // 핵심은 값이 같다는 것보다 <b>요율 정책을 다시 조회조차 하지 않는다</b>는 사실이다 — 조회가 없으면
+        // 정책이 어떻게 바뀌든 과거 정산에 닿을 수 없다. 요율 테이블을 매번 조인해 계산하는 설계였다면
+        // 이 검증이 깨지고, 그때 과거 정산 금액이 조용히 재해석된다(ADR 0014 §4 스냅샷 보존).
+        verify(ratePolicyPort, times(1)).findEffectiveCandidates(any(), any(), any());
+        // 저장도 1)의 1회뿐 — 재전달이 중복 정산을 만들지 않는다.
+        verify(saveSettlementPort, times(1)).save(any());
+    }
 }
