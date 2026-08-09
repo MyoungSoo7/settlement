@@ -5,10 +5,12 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import github.lms.lemuel.common.exception.GlobalExceptionHandler;
 import github.lms.lemuel.sellertier.application.port.in.EvaluateSellerTiersUseCase;
 import github.lms.lemuel.sellertier.application.port.in.EvaluateSellerTiersUseCase.TierEvaluationReport;
+import github.lms.lemuel.sellertier.application.port.in.CheckSellerTierIntegrityUseCase;
 import github.lms.lemuel.sellertier.application.port.in.OverrideSellerTierUseCase;
 import github.lms.lemuel.sellertier.domain.SellerTierGrade;
 import github.lms.lemuel.sellertier.domain.SellerTierPolicy;
 import github.lms.lemuel.sellertier.domain.TierAssignment;
+import github.lms.lemuel.sellertier.domain.TierCacheDrift;
 import github.lms.lemuel.sellertier.domain.exception.SellerTierPolicyException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -45,16 +47,19 @@ class AdminSellerTierControllerTest {
 
     private EvaluateSellerTiersUseCase evaluateUseCase;
     private OverrideSellerTierUseCase overrideUseCase;
+    private CheckSellerTierIntegrityUseCase integrityUseCase;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         evaluateUseCase = mock(EvaluateSellerTiersUseCase.class);
         overrideUseCase = mock(OverrideSellerTierUseCase.class);
+        integrityUseCase = mock(CheckSellerTierIntegrityUseCase.class);
         SellerTierPolicy policy = SellerTierPolicy.of(
                 new BigDecimal("500000000"), new BigDecimal("3000000000"));
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new AdminSellerTierController(evaluateUseCase, overrideUseCase, policy))
+                .standaloneSetup(new AdminSellerTierController(
+                        evaluateUseCase, overrideUseCase, integrityUseCase, policy))
                 // LocalDate 를 담은 응답·에러가 직렬화되어야 상태코드 검증이 의미를 갖는다.
                 // 날짜는 프로덕션(JacksonCompatConfig)과 같이 ISO-8601 문자열로 — 기본값인 숫자 배열로
                 // 두면 여기서만 통과하고 실제 응답 형태를 검증하지 못한다.
@@ -98,6 +103,36 @@ class AdminSellerTierControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.vipThreshold").value(500000000))
                 .andExpect(jsonPath("$.strategicThreshold").value(3000000000L));
+    }
+
+    @Test @DisplayName("integrity: 표본 상한 기본값으로 검사하고 종류별 집계를 낸다")
+    void integrity_defaultsSampleLimit() throws Exception {
+        when(integrityUseCase.check(anyInt())).thenReturn(
+                new CheckSellerTierIntegrityUseCase.TierIntegrityReport(
+                        3L, java.util.Map.of("CACHE_STALE", 2, "CACHE_MISSING", 1),
+                        List.of(TierCacheDrift.of(7L, "VIP", "NORMAL")), 0));
+
+        mockMvc.perform(get("/admin/seller-tiers/integrity"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.drifted").value(3))
+                .andExpect(jsonPath("$.byKind.CACHE_STALE").value(2))
+                .andExpect(jsonPath("$.samples[0].kind").value("CACHE_STALE"))
+                .andExpect(jsonPath("$.samples[0].authoritativeTier").value("VIP"));
+
+        verify(integrityUseCase).check(50);
+    }
+
+    @Test @DisplayName("integrity: 표본 상한을 지정하면 그대로 전달한다")
+    void integrity_passesSampleLimit() throws Exception {
+        when(integrityUseCase.check(anyInt())).thenReturn(
+                new CheckSellerTierIntegrityUseCase.TierIntegrityReport(
+                        0L, java.util.Map.of(), List.of(), 0));
+
+        mockMvc.perform(get("/admin/seller-tiers/integrity").param("sampleLimit", "5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.drifted").value(0));
+
+        verify(integrityUseCase).check(5);
     }
 
     @Test @DisplayName("override: 경로의 셀러와 본문의 등급·사유를 유스케이스에 넘긴다")

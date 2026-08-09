@@ -2,6 +2,7 @@ package github.lms.lemuel.sellertier.adapter.out.persistence;
 
 import github.lms.lemuel.sellertier.application.port.out.LoadSellerNetSalesPort;
 import github.lms.lemuel.sellertier.application.port.out.LoadTierAssignmentPort;
+import github.lms.lemuel.sellertier.application.port.out.LoadTierCacheDriftPort;
 import github.lms.lemuel.sellertier.application.port.out.SaveTierAssignmentPort;
 import github.lms.lemuel.sellertier.application.port.out.SaveTierHistoryPort;
 import github.lms.lemuel.sellertier.domain.SellerTierGrade;
@@ -25,7 +26,8 @@ import java.util.Optional;
  */
 @Repository
 public class SellerTierPersistenceAdapter
-        implements LoadSellerNetSalesPort, LoadTierAssignmentPort, SaveTierAssignmentPort, SaveTierHistoryPort {
+        implements LoadSellerNetSalesPort, LoadTierAssignmentPort, SaveTierAssignmentPort, SaveTierHistoryPort,
+        LoadTierCacheDriftPort {
 
     private final JdbcTemplate jdbc;
 
@@ -119,5 +121,39 @@ public class SellerTierPersistenceAdapter
                 e.prevTier() == null ? null : e.prevTier().name(),
                 e.newTier().name(), e.reason().name(), e.basisAmount(),
                 e.basisPeriodStart(), e.basisPeriodEnd(), e.changedBy(), e.memo());
+    }
+
+    /**
+     * 정본과 캐시가 어긋난 셀러.
+     *
+     * <p>{@code IS DISTINCT FROM} 을 쓰는 이유: {@code <>} 는 한쪽이 NULL 이면 NULL(=거짓 취급)이라
+     * "정본은 있는데 캐시가 빈" 가장 흔한 드리프트가 통째로 빠진다. 그러면 검사가 0건을 보고하면서
+     * 정작 잡아야 할 것을 놓친다.
+     *
+     * <p>FULL OUTER JOIN 은 캐시만 있고 정본이 없는 행(정본 도입 전 수기 UPDATE 흔적)까지 잡기 위한 것이다.
+     */
+    private static final String DRIFT_FROM = """
+              FROM opslab.seller_tier_assignment a
+              FULL OUTER JOIN opslab.users u ON u.id = a.seller_id
+             WHERE a.tier IS DISTINCT FROM u.seller_tier
+               AND (a.seller_id IS NOT NULL OR u.seller_tier IS NOT NULL)
+            """;
+
+    @Override
+    public List<RawDrift> findDrifts(int limit) {
+        return jdbc.query("""
+                SELECT COALESCE(a.seller_id, u.id) AS seller_id,
+                       a.tier         AS authoritative_tier,
+                       u.seller_tier  AS cached_tier
+                """ + DRIFT_FROM + " ORDER BY 1 LIMIT ?",
+                (rs, i) -> new RawDrift(rs.getLong("seller_id"),
+                        rs.getString("authoritative_tier"), rs.getString("cached_tier")),
+                limit);
+    }
+
+    @Override
+    public long countDrifts() {
+        Long count = jdbc.queryForObject("SELECT COUNT(*) " + DRIFT_FROM, Long.class);
+        return count == null ? 0L : count;
     }
 }

@@ -5,8 +5,8 @@
     사실상 아무도 승급하지 못하는 크기다 — 승인 전에는 등급이 바뀌지 않는다(무행동 착지).
   - 결정 ①(임계 거래액)·②(유예 수치)가 확정되면 **설정만 바꾸면 된다**. 코드 변경·배포 불필요.
   - 판단 근거는 `scripts/sim/tier_threshold_simulation.sql` 로 뽑는다.
-  - 이벤트(`lemuel.seller.tier_changed`)와 관리자 지정 API 까지 착지 완료 — 남은 것은 수치 결정과
-    정합성 스위트 1건, settlement 측 등급 초기 백필뿐이다(아래 체크리스트).
+  - 이벤트(`lemuel.seller.tier_changed`)·관리자 지정 API·캐시 정합 검사·프로젝션 백필까지 착지 완료.
+    **남은 것은 임계·유예 수치 결정 하나뿐이다**(아래 체크리스트).
 - 일자: 2026-08-06
 - 관련: ADR 0014(등급별 T+N 정산 주기 — 등급을 **소비**하는 쪽), ADR 0015(등급별 홀드백),
   ADR 0020(order↔settlement DB 분리), ADR 0024(이벤트 계약-as-code), ADR 0032(수수료율 유효기간 정책),
@@ -236,9 +236,15 @@ CREATE INDEX idx_sth_seller ON opslab.seller_tier_history (seller_id, changed_at
 - [x] 관리자 지정 API — `POST /admin/seller-tiers/{sellerId}/override`(사유 필수, 유예 재설정)
 - [x] ShedLock 이름 유일성 게이트 테스트 (`scripts/harness/test/scheduler-lock-gate.test.mjs`)
 - [x] dryRun 응답 계약 테스트 (`AdminSellerTierControllerTest`)
-- [ ] `users.seller_tier` 캐시 정합 검사(정합성 스위트 1건 추가)
-- [ ] settlement 측 등급 컬럼 초기 백필 — 통지가 오기 전까지 NULL 로 남는다(조회 전용이라 무해하나,
-      리포트를 켜기 전에는 채워야 한다)
+- [x] `users.seller_tier` 캐시 정합 검사 — `GET /admin/seller-tiers/integrity`(읽기 전용).
+      **settlement 의 `/admin/integrity` 가 아니라 order 에 두었다**: 정본·캐시가 둘 다 order DB(opslab)에
+      있어 settlement 가 조회하면 cross-DB 가 되고 ADR 0020 경계를 깬다.
+      드리프트를 종류로 분류한다(`CACHE_STALE`/`CACHE_MISSING`/`AUTHORITY_MISSING`) — 복구 절차가
+      다르기 때문. 고치지는 않는다: `AUTHORITY_MISSING` 은 "무엇이 옳은 등급인가"를 사람이 정해야 하고,
+      일괄 덮어쓰기를 넣으면 그 판단 없이 돈이 움직인다.
+- [x] settlement 측 등급 컬럼 초기 백필 — `POST /admin/settlement-projection/backfill` 이 등급 정본을
+      `BACKFILL` 사유로 재발행한다. 발효일은 정본 값을 그대로 싣는다(실행일로 덮으면 "언제부터 그
+      등급이었나"가 사라진다). 컨슈머 upsert + `processed_events` 로 여러 번 실행해도 안전.
 - [x] `./gradlew :order-service:test :order-service:jacocoTestCoverageVerification` (LINE 90%) 통과
 
 > **미결(운영 승인 대기)**: 임계 금액(VIP/STRATEGIC)과 유예 값(개월·연속 미달 횟수)은 재무 승인 사항이라

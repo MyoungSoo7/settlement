@@ -5,6 +5,8 @@ import github.lms.lemuel.sellertier.application.port.out.LoadTierAssignmentPort;
 import github.lms.lemuel.sellertier.application.port.out.SaveTierAssignmentPort;
 import github.lms.lemuel.sellertier.application.port.out.PublishSellerTierEventPort;
 import github.lms.lemuel.sellertier.application.port.out.SaveTierHistoryPort;
+import github.lms.lemuel.sellertier.application.port.out.LoadTierCacheDriftPort;
+import github.lms.lemuel.sellertier.application.service.CheckSellerTierIntegrityService;
 import github.lms.lemuel.sellertier.application.service.EvaluateSellerTiersService;
 import github.lms.lemuel.sellertier.application.service.OverrideSellerTierService;
 import github.lms.lemuel.sellertier.application.service.SellerTierChangeProcessor;
@@ -44,6 +46,11 @@ public class SellerTierConfig {
             SellerTierPolicy policy,
             @Value("${app.seller-tier.miss-threshold:2}") int missThreshold) {
         return new EvaluateSellerTiersService(netSalesPort, loadPort, processor, policy, missThreshold);
+    }
+
+    @Bean
+    public CheckSellerTierIntegrityService checkSellerTierIntegrityService(LoadTierCacheDriftPort driftPort) {
+        return new CheckSellerTierIntegrityService(driftPort);
     }
 
     /**
