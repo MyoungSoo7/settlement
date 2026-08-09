@@ -68,6 +68,21 @@ public class SellerTierPersistenceAdapter
     }
 
     @Override
+    public List<TierAssignment> findAll() {
+        return jdbc.query("""
+                SELECT seller_id, tier, effective_from, demotion_guard_until, consecutive_miss_count
+                  FROM opslab.seller_tier_assignment
+                 ORDER BY seller_id
+                """,
+                (rs, i) -> TierAssignment.rehydrate(
+                        rs.getLong("seller_id"),
+                        SellerTierGrade.valueOf(rs.getString("tier")),
+                        rs.getObject("effective_from", LocalDate.class),
+                        rs.getObject("demotion_guard_until", LocalDate.class),
+                        rs.getInt("consecutive_miss_count")));
+    }
+
+    @Override
     @Transactional
     public TierAssignment save(TierAssignment a) {
         jdbc.update("""

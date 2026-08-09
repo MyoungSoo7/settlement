@@ -10,6 +10,10 @@ import github.lms.lemuel.payment.domain.PaymentDomain;
 import github.lms.lemuel.product.application.port.out.LoadProductPort;
 import github.lms.lemuel.product.application.port.out.PublishProductEventPort;
 import github.lms.lemuel.product.domain.Product;
+import github.lms.lemuel.sellertier.application.port.out.LoadTierAssignmentPort;
+import github.lms.lemuel.sellertier.application.port.out.PublishSellerTierEventPort;
+import github.lms.lemuel.sellertier.domain.TierAssignment;
+import github.lms.lemuel.sellertier.domain.TierChangeReason;
 import github.lms.lemuel.user.application.port.out.LoadUserPort;
 import github.lms.lemuel.user.application.port.out.PublishUserEventPort;
 import github.lms.lemuel.user.domain.User;
@@ -33,11 +37,13 @@ public class SettlementProjectionBackfillService implements BackfillSettlementPr
     private final LoadProductPort loadProductPort;
     private final LoadOrderPort loadOrderPort;
     private final LoadPaymentPort loadPaymentPort;
+    private final LoadTierAssignmentPort loadTierAssignmentPort;
 
     private final PublishUserEventPort publishUserEventPort;
     private final PublishProductEventPort publishProductEventPort;
     private final PublishOrderEventPort publishOrderEventPort;
     private final PublishEventPort publishEventPort;
+    private final PublishSellerTierEventPort publishSellerTierEventPort;
     private final LoadSellerSettlementMetaPort loadSellerSettlementMetaPort;
 
     @Override
@@ -72,8 +78,20 @@ public class SettlementProjectionBackfillService implements BackfillSettlementPr
             payments++;
         }
 
-        log.info("settlement 프로젝션 백필 발행 완료: users={}, products={}, orders={}, payments={}",
+        log.info("settlement 프로젝션 백필 발행(등급 제외): users={}, products={}, orders={}, payments={}",
                 users, products, orders, payments);
-        return new BackfillResult(users, products, orders, payments);
+        // 등급 통지는 "변경 시점"에만 나간다(ADR 0031 §4). 등급 도입 이전부터 있던 셀러는 통지가 한 번도
+        // 오지 않아 소비측 뷰가 비어 있으므로, 확정된 등급을 그대로 재발행해 채운다. 발효일은 정본 값을
+        // 그대로 싣는다 — 백필 실행일로 덮으면 "언제부터 그 등급이었나"가 사라진다.
+        int sellerTiers = 0;
+        for (TierAssignment a : loadTierAssignmentPort.findAll()) {
+            publishSellerTierEventPort.publishTierChanged(
+                    a.getSellerId(), null, a.getTier(), TierChangeReason.BACKFILL,
+                    a.getEffectiveFrom(), null);
+            sellerTiers++;
+        }
+
+        log.info("settlement 프로젝션 백필 발행 완료: sellerTiers={}", sellerTiers);
+        return new BackfillResult(users, products, orders, payments, sellerTiers);
     }
 }

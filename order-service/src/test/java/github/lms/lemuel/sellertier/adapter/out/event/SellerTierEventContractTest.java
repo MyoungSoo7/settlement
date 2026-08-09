@@ -78,6 +78,14 @@ class SellerTierEventContractTest {
         assertThat(savedPayload()).contains("612500000.55");
     }
 
+    @Test @DisplayName("백필 재발행(BACKFILL)도 계약을 만족한다")
+    void backfill_satisfiesContract() {
+        publisher.publishTierChanged(777L, null, SellerTierGrade.VIP,
+                TierChangeReason.BACKFILL, LocalDate.of(2026, 3, 1), null);
+
+        EventContractValidator.assertValid("lemuel.seller.tier_changed", savedPayload());
+    }
+
     @Test @DisplayName("Outbox 를 경유한다 — 등급 변경과 통지가 한 커밋으로 묶인다")
     void writesThroughOutbox() {
         publisher.publishTierChanged(777L, SellerTierGrade.NORMAL, SellerTierGrade.VIP,
