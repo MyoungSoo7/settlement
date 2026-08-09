@@ -261,6 +261,33 @@ export function parseDockerfileModules(dockerfile) {
   return [...deps].filter((module) => sources.has(module));
 }
 
+/**
+ * ci.yml 이 서비스를 아는 방법은 둘 다 필요하다 — paths-filter 는 "무엇이 바뀌었나",
+ * image 매핑은 "무엇을 빌드·푸시하나". 매핑에 없으면 테스트는 돌아도 이미지가 안 만들어진다.
+ */
+export function parseCiMatrixModules(yaml) {
+  const text = String(yaml);
+  const filters = [...text.matchAll(/^\s{8,}([a-z][\w-]*-service):\s*\[/gm)].map((m) => m[1]);
+  const mapped = [...text.matchAll(/^\s*"([a-z][\w-]*-service)"\s*:\s*"/gm)].map((m) => m[1]);
+  // 양쪽 모두에 있어야 배선된 것으로 본다(한쪽만 있으면 절반만 도는 상태다).
+  return filters.filter((module) => mapped.includes(module));
+}
+
+/** compose 최상위 services 키만 본다(들여쓰기 2칸) — 중첩 블록의 키에 오탐하지 않게. */
+export function parseComposeServices(yaml) {
+  const text = String(yaml);
+  const start = text.search(/^services:\s*$/m);
+  if (start < 0) return [];
+  const body = text.slice(start).split('\n').slice(1);
+  const names = [];
+  for (const line of body) {
+    if (/^\S/.test(line)) break;            // 다음 최상위 키(volumes: 등)에서 멈춘다
+    const match = line.match(/^ {2}([a-z][\w-]*):\s*$/);
+    if (match) names.push(match[1]);
+  }
+  return names;
+}
+
 export function parseGatewayRouteIds(yaml) {
   return [...String(yaml).matchAll(/^\s*-\s*id:\s*(\S+)/gm)].map((m) => m[1]);
 }
@@ -282,6 +309,28 @@ function validateServiceWiring(read, tracked, trackedSet, errors) {
     for (const module of modules) {
       if (!copied.has(module)) {
         errors.push(`service wiring: Dockerfile COPY 누락: ${module} (settings 평가가 실패해 전체 이미지 빌드가 깨진다)`);
+      }
+    }
+  }
+
+  // 배포 파이프라인 간선 — Dockerfile·gateway 가 맞아도 여기서 빠지면 이미지가 영원히 안 만들어지고
+  // (CI 매트릭스) 로컬에서 뜨지도 않는다(compose). 둘 다 컴파일도 테스트도 잡아주지 않는다.
+  const ciYml = '.github/workflows/ci.yml';
+  if (trackedSet.has(ciYml)) {
+    const wired = new Set(parseCiMatrixModules(read(ciYml)));
+    for (const module of modules) {
+      if (!wired.has(module)) {
+        errors.push(`service wiring: CI 매트릭스 누락: ${module} (테스트는 전체 build 로 돌지만 이미지가 빌드·푸시되지 않는다)`);
+      }
+    }
+  }
+
+  const composeYml = 'docker-compose.yml';
+  if (trackedSet.has(composeYml)) {
+    const services = new Set(parseComposeServices(read(composeYml)));
+    for (const module of modules) {
+      if (!services.has(module)) {
+        errors.push(`service wiring: docker-compose 누락: ${module} (로컬·통합 기동 대상이 아니라 배선 오류가 실행 전까지 안 드러난다)`);
       }
     }
   }

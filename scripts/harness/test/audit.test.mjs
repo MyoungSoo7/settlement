@@ -562,6 +562,33 @@ test('collectAudit reports missing module and package wiring', () => {
   assert.doesNotMatch(errors.join('\n'), /lemuel\.web/);
 });
 
+// 서비스 → 배포 파이프라인 간선. Dockerfile·gateway 가 배선돼 있어도 CI 매트릭스와 compose 에서
+// 빠지면 "테스트는 도는데 이미지가 영원히 안 만들어지고 로컬에서 뜨지도 않는" 상태가 된다
+// (실사고: deposit-service 가 머지된 뒤 두 곳 모두에서 누락돼 배포 산출물이 없었다).
+test('collectAudit reports modules missing from the CI matrix and docker-compose', () => {
+  const files = {
+    'manifest.json': JSON.stringify(baseManifest(['manifest.json'])),
+    'settings.gradle.kts': 'include(\n  "order-service",\n  "card-service",\n  "gateway-service",\n)',
+    'Dockerfile': 'COPY order-service/build.gradle.kts ./order-service/\nCOPY order-service ./order-service\n'
+      + 'COPY card-service/build.gradle.kts ./card-service/\nCOPY card-service ./card-service\n'
+      + 'COPY gateway-service/build.gradle.kts ./gateway-service/\nCOPY gateway-service ./gateway-service\n',
+    'gateway-service/src/main/resources/application.yml':
+      'routes:\n  - id: order-service-orders\n    uri: x\n  - id: card-service\n    uri: y\n',
+    '.github/workflows/ci.yml':
+      '            order-service: [\'order-service/**\']\n'
+      + '            gateway-service: [\'gateway-service/**\']\n'
+      + '            mapping=\'{\n              "order-service":"",\n              "gateway-service":"-gateway"\n            }\'\n',
+    'docker-compose.yml': 'services:\n  order-service:\n    image: x\n  gateway-service:\n    image: y\n',
+  };
+  const errors = collectAudit(repo(files), baseManifest(['manifest.json'])).errors.filter((e) => e.startsWith('service wiring'));
+
+  assert.match(errors.join('\n'), /CI 매트릭스 누락: card-service/);
+  assert.match(errors.join('\n'), /docker-compose 누락: card-service/);
+  // 배선된 모듈은 조용하다 — 오탐이 나면 규칙이 무시당한다.
+  assert.doesNotMatch(errors.join('\n'), /누락: order-service/);
+  assert.doesNotMatch(errors.join('\n'), /누락: gateway-service/);
+});
+
 test('collectAudit accepts fully wired modules', () => {
   const files = {
     'manifest.json': JSON.stringify(baseManifest(['manifest.json'])),

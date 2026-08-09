@@ -339,6 +339,28 @@ services:
       timeout: 3s
       retries: 10
 
+  # ★ DB-per-service: deposit-service 전용 PostgreSQL (셀러 예치금 원장 — 잔고 단일 진실원)
+  deposit-postgres:
+    image: postgres:17-alpine
+    container_name: lemuel-deposit-db
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      POSTGRES_DB: lemuel_deposit
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "127.0.0.1:5449:5432"
+    volumes:
+      - deposit-postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
   # ★ DB-per-service: card-service 전용 PostgreSQL (셀러 법인카드·임직원 카드 한도 관리)
   card-postgres:
     image: postgres:17-alpine
@@ -1182,6 +1204,50 @@ services:
       redpanda:
         condition: service_healthy
 
+  deposit-service:
+    build:
+      context: .
+      args:
+        MODULE: deposit-service
+    image: ghcr.io/myoungsoo7/lemuel-deposit:latest
+    container_name: lemuel-deposit
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      # 자체 DB(lemuel_deposit) — 셀러 예치금 원장. 잔고의 단일 진실원이라 다른 서비스가 직접 읽지 않는다.
+      SPRING_DATASOURCE_URL: jdbc:postgresql://deposit-postgres:5432/lemuel_deposit?reWriteBatchedInserts=true
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      APP_KAFKA_ENABLED: "true"
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
+      JWT_ISSUER: ${JWT_ISSUER}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_TTL_SECONDS: ${JWT_TTL_SECONDS}
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
+      SERVER_PORT: 8080
+      MANAGEMENT_SERVER_PORT: 8080
+    ports:
+      # 호스트 8112 — 8108/8109 는 insurance 가 쓴다(application.yml 주석 참조).
+      - "127.0.0.1:8112:8080"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://localhost:8080/actuator/health || exit 1",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    depends_on:
+      deposit-postgres:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+
   gateway-service:
     build:
       context: .
@@ -1209,6 +1275,7 @@ services:
       ORGANIZATION_SERVICE_URI: http://organization-service:8080
       CARD_SERVICE_URI: http://card-service:8080
       INSURANCE_SERVICE_URI: http://insurance-service:8080
+      DEPOSIT_SERVICE_URI: http://deposit-service:8080
       MARKET_STREAM_SERVICE_URI: http://market-stream-service:8110
       JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
     ports:
@@ -1369,6 +1436,7 @@ volumes:
   organization-postgres-data:
   card-postgres-data:
   insurance-postgres-data:
+  deposit-postgres-data:
   ai-postgres-data:
   elasticsearch-data:
   redpanda-data:

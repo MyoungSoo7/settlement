@@ -58,7 +58,8 @@ jobs:
             backend:
               - '**'
               - '!frontend/**'
-            # shared: 전 서비스 이미지에 영향 → 변경 시 15개 전부 재빌드
+            # shared: 전 서비스 이미지에 영향 → 변경 시 17개 전부 재빌드
+            # (건수 정본은 settings.gradle.kts — harness-audit 의 ci-matrix 규칙이 대조한다)
             shared:
               - 'shared-common/**'
               - 'build.gradle.kts'
@@ -85,6 +86,7 @@ jobs:
             organization-service: ['organization-service/**']
             card-service: ['card-service/**']
             insurance-service: ['insurance-service/**']
+            deposit-service: ['deposit-service/**']
 
       - name: Compute image build matrix (changed services only)
         id: setmatrix
@@ -109,7 +111,8 @@ jobs:
             "investment-service":"-investment",
             "organization-service":"-organization",
             "card-service":"-card",
-            "insurance-service":"-insurance"
+            "insurance-service":"-insurance",
+            "deposit-service":"-deposit"
           }'
           if echo "$CHANGED" | jq -e 'index("shared")' >/dev/null; then
             # 공용 변경 → 전 서비스 재빌드
@@ -311,7 +314,8 @@ jobs:
     #   organization-service → ghcr.io/myoungsoo7/settlement-organization
     #   card-service         → ghcr.io/myoungsoo7/settlement-card
     #   insurance-service    → ghcr.io/myoungsoo7/settlement-insurance
-    # shared-common·루트 빌드파일·Dockerfile·ci.yml 변경 시엔 changes 잡이 15개 전부 매트릭스에 담는다.
+    #   deposit-service      → ghcr.io/myoungsoo7/settlement-deposit
+    # shared-common·루트 빌드파일·Dockerfile·ci.yml 변경 시엔 changes 잡이 17개 전부 매트릭스에 담는다.
     strategy:
       fail-fast: false # 한 서비스 빌드 실패가 다른 서비스 이미지 푸시를 취소하지 않도록
       matrix: ${{ fromJSON(needs.changes.outputs.build_matrix) }}
