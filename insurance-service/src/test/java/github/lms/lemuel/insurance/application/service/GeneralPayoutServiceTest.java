@@ -13,6 +13,7 @@ import github.lms.lemuel.insurance.domain.GeneralPayoutType;
 import github.lms.lemuel.insurance.domain.Policy;
 import github.lms.lemuel.insurance.domain.PolicyStatus;
 import github.lms.lemuel.insurance.domain.exception.PolicyNotFoundException;
+import github.lms.lemuel.insurance.domain.exception.PolicyOwnershipException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -105,7 +106,7 @@ class GeneralPayoutServiceTest {
         when(loadPolicyPort.findByPolicyNumber(POLICY_NUMBER)).thenReturn(Optional.of(policy));
         when(loadPayoutPort.findByPolicyId(POLICY_ID)).thenReturn(List.of(requested("2220000.00")));
 
-        List<GeneralPayoutSummary> summaries = service().byPolicyNumber(POLICY_NUMBER);
+        List<GeneralPayoutSummary> summaries = service().byPolicyNumber(POLICY_NUMBER, "fc-100");
 
         assertThat(summaries).hasSize(1);
         GeneralPayoutSummary summary = summaries.get(0);
@@ -121,7 +122,26 @@ class GeneralPayoutServiceTest {
     void listUnknownPolicy() {
         when(loadPolicyPort.findByPolicyNumber(POLICY_NUMBER)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service().byPolicyNumber(POLICY_NUMBER))
+        assertThatThrownBy(() -> service().byPolicyNumber(POLICY_NUMBER, "fc-100"))
                 .isInstanceOf(PolicyNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("조회: 담당 FC 가 아니면 403 — 지급액·기납입보험료가 새 나가지 않는다")
+    void listByNonOwnerIsForbidden() {
+        Policy policy = Policy.builder()
+                .id(1L)
+                .policyId(POLICY_ID)
+                .policyNumber(POLICY_NUMBER)
+                .status(PolicyStatus.SURRENDERED)
+                .effectiveDate(LocalDate.of(2020, 1, 1))
+                .premiumAmount(new BigDecimal("1200000.00"))
+                .fcId("fc-100")
+                .build();
+        when(loadPolicyPort.findByPolicyNumber(POLICY_NUMBER)).thenReturn(Optional.of(policy));
+
+        assertThatThrownBy(() -> service().byPolicyNumber(POLICY_NUMBER, "fc-999"))
+                .isInstanceOf(PolicyOwnershipException.class);
+        verify(loadPayoutPort, never()).findByPolicyId(any());
     }
 }

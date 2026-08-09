@@ -383,6 +383,11 @@ settlement `sellerId = userId` 와 동형). 요청 DTO 에 `fcId` 필드 자체�
 | ---------------------------------------------------- | ------------------------------------------------------------------ |
 | POST `/api/insurance/policies/{policyNumber}/surrender` | 임의해지 — D7 전이 4 + 해약환급금 산출·payout 생성 (409/403/404) |
 | POST `/api/insurance/policies/{policyNumber}/cancel`    | 청약철회 — D7 전이 6·7(15일 창구) + 기납입 전액 payout (409)     |
-| GET `/api/insurance/policies/{policyNumber}/payouts`    | 일반지급 내역 조회 (산출근거 포함)                               |
+| GET `/api/insurance/policies/{policyNumber}/payouts`    | 일반지급 내역 조회 (산출근거 포함, 본인 담당 계약만)             |
 
-⚠️ §13 과 동일 한계: fcId 는 JWT 주체가 아니라 요청 입력 — 해지/철회의 fcId 대조는 실수 방지 수준.
+**IDOR**: 세 경로 모두 FC 식별자를 요청이 아니라 JWT 주체에서만 파생한다(`FcIdentity` 단일
+초크포인트 — 가입설계 경로와 동일). 요청 DTO 에 fcId 필드가 없어 본문 바인딩 통로 자체가
+없고, 요청 본문은 아예 받지 않는다. 해지·철회는 계약을 끝내고 환급금을 발생시키는 돈 경로라
+본문 fcId 신뢰가 곧 타인 계약 해지로 이어진다. userId 없는 구(舊) 토큰은 403 —
+계약 존재 여부가 응답 차이로 새 나가지 않도록 소유권 실패와 동일 응답.
+(청약 접수·승인 경로의 본문 fcId 신뢰는 여전히 서비스 전역 미완 과제다.)

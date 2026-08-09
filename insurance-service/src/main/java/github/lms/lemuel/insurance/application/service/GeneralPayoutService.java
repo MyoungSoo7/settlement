@@ -9,6 +9,7 @@ import github.lms.lemuel.insurance.application.port.out.SaveGeneralPayoutPort;
 import github.lms.lemuel.insurance.domain.GeneralPayout;
 import github.lms.lemuel.insurance.domain.Policy;
 import github.lms.lemuel.insurance.domain.exception.PolicyNotFoundException;
+import github.lms.lemuel.insurance.domain.exception.PolicyOwnershipException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -63,9 +64,12 @@ public class GeneralPayoutService implements PayRequestedGeneralPayoutsUseCase, 
     }
 
     @Override
-    public List<GeneralPayoutSummary> byPolicyNumber(String policyNumber) {
+    public List<GeneralPayoutSummary> byPolicyNumber(String policyNumber, String requesterFcId) {
         Policy policy = loadPolicyPort.findByPolicyNumber(policyNumber)
                 .orElseThrow(() -> new PolicyNotFoundException(policyNumber));
+        if (!policy.getFcId().equals(requesterFcId)) {
+            throw new PolicyOwnershipException(policyNumber, requesterFcId);
+        }
         return loadPayoutPort.findByPolicyId(policy.getPolicyId()).stream()
                 .map(GeneralPayoutSummary::from)
                 .toList();

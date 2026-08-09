@@ -16,7 +16,10 @@ public interface CancelPolicyUseCase {
      */
     PolicyTerminationResult cancel(CancelPolicyCommand command);
 
-    /** @param fcId 담당 FC 대조용 — §13 과 동일 한계(요청 입력, 실수 방지 수준) */
+    /**
+     * @param fcId 담당 FC 대조용 — 어댑터가 JWT 주체에서 파생한 값만 넘긴다(IDOR 차단).
+     *             요청 본문에서 온 값을 넣지 말 것.
+     */
     record CancelPolicyCommand(String policyNumber, String fcId) {
     }
 }
