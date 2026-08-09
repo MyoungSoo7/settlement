@@ -46,9 +46,9 @@ class EventContractMoneyTypeTest {
                 if (!isMoney(field.getKey())) {
                     continue;
                 }
-                String type = field.getValue().path("type").asText("");
-                if (!"string".equals(type)) {
-                    violations.add(schema.getFileName() + " → " + field.getKey() + ": \"" + type + "\"");
+                JsonNode type = field.getValue().path("type");
+                if (!isStringMoney(type)) {
+                    violations.add(schema.getFileName() + " → " + field.getKey() + ": " + type);
                 }
             }
         }
@@ -96,11 +96,68 @@ class EventContractMoneyTypeTest {
         }
     }
 
+    /**
+     * nullable 허용이 N5 자체를 무르게 만들지 않는지 못 박는다 — 이 테스트가 없으면 위 완화가
+     * {@code ["string","number"]} 같은 유니온까지 조용히 통과시키는지 아무도 모른다.
+     */
+    @Test
+    @DisplayName("N5: nullable 은 허용하되 number 가 섞인 유니온은 여전히 위반")
+    void nullableIsAllowedButNumberUnionIsNot() {
+        ObjectMapper mapper = new ObjectMapper();
+        assertThat(isStringMoney(mapper.getNodeFactory().textNode("string"))).isTrue();
+        assertThat(isStringMoney(typeOf(mapper, "string", "null"))).isTrue();
+        assertThat(isStringMoney(typeOf(mapper, "null", "string"))).isTrue();
+
+        assertThat(isStringMoney(mapper.getNodeFactory().textNode("number"))).isFalse();
+        assertThat(isStringMoney(typeOf(mapper, "string", "number"))).isFalse();
+        assertThat(isStringMoney(typeOf(mapper, "null"))).isFalse();
+        assertThat(isStringMoney(mapper.createArrayNode())).isFalse();
+        assertThat(isStringMoney(mapper.missingNode())).isFalse();
+    }
+
+    private static JsonNode typeOf(ObjectMapper mapper, String... names) {
+        var array = mapper.createArrayNode();
+        for (String name : names) {
+            array.add(name);
+        }
+        return array;
+    }
+
     @Test
     @DisplayName("스캔 대상이 실제로 존재한다(빈 검사로 통과하는 vacuous pass 방지)")
     void scanIsNotVacuous() throws IOException {
         assertThat(schemaFiles()).hasSizeGreaterThan(10);
         assertThat(sampleFiles()).hasSizeGreaterThan(10);
+    }
+
+    /**
+     * 금액 필드의 {@code type} 이 N5 를 지키는가 — {@code "string"} 이거나, {@code ["string","null"]}
+     * 처럼 <b>string 을 포함하면서 나머지가 null 뿐</b>인 유니온이면 통과다.
+     *
+     * <p>N5 가 막으려는 것은 {@code number} 다(부동소수 정밀도 손실). "값이 없을 수 있음"은 정밀도와
+     * 무관하므로 nullable 금액까지 위반으로 몰면 계약이 거짓을 말하도록 강요된다 — 실제로
+     * {@code lemuel.seller.tier_changed} 의 {@code basisAmount}(관리자 지정 시 null)가 그 경우다.
+     *
+     * <p>이전 구현은 {@code path("type").asText("")} 라 배열 노드에서 빈 문자열이 나왔고, 그래서
+     * nullable 금액이 등장한 순간 오탐으로 develop 이 붉어졌다(2026-08-08).
+     */
+    private static boolean isStringMoney(JsonNode type) {
+        if (type.isTextual()) {
+            return "string".equals(type.asText());
+        }
+        if (!type.isArray() || type.isEmpty()) {
+            return false;
+        }
+        boolean hasString = false;
+        for (JsonNode member : type) {
+            String name = member.asText("");
+            if ("string".equals(name)) {
+                hasString = true;
+            } else if (!"null".equals(name)) {
+                return false;
+            }
+        }
+        return hasString;
     }
 
     private static boolean isMoney(String field) {
