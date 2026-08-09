@@ -329,16 +329,26 @@ V9 premium_rate_tables + proposal_quotes (가입설계) → V10 general_payouts 
 **도메인**: `PremiumRater`(보험나이 = 만 나이 + 6개월 이상 경과 시 +1; 연 보험료 = 보장 ÷ 1,000 ×
 요율, 원 단위 HALF_UP, 0원 설계 거부) · `ProposalQuote` 상태머신 `QUOTED → CONVERTED | EXPIRED`
 (2개 전이만, 그 외 `InvalidProposalTransitionException`; 만료 전환은 `ProposalExpiredException` 409).
-유효기간 30일(`VALIDITY_DAYS`). 전환은 설계의 fcId 와 요청 fcId 대조(`ProposalOwnershipException` 403).
-⚠️ 한계: insurance-service 는 fcId 를 JWT 주체가 아닌 요청 입력으로 받는 전역 관례라 이 대조는
-실수 방지 수준이다 — JWT 주체 파생 배선(조회 API 소유권 포함)은 서비스 전역 별도 과제.
+유효기간 30일(`VALIDITY_DAYS`).
+
+**소유권(IDOR 차단)**: FC 식별자는 요청 본문이 아니라 **JWT 주체에서만 파생**한다 —
+`FcIdentity.currentFcId()`(단일 초크포인트, 현재 규칙은 `userId` 를 FC 식별자로 사용 —
+settlement `sellerId = userId` 와 동형). 요청 DTO 에 `fcId` 필드 자체가 없어 본문에 실어도 바인딩되지
+않고, 산출·조회·설계서·전환 **4개 경로 전부** 작성자 본인만 접근한다(`ProposalOwnershipException` 403).
+`userId` 없는 구(舊) 토큰도 403 — 존재 여부가 새 나가지 않도록 소유권 실패와 같은 응답이다.
+⚠️ 남은 과제: 청약·계약 경로는 아직 본문 fcId 를 신뢰한다(서비스 전역 미완) — 같은 사람이라도
+경로에 따라 FC 식별자가 다를 수 있다. FC 레지스트리(organization 프로젝션 소비)가 생기면
+`FcIdentity` 한 곳만 바꾸면 된다.
 
 | API                                              | 하는 일                                                        |
 | ------------------------------------------------ | -------------------------------------------------------------- |
 | POST `/api/insurance/proposals`                  | 산출 — 요율 조회 + 보험료 계산 + 스냅샷 저장 (201)             |
-| GET `/api/insurance/proposals/{id}`              | 단건 조회 (산출 근거 포함)                                     |
+| GET `/api/insurance/proposals/{id}`              | 단건 조회 (산출 근거 포함) — 본인 설계만 403 대조              |
 | POST `/api/insurance/proposals/{id}/convert`     | 청약 전환 — 금액 없음(서버 주입), 만료 409, 타인 설계 403      |
-| GET `/api/insurance/proposals/{id}/sheet`        | 가입설계서 PDF (iText, adapter/out/pdf)                        |
+| GET `/api/insurance/proposals/{id}/sheet`        | 가입설계서 PDF (iText, adapter/out/pdf) — 본인 설계만          |
+
+요청 DTO 어디에도 `fcId` 가 없다는 점이 이 표의 핵심이다 — 위변조 방어를 검증 로직이 아니라
+**API 형태**로 닫았다(D-P3 금액 서버 주입과 같은 방식).
 
 ## 14. 일반지급 (V10 — 해약환급금·만기보험금·철회환급금)
 

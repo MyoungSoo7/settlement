@@ -241,7 +241,41 @@ class ProposalQuoteServiceTest {
         when(loadProductPort.findByCode("PROD-LIFE-01")).thenReturn(Optional.of(product));
         when(renderPdfPort.render(proposal, product)).thenReturn(new byte[]{1, 2, 3});
 
-        assertThat(service().render(PROPOSAL_ID)).containsExactly((byte) 1, (byte) 2, (byte) 3);
+        assertThat(service().render(PROPOSAL_ID, "fc-100"))
+                .containsExactly((byte) 1, (byte) 2, (byte) 3);
         verify(renderPdfPort).render(eq(proposal), eq(product));
+    }
+
+    @Test
+    @DisplayName("조회: 본인 설계는 산출 근거까지 돌려준다")
+    void getReturnsOwnProposal() {
+        when(loadProposalPort.findByProposalId(PROPOSAL_ID))
+                .thenReturn(Optional.of(quotedProposal(TODAY.plusDays(10))));
+
+        ProposalSummary summary = service().get(PROPOSAL_ID, "fc-100");
+
+        assertThat(summary.proposalId()).isEqualTo(PROPOSAL_ID);
+        assertThat(summary.annualPremium()).isEqualByComparingTo("250000");
+    }
+
+    @Test
+    @DisplayName("조회: 다른 설계사의 설계는 거부한다 (IDOR 차단)")
+    void getRejectsForeignProposal() {
+        when(loadProposalPort.findByProposalId(PROPOSAL_ID))
+                .thenReturn(Optional.of(quotedProposal(TODAY.plusDays(10))));
+
+        assertThatThrownBy(() -> service().get(PROPOSAL_ID, "fc-999"))
+                .isInstanceOf(ProposalOwnershipException.class);
+    }
+
+    @Test
+    @DisplayName("설계서 렌더링: 다른 설계사의 설계는 거부한다 — PDF 를 만들지 않는다")
+    void renderRejectsForeignProposal() {
+        when(loadProposalPort.findByProposalId(PROPOSAL_ID))
+                .thenReturn(Optional.of(quotedProposal(TODAY.plusDays(10))));
+
+        assertThatThrownBy(() -> service().render(PROPOSAL_ID, "fc-999"))
+                .isInstanceOf(ProposalOwnershipException.class);
+        verify(renderPdfPort, never()).render(any(), any());
     }
 }

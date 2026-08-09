@@ -65,21 +65,21 @@ public class ProposalController {
         this.renderUseCase = renderUseCase;
     }
 
-    /** 가입설계 산출 — 201 + 산출 스냅샷(적용 요율·보험료·유효기한). */
+    /** 가입설계 산출 — 201 + 산출 스냅샷(적용 요율·보험료·유효기한). 설계자는 JWT 주체. */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ProposalSummary create(@Valid @RequestBody CreateRequest request) {
         return createUseCase.create(new CreateProposalCommand(
-                request.consultationId(), request.productCode(), request.fcId(),
+                request.consultationId(), request.productCode(), requireFcId(),
                 request.insuredName(), request.insuredBirthDate(), request.insuredGender(),
                 request.coverageAmount(), request.paymentTermYears(),
                 request.salesChannel(), request.partnerBankCode()));
     }
 
-    /** 가입설계 단건 조회. */
+    /** 가입설계 단건 조회 — 본인 설계만(타인 403). */
     @GetMapping("/{proposalId}")
     public ProposalSummary get(@PathVariable String proposalId) {
-        return getUseCase.get(proposalId);
+        return getUseCase.get(proposalId, requireFcId());
     }
 
     /** 청약 전환 — 금액 파라미터 없음(서버 주입). 만기 409, 타인 설계 403. */
@@ -87,14 +87,14 @@ public class ProposalController {
     public ConversionResult convert(@PathVariable String proposalId,
                                     @Valid @RequestBody ConvertRequest request) {
         return convertUseCase.convert(new ConvertProposalCommand(
-                proposalId, request.fcId(), request.contractorName(),
+                proposalId, requireFcId(), request.contractorName(),
                 request.insuredRrn(), request.contractorPhone()));
     }
 
-    /** 가입설계서 PDF. */
+    /** 가입설계서 PDF — 본인 설계만(피보험자·보장금액이 실린다). */
     @GetMapping("/{proposalId}/sheet")
     public ResponseEntity<byte[]> sheet(@PathVariable String proposalId) {
-        byte[] pdf = renderUseCase.render(proposalId);
+        byte[] pdf = renderUseCase.render(proposalId, requireFcId());
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_PDF)
                 .header("Content-Disposition",
@@ -103,12 +103,27 @@ public class ProposalController {
     }
 
     /**
+     * 현재 요청자의 FC 식별자 — 요청 본문이 아니라 JWT 주체에서만 파생한다(IDOR 차단).
+     *
+     * @throws ProposalOwnershipException userId 가 없는 구(舊) 토큰 — 403 으로 매핑된다
+     *                                    (전역 핸들러의 500 폴백을 타지 않도록 도메인 예외로 통일)
+     */
+    private static String requireFcId() {
+        String fcId = FcIdentity.currentFcId();
+        if (fcId == null) {
+            throw ProposalOwnershipException.unidentifiedRequester();
+        }
+        return fcId;
+    }
+
+    /**
+     * 설계자(fcId) 필드는 의도적으로 없다 — JWT 주체에서만 파생한다(IDOR 차단).
+     *
      * @param insuredBirthDate 보험나이 산정에만 사용 — 저장하지 않는다(PII 최소화)
      * @param partnerBankCode  BANCA 설계 시 필수 (도메인이 강제)
      */
     public record CreateRequest(String consultationId,
                                 @NotBlank String productCode,
-                                @NotBlank String fcId,
                                 @NotBlank String insuredName,
                                 @NotNull @Past LocalDate insuredBirthDate,
                                 @NotNull Gender insuredGender,
@@ -119,11 +134,12 @@ public class ProposalController {
     }
 
     /**
+     * 요청자(fcId) 필드는 의도적으로 없다 — JWT 주체에서만 파생한다(IDOR 차단).
+     *
      * @param insuredRrn      선택 — 제공 시 PII 분리 테이블에 암호화 저장
      * @param contractorPhone 선택 — 제공 시 PII 분리 테이블에 암호화 저장
      */
-    public record ConvertRequest(@NotBlank String fcId,
-                                 @NotBlank String contractorName,
+    public record ConvertRequest(@NotBlank String contractorName,
                                  String insuredRrn,
                                  String contractorPhone) {
     }

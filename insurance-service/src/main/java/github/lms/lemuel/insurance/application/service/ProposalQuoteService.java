@@ -103,18 +103,14 @@ public class ProposalQuoteService implements CreateProposalUseCase, GetProposalU
     }
 
     @Override
-    public ProposalSummary get(String proposalId) {
-        return ProposalSummary.from(loadRequired(proposalId));
+    public ProposalSummary get(String proposalId, String requesterFcId) {
+        return ProposalSummary.from(loadOwned(proposalId, requesterFcId));
     }
 
     @Override
     public ConversionResult convert(ConvertProposalCommand cmd) {
-        ProposalQuote proposal = loadRequired(cmd.proposalId());
-
         // 소유권 대조 — 설계 작성자 본인만 전환할 수 있다 (IDOR 차단, 403)
-        if (!proposal.getFcId().equals(cmd.requesterFcId())) {
-            throw new ProposalOwnershipException(proposal.getProposalId());
-        }
+        ProposalQuote proposal = loadOwned(cmd.proposalId(), cmd.requesterFcId());
         requireActiveProduct(proposal.getProductCode());
 
         // D-P3: 보장금액·보험료는 설계 스냅샷의 산출값을 서버가 주입 — 요청 금액은 받지 않는다
@@ -153,8 +149,8 @@ public class ProposalQuoteService implements CreateProposalUseCase, GetProposalU
     }
 
     @Override
-    public byte[] render(String proposalId) {
-        ProposalQuote proposal = loadRequired(proposalId);
+    public byte[] render(String proposalId, String requesterFcId) {
+        ProposalQuote proposal = loadOwned(proposalId, requesterFcId);
         ProductSnapshot product = loadProductPort.findByCode(proposal.getProductCode())
                 .orElseThrow(() -> new ProductNotFoundException(proposal.getProductCode()));
         return renderPdfPort.render(proposal, product);
@@ -163,6 +159,20 @@ public class ProposalQuoteService implements CreateProposalUseCase, GetProposalU
     private ProposalQuote loadRequired(String proposalId) {
         return loadProposalPort.findByProposalId(proposalId)
                 .orElseThrow(() -> new ProposalNotFoundException(proposalId));
+    }
+
+    /**
+     * 설계 로드 + 소유권 대조 — 조회·설계서·전환의 공통 관문.
+     *
+     * <p>설계에는 피보험자 이름·보장금액·보험료가 실리므로 작성자 본인만 볼 수 있다.
+     * 요청자 식별자는 어댑터가 JWT 주체에서 파생해 넘긴다(요청 본문에서 오지 않는다).
+     */
+    private ProposalQuote loadOwned(String proposalId, String requesterFcId) {
+        ProposalQuote proposal = loadRequired(proposalId);
+        if (!proposal.getFcId().equals(requesterFcId)) {
+            throw new ProposalOwnershipException(proposal.getProposalId());
+        }
+        return proposal;
     }
 
     private void requireActiveProduct(String productCode) {
