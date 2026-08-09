@@ -56,7 +56,12 @@ public class OutboxBackedSellerTierEventPublisher implements PublishSellerTierEv
         payload.put("newTier", newTier.name());
         payload.put("reason", reason.name());
         payload.put("effectiveFrom", effectiveFrom.toString());
-        payload.put("basisAmount", basisAmount == null ? null : basisAmount.toPlainString());
+        // 근거 금액이 없으면(관리자 지정) null 을 싣지 않고 필드 자체를 생략한다 — 금액 필드는
+        // JSON string 만 허용이라(DATA-STANDARD N5) null 유니온을 두면 계약이 성립하지 않는다.
+        // required 가 아니므로 생략이 곧 "근거 없음"이고, 소비측은 이 필드를 읽지 않는다.
+        if (basisAmount != null) {
+            payload.put("basisAmount", basisAmount.toPlainString());
+        }
         payload.put("occurredAt", LocalDateTime.now().toString());
 
         String json;
