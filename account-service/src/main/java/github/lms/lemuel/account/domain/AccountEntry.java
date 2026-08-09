@@ -47,7 +47,22 @@ import java.time.LocalDateTime;
  * securedLoanRepaid           : DR CASH                       / CR SECURED_LOAN_RECEIVABLE (완제 — 계약 원금)
  * investmentExecuted          : DR INVESTMENT_ASSET           / CR CASH
  * withholdingAccrued          : DR SELLER_PAYABLE             / CR WITHHOLDING_PAYABLE         W(원천징수반제)   (WITHHOLDING_ACCRUED)
+ *
+ * -- 수신 상품(banking, owner=DEPOSITOR) — 이자는 만기·해지·수급 시 일괄 확정(주기 accrual 없음) --
+ * timeDepositOpened           : DR CASH                       / CR TIME_DEPOSIT_LIABILITY         원금        (TIME_DEPOSIT_OPENED)
+ * timeDepositInterestSettled  : DR INTEREST_EXPENSE           / CR TIME_DEPOSIT_LIABILITY         확정이자     (TIME_DEPOSIT_INTEREST)
+ * timeDepositClosed           : DR TIME_DEPOSIT_LIABILITY     / CR CASH                          원리금 지급   (TIME_DEPOSIT_CLOSED)
+ * savingsInstallmentPaid      : DR CASH                       / CR INSTALLMENT_SAVINGS_LIABILITY 회차 납입    (SAVINGS_INSTALLMENT_PAID)
+ * savingsInterestSettled      : DR INTEREST_EXPENSE           / CR INSTALLMENT_SAVINGS_LIABILITY 확정이자     (SAVINGS_INTEREST)
+ * savingsClosed               : DR INSTALLMENT_SAVINGS_LIABILITY / CR CASH                       원리금 지급   (SAVINGS_CLOSED)
+ * pensionContributionPaid     : DR CASH                       / CR RETIREMENT_PENSION_LIABILITY  부담금       (PENSION_CONTRIBUTION_PAID)
+ * pensionInterestSettled      : DR INTEREST_EXPENSE           / CR RETIREMENT_PENSION_LIABILITY  운용수익     (PENSION_INTEREST)
+ * pensionBenefitPaid          : DR RETIREMENT_PENSION_LIABILITY / CR CASH                        연금·일시금   (PENSION_BENEFIT_PAID)
+ * pensionMidWithdrawn         : DR RETIREMENT_PENSION_LIABILITY / CR CASH                        중도인출     (PENSION_MID_WITHDRAWN)
  * </pre>
+ *
+ * <p><b>수신 상품 균형</b>: 각 수신부채 계정은 (원금·납입 +) + (확정이자 +) − (지급 −) 로 움직여 완전 해지 시 0 으로 닫힌다.
+ * 이자를 별도 전표로 분리하므로 시산표에서 이자비용 누계와 부채 증가분이 서로 대응된다.
  *
  * <p><b>완전정산 균형 증명</b>: SELLER_PAYABLE = +I −(I−O−W) −O −W +Hr −Hr = 0, HOLDBACK_PAYABLE = +H −Hc −Hr = 0,
  * SELLER_RECOVERY_RECEIVABLE = +R −ΣO = 0, CASH 는 회수 종료 시 0 으로 닫힌다. (W 는 원천징수 발생 시에만
@@ -75,6 +90,11 @@ public class AccountEntry {
     public static final String TOPIC_INVESTMENT_EXECUTED = "lemuel.investment.executed";
     /** 백필 청산 분개의 합성 source_topic — 실제 Kafka 토픽이 아니라 자연키 구성용(멱등). */
     public static final String SOURCE_SCHEDULED_CLEARING = "lemuel.account.backfill";
+    /**
+     * 수신 상품(정기예금·적금·퇴직연금) 분개의 합성 source_topic — 실제 Kafka 토픽이 아니다.
+     * banking 서브도메인이 <b>인프로세스</b>로 전기하는 전표의 자연키 구성용이다(account 는 소비 전용이라 발행하지 않는다).
+     */
+    public static final String SOURCE_BANKING = "lemuel.account.banking";
 
     private final Long id;
     private final OwnerType ownerType;
@@ -340,6 +360,101 @@ public class AccountEntry {
         return of(OwnerType.SELLER, sellerId,
                 GlAccount.INVESTMENT_ASSET, GlAccount.CASH, amount,
                 "INVESTMENT_EXECUTED", orderId, TOPIC_INVESTMENT_EXECUTED);
+    }
+
+    // ── 수신 상품(banking 서브도메인, owner=DEPOSITOR) ──────────────────────────────────────────
+    // 이자는 주기 accrual 을 두지 않고 만기·해지·수급 시점에 일괄 확정한다(스케줄러 불필요).
+    // 원금 이동과 이자 인식은 절대 한 전표에 섞지 않는다 — 각각 별도 refType 자연키로 분리 전기한다.
+
+    /** 정기예금 개설(원금 입금) → DR CASH / CR TIME_DEPOSIT_LIABILITY. 자연키 refId=TD-{depositId} (계좌당 1회). */
+    public static AccountEntry timeDepositOpened(String depositorId, String depositId, BigDecimal principal) {
+        return of(OwnerType.DEPOSITOR, depositorId,
+                GlAccount.CASH, GlAccount.TIME_DEPOSIT_LIABILITY, principal,
+                "TIME_DEPOSIT_OPENED", "TD-" + depositId, SOURCE_BANKING);
+    }
+
+    /**
+     * 정기예금 이자 확정 → DR INTEREST_EXPENSE / CR TIME_DEPOSIT_LIABILITY.
+     * 만기 또는 중도해지 시 확정 이자(중도해지면 중도해지이율 적용분)를 부채에 가산한다. 계좌당 1회 멱등.
+     */
+    public static AccountEntry timeDepositInterestSettled(String depositorId, String depositId, BigDecimal interest) {
+        return of(OwnerType.DEPOSITOR, depositorId,
+                GlAccount.INTEREST_EXPENSE, GlAccount.TIME_DEPOSIT_LIABILITY, interest,
+                "TIME_DEPOSIT_INTEREST", "TD-" + depositId, SOURCE_BANKING);
+    }
+
+    /**
+     * 정기예금 해지 지급 → DR TIME_DEPOSIT_LIABILITY / CR CASH.
+     * 만기·중도해지 공통(원금+확정이자 전액 지급) — 지급으로 수신부채가 0 으로 닫힌다. 계좌당 1회 멱등.
+     */
+    public static AccountEntry timeDepositClosed(String depositorId, String depositId, BigDecimal payoutAmount) {
+        return of(OwnerType.DEPOSITOR, depositorId,
+                GlAccount.TIME_DEPOSIT_LIABILITY, GlAccount.CASH, payoutAmount,
+                "TIME_DEPOSIT_CLOSED", "TD-" + depositId, SOURCE_BANKING);
+    }
+
+    /**
+     * 적금 회차 납입 → DR CASH / CR INSTALLMENT_SAVINGS_LIABILITY.
+     * 자연키 refId=SV-{savingsId}-{round} — 회차 단위로 유일해야 재납입 요청이 멱등하게 흡수된다.
+     */
+    public static AccountEntry savingsInstallmentPaid(String depositorId, String savingsId,
+                                                      int round, BigDecimal amount) {
+        return of(OwnerType.DEPOSITOR, depositorId,
+                GlAccount.CASH, GlAccount.INSTALLMENT_SAVINGS_LIABILITY, amount,
+                "SAVINGS_INSTALLMENT_PAID", "SV-" + savingsId + "-" + round, SOURCE_BANKING);
+    }
+
+    /** 적금 이자 확정 → DR INTEREST_EXPENSE / CR INSTALLMENT_SAVINGS_LIABILITY. 계약당 1회 멱등. */
+    public static AccountEntry savingsInterestSettled(String depositorId, String savingsId, BigDecimal interest) {
+        return of(OwnerType.DEPOSITOR, depositorId,
+                GlAccount.INTEREST_EXPENSE, GlAccount.INSTALLMENT_SAVINGS_LIABILITY, interest,
+                "SAVINGS_INTEREST", "SV-" + savingsId, SOURCE_BANKING);
+    }
+
+    /** 적금 해지 지급(만기·중도 공통) → DR INSTALLMENT_SAVINGS_LIABILITY / CR CASH. 계약당 1회 멱등. */
+    public static AccountEntry savingsClosed(String depositorId, String savingsId, BigDecimal payoutAmount) {
+        return of(OwnerType.DEPOSITOR, depositorId,
+                GlAccount.INSTALLMENT_SAVINGS_LIABILITY, GlAccount.CASH, payoutAmount,
+                "SAVINGS_CLOSED", "SV-" + savingsId, SOURCE_BANKING);
+    }
+
+    /**
+     * 퇴직연금 부담금 납입 → DR CASH / CR RETIREMENT_PENSION_LIABILITY.
+     * DB·DC·IRP 공통(사용자·사업장 부담금 구분은 banking 서브원장 소관, GL 은 적립금 부채로만 집계).
+     * 자연키 refId=RP-{pensionId}-{seq} — 납입 건별 유일.
+     */
+    public static AccountEntry pensionContributionPaid(String subscriberId, String pensionId,
+                                                       long seq, BigDecimal amount) {
+        return of(OwnerType.DEPOSITOR, subscriberId,
+                GlAccount.CASH, GlAccount.RETIREMENT_PENSION_LIABILITY, amount,
+                "PENSION_CONTRIBUTION_PAID", "RP-" + pensionId + "-" + seq, SOURCE_BANKING);
+    }
+
+    /** 퇴직연금 운용수익(원리금보장 이자) 확정 → DR INTEREST_EXPENSE / CR RETIREMENT_PENSION_LIABILITY. */
+    public static AccountEntry pensionInterestSettled(String subscriberId, String pensionId,
+                                                      long seq, BigDecimal interest) {
+        return of(OwnerType.DEPOSITOR, subscriberId,
+                GlAccount.INTEREST_EXPENSE, GlAccount.RETIREMENT_PENSION_LIABILITY, interest,
+                "PENSION_INTEREST", "RP-" + pensionId + "-" + seq, SOURCE_BANKING);
+    }
+
+    /** 퇴직연금 수급 지급(연금·일시금 공통) → DR RETIREMENT_PENSION_LIABILITY / CR CASH. 지급 회차별 유일. */
+    public static AccountEntry pensionBenefitPaid(String subscriberId, String pensionId,
+                                                  long seq, BigDecimal amount) {
+        return of(OwnerType.DEPOSITOR, subscriberId,
+                GlAccount.RETIREMENT_PENSION_LIABILITY, GlAccount.CASH, amount,
+                "PENSION_BENEFIT_PAID", "RP-" + pensionId + "-" + seq, SOURCE_BANKING);
+    }
+
+    /**
+     * 퇴직연금 중도인출 → DR RETIREMENT_PENSION_LIABILITY / CR CASH.
+     * 법정 인출사유 검증은 banking 도메인(수급요건)에서 끝난 뒤 호출된다 — GL 은 금액 이동만 기표한다.
+     */
+    public static AccountEntry pensionMidWithdrawn(String subscriberId, String pensionId,
+                                                   long seq, BigDecimal amount) {
+        return of(OwnerType.DEPOSITOR, subscriberId,
+                GlAccount.RETIREMENT_PENSION_LIABILITY, GlAccount.CASH, amount,
+                "PENSION_MID_WITHDRAWN", "RP-" + pensionId + "-" + seq, SOURCE_BANKING);
     }
 
     /** 영속 상태에서 도메인으로 복원 (id·occurredAt 포함). */
