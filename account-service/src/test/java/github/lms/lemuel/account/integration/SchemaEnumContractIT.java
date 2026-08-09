@@ -97,7 +97,7 @@ class SchemaEnumContractIT {
     }
 
     @Test
-    @DisplayName("chk_account_entry_ref_type == AccountEntry 팩토리 21종의 refType (정확 일치, ADR 0026 Option ① + ADR 0029 §B + 감사 MED-3 + 담보대출 GL 소비 + #183 원금 건별)")
+    @DisplayName("chk_account_entry_ref_type == AccountEntry 팩토리 31종의 refType (정확 일치, ADR 0026 Option ① + ADR 0029 §B + 감사 MED-3 + 담보대출 GL 소비 + #183 원금 건별 + 수신 3종)")
     void refTypeCheckMatchesFactorySetExactly() {
         Set<String> factoryRefTypes = new LinkedHashSet<>(Arrays.asList(
                 AccountEntry.settlementCreatedImmediate("s", "1", ONE).getRefType(),
@@ -120,7 +120,18 @@ class SchemaEnumContractIT {
                 AccountEntry.securedLoanRepaid("42", "1", ONE).getRefType(),
                 AccountEntry.securedLoanPrincipalRepaid("42", "1", "e", ONE).getRefType(),
                 AccountEntry.investmentExecuted("s", "1", ONE).getRefType(),
-                AccountEntry.withholdingAccrued("s", "1", ONE).getRefType()));
+                AccountEntry.withholdingAccrued("s", "1", ONE).getRefType(),
+                // 수신 상품 — 원금 이동과 이자 인식이 별개 refType 으로 분리돼 있는지까지 이 목록이 고정한다.
+                AccountEntry.timeDepositOpened("7", "1", ONE).getRefType(),
+                AccountEntry.timeDepositInterestSettled("7", "1", ONE).getRefType(),
+                AccountEntry.timeDepositClosed("7", "1", ONE).getRefType(),
+                AccountEntry.savingsInstallmentPaid("7", "1", 1, ONE).getRefType(),
+                AccountEntry.savingsInterestSettled("7", "1", ONE).getRefType(),
+                AccountEntry.savingsClosed("7", "1", ONE).getRefType(),
+                AccountEntry.pensionContributionPaid("7", "1", 1L, ONE).getRefType(),
+                AccountEntry.pensionInterestSettled("7", "1", 2L, ONE).getRefType(),
+                AccountEntry.pensionBenefitPaid("7", "1", 3L, ONE).getRefType(),
+                AccountEntry.pensionMidWithdrawn("7", "1", 4L, ONE).getRefType()));
 
         assertThat(checkValues("chk_account_entry_ref_type"))
                 .containsExactlyInAnyOrderElementsOf(factoryRefTypes);

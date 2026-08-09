@@ -210,6 +210,15 @@ public class SecurityConfig {
                         // 법인카드 — 인증만 요구하고, 조직 역할(OWNER/MANAGER/STAFF) 판정은
                         // card-service 의 CardOrgAuthorizer 가 멤버십 프로젝션으로 수행한다(IDOR 방지).
                         .requestMatchers("/api/cards/**").authenticated()
+                        // 수신 상품(정기예금·적금·퇴직연금) — 계약 주체가 가입자 본인이라 인증만 요구하고,
+                        // 소유권(depositorId == JWT userId) 판정은 각 상품 서비스가 수행한다(IDOR 방지). /api/cards/** 와 같은 방식.
+                        // 단, 아래 두 경로는 "기관이 돈을 인식·지급하는" 행위라 가입자에게 열어두면 임의 증액이 된다.
+                        // 운용수익 인식(운용사 통지)과 수급 지급(지급 집행)은 /admin/payouts/** 와 같은 운영자 권한으로 막는다.
+                        .requestMatchers(HttpMethod.POST, "/api/banking/pensions/*/interest-settlements")
+                        .hasAnyRole("ADMIN", "MANAGER")
+                        .requestMatchers(HttpMethod.POST, "/api/banking/pensions/*/benefit-payments")
+                        .hasAnyRole("ADMIN", "MANAGER")
+                        .requestMatchers("/api/banking/**").authenticated()
                         // 결제 환불 이력 조회 (관리자·매니저·본인) — 더 세밀한 권한은 향후 Audit PR 에서
                         .requestMatchers("/api/payments/*/refunds").hasAnyRole("ADMIN", "MANAGER", "USER")
                         // 환불 실행(직접 PG 환불) — "어드민 승인 후 환불" 원칙에 따라 운영자 전용.

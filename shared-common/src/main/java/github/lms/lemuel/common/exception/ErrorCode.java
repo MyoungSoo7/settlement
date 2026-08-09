@@ -95,7 +95,14 @@ public enum ErrorCode {
     CARD_FORBIDDEN(HttpStatus.FORBIDDEN, "이 작업을 수행할 권한이 없습니다."),
     CARD_AUTHORIZATION_NOT_FOUND(HttpStatus.NOT_FOUND, "승인 홀드를 찾을 수 없습니다."),
     // 재원 조회 실패는 폴백 없이 명시적 실패시킨다 — 재원을 모른 채 추정 한도를 주면 그 자체가 여신 사고다.
-    CARD_FUNDING_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "재원 조회에 실패했습니다. 잠시 후 다시 시도해주세요.");
+    CARD_FUNDING_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "재원 조회에 실패했습니다. 잠시 후 다시 시도해주세요."),
+
+    // ─── banking (수신 상품 — 정기예금·적금·퇴직연금) ─────────────────────────────
+    // 형제 도메인과 같이 상품별 전용 NOT_FOUND 를 둔다. INVALID_ARGUMENT 로 대용하면 없는 리소스가
+    // 400 으로 나가 클라이언트가 "잘못 보냈다"와 "없다"를 구분하지 못한다.
+    TIME_DEPOSIT_NOT_FOUND(HttpStatus.NOT_FOUND, "정기예금을 찾을 수 없습니다."),
+    INSTALLMENT_SAVINGS_NOT_FOUND(HttpStatus.NOT_FOUND, "적금을 찾을 수 없습니다."),
+    RETIREMENT_PENSION_NOT_FOUND(HttpStatus.NOT_FOUND, "퇴직연금을 찾을 수 없습니다.");
 
     private final HttpStatus status;
     private final String defaultMessage;
