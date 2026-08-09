@@ -42,7 +42,22 @@ public enum GlAccount {
      * settlement 가 payout 산정 시 원천징수를 실제 공제하면서 남는 SELLER_PAYABLE 잔여를
      * {@code Dr SELLER_PAYABLE / Cr WITHHOLDING_PAYABLE} 로 닫아 통제계정 폐루프를 유지한다.
      */
-    WITHHOLDING_PAYABLE(AccountSide.CREDIT);
+    WITHHOLDING_PAYABLE(AccountSide.CREDIT),
+
+    /** 정기예금 수신부채 (부채, 대변성) — 예금주에게 만기 지급할 원금+기 발생 이자. owner=DEPOSITOR. */
+    TIME_DEPOSIT_LIABILITY(AccountSide.CREDIT),
+
+    /** 적금 수신부채 (부채, 대변성) — 회차 납입 누계 + 기 발생 이자. owner=DEPOSITOR. */
+    INSTALLMENT_SAVINGS_LIABILITY(AccountSide.CREDIT),
+
+    /** 퇴직연금 적립금 부채 (부채, 대변성) — DB·DC·IRP 부담금 누계 + 운용수익. owner=DEPOSITOR. */
+    RETIREMENT_PENSION_LIABILITY(AccountSide.CREDIT),
+
+    /**
+     * 수신이자비용 (비용, 차변성) — 예금·적금·퇴직연금에 지급할 이자를 인식할 때의 상대계정.
+     * 이자는 만기·해지·수급 시점에 일괄 확정해 부채로 전기하며(주기 accrual 미도입), 이 계정이 그 차변을 받는다.
+     */
+    INTEREST_EXPENSE(AccountSide.DEBIT);
 
     private final AccountSide side;
 
