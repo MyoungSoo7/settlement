@@ -108,4 +108,20 @@ public interface PublishInsuranceEventPort {
      */
     void publishBancaRuleViolated(java.time.Year year,
             github.lms.lemuel.insurance.domain.BancaRuleEvaluator.BancaRuleViolation violation);
+
+    /**
+     * 일반지급 요청 — 토픽 {@code lemuel.insurance.general_payout_requested}.
+     *
+     * <p>Policy terminal 전이(해지·만기·철회)가 payout 을 낳는 시점에 발행한다 (§14 D-G1).
+     * 산출근거 스냅샷(기납입합계·적용요율·경과월수·납입회차수)을 함께 싣는다 (D-G5).
+     */
+    void publishGeneralPayoutRequested(Policy policy,
+            github.lms.lemuel.insurance.domain.GeneralPayout payout);
+
+    /**
+     * 일반지급 실행 — 토픽 {@code lemuel.insurance.general_payout_paid}.
+     *
+     * <p>일반지급 배치가 지급 1건당 발행한다. account-service 가 소비해 GL 분개 후보가 된다.
+     */
+    void publishGeneralPayoutPaid(github.lms.lemuel.insurance.domain.GeneralPayout payout);
 }

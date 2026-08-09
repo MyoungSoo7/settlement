@@ -225,6 +225,53 @@ public class InsurancePolicyEventPublisherAdapter implements PublishInsuranceEve
                 toJson(payload)));
     }
 
+    /**
+     * 일반지급 요청 — 토픽 {@code lemuel.insurance.general_payout_requested}.
+     *
+     * <p>§14 D-G5: 산출근거 스냅샷(기납입합계·적용요율·경과월수·납입회차수)을 함께 싣는다 —
+     * 소비자가 지급액 재검산을 할 수 있어야 한다.
+     */
+    @Override
+    public void publishGeneralPayoutRequested(
+            Policy policy, github.lms.lemuel.insurance.domain.GeneralPayout payout) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("policyNumber",     payout.getPolicyNumber());
+        payload.put("payoutId",         payout.getPayoutId());
+        payload.put("payoutType",       payout.getPayoutType().name());
+        payload.put("amount",           payout.getAmount().toPlainString());
+        payload.put("paidPremiumTotal", payout.getPaidPremiumTotal().toPlainString());
+        payload.put("appliedRate",      payout.getAppliedRate().toPlainString());
+        payload.put("elapsedMonths",    payout.getElapsedMonths());
+        payload.put("installmentCount", payout.getInstallmentCount());
+        payload.put("requestedOn",      payout.getRequestedOn().toString());
+        payload.put("fcId",             policy.getFcId());
+
+        saveOutboxEventPort.save(OutboxEvent.pending(
+                AGGREGATE_TYPE,
+                payout.getPolicyNumber(),              // 파티션 키
+                "InsuranceGeneralPayoutRequested",     // → lemuel.insurance.general_payout_requested
+                toJson(payload)));
+    }
+
+    /**
+     * 일반지급 실행 — 토픽 {@code lemuel.insurance.general_payout_paid}.
+     */
+    @Override
+    public void publishGeneralPayoutPaid(github.lms.lemuel.insurance.domain.GeneralPayout payout) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("policyNumber", payout.getPolicyNumber());
+        payload.put("payoutId",     payout.getPayoutId());
+        payload.put("payoutType",   payout.getPayoutType().name());
+        payload.put("amount",       payout.getAmount().toPlainString());
+        payload.put("paidOn",       payout.getPaidOn().toString());
+
+        saveOutboxEventPort.save(OutboxEvent.pending(
+                AGGREGATE_TYPE,
+                payout.getPolicyNumber(),          // 파티션 키
+                "InsuranceGeneralPayoutPaid",      // → lemuel.insurance.general_payout_paid
+                toJson(payload)));
+    }
+
     private String toJson(Map<String, Object> payload) {
         try {
             return objectMapper.writeValueAsString(payload);

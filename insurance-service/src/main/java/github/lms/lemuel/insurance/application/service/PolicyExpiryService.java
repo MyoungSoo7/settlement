@@ -32,24 +32,32 @@ public class PolicyExpiryService implements ExpirePoliciesUseCase {
     private final LoadPolicyPort loadPolicyPort;
     private final SavePolicyPort savePolicyPort;
     private final PublishInsuranceEventPort publishPort;
+    private final GeneralPayoutRecorder payoutRecorder;
 
     public PolicyExpiryService(
             LoadPolicyPort loadPolicyPort,
             SavePolicyPort savePolicyPort,
-            PublishInsuranceEventPort publishPort) {
+            PublishInsuranceEventPort publishPort,
+            GeneralPayoutRecorder payoutRecorder) {
         this.loadPolicyPort = loadPolicyPort;
         this.savePolicyPort = savePolicyPort;
         this.publishPort = publishPort;
+        this.payoutRecorder = payoutRecorder;
     }
 
     @Override
     public ExpiryBatchResult expireOn(LocalDate today) {
         int matured = 0;
+        int payouts = 0;
         for (Policy policy : loadPolicyPort.findActiveMaturedOnOrBefore(today)) {
             PolicyStatus previous = policy.getStatus();
             policy.expire();
             savePolicyPort.save(policy);
             publishPort.publishPolicyStatusChanged(policy, previous);
+            // §14 D-G1: 만기소멸이 만기보험금 payout 을 낳는다 (같은 tx)
+            if (payoutRecorder.recordFor(policy, previous, today).isPresent()) {
+                payouts++;
+            }
             matured++;
         }
 
@@ -63,12 +71,17 @@ public class PolicyExpiryService implements ExpirePoliciesUseCase {
             policy.expireAfterLapse(today);
             savePolicyPort.save(policy);
             publishPort.publishPolicyStatusChanged(policy, previous);
+            // §14 D-G1: 실효소멸은 실효일 기준 해약환급금 — 환급액 0 이면 미생성 (D-G3)
+            if (payoutRecorder.recordFor(policy, previous, today).isPresent()) {
+                payouts++;
+            }
             lapsedExpired++;
         }
 
         if (matured + lapsedExpired > 0) {
-            log.info("[PolicyExpiry] today={} 만기소멸={} 실효소멸={}", today, matured, lapsedExpired);
+            log.info("[PolicyExpiry] today={} 만기소멸={} 실효소멸={} 일반지급={}",
+                    today, matured, lapsedExpired, payouts);
         }
-        return new ExpiryBatchResult(matured, lapsedExpired);
+        return new ExpiryBatchResult(matured, lapsedExpired, payouts);
     }
 }

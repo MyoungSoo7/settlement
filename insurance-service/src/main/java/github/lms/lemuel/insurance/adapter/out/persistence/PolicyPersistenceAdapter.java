@@ -53,6 +53,11 @@ public class PolicyPersistenceAdapter implements LoadPolicyPort, SavePolicyPort 
     }
 
     @Override
+    public Optional<Integer> findPaymentCycleMonths(String policyId) {
+        return repository.findPaymentCycleMonths(UUID.fromString(policyId));
+    }
+
+    @Override
     public Policy insertIssued(Policy policy, PolicyIssuanceAttributes attributes) {
         return repository.saveAndFlush(PolicyJpaEntity.fromIssued(
                         policy,

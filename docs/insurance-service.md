@@ -179,6 +179,8 @@ m = ChronoUnit.MONTHS.between(effectiveDate, terminationDate)  // 내림(완료�
 | InsurancePolicyIssued   | lemuel.insurance.policy_issued             | Policy ACTIVE 전환 시 |
 | PolicyStatusChanged     | lemuel.insurance.policy_status_changed     | 상태머신 전이 시      |
 | CommissionScheduleFixed | lemuel.insurance.commission_schedule_fixed | 수수료 확정 시        |
+| GeneralPayoutRequested  | lemuel.insurance.general_payout_requested  | terminal 전이가 일반지급을 낳을 때 (§14) |
+| GeneralPayoutPaid       | lemuel.insurance.general_payout_paid       | 일반지급 실행 배치 지급 시 (§14)         |
 
 - 이벤트 발행: Transactional Outbox (`outbox_events` → KafkaOutboxPublisher)
 - aggregateType: `"Insurance"`, aggregateId: `policyId` (파티션 키)
@@ -246,8 +248,10 @@ ArchUnit 4룰 강제:
 | PolicyExpiryScheduler           | 매일 02:00    | D7 전이 5(ACTIVE→EXPIRED 만기)·전이 3(LAPSED→EXPIRED 부활창구 도과) 자동 집행 + 상태변경 이벤트                |
 | CommissionClawbackSweepScheduler| 매일 03:30    | terminal 계약의 SCHEDULED 회차 소멸(CANCELLED) + PAID 회차 환수 대기 전환(D6 계산) + clawback 이벤트           |
 | CommissionPayoutScheduler       | 매일 04:00    | due_date 도래 SCHEDULED 회차 지급(PAID) — ACTIVE 계약만, LAPSED 보류 + commission_paid 이벤트                  |
+| GeneralPayoutScheduler          | 매일 04:30    | REQUESTED 일반지급(해약환급금·만기보험금·철회환급금) 전건 지급(PAID) + general_payout_paid 이벤트 (§14)        |
 | MonthlyCommissionClosingScheduler| 매월 1일 05:00| 전월 지급 실적(paid_at 기준)을 FC별 append-only 마감 스냅샷(commission_closings, V5)으로 확정 + 이벤트          |
 | BancaConcentrationScheduler     | 매월 2일 06:00| 당해연도 방카 25%룰 점검(은행×부문×원수사 비중, 자산 2조 미만 면제) — 위반 시 banca_rule_violated 이벤트, 위반 0건도 감사 기록 |
+| ProposalExpiryScheduler         | 매일 01:30    | 유효기간(30일) 경과 QUOTED 가입설계를 EXPIRED 로 전이(§13) — 금전 사건 아님, 건 단위 감사 없음                   |
 
 - 전이는 반드시 도메인 메서드를 통과한다 — 배치가 status 를 직접 UPDATE 하지 않는다.
 - 모든 이벤트는 같은 tx 의 Outbox 로 기록(커밋-발행 원자성). 배치 실행은 잡 단위로 audit_logs 에 남는다.
@@ -280,7 +284,8 @@ ArchUnit 4룰 강제:
 ## 11. 마이그레이션
 
 V1 core → V2 outbox/processed/shedlock → V3 audit → V4 PII 하드닝 → V5 commission_closings →
-V6 sales_channel/banca → V7 disclosure_deliveries → V8 insurer_sector + banca_partner_banks.
+V6 sales_channel/banca → V7 disclosure_deliveries → V8 insurer_sector + banca_partner_banks →
+V9 premium_rate_tables + proposal_quotes (가입설계) → V10 general_payouts (일반지급).
 
 ## 12. 언더라이팅 (청약 접수 → 심사 → 승인/반려)
 
@@ -307,3 +312,67 @@ V6 sales_channel/banca → V7 disclosure_deliveries → V8 insurer_sector + banc
 
 이 경로가 배치 5종이 소비하는 `insurance_policies`·`commission_schedules` 행의 생성 지점이다 —
 발행(§12) → 지급/환수/마감(§8) → 소멸(§8)로 계약 전 생애가 시스템 안에서 닫힌다.
+
+## 13. 가입설계 (V9 — 요율 산출 + 설계서 + 청약 전환)
+
+청약 앞단: 상담 → **가입설계(ProposalQuote)** → 청약 → 계약. 설계 결정 4개:
+
+- **D-P1 요율 버저닝**: `premium_rate_tables` — (상품, 성별, 보험나이 구간, 납입기간) ×
+  `effective_from`. 개정은 새 행, 기준일 이전 개시분 중 최신이 이긴다. 요율 부재 시 폴백 없이
+  산출 거부(`RateNotFoundException`, 422).
+- **D-P2 INSERT-only 스냅샷**: `proposal_quotes` 가 산출에 쓴 요율 행(`rate_table_id`)·적용 요율·
+  보험나이·보험료를 고정 보존. 재산출 = 새 설계. 전이 반영은 status·converted_application_id 만.
+- **D-P3 서버 주입**: 청약 전환 시 보장금액·보험료는 설계 스냅샷 값을 서버가 주입 — 전환 요청에
+  금액 파라미터가 없다(위변조 차단). 1설계 1청약은 partial UNIQUE(`converted_application_id`)가 DB 로 보장.
+- **PII 최소화**: 생년월일은 보험나이 산정에만 쓰고 저장하지 않는다(`insurance_age` 만 스냅샷).
+
+**도메인**: `PremiumRater`(보험나이 = 만 나이 + 6개월 이상 경과 시 +1; 연 보험료 = 보장 ÷ 1,000 ×
+요율, 원 단위 HALF_UP, 0원 설계 거부) · `ProposalQuote` 상태머신 `QUOTED → CONVERTED | EXPIRED`
+(2개 전이만, 그 외 `InvalidProposalTransitionException`; 만료 전환은 `ProposalExpiredException` 409).
+유효기간 30일(`VALIDITY_DAYS`). 전환은 설계의 fcId 와 요청 fcId 대조(`ProposalOwnershipException` 403).
+⚠️ 한계: insurance-service 는 fcId 를 JWT 주체가 아닌 요청 입력으로 받는 전역 관례라 이 대조는
+실수 방지 수준이다 — JWT 주체 파생 배선(조회 API 소유권 포함)은 서비스 전역 별도 과제.
+
+| API                                              | 하는 일                                                        |
+| ------------------------------------------------ | -------------------------------------------------------------- |
+| POST `/api/insurance/proposals`                  | 산출 — 요율 조회 + 보험료 계산 + 스냅샷 저장 (201)             |
+| GET `/api/insurance/proposals/{id}`              | 단건 조회 (산출 근거 포함)                                     |
+| POST `/api/insurance/proposals/{id}/convert`     | 청약 전환 — 금액 없음(서버 주입), 만료 409, 타인 설계 403      |
+| GET `/api/insurance/proposals/{id}/sheet`        | 가입설계서 PDF (iText, adapter/out/pdf)                        |
+
+## 14. 일반지급 (V10 — 해약환급금·만기보험금·철회환급금)
+
+계약자 앞 지급 업무 중 **일반지급**(산출식이 금액을 확정하는 지급 — 사고보험금 심사지급 아님).
+설계 결정 5개:
+
+- **D-G1 전이 → 지급 매핑**: 일반지급은 청구 접수가 아니라 **Policy 상태 전이가 낳는다** —
+  심사 단계가 없다(지급 사유·금액이 전이 시점에 확정). ACTIVE→SURRENDERED = 해약환급금(해지일 기준),
+  ACTIVE→EXPIRED = 만기보험금(만기 전일까지 납입 가정), LAPSED→EXPIRED = 해약환급금(실효일 기준 —
+  실효 이후 납입 없음), →CANCELLED = 철회환급금(기납입 전액 — D6 수수료 전액 환수와 대칭).
+- **D-G2 기납입보험료는 정상납입 가정 산출**: 납입 원장이 없는 V1 한계를 명시적 근사로 —
+  회차보험료 = 연보험료 × 납입주기/12(통화 최소단위 절사), 납입회차수 = floor(경과월/주기) + 1
+  (전이일 도래분 포함). 만기만 만기 **전일**까지 산입(만기일 당일 회차 없음).
+- **D-G3 해약환급률표 단일 선언**(`GeneralPayoutConstants`): 경과 12개월 미만 0%(**payout 미생성** —
+  0원 지급 행 없음) / 12~36개월 40% / 36~60개월 60% / 60~84개월 75% / 84개월 이상 85%.
+  구간 경계는 D6 리터럴 가드(`ClawbackConstantDisciplineTest`)와 충돌하지 않도록 환수 창구 값을 쓰지 않는다.
+  만기보험금은 기납입 100%(V1 전 상품 만기환급형 취급 — 상품별 환급형 플래그는 향후 과제).
+- **D-G4 상태머신 1전이**: `REQUESTED → PAID` 뿐(그 외 `InvalidGeneralPayoutTransitionException`).
+  거절·취소 상태가 없는 이유 — payout 은 이미 확정된 terminal 전이에서만 태어나므로 지급 의무가
+  소급 취소될 경로가 없다. 멱등: `payout_id UUID UNIQUE` + **`UNIQUE(policy_id, payout_type)`**
+  (terminal 상태 상호배타 → 계약당 유형별 1건이 자연키).
+- **D-G5 산출근거 스냅샷**: `general_payouts` 행이 기납입합계·적용요율·경과월수·납입회차수를 고정
+  보존한다(D-P2 와 같은 원칙 — 지급액이 어떻게 나왔는지 행 하나로 재구성 가능).
+
+**배치**: `GeneralPayoutScheduler` 매일 04:30 KST(수수료 지급 04:00 이후) — REQUESTED 전건 지급(PAID)
++ `general_payout_paid` 이벤트 + 잡 단위 감사(`INSURANCE_GENERAL_PAYOUT_PAID`).
+
+**이벤트**: `lemuel.insurance.general_payout_requested`(산출근거 포함) / `general_payout_paid` —
+파티션 키 policyNumber, 금액 plain string.
+
+| API                                                  | 하는 일                                                            |
+| ---------------------------------------------------- | ------------------------------------------------------------------ |
+| POST `/api/insurance/policies/{policyNumber}/surrender` | 임의해지 — D7 전이 4 + 해약환급금 산출·payout 생성 (409/403/404) |
+| POST `/api/insurance/policies/{policyNumber}/cancel`    | 청약철회 — D7 전이 6·7(15일 창구) + 기납입 전액 payout (409)     |
+| GET `/api/insurance/policies/{policyNumber}/payouts`    | 일반지급 내역 조회 (산출근거 포함)                               |
+
+⚠️ §13 과 동일 한계: fcId 는 JWT 주체가 아니라 요청 입력 — 해지/철회의 fcId 대조는 실수 방지 수준.

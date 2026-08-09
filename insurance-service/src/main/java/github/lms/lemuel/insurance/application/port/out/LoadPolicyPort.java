@@ -46,4 +46,10 @@ public interface LoadPolicyPort {
 
     /** 증권번호(자연키) 단건 조회. */
     Optional<Policy> findByPolicyNumber(String policyNumber);
+
+    /**
+     * 납입주기(개월) 조회 — SoR 전용 컬럼이라 도메인 {@code Policy} 에는 없다.
+     * 일반지급 기납입보험료 산출(D-G2)에만 쓰인다.
+     */
+    Optional<Integer> findPaymentCycleMonths(String policyId);
 }

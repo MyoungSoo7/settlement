@@ -87,6 +87,12 @@ public enum AuditAction {
     INSURANCE_BANCA_RULE_CHECKED,
     // 청약 승인 → 계약 발행 — 보장 개시 + 초년도 수수료 확정의 금전적 사건, 건 단위 감사.
     INSURANCE_POLICY_ISSUED,
+    // 계약 임의해지 — 해약환급금 산출·지급 요청을 동반하는 금전적 사건, 건 단위 감사.
+    INSURANCE_POLICY_SURRENDERED,
+    // 청약철회 — 기납입보험료 전액 환급 + 수수료 전액 환수의 기산 사건, 건 단위 감사.
+    INSURANCE_POLICY_CANCELLED,
+    // 일반지급 실행 배치 — 해약환급금·만기보험금·철회환급금 실지급 시점의 감사 추적.
+    INSURANCE_GENERAL_PAYOUT_PAID,
     // 정보계 월마감 배치 — 셀러 월 정산 마트 적재 실행(성공/실패)의 잡 단위 감사 추적.
     MONTHLY_CLOSING_EXECUTED
 }

@@ -24,6 +24,10 @@ public interface SpringDataPolicyRepository extends JpaRepository<PolicyJpaEntit
 
     Optional<PolicyJpaEntity> findByPolicyId(UUID policyId);
 
+    /** 납입주기(개월) 단건 조회 — 일반지급 기납입보험료 산출(D-G2) 전용, 행 전체 로드 회피. */
+    @Query("select p.paymentCycleMonths from PolicyJpaEntity p where p.policyId = :policyId")
+    Optional<Integer> findPaymentCycleMonths(@Param("policyId") UUID policyId);
+
     /**
      * 환수 스윕 스캔 — terminal 상태로 종료됐지만 기지급(PAID) 회차가 남은 계약.
      *

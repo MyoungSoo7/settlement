@@ -39,9 +39,20 @@ class PolicyExpiryServiceTest {
     @Mock LoadPolicyPort loadPolicyPort;
     @Mock SavePolicyPort savePolicyPort;
     @Mock PublishInsuranceEventPort publishPort;
+    @Mock GeneralPayoutRecorder payoutRecorder;
 
     private PolicyExpiryService service() {
-        return new PolicyExpiryService(loadPolicyPort, savePolicyPort, publishPort);
+        return new PolicyExpiryService(loadPolicyPort, savePolicyPort, publishPort, payoutRecorder);
+    }
+
+    private static github.lms.lemuel.insurance.domain.GeneralPayout somePayout(Policy policy) {
+        return github.lms.lemuel.insurance.domain.GeneralPayout.request(
+                policy.getPolicyId(), policy.getPolicyNumber(),
+                github.lms.lemuel.insurance.domain.GeneralPayoutType.SURRENDER_REFUND,
+                new github.lms.lemuel.insurance.domain.GeneralPayoutCalculator.PayoutQuote(
+                        new BigDecimal("560000.00"), new BigDecimal("1400000.00"),
+                        new BigDecimal("0.4000"), 13, 14),
+                TODAY);
     }
 
     private static Policy activeMatured() {
@@ -72,19 +83,23 @@ class PolicyExpiryServiceTest {
     }
 
     @Test
-    @DisplayName("만기 도래 ACTIVE 계약을 EXPIRED 로 전이하고 상태변경 이벤트를 발행한다")
+    @DisplayName("만기 도래 ACTIVE 계약을 EXPIRED 로 전이하고 상태변경 이벤트 + 만기 payout 을 남긴다")
     void expiresMaturedActivePolicies() {
         Policy policy = activeMatured();
         when(loadPolicyPort.findActiveMaturedOnOrBefore(TODAY)).thenReturn(List.of(policy));
         when(loadPolicyPort.findLapsedOnOrBefore(any())).thenReturn(List.of());
+        when(payoutRecorder.recordFor(policy, PolicyStatus.ACTIVE, TODAY))
+                .thenReturn(java.util.Optional.of(somePayout(policy)));
 
         ExpiryBatchResult result = service().expireOn(TODAY);
 
         assertThat(result.maturedExpired()).isEqualTo(1);
         assertThat(result.lapsedExpired()).isZero();
+        assertThat(result.payoutsRequested()).isEqualTo(1);
         assertThat(policy.getStatus()).isEqualTo(PolicyStatus.EXPIRED);
         verify(savePolicyPort).save(policy);
         verify(publishPort).publishPolicyStatusChanged(policy, PolicyStatus.ACTIVE);
+        verify(payoutRecorder).recordFor(policy, PolicyStatus.ACTIVE, TODAY);
     }
 
     @Test
@@ -94,11 +109,16 @@ class PolicyExpiryServiceTest {
         when(loadPolicyPort.findActiveMaturedOnOrBefore(TODAY)).thenReturn(List.of());
         when(loadPolicyPort.findLapsedOnOrBefore(any())).thenReturn(List.of(policy));
 
+        when(payoutRecorder.recordFor(policy, PolicyStatus.LAPSED, TODAY))
+                .thenReturn(java.util.Optional.empty()); // 환급액 0 — payout 미생성 (D-G3)
+
         ExpiryBatchResult result = service().expireOn(TODAY);
 
         assertThat(result.lapsedExpired()).isEqualTo(1);
+        assertThat(result.payoutsRequested()).isZero();
         assertThat(policy.getStatus()).isEqualTo(PolicyStatus.EXPIRED);
         verify(publishPort).publishPolicyStatusChanged(policy, PolicyStatus.LAPSED);
+        verify(payoutRecorder).recordFor(policy, PolicyStatus.LAPSED, TODAY);
 
         // 스캔 컷오프 = today - REINSTATEMENT_WINDOW_MONTHS (도메인 상수와 동일 출처)
         ArgumentCaptor<LocalDate> cutoff = ArgumentCaptor.forClass(LocalDate.class);

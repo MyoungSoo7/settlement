@@ -44,11 +44,11 @@ public class PolicyExpiryScheduler {
         LocalDate today = LocalDate.now(clock);
         log.info("[PolicyExpiry] 시작: today={}", today);
         ExpiryBatchResult result = useCase.expireOn(today);
-        log.info("[PolicyExpiry] 완료: 만기소멸={} 실효소멸={}",
-                result.maturedExpired(), result.lapsedExpired());
+        log.info("[PolicyExpiry] 완료: 만기소멸={} 실효소멸={} 일반지급요청={}",
+                result.maturedExpired(), result.lapsedExpired(), result.payoutsRequested());
 
         auditLogger.record(AuditAction.INSURANCE_POLICY_EXPIRY_BATCH, "PolicyExpiryJob", today.toString(),
-                String.format("{\"date\":\"%s\",\"maturedExpired\":%d,\"lapsedExpired\":%d}",
-                        today, result.maturedExpired(), result.lapsedExpired()));
+                String.format("{\"date\":\"%s\",\"maturedExpired\":%d,\"lapsedExpired\":%d,\"payoutsRequested\":%d}",
+                        today, result.maturedExpired(), result.lapsedExpired(), result.payoutsRequested()));
     }
 }
