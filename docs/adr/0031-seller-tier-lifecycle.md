@@ -1,12 +1,15 @@
 # ADR 0031 — 셀러 등급 라이프사이클 (자동 산정 + 변경 이력 + 강등 유예)
 
-- 상태: **Accepted (부분 착지)** — 2026-08-08 구조 구현 완료, **임계·유예 수치는 여전히 결정 대기**
-  - 자동 재산정 스케줄러는 **기본 비활성**(`app.seller-tier.auto-evaluate.enabled`)이고 임계 기본값은
-    사실상 아무도 승급하지 못하는 크기다 — 승인 전에는 등급이 바뀌지 않는다(무행동 착지).
-  - 결정 ①(임계 거래액)·②(유예 수치)가 확정되면 **설정만 바꾸면 된다**. 코드 변경·배포 불필요.
-  - 판단 근거는 `scripts/sim/tier_threshold_simulation.sql` 로 뽑는다.
-  - 이벤트(`lemuel.seller.tier_changed`)·관리자 지정 API·캐시 정합 검사·프로젝션 백필까지 착지 완료.
-    **남은 것은 임계·유예 수치 결정 하나뿐이다**(아래 체크리스트).
+- 상태: **Accepted (착지 완료)** — 2026-08-08 구조 구현, 2026-08-09 임계·유예 수치 승인
+  - **승인된 값**: VIP 5억 / STRATEGIC 30억(12개월 결제 순액), 강등 유예 3개월 + 연속 미달 2회.
+    `order-service/src/main/resources/application.yml` 의 `app.seller-tier.*` 에 명시했고, 환경변수
+    (`APP_SELLER_TIER_*`)로 배포별 재정의가 가능하다 — 재승인 시 코드 변경·배포 불필요.
+  - **자동 재산정 스케줄러는 계속 비활성**(`app.seller-tier.auto-evaluate.enabled=false`)이다.
+    수치가 정해졌다고 사람 확인 없이 수수료·정산주기·홀드백이 바뀌게 두지 않는다 — 운영 절차는
+    `POST /admin/seller-tiers/evaluate`(미리보기) → 결과 확인 → `?dryRun=false`(반영).
+  - 임계 분포는 데이터로 유도하지 못했다: 개발 DB 에 셀러가 1명뿐(12개월 순액 12.2억)이라
+    `scripts/sim/tier_threshold_simulation.sql` 이 분포를 낼 수 없었다. 운영 데이터가 쌓이면
+    같은 스크립트로 재검토할 것.
 - 일자: 2026-08-06
 - 관련: ADR 0014(등급별 T+N 정산 주기 — 등급을 **소비**하는 쪽), ADR 0015(등급별 홀드백),
   ADR 0020(order↔settlement DB 분리), ADR 0024(이벤트 계약-as-code), ADR 0032(수수료율 유효기간 정책),
@@ -247,6 +250,16 @@ CREATE INDEX idx_sth_seller ON opslab.seller_tier_history (seller_id, changed_at
       등급이었나"가 사라진다). 컨슈머 upsert + `processed_events` 로 여러 번 실행해도 안전.
 - [x] `./gradlew :order-service:test :order-service:jacocoTestCoverageVerification` (LINE 90%) 통과
 
-> **미결(운영 승인 대기)**: 임계 금액(VIP/STRATEGIC)과 유예 값(개월·연속 미달 횟수)은 재무 승인 사항이라
-> 코드에 확정값을 넣지 않았다. 기본값은 사실상 아무도 승급하지 못하는 크기라, 값을 명시하기 전에는
-> 자동 승급이 일어나지 않는다(무행동 착지). 승인 후 `app.seller-tier.*` 로 주입한다.
+- [x] 임계·유예 수치 승인 및 설정 반영 (2026-08-09) — 아래 표
+
+| 설정 키                                | 값         | 의미                                          |
+| -------------------------------------- | ---------- | --------------------------------------------- |
+| `app.seller-tier.vip-threshold`         | 500000000  | 12개월 결제 순액 5억 이상 → VIP               |
+| `app.seller-tier.strategic-threshold`   | 3000000000 | 30억 이상 → STRATEGIC                         |
+| `app.seller-tier.guard-months`          | 3          | 승급 후 3개월간 강등 없음(관리자 지정도 동일) |
+| `app.seller-tier.miss-threshold`        | 2          | 유예 후에도 연속 2회 미달해야 강등            |
+| `app.seller-tier.auto-evaluate.enabled` | false      | 자동 실행 안 함 — 미리보기 후 수동 반영       |
+
+> **여전히 남는 안전장치**: 스케줄러가 꺼져 있으므로 이 수치를 넣은 것만으로는 어떤 셀러의 등급도
+> 바뀌지 않는다. 첫 반영은 운영자가 미리보기(`dryRun=true`)로 "누가 어떻게 바뀌는지"를 확인한 뒤
+> 명시적으로 `dryRun=false` 를 호출해야 일어난다.
