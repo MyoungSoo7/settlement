@@ -49,9 +49,9 @@ public class ProposalQuoteJpaEntity {
     @Column(name = "insured_name", nullable = false, length = 100)
     private String insuredName;
 
-    @Enumerated(EnumType.STRING)
+    /** Gender enum 의 name — String 매핑이어야 varchar(1) 스키마와 validate 가 일치한다(요율 엔티티와 동형). */
     @Column(name = "insured_gender", nullable = false, length = 1)
-    private Gender insuredGender;
+    private String insuredGender;
 
     @Column(name = "insurance_age", nullable = false)
     private int insuranceAge;
@@ -117,7 +117,7 @@ public class ProposalQuoteJpaEntity {
         e.productCode = p.getProductCode();
         e.fcId = p.getFcId();
         e.insuredName = p.getInsuredName();
-        e.insuredGender = p.getInsuredGender();
+        e.insuredGender = p.getInsuredGender().name();
         e.insuranceAge = p.getInsuranceAge();
         e.coverageAmount = p.getCoverageAmount();
         e.paymentTermYears = p.getPaymentTermYears();
@@ -143,7 +143,7 @@ public class ProposalQuoteJpaEntity {
                 .productCode(productCode)
                 .fcId(fcId)
                 .insuredName(insuredName)
-                .insuredGender(insuredGender)
+                .insuredGender(Gender.valueOf(insuredGender))
                 .insuranceAge(insuranceAge)
                 .coverageAmount(coverageAmount)
                 .paymentTermYears(paymentTermYears)
