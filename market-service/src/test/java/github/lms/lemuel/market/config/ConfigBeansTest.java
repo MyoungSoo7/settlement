@@ -5,11 +5,16 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.env.YamlPropertySourceLoader;
+import org.springframework.core.env.PropertySource;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -109,5 +114,33 @@ class ConfigBeansTest {
         filter.doFilterInternal(req, res, chain);
 
         verify(chain).doFilter(req, res);
+    }
+
+    @Test
+    void adminApiKeyFilter_키미설정이어도_keyRequired면_403() throws Exception {
+        AdminApiKeyFilter filter = new AdminApiKeyFilter("", true);
+        HttpServletRequest req = mock(HttpServletRequest.class);
+        HttpServletResponse res = mock(HttpServletResponse.class);
+        FilterChain chain = mock(FilterChain.class);
+
+        filter.doFilterInternal(req, res, chain);
+
+        verify(res).sendError(HttpServletResponse.SC_FORBIDDEN, "internal api key not configured");
+        verify(chain, never()).doFilter(req, res);
+    }
+
+    /**
+     * 운영에서 키가 빠지면 게이트가 조용히 열리는 사고를 막는 회귀 가드.
+     *
+     * <p>2026-08-11 실제로 MARKET_INTERNAL_API_KEY 만 시크릿에서 누락된 채 이 프로파일도 없어
+     * /admin/market/** 이 fail-open 이었다. 파일이 지워지거나 플래그가 뒤집히면 여기서 깨진다.
+     */
+    @Test
+    void prod_프로파일은_internal_key_required_를_켠다() throws Exception {
+        List<PropertySource<?>> sources =
+                new YamlPropertySourceLoader().load("prod", new ClassPathResource("application-prod.yml"));
+
+        assertThat(sources).isNotEmpty();
+        assertThat(sources.get(0).getProperty("app.security.internal-key-required")).isEqualTo(true);
     }
 }
