@@ -113,6 +113,6 @@ README 기준 검증 항목:
 1. ~~`ceo-consulting-pipeline.mjs`가 `briefing.md` 초안까지 자동 생성하도록 확장~~ (완료 — 에이전트 자동 감지 + 자동 채점)
 2. ~~`documents` 플러그인을 통한 실제 `briefing.docx` 생성 예시 추가~~ (대체 완료 — 내장 zero-dependency 렌더러 `src/common/docx.mjs` + 예시 6종 재생성, 실제 Word COM 열림 검증)
 3. `../../../../../../README.md`의 장기 운영 규칙을 `../../../../../../AGENTS.md`로 더 이동해 README를 제출용 소개 문서로 축약
-4. ~~`outputs` 예시 산출물 폴더와 샘플 `pipeline-next-steps.md` 추가~~ (완료 — `outputs/삼성전자-ceo-pipeline`·`naver-ceo-pipeline/` 등 6벌 + `outputs/batch/2026Q2` 20사 동봉)
+4. ~~`outputs` 예시 산출물 폴더와 샘플 `pipeline-next-steps.md` 추가~~ (완료 — `outputs/삼성전자-ceo-pipeline`·`naver-ceo-pipeline/` 등 6벌 + `outputs/batch/2026Q2` 20사 실행. 산출물은 실존 상장사 진단이라 저장소 미포함 — 재현 명령으로 로컬 생성. 예외로 태영건설 백테스트만 동봉)
 5. `build-briefing-universe.mjs` 에 부분 저장/`--resume` 추가 (현재는 완주 후 1회 저장 — 중간 실패 시 전량 소실)
 6. 시장 축(KRX) MCP 서버 추가 (현재 dart/ecos/news/registry 4축만 CLI+MCP 이중 노출, KRX 는 CLI 단독)

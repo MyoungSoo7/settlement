@@ -26,6 +26,7 @@ import org.springframework.kafka.support.Acknowledgment;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
@@ -152,6 +153,46 @@ class EventContractConsumerTest {
         verify(userViewRepository).save(captor.capture());
         assertThat(captor.getValue().getUserId()).isEqualTo(301L);
         assertThat(captor.getValue().getEmail()).isEqualTo("seller777@lemuel.io");
+    }
+
+    @Test
+    @DisplayName("seller.tier_changed 정본 샘플 → settlement_user_view 등급이 갱신된다")
+    void sellerTierChangedSample_flowsIntoUserView() {
+        when(processedEventRepository.existsById(any())).thenReturn(false);
+        when(userViewRepository.findById(anyLong())).thenReturn(Optional.empty());
+        SellerTierChangedEventConsumer consumer = new SellerTierChangedEventConsumer(
+                userViewRepository, processedEventRepository, objectMapper, null);
+
+        String sample = EventContractValidator.canonicalSample("lemuel.seller.tier_changed");
+        consumer.onSellerTierChanged(recordOf("lemuel.seller.tier_changed", sample), mock(Acknowledgment.class));
+
+        ArgumentCaptor<SettlementUserViewJpaEntity> captor =
+                ArgumentCaptor.forClass(SettlementUserViewJpaEntity.class);
+        verify(userViewRepository).save(captor.capture());
+        assertThat(captor.getValue().getUserId()).isEqualTo(777L);
+        assertThat(captor.getValue().getSellerTier()).isEqualTo("VIP");
+        assertThat(captor.getValue().getTierEffectiveFrom()).isEqualTo(LocalDate.of(2026, 9, 1));
+    }
+
+    @Test
+    @DisplayName("seller.tier_changed 는 이미 있는 뷰의 email 을 지우지 않는다 — 등급만 덮어쓴다")
+    void sellerTierChangedSample_keepsExistingEmail() {
+        when(processedEventRepository.existsById(any())).thenReturn(false);
+        SettlementUserViewJpaEntity existing = new SettlementUserViewJpaEntity();
+        existing.setUserId(777L);
+        existing.setEmail("seller777@lemuel.io");
+        when(userViewRepository.findById(777L)).thenReturn(Optional.of(existing));
+        SellerTierChangedEventConsumer consumer = new SellerTierChangedEventConsumer(
+                userViewRepository, processedEventRepository, objectMapper, null);
+
+        String sample = EventContractValidator.canonicalSample("lemuel.seller.tier_changed");
+        consumer.onSellerTierChanged(recordOf("lemuel.seller.tier_changed", sample), mock(Acknowledgment.class));
+
+        ArgumentCaptor<SettlementUserViewJpaEntity> captor =
+                ArgumentCaptor.forClass(SettlementUserViewJpaEntity.class);
+        verify(userViewRepository).save(captor.capture());
+        assertThat(captor.getValue().getEmail()).isEqualTo("seller777@lemuel.io");
+        assertThat(captor.getValue().getSellerTier()).isEqualTo("VIP");
     }
 
     @Test

@@ -107,7 +107,7 @@ class MarketPersistenceAdapterTest {
 
         adapter.upsertQuote(new StockQuote(null, "000660", LocalDate.of(2026, 7, 7),
                 new BigDecimal("180000"), null, null, null, null, null,
-                null, null, null, null, ValueSource.KRX, null));
+                null, null, null, null, ValueSource.EXCHANGE, null));
 
         verify(quoteRepository).save(any(StockQuoteJpaEntity.class));
     }
@@ -117,6 +117,6 @@ class MarketPersistenceAdapterTest {
                 new BigDecimal("78000.00"), new BigDecimal("77000"), new BigDecimal("79000"),
                 new BigDecimal("76000"), new BigDecimal("1000"), new BigDecimal("1.30"),
                 BigInteger.valueOf(1000), BigInteger.valueOf(78_000_000), BigInteger.valueOf(5_000_000),
-                BigInteger.valueOf(465_000_000), ValueSource.KRX, Instant.now());
+                BigInteger.valueOf(465_000_000), ValueSource.EXCHANGE, Instant.now());
     }
 }

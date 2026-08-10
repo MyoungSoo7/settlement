@@ -32,6 +32,7 @@ public class Order {
     private LocalDateTime updatedAt;
     private BigDecimal shippingFee = BigDecimal.ZERO;  // 결제에 포함된 배송비(기본 0). 환불 정책 계산에 사용.
     private boolean shipped = false;                   // 배송 시작(IN_TRANSIT/DELIVERED 도달) 여부 — 상태 전이와 무관하게 보존.
+    private boolean stockRestored = false;             // 재고 원복 완료 — 이중 원복 방지(멱등 플래그).
     private final List<OrderItem> items = new ArrayList<>();
 
     // 정본 생성자 — 생성/복원 팩토리(create/createMultiItem/rehydrate)만 통과(Settlement 와 동형).
@@ -205,6 +206,69 @@ public class Order {
         order.shippingFee = shippingFee == null ? BigDecimal.ZERO : shippingFee;
         order.shipped = shipped;
         return order;
+    }
+
+    public static Order rehydrate(Long id, Long userId, Long productId, BigDecimal amount,
+                                  OrderStatus status, LocalDateTime createdAt, LocalDateTime updatedAt,
+                                  BigDecimal shippingFee, boolean shipped, boolean stockRestored) {
+        Order order = rehydrate(id, userId, productId, amount, status, createdAt, updatedAt, shippingFee, shipped);
+        order.stockRestored = stockRestored;
+        return order;
+    }
+
+    /**
+     * 회수 대기 재고를 가진 주문인지 — 배송된 물건에 대해 환불·취소가 끝났는데 아직 물건이 돌아오지 않은 상태.
+     *
+     * <p>이 상태의 수량은 <b>어느 쪽에도 잡혀 있지 않다</b>: 판매 가능 재고로는 복귀하지 않았고(회수 미확인),
+     * 고객에게는 이미 환불됐다. 방치하면 팔 수 있는 물건이 영영 묶이므로 운영자가 추적해야 한다
+     * (반품 회수가 확정되면 {@link #claimStockRestorationOnReturn()} 로 복귀).
+     */
+    public boolean isAwaitingStockReclaim() {
+        return shipped
+                && !stockRestored
+                && !items.isEmpty()
+                && (status == OrderStatus.REFUNDED || status == OrderStatus.CANCELED);
+    }
+
+    /** 이 주문의 재고가 이미 원복됐는지. */
+    public boolean isStockRestored() {
+        return stockRestored;
+    }
+
+    /**
+     * 취소·환불에 따른 재고 원복 권한을 요청한다. 원복 대상 라인을 돌려주며, 한 번 나간 권한은
+     * 다시 나오지 않는다(멱등) — 같은 주문이 두 번 원복되면 없는 재고가 생긴다.
+     *
+     * <p><b>배송이 시작된 주문은 원복하지 않는다.</b> 물건이 고객 손에 있는데 재고를 되돌리면
+     * 장부재고가 실재고를 넘어 "팔았는데 물건이 없는" 초과판매가 난다. 그 물건은 실제 회수가
+     * 확인될 때({@link #claimStockRestorationOnReturn()}) 비로소 재고로 돌아온다.
+     *
+     * @return 원복할 라인들. 빈 목록이면 원복 대상이 아니다(배송됨·이미 원복됨·라인 없는 레거시 주문)
+     */
+    public List<OrderItem> claimStockRestorationOnCancel() {
+        if (shipped) {
+            return List.of();
+        }
+        return claimStockRestoration();
+    }
+
+    /**
+     * 반품 회수 완료에 따른 재고 원복 권한을 요청한다. 물건이 실제로 돌아온 것이 확인된 시점이므로
+     * 배송된 주문도 원복 대상이다. 마찬가지로 권한은 한 번만 나간다 — 배송 전 취소로 이미 원복된
+     * 주문이 반품 회수로 다시 원복되는 일은 없다.
+     */
+    public List<OrderItem> claimStockRestorationOnReturn() {
+        return claimStockRestoration();
+    }
+
+    // 원복 권한 발급 — 미발급일 때만 라인을 넘기고 발급 사실을 기록한다.
+    private List<OrderItem> claimStockRestoration() {
+        if (stockRestored || items.isEmpty()) {
+            return List.of();
+        }
+        stockRestored = true;
+        this.updatedAt = LocalDateTime.now();
+        return List.copyOf(items);
     }
 
     /**

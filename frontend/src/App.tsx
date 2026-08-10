@@ -106,8 +106,8 @@ function App() {
             <Route path="/financials"         element={<Layout><FinancialStatementsPage /></Layout>} />
             {/* 기업 뉴스·평판 조회 (ADR 0023) — 공개 조회 API, 관리자 헤더 메뉴 '기업조회' 진입, Layout 유지 */}
             <Route path="/companies"          element={<Layout><CompanyLookupPage /></Layout>} />
-            {/* 국민연금 사업장 인원·연봉 비교 — 공공 데이터라 공개, Layout 유지 */}
-            <Route path="/workforce"          element={<Layout><WorkforcePage /></Layout>} />
+            {/* 국민연금 사업장 인원·연봉 비교 — 내부 운영자(ADMIN·MANAGER) 전용 */}
+            <Route path="/workforce"          element={<AdminManagerRoute><WorkforcePage /></AdminManagerRoute>} />
             {/* 한국은행 ECOS 경제지표 — 공공 데이터라 공개. 모든 사용자가 헤더 메뉴로 접근·왕복하도록 Layout 유지 */}
             <Route path="/economics"          element={<Layout><EconomicsPage /></Layout>} />
 

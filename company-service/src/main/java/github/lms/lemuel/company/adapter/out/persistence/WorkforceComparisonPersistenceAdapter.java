@@ -33,7 +33,9 @@ public class WorkforceComparisonPersistenceAdapter implements LoadWorkforceCompa
             SELECT a.metric, a.median, a.sample_size, p.percentile
             FROM workforce_aggregate a
             JOIN workforce_aggregate_build b
-              ON b.snapshot_month = a.snapshot_month AND b.status = 'COMPLETE'
+              ON b.snapshot_month = a.snapshot_month
+             AND b.status = 'COMPLETE'
+             AND b.coverage_scope = 'SEOUL_IT_FULL'
             LEFT JOIN workforce_percentile p
               ON p.snapshot_month = a.snapshot_month
              AND p.axis = a.axis AND p.level = a.level AND p.metric = a.metric

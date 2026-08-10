@@ -59,9 +59,7 @@ SettlementProductViewJpaEntity
 SettlementResponse
 SettlementSearchDocument
 SettlementSearchDocumentMapper
-SettlementUserViewJpaEntity
 SpringDataPayoutRepository
 StuckStateReport
 TaxInvoice
 TaxInvoiceJpaEntity
-UserRegisteredEventConsumer

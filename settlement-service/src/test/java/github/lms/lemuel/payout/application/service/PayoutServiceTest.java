@@ -15,6 +15,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import github.lms.lemuel.payout.application.port.in.ExecutePayoutUseCase.PayoutPreview;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -36,6 +37,8 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -264,6 +267,100 @@ class PayoutServiceTest {
 
         assertThatThrownBy(() -> service.cancel(99L, "ops", "사유"))
                 .isInstanceOf(IllegalArgumentException.class);
+        verify(savePort, never()).save(any());
+    }
+
+    // ───────── 송금 미리보기 (dryRun) — 돈이 나가기 전에 규모와 사유를 먼저 본다 ─────────
+
+    @Test
+    @DisplayName("미리보기: 대기 건이 없으면 빈 결과")
+    void preview_empty() {
+        when(loadPort.findByStatus(eq(PayoutStatus.REQUESTED), anyInt())).thenReturn(List.of());
+
+        PayoutPreview preview = service.previewPending();
+
+        assertThat(preview.sendableCount()).isZero();
+        assertThat(preview.sendableAmount()).isEqualByComparingTo("0");
+        assertThat(preview.lines()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("미리보기: 보낼 건의 건수·총액을 집계한다")
+    void preview_aggregatesSendable() {
+        when(loadPort.findByStatus(eq(PayoutStatus.REQUESTED), anyInt()))
+                .thenReturn(List.of(requested(1L, 10L, "30000"), requested(2L, 11L, "20000")));
+        when(limitChecker.canSend(anyLong(), any(), any(), any(), any()))
+                .thenReturn(new PayoutLimitChecker.Decision(true, null));
+
+        PayoutPreview preview = service.previewPending();
+
+        assertThat(preview.sendableCount()).isEqualTo(2);
+        assertThat(preview.sendableAmount()).isEqualByComparingTo("50000");
+        assertThat(preview.limitedCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("미리보기: 한도로 밀릴 건은 사유와 함께 분리 집계한다")
+    void preview_separatesLimited() {
+        when(loadPort.findByStatus(eq(PayoutStatus.REQUESTED), anyInt()))
+                .thenReturn(List.of(requested(1L, 10L, "30000")));
+        when(limitChecker.canSend(anyLong(), any(), any(), any(), any()))
+                .thenReturn(new PayoutLimitChecker.Decision(false, "셀러 일 한도 초과"));
+
+        PayoutPreview preview = service.previewPending();
+
+        assertThat(preview.sendableCount()).isZero();
+        assertThat(preview.limitedCount()).isEqualTo(1);
+        assertThat(preview.limitedAmount()).isEqualByComparingTo("30000");
+        assertThat(preview.lines().get(0).reason()).contains("한도");
+    }
+
+    @Test
+    @DisplayName("미리보기: 앞 건이 쓸 한도를 뒤 건 판정에 누적 반영한다 — 과대 보고 방지")
+    void preview_accumulatesProjectedAmounts() {
+        when(loadPort.findByStatus(eq(PayoutStatus.REQUESTED), anyInt()))
+                .thenReturn(List.of(requested(1L, 10L, "30000"), requested(2L, 10L, "20000")));
+        when(limitChecker.canSend(anyLong(), any(), any(), any(), any()))
+                .thenReturn(new PayoutLimitChecker.Decision(true, null));
+
+        service.previewPending();
+
+        // 같은 셀러(10)의 두 번째 건은 앞 건 30000 이 반영된 상태로 판정돼야 한다.
+        ArgumentCaptor<BigDecimal> sellerProjected = ArgumentCaptor.forClass(BigDecimal.class);
+        verify(limitChecker, times(2))
+                .canSend(anyLong(), any(), any(), sellerProjected.capture(), any());
+        assertThat(sellerProjected.getAllValues().get(0)).isEqualByComparingTo("0");
+        assertThat(sellerProjected.getAllValues().get(1)).isEqualByComparingTo("30000");
+    }
+
+    @Test
+    @DisplayName("미리보기: 밀린 건의 금액은 뒤 건 누적에 넣지 않는다(나가지 않을 돈)")
+    void preview_limitedAmountIsNotAccumulated() {
+        when(loadPort.findByStatus(eq(PayoutStatus.REQUESTED), anyInt()))
+                .thenReturn(List.of(requested(1L, 10L, "30000"), requested(2L, 10L, "20000")));
+        when(limitChecker.canSend(anyLong(), any(), any(), any(), any()))
+                .thenReturn(new PayoutLimitChecker.Decision(false, "한도 초과"))
+                .thenReturn(new PayoutLimitChecker.Decision(true, null));
+
+        service.previewPending();
+
+        ArgumentCaptor<BigDecimal> sellerProjected = ArgumentCaptor.forClass(BigDecimal.class);
+        verify(limitChecker, times(2))
+                .canSend(anyLong(), any(), any(), sellerProjected.capture(), any());
+        assertThat(sellerProjected.getAllValues().get(1)).isEqualByComparingTo("0");
+    }
+
+    @Test
+    @DisplayName("미리보기는 실제 송금을 절대 호출하지 않는다")
+    void preview_neverExecutes() {
+        when(loadPort.findByStatus(eq(PayoutStatus.REQUESTED), anyInt()))
+                .thenReturn(List.of(requested(1L, 10L, "30000")));
+        when(limitChecker.canSend(anyLong(), any(), any(), any(), any()))
+                .thenReturn(new PayoutLimitChecker.Decision(true, null));
+
+        service.previewPending();
+
+        verifyNoInteractions(singleExecutor);
         verify(savePort, never()).save(any());
     }
 }

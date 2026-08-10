@@ -7,13 +7,16 @@ import github.lms.lemuel.user.domain.User;
 import github.lms.lemuel.user.domain.UserRole;
 import github.lms.lemuel.user.domain.exception.InvalidPasswordResetTokenException;
 import github.lms.lemuel.user.domain.exception.UserNotFoundException;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
@@ -28,7 +31,19 @@ class PasswordResetServiceTest {
     @Mock PasswordHashPort passwordHashPort;
     @Mock SavePasswordResetTokenPort savePasswordResetTokenPort;
     @Mock SendEmailPort sendEmailPort;
-    @InjectMocks PasswordResetService passwordResetService;
+
+    /** 토큰 만료 판정을 결정적으로 만들기 위한 고정 시각(KST) — 프로덕션은 TimeConfig 의 시스템 Clock. */
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+    private static final LocalDateTime NOW = LocalDateTime.of(2026, 3, 1, 12, 0);
+    private final Clock clock = Clock.fixed(NOW.atZone(KST).toInstant(), KST);
+
+    private PasswordResetService passwordResetService;
+
+    @BeforeEach
+    void setUp() {
+        passwordResetService = new PasswordResetService(loadUserPort, saveUserPort,
+                savePasswordResetTokenPort, sendEmailPort, passwordHashPort, clock);
+    }
 
     private User user(Long id, String email) {
         User u = User.createWithRole(email, "oldhash", UserRole.USER);
@@ -38,7 +53,7 @@ class PasswordResetServiceTest {
 
     private PasswordResetToken validToken(Long userId, String tokenValue) {
         return new PasswordResetToken(null, userId, tokenValue,
-                java.time.LocalDateTime.now().plusMinutes(30), false, java.time.LocalDateTime.now());
+                NOW.plusMinutes(30), false, NOW);
     }
 
     @Test @DisplayName("비밀번호 재설정 요청 - 존재하지 않는 이메일이면 조용히 무시")

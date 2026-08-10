@@ -6,6 +6,8 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 import {
+  checkProtectedDeletions,
+  discoverStagedDeletions,
   discoverStagedFiles,
   dodNudgeMessage,
   normalizeRepoPath,
@@ -397,5 +399,103 @@ describe('structured allowances', () => {
       owner: 'team-settlement',
       expires: '2026-08-01',
     }]);
+  });
+});
+
+describe('protected harness path deletion', () => {
+  test('flags deletion of agent config and harness paths', () => {
+    const violations = checkProtectedDeletions([
+      '.claude/skills/tdd-discipline/SKILL.md',
+      '.codex/config.toml',
+      'scripts/harness/guard.mjs',
+    ]);
+
+    assert.deepEqual(violations.map(({ id }) => id),
+      ['HARNESS-DELETE', 'HARNESS-DELETE', 'HARNESS-DELETE']);
+  });
+
+  test('ignores deletions outside protected paths', () => {
+    assert.deepEqual(checkProtectedDeletions([
+      'settlement-service/src/main/java/Foo.java',
+      'docs/adr/0001-x.md',
+      'README.md',
+    ]), []);
+  });
+
+  // docs/harness 는 하네스 기계장치가 아니라 해커톤 제출물 보관함이다 — PR #210 사고 때 세 경로가
+  // 한 묶음으로 지워져 보호 목록에 함께 들어갔을 뿐이다. 공개 저장소 위생상 의도적으로 비우는
+  // 대상이므로(CLAUDE.md 배치 기준) 보호하지 않는다. 진짜 하네스는 scripts/harness·.claude·.codex 다.
+  test('docs/harness is submission storage, not harness machinery — deletion is allowed', () => {
+    assert.deepEqual(checkProtectedDeletions([
+      'docs/harness/hackathon/kakaopay/submission/README.md',
+      'docs/harness/omc-harness.md',
+    ]), []);
+  });
+
+  test('does not mistake lookalike prefixes for protected paths', () => {
+    assert.deepEqual(checkProtectedDeletions([
+      '.claudex/file.md',
+      'docs/harness2/etc/note.md',
+      'scripts/harness-old/tool.mjs',
+    ]), []);
+  });
+
+  test('a single deletion is enough to block — mass deletion is not the threshold', () => {
+    assert.equal(checkProtectedDeletions(['.claude/skills/money-safety/SKILL.md']).length, 1);
+  });
+
+  test('gitignored subtrees are not protected — they are regenerable session state', () => {
+    assert.deepEqual(checkProtectedDeletions([
+      '.claude/scratch/note.md',
+      '.claude/agent-memory/x/MEMORY.md',
+      '.claude/worktrees/w/file',
+      '.claude/harness/state.json',
+    ]), []);
+  });
+
+  test('the message names the recovery path so an operator is not stuck', () => {
+    const [violation] = checkProtectedDeletions(['.claude/skills/oo-score/SKILL.md']);
+    assert.match(violation.msg, /HARNESS_ALLOW_DELETE/);
+  });
+
+  test('escape hatch: explicit env opt-in clears the block', () => {
+    assert.deepEqual(
+      checkProtectedDeletions(['.claude/skills/oo-score/SKILL.md'], { allowDelete: true }),
+      [],
+    );
+  });
+
+  test('staged deletions are discoverable — ACMR filter alone hides them', () => {
+    assert.equal(typeof discoverStagedDeletions, 'function');
+  });
+});
+
+describe('--deleted-list mode (CI wiring)', () => {
+  test('blocks when the deleted-file list touches a protected path', async () => {
+    const repoRoot = await temporaryRepo();
+    await writeFile(join(repoRoot, 'deleted.txt'), '.claude/skills/tdd-discipline/SKILL.md\n');
+    const errors = [];
+
+    const code = await runGuardCli(['--deleted-list', 'deleted.txt'],
+      { repoRoot, stderr: (m) => errors.push(m), stdout: () => {} });
+
+    assert.equal(code, 1);
+    assert.ok(errors.some((m) => m.includes('HARNESS-DELETE')));
+  });
+
+  test('passes when no protected path is deleted', async () => {
+    const repoRoot = await temporaryRepo();
+    await writeFile(join(repoRoot, 'deleted.txt'), 'settlement-service/src/main/java/Foo.java\n');
+
+    assert.equal(await runGuardCli(['--deleted-list', 'deleted.txt'],
+      { repoRoot, stderr: () => {}, stdout: () => {} }), 0);
+  });
+
+  test('an empty deleted list is clean, not an error', async () => {
+    const repoRoot = await temporaryRepo();
+    await writeFile(join(repoRoot, 'deleted.txt'), '');
+
+    assert.equal(await runGuardCli(['--deleted-list', 'deleted.txt'],
+      { repoRoot, stderr: () => {}, stdout: () => {} }), 0);
   });
 });

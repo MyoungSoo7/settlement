@@ -390,13 +390,13 @@ docker compose ps        # STATUS 열이 전부 Up (healthy) 이면 성공
 ### E2E 최종 검증 (가입 → 주문 → 결제 → 취소 → 환불)
 
 전체 구매 흐름을 gateway 경유로 한 번에 검증하는 시나리오:
-[docs/demo/E2E-SCENARIO.md](docs/demo/E2E-SCENARIO.md) (단계별 요청값·기대 응답·데이터 초기화 포함)
+`docs/demo/E2E-SCENARIO.md`(로컬 전용, 저장소 미포함) (단계별 요청값·기대 응답·데이터 초기화 포함)
 
 ```bash
 npx newman run docs/demo/postman-e2e-purchase-flow.json -e docs/demo/postman-environment.json
 ```
 
-**실행 증거**: [docs/demo/e2e-report.html](docs/demo/e2e-report.html) — 전체 재빌드 스택에서
+**실행 증거**: `docs/demo/e2e-report.html`(로컬 전용, 저장소 미포함) — 전체 재빌드 스택에서
 14개 요청·14개 assertion 전부 통과한 newman HTML 리포트 (단계별 요청/응답 포함).
 재생성: 위 명령에 `--reporters cli,htmlextra --reporter-htmlextra-export docs/demo/e2e-report.html` 추가.
 
@@ -550,7 +550,7 @@ PENDING → READY → SHIPPED → IN_TRANSIT → DELIVERED → (선택) RETURNED
 | ADR (아키텍처 결정 기록) | [`docs/adr/`](./docs/adr/) |
 | Runbook (장애 대응) | [`docs/runbook/`](./docs/runbook/) |
 | CI/CD | [`.github/workflows/`](./.github/workflows/) |
-| Kubernetes | [`k8s/`](./k8s/) |
+| Kubernetes | `k8s/`(저장소 미포함 — 매니페스트는 로컬 보관) |
 | Flyway | [`order-service/src/main/resources/db/migration/`](./order-service/src/main/resources/db/migration/) |
 
 ### 주요 ADR

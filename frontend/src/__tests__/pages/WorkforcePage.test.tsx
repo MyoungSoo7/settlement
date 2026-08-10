@@ -177,6 +177,41 @@ const withSalaryDifference = (difference: string): WorkforceComparison => ({
   },
 });
 
+/**
+ * 인원수 증감률은 집단 중앙값이 한 자릿수(전국 중앙값 7명)일 때 백만 % 단위가 실제로 나온다
+ * (삼성전자 125,592명 대비 +1,794,071.43%). 소수까지 그대로 그리면 4등분 그리드의 증감률 칸이
+ * 내용 폭만큼 늘어나 백분위 칸을 밀어내 두 값이 붙어 보인다 — 실화면에서 재현된 버그.
+ */
+const withHeadcountRate = (differenceRate: number): WorkforceComparison => ({
+  ...detail,
+  industryComparison: {
+    ...detail.industryComparison,
+    headcount: { median: 7, difference: 125585, differenceRate, percentile: 100 },
+  },
+});
+
+describe('WorkforcePage 증감률 표시', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    workforce.mockResolvedValue(listPage);
+    workforceHistory.mockResolvedValue(history);
+  });
+
+  it('자릿수가 큰 증감률은 소수를 버리고 정확한 값은 title 로 남긴다', async () => {
+    workforceDetail.mockResolvedValue(withHeadcountRate(1794071.43));
+    await openComparison();
+    const cell = await screen.findByText('+1,794,071%');
+    expect(cell).toHaveAttribute('title', '+1,794,071.43%');
+    expect(screen.queryByText('+1,794,071.43%')).not.toBeInTheDocument();
+  });
+
+  it('두 자릿수 증감률은 소수를 그대로 보여준다', async () => {
+    workforceDetail.mockResolvedValue(withHeadcountRate(40.57));
+    await openComparison();
+    expect(await screen.findByText('+40.57%')).toBeInTheDocument();
+  });
+});
+
 describe('WorkforcePage 차이값 색상', () => {
   beforeEach(() => {
     vi.clearAllMocks();

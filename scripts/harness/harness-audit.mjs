@@ -178,6 +178,235 @@ function validatePluginGuardPaths(read, tracked, trackedSet, errors) {
   }
 }
 
+// 문서 → 저장소 노드 간선. 마크다운 링크 `[텍스트](경로)` 의 대상이 추적 그래프 안에 있는지 본다.
+// 링크 대상만 보고 backtick 경로는 보지 않는다 — 산문 속 경로는 예시·플레이스홀더가 섞여 소음이 크다.
+// 제목(`[x](a.md "제목")`)은 잘라내고, 외부 URL·앵커·플레이스홀더(<>{}*$)는 대상이 아니다.
+export function parseDocLinks(markdown) {
+  const targets = [];
+  for (const match of String(markdown).matchAll(/\]\(([^)\n]+)\)/g)) {
+    const target = match[1].trim().split(/\s+/)[0];
+    if (!target || target.startsWith('#')) continue;
+    if (target.includes('://') || target.startsWith('mailto:')) continue;
+    if (/[<>{}*$]/.test(target)) continue;
+    targets.push(target);
+  }
+  return targets;
+}
+
+// 문서 기준 상대경로를 저장소 루트 기준으로 접는다. OS 경로 API 를 쓰지 않는다 —
+// 저장소 경로는 항상 POSIX 이고, Windows 에서 path.join 을 태우면 구분자가 섞인다.
+function resolveDocTarget(doc, target) {
+  const out = [];
+  for (const segment of [...doc.split('/').slice(0, -1), ...target.split('/')]) {
+    if (!segment || segment === '.') continue;
+    if (segment === '..') {
+      if (out.length === 0) return null; // 저장소 밖 — 판정 대상 아님
+      out.pop();
+      continue;
+    }
+    out.push(segment);
+  }
+  return out.join('/');
+}
+
+/**
+ * 링크가 추적 그래프를 벗어나면 보고한다. 두 유형을 구분하는 것이 이 검사의 핵심이다.
+ *
+ * <p>`dangling` 은 대상이 아예 없는 경우고, `untracked` 는 디스크에는 있지만 추적되지 않는 경우다.
+ * 후자가 더 위험하다 — 작성자 화면에서는 링크가 열리므로 육안 리뷰로 절대 잡히지 않고,
+ * clone 한 사람에게만 깨진다. 실제로 gitignore 된 경로를 "정본"으로 가리키는 문서가 나왔다.
+ */
+function validateDocLinks(root, read, tracked, trackedSet, manifest, errors) {
+  const ignorePrefixes = manifest.docLinkIgnorePrefixes ?? [];
+  const dirs = new Set();
+  for (const path of tracked) {
+    const parts = path.split('/');
+    for (let i = 1; i < parts.length; i += 1) dirs.add(parts.slice(0, i).join('/'));
+  }
+  // 에이전트 지시서(.claude/·.codex/)는 스캔하지 않는다 — 그 링크는 저장소 참조가 아니라
+  // "이런 파일을 만들어라"는 산출물 명세인 경우가 많아, 검사하면 템플릿마다 예외를 등록하게 된다.
+  // 그 트리의 참조 무결성은 위 referenceSources 검사(scripts/harness 경로)가 담당한다.
+  for (const doc of tracked.filter((p) => p.endsWith('.md') && !/^\.(claude|codex)\//.test(p))) {
+    let text;
+    try {
+      text = read(doc);
+    } catch {
+      continue;
+    }
+    for (const raw of parseDocLinks(text)) {
+      const target = raw.split('#')[0].split('?')[0];
+      if (!target) continue;
+      const resolved = resolveDocTarget(doc, target);
+      if (resolved === null || resolved === '') continue;
+      if (ignorePrefixes.some((prefix) => resolved.startsWith(prefix))) continue;
+      if (trackedSet.has(resolved) || dirs.has(resolved)) continue;
+      errors.push(existsSync(resolve(root, ...resolved.split('/')))
+        ? `doc link untracked: ${doc} → ${target} (디스크에만 존재 — 로컬에서만 열리고 clone 하면 깨진다)`
+        : `doc link dangling: ${doc} → ${target} (대상 없음)`);
+    }
+  }
+}
+
+// 서비스 → 배선 간선. 배선 누락은 컴파일이 잡아주지 않고 런타임에 조용히 404/500 으로 나온다
+// (📘msa-service-wiring, 실사고 36ac0234). 5곳 중 기계로 확정 가능한 3곳만 본다 —
+// nginx 는 배포 형태가 여러 벌이라 단일 정본이 없고, JPA 스캔은 제한 스캔 서비스마다 정책이 달라
+// 오탐이 난다. 나머지 2곳은 스킬 체크리스트가 담당한다.
+
+// 루트 Dockerfile 은 의존 COPY(build.gradle.kts)와 소스 COPY 두 벌을 요구한다.
+// 소스 COPY 가 빠지면 settings 평가는 통과하고 빌드가 뒤에서 깨진다 — 둘 다 있어야 배선이다.
+export function parseDockerfileModules(dockerfile) {
+  const text = String(dockerfile);
+  const deps = new Set([...text.matchAll(/^COPY\s+([\w-]+)\/build\.gradle\.kts/gm)].map((m) => m[1]));
+  const sources = new Set([...text.matchAll(/^COPY\s+([\w-]+)\s+\.\/[\w-]+/gm)].map((m) => m[1]));
+  return [...deps].filter((module) => sources.has(module));
+}
+
+/**
+ * ci.yml 이 서비스를 아는 방법은 둘 다 필요하다 — paths-filter 는 "무엇이 바뀌었나",
+ * image 매핑은 "무엇을 빌드·푸시하나". 매핑에 없으면 테스트는 돌아도 이미지가 안 만들어진다.
+ */
+export function parseCiMatrixModules(yaml) {
+  const text = String(yaml);
+  const filters = [...text.matchAll(/^\s{8,}([a-z][\w-]*-service):\s*\[/gm)].map((m) => m[1]);
+  const mapped = [...text.matchAll(/^\s*"([a-z][\w-]*-service)"\s*:\s*"/gm)].map((m) => m[1]);
+  // 양쪽 모두에 있어야 배선된 것으로 본다(한쪽만 있으면 절반만 도는 상태다).
+  return filters.filter((module) => mapped.includes(module));
+}
+
+/** compose 최상위 services 키만 본다(들여쓰기 2칸) — 중첩 블록의 키에 오탐하지 않게. */
+export function parseComposeServices(yaml) {
+  const text = String(yaml);
+  const start = text.search(/^services:\s*$/m);
+  if (start < 0) return [];
+  const body = text.slice(start).split('\n').slice(1);
+  const names = [];
+  for (const line of body) {
+    if (/^\S/.test(line)) break;            // 다음 최상위 키(volumes: 등)에서 멈춘다
+    const match = line.match(/^ {2}([a-z][\w-]*):\s*$/);
+    if (match) names.push(match[1]);
+  }
+  return names;
+}
+
+export function parseGatewayRouteIds(yaml) {
+  return [...String(yaml).matchAll(/^\s*-\s*id:\s*(\S+)/gm)].map((m) => m[1]);
+}
+
+export function parseScanBasePackages(java) {
+  const match = String(java).match(/scanBasePackages\s*=\s*(\{[^}]*\}|"[^"]+")/);
+  return match ? [...match[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]) : [];
+}
+
+const SPRING_STEREOTYPE = /@(RestController|Controller|Component|Service|Repository|Configuration|ControllerAdvice|ConfigurationProperties)\b/;
+const DOMAIN_BASE = 'src/main/java/github/lms/lemuel/';
+
+function validateServiceWiring(read, tracked, trackedSet, errors) {
+  if (!trackedSet.has('settings.gradle.kts')) return;
+  const modules = parseGradleModules(read('settings.gradle.kts'));
+
+  if (trackedSet.has('Dockerfile')) {
+    const copied = new Set(parseDockerfileModules(read('Dockerfile')));
+    for (const module of modules) {
+      if (!copied.has(module)) {
+        errors.push(`service wiring: Dockerfile COPY 누락: ${module} (settings 평가가 실패해 전체 이미지 빌드가 깨진다)`);
+      }
+    }
+  }
+
+  // 배포 파이프라인 간선 — Dockerfile·gateway 가 맞아도 여기서 빠지면 이미지가 영원히 안 만들어지고
+  // (CI 매트릭스) 로컬에서 뜨지도 않는다(compose). 둘 다 컴파일도 테스트도 잡아주지 않는다.
+  const ciYml = '.github/workflows/ci.yml';
+  if (trackedSet.has(ciYml)) {
+    const wired = new Set(parseCiMatrixModules(read(ciYml)));
+    for (const module of modules) {
+      if (!wired.has(module)) {
+        errors.push(`service wiring: CI 매트릭스 누락: ${module} (테스트는 전체 build 로 돌지만 이미지가 빌드·푸시되지 않는다)`);
+      }
+    }
+  }
+
+  const composeYml = 'docker-compose.yml';
+  if (trackedSet.has(composeYml)) {
+    const services = new Set(parseComposeServices(read(composeYml)));
+    for (const module of modules) {
+      if (!services.has(module)) {
+        errors.push(`service wiring: docker-compose 누락: ${module} (로컬·통합 기동 대상이 아니라 배선 오류가 실행 전까지 안 드러난다)`);
+      }
+    }
+  }
+
+  const gatewayYml = 'gateway-service/src/main/resources/application.yml';
+  if (trackedSet.has(gatewayYml)) {
+    const ids = parseGatewayRouteIds(read(gatewayYml));
+    for (const module of modules) {
+      if (module === 'gateway-service') continue;
+      // 라우트 id 는 모듈명 그대로이거나 접미가 붙는다(order-service-orders 처럼 경로군 분리).
+      if (!ids.some((id) => id === module || id.startsWith(`${module}-`))) {
+        errors.push(`service wiring: gateway 라우트 누락: ${module} (직접 포트는 되고 8080 경유만 404)`);
+      }
+    }
+  }
+
+  // 스프링 빈을 가진 도메인 패키지가 scanBasePackages 에 없으면 핸들러가 등록되지 않는다.
+  // 스테레오타입이 없는 패키지(마커·DTO·순수 도메인)는 요구하지 않는다 — 요구하면 오탐만 는다.
+  for (const module of modules) {
+    const appPath = tracked.find((p) => p.startsWith(`${module}/src/main/java/`) && p.endsWith('Application.java'));
+    if (!appPath) continue;
+    const scanned = parseScanBasePackages(read(appPath));
+    if (scanned.length === 0) continue; // 미선언 = 애플리케이션 패키지 이하 기본 스캔
+    const base = `${module}/${DOMAIN_BASE}`;
+    const packages = new Set();
+    for (const path of tracked) {
+      if (!path.startsWith(base) || !path.endsWith('.java')) continue;
+      const rest = path.slice(base.length).split('/');
+      if (rest.length > 1) packages.add(rest[0]);
+    }
+    for (const pkg of [...packages].sort()) {
+      const full = `github.lms.lemuel.${pkg}`;
+      if (scanned.some((s) => s === full || s === 'github.lms.lemuel' || full.startsWith(`${s}.`))) continue;
+      const owned = tracked.filter((p) => p.startsWith(`${base + pkg}/`) && p.endsWith('.java'));
+      if (owned.some((p) => SPRING_STEREOTYPE.test(read(p)))) {
+        errors.push(`service wiring: scanBasePackages 누락: ${module} → ${full} (빈 미등록 — 핸들러 404 / 리포지토리 500)`);
+      }
+    }
+  }
+}
+
+// 제출물 → 소유 서비스 간선. CLAUDE.md 배치 기준을 기계로 옮긴다.
+// 제출물은 플러그인 매니페스트(.claude-plugin/.codex-plugin)로 식별한다 — 디렉토리 이름 규칙은
+// 제출물마다 달라 신뢰할 수 없지만 매니페스트는 어느 플러그인에나 있다.
+export function parseSubmissionRoots(tracked, modules) {
+  const known = new Set(modules);
+  const roots = new Map();
+  for (const path of tracked) {
+    if (!/\.(claude|codex)-plugin\/plugin\.json$/.test(path)) continue;
+    const match = path.match(/^([\w-]+)\/src\/main\/resources\/([^/]+)\//);
+    if (!match || !known.has(match[1])) {
+      roots.set(path, null); // 소유 서비스 밖 — 위치 위반
+      continue;
+    }
+    roots.set(`${match[1]}::${match[2]}`, { module: match[1], root: match[2] });
+  }
+  return [...roots].map(([key, value]) => value ?? { module: null, root: null, path: key });
+}
+
+function validateSubmissionPlacement(read, tracked, trackedSet, errors) {
+  if (!trackedSet.has('settings.gradle.kts')) return;
+  const modules = parseGradleModules(read('settings.gradle.kts'));
+  for (const entry of parseSubmissionRoots(tracked, modules)) {
+    if (entry.module === null) {
+      errors.push(`submission placement: ${entry.path} (소유 서비스의 src/main/resources 밖 — 소유 서비스가 없는 제출물은 저장소에 두지 않는다)`);
+      continue;
+    }
+    // jar 에 실리면 이미지가 부풀고 제출물이 배포물에 섞인다(company-service 실측 111M → 84K).
+    const gradle = `${entry.module}/build.gradle.kts`;
+    if (!trackedSet.has(gradle)) continue;
+    if (!read(gradle).includes(`exclude("${entry.root}/**")`)) {
+      errors.push(`submission jar leak: ${entry.module} → ${entry.root} (processResources exclude 누락 — 부트 jar 에 제출물이 실린다)`);
+    }
+  }
+}
+
 function validateStatus(status, tracked, errors) {
   const checks = [
     ['application.yml', tracked.filter((p) => /\/src\/main\/resources\/application\.yml$/.test(p)).length, [/application\.yml[^\n]*?\*\*(\d[\d,]*)[^\d\n*]*\*\*/i, /application\.yml[^\n]*?→\s*(\d[\d,]*)/i]],
@@ -216,6 +445,9 @@ export function collectAudit(repoRoot, manifest) {
   validateModuleRoster(read, trackedSet, errors);
   validateRoutingMap(read, trackedSet, errors);
   validatePluginGuardPaths(read, tracked, trackedSet, errors);
+  validateDocLinks(root, read, tracked, trackedSet, manifest, errors);
+  validateServiceWiring(read, tracked, trackedSet, errors);
+  validateSubmissionPlacement(read, tracked, trackedSet, errors);
 
   for (const pair of manifest.criticalContractPairs) {
     if (!trackedSet.has(pair.claude) || !trackedSet.has(pair.codex)) continue;

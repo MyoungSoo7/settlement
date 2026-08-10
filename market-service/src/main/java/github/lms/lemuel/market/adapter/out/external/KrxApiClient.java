@@ -131,7 +131,7 @@ public class KrxApiClient implements KrxClientPort {
     /** 1행 → StockPrice. 종목코드/종가/시장이 없으면 skip(null). */
     private StockPrice parseItem(JsonNode item, LocalDate baseDate) {
         String stockCode = item.path("srtnCd").asText("").strip();
-        Market market = Market.fromCode(item.path("mrktCtg").asText(""));
+        Market market = toMarket(item.path("mrktCtg").asText(""));
         BigDecimal close = parseDecimal(item.path("clpr").asText(""));
         if (stockCode.isEmpty() || market == null || close == null) {
             return null;
@@ -152,6 +152,24 @@ public class KrxApiClient implements KrxClientPort {
                 parseInteger(item.path("trPrc").asText("")),
                 parseInteger(item.path("lstgStCnt").asText("")),
                 parseInteger(item.path("mrktTotAmt").asText("")));
+    }
+
+    /**
+     * 금융위 피드의 시장구분 코드({@code mrktCtg}) → 도메인 {@link Market}. 미지/결측이면 null(그 행 skip).
+     *
+     * <p>이 번역은 어댑터의 책임이다. 도메인 enum 이 공급자의 코드 문자열을 알면, 공급자가 바뀌거나
+     * 코드 체계가 늘어날 때 도메인이 함께 흔들린다.
+     */
+    static Market toMarket(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        return switch (raw.strip().toUpperCase()) {
+            case "KOSPI" -> Market.KOSPI;
+            case "KOSDAQ" -> Market.KOSDAQ;
+            case "KONEX" -> Market.KONEX;
+            default -> null;
+        };
     }
 
     private static String blankToNull(String v) {

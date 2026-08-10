@@ -151,4 +151,20 @@ class KrxApiClientTest {
         assertThat(only.openPrice()).isNull();   // "abc" → null
         assertThat(only.isin()).isNull();         // isinCd 결측 → blankToNull
     }
+
+    // 시장구분 코드 번역은 도메인이 아니라 이 어댑터의 책임이다 (Market.fromCode 에서 내려왔다).
+
+    @Test
+    void 정상_시장코드는_매핑된다() {
+        assertThat(KrxApiClient.toMarket("KOSPI")).isEqualTo(Market.KOSPI);
+        assertThat(KrxApiClient.toMarket(" kosdaq ")).isEqualTo(Market.KOSDAQ);
+        assertThat(KrxApiClient.toMarket("KONEX")).isEqualTo(Market.KONEX);
+    }
+
+    @Test
+    void 알수없는_값이나_공백은_null() {
+        assertThat(KrxApiClient.toMarket(null)).isNull();
+        assertThat(KrxApiClient.toMarket("")).isNull();
+        assertThat(KrxApiClient.toMarket("NASDAQ")).isNull();
+    }
 }

@@ -39,6 +39,7 @@ public enum ErrorCode {
     DUPLICATE_PRODUCT_NAME(HttpStatus.CONFLICT, "이미 존재하는 상품명입니다."),
     INSUFFICIENT_STOCK(HttpStatus.BAD_REQUEST, "재고가 부족합니다."),
     STOCK_CONCURRENCY(HttpStatus.CONFLICT, "재고 동시성 충돌이 발생했습니다. 잠시 후 다시 시도해주세요."),
+    IMAGE_STORAGE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "이미지 저장에 실패했습니다. 잠시 후 다시 시도해주세요."),
 
     // ─── category ────────────────────────────────────────────────────────────
     CATEGORY_NOT_FOUND(HttpStatus.NOT_FOUND, "카테고리를 찾을 수 없습니다."),
@@ -61,6 +62,9 @@ public enum ErrorCode {
     LEDGER_NOT_FOUND(HttpStatus.NOT_FOUND, "원장 항목을 찾을 수 없습니다."),
     LEDGER_PERIOD_CLOSED(HttpStatus.CONFLICT, "마감된 원장 기간에는 신규 분개를 작성할 수 없습니다."),
     LEDGER_PERIOD_IMBALANCE(HttpStatus.UNPROCESSABLE_ENTITY, "시산표 차대가 균형을 이루지 않아 기간을 마감할 수 없습니다."),
+    MONTHLY_CLOSING_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 월의 정보계 마감 이력이 없습니다."),
+    MONTHLY_CLOSING_LOCKED(HttpStatus.CONFLICT, "원장 마감된 기간의 정보계 마트는 재적재할 수 없습니다."),
+    MONTHLY_CLOSING_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "정보계 월마감 실행에 실패했습니다."),
 
     // ─── loan (선정산·기업 신용대출) ─────────────────────────────────────────────
     CORPORATE_LOAN_NOT_FOUND(HttpStatus.NOT_FOUND, "대출 건 또는 재무자료를 찾을 수 없습니다."),
@@ -89,8 +93,16 @@ public enum ErrorCode {
     CARD_SUB_LIMIT_EXCEEDED(HttpStatus.UNPROCESSABLE_ENTITY, "임직원 한도 합계가 법인 마스터 한도를 초과합니다."),
     CARD_HOLDER_NOT_MEMBER(HttpStatus.UNPROCESSABLE_ENTITY, "해당 조직의 활성 구성원이 아닙니다."),
     CARD_FORBIDDEN(HttpStatus.FORBIDDEN, "이 작업을 수행할 권한이 없습니다."),
+    CARD_AUTHORIZATION_NOT_FOUND(HttpStatus.NOT_FOUND, "승인 홀드를 찾을 수 없습니다."),
     // 재원 조회 실패는 폴백 없이 명시적 실패시킨다 — 재원을 모른 채 추정 한도를 주면 그 자체가 여신 사고다.
-    CARD_FUNDING_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "재원 조회에 실패했습니다. 잠시 후 다시 시도해주세요.");
+    CARD_FUNDING_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "재원 조회에 실패했습니다. 잠시 후 다시 시도해주세요."),
+
+    // ─── banking (수신 상품 — 정기예금·적금·퇴직연금) ─────────────────────────────
+    // 형제 도메인과 같이 상품별 전용 NOT_FOUND 를 둔다. INVALID_ARGUMENT 로 대용하면 없는 리소스가
+    // 400 으로 나가 클라이언트가 "잘못 보냈다"와 "없다"를 구분하지 못한다.
+    TIME_DEPOSIT_NOT_FOUND(HttpStatus.NOT_FOUND, "정기예금을 찾을 수 없습니다."),
+    INSTALLMENT_SAVINGS_NOT_FOUND(HttpStatus.NOT_FOUND, "적금을 찾을 수 없습니다."),
+    RETIREMENT_PENSION_NOT_FOUND(HttpStatus.NOT_FOUND, "퇴직연금을 찾을 수 없습니다.");
 
     private final HttpStatus status;
     private final String defaultMessage;

@@ -75,7 +75,7 @@ class MarketWebLayerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.stockCode").value("005930"))
                 .andExpect(jsonPath("$.latest.closePrice").value(78000.00))
-                .andExpect(jsonPath("$.latest.source").value("KRX"));
+                .andExpect(jsonPath("$.latest.source").value("EXCHANGE"));
     }
 
     @Test
@@ -164,6 +164,6 @@ class MarketWebLayerTest {
                 new BigDecimal("78000.00"), new BigDecimal("77000"), new BigDecimal("79000"),
                 new BigDecimal("76000"), new BigDecimal("1000"), new BigDecimal("1.30"),
                 BigInteger.valueOf(1000), BigInteger.valueOf(78_000_000), BigInteger.valueOf(5_000_000),
-                BigInteger.valueOf(465_000_000), ValueSource.KRX, Instant.now());
+                BigInteger.valueOf(465_000_000), ValueSource.EXCHANGE, Instant.now());
     }
 }

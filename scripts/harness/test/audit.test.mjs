@@ -8,6 +8,10 @@ import { tmpdir } from 'node:os';
 import {
   collectAudit,
   extractHarnessContract,
+  parseDocLinks,
+  parseDockerfileModules,
+  parseGatewayRouteIds,
+  parseScanBasePackages,
   readContractCases,
   runAuditCli,
   validateManifest,
@@ -460,7 +464,182 @@ test('Claude settings retain the write guard, advisory skill router, and telemet
   });
 });
 
-test('repository harness contracts and STATUS match the tracked manifest oracle', () => {
+test('parseDocLinks collects markdown link targets and skips non-path links', () => {
+  const md = [
+    '[tracked](docs/a.md) [dir](docs/) [anchor](#section)',
+    '[ext](https://example.com/x) [mail](mailto:a@b.c)',
+    '[title](docs/b.md "제목") [placeholder](docs/<name>.md)',
+    '[query](docs/c.md#frag) `[notalink](x)` 는 인라인 코드가 아니라 링크로 본다',
+  ].join('\n');
+  assert.deepEqual(parseDocLinks(md), ['docs/a.md', 'docs/', 'docs/b.md', 'docs/c.md#frag', 'x']);
+});
+
+// 문서 → 저장소 노드 간선. 오늘의 사고 유형 그대로:
+// 삭제된 경로를 가리키는 링크(완전 없음)와, 디스크에는 있지만 추적되지 않는 경로를 "정본"으로
+// 가리키는 링크(로컬만 존재)를 구분해 보고한다. 후자가 더 위험하다 — 작성자 화면에서는 열리고
+// clone 한 사람에게만 깨지므로 육안 리뷰로는 잡히지 않는다.
+test('collectAudit reports doc links that leave the tracked graph', () => {
+  const files = {
+    'manifest.json': JSON.stringify(baseManifest(['manifest.json'])),
+    'README.md': [
+      '[ok-file](docs/kept.md)',
+      '[ok-dir](docs/)',
+      '[gone](docs/deleted.md)',
+      '[local-only](docs/local.md)',
+      '[external](https://example.com)',
+      '[anchor](#top)',
+    ].join('\n'),
+    'docs/kept.md': '# kept',
+    'docs/local.md': '# 디스크에는 있지만 추적되지 않는다',
+  };
+  const root = repo(files, ['manifest.json', 'README.md', 'docs/kept.md']);
+  const errors = collectAudit(root, baseManifest(['manifest.json'])).errors.filter((e) => e.startsWith('doc link'));
+
+  assert.equal(errors.length, 2, errors.join('\n'));
+  assert.match(errors.join('\n'), /doc link dangling: README\.md → docs\/deleted\.md/);
+  assert.match(errors.join('\n'), /doc link untracked: README\.md → docs\/local\.md.*로컬/);
+});
+
+// 에이전트 지시서(.claude/·.codex/)의 링크는 저장소 참조가 아니라 "이런 파일을 만들어라"는
+// 산출물 명세인 경우가 많다(ai-dev-team 커맨드의 산출물 목차 등). 여기까지 검사하면 템플릿마다
+// 예외를 등록하게 되고, 예외 목록이 길어지면 검사 자체가 의미를 잃는다. 이 트리의 참조 무결성은
+// 별도 검사(broken reference in ...)가 scripts/harness 경로에 대해 이미 담당한다.
+test('collectAudit skips agent instruction trees — their links are output specs', () => {
+  const root = repo({
+    'manifest.json': JSON.stringify(baseManifest(['manifest.json'])),
+    '.claude/commands/agents/docs.md': '[산출물](docs/generated/01-output.json)',
+    '.codex/skills/x/SKILL.md': '[산출물](docs/generated/02-output.md)',
+  });
+  assert.deepEqual(collectAudit(root, baseManifest(['manifest.json'])).errors.filter((e) => e.startsWith('doc link')), []);
+});
+
+test('collectAudit honours manifest docLinkIgnorePrefixes', () => {
+  const manifest = { ...baseManifest(['manifest.json']), docLinkIgnorePrefixes: ['docs/generated/'] };
+  const root = repo({
+    'manifest.json': JSON.stringify(manifest),
+    'README.md': '[runtime output](docs/generated/report.md) [gone](docs/deleted.md)',
+  });
+  const errors = collectAudit(root, manifest).errors.filter((e) => e.startsWith('doc link'));
+  assert.deepEqual(errors.map((e) => e.replace(/ \(.*/, '')), ['doc link dangling: README.md → docs/deleted.md']);
+});
+
+test('wiring parsers read Dockerfile copies, gateway route ids, and scanned packages', () => {
+  assert.deepEqual(parseDockerfileModules([
+    'COPY order-service/build.gradle.kts ./order-service/',
+    'COPY order-service ./order-service',
+    'COPY card-service/build.gradle.kts ./card-service/',
+  ].join('\n')), ['order-service']); // 의존 COPY 만 있고 소스 COPY 가 없으면 배선된 것이 아니다
+  assert.deepEqual(parseGatewayRouteIds('routes:\n  - id: order-service-orders\n    uri: x\n  - id: card-service\n'),
+    ['order-service-orders', 'card-service']);
+  assert.deepEqual(parseScanBasePackages('@SpringBootApplication(scanBasePackages = {"github.lms.lemuel.order", "github.lms.lemuel.common"})'),
+    ['github.lms.lemuel.order', 'github.lms.lemuel.common']);
+  assert.deepEqual(parseScanBasePackages('@SpringBootApplication(scanBasePackages = "github.lms.lemuel")'), ['github.lms.lemuel']);
+  assert.deepEqual(parseScanBasePackages('@SpringBootApplication'), []);
+});
+
+// 서비스 → 배선 간선. 배선 누락은 컴파일이 잡아주지 않고 런타임에 조용히 404/500 으로 나타난다
+// (실사고 36ac0234: 코드는 있는데 5곳 미배선으로 프론트 3개 페이지 크래시).
+test('collectAudit reports missing module and package wiring', () => {
+  const files = {
+    'manifest.json': JSON.stringify(baseManifest(['manifest.json'])),
+    'settings.gradle.kts': 'include(\n  "order-service",\n  "card-service",\n  "gateway-service",\n)',
+    'Dockerfile': 'COPY order-service/build.gradle.kts ./order-service/\nCOPY order-service ./order-service\n'
+      + 'COPY gateway-service/build.gradle.kts ./gateway-service/\nCOPY gateway-service ./gateway-service\n',
+    'gateway-service/src/main/resources/application.yml': 'routes:\n  - id: order-service-orders\n    uri: x\n',
+    'order-service/src/main/java/github/lms/lemuel/LemuelApplication.java':
+      '@SpringBootApplication(scanBasePackages = {"github.lms.lemuel.order"})\npublic class LemuelApplication {}',
+    'order-service/src/main/java/github/lms/lemuel/order/OrderController.java': '@RestController\nclass OrderController {}',
+    'order-service/src/main/java/github/lms/lemuel/menu/MenuController.java': '@RestController\nclass MenuController {}',
+    'order-service/src/main/java/github/lms/lemuel/web/Marker.java': 'interface Marker {}',
+  };
+  const errors = collectAudit(repo(files), baseManifest(['manifest.json'])).errors.filter((e) => e.startsWith('service wiring'));
+
+  assert.equal(errors.length, 3, errors.join('\n'));
+  assert.match(errors.join('\n'), /Dockerfile COPY 누락: card-service/);
+  assert.match(errors.join('\n'), /gateway 라우트 누락: card-service/);
+  assert.match(errors.join('\n'), /scanBasePackages 누락: order-service → github\.lms\.lemuel\.menu/);
+  // 스프링 스테레오타입이 없는 패키지는 스캔 대상이 아니다 — 요구하면 마커·DTO 패키지마다 오탐이 난다
+  assert.doesNotMatch(errors.join('\n'), /lemuel\.web/);
+});
+
+// 서비스 → 배포 파이프라인 간선. Dockerfile·gateway 가 배선돼 있어도 CI 매트릭스와 compose 에서
+// 빠지면 "테스트는 도는데 이미지가 영원히 안 만들어지고 로컬에서 뜨지도 않는" 상태가 된다
+// (실사고: deposit-service 가 머지된 뒤 두 곳 모두에서 누락돼 배포 산출물이 없었다).
+test('collectAudit reports modules missing from the CI matrix and docker-compose', () => {
+  const files = {
+    'manifest.json': JSON.stringify(baseManifest(['manifest.json'])),
+    'settings.gradle.kts': 'include(\n  "order-service",\n  "card-service",\n  "gateway-service",\n)',
+    'Dockerfile': 'COPY order-service/build.gradle.kts ./order-service/\nCOPY order-service ./order-service\n'
+      + 'COPY card-service/build.gradle.kts ./card-service/\nCOPY card-service ./card-service\n'
+      + 'COPY gateway-service/build.gradle.kts ./gateway-service/\nCOPY gateway-service ./gateway-service\n',
+    'gateway-service/src/main/resources/application.yml':
+      'routes:\n  - id: order-service-orders\n    uri: x\n  - id: card-service\n    uri: y\n',
+    '.github/workflows/ci.yml':
+      '            order-service: [\'order-service/**\']\n'
+      + '            gateway-service: [\'gateway-service/**\']\n'
+      + '            mapping=\'{\n              "order-service":"",\n              "gateway-service":"-gateway"\n            }\'\n',
+    'docker-compose.yml': 'services:\n  order-service:\n    image: x\n  gateway-service:\n    image: y\n',
+  };
+  const errors = collectAudit(repo(files), baseManifest(['manifest.json'])).errors.filter((e) => e.startsWith('service wiring'));
+
+  assert.match(errors.join('\n'), /CI 매트릭스 누락: card-service/);
+  assert.match(errors.join('\n'), /docker-compose 누락: card-service/);
+  // 배선된 모듈은 조용하다 — 오탐이 나면 규칙이 무시당한다.
+  assert.doesNotMatch(errors.join('\n'), /누락: order-service/);
+  assert.doesNotMatch(errors.join('\n'), /누락: gateway-service/);
+});
+
+test('collectAudit accepts fully wired modules', () => {
+  const files = {
+    'manifest.json': JSON.stringify(baseManifest(['manifest.json'])),
+    'settings.gradle.kts': 'include(\n  "order-service",\n  "gateway-service",\n)',
+    'Dockerfile': 'COPY order-service/build.gradle.kts ./order-service/\nCOPY order-service ./order-service\n'
+      + 'COPY gateway-service/build.gradle.kts ./gateway-service/\nCOPY gateway-service ./gateway-service\n',
+    'gateway-service/src/main/resources/application.yml': 'routes:\n  - id: order-service-orders\n    uri: x\n',
+    'order-service/src/main/java/github/lms/lemuel/LemuelApplication.java':
+      '@SpringBootApplication(scanBasePackages = {"github.lms.lemuel.order"})\npublic class LemuelApplication {}',
+    'order-service/src/main/java/github/lms/lemuel/order/OrderController.java': '@RestController\nclass OrderController {}',
+  };
+  assert.deepEqual(collectAudit(repo(files), baseManifest(['manifest.json'])).errors.filter((e) => e.startsWith('service wiring')), []);
+});
+
+// 제출물 → 소유 서비스 간선. CLAUDE.md 배치 기준을 기계로 옮긴다: 소유 서비스가 있는 제출물은
+// 그 서비스의 src/main/resources/ 아래에 두고, jar 에는 processResources exclude 로 넣지 않는다.
+// 오늘 이 기준이 문서·가드·트리에서 서로 달라 세 번 왕복했다 — 문서 규율로 두면 또 어긋난다.
+test('collectAudit reports submissions outside their owning service and unexcluded from the jar', () => {
+  const files = {
+    'manifest.json': JSON.stringify(baseManifest(['manifest.json'])),
+    'settings.gradle.kts': `include(
+  "order-service",
+)`,
+    'order-service/build.gradle.kts': `tasks.named<ProcessResources>("processResources") {
+}`,
+    'order-service/src/main/resources/fashion-copilot/.claude-plugin/plugin.json': '{}',
+    'docs/harness/hackathon/kakaopay/submission/src/.codex-plugin/plugin.json': '{}',
+  };
+  const errors = collectAudit(repo(files), baseManifest(['manifest.json'])).errors.filter((e) => e.startsWith('submission'));
+
+  assert.equal(errors.length, 2, errors.join('\n'));
+  assert.match(errors.join('\n'), /submission placement: docs[/]harness[/]hackathon[/]kakaopay/);
+  assert.match(errors.join('\n'), /submission jar leak: order-service . fashion-copilot/);
+});
+
+test('collectAudit accepts a submission owned by a service and excluded from its jar', () => {
+  const files = {
+    'manifest.json': JSON.stringify(baseManifest(['manifest.json'])),
+    'settings.gradle.kts': `include(
+  "order-service",
+)`,
+    'order-service/build.gradle.kts': `tasks.named<ProcessResources>("processResources") {
+    exclude("fashion-copilot/**")
+}`,
+    'order-service/src/main/resources/fashion-copilot/.claude-plugin/plugin.json': '{}',
+    'order-service/src/main/resources/fashion-copilot/.codex-plugin/plugin.json': '{}',
+  };
+  assert.deepEqual(collectAudit(repo(files), baseManifest(['manifest.json'])).errors.filter((e) => e.startsWith('submission')), []);
+});
+
+test('repository harness contracts match the tracked manifest oracle', () => {
   const root = process.cwd();
   const manifest = JSON.parse(execFileSync('git', ['-C', root, 'show', ':scripts/harness/manifest.json'], { encoding: 'utf8' }));
   const governedErrors = collectAudit(root, manifest).errors.filter((error) =>
@@ -470,10 +649,6 @@ test('repository harness contracts and STATUS match the tracked manifest oracle'
     const skill = readFileSync(join(root, ...path.split('/')), 'utf8');
     if (/cycle\s*>\s*5/i.test(skill)) governedErrors.push(`${path}: forbidden cycle > 5 contract wording`);
   }
-  const status = readFileSync(join(root, 'STATUS.md'), 'utf8');
-  const lastUpdated = status.match(/\*\*Last updated:\*\*\s*(\d{4}-\d{2}-\d{2})/)?.[1];
-  const measurementDate = status.match(/## 핵심 수치 \((\d{4}-\d{2}-\d{2}) 기준/)?.[1];
-  if (lastUpdated !== measurementDate) governedErrors.push(`STATUS measurement date mismatch: lastUpdated=${lastUpdated} measurementDate=${measurementDate}`);
   assert.deepEqual(governedErrors, []);
   assert.match(execFileSync(process.execPath, ['scripts/harness/harness-audit.mjs'], {
     cwd: root,

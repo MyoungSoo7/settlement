@@ -1,5 +1,7 @@
 package github.lms.lemuel.pgreconciliation.adapter.in.web;
 
+import github.lms.lemuel.pgreconciliation.application.port.in.CloseReconciliationRunUseCase;
+import github.lms.lemuel.pgreconciliation.application.port.in.PreviewClawbackImpactUseCase;
 import github.lms.lemuel.pgreconciliation.application.port.in.ReconcilePgFileUseCase;
 import github.lms.lemuel.pgreconciliation.application.port.in.ResolveDiscrepancyUseCase;
 import github.lms.lemuel.pgreconciliation.application.port.out.LoadReconciliationRunPort;
@@ -38,14 +40,20 @@ public class PgReconciliationController {
 
     private final ReconcilePgFileUseCase reconcileUseCase;
     private final ResolveDiscrepancyUseCase resolveUseCase;
+    private final CloseReconciliationRunUseCase closeUseCase;
     private final LoadReconciliationRunPort loadPort;
+    private final PreviewClawbackImpactUseCase previewClawbackImpactUseCase;
 
     public PgReconciliationController(ReconcilePgFileUseCase reconcileUseCase,
                                        ResolveDiscrepancyUseCase resolveUseCase,
-                                       LoadReconciliationRunPort loadPort) {
+                                       CloseReconciliationRunUseCase closeUseCase,
+                                       LoadReconciliationRunPort loadPort,
+                                       PreviewClawbackImpactUseCase previewClawbackImpactUseCase) {
         this.reconcileUseCase = reconcileUseCase;
         this.resolveUseCase = resolveUseCase;
+        this.closeUseCase = closeUseCase;
         this.loadPort = loadPort;
+        this.previewClawbackImpactUseCase = previewClawbackImpactUseCase;
     }
 
     @Operation(summary = "PG 정산파일 업로드 + 즉시 대사 실행",
@@ -83,6 +91,14 @@ public class PgReconciliationController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @Operation(summary = "승인 전 회수 영향 미리보기 — 승인하면 얼마가 셀러에게서 회수되는지",
+            description = "아무 상태도 바꾸지 않는다. 미처리(PENDING) 차이만 집계하며, 회수가 없는 유형도 "
+                    + "건수로 보여준다(승인해도 돈이 안 움직인다는 사실 자체가 판단에 필요하다).")
+    @GetMapping("/runs/{id}/clawback-preview")
+    public ResponseEntity<PreviewClawbackImpactUseCase.ClawbackImpact> clawbackPreview(@PathVariable Long id) {
+        return ResponseEntity.ok(previewClawbackImpactUseCase.previewRun(id));
+    }
+
     @Operation(summary = "차이 승인 — 후속 SettlementAdjustment(역정산) 트리거")
     @PostMapping("/discrepancies/{id}/approve")
     public ResponseEntity<DiscrepancyResponse> approve(@PathVariable Long id,
@@ -97,6 +113,18 @@ public class PgReconciliationController {
                                                        @RequestBody ResolveRequest request) {
         ReconciliationDiscrepancy d = resolveUseCase.reject(id, currentOperatorId(), request.note());
         return ResponseEntity.ok(DiscrepancyResponse.from(d));
+    }
+
+    @Operation(summary = "대사 마감 — 해당 (PG, 날짜) 기간을 잠근다",
+            description = "COMPLETED 상태이고 미결(PENDING) 불일치가 0 건일 때만 마감된다. "
+                    + "마감 후에는 같은 (PG, 날짜)로 새 대사를 열 수 없어, 확정된 기간에 새 조정이 생기는 것을 막는다. "
+                    + "CLOSED 는 종착 상태 — 재개방 경로는 없다.")
+    @PostMapping("/runs/{id}/close")
+    public ResponseEntity<RunResponse> close(@PathVariable Long id,
+                                             @RequestBody(required = false) ResolveRequest request) {
+        ReconciliationRun run = closeUseCase.close(id, currentOperatorId(),
+                request == null ? null : request.note());
+        return ResponseEntity.ok(RunResponse.from(run));
     }
 
     private static String currentOperatorId() {
@@ -123,6 +151,9 @@ public class PgReconciliationController {
             body.put("discrepancyCount", r.getDiscrepancyCount());
             body.put("autoCorrectedCount", r.getAutoCorrectedCount());
             body.put("operatorId", r.getOperatorId());
+            body.put("closed", r.isClosed());
+            body.put("closedBy", r.getClosedBy());
+            body.put("closedAt", r.getClosedAt());
             return new RunResponse(body);
         }
     }

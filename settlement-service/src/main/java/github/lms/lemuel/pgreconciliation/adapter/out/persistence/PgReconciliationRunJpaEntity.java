@@ -57,6 +57,13 @@ public class PgReconciliationRunJpaEntity {
     @Column(columnDefinition = "text")
     private String note;
 
+    /** 마감 수행 운영자 — CLOSED 전이 시에만 채워진다. */
+    @Column(name = "closed_by", length = 100)
+    private String closedBy;
+
+    @Column(name = "closed_at")
+    private LocalDateTime closedAt;
+
     protected PgReconciliationRunJpaEntity() { }
 
     public PgReconciliationRunJpaEntity(Long id, String pgProvider, LocalDate targetDate, String fileName,
@@ -64,7 +71,8 @@ public class PgReconciliationRunJpaEntity {
                                         ReconciliationRunStatus status, LocalDateTime startedAt,
                                         LocalDateTime finishedAt, int totalPgRows, int totalInternalRows,
                                         int matchedCount, int discrepancyCount, int autoCorrectedCount,
-                                        String operatorId, String note) {
+                                        String operatorId, String note,
+                                        String closedBy, LocalDateTime closedAt) {
         this.id = id;
         this.pgProvider = pgProvider;
         this.targetDate = targetDate;
@@ -80,6 +88,8 @@ public class PgReconciliationRunJpaEntity {
         this.autoCorrectedCount = autoCorrectedCount;
         this.operatorId = operatorId;
         this.note = note;
+        this.closedBy = closedBy;
+        this.closedAt = closedAt;
     }
 
     public Long getId() { return id; }
@@ -97,4 +107,6 @@ public class PgReconciliationRunJpaEntity {
     public int getAutoCorrectedCount() { return autoCorrectedCount; }
     public String getOperatorId() { return operatorId; }
     public String getNote() { return note; }
+    public String getClosedBy() { return closedBy; }
+    public LocalDateTime getClosedAt() { return closedAt; }
 }

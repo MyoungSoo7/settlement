@@ -14,7 +14,7 @@ import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 /**
@@ -70,7 +70,7 @@ public class UserRegisteredEventConsumer extends IdempotentEventConsumer {
                 .orElseGet(SettlementUserViewJpaEntity::new);
         view.setUserId(userId);
         view.setEmail(node.hasNonNull("email") ? node.get("email").asText() : null);
-        view.setUpdatedAt(LocalDateTime.now());
+        view.setUpdatedAt(OffsetDateTime.now());
         userViewRepository.save(view);
 
         log.info("settlement_user_view upserted. eventId={}, userId={}", eventId, userId);

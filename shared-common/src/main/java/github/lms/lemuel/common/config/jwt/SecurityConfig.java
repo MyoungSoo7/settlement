@@ -138,6 +138,13 @@ public class SecurityConfig {
                         .requestMatchers("/users/admin/all").hasRole("ADMIN")
                         // 관리자 전용 카테고리 API
                         .requestMatchers("/admin/categories/**").hasRole("ADMIN")
+                        // 송장 일괄 업로드 - 다건 출고를 한 번에 반영. dryRun 기본값이라 파라미터 누락 호출은 미리보기로 떨어진다.
+                        .requestMatchers("/admin/shipments/**").hasAnyRole("ADMIN", "MANAGER")
+                        // 셀러 등급 콘솔 - 등급은 수수료/정산주기/홀드백을 동시에 바꾸므로 ADMIN 만.
+                        .requestMatchers("/admin/seller-tiers/**").hasRole("ADMIN")
+                        // 회수 대기 재고 조회 — 배송 후 환불로 원복이 보류된 주문 목록.
+                        // 실행 없는 읽기 전용이라 조회 콘솔들과 동일하게 MANAGER 도 허용.
+                        .requestMatchers("/admin/stock-reclaim/**").hasAnyRole("ADMIN", "MANAGER")
                         // 운영자 전용 — settlement 프로젝션 백필 (Phase 4 Chunk 3)
                         .requestMatchers("/admin/settlement-projection/**").hasRole("ADMIN")
                         // 운영자 전용 — Outbox DLQ / Kafka DLT / PG 라우팅 / PG 정산파일 대사
@@ -158,6 +165,14 @@ public class SecurityConfig {
                         .requestMatchers("/internal/**").permitAll()
                         // Payout 콘솔 — 송금 권한은 ADMIN 만 (반송 기록·재지급 포함)
                         .requestMatchers("/admin/payouts/**").hasRole("ADMIN")
+                        // 미입금 만료 콘솔 — 주문 취소·재고 원복을 수동 트리거하므로 ADMIN 만.
+                        // dryRun 이 기본값이라 파라미터 누락 호출은 미리보기로 떨어진다.
+                        .requestMatchers("/admin/payment-expiry/**").hasRole("ADMIN")
+                        // 정산 배치 재실행 콘솔 — 확정·홀드백 해제·지급 실행을 수동 트리거하므로
+                        // 조회 콘솔과 달리 MANAGER 에게 열지 않는다. 일자 게이트(미래·소급 상한)는 도메인이 강제.
+                        // 수수료율 정책 — 정산 금액을 직접 바꾸므로 조회 콘솔과 달리 ADMIN 만.
+                        .requestMatchers("/admin/commission-rates/**").hasRole("ADMIN")
+                        .requestMatchers("/admin/settlements/**").hasRole("ADMIN")
                         // 셀러 지급 계좌 레지스트리 — 등록·정정(PII). 셀러 식별자를 관리자 입력으로 받으므로
                         // ADMIN/MANAGER 게이트로 IDOR 방지 (Seed D1).
                         .requestMatchers("/admin/seller-bank-accounts/**").hasAnyRole("ADMIN", "MANAGER")
@@ -195,6 +210,15 @@ public class SecurityConfig {
                         // 법인카드 — 인증만 요구하고, 조직 역할(OWNER/MANAGER/STAFF) 판정은
                         // card-service 의 CardOrgAuthorizer 가 멤버십 프로젝션으로 수행한다(IDOR 방지).
                         .requestMatchers("/api/cards/**").authenticated()
+                        // 수신 상품(정기예금·적금·퇴직연금) — 계약 주체가 가입자 본인이라 인증만 요구하고,
+                        // 소유권(depositorId == JWT userId) 판정은 각 상품 서비스가 수행한다(IDOR 방지). /api/cards/** 와 같은 방식.
+                        // 단, 아래 두 경로는 "기관이 돈을 인식·지급하는" 행위라 가입자에게 열어두면 임의 증액이 된다.
+                        // 운용수익 인식(운용사 통지)과 수급 지급(지급 집행)은 /admin/payouts/** 와 같은 운영자 권한으로 막는다.
+                        .requestMatchers(HttpMethod.POST, "/api/banking/pensions/*/interest-settlements")
+                        .hasAnyRole("ADMIN", "MANAGER")
+                        .requestMatchers(HttpMethod.POST, "/api/banking/pensions/*/benefit-payments")
+                        .hasAnyRole("ADMIN", "MANAGER")
+                        .requestMatchers("/api/banking/**").authenticated()
                         // 결제 환불 이력 조회 (관리자·매니저·본인) — 더 세밀한 권한은 향후 Audit PR 에서
                         .requestMatchers("/api/payments/*/refunds").hasAnyRole("ADMIN", "MANAGER", "USER")
                         // 환불 실행(직접 PG 환불) — "어드민 승인 후 환불" 원칙에 따라 운영자 전용.

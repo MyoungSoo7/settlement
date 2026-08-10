@@ -19,7 +19,7 @@ import java.util.List;
  * KRX 시세 수집 배치.
  *
  * <p>특정 거래일(baseDate)의 전 종목 시세를 금융위 API 에서 받아 종목 마스터와 시세를
- * {@code (stock_code, base_date)} UNIQUE upsert 로 저장(SEED → KRX 대체)한다.
+ * {@code (stock_code, base_date)} UNIQUE upsert 로 저장(SAMPLE → EXCHANGE 대체)한다.
  * economics 가 지표별로 API 를 도는 것과 달리, 금융위 피드는 하루치 전 종목을 한 번에 주므로
  * 날짜 1건이 곧 배치 1회다. 개별 종목 저장 실패는 집계만 하고 계속 진행한다.
  */
@@ -65,7 +65,7 @@ public class KrxSyncService implements SyncQuotesUseCase {
                         price.closePrice(), price.openPrice(), price.highPrice(), price.lowPrice(),
                         price.priorDayDiff(), price.fluctuationRate(),
                         price.volume(), price.tradeAmount(), price.listedShares(), price.marketCap(),
-                        ValueSource.KRX, null));
+                        ValueSource.EXCHANGE, null));
                 upserted++;
             } catch (RuntimeException e) {
                 failed++;

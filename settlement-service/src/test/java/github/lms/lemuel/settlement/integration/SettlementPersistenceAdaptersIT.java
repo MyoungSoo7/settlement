@@ -110,6 +110,12 @@ class SettlementPersistenceAdaptersIT {
         List<Settlement> savedAll = settlementAdapter.saveAll(List.of(s2));
         assertThat(savedAll).hasSize(1);
         assertThat(settlementAdapter.findBySettlementDate(D)).hasSize(2);
+
+        // findAllByIds — 벌크 인덱싱용 배치 IN 조회(N+1 회피). 존재하는 두 건은 조회, 없는 id 는 빠진다.
+        List<Settlement> batch = settlementAdapter.findAllByIds(
+                List.of(saved.getId(), savedAll.get(0).getId(), 999_999L));
+        assertThat(batch).hasSize(2);
+        assertThat(settlementAdapter.findAllByIds(List.of())).isEmpty();
     }
 
     @Test

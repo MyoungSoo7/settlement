@@ -90,7 +90,7 @@ class CouponTest {
         Coupon coupon = Coupon.create("C", CouponType.FIXED, new BigDecimal("1000"),
                 BigDecimal.ZERO, null, 10, null);
         coupon.deactivate();
-        assertThatThrownBy(() -> coupon.validate(new BigDecimal("50000")))
+        assertThatThrownBy(() -> coupon.validate(new BigDecimal("50000"), T))
                 .isInstanceOf(InvalidCouponStateException.class)
                 .hasMessageContaining("비활성");
     }
@@ -100,7 +100,7 @@ class CouponTest {
         Coupon coupon = Coupon.create("C", CouponType.FIXED, new BigDecimal("1000"),
                 BigDecimal.ZERO, null, 1, null);
         coupon.incrementUsage();
-        assertThatThrownBy(() -> coupon.validate(new BigDecimal("50000")))
+        assertThatThrownBy(() -> coupon.validate(new BigDecimal("50000"), T))
                 .isInstanceOf(InvalidCouponStateException.class)
                 .hasMessageContaining("한도");
     }
@@ -109,7 +109,7 @@ class CouponTest {
     void validate_belowMinOrder() {
         Coupon coupon = Coupon.create("C", CouponType.FIXED, new BigDecimal("1000"),
                 new BigDecimal("50000"), null, 10, null);
-        assertThatThrownBy(() -> coupon.validate(new BigDecimal("30000")))
+        assertThatThrownBy(() -> coupon.validate(new BigDecimal("30000"), T))
                 .isInstanceOf(InvalidCouponStateException.class)
                 .hasMessageContaining("최소 주문");
     }
@@ -117,10 +117,62 @@ class CouponTest {
     @Test @DisplayName("만료된 쿠폰 검증 실패")
     void validate_expired() {
         Coupon coupon = Coupon.create("C", CouponType.FIXED, new BigDecimal("1000"),
-                BigDecimal.ZERO, null, 10, LocalDateTime.now().minusDays(1));
-        assertThatThrownBy(() -> coupon.validate(new BigDecimal("50000")))
+                BigDecimal.ZERO, null, 10, T.minusDays(1));
+        assertThatThrownBy(() -> coupon.validate(new BigDecimal("50000"), T))
                 .isInstanceOf(InvalidCouponStateException.class)
                 .hasMessageContaining("만료");
+    }
+
+    // ── 기간 판정은 시스템 시계가 아니라 주입된 시각을 따른다 ────────────────────────────
+    // 컨테이너 JVM 이 UTC 일 때 LocalDateTime.now() 로 판정하면 KST 자정~09시 구간에서 만료
+    // 경계가 하루 어긋난다(settlement TimeConfig 가 이미 겪은 off-by-one). 판정 시각을 밖에서
+    // 주입해 경계를 결정적으로 고정한다.
+
+    private static final LocalDateTime T = LocalDateTime.of(2026, 3, 1, 0, 0, 0);
+
+    private static Coupon couponWithPeriod(LocalDateTime startsAt, LocalDateTime expiresAt) {
+        Coupon coupon = Coupon.create("PERIOD", CouponType.FIXED, new BigDecimal("1000"),
+                BigDecimal.ZERO, null, 10, expiresAt);
+        coupon.configurePeriod(startsAt, expiresAt);
+        return coupon;
+    }
+
+    @Test @DisplayName("만료 경계: 만료 시각과 정확히 같은 순간은 아직 유효")
+    void validate_atExactExpiry_stillValid() {
+        Coupon coupon = couponWithPeriod(null, T);
+        assertThatCode(() -> coupon.validate(new BigDecimal("50000"), T))
+                .doesNotThrowAnyException();
+    }
+
+    @Test @DisplayName("만료 경계: 만료 시각 1나노 뒤는 만료")
+    void validate_oneNanoAfterExpiry_throws() {
+        Coupon coupon = couponWithPeriod(null, T);
+        assertThatThrownBy(() -> coupon.validate(new BigDecimal("50000"), T.plusNanos(1)))
+                .isInstanceOf(InvalidCouponStateException.class)
+                .hasMessageContaining("만료");
+    }
+
+    @Test @DisplayName("시작 경계: 시작 시각과 정확히 같은 순간은 사용 가능")
+    void validate_atExactStart_valid() {
+        Coupon coupon = couponWithPeriod(T, T.plusDays(30));
+        assertThatCode(() -> coupon.validate(new BigDecimal("50000"), T))
+                .doesNotThrowAnyException();
+    }
+
+    @Test @DisplayName("시작 경계: 시작 시각 1나노 전은 사용 불가")
+    void validate_oneNanoBeforeStart_throws() {
+        Coupon coupon = couponWithPeriod(T, T.plusDays(30));
+        assertThatThrownBy(() -> coupon.validate(new BigDecimal("50000"), T.minusNanos(1)))
+                .isInstanceOf(InvalidCouponStateException.class)
+                .hasMessageContaining("아직");
+    }
+
+    @Test @DisplayName("기간 판정은 시스템 시계에 의존하지 않는다 — 이미 지난 쿠폰도 그 이전 시각으로 판정하면 유효")
+    void validate_doesNotDependOnSystemClock() {
+        Coupon coupon = couponWithPeriod(
+                LocalDateTime.of(2020, 1, 1, 0, 0), LocalDateTime.of(2020, 1, 31, 0, 0));
+        assertThatCode(() -> coupon.validate(new BigDecimal("50000"), LocalDateTime.of(2020, 1, 15, 0, 0)))
+                .doesNotThrowAnyException();
     }
 
     @Test @DisplayName("사용 횟수 증가")

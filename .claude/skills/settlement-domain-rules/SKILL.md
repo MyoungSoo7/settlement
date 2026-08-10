@@ -37,6 +37,11 @@ Payment:    READY → AUTHORIZED → CAPTURED → REFUNDED  (AUTHORIZED→FAILED
 - 정산 생성 시점의 요율을 `settlements.commission_rate` 에 **영구 저장**한다.
 - 이후 등급/요율이 바뀌어도 과거 정산은 재계산하지 않는다.
 - "요율 테이블만 조인해서 계산하자"는 설계는 이력 훼손 — 반드시 스냅샷 컬럼을 쓰게 하라.
+- **유효기간 요율 정책(ADR 0032)**: 적용 요율은 `CommissionRatePolicy.resolve()` 가 SELLER > TIER >
+  등급 기본율 순으로 정한다(`[from, to)` 반개구간, 기간 중첩은 DB `EXCLUDE USING gist` 가 차단).
+  결정 근거는 `settlements.commission_rate_source`(예: `SELLER:77`·`TIER:VIP`·`DEFAULT_TIER`)에 남는다.
+  정책은 **미래에만** 건다 — 소급 구간에 이미 정산이 있으면 등록이 거부되고 역정산(`settlement_adjustments`)이
+  정식 경로다.
 
 ## 역정산 = 조정 트랜잭션 (ADR 0004)
 
@@ -47,4 +52,8 @@ Payment:    READY → AUTHORIZED → CAPTURED → REFUNDED  (AUTHORIZED→FAILED
 ## 검증 도구
 
 - 계산 결과 기대값 검증: MCP `settlement_simulate` (amount, tier → fee/holdback/immediatePayout).
+- **적용 요율 교차검증**: `GET /admin/commission-rates/simulate?sellerId=&tier=&at=` — 특정 시점에 어떤
+  정책이 이길지와 그 근거(`source`)를 확정 없이 확인한다. 요율 이견이 나오면 여기서 먼저 대조하라:
+  `settlements.commission_rate_source` 와 simulate 의 `source` 가 다르면 정산 이후 정책이 바뀐 것이며,
+  그 경우 **과거 정산이 맞다**(스냅샷 보존).
 - 구현 후에는 등급 3종 × (정상/환불/경계금액 0원·1원) 매트릭스 테스트를 제안하라.

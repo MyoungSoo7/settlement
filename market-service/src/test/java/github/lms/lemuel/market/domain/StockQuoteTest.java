@@ -14,18 +14,18 @@ class StockQuoteTest {
     void 필수값이_모두_있으면_생성된다() {
         StockQuote quote = new StockQuote(null, "005930", LocalDate.of(2026, 7, 7),
                 new BigDecimal("78000.00"), null, null, null, null, null,
-                null, null, null, null, ValueSource.KRX, null);
+                null, null, null, null, ValueSource.EXCHANGE, null);
 
         assertThat(quote.stockCode()).isEqualTo("005930");
         assertThat(quote.closePrice()).isEqualByComparingTo("78000.00");
-        assertThat(quote.source()).isEqualTo(ValueSource.KRX);
+        assertThat(quote.source()).isEqualTo(ValueSource.EXCHANGE);
     }
 
     @Test
     void stockCode_가_없으면_예외() {
         assertThatThrownBy(() -> new StockQuote(null, " ", LocalDate.now(),
                 BigDecimal.ONE, null, null, null, null, null,
-                null, null, null, null, ValueSource.SEED, null))
+                null, null, null, null, ValueSource.SAMPLE, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("stockCode");
     }
@@ -34,7 +34,7 @@ class StockQuoteTest {
     void baseDate_가_없으면_예외() {
         assertThatThrownBy(() -> new StockQuote(null, "005930", null,
                 BigDecimal.ONE, null, null, null, null, null,
-                null, null, null, null, ValueSource.SEED, null))
+                null, null, null, null, ValueSource.SAMPLE, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("baseDate");
     }
@@ -43,7 +43,7 @@ class StockQuoteTest {
     void closePrice_가_없으면_예외() {
         assertThatThrownBy(() -> new StockQuote(null, "005930", LocalDate.now(),
                 null, null, null, null, null, null,
-                null, null, null, null, ValueSource.SEED, null))
+                null, null, null, null, ValueSource.SAMPLE, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("closePrice");
     }

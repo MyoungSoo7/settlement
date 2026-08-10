@@ -17,7 +17,7 @@ spring:
               # prefix 가 혼재한다: 거래/회원/인증계는 비-/api(/auth,/users,/orders,/payments,/coupons,
               # /reviews,/games,/categories,/memberships,/products), 상품/카테고리/태그/환불이력은 /api.
               predicates:
-                - Path=/auth/**,/users/**,/orders/**,/payments/**,/coupons/**,/reviews/**,/games/**,/categories/**,/memberships/**,/products/**,/api/products/**,/api/categories/**,/api/tags/**,/api/payments/**,/admin/categories/**,/admin/products/**,/admin/pg/**,/admin/menus/**,/admin/common-codes/**,/admin/rbac/**,/admin/settlement-projection/**
+                - Path=/auth/**,/users/**,/orders/**,/payments/**,/coupons/**,/reviews/**,/games/**,/categories/**,/memberships/**,/products/**,/api/products/**,/api/categories/**,/api/tags/**,/api/payments/**,/admin/categories/**,/admin/products/**,/admin/pg/**,/admin/menus/**,/admin/common-codes/**,/admin/rbac/**,/admin/settlement-projection/**,/admin/payment-expiry/**,/admin/stock-reclaim/**,/admin/seller-tiers/**,/admin/shipments/**
             - id: loan-service
               uri: ${LOAN_SERVICE_URI:http://localhost:8084}
               predicates:
@@ -34,7 +34,8 @@ spring:
                 - Path=/api/economics/**
             - id: company-service
               uri: ${COMPANY_SERVICE_URI:http://localhost:8090}
-              # 공개 조회 API 만 라우팅 — 뉴스 수집 트리거(/admin/company/**)는 외부 미노출
+              # 조회 API 라우팅 — workforce는 company-service가 JWT ADMIN/MANAGER를 강제하고,
+              # 뉴스 수집 트리거(/admin/company/**)는 외부 미노출
               predicates:
                 - Path=/api/company/**
             - id: market-service
@@ -76,11 +77,23 @@ spring:
               uri: ${CARD_SERVICE_URI:http://localhost:8106}
               predicates:
                 - Path=/api/cards/**
+            - id: insurance-service
+              uri: ${INSURANCE_SERVICE_URI:http://localhost:8108}
+              # GA 보험대리점 — 상담·청약·계약·유지변경·수수료 정산. shared-common JWT 체인이 인증 강제
+              predicates:
+                - Path=/api/insurance/**
+            - id: deposit-service
+              uri: ${DEPOSIT_SERVICE_URI:http://localhost:8112}
+              # 셀러 예치금 원장 — 재원 이중사용 차단. REST 어댑터는 아직 없어 현재는 라우트만 있고
+              # 호출은 404 다(card-service 와 같은 단계). 컨트롤러가 붙는 순간 배선 누락으로 헤매지 않도록
+              # 경로를 먼저 잡아둔다.
+              predicates:
+                - Path=/api/deposits/**
             - id: settlement-service
               uri: ${SETTLEMENT_SERVICE_URI:http://localhost:8082}
               # SettlementController 는 /settlements(비-/api), 검색/원장/리포트는 /api, 운영 콘솔은 /admin.
               predicates:
-                - Path=/settlements/**,/api/settlements/**,/api/ledger/**,/api/reports/**,/api/tax-invoices/**,/api/seller/bank-account,/admin/payouts/**,/admin/seller-bank-accounts/**,/admin/chargebacks/**,/admin/pg-reconciliation/**,/admin/reconciliation/**,/admin/dlq/**,/admin/backfill/**,/admin/event-track/**,/admin/ledger-periods/**,/admin/seller-tax-profiles/**,/admin/tax/**
+                - Path=/settlements/**,/api/settlements/**,/api/ledger/**,/api/reports/**,/api/tax-invoices/**,/api/seller/bank-account,/admin/payouts/**,/admin/seller-bank-accounts/**,/admin/chargebacks/**,/admin/pg-reconciliation/**,/admin/reconciliation/**,/admin/dlq/**,/admin/backfill/**,/admin/event-track/**,/admin/ledger-periods/**,/admin/seller-tax-profiles/**,/admin/tax/**,/admin/commission-rates/**
             - id: market-stream-service
               uri: ${MARKET_STREAM_SERVICE_URI:http://localhost:8110}
               # 폴리글랏(Go, 8110) 실시간 시세 SSE — 공개 read-only 스트림만 라우팅.

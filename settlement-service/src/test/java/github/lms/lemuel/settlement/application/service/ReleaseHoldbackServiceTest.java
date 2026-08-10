@@ -157,4 +157,74 @@ class ReleaseHoldbackServiceTest {
         assertThat(registry.get("settlement.holdback.released").counter().count())
                 .isEqualTo((double) BATCH_SIZE);
     }
+
+    // ---------- 홀드백 해제 미리보기 (dryRun) ----------
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("미리보기: 해제 대상 건수와 총액을 집계한다")
+    void preview_aggregates() {
+        List<Settlement> batch = releasableBatch(3);
+        when(loadPort.findReleasableOn(eq(TODAY), org.mockito.ArgumentMatchers.anyInt()))
+                .thenReturn(batch);
+        // 홀드백은 결제금액이 아니라 수수료 차감 후 순액 기준이라, 기대값을 손으로 적지 않고
+        // 픽스처의 실제 보류액을 합산해 비교한다(수수료율이 바뀌어도 이 단언은 여전히 옳다).
+        BigDecimal expected = batch.stream().map(Settlement::getHoldbackAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        var preview = service().previewReleasableOn(TODAY, 100);
+
+        assertThat(preview.count()).isEqualTo(3);
+        assertThat(preview.totalAmount()).isEqualByComparingTo(expected);
+        assertThat(preview.lines()).hasSize(3);
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("미리보기는 해제도 지급요청도 이벤트도 만들지 않는다")
+    void preview_changesNothing() {
+        when(loadPort.findReleasableOn(eq(TODAY), org.mockito.ArgumentMatchers.anyInt()))
+                .thenReturn(releasableBatch(2));
+
+        service().previewReleasableOn(TODAY, 100);
+
+        verify(savePort, never()).save(any());
+        verify(requestPayoutUseCase, never())
+                .requestPayoutOfType(anyLong(), anyLong(), any(), any(PayoutType.class));
+        org.mockito.Mockito.verifyNoInteractions(publishEventPort);
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("미리보기는 드레인 루프를 쓰지 않는다 — 조회는 정확히 1회")
+    void preview_doesNotDrain() {
+        // 실행 경로는 해제하면서 대상이 줄어 루프가 끝나지만, 미리보기는 아무것도 해제하지 않는다.
+        // 같은 루프를 쓰면 같은 배치가 영원히 반환돼 무한 루프가 된다.
+        when(loadPort.findReleasableOn(eq(TODAY), org.mockito.ArgumentMatchers.anyInt()))
+                .thenReturn(releasableBatch(BATCH_SIZE));
+
+        var preview = service().previewReleasableOn(TODAY, BATCH_SIZE);
+
+        verify(loadPort, times(1)).findReleasableOn(eq(TODAY), org.mockito.ArgumentMatchers.anyInt());
+        assertThat(preview.count()).isEqualTo(BATCH_SIZE);
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("한도까지 찼으면 잘렸음을 알린다 — 이게 전부라고 오해하면 안 된다")
+    void preview_flagsTruncation() {
+        when(loadPort.findReleasableOn(eq(TODAY), org.mockito.ArgumentMatchers.anyInt()))
+                .thenReturn(releasableBatch(10));
+
+        assertThat(service().previewReleasableOn(TODAY, 10).truncated()).isTrue();
+        assertThat(service().previewReleasableOn(TODAY, 11).truncated()).isFalse();
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("해제 대상이 없으면 0건")
+    void preview_empty() {
+        when(loadPort.findReleasableOn(eq(TODAY), org.mockito.ArgumentMatchers.anyInt()))
+                .thenReturn(List.of());
+
+        var preview = service().previewReleasableOn(TODAY, 100);
+
+        assertThat(preview.count()).isZero();
+        assertThat(preview.totalAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
 }

@@ -114,6 +114,10 @@ class RefundSplitPaymentServiceTest {
         @Override public java.util.List<PaymentDomain> findAllCaptured() {
             return stored == null ? java.util.List.of() : java.util.List.of(stored);
         }
+        @Override public java.util.List<PaymentDomain> findPendingCreatedBefore(
+                java.time.LocalDateTime cutoff, int limit) {
+            return java.util.List.of(); // 미입금 만료 배치는 이 테스트 범위 밖
+        }
         @Override public PaymentDomain save(PaymentDomain p) { this.stored = p; return p; }
     }
 

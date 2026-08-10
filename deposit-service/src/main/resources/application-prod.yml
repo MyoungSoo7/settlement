@@ -1,0 +1,6 @@
+# 운영(prod) 프로파일. app.security.internal-key-required 는 *인바운드* /internal/** 요청에만
+# 작용하는 설정이다 — deposit-service 는 현재 /internal 엔드포인트를 호스팅하지 않으므로 무영향이지만,
+# 전 서비스 prod 프로파일 규약(fail-closed 기본값)을 동형으로 따르기 위해 둔다.
+app:
+  security:
+    internal-key-required: true

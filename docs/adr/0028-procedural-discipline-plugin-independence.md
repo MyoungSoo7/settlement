@@ -95,7 +95,7 @@ OMC keyword-detector 의 워크플로 모드(ralph·autopilot·ulw·team 등)는
 ## 참조
 
 - [`HARNESS.md`](../../HARNESS.md) — 라우팅 맵, 이중 라우팅 경계 정의
-- [`docs/superpowers-harness.md`](../superpowers-harness.md) — 측정 계층(L1~L4) 및 A/B 프로토콜 정본
-- [`docs/superpowers.md`](../superpowers.md) — superpowers 플러그인 소개
+- `docs/superpowers-harness.md`(저장소 미포함) — 측정 계층(L1~L4) 및 A/B 프로토콜 정본
+- `docs/superpowers.md`(저장소 미포함) — superpowers 플러그인 소개
 - `CLAUDE.md` 작업 프로토콜 — 외부 플러그인 스킬 위임 금지 조항
 - [0001 — 헥사고날 아키텍처 (Ports & Adapters)](0001-hexagonal-architecture.md) (게이트 vs 규율 역할 분리의 선행 사례)

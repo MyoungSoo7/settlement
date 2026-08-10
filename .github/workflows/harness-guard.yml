@@ -36,6 +36,7 @@ jobs:
             test -n "$BASE"
             git cat-file -e "$BASE^{commit}"
             git diff --name-only --diff-filter=ACMR "$BASE" HEAD > changed.txt
+            git diff --name-only --diff-filter=D "$BASE" HEAD > deleted.txt
           elif [ "${{ github.event_name }}" = "push" ]; then
             BEFORE="${{ github.event.before }}"
             if [[ ! "$BEFORE" =~ ^[0-9a-fA-F]{40}$ ]]; then
@@ -44,9 +45,11 @@ jobs:
             fi
             if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
               git ls-files > changed.txt
+              : > deleted.txt
             else
               git cat-file -e "$BEFORE^{commit}"
               git diff --name-only --diff-filter=ACMR "$BEFORE" HEAD > changed.txt
+              git diff --name-only --diff-filter=D "$BEFORE" HEAD > deleted.txt
             fi
           else
             echo "unsupported event: ${{ github.event_name }}" >&2
@@ -57,6 +60,11 @@ jobs:
 
       - name: Money / architecture guard (changed files)
         run: node scripts/harness/guard.mjs --list changed.txt
+
+      # 삭제는 changed.txt(ACMR)에 담기지 않는다 — 하네스 경로가 지워졌는지 별도로 검사한다.
+      # PR #210 에 섞여 .claude/.codex/docs/harness 270 파일이 지워진 사고를 막는 지점.
+      - name: Harness deletion guard (deleted files)
+        run: node scripts/harness/guard.mjs --deleted-list deleted.txt
 
       - name: Harness self-audit (doc drift, routing, guard integrity)
         run: node scripts/harness/harness-audit.mjs

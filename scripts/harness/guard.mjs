@@ -2,7 +2,7 @@
 // Lemuel harness guard — PLUGIN-INDEPENDENT, repo-tracked core invariant enforcement.
 //
 // Why this exists: the settlement-copilot / invest-copilot plugin guards live outside the build
-// graph (service `src/main/resources/` — jar-excluded — or `docs/harness/hackathon/`) and are not
+// graph (service `src/main/resources/` — jar-excluded) and are not
 // wired into CI on a fresh clone. This
 // script re-implements the *non-negotiable* money/architecture invariants with zero external
 // dependency so the guard survives plugin relocation and works in CI. (See HARNESS.md
@@ -34,7 +34,7 @@ function policyPath(filePath) {
 }
 
 // Money-scope = files where BigDecimal / immutable-history rules are non-negotiable.
-const MONEY_SCOPE = /(settlement|ledger|payout|chargeback|loan|payment|investment|account|pgreconciliation|recon)/i;
+const MONEY_SCOPE = /(settlement|ledger|payout|chargeback|loan|payment|investment|account|insurance|pgreconciliation|recon)/i;
 const JAVA_KT = /\.(java|kt)$/i;
 const SQL = /\.sql$/i;
 // Money math lives in domain/application; adapters legitimately use double for
@@ -47,14 +47,14 @@ const isProd = (f) => !/\/src\/test\//.test(f);
 // 도메인 프로덕션 소스만 대상. common/audit(감사 인프라 DTO)은 3회 패널 모두 대상 밖 판정.
 const isDomainMain = (f) => JAVA_KT.test(f) && /\/src\/main\/java\/.+\/domain\//.test(f) && !/common\/audit\//.test(f);
 // generic 예외 금지는 캠페인이 청정화를 완료한 5개 금융 서비스에 한정(위성 서비스는 oo-score 스킬로 채점).
-const CAMPAIGN_SERVICES = /(settlement|order|loan|investment|account)-service\//;
+const CAMPAIGN_SERVICES = /(settlement|order|loan|investment|account|insurance)-service\//;
 
 // settlement-service 가 import 해도 되는 자기 바운디드 컨텍스트(+shared-common `common`).
 // 이 집합의 여집합(order 컨텍스트: order/user/cart/product/coupon/shipping/payment/review/game/category/menu/rbac…)은
 // MSA 경계 위반. enum denylist 는 신규 order 도메인 누락에 취약하므로 allowlist 여집합으로 강제한다(감사 MED-2).
 const SETTLEMENT_OWN_PACKAGES = new Set([
   'settlement', 'payout', 'ledger', 'chargeback', 'pgreconciliation',
-  'recon', 'recovery', 'report', 'tax', 'idempotency', 'integrity',
+  'recon', 'recovery', 'report', 'tax', 'idempotency', 'integrity', 'closing',
   'common',
 ]);
 
@@ -275,6 +275,49 @@ export function dodNudgeMessage(files) {
   return `DoD 넛지(비차단): 돈 경로 프로덕션 변경 ${money.length}건이 테스트 변경 없이 스테이지됨 — tdd-discipline·verify-before-done 절차와 게이트(:module:test + jacoco LINE 90%) 통과를 확인하고 커밋하세요.`;
 }
 
+// 하네스 자체를 이루는 경로 — 여기가 지워지면 가드·스킬·규율이 통째로 사라진다.
+// 실제로 PR #210 에 섞인 삭제 커밋 3개가 .claude(81)·.codex(41)·docs/harness(148) 를 날렸고,
+// 기존 스테이징 스캔이 --diff-filter=ACMR 로 삭제를 아예 보지 않아 그대로 통과했다.
+//
+// docs/harness 는 목록에 넣지 않는다 — 그 사고에 함께 휩쓸렸을 뿐 하네스 기계장치가 아니라
+// 해커톤 제출물 보관함이고, 공개 저장소 위생상 의도적으로 비우는 대상이다(CLAUDE.md 배치 기준:
+// 소유 서비스가 없는 제출물은 저장소에 두지 않는다). 보호 대상은 실행되는 하네스로 한정한다.
+const PROTECTED_DELETE_ROOTS = ['.claude/', '.codex/', 'scripts/harness/'];
+
+// 위 루트 안이지만 재생성 가능한 세션 상태 — 삭제를 막을 이유가 없다(정리 작업을 방해하지 않는다).
+const PROTECTED_DELETE_EXEMPT = [
+  '.claude/scratch/', '.claude/agent-memory/', '.claude/worktrees/', '.claude/harness/',
+];
+
+/**
+ * 스테이징된 삭제 중 하네스 보호 경로에 해당하는 것을 위반으로 보고한다.
+ *
+ * <p>임계치를 두지 않는다 — "대량이면 막는다"는 규칙은 한 파일씩 여러 커밋으로 나누면 그대로
+ * 뚫린다. 보호 경로의 삭제는 항상 의도적이어야 하므로 1건도 막고, 진짜 지울 때는
+ * {@code HARNESS_ALLOW_DELETE=1} 로 명시적으로 opt-in 한다(그 사실이 실행 기록에 남는다).
+ */
+export function checkProtectedDeletions(deletedFiles, options = {}) {
+  const allowDelete = options.allowDelete ?? process.env.HARNESS_ALLOW_DELETE === '1';
+  if (allowDelete) return [];
+  const violations = [];
+  for (const file of deletedFiles ?? []) {
+    const path = policyPath(file);
+    if (PROTECTED_DELETE_EXEMPT.some((prefix) => path.startsWith(prefix))) continue;
+    if (!PROTECTED_DELETE_ROOTS.some((prefix) => path.startsWith(prefix))) continue;
+    violations.push({
+      file,
+      id: 'HARNESS-DELETE',
+      msg: '하네스 경로 삭제 금지 — 스킬·가드·규율이 사라진다. 의도한 삭제면 HARNESS_ALLOW_DELETE=1 로 실행',
+    });
+  }
+  return violations;
+}
+
+export function discoverStagedDeletions(repoRoot) {
+  const output = execFileSync('git', ['diff', '--cached', '--name-only', '-z', '--diff-filter=D'], { cwd: repoRoot });
+  return output.toString('utf8').split('\0').filter(Boolean);
+}
+
 export function discoverStagedFiles(repoRoot) {
   const output = execFileSync('git', ['diff', '--cached', '--name-only', '-z', '-M', '--diff-filter=ACMR'], { cwd: repoRoot });
   return output.toString('utf8').split('\0').filter(Boolean);
@@ -305,12 +348,22 @@ function emitReport(violations, io = {}) {
 export async function runGuardCli(args, io = {}) {
   const repoRoot = io.repoRoot ?? process.cwd();
   const stderr = io.stderr ?? ((message) => console.error(message));
-  const modes = ['--staged', '--list', '--files', '--hook', '--self-test'].filter((mode) => args.includes(mode));
+  const modes = ['--staged', '--list', '--deleted-list', '--files', '--hook', '--self-test'].filter((mode) => args.includes(mode));
   if (modes.length !== 1) { stderr('exactly one guard mode is required'); return 2; }
   const mode = modes[0];
   if (mode === '--self-test') {
     if (args.length !== 1) return 2;
     return spawnSync(process.execPath, ['--test', fileURLToPath(new URL('./test/guard.test.mjs', import.meta.url))], { cwd: repoRoot, stdio: 'inherit' }).status ?? 2;
+  }
+  if (mode === '--deleted-list') {
+    // CI 는 삭제를 --diff-filter=ACMR 로 걸러 changed.txt 에 담지 않는다. 삭제 목록을 따로 받아
+    // 하네스 보호 경로가 지워졌는지 검사한다 — PR 로 들어온 대량 삭제를 막는 유일한 지점이다.
+    if (args.length !== 2) return 2;
+    try {
+      const listPath = await normalizeRepoPath(repoRoot, args[1]);
+      const deleted = (await readUtf8Strict(listPath)).split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
+      return emitReport(checkProtectedDeletions(deleted), io);
+    } catch (error) { stderr(`guard input failed: ${error.message}`); return 1; }
   }
   if (mode === '--hook') {
     if (args.length !== 1) return 2;
@@ -337,6 +390,8 @@ export async function runGuardCli(args, io = {}) {
     }
     const violations = [];
     for (const file of files) violations.push(...await scanRepoFile(repoRoot, file));
+    // 삭제는 내용 스캔으로 잡히지 않는다(스테이징 목록이 ACMR 로 D 를 빼고 온다) — 별도로 확인한다.
+    if (mode === '--staged') violations.push(...checkProtectedDeletions(discoverStagedDeletions(repoRoot)));
     await logGuardHits(repoRoot, mode.slice(2), violations); // observability only — never affects the verdict
     if (mode === '--staged') {
       const nudge = dodNudgeMessage(files);

@@ -23,7 +23,7 @@ brownfield_context:
     summary: 기존 company_workforce 도메인·조회 API·CSV 적재·Flyway 마이그레이션과 신규 상세 비교 기능을 구현할 주 모듈
   existing_patterns:
   - company_workforce의 UNIQUE(workplace_name, biz_reg_no_prefix, snapshot_month)를 이용한 월별 멱등 업서트
-  - GET /api/company/workforce?name= 기반 공개 목록 검색과 페이징
+  - GET /api/company/workforce?name= 기반 JWT ADMIN/MANAGER 전용 목록 검색과 페이징
   - POST /admin/company/workforce/import의 Admin키 기반 CSV 적재
   - CompanyWorkforce.estimatedAnnualSalary()의 BigDecimal 추정연봉 계산
   - CompanyWorkforceResponse.note의 추정연봉 한계 안내

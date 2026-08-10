@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ceoApi, type CeoInsight, type CeoRisk, type CeoSummaryCard } from '@/api/ceo';
 import { companyApi } from '@/api/company';
+import { QUOTE_SOURCE_LABEL } from '@/api/market';
 import type { FinancialCompany, FinancialCompanyPage } from '@/api/financial';
 import Card from '@/components/Card';
 import Spinner from '@/components/Spinner';
@@ -303,7 +304,7 @@ const CeoInsightPage: React.FC = () => {
                         </div>
                       </div>
                       <p className="mt-3 text-xs text-slate-400">
-                        기준일 {insight.marketQuote.baseDate} · 출처 {insight.marketQuote.source} · 재무제표 조인으로 산출한 참고치입니다.
+                        기준일 {insight.marketQuote.baseDate} · 출처 {QUOTE_SOURCE_LABEL[insight.marketQuote.source] ?? insight.marketQuote.source} · 재무제표 조인으로 산출한 참고치입니다.
                       </p>
                     </>
                   ) : (

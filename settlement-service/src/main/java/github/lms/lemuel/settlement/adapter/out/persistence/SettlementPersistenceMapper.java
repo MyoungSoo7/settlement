@@ -40,7 +40,8 @@ public interface SettlementPersistenceMapper {
                 entity.getHoldbackRate(),
                 entity.getHoldbackReleaseDate(),
                 entity.isHoldbackReleased(),
-                entity.getHoldbackReleasedAt());
+                entity.getHoldbackReleasedAt(),
+                entity.getCommissionRateSource());
     }
 
     @Mapping(target = "status", expression = "java(domain.getStatus().name())")

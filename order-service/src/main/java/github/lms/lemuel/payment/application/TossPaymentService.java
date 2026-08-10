@@ -6,35 +6,23 @@ import github.lms.lemuel.payment.application.port.in.CreatePaymentPort;
 import github.lms.lemuel.payment.application.port.out.SavePaymentPort;
 import github.lms.lemuel.payment.domain.PaymentDomain;
 import github.lms.lemuel.payment.domain.PaymentGateway;
-import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
-import io.github.resilience4j.retry.annotation.Retry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.HttpClientErrorException;
-import org.springframework.web.client.RestTemplate;
 
-import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Base64;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * 토스페이먼츠 결제 확인 서비스
  * Flow: Toss API 확인 → READY 결제 생성 → AUTHORIZED → CAPTURED (정산 포함)
  *
  * 복원력:
- *   - callTossConfirmApi 에 CircuitBreaker + Retry (Resilience4j)
+ *   - PG 호출은 {@link TossConfirmApiClient}(별도 빈)이 담당 — CircuitBreaker + Retry (Resilience4j)
+ *   - <b>별도 빈이어야</b> 스프링 AOP 프록시를 통과한다. 예전처럼 같은 클래스 안에서 자기호출하면
+ *     어드바이스가 걸리지 않아 재시도·서킷이 조용히 무력화된다
+ *     (회귀 차단: {@code scripts/harness/test/aop-proxy-gate.test.mjs}).
  *   - RestTemplate connect/read timeout 설정으로 쓰레드 고갈 방지
  *   - 4xx (Toss 비즈니스 오류) 는 서킷 판정·재시도 모두에서 제외
  */
@@ -43,28 +31,17 @@ import java.util.Map;
 public class TossPaymentService {
 
     private static final Logger log = LoggerFactory.getLogger(TossPaymentService.class);
-    private static final String PG_INSTANCE = "tossPg";
 
-    @Value("${toss.secret-key}")
-    private String secretKey;
-
-    @Value("${toss.api-url}")
-    private String tossApiUrl;
-
-    private final RestTemplate restTemplate;
+    private final TossConfirmApiClient tossConfirmApiClient;
     private final CreatePaymentPort createPaymentPort;
     private final SavePaymentPort savePaymentPort;
     private final CapturePaymentPort capturePaymentPort;
 
-    public TossPaymentService(CreatePaymentPort createPaymentPort,
+    public TossPaymentService(TossConfirmApiClient tossConfirmApiClient,
+                              CreatePaymentPort createPaymentPort,
                               SavePaymentPort savePaymentPort,
                               CapturePaymentPort capturePaymentPort) {
-        // Boot 4 에서 RestTemplateBuilder 가 제거되어 SimpleClientHttpRequestFactory 로 직접 구성.
-        // connect/read timeout 으로 쓰레드 풀 고갈 방지 — 상위는 Resilience4j 가 담당.
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(Duration.ofSeconds(3));
-        factory.setReadTimeout(Duration.ofSeconds(5));
-        this.restTemplate = new RestTemplate(factory);
+        this.tossConfirmApiClient = tossConfirmApiClient;
         this.createPaymentPort = createPaymentPort;
         this.savePaymentPort = savePaymentPort;
         this.capturePaymentPort = capturePaymentPort;
@@ -80,16 +57,16 @@ public class TossPaymentService {
     public PaymentDomain confirmTossPayment(Long dbOrderId, String paymentKey, String tossOrderId, Long amount) {
         log.info("토스 결제 확인 시작: dbOrderId={}, tossOrderId={}, amount={}", dbOrderId, tossOrderId, amount);
 
-        callTossConfirmApi(paymentKey, tossOrderId, amount);
+        tossConfirmApiClient.confirm(paymentKey, tossOrderId, amount);
 
         PaymentDomain payment = createPaymentPort.createPayment(
                 new CreatePaymentCommand(dbOrderId, "TOSS_PAYMENTS")
         );
 
         // pgTransactionId 는 "PROVIDER:txn" prefix 규칙을 따라야 PgRouter.resolveByTransactionId 가
-            // capture/refund 시 올바른 PG 로 라우팅한다. raw paymentKey 를 그대로 저장하면 prefix 미인식 →
-            // MOCK 폴백 → "어댑터 없음: provider=MOCK" 로 capture 가 죽는다. TOSS: prefix 를 붙인다.
-            payment.authorize(PaymentGateway.TOSS.prefix() + PaymentGateway.TRANSACTION_ID_DELIMITER + paymentKey);
+        // capture/refund 시 올바른 PG 로 라우팅한다. raw paymentKey 를 그대로 저장하면 prefix 미인식 →
+        // MOCK 폴백 → "어댑터 없음: provider=MOCK" 로 capture 가 죽는다. TOSS: prefix 를 붙인다.
+        payment.authorize(PaymentGateway.TOSS.prefix() + PaymentGateway.TRANSACTION_ID_DELIMITER + paymentKey);
         savePaymentPort.save(payment);
 
         PaymentDomain captured = capturePaymentPort.capturePayment(payment.getId());
@@ -105,7 +82,7 @@ public class TossPaymentService {
                                                       String tossOrderId, Long totalAmount) {
         log.info("토스 장바구니 결제 확인 시작: orderIds={}, totalAmount={}", orderIds, totalAmount);
 
-        callTossConfirmApi(paymentKey, tossOrderId, totalAmount);
+        tossConfirmApiClient.confirm(paymentKey, tossOrderId, totalAmount);
 
         List<PaymentDomain> results = new ArrayList<>();
         for (Long orderId : orderIds) {
@@ -125,73 +102,5 @@ public class TossPaymentService {
 
         log.info("토스 장바구니 결제 전체 완료: {}건", results.size());
         return results;
-    }
-
-    /**
-     * Toss Payments 결제 확인 API 호출 — Resilience4j 로 보호.
-     *
-     * - Retry: 네트워크 I/O / 5xx 오류는 exponential backoff 로 최대 3회 재시도
-     * - CircuitBreaker: 최근 20건 중 실패 50% 이상이면 30초간 OPEN
-     * - Fallback: tossFallback 으로 위임. 운영에서는 Alertmanager 로 페이지.
-     * - 4xx (HttpClientErrorException) 는 PG 비즈니스 오류라 서킷/재시도 모두에서 제외하고 즉시 전파.
-     */
-    @CircuitBreaker(name = PG_INSTANCE, fallbackMethod = "tossFallback")
-    @Retry(name = PG_INSTANCE)
-    public void callTossConfirmApi(String paymentKey, String tossOrderId, Long amount) {
-        String encoded = Base64.getEncoder()
-                .encodeToString((secretKey + ":").getBytes(StandardCharsets.UTF_8));
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set(HttpHeaders.AUTHORIZATION, "Basic " + encoded);
-
-        Map<String, Object> body = new HashMap<>();
-        body.put("paymentKey", paymentKey);
-        body.put("orderId", tossOrderId);
-        body.put("amount", amount);
-
-        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
-
-        try {
-            ResponseEntity<Map> response = restTemplate.postForEntity(tossApiUrl, entity, Map.class);
-            log.info("Toss API 응답: status={}", response.getStatusCode());
-
-            if (!response.getStatusCode().is2xxSuccessful()) {
-                String msg = extractTossError(response.getBody());
-                // 외부 PG(Toss) 통합 실패 — 도메인 상태/입력 불변식이 아니라 외부 연동 오류이므로 generic 유지(사유 명시).
-                throw new IllegalStateException("Toss 결제 확인 실패: " + msg);
-            }
-
-        } catch (HttpClientErrorException e) {
-            // 4xx — Toss 비즈니스 에러. 재시도·서킷 대상 아님. 그대로 전파.
-            String responseBody = e.getResponseBodyAsString(StandardCharsets.UTF_8);
-            log.error("Toss API 4xx: status={}, body={}", e.getStatusCode(), responseBody);
-            throw new IllegalStateException("Toss 결제 확인 실패 (" + e.getStatusCode() + "): " + responseBody, e);
-        }
-    }
-
-    /**
-     * CircuitBreaker Fallback — 시그니처는 원본 메서드 + Throwable.
-     * 서킷 OPEN 또는 재시도 모두 소진 시 호출된다.
-     * 운영에서는 여기서 Alertmanager/Slack webhook 알림 발송까지 연계.
-     */
-    @SuppressWarnings("unused") // Resilience4j 가 리플렉션으로 호출
-    public void tossFallback(String paymentKey, String tossOrderId, Long amount, Throwable t) {
-        // 4xx 비즈니스 오류는 그대로 상위로 전파
-        if (t instanceof IllegalStateException ise) {
-            throw ise;
-        }
-        log.error("Toss PG 서킷 오픈 또는 재시도 소진: paymentKey={}, orderId={}, amount={}, cause={}",
-                paymentKey, tossOrderId, amount, t.toString());
-        throw new IllegalStateException(
-                "Toss PG 일시 장애로 결제 확인을 완료할 수 없습니다. 잠시 후 다시 시도해주세요.", t);
-    }
-
-    @SuppressWarnings("unchecked")
-    private String extractTossError(Map<?, ?> body) {
-        if (body == null) return "알 수 없는 오류";
-        Object code = body.get("code");
-        Object message = body.get("message");
-        return code + " - " + message;
     }
 }

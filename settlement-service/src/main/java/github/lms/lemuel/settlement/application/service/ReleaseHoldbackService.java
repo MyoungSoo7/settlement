@@ -55,6 +55,29 @@ public class ReleaseHoldbackService implements ReleaseHoldbackUseCase {
                 .register(meterRegistry);
     }
 
+    /**
+     * 해제 미리보기 — 아무것도 해제하지 않고 "오늘 무엇이 얼마나 풀릴지"만 산출한다.
+     *
+     * <p><b>실행 경로의 드레인 루프를 재사용하지 않는다.</b> releaseAllDueOn 은 해제할수록 대상이
+     * 줄어들어 루프가 끝나지만, 미리보기는 아무것도 해제하지 않아 findReleasableOn 이 같은 배치를
+     * 계속 돌려준다 — 그대로 돌리면 무한 루프다. 그래서 한 번만 조회하고, 한도까지 찼으면
+     * truncated 로 "이게 전부가 아니다"를 알린다(부분만 보고 전체로 오해하는 것이 더 위험하다).
+     */
+    @Override
+    public HoldbackReleasePreview previewReleasableOn(LocalDate today, int limit) {
+        List<Settlement> releasable = loadPort.findReleasableOn(today, limit);
+
+        BigDecimal totalAmount = BigDecimal.ZERO;
+        List<ReleasableLine> lines = new java.util.ArrayList<>(releasable.size());
+        for (Settlement s : releasable) {
+            BigDecimal amount = s.getHoldbackAmount();
+            totalAmount = totalAmount.add(amount);
+            lines.add(new ReleasableLine(s.getId(), s.getPaymentId(), amount, s.getHoldbackReleaseDate()));
+        }
+        return new HoldbackReleasePreview(releasable.size(), totalAmount,
+                releasable.size() >= limit, List.copyOf(lines));
+    }
+
     @Override
     public int releaseAllDueOn(LocalDate today) {
         int totalReleased = 0;

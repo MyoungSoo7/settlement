@@ -5,6 +5,7 @@ import github.lms.lemuel.payout.domain.SellerBankAccount;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -18,6 +19,7 @@ import java.util.concurrent.ThreadLocalRandom;
  * FAILED 처리 흐름을 검증할 수 있게 한다 (시연·테스트 환경).
  */
 @Component
+@ConditionalOnProperty(name = "app.firmbanking.mode", havingValue = "mock", matchIfMissing = true)
 public class MockFirmBankingAdapter implements FirmBankingPort {
 
     private static final Logger log = LoggerFactory.getLogger(MockFirmBankingAdapter.class);

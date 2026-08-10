@@ -9,9 +9,9 @@ name: ci
 #   운영 도메인을 때리는 production-revision-smoke 는 ref == main 조건이 그대로라 안 돈다.
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
 
 env:
   JAVA_VERSION: "25"
@@ -58,7 +58,8 @@ jobs:
             backend:
               - '**'
               - '!frontend/**'
-            # shared: 전 서비스 이미지에 영향 → 변경 시 15개 전부 재빌드
+            # shared: 전 서비스 이미지에 영향 → 변경 시 17개 전부 재빌드
+            # (건수 정본은 settings.gradle.kts — harness-audit 의 ci-matrix 규칙이 대조한다)
             shared:
               - 'shared-common/**'
               - 'build.gradle.kts'
@@ -84,11 +85,13 @@ jobs:
             investment-service: ['investment-service/**']
             organization-service: ['organization-service/**']
             card-service: ['card-service/**']
+            insurance-service: ['insurance-service/**']
+            deposit-service: ['deposit-service/**']
 
       - name: Compute image build matrix (changed services only)
         id: setmatrix
         env:
-          CHANGED: ${{ steps.filter.outputs.changes }}   # dorny: 매치된 필터명 JSON 배열
+          CHANGED: ${{ steps.filter.outputs.changes }} # dorny: 매치된 필터명 JSON 배열
         run: |
           set -euo pipefail
           # 배포 단위 단일 출처: module → image_suffix (아래 backend-ghcr 주석의 매핑과 반드시 일치)
@@ -107,7 +110,9 @@ jobs:
             "ai-service":"-ai",
             "investment-service":"-investment",
             "organization-service":"-organization",
-            "card-service":"-card"
+            "card-service":"-card",
+            "insurance-service":"-insurance",
+            "deposit-service":"-deposit"
           }'
           if echo "$CHANGED" | jq -e 'index("shared")' >/dev/null; then
             # 공용 변경 → 전 서비스 재빌드
@@ -136,7 +141,7 @@ jobs:
   backend-ci:
     name: Backend - Build/Test/JaCoCo/SonarCloud
     runs-on: ubuntu-latest
-    timeout-minutes: 90   # hang 시 러너 6시간 낭비 방지 (정상 55~70분 + 여유)
+    timeout-minutes: 90 # hang 시 러너 6시간 낭비 방지 (정상 55~70분 + 여유)
     needs: changes
     if: needs.changes.outputs.backend == 'true'
     permissions:
@@ -144,7 +149,7 @@ jobs:
       pull-requests: write
       checks: write
       security-events: write
-      packages: read   # ghcr 미러 이미지 pull (mirror-testcontainers.yml 참고)
+      packages: read # ghcr 미러 이미지 pull (mirror-testcontainers.yml 참고)
     services:
       postgres:
         # Docker Hub rate limit 회피 — ghcr 미러 사용 (mirror-testcontainers.yml 로 갱신)
@@ -308,9 +313,11 @@ jobs:
     #   investment-service   → ghcr.io/myoungsoo7/settlement-investment
     #   organization-service → ghcr.io/myoungsoo7/settlement-organization
     #   card-service         → ghcr.io/myoungsoo7/settlement-card
-    # shared-common·루트 빌드파일·Dockerfile·ci.yml 변경 시엔 changes 잡이 15개 전부 매트릭스에 담는다.
+    #   insurance-service    → ghcr.io/myoungsoo7/settlement-insurance
+    #   deposit-service      → ghcr.io/myoungsoo7/settlement-deposit
+    # shared-common·루트 빌드파일·Dockerfile·ci.yml 변경 시엔 changes 잡이 17개 전부 매트릭스에 담는다.
     strategy:
-      fail-fast: false   # 한 서비스 빌드 실패가 다른 서비스 이미지 푸시를 취소하지 않도록
+      fail-fast: false # 한 서비스 빌드 실패가 다른 서비스 이미지 푸시를 취소하지 않도록
       matrix: ${{ fromJSON(needs.changes.outputs.build_matrix) }}
     steps:
       - uses: actions/checkout@v4
@@ -524,7 +531,8 @@ jobs:
   production-revision-smoke:
     name: Currently deployed production revision smoke
     runs-on: ubuntu-latest
-    needs: [frontend-ci, frontend-tests, frontend-ghcr, backend-ci, backend-ghcr]
+    needs:
+      [frontend-ci, frontend-tests, frontend-ghcr, backend-ci, backend-ghcr]
     if: |
       github.event_name == 'push'
       && github.ref == 'refs/heads/main'

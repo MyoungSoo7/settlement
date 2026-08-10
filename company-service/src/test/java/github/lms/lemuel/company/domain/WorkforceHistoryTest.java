@@ -35,8 +35,8 @@ class WorkforceHistoryTest {
     @Test
     @DisplayName("연속 인접 월은 전월 대비 증감(명·%·원·%)을 HALF_UP 으로 계산한다")
     void computesMonthOverMonthChangeForAdjacentMonths() {
-        // 2026-05: 50명, 추정연봉 (16,406,250×12)/(50×0.09) = 43,750,000
-        // 2026-06: 60명, 추정연봉 (18,000,000×12)/(60×0.09) = 40,000,000
+        // 2026-05: 50명, 추정연봉 (16,406,250×12)/(50×0.095) = 41,447,368
+        // 2026-06: 60명, 추정연봉 (18,000,000×12)/(60×0.095) = 37,894,737
         WorkforceHistory history = WorkforceHistory.of(List.of(
                 snapshot(YearMonth.of(2026, 5), 50, "16406250"),
                 snapshot(YearMonth.of(2026, 6), 60, "18000000")));
@@ -44,8 +44,8 @@ class WorkforceHistoryTest {
         WorkforceTrendPoint latest = history.points().get(1);
         assertThat(latest.headcountChange()).isEqualByComparingTo("10");
         assertThat(latest.headcountChangeRate()).isEqualByComparingTo("20.00");
-        assertThat(latest.salaryChange()).isEqualByComparingTo("-3750000");
-        // -3,750,000 / 43,750,000 × 100 = -8.5714… → HALF_UP 2자리 = -8.57
+        assertThat(latest.salaryChange()).isEqualByComparingTo("-3552631");
+        // -3,552,631 / 41,447,368 × 100 = -8.5714… → HALF_UP 2자리 = -8.57
         assertThat(latest.salaryChangeRate()).isEqualByComparingTo("-8.57");
     }
 
@@ -86,7 +86,7 @@ class WorkforceHistoryTest {
         assertThat(history.points()).hasSize(1);
         WorkforceTrendPoint only = history.points().get(0);
         assertThat(only.headcount()).isEqualTo(50);
-        assertThat(only.estimatedAnnualSalary()).isEqualByComparingTo("43750000");
+        assertThat(only.estimatedAnnualSalary()).isEqualByComparingTo("41447368");
         assertThat(only.headcountChange()).isNull();
         assertThat(only.salaryChangeRate()).isNull();
     }
@@ -148,9 +148,9 @@ class WorkforceHistoryTest {
     @Test
     @DisplayName("각 월의 상한 도달 플래그는 스냅샷 판정을 그대로 나른다")
     void carriesSalaryCapFlagPerMonth() {
-        // 2026-06 상한 월 6,370,000 → 연 76,440,000. 1명·고지 600,000 → 추정연봉 80,000,000 ≥ 상한
+        // 2026-06 상한 월 6,370,000 → 연 76,440,000. 1명·고지 605,150 → 추정연봉 76,440,000 = 상한
         WorkforceHistory history = WorkforceHistory.of(List.of(
-                snapshot(YearMonth.of(2026, 6), 1, "600000")));
+                snapshot(YearMonth.of(2026, 6), 1, "605150")));
 
         assertThat(history.points().get(0).salaryCapReached()).isTrue();
     }

@@ -36,6 +36,8 @@ public class Settlement {
     private BigDecimal refundedAmount;    // 환불 금액
     private BigDecimal commission;        // 수수료
     private final BigDecimal commissionRate;    // 적용된 수수료율 (이력 보존, 정산 시점 스냅샷)
+    /** 적용 요율의 근거(ADR 0032) — SELLER:{id} | TIER:{등급} | DEFAULT_TIER. 레거시 행은 null. */
+    private String commissionRateSource;
     private BigDecimal netAmount;         // 실 지급액
     private SettlementStatus status;
     private final LocalDate settlementDate;
@@ -104,6 +106,19 @@ public class Settlement {
      * 차등 수수료 지원 팩토리.
      * @param commissionRate 적용할 수수료율 (예: {@link SellerTier#rate()}). null 이면 {@link #COMMISSION_RATE}.
      */
+    /**
+     * 요율 근거까지 못박는 팩토리 (ADR 0032). 근거는 "왜 이 요율인가"에 답하기 위한 최소 정보라
+     * 요율과 같은 시점에 함께 확정된다.
+     */
+    public static Settlement createFromPayment(Long paymentId, Long orderId,
+                                               BigDecimal paymentAmount, LocalDate settlementDate,
+                                               BigDecimal commissionRate, String commissionRateSource) {
+        Settlement settlement = createFromPayment(paymentId, orderId, paymentAmount,
+                settlementDate, commissionRate);
+        settlement.commissionRateSource = commissionRateSource;
+        return settlement;
+    }
+
     public static Settlement createFromPayment(Long paymentId, Long orderId,
                                                BigDecimal paymentAmount, LocalDate settlementDate,
                                                BigDecimal commissionRate) {
@@ -127,6 +142,25 @@ public class Settlement {
      * <p>{@code commissionRate} 는 정산 시점 스냅샷(V32 이력 보존 원칙)이라 write-once 여야 한다 —
      * {@code final} 필드 + private 생성 경로 + setter 부재로 재부여 자체가 컴파일 단에서 불가능하다.
      */
+    /** 근거 컬럼까지 복원하는 오버로드 (ADR 0032). */
+    public static Settlement rehydrate(Long id, Long paymentId, Long orderId,
+                                       BigDecimal paymentAmount, BigDecimal refundedAmount,
+                                       BigDecimal commission, BigDecimal commissionRate,
+                                       BigDecimal netAmount, SettlementStatus status,
+                                       LocalDate settlementDate, String failureReason,
+                                       LocalDateTime confirmedAt, LocalDateTime createdAt,
+                                       LocalDateTime updatedAt, Long version,
+                                       BigDecimal holdbackAmount, BigDecimal holdbackRate,
+                                       LocalDate holdbackReleaseDate, boolean holdbackReleased,
+                                       LocalDateTime holdbackReleasedAt, String commissionRateSource) {
+        Settlement s = rehydrate(id, paymentId, orderId, paymentAmount, refundedAmount, commission,
+                commissionRate, netAmount, status, settlementDate, failureReason, confirmedAt,
+                createdAt, updatedAt, version, holdbackAmount, holdbackRate, holdbackReleaseDate,
+                holdbackReleased, holdbackReleasedAt);
+        s.commissionRateSource = commissionRateSource;
+        return s;
+    }
+
     public static Settlement rehydrate(Long id, Long paymentId, Long orderId,
                                        BigDecimal paymentAmount, BigDecimal refundedAmount,
                                        BigDecimal commission, BigDecimal commissionRate,
@@ -383,6 +417,7 @@ public class Settlement {
     public BigDecimal getCommission() { return commission; }
 
     public BigDecimal getCommissionRate() { return commissionRate; }
+    public String getCommissionRateSource() { return commissionRateSource; }
 
     public BigDecimal getNetAmount() { return netAmount; }
 

@@ -8,6 +8,7 @@ import github.lms.lemuel.order.application.port.in.CreateOrderUseCase;
 import github.lms.lemuel.order.application.port.in.GetOrderUseCase;
 import github.lms.lemuel.order.application.port.in.IdempotentMultiItemOrderUseCase;
 import github.lms.lemuel.order.domain.Order;
+import github.lms.lemuel.web.security.ResourceOwnership;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -107,6 +108,7 @@ public class OrderController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to) {
+        ResourceOwnership.requireSelfOrAdmin(userId);
         List<OrderResponse> orders = getOrderUseCase.getOrdersByUserId(userId, status, from, to)
                 .stream()
                 .map(OrderResponse::from)
