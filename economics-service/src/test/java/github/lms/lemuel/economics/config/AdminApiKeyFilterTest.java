@@ -5,6 +5,11 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.env.YamlPropertySourceLoader;
+import org.springframework.core.env.PropertySource;
+import org.springframework.core.io.ClassPathResource;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -75,5 +80,35 @@ class AdminApiKeyFilterTest {
 
         verify(res).sendError(HttpServletResponse.SC_FORBIDDEN, "invalid internal api key");
         verify(chain, never()).doFilter(req, res);
+    }
+
+    @Test
+    @DisplayName("키 미설정 + keyRequired(운영) — 통과가 아니라 403")
+    void forbidsWhenKeyBlankAndRequired() throws Exception {
+        AdminApiKeyFilter filter = new AdminApiKeyFilter("", true);
+        HttpServletRequest req = mock(HttpServletRequest.class);
+        HttpServletResponse res = mock(HttpServletResponse.class);
+        FilterChain chain = mock(FilterChain.class);
+
+        filter.doFilterInternal(req, res, chain);
+
+        verify(res).sendError(HttpServletResponse.SC_FORBIDDEN, "internal api key not configured");
+        verify(chain, never()).doFilter(req, res);
+    }
+
+    /**
+     * 운영에서 키가 빠지면 게이트가 조용히 열리는 사고를 막는 회귀 가드.
+     *
+     * <p>2026-08-11 market-service 가 정확히 이 조합(시크릿에 키 없음 + prod 프로파일 없음)으로
+     * fail-open 이었다. application-prod.yml 이 지워지거나 플래그가 뒤집히면 여기서 깨진다.
+     */
+    @Test
+    @DisplayName("prod 프로파일이 internal-key-required 를 켠다")
+    void prodProfileEnablesKeyRequired() throws Exception {
+        List<PropertySource<?>> sources =
+                new YamlPropertySourceLoader().load("prod", new ClassPathResource("application-prod.yml"));
+
+        assertThat(sources).isNotEmpty();
+        assertThat(sources.get(0).getProperty("app.security.internal-key-required")).isEqualTo(true);
     }
 }

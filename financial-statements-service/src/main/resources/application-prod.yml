@@ -1,0 +1,13 @@
+# 운영(prod) 프로파일 — SPRING_PROFILES_ACTIVE=prod 로 활성.
+#
+# 기본(로컬/개발) 프로파일은 FINANCIAL_INTERNAL_API_KEY 미설정 시 fail-open(경고 후 통과)으로
+# 개발 편의를 보존하지만, 운영에서는 이 플래그를 고정해 fail-closed 로 전환한다: 키가 주입되지
+# 않으면 /admin/financial/** 호출을 통과가 아니라 403 으로 거부한다(AdminApiKeyFilter).
+#
+# 2026-08-11 market-service 에서 실제로 이 사고가 났다(helm-deploy #117, settlement #218).
+# settlement-api-keys 시크릿에 MARKET_INTERNAL_API_KEY 만 빠져 있었고 이 프로파일도 없어,
+# 클러스터 내부에서 헤더 없이 관리 엔드포인트 호출이 가능했다. 이 서비스는 키가 시크릿에 있어
+# 지금은 게이트가 닫혀 있지만, 키가 빠지는 순간 똑같이 조용히 열린다 — 그 구조를 끊는다.
+app:
+  security:
+    internal-key-required: true
