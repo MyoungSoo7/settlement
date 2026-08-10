@@ -13,8 +13,14 @@ export interface MarketQuote {
   tradeAmount: number | null;   // 거래대금(원)
   listedShares: number | null;  // 상장주식수
   marketCap: number | null;     // 시가총액(원)
-  source: string;               // SEED(근사 샘플) / KRX(실데이터)
+  source: string;               // SAMPLE(근사 샘플, 신뢰 불가) / EXCHANGE(거래소 공시 실시세)
 }
+
+/** 시세 출처 표시 라벨 — 도메인 값은 공급자 중립이라 화면 문구는 여기서 붙인다. */
+export const QUOTE_SOURCE_LABEL: Record<string, string> = {
+  SAMPLE: '근사 샘플',
+  EXCHANGE: '거래소 공시',
+};
 
 /** 종목 + 최신 시세 스냅샷 — 시세 미적재 시 latest=null */
 export interface StockSnapshot {
