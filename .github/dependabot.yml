@@ -1,0 +1,114 @@
+# 의존성 자동 업데이트. 지금까지 없어서 베이스 이미지·라이브러리 CVE 를 사람이 눈으로 찾아야 했다.
+#
+# PR 폭주를 막는 장치 2개:
+#   - groups: minor/patch 를 생태계별 PR 1개로 묶는다(major 만 개별 PR).
+#   - open-pull-requests-limit: 생태계당 동시 열림 상한.
+# 모든 PR 은 develop 을 target 으로 연다 — main 은 보호 브랜치라 릴리스 PR 로만 들어간다.
+version: 2
+updates:
+  # ── Java (Gradle 멀티모듈) — 루트 + 17개 서비스 모듈 + shared-common
+  - package-ecosystem: gradle
+    directories:
+      - "/"
+      - "/*-service"
+      - "/shared-common"
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Seoul
+    open-pull-requests-limit: 5
+    groups:
+      gradle-minor-patch:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: "chore(deps)"
+
+  # ── 프론트엔드
+  - package-ecosystem: npm
+    directory: /frontend
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Seoul
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor-patch:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: "chore(deps)"
+
+  # ── GitHub Actions (actions/checkout, docker/build-push-action 등 핀 갱신)
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Seoul
+    open-pull-requests-limit: 3
+    groups:
+      actions-all:
+        patterns: ["*"]
+    commit-message:
+      prefix: "chore(ci)"
+
+  # ── 컨테이너 베이스 이미지 (Dockerfile FROM)
+  - package-ecosystem: docker
+    directories:
+      - "/"
+      - "/frontend"
+      - "/*-service"
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Seoul
+    open-pull-requests-limit: 3
+    groups:
+      docker-all:
+        patterns: ["*"]
+    commit-message:
+      prefix: "chore(deps)"
+
+  # ── 폴리글랏 Go 2종
+  - package-ecosystem: gomod
+    directories:
+      - "/market-stream-service"
+      - "/payment-webhook-service"
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Seoul
+    open-pull-requests-limit: 3
+    groups:
+      go-minor-patch:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: "chore(deps)"
+
+  # ── 폴리글랏 Python 3종
+  - package-ecosystem: pip
+    directories:
+      - "/screening-backtest-service"
+      - "/settlement-anomaly-service"
+      - "/forecast-service"
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Seoul
+    open-pull-requests-limit: 3
+    groups:
+      pip-minor-patch:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: "chore(deps)"
