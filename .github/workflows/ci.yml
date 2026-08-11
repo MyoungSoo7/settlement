@@ -561,7 +561,7 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      - name: Install Playwright browser
+      - name: Install Playwright browsers (chromium/firefox/webkit)
         working-directory: frontend
         run: npm run e2e:install
 
