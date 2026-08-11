@@ -32,6 +32,11 @@ on:
 permissions:
   contents: read
 
+# ci.yml 과 같은 규칙 — PR 은 최신 커밋만 검증(취소), push 는 이미지 푸시 때문에 직렬화만.
+concurrency:
+  group: polyglot-ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   REGISTRY: ghcr.io
   IMAGE_BASE: ${{ github.repository }} # MyoungSoo7/settlement (metadata-action 가 소문자화)

@@ -9,6 +9,11 @@ on:
   push:
     branches: [develop, main]
 
+# 가드는 부작용이 없으므로 PR·push 모두 최신 커밋만 검증하면 된다.
+concurrency:
+  group: harness-guard-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   guard:
     runs-on: ubuntu-latest
