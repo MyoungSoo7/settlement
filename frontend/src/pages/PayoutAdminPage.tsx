@@ -1,0 +1,397 @@
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  payoutApi,
+  Payout,
+  PayoutPreview,
+  PayoutStatus,
+  PAYOUT_STATUS_LABEL,
+  newIdempotencyKey,
+} from '@/api/payout';
+import Spinner from '@/components/Spinner';
+import { errorDetail, apiErrorStatus } from '@/lib/apiError';
+import { useToast } from '@/contexts/useToast';
+
+const fmt = (v: number) =>
+  new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(v);
+
+const fmtDate = (s: string | null) =>
+  s ? new Date(s).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
+
+const statusClass = (status: PayoutStatus): string => {
+  switch (status) {
+    case 'COMPLETED':
+      return 'bg-green-100 text-green-800';
+    case 'FAILED':
+      return 'bg-red-100 text-red-800';
+    case 'CANCELED':
+      return 'bg-gray-200 text-gray-700';
+    case 'SENDING':
+      return 'bg-blue-100 text-blue-800';
+    default:
+      return 'bg-yellow-100 text-yellow-800';
+  }
+};
+
+type Tab = 'failed' | 'pending';
+
+/* ─────────────────────────────────────────
+   출금 1건
+───────────────────────────────────────── */
+const PayoutRow: React.FC<{
+  payout: Payout;
+  onChanged: (payout: Payout) => void;
+  onBounced: () => void;
+}> = ({ payout, onChanged, onBounced }) => {
+  const { showToast } = useToast();
+  const [busy, setBusy] = useState(false);
+  const [mode, setMode] = useState<'idle' | 'cancel' | 'bounce'>('idle');
+  const [reason, setReason] = useState('');
+
+  /**
+   * 실자금 경로라 실패를 반드시 드러낸다. 409 는 "이미 처리된 요청"이므로
+   * 오류가 아니라 중복 클릭이었다고 알려 준다 — 서버의 멱등 방어가 동작한 결과다.
+   */
+  const run = async (action: () => Promise<void>, successMsg: string) => {
+    setBusy(true);
+    try {
+      await action();
+      setMode('idle');
+      setReason('');
+      showToast(successMsg, 'success');
+    } catch (err) {
+      if (apiErrorStatus(err) === 409) {
+        showToast('이미 처리된 요청입니다 (중복 방지).', 'warning');
+      } else {
+        showToast(errorDetail(err, '처리에 실패했습니다.'), 'error');
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-bold text-gray-900">
+            지급 #{payout.id} · 정산 #{payout.settlementId}
+          </p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            셀러 #{payout.sellerId} · 요청 {fmtDate(payout.requestedAt)}
+            {payout.retryCount > 0 && ` · 재시도 ${payout.retryCount}회`}
+          </p>
+          <p className="text-base font-bold text-blue-700 mt-1">{fmt(payout.amount)}</p>
+          <p className="text-xs text-gray-500 mt-1 font-mono">
+            {payout.bank} {payout.account} ({payout.holder})
+          </p>
+          {payout.failureReason && (
+            <p className="text-xs text-red-600 mt-1">실패 사유: {payout.failureReason}</p>
+          )}
+        </div>
+        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap ${statusClass(payout.status)}`}>
+          {PAYOUT_STATUS_LABEL[payout.status]}
+        </span>
+      </div>
+
+      {mode !== 'idle' ? (
+        <div className="mt-3">
+          <label className="block text-xs font-medium text-gray-700 mb-1">
+            {mode === 'cancel' ? '취소 사유 (감사 기록에 남습니다)' : '반송 사유'}
+          </label>
+          {mode === 'bounce' && (
+            <p className="text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded p-2 mb-2">
+              계좌 정정을 <b>먼저</b> 하세요. 정정 없이 반송을 기록하면 같은 계좌로 재지급됩니다.
+            </p>
+          )}
+          <input
+            aria-label={mode === 'cancel' ? '취소 사유' : '반송 사유'}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"
+          />
+          <div className="flex gap-2 mt-2">
+            <button
+              type="button"
+              disabled={busy || reason.trim() === ''}
+              onClick={() =>
+                mode === 'cancel'
+                  ? void run(
+                      async () => onChanged(await payoutApi.cancel(payout.id, reason.trim(), newIdempotencyKey())),
+                      '출금을 취소했습니다.'
+                    )
+                  : void run(async () => {
+                      await payoutApi.bounce(payout.id, reason.trim(), newIdempotencyKey());
+                      onBounced();
+                    }, '반송을 기록하고 재지급을 요청했습니다.')
+              }
+              className="px-3 py-1.5 text-xs font-semibold rounded bg-red-600 text-white disabled:opacity-40"
+            >
+              {mode === 'cancel' ? '취소 확정' : '반송 기록'}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMode('idle'); setReason(''); }}
+              className="px-3 py-1.5 text-xs rounded border border-gray-300 text-gray-600"
+            >
+              닫기
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {payout.status === 'FAILED' && (
+            <>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() =>
+                  void run(
+                    async () => onChanged(await payoutApi.retry(payout.id, newIdempotencyKey())),
+                    '재시도로 등록했습니다.'
+                  )
+                }
+                className="px-3 py-1.5 text-xs font-semibold rounded bg-gray-900 text-white disabled:opacity-40"
+              >
+                재시도
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => setMode('cancel')}
+                className="px-3 py-1.5 text-xs font-medium rounded border border-red-300 text-red-700 disabled:opacity-40"
+              >
+                영구 취소
+              </button>
+            </>
+          )}
+          {payout.status === 'COMPLETED' && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => setMode('bounce')}
+              className="px-3 py-1.5 text-xs font-medium rounded border border-orange-300 text-orange-700 disabled:opacity-40"
+            >
+              반송 기록
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ─────────────────────────────────────────
+   송금 미리보기 + 즉시 실행
+───────────────────────────────────────── */
+const PreviewPanel: React.FC<{ onExecuted: () => void }> = ({ onExecuted }) => {
+  const { showToast } = useToast();
+  const [preview, setPreview] = useState<PayoutPreview | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [executing, setExecuting] = useState(false);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      setPreview(await payoutApi.preview());
+    } catch (err) {
+      showToast(errorDetail(err, '미리보기를 불러오지 못했습니다.'), 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const execute = async () => {
+    // 되돌리기 어려운 외부 송금이다. 규모를 눈으로 확인시키고 한 번 더 묻는다.
+    const summary = preview
+      ? `${preview.sendableCount}건 / ${fmt(preview.sendableAmount)}`
+      : '대기 중인 전체 건';
+    if (!window.confirm(`실제 송금을 실행합니다.\n\n대상: ${summary}\n\n계속하시겠습니까?`)) return;
+    setExecuting(true);
+    try {
+      const report = await payoutApi.executeNow();
+      showToast(
+        `송금 완료 ${report.succeeded}건 · 실패 ${report.failed}건 · 한도로 보류 ${report.limitedSkipped}건`,
+        report.failed > 0 ? 'warning' : 'success'
+      );
+      onExecuted();
+      await load();
+    } catch (err) {
+      showToast(errorDetail(err, '송금 실행에 실패했습니다.'), 'error');
+    } finally {
+      setExecuting(false);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-4 mb-5">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-sm font-bold text-gray-900">송금 미리보기</h2>
+          <p className="text-xs text-gray-400 mt-0.5">
+            상태를 바꾸지 않습니다. 실행 전 규모와 밀린 사유를 확인하세요.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void load()}
+          disabled={loading}
+          className="px-3 py-1.5 text-sm font-semibold rounded border border-gray-300 text-gray-700 disabled:opacity-40"
+        >
+          {loading ? '불러오는 중...' : '미리보기'}
+        </button>
+      </div>
+
+      {preview && (
+        <>
+          <div className="grid grid-cols-2 gap-3 mt-3">
+            <div className="rounded-lg bg-blue-50 border border-blue-200 p-3">
+              <p className="text-xs text-blue-700">송금 가능</p>
+              <p className="text-lg font-bold text-blue-900">{preview.sendableCount}건</p>
+              <p className="text-sm text-blue-800">{fmt(preview.sendableAmount)}</p>
+            </div>
+            <div className="rounded-lg bg-yellow-50 border border-yellow-200 p-3">
+              <p className="text-xs text-yellow-700">한도로 보류</p>
+              <p className="text-lg font-bold text-yellow-900">{preview.limitedCount}건</p>
+              <p className="text-sm text-yellow-800">{fmt(preview.limitedAmount)}</p>
+            </div>
+          </div>
+
+          {preview.lines.length > 0 && (
+            <div className="mt-3 max-h-56 overflow-y-auto border border-gray-200 rounded-lg">
+              <table className="w-full text-xs">
+                <thead className="bg-gray-50 sticky top-0">
+                  <tr>
+                    <th className="text-left px-2 py-1.5 font-semibold text-gray-600">지급</th>
+                    <th className="text-left px-2 py-1.5 font-semibold text-gray-600">셀러</th>
+                    <th className="text-right px-2 py-1.5 font-semibold text-gray-600">금액</th>
+                    <th className="text-left px-2 py-1.5 font-semibold text-gray-600">상태</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {preview.lines.map((line) => (
+                    <tr key={line.payoutId} className="border-t border-gray-100">
+                      <td className="px-2 py-1.5 text-gray-700">#{line.payoutId}</td>
+                      <td className="px-2 py-1.5 text-gray-700">#{line.sellerId}</td>
+                      <td className="px-2 py-1.5 text-right text-gray-900">{fmt(line.amount)}</td>
+                      <td className="px-2 py-1.5">
+                        {line.sendable ? (
+                          <span className="text-green-700">송금 가능</span>
+                        ) : (
+                          <span className="text-yellow-700">{line.reason ?? '보류'}</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => void execute()}
+            disabled={executing}
+            className="mt-3 w-full px-3 py-2 text-sm font-bold rounded bg-red-600 text-white disabled:opacity-40"
+          >
+            {executing ? '송금 실행 중...' : '지금 송금 실행'}
+          </button>
+        </>
+      )}
+    </div>
+  );
+};
+
+/* ─────────────────────────────────────────
+   지급 콘솔
+───────────────────────────────────────── */
+const PayoutAdminPage: React.FC = () => {
+  const [tab, setTab] = useState<Tab>('failed');
+  const [payouts, setPayouts] = useState<Payout[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      setPayouts(tab === 'failed' ? await payoutApi.listFailed(50) : await payoutApi.listPending(50));
+    } catch (err) {
+      setError(errorDetail(err, '출금 목록을 불러오지 못했습니다.'));
+    } finally {
+      setLoading(false);
+    }
+  }, [tab]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const handleChanged = (updated: Payout) => {
+    // 재시도·취소로 상태가 바뀌면 현재 탭의 조건에서 벗어난다 — 목록에서 덜어낸다.
+    setPayouts((prev) =>
+      prev
+        .map((p) => (p.id === updated.id ? updated : p))
+        .filter((p) => (tab === 'failed' ? p.status === 'FAILED' : p.status === 'REQUESTED'))
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-4xl mx-auto">
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">정산 지급 콘솔</h1>
+            <p className="text-sm text-gray-500 mt-1">
+              실자금 송금입니다. 모든 조작은 감사 기록에 남고, 중복 요청은 서버가 막습니다.
+            </p>
+          </div>
+          <button
+            onClick={() => void load()}
+            className="px-3 py-2 text-sm font-semibold rounded border border-gray-300 text-gray-700 bg-white"
+          >
+            새로고침
+          </button>
+        </div>
+
+        <PreviewPanel onExecuted={() => void load()} />
+
+        <div className="flex bg-white rounded-xl border border-gray-200 p-1 mb-4">
+          {([
+            { id: 'failed', label: '지급 실패' },
+            { id: 'pending', label: '지급 대기' },
+          ] as { id: Tab; label: string }[]).map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
+                tab === t.id ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-800'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {loading ? (
+          <Spinner size="md" message="출금 목록 불러오는 중..." />
+        ) : error ? (
+          <p className="text-center text-red-600 py-8">{error}</p>
+        ) : payouts.length === 0 ? (
+          <div className="text-center py-16 text-gray-400 bg-white rounded-xl border border-gray-200">
+            <p className="text-sm">
+              {tab === 'failed' ? '지급 실패 건이 없습니다.' : '지급 대기 건이 없습니다.'}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {payouts.map((p) => (
+              <PayoutRow key={p.id} payout={p} onChanged={handleChanged} onBounced={() => void load()} />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default PayoutAdminPage;
