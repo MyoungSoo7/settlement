@@ -269,10 +269,12 @@ const OrderFormTab: React.FC = () => {
                             <p className="text-sm font-semibold text-gray-900">{fmt(product.price)}</p>
                             <p className="text-xs text-gray-400">재고 {product.stockQuantity}개</p>
                           </div>
+                          {/* `tap-target` — 아이콘 버튼이라 시각 크기는 30×30 이지만 터치 환경에서는
+                              눌리는 영역만 44×44 로 넓힌다(index.css, 데스크톱 무영향). */}
                           <button
                             onClick={(e) => { e.stopPropagation(); handleAddToCart(product); }}
                             title="장바구니 담기"
-                            className={`p-1.5 rounded-lg border transition-all flex-shrink-0 ${
+                            className={`tap-target p-1.5 rounded-lg border transition-all flex-shrink-0 ${
                               addedProductId === product.id
                                 ? 'bg-green-500 border-green-500 text-white'
                                 : 'border-gray-300 text-gray-500 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50'

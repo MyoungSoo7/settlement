@@ -55,9 +55,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   }, [location.pathname]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className={`bg-white shadow ${isAdminOrManager ? 'border-b-2 border-gray-800' : ''}`}>
+    /* `px-safe` 는 가로 모드에서 노치가 먹는 좌/우 폭을 셸 바깥쪽에 확보한다. 안쪽 컨테이너의
+       `px-4 sm:px-6 lg:px-8` 과 겹치지 않게 **패딩이 없는 최외곽**에만 건다(겹쳐 걸면 Tailwind
+       유틸리티가 덮여 좌우 여백 자체가 사라진다). 배경은 패딩 아래까지 칠해지므로 흰 띠는 없다. */
+    <div className="min-h-screen bg-gray-50 px-safe">
+      {/* Header — 설치형(standalone)에서는 상태바가 문서 위에 겹쳐 뜨므로(black-translucent)
+          헤더가 그만큼 아래에서 시작해야 로고·내비가 시계·배터리에 가리지 않는다. */}
+      <header className={`bg-white shadow pt-safe ${isAdminOrManager ? 'border-b-2 border-gray-800' : ''}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
 
@@ -129,7 +133,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 {user.role === 'USER' && (
                   <Link
                     to="/cart"
-                    className="relative p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    /* tap-target: 실측 40×40 — 터치 환경에서만 눌리는 영역을 44×44 로 넓힌다. */
+                    className="tap-target relative p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                     title="장바구니"
                   >
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -179,7 +184,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       <main>{children}</main>
 
       {/* Footer */}
-      <footer className="bg-white border-t mt-12">
+      {/* 홈 인디케이터(하단 바)가 문서 위에 겹치는 기기에서 푸터 문구가 가리지 않게 띄운다. */}
+      <footer className="bg-white border-t mt-12 pb-safe">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center text-gray-600">
             <p className="text-sm">© 2024 Lemuel Settlement System. All rights reserved.</p>

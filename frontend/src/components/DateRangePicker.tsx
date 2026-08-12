@@ -80,7 +80,8 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
                 const { start, end } = filter.getValue();
                 onQuickSelect(start, end);
               }}
-              className="px-3 py-1 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors"
+              /* tap-target: 실측 높이 24px — 칩 모양을 키우지 않고 터치 영역만 44px 로 넓힌다. */
+              className="tap-target px-3 py-1 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors"
             >
               {filter.label}
             </button>
