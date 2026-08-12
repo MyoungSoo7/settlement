@@ -1,8 +1,11 @@
 package github.lms.lemuel.loan.application.service;
 
 import github.lms.lemuel.loan.application.port.in.ManageLeaseContractUseCase;
+import github.lms.lemuel.loan.application.port.out.AppendLedgerPort;
 import github.lms.lemuel.loan.application.port.out.LoadLeaseContractPort;
+import github.lms.lemuel.loan.application.port.out.PublishLeaseEventPort;
 import github.lms.lemuel.loan.application.port.out.SaveLeaseContractPort;
+import github.lms.lemuel.loan.domain.LoanLedgerEntry;
 import github.lms.lemuel.loan.domain.Borrower;
 import github.lms.lemuel.loan.domain.EarlyTerminationQuote;
 import github.lms.lemuel.loan.domain.LeaseContract;
@@ -31,11 +34,17 @@ public class LeaseContractService implements ManageLeaseContractUseCase {
 
     private final LoadLeaseContractPort loadPort;
     private final SaveLeaseContractPort savePort;
+    private final AppendLedgerPort appendLedgerPort;
+    private final PublishLeaseEventPort publishLeaseEventPort;
     private final Clock clock;
 
-    public LeaseContractService(LoadLeaseContractPort loadPort, SaveLeaseContractPort savePort, Clock clock) {
+    public LeaseContractService(LoadLeaseContractPort loadPort, SaveLeaseContractPort savePort,
+                                AppendLedgerPort appendLedgerPort, PublishLeaseEventPort publishLeaseEventPort,
+                                Clock clock) {
         this.loadPort = loadPort;
         this.savePort = savePort;
+        this.appendLedgerPort = appendLedgerPort;
+        this.publishLeaseEventPort = publishLeaseEventPort;
         this.clock = clock;
     }
 
@@ -72,10 +81,21 @@ public class LeaseContractService implements ManageLeaseContractUseCase {
         return mutate(contractId, LeaseContract::cancel);
     }
 
+    /**
+     * 물건 인도 → 계약 개시. <b>도메인 저장·원장 기표·이벤트 발행이 한 트랜잭션</b>이다 —
+     * 셋 중 하나만 남으면 채권과 원장이, 또는 원장과 소비측이 어긋난다.
+     *
+     * <p>이중 기표 방어는 3중이다: ① 상태머신이 {@code APPROVED → ACTIVE} 를 한 번만 허용 ②
+     * 락 조회로 동시 진입 차단 ③ {@code uq_loan_ledger_reference_accounts} 유니크(DB 최종선).
+     */
     @Override
     @Transactional
     public LeaseContract activate(Long contractId) {
-        return mutate(contractId, contract -> contract.activate(OffsetDateTime.now(clock)));
+        LeaseContract contract = mutate(contractId, c -> c.activate(OffsetDateTime.now(clock)));
+        appendLedgerPort.append(
+                LoanLedgerEntry.leaseActivation(contract.getId(), contract.getSchedule().financedAmount()));
+        publishLeaseEventPort.publishActivated(contract);
+        return contract;
     }
 
     @Override

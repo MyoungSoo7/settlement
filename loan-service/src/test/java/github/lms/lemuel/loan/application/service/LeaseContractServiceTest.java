@@ -1,8 +1,12 @@
 package github.lms.lemuel.loan.application.service;
 
 import github.lms.lemuel.loan.application.port.in.ManageLeaseContractUseCase.ApplyLeaseCommand;
+import github.lms.lemuel.loan.application.port.out.AppendLedgerPort;
 import github.lms.lemuel.loan.application.port.out.LoadLeaseContractPort;
+import github.lms.lemuel.loan.application.port.out.PublishLeaseEventPort;
 import github.lms.lemuel.loan.application.port.out.SaveLeaseContractPort;
+import github.lms.lemuel.loan.domain.LedgerAccount;
+import github.lms.lemuel.loan.domain.LoanLedgerEntry;
 import github.lms.lemuel.loan.domain.AssetFinanceType;
 import github.lms.lemuel.loan.domain.BorrowerType;
 import github.lms.lemuel.loan.domain.EarlyTerminationQuote;
@@ -36,10 +40,15 @@ class LeaseContractServiceTest {
     private FakeLeasePort port;
     private LeaseContractService service;
 
+    private FakeLedgerPort ledger;
+    private FakeEventPort events;
+
     @BeforeEach
     void setUp() {
         port = new FakeLeasePort();
-        service = new LeaseContractService(port, port, CLOCK);
+        ledger = new FakeLedgerPort();
+        events = new FakeEventPort();
+        service = new LeaseContractService(port, port, ledger, events, CLOCK);
     }
 
     private static ApplyLeaseCommand command(AssetFinanceType type, BigDecimal residual, String registrationNo) {
@@ -184,6 +193,68 @@ class LeaseContractServiceTest {
         LeaseContract defaulted = service.markDefaulted(contract.getId());
 
         assertThat(defaulted.getStatus()).isEqualTo(LeaseStatus.DEFAULTED);
+    }
+
+    @Test
+    @DisplayName("개시는 원장 전표 1건과 이벤트 1건을 같은 흐름에서 남긴다 — 셋 중 하나만 남으면 어긋난다")
+    void activationWritesLedgerAndEvent() {
+        LeaseContract contract = activeContract();
+
+        assertThat(ledger.entries).hasSize(1);
+        LoanLedgerEntry entry = ledger.entries.getFirst();
+        assertThat(entry.getRefType()).isEqualTo("LEASE_ACTIVATE");
+        assertThat(entry.getRefId()).isEqualTo(contract.getId());
+        assertThat(entry.getDebit()).isEqualTo(LedgerAccount.LEASE_RECEIVABLE);
+        assertThat(entry.getCredit()).isEqualTo(LedgerAccount.CASH);
+        assertThat(entry.getAmount()).isEqualByComparingTo("27000000");
+        assertThat(events.activated).containsExactly(contract.getId());
+    }
+
+    @Test
+    @DisplayName("개시 외의 전이는 전표·이벤트를 남기지 않는다 — 승인·수납은 채권 인식 사건이 아니다")
+    void nonActivationTransitionsLeaveNoLedgerOrEvent() {
+        LeaseContract applied = service.apply(command(AssetFinanceType.FINANCE_LEASE,
+                new BigDecimal("6000000"), "1234567890"));
+        service.approve(applied.getId());
+
+        assertThat(ledger.entries).isEmpty();
+        assertThat(events.activated).isEmpty();
+
+        service.activate(applied.getId());
+        service.payInstallment(applied.getId());
+
+        assertThat(ledger.entries).hasSize(1);
+        assertThat(events.activated).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("개시 전표는 차·대 계정이 서로 다르다 — 반쪽 전표가 만들어질 수 없는 구조")
+    void ledgerEntryIsCompositionallyBalanced() {
+        activeContract();
+
+        LoanLedgerEntry entry = ledger.entries.getFirst();
+        assertThat(entry.getDebit()).isNotEqualTo(entry.getCredit());
+        assertThat(entry.getAmount()).isPositive();
+    }
+
+    /** 인메모리 원장 포트. */
+    private static final class FakeLedgerPort implements AppendLedgerPort {
+        private final List<LoanLedgerEntry> entries = new ArrayList<>();
+
+        @Override
+        public void append(LoanLedgerEntry entry) {
+            entries.add(entry);
+        }
+    }
+
+    /** 인메모리 이벤트 포트 — 개시된 계약 id 만 기록한다. */
+    private static final class FakeEventPort implements PublishLeaseEventPort {
+        private final List<Long> activated = new ArrayList<>();
+
+        @Override
+        public void publishActivated(LeaseContract contract) {
+            activated.add(contract.getId());
+        }
     }
 
     /** 인메모리 포트 — 락 조회 횟수를 세어 "상태 변경은 락 조회로 시작한다"를 검증한다. */

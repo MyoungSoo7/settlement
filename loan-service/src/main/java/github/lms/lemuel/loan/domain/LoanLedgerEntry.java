@@ -87,6 +87,23 @@ public class LoanLedgerEntry {
     }
 
     /**
+     * 리스·할부 계약 개시 전표: 차변 LEASE_RECEIVABLE / 대변 CASH (amount = 리스 원금).
+     *
+     * <p>기표 시점이 대출과 다르다 — 돈이 나갈 때가 아니라 <b>물건이 인도되어 계약이 개시될 때</b>다.
+     * 승인만 하고 인도 전에 취소되는 계약이 실제로 있어, 승인 시점 기표는 허위 채권을 만든다.
+     *
+     * <p>금액이 취득원가가 아니라 리스 원금인 이유: 선수금·보증금은 계약 시점에 이미 받아 회수 대상에서
+     * 빠져 있다(순현금 유출 기준). <b>보증금 반환 채무의 별도 부채 인식은 후속</b>이다 — 부채 계정 신설과
+     * 만기·해지 정산 기표가 함께 가야 한다.
+     *
+     * <p>계약 1건당 1회 기표다(상태머신이 APPROVED→ACTIVE 를 한 번만 허용한다).
+     */
+    public static LoanLedgerEntry leaseActivation(Long contractId, BigDecimal financedAmount) {
+        return new LoanLedgerEntry(null, LedgerAccount.LEASE_RECEIVABLE, LedgerAccount.CASH,
+                financedAmount, "LEASE_ACTIVATE", contractId);
+    }
+
+    /**
      * 담보/개인신용 대출 실행 전표: 차변 LOAN_RECEIVABLE / 대변 CASH (amount = 원금).
      * 대출 1건당 1회라 {@code uq_loan_ledger_reference_accounts} 유니크 대상으로 남아 이중지급을 막는다.
      */

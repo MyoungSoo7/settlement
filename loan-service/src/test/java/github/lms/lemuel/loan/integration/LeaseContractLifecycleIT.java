@@ -117,6 +117,26 @@ class LeaseContractLifecycleIT {
     }
 
     @Test
+    @DisplayName("개시가 원장 전표·Outbox 이벤트를 실 DB 에 남긴다 — ref_type CHECK 를 실제로 통과한다")
+    void activationWritesLedgerAndOutboxInRealDatabase() {
+        LeaseContract applied = applyFinanceLease();
+        leaseUseCase.approve(applied.getId());
+
+        leaseUseCase.activate(applied.getId());
+
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM opslab.loan_ledger_entries
+                 WHERE ref_type = 'LEASE_ACTIVATE' AND ref_id = ?
+                   AND debit = 'LEASE_RECEIVABLE' AND credit = 'CASH' AND amount = 27000000
+                """, Integer.class, applied.getId())).isEqualTo(1);
+
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM opslab.outbox_events
+                 WHERE aggregate_type = 'Loan' AND event_type = 'LeaseActivated' AND aggregate_id = ?
+                """, Integer.class, String.valueOf(applied.getId()))).isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("중도해지 정산이 실 DB 상태에 반영된다")
     void earlyTerminationPersists() {
         LeaseContract applied = applyFinanceLease();
