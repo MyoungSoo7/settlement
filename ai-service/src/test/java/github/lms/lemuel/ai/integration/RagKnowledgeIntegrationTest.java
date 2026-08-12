@@ -245,6 +245,41 @@ class RagKnowledgeIntegrationTest {
     }
 
     @Test
+    @DisplayName("목록 — 적재된 문서가 출처 오름차순으로, 매니페스트 대조에 필요한 해시·청크수와 함께 나온다")
+    void listDocuments() throws Exception {
+        // 적재 순서를 출처 역순으로 넣어, 응답 정렬이 삽입 순서가 아님을 드러낸다.
+        ingestAsAdmin("수수료", "docs://fee", FEE_PARAGRAPH);
+        ingestAsAdmin("정산 정책", "docs://cycle", SETTLEMENT_PARAGRAPH + "\n\n" + FEE_PARAGRAPH);
+
+        mockMvc.perform(get("/api/ai/knowledge/documents")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(2))
+                .andExpect(jsonPath("$.documents[0].sourceUri").value("docs://cycle"))
+                .andExpect(jsonPath("$.documents[0].title").value("정산 정책"))
+                .andExpect(jsonPath("$.documents[0].chunkCount").value(2))
+                // 해시가 없으면 동기화 도구가 재적재 없이는 드리프트를 판정할 수 없다.
+                .andExpect(jsonPath("$.documents[0].contentHash").isNotEmpty())
+                .andExpect(jsonPath("$.documents[0].ingestedAt").isNotEmpty())
+                .andExpect(jsonPath("$.documents[1].sourceUri").value("docs://fee"))
+                .andExpect(jsonPath("$.documents[1].chunkCount").value(1))
+                // 내부 PK 는 외부 계약이 아니다 — 식별자는 sourceUri 하나뿐이어야 한다.
+                .andExpect(jsonPath("$.documents[0].id").doesNotExist());
+
+        // 삭제된 문서는 목록에서도 사라진다(= 회수 결과를 목록으로 확인할 수 있다).
+        mockMvc.perform(delete("/api/ai/knowledge/documents")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .param("sourceUri", "docs://fee"))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/ai/knowledge/documents")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(1))
+                .andExpect(jsonPath("$.documents[0].sourceUri").value("docs://cycle"));
+    }
+
+    @Test
     @DisplayName("채팅 — 적재된 근거가 시스템 프롬프트에 실려 LLM 으로 전달된다")
     void chatUsesRetrievedContext() throws Exception {
         when(embeddingPort.embedQuery(anyString())).thenReturn(SETTLEMENT_VECTOR);
@@ -282,7 +317,7 @@ class RagKnowledgeIntegrationTest {
     }
 
     @Test
-    @DisplayName("보안 — 적재/삭제는 ADMIN 전용(USER 는 403), 검색은 USER 허용, 무인증은 401")
+    @DisplayName("보안 — 적재/목록/삭제는 ADMIN 전용(USER 는 403), 검색은 USER 허용, 무인증은 401")
     void security() throws Exception {
         mockMvc.perform(post("/api/ai/knowledge/documents")
                         .header("Authorization", "Bearer " + userToken)
@@ -296,6 +331,14 @@ class RagKnowledgeIntegrationTest {
                         .header("Authorization", "Bearer " + userToken)
                         .param("sourceUri", "docs://policy"))
                 .andExpect(status().isForbidden());
+
+        // 목록은 "챗봇이 무엇을 근거로 말하는가"의 전체 목차다 — 조회라고 열어 두면 안 된다.
+        mockMvc.perform(get("/api/ai/knowledge/documents")
+                        .header("Authorization", "Bearer " + userToken))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/ai/knowledge/documents"))
+                .andExpect(status().isUnauthorized());
 
         mockMvc.perform(get("/api/ai/knowledge/search").param("q", "질문"))
                 .andExpect(status().isUnauthorized());
