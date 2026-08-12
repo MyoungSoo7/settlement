@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { afterEach, describe, test } from 'node:test';
-import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -24,7 +24,10 @@ import {
 
 const temporaryDirectories = [];
 async function temporaryRepo() {
-  const directory = await mkdtemp(join(tmpdir(), 'guard-test-'));
+  // normalizeRepoPath 는 repoRoot 를 realpath 로 정규화한 뒤 격리 여부를 판정한다. macOS 의
+  // tmpdir() 은 /var → /private/var 심링크라, 픽스처 경로를 그대로 쓰면 멀쩡한 경로가
+  // "repository 밖"으로 판정된다 — 리눅스 CI 는 통과하고 개발자 맥에서만 빨간불이 뜬다.
+  const directory = await realpath(await mkdtemp(join(tmpdir(), 'guard-test-')));
   temporaryDirectories.push(directory);
   return directory;
 }

@@ -83,3 +83,19 @@ jobs:
 
       - name: Verify clean working tree
         run: git diff --exit-code
+
+      # 러너는 매 실행 폐기되고 .claude/harness/logs 는 gitignore 대상이라, 여기서 걷어내지
+      # 않으면 가드가 몇 번 돌았고 무엇을 막았는지가 영구히 사라진다. 규칙을 고친 뒤
+      # "효과가 있었나"를 사후에 판정하려면 실행 이력이 남아야 한다. 게이트가 아니므로 always().
+      - name: Harness telemetry report
+        if: always()
+        run: node scripts/harness/telemetry-report.mjs || true
+
+      - name: Upload harness telemetry
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: harness-telemetry-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .claude/harness/logs/
+          if-no-files-found: ignore
+          retention-days: 30

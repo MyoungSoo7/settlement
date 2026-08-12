@@ -20,7 +20,7 @@ import { readFileSync } from 'node:fs';
 import { readFile, realpath, stat } from 'node:fs/promises';
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { appendJsonl, logGuardHits } from './telemetry.mjs';
+import { appendJsonl, logGuardHits, logGuardRun } from './telemetry.mjs';
 
 const ALLOW = /harness-guard:\s*allow/i;
 const ALLOWANCE = /harness-guard:\s*allow\s+reason="([^"]*)"\s+issue="([^"]*)"\s+owner="([^"]*)"\s+expires="([^"]*)"\s*$/i;
@@ -583,6 +583,7 @@ export async function runGuardCli(args, io = {}) {
       const pending = await reconstructPendingContent(event, { repoRoot });
       const { violations } = scanText(event.tool_input.file_path, pending);
       await logGuardHits(repoRoot, 'hook', violations); // observability only — never affects the verdict
+      await logGuardRun(repoRoot, 'hook', { files: 1, violations: violations.length });
       return emitReport(violations, io) ? 2 : 0;
     } catch (error) { stderr(`guard hook rejected input: ${error.message}`); return 2; }
   }
@@ -607,6 +608,7 @@ export async function runGuardCli(args, io = {}) {
     // (--files/--hook 은 편집 중 실시간 경로라 저장소 전수 스캔을 돌리지 않는다.)
     if (mode === '--staged' || mode === '--list') violations.push(...checkKafkaDlqWiring(repoRoot));
     await logGuardHits(repoRoot, mode.slice(2), violations); // observability only — never affects the verdict
+    await logGuardRun(repoRoot, mode.slice(2), { files: files.length, violations: violations.length });
     if (mode === '--staged') {
       const nudge = dodNudgeMessage(files);
       if (nudge) {
