@@ -70,7 +70,20 @@ export const test = base.extend<{ blockLongLivedStreams: void; releaseAppPages: 
       await use();
       await Promise.all(
         // 실패로 페이지가 이상 상태여도 정리는 계속돼야 한다 — 에러는 삼키고 타임아웃을 둔다.
-        context.pages().map((page) => page.goto('about:blank', { timeout: 5_000 }).catch(() => {})),
+        context.pages().map(async (page) => {
+          // ① 서비스워커 **등록 해제**. about:blank 로 나가도 등록 자체는 오리진 스코프에 남아
+          //    백그라운드 스레드가 컨텍스트를 붙잡는다. 실제로 about:blank 만으로는 전체 스위트에서
+          //    행이 재발했다(43 passed·종료코드 1·5.3분). 컨텍스트는 테스트마다 버려지므로
+          //    여기서 지워도 운영 사이트나 다른 테스트에 영향이 없다.
+          await page
+            .evaluate(async () => {
+              const registrations = (await navigator.serviceWorker?.getRegistrations?.()) ?? [];
+              await Promise.all(registrations.map((registration) => registration.unregister()));
+            })
+            .catch(() => {});
+          // ② 앱 페이지에서 빠져나와 남은 요청·타이머 참조를 끊는다.
+          await page.goto('about:blank', { timeout: 5_000 }).catch(() => {});
+        }),
       );
     },
     { auto: true },
