@@ -21,6 +21,7 @@ import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -66,8 +67,12 @@ class ChatFlowIntegrationTest {
         }
     }
 
+    // ★ postgres:17-alpine 이 아니라 pgvector 이미지다 — 마이그레이션 V20260812150000 이
+    //   CREATE EXTENSION vector 를 수행하므로 확장이 없는 이미지에서는 부팅 자체가 실패한다.
+    //   (운영 ai-postgres 도 같은 이미지다. 즉 이 테스트가 곧 운영 DB 전제의 회귀 방지선이다)
     @Container
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17-alpine")
+    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>(
+            DockerImageName.parse("pgvector/pgvector:pg17").asCompatibleSubstituteFor("postgres"))
             .withDatabaseName("ai_test").withUsername("test").withPassword("test");
 
     @DynamicPropertySource
