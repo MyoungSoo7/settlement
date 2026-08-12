@@ -1,17 +1,12 @@
 package github.lms.lemuel.loan;
 
-import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
-import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
-import com.tngtech.archunit.lang.ConditionEvents;
-import com.tngtech.archunit.lang.SimpleConditionEvent;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 /**
@@ -70,38 +65,5 @@ class LoanArchitectureTest {
                         "github.lms.lemuel.settlement..")
                 .allowEmptyShould(true);
         rule.check(loanClasses);
-    }
-
-    /**
-     * 인바운드 포트는 <b>반드시 도달 가능해야</b> 한다 — 구현체와 단위 테스트가 있어도 어떤 인바운드
-     * 어댑터(REST·Kafka·스케줄러)도 호출하지 않으면 그 기능은 런타임에 존재하지 않는다.
-     *
-     * <p>실제로 담보 재평가·강제집행(마진콜 140%·청산 120% 판정)이 이 상태였다: 정책 상수도 서비스도
-     * 초록불 단위 테스트도 있는데 트리거가 없어, 담보 가치가 반토막 나도 아무 일도 일어나지 않았다.
-     * 단위 테스트는 "호출하는 사람이 없다"를 볼 수 없으므로 구조 가드가 대신 본다.
-     */
-    @Test
-    void 모든_인바운드_포트는_어댑터에서_호출된다() {
-        ArchRule rule = classes()
-                .that().resideInAPackage("..loan.application.port.in..")
-                .and().areInterfaces()
-                .should(reachableFromInboundAdapter())
-                .allowEmptyShould(true);
-        rule.check(loanClasses);
-    }
-
-    private static ArchCondition<JavaClass> reachableFromInboundAdapter() {
-        return new ArchCondition<>("인바운드 어댑터에서 호출되어야 한다") {
-            @Override
-            public void check(JavaClass port, ConditionEvents events) {
-                boolean reachable = port.getDirectDependenciesToSelf().stream()
-                        .anyMatch(dep -> dep.getOriginClass().getPackageName().contains(".loan.adapter.in."));
-                if (!reachable) {
-                    events.add(SimpleConditionEvent.violated(port,
-                            port.getName() + " 를 호출하는 인바운드 어댑터가 없다 "
-                                    + "— 구현돼 있어도 런타임에서 도달할 수 없다"));
-                }
-            }
-        };
     }
 }

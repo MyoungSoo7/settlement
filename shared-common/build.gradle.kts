@@ -122,6 +122,9 @@ dependencies {
     testAnnotationProcessor("org.projectlombok:lombok:1.18.40")
 
     // 이벤트 계약(contract-as-code) — 소비 서비스가 testFixtures 좌표로 스키마·검증기·샘플을 공유 (ADR 0024)
+    // 아키텍처 가드 픽스처(InboundPortReachability)용 — 소비 서비스가 이미 archunit 을 test 클래스패스에
+    // 갖고 있으므로 compileOnly 로 두어 픽스처 소비자에게 버전을 강제하지 않는다.
+    testFixturesCompileOnly("com.tngtech.archunit:archunit-junit5:1.4.1")
     testFixturesImplementation("com.networknt:json-schema-validator:1.5.6")
     testFixturesImplementation("com.fasterxml.jackson.core:jackson-databind")
 
