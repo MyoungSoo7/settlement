@@ -148,6 +148,12 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 `INVALID-ALLOWANCE`(예외 주석은 reason·issue·owner·미래 expires 필수 — 무기한 면제 금지) ·
 `HARNESS-DELETE`(`.claude/`·`.codex/`·`scripts/harness/`·`docs/harness/` 삭제 — 1건도 차단, 재생성 가능한
 `scratch`·`agent-memory`·`worktrees`·`harness` 는 예외. 의도한 삭제는 `HARNESS_ALLOW_DELETE=1`) ·
+`KAFKA-DLQ`(`@KafkaListener` 를 가진 모듈은 DLT 배선이 닿아야 한다 — ⓐ 루트 `github.lms.lemuel` 컴포넌트
+스캔 **+ shared-common 의존**, ⓑ 명시 `@Import(KafkaConsumerErrorHandlingConfig)`, ⓒ 자체
+`DeadLetterPublishingRecoverer` 배선(폴리글랏 standalone) 중 하나. 폴리글랏도 대상 — `settings.gradle.kts`
+밖이라고 유실이 허용되지 않는다. 안 닿으면 Spring Kafka 기본 `FixedBackOff(0, 9)` 로 떨어져 재시도 소진
+메시지를 조용히 skip = 사실상 유실).
+
 운영 DB 직접 조작 명령 차단(`check-command`).
 
 **skill-router.mjs 라우트 표** (경로 → 주입 스킬, 세션당 스킬별 1회 · 최대 3개): 14개 서비스 디렉토리 → 각 `{서비스}-rules`
