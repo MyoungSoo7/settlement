@@ -295,6 +295,7 @@ groups:
               2. 채널 장애면 채널 복구, 계약 드리프트면 프로듀서/템플릿 수정
               3. 원본 토픽에 재투입 (rpk 직접 produce 시 -z none 필수)
             이 서비스에는 /admin/dlq 가 없다 — settlement 와 달리 수작업 경로뿐이다. ADR 0017 참조.
+          runbook_url: "https://github.com/MyoungSoo7/settlement/blob/develop/docs/runbook/notification-dlt.md"
 
       # DLT publish 발생 — 정산 시작점 이벤트가 처리 실패한 것 — 즉시 운영자 호출
       # 임계 0.1/s = 5 분 평균 30 건 이상 DLT 라우팅. 정상 운영에서는 0 이어야 함.

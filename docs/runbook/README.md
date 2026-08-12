@@ -8,6 +8,7 @@
 | 일일 대사 불일치 | [settlement-mismatch.md](settlement-mismatch.md) | 배치 ERROR 로그 |
 | Toss PG 장애 | [toss-pg-outage.md](toss-pg-outage.md) | `TossPgCircuitOpen` |
 | Outbox PENDING 적체 | [outbox-backlog.md](outbox-backlog.md) | `OutboxPendingBacklog`/`Critical` |
+| 알림 이벤트 DLT 격리 (replay 자동 경로 없음) | [notification-dlt.md](notification-dlt.md) | `NotificationKafkaDltPublishedSpike` |
 | Flyway 마이그레이션 실패 | [db-migration-rollback.md](db-migration-rollback.md) | 앱 기동 실패 |
 | DB 손실 / K8s/리전 장애 | [disaster-recovery.md](disaster-recovery.md) | 다수 critical |
 
