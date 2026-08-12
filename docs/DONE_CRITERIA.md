@@ -25,7 +25,7 @@
 | G5 | OO 구조 게이트 | `guard.mjs` OO-* 규칙(실시간) + `oo-gate.test.mjs`(CI 전수) — 도메인 public setter/@Data 0, 금융 5서비스 generic IAE 0 |
 | G6 | MSA 경계 | settlement 에 `implementation(project(":order-service"))` 0, order import·cross-DB 조인 0 (guard 강제) |
 | G7 | 금액 안전 | 금액 필드 `double`/`float` 0 — BigDecimal 강제(guard MONEY-PRIMITIVE) |
-| G8 | 이벤트 계약 | 프로듀서·컨슈머 양방향 계약 테스트 그린(36토픽, testFixtures 단일 출처, ADR 0024) — `git ls-files 'shared-common/src/testFixtures/resources/contracts/events/*.schema.json' \| wc -l` |
+| G8 | 이벤트 계약 | 프로듀서·컨슈머 양방향 계약 테스트 그린(37토픽, testFixtures 단일 출처, ADR 0024) — `git ls-files 'shared-common/src/testFixtures/resources/contracts/events/*.schema.json' \| wc -l` |
 | G9 | 하네스 무결성 | `node scripts/harness/harness-audit.mjs` — 문서 드리프트·라우팅 dangling·가드 무결성 0 |
 | G10 | 절차 규율 | 착수 전 `tdd-discipline`, 조사 시 `debugging-discipline`, 완료 직전 `verify-before-done` 로드 |
 

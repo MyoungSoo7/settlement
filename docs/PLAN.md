@@ -25,7 +25,7 @@
 | shared-common | 버전드 라이브러리(1.0.0, composite build): audit·config·exception·outbox·ratelimit·pdf | ✅ |
 | 인증·인가 | JWT(HS256) 발급(order `AuthController`)·검증(shared-common), 역할 ADMIN/MANAGER/USER, IDOR 소유권 대조 | ✅ |
 | Outbox + 멱등 | `outbox_events`(event_id UNIQUE) → 멀티워커 폴러 → 3단 멱등(outbox·processed_events·도메인 UNIQUE) | ✅ |
-| 이벤트 계약-as-code | cross-service 36토픽 JSON Schema + 정본 샘플(testFixtures), 프로듀서·컨슈머 양방향 계약 테스트 (ADR 0024) — `git ls-files 'shared-common/src/testFixtures/resources/contracts/events/*.schema.json' \| wc -l` | ✅ |
+| 이벤트 계약-as-code | cross-service 37토픽 JSON Schema + 정본 샘플(testFixtures), 프로듀서·컨슈머 양방향 계약 테스트 (ADR 0024) — `git ls-files 'shared-common/src/testFixtures/resources/contracts/events/*.schema.json' \| wc -l` | ✅ |
 | 금액·원장 안전 | BigDecimal 강제, 전표 차1·대1 구성적 균형, `PENDING→POSTED→REVERSED` | ✅ |
 | 하네스 게이트 | guard.mjs(PreToolUse·pre-commit·CI 3중), harness-audit, JaCoCo 90% 게이트 | ✅ |
 

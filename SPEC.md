@@ -54,7 +54,7 @@
 
 - **Outbox 패턴**: DB 트랜잭션 안에서 `outbox_events` 에 기록 → 멀티워커 폴러(FOR UPDATE SKIP LOCKED)가 Kafka 발행.
 - **3단 멱등 방어**: `outbox_events.event_id UNIQUE` → 컨슈머 `processed_events(group,event_id)` PK → 도메인 UNIQUE 제약.
-- **이벤트 계약-as-code (ADR 0024)**: cross-service 36개 토픽의 JSON Schema + 정본 샘플이
+- **이벤트 계약-as-code (ADR 0024)**: cross-service 37개 토픽의 JSON Schema + 정본 샘플이
   `shared-common/src/testFixtures/resources/contracts/events/` 에 단일 출처로 존재. 프로듀서·컨슈머 양방향 계약 테스트로 드리프트 차단.
 - **이벤트 드리븐 프로젝션 (ADR 0020)**: settlement 가 order 이벤트를 소비해 자체 DB 에 `settlement_*_view` 적재
   (cross-DB 연결 0). 대사는 order 내부 API `/internal/recon` 호출로 양측이 자기 DB 만 읽는다.
@@ -370,11 +370,11 @@ DepositHold  : ACTIVE → PARTIALLY_CAPTURED → CAPTURED / EXPIRED / VOIDED / R
 
 ---
 
-## 5. 이벤트 카탈로그 (cross-service 36개 계약 토픽)
+## 5. 이벤트 카탈로그 (cross-service 37개 계약 토픽)
 
-계약 스키마·정본 샘플: `shared-common/src/testFixtures/resources/contracts/events/` (36개, ADR 0024).
+계약 스키마·정본 샘플: `shared-common/src/testFixtures/resources/contracts/events/` (37개, ADR 0024).
 
-> 수치 검증: `git ls-files 'shared-common/src/testFixtures/resources/contracts/events/*.schema.json' | wc -l` → 36
+> 수치 검증: `git ls-files 'shared-common/src/testFixtures/resources/contracts/events/*.schema.json' | wc -l` → 37
 
 | 토픽                                                                                                        | 프로듀서     | 주요 컨슈머                                                                                    |
 | ----------------------------------------------------------------------------------------------------------- | ------------ | ---------------------------------------------------------------------------------------------- |
@@ -391,6 +391,7 @@ DepositHold  : ACTIVE → PARTIALLY_CAPTURED → CAPTURED / EXPIRED / VOIDED / R
 | `lemuel.loan.corporate_loan_disbursed`                                                                      | loan         | account                                                                                        |
 | `lemuel.investment.executed`                                                                                | investment   | account · notification                                                                         |
 | `lemuel.loan.secured_loan_disbursed` / `.secured_loan_repaid` / `.secured_loan_principal_repaid`            | loan         | account                                                                                        |
+| `lemuel.loan.lease_activated`                                                                               | loan         | (소비처 미배선 — 계약만 선행)                                                                  |
 | `lemuel.loan.lease_activated`                                                                               | loan         | (미배선 — 발행 전용, account GL 소비는 후속)                                                   |
 | `lemuel.settlement.holdback_released` / `.holdback_consumed`                                                | settlement   | account(GL 홀드백 유보·소멸)                                                                   |
 | `lemuel.settlement.adjusted` / `.canceled`                                                                  | settlement   | account(GL 조정·역정산 분개)                                                                   |

@@ -24,7 +24,7 @@ settlement/                              # 모노레포 루트
 │   │   ├── opssignal/                   # 운영 신호 발행 (절대 throw 금지, fire-and-forget)
 │   │   ├── ratelimit/                   # Bucket4j 기반 rate limiting
 │   │   └── pdf/                         # iText PDF 유틸
-│   └── src/testFixtures/resources/contracts/events/   # ★ 이벤트 계약 정본 (36토픽 JSON Schema+샘플, ADR 0024)
+│   └── src/testFixtures/resources/contracts/events/   # ★ 이벤트 계약 정본 (37토픽 JSON Schema+샘플, ADR 0024)
 │
 ├── order-service/                       # 🛒 Commerce (8088, opslab)
 │   └── .../{user,order,payment,cart,shipping,product,category,coupon,review,game,menu,rbac,commoncode}
