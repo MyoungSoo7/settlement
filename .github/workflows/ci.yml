@@ -303,7 +303,7 @@ jobs:
       # 거기 없는 신규 HIGH/CRITICAL 이 하나라도 나오면 exit 1 로 막는다(semgrep.yml 과 같은 기준).
       # version 고정: 이 게이트를 켤 때 부채 건수를 실측한 바이너리와 동일 버전을 쓴다.
       - name: SCA — Trivy SBOM scan (HIGH/CRITICAL gate)
-        uses: aquasecurity/trivy-action@915b19bbe73b92a6cf82a1bc12b087c9a19a5fe2 # v0.28.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           version: v0.73.0
           scan-type: sbom
@@ -402,11 +402,16 @@ jobs:
       # 파이프라인이 막히는 상황을 피한다. HIGH 까지 조이려면 severity 에 추가할 것.
       # 스캔은 push 뒤에 돈다(이미지는 이미 올라간 상태) — 잡이 빨개지면 롤백 판단은 사람이 한다.
       #
-      # ⚠ 원래 `@0.28.0` 으로 적혀 있었는데 그런 ref 는 존재하지 않는다(실제 태그는 v0.28.0).
-      #   그대로 두면 잡 시작과 동시에 "Unable to resolve action" 으로 죽는다. 이 워크플로가
-      #   아직 origin 에 올라가지 않아 드러나지 않았을 뿐이다 — SHA 핀이 그 오타까지 같이 고친다.
+      # ⚠ 이 액션은 두 번 깨져 있었다 (둘 다 CI 실측으로 잡음):
+      #   ① 원래 `@0.28.0` 으로 적혀 있었는데 그런 ref 자체가 없다(실제 태그는 v0.28.0).
+      #   ② v0.28.0 은 내부적으로 `aquasecurity/setup-trivy@v0.2.1` 을 부르는데 업스트림에서
+      #      그 태그가 사라져, 바깥 액션을 SHA 로 고정해도 잡 시작 즉시
+      #      "Unable to resolve action ... unable to find version v0.2.1" 로 죽는다
+      #      (2026-08-12 run 31592237712 에서 실측).
+      #   v0.36.0 은 setup-trivy 를 커밋 SHA 로 참조해 태그 삭제에 영향을 받지 않는다.
+      #   교훈: 액션을 SHA 로 핀해도 그 액션이 내부에서 쓰는 참조까지 고정되지는 않는다.
       - name: Trivy image scan (CRITICAL gate)
-        uses: aquasecurity/trivy-action@915b19bbe73b92a6cf82a1bc12b087c9a19a5fe2 # v0.28.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         env:
           TRIVY_USERNAME: ${{ github.actor }}
           TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
@@ -573,7 +578,7 @@ jobs:
       # backend-ghcr 와 같은 기준. 프론트 런타임 베이스는 nginx:1.25-alpine 로 고정돼 있어
       # 여기서 CRITICAL 이 먼저 뜰 가능성이 있다 — 그때 답은 스캔을 끄는 게 아니라 베이스 태그를 올리는 것.
       - name: Trivy image scan (CRITICAL gate)
-        uses: aquasecurity/trivy-action@915b19bbe73b92a6cf82a1bc12b087c9a19a5fe2 # v0.28.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         env:
           TRIVY_USERNAME: ${{ github.actor }}
           TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
