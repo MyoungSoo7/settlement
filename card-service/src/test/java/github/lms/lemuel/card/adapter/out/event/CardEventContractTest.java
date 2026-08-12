@@ -1,7 +1,10 @@
 package github.lms.lemuel.card.adapter.out.event;
 
+import github.lms.lemuel.card.domain.AuthorizationHold;
 import github.lms.lemuel.card.domain.Card;
 import github.lms.lemuel.card.domain.CardAccount;
+import github.lms.lemuel.card.domain.CardCapture;
+import github.lms.lemuel.card.domain.HoldStatus;
 import github.lms.lemuel.card.domain.CardAccountStatus;
 import github.lms.lemuel.card.domain.CardStatement;
 import github.lms.lemuel.card.domain.LimitChangeResult;
@@ -23,6 +26,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.Instant;
 import java.time.YearMonth;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -290,6 +294,65 @@ class CardEventContractTest {
                  "paymentId":"PAY-1","paidAt":"2026-09-01T09:00:00Z"}
                 """);
         assertThat(violations).isNotEmpty();
+    }
+
+    // ── lemuel.card.authorized · captured 계약 테스트 (C-4) ───────────────────
+    // 스키마와 정본 샘플은 Phase2ContractPlaceholderTest 가 이미 못 박아 뒀지만, 그 테스트는
+    // '샘플이 스키마를 통과하는가'만 본다(작성 당시엔 발행 코드가 없었다). Phase 2 가 구현된 지금은
+    // 실제 발행 페이로드가 그 스키마를 만족하는지까지 대조해야 계약 드리프트가 런타임 전에 잡힌다.
+
+    private static AuthorizationHold activeHold() {
+        return AuthorizationHold.builder()
+                .id(7001L)
+                .authorizationId("AUTH-VAN-0001")
+                .cardId(9001L)
+                .cardAccountId(5001L)
+                .holderUserId(888L)
+                .amount(new BigDecimal("45000"))
+                .status(HoldStatus.ACTIVE)
+                .merchantName("스타벅스 강남점")
+                .mcc("5814")
+                .authorizedAt(Instant.parse("2026-08-02T10:15:30Z"))
+                .build();
+    }
+
+    @Test
+    @DisplayName("authorized 발행 페이로드가 계약을 만족하고 금액이 문자열이다")
+    void authorized_satisfiesContract() {
+        publisher.publishAuthorized(activeHold(), issuedCard(), activeAccount());
+
+        verify(saveOutboxEventPort).save(outboxCaptor.capture());
+        String payload = outboxCaptor.getValue().getPayload();
+        EventContractValidator.assertValid("lemuel.card.authorized", payload);
+        assertThat(payload).contains("\"amount\":\"45000\"");
+        assertThat(payload).contains("\"authorizationId\":\"AUTH-VAN-0001\"");
+    }
+
+    @Test
+    @DisplayName("captured 발행 페이로드가 계약을 만족하고 금액이 문자열이다")
+    void captured_satisfiesContract() {
+        AuthorizationHold hold = activeHold();
+        CardCapture capture = CardCapture.create("CAP-VAN-0001", hold.getAuthorizationId(),
+                hold.getCardId(), hold.getCardAccountId(), hold.getHolderUserId(),
+                new BigDecimal("45000"), hold.getMerchantName(),
+                Instant.parse("2026-08-02T11:00:00Z"));
+
+        publisher.publishCaptured(capture, hold);
+
+        verify(saveOutboxEventPort).save(outboxCaptor.capture());
+        String payload = outboxCaptor.getValue().getPayload();
+        EventContractValidator.assertValid("lemuel.card.captured", payload);
+        assertThat(payload).contains("\"amount\":\"45000\"");
+        assertThat(payload).contains("\"captureId\":\"CAP-VAN-0001\"");
+    }
+
+    @Test
+    @DisplayName("authorized·captured 도 cardAccountId 로 파티셔닝된다 — 같은 계정의 사건 순서 보존")
+    void phase2EventsArePartitionedByCardAccountId() {
+        publisher.publishAuthorized(activeHold(), issuedCard(), activeAccount());
+
+        verify(saveOutboxEventPort).save(outboxCaptor.capture());
+        assertThat(outboxCaptor.getValue().getAggregateId()).isEqualTo("5001");
     }
 
     @Test
