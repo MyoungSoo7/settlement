@@ -22,6 +22,9 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-jackson")
     implementation("org.springframework.boot:spring-boot-starter-cache")
 
+    // 전문 스펙 YAML 파싱 (ADR 0033) — Boot BOM 이 버전 관리, 전이 의존이 아니라 명시 선언
+    implementation("org.yaml:snakeyaml")
+
     // Flyway
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")

@@ -1,0 +1,9 @@
+# 전문공통부 — 모든 펌뱅킹 전문의 선두 34바이트.
+# fragment 파일은 그 자체로 전송되지 않고 include 로만 조립된다.
+fragment: COMMON_HEADER
+description: 전문공통부 (전문구분코드·전문일련번호·전송일시·응답코드)
+fields:
+  - { name: MSG_TYPE,    length: 4,  type: AN }   # 0200/0210/0400/0410
+  - { name: TELEGRAM_NO, length: 12, type: N }    # 전문일련번호
+  - { name: TRANS_DT,    length: 14, type: N }    # yyyyMMddHHmmss
+  - { name: RESP_CODE,   length: 4,  type: AN }   # 요청 시 공백, 응답 시 0000/2001/9999

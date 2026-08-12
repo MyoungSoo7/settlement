@@ -1,6 +1,6 @@
 # ADR 0033 — 전문(電文) 스펙 주도 코드 생성 (telegram spec-driven codegen)
 
-- 상태: **Proposed (설계만 — 미착수)**
+- 상태: **Proposed — Phase 1 구현 완료(2026-08-12), Phase 2 미착수**
 - 일자: 2026-08-12
 - 관련: ADR 0016(payout 펌뱅킹 — 본 ADR 이 **확장**하는 대상), ADR 0024(이벤트 계약-as-code — 같은 사상의
   Kafka 편), ADR 0021(shared-common composite build — 도구/스펙을 런타임 밖에 두는 선례),
@@ -8,6 +8,22 @@
 - 배경: 금융권 MDD(Model Driven Development) 툴이 "전문 모델 정의 → 소스 생성"으로 하는 일을,
   현행 FEP 어댑터는 **런타임 인터프리터로 절반만** 하고 있다. 나머지 절반(스펙 외부화 + 타입 안전)을
   어디에 둘 것인가에 대한 결정.
+
+## Phase 1 구현 노트 (2026-08-12)
+
+- 스펙 위치는 `settlement-service/src/main/resources/telegram/firmbanking/*.yaml` — Phase 1 은 런타임
+  로더라 classpath 리소스가 자연스럽다. 최상위 `telegram-spec/` 이전은 Phase 2(코드 생성) 때 재검토하며,
+  아래 **미결 질문 4 는 Phase 1 한정으로 해소**된 상태다.
+- Phase 1 스펙 키는 **최소 집합**으로 확정했다 — 전문 `telegram·msgType·description·version·
+  effectiveFrom·include·totalLength·fields`, 프래그먼트 `fragment·description·fields`, 필드 `name·length·type`.
+  `required·scale·min·idempotencyKey` 는 강제 수단이 생기는 Phase 2(VO 생성)로 미룬다. **강제되지 않는
+  선언을 스펙에 두면 "지켜지고 있다"는 착시**를 만들기 때문이다.
+- `version`·`effectiveFrom` 은 파싱·보관만 하고 라우팅에는 쓰지 않는다(개정 병존은 Phase 3).
+- 구현하며 확인된 사실 2건:
+  1. 이체요청 총길이는 **113바이트**(공통부 34 + 개별부 79)다. 본 ADR 초안의 `totalLength: 68` 은 오기였고
+     스펙 파일·본문 모두 바로잡았다. 선언 총길이 어서트가 실제로 이런 오기를 잡는다는 증거이기도 하다.
+  2. `msgType: 0200` 을 인용부호 없이 쓰면 YAML 이 정수 200 으로 읽어 **선행 0 이 사라진다**. 스펙 로더가
+     문자열이 아닌 msgType 을 거부하도록 규칙을 추가했다 — 설계 단계에서 예상하지 못한 함정이다.
 
 ## 컨텍스트
 
@@ -82,7 +98,7 @@ fields:
   - { name: AMOUNT,      length: 13, type: N,  required: true, scale: 0, min: 1 }
   - { name: HOLDER_NAME, length: 20, type: AN, charset: EUC-KR }   # 한글 1자 = 2바이트
   - { name: REF_ID,      length: 20, type: AN, required: true, idempotencyKey: true }
-totalLength: 68                   # 계산값과 불일치하면 빌드 실패
+totalLength: 113                  # 공통부 34 + 개별부 79 — 계산값과 불일치하면 로딩 실패
 ```
 
 - 은행 설계서 ↔ 스펙 파일이 1:1 대응 — 개정 시 **YAML 만** 고친다.
