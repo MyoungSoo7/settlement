@@ -62,7 +62,7 @@ settlement/                       # Gradle 멀티 모듈 루트
 ├── build.gradle.kts              # 부모 빌드 (subprojects 공통 설정)
 ├── shared-common/                # 📦 java-library: common.{audit, config, exception, outbox, ratelimit, pdf}
 ├── order-service/                # 🛒 Commerce (8088, opslab) — user·order·payment·cart·shipping·product·category·coupon·review·game·(menu·rbac·commoncode·recon·projectionbackfill)
-├── settlement-service/           # 💰 Settlement (8082, settlement_db, standalone) — settlement·payout·ledger·chargeback·pgreconciliation·report·recon
+├── settlement-service/           # 💰 Settlement (8082, settlement_db, standalone) — settlement·payout·ledger·tax·chargeback·pgreconciliation·recovery·closing·report·recon·integrity·idempotency
 ├── loan-service/                 # 💸 Loan (8084, lemuel_loan) — 선정산 + 기업대출(CEO). shared-common 의존
 ├── financial-statements-service/ # 📊 Financial (8086, lemuel_financial) — 재무제표 공개조회. ★shared-common 미의존
 ├── economics-service/            # 📈 Economics (8087, lemuel_economics) — ECOS 지표 공개조회. ★shared-common 미의존

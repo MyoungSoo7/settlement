@@ -90,7 +90,8 @@ DB: opslab. 회원·상품·장바구니·주문·결제·배송 + 정합성 부
 
 ### 3.2 settlement-service — 정산 (port 8082, 자체 DB settlement_db)
 
-정산 생성/확정, 지급(payout), 복식부기 원장, 차지백, PG 대사, ES 색인, PDF 리포트.
+정산 생성/확정, 지급(payout), 복식부기 원장·기간마감, 세무(부가세·원천징수·세금계산서), 차지백, PG 대사,
+지급후 회수채권, 정보계 월마감, ES 색인, PDF 리포트.
 order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝션(`settlement_*_view`)으로만 조회(코드·DB 의존 0).
 
 | 도메인      | API                                                                                    | 기능                                                                                                                                                                                                |
@@ -98,10 +99,14 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
 | 정산        | `/settlements`, `/api/settlements`, `/api/settlements/query`                           | 정산 조회/검색(ES) — **REST 는 조회 전용**. 생성은 `payment.captured` 컨슈머, 확정은 Spring Batch(`SettlementConfirmJob`)로 비동기 처리                                                             |
 | 지급        | `/admin/payouts` (ADMIN)                                                               | 셀러 지급 실행·재시도(펌뱅킹 mock), 반송(bounce) 기록·재지급                                                                                                                                        |
 | 지급 계좌   | `/admin/seller-bank-accounts` (ADMIN/MANAGER) · `/api/seller/bank-account` (셀러 본인) | 지급 계좌 레지스트리 — 관리자 대행 등록·정정과 셀러 셀프서비스 upsert/조회. 셀러 경로는 식별자를 JWT 주체(userId)에서만 파생(IDOR 차단), 계좌번호는 저장 시 암호화(`PAYOUT_ENC_KEY`)·노출 시 마스킹 |
-| 원장/리포트 | `/api/ledger`, `/api/reports` (ADMIN/MANAGER)                                          | 복식부기 원장 조회, 캐시플로우 리포트(PDF)                                                                                                                                                          |
+| 원장/리포트 | `/api/ledger`, `/api/reports` (ADMIN/MANAGER) · `/admin/ledger-periods` (ADMIN)         | 복식부기 원장 조회, 캐시플로우 리포트(PDF), 원장 월마감 — 확정 시산표가 **균형일 때만** 마감(불균형 422), 마감 기간 신규 전표 차단·재개봉 없음                                                       |
+| 세무        | `/admin/tax`, `/admin/seller-tax-profiles` (ADMIN/MANAGER) · `/api/tax-invoices` (셀러) | 부가세 **포함과세** 산출(`floor(수수료×10/110)`), 개인 셀러 원천징수 3.3% 를 **실지급액에서 공제**, 세금계산서 발행·PDF, 셀러 업로드 스캔본 OCR 자동매칭(ADR 0029)                                   |
 | 차지백      | `/admin/chargebacks` (ADMIN)                                                           | 지급 거절/분쟁 처리                                                                                                                                                                                 |
 | PG 대사     | `/admin/pg-reconciliation`, `/admin/reconciliation` (ADMIN/MANAGER)                    | PG 정산파일 업로드→대사→차이 승인/거절(역정산 트리거)                                                                                                                                               |
-| 운영        | `/admin/dlq`, `/admin/integrity`, `/admin/event-track`                                 | Kafka DLT/DLQ 관리, 정합성 검증 콘솔, 소비 이벤트 3분류(정상·중복·격리) 추적·재처리                                                                                                                 |
+| 회수        | `/admin/recoveries` (ADMIN/MANAGER)                                                    | 지급후 회수 채권 — holdback 으로 흡수 못한 잔액을 원금으로 개시, 후속 정산 확정 시 자동 상계, 정체 시 `MANUAL_REQUIRED` 이관                                                                         |
+| 월마감      | `/admin/monthly-closing` (ADMIN)                                                       | 정보계 월마감 — 셀러 월 정산 마트 적재(완결된 과거 월만, 기간 단위 교체로 멱등). 원장 마감된 기간 재마감은 409                                                                                       |
+| 정산 운영   | `/admin/settlements`(rerun·holdback-preview), `/admin/commission-rates` (ADMIN)         | 정산 배치 재실행(소급 상한 90일), 보류 해제 미리보기, 유효기간 수수료율 정책 등록·시뮬레이션(ADR 0032 — 미래 구간만)                                                                                |
+| 운영        | `/admin/dlq`, `/admin/integrity`, `/admin/event-track`                                 | Kafka DLT/DLQ 관리, 정합성 자가진단 8종 콘솔, 소비 이벤트 3분류(정상·중복·격리) 추적·재처리                                                                                                         |
 
 **수수료(등급별 스냅샷 보존)**: NORMAL 3.5% / VIP 2.5% / STRATEGIC 2.0%. **정산주기**: T+7 / T+3 / T+1 영업일.
 **홀드백**: NORMAL 30%/30일, VIP 10%/14일, STRATEGIC 0%.
