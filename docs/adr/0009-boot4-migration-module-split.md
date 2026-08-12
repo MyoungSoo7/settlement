@@ -5,8 +5,15 @@
 
 > **Update (이후 변경)**: 본문의 모듈 표는 분리 시점(5 서비스)을 기록한다. 이후 `reservation-service`
 > (시공 예약/기사 배정)는 **제거**됐고(모듈·자체 DB·gateway 라우팅·매니페스트 정리), 반대로 loan(기업대출)·
-> financial·economics·company·operation·market·ai·common-data·investment·account 서비스가 추가되어
-> 현재는 **12 서비스 + gateway** 다. Java 25 / Boot 4 / 멀티모듈 분리라는 본 결정은 그대로 유효하다.
+> financial·economics·company·operation·market·ai·common-data·investment·account·organization·card·
+> insurance·deposit 서비스가 추가되어 현재는 **16 서비스 + gateway**(`settings.gradle.kts` 17 모듈)다.
+>
+> 또한 아래 표의 gateway 책임에 적힌 "인증"은 **실현되지 않았다** — 게이트웨이는 경로 라우팅 전용이고,
+> JWT 인증·rate limit 은 각 서비스의 `shared-common` 필터 체인이 담당한다(중앙 인증 게이트 대신
+> 서비스별 심층 방어). 대응 관계는
+> [ARCHITECTURE §7](../ARCHITECTURE.md#7-금융권-아키텍처-용어-대응-mci--eai--esb--fep) 참조.
+>
+> Java 25 / Boot 4 / 멀티모듈 분리라는 본 결정은 그대로 유효하다.
 
 ## 컨텍스트
 
