@@ -64,6 +64,15 @@ body {
 
 #root {
   width: 100%;
+
+  /* 가로 모드에서 노치가 먹는 좌/우 폭을 **앱 전체**에 한 번만 확보한다.
+     페이지 루트마다 `px-safe` 를 붙이면 그 요소들이 이미 쓰는 `px-4 sm:px-6 lg:px-8` 을
+     덮어 좌우 여백이 통째로 사라진다(유틸리티끼리 같은 속성 경쟁). 그래서 패딩을 쓰지 않는
+     `#root` 에 건다 — Layout 을 거치지 않는 로그인·회원가입·결제실패 등 6개 화면까지 함께 덮인다.
+     세로(top/bottom)를 여기 걸지 않는 이유: 자식이 `min-h-screen`(100dvh)이라 #root 패딩이
+     그대로 더해져 **인셋 높이만큼 항상 스크롤이 생긴다**. 세로는 헤더·푸터·토스트가 각자 처리한다. */
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
 }
 
 @keyframes slide-in {
@@ -119,11 +128,12 @@ label {
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
-/* 가로 모드에서 노치가 좌/우 어느 쪽에 오는지는 회전 방향에 따라 다르다 —
-   양쪽 모두 기존 좌우 패딩에 **더한다**(max 가 아니라 합산: 기존 px-4 는 유지). */
-.px-safe {
-  padding-left: env(safe-area-inset-left, 0px);
-  padding-right: env(safe-area-inset-right, 0px);
+/* 화면 우상단에 고정되는 토스트 앵커 — `top-4 right-4`(1rem) 를 인셋만큼 밀어낸다.
+   Tailwind 의 `top-4`/`right-4` 를 그대로 두면 설치형에서 토스트가 상태바 아래로 들어가고,
+   가로 모드에서는 노치에 물린다. 두 값을 한 클래스에 묶어 어긋날 여지를 없앤다. */
+.toast-anchor {
+  top: calc(1rem + env(safe-area-inset-top, 0px));
+  right: calc(1rem + env(safe-area-inset-right, 0px));
 }
 
 /* ── 터치 히트 영역 확장 ─────────────────────────────────────────────────────

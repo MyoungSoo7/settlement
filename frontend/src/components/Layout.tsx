@@ -31,7 +31,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navItemProps = (active: boolean, variant: 'admin' | 'user') => ({
     'aria-current': active ? ('page' as const) : undefined,
     className: [
-      'px-4 py-2 rounded-lg font-medium transition-colors text-sm shrink-0',
+      // `tap-target`: 내비 항목은 실측 높이 36px 로 Apple 권장 44pt 미만이다. 항목을 키우면 헤더
+      // 높이(h-16)와 데스크톱 배치가 흔들리므로, 터치 환경에서만 히트 영역을 44×44 로 넓힌다.
+      // 폭은 88px 안팎이라 44px 오버레이가 이웃 항목을 가리지 않는다.
+      'tap-target px-4 py-2 rounded-lg font-medium transition-colors text-sm shrink-0',
       active
         ? (variant === 'admin' ? 'bg-gray-800 text-white' : 'bg-blue-600 text-white')
         : (variant === 'admin' ? 'text-gray-600 hover:bg-gray-100' : 'text-gray-700 hover:bg-blue-50'),
@@ -55,10 +58,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   }, [location.pathname]);
 
   return (
-    /* `px-safe` 는 가로 모드에서 노치가 먹는 좌/우 폭을 셸 바깥쪽에 확보한다. 안쪽 컨테이너의
-       `px-4 sm:px-6 lg:px-8` 과 겹치지 않게 **패딩이 없는 최외곽**에만 건다(겹쳐 걸면 Tailwind
-       유틸리티가 덮여 좌우 여백 자체가 사라진다). 배경은 패딩 아래까지 칠해지므로 흰 띠는 없다. */
-    <div className="min-h-screen bg-gray-50 px-safe">
+    /* 좌우 safe-area 는 `#root`(index.css)가 앱 전체에 한 번 건다 — 셸을 거치지 않는 화면까지
+       덮기 위해서다. 여기서는 세로 인셋만 헤더·푸터가 각각 처리한다. */
+    <div className="min-h-screen bg-gray-50">
       {/* Header — 설치형(standalone)에서는 상태바가 문서 위에 겹쳐 뜨므로(black-translucent)
           헤더가 그만큼 아래에서 시작해야 로고·내비가 시계·배터리에 가리지 않는다. */}
       <header className={`bg-white shadow pt-safe ${isAdminOrManager ? 'border-b-2 border-gray-800' : ''}`}>
@@ -153,7 +155,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 {user.role === 'USER' && (
                   <Link
                     to="/mypage"
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+                    /* tap-target: 실측 68×32 — 마이페이지는 자주 눌리는 진입점이라 히트 영역을 넓힌다. */
+                    className={`tap-target flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
                       isActive('/mypage')
                         ? 'bg-blue-600 text-white'
                         : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'
@@ -170,7 +173,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
                 <button
                   onClick={handleLogout}
-                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm"
+                  className="tap-target px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm"
                 >
                   로그아웃
                 </button>
