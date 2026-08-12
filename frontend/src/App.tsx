@@ -2,6 +2,7 @@ import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { authApi } from './api/auth';
 import { ToastProvider } from './contexts/ToastContext';
+import { AuthProvider } from './contexts/AuthContext';
 import { CartProvider } from './contexts/CartContext';
 import Layout from './components/Layout';
 import SystemLayout from './components/SystemLayout';
@@ -45,6 +46,12 @@ const CategoryManagementPage = lazy(() => import('./pages/CategoryManagementPage
 const TagManagementPage = lazy(() => import('./pages/TagManagementPage'));
 const EcommerceCategoryAdmin = lazy(() => import('./pages/EcommerceCategoryAdmin'));
 const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'));
+const ShippingAdminPage = lazy(() => import('./pages/ShippingAdminPage'));
+const OrderApprovalPage = lazy(() => import('./pages/OrderApprovalPage'));
+const PayoutAdminPage = lazy(() => import('./pages/PayoutAdminPage'));
+
+// 인쇄 전용 (레이아웃 없이 문서만 그리는 화면 — 새 창으로 열린다)
+const SettlementPrintPage = lazy(() => import('./pages/print/SettlementPrintPage'));
 
 // 운영 관제 (최고 관리자 전용) — operation-service 인시던트 콘솔
 const OperationConsolePage = lazy(() => import('./pages/operation/OperationConsolePage'));
@@ -74,6 +81,20 @@ const AdminManagerRoute: React.FC<{ children: React.ReactNode }> = ({ children }
   return <Layout>{children}</Layout>;
 };
 
+// ── 인쇄 전용 (/print/**) ────────────────────────────────────────────────
+// 종이에 나갈 문서만 그리므로 헤더·사이드바(Layout)를 걷어낸다. 권한은 화면과 동일하게
+// ADMIN·MANAGER 로 막되, 미인증이면 관리자 로그인으로 보낸다.
+const PrintRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const user = authApi.getCurrentUser();
+  if (!authApi.isAuthenticated()) {
+    return <Navigate to="/admin/login" replace />;
+  }
+  if (user?.role !== 'ADMIN' && user?.role !== 'MANAGER') {
+    return <Navigate to="/login" replace />;
+  }
+  return <>{children}</>;
+};
+
 // ── 최고 관리자 전용 (/admin/system/**, 회원관리 등) ──────────────────────
 const AdminOnlyRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const user = authApi.getCurrentUser();
@@ -89,6 +110,7 @@ const AdminOnlyRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 function App() {
   return (
     <ToastProvider>
+      <AuthProvider>
       <CartProvider>
         <BrowserRouter>
           <Suspense fallback={<div className="flex justify-center items-center min-h-screen"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>}>
@@ -127,8 +149,19 @@ function App() {
             <Route path="/product"            element={<AdminManagerRoute><SettlementLayout><ProductPage /></SettlementLayout></AdminManagerRoute>} />
             <Route path="/admin/settlement"   element={<AdminManagerRoute><SettlementLayout><SettlementAdmin /></SettlementLayout></AdminManagerRoute>} />
             <Route path="/settlement/search"   element={<AdminManagerRoute><SettlementLayout><SettlementDashboard /></SettlementLayout></AdminManagerRoute>} />
+            {/* 지급 콘솔 — 실자금 송금이라 /admin/payouts/** 는 서버가 ADMIN 전용으로 게이트한다.
+                MANAGER 에게 화면만 열어 주면 전부 403 이 되므로 라우트도 AdminOnlyRoute 로 맞춘다. */}
+            <Route path="/admin/payouts"      element={<AdminOnlyRoute><SettlementLayout><PayoutAdminPage /></SettlementLayout></AdminOnlyRoute>} />
+            {/* 배송 관리 — 주문별 배송 생성·출고·상태 전이 (ShippingController) */}
+            <Route path="/admin/shipping"     element={<AdminManagerRoute><ShippingAdminPage /></AdminManagerRoute>} />
+            {/* 취소·환불 승인 큐 — 사용자가 신청한 건을 운영자가 종단으로 보낸다 */}
+            <Route path="/admin/approvals"    element={<AdminManagerRoute><OrderApprovalPage /></AdminManagerRoute>} />
             <Route path="/categories"         element={<AdminManagerRoute><CategoryManagementPage /></AdminManagerRoute>} />
             <Route path="/tags"               element={<AdminManagerRoute><TagManagementPage /></AdminManagerRoute>} />
+
+            {/* ── 인쇄 전용 문서 (새 창) ── */}
+            <Route path="/print/settlement/:id"
+              element={<PrintRoute><SettlementPrintPage /></PrintRoute>} />
 
             {/* ── 최고 관리자 전용: 운영 관제 — 시스템 관리(운영관리)로 편입, 구 경로는 리다이렉트 ── */}
             <Route path="/admin/operation"
@@ -185,6 +218,7 @@ function App() {
           </Suspense>
         </BrowserRouter>
       </CartProvider>
+      </AuthProvider>
     </ToastProvider>
   );
 }
