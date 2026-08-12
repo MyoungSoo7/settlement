@@ -189,6 +189,20 @@ subprojects {
 
     // check 가 호출되면 커버리지 검증도 같이 — CI 의 ./gradlew check 가 자동 강제
     tasks.named("check") { dependsOn(tasks.named("jacocoTestCoverageVerification")) }
+
+    // JaCoCo XML 을 Sonar 에 넘긴다 — 이게 없어서 SonarCloud 커버리지가 0.0% 로 잡혀 있었다
+    // (2026-08-12 실측: coverage 0.0% · new_coverage 0.0%, 저장소 자체 게이트는 LINE 90% 인데도).
+    // 멀티모듈은 모듈별로 경로를 줘야 한다 — 루트에 한 번 적으면 서브모듈 리포트를 못 찾는다.
+    // 파일은 ci.yml 의 `clean build`(=jacocoTestReport 포함)가 만들고, 그다음 `./gradlew sonar`
+    // 호출이 읽는다. 변경 모듈만 빌드된 경우 없는 모듈은 Sonar 가 경고만 남기고 넘어간다.
+    sonar {
+        properties {
+            property(
+                "sonar.coverage.jacoco.xmlReportPaths",
+                layout.buildDirectory.file("reports/jacoco/test/jacocoTestReport.xml").get().asFile.path,
+            )
+        }
+    }
 }
 
 sonar {
