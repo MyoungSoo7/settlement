@@ -219,6 +219,14 @@ public class SecurityConfig {
                         // 계정계(GL) 조회 콘솔 — owner 잔액·분개·전사 집계·시산표는 회계 백오피스라 관리자·매니저 전용
                         // (프론트도 /admin/ceo/accounts 를 AdminManagerRoute 로 보호). 무권한 노출(owner IDOR·전사 집계) 차단.
                         .requestMatchers("/api/account/**").hasAnyRole("ADMIN", "MANAGER")
+                        // 셀러 예치금 운영 콘솔 — 잔고를 직접 움직이는 수기 경로라 ADMIN 만.
+                        // (자동 경로는 settlement.confirmed·payout.completed 컨슈머다)
+                        .requestMatchers("/admin/deposits/**").hasRole("ADMIN")
+                        // 셀러 예치금 조회 — 남의 계좌를 경로로 지정하는 형태라 운영자 전용.
+                        // 본인 조회(/api/deposits/accounts/me)는 아래 authenticated 로 열되, sellerId 를
+                        // 경로가 아니라 JWT 주체에서만 파생해 IDOR 을 원천 차단한다(/api/seller/bank-account 와 동일).
+                        .requestMatchers(HttpMethod.GET, "/api/deposits/accounts/me").authenticated()
+                        .requestMatchers("/api/deposits/**").hasAnyRole("ADMIN", "MANAGER")
                         // 법인카드 — 인증만 요구하고, 조직 역할(OWNER/MANAGER/STAFF) 판정은
                         // card-service 의 CardOrgAuthorizer 가 멤버십 프로젝션으로 수행한다(IDOR 방지).
                         .requestMatchers("/api/cards/**").authenticated()
