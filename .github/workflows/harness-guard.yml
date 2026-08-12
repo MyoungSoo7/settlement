@@ -20,11 +20,11 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          fetch-depth: 0   # need base for diff
+          fetch-depth: 0 # need base for diff
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: '22'
+          node-version: "22"
 
       - name: Run harness tests
         run: node --test scripts/harness/test/*.test.mjs
@@ -80,6 +80,13 @@ jobs:
           set -euo pipefail
           node -e "for (const path of require('./scripts/harness/manifest.json').requiredTrackedFiles) process.stdout.write(path + '\0')" |
             xargs -0 git ls-files --error-unmatch -- >/dev/null
+
+      # RAG 지식베이스는 화이트리스트(docs/knowledge/manifest.txt)에 등재된 문서만 적재한다.
+      # 여기서 잡는 것은 반대 방향의 사고다 — 문서를 추가하고 등재를 잊는 경우. 그러면 그 문서는
+      # 조용히 적재되지 않은 채 "썼으니 챗봇이 안다"고 오해하게 된다. 네트워크를 타지 않으므로
+      # (표준 라이브러리만, HTTP 없음) 어느 PR 에서 돌아도 비용이 없다.
+      - name: Knowledge manifest guard
+        run: python3 scripts/knowledge/sync_knowledge.py --check-manifest
 
       - name: Verify clean working tree
         run: git diff --exit-code
