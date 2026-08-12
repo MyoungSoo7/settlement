@@ -1,6 +1,7 @@
 package github.lms.lemuel.ai.rag.application.service;
 
 import github.lms.lemuel.ai.chat.domain.PiiMasker;
+import github.lms.lemuel.common.log.LogSafe;
 import github.lms.lemuel.ai.config.RagProperties;
 import github.lms.lemuel.ai.rag.application.port.in.IngestKnowledgeUseCase;
 import github.lms.lemuel.ai.rag.application.port.out.EmbeddingPort;
@@ -107,7 +108,7 @@ public class IngestKnowledgeService implements IngestKnowledgeUseCase {
     @Override
     public boolean deleteBySourceUri(String sourceUri) {
         boolean deleted = knowledgeBasePort.deleteBySourceUri(sourceUri);
-        log.info("[RAG] 삭제 요청: sourceUri={}, 삭제됨={}", sourceUri, deleted);
+        log.info("[RAG] 삭제 요청: sourceUri={}, 삭제됨={}", LogSafe.of(sourceUri), deleted);
         return deleted;
     }
 }
