@@ -138,6 +138,8 @@ public class SecurityConfig {
                         .requestMatchers("/users/admin/all").hasRole("ADMIN")
                         // 관리자 전용 카테고리 API
                         .requestMatchers("/admin/categories/**").hasRole("ADMIN")
+                        // 옵션 축/값 카탈로그 — 백필이 상품 옵션 구조를 대량 생성하므로 ADMIN 만.
+                        .requestMatchers("/admin/option-catalog/**").hasRole("ADMIN")
                         // 송장 일괄 업로드 - 다건 출고를 한 번에 반영. dryRun 기본값이라 파라미터 누락 호출은 미리보기로 떨어진다.
                         .requestMatchers("/admin/shipments/**").hasAnyRole("ADMIN", "MANAGER")
                         // 셀러 등급 콘솔 - 등급은 수수료/정산주기/홀드백을 동시에 바꾸므로 ADMIN 만.

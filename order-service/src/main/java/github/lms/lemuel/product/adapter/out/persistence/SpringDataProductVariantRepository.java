@@ -15,6 +15,10 @@ public interface SpringDataProductVariantRepository extends JpaRepository<Produc
 
     List<ProductVariantJpaEntity> findByProductId(Long productId);
 
+    /** SKU 를 하나라도 가진 상품 id (옵션 카탈로그 백필의 순회 대상). */
+    @Query("SELECT DISTINCT v.productId FROM ProductVariantJpaEntity v ORDER BY v.productId ASC")
+    List<Long> findDistinctProductIds();
+
     /**
      * 재고 원자적 차감 — 단일 조건부 UPDATE 로 "재고 검증 + 차감 + 매진 전이" 를 한 번에 처리한다.
      *

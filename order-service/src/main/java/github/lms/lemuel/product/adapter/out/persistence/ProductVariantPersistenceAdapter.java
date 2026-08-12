@@ -37,6 +37,11 @@ public class ProductVariantPersistenceAdapter
     }
 
     @Override
+    public List<Long> findProductIdsWithVariants() {
+        return repository.findDistinctProductIds();
+    }
+
+    @Override
     public ProductVariant save(ProductVariant variant) {
         ProductVariantJpaEntity entity;
         if (variant.getId() == null) {
