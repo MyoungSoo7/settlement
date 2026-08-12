@@ -348,10 +348,10 @@ public class Settlement {
      * ({@code cumulative − settled})이 오작동한다. 따라서 net 만 clawback 만큼 축소한다.
      *
      * <p>DONE 정산은 이미 지급 완료되어 불변 — {@link #adjustForRefund}와 동일하게 예외를 던지고,
-     * 호출자(서비스)가 {@link SettlementAdjustment} 감사 레코드만 남겨 수기 회수로 이관한다.
+     * 호출자(서비스)가 {@link SettlementAdjustment} 조정·역분개·지급후 회수 채권으로 이관한다.
      *
-     * <p><b>Scope 경계</b>: 원장 역분개는 후속 과제다. 기존 {@code enqueueReverse}는 refundId 키 기반이라
-     * 대사에 맞지 않고, chargeback 경로와 동일하게 이 단계에서는 원장을 건드리지 않는다.
+     * <p><b>원장 경계</b>: 역분개는 호출자(서비스)가 PG_RECONCILIATION 출처로 아웃박스에 적재한다
+     * (조정 1건 ↔ 역분개 1건, INV-5). 도메인은 금액만 책임지고 전표를 직접 쓰지 않는다.
      *
      * @param clawbackAmount 회수 금액 (양수)
      */

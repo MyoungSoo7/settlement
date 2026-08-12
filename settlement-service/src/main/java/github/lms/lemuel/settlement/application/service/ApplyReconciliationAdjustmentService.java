@@ -32,8 +32,8 @@ import java.time.LocalDate;
  * {@link Settlement#applyReconciliationClawback}를 써서 {@code refundedAmount} running total 을
  * 오염시키지 않는다(실제 환불과의 이중 계상 방지). holdback 우선 차감 → net 축소 → 감사 레코드 순서.
  *
- * <p><b>NO ledger changes.</b> 원장 역분개는 후속 과제다 — 기존 {@code enqueueReverse}는 refundId 키
- * 기반이라 대사에 맞지 않는다. chargeback 경로와 동일하게 이 단계에서는 원장을 건드리지 않는다.
+ * <p><b>원장</b>: 조정 1건마다 PG_RECONCILIATION 출처 역분개를 같은 트랜잭션 아웃박스에 적재한다(INV-5 1:1).
+ * DONE 정산 분기도 마찬가지이며, 그 반대급부는 지급후 회수 채권(Dr AR / Cr AP)이 받는다(seed-p0-6).
  */
 @Service
 @Transactional
