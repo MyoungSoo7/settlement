@@ -274,6 +274,28 @@ groups:
   - name: lemuel_kafka_dlt_alerts
     interval: 30s
     rules:
+      # notification-service 는 자체 DB 도 replay 콘솔도 없다(무영속 standalone). 즉 DLT 로 간 알림을
+      # 되살릴 자동 경로가 없으므로 "격리가 일어났다" 자체를 즉시 알아야 한다 — settlement 보다 임계를
+      # 낮게 잡는다(0.01/s = 5분 평균 3건). 정상 운영에서는 0 이어야 한다.
+      - alert: NotificationKafkaDltPublishedSpike
+        expr: rate(notification_kafka_dlt_published_total{job="notification"}[5m]) > 0.01
+        for: 2m
+        labels:
+          severity: critical
+          component: kafka-consumer
+        annotations:
+          summary: "알림 이벤트가 DLT 로 격리되는 중 (replay 자동 경로 없음)"
+          description: |
+            최근 5 분간 notification-service 가 초당 {{ $value | humanize }} 건을 DLT 로 라우팅 중.
+            가능한 원인:
+              - 계약 드리프트 (파싱 불가 페이로드 → UnparseableEventPayloadException)
+              - 활성 채널 전멸 (전 채널 실패 → NotificationDispatchFailedException)
+            대응:
+              1. rpk topic consume <원본토픽>.DLT --num 20 — 페이로드와 kafka_dlt-exception-fqcn 확인
+              2. 채널 장애면 채널 복구, 계약 드리프트면 프로듀서/템플릿 수정
+              3. 원본 토픽에 재투입 (rpk 직접 produce 시 -z none 필수)
+            이 서비스에는 /admin/dlq 가 없다 — settlement 와 달리 수작업 경로뿐이다. ADR 0017 참조.
+
       # DLT publish 발생 — 정산 시작점 이벤트가 처리 실패한 것 — 즉시 운영자 호출
       # 임계 0.1/s = 5 분 평균 30 건 이상 DLT 라우팅. 정상 운영에서는 0 이어야 함.
       - alert: SettlementKafkaDltPublishedSpike

@@ -28,6 +28,10 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
 
+    // Prometheus 노출 — 이 서비스는 DLT 격리 카운터(notification.kafka.dlt.published)를 내지만
+    // 레지스트리가 없어 /actuator/prometheus 가 아예 뜨지 않았고, 그래서 격리된 알림을 아무도 보지 못했다.
+    runtimeOnly("io.micrometer:micrometer-registry-prometheus")
+
     // Kafka inbound
     implementation("org.springframework.kafka:spring-kafka")
 
