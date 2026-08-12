@@ -303,7 +303,7 @@ jobs:
       # 거기 없는 신규 HIGH/CRITICAL 이 하나라도 나오면 exit 1 로 막는다(semgrep.yml 과 같은 기준).
       # version 고정: 이 게이트를 켤 때 부채 건수를 실측한 바이너리와 동일 버전을 쓴다.
       - name: SCA — Trivy SBOM scan (HIGH/CRITICAL gate)
-        uses: aquasecurity/trivy-action@915b19bbe73b92a6cf82a1bc12b087c9a19a5fe2 # v0.28.0
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
         with:
           version: v0.73.0
           scan-type: sbom
@@ -406,7 +406,7 @@ jobs:
       #   그대로 두면 잡 시작과 동시에 "Unable to resolve action" 으로 죽는다. 이 워크플로가
       #   아직 origin 에 올라가지 않아 드러나지 않았을 뿐이다 — SHA 핀이 그 오타까지 같이 고친다.
       - name: Trivy image scan (CRITICAL gate)
-        uses: aquasecurity/trivy-action@915b19bbe73b92a6cf82a1bc12b087c9a19a5fe2 # v0.28.0
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
         env:
           TRIVY_USERNAME: ${{ github.actor }}
           TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
@@ -573,7 +573,7 @@ jobs:
       # backend-ghcr 와 같은 기준. 프론트 런타임 베이스는 nginx:1.25-alpine 로 고정돼 있어
       # 여기서 CRITICAL 이 먼저 뜰 가능성이 있다 — 그때 답은 스캔을 끄는 게 아니라 베이스 태그를 올리는 것.
       - name: Trivy image scan (CRITICAL gate)
-        uses: aquasecurity/trivy-action@915b19bbe73b92a6cf82a1bc12b087c9a19a5fe2 # v0.28.0
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
         env:
           TRIVY_USERNAME: ${{ github.actor }}
           TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
