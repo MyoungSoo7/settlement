@@ -51,6 +51,8 @@ export default defineConfig({
       name: 'webkit',
       use: { ...devices['Desktop Safari'] },
       testIgnore: CHROMIUM_ONLY,
+      // 아래 mobile-safari 와 같은 이유 — WebKit 워커 행 억제.
+      workers: 1,
     },
     // 모바일 — 뷰포트(393/390px)·터치·devicePixelRatio 까지 포함한 반응형 검증.
     {
@@ -58,10 +60,25 @@ export default defineConfig({
       use: { ...devices['Pixel 7'] },
       testIgnore: CHROMIUM_ONLY,
     },
+    /**
+     * WebKit 계열은 **프로젝트당 워커 1개**로 직렬화한다.
+     *
+     * 이 두 프로젝트에서만 "worker process did not exit within 300000ms" 가 간헐 발생한다. 워커가
+     * 300초 force-kill 되면 **모든 테스트가 통과해도 종료 코드가 1** 이라 CI 가 빨갛게 뜨고, 이건
+     * 테스트 실패가 아니라 프로세스 종료 문제라 `retries` 로 구제되지 않는다.
+     * fixtures 의 정리(서비스워커 등록 해제 + about:blank)로 빈도를 크게 줄였으나 9회 중 1회가 남았고,
+     * 남은 재현은 전부 WebKit 워커가 여러 개 동시에 뜬 실행이었다. 동시 WebKit 워커 수를 줄여 재현
+     * 조건 자체를 좁힌다.
+     *
+     * `TestProject.workers`(Playwright 1.52+, 설치본 1.60.0 지원 확인)는 전역 `workers` 와 함께
+     * 동작한다 — 다른 프로젝트의 병렬도는 그대로 두고 이 프로젝트만 직렬화한다. 대가는 WebKit
+     * 소요 시간 증가이고, 얻는 것은 초록/빨강 판정의 신뢰성이다.
+     */
     {
       name: 'mobile-safari',
       use: { ...devices['iPhone 14'] },
       testIgnore: CHROMIUM_ONLY,
+      workers: 1,
     },
   ],
 });

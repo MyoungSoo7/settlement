@@ -66,8 +66,20 @@ export const test = base.extend<{ blockLongLivedStreams: void; releaseAppPages: 
    * 이미 만들고 있으므로 추가 비용이 없다.
    */
   releaseAppPages: [
-    async ({ context }, use) => {
+    async ({ context, browserName }, use) => {
       await use();
+
+      /**
+       * **WebKit 에서만** 정리한다.
+       *
+       * 이 정리는 WebKit 워커 행 하나를 겨냥한 것이다. 전 엔진에 걸었더니 Firefox 가 컨텍스트 종료
+       * 시점에 깨졌다 — `browserContext.close: Protocol error (Browser.removeBrowserContext):
+       * can't access property "_maybeDontRestoreTabs"`. close 직전에 내비게이션을 하나 더 얹은 것이
+       * Firefox 세션복원 내부의 레이스를 건드린 것으로 보인다(실측: auto-login 3건 실패).
+       * 필요 없는 엔진까지 건드릴 이유가 없다.
+       */
+      if (browserName !== 'webkit') return;
+
       await Promise.all(
         // 실패로 페이지가 이상 상태여도 정리는 계속돼야 한다 — 에러는 삼키고 타임아웃을 둔다.
         context.pages().map(async (page) => {
