@@ -163,6 +163,11 @@ public class SecurityConfig {
                         // gateway 미라우팅이지만 NodePort 직노출 대비 InternalApiKeyFilter 가 X-Internal-Api-Key 공유
                         // 시크릿을 검증(미설정 시 통과+경고). 여기선 permitAll 로 두고 게이팅은 필터가 담당. 운영선 NetworkPolicy/mTLS 추가 권장.
                         .requestMatchers("/internal/**").permitAll()
+                        // VAN 진입점(card-service 승인·매입·취소·환불) — 게이트웨이 미라우팅이 유일한 방어였고
+                        // 매처 목록에 없어 anyRequest().authenticated() 로 떨어져 있었다. 사용자 토큰 하나로
+                        // 카드 거래를 위조할 수 있다는 뜻이라, /internal/** 과 동일하게 공유 시크릿 필터에 맡긴다.
+                        // (VAN 은 사람이 아니라 기계다 — hasRole 로 여는 문이 아니다.)
+                        .requestMatchers("/van/**").permitAll()
                         // Payout 콘솔 — 송금 권한은 ADMIN 만 (반송 기록·재지급 포함)
                         .requestMatchers("/admin/payouts/**").hasRole("ADMIN")
                         // 미입금 만료 콘솔 — 주문 취소·재고 원복을 수동 트리거하므로 ADMIN 만.
