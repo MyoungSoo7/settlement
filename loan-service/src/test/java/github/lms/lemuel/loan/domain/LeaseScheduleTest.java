@@ -168,6 +168,27 @@ class LeaseScheduleTest {
         }
 
         @Test
+        @DisplayName("연이율은 소수 4자리로 정규화된다 — 저장 왕복 후에도 같은 값 객체여야 한다")
+        void normalizesRateScaleForPersistenceRoundTrip() {
+            LeaseSchedule fromShortScale = LeaseSchedule.of(AssetFinanceType.FINANCE_LEASE, COST,
+                    BigDecimal.ZERO, BigDecimal.ZERO, new BigDecimal("6000000"), 36, new BigDecimal("6.0"));
+            LeaseSchedule fromDbScale = LeaseSchedule.of(AssetFinanceType.FINANCE_LEASE, COST,
+                    BigDecimal.ZERO, BigDecimal.ZERO, new BigDecimal("6000000"), 36, new BigDecimal("6.0000"));
+
+            assertThat(fromShortScale.annualRatePercent()).isEqualTo(new BigDecimal("6.0000"));
+            assertThat(fromShortScale).isEqualTo(fromDbScale);
+        }
+
+        @Test
+        @DisplayName("소수 4자리로 표현되지 않는 이율은 조용히 반올림하지 않고 거부한다")
+        void rejectsRateFinerThanFourDecimals() {
+            assertThatThrownBy(() -> LeaseSchedule.of(AssetFinanceType.FINANCE_LEASE, COST,
+                    BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, 36, new BigDecimal("6.00001")))
+                    .isInstanceOf(LoanInvariantViolationException.class)
+                    .hasMessageContaining("연이율");
+        }
+
+        @Test
         @DisplayName("기간·이율 경계: 기간 0 이하와 음수 이율은 거부한다")
         void rejectsBadTermOrRate() {
             assertThatThrownBy(() -> LeaseSchedule.of(AssetFinanceType.FINANCE_LEASE, COST,

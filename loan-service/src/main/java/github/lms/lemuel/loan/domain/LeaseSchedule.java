@@ -62,6 +62,8 @@ public record LeaseSchedule(
     private static final MathContext MC = MathContext.DECIMAL128;
     private static final BigDecimal HUNDRED = new BigDecimal("100");
     private static final BigDecimal MONTHS_PER_YEAR = new BigDecimal("12");
+    /** 연이율 정규 스케일 — 저장 컬럼 {@code NUMERIC(9,4)} 와 일치시킨다. */
+    private static final int RATE_SCALE = 4;
 
     public LeaseSchedule {
         installments = List.copyOf(installments);
@@ -113,7 +115,8 @@ public record LeaseSchedule(
                     "잔존가치는 리스 원금보다 작아야 합니다(회수할 원금이 없습니다): " + residual + " ≥ " + financed);
         }
 
-        BigDecimal monthlyRate = annualRatePercent.divide(HUNDRED, MC).divide(MONTHS_PER_YEAR, MC);
+        BigDecimal rate = canonicalRate(annualRatePercent);
+        BigDecimal monthlyRate = rate.divide(HUNDRED, MC).divide(MONTHS_PER_YEAR, MC);
         BigDecimal rental = fixedRental(financed, residual, termMonths, monthlyRate, rounding);
         List<LeaseInstallment> installments = schedule(financed, residual, termMonths, monthlyRate, rental, rounding);
 
@@ -124,7 +127,7 @@ public record LeaseSchedule(
             totalInterest = totalInterest.add(installment.interest());
         }
 
-        return new LeaseSchedule(type, cost, down, guarantee, residual, termMonths, annualRatePercent, rounding,
+        return new LeaseSchedule(type, cost, down, guarantee, residual, termMonths, rate, rounding,
                 monthlyRate.setScale(10, RoundingMode.HALF_UP), financed, rental, installments,
                 rounding.round(totalRental), rounding.round(totalInterest));
     }
@@ -178,6 +181,23 @@ public record LeaseSchedule(
             throw new LoanInvariantViolationException(
                     type.label() + "은(는) 만기 반환 전제라 잔존가치가 필요합니다(0 은 모순)");
         }
+    }
+
+    /**
+     * 연이율을 정규 스케일로 고정한다 — 저장 컬럼({@code NUMERIC(9,4)})과 같은 4자리다.
+     *
+     * <p>정규화하지 않으면 {@code 6.0} 으로 만든 스케줄과 DB 왕복 후 {@code 6.0000} 으로 돌아온 스케줄이
+     * <b>값은 같은데 동등하지 않게</b> 된다({@code BigDecimal.equals} 는 스케일을 본다). 저장 전후로 값
+     * 객체가 달라지면 비교·캐시가 조용히 어긋난다.
+     *
+     * <p>금액과 마찬가지로 <b>조용히 반올림하지 않는다</b> — 4자리로 표현되지 않는 이율은 거부한다.
+     */
+    private static BigDecimal canonicalRate(BigDecimal rate) {
+        if (rate.stripTrailingZeros().scale() > RATE_SCALE) {
+            throw new LoanInvariantViolationException(
+                    "연이율은 소수점 " + RATE_SCALE + "자리까지만 표현할 수 있습니다(자동 보정 안 함): " + rate);
+        }
+        return rate.setScale(RATE_SCALE, RoundingMode.UNNECESSARY);
     }
 
     private static BigDecimal requireExactNonNegative(BigDecimal value, String label, RoundingPolicy rounding) {

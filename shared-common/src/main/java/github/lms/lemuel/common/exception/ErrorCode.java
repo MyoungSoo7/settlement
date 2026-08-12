@@ -66,6 +66,11 @@ public enum ErrorCode {
     MONTHLY_CLOSING_LOCKED(HttpStatus.CONFLICT, "원장 마감된 기간의 정보계 마트는 재적재할 수 없습니다."),
     MONTHLY_CLOSING_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "정보계 월마감 실행에 실패했습니다."),
 
+    // ─── tax (세금계산서 OCR 스캔) ────────────────────────────────────────────
+    TAX_INVOICE_SCAN_NOT_FOUND(HttpStatus.NOT_FOUND, "세금계산서 스캔을 찾을 수 없습니다."),
+    TAX_OCR_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "세금계산서 OCR 을 사용할 수 없습니다. 잠시 후 다시 시도해주세요."),
+    TAX_SCAN_UNSUPPORTED_FILE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "지원하지 않는 스캔 파일 형식입니다."),
+
     // ─── loan (선정산·기업 신용대출) ─────────────────────────────────────────────
     CORPORATE_LOAN_NOT_FOUND(HttpStatus.NOT_FOUND, "대출 건 또는 재무자료를 찾을 수 없습니다."),
     CORPORATE_LOAN_REJECTED(HttpStatus.UNPROCESSABLE_ENTITY, "대출 심사가 거절되었습니다."),
@@ -73,6 +78,9 @@ public enum ErrorCode {
     // ─── loan (담보·개인신용 대출) ───────────────────────────────────────────────
     SECURED_LOAN_NOT_FOUND(HttpStatus.NOT_FOUND, "담보/개인신용 대출을 찾을 수 없습니다."),
     SECURED_LOAN_REJECTED(HttpStatus.UNPROCESSABLE_ENTITY, "담보/개인신용 대출 심사가 거절되었습니다."),
+
+    // ─── loan (리스·할부 물건금융) ──────────────────────────────────────────────
+    LEASE_CONTRACT_NOT_FOUND(HttpStatus.NOT_FOUND, "리스·할부 계약을 찾을 수 없습니다."),
 
     // ─── investment (CEO 투자하기) ──────────────────────────────────────────────
     INVESTMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "투자 주문을 찾을 수 없습니다."),
@@ -102,7 +110,16 @@ public enum ErrorCode {
     // 400 으로 나가 클라이언트가 "잘못 보냈다"와 "없다"를 구분하지 못한다.
     TIME_DEPOSIT_NOT_FOUND(HttpStatus.NOT_FOUND, "정기예금을 찾을 수 없습니다."),
     INSTALLMENT_SAVINGS_NOT_FOUND(HttpStatus.NOT_FOUND, "적금을 찾을 수 없습니다."),
-    RETIREMENT_PENSION_NOT_FOUND(HttpStatus.NOT_FOUND, "퇴직연금을 찾을 수 없습니다.");
+    RETIREMENT_PENSION_NOT_FOUND(HttpStatus.NOT_FOUND, "퇴직연금을 찾을 수 없습니다."),
+
+    // ─── deposit (셀러 예치금 원장) ──────────────────────────────────────────────
+    DEPOSIT_ACCOUNT_NOT_FOUND(HttpStatus.NOT_FOUND, "예치 계좌를 찾을 수 없습니다."),
+    // 잔고 부족은 요청 형식의 잘못이 아니라 "지금은 처리 불가"라서 400 이 아닌 422 다
+    // (investment 의 INSUFFICIENT_FUNDING 과 같은 판단).
+    INSUFFICIENT_DEPOSIT(HttpStatus.UNPROCESSABLE_ENTITY, "예치금 잔고가 부족합니다."),
+    // deposit_entries 자연키(UNIQUE) 충돌 — 같은 referenceId 로 두 번 기표하려 한 경우.
+    // 잔고를 두 번 움직이지 않고 409 로 되돌린다(L3 멱등 방어선이 잡아낸 상황).
+    DUPLICATE_DEPOSIT_ENTRY(HttpStatus.CONFLICT, "이미 처리된 예치금 요청입니다.");
 
     private final HttpStatus status;
     private final String defaultMessage;
