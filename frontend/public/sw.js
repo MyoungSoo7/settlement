@@ -1,6 +1,18 @@
 // Lemuel Settlement PWA service worker — app shell 캐시(오프라인 껍데기) + network-first
 // SPA 라 라우트는 index.html 로 폴백. API(axios) 응답은 캐시하지 않음(정산 데이터 신선도).
-const CACHE = 'settlement-shell-v1';
+const CACHE = 'settlement-shell-v2';
+
+/**
+ * 백엔드로 프록시되는 경로 — 캐시에 절대 담지 않는다.
+ *
+ * 정본은 frontend/nginx.conf 의 프록시 location 정규식이다. 예전에는 '/api' 하나만 걸렀는데,
+ * 이 앱의 REST 는 /users/me, /settlements/{id} 처럼 **최상위 경로**도 쓴다. 그래서 그 응답들이
+ * 아래 "정적 자원 cache-first" 가지로 새어 들어가 캐시에 눌러앉았다:
+ *   · /users/me 의 401 이 캐시되면 → 이후 모든 하드 로드가 즉시 로그아웃된다(인쇄 창은 항상 새 창).
+ *   · /settlements/{id} 가 캐시되면 → 정산서에 **낡은 금액**이 찍힌다.
+ */
+const BACKEND_PATH =
+  /^\/(auth|api|admin|users|orders|payments|reviews|settlements|loans|categories|coupons|games|products|tags|refunds|chargebacks|ledger|actuator|swagger-ui|v3)(\/|$)/;
 const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', (e) => {
@@ -18,8 +30,8 @@ self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
-  // API·외부 호출은 캐시 개입 없이 그대로 (정산 데이터 신선도 보장)
-  if (url.pathname.startsWith('/api') || url.origin !== self.location.origin) return;
+  // 백엔드 API·외부 호출은 캐시 개입 없이 그대로 (정산 데이터 신선도 보장)
+  if (BACKEND_PATH.test(url.pathname) || url.origin !== self.location.origin) return;
 
   // SPA 네비게이션: network-first → 실패 시 캐시된 index.html
   if (req.mode === 'navigate') {
