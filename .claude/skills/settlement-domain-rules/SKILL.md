@@ -49,6 +49,22 @@ Payment:    READY → AUTHORIZED → CAPTURED → REFUNDED  (AUTHORIZED→FAILED
 - 조정에도 당시 스냅샷 수수료율을 적용한다 (환불 수수료 반환 계산).
 - 원장에는 역분개(REVERSED) 로 반영한다 — ledger-invariants skill 참조.
 
+## 지급액 차감 순서 (T-4, 2026-08-12 확정)
+
+정산 확정 시 즉시지급분에서 빼는 순서는 **고정**이다 — 바꾸면 세무 리스크가 생긴다.
+
+```
+payout = immediate − 원천징수 − 채권상계          (immediate = net − 미해제 holdback)
+```
+
+- **원천징수가 항상 먼저다.** 못 뗀 채권은 `OPEN` 으로 남아 다음 정산에서 상계되지만(이월 경로 존재),
+  못 뗀 원천징수는 이월 장치가 없어 소실 = 과소징수(가산세)다. 회수가 지연될 뿐인 쪽을 뒤로 미룬다.
+- 상계 서비스에는 **원천징수를 뗀 잔여액**을 가용액으로 넘긴다 — 세금 재원을 채권 회수가 잠식하지 못한다.
+- 현행 등급 정책(최대 홀드백 30%)에서는 `immediate ≥ 0.7×net > 0.033×net` 이라 원천징수는 **항상 전액 확보**된다.
+  `min()` 클램프는 홀드백이 96.7% 를 넘는 미래에 대한 방어선이며, 걸리면 `settlement.withholding.shortfall`
+  메트릭이 오른다(운영 알람 대상 — 정상 상태는 0).
+- 상계 재실행은 기존 상계 총액을 그대로 반환하므로 지급액에 `max(0)` 하한을 둔다(음수 지급 요청 금지).
+
 ## 검증 도구
 
 - 계산 결과 기대값 검증: MCP `settlement_simulate` (amount, tier → fee/holdback/immediatePayout).

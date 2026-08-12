@@ -155,7 +155,7 @@ order-service                    settlement-service
 
 | ID    | 요구                                                                                                       | 근거                                                       |
 | ----- | ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| FR-P1 | 지급액 = `즉시지급분 − 회수상계 − 실효원천징수`. 원천징수는 가용액을 넘지 못한다(초과분 캡핑 + 경고 로그).  | `SettlementConfirmItemWriter`                              |
+| FR-P1 | 지급액 = `즉시지급분 − 원천징수 − 회수상계`. **차감 순서 고정**(T-4): 원천징수를 먼저 확보하고 그 잔여만 상계 가용액으로 넘긴다 — 못 뗀 채권은 이월되지만 못 뗀 세금은 소실되기 때문. | `SettlementConfirmItemWriter`                              |
 | FR-P2 | 한 정산은 **지급 유형별 최대 1건**의 지급만 만든다(`(settlement_id, payout_type)` 멱등).                    | `PayoutType` + DB 제약                                     |
 | FR-P3 | 지급은 시스템 일일 한도(기본 10억)와 셀러 일일 한도(기본 1억)를 넘길 수 없다.                               | `PayoutLimitChecker` · `app.payout.*-daily-limit`          |
 | FR-P4 | `COMPLETED` 지급은 반드시 펌뱅킹 거래 ID 를 갖는다(사후 추적 보장).                                        | `Payout` 불변식                                            |
@@ -249,8 +249,9 @@ ClosingRun  : RUNNING → COMPLETED | FAILED
 부가세       vat        = floor(commission × 10/110)      ← 포함과세
 공급가액     supply     = commission − vat
 원천징수     withhold   = 개인 ? floor(net × 0.033) : 0
-실효원천징수 effective  = min(withhold, immediate − 회수상계)
-실지급액     payout     = immediate − 회수상계 − effective
+실효원천징수 effective  = min(withhold, immediate)              ← 상계보다 먼저 확보(T-4)
+회수상계     offset     = min(미상계 채권, immediate − effective)
+실지급액     payout     = max(0, immediate − effective − offset)
 
 환불 반영    net        = 결제액 − 누적환불액 − commission   (0 이하면 CANCELED)
 대사 회수    net        = net − clawback                    (환불 누적치는 건드리지 않음)
@@ -397,7 +398,11 @@ DB 레벨 강제 장치: 불변성 트리거, 체크 제약, 원장 중복 전�
   조정마다 `enqueueReverseReconciliation` → `REVERSE_RECONCILIATION` 태스크 → 폴러 → `RECON_REVERSED` 전표 2행
   (`Dr SALES_REFUND / Cr ACCOUNTS_PAYABLE` + `Cr COMMISSION_REVENUE`). DB 제약(`V20260722120000`)·단위테스트·
   통합 IT(재실행에도 정확히 2건, INV-5 누락 감지)까지 갖춰져 있다(구현 커밋 `3ca0ec4af`). 낡은 주석은 제거했다.
-- **원천징수 캡핑 잔여분** — 회수상계가 즉시지급분을 소진해 원천징수가 캡핑되면, 미징수 잔여분 처리는 범위 밖(경고 로그만).
+- ~~**원천징수 캡핑 잔여분**~~ — **2026-08-12 해소(T-4).** 원인은 차감 *순서*였다(회수상계 먼저 → 세금 재원 잠식).
+  순서를 `원천징수 → 채권상계` 로 바꾸고, 상계에는 원천징수를 뗀 잔여만 가용액으로 넘긴다. 현행 등급 정책
+  (최대 홀드백 30%)에서 `immediate ≥ 0.7×net > 0.033×net` 이므로 **과소징수는 구조적으로 발생하지 않는다**.
+  못 상계된 채권은 `OPEN` 으로 남아 다음 정산에서 회수된다(이월 경로 기존 구현). 잔여 클램프가 걸리는
+  극단은 `settlement.withholding.shortfall` 메트릭으로 관측한다(정상 0).
 - **세무 프로필 미등록 = 사업자 취급** — 원천징수 0 으로 지급된다. 개인 셀러가 프로필을 안 올리면 과세 리스크가 사업자 쪽으로 기운다.
 - **레거시 수수료 상수 3%** — `Settlement.COMMISSION_RATE` 는 이력 보존용이며 신규 경로가 참조하면 안 된다.
 
@@ -408,4 +413,4 @@ DB 레벨 강제 장치: 불변성 트리거, 체크 제약, 원장 중복 전�
 | T-1 | §12-B 인가 누락             | 🔶 진행 중 — RED 실증(USER·MANAGER → 500, 인가 미차단) + `SecurityConfig` 매처 2건 추가 완료. GREEN 은 병행 FEP 작업의 컴파일 오류로 대기 |
 | T-2 | §12-A 문서 드리프트         | ✅ 2026-08-12 완료 — 문서 3종 현행화 + `harness-audit` 서브도메인 로스터 검사 신설(테스트 179개 GREEN) |
 | T-3 | 대사 clawback 원장 역분개   | ✅ 해당 없음 — 이미 구현·테스트 완료였고 주석만 낡아 있었다(2026-08-12 주석 정정). 설계 불필요 |
-| T-4 | 원천징수 미징수 잔여분      | 정책 결정(이월 징수 / 채권화 / 포기) 필요                                     |
+| T-4 | 원천징수 미징수 잔여분      | ✅ 2026-08-12 완료 — 이월/채권화 대신 **차감 순서 확정**(원천징수 우선)으로 원인 제거. 정본은 `settlement-domain-rules` 스킬 |

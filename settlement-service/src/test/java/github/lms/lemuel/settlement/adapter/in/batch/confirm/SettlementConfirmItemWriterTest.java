@@ -17,6 +17,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.batch.infrastructure.item.Chunk;
@@ -186,5 +187,59 @@ class SettlementConfirmItemWriterTest {
         BigDecimal available = s1.getImmediatePayoutAmount();
         verify(requestPayoutUseCase).requestPayoutOfType(1L, 91L, available.subtract(available), PayoutType.IMMEDIATE);
         verify(publishSettlementDomainEventPort).publishWithholdingAccrued(1L, 91L, available);
+    }
+
+    @Test
+    @DisplayName("T-4: 회수 채권이 즉시지급분을 삼켜도 원천징수가 먼저 확보된다 — 상계는 잔여까지만")
+    void withholdingTakesPrecedenceOverRecoveryOffset() throws Exception {
+        Settlement s1 = confirmed(1L);            // net=9700, holdback 없음 → immediate=9700
+        BigDecimal immediate = s1.getImmediatePayoutAmount();
+        BigDecimal withholding = new BigDecimal("320");   // floor(9700 × 0.033)
+        BigDecimal openDebt = new BigDecimal("50000");    // 즉시지급분을 훨씬 넘는 미상계 채권
+
+        when(saveSettlementPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(loadSellerIdPort.findSellerIdByPaymentId(1L)).thenReturn(Optional.of(91L));
+        when(resolveSettlementWithholdingUseCase.resolveForPayout(91L, s1.getNetAmount()))
+                .thenReturn(WithholdingResolution.of(TaxType.INDIVIDUAL, withholding));
+        // 실제 상계 서비스와 같은 계약: 넘겨받은 가용액까지만 소진하고 나머지 채권은 OPEN 으로 남긴다.
+        when(offsetSellerRecoveryUseCase.offsetForConfirmedSettlement(eq(1L), eq(91L), any(), any()))
+                .thenAnswer(inv -> ((BigDecimal) inv.getArgument(2)).min(openDebt));
+
+        writer.write(new Chunk<>(List.of(s1)));
+
+        // 원천징수는 전액 확보된다(과소징수 0) — 캡핑되지 않는다.
+        verify(publishSettlementDomainEventPort).publishWithholdingAccrued(1L, 91L, withholding);
+        // 상계에 넘기는 가용액은 '원천징수를 뗀 뒤' 잔여다 — 세금 재원을 채권 회수가 잠식하지 못한다.
+        verify(offsetSellerRecoveryUseCase).offsetForConfirmedSettlement(
+                eq(1L), eq(91L), eq(immediate.subtract(withholding)), any());
+        // 잔여를 상계가 전부 가져가므로 셀러 지급은 0. 미상계 채권은 다음 정산으로 이월된다(기존 경로).
+        // 금액 비교는 스케일 무관 compareTo 로 한다 — Mockito 기본 매처는 equals 라 0 과 0.00 을 다르게 본다.
+        ArgumentCaptor<BigDecimal> payoutCaptor = ArgumentCaptor.forClass(BigDecimal.class);
+        verify(requestPayoutUseCase).requestPayoutOfType(eq(1L), eq(91L), payoutCaptor.capture(),
+                eq(PayoutType.IMMEDIATE));
+        assertThat(payoutCaptor.getValue()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    @DisplayName("T-4: 상계가 잔여보다 작으면 셀러가 차액을 받는다 — 순서 변경이 지급액을 줄이지 않는다")
+    void partialOffsetStillPaysRemainderToSeller() throws Exception {
+        Settlement s1 = confirmed(1L);            // immediate=9700
+        BigDecimal immediate = s1.getImmediatePayoutAmount();
+        BigDecimal withholding = new BigDecimal("320");
+        BigDecimal openDebt = new BigDecimal("1000");     // 잔여(9380)보다 작은 채권
+
+        when(saveSettlementPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(loadSellerIdPort.findSellerIdByPaymentId(1L)).thenReturn(Optional.of(91L));
+        when(resolveSettlementWithholdingUseCase.resolveForPayout(91L, s1.getNetAmount()))
+                .thenReturn(WithholdingResolution.of(TaxType.INDIVIDUAL, withholding));
+        when(offsetSellerRecoveryUseCase.offsetForConfirmedSettlement(eq(1L), eq(91L), any(), any()))
+                .thenAnswer(inv -> ((BigDecimal) inv.getArgument(2)).min(openDebt));
+
+        writer.write(new Chunk<>(List.of(s1)));
+
+        // 지급액 = immediate − 원천징수 − 상계. 세 값의 합은 순서와 무관하게 immediate 로 닫힌다.
+        verify(requestPayoutUseCase).requestPayoutOfType(
+                1L, 91L, immediate.subtract(withholding).subtract(openDebt), PayoutType.IMMEDIATE);
+        verify(publishSettlementDomainEventPort).publishWithholdingAccrued(1L, 91L, withholding);
     }
 }

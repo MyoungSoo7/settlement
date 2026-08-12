@@ -29,7 +29,7 @@ import java.util.List;
  * 처리하던 기존 구조와 달리, 청크마다 커밋해 롱 트랜잭션·락 보유 시간을 제한한다.
  *
  * <p><b>2026-07-24 정정(ADR 0029 §B, 독립 GL 감사 HIGH #4 봉합)</b>: 개인 셀러 원천징수를 <b>실제 지급액에서
- * 공제</b>한다 — payout 금액 = {@code immediate − offset − withholding}. 과거엔 세무 전표(장부)만 원천징수를
+ * 공제</b>한다 — payout 금액 = {@code immediate − withholding − offset}(T-4 로 차감 순서 확정). 과거엔 세무 전표(장부)만 원천징수를
  * 줄이고 실제 송금은 net 전액이 나가던 결함이 있었다. 원천징수 확정 지점(= payout 산정 지점)에서
  * {@code lemuel.settlement.withholding_accrued} 를 발행해 account-service GL 이
  * {@code Dr SELLER_PAYABLE / Cr WITHHOLDING_PAYABLE} 로 폐루프를 닫게 한다(ADR 0026 확장).
@@ -42,6 +42,8 @@ public class SettlementConfirmItemWriter implements ItemWriter<Settlement> {
     private static final String METRIC_CONFIRMED_COUNT = "settlement.confirmed.count";
     /** 확정 정산 net_amount 누적 합(관측용 double — 회계값 아님). */
     private static final String METRIC_CONFIRMED_AMOUNT = "settlement.confirmed.amount";
+    /** 원천징수 과소징수 발생 건수 — 현행 홀드백 정책(최대 30%)에서는 0 이어야 하며, 1 이상이면 세무 리스크 알람 대상. */
+    private static final String METRIC_WITHHOLDING_SHORTFALL = "settlement.withholding.shortfall";
 
     private final SaveSettlementPort saveSettlementPort;
     private final LoadSellerIdPort loadSellerIdPort;
@@ -88,12 +90,10 @@ public class SettlementConfirmItemWriter implements ItemWriter<Settlement> {
             loadSellerIdPort.findSellerIdByPaymentId(saved.getPaymentId()).ifPresent(sellerId -> {
                 publishSettlementDomainEventPort.publishSettlementConfirmed(
                         saved.getId(), sellerId, saved.getNetAmount());
-                // 즉시지급액 = net − 미해제 holdback − 채권 상계(seed-p0-6) − 원천징수(ADR 0029 §B, HIGH #4 봉합).
-                // 미상계 채권을 오래된 순으로 소진한 잔액에서 원천징수까지 뺀 최종액만 Payout 으로 요청한다.
+                // 즉시지급액 = net − 미해제 holdback − 원천징수(ADR 0029 §B) − 채권 상계(seed-p0-6).
+                // 원천징수를 먼저 확보한 잔여에서 미상계 채권을 오래된 순으로 소진하고, 남은 금액만 Payout 으로 요청한다.
                 // 0 이면 생성하지 않는다((정산, IMMEDIATE) 멱등, RequestPayoutUseCase 계약).
                 BigDecimal immediate = saved.getImmediatePayoutAmount();
-                BigDecimal offset = offsetSellerRecoveryUseCase.offsetForConfirmedSettlement(
-                        saved.getId(), sellerId, immediate, saved.getSettlementDate());
 
                 WithholdingResolution withholding = resolveSettlementWithholdingUseCase.resolveForPayout(
                         sellerId, saved.getNetAmount());
@@ -104,19 +104,27 @@ public class SettlementConfirmItemWriter implements ItemWriter<Settlement> {
                             + "settlementId={}, sellerId={}", saved.getId(), sellerId);
                 }
 
-                BigDecimal beforeWithholding = immediate.subtract(offset);
-                // 원천징수는 실제 지급 가용액(beforeWithholding)을 넘을 수 없다 — 뗀 만큼만 GL 에 인식한다.
+                // T-4 — 차감 순서: 원천징수 먼저, 채권 상계는 그 잔여까지만.
+                // 근거는 "회수 가능성의 비대칭"이다. 못 뗀 채권은 OPEN 으로 남아 다음 정산에서 상계되지만
+                // (seed-p0-6 이월 경로가 이미 있다), 못 뗀 원천징수는 이월 장치가 없어 그대로 소실된다
+                // — 소실은 곧 과소징수(가산세 리스크)다. 회수가 지연될 뿐인 쪽을 뒤로 미루는 게 맞다.
+                // 이 순서에서 원천징수는 사실상 항상 전액 확보된다: 등급 최대 홀드백이 30% 라
+                // immediate ≥ 0.7 × net > 0.033 × net = 원천징수. 아래 min() 은 홀드백 정책이 96.7% 를
+                // 넘는 미래에도 음수 지급이 나지 않게 하는 방어선이며, 걸리면 과소징수로 관측된다.
+                BigDecimal effectiveWithholding = immediate.min(withholding.withholdingAmount());
+                BigDecimal afterWithholding = immediate.subtract(effectiveWithholding);
+                BigDecimal offset = offsetSellerRecoveryUseCase.offsetForConfirmedSettlement(
+                        saved.getId(), sellerId, afterWithholding, saved.getSettlementDate());
                 // 발행 이벤트(publishWithholdingAccrued)와 payout 감액이 반드시 동일한 effectiveWithholding 을
-                // 써야 account GL 통제계정이 0 으로 닫힌다(GL 감사 HIGH: 회수상계가 즉시분을 소진해 clamp 되면
-                // 전액 원천징수를 발행하던 과대계상 결함 봉합). effectiveWithholding = min(withholding, 가용액).
-                // 가용액이 원천징수 총액보다 작은 극단(회수상계 큼)에서 미징수 잔여분은 이 Seed 범위 밖(알려진 한계).
-                BigDecimal effectiveWithholding = beforeWithholding.max(BigDecimal.ZERO)
-                        .min(withholding.withholdingAmount());
-                BigDecimal payoutAmount = beforeWithholding.subtract(effectiveWithholding);
+                // 써야 account GL 통제계정이 0 으로 닫힌다(GL 감사 HIGH #4 봉합).
+                // max(0): 상계 서비스는 재실행 시 '넘긴 가용액'이 아니라 기존 상계 총액을 그대로 반환하므로,
+                // 차감 순서가 바뀌기 전에 상계된 정산을 재확정하면 잔여를 초과할 수 있다. 음수 지급 요청은 금지다.
+                BigDecimal payoutAmount = afterWithholding.subtract(offset).max(BigDecimal.ZERO);
                 if (effectiveWithholding.compareTo(withholding.withholdingAmount()) < 0) {
-                    log.warn("[SettlementConfirm] 원천징수({})가 즉시지급 가용액({})을 초과 — 실제 징수액({})으로 캡핑. "
-                            + "settlementId={}, sellerId={}", withholding.withholdingAmount(), beforeWithholding,
-                            effectiveWithholding, saved.getId(), sellerId);
+                    meterRegistry.counter(METRIC_WITHHOLDING_SHORTFALL).increment();
+                    log.error("[SettlementConfirm] 원천징수({})가 즉시지급액({})을 초과 — 실제 징수액({})으로 캡핑, "
+                            + "차액은 미징수. settlementId={}, sellerId={}", withholding.withholdingAmount(),
+                            immediate, effectiveWithholding, saved.getId(), sellerId);
                 }
 
                 if (effectiveWithholding.signum() > 0) {
