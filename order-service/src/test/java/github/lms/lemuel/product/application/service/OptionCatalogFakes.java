@@ -140,6 +140,16 @@ final class OptionCatalogFakes {
         }
 
         @Override
+        public Optional<ProductOptionAxis> findProductAxisById(Long productOptionAxisId) {
+            return Optional.ofNullable(productAxes.get(productOptionAxisId));
+        }
+
+        @Override
+        public Optional<ProductOptionValue> findProductValueById(Long productOptionValueId) {
+            return Optional.ofNullable(productValues.get(productOptionValueId));
+        }
+
+        @Override
         public List<ProductOptionValue> loadProductValues(Long productOptionAxisId) {
             return productValues.values().stream()
                     .filter(v -> v.getProductOptionAxisId().equals(productOptionAxisId))

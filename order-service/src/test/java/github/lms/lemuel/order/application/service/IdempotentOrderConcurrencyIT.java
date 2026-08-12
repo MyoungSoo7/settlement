@@ -138,7 +138,9 @@ class IdempotentOrderConcurrencyIT {
         PublishOrderEventPort publish = (orderId, uid, pid, status, amount, createdAt) -> { };
         CouponUseCase coupon = Mockito.mock(CouponUseCase.class); // 쿠폰 미사용 경로
         var delegate = new CreateMultiItemOrderService(loadUser, productAdapter, variantAdapter,
-                decVariant, decProduct, orderAdapter, notify, publish, coupon);
+                decVariant, decProduct, orderAdapter, notify, publish, coupon,
+                // 옵션 스냅샷은 이 IT 의 검증 범위 밖 — 무해한 스텁
+                variantId -> java.util.List.of());
         return new IdempotentMultiItemOrderService(delegate, lock, idempotencyAdapter, orderAdapter,
                 new TransactionTemplate(txManager));
     }

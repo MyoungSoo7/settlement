@@ -5,6 +5,7 @@ import github.lms.lemuel.order.application.port.out.LoadPendingStockReclaimPort;
 import github.lms.lemuel.order.application.port.out.SaveOrderPort;
 import github.lms.lemuel.order.domain.Order;
 import github.lms.lemuel.order.domain.OrderItem;
+import github.lms.lemuel.order.domain.OrderItemOption;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
@@ -24,6 +25,7 @@ public class OrderPersistenceAdapter implements LoadOrderPort, SaveOrderPort, Lo
 
     private final SpringDataOrderJpaRepository orderJpaRepository;
     private final SpringDataOrderItemRepository orderItemRepository;
+    private final SpringDataOrderItemOptionRepository orderItemOptionRepository;
     private final OrderPersistenceMapper mapper;
 
     @Override
@@ -72,7 +74,8 @@ public class OrderPersistenceAdapter implements LoadOrderPort, SaveOrderPort, Lo
                         item.getSku(), item.getProductName(), item.getUnitPrice(),
                         item.getQuantity(), item.getLineAmount(), item.getCreatedAt()
                 );
-                orderItemRepository.save(itemEntity);
+                OrderItemJpaEntity savedItem = orderItemRepository.save(itemEntity);
+                saveItemOptions(savedItem.getId(), item);
             }
         }
 
@@ -81,7 +84,7 @@ public class OrderPersistenceAdapter implements LoadOrderPort, SaveOrderPort, Lo
             // saved Order 에 자식 아이템 다시 로드해서 부착
             List<OrderItem> reloaded = orderItemRepository.findByOrderIdOrderByIdAsc(saved.getId())
                     .stream()
-                    .map(OrderPersistenceAdapter::toItemDomain)
+                    .map(this::toItemDomain)
                     .toList();
             result.replaceItems(reloaded);
         }
@@ -112,17 +115,40 @@ public class OrderPersistenceAdapter implements LoadOrderPort, SaveOrderPort, Lo
         Order order = mapper.toDomain(entity);
         List<OrderItem> items = orderItemRepository.findByOrderIdOrderByIdAsc(entity.getId())
                 .stream()
-                .map(OrderPersistenceAdapter::toItemDomain)
+                .map(this::toItemDomain)
                 .toList();
         order.replaceItems(items);
         return order;
     }
 
-    private static OrderItem toItemDomain(OrderItemJpaEntity e) {
+    /**
+     * 라인 옵션 스냅샷 저장. 라인 자체가 불변이므로 이미 적힌 스냅샷은 다시 쓰지 않는다 —
+     * 주문서를 소급해서 바꾸지 않기 위해서다.
+     */
+    private void saveItemOptions(Long orderItemId, OrderItem item) {
+        if (item.getOptions().isEmpty()
+                || !orderItemOptionRepository.findByOrderItemIdOrderByAxisSortOrderAsc(orderItemId).isEmpty()) {
+            return;
+        }
+        for (OrderItemOption option : item.getOptions()) {
+            orderItemOptionRepository.save(new OrderItemOptionJpaEntity(
+                    null, orderItemId, option.getAxisSortOrder(), option.getAxisCode(),
+                    option.getAxisName(), option.getValueCode(), option.getValueName()));
+        }
+    }
+
+    private OrderItem toItemDomain(OrderItemJpaEntity e) {
+        List<OrderItemOption> options = orderItemOptionRepository
+                .findByOrderItemIdOrderByAxisSortOrderAsc(e.getId())
+                .stream()
+                .map(o -> OrderItemOption.rehydrate(o.getId(), o.getOrderItemId(),
+                        o.getAxisSortOrder(), o.getAxisCode(), o.getAxisName(),
+                        o.getValueCode(), o.getValueName()))
+                .toList();
         return OrderItem.rehydrate(
                 e.getId(), e.getOrderId(), e.getProductId(), e.getVariantId(),
                 e.getSku(), e.getProductName(), e.getUnitPrice(),
-                e.getQuantity(), e.getLineAmount(), e.getCreatedAt()
+                e.getQuantity(), e.getLineAmount(), e.getCreatedAt(), options
         );
     }
 }

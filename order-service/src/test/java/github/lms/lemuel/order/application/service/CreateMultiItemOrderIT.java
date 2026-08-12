@@ -12,9 +12,13 @@ import github.lms.lemuel.order.application.port.out.SendOrderNotificationPort;
 import github.lms.lemuel.order.adapter.out.persistence.OrderPersistenceAdapter;
 import github.lms.lemuel.order.adapter.out.persistence.OrderPersistenceMapperImpl;
 import github.lms.lemuel.order.domain.Order;
+import github.lms.lemuel.order.domain.OrderItemOption;
 import github.lms.lemuel.product.adapter.out.persistence.ProductPersistenceAdapter;
 import github.lms.lemuel.product.adapter.out.persistence.ProductPersistenceMapperImpl;
+import github.lms.lemuel.product.adapter.out.persistence.OptionCatalogPersistenceAdapter;
 import github.lms.lemuel.product.adapter.out.persistence.ProductVariantPersistenceAdapter;
+import github.lms.lemuel.product.adapter.out.persistence.VariantOptionMappingPersistenceAdapter;
+import github.lms.lemuel.product.application.service.DescribeVariantOptionsService;
 import github.lms.lemuel.product.application.service.DecreaseProductStockService;
 import github.lms.lemuel.product.application.service.DecreaseVariantStockService;
 import github.lms.lemuel.product.domain.Product;
@@ -51,6 +55,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 /**
  * 다건 주문 생성 결합 통합 테스트 — 실 PostgreSQL 로 "기능들이 주문 흐름 안에서 함께 동작하는가" 검증.
@@ -70,7 +75,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({ProductPersistenceAdapter.class, ProductPersistenceMapperImpl.class,
         ProductVariantPersistenceAdapter.class, CouponPersistenceAdapter.class,
-        OrderPersistenceAdapter.class, OrderPersistenceMapperImpl.class, OutboxSchema.class})
+        OrderPersistenceAdapter.class, OrderPersistenceMapperImpl.class, OutboxSchema.class,
+        OptionCatalogPersistenceAdapter.class, VariantOptionMappingPersistenceAdapter.class})
 @ActiveProfiles("test")
 class CreateMultiItemOrderIT {
 
@@ -97,6 +103,8 @@ class CreateMultiItemOrderIT {
     @Autowired ProductVariantPersistenceAdapter variantAdapter;
     @Autowired CouponPersistenceAdapter couponAdapter;
     @Autowired OrderPersistenceAdapter orderAdapter;
+    @Autowired OptionCatalogPersistenceAdapter optionCatalogAdapter;
+    @Autowired VariantOptionMappingPersistenceAdapter variantOptionMappingAdapter;
     @Autowired PlatformTransactionManager txManager;
     @PersistenceContext EntityManager em;
 
@@ -119,8 +127,12 @@ class CreateMultiItemOrderIT {
         SendOrderNotificationPort notify = (email, order) -> { };
         PublishOrderEventPort publish = (orderId, userId, productId, status, amount, createdAt) -> { };
 
+        // 옵션 스냅샷은 실제 경로로 검증한다 — 매핑이 없으면 표시명 파싱으로 폴백한다.
+        var describeOptions = new DescribeVariantOptionsService(
+                variantAdapter, optionCatalogAdapter, variantOptionMappingAdapter);
+
         orderService = new CreateMultiItemOrderService(loadUser, productAdapter, variantAdapter,
-                decVariant, decProduct, orderAdapter, notify, publish, couponService);
+                decVariant, decProduct, orderAdapter, notify, publish, couponService, describeOptions);
     }
 
     @Test
@@ -147,6 +159,13 @@ class CreateMultiItemOrderIT {
         assertThat(saved.getAmount()).isEqualByComparingTo("17010");
         assertThat(saved.getItems()).hasSize(1);
         assertThat(saved.getItems().getFirst().getUnitPrice()).isEqualByComparingTo("9450");
+
+        // 옵션 스냅샷: 카탈로그 미백필 SKU 라 표시명 파싱 폴백으로 채워지고, 저장 후 다시 읽어도 남아 있다
+        assertThat(saved.getItems().getFirst().describeOptions()).isEqualTo("색상: 빨강 / 사이즈: L");
+        Order reloaded = orderAdapter.findById(saved.getId()).orElseThrow();
+        assertThat(reloaded.getItems().getFirst().getOptions())
+                .extracting(OrderItemOption::getAxisCode, OrderItemOption::getValueName)
+                .containsExactly(tuple("색상", "빨강"), tuple("사이즈", "L"));
 
         // 커밋된 DB 상태 검증
         assertThat(variantAdapter.loadById(variantId).orElseThrow().getStockQuantity())

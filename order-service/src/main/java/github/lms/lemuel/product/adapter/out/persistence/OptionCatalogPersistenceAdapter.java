@@ -80,6 +80,18 @@ public class OptionCatalogPersistenceAdapter
     }
 
     @Override
+    public Optional<ProductOptionAxis> findProductAxisById(Long productOptionAxisId) {
+        return productAxisRepository.findById(productOptionAxisId)
+                .map(OptionCatalogPersistenceAdapter::toDomain);
+    }
+
+    @Override
+    public Optional<ProductOptionValue> findProductValueById(Long productOptionValueId) {
+        return productValueRepository.findById(productOptionValueId)
+                .map(OptionCatalogPersistenceAdapter::toDomain);
+    }
+
+    @Override
     public List<ProductOptionValue> loadProductValues(Long productOptionAxisId) {
         return productValueRepository
                 .findByProductOptionAxisIdOrderBySortOrderAscIdAsc(productOptionAxisId).stream()

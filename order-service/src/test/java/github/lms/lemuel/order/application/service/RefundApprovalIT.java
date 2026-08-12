@@ -130,7 +130,9 @@ class RefundApprovalIT {
         PublishOrderEventPort publishOrder = (orderId, uid, pid, status, amount, createdAt) -> { };
         CouponUseCase coupon = Mockito.mock(CouponUseCase.class); // 쿠폰 미사용 경로
         createOrderService = new CreateMultiItemOrderService(loadUser, productAdapter, variantAdapter,
-                decVariant, decProduct, orderAdapter, notify, publishOrder, coupon);
+                decVariant, decProduct, orderAdapter, notify, publishOrder, coupon,
+                // 옵션 스냅샷은 이 IT 의 검증 범위 밖 — 무해한 스텁
+                variantId -> java.util.List.of());
 
         // payment→order 상태 반영: 실제 OrderAdapter(→ ChangeOrderStatusService.updateStatus)와 동형인 람다.
         // (수동 조립에서 순환 의존을 끊기 위한 대체 — load → transitionTo → save 로 동일 효과)

@@ -30,7 +30,11 @@ public interface LoadOptionCatalogPort {
 
     Optional<ProductOptionAxis> findProductAxis(Long productId, Long axisId);
 
+    Optional<ProductOptionAxis> findProductAxisById(Long productOptionAxisId);
+
     List<ProductOptionValue> loadProductValues(Long productOptionAxisId);
+
+    Optional<ProductOptionValue> findProductValueById(Long productOptionValueId);
 
     Optional<ProductOptionValue> findProductValue(Long productOptionAxisId, Long axisValueId);
 }
