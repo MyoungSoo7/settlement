@@ -1,0 +1,92 @@
+# Seed: card-service 재원 이중 사용 해소 — deposit hold/offset 연계 상계
+# 상태: DESIGN (미구현 — 이 Seed 는 실행 대상 스펙이지 회귀 기준선이 아니다)
+# 산출 경위: docs/prd/card-service.md 역산 PRD 의 §12-A(최상위 리스크) → 추적항목 C-1 에서 파생.
+#   Ouroboros interview→generate_seed MCP 경로는 이 세션에서 사용할 수 없었다
+#   (interview_20260812_154334, "Credit balance is too low" — MCP 서버가 기동 시점 환경을 캐시하므로
+#    ~/.ouroboros/shell-env.json 의 무크레딧 ANTHROPIC_API_KEY 를 지워도 세션 재시작 전까지 해소되지 않음).
+#   그래서 PRD 근거 위에서 손으로 작성했다. 스키마는 자매 Seed 와 같은 Ouroboros 네이티브지만
+#   semantic_ac_key 는 도구가 부여하는 해시라 생략했다 — 도구로 재생성하면 채워진다.
+# 검증 근거: card-service-rules 스킬(강제 규칙 정본) · ADR 0022(DeclineReason 확정) · ADR 0030(재원 정답지)
+
+goal: card-service 의 마스터 한도가 담보로 삼는 미지급 정산금을 deposit-service 의 hold 로 선점하고 명세서 청구 시 offset 으로 상계해, 카드 이용과 정산 지급이 같은 재원을 두 번 쓰는 구조를 닫는다.
+task_type: code
+
+brownfield_context:
+  project_type: brownfield
+  context_references:
+  - path: card-service/
+    role: primary
+    summary: 한도 산정(CardLimitPolicy)·재산정 배치·승인·명세서 청구가 있는 주 모듈. 재원 선점과 상계 호출이 붙을 자리
+  - path: deposit-service/
+    role: primary
+    summary: 상계 상대편 원장 — SellerDepositAccount·DepositHold·DepositEntry·DepositOffsetShortfall 과 /admin/deposits 수기 콘솔이 이미 존재
+  - path: account-service/
+    role: reference
+    summary: 재원(F = sellerPayable + holdbackPayable)의 유일한 정답지. card 가 내부 API 로 조회하는 GL 통제계정
+  - path: settlement-service/
+    role: reference
+    summary: 정산 확정·지급 경로. 카드가 선점한 재원을 지급이 침범하지 못하게 하는 반대편 통제 지점
+  existing_patterns:
+  - CardLimitPolicy 의 floor((sellerPayable + holdbackPayable) x R x H) 산정과 원 단위 FLOOR 절사
+  - LoadCardAccountPort.findByIdForUpdate 로 계정 행을 먼저 잠그고 그 다음 sumActiveSubLimits 를 재계산하는 락 순서
+  - AccountFundingAdapter 의 내부 API 호출 + X-Internal-Api-Key 헤더, 실패 시 폴백 없이 FundingUnavailableException
+  - CardAccountRescreener 의 계정 1건 = 트랜잭션 1건(REQUIRES_NEW) 배치 패턴과 ShedLock
+  - Transactional Outbox(SaveOutboxEventPort) 발행과 processed_events 컨슈머 멱등
+  - deposit-service 의 hold/offset/shortfall 원장 모델
+  - settlement 의 회수 채권(SellerRecovery) 이월 상계 — 못 받은 금액을 다음 정산에서 회수하는 기존 선례
+  existing_dependencies:
+  - PostgreSQL 비관적 락(PESSIMISTIC_WRITE)
+  - Flyway 마이그레이션
+  - Kafka + Transactional Outbox
+  - shared-common InternalApiKeyFilter
+  - ShedLock
+  - Java BigDecimal, RoundingMode.FLOOR
+
+constraints:
+- card-service 는 deposit-service 를 코드·DB 로 의존하지 않는다. 연계는 내부 API(X-Internal-Api-Key) 또는 Kafka 이벤트로만 하며 cross-DB 조인은 0 이어야 한다.
+- 재원의 정답지는 account-service GL 이다(ADR 0030). deposit hold 는 '선점 표시'이지 재원의 사본이 아니며, card 가 재원을 자체 보관하는 방향은 금지한다.
+- DeclineReason 은 4종(LIMIT_EXCEEDED·CARD_SUSPENDED·MEMBER_INACTIVE·MERCHANT_POLICY_VIOLATION)으로 고정이다. 선점·상계 실패를 새 거절 사유로 표현하지 않는다 — ADR 0022 파괴적 변경이며 소비자 파싱이 깨진다.
+- 재원 조회·선점 조회 실패에 기본값·캐시·직전 값 폴백을 두지 않는다. 판단 불가는 503 으로 끝낸다(추정으로 여신을 내주지 않는다).
+- 승인 경로의 p99 300ms 예산을 지킨다. 승인 시점에 동기 외부 호출을 추가한다면 그 예산 안에서 증명해야 하고, 불가능하면 선점은 한도 산정·재산정 시점으로 미룬다.
+- 한도 검증의 락 순서(계정 행 잠금 → 서브한도 합계 재계산 → 검증 → 저장·발행 동일 트랜잭션)를 깨지 않는다.
+- 금액은 전부 BigDecimal 이고 이벤트 JSON 에서는 toPlainString() 문자열이다(DATA-STANDARD N5).
+- 모든 이벤트는 Outbox 경유이며 파티션 키는 cardAccountId 를 유지한다. 직접 kafkaTemplate 발행은 금지.
+- 상계·선점은 멱등해야 한다. 재전송·배치 재실행이 이중 집행을 만들면 안 된다.
+- 기존 카드 계정의 한도를 이 변경만으로 축소하지 않는다. 선점 도입으로 한도가 줄어야 한다면 재산정 배치의 클램프 규칙(Σ서브한도 하한)과 통지 경로를 그대로 탄다.
+
+acceptance_criteria:
+- description: 한도가 확정되는 모든 경로(신규 개설·일 1회 재산정·수동 변경)에서 확정된 masterLimit 과 같은 금액의 deposit hold 가 존재하고, 한도가 줄면 hold 도 함께 줄며, 한도 산정과 hold 반영 중 하나만 성공한 상태로 끝나지 않는다.
+- description: 정산 지급이 카드가 선점한 재원을 침범하지 못한다 — 지급 가능액 산정에서 활성 카드 hold 가 차감되고, 그로 인해 지급이 줄거나 보류된 사실이 셀러가 조회 가능한 형태로 남는다.
+- description: 명세서가 CLOSED 되면 그 총액만큼 deposit offset 이 실행되어 선점이 실제 회수로 전환되고, 잔고가 부족하면 부족분이 DepositOffsetShortfall 로 남아 후속 정산에서 회수 대상이 된다.
+- description: 같은 statementId 로 상계를 두 번 요청해도 offset 은 한 번만 집행된다. 같은 카드계정에 대한 선점 갱신을 재실행해도 hold 총액은 한도와 일치하는 하나의 값으로 수렴한다.
+- description: deposit 연계가 실패하면 폴백 없이 실패로 끝난다 — 한도 산정 경로는 503 을 반환하고, 재산정 배치는 해당 계정만 옛 한도로 남긴 채 나머지 계정을 계속 처리하며, 승인 거절이 필요한 경우 기존 LIMIT_EXCEEDED 로만 표현된다.
+- description: MSA 경계가 유지된다 — card-service 빌드 의존성에 deposit-service 가 없고, card 가 deposit 테이블을 직접 읽지 않으며, ArchUnit 이 어댑터 외부에서의 외부 서비스 호출을 차단한다.
+- description: 상계가 실제로 걸린 뒤 인정비율 R 을 설정으로 올릴 수 있고, R 변경 후 재산정 배치 1회로 전 계정 한도가 새 R 기준으로 수렴하며 그 과정에서 masterLimit >= Σ 활성 서브한도 불변식이 한 번도 깨지지 않는다.
+- description: 선점 총액·상계 성공 건수·부족(shortfall) 건수와 잔액이 메트릭으로 노출되어, 재원 이중 사용이 남아 있는지를 운영자가 숫자로 확인할 수 있다.
+
+evaluation_principles:
+- 이 Seed 의 성패는 "R 을 몇으로 올렸는가"가 아니라 "선점 없이 나가는 지급이 0 인가"로 판정한다. R 조정은 상계가 증명된 뒤의 결과이지 목표가 아니다.
+- 동시성은 단위 테스트로 판정하지 않는다. 한도 산정·승인·지급이 동시에 도는 통합 시나리오에서 불변식이 유지되는지로 본다.
+- 부분 성공(한도만 바뀌고 hold 는 안 잡힌 상태)이 관측되면 실패다 — 회계 정합성 문제는 '드물게 발생'이 허용 기준이 될 수 없다.
+
+exit_conditions:
+- ./gradlew :card-service:test :card-service:jacocoTestCoverageVerification 통과(LINE 90%)
+- ./gradlew :deposit-service:test :deposit-service:jacocoTestCoverageVerification 통과(연계로 deposit 을 수정한 경우)
+- 동시 승인·동시 발급 IT(CardIssuanceLimitConcurrencyIT·ConcurrentAuthorizationIT)가 선점 도입 후에도 통과
+- 신규·변경 cross-service 토픽이 있으면 shared-common testFixtures 계약 스키마·정본 샘플과 양방향 계약 테스트 배선(ADR 0024)
+- node scripts/harness/guard.mjs --staged 와 harness-audit 통과
+- docs/prd/card-service.md §12-A 와 추적항목 C-1 을 해소로 갱신
+
+deferred_to_implementation:
+- hold 의 소유 단위: 카드계정 1건당 hold 1건으로 갱신할 것인지, 한도 변경마다 새 hold 를 쌓고 만료로 정리할 것인지.
+- settlement 측 반영 지점: 확정 배치의 즉시지급액 산정에서 뺄 것인지, payout 실행 직전에 검사할 것인지. 정산 코어의 차감 순서(원천징수 → 회수상계, T-4)와의 우선순위도 함께 정해야 한다.
+- deposit-service 에 내부 API(/internal/**)를 신설할지, 기존 /admin/deposits 를 재사용할지. 현재 deposit 의 Kafka 컨슈머는 미배선 상태라 이벤트 경로를 쓰려면 그 배선이 선행된다.
+- 상계 실패 부족분의 회수 주체: deposit 의 DepositOffsetShortfall 로 둘 것인지, settlement 의 SellerRecovery 채권으로 넘길 것인지(두 곳에 같은 채권이 이중 계상되지 않아야 한다).
+- R 의 목표값과 전환 절차(한 번에 올릴지, 단계적으로 올릴지).
+
+metadata:
+  source: docs/prd/card-service.md (역산 PRD) §12-A · 추적항목 C-1
+  authored: 2026-08-13
+  authored_by: hand-written (Ouroboros MCP unavailable — see header)
+  risk: high
+  blast_radius: card-service · deposit-service · settlement-service(지급 산정) · account-service(재원 조회)
