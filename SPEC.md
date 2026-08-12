@@ -1,12 +1,12 @@
 # Lemuel 기능명세서 (Functional Specification)
 
-이커머스 + 정산(Settlement) MSA 플랫폼의 전체 기능 명세. 코어 JVM 13개 마이크로서비스 + API Gateway 에
-폴리글랏 7종(Kotlin 2 · Go 2 · Python 3)을 더한 **총 21개 서비스** 헥사고날 백엔드이며,
+이커머스 + 정산(Settlement) MSA 플랫폼의 전체 기능 명세. 코어 JVM 16개 마이크로서비스 + API Gateway 에
+폴리글랏 7종(Kotlin 2 · Go 2 · Python 3)을 더한 **총 24개 서비스** 헥사고날 백엔드이며,
 원래 단일 모놀리스였으나 Bounded Context 로 분리했다.
 아키텍처·컨벤션은 [`CLAUDE.md`](./CLAUDE.md), 아키텍처 결정은 [`docs/adr/`](./docs/adr/) 참조.
 
 - 문서 상태: 현행 코드 기준 요약 명세 (엔드포인트 표면 + 도메인 규칙 + 이벤트 흐름)
-- 최종 갱신: 2026-07-16
+- 최종 갱신: 2026-08-09
 
 ---
 
@@ -14,8 +14,8 @@
 
 | 항목           | 내용                                                                                                                                                                                                |
 | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 도메인         | 주문·결제·정산·선정산/기업대출·투자·계정계·재무제표·경제지표·기업뉴스평판·운영관제·주식시세·AI챗봇·공공데이터·조직/멤버십·법인카드 + 알림·정산대사·실시간시세·결제웹훅·백테스트·이상탐지·시계열예측 |
-| 서비스 수      | **22개** — 코어 Java 14 + API Gateway + Kotlin 2(알림·대사) + Go 2(스트리밍·웹훅) + Python 3(백테스트·이상탐지·예측)                                                                                |
+| 도메인         | 주문·결제·정산·선정산/기업대출·투자·계정계·재무제표·경제지표·기업뉴스평판·운영관제·주식시세·AI챗봇·공공데이터·조직/멤버십·법인카드·보험(GA)·셀러예치금 + 알림·정산대사·실시간시세·결제웹훅·백테스트·이상탐지·시계열예측 |
+| 서비스 수      | **24개** — 코어 Java 16 + API Gateway + Kotlin 2(알림·대사) + Go 2(스트리밍·웹훅) + Python 3(백테스트·이상탐지·예측)                                                                                |
 | 아키텍처       | 헥사고날(Ports & Adapters), DB-per-service, 이벤트 드리븐(CQRS 프로젝션)                                                                                                                            |
 | 서비스 간 연계 | **Kafka 이벤트로만** (코드·DB 직접 의존 0) + 내부 대사 API(`/internal/recon`)                                                                                                                       |
 
@@ -23,7 +23,7 @@
 
 | 구분                          | 기술                                                                                                                                                       |
 | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 언어 / 프레임워크             | **Java 25 / Spring Boot 4.0.4**(코어 14+gateway) · Kotlin 2.0 / Boot 3.3·JDK 21(이벤트 2종) · Go 1.22 `net/http`(엣지 2종) · Python 3.11 / FastAPI(ML 3종) |
+| 언어 / 프레임워크             | **Java 25 / Spring Boot 4.0.4**(코어 16+gateway) · Kotlin 2.0 / Boot 3.3·JDK 21(이벤트 2종) · Go 1.22 `net/http`(엣지 2종) · Python 3.11 / FastAPI(ML 3종) |
 | 빌드                          | Gradle 멀티모듈 (Kotlin DSL), shared-common 은 composite build. **폴리글랏 7종은 standalone 빌드**(settings.gradle 미포함, `polyglot-ci.yml` 별도 CI)      |
 | Gateway                       | Spring Cloud Gateway 2025 (WebFlux)                                                                                                                        |
 | DB / 검색                     | PostgreSQL 17 (DB-per-service) / Elasticsearch 8.17                                                                                                        |
@@ -54,7 +54,7 @@
 
 - **Outbox 패턴**: DB 트랜잭션 안에서 `outbox_events` 에 기록 → 멀티워커 폴러(FOR UPDATE SKIP LOCKED)가 Kafka 발행.
 - **3단 멱등 방어**: `outbox_events.event_id UNIQUE` → 컨슈머 `processed_events(group,event_id)` PK → 도메인 UNIQUE 제약.
-- **이벤트 계약-as-code (ADR 0024)**: cross-service 24개 토픽의 JSON Schema + 정본 샘플이
+- **이벤트 계약-as-code (ADR 0024)**: cross-service 36개 토픽의 JSON Schema + 정본 샘플이
   `shared-common/src/testFixtures/resources/contracts/events/` 에 단일 출처로 존재. 프로듀서·컨슈머 양방향 계약 테스트로 드리프트 차단.
 - **이벤트 드리븐 프로젝션 (ADR 0020)**: settlement 가 order 이벤트를 소비해 자체 DB 에 `settlement_*_view` 적재
   (cross-DB 연결 0). 대사는 order 내부 API `/internal/recon` 호출로 양측이 자기 DB 만 읽는다.
@@ -251,23 +251,72 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
 - **알려진 한계(Phase 2)**: 카드 이용과 정산 지급이 같은 재원을 두 번 쓸 수 있다 — 실제 상계는 청구 사이클의
   몫이고 그때까지 인정비율 `R` 이 그 위험을 흡수한다. 정산 연동(account-service 이벤트 배선)은 이벤트 계약 우선(ADR 0022) 준수 후 Phase 3 착수.
 
-### 3.15 gateway-service — API Gateway (port 8080)
+### 3.15 insurance-service — GA 보험대리점 (port 8108, mgmt 8109, 자체 DB lemuel_insurance)
+
+법인보험대리점(GA) 플랫폼 — 설계사(FC)의 상담 → 가입설계 → 청약 → 계약 → 유지·변경 → 수수료 정산을 하나로 잇는다.
+설계 정본은 [`docs/insurance-service.md`](docs/insurance-service.md).
+
+| 도메인      | API (base `/api/insurance`, **JWT 인증 필수**)                                                     | 기능                                                                          |
+| ----------- | -------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| 가입설계    | `POST /proposals`, `GET /proposals/{id}`, `POST /proposals/{id}/convert`, `GET /proposals/{id}/sheet` | 견적 산출 · 조회 · 청약 전환 · 설계서 출력                                    |
+| 청약        | `POST /applications`, `POST /applications/{id}/{review,approve,reject}`                            | 청약 접수 → 심사 → 승인/거절(승인 시 계약 생성)                               |
+| 계약        | `POST /policies/{policyNumber}/{surrender,cancel}`, `GET /policies/{policyNumber}/payouts`         | 해지 · 철회 · 지급내역 조회                                                   |
+| 상품설명서  | `GET /products/{productCode}/disclosure`, `POST /disclosures`                                      | 상품설명서 조회 · **대면 교부 증빙 등록**(완전판매 게이트 — §아래) |
+
+- **완전판매 게이트**: 청약 **승인(approve)** 시점에 상품설명서 교부 증빙을 검사한다 — 증빙이 없으면
+  `DisclosureNotDeliveredException`. 상태 전이 **전에** 검사하므로 실패한 청약은 `UNDER_REVIEW` 로 남는다.
+- **상태머신**: Application `SUBMITTED→UNDER_REVIEW→APPROVED/REJECTED` · Policy `ACTIVE→LAPSED/SURRENDERED/EXPIRED/CANCELLED`
+  · Proposal `QUOTED→CONVERTED/EXPIRED` · Commission `SCHEDULED→PAID→CLAWBACK_PENDING→CLAWED_BACK/CANCELLED`.
+- **방카슈랑스 확장(V6+)**: 판매채널 `SalesChannel`=FC·BANCA, 은행 채널 **25%룰**(특정 보험사 모집액 집중 한도) 모니터링,
+  수수료 수취인 `recipientType` 에 BANK 추가.
+- **수수료**: 초년도·차년도 요율로 회차 스케줄 생성, 조기 해지 시 환수(clawback). 라운딩은 `RoundingMode.DOWN`.
+- **PII**: 피보험자·계약자 주민번호·연락처는 분리 테이블에 암호화 저장(`INSURANCE_ENC_KEY` 미설정 시 **fail-closed**).
+- **소유권(IDOR)**: 해지·철회·지급내역의 FC 식별자는 요청이 아니라 JWT 주체에서만 파생(`FcIdentity`).
+- **배치 7종**: 계약 만기·가입설계 만료·월말 수수료 마감·수수료 지급·환수 스윕·일반 지급·방카 집중도 감시.
+- **이벤트 발행**(Outbox, 9토픽): `lemuel.insurance.policy_issued` · `.policy_status_changed` · `.commission_confirmed` ·
+  `.commission_paid` · `.commission_clawback_triggered` · `.commission_monthly_closed` · `.banca_rule_violated` ·
+  `.general_payout_requested` · `.general_payout_paid`. **계약 스키마 미등록 · 소비처 미배선**(발행 전용).
+  `application.yml` 의 `coverage-bound: lemuel.insurance.coverage_bound` 는 **발행 코드가 없는 설정 잔재**다.
+
+### 3.16 deposit-service — 셀러 예치금 원장 (port 8112, mgmt 8113, 자체 DB lemuel_deposit)
+
+셀러 예치금 **잔고의 단일 진실원**. 지급·상계 재원을 `hold`(선점)로 묶고 `offset`(상계)으로 소진해,
+같은 재원이 두 곳에서 쓰이는 이중사용을 구조적으로 막는다.
+
+| 도메인    | API                                                                                                 | 기능                                                        |
+| --------- | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| 잔고 조회 | `GET /api/deposits/accounts/me` (셀러 본인) · `GET /api/deposits/accounts/{sellerId}` (ADMIN/MANAGER) | 가용(available)·선점(locked)·총액(total) 조회               |
+| 운영 콘솔 | `POST /admin/deposits/accounts/{sellerId}/{credits,debits,holds,offsets}` (ADMIN)                    | 수기 입금·출금·선점·상계 — 감사 대상                        |
+
+- **IDOR 차단**: `/accounts/me` 는 **경로에 sellerId 가 없다는 것 자체가 계약** — 대상을 경로로 받는 순간 IDOR 경로가 된다.
+  임의 셀러 조회는 별도 경로 + ADMIN/MANAGER 게이트.
+- **계좌 부재는 정상 상태**(첫 입금 시점에 생성). 0원 계좌를 지어내 돌려주지 않는다 — 대사에서 "없음"과 "0원"은 다른 사실.
+- **부족분**(`DepositOffsetShortfall`): 상계 재원이 모자라면 잔여를 부족분으로 적재한다(무음 실패 금지).
+- **이벤트 발행**(Outbox, `aggregateType="Deposit"`): `lemuel.deposit.balance_changed` · `.hold_placed` ·
+  `.hold_released` · `.offset_applied` · `.offset_shortfall`. **계약 스키마 미등록 · 소비처 미배선**(발행 전용).
+- **Kafka 컨슈머 미배선** — 현재 잔고 변동 입력은 `/admin/deposits` 수기 콘솔 경로뿐이다.
+
+### 3.17 gateway-service — API Gateway (port 8080)
 
 - Spring Cloud Gateway(WebFlux). 서비스별 경로 predicate 라우팅. 위성 8종은 공개 조회 API 만 라우팅(수집 트리거
   `/admin/**` 외부 미노출). organization 은 `/api/organizations/**`(JWT 필수)를 라우팅.
 - 자체 인증 필터 없음 — 인증·인가는 각 서비스 SecurityConfig 가 강제.
-- **폴리글랏 7종(§3.16~3.17)은 gateway 미라우팅** — 독립 포트로 직접 노출(내부/데모 용도).
+- **폴리글랏 7종(§3.18~3.19)은 gateway 미라우팅** — 독립 포트로 직접 노출(내부/데모 용도).
+  예외는 실시간 스트림 2종뿐: `market-stream-service` 의 `/api/market-stream/**`(SSE)와
+  `notification-service` 의 `/api/notifications/stream`(알림 푸시 SSE, JWT 필수). 후자는 스트림 한 경로만
+  올린다 — `/notifications/send`·`/demo` 는 인증 없는 내부 발송 경로다. 정본: [`docs/sse.md`](docs/sse.md).
 
-### 3.16 Kotlin 이벤트 서비스 2종 — notification(8130) · reconciliation(8131)
+### 3.18 Kotlin 이벤트 서비스 2종 — notification(8130) · reconciliation(8131)
 
-Boot 3.3 · JDK 21 · 코루틴. **자체 DB 없음**(무영속 MVP) · shared-common 미의존 · gateway 미라우팅.
+Boot 3.3 · JDK 21 · 코루틴. **자체 DB 없음**(무영속 MVP) · shared-common 미의존 · gateway 미라우팅
+(예외: notification 의 알림 푸시 SSE 한 경로 — 아래 표).
 
 | 서비스                            | API / 트리거                                                                          | 기능                                                                                                                                                                                                                                                                                                                   |
 | --------------------------------- | ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **notification-service** (8130)   | `POST /notifications/send`, `GET /notifications/demo` + Kafka 리스너                  | 도메인 이벤트 5토픽(`settlement.confirmed`·`payment.confirmed/captured/refunded`·`investment.executed`) → 다채널(log/Slack/email) 알림. **코루틴 I/O 팬아웃 + 채널별 타임아웃(3s)/재시도(3회) 격리**, eventId 멱등(TTL 30분). Kafka 리스너는 기본 OFF(`APP_KAFKA_ENABLED=true` 로 활성) — 브로커 없이도 기동·데모 가능 |
+| **notification-service** (8130)   | `POST /notifications/send`, `GET /notifications/demo`, **`GET /notifications/stream`(SSE 푸시 허브 — JWT 필수, gateway `/api/notifications/stream`)** + Kafka 리스너 | 도메인 이벤트 5토픽(`settlement.confirmed`·`payment.confirmed/captured/refunded`·`investment.executed`) → 다채널(log/Slack/email) 알림. **코루틴 I/O 팬아웃 + 채널별 타임아웃(3s)/재시도(3회) 격리**, eventId 멱등(TTL 30분). Kafka 리스너는 기본 OFF(`APP_KAFKA_ENABLED=true` 로 활성) — 브로커 없이도 기동·데모 가능 |
 | **reconciliation-service** (8131) | `POST /reconciliation/run`, `GET /reconciliation/demo` + `@Scheduled`(매일 19:00 KST) | 정산 대사 — settlement·payment 소스 **코루틴 병렬 fetch** 후 대조, sealed `Discrepancy`(MISSING/EXTRA/AMOUNT/STATUS) 분류, 허용오차 1원(`tolerance-krw`). 소스 base-url 은 env 주입(기본 샘플 시뮬레이션)                                                                                                              |
 
-### 3.17 Polyglot 서비스 5종 — Go 2 + Python 3 (정본: [`docs/polyglot-services.md`](docs/polyglot-services.md))
+### 3.19 Polyglot 서비스 5종 — Go 2 + Python 3 (정본: [`docs/polyglot-services.md`](docs/polyglot-services.md))
 
 언어별 강점 배치: **Go**=동시성·저지연 엣지, **Python**=데이터/ML/퀀트. 모두 동작 MVP(핵심 로직+헬스체크+테스트+멀티스테이지 Dockerfile, non-root), Gradle 빌드와 독립.
 
@@ -298,11 +347,21 @@ Ledger       : PENDING → POSTED → REVERSED
 PgRecon 실행  : RUNNING → COMPLETED / FAILED
 CorporateLoan: REQUESTED → APPROVED → DISBURSED → REPAID (↘ REJECTED)
 Investment주문: REQUESTED → APPROVED → EXECUTED / REJECTED / CANCELED
+SecuredLoan  : REQUESTED → APPROVED → DISBURSED → REPAID (↘ REJECTED, DISBURSED → OVERDUE → DEFAULTED — 직행 금지)
 Organization : ACTIVE ⇄ SUSPENDED
 Membership   : INVITED → ACTIVE ⇄ SUSPENDED, 각 상태 → REMOVED(터미널)  (마지막 OWNER 불변식)
+CardAccount  : ACTIVE ⇄ SUSPENDED/DELINQUENT → CLOSED
+Card         : ISSUED ⇄ SUSPENDED → CANCELED(터미널)
+Statement    : OPEN → CLOSED → {PARTIALLY_PAID, PAID, DELINQUENT} → PAID
+InsApplication: SUBMITTED → UNDER_REVIEW → APPROVED / REJECTED
+Policy(보험) : ACTIVE → LAPSED / SURRENDERED / EXPIRED / CANCELLED
+Proposal     : QUOTED → CONVERTED / EXPIRED
+Commission   : SCHEDULED → PAID → CLAWBACK_PENDING → CLAWED_BACK / CANCELLED
+DepositHold  : ACTIVE → PARTIALLY_CAPTURED → CAPTURED / EXPIRED / VOIDED / RELEASED
 ```
 
-정책: 수수료·정산주기·홀드백(등급별, §3.2), 기업대출 신용정책(등급×계수 한도), 투자점수 3축.
+정책: 수수료·정산주기·홀드백(등급별, §3.2), 기업대출 신용정책(등급×계수 한도), 투자점수 3축,
+법인카드 한도 산정(재원×인정비율×평판 haircut, §3.14), 보험 수수료 스케줄·환수(§3.15).
 
 ---
 
@@ -344,7 +403,11 @@ Membership   : INVITED → ACTIVE ⇄ SUSPENDED, 각 상태 → REMOVED(터미�
 
 발행 전용(소비처 미배선 — 의도된 상태, 소비자가 생기면 ADR 0024 절차로 계약 편입):
 `lemuel.payment.created` / `lemuel.payment.authorized`(결제 라이프사이클 관측용),
-`lemuel.user.membership_changed`, `lemuel.card.*`(5종 — 청구 사이클 3단계에서 소비 예정).
+`lemuel.user.membership_changed`, `lemuel.card.*`(5종 — 청구 사이클 3단계에서 소비 예정),
+`lemuel.insurance.*`(9종 — `policy_issued`·`policy_status_changed`·`commission_confirmed`·`commission_paid`·
+`commission_clawback_triggered`·`commission_monthly_closed`·`banca_rule_violated`·`general_payout_requested`·`general_payout_paid`),
+`lemuel.deposit.*`(5종 — `balance_changed`·`hold_placed`·`hold_released`·`offset_applied`·`offset_shortfall`).
+insurance·deposit 토픽은 아직 계약 스키마(testFixtures)에 편입되지 않았다.
 역방향 예약: `lemuel.ops.order.failed` 는 operation 이 구독하지만 emit 지점 미배선(OpsSignalCategory 주석 참조).
 
 ---
@@ -356,7 +419,7 @@ Membership   : INVITED → ACTIVE ⇄ SUSPENDED, 각 상태 → REMOVED(터미�
 - **관측**: Prometheus + Micrometer + Grafana + OTLP 트레이싱, 서비스별 헬스/프로브.
 - **테스트**: 도메인→서비스→컨트롤러→통합 순. JaCoCo CI 게이트 **LINE 90%**, 핵심 도메인 INSTRUCTION 80%.
   settlement 통합테스트는 Testcontainers PostgreSQL.
-- **배포**: Docker Compose(로컬, DB-per-service PG 13종+ES+Redpanda+서비스+gateway), Kubernetes(운영, GitHub Actions→GHCR→ArgoCD+image-updater GitOps), Flyway 마이그레이션. 폴리글랏 7종은 전용 차트로 격리 배포(상세: [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) §5).
+- **배포**: Docker Compose(로컬, DB-per-service PG 16종+ES+Redpanda+앱 컨테이너 18개(JVM 17+market-stream)), Kubernetes(운영, GitHub Actions→GHCR→ArgoCD+image-updater GitOps), Flyway 마이그레이션. 폴리글랏 7종은 전용 차트로 격리 배포(상세: [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) §5).
 - **운영 필수 설정**: `JWT_SECRET`(강함), `app.security.internal-key-required=true`, 각 서비스 외부 API 키.
 
 ---
@@ -364,6 +427,7 @@ Membership   : INVITED → ACTIVE ⇄ SUSPENDED, 각 상태 → REMOVED(터미�
 ## 7. 관련 문서
 
 - 아키텍처·컨벤션: [`CLAUDE.md`](./CLAUDE.md) · 사용자 문서: [`README.md`](./README.md)
-- 아키텍처 개요(21서비스 인벤토리·패턴·스택): [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) · 폴리글랏 정본: [`docs/polyglot-services.md`](docs/polyglot-services.md)
+- 아키텍처 개요(24서비스 인벤토리·패턴·스택): [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) · 폴리글랏 정본: [`docs/polyglot-services.md`](docs/polyglot-services.md)
 - 아키텍처 결정: [`docs/adr/`](./docs/adr/) (ADR 0020 DB 분리, 0024 이벤트 계약, 0026 계정계 payout 인식(제안) 등)
-- 도메인 규칙 스킬: `settlement-domain-rules`, `loan-domain-rules`, `investment-domain-rules`, `account-domain-rules`
+- 도메인 규칙 스킬: `settlement-domain-rules`, `loan-domain-rules`, `investment-domain-rules`, `account-domain-rules`,
+  `card-service-rules` (organization·insurance·deposit 는 전용 스킬 미배선 — `HARNESS.md` 커버리지 공백 참조)
