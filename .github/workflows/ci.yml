@@ -610,8 +610,9 @@ jobs:
           cache-to: type=gha,mode=max
           platforms: linux/amd64
 
-      # backend-ghcr 와 같은 기준. 프론트 런타임 베이스는 nginx:1.25-alpine 로 고정돼 있어
-      # 여기서 CRITICAL 이 먼저 뜰 가능성이 있다 — 그때 답은 스캔을 끄는 게 아니라 베이스 태그를 올리는 것.
+      # backend-ghcr 와 같은 기준. 실제로 여기서 CRITICAL 3건이 먼저 떴고(nginx:1.25-alpine 이 물던
+      # Alpine 3.19 는 지원 종료라 수정본이 오지 않았다), 예고대로 **스캔을 끄지 않고 베이스 태그를
+      # 올려** 해소했다 — 지금은 nginx:1.31-alpine(Alpine 3.24, 취약점 0). 다음에 또 뜨면 같은 답이다.
       - name: Trivy image scan (CRITICAL gate)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         env:
