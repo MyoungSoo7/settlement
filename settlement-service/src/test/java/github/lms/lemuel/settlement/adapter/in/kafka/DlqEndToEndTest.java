@@ -138,11 +138,11 @@ class DlqEndToEndTest {
     }
 
     /**
-     * 테스트 전용 부트 컨피그 — 실제 운영 KafkaErrorHandlerConfig 를 임포트해 동일 동작 검증.
+     * 테스트 전용 부트 컨피그 — 실제 운영 공용 배선(KafkaConsumerErrorHandlingConfig)을 임포트해 동일 동작 검증.
      * 자동설정 없이 명시 빈만 사용 → DB·웹·ES 등 무관한 컨텍스트가 뜨지 않아 빠르고 격리됨.
      */
     @SpringBootConfiguration
-    @Import(KafkaErrorHandlerConfig.class)
+    @Import(github.lms.lemuel.common.config.kafka.KafkaConsumerErrorHandlingConfig.class)
     static class TestApp {
 
         @Bean
@@ -160,7 +160,7 @@ class DlqEndToEndTest {
             return new TransientListener();
         }
 
-        /** 테스트 producer — KafkaErrorHandlerConfig 의 dltKafkaTemplate 을 그대로 사용해도 되지만 명시 빈 가독성. */
+        /** 테스트 producer — 공용 배선의 dltKafkaTemplate 을 그대로 써도 되지만 명시 빈 가독성. */
         @Bean
         KafkaTemplate<String, String> producerTemplate(
                 org.springframework.kafka.core.ProducerFactory<String, String> dltProducerFactory) {
@@ -192,7 +192,7 @@ class DlqEndToEndTest {
 }
 
 /*
- * Note: KafkaTemplate 와 ProducerFactory 가 필요하므로 KafkaErrorHandlerConfig 의 dltProducerFactory 빈을
+ * Note: KafkaTemplate 와 ProducerFactory 가 필요하므로 공용 배선의 dltProducerFactory 빈을
  * 그대로 사용. 실제 운영에서는 동일 인스턴스가 DLT publish 와 우리 테스트 send 를 둘 다 책임지지만,
  * 테스트 격리상 해롭지 않다 (서로 다른 토픽).
  */

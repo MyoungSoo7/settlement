@@ -139,7 +139,7 @@ class AccountArchitectureTest {
     @Test
     void account_는_소비전용이라_Outbox_발행머시너리에_의존하지_않는다() {
         // 이벤트 발행(Outbox) 금지 — payout.completed 등 발행은 settlement 만(ADR 0026 Option A).
-        // (KafkaTemplate 은 DLT 격리 전용으로만 쓰이므로 제외 — KafkaErrorHandlerConfig 참조.
+        // (KafkaTemplate 은 DLT 격리 전용으로만 쓰이므로 제외 — 공용 KafkaConsumerErrorHandlingConfig 참조.
         //  비즈니스 이벤트 발행 경로인 Outbox 저장/발행 포트 의존만 하드스톱한다.)
         ArchRule rule = noClasses()
                 .that().resideInAPackage("github.lms.lemuel.account..")
@@ -157,7 +157,7 @@ class AccountArchitectureTest {
         // — guard grep(`kafkaTemplate.send`)의 사각을 메운다(감사 MED-4). account 자기 코드가 KafkaTemplate.send(..)를
         // '직접' 호출하면 비즈니스 이벤트 발행으로 간주해 하드스톱한다.
         // DLT 격리는 DeadLetterPublishingRecoverer(프레임워크)가 send 를 내부 호출하므로 account 코드엔 직접 호출이 없다
-        // → 정상 DLT 배선(KafkaErrorHandlerConfig)을 false-positive 없이 통과한다.
+        // → 정상 DLT 배선(공용 KafkaConsumerErrorHandlingConfig)을 false-positive 없이 통과한다.
         DescribedPredicate<JavaMethodCall> callsKafkaTemplateSend =
                 new DescribedPredicate<>("KafkaTemplate.send(..) 를 직접 호출") {
                     @Override

@@ -6,15 +6,19 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 import {
+  checkKafkaDlqWiring,
   checkProtectedDeletions,
   discoverStagedDeletions,
   discoverStagedFiles,
   dodNudgeMessage,
+  isRootScanned,
   normalizeRepoPath,
   parseAllowance,
+  parseGradleModules,
   readUtf8Strict,
   reconstructPendingContent,
   runGuardCli,
+  stripComments,
   scanText,
 } from '../guard.mjs';
 
@@ -329,6 +333,31 @@ describe('CLI dispatcher', () => {
     assert.equal(await runGuardCli(['--staged', '--files', 'x'], { repoRoot: process.cwd(), stdout() {}, stderr() {} }), 2);
   });
 
+  /** 인자를 잘못 준 실패는 "무엇을 고쳐야 하는지"까지 말해야 한다 — CI 에서 조용한 exit 1 은 원인 불명 실패다. */
+  const usageOf = async (args) => {
+    const errors = [];
+    const code = await runGuardCli(args, { repoRoot: process.cwd(), stdout() {}, stderr: (m) => errors.push(m) });
+    return { code, stderr: errors.join('\n') };
+  };
+
+  test('--list 는 인자가 빠지면 사용법을 알린다', async () => {
+    const { code, stderr } = await usageOf(['--list']);
+    assert.equal(code, 1);
+    assert.match(stderr, /usage: guard --list <file>/);
+  });
+
+  test('--files 는 인자가 빠지면 사용법을 알린다', async () => {
+    const { code, stderr } = await usageOf(['--files']);
+    assert.equal(code, 1);
+    assert.match(stderr, /usage: guard --files <file>/);
+  });
+
+  test('--deleted-list 는 인자가 빠지면 사용법을 알린다', async () => {
+    const { code, stderr } = await usageOf(['--deleted-list']);
+    assert.equal(code, 2);
+    assert.match(stderr, /usage: guard --deleted-list <file>/);
+  });
+
   test('discovers ACMR staged paths including spaces and renames', async () => {
     const repoRoot = await temporaryRepo();
     spawnSync('git', ['init'], { cwd: repoRoot });
@@ -497,5 +526,246 @@ describe('--deleted-list mode (CI wiring)', () => {
 
     assert.equal(await runGuardCli(['--deleted-list', 'deleted.txt'],
       { repoRoot, stderr: () => {}, stdout: () => {} }), 0);
+  });
+});
+
+describe('KAFKA-DLQ wiring (컨슈머는 있는데 DLT 배선이 없는 서비스)', () => {
+  const SETTINGS = 'include(\n  "card-service",\n  "company-service",\n)\nincludeBuild("shared-common")';
+  const APP = (module, pkg) => `${module}/src/main/java/github/lms/lemuel/${pkg}App.java`;
+
+  /** git grep 대역 — 패턴별로 매치 파일 목록을 돌려준다. */
+  const fakeGrep = ({ listeners = [], imports = [], apps = [], ownWiring = [] }) => (_root, pattern, pathspecs) => {
+    // 단일 파일 pathspec 조회는 쓰지 않는다(readSource 로 대체) — 패턴만 보고 분기한다.
+    if (pattern.includes('KafkaListener')) return listeners;
+    if (pattern.includes('KafkaConsumerErrorHandlingConfig')) return imports;
+    if (pattern.includes('DeadLetterPublishingRecoverer')) return ownWiring;
+    if (pattern.includes('SpringBoot')) return apps;
+    throw new Error(`unexpected pattern ${pattern} ${pathspecs}`);
+  };
+
+  /**
+   * build.gradle.kts 는 shared-common 을 의존하고, 앱 클래스는 주어진 소스를 쓴다.
+   * `files` 로 특정 경로의 내용을 덮어써 배선 파일(진짜 @Import vs 자바독 언급)을 구분한다.
+   */
+  const fakeSource = (appSource, { sharedCommon = true, files = {} } = {}) => (file) => {
+    if (file.endsWith('build.gradle.kts')) {
+      return sharedCommon ? 'implementation("github.lms.lemuel:shared-common:1.0.0")' : 'implementation("x")';
+    }
+    return Object.hasOwn(files, file) ? files[file] : appSource;
+  };
+
+  const COMPANY_CFG = 'company-service/src/main/java/github/lms/lemuel/company/adapter/in/kafka/Cfg.java';
+  const NOTIFICATION_CFG = 'notification-service/src/main/kotlin/github/lms/lemuel/notification/Cfg.kt';
+
+  test('루트 스캔 + shared-common 의존이면 공용 배선이 자동으로 닿으므로 통과한다', () => {
+    const violations = checkKafkaDlqWiring('/repo', {
+      readSettings: () => SETTINGS,
+      gitGrepFiles: fakeGrep({
+        listeners: ['card-service/src/main/java/github/lms/lemuel/card/adapter/in/kafka/C.java'],
+        apps: [APP('card-service', '')],
+      }),
+      readSource: fakeSource('@SpringBootApplication\npublic class CardServiceApplication {}'),
+    });
+
+    assert.deepEqual(violations, []);
+  });
+
+  test('루트 스캔이어도 shared-common 미의존이면 차단한다 — 공용 설정이 클래스패스에 없다', () => {
+    const violations = checkKafkaDlqWiring('/repo', {
+      readSettings: () => SETTINGS,
+      gitGrepFiles: fakeGrep({
+        listeners: ['card-service/src/main/java/github/lms/lemuel/card/adapter/in/kafka/C.java'],
+        apps: [APP('card-service', '')],
+      }),
+      readSource: fakeSource('@SpringBootApplication', { sharedCommon: false }),
+    });
+
+    assert.equal(violations.length, 1);
+    assert.equal(violations[0].id, 'KAFKA-DLQ');
+  });
+
+  test('제한 스캔 서비스가 @Import 를 빠뜨리면 차단한다 — 이게 card·insurance·operation 이 유실되던 상태다', () => {
+    const violations = checkKafkaDlqWiring('/repo', {
+      readSettings: () => SETTINGS,
+      gitGrepFiles: fakeGrep({
+        listeners: ['company-service/src/main/java/github/lms/lemuel/company/adapter/in/kafka/C.java'],
+        apps: [APP('company-service', 'company/')],
+      }),
+      readSource: fakeSource('@SpringBootApplication(scanBasePackages = "github.lms.lemuel.company")'),
+    });
+
+    assert.equal(violations.length, 1);
+    assert.equal(violations[0].id, 'KAFKA-DLQ');
+    assert.match(violations[0].file, /^company-service/);
+  });
+
+  test('제한 스캔이어도 명시 @Import 가 있으면 통과한다', () => {
+    const violations = checkKafkaDlqWiring('/repo', {
+      readSettings: () => SETTINGS,
+      gitGrepFiles: fakeGrep({
+        listeners: ['company-service/src/main/java/github/lms/lemuel/company/adapter/in/kafka/C.java'],
+        imports: [COMPANY_CFG],
+        apps: [APP('company-service', 'company/')],
+      }),
+      readSource: fakeSource('@SpringBootApplication(scanBasePackages = "github.lms.lemuel.company")', {
+        files: {
+          [COMPANY_CFG]: '@Configuration\n@Import(KafkaConsumerErrorHandlingConfig.class)\npublic class Cfg {}',
+        },
+      }),
+    });
+
+    assert.deepEqual(violations, []);
+  });
+
+  test('줄바꿈이 낀 @Import 도 인정한다 — 포매터가 애노테이션을 접어도 배선은 배선이다', () => {
+    const violations = checkKafkaDlqWiring('/repo', {
+      readSettings: () => SETTINGS,
+      gitGrepFiles: fakeGrep({
+        listeners: ['company-service/src/main/java/github/lms/lemuel/company/adapter/in/kafka/C.java'],
+        imports: [COMPANY_CFG],
+        apps: [APP('company-service', 'company/')],
+      }),
+      readSource: fakeSource('@SpringBootApplication(scanBasePackages = "github.lms.lemuel.company")', {
+        files: {
+          [COMPANY_CFG]: '@Import({\n    OtherConfig.class,\n    KafkaConsumerErrorHandlingConfig.class,\n})\nclass Cfg {}',
+        },
+      }),
+    });
+
+    assert.deepEqual(violations, []);
+  });
+
+  test('자바독 언급만으로는 통과하지 않는다 — @Import 를 지우고 주석만 남기면 배선은 사라진다', () => {
+    const violations = checkKafkaDlqWiring('/repo', {
+      readSettings: () => SETTINGS,
+      gitGrepFiles: fakeGrep({
+        listeners: ['company-service/src/main/java/github/lms/lemuel/company/adapter/in/kafka/C.java'],
+        imports: [COMPANY_CFG],
+        apps: [APP('company-service', 'company/')],
+      }),
+      readSource: fakeSource('@SpringBootApplication(scanBasePackages = "github.lms.lemuel.company")', {
+        files: {
+          // 실제 저장소에 존재하는 문장 형태 그대로 — 이게 통과되면 가드는 아무것도 지키지 못한다.
+          [COMPANY_CFG]: '/**\n * shared-common 의 {@link KafkaConsumerErrorHandlingConfig} 가 자동으로 잡히지 않는다 —\n'
+            + ' * {@code @Import(KafkaConsumerErrorHandlingConfig.class)} 가 필요하다.\n */\nclass Cfg {}',
+        },
+      }),
+    });
+
+    assert.equal(violations.length, 1);
+    assert.equal(violations[0].id, 'KAFKA-DLQ');
+    assert.match(violations[0].file, /^company-service/);
+  });
+
+  test('폴리글랏 standalone 도 대상이다 — 배선이 없으면 차단한다 (settings 밖이라고 유실이 허용되지 않는다)', () => {
+    const violations = checkKafkaDlqWiring('/repo', {
+      readSettings: () => SETTINGS,
+      gitGrepFiles: fakeGrep({
+        listeners: ['notification-service/src/main/kotlin/github/lms/lemuel/notification/K.kt'],
+        apps: [],
+      }),
+      readSource: fakeSource(''),
+    });
+
+    assert.equal(violations.length, 1);
+    assert.match(violations[0].file, /^notification-service/);
+  });
+
+  test('폴리글랏 standalone 이 자체 DLT 배선을 가지면 통과한다 (notification-service 형태)', () => {
+    const violations = checkKafkaDlqWiring('/repo', {
+      readSettings: () => SETTINGS,
+      gitGrepFiles: fakeGrep({
+        listeners: ['notification-service/src/main/kotlin/github/lms/lemuel/notification/K.kt'],
+        ownWiring: [NOTIFICATION_CFG],
+        apps: [],
+      }),
+      readSource: fakeSource('', {
+        files: { [NOTIFICATION_CFG]: 'fun recoverer() = DeadLetterPublishingRecoverer(dltKafkaTemplate) { r, e -> tp }' },
+      }),
+    });
+
+    assert.deepEqual(violations, []);
+  });
+
+  test('standalone 이 주석으로만 자체 배선을 언급하면 통과하지 않는다', () => {
+    const violations = checkKafkaDlqWiring('/repo', {
+      readSettings: () => SETTINGS,
+      gitGrepFiles: fakeGrep({
+        listeners: ['notification-service/src/main/kotlin/github/lms/lemuel/notification/K.kt'],
+        ownWiring: [NOTIFICATION_CFG],
+        apps: [],
+      }),
+      readSource: fakeSource('', {
+        files: { [NOTIFICATION_CFG]: '/** 언젠가 DeadLetterPublishingRecoverer 로 격리할 예정. */\nclass Cfg' },
+      }),
+    });
+
+    assert.equal(violations.length, 1);
+    assert.match(violations[0].file, /^notification-service/);
+  });
+
+  test('컨슈머가 없는 모듈은 배선을 요구하지 않는다', () => {
+    const violations = checkKafkaDlqWiring('/repo', {
+      readSettings: () => SETTINGS,
+      gitGrepFiles: fakeGrep({ listeners: [], apps: [APP('card-service', '')] }),
+      readSource: fakeSource('@SpringBootApplication'),
+    });
+
+    assert.deepEqual(violations, []);
+  });
+
+  test('settings 를 못 읽는 환경에서는 가드를 깨뜨리지 않는다', () => {
+    const violations = checkKafkaDlqWiring('/repo', {
+      readSettings: () => { throw new Error('no settings'); },
+      gitGrepFiles: () => { throw new Error('should not be called'); },
+    });
+
+    assert.deepEqual(violations, []);
+  });
+
+  test('parseGradleModules 는 include 블록의 모듈만 뽑는다 (includeBuild 는 제외)', () => {
+    assert.deepEqual(parseGradleModules(SETTINGS), ['card-service', 'company-service']);
+  });
+
+  describe('stripComments', () => {
+    test('한 줄 주석과 블록 주석을 지운다 — 배선 판정은 실행되는 코드만 본다', () => {
+      assert.equal(stripComments('a // @Import(X.class)\nb').includes('@Import'), false);
+      assert.equal(stripComments('/* @Import(X.class) */ b').includes('@Import'), false);
+      assert.equal(stripComments('/** {@link X} */\n@Import(X.class)').includes('@Import'), true);
+    });
+
+    test('문자열 안의 // 는 주석이 아니다 — URL 때문에 뒤 코드가 통째로 날아가면 오탐이 난다', () => {
+      const code = 'val url = "https://example.com"; wire(DeadLetterPublishingRecoverer(t))';
+      assert.equal(stripComments(code).includes('DeadLetterPublishingRecoverer('), true);
+    });
+
+    test('주석 안의 따옴표가 문자열 상태를 오염시키지 않는다', () => {
+      const code = '// it\'s a comment with "quote\n@Import(X.class)';
+      assert.equal(stripComments(code).includes('@Import(X.class)'), true);
+    });
+  });
+
+  describe('isRootScanned', () => {
+    test('스캔 속성이 없으면 진입점 패키지(=루트)부터 스캔이다', () => {
+      assert.equal(isRootScanned('@SpringBootApplication\nclass A {}'), true);
+    });
+
+    test('하위 패키지로 좁히면 공용 설정이 안 잡힌다', () => {
+      assert.equal(isRootScanned('@SpringBootApplication(scanBasePackages = "github.lms.lemuel.company")'), false);
+    });
+
+    test('루트 basePackages + excludeFilters 는 여전히 루트 스캔이다 (account 형태)', () => {
+      const source = '@SpringBootConfiguration\n@ComponentScan(\n  basePackages = "github.lms.lemuel",\n'
+        + '  excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX,\n'
+        + '    pattern = {"github\\\\.lms\\\\.lemuel\\\\.common\\\\.outbox\\\\.adapter\\\\.out\\\\..*"}))';
+      assert.equal(isRootScanned(source), true);
+    });
+
+    test('@EntityScan/@EnableJpaRepositories 의 basePackages 는 컴포넌트 스캔과 무관하다 (오탐 회귀)', () => {
+      const source = '@ComponentScan(basePackages = "github.lms.lemuel")\n'
+        + '@EntityScan(basePackages = {"github.lms.lemuel.account.adapter.out.persistence"})\n'
+        + '@EnableJpaRepositories(basePackages = {"github.lms.lemuel.account.adapter.out.persistence"})';
+      assert.equal(isRootScanned(source), true);
+    });
   });
 });

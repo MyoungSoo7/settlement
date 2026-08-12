@@ -16,6 +16,7 @@
 // Exit 0 = clean, Exit 1 = blocking violation(s). Exceptions require structured metadata.
 
 import { execFileSync, spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { readFile, realpath, stat } from 'node:fs/promises';
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -313,6 +314,213 @@ export function checkProtectedDeletions(deletedFiles, options = {}) {
   return violations;
 }
 
+// ── KAFKA-DLQ: 컨슈머를 가진 서비스는 반드시 DLT 배선이 닿아야 한다 ──────────────────
+//
+// 왜 라인 규칙이 아니라 저장소 규칙인가: 이 위반은 "잘못 쓴 줄"이 아니라 "없는 파일"이다.
+// 배선이 서비스마다 ~180줄씩 복붙되던 동안 card·insurance·operation 은 배선 자체가 누락됐고,
+// Spring Kafka 기본 핸들러 FixedBackOff(0, 9) 로 떨어져 재시도 소진 메시지를 조용히 skip 했다
+// (= 사실상 유실). 어떤 파일도 "틀리지" 않았기 때문에 라인 스캔으로는 영원히 안 잡힌다.
+//
+// 판정: 모듈 안에 @KafkaListener 가 있으면 공용 배선(KafkaConsumerErrorHandlingConfig)이
+// 닿아야 한다. 닿는 경로는 둘 중 하나다.
+//   (a) 루트 github.lms.lemuel 스캔 — @SpringBootApplication 이 루트 패키지에 있고 scanBasePackages 로
+//       좁히지 않은 경우 (대부분의 서비스)
+//   (b) 명시 @Import(KafkaConsumerErrorHandlingConfig.class) — 제한 스캔 서비스(company 등)
+const SHARED_KAFKA_CONFIG = 'KafkaConsumerErrorHandlingConfig';
+
+/** settings.gradle.kts 가 선언한 Gradle 모듈만 대상 — 폴리글랏 standalone 은 shared-common 자체가 없다. */
+export function parseGradleModules(settingsText) {
+  const includeBlock = /include\s*\(([\s\S]*?)\)/.exec(String(settingsText));
+  if (!includeBlock) return [];
+  return [...includeBlock[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+}
+
+function gitGrepFiles(repoRoot, pattern, pathspecs) {
+  // --untracked: 아직 커밋되지 않은 신규 배선 파일도 봐야 한다. 이게 없으면 "방금 추가한 @Import"를
+  //   못 보고 오탐을 낸다(무시 대상 파일은 여전히 제외된다).
+  // git grep -l 은 매치가 없으면 exit 1 — 정상 상태이므로 예외로 만들지 않는다.
+  const result = spawnSync('git', ['grep', '-lE', '--untracked', '-e', pattern, '--', ...pathspecs], { cwd: repoRoot });
+  if (result.status === 1) return [];
+  if (result.status !== 0) throw new Error(`git grep failed: ${result.stderr?.toString('utf8') ?? ''}`);
+  return result.stdout.toString('utf8').split(/\r?\n/).filter(Boolean).map((f) => f.replaceAll('\\', '/'));
+}
+
+const moduleOf = (file) => file.split('/')[0];
+
+const ROOT_PACKAGE = 'github.lms.lemuel';
+/** 컴포넌트 스캔 범위를 정하는 어노테이션만 — @EntityScan·@EnableJpaRepositories 의 동명 속성은 무관하다. */
+const COMPONENT_SCAN_ANNOTATION = /@(?:ComponentScan|SpringBootApplication)\s*\(/g;
+/** {@code scanBasePackages}/{@code basePackages} 의 값 리터럴만 뽑는다 — excludeFilters 의 정규식은 보지 않는다. */
+const SCAN_ATTRIBUTE = /\b(?:scanBasePackages|basePackages)\s*=\s*(\{[^}]*\}|"[^"]*")/g;
+
+/** 여는 괄호 위치에서 시작해 짝이 맞는 닫는 괄호까지의 인자 텍스트를 돌려준다. */
+function balancedArgs(source, openParenIndex) {
+  let depth = 0;
+  for (let i = openParenIndex; i < source.length; i += 1) {
+    if (source[i] === '(') depth += 1;
+    else if (source[i] === ')') {
+      depth -= 1;
+      if (depth === 0) return source.slice(openParenIndex + 1, i);
+    }
+  }
+  return source.slice(openParenIndex + 1);
+}
+
+/**
+ * 부트 진입점이 루트 패키지 전체를 컴포넌트 스캔하는지 판정한다.
+ *
+ * <p>스캔 범위 지정이 아예 없으면 진입점의 패키지(=루트)부터 스캔하므로 참이다. 지정이 있으면
+ * 값이 전부 {@code github.lms.lemuel} 일 때만 참 — {@code github.lms.lemuel.company} 처럼
+ * 하위로 좁힌 경우는 shared-common 의 공용 설정이 스캔에 안 잡히므로 거짓이다.
+ *
+ * <p>주의 2가지(둘 다 실제로 오탐을 냈다):
+ * <ul>
+ *   <li>account 는 {@code @ComponentScan(basePackages = "github.lms.lemuel", excludeFilters = ...)} 로
+ *       일부만 배제한다 — 여전히 루트 스캔이다.</li>
+ *   <li>같은 파일의 {@code @EntityScan}/{@code @EnableJpaRepositories} 도 {@code basePackages} 를 쓰지만
+ *       JPA 스캔이라 컴포넌트 스캔 범위와 무관하다 — 그래서 어노테이션 블록 안으로 한정해 읽는다.</li>
+ * </ul>
+ */
+export function isRootScanned(source) {
+  const text = String(source);
+  const packages = [];
+  for (const annotation of text.matchAll(COMPONENT_SCAN_ANNOTATION)) {
+    const args = balancedArgs(text, annotation.index + annotation[0].length - 1);
+    for (const attribute of args.matchAll(SCAN_ATTRIBUTE)) {
+      packages.push(...[...attribute[1].matchAll(/"([^"]*)"/g)].map((q) => q[1]));
+    }
+  }
+  return packages.length === 0 || packages.every((pkg) => pkg === ROOT_PACKAGE);
+}
+
+/** 자체 DLT 격리 머시너리 — 폴리글랏 standalone 이 공용 설정 없이 같은 계약을 만족하는 경로. */
+const OWN_DLT_WIRING = 'DeadLetterPublishingRecoverer';
+
+/**
+ * 주석(한 줄·블록)을 지운 소스를 돌려준다. 배선 판정은 **실행되는 코드**만 봐야 한다 —
+ * 자바독의 {@code @Import(...)} 예시나 "언젠가 이렇게 배선하자"는 메모가 통과 근거가 되면
+ * 애노테이션만 지우고 주석을 남긴 순간 가드가 조용히 GREEN 이 된다(= 가드의 존재 이유 상실).
+ *
+ * 문자열 리터럴은 보존한다 — `"https://..."` 의 `//` 를 주석 시작으로 오인하면 같은 줄 뒤의
+ * 실제 배선 코드가 통째로 사라져 반대 방향 오탐이 난다.
+ */
+export function stripComments(source) {
+  const text = String(source);
+  let out = '';
+  let state = 'code'; // code | line | block | string | char
+  for (let i = 0; i < text.length; i += 1) {
+    const c = text[i];
+    const next = text[i + 1];
+    if (state === 'code') {
+      if (c === '/' && next === '/') { state = 'line'; i += 1; continue; }
+      if (c === '/' && next === '*') { state = 'block'; i += 1; continue; }
+      if (c === '"') state = 'string';
+      else if (c === "'") state = 'char';
+      out += c;
+    } else if (state === 'line') {
+      if (c === '\n') { state = 'code'; out += c; }
+    } else if (state === 'block') {
+      if (c === '*' && next === '/') { state = 'code'; i += 1; }
+      else if (c === '\n') out += c; // 줄 수를 보존해 다른 규칙의 행 번호가 밀리지 않게 한다
+    } else { // string | char
+      if (c === '\\') { out += c + (next ?? ''); i += 1; continue; }
+      if ((state === 'string' && c === '"') || (state === 'char' && c === "'")) state = 'code';
+      out += c;
+    }
+  }
+  return out;
+}
+
+/** 공용 배선을 실제로 끌어오는 형태 — 자바독 예시가 아니라 애노테이션이어야 한다. */
+const IMPORT_SHARED_CONFIG = new RegExp(`@Import[\\s(]*\\{?[^)]*${SHARED_KAFKA_CONFIG}\\s*(?:\\.class|::class)`);
+/** 자체 배선을 실제로 생성하는 형태 — 타입 이름 언급이 아니라 생성자 호출이어야 한다. */
+const CONSTRUCTS_OWN_WIRING = new RegExp(`${OWN_DLT_WIRING}\\s*\\(`);
+
+/** 후보 파일 중 실제 배선 코드를 가진 파일이 하나라도 있는 모듈 집합. */
+function modulesWiredBy(candidateFiles, pattern, readSource) {
+  const wired = new Set();
+  for (const file of candidateFiles) {
+    let source;
+    try {
+      source = readSource(file);
+    } catch {
+      continue; // 읽을 수 없는 후보는 근거로 삼지 않는다 — 통과시키지도 않는다
+    }
+    if (pattern.test(stripComments(source))) wired.add(moduleOf(file));
+  }
+  return wired;
+}
+
+/**
+ * @KafkaListener 를 가진 모듈에 DLT 배선이 닿는지 검사한다.
+ *
+ * <p>배선이 닿는 경로는 셋 중 하나다.
+ * <ol>
+ *   <li><b>(a) 루트 스캔 + shared-common 의존</b> — 공용 설정이 자동으로 잡힌다(대부분의 Java 서비스).
+ *       스캔만으로는 부족하다: shared-common 미의존 위성(financial·economics·market·commondata)은
+ *       루트 스캔이어도 공용 설정이 클래스패스에 아예 없다.</li>
+ *   <li><b>(b) 명시 @Import</b> — 제한 스캔 서비스(company 등). 주석은 근거가 되지 않는다:
+ *       {@code stripComments} 후 애노테이션 형태가 남아 있어야 한다.</li>
+ *   <li><b>(c) 자체 DLT 배선</b> — shared-common 을 의존하지 않는 폴리글랏 standalone
+ *       (notification-service: Kotlin/Boot 3.x/JDK 21). 같은 계약을 자기 언어로 구현한다.</li>
+ * </ol>
+ *
+ * <p>shared-common 자신은 배선 제공자이므로 (c) 로 자연히 통과한다.
+ */
+export function checkKafkaDlqWiring(repoRoot, deps = {}) {
+  const grep = deps.gitGrepFiles ?? gitGrepFiles;
+  const readSource = deps.readSource ?? ((f) => readFileSync(resolve(repoRoot, f), 'utf8'));
+  // 워킹트리를 읽는다 — 모듈을 추가하는 커밋에서도 그 커밋이 곧바로 검사 대상이 되어야 한다.
+  const readSettings = deps.readSettings
+    ?? (() => readFileSync(resolve(repoRoot, 'settings.gradle.kts'), 'utf8'));
+
+  let gradleModules;
+  try {
+    gradleModules = new Set(parseGradleModules(readSettings()));
+  } catch {
+    return []; // settings 를 못 읽는 환경(얕은 클론 등)에서 가드를 깨뜨리지 않는다
+  }
+
+  const mainSources = ['*/src/main/**/*.java', '*/src/main/**/*.kt'];
+  // 폴리글랏 standalone 도 대상이다 — settings.gradle.kts 밖이라고 유실이 허용되지는 않는다.
+  const consumerModules = new Set(grep(repoRoot, '@KafkaListener', mainSources).map(moduleOf));
+  if (consumerModules.size === 0) return [];
+
+  // git grep 은 후보 파일을 싸게 좁히는 용도일 뿐이다 — 통과 판정은 주석을 걷어낸 뒤
+  // 실제 배선 형태(@Import 애노테이션 / recoverer 생성자 호출)가 있을 때만 내린다.
+  const ownWiringModules = modulesWiredBy(grep(repoRoot, OWN_DLT_WIRING, mainSources), CONSTRUCTS_OWN_WIRING, readSource);
+  const importingModules = modulesWiredBy(grep(repoRoot, SHARED_KAFKA_CONFIG, mainSources), IMPORT_SHARED_CONFIG, readSource);
+  // account 처럼 @SpringBootApplication 을 분해해 쓰는 형태(@SpringBootConfiguration +
+  // @EnableAutoConfiguration + @ComponentScan(excludeFilters=...))도 진입점으로 인정한다.
+  const rootScanned = new Set(
+    grep(repoRoot, '@SpringBoot(Application|Configuration)', mainSources)
+      .filter((f) => /\/src\/main\/java\/github\/lms\/lemuel\/[^/]+\.java$/.test(f))
+      .filter((f) => isRootScanned(readSource(f)))
+      .map(moduleOf),
+  );
+
+  const dependsOnSharedCommon = (module) => {
+    if (!gradleModules.has(module)) return false;
+    try {
+      return readSource(`${module}/build.gradle.kts`).includes('shared-common');
+    } catch {
+      return false;
+    }
+  };
+
+  const violations = [];
+  for (const module of [...consumerModules].sort()) {
+    if (ownWiringModules.has(module) || importingModules.has(module)) continue;
+    if (rootScanned.has(module) && dependsOnSharedCommon(module)) continue;
+    violations.push({
+      file: `${module}/src/main`,
+      id: 'KAFKA-DLQ',
+      msg: `@KafkaListener 가 있는데 DLT 배선이 닿지 않음 — Spring Kafka 기본 핸들러는 재시도 소진 후 메시지를 조용히 skip 한다(사실상 유실). shared-common 의존 서비스는 루트 스캔이거나 @Import(${SHARED_KAFKA_CONFIG}.class), standalone 은 자체 ${OWN_DLT_WIRING} 배선이 필요하다`,
+    });
+  }
+  return violations;
+}
+
 export function discoverStagedDeletions(repoRoot) {
   const output = execFileSync('git', ['diff', '--cached', '--name-only', '-z', '--diff-filter=D'], { cwd: repoRoot });
   return output.toString('utf8').split('\0').filter(Boolean);
@@ -351,14 +559,17 @@ export async function runGuardCli(args, io = {}) {
   const modes = ['--staged', '--list', '--deleted-list', '--files', '--hook', '--self-test'].filter((mode) => args.includes(mode));
   if (modes.length !== 1) { stderr('exactly one guard mode is required'); return 2; }
   const mode = modes[0];
+  // 인자 검증 실패를 종료 코드만으로 알리면 CI 로그에는 "exit 1" 만 남아 원인 추적이 불가능하다.
+  // 어떤 모드가 무엇을 요구하는지 항상 stderr 로 말한다.
+  const usage = (spec, code) => { stderr(`usage: guard ${spec}`); return code; };
   if (mode === '--self-test') {
-    if (args.length !== 1) return 2;
+    if (args.length !== 1) return usage('--self-test', 2);
     return spawnSync(process.execPath, ['--test', fileURLToPath(new URL('./test/guard.test.mjs', import.meta.url))], { cwd: repoRoot, stdio: 'inherit' }).status ?? 2;
   }
   if (mode === '--deleted-list') {
     // CI 는 삭제를 --diff-filter=ACMR 로 걸러 changed.txt 에 담지 않는다. 삭제 목록을 따로 받아
     // 하네스 보호 경로가 지워졌는지 검사한다 — PR 로 들어온 대량 삭제를 막는 유일한 지점이다.
-    if (args.length !== 2) return 2;
+    if (args.length !== 2) return usage('--deleted-list <file>', 2);
     try {
       const listPath = await normalizeRepoPath(repoRoot, args[1]);
       const deleted = (await readUtf8Strict(listPath)).split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
@@ -366,7 +577,7 @@ export async function runGuardCli(args, io = {}) {
     } catch (error) { stderr(`guard input failed: ${error.message}`); return 1; }
   }
   if (mode === '--hook') {
-    if (args.length !== 1) return 2;
+    if (args.length !== 1) return usage('--hook   (PreToolUse 이벤트 JSON 을 stdin 으로)', 2);
     try {
       const event = JSON.parse(io.stdin ?? await readStdinUtf8Strict());
       const pending = await reconstructPendingContent(event, { repoRoot });
@@ -378,20 +589,23 @@ export async function runGuardCli(args, io = {}) {
   try {
     let files;
     if (mode === '--staged') {
-      if (args.length !== 1) return 2;
+      if (args.length !== 1) return usage('--staged', 2);
       files = discoverStagedFiles(repoRoot);
     } else if (mode === '--list') {
-      if (args.length !== 2) return 1;
+      if (args.length !== 2) return usage('--list <file>   (검사할 파일 목록이 줄 단위로 담긴 파일)', 1);
       const listPath = await normalizeRepoPath(repoRoot, args[1]);
       files = (await readUtf8Strict(listPath)).split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
     } else {
-      if (args[0] !== '--files' || args.length < 2) return 1;
+      if (args[0] !== '--files' || args.length < 2) return usage('--files <file> [file...]', 1);
       files = args.slice(1);
     }
     const violations = [];
     for (const file of files) violations.push(...await scanRepoFile(repoRoot, file));
     // 삭제는 내용 스캔으로 잡히지 않는다(스테이징 목록이 ACMR 로 D 를 빼고 온다) — 별도로 확인한다.
     if (mode === '--staged') violations.push(...checkProtectedDeletions(discoverStagedDeletions(repoRoot)));
+    // "없는 파일"은 라인 스캔으로 못 잡는다 — 저장소 단위 불변식은 커밋·CI 시점에 전수 검사한다.
+    // (--files/--hook 은 편집 중 실시간 경로라 저장소 전수 스캔을 돌리지 않는다.)
+    if (mode === '--staged' || mode === '--list') violations.push(...checkKafkaDlqWiring(repoRoot));
     await logGuardHits(repoRoot, mode.slice(2), violations); // observability only — never affects the verdict
     if (mode === '--staged') {
       const nudge = dodNudgeMessage(files);

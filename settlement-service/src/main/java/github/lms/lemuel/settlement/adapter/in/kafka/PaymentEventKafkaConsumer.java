@@ -32,7 +32,8 @@ import java.util.UUID;
  *
  * <p>장애 처리 (DLT):
  * <ul>
- *   <li>예외가 throw 되면 ack 하지 않고 {@link KafkaErrorHandlerConfig} 의 DefaultErrorHandler 로 위임.</li>
+ *   <li>예외가 throw 되면 ack 하지 않고 {@link github.lms.lemuel.common.config.kafka.KafkaConsumerErrorHandlingConfig}
+ *       의 DefaultErrorHandler 로 위임.</li>
  *   <li>일시적 예외 → ExponentialBackOff(2s ×2, 3회) 재시도 → 끝나면 DLT</li>
  *   <li>독성 메시지 (JsonProcessingException, IllegalArgumentException, IllegalStateException)
  *       → 재시도 없이 즉시 DLT — 같은 파티션의 후속 메시지 stall 방지</li>
