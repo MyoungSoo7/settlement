@@ -51,13 +51,13 @@ jobs:
       # test 를 실행하지 않으므로, true 면 backend-ci 가 shared-common 자체 게이트를 별도 실행한다.
       shared: ${{ steps.filter.outputs.shared }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
 
       - name: Paths filter
         id: filter
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3.0.4
         with:
           filters: |
             frontend:
@@ -190,12 +190,12 @@ jobs:
           --health-retries 10
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
 
       - name: Set up JDK ${{ env.JAVA_VERSION }}
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: temurin
@@ -215,7 +215,7 @@ jobs:
       # Docker Hub rate limit 회피 — 각 모듈 testcontainers.properties 의
       # hub.image.name.prefix=ghcr.io/myoungsoo7/mirror/ 와 세트.
       - name: Login to GHCR (for Testcontainers pulls)
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -245,7 +245,7 @@ jobs:
           SPRING_ELASTICSEARCH_URIS: http://localhost:9200
 
       - name: Upload test/coverage reports
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
           name: backend-reports
@@ -256,14 +256,19 @@ jobs:
 
       - name: Add coverage comment to PR
         if: github.event_name == 'pull_request'
-        uses: madrapps/jacoco-report@v1.6.1
+        uses: madrapps/jacoco-report@db72e7e7c96f98d239967958b0a0a6ca7d3bb45f # v1.6.1
         with:
           paths: ${{ github.workspace }}/*/build/reports/jacoco/test/jacocoTestReport.xml
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: SonarCloud Scan
+      # 게이트다 — continue-on-error 를 뗐다(2026-08-12).
+      # 그전까지 이 스텝은 sonarqube 플러그인 5.1.0.4882 가 Gradle 9 에서 제거된 Convention API 를
+      # 호출해 NoSuchMethodError 로 13초 만에 죽었고, continue-on-error 가 그걸 삼켰다.
+      # 즉 SonarCloud 분석은 한 번도 업로드된 적이 없다(run 31432558450 로그가 근거).
+      # 플러그인 7.4.0.8496 + sonar.qualitygate.wait=true(build.gradle.kts)와 세트로 동작한다:
+      # 품질 게이트가 깨지면 이 잡이 실패하고, 실패하면 backend-ghcr 가 이미지를 만들지 않는다.
+      - name: SonarCloud Scan (quality gate)
         if: github.event_name != 'pull_request'
-        continue-on-error: true
         run: ./gradlew sonar --no-daemon --stacktrace
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -273,23 +278,46 @@ jobs:
           SPRING_DATASOURCE_PASSWORD: testpass
           SPRING_ELASTICSEARCH_URIS: http://localhost:9200
 
-      # 의존성(SCA) 스캔. 아직 continue-on-error — 현재 취약점 건수를 실측한 뒤 차단으로 전환한다.
-      # 결과는 이 스텝의 로그가 정본이다(코드 스캐닝이 비활성이라 대시보드로는 안 올라간다).
-      - name: Run Snyk Security Scan (Backend)
-        uses: snyk/actions/gradle-jdk21@master
-        continue-on-error: true
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          args: --severity-threshold=high --all-projects
+      # ── SCA (의존성 취약점) — Snyk 을 걷어내고 SBOM + Trivy 로 갈아탔다 (2026-08-12).
+      #
+      # Snyk 을 뺀 이유(실측, run 31432558450):
+      #   ERROR Authentication error (SNYK-0005) — 토큰이 무효라 스캔 자체가 시작되지 않았고,
+      #   ✗ 21/21 detected Gradle manifests did not return dependencies — 의존성 해석도 실패했다.
+      #   continue-on-error 가 둘 다 삼켜서 "SCA 가 돌고 있다"는 초록불만 남아 있었다.
+      # 지금 방식은 외부 계정·토큰에 의존하지 않는다(전부 러너 안에서 끝난다).
+      #
+      # CycloneDX 는 루트에 적용하면 17개 서비스 전부를 합친 aggregate BOM 을 만든다
+      # (build/reports/cyclonedx/bom.json — 실측 451 컴포넌트).
+      - name: Generate SBOM (CycloneDX)
+        run: ./gradlew cyclonedxBom --no-daemon
 
-  #      - name: SonarCloud Quality Gate
-  #        uses: sonarsource/sonarqube-quality-gate-action@v1.1.0
-  #        timeout-minutes: 5
-  #        env:
-  #          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-  #        with:
-  #          scanMetadataReportFile: build/sonar/report-task.txt
+      - name: Upload SBOM
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: backend-sbom
+          path: build/reports/cyclonedx/bom.json
+          retention-days: 90
+
+      # 차단 게이트. 기존 부채 48건은 .trivyignore.yaml 에 만료일과 함께 명시돼 있고,
+      # 거기 없는 신규 HIGH/CRITICAL 이 하나라도 나오면 exit 1 로 막는다(semgrep.yml 과 같은 기준).
+      # version 고정: 이 게이트를 켤 때 부채 건수를 실측한 바이너리와 동일 버전을 쓴다.
+      - name: SCA — Trivy SBOM scan (HIGH/CRITICAL gate)
+        uses: aquasecurity/trivy-action@915b19bbe73b92a6cf82a1bc12b087c9a19a5fe2 # v0.28.0
+        with:
+          version: v0.73.0
+          scan-type: sbom
+          scan-ref: build/reports/cyclonedx/bom.json
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          trivyignores: .trivyignore.yaml
+          format: table
+          exit-code: "1"
+
+  # (제거) 주석 처리돼 있던 sonarqube-quality-gate-action 블록 — build.gradle.kts 의
+  # sonar.qualitygate.wait=true 가 같은 일을 하므로(분석 태스크가 게이트 결과를 기다렸다가 실패)
+  # 별도 액션이 필요 없다. 죽은 주석은 "게이트가 있다"는 착시만 남긴다.
 
   backend-ghcr:
     name: Backend - Build & Push to GHCR
@@ -322,13 +350,13 @@ jobs:
       fail-fast: false # 한 서비스 빌드 실패가 다른 서비스 이미지 푸시를 취소하지 않도록
       matrix: ${{ fromJSON(needs.changes.outputs.build_matrix) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
       - name: Log in to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -336,14 +364,14 @@ jobs:
 
       # 준비: Docker Hub 로그인 (추후 사용)
       # - name: Log in to Docker Hub
-      #   uses: docker/login-action@v3
+      #   uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
       #   with:
       #     username: ${{ secrets.DOCKERHUB_USERNAME }}
       #     password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Docker metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}${{ matrix.image_suffix }}
           tags: |
@@ -352,7 +380,7 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push (GHCR)
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5.4.0
         with:
           context: .
           file: ./Dockerfile
@@ -373,8 +401,12 @@ jobs:
       # 게이트 범위: CRITICAL + 이미 수정 버전이 나온 것만(ignore-unfixed) — 미수정 CVE 로
       # 파이프라인이 막히는 상황을 피한다. HIGH 까지 조이려면 severity 에 추가할 것.
       # 스캔은 push 뒤에 돈다(이미지는 이미 올라간 상태) — 잡이 빨개지면 롤백 판단은 사람이 한다.
+      #
+      # ⚠ 원래 `@0.28.0` 으로 적혀 있었는데 그런 ref 는 존재하지 않는다(실제 태그는 v0.28.0).
+      #   그대로 두면 잡 시작과 동시에 "Unable to resolve action" 으로 죽는다. 이 워크플로가
+      #   아직 origin 에 올라가지 않아 드러나지 않았을 뿐이다 — SHA 핀이 그 오타까지 같이 고친다.
       - name: Trivy image scan (CRITICAL gate)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@915b19bbe73b92a6cf82a1bc12b087c9a19a5fe2 # v0.28.0
         env:
           TRIVY_USERNAME: ${{ github.actor }}
           TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
@@ -394,10 +426,10 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "20"
           cache: npm
@@ -433,20 +465,22 @@ jobs:
           TOSS_CLIENT_KEY: ${{ secrets.VITE_TOSS_CLIENT_KEY || 'test_ck_D5GePWvyJnrK0W0k6q8gLzN97Eoq' }}
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: frontend-dist
           path: frontend/dist
           retention-days: 7
 
-      # backend-ci 와 같은 상태 — 실측 후 차단 전환 대상.
-      - name: Run Snyk Security Scan (Frontend)
-        uses: snyk/actions/node@master
-        continue-on-error: true
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          args: --severity-threshold=high --file=frontend/package.json
+      # ── SCA (의존성 취약점) — backend-ci 와 같은 이유로 Snyk 을 걷어냈다(토큰 무효, 2026-08-12).
+      # npm 내장 audit 이라 외부 계정·토큰이 필요 없다.
+      #
+      # --omit=dev: 게이트 대상은 *프로덕션 번들에 들어가는* 의존성이다. dev 전용(vite·vitest 등)
+      #   취약점은 사용자에게 배포되지 않는데 여기서 막으면 노이즈로 게이트가 무시당한다
+      #   (실측 2026-08-12: 전체 16건 / 프로덕션 3건). dev 쪽은 Dependabot 이 주간으로 올린다.
+      # 차단이다 — continue-on-error 없음. 새 프로덕션 high 취약점이 들어오면 여기서 막힌다.
+      - name: SCA — npm audit (production deps, high gate)
+        working-directory: frontend
+        run: npm audit --omit=dev --audit-level=high
 
   # 프론트 단위/컴포넌트 테스트 게이트.
   # 2026-08-02 까지 `if: false` 로 꺼져 있었고 frontend-ci 에도 `npm test` 가 없어서,
@@ -461,10 +495,10 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "20"
           cache: npm
@@ -481,7 +515,7 @@ jobs:
         run: npm run test:coverage
 
       - name: Upload test coverage
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
           name: frontend-test-coverage
@@ -499,13 +533,13 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
       - name: Log in to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -513,7 +547,7 @@ jobs:
 
       - name: Docker metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}
           tags: |
@@ -522,7 +556,7 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push (GHCR)
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5.4.0
         with:
           context: ./frontend
           file: ./frontend/Dockerfile
@@ -539,7 +573,7 @@ jobs:
       # backend-ghcr 와 같은 기준. 프론트 런타임 베이스는 nginx:1.25-alpine 로 고정돼 있어
       # 여기서 CRITICAL 이 먼저 뜰 가능성이 있다 — 그때 답은 스캔을 끄는 게 아니라 베이스 태그를 올리는 것.
       - name: Trivy image scan (CRITICAL gate)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@915b19bbe73b92a6cf82a1bc12b087c9a19a5fe2 # v0.28.0
         env:
           TRIVY_USERNAME: ${{ github.actor }}
           TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
@@ -578,10 +612,10 @@ jobs:
     env:
       PLAYWRIGHT_BASE_URL: https://jen.lemuel.co.kr
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "20"
           cache: npm
@@ -606,7 +640,7 @@ jobs:
 
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: playwright-report
           path: frontend/playwright-report/

@@ -1,0 +1,177 @@
+# SCA 베이스라인 — Trivy SBOM 스캔(ci.yml backend-ci)이 참조한다.
+#
+# 왜 있나: SCA 게이트를 차단으로 켠 시점(2026-08-12)에 이미 존재하던 부채 48건(HIGH 43 · CRITICAL 5)이다.
+#   그전까지 SCA 는 Snyk 스텝이 담당했으나, 토큰이 무효(SNYK-0005 Authentication error)라 실제로는
+#   한 번도 스캔하지 않았고 continue-on-error 가 그 실패를 삼켰다 — 즉 이 48건은 "새로 생긴 것"이 아니라
+#   "지금까지 아무도 보지 못한 것"이다. 실측 근거: run 31432558450 백엔드 잡 로그.
+#
+# 설계: semgrep.yml 과 같은 기준 — "새로 생긴 것만 막는다".
+#   기존 부채로 파이프라인이 통째로 빨개지지 않게 하되, 신규 HIGH/CRITICAL 은 확실히 차단한다.
+#
+# ⚠ expired_at 이 지나면 해당 항목은 다시 차단 대상이 된다(부채가 영구히 숨지 않게 하는 장치).
+#   기한 안에 처리하지 못하면 날짜를 미루는 게 아니라, 왜 못 고치는지를 여기 statement 에 적을 것.
+#
+# 해소 경로(대부분 한 번에 사라진다):
+#   - spring-boot 4.0.4 → 4.0.6 : spring-*, spring-security, spring-kafka, spring-data,
+#     tomcat-embed, netty, jackson, micrometer 는 전부 Boot BOM 관리 버전이라 함께 올라간다.
+#   - org.postgresql:postgresql 42.7.3 → 42.7.11, org.bouncycastle:bcprov-jdk18on 1.81 → 1.84 는 개별 상향.
+#   갱신 후 재실측: ./gradlew cyclonedxBom && trivy sbom build/reports/cyclonedx/bom.json \
+#                    --severity HIGH,CRITICAL --ignore-unfixed
+vulnerabilities:
+  # ── org.springframework.boot:spring-boot 4.0.4 → 4.0.6
+  - id: CVE-2026-40976 # CRITICAL — 기본 웹 시큐리티 무력화로 인한 인가 우회
+    statement: "Baseline 2026-08-12. Fixed in Spring Boot 4.0.6 — 프레임워크 패치 업그레이드로 일괄 해소 예정."
+    expired_at: 2026-09-30
+  - id: CVE-2026-40973
+    statement: "Baseline 2026-08-12. Fixed in Spring Boot 4.0.6."
+    expired_at: 2026-09-30
+  - id: CVE-2026-40972 # spring-boot-devtools — 런타임 이미지에는 포함되지 않는다
+    statement: "Baseline 2026-08-12. devtools 는 개발 전용 의존성(프로덕션 이미지 미포함). Fixed in 4.0.6."
+    expired_at: 2026-09-30
+  - id: CVE-2026-41695 # spring-data-commons
+    statement: "Baseline 2026-08-12. Fixed in Spring Boot 4.0.6 (spring-data-commons 4.0.6)."
+    expired_at: 2026-09-30
+  - id: CVE-2026-41731 # spring-kafka — 역직렬화 RCE
+    statement: "Baseline 2026-08-12. Fixed in spring-kafka 4.0.6. 이 저장소는 신뢰 토픽만 소비하지만 상향 대상."
+    expired_at: 2026-09-30
+
+  # ── org.springframework:spring-* 7.0.6 → 7.0.8
+  - id: CVE-2026-41850 # spring-expression DoS
+    statement: "Baseline 2026-08-12. Fixed in Spring Framework 7.0.8."
+    expired_at: 2026-09-30
+  - id: CVE-2026-41842 # spring-webmvc / spring-webflux 정적 리소스 DoS
+    statement: "Baseline 2026-08-12. Fixed in Spring Framework 7.0.8."
+    expired_at: 2026-09-30
+  - id: CVE-2026-41845 # spring-webmvc XSS
+    statement: "Baseline 2026-08-12. Fixed in Spring Framework 7.0.8."
+    expired_at: 2026-09-30
+
+  # ── org.springframework.security:spring-security-config 7.0.4 → 7.0.5
+  - id: CVE-2026-22753
+    statement: "Baseline 2026-08-12. servlet path matching 인가 우회. Fixed in Spring Security 7.0.5."
+    expired_at: 2026-09-30
+  - id: CVE-2026-22754
+    statement: "Baseline 2026-08-12. servlet path matching 인가 우회. Fixed in Spring Security 7.0.5."
+    expired_at: 2026-09-30
+
+  # ── org.apache.tomcat.embed:tomcat-embed-core 11.0.18 → 11.0.22 (Boot BOM 경유)
+  - id: CVE-2026-41293
+    statement: "Baseline 2026-08-12. Fixed in Tomcat 11.0.20+ (Boot 4.0.6 관리 버전)."
+    expired_at: 2026-09-30
+  - id: CVE-2026-43512
+    statement: "Baseline 2026-08-12. Fixed in Tomcat 11.0.22."
+    expired_at: 2026-09-30
+  - id: CVE-2026-43515
+    statement: "Baseline 2026-08-12. Fixed in Tomcat 11.0.22."
+    expired_at: 2026-09-30
+  - id: CVE-2026-43513
+    statement: "Baseline 2026-08-12. Fixed in Tomcat 11.0.22."
+    expired_at: 2026-09-30
+  - id: CVE-2026-42498
+    statement: "Baseline 2026-08-12. Fixed in Tomcat 11.0.21."
+    expired_at: 2026-09-30
+  - id: CVE-2026-41284
+    statement: "Baseline 2026-08-12. Fixed in Tomcat 11.0.20."
+    expired_at: 2026-09-30
+  - id: CVE-2026-34483
+    statement: "Baseline 2026-08-12. Fixed in Tomcat 11.0.20."
+    expired_at: 2026-09-30
+  - id: CVE-2026-29129
+    statement: "Baseline 2026-08-12. Fixed in Tomcat 11.0.20."
+    expired_at: 2026-09-30
+  - id: CVE-2026-24880
+    statement: "Baseline 2026-08-12. Fixed in Tomcat 11.0.20."
+    expired_at: 2026-09-30
+
+  # ── io.netty:* 4.2.10.Final → 4.2.16.Final (gateway/webflux 경유)
+  - id: CVE-2026-56745
+    statement: "Baseline 2026-08-12. netty-codec-http. Fixed in 4.2.16.Final."
+    expired_at: 2026-09-30
+  - id: CVE-2026-55833
+    statement: "Baseline 2026-08-12. netty-codec-http. Fixed in 4.2.16.Final."
+    expired_at: 2026-09-30
+  - id: CVE-2026-55831
+    statement: "Baseline 2026-08-12. netty-codec-http. Fixed in 4.2.16.Final."
+    expired_at: 2026-09-30
+  - id: CVE-2026-42587
+    statement: "Baseline 2026-08-12. netty-codec-http/http2. Fixed in 4.2.13.Final."
+    expired_at: 2026-09-30
+  - id: CVE-2026-42584
+    statement: "Baseline 2026-08-12. netty-codec-http. Fixed in 4.2.13.Final."
+    expired_at: 2026-09-30
+  - id: CVE-2026-56819
+    statement: "Baseline 2026-08-12. netty-codec-http2. Fixed in 4.2.16.Final."
+    expired_at: 2026-09-30
+  - id: CVE-2026-33871
+    statement: "Baseline 2026-08-12. netty-codec-http2. Fixed in 4.2.11.Final."
+    expired_at: 2026-09-30
+  - id: CVE-2026-56816
+    statement: "Baseline 2026-08-12. netty-codec-http3. Fixed in 4.2.16.Final."
+    expired_at: 2026-09-30
+  - id: CVE-2026-48748
+    statement: "Baseline 2026-08-12. netty-codec-http3. Fixed in 4.2.15.Final."
+    expired_at: 2026-09-30
+  - id: CVE-2026-44892
+    statement: "Baseline 2026-08-12. netty-codec-http3. Fixed in 4.2.15.Final."
+    expired_at: 2026-09-30
+  - id: CVE-2026-42582
+    statement: "Baseline 2026-08-12. netty-codec-http3. Fixed in 4.2.13.Final."
+    expired_at: 2026-09-30
+  - id: CVE-2026-50010
+    statement: "Baseline 2026-08-12. netty-handler. Fixed in 4.2.15.Final."
+    expired_at: 2026-09-30
+  - id: CVE-2026-45416
+    statement: "Baseline 2026-08-12. netty-handler. Fixed in 4.2.15.Final."
+    expired_at: 2026-09-30
+  - id: CVE-2026-44249
+    statement: "Baseline 2026-08-12. netty-handler. Fixed in 4.2.15.Final."
+    expired_at: 2026-09-30
+  - id: CVE-2026-47691
+    statement: "Baseline 2026-08-12. netty-resolver-dns. Fixed in 4.2.15.Final."
+    expired_at: 2026-09-30
+  - id: CVE-2026-45674
+    statement: "Baseline 2026-08-12. netty-resolver-dns. Fixed in 4.2.15.Final."
+    expired_at: 2026-09-30
+  - id: CVE-2026-42579
+    statement: "Baseline 2026-08-12. netty-codec-dns. Fixed in 4.2.13.Final."
+    expired_at: 2026-09-30
+  - id: CVE-2026-59901
+    statement: "Baseline 2026-08-12. netty-codec-compression. Fixed in 4.2.16.Final."
+    expired_at: 2026-09-30
+  - id: CVE-2026-42583
+    statement: "Baseline 2026-08-12. netty-codec-compression. Fixed in 4.2.13.Final."
+    expired_at: 2026-09-30
+  - id: CVE-2026-44894
+    statement: "Baseline 2026-08-12. netty-codec-classes-quic. Fixed in 4.2.15.Final."
+    expired_at: 2026-09-30
+  - id: CVE-2026-42577
+    statement: "Baseline 2026-08-12. netty-transport-classes-epoll. Fixed in 4.2.13.Final."
+    expired_at: 2026-09-30
+
+  # ── Jackson (2.x·3.x 동시 존재 — Boot 4 는 tools.jackson 3.x, 일부 라이브러리가 2.x 를 끌어온다)
+  - id: CVE-2026-54512
+    statement: "Baseline 2026-08-12. jackson-databind PolymorphicTypeValidator 우회. Fixed in 3.1.4 / 2.21.4."
+    expired_at: 2026-09-30
+  - id: CVE-2026-54513
+    statement: "Baseline 2026-08-12. jackson-databind. Fixed in 3.1.4 / 2.21.4."
+    expired_at: 2026-09-30
+  - id: GHSA-2m67-wjpj-xhg9
+    statement: "Baseline 2026-08-12. jackson-core 문서 길이 제한 우회. Fixed in 3.1.1."
+    expired_at: 2026-09-30
+  - id: GHSA-r7wm-3cxj-wff9
+    statement: "Baseline 2026-08-12. jackson-core async parser. Fixed in 3.1.4 / 2.21.4."
+    expired_at: 2026-09-30
+
+  # ── 그 외 (Boot BOM 밖 — 개별 상향 필요)
+  - id: CVE-2026-40983
+    statement: "Baseline 2026-08-12. micrometer-core. Fixed in 1.16.6."
+    expired_at: 2026-09-30
+  - id: CVE-2026-40984
+    statement: "Baseline 2026-08-12. micrometer-core. Fixed in 1.16.6."
+    expired_at: 2026-09-30
+  - id: CVE-2026-42198
+    statement: "Baseline 2026-08-12. org.postgresql:postgresql 42.7.3 → 42.7.11 개별 상향 필요."
+    expired_at: 2026-09-30
+  - id: CVE-2025-14813 # CRITICAL
+    statement: "Baseline 2026-08-12. org.bouncycastle:bcprov-jdk18on 1.81 → 1.84 개별 상향 필요."
+    expired_at: 2026-09-30

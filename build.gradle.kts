@@ -3,7 +3,12 @@ plugins {
     id("org.springframework.boot") version "4.0.4" apply false
     id("io.spring.dependency-management") version "1.1.7" apply false
     jacoco
-    id("org.sonarqube") version "5.1.0.4882"
+    // 5.1.0.4882 는 Gradle 9 에서 제거된 Convention API 를 호출해 sonar 태스크가
+    // NoSuchMethodError 로 즉사했다(2026-08-10 run 31432558450, "BUILD FAILED in 13s").
+    // continue-on-error 가 이 실패를 삼켜서, SonarCloud 분석은 한 번도 올라간 적이 없다.
+    id("org.sonarqube") version "7.4.0.8496"
+    // SCA(의존성 취약점) 게이트용 SBOM 생성. Trivy 가 이 BOM 을 스캔한다(ci.yml backend-ci).
+    id("org.cyclonedx.bom") version "3.4.1"
 }
 
 allprojects {
@@ -182,7 +187,9 @@ sonar {
         property("sonar.projectKey", "MyoungSoo7_settlement")
         property("sonar.organization", "myoungsoo7")
         property("sonar.host.url", "https://sonarcloud.io")
-        property("sonar.qualitygate.wait", false)
+        // 품질 게이트 결과를 기다렸다가 실패면 빌드를 깬다 — false 면 분석만 올리고
+        // 게이트 판정은 아무 데도 반영되지 않는다(ci.yml 의 continue-on-error 와 세트로 무력했다).
+        property("sonar.qualitygate.wait", true)
         property("sonar.java.source", "25")
     }
 }
