@@ -1,19 +1,15 @@
 package github.lms.lemuel.product.application.service;
 
 import github.lms.lemuel.product.application.port.in.BackfillOptionCatalogUseCase.BackfillReport;
-import github.lms.lemuel.product.application.port.out.LoadOptionCatalogPort;
-import github.lms.lemuel.product.application.port.out.LoadProductVariantPort;
-import github.lms.lemuel.product.application.port.out.SaveOptionCatalogPort;
+import github.lms.lemuel.product.application.service.OptionCatalogFakes.FakeOptionCatalogPort;
+import github.lms.lemuel.product.application.service.OptionCatalogFakes.FakeProductVariantPort;
 import github.lms.lemuel.product.domain.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.util.*;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -21,14 +17,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @DisplayName("BackfillOptionCatalogService — 레거시 표시명에서 옵션 카탈로그 역생성")
 class BackfillOptionCatalogServiceTest {
 
-    private FakeVariantPort variantPort;
-    private FakeCatalogPort catalogPort;
+    private FakeProductVariantPort variantPort;
+    private FakeOptionCatalogPort catalogPort;
     private BackfillOptionCatalogService service;
 
     @BeforeEach
     void setUp() {
-        variantPort = new FakeVariantPort();
-        catalogPort = new FakeCatalogPort();
+        variantPort = new FakeProductVariantPort();
+        catalogPort = new FakeOptionCatalogPort();
         service = new BackfillOptionCatalogService(variantPort, catalogPort, catalogPort);
     }
 
@@ -255,162 +251,4 @@ class BackfillOptionCatalogServiceTest {
         }
     }
 
-    // --- 테스트 더블 -------------------------------------------------------
-
-    private static final class FakeVariantPort implements LoadProductVariantPort {
-
-        private final List<ProductVariant> variants = new ArrayList<>();
-        private final AtomicLong sequence = new AtomicLong();
-
-        void add(Long productId, String sku, String optionName) {
-            variants.add(ProductVariant.rehydrate(
-                    sequence.incrementAndGet(), productId, sku, optionName,
-                    BigDecimal.ZERO, 10, 0L, ProductVariantStatus.ACTIVE,
-                    LocalDateTime.now(), LocalDateTime.now()));
-        }
-
-        @Override
-        public Optional<ProductVariant> loadById(Long id) {
-            return variants.stream().filter(v -> v.getId().equals(id)).findFirst();
-        }
-
-        @Override
-        public Optional<ProductVariant> loadBySku(String sku) {
-            return variants.stream().filter(v -> v.getSku().equals(sku)).findFirst();
-        }
-
-        @Override
-        public List<ProductVariant> loadByProductId(Long productId) {
-            return variants.stream().filter(v -> v.getProductId().equals(productId)).toList();
-        }
-
-        @Override
-        public List<Long> findProductIdsWithVariants() {
-            return variants.stream().map(ProductVariant::getProductId).distinct().sorted().toList();
-        }
-    }
-
-    /** 옵션 카탈로그 인메모리 구현 — 백필의 상태 누적(멱등)을 검증하려면 목이 아니라 실제 저장소가 필요하다. */
-    private static final class FakeCatalogPort implements LoadOptionCatalogPort, SaveOptionCatalogPort {
-
-        private final Map<Long, OptionAxis> axes = new LinkedHashMap<>();
-        private final Map<Long, OptionAxisValue> axisValues = new LinkedHashMap<>();
-        private final Map<Long, ProductOptionAxis> productAxes = new LinkedHashMap<>();
-        private final Map<Long, ProductOptionValue> productValues = new LinkedHashMap<>();
-        private final AtomicLong sequence = new AtomicLong();
-
-        @Override
-        public Optional<OptionAxis> findAxisByCode(String code) {
-            return axes.values().stream().filter(a -> a.getCode().equals(code)).findFirst();
-        }
-
-        @Override
-        public Optional<OptionAxis> findAxisById(Long axisId) {
-            return Optional.ofNullable(axes.get(axisId));
-        }
-
-        @Override
-        public List<OptionAxis> loadAllAxes() {
-            return List.copyOf(axes.values());
-        }
-
-        @Override
-        public Optional<OptionAxisValue> findAxisValueByCode(Long axisId, String code) {
-            return axisValues.values().stream()
-                    .filter(v -> v.getAxisId().equals(axisId) && v.getCode().equals(code))
-                    .findFirst();
-        }
-
-        @Override
-        public Optional<OptionAxisValue> findAxisValueById(Long axisValueId) {
-            return Optional.ofNullable(axisValues.get(axisValueId));
-        }
-
-        @Override
-        public List<OptionAxisValue> loadAxisValues(Long axisId) {
-            return axisValues.values().stream()
-                    .filter(v -> v.getAxisId().equals(axisId))
-                    .toList();
-        }
-
-        @Override
-        public List<ProductOptionAxis> loadProductAxes(Long productId) {
-            return productAxes.values().stream()
-                    .filter(a -> a.getProductId().equals(productId))
-                    .sorted(Comparator.comparingInt(ProductOptionAxis::getSortOrder))
-                    .toList();
-        }
-
-        @Override
-        public Optional<ProductOptionAxis> findProductAxis(Long productId, Long axisId) {
-            return productAxes.values().stream()
-                    .filter(a -> a.getProductId().equals(productId) && a.getAxisId().equals(axisId))
-                    .findFirst();
-        }
-
-        @Override
-        public List<ProductOptionValue> loadProductValues(Long productOptionAxisId) {
-            return productValues.values().stream()
-                    .filter(v -> v.getProductOptionAxisId().equals(productOptionAxisId))
-                    .toList();
-        }
-
-        @Override
-        public Optional<ProductOptionValue> findProductValue(Long productOptionAxisId, Long axisValueId) {
-            return productValues.values().stream()
-                    .filter(v -> v.getProductOptionAxisId().equals(productOptionAxisId)
-                            && v.getAxisValueId().equals(axisValueId))
-                    .findFirst();
-        }
-
-        @Override
-        public OptionAxis saveAxis(OptionAxis axis) {
-            OptionAxis stored = axis.getId() != null ? axis : withId(axis);
-            axes.put(stored.getId(), stored);
-            return stored;
-        }
-
-        @Override
-        public OptionAxisValue saveAxisValue(OptionAxisValue value) {
-            OptionAxisValue stored = value.getId() != null ? value : withId(value);
-            axisValues.put(stored.getId(), stored);
-            return stored;
-        }
-
-        @Override
-        public ProductOptionAxis saveProductAxis(ProductOptionAxis axis) {
-            ProductOptionAxis stored = axis.getId() != null ? axis : withId(axis);
-            productAxes.put(stored.getId(), stored);
-            return stored;
-        }
-
-        @Override
-        public ProductOptionValue saveProductValue(ProductOptionValue value) {
-            ProductOptionValue stored = value.getId() != null ? value : withId(value);
-            productValues.put(stored.getId(), stored);
-            return stored;
-        }
-
-        private OptionAxis withId(OptionAxis axis) {
-            return OptionAxis.rehydrate(sequence.incrementAndGet(), axis.getCode(), axis.getName(),
-                    axis.getInputType(), axis.isActive());
-        }
-
-        private OptionAxisValue withId(OptionAxisValue value) {
-            return OptionAxisValue.rehydrate(sequence.incrementAndGet(), value.getAxisId(),
-                    value.getCode(), value.getName(), value.getSwatchHex(),
-                    value.getSortOrder(), value.isActive());
-        }
-
-        private ProductOptionAxis withId(ProductOptionAxis axis) {
-            return ProductOptionAxis.rehydrate(sequence.incrementAndGet(), axis.getProductId(),
-                    axis.getAxisId(), axis.getSortOrder(), axis.isRequired());
-        }
-
-        private ProductOptionValue withId(ProductOptionValue value) {
-            return ProductOptionValue.rehydrate(sequence.incrementAndGet(),
-                    value.getProductOptionAxisId(), value.getAxisValueId(),
-                    value.getSortOrder(), value.isActive());
-        }
-    }
 }

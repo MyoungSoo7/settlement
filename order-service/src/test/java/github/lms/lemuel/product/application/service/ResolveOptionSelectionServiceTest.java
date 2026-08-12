@@ -2,6 +2,7 @@ package github.lms.lemuel.product.application.service;
 import github.lms.lemuel.product.domain.exception.ProductInvariantViolationException;
 
 import github.lms.lemuel.product.application.port.in.ResolveOptionSelectionUseCase.Selection;
+import github.lms.lemuel.product.application.port.out.LoadOptionCatalogPort;
 import github.lms.lemuel.product.application.port.out.LoadProductPort;
 import github.lms.lemuel.product.application.port.out.LoadProductVariantPort;
 import github.lms.lemuel.product.domain.Product;
@@ -37,13 +38,16 @@ class ResolveOptionSelectionServiceTest {
 
     private LoadProductPort loadProductPort;
     private LoadProductVariantPort loadVariantPort;
+    private LoadOptionCatalogPort loadCatalogPort;
     private ResolveOptionSelectionService service;
 
     @BeforeEach
     void setup() {
         loadProductPort = mock(LoadProductPort.class);
         loadVariantPort = mock(LoadProductVariantPort.class);
-        service = new ResolveOptionSelectionService(loadProductPort, loadVariantPort);
+        // 카탈로그 미백필 상품 — loadProductAxes 가 빈 목록이라 레거시 트리 경로로 내려간다.
+        loadCatalogPort = mock(LoadOptionCatalogPort.class);
+        service = new ResolveOptionSelectionService(loadProductPort, loadVariantPort, loadCatalogPort);
     }
 
     private void productWithTree(String optionsJson) {

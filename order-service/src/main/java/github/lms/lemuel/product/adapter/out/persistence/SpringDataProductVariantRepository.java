@@ -15,6 +15,12 @@ public interface SpringDataProductVariantRepository extends JpaRepository<Produc
 
     List<ProductVariantJpaEntity> findByProductId(Long productId);
 
+    /**
+     * 조합 서명으로 SKU 단건 조회 — {@code uq_product_variants_signature} 유니크 인덱스를 그대로 탄다.
+     * 문자열 option_name 전량 스캔을 대체하는 경로다.
+     */
+    Optional<ProductVariantJpaEntity> findByProductIdAndOptionSignature(Long productId, String optionSignature);
+
     /** SKU 를 하나라도 가진 상품 id (옵션 카탈로그 백필의 순회 대상). */
     @Query("SELECT DISTINCT v.productId FROM ProductVariantJpaEntity v ORDER BY v.productId ASC")
     List<Long> findDistinctProductIds();

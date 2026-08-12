@@ -51,6 +51,17 @@ final class OptionCatalogFakes {
         }
 
         @Override
+        public Optional<ProductVariant> loadByOptionSignature(Long productId, String optionSignature) {
+            if (optionSignature == null) {
+                return Optional.empty();
+            }
+            return variants.values().stream()
+                    .filter(v -> v.getProductId().equals(productId)
+                            && optionSignature.equals(v.getOptionSignature()))
+                    .findFirst();
+        }
+
+        @Override
         public List<Long> findProductIdsWithVariants() {
             return variants.values().stream()
                     .map(ProductVariant::getProductId).distinct().sorted().toList();

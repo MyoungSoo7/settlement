@@ -37,6 +37,15 @@ public class ProductVariantPersistenceAdapter
     }
 
     @Override
+    public Optional<ProductVariant> loadByOptionSignature(Long productId, String optionSignature) {
+        if (optionSignature == null) {
+            return Optional.empty();
+        }
+        return repository.findByProductIdAndOptionSignature(productId, optionSignature)
+                .map(ProductVariantPersistenceAdapter::toDomain);
+    }
+
+    @Override
     public List<Long> findProductIdsWithVariants() {
         return repository.findDistinctProductIds();
     }
