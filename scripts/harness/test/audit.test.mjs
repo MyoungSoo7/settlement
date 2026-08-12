@@ -655,3 +655,67 @@ test('repository harness contracts match the tracked manifest oracle', () => {
     encoding: 'utf8',
   }), /harness-audit: healthy/i);
 });
+
+// ── 문서 사실 게이트 3종 ────────────────────────────────────────────────────────
+// 2026-08-12 실측 드리프트 3종의 회귀 가드. 각 규칙은 "잡는다" 와 "오탐하지 않는다" 를 짝으로 검증한다.
+const DOC_FACTS_SETTINGS = 'include(\n  "card-service",\n  "organization-service",\n  "deposit-service",\n)';
+
+function docFactsRepo(files) {
+  return repo({
+    'settings.gradle.kts': DOC_FACTS_SETTINGS,
+    'shared-common/src/testFixtures/resources/contracts/events/lemuel.organization.created.schema.json': '{}',
+    'shared-common/src/testFixtures/resources/contracts/events/lemuel.card.issued.schema.json': '{}',
+    ...files,
+  });
+}
+
+function docFactErrors(files) {
+  const root = docFactsRepo(files);
+  return collectAudit(root, baseManifest()).errors.filter((error) => error.startsWith('doc facts:'));
+}
+
+test('doc facts: 계약 토픽 수 주장이 실제 스키마 파일 수와 다르면 실패한다', () => {
+  const errors = docFactErrors({
+    'CLAUDE.md': 'card-service organization-service deposit-service\n- contracts/events/ 는 12토픽 JSON Schema 정본이다.\n',
+  });
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /CLAUDE\.md:2 이벤트 계약 토픽 수 불일치: claimed=12 actual=2/);
+});
+
+test('doc facts: 계약 코퍼스와 무관한 부분집합 토픽 수는 오탐하지 않는다', () => {
+  assert.deepEqual(docFactErrors({
+    'CLAUDE.md': 'card-service organization-service deposit-service\n- contracts/events/ 는 2토픽 정본이다.\n- account 는 6토픽을 소비한다.\n',
+  }), []);
+});
+
+test('doc facts: 어댑터가 실재하는데 미구현으로 적히면 실패한다(card 구현 상태 역전 회귀)', () => {
+  const errors = docFactErrors({
+    'CLAUDE.md': 'organization-service deposit-service\n- card-service/ — REST·스케줄러는 미구현\n',
+    'card-service/src/main/java/github/lms/lemuel/card/adapter/in/web/CardController.java': 'class CardController {}',
+  });
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /CLAUDE\.md:2 구현 상태 역전: card-service 의 REST\(adapter\/in\/web\)는 실재/);
+});
+
+test('doc facts: 어댑터가 실제로 없으면 미배선 기술을 통과시킨다', () => {
+  assert.deepEqual(docFactErrors({
+    'CLAUDE.md': 'card-service organization-service\n- deposit-service/ — Kafka 컨슈머는 미배선\n',
+  }), []);
+});
+
+test('doc facts: 다른 모듈이 토픽을 참조하면 "소비처 미배선" 기술은 실패한다(organization 회귀)', () => {
+  const errors = docFactErrors({
+    'CLAUDE.md': 'card-service deposit-service\n- organization-service — 이벤트 발행 전용(소비처 미배선)\n',
+    'organization-service/src/main/resources/application.yml': 'topic:\n  created: lemuel.organization.created\n',
+    'card-service/src/main/resources/application.yml': 'topic:\n  organization-created: lemuel.organization.created\n',
+  });
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /소비처 배선 있음: lemuel\.organization\.created 를 card-service 가 참조/);
+});
+
+test('doc facts: 발행 모듈 자신의 yml 참조는 소비 근거로 보지 않는다', () => {
+  assert.deepEqual(docFactErrors({
+    'SPEC.md': 'organization-service deposit-service\n| `lemuel.card.issued` | card | 소비처 미배선 — 발행 전용 |\n',
+    'card-service/src/main/resources/application.yml': 'topic:\n  issued: lemuel.card.issued\n',
+  }), []);
+});

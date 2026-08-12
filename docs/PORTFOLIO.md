@@ -183,7 +183,9 @@ harness-audit        문서 드리프트·라우팅 dangling·가드 무결성 �
 ```
 
 - 하네스 정본: [HARNESS.md](../HARNESS.md) · 가드: [scripts/harness/](../scripts/harness/) ·
-  MCP 서버: [settlement-copilot](../settlement-service/src/main/resources/settlement-copilot/)
+  MCP 서버: `settlement-service/src/main/resources/settlement-copilot/`
+  (플러그인 트리로는 **링크를 걸지 않는다** — 하네스는 플러그인 없는 클론에서도 동일하게 동작해야 하고,
+  링크를 걸면 그 클론에서 doc link 가 dangling 이 된다. ADR 0028)
 
 ### 아직 없는 것 (선을 긋는다)
 
