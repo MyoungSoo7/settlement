@@ -11,12 +11,13 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 
 /**
  * KRX 시세 일일 자동 수집 스케줄러.
  *
- * <p>매일 {@code app.market.sync.schedule.cron}(기본 07:30 KST)에 최근 {@code lookback-days}(기본 3)
+ * <p>매일 {@code app.market.sync.schedule.cron}(기본 07:30 KST)에 최근 {@code lookback-days}(기본 7)
  * 거래일을 재조회해 시세를 upsert 한다. data.go.kr 금융위 API 는 T+1 지연이 있어 "오늘"은 대개
  * 미공시라, 어제부터 며칠을 되짚어 주말/공휴일/지연 갭을 흡수한다(거래일 아니면 0건 upsert).
  *
@@ -41,7 +42,7 @@ public class MarketSyncScheduler {
     public MarketSyncScheduler(SyncQuotesUseCase syncQuotesUseCase,
                                KrxClientPort krxClient,
                                SyncStatusTracker tracker,
-                               @Value("${app.market.sync.schedule.lookback-days:3}") int lookbackDays,
+                               @Value("${app.market.sync.schedule.lookback-days:7}") int lookbackDays,
                                Clock clock) {
         this.syncQuotesUseCase = syncQuotesUseCase;
         this.krxClient = krxClient;
@@ -75,11 +76,21 @@ public class MarketSyncScheduler {
         try {
             SyncResult result = syncQuotesUseCase.syncQuotes(baseDate);
             tracker.complete(result);
+            if (result.scanned() == 0 && isWeekday(baseDate)) {
+                // 평일 0건은 "실패 0" 이라 성공으로 집계되지만 실제론 시세가 통째로 비어 있다.
+                // 공휴일이면 정상이므로 오류가 아닌 경고로 남긴다 — 침묵만은 막는다.
+                log.warn("일일 KRX 자동 수집 0건 job={} — 평일인데 시세가 비었다(공휴일 아니면 결손)", job);
+            }
             log.info("일일 KRX 자동 수집 완료 job={} 결과={}", job, result);
         } catch (RuntimeException e) {
             tracker.fail(e.getMessage() != null ? e.getMessage() : e.toString());
             log.error("일일 KRX 자동 수집 실패 job={}", job, e);
         }
         return true;
+    }
+
+    private static boolean isWeekday(LocalDate date) {
+        DayOfWeek dow = date.getDayOfWeek();
+        return dow != DayOfWeek.SATURDAY && dow != DayOfWeek.SUNDAY;
     }
 }
