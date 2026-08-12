@@ -25,7 +25,7 @@
 | G5 | OO 구조 게이트 | `guard.mjs` OO-* 규칙(실시간) + `oo-gate.test.mjs`(CI 전수) — 도메인 public setter/@Data 0, 금융 5서비스 generic IAE 0 |
 | G6 | MSA 경계 | settlement 에 `implementation(project(":order-service"))` 0, order import·cross-DB 조인 0 (guard 강제) |
 | G7 | 금액 안전 | 금액 필드 `double`/`float` 0 — BigDecimal 강제(guard MONEY-PRIMITIVE) |
-| G8 | 이벤트 계약 | 프로듀서·컨슈머 양방향 계약 테스트 그린(14토픽, testFixtures 단일 출처, ADR 0024) |
+| G8 | 이벤트 계약 | 프로듀서·컨슈머 양방향 계약 테스트 그린(36토픽, testFixtures 단일 출처, ADR 0024) — `git ls-files 'shared-common/src/testFixtures/resources/contracts/events/*.schema.json' \| wc -l` |
 | G9 | 하네스 무결성 | `node scripts/harness/harness-audit.mjs` — 문서 드리프트·라우팅 dangling·가드 무결성 0 |
 | G10 | 절차 규율 | 착수 전 `tdd-discipline`, 조사 시 `debugging-discipline`, 완료 직전 `verify-before-done` 로드 |
 
@@ -94,7 +94,28 @@
 ### organization-service ✅ 🟡
 - [ ] JWT 인증 필수, 인가는 조직 내 역할(OrgAuthorizer)로 판정
 - [ ] 마지막 OWNER 제거 불가 불변식 테스트, 상태머신 강제
-- [ ] `organization.created · member_joined` Outbox 발행 + 계약 스키마 존재 — 🟡 소비처 미배선(의도된 상태)
+- [ ] `organization.created · member_joined · member_role_changed · member_removed` Outbox 발행 + 계약 스키마 존재 — 소비처는 card-service 조직 프로젝션(양방향 계약 테스트 대상)
+
+### card-service ✅
+- [ ] `master_limit >= Σ sub_limit` 불변식 — `findByIdForUpdate`(비관적 락) 후 `sumActiveSubLimits` 재계산, 동시 발급/한도변경 IT(`CardIssuanceLimitConcurrencyIT`)
+- [ ] 가용한도 = `masterLimit − Σ활성홀드 − Σ매입` — 동시 승인 경합 IT(`ConcurrentAuthorizationIT`)
+- [ ] 재원(account-service GL) 조회 실패 시 **폴백 금지** — `CARD_FUNDING_UNAVAILABLE`(503) 테스트, 추정으로 여신 미발급
+- [ ] `sumActiveSubLimits` 는 SUSPENDED 카드도 포함(status <> 'CANCELED') — 정지 카드 한도 점유 테스트
+- [ ] `lemuel.organization.member_removed` 소비 → 이탈자 카드 자동 정지(멱등 컨슈머)
+
+### insurance-service ✅
+- [ ] 완전판매 게이트 — 청약 승인 시 상품설명서 교부 증빙(`disclosure_deliveries`) 부재면 `DisclosureNotDeliveredException`(409), 청약은 UNDER_REVIEW 잔류
+- [ ] 방카 25%룰 — 은행×부문별 특정 원수사 신계약 보험료 비중 > 25% 위반 판정(정확히 25% 허용), 자산 2조 미만 면제·미등록 은행 fail-closed(적용 대상) 테스트
+- [ ] 수수료 환수(clawback) — CANCELLED 전액, SURRENDERED/LAPSED→EXPIRED 는 `기지급합계 × (24-m)/24`(m≥24 이면 0), `RoundingMode.DOWN`
+- [ ] Policy/Application/Proposal/Commission 4개 상태머신 비정상 전이 → 타입 예외(그 외 `InvalidXxxTransitionException`)
+- [ ] FC 식별자는 JWT 주체에서만 파생(`FcIdentity`), 소유권 불일치 403(가입설계·해지·철회·지급내역 경로)
+
+### deposit-service 🟡
+- [ ] hold(선점)/offset(상계)로 재원 이중사용 차단 — 동일 재원 중복 hold·offset 방지 동시성 테스트
+- [ ] `/accounts/me` 는 경로에 sellerId 없음(IDOR 구조적 차단), 임의 셀러 조회는 별도 경로 + ADMIN/MANAGER 게이트
+- [ ] 계좌 부재(첫 입금 전)와 0원 계좌 구분 — 없음을 0원으로 지어내지 않는 테스트
+- [ ] 상계 재원 부족 시 `DepositOffsetShortfall` 명시 적재(무음 실패 금지)
+- [ ] 🟡 **잔여**: Kafka 컨슈머 미배선(현재 잔고 변동 입력은 `/admin/deposits` 수기 콘솔뿐)
 
 ### 폴리글랏 7종 ✅
 - [ ] 공통: `GET /health`(또는 `/healthz`) → `{"status":"UP"}`, 무-외부의존 단독 기동, 테스트 그린

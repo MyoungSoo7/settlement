@@ -25,7 +25,7 @@
 | shared-common | 버전드 라이브러리(1.0.0, composite build): audit·config·exception·outbox·ratelimit·pdf | ✅ |
 | 인증·인가 | JWT(HS256) 발급(order `AuthController`)·검증(shared-common), 역할 ADMIN/MANAGER/USER, IDOR 소유권 대조 | ✅ |
 | Outbox + 멱등 | `outbox_events`(event_id UNIQUE) → 멀티워커 폴러 → 3단 멱등(outbox·processed_events·도메인 UNIQUE) | ✅ |
-| 이벤트 계약-as-code | cross-service 14토픽 JSON Schema + 정본 샘플(testFixtures), 프로듀서·컨슈머 양방향 계약 테스트 (ADR 0024) | ✅ |
+| 이벤트 계약-as-code | cross-service 36토픽 JSON Schema + 정본 샘플(testFixtures), 프로듀서·컨슈머 양방향 계약 테스트 (ADR 0024) — `git ls-files 'shared-common/src/testFixtures/resources/contracts/events/*.schema.json' \| wc -l` | ✅ |
 | 금액·원장 안전 | BigDecimal 강제, 전표 차1·대1 구성적 균형, `PENDING→POSTED→REVERSED` | ✅ |
 | 하네스 게이트 | guard.mjs(PreToolUse·pre-commit·CI 3중), harness-audit, JaCoCo 90% 게이트 | ✅ |
 
@@ -116,7 +116,36 @@
 - 멤버십 초대·수락·역할변경(OWNER 전용)·제거(**마지막 OWNER 보호 불변식**)
 - 인가는 JWT 주체의 조직 내 역할로 판정(`OrgAuthorizer`, IDOR 방지)
 - 상태머신: Organization ACTIVE⇄SUSPENDED, Membership INVITED→ACTIVE⇄SUSPENDED→REMOVED
-- **이벤트 발행 전용** `organization.created · member_joined` — 🟡 소비처 미배선(계약 스키마는 존재, 의도된 상태)
+- **이벤트 발행 전용** `organization.created · member_joined · member_role_changed · member_removed` (4토픽, 계약 스키마 존재) — ✅ card-service 가 조직 프로젝션으로 소비(`OrganizationCreatedConsumer` 외 3종)
+
+---
+
+## Phase 5.5 — 법인 부가서비스 (card·insurance·deposit) ✅ DONE 🟡
+> organization 프로젝션 이후 붙은 3개 서비스. card 는 organization 이벤트를 소비하고, insurance·deposit 은
+> 아직 발행 전용(소비처 미배선) — Phase 5 와 마찬가지로 거래/정산 계보와 코드·DB 의존은 0.
+
+### 5.5a card-service (8106, mgmt 8107 / lemuel_card) ✅
+- **Phase 1**(발급·한도·상태·프로젝션) + **Phase 2**(실시간 승인·매입·명세서·지출관리 SaaS) 모두 완료(2026-08-04)
+- 셀러 조직에 마스터한도 부여 → 임직원별 서브한도 카드 발급. 한도 = `floor((sellerPayable+holdbackPayable) × R × H)`
+  (재원은 account-service GL 통제계정 조회 — ADR 0030, card 는 재원을 복제하지 않는다)
+- **핵심 불변식**: `master_limit >= Σ sub_limit`(서로 다른 애그리거트, DB 제약 불가 → 비관적 락 + 재계산으로 방어)
+- Phase 2: 실시간 승인/홀드, 매입·취소·환불, 명세서·상환, 지출관리(제출/승인/반려) 워크플로
+- `lemuel.organization.*` 4종 소비(이탈자 카드 자동 정지) — 이벤트 발행(Outbox) `account_opened·issued·limit_changed·status_changed·authorized·captured·statement.paid`
+
+### 5.5b insurance-service (8108, mgmt 8109 / lemuel_insurance) ✅
+- GA(법인보험대리점) 플랫폼 — 상담 → 가입설계 → 청약 → 계약 → 유지·변경 → 수수료 정산을 하나로 잇는다
+- 상태머신 4종: Application/Policy/Proposal/Commission (전이표 상세는 [`docs/insurance-service.md`](insurance-service.md))
+- 방카슈랑스 확장(V6+): 판매채널 FC/BANCA, 은행 채널 25%룰 모니터링, 대면 상품설명서 교부 증빙(완전판매 게이트)
+- 배치 7종(만기·가입설계 만료·월말 마감·수수료 지급·환수 스윕·일반지급·방카 집중도 감시)
+- PII(주민번호·연락처) 분리 테이블 암호화(`INSURANCE_ENC_KEY` 미설정 시 fail-closed)
+- **이벤트 발행 전용**(9종, Outbox) — 계약 스키마 미등록·소비처 미배선
+
+### 5.5c deposit-service (8112, mgmt 8113 / lemuel_deposit) 🟡
+- 셀러 예치금 **잔고의 단일 진실원** — hold(선점)로 재원을 묶고 offset(상계)으로 소진해 이중사용을 구조적으로 차단
+- IDOR 차단: `/accounts/me` 는 경로에 sellerId 가 없다는 것 자체가 계약(임의 셀러 조회는 별도 경로+ADMIN/MANAGER)
+- 부족분(`DepositOffsetShortfall`)은 무음 실패 대신 명시적으로 적재
+- REST 는 `/api/deposits` 조회 + `/admin/deposits` 수기 콘솔뿐 — **Kafka 컨슈머 미배선**(잔고 변동 입력이 수기 경로뿐)
+- **이벤트 발행 전용**(Outbox) — 계약 스키마 미등록·소비처 미배선
 
 ---
 

@@ -3,13 +3,13 @@
 > 저장소 전체 디렉토리·모듈 구조의 정본. 서비스 책임·API 는 [`../SPEC.md`](../SPEC.md),
 > 아키텍처 개요·패턴은 [`ARCHITECTURE.md`](ARCHITECTURE.md), 에이전트 지침은 [`../CLAUDE.md`](../CLAUDE.md) 참조.
 
-## JVM 코어 — Gradle 멀티모듈 (Java 14 서비스 + Gateway + shared-common)
+## JVM 코어 — Gradle 멀티모듈 (Java 서비스 16종 + Gateway + shared-common)
 
 ```
 settlement/                              # 모노레포 루트
-├── settings.gradle.kts                  # 14 서비스 + gateway 모듈 선언 (shared-common 은 composite build)
+├── settings.gradle.kts                  # 16 서비스 + gateway 모듈 선언 (shared-common 은 composite build)
 ├── build.gradle.kts                     # 부모 빌드 (subprojects 공통 설정, JaCoCo LINE 90% 게이트)
-├── docker-compose.yml                   # PG 14종 · ES · Redpanda · 14 services + gateway
+├── docker-compose.yml                   # PG 16종 · ES · Redpanda · 앱 컨테이너 19개(JVM 17 + market-stream + notification)
 ├── Dockerfile                           # MODULE 빌드 인자 파라미터화 (JVM 서비스 공용)
 │
 ├── shared-common/                       # 📦 버전드 플랫폼 라이브러리 (java-library, ADR 0021)
@@ -24,7 +24,7 @@ settlement/                              # 모노레포 루트
 │   │   ├── opssignal/                   # 운영 신호 발행 (절대 throw 금지, fire-and-forget)
 │   │   ├── ratelimit/                   # Bucket4j 기반 rate limiting
 │   │   └── pdf/                         # iText PDF 유틸
-│   └── src/testFixtures/resources/contracts/events/   # ★ 이벤트 계약 정본 (12토픽 JSON Schema+샘플, ADR 0024)
+│   └── src/testFixtures/resources/contracts/events/   # ★ 이벤트 계약 정본 (36토픽 JSON Schema+샘플, ADR 0024)
 │
 ├── order-service/                       # 🛒 Commerce (8088, opslab)
 │   └── .../{user,order,payment,cart,shipping,product,category,coupon,review,game,menu,rbac,commoncode}
@@ -51,8 +51,9 @@ settlement/                              # 모노레포 루트
 │                                        #      매수·매도 등 투자 판단과 그 결과의 책임은 이용자 본인에게 있음
 ├── account-service/                     # 🏦 Account (8102, lemuel_account) — 계정계 GL 집계 (소비 전용)
 ├── organization-service/                # 👥 Organization (8104, lemuel_organization) — 조직·멤버십 (발행 전용)
-├── card-service/                        # 💳 Card (8106/mgmt 8107, lemuel_card) — 법인카드 카드계정·카드 (도메인·정책만, 영속/REST/스케줄러 미구현)
+├── card-service/                        # 💳 Card (8106/mgmt 8107, lemuel_card) — 법인카드 카드계정·카드(마스터/서브 한도). 도메인·정책·영속(adapter/out/persistence)·REST(adapter/in/web)·스케줄러(adapter/in/schedule) 구현 — Phase 2(승인·매입·명세서·지출관리) 포함
 ├── insurance-service/                   # 🛡️ Insurance (8108/mgmt 8109, lemuel_insurance) — GA 보험대리점 플랫폼: 상담·가입설계·청약·계약·유지변경·수수료정산. shared-common 의존
+├── deposit-service/                     # 🏧 Deposit (8112/mgmt 8113, lemuel_deposit) — 셀러 예치금 원장(잔고 단일 진실원, hold/offset 로 재원 이중사용 차단). shared-common 의존, REST 는 `/api/deposits` 조회 + `/admin/deposits` 수기 콘솔(Kafka 컨슈머는 미배선)
 └── gateway-service/                     # 🚪 API Gateway (8080) — 라우팅만 (자체 인증 필터 없음)
 ```
 
@@ -67,19 +68,19 @@ settlement/                              # 모노레포 루트
 ├── screening-backtest-service/          # 🐍 Py  :8120  투자 스크리닝 백테스트 (pandas·numpy)
 ├── settlement-anomaly-service/          # 🐍 Py  :8121  정산/payout 이상탐지 (scikit-learn)
 ├── forecast-service/                    # 🐍 Py  :8122  정산액/매출 시계열 예측 (statsmodels)
-├── notification-service/                # 🅺 Kt  :8130  이벤트 5토픽 → 다채널 알림 (코루틴 팬아웃·멱등)
+├── notification-service/                # 🅺 Kt  :8130  이벤트 5토픽 → 다채널 알림 + 푸시 SSE 허브 (코루틴 팬아웃·멱등·재생)
 └── reconciliation-service/              # 🅺 Kt  :8131  정산 대사 (sealed Discrepancy·병렬 fetch·19:00 cron)
 ```
 
 - 자체 DB 없음(무영속 MVP) · CI 는 `../.github/workflows/polyglot-ci.yml` 분리(**변경 서비스만** 동적 매트릭스 —
-  JVM ci.yml 과 동일 패턴, 21종 전부 서비스 단위 CI) · 배포는 전용 차트 격리
+  JVM ci.yml 과 동일 패턴, 24종 전부 서비스 단위 CI) · 배포는 전용 차트 격리
   (`charts/polyglot-services`, helm-deploy 레포). 정본: [`polyglot-services.md`](polyglot-services.md).
 
 ## 부속 디렉토리
 
 ```
 ├── frontend/                            # ⚛️ React(Vite) 관리자/쇼핑 프론트 — nginx 프록시로 gateway 연동
-├── docs/                                # 📚 ADR 26개(adr/) · 러너북(runbook/) · ARCHITECTURE · DEVELOPMENT · 검증(SETTLEMENT-VERIFICATION)
+├── docs/                                # 📚 ADR 31개(adr/) · 러너북(runbook/) · ARCHITECTURE · DEVELOPMENT · 검증(SETTLEMENT-VERIFICATION)
 ├── monitoring/                          # 📊 Prometheus·Grafana 대시보드(비즈니스 KPI)·alert rules
 ├── load-test/                           # 🔥 k6 부하 시나리오 4종
 ├── scripts/harness/                     # 🛡️ 저장소 가드(guard.mjs)·자기진단(harness-audit.mjs)·git hook 설치

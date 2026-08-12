@@ -9,7 +9,7 @@
 
 **언어를 능력에 맞게 배치한 폴리글랏 MSA**: JVM(Java/Kotlin)으로 도메인 정합성·트랜잭션, Go 로 동시성·엣지, Python 으로 데이터/ML.
 
-### JVM · Java 16 서비스 + Gateway (핵심 도메인 · 정합성)
+### JVM · Java 서비스 16종 + Gateway (핵심 도메인 · 정합성)
 
 | # | 서비스 | 포트 | 도메인 / 역할 |
 |---|---|---|---|
@@ -55,7 +55,7 @@
 | **notification-service** | 8130 | 도메인 이벤트(Kafka) → 다채널(log/Slack/email) 알림 + 브라우저 푸시 SSE(`/api/notifications/stream`) | 코루틴 I/O 팬아웃 · 채널별 타임아웃/재시도 격리 · eventId 멱등 · JWT 신원 라우팅/`Last-Event-ID` 재생([`sse.md`](sse.md)) |
 | **reconciliation-service** | 8131 | 정산 대사 (settlement ↔ PG/payout/원장) | sealed Discrepancy(MISSING/EXTRA/AMOUNT/STATUS) · 다소스 코루틴 병렬 fetch · @Scheduled |
 
-**합계**: Java 17(16 서비스 + gateway) + Go 2 + Python 3 + Kotlin 2 = **24 서비스** (+ shared-common 라이브러리).
+**합계**: Java 17종(16 서비스 + gateway) + Go 2 + Python 3 + Kotlin 2 = **24 서비스** (+ shared-common 라이브러리). *런타임은 Java 25 — 위 숫자는 서비스 수다.*
 
 ---
 
