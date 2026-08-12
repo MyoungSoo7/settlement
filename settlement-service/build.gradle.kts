@@ -111,6 +111,22 @@ tasks.named<Test>("test") {
     jvmArgs("-javaagent:${mockitoAgent.asPath}")
 }
 
+// 전문 스펙(telegram/firmbanking/*.yaml) → VO·코덱 소스 재생성 (ADR 0033 Phase 2).
+// 생성물은 src/main 에 커밋되고, 스펙과의 일치는 TelegramGeneratedSourcesTest 가 매 빌드 대조한다.
+tasks.register<Test>("generateTelegramSources") {
+    group = "build"
+    description = "전문 스펙 YAML 에서 VO·코덱 소스를 재생성한다"
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    filter { includeTestsMatching("*TelegramGeneratedSourcesTest*") }
+    systemProperty("telegram.codegen.write", "true")
+    outputs.upToDateWhen { false }
+    // 부모 build 가 모든 Test 태스크에 jacocoTestReport 를 finalizer 로 붙이는데,
+    // 그 리포트는 test 태스크에 의존한다 → 소스 재생성 한 번에 전체 스위트가 딸려온다. 끊는다.
+    setFinalizedBy(emptyList<Task>())
+    extensions.configure<JacocoTaskExtension> { isEnabled = false }
+}
+
 val querydslDir = layout.buildDirectory.dir("generated/querydsl")
 
 tasks.withType<JavaCompile>().configureEach {

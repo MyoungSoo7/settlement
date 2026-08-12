@@ -1,0 +1,13 @@
+# 예금주조회 응답 — RESULT S/F/N. 성명은 EUC-KR 20바이트(한글 10자)를 넘으면 은행이 절단해 내려준다.
+telegram: HOLDER_RESPONSE
+msgType: "0310"
+description: 예금주 성명조회 응답
+version: 1
+effectiveFrom: 2026-01-01
+include: COMMON_HEADER
+totalLength: 81         # 공통부 34 + 개별부 47
+fields:
+  - { name: BANK_CODE,   length: 10, type: AN }
+  - { name: ACCOUNT_NO,  length: 16, type: AN }
+  - { name: HOLDER_NAME, length: 20, type: AN }
+  - { name: RESULT,      length: 1,  type: AN }

@@ -1,6 +1,6 @@
 # ADR 0033 — 전문(電文) 스펙 주도 코드 생성 (telegram spec-driven codegen)
 
-- 상태: **Proposed — Phase 1 구현 완료(2026-08-12), Phase 2 미착수**
+- 상태: **Accepted — Phase 1·2 구현 완료(2026-08-12), Phase 3 보류**
 - 일자: 2026-08-12
 - 관련: ADR 0016(payout 펌뱅킹 — 본 ADR 이 **확장**하는 대상), ADR 0024(이벤트 계약-as-code — 같은 사상의
   Kafka 편), ADR 0021(shared-common composite build — 도구/스펙을 런타임 밖에 두는 선례),
@@ -150,6 +150,38 @@ QueryDSL 배관을 그대로 재사용한다 — `settlement-service/build.gradl
 | **3. 카탈로그·시뮬레이터** | `MockBankServer` 를 스펙 구동으로, 전문 목록·샘플 콘솔 | — (**보류**, 아래 한계 참조) |
 
 Phase 1 만으로도 "스펙이 원본, 코드가 산출물"이라는 명제는 성립한다. Phase 2 는 타입 안전을 얻는 단계다.
+
+## Phase 2 구현 노트 (2026-08-12) — 설계와 달라진 점 포함
+
+**전문 4종 → 10종.** Phase 2 착수 조건(8종 이상 또는 반복부 실수요)을 실제로 충족시키고 들어갔다 —
+잔액조회(0100/0110)·예금주조회(0300/0310)·**다건이체(0220/0230, 반복부 포함)** 를 추가했다.
+
+**⚠ 배치가 §2 설계와 다르다.** ADR 초안은 생성기를 composite build(`telegram-codegen`)에 두고 생성물을
+`build/generated/telegram` 에 두는(git 미추적) QueryDSL 방식을 그렸다. 실제로는 **생성기를 test 소스셋에,
+생성물을 `src/main/.../fep/protocol/generated/` 에 커밋**하는 방식을 택했다. 이유:
+
+- 스펙 파서가 settlement-service main 에 있다. 생성기를 main 에 두면 *생성물을 컴파일하려면 생성기가,
+  생성기를 컴파일하려면 main 이* 필요한 **순환**이 생긴다. test 소스셋은 main 을 자유롭게 쓰므로 순환이 없다.
+- 순환을 끊는 정공법은 파서·코덱(`FepField`·`TelegramLayout`·`spec/*`)을 새 composite build 로 **추출**하는
+  것인데, 그러면 ① Spring BOM 버전을 동기화해야 할 지점이 하나 더 생기고(shared-common 빌드 파일에 이미
+  ⚠ 경고가 붙어 있다) ② 프로토콜 클래스가 어댑터 밖으로 나간다. 전문 10종 규모에서 그 값보다 비용이 크다.
+- 대신 **드리프트 게이트**로 같은 보증을 만든다: `TelegramGeneratedSourcesTest` 가 매 빌드 스펙에서
+  다시 생성해 커밋된 파일과 대조한다. 생성물을 손으로 고치거나 스펙만 고치고 재생성을 잊으면 빌드가 깨진다.
+  재생성은 `./gradlew :settlement-service:generateTelegramSources`.
+
+전문이 더 늘거나 다른 서비스가 대외 전문을 갖게 되면 composite build 추출을 재검토한다(미결 질문 4).
+
+**`scale` 키를 도입했다.** Phase 1 은 의미 키를 전부 미뤘지만, 코드 생성 단계에서는 금액을 `BigDecimal` 로
+승격할 근거가 필요하다. `scale` 이 선언된 N 필드만 `BigDecimal` 이 되고, 나머지 N(일련번호·일시·건수)은
+선행 0 보존을 위해 `String` 으로 남는다 — `required`·`min` 같은 나머지 의미 키는 여전히 미도입이다.
+
+**반복부(OCCURS)** 는 고정 횟수만 지원한다. 스펙에서는 구조로 보존하고(`TelegramElement.Repeated`),
+코덱에는 `DETAIL_3_REF_ID` 형태로 펼쳐 넣는다 — 런타임 엔진(`TelegramLayout`)은 손대지 않았다.
+디코딩은 **선언 건수를 그대로** 돌려준다(빈 슬롯 포함). 값이 비었다는 이유로 슬롯을 버리면 은행이 보낸
+실패 건을 놓치기 때문이고, 유효 건수는 전문의 건수 필드가 알려준다.
+
+**생성물**: 전문 10종 × (VO record + Codec) = 20파일. 반복부는 `List<Detail>`, 금액은 `BigDecimal`,
+최대 건수 초과·음수 금액·규격 초과 정밀도는 인코딩이 거부한다.
 
 ## 고려한 대안
 

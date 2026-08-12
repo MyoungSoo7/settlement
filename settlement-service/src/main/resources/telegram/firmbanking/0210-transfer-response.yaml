@@ -9,7 +9,7 @@ totalLength: 133        # 공통부 34 + 개별부 99
 fields:
   - { name: BANK_CODE,   length: 10, type: AN }
   - { name: ACCOUNT_NO,  length: 16, type: AN }
-  - { name: AMOUNT,      length: 13, type: N }
+  - { name: AMOUNT,      length: 13, type: N, scale: 0 }
   - { name: HOLDER_NAME, length: 20, type: AN }
   - { name: REF_ID,      length: 20, type: AN }
   - { name: TXN_ID,      length: 20, type: AN }   # 은행 거래번호

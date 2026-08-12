@@ -46,11 +46,22 @@ class TelegramSpecLoaderTest {
                 TelegramSpecLoader.loadFromClasspath(TelegramSpecLoader.FIRMBANKING_LOCATION);
 
         @Test
-        @DisplayName("펌뱅킹 전문 4종이 로드된다 (fragment 는 전문으로 세지 않는다)")
-        void loadsFourTelegrams() {
+        @DisplayName("펌뱅킹 전문 10종이 로드된다 (fragment 는 전문으로 세지 않는다)")
+        void loadsAllTelegrams() {
             assertThat(catalog.names())
                     .containsExactlyInAnyOrder(
-                            "TRANSFER_REQUEST", "TRANSFER_RESPONSE", "INQUIRY_REQUEST", "INQUIRY_RESPONSE");
+                            "TRANSFER_REQUEST", "TRANSFER_RESPONSE", "INQUIRY_REQUEST", "INQUIRY_RESPONSE",
+                            "BALANCE_REQUEST", "BALANCE_RESPONSE", "HOLDER_REQUEST", "HOLDER_RESPONSE",
+                            "BULK_TRANSFER_REQUEST", "BULK_TRANSFER_RESPONSE");
+        }
+
+        @Test
+        @DisplayName("조회계 3종 총길이: 잔액 60/95 · 예금주 60/81")
+        void inquiryTelegramLengths() {
+            assertThat(catalog.spec("BALANCE_REQUEST").totalLength()).isEqualTo(60);
+            assertThat(catalog.spec("BALANCE_RESPONSE").totalLength()).isEqualTo(95);
+            assertThat(catalog.spec("HOLDER_REQUEST").totalLength()).isEqualTo(60);
+            assertThat(catalog.spec("HOLDER_RESPONSE").totalLength()).isEqualTo(81);
         }
 
         @Test
@@ -65,7 +76,7 @@ class TelegramSpecLoaderTest {
                     new FepField("RESP_CODE", 4, FepFieldType.AN),
                     new FepField("BANK_CODE", 10, FepFieldType.AN),
                     new FepField("ACCOUNT_NO", 16, FepFieldType.AN),
-                    new FepField("AMOUNT", 13, FepFieldType.N),
+                    new FepField("AMOUNT", 13, FepFieldType.N, 0),   // scale 선언 = 금액 필드
                     new FepField("HOLDER_NAME", 20, FepFieldType.AN),
                     new FepField("REF_ID", 20, FepFieldType.AN));
             assertThat(spec.totalLength()).isEqualTo(113);
@@ -95,6 +106,147 @@ class TelegramSpecLoaderTest {
             byte[] telegram = catalog.layout("INQUIRY_REQUEST").encode(
                     Map.of("MSG_TYPE", "0400", "ORIG_TELEGRAM_NO", "260808000001", "REF_ID", "PAYOUT-42"));
             assertThat(telegram).hasSize(66);
+        }
+    }
+
+    @Nested
+    @DisplayName("반복부(OCCURS) — 다건이체")
+    class Repetition {
+
+        private final TelegramCatalog catalog =
+                TelegramSpecLoader.loadFromClasspath(TelegramSpecLoader.FIRMBANKING_LOCATION);
+
+        @Test
+        @DisplayName("반복부는 인덱스 붙은 필드로 펼쳐진다: DETAIL_1_SEQ … DETAIL_5_REF_ID")
+        void flattensRepeatedGroup() {
+            TelegramSpec spec = catalog.spec("BULK_TRANSFER_REQUEST");
+
+            assertThat(spec.fields()).extracting(FepField::name)
+                    .startsWith("MSG_TYPE", "TELEGRAM_NO", "TRANS_DT", "RESP_CODE", "TOTAL_CNT", "TOTAL_AMOUNT",
+                            "DETAIL_1_SEQ", "DETAIL_1_BANK_CODE")
+                    .endsWith("DETAIL_5_AMOUNT", "DETAIL_5_HOLDER_NAME", "DETAIL_5_REF_ID")
+                    // 공통부 4 + 합계부 2 + 명세 6 x 5
+                    .hasSize(36);
+            assertThat(spec.totalLength()).isEqualTo(462);
+        }
+
+        @Test
+        @DisplayName("반복 구조가 보존된다 — 코드 생성이 List<Detail> 을 만들 근거")
+        void keepsGroupStructure() {
+            TelegramSpec spec = catalog.spec("BULK_TRANSFER_RESPONSE");
+
+            assertThat(spec.elements()).hasSize(4 + 2 + 1);
+            TelegramElement.Repeated group = (TelegramElement.Repeated) spec.elements().getLast();
+            assertThat(group.name()).isEqualTo("DETAIL");
+            assertThat(group.count()).isEqualTo(5);
+            assertThat(group.fields()).extracting(FepField::name)
+                    .containsExactly("SEQ", "REF_ID", "RESULT", "TXN_ID", "ERROR_CODE");
+            assertThat(spec.totalLength()).isEqualTo(280);
+        }
+
+        @Test
+        @DisplayName("건별 값이 제자리에 인코딩된다 — 3번째 명세만 채워도 그 슬롯에서만 읽힌다")
+        void encodesPerOccurrenceSlot() {
+            var layout = catalog.layout("BULK_TRANSFER_REQUEST");
+            Map<String, String> values = new LinkedHashMap<>();
+            values.put("MSG_TYPE", "0220");
+            values.put("TOTAL_CNT", "1");
+            values.put("TOTAL_AMOUNT", "50000");
+            values.put("DETAIL_3_SEQ", "3");
+            values.put("DETAIL_3_AMOUNT", "50000");
+            values.put("DETAIL_3_REF_ID", "PAYOUT-777");
+
+            Map<String, String> decoded = layout.decode(layout.encode(values));
+
+            assertThat(decoded).containsEntry("DETAIL_3_REF_ID", "PAYOUT-777");
+            assertThat(decoded).containsEntry("DETAIL_3_AMOUNT", "0000000050000");
+            assertThat(decoded.get("DETAIL_2_REF_ID")).isEmpty();
+            assertThat(decoded).containsEntry("DETAIL_4_AMOUNT", "0000000000000");
+        }
+
+        @Test
+        @DisplayName("반복 횟수 0 이하는 실패")
+        void rejectsNonPositiveCount() {
+            String yaml = """
+                    telegram: X
+                    msgType: "0100"
+                    fields:
+                      - occurs:
+                          name: D
+                          count: 0
+                          fields:
+                            - { name: A, length: 5, type: AN }
+                    """;
+            assertThatThrownBy(() -> TelegramSpecLoader.parseAll(sources(yaml)))
+                    .isInstanceOf(FepProtocolException.class)
+                    .hasMessageContaining("반복 횟수");
+        }
+
+        @Test
+        @DisplayName("반복부 중첩은 실패 — Phase 2 는 1단만 지원한다")
+        void rejectsNestedOccurs() {
+            String yaml = """
+                    telegram: X
+                    msgType: "0100"
+                    fields:
+                      - occurs:
+                          name: OUTER
+                          count: 2
+                          fields:
+                            - occurs:
+                                name: INNER
+                                count: 2
+                                fields:
+                                  - { name: A, length: 5, type: AN }
+                    """;
+            assertThatThrownBy(() -> TelegramSpecLoader.parseAll(sources(yaml)))
+                    .isInstanceOf(FepProtocolException.class)
+                    .hasMessageContaining("중첩");
+        }
+
+        @Test
+        @DisplayName("반복부의 알 수 없는 키·이름 누락은 실패")
+        void rejectsMalformedOccurs() {
+            String unknownKey = """
+                    telegram: X
+                    msgType: "0100"
+                    fields:
+                      - occurs: { name: D, count: 2, feilds: [] }
+                    """;
+            String missingName = """
+                    telegram: X
+                    msgType: "0100"
+                    fields:
+                      - occurs:
+                          count: 2
+                          fields:
+                            - { name: A, length: 5, type: AN }
+                    """;
+            assertThatThrownBy(() -> TelegramSpecLoader.parseAll(sources(unknownKey)))
+                    .isInstanceOf(FepProtocolException.class)
+                    .hasMessageContaining("feilds");
+            assertThatThrownBy(() -> TelegramSpecLoader.parseAll(sources(missingName)))
+                    .isInstanceOf(FepProtocolException.class)
+                    .hasMessageContaining("name");
+        }
+
+        @Test
+        @DisplayName("펼친 뒤 필드명이 겹치면 실패 — 반복부 이름이 기존 필드와 충돌하는 경우")
+        void rejectsCollisionAfterFlattening() {
+            String yaml = """
+                    telegram: X
+                    msgType: "0100"
+                    fields:
+                      - { name: D_1_A, length: 5, type: AN }
+                      - occurs:
+                          name: D
+                          count: 2
+                          fields:
+                            - { name: A, length: 5, type: AN }
+                    """;
+            assertThatThrownBy(() -> TelegramSpecLoader.parseAll(sources(yaml)))
+                    .isInstanceOf(FepProtocolException.class)
+                    .hasMessageContaining("필드명 중복");
         }
     }
 
@@ -378,7 +530,7 @@ class TelegramSpecLoaderTest {
             assertThatThrownBy(() -> catalog.layout("TRANSFER_REQEUST"))
                     .isInstanceOf(FepProtocolException.class)
                     .hasMessageContaining("알 수 없는 전문");
-            assertThat(catalog.size()).isEqualTo(4);
+            assertThat(catalog.size()).isEqualTo(10);
         }
 
         @Test

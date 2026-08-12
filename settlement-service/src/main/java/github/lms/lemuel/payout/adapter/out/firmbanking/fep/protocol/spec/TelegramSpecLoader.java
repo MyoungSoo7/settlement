@@ -40,7 +40,8 @@ public final class TelegramSpecLoader {
     private static final Set<String> TELEGRAM_KEYS =
             Set.of("telegram", "msgType", "description", "version", "effectiveFrom", "include", "totalLength", "fields");
     private static final Set<String> FRAGMENT_KEYS = Set.of("fragment", "description", "fields");
-    private static final Set<String> FIELD_KEYS = Set.of("name", "length", "type");
+    private static final Set<String> FIELD_KEYS = Set.of("name", "length", "type", "scale");
+    private static final Set<String> OCCURS_KEYS = Set.of("name", "count", "fields");
 
     private TelegramSpecLoader() {
     }
@@ -74,7 +75,7 @@ public final class TelegramSpecLoader {
      * <p>2-pass — fragment 를 먼저 모은 뒤 전문을 조립한다. 파일 순서에 의존하지 않기 위해서다.
      */
     public static TelegramCatalog parseAll(Map<String, String> sources) {
-        Map<String, List<FepField>> fragments = new LinkedHashMap<>();
+        Map<String, List<TelegramElement>> fragments = new LinkedHashMap<>();
         Map<String, Map<String, Object>> telegrams = new LinkedHashMap<>();
 
         sources.forEach((file, content) -> {
@@ -82,7 +83,7 @@ public final class TelegramSpecLoader {
             if (root.containsKey("fragment")) {
                 requireKnownKeys(file, root.keySet(), FRAGMENT_KEYS);
                 String name = requireText(file, root, "fragment");
-                if (fragments.put(name, readFields(file, root)) != null) {
+                if (fragments.put(name, readElements(file, root)) != null) {
                     throw new FepProtocolException("fragment 중복: " + name + " (" + file + ")");
                 }
             } else if (root.containsKey("telegram")) {
@@ -98,20 +99,20 @@ public final class TelegramSpecLoader {
         return TelegramCatalog.of(specs);
     }
 
-    private static TelegramSpec toSpec(String file, Map<String, Object> root, Map<String, List<FepField>> fragments) {
+    private static TelegramSpec toSpec(String file, Map<String, Object> root, Map<String, List<TelegramElement>> fragments) {
         String name = requireText(file, root, "telegram");
 
-        List<FepField> fields = new ArrayList<>();
+        List<TelegramElement> elements = new ArrayList<>();
         Object include = root.get("include");
         if (include != null) {
-            List<FepField> fragment = fragments.get(String.valueOf(include));
+            List<TelegramElement> fragment = fragments.get(String.valueOf(include));
             if (fragment == null) {
                 throw new FepProtocolException(
                         "존재하지 않는 fragment include: " + include + " (" + file + ", 등록: " + fragments.keySet() + ")");
             }
-            fields.addAll(fragment);
+            elements.addAll(fragment);
         }
-        fields.addAll(readFields(file, root));
+        elements.addAll(readElements(file, root));
 
         TelegramSpec spec = new TelegramSpec(
                 name,
@@ -119,7 +120,7 @@ public final class TelegramSpecLoader {
                 root.containsKey("description") ? String.valueOf(root.get("description")) : "",
                 root.containsKey("version") ? requireInt(file, root.get("version"), "version") : 1,
                 readEffectiveFrom(file, root.get("effectiveFrom")),
-                fields);
+                elements);
 
         if (root.containsKey("totalLength")) {
             int declared = requireInt(file, root.get("totalLength"), "totalLength");
@@ -131,24 +132,68 @@ public final class TelegramSpecLoader {
         return spec;
     }
 
+    /** 본문 구성 요소 목록 — 단일 필드와 반복부(occurs)가 선언 순서대로 섞일 수 있다. */
     @SuppressWarnings("unchecked")
-    private static List<FepField> readFields(String file, Map<String, Object> root) {
+    private static List<TelegramElement> readElements(String file, Map<String, Object> root) {
         Object raw = root.get("fields");
         if (!(raw instanceof List<?> list) || list.isEmpty()) {
             throw new FepProtocolException("fields 목록 필수: " + file);
         }
+        List<TelegramElement> elements = new ArrayList<>();
+        for (Object entry : list) {
+            if (!(entry instanceof Map<?, ?> map)) {
+                throw new FepProtocolException("fields 항목은 매핑이어야 한다: " + file + " → " + entry);
+            }
+            Map<String, Object> element = (Map<String, Object>) map;
+            if (element.containsKey("occurs")) {
+                elements.add(readOccurs(file, element));
+            } else {
+                elements.add(new TelegramElement.Single(readField(file, element)));
+            }
+        }
+        return elements;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static TelegramElement.Repeated readOccurs(String file, Map<String, Object> element) {
+        if (element.size() > 1) {
+            throw new FepProtocolException("occurs 항목에는 occurs 키만 둔다: " + file + " → " + element.keySet());
+        }
+        if (!(element.get("occurs") instanceof Map<?, ?> raw)) {
+            throw new FepProtocolException("occurs 는 매핑이어야 한다: " + file);
+        }
+        Map<String, Object> occurs = new LinkedHashMap<>();
+        raw.forEach((key, value) -> occurs.put(String.valueOf(key), value));
+        requireKnownKeys(file, occurs.keySet(), OCCURS_KEYS);
+
+        String name = requireText(file, occurs, "name");
+        int count = requireInt(file, occurs.get("count"), "count(" + name + ")");
+        Object rawFields = occurs.get("fields");
+        if (!(rawFields instanceof List<?> list) || list.isEmpty()) {
+            throw new FepProtocolException("반복부 fields 목록 필수: " + file + "." + name);
+        }
         List<FepField> fields = new ArrayList<>();
-        for (Object element : list) {
-            if (!(element instanceof Map<?, ?> map)) {
-                throw new FepProtocolException("fields 항목은 매핑이어야 한다: " + file + " → " + element);
+        for (Object entry : list) {
+            if (!(entry instanceof Map<?, ?> map)) {
+                throw new FepProtocolException("반복부 fields 항목은 매핑이어야 한다: " + file + "." + name);
             }
             Map<String, Object> field = (Map<String, Object>) map;
-            requireKnownKeys(file, field.keySet(), FIELD_KEYS);
-            String fieldName = requireText(file, field, "name");
-            int length = requireInt(file, field.get("length"), "length(" + fieldName + ")");
-            fields.add(new FepField(fieldName, length, readType(file, fieldName, field.get("type"))));
+            if (field.containsKey("occurs")) {
+                throw new FepProtocolException("반복부 중첩은 지원하지 않는다: " + file + "." + name);
+            }
+            fields.add(readField(file, field));
         }
-        return fields;
+        return new TelegramElement.Repeated(name, count, fields);
+    }
+
+    private static FepField readField(String file, Map<String, Object> field) {
+        requireKnownKeys(file, field.keySet(), FIELD_KEYS);
+        String fieldName = requireText(file, field, "name");
+        int length = requireInt(file, field.get("length"), "length(" + fieldName + ")");
+        Integer scale = field.containsKey("scale")
+                ? requireInt(file, field.get("scale"), "scale(" + fieldName + ")")
+                : null;
+        return new FepField(fieldName, length, readType(file, fieldName, field.get("type")), scale);
     }
 
     private static FepFieldType readType(String file, String fieldName, Object raw) {

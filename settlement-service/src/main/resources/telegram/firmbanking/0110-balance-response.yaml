@@ -1,0 +1,13 @@
+# 잔액조회 응답 — BALANCE 는 원단위 15자리. 마이너스 통장은 이 규격으로 표현할 수 없다(부호 필드 없음).
+telegram: BALANCE_RESPONSE
+msgType: "0110"
+description: 계좌 잔액조회 응답
+version: 1
+effectiveFrom: 2026-01-01
+include: COMMON_HEADER
+totalLength: 95         # 공통부 34 + 개별부 61
+fields:
+  - { name: BANK_CODE,   length: 10, type: AN }
+  - { name: ACCOUNT_NO,  length: 16, type: AN }
+  - { name: BALANCE,     length: 15, type: N, scale: 0 }
+  - { name: HOLDER_NAME, length: 20, type: AN }
