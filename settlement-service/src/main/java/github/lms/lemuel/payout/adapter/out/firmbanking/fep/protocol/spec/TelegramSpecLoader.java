@@ -41,7 +41,7 @@ public final class TelegramSpecLoader {
             Set.of("telegram", "msgType", "description", "version", "effectiveFrom", "include", "totalLength", "fields");
     private static final Set<String> FRAGMENT_KEYS = Set.of("fragment", "description", "fields");
     private static final Set<String> FIELD_KEYS = Set.of("name", "length", "type", "scale");
-    private static final Set<String> OCCURS_KEYS = Set.of("name", "count", "fields");
+    private static final Set<String> OCCURS_KEYS = Set.of("name", "count", "countField", "max", "fields");
 
     private TelegramSpecLoader() {
     }
@@ -123,6 +123,10 @@ public final class TelegramSpecLoader {
                 elements);
 
         if (root.containsKey("totalLength")) {
+            if (spec.isVariable()) {
+                throw new FepProtocolException("가변 전문에는 totalLength 를 선언할 수 없다(건수마다 달라진다): "
+                        + name + " (" + file + ") — 반복부 max 로 상한을 표현한다");
+            }
             int declared = requireInt(file, root.get("totalLength"), "totalLength");
             if (declared != spec.totalLength()) {
                 throw new FepProtocolException("전문 총길이 불일치: " + name + " 선언 " + declared
@@ -155,7 +159,7 @@ public final class TelegramSpecLoader {
     }
 
     @SuppressWarnings("unchecked")
-    private static TelegramElement.Repeated readOccurs(String file, Map<String, Object> element) {
+    private static TelegramElement readOccurs(String file, Map<String, Object> element) {
         if (element.size() > 1) {
             throw new FepProtocolException("occurs 항목에는 occurs 키만 둔다: " + file + " → " + element.keySet());
         }
@@ -167,7 +171,12 @@ public final class TelegramSpecLoader {
         requireKnownKeys(file, occurs.keySet(), OCCURS_KEYS);
 
         String name = requireText(file, occurs, "name");
-        int count = requireInt(file, occurs.get("count"), "count(" + name + ")");
+        boolean fixed = occurs.containsKey("count");
+        boolean variable = occurs.containsKey("countField");
+        if (fixed == variable) {
+            throw new FepProtocolException("반복부는 count(고정) 또는 countField(가변) 중 정확히 하나를 쓴다: "
+                    + file + "." + name);
+        }
         Object rawFields = occurs.get("fields");
         if (!(rawFields instanceof List<?> list) || list.isEmpty()) {
             throw new FepProtocolException("반복부 fields 목록 필수: " + file + "." + name);
@@ -183,7 +192,15 @@ public final class TelegramSpecLoader {
             }
             fields.add(readField(file, field));
         }
-        return new TelegramElement.Repeated(name, count, fields);
+        if (fixed) {
+            return new TelegramElement.Repeated(
+                    name, requireInt(file, occurs.get("count"), "count(" + name + ")"), fields);
+        }
+        return new TelegramElement.VariableRepeated(
+                name,
+                requireText(file, occurs, "countField"),
+                requireInt(file, occurs.get("max"), "max(" + name + ")"),
+                fields);
     }
 
     private static FepField readField(String file, Map<String, Object> field) {

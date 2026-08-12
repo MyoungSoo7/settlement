@@ -6,17 +6,16 @@ package github.lms.lemuel.payout.adapter.out.firmbanking.fep.protocol.generated;
 import java.math.BigDecimal;
 
 /**
- * 지급이체 응답 — 전문구분코드 0210 · 개정 1 · 총 133바이트.
+ * 계좌 잔액조회 응답 (개정 2 — 최종거래일자 추가) — 전문구분코드 0110 · 개정 2 · 총 103바이트.
  */
-public record TransferResponseTelegram(
+public record BalanceResponseV2Telegram(
         String msgType,
         String telegramNo,
         String transDt,
         String respCode,
         String bankCode,
         String accountNo,
-        BigDecimal amount,
+        BigDecimal balance,
         String holderName,
-        String refId,
-        String txnId) {
+        String lastTxnDt) {
 }

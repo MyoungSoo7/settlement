@@ -10,6 +10,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -64,7 +65,41 @@ class TelegramGeneratedCodecTest {
     }
 
     @Test
-    @DisplayName("반복부는 List 로 넣고 List 로 받는다 — 빈 슬롯도 건수대로 돌려준다")
+    @DisplayName("가변 전문은 건수만큼만 길어진다 — 1건과 2건의 바이트 길이가 다르다")
+    void variableTelegramLengthFollowsCount() {
+        var one = bulk(List.of(detail("1", "PAYOUT-1", "50000")), null);
+        var two = bulk(List.of(detail("1", "PAYOUT-1", "50000"), detail("2", "PAYOUT-2", "70000")), null);
+
+        int oneLength = BulkTransferRequestCodec.encode(one).length;
+        int twoLength = BulkTransferRequestCodec.encode(two).length;
+
+        assertThat(oneLength).isEqualTo(BulkTransferRequestCodec.BASE_LENGTH + 82);
+        assertThat(twoLength).isEqualTo(BulkTransferRequestCodec.BASE_LENGTH + 82 * 2);
+    }
+
+    @Test
+    @DisplayName("건수 필드를 비워 두면 실제 건수로 채워진다")
+    void derivesCountFieldFromDetails() {
+        var request = bulk(List.of(detail("1", "PAYOUT-1", "50000"), detail("2", "PAYOUT-2", "70000")), null);
+
+        var decoded = BulkTransferRequestCodec.decode(BulkTransferRequestCodec.encode(request));
+
+        assertThat(decoded.totalCnt()).isEqualTo("002");
+        assertThat(decoded.details()).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("건수 필드와 실제 명세 건수가 다르면 거부한다 — 은행이 앞 n건만 처리하고 나머지를 버린다")
+    void rejectsCountFieldMismatch() {
+        var request = bulk(List.of(detail("1", "PAYOUT-1", "50000")), "3");
+
+        assertThatThrownBy(() -> BulkTransferRequestCodec.encode(request))
+                .isInstanceOf(FepProtocolException.class)
+                .hasMessageContaining("건수 필드와 실제 명세 건수가 다르다");
+    }
+
+    @Test
+    @DisplayName("반복부는 List 로 넣고 List 로 받는다 — 보낸 건수만 돌아온다")
     void bulkDetailsRoundTripAsList() {
         var details = List.of(
                 new BulkTransferRequestTelegram.Detail(
@@ -77,26 +112,34 @@ class TelegramGeneratedCodecTest {
 
         var decoded = BulkTransferRequestCodec.decode(BulkTransferRequestCodec.encode(request));
 
-        assertThat(decoded.details()).hasSize(BulkTransferRequestCodec.DETAIL_MAX);
+        assertThat(decoded.details()).hasSize(2);
         assertThat(decoded.details().get(0).refId()).isEqualTo("PAYOUT-1");
         assertThat(decoded.details().get(1).amount()).isEqualByComparingTo("70000");
         assertThat(decoded.details().get(1).holderName()).isEqualTo("이영희");
-        assertThat(decoded.details().get(4).refId()).as("빈 슬롯은 공백").isEmpty();
         assertThat(decoded.totalAmount()).isEqualByComparingTo("120000");
+    }
+
+    private static BulkTransferRequestTelegram bulk(
+            List<BulkTransferRequestTelegram.Detail> details, String declaredCount) {
+        return new BulkTransferRequestTelegram(
+                "0220", "260808000002", "20260808120500", "",
+                declaredCount, new BigDecimal("120000"), details);
+    }
+
+    private static BulkTransferRequestTelegram.Detail detail(String seq, String refId, String amount) {
+        return new BulkTransferRequestTelegram.Detail(
+                seq, "KB", "1111111111111111", new BigDecimal(amount), "김철수", refId);
     }
 
     @Test
     @DisplayName("반복 최대 건수를 넘기면 인코딩이 거부한다")
     void rejectsTooManyDetails() {
-        var detail = new BulkTransferRequestTelegram.Detail(
-                "1", "KB", "1111111111111111", new BigDecimal("1000"), "김철수", "PAYOUT-1");
-        var request = new BulkTransferRequestTelegram(
-                "0220", "260808000003", "20260808121000", "",
-                "6", new BigDecimal("6000"), List.of(detail, detail, detail, detail, detail, detail));
+        var request = bulk(
+                Collections.nCopies(BulkTransferRequestCodec.DETAIL_MAX + 1, detail("1", "PAYOUT-1", "1000")), null);
 
         assertThatThrownBy(() -> BulkTransferRequestCodec.encode(request))
                 .isInstanceOf(FepProtocolException.class)
-                .hasMessageContaining("최대 5건 초과");
+                .hasMessageContaining("최대 100건 초과");
     }
 
     @Test

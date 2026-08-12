@@ -1,18 +1,20 @@
 # 다건이체 응답 — 건별 성패가 섞여 돌아온다. 부분 성공이 정상 경로이므로
 # 명세 단위 RESULT 를 반드시 건별로 읽어야 한다(전체 RESP_CODE 만 보면 실패 건을 놓친다).
+#
+# 접수 건수(ACCEPT_CNT)가 반복 건수를 알린다 — 요청 건수(TOTAL_CNT)와 다를 수 있다.
 telegram: BULK_TRANSFER_RESPONSE
 msgType: "0230"
 description: 다건 지급이체 응답
 version: 1
 effectiveFrom: 2026-01-01
 include: COMMON_HEADER
-totalLength: 280        # 공통부 34 + 집계부 6 + 명세부 48 x 5
 fields:
   - { name: TOTAL_CNT,  length: 3, type: N }   # 요청 건수 echo
-  - { name: ACCEPT_CNT, length: 3, type: N }   # 은행이 접수한 건수
+  - { name: ACCEPT_CNT, length: 3, type: N }   # 은행이 접수한 건수 — 반복부의 countField
   - occurs:
       name: DETAIL
-      count: 5
+      countField: ACCEPT_CNT
+      max: 100
       fields:
         - { name: SEQ,        length: 3,  type: N }
         - { name: REF_ID,     length: 20, type: AN }

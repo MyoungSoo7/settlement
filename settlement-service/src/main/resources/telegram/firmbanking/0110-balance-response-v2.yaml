@@ -1,0 +1,18 @@
+# 잔액조회 응답 개정 2 — 2026-07-01 시행. 최종거래일자(LAST_TXN_DT)가 추가됐다.
+#
+# 구 규격(version 1)을 지우지 않는다: 시행일 전에 오간 전문을 다시 해석해야 할 수 있고,
+# 은행이 시행일에 일괄 전환하지 않는 경우도 있다. 수신 해석은 기준일로 고른다
+# (TelegramCatalog.byMsgType(code, asOf)).
+telegram: BALANCE_RESPONSE
+msgType: "0110"
+description: 계좌 잔액조회 응답 (개정 2 — 최종거래일자 추가)
+version: 2
+effectiveFrom: 2026-07-01
+include: COMMON_HEADER
+totalLength: 103        # 공통부 34 + 개별부 69 (v1 61 + 최종거래일자 8)
+fields:
+  - { name: BANK_CODE,    length: 10, type: AN }
+  - { name: ACCOUNT_NO,   length: 16, type: AN }
+  - { name: BALANCE,      length: 15, type: N, scale: 0 }
+  - { name: HOLDER_NAME,  length: 20, type: AN }
+  - { name: LAST_TXN_DT,  length: 8,  type: N }   # yyyyMMdd — 개정 2 신설

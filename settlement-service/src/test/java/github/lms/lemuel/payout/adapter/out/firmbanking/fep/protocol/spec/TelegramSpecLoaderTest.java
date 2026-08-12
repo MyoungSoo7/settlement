@@ -56,10 +56,10 @@ class TelegramSpecLoaderTest {
         }
 
         @Test
-        @DisplayName("조회계 3종 총길이: 잔액 60/95 · 예금주 60/81")
+        @DisplayName("조회계 3종 총길이: 잔액 60/95(개정1) · 예금주 60/81")
         void inquiryTelegramLengths() {
             assertThat(catalog.spec("BALANCE_REQUEST").totalLength()).isEqualTo(60);
-            assertThat(catalog.spec("BALANCE_RESPONSE").totalLength()).isEqualTo(95);
+            assertThat(catalog.spec("BALANCE_RESPONSE", 1).totalLength()).isEqualTo(95);
             assertThat(catalog.spec("HOLDER_REQUEST").totalLength()).isEqualTo(60);
             assertThat(catalog.spec("HOLDER_RESPONSE").totalLength()).isEqualTo(81);
         }
@@ -101,6 +101,34 @@ class TelegramSpecLoaderTest {
         }
 
         @Test
+        @DisplayName("개정 병존: 잔액응답은 시행일 기준으로 규격이 갈린다 (v1 95바이트 / v2 103바이트)")
+        void resolvesRevisionByEffectiveDate() {
+            assertThat(catalog.byMsgType("0110", LocalDate.of(2026, 6, 30)).version()).isEqualTo(1);
+            assertThat(catalog.byMsgType("0110", LocalDate.of(2026, 7, 1)).version()).isEqualTo(2);
+            assertThat(catalog.spec("BALANCE_RESPONSE", 1).totalLength()).isEqualTo(95);
+            assertThat(catalog.spec("BALANCE_RESPONSE", 2).totalLength()).isEqualTo(103);
+            assertThat(catalog.spec("BALANCE_RESPONSE").version())
+                    .as("이름만 주면 최신 개정")
+                    .isEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("개정이 여럿인 코드를 날짜 없이 조회하면 실패 — 어느 규격인지 알 수 없다")
+        void requiresDateWhenRevisionsCoexist() {
+            assertThatThrownBy(() -> catalog.byMsgType("0110"))
+                    .isInstanceOf(FepProtocolException.class)
+                    .hasMessageContaining("시행일 기준 조회");
+        }
+
+        @Test
+        @DisplayName("시행 전 기준일에는 시행 중인 개정이 없으면 실패")
+        void failsWhenNoRevisionEffectiveYet() {
+            assertThatThrownBy(() -> catalog.byMsgType("0110", LocalDate.of(2025, 12, 31)))
+                    .isInstanceOf(FepProtocolException.class)
+                    .hasMessageContaining("시행 중인 개정이 없다");
+        }
+
+        @Test
         @DisplayName("로드된 스펙은 곧바로 코덱이 된다 — 인코딩 길이가 총길이와 일치")
         void layoutEncodesToDeclaredLength() {
             byte[] telegram = catalog.layout("INQUIRY_REQUEST").encode(
@@ -117,17 +145,25 @@ class TelegramSpecLoaderTest {
                 TelegramSpecLoader.loadFromClasspath(TelegramSpecLoader.FIRMBANKING_LOCATION);
 
         @Test
-        @DisplayName("반복부는 인덱스 붙은 필드로 펼쳐진다: DETAIL_1_SEQ … DETAIL_5_REF_ID")
-        void flattensRepeatedGroup() {
+        @DisplayName("가변 반복부는 건수를 줘야 펼쳐진다 — 건수 없이 총길이를 묻는 것은 실패")
+        void expandsOnlyWithOccurrenceCount() {
             TelegramSpec spec = catalog.spec("BULK_TRANSFER_REQUEST");
 
-            assertThat(spec.fields()).extracting(FepField::name)
+            assertThat(spec.isVariable()).isTrue();
+            assertThatThrownBy(spec::totalLength)
+                    .isInstanceOf(FepProtocolException.class)
+                    .hasMessageContaining("건수 없이");
+
+            assertThat(spec.fieldsFor(2)).extracting(FepField::name)
                     .startsWith("MSG_TYPE", "TELEGRAM_NO", "TRANS_DT", "RESP_CODE", "TOTAL_CNT", "TOTAL_AMOUNT",
                             "DETAIL_1_SEQ", "DETAIL_1_BANK_CODE")
-                    .endsWith("DETAIL_5_AMOUNT", "DETAIL_5_HOLDER_NAME", "DETAIL_5_REF_ID")
-                    // 공통부 4 + 합계부 2 + 명세 6 x 5
-                    .hasSize(36);
-            assertThat(spec.totalLength()).isEqualTo(462);
+                    .endsWith("DETAIL_2_AMOUNT", "DETAIL_2_HOLDER_NAME", "DETAIL_2_REF_ID")
+                    // 공통부 4 + 합계부 2 + 명세 6 x 2
+                    .hasSize(18);
+            // 선두 52 + 82 x 건수
+            assertThat(spec.baseLength()).isEqualTo(52);
+            assertThat(spec.lengthFor(2)).isEqualTo(216);
+            assertThat(spec.lengthFor(0)).isEqualTo(52);
         }
 
         @Test
@@ -136,32 +172,150 @@ class TelegramSpecLoaderTest {
             TelegramSpec spec = catalog.spec("BULK_TRANSFER_RESPONSE");
 
             assertThat(spec.elements()).hasSize(4 + 2 + 1);
-            TelegramElement.Repeated group = (TelegramElement.Repeated) spec.elements().getLast();
+            var group = (TelegramElement.VariableRepeated) spec.elements().getLast();
             assertThat(group.name()).isEqualTo("DETAIL");
-            assertThat(group.count()).isEqualTo(5);
+            assertThat(group.countField()).isEqualTo("ACCEPT_CNT");
+            assertThat(group.max()).isEqualTo(100);
             assertThat(group.fields()).extracting(FepField::name)
                     .containsExactly("SEQ", "REF_ID", "RESULT", "TXN_ID", "ERROR_CODE");
-            assertThat(spec.totalLength()).isEqualTo(280);
         }
 
         @Test
-        @DisplayName("건별 값이 제자리에 인코딩된다 — 3번째 명세만 채워도 그 슬롯에서만 읽힌다")
-        void encodesPerOccurrenceSlot() {
-            var layout = catalog.layout("BULK_TRANSFER_REQUEST");
+        @DisplayName("수신 전문에서 건수를 먼저 읽는다 — 레이아웃을 만들기 전에 필요하다")
+        void readsOccurrenceCountBeforeDecoding() {
+            TelegramSpec spec = catalog.spec("BULK_TRANSFER_REQUEST");
             Map<String, String> values = new LinkedHashMap<>();
             values.put("MSG_TYPE", "0220");
-            values.put("TOTAL_CNT", "1");
-            values.put("TOTAL_AMOUNT", "50000");
-            values.put("DETAIL_3_SEQ", "3");
-            values.put("DETAIL_3_AMOUNT", "50000");
-            values.put("DETAIL_3_REF_ID", "PAYOUT-777");
+            values.put("TOTAL_CNT", "2");
+            values.put("TOTAL_AMOUNT", "120000");
+            values.put("DETAIL_2_REF_ID", "PAYOUT-777");
 
-            Map<String, String> decoded = layout.decode(layout.encode(values));
+            byte[] telegram = spec.layoutFor(2).encode(values);
 
-            assertThat(decoded).containsEntry("DETAIL_3_REF_ID", "PAYOUT-777");
-            assertThat(decoded).containsEntry("DETAIL_3_AMOUNT", "0000000050000");
-            assertThat(decoded.get("DETAIL_2_REF_ID")).isEmpty();
-            assertThat(decoded).containsEntry("DETAIL_4_AMOUNT", "0000000000000");
+            assertThat(telegram).hasSize(spec.lengthFor(2));
+            assertThat(spec.readOccurrences(telegram)).isEqualTo(2);
+            assertThat(spec.layoutFor(spec.readOccurrences(telegram)).decode(telegram))
+                    .containsEntry("DETAIL_2_REF_ID", "PAYOUT-777");
+        }
+
+        @Test
+        @DisplayName("건수 필드가 최대치를 넘으면 디코딩 전에 거부한다")
+        void rejectsCountBeyondMax() {
+            String yaml = """
+                    telegram: X
+                    msgType: "0900"
+                    fields:
+                      - { name: CNT, length: 3, type: N }
+                      - occurs:
+                          name: D
+                          countField: CNT
+                          max: 2
+                          fields:
+                            - { name: A, length: 5, type: AN }
+                    """;
+            TelegramSpec spec = TelegramSpecLoader.parseAll(sources(yaml)).spec("X");
+            byte[] telegram = spec.layoutFor(2).encode(Map.of("CNT", "99"));
+
+            assertThatThrownBy(() -> spec.readOccurrences(telegram))
+                    .isInstanceOf(FepProtocolException.class)
+                    .hasMessageContaining("건수 필드가 규격을 벗어났다");
+        }
+
+        @Test
+        @DisplayName("가변부는 전문 마지막에만 올 수 있다 — 뒤 필드 offset 이 건수에 밀린다")
+        void rejectsVariableGroupNotLast() {
+            String yaml = """
+                    telegram: X
+                    msgType: "0900"
+                    fields:
+                      - { name: CNT, length: 3, type: N }
+                      - occurs:
+                          name: D
+                          countField: CNT
+                          max: 2
+                          fields:
+                            - { name: A, length: 5, type: AN }
+                      - { name: TAIL, length: 4, type: AN }
+                    """;
+            assertThatThrownBy(() -> TelegramSpecLoader.parseAll(sources(yaml)))
+                    .isInstanceOf(FepProtocolException.class)
+                    .hasMessageContaining("마지막에 와야 한다");
+        }
+
+        @Test
+        @DisplayName("건수 필드가 반복부 앞에 없거나 N 이 아니면 실패")
+        void rejectsBadCountField() {
+            String missing = """
+                    telegram: X
+                    msgType: "0900"
+                    fields:
+                      - occurs:
+                          name: D
+                          countField: NOPE
+                          max: 2
+                          fields:
+                            - { name: A, length: 5, type: AN }
+                    """;
+            String notNumeric = """
+                    telegram: X
+                    msgType: "0900"
+                    fields:
+                      - { name: CNT, length: 3, type: AN }
+                      - occurs:
+                          name: D
+                          countField: CNT
+                          max: 2
+                          fields:
+                            - { name: A, length: 5, type: AN }
+                    """;
+            assertThatThrownBy(() -> TelegramSpecLoader.parseAll(sources(missing)))
+                    .isInstanceOf(FepProtocolException.class)
+                    .hasMessageContaining("건수 필드를 반복부 앞에서 찾을 수 없다");
+            assertThatThrownBy(() -> TelegramSpecLoader.parseAll(sources(notNumeric)))
+                    .isInstanceOf(FepProtocolException.class)
+                    .hasMessageContaining("건수 필드는 N 이어야 한다");
+        }
+
+        @Test
+        @DisplayName("가변 전문에 totalLength 를 선언하면 실패 — 건수마다 달라진다")
+        void rejectsTotalLengthOnVariableTelegram() {
+            String yaml = """
+                    telegram: X
+                    msgType: "0900"
+                    totalLength: 100
+                    fields:
+                      - { name: CNT, length: 3, type: N }
+                      - occurs:
+                          name: D
+                          countField: CNT
+                          max: 2
+                          fields:
+                            - { name: A, length: 5, type: AN }
+                    """;
+            assertThatThrownBy(() -> TelegramSpecLoader.parseAll(sources(yaml)))
+                    .isInstanceOf(FepProtocolException.class)
+                    .hasMessageContaining("가변 전문에는 totalLength");
+        }
+
+        @Test
+        @DisplayName("count 와 countField 를 함께 쓰면 실패 — 고정인지 가변인지 하나여야 한다")
+        void rejectsBothFixedAndVariable() {
+            String yaml = """
+                    telegram: X
+                    msgType: "0900"
+                    fields:
+                      - { name: CNT, length: 3, type: N }
+                      - occurs:
+                          name: D
+                          count: 2
+                          countField: CNT
+                          max: 2
+                          fields:
+                            - { name: A, length: 5, type: AN }
+                    """;
+            assertThatThrownBy(() -> TelegramSpecLoader.parseAll(sources(yaml)))
+                    .isInstanceOf(FepProtocolException.class)
+                    .hasMessageContaining("정확히 하나");
         }
 
         @Test
@@ -530,7 +684,8 @@ class TelegramSpecLoaderTest {
             assertThatThrownBy(() -> catalog.layout("TRANSFER_REQEUST"))
                     .isInstanceOf(FepProtocolException.class)
                     .hasMessageContaining("알 수 없는 전문");
-            assertThat(catalog.size()).isEqualTo(10);
+            // 전문 10종 + 잔액응답 개정 2 = 스펙 11건
+            assertThat(catalog.size()).isEqualTo(11);
         }
 
         @Test

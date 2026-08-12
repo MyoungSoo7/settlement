@@ -1,20 +1,22 @@
 # 다건이체 요청 — 정산 지급을 1건씩 보내지 않고 묶어 보낸다.
 #
-# 반복부(occurs): 명세 5건 고정. 실제 건수는 TOTAL_CNT 로 알리고, 남는 슬롯은 공백/0 으로 채운다.
-# 고정 반복이라 전문 총길이가 항상 462바이트로 일정하다 — 가변부는 도입하지 않았다(ADR 0033 Phase 3).
+# 가변 반복부: 실제 건수만큼만 전송한다(TOTAL_CNT 가 건수를 알린다). 고정 반복이면 1건을 보낼 때도
+# 빈 슬롯을 채워 보내야 하고, 상한을 늘리는 순간 전문이 통째로 커진다.
+# 가변부는 전문 마지막에만 올 수 있다 — 뒤에 필드가 있으면 그 offset 이 건수에 따라 밀리기 때문이다.
 telegram: BULK_TRANSFER_REQUEST
 msgType: "0220"
 description: 다건 지급이체 요청
 version: 1
 effectiveFrom: 2026-01-01
 include: COMMON_HEADER
-totalLength: 462        # 공통부 34 + 합계부 18 + 명세부 82 x 5
+# totalLength 없음 — 건수마다 달라진다. 길이 = 공통부 34 + 합계부 18 + 82 x 건수
 fields:
-  - { name: TOTAL_CNT,    length: 3,  type: N }    # 유효 명세 건수 (1~5)
-  - { name: TOTAL_AMOUNT, length: 15, type: N, scale: 0 }   # 명세 금액 합계 — 은행이 대사한다
+  - { name: TOTAL_CNT,    length: 3,  type: N }            # 유효 명세 건수 — 반복부의 countField
+  - { name: TOTAL_AMOUNT, length: 15, type: N, scale: 0 }  # 명세 금액 합계 — 은행이 대사한다
   - occurs:
       name: DETAIL
-      count: 5
+      countField: TOTAL_CNT
+      max: 100
       fields:
         - { name: SEQ,         length: 3,  type: N }
         - { name: BANK_CODE,   length: 10, type: AN }
