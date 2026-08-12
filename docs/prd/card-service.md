@@ -272,7 +272,14 @@ masterLimit = floor(F × R × H)             (원 단위 FLOOR — 반올림으�
 구현과 함께 재조정해야 한다"). 한편 `deposit-service` 는 "hold/offset 으로 재원 이중사용 차단"을 표방하며
 존재하지만 **card 와 연결되어 있지 않다**. → Seed `card-service-funding-offset` 참조.
 
-### B. `/van/**` 경로에 전용 게이트가 없다 (방어 비대칭)
+### B. `/van/**` 경로에 전용 게이트가 없다 (방어 비대칭) — ✅ 2026-08-13 해소 (C-2)
+
+> **조치 완료**: `/van/**` 을 `InternalApiKeyFilter` 보호 대상에 편입하고 `SecurityConfig` 에
+> `permitAll`(필터가 게이트)로 명시했다. VAN 은 사람이 아니라 기계라 역할이 아니라 공유 시크릿으로 가린다.
+> 회귀 가드 `VanPathGateTest` 는 사용자·ADMIN 토큰 단독 401 / 올바른 시크릿 통과를 검증한다.
+> 조치 과정에서 **필터가 `getServletPath()` 만 보고 있어 그 값이 비면 게이트가 조용히 꺼지는** 잠재 구멍도
+> 함께 막았다(requestURI 폴백 + 컨텍스트 경로 제거). 이는 기존 `/internal/**` 보호에도 있던 구멍이다.
+> 아래는 해소 전 상태 기록이다.
 
 `/van/v1/{authorizations,captures,voids,refunds}` 는 shared-common `SecurityConfig` 의 경로별 매처 목록에
 없어 최종 규칙 `anyRequest().authenticated()` 로 떨어진다. 즉 **유효한 사용자 JWT 만 있으면 누구나** 승인·매입·
@@ -301,6 +308,6 @@ masterLimit = floor(F × R × H)             (원 단위 FLOOR — 반올림으�
 | #   | 항목                     | 제안 조치                                                              |
 | --- | ------------------------ | ---------------------------------------------------------------------- |
 | C-1 | §12-A 재원 이중 사용     | Seed `card-service-funding-offset` — deposit hold/offset 연계 설계·구현 |
-| C-2 | §12-B `/van/**` 게이트   | 실패 테스트(USER→403) → 전용 키 필터 또는 SecurityConfig 매처 추가      |
+| C-2 | §12-B `/van/**` 게이트   | ✅ 2026-08-13 완료 — 공유 시크릿 게이트 편입 + servletPath 폴백 구멍 동반 수정(card 343·shared 275 GREEN) |
 | C-3 | §12-C Kafka 기본값       | 기본 `true` 로 뒤집거나, 비활성 시 기동 로그에 경고를 남긴다           |
 | C-4 | §12-D 설정·코드 드리프트 | 미사용 토픽 항목 제거 또는 8종 전부 명시                               |
