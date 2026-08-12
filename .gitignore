@@ -201,3 +201,7 @@ docs/harness/
 #   그동안 기능 커밋마다 "chore(frontend): dist 갱신" 을 따라붙였으나(20커밋, 55파일),
 #   해시 파일명이라 매번 전량 교체돼 diff 를 뒤덮고 머지 충돌만 만들었다.
 frontend/dist/
+
+# verify.sh 가 guard 에 넘기는 목록 — guard 는 저장소 밖 경로를 거부하므로 리포 안에 둔다. 실행 후 자동 삭제.
+.harness-changed.txt
+.harness-deleted.txt
