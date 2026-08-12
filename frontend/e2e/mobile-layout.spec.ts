@@ -74,6 +74,20 @@ async function measureOverflow(page: Page) {
 /** 폭 안정화 대기 상한 — 데이터 로드 후 표·카드가 뒤늦게 붙는 화면을 위한 여유. */
 const SETTLE_TIMEOUT_MS = 8_000;
 
+/**
+ * 라우트에 **실제로 도달했는지** 먼저 확인한다.
+ *
+ * 이 가드가 조용히 무력해지는 방식은 하나다. 인증이 끊기거나 권한이 없어 `/login` 으로 튕기면
+ * 로그인 화면은 당연히 안 넘치므로 **모든 라우트가 통과로 찍힌다**. 측정값이 아니라 측정 대상이
+ * 사라진 것인데 결과는 초록이다. 그래서 넘침을 재기 전에 도달을 어서트한다.
+ */
+async function expectRouteReached(page: Page, route: string) {
+  const landed = new URL(page.url()).pathname;
+  expect
+    .soft(landed, `${route} 도달 실패 — ${landed} 로 이동됨(인증 만료/권한 부족이면 가드가 통째로 무의미해진다)`)
+    .not.toBe('/login');
+}
+
 async function expectNoHorizontalOverflow(page: Page, route: string) {
   // 지연 렌더까지 포함해 "최종 폭"을 재야 하므로 한 번 재고 끝내지 않는다. expect.poll 을 쓰지
   // 않는 이유는, poll 이 실패하면 마지막 측정값을 잃어 **원인 요소를 출력할 수 없기** 때문이다.
@@ -117,9 +131,13 @@ async function loginAs(page: Page, button: string, expectedPath: string) {
 const PUBLIC_ROUTES = ['/login'];
 
 /** USER 동선 — 주문·장바구니·마이페이지가 모바일 사용 비중이 가장 높다. */
-const USER_ROUTES = ['/order', '/cart', '/mypage', '/recommend'];
+const USER_ROUTES = ['/order', '/cart', '/mypage', '/recommend', '/loans', '/ai/chat'];
 
-/** ADMIN 동선 — 표가 많아 넘침이 가장 잘 나는 화면들. */
+/**
+ * ADMIN 동선 — 표가 많아 넘침이 가장 잘 나는 화면들.
+ * CEO·시스템 그룹은 좌측 사이드바 레이아웃(CeoLayout·SystemLayout)을 쓰므로 셸별로 최소 1개씩
+ * 포함해 **레이아웃 3종이 모두 측정되게** 한다.
+ */
 const ADMIN_ROUTES = [
   '/admin',
   '/admin/settlement',
@@ -128,6 +146,15 @@ const ADMIN_ROUTES = [
   '/admin/payouts',
   '/admin/shipping',
   '/admin/approvals',
+  '/workforce',
+  // CEO 그룹(CeoLayout)
+  '/admin/ceo/insight',
+  '/admin/ceo/invest',
+  '/admin/ceo/companies',
+  // 시스템 그룹(SystemLayout)
+  '/admin/system/menus',
+  '/admin/system/codes',
+  '/admin/system/operation',
 ];
 
 test.describe('모바일 레이아웃 — 가로 넘침 회귀 가드', () => {
@@ -146,6 +173,7 @@ test.describe('모바일 레이아웃 — 가로 넘침 회귀 가드', () => {
     await loginAs(page, '👤 일반 사용자', '/order');
     for (const route of USER_ROUTES) {
       await page.goto(route);
+      await expectRouteReached(page, route);
       await expectNoHorizontalOverflow(page, route);
     }
   });
@@ -154,6 +182,7 @@ test.describe('모바일 레이아웃 — 가로 넘침 회귀 가드', () => {
     await loginAs(page, '👑 관리자', '/admin');
     for (const route of ADMIN_ROUTES) {
       await page.goto(route);
+      await expectRouteReached(page, route);
       await expectNoHorizontalOverflow(page, route);
     }
   });
