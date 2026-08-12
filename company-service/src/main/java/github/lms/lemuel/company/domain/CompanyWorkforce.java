@@ -34,6 +34,12 @@ public class CompanyWorkforce {
         if (headcount < 0) {
             throw new IllegalArgumentException("가입자수는 음수일 수 없습니다: " + headcount);
         }
+        // 기준월은 보험료율·상한 조회(NpsContributionRate·NpsIncomeCap)와 응답 직렬화가 모두 의존한다.
+        // null 을 통과시키면 생성은 성공하고 한참 뒤 추정연봉 계산이나 목록 응답에서 NPE 로 터진다
+        // (SonarCloud javabugs:S2259 가 CompanyWorkforceResponse:26 의 snapshotMonth().toString() 을 지적).
+        if (snapshotMonth == null) {
+            throw new IllegalArgumentException("기준월은 필수입니다");
+        }
         if (monthlyBilledAmount == null || monthlyBilledAmount.signum() < 0) {
             throw new IllegalArgumentException("당월고지금액은 음수일 수 없습니다: " + monthlyBilledAmount);
         }

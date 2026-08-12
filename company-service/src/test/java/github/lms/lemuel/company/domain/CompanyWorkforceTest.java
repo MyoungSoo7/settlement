@@ -33,6 +33,16 @@ class CompanyWorkforceTest {
     }
 
     @Test
+    @DisplayName("기준월 누락은 생성 시점에 거부한다 — 나중에 NPE 로 터지게 두지 않는다")
+    void rejectsNullSnapshotMonth() {
+        // 기준월은 보험료율·상한 조회(NpsContributionRate/NpsIncomeCap)와 응답 직렬화가 모두 의존하는 필수값이다.
+        // null 을 허용하면 생성은 통과하고 한참 뒤 추정연봉 계산이나 목록 응답에서 NPE 로 터진다.
+        assertThrows(IllegalArgumentException.class, () ->
+                new CompanyWorkforce("주식회사에고이즘", "866759", "525101", "전자상거래 소매업", "주소",
+                        null, 50, new BigDecimal("1000000")));
+    }
+
+    @Test
     @DisplayName("가입자수는 음수를 거부한다")
     void rejectsNegativeHeadcount() {
         assertThrows(IllegalArgumentException.class, () -> valid(-1, "1000000"));
