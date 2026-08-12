@@ -1,6 +1,15 @@
 plugins {
     java
-    id("org.springframework.boot") version "4.0.4" apply false
+    // 4.0.4 → 4.0.7: CVE-2026-40976(CRITICAL, 기본 웹 시큐리티 무력화)를 비롯해 Boot BOM 이 관리하는
+    // spring-*, spring-security, spring-kafka, spring-data, tomcat-embed, netty, jackson, micrometer 의
+    // HIGH/CRITICAL 이 이 한 줄로 함께 올라간다. 근거·잔여 목록은 .trivyignore.yaml.
+    //
+    // 4.0.6 이 아니라 4.0.7 인 이유(SBOM 실측): 4.0.6 이 물고 오는 관리 버전은 수정판보다 딱 한 패치
+    // 아래라(tomcat 11.0.21 vs 11.0.22, netty 4.2.12 vs 4.2.13+, jackson 2.21.2 vs 2.21.4) 부채가
+    // 38건 남는다. 같은 4.0.x 라인의 4.0.7 은 8건까지 줄인다 — 48 → 38(4.0.6) → 8(4.0.7).
+    // shared-common/build.gradle.kts 의 spring-boot-dependencies 좌표와 반드시 같은 값이어야 한다
+    // (composite build 로 로컬 치환되므로 버전이 갈리면 서비스마다 다른 BOM 이 섞인다).
+    id("org.springframework.boot") version "4.0.7" apply false
     id("io.spring.dependency-management") version "1.1.7" apply false
     jacoco
     // 5.1.0.4882 는 Gradle 9 에서 제거된 Convention API 를 호출해 sonar 태스크가

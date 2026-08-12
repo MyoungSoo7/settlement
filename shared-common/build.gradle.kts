@@ -8,6 +8,15 @@ plugins {
     jacoco
 }
 
+// -parameters: 메서드 파라미터 이름을 바이트코드에 보존한다 — 루트 build.gradle.kts 의 subprojects 설정과 동일하게.
+// shared-common 은 독립 빌드라 그 설정을 상속받지 않아 그동안 빠져 있었다. 그래서 이 모듈의 @Bean 메서드는
+// "파라미터명 = 빈 이름" 폴백을 쓸 수 없었고, 같은 타입 빈이 둘 이상인 컨텍스트(서비스가 자체 KafkaTemplate 을
+// 추가 정의하는 경우 등)에서 주입이 모호해져 기동이 깨진다 — 실제로 settlement DLQ E2E 컨텍스트 로드가
+// 이 이유로 실패했다. (Spring Data 의 @Query 이름 파라미터 추론에도 같은 이유로 필요 — 루트 주석 참조.)
+tasks.withType<JavaCompile>().configureEach {
+    options.compilerArgs.add("-parameters")
+}
+
 group = "github.lms.lemuel"
 version = "1.0.0"
 
@@ -24,7 +33,9 @@ java {
 
 dependencies {
     // Spring Boot 의 BOM 을 사용하기 위해 dependency-management 만 적용 (boot plugin 자체는 X — 라이브러리 모듈)
-    api(platform("org.springframework.boot:spring-boot-dependencies:4.0.4"))
+    // ⚠ 루트 build.gradle.kts 의 org.springframework.boot 플러그인 버전과 같은 값을 유지할 것 —
+    //   composite build 로 로컬 치환되므로 여기만 뒤처지면 서비스마다 다른 BOM 이 섞인다.
+    api(platform("org.springframework.boot:spring-boot-dependencies:4.0.7"))
 
     // Spring 코어
     implementation("org.springframework:spring-aop")
