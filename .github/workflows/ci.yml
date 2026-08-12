@@ -265,9 +265,11 @@ jobs:
       # 그전까지 이 스텝은 sonarqube 플러그인 5.1.0.4882 가 Gradle 9 에서 제거된 Convention API 를
       # 호출해 NoSuchMethodError 로 13초 만에 죽었고, continue-on-error 가 그걸 삼켰다.
       # 즉 SonarCloud 분석은 한 번도 업로드된 적이 없다(run 31432558450 로그가 근거).
-      # 플러그인 7.4.0.8496 + sonar.qualitygate.wait=true(build.gradle.kts)와 세트로 동작한다:
-      # 품질 게이트가 깨지면 이 잡이 실패하고, 실패하면 backend-ghcr 가 이미지를 만들지 않는다.
-      - name: SonarCloud Scan (quality gate)
+      # 지금 이 스텝이 막는 것은 "분석이 안 돌았다"까지다 — 플러그인 크래시·토큰 만료처럼
+      # 분석 자체가 실패하면 이 잡이 깨지고, 그러면 backend-ghcr 가 이미지를 만들지 않는다.
+      # 품질 게이트 *내용*은 아직 차단하지 않는다(sonar.qualitygate.wait=false, build.gradle.kts).
+      # 이유와 true 로 조이는 순서는 그쪽 주석에 실측과 함께 적어 뒀다.
+      - name: SonarCloud Scan (analysis must succeed)
         if: github.event_name != 'pull_request'
         run: ./gradlew sonar --no-daemon --stacktrace
         env:

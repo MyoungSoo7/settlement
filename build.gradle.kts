@@ -196,9 +196,19 @@ sonar {
         property("sonar.projectKey", "MyoungSoo7_settlement")
         property("sonar.organization", "myoungsoo7")
         property("sonar.host.url", "https://sonarcloud.io")
-        // 품질 게이트 결과를 기다렸다가 실패면 빌드를 깬다 — false 면 분석만 올리고
-        // 게이트 판정은 아무 데도 반영되지 않는다(ci.yml 의 continue-on-error 와 세트로 무력했다).
-        property("sonar.qualitygate.wait", true)
+        // 일부러 false 다 — "분석이 안 돌았다"는 막고, "품질 게이트 내용"은 아직 막지 않는다.
+        //
+        // ci.yml 의 continue-on-error 는 제거된 상태이므로 플러그인 크래시·토큰 만료처럼
+        // *분석 자체가 실패*하면 backend-ci 가 깨진다(원래 결함은 닫힌 상태). 여기서 wait 까지
+        // true 로 두면 6개월치 누적 부채가 그대로 차단으로 들어온다 — 실측(2026-08-12,
+        // sonarcloud api/qualitygates/project_status, 마지막 분석 2026-02-26 기준):
+        //   status=ERROR · new_reliability_rating 3(A 요구) · new_coverage 0.0%(80% 요구)
+        // 커버리지 0% 는 테스트가 없어서가 아니라 JaCoCo XML 이 Sonar 로 전달된 적이 없어서다
+        // (이 블록에 sonar.coverage.jacoco.xmlReportPaths 가 없다. 저장소 자체 게이트는 LINE 90%).
+        //
+        // true 로 조이는 순서: ① JaCoCo XML 을 Sonar 에 연결해 커버리지 0% 해소
+        //   → ② bugs 3건 정리(new_reliability_rating A) → ③ 그때 이 값을 true 로.
+        property("sonar.qualitygate.wait", false)
         property("sonar.java.source", "25")
     }
 }
