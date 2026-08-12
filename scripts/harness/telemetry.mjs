@@ -46,3 +46,15 @@ export function guardHitRecords(mode, violations, now = new Date()) {
 export async function logGuardHits(repoRoot, mode, violations, options = {}) {
   return appendJsonl(repoRoot, 'guard-hits.jsonl', guardHitRecords(mode, violations, options.now ?? new Date()), options);
 }
+
+// 분모(heartbeat). guard-hits.jsonl 은 **위반만** 적기 때문에, 파일이 비어 있는 상태가
+// "아무도 규칙을 어기지 않았다" 인지 "가드가 아예 안 돌았다" 인지 구분되지 않는다. 실제로
+// 9개 체크아웃 어디에도 로그 디렉토리가 없었는데(2026-08-12 확인), 그게 무결점이라는 뜻인지
+// 훅이 죽어 있었다는 뜻인지 사후에 답할 수 없었다. 실행 자체를 1줄 남겨 분모를 만든다.
+export function guardRunRecord(mode, { files = 0, violations = 0 } = {}, now = new Date()) {
+  return { ts: now.toISOString(), mode, files, violations };
+}
+
+export async function logGuardRun(repoRoot, mode, counts, options = {}) {
+  return appendJsonl(repoRoot, 'guard-runs.jsonl', [guardRunRecord(mode, counts, options.now ?? new Date())], options);
+}
