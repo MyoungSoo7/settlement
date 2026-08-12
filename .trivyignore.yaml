@@ -10,9 +10,11 @@
 # ⚠ expired_at 이 지나면 다시 차단 대상이 된다(부채가 영구히 숨지 않게 하는 장치).
 #   기한 안에 못 고치면 날짜를 미루지 말고 왜 못 고치는지를 statement 에 적을 것.
 #
-# 경과: 최초 등록 48건(CRITICAL 5 · HIGH 43) → spring-boot 4.0.4 → 4.0.7 업그레이드로 40건 해소,
-#   현재 8건(CRITICAL 1 · HIGH 7)만 남았다. 남은 것은 전부 Boot BOM 이 관리하지 않거나
-#   BOM 관리 버전이 아직 수정판에 못 미치는 것들이다.
+# 경과: 최초 등록 48건(CRITICAL 5 · HIGH 43)
+#   → spring-boot 4.0.4 → 4.0.7 로 40건 해소 (8건 잔여)
+#   → bcprov-jdk18on 1.81 → 1.84 로 CVE-2025-14813 해소 (7건 잔여, **CRITICAL 0건**)
+#   현재 남은 7건은 전부 HIGH 이고, Boot BOM 이 관리하지 않거나 BOM 관리 버전이 아직
+#   수정판에 못 미치는 것들이다.
 #   재측정: ./gradlew cyclonedxBom && trivy sbom build/reports/cyclonedx/bom.json \
 #             --severity HIGH,CRITICAL --ignore-unfixed
 vulnerabilities:
@@ -46,7 +48,6 @@ vulnerabilities:
     statement: "Baseline 2026-08-12. netty-codec-compression. Boot 4.0.7 관리 4.2.15 → 수정판 4.2.16."
     expired_at: 2026-09-30
 
-  # ── org.bouncycastle:bcprov-jdk18on 1.81 → 1.84 (CRITICAL, 유일하게 남은 CRITICAL)
-  - id: CVE-2025-14813
-    statement: "Baseline 2026-08-12. 유입 경로는 spring-cloud-starter 5.0.0 (spring-cloud-dependencies 2025.1.0 BOM, 루트 build.gradle.kts). Boot 상향으로는 해소되지 않는다 — Cloud BOM 상향 또는 bcprov 1.84 명시 고정 필요."
-    expired_at: 2026-09-30
+  # ── (해소됨) CVE-2025-14813 / bcprov-jdk18on — gateway-service 의 constraint 로 1.84 고정.
+  #   ignore 로 덮지 않고 실제로 고쳤으므로 항목을 지운다. 이미지 스캔은 이 파일을 참조하지
+  #   않기 때문에(설계상) 여기 남겨둬도 gateway 이미지 게이트는 계속 빨간불이었을 것이다.
