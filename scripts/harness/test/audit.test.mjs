@@ -305,7 +305,9 @@ test('collectAudit cross-checks gradle module roster against CLAUDE.md and STRUC
   const files = {
     'settings.gradle.kts': settings,
     'CLAUDE.md': '├── alpha-service/ # A\n└── gateway-service/ # GW\n',
-    'STRUCTURE.md': '├── alpha-service/\n└── gateway-service/\n',
+    // 구조 정본은 docs/ 아래에 있다 — 루트 'STRUCTURE.md' 로 조회하면 trackedSet 이 항상 빗나가
+    // 이 문서가 조용히 검사 대상에서 빠진다(실제로 그렇게 방치돼 있었다).
+    'docs/STRUCTURE.md': '├── alpha-service/\n└── gateway-service/\n',
   };
   const root = repo(files);
   assert.deepEqual(collectAudit(root, baseManifest(Object.keys(files))).errors, []);
@@ -315,6 +317,35 @@ test('collectAudit cross-checks gradle module roster against CLAUDE.md and STRUC
   assert.match(bad, /CLAUDE\.md module roster missing: alpha-service/);
   assert.doesNotMatch(bad, /STRUCTURE\.md/);
   assert.doesNotMatch(bad, /shared-common/);
+
+  // docs/STRUCTURE.md 도 실제로 검사된다 — 경로 오타로 이 검사가 죽으면 여기서 잡힌다.
+  put(root, 'docs/STRUCTURE.md', '└── gateway-service/\n');
+  const both = collectAudit(root, baseManifest(Object.keys(files))).errors.join('\n');
+  assert.match(both, /docs\/STRUCTURE\.md module roster missing: alpha-service/);
+});
+
+test('collectAudit cross-checks settlement 서브도메인 roster against 문서 트리 줄', () => {
+  const files = {
+    'settlement-service/src/main/java/github/lms/lemuel/settlement/domain/Settlement.java': '',
+    'settlement-service/src/main/java/github/lms/lemuel/tax/domain/TaxCalculation.java': '',
+    // 루트 직속 파일은 서브도메인이 아니다(디렉터리만 대상).
+    'settlement-service/src/main/java/github/lms/lemuel/SettlementServiceApplication.java': '',
+    // 첫 줄은 가드레일 문단을 흉내낸 미끼 — 'settlement-service/' 만으로 앵커를 잡으면 여기 걸려
+    // 트리 줄을 못 보고 전부 누락으로 오탐한다(포트 8082 를 함께 요구해 고정).
+    'CLAUDE.md': '- settlement-service/build.gradle.kts 에 order 의존 금지\n'
+      + '├── settlement-service/ # Settlement (8082) — settlement·tax\n',
+    'docs/STRUCTURE.md': '├── settlement-service/ # Settlement (8082)\n'
+      + '│   └── .../{settlement,tax}\n',
+  };
+  const root = repo(files);
+  assert.deepEqual(collectAudit(root, baseManifest(Object.keys(files))).errors, []);
+
+  put(root, 'CLAUDE.md', '- settlement-service/build.gradle.kts 에 order 의존 금지\n'
+    + '├── settlement-service/ # Settlement (8082) — settlement\n');
+  const bad = collectAudit(root, baseManifest(Object.keys(files))).errors.join('\n');
+  assert.match(bad, /CLAUDE\.md settlement 서브도메인 누락: tax/);
+  assert.doesNotMatch(bad, /누락: settlement /);
+  assert.doesNotMatch(bad, /SettlementServiceApplication/);
 });
 
 test('collectAudit resolves HARNESS.md routing map entrypoints against agents, skills, and commands', () => {

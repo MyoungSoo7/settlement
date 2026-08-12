@@ -122,12 +122,54 @@ export function parseGradleModules(settings) {
 function validateModuleRoster(read, trackedSet, errors) {
   if (!trackedSet.has('settings.gradle.kts')) return;
   const modules = parseGradleModules(read('settings.gradle.kts'));
-  for (const doc of ['CLAUDE.md', 'STRUCTURE.md']) {
+  // 경로 주의: 구조 정본은 저장소 루트가 아니라 docs/ 아래다. 예전엔 'STRUCTURE.md' 로 적어
+  // trackedSet 조회가 항상 빗나가 이 문서는 검사된 적이 없었다(조용한 skip).
+  for (const doc of ['CLAUDE.md', 'docs/STRUCTURE.md']) {
     if (!trackedSet.has(doc)) continue;
     const content = read(doc);
     for (const module of modules) {
       if (!content.includes(module)) {
         errors.push(`${doc} module roster missing: ${module} (declared in settings.gradle.kts)`);
+      }
+    }
+  }
+}
+
+// settlement-service 서브도메인 로스터 ↔ 문서 트리 대조 —
+// 모듈은 settings.gradle.kts 가 정본이라 위 검사가 잡지만, 한 모듈 '안'의 서브도메인은 어디에도
+// 선언이 없어 코드에만 존재한다. 실제로 tax(부가세·원천징수 — 실지급액을 바꾼다)·closing·recovery 가
+// 문서에 없는 채로 오래 방치됐다(2026-08-12 역산에서 발견: 문서 7개 vs 코드 12개).
+// 낡은 요약은 "정산은 그 7개가 전부"라는 잘못된 범위 판단을 유도하므로 기계로 막는다.
+export function parseSettlementDomains(tracked) {
+  // DOMAIN_BASE 는 이 파일 아래쪽에서 선언되므로 톱레벨 상수로 빼지 않는다(TDZ) — 호출 시점엔 이미 초기화됨.
+  const prefix = `settlement-service/${DOMAIN_BASE}`;
+  const domains = new Set();
+  for (const file of tracked) {
+    if (!file.startsWith(prefix)) continue;
+    const rest = file.slice(prefix.length);
+    if (!rest.includes('/')) continue;                  // 루트 직속 파일(Application) 제외
+    const segment = rest.slice(0, rest.indexOf('/'));
+    if (/^[a-z][a-z0-9]*$/.test(segment)) domains.add(segment);  // 점으로 시작하는 도구 디렉터리 제외
+  }
+  return [...domains].sort();
+}
+
+function validateSettlementDomainRoster(read, tracked, trackedSet, errors) {
+  const domains = parseSettlementDomains(tracked);
+  if (!domains.length) return;
+  // 문서마다 표기가 다르다(CLAUDE.md 는 한 줄 `·` 나열, STRUCTURE.md 는 다음 줄 중괄호 목록) —
+  // settlement-service 트리 줄부터 2줄을 창으로 잡아 그 안에서만 찾는다(다른 문단 오탐 방지).
+  for (const doc of ['CLAUDE.md', 'docs/STRUCTURE.md']) {
+    if (!trackedSet.has(doc)) continue;
+    const lines = read(doc).split(/\r?\n/);
+    // 앵커는 '모듈 트리 줄'이어야 한다 — 'settlement-service/' 만으로 찾으면 가드레일 문단의
+    // build.gradle.kts 언급에 먼저 걸린다. 포트(8082)를 함께 요구해 트리 줄로 고정한다.
+    const anchor = lines.findIndex((line) => line.includes('settlement-service/') && line.includes('8082'));
+    if (anchor < 0) continue;
+    const window = lines.slice(anchor, anchor + 3).join('\n');
+    for (const domain of domains) {
+      if (!window.includes(domain)) {
+        errors.push(`${doc} settlement 서브도메인 누락: ${domain} (코드에 존재하나 문서 트리에 없음)`);
       }
     }
   }
@@ -570,6 +612,7 @@ export function collectAudit(repoRoot, manifest) {
 
   if (trackedSet.has('STATUS.md')) validateStatus(read('STATUS.md'), tracked, errors);
   validateModuleRoster(read, trackedSet, errors);
+  validateSettlementDomainRoster(read, tracked, trackedSet, errors);
   validateRoutingMap(read, trackedSet, errors);
   validatePluginGuardPaths(read, tracked, trackedSet, errors);
   validateDocLinks(root, read, tracked, trackedSet, manifest, errors);
