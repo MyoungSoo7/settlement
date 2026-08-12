@@ -560,18 +560,61 @@ describe('KAFKA-DLQ wiring (컨슈머는 있는데 DLT 배선이 없는 서비�
   const COMPANY_CFG = 'company-service/src/main/java/github/lms/lemuel/company/adapter/in/kafka/Cfg.java';
   const NOTIFICATION_CFG = 'notification-service/src/main/kotlin/github/lms/lemuel/notification/Cfg.kt';
 
-  test('루트 스캔 + shared-common 의존이면 공용 배선이 자동으로 닿으므로 통과한다', () => {
+  test('루트 스캔 + shared-common 의존 + 공용 배선 존재면 통과한다', () => {
     const violations = checkKafkaDlqWiring('/repo', {
       readSettings: () => SETTINGS,
       gitGrepFiles: fakeGrep({
         listeners: ['card-service/src/main/java/github/lms/lemuel/card/adapter/in/kafka/C.java'],
+        imports: [SHARED_PROVIDER], // shared-common 이 실제로 배선을 제공하는 상태
+        apps: [APP('card-service', '')],
+      }),
+      readSource: fakeSource('@SpringBootApplication\npublic class CardServiceApplication {}', {
+        files: { [SHARED_PROVIDER]: 'public class KafkaConsumerErrorHandlingConfig {}' },
+      }),
+    });
+
+    assert.deepEqual(violations, []);
+  });
+
+  const SHARED_PROVIDER = 'shared-common/src/main/java/github/lms/lemuel/common/config/kafka/KafkaConsumerErrorHandlingConfig.java';
+
+  test('공용 배선 클래스가 저장소에서 사라지면 루트 스캔 서비스도 통과하지 못한다 — 7cf573446 식 사고를 잡는 조건', () => {
+    // 실제 사고: "fix(ci): 액션 SHA 핀" 커밋이 서비스별 배선 5벌을 함께 지웠다. 당시 shared-common 에는
+    // 공용 배선이 없었으므로, (a) 경로가 "루트 스캔 + shared-common 의존"만 보면 5개 서비스가 조용히 통과한다.
+    const violations = checkKafkaDlqWiring('/repo', {
+      readSettings: () => SETTINGS,
+      gitGrepFiles: fakeGrep({
+        listeners: ['card-service/src/main/java/github/lms/lemuel/card/adapter/in/kafka/C.java'],
+        imports: [], // 공용 설정을 언급하는 파일이 하나도 없다 = 클래스가 사라졌다
         apps: [APP('card-service', '')],
       }),
       readSource: fakeSource('@SpringBootApplication\npublic class CardServiceApplication {}'),
     });
 
-    assert.deepEqual(violations, []);
+    assert.equal(violations.length, 1);
+    assert.equal(violations[0].id, 'KAFKA-DLQ');
+    assert.match(violations[0].msg, /공용 배선/);
   });
+
+  test('공용 배선을 이름만 언급하는 파일은 제공자로 치지 않는다 — 정의가 있어야 한다', () => {
+    const violations = checkKafkaDlqWiring('/repo', {
+      readSettings: () => SETTINGS,
+      gitGrepFiles: fakeGrep({
+        listeners: ['card-service/src/main/java/github/lms/lemuel/card/adapter/in/kafka/C.java'],
+        imports: ['card-service/src/main/java/github/lms/lemuel/card/adapter/in/kafka/C.java'],
+        apps: [APP('card-service', '')],
+      }),
+      readSource: fakeSource('@SpringBootApplication', {
+        files: {
+          'card-service/src/main/java/github/lms/lemuel/card/adapter/in/kafka/C.java':
+            '// TODO: KafkaConsumerErrorHandlingConfig 로 옮기기\nclass C {}',
+        },
+      }),
+    });
+
+    assert.equal(violations.length, 1);
+  });
+
 
   test('루트 스캔이어도 shared-common 미의존이면 차단한다 — 공용 설정이 클래스패스에 없다', () => {
     const violations = checkKafkaDlqWiring('/repo', {

@@ -433,6 +433,8 @@ export function stripComments(source) {
 
 /** 공용 배선을 실제로 끌어오는 형태 — 자바독 예시가 아니라 애노테이션이어야 한다. */
 const IMPORT_SHARED_CONFIG = new RegExp(`@Import[\\s(]*\\{?[^)]*${SHARED_KAFKA_CONFIG}\\s*(?:\\.class|::class)`);
+/** 공용 배선을 **제공**하는 형태 — 이름 언급이 아니라 클래스 정의여야 한다. */
+const DEFINES_SHARED_CONFIG = new RegExp(`\\bclass\\s+${SHARED_KAFKA_CONFIG}\\b`);
 /** 자체 배선을 실제로 생성하는 형태 — 타입 이름 언급이 아니라 생성자 호출이어야 한다. */
 const CONSTRUCTS_OWN_WIRING = new RegExp(`${OWN_DLT_WIRING}\\s*\\(`);
 
@@ -489,7 +491,12 @@ export function checkKafkaDlqWiring(repoRoot, deps = {}) {
   // git grep 은 후보 파일을 싸게 좁히는 용도일 뿐이다 — 통과 판정은 주석을 걷어낸 뒤
   // 실제 배선 형태(@Import 애노테이션 / recoverer 생성자 호출)가 있을 때만 내린다.
   const ownWiringModules = modulesWiredBy(grep(repoRoot, OWN_DLT_WIRING, mainSources), CONSTRUCTS_OWN_WIRING, readSource);
-  const importingModules = modulesWiredBy(grep(repoRoot, SHARED_KAFKA_CONFIG, mainSources), IMPORT_SHARED_CONFIG, readSource);
+  const sharedConfigCandidates = grep(repoRoot, SHARED_KAFKA_CONFIG, mainSources);
+  const importingModules = modulesWiredBy(sharedConfigCandidates, IMPORT_SHARED_CONFIG, readSource);
+  // (a) 경로는 "shared-common 이 배선을 제공한다"는 가정 위에 서 있다. 그 가정을 검사하지 않으면
+  // 공용 배선이 통째로 사라져도 루트 스캔 서비스가 전부 조용히 통과한다 — 실제 사고가 그렇게 났다
+  // (커밋 7cf573446 이 "액션 SHA 핀" 제목으로 서비스별 배선 5벌을 함께 삭제). 제공자 존재를 함께 본다.
+  const sharedConfigProvided = modulesWiredBy(sharedConfigCandidates, DEFINES_SHARED_CONFIG, readSource).size > 0;
   // account 처럼 @SpringBootApplication 을 분해해 쓰는 형태(@SpringBootConfiguration +
   // @EnableAutoConfiguration + @ComponentScan(excludeFilters=...))도 진입점으로 인정한다.
   const rootScanned = new Set(
@@ -511,11 +518,15 @@ export function checkKafkaDlqWiring(repoRoot, deps = {}) {
   const violations = [];
   for (const module of [...consumerModules].sort()) {
     if (ownWiringModules.has(module) || importingModules.has(module)) continue;
-    if (rootScanned.has(module) && dependsOnSharedCommon(module)) continue;
+    const scannedWithSharedCommon = rootScanned.has(module) && dependsOnSharedCommon(module);
+    if (scannedWithSharedCommon && sharedConfigProvided) continue;
+    const cause = scannedWithSharedCommon
+      ? `공용 배선 클래스 ${SHARED_KAFKA_CONFIG} 가 저장소에 없다 — 삭제됐거나 옮겨졌다. 루트 스캔·shared-common 의존만으로는 배선이 성립하지 않는다`
+      : `shared-common 의존 서비스는 루트 스캔이거나 @Import(${SHARED_KAFKA_CONFIG}.class), standalone 은 자체 ${OWN_DLT_WIRING} 배선이 필요하다`;
     violations.push({
       file: `${module}/src/main`,
       id: 'KAFKA-DLQ',
-      msg: `@KafkaListener 가 있는데 DLT 배선이 닿지 않음 — Spring Kafka 기본 핸들러는 재시도 소진 후 메시지를 조용히 skip 한다(사실상 유실). shared-common 의존 서비스는 루트 스캔이거나 @Import(${SHARED_KAFKA_CONFIG}.class), standalone 은 자체 ${OWN_DLT_WIRING} 배선이 필요하다`,
+      msg: `@KafkaListener 가 있는데 DLT 배선이 닿지 않음 — Spring Kafka 기본 핸들러는 재시도 소진 후 메시지를 조용히 skip 한다(사실상 유실). ${cause}`,
     });
   }
   return violations;
