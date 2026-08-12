@@ -35,6 +35,7 @@ public class ProductVariant {
     private int stockQuantity;
     private long version;
     private ProductVariantStatus status;
+    private String optionSignature;
     private final LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -68,8 +69,19 @@ public class ProductVariant {
                                             BigDecimal discountRate, int stockQuantity, long version,
                                             ProductVariantStatus status, LocalDateTime createdAt,
                                             LocalDateTime updatedAt) {
-        return new ProductVariant(id, productId, sku, optionName, additionalPrice, discountPrice,
-                discountRate, stockQuantity, version, status, createdAt, updatedAt);
+        return rehydrate(id, productId, sku, optionName, additionalPrice, discountPrice, discountRate,
+                stockQuantity, version, status, null, createdAt, updatedAt);
+    }
+
+    public static ProductVariant rehydrate(Long id, Long productId, String sku, String optionName,
+                                            BigDecimal additionalPrice, BigDecimal discountPrice,
+                                            BigDecimal discountRate, int stockQuantity, long version,
+                                            ProductVariantStatus status, String optionSignature,
+                                            LocalDateTime createdAt, LocalDateTime updatedAt) {
+        ProductVariant variant = new ProductVariant(id, productId, sku, optionName, additionalPrice,
+                discountPrice, discountRate, stockQuantity, version, status, createdAt, updatedAt);
+        variant.optionSignature = optionSignature;
+        return variant;
     }
 
     private ProductVariant(Long id, Long productId, String sku, String optionName,
@@ -158,6 +170,27 @@ public class ProductVariant {
         return status == ProductVariantStatus.ACTIVE && stockQuantity > 0;
     }
 
+    /**
+     * 조합 서명 부여 — 이 SKU 가 어떤 옵션 값 조합인지의 기계 식별자({@link OptionSignature}).
+     *
+     * <p>같은 값을 다시 넣는 것은 no-op 이라 백필을 몇 번 돌려도 안전하다. 반면 <b>다른</b> 서명을
+     * 덮어쓰려는 것은 "이 SKU 의 옵션 조합이 바뀌었다"는 뜻인데, 조합이 바뀌면 그건 다른 SKU 다 —
+     * 이미 팔린 주문이 가리키는 조합이 소급해서 달라지므로 막는다.
+     */
+    public void assignOptionSignature(String signature) {
+        Objects.requireNonNull(signature, "signature");
+        if (this.optionSignature != null && !this.optionSignature.equals(signature)) {
+            throw new InvalidProductStateException(
+                    "이미 다른 조합 서명이 부여된 SKU 입니다: sku=" + sku);
+        }
+        this.optionSignature = signature;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public boolean hasOptionSignature() {
+        return optionSignature != null;
+    }
+
     public Long getId() { return id; }
     public Long getProductId() { return productId; }
     public String getSku() { return sku; }
@@ -168,6 +201,7 @@ public class ProductVariant {
     public int getStockQuantity() { return stockQuantity; }
     public long getVersion() { return version; }
     public ProductVariantStatus getStatus() { return status; }
+    public String getOptionSignature() { return optionSignature; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
 

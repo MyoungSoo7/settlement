@@ -2,6 +2,8 @@ package github.lms.lemuel.product.adapter.in.web;
 
 import github.lms.lemuel.product.application.port.in.BackfillOptionCatalogUseCase;
 import github.lms.lemuel.product.application.port.in.BackfillOptionCatalogUseCase.BackfillReport;
+import github.lms.lemuel.product.application.port.in.BackfillVariantSignatureUseCase;
+import github.lms.lemuel.product.application.port.in.BackfillVariantSignatureUseCase.SignatureBackfillReport;
 import github.lms.lemuel.product.application.port.out.LoadOptionCatalogPort;
 import github.lms.lemuel.product.adapter.in.web.response.OptionAxisResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -26,11 +28,14 @@ import java.util.List;
 public class AdminOptionCatalogController {
 
     private final BackfillOptionCatalogUseCase backfillUseCase;
+    private final BackfillVariantSignatureUseCase signatureUseCase;
     private final LoadOptionCatalogPort loadCatalogPort;
 
     public AdminOptionCatalogController(BackfillOptionCatalogUseCase backfillUseCase,
+                                        BackfillVariantSignatureUseCase signatureUseCase,
                                         LoadOptionCatalogPort loadCatalogPort) {
         this.backfillUseCase = backfillUseCase;
+        this.signatureUseCase = signatureUseCase;
         this.loadCatalogPort = loadCatalogPort;
     }
 
@@ -51,6 +56,18 @@ public class AdminOptionCatalogController {
         BackfillReport report = productId == null
                 ? backfillUseCase.backfillAll()
                 : backfillUseCase.backfillProduct(productId);
+        return ResponseEntity.ok(report);
+    }
+
+    @Operation(summary = "SKU 조합 매핑·서명 백필",
+            description = "SKU 를 옵션 값에 매핑하고 조합 서명을 부여한다. 카탈로그 백필이 선행되어야 하며 멱등이다.")
+    @PostMapping("/backfill-signatures")
+    public ResponseEntity<SignatureBackfillReport> backfillSignatures(
+            @Parameter(description = "특정 상품만 처리할 경우 상품 ID (생략 시 전체)")
+            @RequestParam(required = false) Long productId) {
+        SignatureBackfillReport report = productId == null
+                ? signatureUseCase.backfillAll()
+                : signatureUseCase.backfillProduct(productId);
         return ResponseEntity.ok(report);
     }
 }

@@ -144,19 +144,9 @@ public class BackfillOptionCatalogService implements BackfillOptionCatalogUseCas
                 });
     }
 
-    /**
-     * 표시 이름 → 기계 코드. 내부 공백만 하이픈으로 접고, 그 외에는 손대지 않는다.
-     *
-     * <p>길이 초과를 잘라내지 않는 이유: 잘라내면 서로 다른 두 이름이 한 코드로 합쳐져 <b>다른 옵션이
-     * 같은 값이 되는</b> 조용한 오염이 생긴다. 드러나게 실패시키고 사람이 이름을 정리하는 편이 안전하다.
-     */
+    /** 표시 이름 → 기계 코드. 규칙은 {@link OptionCode} 가 소유한다(백필과 조회가 같은 규칙을 써야 함). */
     private static String toCode(String name, String what) {
-        String code = name.trim().replaceAll("\\s+", "-");
-        if (code.length() > 50) {
-            throw new ProductInvariantViolationException(
-                    what + "이 코드 길이 50 자를 넘습니다(자동 축약하지 않음): " + name);
-        }
-        return code;
+        return OptionCode.fromDisplayName(name, what);
     }
 
     /** 생성 건수 집계용 가변 카운터 — 서비스 내부 전용. */
