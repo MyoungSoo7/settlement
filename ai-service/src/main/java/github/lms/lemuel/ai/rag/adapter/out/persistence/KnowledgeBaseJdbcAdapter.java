@@ -57,6 +57,29 @@ public class KnowledgeBaseJdbcAdapter implements KnowledgeBasePort {
     }
 
     /**
+     * 문서 목록 — 출처 오름차순.
+     *
+     * <p>정렬을 {@code source_uri} 로 고정하는 이유: 이 응답은 매니페스트(정렬된 텍스트)와 대조되고
+     * 스크립트가 diff 를 뜬다. 삽입 순서대로 돌려주면 같은 내용인데도 매번 다른 순서가 나와
+     * 사람이 눈으로 대조할 수 없다.
+     */
+    @Override
+    public List<KnowledgeDocument> listDocuments() {
+        return jdbcTemplate.query("""
+                SELECT id, title, source_uri, content_hash, chunk_count, ingested_at
+                  FROM knowledge_documents
+                 ORDER BY source_uri
+                """,
+                (rs, rowNum) -> new KnowledgeDocument(
+                        rs.getObject("id", java.util.UUID.class),
+                        rs.getString("title"),
+                        rs.getString("source_uri"),
+                        rs.getString("content_hash"),
+                        rs.getInt("chunk_count"),
+                        rs.getTimestamp("ingested_at").toInstant()));
+    }
+
+    /**
      * 문서 + 청크 전량 교체.
      *
      * <p>단일 트랜잭션이어야 하는 이유: 청크가 일부만 갱신된 상태는 옛 답과 새 답이 섞인 근거라

@@ -4,6 +4,7 @@ import github.lms.lemuel.ai.chat.domain.PiiMasker;
 import github.lms.lemuel.common.log.LogSafe;
 import github.lms.lemuel.ai.config.RagProperties;
 import github.lms.lemuel.ai.rag.application.port.in.IngestKnowledgeUseCase;
+import github.lms.lemuel.ai.rag.application.port.in.ListKnowledgeDocumentsUseCase;
 import github.lms.lemuel.ai.rag.application.port.out.EmbeddingPort;
 import github.lms.lemuel.ai.rag.application.port.out.KnowledgeBasePort;
 import github.lms.lemuel.ai.rag.domain.ContentHash;
@@ -37,7 +38,7 @@ import java.util.Optional;
  */
 @Service
 @ConditionalOnProperty(name = "app.ai.rag.enabled", havingValue = "true")
-public class IngestKnowledgeService implements IngestKnowledgeUseCase {
+public class IngestKnowledgeService implements IngestKnowledgeUseCase, ListKnowledgeDocumentsUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(IngestKnowledgeService.class);
 
@@ -103,6 +104,17 @@ public class IngestKnowledgeService implements IngestKnowledgeUseCase {
         log.info("[RAG] 적재 완료: sourceUri={}, chunks={}, model={}",
                 command.sourceUri(), chunks.size(), embeddingPort.modelId());
         return new IngestResult(command.sourceUri(), chunks.size(), false, embeddingPort.modelId());
+    }
+
+    /**
+     * 적재 문서 목록 — 지식베이스를 건드리지 않는 순수 조회다.
+     *
+     * <p>여기에 필터·가공을 두지 않는다. 이 응답의 유일한 용도는 매니페스트(리포)와 실제 적재분(DB)의
+     * <b>대조</b>이고, 대조 대상이 가공되면 diff 가 거짓말을 한다.
+     */
+    @Override
+    public List<KnowledgeDocument> listDocuments() {
+        return knowledgeBasePort.listDocuments();
     }
 
     @Override
