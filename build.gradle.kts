@@ -224,5 +224,32 @@ sonar {
         //   → ② bugs 3건 정리(new_reliability_rating A) → ③ 그때 이 값을 true 로.
         property("sonar.qualitygate.wait", false)
         property("sonar.java.source", "25")
+
+        // ⚠ 미해결(빌드에서 고칠 수 없음): 스캐너가 남기는
+        //   "Could not find ref 'master' in refs/heads, refs/remotes, refs/remotes/upstream
+        //    or refs/remotes/origin" (2026-08-12 run 31611508158 실측)
+        // 원인은 SonarCloud 프로젝트의 **주 브랜치가 `master` 로 등록**돼 있는데 저장소에는 그 ref 가
+        // 없다는 것이다(원격 브랜치는 main·develop 뿐 — master 는 rename 됐다).
+        //
+        // 여기서 sonar.branch.name 을 GITHUB_REF_NAME 으로 주는 우회는 **일부러 하지 않았다**:
+        // 그러면 develop 이 서버의 주 브랜치가 아니라 신규 "브랜치"로 등록되고, 신규 코드 기준선이
+        // 이력 없는 상태에서 다시 잡혀 new_* 지표가 오히려 왜곡된다(현재는 develop 분석이 주 브랜치
+        // 이력에 누적되므로 직전 분석 대비 신규 코드 판정은 정상 동작한다).
+        // 정본 조치는 SonarCloud UI 에서 주 브랜치 이름을 master → develop(또는 main)으로 바꾸는 것이다.
     }
+}
+
+// 분석 전에 전 모듈이 컴파일돼 있게 강제한다.
+//
+// ci.yml 은 변경 모듈만 빌드하고(`:<module>:build`) 그다음 별도 Gradle 호출로 `sonar` 를 돌린다.
+// 그래서 안 건드린 모듈에는 .class 가 없고, 스캐너가 "Binary paths (sonar.java.binaries) are empty"
+// 를 남긴다(2026-08-12 run 31611508158 실측). 바이너리가 없으면 타입 해석이 반쪽이 되어
+// ("Unresolved imports/types have been detected") 자바 규칙 상당수가 조용히 비활성화된다 —
+// 분석이 "돌았다"와 "제대로 봤다"는 다르다. 컴파일 시간을 조금 더 쓰고 분석의 신뢰도를 산다.
+// `classes` 가 아니라 `compileJava` 다. classes 를 걸면 processResources 가 그래프에 들어오고,
+// 플러그인의 sonarResolver 가 그 산출 디렉터리를 선언 없이 읽어 Gradle 이 암묵 의존성 위반으로
+// 빌드를 깬다(실측: "Declare task ':account-service:processResources' as an input of
+// ':account-service:sonarResolver'"). 스캐너에 필요한 건 .class 뿐이므로 컴파일만 요구한다.
+tasks.named("sonar") {
+    dependsOn(subprojects.map { "${it.path}:compileJava" })
 }
