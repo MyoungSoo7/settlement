@@ -173,6 +173,11 @@ public class SecurityConfig {
                         // 수수료율 정책 — 정산 금액을 직접 바꾸므로 조회 콘솔과 달리 ADMIN 만.
                         .requestMatchers("/admin/commission-rates/**").hasRole("ADMIN")
                         .requestMatchers("/admin/settlements/**").hasRole("ADMIN")
+                        // 원장 기간 마감·정보계 월마감 — 두 컨트롤러 javadoc 이 "/admin/** ADMIN 게이트 상속"이라
+                        // 적었지만 그런 포괄 매처는 존재한 적이 없어(경로별 열거 방식) authenticated() 로 새고 있었다.
+                        // 기간 마감은 재개봉이 없고 월마감은 마트를 통째로 교체하므로 형제 실행 콘솔과 동일하게 ADMIN 만.
+                        .requestMatchers("/admin/ledger-periods/**").hasRole("ADMIN")
+                        .requestMatchers("/admin/monthly-closing/**").hasRole("ADMIN")
                         // 셀러 지급 계좌 레지스트리 — 등록·정정(PII). 셀러 식별자를 관리자 입력으로 받으므로
                         // ADMIN/MANAGER 게이트로 IDOR 방지 (Seed D1).
                         .requestMatchers("/admin/seller-bank-accounts/**").hasAnyRole("ADMIN", "MANAGER")
