@@ -93,7 +93,15 @@ class KafkaErrorHandlingConfig(
     )
 
     /**
-     * Routes a dead record to `<topic>.DLT`, same partition (so key ordering survives replay).
+     * Routes a dead record to `<topic>.DLT`, leaving the partition to the producer (-1).
+     *
+     * Pinning the source partition number would require `<topic>.DLT` to have at least as many
+     * partitions as the source — an assumption that breaks silently in production, since partitions
+     * can only grow and the DLT does not follow (measured: `lemuel.payment.captured` had 6 partitions
+     * while its DLT had 3, so records from partitions 3-5 would be routed to a partition that does
+     * not exist and the quarantine publish itself would fail). The record keeps its key, so the
+     * producer's partitioner still groups a key onto one partition — per-key order survives replay.
+     *
      * Already-`.DLT` topics are not suffixed again — no `.DLT.DLT` growth.
      */
     @Bean
@@ -110,7 +118,7 @@ class KafkaErrorHandlingConfig(
                 "[DLT] publishing record to DLT. topic={}, partition={}, offset={}, exception={}",
                 record.topic(), record.partition(), record.offset(), ex.javaClass.simpleName,
             )
-            TopicPartition(dltTopicOf(record.topic()), record.partition())
+            TopicPartition(dltTopicOf(record.topic()), PRODUCER_CHOOSES_PARTITION)
         }
     }
 
@@ -158,6 +166,9 @@ class KafkaErrorHandlingConfig(
         private const val RETRY_INTERVAL_MS = 2_000L
         private const val MAX_RETRIES = 3L
         private const val DLT_SUFFIX = ".DLT"
+
+        /** Negative partition = unset; the producer's partitioner picks one from the record key. */
+        private const val PRODUCER_CHOOSES_PARTITION = -1
 
         fun dltTopicOf(topic: String): String =
             if (topic.endsWith(DLT_SUFFIX)) topic else topic + DLT_SUFFIX

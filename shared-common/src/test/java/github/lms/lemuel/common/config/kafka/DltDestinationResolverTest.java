@@ -27,12 +27,17 @@ class DltDestinationResolverTest {
     }
 
     @Test
-    @DisplayName("<원본>.DLT 의 같은 파티션으로 보낸다 — key 기반 순서가 replay 에서도 유지되어야 한다")
-    void routesToDltPreservingPartition() {
+    @DisplayName("<원본>.DLT 로 보내되 파티션은 프로듀서에게 맡긴다(-1) — 원본 파티션 번호를 고정하면 DLT 에 그 번호가 없을 때 격리가 통째로 실패한다")
+    void routesToDltLettingProducerChoosePartition() {
+        // 실측 근거: lemuel.payment.captured 는 파티션 6개인데 lemuel.payment.captured.DLT 는 3개다.
+        // 원본 파티션 번호를 그대로 쓰면 파티션 3~5 의 실패 레코드는 존재하지 않는 목적지로 향한다.
+        // 파티션 수는 늘리기만 가능하고 DLT 가 자동으로 따라오지도 않으므로, "파티션 수가 같아야 한다"는
+        // 전제 자체를 없앤다. 키가 보존되므로 키 단위 순서는 프로듀서 파티셔너가 그대로 지킨다.
         TopicPartition destination = resolver.apply(
-                record("lemuel.payment.captured", 2), new IllegalStateException("boom"));
+                record("lemuel.payment.captured", 4), new IllegalStateException("boom"));
 
-        assertThat(destination).isEqualTo(new TopicPartition("lemuel.payment.captured.DLT", 2));
+        assertThat(destination.topic()).isEqualTo("lemuel.payment.captured.DLT");
+        assertThat(destination.partition()).isNegative();
     }
 
     @Test
