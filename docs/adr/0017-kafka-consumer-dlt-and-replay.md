@@ -24,18 +24,29 @@ Spring Kafka 기본 동작은 `FixedBackOff(0, 9)` 로 즉시 9회 재시도 후
 
 ### 1. 컨슈머 측 — DefaultErrorHandler + DLT
 
-`KafkaErrorHandlerConfig` 가 `DefaultErrorHandler` 를 구성한다:
+shared-common 의 `KafkaConsumerErrorHandlingConfig` 가 `DefaultErrorHandler` 를 구성한다. 원래는
+서비스마다 `KafkaErrorHandlerConfig` 를 복붙했으나(5벌), 그 사본 문화 때문에 나중에 추가된
+서비스는 배선 자체가 누락돼 기본 핸들러 `FixedBackOff(0, 9)` 로 떨어졌다 — 기본 핸들러는 재시도
+소진 후 메시지를 조용히 skip 하므로 사실상 유실이다. 배선을 한 벌로 모으고, 누락은 `guard.mjs` 의
+`KAFKA-DLQ` 규칙이 기계로 차단한다:
 
 - 일시적 예외 → `FixedBackOff(2s, 3회)` 재시도
 - 독성 예외(`JsonProcessingException`, `IllegalArgumentException`, `IllegalStateException`)는
   `addNotRetryableExceptions` 로 **재시도 없이 즉시 DLT**
+- 서비스별 도메인 타입 예외(account 의 `AccountDomainException` 등)는 `NonRetryableConsumerExceptions`
+  빈으로 기여해 같은 즉시-DLT 목록에 붙인다 — 계약 위반은 재시도로 복구되지 않는다
 - 재시도 한계 도달 → `DeadLetterPublishingRecoverer` 가 원본 record 를 `<topic>.DLT` 로 복사 후 ack
   → 같은 파티션의 후속 메시지는 정상 처리(stall 방지)
 
 DLT recoverer 는 `kafka_dlt-*` 헤더(원본 토픽/파티션/오프셋/예외 FQCN/스택트레이스)를 자동 부여하고,
 원본 `event_id`·`traceparent` 헤더는 패스스루한다 → 사후 추적 + replay 시 멱등 보장. 메트릭
-`settlement.kafka.dlt.published` 로 알람 임계(예: 10/min)를 건다. 컨슈머는
+`settlement.kafka.dlt.published` 로 알람 임계(예: 10/min)를 건다(접두는 `spring.application.name` 의
+`lemuel-` 을 떼어 유도하므로 서비스마다 기존 알람 이름이 그대로 유지된다). 컨슈머는
 `ConditionalOnProperty(app.kafka.enabled=true)` 라 Kafka 비활성 환경에서는 빈 자체가 안 만들어진다.
+
+shared-common 을 의존하지 않는 폴리글랏 standalone(`notification-service`, Kotlin/Boot 3.x)은 같은
+계약을 자기 언어로 구현한다(`KafkaErrorHandlingConfig`). ack 모드만 다르다 — 그 서비스 리스너에는
+`Acknowledgment` 파라미터가 없어 `RECORD` 를 쓴다(수동 모드면 오프셋이 영원히 커밋되지 않는다).
 
 ### 2. Outbox 측 — retryCount 한계 → DLQ
 

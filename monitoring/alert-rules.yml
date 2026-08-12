@@ -268,7 +268,7 @@ groups:
 
   # ──────────────────────────────────────────────────────────────────────
   # Kafka DLT (Dead Letter Topic) — 정산 시작점 이벤트 처리 실패 감시
-  # 메트릭은 settlement-service KafkaErrorHandlerConfig 가 노출.
+  # 메트릭은 shared-common KafkaConsumerErrorHandlingConfig 가 노출(접두는 spring.application.name 유래).
   # 자세한 설계는 ADR 0017 참조.
   # ──────────────────────────────────────────────────────────────────────
   - name: lemuel_kafka_dlt_alerts
