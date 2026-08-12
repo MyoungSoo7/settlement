@@ -319,8 +319,28 @@ jobs:
       #    Please check the property sonar.token or the environment variable SONAR_TOKEN."
       #   토큰은 2026-02-24 등록분이고 마지막 분석은 2026-02-26 이다. 이 스텝이 초록이 되려면
       #   SonarCloud 에서 토큰을 재발급해 저장소 시크릿 SONAR_TOKEN 을 갱신해야 한다.
-      - name: SonarCloud Scan (analysis must succeed)
+      #   아래 유무 가드는 "토큰이 없는" 환경만 덮는다 — 지금처럼 토큰이 있는데 거부되면(403)
+      #   이 스텝은 그대로 실패한다. 만료를 조용히 통과시키면 분석이 영영 안 돌아도 초록이 된다.
+
+      # 토큰 유무 판정을 스캔에서 분리한다: secrets 컨텍스트는 step 의 if 에서 쓸 수 없고, 스텝 자신의
+      # env 도 그 스텝의 if 가 평가되는 시점에는 없다. 그래서 앞선 스텝의 output 으로 옮긴다.
+      # 시크릿이 없는 환경(포크, 시크릿 미설정 클론)에서 "토큰이 없어서" 잡이 깨지는 것을 막되,
+      # 스킵을 조용히 넘기지 않고 ::warning:: 으로 남긴다 — 스킵을 "분석 통과"로 오독하면 안 된다.
+      - name: SONAR_TOKEN 유무 확인
+        id: sonar_token
         if: github.event_name != 'pull_request'
+        run: |
+          if [ -n "$SONAR_TOKEN" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=SonarCloud 분석 건너뜀::SONAR_TOKEN 시크릿이 비어 있어 분석을 실행하지 않았다. 저장소 Settings → Secrets 에 토큰을 등록하면 다시 돈다."
+          fi
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      - name: SonarCloud Scan (analysis must succeed)
+        if: github.event_name != 'pull_request' && steps.sonar_token.outputs.present == 'true'
         run: ./gradlew sonar --no-daemon --stacktrace
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
