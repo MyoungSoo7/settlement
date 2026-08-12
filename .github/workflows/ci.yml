@@ -261,25 +261,12 @@ jobs:
           paths: ${{ github.workspace }}/*/build/reports/jacoco/test/jacocoTestReport.xml
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      # 게이트다 — continue-on-error 를 뗐다(2026-08-12).
-      # 그전까지 이 스텝은 sonarqube 플러그인 5.1.0.4882 가 Gradle 9 에서 제거된 Convention API 를
-      # 호출해 NoSuchMethodError 로 13초 만에 죽었고, continue-on-error 가 그걸 삼켰다.
-      # 즉 SonarCloud 분석은 한 번도 업로드된 적이 없다(run 31432558450 로그가 근거).
-      # 지금 이 스텝이 막는 것은 "분석이 안 돌았다"까지다 — 플러그인 크래시·토큰 만료처럼
-      # 분석 자체가 실패하면 이 잡이 깨지고, 그러면 backend-ghcr 가 이미지를 만들지 않는다.
-      # 품질 게이트 *내용*은 아직 차단하지 않는다(sonar.qualitygate.wait=false, build.gradle.kts).
-      # 이유와 true 로 조이는 순서는 그쪽 주석에 실측과 함께 적어 뒀다.
-      - name: SonarCloud Scan (analysis must succeed)
-        if: github.event_name != 'pull_request'
-        run: ./gradlew sonar --no-daemon --stacktrace
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/testdb
-          SPRING_DATASOURCE_USERNAME: testuser
-          SPRING_DATASOURCE_PASSWORD: testpass
-          SPRING_ELASTICSEARCH_URIS: http://localhost:9200
-
+      # ⚠ 순서 주의: SCA(보안 게이트)가 SonarCloud(품질 분석)보다 *먼저* 온다.
+      #   원래는 반대였는데, 2026-08-12 run 31602739861 에서 SONAR_TOKEN 만료(HTTP 403)로
+      #   Sonar 스텝이 실패하자 뒤따르던 SBOM·Trivy 가 통째로 skip 됐다 — 무관한 도구의 인증
+      #   문제로 보안 게이트가 조용히 사라진 것이고, 이 작업이 없애려던 실패 양식 그대로다.
+      #   보안 게이트를 앞에 두면 품질 도구의 사정과 무관하게 항상 판정된다.
+      #
       # ── SCA (의존성 취약점) — Snyk 을 걷어내고 SBOM + Trivy 로 갈아탔다 (2026-08-12).
       #
       # Snyk 을 뺀 이유(실측, run 31432558450):
@@ -293,9 +280,11 @@ jobs:
       - name: Generate SBOM (CycloneDX)
         run: ./gradlew cyclonedxBom --no-daemon
 
+      # if: always() 를 뗐다 — SBOM 생성이 skip/실패했는데도 업로드가 돌아 빈손으로 성공하던
+      # 스텝이었다(run 31599697053: Generate 는 skipped, Upload 는 success). 스캔은 이 뒤에
+      # 오므로 스캔이 실패해도 이 업로드는 이미 끝나 있다 — always() 가 필요 없다.
       - name: Upload SBOM
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        if: always()
         with:
           name: backend-sbom
           path: build/reports/cyclonedx/bom.json
@@ -316,6 +305,30 @@ jobs:
           trivyignores: .trivyignore.yaml
           format: table
           exit-code: "1"
+
+      # 게이트다 — continue-on-error 를 뗐다(2026-08-12).
+      # 그전까지 이 스텝은 sonarqube 플러그인 5.1.0.4882 가 Gradle 9 에서 제거된 Convention API 를
+      # 호출해 NoSuchMethodError 로 13초 만에 죽었고, continue-on-error 가 그걸 삼켰다.
+      # 즉 SonarCloud 분석은 한 번도 업로드된 적이 없다(run 31432558450 로그가 근거).
+      # 지금 이 스텝이 막는 것은 "분석이 안 돌았다"까지다 — 플러그인 크래시·토큰 만료처럼
+      # 분석 자체가 실패하면 이 잡이 깨지고, 그러면 backend-ghcr 가 이미지를 만들지 않는다.
+      # 품질 게이트 *내용*은 아직 차단하지 않는다(sonar.qualitygate.wait=false, build.gradle.kts).
+      #
+      # ⚠ 현재 SONAR_TOKEN 은 만료 상태다 — run 31602739861 실측:
+      #   "GET https://api.sonarcloud.io/analysis/jres... failed with HTTP 403 Forbidden.
+      #    Please check the property sonar.token or the environment variable SONAR_TOKEN."
+      #   토큰은 2026-02-24 등록분이고 마지막 분석은 2026-02-26 이다. 이 스텝이 초록이 되려면
+      #   SonarCloud 에서 토큰을 재발급해 저장소 시크릿 SONAR_TOKEN 을 갱신해야 한다.
+      - name: SonarCloud Scan (analysis must succeed)
+        if: github.event_name != 'pull_request'
+        run: ./gradlew sonar --no-daemon --stacktrace
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/testdb
+          SPRING_DATASOURCE_USERNAME: testuser
+          SPRING_DATASOURCE_PASSWORD: testpass
+          SPRING_ELASTICSEARCH_URIS: http://localhost:9200
 
   # (제거) 주석 처리돼 있던 sonarqube-quality-gate-action 블록 — build.gradle.kts 의
   # sonar.qualitygate.wait=true 가 같은 일을 하므로(분석 태스크가 게이트 결과를 기다렸다가 실패)
