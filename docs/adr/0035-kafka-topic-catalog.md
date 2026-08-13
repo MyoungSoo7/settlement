@@ -98,15 +98,41 @@ Kafka 레퍼런스 *Configuring Topics*). 편의 기능이지만 이 저장소�
 
 ### 한계 (정직하게)
 
-- **브로커 실측 미반영**: 카탈로그의 `partitions: 3` 은 기존 코드의 의도값(`app.kafka.topic.partitions:3`)을
-  옮긴 것이지, 운영 브로커에서 측정한 값이 아니다(작업 시점에 Docker 미기동). 실제 파티션이 1이면
-  프로비저너는 늘리지 않고 드리프트로 보고한다 — 안전하지만, 카탈로그와 현실을 맞추는 **1회 실측 패스**가
-  남아 있다: `docker exec lemuel-redpanda rpk topic describe <topic>`.
+- ~~브로커 실측 미반영~~ → **해소 (2026-08-14)**. 아래 "실측 결과" 참조.
 - **`orderingKey` 값은 미검증**: 계약 스키마의 식별자 필드와 발행 어댑터 주석에서 도출했다. 게이트는
   "선언되어 있음"만 강제하며, 각 값이 실제 `aggregateId` 와 일치하는지의 publisher 별 대조는 후속 작업이다.
 - 런타임 강제 아님 — `rpk` 로 사람이 만든 토픽은 카탈로그를 거치지 않는다(드리프트로만 드러난다).
 - 파티션 **변경** 자체를 막지는 않는다. 카탈로그 값이 바뀌면 diff 에 드러나 리뷰에 걸리지만, 전용
   가드 규칙(변경 시 마이그레이션 근거 요구)은 넣지 않았다.
+
+## 실측 결과 (2026-08-14)
+
+로컬 브로커(`lemuel-redpanda`, 볼륨 `settlement_redpanda-data`)에서 `rpk topic list` 로 33개 `lemuel.*`
+토픽을 실측했다. **가설이 그대로 확인됐다 — 자동생성 토픽은 전부 파티션 1**이었다.
+
+특히 `lemuel.payment.captured` 는 **6 파티션인데 그 DLT 는 3** 이었다. notification-service 주석에
+기록된 사고가 브로커에 그대로 살아 있었다는 뜻이다(파티션 3~5 의 레코드는 격리 발행 자체가 실패한다).
+
+조정은 **메시지가 있는지**를 기준으로 갈랐다(`HIGH-WATERMARK` 합계):
+
+| 구분 | 조치 | 대상 |
+|---|---|---|
+| 비어 있음 | 브로커를 3으로 증설 (재해시 없음) | settlement.{adjusted,canceled,holdback_consumed,withholding_accrued}, seller_recovery.{opened,offset}, pgreconciliation.discrepancy_approved, loan.corporate_loan_disbursed |
+| 비어 있음(DLT) | 3 → 6 으로 증설 — **기록된 사고 해소** | payment.captured.DLT |
+| 데이터 보유 | 카탈로그를 실측값 1 로 하향 | order.created(1552), settlement.created(1317), settlement.holdback_released(1310), payout.completed(200), product.changed(64), user.registered(43), 외 5종 |
+| 이미 일치 | 변경 없음 | payment.refunded(3), payment.refunded.DLT(3) |
+| 실측 반영 | 카탈로그 3 → 6 (축소 불가) | payment.captured |
+
+결과: **카탈로그 ↔ 브로커 불일치 0건**(브로커에 존재하는 23개 항목 기준). 나머지는 아직 미생성이며
+소유 서비스 기동 시 프로비저너가 만든다.
+
+`1` 로 적힌 토픽을 나중에 올리려면 드레인 후 계획된 마이그레이션이 필요하다 — 카탈로그만 고치면
+프로비저너는 증설하지 않고 드리프트 게이지로만 뜬다(설계대로다).
+
+**의도적 제외** (카탈로그 밖 브로커 토픽 9개): `lemuel.ops.*` 5종은 `KafkaOpsSignalPublisher` 가
+모든 서비스에서 발행해 `owner` 가 하나로 정해지지 않고 best-effort 라 순서 보장 대상이 아니다.
+`lemuel.payment.{authorized,confirmed,created}` 는 어느 서비스도 참조하지 않는 레거시,
+`lemuel.user.membership_changed` 는 ADR 0024 가 남긴 잔여 후보다.
 
 ## 참조
 
