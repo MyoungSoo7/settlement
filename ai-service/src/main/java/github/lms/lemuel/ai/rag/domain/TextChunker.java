@@ -26,7 +26,10 @@ import java.util.regex.Pattern;
 public final class TextChunker {
 
     /** 문단 구분 — 빈 줄 1개 이상(공백 포함 허용). CRLF 도 처리. */
-    private static final Pattern PARAGRAPH_BREAK = Pattern.compile("(?:\\r?\\n[ \\t]*){2,}");
+    // [ \t]*+ 는 소유 수량자다(possessive). 일반 * 를 쓰면 {2,} 와 맞물려 백트래킹이 폭발할 수 있고,
+    // RAG 는 대형 문서를 통째로 넣는 경로라 그 입력이 실제로 들어온다(S5998: 스택 오버플로 위험).
+    // 소유 수량자는 한 번 먹은 공백을 되돌려주지 않으므로 백트래킹 자체가 사라진다 — 매칭 결과는 동일하다.
+    private static final Pattern PARAGRAPH_BREAK = Pattern.compile("(?:\\r?\\n[ \\t]*+){2,}");
 
     private static final String JOINER = "\n\n";
 
