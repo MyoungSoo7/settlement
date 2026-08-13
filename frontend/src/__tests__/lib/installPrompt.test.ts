@@ -24,13 +24,17 @@ const setupEnv = ({
   ua,
   standalone = false,
   dismissedAt = null,
+  loggedIn = true,
 }: {
   ua: string;
   standalone?: boolean;
   dismissedAt?: number | null;
+  /** 로그인 흔적(access_token). 기본 true — 로그인 화면 케이스만 false 로 준다. */
+  loggedIn?: boolean;
 }) => {
   const store = new Map<string, string>();
   if (dismissedAt !== null) store.set('pwa_install_dismissed_at', String(dismissedAt));
+  if (loggedIn) store.set('access_token', 'test-token');
 
   const handlers: Record<string, ((e: unknown) => void)[]> = {};
   const win = {
@@ -84,6 +88,31 @@ describe('installPrompt', () => {
 
     expect(preventDefault, '막지 않으면 이벤트를 쥘 수 없다').toHaveBeenCalled();
     expect(seen).toHaveBeenCalledWith({ kind: 'prompt', event });
+  });
+
+  /**
+   * 회귀 가드 — 이 배너가 로그인 화면을 덮어 데모 버튼 클릭을 막은 적이 있다.
+   * e2e(mobile-safari) 6건이 `locator.click: Timeout` 으로 죽었고, 가로막은 요소가 이 배너였다.
+   * 로그인 흔적이 없으면 어떤 조건에서도 뜨지 않아야 한다.
+   */
+  it('로그인 흔적이 없으면(로그인 화면) 띄우지 않는다 — 하단 배너가 로그인 버튼을 덮는다', async () => {
+    setupEnv({ ua: IOS_UA, loggedIn: false });
+    const { watchInstallAvailability, onInstallAvailable } = await load();
+
+    watchInstallAvailability(NOW);
+    const seen = vi.fn();
+    onInstallAvailable(seen);
+
+    expect(seen).not.toHaveBeenCalled();
+  });
+
+  it('Chromium 도 로그인 흔적이 없으면 beforeinstallprompt 를 아예 구독하지 않는다', async () => {
+    const { handlers } = setupEnv({ ua: ANDROID_UA, loggedIn: false });
+    const { watchInstallAvailability } = await load();
+
+    watchInstallAvailability(NOW);
+
+    expect(handlers['beforeinstallprompt'], '리스너 자체를 걸지 않는다').toBeUndefined();
   });
 
   it('이미 설치해 실행 중이면(standalone) 아무것도 띄우지 않는다', async () => {

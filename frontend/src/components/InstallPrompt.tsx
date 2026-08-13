@@ -24,12 +24,28 @@ const InstallPrompt: React.FC = () => {
 
   useEffect(() => onInstallAvailable(setMode), []);
 
+  /**
+   * 배너가 떠 있는 동안 화면 아래를 비운다(index.css 의 `body.pwa-banner-open`).
+   * 고정 배너는 문서 흐름 밖이라 그냥 두면 하단 버튼 위에 얹혀 클릭을 막는다 — 실제로
+   * 로그인 화면 데모 버튼이 눌리지 않아 e2e 6건이 실패했다. 표시 여부와 클래스를 한곳에서
+   * 묶어, 배너가 사라질 때 여백도 반드시 함께 사라지게 한다.
+   */
+  useEffect(() => {
+    if (!mode) return;
+    document.body.classList.add('pwa-banner-open');
+    return () => document.body.classList.remove('pwa-banner-open');
+  }, [mode]);
+
   if (!mode) return null;
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-safe pointer-events-none">
       {/* 바깥은 클릭을 통과시키고 배너만 받는다 — 화면 하단을 막지 않기 위해서다. */}
-      <div className="pointer-events-auto mb-20 flex w-full max-w-md items-center gap-3 rounded-xl border border-blue-200 bg-white px-4 py-3 shadow-lg">
+      {/* `mb-20`(5rem) 로 띄웠더니 화면 중앙부까지 올라와 로그인 데모 버튼을 28px 덮었다
+          (실측: 버튼 하단 534 / 배너 상단 506). 바닥에 붙여 침범 면적을 최소화한다.
+          업데이트 배너와 동시에 뜨는 경우는 드물고, 겹치더라도 그건 미관 문제지만
+          버튼을 못 누르는 것은 기능 결함이라 이쪽을 우선한다. */}
+      <div className="pointer-events-auto mb-4 flex w-full max-w-md items-center gap-3 rounded-xl border border-blue-200 bg-white px-4 py-3 shadow-lg">
         <span className="text-lg leading-none">📲</span>
 
         {mode.kind === 'prompt' ? (

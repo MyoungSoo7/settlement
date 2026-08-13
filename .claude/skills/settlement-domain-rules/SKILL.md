@@ -49,13 +49,28 @@ Payment:    READY → AUTHORIZED → CAPTURED → REFUNDED  (AUTHORIZED→FAILED
 - 조정에도 당시 스냅샷 수수료율을 적용한다 (환불 수수료 반환 계산).
 - 원장에는 역분개(REVERSED) 로 반영한다 — ledger-invariants skill 참조.
 
-## 지급액 차감 순서 (T-4, 2026-08-12 확정)
+## 지급액 차감 순서 (T-4 2026-08-12 · L-3 2026-08-13 확정)
 
-정산 확정 시 즉시지급분에서 빼는 순서는 **고정**이다 — 바꾸면 세무 리스크가 생긴다.
+정산 확정 시 즉시지급분에서 빼는 순서는 **고정**이다 — 바꾸면 세무·회수 리스크가 생긴다.
 
 ```
-payout = immediate − 원천징수 − 채권상계          (immediate = net − 미해제 holdback)
+payout = immediate − 원천징수 − 대출 상환차감 − 채권상계   (immediate = net − 미해제 holdback)
 ```
+
+**순서를 정하는 기준은 "못 뗐을 때 이월되는가"** 하나다. 이월되는 쪽을 뒤로 미룬다.
+
+| 순위 | 차감 | 못 뗐을 때 | 근거 |
+| --- | --- | --- | --- |
+| 1 | 원천징수 | **소실**(과소징수·가산세) | 이월 장치 없음. 국세 |
+| 2 | 대출 상환차감 | **손실** | loan 이 이미 대출 잔액을 줄이고 상환을 기록한다 — 이번 회차에 못 떼면 채권만 사라진다 |
+| 3 | 채권상계 | 지연 | `SellerRecovery` 가 OPEN 으로 남아 다음 정산에서 회수된다 |
+
+> ⚠️ **2순위는 현재 구현되어 있지 않다(2026-08-13 확인).** `SettlementConfirmItemWriter` 는 확정 시점에
+> `immediate − 원천징수 − 채권상계` 로 payout 금액을 **확정**하는데, loan 차감은 그 뒤에 비동기로 도착한다
+> (settlement.confirmed → loan FIFO 차감 → `repayment_applied` → settlement 가 `settlement_loan_deductions` 에
+> **기록만**). `ApplyLoanDeductionUseCase.netPayoutFor()` 는 호출자가 없고, `Payout.amount` 는 final 이라
+> 사후 감액도 불가하다. 결과: **대출 잔액은 줄고 현금은 셀러에게 전액 나간다.** 상세·수정안은
+> `docs/prd/loan-service.md` §10-D 참조. 이 절의 순서표는 그 수정이 지향할 목표 상태다.
 
 - **원천징수가 항상 먼저다.** 못 뗀 채권은 `OPEN` 으로 남아 다음 정산에서 상계되지만(이월 경로 존재),
   못 뗀 원천징수는 이월 장치가 없어 소실 = 과소징수(가산세)다. 회수가 지연될 뿐인 쪽을 뒤로 미룬다.

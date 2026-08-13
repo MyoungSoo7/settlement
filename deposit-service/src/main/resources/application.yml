@@ -137,3 +137,12 @@ app:
       deposit-offset-applied: lemuel.deposit.offset_applied
       # 부족분 발생 — 발행 전용. 소비하는 컨슈머는 아직 없음(추후 정산/알림 서비스 쪽에서 구현 예정).
       deposit-offset-shortfall: lemuel.deposit.offset_shortfall
+      # 구독 (* → deposit) — @KafkaListener 가 아래 키를 플레이스홀더로 직접 참조한다.
+      # 발행측은 settlement-service 다. account-service 도 같은 두 토픽을 구독하지만
+      # 컨슈머 그룹이 달라(lemuel-account) 서로의 오프셋에 영향을 주지 않는다(pub/sub 팬아웃).
+      settlement-confirmed: lemuel.settlement.confirmed
+      payout-completed: lemuel.payout.completed
+      # ※ lemuel.card.authorized / lemuel.card.captured 는 아직 구독하지 않는다.
+      #   두 이벤트의 페이로드에 sellerId 가 없고(cardAccountId 만 있다) card 의 sellerId 는
+      #   String, deposit 은 Long 이라 이벤트만으로 대상 예치 계좌를 특정할 수 없다.
+      #   그때까지 hold·offset 입력은 /admin/deposits 콘솔 경로다(SPEC §3.16).
