@@ -6,6 +6,7 @@ import github.lms.lemuel.payout.application.port.out.PayoutBackfillQueryPort;
 import github.lms.lemuel.payout.application.port.out.PayoutBackfillQueryPort.SettlementForPayout;
 import github.lms.lemuel.payout.domain.PayoutBackfillReport;
 import github.lms.lemuel.payout.domain.PayoutType;
+import github.lms.lemuel.settlement.application.port.in.ApplyLoanDeductionUseCase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,6 +22,11 @@ import java.util.List;
  * <p>INV-6 탐지 SQL(settlementsWithoutPayout)을 페이지 단위 재사용해 확정 정산의 누락된
  * Payout 을 append-only 로 신규 생성한다. 각 정산당 IMMEDIATE / HOLDBACK_RELEASE 두 유형을
  * 독립적으로 처리한다.
+ *
+ * <h3>IMMEDIATE 는 재구동, HOLDBACK_RELEASE 는 직접 생성</h3>
+ * IMMEDIATE 지급액은 원천징수·대출 상환차감·채권상계를 거쳐 정해지므로 백필이 자체 계산하지 않고
+ * 확정 경로의 종착점({@link ApplyLoanDeductionUseCase#redriveFromRecordedDeduction})을 재구동한다.
+ * HOLDBACK_RELEASE 는 유보분 해제라 차감 대상이 아니므로 그대로 생성한다.
  *
  * <h3>멱등성 보장</h3>
  * <ul>
@@ -47,14 +53,17 @@ public class BackfillMissingPayoutsService implements BackfillMissingPayoutsUseC
 
     private final PayoutBackfillQueryPort queryPort;
     private final RequestPayoutUseCase requestPayoutUseCase;
+    private final ApplyLoanDeductionUseCase applyLoanDeductionUseCase;
     private final int defaultPageSize;
 
     public BackfillMissingPayoutsService(
             PayoutBackfillQueryPort queryPort,
             RequestPayoutUseCase requestPayoutUseCase,
+            ApplyLoanDeductionUseCase applyLoanDeductionUseCase,
             @Value("${app.payout.backfill.page-size:" + DEFAULT_PAGE_SIZE + "}") int defaultPageSize) {
         this.queryPort = queryPort;
         this.requestPayoutUseCase = requestPayoutUseCase;
+        this.applyLoanDeductionUseCase = applyLoanDeductionUseCase;
         this.defaultPageSize = defaultPageSize;
     }
 
@@ -77,7 +86,7 @@ public class BackfillMissingPayoutsService implements BackfillMissingPayoutsUseC
                 break;
             }
             for (SettlementForPayout s : page) {
-                Result r = createPayout(s, s.immediatePayoutAmount(), PayoutType.IMMEDIATE);
+                Result r = redriveImmediate(s);
                 created += r.created;
                 skipped += r.skipped;
                 failed += r.failed;
@@ -126,6 +135,49 @@ public class BackfillMissingPayoutsService implements BackfillMissingPayoutsUseC
     }
 
     // ── 내부 헬퍼 ────────────────────────────────────────────────────────────
+
+    /**
+     * IMMEDIATE 백필 — <b>금액을 여기서 계산하지 않는다</b>.
+     *
+     * <p>과거에는 {@code s.immediatePayoutAmount()} 를 그대로 지급했다. 그 값은 원천징수·대출
+     * 상환차감·채권상계를 하나도 반영하지 않은 총액이라, 백필이 돌 때마다 확정 경로보다 많은 현금이
+     * 나갔다. 계산을 복제하면 정책이 바뀔 때마다 두 경로가 다시 갈라지므로, 백필은 확정 경로의
+     * 종착점({@code ApplyLoanDeductionUseCase})을 재구동하고 금액 산식은 거기 한 곳에만 둔다.
+     *
+     * <p>차감 기록이 없으면 <b>지급하지 않고 FAILED 로 남긴다</b>. 이 정산은 loan 이벤트가 도착하지
+     * 않은 건이고, 차감액을 모르는 채 지급하면 대출채권이 사라진다. 남은 건수는 {@code remaining}
+     * 으로 계속 보고되므로 "백필을 돌렸는데 잔여가 안 줄었다" 가 곧 loan 이벤트 유실 신호다.
+     */
+    private Result redriveImmediate(SettlementForPayout s) {
+        if (s.sellerId() == null) {
+            log.warn("[PayoutBackfill] sellerId 미해석 — 스킵. settlementId={}, type=IMMEDIATE", s.settlementId());
+            return Result.FAILED;
+        }
+        java.math.BigDecimal immediate = s.immediatePayoutAmount();
+        if (immediate == null || immediate.signum() <= 0) {
+            // 차감은 금액을 늘리지 못하므로 즉시지급분이 0 이면 재구동해도 지급은 0 이다.
+            log.debug("[PayoutBackfill] 즉시지급분 0 이하 — 스킵. settlementId={}, amount={}",
+                    s.settlementId(), immediate);
+            return Result.SKIPPED;
+        }
+        try {
+            boolean redriven = applyLoanDeductionUseCase.redriveFromRecordedDeduction(
+                    s.settlementId(), s.sellerId());
+            if (!redriven) {
+                log.warn("[PayoutBackfill] 대출 차감 기록 없음 — 백필하지 않는다(loan 이벤트 미도착 의심). "
+                        + "settlementId={}, sellerId={}", s.settlementId(), s.sellerId());
+                return Result.FAILED;
+            }
+            return Result.CREATED;
+        } catch (DataIntegrityViolationException e) {
+            log.warn("[PayoutBackfill] UNIQUE 충돌(동시 실행) — 스킵. settlementId={}, type=IMMEDIATE",
+                    s.settlementId());
+            return Result.SKIPPED;
+        } catch (PayoutConcurrentClaimException e) {
+            log.warn("[PayoutBackfill] 동시 생성 경합 — 스킵. settlementId={}, type=IMMEDIATE", s.settlementId());
+            return Result.SKIPPED;
+        }
+    }
 
     private Result createPayout(SettlementForPayout s, java.math.BigDecimal amount, PayoutType type) {
         if (s.sellerId() == null) {

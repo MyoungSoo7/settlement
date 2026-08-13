@@ -19,4 +19,15 @@ public interface ApplyLoanDeductionUseCase {
      * ({@code settlement_loan_deductions.settlement_id}) · payout {@code (settlement_id, payout_type)} UNIQUE(L3).
      */
     void apply(long settlementId, long sellerId, BigDecimal deducted);
+
+    /**
+     * 기록된 차감으로 지급 생성을 <b>재구동</b>한다 — 지급 누락 백필의 정식 경로.
+     *
+     * <p>백필이 금액을 자체 계산하면 확정 경로와 갈라져 원천징수·대출차감·채권상계를 빠뜨린 채
+     * 과다 지급하게 된다(실제로 그런 상태였다). 그래서 백필은 계산하지 않고 이 종착점을 다시 태운다.
+     *
+     * @return 차감 기록이 없으면(= loan 이벤트가 아직/영영 도착하지 않음) {@code false} — 이때는
+     *         차감액을 알 수 없으므로 <b>지급을 만들지 않는다</b>. 모르는 채 지급하면 대출채권이 사라진다.
+     */
+    boolean redriveFromRecordedDeduction(long settlementId, long sellerId);
 }

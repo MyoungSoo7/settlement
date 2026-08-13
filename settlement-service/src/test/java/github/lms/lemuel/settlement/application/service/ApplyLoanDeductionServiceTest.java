@@ -25,6 +25,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -128,5 +129,31 @@ class ApplyLoanDeductionServiceTest {
         service().apply(100L, 7L, BigDecimal.ZERO);
 
         assertThat(capturedPayout()).isEqualByComparingTo(new BigDecimal("9700"));
+    }
+
+    @Test
+    @DisplayName("재구동: 기록된 차감으로 지급을 만든다 — 백필이 금액을 자체 계산하지 않게 하는 경로")
+    void 재구동은_기록된_차감을_쓴다() {
+        Settlement s = confirmedSettlement();
+        when(loadSettlementPort.findById(100L)).thenReturn(Optional.of(s));
+        when(recordLoanDeductionPort.findDeduction(100L)).thenReturn(Optional.of(new BigDecimal("2000")));
+        when(resolveSettlementWithholdingUseCase.resolveForPayout(7L, s.getNetAmount()))
+                .thenReturn(WithholdingResolution.of(TaxType.INDIVIDUAL, new BigDecimal("320")));
+        when(offsetSellerRecoveryUseCase.offsetForConfirmedSettlement(any(), any(), any(), any()))
+                .thenReturn(BigDecimal.ZERO);
+
+        assertThat(service().redriveFromRecordedDeduction(100L, 7L)).isTrue();
+
+        assertThat(capturedPayout()).isEqualByComparingTo(new BigDecimal("7380"));  // 9,700 − 320 − 2,000
+    }
+
+    @Test
+    @DisplayName("재구동: 차감 기록이 없으면 지급을 만들지 않는다 — 모르는 채 지급하면 대출채권이 사라진다")
+    void 차감기록이_없으면_재구동하지_않는다() {
+        when(recordLoanDeductionPort.findDeduction(100L)).thenReturn(Optional.empty());
+
+        assertThat(service().redriveFromRecordedDeduction(100L, 7L)).isFalse();
+
+        verifyNoInteractions(requestPayoutUseCase);
     }
 }

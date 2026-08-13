@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.Optional;
 
 /**
  * 상환 saga 의 settlement 측 종착점: loan 차감을 기록하고 <b>즉시지급 Payout 을 생성</b>한다.
@@ -68,7 +69,9 @@ public class ApplyLoanDeductionService implements ApplyLoanDeductionUseCase {
                 .orElseThrow(() -> new SettlementNotFoundException(
                         "정산을 찾을 수 없습니다. settlementId=" + settlementId));
 
-        BigDecimal immediate = settlement.getImmediatePayoutAmount();
+        // getImmediatePayoutAmount() 가 아니라 Base 다 — 해제된 정산을 재구동할 때 net 전액이 나가면
+        // HOLDBACK_RELEASE payout 과 합쳐 net 을 초과한다(INV-6 이중 지급).
+        BigDecimal immediate = settlement.getImmediatePayoutBase();
 
         // ① 원천징수 — 확정 배치가 같은 입력(net)으로 산출·발행한 값과 동일해야 account GL 통제계정이
         //    0 으로 닫힌다. 입력이 같으므로 재계산 결과도 같다(결정적 순수 함수).
@@ -91,5 +94,20 @@ public class ApplyLoanDeductionService implements ApplyLoanDeductionUseCase {
         log.info("[LoanDeduction] 반영·지급요청: settlementId={}, sellerId={}, immediate={}, 원천징수={}, "
                         + "대출차감={}, 채권상계={}, 지급={}",
                 settlementId, sellerId, immediate, effectiveWithholding, deducted, offset, payoutAmount);
+    }
+
+    @Override
+    @Transactional
+    public boolean redriveFromRecordedDeduction(long settlementId, long sellerId) {
+        Optional<BigDecimal> recorded = recordLoanDeductionPort.findDeduction(settlementId);
+        if (recorded.isEmpty()) {
+            // loan 이벤트가 아직/영영 도착하지 않았다. 차감액을 모르는 채 지급하면 대출채권이 사라진다.
+            // 여기서 0 으로 가정하는 것이 정확히 그 사고다 — 지급하지 않고 미해결로 남긴다.
+            log.warn("[LoanDeduction] 재구동 불가 — 차감 기록 없음(loan 이벤트 미도착). "
+                    + "settlementId={}, sellerId={}", settlementId, sellerId);
+            return false;
+        }
+        apply(settlementId, sellerId, recorded.get());
+        return true;
     }
 }

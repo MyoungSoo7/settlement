@@ -56,6 +56,27 @@ class SettlementHoldbackTest {
     }
 
     @Test
+    @DisplayName("getImmediatePayoutBase: 해제 후에도 IMMEDIATE 몫은 net − holdback 이다 (이중지급 금지)")
+    void immediatePayoutBase_isUnaffectedByRelease() {
+        Settlement s = Settlement.createFromPayment(1L, 10L,
+                new BigDecimal("100000"), LocalDate.of(2026, 5, 1), new BigDecimal("0.0350"));
+        s.applyHoldback(new BigDecimal("0.30"), LocalDate.of(2026, 5, 31));
+
+        assertThat(s.getImmediatePayoutBase()).isEqualByComparingTo("67550.00");
+
+        s.releaseHoldback(LocalDate.of(2026, 5, 31));
+
+        // 해제분(28,950)은 HOLDBACK_RELEASE payout 이 따로 지급한다. 여기서 net 전액을 돌려주면
+        // 뒤늦은 IMMEDIATE 생성(백필·재구동)이 두 payout 합계로 net 을 초과한다.
+        assertThat(s.getImmediatePayoutBase())
+                .as("해제 여부와 무관한 IMMEDIATE 산정 기준")
+                .isEqualByComparingTo("67550.00");
+        assertThat(s.getImmediatePayoutBase().add(s.getHoldbackAmount()))
+                .as("IMMEDIATE + HOLDBACK_RELEASE = net — 초과하면 이중지급")
+                .isEqualByComparingTo("96500.00");
+    }
+
+    @Test
     @DisplayName("releaseHoldback: 아직 release 시점이 아니면 IllegalStateException")
     void releaseHoldback_tooEarly() {
         Settlement s = Settlement.createFromPayment(1L, 10L,
