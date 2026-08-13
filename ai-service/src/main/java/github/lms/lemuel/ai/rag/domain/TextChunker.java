@@ -26,10 +26,17 @@ import java.util.regex.Pattern;
 public final class TextChunker {
 
     /** 문단 구분 — 빈 줄 1개 이상(공백 포함 허용). CRLF 도 처리. */
-    // [ \t]*+ 는 소유 수량자다(possessive). 일반 * 를 쓰면 {2,} 와 맞물려 백트래킹이 폭발할 수 있고,
-    // RAG 는 대형 문서를 통째로 넣는 경로라 그 입력이 실제로 들어온다(S5998: 스택 오버플로 위험).
-    // 소유 수량자는 한 번 먹은 공백을 되돌려주지 않으므로 백트래킹 자체가 사라진다 — 매칭 결과는 동일하다.
-    private static final Pattern PARAGRAPH_BREAK = Pattern.compile("(?:\\r?\\n[ \\t]*+){2,}");
+    // 문단 구분 — 줄바꿈 2개 이상(사이에 가로 공백 허용). CRLF 는 한 줄바꿈으로 센다.
+    //
+    // ★ 그룹 반복 (?:...){2,} 을 쓰지 않는다. Java 정규식은 그룹 반복을 재귀로 처리해서, 연속 빈 줄이
+    //   많은 문서가 들어오면 StackOverflowError 가 난다 — 이론이 아니라 실측이다(TextChunkerLargeInputTest:
+    //   빈 줄 50,000 개에서 Pattern.java:4615 StackOverflowError). 소유 수량자를 안쪽에 붙이는 것으로는
+    //   해결되지 않았다. 지적 대상이 안쪽 백트래킹이 아니라 바깥 그룹 반복이기 때문이다(S5998).
+    //
+    // 그래서 "줄바꿈 → 가로공백 → 줄바꿈 → 나머지 공백 일괄" 구조로 편다. 남은 반복은 전부 문자 클래스라
+    // Java 가 재귀 없이 순회한다. 세 번째 이후의 빈 줄은 마지막 [ \t\r\n]*+ 가 한 번에 삼킨다.
+    // CRLF 안전성: \r?\n 을 두 번 요구하므로 "\r\n" 하나는 문단 경계가 되지 않는다.
+    private static final Pattern PARAGRAPH_BREAK = Pattern.compile("\\r?\\n[ \\t]*+\\r?\\n[ \\t\\r\\n]*+");
 
     private static final String JOINER = "\n\n";
 
