@@ -9,6 +9,19 @@ plugins {
 // 이전 라이브러리 모드(order-service fat jar 번들)는 해제 — bootJar 가 Spring Boot 플러그인
 // 기본값(활성)으로 동작하며, 진입점은 SettlementServiceApplication 이다.
 
+// httpcore5 5.3.6 은 CVE-2026-54399(HIGH, 수정판 5.4.3). Boot 4.0.7 BOM 이 httpclient5 를 5.5.2 로,
+// httpcore5 를 5.3.6 으로 관리한다 — Boot 상향으로는 안 풀리고, 그렇다고 httpcore5 만 올리면
+// httpclient5 5.5.x 와 짝이 어긋난다. 상류가 맞춰 낸 조합(httpclient5 5.6 + httpcore5 5.4.x)으로 함께 올린다.
+// 마침 elasticsearch-rest5-client 9.2.8 이 원래 요구하는 것도 httpclient5 5.6 인데 BOM 이 5.5.2 로
+// 내리고 있었다 — 이 오버라이드는 그 다운그레이드도 되돌린다. ES 를 쓰는 모듈은 이 서비스뿐이다
+// (전 모듈 build.gradle.kts 검색 실측).
+//
+// `constraints` 가 아니라 BOM 프로퍼티인 이유: io.spring.dependency-management 는 BOM 관리 버전을
+// resolutionStrategy 룰로 강제해서 Gradle constraint 를 이긴다. 실측으로 constraint 는 무시됐고
+// (dependencyInsight: "Selected by rule", httpclient5 5.5.2 유지) 프로퍼티 오버라이드만 먹혔다.
+extra["httpclient5.version"] = "5.6"
+extra["httpcore5.version"] = "5.4.3"
+
 dependencies {
     implementation("github.lms.lemuel:shared-common:1.0.0")   // 버전드 내부 라이브러리(composite build 로 로컬 치환)
     testImplementation(testFixtures("github.lms.lemuel:shared-common:1.0.0"))   // 이벤트 계약 스키마·검증기·정본 샘플 (ADR 0024)
