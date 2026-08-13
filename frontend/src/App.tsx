@@ -48,6 +48,11 @@ const ShippingAdminPage = lazy(() => import('./pages/ShippingAdminPage'));
 const OrderApprovalPage = lazy(() => import('./pages/OrderApprovalPage'));
 const PayoutAdminPage = lazy(() => import('./pages/PayoutAdminPage'));
 
+// 정산운영 콘솔 — settlement-service 운영 API(/admin/**)를 화면으로 노출한다.
+const IntegrityConsolePage = lazy(() => import('./pages/settlement/IntegrityConsolePage'));
+const ReconciliationConsolePage = lazy(() => import('./pages/settlement/ReconciliationConsolePage'));
+const LedgerConsolePage = lazy(() => import('./pages/settlement/LedgerConsolePage'));
+
 // 인쇄 전용 (레이아웃 없이 문서만 그리는 화면 — 새 창으로 열린다)
 const SettlementPrintPage = lazy(() => import('./pages/print/SettlementPrintPage'));
 
@@ -151,6 +156,20 @@ function App() {
             {/* 지급 콘솔 — 실자금 송금이라 /admin/payouts/** 는 서버가 ADMIN 전용으로 게이트한다.
                 MANAGER 에게 화면만 열어 주면 전부 403 이 되므로 라우트도 AdminOnlyRoute 로 맞춘다. */}
             <Route path="/admin/payouts"      element={<AdminOnlyRoute><SideNavLayout><PayoutAdminPage /></SideNavLayout></AdminOnlyRoute>} />
+
+            {/* ── 정산운영 콘솔 (ADMIN·MANAGER) ──
+                URL 이 /admin/settlement/** 아래인 이유: nginx SPA 폴백이 /admin 하위에서
+                (system|operation|ceo|settlement|login) 만 index.html 로 내려보낸다. 다른 접두사를
+                쓰면 새로고침·직접진입이 404 가 된다. API 는 /admin/integrity 처럼 별도 접두사라 충돌 없음. */}
+            <Route path="/admin/settlement/integrity"
+              element={<AdminManagerRoute><SideNavLayout><IntegrityConsolePage /></SideNavLayout></AdminManagerRoute>} />
+            <Route path="/admin/settlement/reconciliation"
+              element={<AdminManagerRoute><SideNavLayout><ReconciliationConsolePage /></SideNavLayout></AdminManagerRoute>} />
+            {/* 원장 조회는 ADMIN·MANAGER, 시산표·기간 마감은 ADMIN 전용이라 화면 안에서 역할로 가른다
+                (라우트를 ADMIN 으로 잠그면 MANAGER 가 분개 조회조차 못 한다) */}
+            <Route path="/admin/settlement/ledger"
+              element={<AdminManagerRoute><SideNavLayout><LedgerConsolePage /></SideNavLayout></AdminManagerRoute>} />
+
             {/* 배송 관리 — 주문별 배송 생성·출고·상태 전이 (ShippingController) */}
             <Route path="/admin/shipping"     element={<AdminManagerRoute><ShippingAdminPage /></AdminManagerRoute>} />
             {/* 취소·환불 승인 큐 — 사용자가 신청한 건을 운영자가 종단으로 보낸다 */}

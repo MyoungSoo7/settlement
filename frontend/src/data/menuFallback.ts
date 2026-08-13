@@ -46,6 +46,15 @@ export const FALLBACK_MENUS: FallbackMenuNode[] = [
     ],
   },
   {
+    id: -10, name: '정산운영', path: '/admin/settlement/integrity', icon: '🧪',
+    description: 'Settlement Operations', area: 'BACKOFFICE', type: 'GROUP', roles: ['ADMIN', 'MANAGER'],
+    children: [
+      { id: -101, name: '정합성 검증', path: '/admin/settlement/integrity', icon: '🧪', description: '원장·지급·홀드백·체류 8종', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
+      { id: -103, name: '일일 대사', path: '/admin/settlement/reconciliation', icon: '🔀', description: 'order ↔ settlement 이중장부', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
+      { id: -102, name: '원장·시산표', path: '/admin/settlement/ledger', icon: '📒', description: '분개 조회 · 월 시산표 · 기간 마감', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
+    ],
+  },
+  {
     id: -3, name: '배송', path: '/admin/shipping', icon: '🚚', description: null,
     area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'],
   },

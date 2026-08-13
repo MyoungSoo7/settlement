@@ -79,13 +79,13 @@ class MenuSeedIntegrationTest {
     }
 
     @Test
-    @DisplayName("시드 총 31행 — 이관 전 하드코딩 네비 항목 수와 같다")
-    void seedsExactlyThirtyOne() {
-        assertThat(adapter.findAll()).hasSize(31);
+    @DisplayName("시드 총 35행 — 이관분 31 + 정산운영 그룹 1 + 운영 화면 3")
+    void seedsExactlyThirtyFive() {
+        assertThat(adapter.findAll()).hasSize(35);
     }
 
     @Test
-    @DisplayName("최상위 9개가 상단 네비 순서대로 들어간다")
+    @DisplayName("최상위 10개가 상단 네비 순서대로 들어간다")
     void rootsInOrder() {
         List<Menu> roots = adapter.findAll().stream()
                 .filter(m -> m.getParentId() == null)
@@ -93,7 +93,17 @@ class MenuSeedIntegrationTest {
                 .toList();
 
         assertThat(roots).extracting(Menu::getName).containsExactly(
-                "대시보드", "정산", "배송", "승인", "AI 도우미", "CEO", "시스템 관리", "주문하기", "추천받기");
+                "대시보드", "정산", "정산운영", "배송", "승인", "AI 도우미", "CEO", "시스템 관리",
+                "주문하기", "추천받기");
+    }
+
+    @Test
+    @DisplayName("정산운영 그룹은 운영 화면만 담는다 — 정산 그룹과 섞이지 않는다")
+    void settlementOpsChildren() {
+        assertThat(childrenOf("정산운영")).extracting(Menu::getName)
+                .containsExactly("정합성 검증", "일일 대사", "원장·시산표");
+        assertThat(childrenOf("정산")).extracting(Menu::getName)
+                .containsExactly("상품관리", "정산관리", "정산조회", "지급관리");
     }
 
     @Test

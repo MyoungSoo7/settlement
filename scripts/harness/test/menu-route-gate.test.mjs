@@ -15,14 +15,29 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
-const SEED_SQL = join(REPO_ROOT, 'order-service', 'src', 'main', 'resources', 'db',
-  'migration', 'V20260813100000__menu_area_permission.sql');
+const MIGRATION_DIR = join(REPO_ROOT, 'order-service', 'src', 'main', 'resources', 'db', 'migration');
+
+/**
+ * 현재 트리를 만드는 시드 기준점. 이 마이그레이션이 이전 시드(V20260623100002 의 4행)를
+ * 전부 지우고 다시 심었으므로, 그보다 앞선 메뉴 마이그레이션은 세면 중복이 된다.
+ */
+const SEED_BASELINE = 'V20260813100000__menu_area_permission.sql';
+
+/**
+ * 기준점 이후의 메뉴 마이그레이션 <b>전부</b>. 한 파일만 지목하면 그 다음 마이그레이션부터
+ * 게이트가 눈을 감는다 — 실제로 '정산운영' 그룹을 추가한 두 번째 파일이 그렇게 새어 나갔다.
+ * 버전 접두사가 같은 자리수의 타임스탬프라 사전순 비교가 곧 시간순 비교다.
+ */
+const seedSqlFiles = () => readdirSync(MIGRATION_DIR)
+  .filter((name) => /^V\d+__menu_.*\.sql$/.test(name) && name >= SEED_BASELINE)
+  .sort()
+  .map((name) => join(MIGRATION_DIR, name));
 const FALLBACK_TS = join(REPO_ROOT, 'frontend', 'src', 'data', 'menuFallback.ts');
 const APP_TSX = join(REPO_ROOT, 'frontend', 'src', 'App.tsx');
 
@@ -55,13 +70,26 @@ const ROUTES_WITHOUT_MENU = new Map([
 
 const read = (path) => readFileSync(path, 'utf8');
 
-/** 시드 SQL 의 INSERT 구간에서만 경로 리터럴을 뽑는다 (DELETE 절의 경로는 제외). */
+/**
+ * 시드 SQL 에서 <b>삽입되는 값</b>의 경로 리터럴만 뽑는다.
+ *
+ * <p>제외 대상: `DELETE`/`UPDATE` 문과 조건절(`WHERE`/`AND`/`OR`). 이 줄들의 경로는 "행을
+ * 고르는 조건"이지 새로 생기는 메뉴가 아니라서, 같이 세면 한 경로가 두 번 잡힌다
+ * (실제로 '원장·시산표' 의 정렬을 바꾸는 UPDATE 가 그렇게 잡혔다).
+ *
+ * <p>한계: `UPDATE menus SET path = '/new'` 처럼 경로 자체를 갱신하면 이 추출기는 새 경로를
+ * 못 본다 → 폴백과 어긋나 게이트가 FAIL 한다. 조용히 통과하는 것보다 낫게 실패하도록 둔 선택이며,
+ * 경로 변경은 DELETE + INSERT 로 표현한다.
+ */
 function seedPaths() {
-  const sql = read(SEED_SQL)
-    .split('\n')
-    .filter((line) => !/^\s*DELETE\s+FROM/i.test(line))
-    .join('\n');
-  return [...sql.matchAll(/'(\/[^']*)'/g)].map((m) => m[1]);
+  return seedSqlFiles().flatMap((file) => {
+    const sql = read(file)
+      .split('\n')
+      .filter((line) => !/^\s*(DELETE|UPDATE)\b/i.test(line))
+      .filter((line) => !/^\s*(WHERE|AND|OR)\b/i.test(line))
+      .join('\n');
+    return [...sql.matchAll(/'(\/[^']*)'/g)].map((m) => m[1]);
+  });
 }
 
 function fallbackPaths() {

@@ -13,16 +13,16 @@ const labelsOf = (role: string) => resolveFallbackMenus(role).map((m) => m.label
 const childrenOf = (role: string, groupName: string) =>
   resolveFallbackMenus(role).find((m) => m.name === groupName)?.children.map((c) => c.name) ?? [];
 
-describe('상단 네비 — 역할별 항목이 이관 전과 같다', () => {
-  it('ADMIN: 대시보드·정산·배송·승인·AI 도우미·CEO·시스템', () => {
+describe('상단 네비 — 역할별 항목·순서 고정', () => {
+  it('ADMIN: 대시보드·정산·정산운영·배송·승인·AI 도우미·CEO·시스템', () => {
     expect(labelsOf('ADMIN')).toEqual([
-      '대시보드', '정산', '배송', '승인', 'AI 도우미', 'CEO', '시스템',
+      '대시보드', '정산', '정산운영', '배송', '승인', 'AI 도우미', 'CEO', '시스템',
     ]);
   });
 
   it('MANAGER: ADMIN 목록에서 시스템만 빠진다', () => {
     expect(labelsOf('MANAGER')).toEqual([
-      '대시보드', '정산', '배송', '승인', 'AI 도우미', 'CEO',
+      '대시보드', '정산', '정산운영', '배송', '승인', 'AI 도우미', 'CEO',
     ]);
   });
 
@@ -45,6 +45,13 @@ describe('사이드바 — 그룹별 항목이 이관 전과 같다', () => {
 
   it('정산 (MANAGER): 지급관리는 빠진다 — 서버가 ADMIN 으로 막는 실자금 경로', () => {
     expect(childrenOf('MANAGER', '정산')).toEqual(['상품관리', '정산관리', '정산조회']);
+  });
+
+  it('정산운영: 정산 그룹과 섞이지 않고 운영 화면만 담는다', () => {
+    // "깨졌나(정합성) → 어디가(대사) → 무슨 분개(원장)" 순으로 읽히게 배치한다
+    expect(childrenOf('ADMIN', '정산운영')).toEqual(['정합성 검증', '일일 대사', '원장·시산표']);
+    // 원장 조회는 MANAGER 도 되는 표면이라 메뉴에서 빼지 않는다 (시산표만 화면 안에서 가린다)
+    expect(childrenOf('MANAGER', '정산운영')).toEqual(['정합성 검증', '일일 대사', '원장·시산표']);
   });
 
   it('CEO: 13개 항목이 순서대로', () => {
