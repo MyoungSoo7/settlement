@@ -55,6 +55,11 @@ export const GUARD_CANARIES = {
     file: 'settlement-service/src/main/java/github/lms/lemuel/settlement/domain/X.java',
     line: 'throw new IllegalArgumentException("bad");',
   },
+  // 실제 사고 형태 그대로 — script 블록 안 주석에 들어간 빈 표현식.
+  'WORKFLOW-EMPTY-EXPR': {
+    file: '.github/workflows/canary.yml',
+    line: '            // 주석 안이라도 ${{ }} 는 워크플로를 통째로 무효화한다',
+  },
 };
 
 export function canaryResults({ rules = RULES, canaries = GUARD_CANARIES } = {}) {

@@ -112,7 +112,7 @@ VAN → POST /van/v1/authorizations
 매입: 홀드 소진 + CardCapture 생성 (부분 매입 시 홀드 PARTIALLY_CAPTURED, 잔여 유지)
 마감: 매월 1일 01:00 → OPEN → CLOSED
 납부: POST /internal/api/v1/statements/{id}/payments (paymentId 멱등)
-      전액 납부 → PAID + lemuel.card.statement.paid 발행, DELINQUENT 계정은 ACTIVE 복구
+      전액 납부 → PAID + lemuel.card.statement_paid 발행, DELINQUENT 계정은 ACTIVE 복구
 연체: 매일 02:00 → CLOSED/PARTIALLY_PAID → DELINQUENT (명세서 1건 = 트랜잭션 1건)
 ```
 

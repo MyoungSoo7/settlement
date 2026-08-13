@@ -59,7 +59,7 @@
 - [x] **연체 배치**: `MarkDelinquentStatementsUseCase` · `MarkDelinquentStatementsService` + `DelinquentStatementProcessor`(별도 빈, REQUIRES_NEW — self-invocation 안티패턴 방지).
 - [x] **연체 전이**: CardAccount → DELINQUENT, 승인 거절 `DeclineReason.CARD_SUSPENDED`.
 - [x] **자동 복구**: 전액 납부 시 `CardAccount.recoverFromDelinquency()` → ACTIVE.
-- [x] **이벤트 계약**: `lemuel.card.statement.paid` 신규 토픽(ADR 0022 하위호환, 신규 스키마 + 정본 샘플).
+- [x] **이벤트 계약**: `lemuel.card.statement_paid` 신규 토픽(ADR 0022 하위호환, 신규 스키마 + 정본 샘플).
 - [x] **Flyway V8**: `card_statements` · `statement_payments` 테이블.
 - [x] **통합테스트**: `StatementBillingIT`(5건) · `DelinquencyAuthorizationIT`(5건).
 
@@ -82,7 +82,7 @@
 | ---------------------------- | ---------------------------------------- | ----------- | ------------------------------------ |
 | `lemuel.card.authorized`     | `lemuel.card.authorized.schema.json`     | card        | 계약 선확정, Phase 2 발행 구현 완료  |
 | `lemuel.card.captured`       | `lemuel.card.captured.schema.json`       | card        | 계약 선확정, Phase 2 발행 구현 완료  |
-| `lemuel.card.statement.paid` | `lemuel.card.statement.paid.schema.json` | card        | Phase 2 신규 토픽(ADR 0022 하위호환) |
+| `lemuel.card.statement_paid` | `lemuel.card.statement_paid.schema.json` | card        | Phase 2 신규 토픽(ADR 0022 하위호환) |
 
 ---
 

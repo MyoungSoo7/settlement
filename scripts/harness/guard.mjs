@@ -38,6 +38,7 @@ function policyPath(filePath) {
 const MONEY_SCOPE = /(settlement|ledger|payout|chargeback|loan|payment|investment|account|insurance|pgreconciliation|recon)/i;
 const JAVA_KT = /\.(java|kt)$/i;
 const SQL = /\.sql$/i;
+const WORKFLOW_YAML = /(^|\/)\.github\/workflows\/[^/]+\.ya?ml$/i;
 // Money math lives in domain/application; adapters legitimately use double for
 // Micrometer gauges, pagination, mock probabilities, JDBC — scope the primitive
 // rule to core layers and exclude test sources to keep the gate false-positive free.
@@ -140,6 +141,18 @@ export const RULES = [
     when: (f) => isDomainMain(f) && CAMPAIGN_SERVICES.test(f),
     test: (line) => /throw\s+new\s+IllegalArgumentException\s*\(/.test(line),
     msg: '금융 5서비스 도메인에서 generic IllegalArgumentException throw 금지 → 타입 도메인 예외 (OO 게이트)',
+  },
+  {
+    id: 'WORKFLOW-EMPTY-EXPR',
+    // Actions 는 워크플로 전체를 표현식 렉서로 훑는다 — run/script 블록 안의 주석까지 포함해서.
+    // 빈 표현식이 하나라도 있으면 "(Line: N, Col: M): An expression was expected" 로 **파일이
+    // 통째로 무효**가 되고, 그 워크플로는 잡 0개·로그 없음·실행 이름이 파일 경로로 뜨는 형태로
+    // 죽는다. 다른 체크는 초록이라 며칠간 아무도 모른다(2026-08 pr-review.yml 실측).
+    // 이 계층에서만 잡힌다: YAML 파서·공식 워크플로 스키마·액션 SHA 검증은 모두 통과한다.
+    // \s* 라서 개행으로 쪼갠 표기도 함께 막는다.
+    when: (f) => WORKFLOW_YAML.test(f),
+    fileTest: /\$\{\{\s*\}\}/g,
+    msg: '워크플로에 빈 표현식 ${{ }} 금지 — Actions 가 파일을 통째로 무효화한다(잡 0개·로그 없이 죽음). 주석 안에도 쓰지 말 것',
   },
 ];
 

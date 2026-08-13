@@ -208,6 +208,13 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
   컴파일러도 런타임도 알려 주지 않는다. 진입점이 네비게이션이 아닌 화면(PG 콜백·인쇄·리다이렉트 등)은
   게이트의 `ROUTES_WITHOUT_MENU` 에 **사유와 함께** 등록해야 통과한다 → 화면 추가 시 "메뉴에 넣을지"를
   강제로 결정하게 만든다. 삭제된 사이드바 셸 3종(SettlementLayout·CeoLayout·SystemLayout)의 부활도 함께 막는다.
+- **백엔드 표면↔화면 커버리지 게이트** — `scripts/harness/test/api-screen-gate.test.mjs`: 자바 16서비스의
+  `@RestController` base path 를 프론트 전체(`frontend/src`, 테스트 제외)의 URL 리터럴과 대조한다. 메뉴↔라우트
+  게이트가 못 보는 반대편 누락 — **기능은 짰는데 부르는 화면이 없는 상태**를 잡는다(실제로 card Phase 2·insurance·
+  deposit·organization 이 REST·게이트웨이 라우팅을 다 갖춘 채 화면 0 으로 방치됐다). 새 컨트롤러는 ① 화면을 붙이거나
+  ② `MACHINE_ONLY`(웹훅·VAN 단말·내부키 수집 트리거·일회성 백필) ③ `SCREEN_PENDING`(인정된 화면 부채) 중 하나로
+  **사유와 함께** 분류해야 통과한다. 부채는 `PENDING_BUDGET` 래칫으로 **내려가기만** 한다 — 줄었는데 예산을 안 내려도
+  FAIL 이라 목록이 늘 정확하다. 추출 정규식이 깨져 전부 통과하는 가짜 GREEN 도 스캔 하한선으로 막는다.
 - **하네스 자기 진단** — `scripts/harness/harness-audit.mjs`: 문서 드리프트를 규율이 아닌 **기계 게이트**로 승격(과거 문서 3주 방치 재발 방지).
   라우팅 맵 dangling 도 기계 검증한다 — 🤖📘⌘ 아이콘 줄의 backtick 진입점 토큰을 agents/skills/commands 실존과 대조
   (에이전트·스킬·커맨드를 삭제/개명하고 라우팅 맵을 안 고치면 audit FAIL → CI 차단).

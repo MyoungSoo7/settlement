@@ -206,10 +206,10 @@ card 8종이 전부 `cardAccountId` 로 묶이는 것은 의도된 설계다(어
 
 - **누락 토픽 2개**: `lemuel.insurance.general_payout_{requested,paid}` 은 발행 코드가 있는데 카탈로그에
   없었다. `app.kafka.topic.*` 로 참조되지 않아 게이트가 잡지 못했다(게이트의 사각지대 — 발행 전용 토픽).
-- **토픽명 오류 1개**: 카탈로그에 `lemuel.card.statement.paid` 로 적혀 있었으나, `resolveTopic` 규칙상
+- **토픽명 오류 1개**: 카탈로그에 `lemuel.card.statement_paid` 로 적혀 있었으나, `resolveTopic` 규칙상
   실제 발행명은 `lemuel.card.statement_paid` 다(`Card` + `CardStatementPaid` → `statement_paid`).
   초기값을 계약 스키마 파일명에서 옮긴 탓이며, **그 스키마 파일명 자체가 실제 토픽과 다르다**
-  (`contracts/events/lemuel.card.statement.paid.schema.json` — ADR 0024 영역, 미수정).
+  (`contracts/events/lemuel.card.statement_paid.schema.json` — ADR 0024 영역, 미수정).
 - **프로듀서 없는 토픽 1개**: `lemuel.insurance.coverage_bound` 는 insurance yml 이 선언하지만 발행 코드가
   없다(전 저장소 검색 0건). 설정에만 존재하는 유령 토픽이다 — 미조치.
 

@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import { afterEach, describe, test } from 'node:test';
-import { mkdtemp, mkdir, realpath, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, readdir, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
 import {
@@ -95,6 +96,15 @@ const cases = [
     violation: 'throw new IllegalArgumentException("hold 금액은 양수여야 합니다: " + amount);',
     normal: 'throw new InvalidDepositAmountException("hold 금액은 양수여야 합니다: " + amount, "place", amount);',
   },
+  {
+    // Actions 는 워크플로 전체를 표현식 렉서로 훑는다. 빈 표현식이 하나라도 있으면
+    // "An expression was expected" 로 **파일이 통째로 무효**가 되어 잡 0개·로그 없이 죽는다.
+    // YAML 파서·공식 스키마·액션 SHA 검증은 전부 통과하므로 이 계층에서만 잡힌다.
+    id: 'WORKFLOW-EMPTY-EXPR',
+    file: '.github/workflows/pr-review.yml',
+    violation: '            // 모델 출력은 신뢰할 수 없는 텍스트다 — ${{ }} 로 스크립트에 보간하지 않고',
+    normal: '          github-token: ${{ secrets.GITHUB_TOKEN }}',
+  },
 ];
 
 describe('guard policy fixtures', () => {
@@ -107,6 +117,26 @@ describe('guard policy fixtures', () => {
       assert.deepEqual(clean.violations, []);
     });
   }
+
+  // 이 규칙은 오탐이 나면 워크플로 편집 전체를 막는다 — 저장소의 진짜 워크플로(정상 표현식
+  // 190건 이상)가 깨끗한지 매번 확인한다. 동시에 "실제 파일에 규칙이 닿는가"의 증거이기도 하다.
+  test('WORKFLOW-EMPTY-EXPR 은 저장소의 실제 워크플로에 오탐하지 않는다', async () => {
+    const workflowDir = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '.github', 'workflows');
+    const names = (await readdir(workflowDir)).filter((name) => /\.ya?ml$/i.test(name));
+    assert.ok(names.length > 0, '워크플로를 하나도 못 찾았다 — 경로가 바뀌었는지 확인할 것');
+
+    for (const name of names) {
+      const path = join(workflowDir, name);
+      const result = scanText(path, await readFile(path, 'utf8'), { now: NOW });
+      assert.deepEqual(result.violations, [], `${name} 오탐`);
+    }
+  });
+
+  test('WORKFLOW-EMPTY-EXPR 은 개행으로 쪼갠 빈 표현식도 막는다', () => {
+    const result = scanText('.github/workflows/x.yml', 'script: |\n  // ${{\n  }}\n', { now: NOW });
+
+    assert.deepEqual(result.violations.map(({ id }) => id), ['WORKFLOW-EMPTY-EXPR']);
+  });
 
   test('ignores Java and Kotlin comment-only lines', () => {
     const java = scanText(cases[0].file, '// double amount = 1.0;', { now: NOW });
