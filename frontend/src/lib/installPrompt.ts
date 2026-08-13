@@ -45,6 +45,28 @@ export const isStandalone = (): boolean =>
 
 const isIos = (): boolean => /iphone|ipad|ipod/i.test(navigator.userAgent);
 
+/**
+ * 이 사용자가 앱을 실제로 써 본 적이 있는가(로그인 흔적).
+ *
+ * 로그인 화면에서는 배너를 띄우지 않는다. 두 가지 이유가 있고 둘 다 실측에서 나왔다.
+ *  ① **하단 고정 배너가 로그인 화면의 데모 버튼을 덮어 클릭을 막았다.** e2e(mobile-safari)
+ *     6건이 이것으로 실패했고, 실패 로그가 가로막은 요소로 이 배너를 지목했다
+ *     (`locator.click: Timeout` + intercepting `<div class="pointer-events-auto mb-20 …">`).
+ *     테스트만의 문제가 아니라 실제 아이폰 사용자가 로그인 버튼을 못 누르는 상태였다.
+ *  ② 아직 써 보지도 않은 사람에게 "설치하세요"를 먼저 들이미는 것은 순서가 뒤집힌 권유다.
+ *
+ * 판정은 토큰 유무로 한다 — 이 모듈은 라우터·컨텍스트 바깥(main.tsx)에서 돌아 경로를 모른다.
+ * 대신 배너는 "로그인해 본 적 있는 사용자의 다음 방문"부터 뜬다. 설치 유도의 성격상 그 시점이
+ * 오히려 적절하고, 로그인 동선을 절대 가리지 않는다는 보장이 생긴다.
+ */
+const hasEngaged = (): boolean => {
+  try {
+    return !!window.localStorage?.getItem('access_token');
+  } catch {
+    return false; // 저장소 접근 불가(프라이빗 모드 등)는 "모름" → 띄우지 않는 쪽으로
+  }
+};
+
 /** 거절 유예가 아직 유효한가. 값이 깨져 있으면 유예 없음으로 본다(사용자에게 유리한 쪽이 아니라 안전한 쪽). */
 const isSnoozed = (now: number): boolean => {
   const raw = window.localStorage?.getItem(DISMISSED_KEY);
@@ -94,7 +116,7 @@ export const acceptInstall = async (mode: InstallMode): Promise<'accepted' | 'di
  * 만족하는지(manifest·서비스워커·HTTPS 등) 판단하는 주체는 브라우저이지 우리가 아니다.
  */
 export const watchInstallAvailability = (now: number = Date.now()) => {
-  if (isStandalone() || isSnoozed(now)) return;
+  if (isStandalone() || isSnoozed(now) || !hasEngaged()) return;
 
   if (isIos()) {
     notify({ kind: 'ios-manual' });
