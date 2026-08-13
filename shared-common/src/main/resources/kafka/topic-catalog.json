@@ -68,7 +68,6 @@
 
     { "name": "lemuel.insurance.policy_issued", "owner": "insurance-service", "orderingKey": "policyNumber", "partitions": 3, "replicas": 1, "retentionDays": 7 },
     { "name": "lemuel.insurance.policy_status_changed", "owner": "insurance-service", "orderingKey": "policyNumber", "partitions": 3, "replicas": 1, "retentionDays": 7 },
-    { "name": "lemuel.insurance.coverage_bound", "owner": "insurance-service", "orderingKey": "policyNumber", "partitions": 3, "replicas": 1, "retentionDays": 7 },
     { "name": "lemuel.insurance.banca_rule_violated", "owner": "insurance-service", "orderingKey": "bankCode", "partitions": 3, "replicas": 1, "retentionDays": 7 },
     { "name": "lemuel.insurance.commission_confirmed", "owner": "insurance-service", "orderingKey": "policyNumber", "partitions": 3, "replicas": 1, "retentionDays": 7 },
     { "name": "lemuel.insurance.commission_paid", "owner": "insurance-service", "orderingKey": "policyNumber", "partitions": 3, "replicas": 1, "retentionDays": 7 },

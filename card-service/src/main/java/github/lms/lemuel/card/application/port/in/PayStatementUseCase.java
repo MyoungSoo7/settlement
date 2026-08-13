@@ -14,7 +14,7 @@ import java.math.BigDecimal;
  * <ul>
  *   <li>명세서 상태 → PAID</li>
  *   <li>카드계정이 DELINQUENT 상태였다면 ACTIVE 로 자동 복구</li>
- *   <li>{@code lemuel.card.statement.paid} Outbox 이벤트 발행</li>
+ *   <li>{@code lemuel.card.statement_paid} Outbox 이벤트 발행</li>
  * </ul>
  */
 public interface PayStatementUseCase {

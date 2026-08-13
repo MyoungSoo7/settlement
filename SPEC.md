@@ -261,7 +261,7 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
   최신 영수증이 MATCHED 여야 승인(`CARD_RECEIPT_NOT_MATCHED` 422). 판독 실패는 무폴백 `CARD_RECEIPT_OCR_UNAVAILABLE`(503).
 - **조직 연동**: `lemuel.organization.member_removed` 소비 → 이탈자 카드 자동 정지(멱등 컨슈머).
 - **이벤트 발행**(Outbox, `aggregateType="Card"`, **파티션 키는 항상 cardAccountId**): `account_opened`·`issued`·
-  `limit_changed`·`status_changed`·`account_status_changed`·`authorized`·`captured`·`statement.paid`.
+  `limit_changed`·`status_changed`·`account_status_changed`·`authorized`·`captured`·`statement_paid`.
 - **알려진 한계(Phase 2)**: 카드 이용과 정산 지급이 같은 재원을 두 번 쓸 수 있다 — 실제 상계는 청구 사이클의
   몫이고 그때까지 인정비율 `R` 이 그 위험을 흡수한다. 정산 연동(account-service 이벤트 배선)은 이벤트 계약 우선(ADR 0022) 준수 후 Phase 3 착수.
 
@@ -295,7 +295,8 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
 - **이벤트 발행**(Outbox, 9토픽): `lemuel.insurance.policy_issued` · `.policy_status_changed` · `.commission_confirmed` ·
   `.commission_paid` · `.commission_clawback_triggered` · `.commission_monthly_closed` · `.banca_rule_violated` ·
   `.general_payout_requested` · `.general_payout_paid`. **계약 스키마 미등록 · 소비처 미배선**(발행 전용).
-  `application.yml` 의 `coverage-bound: lemuel.insurance.coverage_bound` 는 **발행 코드가 없는 설정 잔재**다.
+  (`coverage-bound: lemuel.insurance.coverage_bound` 는 발행·소비·스키마가 모두 없는 설정 잔재여서
+  2026-08-14 제거했다 — 기능이 생기면 프로듀서와 함께 카탈로그에 다시 등록한다. ADR 0035)
 
 ### 3.16 deposit-service — 셀러 예치금 원장 (port 8112, mgmt 8113, 자체 DB lemuel_deposit)
 

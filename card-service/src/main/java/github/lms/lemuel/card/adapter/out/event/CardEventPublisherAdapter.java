@@ -257,9 +257,9 @@ public class CardEventPublisherAdapter implements PublishCardEventPort {
     }
 
     /**
-     * 청구서 전액 납부 — 토픽 {@code lemuel.card.statement.paid}.
+     * 청구서 전액 납부 — 토픽 {@code lemuel.card.statement_paid}.
      *
-     * <p>계약 스키마({@code lemuel.card.statement.paid.schema.json}) required 필드:
+     * <p>계약 스키마({@code lemuel.card.statement_paid.schema.json}) required 필드:
      * statementId · cardAccountId · billingYearMonth · paidAmount · paymentId · paidAt.
      *
      * <p>파티션 키: {@code cardAccountId} — 1단계 카드 이벤트·2단계 승인·매입과 동일.
@@ -283,7 +283,7 @@ public class CardEventPublisherAdapter implements PublishCardEventPort {
         saveOutboxEventPort.save(OutboxEvent.pending(
                 AGGREGATE_TYPE,
                 String.valueOf(statement.getCardAccountId()),  // 파티션 키 = cardAccountId
-                "CardStatementPaid",                           // → 토픽 lemuel.card.statement.paid
+                "CardStatementPaid",                           // → 토픽 lemuel.card.statement_paid
                 toJson(payload)));
     }
 

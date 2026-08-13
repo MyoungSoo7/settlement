@@ -26,7 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li>멱등 체크 — 동일 paymentId 로 이미 처리됐으면 현재 상태 반환</li>
  *   <li>납부 적용 → 명세서 저장 + 납부 레코드 저장(멱등 키)</li>
  *   <li>전액 납부(PAID)이면 카드계정 DELINQUENT → ACTIVE 자동 복구</li>
- *   <li>PAID 이면 {@code lemuel.card.statement.paid} Outbox 이벤트 발행</li>
+ *   <li>PAID 이면 {@code lemuel.card.statement_paid} Outbox 이벤트 발행</li>
  * </ol>
  */
 @Service

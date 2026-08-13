@@ -65,7 +65,7 @@ DELINQUENT → PAID (전액 납부 후 ACTIVE 복구)
 ### 상환(Payment) 멱등
 
 - `paymentId` = L3 멱등키 (`statement_payments.payment_id UNIQUE`).
-- 전액 납부(`paidAmount >= totalAmount`) → `StatementStatus.PAID` + `lemuel.card.statement.paid` Outbox 발행.
+- 전액 납부(`paidAmount >= totalAmount`) → `StatementStatus.PAID` + `lemuel.card.statement_paid` Outbox 발행.
 - 계정 복구: DELINQUENT 명세서의 전액 납부 시 `CardAccount.recoverFromDelinquency()` → ACTIVE.
 
 ### 연체(Delinquency) 배치
@@ -176,7 +176,7 @@ CardAccount 와 Card 는 **다른 애그리거트**다. Postgres 는 CHECK 절�
 | CardAccountStatusChanged | `lemuel.card.account_status_changed` | 법인 계정(여신 사건 — 재산정 강등·수동 조치)               |
 | CardAuthorized           | `lemuel.card.authorized`             | 승인 홀드 생성 (Phase 2)                                   |
 | CardCaptured             | `lemuel.card.captured`               | 매입 확정 (Phase 2)                                        |
-| CardStatementPaid        | `lemuel.card.statement.paid`         | 명세서 전액 납부 완료 (Phase 2)                            |
+| CardStatementPaid        | `lemuel.card.statement_paid`         | 명세서 전액 납부 완료 (Phase 2)                            |
 
 - 카드 상태와 계정 상태를 **한 토픽에 섞지 않는다**: 상태 enum 도 소비자도 다르고, 섞으면 cardId 가
   있는 페이로드와 없는 페이로드를 소비자가 런타임에 분기해야 한다.
