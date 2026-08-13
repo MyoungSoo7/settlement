@@ -94,7 +94,7 @@ seed:
   known_issues:  # 발견만 기록 — 사양은 as-is 유지
     - id: KI-1
       finding: "부모 build.gradle.kts:132-150 핵심 도메인 INSTRUCTION 80% 엄격 패키지 목록에 investment.domain.* 미포함 — 금융 도메인인데 상위 게이트 누락 (LINE 90% 는 적용됨)"
-      disposition: recorded-not-fixed (게이트 비대칭)
+      disposition: OUTDATED (2026-08-13 확인 — investment.domain.* 은 현재 목록에 포함돼 있다. 대신 loan·account·card·deposit 이 빠져 있었고 같은 날 편입했다)
     - id: KI-2
       finding: "app.kafka.enabled 기본 false — 운영 미주입 시 settlement.confirmed 소비가 조용히 중단되어 재원 프로젝션 미적재 (application.yml:138)"
       disposition: by-design (브로커 없이 기동) — 운영 관점 silent gap
