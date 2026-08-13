@@ -65,12 +65,12 @@ payout = immediate − 원천징수 − 대출 상환차감 − 채권상계   (
 | 2 | 대출 상환차감 | **손실** | loan 이 이미 대출 잔액을 줄이고 상환을 기록한다 — 이번 회차에 못 떼면 채권만 사라진다 |
 | 3 | 채권상계 | 지연 | `SellerRecovery` 가 OPEN 으로 남아 다음 정산에서 회수된다 |
 
-> ⚠️ **2순위는 현재 구현되어 있지 않다(2026-08-13 확인).** `SettlementConfirmItemWriter` 는 확정 시점에
-> `immediate − 원천징수 − 채권상계` 로 payout 금액을 **확정**하는데, loan 차감은 그 뒤에 비동기로 도착한다
-> (settlement.confirmed → loan FIFO 차감 → `repayment_applied` → settlement 가 `settlement_loan_deductions` 에
-> **기록만**). `ApplyLoanDeductionUseCase.netPayoutFor()` 는 호출자가 없고, `Payout.amount` 는 final 이라
-> 사후 감액도 불가하다. 결과: **대출 잔액은 줄고 현금은 셀러에게 전액 나간다.** 상세·수정안은
-> `docs/prd/loan-service.md` §10-D 참조. 이 절의 순서표는 그 수정이 지향할 목표 상태다.
+> **트리거 주의(L-3, 2026-08-13 배선 완료)**: 이 차감은 **확정 배치가 아니라 상환차감 수신 시점**에
+> 일어난다(`ApplyLoanDeductionService`). 확정 시점에 금액을 확정하면 뒤늦게 도착하는 대출 차감을
+> 반영할 수 없어(`Payout.amount` 는 final) 대출 잔액만 줄고 현금은 전액 나가던 결함이 있었다.
+> 그래서 **확정 배치는 지급을 만들지 않는다** — `RequestPayoutUseCase`·`OffsetSellerRecoveryUseCase`
+> 의존 자체를 제거해 구조로 막았다. 확정 시점에 남는 것은 원천징수(1순위)뿐이고, 지급 단계가 같은
+> 입력으로 재계산해 동일 값을 쓴다(통제계정이 0 으로 닫힌다).
 
 - **원천징수가 항상 먼저다.** 못 뗀 채권은 `OPEN` 으로 남아 다음 정산에서 상계되지만(이월 경로 존재),
   못 뗀 원천징수는 이월 장치가 없어 소실 = 과소징수(가산세)다. 회수가 지연될 뿐인 쪽을 뒤로 미룬다.

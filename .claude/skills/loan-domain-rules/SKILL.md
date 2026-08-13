@@ -138,11 +138,10 @@ i > 0    → 월납입 = (financed − 잔존가치/(1+i)^n) × i(1+i)^n / ((1+i
 
 - 정산 확정 시 셀러 미상환 대출을 **FIFO(오래된 순)** 로 락 조회 후 순차 차감 → 차감총액을
   `LoanRepaymentApplied` 발행 → settlement 가 순지급액(`amount - deducted`)으로 payout.
-  ⚠️ **이 마지막 단계는 현재 성립하지 않는다(2026-08-13 확인).** settlement 는 확정 시점에 payout 금액을
-  `immediate − 원천징수 − 채권상계` 로 이미 확정하고, 뒤늦게 도착한 차감액은 `settlement_loan_deductions` 에
-  **기록만** 한다(`netPayoutFor()` 는 호출자 없음, `Payout.amount` 는 final). 즉 **loan 은 대출 잔액을 줄이는데
-  현금은 전액 나간다.** 이 saga 를 고칠 때 지급액 차감 순서(원천징수 → 대출 차감 → 채권상계)는
-  📘`settlement-domain-rules` 의 "지급액 차감 순서" 절이 정본이다.
+  **지급 트리거(L-3, 2026-08-13 배선)**: settlement 는 이 이벤트를 받아야 지급을 만든다 — 확정 배치는
+  지급을 만들지 않는다. 즉 `repayment_applied` 발행이 셀러 지급의 **유일한 트리거**이고,
+  차감 순서(원천징수 → 대출차감 → 채권상계) 정본은 📘`settlement-domain-rules` 의
+  "지급액 차감 순서" 절이다.
 - **멱등 3중**: `recordRepaymentPort.existsForSettlement(settlementId)` 선체크 + 컨슈머 `processed_events`
   \+ `loan_repayments.settlement_id UNIQUE`(스키마 최종 방어).
 - **차감 0(대출 없음)이어도 record·publish 한다** — settlement 가 전액 지급하도록 통지해야 멱등·정합이 성립.
