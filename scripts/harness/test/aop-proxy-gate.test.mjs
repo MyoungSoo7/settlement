@@ -43,6 +43,9 @@ const TRANSACTIONAL_SELF_CALL_ALLOWLIST = new Map([
     '호출자 uploadImages 가 @Transactional — 같은 tx 에 합류, 커밋 경계 동일'],
   ['settlement-service/src/main/java/github/lms/lemuel/ledger/application/service/ReverseEntryService.java::reverseForReference',
     'reverseForRefund 의 오버로드 위임 — 둘 다 @Transactional REQUIRED, 경계 동일'],
+  ['settlement-service/src/main/java/github/lms/lemuel/settlement/application/service/ApplyLoanDeductionService.java::apply',
+    '재구동 진입점 redriveFromRecordedDeduction 이 @Transactional — 차감 기록 조회와 지급 생성이 한 tx 여야 '
+    + '하므로 REQUIRED 합류가 오히려 정답(별도 빈 분리는 경계를 둘로 쪼갠다)'],
 ]);
 
 const read = (f) => readFileSync(join(repoRoot, f), 'utf8');
