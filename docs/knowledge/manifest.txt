@@ -1,0 +1,23 @@
+# RAG 지식베이스 적재 화이트리스트
+#
+# 여기 등재된 파일만 챗봇 지식베이스에 적재된다 (deny-by-default).
+# docs/knowledge/ 에 파일을 두는 것만으로는 적재되지 않는다.
+#
+# ⚠️ 한 줄을 추가한다는 것은 그 문서를 **모든 사용자 답변의 근거**로 삼겠다는 뜻이다.
+#    추가 전에 확인할 것:
+#      - 셀러/사업자에게 그대로 읽혀도 되는 내용인가 (내부 설계·미구현 기능·보안 규칙 금지)
+#      - 사실인가 (수치·정책은 1차 출처를 문서 안에 명시했는가)
+#      - 문단 하나만 뽑혀 나가도 말이 되는가 (검색은 문단 단위로 인용한다)
+#
+# 형식: docs/knowledge/ 기준 상대 경로 한 줄에 하나. '#' 뒤는 주석.
+# 제목은 문서의 H1 에서, 출처 URI 는 파일명에서 자동으로 파생된다
+#   guide-funds.md → 출처 URI `kb://guide-funds`
+#
+# 동기화: python3 scripts/knowledge/sync_knowledge.py --dry-run
+# 정합성: python3 scripts/knowledge/sync_knowledge.py --check-manifest
+
+# ── 플랫폼 이용 안내 (CEO 대출/투자 가이드 화면과 같은 내용) ──
+guide-lender-tiers.md
+guide-funds.md
+guide-loan-products.md
+guide-loan-process.md

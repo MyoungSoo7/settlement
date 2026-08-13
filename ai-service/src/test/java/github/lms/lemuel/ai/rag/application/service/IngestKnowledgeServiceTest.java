@@ -183,6 +183,19 @@ class IngestKnowledgeServiceTest {
     }
 
     @Test
+    @DisplayName("목록은 포트 결과를 가공 없이 그대로 넘긴다 (매니페스트 대조 대상이라 순서·내용을 바꾸면 안 된다)")
+    void listDocuments_passesThroughUnchanged() {
+        List<KnowledgeDocument> stored = List.of(
+                KnowledgeDocument.ingest("정산 정책", "kb://policy/settlement", ContentHash.of("가"), 3, NOW),
+                KnowledgeDocument.ingest("수수료", "kb://policy/fee", ContentHash.of("나"), 1, NOW));
+        when(knowledgeBasePort.listDocuments()).thenReturn(stored);
+
+        assertThat(service.listDocuments()).isSameAs(stored);
+        // 조회는 임베딩(유료 외부 호출)을 건드리지 않는다.
+        verifyNoInteractions(embeddingPort);
+    }
+
+    @Test
     @DisplayName("커맨드 검증 — 제목·출처·본문 누락은 생성 시점에 거부된다")
     void command_validation() {
         assertThatThrownBy(() -> new IngestCommand(" ", "docs://x", "본문"))

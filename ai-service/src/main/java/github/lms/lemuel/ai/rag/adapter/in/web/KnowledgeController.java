@@ -1,10 +1,12 @@
 package github.lms.lemuel.ai.rag.adapter.in.web;
 
+import github.lms.lemuel.ai.rag.adapter.in.web.dto.KnowledgeDtos.DocumentsResponse;
 import github.lms.lemuel.ai.rag.adapter.in.web.dto.KnowledgeDtos.IngestRequest;
 import github.lms.lemuel.ai.rag.adapter.in.web.dto.KnowledgeDtos.IngestResponse;
 import github.lms.lemuel.ai.rag.adapter.in.web.dto.KnowledgeDtos.SearchResponse;
 import github.lms.lemuel.ai.rag.application.port.in.IngestKnowledgeUseCase;
 import github.lms.lemuel.ai.rag.application.port.in.IngestKnowledgeUseCase.IngestCommand;
+import github.lms.lemuel.ai.rag.application.port.in.ListKnowledgeDocumentsUseCase;
 import github.lms.lemuel.ai.rag.application.port.in.SearchKnowledgeUseCase;
 import jakarta.validation.Valid;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -22,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * <ul>
  *   <li>POST   /api/ai/knowledge/documents — 문서 적재/교체 (<b>ADMIN</b>)</li>
+ *   <li>GET    /api/ai/knowledge/documents — 적재 문서 목록 (<b>ADMIN</b>)</li>
  *   <li>DELETE /api/ai/knowledge/documents?sourceUri=… — 문서 삭제 (<b>ADMIN</b>)</li>
  *   <li>GET    /api/ai/knowledge/search?q=… — 검색 확인 (USER 이상)</li>
  * </ul>
@@ -39,11 +42,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class KnowledgeController {
 
     private final IngestKnowledgeUseCase ingestKnowledgeUseCase;
+    private final ListKnowledgeDocumentsUseCase listKnowledgeDocumentsUseCase;
     private final SearchKnowledgeUseCase searchKnowledgeUseCase;
 
     public KnowledgeController(IngestKnowledgeUseCase ingestKnowledgeUseCase,
+                              ListKnowledgeDocumentsUseCase listKnowledgeDocumentsUseCase,
                               SearchKnowledgeUseCase searchKnowledgeUseCase) {
         this.ingestKnowledgeUseCase = ingestKnowledgeUseCase;
+        this.listKnowledgeDocumentsUseCase = listKnowledgeDocumentsUseCase;
         this.searchKnowledgeUseCase = searchKnowledgeUseCase;
     }
 
@@ -51,6 +57,18 @@ public class KnowledgeController {
     public IngestResponse ingest(@Valid @RequestBody IngestRequest request) {
         return IngestResponse.from(ingestKnowledgeUseCase.ingest(
                 new IngestCommand(request.title(), request.sourceUri(), request.content())));
+    }
+
+    /**
+     * 적재 문서 목록.
+     *
+     * <p>권한은 {@code AiSecurityConfig} 의 경로 매처가 그대로 준다 — 매처가 HTTP 메서드를 구분하지
+     * 않으므로 {@code /documents} 에 대한 GET 도 ADMIN 이다. 이것이 옳다: 목록은 "챗봇이 무엇을 근거로
+     * 말하는가"의 전체 목차이며, 적재 권한이 없는 사람이 알아야 할 정보가 아니다.
+     */
+    @GetMapping("/documents")
+    public DocumentsResponse listDocuments() {
+        return DocumentsResponse.of(listKnowledgeDocumentsUseCase.listDocuments());
     }
 
     @DeleteMapping("/documents")
