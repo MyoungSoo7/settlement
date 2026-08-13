@@ -1,0 +1,118 @@
+# Seed: insurance-service GA 보험대리점 as-is 사양 (Ouroboros 방법론 — Interview → Seed 결정화)
+# 상태: CONFIRMED (settlement/account seed 와 동일 방식 지시로 승인 승계, 2026-08-13)
+# 원칙: 이 Seed 는 "현행 코드가 실제로 하는 일"의 불변 기술이다. 결함은 교정하지 않고 known_issues 로만 기록한다.
+# 자매 Seed: settlement-service-accounting-core (수수료 정산의 회계 원칙 참조)
+
+seed:
+  id: insurance-service-ga-platform-v1
+  goal: >-
+    insurance-service(GA 보험대리점 — 청약·계약·유지변경·수수료정산 + 방카 규제 규칙)의 현행 동작을
+    실행 가능한 게이트에 매핑된 불변 사양으로 결정화해, 회귀 기준선 · 규제 규칙 근거 ·
+    면접/포트폴리오 문서로 사용한다.
+
+  scope:
+    included:
+      - 상태머신 3종(청약·계약·수수료)과 전이 강제
+      - 완전판매 게이트(상품설명서 교부 선행조건)
+      - 방카슈랑스 25%룰 판정
+      - 수수료 분급·환수(clawback) 계산 규칙
+      - 발행 이벤트 표면과 원수사 계약상태 소비
+    excluded:
+      - 보험료 산출(PremiumRater) 요율 테이블 상세
+      - 방카 배치 5종 운영 절차 (존재 사실만)
+
+  constraints:
+    - "금액은 BigDecimal, scale 2 — 통화 최소단위 절사(RoundingPolicy 준수)"
+    - "상태 전이는 canTransitionTo 상태머신이 강제 — 비정상 전이는 타입 예외"
+    - "규제 임계(25%룰 상한, 환수 창)는 단일 선언 지점 상수로만 표현"
+    - "이벤트 발행은 Outbox 경유만"
+    - "헥사고날: domain 은 adapter 를 import 하지 않는다 (ArchUnit 강제)"
+
+  invariants:  # as-is 코드 사실 — 파일:라인 근거 (경로 접두 insurance-service/src/main/java/github/lms/lemuel/insurance/)
+    application_state_machine:
+      source: domain/ApplicationStatus.java:21-33,46
+      rule: "SUBMITTED → UNDER_REVIEW → APPROVED | REJECTED, canTransitionTo 로 강제"
+    policy_state_machine:
+      source: domain/PolicyStatus.java:25-40,59
+      rule: "ACTIVE / LAPSED / SURRENDERED / EXPIRED / CANCELLED — 전이 강제"
+    commission_state_machine:
+      source: domain/CommissionStatus.java:25-37
+      rule: "SCHEDULED → PAID → CLAWBACK_PENDING → CLAWED_BACK"
+    complete_sale_gate:
+      source: application/service/ApplicationUnderwritingService.java:118
+      rule: "상품설명서 교부 기록(existsForApplication)이 없으면 승인 거부 — DisclosureNotDeliveredException"
+      rationale: "완전판매 의무의 코드 표현 — 증빙 없는 승인 경로를 막는다"
+    disclosure_evidence_fields:
+      source: domain/DisclosureDelivery.java:12,52,63-72
+      rule: "누가(deliveredBy)·어느 채널로(salesChannel)·계약자명이 필수. 빈 값은 InvalidDisclosureException"
+    banca_concentration_limit:
+      source: domain/BancaRuleEvaluator.java:12-18,26-27
+      rule: "CONCENTRATION_LIMIT = 0.25 단일 선언. 초과가 위반이고 정확히 25%는 허용. 비중 스케일 소수 4자리 HALF_UP"
+      input: "(은행, 부문, 원수사)별 보험료 합 목록"
+    clawback_formula:
+      source: domain/CommissionConstants.java:16-17,24
+      rule: "환수 창 W = 24개월. m >= W 이면 환수 0, m < W 이면 기지급 합계 × (W − m) / W, 통화 최소단위 절사"
+    installment_count:
+      source: domain/CommissionConstants.java:27
+      rule: "수수료 스케줄 기본 12분급"
+    recipient_types:
+      source: domain/CommissionConstants.java:36,39
+      rule: "FC(설계사) / BANK(방카) — 수수료 귀속 주체 구분"
+    amount_scale:
+      source: domain/CommissionConstants.java:33
+      rule: "AMOUNT_SCALE = 2 — 금액 스케일 고정"
+
+  event_contracts:
+    publishes:
+      - InsurancePolicyIssued
+      - InsurancePolicyStatusChanged
+      - InsuranceCommissionPaid
+      - InsuranceGeneralPayoutPaid
+    consumes:
+      - "원수사 계약상태 (CarrierPolicyStatusConsumer) → 계약 상태 반영"
+
+  acceptance_criteria:  # 실행 가능 — 각 AC 는 기존 게이트에 매핑
+    - id: AC-1
+      criterion: 상태머신 3종 전이표·타입 예외가 일치한다
+      gate: "./gradlew :insurance-service:test — 도메인 상태 테스트"
+    - id: AC-2
+      criterion: 상품설명서 교부 없이 청약이 승인되지 않는다
+      gate: "ApplicationUnderwritingService 테스트 (DisclosureNotDeliveredException)"
+    - id: AC-3
+      criterion: 25%룰 경계(정확히 25% 허용, 초과 위반)가 일치한다
+      gate: "BancaRuleEvaluator 테스트"
+    - id: AC-4
+      criterion: 환수 공식과 24개월 창 경계가 일치한다
+      gate: "ClawbackCalculator 테스트"
+    - id: AC-5
+      criterion: 12분급 스케줄 생성이 정본과 일치한다
+      gate: "CommissionScheduleFactory 테스트"
+    - id: AC-6
+      criterion: 원수사 상태 소비가 DLT 배선에 닿는다
+      gate: "node scripts/harness/guard.mjs — KAFKA-DLQ 규칙"
+    - id: AC-7
+      criterion: 헥사고날 의존 방향 위반 0
+      gate: "ArchUnit 테스트"
+    - id: AC-8
+      criterion: 커버리지 LINE >= 90%
+      gate: "./gradlew :insurance-service:jacocoTestCoverageVerification (check 편입)"
+
+  known_issues:  # 발견만 기록 — 사양은 as-is 유지
+    - id: KI-1
+      finding: "전용 *-rules 스킬이 없다 — organization·deposit 과 함께 3대 공백이며 HARNESS.md 가 '알려진 부채'로 명시한다. 규제성 규칙(25%룰·완전판매·환수)을 가진 서비스인데 온디맨드 규칙 문서가 없다"
+      disposition: recorded-not-fixed (문서화된 부채 — 이 Seed 가 임시 근거)
+    - id: KI-2
+      finding: "25%룰이 순수 도메인 함수라 '언제 평가되는가'(청약 시점 / 배치 / 조회 시)를 이 Seed 범위에서 확인하지 않았다. 규제 규칙은 판정 시점이 곧 실효성이다"
+      disposition: recorded-not-verified
+    - id: KI-3
+      finding: "완전판매 게이트가 존재 여부(existsForApplication)만 확인한다. 교부 시점이 청약 이후여도, 다른 상품코드 교부 기록이어도 통과하는지 확인하지 않았다"
+      disposition: recorded-not-verified (게이트 강도)
+    - id: KI-4
+      finding: "환수 계산이 기지급 합계 × (W − m) / W 선형 비례 단일 공식이다. 실무 GA 계약은 회차별 환수율이 다른 경우가 많은데 의도된 MVP 단순화인지 문서에 없다"
+      disposition: recorded-not-verified
+
+  uses:
+    - regression-baseline
+    - regulatory-rule-basis
+    - interview-portfolio
+    - brownfield-base
