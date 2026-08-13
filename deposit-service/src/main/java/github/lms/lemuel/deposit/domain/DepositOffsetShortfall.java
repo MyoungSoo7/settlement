@@ -1,5 +1,7 @@
 package github.lms.lemuel.deposit.domain;
 
+import github.lms.lemuel.deposit.domain.exception.InvalidDepositStateException;
+import github.lms.lemuel.deposit.domain.exception.DepositInvariantViolationException;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.Objects;
@@ -64,7 +66,7 @@ public class DepositOffsetShortfall {
     /** 부족분 재상계 성공 — RESOLVED 로 전이. */
     public void resolve(BigDecimal additionalApplied) {
         if (this.status != DepositShortfallStatus.OPEN) {
-            throw new IllegalStateException("OPEN 상태만 resolve 가능합니다. 현재=" + status);
+            throw new InvalidDepositStateException("OPEN 상태만 resolve 가능합니다. 현재=" + status, String.valueOf(status), "resolve");
         }
         this.appliedAmount = this.appliedAmount.add(additionalApplied);
         this.shortfallAmount = this.shortfallAmount.subtract(additionalApplied);
@@ -74,13 +76,13 @@ public class DepositOffsetShortfall {
     /** 수동 상각 — WRITTEN_OFF 로 전이. */
     public void writeOff() {
         if (this.status != DepositShortfallStatus.OPEN) {
-            throw new IllegalStateException("OPEN 상태만 write-off 가능합니다. 현재=" + status);
+            throw new InvalidDepositStateException("OPEN 상태만 write-off 가능합니다. 현재=" + status, String.valueOf(status), "writeOff");
         }
         this.status = DepositShortfallStatus.WRITTEN_OFF;
     }
 
     public void assignId(Long id) {
-        if (this.id != null) throw new IllegalStateException("이미 ID 가 할당된 shortfall 입니다");
+        if (this.id != null) throw new DepositInvariantViolationException("이미 ID 가 할당된 shortfall 입니다");
         this.id = Objects.requireNonNull(id);
     }
 

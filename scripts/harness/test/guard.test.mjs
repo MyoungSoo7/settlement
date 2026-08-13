@@ -88,6 +88,13 @@ const cases = [
     violation: 'throw new IllegalArgumentException("대출 한도 초과");',
     normal: 'throw new LoanInvariantViolationException("대출 한도 초과: requested=" + requested, requested, limit);',
   },
+  {
+    // deposit 은 셀러 예치금 원장(돈 경로)인데 대상 목록에서 빠져 있었다 — 게이트 비대칭을 닫는다.
+    id: 'OO-DOMAIN-GENERIC-IAE',
+    file: 'deposit-service/src/main/java/github/lms/lemuel/deposit/domain/DepositHold.java',
+    violation: 'throw new IllegalArgumentException("hold 금액은 양수여야 합니다: " + amount);',
+    normal: 'throw new InvalidDepositAmountException("hold 금액은 양수여야 합니다: " + amount, "place", amount);',
+  },
 ];
 
 describe('guard policy fixtures', () => {

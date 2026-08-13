@@ -1,5 +1,7 @@
 package github.lms.lemuel.deposit.domain;
 
+import github.lms.lemuel.deposit.domain.exception.InvalidDepositAmountException;
+import github.lms.lemuel.deposit.domain.exception.DepositInvariantViolationException;
 import github.lms.lemuel.deposit.domain.exception.InsufficientDepositException;
 
 import java.math.BigDecimal;
@@ -204,13 +206,13 @@ public class SellerDepositAccount {
     // ──────────────────────────────────────────────────────────────────────────
 
     private static BigDecimal normalize(BigDecimal value) {
-        if (value == null) throw new IllegalArgumentException("금액은 null 일 수 없습니다");
+        if (value == null) throw new InvalidDepositAmountException("금액은 null 일 수 없습니다", "normalize", null);
         return value.setScale(SCALE, ROUNDING);
     }
 
     private static void requirePositive(BigDecimal amount, String op) {
         if (amount == null || amount.signum() <= 0) {
-            throw new IllegalArgumentException(op + " 금액은 양수여야 합니다: " + amount);
+            throw new InvalidDepositAmountException(op + " 금액은 양수여야 합니다: " + amount, op, amount);
         }
     }
 
@@ -220,17 +222,17 @@ public class SellerDepositAccount {
      */
     private void enforceInvariant() {
         if (available.signum() < 0) {
-            throw new IllegalStateException("불변식 위반: available < 0 (" + available + ")");
+            throw new DepositInvariantViolationException("불변식 위반: available < 0 (" + available + ")");
         }
         if (locked.signum() < 0) {
-            throw new IllegalStateException("불변식 위반: locked < 0 (" + locked + ")");
+            throw new DepositInvariantViolationException("불변식 위반: locked < 0 (" + locked + ")");
         }
         if (total.signum() < 0) {
-            throw new IllegalStateException("불변식 위반: total < 0 (" + total + ")");
+            throw new DepositInvariantViolationException("불변식 위반: total < 0 (" + total + ")");
         }
         BigDecimal expectedTotal = available.add(locked);
         if (total.compareTo(expectedTotal) != 0) {
-            throw new IllegalStateException(
+            throw new DepositInvariantViolationException(
                     "불변식 위반: total(" + total + ") != available(" + available
                             + ") + locked(" + locked + ") = " + expectedTotal);
         }
@@ -256,7 +258,7 @@ public class SellerDepositAccount {
     /** 영속 어댑터가 저장 후 할당된 ID 를 역주입하는 전용 메서드. */
     public void assignId(Long id) {
         if (this.id != null) {
-            throw new IllegalStateException("이미 ID 가 할당된 계좌입니다: " + this.id);
+            throw new DepositInvariantViolationException("이미 ID 가 할당된 계좌입니다: " + this.id);
         }
         this.id = Objects.requireNonNull(id, "id");
     }

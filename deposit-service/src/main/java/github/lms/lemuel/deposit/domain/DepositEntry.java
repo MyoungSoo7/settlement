@@ -1,5 +1,6 @@
 package github.lms.lemuel.deposit.domain;
 
+import github.lms.lemuel.deposit.domain.exception.DepositInvariantViolationException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Objects;
@@ -67,7 +68,7 @@ public class DepositEntry {
     }
 
     public void assignId(Long id) {
-        if (this.id != null) throw new IllegalStateException("이미 ID 가 할당된 엔트리입니다");
+        if (this.id != null) throw new DepositInvariantViolationException("이미 ID 가 할당된 엔트리입니다");
         this.id = Objects.requireNonNull(id);
     }
 
