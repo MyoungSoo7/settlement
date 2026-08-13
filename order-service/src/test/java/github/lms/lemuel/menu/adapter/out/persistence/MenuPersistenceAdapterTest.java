@@ -89,7 +89,10 @@ class MenuPersistenceAdapterTest {
         when(menuRepository.save(any(MenuJpaEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        Menu menu = Menu.create("주문관리", "/admin/orders", "cart", 2L, 4, "ADMIN", true);
+        Menu menu = Menu.create(new github.lms.lemuel.menu.domain.MenuAttributes(
+                "주문관리", null, "/admin/orders", "cart", null,
+                github.lms.lemuel.menu.domain.MenuArea.BACKOFFICE,
+                github.lms.lemuel.menu.domain.MenuType.ITEM, "ADMIN", null), 2L, 4, true);
         Menu saved = adapter.save(menu);
 
         assertThat(saved.getName()).isEqualTo("주문관리");

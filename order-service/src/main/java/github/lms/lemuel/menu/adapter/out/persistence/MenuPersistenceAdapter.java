@@ -3,6 +3,7 @@ package github.lms.lemuel.menu.adapter.out.persistence;
 import github.lms.lemuel.menu.application.port.out.LoadMenuPort;
 import github.lms.lemuel.menu.application.port.out.SaveMenuPort;
 import github.lms.lemuel.menu.domain.Menu;
+import github.lms.lemuel.menu.domain.MenuAttributes;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -60,10 +61,15 @@ public class MenuPersistenceAdapter implements LoadMenuPort, SaveMenuPort {
         entity.setId(domain.getId());
         entity.setParentId(domain.getParentId());
         entity.setName(domain.getName());
+        entity.setShortName(domain.getShortName());
         entity.setPath(domain.getPath());
         entity.setIcon(domain.getIcon());
+        entity.setDescription(domain.getDescription());
+        entity.setArea(domain.getArea());
+        entity.setMenuType(domain.getType());
         entity.setSortOrder(domain.getSortOrder());
         entity.setRequiredRole(domain.getRequiredRole());
+        entity.setRequiredPermission(domain.getRequiredPermission());
         entity.setVisible(domain.isVisible());
         entity.setActive(domain.isActive());
         entity.setCreatedAt(domain.getCreatedAt());
@@ -75,11 +81,17 @@ public class MenuPersistenceAdapter implements LoadMenuPort, SaveMenuPort {
         return Menu.rehydrate(
                 entity.getId(),
                 entity.getParentId(),
-                entity.getName(),
-                entity.getPath(),
-                entity.getIcon(),
+                new MenuAttributes(
+                        entity.getName(),
+                        entity.getShortName(),
+                        entity.getPath(),
+                        entity.getIcon(),
+                        entity.getDescription(),
+                        entity.getArea(),
+                        entity.getMenuType(),
+                        entity.getRequiredRole(),
+                        entity.getRequiredPermission()),
                 entity.getSortOrder(),
-                entity.getRequiredRole(),
                 entity.isVisible(),
                 entity.isActive(),
                 entity.getCreatedAt(),

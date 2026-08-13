@@ -31,7 +31,10 @@ class AdminMenuControllerTest {
     @MockitoBean MenuUseCase menuUseCase;
 
     private Menu menu(long id, String name) {
-        Menu m = Menu.create(name, "/admin/" + name, "icon", null, 1, "ADMIN", true);
+        Menu m = Menu.create(new github.lms.lemuel.menu.domain.MenuAttributes(
+                name, null, "/admin/" + name, "icon", null,
+                github.lms.lemuel.menu.domain.MenuArea.SYSTEM,
+                github.lms.lemuel.menu.domain.MenuType.ITEM, "ADMIN", null), null, 1, true);
         m.assignId(id);
         return m;
     }
@@ -69,6 +72,7 @@ class AdminMenuControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name":"상품관리","path":"/admin/products","icon":"box",
+                                 "area":"BACKOFFICE","menuType":"ITEM",
                                  "parentId":null,"sortOrder":1,"requiredRole":"ADMIN","visible":true}
                                 """))
                 .andExpect(status().isCreated())
@@ -86,6 +90,7 @@ class AdminMenuControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name":"상품관리","path":"/admin/products","icon":"box",
+                                 "area":"BACKOFFICE","menuType":"ITEM",
                                  "parentId":null,"sortOrder":2,"requiredRole":"ADMIN",
                                  "visible":true,"active":true}
                                 """))

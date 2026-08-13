@@ -80,12 +80,9 @@ public class AdminMenuController {
     @PostMapping
     public ResponseEntity<MenuResponse> createMenu(@Valid @RequestBody MenuCreateRequest request) {
         Menu created = menuUseCase.createMenu(new MenuUseCase.CreateMenuCommand(
-                request.getName(),
-                request.getPath(),
-                request.getIcon(),
+                request.toAttributes(),
                 request.getParentId(),
                 request.getSortOrder(),
-                request.getRequiredRole(),
                 request.isVisible()
         ));
         return ResponseEntity.status(HttpStatus.CREATED).body(MenuResponse.fromFlat(created));
@@ -107,12 +104,9 @@ public class AdminMenuController {
             @Parameter(description = "메뉴 ID", required = true) @PathVariable Long id,
             @Valid @RequestBody MenuUpdateRequest request) {
         Menu updated = menuUseCase.updateMenu(id, new MenuUseCase.UpdateMenuCommand(
-                request.getName(),
-                request.getPath(),
-                request.getIcon(),
+                request.toAttributes(),
                 request.getParentId(),
                 request.getSortOrder(),
-                request.getRequiredRole(),
                 request.isVisible(),
                 request.isActive()
         ));
