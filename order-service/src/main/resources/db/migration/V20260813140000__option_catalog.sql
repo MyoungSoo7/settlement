@@ -1,4 +1,4 @@
--- V20260813140000: 옵션 축/값 카탈로그 (설계 Phase 1 — docs/product-catalog-design.md)
+-- V20260813140000: 옵션 축/값 카탈로그 (설계 Phase 1 — docs/inflearn/product-catalog-design.md — 로컬 전용(gitignore))
 --
 -- 지금까지 상품 옵션은 표현이 products.options_json(JSONB), 재고가 product_variants(SKU) 였고
 -- 둘을 잇는 건 product_variants.option_name 의 "색상:빨강/사이즈:L" 문자열 규약뿐이었다.

@@ -1,4 +1,4 @@
--- V20260813160000: 주문 옵션 스냅샷 + option_name 유니크 해제 (설계 Phase 4 — docs/product-catalog-design.md)
+-- V20260813160000: 주문 옵션 스냅샷 + option_name 유니크 해제 (설계 Phase 4 — docs/inflearn/product-catalog-design.md — 로컬 전용(gitignore))
 --
 -- (1) UNIQUE(product_id, option_name) 해제
 --     이 유니크는 "색상:빨강/사이즈:L" 문자열을 조합 유일성의 기준으로 못박고 있었다. 조합 유일성은

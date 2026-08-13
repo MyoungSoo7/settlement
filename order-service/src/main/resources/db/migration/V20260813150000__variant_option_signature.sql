@@ -1,4 +1,4 @@
--- V20260813150000: SKU 조합 ↔ 옵션 값 매핑과 조합 서명 (설계 Phase 2 — docs/product-catalog-design.md)
+-- V20260813150000: SKU 조합 ↔ 옵션 값 매핑과 조합 서명 (설계 Phase 2 — docs/inflearn/product-catalog-design.md — 로컬 전용(gitignore))
 --
 -- Phase 1 이 축·값을 테이블로 만들었지만, 어떤 SKU 가 어떤 값 조합인지는 여전히
 -- product_variants.option_name 문자열 안에만 있었다. 이 마이그레이션이 그 연결을 실체로 만든다.

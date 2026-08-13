@@ -1,4 +1,4 @@
--- V20260813180000: 카테고리 경로 비정규화 + 상품수 캐시 (설계 Phase 6 — docs/product-catalog-design.md)
+-- V20260813180000: 카테고리 경로 비정규화 + 상품수 캐시 (설계 Phase 6 — docs/inflearn/product-catalog-design.md — 로컬 전용(gitignore))
 --
 -- 하위 트리 조회는 지금까지 매번 재귀(자기조인/CTE)였다. 경로를 행에 적어 두면
 -- "이 카테고리 아래 전부" 가 WHERE path_ids @> ARRAY[:id] 한 줄이 된다.

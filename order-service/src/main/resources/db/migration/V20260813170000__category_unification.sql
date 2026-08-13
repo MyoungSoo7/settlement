@@ -1,4 +1,4 @@
--- V20260813170000: 카테고리 단일화 (설계 Phase 5 — docs/product-catalog-design.md)
+-- V20260813170000: 카테고리 단일화 (설계 Phase 5 — docs/inflearn/product-catalog-design.md — 로컬 전용(gitignore))
 --
 -- 상품이 카테고리에 붙는 경로가 두 개였다:
 --   categories(V12)            + products.category_id            (1:N, 하드 삭제, name 글로벌 UNIQUE)
