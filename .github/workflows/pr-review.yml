@@ -102,8 +102,14 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
-            // 모델 출력은 신뢰할 수 없는 텍스트다 — ${{ }} 로 스크립트에 보간하지 않고
+            // 모델 출력은 신뢰할 수 없는 텍스트다 — Actions 표현식으로 스크립트에 보간하지 않고
             // 파일에서 읽어 문자열 변수로만 다룬다(스크립트 인젝션 차단).
+            //
+            // ⚠ 이 블록 안에는 표현식 여는 토큰(달러 + 중괄호 두 개)을 **주석으로도** 쓰지 말 것.
+            // Actions 는 script 값 전체를 표현식으로 파싱하므로 빈 토큰이 그대로 파싱 대상이 되어
+            // "(Line: 103, Col: 19): An expression was expected" 로 워크플로가 통째로 무효가 된다.
+            // 실측: 바로 이 자리에 그 토큰을 적어 둔 주석 한 줄 때문에 pr-review 가 며칠간
+            // startup failure(잡 0개·로그 없음, 실행 이름이 파일 경로로 표시)로 죽어 있었다.
             const review = fs.existsSync('pr-review.md')
               ? fs.readFileSync('pr-review.md', 'utf8').trim()
               : '_AI review step did not run._';
