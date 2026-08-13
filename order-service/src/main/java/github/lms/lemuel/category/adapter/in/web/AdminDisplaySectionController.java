@@ -1,5 +1,6 @@
 package github.lms.lemuel.category.adapter.in.web;
 
+import github.lms.lemuel.category.adapter.in.web.dto.DisplaySectionItemResponse;
 import github.lms.lemuel.category.adapter.in.web.dto.DisplaySectionResponse;
 import github.lms.lemuel.category.application.service.DisplaySectionService;
 import github.lms.lemuel.category.domain.DisplaySectionKind;
@@ -46,6 +47,15 @@ public class AdminDisplaySectionController {
     public ResponseEntity<List<DisplaySectionResponse>> getAll() {
         return ResponseEntity.ok(displaySectionService.getAllSections().stream()
                 .map(DisplaySectionResponse::from)
+                .toList());
+    }
+
+    @Operation(summary = "편성에 담긴 상품", description = "노출이 끝난 편성의 내용도 그대로 보여 준다 — 편성을 짜는 자리다.")
+    @GetMapping("/{code}/items")
+    public ResponseEntity<List<DisplaySectionItemResponse>> getItems(
+            @Parameter(description = "편성 코드", required = true) @PathVariable String code) {
+        return ResponseEntity.ok(displaySectionService.getItems(code).stream()
+                .map(DisplaySectionItemResponse::from)
                 .toList());
     }
 
