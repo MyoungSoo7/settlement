@@ -11,7 +11,11 @@ import java.util.Objects;
  *
  * <p>applyOffset 시 가용 재원이 요청액에 못 미칠 때 부족분을 영속화한다.
  * 상태 OPEN → RESOLVED | WRITTEN_OFF.
- * DepositShortfallRetryScheduler 가 주기적으로 OPEN 건을 재상계 시도한다.
+ *
+ * <p><b>해소 주체는 아직 없다.</b> {@link #resolve}/{@link #writeOff} 는 프로덕션 호출자가 0건이고,
+ * OPEN 건을 도는 스케줄러도 존재하지 않는다 — 즉 부족분은 <b>기록되기만 하고 자동으로 해소되지 않는다.</b>
+ * (이 자리에 원래 "DepositShortfallRetryScheduler 가 주기적으로 재상계한다"고 적혀 있었으나 그런 클래스는
+ * 없었다. 없는 동작을 있다고 적으면 부족분 적체를 아무도 보지 않게 된다.)
  */
 public class DepositOffsetShortfall {
 

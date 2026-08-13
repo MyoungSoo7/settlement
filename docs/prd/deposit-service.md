@@ -9,7 +9,7 @@
 > | 대상 범위 | `deposit-service`(8112, mgmt 8113, DB `lemuel_deposit`) 전체 — 예치금 원장·hold·상계     |
 > | 역산 기준 | 2026-08-13 `develop` 브랜치                                                              |
 > | 근거      | 도메인 9개 클래스, 진입 어댑터 2종(공개 REST·관리 REST), Flyway V1~V3, 테스트 9개 클래스 |
-> | 범위 밖   | 재원 산정 공식(card-service 소관) · 실제 송금 실행(settlement payout) · Kafka 소비(미배선) |
+> | 범위 밖   | 재원 산정 공식(card-service 소관) · 실제 송금 실행(settlement payout)                     |
 > | 관련 문서 | [`SPEC.md`](../../SPEC.md) · [`deposit-service-ledger.seed.yaml`](../seeds/deposit-service-ledger.seed.yaml) · `card-service-rules`(재원 소비측) |
 
 ---
@@ -47,7 +47,7 @@ deposit-service 는 **잔고의 단일 진실원**을 세우고, 모든 변경�
 | N1 | **재원 산정 공식** | 카드 한도 산식은 card-service 소관. 여기는 잔고만 안다 |
 | N2 | 실제 송금 | 지급 실행은 settlement payout 소관 |
 | N3 | 이자·수익 계산 | 예치금은 보관 개념이지 금융상품이 아니다 |
-| N4 | 자동 이벤트 수신 | 현재 컨슈머가 없다 — 의도가 아니라 **미배선**(→ G-1) |
+| N4 | hold/offset 의 자동 이벤트 수신 | 입·출금은 배선됐으나(PR #229) hold/offset 은 콘솔 경로 — card 승인·매입 페이로드에 sellerId 가 없다 |
 
 ## 3. 사용자
 
@@ -157,7 +157,11 @@ deposit-service 는 **잔고의 단일 진실원**을 세우고, 모든 변경�
 ### 9.3 이벤트
 
 **발행** — `lemuel.deposit.*`(대표 `DepositBalanceChanged`: sellerId·available·locked·total·triggerEventType).
-**소비 0** — 컨슈머 미배선(→ G-1).
+계약 스키마 미등록 — 저장소 정책상 **발행 전용 토픽은 소비자가 생길 때 편입**한다(`SPEC.md` §5).
+
+**소비 2** — `lemuel.settlement.confirmed`→입금(refType `SETTLEMENT`, refId settlementId) ·
+`lemuel.payout.completed`→출금(refType `PAYOUT`, refId payoutId). 멱등키가 payoutId 인 이유는 계약상
+`settlementId` 가 nullable 이라 자연키가 못 되기 때문이다. 소비측 계약 테스트 `DepositConsumerParsingTest`.
 
 ## 10. 비기능 요구
 
@@ -176,40 +180,50 @@ deposit-service 는 **잔고의 단일 진실원**을 세우고, 모든 변경�
 
 ## 12. 역산에서 드러난 격차
 
-### G-1. 진실원을 채우는 자동 경로가 없다
+### G-1. ~~진실원을 채우는 자동 경로가 없다~~ → 부분 해소(2026-08-13, PR #229)
 
-이 서비스는 "잔고의 단일 진실원"을 표방한다. 그런데 **`@KafkaListener` 가 0건**이다. 정산 확정·payout·
-카드 승인 같은 상류 사건이 예치금에 자동 반영되지 않고, 현재 유입은 `/admin` 수기 콘솔뿐이다.
-즉 **진실원이라는 이름과 실제 채워지는 방식이 어긋나 있다.**
+초안 시점엔 `@KafkaListener` 가 0건이라 유입이 `/admin` 수기 콘솔뿐이었다. 이후 **입금·출금 두 경로가
+배선**됐다(`settlement.confirmed`→credit, `payout.completed`→debit). **남은 것은 hold/offset** — card
+승인·매입 페이로드에 `sellerId` 가 없어 구독할 수 없고, 여전히 콘솔 경로다.
 
-### G-2. 발행 이벤트에 계약이 없다
+### G-2. ~~발행 이벤트에 계약이 없다~~ → 격차 아님(정책대로)
 
-`lemuel.deposit.*` 의 JSON Schema 가 `shared-common` testFixtures 에 없다. 양방향 계약 테스트(ADR 0024)
-대상이 아니므로, 소비처가 붙는 순간 **드리프트 방어 없이** 시작된다.
+`lemuel.deposit.*` 의 JSON Schema 가 없는 것은 맞으나, 저장소 정책은 **발행 전용 토픽을 소비자가 생길 때
+계약 편입**하는 것이다(`SPEC.md` §5 "발행 전용" 절 — insurance 9종·card 5종도 같은 처지로 명시돼 있다).
+소비자 없이 계약을 먼저 고정하면 실제 필요 형태를 모른 채 박는 셈이다. **트리거는 소비처 등장 시점.**
 
-### G-3. 도메인 예외가 generic 이다
+### G-3. ~~도메인 예외가 generic 이다~~ → 해소(2026-08-13)
 
-`DepositHold` 의 금액 검증은 `IllegalArgumentException`, 상태 전이 위반은 `IllegalStateException` 이다.
-`guard.mjs` 의 `OO-DOMAIN-GENERIC-IAE` 대상 서비스 목록에 deposit 이 없어 차단되지 않는다 — 금융
-도메인인데 게이트가 비대칭이다. 게다가 `IllegalStateException` 은 공용 Kafka 에러 핸들러의 **즉시-DLT
-분류**에 걸리므로, 소비 경로가 붙는 순간 상태 위반 메시지가 재시도 없이 격리된다.
+타입 예외 3종(`InvalidDepositAmountException`·`InvalidDepositStateException`·
+`DepositInvariantViolationException`)으로 전환하고 `guard.mjs` 의 `OO-DOMAIN-GENERIC-IAE` 대상에 deposit 을
+편입했다. 후속으로 `deposit.domain.*` 을 INSTRUCTION 80% 엄격 목록에도 넣었다(`885c24d81`).
+상속 대상이 곧 재시도 정책(IAE/ISE = 즉시 DLT)이라는 계약은 `DepositExceptionContextTest` 가 고정한다.
 
-### G-4. hold 만료의 실행 주체가 불명확하다
+### G-4. hold 만료를 도는 주체가 없다 — **확인 완료, 실재하는 격차**
 
-만료 스캔용 부분 인덱스(`ACTIVE` + `expires_at`)는 준비돼 있는데, 그것을 도는 배치가 있는지는
-확인하지 않았다. 없다면 만료된 hold 가 `locked` 를 영구히 잡고 있어 **가용액이 조용히 줄어든 채 유지**된다.
+초안은 "확인하지 않았다"로 남겼다. 확인 결과: 부분 인덱스(`ACTIVE` + `expires_at`)도, 포트
+`LoadDepositHoldPort.findActiveExpiredBefore` 도, 그 어댑터 구현도 있다. **없는 것은 호출자다** —
+`@Scheduled` 0건이고 `DepositServiceApplication` 은 `@EnableScheduling` 을 의도적으로 끄고 있다(주석 명시).
 
-### G-5. shortfall 의 후속 처리가 없다
+만료된 hold 가 `locked` 를 계속 잡으므로 **가용액이 조용히 줄어든 채 유지**된다. 잔고가 틀리는 게 아니라
+*덜 보이는* 방향이라 잔고 검증으로는 잡히지 않는다 — 셀러 입장에선 "왜 출금이 안 되지"가 된다.
 
-부족분을 기록하지만(BR-4), 그 레코드를 누가 언제 해소하는지에 대한 흐름이 보이지 않는다. 기록만 되고
-방치되면 "기록했으니 됐다"는 착시가 생긴다.
+### G-5. shortfall 을 해소하는 주체가 없다 — **확인 완료, 게다가 코드가 거짓을 적고 있었다**
+
+`resolve()`/`writeOff()` 는 **프로덕션 호출자 0건**(테스트만 호출)이고 OPEN 건을 도는 스케줄러도 없다.
+그런데 `DepositOffsetShortfall` 의 Javadoc 은 "`DepositShortfallRetryScheduler` 가 주기적으로 OPEN 건을
+재상계 시도한다"고 단언하고 있었다 — **그런 클래스는 존재한 적이 없다.** 없는 동작을 있다고 적으면
+부족분 적체를 아무도 보지 않게 되므로, 주석을 사실(해소 주체 없음)로 정정했다.
+
+> G-4·G-5 는 같은 형태다 — **회수/해소의 재료는 다 있는데 그것을 도는 주체만 없다.** 둘 다 실패가
+> 조용하다는 점도 같다(가용액 감소·부족분 적체 모두 예외를 던지지 않는다).
 
 ## 13. 추적 항목
 
 | # | 항목 | 상태 |
 |---|---|---|
-| T-1 | 상류 이벤트 컨슈머 배선 | 미배선 (G-1) |
-| T-2 | `lemuel.deposit.*` 계약 스키마 등록 | 없음 (G-2) |
-| T-3 | 도메인 타입 예외 전환 + guard 대상 편입 | 미착수 (G-3) |
-| T-4 | hold 만료 배치 확인 | 미확인 (G-4) |
-| T-5 | shortfall 해소 워크플로 | 없음 (G-5) |
+| T-1 | 상류 이벤트 컨슈머 배선 | ✅ 입·출금 배선(PR #229) / hold·offset 은 잔여 (G-1) |
+| T-2 | `lemuel.deposit.*` 계약 스키마 등록 | 정책대로 보류 — 소비처 등장이 트리거 (G-2) |
+| T-3 | 도메인 타입 예외 전환 + guard 대상 편입 | ✅ 완료 + 게이트 편입 (G-3) |
+| T-4 | hold 만료 회수 배치 | **없음 — 포트·인덱스만 있고 호출자 0건** (G-4) |
+| T-5 | shortfall 해소 워크플로 | **없음 — resolve/writeOff 프로덕션 호출자 0건** (G-5) |

@@ -301,8 +301,15 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
 - **계좌 부재는 정상 상태**(첫 입금 시점에 생성). 0원 계좌를 지어내 돌려주지 않는다 — 대사에서 "없음"과 "0원"은 다른 사실.
 - **부족분**(`DepositOffsetShortfall`): 상계 재원이 모자라면 잔여를 부족분으로 적재한다(무음 실패 금지).
 - **이벤트 발행**(Outbox, `aggregateType="Deposit"`): `lemuel.deposit.balance_changed` · `.hold_placed` ·
-  `.hold_released` · `.offset_applied` · `.offset_shortfall`. **계약 스키마 미등록 · 소비처 미배선**(발행 전용).
-- **Kafka 컨슈머 미배선** — 현재 잔고 변동 입력은 `/admin/deposits` 수기 콘솔 경로뿐이다.
+  `.hold_released` · `.offset_applied` · `.offset_shortfall`. **계약 스키마 미등록 · 소비처 미배선**(발행 전용 —
+  §5 발행 전용 정책 적용).
+- **Kafka 컨슈머 2종**(PR #229): `lemuel.settlement.confirmed` → 입금(credit, refType=`SETTLEMENT`, refId=settlementId) ·
+  `lemuel.payout.completed` → 출금(debit, refType=`PAYOUT`, refId=payoutId). 멱등키를 payoutId 로 잡는 이유는
+  계약상 `settlementId` 가 nullable(정산 없는 지급)이라 자연키가 못 되기 때문이다.
+  지급이 나갔는데 차감할 잔고가 없으면(`InsufficientDepositException`) **삼키지 않고 전파**해 DLT 에 남긴다 —
+  상계 부족분(shortfall)과 달리 설계된 결과가 아니라 원장 불일치 신호다.
+  소비측 계약 테스트: `DepositConsumerParsingTest`(정본 샘플 기반).
+- **hold/offset 은 여전히 콘솔 경로** — card 승인·매입은 페이로드에 sellerId 가 없어 미구독이다.
 
 ### 3.17 gateway-service — API Gateway (port 8080)
 
@@ -387,8 +394,8 @@ DepositHold  : ACTIVE → PARTIALLY_CAPTURED → CAPTURED / EXPIRED / VOIDED / R
 | `lemuel.product.changed`                                                                                    | order        | settlement(프로젝션)                                                                           |
 | `lemuel.seller.tier_changed`                                                                                | order        | settlement(프로젝션 — 조회·리포트용. **정산 계산 미사용**, 결제 시점 등급이 정본, ADR 0031). `reason=BACKFILL` 은 변경이 아니라 초기 적재용 재발행 |
 | `lemuel.settlement.created`                                                                                 | settlement   | loan · account                                                                                 |
-| `lemuel.settlement.confirmed`                                                                               | settlement   | loan · investment · account · notification                                                     |
-| `lemuel.payout.completed`                                                                                   | settlement   | account(GL 현금 폐루프 — DR SELLER_PAYABLE / CR CASH, ADR 0026 Option A)                       |
+| `lemuel.settlement.confirmed`                                                                               | settlement   | loan · investment · account · notification · deposit(입금)                                     |
+| `lemuel.payout.completed`                                                                                   | settlement   | account(GL 현금 폐루프 — DR SELLER_PAYABLE / CR CASH, ADR 0026 Option A) · deposit(출금)       |
 | `lemuel.loan.repayment_applied`                                                                             | loan         | settlement · account                                                                           |
 | `lemuel.loan.disbursement_requested`                                                                        | loan         | account                                                                                        |
 | `lemuel.loan.corporate_loan_disbursed`                                                                      | loan         | account                                                                                        |

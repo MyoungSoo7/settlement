@@ -65,12 +65,17 @@
 
 ## Known Issues (발견만 기록 — 사양은 as-is 유지)
 
-- **KI-1** **컨슈머 미배선** — 발행측(Outbox)만 있고 `@KafkaListener` 는 0건이다. 정산 확정/지급/카드 승인이
-  예치금에 자동 반영되지 않아, 현재 잔고는 `/admin/deposits` 수기 입력에 의존한다. 서비스 자체는 "잔고 단일
-  진실원"을 표방하지만 그 진실원을 채우는 자동 경로가 없다. → `disposition: gap` (배선 미완, CLAUDE.md 도 명시)
+- **KI-1** ~~**컨슈머 미배선**~~ → **해소됨**(2026-08-13 확인, PR #229 / `98d525b3e`). Seed 작성 시점엔 `@KafkaListener`
+  가 0건이라 잔고가 `/admin/deposits` 수기 입력에만 의존했으나, 이후 컨슈머 2종이 배선됐다 —
+  `settlement.confirmed`→입금(refType `SETTLEMENT`), `payout.completed`→출금(refType `PAYOUT`).
+  소비측 계약 테스트(`DepositConsumerParsingTest`)도 함께 들어왔다. **단 hold/offset 은 여전히 콘솔 경로**다
+  (card 승인·매입은 페이로드에 sellerId 가 없어 미구독). → `disposition: resolved-upstream` (잔여: hold/offset 자동화)
 - **KI-2** 발행 이벤트에 **계약 스키마가 없다** — `shared-common/src/testFixtures/resources/contracts/events/`
-  에 `lemuel.deposit.*` 스키마가 없어 양방향 계약 테스트(ADR 0024) 대상이 아니다. 소비처가 붙는 순간 드리프트
-  방어가 없는 상태로 시작된다. → `disposition: gap` (event-contract-change 대상)
+  에 `lemuel.deposit.*` 스키마가 없어 양방향 계약 테스트(ADR 0024) 대상이 아니다.
+  → `disposition: by-design` (2026-08-13 재평가). 저장소 정책은 **발행 전용 토픽을 소비자가 생길 때 계약 편입**
+  하는 것이고(`SPEC.md` §5 "발행 전용" 절, insurance 9종·card 5종도 동일), `lemuel.deposit.*` 5종은 거기에
+  명시돼 있다. 계약을 먼저 박으면 소비자가 실제로 필요로 하는 형태를 모른 채 고정하는 셈이다.
+  **소비처가 생기는 시점이 트리거** — 그때 `event-contract-change` 절차로 편입한다.
 - **KI-3** `DepositHold.place`/`capture` 가 금액 검증에 **generic `IllegalArgumentException`** 을 던진다
   (`DepositHold.java:57,85,89`). OO 게이트의 "금융 도메인 타입 예외" 관례와 어긋나지만 guard 의
   `OO-DOMAIN-GENERIC-IAE` 규칙 대상 서비스 목록(settlement·order·loan·investment·account·insurance)에

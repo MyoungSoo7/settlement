@@ -109,17 +109,17 @@ seed:
 
   known_issues:  # 발견만 기록 — 사양은 as-is 유지
     - id: KI-1
-      finding: "컨슈머 미배선 — 발행측(Outbox)만 있고 @KafkaListener 0건. 정산 확정/지급/카드 승인이 예치금에 자동 반영되지 않아 잔고가 /admin/deposits 수기 입력에 의존한다. '잔고 단일 진실원'을 표방하지만 그 진실원을 채우는 자동 경로가 없다"
-      disposition: gap (배선 미완 — CLAUDE.md 도 명시)
+      finding: "[해소 2026-08-13 / PR #229 98d525b3e] Seed 작성 시점엔 @KafkaListener 0건이라 잔고가 /admin/deposits 수기 입력에만 의존했다. 이후 컨슈머 2종 배선 — settlement.confirmed→credit(refType SETTLEMENT, refId settlementId), payout.completed→debit(refType PAYOUT, refId payoutId). 소비측 계약 테스트 DepositConsumerParsingTest 동반. 잔여: hold/offset 은 여전히 콘솔 경로(card 승인·매입은 페이로드에 sellerId 가 없어 미구독)"
+      disposition: resolved-upstream (잔여 — hold/offset 자동화)
     - id: KI-2
-      finding: "발행 이벤트에 계약 스키마가 없다 — shared-common testFixtures 에 lemuel.deposit.* 스키마 부재로 양방향 계약 테스트(ADR 0024) 대상 밖. 소비처가 붙는 순간 드리프트 방어 없이 시작된다"
-      disposition: gap (event-contract-change 대상)
+      finding: "[재평가 2026-08-13] 발행 이벤트에 계약 스키마가 없는 것은 맞으나 격차가 아니다. 저장소 정책은 발행 전용 토픽을 소비자가 생길 때 계약 편입하는 것이고(SPEC.md §5 '발행 전용' 절), lemuel.deposit.* 5종이 insurance 9종·card 5종과 함께 명시돼 있다. 소비자 없이 계약을 먼저 박으면 실제 필요 형태를 모른 채 고정하게 된다"
+      disposition: by-design (트리거 — 소비처 등장 시 event-contract-change 절차)
     - id: KI-3
-      finding: "DepositHold.place/capture 가 금액 검증에 generic IllegalArgumentException 을 던진다(DepositHold.java:57,85,89). guard 의 OO-DOMAIN-GENERIC-IAE 대상 서비스 목록에 deposit 이 없어 차단되지 않는다"
-      disposition: recorded-not-fixed (게이트 비대칭)
+      finding: "[해소 2026-08-13] DepositHold.place/capture 의 generic IllegalArgumentException 을 타입 예외(InvalidDepositAmountException 등 3종)로 전환하고, guard 의 OO-DOMAIN-GENERIC-IAE CAMPAIGN_SERVICES 에 deposit 을 편입했다. 후속으로 deposit.domain.* 을 INSTRUCTION 80% 엄격 목록에도 넣었다(885c24d81)"
+      disposition: fixed
     - id: KI-4
-      finding: "hold 상태 전이 위반이 IllegalStateException(DepositHold.java:105,117,130) — 공용 Kafka 에러 핸들러의 즉시-DLT 분류에 걸린다. 소비 경로가 붙으면 상태 위반 메시지가 재시도 없이 격리된다(의도된 결과이나 문서화된 적 없음)"
-      disposition: recorded-not-fixed
+      finding: "[문서화 2026-08-13] hold 상태 전이 위반은 InvalidDepositStateException(IllegalStateException 계열) — 공용 Kafka 에러 핸들러의 즉시-DLT 분류에 걸려 재시도 없이 격리된다. 소비 경로가 실제로 붙은 지금 이 동작이 발효 중이며, 상속 대상이 곧 재시도 정책이라는 계약을 DepositExceptionContextTest 가 고정한다"
+      disposition: by-design (테스트로 계약 고정)
 
   uses:
     - regression-baseline
