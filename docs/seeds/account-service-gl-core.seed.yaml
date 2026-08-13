@@ -1,0 +1,141 @@
+# Seed: account-service GL 코어 as-is 사양 (Ouroboros 방법론 — Interview → Seed 결정화)
+# 상태: CONFIRMED (settlement/investment seed 와 동일 방식 지시로 승인 승계, 2026-08-13)
+# 원칙: 이 Seed 는 "현행 코드가 실제로 하는 일"의 불변 기술이다. 결함은 교정하지 않고 known_issues 로만 기록한다.
+# 자매 Seed: settlement-service-accounting-core (전표 원천 이벤트의 발행측)
+
+seed:
+  id: account-service-gl-core-v1
+  goal: >-
+    account-service(전사 GL 집계 — 소비 전용 복식부기 원장)의 현행 동작을 실행 가능한 게이트에 매핑된
+    불변 사양으로 결정화해, 회귀 기준선 · 계약 드리프트 게이트 · 면접/포트폴리오 문서 ·
+    후속 기능 베이스로 사용한다.
+
+  scope:
+    included:
+      - 전표(AccountEntry) 생성 규칙 — 구성적 균형·금액 정규화·팩토리 전용
+      - 계정과목(GlAccount 14종)과 차/대 방향 고정
+      - 이벤트→분개 매핑 17토픽 (소비 전용, 발행 0)
+      - 멱등 3단 방어의 account 측 구현 (processed_events + 자연키 UNIQUE)
+      - append-only 강제(트리거·CHECK)와 조회 표면(시산표·통제계정 대사)
+    excluded:
+      - 수신 3종(정기예금·적금·퇴직연금) 도메인 상세 — 계정과목 경계 사실만 기재, 별도 Seed 대상
+      - 감사로그 파티셔닝 운영 절차 (마이그레이션 존재 사실만)
+
+  constraints:
+    - "금액은 BigDecimal — Money(scale 2 HALF_UP)로 정규화하되 scale>2 유입은 예외로 거부(조용한 반올림 금지)"
+    - "전표는 차변1·대변1·금액1 구성적 균형 — 반쪽 전표를 표현할 타입이 없다"
+    - "POSTED 전표 수정 금지 — 정정은 역방향 전표로만 (append-only 트리거)"
+    - "account 는 소비 전용 — 이벤트 발행 코드 추가 금지 (Outbox 머시너리 배제, ArchUnit 강제)"
+    - "헥사고날: domain 은 adapter 를 import 하지 않는다 (ArchUnit 강제)"
+    - "도메인 규칙 위반은 타입 도메인 예외(AccountDomainException 계열)로 — generic IAE 금지"
+
+  invariants:  # as-is 코드 사실 — 파일:라인 근거 (경로 접두 account-service/src/main/java/github/lms/lemuel/account/)
+    compositional_balance:
+      source: domain/AccountEntry.java:72,110-123
+      rule: "전표 = 차변계정1 + 대변계정1 + 금액1. 생성자 private → 의미 있는 팩토리(settlementCreatedImmediate 등)로만 생성"
+      db_guard: "V20260715141000__account_entry_append_only_hardening.sql:19 chk_account_entry_accounts_distinct — 차/대 동일 계정 거부"
+    amount_normalization:
+      source: domain/AccountEntry.java:123,137-138
+      rule: "Money(scale 2 HALF_UP) → toBigDecimal 로 저장(numeric(19,2) 와 동형). scale>2 유입은 ExcessivePrecisionEntryAmountException"
+      rationale: "account 는 원천 금액의 mirror 다 — 조용히 깎으면 원천과 GL 이 어긋난다"
+      db_guard: "V1__account_core.sql chk_account_entry_amount — amount > 0"
+    append_only:
+      source: V20260715141000__account_entry_append_only_hardening.sql:38-39
+      rule: "trg_account_entry_append_only 가 UPDATE/DELETE 를 차단. 정정은 역방향 전표 추가로만"
+    idempotency:
+      source: V1__account_core.sql:14-16,22
+      rule: "자연키 (source_topic, ref_type, ref_id) UNIQUE = uq_account_entry_natural — 3단 방어의 마지막 층"
+      upstream: "2단 = processed_events (consumer_group, event_id) PK (V2__processed_events.sql), 1단 = 원천 outbox_events.event_id UNIQUE"
+    consume_only:
+      source: ../../test/java/github/lms/lemuel/account/AccountArchitectureTest.java:139-160
+      rule: "Outbox 발행 포트 의존 0 + kafkaTemplate.send 직접 호출 0 을 ArchUnit 이 하드스톱"
+      exception: "DLT publish 전용 프로듀서(공용 KafkaConsumerErrorHandlingConfig)는 비즈니스 이벤트 발행이 아니라 실패 record 격리라 대상 밖"
+    chart_of_accounts:
+      source: domain/GlAccount.java:13-60 + domain/AccountSide.java:9-12
+      debit: "CASH, LOAN_RECEIVABLE, CORPORATE_LOAN_RECEIVABLE, SECURED_LOAN_RECEIVABLE, INVESTMENT_ASSET, SELLER_RECOVERY_RECEIVABLE, SETTLEMENT_SCHEDULED, INTEREST_EXPENSE"
+      credit: "SELLER_PAYABLE, HOLDBACK_PAYABLE, WITHHOLDING_PAYABLE, TIME_DEPOSIT_LIABILITY, INSTALLMENT_SAVINGS_LIABILITY, RETIREMENT_PENSION_LIABILITY"
+      note: "계정의 차/대 성격이 enum 에 고정 — 팩토리가 방향을 임의로 뒤집을 수 없다"
+    adjustment_leg_check:
+      source: domain/AccountEntry.java:188-190
+      rule: "settlementAdjusted 는 허용된 targetLeg 밖이면 UnbalancedAccountEntryException"
+    confirmed_is_no_entry:
+      source: adapter/in/kafka/SettlementConfirmedConsumer.java handle()
+      rule: "settlement.confirmed 는 GL 무전표(ADR 0026 Option A). 상계는 payout.completed 에서 수행"
+    payout_split_posting:
+      source: application/service/RecordPayoutService.java:72,75
+      rule: "payable = min(amount, max(0, 현재 SELLER_PAYABLE 잔액)) → payoutCompleted(DR SELLER_PAYABLE / CR CASH), 초과분 → payoutAdvanceReceivable"
+      rationale: "대응 크레딧 없는 실지급(수기 송금 등)이 통제계정을 음수로 모는 것을 막는다"
+
+  event_contracts:
+    publishes: []   # 소비 전용 — 발행 0 (invariants.consume_only)
+    consumes:
+      count: 17
+      group: "lemuel-account (컨슈머별 CONSUMER_GROUP 상수)"
+      mapping:
+        - "settlement.created → settlementCreatedImmediate (AccountEntry.java:148)"
+        - "settlement.holdback_released / .holdback_consumed → holdbackReleased:168 / holdbackConsumed:178"
+        - "settlement.adjusted → settlementAdjusted:188"
+        - "settlement.canceled → settlementCanceledPayable:198 (+ settlementCanceledHoldback:205)"
+        - "settlement.withholding_accrued → withholdingAccrued"
+        - "settlement.confirmed → 무전표 (Option A)"
+        - "payout.completed → payoutCompleted + payoutAdvanceReceivable (분할)"
+        - "seller_recovery.opened / .offset → recoveryOpened:215 / recoveryOffset:225"
+        - "loan.disbursement_requested / .repayment_applied → loanDisbursed / loanRepaid"
+        - "loan.corporate_loan_disbursed → corporateLoanDisbursed"
+        - "loan.secured_loan_disbursed / .secured_loan_repaid / .secured_loan_principal_repaid → 동명 팩토리 3종"
+        - "investment.executed → investmentExecuted"
+
+  read_surface:
+    source: adapter/in/web/AccountController.java:37,44,53,58,63,72,92
+    endpoints:
+      - "GET /api/account/accounts/{ownerType}/{ownerId} (+ /entries)"
+      - "GET /api/account/aggregates/{loans|investments|settlements}"
+      - "GET /api/account/trial-balance — 시산표(차·대 합 일치 검증 지점)"
+      - "GET /api/account/control-recon — 통제계정 대사"
+      - "/internal/account (InternalAccountController) — 내부 호출 표면"
+
+  acceptance_criteria:  # 실행 가능 — 각 AC 는 기존 게이트에 매핑
+    - id: AC-1
+      criterion: 전표가 차1·대1·금액1 구성적 균형이며 팩토리 밖 생성 경로가 없다
+      gate: "./gradlew :account-service:test — AccountEntryTest"
+    - id: AC-2
+      criterion: 이벤트 발행 0 (Outbox 미의존 + KafkaTemplate.send 직접호출 0)
+      gate: "AccountArchitectureTest (ArchUnit)"
+    - id: AC-3
+      criterion: 같은 이벤트 재소비가 전표를 늘리지 않는다
+      gate: "uq_account_entry_natural + processed_events PK · AccountConsumerParsingTest · RecordAccountEntryServiceTest"
+    - id: AC-4
+      criterion: 시산표 차·대 합이 일치한다
+      gate: "TrialBalanceTest · GET /api/account/trial-balance"
+    - id: AC-5
+      criterion: 통제계정 잔액이 보조부와 어긋나지 않는다
+      gate: "BalanceReconSchedulerTest · GET /api/account/control-recon"
+    - id: AC-6
+      criterion: 실지급이 SELLER_PAYABLE 을 음수로 몰지 않는다(분할 전기)
+      gate: "RecordPayoutServiceTest"
+    - id: AC-7
+      criterion: 커버리지 LINE >= 90%
+      gate: "./gradlew :account-service:jacocoTestCoverageVerification (check 편입)"
+    - id: AC-8
+      criterion: 소비 컨슈머가 DLT 배선에 닿는다 (재시도 소진 메시지 유실 0)
+      gate: "node scripts/harness/guard.mjs --staged — KAFKA-DLQ 규칙"
+
+  known_issues:  # 발견만 기록 — 사양은 as-is 유지
+    - id: KI-1
+      finding: "settlement.confirmed 무전표(Option A) — 확정과 실지급 사이 구간의 시산표는 정산 상태와 시점이 어긋난다(미지급금이 created 시점 값으로 남음)"
+      disposition: by-design (ADR 0026 Option A)
+    - id: KI-2
+      finding: "payout 분할 전기의 클램프는 '실지급이 SELLER_PAYABLE 을 음수로 만들지 않는다'만 보장한다. 잔액을 읽지 않는 다른 전기가 동시에 오면 통제계정이 음수가 될 수 있다 (RecordPayoutService.java:29-31 주석이 명시)"
+      disposition: recorded-not-fixed (동시성 경계)
+    - id: KI-3
+      finding: "수신 3종(정기예금·적금·퇴직연금)이 같은 서비스·같은 GL 에 얹혀 계정과목이 확장됐다 — 집계 서비스와 상품 서비스가 한 배포 단위에 섞여 있다"
+      disposition: recorded-not-fixed (경계 후보)
+    - id: KI-4
+      finding: "소비 전용이라 재발행 경로가 없다 — DLT 로 격리된 분개 이벤트는 원천 서비스 재발행 또는 수기 보정뿐인데 그 절차가 문서화돼 있지 않다"
+      disposition: gap (러너북 후보 — notification-dlt.md 와 동형)
+
+  uses:
+    - regression-baseline
+    - contract-drift-gate
+    - interview-portfolio
+    - brownfield-base
