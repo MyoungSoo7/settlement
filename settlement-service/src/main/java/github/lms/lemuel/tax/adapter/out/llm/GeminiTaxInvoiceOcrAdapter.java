@@ -1,7 +1,8 @@
 package github.lms.lemuel.tax.adapter.out.llm;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import github.lms.lemuel.common.ocr.VisionExtractionClient;
+import github.lms.lemuel.common.ocr.VisionExtractionException;
 import github.lms.lemuel.tax.application.exception.TaxOcrUnavailableException;
 import github.lms.lemuel.tax.application.port.out.ExtractTaxInvoiceFieldsPort;
 import github.lms.lemuel.tax.application.port.out.dto.OcrExtraction;
@@ -10,20 +11,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestClient;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.Base64;
-import java.util.List;
-import java.util.Map;
 
 /**
  * Gemini(Generative Language API) 비전 기반 세금계산서 OCR — {@code app.tax.ocr.provider=gemini}.
  *
- * <p>스캔 이미지를 {@code inline_data}(base64)로 실어 보내고 {@code responseMimeType=application/json} 으로
- * 구조화 응답을 강제한다. ai-service 의 {@code GeminiChatAdapter} 와 같은 방식(RestClient 직접 호출, 벤더
- * SDK 미도입)이라 키·엔드포인트 운영이 동일하다.
+ * <p>HTTP 호출·응답 봉투 해체는 shared-common 의 {@link VisionExtractionClient}(ADR 0036)에 위임하고,
+ * 여기는 <b>세금계산서 도메인 지식만</b> 남긴다 — 프롬프트(어떤 필드를 읽을지)와 필드 해석(금액·작성일자·
+ * 신뢰도). card-service 영수증 OCR 이 같은 클라이언트를 쓴다.
  *
  * <p><b>폴백 없음</b>: 호출 실패·빈 응답·형식 파손·숫자 아닌 금액은 모두 {@link TaxOcrUnavailableException}
  * (503)이다. 모델이 확신 없이 채운 값을 세무 대사 근거로 저장하면 조용한 오대사가 되므로, 못 읽으면 못 읽었다고
@@ -53,88 +50,46 @@ public class GeminiTaxInvoiceOcrAdapter implements ExtractTaxInvoiceFieldsPort {
             }
             """;
 
-    private final TaxOcrProperties properties;
-    private final RestClient restClient;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final VisionExtractionClient client;
 
+    /** 생성자가 둘(운영용·테스트 주입용)이라 스프링이 쓸 쪽을 명시한다 — provider=gemini 기동 필수. */
+    @org.springframework.beans.factory.annotation.Autowired
     public GeminiTaxInvoiceOcrAdapter(TaxOcrProperties properties) {
-        this.properties = properties;
-        this.restClient = RestClient.create(properties.baseUrl());
-        if (!properties.configured()) {
+        this(new VisionExtractionClient(properties.baseUrl(), properties.apiKey(),
+                properties.model(), properties.maxOutputTokens()));
+    }
+
+    /** 테스트 전용 — 클라이언트를 밖에서 주입한다. */
+    GeminiTaxInvoiceOcrAdapter(VisionExtractionClient client) {
+        this.client = client;
+        if (!client.isConfigured()) {
             log.warn("app.tax.ocr.api-key 미설정 — 세금계산서 OCR 업로드는 503 으로 응답합니다.");
         }
     }
 
     @Override
     public boolean isConfigured() {
-        return properties.configured();
+        return client.isConfigured();
     }
 
     @Override
     public String modelName() {
-        return properties.model();
+        return client.modelName();
     }
 
     @Override
     public OcrExtraction extract(byte[] content, String contentType) {
-        String response;
-        try {
-            response = restClient.post()
-                    .uri("/v1beta/models/{model}:generateContent", properties.model())
-                    .header("x-goog-api-key", properties.apiKey())
-                    .header("content-type", "application/json")
-                    .body(buildBody(content, contentType))
-                    .retrieve()
-                    .body(String.class);
-        } catch (RuntimeException e) {
-            throw new TaxOcrUnavailableException("세금계산서 OCR 호출에 실패했습니다.", e);
-        }
-        return parse(response, objectMapper);
-    }
-
-    /** generateContent 요청 본문 — 프롬프트 + 이미지 inline_data + JSON 강제. */
-    static Map<String, Object> buildBody(byte[] content, String contentType) {
-        String base64 = Base64.getEncoder().encodeToString(content == null ? new byte[0] : content);
-        return Map.of(
-                "contents", List.of(Map.of("role", "user", "parts", List.of(
-                        Map.of("text", PROMPT),
-                        Map.of("inline_data", Map.of(
-                                "mime_type", contentType == null ? "image/png" : contentType,
-                                "data", base64))))),
-                "generationConfig", Map.of("responseMimeType", "application/json"));
-    }
-
-    /**
-     * 응답 봉투(candidates[0].content.parts[0].text) 안의 JSON 을 추출 결과로 옮긴다.
-     * 코드펜스(```json)로 감싸 오는 흔한 습관은 벗겨서 읽는다.
-     */
-    static OcrExtraction parse(String response, ObjectMapper mapper) {
-        JsonNode root;
-        try {
-            root = mapper.readTree(response == null ? "{}" : response);
-        } catch (Exception e) {
-            throw new TaxOcrUnavailableException("OCR 응답 파싱에 실패했습니다.", e);
-        }
-        JsonNode candidates = root.path("candidates");
-        if (!candidates.isArray() || candidates.isEmpty()) {
-            throw new TaxOcrUnavailableException("OCR 이 빈 응답을 반환했습니다.");
-        }
-        JsonNode parts = candidates.get(0).path("content").path("parts");
-        String text = (parts.isArray() && !parts.isEmpty()) ? parts.get(0).path("text").asText("") : "";
-        if (text.isBlank()) {
-            throw new TaxOcrUnavailableException("OCR 이 빈 응답을 반환했습니다.");
-        }
-
         JsonNode fields;
         try {
-            fields = mapper.readTree(stripCodeFence(text));
-        } catch (Exception e) {
-            throw new TaxOcrUnavailableException("OCR 응답이 JSON 형식이 아닙니다.", e);
+            fields = client.extractJson(content, contentType, PROMPT);
+        } catch (VisionExtractionException e) {
+            throw new TaxOcrUnavailableException("세금계산서 OCR 호출에 실패했습니다.", e);
         }
-        if (!fields.isObject()) {
-            throw new TaxOcrUnavailableException("OCR 응답이 JSON 객체가 아닙니다.");
-        }
+        return mapFields(fields);
+    }
 
+    /** 모델이 돌려준 JSON 객체를 세금계산서 추출 결과로 옮긴다 — 필드 해석의 정본. */
+    static OcrExtraction mapFields(JsonNode fields) {
         return new OcrExtraction(
                 text(fields, "supplierBusinessNo"),
                 text(fields, "buyerBusinessNo"),
@@ -144,17 +99,6 @@ public class GeminiTaxInvoiceOcrAdapter implements ExtractTaxInvoiceFieldsPort {
                 amount(fields, "totalAmount", "합계금액"),
                 text(fields, "approvalNumber"),
                 confidence(text(fields, "confidence")));
-    }
-
-    private static String stripCodeFence(String text) {
-        String trimmed = text.trim();
-        if (!trimmed.startsWith("```")) {
-            return trimmed;
-        }
-        int firstLineEnd = trimmed.indexOf('\n');
-        String body = firstLineEnd < 0 ? "" : trimmed.substring(firstLineEnd + 1);
-        int closing = body.lastIndexOf("```");
-        return (closing < 0 ? body : body.substring(0, closing)).trim();
     }
 
     private static String text(JsonNode fields, String name) {

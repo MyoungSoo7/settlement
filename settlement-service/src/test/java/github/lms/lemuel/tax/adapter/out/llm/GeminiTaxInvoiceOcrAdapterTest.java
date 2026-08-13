@@ -1,33 +1,52 @@
 package github.lms.lemuel.tax.adapter.out.llm;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import github.lms.lemuel.common.ocr.VisionExtractionClient;
+import github.lms.lemuel.common.ocr.VisionExtractionException;
 import github.lms.lemuel.tax.application.exception.TaxOcrUnavailableException;
 import github.lms.lemuel.tax.application.port.out.dto.OcrExtraction;
 import github.lms.lemuel.tax.config.TaxOcrProperties;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.web.client.RestClient;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 /**
- * Gemini 비전 OCR 어댑터의 <b>응답 해석</b> 계약 — HTTP 호출부는 통합 검증 대상이고, 여기서는
- * 모델이 뱉는 JSON 을 도메인 경계로 넘기기 전 어떻게 다루는지를 못박는다.
+ * Gemini 비전 OCR 어댑터의 <b>세금계산서 필드 해석</b> 계약 — HTTP·봉투 해체는 shared-common
+ * {@code VisionExtractionClient} 로 이관됐고(ADR 0036), 여기서는 도메인 지식(금액·작성일자·신뢰도 해석)과
+ * 추출 실패의 503 번역을 못박는다.
  *
- * <p>핵심: 모델이 빈 응답·형식 파손·숫자 아닌 금액을 주면 <b>지어내지 않고</b> 503 이다.
+ * <p>핵심: 모델이 형식 파손·숫자 아닌 금액을 주면 <b>지어내지 않고</b> 503 이다.
  */
 class GeminiTaxInvoiceOcrAdapterTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
+    private static JsonNode fields(String innerJson) {
+        try {
+            return MAPPER.readTree(innerJson);
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     /** Gemini generateContent 응답 봉투 — parts[0].text 안에 우리가 요구한 JSON 이 들어온다. */
     private static String envelope(String innerJson) {
         try {
-            return MAPPER.writeValueAsString(Map.of("candidates", java.util.List.of(
-                    Map.of("content", Map.of("parts", java.util.List.of(Map.of("text", innerJson)))))));
+            return MAPPER.writeValueAsString(Map.of("candidates", List.of(
+                    Map.of("content", Map.of("parts", List.of(Map.of("text", innerJson)))))));
         } catch (Exception e) {
             throw new IllegalStateException(e);
         }
@@ -42,7 +61,7 @@ class GeminiTaxInvoiceOcrAdapterTest {
                  "totalAmount":"1100000","approvalNumber":"TI-0000000005","confidence":"0.93"}
                 """;
 
-        OcrExtraction extraction = GeminiTaxInvoiceOcrAdapter.parse(envelope(inner), MAPPER);
+        OcrExtraction extraction = GeminiTaxInvoiceOcrAdapter.mapFields(fields(inner));
 
         assertThat(extraction.supplierBusinessNo()).isEqualTo("101-81-00001");
         assertThat(extraction.writtenDate()).isEqualTo(LocalDate.of(2026, 8, 1));
@@ -54,18 +73,15 @@ class GeminiTaxInvoiceOcrAdapterTest {
     }
 
     @Test
-    @DisplayName("코드펜스로 감싸 오는 응답도 벗겨서 읽는다 (모델의 흔한 습관)")
-    void stripsCodeFence() {
+    @DisplayName("누락 필드는 null — 지어내지 않는다")
+    void missingOptionalFieldsAreNull() {
         String inner = """
-                ```json
                 {"supplierBusinessNo":"101-81-00001","writtenDate":"2026-08-01","supplyAmount":"1000",
                  "taxAmount":"100","totalAmount":"1100","confidence":"0.8"}
-                ```
                 """;
 
-        OcrExtraction extraction = GeminiTaxInvoiceOcrAdapter.parse(envelope(inner), MAPPER);
+        OcrExtraction extraction = GeminiTaxInvoiceOcrAdapter.mapFields(fields(inner));
 
-        assertThat(extraction.supplyAmount()).isEqualByComparingTo("1000");
         assertThat(extraction.buyerBusinessNo()).isNull();
         assertThat(extraction.approvalNumber()).isNull();
     }
@@ -78,7 +94,7 @@ class GeminiTaxInvoiceOcrAdapterTest {
                  "supplyAmount":"1,000,000원","taxAmount":"100,000","totalAmount":"1,100,000","confidence":"0.9"}
                 """;
 
-        OcrExtraction extraction = GeminiTaxInvoiceOcrAdapter.parse(envelope(inner), MAPPER);
+        OcrExtraction extraction = GeminiTaxInvoiceOcrAdapter.mapFields(fields(inner));
 
         assertThat(extraction.supplyAmount()).isEqualByComparingTo("1000000");
         assertThat(extraction.totalAmount()).isEqualByComparingTo("1100000");
@@ -92,32 +108,18 @@ class GeminiTaxInvoiceOcrAdapterTest {
                  "taxAmount":"100","totalAmount":"1100"}
                 """;
 
-        assertThat(GeminiTaxInvoiceOcrAdapter.parse(envelope(inner), MAPPER).confidence())
+        assertThat(GeminiTaxInvoiceOcrAdapter.mapFields(fields(inner)).confidence())
                 .isEqualByComparingTo("0.50");
     }
 
     @Test
-    @DisplayName("빈 응답·후보 없음은 503")
-    void emptyResponse() {
-        assertThatThrownBy(() -> GeminiTaxInvoiceOcrAdapter.parse("{}", MAPPER))
-                .isInstanceOf(TaxOcrUnavailableException.class);
-        assertThatThrownBy(() -> GeminiTaxInvoiceOcrAdapter.parse(null, MAPPER))
-                .isInstanceOf(TaxOcrUnavailableException.class);
-        assertThatThrownBy(() -> GeminiTaxInvoiceOcrAdapter.parse(envelope("   "), MAPPER))
-                .isInstanceOf(TaxOcrUnavailableException.class);
-    }
-
-    @Test
-    @DisplayName("JSON 이 아니거나 금액을 못 읽으면 503 — 부분 결과를 만들지 않는다")
-    void malformedResponse() {
-        assertThatThrownBy(() -> GeminiTaxInvoiceOcrAdapter.parse(envelope("계산서를 읽을 수 없습니다"), MAPPER))
-                .isInstanceOf(TaxOcrUnavailableException.class);
-
+    @DisplayName("금액·작성일자를 못 읽으면 503 — 부분 결과를 만들지 않는다")
+    void malformedFields() {
         String badAmount = """
                 {"supplierBusinessNo":"101-81-00001","writtenDate":"2026-08-01",
                  "supplyAmount":"알 수 없음","taxAmount":"100","totalAmount":"1100","confidence":"0.9"}
                 """;
-        assertThatThrownBy(() -> GeminiTaxInvoiceOcrAdapter.parse(envelope(badAmount), MAPPER))
+        assertThatThrownBy(() -> GeminiTaxInvoiceOcrAdapter.mapFields(fields(badAmount)))
                 .isInstanceOf(TaxOcrUnavailableException.class)
                 .hasMessageContaining("금액");
 
@@ -125,19 +127,41 @@ class GeminiTaxInvoiceOcrAdapterTest {
                 {"supplierBusinessNo":"101-81-00001","writtenDate":"언제인지 모름",
                  "supplyAmount":"1000","taxAmount":"100","totalAmount":"1100","confidence":"0.9"}
                 """;
-        assertThatThrownBy(() -> GeminiTaxInvoiceOcrAdapter.parse(envelope(badDate), MAPPER))
+        assertThatThrownBy(() -> GeminiTaxInvoiceOcrAdapter.mapFields(fields(badDate)))
                 .isInstanceOf(TaxOcrUnavailableException.class)
                 .hasMessageContaining("작성일자");
     }
 
     @Test
-    @DisplayName("요청 본문에 이미지가 inline_data 로 실린다 (base64 + mime)")
-    void buildsInlineImageRequest() {
-        Map<String, Object> body = GeminiTaxInvoiceOcrAdapter.buildBody(new byte[]{1, 2, 3}, "image/png");
+    @DisplayName("클라이언트 추출 실패는 TaxOcrUnavailable(503) 로 번역된다")
+    void translatesClientFailureTo503() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        server.expect(requestTo("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"))
+                .andRespond(withServerError());
+        GeminiTaxInvoiceOcrAdapter adapter = new GeminiTaxInvoiceOcrAdapter(new VisionExtractionClient(
+                "https://generativelanguage.googleapis.com", "key", "gemini-2.5-flash", 1024, builder));
 
-        String json = body.toString();
-        assertThat(json).contains("inline_data").contains("image/png").contains("AQID");   // base64(1,2,3)
-        assertThat(json).contains("application/json");   // responseMimeType — 구조화 응답 강제
+        assertThatThrownBy(() -> adapter.extract(new byte[]{1}, "image/png"))
+                .isInstanceOf(TaxOcrUnavailableException.class)
+                .hasCauseInstanceOf(VisionExtractionException.class);
+    }
+
+    @Test
+    @DisplayName("정상 봉투 응답이면 HTTP 경유로도 추출 결과가 나온다")
+    void extractsOverHttp() {
+        String inner = """
+                {"supplierBusinessNo":"101-81-00001","writtenDate":"2026-08-01","supplyAmount":"1000",
+                 "taxAmount":"100","totalAmount":"1100","confidence":"0.9"}
+                """;
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        server.expect(requestTo("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"))
+                .andRespond(withSuccess(envelope(inner), MediaType.APPLICATION_JSON));
+        GeminiTaxInvoiceOcrAdapter adapter = new GeminiTaxInvoiceOcrAdapter(new VisionExtractionClient(
+                "https://generativelanguage.googleapis.com", "key", "gemini-2.5-flash", 1024, builder));
+
+        assertThat(adapter.extract(new byte[]{1}, "image/png").totalAmount()).isEqualByComparingTo("1100");
     }
 
     @Test
