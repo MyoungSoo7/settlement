@@ -51,6 +51,7 @@ export const FALLBACK_MENUS: FallbackMenuNode[] = [
     children: [
       { id: -101, name: '정합성 검증', path: '/admin/settlement/integrity', icon: '🧪', description: '원장·지급·홀드백·체류 8종', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       { id: -103, name: '일일 대사', path: '/admin/settlement/reconciliation', icon: '🔀', description: 'order ↔ settlement 이중장부', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
+      { id: -104, name: 'PG 대사', path: '/admin/settlement/pg-reconciliation', icon: '🧾', description: 'PG 정산파일 업로드 · 차이 승인 · 마감', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       { id: -102, name: '원장·시산표', path: '/admin/settlement/ledger', icon: '📒', description: '분개 조회 · 월 시산표 · 기간 마감', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
     ],
   },

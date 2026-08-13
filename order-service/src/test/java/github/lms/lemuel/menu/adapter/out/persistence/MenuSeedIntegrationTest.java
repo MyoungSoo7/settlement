@@ -79,9 +79,9 @@ class MenuSeedIntegrationTest {
     }
 
     @Test
-    @DisplayName("시드 총 35행 — 이관분 31 + 정산운영 그룹 1 + 운영 화면 3")
-    void seedsExactlyThirtyFive() {
-        assertThat(adapter.findAll()).hasSize(35);
+    @DisplayName("시드 총 36행 — 이관분 31 + 정산운영 그룹 1 + 운영 화면 4")
+    void seedsExactlyThirtySix() {
+        assertThat(adapter.findAll()).hasSize(36);
     }
 
     @Test
@@ -101,7 +101,7 @@ class MenuSeedIntegrationTest {
     @DisplayName("정산운영 그룹은 운영 화면만 담는다 — 정산 그룹과 섞이지 않는다")
     void settlementOpsChildren() {
         assertThat(childrenOf("정산운영")).extracting(Menu::getName)
-                .containsExactly("정합성 검증", "일일 대사", "원장·시산표");
+                .containsExactly("정합성 검증", "일일 대사", "PG 대사", "원장·시산표");
         assertThat(childrenOf("정산")).extracting(Menu::getName)
                 .containsExactly("상품관리", "정산관리", "정산조회", "지급관리");
     }
