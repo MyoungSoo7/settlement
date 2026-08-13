@@ -152,7 +152,12 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 스캔 **+ shared-common 의존**, ⓑ 명시 `@Import(KafkaConsumerErrorHandlingConfig)`, ⓒ 자체
 `DeadLetterPublishingRecoverer` 배선(폴리글랏 standalone) 중 하나. 폴리글랏도 대상 — `settings.gradle.kts`
 밖이라고 유실이 허용되지 않는다. 안 닿으면 Spring Kafka 기본 `FixedBackOff(0, 9)` 로 떨어져 재시도 소진
-메시지를 조용히 skip = 사실상 유실).
+메시지를 조용히 skip = 사실상 유실) ·
+`WORKFLOW-EMPTY-EXPR`(`.github/workflows/*.yml` 에 빈 표현식 금지 — Actions 는 워크플로 전체를 표현식
+렉서로 훑으므로 `run`/`script` 블록 **안의 주석**에 있어도 `An expression was expected` 로 파일이 통째로
+무효가 된다. 그 워크플로는 잡 0개·로그 없음·실행 이름이 파일 경로로 뜨는 형태로 죽고, 다른 체크는 초록이라
+드러나지 않는다. YAML 파서·공식 워크플로 스키마·액션 SHA 실재 검증이 전부 통과하는 사각지대라 grep 계층에
+둔다 — 2026-08 pr-review.yml 이 이 한 줄 주석 때문에 며칠간 죽어 있었다).
 
 운영 DB 직접 조작 명령 차단(`check-command`).
 
