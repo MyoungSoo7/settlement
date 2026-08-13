@@ -84,7 +84,7 @@ settlement/                       # Gradle 멀티 모듈 루트
   `AdminApiKeyFilter`(X-Internal-Api-Key) 게이트. company·operation·ai·account 는 의존이되 제한 스캔(트리 주석 참조).
 - **폴리글랏 7종**(위 트리·settings.gradle 미포함, standalone 디렉토리): notification(8130)·reconciliation(8131, Kotlin) ·
   market-stream(8110)·payment-webhook(8111, Go) · screening-backtest(8120)·settlement-anomaly(8121)·forecast(8122, Python).
-  자체 DB 없음(무영속 MVP), CI 는 `polyglot-ci.yml` 분리 — 정본 `docs/polyglot-services.md`.
+  자체 DB 없음(무영속 MVP), CI 는 `polyglot-ci.yml` 분리 — 정본 `docs/plan/polyglot-services.md`.
 - 각 서비스의 **책임·API·유스케이스는 [`SPEC.md`](./SPEC.md), 강제 규칙은 `*-rules` 스킬** 참조.
 - 위 트리는 **에이전트용 경계 요약**(포트·DB·shared-common 의존 방식) — 전체 디렉토리·모듈 트리 정본은
   [`docs/STRUCTURE.md`](docs/STRUCTURE.md). 로스터 드리프트는 `harness-audit` 가 `settings.gradle.kts` 와 대조해 차단.

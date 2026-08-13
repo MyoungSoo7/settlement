@@ -63,13 +63,13 @@ class IntegrityReportsTest {
     void payoutReconJudgment() {
         var onlyMissing = PayoutReconReport.of(DATE, 5, new BigDecimal("500000.00"),
                 3, new BigDecimal("300000.00"), 3,
-                List.of(1L, 2L), List.of(), List.of(), List.of());
+                List.of(1L, 2L), List.of(), 360, List.of(), List.of(), List.of());
         assertThat(onlyMissing.ok()).isTrue();
         assertThat(onlyMissing.settlementsWithoutPayout()).hasSize(2);
 
         var overpaid = PayoutReconReport.of(DATE, 5, new BigDecimal("500000.00"),
                 3, new BigDecimal("300000.00"), 3,
-                List.of(),
+                List.of(), List.of(), 360,
                 List.of(new PayoutReconReport.OverpaidPayout(11L, 1L,
                         new BigDecimal("97000.00"), new BigDecimal("96500.00"))),
                 List.of(), List.of());
@@ -77,17 +77,44 @@ class IntegrityReportsTest {
         assertThat(overpaid.reasons()).anySatisfy(r -> assertThat(r).contains("과다 지급"));
 
         var dup = PayoutReconReport.of(DATE, 5, BigDecimal.ZERO,
-                2, BigDecimal.ZERO, 0, List.of(), List.of(), List.of(1L), List.of());
+                2, BigDecimal.ZERO, 0, List.of(), List.of(), 360, List.of(), List.of(1L), List.of());
         assertThat(dup.ok()).isFalse();
         assertThat(dup.reasons()).anySatisfy(r -> assertThat(r).contains("이중 지급"));
 
         // 유형별 1건씩이어도 payout 합계가 net 을 넘으면 위반 (유형 분산 이중 지급)
         var overTotal = PayoutReconReport.of(DATE, 5, new BigDecimal("500000.00"),
-                2, new BigDecimal("120000.00"), 0, List.of(), List.of(), List.of(),
+                2, new BigDecimal("120000.00"), 0, List.of(), List.of(), 360, List.of(), List.of(),
                 List.of(new PayoutReconReport.OverTotalSettlement(1L,
                         new BigDecimal("120000.00"), new BigDecimal("96500.00"))));
         assertThat(overTotal.ok()).isFalse();
         assertThat(overTotal.reasons()).anySatisfy(r -> assertThat(r).contains("합계"));
+    }
+
+    @Test
+    @DisplayName("INV-6: 확정 후 유예시간이 지나도 payout 이 없으면 위반 — 백필 전 loan 이벤트 확인을 안내한다")
+    void payoutReconStaleMissingEscalates() {
+        // 유예 안: 방금 확정돼 payout 이 아직 없는 것은 정상 — 지급은 상환차감 수신 시점에 만들어진다.
+        var withinGrace = PayoutReconReport.of(DATE, 5, new BigDecimal("500000.00"),
+                3, new BigDecimal("300000.00"), 3,
+                List.of(7L, 8L), List.of(), 360, List.of(), List.of(), List.of());
+        assertThat(withinGrace.ok())
+                .as("유예 안의 payout 미생성은 여전히 정보성")
+                .isTrue();
+
+        // 유예 경과: loan repayment_applied 가 오지 않아 지급이 영영 안 만들어진 상태다.
+        var stale = PayoutReconReport.of(DATE, 5, new BigDecimal("500000.00"),
+                3, new BigDecimal("300000.00"), 3,
+                List.of(7L, 8L), List.of(8L), 360, List.of(), List.of(), List.of());
+        assertThat(stale.ok())
+                .as("확정 후 6시간이 지나도 지급이 없으면 셀러에게 돈이 안 나간 것 — 위반")
+                .isFalse();
+        assertThat(stale.stalePayoutMissing()).containsExactly(8L);
+        assertThat(stale.reasons()).anySatisfy(r -> {
+            assertThat(r).contains("360");                  // 유예시간을 문구에 박아 재현 가능하게
+            assertThat(r).contains("지급 누락");
+            // 백필부터 돌리면 차감 기록 없는 건은 그대로 남는다 — 순서를 문구가 알려줘야 한다.
+            assertThat(r).contains("loan");
+        });
     }
 
     // ── PayoutBounceReconReport (INV-13) ────────────────────────────────────

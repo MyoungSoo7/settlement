@@ -1,4 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import OptionFacetPanel from '@/components/product/OptionFacetPanel';
+import {
+  facetApi, countSelected, toggleFacetValue,
+  type Facet, type FacetSelection,
+} from '@/api/facet';
 import { orderApi } from '@/api/order';
 import { paymentApi } from '@/api/payment';
 import { productApi } from '@/api/product';
@@ -50,6 +55,12 @@ const OrderFormTab: React.FC = () => {
   const [couponResult, setCouponResult] = useState<CouponValidateResponse | null>(null);
   const [appliedCouponCode, setAppliedCouponCode] = useState<string | undefined>(undefined);
 
+  // 옵션 파셋 필터
+  const [facets, setFacets] = useState<Facet[]>([]);
+  const [facetSelection, setFacetSelection] = useState<FacetSelection>({});
+  const [facetProducts, setFacetProducts] = useState<ProductResponse[] | null>(null);
+  const [loadingFacets, setLoadingFacets] = useState(false);
+
   // 상품 리뷰 미리보기
   const [reviews, setReviews] = useState<ReviewResponse[]>([]);
   const [reviewsOpen, setReviewsOpen] = useState(false);
@@ -63,6 +74,23 @@ const OrderFormTab: React.FC = () => {
       .finally(() => setLoadingProducts(false));
   }, []);
 
+  // 파셋은 선택이 바뀔 때마다 다시 묻는다 — 값별 남는 상품 수가 선택에 따라 달라지기 때문이다.
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingFacets(true);
+    facetApi.search(facetSelection)
+      .then((result) => {
+        if (cancelled) return;
+        setFacets(result.facets);
+        // 선택이 없으면 목록은 기존 전체 조회를 그대로 쓴다 — 파셋 질의는 옵션이 있는 상품만
+        // 훑으므로, 선택도 없는데 이 결과로 갈아치우면 옵션 없는 상품이 화면에서 사라진다.
+        setFacetProducts(countSelected(facetSelection) > 0 ? result.products : null);
+      })
+      .catch(() => { if (!cancelled) { setFacets([]); setFacetProducts(null); } })
+      .finally(() => { if (!cancelled) setLoadingFacets(false); });
+    return () => { cancelled = true; };
+  }, [facetSelection]);
+
   useEffect(() => {
     if (!selectedProduct) { setReviews([]); setReviewsOpen(false); return; }
     setLoadingReviews(true);
@@ -72,7 +100,18 @@ const OrderFormTab: React.FC = () => {
       .finally(() => setLoadingReviews(false));
   }, [selectedProduct]);
 
-  const filteredProducts = products
+  const handleToggleFacet = (axisCode: string, valueCode: string) => {
+    setFacetSelection((prev) => toggleFacetValue(prev, axisCode, valueCode));
+    setSelectedProduct(null); // 필터가 바뀌면 고른 상품이 목록에서 빠질 수 있다
+  };
+
+  const handleClearFacets = () => {
+    setFacetSelection({});
+    setSelectedProduct(null);
+  };
+
+  // 옵션 필터가 걸리면 그 결과가 목록의 원천이고, 키워드는 그 위에 얹는다.
+  const filteredProducts = (facetProducts ?? products)
     .filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
     .slice(0, PRODUCTS_PER_PAGE);
 
@@ -227,6 +266,15 @@ const OrderFormTab: React.FC = () => {
                 onChange={(e) => { setSearchQuery(e.target.value); setSelectedProduct(null); }}
               />
             </div>
+
+            {/* 옵션 파셋 필터 — 옵션 있는 상품이 없으면 패널 자체가 그려지지 않는다 */}
+            <OptionFacetPanel
+              facets={facets}
+              selection={facetSelection}
+              onToggle={handleToggleFacet}
+              onClear={handleClearFacets}
+              loading={loadingFacets}
+            />
 
             {/* 상품 목록 */}
             <div>

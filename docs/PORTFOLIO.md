@@ -18,7 +18,7 @@
 | **Flyway 마이그레이션** | **274 개**(`git ls-files '*/src/main/resources/db/migration/V*__*.sql' \| wc -l`) |
 | **ADR** | **31 개** (0001 ~ 0032, 0019 결번) |
 | **테스트** | **테스트 클래스 909개**(`*Test.java`+`*IT.java`, `git ls-files '*/src/test/java/**/*.java' \| grep -E '(Test\|IT)\.java$' \| wc -l`) — 핵심 정산 모듈 **520 테스트 실측 통과**(2026-07-12 측정) |
-| **커버리지 (검증)** | **정산 모듈 LINE 94.17%** (게이트 90%, 2026-07-12 측정) — [SETTLEMENT-VERIFICATION.md](SETTLEMENT-VERIFICATION.md) |
+| **커버리지 (검증)** | **정산 모듈 LINE 94.17%** (게이트 90%, 2026-07-12 측정) — [SETTLEMENT-VERIFICATION.md](plan/SETTLEMENT-VERIFICATION.md) |
 | **부하테스트** | 4 시나리오 (k6) |
 
 > 휘발성 수치는 문서에 박제하지 않는다 — 각 수치 옆의 `git ls-files` 명령을 그때그때 실행한 결과가 정답이다.
@@ -40,7 +40,7 @@
 ```
 
 무엇이 어떤 테스트로 검증되는지(복식부기 균형·멱등 3계층·동시성·정합성 INV-5~11) + **검증되지 않는 한계까지** 정직하게 정리:
-→ **[docs/SETTLEMENT-VERIFICATION.md](SETTLEMENT-VERIFICATION.md)**
+→ **[docs/SETTLEMENT-VERIFICATION.md](plan/SETTLEMENT-VERIFICATION.md)**
 
 ---
 
@@ -199,7 +199,7 @@ ai-service 는 **시스템 프롬프트 + 컨텍스트 윈도의 단순 대화�
 | 질문 | 답변 |
 |---|---|
 | MSA 인데 DB 공유 아닌가요? | [settlement readmodel 프로젝션](../settlement-service/src/main/java/github/lms/lemuel/settlement/adapter/out/readmodel/) + [OrderReconClient](../settlement-service/src/main/java/github/lms/lemuel/recon/OrderReconClient.java) |
-| 정산이 정말 정확한가요? | **[SETTLEMENT-VERIFICATION.md](SETTLEMENT-VERIFICATION.md)** — 520 테스트·94% 커버리지 + 불변식 매핑 + 한계 |
+| 정산이 정말 정확한가요? | **[SETTLEMENT-VERIFICATION.md](plan/SETTLEMENT-VERIFICATION.md)** — 520 테스트·94% 커버리지 + 불변식 매핑 + 한계 |
 | 결제 PG 장애 시 fallback? | [PgRouter](../order-service/src/main/java/github/lms/lemuel/payment/adapter/out/pg/PgRouter.java) — fallback chain |
 | 환불 중 PG 가 죽으면? | [RefundPaymentUseCase](../order-service/src/main/java/github/lms/lemuel/payment/application/RefundPaymentUseCase.java) — 예외 변환 + 롤백, 유령 환불 방지 |
 | 이벤트 발행 영구 실패 시? | [DLQ + Admin API](../shared-common/src/main/java/github/lms/lemuel/common/outbox/) |
@@ -225,7 +225,7 @@ ai-service 는 **시스템 프롬프트 + 컨텍스트 윈도의 단순 대화�
 | 자산 | 위치                                                             |
 |---|------------------------------------------------------------------|
 | **Architecture Decision Records** 31개 | [docs/adr/](adr/)                                                |
-| **정산 정확성 검증 문서** | [docs/SETTLEMENT-VERIFICATION.md](SETTLEMENT-VERIFICATION.md)    |
+| **정산 정확성 검증 문서** | [docs/SETTLEMENT-VERIFICATION.md](plan/SETTLEMENT-VERIFICATION.md)    |
 | **k6 부하테스트** 4 시나리오 | [load-test/](../load-test/)                                      |
 | **Grafana 대시보드** + 커스텀 메트릭 | [monitoring/grafana/dashboards/](../monitoring/grafana/dashboards/) |
 | **분산 트레이싱** (Tempo + OTLP) | [docker-compose.yml](../docker-compose.yml)                      |
@@ -254,7 +254,7 @@ ai-service 는 **시스템 프롬프트 + 컨텍스트 윈도의 단순 대화�
 
 ## 빠른 둘러보기 (5분)
 
-1. **[docs/SETTLEMENT-VERIFICATION.md](SETTLEMENT-VERIFICATION.md)** — "정말 작동하나"의 재현 가능한 답(520 테스트·94%)
+1. **[docs/SETTLEMENT-VERIFICATION.md](plan/SETTLEMENT-VERIFICATION.md)** — "정말 작동하나"의 재현 가능한 답(520 테스트·94%)
 2. **[README.md](../README.md)** 의 *"면접관용 빠른 둘러보기"* + 아키텍처 다이어그램
 3. **[docs/adr/0020-order-settlement-db-split.md](adr/0020-order-settlement-db-split.md)** — DB 물리 분리 결정
 4. **[docs/adr/](adr/)** 31개 — 왜 이렇게 설계했는지

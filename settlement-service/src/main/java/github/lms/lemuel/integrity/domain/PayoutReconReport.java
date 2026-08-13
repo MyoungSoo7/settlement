@@ -29,6 +29,8 @@ public record PayoutReconReport(
         BigDecimal activePayoutTotal,
         long completedPayouts,
         List<Long> settlementsWithoutPayout, // payout 없는 정산 (정보성, 상한 절단)
+        List<Long> stalePayoutMissing,      // 그중 확정 후 유예시간이 지난 것 — 지급 누락 (위반)
+        int payoutGraceMinutes,             // 유예시간 (경보 문구·재현용)
         List<OverpaidPayout> overpaidPayouts, // payout.amount > net_amount — 과다 지급
         List<Long> duplicatePayoutSettlementIds, // 같은 (정산, 유형) 활성 payout 2건 이상
         List<OverTotalSettlement> overTotalSettlements, // 정산별 payout 합계 > net — 이중 지급
@@ -53,6 +55,8 @@ public record PayoutReconReport(
                                        BigDecimal activePayoutTotal,
                                        long completedPayouts,
                                        List<Long> settlementsWithoutPayout,
+                                       List<Long> stalePayoutMissing,
+                                       int payoutGraceMinutes,
                                        List<OverpaidPayout> overpaidPayouts,
                                        List<Long> duplicatePayoutSettlementIds,
                                        List<OverTotalSettlement> overTotalSettlements) {
@@ -71,7 +75,8 @@ public record PayoutReconReport(
         }
         return new PayoutReconReport(targetDate, confirmedSettlements, confirmedNetTotal,
                 activePayouts, activePayoutTotal, completedPayouts,
-                List.copyOf(settlementsWithoutPayout), List.copyOf(overpaidPayouts),
+                List.copyOf(settlementsWithoutPayout), List.copyOf(stalePayoutMissing),
+                payoutGraceMinutes, List.copyOf(overpaidPayouts),
                 List.copyOf(duplicatePayoutSettlementIds), List.copyOf(overTotalSettlements),
                 reasons.isEmpty(), List.copyOf(reasons));
     }

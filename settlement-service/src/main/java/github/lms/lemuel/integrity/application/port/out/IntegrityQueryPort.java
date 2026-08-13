@@ -23,7 +23,13 @@ public interface IntegrityQueryPort {
 
     LedgerCompletenessReport ledgerCompleteness(LocalDate date, int graceMinutes, LocalDateTime graceCutoff);
 
-    PayoutReconReport payoutRecon(LocalDate date);
+    /**
+     * INV-6 지급 대사.
+     *
+     * @param graceMinutes 확정 후 payout 이 없어도 정상으로 보는 유예시간 (경보 문구에 실린다)
+     * @param graceCutoff  이 시각보다 먼저 확정됐는데 payout 이 없으면 지급 누락으로 판정한다
+     */
+    PayoutReconReport payoutRecon(LocalDate date, int graceMinutes, LocalDateTime graceCutoff);
 
     /** payout_bounces 체인 ↔ 재지급 payout(settlement_id=NULL) 1:1 대사 (INV-13, Seed D1 후속). */
     PayoutBounceReconReport payoutBounceRecon();

@@ -40,6 +40,13 @@ public class IntegrityQueryService implements IntegrityQueryUseCase {
     private final LoadCompletedRefundsPort completedRefundsPort;
     private final int defaultGraceMinutes;
     private final int defaultStuckThresholdMinutes;
+    /**
+     * 확정 후 payout 이 없어도 정상으로 보는 유예시간 (INV-6).
+     *
+     * <p>지급은 상환차감 수신 시점에 초 단위로 만들어진다(L-3). 6시간은 Kafka 지연·DLT 재처리를
+     * 흡수하고도 남는 폭이라, 이 시간을 넘겨 payout 이 없다면 대개 loan 이벤트가 오지 않은 것이다.
+     */
+    private final int defaultPayoutGraceMinutes;
     /** KST 기준 시각 소스 — grace/threshold cutoff·오늘 판정이 JVM 타임존에 흔들리지 않게 한다. */
     private final Clock clock;
 
@@ -47,11 +54,13 @@ public class IntegrityQueryService implements IntegrityQueryUseCase {
                                  LoadCompletedRefundsPort completedRefundsPort,
                                  @Value("${app.integrity.grace-minutes:15}") int defaultGraceMinutes,
                                  @Value("${app.integrity.stuck-threshold-minutes:60}") int defaultStuckThresholdMinutes,
+                                 @Value("${app.integrity.payout-grace-minutes:360}") int defaultPayoutGraceMinutes,
                                  Clock clock) {
         this.queryPort = queryPort;
         this.completedRefundsPort = completedRefundsPort;
         this.defaultGraceMinutes = defaultGraceMinutes;
         this.defaultStuckThresholdMinutes = defaultStuckThresholdMinutes;
+        this.defaultPayoutGraceMinutes = defaultPayoutGraceMinutes;
         this.clock = clock;
     }
 
@@ -64,7 +73,8 @@ public class IntegrityQueryService implements IntegrityQueryUseCase {
 
     @Override
     public PayoutReconReport checkPayoutRecon(LocalDate date) {
-        return queryPort.payoutRecon(date);
+        LocalDateTime graceCutoff = LocalDateTime.now(clock).minusMinutes(defaultPayoutGraceMinutes);
+        return queryPort.payoutRecon(date, defaultPayoutGraceMinutes, graceCutoff);
     }
 
     @Override

@@ -118,14 +118,6 @@ company-service/src/main/resources/pwc/accounting/outputs/*
 # 채점기와 에이전트가 파생 엔진을 공유하는 자기순환을 외부 정답으로 반증한 유일한 증거라 공개 유지한다.
 !company-service/src/main/resources/pwc/accounting/outputs/taeyoung-backtest-2022/
 
-## https 폴더제외
-https
-
-### Codex isolated worktrees ###
-.worktrees/
-
-docs/inflearn
-docs/harness2
 
 ### AI 도구 로컬 설정·세션 아티팩트 (공개 저장소 이력 제외) ###
 .credentials.json
@@ -193,7 +185,6 @@ company-service/src/main/resources/*.csv
 # 호출하지 않아 소유 서비스가 없고, 따라서 원격 실행 대상이 아니다(CLAUDE.md 배치 기준).
 # 공개 저장소에 대회 제출물·타사 브랜드명·실명 종목 리포트를 싣지 않는다.
 # 소유 서비스가 있는 제출물은 그 서비스의 src/main/resources/ 아래에서 계속 추적된다.
-docs/harness/
 
 # 프론트 빌드 산출물 — 배포에 쓰이지 않으므로 추적하지 않는다 (2026-08-01).
 #   frontend/Dockerfile 은 COPY . . 후 `npm run build` 로 소스에서 다시 빌드하고,
@@ -206,4 +197,14 @@ frontend/dist/
 .harness-changed.txt
 .harness-deleted.txt
 
-docs/plan
+## https 폴더제외
+https
+
+### Codex isolated worktrees ###
+.worktrees/
+
+docs/inflearn/
+docs/harness2/
+docs/harness/
+docs/plan/
+docs/knowledge/
