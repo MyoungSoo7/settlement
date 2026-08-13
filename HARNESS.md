@@ -202,6 +202,12 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 - **스케줄러 락 이름 유일성** — `scripts/harness/test/scheduler-lock-gate.test.mjs`: 같은 `@SchedulerLock`
   이름을 두 배치가 쓰면 락 보유 기간 동안 나머지가 **조용히 스킵**된다(예외·로그 없음 → 컴파일도 CI 도 못 잡음).
   리포 전수로 잠근다. 의도적 공유가 필요하면 게이트의 `ALLOWED_SHARED` 에 근거와 함께 등록.
+- **메뉴↔라우트 정합 게이트** — `scripts/harness/test/menu-route-gate.test.mjs`: 네비게이션 트리의 세 사본
+  (시드 SQL `V20260813100000__menu_area_permission.sql` = 정본 · 프론트 폴백 `menuFallback.ts` · `App.tsx` 라우트)을
+  대조한다. 메뉴만 있고 라우트가 없으면 **죽은 링크**, 라우트만 있고 메뉴가 없으면 **유령 화면**이 되는데 둘 다
+  컴파일러도 런타임도 알려 주지 않는다. 진입점이 네비게이션이 아닌 화면(PG 콜백·인쇄·리다이렉트 등)은
+  게이트의 `ROUTES_WITHOUT_MENU` 에 **사유와 함께** 등록해야 통과한다 → 화면 추가 시 "메뉴에 넣을지"를
+  강제로 결정하게 만든다. 삭제된 사이드바 셸 3종(SettlementLayout·CeoLayout·SystemLayout)의 부활도 함께 막는다.
 - **하네스 자기 진단** — `scripts/harness/harness-audit.mjs`: 문서 드리프트를 규율이 아닌 **기계 게이트**로 승격(과거 문서 3주 방치 재발 방지).
   라우팅 맵 dangling 도 기계 검증한다 — 🤖📘⌘ 아이콘 줄의 backtick 진입점 토큰을 agents/skills/commands 실존과 대조
   (에이전트·스킬·커맨드를 삭제/개명하고 라우팅 맵을 안 고치면 audit FAIL → CI 차단).

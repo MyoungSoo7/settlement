@@ -161,6 +161,10 @@ order Kafka 이벤트를 컨슈머(`adapter/in/kafka/`)가 받아 로컬 적재�
   - shared-common 은 composite build 로 로컬 치환 — 변경이 의존 서비스에 즉시 반영(별도 publish 불필요).
   - 제한 스캔 서비스(company/ai/account 등)에 shared-common 빈(JwtUtil·필터 등) 추가 시 `@Import` 필요(전역 스캔 안 됨).
   - 새 도메인/서비스는 코드만으론 안 붙는다 — 스캔·JPA·gateway·nginx·Dockerfile 5곳 배선(→ `msa-service-wiring` 스킬).
+  - **새 화면 = 라우트 + 메뉴 2스텝**: 네비게이션 정본은 `menus` 테이블이다(프론트 셸은 `GET /api/menus/me` 로 그린다).
+    ① `App.tsx` 라우트 추가 ② 시드 마이그레이션 + `frontend/src/data/menuFallback.ts` 에 메뉴 행 추가. 메뉴에 넣지
+    않을 화면이면 `menu-route-gate.test.mjs` 의 `ROUTES_WITHOUT_MENU` 에 사유 등록(안 하면 CI FAIL).
+    메뉴 **구조**(path·area·parent·권한)는 마이그레이션으로만 — 운영 화면 편집은 표시 속성(이름·순서·노출·아이콘)까지.
   - CRLF 파일을 `sed -i` 로 편집하면 전체 라인엔딩이 churn — Edit 도구로 해당 줄만 수정.
 
 ## 보안
