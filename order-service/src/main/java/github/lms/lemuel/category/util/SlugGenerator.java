@@ -62,7 +62,9 @@ public class SlugGenerator {
         slug = slug.replaceAll("-+", "-");
 
         // 앞뒤 하이픈 제거
-        slug = slug.replaceAll("^-|-$", "");
+        // 그룹으로 의도를 명시한다(S5850): "(^-) 또는 (-$)" 이지 "^(-|-)$" 가 아니다.
+        // 동작은 종전과 같다 — 위에서 연속 하이픈을 하나로 접었으므로 각 끝에서 1개만 지우면 된다.
+        slug = slug.replaceAll("(?:^-)|(?:-$)", "");
 
         if (slug.isEmpty()) {
             throw new CategoryInvariantViolationException("Generated slug is empty. Input may contain only special characters.");
