@@ -256,7 +256,7 @@ noClasses().that().resideInAPackage("..domain..")
 ### 7. Reconciliation (대사)
 
 `settlements.payment_amount ≠ payments.amount` 같은 불일치를 일/주 단위로 탐지.
-`docs/runbook/cashflow-reconciliation.md` 의 절차에 따라 알림·보정.
+`docs/plan/runbook/cashflow-reconciliation.md` 의 절차에 따라 알림·보정.
 
 ### 8. 다중 PG 라우팅 + Bulkhead ★
 
@@ -565,7 +565,7 @@ PENDING → READY → SHIPPED → IN_TRANSIT → DELIVERED → (선택) RETURNED
 | Claude Code 컨텍스트 | [`CLAUDE.md`](./CLAUDE.md) |
 | Ouroboros (명세 우선 AI 워크플로 엔진) | [`docs/inflearn/ouroboros.md`](docs/inflearn/ouroboros.md) |
 | ADR (아키텍처 결정 기록) | [`docs/adr/`](./docs/adr/) |
-| Runbook (장애 대응) | [`docs/runbook/`](./docs/runbook/) |
+| Runbook (장애 대응) | [`docs/plan/runbook/`](docs/plan/runbook/) |
 | CI/CD | [`.github/workflows/`](./.github/workflows/) |
 | Kubernetes | `k8s/`(저장소 미포함 — 매니페스트는 로컬 보관) |
 | Flyway | [`order-service/src/main/resources/db/migration/`](./order-service/src/main/resources/db/migration/) |

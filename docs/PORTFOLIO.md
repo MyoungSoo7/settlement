@@ -229,7 +229,7 @@ ai-service 는 **시스템 프롬프트 + 컨텍스트 윈도의 단순 대화�
 | **k6 부하테스트** 4 시나리오 | [load-test/](../load-test/)                                      |
 | **Grafana 대시보드** + 커스텀 메트릭 | [monitoring/grafana/dashboards/](../monitoring/grafana/dashboards/) |
 | **분산 트레이싱** (Tempo + OTLP) | [docker-compose.yml](../docker-compose.yml)                      |
-| **장애 대응 Runbook** | [docs/runbook/](runbook/)                                        |
+| **장애 대응 Runbook** | [docs/runbook/](plan/runbook/)                                        |
 | **CI/CD** GitHub Actions | [.github/workflows/](../.github/workflows/)                      |
 
 

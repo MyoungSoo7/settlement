@@ -98,9 +98,9 @@ orders/captured-payments 를 각 Publish 포트로 재발행, `SettlementProject
 | 5 | 하드닝 — cross-DB 대사(self-totals), 드리프트/lag 관측, opslab 잔여 테이블 정리 |
 
 각 Phase 는 독립 배포·롤백 가능하다. 일회성 운영 절차는 런북으로 분리한다 —
-[컷오버](../runbook/settlement-db-cutover.md)(Phase 4),
-[프로젝션 lag/드리프트](../runbook/settlement-projection-lag.md)(Phase 5.2/5.6),
-[opslab decommission](../runbook/settlement-db-decommission.md)(Phase 5.5).
+[컷오버](../plan/runbook/settlement-db-cutover.md)(Phase 4),
+[프로젝션 lag/드리프트](../plan/runbook/settlement-projection-lag.md)(Phase 5.2/5.6),
+[opslab decommission](../plan/runbook/settlement-db-decommission.md)(Phase 5.5).
 
 ## 결과
 
@@ -136,6 +136,6 @@ orders/captured-payments 를 각 Publish 포트로 재발행, `SettlementProject
 - [0012 — Outbox 분산 트레이싱](0012-distributed-tracing-across-outbox.md)
 - [0021 — shared-common 을 버전드 플랫폼 라이브러리로](0021-shared-common-as-platform-library.md)
 - [0022 — 이벤트 Schema Registry](0022-event-schema-registry.md) (Phase 5.3)
-- 런북: [DB 컷오버](../runbook/settlement-db-cutover.md) ·
-  [프로젝션 lag/드리프트](../runbook/settlement-projection-lag.md) ·
-  [opslab decommission](../runbook/settlement-db-decommission.md)
+- 런북: [DB 컷오버](../plan/runbook/settlement-db-cutover.md) ·
+  [프로젝션 lag/드리프트](../plan/runbook/settlement-projection-lag.md) ·
+  [opslab decommission](../plan/runbook/settlement-db-decommission.md)

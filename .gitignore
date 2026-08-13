@@ -205,3 +205,5 @@ frontend/dist/
 # verify.sh 가 guard 에 넘기는 목록 — guard 는 저장소 밖 경로를 거부하므로 리포 안에 둔다. 실행 후 자동 삭제.
 .harness-changed.txt
 .harness-deleted.txt
+
+docs/plan

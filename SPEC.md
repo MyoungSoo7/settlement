@@ -152,7 +152,7 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
 
 기업 식별자(stockCode/corpCode)는 financial 과 공용 비즈니스 키. Phase 3 평판 변동 Outbox 발행.
 
-**사업장 업종·지역 비교**(Seed: `docs/seeds/company-service-workforce-comparison.seed.yaml`) — 사업자등록번호가 앞
+**사업장 업종·지역 비교**(Seed: `docs/plan/seeds/company-service-workforce-comparison.seed.yaml`) — 사업자등록번호가 앞
 6자리만 공개돼 타 서비스와 자동 조인이 불가하므로 company-service 단독으로 완결한다.
 
 - 상세 조회는 내부 id 가 아니라 **복합키 query parameter**(`name`·`bizRegNoPrefix`·`snapshotMonth`) — 실제 데이터에
