@@ -79,9 +79,9 @@ class MenuSeedIntegrationTest {
     }
 
     @Test
-    @DisplayName("시드 총 36행 — 이관분 31 + 정산운영 그룹 1 + 운영 화면 4")
-    void seedsExactlyThirtySix() {
-        assertThat(adapter.findAll()).hasSize(36);
+    @DisplayName("시드 총 37행 — 이관분 31 + 정산운영 그룹 1 + 운영 화면 5")
+    void seedsExactlyThirtySeven() {
+        assertThat(adapter.findAll()).hasSize(37);
     }
 
     @Test
@@ -101,7 +101,11 @@ class MenuSeedIntegrationTest {
     @DisplayName("정산운영 그룹은 운영 화면만 담는다 — 정산 그룹과 섞이지 않는다")
     void settlementOpsChildren() {
         assertThat(childrenOf("정산운영")).extracting(Menu::getName)
-                .containsExactly("정합성 검증", "일일 대사", "PG 대사", "원장·시산표");
+                .containsExactly("정합성 검증", "일일 대사", "PG 대사", "차지백", "원장·시산표");
+        // 차지백만 ADMIN — 서버가 /admin/chargebacks/** 를 ADMIN 으로 막는 결정 표면이다
+        assertThat(childrenOf("정산운영").stream()
+                .filter(m -> m.getName().equals("차지백")).findFirst().orElseThrow().allowedRoles())
+                .containsExactly("ADMIN");
         assertThat(childrenOf("정산")).extracting(Menu::getName)
                 .containsExactly("상품관리", "정산관리", "정산조회", "지급관리");
     }
