@@ -37,7 +37,7 @@
 
 | 서비스 | 포트 | 역할 | 핵심 |
 |---|---|---|---|
-| **market-stream-service** | 8110 | 실시간 시세 스트리밍 (SSE `/stream/{code}` + WebSocket) | goroutine Hub 팬아웃(누수 0) · `Last-Event-ID` 재생([`inflearn/sse.md`](inflearn/sse.md)) |
+| **market-stream-service** | 8110 | 실시간 시세 스트리밍 (SSE `/stream/{code}` + WebSocket) | goroutine Hub 팬아웃(누수 0) · `Last-Event-ID` 재생([`sse.md`](sse.md)) |
 | **payment-webhook-service** | 8111 | Toss 결제 웹훅 수신 → Kafka 발행 | HMAC 서명검증 · 멱등(TTL) · `lemuel.payment.confirmed` 발행 |
 
 ### Polyglot · Python 3 (데이터 · ML · 퀀트)
@@ -52,7 +52,7 @@
 
 | 서비스 | 포트 | 역할 | 핵심 |
 |---|---|---|---|
-| **notification-service** | 8130 | 도메인 이벤트(Kafka) → 다채널(log/Slack/email) 알림 + 브라우저 푸시 SSE(`/api/notifications/stream`) | 코루틴 I/O 팬아웃 · 채널별 타임아웃/재시도 격리 · eventId 멱등 · JWT 신원 라우팅/`Last-Event-ID` 재생([`inflearn/sse.md`](inflearn/sse.md)) |
+| **notification-service** | 8130 | 도메인 이벤트(Kafka) → 다채널(log/Slack/email) 알림 + 브라우저 푸시 SSE(`/api/notifications/stream`) | 코루틴 I/O 팬아웃 · 채널별 타임아웃/재시도 격리 · eventId 멱등 · JWT 신원 라우팅/`Last-Event-ID` 재생([`sse.md`](sse.md)) |
 | **reconciliation-service** | 8131 | 정산 대사 (settlement ↔ PG/payout/원장) | sealed Discrepancy(MISSING/EXTRA/AMOUNT/STATUS) · 다소스 코루틴 병렬 fetch · @Scheduled |
 
 **합계**: Java 17종(16 서비스 + gateway) + Go 2 + Python 3 + Kotlin 2 = **24 서비스** (+ shared-common 라이브러리). *런타임은 Java 25 — 위 숫자는 서비스 수다.*

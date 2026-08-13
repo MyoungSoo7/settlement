@@ -170,7 +170,7 @@ A. 아직입니다. 다만 확장을 전제로 DB 이미지를 `pgvector/pgvecto
 **C축 — ML/통계**
 - `settlement-anomaly-service/` (MAD + IsolationForest) · `forecast-service/` (Holt-Winters) · `screening-backtest-service/`
 - `operation-service/src/main/java/github/lms/lemuel/operation/anomaly/` — 통계·규칙 기반 상시 이상탐지
-- `../inflearn/polyglot-services.md` — 폴리글랏 7종 정본(언어 선택 근거·알려진 한계)
+- `../polyglot-services.md` — 폴리글랏 7종 정본(언어 선택 근거·알려진 한계)
 
 **D축 — MCP 에이전트 도구**
 - `settlement-service/src/main/resources/settlement-copilot/` · `order-service/src/main/resources/fashion-copilot/` · `company-service/src/main/resources/pwc/`

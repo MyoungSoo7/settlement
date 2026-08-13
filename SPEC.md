@@ -262,7 +262,7 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
 ### 3.15 insurance-service — GA 보험대리점 (port 8108, mgmt 8109, 자체 DB lemuel_insurance)
 
 법인보험대리점(GA) 플랫폼 — 설계사(FC)의 상담 → 가입설계 → 청약 → 계약 → 유지·변경 → 수수료 정산을 하나로 잇는다.
-설계 정본은 [`docs/inflearn/insurance-service.md`](docs/inflearn/insurance-service.md).
+설계 정본은 [`docs/insurance-service.md`](docs/insurance-service.md).
 
 | 도메인      | API (base `/api/insurance`, **JWT 인증 필수**)                                                     | 기능                                                                          |
 | ----------- | -------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
@@ -319,7 +319,7 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
 - **폴리글랏 7종(§3.18~3.19)은 gateway 미라우팅** — 독립 포트로 직접 노출(내부/데모 용도).
   예외는 실시간 스트림 2종뿐: `market-stream-service` 의 `/api/market-stream/**`(SSE)와
   `notification-service` 의 `/api/notifications/stream`(알림 푸시 SSE, JWT 필수). 후자는 스트림 한 경로만
-  올린다 — `/notifications/send`·`/demo` 는 인증 없는 내부 발송 경로다. 정본: [`docs/inflearn/sse.md`](docs/inflearn/sse.md).
+  올린다 — `/notifications/send`·`/demo` 는 인증 없는 내부 발송 경로다. 정본: [`docs/sse.md`](docs/sse.md).
 
 ### 3.18 Kotlin 이벤트 서비스 2종 — notification(8130) · reconciliation(8131)
 
@@ -331,7 +331,7 @@ Boot 3.3 · JDK 21 · 코루틴. **자체 DB 없음**(무영속 MVP) · shared-c
 | **notification-service** (8130)   | `POST /notifications/send`, `GET /notifications/demo`, **`GET /notifications/stream`(SSE 푸시 허브 — JWT 필수, gateway `/api/notifications/stream`)** + Kafka 리스너 | 도메인 이벤트 5토픽(`settlement.confirmed`·`payment.confirmed/captured/refunded`·`investment.executed`) → 다채널(log/Slack/email) 알림. **코루틴 I/O 팬아웃 + 채널별 타임아웃(3s)/재시도(3회) 격리**, eventId 멱등(TTL 30분). Kafka 리스너는 기본 OFF(`APP_KAFKA_ENABLED=true` 로 활성) — 브로커 없이도 기동·데모 가능 |
 | **reconciliation-service** (8131) | `POST /reconciliation/run`, `GET /reconciliation/demo` + `@Scheduled`(매일 19:00 KST) | 정산 대사 — settlement·payment 소스 **코루틴 병렬 fetch** 후 대조, sealed `Discrepancy`(MISSING/EXTRA/AMOUNT/STATUS) 분류, 허용오차 1원(`tolerance-krw`). 소스 base-url 은 env 주입(기본 샘플 시뮬레이션)                                                                                                              |
 
-### 3.19 Polyglot 서비스 5종 — Go 2 + Python 3 (정본: [`docs/inflearn/polyglot-services.md`](docs/inflearn/polyglot-services.md))
+### 3.19 Polyglot 서비스 5종 — Go 2 + Python 3 (정본: [`docs/polyglot-services.md`](docs/polyglot-services.md))
 
 언어별 강점 배치: **Go**=동시성·저지연 엣지, **Python**=데이터/ML/퀀트. 모두 동작 MVP(핵심 로직+헬스체크+테스트+멀티스테이지 Dockerfile, non-root), Gradle 빌드와 독립.
 
@@ -444,7 +444,7 @@ insurance·deposit 토픽은 아직 계약 스키마(testFixtures)에 편입되�
 ## 7. 관련 문서
 
 - 아키텍처·컨벤션: [`CLAUDE.md`](./CLAUDE.md) · 사용자 문서: [`README.md`](./README.md)
-- 아키텍처 개요(24서비스 인벤토리·패턴·스택): [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) · 폴리글랏 정본: [`docs/inflearn/polyglot-services.md`](docs/inflearn/polyglot-services.md)
+- 아키텍처 개요(24서비스 인벤토리·패턴·스택): [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) · 폴리글랏 정본: [`docs/polyglot-services.md`](docs/polyglot-services.md)
 - 아키텍처 결정: [`docs/adr/`](./docs/adr/) (ADR 0020 DB 분리, 0024 이벤트 계약, 0026 계정계 payout 인식(제안) 등)
 - 도메인 규칙 스킬: `settlement-domain-rules`, `loan-domain-rules`, `investment-domain-rules`, `account-domain-rules`,
   `card-service-rules` (organization·insurance·deposit 는 전용 스킬 미배선 — `HARNESS.md` 커버리지 공백 참조)
