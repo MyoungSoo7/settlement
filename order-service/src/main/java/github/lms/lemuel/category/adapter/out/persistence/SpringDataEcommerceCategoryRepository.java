@@ -79,4 +79,32 @@ public interface SpringDataEcommerceCategoryRepository extends JpaRepository<Eco
                                       WHERE p.category_id = e.id)
             """, nativeQuery = true)
     int refreshProductCounts();
+
+    /**
+     * 상품수 캐시가 어긋난 카테고리 수.
+     *
+     * <p>조건은 {@link #refreshProductCounts()} 의 WHERE 절과 <b>같은 식</b>이다. 갈리면 점검은
+     * 깨끗한데 재계산이 행을 고치는 상태가 되고, 그때는 어느 쪽을 믿어야 할지 알 수 없다.
+     * (삭제 카테고리를 빼지 않는 것도 재계산과 맞춘 것이다 — 캐시는 그 행에도 남아 있다.)
+     */
+    @Query(value = """
+            SELECT COUNT(*) FROM opslab.ecommerce_categories e
+            WHERE e.product_count <> (SELECT COUNT(*) FROM opslab.product_ecommerce_categories p
+                                      WHERE p.category_id = e.id)
+            """, nativeQuery = true)
+    long countProductCountDrifts();
+
+    /** 어긋난 카테고리 표본 — 차이가 큰 순(같으면 id 순)이라 조치 우선순위대로 읽힌다. */
+    @Query(value = """
+            SELECT e.id, e.slug, e.name, e.product_count,
+                   (SELECT COUNT(*) FROM opslab.product_ecommerce_categories p
+                    WHERE p.category_id = e.id) AS actual_count
+            FROM opslab.ecommerce_categories e
+            WHERE e.product_count <> (SELECT COUNT(*) FROM opslab.product_ecommerce_categories p
+                                      WHERE p.category_id = e.id)
+            ORDER BY ABS(e.product_count - (SELECT COUNT(*) FROM opslab.product_ecommerce_categories p
+                                            WHERE p.category_id = e.id)) DESC, e.id
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<Object[]> findProductCountDrifts(@Param("limit") int limit);
 }

@@ -1,0 +1,135 @@
+# Seed: market-stream-service 실시간 시세 스트리밍 as-is 사양 (Ouroboros 방법론 — Interview → Seed 결정화)
+# 상태: CONFIRMED (기존 서비스 seed 와 동일 방식 지시로 승인 승계, 2026-08-13)
+# 원칙: 이 Seed 는 "현행 코드가 실제로 하는 일"의 불변 기술이다. 결함은 교정하지 않고 known_issues 로만 기록한다.
+
+seed:
+  id: market-stream-service-streaming-v1
+  goal: >-
+    market-stream-service(Go 폴리글랏 8110 — 종목당 단일 quote loop·구독자 팬아웃 drop-oldest·
+    결정적 랜덤워크·market-service 종가 base 폴링·SSE 외부노출/WS 내부)의 현행 동작을
+    실행 가능한 게이트에 매핑된 불변 사양으로 결정화해, 회귀 기준선 · 면접/포트폴리오 문서 ·
+    후속 하드닝 베이스로 사용한다.
+
+  scope:
+    included:
+      - Hub 팬아웃 (종목별 단일 생산자·구독 수명·논블로킹 송신)
+      - 가격 생성 (시뮬레이션 랜덤워크 결정성·밴드/스텝 클램프)
+      - 실데이터 승급 경로 (PollingSource·폴백)
+      - HTTP 표면 (SSE·WS·healthz·프록시 버퍼링 회피)
+      - 배포/노출 (게이트웨이 RewritePath·compose·프론트 경로 계약)
+    excluded:
+      - KRX 실시세 수집·시가총액 (market-service 소관)
+      - 밸류에이션·파생 지표 (소비측 몫)
+
+  constraints:
+    - "DB 없음 — 무영속. 시세 이력은 market-service 소관"
+    - "Kafka 의존 없음 — 이벤트 발행/소비 0"
+    - "인증·인가 없음 — 공개 read-only 스트림(위성 공개조회와 같은 등급)"
+    - "WS 는 게이트웨이에 올리지 않는다 — 프론트는 SSE 만 사용"
+    - "외부 의존 0으로 실행 가능해야 한다 — 기본 소스는 시뮬레이션"
+    - "distroless static nonroot 이미지 — 셸 없음(컨테이너 헬스체크 불가)"
+
+  invariants:  # as-is 코드 사실 — 파일:라인 근거 (경로 접두 market-stream-service/)
+    hub_lifecycle:
+      source: internal/hub/hub.go:92-139
+      rule: >-
+        Subscribe(code): 해당 종목의 첫 구독자면 context.WithCancel 로 quote loop goroutine 기동.
+        unsubscribe 는 sync.Once 로 감싸 다중 호출 안전. 마지막 구독자가 떠나면 cancel() + codes 맵에서 삭제
+        → 구독자 0인 종목의 loop 는 존재하지 않는다(패키지 주석의 'No goroutines leak' 계약)
+      single_producer: "종목당 quote loop 정확히 1개. 모든 공유 상태는 단일 mutex 뒤"
+    nonblocking_broadcast:
+      source: internal/hub/hub.go:163-192
+      rule: >-
+        락을 잡고 구독자 채널 스냅샷만 뜬 뒤 락을 놓고 송신 — 느린 클라이언트가 브로드캐스터를 막지 못한다.
+        select+default 로 논블로킹, 버퍼(기본 16) 가득이면 가장 오래된 틱을 뽑아 버리고 최신 틱을 넣는다
+        (best-effort). 최신성 > 완전성이 명시적 판단(주석 명문)
+    price_walk:
+      source: internal/quote/simulated.go:17-102
+      rule: >-
+        bandPct=0.05(base 대비 ±5% 클램프), stepPct=0.01(틱당 ±1% 랜덤 스텝).
+        rng 시드 = seed ^ fnv64a(stockCode) → (seed, code) 가 같으면 틱 시퀀스 완전 재현(테스트 가능).
+        SetBase 는 base 와 현재가를 함께 리셋
+      tick_shape: "Tick{stockCode, price(round2), ts} — ts 는 UTC RFC3339 밀리초. 소스 종류와 무관하게 동일 스키마 (internal/quote/quote.go:12-32)"
+    polling_source:
+      source: internal/quote/polling.go:22-127
+      rule: >-
+        SimulatedSource 를 임베드해 base 가격만 실데이터로 교체. GET {baseURL}/api/market/stocks/{code}/series?from={30일전}
+        의 마지막 점 closePrice 를 채택(오름차순 전제). 요청 실패·비200·디코드 실패·빈 시계열·close<=0 은
+        모두 시뮬레이션 base 로 폴백 — 스트림은 절대 죽지 않는다. client Timeout 5s
+      rate_limit: "shouldPoll 이 종목별 lastPoll 로 pollInterval(기본 60s) 레이트 리밋"
+    http_surface:
+      source: internal/httpapi/{server.go:30-101, ws.go:15-72}
+      rule: >-
+        Go 1.22 ServeMux 경로 파라미터 라우팅 — GET /healthz · GET /stream/{stockCode} · GET /ws/{stockCode}.
+        빈 종목코드는 400. SSE 는 Content-Type text/event-stream + Cache-Control no-cache + Connection keep-alive +
+        X-Accel-Buffering: no(nginx 버퍼링 무력화). 연결 즉시 ': connected' 주석 후 flush.
+        프레임은 'event: tick' + data 한 줄 + 빈 줄
+      lifecycle: "한 HTTP 요청 == 한 Hub 구독. r.Context() 취소(클라이언트 종료) 시 defer unsubscribe. WS 는 백그라운드 Read 고루틴으로 피어 종료 감지 후 cancel, write 는 5s 타임아웃"
+    runtime:
+      source: cmd/server/main.go:21-135 + Dockerfile
+      rule: >-
+        env 기반 설정 — MARKET_STREAM_PORT(8110)·TICK_INTERVAL(1s)·SUB_BUFFER(16)·SEED(시각)·
+        SOURCE(simulated|polling)·MARKET_BASE_URL(http://market-service:8080)·POLL_INTERVAL(60s).
+        파싱 실패 env 는 warn 후 기본값. ReadHeaderTimeout 5s. SIGINT/SIGTERM 시 srv.Shutdown(10s) 후 Hub.Shutdown
+      image: "golang:1.22 빌드 → distroless/static-debian12:nonroot(uid 65532), CGO_ENABLED=0 정적 링크, -trimpath -s -w"
+    exposure:
+      source: ../gateway-service/src/main/resources/application.yml:136-145 + ../docker-compose.yml:874-891 + ../frontend/src/api/marketStream.ts:24
+      rule: >-
+        게이트웨이 /api/market-stream/** → RewritePath 로 프리픽스 제거 → /stream/{code}. /ws/** 는 미노출.
+        compose 는 MARKET_STREAM_SOURCE=polling + MARKET_BASE_URL=http://market-service:8080,
+        depends_on market-service(healthy), 포트 127.0.0.1:8110 바인딩, healthcheck 없음(distroless 셸 부재).
+        nginx 에 /api/market-stream/ 전용 무버퍼 location(proxy_buffering off, read_timeout 3600s).
+        프론트 계약 상수 STREAM_PREFIX='/api/market-stream' — 7종 중 유일하게 프론트 배선됨
+
+  event_contracts:
+    published: []  # 없음 — Kafka 의존 자체가 빌드에 없음 (go.mod 는 websocket 단일 의존)
+    consumed: []
+    note: "서비스 간 연계는 market-service 시계열 HTTP pull 1건만"
+
+  acceptance_criteria:  # 실행 가능 — 각 AC 는 기존 게이트에 매핑
+    - id: AC-1
+      criterion: 구독 수명(첫 구독자 loop 기동·마지막 해제 시 정지)과 goroutine 누수 0
+      gate: "go test ./... -race — internal/hub/hub_test.go"
+    - id: AC-2
+      criterion: 랜덤워크 결정성과 밴드/스텝 클램프가 일치한다
+      gate: "internal/quote/simulated_test.go"
+    - id: AC-3
+      criterion: SSE 프레임 형식·헤더·400 처리가 일치한다
+      gate: "internal/httpapi/server_test.go"
+    - id: AC-4
+      criterion: 프론트 경로 계약(/api/market-stream/stream/{code})이 유지된다
+      gate: "frontend/src/__tests__/api/marketStream.test.ts"
+    - id: AC-5
+      criterion: Go 빌드·vet·race 테스트 GREEN
+      gate: ".github/workflows/polyglot-ci.yml (Go 매트릭스)"
+
+  known_issues:  # 발견만 기록 — 사양은 as-is 유지
+    - id: KI-1
+      finding: "★ 화면의 '실시간 시세'가 실제 체결가가 아니다 — polling 모드에서도 실데이터는 base 하나뿐이고 초 단위 틱은 전부 난수 워크. 프론트 LiveQuoteTicker 가 이 값을 CEO 투자 화면 현재가로 표시하는데, 응답·화면 어디에도 시뮬레이션 표식이 없다"
+      disposition: recorded-not-fixed (high — 투자 화면 오인 리스크)
+    - id: KI-2
+      finding: "★ 폴링 주기가 실질적으로 '구독 시작 시 1회' — runQuoteLoop 이 BasePrice 를 루프 진입 전 1회만 호출(hub.go:144)하고 이후 Next 가 내부 base 로 돈다. MARKET_STREAM_POLL_INTERVAL 은 shouldPoll 의 레이트 리밋일 뿐 루프 중 base 갱신 경로가 없다 — 설정 이름이 약속하는 동작과 실제가 다르다"
+      disposition: recorded-not-fixed (high — 설정/동작 불일치)
+    - id: KI-3
+      finding: "종목 수·구독자 수·클라이언트당 연결 수 상한이 전무. 인증·레이트리밋도 없어 임의 코드로 연결을 반복하면 goroutine·맵 엔트리가 무제한 생성된다(방어는 네트워크 경계뿐)"
+      disposition: recorded-not-fixed (medium)
+    - id: KI-4
+      finding: "종목코드 미검증 — 존재하지 않는 코드도 폴링 실패 후 기본 base 70000 으로 그럴듯한 스트림을 만든다. 클라이언트가 '없는 종목'을 구분할 수 없다"
+      disposition: recorded-not-fixed (medium)
+    - id: KI-5
+      finding: "메트릭 노출 경로 없음 — Hub.ActiveCodes()/SubscriberCount() 가 'for tests and metrics' 라고 적혀 있으나 /metrics 엔드포인트가 없다. 폴리글랏 Kotlin 2종은 Prometheus 레지스트리 보유, Go 2종은 없음"
+      disposition: recorded-not-fixed (medium)
+    - id: KI-6
+      finding: "버퍼 초과 틱 폐기가 조용하다 — 로그도 카운터도 없다(notification 의 메일박스 초과가 warn 을 남기는 것과 대조). 서버는 얼마나 버렸는지 전혀 모른다"
+      disposition: recorded-not-fixed (low)
+    - id: KI-7
+      finding: "WebSocket 이 Origin 미검증 — websocket.AcceptOptions{InsecureSkipVerify: true}, 코드에 'TODO: constrain OriginPatterns for production' 명문. 게이트웨이 /ws 미노출이 유일한 방어"
+      disposition: by-design-documented (MVP 트레이드오프) — 노출 시 즉시 위험
+    - id: KI-8
+      finding: "compose healthcheck 없음 — distroless 라 셸 기반 체크 불가(주석 명문). /healthz 는 구현돼 있으나 compose 가 이 서비스 건강을 판단하지 않고 depends_on 대상도 될 수 없다"
+      disposition: by-design-documented (이미지 선택의 대가)
+
+  uses:
+    - regression-baseline
+    - interview-portfolio
+    - brownfield-base

@@ -12,7 +12,7 @@
     { "name": "lemuel.order.created", "owner": "order-service", "orderingKey": "orderId", "partitions": 3, "retentionDays": 7 },
     { "name": "lemuel.user.registered", "owner": "order-service", "orderingKey": "userId", "partitions": 3, "retentionDays": 7 },
     { "name": "lemuel.product.changed", "owner": "order-service", "orderingKey": "productId", "partitions": 3, "retentionDays": 7 },
-    { "name": "lemuel.payment.captured", "owner": "order-service", "orderingKey": "paymentId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.payment.captured", "owner": "order-service", "orderingKey": "paymentId", "partitions": 6, "retentionDays": 7 },
     { "name": "lemuel.payment.refunded", "owner": "order-service", "orderingKey": "paymentId", "partitions": 3, "retentionDays": 7 },
     { "name": "lemuel.seller.tier_changed", "owner": "order-service", "orderingKey": "sellerId", "partitions": 3, "retentionDays": 7 },
 
