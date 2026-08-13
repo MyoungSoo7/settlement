@@ -310,6 +310,12 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
   상계 부족분(shortfall)과 달리 설계된 결과가 아니라 원장 불일치 신호다.
   소비측 계약 테스트: `DepositConsumerParsingTest`(정본 샘플 기반).
 - **hold/offset 은 여전히 콘솔 경로** — card 승인·매입은 페이로드에 sellerId 가 없어 미구독이다.
+- **배치 2종**: 만료 hold 회수(`DepositHoldExpiryScheduler`, 매시 5분 KST, ShedLock) — 만료됐는데 재원을
+  잡고 있는 hold(`ACTIVE`·`PARTIALLY_CAPTURED` 둘 다)를 닫고 `locked` 를 `available` 로 되돌린다.
+  부족분 적체 지표(`ShortfallBacklogMetrics`, 5분) — `deposit.shortfall.open.{count,amount}`.
+- **부족분 해소는 운영자 주도**(자동 재상계 없음 — 재상계는 잔고에서 돈을 다시 가져오는 행위라 정책):
+  `GET /admin/deposits/shortfalls` · `POST .../{id}/resolve`(실제 available 차감, 모자라면 422) ·
+  `POST .../{id}/write-off`(잔고 불변).
 
 ### 3.17 gateway-service — API Gateway (port 8080)
 

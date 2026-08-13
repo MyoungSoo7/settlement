@@ -176,7 +176,8 @@ deposit-service 는 **잔고의 단일 진실원**을 세우고, 모든 변경�
 
 | 주기 | 작업 |
 |---|---|
-| — | hold 만료 스캔용 부분 인덱스는 있으나, **만료 배치 자체는 이 역산 범위에서 확인하지 않았다**(→ G-4) |
+| 매시 5분(KST) | 만료 hold 회수 — `DepositHoldExpiryScheduler`(ShedLock `PT10M`, fail-open) |
+| 5분 간격 | 부족분 적체 지표 스냅샷 — `ShortfallBacklogMetrics`(ShedLock 없음, 인스턴스별 게이지) |
 
 ## 12. 역산에서 드러난 격차
 
@@ -199,24 +200,40 @@ deposit-service 는 **잔고의 단일 진실원**을 세우고, 모든 변경�
 편입했다. 후속으로 `deposit.domain.*` 을 INSTRUCTION 80% 엄격 목록에도 넣었다(`885c24d81`).
 상속 대상이 곧 재시도 정책(IAE/ISE = 즉시 DLT)이라는 계약은 `DepositExceptionContextTest` 가 고정한다.
 
-### G-4. hold 만료를 도는 주체가 없다 — **확인 완료, 실재하는 격차**
+### G-4. ~~hold 만료를 도는 주체가 없다~~ → 해소(2026-08-13)
 
-초안은 "확인하지 않았다"로 남겼다. 확인 결과: 부분 인덱스(`ACTIVE` + `expires_at`)도, 포트
-`LoadDepositHoldPort.findActiveExpiredBefore` 도, 그 어댑터 구현도 있다. **없는 것은 호출자다** —
-`@Scheduled` 0건이고 `DepositServiceApplication` 은 `@EnableScheduling` 을 의도적으로 끄고 있다(주석 명시).
+초안은 "확인하지 않았다"로 남겼다. 확인 결과 부분 인덱스도 포트도 어댑터 구현도 있었고 **없는 것은
+호출자**였다(`@Scheduled` 0건, `@EnableScheduling` 도 꺼짐). `DepositHoldExpiryScheduler`(매시 5분 KST,
+ShedLock)를 붙이고 `@EnableScheduling` 을 켰다.
 
-만료된 hold 가 `locked` 를 계속 잡으므로 **가용액이 조용히 줄어든 채 유지**된다. 잔고가 틀리는 게 아니라
-*덜 보이는* 방향이라 잔고 검증으로는 잡히지 않는다 — 셀러 입장에선 "왜 출금이 안 되지"가 된다.
+> **회수를 붙이다 더 큰 결함을 찾았다** — 스캔이 `ACTIVE` 만 보고 있었다. 재원을 잡는 상태는
+> `ACTIVE` 와 `PARTIALLY_CAPTURED` 둘인데, **부분 매입 후 방치된 hold 의 잔여는 만료돼도 회수 대상에
+> 잡히지 않아 영구히 잠겼다.** 부분 캡처는 예외가 아니라 카드 매입의 정상 경로라 이 누락은 시간이
+> 갈수록 쌓인다. 포트·쿼리·부분 인덱스를 두 상태로 넓혔고(`V20260813120000`), 포트 이름도
+> `findActiveExpiredBefore` → `findExpiredStillHolding` 으로 바꿨다 — 이름이 곧 계약이라
+> "ACTIVE" 는 거짓말이었다.
 
-### G-5. shortfall 을 해소하는 주체가 없다 — **확인 완료, 게다가 코드가 거짓을 적고 있었다**
+종단 상태는 갈라 적는다 — `EXPIRED`(한 번도 안 쓰이고 만료) vs `RELEASED`(쓰이다 남은 잔여를 놓음).
+뭉개면 카드 승인 쪽과 대사할 때 구분이 사라진다.
 
-`resolve()`/`writeOff()` 는 **프로덕션 호출자 0건**(테스트만 호출)이고 OPEN 건을 도는 스케줄러도 없다.
-그런데 `DepositOffsetShortfall` 의 Javadoc 은 "`DepositShortfallRetryScheduler` 가 주기적으로 OPEN 건을
-재상계 시도한다"고 단언하고 있었다 — **그런 클래스는 존재한 적이 없다.** 없는 동작을 있다고 적으면
-부족분 적체를 아무도 보지 않게 되므로, 주석을 사실(해소 주체 없음)로 정정했다.
+### G-5. ~~shortfall 을 해소하는 주체가 없다~~ → 운영자 경로 + 지표로 해소(2026-08-13)
 
-> G-4·G-5 는 같은 형태다 — **회수/해소의 재료는 다 있는데 그것을 도는 주체만 없다.** 둘 다 실패가
-> 조용하다는 점도 같다(가용액 감소·부족분 적체 모두 예외를 던지지 않는다).
+`resolve()`/`writeOff()` 는 프로덕션 호출자 0건이었고, 게다가 `DepositOffsetShortfall` 의 Javadoc 은
+"`DepositShortfallRetryScheduler` 가 주기적으로 재상계한다"고 단언하고 있었다 — **그런 클래스는
+존재한 적이 없다.** 주석을 사실로 정정한 뒤, 해소 경로를 열었다.
+
+**자동 재상계 배치는 두지 않는다.** 재상계는 셀러 잔고에서 돈을 다시 가져오는 행위라 언제·몇 번
+시도할지가 기술 기본값이 아니라 정책이다. 대신 운영자가 현재 가용 잔고로 덮을 수 있는지 보고 승인한다:
+
+| 경로 | 동작 |
+|---|---|
+| `GET /admin/deposits/shortfalls` | 미해소(OPEN) 목록 — 요청·적용·부족 세 금액을 모두 낸다 |
+| `POST .../{id}/resolve` | **실제로 available 을 차감**하고 RESOLVED. 모자라면 422, 아무것도 안 바뀜 |
+| `POST .../{id}/write-off` | 회수 포기 상각 — 잔고를 건드리지 않는다(판단의 기록) |
+
+부분 해소를 지원하지 않는 것은 의도다 — 남은 부족분이 갈래를 만들어 "언제 덮였나"의 답이 하나로
+유지되지 않는다. 적체는 `deposit.shortfall.open.{count,amount}` 게이지로 나간다(건수만 보면 대형 1건이
+소액 무리에 묻히고, 금액만 보면 소액이 늘어나는 추세를 놓친다).
 
 ## 13. 추적 항목
 
@@ -225,5 +242,5 @@ deposit-service 는 **잔고의 단일 진실원**을 세우고, 모든 변경�
 | T-1 | 상류 이벤트 컨슈머 배선 | ✅ 입·출금 배선(PR #229) / hold·offset 은 잔여 (G-1) |
 | T-2 | `lemuel.deposit.*` 계약 스키마 등록 | 정책대로 보류 — 소비처 등장이 트리거 (G-2) |
 | T-3 | 도메인 타입 예외 전환 + guard 대상 편입 | ✅ 완료 + 게이트 편입 (G-3) |
-| T-4 | hold 만료 회수 배치 | **없음 — 포트·인덱스만 있고 호출자 0건** (G-4) |
-| T-5 | shortfall 해소 워크플로 | **없음 — resolve/writeOff 프로덕션 호출자 0건** (G-5) |
+| T-4 | hold 만료 회수 배치 | ✅ 매시 회수 + PARTIALLY_CAPTURED 누락 수정 (G-4) |
+| T-5 | shortfall 해소 워크플로 | ✅ 운영자 경로 + 적체 지표 (자동 재상계는 의도적 미도입, G-5) |
