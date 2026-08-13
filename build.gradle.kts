@@ -177,6 +177,13 @@ subprojects {
                     "github.lms.lemuel.financial.domain.*",
                     "github.lms.lemuel.ai.chat.domain.*",
                     "github.lms.lemuel.insurance.domain.*",
+                    // 2026-08-13 편입 — 역산에서 돈 경로 4종이 이 목록에서 빠져 있는 것을 발견했다.
+                    // 실측 INSTRUCTION: loan 97.7% · account 99.7% · card 94.8% · deposit 93.6%
+                    // (이미 80% 를 크게 넘고 있었으므로, 없던 것은 커버리지가 아니라 게이트였다)
+                    "github.lms.lemuel.loan.domain.*",
+                    "github.lms.lemuel.account.domain.*",
+                    "github.lms.lemuel.card.domain.*",
+                    "github.lms.lemuel.deposit.domain.*",
                     // common.outbox.domain 게이트는 shared-common 독립 빌드로 이관됨
                 )
                 limit {
