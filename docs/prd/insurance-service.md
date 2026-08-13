@@ -10,7 +10,7 @@
 > | 역산 기준 | 2026-08-13 `develop` 브랜치                                                                   |
 > | 근거      | 도메인 22+ 클래스, REST 4개 컨텍스트, 배치 7종, 발행 4·소비 1 토픽, 테스트 42개 클래스        |
 > | 범위 밖   | 원수사 실연동(전문·API) · 보험료 요율 산출 테이블 · 보험금 지급 심사                            |
-> | 관련 문서 | [`SPEC.md`](../../SPEC.md) · [`insurance-service-ga-platform.seed.yaml`](../seeds/insurance-service-ga-platform.seed.yaml) · `docs/insurance-service.md` |
+> | 관련 문서 | [`SPEC.md`](../../SPEC.md) · [`insurance-service-ga-platform.seed.yaml`](../seeds/insurance-service-ga-platform.seed.yaml) · `../inflearn/insurance-service.md` |
 
 ---
 
