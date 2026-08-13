@@ -44,6 +44,7 @@ const SettlementAdmin = lazy(() => import('./pages/SettlementAdmin'));
 const TagManagementPage = lazy(() => import('./pages/TagManagementPage'));
 const EcommerceCategoryAdmin = lazy(() => import('./pages/EcommerceCategoryAdmin'));
 const DisplaySectionAdminPage = lazy(() => import('./pages/DisplaySectionAdminPage'));
+const OptionCatalogAdminPage = lazy(() => import('./pages/OptionCatalogAdminPage'));
 const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'));
 const ShippingAdminPage = lazy(() => import('./pages/ShippingAdminPage'));
 const OrderApprovalPage = lazy(() => import('./pages/OrderApprovalPage'));
@@ -212,6 +213,8 @@ function App() {
               element={<AdminOnlyRoute><SideNavLayout><EcommerceCategoryAdmin /></SideNavLayout></AdminOnlyRoute>} />
             <Route path="/admin/system/display-sections"
               element={<AdminOnlyRoute><SideNavLayout><DisplaySectionAdminPage /></SideNavLayout></AdminOnlyRoute>} />
+            <Route path="/admin/system/option-catalog"
+              element={<AdminOnlyRoute><SideNavLayout><OptionCatalogAdminPage /></SideNavLayout></AdminOnlyRoute>} />
             <Route path="/admin/system/operation"
               element={<AdminOnlyRoute><SideNavLayout><OperationConsolePage /></SideNavLayout></AdminOnlyRoute>} />
 
