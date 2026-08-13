@@ -36,6 +36,14 @@ const closingOf = (over: Partial<Record<string, unknown>> = {}) => ({
 
 const renderPage = () => render(<ToastProvider><MonthlyClosingConsolePage /></ToastProvider>);
 
+/**
+ * 실행 버튼의 라벨은 조회 결과에 달려 있다 — 기존 실행 이력이 렌더된 뒤에야 '마감 재실행'이 되고,
+ * 그전에는 '마감 실행'이다. `get` 이 호출됐는지만 기다리면 응답이 반영되기 전에 통과해 라벨을
+ * 놓치므로(CI 에서 실제로 산발 실패했다), 버튼 자체가 나타날 때까지 기다린다.
+ */
+const clickRerun = async () =>
+  fireEvent.click(await screen.findByRole('button', { name: '마감 재실행' }));
+
 beforeEach(() => {
   vi.clearAllMocks();
   mocked.get.mockResolvedValue(closingOf());
@@ -96,9 +104,8 @@ describe('MonthlyClosingConsolePage — 실행', () => {
   it('확인을 취소하면 실행하지 않는다', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(false);
     renderPage();
-    await waitFor(() => expect(mocked.get).toHaveBeenCalled());
 
-    fireEvent.click(screen.getByRole('button', { name: '마감 재실행' }));
+    await clickRerun();
 
     expect(mocked.run).not.toHaveBeenCalled();
   });
@@ -106,9 +113,8 @@ describe('MonthlyClosingConsolePage — 실행', () => {
   it('이미 완료된 기간의 재실행 확인창은 마트 교체를 알린다', async () => {
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
     renderPage();
-    await waitFor(() => expect(mocked.get).toHaveBeenCalled());
 
-    fireEvent.click(screen.getByRole('button', { name: '마감 재실행' }));
+    await clickRerun();
 
     expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('통째 교체'));
   });
@@ -119,7 +125,7 @@ describe('MonthlyClosingConsolePage — 실행', () => {
     renderPage();
     await waitFor(() => expect(mocked.get).toHaveBeenCalledTimes(1));
 
-    fireEvent.click(screen.getByRole('button', { name: '마감 재실행' }));
+    await clickRerun();
 
     await waitFor(() => expect(mocked.run).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(mocked.get).toHaveBeenCalledTimes(2));
@@ -129,9 +135,8 @@ describe('MonthlyClosingConsolePage — 실행', () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     mocked.run.mockRejectedValue({ isAxiosError: true, response: { status: 409 } });
     renderPage();
-    await waitFor(() => expect(mocked.get).toHaveBeenCalled());
 
-    fireEvent.click(screen.getByRole('button', { name: '마감 재실행' }));
+    await clickRerun();
 
     await waitFor(() =>
       expect(screen.getByText(/원장이 마감된 기간이라 재실행할 수 없습니다/)).toBeInTheDocument());
@@ -144,9 +149,8 @@ describe('MonthlyClosingConsolePage — 실행', () => {
       run: runOf({ status: 'FAILED', failureReason: '원천 데이터 결손' }),
     }));
     renderPage();
-    await waitFor(() => expect(mocked.get).toHaveBeenCalled());
 
-    fireEvent.click(screen.getByRole('button', { name: '마감 재실행' }));
+    await clickRerun();
 
     await waitFor(() => expect(screen.getByText(/실패 사유: 원천 데이터 결손/)).toBeInTheDocument());
   });

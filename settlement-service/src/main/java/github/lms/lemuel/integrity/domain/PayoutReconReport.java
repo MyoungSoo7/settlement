@@ -17,9 +17,15 @@ import java.util.List;
  *   <li><b>BLOCK</b>: 과다 지급({@code payout.amount > net_amount}) / 같은 (정산, 유형)의
  *       이중 payout (스키마의 {@code uq_payouts_settlement_type} 가 1차 방어지만
  *       belt-and-suspenders 로 재확인) / 정산별 활성 payout 합계가 net 초과.</li>
- *   <li><b>정보성</b>: payout 미생성 정산 — payout 생성은 운영자/후속 배치 시점에 따라
- *       뒤따라오므로 그 자체로는 위반이 아니다. 건수·목록만 노출한다.</li>
+ *   <li><b>정보성</b>: payout 미생성 정산 — 지급은 상환차감 수신 시점에 뒤따라오므로 방금 확정된
+ *       건의 payout 부재는 위반이 아니다. 건수·목록만 노출한다.</li>
+ *   <li><b>BLOCK</b>: 그중 <b>확정 후 유예시간이 지난</b> 것({@code stalePayoutMissing}) — 지급이
+ *       올 시점은 이미 지났다. 셀러에게 돈이 안 나간 상태이므로 위반으로 올린다.</li>
  * </ul>
+ *
+ * <p>유예 경과 건은 대개 loan 의 {@code repayment_applied} 가 도착하지 않은 정산이다(L-3 이후
+ * 지급 생성 트리거가 그 이벤트다). 그래서 경보 문구는 <b>백필보다 이벤트 확인이 먼저</b>임을
+ * 명시한다 — 차감 기록이 없는 건은 백필이 지급하지 않으므로, 백필만 돌리면 잔여가 그대로 남는다.
  */
 public record PayoutReconReport(
         LocalDate targetDate,
@@ -61,6 +67,12 @@ public record PayoutReconReport(
                                        List<Long> duplicatePayoutSettlementIds,
                                        List<OverTotalSettlement> overTotalSettlements) {
         List<String> reasons = new ArrayList<>();
+        if (!stalePayoutMissing.isEmpty()) {
+            reasons.add("확정 후 " + payoutGraceMinutes + "분이 지나도 payout 이 없는 정산 "
+                    + stalePayoutMissing.size() + "건 — 지급 누락 (INV-6 위반). "
+                    + "백필을 먼저 돌리지 말고 loan 의 repayment_applied 도착 여부부터 확인하라: "
+                    + "차감 기록이 없는 건은 백필이 지급하지 않는다(차감액을 모르는 채 지급하면 대출채권이 사라진다).");
+        }
         if (!overpaidPayouts.isEmpty()) {
             reasons.add("정산 net 을 초과하는 payout " + overpaidPayouts.size()
                     + "건 — 과다 지급 (INV-6 위반, 즉시 확인)");
