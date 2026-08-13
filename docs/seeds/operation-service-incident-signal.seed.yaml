@@ -1,0 +1,118 @@
+# Seed: operation-service 운영 관제 as-is 사양 (Ouroboros 방법론 — Interview → Seed 결정화)
+# 상태: CONFIRMED (settlement/account seed 와 동일 방식 지시로 승인 승계, 2026-08-13)
+# 원칙: 이 Seed 는 "현행 코드가 실제로 하는 일"의 불변 기술이다. 결함은 교정하지 않고 known_issues 로만 기록한다.
+# 관련 스킬: operation-signal-rules (강제 규칙 정본)
+
+seed:
+  id: operation-service-incident-signal-v1
+  goal: >-
+    operation-service(운영 관제 — 인시던트 라이프사이클·5분 신호버킷·이상탐지)의 현행 동작을
+    실행 가능한 게이트에 매핑된 불변 사양으로 결정화해, 회귀 기준선 · 관제 계약 근거 ·
+    면접/포트폴리오 문서로 사용한다.
+
+  scope:
+    included:
+      - 인시던트 상태머신·활성 유일성·refire 병합 규칙
+      - 5분 신호 버킷의 정렬·누적·파생 계산 경계
+      - Alertmanager webhook 수신 계약
+      - 이상탐지(베이스라인·임계) 판정 경계
+    excluded:
+      - Prometheus/Alertmanager 설정 자체 (monitoring/ 소관)
+      - 폴리글랏 이상탐지(settlement-anomaly, Python)와의 역할 분담 상세
+
+  constraints:
+    - "상태 전이는 도메인 상태머신이 강제 — 비정상 전이는 타입 예외"
+    - "신호 적재 경로는 절대 throw 하지 않는다 (fire-and-forget, 컨슈머 정지 방지)"
+    - "webhook 응답은 항상 200 — 5xx 는 Alertmanager 재전송 폭주를 부른다"
+    - "버킷 적재는 UPSERT 누적, 파생 계산은 읽기 시점"
+    - "헥사고날: domain 은 adapter 를 import 하지 않는다 (ArchUnit 강제)"
+
+  invariants:  # as-is 코드 사실 — 파일:라인 근거 (경로 접두 operation-service/src/main/java/github/lms/lemuel/operation/)
+    transition_enforced:
+      source: incident/domain/Incident.java:13,186-187,194
+      rule: "IncidentStatus.canTransitionTo 통과 없이는 전이 불가 — 위반은 InvalidIncidentTransitionException"
+    active_uniqueness:
+      source: incident/domain/Incident.java:15-16,98-99
+      rule: "같은 (source, correlationKey) 의 활성 인시던트는 최대 1건 — DB partial unique index uq_incident_active 가 최종 방어선"
+      domain_expression: "중복 상황을 예외가 아니라 refire(병합)로 표현한다"
+      correlation_key: "ANOMALY 경로는 metric_key(예 settlement), Alertmanager 경로는 fingerprint"
+    refire_severity_upgrade_only:
+      source: incident/domain/Incident.java:17,122-126 + incident/domain/IncidentSeverity.java:6
+      rule: "refire 시 심각도는 상향만 반영(WARNING→CRITICAL). 하향은 무시. occurrenceCount·lastSeenAt 갱신"
+    timeline_suppression:
+      source: incident/domain/Incident.java:136
+      rule: "일반 refire 는 직전 기록 후 억제 간격 경과 시에만 타임라인에 남기고, 심각도 승격은 억제 없이 즉시 기록"
+    bucket_window_alignment:
+      source: signal/domain/BucketWindow.java:6-9,19
+      rule: "UTC epoch 초를 bucketSeconds(기본 300)로 내림 정렬 — 같은 5분 창의 이벤트/게이지가 동일 bucket_start 로 모인다"
+    upsert_accumulate_compute_on_read:
+      source: signal/domain/MetricBucket.java:6,11,15,28
+      rule: "적재는 UPSERT 누적, failureRate = countSignal / countTotal 은 읽기 시점 계산"
+    webhook_always_200:
+      source: incident/adapter/in/web (webhook 컨트롤러):21
+      rule: "보안 체인 permitAll + 응답 항상 200 — 5xx 를 돌려주면 Alertmanager 가 재전송을 반복한다"
+    anomaly_baseline_verdict:
+      source: anomaly/domain/{RollingWindowBaseline,AnomalyThreshold,AnomalyEvaluator,AnomalyVerdict}.java
+      rule: "롤링 윈도 베이스라인과 임계로 verdict 산출 — 판정 로직이 도메인 순수 함수에 있다"
+    auto_resolve:
+      source: incident/domain/Incident.java:165
+      rule: "조건 충족 시 시스템 액터(AUTO_ACTOR)로 자동 해소"
+
+  event_contracts:
+    publishes: []   # 관제 종단 — 발행 없음
+    consumes:
+      count: 8
+      success_signals: "lemuel.order.created, lemuel.payment.captured, lemuel.settlement.created (분모=시도 카운트)"
+      failure_signals: "lemuel.ops.order.failed, .payment.failed, .stock.depleted, .stock.reclaim_delayed, .shipping.delayed, .settlement.failed"
+      error_policy: "적재 실패는 삼키고 ack — 통계 손실을 컨슈머 정지보다 우선 (known_issues KI-2)"
+
+  read_surface:
+    endpoints:
+      - "POST /api/ops/webhook — Alertmanager 수신 (permitAll, 항상 200)"
+      - "/api/ops/incidents — 인시던트 조회·전이"
+
+  acceptance_criteria:  # 실행 가능 — 각 AC 는 기존 게이트에 매핑
+    - id: AC-1
+      criterion: 인시던트 상태머신 전이표·타입 예외가 일치한다
+      gate: "./gradlew :operation-service:test — IncidentTest"
+    - id: AC-2
+      criterion: 활성 인시던트 중복 생성이 차단된다
+      gate: "uq_incident_active · IncidentLifecycleIntegrationTest"
+    - id: AC-3
+      criterion: refire 가 상향만 반영하고 타임라인 억제가 동작한다
+      gate: "IncidentTest · IncidentCommandServiceTest"
+    - id: AC-4
+      criterion: 같은 5분 창의 신호가 한 행에 누적된다
+      gate: "BucketWindowTest · MetricBucketUpsertIntegrationTest"
+    - id: AC-5
+      criterion: failureRate 파생 계산이 읽기 시점에 정확하다
+      gate: "MetricBucketTest"
+    - id: AC-6
+      criterion: webhook 이 어떤 입력에도 200 을 돌려준다
+      gate: "IngestAlertServiceTest · AlertApplierTest"
+    - id: AC-7
+      criterion: 이상탐지 판정 경계가 정본 표와 일치한다
+      gate: "AnomalyEvaluatorTest · AnomalyDetectionServiceTest · AnomalyDetectionIntegrationTest"
+    - id: AC-8
+      criterion: 커버리지 LINE >= 90%
+      gate: "./gradlew :operation-service:jacocoTestCoverageVerification (check 편입)"
+
+  known_issues:  # 발견만 기록 — 사양은 as-is 유지
+    - id: KI-1
+      finding: "관제의 관제가 없다 — 이 서비스가 죽으면 인시던트 수집이 침묵한다. prometheus.yml 이 up{job=\"operation\"} 을 스크레이프해 OperationServiceDown 알람의 소스로 삼지만 그 알람도 Prometheus 가 살아 있어야 동작한다"
+      disposition: by-design (외부 관제 의존)
+    - id: KI-2
+      finding: "컨슈머가 적재 실패를 삼키고 ack 한다 — Kafka 재시도·DLT 방어가 이 경로에는 적용되지 않고 브로커에는 성공으로 보인다. 통계 유실이 조용히 일어날 수 있다"
+      disposition: by-design-documented (operation-signal-rules 가 명시)
+    - id: KI-3
+      finding: "webhook 이 항상 200 + permitAll — 인증 없는 엔드포인트가 인시던트를 생성할 수 있다. 네트워크 경계(gateway 미라우팅)에 의존한다"
+      disposition: by-design (경계 의존 — 노출 시 위험)
+    - id: KI-4
+      finding: "이상탐지가 Java(operation)와 Python(settlement-anomaly) 양쪽에 존재한다. 어느 쪽이 정본이고 판정이 어긋나면 무엇을 믿는지가 문서에 없다"
+      disposition: recorded-not-verified (역할 분담 불명)
+
+  uses:
+    - regression-baseline
+    - operations-contract
+    - interview-portfolio
+    - brownfield-base
