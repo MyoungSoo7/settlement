@@ -5,6 +5,7 @@ import github.lms.lemuel.insurance.application.port.in.SubmitApplicationUseCase.
 import github.lms.lemuel.insurance.application.port.in.UnderwriteApplicationUseCase;
 import github.lms.lemuel.insurance.application.port.in.UnderwriteApplicationUseCase.IssuedPolicySummary;
 import github.lms.lemuel.insurance.domain.SalesChannel;
+import github.lms.lemuel.insurance.domain.exception.ApplicationDocumentNotMatchedException;
 import github.lms.lemuel.insurance.domain.exception.ApplicationNotFoundException;
 import github.lms.lemuel.insurance.domain.exception.DisclosureNotDeliveredException;
 import github.lms.lemuel.insurance.domain.exception.InvalidApplicationException;
@@ -116,6 +117,12 @@ public class InsuranceApplicationController {
     public ResponseEntity<Map<String, String>> disclosureGate(DisclosureNotDeliveredException e) {
         // 교부 후 재시도 가능한 업무 규칙 충돌 — 409
         return ResponseEntity.status(409).body(Map.of("error", e.getMessage()));
+    }
+
+    @ExceptionHandler(ApplicationDocumentNotMatchedException.class)
+    public ResponseEntity<Map<String, String>> documentGate(ApplicationDocumentNotMatchedException e) {
+        // 서류 대사 미통과(ADR 0036) — 형식이 아니라 "지금은 승인 불가"라서 422 (409 는 전이·미교부 몫)
+        return ResponseEntity.unprocessableEntity().body(Map.of("error", e.getMessage()));
     }
 
     @ExceptionHandler({InvalidApplicationException.class, InvalidSalesChannelException.class})

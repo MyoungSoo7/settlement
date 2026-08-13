@@ -275,9 +275,14 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
 | 청약        | `POST /applications`, `POST /applications/{id}/{review,approve,reject}`                            | 청약 접수 → 심사 → 승인/거절(승인 시 계약 생성)                               |
 | 계약        | `POST /policies/{policyNumber}/{surrender,cancel}`, `GET /policies/{policyNumber}/payouts`         | 해지 · 철회 · 지급내역 조회                                                   |
 | 상품설명서  | `GET /products/{productCode}/disclosure`, `POST /disclosures`                                      | 상품설명서 조회 · **대면 교부 증빙 등록**(완전판매 게이트 — §아래) |
+| 청약서류 OCR (ADR 0036) | `POST /applications/{id}/documents`(멀티파트), `GET /applications/{id}/documents/latest`, `POST /application-documents/{id}/review` | 청약서 업로드→Gemini OCR→청약 자동 대사 / 최신 서류 조회 / NEEDS_REVIEW 육안 리뷰 종결 |
 
 - **완전판매 게이트**: 청약 **승인(approve)** 시점에 상품설명서 교부 증빙을 검사한다 — 증빙이 없으면
   `DisclosureNotDeliveredException`. 상태 전이 **전에** 검사하므로 실패한 청약은 `UNDER_REVIEW` 로 남는다.
+- **청약서류 대사 게이트(ADR 0036)**: 청약서 업로드 → shared-common `VisionExtractionClient`(Gemini) OCR →
+  청약 대조 자동 대사(연 보험료·보장금액 compareTo 정확 일치 · 청약일 접수일 KST ±1일 · 신뢰도 <0.80 은
+  NEEDS_REVIEW). `(application_id, file_hash)` 멱등. 승인 시 서류가 첨부돼 있으면 최신 서류가 MATCHED
+  여야 통과(422, 무서류는 점진 도입). 판독 실패는 무폴백 503. PII(주민번호·연락처)는 추출하지 않는다.
 - **상태머신**: Application `SUBMITTED→UNDER_REVIEW→APPROVED/REJECTED` · Policy `ACTIVE→LAPSED/SURRENDERED/EXPIRED/CANCELLED`
   · Proposal `QUOTED→CONVERTED/EXPIRED` · Commission `SCHEDULED→PAID→CLAWBACK_PENDING→CLAWED_BACK/CANCELLED`.
 - **방카슈랑스 확장(V6+)**: 판매채널 `SalesChannel`=FC·BANCA, 은행 채널 **25%룰**(특정 보험사 모집액 집중 한도) 모니터링,

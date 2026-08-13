@@ -99,8 +99,9 @@ Kafka 레퍼런스 *Configuring Topics*). 편의 기능이지만 이 저장소�
 ### 한계 (정직하게)
 
 - ~~브로커 실측 미반영~~ → **해소 (2026-08-14)**. 아래 "실측 결과" 참조.
-- **`orderingKey` 값은 미검증**: 계약 스키마의 식별자 필드와 발행 어댑터 주석에서 도출했다. 게이트는
-  "선언되어 있음"만 강제하며, 각 값이 실제 `aggregateId` 와 일치하는지의 publisher 별 대조는 후속 작업이다.
+- ~~`orderingKey` 값은 미검증~~ → **해소 (2026-08-14)**. 아래 "orderingKey publisher 대조" 참조.
+  다만 게이트가 강제하는 것은 여전히 "선언되어 있음"뿐이다 — 값과 publisher 의 대조는 Java 파싱이
+  필요해 기계화하지 않았다. 발행 어댑터의 `aggregateId` 를 바꾸면 카탈로그가 조용히 낡는다.
 - 런타임 강제 아님 — `rpk` 로 사람이 만든 토픽은 카탈로그를 거치지 않는다(드리프트로만 드러난다).
 - 파티션 **변경** 자체를 막지는 않는다. 카탈로그 값이 바뀌면 diff 에 드러나 리뷰에 걸리지만, 전용
   가드 규칙(변경 시 마이그레이션 근거 요구)은 넣지 않았다.
@@ -133,6 +134,37 @@ Kafka 레퍼런스 *Configuring Topics*). 편의 기능이지만 이 저장소�
 모든 서비스에서 발행해 `owner` 가 하나로 정해지지 않고 best-effort 라 순서 보장 대상이 아니다.
 `lemuel.payment.{authorized,confirmed,created}` 는 어느 서비스도 참조하지 않는 레거시,
 `lemuel.user.membership_changed` 는 ADR 0024 가 남긴 잔여 후보다.
+
+## orderingKey publisher 대조 (2026-08-14)
+
+`KafkaOutboxPublisher#buildRecord` 가 싣는 메시지 키는 `OutboxEvent.pending(aggregateType, **aggregateId**, …)`
+의 두 번째 인자다. 전 서비스의 호출부 49개를 뽑아 카탈로그와 대조했다. 계약 스키마의 첫 식별자 필드에서
+도출한 초기값은 **12건이 실제 키와 달랐다.**
+
+| 토픽 | 카탈로그(초기) | 실제 `aggregateId` |
+|---|---|---|
+| card.issued · card.status_changed | `cardId` | `account.getId()` = **cardAccountId** |
+| card.authorized | `authorizationId` | `hold.getCardAccountId()` = **cardAccountId** |
+| card.captured | `captureId` | `capture.getCardAccountId()` = **cardAccountId** |
+| card.statement_paid | `statementId` | `statement.getCardAccountId()` = **cardAccountId** |
+| insurance.policy_issued · policy_status_changed · commission_{confirmed,paid,clawback_triggered} | `policyId` / `commissionId` | `policy.getPolicyNumber()` = **policyNumber** |
+| insurance.commission_monthly_closed | `commissionId` | `closing.getFcId()` = **fcId** (설계사 단위) |
+| insurance.banca_rule_violated | `policyId` | `violation.bankCode()` = **bankCode** (은행 단위) |
+| settlement.holdback_consumed | `adjustmentId` | `sourceAdjustmentId` |
+
+card 8종이 전부 `cardAccountId` 로 묶이는 것은 의도된 설계다(어댑터 주석 `// 파티션 키 = cardAccountId`) —
+카드 계정 단위로 승인·매입·명세서의 순서를 지킨다. 나머지 39개 토픽은 초기값이 실제와 일치했다.
+
+같이 드러난 것:
+
+- **누락 토픽 2개**: `lemuel.insurance.general_payout_{requested,paid}` 은 발행 코드가 있는데 카탈로그에
+  없었다. `app.kafka.topic.*` 로 참조되지 않아 게이트가 잡지 못했다(게이트의 사각지대 — 발행 전용 토픽).
+- **토픽명 오류 1개**: 카탈로그에 `lemuel.card.statement.paid` 로 적혀 있었으나, `resolveTopic` 규칙상
+  실제 발행명은 `lemuel.card.statement_paid` 다(`Card` + `CardStatementPaid` → `statement_paid`).
+  초기값을 계약 스키마 파일명에서 옮긴 탓이며, **그 스키마 파일명 자체가 실제 토픽과 다르다**
+  (`contracts/events/lemuel.card.statement.paid.schema.json` — ADR 0024 영역, 미수정).
+- **프로듀서 없는 토픽 1개**: `lemuel.insurance.coverage_bound` 는 insurance yml 이 선언하지만 발행 코드가
+  없다(전 저장소 검색 0건). 설정에만 존재하는 유령 토픽이다 — 미조치.
 
 ## 참조
 
