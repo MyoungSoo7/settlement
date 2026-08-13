@@ -1,0 +1,72 @@
+{
+  "$comment": [
+    "Kafka 토픽 전송 속성의 단일 출처 — ADR 0035. 페이로드 계약은 ADR 0024(testFixtures/contracts/events)가 정본이다.",
+    "partitions 는 되돌릴 수 없는 값이다: 메시지 키가 outbox aggregateId 이므로 파티션 수가 바뀌면 hash(key)%N 이 바뀌어",
+    "같은 애그리거트의 이벤트가 다른 파티션으로 흩어진다(순서 보장 소급 붕괴). 변경은 반드시 코드 리뷰 + 마이그레이션 절차를 거친다.",
+    "owner 는 이 토픽을 발행하는 Gradle 모듈 — 토픽을 만드는 주체는 프로듀서 하나뿐이다(컨슈머는 만들지 않는다).",
+    "orderingKey 는 메시지 키의 도메인 의미. 출처는 계약 스키마의 식별자 필드 + 발행 어댑터 주석이며,",
+    "게이트는 '선언되어 있음'을 강제한다(값과 실제 aggregateId 의 대조는 publisher 별 후속 검증 대상).",
+    "DLT 는 등록하지 않는다 — 원본에서 파생되며 파티션 수가 항상 원본과 같다(TopicCatalog.Topic#deadLetterSpec)."
+  ],
+  "topics": [
+    { "name": "lemuel.order.created", "owner": "order-service", "orderingKey": "orderId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.user.registered", "owner": "order-service", "orderingKey": "userId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.product.changed", "owner": "order-service", "orderingKey": "productId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.payment.captured", "owner": "order-service", "orderingKey": "paymentId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.payment.refunded", "owner": "order-service", "orderingKey": "paymentId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.seller.tier_changed", "owner": "order-service", "orderingKey": "sellerId", "partitions": 3, "retentionDays": 7 },
+
+    { "name": "lemuel.settlement.created", "owner": "settlement-service", "orderingKey": "settlementId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.settlement.confirmed", "owner": "settlement-service", "orderingKey": "settlementId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.settlement.canceled", "owner": "settlement-service", "orderingKey": "settlementId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.settlement.adjusted", "owner": "settlement-service", "orderingKey": "adjustmentId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.settlement.holdback_consumed", "owner": "settlement-service", "orderingKey": "adjustmentId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.settlement.holdback_released", "owner": "settlement-service", "orderingKey": "settlementId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.settlement.withholding_accrued", "owner": "settlement-service", "orderingKey": "settlementId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.payout.completed", "owner": "settlement-service", "orderingKey": "payoutId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.pgreconciliation.discrepancy_approved", "owner": "settlement-service", "orderingKey": "discrepancyId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.seller_recovery.opened", "owner": "settlement-service", "orderingKey": "recoveryId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.seller_recovery.offset", "owner": "settlement-service", "orderingKey": "allocationId", "partitions": 3, "retentionDays": 7 },
+
+    { "name": "lemuel.loan.disbursement_requested", "owner": "loan-service", "orderingKey": "loanId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.loan.corporate_loan_disbursed", "owner": "loan-service", "orderingKey": "loanId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.loan.repayment_applied", "owner": "loan-service", "orderingKey": "settlementId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.loan.secured_loan_disbursed", "owner": "loan-service", "orderingKey": "loanId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.loan.secured_loan_principal_repaid", "owner": "loan-service", "orderingKey": "loanId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.loan.secured_loan_repaid", "owner": "loan-service", "orderingKey": "loanId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.loan.lease_activated", "owner": "loan-service", "orderingKey": "contractId", "partitions": 3, "retentionDays": 7 },
+
+    { "name": "lemuel.company.reputation_changed", "owner": "company-service", "orderingKey": "stockCode", "partitions": 3, "retentionDays": 7 },
+
+    { "name": "lemuel.investment.executed", "owner": "investment-service", "orderingKey": "orderId", "partitions": 3, "retentionDays": 7 },
+
+    { "name": "lemuel.organization.created", "owner": "organization-service", "orderingKey": "organizationId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.organization.member_joined", "owner": "organization-service", "orderingKey": "organizationId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.organization.member_removed", "owner": "organization-service", "orderingKey": "organizationId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.organization.member_role_changed", "owner": "organization-service", "orderingKey": "organizationId", "partitions": 3, "retentionDays": 7 },
+
+    { "name": "lemuel.card.account_opened", "owner": "card-service", "orderingKey": "cardAccountId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.card.account_status_changed", "owner": "card-service", "orderingKey": "cardAccountId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.card.limit_changed", "owner": "card-service", "orderingKey": "cardAccountId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.card.issued", "owner": "card-service", "orderingKey": "cardId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.card.status_changed", "owner": "card-service", "orderingKey": "cardId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.card.authorized", "owner": "card-service", "orderingKey": "authorizationId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.card.captured", "owner": "card-service", "orderingKey": "captureId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.card.statement.paid", "owner": "card-service", "orderingKey": "statementId", "partitions": 3, "retentionDays": 7 },
+
+    { "name": "lemuel.insurance.policy_issued", "owner": "insurance-service", "orderingKey": "policyId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.insurance.policy_status_changed", "owner": "insurance-service", "orderingKey": "policyId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.insurance.coverage_bound", "owner": "insurance-service", "orderingKey": "policyId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.insurance.banca_rule_violated", "owner": "insurance-service", "orderingKey": "policyId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.insurance.commission_confirmed", "owner": "insurance-service", "orderingKey": "commissionId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.insurance.commission_paid", "owner": "insurance-service", "orderingKey": "commissionId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.insurance.commission_clawback_triggered", "owner": "insurance-service", "orderingKey": "commissionId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.insurance.commission_monthly_closed", "owner": "insurance-service", "orderingKey": "commissionId", "partitions": 3, "retentionDays": 7 },
+
+    { "name": "lemuel.deposit.balance_changed", "owner": "deposit-service", "orderingKey": "sellerId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.deposit.hold_placed", "owner": "deposit-service", "orderingKey": "sellerId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.deposit.hold_released", "owner": "deposit-service", "orderingKey": "sellerId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.deposit.offset_applied", "owner": "deposit-service", "orderingKey": "sellerId", "partitions": 3, "retentionDays": 7 },
+    { "name": "lemuel.deposit.offset_shortfall", "owner": "deposit-service", "orderingKey": "sellerId", "partitions": 3, "retentionDays": 7 }
+  ]
+}
