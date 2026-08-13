@@ -1,0 +1,115 @@
+# Seed: ai-service 챗봇 as-is 사양 (Ouroboros 방법론 — Interview → Seed 결정화)
+# 상태: CONFIRMED (settlement/account/market seed 와 동일 방식 지시로 승인 승계, 2026-08-13)
+# 원칙: 이 Seed 는 "현행 코드가 실제로 하는 일"의 불변 기술이다. 결함은 교정하지 않고 known_issues 로만 기록한다.
+# 관련 스킬: ai-chat-rules (강제 규칙 정본)
+
+seed:
+  id: ai-service-chat-v1
+  goal: >-
+    ai-service(AI 챗봇 — PII 마스킹 초크포인트·provider 스위치·비용 가드·무폴백)의 현행 동작을
+    실행 가능한 게이트에 매핑된 불변 사양으로 결정화해, 회귀 기준선 · 경계 방어 근거 ·
+    면접/포트폴리오 문서로 사용한다.
+
+  scope:
+    included:
+      - PII 마스킹 단일 초크포인트와 마스킹 규칙(주민번호·카드번호)
+      - provider 스위치(gemini/anthropic)와 어댑터 격리
+      - 비용 가드(사용자별 분·일 이중 대역폭)
+      - LLM 실패 시 폴백 부재 정책과 저장 경계
+      - 대화 내용 저장 시 봉투 암호화
+    excluded:
+      - 각 LLM 공급자의 요청/응답 스키마 상세 (어댑터 사정)
+      - RAG·임베딩 경로 (별도 Seed 대상 — Embedding·pgvector 계열)
+
+  constraints:
+    - "사용자 입력은 LLM 으로 나가기 전 단일 초크포인트에서 마스킹한다"
+    - "provider 는 정확히 하나만 등록된다 (app.ai.provider)"
+    - "LLM 은 포트 뒤에 격리 — 도메인·서비스는 공급자를 모른다 (ArchUnit 강제)"
+    - "LLM 실패에 폴백 응답을 만들지 않는다 — 예외를 그대로 올리고 저장하지 않는다"
+    - "대화 내용은 평문으로 저장하지 않는다 (AES-GCM 봉투 암호화)"
+
+  invariants:  # as-is 코드 사실 — 파일:라인 근거 (경로 접두 ai-service/src/main/java/github/lms/lemuel/ai/chat/)
+    pii_single_chokepoint:
+      source: application/service/ChatService.java:84
+      rule: "PiiMasker.mask(command.message()) 한 지점 — 마스킹을 우회하는 LLM 호출 경로가 없다"
+    rrn_masking:
+      source: domain/PiiMasker.java:23,28,40
+      rule: "주민번호 = 6자리 + 성별코드[1-8] + 6자리, 앞뒤 숫자 경계 확인 → '[주민번호 마스킹됨]'"
+    card_masking_luhn_gated:
+      source: domain/PiiMasker.java:26,49-51
+      rule: "13~19자리 후보 중 Luhn 검증 통과분만 '[카드번호 마스킹됨]' 으로 치환 — 전화번호·주문번호 오탐 방지"
+    provider_switch:
+      source: adapter/out/llm/GeminiChatAdapter.java:38 + adapter/out/llm/AnthropicChatAdapter.java:43
+      rule: "@ConditionalOnProperty(app.ai.provider) 로 배타 등록 — gemini 가 기본(matchIfMissing=true), anthropic 은 명시 선택"
+    llm_behind_port:
+      source: application/port/out/ChatCompletionPort.java
+      rule: "도메인·서비스는 ChatCompletionPort 만 안다 — 공급자 타입이 새어나오지 않는다 (AiArchitectureTest 강제)"
+    cost_guard_dual_bandwidth:
+      source: adapter/out/ratelimit/Bucket4jRateLimiter.java:16-20,34
+      rule: "사용자별 버킷 하나에 분당·일일 두 대역폭 — 어느 한도든 먼저 소진되면 RateLimitExceededException → 429"
+      default: "app.ai.rate-limit.per-minute 기본 5"
+      retention: "일일 한도 추적 위해 마지막 접근 후 25시간 버킷 보존"
+    misconfigured_vs_unavailable:
+      source: application/service/ChatService.java:78,107 + adapter/in/web/GlobalExceptionHandler.java:28-30
+      rule: "키 미설정 = AiNotConfiguredException, 호출 실패 = AiUnavailableException — 응답이 갈린다"
+    no_fallback:
+      source: application/service/ChatService.java:107-111,118
+      rule: "LLM 실패 시 대체 응답을 만들지 않고 예외를 그대로 올린다. 저장(saveExchange)은 성공 경로에서만 실행된다"
+      rationale: "폴백 응답은 사용자에게 '답이 나왔다'는 착각을 준다 — 실패는 실패로 보여야 한다"
+    content_envelope_encryption:
+      source: adapter/out/persistence/ChatContentEncryptionConverter.java:22-23,37-38,54
+      rule: "AES-GCM(256), 저장 형식 enc:v1: + Base64(IV || ciphertext+tag). 키는 env CHAT_ENC_KEY, 정확히 32바이트(AES-256) 아니면 기동 실패"
+    three_stage_separation:
+      source: application/service/ChatService.java:33
+      rule: "마스킹 → LLM 호출 → 저장(단일 tx) 3단 분리 — 외부 호출이 트랜잭션을 잡고 있지 않다"
+
+  event_contracts:
+    publishes: []
+    consumes: []
+    note: "Kafka 미사용 — shared-common 은 JWT 만 제한 스캔"
+
+  acceptance_criteria:  # 실행 가능 — 각 AC 는 기존 게이트에 매핑
+    - id: AC-1
+      criterion: 마스킹 없이 LLM 으로 나가는 경로가 없다
+      gate: "./gradlew :ai-service:test — ChatServiceTest"
+    - id: AC-2
+      criterion: 주민번호·카드번호 마스킹 규칙(Luhn 포함)이 경계까지 일치한다
+      gate: "PiiMasker 단위 테스트"
+    - id: AC-3
+      criterion: provider 가 동시에 둘 등록되지 않는다
+      gate: "GeminiChatAdapterTest · AnthropicChatAdapterTest"
+    - id: AC-4
+      criterion: 분·일 한도 초과가 429 로 변환된다
+      gate: "Bucket4jRateLimiterTest"
+    - id: AC-5
+      criterion: LLM 실패 시 폴백 응답이 만들어지지 않고 저장도 되지 않는다
+      gate: "ChatServiceTest · ChatFlowIntegrationTest (Testcontainers)"
+    - id: AC-6
+      criterion: 저장 내용이 평문으로 남지 않는다
+      gate: "ChatContentEncryptionConverterTest"
+    - id: AC-7
+      criterion: 헥사고날·LLM 격리 위반 0
+      gate: "AiArchitectureTest (ArchUnit)"
+    - id: AC-8
+      criterion: 커버리지 LINE >= 90%
+      gate: "./gradlew :ai-service:jacocoTestCoverageVerification (check 편입)"
+
+  known_issues:  # 발견만 기록 — 사양은 as-is 유지
+    - id: KI-1
+      finding: "레이트리밋이 인메모리 단일 인스턴스 전제(Bucket4jRateLimiter.java:19-20 주석 명시). 스케일아웃하면 인스턴스 수만큼 한도가 곱해져 비용 가드가 사실상 무력해진다"
+      disposition: by-design-documented (스케일아웃 시 Redis ProxyManager 교체 필수 — 포트 뒤라 계약 불변)
+    - id: KI-2
+      finding: "마스킹 대상이 주민번호·카드번호 2종뿐(PiiMasker.java:23,26). 계좌번호·전화번호·이메일은 그대로 LLM 에 전달된다. 초크포인트 구조 덕에 규칙 추가는 한 곳에서 끝나지만 현재 커버리지는 2종이다"
+      disposition: recorded-not-fixed (범위 한계)
+    - id: KI-3
+      finding: "카드 마스킹이 Luhn 통과분만 치환 — Luhn 을 통과하는 비카드 숫자열은 오탐 마스킹되고, Luhn 을 통과 못 하는 실제 카드 오타는 통과한다. 정밀도/재현율 트레이드오프가 명시적 선택인지 문서에 없다"
+      disposition: recorded-not-verified
+    - id: KI-4
+      finding: "저장되는 것은 마스킹된 입력이라 원문 복구가 불가능하다 — 감사·분쟁 대응에서 '무엇이 입력됐는가'를 되짚을 수 없다. 의도된 트레이드오프인지 확인하지 않았다"
+      disposition: recorded-not-verified
+
+  uses:
+    - regression-baseline
+    - boundary-defense
+    - interview-portfolio
+    - brownfield-base
