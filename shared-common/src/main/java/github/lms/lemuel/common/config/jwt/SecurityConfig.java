@@ -126,6 +126,9 @@ public class SecurityConfig {
                         // /actuator/metrics(탐색형 단건 조회 API)는 그대로 인증 필요.
                         .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info", "/actuator/prometheus").permitAll()
                         .requestMatchers("/games/**").permitAll()
+                        // 네비게이션 메뉴 — 응답이 호출자 권한으로 이미 걸러져 나가므로 401 을 만들지 않는다.
+                        // (로그인 화면에서도 셸이 호출한다. 메뉴 숨김은 UX 이고, 실제 인가는 각 API 가 한다.)
+                        .requestMatchers(HttpMethod.GET, "/api/menus/me").permitAll()
                         // 공개 카테고리 API
                         .requestMatchers(HttpMethod.GET, "/categories", "/categories/**").permitAll()
                         // 쿠폰 관련 API
