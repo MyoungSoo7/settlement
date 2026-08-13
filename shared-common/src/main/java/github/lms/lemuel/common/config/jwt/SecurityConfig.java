@@ -131,6 +131,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/menus/me").permitAll()
                         // 공개 카테고리 API
                         .requestMatchers(HttpMethod.GET, "/categories", "/categories/**").permitAll()
+                        // 진열/기획전 공개 조회 — 노출 판정(기간·활성)은 서버가 하므로 미인증에게도 안전하다.
+                        .requestMatchers(HttpMethod.GET, "/display-sections", "/display-sections/**").permitAll()
                         // 쿠폰 관련 API
                         .requestMatchers(HttpMethod.GET, "/coupons/available").hasAnyRole("ADMIN", "MANAGER", "USER")
                         .requestMatchers(HttpMethod.GET, "/coupons", "/coupons/**").hasAnyRole("ADMIN", "MANAGER")
@@ -143,6 +145,8 @@ public class SecurityConfig {
                         .requestMatchers("/admin/categories/**").hasRole("ADMIN")
                         // 옵션 축/값 카탈로그 — 백필이 상품 옵션 구조를 대량 생성하므로 ADMIN 만.
                         .requestMatchers("/admin/option-catalog/**").hasRole("ADMIN")
+                        // 진열 편성 — 무엇이 화면 앞에 오는지를 정하는 콘솔이라 ADMIN 만.
+                        .requestMatchers("/admin/display-sections/**").hasRole("ADMIN")
                         // 송장 일괄 업로드 - 다건 출고를 한 번에 반영. dryRun 기본값이라 파라미터 누락 호출은 미리보기로 떨어진다.
                         .requestMatchers("/admin/shipments/**").hasAnyRole("ADMIN", "MANAGER")
                         // 셀러 등급 콘솔 - 등급은 수수료/정산주기/홀드백을 동시에 바꾸므로 ADMIN 만.
@@ -234,6 +238,15 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/banking/pensions/*/benefit-payments")
                         .hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers("/api/banking/**").authenticated()
+                        // 셀러 예치금 — 읽기 표면(/api)과 잔고를 움직이는 표면(/admin)을 경로로 분리한다.
+                        // 본인 조회는 경로에 sellerId 가 없고 JWT 주체에서 파생하므로 인증만 요구하고,
+                        // 임의 셀러 조회는 타인 잔고 열람이라 운영자 전용이다. 순서가 곧 규칙이니
+                        // /accounts/me 매처가 와일드카드보다 먼저 와야 한다.
+                        .requestMatchers(HttpMethod.GET, "/api/deposits/accounts/me").authenticated()
+                        .requestMatchers("/api/deposits/**").hasAnyRole("ADMIN", "MANAGER")
+                        // 수기 입출금·선점·상계는 실자금 원장 조작이라 MANAGER 도 제외하고 ADMIN 만
+                        // (/admin/payouts/** 와 같은 기준).
+                        .requestMatchers("/admin/deposits/**").hasRole("ADMIN")
                         // 결제 환불 이력 조회 (관리자·매니저·본인) — 더 세밀한 권한은 향후 Audit PR 에서
                         .requestMatchers("/api/payments/*/refunds").hasAnyRole("ADMIN", "MANAGER", "USER")
                         // 환불 실행(직접 PG 환불) — "어드민 승인 후 환불" 원칙에 따라 운영자 전용.

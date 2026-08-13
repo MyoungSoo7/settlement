@@ -65,4 +65,14 @@ public class EcommerceCategoryPersistenceAdapter
         EcommerceCategoryJpaEntity saved = repository.save(mapper.toJpaEntity(category));
         return mapper.toDomainEntity(saved);
     }
+
+    @Override
+    public int recalculatePaths() {
+        return repository.recalculatePaths();
+    }
+
+    @Override
+    public int refreshProductCounts() {
+        return repository.refreshProductCounts();
+    }
 }

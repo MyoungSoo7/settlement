@@ -17,7 +17,7 @@ spring:
               # prefix 가 혼재한다: 거래/회원/인증계는 비-/api(/auth,/users,/orders,/payments,/coupons,
               # /reviews,/games,/categories,/memberships,/products), 상품/카테고리/태그/환불이력은 /api.
               predicates:
-                - Path=/auth/**,/users/**,/orders/**,/payments/**,/coupons/**,/reviews/**,/games/**,/categories/**,/memberships/**,/products/**,/api/products/**,/api/categories/**,/api/tags/**,/api/payments/**,/api/menus/**,/admin/categories/**,/admin/products/**,/admin/pg/**,/admin/menus/**,/admin/common-codes/**,/admin/rbac/**,/admin/settlement-projection/**,/admin/payment-expiry/**,/admin/stock-reclaim/**,/admin/seller-tiers/**,/admin/shipments/**
+                - Path=/auth/**,/users/**,/orders/**,/payments/**,/coupons/**,/reviews/**,/games/**,/categories/**,/memberships/**,/products/**,/api/products/**,/api/categories/**,/api/tags/**,/api/payments/**,/api/menus/**,/admin/categories/**,/admin/products/**,/admin/pg/**,/admin/menus/**,/admin/common-codes/**,/admin/rbac/**,/admin/settlement-projection/**,/admin/payment-expiry/**,/admin/stock-reclaim/**,/admin/seller-tiers/**,/admin/shipments/**,/admin/option-catalog/**,/display-sections/**,/admin/display-sections/**
             - id: loan-service
               uri: ${LOAN_SERVICE_URI:http://localhost:8084}
               predicates:
@@ -84,11 +84,11 @@ spring:
                 - Path=/api/insurance/**
             - id: deposit-service
               uri: ${DEPOSIT_SERVICE_URI:http://localhost:8112}
-              # 셀러 예치금 원장 — 재원 이중사용 차단. REST 어댑터는 아직 없어 현재는 라우트만 있고
-              # 호출은 404 다(card-service 와 같은 단계). 컨트롤러가 붙는 순간 배선 누락으로 헤매지 않도록
-              # 경로를 먼저 잡아둔다.
+              # 셀러 예치금 원장 — 재원 이중사용 차단. /api 는 읽기 전용(본인·운영자 잔고 조회),
+              # /admin 은 잔고를 움직이는 수기 콘솔(ADMIN 전용). 두 경로의 권한 등급이 다르므로
+              # 하나의 와일드카드로 합치지 않는다.
               predicates:
-                - Path=/api/deposits/**
+                - Path=/api/deposits/**,/admin/deposits/**
             - id: settlement-service
               uri: ${SETTLEMENT_SERVICE_URI:http://localhost:8082}
               # SettlementController 는 /settlements(비-/api), 검색/원장/리포트는 /api, 운영 콘솔은 /admin.
@@ -102,6 +102,15 @@ spring:
                 - Path=/api/market-stream/**
               filters:
                 - RewritePath=/api/market-stream/(?<segment>.*), /$\{segment}
+            - id: notification-service
+              uri: ${NOTIFICATION_SERVICE_URI:http://localhost:8130}
+              # 폴리글랏(Kotlin, 8130) 알림 푸시 SSE — 스트림 하나만 노출한다.
+              # /notifications/send·/notifications/demo 는 인증 없이 발송하는 내부 경로라
+              # 게이트웨이에 올리지 않는다(와일드카드 금지). 서비스 실경로는 /notifications/stream.
+              predicates:
+                - Path=/api/notifications/stream
+              filters:
+                - RewritePath=/api/notifications/stream, /notifications/stream
 
 server:
   port: 8080

@@ -62,7 +62,9 @@ public class EcommerceCategoryService {
                     sortOrder != null ? sortOrder : 0);
         }
 
-        return savePort.save(category);
+        EcommerceCategory saved = savePort.save(category);
+        savePort.recalculatePaths();
+        return saved;
     }
 
     @Cacheable(value = "ecommerce-categories", key = "'id:' + #id")
@@ -154,7 +156,19 @@ public class EcommerceCategoryService {
         }
 
         category.changeParent(newParentId, newParentDepth != null ? newParentDepth : -1);
-        return savePort.save(category);
+        EcommerceCategory moved = savePort.save(category);
+        // 옮겨진 노드뿐 아니라 그 아래 전부의 경로가 바뀐다 — 영향 범위를 좁게 잡으면 조용히 어긋난다.
+        savePort.recalculatePaths();
+        return moved;
+    }
+
+    /**
+     * 상품수 캐시 재계산. 캐시는 정본이 아니므로(정본은 매핑 테이블) 주기적/수동 갱신으로 맞춘다.
+     *
+     * @return 값이 달라진 행 수. 0 이면 캐시와 정본이 일치한다.
+     */
+    public int refreshProductCounts() {
+        return savePort.refreshProductCounts();
     }
 
     private void validateNoCircularReference(Long categoryId, Long newParentId) {
@@ -246,5 +260,6 @@ public class EcommerceCategoryService {
 
         category.softDelete();
         savePort.save(category);
+        savePort.recalculatePaths();
     }
 }

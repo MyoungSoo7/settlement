@@ -162,4 +162,17 @@ public class AdminEcommerceCategoryController {
         categoryService.deleteCategory(id);
         return ResponseEntity.noContent().build();
     }
+
+    /**
+     * 상품수 캐시 재계산.
+     *
+     * <p>응답의 갱신 행 수가 0 이면 캐시와 정본(product_ecommerce_categories 실계수)이 일치한다는 뜻이라,
+     * 정합성 점검용 신호로도 쓸 수 있다.
+     */
+    @Operation(summary = "카테고리 상품수 캐시 재계산",
+            description = "product_ecommerce_categories 실계수로 product_count 를 다시 채운다. 갱신된 행 수를 반환한다.")
+    @PostMapping("/refresh-counts")
+    public ResponseEntity<Integer> refreshProductCounts() {
+        return ResponseEntity.ok(categoryService.refreshProductCounts());
+    }
 }
