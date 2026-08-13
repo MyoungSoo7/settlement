@@ -10,12 +10,12 @@
     | `vector` 확장                  | 설치됨 (`pg_extension` 에 존재)                           |
     | 앱 롤 `settlement`             | `rolsuper = t` → `CREATE EXTENSION` 가능                  |
     | `GEMINI_API_KEY`               | 주입됨 (차트 `envFromSecrets` → `settlement-api-keys`)    |
-    | 운영 이미지                    | `main-f2b3b84` — **RAG 코드 없음** (`master` 미반영)      |
+    | 운영 이미지                    | `main-f2b3b84` — **RAG 코드 없음** (`main` 미반영)      |
     | 마이그레이션 `V20260812150000` | **미적용** (`flyway_schema_history` 부재)                 |
     | `APP_AI_RAG_ENABLED`           | unset (= false)                                           |
   - **따라서 플래그를 차트에 미리 박지 않는다.** 지금 넣으면 오늘은 무해하지만, 릴리즈
-    PR(develop→master)이 머지되는 순간 **아무도 의도하지 않은 타이밍에 저절로 켜진다**.
-    순서는 ① 코드가 `master` 에 들어가고 ② 지식 적재를 마친 뒤 ③ `charts/settlement-msa`
+    PR(develop→main)이 머지되는 순간 **아무도 의도하지 않은 타이밍에 저절로 켜진다**.
+    순서는 ① 코드가 `main` 에 들어가고 ② 지식 적재를 마친 뒤 ③ `charts/settlement-msa`
     `values.yaml` 의 `ai` 블록에 `extraEnv: { APP_AI_RAG_ENABLED: "true" }` 를 **의도된
     한 걸음으로** 추가하고 지켜보는 것이다.
 - 일자: 2026-08-12 (상태 확정 2026-08-13)
