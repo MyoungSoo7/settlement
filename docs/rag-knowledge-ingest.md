@@ -1,7 +1,7 @@
 # RAG 지식베이스 적재 운영
 
 AI 챗봇(ai-service)이 답변 근거로 쓰는 지식베이스를 리포에서 관리하는 방법. 설계 배경은
-[ADR 0034](../adr/0034-ai-service-rag-pgvector.md), 적재 대상 문서는 `` 에 있다.
+[ADR 0034](adr/0034-ai-service-rag-pgvector.md), 적재 대상 문서는 `docs/knowledge/` 에 있다.
 
 ## 원칙 — 등재된 문서만 적재한다
 

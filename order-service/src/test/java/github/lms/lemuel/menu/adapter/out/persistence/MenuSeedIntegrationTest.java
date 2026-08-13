@@ -79,9 +79,9 @@ class MenuSeedIntegrationTest {
     }
 
     @Test
-    @DisplayName("시드 총 39행 — 이관분 31 + 정산운영 그룹 1 + 운영 화면 7")
-    void seedsExactlyThirtyNine() {
-        assertThat(adapter.findAll()).hasSize(39);
+    @DisplayName("시드 총 41행 — 이관분 31 + 정산운영 그룹 1 + 운영 화면 7 + 시스템 화면 2")
+    void seedsExactlyFortyOne() {
+        assertThat(adapter.findAll()).hasSize(41);
     }
 
     @Test
@@ -134,14 +134,18 @@ class MenuSeedIntegrationTest {
     }
 
     @Test
-    @DisplayName("시스템 사이드바 5개 — 앞 3개는 RBAC permission 과 짝지어진다")
+    @DisplayName("시스템 사이드바 7개 — 앞 3개는 RBAC permission 과 짝지어진다")
     void systemChildren() {
         List<Menu> children = childrenOf("시스템 관리");
 
+        // 분류(카테고리) → 편성(진열) → 선택지(옵션) → 관제(운영) 순. 뒤에 붙는 화면마다
+        // 운영관리의 sort_order 를 한 칸씩 밀어 이 순서를 유지한다.
         assertThat(children).extracting(Menu::getName).containsExactly(
-                "메뉴 관리", "공통코드 관리", "RBAC 관리", "이커머스 카테고리", "운영관리");
+                "메뉴 관리", "공통코드 관리", "RBAC 관리", "이커머스 카테고리",
+                "진열 편성", "옵션 카탈로그", "운영관리");
         assertThat(children).extracting(Menu::getRequiredPermission).containsExactly(
-                "SYSTEM_MENU_MANAGE", "SYSTEM_CODE_MANAGE", "SYSTEM_RBAC_MANAGE", null, null);
+                "SYSTEM_MENU_MANAGE", "SYSTEM_CODE_MANAGE", "SYSTEM_RBAC_MANAGE",
+                null, null, null, null);
     }
 
     @Test
