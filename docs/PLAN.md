@@ -40,6 +40,7 @@
 |----------|----------|------|
 | 회원/인증/멤버십 | `/auth · /users · /memberships` | ✅ |
 | 상품·SKU·카테고리·태그·이미지 | `/api/products · /categories · /api/tags` | ✅ |
+| 카탈로그(옵션 축/값·조합 SKU·진열 편성) | `/admin/option-catalog · /admin/display-sections · /display-sections` — 설계 정본 [`product-catalog-design.md`](product-catalog-design.md) | ✅ |
 | 장바구니·쿠폰(등급별) | `/users/{id}/cart · /coupons` | ✅ |
 | 주문(재고 조건부 차감·Idempotency-Key)·배송 | `/orders · /orders/{id}/shipment` | ✅ |
 | 결제(Toss·분할·환불 동시성) | `/payments · /payments/split · /api/payments/*/refunds` | ✅ |
@@ -130,7 +131,7 @@
   (재원은 account-service GL 통제계정 조회 — ADR 0030, card 는 재원을 복제하지 않는다)
 - **핵심 불변식**: `master_limit >= Σ sub_limit`(서로 다른 애그리거트, DB 제약 불가 → 비관적 락 + 재계산으로 방어)
 - Phase 2: 실시간 승인/홀드, 매입·취소·환불, 명세서·상환, 지출관리(제출/승인/반려) 워크플로
-- `lemuel.organization.*` 4종 소비(이탈자 카드 자동 정지) — 이벤트 발행(Outbox) `account_opened·issued·limit_changed·status_changed·authorized·captured·statement.paid`
+- `lemuel.organization.*` 4종 소비(이탈자 카드 자동 정지) — 이벤트 발행(Outbox) `account_opened·issued·limit_changed·status_changed·authorized·captured·statement_paid`
 
 ### 5.5b insurance-service (8108, mgmt 8109 / lemuel_insurance) ✅
 - GA(법인보험대리점) 플랫폼 — 상담 → 가입설계 → 청약 → 계약 → 유지·변경 → 수수료 정산을 하나로 잇는다
