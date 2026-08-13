@@ -135,13 +135,14 @@ public class BackfillOptionCatalogService implements BackfillOptionCatalogUseCas
 
     private void resolveProductValue(ProductOptionAxis productAxis, OptionAxisValue axisValue,
                                      Counters counters) {
-        loadCatalogPort.findProductValue(productAxis.getId(), axisValue.getId())
-                .orElseGet(() -> {
-                    int nextOrder = loadCatalogPort.loadProductValues(productAxis.getId()).size();
-                    counters.productValues++;
-                    return saveCatalogPort.saveProductValue(
-                            ProductOptionValue.create(productAxis.getId(), axisValue.getId(), nextOrder));
-                });
+        // orElseGet 의 반환값을 버리고 부작용(저장·카운트)만 쓰던 자리다(S2201).
+        // "없으면 만든다"를 if 로 드러낸다 — 동작은 그대로이고, 반환값을 쓰는지 여부가 애매하지 않다.
+        if (loadCatalogPort.findProductValue(productAxis.getId(), axisValue.getId()).isEmpty()) {
+            int nextOrder = loadCatalogPort.loadProductValues(productAxis.getId()).size();
+            counters.productValues++;
+            saveCatalogPort.saveProductValue(
+                    ProductOptionValue.create(productAxis.getId(), axisValue.getId(), nextOrder));
+        }
     }
 
     /** 표시 이름 → 기계 코드. 규칙은 {@link OptionCode} 가 소유한다(백필과 조회가 같은 규칙을 써야 함). */

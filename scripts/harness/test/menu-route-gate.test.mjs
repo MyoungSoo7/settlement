@@ -46,7 +46,6 @@ const ROUTES_WITHOUT_MENU = new Map([
   ['/loans', 'CEO 메뉴(/admin/ceo/loans)로 진입'],
   ['/cart', '헤더 장바구니 아이콘으로 진입'],
   ['/mypage', '헤더 MY 버튼으로 진입'],
-  ['/categories', '관리 화면 내부 이동'],
   ['/tags', '관리 화면 내부 이동'],
   ['/print/settlement/:id', '인쇄 전용 — 새 창으로 열린다'],
   ['/admin/system', '그룹 진입 리다이렉트'],

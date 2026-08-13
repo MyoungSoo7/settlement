@@ -40,8 +40,6 @@ public class ProductJpaEntity {
     @Column(nullable = false, length = 20)
     private ProductStatus status;
 
-    @Column(name = "category_id")
-    private Long categoryId;
 
     /** 원본 옵션 트리(임의 깊이). JSONB 컬럼에 문자열 그대로 저장 — 재고는 ProductVariant 가 담당. */
     @JdbcTypeCode(SqlTypes.JSON)

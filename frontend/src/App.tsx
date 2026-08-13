@@ -41,7 +41,6 @@ const AiChatPage = lazy(() => import('./pages/AiChatPage'));
 const ProductPage = lazy(() => import('./pages/ProductPage'));
 const SettlementDashboard = lazy(() => import('./pages/SettlementDashboardImproved'));
 const SettlementAdmin = lazy(() => import('./pages/SettlementAdmin'));
-const CategoryManagementPage = lazy(() => import('./pages/CategoryManagementPage'));
 const TagManagementPage = lazy(() => import('./pages/TagManagementPage'));
 const EcommerceCategoryAdmin = lazy(() => import('./pages/EcommerceCategoryAdmin'));
 const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'));
@@ -156,7 +155,6 @@ function App() {
             <Route path="/admin/shipping"     element={<AdminManagerRoute><ShippingAdminPage /></AdminManagerRoute>} />
             {/* 취소·환불 승인 큐 — 사용자가 신청한 건을 운영자가 종단으로 보낸다 */}
             <Route path="/admin/approvals"    element={<AdminManagerRoute><OrderApprovalPage /></AdminManagerRoute>} />
-            <Route path="/categories"         element={<AdminManagerRoute><CategoryManagementPage /></AdminManagerRoute>} />
             <Route path="/tags"               element={<AdminManagerRoute><TagManagementPage /></AdminManagerRoute>} />
 
             {/* ── 인쇄 전용 문서 (새 창) ── */}

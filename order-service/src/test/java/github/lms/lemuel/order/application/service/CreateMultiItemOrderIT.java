@@ -73,7 +73,8 @@ import static org.assertj.core.api.Assertions.tuple;
 @DataJpaTest
 @ImportAutoConfiguration(FlywayAutoConfiguration.class)
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({ProductPersistenceAdapter.class, ProductPersistenceMapperImpl.class,
+@Import({ProductPersistenceAdapter.class,
+        github.lms.lemuel.category.adapter.out.persistence.PrimaryCategoryLookupAdapter.class, ProductPersistenceMapperImpl.class,
         ProductVariantPersistenceAdapter.class, CouponPersistenceAdapter.class,
         OrderPersistenceAdapter.class, OrderPersistenceMapperImpl.class, OutboxSchema.class,
         OptionCatalogPersistenceAdapter.class, VariantOptionMappingPersistenceAdapter.class})
