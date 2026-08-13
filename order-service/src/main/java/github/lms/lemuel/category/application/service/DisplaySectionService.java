@@ -45,8 +45,24 @@ public class DisplaySectionService {
         return displaySectionPort.loadAll();
     }
 
+    /** 편성 내용 — 노출 여부와 무관하다. 편성을 <b>짜는</b> 운영 표면이 쓴다. */
     public List<DisplaySectionItem> getItems(String code) {
         return displaySectionPort.loadItems(requireSection(code).getId());
+    }
+
+    /**
+     * 노출 중인 편성의 내용 — 공개 표면이 쓴다.
+     *
+     * <p>목록은 노출 판정을 하는데 항목은 안 하면, 편성 코드만 아는 사람이 아직 시작하지 않은
+     * 기획전의 라인업을 미리 읽을 수 있다. 미노출 편성은 <b>없는 것과 같게</b> 다뤄
+     * 존재 여부도 흘리지 않는다(404).
+     */
+    public List<DisplaySectionItem> getVisibleItems(String code) {
+        DisplaySection section = requireSection(code);
+        if (!section.isVisibleAt(LocalDateTime.now(clock))) {
+            throw new CategoryNotFoundException(code);
+        }
+        return displaySectionPort.loadItems(section.getId());
     }
 
     @Transactional

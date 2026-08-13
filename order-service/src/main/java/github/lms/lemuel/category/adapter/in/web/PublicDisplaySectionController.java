@@ -36,11 +36,13 @@ public class PublicDisplaySectionController {
                 .toList());
     }
 
-    @Operation(summary = "편성에 담긴 상품", description = "고정 상품이 앞, 그 다음 정렬 순서로 반환한다.")
+    @Operation(summary = "편성에 담긴 상품",
+            description = "고정 상품이 앞, 그 다음 정렬 순서로 반환한다. 노출 중이 아닌 편성은 404 — 코드를 안다고 "
+                    + "시작 전 기획전의 라인업을 미리 볼 수는 없다.")
     @GetMapping("/{code}/items")
     public ResponseEntity<List<DisplaySectionItemResponse>> getItems(
             @Parameter(description = "편성 코드", required = true) @PathVariable String code) {
-        return ResponseEntity.ok(displaySectionService.getItems(code).stream()
+        return ResponseEntity.ok(displaySectionService.getVisibleItems(code).stream()
                 .map(DisplaySectionItemResponse::from)
                 .toList());
     }
