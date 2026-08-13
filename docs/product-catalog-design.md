@@ -1,6 +1,6 @@
 # 상품 카테고리·옵션 테이블 설계 (ssgb2e / ofDentis 사례 분석 기반)
 
-> 대상: `order-service` (opslab). 상태: **설계안 — 미구현**.
+> 대상: `order-service` (opslab). 상태: **Phase 1–7 구현 완료** (§4 이관 계획의 단계별 커밋 참조).
 > 근거 저장소: `MyoungSoo7/ssgb2e-front_20250721`(Oracle + MyBatis, B2E 복지몰),
 > `MyoungSoo7/ofDentis_final`(JPA/QueryDSL, 치과자재 마켓).
 
@@ -358,15 +358,23 @@ CREATE TABLE opslab.order_item_options (
 
 ## 4. 이관 계획 (각 단계가 독립 배포 가능)
 
-| Phase | 내용 | 되돌릴 수 있는가 |
-| --- | --- | --- |
-| 1 | 옵션 축/값 카탈로그(①~④) 생성 + 시드. 기존 `option_name` 을 파싱해 축·값 역생성 | 예 (읽는 코드 없음) |
-| 2 | `product_variant_option_values`(⑤) 백필 + `option_signature`(⑥) 채움. **검증**: 모든 variant 가 signature 를 갖고 `(product_id, option_signature)` 충돌 0 | 예 |
-| 3 | `ResolveOptionSelectionService` 를 signature 단건 조회로 교체. `option_name` 은 표시 전용. `options_json` → 감사 사본 격하 | 예 (플래그로 이전 경로 유지) |
-| 4 | `UNIQUE(product_id, option_name)` 제거. `order_item_options` 추가 + 주문 생성 경로에 기록 | 조건부 |
-| 5 | 카테고리 단일화: `categories` → `ecommerce_categories` 이관, `is_primary` 설정, `products.category_id` 드랍 | 조건부 |
-| 6 | `path_ids`/`path_slug`/`product_count` 추가 + 갱신 경로(서브트리 재계산, 카운트 배치) | 예 |
-| 7 | `display_sections` / `display_section_items` 추가 | 예 |
+| Phase | 내용 | 되돌릴 수 있는가 | 상태 |
+| --- | --- | --- | --- |
+| 1 | 옵션 축/값 카탈로그(①~④) 생성 + 시드. 기존 `option_name` 을 파싱해 축·값 역생성 | 예 (읽는 코드 없음) | ✅ `V20260813140000` |
+| 2 | `product_variant_option_values`(⑤) 백필 + `option_signature`(⑥) 채움. **검증**: 모든 variant 가 signature 를 갖고 `(product_id, option_signature)` 충돌 0 | 예 | ✅ `V20260813150000` |
+| 3 | `ResolveOptionSelectionService` 를 signature 단건 조회로 교체. `option_name` 은 표시 전용 | 예 (미백필 SKU 는 레거시 폴백) | ✅ |
+| 4 | `UNIQUE(product_id, option_name)` 제거. `order_item_options` 추가 + 주문 생성 경로에 기록 | 조건부 | ✅ `V20260813160000` |
+| 5 | 카테고리 단일화: `categories` → `ecommerce_categories` 이관, `is_primary` 설정, `products.category_id` 드랍 | 조건부 | ✅ `V20260813170000` |
+| 6 | `path_ids`/`path_slug`/`product_count` 추가 + 갱신 경로(경로 전량 재계산, 카운트 갱신) | 예 | ✅ `V20260813180000` |
+| 7 | `display_sections` / `display_section_items` 추가 | 예 | ✅ `V20260813190000` |
+
+구현하며 설계에서 달라진 점 두 가지:
+
+- **Phase 3 의 레거시 경로는 플래그가 아니라 상태로 갈린다.** 상품에 채택된 축이 없거나(미백필)
+  조합 서명이 아직 없는 SKU 일 때만 옛 경로로 내려간다. 서명이 채워진 SKU 는 절대 그 경로를 타지
+  않으므로, 백필이 끝나면 플래그를 끄는 절차 없이 다리를 걷어낼 수 있다.
+- **Phase 6 의 경로 재계산은 서브트리가 아니라 전량이다.** 부모 변경의 영향 범위를 좁게 잡으면
+  경로가 조용히 어긋나는데, 카테고리 트리는 수백 행 규모라 전량 재계산이 더 싸고 확실했다.
 
 Phase 1–2 는 순수 추가라 무중단이다. Phase 4·5 가 되돌리기 어려운 지점이므로 **Phase 3 이 프로덕션에서
 한 사이클 돈 뒤에** 착수한다. ofDentis 가 `tb_market_opt` 에 엔티티 두 개를 남긴 채 멈춘 것이
