@@ -11,7 +11,7 @@ object NotificationTemplate {
      * routed to the ops mailbox so no event disappears unnoticed (deliberate
      * fail-visible default, not a silent drop).
      */
-    private const val OPS_FALLBACK_RECIPIENT = "ops@lemuel"
+    const val OPS_FALLBACK_RECIPIENT = "ops@lemuel"
 
     /**
      * Render a one-line plain-text representation of a notification,

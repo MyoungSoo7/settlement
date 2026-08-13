@@ -19,6 +19,11 @@ app:
     enabled: ${APP_KAFKA_ENABLED:false}
   dedupe:
     ttl-minutes: ${APP_DEDUPE_TTL_MINUTES:30}
+  stream:
+    # SSE 재생 창(리플레이) 상한 — 프로세스 메모리라 무한 증가하지 않게 묶어 둔다.
+    buffer-per-recipient: ${APP_STREAM_BUFFER_PER_RECIPIENT:100}
+    max-recipients: ${APP_STREAM_MAX_RECIPIENTS:10000}
+    max-pending-per-subscriber: ${APP_STREAM_MAX_PENDING:200}
   dispatch:
     per-channel-timeout-ms: ${APP_DISPATCH_TIMEOUT_MS:3000}
     max-attempts: ${APP_DISPATCH_MAX_ATTEMPTS:3}
