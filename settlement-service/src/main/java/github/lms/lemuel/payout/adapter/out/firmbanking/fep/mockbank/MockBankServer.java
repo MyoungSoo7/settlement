@@ -112,6 +112,11 @@ public class MockBankServer {
                 default -> log.warn("[MockBank] 미지원 전문구분코드: {}", msgType);
             }
         } catch (IOException | InterruptedException e) {
+            // 인터럽트를 삼키면 상위 루프가 종료 신호를 못 본다 — 플래그를 즉시 복원한다.
+            // (서버 종료 시 accept 루프가 인터럽트로 내려오는데, 여기서 지워지면 스레드가 계속 돈다.)
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
             log.debug("[MockBank] 연결 처리 종료: {}", e.getMessage());
         }
     }
