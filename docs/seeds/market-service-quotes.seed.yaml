@@ -49,7 +49,7 @@ seed:
       source: V20260718300000__stock_quotes_value_checks.sql:12-18
       rule: "close_price > 0, 나머지 가격·수량 >= 0"
       exception: "prior_day_diff·fluctuation_rate 는 음수가 정상(하락)이라 CHECK 대상 밖 (:8)"
-      caveat: "NOT VALID 로 추가 — 신규 행만 검증 (known_issues KI-3)"
+      caveat: "NOT VALID 로 ADD 후 같은 파일 :23-25 에서 VALIDATE — 기존 행까지 검증됨 (락 회피 2단 패턴, KI-3 참조)"
     trust_marker:
       source: domain/ValueSource.java:14 + V20260810160000__value_source_domain_rename.sql:1-8
       rule: "SAMPLE(근사 샘플, 신뢰 불가) / EXCHANGE(거래소 공시 실시세, 신뢰 가능)"
@@ -103,8 +103,8 @@ seed:
       finding: "AdminApiKeyFilter 는 키 미설정 시 개발 통과. 운영에서 app.security.internal-key-required=true 주입이 빠지면 수집 트리거가 무인증으로 열린다"
       disposition: by-design (전 서비스 공통 패턴 — 운영 주입 필수)
     - id: KI-3
-      finding: "값 무결성 CHECK 가 NOT VALID 로 추가됨(V20260718300000:13) — 신규 행만 검증되고 기존 행은 미검증. VALIDATE 수행 여부는 이 Seed 범위에서 확인하지 않았다"
-      disposition: recorded-not-verified
+      finding: "[정정 2026-08-13] 초안은 NOT VALID(:13)만 보고 기존 행 미검증이라 기록했으나, 같은 파일 :23-25 가 VALIDATE CONSTRAINT 3종을 수행한다. 임시 DB 에 마이그레이션 전량 적용해 실측 — chk_sq 4종 convalidated=t, 미검증 제약 0건(파티션 상속본 포함), close_price=-1 INSERT 는 chk_sq_close_price_positive 위반으로 거부. 후속 V20260810160000 은 chk_sq_source 만 DROP/ADD 하므로 값 CHECK 의 검증 상태를 풀지 않는다"
+      disposition: verified-not-an-issue
     - id: KI-4
       finding: "ValueSource 재정의가 파티션드 테이블 + CHECK 제약 해제→값 치환→재생성 순서에 의존하는 마이그레이션이었다(V20260810160000:10-14). 같은 형태의 값 집합 변경이 또 필요하면 동일한 순서 함정을 밟는다"
       disposition: recorded-not-fixed (마이그레이션 패턴 위험)

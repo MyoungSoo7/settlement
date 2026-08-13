@@ -65,9 +65,11 @@
 - **KI-2** `AdminApiKeyFilter` 는 **키 미설정 시 개발 통과**다. 운영에서 `app.security.internal-key-required=true`
   주입이 빠지면 수집 트리거가 무인증으로 열린다 — 배포 절차에 의존하는 안전장치다.
   → `disposition: by-design` (전 서비스 공통 패턴, 운영 주입 필수)
-- **KI-3** 값 무결성 CHECK 가 `NOT VALID` 로 추가됐다(`V20260718300000:13`). 신규 행만 검증되고 **기존 행은
-  검증되지 않은 채 남는다** — VALIDATE 단계가 별도로 수행됐는지는 이 Seed 범위에서 확인하지 않았다.
-  → `disposition: recorded-not-verified`
+- **KI-3** ~~값 무결성 CHECK 가 `NOT VALID` 로 추가됐다~~ → **검증 결과 사실 아님**(2026-08-13). 같은 파일
+  `:23-25` 가 `VALIDATE CONSTRAINT` 3종을 이어서 수행한다. 임시 DB 실측에서 `chk_sq` 4종 모두
+  `convalidated = t`, 미검증 제약 0건(파티션 상속본 포함), 음수 종가 INSERT 는 실제로 거부됐다.
+  `NOT VALID`→`VALIDATE` 2단은 락 회피 패턴이지 검증 누락이 아니다.
+  → `disposition: verified-not-an-issue`
 - **KI-4** `ValueSource` 재정의(`SEED`→`SAMPLE`, `KRX`→`EXCHANGE`)는 **파티션드 테이블 + CHECK 제약 해제·재생성
   순서에 의존**하는 마이그레이션이었다(`V20260810160000:10-14`). 같은 형태의 값 집합 변경이 또 필요하면
   동일한 순서 함정을 밟는다. → `disposition: recorded-not-fixed` (마이그레이션 패턴 위험)
