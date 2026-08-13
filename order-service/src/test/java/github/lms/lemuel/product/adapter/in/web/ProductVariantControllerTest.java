@@ -36,11 +36,10 @@ class ProductVariantControllerTest {
     @MockitoBean LoadProductVariantPort loadPort;
     @MockitoBean ResolveOptionSelectionUseCase resolveUseCase;
 
+    /** 할인 미설정(null)이 기본이다 — 대부분의 SKU 는 할인이 없다. */
     private static ProductVariant variant(Long id) {
-        // VariantResponse.from() 은 Map.of() 로 만들어 discountPrice/discountRate 가 null 이면 NPE 이므로
-        // (프로덕션 코드 실제 동작 재현) rehydrate 로 0 값을 채워 넣는다.
         return ProductVariant.rehydrate(id, 1L, "SKU-1", "색상:빨강", new BigDecimal("500"),
-                BigDecimal.ZERO, BigDecimal.ZERO, 10, 0L, github.lms.lemuel.product.domain.ProductVariantStatus.ACTIVE,
+                null, null, 10, 0L, github.lms.lemuel.product.domain.ProductVariantStatus.ACTIVE,
                 java.time.LocalDateTime.now(), java.time.LocalDateTime.now());
     }
 
@@ -99,5 +98,17 @@ class ProductVariantControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.variant.id").value(100));
+    }
+
+    @Test
+    @DisplayName("할인 미설정 SKU 도 200 으로 직렬화된다 — Map.of 가 null 을 거부해 500 이 나던 회귀")
+    void serializesVariantWithoutDiscounts() throws Exception {
+        when(loadPort.loadByProductId(1L)).thenReturn(List.of(variant(100L)));
+
+        mockMvc.perform(get("/products/1/variants"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].variant.id").value(100))
+                .andExpect(jsonPath("$[0].variant.discountPrice").doesNotExist())
+                .andExpect(jsonPath("$[0].variant.discountRate").doesNotExist());
     }
 }

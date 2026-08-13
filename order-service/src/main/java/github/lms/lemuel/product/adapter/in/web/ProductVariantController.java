@@ -13,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -88,19 +89,25 @@ public class ProductVariantController {
     public record DecreaseStockRequest(@Min(1) int quantity) {}
 
     public record VariantResponse(Map<String, Object> variant) {
+
+        /**
+         * {@code Map.of} 는 null 값을 거부한다 — 할인 두 필드는 미설정이 정상(대부분의 SKU 가 할인이 없다)이라
+         * 그대로 두면 할인 없는 SKU 를 담을 때마다 NPE 로 500 이 난다. 순서를 보존하는 맵에 담아 null 을 허용한다.
+         */
         static VariantResponse from(ProductVariant v) {
-            return new VariantResponse(Map.of(
-                    "id", v.getId(),
-                    "productId", v.getProductId(),
-                    "sku", v.getSku(),
-                    "optionName", v.getOptionName(),
-                    "additionalPrice", v.getAdditionalPrice(),
-                    "discountPrice", v.getDiscountPrice(),
-                    "discountRate", v.getDiscountRate(),
-                    "stockQuantity", v.getStockQuantity(),
-                    "version", v.getVersion(),
-                    "status", v.getStatus().name()
-            ));
+            Map<String, Object> fields = new LinkedHashMap<>();
+            fields.put("id", v.getId());
+            fields.put("productId", v.getProductId());
+            fields.put("sku", v.getSku());
+            fields.put("optionName", v.getOptionName());
+            fields.put("additionalPrice", v.getAdditionalPrice());
+            fields.put("discountPrice", v.getDiscountPrice());
+            fields.put("discountRate", v.getDiscountRate());
+            fields.put("stockQuantity", v.getStockQuantity());
+            fields.put("version", v.getVersion());
+            fields.put("status", v.getStatus().name());
+            fields.put("optionSignature", v.getOptionSignature());
+            return new VariantResponse(fields);
         }
     }
 }

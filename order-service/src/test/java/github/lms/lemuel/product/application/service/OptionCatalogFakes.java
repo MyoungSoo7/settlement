@@ -69,6 +69,9 @@ final class OptionCatalogFakes {
 
         @Override
         public ProductVariant save(ProductVariant variant) {
+            if (variant.getId() == null) {
+                variant.assignId(sequence.incrementAndGet());
+            }
             variants.put(variant.getId(), variant);
             return variant;
         }

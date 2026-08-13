@@ -10,6 +10,7 @@ import github.lms.lemuel.product.domain.ProductOptionAxis;
 import github.lms.lemuel.product.domain.ProductOptionValue;
 import github.lms.lemuel.product.domain.ProductVariant;
 import github.lms.lemuel.product.domain.exception.ProductInvariantViolationException;
+import github.lms.lemuel.product.domain.exception.ProductNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -25,10 +26,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * 카탈로그 + 조합 서명 경로 검증 (설계 Phase 3).
+ * 옵션 선택 → SKU 해석. 경로는 카탈로그 + 조합 서명 하나뿐이다(이관용 레거시 폴백 제거됨).
  *
- * <p>레거시 트리 경로는 {@link ResolveOptionSelectionServiceTest} 가 담당한다. 여기서는 백필이 끝난
- * 상품에서 <b>서명 단건 조회</b>가 실제로 쓰이는지, 그리고 선택 순서 의존이 사라졌는지를 본다.
+ * <p>서명 단건 조회가 실제로 쓰이는지, 선택 순서 의존이 사라졌는지, 그리고 실패가 원인별로
+ * 구분되는지를 본다.
  */
 @DisplayName("ResolveOptionSelectionService — 카탈로그·서명 경로")
 class ResolveOptionSelectionCatalogPathTest {
@@ -185,35 +186,38 @@ class ResolveOptionSelectionCatalogPathTest {
     }
 
     @Nested
-    @DisplayName("이관 중 폴백")
-    class MigrationFallback {
+    @DisplayName("해석 실패")
+    class Failures {
 
         @Test
-        @DisplayName("카탈로그 검증은 통과했지만 서명이 없는 SKU 는 레거시 조회로 찾는다")
-        void fallsBackForUnsignedVariant() {
-            backfilledProduct("색상:빨강/사이즈:L");
-            // 서명이 아직 없는 SKU 를 나중에 추가된 것처럼 끼워 넣는다.
-            variantPort.add(PRODUCT_ID, "SKU-LATE", "색상:빨강/사이즈:M");
-            new BackfillOptionCatalogService(variantPort, catalogPort, catalogPort).backfillAll();
-            when(loadProductPort.findById(PRODUCT_ID)).thenReturn(Optional.of(productWithTree()));
+        @DisplayName("조합이 카탈로그상 유효해도 대응 SKU 가 없으면 거부한다")
+        void rejectsWhenNoVariantForCombination() {
+            // 빨강+L, 파랑+M 만 판다 — 빨강+M 은 값은 다 있지만 SKU 가 없다.
+            backfilledProduct("색상:빨강/사이즈:L", "색상:파랑/사이즈:M");
 
-            ProductVariant result = service.resolve(PRODUCT_ID, List.of(
-                    new Selection("색상", "빨강"), new Selection("사이즈", "M")));
-
-            assertThat(result.getSku()).isEqualTo("SKU-LATE");
-            assertThat(result.hasOptionSignature()).isFalse();
+            assertThatThrownBy(() -> service.resolve(PRODUCT_ID, List.of(
+                    new Selection("색상", "빨강"), new Selection("사이즈", "M"))))
+                    .isInstanceOf(ProductInvariantViolationException.class)
+                    .hasMessageContaining("대응하는 SKU 가 없습니다");
         }
 
         @Test
-        @DisplayName("카탈로그가 없는 상품은 처음부터 레거시 트리로 간다")
-        void usesLegacyWhenNoCatalog() {
-            variantPort.add(PRODUCT_ID, "SKU-0", "색상:빨강/사이즈:L");
+        @DisplayName("옵션이 정의되지 않은 상품은 400 — 상품 부재(404)와 구분한다")
+        void rejectsProductWithoutOptions() {
             when(loadProductPort.findById(PRODUCT_ID)).thenReturn(Optional.of(productWithTree()));
 
-            ProductVariant result = service.resolve(PRODUCT_ID, List.of(
-                    new Selection("색상", "빨강"), new Selection("사이즈", "L")));
+            assertThatThrownBy(() -> service.resolve(PRODUCT_ID, List.of(new Selection("색상", "빨강"))))
+                    .isInstanceOf(ProductInvariantViolationException.class)
+                    .hasMessageContaining("옵션이 정의되지 않은");
+        }
 
-            assertThat(result.getSku()).isEqualTo("SKU-0");
+        @Test
+        @DisplayName("상품 자체가 없으면 ProductNotFoundException")
+        void rejectsMissingProduct() {
+            when(loadProductPort.findById(PRODUCT_ID)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> service.resolve(PRODUCT_ID, List.of(new Selection("색상", "빨강"))))
+                    .isInstanceOf(ProductNotFoundException.class);
         }
 
         private Product productWithTree() {

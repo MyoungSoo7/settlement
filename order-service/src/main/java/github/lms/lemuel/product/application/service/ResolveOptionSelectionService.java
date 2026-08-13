@@ -1,7 +1,5 @@
 package github.lms.lemuel.product.application.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import github.lms.lemuel.product.application.port.in.ResolveOptionSelectionUseCase;
 import github.lms.lemuel.product.application.port.out.LoadOptionCatalogPort;
 import github.lms.lemuel.product.application.port.out.LoadProductPort;
@@ -16,38 +14,29 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
  * 옵션 선택 → SKU(variant) 변환.
  *
- * <p><b>기본 경로는 카탈로그 + 조합 서명</b>이다. 상품이 채택한 축({@code product_option_axes})으로 선택을
- * 검증하고, {@link OptionSignature} 를 계산해 {@code (product_id, option_signature)} 유니크 인덱스로 SKU 를
- * 단건 조회한다. 이전에는 {@code "색상:빨강/사이즈:L"} 문자열을 조립해 상품의 전체 SKU 를 선형 스캔했다 —
- * 구분자·순서·공백 중 하나만 어긋나도 조회가 조용히 실패하는 구조였고, SKU 수에 비례해 느려졌다.
+ * <p>상품이 채택한 축({@code product_option_axes})으로 선택을 검증하고, {@link OptionSignature} 를 계산해
+ * {@code (product_id, option_signature)} 유니크 인덱스로 SKU 를 단건 조회한다.
  *
- * <p><b>레거시 경로(옵션 트리 JSON + option_name 스캔)는 두 경우에만 쓰인다</b>:
- * <ol>
- *   <li>상품이 아직 카탈로그로 백필되지 않았다(채택한 축이 하나도 없다)</li>
- *   <li>카탈로그 검증은 통과했는데 그 조합의 SKU 에 아직 서명이 없다</li>
- * </ol>
- * 둘 다 이관 중에만 존재하는 상태다. 서명이 채워진 SKU 는 절대 이 경로로 내려오지 않으므로,
- * 백필이 끝나면(모든 SKU 가 서명 보유) 이 다리를 걷어낼 수 있다.
+ * <p>이전에는 {@code "색상:빨강/사이즈:L"} 문자열을 조립해 상품의 전체 SKU 를 선형 스캔했다. 구분자·순서·공백
+ * 중 하나만 어긋나도 조회가 조용히 실패했고 SKU 수에 비례해 느려졌다. 이관 기간 동안 그 옛 경로를
+ * 폴백으로 남겨 두었으나, 백필 완료(모든 SKU 가 서명 보유)와 생성 경로의 카탈로그 등록으로
+ * <b>서명 없는 SKU 가 만들어질 수 없게 된 뒤</b> 걷어냈다.
  *
- * <p>선택 <b>순서</b>는 카탈로그 경로에서 의미가 없다 — 서명이 축 id 로 정렬되기 때문이다. 반면 레거시
- * 경로는 트리 차수 순서를 그대로 요구한다. 이 차이는 의도된 것이며, 순서 의존이 사라지는 게 이관의 이득이다.
+ * <p>선택 <b>순서는 의미가 없다</b> — 서명이 축 id 로 정렬되므로 색상을 먼저 고르든 사이즈를 먼저 고르든
+ * 같은 SKU 를 찾는다. 검증은 집합 기준(필수 축 빠짐없이, 축당 한 번, 노출 중인 값)이다.
  *
- * <p>Jackson 빈 주입 트랩(Boot4 의 제한 스캔/ObjectMapper 빈 부재)을 피하려고 파싱 전용 ObjectMapper 를
- * 로컬 상수로 보유한다 — 읽기 전용 트리 파싱만 하므로 설정 의존이 없다.
+ * <p>{@code products.options_json} 은 더 이상 읽지 않는다. 상품 등록 시점의 옵션 트리를 남긴 감사 사본이며,
+ * 진열·선택 검증의 정본은 카탈로그 테이블이다.
  */
 @Service
 @Transactional(readOnly = true)
 public class ResolveOptionSelectionService implements ResolveOptionSelectionUseCase {
-
-    private static final ObjectMapper MAPPER = new ObjectMapper();
-    private static final String SEP = "/";
 
     private final LoadProductPort loadProductPort;
     private final LoadProductVariantPort loadVariantPort;
@@ -68,19 +57,19 @@ public class ResolveOptionSelectionService implements ResolveOptionSelectionUseC
         }
 
         List<ProductOptionAxis> productAxes = loadCatalogPort.loadProductAxes(productId);
-        if (!productAxes.isEmpty()) {
-            String signature = OptionSignature.of(validateAgainstCatalog(productAxes, selections));
-            Optional<ProductVariant> found = loadVariantPort.loadByOptionSignature(productId, signature);
-            if (found.isPresent()) {
-                return found.get();
-            }
-            // 서명 미부여 SKU — 이관 중에만 발생한다. 아래 레거시 조회로 내려간다.
+        if (productAxes.isEmpty()) {
+            // 상품이 없는 것과 옵션이 없는 것은 다른 실패다 — 404 와 400 을 뭉뚱그리지 않는다.
+            loadProductPort.findById(productId)
+                    .orElseThrow(() -> new ProductNotFoundException(productId));
+            throw new ProductInvariantViolationException(
+                    "옵션이 정의되지 않은 상품입니다: productId=" + productId);
         }
 
-        return resolveFromLegacyTree(productId, selections);
+        String signature = OptionSignature.of(validateAgainstCatalog(productAxes, selections));
+        return loadVariantPort.loadByOptionSignature(productId, signature)
+                .orElseThrow(() -> new ProductInvariantViolationException(
+                        "선택한 옵션 조합에 대응하는 SKU 가 없습니다: " + describe(selections)));
     }
-
-    // --- 카탈로그 경로 -------------------------------------------------------
 
     /**
      * 선택을 상품 카탈로그로 검증하고 서명 입력을 만든다.
@@ -143,67 +132,10 @@ public class ResolveOptionSelectionService implements ResolveOptionSelectionUseC
         return resolved;
     }
 
-    // --- 레거시 경로(이관 중 한시) -------------------------------------------
-
-    private ProductVariant resolveFromLegacyTree(Long productId, List<Selection> selections) {
-        Product product = loadProductPort.findById(productId)
-                .orElseThrow(() -> new ProductNotFoundException(productId));
-        if (product.getOptionsJson() == null || product.getOptionsJson().isBlank()) {
-            throw new ProductInvariantViolationException("옵션 트리가 정의되지 않은 상품입니다: productId=" + productId);
-        }
-
-        validatePathExists(parse(product.getOptionsJson()), selections);
-
-        String optionName = selections.stream()
+    /** 실패 메시지용 사람이 읽는 선택 요약. */
+    private static String describe(List<Selection> selections) {
+        return selections.stream()
                 .map(s -> s.name() + ":" + s.value())
-                .collect(Collectors.joining(SEP));
-
-        return loadVariantPort.loadByProductId(productId).stream()
-                .filter(v -> optionName.equals(v.getOptionName()))
-                .findFirst()
-                .orElseThrow(() -> new ProductInvariantViolationException(
-                        "선택한 옵션 조합에 대응하는 SKU 가 없습니다: " + optionName));
-    }
-
-    private JsonNode parse(String optionsJson) {
-        try {
-            return MAPPER.readTree(optionsJson);
-        } catch (Exception e) {
-            throw new ProductInvariantViolationException("옵션 트리 JSON 파싱 실패", e);
-        }
-    }
-
-    /**
-     * 선택 경로가 트리에 실재하는지 차수별로 검증한다. 차수 이름 불일치 / 없는 값 / 선택 불완전(leaf 미도달) /
-     * 선택 과다(leaf 이후 추가 선택) 를 모두 거른다.
-     */
-    private void validatePathExists(JsonNode root, List<Selection> selections) {
-        JsonNode level = root;
-        for (Selection sel : selections) {
-            if (level == null || !level.hasNonNull("name") || !level.has("values")) {
-                throw new ProductInvariantViolationException("선택 차수가 트리보다 많습니다: " + sel.name());
-            }
-            String levelName = level.get("name").asText();
-            if (!levelName.equals(sel.name())) {
-                throw new ProductInvariantViolationException(
-                        "옵션 차수 이름 불일치: 기대=" + levelName + ", 입력=" + sel.name());
-            }
-            JsonNode matched = null;
-            for (JsonNode valueNode : level.get("values")) {
-                if (valueNode.hasNonNull("value") && valueNode.get("value").asText().equals(sel.value())) {
-                    matched = valueNode;
-                    break;
-                }
-            }
-            if (matched == null) {
-                throw new ProductInvariantViolationException(
-                        "존재하지 않는 옵션 값: " + sel.name() + "=" + sel.value());
-            }
-            level = matched.get("children"); // leaf 면 null
-        }
-        if (level != null && level.has("values")) {
-            throw new ProductInvariantViolationException(
-                    "옵션 선택이 불완전합니다 — 더 깊은 차수(" + level.get("name").asText() + ") 선택이 필요합니다");
-        }
+                .collect(Collectors.joining("/"));
     }
 }
