@@ -68,6 +68,13 @@ subprojects {
         // 하루 어긋나 off-by-one 단정 실패(SettlementDate 등)를 유발했다. 테스트 JVM 을 프로덕션과
         // 동일한 KST 로 고정해 이 클래스의 타임존 플레이키를 결정적으로 제거한다.
         systemProperty("user.timezone", "Asia/Seoul")
+        // Outbox 폴러(2초 주기)는 테스트에서 얻는 게 없고 잃는 게 있다. 컨텍스트가 내려갈 때
+        // Hikari 셧다운과 경합해 "Failed to validate connection ... This connection has been closed"
+        // 류의 WARN/ERROR 를 매 실행 수십 줄 남긴다(실측: run 31676479927 의 card-service 구간 42줄).
+        // 빌드는 초록인데 로그만 붉어서, 진짜 DB 문제가 났을 때 이 노이즈에 묻힌다.
+        // 발행기 빈(OutboxPublisherScheduler)은 그대로 남으므로, 폴링에 기대지 않고 수동 호출로
+        // 발행을 검증하는 order-service KafkaOutboxIntegrationTest 는 영향받지 않는다.
+        systemProperty("app.outbox.polling.enabled", "false")
         jvmArgs("-XX:+HeapDumpOnOutOfMemoryError", "-XX:HeapDumpPath=build/test-heapdump.hprof")
         finalizedBy(tasks.named("jacocoTestReport"))
         // JWT 서명키는 운영에서 env(JWT_SECRET)로만 주입한다(yaml 기본값 없음 = 미설정 시 기동 실패).

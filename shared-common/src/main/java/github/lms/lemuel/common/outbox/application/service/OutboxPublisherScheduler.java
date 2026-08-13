@@ -8,7 +8,6 @@ import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
@@ -68,8 +67,10 @@ public class OutboxPublisherScheduler {
      * PENDING outbox 레코드를 claim 후 배치 발행.
      *
      * <p>ShedLock 없음 — 다중 인스턴스 병렬 폴링은 claim 단계의 SKIP LOCKED 로 안전하게 분할된다.
+     *
+     * <p>주기 실행은 {@link OutboxPollingTrigger} 가 건다. 여기에 {@code @Scheduled} 를 다시 붙이면
+     * 트리거를 꺼도 폴링이 살아남는다 — {@code OutboxPollingTriggerTest} 가 그 회귀를 막는다.
      */
-    @Scheduled(fixedDelayString = "${app.outbox.polling-delay-ms:2000}")
     public void publishPendingEvents() {
         pendingGauge.set(loadOutboxEventPort.countPending());
         failedGauge.set(loadOutboxEventPort.countFailed());
