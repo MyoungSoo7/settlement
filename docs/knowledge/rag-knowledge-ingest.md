@@ -1,11 +1,11 @@
 # RAG 지식베이스 적재 운영
 
 AI 챗봇(ai-service)이 답변 근거로 쓰는 지식베이스를 리포에서 관리하는 방법. 설계 배경은
-[ADR 0034](adr/0034-ai-service-rag-pgvector.md), 적재 대상 문서는 `docs/knowledge/` 에 있다.
+[ADR 0034](../adr/0034-ai-service-rag-pgvector.md), 적재 대상 문서는 `` 에 있다.
 
 ## 원칙 — 등재된 문서만 적재한다
 
-`docs/knowledge/manifest.txt` 에 경로가 적힌 파일만 적재된다. 디렉터리에 파일을 두는 것만으로는
+`manifest.txt` 에 경로가 적힌 파일만 적재된다. 디렉터리에 파일을 두는 것만으로는
 적재되지 않는다.
 
 기본값이 "적재"가 아니라 "제외"인 이유: 적재된 문서는 이후 **모든 사용자 답변의 근거**로 프롬프트에
@@ -15,8 +15,8 @@ AI 챗봇(ai-service)이 답변 근거로 쓰는 지식베이스를 리포에서
 ## 문서를 추가하는 절차
 
 1. `docs/knowledge/<이름>.md` 로 작성한다. 첫 줄은 `# 제목` (H1) — 제목은 여기서 파생된다.
-2. `docs/knowledge/manifest.txt` 에 파일명을 한 줄 추가한다.
-3. `docs/knowledge/golden-questions.txt` 에 그 문서를 찾아야 할 질문을 1~2개 추가한다.
+2. `manifest.txt` 에 파일명을 한 줄 추가한다.
+3. `golden-questions.txt` 에 그 문서를 찾아야 할 질문을 1~2개 추가한다.
 4. `python3 scripts/knowledge/sync_knowledge.py --check-manifest` 로 정합성을 확인한다.
 
 제목과 출처 URI 는 매니페스트에 적지 않는다 — H1 과 파일명에서 파생된다

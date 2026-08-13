@@ -65,7 +65,7 @@ _판정 로그_ 다. 지금까지 하네스는 계속 늘어나기만 했고, �
 
 - **status**: verified (부분)
 - **predicted_effect**: 규칙별 차단 0회가 "죽은 규칙" 인지 "완전 예방" 인지 판별 가능해진다.
-- **verified_at**: 2026-08-12 — 9개 규칙 카나리아 전부 PASS. `test/telemetry-report.test.mjs`
+- **verified_at**: 2026-08-12 — 9개 규칙 카나리아 전부 PASS. `inflearn/test/telemetry-report.test.mjs`
   의 `every rule has a canary fixture and every canary passes` 가 CI 게이트로 강제되므로
   규칙 사망은 기계적으로 차단된다. **단** 순응률·세션 메트릭 쪽은 입력 데이터가 0건이라
   여전히 미검증이다.
