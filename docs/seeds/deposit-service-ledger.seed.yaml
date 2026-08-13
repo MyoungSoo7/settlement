@@ -1,0 +1,128 @@
+# Seed: deposit-service 예치금 원장 as-is 사양 (Ouroboros 방법론 — Interview → Seed 결정화)
+# 상태: CONFIRMED (settlement/account seed 와 동일 방식 지시로 승인 승계, 2026-08-13)
+# 원칙: 이 Seed 는 "현행 코드가 실제로 하는 일"의 불변 기술이다. 결함은 교정하지 않고 known_issues 로만 기록한다.
+# 자매 Seed: account-service-gl-core (전사 GL), card-service-funding-offset (재원 소비측)
+
+seed:
+  id: deposit-service-ledger-v1
+  goal: >-
+    deposit-service(셀러 예치금 원장 — 잔고 단일 진실원, hold/offset 으로 재원 이중사용 차단)의
+    현행 동작을 실행 가능한 게이트에 매핑된 불변 사양으로 결정화해, 회귀 기준선 ·
+    계약 드리프트 게이트 · 면접/포트폴리오 문서 · 후속 기능 베이스로 사용한다.
+
+  scope:
+    included:
+      - 잔고 3필드 불변식(total = available + locked, 모두 >= 0)과 도메인·DB 2중 강제
+      - hold 상태머신 6상태와 부분 캡처
+      - 상계(offset) 충당 순서와 부족분(shortfall) 기록
+      - append-only 원장과 L3 멱등 자연키
+      - 조회 표면(/api/deposits) + 수기 콘솔(/admin/deposits)
+    excluded:
+      - Kafka 소비 경로 — 현재 컨슈머가 하나도 없다 (경계 사실로만 기재, known_issues KI-1)
+      - hold 만료 배치 운영 절차 (부분 인덱스 존재 사실만)
+
+  constraints:
+    - "금액은 BigDecimal — 도메인 normalize 후 저장"
+    - "잔고 변경은 반드시 원장 엔트리로 기록 — 대사 가능성이 목적이다"
+    - "쓰기 연산은 @Transactional + 비관적 락 안에서만"
+    - "헥사고날: domain 은 adapter 를 import 하지 않는다 (ArchUnit 강제)"
+    - "이벤트 발행은 Outbox 경유만 — kafkaTemplate 직접 호출 없음"
+
+  invariants:  # as-is 코드 사실 — 파일:라인 근거 (경로 접두 deposit-service/src/main/java/github/lms/lemuel/deposit/)
+    balance_identity:
+      source: domain/SellerDepositAccount.java:15-16,30-50
+      rule: "total = available + locked, 세 필드 모두 >= 0"
+      db_guard: "V1__deposit_core.sql:23-26 — chk_*_available/locked/total_non_negative + chk_deposit_accounts_total_eq_sum"
+      note: "도메인이 1차 방어, DB CHECK 가 최후 방어선(마이그레이션 주석이 명시)"
+    debit_bounded_by_available:
+      source: domain/SellerDepositAccount.java:103-111
+      rule: "available < amount 이면 InsufficientDepositException — locked 는 출금 재원이 아니다"
+    ledger_append_only:
+      source: V1__deposit_core.sql:66,79-81,93
+      rule: "모든 잔고 변경은 엔트리 1건 이상으로 기록. entry_type ∈ {CREDIT, DEBIT, HOLD, RELEASE, OFFSET} (:79-80), amount > 0 (:81)"
+    idempotency_l3:
+      source: V1__deposit_core.sql:83-84
+      rule: "UNIQUE (account_id, entry_type, reference_type, reference_id, offset_sequence) = uq_deposit_entries_natural"
+      note: "Triple Idempotency 의 L3 — 동일 참조 중복 원장 기록을 DB 레벨에서 차단"
+    hold_uniqueness:
+      source: V1__deposit_core.sql:47
+      rule: "UNIQUE (holder_type, holder_reference) — 같은 원인(카드 승인·대출 실행 등)으로 hold 가 두 번 잡히지 않는다"
+      holder_types: "CARD_AUTHORIZATION, LOAN_DISBURSEMENT, INVESTMENT_EXECUTION, MANUAL (V1:48-49)"
+    hold_state_machine:
+      source: domain/DepositHold.java:80-89,103-105,114-117,127-130
+      states: "ACTIVE, PARTIALLY_CAPTURED, CAPTURED, EXPIRED, VOIDED, RELEASED (V1:50-51 CHECK 로 고정)"
+      partial_capture: "capture 후 remaining > 0 → PARTIALLY_CAPTURED, remaining == 0 → CAPTURED"
+      db_guard: "V1:52-54 — original_amount > 0, remaining >= 0, remaining <= original"
+      transition_guard: "ACTIVE 만 만료 가능 등 상태 확인 후 거부 (IllegalStateException — known_issues KI-4)"
+    offset_funding_order:
+      source: application/service/DepositService.java:146-167
+      rule: "① hold 의 locked 에서 min(offsetAmount, hold.remaining) 캡처 → ② 잔여 locked 는 release → ③ 부족하면 available 에서 min(remaining, available) 직접 차감"
+      rationale: "재원 이중사용 차단 — 이미 잡아둔 locked 를 우선 소진한 뒤에야 available 을 건드린다"
+    shortfall_recorded:
+      source: application/service/DepositService.java:186 + domain/DepositOffsetShortfall.java:45-51
+      rule: "shortfall = requestedAmount − appliedAmount. 충당 실패분은 삼키지 않고 레코드로 남긴다"
+    write_under_lock:
+      source: application/service/DepositService.java:20-25
+      rule: "모든 쓰기 연산이 @Transactional 범위에서 비관적 락 획득 후 도메인 불변식 강제"
+    publish_via_outbox:
+      source: adapter/out/event/DepositEventPublisherAdapter.java:21,27,46
+      rule: "aggregateType=\"Deposit\", eventType 라우팅 → lemuel.deposit.* . 페이로드: sellerId·available·locked·total·triggerEventType"
+
+  event_contracts:
+    publishes:
+      - "lemuel.deposit.* (Outbox 경유) — 대표 eventType: DepositBalanceChanged"
+    consumes: []   # @KafkaListener 0건 — known_issues KI-1
+    contract_schemas: none   # shared-common testFixtures 에 lemuel.deposit.* 스키마 없음 (KI-2)
+
+  read_surface:
+    source: adapter/in/web/DepositController.java:31,45,52 + adapter/in/web/DepositAdminController.java:54,83,96,112,129
+    endpoints:
+      - "GET /api/deposits/accounts/me — JWT 주체 파생(IDOR 방지)"
+      - "GET /api/deposits/accounts/{sellerId}"
+      - "POST /admin/deposits/accounts/{sellerId}/credits | /debits | /holds | /offsets — 수기 콘솔"
+
+  acceptance_criteria:  # 실행 가능 — 각 AC 는 기존 게이트에 매핑
+    - id: AC-1
+      criterion: 잔고 항등식·비음수가 어떤 연산 후에도 유지된다
+      gate: "./gradlew :deposit-service:test — SellerDepositAccountTest + DB CHECK 4종"
+    - id: AC-2
+      criterion: available 초과 출금이 타입 예외로 거부된다
+      gate: "SellerDepositAccountTest (InsufficientDepositException)"
+    - id: AC-3
+      criterion: hold 상태머신·부분 캡처 경계가 정본 표와 일치한다
+      gate: "DepositHoldTest"
+    - id: AC-4
+      criterion: 상계 충당 순서(locked → release → available)와 부족분 기록이 일치한다
+      gate: "DepositServiceTest · DepositOffsetShortfallTest"
+    - id: AC-5
+      criterion: 동일 참조 중복 기록이 원장에 쌓이지 않는다
+      gate: "uq_deposit_entries_natural (L3) · DepositEntryTest"
+    - id: AC-6
+      criterion: 헥사고날 의존 방향 위반 0
+      gate: "DepositArchitectureTest (ArchUnit)"
+    - id: AC-7
+      criterion: 인바운드 포트가 모두 어댑터에서 도달 가능하다
+      gate: "InboundPortReachabilityTest"
+    - id: AC-8
+      criterion: 커버리지 LINE >= 90%
+      gate: "./gradlew :deposit-service:jacocoTestCoverageVerification (check 편입)"
+
+  known_issues:  # 발견만 기록 — 사양은 as-is 유지
+    - id: KI-1
+      finding: "컨슈머 미배선 — 발행측(Outbox)만 있고 @KafkaListener 0건. 정산 확정/지급/카드 승인이 예치금에 자동 반영되지 않아 잔고가 /admin/deposits 수기 입력에 의존한다. '잔고 단일 진실원'을 표방하지만 그 진실원을 채우는 자동 경로가 없다"
+      disposition: gap (배선 미완 — CLAUDE.md 도 명시)
+    - id: KI-2
+      finding: "발행 이벤트에 계약 스키마가 없다 — shared-common testFixtures 에 lemuel.deposit.* 스키마 부재로 양방향 계약 테스트(ADR 0024) 대상 밖. 소비처가 붙는 순간 드리프트 방어 없이 시작된다"
+      disposition: gap (event-contract-change 대상)
+    - id: KI-3
+      finding: "DepositHold.place/capture 가 금액 검증에 generic IllegalArgumentException 을 던진다(DepositHold.java:57,85,89). guard 의 OO-DOMAIN-GENERIC-IAE 대상 서비스 목록에 deposit 이 없어 차단되지 않는다"
+      disposition: recorded-not-fixed (게이트 비대칭)
+    - id: KI-4
+      finding: "hold 상태 전이 위반이 IllegalStateException(DepositHold.java:105,117,130) — 공용 Kafka 에러 핸들러의 즉시-DLT 분류에 걸린다. 소비 경로가 붙으면 상태 위반 메시지가 재시도 없이 격리된다(의도된 결과이나 문서화된 적 없음)"
+      disposition: recorded-not-fixed
+
+  uses:
+    - regression-baseline
+    - contract-drift-gate
+    - interview-portfolio
+    - brownfield-base
