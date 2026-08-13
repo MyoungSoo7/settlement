@@ -87,14 +87,32 @@ export const commonCodeApi = {
 // ════════════════════════════════════════════════════════════════════════════
 // 메뉴 (Menu)
 // ════════════════════════════════════════════════════════════════════════════
+/** 메뉴 영역 — 하나의 셸(상단 네비 + 사이드바)이 담당하는 페르소나 묶음. 서버 enum 과 1:1. */
+export type MenuArea = 'SHOP' | 'SELLER' | 'BACKOFFICE' | 'CORP' | 'CEO' | 'SYSTEM';
+
+/** 노드 종류 — GROUP 은 하위를 거느리는 묶음, DIVIDER 는 경로가 없는 구분선. */
+export type MenuNodeType = 'GROUP' | 'ITEM' | 'DIVIDER';
+
+export const MENU_AREAS: MenuArea[] = ['SHOP', 'SELLER', 'BACKOFFICE', 'CORP', 'CEO', 'SYSTEM'];
+export const MENU_TYPES: MenuNodeType[] = ['GROUP', 'ITEM', 'DIVIDER'];
+
 export interface MenuNode {
   id: number;
   parentId: number | null;
   name: string;
+  /** 상단 네비용 짧은 이름 (없으면 name 사용) */
+  shortName?: string | null;
   path?: string | null;
   icon?: string | null;
+  /** 부제 — 사이드바 항목 아래 한 줄 설명 */
+  description?: string | null;
+  area?: MenuArea | null;
+  menuType: MenuNodeType;
   sortOrder: number;
+  /** 접근 허용 역할 CSV allowlist (예: 'ADMIN,MANAGER'). 비면 제한 없음 */
   requiredRole?: string | null;
+  /** 접근 필요 권한 코드 (permissions.code) */
+  requiredPermission?: string | null;
   visible: boolean;
   active: boolean;
   createdAt: string;
@@ -104,11 +122,16 @@ export interface MenuNode {
 
 export interface MenuCreateRequest {
   name: string;
+  shortName?: string;
   path?: string;
   icon?: string;
+  description?: string;
+  area: MenuArea;
+  menuType: MenuNodeType;
   parentId?: number | null;
   sortOrder: number;
   requiredRole?: string;
+  requiredPermission?: string;
   visible: boolean;
 }
 export interface MenuUpdateRequest extends MenuCreateRequest {

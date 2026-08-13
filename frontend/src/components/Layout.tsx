@@ -2,6 +2,8 @@ import React, { useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { authApi } from '@/api/auth';
 import { useCart } from '@/contexts/useCart';
+import { useMenus } from '@/contexts/useMenus';
+import { findActiveTrail } from '@/lib/menuTree';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -41,9 +43,15 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     ].join(' '),
   });
 
-  // 정산 그룹(상품관리·정산관리·정산조회) — 세 경로 중 어디에 있어도 활성
-  const settlementActive =
-    isActive('/product') || isActive('/admin/settlement') || isActive('/settlement/search');
+  /**
+   * 상단 네비 항목은 메뉴 트리의 최상위 노드다(정본은 `menus` 테이블). 활성 판정은
+   * "현재 경로의 가장 긴 접두사인 메뉴"를 고르는 한 가지 규칙으로 통일했다 —
+   * 하드코딩 시절 `/admin`(대시보드)이 모든 `/admin/**` 에서 함께 켜지던 문제와,
+   * 그걸 피하려고 손으로 나열한 정산 그룹 판정에서 `/admin/payouts` 가 빠져 있던
+   * 버그를 규칙 하나로 함께 없앤다.
+   */
+  const { menus } = useMenus();
+  const activeRootId = findActiveTrail(menus, location.pathname)[0]?.id ?? null;
 
   /**
    * 좁은 화면에서 내비는 가로 스크롤 스트립이라 뒤쪽 항목이 화면 밖에 있다. 그대로 두면 사용자가
@@ -76,38 +84,19 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 Lemuel
               </Link>
 
-              {/* ── 관리자·매니저 내비 ── */}
-              {user && isAdminOrManager && (
+              {/* ── 내비게이션 ── 항목·순서·노출 역할은 전부 menus 테이블이 정한다.
+                  역할별 분기는 서버가 이미 끝냈으므로 여기서는 색만 고른다. */}
+              {user && menus.length > 0 && (
                 <nav ref={navRef} className="flex space-x-1 min-w-0 overflow-x-auto whitespace-nowrap [scrollbar-width:thin]">
-                  {/* 대시보드만 정확 매칭 — 정산·CEO·시스템이 전부 /admin 하위라 접두 매칭이면
-                      어느 섹션에 있든 대시보드까지 함께 활성으로 칠해진다(활성 항목 2개 → 현재
-                      위치가 흐려지고, aria-current 도 둘이 된다). */}
-                  <Link to="/admin" {...navItemProps(location.pathname === '/admin', 'admin')}>대시보드</Link>
-                  {/* 정산 — 상품관리·정산관리·정산조회 3개 하위 (좌측 사이드바) */}
-                  <Link to="/admin/settlement" {...navItemProps(settlementActive, 'admin')}>
-                    정산
-                  </Link>
-                  <Link to="/ai/chat" {...navItemProps(isActive('/ai/chat'), 'admin')}>AI 도우미</Link>
-                  {/* CEO — ADMIN·MANAGER 공통 (경제지표·재무제표·기업조회·대출관리 4개 하위, 좌측 사이드바) */}
-                  <Link to="/admin/ceo/insight" {...navItemProps(isActive('/admin/ceo'), 'admin')}>
-                    CEO
-                  </Link>
-                  {/* 시스템 — ADMIN 전용 */}
-                  {user.role === 'ADMIN' && (
-                    <Link to="/admin/system/menus" {...navItemProps(isActive('/admin/system'), 'admin')}>
-                      시스템
+                  {menus.map((item) => (
+                    <Link
+                      key={item.id}
+                      to={item.path ?? '#'}
+                      {...navItemProps(item.id === activeRootId, isAdminOrManager ? 'admin' : 'user')}
+                    >
+                      {item.label}
                     </Link>
-                  )}
-                </nav>
-              )}
-
-              {/* ── 일반 사용자 내비 ── 주문하기 + 추천받기 (USER 전용) */}
-              {user && !isAdminOrManager && (
-                <nav ref={navRef} className="flex space-x-1 min-w-0 overflow-x-auto whitespace-nowrap [scrollbar-width:thin]">
-                  <Link to="/order" {...navItemProps(isActive('/order'), 'user')}>주문하기</Link>
-                  {user.role === 'USER' && (
-                    <Link to="/recommend" {...navItemProps(isActive('/recommend'), 'user')}>추천받기</Link>
-                  )}
+                  ))}
                 </nav>
               )}
             </div>

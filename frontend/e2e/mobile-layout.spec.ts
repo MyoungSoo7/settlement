@@ -135,8 +135,8 @@ const USER_ROUTES = ['/order', '/cart', '/mypage', '/recommend', '/loans', '/ai/
 
 /**
  * ADMIN 동선 — 표가 많아 넘침이 가장 잘 나는 화면들.
- * CEO·시스템 그룹은 좌측 사이드바 레이아웃(CeoLayout·SystemLayout)을 쓰므로 셸별로 최소 1개씩
- * 포함해 **레이아웃 3종이 모두 측정되게** 한다.
+ * 정산·CEO·시스템 그룹은 좌측 사이드바 셸(SideNavLayout)을 쓰므로 그룹별로 최소 1개씩 포함해
+ * **사이드바가 붙는 3개 그룹이 모두 측정되게** 한다(항목은 menus 테이블이 정한다).
  */
 const ADMIN_ROUTES = [
   '/admin',
@@ -147,11 +147,11 @@ const ADMIN_ROUTES = [
   '/admin/shipping',
   '/admin/approvals',
   '/workforce',
-  // CEO 그룹(CeoLayout)
+  // CEO 그룹
   '/admin/ceo/insight',
   '/admin/ceo/invest',
   '/admin/ceo/companies',
-  // 시스템 그룹(SystemLayout)
+  // 시스템 그룹
   '/admin/system/menus',
   '/admin/system/codes',
   '/admin/system/operation',

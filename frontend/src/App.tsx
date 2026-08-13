@@ -3,11 +3,10 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { authApi } from './api/auth';
 import { ToastProvider } from './contexts/ToastContext';
 import { AuthProvider } from './contexts/AuthContext';
+import { MenuProvider } from './contexts/MenuContext';
 import { CartProvider } from './contexts/CartContext';
 import Layout from './components/Layout';
-import SystemLayout from './components/SystemLayout';
-import CeoLayout from './components/CeoLayout';
-import SettlementLayout from './components/SettlementLayout';
+import SideNavLayout from './components/SideNavLayout';
 
 // 공개 페이지 (즉시 로드)
 import Login from './pages/Login';
@@ -111,6 +110,7 @@ function App() {
   return (
     <ToastProvider>
       <AuthProvider>
+      <MenuProvider>
       <CartProvider>
         <BrowserRouter>
           <Suspense fallback={<div className="flex justify-center items-center min-h-screen"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>}>
@@ -145,13 +145,13 @@ function App() {
 
             {/* ── 관리자·매니저 공용 ── */}
             <Route path="/admin"              element={<AdminManagerRoute><AdminDashboardPage /></AdminManagerRoute>} />
-            {/* 정산 그룹 (상품관리·정산관리·정산조회) — 좌측 사이드바(SettlementLayout)로 묶음 */}
-            <Route path="/product"            element={<AdminManagerRoute><SettlementLayout><ProductPage /></SettlementLayout></AdminManagerRoute>} />
-            <Route path="/admin/settlement"   element={<AdminManagerRoute><SettlementLayout><SettlementAdmin /></SettlementLayout></AdminManagerRoute>} />
-            <Route path="/settlement/search"   element={<AdminManagerRoute><SettlementLayout><SettlementDashboard /></SettlementLayout></AdminManagerRoute>} />
+            {/* 정산 그룹 — 좌측 사이드바 항목은 menus 테이블이 정한다(SideNavLayout 이 트리에서 그림) */}
+            <Route path="/product"            element={<AdminManagerRoute><SideNavLayout><ProductPage /></SideNavLayout></AdminManagerRoute>} />
+            <Route path="/admin/settlement"   element={<AdminManagerRoute><SideNavLayout><SettlementAdmin /></SideNavLayout></AdminManagerRoute>} />
+            <Route path="/settlement/search"   element={<AdminManagerRoute><SideNavLayout><SettlementDashboard /></SideNavLayout></AdminManagerRoute>} />
             {/* 지급 콘솔 — 실자금 송금이라 /admin/payouts/** 는 서버가 ADMIN 전용으로 게이트한다.
                 MANAGER 에게 화면만 열어 주면 전부 403 이 되므로 라우트도 AdminOnlyRoute 로 맞춘다. */}
-            <Route path="/admin/payouts"      element={<AdminOnlyRoute><SettlementLayout><PayoutAdminPage /></SettlementLayout></AdminOnlyRoute>} />
+            <Route path="/admin/payouts"      element={<AdminOnlyRoute><SideNavLayout><PayoutAdminPage /></SideNavLayout></AdminOnlyRoute>} />
             {/* 배송 관리 — 주문별 배송 생성·출고·상태 전이 (ShippingController) */}
             <Route path="/admin/shipping"     element={<AdminManagerRoute><ShippingAdminPage /></AdminManagerRoute>} />
             {/* 취소·환불 승인 큐 — 사용자가 신청한 건을 운영자가 종단으로 보낸다 */}
@@ -171,53 +171,54 @@ function App() {
             <Route path="/admin/system"
               element={<Navigate to="/admin/system/menus" replace />} />
             <Route path="/admin/system/menus"
-              element={<AdminOnlyRoute><SystemLayout><MenuManagementPage /></SystemLayout></AdminOnlyRoute>} />
+              element={<AdminOnlyRoute><SideNavLayout><MenuManagementPage /></SideNavLayout></AdminOnlyRoute>} />
             <Route path="/admin/system/codes"
-              element={<AdminOnlyRoute><SystemLayout><CommonCodeManagementPage /></SystemLayout></AdminOnlyRoute>} />
+              element={<AdminOnlyRoute><SideNavLayout><CommonCodeManagementPage /></SideNavLayout></AdminOnlyRoute>} />
             <Route path="/admin/system/rbac"
-              element={<AdminOnlyRoute><SystemLayout><RbacManagementPage /></SystemLayout></AdminOnlyRoute>} />
+              element={<AdminOnlyRoute><SideNavLayout><RbacManagementPage /></SideNavLayout></AdminOnlyRoute>} />
             <Route path="/admin/system/ecommerce-categories"
-              element={<AdminOnlyRoute><SystemLayout><EcommerceCategoryAdmin /></SystemLayout></AdminOnlyRoute>} />
+              element={<AdminOnlyRoute><SideNavLayout><EcommerceCategoryAdmin /></SideNavLayout></AdminOnlyRoute>} />
             <Route path="/admin/system/operation"
-              element={<AdminOnlyRoute><SystemLayout><OperationConsolePage /></SystemLayout></AdminOnlyRoute>} />
+              element={<AdminOnlyRoute><SideNavLayout><OperationConsolePage /></SideNavLayout></AdminOnlyRoute>} />
 
             {/* ── CEO 인사이트 (ADMIN·MANAGER, 좌측 사이드바) — 위성 조회 서비스 묶음 ── */}
             <Route path="/admin/ceo"
               element={<Navigate to="/admin/ceo/insight" replace />} />
             <Route path="/admin/ceo/insight"
-              element={<AdminManagerRoute><CeoLayout><CeoInsightPage /></CeoLayout></AdminManagerRoute>} />
+              element={<AdminManagerRoute><SideNavLayout><CeoInsightPage /></SideNavLayout></AdminManagerRoute>} />
             <Route path="/admin/ceo/economics"
-              element={<AdminManagerRoute><CeoLayout><EconomicsPage /></CeoLayout></AdminManagerRoute>} />
+              element={<AdminManagerRoute><SideNavLayout><EconomicsPage /></SideNavLayout></AdminManagerRoute>} />
             <Route path="/admin/ceo/financials"
-              element={<AdminManagerRoute><CeoLayout><FinancialStatementsPage /></CeoLayout></AdminManagerRoute>} />
+              element={<AdminManagerRoute><SideNavLayout><FinancialStatementsPage /></SideNavLayout></AdminManagerRoute>} />
             <Route path="/admin/ceo/companies"
-              element={<AdminManagerRoute><CeoLayout><CompanyLookupPage /></CeoLayout></AdminManagerRoute>} />
+              element={<AdminManagerRoute><SideNavLayout><CompanyLookupPage /></SideNavLayout></AdminManagerRoute>} />
             <Route path="/admin/ceo/workforce"
-              element={<AdminManagerRoute><CeoLayout><WorkforcePage /></CeoLayout></AdminManagerRoute>} />
+              element={<AdminManagerRoute><SideNavLayout><WorkforcePage /></SideNavLayout></AdminManagerRoute>} />
             <Route path="/admin/ceo/invest"
-              element={<AdminManagerRoute><CeoLayout><CeoInvestPage /></CeoLayout></AdminManagerRoute>} />
+              element={<AdminManagerRoute><SideNavLayout><CeoInvestPage /></SideNavLayout></AdminManagerRoute>} />
             <Route path="/admin/ceo/invest-recommend"
-              element={<AdminManagerRoute><CeoLayout><CeoInvestRecommendPage /></CeoLayout></AdminManagerRoute>} />
+              element={<AdminManagerRoute><SideNavLayout><CeoInvestRecommendPage /></SideNavLayout></AdminManagerRoute>} />
             <Route path="/admin/ceo/loans"
-              element={<AdminManagerRoute><CeoLayout><LoanPage /></CeoLayout></AdminManagerRoute>} />
+              element={<AdminManagerRoute><SideNavLayout><LoanPage /></SideNavLayout></AdminManagerRoute>} />
             <Route path="/admin/ceo/loan-guide"
-              element={<AdminManagerRoute><CeoLayout><CeoLoanGuidePage /></CeoLayout></AdminManagerRoute>} />
+              element={<AdminManagerRoute><SideNavLayout><CeoLoanGuidePage /></SideNavLayout></AdminManagerRoute>} />
             {/* 대출 심사·상환 안내 — 심사 절차·신용평가 산식·상환 구조 (정적 콘텐츠, API 없음) */}
             <Route path="/admin/ceo/loan-process"
-              element={<AdminManagerRoute><CeoLayout><CeoLoanProcessGuidePage /></CeoLayout></AdminManagerRoute>} />
+              element={<AdminManagerRoute><SideNavLayout><CeoLoanProcessGuidePage /></SideNavLayout></AdminManagerRoute>} />
             {/* 대출기관 안내 — 은행·저축은행·캐피탈·대부업 업권 비교 (정적 콘텐츠, API 없음) */}
             <Route path="/admin/ceo/lender-guide"
-              element={<AdminManagerRoute><CeoLayout><CeoLenderGuidePage /></CeoLayout></AdminManagerRoute>} />
+              element={<AdminManagerRoute><SideNavLayout><CeoLenderGuidePage /></SideNavLayout></AdminManagerRoute>} />
             {/* 자산운용펀드 안내 — 집합투자기구 6종 + 부동산·주식·채권 (정적 콘텐츠, API 없음) */}
             <Route path="/admin/ceo/fund-guide"
-              element={<AdminManagerRoute><CeoLayout><CeoFundGuidePage /></CeoLayout></AdminManagerRoute>} />
+              element={<AdminManagerRoute><SideNavLayout><CeoFundGuidePage /></SideNavLayout></AdminManagerRoute>} />
             <Route path="/admin/ceo/accounts"
-              element={<AdminManagerRoute><CeoLayout><CeoAccountPage /></CeoLayout></AdminManagerRoute>} />
+              element={<AdminManagerRoute><SideNavLayout><CeoAccountPage /></SideNavLayout></AdminManagerRoute>} />
 
           </Routes>
           </Suspense>
         </BrowserRouter>
       </CartProvider>
+      </MenuProvider>
       </AuthProvider>
     </ToastProvider>
   );
