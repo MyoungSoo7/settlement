@@ -16,7 +16,8 @@ plugins {
 // 관리하면서 httpcore5 5.3.6 이 따라 들어온다. settlement-service 와 같은 이유·같은 방식으로
 // 짝(httpclient5 5.6 + httpcore5 5.4.x)을 함께 올린다 — 근거는 settlement-service/build.gradle.kts 주석.
 // httpcore5 를 끌고 오는 모듈은 settlement(ES)·ai(Anthropic) 둘뿐이다(전 모듈 dependencyInsight 실측).
-extra["httpclient5.version"] = "5.6"
+// 2026-08-13: httpclient5 5.6 이 CVE-2026-40542(HIGH)에 걸려 5.6.1 로 올린다 — 근거는 settlement 쪽 주석.
+extra["httpclient5.version"] = "5.6.1"
 extra["httpcore5.version"] = "5.4.3"
 
 dependencies {

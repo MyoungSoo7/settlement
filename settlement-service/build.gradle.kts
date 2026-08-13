@@ -19,7 +19,10 @@ plugins {
 // `constraints` 가 아니라 BOM 프로퍼티인 이유: io.spring.dependency-management 는 BOM 관리 버전을
 // resolutionStrategy 룰로 강제해서 Gradle constraint 를 이긴다. 실측으로 constraint 는 무시됐고
 // (dependencyInsight: "Selected by rule", httpclient5 5.5.2 유지) 프로퍼티 오버라이드만 먹혔다.
-extra["httpclient5.version"] = "5.6"
+//
+// 2026-08-13: 그 5.6 이 이번엔 CVE-2026-40542(HIGH — 인증 시 상호 인증 검증 누락)에 걸렸다.
+// 수정판 5.6.1 로 올린다. httpcore5 짝은 5.4.3 그대로 유효하다(5.6.x 대역 내 패치 상향).
+extra["httpclient5.version"] = "5.6.1"
 extra["httpcore5.version"] = "5.4.3"
 
 dependencies {
