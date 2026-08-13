@@ -30,7 +30,7 @@ class TelegramGeneratedSourcesTest {
     private static final Path CODE_DIR = Path.of(
             "src/main/java/github/lms/lemuel/payout/adapter/out/firmbanking/fep/protocol/generated");
     /** 설계서는 저장소 문서 트리에 둔다 — 사람이 읽는 산출물이라 모듈 안이 아니라 docs 아래가 맞다. */
-    private static final Path DOC_DIR = Path.of("../docs/telegram");
+    private static final Path DOC_DIR = Path.of("../docs/plan/telegram");
 
     private static final TelegramCatalog CATALOG =
             TelegramSpecLoader.loadFromClasspath(TelegramSpecLoader.FIRMBANKING_LOCATION);
