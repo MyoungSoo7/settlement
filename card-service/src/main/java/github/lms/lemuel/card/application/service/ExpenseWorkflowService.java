@@ -6,9 +6,11 @@ import github.lms.lemuel.card.application.port.in.QueryBudgetUtilizationUseCase;
 import github.lms.lemuel.card.application.port.in.RejectExpenseReportUseCase;
 import github.lms.lemuel.card.application.port.in.SubmitExpenseReportUseCase;
 import github.lms.lemuel.card.application.port.out.LoadDepartmentBudgetPort;
+import github.lms.lemuel.card.application.port.out.LoadExpenseReceiptPort;
 import github.lms.lemuel.card.application.port.out.LoadExpenseReportPort;
 import github.lms.lemuel.card.application.port.out.SaveExpenseReportPort;
 import github.lms.lemuel.card.application.port.out.UpdateDepartmentBudgetPort;
+import github.lms.lemuel.card.domain.ExpenseReceiptStatus;
 import github.lms.lemuel.card.domain.ExpenseReport;
 import github.lms.lemuel.common.exception.BusinessException;
 import github.lms.lemuel.common.exception.ErrorCode;
@@ -63,15 +65,18 @@ public class ExpenseWorkflowService
     private final SaveExpenseReportPort saveExpenseReportPort;
     private final LoadDepartmentBudgetPort loadDepartmentBudgetPort;
     private final UpdateDepartmentBudgetPort updateDepartmentBudgetPort;
+    private final LoadExpenseReceiptPort loadExpenseReceiptPort;
 
     public ExpenseWorkflowService(LoadExpenseReportPort loadExpenseReportPort,
                                    SaveExpenseReportPort saveExpenseReportPort,
                                    LoadDepartmentBudgetPort loadDepartmentBudgetPort,
-                                   UpdateDepartmentBudgetPort updateDepartmentBudgetPort) {
+                                   UpdateDepartmentBudgetPort updateDepartmentBudgetPort,
+                                   LoadExpenseReceiptPort loadExpenseReceiptPort) {
         this.loadExpenseReportPort = loadExpenseReportPort;
         this.saveExpenseReportPort = saveExpenseReportPort;
         this.loadDepartmentBudgetPort = loadDepartmentBudgetPort;
         this.updateDepartmentBudgetPort = updateDepartmentBudgetPort;
+        this.loadExpenseReceiptPort = loadExpenseReceiptPort;
     }
 
     /**
@@ -121,11 +126,21 @@ public class ExpenseWorkflowService
 
     /**
      * 관리자 승인 (SUBMITTED → APPROVED). 부서 예산 소진액 갱신.
+     *
+     * <p><b>영수증 대사 게이트(ADR 0036)</b>: 영수증이 첨부돼 있으면 최신 영수증이 MATCHED 여야 승인
+     * 통과 — MISMATCHED·NEEDS_REVIEW·EXTRACTED 는 422 로 거절한다. 영수증이 없으면 기존 경로 그대로
+     * 통과(점진 도입 — 전면 강제는 조직별 정책 플래그가 필요한 별도 결정).
      */
     @Override
     @Transactional
     public ExpenseReport approve(ApproveExpenseReportCommand command) {
         ExpenseReport report = loadOrThrow(command.reportId());
+        loadExpenseReceiptPort.findLatestByReportId(report.getReportId()).ifPresent(receipt -> {
+            if (receipt.getStatus() != ExpenseReceiptStatus.MATCHED) {
+                throw new BusinessException(ErrorCode.CARD_RECEIPT_NOT_MATCHED,
+                        "영수증 대사 미통과(" + receipt.getStatus() + ") — " + receipt.getMatchNote());
+            }
+        });
         report.approve(command.reviewerId());
         ExpenseReport saved = saveExpenseReportPort.save(report);
 

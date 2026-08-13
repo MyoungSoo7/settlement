@@ -104,6 +104,11 @@ public enum ErrorCode {
     CARD_AUTHORIZATION_NOT_FOUND(HttpStatus.NOT_FOUND, "승인 홀드를 찾을 수 없습니다."),
     // 재원 조회 실패는 폴백 없이 명시적 실패시킨다 — 재원을 모른 채 추정 한도를 주면 그 자체가 여신 사고다.
     CARD_FUNDING_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "재원 조회에 실패했습니다. 잠시 후 다시 시도해주세요."),
+    // 영수증 판독 실패도 재원 조회와 같은 무폴백 원칙(ADR 0036) — 추정 판독을 대사 근거로 쓰지 않는다.
+    CARD_RECEIPT_OCR_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "영수증 판독에 실패했습니다. 잠시 후 다시 시도해주세요."),
+    CARD_RECEIPT_NOT_FOUND(HttpStatus.NOT_FOUND, "영수증을 찾을 수 없습니다."),
+    // 대사 미통과 영수증으로는 승인 불가 — 요청 형식의 잘못이 아니라 "지금은 승인 불가"라서 422.
+    CARD_RECEIPT_NOT_MATCHED(HttpStatus.UNPROCESSABLE_ENTITY, "영수증 대사가 완료되지 않아 승인할 수 없습니다."),
 
     // ─── banking (수신 상품 — 정기예금·적금·퇴직연금) ─────────────────────────────
     // 형제 도메인과 같이 상품별 전용 NOT_FOUND 를 둔다. INVALID_ARGUMENT 로 대용하면 없는 리소스가

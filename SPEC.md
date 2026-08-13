@@ -239,6 +239,7 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
 | 매입·취소·환불 (Phase 2) | `POST /internal/api/v1/authorize/{id}/capture`, `DELETE /internal/api/v1/holds/{id}`, `POST /internal/api/v1/captures/{id}/refund`            | 매입 확정 / 홀드 취소 / 환불                                        |
 | 명세서·상환 (Phase 2)    | `POST /internal/api/v1/statements/{id}/payments`                                                                                              | 명세서 납부(`paymentId` 멱등)                                       |
 | 지출관리 (Phase 2)       | `POST /api/expenses/{id}/submit`, `POST /api/expenses/{id}/approve`, `POST /api/expenses/{id}/reject`, `GET /api/budgets/{orgId}/departments` | 지출 워크플로(제출/승인/반려) / 부서 예산 소진율 조회               |
+| 영수증 OCR (ADR 0036)    | `POST /internal/api/v1/expense-reports/{reportId}/receipts`(멀티파트), `GET .../receipts/latest`, `POST /internal/api/v1/expense-receipts/{id}/review` | 영수증 업로드→Gemini OCR→매입 자동 대사 / 최신 영수증 조회 / NEEDS_REVIEW 육안 리뷰 종결 |
 
 - **한도 산정**: `masterLimit = floor((sellerPayable + holdbackPayable) × R × H)` — `R`=인정비율(기본 0.70,
   `app.card.limit.recognition-ratio`), `H`=평판 haircut(A·B 1.00 / C 0.85 / D 0.70 / E 0.00). 재원은 account-service
@@ -253,6 +254,10 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
 - **배치**: ① 매일 03:30 KST 한도 재산정(ShedLock `card-limit-recalculation` PT30M). ② 일 1회 미매입 홀드 만료(`HoldExpiryScheduler`). ③ 월말 명세서 마감(`CloseStatementScheduler`). ④ 일 1회 연체 전이(`DelinquencyBatchScheduler`). 각 배치 1건 = 트랜잭션 1건(`REQUIRES_NEW`).
 - **명세서 생명주기(Phase 2)**: OPEN→CLOSED→{PARTIALLY_PAID,PAID,DELINQUENT}→PAID. 전액 납부 시 DELINQUENT 계정 자동 ACTIVE 복구.
 - **지출관리(Phase 2)**: 매입 Kafka 이벤트 소비 → 경비보고서 DRAFT 자동 생성(captureId 멱등). 제출→승인/반려 워크플로. 승인 경로 비결합(`AuthorizationLatencyTest` p99≤300ms).
+- **영수증 3자 대사(ADR 0036)**: 영수증 업로드 → shared-common `VisionExtractionClient`(Gemini) OCR →
+  매입 대조 자동 대사(총액 compareTo 정확 일치 · 거래일 KST ±1일 · 신뢰도 <0.80 은 NEEDS_REVIEW).
+  `(report_id, file_hash)` 멱등(재업로드 시 OCR 재호출 없음). **승인 게이트**: 영수증이 첨부된 보고서는
+  최신 영수증이 MATCHED 여야 승인(`CARD_RECEIPT_NOT_MATCHED` 422). 판독 실패는 무폴백 `CARD_RECEIPT_OCR_UNAVAILABLE`(503).
 - **조직 연동**: `lemuel.organization.member_removed` 소비 → 이탈자 카드 자동 정지(멱등 컨슈머).
 - **이벤트 발행**(Outbox, `aggregateType="Card"`, **파티션 키는 항상 cardAccountId**): `account_opened`·`issued`·
   `limit_changed`·`status_changed`·`account_status_changed`·`authorized`·`captured`·`statement.paid`.
