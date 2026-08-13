@@ -70,7 +70,7 @@ public class IngestKnowledgeService implements IngestKnowledgeUseCase, ListKnowl
         // 본문이 그대로면 재임베딩하지 않는다 (같은 문서 재적재의 비용을 0 으로).
         Optional<String> existingHash = knowledgeBasePort.findContentHash(command.sourceUri());
         if (existingHash.filter(contentHash::equals).isPresent()) {
-            log.info("[RAG] 적재 스킵 — 본문 해시 동일: sourceUri={}", command.sourceUri());
+            log.info("[RAG] 적재 스킵 — 본문 해시 동일: sourceUri={}", LogSafe.of(command.sourceUri()));
             return new IngestResult(command.sourceUri(), 0, true, embeddingPort.modelId());
         }
 
@@ -102,7 +102,7 @@ public class IngestKnowledgeService implements IngestKnowledgeUseCase, ListKnowl
         knowledgeBasePort.replaceDocument(document, chunks);
 
         log.info("[RAG] 적재 완료: sourceUri={}, chunks={}, model={}",
-                command.sourceUri(), chunks.size(), embeddingPort.modelId());
+                LogSafe.of(command.sourceUri()), chunks.size(), embeddingPort.modelId());
         return new IngestResult(command.sourceUri(), chunks.size(), false, embeddingPort.modelId());
     }
 
