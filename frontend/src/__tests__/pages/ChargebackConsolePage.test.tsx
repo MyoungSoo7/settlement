@@ -64,7 +64,7 @@ describe('ChargebackConsolePage — 결정 안전장치', () => {
     renderPage();
     await waitFor(() => expect(mocked.list).toHaveBeenCalled());
 
-    fireEvent.click(screen.getByRole('button', { name: '수락' }));
+    fireEvent.click(await screen.findByRole('button', { name: '수락' }));
 
     expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('25,000원 이 차감됩니다'));
     expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('되돌릴 수 없습니다'));
@@ -76,7 +76,7 @@ describe('ChargebackConsolePage — 결정 안전장치', () => {
     renderPage();
     await waitFor(() => expect(mocked.list).toHaveBeenCalled());
 
-    fireEvent.click(screen.getByRole('button', { name: '기각' }));
+    fireEvent.click(await screen.findByRole('button', { name: '기각' }));
 
     expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('정산에는 영향이 없습니다'));
   });
@@ -87,7 +87,7 @@ describe('ChargebackConsolePage — 결정 안전장치', () => {
     renderPage();
     await waitFor(() => expect(mocked.list).toHaveBeenCalled());
 
-    fireEvent.click(screen.getByRole('button', { name: '기각' }));
+    fireEvent.click(await screen.findByRole('button', { name: '기각' }));
 
     await waitFor(() => expect(mocked.reject).not.toHaveBeenCalled());
   });
@@ -99,7 +99,7 @@ describe('ChargebackConsolePage — 결정 안전장치', () => {
     renderPage();
     await waitFor(() => expect(mocked.list).toHaveBeenCalledTimes(1));
 
-    fireEvent.click(screen.getByRole('button', { name: '수락' }));
+    fireEvent.click(await screen.findByRole('button', { name: '수락' }));
 
     await waitFor(() => expect(mocked.accept).toHaveBeenCalledWith(3, '카드사 확정'));
     await waitFor(() => expect(mocked.list).toHaveBeenCalledTimes(2));
@@ -112,7 +112,7 @@ describe('ChargebackConsolePage — 결정 안전장치', () => {
     renderPage();
     await waitFor(() => expect(mocked.list).toHaveBeenCalledTimes(1));
 
-    fireEvent.click(screen.getByRole('button', { name: '수락' }));
+    fireEvent.click(await screen.findByRole('button', { name: '수락' }));
 
     await waitFor(() => expect(screen.getByText(/이미 처리된 결정입니다/)).toBeInTheDocument());
     await waitFor(() => expect(mocked.list).toHaveBeenCalledTimes(2));
