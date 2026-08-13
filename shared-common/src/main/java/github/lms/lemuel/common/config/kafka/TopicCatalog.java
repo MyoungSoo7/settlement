@@ -41,9 +41,13 @@ public final class TopicCatalog {
      * @param orderingKey   메시지 키의 도메인 의미 = outbox {@code aggregateId} 가 담는 값. 이 키 단위로
      *                      시간 순서가 보장된다. 선언을 강제해 "무엇의 순서를 지키는가"를 항상 명시하게 한다
      * @param partitions    파티션 수. 컨슈머 병렬 소비의 상한이자 키 해시의 제수 — 변경은 순서 보장을 깬다
-     * @param retentionDays 보존기간(일)
+     * @param replicas      복제본 수. 브로커 수를 넘을 수 없다(로컬 단일 브로커 = 1, 프로덕션 권장 3).
+     *                      코드 상수가 아니라 토픽별 선언인 이유는 파티션과 같다 — 리뷰 대상이어야 한다
+     * @param retentionDays 보존기간(일). 명시하지 않으면 클러스터 기본값(log_retention_ms)을 물려받아
+     *                      그 값이 바뀔 때 조용히 따라 바뀐다 — 그래서 프로비저너가 토픽에 고정한다
      */
-    public record Topic(String name, String owner, String orderingKey, int partitions, int retentionDays) {
+    public record Topic(String name, String owner, String orderingKey, int partitions, int replicas,
+                        int retentionDays) {
 
         public Topic {
             if (name == null || !name.startsWith(NAMESPACE)) {
@@ -61,6 +65,9 @@ public final class TopicCatalog {
                 throw new InvalidTopicCatalogException(
                         "orderingKey 가 비었다 — 무엇의 시간 순서를 보장하는지 선언하지 않은 토픽은 둘 수 없다: " + name);
             }
+            if (replicas < 1) {
+                throw new InvalidTopicCatalogException("replicas 는 1 이상이어야 한다: " + name + "=" + replicas);
+            }
             if (partitions < 1) {
                 throw new InvalidTopicCatalogException("partitions 는 1 이상이어야 한다: " + name + "=" + partitions);
             }
@@ -71,7 +78,7 @@ public final class TopicCatalog {
 
         /** 브로커에 만들 때 필요한 값만 추린 것. */
         public Spec spec() {
-            return new Spec(name, partitions, retentionDays);
+            return new Spec(name, partitions, replicas, retentionDays);
         }
 
         /**
@@ -81,7 +88,7 @@ public final class TopicCatalog {
          * 둘이 어긋날 수 없다.
          */
         public Spec deadLetterSpec() {
-            return new Spec(name + DLT_SUFFIX, partitions, DLT_RETENTION_DAYS);
+            return new Spec(name + DLT_SUFFIX, partitions, replicas, DLT_RETENTION_DAYS);
         }
     }
 
@@ -89,7 +96,7 @@ public final class TopicCatalog {
      * 브로커에 실제로 만들 토픽 하나의 스펙. 원본과 DLT 를 같은 타입으로 다뤄 프로비저너가 둘을
      * 구분하지 않게 한다 — 구분이 없으면 한쪽만 빠뜨릴 수도 없다.
      */
-    public record Spec(String name, int partitions, int retentionDays) {
+    public record Spec(String name, int partitions, int replicas, int retentionDays) {
     }
 
     private final List<Topic> topics;
@@ -132,6 +139,7 @@ public final class TopicCatalog {
                         node.path("owner").asText(null),
                         node.path("orderingKey").asText(null),
                         node.path("partitions").asInt(0),
+                        node.path("replicas").asInt(0),
                         node.path("retentionDays").asInt(0)));
             }
             return of(parsed);

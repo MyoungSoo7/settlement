@@ -77,13 +77,23 @@ describe('Kafka 토픽 카탈로그 (ADR 0035)', () => {
     assert.deepEqual(catalog.topics.filter((t) => t.name.endsWith('.DLT')).map((t) => t.name), []);
   });
 
-  test('모든 토픽이 owner·orderingKey·partitions 를 선언한다', () => {
+  test('모든 토픽이 owner·orderingKey·partitions·replicas·retentionDays 를 선언한다', () => {
     const incomplete = catalog.topics
-      .filter((t) => !t.owner || !t.orderingKey || !(t.partitions >= 1) || !(t.retentionDays >= 1))
+      .filter((t) => !t.owner || !t.orderingKey || !(t.partitions >= 1) || !(t.replicas >= 1)
+        || !(t.retentionDays >= 1))
       .map((t) => t.name);
 
     assert.deepEqual(incomplete, [],
-      'orderingKey 미선언 = "무엇의 시간 순서를 지키는지" 모른 채 파티션을 나눈 상태다');
+      'orderingKey 미선언 = "무엇의 시간 순서를 지키는지" 모른 채 파티션을 나눈 상태다. '
+      + 'replicas 미선언 = 내구성이 코드 상수로 숨는다');
+  });
+
+  test('DLT 보존기간이 원본보다 길다는 전제가 카탈로그에서 성립한다', () => {
+    // DLT 는 파생값이라 카탈로그에 없다 — 원본 보존기간이 DLT 상수(30일)보다 짧아야 그 전제가 성립한다.
+    const tooLong = catalog.topics.filter((t) => t.retentionDays >= 30).map((t) => t.name);
+
+    assert.deepEqual(tooLong, [],
+      '원본 보존이 DLT(30일) 이상이면 "운영자가 사후 분석할 시간을 더 준다"는 설계가 무너진다');
   });
 
   test('owner 는 실재하는 서비스 모듈이다', () => {

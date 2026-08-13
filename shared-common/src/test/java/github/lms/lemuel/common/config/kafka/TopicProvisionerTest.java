@@ -1,6 +1,8 @@
 package github.lms.lemuel.common.config.kafka;
 
+import org.assertj.core.groups.Tuple;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -12,37 +14,41 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 토픽 프로비저닝 — **없는 토픽만 만들고, 있는 토픽은 절대 건드리지 않는다**.
+ * 토픽 프로비저닝 — 속성마다 다르게 다룬다.
  *
- * <p>Spring 의 {@code KafkaAdmin} 은 {@code NewTopic} 이 선언한 파티션이 더 많으면 기존 토픽의
- * 파티션을 <b>자동으로 늘린다</b>(Spring Kafka 레퍼런스 "Configuring Topics"). 키 기반 순서 보장을
- * 쓰는 이 저장소에서 그 증설은 재해시 = 순서 붕괴다. 카탈로그를 도입하면서 그 사고를 유발하면
- * 본말전도이므로, 프로비저너는 증설 대신 <b>드리프트로 보고</b>하고 조치는 사람에게 넘긴다.
+ * <p>파티션은 만들 때만(변경 = 키 재해시 = 순서 보장 소급 붕괴), 보존기간은 항상 맞춘다(되돌릴 수
+ * 있고 키·순서와 무관), 복제본은 보고만(브로커 수 종속).
  */
 class TopicProvisionerTest {
 
-    /** 테스트용 인메모리 브로커 — 실제 AdminClient 없이 프로비저닝 판단만 검증한다. */
+    /** 테스트용 인메모리 브로커. */
     private static final class FakeTopicAdmin implements TopicAdmin {
-        private final Map<String, Integer> existing;
+        private final Map<String, TopicState> existing;
         private final List<String> created = new ArrayList<>();
+        private final List<String> retentionCalls = new ArrayList<>();
 
-        FakeTopicAdmin(Map<String, Integer> existing) {
+        FakeTopicAdmin(Map<String, TopicState> existing) {
             this.existing = new LinkedHashMap<>(existing);
         }
 
         @Override
-        public Map<String, Integer> describePartitions(Set<String> names) {
-            Map<String, Integer> found = new LinkedHashMap<>();
-            for (String name : names) {
-                if (existing.containsKey(name)) found.put(name, existing.get(name));
-            }
+        public Map<String, TopicState> describe(Set<String> names) {
+            Map<String, TopicState> found = new LinkedHashMap<>();
+            names.forEach(n -> {
+                if (existing.containsKey(n)) found.put(n, existing.get(n));
+            });
             return found;
         }
 
         @Override
-        public void create(String name, int partitions, int retentionDays) {
-            created.add(name + ":" + partitions + ":" + retentionDays + "d");
-            existing.put(name, partitions);
+        public void create(TopicCatalog.Spec spec) {
+            created.add(spec.name() + ":p" + spec.partitions() + ":r" + spec.replicas()
+                    + ":" + spec.retentionDays() + "d");
+        }
+
+        @Override
+        public void alterRetention(String name, int retentionDays) {
+            retentionCalls.add(name + "=" + retentionDays + "d");
         }
     }
 
@@ -51,85 +57,158 @@ class TopicProvisionerTest {
     }
 
     private static TopicCatalog.Topic paymentCaptured(int partitions) {
-        return new TopicCatalog.Topic("lemuel.payment.captured", "order-service", "paymentId", partitions, 7);
+        return new TopicCatalog.Topic("lemuel.payment.captured", "order-service", "paymentId",
+                partitions, 1, 7);
     }
 
-    @Test
-    @DisplayName("없는 토픽은 카탈로그 파티션 수로 만든다")
-    void createsMissingTopic() {
-        FakeTopicAdmin admin = new FakeTopicAdmin(Map.of());
-
-        TopicProvisioner.Report report =
-                new TopicProvisioner(admin).provision(catalogOf(paymentCaptured(3)), "order-service");
-
-        assertThat(admin.created).contains("lemuel.payment.captured:3:7d");
-        assertThat(report.created()).contains("lemuel.payment.captured");
-        assertThat(report.drifted()).isEmpty();
+    /** 카탈로그와 완전히 일치하고 보존기간까지 고정된 상태. */
+    private static TopicAdmin.TopicState settled(int partitions, int retentionDays) {
+        return new TopicAdmin.TopicState(partitions, 1, retentionDays, true);
     }
 
-    @Test
-    @DisplayName("DLT 도 원본과 같은 파티션 수로 함께 만든다 — 자동생성에 맡기면 브로커 기본값(1)로 갈린다")
-    void createsDeadLetterTopicAlongside() {
-        FakeTopicAdmin admin = new FakeTopicAdmin(Map.of());
+    @Nested
+    @DisplayName("생성")
+    class Creation {
 
-        new TopicProvisioner(admin).provision(catalogOf(paymentCaptured(6)), "order-service");
+        @Test
+        @DisplayName("없는 토픽은 카탈로그 스펙 그대로 만든다 — 복제본도 카탈로그가 정한다")
+        void createsMissingTopic() {
+            FakeTopicAdmin admin = new FakeTopicAdmin(Map.of());
 
-        assertThat(admin.created).contains("lemuel.payment.captured.DLT:6:30d");
+            TopicProvisioner.Report report =
+                    new TopicProvisioner(admin).provision(catalogOf(paymentCaptured(3)), "order-service");
+
+            assertThat(admin.created).contains("lemuel.payment.captured:p3:r1:7d");
+            assertThat(report.created()).contains("lemuel.payment.captured");
+        }
+
+        @Test
+        @DisplayName("DLT 도 원본과 같은 파티션·복제본으로, 더 긴 보존기간으로 함께 만든다")
+        void createsDeadLetterTopicAlongside() {
+            FakeTopicAdmin admin = new FakeTopicAdmin(Map.of());
+
+            new TopicProvisioner(admin).provision(catalogOf(paymentCaptured(6)), "order-service");
+
+            assertThat(admin.created).contains("lemuel.payment.captured.DLT:p6:r1:30d");
+        }
+
+        @Test
+        @DisplayName("소유하지 않은 토픽은 만들지 않는다")
+        void ignoresTopicsOwnedByOtherServices() {
+            FakeTopicAdmin admin = new FakeTopicAdmin(Map.of());
+
+            new TopicProvisioner(admin).provision(catalogOf(paymentCaptured(3)), "settlement-service");
+
+            assertThat(admin.created).isEmpty();
+        }
     }
 
-    @Test
-    @DisplayName("이미 있고 파티션이 충분하면 아무것도 하지 않는다")
-    void leavesSatisfiedTopicAlone() {
-        FakeTopicAdmin admin = new FakeTopicAdmin(Map.of(
-                "lemuel.payment.captured", 3, "lemuel.payment.captured.DLT", 3));
+    @Nested
+    @DisplayName("파티션 — 만들 때만, 절대 바꾸지 않는다")
+    class Partitions {
 
-        TopicProvisioner.Report report =
-                new TopicProvisioner(admin).provision(catalogOf(paymentCaptured(3)), "order-service");
+        @Test
+        @DisplayName("파티션이 카탈로그보다 적어도 늘리지 않고 드리프트로 보고한다")
+        void neverGrowsExistingTopic() {
+            FakeTopicAdmin admin = new FakeTopicAdmin(Map.of(
+                    "lemuel.payment.captured", settled(1, 7),
+                    "lemuel.payment.captured.DLT", settled(1, 30)));
 
-        assertThat(admin.created).isEmpty();
-        assertThat(report.created()).isEmpty();
-        assertThat(report.drifted()).isEmpty();
+            TopicProvisioner.Report report =
+                    new TopicProvisioner(admin).provision(catalogOf(paymentCaptured(3)), "order-service");
+
+            assertThat(admin.created).as("증설도 재생성도 없어야 한다").isEmpty();
+            assertThat(report.drifted())
+                    .extracting(TopicProvisioner.Drift::topic, TopicProvisioner.Drift::property,
+                            TopicProvisioner.Drift::declared, TopicProvisioner.Drift::actual)
+                    .contains(Tuple.tuple("lemuel.payment.captured", "partitions", 3, 1));
+        }
+
+        @Test
+        @DisplayName("파티션이 카탈로그보다 많아도 드리프트로 보고한다")
+        void reportsUpwardDriftToo() {
+            FakeTopicAdmin admin = new FakeTopicAdmin(Map.of(
+                    "lemuel.payment.captured", settled(6, 7),
+                    "lemuel.payment.captured.DLT", settled(6, 30)));
+
+            TopicProvisioner.Report report =
+                    new TopicProvisioner(admin).provision(catalogOf(paymentCaptured(3)), "order-service");
+
+            assertThat(report.drifted())
+                    .extracting(TopicProvisioner.Drift::property, TopicProvisioner.Drift::actual)
+                    .contains(Tuple.tuple("partitions", 6));
+        }
     }
 
-    @Test
-    @DisplayName("기존 토픽의 파티션이 카탈로그보다 적어도 늘리지 않는다 — 증설은 재해시 = 순서 붕괴")
-    void neverGrowsExistingTopic() {
-        FakeTopicAdmin admin = new FakeTopicAdmin(Map.of(
-                "lemuel.payment.captured", 1, "lemuel.payment.captured.DLT", 1));
+    @Nested
+    @DisplayName("보존기간 — 항상 맞춘다")
+    class Retention {
 
-        TopicProvisioner.Report report =
-                new TopicProvisioner(admin).provision(catalogOf(paymentCaptured(3)), "order-service");
+        @Test
+        @DisplayName("보존기간이 다르면 고쳐 맞춘다 — 되돌릴 수 있고 키·순서와 무관하다")
+        void alignsMismatchedRetention() {
+            FakeTopicAdmin admin = new FakeTopicAdmin(Map.of(
+                    "lemuel.payment.captured", settled(3, 1),
+                    "lemuel.payment.captured.DLT", settled(3, 30)));
 
-        assertThat(admin.created).as("증설도 재생성도 없어야 한다").isEmpty();
-        assertThat(report.drifted())
-                .extracting(TopicProvisioner.Drift::topic, TopicProvisioner.Drift::declared,
-                        TopicProvisioner.Drift::actual)
-                .contains(org.assertj.core.groups.Tuple.tuple("lemuel.payment.captured", 3, 1));
+            TopicProvisioner.Report report =
+                    new TopicProvisioner(admin).provision(catalogOf(paymentCaptured(3)), "order-service");
+
+            assertThat(admin.retentionCalls).containsExactly("lemuel.payment.captured=7d");
+            assertThat(report.retentionAligned()).containsExactly("lemuel.payment.captured");
+        }
+
+        @Test
+        @DisplayName("값이 같아도 토픽에 고정돼 있지 않으면 고정한다 — 상속은 '지금 우연히 같은 값'일 뿐이다")
+        void pinsInheritedRetentionEvenWhenValueMatches() {
+            FakeTopicAdmin admin = new FakeTopicAdmin(Map.of(
+                    "lemuel.payment.captured", new TopicAdmin.TopicState(3, 1, 7, false),
+                    "lemuel.payment.captured.DLT", settled(3, 30)));
+
+            TopicProvisioner.Report report =
+                    new TopicProvisioner(admin).provision(catalogOf(paymentCaptured(3)), "order-service");
+
+            assertThat(admin.retentionCalls)
+                    .as("클러스터 기본값이 바뀌면 조용히 따라 바뀌는 상태를 끊어야 한다")
+                    .containsExactly("lemuel.payment.captured=7d");
+            assertThat(report.retentionAligned()).containsExactly("lemuel.payment.captured");
+        }
+
+        @Test
+        @DisplayName("이미 고정돼 있고 값도 맞으면 건드리지 않는다")
+        void leavesPinnedMatchingRetentionAlone() {
+            FakeTopicAdmin admin = new FakeTopicAdmin(Map.of(
+                    "lemuel.payment.captured", settled(3, 7),
+                    "lemuel.payment.captured.DLT", settled(3, 30)));
+
+            TopicProvisioner.Report report =
+                    new TopicProvisioner(admin).provision(catalogOf(paymentCaptured(3)), "order-service");
+
+            assertThat(admin.retentionCalls).isEmpty();
+            assertThat(report.retentionAligned()).isEmpty();
+            assertThat(report.drifted()).isEmpty();
+        }
     }
 
-    @Test
-    @DisplayName("파티션이 카탈로그보다 많아도 드리프트로 보고한다 — 카탈로그가 현실과 어긋난 상태다")
-    void reportsUpwardDriftToo() {
-        FakeTopicAdmin admin = new FakeTopicAdmin(Map.of(
-                "lemuel.payment.captured", 6, "lemuel.payment.captured.DLT", 6));
+    @Nested
+    @DisplayName("복제본 — 보고만")
+    class Replicas {
 
-        TopicProvisioner.Report report =
-                new TopicProvisioner(admin).provision(catalogOf(paymentCaptured(3)), "order-service");
+        @Test
+        @DisplayName("복제본이 다르면 드리프트로 보고하고 고치지 않는다 — 파티션 재배치가 필요하다")
+        void reportsReplicaDriftWithoutFixing() {
+            FakeTopicAdmin admin = new FakeTopicAdmin(Map.of(
+                    "lemuel.payment.captured", new TopicAdmin.TopicState(3, 3, 7, true),
+                    "lemuel.payment.captured.DLT", new TopicAdmin.TopicState(3, 3, 30, true)));
 
-        assertThat(report.drifted())
-                .extracting(TopicProvisioner.Drift::topic, TopicProvisioner.Drift::actual)
-                .contains(org.assertj.core.groups.Tuple.tuple("lemuel.payment.captured", 6));
-    }
+            TopicProvisioner.Report report =
+                    new TopicProvisioner(admin).provision(catalogOf(paymentCaptured(3)), "order-service");
 
-    @Test
-    @DisplayName("소유하지 않은 토픽은 만들지 않는다 — 컨슈머가 토픽을 만들면 파티션 수 결정 주체가 둘이 된다")
-    void ignoresTopicsOwnedByOtherServices() {
-        FakeTopicAdmin admin = new FakeTopicAdmin(Map.of());
-
-        TopicProvisioner.Report report =
-                new TopicProvisioner(admin).provision(catalogOf(paymentCaptured(3)), "settlement-service");
-
-        assertThat(admin.created).isEmpty();
-        assertThat(report.created()).isEmpty();
+            assertThat(admin.created).isEmpty();
+            assertThat(report.drifted())
+                    .extracting(TopicProvisioner.Drift::property, TopicProvisioner.Drift::declared,
+                            TopicProvisioner.Drift::actual)
+                    .contains(Tuple.tuple("replicas", 1, 3));
+        }
     }
 }

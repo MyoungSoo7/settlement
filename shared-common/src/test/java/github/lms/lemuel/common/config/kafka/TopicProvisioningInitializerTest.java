@@ -17,20 +17,20 @@ class TopicProvisioningInitializerTest {
     private final MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
     private static final TopicCatalog CATALOG = TopicCatalog.of(List.of(
-            new TopicCatalog.Topic("lemuel.payment.captured", "order-service", "paymentId", 3, 7)));
+            new TopicCatalog.Topic("lemuel.payment.captured", "order-service", "paymentId", 3, 1, 7)));
 
     /** 브로커 상태를 흉내내는 최소 구현. */
     private static final class StubAdmin implements TopicAdmin {
-        private final Map<String, Integer> existing;
+        private final Map<String, TopicAdmin.TopicState> existing;
         private final List<String> created = new java.util.ArrayList<>();
 
-        StubAdmin(Map<String, Integer> existing) {
+        StubAdmin(Map<String, TopicAdmin.TopicState> existing) {
             this.existing = new LinkedHashMap<>(existing);
         }
 
         @Override
-        public Map<String, Integer> describePartitions(Set<String> names) {
-            Map<String, Integer> found = new LinkedHashMap<>();
+        public Map<String, TopicState> describe(Set<String> names) {
+            Map<String, TopicState> found = new LinkedHashMap<>();
             names.forEach(n -> {
                 if (existing.containsKey(n)) found.put(n, existing.get(n));
             });
@@ -38,8 +38,13 @@ class TopicProvisioningInitializerTest {
         }
 
         @Override
-        public void create(String name, int partitions, int retentionDays) {
-            created.add(name);
+        public void create(TopicCatalog.Spec spec) {
+            created.add(spec.name());
+        }
+
+        @Override
+        public void alterRetention(String name, int retentionDays) {
+            // 이 테스트의 관심사가 아니다 — 프로비저너 단위 테스트가 검증한다.
         }
     }
 
@@ -71,7 +76,8 @@ class TopicProvisioningInitializerTest {
     @DisplayName("드리프트를 게이지로 노출한다 — WARN 로그만 남기면 아무도 읽지 않는다")
     void publishesDriftGauge() {
         StubAdmin admin = new StubAdmin(Map.of(
-                "lemuel.payment.captured", 1, "lemuel.payment.captured.DLT", 1));
+                "lemuel.payment.captured", new TopicAdmin.TopicState(1, 1, 7, true),
+                "lemuel.payment.captured.DLT", new TopicAdmin.TopicState(1, 1, 30, true)));
 
         initializer(admin, "order-service").afterSingletonsInstantiated();
 
@@ -84,12 +90,17 @@ class TopicProvisioningInitializerTest {
     void survivesBrokerFailure() {
         TopicAdmin failing = new TopicAdmin() {
             @Override
-            public Map<String, Integer> describePartitions(Set<String> names) {
+            public Map<String, TopicState> describe(Set<String> names) {
                 throw new InvalidTopicCatalogException("broker down");
             }
 
             @Override
-            public void create(String name, int partitions, int retentionDays) {
+            public void create(TopicCatalog.Spec spec) {
+                throw new IllegalStateException("unreachable");
+            }
+
+            @Override
+            public void alterRetention(String name, int retentionDays) {
                 throw new IllegalStateException("unreachable");
             }
         };

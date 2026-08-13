@@ -56,7 +56,25 @@
 **DLT 는 등록하지 않는다.** `TopicCatalog.Topic#deadLetterSpec()` 이 원본에서 파생하며 파티션 수가 항상
 원본과 같다. 파생값이면 둘이 어긋날 수 없다 — 위 실측 사고의 구조적 재발 방지다.
 
-### 2. 프로비저닝: 만들기만 하고 고치지 않는다
+### 1-1. 속성별 취급의 비대칭 (2026-08-14 개정)
+
+처음에는 세 속성을 모두 "만들 때만 적용"으로 통일했다. 그건 **파티션의 성질에 맞춘 규칙을 나머지에까지
+적용한 실수**였다. 실측에서 드러났듯 기존 토픽의 보존기간은 카탈로그가 뭐라 적혀 있든 클러스터
+기본값을 물려받고 있었다 — 선언은 있는데 효력이 없는 **쓰기 전용 문서**였다.
+
+| 속성 | 변경하면 | 되돌릴 수 있나 | 프로비저너의 처리 |
+|---|---|---|---|
+| **partitions** | 키 재해시 → 순서 보장 **소급 붕괴** | ❌ | 만들 때만. 불일치는 드리프트 보고 |
+| **retentionDays** | 로그 삭제 시점만 변함. 키·순서 무관 | ✅ | **기동마다 토픽에 고정** |
+| **replicas** | 파티션 재배치 필요, 브로커 수 종속 | △ | 보고만 |
+
+보존기간은 **값이 같아도 고정한다**. `SOURCE=DEFAULT_CONFIG` 는 "지금 우연히 같은 값"일 뿐이고,
+누가 `log_retention_ms` 를 바꾸면 전 토픽이 조용히 따라 바뀐다. 그 상속을 끊어야 카탈로그가 보장이 된다.
+
+`replicas` 는 `KafkaClientTopicAdmin` 의 `private static final short REPLICAS = 1` 상수였다 — 파티션을
+카탈로그로 끌어오면서 정작 옆의 같은 문제를 남겨뒀던 것이라, 토픽별 선언으로 옮기고 게이트가 강제한다.
+
+### 2. 프로비저닝: 파티션은 만들기만, 보존기간은 맞춘다
 
 Spring 의 `KafkaAdmin` 은 "`NewTopic` 이 선언한 파티션이 기존 토픽보다 많으면 파티션을 늘린다"(Spring
 Kafka 레퍼런스 *Configuring Topics*). 편의 기능이지만 이 저장소에서는 사고다 — 토픽 정의를 코드로
@@ -134,6 +152,35 @@ Kafka 레퍼런스 *Configuring Topics*). 편의 기능이지만 이 저장소�
 모든 서비스에서 발행해 `owner` 가 하나로 정해지지 않고 best-effort 라 순서 보장 대상이 아니다.
 `lemuel.payment.{authorized,confirmed,created}` 는 어느 서비스도 참조하지 않는 레거시,
 `lemuel.user.membership_changed` 는 ADR 0024 가 남긴 잔여 후보다.
+
+## 보존기간·복제본 실측 (2026-08-14, 2차)
+
+파티션을 맞춘 뒤 남은 두 속성을 재보니, 카탈로그의 선언이 브로커에 **전혀 반영돼 있지 않았다.**
+
+```
+lemuel.payment.captured   retention.ms=604800000(7일)  SOURCE=DEFAULT_CONFIG
+lemuel.order.created      retention.ms=604800000(7일)  SOURCE=DEFAULT_CONFIG
+클러스터 log_retention_ms 604800000
+```
+
+`SOURCE=DEFAULT_CONFIG` 가 핵심이다. 이 7일은 토픽 설정조차 아니고 **클러스터 기본값**이었다. 카탈로그의
+`retentionDays` 는 신규 생성 시에만 실렸고, 프로비저너는 보존기간을 비교조차 하지 않았다.
+
+증상이 DLT 에서 그대로 드러났다 — ADR 은 "DLT 는 원본보다 길게 보존해 운영자가 사후 분석할 시간을
+확보한다"고 적어놨는데:
+
+| DLT | 보존 | 출처 |
+|---|---|---|
+| payment.captured.DLT · payment.refunded.DLT | 30일 | DYNAMIC_TOPIC_CONFIG (구 `NewTopic` 빈이 설정) |
+| user.membership_changed.DLT | **7일** | DEFAULT_CONFIG (자동생성) |
+
+**조치**: `TopicAdmin` 에 `alterRetention` 을 추가해 프로비저너가 기동마다 고정하도록 했고(값이 같아도
+상속 상태면 고정), 기존 토픽 23개는 `rpk topic alter-config` 로 1회 정렬했다.
+**검증: 23/23 이 `DYNAMIC_TOPIC_CONFIG` 로 고정, 카탈로그 대비 불일치 0건.**
+
+복제본은 전 토픽 RF=1 이었다(브로커 1대라 그 이상 불가). 값 자체는 정상이지만 **선언 위치가 문제였다** —
+코드 상수라 토픽별로 다르게 줄 수도, 리뷰할 수도 없었다. 카탈로그 `replicas` 필드로 옮기고 게이트가
+선언을 강제한다. 프로덕션 전환 시 이 값이 리뷰 대상이 된다.
 
 ## orderingKey publisher 대조 (2026-08-14)
 

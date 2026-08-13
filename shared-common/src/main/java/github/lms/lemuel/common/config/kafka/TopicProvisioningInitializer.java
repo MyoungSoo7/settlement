@@ -21,7 +21,10 @@ public class TopicProvisioningInitializer implements SmartInitializingSingleton 
 
     private static final Logger log = LoggerFactory.getLogger(TopicProvisioningInitializer.class);
 
-    /** 카탈로그 선언과 브로커 실제 파티션 수가 어긋난 토픽 수. 0 이 아니면 순서 보장 전제가 흔들린 상태다. */
+    /**
+     * 카탈로그 선언과 브로커 실제 값이 어긋난 항목 수(파티션·복제본). 0 이 아니면 순서 보장이나
+     * 내구성 전제가 흔들린 상태다. 보존기간은 자동으로 맞추므로 여기 잡히지 않는다.
+     */
     static final String DRIFT_GAUGE = "kafka.topic.partition.drift";
 
     private final TopicCatalog catalog;
@@ -35,7 +38,7 @@ public class TopicProvisioningInitializer implements SmartInitializingSingleton 
         this.provisioner = provisioner;
         this.module = module;
         Gauge.builder(DRIFT_GAUGE, driftCount, AtomicInteger::get)
-                .description("카탈로그 선언과 브로커 파티션 수가 어긋난 토픽 수 (ADR 0035)")
+                .description("카탈로그 선언과 브로커 값이 어긋난 항목 수 — 파티션·복제본 (ADR 0035)")
                 .register(meterRegistry);
     }
 
@@ -55,11 +58,16 @@ public class TopicProvisioningInitializer implements SmartInitializingSingleton 
             if (!report.created().isEmpty()) {
                 log.info("Kafka 토픽 프로비저닝 완료: module={}, created={}", module, report.created());
             }
+            if (!report.retentionAligned().isEmpty()) {
+                // 보존기간은 되돌릴 수 있고 키·순서와 무관하므로 자동으로 맞춘다(파티션과의 결정적 차이).
+                log.info("Kafka 토픽 보존기간을 카탈로그에 맞춰 고정: module={}, topics={}",
+                        module, report.retentionAligned());
+            }
             for (TopicProvisioner.Drift drift : report.drifted()) {
                 // 고치지 않는다 — 파티션 변경은 키 재해시라 순서 보장을 소급해서 깬다. 사람이 판단한다.
-                log.warn("Kafka 토픽 파티션 드리프트: topic={}, 카탈로그={}, 브로커={} — "
+                log.warn("Kafka 토픽 드리프트: topic={}, {} 카탈로그={} 브로커={} — "
                                 + "브로커를 맞출지(rpk) 카탈로그를 고칠지는 도메인 판단이다 (ADR 0035)",
-                        drift.topic(), drift.declared(), drift.actual());
+                        drift.topic(), drift.property(), drift.declared(), drift.actual());
             }
             driftCount.set(report.drifted().size());
             return report.drifted().size();

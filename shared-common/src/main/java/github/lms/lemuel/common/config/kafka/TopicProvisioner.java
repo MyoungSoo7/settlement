@@ -7,26 +7,30 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * 카탈로그가 선언한 토픽 중 <b>없는 것만</b> 만든다 (ADR 0035).
+ * 카탈로그가 선언한 토픽을 브로커에 반영한다 (ADR 0035).
  *
- * <p><b>왜 Spring 의 {@code NewTopic} 빈을 쓰지 않는가.</b> {@code KafkaAdmin} 은 "NewTopic 이 선언한
- * 파티션이 기존 토픽보다 많으면 파티션을 늘린다"(Spring Kafka 레퍼런스 <i>Configuring Topics</i>).
- * 편의 기능이지만 이 저장소에서는 사고다 — 메시지 키가 outbox {@code aggregateId} 이므로 파티션 수가
- * 바뀌면 {@code hash(key) % N} 이 바뀌고, 같은 애그리거트의 이벤트가 다른 파티션으로 흩어져 순서 보장이
- * 소급 붕괴한다. 토픽 정의를 코드로 옮기는 작업이 그 붕괴를 유발하면 본말전도이므로, 증설 경로가
- * 아예 없는 프로비저너를 쓴다.
+ * <p><b>속성마다 다르게 다룬다.</b> 처음에는 세 속성을 모두 "만들 때만 적용"으로 통일했는데, 그건
+ * 파티션의 성질에 맞춘 규칙을 나머지에까지 적용한 실수였다. 실측에서 드러났듯이 기존 토픽의 보존기간은
+ * 카탈로그가 뭐라 적혀 있든 클러스터 기본값(log_retention_ms)을 물려받고 있었다 — 선언은 있는데
+ * 효력이 없는 <b>쓰기 전용 문서</b>였다.
  *
- * <p>파티션 수가 카탈로그와 다르면 만들지도 고치지도 않고 {@link Drift} 로 보고한다. 조치는 사람이
- * 판단한다 — 브로커를 카탈로그에 맞출지(rpk), 카탈로그를 현실에 맞출지는 도메인 판단이다.
+ * <ul>
+ *   <li><b>파티션</b> — 만들 때만. 변경은 키 재해시라 이미 쌓인 메시지의 순서 보장까지 소급해서 깬다.
+ *       불일치는 {@link Drift} 로 보고만 하고 조치는 사람이 판단한다.</li>
+ *   <li><b>보존기간</b> — <b>항상 맞춘다.</b> 로그 삭제 시점만 바뀔 뿐 키·순서와 무관하고 되돌릴 수
+ *       있다. 값이 같아도 토픽에 고정되지 않았다면 고정한다 — 상속 상태로 두면 클러스터 기본값이
+ *       바뀌는 순간 조용히 따라 바뀐다.</li>
+ *   <li><b>복제본</b> — 보고만. 파티션 재배치가 필요하고 브로커 수에 종속된다.</li>
+ * </ul>
  */
 public class TopicProvisioner {
 
-    /** 프로비저닝 결과 — 만든 토픽과, 카탈로그와 어긋난 토픽. */
-    public record Report(List<String> created, List<Drift> drifted) {
+    /** 프로비저닝 결과. */
+    public record Report(List<String> created, List<Drift> drifted, List<String> retentionAligned) {
     }
 
-    /** 브로커 실제 파티션 수가 카탈로그 선언과 다른 상태. */
-    public record Drift(String topic, int declared, int actual) {
+    /** 브로커 실제 값이 카탈로그 선언과 다른 상태. 자동으로 고치지 않는 속성만 여기 담긴다. */
+    public record Drift(String topic, String property, int declared, int actual) {
     }
 
     private final TopicAdmin admin;
@@ -43,21 +47,31 @@ public class TopicProvisioner {
         }
 
         Set<String> names = new LinkedHashSet<>(specs.stream().map(TopicCatalog.Spec::name).toList());
-        Map<String, Integer> actual = admin.describePartitions(names);
+        Map<String, TopicAdmin.TopicState> actual = admin.describe(names);
 
         List<String> created = new ArrayList<>();
         List<Drift> drifted = new ArrayList<>();
+        List<String> retentionAligned = new ArrayList<>();
+
         for (TopicCatalog.Spec spec : specs) {
-            Integer existing = actual.get(spec.name());
-            if (existing == null) {
-                admin.create(spec.name(), spec.partitions(), spec.retentionDays());
+            TopicAdmin.TopicState state = actual.get(spec.name());
+            if (state == null) {
+                admin.create(spec);
                 created.add(spec.name());
-            } else if (existing != spec.partitions()) {
-                // 늘리지도 줄이지도 않는다 — 파티션 변경은 키 재해시이고, 재해시는 이미 쌓인 메시지의
-                // 순서 보장까지 소급해서 깬다. 조치(rpk add-partitions 또는 카탈로그 정정)는 사람이 판단한다.
-                drifted.add(new Drift(spec.name(), spec.partitions(), existing));
+                continue;
+            }
+            if (state.partitions() != spec.partitions()) {
+                drifted.add(new Drift(spec.name(), "partitions", spec.partitions(), state.partitions()));
+            }
+            if (state.replicas() != spec.replicas()) {
+                drifted.add(new Drift(spec.name(), "replicas", spec.replicas(), state.replicas()));
+            }
+            // 값이 같아도 고정돼 있지 않으면 고정한다 — 상속은 "지금 우연히 같은 값"일 뿐이다.
+            if (!state.retentionPinned() || state.retentionDays() != spec.retentionDays()) {
+                admin.alterRetention(spec.name(), spec.retentionDays());
+                retentionAligned.add(spec.name());
             }
         }
-        return new Report(created, drifted);
+        return new Report(created, drifted, retentionAligned);
     }
 }

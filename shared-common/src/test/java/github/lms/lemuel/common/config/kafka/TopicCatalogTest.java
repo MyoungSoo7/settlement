@@ -20,7 +20,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class TopicCatalogTest {
 
     private static TopicCatalog.Topic topic(String name) {
-        return new TopicCatalog.Topic(name, "settlement-service", "settlementId", 3, 7);
+        return new TopicCatalog.Topic(name, "settlement-service", "settlementId", 3, 1, 7);
     }
 
     @Nested
@@ -41,7 +41,7 @@ class TopicCatalogTest {
         @DisplayName("순서키가 비면 거부한다 — 무엇으로 순서를 보장하는지 선언하지 않은 토픽은 없다")
         void rejectsBlankOrderingKey() {
             assertThatThrownBy(() -> TopicCatalog.of(List.of(
-                    new TopicCatalog.Topic("lemuel.settlement.confirmed", "settlement-service", "  ", 3, 7))))
+                    new TopicCatalog.Topic("lemuel.settlement.confirmed", "settlement-service", "  ", 3, 1, 7))))
                     .isInstanceOf(InvalidTopicCatalogException.class)
                     .hasMessageContaining("orderingKey");
         }
@@ -50,7 +50,7 @@ class TopicCatalogTest {
         @DisplayName("소유자가 비면 거부한다 — 토픽을 만드는 주체가 둘이면 파티션 수가 갈린다")
         void rejectsBlankOwner() {
             assertThatThrownBy(() -> TopicCatalog.of(List.of(
-                    new TopicCatalog.Topic("lemuel.settlement.confirmed", "", "settlementId", 3, 7))))
+                    new TopicCatalog.Topic("lemuel.settlement.confirmed", "", "settlementId", 3, 1, 7))))
                     .isInstanceOf(InvalidTopicCatalogException.class)
                     .hasMessageContaining("owner");
         }
@@ -59,7 +59,7 @@ class TopicCatalogTest {
         @DisplayName("파티션 수가 1 미만이면 거부한다")
         void rejectsNonPositivePartitions() {
             assertThatThrownBy(() -> TopicCatalog.of(List.of(
-                    new TopicCatalog.Topic("lemuel.settlement.confirmed", "settlement-service", "settlementId", 0, 7))))
+                    new TopicCatalog.Topic("lemuel.settlement.confirmed", "settlement-service", "settlementId", 0, 1, 7))))
                     .isInstanceOf(InvalidTopicCatalogException.class)
                     .hasMessageContaining("partitions");
         }
@@ -68,7 +68,7 @@ class TopicCatalogTest {
         @DisplayName("lemuel. 접두사가 없으면 거부한다")
         void rejectsForeignNamespace() {
             assertThatThrownBy(() -> TopicCatalog.of(List.of(
-                    new TopicCatalog.Topic("other.settlement.confirmed", "settlement-service", "settlementId", 3, 7))))
+                    new TopicCatalog.Topic("other.settlement.confirmed", "settlement-service", "settlementId", 3, 1, 7))))
                     .isInstanceOf(InvalidTopicCatalogException.class)
                     .hasMessageContaining("lemuel.");
         }
@@ -82,10 +82,19 @@ class TopicCatalogTest {
         }
 
         @Test
+        @DisplayName("복제본이 1 미만이면 거부한다 — 내구성도 리뷰 대상이다")
+        void rejectsNonPositiveReplicas() {
+            assertThatThrownBy(() -> TopicCatalog.of(List.of(
+                    new TopicCatalog.Topic("lemuel.settlement.confirmed", "settlement-service", "settlementId", 3, 0, 7))))
+                    .isInstanceOf(InvalidTopicCatalogException.class)
+                    .hasMessageContaining("replicas");
+        }
+
+        @Test
         @DisplayName("보존기간이 1일 미만이면 거부한다")
         void rejectsNonPositiveRetention() {
             assertThatThrownBy(() -> TopicCatalog.of(List.of(
-                    new TopicCatalog.Topic("lemuel.settlement.confirmed", "settlement-service", "settlementId", 3, 0))))
+                    new TopicCatalog.Topic("lemuel.settlement.confirmed", "settlement-service", "settlementId", 3, 1, 0))))
                     .isInstanceOf(InvalidTopicCatalogException.class)
                     .hasMessageContaining("retentionDays");
         }
@@ -101,7 +110,7 @@ class TopicCatalogTest {
             String json = """
                     { "topics": [
                       { "name": "lemuel.payout.completed", "owner": "settlement-service",
-                        "orderingKey": "payoutId", "partitions": 4, "retentionDays": 7 }
+                        "orderingKey": "payoutId", "partitions": 4, "replicas": 1, "retentionDays": 7 }
                     ]}""";
 
             TopicCatalog catalog = TopicCatalog.load(
@@ -127,7 +136,7 @@ class TopicCatalogTest {
         @DisplayName("DLT 는 원본과 같은 파티션 수를 갖는다 — 실측 사고(원본 6 vs DLT 3)의 회귀 가드")
         void dltMirrorsSourcePartitions() {
             TopicCatalog.Topic source = new TopicCatalog.Topic(
-                    "lemuel.payment.captured", "order-service", "paymentId", 6, 7);
+                    "lemuel.payment.captured", "order-service", "paymentId", 6, 1, 7);
 
             TopicCatalog.Spec dlt = source.deadLetterSpec();
 
@@ -152,8 +161,8 @@ class TopicCatalogTest {
         @DisplayName("소유 서비스로 필터링한다 — 각 토픽을 만드는 주체는 프로듀서 하나뿐이다")
         void filtersByOwner() {
             TopicCatalog catalog = TopicCatalog.of(List.of(
-                    new TopicCatalog.Topic("lemuel.payment.captured", "order-service", "paymentId", 3, 7),
-                    new TopicCatalog.Topic("lemuel.settlement.confirmed", "settlement-service", "settlementId", 3, 7)));
+                    new TopicCatalog.Topic("lemuel.payment.captured", "order-service", "paymentId", 3, 1, 7),
+                    new TopicCatalog.Topic("lemuel.settlement.confirmed", "settlement-service", "settlementId", 3, 1, 7)));
 
             assertThat(catalog.ownedBy("order-service"))
                     .extracting(TopicCatalog.Topic::name)
@@ -194,6 +203,12 @@ class TopicCatalogTest {
         void ownersAreRealModules() {
             assertThat(catalog.all())
                     .allSatisfy(t -> assertThat(t.owner()).endsWith("-service"));
+        }
+
+        @Test
+        @DisplayName("모든 토픽이 복제본을 선언한다 — 코드 상수로 숨어 있던 값을 카탈로그로 끌어냈다")
+        void everyTopicDeclaresReplicas() {
+            assertThat(catalog.all()).allSatisfy(t -> assertThat(t.replicas()).isPositive());
         }
 
         @Test
