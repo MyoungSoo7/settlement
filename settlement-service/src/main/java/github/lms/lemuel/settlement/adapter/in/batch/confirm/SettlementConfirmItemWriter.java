@@ -1,9 +1,6 @@
 package github.lms.lemuel.settlement.adapter.in.batch.confirm;
 
 import github.lms.lemuel.ledger.application.port.in.EnqueueLedgerTaskPort;
-import github.lms.lemuel.payout.application.port.in.RequestPayoutUseCase;
-import github.lms.lemuel.payout.domain.PayoutType;
-import github.lms.lemuel.recovery.application.port.in.OffsetSellerRecoveryUseCase;
 import github.lms.lemuel.settlement.application.port.out.LoadSellerIdPort;
 import github.lms.lemuel.settlement.application.port.out.PublishSettlementDomainEventPort;
 import github.lms.lemuel.settlement.application.port.out.PublishSettlementEventPort;
@@ -50,8 +47,6 @@ public class SettlementConfirmItemWriter implements ItemWriter<Settlement> {
     private final PublishSettlementDomainEventPort publishSettlementDomainEventPort;
     private final EnqueueLedgerTaskPort enqueueLedgerTaskPort;
     private final PublishSettlementEventPort publishSettlementEventPort;
-    private final RequestPayoutUseCase requestPayoutUseCase;
-    private final OffsetSellerRecoveryUseCase offsetSellerRecoveryUseCase;
     private final ResolveSettlementWithholdingUseCase resolveSettlementWithholdingUseCase;
     private final MeterRegistry meterRegistry;
 
@@ -60,8 +55,6 @@ public class SettlementConfirmItemWriter implements ItemWriter<Settlement> {
                                        PublishSettlementDomainEventPort publishSettlementDomainEventPort,
                                        EnqueueLedgerTaskPort enqueueLedgerTaskPort,
                                        PublishSettlementEventPort publishSettlementEventPort,
-                                       RequestPayoutUseCase requestPayoutUseCase,
-                                       OffsetSellerRecoveryUseCase offsetSellerRecoveryUseCase,
                                        ResolveSettlementWithholdingUseCase resolveSettlementWithholdingUseCase,
                                        MeterRegistry meterRegistry) {
         this.saveSettlementPort = saveSettlementPort;
@@ -69,8 +62,6 @@ public class SettlementConfirmItemWriter implements ItemWriter<Settlement> {
         this.publishSettlementDomainEventPort = publishSettlementDomainEventPort;
         this.enqueueLedgerTaskPort = enqueueLedgerTaskPort;
         this.publishSettlementEventPort = publishSettlementEventPort;
-        this.requestPayoutUseCase = requestPayoutUseCase;
-        this.offsetSellerRecoveryUseCase = offsetSellerRecoveryUseCase;
         this.resolveSettlementWithholdingUseCase = resolveSettlementWithholdingUseCase;
         this.meterRegistry = meterRegistry;
     }
@@ -90,9 +81,12 @@ public class SettlementConfirmItemWriter implements ItemWriter<Settlement> {
             loadSellerIdPort.findSellerIdByPaymentId(saved.getPaymentId()).ifPresent(sellerId -> {
                 publishSettlementDomainEventPort.publishSettlementConfirmed(
                         saved.getId(), sellerId, saved.getNetAmount());
-                // 즉시지급액 = net − 미해제 holdback − 원천징수(ADR 0029 §B) − 채권 상계(seed-p0-6).
-                // 원천징수를 먼저 확보한 잔여에서 미상계 채권을 오래된 순으로 소진하고, 남은 금액만 Payout 으로 요청한다.
-                // 0 이면 생성하지 않는다((정산, IMMEDIATE) 멱등, RequestPayoutUseCase 계약).
+                // L-3 — 지급 생성은 여기가 아니라 상환차감 수신 시점(ApplyLoanDeductionService)이다.
+                // 확정 시점에 금액을 확정하면 뒤늦게 도착하는 대출 차감을 반영할 수 없고(Payout.amount 는
+                // final), 그 결과 loan 은 대출 잔액을 줄이는데 현금은 전액 나갔다. 채권상계도 대출 차감
+                // 뒤에 계산해야 하므로 함께 옮겼다 — 여기서 상계하면 대출로 갈 재원을 미리 소진한다.
+                // 여기 남는 것은 원천징수뿐이다: 차감 순서 1순위라 뒤 단계에 의존하지 않고, GL 인식
+                // 시점도 확정 시점이 맞다. 지급 단계는 같은 입력으로 재계산해 동일한 값을 쓴다.
                 BigDecimal immediate = saved.getImmediatePayoutAmount();
 
                 WithholdingResolution withholding = resolveSettlementWithholdingUseCase.resolveForPayout(
@@ -104,22 +98,7 @@ public class SettlementConfirmItemWriter implements ItemWriter<Settlement> {
                             + "settlementId={}, sellerId={}", saved.getId(), sellerId);
                 }
 
-                // T-4 — 차감 순서: 원천징수 먼저, 채권 상계는 그 잔여까지만.
-                // 근거는 "회수 가능성의 비대칭"이다. 못 뗀 채권은 OPEN 으로 남아 다음 정산에서 상계되지만
-                // (seed-p0-6 이월 경로가 이미 있다), 못 뗀 원천징수는 이월 장치가 없어 그대로 소실된다
-                // — 소실은 곧 과소징수(가산세 리스크)다. 회수가 지연될 뿐인 쪽을 뒤로 미루는 게 맞다.
-                // 이 순서에서 원천징수는 사실상 항상 전액 확보된다: 등급 최대 홀드백이 30% 라
-                // immediate ≥ 0.7 × net > 0.033 × net = 원천징수. 아래 min() 은 홀드백 정책이 96.7% 를
-                // 넘는 미래에도 음수 지급이 나지 않게 하는 방어선이며, 걸리면 과소징수로 관측된다.
                 BigDecimal effectiveWithholding = immediate.min(withholding.withholdingAmount());
-                BigDecimal afterWithholding = immediate.subtract(effectiveWithholding);
-                BigDecimal offset = offsetSellerRecoveryUseCase.offsetForConfirmedSettlement(
-                        saved.getId(), sellerId, afterWithholding, saved.getSettlementDate());
-                // 발행 이벤트(publishWithholdingAccrued)와 payout 감액이 반드시 동일한 effectiveWithholding 을
-                // 써야 account GL 통제계정이 0 으로 닫힌다(GL 감사 HIGH #4 봉합).
-                // max(0): 상계 서비스는 재실행 시 '넘긴 가용액'이 아니라 기존 상계 총액을 그대로 반환하므로,
-                // 차감 순서가 바뀌기 전에 상계된 정산을 재확정하면 잔여를 초과할 수 있다. 음수 지급 요청은 금지다.
-                BigDecimal payoutAmount = afterWithholding.subtract(offset).max(BigDecimal.ZERO);
                 if (effectiveWithholding.compareTo(withholding.withholdingAmount()) < 0) {
                     meterRegistry.counter(METRIC_WITHHOLDING_SHORTFALL).increment();
                     log.error("[SettlementConfirm] 원천징수({})가 즉시지급액({})을 초과 — 실제 징수액({})으로 캡핑, "
@@ -131,9 +110,6 @@ public class SettlementConfirmItemWriter implements ItemWriter<Settlement> {
                     publishSettlementDomainEventPort.publishWithholdingAccrued(
                             saved.getId(), sellerId, effectiveWithholding);
                 }
-
-                requestPayoutUseCase.requestPayoutOfType(
-                        saved.getId(), sellerId, payoutAmount, PayoutType.IMMEDIATE);
             });
         }
 
