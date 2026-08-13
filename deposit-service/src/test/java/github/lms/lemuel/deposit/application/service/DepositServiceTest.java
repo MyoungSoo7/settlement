@@ -43,6 +43,7 @@ class DepositServiceTest {
     private SaveDepositEntryPort saveEntryPort;
     private LoadDepositHoldPort loadHoldPort;
     private SaveDepositHoldPort saveHoldPort;
+    private LoadDepositOffsetShortfallPort loadShortfallPort;
     private SaveDepositOffsetShortfallPort saveShortfallPort;
     private PublishDepositEventPort publishEventPort;
 
@@ -55,6 +56,7 @@ class DepositServiceTest {
         saveEntryPort = mock(SaveDepositEntryPort.class);
         loadHoldPort = mock(LoadDepositHoldPort.class);
         saveHoldPort = mock(SaveDepositHoldPort.class);
+        loadShortfallPort = mock(LoadDepositOffsetShortfallPort.class);
         saveShortfallPort = mock(SaveDepositOffsetShortfallPort.class);
         publishEventPort = mock(PublishDepositEventPort.class);
 
@@ -71,7 +73,7 @@ class DepositServiceTest {
         when(saveShortfallPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         service = new DepositService(loadAccountPort, saveAccountPort, saveEntryPort,
-                loadHoldPort, saveHoldPort, saveShortfallPort, publishEventPort);
+                loadHoldPort, saveHoldPort, loadShortfallPort, saveShortfallPort, publishEventPort);
     }
 
     /** 지정 잔고를 가진 영속 계좌. */

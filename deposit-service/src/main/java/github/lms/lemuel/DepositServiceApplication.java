@@ -4,6 +4,7 @@ import io.github.cdimascio.dotenv.Dotenv;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * deposit-service 독립 부팅 진입점.
@@ -17,11 +18,14 @@ import org.springframework.cache.annotation.EnableCaching;
  * <p>JPA Auditing 은 {@code deposit.config.JpaAuditingConfig} 로 분리했다 — 여기에 두면
  * {@code @WebMvcTest} 슬라이스가 JPA 메타모델 없이 {@code jpaAuditingHandler} 를 만들려다 전부 깨진다.
  *
- * <p>{@code @EnableScheduling} 은 현재 deposit 코드에 {@code @Scheduled} 메서드가 없어 생략한다
- * (card 의 한도 재산정 배치 같은 필요가 생기면 그때 추가).
+ * <p>{@code @EnableScheduling} 은 만료 hold 회수 배치({@code DepositHoldExpiryScheduler})에 필요하다.
+ * 이게 꺼져 있으면 스케줄러 빈은 정상 생성되지만 <b>한 번도 호출되지 않는다</b> — 기동 로그에도
+ * 아무 경고가 없어서, 만료된 hold 가 계속 쌓이는 동안 배선이 살아 있다고 착각하기 쉽다.
+ * ShedLock 은 shared-common 의 {@code SchedulingLockConfig} 가 함께 켠다.
  */
 @SpringBootApplication
 @EnableCaching
+@EnableScheduling
 public class DepositServiceApplication {
 
     public static void main(String[] args) {

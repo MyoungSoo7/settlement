@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -24,7 +25,8 @@ import java.util.Optional;
 @Transactional
 public class DepositService
         implements CreditDepositUseCase, DebitDepositUseCase,
-                   PlaceHoldUseCase, ApplyOffsetUseCase, QueryDepositAccountUseCase {
+                   PlaceHoldUseCase, ApplyOffsetUseCase, QueryDepositAccountUseCase,
+                   ExpireDueHoldsUseCase, ManageShortfallUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(DepositService.class);
 
@@ -35,6 +37,7 @@ public class DepositService
     private final SaveDepositEntryPort saveEntryPort;
     private final LoadDepositHoldPort loadHoldPort;
     private final SaveDepositHoldPort saveHoldPort;
+    private final LoadDepositOffsetShortfallPort loadShortfallPort;
     private final SaveDepositOffsetShortfallPort saveShortfallPort;
     private final PublishDepositEventPort publishEventPort;
 
@@ -43,6 +46,7 @@ public class DepositService
                            SaveDepositEntryPort saveEntryPort,
                            LoadDepositHoldPort loadHoldPort,
                            SaveDepositHoldPort saveHoldPort,
+                           LoadDepositOffsetShortfallPort loadShortfallPort,
                            SaveDepositOffsetShortfallPort saveShortfallPort,
                            PublishDepositEventPort publishEventPort) {
         this.loadAccountPort = loadAccountPort;
@@ -50,6 +54,7 @@ public class DepositService
         this.saveEntryPort = saveEntryPort;
         this.loadHoldPort = loadHoldPort;
         this.saveHoldPort = saveHoldPort;
+        this.loadShortfallPort = loadShortfallPort;
         this.saveShortfallPort = saveShortfallPort;
         this.publishEventPort = publishEventPort;
     }
@@ -197,6 +202,126 @@ public class DepositService
 
         log.info("[deposit] offset applied sellerId={} holderRef={} amount={} applied={}",
                 sellerId, holderReference, offsetAmount, applied);
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // 만료 hold 회수 (배치)
+    // ──────────────────────────────────────────────────────────────────────────
+
+    /**
+     * 건별 독립 트랜잭션이 아니라 <b>건별 예외 격리</b>다 — 한 건이 터져도 루프를 멈추지 않고,
+     * 실패한 hold 는 ACTIVE 로 남아 다음 회차가 다시 집는다. 배치가 매번 다시 도는 것 자체가
+     * 복구 수단이므로, 실패를 삼키지 않되(로그+카운트) 전체를 되돌리지도 않는다.
+     */
+    @Override
+    public int expireDueHolds(LocalDateTime cutoff) {
+        List<DepositHold> due = loadHoldPort.findExpiredStillHolding(cutoff);
+        if (due.isEmpty()) {
+            return 0;
+        }
+
+        int expired = 0;
+        for (DepositHold hold : due) {
+            try {
+                expireOne(hold);
+                expired++;
+            } catch (RuntimeException e) {
+                // 삼키지 않는다 — 남기고 넘어간다. 조용히 건너뛰면 영영 안 풀리는 hold 가 생긴다.
+                log.error("[deposit] hold 만료 회수 실패 holdId={} accountId={} — 다음 회차 재시도",
+                        hold.getId(), hold.getAccountId(), e);
+            }
+        }
+        log.info("[deposit] hold 만료 회수: 대상 {}건 중 {}건 처리", due.size(), expired);
+        return expired;
+    }
+
+    private void expireOne(DepositHold hold) {
+        SellerDepositAccount account = loadAccountPort.findByIdForUpdate(hold.getAccountId())
+                .orElseThrow(() -> new IllegalStateException(
+                        "hold 가 가리키는 계좌가 없습니다. accountId=" + hold.getAccountId()));
+
+        // 되돌리는 것은 remaining 이다. 부분 캡처된 hold 에서 originalAmount 를 쓰면
+        // 이미 계좌를 떠난 캡처분까지 available 로 되살아나 없는 돈이 생긴다.
+        BigDecimal remaining = hold.getRemainingAmount();
+
+        // 종단 상태를 갈라 적는다 — 둘 다 "재원을 놓았다"지만 사후에 읽는 의미가 다르다.
+        // EXPIRED = 한 번도 쓰이지 않고 시간이 지났다(상류가 매입을 아예 안 보냈다).
+        // RELEASED = 쓰이다 남은 잔여를 놓았다(상류가 일부만 매입했다).
+        // 하나로 뭉개면 "왜 이 hold 가 풀렸나"를 카드 승인 쪽과 대사할 때 구분이 사라진다.
+        if (hold.getStatus() == DepositHoldStatus.PARTIALLY_CAPTURED) {
+            hold.release();
+        } else {
+            hold.expire();
+        }
+        saveHoldPort.save(hold);
+
+        if (remaining.signum() > 0) {
+            account.release(remaining);
+            saveAccountPort.save(account);
+
+            DepositEntry entry = DepositEntry.of(account.getId(), DepositEntryType.RELEASE,
+                    remaining, hold.getHolderReference(), hold.getHolderType().name());
+            saveEntryPort.save(entry);
+            publishEventPort.publishHoldReleased(hold, account);
+        }
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // 부족분 해소 (운영자 주도)
+    // ──────────────────────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<DepositOffsetShortfall> findOpenShortfalls() {
+        return loadShortfallPort.findByStatus(DepositShortfallStatus.OPEN);
+    }
+
+    @Override
+    public BigDecimal resolveFromAvailable(Long shortfallId) {
+        DepositOffsetShortfall shortfall = requireShortfall(shortfallId);
+        BigDecimal outstanding = shortfall.getShortfallAmount();
+
+        SellerDepositAccount account = loadAccountForUpdate(shortfall.getSellerId());
+        if (account.getAvailable().compareTo(outstanding) < 0) {
+            // 부분 해소를 하지 않는 이유 — 남은 부족분이 새 레코드를 낳거나 같은 레코드를
+            // 두 번 건드리게 되고, 그러면 "이 부족분은 언제 덮였나"의 답이 갈래로 쪼개진다.
+            throw new InsufficientDepositException(
+                    "가용액(" + account.getAvailable() + ")이 부족분(" + outstanding + ")에 못 미칩니다",
+                    String.valueOf(shortfall.getSellerId()), "resolveShortfall");
+        }
+
+        account.debitAvailable(outstanding);
+        saveAccountPort.save(account);
+
+        DepositEntry entry = DepositEntry.ofOffset(account.getId(), outstanding,
+                shortfall.getHolderReference(), shortfall.getHolderType().name(),
+                0, shortfall.getSourceHoldId());
+        saveEntryPort.save(entry);
+
+        shortfall.resolve(outstanding);
+        saveShortfallPort.save(shortfall);
+
+        publishEventPort.publishOffsetApplied(entry, account);
+        publishEventPort.publishBalanceChanged(account, "SHORTFALL_RESOLVED");
+        log.info("[deposit] shortfall 해소 id={} sellerId={} amount={}",
+                shortfallId, shortfall.getSellerId(), outstanding);
+        return outstanding;
+    }
+
+    @Override
+    public void writeOff(Long shortfallId) {
+        DepositOffsetShortfall shortfall = requireShortfall(shortfallId);
+        shortfall.writeOff();
+        saveShortfallPort.save(shortfall);
+        // 잔고를 건드리지 않는다 — 상각은 돈의 이동이 아니라 회수를 포기했다는 판단의 기록이다.
+        log.warn("[deposit] shortfall 상각 id={} sellerId={} amount={}",
+                shortfallId, shortfall.getSellerId(), shortfall.getShortfallAmount());
+    }
+
+    private DepositOffsetShortfall requireShortfall(Long shortfallId) {
+        return loadShortfallPort.findById(shortfallId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "부족분을 찾을 수 없습니다: " + shortfallId));
     }
 
     // ──────────────────────────────────────────────────────────────────────────

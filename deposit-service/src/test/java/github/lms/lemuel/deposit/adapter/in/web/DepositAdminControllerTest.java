@@ -4,9 +4,12 @@ import github.lms.lemuel.common.config.jwt.JwtUtil;
 import github.lms.lemuel.deposit.application.port.in.ApplyOffsetUseCase;
 import github.lms.lemuel.deposit.application.port.in.CreditDepositUseCase;
 import github.lms.lemuel.deposit.application.port.in.DebitDepositUseCase;
+import github.lms.lemuel.deposit.application.port.in.ManageShortfallUseCase;
 import github.lms.lemuel.deposit.application.port.in.PlaceHoldUseCase;
 import github.lms.lemuel.deposit.domain.DepositHold;
 import github.lms.lemuel.deposit.domain.DepositHolderType;
+import github.lms.lemuel.deposit.domain.DepositOffsetShortfall;
+import github.lms.lemuel.deposit.domain.exception.InsufficientDepositException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +22,8 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -26,6 +31,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -49,6 +55,7 @@ class DepositAdminControllerTest {
     @MockitoBean DebitDepositUseCase debitDepositUseCase;
     @MockitoBean PlaceHoldUseCase placeHoldUseCase;
     @MockitoBean ApplyOffsetUseCase applyOffsetUseCase;
+    @MockitoBean ManageShortfallUseCase manageShortfallUseCase;
 
     @Test
     @DisplayName("수기 입금은 본문의 멱등 키를 그대로 유스케이스로 넘긴다")
@@ -110,5 +117,58 @@ class DepositAdminControllerTest {
 
         verify(applyOffsetUseCase).applyOffset(eq(777L), eq(DepositHolderType.CARD_AUTHORIZATION),
                 eq("AUTH-1"), any(), anyInt(), any());
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // 부족분 해소 경로 — 자동 배치가 없는 자리라 이 콘솔이 유일한 출구다
+    // ──────────────────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("미해소 부족분 목록은 요청·적용·부족 세 금액을 모두 낸다 — 부족분만 주면 우선순위를 못 정한다")
+    void listsOpenShortfallsWithAllThreeAmounts() throws Exception {
+        DepositOffsetShortfall s = DepositOffsetShortfall.open(
+                777L, DepositHolderType.CARD_AUTHORIZATION, "CAP-1",
+                new BigDecimal("3000"), new BigDecimal("1000"), null, OffsetDateTime.now());
+        s.assignId(99L);
+        when(manageShortfallUseCase.findOpenShortfalls()).thenReturn(List.of(s));
+
+        mockMvc.perform(get("/admin/deposits/shortfalls"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(99))
+                .andExpect(jsonPath("$[0].requestedAmount").value(3000))
+                .andExpect(jsonPath("$[0].appliedAmount").value(1000))
+                .andExpect(jsonPath("$[0].shortfallAmount").value(2000))
+                .andExpect(jsonPath("$[0].status").value("OPEN"));
+    }
+
+    @Test
+    @DisplayName("부족분 해소는 실제 차감액을 돌려준다 — 운영자가 얼마가 움직였는지 응답에서 확인해야 한다")
+    void resolveReturnsAppliedAmount() throws Exception {
+        when(manageShortfallUseCase.resolveFromAvailable(99L)).thenReturn(new BigDecimal("2000"));
+
+        mockMvc.perform(post("/admin/deposits/shortfalls/99/resolve"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.appliedAmount").value(2000));
+    }
+
+    @Test
+    @DisplayName("가용액 부족이면 422 — 200 으로 뭉개면 운영자가 해소됐다고 믿는다")
+    void resolveRejectsWhenInsufficient() throws Exception {
+        when(manageShortfallUseCase.resolveFromAvailable(99L))
+                .thenThrow(new InsufficientDepositException("가용액 부족", "777", "resolveShortfall"));
+
+        // 422 는 이 서비스가 잔고 부족 전반에 쓰는 코드다(ErrorCode.INSUFFICIENT_DEPOSIT).
+        // 해소 실패만 409 로 달리 주면 클라이언트가 같은 원인을 두 갈래로 다루게 된다.
+        mockMvc.perform(post("/admin/deposits/shortfalls/99/resolve"))
+                .andExpect(status().isUnprocessableEntity());
+    }
+
+    @Test
+    @DisplayName("상각은 204 — 잔고가 움직이지 않으므로 돌려줄 금액이 없다")
+    void writeOffReturnsNoContent() throws Exception {
+        mockMvc.perform(post("/admin/deposits/shortfalls/99/write-off"))
+                .andExpect(status().isNoContent());
+
+        verify(manageShortfallUseCase).writeOff(99L);
     }
 }

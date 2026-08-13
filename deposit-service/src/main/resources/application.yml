@@ -146,3 +146,17 @@ app:
       #   두 이벤트의 페이로드에 sellerId 가 없고(cardAccountId 만 있다) card 의 sellerId 는
       #   String, deposit 은 Long 이라 이벤트만으로 대상 예치 계좌를 특정할 수 없다.
       #   그때까지 hold·offset 입력은 /admin/deposits 콘솔 경로다(SPEC §3.16).
+
+  deposit:
+    hold:
+      # 만료 hold 회수 — 매시 5분(KST). 일 1회면 만료와 회수 사이에 최대 24시간의 공백이 생기고
+      # 그동안 셀러 가용액이 이유 없이 줄어 있다. 회수는 계좌 단건 락이라 자주 도는 비용이 더 싸다.
+      expiry-cron: ${APP_DEPOSIT_HOLD_EXPIRY_CRON:0 5 * * * *}
+    shortfall:
+      # 부족분 적체 지표 갱신 주기. Gauge 콜백에서 DB 를 읽지 않는 대신 여기서 스냅샷을 채운다
+      # (스크레이프가 DB 지연을 물지 않게 — ShortfallBacklogMetrics 참조).
+      metrics-interval-ms: ${APP_DEPOSIT_SHORTFALL_METRICS_INTERVAL_MS:300000}
+      metrics-initial-delay-ms: ${APP_DEPOSIT_SHORTFALL_METRICS_INITIAL_DELAY_MS:30000}
+      # 0 이면 경고 로그 없음(지표만). 운영에서 값을 넣어 적체를 사람에게 알린다 —
+      # 부족분은 자동으로 해소되지 않으므로 아무도 안 보면 조용히 쌓인다.
+      alert-threshold: ${APP_DEPOSIT_SHORTFALL_ALERT_THRESHOLD:0}

@@ -7,6 +7,7 @@ import github.lms.lemuel.deposit.domain.DepositShortfallStatus;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Optional;
 
 @Component
 public class DepositOffsetShortfallPersistenceAdapter
@@ -44,6 +45,11 @@ public class DepositOffsetShortfallPersistenceAdapter
     @Override
     public List<DepositOffsetShortfall> findByStatus(DepositShortfallStatus status) {
         return repo.findByStatus(status).stream().map(this::toDomain).toList();
+    }
+
+    @Override
+    public Optional<DepositOffsetShortfall> findById(Long id) {
+        return repo.findById(id).map(this::toDomain);
     }
 
     private DepositOffsetShortfall toDomain(DepositOffsetShortfallJpaEntity e) {
