@@ -78,6 +78,10 @@ public enum ErrorCode {
     // ─── loan (담보·개인신용 대출) ───────────────────────────────────────────────
     SECURED_LOAN_NOT_FOUND(HttpStatus.NOT_FOUND, "담보/개인신용 대출을 찾을 수 없습니다."),
     SECURED_LOAN_REJECTED(HttpStatus.UNPROCESSABLE_ENTITY, "담보/개인신용 대출 심사가 거절되었습니다."),
+    // 담보서류 OCR (ADR 0036 확산) — 판독 실패는 무폴백 503, 대사 미통과 승인은 422.
+    LOAN_COLLATERAL_DOC_NOT_FOUND(HttpStatus.NOT_FOUND, "담보서류를 찾을 수 없습니다."),
+    LOAN_COLLATERAL_DOC_OCR_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "담보서류 판독에 실패했습니다. 잠시 후 다시 시도해주세요."),
+    LOAN_COLLATERAL_DOC_NOT_MATCHED(HttpStatus.UNPROCESSABLE_ENTITY, "담보서류 대사가 완료되지 않아 승인할 수 없습니다."),
 
     // ─── loan (리스·할부 물건금융) ──────────────────────────────────────────────
     LEASE_CONTRACT_NOT_FOUND(HttpStatus.NOT_FOUND, "리스·할부 계약을 찾을 수 없습니다."),

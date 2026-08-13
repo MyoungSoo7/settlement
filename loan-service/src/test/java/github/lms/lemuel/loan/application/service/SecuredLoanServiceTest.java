@@ -6,12 +6,14 @@ import github.lms.lemuel.loan.application.port.in.RequestSecuredLoanUseCase.Pers
 import github.lms.lemuel.loan.application.port.out.AppendLedgerPort;
 import github.lms.lemuel.loan.application.port.out.BaseRatePort;
 import github.lms.lemuel.loan.application.port.out.CollateralValuationPort;
+import github.lms.lemuel.loan.application.port.out.LoadCollateralDocumentPort;
 import github.lms.lemuel.loan.application.port.out.LoadSecuredLoanPort;
 import github.lms.lemuel.loan.application.port.out.LoanMetricsPort;
 import github.lms.lemuel.loan.application.port.out.PublishSecuredLoanEventPort;
 import github.lms.lemuel.loan.application.port.out.SaveSecuredLoanPort;
 import github.lms.lemuel.loan.domain.BorrowerType;
 import github.lms.lemuel.loan.domain.Collateral;
+import github.lms.lemuel.loan.domain.CollateralDocument;
 import github.lms.lemuel.loan.domain.CollateralStatus;
 import github.lms.lemuel.loan.domain.CollateralType;
 import github.lms.lemuel.loan.domain.LedgerAccount;
@@ -62,6 +64,19 @@ class SecuredLoanServiceTest {
     private RepaySecuredLoanService repayService;
     private SecuredLoanCollectionService collectionService;
 
+    /** 담보서류 미첨부 — 게이트가 기존 경로를 바꾸지 않음을 전제로 한다 (ADR 0036 점진 도입). */
+    private static final LoadCollateralDocumentPort NO_DOCUMENTS = new LoadCollateralDocumentPort() {
+        @Override public java.util.Optional<CollateralDocument> findById(Long id) {
+            return java.util.Optional.empty();
+        }
+        @Override public java.util.Optional<CollateralDocument> findByLoanIdAndFileHash(Long loanId, String fileHash) {
+            return java.util.Optional.empty();
+        }
+        @Override public java.util.Optional<CollateralDocument> findLatestByLoanId(Long loanId) {
+            return java.util.Optional.empty();
+        }
+    };
+
     @BeforeEach
     void setUp() {
         store = new FakeSecuredLoanStore();
@@ -72,7 +87,8 @@ class SecuredLoanServiceTest {
         BaseRatePort baseRate = () -> BASE_RATE;
 
         requestService = new RequestSecuredLoanService(store, valuation, baseRate, metrics, LTV, FIXED_CLOCK);
-        disburseService = new DisburseSecuredLoanService(store, store, ledger, events, metrics, FIXED_CLOCK);
+        disburseService = new DisburseSecuredLoanService(store, store, ledger, events, metrics,
+                NO_DOCUMENTS, FIXED_CLOCK);
         repayService = new RepaySecuredLoanService(store, store, ledger, events, metrics);
         collectionService = new SecuredLoanCollectionService(store, store);
     }

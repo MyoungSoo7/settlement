@@ -82,9 +82,22 @@ card/adapter/in/web/  POST /internal/api/v1/expense-reports/{reportId}/receipts 
 
 ### 5. 범위 밖
 
-- **Kafka 신규 토픽 없음** — 대사는 card-service 내부에서 닫힌다(계약 작업·컨슈머 없음).
-- 예산 초과 승인 차단(카드-rules 기존 결정 유지), insurance 청약·loan 담보 확산(후속 — 본 ADR 의
-  클라이언트를 그대로 쓰면 각 서비스 어댑터 1개 + 도메인 판정만 추가하면 된다).
+- **Kafka 신규 토픽 없음** — 대사는 각 서비스 내부에서 닫힌다(계약 작업·컨슈머 없음).
+- 예산 초과 승인 차단(카드-rules 기존 결정 유지).
+
+### 6. 확산 (2026-08-14 완료)
+
+본 ADR 의 클라이언트 위에 서비스별 어댑터 1개 + 도메인 판정만 얹어 두 서비스로 확산했다 — 구조는 전부 동형
+(첨부 애그리거트 · `(anchor, file_hash)` 멱등 · 자동 대사 · 승인 게이트 점진 도입 · NEEDS_REVIEW 리뷰 큐 · 무폴백 503):
+
+| 서비스 | 서류 | 대사 축 (정본 값) | 승인 게이트 위치 |
+|---|---|---|---|
+| insurance | 청약서 | 연 보험료·보장금액(정확 일치) · 청약일(접수일 KST ±1일) | `ApplicationUnderwritingService.approve` — 완전판매 게이트 직후 |
+| loan | 감정평가서·등기부 | 감정평가액(정확 일치) · **선순위 채권최고액**(자기신고값의 유일한 검증 수단) · 평가기준일(±1일) | `DisburseSecuredLoanService.approve` — 담보 유효화(ACTIVE) 직전 |
+
+- insurance 는 하우스 컨벤션(전용 타입 예외 + 컨트롤러 로컬 핸들러)을, loan 은 `LoanDomainException`(ErrorCode
+  경유)을 따랐다 — 예외 매핑 방식은 서비스 관례가 우선이고 상태코드 계약(404/422/503)만 통일했다.
+- PII 최소화: insurance 청약서 프롬프트는 주민번호·연락처를 요구하지 않는다(추출 자체를 배제).
 
 ## 결과
 

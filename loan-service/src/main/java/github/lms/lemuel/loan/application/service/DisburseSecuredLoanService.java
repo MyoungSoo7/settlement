@@ -2,13 +2,16 @@ package github.lms.lemuel.loan.application.service;
 
 import github.lms.lemuel.loan.application.port.in.DisburseSecuredLoanUseCase;
 import github.lms.lemuel.loan.application.port.out.AppendLedgerPort;
+import github.lms.lemuel.loan.application.port.out.LoadCollateralDocumentPort;
 import github.lms.lemuel.loan.application.port.out.LoadSecuredLoanPort;
 import github.lms.lemuel.loan.application.port.out.LoanMetricsPort;
 import github.lms.lemuel.loan.application.port.out.PublishSecuredLoanEventPort;
 import github.lms.lemuel.loan.application.port.out.SaveSecuredLoanPort;
 import github.lms.lemuel.loan.domain.Collateral;
+import github.lms.lemuel.loan.domain.CollateralDocumentStatus;
 import github.lms.lemuel.loan.domain.LoanLedgerEntry;
 import github.lms.lemuel.loan.domain.SecuredLoan;
+import github.lms.lemuel.loan.domain.exception.CollateralDocumentNotMatchedException;
 import github.lms.lemuel.loan.domain.exception.SecuredLoanNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +37,7 @@ public class DisburseSecuredLoanService implements DisburseSecuredLoanUseCase {
     private final AppendLedgerPort appendLedgerPort;
     private final PublishSecuredLoanEventPort publishSecuredLoanEventPort;
     private final LoanMetricsPort loanMetricsPort;
+    private final LoadCollateralDocumentPort loadCollateralDocumentPort;
     private final Clock clock;
 
     public DisburseSecuredLoanService(LoadSecuredLoanPort loadSecuredLoanPort,
@@ -41,19 +45,33 @@ public class DisburseSecuredLoanService implements DisburseSecuredLoanUseCase {
                                       AppendLedgerPort appendLedgerPort,
                                       PublishSecuredLoanEventPort publishSecuredLoanEventPort,
                                       LoanMetricsPort loanMetricsPort,
+                                      LoadCollateralDocumentPort loadCollateralDocumentPort,
                                       Clock clock) {
         this.loadSecuredLoanPort = loadSecuredLoanPort;
         this.saveSecuredLoanPort = saveSecuredLoanPort;
         this.appendLedgerPort = appendLedgerPort;
         this.publishSecuredLoanEventPort = publishSecuredLoanEventPort;
         this.loanMetricsPort = loanMetricsPort;
+        this.loadCollateralDocumentPort = loadCollateralDocumentPort;
         this.clock = clock;
     }
 
+    /**
+     * 승인 — 담보 유효화(ACTIVE) 전에 담보서류 대사 게이트(ADR 0036)를 지난다.
+     *
+     * <p>서류가 첨부돼 있으면 최신 서류가 MATCHED 여야 통과 — MISMATCHED·NEEDS_REVIEW·EXTRACTED 는
+     * 422 로 거절한다(상태 불변). 서류가 없으면 기존 경로 그대로(점진 도입) — 전면 강제는 별도 결정.
+     */
     @Override
     @Transactional
     public SecuredLoan approve(Long loanId) {
         SecuredLoan loan = require(loanId);
+        loadCollateralDocumentPort.findLatestByLoanId(loanId).ifPresent(document -> {
+            if (document.getStatus() != CollateralDocumentStatus.MATCHED) {
+                throw new CollateralDocumentNotMatchedException(
+                        loanId, document.getStatus(), document.getMatchNote());
+            }
+        });
         loan.approve();
         activateCollateral(loan);
         return saveSecuredLoanPort.save(loan);
