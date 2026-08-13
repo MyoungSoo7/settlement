@@ -54,6 +54,7 @@ const ReconciliationConsolePage = lazy(() => import('./pages/settlement/Reconcil
 const LedgerConsolePage = lazy(() => import('./pages/settlement/LedgerConsolePage'));
 const PgReconciliationConsolePage = lazy(() => import('./pages/settlement/PgReconciliationConsolePage'));
 const ChargebackConsolePage = lazy(() => import('./pages/settlement/ChargebackConsolePage'));
+const RecoveryConsolePage = lazy(() => import('./pages/settlement/RecoveryConsolePage'));
 
 // 인쇄 전용 (레이아웃 없이 문서만 그리는 화면 — 새 창으로 열린다)
 const SettlementPrintPage = lazy(() => import('./pages/print/SettlementPrintPage'));
@@ -172,6 +173,8 @@ function App() {
             {/* 차지백은 서버가 /admin/chargebacks/** 를 ADMIN 전용으로 막는다 — 라우트도 같은 등급으로 */}
             <Route path="/admin/settlement/chargebacks"
               element={<AdminOnlyRoute><SideNavLayout><ChargebackConsolePage /></SideNavLayout></AdminOnlyRoute>} />
+            <Route path="/admin/settlement/recoveries"
+              element={<AdminManagerRoute><SideNavLayout><RecoveryConsolePage /></SideNavLayout></AdminManagerRoute>} />
             {/* 원장 조회는 ADMIN·MANAGER, 시산표·기간 마감은 ADMIN 전용이라 화면 안에서 역할로 가른다
                 (라우트를 ADMIN 으로 잠그면 MANAGER 가 분개 조회조차 못 한다) */}
             <Route path="/admin/settlement/ledger"

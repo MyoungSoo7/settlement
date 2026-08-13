@@ -53,6 +53,7 @@ export const FALLBACK_MENUS: FallbackMenuNode[] = [
       { id: -103, name: '일일 대사', path: '/admin/settlement/reconciliation', icon: '🔀', description: 'order ↔ settlement 이중장부', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       { id: -104, name: 'PG 대사', path: '/admin/settlement/pg-reconciliation', icon: '🧾', description: 'PG 정산파일 업로드 · 차이 승인 · 마감', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       { id: -105, name: '차지백', path: '/admin/settlement/chargebacks', icon: '⚖️', description: '카드사 분쟁 수락 · 기각', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN'] },
+      { id: -106, name: '회수 채권', path: '/admin/settlement/recoveries', icon: '🧲', description: '셀러별 미상계 잔액 · 상계 이력', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       { id: -102, name: '원장·시산표', path: '/admin/settlement/ledger', icon: '📒', description: '분개 조회 · 월 시산표 · 기간 마감', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
     ],
   },
