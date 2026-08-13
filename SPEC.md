@@ -442,7 +442,7 @@ insurance·deposit 토픽은 아직 계약 스키마(testFixtures)에 편입되�
 - **관측**: Prometheus + Micrometer + Grafana + OTLP 트레이싱, 서비스별 헬스/프로브.
 - **테스트**: 도메인→서비스→컨트롤러→통합 순. JaCoCo CI 게이트 **LINE 90%**, 핵심 도메인 INSTRUCTION 80%.
   settlement 통합테스트는 Testcontainers PostgreSQL.
-- **배포**: Docker Compose(로컬, DB-per-service PG 16종+ES+Redpanda+앱 컨테이너 18개(JVM 17+market-stream)), Kubernetes(운영, GitHub Actions→GHCR→ArgoCD+image-updater GitOps), Flyway 마이그레이션. 폴리글랏 7종은 전용 차트로 격리 배포(상세: [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) §5).
+- **배포**: Docker Compose(로컬, DB-per-service PG 16종+ES+Redpanda+앱 컨테이너 18개(JVM 17+market-stream)), Kubernetes(운영, GitHub Actions→GHCR→ArgoCD+image-updater GitOps), Flyway 마이그레이션. 폴리글랏 7종은 전용 차트로 격리 배포(상세: [`ARCHITECTURE.md`](ARCHITECTURE.md) §5).
 - **운영 필수 설정**: `JWT_SECRET`(강함), `app.security.internal-key-required=true`, 각 서비스 외부 API 키.
 
 ---
@@ -450,7 +450,7 @@ insurance·deposit 토픽은 아직 계약 스키마(testFixtures)에 편입되�
 ## 7. 관련 문서
 
 - 아키텍처·컨벤션: [`CLAUDE.md`](./CLAUDE.md) · 사용자 문서: [`README.md`](./README.md)
-- 아키텍처 개요(24서비스 인벤토리·패턴·스택): [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) · 폴리글랏 정본: [`docs/plan/polyglot-services.md`](docs/plan/polyglot-services.md)
+- 아키텍처 개요(24서비스 인벤토리·패턴·스택): [`ARCHITECTURE.md`](ARCHITECTURE.md) · 폴리글랏 정본: [`docs/plan/polyglot-services.md`](docs/plan/polyglot-services.md)
 - 아키텍처 결정: [`docs/adr/`](./docs/adr/) (ADR 0020 DB 분리, 0024 이벤트 계약, 0026 계정계 payout 인식(제안) 등)
 - 도메인 규칙 스킬: `settlement-domain-rules`, `loan-domain-rules`, `investment-domain-rules`, `account-domain-rules`,
   `card-service-rules` (organization·insurance·deposit 는 전용 스킬 미배선 — `HARNESS.md` 커버리지 공백 참조)

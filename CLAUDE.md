@@ -38,7 +38,7 @@
 여기에 **폴리글랏 7종**(Kotlin 2 알림·대사 / Go 2 스트리밍·웹훅 / Python 3 백테스트·이상탐지·예측 — Gradle 미포함
 standalone, gateway 미라우팅 — 예외 2종: market-stream 은 `/api/market-stream/**` SSE, notification 은
 `/api/notifications/stream` 알림 푸시 SSE 만 gateway 라우팅 + compose 배선. 정본 [`docs/sse.md`](docs/sse.md))을
-더해 총 24개 서비스 = 16 + gateway 1 + 폴리글랏 7 (정본: `polyglot-services.md` · `docs/ARCHITECTURE.md`).
+더해 총 24개 서비스 = 16 + gateway 1 + 폴리글랏 7 (정본: `polyglot-services.md` · `ARCHITECTURE.md`).
 
 - **16개 서비스 모두 DB-per-service** — order=opslab, settlement=settlement_db, loan=lemuel_loan,
   financial=lemuel_financial, economics=lemuel_economics, company=lemuel_company, operation=lemuel_operation,
@@ -87,7 +87,7 @@ settlement/                       # Gradle 멀티 모듈 루트
   자체 DB 없음(무영속 MVP), CI 는 `polyglot-ci.yml` 분리 — 정본 `docs/plan/polyglot-services.md`.
 - 각 서비스의 **책임·API·유스케이스는 [`SPEC.md`](./SPEC.md), 강제 규칙은 `*-rules` 스킬** 참조.
 - 위 트리는 **에이전트용 경계 요약**(포트·DB·shared-common 의존 방식) — 전체 디렉토리·모듈 트리 정본은
-  [`docs/STRUCTURE.md`](docs/STRUCTURE.md). 로스터 드리프트는 `harness-audit` 가 `settings.gradle.kts` 와 대조해 차단.
+  [`STRUCTURE.md`](STRUCTURE.md). 로스터 드리프트는 `harness-audit` 가 `settings.gradle.kts` 와 대조해 차단.
 
 ## 헥사고날 아키텍처 (각 서비스 내부)
 
@@ -122,6 +122,12 @@ order Kafka 이벤트를 컨슈머(`adapter/in/kafka/`)가 받아 로컬 적재�
 - **이벤트 계약-as-code (ADR 0024)**: cross-service 토픽의 JSON Schema + 정본 샘플이
   `shared-common/src/testFixtures/resources/contracts/events/` 에 단일 출처. 프로듀서·컨슈머 **양방향 계약 테스트**로
   드리프트를 빌드 시점 차단. 소비: `testImplementation(testFixtures("github.lms.lemuel:shared-common:1.0.0"))`.
+- **토픽 전송 속성 (ADR 0035)**: 파티션·보존기간·순서키·소유 모듈의 정본은
+  `shared-common/src/main/resources/kafka/topic-catalog.json`. 메시지 키가 outbox `aggregateId` 이므로
+  **파티션 수 변경 = 키 재해시 = 순서 보장 소급 붕괴** — 되돌릴 수 없다. 토픽을 만드는 주체는 발행 모듈
+  하나뿐이며(`app.kafka.topic.owner`), 프로비저너는 없는 토픽만 만들고 기존 파티션은 절대 늘리지 않는다
+  (드리프트는 `kafka.topic.partition.drift` 게이지). 새 토픽은 카탈로그 등록 필수 — 누락 시
+  `kafka-topic-gate.test.mjs` 가 CI 에서 FAIL.
 - 토픽 목록·프로듀서/컨슈머 매핑 → [`SPEC.md`](./SPEC.md) §5. 이벤트/멱등 코드 작성 규칙 → `idempotency-and-events` 스킬.
   토픽 추가·페이로드 변경 절차(스키마·샘플·양방향 테스트 배선) → `event-contract-change` 스킬.
 
@@ -153,7 +159,7 @@ order Kafka 이벤트를 컨슈머(`adapter/in/kafka/`)가 받아 로컬 적재�
 - **절차 규율(플러그인 독립, `.claude/skills/` 자체 내재)**: 구현·버그픽스 착수 전 → `tdd-discipline`,
   버그·테스트 실패 조사 → `debugging-discipline`, "완료" 선언·커밋 직전 → `verify-before-done` 스킬 로드.
   외부 플러그인(superpowers 등) 스킬에 위임하지 않는다 — 미설치 환경에서도 동일하게 동작해야 한다.
-- **커밋**: develop 에 항목별 개별 커밋(리뷰·롤백 용이). `main` 은 보호 브랜치 — PR 필수, **squash 만**, 필수 CI 2종.
+- **커밋**: develop 에 항목별 개별 커밋(리뷰·롤백 용이). `main` 은 보호 브랜치(ruleset `settlement`, `~DEFAULT_BRANCH`) — PR 필수(승인 0인·스레드 해소 필수), **squash 만**, deletion·non-fast-forward 금지, **필수 CI 6종**: `Detect changed paths` · `Backend - Build/Test/JaCoCo/SonarCloud` · `Frontend - Production Build & Quality` · `Frontend - Tests` · `guard`(harness-guard) · `SAST (Semgrep OSS)`. 조건부 스킵되는 잡은 `skipped` 로 보고돼 통과 처리되지만, `polyglot-ci` 는 워크플로 수준 `on.paths` 필터라 해당 경로 미변경 PR 에서 체크가 **아예 보고되지 않아** 영구 대기에 빠진다 — 그래서 필수에서 제외한다(정보성 유지).
   세션 로그·재생성 산출물(.omc/logs/cache)은 커밋 대상 아님. PowerShell 에서 커밋 메시지는 `git commit -F <file>`(here-string `@` 누수 회피).
 - **흔한 함정**:
   - `JWT_SECRET` 은 운영 필수(기본값 없음, ≥32바이트). 테스트는 부모 `build.gradle.kts` 의 test env 로 주입됨.

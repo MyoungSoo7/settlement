@@ -20,7 +20,7 @@
     "scripts/harness/test/scheduler-lock-gate.test.mjs",
     "scripts/harness/test/telemetry-report.test.mjs",
     "HARNESS.md",
-    "docs/HARNESS-IMPROVEMENT-LOG.md",
+    "docs/plan/HARNESS-IMPROVEMENT-LOG.md",
     "scripts/verify.sh",
     ".claude/skills/oo-score/SKILL.md",
     ".claude/commands/harness-check.md",

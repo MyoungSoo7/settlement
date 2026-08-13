@@ -11,7 +11,7 @@
 > 또한 아래 표의 gateway 책임에 적힌 "인증"은 **실현되지 않았다** — 게이트웨이는 경로 라우팅 전용이고,
 > JWT 인증·rate limit 은 각 서비스의 `shared-common` 필터 체인이 담당한다(중앙 인증 게이트 대신
 > 서비스별 심층 방어). 대응 관계는
-> [ARCHITECTURE §7](../ARCHITECTURE.md#7-금융권-아키텍처-용어-대응-mci--eai--esb--fep) 참조.
+> [ARCHITECTURE §7](../../ARCHITECTURE.md#7-금융권-아키텍처-용어-대응-mci--eai--esb--fep) 참조.
 >
 > Java 25 / Boot 4 / 멀티모듈 분리라는 본 결정은 그대로 유효하다.
 

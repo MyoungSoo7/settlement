@@ -37,6 +37,7 @@
 | [0032](0032-effective-dated-commission-rate-policy.md)          | 수수료율 유효기간 정책 (effective-dated + scope 우선순위)                                      | Proposed |
 | [0033](0033-telegram-spec-driven-codegen.md)                    | 전문(電文) 스펙 주도 코드 생성 (telegram spec-driven codegen)                                  | Accepted |
 | [0034](0034-ai-service-rag-pgvector.md)                         | ai-service RAG 지식베이스 (pgvector + 시스템 프롬프트 증강)                                    | Proposed |
+| [0035](0035-kafka-topic-catalog.md)                             | Kafka 토픽 카탈로그 (파티션 수를 코드 안으로 — 키 재해시 차단)                                 | Accepted |
 
 > **0019 결번**: 0019 번은 ADR 이 작성된 적이 없다(결번). 문서·코드 어디에도 참조가 없어 유실이 아니라
 > 건너뛴 번호로 간주한다. 규칙 1(번호 재사용 금지)에 따라 재할당하지 않는다.

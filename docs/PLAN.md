@@ -134,7 +134,7 @@
 
 ### 5.5b insurance-service (8108, mgmt 8109 / lemuel_insurance) ✅
 - GA(법인보험대리점) 플랫폼 — 상담 → 가입설계 → 청약 → 계약 → 유지·변경 → 수수료 정산을 하나로 잇는다
-- 상태머신 4종: Application/Policy/Proposal/Commission (전이표 상세는 [`plan/insurance-service.md`](plan/insurance-service.md))
+- 상태머신 4종: Application/Policy/Proposal/Commission (전이표 상세는 [`insurance-service.md`](plan/insurance-service.md))
 - 방카슈랑스 확장(V6+): 판매채널 FC/BANCA, 은행 채널 25%룰 모니터링, 대면 상품설명서 교부 증빙(완전판매 게이트)
 - 배치 7종(만기·가입설계 만료·월말 마감·수수료 지급·환수 스윕·일반지급·방카 집중도 감시)
 - PII(주민번호·연락처) 분리 테이블 암호화(`INSURANCE_ENC_KEY` 미설정 시 fail-closed)
@@ -183,6 +183,38 @@
 | 8-5 | operation Phase 4 AI 브리핑 | Phase 3 완료됨 | ⬜ 로드맵 |
 | 8-6 | organization 이벤트 소비처 배선(소비자 생기면 ADR 0024 절차로 계약 편입) | 소비 유스케이스 | ⬜ |
 | 8-7 | 신규 서비스 통합테스트 보강(커버리지 게이트 LINE 90% 후속) | 없음 | 🟡 진행 |
+| 8-8 | 정산운영 콘솔 — 화면 없는 `/admin/**` 표면 4종 노출 (아래 로스터) | 없음(서버 API 는 구현됨) | 🟡 7/11 랜딩 |
+
+### 8-8. 정산운영 콘솔 로스터 (화면 노출 현황)
+> settlement-service 의 `/admin/**` 은 **서버 표면만 있으면 curl·MCP 로만 굴러간다** — 운영자가 눈으로 볼 수단이 없다.
+> 아래는 *화면(라우트+메뉴) 기준* 현황이다. 서버 API 구현 여부는 Phase 2 표가 정본이고, 여기서 ⬜ 는 "API 는 있는데 화면이 없다"는 뜻이다.
+
+| 화면 | 라우트 | 서버 표면 | 상태 |
+|------|--------|----------|------|
+| 정합성 검증 | `/admin/settlement/integrity` | `/admin/integrity` | ✅ `72fcfc390` |
+| 일일 대사 | `/admin/settlement/reconciliation` | `/admin/reconciliation` | ✅ `72fcfc390` |
+| 원장·시산표 | `/admin/settlement/ledger` | `/api/ledger` · `/admin/ledger-periods` | ✅ `72fcfc390` |
+| PG 대사 | `/admin/settlement/pg-reconciliation` | `/admin/pg-reconciliation` | ✅ `9213fc61f` |
+| 차지백 | `/admin/settlement/chargebacks` | `/admin/chargebacks` | ✅ `9e16a4255` |
+| 회수 채권 | `/admin/settlement/recoveries` | `/admin/recoveries` | ✅ `77a3ec8ce` |
+| 월마감 | `/admin/settlement/monthly-closing` | `/admin/monthly-closing` | ✅ `aeadb1937`+`29743b4ed` |
+| 세무(세금계산서) | `/admin/settlement/tax` (예정) | `/admin/tax/scans` · `/admin/seller-tax-profiles` · `/admin/tax/settlements/{id}` | ⬜ |
+| 수수료율 | `/admin/settlement/commission-rates` (예정) | `/admin/commission-rates` | ⬜ |
+| DLQ 재처리 | `/admin/settlement/dlq` (예정) | `/admin/dlq` | ⬜ |
+| 이벤트 추적·정산 재구동 | `/admin/settlement/event-track` (예정) | `/admin/event-track` · `/admin/settlements/rerun` | ⬜ |
+
+**라우트 접두사 고정**: 신규 화면도 `/admin/settlement/**` 아래에 둔다 — nginx SPA 폴백이 `/admin` 하위에서
+`(system|operation|ceo|settlement|login)` 만 index.html 로 내려보내므로, 다른 접두사는 새로고침·직접진입이 404 가 된다.
+
+**배선 2스텝**: `App.tsx` 라우트 + (시드 마이그레이션 & `frontend/src/data/menuFallback.ts` 한 행). 메뉴에 넣지 않을
+화면이면 `menu-route-gate` 의 `ROUTES_WITHOUT_MENU` 에 사유를 등록한다(안 하면 CI FAIL).
+
+**화면을 만들지 않는 표면**: 백필·일회성 도구(`/admin/payouts/backfill` · `/admin/payouts/pii` ·
+`/admin/backfill/ledger-reverse` · `/admin/outbox/ledger`)는 제외한다 — 1회성 집행 경로라 화면으로 상설하면
+운영자가 상시 기능으로 오해한다.
+
+**표기 정정**: 커밋 메시지의 `(P0 n/10)` 은 이 로스터로 대체한다. 당시 "10개" 목록이 어느 문서에도 남지 않아
+남은 항목을 코드(화면 없는 admin 컨트롤러)에서 역산했고, 그 결과 총량이 11 로 잡혔다.
 
 ---
 

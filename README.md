@@ -5,7 +5,7 @@
 > 여기에 **Go·Python·Kotlin 폴리글랏 7종**(실시간 시세 스트리밍·결제 웹훅·스크리닝 백테스트·이상탐지·예측·알림·정산 대사)을 더해 **총 24개 서비스**의 폴리글랏 MSA 로 도메인·언어 양방향 확장력을 증명한다.
 > 단일 모놀리스 → **Bounded Context 분리** → **이벤트 드리븐** → **DB-per-service + 이벤트 프로젝션 패턴**(ADR 0020) → **폴리글랏 MSA** 로 진화시킨 헥사고날 백엔드 포트폴리오.
 >
-> 📐 **전체 구성·아키텍처·디자인 패턴·기술 스택 한눈에 → [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**
+> 📐 **전체 구성·아키텍처·디자인 패턴·기술 스택 한눈에 → [docs/ARCHITECTURE.md](ARCHITECTURE.md)**
 
 [![Java 25](https://img.shields.io/badge/Java-25-orange)](https://www.oracle.com/java/)
 [![Kotlin 2.0](https://img.shields.io/badge/Kotlin-2.0-purple)](https://kotlinlang.org/)
@@ -14,8 +14,8 @@
 [![Spring Boot 4](https://img.shields.io/badge/Spring%20Boot-4.0.4-brightgreen)](https://spring.io/projects/spring-boot)
 [![PostgreSQL 17](https://img.shields.io/badge/PostgreSQL-17-blue)](https://www.postgresql.org/)
 [![Kafka](https://img.shields.io/badge/Kafka-Strimzi%2FRedpanda-red)](https://strimzi.io/)
-[![Polyglot MSA](https://img.shields.io/badge/MSA-24%20services%20(Java·Kotlin·Go·Python)-teal)](docs/ARCHITECTURE.md)
-[![GitOps](https://img.shields.io/badge/CD-ArgoCD%20GitOps-orange)](docs/ARCHITECTURE.md#5-cicd-파이프라인)
+[![Polyglot MSA](https://img.shields.io/badge/MSA-24%20services%20(Java·Kotlin·Go·Python)-teal)](ARCHITECTURE.md)
+[![GitOps](https://img.shields.io/badge/CD-ArgoCD%20GitOps-orange)](ARCHITECTURE.md#5-cicd-파이프라인)
 [![Hexagonal](https://img.shields.io/badge/Architecture-Hexagonal-purple)](docs/adr/0001-hexagonal-architecture.md)
 [![ArchUnit Enforced](https://img.shields.io/badge/ArchUnit-Enforced-success)](order-service/src/test/java/github/lms/lemuel/architecture/HexagonalArchitectureTest.java)
 
@@ -23,7 +23,7 @@
 
 | 보고 싶은 것 | 한 번에 가는 곳                                                                                                      |
 |---|----------------------------------------------------------------------------------------------------------------------|
-| **✅ "정말 작동하나" (5분, 재현 가능)** | **[docs/SETTLEMENT-VERIFICATION.md](docs/plan/SETTLEMENT-VERIFICATION.md)** — 520 테스트·LINE 94.17% + 불변식 매핑 + 한계 |
+| **✅ "정말 작동하나" (5분, 재현 가능)** | **[docs/plan/SETTLEMENT-VERIFICATION.md](docs/plan/SETTLEMENT-VERIFICATION.md)** — 520 테스트·LINE 94.17% + 불변식 매핑 + 한계 |
 | **📄 1장 요약 (이력서 첨부용)** | **[PORTFOLIO.md](docs/PORTFOLIO.md)**                                                                                |
 | **시스템 전체 구조** | [아키텍처 다이어그램 (본 README)](#아키텍처)                                                                         |
 | **Architecture Decision Records** | [docs/adr/](docs/adr/)                                                                                               |
@@ -150,7 +150,7 @@ CQRS 로 분리하고, 대사는 order 의 내부 API 를 호출해 cross-DB 연
 
 ## 모듈 구조
 
-전체 디렉토리·모듈 트리 정본은 **[STRUCTURE.md](docs/STRUCTURE.md)** 로 분리했다.
+전체 디렉토리·모듈 트리 정본은 **[STRUCTURE.md](STRUCTURE.md)** 로 분리했다.
 
 - **JVM 코어**: Gradle 멀티모듈 — Java 서비스 16종 + gateway, `shared-common` 은 composite build 라이브러리 (ADR 0021)
 - **폴리글랏 7종**(Go 2 · Python 3 · Kotlin 2, 포트 8110~8131): 루트 레벨 standalone — Gradle·gateway 미포함,
@@ -561,9 +561,9 @@ PENDING → READY → SHIPPED → IN_TRANSIT → DELIVERED → (선택) RETURNED
 
 | 문서 | 경로 |
 |---|---|
-| **🏛 아키텍처 개요 (서비스·패턴·스택)** | **[`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)** |
+| **🏛 아키텍처 개요 (서비스·패턴·스택)** | **[`ARCHITECTURE.md`](ARCHITECTURE.md)** |
 | Claude Code 컨텍스트 | [`CLAUDE.md`](./CLAUDE.md) |
-| Ouroboros (명세 우선 AI 워크플로 엔진) | [`docs/inflearn/ouroboros.md`](docs/inflearn/ouroboros.md) |
+| Ouroboros (명세 우선 AI 워크플로 엔진) | `docs/inflearn/ouroboros.md` (로컬 전용 — 강의 대조 노트는 저장소에 싣지 않는다) |
 | ADR (아키텍처 결정 기록) | [`docs/adr/`](./docs/adr/) |
 | Runbook (장애 대응) | [`docs/plan/runbook/`](docs/plan/runbook/) |
 | CI/CD | [`.github/workflows/`](./.github/workflows/) |

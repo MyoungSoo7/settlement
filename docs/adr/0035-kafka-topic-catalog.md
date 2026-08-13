@@ -1,0 +1,116 @@
+# ADR 0035 — Kafka 토픽 카탈로그 (파티션 수를 코드 안으로)
+
+- 상태: Accepted (구현 완료)
+- 일자: 2026-08-13
+
+## 컨텍스트
+
+이 저장소는 **키 기반 순서 보장**을 쓴다. `KafkaOutboxPublisher` 가 outbox 의 `aggregateId` 를 메시지
+키로 실어 발행하므로(`KafkaOutboxPublisher#buildRecord`), 같은 결제/정산의 이벤트는 같은 파티션에
+쌓이고 그 안에서 시간 순서가 보장된다. 정산·원장처럼 순서가 회계 결과를 바꾸는 도메인에서 이 보장은
+설계의 전제다.
+
+그런데 그 보장의 제수(除數)인 **파티션 수가 코드에 없었다.**
+
+- `NewTopic` 선언은 `shared-common` 의 `KafkaConfig` 하나뿐이었고, 거기 선언된 토픽은
+  `lemuel.payment.captured`·`lemuel.payment.refunded` 와 두 DLT — **4개**였다.
+- 반면 서비스들이 실제로 발행·구독하는 토픽은 **50개가 넘는다**(settlement 11 · card 8 · insurance 8 ·
+  loan 7 · order 6 · deposit 5 · organization 4 · company/investment 각 1).
+- 나머지 46여 개는 브로커 자동생성에 맡겨졌다. Redpanda 의 `default_topic_partitions` 기본값은 **1** 이다.
+
+여기서 두 가지가 따라온다.
+
+**첫째, 조정 손잡이가 없다.** 7개 서비스가 `concurrency: 3` 을 켜 두었지만 컨슈머 병렬 소비의 상한은
+파티션 수다. 파티션이 1이면 나머지 스레드는 논다. `monitoring/grafana/dashboards/kafka-lag.json` 은
+"concurrency/partitions 늘리면 0으로 수렴해야 정상"이라 안내하는데, 그 `partitions` 를 조정할 선언이
+대부분 토픽에 없었다.
+
+**둘째, 그리고 더 중요하게, 파티션 확대는 되돌릴 수 없다.** 파티션 수 N 이 바뀌면 `hash(key) % N` 이
+바뀌어 같은 애그리거트의 이벤트가 다른 파티션으로 흩어진다 — 이미 쌓인 메시지에 대해서까지 순서
+보장이 **소급 붕괴**한다. 인프런 「핵심만 빠르게 끝내는 실전 카프카」(bradkim)가 "키값을 사용하는
+토픽은 파티션 개수 변경이 구조적으로 어려우니 초기에 여유 있게 잡으라"고 말하는 지점이 정확히 여기다.
+되돌릴 수 없는 결정이라면 코드 리뷰를 거쳐야 하고, 그러려면 값이 코드 안에 있어야 한다.
+
+이 위험은 이미 한 번 현실화됐다. `notification-service/.../KafkaErrorHandlingConfig.kt` 에 실측 기록이
+남아 있다 — `lemuel.payment.captured` 가 6 파티션인데 그 DLT 는 3 이어서, 파티션 3~5 의 레코드는
+존재하지 않는 파티션으로 라우팅되어 **격리 발행 자체가 실패**했다. 원본은 늘었는데 자동생성된 DLT 는
+따라오지 않았기 때문이다.
+
+## 결정
+
+**토픽의 전송 속성을 코드 안의 단일 출처로 옮기고, 없는 토픽만 만든다.**
+
+### 1. 카탈로그: `shared-common/src/main/resources/kafka/topic-catalog.json`
+
+페이로드 계약은 ADR 0024(`testFixtures/contracts/events/`)가 정본이다. 이 카탈로그는 그 계약이 다루지
+않는 **전송** 속성을 맡는다. 계약과 달리 전송 속성은 프로덕션 기동 시점에 필요하므로 `src/main` 에 둔다.
+
+| 필드 | 의미 |
+|---|---|
+| `name` | 토픽명 |
+| `owner` | 이 토픽을 **발행**하는 Gradle 모듈. 토픽을 만드는 주체는 프로듀서 하나뿐이다 |
+| `orderingKey` | 메시지 키의 도메인 의미 — 무엇의 시간 순서를 지키는가 |
+| `partitions` | 파티션 수. **변경은 키 재해시 = 순서 보장 소급 붕괴** |
+| `retentionDays` | 보존기간 |
+
+**DLT 는 등록하지 않는다.** `TopicCatalog.Topic#deadLetterSpec()` 이 원본에서 파생하며 파티션 수가 항상
+원본과 같다. 파생값이면 둘이 어긋날 수 없다 — 위 실측 사고의 구조적 재발 방지다.
+
+### 2. 프로비저닝: 만들기만 하고 고치지 않는다
+
+Spring 의 `KafkaAdmin` 은 "`NewTopic` 이 선언한 파티션이 기존 토픽보다 많으면 파티션을 늘린다"(Spring
+Kafka 레퍼런스 *Configuring Topics*). 편의 기능이지만 이 저장소에서는 사고다 — 토픽 정의를 코드로
+옮기는 작업이 바로 그 재해시를 유발하면 본말전도다. 그래서 `NewTopic` 빈을 쓰지 않는다.
+
+- `TopicAdmin` 포트에는 **생성만** 있다. 증설·삭제 메서드가 없으므로 실수로 부를 수도 없다.
+- `TopicProvisioner` 는 없는 토픽만 만들고, 파티션 수가 카탈로그와 다르면 **`Drift` 로 보고**한다.
+- `TopicProvisioningInitializer` 가 기동 시(리스너 컨테이너보다 먼저) 자기 모듈 소유 토픽만 프로비저닝하고,
+  드리프트를 `kafka.topic.partition.drift` 게이지로 노출한다. 브로커에 닿지 못해도 **기동은 막지 않는다**.
+
+조치는 사람이 판단한다 — 브로커를 카탈로그에 맞출지(`rpk topic add-partitions`), 카탈로그를 현실에
+맞출지는 도메인 판단이다.
+
+### 3. 소유권: `app.kafka.topic.owner`
+
+발행 서비스 9곳(order·settlement·loan·company·investment·organization·card·insurance·deposit)에만 선언한다.
+컨슈머 전용 서비스는 비워 두고 프로비저닝을 건너뛴다. 컨슈머가 토픽을 만들면 파티션 수 결정 주체가
+둘이 되어 드리프트가 재발한다.
+
+같이 제거한 것: `app.kafka.topic.partitions`. 4개 토픽에만 닿던 죽은 손잡이였다(9개 yml).
+
+### 4. 게이트: `scripts/harness/test/kafka-topic-gate.test.mjs`
+
+`harness-guard.yml` 의 `node --test scripts/harness/test/*.test.mjs` 로 CI 에서 자동 수집된다.
+
+- **참조되는 모든 토픽이 카탈로그에 있다** — 없으면 브로커 기본값으로 자동생성된다(= 파티션이 코드 밖)
+- 토픽명 중복 없음 / `.DLT` 직접 등록 금지 / owner 는 실재 모듈 / 토픽당 소유자 1
+- `owner`·`orderingKey`·`partitions`·`retentionDays` 전부 선언
+- 빈 스캔 방지 어서션 — 추출기가 깨져 "0건이라 통과"하는 경로를 막는다
+
+## 결과
+
+### 좋아지는 점
+
+- 파티션 수가 **리뷰 가능한 값**이 됐다. 되돌릴 수 없는 변경이 조용히 일어나지 않는다.
+- DLT 파티션 불일치가 **구조적으로** 불가능해졌다(파생값).
+- `orderingKey` 선언 강제 = 토픽을 추가할 때 "무엇의 순서를 지키는가"를 항상 답하게 된다.
+- 브로커 현실과 카탈로그의 어긋남이 게이지로 드러난다 — 기존에는 관측 수단 자체가 없었다.
+
+### 한계 (정직하게)
+
+- **브로커 실측 미반영**: 카탈로그의 `partitions: 3` 은 기존 코드의 의도값(`app.kafka.topic.partitions:3`)을
+  옮긴 것이지, 운영 브로커에서 측정한 값이 아니다(작업 시점에 Docker 미기동). 실제 파티션이 1이면
+  프로비저너는 늘리지 않고 드리프트로 보고한다 — 안전하지만, 카탈로그와 현실을 맞추는 **1회 실측 패스**가
+  남아 있다: `docker exec lemuel-redpanda rpk topic describe <topic>`.
+- **`orderingKey` 값은 미검증**: 계약 스키마의 식별자 필드와 발행 어댑터 주석에서 도출했다. 게이트는
+  "선언되어 있음"만 강제하며, 각 값이 실제 `aggregateId` 와 일치하는지의 publisher 별 대조는 후속 작업이다.
+- 런타임 강제 아님 — `rpk` 로 사람이 만든 토픽은 카탈로그를 거치지 않는다(드리프트로만 드러난다).
+- 파티션 **변경** 자체를 막지는 않는다. 카탈로그 값이 바뀌면 diff 에 드러나 리뷰에 걸리지만, 전용
+  가드 규칙(변경 시 마이그레이션 근거 요구)은 넣지 않았다.
+
+## 참조
+
+- [0024 — 이벤트 계약-as-code](0024-event-contract-as-code.md) (페이로드 계약 정본. 본 ADR 은 전송 속성 담당)
+- [0020 — order↔settlement DB 물리 분리](0020-order-settlement-db-split.md) (키 기반 프로젝션의 기원)
+- [0017 — Kafka 컨슈머 DLT + Replay](0017-kafka-consumer-dlt-and-replay.md) (DLT 파티션 불일치의 무대)
+- 인프런 「핵심만 빠르게 끝내는 실전 카프카」(bradkim) — 파티션 개수 결정 요인, 키-해시 매핑

@@ -252,7 +252,7 @@ Phase 3 를 셋으로 갈라, **기능 공백 3건은 구현하고 개발 편의
 | MSA 경계 | 서비스 추가 없음 → 스캔·JPA·gateway·nginx·Dockerfile 5곳 배선 불필요 |
 | 커버리지 게이트 | `**/generated/**` JaCoCo 제외 추가 (`**/Q*.class` 선례) |
 | OO 가드 | 생성물이 `record` + builder → setter 0, 가드 통과 |
-| `harness-audit` | 최상위 디렉토리 2개 추가 → `docs/STRUCTURE.md` 갱신 필요 |
+| `harness-audit` | 최상위 디렉토리 2개 추가 → `STRUCTURE.md` 갱신 필요 |
 
 ## 미결 질문
 
@@ -268,7 +268,7 @@ Phase 3 를 셋으로 갈라, **기능 공백 3건은 구현하고 개발 편의
 - [ ] Phase 1: `FepLayouts` 4종을 YAML 로 이관, 기존 FEP 테스트 전부 GREEN 유지로 등가 증명
 - [ ] Phase 2 전제: 전문 3종 추가(잔액조회·예금주조회·다건이체 반복부)로 생성기 정당화
 - [ ] Phase 2: 생성 태스크 배선 + JaCoCo 제외 + 픽스처 왕복(encode→decode→동일값) 계약 테스트
-- [ ] `docs/STRUCTURE.md`·`docs/ARCHITECTURE.md §7` 갱신, `harness-audit` 통과 확인
+- [ ] `STRUCTURE.md`·`ARCHITECTURE.md §7` 갱신, `harness-audit` 통과 확인
 
 ## 참조
 

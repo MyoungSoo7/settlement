@@ -305,9 +305,9 @@ test('collectAudit cross-checks gradle module roster against CLAUDE.md and STRUC
   const files = {
     'settings.gradle.kts': settings,
     'CLAUDE.md': '├── alpha-service/ # A\n└── gateway-service/ # GW\n',
-    // 구조 정본은 docs/ 아래에 있다 — 루트 'STRUCTURE.md' 로 조회하면 trackedSet 이 항상 빗나가
+    // 구조 정본은 저장소 루트의 STRUCTURE.md 다 — 경로가 어긋나면 trackedSet 조회가 빗나가
     // 이 문서가 조용히 검사 대상에서 빠진다(실제로 그렇게 방치돼 있었다).
-    'docs/STRUCTURE.md': '├── alpha-service/\n└── gateway-service/\n',
+    'STRUCTURE.md': '├── alpha-service/\n└── gateway-service/\n',
   };
   const root = repo(files);
   assert.deepEqual(collectAudit(root, baseManifest(Object.keys(files))).errors, []);
@@ -318,10 +318,10 @@ test('collectAudit cross-checks gradle module roster against CLAUDE.md and STRUC
   assert.doesNotMatch(bad, /STRUCTURE\.md/);
   assert.doesNotMatch(bad, /shared-common/);
 
-  // docs/STRUCTURE.md 도 실제로 검사된다 — 경로 오타로 이 검사가 죽으면 여기서 잡힌다.
-  put(root, 'docs/STRUCTURE.md', '└── gateway-service/\n');
+  // STRUCTURE.md 도 실제로 검사된다 — 경로 오타로 이 검사가 죽으면 여기서 잡힌다.
+  put(root, 'STRUCTURE.md', '└── gateway-service/\n');
   const both = collectAudit(root, baseManifest(Object.keys(files))).errors.join('\n');
-  assert.match(both, /docs\/STRUCTURE\.md module roster missing: alpha-service/);
+  assert.match(both, /STRUCTURE\.md module roster missing: alpha-service/);
 });
 
 test('collectAudit cross-checks settlement 서브도메인 roster against 문서 트리 줄', () => {
@@ -334,7 +334,7 @@ test('collectAudit cross-checks settlement 서브도메인 roster against 문서
     // 트리 줄을 못 보고 전부 누락으로 오탐한다(포트 8082 를 함께 요구해 고정).
     'CLAUDE.md': '- settlement-service/build.gradle.kts 에 order 의존 금지\n'
       + '├── settlement-service/ # Settlement (8082) — settlement·tax\n',
-    'docs/STRUCTURE.md': '├── settlement-service/ # Settlement (8082)\n'
+    'STRUCTURE.md': '├── settlement-service/ # Settlement (8082)\n'
       + '│   └── .../{settlement,tax}\n',
   };
   const root = repo(files);

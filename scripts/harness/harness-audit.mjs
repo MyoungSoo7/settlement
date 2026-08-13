@@ -122,9 +122,9 @@ export function parseGradleModules(settings) {
 function validateModuleRoster(read, trackedSet, errors) {
   if (!trackedSet.has('settings.gradle.kts')) return;
   const modules = parseGradleModules(read('settings.gradle.kts'));
-  // 경로 주의: 구조 정본은 저장소 루트가 아니라 docs/ 아래다. 예전엔 'STRUCTURE.md' 로 적어
-  // trackedSet 조회가 항상 빗나가 이 문서는 검사된 적이 없었다(조용한 skip).
-  for (const doc of ['CLAUDE.md', 'docs/STRUCTURE.md']) {
+  // 경로 주의: 구조 정본은 저장소 루트의 STRUCTURE.md 다(2026-08-13 docs/ 에서 승격).
+  // 경로가 어긋나면 trackedSet 조회가 빗나가 이 문서는 검사된 적 없이 조용히 skip 된다.
+  for (const doc of ['CLAUDE.md', 'STRUCTURE.md']) {
     if (!trackedSet.has(doc)) continue;
     const content = read(doc);
     for (const module of modules) {
@@ -159,7 +159,7 @@ function validateSettlementDomainRoster(read, tracked, trackedSet, errors) {
   if (!domains.length) return;
   // 문서마다 표기가 다르다(CLAUDE.md 는 한 줄 `·` 나열, STRUCTURE.md 는 다음 줄 중괄호 목록) —
   // settlement-service 트리 줄부터 2줄을 창으로 잡아 그 안에서만 찾는다(다른 문단 오탐 방지).
-  for (const doc of ['CLAUDE.md', 'docs/STRUCTURE.md']) {
+  for (const doc of ['CLAUDE.md', 'STRUCTURE.md']) {
     if (!trackedSet.has(doc)) continue;
     const lines = read(doc).split(/\r?\n/);
     // 앵커는 '모듈 트리 줄'이어야 한다 — 'settlement-service/' 만으로 찾으면 가드레일 문단의
@@ -459,7 +459,7 @@ function validateSubmissionPlacement(read, tracked, trackedSet, errors) {
 // 세 규칙 모두 판정 근거가 같은 줄에 있을 때만 주장으로 인정한다.
 const STATE_DOCS = [
   'CLAUDE.md', 'SPEC.md', 'README.md', 'HARNESS.md',
-  'docs/ARCHITECTURE.md', 'docs/STRUCTURE.md', 'docs/DEVELOPMENT.md',
+  'ARCHITECTURE.md', 'STRUCTURE.md', 'docs/DEVELOPMENT.md',
   'docs/PLAN.md', 'docs/PORTFOLIO.md', 'docs/DONE_CRITERIA.md',
 ];
 const CONTRACT_EVENTS_DIR = 'shared-common/src/testFixtures/resources/contracts/events/';
