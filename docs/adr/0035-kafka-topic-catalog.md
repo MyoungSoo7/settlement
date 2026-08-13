@@ -105,6 +105,28 @@ Kafka 레퍼런스 *Configuring Topics*). 편의 기능이지만 이 저장소�
 - `owner`·`orderingKey`·`partitions`·`retentionDays` 전부 선언
 - 빈 스캔 방지 어서션 — 추출기가 깨져 "0건이라 통과"하는 경로를 막는다
 
+### 5. 발행부 대조 게이트: `kafka-publisher-gate.test.mjs` (2026-08-14 추가)
+
+위 게이트는 `application.yml` 만 본다. 그래서 **구독 설정이 없는 발행 전용 토픽**은 카탈로그에서 빠져도
+아무도 모른다. 실제로 두 번 났다 — `insurance.general_payout_{requested,paid}`(발행 코드는 있는데
+카탈로그에 없음), `card.statement.paid`(계약 스키마 파일명을 옮겨 적어 실재하지 않는 이름이 등재됨).
+
+그래서 정본을 yml 이 아니라 **발행 코드**에서 가져온다. `OutboxEvent.pending(aggregateType,
+aggregateId, eventType, …)` 호출부를 파싱해 `KafkaOutboxPublisher` 와 **같은 규칙**으로 토픽명을
+계산하고(`resolveTopic` + `camelToSnake` 를 게이트가 복제, 단위 테스트로 동치 고정) 카탈로그와 대조한다.
+
+- 발행되는 모든 토픽이 카탈로그에 있다
+- 카탈로그 `owner` == 그 발행부가 속한 Gradle 모듈
+- `orderingKey` == 발행부의 `aggregateId` 에서 뽑은 키 이름
+
+**실측 커버리지**: 호출부 40건 해석 / 6건 미해석, 고유 토픽 39개(카탈로그 52개 중 39개를 발행부로
+교차검증), `orderingKey` 실제 대조 28건 / 판정 보류 12건.
+
+**판정을 보류하는 경우**를 명시해 둔다. `String.valueOf(account.getId())` 처럼 게터가 일반형(`getId`)이면
+수신자 변수명(`account`)이 카탈로그 용어와 다를 수 있어 대조 근거가 못 된다 — 오탐보다 범위 축소를
+택했다. `eventType` 이 변수인 호출부(deposit 처럼 래퍼 메서드 경유)는 토픽을 계산할 수 없어 미해석으로
+세고, **그 수에 상한(12)을 둬** 래퍼 발행이 늘면 게이트가 조용히 눈감는 일을 막는다.
+
 ## 결과
 
 ### 좋아지는 점
@@ -117,9 +139,11 @@ Kafka 레퍼런스 *Configuring Topics*). 편의 기능이지만 이 저장소�
 ### 한계 (정직하게)
 
 - ~~브로커 실측 미반영~~ → **해소 (2026-08-14)**. 아래 "실측 결과" 참조.
-- ~~`orderingKey` 값은 미검증~~ → **해소 (2026-08-14)**. 아래 "orderingKey publisher 대조" 참조.
-  다만 게이트가 강제하는 것은 여전히 "선언되어 있음"뿐이다 — 값과 publisher 의 대조는 Java 파싱이
-  필요해 기계화하지 않았다. 발행 어댑터의 `aggregateId` 를 바꾸면 카탈로그가 조용히 낡는다.
+- ~~`orderingKey` 값은 미검증~~ → **해소 (2026-08-14)**. 1차로 publisher 를 손으로 대조했고(아래
+  "orderingKey publisher 대조"), 이후 `kafka-publisher-gate` 로 기계화했다(§5). 다만 게터가 일반형인
+  12건은 판정 보류라 여전히 사람이 봐야 한다.
+- ~~발행 전용 토픽은 게이트 사각지대~~ → **해소 (2026-08-14)**, §5. 단 `eventType` 이 변수인 호출부
+  6건(deposit 등 래퍼 경유)은 토픽을 계산할 수 없어 여전히 사각지대다 — 수를 상한으로 잠가뒀다.
 - 런타임 강제 아님 — `rpk` 로 사람이 만든 토픽은 카탈로그를 거치지 않는다(드리프트로만 드러난다).
 - 파티션 **변경** 자체를 막지는 않는다. 카탈로그 값이 바뀌면 diff 에 드러나 리뷰에 걸리지만, 전용
   가드 규칙(변경 시 마이그레이션 근거 요구)은 넣지 않았다.
