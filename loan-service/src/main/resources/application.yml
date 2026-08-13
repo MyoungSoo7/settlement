@@ -133,7 +133,7 @@ app:
     consumer:
       concurrency: ${APP_KAFKA_CONSUMER_CONCURRENCY:3}
     topic:
-      partitions: ${APP_KAFKA_TOPIC_PARTITIONS:3}
+      owner: loan-service   # ADR 0035 — 이 모듈이 발행(소유)하는 토픽만 만든다(파티션 정본은 topic-catalog.json)
       # 수신 (settlement → loan)
       settlement-created: lemuel.settlement.created
       settlement-confirmed: lemuel.settlement.confirmed

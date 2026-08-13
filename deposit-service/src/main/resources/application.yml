@@ -127,7 +127,7 @@ app:
     consumer:
       concurrency: ${APP_KAFKA_CONSUMER_CONCURRENCY:3}
     topic:
-      partitions: ${APP_KAFKA_TOPIC_PARTITIONS:3}
+      owner: deposit-service   # ADR 0035 — 이 모듈이 발행(소유)하는 토픽만 만든다(파티션 정본은 topic-catalog.json)
       # 발행 (deposit → *) — DepositEventPublisherAdapter 가 Outbox 경유로 발행.
       # 토픽명은 KafkaOutboxPublisher 가 aggregateType="Deposit"+eventType 에서 자동 파생한다
       # (lemuel.<aggregate>.<event_snake>) — 아래 키는 그 결과를 문서화한 것으로 코드가 직접 참조하지 않는다.

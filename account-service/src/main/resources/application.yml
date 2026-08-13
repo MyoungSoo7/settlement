@@ -130,7 +130,6 @@ app:
     consumer:
       concurrency: ${APP_KAFKA_CONSUMER_CONCURRENCY:3}
     topic:
-      partitions: ${APP_KAFKA_TOPIC_PARTITIONS:3}
       # 수신 (settlement → account)
       settlement-created: lemuel.settlement.created
       settlement-confirmed: lemuel.settlement.confirmed
