@@ -77,6 +77,7 @@ class PolicyIssueTest {
                 "11111111-1111-1111-1111-111111111111", "fc-100",
                 new BigDecimal("100000.00"), new BigDecimal("0.035"), SalesChannel.FC);
 
+        assertThat(schedules).hasSize(CommissionConstants.INSTALLMENT_COUNT);
         assertThat(schedules).allSatisfy(s -> assertThat(s.getDueDate()).isNull());
     }
 }

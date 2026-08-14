@@ -172,6 +172,7 @@ class ReverseEntryServiceTest {
 
             List<LedgerEntry> rows = service.reverseForRefund(1L, 901L, bd("5000"), closedMonthDate);
 
+            assertThat(rows).hasSize(2);
             assertThat(rows).allSatisfy(r ->
                     assertThat(r.getSettlementDate()).isEqualTo(LocalDate.of(2026, 5, 1)));
         }
@@ -183,6 +184,7 @@ class ReverseEntryServiceTest {
 
             List<LedgerEntry> rows = service.reverseForRefund(1L, 902L, bd("5000"), openMonthDate);
 
+            assertThat(rows).hasSize(2);
             assertThat(rows).allSatisfy(r ->
                     assertThat(r.getSettlementDate()).isEqualTo(openMonthDate));
         }
