@@ -6,7 +6,7 @@
 아키텍처·컨벤션은 [`CLAUDE.md`](./CLAUDE.md), 아키텍처 결정은 [`docs/adr/`](./docs/adr/) 참조.
 
 - 문서 상태: 현행 코드 기준 요약 명세 (엔드포인트 표면 + 도메인 규칙 + 이벤트 흐름)
-- 최종 갱신: 2026-08-09
+- 최종 갱신: 2026-08-15
 
 ---
 
@@ -23,7 +23,7 @@
 
 | 구분                          | 기술                                                                                                                                                       |
 | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 언어 / 프레임워크             | **Java 25 / Spring Boot 4.0.4**(코어 16+gateway) · Kotlin 2.0 / Boot 3.3·JDK 21(이벤트 2종) · Go 1.22 `net/http`(엣지 2종) · Python 3.11 / FastAPI(ML 3종) |
+| 언어 / 프레임워크             | **Java 25 / Spring Boot 4.0.7**(코어 16+gateway) · Kotlin 2.0 / Boot 3.3·JDK 21(이벤트 2종) · Go 1.22/1.23 `net/http`(엣지 2종) · Python 3.11 / FastAPI(ML 3종) |
 | 빌드                          | Gradle 멀티모듈 (Kotlin DSL), shared-common 은 composite build. **폴리글랏 7종은 standalone 빌드**(settings.gradle 미포함, `polyglot-ci.yml` 별도 CI)      |
 | Gateway                       | Spring Cloud Gateway 2025 (WebFlux)                                                                                                                        |
 | DB / 검색                     | PostgreSQL 17 (DB-per-service) / Elasticsearch 8.17                                                                                                        |
@@ -80,12 +80,12 @@ DB: opslab. 회원·상품·장바구니·주문·결제·배송 + 정합성 부
 | 도메인             | API(대표 경로)                                                                                                                                | 기능                                                                                |
 | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | 회원/인증          | `/auth`, `/users`, `/memberships`                                                                                                             | 회원가입·로그인(JWT 발급)·비밀번호 재설정·멤버십 승인                               |
-| 상품/카테고리/태그 | `/api/products`, `/products/{id}/variants`, `/api/categories`, `/categories`, `/admin/categories`, `/api/tags`, `/admin/products/{id}/images` | 상품·SKU(variant)·이미지·이커머스 카테고리 트리(계층·정렬·soft delete)·태그         |
+| 상품/카테고리/태그 | `/api/products`, `/products/{id}/variants`, `/categories`, `/admin/categories`, `/display-sections`, `/admin/display-sections`, `/admin/option-catalog`, `/api/tags`, `/admin/products/{id}/images` | 상품·SKU(variant)·이미지·카테고리 트리(계층·정렬·soft delete)·진열 섹션·옵션 카탈로그·태그. ※ `/api/categories` 매핑은 없다(gateway 라우트만 존재) |
 | 장바구니/쿠폰      | `/users/{userId}/cart`, `/coupons`                                                                                                            | 장바구니, 쿠폰 발급/사용(등급별 권한)                                               |
-| 주문               | `/orders`, `/orders/{id}/shipment`                                                                                                            | 단건/다건(SKU 자동 재고차감) 주문, Idempotency-Key 중복제출 차단, 배송 라이프사이클 |
+| 주문               | `/orders`, `/orders/{id}/shipment`, `/admin/shipments`, `/admin/payment-expiry`, `/admin/stock-reclaim`                                       | 단건/다건(SKU 자동 재고차감) 주문, Idempotency-Key 중복제출 차단, 배송 라이프사이클·관리 콘솔, 결제 만료·재고 회수 배치 트리거 |
 | 결제               | `/payments`, `/payments/split`, `/api/payments/*/refunds`, `/admin/refunds`, `/admin/pg`                                                      | Toss 결제 생성·인증·캡처·환불(분할결제 포함), PG 라우팅, 환불이력, 관리자 환불승인  |
 | 리뷰/게임          | `/reviews`, `/games`                                                                                                                          | 상품 리뷰, 게임(이벤트성)                                                           |
-| 시스템 관리        | `/admin/menus`, `/admin/common-codes`, `/admin/rbac`                                                                                          | 메뉴 트리·순환참조 방지·배치정렬, 공통코드 그룹/항목, RBAC 역할·권한                |
+| 시스템 관리        | `/api/menus`, `/admin/menus`, `/admin/common-codes`, `/admin/rbac`, `/admin/seller-tiers`                                                     | 메뉴 조회(`/api/menus/me`)·트리·순환참조 방지·배치정렬, 공통코드 그룹/항목, RBAC 역할·권한, 셀러 등급 콘솔(ADR 0031) |
 | 내부/정합성        | `/internal/recon`, `/admin/settlement-projection`                                                                                             | order 자기 합계 노출(대사, X-Internal-Api-Key), 프로젝션 백필                       |
 
 ### 3.2 settlement-service — 정산 (port 8082, 자체 DB settlement_db)
@@ -185,7 +185,8 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
 - `/api/ai` (ChatController), `/api/ai/conversations` — 컨텍스트 유지 채팅(SSE 스트리밍) + 대화 이력 CRUD.
 - **provider 스위치**(`app.ai.provider`, 기본 gemini): Gemini(RestClient) / Anthropic(Spring AI SDK) 중 하나만 등록.
 - LLM 실비용 → **JWT USER 이상 필수 + bucket4j 비용가드(분5/일100)**. LLM 어댑터는 `adapter/out/llm` 격리(ArchUnit).
-  저장·전송 전 카드/주민번호 PII 마스킹. 로드맵: Function Calling → RAG(pgvector).
+  저장·전송 전 카드/주민번호 PII 마스킹. **RAG 구현 완료**(pgvector 지식베이스 `/api/ai/knowledge` +
+  임베딩 검색 폴백, ADR 0034 — `app.ai.rag.enabled`, 기본 off). 로드맵: Function Calling.
 
 ### 3.10 common-data-service — 공공데이터 범용 커넥터 (port 8098, lemuel_commondata)
 
@@ -205,8 +206,13 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
 ### 3.12 account-service — 계정계 GL (port 8102, lemuel_account)
 
 - `/api/account` (**ADMIN/MANAGER**) — owner 잔액·분개, 대출/투자/정산 집계, 시산표(trial-balance).
-- loan·investment·settlement 의 6개 토픽 소비 → 전사 복식부기 GL(`account_entries`, 전표당 차1·대1).
-- 계정: CASH·LOAN_RECEIVABLE·CORPORATE_LOAN_RECEIVABLE·INVESTMENT_ASSET·SELLER_PAYABLE·SETTLEMENT_SCHEDULED.
+  수신(banking) BC 3종: `/api/banking/time-deposits`(정기예금)·`/api/banking/savings`(적금)·`/api/banking/pensions`(퇴직연금).
+  내부/운영: `/internal/account`, `/admin/backfill`(정산예정 청산 백필).
+- 컨슈머 **17종** 소비(settlement 7 · loan 6 · seller_recovery 2 · payout 1 · investment 1) → 전사 복식부기
+  GL(`account_entries`, 전표당 차1·대1).
+- 계정 **14종**(`GlAccount`): CASH·LOAN_RECEIVABLE·CORPORATE_LOAN_RECEIVABLE·SECURED_LOAN_RECEIVABLE·
+  INVESTMENT_ASSET·SELLER_PAYABLE·SETTLEMENT_SCHEDULED·HOLDBACK_PAYABLE·SELLER_RECOVERY_RECEIVABLE·
+  WITHHOLDING_PAYABLE·TIME_DEPOSIT_LIABILITY·INSTALLMENT_SAVINGS_LIABILITY·RETIREMENT_PENSION_LIABILITY·INTEREST_EXPENSE.
 - 멱등 2단(processed_events + `(source_topic,ref_type,ref_id)` UNIQUE). **발행 없음(소비 전용)**.
 - 미결(ADR 0026): 셀러 payout 현금 유출 GL 인식 + 시산표 실검증(회계 결정 대기).
 
@@ -232,14 +238,15 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
 셀러 조직에 **마스터 한도**를 부여하고, 그 한도 안에서 임직원별 **서브한도** 카드를 발급한다.
 **Phase 1**(발급·한도·상태·프로젝션)과 **Phase 2**(실시간 승인·매입·명세서·지출관리 SaaS) 모두 완료(2026-08-04).
 
-| 도메인                   | API (base `/api/cards`, **JWT 인증 필수**)                                                                                                    | 기능                                                                |
+| 도메인                   | API (카드계정·카드는 base `/api/cards`·**JWT 필수** — Phase 2 는 `/van/v1/**`·`/internal/api/v1/**` 별도 표면)                                | 기능                                                                |
 | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| 카드계정                 | `POST /accounts`, `GET /accounts/{id}`, `POST /accounts/{id}/recalculate`                                                                     | 개설(심사 후 마스터한도 산정) / 조회 / 수동 재산정(ADMIN)           |
+| 카드계정                 | `POST /accounts`, `GET /accounts/{id}`                                                                                                        | 개설(심사 후 마스터한도 산정) / 조회 — 재산정은 배치 전용(수동 API 없음) |
 | 카드                     | `POST /accounts/{id}/cards`, `GET /cards/me`, `PATCH /cards/{cardId}/limit`, `PATCH /cards/{cardId}/status`                                   | 발급(서브한도 검증) / 내 카드 조회 / 서브한도 변경 / 정지·재개·해지 |
-| 승인 (Phase 2)           | VAN: `POST /van/api/v1/authorize` / 내부: `POST /internal/api/v1/authorize`                                                                   | 실시간 승인 — 가용한도 검증 + 홀드 생성(authorizationId 멱등)       |
-| 매입·취소·환불 (Phase 2) | `POST /internal/api/v1/authorize/{id}/capture`, `DELETE /internal/api/v1/holds/{id}`, `POST /internal/api/v1/captures/{id}/refund`            | 매입 확정 / 홀드 취소 / 환불                                        |
+| 승인 (Phase 2)           | VAN: `POST /van/v1/authorizations` / 내부: `POST /internal/api/v1/cards/{cardId}/authorizations`                                              | 실시간 승인 — 가용한도 검증 + 홀드 생성(authorizationId 멱등)       |
+| 매입·취소·환불 (Phase 2) | `POST /van/v1/captures`, `POST /van/v1/voids`, `POST /van/v1/refunds`                                                                         | 매입 확정 / 홀드 취소 / 환불                                        |
 | 명세서·상환 (Phase 2)    | `POST /internal/api/v1/statements/{id}/payments`                                                                                              | 명세서 납부(`paymentId` 멱등)                                       |
-| 지출관리 (Phase 2)       | `POST /api/expenses/{id}/submit`, `POST /api/expenses/{id}/approve`, `POST /api/expenses/{id}/reject`, `GET /api/budgets/{orgId}/departments` | 지출 워크플로(제출/승인/반려) / 부서 예산 소진율 조회               |
+| 지출관리 (Phase 2)       | `POST /internal/api/v1/expense-reports/{reportId}/{submit,approve,reject}`, `GET /internal/api/v1/organizations/{orgId}/departments/{deptId}/budget-utilization` | 지출 워크플로(제출/승인/반려) / 부서 예산 소진율 조회               |
+| 운영 콘솔 (ADR 0036)     | `GET/POST /admin/expense-receipts/**` (gateway 라우팅)                                                                                        | NEEDS_REVIEW 영수증 리뷰 큐 — card 최초의 admin 표면                |
 | 영수증 OCR (ADR 0036)    | `POST /internal/api/v1/expense-reports/{reportId}/receipts`(멀티파트), `GET .../receipts/latest`, `POST /internal/api/v1/expense-receipts/{id}/review` | 영수증 업로드→Gemini OCR→매입 자동 대사 / 최신 영수증 조회 / NEEDS_REVIEW 육안 리뷰 종결 |
 
 - **한도 산정**: `masterLimit = floor((sellerPayable + holdbackPayable) × R × H)` — `R`=인정비율(기본 0.70,
@@ -248,11 +255,11 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
 - **핵심 불변식**: `master_limit >= Σ sub_limit`. 서로 다른 애그리거트라 DB 제약으로 표현 불가 —
   `findByIdForUpdate`(PESSIMISTIC_WRITE) **후** `sumActiveSubLimits` 재계산이 유일한 방어(`CardIssuanceLimitConcurrencyIT` 가 게이트).
 - **가용한도 불변식(Phase 2)**: `가용 = masterLimit − Σ활성홀드 − Σ매입`. 동시 승인 경합은 비관적 락 + `ConcurrentAuthorizationIT` 게이트.
-- **상태머신**: CardAccount ACTIVE⇄SUSPENDED/DELINQUENT→CLOSED. Card ISSUED⇄SUSPENDED→CANCELED(터미널).
+- **상태머신**: CardAccount SCREENING→{ACTIVE,REJECTED(터미널)}, ACTIVE⇄SUSPENDED/DELINQUENT→CLOSED. Card ISSUED⇄SUSPENDED→CANCELED(터미널).
   `sumActiveSubLimits` 는 `status <> 'CANCELED'` — **정지 카드도 한도를 계속 점유**한다(복직 시 한도 충돌 방지).
 - **거절사유(Phase 2)**: LIMIT_EXCEEDED / CARD_SUSPENDED(정지·연체) / MEMBER_INACTIVE / MERCHANT_POLICY_VIOLATION — 4종 확정, 추가 금지(ADR 0022).
 - **재원 조회 실패**: 폴백 없음 → `CARD_FUNDING_UNAVAILABLE`(**503**). 추정으로 여신을 내주지 않는다.
-- **배치**: ① 매일 03:30 KST 한도 재산정(ShedLock `card-limit-recalculation` PT30M). ② 일 1회 미매입 홀드 만료(`HoldExpiryScheduler`). ③ 월말 명세서 마감(`CloseStatementScheduler`). ④ 일 1회 연체 전이(`DelinquencyBatchScheduler`). 각 배치 1건 = 트랜잭션 1건(`REQUIRES_NEW`).
+- **배치**: ① 매일 03:30 KST 한도 재산정(ShedLock `card-limit-recalculation` PT30M). ② 일 1회 미매입 홀드 만료(`HoldExpiryScheduler`). ③ 매월 1일 01:00 KST 명세서 마감(`StatementBillingScheduler`). ④ 일 1회 연체 전이(`DelinquencyBatchScheduler`). 각 배치 1건 = 트랜잭션 1건(`REQUIRES_NEW`).
 - **명세서 생명주기(Phase 2)**: OPEN→CLOSED→{PARTIALLY_PAID,PAID,DELINQUENT}→PAID. 전액 납부 시 DELINQUENT 계정 자동 ACTIVE 복구.
 - **지출관리(Phase 2)**: 매입 Kafka 이벤트 소비 → 경비보고서 DRAFT 자동 생성(captureId 멱등). 제출→승인/반려 워크플로. 승인 경로 비결합(`AuthorizationLatencyTest` p99≤300ms).
 - **영수증 3자 대사(ADR 0036)**: 영수증 업로드 → shared-common `VisionExtractionClient`(Gemini) OCR →
@@ -297,6 +304,8 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
 - **이벤트 발행**(Outbox, 9토픽): `lemuel.insurance.policy_issued` · `.policy_status_changed` · `.commission_confirmed` ·
   `.commission_paid` · `.commission_clawback_triggered` · `.commission_monthly_closed` · `.banca_rule_violated` ·
   `.general_payout_requested` · `.general_payout_paid`. **계약 스키마 미등록 · 소비처 미배선**(발행 전용).
+  인바운드 예외 1종: `lemuel.insurance.carrier_policy_status`(보험사 계약상태 통지)를 **소비**한다
+  (`CarrierPolicyStatusConsumer`) — 외부 유입 토픽이라 §5 표·토픽 카탈로그(발행 모듈 기준)에는 없다.
   (`coverage-bound: lemuel.insurance.coverage_bound` 는 발행·소비·스키마가 모두 없는 설정 잔재여서
   2026-08-14 제거했다 — 기능이 생기면 프로듀서와 함께 카탈로그에 다시 등록한다. ADR 0035)
 
@@ -342,7 +351,7 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
 
 ### 3.17 gateway-service — API Gateway (port 8080)
 
-- Spring Cloud Gateway(WebFlux). 서비스별 경로 predicate 라우팅. 위성 8종은 공개 조회 API 만 라우팅(수집 트리거
+- Spring Cloud Gateway(WebFlux). 서비스별 경로 predicate 라우팅. 위성 5종(financial·economics·market·commondata·company)은 공개 조회 API 만 라우팅(수집 트리거
   `/admin/**` 외부 미노출). organization 은 `/api/organizations/**`(JWT 필수)를 라우팅.
 - 자체 인증 필터 없음 — 인증·인가는 각 서비스 SecurityConfig 가 강제.
 - **폴리글랏 7종(§3.18~3.19)은 gateway 미라우팅** — 독립 포트로 직접 노출(내부/데모 용도).
@@ -391,10 +400,11 @@ Ledger       : PENDING → POSTED → REVERSED
 PgRecon 실행  : RUNNING → COMPLETED / FAILED
 CorporateLoan: REQUESTED → APPROVED → DISBURSED → REPAID (↘ REJECTED)
 Investment주문: REQUESTED → APPROVED → EXECUTED / REJECTED / CANCELED
-SecuredLoan  : REQUESTED → APPROVED → DISBURSED → REPAID (↘ REJECTED, DISBURSED → OVERDUE → DEFAULTED — 직행 금지)
+SecuredLoan  : REQUESTED → APPROVED → DISBURSED → REPAID (↘ REJECTED, DISBURSED → OVERDUE → DEFAULTED → {REPAID, WRITTEN_OFF} — 직행 금지)
+선정산 Loan   : REQUESTED → APPROVED → DISBURSED → REPAID (↘ REJECTED, DISBURSED → OVERDUE → {REPAID, WRITTEN_OFF})
 Organization : ACTIVE ⇄ SUSPENDED
 Membership   : INVITED → ACTIVE ⇄ SUSPENDED, 각 상태 → REMOVED(터미널)  (마지막 OWNER 불변식)
-CardAccount  : ACTIVE ⇄ SUSPENDED/DELINQUENT → CLOSED
+CardAccount  : SCREENING → ACTIVE / REJECTED(터미널), ACTIVE ⇄ SUSPENDED/DELINQUENT → CLOSED
 Card         : ISSUED ⇄ SUSPENDED → CANCELED(터미널)
 Statement    : OPEN → CLOSED → {PARTIALLY_PAID, PAID, DELINQUENT} → PAID
 InsApplication: SUBMITTED → UNDER_REVIEW → APPROVED / REJECTED
@@ -430,8 +440,7 @@ DepositHold  : ACTIVE → PARTIALLY_CAPTURED → CAPTURED / EXPIRED / VOIDED / R
 | `lemuel.loan.corporate_loan_disbursed`                                                                      | loan         | account                                                                                        |
 | `lemuel.investment.executed`                                                                                | investment   | account · notification                                                                         |
 | `lemuel.loan.secured_loan_disbursed` / `.secured_loan_repaid` / `.secured_loan_principal_repaid`            | loan         | account                                                                                        |
-| `lemuel.loan.lease_activated`                                                                               | loan         | (소비처 미배선 — 계약만 선행)                                                                  |
-| `lemuel.loan.lease_activated`                                                                               | loan         | (미배선 — 발행 전용, account GL 소비는 후속)                                                   |
+| `lemuel.loan.lease_activated`                                                                               | loan         | (소비처 미배선 — 계약만 선행, account GL 소비는 후속)                                          |
 | `lemuel.settlement.holdback_released` / `.holdback_consumed`                                                | settlement   | account(GL 홀드백 유보·소멸)                                                                   |
 | `lemuel.settlement.adjusted` / `.canceled`                                                                  | settlement   | account(GL 조정·역정산 분개)                                                                   |
 | `lemuel.settlement.withholding_accrued`                                                                     | settlement   | account(원천징수 부채 계상)                                                                    |
@@ -441,10 +450,10 @@ DepositHold  : ACTIVE → PARTIALLY_CAPTURED → CAPTURED / EXPIRED / VOIDED / R
 | `lemuel.organization.member_removed`                                                                        | organization | card(이탈자 카드 자동 정지)                                                                    |
 | `lemuel.card.account_opened` / `.issued` / `.limit_changed` / `.status_changed` / `.account_status_changed` | card         | 소비처 미배선 — 발행 전용                                                                      |
 | `lemuel.card.authorized`                                                                                    | card         | Phase 2 완료 — 승인 홀드 생성(Phase2ContractPlaceholderTest + CardEventContractTest 계약 검증) |
-| `lemuel.card.captured`                                                                                      | card         | Phase 2 완료 — 매입 확정(Phase2ContractPlaceholderTest + CardEventContractTest 계약 검증)      |
+| `lemuel.card.captured`                                                                                      | card         | card 자기 소비 2그룹 — `lemuel-card-expense`(경비보고서 DRAFT 자동생성)·`lemuel-card-statement`(명세서 적재). 계약: CardEventContractTest |
 | `lemuel.card.statement_paid`                                                                                | card         | Phase 2 완료 — 명세서 전액 납부(ADR 0022 신규 토픽, 하위호환)                                  |
 
-부가(계약 스키마 없음): `lemuel.ops.*`(실패 신호 `*.failed` + `lemuel.ops.stock.reclaim_delayed`), `lemuel.pgreconciliation.discrepancy_approved`,
+부가(계약 스키마 없음): `lemuel.ops.*`(실패 신호 `*.failed` + `stock.depleted`·`stock.reclaim_delayed`·`shipping.delayed`), `lemuel.pgreconciliation.discrepancy_approved`,
 `lemuel.payment.confirmed`(payment-webhook-service(Go) 발행 → notification 소비 — 내부 계약).
 
 발행 전용(소비처 미배선 — 의도된 상태, 소비자가 생기면 ADR 0024 절차로 계약 편입):
@@ -465,7 +474,7 @@ insurance·deposit 토픽은 아직 계약 스키마(testFixtures)에 편입되�
 - **관측**: Prometheus + Micrometer + Grafana + OTLP 트레이싱, 서비스별 헬스/프로브.
 - **테스트**: 도메인→서비스→컨트롤러→통합 순. JaCoCo CI 게이트 **LINE 90%**, 핵심 도메인 INSTRUCTION 80%.
   settlement 통합테스트는 Testcontainers PostgreSQL.
-- **배포**: Docker Compose(로컬, DB-per-service PG 16종+ES+Redpanda+앱 컨테이너 18개(JVM 17+market-stream)), Kubernetes(운영, GitHub Actions→GHCR→ArgoCD+image-updater GitOps), Flyway 마이그레이션. 폴리글랏 7종은 전용 차트로 격리 배포(상세: [`ARCHITECTURE.md`](ARCHITECTURE.md) §5).
+- **배포**: Docker Compose(로컬, DB-per-service PG 16종+ES+Redpanda+redis+pgbouncer+앱 컨테이너 19개(JVM 17+market-stream+notification)+frontend), Kubernetes(운영, GitHub Actions→GHCR→ArgoCD+image-updater GitOps), Flyway 마이그레이션. 폴리글랏 7종은 전용 차트로 격리 배포(상세: [`ARCHITECTURE.md`](ARCHITECTURE.md) §5).
 - **운영 필수 설정**: `JWT_SECRET`(강함), `app.security.internal-key-required=true`, 각 서비스 외부 API 키.
 
 ---
