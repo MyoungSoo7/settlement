@@ -26,9 +26,9 @@
 
 - 운영/스테이징 DB 에 psql 등으로 **직접 접속하는 명령을 생성하지 마라**.
   대사·원장·프로젝션 상태 조회는 `settlement-copilot` MCP 도구
-  (`recon_run`, `ledger_entries`, `projection_status`, `outbox_status`, `pg_recon_runs`,
-  `integrity_check`, `ledger_completeness`, `payout_recon`, `holdback_status`, `stuck_states`,
-  `refund_adjustments`, `event_accounting`)로만 한다.
+  (`recon_run`, `order_recon_totals`, `ledger_entries`, `projection_status`, `outbox_status`,
+  `pg_recon_runs`, `integrity_check`, `ledger_completeness`, `payout_recon`, `holdback_status`,
+  `stuck_states`, `refund_adjustments`, `event_accounting`, `settlement_simulate`)로만 한다.
 
 ## 가드 자가 검증 (실시간 훅이 없는 환경 — Codex CLI 등)
 
