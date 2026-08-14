@@ -40,6 +40,7 @@ public class DepositService
     private final LoadDepositOffsetShortfallPort loadShortfallPort;
     private final SaveDepositOffsetShortfallPort saveShortfallPort;
     private final PublishDepositEventPort publishEventPort;
+    private final DepositProofGate depositProofGate;
 
     public DepositService(LoadDepositAccountPort loadAccountPort,
                            SaveDepositAccountPort saveAccountPort,
@@ -48,7 +49,8 @@ public class DepositService
                            SaveDepositHoldPort saveHoldPort,
                            LoadDepositOffsetShortfallPort loadShortfallPort,
                            SaveDepositOffsetShortfallPort saveShortfallPort,
-                           PublishDepositEventPort publishEventPort) {
+                           PublishDepositEventPort publishEventPort,
+                           DepositProofGate depositProofGate) {
         this.loadAccountPort = loadAccountPort;
         this.saveAccountPort = saveAccountPort;
         this.saveEntryPort = saveEntryPort;
@@ -57,6 +59,7 @@ public class DepositService
         this.loadShortfallPort = loadShortfallPort;
         this.saveShortfallPort = saveShortfallPort;
         this.publishEventPort = publishEventPort;
+        this.depositProofGate = depositProofGate;
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -65,6 +68,9 @@ public class DepositService
 
     @Override
     public void credit(Long sellerId, BigDecimal amount, String referenceId, String referenceType) {
+        // 증빙 대사 게이트(ADR 0036) — 이 참조에 증빙이 첨부돼 있으면 MATCHED 여야 기표 통과.
+        // 증빙이 없으면 그대로 통과(점진 도입) — Kafka 자동 기표(SETTLEMENT)는 무영향.
+        depositProofGate.assertMatchedIfProofExists(sellerId, referenceType, referenceId, amount);
         SellerDepositAccount account = getOrCreateAccount(sellerId);
         account.credit(amount);
         saveAccountPort.save(account);
@@ -83,6 +89,8 @@ public class DepositService
 
     @Override
     public void debit(Long sellerId, BigDecimal amount, String referenceId, String referenceType) {
+        // 증빙 대사 게이트(ADR 0036) — credit 과 동일. Kafka 자동 기표(PAYOUT)는 무영향.
+        depositProofGate.assertMatchedIfProofExists(sellerId, referenceType, referenceId, amount);
         SellerDepositAccount account = loadAccountForUpdate(sellerId);
         account.debit(amount);
         saveAccountPort.save(account);

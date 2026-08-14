@@ -128,7 +128,11 @@ public enum ErrorCode {
     INSUFFICIENT_DEPOSIT(HttpStatus.UNPROCESSABLE_ENTITY, "예치금 잔고가 부족합니다."),
     // deposit_entries 자연키(UNIQUE) 충돌 — 같은 referenceId 로 두 번 기표하려 한 경우.
     // 잔고를 두 번 움직이지 않고 409 로 되돌린다(L3 멱등 방어선이 잡아낸 상황).
-    DUPLICATE_DEPOSIT_ENTRY(HttpStatus.CONFLICT, "이미 처리된 예치금 요청입니다.");
+    DUPLICATE_DEPOSIT_ENTRY(HttpStatus.CONFLICT, "이미 처리된 예치금 요청입니다."),
+    // 수기 기표 증빙 OCR (ADR 0036 확산) — 판독 실패는 무폴백 503, 대사 미통과 기표는 422.
+    DEPOSIT_PROOF_NOT_FOUND(HttpStatus.NOT_FOUND, "예치금 증빙을 찾을 수 없습니다."),
+    DEPOSIT_PROOF_OCR_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "예치금 증빙 판독에 실패했습니다. 잠시 후 다시 시도해주세요."),
+    DEPOSIT_PROOF_NOT_MATCHED(HttpStatus.UNPROCESSABLE_ENTITY, "예치금 증빙 대사가 완료되지 않아 기표할 수 없습니다.");
 
     private final HttpStatus status;
     private final String defaultMessage;

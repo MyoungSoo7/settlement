@@ -2,6 +2,9 @@ package github.lms.lemuel.deposit.adapter.in.web;
 
 import github.lms.lemuel.common.exception.ErrorCode;
 import github.lms.lemuel.common.exception.ErrorResponse;
+import github.lms.lemuel.deposit.domain.exception.DepositProofNotFoundException;
+import github.lms.lemuel.deposit.domain.exception.DepositProofNotMatchedException;
+import github.lms.lemuel.deposit.domain.exception.DepositProofOcrUnavailableException;
 import github.lms.lemuel.deposit.domain.exception.InsufficientDepositException;
 import io.swagger.v3.oas.annotations.Hidden;
 import org.slf4j.Logger;
@@ -75,6 +78,29 @@ public class DepositExceptionHandler {
     public ResponseEntity<ErrorResponse> handleInvalidArgument(IllegalArgumentException e) {
         log.warn("[DepositInvalidArgument] {}", e.getMessage());
         return toResponse(ErrorCode.INVALID_ARGUMENT, e.getMessage());
+    }
+
+    // ── 예치금 증빙 (ADR 0036) ──
+
+    /** 증빙 미존재 — 404. ISE catch-all(계좌 404)과 코드·메시지를 구분하려 전용 타입으로 받는다. */
+    @ExceptionHandler(DepositProofNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleProofNotFound(DepositProofNotFoundException e) {
+        log.warn("[DepositProofNotFound] {}", e.getMessage());
+        return toResponse(ErrorCode.DEPOSIT_PROOF_NOT_FOUND, e.getMessage());
+    }
+
+    /** 증빙 판독 실패·미구성 — 무폴백 503 (재시도 가능한 일시 장애). */
+    @ExceptionHandler(DepositProofOcrUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handleProofOcrUnavailable(DepositProofOcrUnavailableException e) {
+        log.warn("[DepositProofOcrUnavailable] {}", e.getMessage());
+        return toResponse(ErrorCode.DEPOSIT_PROOF_OCR_UNAVAILABLE, e.getMessage());
+    }
+
+    /** 증빙 대사 미통과 기표 — 요청 형식이 아니라 "지금은 기표 불가"라서 422 (잔고 부족과 같은 결). */
+    @ExceptionHandler(DepositProofNotMatchedException.class)
+    public ResponseEntity<ErrorResponse> handleProofNotMatched(DepositProofNotMatchedException e) {
+        log.warn("[DepositProofNotMatched] {}", e.getMessage());
+        return toResponse(ErrorCode.DEPOSIT_PROOF_NOT_MATCHED, e.getMessage());
     }
 
     /**

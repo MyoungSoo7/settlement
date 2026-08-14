@@ -307,6 +307,7 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
 | --------- | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
 | 잔고 조회 | `GET /api/deposits/accounts/me` (셀러 본인) · `GET /api/deposits/accounts/{sellerId}` (ADMIN/MANAGER) | 가용(available)·선점(locked)·총액(total) 조회               |
 | 운영 콘솔 | `POST /admin/deposits/accounts/{sellerId}/{credits,debits,holds,offsets}` (ADMIN)                    | 수기 입금·출금·선점·상계 — 감사 대상                        |
+| 증빙 OCR (ADR 0036) | `POST /admin/deposits/accounts/{sellerId}/proofs`(멀티파트, referenceType·referenceId 쿼리), `GET .../proofs/latest`, `POST /admin/deposits/proofs/{id}/review` (ADMIN) | 수기 기표 증빙(이체확인증) 업로드→Gemini OCR / 최신 증빙 조회 / NEEDS_REVIEW 육안 리뷰 종결 |
 
 - **IDOR 차단**: `/accounts/me` 는 **경로에 sellerId 가 없다는 것 자체가 계약** — 대상을 경로로 받는 순간 IDOR 경로가 된다.
   임의 셀러 조회는 별도 경로 + ADMIN/MANAGER 게이트.
@@ -322,6 +323,13 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
   상계 부족분(shortfall)과 달리 설계된 결과가 아니라 원장 불일치 신호다.
   소비측 계약 테스트: `DepositConsumerParsingTest`(정본 샘플 기반).
 - **hold/offset 은 여전히 콘솔 경로** — card 승인·매입은 페이로드에 sellerId 가 없어 미구독이다.
+- **수기 기표 증빙 대사(ADR 0036, 지연 대사 변형)**: 수기 기표는 즉시 반영·선행 애그리거트 없음이라
+  앵커를 호출자 지정 멱등 키 `(sellerId, referenceType, referenceId)` 로 잡는다 — 증빙을 먼저 첨부하고,
+  값 대사(이체금액 compareTo 정확 일치 · 이체일 기표일 ±3일 — 수기 리드타임 흡수, `app.deposit.proof-ocr.date-tolerance-days`)
+  는 **기표(credit/debit) 시점**에 실행된다(`DepositProofGate`). 증빙이 첨부된 참조는 MATCHED 여야 기표
+  통과(`DEPOSIT_PROOF_NOT_MATCHED` 422), 무증빙은 그대로 통과(점진 도입 — Kafka 자동 기표 무영향).
+  대사 실패 판정은 기표 트랜잭션과 함께 롤백되어 EXTRACTED 로 남는다(요청 값 정정 후 재시도 가능).
+  판독 실패는 무폴백 503. 계좌번호는 추출하지 않는다(PII 최소화).
 - **배치 2종**: 만료 hold 회수(`DepositHoldExpiryScheduler`, 매시 5분 KST, ShedLock) — 만료됐는데 재원을
   잡고 있는 hold(`ACTIVE`·`PARTIALLY_CAPTURED` 둘 다)를 닫고 `locked` 를 `available` 로 되돌린다.
   부족분 적체 지표(`ShortfallBacklogMetrics`, 5분) — `deposit.shortfall.open.{count,amount}`.

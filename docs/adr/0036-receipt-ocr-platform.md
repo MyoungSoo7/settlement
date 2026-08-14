@@ -94,6 +94,13 @@ card/adapter/in/web/  POST /internal/api/v1/expense-reports/{reportId}/receipts 
 |---|---|---|---|
 | insurance | 청약서 | 연 보험료·보장금액(정확 일치) · 청약일(접수일 KST ±1일) | `ApplicationUnderwritingService.approve` — 완전판매 게이트 직후 |
 | loan | 감정평가서·등기부 | 감정평가액(정확 일치) · **선순위 채권최고액**(자기신고값의 유일한 검증 수단) · 평가기준일(±1일) | `DisburseSecuredLoanService.approve` — 담보 유효화(ACTIVE) 직전 |
+| deposit | 이체확인증 | 이체금액(정확 일치) · 이체일(기표일 ±3일 — 수기 리드타임) | `DepositService.credit/debit` 최상단(`DepositProofGate`) — **지연 대사 변형** |
+
+- **deposit 지연 대사 변형**: 수기 기표는 즉시 반영·선행 애그리거트 없음 → 앵커를 호출자 지정 멱등 키
+  `(sellerId, referenceType, referenceId)` 로 승격하고, 값 대사를 첨부 시점이 아니라 <b>기표 시점</b>에
+  기표 요청 값과 대조해 실행한다. 실패 판정은 기표 트랜잭션과 함께 롤백되어 EXTRACTED 로 남는다
+  (운영자가 기표 값을 잘못 친 경우 재시도 가능) — 리뷰행 결함(신뢰도·이체일 판독 불가)만 첨부 시점에
+  영속해 리뷰 경로를 확보한다.
 
 - insurance 는 하우스 컨벤션(전용 타입 예외 + 컨트롤러 로컬 핸들러)을, loan 은 `LoanDomainException`(ErrorCode
   경유)을 따랐다 — 예외 매핑 방식은 서비스 관례가 우선이고 상태코드 계약(404/422/503)만 통일했다.

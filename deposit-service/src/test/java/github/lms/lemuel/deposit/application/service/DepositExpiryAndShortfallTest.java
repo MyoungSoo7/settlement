@@ -59,7 +59,8 @@ class DepositExpiryAndShortfallTest {
         when(saveShortfallPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         service = new DepositService(loadAccountPort, saveAccountPort, saveEntryPort,
-                loadHoldPort, saveHoldPort, loadShortfallPort, saveShortfallPort, publishEventPort);
+                loadHoldPort, saveHoldPort, loadShortfallPort, saveShortfallPort, publishEventPort,
+                mock(DepositProofGate.class));
     }
 
     /** available/locked 를 직접 지정한 계좌. */
