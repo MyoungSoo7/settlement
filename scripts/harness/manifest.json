@@ -18,6 +18,7 @@
     "scripts/harness/test/install.test.mjs",
     "scripts/harness/test/oo-gate.test.mjs",
     "scripts/harness/test/scheduler-lock-gate.test.mjs",
+    "scripts/harness/test/async-query-gate.test.mjs",
     "scripts/harness/test/telemetry-report.test.mjs",
     "HARNESS.md",
     "docs/plan/HARNESS-IMPROVEMENT-LOG.md",
