@@ -79,9 +79,9 @@ class MenuSeedIntegrationTest {
     }
 
     @Test
-    @DisplayName("시드 총 44행 — 이관분 31 + 정산운영 그룹 1 + 운영 화면 9 + 시스템 화면 3")
-    void seedsExactlyFortyFour() {
-        assertThat(adapter.findAll()).hasSize(44);
+    @DisplayName("시드 총 45행 — 이관분 31 + 정산운영 그룹 1 + 운영 화면 10 + 시스템 화면 3")
+    void seedsExactlyFortyFive() {
+        assertThat(adapter.findAll()).hasSize(45);
     }
 
     @Test
@@ -102,7 +102,7 @@ class MenuSeedIntegrationTest {
     void settlementOpsChildren() {
         assertThat(childrenOf("정산운영")).extracting(Menu::getName)
                 .containsExactly("정합성 검증", "일일 대사", "PG 대사", "차지백", "회수 채권",
-                        "월마감", "세무", "수수료율", "원장·시산표");
+                        "월마감", "세무", "수수료율", "DLQ 재처리", "원장·시산표");
         // 수수료율은 ADMIN 전용 — 요율은 정산 금액을 직접 바꾸므로 MANAGER 에게 열지 않는다(ADR 0032)
         assertThat(childrenOf("정산운영").stream()
                 .filter(m -> m.getName().equals("수수료율")).findFirst().orElseThrow().allowedRoles())

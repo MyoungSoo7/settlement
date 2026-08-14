@@ -201,7 +201,7 @@
 | 월마감 | `/admin/settlement/monthly-closing` | `/admin/monthly-closing` | ✅ `aeadb1937`+`29743b4ed` |
 | 세무(세금계산서) | `/admin/settlement/tax` | `/admin/tax/scans` · `/admin/seller-tax-profiles` · `/admin/tax/settlements/{id}` | ✅ (스캔 리뷰·전표 전기·발행·3자 대사) |
 | 수수료율 | `/admin/settlement/commission-rates` | `/admin/commission-rates` | ✅ (목록·등록·종료·해석 미리보기, GET 목록 신설) |
-| DLQ 재처리 | `/admin/settlement/dlq` (예정) | `/admin/dlq` | ⬜ |
+| DLQ 재처리 | `/admin/settlement/dlq` | `/admin/dlq` | ✅ (토픽 선택·인스펙션·재발행, GET /topics 신설) |
 | 이벤트 추적·정산 재구동 | `/admin/settlement/event-track` (예정) | `/admin/event-track` · `/admin/settlements/rerun` | ⬜ |
 
 **라우트 접두사 고정**: 신규 화면도 `/admin/settlement/**` 아래에 둔다 — nginx SPA 폴백이 `/admin` 하위에서
