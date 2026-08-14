@@ -89,7 +89,7 @@ describe('CeoCardPage — 카드계정 조회', () => {
     await lookupAccount();
 
     await waitFor(() => expect(mocked.listCards).toHaveBeenCalledWith(3));
-    expect(screen.getByText('7,000,000')).toBeInTheDocument();      // masterLimit
+    expect(await screen.findByText('7,000,000')).toBeInTheDocument(); // masterLimit
     expect(screen.getByText(/평판등급/)).toBeInTheDocument();
     expect(screen.getByText('8,000,000')).toBeInTheDocument();      // sellerPayable
     expect(screen.getByText(/70%/)).toBeInTheDocument();            // appliedRatio
@@ -111,7 +111,7 @@ describe('CeoCardPage — 카드계정 조회', () => {
   it('계정 ID 없이 조회하면 서버를 부르지 않는다', async () => {
     renderPage();
     await waitFor(() => expect(mocked.myCards).toHaveBeenCalled());
-    fireEvent.click(screen.getByRole('button', { name: '계정 조회' }));
+    fireEvent.click(await screen.findByRole('button', { name: '계정 조회' }));
 
     await waitFor(() => expect(mocked.getAccount).not.toHaveBeenCalled());
   });
@@ -159,7 +159,7 @@ describe('CeoCardPage — 발급·한도·상태', () => {
     await lookupAccount();
     await waitFor(() => expect(mocked.listCards).toHaveBeenCalledTimes(1));
 
-    fireEvent.change(screen.getByLabelText('임직원 사용자 ID'), { target: { value: '42' } });
+    fireEvent.change(await screen.findByLabelText('임직원 사용자 ID'), { target: { value: '42' } });
     fireEvent.change(screen.getByLabelText('서브한도(원)'), { target: { value: '500000' } });
     fireEvent.click(screen.getByRole('button', { name: '카드 발급' }));
 
