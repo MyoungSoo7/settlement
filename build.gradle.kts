@@ -239,6 +239,23 @@ sonar {
         property("sonar.qualitygate.wait", false)
         property("sonar.java.source", "25")
 
+        // ── 규칙 제외 2건 (코드/워크플로 수정으로는 만족시킬 수 없는 것만) ─────────────────
+        // 나머지 신규 코드 지적은 전부 코드에서 처리했다: 실결함은 수정, "안전한지 확인하라" 류는
+        // 근거를 적은 @SuppressWarnings 로 호출부에 남겼다. 여기 두 건은 성격이 다르다.
+        //
+        // e1) githubactions:S8544 — polyglot-ci 의 `pip install -r requirements*.txt`.
+        //     세 파이썬 서비스의 의존성은 requirements.txt 에 `==` 로 이미 고정돼 있고 dependabot 이
+        //     갱신한다. 이 규칙이 추가로 요구하는 건 `--require-hashes`(전이 의존까지 해시 고정)인데,
+        //     그건 세 서비스의 의존 그래프를 플랫폼별 해시로 잠그고 유지하는 별도 과제다.
+        //     (같은 스텝의 sdist 실행 경로 차단(S8541)은 `--only-binary :all:` 로 실제 적용했다.)
+        // e2) text:S8569 — Gradle 의존성 잠금파일(gradle.lockfile / verification-metadata.xml) 부재.
+        //     17개 모듈 전체에 락을 쓰고 유지하는 결정이 필요한 사안이라 정적분석 경고로 처리하지 않는다.
+        property("sonar.issue.ignore.multicriteria", "e1,e2")
+        property("sonar.issue.ignore.multicriteria.e1.ruleKey", "githubactions:S8544")
+        property("sonar.issue.ignore.multicriteria.e1.resourceKey", ".github/workflows/polyglot-ci.yml")
+        property("sonar.issue.ignore.multicriteria.e2.ruleKey", "text:S8569")
+        property("sonar.issue.ignore.multicriteria.e2.resourceKey", "**/build.gradle.kts")
+
         // ⚠ 미해결(빌드에서 고칠 수 없음): 스캐너가 남기는
         //   "Could not find ref 'master' in refs/heads, refs/remotes, refs/remotes/upstream
         //    or refs/remotes/origin" (2026-08-12 run 31611508158 실측)
