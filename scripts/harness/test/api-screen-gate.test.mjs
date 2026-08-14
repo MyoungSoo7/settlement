@@ -122,14 +122,13 @@ const SCREEN_PENDING = new Map([
   ['ai-service/KnowledgeController', 'AI 지식베이스 관리'],
   ['common-data-service/DataSourceController', '공공데이터 데이터소스 등록 화면'],
   ['organization-service/OrganizationController', '조직·멤버십 화면 — 서비스 전체가 화면 0'],
-  ['card-service/CardController', '법인카드 화면 — Phase 2 까지 구현됐는데 화면 0'],
 ]);
 
 /**
  * 미노출 부채의 상한. <b>내려가기만 한다</b> — 화면을 붙였으면 이 수를 함께 내린다.
  * 올리려면 그 자체가 리뷰 대상이라는 뜻이다.
  */
-const PENDING_BUDGET = 44;
+const PENDING_BUDGET = 43;
 
 const read = (path) => readFileSync(path, 'utf8');
 
