@@ -220,6 +220,13 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
   ② `MACHINE_ONLY`(웹훅·VAN 단말·내부키 수집 트리거·일회성 백필) ③ `SCREEN_PENDING`(인정된 화면 부채) 중 하나로
   **사유와 함께** 분류해야 통과한다. 부채는 `PENDING_BUDGET` 래칫으로 **내려가기만** 한다 — 줄었는데 예산을 안 내려도
   FAIL 이라 목록이 늘 정확하다. 추출 정규식이 깨져 전부 통과하는 가짜 GREEN 도 스캔 하한선으로 막는다.
+- **프론트 테스트 렌더 경합 게이트** — `scripts/harness/test/async-query-gate.test.mjs`: `waitFor(API 가 불렸는지)`로
+  기다린 뒤 곧바로 `screen.getBy*` 로 데이터 의존 엘리먼트를 집는 형태를 막는다. 호출된 시점과 렌더에 반영된 시점
+  사이에 상태 갱신 한 틱이 있어 **로컬에선 늘 통과하고 CI 러너에서만 랜덤하게 실패**한다 — 2026-08-13 하루에 두
+  파일(차지백 콘솔·카테고리 정합 패널)이 같은 이유로 필수 체크를 깼고, 매번 PR 이 막힌 뒤에야 발견됐다. 고치는 법은
+  `await screen.findBy*`(재시도 조회)이며, 마운트부터 있는 정적 chrome(헤더·필터 탭·조건 없는 폼)은 게이트의
+  `STATIC_QUERIES` 에 **사유와 함께** 등록해야 통과한다. 린트로는 못 잡는다 — `testing-library/prefer-find-by` 는
+  `waitFor(() => getBy...)` 형태만 보고 이 사각지대는 대상이 아니다. 도입 시점에 이미 새 파일 1건을 잡았다.
 - **하네스 자기 진단** — `scripts/harness/harness-audit.mjs`: 문서 드리프트를 규율이 아닌 **기계 게이트**로 승격(과거 문서 3주 방치 재발 방지).
   라우팅 맵 dangling 도 기계 검증한다 — 🤖📘⌘ 아이콘 줄의 backtick 진입점 토큰을 agents/skills/commands 실존과 대조
   (에이전트·스킬·커맨드를 삭제/개명하고 라우팅 맵을 안 고치면 audit FAIL → CI 차단).
