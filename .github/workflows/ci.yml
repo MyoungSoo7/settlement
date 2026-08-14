@@ -45,8 +45,11 @@ jobs:
       build_matrix: ${{ steps.setmatrix.outputs.matrix }}
       # 빌드할 서비스가 하나라도 있으면 true (backend-ghcr 실행 게이트)
       build_any: ${{ steps.setmatrix.outputs.any }}
-      # backend-ci 가 실행할 gradle 테스트 태스크 (변경 모듈만 / shared·모호 변경 시 전체 build)
-      test_tasks: ${{ steps.setmatrix.outputs.test_tasks }}
+      # 모듈별 테스트 매트릭스: {"include":[{module},...]} — backend-test 가 모듈당 잡 하나로 병렬 실행한다.
+      # 단일 잡이던 시절 백엔드는 14~43분이 걸렸고, 그 사이 다음 push 가 오면 concurrency 대기 슬롯
+      # (그룹당 1개)에서 밀려나 취소됐다 — 2026-08-14 실측으로 develop ci 20건 중 완주 2건.
+      test_matrix: ${{ steps.setmatrix.outputs.test_matrix }}
+      test_any: ${{ steps.setmatrix.outputs.test_any }}
       # shared-common(composite included build) 변경 여부 — 루트 build 태스크는 included build 의
       # test 를 실행하지 않으므로, true 면 backend-ci 가 shared-common 자체 게이트를 별도 실행한다.
       shared: ${{ steps.filter.outputs.shared }}
@@ -133,29 +136,72 @@ jobs:
           echo "matrix={\"include\":$include}" >> "$GITHUB_OUTPUT"
           echo "any=$([ "$count" -gt 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "이미지 빌드 대상 서비스: ${count}개 → $include"
-          # 테스트 태스크: shared 변경→전체 build, 변경 서비스만 있으면 해당 모듈만,
-          # 그 외(모듈·shared 모두 아닌 모호한 backend 변경)→안전하게 전체 build (게이트 약화 방지)
-          if echo "$CHANGED" | jq -e 'index("shared")' >/dev/null; then
-            test_tasks="build"
-          elif [ "$count" -gt 0 ]; then
-            test_tasks=$(echo "$include" | jq -r '[.[] | ":\(.module):build"] | join(" ")')
+          # 테스트 매트릭스: shared 변경→전 모듈, 변경 서비스만 있으면 해당 모듈만,
+          # 그 외(모듈·shared 모두 아닌 모호한 backend 변경)→안전하게 전 모듈 (게이트 약화 방지).
+          # 태스크 문자열이 아니라 **모듈 목록**을 낸다 — 잡을 모듈당 하나로 쪼개 병렬 실행하기 위해서다.
+          if echo "$CHANGED" | jq -e 'index("shared")' >/dev/null || [ "$count" -eq 0 ]; then
+            test_modules=$(echo "$mapping" | jq -c 'keys')
           else
-            test_tasks="build"
+            test_modules=$(echo "$include" | jq -c '[.[].module]')
           fi
-          echo "test_tasks=$test_tasks" >> "$GITHUB_OUTPUT"
-          echo "테스트 태스크: $test_tasks"
+          test_include=$(echo "$test_modules" | jq -c '[.[] | {module: .}]')
+          echo "test_matrix={\"include\":$test_include}" >> "$GITHUB_OUTPUT"
+          echo "test_any=$(echo "$test_include" | jq 'length > 0')" >> "$GITHUB_OUTPUT"
+          echo "테스트 대상 모듈: $(echo "$test_modules" | jq 'length')개 → $test_modules"
 
-  backend-ci:
-    name: Backend - Build/Test/JaCoCo/SonarCloud
+  # shared-common 은 composite included build — 루트 build 태스크는 jar 만 만들 뿐 included build 의
+  # test 를 실행하지 않는다. 호출 형태가 `-p shared-common` 으로 달라 모듈 매트릭스에 넣을 수 없어
+  # 별도 잡으로 분리한다. 자체 게이트(LINE 90% + outbox.domain INSTRUCTION 80%)는 그대로 강제된다.
+  backend-shared:
+    name: Backend - Test (shared-common)
     runs-on: ubuntu-latest
-    timeout-minutes: 90 # hang 시 러너 6시간 낭비 방지 (정상 55~70분 + 여유)
+    timeout-minutes: 30
     needs: changes
-    if: needs.changes.outputs.backend == 'true'
+    if: needs.changes.outputs.shared == 'true'
     permissions:
       contents: read
-      pull-requests: write
-      checks: write
+      packages: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Login to GHCR (for Testcontainers pulls)
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & Test shared-common (JaCoCo gate)
+        run: ./gradlew -p shared-common clean build --no-daemon --stacktrace
+        env:
+          TESTCONTAINERS_RYUK_DISABLED: "true"
+
+  # 모듈당 잡 하나. 단일 잡이던 시절 이 단계가 14~43분이었고, 그 사이 다음 push 가 오면
+  # concurrency 대기 슬롯(그룹당 1개)에서 밀려 취소됐다 — 2026-08-14 실측 develop ci 20건 중 완주 2건.
+  # 이제 벽시계 시간은 "가장 느린 단일 모듈"로 수렴한다(전체 합이 아니라).
+  # max-parallel 은 두지 않는다 — 계정 동시 실행 상한에 맞춰 GitHub 이 알아서 큐잉한다.
+  backend-test:
+    name: Backend - Test (${{ matrix.module }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45 # 단일 모듈 기준. hang 시 러너 6시간 낭비 방지
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' && needs.changes.outputs.test_any == 'true'
+    permissions:
+      contents: read
       packages: read # ghcr 미러 이미지 pull (mirror-testcontainers.yml 참고)
+    strategy:
+      fail-fast: false # 한 모듈 실패가 나머지 모듈의 판정을 가리지 않도록
+      matrix: ${{ fromJSON(needs.changes.outputs.test_matrix) }}
     services:
       postgres:
         # Docker Hub rate limit 회피 — ghcr 미러 사용 (mirror-testcontainers.yml 로 갱신)
@@ -221,20 +267,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # shared-common 은 composite included build — 루트 build 태스크는 jar 만 만들 뿐
-      # included build 의 test 를 실행하지 않는다. shared 변경 시 자체 빌드로 직접 실행해
-      # 자체 게이트(LINE 90% + outbox.domain INSTRUCTION 80%, shared-common/build.gradle.kts)를 강제한다.
-      - name: Build & Test shared-common (JaCoCo gate)
-        if: needs.changes.outputs.shared == 'true'
-        run: ./gradlew -p shared-common clean build --no-daemon --stacktrace
-        env:
-          TESTCONTAINERS_RYUK_DISABLED: "true"
-
       # build = compile + test + jacocoTestReport + jacocoTestCoverageVerification (게이트 포함, build.gradle.kts:157)
-      # test_tasks = 변경 모듈만(`:<mod>:build`) / shared·모호 변경 시 전체 `build` (changes 잡이 산출)
       # Testcontainers 기반 통합테스트는 러너의 Docker 데몬을 사용한다.
-      - name: Build & Test (JaCoCo gate)
-        run: ./gradlew clean ${{ needs.changes.outputs.test_tasks }} --no-daemon --stacktrace
+      - name: Build & Test ${{ matrix.module }} (JaCoCo gate)
+        run: ./gradlew clean :${{ matrix.module }}:build --no-daemon --stacktrace
         env:
           # ryuk(정리용 유틸 컨테이너) 비활성화 — 러너는 일회용이라 불필요하고,
           # 이미지 치환과 얽혀 모듈별 test JVM 에서 비결정적 hang 을 유발했다 (2026-07-08).
@@ -244,15 +280,84 @@ jobs:
           SPRING_DATASOURCE_PASSWORD: testpass
           SPRING_ELASTICSEARCH_URIS: http://localhost:9200
 
-      - name: Upload test/coverage reports
+      # 집계 잡이 이 아티팩트를 `<module>/build/reports/` 로 되돌려 놓아야 Sonar 의
+      # sonar.coverage.jacoco.xmlReportPaths 와 PR 코멘트 글롭이 경로를 찾는다.
+      # 업로드 루트를 모듈의 reports 디렉터리로 두고, 모듈명은 **아티팩트 이름**에 실어 복원 시 재구성한다.
+      - name: Upload test/coverage reports (${{ matrix.module }})
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
-          name: backend-reports
-          path: |
-            */build/reports/jacoco/test/
-            */build/reports/tests/test/
+          name: backend-reports-${{ matrix.module }}
+          path: ${{ matrix.module }}/build/reports/
           retention-days: 30
+          if-no-files-found: ignore
+
+  backend-ci:
+    # ⚠ 이 이름을 바꾸지 말 것 — ruleset 의 **필수 상태 체크**로 등록된 문자열이다.
+    #   잡을 쪼개면서 이 이름이 사라지면 체크가 영영 보고되지 않아 main PR 이 영구 대기에 빠진다.
+    #   모듈 잡 이름은 매트릭스라 가변이므로 필수 체크로 걸 수 없다 — 그래서 집계 잡이 이름을 물려받는다.
+    name: Backend - Build/Test/JaCoCo/SonarCloud
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    needs: [changes, backend-shared, backend-test]
+    # always() 가 필수다. 기본 동작은 needs 실패 시 이 잡을 **skip** 인데, 필수 체크에서 skip 은
+    # 통과로 취급된다 — 모듈 하나가 깨져도 게이트가 조용히 사라진다(이 파일 상단 changes 잡 주석과 같은 실패 양식).
+    if: always() && !cancelled() && needs.changes.outputs.backend == 'true'
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
+    steps:
+      # 스킵을 통과로 읽지 않는다 — 변경 없음(skipped)만 허용하고 failure/cancelled 는 여기서 떨어뜨린다.
+      - name: 모듈 테스트 결과 집계
+        run: |
+          set -euo pipefail
+          echo "backend-shared: ${{ needs.backend-shared.result }}"
+          echo "backend-test  : ${{ needs.backend-test.result }}"
+          for result in "${{ needs.backend-shared.result }}" "${{ needs.backend-test.result }}"; do
+            case "$result" in
+              success|skipped) ;;
+              *) echo "::error::백엔드 모듈 테스트가 통과하지 않았다 (result=$result)"; exit 1 ;;
+            esac
+          done
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Download module coverage reports
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: backend-reports-*
+          path: artifacts
+
+      # 모듈 잡에서 올라온 리포트를 원래 경로로 되돌린다. 아티팩트 이름의 접미사가 모듈명이다.
+      - name: Restore report paths
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          for dir in artifacts/backend-reports-*; do
+            module="${dir#artifacts/backend-reports-}"
+            mkdir -p "$module/build/reports"
+            cp -r "$dir/." "$module/build/reports/"
+          done
+          count=$(ls -1 */build/reports/jacoco/test/jacocoTestReport.xml 2>/dev/null | wc -l)
+          echo "복원된 커버리지 XML: ${count}개"
+          # 0 개면 Sonar 커버리지가 조용히 0% 로 잡히고 PR 코멘트도 빈손이 된다 — 침묵시키지 않는다.
+          if [ "$count" -eq 0 ] && [ "${{ needs.backend-test.result }}" = "success" ]; then
+            echo "::error::모듈 테스트는 통과했는데 커버리지 XML 이 하나도 복원되지 않았다 — 아티팩트 배선을 확인할 것"
+            exit 1
+          fi
 
       - name: Add coverage comment to PR
         if: github.event_name == 'pull_request'
@@ -353,14 +458,13 @@ jobs:
 
       - name: SonarCloud Scan (analysis must succeed)
         if: github.event_name != 'pull_request' && steps.sonar_token.outputs.present == 'true'
+        # DB·ES 환경변수를 뗐다 — 이 잡에는 서비스 컨테이너가 없다(테스트는 backend-test 가 이미 끝냈다).
+        # `sonar` 는 subprojects 의 compileJava 에만 의존하므로 DB 가 필요 없다(build.gradle.kts 하단 주석).
+        # 없는 포트를 가리키는 값을 남겨두면 "설정돼 있으니 동작한다"는 착시만 만든다.
         run: ./gradlew sonar --no-daemon --stacktrace
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/testdb
-          SPRING_DATASOURCE_USERNAME: testuser
-          SPRING_DATASOURCE_PASSWORD: testpass
-          SPRING_ELASTICSEARCH_URIS: http://localhost:9200
 
   # (제거) 주석 처리돼 있던 sonarqube-quality-gate-action 블록 — build.gradle.kts 의
   # sonar.qualitygate.wait=true 가 같은 일을 하므로(분석 태스크가 게이트 결과를 기다렸다가 실패)
