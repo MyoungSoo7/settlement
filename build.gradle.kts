@@ -9,7 +9,7 @@ plugins {
     // 38건 남는다. 같은 4.0.x 라인의 4.0.7 은 8건까지 줄인다 — 48 → 38(4.0.6) → 8(4.0.7).
     // shared-common/build.gradle.kts 의 spring-boot-dependencies 좌표와 반드시 같은 값이어야 한다
     // (composite build 로 로컬 치환되므로 버전이 갈리면 서비스마다 다른 BOM 이 섞인다).
-    id("org.springframework.boot") version "4.0.7" apply false
+    id("org.springframework.boot") version "4.1.0" apply false
     id("io.spring.dependency-management") version "1.1.7" apply false
     jacoco
     // 5.1.0.4882 는 Gradle 9 에서 제거된 Convention API 를 호출해 sonar 태스크가
@@ -51,7 +51,7 @@ subprojects {
 
     extensions.configure<io.spring.gradle.dependencymanagement.dsl.DependencyManagementExtension> {
         imports {
-            mavenBom("org.springframework.cloud:spring-cloud-dependencies:2025.1.0")
+            mavenBom("org.springframework.cloud:spring-cloud-dependencies:2025.1.2")
         }
     }
 
