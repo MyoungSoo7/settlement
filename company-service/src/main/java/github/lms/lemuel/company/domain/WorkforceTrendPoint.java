@@ -30,7 +30,8 @@ public record WorkforceTrendPoint(YearMonth month, int headcount, BigDecimal est
 
     /** 연속 인접 월 지점 — 전월 스냅샷 대비 증감을 계산한다. */
     static WorkforceTrendPoint withChange(CompanyWorkforce snapshot, CompanyWorkforce previous) {
-        BigDecimal headcountChange = BigDecimal.valueOf(snapshot.headcount() - previous.headcount());
+        // long 산술 — int 뺄셈 후 넓히면 극단값에서 부호가 뒤집힌 증감이 나온다.
+        BigDecimal headcountChange = BigDecimal.valueOf((long) snapshot.headcount() - previous.headcount());
         BigDecimal previousSalary = previous.estimatedAnnualSalary().orElse(null);
         BigDecimal currentSalary = snapshot.estimatedAnnualSalary().orElse(null);
         BigDecimal salaryChange = previousSalary == null || currentSalary == null

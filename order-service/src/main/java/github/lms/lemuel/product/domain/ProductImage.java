@@ -92,7 +92,7 @@ public class ProductImage {
 
     // 도메인 규칙: 파일 크기 검증 (5MB)
     public void validateFileSize() {
-        long maxSize = 5 * 1024 * 1024; // 5MB
+        long maxSize = 5L * 1024 * 1024; // 5MB — long 산술로 계산(int 곱 후 넓히기는 상한을 키울 때 조용히 넘친다)
         if (sizeBytes == null || sizeBytes <= 0) {
             throw new ProductInvariantViolationException("File size must be greater than 0");
         }

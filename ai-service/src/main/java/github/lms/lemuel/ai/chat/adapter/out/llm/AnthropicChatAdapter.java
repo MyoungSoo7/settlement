@@ -148,10 +148,11 @@ public class AnthropicChatAdapter implements ChatCompletionPort {
         if (text == null || text.isBlank()) {
             throw new AiUnavailableException("AI 가 빈 응답을 반환했습니다.", null);
         }
-        Usage usage = response.getMetadata() == null ? null : response.getMetadata().getUsage();
-        return new ChatCompletion(text, properties.model(),
-                usage == null ? null : usage.getPromptTokens(),
-                usage == null ? null : usage.getCompletionTokens());
+        // 단발 호출 응답의 metadata·usage 는 Spring AI 계약상 널이 아니다(미보고 시 EmptyUsage 로 0).
+        // 널 분기는 실행될 수 없는 죽은 코드였다 — 스트리밍 경로의 usage 는 청크마다 없을 수 있어
+        // 거기서는 여전히 널 검사를 유지한다(같은 이름이지만 출처가 다르다).
+        Usage usage = response.getMetadata().getUsage();
+        return new ChatCompletion(text, properties.model(), usage.getPromptTokens(), usage.getCompletionTokens());
     }
 
     private static String extractText(ChatResponse response) {
