@@ -539,7 +539,11 @@ jobs:
             # (load 대상이 없다) Trivy 의 tags[0] 참조도 깨진다 — PR 전용 태그를 하나 보장한다.
             # push 이벤트에서는 이 줄이 적용되지 않아 기존 태그 구성이 그대로다.
             type=ref,event=pr
-            type=sha,prefix={{branch}}-
+            # PR 에서는 {{branch}} 가 빈 문자열이라 태그가 `-<sha7>` 이 된다. 하이픈으로 시작하는
+            # 태그는 불법이라 buildx 가 "invalid reference format" 으로 거부한다 — 이 잡이 push
+            # 전용이던 동안 드러나지 않던 결함이고, PR 에서 돌게 하면서 노출됐다(실측: frontend
+            # 쪽이 `settlement-frontend:-4cdf810` 로 실패). PR 태그는 위 event=pr 이 이미 만든다.
+            type=sha,prefix={{branch}}-,enable=${{ github.event_name != 'pull_request' }}
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push (GHCR)
@@ -733,7 +737,9 @@ jobs:
             # (load 대상이 없다) Trivy 의 tags[0] 참조도 깨진다 — PR 전용 태그를 하나 보장한다.
             # push 이벤트에서는 이 줄이 적용되지 않아 기존 태그 구성이 그대로다.
             type=ref,event=pr
-            type=sha,prefix={{branch}}-
+            # backend-ghcr 와 같은 이유 — PR 에서 {{branch}} 가 비어 `-<sha7>` 불법 태그가 된다.
+            # 실제로 여기서 먼저 터졌다: `settlement-frontend:-4cdf810` (run 31771642040).
+            type=sha,prefix={{branch}}-,enable=${{ github.event_name != 'pull_request' }}
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push (GHCR)
