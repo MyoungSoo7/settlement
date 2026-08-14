@@ -100,6 +100,7 @@ export const FALLBACK_MENUS: FallbackMenuNode[] = [
       { id: -86, name: '진열 편성', path: '/admin/system/display-sections', icon: '🎪', description: '기획전 · 메인 진열 편성', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
       { id: -87, name: '옵션 카탈로그', path: '/admin/system/option-catalog', icon: '🎛️', description: '표준 옵션 축 · 값 관리', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
       { id: -85, name: '운영관리', path: '/admin/system/operation', icon: '🖥️', description: '인시던트 관제 콘솔', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
+      { id: -88, name: '증빙 리뷰 큐', path: '/admin/system/proof-review', icon: '🧾', description: '증빙 OCR 리뷰 큐 (영수증·청약·담보·예치금)', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
     ],
   },
   {
