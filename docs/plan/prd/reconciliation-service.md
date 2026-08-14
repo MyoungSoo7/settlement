@@ -10,7 +10,7 @@
 > | 역산 기준 | 2026-08-13 `develop` 브랜치                                                              |
 > | 근거      | 프로덕션 Kotlin 15파일, 테스트 4클래스, 소스 어댑터 4종(실 HTTP 2 + 샘플 2), `application.yml` |
 > | 범위 밖   | settlement/order 의 `/internal/recon` 구현(각 서비스 소관) · 불일치의 회계 처리·조정 전표 |
-> | 관련 문서 | [`../polyglot-services.md`](../polyglot-services.md) · `recon-playbook` 스킬 · [`../seeds/reconciliation-service-batch.seed.yaml`](../seeds/reconciliation-service-batch.seed.yaml) |
+> | 관련 문서 | [`../../inflearn/polyglot-services.md`](../../inflearn/polyglot-services.md) · `recon-playbook` 스킬 · [`../seeds/reconciliation-service-batch.seed.yaml`](../seeds/reconciliation-service-batch.seed.yaml) |
 
 ---
 

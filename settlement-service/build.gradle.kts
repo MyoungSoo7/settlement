@@ -125,6 +125,23 @@ dependencies {
 tasks.named<Test>("test") {
     useJUnitPlatform()
     jvmArgs("-javaagent:${mockitoAgent.asPath}")
+
+    // 이 모듈이 CI 벽시계의 병목이다 — 모듈 매트릭스로 쪼갠 뒤에도 11분으로 가장 느리다
+    // (2026-08-14 실측: 다음이 order-service 7분, 나머지는 2~5분). 테스트 1,404개 중
+    // Testcontainers 통합 30클래스가 시간을 지배한다.
+    //
+    // 잡을 더 쪼개는 대신 **포크 병렬화**를 쓴다: jacocoTestCoverageVerification(LINE 90%)이
+    // 모듈 단위라, 테스트를 CI 잡 여러 개로 나누면 각 샤드가 부분 커버리지만 갖게 되어 전부
+    // 게이트에 걸린다. 그걸 피하려면 .exec 병합 배선이 필요한데 비용 대비 이득이 낮다.
+    // 포크는 커버리지 산정 단위를 건드리지 않는다(에이전트가 같은 exec 에 append).
+    //
+    // 기본값은 러너 코어의 절반 — ubuntu-latest(4 vCPU)에서 2. 포크마다 maxHeapSize 3g(루트
+    // 설정)와 Testcontainers 컨테이너가 붙으므로 코어 수만큼 올리면 메모리로 되레 느려진다.
+    // 로컬에서 CI 조건을 재현하려면 `-PtestForks=2`.
+    maxParallelForks = (
+        (project.findProperty("testForks") as String?)?.toIntOrNull()
+            ?: (Runtime.getRuntime().availableProcessors() / 2)
+        ).coerceAtLeast(1)
 }
 
 // 전문 스펙(telegram/firmbanking/*.yaml) → VO·코덱 소스 재생성 (ADR 0033 Phase 2).

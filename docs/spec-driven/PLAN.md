@@ -1,6 +1,6 @@
 # PLAN — Lemuel 구현 계획 (기능 기반)
 
-> [`../SPEC.md`](../SPEC.md) 의 기능을 **구현 단위(Phase)로 분해한 계획서**. 완료 판정 기준은 [`DONE_CRITERIA.md`](DONE_CRITERIA.md).
+> [`../../SPEC.md`](../../SPEC.md) 의 기능을 **구현 단위(Phase)로 분해한 계획서**. 완료 판정 기준은 [`DONE_CRITERIA.md`](DONE_CRITERIA.md).
 > 실시간 진척은 git 이력이 정본 — 이 문서는 "무엇을 어떤 순서·의존으로 짓는가"의 지도.
 
 - 기준 시점: 2026-07-24 (SPEC 2026-07-16 기준)
@@ -40,7 +40,7 @@
 |----------|----------|------|
 | 회원/인증/멤버십 | `/auth · /users · /memberships` | ✅ |
 | 상품·SKU·카테고리·태그·이미지 | `/api/products · /categories · /api/tags` | ✅ |
-| 카탈로그(옵션 축/값·조합 SKU·진열 편성) | `/admin/option-catalog · /admin/display-sections · /display-sections` — 설계 정본 [`product-catalog-design.md`](product-catalog-design.md) | ✅ |
+| 카탈로그(옵션 축/값·조합 SKU·진열 편성) | `/admin/option-catalog · /admin/display-sections · /display-sections` — 설계 정본 [`../study/product-catalog-design.md`](../study/product-catalog-design.md) | ✅ |
 | 장바구니·쿠폰(등급별) | `/users/{id}/cart · /coupons` | ✅ |
 | 주문(재고 조건부 차감·Idempotency-Key)·배송 | `/orders · /orders/{id}/shipment` | ✅ |
 | 결제(Toss·분할·환불 동시성) | `/payments · /payments/split · /api/payments/*/refunds` | ✅ |
@@ -135,7 +135,7 @@
 
 ### 5.5b insurance-service (8108, mgmt 8109 / lemuel_insurance) ✅
 - GA(법인보험대리점) 플랫폼 — 상담 → 가입설계 → 청약 → 계약 → 유지·변경 → 수수료 정산을 하나로 잇는다
-- 상태머신 4종: Application/Policy/Proposal/Commission (전이표 상세는 [`insurance-service.md`](plan/insurance-service.md))
+- 상태머신 4종: Application/Policy/Proposal/Commission (전이표 상세는 [`insurance-service.md`](../inflearn/insurance-service.md))
 - 방카슈랑스 확장(V6+): 판매채널 FC/BANCA, 은행 채널 25%룰 모니터링, 대면 상품설명서 교부 증빙(완전판매 게이트)
 - 배치 7종(만기·가입설계 만료·월말 마감·수수료 지급·환수 스윕·일반지급·방카 집중도 감시)
 - PII(주민번호·연락처) 분리 테이블 암호화(`INSURANCE_ENC_KEY` 미설정 시 fail-closed)
@@ -207,7 +207,7 @@
 **라우트 접두사 고정**: 신규 화면도 `/admin/settlement/**` 아래에 둔다 — nginx SPA 폴백이 `/admin` 하위에서
 `(system|operation|ceo|settlement|login)` 만 index.html 로 내려보내므로, 다른 접두사는 새로고침·직접진입이 404 가 된다.
 
-**배선 2스텝**: `App.tsx` 라우트 + (시드 마이그레이션 & `frontend/src/data/menuFallback.ts` 한 행). 메뉴에 넣지 않을
+**배선 2스텝**: `App.tsx` 라우트 + (시드 마이그레이션 & `../../frontend/src/data/menuFallback.ts` 한 행). 메뉴에 넣지 않을
 화면이면 `menu-route-gate` 의 `ROUTES_WITHOUT_MENU` 에 사유를 등록한다(안 하면 CI FAIL).
 
 **화면을 만들지 않는 표면**: 백필·일회성 도구(`/admin/payouts/backfill` · `/admin/payouts/pii` ·

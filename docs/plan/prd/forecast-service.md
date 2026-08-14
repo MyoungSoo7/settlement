@@ -10,7 +10,7 @@
 > | 역산 기준 | 2026-08-13 `develop` 브랜치                                                              |
 > | 근거      | Python 프로덕션 9파일, 테스트 4파일, 모델 2종(Holt-Winters·seasonal-naive), 데모 CSV     |
 > | 범위 밖   | 정산 실적 산출(→ `settlement-service`) · 화면 렌더링(프론트)                             |
-> | 관련 문서 | [`../polyglot-services.md`](../polyglot-services.md) · [`../seeds/forecast-service-timeseries.seed.yaml`](../seeds/forecast-service-timeseries.seed.yaml) |
+> | 관련 문서 | [`../../inflearn/polyglot-services.md`](../../inflearn/polyglot-services.md) · [`../seeds/forecast-service-timeseries.seed.yaml`](../seeds/forecast-service-timeseries.seed.yaml) |
 
 ---
 

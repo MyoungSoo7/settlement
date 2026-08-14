@@ -24,7 +24,7 @@
   배치 기준은 **호출 대상 서비스**: settlement-copilot→`settlement-service/`, pwc(trusted-ceo)→`company-service/`,
   fashion-copilot→`order-service/` (각 `src/main/resources/` 아래, jar 에는 `processResources` exclude 로 미포함).
   **자사 서비스를 호출하지 않는 제출물(kakaopay·musinsa·invest-copilot)은 저장소에 두지 않는다** — 소유 서비스가
-  없어 원격 실행 대상이 아니고, 공개 저장소라 대회 제출물·타사 브랜드명을 싣지 않는다(로컬 전용, 2026-08-07 `docs/harness` 제거).
+  없어 원격 실행 대상이 아니고, 공개 저장소라 대회 제출물·타사 브랜드명을 싣지 않는다(로컬 전용, 2026-08-07 `docs/ax` 제거).
 
 > 위 가드레일은 **기계로 강제된다**(문서 규율 아님): 저장소 추적 가드 `scripts/harness/guard.mjs` 가 실시간
 > PreToolUse(exit 2 차단)·git pre-commit(`node scripts/harness/install-hooks.mjs`)·CI(`.github/workflows/harness-guard.yml`) 3중으로
@@ -37,7 +37,7 @@
 **16개 마이크로서비스 + API Gateway** 로 분리한 헥사고날 백엔드. 원래 모놀리스였으나 Bounded Context 로 분리.
 여기에 **폴리글랏 7종**(Kotlin 2 알림·대사 / Go 2 스트리밍·웹훅 / Python 3 백테스트·이상탐지·예측 — Gradle 미포함
 standalone, gateway 미라우팅 — 예외 2종: market-stream 은 `/api/market-stream/**` SSE, notification 은
-`/api/notifications/stream` 알림 푸시 SSE 만 gateway 라우팅 + compose 배선. 정본 [`docs/sse.md`](docs/sse.md))을
+`/api/notifications/stream` 알림 푸시 SSE 만 gateway 라우팅 + compose 배선. 정본 [`docs/study/sse.md`](docs/study/sse.md))을
 더해 총 24개 서비스 = 16 + gateway 1 + 폴리글랏 7 (정본: `polyglot-services.md` · `ARCHITECTURE.md`).
 
 - **16개 서비스 모두 DB-per-service** — order=opslab, settlement=settlement_db, loan=lemuel_loan,
@@ -84,7 +84,7 @@ settlement/                       # Gradle 멀티 모듈 루트
   `AdminApiKeyFilter`(X-Internal-Api-Key) 게이트. company·operation·ai·account 는 의존이되 제한 스캔(트리 주석 참조).
 - **폴리글랏 7종**(위 트리·settings.gradle 미포함, standalone 디렉토리): notification(8130)·reconciliation(8131, Kotlin) ·
   market-stream(8110)·payment-webhook(8111, Go) · screening-backtest(8120)·settlement-anomaly(8121)·forecast(8122, Python).
-  자체 DB 없음(무영속 MVP), CI 는 `polyglot-ci.yml` 분리 — 정본 `docs/plan/polyglot-services.md`.
+  자체 DB 없음(무영속 MVP), CI 는 `polyglot-ci.yml` 분리 — 정본 `docs/inflearn/polyglot-services.md`.
 - 각 서비스의 **책임·API·유스케이스는 [`SPEC.md`](./SPEC.md), 강제 규칙은 `*-rules` 스킬** 참조.
 - 위 트리는 **에이전트용 경계 요약**(포트·DB·shared-common 의존 방식) — 전체 디렉토리·모듈 트리 정본은
   [`STRUCTURE.md`](STRUCTURE.md). 로스터 드리프트는 `harness-audit` 가 `settings.gradle.kts` 와 대조해 차단.
@@ -130,7 +130,7 @@ order Kafka 이벤트를 컨슈머(`adapter/in/kafka/`)가 받아 로컬 적재�
   `kafka-topic-gate.test.mjs` 가 CI 에서 FAIL.
 - 토픽 목록·프로듀서/컨슈머 매핑 → [`SPEC.md`](./SPEC.md) §5. 이벤트/멱등 코드 작성 규칙 → `idempotency-and-events` 스킬.
   **전송 계약·운영 절차(파티션 증설 판단·보존기간·DLT·실측 명령·게이트 4종) 정본은
-  [`docs/kafka.md`](docs/kafka.md)** — 카프카 관련 작업은 여기서 시작한다.
+  [`docs/study/kafka.md`](docs/study/kafka.md)** — 카프카 관련 작업은 여기서 시작한다.
   토픽 추가·페이로드 변경 절차(스키마·샘플·양방향 테스트 배선) → `event-contract-change` 스킬.
 
 ## 도메인 규칙 (요지 — 상세는 SPEC.md §4 + `*-rules` 스킬)
