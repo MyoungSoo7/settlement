@@ -547,6 +547,74 @@ export function checkKafkaDlqWiring(repoRoot, deps = {}) {
   return violations;
 }
 
+// ── KAFKA-GROUP-OWNER: 컨슈머 그룹 ID 는 모듈 소유여야 한다 ────────────────────────
+//
+// 같은 group-id 를 두 서비스가 쓰면 카프카는 그 둘을 한 컨슈머 그룹으로 보고 파티션을 나눠 준다.
+// 한쪽이 가져간 메시지는 다른 쪽에 오지 않고, 오프셋까지 공유되므로 **조용히 유실**된다. 예외도
+// 로그도 없다 — 정산 이벤트가 안 왔다는 사실로만 뒤늦게 드러난다.
+//
+// 실제 상태(2026-08-14): order-service 가 spring.kafka.consumer.group-id 로 `lemuel-settlement` 을
+// 들고 있었다. 모놀리스 분리 시점의 잔재이고 order 에는 @KafkaListener 가 하나도 없어 지금은 무해하지만,
+// 리스너가 하나 붙는 순간 settlement 가 받아야 할 파티션 일부를 order 가 점유하고 커밋한다.
+// 컴파일도 테스트도 잡지 못한다.
+//
+// 판정: Gradle 모듈 `<name>-service` 의 group-id 는 `lemuel-<name>` 이어야 한다. 이름 규칙이 곧
+// 유일성 보장이다. 폴리글랏 standalone(settings.gradle.kts 밖)은 대상이 아니다 — 팬아웃 목적의
+// 별도 그룹을 쓰는 것이 정상이다.
+const CONSUMER_GROUP_ID = /^\s*group-id:\s*(\S+)\s*$/m;
+
+/** 의도적으로 규칙을 벗어나는 모듈(현재 없음). 추가 시 반드시 사유를 남긴다. */
+const ALLOWED_GROUP_IDS = new Map();
+
+/** `${KAFKA_GROUP_ID:lemuel-order}` 처럼 환경변수로 감싼 경우 기본값을 본다 — 실제로 뜨는 값이다. */
+export function resolveGroupId(raw) {
+  const wrapped = /^\$\{[^:}]*:?([^}]*)\}$/.exec(String(raw).trim());
+  return (wrapped ? wrapped[1] : String(raw).trim()) || null;
+}
+
+/** `order-service` → `lemuel-order` */
+export function expectedGroupId(module) {
+  return `lemuel-${module.replace(/-service$/, '')}`;
+}
+
+export function checkConsumerGroupOwnership(repoRoot, deps = {}) {
+  const readSettings = deps.readSettings
+    ?? (() => readFileSync(resolve(repoRoot, 'settings.gradle.kts'), 'utf8'));
+  const readYaml = deps.readYaml ?? ((module) => {
+    try {
+      return readFileSync(resolve(repoRoot, module, 'src/main/resources/application.yml'), 'utf8');
+    } catch {
+      return null; // 설정이 없는 모듈(gateway 등)은 대상이 아니다
+    }
+  });
+
+  let modules;
+  try {
+    modules = parseGradleModules(readSettings());
+  } catch {
+    return [];
+  }
+
+  const violations = [];
+  for (const module of modules.filter((m) => m.endsWith('-service')).sort()) {
+    const yaml = readYaml(module);
+    if (!yaml) continue;
+    const match = CONSUMER_GROUP_ID.exec(yaml);
+    if (!match) continue; // 컨슈머가 없는 모듈
+    const actual = resolveGroupId(match[1]);
+    const expected = ALLOWED_GROUP_IDS.get(module) ?? expectedGroupId(module);
+    if (actual === expected) continue;
+    violations.push({
+      file: `${module}/src/main/resources/application.yml`,
+      id: 'KAFKA-GROUP-OWNER',
+      msg: `컨슈머 그룹 ID 가 '${actual}' 이다 — '${expected}' 여야 한다. 다른 모듈과 같은 그룹을 쓰면 `
+        + '카프카가 둘을 한 그룹으로 보고 파티션을 나눠 줘, 한쪽이 가져간 메시지는 다른 쪽에 오지 않고 '
+        + '오프셋까지 공유되어 조용히 유실된다',
+    });
+  }
+  return violations;
+}
+
 export function discoverStagedDeletions(repoRoot) {
   const output = execFileSync('git', ['diff', '--cached', '--name-only', '-z', '--diff-filter=D'], { cwd: repoRoot });
   return output.toString('utf8').split('\0').filter(Boolean);
@@ -632,7 +700,10 @@ export async function runGuardCli(args, io = {}) {
     if (mode === '--staged') violations.push(...checkProtectedDeletions(discoverStagedDeletions(repoRoot)));
     // "없는 파일"은 라인 스캔으로 못 잡는다 — 저장소 단위 불변식은 커밋·CI 시점에 전수 검사한다.
     // (--files/--hook 은 편집 중 실시간 경로라 저장소 전수 스캔을 돌리지 않는다.)
-    if (mode === '--staged' || mode === '--list') violations.push(...checkKafkaDlqWiring(repoRoot));
+    if (mode === '--staged' || mode === '--list') {
+      violations.push(...checkKafkaDlqWiring(repoRoot));
+      violations.push(...checkConsumerGroupOwnership(repoRoot));
+    }
     await logGuardHits(repoRoot, mode.slice(2), violations); // observability only — never affects the verdict
     await logGuardRun(repoRoot, mode.slice(2), { files: files.length, violations: violations.length });
     if (mode === '--staged') {

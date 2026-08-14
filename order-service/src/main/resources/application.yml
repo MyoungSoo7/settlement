@@ -97,7 +97,10 @@ spring:
         max.in.flight.requests.per.connection: 5
         compression.type: lz4
     consumer:
-      group-id: lemuel-settlement
+      # 모놀리스 분리 시점에 lemuel-settlement 이 남아 있었다. order 에 @KafkaListener 가 붙는 순간
+      # settlement 와 같은 컨슈머 그룹이 되어 파티션을 나눠 갖고 오프셋까지 공유했을 것이다(정산 이벤트
+      # 조용한 유실). 리스너가 0건인 지금 정정한다 — 이관할 오프셋이 없다. guard KAFKA-GROUP-OWNER 강제.
+      group-id: lemuel-order
       auto-offset-reset: earliest               # 새 컨슈머는 시작부터 재생
       enable-auto-commit: false                 # 수동 ack → 멱등 처리 후 커밋
       properties:

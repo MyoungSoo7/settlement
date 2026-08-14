@@ -21,6 +21,9 @@ import {
   runGuardCli,
   stripComments,
   scanText,
+  checkConsumerGroupOwnership,
+  expectedGroupId,
+  resolveGroupId,
 } from '../guard.mjs';
 
 const temporaryDirectories = [];
@@ -850,5 +853,74 @@ describe('KAFKA-DLQ wiring (컨슈머는 있는데 DLT 배선이 없는 서비�
         + '@EnableJpaRepositories(basePackages = {"github.lms.lemuel.account.adapter.out.persistence"})';
       assert.equal(isRootScanned(source), true);
     });
+  });
+});
+
+describe('KAFKA-GROUP-OWNER (컨슈머 그룹 ID 소유권)', () => {
+  const SETTINGS = [
+    'include(',
+    '  "order-service",',
+    '  "settlement-service",',
+    '  "gateway-service",',
+    ')',
+  ].join('\n');
+  const yaml = (groupId) => [
+    'spring:',
+    '  kafka:',
+    '    consumer:',
+    `      group-id: ${groupId}`,
+  ].join('\n');
+
+  test('모듈명과 짝이 맞으면 통과한다', () => {
+    const violations = checkConsumerGroupOwnership('/repo', {
+      readSettings: () => SETTINGS,
+      readYaml: (m) => yaml(`lemuel-${m.replace('-service', '')}`),
+    });
+
+    assert.deepEqual(violations, []);
+  });
+
+  test('다른 모듈의 그룹 ID 를 쓰면 잡는다 — order 가 lemuel-settlement 을 들고 있던 실제 상태', () => {
+    const violations = checkConsumerGroupOwnership('/repo', {
+      readSettings: () => SETTINGS,
+      readYaml: (m) => yaml(m === 'order-service' ? 'lemuel-settlement' : 'lemuel-settlement'),
+    });
+
+    const order = violations.find((v) => v.file.startsWith('order-service'));
+    assert.equal(order.id, 'KAFKA-GROUP-OWNER');
+    assert.match(order.msg, /lemuel-order/);
+  });
+
+  test('컨슈머가 없는 모듈(group-id 미선언)은 대상이 아니다', () => {
+    const violations = checkConsumerGroupOwnership('/repo', {
+      readSettings: () => SETTINGS,
+      readYaml: () => ['spring:', '  application:', '    name: x'].join('\n'),
+    });
+
+    assert.deepEqual(violations, []);
+  });
+
+  test('설정 파일이 없는 모듈은 건너뛴다', () => {
+    assert.deepEqual(checkConsumerGroupOwnership('/repo', {
+      readSettings: () => SETTINGS, readYaml: () => null,
+    }), []);
+  });
+
+  test('환경변수로 감싼 값은 기본값으로 판정한다 — 실제로 뜨는 값이다', () => {
+    assert.equal(resolveGroupId('${KAFKA_GROUP_ID:lemuel-order}'), 'lemuel-order');
+    assert.equal(expectedGroupId('common-data-service'), 'lemuel-common-data');
+  });
+
+  test('settings 를 못 읽으면 가드를 깨뜨리지 않는다', () => {
+    assert.deepEqual(checkConsumerGroupOwnership('/repo', {
+      readSettings: () => { throw new Error('shallow clone'); },
+    }), []);
+  });
+
+  // 리포 전수 — 규칙이 현재 트리에서 실제로 성립하는지
+  test('현재 저장소의 모든 모듈이 규칙을 지킨다', () => {
+    const actualRepoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+
+    assert.deepEqual(checkConsumerGroupOwnership(actualRepoRoot), []);
   });
 });
