@@ -48,6 +48,47 @@ const levelLabel = (axis: 'industry' | 'region', comparison: WorkforceGroupCompa
   return axis === 'industry' ? '상위 업종(앞 3자리)으로 확대' : '시도 단위로 확대';
 };
 
+/**
+ * 증감률 표시 — 세 자릿수부터는 소수를 버린다.
+ *
+ * 집단 중앙값이 한 자릿수(전국 인원수 중앙값 7명)면 대기업 증감률이 백만 % 단위로 나온다
+ * (삼성전자 +1,794,071.43%). 이 길이를 그대로 그리면 4등분 그리드의 칸이 내용 폭만큼 늘어나
+ * 옆 칸(백분위)을 밀어내 두 값이 붙어 보인다. 이 크기에서 소수 두 자리는 정보 가치가 없으므로
+ * 버리되, 정확한 값은 잘라낸 자리 없이 title 로 남긴다.
+ */
+const RATE_DECIMALS_CUTOFF = 100;
+
+const rateText = (rate: number | null): { shown: string; exact: string | undefined } => {
+  if (rate === null) return { shown: '—', exact: undefined };
+  const exact = fmtSigned(rate, '%');
+  if (Math.abs(rate) < RATE_DECIMALS_CUTOFF) return { shown: exact, exact: undefined };
+  return { shown: fmtSigned(Math.round(rate), '%'), exact };
+};
+
+/**
+ * 지표 한 칸.
+ *
+ * `min-w-0` 가 핵심 — 그리드 아이템의 기본 `min-width: auto` 를 풀지 않으면 긴 값이 칸 폭을
+ * 밀어 올려 이웃 칸을 침범한다. 말줄임(truncate)은 쓰지 않는다: 금액은 단위 "원" 앞에서 줄바꿈이
+ * 일어나 두 줄로 온전히 보이는데, 말줄임으로 바꾸면 그 값이 잘려 사라진다. 줄바꿈 지점이 없는
+ * 값(퍼센트)만 `break-words` 로 마지막 방어를 두되, 그 전에 {@link rateText} 가 길이를 줄여
+ * 실데이터에서는 한 줄에 들어간다.
+ */
+const MetricCell: React.FC<{
+  label: string;
+  labelTitle?: string;
+  value: string;
+  valueTitle?: string;
+  valueClass?: string;
+}> = ({ label, labelTitle, value, valueTitle, valueClass }) => (
+  <div className="min-w-0">
+    <div className="text-xs text-gray-400" title={labelTitle}>{label}</div>
+    <div className={`font-medium break-words ${valueClass ?? 'text-gray-900'}`} title={valueTitle}>
+      {value}
+    </div>
+  </div>
+);
+
 /** 한 지표(중앙값·차이·증감률·백분위) 표시 행 */
 const MetricRow: React.FC<{
   label: string;
@@ -57,30 +98,28 @@ const MetricRow: React.FC<{
   percentile: number;
   unit: string;
   isMoney?: boolean;
-}> = ({ label, median, difference, differenceRate, percentile, unit, isMoney }) => (
-  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm bg-gray-50 rounded-lg px-3 py-2.5">
-    <div>
-      <div className="text-xs text-gray-400">{label} 중앙값</div>
-      <div className="font-medium text-gray-900">{isMoney ? fmtWon(median) : `${median}${unit}`}</div>
+}> = ({ label, median, difference, differenceRate, percentile, unit, isMoney }) => {
+  const rate = rateText(differenceRate);
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm bg-gray-50 rounded-lg px-3 py-2.5">
+      <MetricCell
+        label={`${label} 중앙값`}
+        value={isMoney ? fmtWon(median) : `${median}${unit}`}
+      />
+      <MetricCell
+        label="차이"
+        value={fmtSigned(difference, isMoney ? '원' : unit)}
+        valueClass={diffColor(difference)}
+      />
+      <MetricCell label="증감률" value={rate.shown} valueTitle={rate.exact} />
+      <MetricCell
+        label="백분위"
+        labelTitle="같은 집단에서 이 값 이하인 사업장의 비율"
+        value={`${percentile}%`}
+      />
     </div>
-    <div>
-      <div className="text-xs text-gray-400">차이</div>
-      <div className={`font-medium ${diffColor(difference)}`}>
-        {fmtSigned(difference, isMoney ? '원' : unit)}
-      </div>
-    </div>
-    <div>
-      <div className="text-xs text-gray-400">증감률</div>
-      <div className="font-medium text-gray-900">
-        {differenceRate === null ? '—' : fmtSigned(differenceRate, '%')}
-      </div>
-    </div>
-    <div>
-      <div className="text-xs text-gray-400" title="같은 집단에서 이 값 이하인 사업장의 비율">백분위</div>
-      <div className="font-medium text-gray-900">{percentile}%</div>
-    </div>
-  </div>
-);
+  );
+};
 
 /** 한 비교축(업종/지역) 카드 */
 const ComparisonCard: React.FC<{
@@ -386,8 +425,12 @@ const WorkforcePage: React.FC = () => {
                   </div>
                 )}
 
-                {/* 비교 2축 — 업종·지역 각각 독립 판정 */}
-                <div className="grid gap-4 lg:grid-cols-2">
+                {/* 비교 2축 — 업종·지역 각각 독립 판정.
+                    카드를 나란히 놓지 않고 세로로 쌓는다: 컨테이너가 max-w-6xl(1152px)이라 2열이면
+                    카드가 550px 안쪽이고, 그 안에서 지표 4칸을 나누면 칸당 90px 남짓이라 금액이
+                    "42,934,857 / 원" 처럼 단위만 다음 줄로 떨어진다. 1열이면 칸당 190px 이 나와
+                    억 단위 금액도 한 줄에 들어간다 — 화면 높이보다 값 가독성을 택한 것. */}
+                <div className="grid gap-4">
                   <ComparisonCard title="업종 비교" axis="industry" comparison={detail.industryComparison} />
                   <ComparisonCard title="지역 비교" axis="region" comparison={detail.regionComparison} />
                 </div>

@@ -2,10 +2,12 @@ package github.lms.lemuel.company.adapter.out.persistence;
 
 import github.lms.lemuel.company.application.port.out.BuildWorkforceAggregatePort;
 import github.lms.lemuel.company.domain.AggregateRowTally;
+import github.lms.lemuel.company.domain.NpsContributionRate;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.YearMonth;
 
 /**
@@ -24,7 +26,7 @@ public class WorkforceAggregatePersistenceAdapter implements BuildWorkforceAggre
      * ({@code CompanyWorkforce.eligibleForComparison()})과 같은 규칙이다 — 가입자수 0 이나 고지금액 0 은
      * 추정연봉을 산출할 수 없어 두 지표 중 하나를 만들 수 없으므로 모집단에서 뺀다.
      *
-     * <p>추정연봉 역산식도 도메인과 같다: (당월고지금액 × 12) / (가입자수 × 9%), 원 단위 HALF_UP.
+     * <p>추정연봉 역산식도 도메인과 같다: (당월고지금액 × 12) / (가입자수 × 해당월 보험료율), 원 단위 HALF_UP.
      * PostgreSQL {@code round(numeric)} 은 0.5 를 0 에서 먼 쪽으로 올리므로 Java HALF_UP 과 일치한다.
      */
     private static final String ELIGIBLE_GROUPS = """
@@ -35,7 +37,7 @@ public class WorkforceAggregatePersistenceAdapter implements BuildWorkforceAggre
                        sido,
                        sigungu,
                        headcount::numeric                                         AS headcount,
-                       ROUND(monthly_billed_amount * 12 / (headcount * 0.09), 0)   AS est_salary
+                       ROUND(monthly_billed_amount * 12 / (headcount * ?::numeric), 0) AS est_salary
                 FROM company_workforce
                 WHERE snapshot_month = ? AND headcount > 0 AND monthly_billed_amount > 0
             ),
@@ -58,27 +60,26 @@ public class WorkforceAggregatePersistenceAdapter implements BuildWorkforceAggre
             )
             """;
 
-    /**
-     * 집단 중앙값 = percentile_cont(0.5), 표본수 = 그 집단의 적격 레코드 수(AC-5 대사 대상).
-     *
-     * <p>percentile_cont 는 정렬식을 double precision 으로 받으므로 결과를 numeric 으로 되돌려 저장한다
-     * (컬럼은 NUMERIC — 부동소수 컬럼을 쓰지 않는다). 대상 값은 인원수(≤10^6)와 원 단위 추정연봉(≤10^9)
-     * 이라 double 의 정확 정수 범위(2^53) 안이고, 짝수 표본의 .5 도 이진수로 정확히 표현된다.
-     */
+    /** 집단 중앙값은 NUMERIC 행 순위로 구한다. 짝수 표본은 가운데 두 값을 평균낸다. */
     private static final String INSERT_AGGREGATE = ELIGIBLE_GROUPS + """
+            , metric_values(axis, level, group_key, metric, metric_value) AS (
+                SELECT axis, level, group_key, 'HEADCOUNT', headcount FROM grouped
+                UNION ALL
+                SELECT axis, level, group_key, 'ESTIMATED_ANNUAL_SALARY', est_salary FROM grouped
+            ),
+            ranked AS (
+                SELECT axis, level, group_key, metric, metric_value,
+                       ROW_NUMBER() OVER (PARTITION BY axis, level, group_key, metric ORDER BY metric_value) AS row_number,
+                       COUNT(*) OVER (PARTITION BY axis, level, group_key, metric) AS group_count
+                FROM metric_values
+            )
             INSERT INTO workforce_aggregate
                 (snapshot_month, axis, level, group_key, metric, median, sample_size)
-            SELECT ?, axis, level, group_key, 'HEADCOUNT',
-                   ROUND((percentile_cont(0.5) WITHIN GROUP (ORDER BY headcount::double precision))::numeric, 2),
-                   COUNT(*)
-            FROM grouped
-            GROUP BY axis, level, group_key
-            UNION ALL
-            SELECT ?, axis, level, group_key, 'ESTIMATED_ANNUAL_SALARY',
-                   ROUND((percentile_cont(0.5) WITHIN GROUP (ORDER BY est_salary::double precision))::numeric, 2),
-                   COUNT(*)
-            FROM grouped
-            GROUP BY axis, level, group_key
+            SELECT ?, axis, level, group_key, metric,
+                   ROUND(AVG(metric_value), 2), MAX(group_count)
+            FROM ranked
+            WHERE row_number IN ((group_count + 1) / 2, (group_count + 2) / 2)
+            GROUP BY axis, level, group_key, metric
             """;
 
     /**
@@ -116,14 +117,21 @@ public class WorkforceAggregatePersistenceAdapter implements BuildWorkforceAggre
 
     private static final String MARK_BUILDING = """
             INSERT INTO workforce_aggregate_build
-                (snapshot_month, status, source_row_count, accepted_row_count, rejected_row_count, built_at)
-            VALUES (?, 'BUILDING', ?, ?, ?, NOW())
+                (snapshot_month, status, source_row_count, accepted_row_count, rejected_row_count, built_at,
+                 source_release_date, source_sha256, raw_source_row_count, coverage_scope, region_scope, industry_scope)
+            VALUES (?, 'BUILDING', ?, ?, ?, NOW(), NULL, NULL, NULL, NULL, NULL, NULL)
             ON CONFLICT (snapshot_month)
             DO UPDATE SET status = 'BUILDING',
                           source_row_count = EXCLUDED.source_row_count,
                           accepted_row_count = EXCLUDED.accepted_row_count,
                           rejected_row_count = EXCLUDED.rejected_row_count,
-                          built_at = EXCLUDED.built_at
+                          built_at = EXCLUDED.built_at,
+                          source_release_date = NULL,
+                          source_sha256 = NULL,
+                          raw_source_row_count = NULL,
+                          coverage_scope = NULL,
+                          region_scope = NULL,
+                          industry_scope = NULL
             """;
 
     private static final String MARK_COMPLETE =
@@ -142,12 +150,14 @@ public class WorkforceAggregatePersistenceAdapter implements BuildWorkforceAggre
     @Transactional
     public void rebuild(YearMonth snapshotMonth, AggregateRowTally tally) {
         String month = snapshotMonth.toString();
+        BigDecimal contributionRate = NpsContributionRate.rateOf(snapshotMonth)
+                .orElseThrow(() -> new IllegalArgumentException("Unsupported NPS contribution rate month: " + month));
         jdbcTemplate.update(MARK_BUILDING, month, tally.sourceRowCount(), tally.acceptedRowCount(),
                 tally.rejectedRowCount());
         jdbcTemplate.update(DELETE_AGGREGATE, month);
         jdbcTemplate.update(DELETE_PERCENTILE, month);
-        jdbcTemplate.update(INSERT_AGGREGATE, month, month, month);
-        jdbcTemplate.update(INSERT_PERCENTILE, month, month, month);
+        jdbcTemplate.update(INSERT_AGGREGATE, contributionRate, month, month);
+        jdbcTemplate.update(INSERT_PERCENTILE, contributionRate, month, month, month);
         jdbcTemplate.update(MARK_COMPLETE, month);
     }
 }

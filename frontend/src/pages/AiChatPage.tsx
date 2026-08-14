@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   aiChatApi,
+  type ChatResponse,
   type ConversationSummary,
 } from '@/api/aichat';
 import Card from '@/components/Card';
@@ -93,7 +94,8 @@ const AiChatPage: React.FC = () => {
       });
 
     try {
-      let result;
+      // 스트리밍·폴백 두 경로가 같은 응답 타입을 준다 — 명시하지 않으면 암묵적 any 로 새어 나간다.
+      let result: ChatResponse;
       try {
         result = await aiChatApi.chatStream(message, activeId ?? undefined, appendDelta);
       } catch (streamErr) {

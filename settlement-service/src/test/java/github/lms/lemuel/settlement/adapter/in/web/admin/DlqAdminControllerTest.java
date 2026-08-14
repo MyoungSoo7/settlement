@@ -38,6 +38,56 @@ class DlqAdminControllerTest {
     @MockitoBean JwtUtil jwtUtil;
     @MockitoBean DlqReplayService dlqReplayService;
     @MockitoBean AuditLogger auditLogger;
+    @MockitoBean org.springframework.kafka.config.KafkaListenerEndpointRegistry listenerRegistry;
+
+    /** 실제로 구독 중인 토픽을 들고 있는 컨테이너 하나를 흉내 낸다. */
+    private static org.springframework.kafka.listener.MessageListenerContainer container(String... topics) {
+        var c = org.mockito.Mockito.mock(org.springframework.kafka.listener.MessageListenerContainer.class);
+        when(c.getContainerProperties())
+                .thenReturn(new org.springframework.kafka.listener.ContainerProperties(topics));
+        return c;
+    }
+
+    @Test
+    @DisplayName("GET /admin/dlq/topics — 구독 중인 토픽에서 DLT 후보를 만들어 준다")
+    void topics() throws Exception {
+        // 토픽 이름을 외우게 하면 오타가 곧 사고다 — 실제 구독 목록에서 뽑는다.
+        // 컨테이너는 미리 만든다 — when(...) 인자 안에서 스터빙하면 Mockito 가 중첩으로 보고 깨진다.
+        var captured = container("lemuel.payment.captured");
+        var created = container("lemuel.order.created");
+        when(listenerRegistry.getListenerContainers()).thenReturn(List.of(captured, created));
+
+        mockMvc.perform(get("/admin/dlq/topics"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].sourceTopic").value("lemuel.order.created"))
+                .andExpect(jsonPath("$[0].dltTopic").value("lemuel.order.created.DLT"))
+                .andExpect(jsonPath("$[1].sourceTopic").value("lemuel.payment.captured"));
+    }
+
+    @Test
+    @DisplayName("GET /admin/dlq/topics — 같은 토픽을 여러 컨테이너가 구독해도 한 번만 나온다")
+    void topicsAreDeduplicated() throws Exception {
+        var one = container("lemuel.payment.captured");
+        var two = container("lemuel.payment.captured", "lemuel.user.registered");
+        when(listenerRegistry.getListenerContainers()).thenReturn(List.of(one, two));
+
+        mockMvc.perform(get("/admin/dlq/topics"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+    }
+
+    @Test
+    @DisplayName("GET /admin/dlq/topics — DLT 토픽 자체는 후보에서 제외한다 (.DLT.DLT 방지)")
+    void topicsExcludeDltItself() throws Exception {
+        var mixed = container("lemuel.payment.captured", "lemuel.payment.captured.DLT");
+        when(listenerRegistry.getListenerContainers()).thenReturn(List.of(mixed));
+
+        mockMvc.perform(get("/admin/dlq/topics"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].dltTopic").value("lemuel.payment.captured.DLT"));
+    }
 
     @Test
     @DisplayName("GET /admin/dlq/inspect — DLT 메시지 인스펙션")

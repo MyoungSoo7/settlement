@@ -42,7 +42,8 @@ public record WorkforceComparisonResponse(String workplaceName, String bizRegNoP
                                           String note) {
 
     private static final String CAP_DISCLAIMER =
-            "국민연금 기준소득월액 상한 적용 추정치입니다 — 실제 급여와 다를 수 있습니다. "
+            "2026년 7월 23일 배포본의 서울 소프트웨어·IT 서비스 사업장 비교입니다. "
+                    + "국민연금 기준소득월액 상한 적용 추정치입니다 — 실제 급여와 다를 수 있습니다. "
                     + "수록 범위가 3인 이상 법인사업장(개인사업장은 10인 이상)이라 집단 중앙값은 절단 표본 기준입니다.";
 
     public static WorkforceComparisonResponse from(WorkforceComparison comparison) {

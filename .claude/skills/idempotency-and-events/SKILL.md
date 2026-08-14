@@ -38,6 +38,32 @@ public void on(Event e) {
 중복 정산 버그 조사 시: 3층 제약 위반 로그가 있으면 1·2층이 뚫린 것 — event_id 생성 위치와
 컨슈머 tx 경계부터 확인하라.
 
+## 신규 컨슈머 체크리스트 (돈이 걸린 토픽이면 예외 없음)
+
+**2층은 그룹 ID 에 묶여 있다.** `processed_events` PK 가 `(consumer_group, event_id)` 이므로
+**그룹 ID 를 바꾸는 순간 2층 방어가 통째로 무효**가 된다. 전 서비스가 `auto-offset-reset: earliest`
+이라 새 그룹은 보존기간(7일) 안의 이벤트를 **전량 재처리**한다. 즉 yml 한 줄 수정이 "지난 7일치 회계
+이벤트 재생" 스위치다. 이때 남는 것은 3층뿐이다.
+
+새 컨슈머를 붙이기 전에 답할 것:
+
+1. **3층(도메인 자연키 UNIQUE)이 있는가?** 없으면 그룹 ID 변경·DLT 리플레이가 곧 이중 계상이다.
+   현행 예: deposit `UNIQUE(account_id, entry_type, reference_type, reference_id, offset_sequence)`,
+   account `(source_topic, ref_type, ref_id)`, settlement `settlements.payment_id`.
+   금액을 쓰거나 원장에 적는 컨슈머인데 3층이 없다면, **먼저 마이그레이션으로 제약을 넣고** 시작한다.
+2. **그룹 ID 가 `lemuel-<모듈명>` 인가?** 다른 서비스와 같은 그룹을 쓰면 카프카가 둘을 한 그룹으로 보고
+   파티션을 나눠 줘, 한쪽이 가져간 메시지는 다른 쪽에 오지 않고 오프셋까지 공유되어 **조용히 유실**된다.
+   guard `KAFKA-GROUP-OWNER` 가 강제한다(order-service 가 `lemuel-settlement` 을 들고 있던 실제 사례).
+3. **팬아웃인가 분산인가?** 같은 토픽을 여러 서비스가 각자 처리해야 하면 그룹 ID 가 서로 **달라야** 한다
+   (예: `lemuel.settlement.confirmed` 를 account·deposit·investment·loan 이 각각 소비).
+   같은 서비스를 N대로 늘려 처리량을 올리는 것이라면 그룹 ID 는 **같아야** 한다.
+4. **`auto-offset-reset` 이 목적에 맞는가?** 과거분까지 필요하면 `earliest`(기본), 지금부터면 `latest`
+   (operation-service 가 후자 — 사유를 yml 주석에 남겨 뒀다).
+5. **DLT 배선이 닿는가?** guard `KAFKA-DLQ` 가 강제한다. 안 닿으면 Spring 기본 핸들러가 재시도 소진
+   메시지를 조용히 skip 한다(= 사실상 유실).
+6. **토픽이 카탈로그에 있는가?** 없으면 브로커 기본값으로 자동생성되어 파티션이 코드 밖에서 정해진다
+   (ADR 0035). `kafka-topic-gate`·`kafka-publisher-gate` 가 강제한다.
+
 ## 실패 처리 — DLT + 리플레이 (ADR 0017)
 
 - 컨슈머 예외는 재시도 후 DLT 토픽으로. DLT 적체는 "조용한 데이터 유실" — 정기 확인 대상.

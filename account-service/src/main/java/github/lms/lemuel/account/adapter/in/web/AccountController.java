@@ -18,6 +18,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
+import java.util.Arrays;
+import java.util.stream.Collectors;
 
 /**
  * 계정계 조회 API — owner 잔액·분개·대출/투자/정산 집계·시산표. (JWT 인증)
@@ -97,7 +99,10 @@ public class AccountController {
         try {
             return OwnerType.valueOf(raw.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("알 수 없는 ownerType: " + raw + " (SELLER|CORPORATE)");
+            // 허용값은 enum 에서 뽑는다 — 하드코딩하면 owner 종류가 늘 때마다 안내가 조용히 낡는다
+            // (실제로 BORROWER 추가 후 "(SELLER|CORPORATE)" 로 남아 있었다).
+            String allowed = Arrays.stream(OwnerType.values()).map(Enum::name).collect(Collectors.joining("|"));
+            throw new IllegalArgumentException("알 수 없는 ownerType: " + raw + " (" + allowed + ")");
         }
     }
 }

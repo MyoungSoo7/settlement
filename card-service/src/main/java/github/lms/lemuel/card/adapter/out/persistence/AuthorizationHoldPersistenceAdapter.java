@@ -10,6 +10,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 
 @Component
@@ -25,6 +26,12 @@ public class AuthorizationHoldPersistenceAdapter
     @Override
     public Optional<AuthorizationHold> findByAuthorizationId(String authorizationId) {
         return repository.findByAuthorizationId(authorizationId)
+                .map(AuthorizationHoldJpaEntity::toDomain);
+    }
+
+    @Override
+    public Optional<AuthorizationHold> findByAuthorizationIdForUpdate(String authorizationId) {
+        return repository.findByAuthorizationIdForUpdate(authorizationId)
                 .map(AuthorizationHoldJpaEntity::toDomain);
     }
 
@@ -50,6 +57,14 @@ public class AuthorizationHoldPersistenceAdapter
         Instant from = month.atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant();
         Instant to = month.plusMonths(1).atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant();
         return repository.sumHoldsByCardAndPeriod(cardId, from, to);
+    }
+
+    @Override
+    public List<AuthorizationHold> findAllActiveAuthorizedBefore(Instant before) {
+        return repository.findAllActiveAuthorizedBefore(before)
+                .stream()
+                .map(AuthorizationHoldJpaEntity::toDomain)
+                .toList();
     }
 
     @Override

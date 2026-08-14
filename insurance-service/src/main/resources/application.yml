@@ -1,0 +1,160 @@
+spring:
+  profiles:
+    active: local
+
+  application:
+    name: lemuel-insurance
+
+  threads:
+    virtual:
+      enabled: true
+
+  # ★ insurance-service 는 자체 DB(lemuel_insurance) 를 소유한다 (DB-per-service).
+  #   GA(법인보험대리점) — 상담·청약·계약·유지변경·수수료정산. 타 서비스 코드·DB 의존 0;
+  #   settlement·account 와는 Kafka 이벤트 + 내부 REST 로만 연동.
+  datasource:
+    url: jdbc:postgresql://localhost:5448/lemuel_insurance?reWriteBatchedInserts=true
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      pool-name: lemuel-insurance-pool
+      maximum-pool-size: ${DB_POOL_MAX:20}
+      minimum-idle: ${DB_POOL_MIN_IDLE:5}
+      connection-timeout: 10000
+      leak-detection-threshold: 30000
+      max-lifetime: 1800000 # 30분 — 유휴 커넥션 CNI/conntrack 만료로 조용히 죽는 것 방지
+      keepalive-time: 300000 # 5분
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        # ★ 스키마명은 opslab 재사용(물리 DB 는 lemuel_insurance 로 분리).
+        #   shared-common Outbox claim 네이티브 쿼리가 'opslab.outbox_events' 를 하드코딩한다.
+        #   (OutboxSchema.java 가 default_schema 를 읽어 네이티브 SQL 에 박음)
+        default_schema: opslab
+        jdbc:
+          batch_size: 50
+          batch_versioned_data: true
+        order_inserts: true
+        order_updates: true
+
+  flyway:
+    enabled: true
+    schemas: opslab
+    locations: classpath:db/migration
+
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=500,expireAfterWrite=600s
+
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: lemuel-insurance
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      properties:
+        isolation.level: read_committed
+    producer:
+      acks: all
+      retries: 5
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+    listener:
+      ack-mode: manual_immediate
+      missing-topics-fatal: false
+
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+server:
+  port: 8108
+  shutdown: graceful
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    prometheus:
+      enabled: true
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
+  health:
+    elasticsearch:
+      enabled: false
+    db:
+      enabled: true
+  server:
+    port: 8109
+  metrics:
+    tags:
+      application: ${spring.application.name}
+      environment: ${ENVIRONMENT:local}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+app:
+  # JWT — shared-common JwtProperties(prefix=app.jwt). order-service 와 동일 시크릿.
+  jwt:
+    issuer: ${JWT_ISSUER:lemuel}
+    secret: ${JWT_SECRET}
+    ttl-seconds: ${JWT_TTL_SECONDS:3600}
+
+  internal:
+    api-key: ${INTERNAL_API_KEY:}
+
+  # ★ 피보험자·계약자 PII 암호화 키 (Base64 32바이트 = AES-256).
+  #   기본값 없음 — 미설정 시 Spring 이 'INSURANCE_ENC_KEY' 를 포함한 메시지로 명확하게 기동 실패.
+  #   운영 배포 시 반드시 강한 키를 주입할 것 (PAYOUT_ENC_KEY 와 동일 패턴).
+  insurance:
+    enc-key: ${INSURANCE_ENC_KEY}
+
+    # ── 배치 크론 (KST) — 실행 순서가 곧 정합성이다:
+    #   02:00 만기·실효소멸 판정 → 03:30 환수 스윕(미지급 소멸+환수 전환) → 04:00 회차 지급
+    #   → 04:30 일반지급 실행(§14 — 02:00 판정이 낳은 만기보험금·해약환급금이 당일 지급된다).
+    #   지급이 스윕보다 먼저 돌면 terminal 계약의 회차가 지급될 수 있다.
+    batch:
+      policy-expiry-cron: "0 0 2 * * *"
+      clawback-sweep-cron: "0 30 3 * * *"
+      commission-payout-cron: "0 0 4 * * *"
+      general-payout-cron: "0 30 4 * * *"
+      # 매월 1일 05:00 — 일 배치 3종 이후, 전월 지급분 마감
+      monthly-closing-cron: "0 0 5 1 * *"
+      # 매월 2일 06:00 — 당해연도 방카 25%룰 누적 점검
+      banca-rule-cron: "0 0 6 2 * *"
+
+  kafka:
+    enabled: ${APP_KAFKA_ENABLED:false}
+    consumer:
+      concurrency: ${APP_KAFKA_CONSUMER_CONCURRENCY:3}
+    topic:
+      owner: insurance-service   # ADR 0035 — 이 모듈이 발행(소유)하는 토픽만 만든다(파티션 정본은 topic-catalog.json)
+      # 발행 (insurance → settlement/account/loan/investment)
+      policy-issued: lemuel.insurance.policy_issued
+      policy-status-changed: lemuel.insurance.policy_status_changed
+      commission-confirmed: lemuel.insurance.commission_confirmed
+      commission-paid: lemuel.insurance.commission_paid
+      commission-clawback-triggered: lemuel.insurance.commission_clawback_triggered
+      commission-monthly-closed: lemuel.insurance.commission_monthly_closed
+      banca-rule-violated: lemuel.insurance.banca_rule_violated

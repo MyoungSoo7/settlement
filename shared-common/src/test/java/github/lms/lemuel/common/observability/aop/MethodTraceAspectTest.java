@@ -1,6 +1,9 @@
 package github.lms.lemuel.common.observability.aop;
 
 import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import github.lms.lemuel.common.config.observability.MdcKeys;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -8,9 +11,12 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.aop.aspectj.annotation.AspectJProxyFactory;
 import org.springframework.beans.factory.ObjectProvider;
 
+import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -55,6 +61,38 @@ class MethodTraceAspectTest {
         }
     }
 
+    /** 중첩 호출(깊이 2)을 만들기 위한 바깥 서비스 — 안쪽은 프록시된 SampleService 를 부른다. */
+    static class OuterService {
+        private final SampleService inner;
+
+        OuterService(SampleService inner) {
+            this.inner = inner;
+        }
+
+        String call() {
+            return inner.greet("nested");
+        }
+
+        String callFailing() {
+            inner.boom();
+            return "unreachable";
+        }
+    }
+
+    /** 어드바이스 안쪽에서 관측된 MDC traceId 를 밖으로 흘려주는 프로브. */
+    static class ProbeService {
+        private final AtomicReference<String> seen;
+
+        ProbeService(AtomicReference<String> seen) {
+            this.seen = seen;
+        }
+
+        String observe() {
+            seen.set(MDC.get(MdcKeys.TRACE_ID));
+            return "observed";
+        }
+    }
+
     private SampleService proxyWith(MeterRegistry registry) {
         return proxyWith(registry, new ObservabilityAopProperties());
     }
@@ -77,9 +115,116 @@ class MethodTraceAspectTest {
         }
 
         @org.aspectj.lang.annotation.Around(
-                "execution(* github.lms.lemuel.common.observability.aop.MethodTraceAspectTest.SampleService.*(..))")
+                "execution(* github.lms.lemuel.common.observability.aop.MethodTraceAspectTest.*Service.*(..))")
         public Object around(org.aspectj.lang.ProceedingJoinPoint pjp) throws Throwable {
             return trace(pjp);
+        }
+    }
+
+    /** 바깥 서비스 → 안쪽 서비스 모두 어드바이스가 걸린 프록시 체인. */
+    private OuterService nestedProxy(ObservabilityAopProperties props) {
+        @SuppressWarnings("unchecked")
+        ObjectProvider<MeterRegistry> provider = mock(ObjectProvider.class);
+        when(provider.getIfAvailable()).thenReturn(new SimpleMeterRegistry());
+
+        AspectJProxyFactory innerFactory = new AspectJProxyFactory(new SampleService());
+        innerFactory.addAspect(new TestAspect(props, provider));
+        SampleService inner = innerFactory.getProxy();
+
+        AspectJProxyFactory outerFactory = new AspectJProxyFactory(new OuterService(inner));
+        outerFactory.addAspect(new TestAspect(props, provider));
+        return outerFactory.getProxy();
+    }
+
+    /** MethodTraceAspect 로거에 붙여 로그 라인을 수집하는 어펜더. */
+    private ListAppender<ILoggingEvent> attachAppender() {
+        ch.qos.logback.classic.Logger logger =
+                (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(MethodTraceAspect.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        return appender;
+    }
+
+    private void detach(ListAppender<ILoggingEvent> appender) {
+        ((ch.qos.logback.classic.Logger) LoggerFactory.getLogger(MethodTraceAspect.class))
+                .detachAppender(appender);
+    }
+
+    private static List<String> messages(ListAppender<ILoggingEvent> appender) {
+        return appender.list.stream().map(ILoggingEvent::getFormattedMessage).toList();
+    }
+
+    @Test
+    void nested_calls_are_rendered_with_call_depth_prefix() {
+        ListAppender<ILoggingEvent> appender = attachAppender();
+        try {
+            OuterService outer = nestedProxy(new ObservabilityAopProperties());
+
+            assertThat(outer.call()).isEqualTo("hi nested");
+
+            List<String> lines = messages(appender);
+            // 최상위(depth 1)는 들여쓰기 없이, 중첩(depth 2)은 계단식 들여쓰기가 붙는다.
+            assertThat(lines).anySatisfy(l -> assertThat(l).startsWith("→ ").contains("OuterService.call"));
+            assertThat(lines).anySatisfy(l -> assertThat(l).startsWith("|   → ").contains("SampleService.greet"));
+            assertThat(lines).anySatisfy(l -> assertThat(l).startsWith("|   ← ").contains("SampleService.greet"));
+            assertThat(lines).anySatisfy(l -> assertThat(l).startsWith("← ").contains("OuterService.call"));
+        } finally {
+            detach(appender);
+        }
+    }
+
+    @Test
+    void nested_exception_is_rendered_with_depth_prefix() {
+        ListAppender<ILoggingEvent> appender = attachAppender();
+        try {
+            OuterService outer = nestedProxy(new ObservabilityAopProperties());
+
+            assertThatThrownBy(outer::callFailing).isInstanceOf(IllegalStateException.class);
+
+            assertThat(messages(appender))
+                    .anySatisfy(l -> assertThat(l).startsWith("|   ✗ ").contains("SampleService.boom"));
+        } finally {
+            detach(appender);
+        }
+    }
+
+    @Test
+    void root_entry_attaches_trace_id_and_removes_it_afterwards() {
+        MDC.remove(MdcKeys.TRACE_ID);
+        try {
+            AtomicReference<String> seenInside = new AtomicReference<>();
+            @SuppressWarnings("unchecked")
+            ObjectProvider<MeterRegistry> provider = mock(ObjectProvider.class);
+            when(provider.getIfAvailable()).thenReturn(new SimpleMeterRegistry());
+
+            AspectJProxyFactory factory = new AspectJProxyFactory(new ProbeService(seenInside));
+            factory.addAspect(new TestAspect(new ObservabilityAopProperties(), provider));
+            ProbeService service = factory.getProxy();
+
+            assertThat(service.observe()).isEqualTo("observed");
+
+            // 웹 필터 밖(Kafka·스케줄러)에서도 실행 단위 traceId 가 부여되고,
+            assertThat(seenInside.get()).isNotBlank();
+            // 스레드 풀 재사용 대비 — 호출이 끝나면 반드시 제거된다.
+            assertThat(MDC.get(MdcKeys.TRACE_ID)).isNull();
+        } finally {
+            MDC.remove(MdcKeys.TRACE_ID);
+        }
+    }
+
+    @Test
+    void existing_trace_id_is_preserved_and_not_removed() {
+        MDC.put(MdcKeys.TRACE_ID, "upstream-trace");
+        try {
+            SampleService service = proxyWith(new SimpleMeterRegistry());
+
+            assertThat(service.ping()).isEqualTo("pong");
+
+            // 필터가 붙인 traceId 는 우리가 만든 게 아니므로 지우지 않는다(부착한 쪽이 지운다).
+            assertThat(MDC.get(MdcKeys.TRACE_ID)).isEqualTo("upstream-trace");
+        } finally {
+            MDC.remove(MdcKeys.TRACE_ID);
         }
     }
 

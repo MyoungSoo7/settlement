@@ -30,7 +30,7 @@ Thumbs.db
 docs/
 
 # Test
-**/test/
+docs/inflearn/test/
 *.log
 
 # Environment

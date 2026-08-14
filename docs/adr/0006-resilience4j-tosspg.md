@@ -74,6 +74,25 @@ read 5s 타임아웃을 직접 설정해 스레드 점유 상한을 둔다. 서�
 | 모든 예외를 서킷에 집계 | ✗ | 정상 4xx 거절이 멀쩡한 PG 를 차단 |
 | Hystrix | ✗ | 유지보수 종료, Resilience4j 가 표준 |
 
+## 개정 이력
+
+### 2026-08-05 — 적용 지점 변경: `TossConfirmApiClient` 로 분리
+
+본 ADR 의 "트레이드오프 / 리스크" 마지막 줄이 경고한 사고가 실제로 발생해 있었다 —
+`TossPaymentService.confirmTossPayment()` 가 같은 클래스의 `callTossConfirmApi()` 를
+자기호출하고 있어, **선언된 `@CircuitBreaker`·`@Retry` 가 한 번도 동작하지 않았다**.
+스프링 AOP 는 프록시 기반이므로 `this.method()` 호출은 어드바이스를 거치지 않는다.
+
+기존 `TossPaymentResilienceTest` 는 Resilience4j 를 프로그래매틱 API 로 검증해
+"설정값이 옳음"만 증명했을 뿐, "그 설정이 호출 경로에 걸려 있음"은 증명하지 않아 결함이 드러나지 않았다.
+
+- **적용 지점**: `TossPaymentService.callTossConfirmApi` → **`TossConfirmApiClient.confirm`**
+  (별도 스프링 빈). 호출이 외부 호출이 되어 프록시를 통과한다.
+- 인스턴스명(`tossPg`)·4xx 제외 정책·타임아웃·폴백 동작은 **변경 없음** — `application.yml` 수정 불필요.
+- **회귀 차단**: `scripts/harness/test/aop-proxy-gate.test.mjs` 가 리포 전수로 프록시 의존 애노테이션의
+  자기호출을 0건으로 강제한다(CI 필수). 경위·근거는 `docs/inflearn/spring.md`(로컬 전용, 저장소 미포함).
+
 ## 참조
 
 - [0010 — 다중 PG 라우팅 + Bulkhead](0010-multi-pg-routing-and-bulkhead.md)
+- `docs/inflearn/spring.md`(로컬 전용, 저장소 미포함) — 프록시 내부 호출 결함의 발견·수정 기록

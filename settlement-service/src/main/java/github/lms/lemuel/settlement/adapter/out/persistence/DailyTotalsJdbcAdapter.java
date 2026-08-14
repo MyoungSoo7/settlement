@@ -41,12 +41,15 @@ public class DailyTotalsJdbcAdapter implements LoadDailyTotalsPort {
         return nz(orderReconClient.dailyTotals(date).refundedAgainstCaptures());
     }
 
+    // created_at::date = ? 는 컬럼에 캐스트가 걸려 인덱스(idx_settlements_created_at)를 못 탄다
+    // (sargable 위반 → 매일 풀스캔). 반개구간 [date, date+1) 범위 술어는 동치이면서 인덱스 탐색.
+
     @Override
     public BigDecimal sumSettlementGross(LocalDate date) {
         return queryDecimal("""
                 SELECT COALESCE(SUM(payment_amount), 0)
                 FROM settlements
-                WHERE created_at::date = ?
+                WHERE created_at >= ? AND created_at < ?
                 """, date);
     }
 
@@ -55,7 +58,7 @@ public class DailyTotalsJdbcAdapter implements LoadDailyTotalsPort {
         return queryDecimal("""
                 SELECT COALESCE(SUM(refunded_amount), 0)
                 FROM settlements
-                WHERE created_at::date = ?
+                WHERE created_at >= ? AND created_at < ?
                 """, date);
     }
 
@@ -67,13 +70,13 @@ public class DailyTotalsJdbcAdapter implements LoadDailyTotalsPort {
     @Override
     public long countSettlementsCreated(LocalDate date) {
         Long result = jdbcTemplate.queryForObject("""
-                SELECT COUNT(*) FROM settlements WHERE created_at::date = ?
-                """, Long.class, date);
+                SELECT COUNT(*) FROM settlements WHERE created_at >= ? AND created_at < ?
+                """, Long.class, date, date.plusDays(1));
         return result != null ? result : 0L;
     }
 
     private BigDecimal queryDecimal(String sql, LocalDate date) {
-        BigDecimal result = jdbcTemplate.queryForObject(sql, BigDecimal.class, date);
+        BigDecimal result = jdbcTemplate.queryForObject(sql, BigDecimal.class, date, date.plusDays(1));
         return result != null ? result : BigDecimal.ZERO;
     }
 

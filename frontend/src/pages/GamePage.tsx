@@ -39,7 +39,8 @@ const GamePage: React.FC = () => {
           src={`/games/${activeGame}`}
           title={activeGame === 'baduk' ? '바둑' : '오목'}
           className="w-full"
-          style={{ height: 'calc(100vh - 220px)', minHeight: '600px', border: 'none' }}
+          /* dvh — iOS 주소창 개폐를 따라가는 높이. vh 로 두면 주소창이 펼쳐질 때 iframe 하단이 잘린다. */
+          style={{ height: 'calc(100dvh - 220px)', minHeight: '600px', border: 'none' }}
         />
       </div>
     </div>

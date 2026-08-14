@@ -159,7 +159,7 @@ class IntegrityPhaseAIntegrationTest {
     // ── INV-6 지급 대사 ───────────────────────────────────────────────────
 
     @Test
-    @DisplayName("INV-6: net 초과 payout 은 위반, payout 미생성은 정보성")
+    @DisplayName("INV-6: net 초과 payout 은 위반, 유예 경과 payout 미생성도 위반으로 격상된다")
     void detectsOverpaidPayoutButNotMissingPayout() {
         LocalDate target = LocalDate.now().minusDays(3); // 기준일 분리 (스코프 오염 차단)
         LocalDateTime confirmedAt = target.atTime(12, 0);
@@ -185,9 +185,34 @@ class IntegrityPhaseAIntegrationTest {
                     assertThat(p.payoutAmount()).isEqualByComparingTo("97000.00");
                     assertThat(p.netAmount()).isEqualByComparingTo("96500.00");
                 });
-        // payout 미생성은 목록에는 나오지만 ok 판정을 뒤집지 않는다 (정보성)
+        // 3일 전 확정인데 payout 이 없다 — 유예(기본 6시간)를 한참 넘겼으므로 지급 누락으로 격상된다.
         assertThat(report.settlementsWithoutPayout()).contains(ids.withoutPayout());
-        assertThat(report.reasons()).noneSatisfy(r -> assertThat(r).contains("미생성"));
+        assertThat(report.stalePayoutMissing()).contains(ids.withoutPayout());
+        assertThat(report.reasons()).anySatisfy(r -> {
+            assertThat(r).contains("지급 누락");
+            // 조치 순서를 문구가 지시한다 — 백필부터 돌리면 차감 기록 없는 건은 그대로 남는다.
+            assertThat(r).contains("repayment_applied");
+        });
+    }
+
+    @Test
+    @DisplayName("INV-6: 방금 확정돼 payout 이 아직 없는 건은 유예 안 — 목록에는 있지만 위반 아님")
+    void freshlyConfirmedWithoutPayoutStaysInformational() {
+        LocalDate today = LocalDate.now();
+
+        Long freshId = tx.execute(s -> {
+            // 지급은 상환차감 수신 시점에 만들어진다(L-3) — 확정 직후의 payout 부재는 정상 대기 상태다.
+            SettlementJpaEntity fresh = settlement(today, LocalDateTime.now());
+            em.persist(fresh);
+            return fresh.getId();
+        });
+
+        PayoutReconReport report = integrity.checkPayoutRecon(today);
+
+        assertThat(report.settlementsWithoutPayout()).contains(freshId);
+        assertThat(report.stalePayoutMissing())
+                .as("유예 안이면 경보 대상이 아니다 — 매일 아침 오탐이 뜨면 경보가 무시된다")
+                .doesNotContain(freshId);
     }
 
     // ── INV-7 홀드백 ─────────────────────────────────────────────────────

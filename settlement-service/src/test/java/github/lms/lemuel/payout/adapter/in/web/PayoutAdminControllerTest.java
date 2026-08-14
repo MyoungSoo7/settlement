@@ -23,6 +23,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.mockito.Mockito.never;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
@@ -201,5 +202,45 @@ class PayoutAdminControllerTest {
 
         verify(auditLogger).record(eq(AuditAction.PAYOUT_EXECUTED), eq("PayoutBatch"),
                 eq("execute-now"), anyString());
+    }
+
+    // ───────── 송금 미리보기 — 돈이 나가기 전에 규모를 먼저 본다 ─────────
+
+    @Test
+    @DisplayName("GET /admin/payouts/preview — 보낼 건수·총액과 밀릴 사유를 돌려준다")
+    void preview() throws Exception {
+        when(executeUseCase.previewPending()).thenReturn(new ExecutePayoutUseCase.PayoutPreview(
+                2, new BigDecimal("50000"), 1, new BigDecimal("30000"),
+                List.of(new ExecutePayoutUseCase.PayoutPreviewLine(
+                        1L, 10L, new BigDecimal("30000"), false, "셀러 일 한도 초과"))));
+
+        mockMvc.perform(get("/admin/payouts/preview"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sendableCount").value(2))
+                .andExpect(jsonPath("$.sendableAmount").value(50000))
+                .andExpect(jsonPath("$.limitedCount").value(1))
+                .andExpect(jsonPath("$.lines[0].reason").value("셀러 일 한도 초과"));
+    }
+
+    @Test
+    @DisplayName("미리보기는 실제 송금을 실행하지 않는다")
+    void preview_doesNotExecute() throws Exception {
+        when(executeUseCase.previewPending()).thenReturn(new ExecutePayoutUseCase.PayoutPreview(
+                0, BigDecimal.ZERO, 0, BigDecimal.ZERO, List.of()));
+
+        mockMvc.perform(get("/admin/payouts/preview")).andExpect(status().isOk());
+
+        verify(executeUseCase, never()).executeAllPending();
+    }
+
+    @Test
+    @DisplayName("미리보기는 조회라 감사 기록을 남기지 않는다(실집행만 기록)")
+    void preview_isNotAudited() throws Exception {
+        when(executeUseCase.previewPending()).thenReturn(new ExecutePayoutUseCase.PayoutPreview(
+                0, BigDecimal.ZERO, 0, BigDecimal.ZERO, List.of()));
+
+        mockMvc.perform(get("/admin/payouts/preview")).andExpect(status().isOk());
+
+        verifyNoInteractions(auditLogger);
     }
 }

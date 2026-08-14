@@ -13,7 +13,9 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -91,6 +93,30 @@ public class GlobalExceptionHandler {
         String message = ex.getParameterName() + " parameter is required";
         log.warn("[MissingServletRequestParameterException] {}", message);
         return badRequest(ErrorResponse.of(HttpStatus.BAD_REQUEST, ErrorCode.INVALID_PARAMETER.code(), message));
+    }
+
+    /**
+     * 400 - 요청 파라미터 타입 변환 실패 (enum 허용값 이탈, 날짜 형식 오류 등).
+     *
+     * <p>이 매핑이 없으면 {@code ?scope=FOOBAR} 같은 오타 하나가 catch-all(500)로 떨어져 <b>서버 오류</b>로
+     * 보고된다 — 실제로는 클라이언트 입력 오류다. enum 파라미터는 허용값 목록까지 응답에 담아
+     * 운영자가 재시도할 수 있게 한다.
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleMethodArgumentTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        String message = describeTypeMismatch(ex);
+        log.warn("[MethodArgumentTypeMismatchException] {}", message);
+        return badRequest(ErrorResponse.of(HttpStatus.BAD_REQUEST, ErrorCode.INVALID_PARAMETER.code(), message));
+    }
+
+    /** enum 이면 허용값을 붙이고, 그 외에는 기대 타입명만 알린다(입력값 자체는 그대로 반향하지 않는다). */
+    private static String describeTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        Class<?> required = ex.getRequiredType();
+        String base = ex.getName() + " parameter is invalid";
+        if (required != null && required.isEnum()) {
+            return base + " — allowed: " + Arrays.toString(required.getEnumConstants());
+        }
+        return required != null ? base + " — expected " + required.getSimpleName() : base;
     }
 
     /**

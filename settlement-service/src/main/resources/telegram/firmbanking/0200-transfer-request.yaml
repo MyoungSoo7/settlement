@@ -1,0 +1,15 @@
+# 지급이체 요청 — settlement → 은행(FEP).
+# REF_ID(출금의뢰번호)가 은행측 중복 판정 키다. 동일 REF_ID 재송신은 최초 결과를 그대로 받는다.
+telegram: TRANSFER_REQUEST
+msgType: "0200"
+description: 지급이체 요청
+version: 1
+effectiveFrom: 2026-01-01
+include: COMMON_HEADER
+totalLength: 113        # 공통부 34 + 개별부 79 — 계산값과 다르면 로딩 실패
+fields:
+  - { name: BANK_CODE,   length: 10, type: AN }
+  - { name: ACCOUNT_NO,  length: 16, type: AN }
+  - { name: AMOUNT,      length: 13, type: N, scale: 0 }   # 원단위 — scale 선언이 생성 코드의 BigDecimal 근거
+  - { name: HOLDER_NAME, length: 20, type: AN }   # EUC-KR 기준 20바이트 = 한글 10자
+  - { name: REF_ID,      length: 20, type: AN }   # PAYOUT-<id>

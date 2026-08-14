@@ -147,7 +147,7 @@ app:
     consumer:
       concurrency: ${APP_KAFKA_CONSUMER_CONCURRENCY:3}
     topic:
-      partitions: ${APP_KAFKA_TOPIC_PARTITIONS:3}
+      owner: investment-service   # ADR 0035 — 이 모듈이 발행(소유)하는 토픽만 만든다(파티션 정본은 topic-catalog.json)
       # 수신 (settlement → investment) — 확정 정산금을 재원 프로젝션으로 적재
       settlement-confirmed: lemuel.settlement.confirmed
       # 발행 (investment → 소비자). Outbox 폴러가 aggregateType="Investment"+eventType 으로

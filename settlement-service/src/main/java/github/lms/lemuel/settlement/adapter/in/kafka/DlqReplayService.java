@@ -1,5 +1,6 @@
 package github.lms.lemuel.settlement.adapter.in.kafka;
 
+import github.lms.lemuel.common.log.LogSafe;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.apache.kafka.clients.consumer.Consumer;
@@ -112,7 +113,7 @@ public class DlqReplayService {
         }
         replayCounter.increment(sent);
         log.warn("[DLQ replay] dltTopic={} → sourceTopic={}, sent={}, skipped={}",
-                dltTopic, sourceTopic, sent, skipped);
+                LogSafe.of(dltTopic), LogSafe.of(sourceTopic), sent, skipped);
         return new ReplayResult(sourceTopic, dltTopic, sent, skipped);
     }
 

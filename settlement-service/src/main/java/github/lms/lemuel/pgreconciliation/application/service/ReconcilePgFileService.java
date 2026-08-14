@@ -1,11 +1,13 @@
 package github.lms.lemuel.pgreconciliation.application.service;
 
+import github.lms.lemuel.common.log.LogSafe;
 import github.lms.lemuel.pgreconciliation.application.port.in.ReconcilePgFileUseCase;
 import github.lms.lemuel.pgreconciliation.application.port.out.LoadInternalPaymentsForReconciliationPort;
 import github.lms.lemuel.pgreconciliation.application.port.out.LoadReconciliationRunPort;
 import github.lms.lemuel.pgreconciliation.application.port.out.ParsePgFilePort;
 import github.lms.lemuel.pgreconciliation.application.port.out.SaveReconciliationRunPort;
 import github.lms.lemuel.pgreconciliation.domain.*;
+import github.lms.lemuel.pgreconciliation.domain.exception.InvalidReconciliationStateException;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
@@ -61,7 +63,18 @@ public class ReconcilePgFileService implements ReconcilePgFileUseCase {
     public ReconciliationRun reconcile(String pgProvider, LocalDate targetDate, String fileName,
                                         InputStream input, String operatorId) {
         log.info("[PgRecon] start. provider={}, date={}, file={}, operator={}",
-                pgProvider, targetDate, fileName, operatorId);
+                LogSafe.of(pgProvider), targetDate, LogSafe.of(fileName), LogSafe.of(operatorId));
+
+        // 마감 확인이 가장 먼저다 — 해시 멱등은 "같은 파일"만 막고, 다른 파일이 같은 기간으로
+        // 들어오면 확정된 기간에 새 불일치·새 clawback 이 생긴다. 파일을 읽기도 전에 끊는다.
+        loadRunPort.findClosedByProviderAndDate(pgProvider, targetDate).ifPresent(closed -> {
+            meterRegistry.counter("pg.reconciliation.closed_period.rejected", "provider", pgProvider).increment();
+            log.warn("[PgRecon] 마감된 기간에 대사 시도 — 거부. provider={}, date={}, closedRunId={}, file={}",
+                    pgProvider, targetDate, closed.getId(), fileName);
+            throw new InvalidReconciliationStateException(
+                    "이미 마감된 대사 기간입니다 (provider=" + pgProvider + ", date=" + targetDate
+                            + ", runId=" + closed.getId() + ")");
+        });
 
         // 파일 내용 해시 — 같은 파일 재업로드 멱등 판정 키. 중복 run 이 각각 승인되면 같은 결제에
         // 이중 clawback 이 가능하므로(discrepancyId 1:1 UNIQUE 로는 차단 불가) 여기서 차단한다.
@@ -72,7 +85,7 @@ public class ReconcilePgFileService implements ReconcilePgFileUseCase {
         if (duplicate.isPresent()) {
             meterRegistry.counter("pg.reconciliation.duplicate_file.hit", "provider", pgProvider).increment();
             log.warn("[PgRecon] 같은 파일 재업로드 — 기존 완료 run 반환(멱등). runId={}, sha256={}, file={}",
-                    duplicate.get().getId(), fileSha256, fileName);
+                    duplicate.get().getId(), LogSafe.of(fileSha256), LogSafe.of(fileName));
             return duplicate.get();
         }
 

@@ -1,0 +1,136 @@
+# Seed: reconciliation-service 대사 배치 as-is 사양 (Ouroboros 방법론 — Interview → Seed 결정화)
+# 상태: CONFIRMED (기존 서비스 seed 와 동일 방식 지시로 승인 승계, 2026-08-13)
+# 원칙: 이 Seed 는 "현행 코드가 실제로 하는 일"의 불변 기술이다. 결함은 교정하지 않고 known_issues 로만 기록한다.
+
+seed:
+  id: reconciliation-service-batch-v1
+  goal: >-
+    reconciliation-service(Kotlin 폴리글랏 8131 — 양측 /internal/recon 코루틴 동시 fetch·
+    businessKey diff 4분류·허용오차·프로파일로 샘플/실소스 격리·일 1회 19시 배치)의 현행 동작을
+    실행 가능한 게이트에 매핑된 불변 사양으로 결정화해, 회귀 기준선 · 면접/포트폴리오 문서 ·
+    후속 배선 베이스로 사용한다.
+
+  scope:
+    included:
+      - 대사 엔진 (4분류·허용오차·금액우선 순서)
+      - 소스 포트/어댑터 (실 HTTP 2종·샘플 2종·프로파일 격리·페이지네이션)
+      - 오케스트레이션 (role 병합·코루틴 동시 fetch·role 부재 거부)
+      - 스케줄 배치 (cron·전일 대상·fail-open·메트릭)
+      - REST 표면 (즉석 대사·데모·에러 매핑)
+    excluded:
+      - settlement/order 의 /internal/recon 구현 (각 서비스 소관)
+      - 불일치의 회계 처리·조정 전표 (settlement 역정산 소관)
+
+  constraints:
+    - "shared-common 미의존 — 폴리글랏 독립 standalone Gradle 빌드(settings.gradle.kts 미포함)"
+    - "DB 없음 — 대사 결과 영속화 0(로그 + 메트릭만)"
+    - "Kafka 의존 없음 — 순수 HTTP pull 배치"
+    - "cross-DB 연결 금지 — 양측이 각자 자기 DB 만 읽고 숫자를 HTTP 로 주고받는다"
+    - "JDK 21 툴체인 + jvmTarget 21 고정 (JDK25/Kotlin2.3 조합 회피)"
+    - "샘플 소스와 실 소스는 프로파일로 상호배타 — 공존 시 대사 결과가 통째로 허구"
+
+  invariants:  # as-is 코드 사실 — 파일:라인 근거 (경로 접두 reconciliation-service/src/main/kotlin/github/lms/lemuel/reconciliation/)
+    engine_classification:
+      source: domain/ReconciliationEngine.kt:16-74
+      rule: >-
+        businessKey associateBy 후 ① expected-only → MISSING ② actual-only → EXTRA
+        ③ 공유 키는 classifyShared: abs(차) > tolerance → AMOUNT_MISMATCH(diffKrw = exp - act),
+        아니면 status 불일치 → STATUS_MISMATCH, 둘 다 아니면 matched(리포트 미수록).
+        금액·상태가 동시에 어긋나면 AMOUNT_MISMATCH 로 1건만 보고(돈이 우선 신호 — 주석 명문)
+      tolerance: "toleranceKrw < 0 이면 ReconciliationInvariantViolationException(IAE 확장) — 도메인은 stdlib 예외를 직접 던지지 않는다"
+      sealed: "Discrepancy sealed interface 4구현 — DTO 매핑의 when 이 컴파일러 전수 검사 대상 (adapter/in/web/ReconciliationDtos.kt:36-55)"
+    source_port:
+      source: application/ReconciliationSource.kt:14-27
+      rule: "ReconciliationSource{name, role: EXPECTED|ACTUAL, suspend fetch(period)}. fetch 가 suspend 인 것이 동시 fetch 의 전제. ReconPeriod 는 폐구간(from..to), day(date) 팩토리"
+    concurrent_fetch:
+      source: application/ReconciliationService.kt:44-71
+      rule: >-
+        coroutineScope 안에서 소스별 async 기동 후 await — N개 소스가 직렬이 아니라 병렬.
+        같은 role 은 합집합 병합. EXPECTED 또는 ACTUAL 이 0개면 ReconciliationInvariantViolationException.
+        소스 예외는 스코프가 전파 — fail-open 이 필요한 호출자(스케줄러)가 자기 try/catch 로 감싼다
+      engine_scope: "ReconciliationEngine 을 호출마다 생성 — 허용오차가 요청 스코프"
+    live_sources:
+      source: adapter/out/source/HttpSources.kt:40-131
+      rule: >-
+        EXPECTED=settlement-http → GET {settlementBaseUrl}/internal/recon/settlements?date&afterPaymentId&limit,
+        ACTUAL=payment-http → GET {paymentBaseUrl}/internal/recon/captured-payments?date.
+        RestClient 는 블로킹이라 withContext(Dispatchers.IO) — 코루틴 병렬성 보존.
+        기간은 days() 로 일 단위 API 를 확장, 금액은 BigDecimal → setScale(0, HALF_UP) → Long
+      pagination: "EXPECTED 만 커서 페이지네이션(PAGE_SIZE=1000 < 서버 상한 2000). 소진까지 읽는 이유: 단일 요청으로 자르면 초과분이 빠지고 상대편은 전건을 주므로 그 차이가 전부 EXTRA 로 보고된다 — 대사가 거짓 불일치를 만든다(주석 명문)"
+      actual_normalization: "ACTUAL 금액 = amount - refundedAmount(상대편과 같은 정의), 상태는 refunded>0 ? REFUNDED : PAID 로 정규화"
+    profile_isolation:
+      source: adapter/out/source/SourceConfig.kt:24-79
+      rule: >-
+        LiveSources @Profile("!demo") 가 실 HTTP 소스 2종을, DemoSources @Profile("demo") 가 샘플 2종을 등록.
+        샘플은 @Component 가 아니다. 근거: 2026-07-30 이전에는 샘플이 @Component 라 프로덕션에서도 등록되고
+        실 소스는 빈이 아니어서, 배치가 매일 가짜 결과(expected=5 actual=5 discrepancies=4)를 뱉었다(프로덕션 로그로 확인)
+      internal_key: "RestClient 에 X-Internal-Api-Key 기본 헤더(키가 비면 헤더 생략 = 로컬 fail-open). connect 5s / read 30s"
+    scheduler:
+      source: adapter/in/schedule/ReconciliationScheduler.kt:28-104
+      rule: >-
+        @Scheduled(cron=${app.reconciliation.cron:0 0 19 * * *}, zone=Asia/Seoul), 대상은 전일(now-1d).
+        실행 전 role 집합 검사 — EXPECTED·ACTUAL 둘 다 없으면 실행 자체를 하지 않고 recon.runs{result=misconfigured}.
+        fail-open: 어떤 예외도 catch 후 recon.runs{result=error} — 흔들리는 PG 가 스케줄러 스레드/앱을 죽이면 안 된다
+      metrics: >-
+        게이지 recon.last.run.epoch.seconds(0=미실행) · recon.last.discrepancies(-1=성공 실행 없음) ·
+        recon.last.records{role=expected|actual} / 카운터 recon.runs{result=clean|discrepancy|error|misconfigured} ·
+        recon.discrepancies{type}. 2026-07-30 추가 근거: 로그는 사람이 봐야 보이지만 지표는 알림을 걸 수 있다
+    rest_surface:
+      source: adapter/in/web/{ReconciliationController.kt:16-59, ReconciliationExceptionHandler.kt:22-33}
+      rule: "POST /reconciliation/run(요청 본문 두 집합, tolerance 기본 1) · GET /reconciliation/demo. IllegalArgumentException → 400, 인프라 실패는 500. 인증 없음"
+    report_immutability:
+      source: domain/ReconciliationReport.kt:13-37
+      rule: "discrepancies 방어적 복사(toList). byType 은 enum 전 값을 0 기본으로 포함. matched 는 카운트로만 — 일치는 리포트에 담지 않는다"
+
+  event_contracts:
+    published: []  # 없음 — Kafka 의존 자체가 빌드에 없음
+    consumed: []
+    note: "서비스 간 연계는 HTTP pull 2건(settlement·order 의 /internal/recon)만"
+
+  acceptance_criteria:  # 실행 가능 — 각 AC 는 기존 게이트에 매핑
+    - id: AC-1
+      criterion: 4분류·허용오차 경계·금액 우선 순서가 일치한다
+      gate: "JAVA_HOME=<JDK21> ./gradlew test — ReconciliationEngineTest"
+    - id: AC-2
+      criterion: role 병합·동시 fetch·role 부재 거부가 일치한다
+      gate: "ReconciliationServiceTest"
+    - id: AC-3
+      criterion: 실 HTTP 소스의 페이지네이션 종료 조건·금액/상태 정규화가 일치한다
+      gate: "HttpSourcesTest"
+    - id: AC-4
+      criterion: REST 계약(요청/응답 shape·400 매핑)이 일치한다
+      gate: "ReconciliationControllerTest"
+    - id: AC-5
+      criterion: 전체 빌드 GREEN
+      gate: "JAVA_HOME=<JDK21> ./gradlew build · .github/workflows/polyglot-ci.yml (Kotlin 매트릭스)"
+
+  known_issues:  # 발견만 기록 — 사양은 as-is 유지
+    - id: KI-1
+      finding: "★ 어떤 배포 환경에서도 돌지 않는다 — docker-compose.yml 에 reconciliation-service 정의가 없고 게이트웨이 라우트도 없다. 코드·테스트·Dockerfile 은 온전하나 19:00 스케줄러가 실행되는 환경이 존재하지 않는다(현재 대사는 settlement 내부 /admin/reconciliation 경로로만 수행)"
+      disposition: recorded-not-fixed (high — 목적 미수행)
+    - id: KI-2
+      finding: "★ DRIFT: polyglot-services.md:8 이 이 서비스를 'MVP·skeleton (HTTP 소스 인터페이스만 — 실소스 빈 미등록)' 으로, :26-27 이 '실소스 빈 미등록으로 fetch 가 빈 리스트 반환'으로 기술 — 2026-07-30 변경으로 둘 다 사실 아님(LiveSources 가 실 소스 2종 등록, 페이지네이션 구현 완료)"
+      disposition: doc-drift (정본 갱신 필요)
+    - id: KI-3
+      finding: "app.reconciliation.tolerance-krw 를 읽는 코드가 없다 — 스케줄러는 인터페이스 기본값 1, 컨트롤러는 자기 상수 DEFAULT_TOLERANCE_KRW=1 을 쓴다. 환경변수 APP_RECONCILIATION_TOLERANCE_KRW 를 올려도 무효"
+      disposition: recorded-not-fixed (medium — 사문화된 설정)
+    - id: KI-4
+      finding: "settlement-base-url 기본값이 http://settlement-service:8082 — compose 네트워크에서 Java 서비스는 컨테이너 내부 8080 으로 서빙한다(gateway env 가 8080 사용). 8082 는 호스트 바인딩 포트. KI-1 때문에 지금은 안 드러나지만 compose 에 올리는 순간 EXPECTED 소스 연결 실패"
+      disposition: recorded-not-fixed (medium)
+    - id: KI-5
+      finding: "GET /reconciliation/demo 가 비-demo 프로파일에서 실 소스로 폴백한다(ifEmpty, ReconciliationController.kt:44-46) — 인증 없는 GET 하나가 settlement·order 내부 API 를 오늘 날짜로 전량 조회시킨다"
+      disposition: recorded-not-fixed (medium)
+    - id: KI-6
+      finding: "POST /reconciliation/run · GET /reconciliation/demo 무인증 — 방어가 '게이트웨이 미노출' 하나뿐. KI-5 와 결합 시 서비스 포트 도달 가능 위치에서 내부 대사 API 를 임의로 당길 수 있다"
+      disposition: recorded-not-fixed (medium)
+    - id: KI-7
+      finding: "대사 결과 미보존 — 게이지는 recon.last.* 로 마지막 실행값만 갖는다. 어제 불일치 건수, 특정 businessKey 의 최초 어긋난 시점을 서비스 안에서 추적할 방법이 없다"
+      disposition: by-design (무영속 MVP) — 이력 요구 발생 시 재검토
+    - id: KI-8
+      finding: "커버리지 게이트 없음(Java 모듈의 JaCoCo LINE 90% 미적용). 테스트 4클래스가 엔진·서비스·컨트롤러·HTTP소스를 덮지만 ReconciliationScheduler 와 SourceConfig 프로파일 분기는 전용 테스트가 없다 — KI-5 폴백과 프로파일 격리 규칙이 회귀 보호 밖"
+      disposition: recorded-not-fixed (medium)
+
+  uses:
+    - regression-baseline
+    - interview-portfolio
+    - brownfield-base

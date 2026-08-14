@@ -1,0 +1,11 @@
+# 잔액조회 요청 — 지급이체 전 출금계좌 잔액을 확인한다.
+telegram: BALANCE_REQUEST
+msgType: "0100"
+description: 계좌 잔액조회 요청
+version: 1
+effectiveFrom: 2026-01-01
+include: COMMON_HEADER
+totalLength: 60         # 공통부 34 + 개별부 26
+fields:
+  - { name: BANK_CODE,  length: 10, type: AN }
+  - { name: ACCOUNT_NO, length: 16, type: AN }

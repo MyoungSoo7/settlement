@@ -29,4 +29,26 @@ class NotificationExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
             .body(ErrorResponse(400, "BAD_REQUEST", ex.message ?: "invalid request"))
     }
+
+    /**
+     * No verified identity — 401, never 500. The reason stays generic: the
+     * caller learns that it is unauthenticated, not why the token failed.
+     */
+    @ExceptionHandler(StreamUnauthorizedException::class)
+    fun handleUnauthorized(ex: StreamUnauthorizedException): ResponseEntity<ErrorResponse> {
+        log.debug("stream rejected: {}", ex.message)
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+            .body(ErrorResponse(401, "UNAUTHORIZED", "authentication required"))
+    }
+
+    /**
+     * No signing key configured — the push stream is disabled (503) while the
+     * rest of the service keeps serving. Fail-closed, not fail-open.
+     */
+    @ExceptionHandler(StreamNotConfiguredException::class)
+    fun handleNotConfigured(ex: StreamNotConfiguredException): ResponseEntity<ErrorResponse> {
+        log.warn("stream unavailable: {}", ex.message)
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+            .body(ErrorResponse(503, "STREAM_NOT_CONFIGURED", "notification stream is not available"))
+    }
 }

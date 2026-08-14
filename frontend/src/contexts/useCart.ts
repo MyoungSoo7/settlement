@@ -20,6 +20,15 @@ export interface CartContextType {
   clearCart: () => void;
   totalAmount: number;
   totalCount: number;
+  /**
+   * 서버 장바구니를 읽어오는 중. 비로그인(로컬 모드)에서는 항상 false 다.
+   * 이 값이 true 인 동안의 빈 목록은 "장바구니가 비었다"가 아니라 "아직 모른다"이다.
+   */
+  loading: boolean;
+  /** 로그인 상태에서 서버와 통신 중인지 — 저장은 낙관적으로 반영되므로 표시용이다. */
+  syncing: boolean;
+  /** 서버 장바구니 사용 여부(로그인 + userId 확보). false 면 localStorage 로 동작한다. */
+  serverBacked: boolean;
 }
 
 export const CartContext = createContext<CartContextType | null>(null);

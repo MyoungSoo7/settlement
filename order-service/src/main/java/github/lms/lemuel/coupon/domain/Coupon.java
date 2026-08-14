@@ -81,19 +81,26 @@ public class Coupon {
     }
 
     /**
-     * 쿠폰 유효성 검사
+     * 쿠폰 유효성 검사 (활성/사용횟수/기간/최소주문액).
+     *
+     * <p>기간 판정 시각 {@code now} 는 <b>호출자가 주입한다</b> — 도메인이 {@code LocalDateTime.now()} 를
+     * 직접 읽지 않는다. JVM 기본 타임존이 UTC 인 컨테이너에서 정적 {@code now()} 로 판정하면 KST
+     * 자정~09시 구간에서 만료/시작 경계가 하루 어긋난다. 응용 서비스가 KST {@code Clock} 으로 시각을
+     * 만들어 넘기므로 경계는 업무 표준시를 따르고, 테스트는 고정 시각으로 결정적 검증이 가능하다.
+     *
+     * <p>경계는 <b>포함</b>이다 — {@code now == startsAt} 은 사용 가능, {@code now == expiresAt} 은 아직 유효.
      */
-    public void validate(BigDecimal orderAmount) {
+    public void validate(BigDecimal orderAmount, LocalDateTime now) {
         if (!isActive) {
             throw new InvalidCouponStateException("비활성화된 쿠폰입니다.");
         }
         if (usedCount >= maxUses) {
             throw new InvalidCouponStateException("쿠폰 사용 한도를 초과했습니다.");
         }
-        if (startsAt != null && LocalDateTime.now().isBefore(startsAt)) {
+        if (startsAt != null && now.isBefore(startsAt)) {
             throw new InvalidCouponStateException("아직 사용할 수 없는 쿠폰입니다.");
         }
-        if (expiresAt != null && LocalDateTime.now().isAfter(expiresAt)) {
+        if (expiresAt != null && now.isAfter(expiresAt)) {
             throw new InvalidCouponStateException("만료된 쿠폰입니다.");
         }
         if (orderAmount.compareTo(minOrderAmount) < 0) {

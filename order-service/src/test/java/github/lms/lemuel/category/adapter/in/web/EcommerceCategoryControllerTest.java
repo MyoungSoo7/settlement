@@ -1,5 +1,6 @@
 package github.lms.lemuel.category.adapter.in.web;
 
+import github.lms.lemuel.category.application.port.in.CheckCategoryCountIntegrityUseCase;
 import github.lms.lemuel.category.application.service.EcommerceCategoryService;
 import github.lms.lemuel.category.domain.EcommerceCategory;
 import github.lms.lemuel.common.config.jwt.JwtUtil;
@@ -34,6 +35,8 @@ class EcommerceCategoryControllerTest {
     @Autowired MockMvc mockMvc;
     @MockitoBean JwtUtil jwtUtil;
     @MockitoBean EcommerceCategoryService categoryService;
+    /** 관리 컨트롤러가 정합 점검 유스케이스를 함께 받는다 — 슬라이스가 뜨려면 여기도 채워야 한다. */
+    @MockitoBean CheckCategoryCountIntegrityUseCase countIntegrityUseCase;
 
     @Test
     @DisplayName("GET /categories returns active category tree")

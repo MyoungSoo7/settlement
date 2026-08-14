@@ -29,8 +29,8 @@ spring:
       # 'Connection is not available … (total=0)' 로 터진다 — settlement-service 의 outbox 폴러가
       # 이틀간 46회 이렇게 실패했다. keepalive 로 주기적으로 살아있음을 확인하고,
       # max-lifetime 으로 오래된 커넥션을 선제 교체한다. (economics/market/common-data 는 이미 적용됨)
-      max-lifetime: 1800000     # 30분
-      keepalive-time: 300000    # 5분
+      max-lifetime: 1800000 # 30분
+      keepalive-time: 300000 # 5분
 
   jpa:
     hibernate:
@@ -134,3 +134,31 @@ app:
       # LLM 비용 가드 — 사용자별 채팅 호출 상한. 초과 시 429 + Retry-After.
       per-minute: ${APP_AI_RATE_PER_MINUTE:5}
       per-day: ${APP_AI_RATE_PER_DAY:100}
+
+    # ── RAG (ADR 0034) ────────────────────────────────────────────────
+    # 기본 false. 켜야만 KnowledgeController·검색 서비스·임베딩 어댑터 빈이 등록되고,
+    # 꺼져 있으면 RagWiringConfig 의 "근거 0건" 포트가 대신 꽂혀 Phase 1 과 동작이 같아진다.
+    # ★ true 로 켜기 전 확인: 대상 DB 에 pgvector 확장이 있고 앱 계정이 슈퍼유저인가.
+    #   (마이그레이션 V20260812150000 이 CREATE EXTENSION 을 시도하고, 실패하면 부팅이 멈춘다)
+    rag:
+      enabled: ${APP_AI_RAG_ENABLED:false}
+      # 프롬프트에 실을 근거 청크 수 — 컨텍스트 길이·비용의 1차 상한.
+      top-k: ${APP_AI_RAG_TOP_K:4}
+      # 코사인 유사도 하한. 이보다 낮은 근거는 "관련 없음"으로 보고 버린다 —
+      # 무관한 근거를 붙이는 것은 근거를 안 붙이는 것보다 나쁘다(환각을 오히려 부추긴다).
+      min-similarity: ${APP_AI_RAG_MIN_SIMILARITY:0.55}
+      # 청크 크기·겹침(문자 기준). 겹침은 문단 경계에서 잘린 문맥을 복구하는 보험.
+      chunk-max-chars: ${APP_AI_RAG_CHUNK_MAX:1200}
+      chunk-overlap-chars: ${APP_AI_RAG_CHUNK_OVERLAP:200}
+
+    # 임베딩 벤더 배선 — rag 정책(위)과 분리한다. 모델 id 는 여기 하나뿐이고,
+    # 청크마다 DB(knowledge_chunks.embedding_model)에 기록돼 모델 교체를 감지한다.
+    embedding:
+      # 채팅과 같은 GEMINI_API_KEY 를 공용. 미설정 시 적재는 503, 검색은 근거 0건.
+      api-key: ${GEMINI_API_KEY:}
+      model: ${APP_AI_EMBEDDING_MODEL:gemini-embedding-001}
+      base-url: https://generativelanguage.googleapis.com
+      # ★ 3072(기본) 이 아니라 768 인 이유: pgvector 의 vector 타입은 2000 차원까지만
+      #   인덱싱된다. MRL 학습 모델이라 절단이 허용되며, 절단 시 L2 정규화는 수동 책임이다
+      #   (어댑터가 수행). 3072 를 쓰려면 halfvec(4000 까지) 로 스키마를 바꿔야 한다.
+      dimension: ${APP_AI_EMBEDDING_DIMENSION:768}

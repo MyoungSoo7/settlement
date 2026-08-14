@@ -8,6 +8,7 @@ import github.lms.lemuel.payout.domain.PayoutBackfillReport;
 import github.lms.lemuel.payout.domain.PayoutStatus;
 import github.lms.lemuel.payout.domain.PayoutType;
 import github.lms.lemuel.payout.domain.SellerBankAccount;
+import github.lms.lemuel.settlement.application.port.in.ApplyLoanDeductionUseCase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -43,12 +44,14 @@ class BackfillMissingPayoutsServiceTest {
 
     @Mock PayoutBackfillQueryPort queryPort;
     @Mock RequestPayoutUseCase requestPayoutUseCase;
+    @Mock ApplyLoanDeductionUseCase applyLoanDeductionUseCase;
 
     BackfillMissingPayoutsService service;
 
     @BeforeEach
     void setUp() {
-        service = new BackfillMissingPayoutsService(queryPort, requestPayoutUseCase, 100);
+        service = new BackfillMissingPayoutsService(
+                queryPort, requestPayoutUseCase, applyLoanDeductionUseCase, 100);
     }
 
     // ── status ──────────────────────────────────────────────────────────────
@@ -92,7 +95,7 @@ class BackfillMissingPayoutsServiceTest {
     // ── backfill: IMMEDIATE ──────────────────────────────────────────────────
 
     @Test
-    @DisplayName("backfill: IMMEDIATE 정산 1건 — sellerId/amount 있으면 created=1")
+    @DisplayName("backfill: IMMEDIATE 는 확정 경로를 재구동한다 — 백필이 금액을 직접 계산하지 않는다")
     void backfill_immediateCreated() {
         SettlementForPayout settlement = new SettlementForPayout(
                 10L, 100L, 7L,
@@ -110,9 +113,7 @@ class BackfillMissingPayoutsServiceTest {
         when(queryPort.findDoneWithoutHoldbackReleasePayoutPage(eq(FROM), eq(TO), eq(0L), anyInt()))
                 .thenReturn(List.of());
 
-        Payout savedPayout = dummyPayout(10L, PayoutType.IMMEDIATE);
-        when(requestPayoutUseCase.requestPayoutOfType(eq(10L), eq(7L), eq(new BigDecimal("97000")), eq(PayoutType.IMMEDIATE)))
-                .thenReturn(Optional.of(savedPayout));
+        when(applyLoanDeductionUseCase.redriveFromRecordedDeduction(10L, 7L)).thenReturn(true);
 
         when(queryPort.countDoneWithoutImmediatePayout(FROM, TO)).thenReturn(0L);
         when(queryPort.countDoneWithoutHoldbackReleasePayout(FROM, TO)).thenReturn(0L);
@@ -123,6 +124,40 @@ class BackfillMissingPayoutsServiceTest {
         assertThat(report.skipped()).isZero();
         assertThat(report.failed()).isZero();
         assertThat(report.complete()).isTrue();
+        // 백필이 총액(97,000)을 직접 지급 요청하면 원천징수·대출차감·채권상계가 통째로 빠진다.
+        verify(requestPayoutUseCase, never())
+                .requestPayoutOfType(any(), any(), any(), eq(PayoutType.IMMEDIATE));
+    }
+
+    @Test
+    @DisplayName("backfill: 대출 차감 기록이 없으면 지급하지 않고 failed — loan 이벤트 미도착 건")
+    void backfill_noLoanDeductionRecord_countsFailed() {
+        SettlementForPayout settlement = new SettlementForPayout(
+                10L, 100L, 7L,
+                new BigDecimal("97000"),
+                new BigDecimal("97000"),
+                BigDecimal.ZERO, false);
+
+        when(queryPort.findDoneWithoutImmediatePayoutPage(eq(FROM), eq(TO), eq(0L), anyInt()))
+                .thenReturn(List.of(settlement));
+        when(queryPort.findDoneWithoutImmediatePayoutPage(eq(FROM), eq(TO), eq(10L), anyInt()))
+                .thenReturn(List.of());
+        when(queryPort.findDoneWithoutHoldbackReleasePayoutPage(any(), any(), anyLong(), anyInt()))
+                .thenReturn(List.of());
+
+        when(applyLoanDeductionUseCase.redriveFromRecordedDeduction(10L, 7L)).thenReturn(false);
+
+        // 지급이 안 만들어졌으므로 잔여는 그대로 1 — "백필했는데 잔여가 안 줄었다"가 유실 신호다.
+        when(queryPort.countDoneWithoutImmediatePayout(FROM, TO)).thenReturn(1L);
+        when(queryPort.countDoneWithoutHoldbackReleasePayout(FROM, TO)).thenReturn(0L);
+
+        PayoutBackfillReport report = service.backfill(FROM, TO, null);
+
+        assertThat(report.failed()).isEqualTo(1);
+        assertThat(report.created()).isZero();
+        assertThat(report.remaining()).isEqualTo(1);
+        assertThat(report.complete()).isFalse();
+        verify(requestPayoutUseCase, never()).requestPayoutOfType(any(), any(), any(), any());
     }
 
     @Test
@@ -191,7 +226,7 @@ class BackfillMissingPayoutsServiceTest {
         when(queryPort.findDoneWithoutHoldbackReleasePayoutPage(any(), any(), anyLong(), anyInt()))
                 .thenReturn(List.of());
 
-        when(requestPayoutUseCase.requestPayoutOfType(any(), any(), any(), eq(PayoutType.IMMEDIATE)))
+        when(applyLoanDeductionUseCase.redriveFromRecordedDeduction(10L, 7L))
                 .thenThrow(new DataIntegrityViolationException("unique constraint"));
 
         when(queryPort.countDoneWithoutImmediatePayout(FROM, TO)).thenReturn(0L);
@@ -243,7 +278,8 @@ class BackfillMissingPayoutsServiceTest {
         SettlementForPayout s2 = settlement(20L, "50000");
 
         // 페이지 크기 1 설정으로 2페이지 실행
-        service = new BackfillMissingPayoutsService(queryPort, requestPayoutUseCase, 1);
+        service = new BackfillMissingPayoutsService(
+                queryPort, requestPayoutUseCase, applyLoanDeductionUseCase, 1);
 
         when(queryPort.findDoneWithoutImmediatePayoutPage(eq(FROM), eq(TO), eq(0L), eq(1)))
                 .thenReturn(List.of(s1));
@@ -254,8 +290,8 @@ class BackfillMissingPayoutsServiceTest {
         when(queryPort.findDoneWithoutHoldbackReleasePayoutPage(any(), any(), anyLong(), anyInt()))
                 .thenReturn(List.of());
 
-        when(requestPayoutUseCase.requestPayoutOfType(any(), any(), any(), eq(PayoutType.IMMEDIATE)))
-                .thenReturn(Optional.of(dummyPayout(null, PayoutType.IMMEDIATE)));
+        when(applyLoanDeductionUseCase.redriveFromRecordedDeduction(anyLong(), anyLong()))
+                .thenReturn(true);
 
         when(queryPort.countDoneWithoutImmediatePayout(FROM, TO)).thenReturn(0L);
         when(queryPort.countDoneWithoutHoldbackReleasePayout(FROM, TO)).thenReturn(0L);

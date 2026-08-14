@@ -1,0 +1,11 @@
+{
+  "contractId": 4242,
+  "borrowerUserId": 8484,
+  "financeType": "FINANCE_LEASE",
+  "assetDescription": "지게차 3톤",
+  "financedAmount": "27000000",
+  "residualValue": "6000000",
+  "monthlyRental": "668861",
+  "termMonths": 36,
+  "activatedAt": "2026-08-13T00:00:00Z"
+}

@@ -47,6 +47,29 @@ public class EcommerceCategoryJpaEntity {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
+    /**
+     * 루트→자기 slug 경로. path_ids(BIGINT[]) 는 JPA 로 매핑하지 않는다 — 하위 트리 조회는
+     * GIN 인덱스를 타는 네이티브 질의가 담당하고, 매핑하지 않은 컬럼은 스키마 검증에도 영향이 없다.
+     */
+    @Column(name = "path_slug", length = 900)
+    private String pathSlug;
+
+    /** 직접 매핑된 상품 수 캐시. 정본은 product_ecommerce_categories 실계수. */
+    @Column(name = "product_count", nullable = false)
+    private Integer productCount;
+
+    /**
+     * 경로·카운트는 DB 가 유지하는 파생값이라 도메인에서 넘어오지 않는다. 기존 호출부의
+     * 10-인자 형태를 그대로 유지해, 파생 컬럼 추가가 매퍼 시그니처를 흔들지 않게 한다.
+     */
+    public EcommerceCategoryJpaEntity(Long id, String name, String slug, Long parentId,
+                                      Integer depth, Integer sortOrder, Boolean isActive,
+                                      LocalDateTime createdAt, LocalDateTime updatedAt,
+                                      LocalDateTime deletedAt) {
+        this(id, name, slug, parentId, depth, sortOrder, isActive,
+                createdAt, updatedAt, deletedAt, null, 0);
+    }
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
@@ -59,6 +82,9 @@ public class EcommerceCategoryJpaEntity {
         }
         if (isActive == null) {
             isActive = true;
+        }
+        if (productCount == null) {
+            productCount = 0;
         }
     }
 

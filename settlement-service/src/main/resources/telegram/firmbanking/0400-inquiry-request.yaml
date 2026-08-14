@@ -1,0 +1,11 @@
+# 결과조회 요청 — 이체 응답을 못 받았거나 불확실할 때 원거래 결과를 되묻는다.
+telegram: INQUIRY_REQUEST
+msgType: "0400"
+description: 이체결과 조회 요청
+version: 1
+effectiveFrom: 2026-01-01
+include: COMMON_HEADER
+totalLength: 66         # 공통부 34 + 개별부 32
+fields:
+  - { name: ORIG_TELEGRAM_NO, length: 12, type: N }    # 원거래 전문일련번호
+  - { name: REF_ID,           length: 20, type: AN }

@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---- build stage ----
-FROM eclipse-temurin:21-jdk AS build
+FROM eclipse-temurin:25-jdk AS build
 WORKDIR /workspace
 
 # Cache gradle wrapper + dependency resolution before copying sources.
@@ -13,7 +13,7 @@ COPY src ./src
 RUN ./gradlew --no-daemon clean bootJar -x test
 
 # ---- runtime stage ----
-FROM eclipse-temurin:21-jre AS runtime
+FROM eclipse-temurin:25-jre AS runtime
 WORKDIR /app
 
 # Non-root user

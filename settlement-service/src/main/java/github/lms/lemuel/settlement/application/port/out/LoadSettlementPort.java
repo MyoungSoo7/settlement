@@ -14,6 +14,13 @@ public interface LoadSettlementPort {
 
     Optional<Settlement> findById(Long settlementId);
 
+    /**
+     * 여러 정산을 <b>한 번의 조회</b>로 가져온다(IN 절). 벌크 인덱싱처럼 다건을 다룰 때
+     * id 마다 {@link #findById} 를 반복하면 N+1 이 되므로 배치 경로는 이 메서드를 쓴다.
+     * 존재하지 않는 id 는 결과에서 빠진다(순서·개수 보장 없음).
+     */
+    List<Settlement> findAllByIds(List<Long> settlementIds);
+
     Optional<Settlement> findByPaymentId(Long paymentId);
 
     /**

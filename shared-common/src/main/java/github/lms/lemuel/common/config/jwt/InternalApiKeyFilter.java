@@ -28,7 +28,13 @@ public class InternalApiKeyFilter extends OncePerRequestFilter {
 
     /** 호출자가 공유 시크릿을 싣는 요청 헤더 이름. */
     public static final String HEADER = "X-Internal-Api-Key";
-    private static final String INTERNAL_PREFIX = "/internal/";
+    /**
+     * 이 필터가 지키는 경로 접두. {@code /van/} 은 card-service 의 VAN 진입점(승인·매입·취소·환불)이다 —
+     * 사람이 아니라 기계가 부르는 경로라 사용자 토큰이 아니라 공유 시크릿으로 가려야 한다.
+     * 현재 VAN 은 실제 외부 파트너가 아니라 시뮬레이터라 내부키를 함께 쓴다. 실제 VAN 을 온보딩하면
+     * 그때 별도 시크릿으로 분리해야 한다(파트너 키 유출 반경과 내부 키 유출 반경은 달라야 한다).
+     */
+    private static final String[] GUARDED_PREFIXES = {"/internal/", "/van/"};
     private static final Logger log = LoggerFactory.getLogger(InternalApiKeyFilter.class);
 
     private final String apiKey;
@@ -50,8 +56,7 @@ public class InternalApiKeyFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
-        String path = request.getServletPath();
-        if (path != null && path.startsWith(INTERNAL_PREFIX)) {
+        if (isGuarded(resolvePath(request))) {
             if (apiKey == null || apiKey.isBlank()) {
                 // 키 미설정: app.security.internal-key-required=true(운영) 면 fail-closed 로 거부,
                 // 기본(false, 로컬/개발) 이면 1회 경고 후 통과.
@@ -71,5 +76,35 @@ public class InternalApiKeyFilter extends OncePerRequestFilter {
             }
         }
         chain.doFilter(request, response);
+    }
+
+    /**
+     * 보호 판정에 쓸 경로를 정한다. {@code getServletPath()} 는 디스패처 서블릿 매핑·컨테이너에 따라
+     * 빈 문자열이 될 수 있고, 그러면 이 게이트가 <b>조용히 꺼진다</b>(보호 대상 경로가 그대로 통과).
+     * 그래서 비어 있으면 requestURI 에서 컨텍스트 경로를 걷어낸 값으로 폴백한다.
+     */
+    private static String resolvePath(HttpServletRequest request) {
+        String servletPath = request.getServletPath();
+        if (servletPath != null && !servletPath.isEmpty()) {
+            return servletPath;
+        }
+        String uri = request.getRequestURI();
+        String context = request.getContextPath();
+        if (uri != null && context != null && !context.isEmpty() && uri.startsWith(context)) {
+            return uri.substring(context.length());
+        }
+        return uri;
+    }
+
+    private static boolean isGuarded(String path) {
+        if (path == null) {
+            return false;
+        }
+        for (String prefix : GUARDED_PREFIXES) {
+            if (path.startsWith(prefix)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

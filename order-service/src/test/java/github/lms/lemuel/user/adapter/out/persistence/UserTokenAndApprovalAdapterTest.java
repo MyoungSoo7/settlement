@@ -42,7 +42,8 @@ class UserTokenAndApprovalAdapterTest {
     @DisplayName("token save: 저장 후 도메인 매핑")
     void tokenSave() {
         when(tokenRepository.save(any())).thenReturn(tokenEntity());
-        PasswordResetToken saved = tokenAdapter().save(PasswordResetToken.create(100L, 30));
+        PasswordResetToken saved = tokenAdapter().save(
+                PasswordResetToken.create(100L, 30, LocalDateTime.of(2026, 3, 1, 0, 0)));
         assertThat(saved.getToken()).isEqualTo("tok-123");
     }
 

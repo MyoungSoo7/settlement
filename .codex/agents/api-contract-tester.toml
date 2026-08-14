@@ -212,7 +212,7 @@ For each DTO field, verify type compatibility, nullability, and naming.\r
 \r
 # Persistent Agent Memory\r
 \r
-You have a persistent memory directory at `C:\\Users\\iamip\\IdeaProjects\\kubenetis\\settlement\\.Codex\\agent-memory\\api-contract-tester\\`. Its contents persist across conversations.\r
+You have a persistent memory directory at `.claude/agent-memory/api-contract-tester/`. Its contents persist across conversations.\r
 \r
 ## MEMORY.md\r
 \r

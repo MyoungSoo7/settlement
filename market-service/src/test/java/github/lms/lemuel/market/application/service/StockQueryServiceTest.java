@@ -70,7 +70,7 @@ class StockQueryServiceTest {
     void getStock_은_최신시세를_붙여_스냅샷을_돌려준다() {
         StockQuote latest = new StockQuote(1L, "005930", LocalDate.of(2026, 7, 7),
                 new BigDecimal("78000.00"), null, null, null, null, null,
-                null, null, null, null, ValueSource.KRX, null);
+                null, null, null, null, ValueSource.EXCHANGE, null);
         when(loadStockPort.findByCode("005930")).thenReturn(Optional.of(samsung));
         when(loadStockQuotePort.findLatest("005930")).thenReturn(Optional.of(latest));
 

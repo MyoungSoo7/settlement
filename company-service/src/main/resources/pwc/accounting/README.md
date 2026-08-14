@@ -428,18 +428,23 @@ node src/bin/ceo-consulting-pipeline.mjs --company 삼성전자 --business-numbe
 # 옵션: --data-dir <내부CSV> --judge (LLM 인과 채점) --agent none (에이전트 없이 준비만)
 ```
 
-라이브 실행 산출물이 동봉되어 있으며, 채점 명령 한 줄로 지금 바로 재검증할 수 있습니다
-(아래 결과는 2026-07-14 동봉 패킷 기준 재채점 실측값).
+아래는 실제로 완주한 실행 기록이며, 각 행의 명령으로 `outputs/` 에 다시 만들어 재검증할 수 있습니다
+(결과는 2026-07-14 산출 패킷 기준 재채점 실측값).
+
+> **산출물은 저장소에 포함하지 않습니다.** `outputs/` 는 실존 상장사에 대한 AI 생성 부실징후 진단이라
+> 원문을 공개 저장소에 두지 않고, 실행하면 로컬에 재생성되는 로컬 전용 디렉터리로 둡니다.
+> 예외는 아래 **태영건설 백테스트** 한 벌 — 이미 확정·공개된 과거 사건(2023-12 워크아웃)의 사후
+> 방법론 검증이라 성격이 다르고, 신호 정의의 외부 정답 대조 증거라 동봉합니다.
 
 | 예시 | 모드 | 결과 |
 |---|---|---|
-| [`outputs/삼성전자-ceo-pipeline`](./outputs/삼성전자-ceo-pipeline/) | 실기업(삼성전자) API-only — identity → 패킷 → 브리핑 → Word | 재현율 2/2 · EVAL PASS |
-| [`outputs/naver-ceo-pipeline`](./outputs/naver-ceo-pipeline/) | 실기업(NAVER) API-only 파이프라인 완주 | EVAL PASS |
-| [`outputs/batch/2026Q2`](./outputs/batch/2026Q2/) | 분기 브리핑 배치(`quarterly-briefing-batch`) — 코스피 대형주 20사 일괄 완주 | 기업별 `briefing.md`+`pipeline-next-steps.md` |
-| [`outputs/taeyoung-backtest-2022`](outputs/taeyoung-backtest-2022/README.md) | 실사례 백테스트 — 태영건설 워크아웃 9개월 전 공시(FY2022)만으로 진단 | E1·E2·E4 동시 발화 |
+| `outputs/삼성전자-ceo-pipeline` | 실기업(삼성전자) API-only — identity → 패킷 → 브리핑 → Word | 재현율 2/2 · EVAL PASS |
+| `outputs/naver-ceo-pipeline` | 실기업(NAVER) API-only 파이프라인 완주 | EVAL PASS |
+| `outputs/batch/2026Q2` | 분기 브리핑 배치(`quarterly-briefing-batch`) — 코스피 대형주 20사 일괄 완주 | 기업별 `briefing.md`+`pipeline-next-steps.md` |
+| [`outputs/taeyoung-backtest-2022`](outputs/taeyoung-backtest-2022/README.md) ★동봉 | 실사례 백테스트 — 태영건설 워크아웃 9개월 전 공시(FY2022)만으로 진단 | E1·E2·E4 동시 발화 |
 
 ```powershell
-# 동봉 산출물 재검증 (네트워크 0 — 동봉 패킷 기준)
+# 산출물 재검증 (네트워크 0 — 위 명령으로 생성된 로컬 패킷 기준)
 node src/test/briefing-eval.mjs --signals-file outputs/삼성전자-ceo-pipeline/diagnostic-packet.json outputs/삼성전자-ceo-pipeline/briefing.md
 ```
 
@@ -510,7 +515,8 @@ submission/
 |-- docs/
 |   |-- poc-trusted-ceo-accounting-agent.md   # PoC 제안서
 |   `-- plugin-evaluation-report.md
-|-- outputs/                        # 라이브 실행 산출물 (동봉 패킷으로 재검증 가능)
+|-- outputs/                        # 라이브 실행 산출물 (로컬 전용 — 실행 시 재생성)
+|   `-- taeyoung-backtest-2022/     #   예외: 외부 정답 대조 백테스트만 동봉
 |-- engagements/                    # 엔게이지먼트 사이클 상태 (네이버 사이클 1 완주 실증)
 |-- src/
 |   |-- .codex-plugin/plugin.json

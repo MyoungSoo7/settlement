@@ -12,6 +12,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.LocalDateTime;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -23,6 +26,8 @@ public class PasswordResetService implements PasswordResetUseCase {
     private final SavePasswordResetTokenPort savePasswordResetTokenPort;
     private final SendEmailPort sendEmailPort;
     private final PasswordHashPort passwordHashPort;
+    /** 토큰 발급·만료 판정의 시간 소스 — KST({@code TimeConfig}). 도메인에 시각을 값으로 넘긴다. */
+    private final Clock clock;
 
     @Value("${app.password-reset.token-expiry-minutes}")
     private int tokenExpiryMinutes;
@@ -51,7 +56,7 @@ public class PasswordResetService implements PasswordResetUseCase {
             resetToken = existingToken.get();
         } else {
             // 3. 새 토큰 생성
-            resetToken = PasswordResetToken.create(user.getId(), tokenExpiryMinutes);
+            resetToken = PasswordResetToken.create(user.getId(), tokenExpiryMinutes, LocalDateTime.now(clock));
             resetToken = savePasswordResetTokenPort.save(resetToken);
             log.info("새 비밀번호 재설정 토큰 생성: userId={}, tokenId={}", user.getId(), resetToken.getId());
         }
@@ -75,9 +80,10 @@ public class PasswordResetService implements PasswordResetUseCase {
         PasswordResetToken resetToken = savePasswordResetTokenPort.findByToken(command.token())
                 .orElseThrow(() -> new InvalidPasswordResetTokenException("유효하지 않은 토큰입니다."));
 
-        if (!resetToken.isValid()) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        if (!resetToken.isValid(now)) {
             log.warn("만료되거나 사용된 토큰: tokenId={}, used={}, expired={}",
-                    resetToken.getId(), resetToken.isUsed(), resetToken.isExpired());
+                    resetToken.getId(), resetToken.isUsed(), resetToken.isExpired(now));
             throw new InvalidPasswordResetTokenException();
         }
 

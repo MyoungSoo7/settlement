@@ -161,6 +161,7 @@ app:
   kafka:
     enabled: ${APP_KAFKA_ENABLED:false}
     topic:
+      owner: company-service   # ADR 0035 — 이 모듈이 발행(소유)하는 토픽만 만든다(파티션 정본은 topic-catalog.json)
       # 발행 (company → loan). Outbox 폴러가 aggregateType="Company"+eventType="CompanyReputationChanged"
       # 로 자동 라우팅하는 실제 토픽명(snake_case). loan 컨슈머가 이 이름으로 구독한다.
       reputation-changed: lemuel.company.reputation_changed

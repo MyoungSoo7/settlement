@@ -24,10 +24,12 @@ import static org.mockito.Mockito.when;
 class ProductPersistenceAdapterTest {
 
     @Mock SpringDataProductJpaRepository repository;
+    // 대표 분류 조회 — 스텁하지 않으면 빈 결과라 categoryId 는 null 로 남는다(이 테스트의 관심사 밖).
+    @Mock github.lms.lemuel.product.application.port.out.LoadPrimaryCategoryPort loadPrimaryCategoryPort;
     @Mock ProductPersistenceMapper mapper;
 
     private ProductPersistenceAdapter adapter() {
-        return new ProductPersistenceAdapter(repository, mapper);
+        return new ProductPersistenceAdapter(repository, loadPrimaryCategoryPort, mapper);
     }
 
     private ProductJpaEntity entity(Long id) {

@@ -79,17 +79,28 @@ const Toast: React.FC<ToastProps> = ({ message, type = 'info', duration = 3000, 
   };
 
   return (
-    <div className="fixed top-4 right-4 z-50 animate-slide-in">
-      <div className={`flex items-center p-4 rounded-lg border shadow-lg ${getToastStyle()} min-w-[300px]`}>
+    /* `toast-anchor`(index.css) = top/right 1rem + safe-area 인셋. 설치형에서 상태바에 물리는 것을 막는다. */
+    <div className="fixed toast-anchor z-50 animate-slide-in">
+      {/* 폭: 기존 `min-w-[300px]` 은 320px 기기에서 좌우 여백(2rem)을 더하면 화면을 넘겼다.
+          min-width 가 max-width 를 이기는 CSS 규칙 탓에 max 만 걸어서는 못 막으므로,
+          최소 폭 자체를 뷰포트에 종속시킨다. 고정 요소라 문서 scrollWidth 에 안 잡혀
+          가로 넘침 가드(mobile-layout.spec.ts)로는 검출되지 않는 자리다. */}
+      <div
+        className={`flex items-center p-4 rounded-lg border shadow-lg ${getToastStyle()} min-w-[min(300px,calc(100vw-2rem))] max-w-[calc(100vw-2rem)]`}
+      >
         <div className="flex-shrink-0">{getIcon()}</div>
         <div className="ml-3 flex-1">
           <p className="text-sm font-medium">{message}</p>
         </div>
+        {/* 닫기 버튼은 실측 약 16×16 이었다 — WCAG 2.5.8 최소(24×24) 미달이라 권장이 아니라 결함이다.
+            시각 크기를 28×28(아이콘 20 + p-1)로 올려 최소선을 넘기고, `tap-target` 으로 터치 환경의
+            히트 영역은 44×44 로 넓힌다. */}
         <button
           onClick={onClose}
-          className="ml-4 inline-flex text-gray-400 hover:text-gray-600 focus:outline-none"
+          aria-label="알림 닫기"
+          className="tap-target ml-4 inline-flex p-1 rounded text-gray-400 hover:text-gray-600 focus:outline-none"
         >
-          <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+          <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
             <path
               fillRule="evenodd"
               d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "lemuel.loan.lease_activated",
+  "description": "loan-service(LeaseEventPublisherAdapter) → 소비측(계정계 GL 분개 등). 리스·할부 계약이 물건 인도로 개시된 사실을 통지한다. 발행 시점이 승인이 아니라 개시인 이유는 승인 후 인도 전 취소가 실재하기 때문 — 승인 기준으로 잡으면 소비측이 허위 채권을 인식한다. 금액(financedAmount/residualValue/monthlyRental)은 JSON string(BigDecimal.toPlainString, DATA-STANDARD N5 — loan 계열 통일). residualValue 는 할부·잔존가치 없는 금융리스에서 0 이므로 비음수 패턴.",
+  "type": "object",
+  "properties": {
+    "contractId": { "type": "integer" },
+    "borrowerUserId": { "type": "integer" },
+    "financeType": { "type": "string", "enum": ["FINANCE_LEASE", "OPERATING_LEASE", "INSTALLMENT"] },
+    "assetDescription": { "type": "string", "minLength": 1 },
+    "financedAmount": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?$" },
+    "residualValue": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?$" },
+    "monthlyRental": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?$" },
+    "termMonths": { "type": "integer", "minimum": 1 },
+    "activatedAt": { "type": "string", "minLength": 1 }
+  },
+  "required": [
+    "contractId",
+    "borrowerUserId",
+    "financeType",
+    "financedAmount",
+    "residualValue",
+    "termMonths"
+  ],
+  "additionalProperties": true
+}

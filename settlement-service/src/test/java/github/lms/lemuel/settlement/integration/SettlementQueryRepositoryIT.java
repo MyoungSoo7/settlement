@@ -18,6 +18,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -35,6 +36,15 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>{@link ServingLocalProjectionIT} 와 동일한 부트스트랩(Flyway V1 베이스라인 + ddl validate).
  * settlements 와 로컬 프로젝션(settlement_*_view) 을 직접 seed 해 daily/monthly summary,
  * 커서 검색(모든 필터·정렬·커서 분기), 결제/환불 집계, 승인 상태, 대사 불일치, 감사 추적을 모두 태운다.
+ *
+ * <p><b>격리는 트랜잭션 롤백으로 한다</b>({@code @Transactional}) — 이전에는 매 테스트 시작마다
+ * TRUNCATE/DELETE 로 5개 테이블을 비웠다. 지우는 방식은 새 테이블이 늘 때 목록에 추가하는 걸 잊으면
+ * 조용히 테스트 간 오염이 생기고, 중간에 실패하면 잔존 데이터가 다음 테스트를 깨뜨린다.
+ * 롤백은 그 목록 자체를 없앤다.
+ *
+ * <p>이 클래스가 롤백으로 전환 가능한 이유: seed 가 전부 <b>raw JDBC INSERT</b> 이고 검증은 조회 전용이라
+ * 같은 트랜잭션·커넥션 안에서 보인다. JPA 로 쓰고 raw JDBC 로 집계를 읽거나(flush 안 됨),
+ * {@code REQUIRES_NEW} 로 건별 독립 커밋하는 IT 는 이 방식으로 바꿀 수 없다.
  */
 @SpringBootTest(
         classes = SettlementServiceApplication.class,
@@ -53,6 +63,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 )
 @Testcontainers
 @EnabledIf(value = "isDockerAvailable", disabledReason = "Docker is not available")
+@Transactional
 class SettlementQueryRepositoryIT {
 
     static boolean isDockerAvailable() {
@@ -78,13 +89,6 @@ class SettlementQueryRepositoryIT {
 
     @BeforeEach
     void seed() {
-        // 정산 이력 테이블은 immutable-history-guard 가 DELETE 금지 — 테스트 격리 초기화는 TRUNCATE 로.
-        jdbc.execute("TRUNCATE TABLE settlement_adjustments, settlements RESTART IDENTITY CASCADE");
-        jdbc.update("DELETE FROM settlement_payment_view");
-        jdbc.update("DELETE FROM settlement_order_view");
-        jdbc.update("DELETE FROM settlement_user_view");
-        jdbc.update("DELETE FROM settlement_product_view");
-
         // 사용자·상품 프로젝션
         jdbc.update("INSERT INTO settlement_user_view (user_id, email, updated_at) VALUES (100, 'kim@test.com', now())");
         jdbc.update("INSERT INTO settlement_product_view (product_id, name, updated_at) VALUES (200, 'Tile A', now())");

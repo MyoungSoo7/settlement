@@ -28,7 +28,8 @@ public interface OrderPersistenceMapper {
                 entity.getCreatedAt(),
                 entity.getUpdatedAt(),
                 entity.getShippingFee(),
-                entity.isShipped());
+                entity.isShipped(),
+                entity.isStockRestored());
     }
 
     @Mapping(target = "status", expression = "java(domain.getStatus().name())")

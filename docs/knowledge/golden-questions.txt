@@ -1,0 +1,34 @@
+# 골든 질문 — 검색이 기대한 문서를 실제로 찾아내는지 검사한다.
+#
+# 왜 필요한가: 적재 200 OK 는 "벡터가 저장됐다"까지만 증명한다. 임베딩 모델·차원·유사도
+# 임계값(app.ai.rag.min-similarity) 중 하나만 어긋나면 **적재는 성공하고 검색만 조용히 빈손**이
+# 된다. 그 침묵은 사용자가 "챗봇이 모른다"고 겪기 전까지 아무 알람도 울리지 않는다.
+#
+# 질문은 문서의 표현을 그대로 베끼지 않는다 — 실제 사용자는 문서의 소제목대로 묻지 않는다.
+# 문서 문장을 복사해 넣으면 통과는 쉬워지지만 검증으로서는 아무것도 말해 주지 않는다.
+#
+# 형식: <질문><TAB><이 출처가 검색 결과에 있어야 함>
+# 실행: python3 scripts/knowledge/sync_knowledge.py --verify
+
+# ── 대출기관 / 금리 상한 ──
+대부업체가 등록된 곳인지 확인하려면 어디서 봐야 하나요	kb://guide-lender-tiers
+저축은행이 망하면 넣어둔 돈은 어떻게 되나요	kb://guide-lender-tiers
+이자를 연 30% 요구받았는데 다 내야 하나요	kb://guide-lender-tiers
+돈을 빌리면서 수수료 명목으로 미리 떼였습니다	kb://guide-lender-tiers
+
+# ── 대출 상품 / 한도 / 금리 ──
+신용점수가 700점인데 얼마까지 빌릴 수 있나요	kb://guide-loan-products
+집을 담보로 맡기면 이자가 얼마나 싸지나요	kb://guide-loan-products
+주식을 담보로 걸었는데 주가가 떨어지면 어떻게 되나요	kb://guide-loan-products
+대출을 예정보다 일찍 갚으면 수수료를 내야 하나요	kb://guide-loan-products
+
+# ── 심사 절차 / 상환 ──
+대출을 신청하면 어떤 순서로 진행되나요	kb://guide-loan-process
+원리금균등과 원금균등은 매달 내는 돈이 어떻게 다른가요	kb://guide-loan-process
+갚지 못하고 계속 밀리면 결국 어떻게 되나요	kb://guide-loan-process
+정산받을 돈을 미리 당겨 쓰면 나중에 어떻게 갚나요	kb://guide-loan-process
+
+# ── 펀드 ──
+펀드는 예금처럼 원금이 보장되나요	kb://guide-funds
+부동산에 투자하는 펀드는 아무 때나 뺄 수 있나요	kb://guide-funds
+펀드에 가입하기 전에 무엇을 확인해야 하나요	kb://guide-funds

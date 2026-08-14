@@ -3,7 +3,12 @@ import github.lms.lemuel.order.domain.exception.OrderInvariantViolationException
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 주문 라인 아이템 — Order 의 자식 도메인 객체.
@@ -29,9 +34,22 @@ public class OrderItem {
     private final int quantity;
     private final BigDecimal lineAmount; // unitPrice * quantity
     private final LocalDateTime createdAt;
+    private final List<OrderItemOption> options; // 주문 시점 옵션 선택 스냅샷 (옵션 없는 상품은 빈 목록)
 
     public static OrderItem newItem(Long productId, Long variantId, String sku,
                                      String productName, BigDecimal unitPrice, int quantity) {
+        return newItem(productId, variantId, sku, productName, unitPrice, quantity, List.of());
+    }
+
+    /**
+     * 옵션 스냅샷을 함께 담아 라인을 만든다.
+     *
+     * <p>같은 축이 두 번 들어오면 거절한다 — "빨강이면서 파랑" 인 주문 라인은 존재할 수 없고,
+     * 이 불변식은 SKU 쪽 {@code (variant_id, product_option_axis_id)} PK 와 짝을 이룬다.
+     */
+    public static OrderItem newItem(Long productId, Long variantId, String sku,
+                                     String productName, BigDecimal unitPrice, int quantity,
+                                     List<OrderItemOption> options) {
         Objects.requireNonNull(productId, "productId");
         if (productName == null || productName.isBlank()) {
             throw new OrderInvariantViolationException("productName 은 필수");
@@ -42,21 +60,39 @@ public class OrderItem {
         if (quantity <= 0) {
             throw new OrderInvariantViolationException("quantity 는 양수");
         }
+        List<OrderItemOption> safeOptions = options == null ? List.of() : List.copyOf(options);
+        Set<Integer> depths = new HashSet<>();
+        for (OrderItemOption option : safeOptions) {
+            if (!depths.add(option.getAxisSortOrder())) {
+                throw new OrderInvariantViolationException(
+                        "같은 옵션 차수가 두 번 들어왔습니다: " + option.getAxisSortOrder());
+            }
+        }
         BigDecimal line = unitPrice.multiply(BigDecimal.valueOf(quantity));
         return new OrderItem(null, null, productId, variantId, sku, productName,
-                unitPrice, quantity, line, LocalDateTime.now());
+                unitPrice, quantity, line, LocalDateTime.now(), safeOptions);
     }
 
     public static OrderItem rehydrate(Long id, Long orderId, Long productId, Long variantId,
                                        String sku, String productName, BigDecimal unitPrice,
                                        int quantity, BigDecimal lineAmount, LocalDateTime createdAt) {
+        return rehydrate(id, orderId, productId, variantId, sku, productName, unitPrice,
+                quantity, lineAmount, createdAt, List.of());
+    }
+
+    public static OrderItem rehydrate(Long id, Long orderId, Long productId, Long variantId,
+                                       String sku, String productName, BigDecimal unitPrice,
+                                       int quantity, BigDecimal lineAmount, LocalDateTime createdAt,
+                                       List<OrderItemOption> options) {
         return new OrderItem(id, orderId, productId, variantId, sku, productName,
-                unitPrice, quantity, lineAmount, createdAt);
+                unitPrice, quantity, lineAmount, createdAt,
+                options == null ? List.of() : List.copyOf(options));
     }
 
     private OrderItem(Long id, Long orderId, Long productId, Long variantId, String sku,
                       String productName, BigDecimal unitPrice, int quantity,
-                      BigDecimal lineAmount, LocalDateTime createdAt) {
+                      BigDecimal lineAmount, LocalDateTime createdAt,
+                      List<OrderItemOption> options) {
         this.id = id;
         this.orderId = orderId;
         this.productId = productId;
@@ -67,6 +103,7 @@ public class OrderItem {
         this.quantity = quantity;
         this.lineAmount = lineAmount;
         this.createdAt = createdAt;
+        this.options = options;
     }
 
     void attachToOrder(Long orderId) {
@@ -81,6 +118,21 @@ public class OrderItem {
             throw new IllegalStateException("id 는 1회만 부여 가능");
         }
         this.id = id;
+        options.forEach(option -> option.attachToItem(id));
+    }
+
+    /** 주문 시점 옵션 선택 스냅샷 (차수 순). 옵션 없는 상품은 빈 목록. */
+    public List<OrderItemOption> getOptions() {
+        return options.stream()
+                .sorted(Comparator.comparingInt(OrderItemOption::getAxisSortOrder))
+                .toList();
+    }
+
+    /** 주문서 표시용 — "색상: 빨강 / 사이즈: L". 옵션이 없으면 빈 문자열. */
+    public String describeOptions() {
+        return getOptions().stream()
+                .map(OrderItemOption::describe)
+                .collect(Collectors.joining(" / "));
     }
 
     public Long getId() { return id; }

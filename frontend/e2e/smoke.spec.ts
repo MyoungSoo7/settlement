@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 test.describe('운영 smoke — 라우팅/백엔드 프록시 통합', () => {
   test('루트 / 200 + 로그인 페이지 진입 가능', async ({ page }) => {

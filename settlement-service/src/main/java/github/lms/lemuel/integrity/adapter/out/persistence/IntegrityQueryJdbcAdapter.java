@@ -140,7 +140,7 @@ public class IntegrityQueryJdbcAdapter implements IntegrityQueryPort {
     // ── INV-6 지급 대사 ────────────────────────────────────────────────────
 
     @Override
-    public PayoutReconReport payoutRecon(LocalDate date) {
+    public PayoutReconReport payoutRecon(LocalDate date, int graceMinutes, LocalDateTime graceCutoff) {
         LocalDateTime start = date.atStartOfDay();
         LocalDateTime end = start.plusDays(1);
 
@@ -179,6 +179,20 @@ public class IntegrityQueryJdbcAdapter implements IntegrityQueryPort {
                         ORDER BY s.id LIMIT %d
                         """.formatted(ID_LIMIT))
                 .param("start", start).param("end", end)
+                .query(Long.class).list();
+
+        // 그중 확정 후 유예시간이 지난 것 — 지급이 뒤따라올 시점은 이미 지났다.
+        // 지급은 상환차감(loan repayment_applied) 수신 시점에 만들어지므로(L-3), 여기 남는 건은
+        // 대개 그 이벤트가 오지 않은 정산이다. 백필로 덮으면 안 되는 이유는 경보 문구에 있다.
+        List<Long> staleWithoutPayout = jdbc.sql("""
+                        SELECT s.id FROM settlements s
+                        WHERE s.status = 'DONE' AND s.confirmed_at >= :start AND s.confirmed_at < :end
+                          AND s.confirmed_at < :graceCutoff
+                          AND NOT EXISTS (SELECT 1 FROM payouts p
+                                          WHERE p.settlement_id = s.id AND p.status <> 'CANCELED')
+                        ORDER BY s.id LIMIT %d
+                        """.formatted(ID_LIMIT))
+                .param("start", start).param("end", end).param("graceCutoff", graceCutoff)
                 .query(Long.class).list();
 
         List<PayoutReconReport.OverpaidPayout> overpaid = jdbc.sql("""
@@ -229,7 +243,7 @@ public class IntegrityQueryJdbcAdapter implements IntegrityQueryPort {
 
         return PayoutReconReport.of(date, confirmed.count(), confirmed.total(),
                 payouts.count(), payouts.total(), payouts.completed(),
-                withoutPayout, overpaid, duplicates, overTotal);
+                withoutPayout, staleWithoutPayout, graceMinutes, overpaid, duplicates, overTotal);
     }
 
     // ── INV-13 반송 재지급 대사 (Seed D1 후속) ─────────────────────────────
@@ -407,6 +421,8 @@ public class IntegrityQueryJdbcAdapter implements IntegrityQueryPort {
     }
 
     // ── INV-12 프로젝션 행 diff (settlement_payment_view) ─────────────────
+    // captured_at::date = :date 는 컬럼 캐스트로 idx_settlement_payment_view_captured 를 못 탄다
+    // (sargable 위반). 동치인 반개구간 [date, date+1) 술어로 인덱스 탐색을 살린다.
 
     @Override
     public KeyChecksum projectionPaymentChecksum(LocalDate date) {
@@ -415,9 +431,9 @@ public class IntegrityQueryJdbcAdapter implements IntegrityQueryPort {
                                coalesce(sum(amount), 0) AS amount_sum,
                                coalesce(md5(string_agg(payment_id::text, ',' ORDER BY payment_id)), '') AS id_checksum
                         FROM settlement_payment_view
-                        WHERE captured_at::date = :date
+                        WHERE captured_at >= :dayStart AND captured_at < :dayEnd
                         """)
-                .param("date", date)
+                .param("dayStart", date).param("dayEnd", date.plusDays(1))
                 .query((rs, i) -> new KeyChecksum(
                         rs.getLong("cnt"), money(rs, "amount_sum"), rs.getString("id_checksum")))
                 .single();
@@ -427,10 +443,11 @@ public class IntegrityQueryJdbcAdapter implements IntegrityQueryPort {
     public List<PaymentKey> projectionPaymentKeys(LocalDate date, long afterId, int limit) {
         return jdbc.sql("""
                         SELECT payment_id, amount FROM settlement_payment_view
-                        WHERE captured_at::date = :date AND payment_id > :afterId
+                        WHERE captured_at >= :dayStart AND captured_at < :dayEnd AND payment_id > :afterId
                         ORDER BY payment_id LIMIT :limit
                         """)
-                .param("date", date).param("afterId", afterId).param("limit", limit)
+                .param("dayStart", date).param("dayEnd", date.plusDays(1))
+                .param("afterId", afterId).param("limit", limit)
                 .query((rs, i) -> new PaymentKey(rs.getLong("payment_id"), money(rs, "amount")))
                 .list();
     }

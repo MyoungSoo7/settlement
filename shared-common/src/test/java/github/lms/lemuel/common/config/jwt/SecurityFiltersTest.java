@@ -179,6 +179,55 @@ class SecurityFiltersTest {
     }
 
     @Test
+    @DisplayName("VAN 경로(/van/**)도 같은 공유 시크릿으로 보호된다 — 헤더 불일치는 401")
+    void vanPathIsGuardedByInternalKey() throws Exception {
+        InternalApiKeyFilter filter = new InternalApiKeyFilter("secret-key");
+        MockHttpServletRequest req = new MockHttpServletRequest("POST", "/van/v1/authorizations");
+        req.setServletPath("/van/v1/authorizations");
+        req.addHeader(InternalApiKeyFilter.HEADER, "wrong");
+        MockHttpServletResponse res = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        filter.doFilter(req, res, chain);
+
+        assertThat(res.getStatus()).isEqualTo(HttpServletResponse.SC_UNAUTHORIZED);
+        verify(chain, never()).doFilter(req, res);
+    }
+
+    @Test
+    @DisplayName("servletPath 가 비어도 requestURI 로 보호 경로를 판정한다 — 게이트가 조용히 꺼지지 않는다")
+    void guardFallsBackToRequestUriWhenServletPathEmpty() throws Exception {
+        InternalApiKeyFilter filter = new InternalApiKeyFilter("secret-key");
+        MockHttpServletRequest req = new MockHttpServletRequest("GET", "/internal/recon/settlements");
+        req.setServletPath("");                       // 디스패처 매핑에 따라 실제로 빈 값이 온다
+        req.setRequestURI("/internal/recon/settlements");
+        MockHttpServletResponse res = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        filter.doFilter(req, res, chain);
+
+        assertThat(res.getStatus()).isEqualTo(HttpServletResponse.SC_UNAUTHORIZED);
+        verify(chain, never()).doFilter(req, res);
+    }
+
+    @Test
+    @DisplayName("컨텍스트 경로가 붙어도 보호 경로 판정이 유지된다")
+    void guardStripsContextPathOnFallback() throws Exception {
+        InternalApiKeyFilter filter = new InternalApiKeyFilter("secret-key");
+        MockHttpServletRequest req = new MockHttpServletRequest("POST", "/app/van/v1/captures");
+        req.setServletPath("");
+        req.setContextPath("/app");
+        req.setRequestURI("/app/van/v1/captures");
+        MockHttpServletResponse res = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        filter.doFilter(req, res, chain);
+
+        assertThat(res.getStatus()).isEqualTo(HttpServletResponse.SC_UNAUTHORIZED);
+        verify(chain, never()).doFilter(req, res);
+    }
+
+    @Test
     @DisplayName("비-내부 경로는 키 검사 없이 통과")
     void internalKeyIgnoresNonInternalPath() throws Exception {
         InternalApiKeyFilter filter = new InternalApiKeyFilter("secret-key");

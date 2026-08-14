@@ -12,5 +12,9 @@ public interface BackfillSettlementProjectionsUseCase {
 
     BackfillResult backfillAll();
 
-    record BackfillResult(int users, int products, int orders, int payments) {}
+    /**
+     * @param sellerTiers 재발행한 셀러 등급 수 (ADR 0031) — 등급 통지는 변경 시점에만 나가므로,
+     *                    도입 이전부터 있던 셀러는 백필하지 않으면 소비측 뷰가 계속 비어 있다
+     */
+    record BackfillResult(int users, int products, int orders, int payments, int sellerTiers) {}
 }

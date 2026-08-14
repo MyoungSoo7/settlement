@@ -1,3 +1,46 @@
+<!-- codex-project:begin (project-owned; keep above managed plugin blocks) -->
+# Codex 프로젝트 작업 지침 — Lemuel
+
+이 파일은 Codex가 이 저장소에서 작업할 때 적용하는 프로젝트 공통 운영 규칙이다.
+아래의 `settlement-copilot`·`invest-copilot` 블록은 설치 스크립트가 관리하므로 직접 수정하지 않는다.
+
+## 적용 우선순위와 범위
+
+- 시스템·개발자·사용자 지침이 최우선이다.
+- 이 루트 `AGENTS.md`는 저장소 전체에 적용한다. 더 깊은 경로의 `AGENTS.md`는 해당 하위 경로에 추가 적용한다.
+- `CLAUDE.md`는 프로젝트의 상세 아키텍처·도메인·빌드 정본으로 참조한다. Claude 전용 훅·명령어를 Codex에서 사용할 수 있다고 가정하지 않는다.
+- 작업에 해당하는 Codex skill은 행동 전에 `SKILL.md`를 끝까지 읽고 적용한다. 사용한 skill이 요구하는 MCP·검증·질문 절차를 생략하지 않는다.
+
+## Codex 작업 프로토콜
+
+- 작업 시작 전 `git status -sb`, 관련 파일, 최근 변경을 확인한다. 기존 사용자 변경을 되돌리거나 덮어쓰지 않는다.
+- 여러 파일·도메인·서비스를 건드리는 작업은 먼저 범위와 검증 계획을 세운다. 독립 작업만 병렬화하고, 공유 파일은 소유권을 나눠 충돌을 피한다.
+- 파일 수정은 `apply_patch`를 사용한다. PowerShell here-string, `cat`, 임시 Python 쓰기 스크립트로 파일을 덮어쓰지 않는다.
+- 완료·수정·통과를 주장하기 전에 실제 명령을 실행하고 결과와 종료 코드를 확인한다. 테스트·빌드·가드가 실패하면 원인과 미해결 상태를 그대로 보고한다.
+- 코드 변경 후에는 가장 가까운 테스트와 저장소 가드를 실행한다. 정산·원장·지급·결제 코드는 금액·이력·멱등성 규칙을 별도 검토한다.
+- `git commit --no-verify`로 가드를 우회하지 않는다. 커밋·푸시는 사용자가 명시적으로 요청한 경우에만 수행한다.
+
+## Codex 도구·MCP 규칙
+
+- 도구가 현재 Codex 세션에 노출되지 않았으면 이름을 추측하거나 일반 셸 작업으로 대체하지 않는다. 필요한 deferred MCP schema를 먼저 로드하고, 그래도 unavailable이면 차단 사유를 보고한다.
+- Ouroboros 계열 호출은 호출 직전에 해당 도구의 schema를 다시 로드한다. `auto`·`interview`·`seed`·`run`의 MCP 경로와 CLI 경로를 혼동하지 않는다.
+- 비동기 job은 반환된 `job_id`·`session_id`·`cursor`를 보존한다. observer가 cursor를 소유하면 주 세션에서 같은 job을 중복 polling하지 않는다.
+- MCP·운영 조회 결과를 실제로 확인하지 않고 상태·성공·완료를 추측하지 않는다. 운영 DB에 직접 `psql`, `pg_dump`, Kafka produce 명령을 만들지 않는다.
+
+## 저장소·브랜치 규칙
+
+- 기본 작업 브랜치는 `develop`이며 항목별 커밋을 선호한다. `main`은 보호 브랜치이므로 직접 push하지 않고 PR을 사용한다.
+- 커밋 전 변경 범위를 다시 확인한다. 사용자가 “전부 커밋”이라고 명시하지 않은 한 `git add -A`로 unrelated 변경을 묶지 않는다.
+- 삭제·추적 해제 전에는 정확한 대상과 로컬 보존 여부를 확인한다. 광범위한 recursive 삭제나 reset은 사용자 승인 없이는 실행하지 않는다.
+
+## 프로젝트 정본
+
+- 금액·정산·원장·이벤트·보안·헥사고날 규칙은 이 파일의 managed copilot 블록과 `CLAUDE.md`를 따른다.
+- 기능 상세는 `SPEC.md`, 아키텍처 결정은 `docs/adr/`, 빌드·인프라·실행법은 `docs/DEVELOPMENT.md`를 확인한다.
+- 구현 전에 해당 도메인 skill(예: `settlement-domain-rules`, `money-safety`, `idempotency-and-events`)을 선택하고, 완료 전에 검증 skill을 적용한다.
+
+<!-- codex-project:end -->
+
 <!-- settlement-copilot:begin (managed by install-codex.sh - 직접 수정 금지) -->
 # Settlement Copilot — 상시 코어 규칙
 

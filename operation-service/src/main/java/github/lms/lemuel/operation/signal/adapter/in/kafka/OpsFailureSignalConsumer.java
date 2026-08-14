@@ -53,6 +53,17 @@ public class OpsFailureSignalConsumer {
         recordFailure("stock", record, ack);
     }
 
+    /**
+     * 배송 후 환불로 보류된 재고의 회수 지연.
+     *
+     * <p>재고 "부족"(stock)과 다른 버킷에 넣는다 — 부족은 매입·발주로, 지연은 택배 회수 독촉으로
+     * 해소되므로 원인도 조치도 다르다. 같은 버킷에 섞으면 실패율이 무엇을 뜻하는지 알 수 없게 된다.
+     */
+    @KafkaListener(topics = "lemuel.ops.stock.reclaim_delayed", groupId = GROUP)
+    public void onStockReclaimDelayed(ConsumerRecord<String, String> record, Acknowledgment ack) {
+        recordFailure("stock-reclaim", record, ack);
+    }
+
     @KafkaListener(topics = "lemuel.ops.shipping.delayed", groupId = GROUP)
     public void onShippingDelayed(ConsumerRecord<String, String> record, Acknowledgment ack) {
         recordFailure("shipping", record, ack);

@@ -11,6 +11,7 @@ import github.lms.lemuel.order.application.port.out.RefundOrderPaymentPort;
 import github.lms.lemuel.order.application.port.out.SaveOrderStatusHistoryPort;
 import github.lms.lemuel.order.application.port.out.SendOrderNotificationPort;
 import github.lms.lemuel.order.domain.Order;
+import github.lms.lemuel.order.application.port.in.GetPendingStockReclaimUseCase.PendingReclaim;
 import github.lms.lemuel.order.domain.OrderStatus;
 import github.lms.lemuel.payment.adapter.out.persistence.PaymentMapper;
 import github.lms.lemuel.payment.adapter.out.persistence.PaymentPersistenceAdapter;
@@ -77,7 +78,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DataJpaTest
 @ImportAutoConfiguration(FlywayAutoConfiguration.class)
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({ProductPersistenceAdapter.class, ProductPersistenceMapperImpl.class,
+@Import({ProductPersistenceAdapter.class,
+        github.lms.lemuel.category.adapter.out.persistence.PrimaryCategoryLookupAdapter.class, ProductPersistenceMapperImpl.class,
         ProductVariantPersistenceAdapter.class,
         OrderPersistenceAdapter.class, OrderPersistenceMapperImpl.class,
         PaymentPersistenceAdapter.class, PaymentMapper.class, RefundPersistenceAdapter.class,
@@ -129,7 +131,9 @@ class RefundApprovalIT {
         PublishOrderEventPort publishOrder = (orderId, uid, pid, status, amount, createdAt) -> { };
         CouponUseCase coupon = Mockito.mock(CouponUseCase.class); // 쿠폰 미사용 경로
         createOrderService = new CreateMultiItemOrderService(loadUser, productAdapter, variantAdapter,
-                decVariant, decProduct, orderAdapter, notify, publishOrder, coupon);
+                decVariant, decProduct, orderAdapter, notify, publishOrder, coupon,
+                // 옵션 스냅샷은 이 IT 의 검증 범위 밖 — 무해한 스텁
+                variantId -> java.util.List.of());
 
         // payment→order 상태 반영: 실제 OrderAdapter(→ ChangeOrderStatusService.updateStatus)와 동형인 람다.
         // (수동 조립에서 순환 의존을 끊기 위한 대체 — load → transitionTo → save 로 동일 효과)
@@ -189,7 +193,7 @@ class RefundApprovalIT {
     }
 
     @Test
-    @DisplayName("환불 승인(배송 후): 배송비 차감 부분 환불 → 주문 REFUNDED, 결제 부분환불, 재고 원복")
+    @DisplayName("환불 승인(배송 후): 배송비 차감 부분 환불 → 주문 REFUNDED, 결제 부분환불, 재고는 회수 전까지 보류")
     void approveRefund_afterShipping_deductsShippingFee() {
         Fixture f = seedPaidOrder(100, new BigDecimal("10000"), 2); // amount 20000
         prepareOrder(f.orderId, new BigDecimal("3000"), /*ship*/true, OrderStatus.REFUND_REQUESTED);
@@ -202,8 +206,70 @@ class RefundApprovalIT {
         // 배송비 3000 차감 → 17000 만 환불. 결제는 잔액(3000)이 남아 CAPTURED 유지.
         assertThat(pay.getRefundedAmount()).isEqualByComparingTo("17000");
         assertThat(pay.getStatus()).isEqualTo(PaymentStatus.CAPTURED);
+        // 배송된 물건은 고객 손에 있다 — 환불만으로 되돌리면 장부재고가 실재고를 넘어 초과판매가 난다.
+        // 실제 회수(반품)가 확인될 때 비로소 판매 가능 재고로 복귀한다(ShippingService.markReturned).
         assertThat(productAdapter.findById(f.productId).orElseThrow().getStockQuantity())
-                .as("재고 원복").isEqualTo(100);
+                .as("재고 보류(98 유지)").isEqualTo(98);
+    }
+
+    @Test
+    @DisplayName("배송 후 환불로 보류된 재고는 반품 회수가 확인될 때 원복된다")
+    void stockReturnsOnlyAfterGoodsAreReclaimed() {
+        Fixture f = seedPaidOrder(100, new BigDecimal("10000"), 2); // 재고 100 → 98
+        prepareOrder(f.orderId, new BigDecimal("3000"), /*ship*/true, OrderStatus.REFUND_REQUESTED);
+
+        inNewTx(() -> changeStatusService.approveRefund(f.orderId, "배송후 반품", "admin"));
+        assertThat(productAdapter.findById(f.productId).orElseThrow().getStockQuantity())
+                .as("회수 전에는 보류").isEqualTo(98);
+
+        // 택배 회수 완료 — 물건이 실제로 돌아온 시점.
+        boolean restored = inNewTx(() -> changeStatusService.restoreStockOnReturn(f.orderId));
+        assertThat(restored).as("회수 시점에 원복이 실행됨").isTrue();
+        // @DataJpaTest 는 테스트 메서드를 트랜잭션으로 감싸 영속성 컨텍스트를 공유한다.
+        // 위에서 읽어 캐시된 상품/주문이 그대로 돌아오므로, 커밋된 값을 보려면 1차 캐시를 비운다.
+        em.clear();
+
+        assertThat(productAdapter.findById(f.productId).orElseThrow().getStockQuantity())
+                .as("회수 후 원복(98→100)").isEqualTo(100);
+
+        // 회수 신호가 중복 도착해도 재고가 더 늘지 않는다(멱등).
+        boolean again = inNewTx(() -> changeStatusService.restoreStockOnReturn(f.orderId));
+        assertThat(again).as("두 번째 회수 신호는 원복하지 않음").isFalse();
+        em.clear();   // 캐시된 100 이 아니라 커밋된 값을 본다(어서션이 무의미해지지 않도록)
+        assertThat(productAdapter.findById(f.productId).orElseThrow().getStockQuantity())
+                .as("중복 회수 신호에도 불변").isEqualTo(100);
+    }
+
+    @Test
+    @DisplayName("회수 대기 조회: 보류된 주문만 잡히고, 회수되면 목록에서 빠진다")
+    void pendingStockReclaimQuery() {
+        Fixture shippedRefund = seedPaidOrder(100, new BigDecimal("10000"), 2);
+        prepareOrder(shippedRefund.orderId, new BigDecimal("3000"), /*ship*/true, OrderStatus.REFUND_REQUESTED);
+        inNewTx(() -> changeStatusService.approveRefund(shippedRefund.orderId, "배송후 반품", "admin"));
+
+        // 대조군 — 배송 전 환불이라 이미 원복됐고, 회수 대기가 아니다.
+        Fixture beforeShipping = seedPaidOrder(100, new BigDecimal("10000"), 1);
+        prepareOrder(beforeShipping.orderId, BigDecimal.ZERO, /*ship*/false, OrderStatus.REFUND_REQUESTED);
+        inNewTx(() -> changeStatusService.approveRefund(beforeShipping.orderId, "변심", "admin"));
+        em.clear();
+
+        var reclaimService = new GetPendingStockReclaimService(orderAdapter);
+        var pending = inNewTx(() -> reclaimService.findPending(LocalDateTime.now(), 100));
+
+        assertThat(pending).extracting(PendingReclaim::orderId)
+                .as("배송 후 환불만 회수 대기").contains(shippedRefund.orderId)
+                .doesNotContain(beforeShipping.orderId);
+        assertThat(pending.stream()
+                .filter(r -> r.orderId().equals(shippedRefund.orderId)).findFirst().orElseThrow()
+                .totalQuantity()).as("묶인 수량").isEqualTo(2);
+
+        // 택배 회수가 확정되면 재고가 돌아오고 목록에서도 빠진다.
+        inNewTx(() -> changeStatusService.restoreStockOnReturn(shippedRefund.orderId));
+        em.clear();
+
+        assertThat(inNewTx(() -> reclaimService.findPending(LocalDateTime.now(), 100)))
+                .extracting(PendingReclaim::orderId)
+                .as("회수 후 목록에서 제외").doesNotContain(shippedRefund.orderId);
     }
 
     @Test

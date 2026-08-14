@@ -23,7 +23,9 @@ public interface SpringDataProductJpaRepository extends JpaRepository<ProductJpa
 
     @Query("""
             SELECT p FROM ProductJpaEntity p
-            WHERE (:categoryId IS NULL OR p.categoryId = :categoryId)
+            WHERE (:categoryId IS NULL
+                   OR EXISTS (SELECT 1 FROM ProductEcommerceCategoryJpaEntity pc
+                              WHERE pc.productId = p.id AND pc.categoryId = :categoryId))
               AND (:keyword IS NULL
                    OR LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
                    OR LOWER(COALESCE(p.description, '')) LIKE LOWER(CONCAT('%', :keyword, '%')))

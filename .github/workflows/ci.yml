@@ -9,9 +9,16 @@ name: ci
 #   운영 도메인을 때리는 production-revision-smoke 는 ref == main 조건이 그대로라 안 돈다.
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
+
+# 같은 브랜치에 연속 push 하면 이전 실행이 러너를 계속 점유한다(백엔드 잡 정상 55~70분).
+# PR 은 최신 커밋만 검증하면 되므로 취소하고, main/develop push 는 이미지 푸시가 걸려 있어
+# 취소하지 않고 직렬화만 한다(앞 실행이 끝나야 다음이 시작 → 이미지 태그 경합 방지).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   JAVA_VERSION: "25"
@@ -38,19 +45,22 @@ jobs:
       build_matrix: ${{ steps.setmatrix.outputs.matrix }}
       # 빌드할 서비스가 하나라도 있으면 true (backend-ghcr 실행 게이트)
       build_any: ${{ steps.setmatrix.outputs.any }}
-      # backend-ci 가 실행할 gradle 테스트 태스크 (변경 모듈만 / shared·모호 변경 시 전체 build)
-      test_tasks: ${{ steps.setmatrix.outputs.test_tasks }}
+      # 모듈별 테스트 매트릭스: {"include":[{module},...]} — backend-test 가 모듈당 잡 하나로 병렬 실행한다.
+      # 단일 잡이던 시절 백엔드는 14~43분이 걸렸고, 그 사이 다음 push 가 오면 concurrency 대기 슬롯
+      # (그룹당 1개)에서 밀려나 취소됐다 — 2026-08-14 실측으로 develop ci 20건 중 완주 2건.
+      test_matrix: ${{ steps.setmatrix.outputs.test_matrix }}
+      test_any: ${{ steps.setmatrix.outputs.test_any }}
       # shared-common(composite included build) 변경 여부 — 루트 build 태스크는 included build 의
       # test 를 실행하지 않으므로, true 면 backend-ci 가 shared-common 자체 게이트를 별도 실행한다.
       shared: ${{ steps.filter.outputs.shared }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
       - name: Paths filter
         id: filter
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         with:
           filters: |
             frontend:
@@ -58,7 +68,8 @@ jobs:
             backend:
               - '**'
               - '!frontend/**'
-            # shared: 전 서비스 이미지에 영향 → 변경 시 15개 전부 재빌드
+            # shared: 전 서비스 이미지에 영향 → 변경 시 17개 전부 재빌드
+            # (건수 정본은 settings.gradle.kts — harness-audit 의 ci-matrix 규칙이 대조한다)
             shared:
               - 'shared-common/**'
               - 'build.gradle.kts'
@@ -84,11 +95,13 @@ jobs:
             investment-service: ['investment-service/**']
             organization-service: ['organization-service/**']
             card-service: ['card-service/**']
+            insurance-service: ['insurance-service/**']
+            deposit-service: ['deposit-service/**']
 
       - name: Compute image build matrix (changed services only)
         id: setmatrix
         env:
-          CHANGED: ${{ steps.filter.outputs.changes }}   # dorny: 매치된 필터명 JSON 배열
+          CHANGED: ${{ steps.filter.outputs.changes }} # dorny: 매치된 필터명 JSON 배열
         run: |
           set -euo pipefail
           # 배포 단위 단일 출처: module → image_suffix (아래 backend-ghcr 주석의 매핑과 반드시 일치)
@@ -107,7 +120,9 @@ jobs:
             "ai-service":"-ai",
             "investment-service":"-investment",
             "organization-service":"-organization",
-            "card-service":"-card"
+            "card-service":"-card",
+            "insurance-service":"-insurance",
+            "deposit-service":"-deposit"
           }'
           if echo "$CHANGED" | jq -e 'index("shared")' >/dev/null; then
             # 공용 변경 → 전 서비스 재빌드
@@ -121,30 +136,72 @@ jobs:
           echo "matrix={\"include\":$include}" >> "$GITHUB_OUTPUT"
           echo "any=$([ "$count" -gt 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "이미지 빌드 대상 서비스: ${count}개 → $include"
-          # 테스트 태스크: shared 변경→전체 build, 변경 서비스만 있으면 해당 모듈만,
-          # 그 외(모듈·shared 모두 아닌 모호한 backend 변경)→안전하게 전체 build (게이트 약화 방지)
-          if echo "$CHANGED" | jq -e 'index("shared")' >/dev/null; then
-            test_tasks="build"
-          elif [ "$count" -gt 0 ]; then
-            test_tasks=$(echo "$include" | jq -r '[.[] | ":\(.module):build"] | join(" ")')
+          # 테스트 매트릭스: shared 변경→전 모듈, 변경 서비스만 있으면 해당 모듈만,
+          # 그 외(모듈·shared 모두 아닌 모호한 backend 변경)→안전하게 전 모듈 (게이트 약화 방지).
+          # 태스크 문자열이 아니라 **모듈 목록**을 낸다 — 잡을 모듈당 하나로 쪼개 병렬 실행하기 위해서다.
+          if echo "$CHANGED" | jq -e 'index("shared")' >/dev/null || [ "$count" -eq 0 ]; then
+            test_modules=$(echo "$mapping" | jq -c 'keys')
           else
-            test_tasks="build"
+            test_modules=$(echo "$include" | jq -c '[.[].module]')
           fi
-          echo "test_tasks=$test_tasks" >> "$GITHUB_OUTPUT"
-          echo "테스트 태스크: $test_tasks"
+          test_include=$(echo "$test_modules" | jq -c '[.[] | {module: .}]')
+          echo "test_matrix={\"include\":$test_include}" >> "$GITHUB_OUTPUT"
+          echo "test_any=$(echo "$test_include" | jq 'length > 0')" >> "$GITHUB_OUTPUT"
+          echo "테스트 대상 모듈: $(echo "$test_modules" | jq 'length')개 → $test_modules"
 
-  backend-ci:
-    name: Backend - Build/Test/JaCoCo/SonarCloud
+  # shared-common 은 composite included build — 루트 build 태스크는 jar 만 만들 뿐 included build 의
+  # test 를 실행하지 않는다. 호출 형태가 `-p shared-common` 으로 달라 모듈 매트릭스에 넣을 수 없어
+  # 별도 잡으로 분리한다. 자체 게이트(LINE 90% + outbox.domain INSTRUCTION 80%)는 그대로 강제된다.
+  backend-shared:
+    name: Backend - Test (shared-common)
     runs-on: ubuntu-latest
-    timeout-minutes: 90   # hang 시 러너 6시간 낭비 방지 (정상 55~70분 + 여유)
+    timeout-minutes: 30
     needs: changes
-    if: needs.changes.outputs.backend == 'true'
+    if: needs.changes.outputs.shared == 'true'
     permissions:
       contents: read
-      pull-requests: write
-      checks: write
-      security-events: write
-      packages: read   # ghcr 미러 이미지 pull (mirror-testcontainers.yml 참고)
+      packages: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Login to GHCR (for Testcontainers pulls)
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & Test shared-common (JaCoCo gate)
+        run: ./gradlew -p shared-common clean build --no-daemon --stacktrace
+        env:
+          TESTCONTAINERS_RYUK_DISABLED: "true"
+
+  # 모듈당 잡 하나. 단일 잡이던 시절 이 단계가 14~43분이었고, 그 사이 다음 push 가 오면
+  # concurrency 대기 슬롯(그룹당 1개)에서 밀려 취소됐다 — 2026-08-14 실측 develop ci 20건 중 완주 2건.
+  # 이제 벽시계 시간은 "가장 느린 단일 모듈"로 수렴한다(전체 합이 아니라).
+  # max-parallel 은 두지 않는다 — 계정 동시 실행 상한에 맞춰 GitHub 이 알아서 큐잉한다.
+  backend-test:
+    name: Backend - Test (${{ matrix.module }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45 # 단일 모듈 기준. hang 시 러너 6시간 낭비 방지
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' && needs.changes.outputs.test_any == 'true'
+    permissions:
+      contents: read
+      packages: read # ghcr 미러 이미지 pull (mirror-testcontainers.yml 참고)
+    strategy:
+      fail-fast: false # 한 모듈 실패가 나머지 모듈의 판정을 가리지 않도록
+      matrix: ${{ fromJSON(needs.changes.outputs.test_matrix) }}
     services:
       postgres:
         # Docker Hub rate limit 회피 — ghcr 미러 사용 (mirror-testcontainers.yml 로 갱신)
@@ -179,12 +236,12 @@ jobs:
           --health-retries 10
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
       - name: Set up JDK ${{ env.JAVA_VERSION }}
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: temurin
@@ -204,26 +261,16 @@ jobs:
       # Docker Hub rate limit 회피 — 각 모듈 testcontainers.properties 의
       # hub.image.name.prefix=ghcr.io/myoungsoo7/mirror/ 와 세트.
       - name: Login to GHCR (for Testcontainers pulls)
-        uses: docker/login-action@v3
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # shared-common 은 composite included build — 루트 build 태스크는 jar 만 만들 뿐
-      # included build 의 test 를 실행하지 않는다. shared 변경 시 자체 빌드로 직접 실행해
-      # 자체 게이트(LINE 90% + outbox.domain INSTRUCTION 80%, shared-common/build.gradle.kts)를 강제한다.
-      - name: Build & Test shared-common (JaCoCo gate)
-        if: needs.changes.outputs.shared == 'true'
-        run: ./gradlew -p shared-common clean build --no-daemon --stacktrace
-        env:
-          TESTCONTAINERS_RYUK_DISABLED: "true"
-
       # build = compile + test + jacocoTestReport + jacocoTestCoverageVerification (게이트 포함, build.gradle.kts:157)
-      # test_tasks = 변경 모듈만(`:<mod>:build`) / shared·모호 변경 시 전체 `build` (changes 잡이 산출)
       # Testcontainers 기반 통합테스트는 러너의 Docker 데몬을 사용한다.
-      - name: Build & Test (JaCoCo gate)
-        run: ./gradlew clean ${{ needs.changes.outputs.test_tasks }} --no-daemon --stacktrace
+      - name: Build & Test ${{ matrix.module }} (JaCoCo gate)
+        run: ./gradlew clean :${{ matrix.module }}:build --no-daemon --stacktrace
         env:
           # ryuk(정리용 유틸 컨테이너) 비활성화 — 러너는 일회용이라 불필요하고,
           # 이미지 치환과 얽혀 모듈별 test JVM 에서 비결정적 hang 을 유발했다 (2026-07-08).
@@ -233,56 +280,195 @@ jobs:
           SPRING_DATASOURCE_PASSWORD: testpass
           SPRING_ELASTICSEARCH_URIS: http://localhost:9200
 
-      - name: Upload test/coverage reports
-        uses: actions/upload-artifact@v4
+      # 집계 잡이 이 아티팩트를 `<module>/build/reports/` 로 되돌려 놓아야 Sonar 의
+      # sonar.coverage.jacoco.xmlReportPaths 와 PR 코멘트 글롭이 경로를 찾는다.
+      # 업로드 루트를 모듈의 reports 디렉터리로 두고, 모듈명은 **아티팩트 이름**에 실어 복원 시 재구성한다.
+      - name: Upload test/coverage reports (${{ matrix.module }})
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
-          name: backend-reports
-          path: |
-            */build/reports/jacoco/test/
-            */build/reports/tests/test/
+          name: backend-reports-${{ matrix.module }}
+          path: ${{ matrix.module }}/build/reports/
           retention-days: 30
+          if-no-files-found: ignore
+
+  backend-ci:
+    # ⚠ 이 이름을 바꾸지 말 것 — ruleset 의 **필수 상태 체크**로 등록된 문자열이다.
+    #   잡을 쪼개면서 이 이름이 사라지면 체크가 영영 보고되지 않아 main PR 이 영구 대기에 빠진다.
+    #   모듈 잡 이름은 매트릭스라 가변이므로 필수 체크로 걸 수 없다 — 그래서 집계 잡이 이름을 물려받는다.
+    name: Backend - Build/Test/JaCoCo/SonarCloud
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    needs: [changes, backend-shared, backend-test]
+    # always() 가 필수다. 기본 동작은 needs 실패 시 이 잡을 **skip** 인데, 필수 체크에서 skip 은
+    # 통과로 취급된다 — 모듈 하나가 깨져도 게이트가 조용히 사라진다(이 파일 상단 changes 잡 주석과 같은 실패 양식).
+    if: always() && !cancelled() && needs.changes.outputs.backend == 'true'
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
+    steps:
+      # 스킵을 통과로 읽지 않는다 — 변경 없음(skipped)만 허용하고 failure/cancelled 는 여기서 떨어뜨린다.
+      - name: 모듈 테스트 결과 집계
+        run: |
+          set -euo pipefail
+          echo "backend-shared: ${{ needs.backend-shared.result }}"
+          echo "backend-test  : ${{ needs.backend-test.result }}"
+          for result in "${{ needs.backend-shared.result }}" "${{ needs.backend-test.result }}"; do
+            case "$result" in
+              success|skipped) ;;
+              *) echo "::error::백엔드 모듈 테스트가 통과하지 않았다 (result=$result)"; exit 1 ;;
+            esac
+          done
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Download module coverage reports
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: backend-reports-*
+          path: artifacts
+
+      # 모듈 잡에서 올라온 리포트를 원래 경로로 되돌린다. 아티팩트 이름의 접미사가 모듈명이다.
+      - name: Restore report paths
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          for dir in artifacts/backend-reports-*; do
+            module="${dir#artifacts/backend-reports-}"
+            mkdir -p "$module/build/reports"
+            cp -r "$dir/." "$module/build/reports/"
+          done
+          count=$(ls -1 */build/reports/jacoco/test/jacocoTestReport.xml 2>/dev/null | wc -l)
+          echo "복원된 커버리지 XML: ${count}개"
+          # 0 개면 Sonar 커버리지가 조용히 0% 로 잡히고 PR 코멘트도 빈손이 된다 — 침묵시키지 않는다.
+          if [ "$count" -eq 0 ] && [ "${{ needs.backend-test.result }}" = "success" ]; then
+            echo "::error::모듈 테스트는 통과했는데 커버리지 XML 이 하나도 복원되지 않았다 — 아티팩트 배선을 확인할 것"
+            exit 1
+          fi
 
       - name: Add coverage comment to PR
         if: github.event_name == 'pull_request'
-        uses: madrapps/jacoco-report@v1.6.1
+        uses: madrapps/jacoco-report@e51ce1f46f7f8b5331593f935e59cbaf44b84920 # v1.8.0
         with:
           paths: ${{ github.workspace }}/*/build/reports/jacoco/test/jacocoTestReport.xml
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: SonarCloud Scan
+      # ⚠ 순서 주의: SCA(보안 게이트)가 SonarCloud(품질 분석)보다 *먼저* 온다.
+      #   원래는 반대였는데, 2026-08-12 run 31602739861 에서 SONAR_TOKEN 만료(HTTP 403)로
+      #   Sonar 스텝이 실패하자 뒤따르던 SBOM·Trivy 가 통째로 skip 됐다 — 무관한 도구의 인증
+      #   문제로 보안 게이트가 조용히 사라진 것이고, 이 작업이 없애려던 실패 양식 그대로다.
+      #   보안 게이트를 앞에 두면 품질 도구의 사정과 무관하게 항상 판정된다.
+      #
+      # ── SCA (의존성 취약점) — Snyk 을 걷어내고 SBOM + Trivy 로 갈아탔다 (2026-08-12).
+      #
+      # Snyk 을 뺀 이유(실측, run 31432558450):
+      #   ERROR Authentication error (SNYK-0005) — 토큰이 무효라 스캔 자체가 시작되지 않았고,
+      #   ✗ 21/21 detected Gradle manifests did not return dependencies — 의존성 해석도 실패했다.
+      #   continue-on-error 가 둘 다 삼켜서 "SCA 가 돌고 있다"는 초록불만 남아 있었다.
+      # 지금 방식은 외부 계정·토큰에 의존하지 않는다(전부 러너 안에서 끝난다).
+      #
+      # CycloneDX 는 루트에 적용하면 17개 서비스 전부를 합친 aggregate BOM 을 만든다
+      # (build/reports/cyclonedx/bom.json — 실측 451 컴포넌트).
+      - name: Generate SBOM (CycloneDX)
+        run: ./gradlew cyclonedxBom --no-daemon
+
+      # if: always() 를 뗐다 — SBOM 생성이 skip/실패했는데도 업로드가 돌아 빈손으로 성공하던
+      # 스텝이었다(run 31599697053: Generate 는 skipped, Upload 는 success). 스캔은 이 뒤에
+      # 오므로 스캔이 실패해도 이 업로드는 이미 끝나 있다 — always() 가 필요 없다.
+      - name: Upload SBOM
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: backend-sbom
+          path: build/reports/cyclonedx/bom.json
+          retention-days: 90
+
+      # 차단 게이트. 기존 부채 48건은 .trivyignore.yaml 에 만료일과 함께 명시돼 있고,
+      # 거기 없는 신규 HIGH/CRITICAL 이 하나라도 나오면 exit 1 로 막는다(semgrep.yml 과 같은 기준).
+      # version 고정: 이 게이트를 켤 때 부채 건수를 실측한 바이너리와 동일 버전을 쓴다.
+      - name: SCA — Trivy SBOM scan (HIGH/CRITICAL gate)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: v0.73.0
+          scan-type: sbom
+          scan-ref: build/reports/cyclonedx/bom.json
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          trivyignores: .trivyignore.yaml
+          format: table
+          exit-code: "1"
+
+      # 게이트다 — continue-on-error 를 뗐다(2026-08-12).
+      # 그전까지 이 스텝은 sonarqube 플러그인 5.1.0.4882 가 Gradle 9 에서 제거된 Convention API 를
+      # 호출해 NoSuchMethodError 로 13초 만에 죽었고, continue-on-error 가 그걸 삼켰다.
+      # 즉 SonarCloud 분석은 한 번도 업로드된 적이 없다(run 31432558450 로그가 근거).
+      # 지금 이 스텝이 막는 것은 "분석이 안 돌았다"까지다 — 플러그인 크래시·토큰 만료처럼
+      # 분석 자체가 실패하면 이 잡이 깨지고, 그러면 backend-ghcr 가 이미지를 만들지 않는다.
+      # 품질 게이트 *내용*은 아직 차단하지 않는다(sonar.qualitygate.wait=false, build.gradle.kts).
+      #
+      # ⚠ 현재 SONAR_TOKEN 은 만료 상태다 — run 31602739861 실측:
+      #   "GET https://api.sonarcloud.io/analysis/jres... failed with HTTP 403 Forbidden.
+      #    Please check the property sonar.token or the environment variable SONAR_TOKEN."
+      #   토큰은 2026-02-24 등록분이고 마지막 분석은 2026-02-26 이다. 이 스텝이 초록이 되려면
+      #   SonarCloud 에서 토큰을 재발급해 저장소 시크릿 SONAR_TOKEN 을 갱신해야 한다.
+      #   아래 유무 가드는 "토큰이 없는" 환경만 덮는다 — 지금처럼 토큰이 있는데 거부되면(403)
+      #   이 스텝은 그대로 실패한다. 만료를 조용히 통과시키면 분석이 영영 안 돌아도 초록이 된다.
+
+      # 토큰 유무 판정을 스캔에서 분리한다: secrets 컨텍스트는 step 의 if 에서 쓸 수 없고, 스텝 자신의
+      # env 도 그 스텝의 if 가 평가되는 시점에는 없다. 그래서 앞선 스텝의 output 으로 옮긴다.
+      # 시크릿이 없는 환경(포크, 시크릿 미설정 클론)에서 "토큰이 없어서" 잡이 깨지는 것을 막되,
+      # 스킵을 조용히 넘기지 않고 ::warning:: 으로 남긴다 — 스킵을 "분석 통과"로 오독하면 안 된다.
+      #
+      # 검증 상태(2026-08-13, 다음 사람이 같은 질문을 반복하지 않도록 기록):
+      #   ✔ 출력 배선 + 참 분기 — run 31611508158 에서 이 스텝과 아래 스캔 스텝이 둘 다 success.
+      #     id/outputs 오타였다면 표현식이 거짓이 되어 스캔이 skipped 로 떴을 것이다. 즉 가장 위험한
+      #     실패 모드("오타 때문에 분석이 영원히 조용히 스킵")는 배제됐다.
+      #   ✔ 쉘 로직 — 빈 문자열·변수 미설정 두 경우 모두 present=false + ::warning 발화를 로컬 재현.
+      #   ✖ 거짓 분기 전체(빈 시크릿 → env 빈 문자열 → 스킵)는 실측하지 못했다. 실측하려면 운영
+      #     워크플로에 테스트 훅(workflow_dispatch 입력)을 심거나 보호 브랜치에 실험 커밋을 넣어야 하는데,
+      #     5줄 가드의 잔여 리스크보다 그 오염이 비싸다고 판단했다.
+      #     남은 미지수가 틀렸을 때의 결과는 "토큰 없이 스캔 실행 → 요란한 실패"= 가드 도입 전 상태이며,
+      #     조용한 통과가 되지는 않는다(실패 방향이 안전하다). 깨끗한 실측 방법은 시크릿을 잠시 비웠다
+      #     되돌리는 것뿐이고, 그건 저장소 소유자만 할 수 있다.
+      - name: SONAR_TOKEN 유무 확인
+        id: sonar_token
         if: github.event_name != 'pull_request'
-        continue-on-error: true
+        run: |
+          if [ -n "$SONAR_TOKEN" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=SonarCloud 분석 건너뜀::SONAR_TOKEN 시크릿이 비어 있어 분석을 실행하지 않았다. 저장소 Settings → Secrets 에 토큰을 등록하면 다시 돈다."
+          fi
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      - name: SonarCloud Scan (analysis must succeed)
+        if: github.event_name != 'pull_request' && steps.sonar_token.outputs.present == 'true'
+        # DB·ES 환경변수를 뗐다 — 이 잡에는 서비스 컨테이너가 없다(테스트는 backend-test 가 이미 끝냈다).
+        # `sonar` 는 subprojects 의 compileJava 에만 의존하므로 DB 가 필요 없다(build.gradle.kts 하단 주석).
+        # 없는 포트를 가리키는 값을 남겨두면 "설정돼 있으니 동작한다"는 착시만 만든다.
         run: ./gradlew sonar --no-daemon --stacktrace
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/testdb
-          SPRING_DATASOURCE_USERNAME: testuser
-          SPRING_DATASOURCE_PASSWORD: testpass
-          SPRING_ELASTICSEARCH_URIS: http://localhost:9200
 
-      - name: Run Snyk Security Scan (Backend)
-        uses: snyk/actions/gradle-jdk21@master
-        continue-on-error: true
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          args: --severity-threshold=high --all-projects
-
-      - name: Upload Snyk results to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@v4
-        if: always() && hashFiles('snyk.sarif') != ''
-        with:
-          sarif_file: snyk.sarif
-
-  #      - name: SonarCloud Quality Gate
-  #        uses: sonarsource/sonarqube-quality-gate-action@v1.1.0
-  #        timeout-minutes: 5
-  #        env:
-  #          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-  #        with:
-  #          scanMetadataReportFile: build/sonar/report-task.txt
+  # (제거) 주석 처리돼 있던 sonarqube-quality-gate-action 블록 — build.gradle.kts 의
+  # sonar.qualitygate.wait=true 가 같은 일을 하므로(분석 태스크가 게이트 결과를 기다렸다가 실패)
+  # 별도 액션이 필요 없다. 죽은 주석은 "게이트가 있다"는 착시만 남긴다.
 
   backend-ghcr:
     name: Backend - Build & Push to GHCR
@@ -308,18 +494,20 @@ jobs:
     #   investment-service   → ghcr.io/myoungsoo7/settlement-investment
     #   organization-service → ghcr.io/myoungsoo7/settlement-organization
     #   card-service         → ghcr.io/myoungsoo7/settlement-card
-    # shared-common·루트 빌드파일·Dockerfile·ci.yml 변경 시엔 changes 잡이 15개 전부 매트릭스에 담는다.
+    #   insurance-service    → ghcr.io/myoungsoo7/settlement-insurance
+    #   deposit-service      → ghcr.io/myoungsoo7/settlement-deposit
+    # shared-common·루트 빌드파일·Dockerfile·ci.yml 변경 시엔 changes 잡이 17개 전부 매트릭스에 담는다.
     strategy:
-      fail-fast: false   # 한 서비스 빌드 실패가 다른 서비스 이미지 푸시를 취소하지 않도록
+      fail-fast: false # 한 서비스 빌드 실패가 다른 서비스 이미지 푸시를 취소하지 않도록
       matrix: ${{ fromJSON(needs.changes.outputs.build_matrix) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
 
       - name: Log in to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -327,14 +515,14 @@ jobs:
 
       # 준비: Docker Hub 로그인 (추후 사용)
       # - name: Log in to Docker Hub
-      #   uses: docker/login-action@v3
+      #   uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
       #   with:
       #     username: ${{ secrets.DOCKERHUB_USERNAME }}
       #     password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Docker metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}${{ matrix.image_suffix }}
           tags: |
@@ -343,7 +531,7 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push (GHCR)
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
           file: ./Dockerfile
@@ -358,6 +546,34 @@ jobs:
           cache-to: type=gha,mode=max
           platforms: linux/amd64
 
+      # 컨테이너 레이어(OS 패키지 + 번들 라이브러리) 취약점 스캔.
+      # Snyk 은 Gradle 의존성만 보고 그마저 continue-on-error 라, 베이스 이미지 CVE 는
+      # 지금까지 아무도 보지 않았다.
+      # 게이트 범위: CRITICAL + 이미 수정 버전이 나온 것만(ignore-unfixed) — 미수정 CVE 로
+      # 파이프라인이 막히는 상황을 피한다. HIGH 까지 조이려면 severity 에 추가할 것.
+      # 스캔은 push 뒤에 돈다(이미지는 이미 올라간 상태) — 잡이 빨개지면 롤백 판단은 사람이 한다.
+      #
+      # ⚠ 이 액션은 두 번 깨져 있었다 (둘 다 CI 실측으로 잡음):
+      #   ① 원래 `@0.28.0` 으로 적혀 있었는데 그런 ref 자체가 없다(실제 태그는 v0.28.0).
+      #   ② v0.28.0 은 내부적으로 `aquasecurity/setup-trivy@v0.2.1` 을 부르는데 업스트림에서
+      #      그 태그가 사라져, 바깥 액션을 SHA 로 고정해도 잡 시작 즉시
+      #      "Unable to resolve action ... unable to find version v0.2.1" 로 죽는다
+      #      (2026-08-12 run 31592237712 에서 실측).
+      #   v0.36.0 은 setup-trivy 를 커밋 SHA 로 참조해 태그 삭제에 영향을 받지 않는다.
+      #   교훈: 액션을 SHA 로 핀해도 그 액션이 내부에서 쓰는 참조까지 고정되지는 않는다.
+      - name: Trivy image scan (CRITICAL gate)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          image-ref: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
+          format: table
+          vuln-type: os,library
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
   frontend-ci:
     name: Frontend - Production Build & Quality
     runs-on: ubuntu-latest
@@ -365,12 +581,11 @@ jobs:
     if: needs.changes.outputs.frontend == 'true'
     permissions:
       contents: read
-      security-events: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "20"
           cache: npm
@@ -406,25 +621,22 @@ jobs:
           TOSS_CLIENT_KEY: ${{ secrets.VITE_TOSS_CLIENT_KEY || 'test_ck_D5GePWvyJnrK0W0k6q8gLzN97Eoq' }}
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: frontend-dist
           path: frontend/dist
           retention-days: 7
 
-      - name: Run Snyk Security Scan (Frontend)
-        uses: snyk/actions/node@master
-        continue-on-error: true
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          args: --severity-threshold=high --file=frontend/package.json
-
-      - name: Upload Snyk results to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@v4
-        if: always() && hashFiles('snyk.sarif') != ''
-        with:
-          sarif_file: snyk.sarif
+      # ── SCA (의존성 취약점) — backend-ci 와 같은 이유로 Snyk 을 걷어냈다(토큰 무효, 2026-08-12).
+      # npm 내장 audit 이라 외부 계정·토큰이 필요 없다.
+      #
+      # --omit=dev: 게이트 대상은 *프로덕션 번들에 들어가는* 의존성이다. dev 전용(vite·vitest 등)
+      #   취약점은 사용자에게 배포되지 않는데 여기서 막으면 노이즈로 게이트가 무시당한다
+      #   (실측 2026-08-12: 전체 16건 / 프로덕션 3건). dev 쪽은 Dependabot 이 주간으로 올린다.
+      # 차단이다 — continue-on-error 없음. 새 프로덕션 high 취약점이 들어오면 여기서 막힌다.
+      - name: SCA — npm audit (production deps, high gate)
+        working-directory: frontend
+        run: npm audit --omit=dev --audit-level=high
 
   # 프론트 단위/컴포넌트 테스트 게이트.
   # 2026-08-02 까지 `if: false` 로 꺼져 있었고 frontend-ci 에도 `npm test` 가 없어서,
@@ -439,10 +651,10 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "20"
           cache: npm
@@ -459,7 +671,7 @@ jobs:
         run: npm run test:coverage
 
       - name: Upload test coverage
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: frontend-test-coverage
@@ -477,13 +689,13 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
 
       - name: Log in to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -491,7 +703,7 @@ jobs:
 
       - name: Docker metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}
           tags: |
@@ -500,7 +712,7 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push (GHCR)
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: ./frontend
           file: ./frontend/Dockerfile
@@ -514,6 +726,22 @@ jobs:
           cache-to: type=gha,mode=max
           platforms: linux/amd64
 
+      # backend-ghcr 와 같은 기준. 실제로 여기서 CRITICAL 3건이 먼저 떴고(nginx:1.25-alpine 이 물던
+      # Alpine 3.19 는 지원 종료라 수정본이 오지 않았다), 예고대로 **스캔을 끄지 않고 베이스 태그를
+      # 올려** 해소했다 — 지금은 nginx:1.31-alpine(Alpine 3.24, 취약점 0). 다음에 또 뜨면 같은 답이다.
+      - name: Trivy image scan (CRITICAL gate)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          image-ref: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
+          format: table
+          vuln-type: os,library
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
   # main 머지 후 ArgoCD plain Directory 앱의 manifest reconciliation 시간을 둔 다음,
   # 현재 배포된 운영 revision(jen.lemuel.co.kr)을 E2E smoke 한다.
   # 이 job은 새 mutable image tag의 promotion을 증명하지 않는다.
@@ -524,7 +752,8 @@ jobs:
   production-revision-smoke:
     name: Currently deployed production revision smoke
     runs-on: ubuntu-latest
-    needs: [frontend-ci, frontend-tests, frontend-ghcr, backend-ci, backend-ghcr]
+    needs:
+      [frontend-ci, frontend-tests, frontend-ghcr, backend-ci, backend-ghcr]
     if: |
       github.event_name == 'push'
       && github.ref == 'refs/heads/main'
@@ -540,10 +769,10 @@ jobs:
     env:
       PLAYWRIGHT_BASE_URL: https://jen.lemuel.co.kr
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "20"
           cache: npm
@@ -553,7 +782,7 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      - name: Install Playwright browser
+      - name: Install Playwright browsers (chromium/firefox/webkit)
         working-directory: frontend
         run: npm run e2e:install
 
@@ -568,7 +797,7 @@ jobs:
 
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: playwright-report
           path: frontend/playwright-report/

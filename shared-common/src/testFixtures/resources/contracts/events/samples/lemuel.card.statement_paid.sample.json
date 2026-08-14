@@ -1,0 +1,9 @@
+{
+  "statementId": 10001,
+  "cardAccountId": 5001,
+  "billingYearMonth": "2026-08",
+  "paidAmount": "350000.00",
+  "totalAmount": "350000.00",
+  "paymentId": "PAY-20260901-0001",
+  "paidAt": "2026-09-01T09:00:00Z"
+}

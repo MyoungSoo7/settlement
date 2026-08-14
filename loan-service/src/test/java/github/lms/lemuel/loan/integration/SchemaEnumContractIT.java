@@ -86,7 +86,7 @@ class SchemaEnumContractIT {
     }
 
     @Test
-    @DisplayName("chk_loan_ledger_ref_type == LoanLedgerEntry 팩토리 17종의 refType (정확 일치)")
+    @DisplayName("chk_loan_ledger_ref_type == LoanLedgerEntry 팩토리 18종의 refType (정확 일치)")
     void loanLedgerRefTypeCheckMatchesFactorySetExactly() {
         Set<String> factoryRefTypes = new LinkedHashSet<>(java.util.Arrays.asList(
                 LoanLedgerEntry.disbursement(1L, ONE).getRefType(),
@@ -108,7 +108,9 @@ class SchemaEnumContractIT {
                 LoanLedgerEntry.securedDisposalShortfall(1L, ONE).getRefType(),
                 LoanLedgerEntry.securedDisposalSurplus(1L, ONE).getRefType(),
                 LoanLedgerEntry.securedSubrogation(1L, ONE).getRefType(),
-                LoanLedgerEntry.securedWriteOff(1L, ONE).getRefType()));
+                LoanLedgerEntry.securedWriteOff(1L, ONE).getRefType(),
+                // 리스·할부 개시 1종 — 같은 갭(팩토리만 늘리고 CHECK 미확장)이 재발하지 않도록 계약에 포함.
+                LoanLedgerEntry.leaseActivation(1L, ONE).getRefType()));
 
         assertThat(checkValues("chk_loan_ledger_ref_type"))
                 .containsExactlyInAnyOrderElementsOf(factoryRefTypes);

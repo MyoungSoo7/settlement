@@ -7,6 +7,8 @@ import github.lms.lemuel.card.domain.AuthorizationHold;
 import github.lms.lemuel.card.domain.Card;
 import github.lms.lemuel.card.domain.CardAccount;
 import github.lms.lemuel.card.domain.CardAccountStatus;
+import github.lms.lemuel.card.domain.CardCapture;
+import github.lms.lemuel.card.domain.CardStatement;
 import github.lms.lemuel.card.domain.CardStatus;
 import github.lms.lemuel.card.domain.LimitChangeResult;
 import github.lms.lemuel.common.outbox.application.port.out.SaveOutboxEventPort;
@@ -217,6 +219,71 @@ public class CardEventPublisherAdapter implements PublishCardEventPort {
                 AGGREGATE_TYPE,
                 String.valueOf(hold.getCardAccountId()),   // 파티션 키 = cardAccountId
                 "CardAuthorized",                          // → 토픽 lemuel.card.authorized
+                toJson(payload)));
+    }
+
+    /**
+     * 카드 매입(capture) — 토픽 {@code lemuel.card.captured}.
+     *
+     * <p>계약 스키마({@code lemuel.card.captured.schema.json}) required 필드:
+     * captureId · authorizationId · cardId · cardAccountId · amount · capturedAt.
+     *
+     * <p>파티션 키: {@code cardAccountId} — 1단계 카드 이벤트·2단계 승인 이벤트와 동일.
+     * 같은 계정의 발급·승인·매입이 같은 파티션에 순서대로 떨어져야 소비자가 일관된 순서를 본다.
+     *
+     * <p>금액({@code amount})은 반드시 {@link java.math.BigDecimal#toPlainString()} 으로
+     * 직렬화한다(DATA-STANDARD N5, 계약 강제) — 부동소수 파싱 오차가 GL 분개 오차가 된다.
+     */
+    @Override
+    public void publishCaptured(CardCapture capture, AuthorizationHold hold) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("captureId", capture.getCaptureId());
+        payload.put("authorizationId", capture.getAuthorizationId());
+        payload.put("cardId", capture.getCardId());
+        payload.put("cardAccountId", capture.getCardAccountId());
+        payload.put("holderUserId", capture.getHolderUserId());
+        // amount = 이번 매입 금액(부분 매입에서 승인 금액과 다를 수 있다) — DATA-STANDARD N5
+        payload.put("amount", capture.getCapturedAmount().toPlainString());
+        if (capture.getMerchantName() != null) {
+            payload.put("merchantName", capture.getMerchantName());
+        }
+        payload.put("capturedAt", capture.getCapturedAt().toString());
+
+        saveOutboxEventPort.save(OutboxEvent.pending(
+                AGGREGATE_TYPE,
+                String.valueOf(capture.getCardAccountId()),   // 파티션 키 = cardAccountId
+                "CardCaptured",                               // → 토픽 lemuel.card.captured
+                toJson(payload)));
+    }
+
+    /**
+     * 청구서 전액 납부 — 토픽 {@code lemuel.card.statement_paid}.
+     *
+     * <p>계약 스키마({@code lemuel.card.statement_paid.schema.json}) required 필드:
+     * statementId · cardAccountId · billingYearMonth · paidAmount · paymentId · paidAt.
+     *
+     * <p>파티션 키: {@code cardAccountId} — 1단계 카드 이벤트·2단계 승인·매입과 동일.
+     * 같은 계정의 발급·승인·매입·청구 이벤트가 같은 파티션에 순서대로 떨어져야 소비자(GL 분개)가
+     * 일관된 순서를 본다.
+     *
+     * <p>금액({@code paidAmount})은 반드시 {@code toPlainString()} 으로 직렬화한다(DATA-STANDARD N5).
+     */
+    @Override
+    public void publishStatementPaid(CardStatement statement, String paymentId) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("statementId", statement.getId());
+        payload.put("cardAccountId", statement.getCardAccountId());
+        payload.put("billingYearMonth", statement.getBillingYearMonth().toString());
+        // paidAmount = 전체 납부 금액(누적) — DATA-STANDARD N5
+        payload.put("paidAmount", statement.getPaidAmount().toPlainString());
+        payload.put("totalAmount", statement.getTotalAmount().toPlainString());
+        payload.put("paymentId", paymentId);
+        payload.put("paidAt", java.time.Instant.now().toString());
+
+        saveOutboxEventPort.save(OutboxEvent.pending(
+                AGGREGATE_TYPE,
+                String.valueOf(statement.getCardAccountId()),  // 파티션 키 = cardAccountId
+                "CardStatementPaid",                           // → 토픽 lemuel.card.statement_paid
                 toJson(payload)));
     }
 

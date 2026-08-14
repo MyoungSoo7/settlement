@@ -107,6 +107,28 @@ public class CardAccount {
         transitionTo(CardAccountStatus.CLOSED);
     }
 
+    /**
+     * 연체 전이 — ACTIVE → DELINQUENT.
+     *
+     * <p>청구서 만기일 경과 + 미상환 잔액이 있을 때 배치({@code DelinquencyBatchScheduler})가
+     * 호출한다. 연체 중에는 모든 승인이 {@link DeclineReason#CARD_SUSPENDED} 로 거절된다.
+     * 전이 전에 상태 검증이 일어나므로, 이미 연체 상태인 계정을 다시 markDelinquent 해도
+     * {@link InvalidCardTransitionException} 이 던져져 멱등하지 않다 — 호출자가 상태를 확인해야 한다.
+     */
+    public void markDelinquent() {
+        transitionTo(CardAccountStatus.DELINQUENT);
+    }
+
+    /**
+     * 연체 복구 — DELINQUENT → ACTIVE.
+     *
+     * <p>청구서 전액 상환이 확인됐을 때({@code PayStatementService}) 호출한다.
+     * DELINQUENT 에서만 허용되는 전이다 — SUSPENDED 복구는 별도의 {@link #resume()} 이다.
+     */
+    public void recoverFromDelinquency() {
+        transitionTo(CardAccountStatus.ACTIVE);
+    }
+
     /** 발급 가능 여부 검증 — 불변식 masterLimit >= Σ subLimit 의 도메인 표현. */
     public void assertCanIssue(BigDecimal currentSubLimitSum, BigDecimal newSubLimit) {
         if (status != CardAccountStatus.ACTIVE) {

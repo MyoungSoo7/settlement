@@ -25,7 +25,8 @@ import java.util.List;
 /**
  * company-service 자체 최소 보안 설정.
  *
- * <p>이 서비스가 다루는 것은 공개 뉴스 메타데이터(제목·요약·링크)라 조회(GET)는 무인증이다.
+ * <p>공개 뉴스 메타데이터(제목·요약·링크) 조회는 무인증이지만, 행 단위 workforce 조회와
+ * CEO 브리핑 문서는 JWT ADMIN/MANAGER 인증이 필요하다.
  * 유일한 쓰기 경로인 수집 트리거(/admin/company/**)는 {@link AdminApiKeyFilter} 가
  * X-Internal-Api-Key 공유 시크릿으로 게이팅한다(financial 의 AdminApiKeyFilter 와 동일 시맨틱).
  * shared-common JWT 스택을 쓰지 않는 이유는 CompanyServiceApplication javadoc 참조.
@@ -88,6 +89,10 @@ public class SecurityConfig {
                         // 반드시 아래 공개 /api/company/** 규칙보다 먼저 선언한다(첫 매칭 우선).
                         .requestMatchers(HttpMethod.GET, "/api/company/documents/*/download",
                                 "/api/company/companies/*/documents").hasAnyRole("ADMIN", "MANAGER")
+                        // 사업장 행 단위 인원·연봉 데이터 — 내부 ADMIN/MANAGER JWT 호출만 허용.
+                        // 반드시 아래 공개 /api/company/** 규칙보다 먼저 선언한다(첫 매칭 우선).
+                        .requestMatchers(HttpMethod.GET, "/api/company/workforce",
+                                "/api/company/workforce/**").hasAnyRole("ADMIN", "MANAGER")
                         // 나머지 공개 조회 API — 뉴스 메타데이터이므로 무인증
                         .requestMatchers(HttpMethod.GET, "/api/company/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()

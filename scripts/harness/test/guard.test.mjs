@@ -1,24 +1,37 @@
 import assert from 'node:assert/strict';
 import { afterEach, describe, test } from 'node:test';
-import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, readdir, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
 import {
+  checkKafkaDlqWiring,
+  checkProtectedDeletions,
+  discoverStagedDeletions,
   discoverStagedFiles,
   dodNudgeMessage,
+  isRootScanned,
   normalizeRepoPath,
   parseAllowance,
+  parseGradleModules,
   readUtf8Strict,
   reconstructPendingContent,
   runGuardCli,
+  stripComments,
   scanText,
+  checkConsumerGroupOwnership,
+  expectedGroupId,
+  resolveGroupId,
 } from '../guard.mjs';
 
 const temporaryDirectories = [];
 async function temporaryRepo() {
-  const directory = await mkdtemp(join(tmpdir(), 'guard-test-'));
+  // normalizeRepoPath 는 repoRoot 를 realpath 로 정규화한 뒤 격리 여부를 판정한다. macOS 의
+  // tmpdir() 은 /var → /private/var 심링크라, 픽스처 경로를 그대로 쓰면 멀쩡한 경로가
+  // "repository 밖"으로 판정된다 — 리눅스 CI 는 통과하고 개발자 맥에서만 빨간불이 뜬다.
+  const directory = await realpath(await mkdtemp(join(tmpdir(), 'guard-test-')));
   temporaryDirectories.push(directory);
   return directory;
 }
@@ -79,6 +92,22 @@ const cases = [
     violation: 'throw new IllegalArgumentException("대출 한도 초과");',
     normal: 'throw new LoanInvariantViolationException("대출 한도 초과: requested=" + requested, requested, limit);',
   },
+  {
+    // deposit 은 셀러 예치금 원장(돈 경로)인데 대상 목록에서 빠져 있었다 — 게이트 비대칭을 닫는다.
+    id: 'OO-DOMAIN-GENERIC-IAE',
+    file: 'deposit-service/src/main/java/github/lms/lemuel/deposit/domain/DepositHold.java',
+    violation: 'throw new IllegalArgumentException("hold 금액은 양수여야 합니다: " + amount);',
+    normal: 'throw new InvalidDepositAmountException("hold 금액은 양수여야 합니다: " + amount, "place", amount);',
+  },
+  {
+    // Actions 는 워크플로 전체를 표현식 렉서로 훑는다. 빈 표현식이 하나라도 있으면
+    // "An expression was expected" 로 **파일이 통째로 무효**가 되어 잡 0개·로그 없이 죽는다.
+    // YAML 파서·공식 스키마·액션 SHA 검증은 전부 통과하므로 이 계층에서만 잡힌다.
+    id: 'WORKFLOW-EMPTY-EXPR',
+    file: '.github/workflows/pr-review.yml',
+    violation: '            // 모델 출력은 신뢰할 수 없는 텍스트다 — ${{ }} 로 스크립트에 보간하지 않고',
+    normal: '          github-token: ${{ secrets.GITHUB_TOKEN }}',
+  },
 ];
 
 describe('guard policy fixtures', () => {
@@ -91,6 +120,26 @@ describe('guard policy fixtures', () => {
       assert.deepEqual(clean.violations, []);
     });
   }
+
+  // 이 규칙은 오탐이 나면 워크플로 편집 전체를 막는다 — 저장소의 진짜 워크플로(정상 표현식
+  // 190건 이상)가 깨끗한지 매번 확인한다. 동시에 "실제 파일에 규칙이 닿는가"의 증거이기도 하다.
+  test('WORKFLOW-EMPTY-EXPR 은 저장소의 실제 워크플로에 오탐하지 않는다', async () => {
+    const workflowDir = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '.github', 'workflows');
+    const names = (await readdir(workflowDir)).filter((name) => /\.ya?ml$/i.test(name));
+    assert.ok(names.length > 0, '워크플로를 하나도 못 찾았다 — 경로가 바뀌었는지 확인할 것');
+
+    for (const name of names) {
+      const path = join(workflowDir, name);
+      const result = scanText(path, await readFile(path, 'utf8'), { now: NOW });
+      assert.deepEqual(result.violations, [], `${name} 오탐`);
+    }
+  });
+
+  test('WORKFLOW-EMPTY-EXPR 은 개행으로 쪼갠 빈 표현식도 막는다', () => {
+    const result = scanText('.github/workflows/x.yml', 'script: |\n  // ${{\n  }}\n', { now: NOW });
+
+    assert.deepEqual(result.violations.map(({ id }) => id), ['WORKFLOW-EMPTY-EXPR']);
+  });
 
   test('ignores Java and Kotlin comment-only lines', () => {
     const java = scanText(cases[0].file, '// double amount = 1.0;', { now: NOW });
@@ -327,6 +376,31 @@ describe('CLI dispatcher', () => {
     assert.equal(await runGuardCli(['--staged', '--files', 'x'], { repoRoot: process.cwd(), stdout() {}, stderr() {} }), 2);
   });
 
+  /** 인자를 잘못 준 실패는 "무엇을 고쳐야 하는지"까지 말해야 한다 — CI 에서 조용한 exit 1 은 원인 불명 실패다. */
+  const usageOf = async (args) => {
+    const errors = [];
+    const code = await runGuardCli(args, { repoRoot: process.cwd(), stdout() {}, stderr: (m) => errors.push(m) });
+    return { code, stderr: errors.join('\n') };
+  };
+
+  test('--list 는 인자가 빠지면 사용법을 알린다', async () => {
+    const { code, stderr } = await usageOf(['--list']);
+    assert.equal(code, 1);
+    assert.match(stderr, /usage: guard --list <file>/);
+  });
+
+  test('--files 는 인자가 빠지면 사용법을 알린다', async () => {
+    const { code, stderr } = await usageOf(['--files']);
+    assert.equal(code, 1);
+    assert.match(stderr, /usage: guard --files <file>/);
+  });
+
+  test('--deleted-list 는 인자가 빠지면 사용법을 알린다', async () => {
+    const { code, stderr } = await usageOf(['--deleted-list']);
+    assert.equal(code, 2);
+    assert.match(stderr, /usage: guard --deleted-list <file>/);
+  });
+
   test('discovers ACMR staged paths including spaces and renames', async () => {
     const repoRoot = await temporaryRepo();
     spawnSync('git', ['init'], { cwd: repoRoot });
@@ -397,5 +471,456 @@ describe('structured allowances', () => {
       owner: 'team-settlement',
       expires: '2026-08-01',
     }]);
+  });
+});
+
+describe('protected harness path deletion', () => {
+  test('flags deletion of agent config and harness paths', () => {
+    const violations = checkProtectedDeletions([
+      '.claude/skills/tdd-discipline/SKILL.md',
+      '.codex/config.toml',
+      'scripts/harness/guard.mjs',
+    ]);
+
+    assert.deepEqual(violations.map(({ id }) => id),
+      ['HARNESS-DELETE', 'HARNESS-DELETE', 'HARNESS-DELETE']);
+  });
+
+  test('ignores deletions outside protected paths', () => {
+    assert.deepEqual(checkProtectedDeletions([
+      'settlement-service/src/main/java/Foo.java',
+      'docs/adr/0001-x.md',
+      'README.md',
+    ]), []);
+  });
+
+  // docs/harness 는 하네스 기계장치가 아니라 해커톤 제출물 보관함이다 — PR #210 사고 때 세 경로가
+  // 한 묶음으로 지워져 보호 목록에 함께 들어갔을 뿐이다. 공개 저장소 위생상 의도적으로 비우는
+  // 대상이므로(CLAUDE.md 배치 기준) 보호하지 않는다. 진짜 하네스는 scripts/harness·.claude·.codex 다.
+  test('docs/harness is submission storage, not harness machinery — deletion is allowed', () => {
+    assert.deepEqual(checkProtectedDeletions([
+      'docs/harness/hackathon/kakaopay/submission/README.md',
+      'docs/harness/omc-harness.md',
+    ]), []);
+  });
+
+  test('does not mistake lookalike prefixes for protected paths', () => {
+    assert.deepEqual(checkProtectedDeletions([
+      '.claudex/file.md',
+      'docs/harness2/etc/note.md',
+      'scripts/harness-old/tool.mjs',
+    ]), []);
+  });
+
+  test('a single deletion is enough to block — mass deletion is not the threshold', () => {
+    assert.equal(checkProtectedDeletions(['.claude/skills/money-safety/SKILL.md']).length, 1);
+  });
+
+  test('gitignored subtrees are not protected — they are regenerable session state', () => {
+    assert.deepEqual(checkProtectedDeletions([
+      '.claude/scratch/note.md',
+      '.claude/agent-memory/x/MEMORY.md',
+      '.claude/worktrees/w/file',
+      '.claude/harness/state.json',
+    ]), []);
+  });
+
+  test('the message names the recovery path so an operator is not stuck', () => {
+    const [violation] = checkProtectedDeletions(['.claude/skills/oo-score/SKILL.md']);
+    assert.match(violation.msg, /HARNESS_ALLOW_DELETE/);
+  });
+
+  test('escape hatch: explicit env opt-in clears the block', () => {
+    assert.deepEqual(
+      checkProtectedDeletions(['.claude/skills/oo-score/SKILL.md'], { allowDelete: true }),
+      [],
+    );
+  });
+
+  test('staged deletions are discoverable — ACMR filter alone hides them', () => {
+    assert.equal(typeof discoverStagedDeletions, 'function');
+  });
+});
+
+describe('--deleted-list mode (CI wiring)', () => {
+  test('blocks when the deleted-file list touches a protected path', async () => {
+    const repoRoot = await temporaryRepo();
+    await writeFile(join(repoRoot, 'deleted.txt'), '.claude/skills/tdd-discipline/SKILL.md\n');
+    const errors = [];
+
+    const code = await runGuardCli(['--deleted-list', 'deleted.txt'],
+      { repoRoot, stderr: (m) => errors.push(m), stdout: () => {} });
+
+    assert.equal(code, 1);
+    assert.ok(errors.some((m) => m.includes('HARNESS-DELETE')));
+  });
+
+  test('passes when no protected path is deleted', async () => {
+    const repoRoot = await temporaryRepo();
+    await writeFile(join(repoRoot, 'deleted.txt'), 'settlement-service/src/main/java/Foo.java\n');
+
+    assert.equal(await runGuardCli(['--deleted-list', 'deleted.txt'],
+      { repoRoot, stderr: () => {}, stdout: () => {} }), 0);
+  });
+
+  test('an empty deleted list is clean, not an error', async () => {
+    const repoRoot = await temporaryRepo();
+    await writeFile(join(repoRoot, 'deleted.txt'), '');
+
+    assert.equal(await runGuardCli(['--deleted-list', 'deleted.txt'],
+      { repoRoot, stderr: () => {}, stdout: () => {} }), 0);
+  });
+});
+
+describe('KAFKA-DLQ wiring (컨슈머는 있는데 DLT 배선이 없는 서비스)', () => {
+  const SETTINGS = 'include(\n  "card-service",\n  "company-service",\n)\nincludeBuild("shared-common")';
+  const APP = (module, pkg) => `${module}/src/main/java/github/lms/lemuel/${pkg}App.java`;
+
+  /** git grep 대역 — 패턴별로 매치 파일 목록을 돌려준다. */
+  const fakeGrep = ({ listeners = [], imports = [], apps = [], ownWiring = [] }) => (_root, pattern, pathspecs) => {
+    // 단일 파일 pathspec 조회는 쓰지 않는다(readSource 로 대체) — 패턴만 보고 분기한다.
+    if (pattern.includes('KafkaListener')) return listeners;
+    if (pattern.includes('KafkaConsumerErrorHandlingConfig')) return imports;
+    if (pattern.includes('DeadLetterPublishingRecoverer')) return ownWiring;
+    if (pattern.includes('SpringBoot')) return apps;
+    throw new Error(`unexpected pattern ${pattern} ${pathspecs}`);
+  };
+
+  /**
+   * build.gradle.kts 는 shared-common 을 의존하고, 앱 클래스는 주어진 소스를 쓴다.
+   * `files` 로 특정 경로의 내용을 덮어써 배선 파일(진짜 @Import vs 자바독 언급)을 구분한다.
+   */
+  const fakeSource = (appSource, { sharedCommon = true, files = {} } = {}) => (file) => {
+    if (file.endsWith('build.gradle.kts')) {
+      return sharedCommon ? 'implementation("github.lms.lemuel:shared-common:1.0.0")' : 'implementation("x")';
+    }
+    return Object.hasOwn(files, file) ? files[file] : appSource;
+  };
+
+  const COMPANY_CFG = 'company-service/src/main/java/github/lms/lemuel/company/adapter/in/kafka/Cfg.java';
+  const NOTIFICATION_CFG = 'notification-service/src/main/kotlin/github/lms/lemuel/notification/Cfg.kt';
+
+  test('루트 스캔 + shared-common 의존 + 공용 배선 존재면 통과한다', () => {
+    const violations = checkKafkaDlqWiring('/repo', {
+      readSettings: () => SETTINGS,
+      gitGrepFiles: fakeGrep({
+        listeners: ['card-service/src/main/java/github/lms/lemuel/card/adapter/in/kafka/C.java'],
+        imports: [SHARED_PROVIDER], // shared-common 이 실제로 배선을 제공하는 상태
+        apps: [APP('card-service', '')],
+      }),
+      readSource: fakeSource('@SpringBootApplication\npublic class CardServiceApplication {}', {
+        files: { [SHARED_PROVIDER]: 'public class KafkaConsumerErrorHandlingConfig {}' },
+      }),
+    });
+
+    assert.deepEqual(violations, []);
+  });
+
+  const SHARED_PROVIDER = 'shared-common/src/main/java/github/lms/lemuel/common/config/kafka/KafkaConsumerErrorHandlingConfig.java';
+
+  test('공용 배선 클래스가 저장소에서 사라지면 루트 스캔 서비스도 통과하지 못한다 — 7cf573446 식 사고를 잡는 조건', () => {
+    // 실제 사고: "fix(ci): 액션 SHA 핀" 커밋이 서비스별 배선 5벌을 함께 지웠다. 당시 shared-common 에는
+    // 공용 배선이 없었으므로, (a) 경로가 "루트 스캔 + shared-common 의존"만 보면 5개 서비스가 조용히 통과한다.
+    const violations = checkKafkaDlqWiring('/repo', {
+      readSettings: () => SETTINGS,
+      gitGrepFiles: fakeGrep({
+        listeners: ['card-service/src/main/java/github/lms/lemuel/card/adapter/in/kafka/C.java'],
+        imports: [], // 공용 설정을 언급하는 파일이 하나도 없다 = 클래스가 사라졌다
+        apps: [APP('card-service', '')],
+      }),
+      readSource: fakeSource('@SpringBootApplication\npublic class CardServiceApplication {}'),
+    });
+
+    assert.equal(violations.length, 1);
+    assert.equal(violations[0].id, 'KAFKA-DLQ');
+    assert.match(violations[0].msg, /공용 배선/);
+  });
+
+  test('공용 배선을 이름만 언급하는 파일은 제공자로 치지 않는다 — 정의가 있어야 한다', () => {
+    const violations = checkKafkaDlqWiring('/repo', {
+      readSettings: () => SETTINGS,
+      gitGrepFiles: fakeGrep({
+        listeners: ['card-service/src/main/java/github/lms/lemuel/card/adapter/in/kafka/C.java'],
+        imports: ['card-service/src/main/java/github/lms/lemuel/card/adapter/in/kafka/C.java'],
+        apps: [APP('card-service', '')],
+      }),
+      readSource: fakeSource('@SpringBootApplication', {
+        files: {
+          'card-service/src/main/java/github/lms/lemuel/card/adapter/in/kafka/C.java':
+            '// TODO: KafkaConsumerErrorHandlingConfig 로 옮기기\nclass C {}',
+        },
+      }),
+    });
+
+    assert.equal(violations.length, 1);
+  });
+
+
+  test('루트 스캔이어도 shared-common 미의존이면 차단한다 — 공용 설정이 클래스패스에 없다', () => {
+    const violations = checkKafkaDlqWiring('/repo', {
+      readSettings: () => SETTINGS,
+      gitGrepFiles: fakeGrep({
+        listeners: ['card-service/src/main/java/github/lms/lemuel/card/adapter/in/kafka/C.java'],
+        apps: [APP('card-service', '')],
+      }),
+      readSource: fakeSource('@SpringBootApplication', { sharedCommon: false }),
+    });
+
+    assert.equal(violations.length, 1);
+    assert.equal(violations[0].id, 'KAFKA-DLQ');
+  });
+
+  test('제한 스캔 서비스가 @Import 를 빠뜨리면 차단한다 — 이게 card·insurance·operation 이 유실되던 상태다', () => {
+    const violations = checkKafkaDlqWiring('/repo', {
+      readSettings: () => SETTINGS,
+      gitGrepFiles: fakeGrep({
+        listeners: ['company-service/src/main/java/github/lms/lemuel/company/adapter/in/kafka/C.java'],
+        apps: [APP('company-service', 'company/')],
+      }),
+      readSource: fakeSource('@SpringBootApplication(scanBasePackages = "github.lms.lemuel.company")'),
+    });
+
+    assert.equal(violations.length, 1);
+    assert.equal(violations[0].id, 'KAFKA-DLQ');
+    assert.match(violations[0].file, /^company-service/);
+  });
+
+  test('제한 스캔이어도 명시 @Import 가 있으면 통과한다', () => {
+    const violations = checkKafkaDlqWiring('/repo', {
+      readSettings: () => SETTINGS,
+      gitGrepFiles: fakeGrep({
+        listeners: ['company-service/src/main/java/github/lms/lemuel/company/adapter/in/kafka/C.java'],
+        imports: [COMPANY_CFG],
+        apps: [APP('company-service', 'company/')],
+      }),
+      readSource: fakeSource('@SpringBootApplication(scanBasePackages = "github.lms.lemuel.company")', {
+        files: {
+          [COMPANY_CFG]: '@Configuration\n@Import(KafkaConsumerErrorHandlingConfig.class)\npublic class Cfg {}',
+        },
+      }),
+    });
+
+    assert.deepEqual(violations, []);
+  });
+
+  test('줄바꿈이 낀 @Import 도 인정한다 — 포매터가 애노테이션을 접어도 배선은 배선이다', () => {
+    const violations = checkKafkaDlqWiring('/repo', {
+      readSettings: () => SETTINGS,
+      gitGrepFiles: fakeGrep({
+        listeners: ['company-service/src/main/java/github/lms/lemuel/company/adapter/in/kafka/C.java'],
+        imports: [COMPANY_CFG],
+        apps: [APP('company-service', 'company/')],
+      }),
+      readSource: fakeSource('@SpringBootApplication(scanBasePackages = "github.lms.lemuel.company")', {
+        files: {
+          [COMPANY_CFG]: '@Import({\n    OtherConfig.class,\n    KafkaConsumerErrorHandlingConfig.class,\n})\nclass Cfg {}',
+        },
+      }),
+    });
+
+    assert.deepEqual(violations, []);
+  });
+
+  test('자바독 언급만으로는 통과하지 않는다 — @Import 를 지우고 주석만 남기면 배선은 사라진다', () => {
+    const violations = checkKafkaDlqWiring('/repo', {
+      readSettings: () => SETTINGS,
+      gitGrepFiles: fakeGrep({
+        listeners: ['company-service/src/main/java/github/lms/lemuel/company/adapter/in/kafka/C.java'],
+        imports: [COMPANY_CFG],
+        apps: [APP('company-service', 'company/')],
+      }),
+      readSource: fakeSource('@SpringBootApplication(scanBasePackages = "github.lms.lemuel.company")', {
+        files: {
+          // 실제 저장소에 존재하는 문장 형태 그대로 — 이게 통과되면 가드는 아무것도 지키지 못한다.
+          [COMPANY_CFG]: '/**\n * shared-common 의 {@link KafkaConsumerErrorHandlingConfig} 가 자동으로 잡히지 않는다 —\n'
+            + ' * {@code @Import(KafkaConsumerErrorHandlingConfig.class)} 가 필요하다.\n */\nclass Cfg {}',
+        },
+      }),
+    });
+
+    assert.equal(violations.length, 1);
+    assert.equal(violations[0].id, 'KAFKA-DLQ');
+    assert.match(violations[0].file, /^company-service/);
+  });
+
+  test('폴리글랏 standalone 도 대상이다 — 배선이 없으면 차단한다 (settings 밖이라고 유실이 허용되지 않는다)', () => {
+    const violations = checkKafkaDlqWiring('/repo', {
+      readSettings: () => SETTINGS,
+      gitGrepFiles: fakeGrep({
+        listeners: ['notification-service/src/main/kotlin/github/lms/lemuel/notification/K.kt'],
+        apps: [],
+      }),
+      readSource: fakeSource(''),
+    });
+
+    assert.equal(violations.length, 1);
+    assert.match(violations[0].file, /^notification-service/);
+  });
+
+  test('폴리글랏 standalone 이 자체 DLT 배선을 가지면 통과한다 (notification-service 형태)', () => {
+    const violations = checkKafkaDlqWiring('/repo', {
+      readSettings: () => SETTINGS,
+      gitGrepFiles: fakeGrep({
+        listeners: ['notification-service/src/main/kotlin/github/lms/lemuel/notification/K.kt'],
+        ownWiring: [NOTIFICATION_CFG],
+        apps: [],
+      }),
+      readSource: fakeSource('', {
+        files: { [NOTIFICATION_CFG]: 'fun recoverer() = DeadLetterPublishingRecoverer(dltKafkaTemplate) { r, e -> tp }' },
+      }),
+    });
+
+    assert.deepEqual(violations, []);
+  });
+
+  test('standalone 이 주석으로만 자체 배선을 언급하면 통과하지 않는다', () => {
+    const violations = checkKafkaDlqWiring('/repo', {
+      readSettings: () => SETTINGS,
+      gitGrepFiles: fakeGrep({
+        listeners: ['notification-service/src/main/kotlin/github/lms/lemuel/notification/K.kt'],
+        ownWiring: [NOTIFICATION_CFG],
+        apps: [],
+      }),
+      readSource: fakeSource('', {
+        files: { [NOTIFICATION_CFG]: '/** 언젠가 DeadLetterPublishingRecoverer 로 격리할 예정. */\nclass Cfg' },
+      }),
+    });
+
+    assert.equal(violations.length, 1);
+    assert.match(violations[0].file, /^notification-service/);
+  });
+
+  test('컨슈머가 없는 모듈은 배선을 요구하지 않는다', () => {
+    const violations = checkKafkaDlqWiring('/repo', {
+      readSettings: () => SETTINGS,
+      gitGrepFiles: fakeGrep({ listeners: [], apps: [APP('card-service', '')] }),
+      readSource: fakeSource('@SpringBootApplication'),
+    });
+
+    assert.deepEqual(violations, []);
+  });
+
+  test('settings 를 못 읽는 환경에서는 가드를 깨뜨리지 않는다', () => {
+    const violations = checkKafkaDlqWiring('/repo', {
+      readSettings: () => { throw new Error('no settings'); },
+      gitGrepFiles: () => { throw new Error('should not be called'); },
+    });
+
+    assert.deepEqual(violations, []);
+  });
+
+  test('parseGradleModules 는 include 블록의 모듈만 뽑는다 (includeBuild 는 제외)', () => {
+    assert.deepEqual(parseGradleModules(SETTINGS), ['card-service', 'company-service']);
+  });
+
+  describe('stripComments', () => {
+    test('한 줄 주석과 블록 주석을 지운다 — 배선 판정은 실행되는 코드만 본다', () => {
+      assert.equal(stripComments('a // @Import(X.class)\nb').includes('@Import'), false);
+      assert.equal(stripComments('/* @Import(X.class) */ b').includes('@Import'), false);
+      assert.equal(stripComments('/** {@link X} */\n@Import(X.class)').includes('@Import'), true);
+    });
+
+    test('문자열 안의 // 는 주석이 아니다 — URL 때문에 뒤 코드가 통째로 날아가면 오탐이 난다', () => {
+      const code = 'val url = "https://example.com"; wire(DeadLetterPublishingRecoverer(t))';
+      assert.equal(stripComments(code).includes('DeadLetterPublishingRecoverer('), true);
+    });
+
+    test('주석 안의 따옴표가 문자열 상태를 오염시키지 않는다', () => {
+      const code = '// it\'s a comment with "quote\n@Import(X.class)';
+      assert.equal(stripComments(code).includes('@Import(X.class)'), true);
+    });
+  });
+
+  describe('isRootScanned', () => {
+    test('스캔 속성이 없으면 진입점 패키지(=루트)부터 스캔이다', () => {
+      assert.equal(isRootScanned('@SpringBootApplication\nclass A {}'), true);
+    });
+
+    test('하위 패키지로 좁히면 공용 설정이 안 잡힌다', () => {
+      assert.equal(isRootScanned('@SpringBootApplication(scanBasePackages = "github.lms.lemuel.company")'), false);
+    });
+
+    test('루트 basePackages + excludeFilters 는 여전히 루트 스캔이다 (account 형태)', () => {
+      const source = '@SpringBootConfiguration\n@ComponentScan(\n  basePackages = "github.lms.lemuel",\n'
+        + '  excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX,\n'
+        + '    pattern = {"github\\\\.lms\\\\.lemuel\\\\.common\\\\.outbox\\\\.adapter\\\\.out\\\\..*"}))';
+      assert.equal(isRootScanned(source), true);
+    });
+
+    test('@EntityScan/@EnableJpaRepositories 의 basePackages 는 컴포넌트 스캔과 무관하다 (오탐 회귀)', () => {
+      const source = '@ComponentScan(basePackages = "github.lms.lemuel")\n'
+        + '@EntityScan(basePackages = {"github.lms.lemuel.account.adapter.out.persistence"})\n'
+        + '@EnableJpaRepositories(basePackages = {"github.lms.lemuel.account.adapter.out.persistence"})';
+      assert.equal(isRootScanned(source), true);
+    });
+  });
+});
+
+describe('KAFKA-GROUP-OWNER (컨슈머 그룹 ID 소유권)', () => {
+  const SETTINGS = [
+    'include(',
+    '  "order-service",',
+    '  "settlement-service",',
+    '  "gateway-service",',
+    ')',
+  ].join('\n');
+  const yaml = (groupId) => [
+    'spring:',
+    '  kafka:',
+    '    consumer:',
+    `      group-id: ${groupId}`,
+  ].join('\n');
+
+  test('모듈명과 짝이 맞으면 통과한다', () => {
+    const violations = checkConsumerGroupOwnership('/repo', {
+      readSettings: () => SETTINGS,
+      readYaml: (m) => yaml(`lemuel-${m.replace('-service', '')}`),
+    });
+
+    assert.deepEqual(violations, []);
+  });
+
+  test('다른 모듈의 그룹 ID 를 쓰면 잡는다 — order 가 lemuel-settlement 을 들고 있던 실제 상태', () => {
+    const violations = checkConsumerGroupOwnership('/repo', {
+      readSettings: () => SETTINGS,
+      readYaml: (m) => yaml(m === 'order-service' ? 'lemuel-settlement' : 'lemuel-settlement'),
+    });
+
+    const order = violations.find((v) => v.file.startsWith('order-service'));
+    assert.equal(order.id, 'KAFKA-GROUP-OWNER');
+    assert.match(order.msg, /lemuel-order/);
+  });
+
+  test('컨슈머가 없는 모듈(group-id 미선언)은 대상이 아니다', () => {
+    const violations = checkConsumerGroupOwnership('/repo', {
+      readSettings: () => SETTINGS,
+      readYaml: () => ['spring:', '  application:', '    name: x'].join('\n'),
+    });
+
+    assert.deepEqual(violations, []);
+  });
+
+  test('설정 파일이 없는 모듈은 건너뛴다', () => {
+    assert.deepEqual(checkConsumerGroupOwnership('/repo', {
+      readSettings: () => SETTINGS, readYaml: () => null,
+    }), []);
+  });
+
+  test('환경변수로 감싼 값은 기본값으로 판정한다 — 실제로 뜨는 값이다', () => {
+    assert.equal(resolveGroupId('${KAFKA_GROUP_ID:lemuel-order}'), 'lemuel-order');
+    assert.equal(expectedGroupId('common-data-service'), 'lemuel-common-data');
+  });
+
+  test('settings 를 못 읽으면 가드를 깨뜨리지 않는다', () => {
+    assert.deepEqual(checkConsumerGroupOwnership('/repo', {
+      readSettings: () => { throw new Error('shallow clone'); },
+    }), []);
+  });
+
+  // 리포 전수 — 규칙이 현재 트리에서 실제로 성립하는지
+  test('현재 저장소의 모든 모듈이 규칙을 지킨다', () => {
+    const actualRepoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+
+    assert.deepEqual(checkConsumerGroupOwnership(actualRepoRoot), []);
   });
 });

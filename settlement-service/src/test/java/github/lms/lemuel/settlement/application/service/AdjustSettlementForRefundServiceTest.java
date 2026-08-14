@@ -68,13 +68,14 @@ class AdjustSettlementForRefundServiceTest {
 
         Settlement result = service.adjustSettlementForRefund(1L, new BigDecimal("20000"), 777L);
 
-        assertThat(result.getRefundedAmount()).isEqualTo(new BigDecimal("20000"));
+        // BigDecimal 은 equals 가 scale 까지 비교한다 — 값 비교(compareTo)로 검증한다.
+        assertThat(result.getRefundedAmount()).isEqualByComparingTo(new BigDecimal("20000"));
         ArgumentCaptor<SettlementAdjustment> captor = ArgumentCaptor.forClass(SettlementAdjustment.class);
         verify(saveSettlementAdjustmentPort).save(captor.capture());
         SettlementAdjustment adj = captor.getValue();
         assertThat(adj.getSettlementId()).isEqualTo(100L);
         assertThat(adj.getRefundId()).isEqualTo(777L);
-        assertThat(adj.getAmount()).isEqualTo(new BigDecimal("-20000"));
+        assertThat(adj.getAmount()).isEqualByComparingTo(new BigDecimal("-20000"));
     }
 
     @Test @DisplayName("정산이 존재하지 않으면 SettlementNotFoundException")

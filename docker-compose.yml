@@ -2,6 +2,24 @@ services:
   postgres:
     image: postgres:17-alpine
     container_name: lemuel-postgres
+    # 쿼리 단위 실측 도구 (DB 성능 감사 ④): pg_stat_statements 누적 통계 + auto_explain 이
+    # 200ms 초과 쿼리의 실제 실행계획(EXPLAIN ANALYZE 상당)을 서버 로그로 남긴다.
+    # 인덱스 유무는 추정이 아니라 실행계획으로 판정한다 — pg_stat_statements 뷰는 필요 DB 에서
+    # CREATE EXTENSION 후 사용(settlement_db 는 Flyway 가 생성, opslab 은 필요 시 수동).
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_preload_libraries=pg_stat_statements,auto_explain"
+      - "-c"
+      - "pg_stat_statements.track=all"
+      - "-c"
+      - "auto_explain.log_min_duration=200ms"
+      - "-c"
+      - "auto_explain.log_analyze=on"
+      - "-c"
+      - "auto_explain.log_buffers=on"
+      - "-c"
+      - "auto_explain.log_nested_statements=on"
     env_file:
       - path: .env
         required: false
@@ -24,6 +42,21 @@ services:
   settlement-db:
     image: postgres:17-alpine
     container_name: lemuel-settlement-db
+    # postgres 서비스와 동일한 실측 배선 (감사 ④) — 확장 생성은 V20260807130000 마이그레이션.
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_preload_libraries=pg_stat_statements,auto_explain"
+      - "-c"
+      - "pg_stat_statements.track=all"
+      - "-c"
+      - "auto_explain.log_min_duration=200ms"
+      - "-c"
+      - "auto_explain.log_analyze=on"
+      - "-c"
+      - "auto_explain.log_buffers=on"
+      - "-c"
+      - "auto_explain.log_nested_statements=on"
     env_file:
       - path: .env
         required: false
@@ -284,6 +317,50 @@ services:
       timeout: 3s
       retries: 10
 
+  # ★ DB-per-service: insurance-service 전용 PostgreSQL (GA 보험대리점 — 상담·청약·계약·수수료)
+  insurance-postgres:
+    image: postgres:17-alpine
+    container_name: lemuel-insurance-db
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      POSTGRES_DB: lemuel_insurance
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "127.0.0.1:5448:5432"
+    volumes:
+      - insurance-postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  # ★ DB-per-service: deposit-service 전용 PostgreSQL (셀러 예치금 원장 — 잔고 단일 진실원)
+  deposit-postgres:
+    image: postgres:17-alpine
+    container_name: lemuel-deposit-db
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      POSTGRES_DB: lemuel_deposit
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "127.0.0.1:5449:5432"
+    volumes:
+      - deposit-postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
   # ★ DB-per-service: card-service 전용 PostgreSQL (셀러 법인카드·임직원 카드 한도 관리)
   card-postgres:
     image: postgres:17-alpine
@@ -326,7 +403,11 @@ services:
       - elasticsearch-data:/usr/share/elasticsearch/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS -u $$ELASTICSEARCH_USER:$$ELASTICSEARCH_PASSWORD http://127.0.0.1:9200/_cluster/health?wait_for_status=yellow&timeout=5s >/dev/null || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS -u $$ELASTICSEARCH_USER:$$ELASTICSEARCH_PASSWORD http://127.0.0.1:9200/_cluster/health?wait_for_status=yellow&timeout=5s >/dev/null || exit 1",
+        ]
       interval: 10s
       timeout: 5s
       retries: 20
@@ -388,11 +469,11 @@ services:
       DB_NAME: inter
       DB_USER: ${POSTGRES_USER}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
-      LISTEN_PORT: "6432"                 # pgbouncer 리슨 포트를 6432 로 (기본 5432). 매핑·헬스체크·앱 접속(pgbouncer:6432)과 일치
+      LISTEN_PORT: "6432" # pgbouncer 리슨 포트를 6432 로 (기본 5432). 매핑·헬스체크·앱 접속(pgbouncer:6432)과 일치
       AUTH_TYPE: scram-sha-256
-      POOL_MODE: transaction              # 트랜잭션 단위로 백엔드 커넥션 반납 → 멀티플렉싱
-      MAX_CLIENT_CONN: "1000"             # 앱 측 동시 커넥션 상한 (가상 스레드 대응)
-      DEFAULT_POOL_SIZE: "25"             # PG 로 나가는 실제 백엔드 커넥션 수 (서비스당)
+      POOL_MODE: transaction # 트랜잭션 단위로 백엔드 커넥션 반납 → 멀티플렉싱
+      MAX_CLIENT_CONN: "1000" # 앱 측 동시 커넥션 상한 (가상 스레드 대응)
+      DEFAULT_POOL_SIZE: "25" # PG 로 나가는 실제 백엔드 커넥션 수 (서비스당)
       MIN_POOL_SIZE: "5"
       RESERVE_POOL_SIZE: "5"
       SERVER_RESET_QUERY: DISCARD ALL
@@ -403,7 +484,11 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 6432 -U $$DB_USER -d $$DB_NAME || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -h 127.0.0.1 -p 6432 -U $$DB_USER -d $$DB_NAME || exit 1",
+        ]
       interval: 10s
       timeout: 3s
       retries: 10
@@ -425,14 +510,14 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://pgbouncer:6432/inter?prepareThreshold=0&reWriteBatchedInserts=true
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
-      DB_POOL_MAX: "50"                   # PgBouncer 가 흡수하므로 앱 풀을 넉넉히
+      DB_POOL_MAX: "50" # PgBouncer 가 흡수하므로 앱 풀을 넉넉히
       APP_KAFKA_ENABLED: "true"
       SPRING_KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
       CART_STORE: redis
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: "6379"
       MANAGEMENT_HEALTH_REDIS_ENABLED: "true"
-      APP_CACHE_TWO_TIER_ENABLED: "true"   # L1 Caffeine + L2 Redis (공유 캐시 + Pub/Sub 무효화)
+      APP_CACHE_TWO_TIER_ENABLED: "true" # L1 Caffeine + L2 Redis (공유 캐시 + Pub/Sub 무효화)
       JWT_ISSUER: ${JWT_ISSUER}
       JWT_SECRET: ${JWT_SECRET}
       JWT_TTL_SECONDS: ${JWT_TTL_SECONDS}
@@ -450,7 +535,11 @@ services:
       - "127.0.0.1:8088:8080"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://localhost:8080/actuator/health || exit 1",
+        ]
       interval: 15s
       timeout: 5s
       retries: 10
@@ -508,7 +597,11 @@ services:
       - "127.0.0.1:8082:8080"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://localhost:8080/actuator/health || exit 1",
+        ]
       interval: 15s
       timeout: 5s
       retries: 10
@@ -556,7 +649,11 @@ services:
       - "127.0.0.1:8084:8080"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://localhost:8080/actuator/health || exit 1",
+        ]
       interval: 15s
       timeout: 5s
       retries: 10
@@ -593,7 +690,11 @@ services:
       - "127.0.0.1:8086:8080"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://localhost:8080/actuator/health || exit 1",
+        ]
       interval: 15s
       timeout: 5s
       retries: 10
@@ -629,7 +730,11 @@ services:
       - "127.0.0.1:8090:8080"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://localhost:8080/actuator/health || exit 1",
+        ]
       interval: 15s
       timeout: 5s
       retries: 10
@@ -672,7 +777,11 @@ services:
       - "127.0.0.1:8092:8080"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://localhost:8080/actuator/health || exit 1",
+        ]
       interval: 15s
       timeout: 5s
       retries: 10
@@ -709,7 +818,11 @@ services:
       - "127.0.0.1:8087:8080"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://localhost:8080/actuator/health || exit 1",
+        ]
       interval: 15s
       timeout: 5s
       retries: 10
@@ -744,7 +857,11 @@ services:
       - "127.0.0.1:8094:8080"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://localhost:8080/actuator/health || exit 1",
+        ]
       interval: 15s
       timeout: 5s
       retries: 10
@@ -800,7 +917,11 @@ services:
       - "127.0.0.1:8098:8080"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://localhost:8080/actuator/health || exit 1",
+        ]
       interval: 15s
       timeout: 5s
       retries: 10
@@ -827,6 +948,16 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       # Anthropic Messages API 키 (company 감성분석과 공용) — 미설정이면 채팅만 503, 이력 조회는 정상
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # ── RAG (ADR 0034) — 기본 꺼짐 ──
+      # 켜면 마이그레이션이 CREATE EXTENSION vector 를 실행한다. ai-postgres 는 pgvector 이미지이고
+      # POSTGRES_USER 가 슈퍼유저라 여기서는 성공한다 (pgvector 는 trusted 확장이 아니라 슈퍼유저를 요구).
+      # 끈 채로 두면 "근거 0건" 포트가 꽂혀 챗봇 동작이 Phase 1 과 같아진다.
+      APP_AI_RAG_ENABLED: ${APP_AI_RAG_ENABLED:-false}
+      # 임베딩 키. 미설정이면 적재는 503, 검색은 근거 0건 — 챗봇 자체는 계속 동작한다.
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      # ★ 스키마의 vector(768) 과 반드시 같아야 한다. 다르게 주면 적재 시 INSERT 가 깨진다
+      #   (컬럼 차원은 마이그레이션이 고정하므로 이 값만 바꿔서는 따라오지 않는다).
+      APP_AI_EMBEDDING_DIMENSION: ${APP_AI_EMBEDDING_DIMENSION:-768}
       # JWT 검증 — order-service 발급 토큰을 검증하므로 동일 시크릿 필수
       JWT_SECRET: ${JWT_SECRET}
       JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
@@ -835,7 +966,11 @@ services:
       - "127.0.0.1:8096:8080"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://localhost:8080/actuator/health || exit 1",
+        ]
       interval: 15s
       timeout: 5s
       retries: 10
@@ -879,7 +1014,11 @@ services:
       - "127.0.0.1:8100:8080"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://localhost:8080/actuator/health || exit 1",
+        ]
       interval: 15s
       timeout: 5s
       retries: 10
@@ -921,7 +1060,11 @@ services:
       - "127.0.0.1:8102:8080"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://localhost:8080/actuator/health || exit 1",
+        ]
       interval: 15s
       timeout: 5s
       retries: 10
@@ -961,7 +1104,11 @@ services:
       - "127.0.0.1:8104:8080"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://localhost:8080/actuator/health || exit 1",
+        ]
       interval: 15s
       timeout: 5s
       retries: 10
@@ -1006,13 +1153,107 @@ services:
       - "127.0.0.1:8106:8080"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://localhost:8080/actuator/health || exit 1",
+        ]
       interval: 15s
       timeout: 5s
       retries: 10
       start_period: 60s
     depends_on:
       card-postgres:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+
+  insurance-service:
+    build:
+      context: .
+      args:
+        MODULE: insurance-service
+    image: ghcr.io/myoungsoo7/lemuel-insurance:latest
+    container_name: lemuel-insurance
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      # 자체 DB(lemuel_insurance) — GA 보험대리점(상담·청약·계약·수수료). 외부 보험사 연동 없음(D1).
+      SPRING_DATASOURCE_URL: jdbc:postgresql://insurance-postgres:5432/lemuel_insurance?reWriteBatchedInserts=true
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      APP_KAFKA_ENABLED: "true"
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY is required for insurance-service}
+      JWT_ISSUER: ${JWT_ISSUER}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_TTL_SECONDS: ${JWT_TTL_SECONDS}
+      # PII 암호화 키 (Base64 32byte AES-256) — 반드시 주입 필요(기본값 없음)
+      INSURANCE_ENC_KEY: ${INSURANCE_ENC_KEY}
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
+      SERVER_PORT: 8080
+      MANAGEMENT_SERVER_PORT: 8080
+    ports:
+      - "127.0.0.1:8108:8080"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://localhost:8080/actuator/health || exit 1",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    depends_on:
+      insurance-postgres:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+
+  deposit-service:
+    build:
+      context: .
+      args:
+        MODULE: deposit-service
+    image: ghcr.io/myoungsoo7/lemuel-deposit:latest
+    container_name: lemuel-deposit
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      # 자체 DB(lemuel_deposit) — 셀러 예치금 원장. 잔고의 단일 진실원이라 다른 서비스가 직접 읽지 않는다.
+      SPRING_DATASOURCE_URL: jdbc:postgresql://deposit-postgres:5432/lemuel_deposit?reWriteBatchedInserts=true
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      APP_KAFKA_ENABLED: "true"
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
+      JWT_ISSUER: ${JWT_ISSUER}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_TTL_SECONDS: ${JWT_TTL_SECONDS}
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
+      SERVER_PORT: 8080
+      MANAGEMENT_SERVER_PORT: 8080
+    ports:
+      # 호스트 8112 — 8108/8109 는 insurance 가 쓴다(application.yml 주석 참조).
+      - "127.0.0.1:8112:8080"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://localhost:8080/actuator/health || exit 1",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    depends_on:
+      deposit-postgres:
         condition: service_healthy
       redpanda:
         condition: service_healthy
@@ -1043,13 +1284,19 @@ services:
       ACCOUNT_SERVICE_URI: http://account-service:8080
       ORGANIZATION_SERVICE_URI: http://organization-service:8080
       CARD_SERVICE_URI: http://card-service:8080
+      INSURANCE_SERVICE_URI: http://insurance-service:8080
+      DEPOSIT_SERVICE_URI: http://deposit-service:8080
       MARKET_STREAM_SERVICE_URI: http://market-stream-service:8110
       JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
     ports:
       - "127.0.0.1:8080:8080"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://localhost:8080/actuator/health || exit 1",
+        ]
       interval: 15s
       timeout: 5s
       retries: 10
@@ -1083,10 +1330,10 @@ services:
     image: danielqsj/kafka-exporter:v1.8.0
     container_name: lemuel-kafka-exporter
     command:
-      - "--kafka.server=redpanda:29092"   # 브로커 내부 주소 (compose 네트워크)
+      - "--kafka.server=redpanda:29092" # 브로커 내부 주소 (compose 네트워크)
       - "--web.listen-address=:9308"
     ports:
-      - "127.0.0.1:9308:9308"             # /metrics (실습 중 직접 확인용)
+      - "127.0.0.1:9308:9308" # /metrics (실습 중 직접 확인용)
     restart: unless-stopped
     depends_on:
       redpanda:
@@ -1127,12 +1374,12 @@ services:
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
-      - "--web.enable-lifecycle"          # POST /-/reload 로 핫 리로드 허용 (실습 편의)
+      - "--web.enable-lifecycle" # POST /-/reload 로 핫 리로드 허용 (실습 편의)
     ports:
       - "127.0.0.1:9090:9090"
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./monitoring/alert-rules.yml:/etc/prometheus/alert-rules.yml:ro   # rule_files 가 참조 — 마운트 필수
+      - ./monitoring/alert-rules.yml:/etc/prometheus/alert-rules.yml:ro # rule_files 가 참조 — 마운트 필수
     restart: unless-stopped
     depends_on:
       - alertmanager
@@ -1161,9 +1408,9 @@ services:
       - ./monitoring/tempo.yaml:/etc/tempo.yaml:ro
       - tempo-data:/var/tempo
     ports:
-      - "127.0.0.1:3200:3200"   # Tempo HTTP query API
-      - "127.0.0.1:4317:4317"   # OTLP gRPC
-      - "127.0.0.1:4318:4318"   # OTLP HTTP
+      - "127.0.0.1:3200:3200" # Tempo HTTP query API
+      - "127.0.0.1:4317:4317" # OTLP gRPC
+      - "127.0.0.1:4318:4318" # OTLP HTTP
     restart: unless-stopped
 
   grafana:
@@ -1198,6 +1445,8 @@ volumes:
   account-postgres-data:
   organization-postgres-data:
   card-postgres-data:
+  insurance-postgres-data:
+  deposit-postgres-data:
   ai-postgres-data:
   elasticsearch-data:
   redpanda-data:

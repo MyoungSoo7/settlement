@@ -65,7 +65,7 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 ## 대상 코드베이스
 
 - **14 마이크로서비스** + API Gateway + `shared-common`(버전드 1.0.0) · **DB-per-service** · 서비스 간 연계는 Kafka 이벤트 + 내부 대사 API 뿐 — **cross-DB 0 · cross-code 0**(이것이 이 하네스가 지키는 핵심 불변식)
-- 서비스 로스터·포트·DB·수치 정본 → `STATUS.md` · 모듈 경계·컨벤션 → `CLAUDE.md` · _reservation(시공 예약) 도메인 제거 완료(에이전트·규칙 폐기)_
+- 서비스 로스터·포트·DB·모듈 경계·컨벤션 → `CLAUDE.md` · _reservation(시공 예약) 도메인 제거 완료(에이전트·규칙 폐기)_
 
 ## 서비스별 규칙 스킬 (온디맨드 로드)
 
@@ -112,7 +112,7 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 > | 요구사항 모호                              | 📘`interview-harness`(=`socrates`+`evolve-step`+`ontology` 루프)                                                                                  |
 > | 전사 역할 산출물 일괄                      | ⌘`/ai-dev-team` (+ `commands/agents/*` 서브커맨드)                                                                                                |
 > | hookify 규칙 생성·수정 / "훅 굳혀줘"       | 📘`hookify-to-guard` (캡처는 임시, 정본은 guard.mjs 3중 강제 — 이식 후 원본 삭제) — 라우터가 `hookify.*.local.md` 편집 시 주입                    |
-> | 하네스 자기 진단·드리프트                  | ⌘`/harness-check` (audit + 가드 + `--fix` 로 STATUS 수치 자동 갱신) → 🚦`harness-audit.mjs`                                                       |
+> | 하네스 자기 진단·드리프트                  | ⌘`/harness-check` (audit + 가드) → 🚦`harness-audit.mjs`                                                       |
 >
 > **원칙:** 결정적인 것은 🚦게이트로 강제 · 판단 필요한 것은 🤖에이전트로 위임 · 작성과 검증은 분리(자기 승인 금지).
 >
@@ -132,8 +132,12 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 > | 파일 편집 직전           | PreToolUse `Write\|Edit\|MultiEdit`        | `guard.mjs --hook`                                                                                 | **exit 2 = 편집 차단**                                             |
 > | 파일 편집·스킬 호출 직전 | PreToolUse `Write\|Edit\|MultiEdit\|Skill` | `skill-router.mjs --hook`                                                                          | 차단 없음(항상 exit 0) — 스킬 로드 리마인더 주입                   |
 > | 세션 시작                | SessionStart                               | `telemetry-report.mjs --hook`                                                                      | 차단 없음 — 최근 차단·라우터 순응률 요약 주입(알릴 것 없으면 침묵) |
-> | `git commit`             | `core.hooksPath=scripts/harness/hooks`     | `guard.mjs --staged`                                                                               | **커밋 거부** (`--no-verify` 우회 금지)                            |
-> | PR·push (develop/main)   | `harness-guard.yml`                        | 하네스 자기 테스트 → `guard.mjs --list` → `harness-audit.mjs` → manifest 추적 검증 → 워킹트리 청결 | **CI 실패** (로컬 훅 미설치·우회를 재차단)                         |
+> | `git commit`             | `core.hooksPath=scripts/harness/hooks`     | `guard.mjs --staged` (내용 스캔 + 하네스 경로 삭제 검사)                                           | **커밋 거부** (`--no-verify` 우회 금지)                            |
+> | PR·push (develop/main)   | `harness-guard.yml`                        | 하네스 자기 테스트 → `guard.mjs --list` → `guard.mjs --deleted-list` → `harness-audit.mjs` → manifest 추적 검증 → 워킹트리 청결 | **CI 실패** (로컬 훅 미설치·우회를 재차단)                         |
+>
+> 삭제는 내용 스캔으로 잡히지 않는다 — 스테이징·CI 파일 목록이 `--diff-filter=ACMR` 로 삭제(D)를 빼고 오기 때문이다.
+> 그래서 `--staged`/`--deleted-list` 가 삭제 목록을 따로 받아 하네스 경로를 지키고, 실시간 훅(PreToolUse)은
+> Write/Edit 만 보므로 삭제 축은 커밋·CI 2중이 담당한다.
 >
 > 훅 설치는 `node scripts/harness/install-hooks.mjs` — 미설치 시 로컬 커밋 가드만 비고, 실시간 훅과 CI 는 그대로 산다(3중 구성의 목적).
 
@@ -141,7 +145,21 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 `MONEY-PRIMITIVE` · `MONEY-BIGDECIMAL-DOUBLE`(금액 double/float·`new BigDecimal(더블 리터럴)`) ·
 `IMMUTABLE-HISTORY` · `MSA-BOUNDARY`(settlement→order import, `import static` 포함) · `ACCOUNT-CONSUME-ONLY` ·
 `MARKET-NO-VALUATION` · `OO-DOMAIN-SETTER` · `OO-DOMAIN-MUTABLE-LOMBOK` · `OO-DOMAIN-GENERIC-IAE` ·
-`INVALID-ALLOWANCE`(예외 주석은 reason·issue·owner·미래 expires 필수 — 무기한 면제 금지) · 운영 DB 직접 조작 명령 차단(`check-command`).
+`INVALID-ALLOWANCE`(예외 주석은 reason·issue·owner·미래 expires 필수 — 무기한 면제 금지) ·
+`HARNESS-DELETE`(`.claude/`·`.codex/`·`scripts/harness/`·`docs/ax/` 삭제 — 1건도 차단, 재생성 가능한
+`scratch`·`agent-memory`·`worktrees`·`harness` 는 예외. 의도한 삭제는 `HARNESS_ALLOW_DELETE=1`) ·
+`KAFKA-DLQ`(`@KafkaListener` 를 가진 모듈은 DLT 배선이 닿아야 한다 — ⓐ 루트 `github.lms.lemuel` 컴포넌트
+스캔 **+ shared-common 의존**, ⓑ 명시 `@Import(KafkaConsumerErrorHandlingConfig)`, ⓒ 자체
+`DeadLetterPublishingRecoverer` 배선(폴리글랏 standalone) 중 하나. 폴리글랏도 대상 — `settings.gradle.kts`
+밖이라고 유실이 허용되지 않는다. 안 닿으면 Spring Kafka 기본 `FixedBackOff(0, 9)` 로 떨어져 재시도 소진
+메시지를 조용히 skip = 사실상 유실) ·
+`WORKFLOW-EMPTY-EXPR`(`.github/workflows/*.yml` 에 빈 표현식 금지 — Actions 는 워크플로 전체를 표현식
+렉서로 훑으므로 `run`/`script` 블록 **안의 주석**에 있어도 `An expression was expected` 로 파일이 통째로
+무효가 된다. 그 워크플로는 잡 0개·로그 없음·실행 이름이 파일 경로로 뜨는 형태로 죽고, 다른 체크는 초록이라
+드러나지 않는다. YAML 파서·공식 워크플로 스키마·액션 SHA 실재 검증이 전부 통과하는 사각지대라 grep 계층에
+둔다 — 2026-08 pr-review.yml 이 이 한 줄 주석 때문에 며칠간 죽어 있었다).
+
+운영 DB 직접 조작 명령 차단(`check-command`).
 
 **skill-router.mjs 라우트 표** (경로 → 주입 스킬, 세션당 스킬별 1회 · 최대 3개): 14개 서비스 디렉토리 → 각 `{서비스}-rules`
 (settlement `ledger` 경로·account 는 `ledger-invariants` 동반) · `outbox/`·`adapter/in/kafka/`·`adapter/out/event/` →
@@ -155,10 +173,10 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 
 - **경로 A — MCP(리치, 플러그인 설치 시)**: settlement/invest-copilot MCP 도구(`recon_run`·`ledger_entries`·`projection_status`·`outbox_status`·`integrity_check`·`trial_balance` 등). 대화형 조사에 최적.
 - **경로 B — 저장소 네이티브(플러그인 0 의존, CI 가능)**:
-  - `node scripts/harness/harness-audit.mjs` — 하네스 자기 진단(STATUS 수치 드리프트·라우팅 dangling·가드 훅 경로 실존·인벤토리)
+  - `node scripts/harness/harness-audit.mjs` — 하네스 자기 진단(라우팅 dangling·가드 훅 경로 실존·모듈 로스터·인벤토리)
   - `node scripts/harness/guard.mjs --staged` — 돈/경계/이력 불변식 가드
   - `node scripts/harness/telemetry-report.mjs` — 가드 발화·스킬 사용/제안 텔레메트리 + 가드 카나리아(`.claude/harness/logs`)
-  - `node scripts/harness/session-metrics.mjs` — OMC 세션·미션 완주율·재작업률 KPI 리포트(`.omc` 읽기 전용 관측 — KPI 정본은 [`docs/harness/omc-harness.md`](docs/harness/omc-harness.md))
+  - `node scripts/harness/session-metrics.mjs` — OMC 세션·미션 완주율·재작업률 KPI 리포트(`.omc` 읽기 전용 관측 — KPI 정본은 `docs/ax/omc-harness.md` — 로컬 전용, 저장소 미포함)
   - `./gradlew :<module>:test`·`:jacocoTestCoverageVerification` — 정합 검증(측정 정답)
   - 서비스 자체 `/admin/integrity`·`/api/account/trial-balance` 조회 API(읽기 전용)
 - **불변식**: psql/pg_dump/kafka produce 로 운영 데이터에 직접 손대는 명령을 만들지 않는다(가드가 `check-command` 로 차단).
@@ -186,9 +204,37 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
   **라인+파일(멀티라인) 이중 스캔**으로 개행 분할 우회를 차단한다. `--staged` 는 돈 경로 프로덕션 변경이 테스트 변경 없이
   스테이지되면 **비차단 DoD 넛지**를 stderr 로 출력한다(차단 안 함 — 완료 판정은 JaCoCo 게이트가 정답, 발화는 텔레메트리 적재).
 - **OO 구조 게이트** — `scripts/harness/test/oo-gate.test.mjs`: 트리 전수 스캔(도메인 setter 0·@Setter 0·금융 5서비스 IAE 0·코어 애그리거트 17종 생성자 봉인·상태 enum 9종 canTransitionTo 전이표 보유). 2026-07-14 OO 캠페인(패널 중앙값 9.5+)의 구조 정본 회귀 방지 — CI 하네스 테스트에 자동 포함. 점수 재채점(LLM 판정)은 📘`oo-score` 스킬.
-- **하네스 자기 진단** — `scripts/harness/harness-audit.mjs`: 문서 드리프트를 규율이 아닌 **기계 게이트**로 승격(과거 STATUS 3주 방치 재발 방지).
+- **스케줄러 락 이름 유일성** — `scripts/harness/test/scheduler-lock-gate.test.mjs`: 같은 `@SchedulerLock`
+  이름을 두 배치가 쓰면 락 보유 기간 동안 나머지가 **조용히 스킵**된다(예외·로그 없음 → 컴파일도 CI 도 못 잡음).
+  리포 전수로 잠근다. 의도적 공유가 필요하면 게이트의 `ALLOWED_SHARED` 에 근거와 함께 등록.
+- **메뉴↔라우트 정합 게이트** — `scripts/harness/test/menu-route-gate.test.mjs`: 네비게이션 트리의 세 사본
+  (시드 SQL `V20260813100000__menu_area_permission.sql` = 정본 · 프론트 폴백 `menuFallback.ts` · `App.tsx` 라우트)을
+  대조한다. 메뉴만 있고 라우트가 없으면 **죽은 링크**, 라우트만 있고 메뉴가 없으면 **유령 화면**이 되는데 둘 다
+  컴파일러도 런타임도 알려 주지 않는다. 진입점이 네비게이션이 아닌 화면(PG 콜백·인쇄·리다이렉트 등)은
+  게이트의 `ROUTES_WITHOUT_MENU` 에 **사유와 함께** 등록해야 통과한다 → 화면 추가 시 "메뉴에 넣을지"를
+  강제로 결정하게 만든다. 삭제된 사이드바 셸 3종(SettlementLayout·CeoLayout·SystemLayout)의 부활도 함께 막는다.
+- **백엔드 표면↔화면 커버리지 게이트** — `scripts/harness/test/api-screen-gate.test.mjs`: 자바 16서비스의
+  `@RestController` base path 를 프론트 전체(`frontend/src`, 테스트 제외)의 URL 리터럴과 대조한다. 메뉴↔라우트
+  게이트가 못 보는 반대편 누락 — **기능은 짰는데 부르는 화면이 없는 상태**를 잡는다(실제로 card Phase 2·insurance·
+  deposit·organization 이 REST·게이트웨이 라우팅을 다 갖춘 채 화면 0 으로 방치됐다). 새 컨트롤러는 ① 화면을 붙이거나
+  ② `MACHINE_ONLY`(웹훅·VAN 단말·내부키 수집 트리거·일회성 백필) ③ `SCREEN_PENDING`(인정된 화면 부채) 중 하나로
+  **사유와 함께** 분류해야 통과한다. 부채는 `PENDING_BUDGET` 래칫으로 **내려가기만** 한다 — 줄었는데 예산을 안 내려도
+  FAIL 이라 목록이 늘 정확하다. 추출 정규식이 깨져 전부 통과하는 가짜 GREEN 도 스캔 하한선으로 막는다.
+- **프론트 테스트 렌더 경합 게이트** — `scripts/harness/test/async-query-gate.test.mjs`: `waitFor(API 가 불렸는지)`로
+  기다린 뒤 곧바로 `screen.getBy*` 로 데이터 의존 엘리먼트를 집는 형태를 막는다. 호출된 시점과 렌더에 반영된 시점
+  사이에 상태 갱신 한 틱이 있어 **로컬에선 늘 통과하고 CI 러너에서만 랜덤하게 실패**한다 — 2026-08-13 하루에 두
+  파일(차지백 콘솔·카테고리 정합 패널)이 같은 이유로 필수 체크를 깼고, 매번 PR 이 막힌 뒤에야 발견됐다. 고치는 법은
+  `await screen.findBy*`(재시도 조회)이며, 마운트부터 있는 정적 chrome(헤더·필터 탭·조건 없는 폼)은 게이트의
+  `STATIC_QUERIES` 에 **사유와 함께** 등록해야 통과한다. 린트로는 못 잡는다 — `testing-library/prefer-find-by` 는
+  `waitFor(() => getBy...)` 형태만 보고 이 사각지대는 대상이 아니다. 도입 시점에 이미 새 파일 1건을 잡았다.
+- **하네스 자기 진단** — `scripts/harness/harness-audit.mjs`: 문서 드리프트를 규율이 아닌 **기계 게이트**로 승격(과거 문서 3주 방치 재발 방지).
   라우팅 맵 dangling 도 기계 검증한다 — 🤖📘⌘ 아이콘 줄의 backtick 진입점 토큰을 agents/skills/commands 실존과 대조
   (에이전트·스킬·커맨드를 삭제/개명하고 라우팅 맵을 안 고치면 audit FAIL → CI 차단).
+- **로컬 통합 검증** — `scripts/verify.sh`: CI(`harness-guard.yml` + `ci.yml`)의 판정을 **같은 순서로** 로컬에서 재현한다.
+  하네스 테스트 → 자기 진단 → 변경 파일 가드 → 삭제 가드 → 변경 모듈 Gradle. "다 됐다" 를 자기보고가 아니라 종료 코드로 증명하는 지점.
+  `--fast`(Gradle 생략, 수초) · `--all`(전체 build) · `--base <ref>`. 느려지면 우회당하므로 기본 경로는 변경 모듈만 빌드한다(ci.yml 매핑과 동일).
+- **하네스 개선 로그** — `docs/plan/HARNESS-IMPROVEMENT-LOG.md`: 하네스를 고칠 때마다 `status`·`predicted_effect`·`verified_at` 을 남긴다.
+  규칙을 늘리기만 하고 효과를 잰 적이 없어 아무도 지우지 못하던 문제에 대한 대응 — 예측이 빗나가면 `reverted` 로 남기고 되돌린다.
 - **CI 강제** — `.github/workflows/harness-guard.yml`: PR/푸시마다 변경 파일 가드(`guard.mjs --list`) + 자기 진단을 **로컬 설정과 무관하게** 실행(훅 미설치·`--no-verify` 우회를 CI가 재차단). 기존 `ci.yml`(빌드·테스트·커버리지)와 병존.
 - **하네스 텔레메트리(관측 계층)** — `scripts/harness/telemetry.mjs`: 가드 차단·스킬 사용·라우터 제안을 `.claude/harness/logs/*.jsonl`(gitignore, 비커밋 — `.omc` 는 OMC 플러그인 소유·정리 대상이라 하네스 런타임은 프로젝트 소유 `.claude/harness/` 에 격리)에 append-only 적재. 집계는 `node scripts/harness/telemetry-report.mjs`(규칙별 발화 횟수·0회=죽은 규칙 후보·스킬 사용률·제안 대비 미로드). 관측 실패가 가드를 깨뜨리지 않는 non-fatal 설계, 킬 스위치 `HARNESS_TELEMETRY=off`.
   **닫힌 피드백 루프**: SessionStart 훅이 `telemetry-report.mjs --hook` 으로 압축 요약(최근 차단·라우터 순응률·카나리아 생존)을
@@ -210,22 +256,22 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 - [ ] **cross-service 토픽 변경 시** 이벤트 계약 테스트(ADR 0024) 통과 — 프로듀서·컨슈머 양방향
 - [ ] 돈 경로 가드 통과 · `--no-verify` 미사용
 - [ ] **작성과 검증 분리** — 같은 컨텍스트 자기 승인 금지, `code-reviewer`/`verifier` 별도 패스로 증거 수집
-- [ ] 문서 휘발성 수치를 바꿨으면 재현 명령 재실행 + `STATUS.md#핵심 수치` 갱신
+- [ ] 문서에 휘발성 수치를 적었으면 재현 명령을 병기했는지 확인(값만 적으면 즉시 드리프트)
   > 하나라도 미충족이면 "완료"라고 쓰지 않는다. 커밋은 `develop` 항목별 개별 커밋(PowerShell 은 `git commit -F <file>`).
   > `main` 반영은 PR·**squash 만**·필수 CI 2종 (직접 push 금지 — 보호 브랜치). 운영 배포는 강한 `JWT_SECRET`·`internal-key-required=true`·외부 API 키 주입 확인.
 
 ## 드리프트 방지 규약 (문서 최신성)
 
-- **휘발성 수치**(마이그레이션·테스트·서비스 수 등)는 값만 적지 말고 **재현 git 명령을 병기**한다 → 수치가 falsifiable 해져 조용한 드리프트가 불가능해진다. 정본은 `STATUS.md#핵심 수치`.
+- **휘발성 수치**(마이그레이션·테스트·서비스 수 등)는 값만 적지 말고 **재현 git 명령을 병기**한다 → 수치가 falsifiable 해져 조용한 드리프트가 불가능해진다. 별도 수치 정본 문서는 두지 않는다 — 병행 세션이 동시에 갱신하면서 값이 늘 어긋났다(2026-08-07 STATUS.md 폐지).
 - 수치 집계는 반드시 **git-tracked 소스 기준**(`git ls-files`) — `find` 는 `build/` 사본과 `.claude/worktrees/` 에이전트 사본을 이중 집계하므로 금지(과거 마이그레이션 224 유령 수치의 원인).
-- 문서 상호참조는 **단일 출처**를 가리킨다: 수치→STATUS, 기능·API→SPEC, 규칙→`*-rules` 스킬, 경계·컨벤션→CLAUDE. 같은 사실을 두 곳에 복제하지 않는다.
+- 문서 상호참조는 **단일 출처**를 가리킨다: 수치→재현 명령, 기능·API→SPEC, 규칙→`*-rules` 스킬, 경계·컨벤션→CLAUDE. 같은 사실을 두 곳에 복제하지 않는다.
 
 **셀프체크** (수치 드리프트 + 라우팅 맵 dangling 진입점을 한 번에 노출 — 하네스 수정 후 실행):
 
 ```bash
-# 1) STATUS 핵심 수치 재검증
-git ls-files '*/src/main/resources/db/migration/*.sql' | wc -l   # STATUS.md#핵심 수치의 값과 일치해야 함(수치는 STATUS 가 단일 출처 — 여기 복제 금지)
-git ls-files '*/src/test/*Test.java' '*/src/test/*Tests.java' '*/src/test/*IT.java' | wc -l  # STATUS.md#핵심 수치의 값과 일치해야 함
+# 1) 휘발성 수치는 필요할 때 직접 센다(문서에 박제하지 않는다)
+git ls-files '*/src/main/resources/db/migration/*.sql' | wc -l
+git ls-files '*/src/test/*Test.java' '*/src/test/*Tests.java' '*/src/test/*IT.java' | wc -l
 # 2) 라우팅 맵 진입점 존재 검증 — harness-audit.mjs 가 기계 검증(수동 grep 불필요, CI 자동 포함)
 node scripts/harness/harness-audit.mjs
 ```
@@ -240,6 +286,5 @@ node scripts/harness/harness-audit.mjs
 
 - `CLAUDE.md` — 에이전트 운용 규칙 / 아키텍처 경계·컨벤션
 - `SPEC.md` — 전체 기능명세(엔드포인트·도메인 규칙·이벤트 카탈로그)
-- `STATUS.md` — 프로젝트 상태 (14서비스, 계정계·투자·법인카드 확장) · **모든 휘발성 수치의 단일 출처**
 - `docs/PORTFOLIO.md` — 면접용 1장 요약 · `README.md` — 아키텍처 개요
-- `docs/adr/` — 아키텍처 결정 기록 (개수 정본: `STATUS.md#핵심 수치`)
+- `docs/adr/` — 아키텍처 결정 기록

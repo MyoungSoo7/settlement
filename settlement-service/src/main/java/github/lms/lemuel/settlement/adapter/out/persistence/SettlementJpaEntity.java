@@ -50,6 +50,10 @@ public class SettlementJpaEntity {
     @Column(name = "commission_rate", nullable = false, precision = 5, scale = 4)
     private BigDecimal commissionRate = new BigDecimal("0.0300");
 
+    /** 적용 요율의 근거 (ADR 0032) — 레거시 행은 null(DEFAULT_TIER 로 해석). */
+    @Column(name = "commission_rate_source", length = 32)
+    private String commissionRateSource;
+
     @Column(name = "net_amount", nullable = false, precision = 10, scale = 2)
     private BigDecimal netAmount;
 

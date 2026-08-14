@@ -1,0 +1,126 @@
+# Seed: screening-backtest-service 백테스트 as-is 사양 (Ouroboros 방법론 — Interview → Seed 결정화)
+# 상태: CONFIRMED (기존 서비스 seed 와 동일 방식 지시로 승인 승계, 2026-08-13)
+# 원칙: 이 Seed 는 "현행 코드가 실제로 하는 일"의 불변 기술이다. 결함은 교정하지 않고 known_issues 로만 기록한다.
+
+seed:
+  id: screening-backtest-service-backtest-v1
+  goal: >-
+    screening-backtest-service(Python/FastAPI 8120 — investment-service 매매계획 재현·
+    종가 전진 청산 시뮬레이션 3분류·포트폴리오 위험/수익 지표 8종)의 현행 동작을
+    실행 가능한 게이트에 매핑된 불변 사양으로 결정화해, 회귀 기준선 · 면접/포트폴리오 문서 ·
+    후속 규칙 튜닝 베이스로 사용한다.
+
+  scope:
+    included:
+      - 매매계획 (3분할·KRX 틱 내림·평단/손절/익절·예산 배분·feasible 판정)
+      - 청산 시뮬레이션 (익절 우선·손절·기간만료 MTM·빈 윈도우)
+      - 포트폴리오 지표 (총수익·CAGR·MDD·Sharpe·승률·평균손익·거래수·자산곡선)
+      - API 표면 (health·backtest·demo) 와 pydantic 입력 검증
+    excluded:
+      - 투자점수 산정·주문 집행 (investment-service 소관)
+      - 시세 수집 (market-service 소관)
+
+  constraints:
+    - "DB 없음 — 결과 영속화 0(요청/응답만). 번들 샘플 data/sample_backtest.json 만 파일"
+    - "Kafka 의존 없음 — 이벤트 발행/소비 0"
+    - "수수료·세금 미모델링 (trade_plan.py 모듈 주석 명문)"
+    - "일중(intraday) 미사용 — 일간 종가만"
+    - "매매계획은 investment-service 의 TradePlanPolicy.java 를 충실히 재구현한 것이어야 한다"
+    - "Python 3.11 필수 — 핀된 의존성에 3.14 휠 없음"
+
+  invariants:  # as-is 코드 사실 — 파일:라인 근거 (경로 접두 screening-backtest-service/src/screening_backtest/)
+    krx_tick:
+      source: core/trade_plan.py:19-57
+      rule: >-
+        2023-01 개편 호가 테이블 — (<2000:1)(<5000:5)(<20000:10)(<50000:50)(<200000:100)(<500000:500),
+        그 이상 1000. krx_tick_round_down 은 Decimal 로 ROUND_FLOOR 내림 후 int.
+        예: 797000→797000, 49999→49950, 50000→50000
+    trade_plan:
+      source: core/trade_plan.py:30-171
+      rule: >-
+        진입 3구간 = [1차 30% @100%, 2차 30% @95%, 3차 40% @90%] (틱 내림 적용).
+        STOP_LOSS_RATIO=0.93, TAKE_PROFIT_RATIO=1.20 — 손절/익절도 틱 내림.
+        budget=None 이면 가격레벨만: 평단 = Σ(구간가 × 비중) 을 HALF_UP 정수화.
+        budget 지정 시 구간별 qty = floor(budget×share / 구간가), 평단 = 총체결금액/총수량(HALF_UP).
+        총수량 0 이면 feasible=False + 사유 문자열. current_price<=0 또는 budget<=0 은 ValueError
+    exit_simulation:
+      source: core/backtest.py:44-81
+      rule: >-
+        신호일 이후 종가를 horizon 개까지 앞에서부터 순회 — close >= take 면 TAKE_PROFIT(체결가=take),
+        close <= stop 이면 STOP_LOSS(체결가=stop). 익절 검사가 손절보다 먼저.
+        둘 다 없으면 윈도우 마지막 종가로 HORIZON(MTM). 윈도우가 비면 진입가로 플랫(holding_days=0, pnl=0).
+        entry_avg<=0 또는 horizon<=0 은 ValueError
+    metrics:
+      source: core/backtest.py:108-183
+      rule: >-
+        max_drawdown 은 음수 분수(peak 갱신하며 최저 낙폭). sharpe 는 rf=0, 모집단 std, std=0 이면 0
+        — 거래별(비연율) Sharpe 임을 독스트링 명문. total_return = equity[-1]/equity[0]-1.
+        CAGR = (1+total_return)^(1/years)-1, years = total_days/252(총일수 없으면 0).
+        win_rate/avg_win/avg_loss 는 양/음 수익률 분리 집계
+    engine:
+      source: core/engine.py:50-157
+      rule: >-
+        픽별로 trade_plan → 신호일 초과 종가 추출(pandas 로 date 정렬) → simulate_exit.
+        feasible=False 픽은 거래 목록·수익률에서 제외(지표 왜곡 방지)하고 사유만 반환.
+        equity_curve 는 거래 수익률을 1.0 부터 순차 복리(각 픽을 포트폴리오 전액 투입으로 간주 — MVP 단순화 주석 명문),
+        소수 8자리 반올림. total_days 는 픽별 holding_days 의 합
+    api_contract:
+      source: api/{app.py:29-58, schemas.py:10-36}
+      rule: >-
+        GET /health · POST /backtest · GET /backtest/demo(번들 샘플 실행 후 dataset 필드 동봉).
+        pydantic 강제 — currentPrice>0, close>0, horizonDays>0, budget>0(optional).
+        요청 카멜케이스 → 엔진 스네이크케이스 변환은 to_engine_args 가 담당
+
+  event_contracts:
+    published: []
+    consumed: []
+    note: "순수 계산 API — 시세는 요청 본문 또는 번들 샘플에서만 온다"
+
+  acceptance_criteria:  # 실행 가능 — 각 AC 는 기존 게이트에 매핑
+    - id: AC-1
+      criterion: KRX 틱 내림·3분할 배분·평단/손절/익절 산출이 일치한다
+      gate: "python3.11 -m pytest — tests/test_trade_plan.py"
+    - id: AC-2
+      criterion: 청산 3분류·경계 조건·지표 계산이 일치한다
+      gate: "tests/test_backtest.py"
+    - id: AC-3
+      criterion: API 계약과 데모 실행이 일치한다
+      gate: "tests/test_api.py"
+    - id: AC-4
+      criterion: Python 3.11 pytest GREEN
+      gate: ".github/workflows/polyglot-ci.yml (Python 매트릭스)"
+
+  known_issues:  # 발견만 기록 — 사양은 as-is 유지
+    - id: KI-1
+      finding: >-
+        ★ Java 정책 복제에 계약 테스트가 없다 — trade_plan.py:5-7 이 'Reimplemented faithfully from
+        TradePlanPolicy.java' 라고 명시하지만 두 구현을 묶는 골든값 테스트가 없다. Java 쪽 비율(0.93/1.20)·
+        구간 비중(30/30/40)·틱 테이블이 바뀌면 파이썬은 낡은 규칙을 백테스트하고도 초록불이 된다
+        — 이 서비스의 존재 이유(BR-1)를 정면으로 무력화
+      disposition: recorded-not-fixed (high — 드리프트 위험)
+    - id: KI-2
+      finding: "MARKET_BASE_URL(config.py:23)이 선언만 있고 참조 코드가 한 줄도 없다 — 시세는 요청 본문/번들 샘플에서만. polyglot-services.md:28-29 도 '선언만 존재, 실연동 미구현'으로 기재. 설정 존재가 연동 오해를 만든다"
+      disposition: doc-consistent-but-dead-config (medium)
+    - id: KI-3
+      finding: "종가만 보는 청산이 구조적 낙관 편향 — 장중 저가가 손절선을 먼저 찍고 종가가 익절선에 닿은 날을 TAKE_PROFIT 으로 기록한다. 일중 미사용은 의도(N4)지만 편향 사실이 응답 어디에도 표시되지 않는다"
+      disposition: by-design-with-consequence
+    - id: KI-4
+      finding: "CAGR 기간이 픽별 holding_days 의 '합'(engine.py:115,137) — 동시 보유 시 캘린더 스팬보다 훨씬 커져 연환산 기간이 과대해지고 CAGR 이 과소 계산된다. 픽이 1개일 때만 의미를 갖는다"
+      disposition: recorded-not-fixed (medium — 계산 왜곡)
+    - id: KI-5
+      finding: "자산곡선이 순차 전량 배분 가정(engine.py:149-153 주석 명문) — 실제 분산 포트폴리오의 수익률/MDD 와 다르고, 픽 순서가 바뀌면 MDD 도 바뀐다"
+      disposition: by-design-documented (MVP 단순화)
+    - id: KI-6
+      finding: "Sharpe 가 비연율(거래별) — 독스트링에는 명문이나 응답 필드명은 그냥 sharpe 라서 통상의 연율 Sharpe 와 직접 비교 시 오해를 부른다"
+      disposition: recorded-not-fixed (low)
+    - id: KI-7
+      finding: "수수료·세금·슬리피지 0 — 3분할 매수 + 청산이면 최소 4회 체결이라 실전 수익률과 괴리가 작지 않다"
+      disposition: by-design-documented (N1)
+    - id: KI-8
+      finding: "호출자·배선·인가 전무 — compose 정의, 게이트웨이 라우트, 호출 Java 서비스가 모두 없고 3개 엔드포인트 모두 무인증. 현재 로컬 실행·데모 용도로만 존재"
+      disposition: recorded-not-fixed (high — 미배선)
+
+  uses:
+    - regression-baseline
+    - interview-portfolio
+    - brownfield-base

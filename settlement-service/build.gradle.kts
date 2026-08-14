@@ -9,6 +9,22 @@ plugins {
 // 이전 라이브러리 모드(order-service fat jar 번들)는 해제 — bootJar 가 Spring Boot 플러그인
 // 기본값(활성)으로 동작하며, 진입점은 SettlementServiceApplication 이다.
 
+// httpcore5 5.3.6 은 CVE-2026-54399(HIGH, 수정판 5.4.3). Boot 4.0.7 BOM 이 httpclient5 를 5.5.2 로,
+// httpcore5 를 5.3.6 으로 관리한다 — Boot 상향으로는 안 풀리고, 그렇다고 httpcore5 만 올리면
+// httpclient5 5.5.x 와 짝이 어긋난다. 상류가 맞춰 낸 조합(httpclient5 5.6 + httpcore5 5.4.x)으로 함께 올린다.
+// 마침 elasticsearch-rest5-client 9.2.8 이 원래 요구하는 것도 httpclient5 5.6 인데 BOM 이 5.5.2 로
+// 내리고 있었다 — 이 오버라이드는 그 다운그레이드도 되돌린다. ES 를 쓰는 모듈은 이 서비스뿐이다
+// (전 모듈 build.gradle.kts 검색 실측).
+//
+// `constraints` 가 아니라 BOM 프로퍼티인 이유: io.spring.dependency-management 는 BOM 관리 버전을
+// resolutionStrategy 룰로 강제해서 Gradle constraint 를 이긴다. 실측으로 constraint 는 무시됐고
+// (dependencyInsight: "Selected by rule", httpclient5 5.5.2 유지) 프로퍼티 오버라이드만 먹혔다.
+//
+// 2026-08-13: 그 5.6 이 이번엔 CVE-2026-40542(HIGH — 인증 시 상호 인증 검증 누락)에 걸렸다.
+// 수정판 5.6.1 로 올린다. httpcore5 짝은 5.4.3 그대로 유효하다(5.6.x 대역 내 패치 상향).
+extra["httpclient5.version"] = "5.6.1"
+extra["httpcore5.version"] = "5.4.3"
+
 dependencies {
     implementation("github.lms.lemuel:shared-common:1.0.0")   // 버전드 내부 라이브러리(composite build 로 로컬 치환)
     testImplementation(testFixtures("github.lms.lemuel:shared-common:1.0.0"))   // 이벤트 계약 스키마·검증기·정본 샘플 (ADR 0024)
@@ -21,6 +37,9 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-jackson")
     implementation("org.springframework.boot:spring-boot-starter-cache")
+
+    // 전문 스펙 YAML 파싱 (ADR 0033) — Boot BOM 이 버전 관리, 전이 의존이 아니라 명시 선언
+    implementation("org.yaml:snakeyaml")
 
     // Flyway
     implementation("org.flywaydb:flyway-core")
@@ -106,6 +125,39 @@ dependencies {
 tasks.named<Test>("test") {
     useJUnitPlatform()
     jvmArgs("-javaagent:${mockitoAgent.asPath}")
+
+    // 이 모듈이 CI 벽시계의 병목이다 — 모듈 매트릭스로 쪼갠 뒤에도 11분으로 가장 느리다
+    // (2026-08-14 실측: 다음이 order-service 7분, 나머지는 2~5분). 테스트 1,404개 중
+    // Testcontainers 통합 30클래스가 시간을 지배한다.
+    //
+    // 잡을 더 쪼개는 대신 **포크 병렬화**를 쓴다: jacocoTestCoverageVerification(LINE 90%)이
+    // 모듈 단위라, 테스트를 CI 잡 여러 개로 나누면 각 샤드가 부분 커버리지만 갖게 되어 전부
+    // 게이트에 걸린다. 그걸 피하려면 .exec 병합 배선이 필요한데 비용 대비 이득이 낮다.
+    // 포크는 커버리지 산정 단위를 건드리지 않는다(에이전트가 같은 exec 에 append).
+    //
+    // 기본값은 러너 코어의 절반 — ubuntu-latest(4 vCPU)에서 2. 포크마다 maxHeapSize 3g(루트
+    // 설정)와 Testcontainers 컨테이너가 붙으므로 코어 수만큼 올리면 메모리로 되레 느려진다.
+    // 로컬에서 CI 조건을 재현하려면 `-PtestForks=2`.
+    maxParallelForks = (
+        (project.findProperty("testForks") as String?)?.toIntOrNull()
+            ?: (Runtime.getRuntime().availableProcessors() / 2)
+        ).coerceAtLeast(1)
+}
+
+// 전문 스펙(telegram/firmbanking/*.yaml) → VO·코덱 소스 재생성 (ADR 0033 Phase 2).
+// 생성물은 src/main 에 커밋되고, 스펙과의 일치는 TelegramGeneratedSourcesTest 가 매 빌드 대조한다.
+tasks.register<Test>("generateTelegramSources") {
+    group = "build"
+    description = "전문 스펙 YAML 에서 VO·코덱 소스를 재생성한다"
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    filter { includeTestsMatching("*TelegramGeneratedSourcesTest*") }
+    systemProperty("telegram.codegen.write", "true")
+    outputs.upToDateWhen { false }
+    // 부모 build 가 모든 Test 태스크에 jacocoTestReport 를 finalizer 로 붙이는데,
+    // 그 리포트는 test 태스크에 의존한다 → 소스 재생성 한 번에 전체 스위트가 딸려온다. 끊는다.
+    setFinalizedBy(emptyList<Task>())
+    extensions.configure<JacocoTaskExtension> { isEnabled = false }
 }
 
 val querydslDir = layout.buildDirectory.dir("generated/querydsl")

@@ -1,6 +1,7 @@
 # Lemuel — 이커머스 + 정산 MSA 플랫폼
 
 > 이 문서는 **에이전트용 작업 지침** — 아키텍처 경계, 코딩 컨벤션, 빌드·보안에 집중한다.
+>
 > - **기능·API·유스케이스 상세** → [`SPEC.md`](./SPEC.md) (사람용 기능명세)
 > - **서비스별 강제 도메인 규칙**(상태머신·수수료·정책 등) → `*-domain-rules` / `*-rules` 스킬(온디맨드 로드:
 >   order-commerce·settlement-domain·loan-domain·investment-domain·account-domain·financial-data·economics-data·
@@ -22,7 +23,8 @@
 - **커밋**: `main` 직접 push **금지**(보호 브랜치). 제출물 플러그인은 원격 실행을 위해 커밋 대상(재생성 산출물은 .gitignore 유지).
   배치 기준은 **호출 대상 서비스**: settlement-copilot→`settlement-service/`, pwc(trusted-ceo)→`company-service/`,
   fashion-copilot→`order-service/` (각 `src/main/resources/` 아래, jar 에는 `processResources` exclude 로 미포함).
-  자사 서비스를 호출하지 않거나(kakaopay·musinsa) 소유 서비스가 단일하지 않은 것(invest-copilot)은 `docs/harness/hackathon/`.
+  **자사 서비스를 호출하지 않는 제출물(kakaopay·musinsa·invest-copilot)은 저장소에 두지 않는다** — 소유 서비스가
+  없어 원격 실행 대상이 아니고, 공개 저장소라 대회 제출물·타사 브랜드명을 싣지 않는다(로컬 전용, 2026-08-07 `docs/ax` 제거).
 
 > 위 가드레일은 **기계로 강제된다**(문서 규율 아님): 저장소 추적 가드 `scripts/harness/guard.mjs` 가 실시간
 > PreToolUse(exit 2 차단)·git pre-commit(`node scripts/harness/install-hooks.mjs`)·CI(`.github/workflows/harness-guard.yml`) 3중으로
@@ -31,16 +33,17 @@
 
 ## 프로젝트 개요
 
-주문·결제·정산·선정산/기업대출·투자·계정계·재무제표·경제지표·기업뉴스평판·운영관제·주식시세·AI챗봇·공공데이터·조직/멤버십을
-**14개 마이크로서비스 + API Gateway** 로 분리한 헥사고날 백엔드. 원래 모놀리스였으나 Bounded Context 로 분리.
+주문·결제·정산·선정산/기업대출·투자·계정계·재무제표·경제지표·기업뉴스평판·운영관제·주식시세·AI챗봇·공공데이터·조직/멤버십·법인카드·보험·예치금을
+**16개 마이크로서비스 + API Gateway** 로 분리한 헥사고날 백엔드. 원래 모놀리스였으나 Bounded Context 로 분리.
 여기에 **폴리글랏 7종**(Kotlin 2 알림·대사 / Go 2 스트리밍·웹훅 / Python 3 백테스트·이상탐지·예측 — Gradle 미포함
-standalone, gateway 미라우팅 — 예외: market-stream 은 `/api/market-stream/**` SSE 만 gateway 라우팅 + compose 배선)을
-더해 총 22개 서비스(정본: `polyglot-services.md` · `docs/ARCHITECTURE.md`).
+standalone, gateway 미라우팅 — 예외 2종: market-stream 은 `/api/market-stream/**` SSE, notification 은
+`/api/notifications/stream` 알림 푸시 SSE 만 gateway 라우팅 + compose 배선. 정본 [`docs/sse.md`](docs/sse.md))을
+더해 총 24개 서비스 = 16 + gateway 1 + 폴리글랏 7 (정본: `polyglot-services.md` · `ARCHITECTURE.md`).
 
-- **14개 서비스 모두 DB-per-service** — order=opslab, settlement=settlement_db, loan=lemuel_loan,
+- **16개 서비스 모두 DB-per-service** — order=opslab, settlement=settlement_db, loan=lemuel_loan,
   financial=lemuel_financial, economics=lemuel_economics, company=lemuel_company, operation=lemuel_operation,
   market=lemuel_market, ai=lemuel_ai, commondata=lemuel_commondata, investment=lemuel_investment, account=lemuel_account,
-  organization=lemuel_organization, card=lemuel_card.
+  organization=lemuel_organization, card=lemuel_card, insurance=lemuel_insurance, deposit=lemuel_deposit.
 - 서비스 간 연계는 **Kafka 이벤트로만** (코드·DB 직접 의존 0).
 - order↔settlement 는 settlement 가 자체 DB 에 **이벤트 드리븐 프로젝션**(`settlement_*_view`)을 적재하는 CQRS 로 분리
   (ADR 0020), 대사는 order 내부 API(`/internal/recon`) 호출로 cross-DB 연결 0 유지.
@@ -55,11 +58,11 @@ standalone, gateway 미라우팅 — 예외: market-stream 은 `/api/market-stre
 
 ```
 settlement/                       # Gradle 멀티 모듈 루트
-├── settings.gradle.kts           # 13 서비스 모듈 선언 (shared-common 은 composite build)
+├── settings.gradle.kts           # 17 모듈 선언 = 16 서비스 + gateway (shared-common 은 composite build)
 ├── build.gradle.kts              # 부모 빌드 (subprojects 공통 설정)
 ├── shared-common/                # 📦 java-library: common.{audit, config, exception, outbox, ratelimit, pdf}
 ├── order-service/                # 🛒 Commerce (8088, opslab) — user·order·payment·cart·shipping·product·category·coupon·review·game·(menu·rbac·commoncode·recon·projectionbackfill)
-├── settlement-service/           # 💰 Settlement (8082, settlement_db, standalone) — settlement·payout·ledger·chargeback·pgreconciliation·report·recon
+├── settlement-service/           # 💰 Settlement (8082, settlement_db, standalone) — settlement·payout·ledger·tax·chargeback·pgreconciliation·recovery·closing·report·recon·integrity·idempotency
 ├── loan-service/                 # 💸 Loan (8084, lemuel_loan) — 선정산 + 기업대출(CEO). shared-common 의존
 ├── financial-statements-service/ # 📊 Financial (8086, lemuel_financial) — 재무제표 공개조회. ★shared-common 미의존
 ├── economics-service/            # 📈 Economics (8087, lemuel_economics) — ECOS 지표 공개조회. ★shared-common 미의존
@@ -70,8 +73,10 @@ settlement/                       # Gradle 멀티 모듈 루트
 ├── common-data-service/          # 🗂️ Common-Data (8098, lemuel_commondata) — data.go.kr 범용 커넥터. ★shared-common 미의존
 ├── investment-service/           # 📈 Investment (8100, lemuel_investment) — CEO 투자하기. shared-common 의존
 ├── account-service/              # 🏦 Account (8102, lemuel_account) — 계정계 GL 집계. shared-common 제한 스캔(소비 전용)
-├── organization-service/         # 👥 Organization (8104, lemuel_organization) — 셀러/기업 조직·멤버십(OWNER/MANAGER/STAFF). shared-common 의존, 이벤트 발행 전용(소비처 미배선)
-├── card-service/                 # 💳 Card (8106/mgmt 8107, lemuel_card) — 법인카드 카드계정·카드(마스터/서브 한도). shared-common 의존, 도메인·정책·영속·이벤트 프로젝션 소비까지(REST·유스케이스·스케줄러는 Task 8~15 미구현)
+├── organization-service/         # 👥 Organization (8104, lemuel_organization) — 셀러/기업 조직·멤버십(OWNER/MANAGER/STAFF). shared-common 의존, 이벤트 발행 전용(4토픽 → card-service 가 조직 프로젝션으로 소비)
+├── card-service/                 # 💳 Card (8106/mgmt 8107, lemuel_card) — 법인카드 카드계정·카드(마스터/서브 한도) + 승인·매입·명세서·지출관리(Phase 2). shared-common 의존, 도메인·정책·영속·REST(`/api/cards`)·스케줄러 4종·이벤트 컨슈머 6종까지 구현
+├── insurance-service/            # 🛡️ Insurance (8108/mgmt 8109, lemuel_insurance) — GA 보험대리점 플랫폼: 상담·가입설계·청약·계약·유지변경·수수료정산. shared-common 의존
+├── deposit-service/              # 🏧 Deposit (8112/mgmt 8113, lemuel_deposit) — 셀러 예치금 원장(잔고 단일 진실원, hold/offset 로 재원 이중사용 차단). shared-common 의존, REST 는 `/api/deposits` 조회 + `/admin/deposits` 수기 콘솔, Kafka 컨슈머 2종(settlement.confirmed·payout.completed). card 승인·매입은 페이로드에 sellerId 가 없어 미구독 — hold/offset 은 콘솔 경로
 └── gateway-service/              # 🚪 API Gateway (8080) — 라우팅만(자체 인증 필터 없음)
 ```
 
@@ -79,10 +84,10 @@ settlement/                       # Gradle 멀티 모듈 루트
   `AdminApiKeyFilter`(X-Internal-Api-Key) 게이트. company·operation·ai·account 는 의존이되 제한 스캔(트리 주석 참조).
 - **폴리글랏 7종**(위 트리·settings.gradle 미포함, standalone 디렉토리): notification(8130)·reconciliation(8131, Kotlin) ·
   market-stream(8110)·payment-webhook(8111, Go) · screening-backtest(8120)·settlement-anomaly(8121)·forecast(8122, Python).
-  자체 DB 없음(무영속 MVP), CI 는 `polyglot-ci.yml` 분리 — 정본 `docs/polyglot-services.md`.
+  자체 DB 없음(무영속 MVP), CI 는 `polyglot-ci.yml` 분리 — 정본 `docs/plan/polyglot-services.md`.
 - 각 서비스의 **책임·API·유스케이스는 [`SPEC.md`](./SPEC.md), 강제 규칙은 `*-rules` 스킬** 참조.
 - 위 트리는 **에이전트용 경계 요약**(포트·DB·shared-common 의존 방식) — 전체 디렉토리·모듈 트리 정본은
-  [`docs/STRUCTURE.md`](docs/STRUCTURE.md). 로스터 드리프트는 `harness-audit` 가 `settings.gradle.kts` 와 대조해 차단.
+  [`STRUCTURE.md`](STRUCTURE.md). 로스터 드리프트는 `harness-audit` 가 `settings.gradle.kts` 와 대조해 차단.
 
 ## 헥사고날 아키텍처 (각 서비스 내부)
 
@@ -114,9 +119,15 @@ order Kafka 이벤트를 컨슈머(`adapter/in/kafka/`)가 받아 로컬 적재�
 - **Outbox**: DB tx 안에서 `outbox_events` INSERT → 멀티워커 폴러(FOR UPDATE SKIP LOCKED, 기본 2s) 가 Kafka 발행.
 - **3단 멱등 방어**: ① `outbox_events.event_id UUID UNIQUE` → ② 컨슈머 `processed_events (consumer_group, event_id)` PK →
   ③ 도메인 UNIQUE(예: `settlements.payment_id`, account `(source_topic, ref_type, ref_id)`).
-- **이벤트 계약-as-code (ADR 0024)**: cross-service 토픽(수치 정본 `STATUS.md#핵심 수치`)의 JSON Schema + 정본 샘플이
+- **이벤트 계약-as-code (ADR 0024)**: cross-service 토픽의 JSON Schema + 정본 샘플이
   `shared-common/src/testFixtures/resources/contracts/events/` 에 단일 출처. 프로듀서·컨슈머 **양방향 계약 테스트**로
   드리프트를 빌드 시점 차단. 소비: `testImplementation(testFixtures("github.lms.lemuel:shared-common:1.0.0"))`.
+- **토픽 전송 속성 (ADR 0035)**: 파티션·보존기간·순서키·소유 모듈의 정본은
+  `shared-common/src/main/resources/kafka/topic-catalog.json`. 메시지 키가 outbox `aggregateId` 이므로
+  **파티션 수 변경 = 키 재해시 = 순서 보장 소급 붕괴** — 되돌릴 수 없다. 토픽을 만드는 주체는 발행 모듈
+  하나뿐이며(`app.kafka.topic.owner`), 프로비저너는 없는 토픽만 만들고 기존 파티션은 절대 늘리지 않는다
+  (드리프트는 `kafka.topic.partition.drift` 게이지). 새 토픽은 카탈로그 등록 필수 — 누락 시
+  `kafka-topic-gate.test.mjs` 가 CI 에서 FAIL.
 - 토픽 목록·프로듀서/컨슈머 매핑 → [`SPEC.md`](./SPEC.md) §5. 이벤트/멱등 코드 작성 규칙 → `idempotency-and-events` 스킬.
   토픽 추가·페이로드 변경 절차(스키마·샘플·양방향 테스트 배선) → `event-contract-change` 스킬.
 
@@ -148,7 +159,7 @@ order Kafka 이벤트를 컨슈머(`adapter/in/kafka/`)가 받아 로컬 적재�
 - **절차 규율(플러그인 독립, `.claude/skills/` 자체 내재)**: 구현·버그픽스 착수 전 → `tdd-discipline`,
   버그·테스트 실패 조사 → `debugging-discipline`, "완료" 선언·커밋 직전 → `verify-before-done` 스킬 로드.
   외부 플러그인(superpowers 등) 스킬에 위임하지 않는다 — 미설치 환경에서도 동일하게 동작해야 한다.
-- **커밋**: develop 에 항목별 개별 커밋(리뷰·롤백 용이). `main` 은 보호 브랜치 — PR 필수, **squash 만**, 필수 CI 2종.
+- **커밋**: develop 에 항목별 개별 커밋(리뷰·롤백 용이). `main` 은 보호 브랜치(ruleset `settlement`, `~DEFAULT_BRANCH`) — PR 필수(승인 0인·스레드 해소 필수), **squash 만**, deletion·non-fast-forward 금지, **필수 CI 6종**: `Detect changed paths` · `Backend - Build/Test/JaCoCo/SonarCloud` · `Frontend - Production Build & Quality` · `Frontend - Tests` · `guard`(harness-guard) · `SAST (Semgrep OSS)`. 조건부 스킵되는 잡은 `skipped` 로 보고돼 통과 처리되지만, `polyglot-ci` 는 워크플로 수준 `on.paths` 필터라 해당 경로 미변경 PR 에서 체크가 **아예 보고되지 않아** 영구 대기에 빠진다 — 그래서 필수에서 제외한다(정보성 유지).
   세션 로그·재생성 산출물(.omc/logs/cache)은 커밋 대상 아님. PowerShell 에서 커밋 메시지는 `git commit -F <file>`(here-string `@` 누수 회피).
 - **흔한 함정**:
   - `JWT_SECRET` 은 운영 필수(기본값 없음, ≥32바이트). 테스트는 부모 `build.gradle.kts` 의 test env 로 주입됨.
@@ -156,19 +167,23 @@ order Kafka 이벤트를 컨슈머(`adapter/in/kafka/`)가 받아 로컬 적재�
   - shared-common 은 composite build 로 로컬 치환 — 변경이 의존 서비스에 즉시 반영(별도 publish 불필요).
   - 제한 스캔 서비스(company/ai/account 등)에 shared-common 빈(JwtUtil·필터 등) 추가 시 `@Import` 필요(전역 스캔 안 됨).
   - 새 도메인/서비스는 코드만으론 안 붙는다 — 스캔·JPA·gateway·nginx·Dockerfile 5곳 배선(→ `msa-service-wiring` 스킬).
+  - **새 화면 = 라우트 + 메뉴 2스텝**: 네비게이션 정본은 `menus` 테이블이다(프론트 셸은 `GET /api/menus/me` 로 그린다).
+    ① `App.tsx` 라우트 추가 ② 시드 마이그레이션 + `frontend/src/data/menuFallback.ts` 에 메뉴 행 추가. 메뉴에 넣지
+    않을 화면이면 `menu-route-gate.test.mjs` 의 `ROUTES_WITHOUT_MENU` 에 사유 등록(안 하면 CI FAIL).
+    메뉴 **구조**(path·area·parent·권한)는 마이그레이션으로만 — 운영 화면 편집은 표시 속성(이름·순서·노출·아이콘)까지.
   - CRLF 파일을 `sed -i` 로 편집하면 전체 라인엔딩이 churn — Edit 도구로 해당 줄만 수정.
 
 ## 보안
 
-| 항목 | 설정 |
-|------|------|
-| 인증 | JWT (HS256) — `shared-common.common.config.jwt`. `JWT_SECRET` **운영 필수**(기본값 없음 → 미설정 시 기동 실패, ≥32바이트) |
-| 인가 | 역할 ADMIN/MANAGER/USER + 경로별 `hasRole`. 셀러 리소스는 소유권 대조(IDOR 방지) |
-| 내부/관리 API 키 필터 | `AdminApiKeyFilter`/`InternalApiKeyFilter` — 키 미설정 시 개발 통과, `app.security.internal-key-required=true`(운영) 면 **fail-closed** |
-| 비밀번호 / CORS / RateLimit | BCrypt(cost=12) / 환경변수 화이트리스트 / Bucket4j |
-| Actuator | 인증 필수, `health.show-details=when-authorized`(미인증엔 상태만) |
-| Audit / 환불 동시성 | PII 마스킹 + 감사로그 / Pessimistic Lock + Idempotency-Key |
-| SSRF | commondata 데이터소스 등록 시 내부/사설/메타데이터 IP 차단 |
+| 항목                        | 설정                                                                                                                                    |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| 인증                        | JWT (HS256) — `shared-common.common.config.jwt`. `JWT_SECRET` **운영 필수**(기본값 없음 → 미설정 시 기동 실패, ≥32바이트)               |
+| 인가                        | 역할 ADMIN/MANAGER/USER + 경로별 `hasRole`. 셀러 리소스는 소유권 대조(IDOR 방지)                                                        |
+| 내부/관리 API 키 필터       | `AdminApiKeyFilter`/`InternalApiKeyFilter` — 키 미설정 시 개발 통과, `app.security.internal-key-required=true`(운영) 면 **fail-closed** |
+| 비밀번호 / CORS / RateLimit | BCrypt(cost=12) / 환경변수 화이트리스트 / Bucket4j                                                                                      |
+| Actuator                    | 인증 필수, `health.show-details=when-authorized`(미인증엔 상태만)                                                                       |
+| Audit / 환불 동시성         | PII 마스킹 + 감사로그 / Pessimistic Lock + Idempotency-Key                                                                              |
+| SSRF                        | commondata 데이터소스 등록 시 내부/사설/메타데이터 IP 차단                                                                              |
 
 > 운영 배포 필수 주입: 강한 `JWT_SECRET`, `app.security.internal-key-required=true`, 각 서비스 외부 API 키.
 

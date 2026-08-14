@@ -30,10 +30,11 @@
 
 # 모듈: shared-common, order-service, settlement-service, loan-service, financial-statements-service,
 #       economics-service, company-service, operation-service, market-service, ai-service,
-#       common-data-service, investment-service, account-service, gateway-service
+#       common-data-service, investment-service, account-service, organization-service,
+#       card-service, insurance-service, deposit-service, gateway-service
 
 # Docker
-docker compose up -d                                # DB-per-service PG 12종 · ES · Redpanda · 12 services + gateway
+docker compose up -d                                # DB-per-service PG 16종 · ES · Redpanda · 앱 컨테이너 18개(JVM 17 + market-stream)
 docker build --build-arg MODULE=<service> -t lemuel-<name> .   # 컨테이너 이미지 (MODULE 로 서비스 지정)
 ```
 
@@ -46,7 +47,32 @@ docker build --build-arg MODULE=<service> -t lemuel-<name> .   # 컨테이너 �
 
 ## 작업 이력 / 브랜치 정보
 
-- **메인 라인**: `develop` → `main`. main 은 보호 브랜치(PR 필수, squash 만, 필수 CI 2종). 분리 전 백업 `backup/pre-msa-split`.
-- **MSA 분리 완료**: 12 서비스 + DB-per-service, settlement↔order 이벤트 프로젝션(ADR 0020).
+- **메인 라인**: `develop` → `main`. main 은 보호 브랜치(PR 필수, squash 만, **필수 CI 6종** — 목록은 [`CLAUDE.md`](../CLAUDE.md) 작업 프로토콜 절). 분리 전 백업 `backup/pre-msa-split`.
+- **MSA 분리 완료**: 16 서비스 + gateway, 전 서비스 DB-per-service, settlement↔order 이벤트 프로젝션(ADR 0020).
 - **제거된 도메인**: `reservation`(시공 예약) — 모듈·DB·라우팅·프론트·k8s 정리 완료.
 - **TPS 개선**: PgBouncer→Redpanda, settlement 배치/컨슈머 스레드·프로젝션 쿼리·캐시·PDF 비동기화 등.
+- **CI 백엔드 병렬화 (2026-08-14)**: 백엔드 게이트가 단일 잡으로 17모듈을 순차 실행해 14~43분이
+  걸렸고, 그 사이 다음 push 가 오면 concurrency 대기 슬롯(그룹당 1개)에서 밀려 취소됐다 —
+  **develop `ci` 20건 중 완주 2건**(실측). 즉 push 가 잦으면 게이트가 판정을 내지 못했다.
+  ① 모듈 매트릭스로 분할(`backend-test`) + 집계 잡(`backend-ci`)이 SBOM·Trivy·Sonar·커버리지
+  코멘트를 한 번만 수행, ② 최대 병목 `settlement-service` 는 포크 병렬화(`maxParallelForks`).
+
+  | 구간                        | 이전  | 이후                    |
+  | --------------------------- | ----- | ----------------------- |
+  | 백엔드 게이트(벽시계)       | 29분  | 11분 = 가장 느린 모듈   |
+  | 전체 `ci` run               | —     | 15분                    |
+  | `settlement-service` 테스트 | 9분36초(forks=1) | 6분2초(forks=2, **-37%**) |
+
+  모듈별(2026-08-14 run 31762060415): settlement 11분 · order 7분 · card 5분 · 나머지 2~4분 ·
+  집계 잡 3분. 포크 벤치마크는 격리 worktree + Docker 기동으로 측정했고 테스트 1,409개 ·
+  skip 1 · 실패 0 · JaCoCo 게이트 통과(포크가 exec 데이터를 손상시키지 않음)를 함께 확인했다.
+
+  **잡을 더 쪼개지 않은 이유**: `jacocoTestCoverageVerification`(LINE 90%)이 모듈 단위라, 한 모듈의
+  테스트를 CI 잡 여러 개로 나누면 각 샤드가 부분 커버리지만 갖게 되어 전부 게이트에 걸린다.
+  우회하려면 `.exec` 를 아티팩트로 모아 병합 후 검증하는 배선이 필요한데, 로컬 검증이 불가능해
+  CI 에서만 확인 가능해진다. 포크 병렬화는 커버리지 산정 단위를 건드리지 않는다.
+
+  **집계 잡 이름(`Backend - Build/Test/JaCoCo/SonarCloud`)은 바꾸지 말 것** — ruleset 의 필수 상태
+  체크로 등록된 문자열이고, 매트릭스 잡 이름은 가변이라 필수로 걸 수 없다. 또한 집계 잡에는
+  `always()` + needs 결과 명시 검사가 걸려 있다: 기본 동작인 skip 은 필수 체크에서 통과로
+  취급되어, 모듈 하나가 깨져도 게이트가 조용히 사라지기 때문이다.

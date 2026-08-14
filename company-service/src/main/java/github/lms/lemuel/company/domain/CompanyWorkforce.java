@@ -14,9 +14,6 @@ import java.util.Optional;
  */
 public class CompanyWorkforce {
 
-    /** 국민연금 보험료율(사용자+근로자 합산, 국민연금법 고정) — 당월고지금액에서 소득월액을 역산하는 데 쓴다. */
-    private static final BigDecimal NPS_CONTRIBUTION_RATE = new BigDecimal("0.09");
-
     /** 업종코드 롤업 단위 — 국세청 업종코드 연계표 기준 앞 3자리. */
     private static final int INDUSTRY_ROLLUP_LENGTH = 3;
 
@@ -37,6 +34,12 @@ public class CompanyWorkforce {
         if (headcount < 0) {
             throw new IllegalArgumentException("가입자수는 음수일 수 없습니다: " + headcount);
         }
+        // 기준월은 보험료율·상한 조회(NpsContributionRate·NpsIncomeCap)와 응답 직렬화가 모두 의존한다.
+        // null 을 통과시키면 생성은 성공하고 한참 뒤 추정연봉 계산이나 목록 응답에서 NPE 로 터진다
+        // (SonarCloud javabugs:S2259 가 CompanyWorkforceResponse:26 의 snapshotMonth().toString() 을 지적).
+        if (snapshotMonth == null) {
+            throw new IllegalArgumentException("기준월은 필수입니다");
+        }
         if (monthlyBilledAmount == null || monthlyBilledAmount.signum() < 0) {
             throw new IllegalArgumentException("당월고지금액은 음수일 수 없습니다: " + monthlyBilledAmount);
         }
@@ -51,8 +54,8 @@ public class CompanyWorkforce {
     }
 
     /**
-     * 추정연봉 — 당월고지금액(사업장 전체, 국민연금 보험료 9% 대납분 합계)을 가입자수로 나눈 뒤
-     * 보험료율로 역산해 1인당 월 소득월액을 구하고 12개월을 곱한다. 국민연금 기준소득월액 상한이
+     * 추정연봉 — 당월고지금액(사업장 전체, 기준월 적용 국민연금 보험료 대납분 합계)을 가입자수로 나눈 뒤
+     * 기준월 적용 보험료율로 역산해 1인당 월 소득월액을 구하고 12개월을 곱한다. 국민연금 기준소득월액 상한이
      * 적용되므로 고소득 구간은 실제보다 낮게 추정된다(왜곡 가능— 호출측에서 안내 문구 필요).
      */
     public Optional<BigDecimal> estimatedAnnualSalary() {
@@ -60,8 +63,9 @@ public class CompanyWorkforce {
             return Optional.empty();
         }
         BigDecimal annualBilled = monthlyBilledAmount.multiply(BigDecimal.valueOf(12));
-        BigDecimal denominator = BigDecimal.valueOf(headcount).multiply(NPS_CONTRIBUTION_RATE);
-        return Optional.of(annualBilled.divide(denominator, 0, RoundingMode.HALF_UP));
+        return NpsContributionRate.rateOf(snapshotMonth)
+                .map(contributionRate -> annualBilled.divide(
+                        BigDecimal.valueOf(headcount).multiply(contributionRate), 0, RoundingMode.HALF_UP));
     }
 
     /**

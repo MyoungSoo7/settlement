@@ -11,5 +11,7 @@ package github.lms.lemuel.account.domain;
 public enum OwnerType {
     SELLER,
     CORPORATE,
-    BORROWER
+    BORROWER,
+    /** 수신 상품(정기예금·적금·퇴직연금) 가입자 — ownerId = userId 숫자 문자열. 제도별로 쪼개지 않는다. */
+    DEPOSITOR
 }

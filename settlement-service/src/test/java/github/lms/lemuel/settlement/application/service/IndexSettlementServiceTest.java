@@ -52,14 +52,18 @@ class IndexSettlementServiceTest {
         service.bulkIndexSettlements(List.of(1L, 2L));
         verify(searchIndexPort, never()).bulkIndexSettlements(any());
     }
-    @Test @DisplayName("벌크 인덱싱 성공") void bulkIndex_success() {
+    @Test @DisplayName("벌크 인덱싱 성공 — 배치 조회 1회로 N+1 없이 인덱싱") void bulkIndex_success() {
         Settlement s1 = Settlement.createFromPayment(1L, 10L, new BigDecimal("5000"), LocalDate.now());
         Settlement s2 = Settlement.createFromPayment(2L, 20L, new BigDecimal("3000"), LocalDate.now());
         when(searchIndexPort.isSearchEnabled()).thenReturn(true);
-        when(loadSettlementPort.findById(1L)).thenReturn(Optional.of(s1));
-        when(loadSettlementPort.findById(2L)).thenReturn(Optional.of(s2));
+        when(loadSettlementPort.findAllByIds(List.of(1L, 2L))).thenReturn(List.of(s1, s2));
+
         service.bulkIndexSettlements(List.of(1L, 2L));
+
         verify(searchIndexPort).bulkIndexSettlements(argThat(list -> list.size() == 2));
+        // N+1 방지: 배치 조회 1회, id 당 findById 반복 없음
+        verify(loadSettlementPort).findAllByIds(List.of(1L, 2L));
+        verify(loadSettlementPort, never()).findById(any());
     }
     @Test @DisplayName("삭제 비활성") void delete_disabled() {
         when(searchIndexPort.isSearchEnabled()).thenReturn(false);

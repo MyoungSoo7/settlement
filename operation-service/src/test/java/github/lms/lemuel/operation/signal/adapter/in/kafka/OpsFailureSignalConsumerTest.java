@@ -66,6 +66,15 @@ class OpsFailureSignalConsumerTest {
     }
 
     @Test
+    void 회수지연은_재고부족과_다른_metricKey_로_적재된다() {
+        // 재고 "부족"과 회수 "지연"은 원인도 조치도 달라, 같은 버킷에 섞이면 대시보드가 무의미해진다.
+        consumer().onStockReclaimDelayed(record("lemuel.ops.stock.reclaim_delayed", "{}", 1000L), ack);
+
+        verify(recordSignalUseCase).recordEvent(eq("stock-reclaim"), eq(true), any());
+        verify(ack).acknowledge();
+    }
+
+    @Test
     void 깨진_JSON_이어도_record_timestamp_폴백으로_적재하고_ack_한다() {
         long ts = 1000L;
         consumer().onOrderFailed(record("lemuel.ops.order.failed", "not json", ts), ack);

@@ -7,6 +7,7 @@ import {
   mkdirSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -34,8 +35,13 @@ function toPosixPath(path) {
 
 function isPluginOrMcpPath(path) {
   // copilot 플러그인 트리는 서비스 소유 기준으로 재배치될 수 있으므로 부모 경로를 고정하지 않는다
-  // (settlement-copilot → settlement-service/src/main/resources/, invest-copilot → docs/harness/hackathon/).
-  return /(^|\/)(?:\.claude-plugin|\.codex-plugin|mcp)(?:\/|$)|(^|\/)\.mcp\.json$|(?:^|\/)(?:settlement|invest)-copilot(?:\/|$)/.test(
+  // (settlement-copilot → settlement-service/src/main/resources/. 소유 서비스가 없는 제출물은 저장소 미포함.)
+  //
+  // 로스터는 CLAUDE.md 의 배치 기준이 정본이다 — settlement-copilot·fashion-copilot·pwc(trusted-ceo)
+  // 는 서비스 resources 아래, invest-copilot 은 docs/harness/hackathon 아래. 하나라도 빠뜨리면
+  // fresh-repo 증명이 "플러그인 없이 선다"를 못 보이고, 남은 플러그인 문서가 걷어낸 플러그인을
+  // 가리켜 링크가 끊긴다(실사고: fashion-copilot → settlement-copilot).
+  return /(^|\/)(?:\.claude-plugin|\.codex-plugin|mcp)(?:\/|$)|(^|\/)\.mcp\.json$|(?:^|\/)(?:settlement|invest|fashion)-copilot(?:\/|$)|(?:^|\/)pwc(?:\/|$)/.test(
     toPosixPath(path),
   );
 }
@@ -73,8 +79,14 @@ function put(root, path, content) {
   writeFileSync(target, content);
 }
 
+// findGitRoot 는 실경로를 돌려준다. macOS tmpdir() 은 /var → /private/var 심링크라
+// 픽스처 쪽도 실경로로 정규화해 두지 않으면 개발자 맥에서만 깨진다(리눅스 CI 는 통과).
+function makeTempRoot(prefix) {
+  return realpathSync(mkdtempSync(join(tmpdir(), prefix)));
+}
+
 function createRepo() {
-  const root = mkdtempSync(join(tmpdir(), 'harness-install-'));
+  const root = makeTempRoot('harness-install-');
   temporaryRoots.push(root);
   assert.equal(git(root, 'init').status, 0);
   assert.equal(git(root, 'config', 'user.name', 'Harness Test').status, 0);
@@ -87,7 +99,7 @@ function createRepo() {
 }
 
 function createFreshRepositorySnapshot() {
-  const root = mkdtempSync(join(tmpdir(), 'harness-fresh-repository-'));
+  const root = makeTempRoot('harness-fresh-repository-');
   temporaryRoots.push(root);
   const tracked = git(projectRoot, 'ls-tree', '-r', '--name-only', '-z', 'HEAD').stdout
     .split('\0')
@@ -117,8 +129,22 @@ function cpTestPaths(directory) {
     .filter(existsSync);
 }
 
+// 임시 트리 정리 — 이 테스트는 픽스처 안에서 git 을 여러 번 돌리고(init·add·commit) 자식
+// 하네스 테스트까지 실행한다. 그 프로세스들이 종료 직후에도 잠깐 파일 핸들을 붙들고 있으면
+// rmSync 가 ENOTEMPTY 로 터지는데, after 훅의 예외는 <b>서브테스트가 전부 통과해도</b> 스위트를
+// 실패시킨다(실제로 CI 에서 그렇게 한 번 빨갛게 떴다).
+//
+// 그래서 ① 재시도로 핸들이 풀릴 시간을 주고 ② 그래도 남으면 삼킨다 — 정리 실패는 검증 결과가
+// 아니라 임시 디렉터리 찌꺼기일 뿐이고, OS 가 회수한다. 여기서 스위트를 빨갛게 만들면
+// "게이트가 무엇을 막는지"가 흐려진다.
 test.after(() => {
-  for (const root of temporaryRoots) rmSync(root, { recursive: true, force: true });
+  for (const root of temporaryRoots) {
+    try {
+      rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    } catch {
+      // 의도적 무시 — 위 주석 참조.
+    }
+  }
 });
 
 test('repository-owned harness documentation does not reference the legacy shell installer', () => {
@@ -227,4 +253,27 @@ test('fresh repository reproduces the complete plugin-independent harness contra
   const deletedReferenceAudit = run(root, process.execPath, ['scripts/harness/harness-audit.mjs']);
   assert.notEqual(deletedReferenceAudit.status, 0);
   assert.match(deletedReferenceAudit.stdout, /broken reference.*deleted-reference\.mjs.*not tracked/i);
+});
+
+// fresh-repo 증명은 "플러그인 없이도 하네스가 선다"를 보이는 것이므로, 플러그인 트리를 하나라도
+// 남기면 증명이 약해진다. 실제로 fashion-copilot 이 남아 settlement-copilot 링크가 끊겼다
+// (필터가 settlement/invest 만 알고 fashion·pwc 를 몰랐다). 로스터는 CLAUDE.md 배치 기준이 정본.
+test('plugin filter strips every tracked plugin tree, not just some', () => {
+  for (const path of [
+    'settlement-service/src/main/resources/settlement-copilot/README.md',
+    'order-service/src/main/resources/fashion-copilot/README.md',
+    'company-service/src/main/resources/pwc/README.md',
+    'docs/harness/hackathon/invest-copilot/README.md',
+  ]) {
+    assert.ok(isPluginOrMcpPath(path), `플러그인 경로인데 걸러지지 않음: ${path}`);
+  }
+
+  for (const path of [
+    'settlement-service/src/main/java/github/lms/lemuel/settlement/domain/Settlement.java',
+    'order-service/src/main/resources/templates/mail.html',
+    'scripts/harness/guard.mjs',
+    'docs/polyglot-services.md',
+  ]) {
+    assert.ok(!isPluginOrMcpPath(path), `플러그인이 아닌데 걸러짐: ${path}`);
+  }
 });

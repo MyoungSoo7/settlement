@@ -1,0 +1,109 @@
+# Seed: gateway-service 라우팅 표면 as-is 사양 (Ouroboros 방법론 — Interview → Seed 결정화)
+# 상태: CONFIRMED (기존 서비스 seed 와 동일 방식 지시로 승인 승계, 2026-08-13)
+# 원칙: 이 Seed 는 "현행 코드가 실제로 하는 일"의 불변 기술이다. 결함은 교정하지 않고 known_issues 로만 기록한다.
+
+seed:
+  id: gateway-service-routing-v1
+  goal: >-
+    gateway-service(Spring Cloud Gateway WebFlux 8080 — 단일 오리진 라우팅 18건·프리픽스 무변경 전달·
+    위성 admin 경로 미노출·폴리글랏 2종 RewritePath)의 현행 동작을 실행 가능한 게이트에 매핑된
+    불변 사양으로 결정화해, 회귀 기준선 · 면접/포트폴리오 문서 · 후속 배선 베이스로 사용한다.
+
+  scope:
+    included:
+      - 라우트 정의 18건 (predicate·백엔드 URI 환경변수·필터)
+      - 노출면 정책 (위성 /admin/** 미등록, deposit 등급 분리, notification 정확일치)
+      - 런타임 형태 (reactive 고정·무상태·graceful shutdown·actuator)
+      - 배포 배선 (compose 환경변수·depends_on·nginx 프론트 프록시 경계)
+    excluded:
+      - 각 백엔드 서비스의 인증/인가·도메인 규칙 (각 서비스 seed 소관)
+      - k8s Ingress·helm 차트 (helm-deploy 레포)
+
+  constraints:
+    - "자체 인증 필터 0개 — 게이트웨이 통과는 인증 통과가 아니다. JWT 검증은 각 서비스 보안 체인"
+    - "DB·세션·캐시 없음 — 완전 무상태"
+    - "Kafka 의존이 빌드에 없음 — 이벤트 발행/소비 0"
+    - "프리픽스 무변경 전달이 기본 — 필터는 RewritePath 2건뿐"
+    - "spring.main.web-application-type=reactive 명시 고정 (WebFlux)"
+    - "bcprov-jdk18on 은 constraint 로 1.84 고정 — 직접 의존 추가 없이 전이 버전만 상향"
+
+  invariants:  # as-is 코드 사실 — 파일:라인 근거 (경로 접두 gateway-service/)
+    route_table:
+      source: src/main/resources/application.yml:12-159
+      rule: >-
+        라우트 18건 = 16 Java 서비스 전부 + 폴리글랏 2종(market-stream·notification).
+        모든 uri 는 ${<SVC>_SERVICE_URI:http://localhost:<port>} 형태 — 배포 시 주입, 기본값은 로컬 포트.
+      java_routes: "order(8088)·settlement(8082)·loan(8084)·financial(8086)·economics(8087)·company(8090)·operation(8092)·market(8094)·ai(8096)·commondata(8098)·investment(8100)·account(8102)·organization(8104)·card(8106)·insurance(8108)·deposit(8112)"
+      polyglot_routes: "market-stream(8110)·notification(8130) — 나머지 폴리글랏 5종은 라우트 없음"
+    prefix_passthrough:
+      source: src/main/resources/application.yml:16-19
+      rule: "게이트웨이는 프리픽스를 바꾸지 않는다. order 는 컨트롤러별 /api 유무가 혼재하는데 통일하지 않고 양쪽을 그대로 열거한다(주석 명문)"
+      exceptions: "RewritePath 2건 — /api/market-stream/(?<segment>.*) -> /$\\{segment} (:143), /api/notifications/stream -> /notifications/stream (:158)"
+    exposure_policy:
+      source: src/main/resources/application.yml:31-64,120-133,150-152
+      rule: >-
+        위성 5종(financial·economics·company·market·commondata)은 공개 조회 /api/{도메인}/** 만 라우팅하고
+        수집 트리거 /admin/** 는 등록하지 않는다(각 라우트 주석에 '외부 미노출' 명문) — 라우트 미등록이 곧 차단.
+      deliberate_inclusions: "order·settlement 의 /admin/** 는 운영 콘솔이 쓰므로 경로를 손으로 열거(order 13종·settlement 17종)"
+      deposit_split: "deposit 만 /api(읽기)와 /admin(잔고 이동)을 한 predicate 에 담되 와일드카드로 합치지 않는다 — 권한 등급이 다르다는 주석 명문 (:129-133)"
+      notification_exact: "notification 은 Path 정확일치 1건 — /notifications/send·/demo 는 무인증 발송 경로라 와일드카드 금지(주석 명문 :154-157)"
+    stateless_runtime:
+      source: src/main/resources/application.yml:5-7,161-181 + src/main/java/github/lms/lemuel/GatewayServiceApplication.java
+      rule: "@SpringBootApplication 단일 클래스(11줄) + YAML 이 전부. 컨트롤러·필터·설정 클래스 0. reactive 고정, server.shutdown=graceful, actuator health/info/metrics/prometheus, health.show-details=when-authorized + liveness/readiness probe"
+    supply_chain_pin:
+      source: build.gradle.kts:8-19
+      rule: "spring-cloud-starter 5.0.0 이 전이로 끌어오는 bcprov-jdk18on 1.81 은 CVE-2025-14813(CRITICAL). Boot BOM 밖이라 Boot 상향으로 해소 안 됨 → constraints 로 1.84 상향. 실측 근거는 run 31611508158 의 Trivy 이미지 스캔 실패(이미지 스캔은 .trivyignore.yaml 미적용)"
+    deployment_wiring:
+      source: ../docker-compose.yml:1261-1305 + ../frontend/nginx.compose.conf:27-90
+      rule: >-
+        compose gateway 는 15개 Java 서비스 URI + MARKET_STREAM_SERVICE_URI 를 주입하고
+        depends_on 은 order-service(service_healthy) 하나뿐. 포트는 127.0.0.1:8080 바인딩.
+        nginx 는 변수 proxy_pass + resolver 127.0.0.11 로 매 요청 DNS 재해석(stale IP 로 전 API 500 나던 실사고 대응).
+      sse_locations: "nginx 에 proxy_buffering off 전용 location 은 /api/ai/ 와 /api/market-stream/ 2건뿐"
+
+  event_contracts:
+    published: []  # 없음 — Kafka 의존 자체가 빌드에 없음
+    consumed: []
+    note: "순수 HTTP 라우터 — 서비스 간 연계에 관여하지 않는다"
+
+  acceptance_criteria:  # 실행 가능 — 각 AC 는 기존 게이트에 매핑
+    - id: AC-1
+      criterion: 스프링 컨텍스트가 reactive 스택으로 부팅된다
+      gate: "./gradlew :gateway-service:test — GatewayServiceApplicationTest.contextLoads (RANDOM_PORT 로 Netty 조립까지 포함)"
+    - id: AC-2
+      criterion: application.yml 의 라우트가 RouteLocator 에 로드된다
+      gate: "GatewayServiceApplicationTest.routesAreConfigured (단 5개 id 만 어서트 — KI-3)"
+    - id: AC-3
+      criterion: 이미지에 CRITICAL CVE 0
+      gate: ".github/workflows — Trivy image scan (CRITICAL gate)"
+    - id: AC-4
+      criterion: 라우트 대상 16 Java 서비스 로스터가 settings.gradle.kts 와 일치한다
+      gate: "node scripts/harness/harness-audit.mjs (로스터 드리프트 차단)"
+
+  known_issues:  # 발견만 기록 — 사양은 as-is 유지
+    - id: KI-1
+      finding: "★ notification 라우트가 compose 에서 도달 불가 — docker-compose.yml 에 notification-service 컨테이너 정의가 없고 gateway environment 에 NOTIFICATION_SERVICE_URI 도 없다. 기본값 http://localhost:8130 은 gateway 컨테이너 자신을 가리킨다. CLAUDE.md 는 폴리글랏 2종 모두 'gateway 라우팅 + compose 배선'이라고 기술하지만 compose 배선은 market-stream 한쪽만 사실"
+      disposition: recorded-not-fixed (high — 기능 미도달)
+    - id: KI-2
+      finding: "★ /api/notifications/stream 에 nginx 무버퍼 location 이 없다 — 범용 regex location(nginx.compose.conf:79-90)에 잡혀 proxy_buffering 기본 on + proxy_read_timeout 60s. KI-1 이 해소돼도 SSE 가 묶여 도착하고 60초마다 끊긴다 (/api/ai/·/api/market-stream/ 은 전용 무버퍼 location 보유)"
+      disposition: recorded-not-fixed (high — SSE 품질)
+    - id: KI-3
+      finding: "라우트 테스트가 18건 중 5건 id 만 어서트 — 나머지 13건은 삭제·오타에도 테스트 통과. 라우트 목록이 이 서비스의 유일한 프로덕션 로직인데 대부분 회귀 보호 밖"
+      disposition: recorded-not-fixed (medium)
+    - id: KI-4
+      finding: "경로 화이트리스트 수기 유지 — order predicate 32경로·settlement 22경로. 백엔드 컨트롤러 추가 시 누락하면 컴파일·테스트 통과 후 런타임 404(msa-service-wiring 스킬이 다루는 함정). nginx 는 같은 문제를 겪고 allowlist 를 버리는 방향으로 전환했으나(nginx.compose.conf:31-34 주석) 게이트웨이만 allowlist 유지"
+      disposition: by-design-documented (트레이드오프: 노출면 통제 vs 유지비)
+    - id: KI-5
+      finding: "compose 가 SPRING_PROFILES_ACTIVE=prod 를 주입하나 application-prod.yml 이 없다 — 무해하지만 'prod 는 다르게 동작한다'는 오해 유발"
+      disposition: recorded-not-fixed (low)
+    - id: KI-6
+      finding: "depends_on 이 order-service 하나뿐 — 나머지 15개 미기동 시 게이트웨이는 정상 기동하고 커넥션 오류를 그대로 노출. actuator health 에 백엔드 도달성 미반영"
+      disposition: by-design (게이트웨이 헬스는 자기 기동만 의미)
+    - id: KI-7
+      finding: "CORS·RateLimit 설정 없음 — 동일 오리진(nginx→gateway) 전제. RateLimit 은 각 서비스 Bucket4j 가 담당(의도), CORS 는 브라우저 직접 호출 배포 형태에서 주체가 흩어짐"
+      disposition: by-design (N2·N7)
+
+  uses:
+    - regression-baseline
+    - interview-portfolio
+    - brownfield-base

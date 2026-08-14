@@ -26,7 +26,7 @@ description: "완료" 선언 직전 검증 절차 — HARNESS.md DoD 게이트�
 4. **작성·검증 분리** — 설계 판단이 필요한 변경(돈 경로·경계·계약)은 같은 컨텍스트에서
    자기 승인하지 않는다. `code-reviewer`/`verifier` 별도 패스 또는 해당 리뷰 에이전트
    (🤖`hexagonal-arch-reviewer`·`event-contract-reviewer`·`gl-ledger-auditor`)로 증거를 받는다.
-5. **문서 후속** — 휘발성 수치를 바꿨으면 재현 명령 재실행 + `STATUS.md#핵심 수치` 갱신.
+5. **문서 후속** — 휘발성 수치를 문서에 적었다면 재현 명령을 병기한다(값만 적으면 즉시 드리프트).
 
 ## 완료 보고 형식
 

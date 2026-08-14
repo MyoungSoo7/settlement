@@ -39,6 +39,7 @@ public enum ErrorCode {
     DUPLICATE_PRODUCT_NAME(HttpStatus.CONFLICT, "이미 존재하는 상품명입니다."),
     INSUFFICIENT_STOCK(HttpStatus.BAD_REQUEST, "재고가 부족합니다."),
     STOCK_CONCURRENCY(HttpStatus.CONFLICT, "재고 동시성 충돌이 발생했습니다. 잠시 후 다시 시도해주세요."),
+    IMAGE_STORAGE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "이미지 저장에 실패했습니다. 잠시 후 다시 시도해주세요."),
 
     // ─── category ────────────────────────────────────────────────────────────
     CATEGORY_NOT_FOUND(HttpStatus.NOT_FOUND, "카테고리를 찾을 수 없습니다."),
@@ -61,6 +62,14 @@ public enum ErrorCode {
     LEDGER_NOT_FOUND(HttpStatus.NOT_FOUND, "원장 항목을 찾을 수 없습니다."),
     LEDGER_PERIOD_CLOSED(HttpStatus.CONFLICT, "마감된 원장 기간에는 신규 분개를 작성할 수 없습니다."),
     LEDGER_PERIOD_IMBALANCE(HttpStatus.UNPROCESSABLE_ENTITY, "시산표 차대가 균형을 이루지 않아 기간을 마감할 수 없습니다."),
+    MONTHLY_CLOSING_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 월의 정보계 마감 이력이 없습니다."),
+    MONTHLY_CLOSING_LOCKED(HttpStatus.CONFLICT, "원장 마감된 기간의 정보계 마트는 재적재할 수 없습니다."),
+    MONTHLY_CLOSING_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "정보계 월마감 실행에 실패했습니다."),
+
+    // ─── tax (세금계산서 OCR 스캔) ────────────────────────────────────────────
+    TAX_INVOICE_SCAN_NOT_FOUND(HttpStatus.NOT_FOUND, "세금계산서 스캔을 찾을 수 없습니다."),
+    TAX_OCR_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "세금계산서 OCR 을 사용할 수 없습니다. 잠시 후 다시 시도해주세요."),
+    TAX_SCAN_UNSUPPORTED_FILE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "지원하지 않는 스캔 파일 형식입니다."),
 
     // ─── loan (선정산·기업 신용대출) ─────────────────────────────────────────────
     CORPORATE_LOAN_NOT_FOUND(HttpStatus.NOT_FOUND, "대출 건 또는 재무자료를 찾을 수 없습니다."),
@@ -69,6 +78,13 @@ public enum ErrorCode {
     // ─── loan (담보·개인신용 대출) ───────────────────────────────────────────────
     SECURED_LOAN_NOT_FOUND(HttpStatus.NOT_FOUND, "담보/개인신용 대출을 찾을 수 없습니다."),
     SECURED_LOAN_REJECTED(HttpStatus.UNPROCESSABLE_ENTITY, "담보/개인신용 대출 심사가 거절되었습니다."),
+    // 담보서류 OCR (ADR 0036 확산) — 판독 실패는 무폴백 503, 대사 미통과 승인은 422.
+    LOAN_COLLATERAL_DOC_NOT_FOUND(HttpStatus.NOT_FOUND, "담보서류를 찾을 수 없습니다."),
+    LOAN_COLLATERAL_DOC_OCR_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "담보서류 판독에 실패했습니다. 잠시 후 다시 시도해주세요."),
+    LOAN_COLLATERAL_DOC_NOT_MATCHED(HttpStatus.UNPROCESSABLE_ENTITY, "담보서류 대사가 완료되지 않아 승인할 수 없습니다."),
+
+    // ─── loan (리스·할부 물건금융) ──────────────────────────────────────────────
+    LEASE_CONTRACT_NOT_FOUND(HttpStatus.NOT_FOUND, "리스·할부 계약을 찾을 수 없습니다."),
 
     // ─── investment (CEO 투자하기) ──────────────────────────────────────────────
     INVESTMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "투자 주문을 찾을 수 없습니다."),
@@ -89,8 +105,34 @@ public enum ErrorCode {
     CARD_SUB_LIMIT_EXCEEDED(HttpStatus.UNPROCESSABLE_ENTITY, "임직원 한도 합계가 법인 마스터 한도를 초과합니다."),
     CARD_HOLDER_NOT_MEMBER(HttpStatus.UNPROCESSABLE_ENTITY, "해당 조직의 활성 구성원이 아닙니다."),
     CARD_FORBIDDEN(HttpStatus.FORBIDDEN, "이 작업을 수행할 권한이 없습니다."),
+    CARD_AUTHORIZATION_NOT_FOUND(HttpStatus.NOT_FOUND, "승인 홀드를 찾을 수 없습니다."),
     // 재원 조회 실패는 폴백 없이 명시적 실패시킨다 — 재원을 모른 채 추정 한도를 주면 그 자체가 여신 사고다.
-    CARD_FUNDING_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "재원 조회에 실패했습니다. 잠시 후 다시 시도해주세요.");
+    CARD_FUNDING_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "재원 조회에 실패했습니다. 잠시 후 다시 시도해주세요."),
+    // 영수증 판독 실패도 재원 조회와 같은 무폴백 원칙(ADR 0036) — 추정 판독을 대사 근거로 쓰지 않는다.
+    CARD_RECEIPT_OCR_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "영수증 판독에 실패했습니다. 잠시 후 다시 시도해주세요."),
+    CARD_RECEIPT_NOT_FOUND(HttpStatus.NOT_FOUND, "영수증을 찾을 수 없습니다."),
+    // 대사 미통과 영수증으로는 승인 불가 — 요청 형식의 잘못이 아니라 "지금은 승인 불가"라서 422.
+    CARD_RECEIPT_NOT_MATCHED(HttpStatus.UNPROCESSABLE_ENTITY, "영수증 대사가 완료되지 않아 승인할 수 없습니다."),
+
+    // ─── banking (수신 상품 — 정기예금·적금·퇴직연금) ─────────────────────────────
+    // 형제 도메인과 같이 상품별 전용 NOT_FOUND 를 둔다. INVALID_ARGUMENT 로 대용하면 없는 리소스가
+    // 400 으로 나가 클라이언트가 "잘못 보냈다"와 "없다"를 구분하지 못한다.
+    TIME_DEPOSIT_NOT_FOUND(HttpStatus.NOT_FOUND, "정기예금을 찾을 수 없습니다."),
+    INSTALLMENT_SAVINGS_NOT_FOUND(HttpStatus.NOT_FOUND, "적금을 찾을 수 없습니다."),
+    RETIREMENT_PENSION_NOT_FOUND(HttpStatus.NOT_FOUND, "퇴직연금을 찾을 수 없습니다."),
+
+    // ─── deposit (셀러 예치금 원장) ──────────────────────────────────────────────
+    DEPOSIT_ACCOUNT_NOT_FOUND(HttpStatus.NOT_FOUND, "예치 계좌를 찾을 수 없습니다."),
+    // 잔고 부족은 요청 형식의 잘못이 아니라 "지금은 처리 불가"라서 400 이 아닌 422 다
+    // (investment 의 INSUFFICIENT_FUNDING 과 같은 판단).
+    INSUFFICIENT_DEPOSIT(HttpStatus.UNPROCESSABLE_ENTITY, "예치금 잔고가 부족합니다."),
+    // deposit_entries 자연키(UNIQUE) 충돌 — 같은 referenceId 로 두 번 기표하려 한 경우.
+    // 잔고를 두 번 움직이지 않고 409 로 되돌린다(L3 멱등 방어선이 잡아낸 상황).
+    DUPLICATE_DEPOSIT_ENTRY(HttpStatus.CONFLICT, "이미 처리된 예치금 요청입니다."),
+    // 수기 기표 증빙 OCR (ADR 0036 확산) — 판독 실패는 무폴백 503, 대사 미통과 기표는 422.
+    DEPOSIT_PROOF_NOT_FOUND(HttpStatus.NOT_FOUND, "예치금 증빙을 찾을 수 없습니다."),
+    DEPOSIT_PROOF_OCR_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "예치금 증빙 판독에 실패했습니다. 잠시 후 다시 시도해주세요."),
+    DEPOSIT_PROOF_NOT_MATCHED(HttpStatus.UNPROCESSABLE_ENTITY, "예치금 증빙 대사가 완료되지 않아 기표할 수 없습니다.");
 
     private final HttpStatus status;
     private final String defaultMessage;

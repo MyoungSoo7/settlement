@@ -4,6 +4,7 @@ import github.lms.lemuel.card.domain.AuthorizationHold;
 import github.lms.lemuel.card.domain.Card;
 import github.lms.lemuel.card.domain.CardAccount;
 import github.lms.lemuel.card.domain.CardAccountStatus;
+import github.lms.lemuel.card.domain.CardCapture;
 import github.lms.lemuel.card.domain.CardStatus;
 import github.lms.lemuel.card.domain.LimitChangeResult;
 
@@ -87,4 +88,39 @@ public interface PublishCardEventPort {
      * @param account 카드계정(파티션 키 · 잔여 마스터한도 계산에 쓴다)
      */
     void publishAuthorized(AuthorizationHold hold, Card card, CardAccount account);
+
+    /**
+     * 카드 매입(capture) — 토픽 {@code lemuel.card.captured}.
+     *
+     * <p>계약 스키마({@code lemuel.card.captured.schema.json}) required 필드:
+     * captureId · authorizationId · cardId · cardAccountId · amount · capturedAt.
+     *
+     * <p>파티션 키: {@code cardAccountId}(1단계·2단계 승인과 동일) — 같은 계정의 발급·승인·매입이
+     * 같은 파티션에 순서대로 떨어져야 소비자(account-service GL 분개)가 일관된 순서를 본다.
+     *
+     * <p>금액({@code amount})은 승인 금액이 아니라 <b>이번 매입 금액</b>이다(부분 매입에서 둘은 다르다).
+     * 반드시 {@link java.math.BigDecimal#toPlainString()} 으로 직렬화한다(DATA-STANDARD N5).
+     *
+     * @param capture 저장된 매입 레코드(captureId · capturedAmount · capturedAt 포함)
+     * @param hold    승인 홀드(authorizationId 포함)
+     */
+    void publishCaptured(CardCapture capture, AuthorizationHold hold);
+
+    /**
+     * 청구서 전액 납부 완료 — 토픽 {@code lemuel.card.statement_paid}.
+     *
+     * <p>계약 스키마({@code lemuel.card.statement_paid.schema.json}) required 필드:
+     * statementId · cardAccountId · billingYearMonth · paidAmount · paymentId · paidAt.
+     *
+     * <p>파티션 키: {@code cardAccountId} — 1단계 카드 이벤트·2단계 승인·매입과 동일.
+     * 같은 계정의 발급·승인·매입·청구 이벤트가 같은 파티션에 순서대로 떨어져야 소비자(GL 분개)가
+     * 일관된 순서를 본다.
+     *
+     * <p>금액({@code paidAmount})은 반드시 {@link java.math.BigDecimal#toPlainString()} 으로
+     * 직렬화한다(DATA-STANDARD N5).
+     *
+     * @param statement 전액 납부된 명세서
+     * @param paymentId 이번 납부 멱등 키
+     */
+    void publishStatementPaid(github.lms.lemuel.card.domain.CardStatement statement, String paymentId);
 }

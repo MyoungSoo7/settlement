@@ -122,6 +122,15 @@ public class PaymentDomain {
         this.updatedAt = LocalDateTime.now();
     }
 
+    // Business logic: Expire payment (미입금 만료) — 입금을 기다리는 READY 건만 만료 가능.
+    // 승인 이후에는 자금이 잡혀 있으므로 cancel/refund 경로를 쓴다(상태머신: READY ↘ EXPIRED).
+    // 만료 여부 판정(수단·기한)은 PaymentExpiryPolicy 가, 전이 가능 여부는 이 가드가 책임진다.
+    public void expire() {
+        requireTransition(PaymentStatus.EXPIRED);
+        this.status = PaymentStatus.EXPIRED;
+        this.updatedAt = LocalDateTime.now();
+    }
+
     // Business logic: Refund payment
     public void refund() {
         requireTransition(PaymentStatus.REFUNDED);

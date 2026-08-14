@@ -97,7 +97,10 @@ spring:
         max.in.flight.requests.per.connection: 5
         compression.type: lz4
     consumer:
-      group-id: lemuel-settlement
+      # 모놀리스 분리 시점에 lemuel-settlement 이 남아 있었다. order 에 @KafkaListener 가 붙는 순간
+      # settlement 와 같은 컨슈머 그룹이 되어 파티션을 나눠 갖고 오프셋까지 공유했을 것이다(정산 이벤트
+      # 조용한 유실). 리스너가 0건인 지금 정정한다 — 이관할 오프셋이 없다. guard KAFKA-GROUP-OWNER 강제.
+      group-id: lemuel-order
       auto-offset-reset: earliest               # 새 컨슈머는 시작부터 재생
       enable-auto-commit: false                 # 수동 ack → 멱등 처리 후 커밋
       properties:
@@ -251,7 +254,7 @@ app:
   kafka:
     enabled: ${APP_KAFKA_ENABLED:false}         # 로컬 개발 기본 OFF — 프로덕션 compose/K8s 에서 true
     topic:
-      partitions: ${APP_KAFKA_TOPIC_PARTITIONS:3}   # 컨슈머 병렬 소비 상한 — settlement concurrency 와 함께 스케일
+      owner: order-service   # ADR 0035 — 이 모듈이 발행(소유)하는 토픽만 만든다(파티션 정본은 topic-catalog.json)
       payment-captured: lemuel.payment.captured
       payment-refunded: lemuel.payment.refunded
   outbox:
@@ -274,6 +277,23 @@ app:
       # 100 만원 이상 거래는 한도/안정성을 위해 고액 우선 PG 로 라우팅
       high-amount-threshold: 1000000
       high-amount-preferred: NICE
+  # 셀러 등급 산정 (ADR 0031) — 등급 하나가 수수료율·정산주기·홀드백 3축을 동시에 바꾼다.
+  # 임계는 재무 승인 사항이라 코드가 아니라 여기서 온다(승인 갱신 때 배포 불필요).
+  seller-tier:
+    # 12개월 결제 순액(환불 차감) 기준 승급 임계. 2026-08-09 승인.
+    #   ~5억      NORMAL     수수료 3.5% · T+7 · 홀드백 30%/30일
+    #   5억~30억  VIP        수수료 2.5% · T+3 · 홀드백 10%/14일
+    #   30억~     STRATEGIC  수수료 2.0% · T+1 · 홀드백 0%
+    vip-threshold: ${APP_SELLER_TIER_VIP_THRESHOLD:500000000}
+    strategic-threshold: ${APP_SELLER_TIER_STRATEGIC_THRESHOLD:3000000000}
+    # 강등만 유예한다(승급은 즉시). 임계 근처 셀러가 매월 오르내리면 경제조건이 출렁이기 때문이다.
+    # 승급 후 3개월은 강등 없음 + 유예가 끝나도 연속 2회 미달해야 강등된다(1회는 GUARDED 로 이력만).
+    guard-months: ${APP_SELLER_TIER_GUARD_MONTHS:3}
+    miss-threshold: ${APP_SELLER_TIER_MISS_THRESHOLD:2}
+    auto-evaluate:
+      # 기본 OFF — 사람 확인 없이 수수료·정산주기·홀드백이 바뀌지 않게 한다. 운영 절차는
+      # POST /admin/seller-tiers/evaluate (미리보기) → 결과 확인 → ?dryRun=false (반영).
+      enabled: ${APP_SELLER_TIER_AUTO_EVALUATE_ENABLED:false}
   search:
     enabled: false
   jwt:

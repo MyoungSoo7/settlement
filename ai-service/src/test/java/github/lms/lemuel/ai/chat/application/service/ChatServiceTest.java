@@ -9,11 +9,13 @@ import github.lms.lemuel.ai.chat.application.port.in.ChatUseCase.ChatResult;
 import github.lms.lemuel.ai.chat.application.port.out.ChatCompletionPort;
 import github.lms.lemuel.ai.chat.application.port.out.LoadConversationPort;
 import github.lms.lemuel.ai.chat.application.port.out.RateLimitPort;
+import github.lms.lemuel.ai.chat.application.port.out.RetrieveContextPort;
 import github.lms.lemuel.ai.chat.application.port.out.SaveConversationPort;
 import github.lms.lemuel.ai.chat.domain.ChatCompletion;
 import github.lms.lemuel.ai.chat.domain.ChatMessage;
 import github.lms.lemuel.ai.chat.domain.Conversation;
 import github.lms.lemuel.ai.chat.domain.MessageRole;
+import github.lms.lemuel.ai.chat.domain.RetrievedContext;
 import github.lms.lemuel.ai.config.AiChatProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -53,6 +55,9 @@ class ChatServiceTest {
     @Mock LoadConversationPort loadConversationPort;
     @Mock SaveConversationPort saveConversationPort;
     @Mock RateLimitPort rateLimitPort;
+    // RAG 근거 검색. Mockito 기본 응답이 List 에 대해 빈 리스트라, 별도 스텁이 없는
+    // 기존 테스트는 모두 "근거 0건" 경로 = RAG 도입 전과 동일한 프롬프트를 그대로 검증한다.
+    @Mock RetrieveContextPort retrieveContextPort;
 
     private ChatService chatService;
 
@@ -61,7 +66,7 @@ class ChatServiceTest {
         AiChatProperties properties = new AiChatProperties(
                 "test-key", "claude-test", 1024, 10, 30, SYSTEM_PROMPT);
         chatService = new ChatService(chatCompletionPort, loadConversationPort, saveConversationPort,
-                rateLimitPort, properties, Clock.fixed(NOW, ZoneOffset.UTC));
+                rateLimitPort, retrieveContextPort, properties, Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     @Test
@@ -206,6 +211,51 @@ class ChatServiceTest {
         verify(saveConversationPort).saveExchange(saved.capture(), userMsg.capture(), any());
         assertThat(userMsg.getValue().content()).doesNotContain("4111");
         assertThat(saved.getValue().title()).doesNotContain("4111");
+    }
+
+    @Test
+    @DisplayName("RAG 근거 있음 — 시스템 프롬프트에만 근거가 붙고, 사용자 메시지·저장본은 그대로다")
+    void chat_withRetrievedContext_augmentsSystemPromptOnly() {
+        when(chatCompletionPort.isConfigured()).thenReturn(true);
+        when(retrieveContextPort.retrieve("정산주기가 어떻게 되나요?")).thenReturn(List.of(
+                new RetrievedContext("정산 정책", "docs://settlement/policy",
+                        "VIP 셀러의 정산주기는 T+3 영업일입니다.", 0.91)));
+        when(chatCompletionPort.complete(anyString(), any(), anyString()))
+                .thenReturn(new ChatCompletion("T+3 영업일입니다.", "claude-test", 300, 20));
+
+        chatService.chat(new ChatCommand(USER_ID, null, "정산주기가 어떻게 되나요?"));
+
+        ArgumentCaptor<String> prompt = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> userText = ArgumentCaptor.forClass(String.class);
+        verify(chatCompletionPort).complete(prompt.capture(), any(), userText.capture());
+        assertThat(prompt.getValue())
+                .startsWith(SYSTEM_PROMPT)
+                .contains("T+3 영업일", "정산 정책");
+        // 근거는 프롬프트에만 실린다 — 사용자 메시지에 섞으면 대화 이력에 영구 저장되고
+        // 다음 턴의 히스토리 윈도까지 오염된다.
+        assertThat(userText.getValue()).isEqualTo("정산주기가 어떻게 되나요?");
+
+        ArgumentCaptor<ChatMessage> userMsg = ArgumentCaptor.forClass(ChatMessage.class);
+        verify(saveConversationPort).saveExchange(any(), userMsg.capture(), any());
+        assertThat(userMsg.getValue().content()).isEqualTo("정산주기가 어떻게 되나요?");
+    }
+
+    @Test
+    @DisplayName("RAG 검색 실패 — 대화는 계속되고 프롬프트는 원본 그대로다 (검색 장애가 챗봇을 멈추지 않는다)")
+    void chat_retrievalFailure_degradesToNoContext() {
+        when(chatCompletionPort.isConfigured()).thenReturn(true);
+        when(retrieveContextPort.retrieve(anyString()))
+                .thenThrow(new IllegalStateException("임베딩 API 다운"));
+        when(chatCompletionPort.complete(anyString(), any(), anyString()))
+                .thenReturn(new ChatCompletion("답변", "claude-test", 10, 5));
+
+        ChatResult result = chatService.chat(new ChatCommand(USER_ID, null, "질문"));
+
+        assertThat(result.reply()).isEqualTo("답변");
+        // LLM 실패와 달리 503 으로 올리지 않는다 — 근거 없는 답은 여전히 가능하기 때문.
+        verify(chatCompletionPort).complete(eq(SYSTEM_PROMPT), any(), eq("질문"));
+        verify(rateLimitPort, never()).refund(USER_ID);
+        verify(saveConversationPort).saveExchange(any(), any(), any());
     }
 
     @Test
