@@ -4,7 +4,7 @@
 #   docker build --build-arg MODULE=settlement-service .
 #   docker build --build-arg MODULE=gateway-service .
 ############################
-FROM gradle:9.1.0-jdk25 AS builder
+FROM gradle:9.7.0-jdk25 AS builder
 ARG MODULE
 WORKDIR /workspace
 
