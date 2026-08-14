@@ -76,7 +76,7 @@ dependencies {
     testImplementation("org.mockito:mockito-core")
     // Java 25 클래스 파싱은 ArchUnit 1.4.x 부터 지원
     testImplementation("com.tngtech.archunit:archunit-junit5:1.4.1")
-    testImplementation(platform("org.testcontainers:testcontainers-bom:1.21.4"))
+    testImplementation(platform("org.testcontainers:testcontainers-bom:2.0.5"))
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:postgresql")
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
