@@ -64,6 +64,21 @@ const STATIC_QUERIES = new Map([
   // 패널은 조건부 블록 안이라 등록하지 않고 재시도 조회로 고쳤다.
   ["TaxConsolePage.test.tsx :: screen.getByLabelText('상태')", '스캔 상태 필터 — 조건 없이 렌더'],
   ["TaxConsolePage.test.tsx :: screen.getByLabelText('세무유형')", '등록·정정 폼 셀렉트 — 조건 없이 렌더'],
+
+  // CommissionRateConsolePage.tsx 의 '요율 확인' 패널과 '새 정책 등록' 패널은 목록 로딩과 무관한
+  // 형제 블록이라 조건부 렌더 밖이다(목록만 loading/error/empty 로 갈린다). 반대로 조회 결과인
+  // simulation-result 패널은 {simulation && ...} 안이라 등록하지 않고 재시도 조회로 고쳤다.
+  ["CommissionRateConsolePage.test.tsx :: screen.getByLabelText('종료된 정책도 보기')", '목록 헤더 체크박스 — 조건 없이 렌더'],
+  ["CommissionRateConsolePage.test.tsx :: screen.getByPlaceholderText('셀러 ID(선택)')", '요율 확인 입력 — 조건 없이 렌더'],
+  ["CommissionRateConsolePage.test.tsx :: screen.getByRole('button', { name: '요율 확인' })", '요율 확인 버튼 — 조건 없이 렌더'],
+  ["CommissionRateConsolePage.test.tsx :: screen.getByRole('button', { name: '정책 등록' })", '등록 폼 제출 버튼 — 조건 없이 렌더'],
+  ["CommissionRateConsolePage.test.tsx :: screen.getByPlaceholderText('왜 이 요율인가')", '등록 폼 사유 입력 — 조건 없이 렌더'],
+  ["CommissionRateConsolePage.test.tsx :: screen.getByPlaceholderText('예: 2.5')", '등록 폼 요율 입력 — 조건 없이 렌더'],
+
+  // DlqConsolePage.tsx 의 조회 버튼은 결과 블록 밖이라 마운트부터 있다. 같은 필터 바의 토픽
+  // 셀렉트는 등록하지 않았다 — 엘리먼트는 정적이지만 <option> 은 데이터로 채워져서, 테스트가
+  // **옵션**을 기다리도록 고쳤다(옵션 전에 change 를 쏘면 값이 조용히 무시되고 빈 토픽으로 조회가 나간다).
+  ["DlqConsolePage.test.tsx :: screen.getByRole('button', { name: '조회' })", '조회 버튼 — 조건 없이 렌더'],
 ]);
 
 /** 앞선 waitFor 로부터 이 줄 수 안에 있는 조회만 같은 흐름으로 본다. */

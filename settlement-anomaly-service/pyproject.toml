@@ -8,17 +8,17 @@ version = "0.1.0"
 description = "Anomaly / fraud scoring on settlement & payout records (FastAPI + scikit-learn)."
 requires-python = ">=3.11"
 dependencies = [
-    "fastapi==0.115.6",
-    "uvicorn[standard]==0.34.0",
-    "pydantic==2.10.4",
-    "scikit-learn==1.6.0",
-    "numpy==2.2.1",
-    "pandas==2.2.3",
+    "fastapi==0.141.1",
+    "uvicorn[standard]==0.52.1",
+    "pydantic==2.13.4",
+    "scikit-learn==1.9.0",
+    "numpy==2.4.6",
+    "pandas==3.0.5",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest==8.3.4",
+    "pytest==9.1.1",
     "httpx==0.28.1",
 ]
 

@@ -58,6 +58,10 @@ public class PartitionMaintenanceRunner implements ApplicationRunner {
         ensurePartitions();
     }
 
+    // 동적 SQL 경고(java:S2077) 억제 — 이어 붙이는 건 식별자뿐이다: 스키마는 애플리케이션
+    // 설정(hibernate.default_schema), 함수명은 코드 상수다. 요청에서 온 값은 이 경로에 닿지 않으며
+    // 유일한 값 인자는 바인딩 파라미터(?)로 넘긴다. 네이티브 SQL 은 식별자를 바인딩할 수 없다.
+    @SuppressWarnings("java:S2077")
     private void ensurePartitions() {
         try {
             Integer created = jdbcTemplate.queryForObject(

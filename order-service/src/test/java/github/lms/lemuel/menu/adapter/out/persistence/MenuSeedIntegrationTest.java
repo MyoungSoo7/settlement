@@ -79,9 +79,9 @@ class MenuSeedIntegrationTest {
     }
 
     @Test
-    @DisplayName("시드 총 43행 — 이관분 31 + 정산운영 그룹 1 + 운영 화면 8 + 시스템 화면 3")
-    void seedsExactlyFortyThree() {
-        assertThat(adapter.findAll()).hasSize(43);
+    @DisplayName("시드 총 46행 — 이관분 31 + 정산운영 그룹 1 + 운영 화면 10 + 시스템 화면 3 + 법인카드(CEO) 1")
+    void seedsExactlyFortySix() {
+        assertThat(adapter.findAll()).hasSize(46);
     }
 
     @Test
@@ -102,7 +102,11 @@ class MenuSeedIntegrationTest {
     void settlementOpsChildren() {
         assertThat(childrenOf("정산운영")).extracting(Menu::getName)
                 .containsExactly("정합성 검증", "일일 대사", "PG 대사", "차지백", "회수 채권",
-                        "월마감", "세무", "원장·시산표");
+                        "월마감", "세무", "수수료율", "DLQ 재처리", "원장·시산표");
+        // 수수료율은 ADMIN 전용 — 요율은 정산 금액을 직접 바꾸므로 MANAGER 에게 열지 않는다(ADR 0032)
+        assertThat(childrenOf("정산운영").stream()
+                .filter(m -> m.getName().equals("수수료율")).findFirst().orElseThrow().allowedRoles())
+                .containsExactly("ADMIN");
         // 세무는 ADMIN·MANAGER — 서버가 /admin/tax/** 를 그 등급으로 막는다(스캔 리뷰는 MANAGER 몫)
         assertThat(childrenOf("정산운영").stream()
                 .filter(m -> m.getName().equals("세무")).findFirst().orElseThrow().allowedRoles())
@@ -129,12 +133,12 @@ class MenuSeedIntegrationTest {
     }
 
     @Test
-    @DisplayName("CEO 사이드바 13개가 순서대로 들어간다")
+    @DisplayName("CEO 사이드바 14개가 순서대로 들어간다")
     void ceoChildren() {
         assertThat(childrenOf("CEO")).extracting(Menu::getName).containsExactly(
                 "통합 브리핑", "경제지표", "재무제표", "기업조회", "사업장비교",
                 "투자하기", "투자 추천", "대출관리", "대출 상품 안내", "대출 심사·상환 안내",
-                "대출기관 안내", "자산운용펀드 안내", "계정계 현황");
+                "대출기관 안내", "자산운용펀드 안내", "계정계 현황", "법인카드");
     }
 
     @Test

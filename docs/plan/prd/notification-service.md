@@ -183,11 +183,20 @@ notification-service 는 **도메인 이벤트 하나를 받아 활성 채널 �
 릴랙스 바인딩 규칙(`APP_SECURITY_JWT_SECRET`)을 스스로 알아내야 한다. 설계는 fail-closed 로 옳지만
 **현재 구성으로는 SSE 푸시 기능 전체가 꺼져 있다.**
 
+> **해소(632091a1)** — `app.security.jwt.secret: ${JWT_SECRET:}` 를 `application.yml` 에 선언했다.
+> 레포 공통 `JWT_SECRET` 을 그대로 쓰므로 게이트웨이가 발급한 토큰이 여기서 검증된다. 값이 비면
+> 스트림만 꺼지고 부팅은 계속되는 fail-closed 동작은 유지. 로컬 compose 에서 JWT 로 스트림을 열어
+> 데모 알림 수신까지 확인했다.
+
 ### G-2. 서비스가 compose 에 없고 게이트웨이가 도달하지 못한다 ★
 
 `docker-compose.yml` 에 `notification-service` 컨테이너 정의가 없고, gateway 컨테이너에도
 `NOTIFICATION_SERVICE_URI` 가 없다. 게이트웨이 라우트는 존재하므로 "배선됐다"고 읽히지만 실제로는
 게이트웨이 자신의 `localhost:8130` 으로 프록시를 시도한다. 상세는 [`gateway-service.md`](gateway-service.md) G-1.
+
+> **해소(632091a1)** — compose 에 `notification-service` 컨테이너와 gateway 의
+> `NOTIFICATION_SERVICE_URI=http://notification-service:8130` 을 넣었다. 컨테이너 DNS 도달을
+> 실기동으로 확인했다. k8s/helm 배포 경로는 여전히 미배선이다.
 
 ### G-3. nginx 가 이 SSE 를 버퍼링하고 60초에 끊는다 ★
 
@@ -215,10 +224,10 @@ notification-service 는 **도메인 이벤트 하나를 받아 활성 채널 �
 붙은 레플리카가 가진 것만 재개된다. `polyglot-services.md` 가 알려진 한계로 명시하고 있으며, 하류 Java
 컨슈머의 `processed_events` 멱등 덕분에 **회계 영향은 없다** — 손상은 수신자 경험에 국한된다.
 
-### G-7. `docs/sse.md` 정본은 해소됐다 (2026-08-13 추가)
+### G-7. `../../sse.md` 정본은 해소됐다 (2026-08-13 추가)
 
 `JwtSubscriberIdentityResolver:118`·`InMemoryNotificationStream:33` 두 곳의 KDoc 과 루트 `CLAUDE.md` 가
-`docs/sse.md` 를 SSE 정본으로 참조한다. 역산 착수 시점에는 이 파일이 없어 dangling 참조였으나, **작업 중
+`../../sse.md` 를 SSE 정본으로 참조한다. 역산 착수 시점에는 이 파일이 없어 dangling 참조였으나, **작업 중
 병행 세션이 [`../../sse.md`](../../sse.md) 를 추가해 해소됐다**(토큰 URL 트레이드오프, 재생 정책, 하트비트,
 멀티 레플리카 한계까지 수록). 다만 해당 문서도 아래 G-1~G-3(배선·시크릿)은 다루지 않으므로 이 PRD 가
 그 부분의 유일한 기록이다.
@@ -237,11 +246,11 @@ warn 로그 외에 없다. 실패 채널만 골라 재전송하는 경로도, �
 
 | #   | 항목                                                            | 상태                   |
 | --- | --------------------------------------------------------------- | ---------------------- |
-| T-1 | `app.security.jwt.secret` 를 `application.yml` 에 환경변수로 선언 | 없음 (G-1)            |
-| T-2 | compose 서비스 정의 + `NOTIFICATION_SERVICE_URI`                | 없음 (G-2)             |
-| T-3 | nginx `/api/notifications/` 무버퍼 location                      | 없음 (G-3)             |
-| T-4 | 실배포 `APP_KAFKA_ENABLED=true` 주입 경로                        | 없음 (G-4)             |
+| T-1 | `app.security.jwt.secret` 를 `application.yml` 에 환경변수로 선언 | **해소** (G-1)         |
+| T-2 | compose 서비스 정의 + `NOTIFICATION_SERVICE_URI`                | **해소** (G-2)         |
+| T-3 | nginx `/api/notifications/` 무버퍼 location                      | **해소** (G-3)         |
+| T-4 | 실배포 `APP_KAFKA_ENABLED=true` 주입 경로                        | compose 만 해소 (G-4)  |
 | T-5 | `/notifications/send`·`/demo` 인가 게이트                        | 없음 (G-5)             |
 | T-6 | 내구 dedupe·재생 저장소(Redis 등)                                | 인메모리 (G-6)         |
-| T-7 | `docs/sse.md` 작성 — 코드가 참조하는 정본                        | **해소** (G-7)         |
+| T-7 | `../../sse.md` 작성 — 코드가 참조하는 정본                        | **해소** (G-7)         |
 | T-8 | 채널별 성공/실패 메트릭                                          | 없음 (G-9)             |

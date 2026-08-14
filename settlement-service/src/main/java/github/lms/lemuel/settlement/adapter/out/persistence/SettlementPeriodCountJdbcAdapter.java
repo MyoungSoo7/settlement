@@ -24,6 +24,9 @@ public class SettlementPeriodCountJdbcAdapter implements CountSettlementsInPerio
     }
 
     @Override
+    // 동적 SQL 경고(java:S2077) 억제 — 조립되는 건 enum(RateScope)이 고르는 두 컬럼명 중 하나뿐이다.
+    // 기간·scopeKey 등 값은 모두 바인딩 파라미터(?)다. 컬럼명은 바인딩할 수 없어 분기로 고정한다.
+    @SuppressWarnings("java:S2077")
     public long countInPeriod(RateScope scope, String scopeKey, LocalDate from, LocalDate to) {
         String column = scope == RateScope.SELLER ? "v.seller_id::text" : "v.seller_tier";
         String sql = """

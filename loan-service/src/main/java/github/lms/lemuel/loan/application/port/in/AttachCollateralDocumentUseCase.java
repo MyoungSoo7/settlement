@@ -2,6 +2,9 @@ package github.lms.lemuel.loan.application.port.in;
 
 import github.lms.lemuel.loan.domain.CollateralDocument;
 
+import java.util.Arrays;
+import java.util.Objects;
+
 /**
  * 담보서류 첨부 유스케이스 — 업로드 → OCR 추출 → 담보 설정값 자동 대사까지 한 트랜잭션 (ADR 0036 확산).
  *
@@ -20,5 +23,30 @@ public interface AttachCollateralDocumentUseCase {
      */
     record AttachCollateralDocumentCommand(Long loanId, Long uploaderUserId, String fileName,
                                            String contentType, byte[] content) {
+
+        // 배열 컴포넌트는 레코드 기본 구현이 참조 동일성으로 비교·해시한다 — 같은 파일 재업로드를
+        // 멱등으로 다루는 명령에서 "같은 내용"이 같지 않게 나오는 함정이라 내용 기준으로 맞춘다.
+        // toString 은 본문 대신 길이만 남긴다(파일 바이트가 로그로 새지 않게).
+        @Override
+        public boolean equals(Object o) {
+            return o instanceof AttachCollateralDocumentCommand c
+                    && Objects.equals(loanId, c.loanId)
+                    && Objects.equals(uploaderUserId, c.uploaderUserId)
+                    && Objects.equals(fileName, c.fileName)
+                    && Objects.equals(contentType, c.contentType)
+                    && Arrays.equals(content, c.content);
+        }
+
+        @Override
+        public int hashCode() {
+            return 31 * Objects.hash(loanId, uploaderUserId, fileName, contentType) + Arrays.hashCode(content);
+        }
+
+        @Override
+        public String toString() {
+            return "AttachCollateralDocumentCommand[loanId=" + loanId + ", uploaderUserId=" + uploaderUserId
+                    + ", fileName=" + fileName + ", contentType=" + contentType
+                    + ", contentBytes=" + (content == null ? 0 : content.length) + "]";
+        }
     }
 }

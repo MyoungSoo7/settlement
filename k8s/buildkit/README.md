@@ -11,7 +11,7 @@
 
 ## 왜 Kaniko 가 아니라 BuildKit 인가
 
-루트 `Dockerfile` 이 Gradle 의존성 캐시를 `RUN --mount=type=cache` 로 잡는다(`Dockerfile:33`, `Dockerfile:57`).
+루트 `Dockerfile` 이 Gradle 의존성 캐시를 `RUN --mount=type=cache` 로 잡는다(`Dockerfile:34`, `Dockerfile:57`).
 **Kaniko 는 이 문법을 지원하지 않는다.** BuildKit(또는 buildah)만 이 Dockerfile 을 수정 없이 빌드할 수 있다.
 
 ## 구성

@@ -1,18 +1,14 @@
-# 상품 카테고리·옵션 테이블 설계 (ssgb2e / ofDentis 사례 분석 기반)
+# 상품 카테고리·옵션 테이블 설계  
 
 > 대상: `order-service` (opslab). 상태: **Phase 1–7 구현 완료 + 운영 표면까지 배선**
 > (§4 이관 계획의 단계별 마이그레이션, §7 이후 붙은 것).
-> 근거 저장소: `MyoungSoo7/ssgb2e-front_20250721`(Oracle + MyBatis, B2E 복지몰),
-> `MyoungSoo7/ofDentis_final`(JPA/QueryDSL, 치과자재 마켓).
->
-> **이 문서가 카탈로그 설계의 정본이다.** 한때 `docs/inflearn/`(gitignore 대상)으로 옮겨져 저장소에서
 > 사라진 적이 있다 — 로컬 디스크에만 있는 정본은 협업·CI 에서 없는 것과 같으므로 원래 경로로 되살렸다.
 
 ---
 
 ## 1. 선행 사례 분석
 
-### 1.1 SSG B2E — 코드 트리 + 옵션 정의/판매옵션 2층
+### 1.1 드 트리 + 옵션 정의/판매옵션 2층
 
 **카테고리**
 
@@ -56,7 +52,7 @@ TBL_PRODUCTOPTION (poid, prid, proptionname, proptionkind, parent_poid,
 - ❌ 노출/삭제 플래그가 `showyn`·`dispyn`·`delyn` 3개로 흩어져 의미가 겹친다.
 - ❌ `proptionmarginrate`·`proptionenurirate`(마진율·에누리율)가 옵션 행에 섞임 — 정산 관심사의 침투.
 
-### 1.2 ofDentis — 경로 비정규화 + 카운트 캐시, 그러나 SKU 부재
+### 1.2 경로 비정규화 + 카운트 캐시, 그러나 SKU 부재
 
 **카테고리**
 
@@ -433,7 +429,7 @@ order-service/src/main/java/github/lms/lemuel/
 | 카테고리 경로(`path_ids` 끝 = 자기 id, 길이 = depth+1) | `EcommerceCategoryPathTest` | ✅ |
 | `product_count` 대사(캐시 vs 실계수) | `CategoryProductCountDriftTest` · `CheckCategoryCountIntegrityServiceTest` + `GET /admin/categories/count-integrity` | ✅ |
 | 편성 노출 판정(기간·활성, 공개 표면) | `DisplaySectionTest` · `DisplaySectionServiceTest` · `PublicDisplaySectionControllerTest` | ✅ |
-| 화면 배선(라우트 ↔ 메뉴) | `scripts/harness/test/menu-route-gate.test.mjs` | ✅ |
+| 화면 배선(라우트 ↔ 메뉴) | `../../scripts/harness/test/menu-route-gate.test.mjs` | ✅ |
 | 커버리지 게이트 | `./gradlew :order-service:test :order-service:jacocoTestCoverageVerification` (LINE 90%) | ✅ |
 
 > 건수·수치는 여기 적지 않는다(적는 순간 낡는다). 규모가 궁금하면 위 명령을 돌린다.
@@ -463,5 +459,5 @@ order-service/src/main/java/github/lms/lemuel/
 - **새 화면 = 라우트 + 메뉴 2스텝.** 메뉴 정본은 `menus` 테이블이라 시드 마이그레이션과
   `menuFallback.ts` 를 함께 고쳐야 하고, 어긋나면 `menu-route-gate` 가 CI 를 깬다.
 - **공개 경로는 nginx 에도 있어야 한다.** `/display-sections/**` 는 게이트웨이에는 등록돼 있었지만
-  `frontend/nginx.conf` 의 location 정규식에 없어 SPA 폴백(index.html)으로 새고 있었다. 200 HTML 이라
+  `../../frontend/nginx.conf` 의 location 정규식에 없어 SPA 폴백(index.html)으로 새고 있었다. 200 HTML 이라
   조용히 실패한다 — `/admin` 접두 경로는 기존 세그먼트에 걸려 이 함정을 비껴간다.

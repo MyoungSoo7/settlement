@@ -121,6 +121,10 @@ public class TaxInvoicePdfAdapter implements RenderTaxInvoicePdfPort {
     }
 
     /** gs 로 PDF/A 아카이빙 시도 — 실패(바이너리 부재 등) 시 원본 PDF 로 폴백. */
+    // 공용 임시 디렉터리 경고(java:S5443) 억제 — gs 는 파일 경로로만 입출력하므로 임시 파일이 불가피하다.
+    // Files.createTempFile 은 예측 불가한 이름으로 원자적으로 만들고(선점·심볼릭 링크 치환 불가),
+    // POSIX 에서 소유자 전용(rw-------) 권한을 부여한다. 산출물은 finally 에서 즉시 지운다.
+    @SuppressWarnings("java:S5443")
     private byte[] archiveAsPdfA(byte[] source, String issueNumber) {
         Path input = null;
         Path output = null;

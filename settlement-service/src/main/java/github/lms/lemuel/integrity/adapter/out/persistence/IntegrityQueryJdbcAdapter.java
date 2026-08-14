@@ -19,6 +19,7 @@ import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -35,6 +36,9 @@ import java.util.Set;
 public class IntegrityQueryJdbcAdapter implements IntegrityQueryPort {
 
     private static final int ID_LIMIT = 20;
+
+    /** 정산 업무 표준시 — 스케줄러 cron zone("Asia/Seoul")과 같은 출처(경과 시간 계산 기준). */
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     private final JdbcClient jdbc;
 
@@ -463,8 +467,10 @@ public class IntegrityQueryJdbcAdapter implements IntegrityQueryPort {
                         """)
                 .query((rs, i) -> {
                     LocalDateTime oldest = timestamp(rs, "oldest");
+                    // 적체 나이는 업무 표준시(KST) 기준 경과다. 시간대 없는 뺄셈은 "하루 = 24시간"을
+                    // 암묵 가정한다 — KST 는 서머타임이 없어 값은 같지만 기준을 타입에 남긴다.
                     long ageSec = oldest == null ? 0
-                            : Math.max(0, Duration.between(oldest, now).getSeconds());
+                            : Math.max(0, Duration.between(oldest.atZone(KST), now.atZone(KST)).getSeconds());
                     return new OutboxSnapshot(rs.getLong("pending"), rs.getLong("failed"), ageSec);
                 })
                 .single();

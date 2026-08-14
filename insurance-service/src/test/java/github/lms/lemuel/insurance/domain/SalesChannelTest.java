@@ -90,6 +90,7 @@ class SalesChannelTest {
         List<CommissionSchedule> schedules = CommissionScheduleFactory.createFirstYearSchedule(
                 "policy-uuid-1", "fc-100", new BigDecimal("100000.00"), new BigDecimal("0.03"));
 
+        assertThat(schedules).hasSize(CommissionConstants.INSTALLMENT_COUNT);
         assertThat(schedules).allSatisfy(s ->
                 assertThat(s.getRecipientType()).isEqualTo(CommissionConstants.RECIPIENT_TYPE_FC));
     }

@@ -7,6 +7,7 @@ import java.time.LocalDate;
 import java.util.Collection;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -167,9 +168,10 @@ public final class BusinessDayCalculator {
      * 정적 편의 메서드({@link #isBusinessDay}·{@link #addBusinessDays})가 위임하는 프로세스 기본 인스턴스.
      * 기본은 {@link #STANDARD} 이며, config 계층이 기동 시점에 {@link #installDefault} 로 임시공휴일을 얹은
      * 인스턴스를 1회 설치할 수 있다. 설치 이후 도메인 정적 호출부가 그 캘린더를 반영한다. 기동 시 1회 설정,
-     * 이후 읽기 전용이라 {@code volatile} 로 가시성만 보장한다.
+     * 이후 읽기 전용이라 참조 교체의 가시성만 보장하면 된다 — 그 계약을 {@link AtomicReference} 로 명시한다
+     * ({@code volatile} 필드는 "참조 교체만 원자적"이라는 사실이 타입에 드러나지 않는다).
      */
-    private static volatile BusinessDayCalculator defaultInstance = STANDARD;
+    private static final AtomicReference<BusinessDayCalculator> DEFAULT_INSTANCE = new AtomicReference<>(STANDARD);
 
     /** 하드코딩 상수 위에 얹히는 인스턴스별 추가 공휴일(정부 지정 임시공휴일 등). 불변. */
     private final Set<LocalDate> extraHolidays;
@@ -205,12 +207,12 @@ public final class BusinessDayCalculator {
      * config 계층이 기동 시점에 1회 호출하는 것을 전제로 한다(런타임 도중 변경 대상 아님).
      */
     public static void installDefault(BusinessDayCalculator calculator) {
-        defaultInstance = Objects.requireNonNull(calculator, "calculator 필수");
+        DEFAULT_INSTANCE.set(Objects.requireNonNull(calculator, "calculator 필수"));
     }
 
     /** 현재 설치된 기본 캘린더(정적 메서드가 위임하는 인스턴스). */
     public static BusinessDayCalculator activeDefault() {
-        return defaultInstance;
+        return DEFAULT_INSTANCE.get();
     }
 
     /** 이 캘린더에 주입된 추가 공휴일(불변 뷰). */
@@ -264,11 +266,11 @@ public final class BusinessDayCalculator {
      * 임시공휴일이 얹힌 인스턴스가 설치돼 있으면 그 캘린더를 반영한다.
      */
     public static LocalDate addBusinessDays(LocalDate from, int n) {
-        return defaultInstance.addBusinessDaysFrom(from, n);
+        return DEFAULT_INSTANCE.get().addBusinessDaysFrom(from, n);
     }
 
     /** 설치된 기본 캘린더 기준 영업일 판정 — 정적 하위호환 진입점. */
     public static boolean isBusinessDay(LocalDate date) {
-        return defaultInstance.isBusinessDayOn(date);
+        return DEFAULT_INSTANCE.get().isBusinessDayOn(date);
     }
 }

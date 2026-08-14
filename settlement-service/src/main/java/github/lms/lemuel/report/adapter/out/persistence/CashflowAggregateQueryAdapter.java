@@ -56,6 +56,9 @@ public class CashflowAggregateQueryAdapter implements LoadCashflowAggregatePort 
     }
 
     @Override
+    // 동적 SQL 경고(java:S2077) 억제 — 조립되는 건 enum(BucketGranularity)이 고르는 버킷 표현식
+    // 3종 중 하나(코드 상수)뿐이다. 기간·셀러는 바인딩 파라미터(?)로 넘긴다.
+    @SuppressWarnings("java:S2077")
     public List<CashflowBucket> aggregateBySeller(LocalDate from, LocalDate to,
                                                   BucketGranularity granularity, Long sellerId) {
         if (sellerId == null) {

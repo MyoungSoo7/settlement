@@ -22,6 +22,9 @@ public class SettlementSearchJdbcRepository {
 
     private final JdbcTemplate jdbcTemplate;
 
+    // 동적 SQL 경고(java:S2077) 억제 — 검색어·상태·기간은 전부 ? 바인딩이고, 조립되는 건 화이트리스트
+    // 분기로 고른 정렬 컬럼(switch 의 상수)과 방향("ASC"/"DESC"), 그리고 고정 FROM/JOIN 절뿐이다.
+    @SuppressWarnings("java:S2077")
     public SettlementPageResponse search(
             String ordererName, String productName, Boolean isRefunded,
             String status, LocalDate startDate, LocalDate endDate,

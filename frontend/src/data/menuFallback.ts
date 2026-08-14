@@ -56,6 +56,8 @@ export const FALLBACK_MENUS: FallbackMenuNode[] = [
       { id: -106, name: '회수 채권', path: '/admin/settlement/recoveries', icon: '🧲', description: '셀러별 미상계 잔액 · 상계 이력', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       { id: -107, name: '월마감', path: '/admin/settlement/monthly-closing', icon: '📆', description: '셀러 월 정산 마트 집계 · 재실행', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN'] },
       { id: -108, name: '세무', path: '/admin/settlement/tax', icon: '🧾', description: '스캔 리뷰 · 전표 전기 · 세금계산서', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
+      { id: -109, name: '수수료율', path: '/admin/settlement/commission-rates', icon: '⚖️', description: '셀러·등급 요율 정책 · 이력', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN'] },
+      { id: -110, name: 'DLQ 재처리', path: '/admin/settlement/dlq', icon: '📮', description: '처리 실패 이벤트 확인 · 재발행', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN'] },
       { id: -102, name: '원장·시산표', path: '/admin/settlement/ledger', icon: '📒', description: '분개 조회 · 월 시산표 · 기간 마감', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
     ],
   },
@@ -88,6 +90,7 @@ export const FALLBACK_MENUS: FallbackMenuNode[] = [
       { id: -71, name: '대출기관 안내', path: '/admin/ceo/lender-guide', icon: '🏦', description: '은행 · 저축은행 · 캐피탈 · 대부업', area: 'CEO', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       { id: -72, name: '자산운용펀드 안내', path: '/admin/ceo/fund-guide', icon: '🧺', description: '부동산 · 주식 · 채권 펀드', area: 'CEO', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       { id: -73, name: '계정계 현황', path: '/admin/ceo/accounts', icon: '🧮', description: '집계 · 시산표 · 잔액', area: 'CEO', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
+      { id: -74, name: '법인카드', path: '/admin/ceo/cards', icon: '💳', description: '카드계정 · 임직원 카드 한도', area: 'CEO', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
     ],
   },
   {

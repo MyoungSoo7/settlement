@@ -46,7 +46,8 @@ public class MarketQuotesApiClient implements LoadDailyClosesPort {
     @Cacheable(cacheNames = "beginnerDailyCloses", key = "#stockCode")
     public List<DailyClose> loadRecentYear(String stockCode) {
         LocalDate from = LocalDate.now().minusDays(WINDOW_DAYS);
-        JsonNode series = getJson("/api/market/stocks/" + stockCode + "/series?from=" + from);
+        JsonNode series = getJson("/api/market/stocks/{stockCode}/series?from={from}",
+                StockCodePath.segment(stockCode), from);
         if (series == null) {
             return List.of(); // 종목 미등록
         }
@@ -62,18 +63,23 @@ public class MarketQuotesApiClient implements LoadDailyClosesPort {
         return closes;
     }
 
-    /** GET → JsonNode. 404 는 null(미존재), 그 외 오류는 예외. */
-    private JsonNode getJson(String path) {
+    /**
+     * GET → JsonNode. 404 는 null(미존재), 그 외 오류는 예외.
+     *
+     * <p>경로는 <b>URI 템플릿 + 변수</b>로만 만든다 — 요청에서 온 값을 문자열로 이어 붙이면 경로 조작이
+     * 통과한다. 변수는 {@link StockCodePath} 관문을 이미 통과한 값이며, 템플릿 확장이 인코딩까지 한다.
+     */
+    private JsonNode getJson(String uriTemplate, Object... uriVariables) {
         try {
-            String body = restClient.get().uri(path).retrieve().body(String.class);
+            String body = restClient.get().uri(uriTemplate, uriVariables).retrieve().body(String.class);
             return body == null ? null : objectMapper.readTree(body);
         } catch (RestClientResponseException e) {
             if (e.getStatusCode().value() == 404) {
                 return null;
             }
-            throw new IllegalStateException("market API 오류 path=" + path + " status=" + e.getStatusCode(), e);
+            throw new IllegalStateException("market API 오류 path=" + uriTemplate + " status=" + e.getStatusCode(), e);
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-            throw new IllegalStateException("market API 응답 파싱 실패 path=" + path, e);
+            throw new IllegalStateException("market API 응답 파싱 실패 path=" + uriTemplate, e);
         }
     }
 

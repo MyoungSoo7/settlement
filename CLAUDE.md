@@ -24,7 +24,7 @@
   배치 기준은 **호출 대상 서비스**: settlement-copilot→`settlement-service/`, pwc(trusted-ceo)→`company-service/`,
   fashion-copilot→`order-service/` (각 `src/main/resources/` 아래, jar 에는 `processResources` exclude 로 미포함).
   **자사 서비스를 호출하지 않는 제출물(kakaopay·musinsa·invest-copilot)은 저장소에 두지 않는다** — 소유 서비스가
-  없어 원격 실행 대상이 아니고, 공개 저장소라 대회 제출물·타사 브랜드명을 싣지 않는다(로컬 전용, 2026-08-07 `docs/harness` 제거).
+  없어 원격 실행 대상이 아니고, 공개 저장소라 대회 제출물·타사 브랜드명을 싣지 않는다(로컬 전용, 2026-08-07 `docs/ax` 제거).
 
 > 위 가드레일은 **기계로 강제된다**(문서 규율 아님): 저장소 추적 가드 `scripts/harness/guard.mjs` 가 실시간
 > PreToolUse(exit 2 차단)·git pre-commit(`node scripts/harness/install-hooks.mjs`)·CI(`.github/workflows/harness-guard.yml`) 3중으로

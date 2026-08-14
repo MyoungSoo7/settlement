@@ -47,12 +47,13 @@ public class CompanyNewsApiClient implements LoadCompanyNewsPort {
     @Override
     @Cacheable(cacheNames = "beginnerNewsFeed", key = "#stockCode")
     public Optional<List<NewsArticleSummary>> loadRecentArticles(String stockCode) {
-        JsonNode company = getJson("/api/company/companies/" + stockCode);
+        String code = StockCodePath.segment(stockCode);
+        JsonNode company = getJson("/api/company/companies/{stockCode}", code);
         if (company == null) {
             return Optional.empty(); // 기업 미등록 — "기사 0건"과 구분
         }
-        JsonNode page = getJson("/api/company/companies/" + stockCode
-                + "/articles?page=0&size=" + PAGE_SIZE);
+        JsonNode page = getJson("/api/company/companies/{stockCode}/articles?page=0&size={size}",
+                code, PAGE_SIZE);
         List<NewsArticleSummary> articles = new ArrayList<>();
         if (page != null) {
             for (JsonNode item : page.path("content")) {
@@ -66,18 +67,23 @@ public class CompanyNewsApiClient implements LoadCompanyNewsPort {
         return Optional.of(articles);
     }
 
-    /** GET → JsonNode. 404 는 null(미존재), 그 외 오류는 예외. */
-    private JsonNode getJson(String path) {
+    /**
+     * GET → JsonNode. 404 는 null(미존재), 그 외 오류는 예외.
+     *
+     * <p>경로는 <b>URI 템플릿 + 변수</b>로만 만든다 — 요청에서 온 값을 문자열로 이어 붙이면 경로 조작이
+     * 통과한다. 변수는 {@link StockCodePath} 관문을 이미 통과한 값이며, 템플릿 확장이 인코딩까지 한다.
+     */
+    private JsonNode getJson(String uriTemplate, Object... uriVariables) {
         try {
-            String body = restClient.get().uri(path).retrieve().body(String.class);
+            String body = restClient.get().uri(uriTemplate, uriVariables).retrieve().body(String.class);
             return body == null ? null : objectMapper.readTree(body);
         } catch (RestClientResponseException e) {
             if (e.getStatusCode().value() == 404) {
                 return null;
             }
-            throw new IllegalStateException("company API 오류 path=" + path + " status=" + e.getStatusCode(), e);
+            throw new IllegalStateException("company API 오류 path=" + uriTemplate + " status=" + e.getStatusCode(), e);
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-            throw new IllegalStateException("company API 응답 파싱 실패 path=" + path, e);
+            throw new IllegalStateException("company API 응답 파싱 실패 path=" + uriTemplate, e);
         }
     }
 

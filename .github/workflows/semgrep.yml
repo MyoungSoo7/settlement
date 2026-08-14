@@ -31,19 +31,22 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # --baseline-commit 에 merge-base 가 필요
 
       # 컨테이너(semgrep/semgrep, alpine) 대신 pip 설치를 쓴다 —
       # alpine 컨테이너에서는 node20 기반 액션(actions/checkout)이 깨진다.
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
           cache: pip
 
+      # 버전 고정 + 휠 전용 설치: SAST 결과가 러너마다 달라지지 않게 하고(같은 엔진·같은 룰 해석),
+      # sdist 의 setup.py 실행 경로를 막는다. 버전 상향은 이 줄을 바꾸는 명시적 커밋으로만.
       - name: Install Semgrep
-        run: pip install --disable-pip-version-check semgrep
+        run: |
+          pip install --disable-pip-version-check --only-binary :all: "semgrep==1.173.0"
 
       - name: Semgrep — PR (new ERROR findings only, blocking)
         if: github.event_name == 'pull_request'

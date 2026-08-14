@@ -46,6 +46,9 @@ public class ProductFacetJdbcAdapter implements LoadProductFacetPort {
     }
 
     @Override
+    // 동적 SQL 경고(java:S2077) 억제 — 요청에서 온 값(축 코드·값 코드·카테고리)은 전부 명명
+    // 파라미터로 바인딩한다. 문자열로 조립하는 건 별칭 접미사와 고정 조인 사슬뿐이다.
+    @SuppressWarnings("java:S2077")
     public List<Long> findProductIds(OptionFacetQuery query, Long categoryId, boolean availableOnly) {
         MapSqlParameterSource params = new MapSqlParameterSource();
         if (query.isEmpty()) {
@@ -58,6 +61,9 @@ public class ProductFacetJdbcAdapter implements LoadProductFacetPort {
     }
 
     @Override
+    // 동적 SQL 경고(java:S2077) 억제 — 요청에서 온 값(축 코드·값 코드·카테고리)은 전부 명명
+    // 파라미터로 바인딩한다. 문자열로 조립하는 건 별칭 접미사와 고정 조인 사슬뿐이다.
+    @SuppressWarnings("java:S2077")
     public List<FacetCount> countFacets(OptionFacetQuery query, Long categoryId,
                                         boolean availableOnly, String restrictToAxisCode) {
         MapSqlParameterSource params = new MapSqlParameterSource();

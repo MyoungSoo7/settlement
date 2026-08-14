@@ -269,7 +269,7 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
 ### 3.15 insurance-service — GA 보험대리점 (port 8108, mgmt 8109, 자체 DB lemuel_insurance)
 
 법인보험대리점(GA) 플랫폼 — 설계사(FC)의 상담 → 가입설계 → 청약 → 계약 → 유지·변경 → 수수료 정산을 하나로 잇는다.
-설계 정본은 [`docs/plan/insurance-service.md`](docs/plan/insurance-service.md).
+설계 정본은 [`docs/plan/prd/insurance-service.md`](docs/plan/prd/insurance-service.md).
 
 | 도메인      | API (base `/api/insurance`, **JWT 인증 필수**)                                                     | 기능                                                                          |
 | ----------- | -------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
