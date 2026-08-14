@@ -1,16 +1,20 @@
 # SSE (Server-Sent Events) 정본
 
-폴리글랏 7종 중 **gateway 에 라우팅되는 2종만** 브라우저에 스트림을 연다. 나머지 5종은 gateway
-미라우팅이다(정본: `polyglot-services.md`). 이 문서는 그 2개 스트림의 **계약·인증·재생·한계**를
+브라우저에 SSE 스트림을 여는 경로는 **3종**이다: 폴리글랏 7종 중 gateway 에 라우팅되는 2종
+(market-stream·notification — 나머지 5종은 gateway 미라우팅, 정본: `polyglot-services.md`)과
+JVM 쪽 **ai-service 챗 스트리밍**. 이 문서는 그 스트림들의 **계약·인증·재생·한계**를
 한 곳에 모은다 — 코드 주석이 `docs/sse.md` 를 가리키는 대상이 여기다.
 
 | 스트림 | gateway 경로 | 서비스 실경로 | 서비스 | 인증 | 재생(Last-Event-ID) |
 | --- | --- | --- | --- | --- | --- |
 | 실시간 시세 | `/api/market-stream/**` | `/stream/{stockCode}` | market-stream (Go, 8110) | 공개 | **없음(라이브 전용)** |
 | 알림 푸시 | `/api/notifications/stream` | `/notifications/stream` | notification (Kotlin, 8130) | JWT 필수 | 있음(보존 창 안에서) |
+| AI 챗 응답 | `POST /api/ai/chat/stream` (일반 `/api/ai/**` 라우트) | 동일 경로 | ai-service (Java, 8096) | JWT 필수 | 없음(유한 응답 스트림) |
 
-gateway 는 두 경로 모두 프리픽스를 벗겨 전달한다(`RewritePath`). 알림 쪽은 **와일드카드를 쓰지 않는다** —
+gateway 는 폴리글랏 두 경로의 프리픽스를 벗겨 전달한다(`RewritePath`). 알림 쪽은 **와일드카드를 쓰지 않는다** —
 `/notifications/send`·`/notifications/demo` 는 인증 없이 발송하는 내부 경로라 노출 대상이 아니다.
+AI 챗은 요청-응답형이라 별도 RewritePath 없이 일반 라우트를 탄다 — 다만 응답이 `text/event-stream`
+이므로 아래 §3 프록시 주의는 동일하게 적용된다.
 
 ## 1. 시세 스트림 (market-stream)
 
@@ -63,13 +67,16 @@ gateway 는 두 경로 모두 프리픽스를 벗겨 전달한다(`RewritePath`)
 SSE 는 프록시 설정 하나로 조용히 죽는다 — 버퍼링이 켜져 있으면 이벤트가 묶이고,
 `proxy_read_timeout` 이 짧으면 유휴 연결이 잘린다.
 
-`../../frontend/nginx.conf`·`nginx.compose.conf` 는 **두 스트림 모두** 전용 location 을 두어
-`proxy_buffering off` + `proxy_cache off` + `proxy_read_timeout 3600s` 를 건다.
+`../../frontend/nginx.conf`·`nginx.compose.conf` 는 **세 스트림 모두** 전용 location 을 두어
+`proxy_buffering off` + `proxy_cache off` 를 걸고, read timeout 은 스트림 성격에 맞춘다
+(장기 유휴 스트림 3600s / AI 챗은 유한 응답이라 120s — LLM 생성이 60s 를 넘을 수 있다).
+드리프트는 `scripts/harness/test/sse-nginx-gate.test.mjs` 가 CI 에서 차단한다.
 
-| 경로 | 매칭 | 비고 |
-| --- | --- | --- |
-| `/api/market-stream/` | 프리픽스(`^~`) | `/stream/{code}` 다수 종목 |
-| `/api/notifications/stream` | **정확 일치(`=`)** | gateway 도 와일드카드를 금지한다 — `/notifications/send`·`demo` 는 인증 없이 발송하는 내부 경로라 노출 대상이 아니다. 프리픽스로 열면 그 결정을 프록시 층에서 되돌리는 셈이다. 쿼리스트링(`?token=`)은 location 매칭에 영향을 주지 않아 EventSource 인증 경로도 그대로 탄다 |
+| 경로 | 매칭 | read timeout | 비고 |
+| --- | --- | --- | --- |
+| `/api/market-stream/` | 프리픽스(`^~`) | 3600s | `/stream/{code}` 다수 종목 |
+| `/api/notifications/stream` | **정확 일치(`=`)** | 3600s | gateway 도 와일드카드를 금지한다 — `/notifications/send`·`demo` 는 인증 없이 발송하는 내부 경로라 노출 대상이 아니다. 프리픽스로 열면 그 결정을 프록시 층에서 되돌리는 셈이다. 쿼리스트링(`?token=`)은 location 매칭에 영향을 주지 않아 EventSource 인증 경로도 그대로 탄다 |
+| `/api/ai/` | 프리픽스(`^~`) | 120s | 챗 SSE(`/chat/stream`)와 일반 REST 가 같은 세그먼트를 공유 — 버퍼링 off 는 REST 에도 무해하다 |
 
 전용 location 이 없으면 일반 `api` location 으로 떨어져 버퍼링이 켜진 채 `proxy_read_timeout 60s`
 를 받는다. **gateway 직결(개발)에서는 정상 동작하고 nginx 를 앞에 둔 compose·배포 경로에서만
