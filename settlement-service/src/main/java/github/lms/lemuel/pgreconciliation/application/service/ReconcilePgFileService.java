@@ -1,5 +1,6 @@
 package github.lms.lemuel.pgreconciliation.application.service;
 
+import github.lms.lemuel.common.log.LogSafe;
 import github.lms.lemuel.pgreconciliation.application.port.in.ReconcilePgFileUseCase;
 import github.lms.lemuel.pgreconciliation.application.port.out.LoadInternalPaymentsForReconciliationPort;
 import github.lms.lemuel.pgreconciliation.application.port.out.LoadReconciliationRunPort;
@@ -62,7 +63,7 @@ public class ReconcilePgFileService implements ReconcilePgFileUseCase {
     public ReconciliationRun reconcile(String pgProvider, LocalDate targetDate, String fileName,
                                         InputStream input, String operatorId) {
         log.info("[PgRecon] start. provider={}, date={}, file={}, operator={}",
-                pgProvider, targetDate, fileName, operatorId);
+                LogSafe.of(pgProvider), targetDate, LogSafe.of(fileName), LogSafe.of(operatorId));
 
         // 마감 확인이 가장 먼저다 — 해시 멱등은 "같은 파일"만 막고, 다른 파일이 같은 기간으로
         // 들어오면 확정된 기간에 새 불일치·새 clawback 이 생긴다. 파일을 읽기도 전에 끊는다.
@@ -84,7 +85,7 @@ public class ReconcilePgFileService implements ReconcilePgFileUseCase {
         if (duplicate.isPresent()) {
             meterRegistry.counter("pg.reconciliation.duplicate_file.hit", "provider", pgProvider).increment();
             log.warn("[PgRecon] 같은 파일 재업로드 — 기존 완료 run 반환(멱등). runId={}, sha256={}, file={}",
-                    duplicate.get().getId(), fileSha256, fileName);
+                    duplicate.get().getId(), LogSafe.of(fileSha256), LogSafe.of(fileName));
             return duplicate.get();
         }
 

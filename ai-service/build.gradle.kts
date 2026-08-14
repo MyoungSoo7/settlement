@@ -11,8 +11,18 @@ plugins {
 //   부팅이 실패하지 않게 한다(ArchUnit 으로 격리 강제).
 //   shared-common 은 JWT 스택만 제한 스캔(outbox/audit 미사용 — Phase 1 은 이벤트 발행 없음).
 
+// httpcore5 5.3.6 은 CVE-2026-54399(HIGH, 수정판 5.4.3). 여기서는 spring-ai-anthropic →
+// anthropic-java-core 가 httpclient5 를 끌고 오고(그쪽 요구는 5.3.1), Boot 4.0.7 BOM 이 그걸 5.5.2 로
+// 관리하면서 httpcore5 5.3.6 이 따라 들어온다. settlement-service 와 같은 이유·같은 방식으로
+// 짝(httpclient5 5.6 + httpcore5 5.4.x)을 함께 올린다 — 근거는 settlement-service/build.gradle.kts 주석.
+// httpcore5 를 끌고 오는 모듈은 settlement(ES)·ai(Anthropic) 둘뿐이다(전 모듈 dependencyInsight 실측).
+// 2026-08-13: httpclient5 5.6 이 CVE-2026-40542(HIGH)에 걸려 5.6.1 로 올린다 — 근거는 settlement 쪽 주석.
+extra["httpclient5.version"] = "5.6.1"
+extra["httpcore5.version"] = "5.4.3"
+
 dependencies {
     implementation("github.lms.lemuel:shared-common:1.0.0")   // 버전드 내부 라이브러리(composite build 로 로컬 치환) — JWT
+    testImplementation(testFixtures("github.lms.lemuel:shared-common:1.0.0"))   // 아키텍처 가드 픽스처(테스트 전용 — 프로덕션 미의존 경계는 그대로)
 
     // Spring Boot 스타터
     implementation("org.springframework.boot:spring-boot-starter-actuator")

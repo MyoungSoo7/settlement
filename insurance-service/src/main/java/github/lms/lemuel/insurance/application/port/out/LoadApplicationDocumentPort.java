@@ -1,0 +1,24 @@
+package github.lms.lemuel.insurance.application.port.out;
+
+import github.lms.lemuel.insurance.domain.ApplicationDocument;
+import github.lms.lemuel.insurance.domain.ApplicationDocumentStatus;
+
+import java.util.List;
+import java.util.Optional;
+
+/**
+ * 청약서류 조회 포트.
+ */
+public interface LoadApplicationDocumentPort {
+
+    Optional<ApplicationDocument> findById(Long id);
+
+    /** 상태별 목록(최신 우선) — 리뷰 큐 화면용. */
+    List<ApplicationDocument> findByStatus(ApplicationDocumentStatus status, int limit);
+
+    /** 멱등 선조회 — 같은 파일 재업로드를 OCR 호출 전에 잡는다. */
+    Optional<ApplicationDocument> findByApplicationIdAndFileHash(String applicationId, String fileHash);
+
+    /** 청약의 최신 서류(업로드 시각 기준) — 승인 게이트의 판정 대상. */
+    Optional<ApplicationDocument> findLatestByApplicationId(String applicationId);
+}

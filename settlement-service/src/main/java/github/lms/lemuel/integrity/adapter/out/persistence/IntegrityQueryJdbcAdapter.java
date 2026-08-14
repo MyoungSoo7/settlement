@@ -140,7 +140,7 @@ public class IntegrityQueryJdbcAdapter implements IntegrityQueryPort {
     // ── INV-6 지급 대사 ────────────────────────────────────────────────────
 
     @Override
-    public PayoutReconReport payoutRecon(LocalDate date) {
+    public PayoutReconReport payoutRecon(LocalDate date, int graceMinutes, LocalDateTime graceCutoff) {
         LocalDateTime start = date.atStartOfDay();
         LocalDateTime end = start.plusDays(1);
 
@@ -179,6 +179,20 @@ public class IntegrityQueryJdbcAdapter implements IntegrityQueryPort {
                         ORDER BY s.id LIMIT %d
                         """.formatted(ID_LIMIT))
                 .param("start", start).param("end", end)
+                .query(Long.class).list();
+
+        // 그중 확정 후 유예시간이 지난 것 — 지급이 뒤따라올 시점은 이미 지났다.
+        // 지급은 상환차감(loan repayment_applied) 수신 시점에 만들어지므로(L-3), 여기 남는 건은
+        // 대개 그 이벤트가 오지 않은 정산이다. 백필로 덮으면 안 되는 이유는 경보 문구에 있다.
+        List<Long> staleWithoutPayout = jdbc.sql("""
+                        SELECT s.id FROM settlements s
+                        WHERE s.status = 'DONE' AND s.confirmed_at >= :start AND s.confirmed_at < :end
+                          AND s.confirmed_at < :graceCutoff
+                          AND NOT EXISTS (SELECT 1 FROM payouts p
+                                          WHERE p.settlement_id = s.id AND p.status <> 'CANCELED')
+                        ORDER BY s.id LIMIT %d
+                        """.formatted(ID_LIMIT))
+                .param("start", start).param("end", end).param("graceCutoff", graceCutoff)
                 .query(Long.class).list();
 
         List<PayoutReconReport.OverpaidPayout> overpaid = jdbc.sql("""
@@ -229,7 +243,7 @@ public class IntegrityQueryJdbcAdapter implements IntegrityQueryPort {
 
         return PayoutReconReport.of(date, confirmed.count(), confirmed.total(),
                 payouts.count(), payouts.total(), payouts.completed(),
-                withoutPayout, overpaid, duplicates, overTotal);
+                withoutPayout, staleWithoutPayout, graceMinutes, overpaid, duplicates, overTotal);
     }
 
     // ── INV-13 반송 재지급 대사 (Seed D1 후속) ─────────────────────────────

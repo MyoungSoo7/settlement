@@ -122,12 +122,54 @@ export function parseGradleModules(settings) {
 function validateModuleRoster(read, trackedSet, errors) {
   if (!trackedSet.has('settings.gradle.kts')) return;
   const modules = parseGradleModules(read('settings.gradle.kts'));
+  // 경로 주의: 구조 정본은 저장소 루트의 STRUCTURE.md 다(2026-08-13 docs/ 에서 승격).
+  // 경로가 어긋나면 trackedSet 조회가 빗나가 이 문서는 검사된 적 없이 조용히 skip 된다.
   for (const doc of ['CLAUDE.md', 'STRUCTURE.md']) {
     if (!trackedSet.has(doc)) continue;
     const content = read(doc);
     for (const module of modules) {
       if (!content.includes(module)) {
         errors.push(`${doc} module roster missing: ${module} (declared in settings.gradle.kts)`);
+      }
+    }
+  }
+}
+
+// settlement-service 서브도메인 로스터 ↔ 문서 트리 대조 —
+// 모듈은 settings.gradle.kts 가 정본이라 위 검사가 잡지만, 한 모듈 '안'의 서브도메인은 어디에도
+// 선언이 없어 코드에만 존재한다. 실제로 tax(부가세·원천징수 — 실지급액을 바꾼다)·closing·recovery 가
+// 문서에 없는 채로 오래 방치됐다(2026-08-12 역산에서 발견: 문서 7개 vs 코드 12개).
+// 낡은 요약은 "정산은 그 7개가 전부"라는 잘못된 범위 판단을 유도하므로 기계로 막는다.
+export function parseSettlementDomains(tracked) {
+  // DOMAIN_BASE 는 이 파일 아래쪽에서 선언되므로 톱레벨 상수로 빼지 않는다(TDZ) — 호출 시점엔 이미 초기화됨.
+  const prefix = `settlement-service/${DOMAIN_BASE}`;
+  const domains = new Set();
+  for (const file of tracked) {
+    if (!file.startsWith(prefix)) continue;
+    const rest = file.slice(prefix.length);
+    if (!rest.includes('/')) continue;                  // 루트 직속 파일(Application) 제외
+    const segment = rest.slice(0, rest.indexOf('/'));
+    if (/^[a-z][a-z0-9]*$/.test(segment)) domains.add(segment);  // 점으로 시작하는 도구 디렉터리 제외
+  }
+  return [...domains].sort();
+}
+
+function validateSettlementDomainRoster(read, tracked, trackedSet, errors) {
+  const domains = parseSettlementDomains(tracked);
+  if (!domains.length) return;
+  // 문서마다 표기가 다르다(CLAUDE.md 는 한 줄 `·` 나열, STRUCTURE.md 는 다음 줄 중괄호 목록) —
+  // settlement-service 트리 줄부터 2줄을 창으로 잡아 그 안에서만 찾는다(다른 문단 오탐 방지).
+  for (const doc of ['CLAUDE.md', 'STRUCTURE.md']) {
+    if (!trackedSet.has(doc)) continue;
+    const lines = read(doc).split(/\r?\n/);
+    // 앵커는 '모듈 트리 줄'이어야 한다 — 'settlement-service/' 만으로 찾으면 가드레일 문단의
+    // build.gradle.kts 언급에 먼저 걸린다. 포트(8082)를 함께 요구해 트리 줄로 고정한다.
+    const anchor = lines.findIndex((line) => line.includes('settlement-service/') && line.includes('8082'));
+    if (anchor < 0) continue;
+    const window = lines.slice(anchor, anchor + 3).join('\n');
+    for (const domain of domains) {
+      if (!window.includes(domain)) {
+        errors.push(`${doc} settlement 서브도메인 누락: ${domain} (코드에 존재하나 문서 트리에 없음)`);
       }
     }
   }
@@ -407,6 +449,133 @@ function validateSubmissionPlacement(read, tracked, trackedSet, errors) {
   }
 }
 
+// ── 문서 사실 게이트 3종 ────────────────────────────────────────────────────────
+// 로스터·라우팅은 위에서 잡지만, "신규 서비스가 붙은 뒤 상위 문서가 안 따라오는" 드리프트는
+// 새는 축이 따로 있었다(2026-08-12 실측: card 구현 상태가 사실과 반대 · organization 소비처
+// 미배선 주장 4곳 · 계약 토픽 12 vs 실측 36). 셋 다 코드/배선으로 기계 판정이 가능하다.
+//
+// 대상은 "현재 상태"를 기술하는 문서로 한정한다 — docs/adr·docs/superpowers·docs/seeds 는
+// 시점 기록이라 지금 기준 부정확이 결함이 아니다(ADR 본문 보존 원칙). 오탐보다 범위 축소가 원칙:
+// 세 규칙 모두 판정 근거가 같은 줄에 있을 때만 주장으로 인정한다.
+const STATE_DOCS = [
+  'CLAUDE.md', 'SPEC.md', 'README.md', 'HARNESS.md',
+  'ARCHITECTURE.md', 'STRUCTURE.md', 'docs/DEVELOPMENT.md',
+  'docs/PLAN.md', 'docs/PORTFOLIO.md', 'docs/DONE_CRITERIA.md',
+];
+const CONTRACT_EVENTS_DIR = 'shared-common/src/testFixtures/resources/contracts/events/';
+
+// 1) 이벤트 계약 토픽 수 — "N토픽"/"N개 토픽" 주장 vs 실제 스키마 파일 수.
+// 계약 코퍼스를 가리키는 줄만 본다(contracts/events·testFixtures·cross-service 언급).
+// "6토픽 소비"(account GL) 같은 부분집합 주장은 이 키워드가 없어 대상 밖이다.
+export function parseContractTopicClaims(markdown) {
+  const claims = [];
+  const lines = String(markdown).split(/\r?\n/);
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (!/contracts\/events|testFixtures|cross-service/.test(line)) continue;
+    const match = line.match(/(\d+)\s*(?:개\s*)?토픽/);
+    if (match) claims.push({ line: index + 1, claimed: Number(match[1]) });
+  }
+  return claims;
+}
+
+// 2) 구현 상태 — "REST/스케줄러/컨슈머 미구현·미배선" 주장 vs 해당 어댑터 디렉토리 실재.
+// 어댑터가 실재하는데 미구현이라 적혀 있으면 실패. 같은 줄에 모듈과 종류가 함께 있을 때만 본다.
+const ADAPTER_CLAIM_KINDS = [
+  { keyword: 'REST', dir: 'adapter/in/web' },
+  { keyword: '스케줄러', dir: 'adapter/in/schedule' },
+  { keyword: '컨슈머', dir: 'adapter/in/kafka' },
+];
+
+export function parseUnimplementedClaims(markdown, modules) {
+  const claims = [];
+  const lines = String(markdown).split(/\r?\n/);
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (!/미구현|미배선/.test(line)) continue;
+    for (const module of modules) {
+      if (!line.includes(module)) continue;
+      for (const kind of ADAPTER_CLAIM_KINDS) {
+        if (line.includes(kind.keyword)) claims.push({ line: index + 1, module, ...kind });
+      }
+    }
+  }
+  return claims;
+}
+
+// 3) 소비처 배선 — "소비처 미배선" 주장 vs 다른 모듈 application.yml 의 토픽 참조.
+// 줄에 토픽이 명시되면 그것을, 없으면 모듈명에서 도메인 접두(organization-service → lemuel.organization.*)를
+// 끌어와 그 모듈이 발행하는 토픽으로 본다. 발행 모듈 자신의 yml 참조는 소비 근거가 아니다.
+export function parseUnconsumedClaims(markdown, modules) {
+  const claims = [];
+  const lines = String(markdown).split(/\r?\n/);
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (!/소비처\s*(?:가\s*)?(?:미배선|없음)/.test(line)) continue;
+    const topics = [...line.matchAll(/lemuel\.[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*/g)].map((m) => m[0]);
+    const owners = modules.filter((module) => line.includes(module));
+    if (topics.length > 0) claims.push({ line: index + 1, topics, owners });
+    else if (owners.length > 0) claims.push({ line: index + 1, topics: [], owners });
+  }
+  return claims;
+}
+
+function validateDocFacts(read, tracked, trackedSet, errors) {
+  const modules = trackedSet.has('settings.gradle.kts') ? parseGradleModules(read('settings.gradle.kts')) : [];
+  const schemaCount = tracked.filter((p) => p.startsWith(CONTRACT_EVENTS_DIR) && p.endsWith('.schema.json')).length;
+  const ymlOf = (module) => {
+    const path = `${module}/src/main/resources/application.yml`;
+    return trackedSet.has(path) ? read(path) : '';
+  };
+
+  for (const doc of STATE_DOCS) {
+    if (!trackedSet.has(doc)) continue;
+    const content = read(doc);
+
+    if (schemaCount > 0) {
+      for (const claim of parseContractTopicClaims(content)) {
+        if (claim.claimed !== schemaCount) {
+          errors.push(`doc facts: ${doc}:${claim.line} 이벤트 계약 토픽 수 불일치: claimed=${claim.claimed} actual=${schemaCount} (${CONTRACT_EVENTS_DIR}*.schema.json)`);
+        }
+      }
+    }
+
+    for (const claim of parseUnimplementedClaims(content, modules)) {
+      const base = `${claim.module}/${DOMAIN_BASE}`;
+      const exists = tracked.some((p) => p.startsWith(base) && p.includes(`/${claim.dir}/`) && p.endsWith('.java'));
+      if (exists) {
+        errors.push(`doc facts: ${doc}:${claim.line} 구현 상태 역전: ${claim.module} 의 ${claim.keyword}(${claim.dir})는 실재하는데 미구현/미배선으로 기술됨`);
+      }
+    }
+
+    for (const claim of parseUnconsumedClaims(content, modules)) {
+      let topics = claim.topics;
+      if (topics.length === 0) {
+        // 모듈만 지목된 주장 — 그 모듈 yml 이 선언한 자기 도메인 토픽을 발행분으로 본다.
+        topics = claim.owners.flatMap((owner) => {
+          const prefix = `lemuel.${owner.replace(/-service$/, '').replace(/-/g, '')}.`;
+          return [...ymlOf(owner).matchAll(/lemuel\.[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*/g)]
+            .map((m) => m[0])
+            .filter((topic) => topic.startsWith(prefix));
+        });
+      }
+      for (const topic of [...new Set(topics)]) {
+        // 발행 모듈의 자기 yml 참조는 소비 근거가 아니다. 발행자는 줄이 지목한 모듈 + 토픽
+        // 도메인에서 도출한다(lemuel.card.* → card-service) — 표 행처럼 모듈명이 축약된 경우 대비.
+        const domain = topic.split('.')[1];
+        const producers = new Set(claim.owners);
+        for (const module of modules) {
+          if (module.replace(/-service$/, '').replace(/-/g, '') === domain) producers.add(module);
+        }
+        const consumer = modules.find((module) => !producers.has(module) && ymlOf(module).includes(topic));
+        if (consumer) {
+          errors.push(`doc facts: ${doc}:${claim.line} 소비처 배선 있음: ${topic} 를 ${consumer} 가 참조하는데 "소비처 미배선"으로 기술됨`);
+        }
+      }
+    }
+  }
+}
+
 function validateStatus(status, tracked, errors) {
   const checks = [
     ['application.yml', tracked.filter((p) => /\/src\/main\/resources\/application\.yml$/.test(p)).length, [/application\.yml[^\n]*?\*\*(\d[\d,]*)[^\d\n*]*\*\*/i, /application\.yml[^\n]*?→\s*(\d[\d,]*)/i]],
@@ -443,11 +612,13 @@ export function collectAudit(repoRoot, manifest) {
 
   if (trackedSet.has('STATUS.md')) validateStatus(read('STATUS.md'), tracked, errors);
   validateModuleRoster(read, trackedSet, errors);
+  validateSettlementDomainRoster(read, tracked, trackedSet, errors);
   validateRoutingMap(read, trackedSet, errors);
   validatePluginGuardPaths(read, tracked, trackedSet, errors);
   validateDocLinks(root, read, tracked, trackedSet, manifest, errors);
   validateServiceWiring(read, tracked, trackedSet, errors);
   validateSubmissionPlacement(read, tracked, trackedSet, errors);
+  validateDocFacts(read, tracked, trackedSet, errors);
 
   for (const pair of manifest.criticalContractPairs) {
     if (!trackedSet.has(pair.claude) || !trackedSet.has(pair.codex)) continue;

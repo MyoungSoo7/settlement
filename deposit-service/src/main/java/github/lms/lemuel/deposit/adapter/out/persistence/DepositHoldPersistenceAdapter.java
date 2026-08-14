@@ -26,8 +26,9 @@ public class DepositHoldPersistenceAdapter implements LoadDepositHoldPort, SaveD
     }
 
     @Override
-    public List<DepositHold> findActiveExpiredBefore(LocalDateTime cutoff) {
-        return repo.findByStatusAndExpiresAtBefore(DepositHoldStatus.ACTIVE, cutoff)
+    public List<DepositHold> findExpiredStillHolding(LocalDateTime cutoff) {
+        return repo.findByStatusInAndExpiresAtBefore(
+                        List.of(DepositHoldStatus.ACTIVE, DepositHoldStatus.PARTIALLY_CAPTURED), cutoff)
                 .stream().map(this::toDomain).toList();
     }
 

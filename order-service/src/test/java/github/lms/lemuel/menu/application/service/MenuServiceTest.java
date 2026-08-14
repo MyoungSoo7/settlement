@@ -1,11 +1,16 @@
 package github.lms.lemuel.menu.application.service;
-import github.lms.lemuel.menu.domain.exception.MenuInvariantViolationException;
 
 import github.lms.lemuel.menu.application.port.in.MenuUseCase;
 import github.lms.lemuel.menu.application.port.out.LoadMenuPort;
+import github.lms.lemuel.menu.application.port.out.LoadPermissionCodesPort;
 import github.lms.lemuel.menu.application.port.out.SaveMenuPort;
 import github.lms.lemuel.menu.domain.Menu;
+import github.lms.lemuel.menu.domain.MenuArea;
+import github.lms.lemuel.menu.domain.MenuAttributes;
+import github.lms.lemuel.menu.domain.MenuType;
+import github.lms.lemuel.menu.domain.exception.MenuInvariantViolationException;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -14,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -27,10 +33,24 @@ class MenuServiceTest {
 
     @Mock LoadMenuPort loadMenuPort;
     @Mock SaveMenuPort saveMenuPort;
+    @Mock LoadPermissionCodesPort loadPermissionCodesPort;
     @InjectMocks MenuService service;
 
+    private static MenuAttributes attrs(String name) {
+        return MenuAttributes.item(name, "/" + name, MenuArea.BACKOFFICE, "USER");
+    }
+
     private Menu menu(Long id, Long parentId, String name, int sortOrder) {
-        Menu m = Menu.create(name, "/" + name, null, parentId, sortOrder, "USER", true);
+        Menu m = Menu.create(attrs(name), parentId, sortOrder, true);
+        m.assignId(id);
+        return m;
+    }
+
+    private Menu node(Long id, Long parentId, String name, MenuArea area,
+                      MenuType type, String roles, String permission, boolean visible) {
+        Menu m = Menu.create(new MenuAttributes(name, null,
+                type == MenuType.DIVIDER ? null : "/" + name,
+                null, null, area, type, roles, permission), parentId, 0, visible);
         m.assignId(id);
         return m;
     }
@@ -65,11 +85,12 @@ class MenuServiceTest {
         });
 
         Menu saved = service.createMenu(new MenuUseCase.CreateMenuCommand(
-                "메뉴A", "/a", "icon", null, 3, "ADMIN", true));
+                MenuAttributes.item("메뉴A", "/a", MenuArea.SYSTEM, "ADMIN"), null, 3, true));
 
         assertThat(saved.getId()).isEqualTo(10L);
         assertThat(saved.getName()).isEqualTo("메뉴A");
         assertThat(saved.getRequiredRole()).isEqualTo("ADMIN");
+        assertThat(saved.getArea()).isEqualTo(MenuArea.SYSTEM);
     }
 
     @Test @DisplayName("updateMenu - 존재하면 수정 후 저장")
@@ -79,7 +100,7 @@ class MenuServiceTest {
         when(saveMenuPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         Menu updated = service.updateMenu(5L, new MenuUseCase.UpdateMenuCommand(
-                "new", "/new", "ic", null, 1, "USER", false, false));
+                MenuAttributes.item("new", "/new", MenuArea.BACKOFFICE, "USER"), null, 1, false, false));
 
         assertThat(updated.getName()).isEqualTo("new");
         assertThat(updated.isVisible()).isFalse();
@@ -91,7 +112,7 @@ class MenuServiceTest {
         when(loadMenuPort.findById(404L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.updateMenu(404L, new MenuUseCase.UpdateMenuCommand(
-                "n", "/n", null, null, 0, "USER", true, true)))
+                attrs("n"), null, 0, true, true)))
                 .isInstanceOf(MenuInvariantViolationException.class);
     }
 
@@ -127,10 +148,10 @@ class MenuServiceTest {
 
     @Test @DisplayName("createMenu - 존재하지 않는 부모면 예외")
     void createMenu_parentNotFound() {
-        when(loadMenuPort.findById(99L)).thenReturn(Optional.empty());
+        when(loadMenuPort.findAll()).thenReturn(List.of());
 
         assertThatThrownBy(() -> service.createMenu(new MenuUseCase.CreateMenuCommand(
-                "메뉴A", "/a", null, 99L, 0, null, true)))
+                MenuAttributes.item("메뉴A", "/a", MenuArea.BACKOFFICE, null), 99L, 0, true)))
                 .isInstanceOf(MenuInvariantViolationException.class);
         verify(saveMenuPort, never()).save(any());
     }
@@ -140,7 +161,7 @@ class MenuServiceTest {
         when(loadMenuPort.findById(5L)).thenReturn(Optional.of(menu(5L, null, "a", 0)));
 
         assertThatThrownBy(() -> service.updateMenu(5L, new MenuUseCase.UpdateMenuCommand(
-                "a", "/a", null, 5L, 0, null, true, true)))
+                attrs("a"), 5L, 0, true, true)))
                 .isInstanceOf(MenuInvariantViolationException.class);
         verify(saveMenuPort, never()).save(any());
     }
@@ -154,7 +175,7 @@ class MenuServiceTest {
         when(loadMenuPort.findAll()).thenReturn(List.of(root, child, grandChild));
 
         assertThatThrownBy(() -> service.updateMenu(1L, new MenuUseCase.UpdateMenuCommand(
-                "root", "/root", null, 3L, 0, null, true, true)))
+                attrs("root"), 3L, 0, true, true)))
                 .isInstanceOf(MenuInvariantViolationException.class)
                 .hasMessageContaining("순환");
         verify(saveMenuPort, never()).save(any());
@@ -166,7 +187,7 @@ class MenuServiceTest {
         when(loadMenuPort.findAll()).thenReturn(List.of(menu(1L, null, "a", 0)));
 
         assertThatThrownBy(() -> service.updateMenu(1L, new MenuUseCase.UpdateMenuCommand(
-                "a", "/a", null, 99L, 0, null, true, true)))
+                attrs("a"), 99L, 0, true, true)))
                 .isInstanceOf(MenuInvariantViolationException.class);
     }
 
@@ -179,7 +200,7 @@ class MenuServiceTest {
         when(saveMenuPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         Menu updated = service.updateMenu(1L, new MenuUseCase.UpdateMenuCommand(
-                "a", "/a", null, 2L, 0, null, true, true));
+                attrs("a"), 2L, 0, true, true));
 
         assertThat(updated.getParentId()).isEqualTo(2L);
     }
@@ -254,5 +275,173 @@ class MenuServiceTest {
                 .isInstanceOf(MenuInvariantViolationException.class)
                 .hasMessageContaining("순환");
         verify(saveMenuPort, never()).saveAll(any());
+    }
+
+    @Nested
+    @DisplayName("깊이 제한 — 셸이 그릴 수 있는 3 단계까지")
+    class DepthLimit {
+
+        @Test @DisplayName("createMenu - 4 단계가 되면 거부")
+        void create_beyondMaxDepth() {
+            Menu d1 = menu(1L, null, "d1", 0);
+            Menu d2 = menu(2L, 1L, "d2", 0);
+            Menu d3 = menu(3L, 2L, "d3", 0);
+            when(loadMenuPort.findAll()).thenReturn(List.of(d1, d2, d3));
+
+            assertThatThrownBy(() -> service.createMenu(new MenuUseCase.CreateMenuCommand(
+                    MenuAttributes.item("d4", "/d4", MenuArea.BACKOFFICE, null), 3L, 0, true)))
+                    .isInstanceOf(MenuInvariantViolationException.class)
+                    .hasMessageContaining("깊이");
+            verify(saveMenuPort, never()).save(any());
+        }
+
+        @Test @DisplayName("createMenu - 3 단계는 허용")
+        void create_atMaxDepth() {
+            Menu d1 = menu(1L, null, "d1", 0);
+            Menu d2 = menu(2L, 1L, "d2", 0);
+            when(loadMenuPort.findAll()).thenReturn(List.of(d1, d2));
+            when(saveMenuPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            Menu saved = service.createMenu(new MenuUseCase.CreateMenuCommand(
+                    MenuAttributes.item("d3", "/d3", MenuArea.BACKOFFICE, null), 2L, 0, true));
+
+            assertThat(saved.getParentId()).isEqualTo(2L);
+        }
+
+        @Test @DisplayName("reorder - 자손까지 함께 내려가 4 단계가 되면 거부")
+        void reorder_subtreeOverflow() {
+            Menu a = menu(1L, null, "a", 0);
+            Menu aChild = menu(2L, 1L, "aChild", 0);
+            Menu aGrand = menu(3L, 2L, "aGrand", 0);
+            Menu b = menu(4L, null, "b", 0);
+            Menu bChild = menu(5L, 4L, "bChild", 0);
+            when(loadMenuPort.findAll()).thenReturn(List.of(a, aChild, aGrand, b, bChild));
+
+            // a(깊이1) 를 bChild(깊이2) 아래로 → a=3, aChild=4 로 초과
+            assertThatThrownBy(() -> service.reorder(List.of(
+                    new MenuUseCase.ReorderItemCommand(1L, 5L, 0))))
+                    .isInstanceOf(MenuInvariantViolationException.class)
+                    .hasMessageContaining("깊이");
+            verify(saveMenuPort, never()).saveAll(any());
+        }
+    }
+
+    @Nested
+    @DisplayName("영역 일치 — 한 사이드바에 남의 영역이 섞이지 않는다")
+    class AreaConsistency {
+
+        @Test @DisplayName("createMenu - 부모와 영역이 다르면 거부")
+        void create_areaMismatch() {
+            Menu parent = node(1L, null, "부모", MenuArea.CEO, MenuType.GROUP, null, null, true);
+            when(loadMenuPort.findAll()).thenReturn(List.of(parent));
+
+            assertThatThrownBy(() -> service.createMenu(new MenuUseCase.CreateMenuCommand(
+                    MenuAttributes.item("자식", "/c", MenuArea.SYSTEM, null), 1L, 0, true)))
+                    .isInstanceOf(MenuInvariantViolationException.class)
+                    .hasMessageContaining("같은 영역");
+            verify(saveMenuPort, never()).save(any());
+        }
+
+        @Test @DisplayName("reorder - 다른 영역 밑으로 옮기면 거부")
+        void reorder_areaMismatch() {
+            Menu ceo = node(1L, null, "ceo", MenuArea.CEO, MenuType.GROUP, null, null, true);
+            Menu sys = node(2L, null, "sys", MenuArea.SYSTEM, MenuType.ITEM, null, null, true);
+            when(loadMenuPort.findAll()).thenReturn(List.of(ceo, sys));
+
+            assertThatThrownBy(() -> service.reorder(List.of(
+                    new MenuUseCase.ReorderItemCommand(2L, 1L, 0))))
+                    .isInstanceOf(MenuInvariantViolationException.class)
+                    .hasMessageContaining("같은 영역");
+        }
+    }
+
+    @Nested
+    @DisplayName("셸 네비게이션 조회 — getVisibleMenuTreeForRole")
+    class VisibleTree {
+
+        @Test @DisplayName("역할이 맞는 메뉴만 남는다")
+        void filtersByRole() {
+            Menu adminOnly = node(1L, null, "시스템", MenuArea.SYSTEM, MenuType.ITEM, "ADMIN", null, true);
+            Menu shared = node(2L, null, "정산", MenuArea.BACKOFFICE, MenuType.ITEM, "ADMIN,MANAGER", null, true);
+            Menu shop = node(3L, null, "주문", MenuArea.SHOP, MenuType.ITEM, "USER", null, true);
+            when(loadMenuPort.findAll()).thenReturn(List.of(adminOnly, shared, shop));
+            when(loadPermissionCodesPort.findByRoleCode("MANAGER")).thenReturn(Set.of());
+
+            List<Menu> tree = service.getVisibleMenuTreeForRole("MANAGER");
+
+            assertThat(tree).extracting(Menu::getName).containsExactly("정산");
+        }
+
+        @Test @DisplayName("숨김·비활성 메뉴는 빠진다")
+        void filtersHidden() {
+            Menu hidden = node(1L, null, "숨김", MenuArea.BACKOFFICE, MenuType.ITEM, null, null, false);
+            Menu shown = node(2L, null, "노출", MenuArea.BACKOFFICE, MenuType.ITEM, null, null, true);
+            when(loadMenuPort.findAll()).thenReturn(List.of(hidden, shown));
+
+            List<Menu> tree = service.getVisibleMenuTreeForRole(null);
+
+            assertThat(tree).extracting(Menu::getName).containsExactly("노출");
+        }
+
+        @Test @DisplayName("권한이 필요한 메뉴는 권한 보유자에게만 보인다")
+        void filtersByPermission() {
+            Menu gated = node(1L, null, "메뉴관리", MenuArea.SYSTEM, MenuType.ITEM,
+                    "ADMIN", "SYSTEM_MENU_MANAGE", true);
+            when(loadMenuPort.findAll()).thenReturn(List.of(gated));
+            when(loadPermissionCodesPort.findByRoleCode("ADMIN")).thenReturn(Set.of("SYSTEM_MENU_MANAGE"));
+
+            assertThat(service.getVisibleMenuTreeForRole("ADMIN")).hasSize(1);
+        }
+
+        @Test @DisplayName("권한이 없으면 해당 메뉴는 빠진다")
+        void filtersByPermission_denied() {
+            Menu gated = node(1L, null, "메뉴관리", MenuArea.SYSTEM, MenuType.ITEM,
+                    "ADMIN", "SYSTEM_MENU_MANAGE", true);
+            when(loadMenuPort.findAll()).thenReturn(List.of(gated));
+            when(loadPermissionCodesPort.findByRoleCode("ADMIN")).thenReturn(Set.of("ORDER_READ"));
+
+            assertThat(service.getVisibleMenuTreeForRole("ADMIN")).isEmpty();
+        }
+
+        @Test @DisplayName("자식이 전부 걸러진 묶음은 가지치기된다 — 빈 사이드바로 착지하지 않도록")
+        void prunesEmptyGroup() {
+            Menu group = node(1L, null, "정산", MenuArea.BACKOFFICE, MenuType.GROUP, "ADMIN,MANAGER", null, true);
+            Menu adminChild = node(2L, 1L, "지급관리", MenuArea.BACKOFFICE, MenuType.ITEM, "ADMIN", null, true);
+            when(loadMenuPort.findAll()).thenReturn(List.of(group, adminChild));
+            when(loadPermissionCodesPort.findByRoleCode("MANAGER")).thenReturn(Set.of());
+
+            assertThat(service.getVisibleMenuTreeForRole("MANAGER")).isEmpty();
+        }
+
+        @Test @DisplayName("자식이 하나라도 남으면 묶음은 유지된다")
+        void keepsGroupWithSurvivingChild() {
+            Menu group = node(1L, null, "정산", MenuArea.BACKOFFICE, MenuType.GROUP, "ADMIN,MANAGER", null, true);
+            Menu shared = node(2L, 1L, "정산조회", MenuArea.BACKOFFICE, MenuType.ITEM, "ADMIN,MANAGER", null, true);
+            Menu adminChild = node(3L, 1L, "지급관리", MenuArea.BACKOFFICE, MenuType.ITEM, "ADMIN", null, true);
+            when(loadMenuPort.findAll()).thenReturn(List.of(group, shared, adminChild));
+            when(loadPermissionCodesPort.findByRoleCode("MANAGER")).thenReturn(Set.of());
+
+            List<Menu> tree = service.getVisibleMenuTreeForRole("MANAGER");
+
+            assertThat(tree).hasSize(1);
+            assertThat(tree.get(0).getChildren()).extracting(Menu::getName).containsExactly("정산조회");
+        }
+
+        @Test @DisplayName("자식 없는 ITEM 루트는 가지치기 대상이 아니다")
+        void keepsLeafRoot() {
+            Menu leaf = node(1L, null, "대시보드", MenuArea.BACKOFFICE, MenuType.ITEM, null, null, true);
+            when(loadMenuPort.findAll()).thenReturn(List.of(leaf));
+
+            assertThat(service.getVisibleMenuTreeForRole(null)).hasSize(1);
+        }
+
+        @Test @DisplayName("미인증이면 권한 조회를 하지 않는다")
+        void anonymousSkipsPermissionLookup() {
+            when(loadMenuPort.findAll()).thenReturn(List.of(
+                    node(1L, null, "공개", MenuArea.SHOP, MenuType.ITEM, null, null, true)));
+
+            assertThat(service.getVisibleMenuTreeForRole(null)).hasSize(1);
+            verify(loadPermissionCodesPort, never()).findByRoleCode(any());
+        }
     }
 }

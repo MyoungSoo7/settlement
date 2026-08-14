@@ -1,5 +1,8 @@
 package github.lms.lemuel.deposit.domain;
 
+import github.lms.lemuel.deposit.domain.exception.DepositInvariantViolationException;
+import github.lms.lemuel.deposit.domain.exception.InvalidDepositAmountException;
+import github.lms.lemuel.deposit.domain.exception.InvalidDepositStateException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -70,7 +73,7 @@ class DepositOffsetShortfallTest {
         shortfall.resolve(new BigDecimal("20000"));
 
         assertThatThrownBy(() -> shortfall.resolve(BigDecimal.ONE))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(InvalidDepositStateException.class);
     }
 
     @Test
@@ -81,7 +84,7 @@ class DepositOffsetShortfallTest {
         shortfall.writeOff();
 
         assertThat(shortfall.getStatus()).isEqualTo(DepositShortfallStatus.WRITTEN_OFF);
-        assertThatThrownBy(shortfall::writeOff).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(shortfall::writeOff).isInstanceOf(InvalidDepositStateException.class);
     }
 
     @Test
@@ -119,6 +122,6 @@ class DepositOffsetShortfallTest {
         shortfall.assignId(1L);
 
         assertThat(shortfall.getId()).isEqualTo(1L);
-        assertThatThrownBy(() -> shortfall.assignId(2L)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> shortfall.assignId(2L)).isInstanceOf(DepositInvariantViolationException.class);
     }
 }

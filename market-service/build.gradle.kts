@@ -14,6 +14,7 @@ plugins {
 //   (JWT·Outbox·Kafka 토글)을 의도적으로 물지 않는다 — 자체 최소 SecurityConfig 보유.
 
 dependencies {
+    testImplementation(testFixtures("github.lms.lemuel:shared-common:1.0.0"))   // 아키텍처 가드 픽스처(테스트 전용 — 프로덕션 미의존 경계는 그대로)
     // Spring Boot 스타터
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")

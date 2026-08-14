@@ -9,71 +9,120 @@ permissions:
   pull-requests: write
   issues: write
 
+# PR 에 연속 push 하면 이전 리뷰 실행은 의미가 없다(모델 호출 비용만 발생) — 취소한다.
+concurrency:
+  group: pr-review-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   basic-review:
     name: Lightweight PR Review
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
 
       - name: Collect PR stats
         id: stats
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          git fetch origin ${{ github.base_ref }}
-          ADDED=$(git diff --shortstat origin/${{ github.base_ref }}...HEAD | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+' || echo 0)
-          DELETED=$(git diff --shortstat origin/${{ github.base_ref }}...HEAD | grep -oE '[0-9]+ deletion' | grep -oE '[0-9]+' || echo 0)
-          FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | wc -l | tr -d ' ')
-          echo "added=$ADDED" >> "$GITHUB_OUTPUT"
-          echo "deleted=$DELETED" >> "$GITHUB_OUTPUT"
-          echo "files=$FILES" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          git fetch --no-tags origin "$BASE_REF"
+          SHORTSTAT=$(git diff --shortstat "origin/${BASE_REF}...HEAD")
+          ADDED=$(echo "$SHORTSTAT" | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+' || echo 0)
+          DELETED=$(echo "$SHORTSTAT" | grep -oE '[0-9]+ deletion' | grep -oE '[0-9]+' || echo 0)
+          FILES=$(git diff --name-only "origin/${BASE_REF}...HEAD" | wc -l | tr -d ' ')
+          {
+            echo "added=$ADDED"
+            echo "deleted=$DELETED"
+            echo "files=$FILES"
+          } >> "$GITHUB_OUTPUT"
 
-
+      # 리뷰 본문은 GITHUB_OUTPUT 이 아니라 파일(pr-review.md)로 넘긴다.
+      # 이전에는 본문을 output 에 담아놓고 코멘트 body 에 넣지 않아, '### AI Review' 헤더만
+      # 붙고 내용은 늘 비어 있었다(API 비용은 발생, 결과는 폐기). 파일 경유로 바꾸면
+      # 구분자(EOF) 충돌·output 길이 제한도 함께 사라진다.
       - name: Claude review (optional)
         id: claude
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          if [ -z "$ANTHROPIC_API_KEY" ]; then
-            echo "review=Set ANTHROPIC_API_KEY secret to enable AI review." >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+            echo '_AI review disabled: set the `ANTHROPIC_API_KEY` secret to enable it._' > pr-review.md
             exit 0
           fi
-          DIFF=$(git diff origin/${{ github.base_ref }}...HEAD | head -c 60000)
-          PAYLOAD=$(jq -Rn --arg diff "$DIFF" '{
-            model: "claude-opus-4-5",
-            max_tokens: 1024,
-            messages: [{role:"user", content:("Review this diff for code quality, security, tests, naming. Be concise.\n\n" + $diff)}]
+
+          # head -c 를 파이프로 물리면 SIGPIPE 로 pipefail 이 터진다 — 파일로 받고 자른다.
+          git diff "origin/${BASE_REF}...HEAD" > full.diff
+          DIFF=$(head -c 60000 full.diff)
+
+          PAYLOAD=$(jq -n --arg diff "$DIFF" '{
+            model: "claude-opus-5",
+            max_tokens: 8000,
+            output_config: { effort: "medium" },
+            fallbacks: "default",
+            system: "You review pull request diffs for a Java/Spring hexagonal MSA settlement platform. Report concrete defects only: correctness, money handling (BigDecimal/rounding), MSA boundary violations, authorization/IDOR, missing tests. Skip style nits. If nothing substantive is wrong, say so in one line.",
+            messages: [{ role: "user", content: ("Review this diff. Be concise and specific — cite file paths.\n\n" + $diff) }]
           }')
-          RESP=$(curl -sS https://api.anthropic.com/v1/messages \
+
+          HTTP=$(curl -sS -o response.json -w "%{http_code}" https://api.anthropic.com/v1/messages \
             -H "x-api-key: $ANTHROPIC_API_KEY" \
             -H "anthropic-version: 2023-06-01" \
+            -H "anthropic-beta: server-side-fallback-2026-07-01" \
             -H "content-type: application/json" \
             -d "$PAYLOAD")
-          REVIEW=$(echo "$RESP" | jq -r '.content[0].text // "No content."')
-          {
-            echo "review<<EOF_R"
-            echo "$REVIEW"
-            echo "EOF_R"
-          } >> "$GITHUB_OUTPUT"
 
+          # 실패를 조용히 삼키지 않는다 — 왜 리뷰가 없는지 코멘트에 남긴다.
+          if [ "$HTTP" != "200" ]; then
+            printf '_AI review skipped: API returned HTTP %s (`%s`)._\n' \
+              "$HTTP" "$(jq -r '.error.type // "unknown"' response.json)" > pr-review.md
+            exit 0
+          fi
+          if [ "$(jq -r '.stop_reason // ""' response.json)" = "refusal" ]; then
+            printf '_AI review skipped: the model declined this diff (`%s`)._\n' \
+              "$(jq -r '.stop_details.category // "unspecified"' response.json)" > pr-review.md
+            exit 0
+          fi
+
+          jq -r '[.content[]? | select(.type == "text") | .text] | join("\n")' response.json > pr-review.md
+          [ -s pr-review.md ] || echo '_AI review returned no text output._' > pr-review.md
 
       - name: Post comment
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        env:
+          FILES: ${{ steps.stats.outputs.files }}
+          ADDED: ${{ steps.stats.outputs.added }}
+          DELETED: ${{ steps.stats.outputs.deleted }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
+            const fs = require('fs');
+            // 모델 출력은 신뢰할 수 없는 텍스트다 — Actions 표현식으로 스크립트에 보간하지 않고
+            // 파일에서 읽어 문자열 변수로만 다룬다(스크립트 인젝션 차단).
+            //
+            // ⚠ 이 블록 안에는 표현식 여는 토큰(달러 + 중괄호 두 개)을 **주석으로도** 쓰지 말 것.
+            // Actions 는 script 값 전체를 표현식으로 파싱하므로 빈 토큰이 그대로 파싱 대상이 되어
+            // "(Line: 103, Col: 19): An expression was expected" 로 워크플로가 통째로 무효가 된다.
+            // 실측: 바로 이 자리에 그 토큰을 적어 둔 주석 한 줄 때문에 pr-review 가 며칠간
+            // startup failure(잡 0개·로그 없음, 실행 이름이 파일 경로로 표시)로 죽어 있었다.
+            const review = fs.existsSync('pr-review.md')
+              ? fs.readFileSync('pr-review.md', 'utf8').trim()
+              : '_AI review step did not run._';
             const body = [
               '## PR Review Summary',
               '',
-              `- Files changed: ${{ steps.stats.outputs.files }}`,
-              `- Lines added: ${{ steps.stats.outputs.added }}`,
-              `- Lines deleted: ${{ steps.stats.outputs.deleted }}`,
-
+              `- Files changed: ${process.env.FILES}`,
+              `- Lines added: ${process.env.ADDED}`,
+              `- Lines deleted: ${process.env.DELETED}`,
               '',
               '### AI Review',
-
+              '',
+              review,
             ].join('\n');
             await github.rest.issues.createComment({
               owner: context.repo.owner,

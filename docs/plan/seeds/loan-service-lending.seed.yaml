@@ -1,0 +1,125 @@
+# Seed: loan-service 여신 as-is 사양 (Ouroboros 방법론 — Interview → Seed 결정화)
+# 상태: CONFIRMED (settlement/account seed 와 동일 방식 지시로 승인 승계, 2026-08-13)
+# 원칙: 이 Seed 는 "현행 코드가 실제로 하는 일"의 불변 기술이다. 결함은 교정하지 않고 known_issues 로만 기록한다.
+# 관련: docs/prd/loan-service.md (PRD), 스킬 loan-domain-rules (강제 규칙 정본)
+# 자매 Seed: account-service-gl-core (대출 이벤트를 GL 분개로 소비하는 하류)
+
+seed:
+  id: loan-service-lending-v1
+  goal: >-
+    loan-service(여신 — 선정산 대출·기업 신용대출·담보대출·물건금융을 한 서비스에서 다루는 컨텍스트)의
+    현행 동작을 실행 가능한 게이트에 매핑된 불변 사양으로 결정화해, 회귀 기준선 ·
+    계약 드리프트 게이트 · 면접/포트폴리오 문서로 사용한다.
+
+  scope:
+    included:
+      - 상태머신 2종(선정산 LoanStatus·기업신용 CorporateLoanStatus)과 전이 강제
+      - 기업 신용정책(점수→등급→한도/수수료) 구간 규칙
+      - 자체 복식부기 원장(차1·대1 균형)과 전표 팩토리
+      - 선정산 상환 충당 규칙
+      - 물건금융(리스·할부)의 잔가 허용/필수 구분
+      - 발행·소비 이벤트 표면
+    excluded:
+      - 담보 재평가·마진콜 상세 (Collateral*·MarginCall* — 별도 Seed 대상)
+      - 외부 재무제표·평판 API 클라이언트 페이로드
+
+  constraints:
+    - "금액은 BigDecimal/Money — 라운딩 정책 보존"
+    - "상태 전이 규칙은 enum 이 단일 출처, 애그리거트는 판정을 호출만 한다"
+    - "전표는 차변1·대변1 균형 — 팩토리로만 생성"
+    - "도메인 규칙 위반은 타입 예외(LoanInvariantViolationException 등) — generic IAE 금지(guard OO 규칙 대상)"
+    - "이벤트 발행은 Outbox 경유만"
+
+  invariants:  # as-is 코드 사실 — 파일:라인 근거 (경로 접두 loan-service/src/main/java/github/lms/lemuel/loan/)
+    advance_state_machine:
+      source: domain/LoanStatus.java:13-19,22,35
+      rule: "REQUESTED·APPROVED·DISBURSED·REPAID·REJECTED·OVERDUE·WRITTEN_OFF — canTransitionTo 단일 출처"
+    corporate_state_machine:
+      source: domain/CorporateLoanStatus.java:16-20,23,31
+      rule: "REQUESTED·APPROVED·DISBURSED·REPAID·REJECTED — canTransitionTo 단일 출처"
+    transition_single_source:
+      source: domain/LoanStatus.java:22 + domain/CorporateLoanStatus.java:23
+      rule: "전이 허용표는 enum 이 갖고 애그리거트는 호출만 한다 (settlement 의 SettlementStatus 와 동형)"
+    credit_grade_bands:
+      source: domain/CorporateCreditPolicy.java:26
+      rule: "≥80 A, ≥65 B, ≥50 C, ≥35 D, <35 E — E 는 대출 불가"
+    limit_formula:
+      source: domain/CorporateCreditPolicy.java:27-28
+      rule: "한도 = 자본총계 × equityLimitRatio(기본 10%) × gradeFactor(A 1.0 / B 0.8 / C 0.6 / D 0.3 / E 0). 자본총계 null 또는 ≤0 → 한도 0"
+    fee_formula:
+      source: domain/CorporateCreditPolicy.java:29
+      rule: "수수료 = 원금 × dailyRate × termDays × gradeSurcharge(A 1.0 / B 1.1 / C 1.25 / D 1.5)"
+    deterministic_band_mapping:
+      source: domain/CorporateCreditPolicy.java:14
+      rule: "점수·등급·한도·수수료 매핑이 전부 구간 기반 결정적 함수 — 경계를 단위 테스트로 고정할 수 있게 설계"
+    ledger_balanced_entry:
+      source: domain/LoanLedgerEntry.java:12,21-38
+      rule: "전표는 차변 1 + 대변 1, 한 전표 안에서 차변금액 = 대변금액. private 생성자 + 팩토리"
+    ledger_account_pairs:
+      source: domain/LoanLedgerEntry.java:45,50,55,61,67
+      rule: "실행 LOAN_RECEIVABLE/CASH · 수수료 FEE_RECEIVABLE/FEE_INCOME · 상환 CASH/LOAN_RECEIVABLE — 계정 조합이 팩토리에 고정"
+    repayment_bounded_by_available:
+      source: domain/LoanAdvance.java:132-142
+      rule: "충당액 = min(잔액, 가용 정산금). 음수 가용액은 LoanInvariantViolationException"
+    asset_finance_residual:
+      source: domain/AssetFinanceType.java:17,29-35,45
+      rule: "물건금융 유형이 잔가 허용(residualAllowed)·필수(residualRequired) 여부를 타입으로 구분"
+
+  event_contracts:
+    publishes:
+      - LoanDisbursementRequested
+      - LoanRepaymentApplied
+      - CorporateLoanDisbursed
+      - SecuredLoanDisbursed
+      - SecuredLoanRepaid
+      - SecuredLoanPrincipalRepaid
+      - LeaseActivated   # 소비처 미배선 (known_issues KI-2)
+    consumes:
+      - "settlement.created / settlement.confirmed — 선정산 재원"
+      - "company.reputation_changed — 신용평가 입력"
+
+  acceptance_criteria:  # 실행 가능 — 각 AC 는 기존 게이트에 매핑
+    - id: AC-1
+      criterion: 상태머신 2종 전이표·타입 예외가 일치한다
+      gate: "./gradlew :loan-service:test — 상태 enum·애그리거트 테스트"
+    - id: AC-2
+      criterion: 등급 구간·한도·수수료 경계값이 정본 표와 일치한다
+      gate: "CorporateCreditPolicy 테스트 (경계 전수)"
+    - id: AC-3
+      criterion: E 등급이 대출 불가로 차단된다
+      gate: "CorporateCreditPolicy 테스트"
+    - id: AC-4
+      criterion: 원장 전표가 차1·대1 균형이며 팩토리 밖 생성 경로가 없다
+      gate: "LoanLedgerEntry 테스트"
+    - id: AC-5
+      criterion: 상환 충당이 가용액을 넘지 않는다
+      gate: "LoanAdvance 테스트"
+    - id: AC-6
+      criterion: 발행 이벤트가 JSON Schema 계약과 일치한다 (양방향)
+      gate: "계약 테스트 + account-service 소비측"
+    - id: AC-7
+      criterion: 소비 컨슈머가 DLT 배선에 닿는다
+      gate: "node scripts/harness/guard.mjs — KAFKA-DLQ 규칙"
+    - id: AC-8
+      criterion: 커버리지 LINE >= 90%
+      gate: "./gradlew :loan-service:jacocoTestCoverageVerification (check 편입)"
+
+  known_issues:  # 발견만 기록 — 사양은 as-is 유지
+    - id: KI-1
+      finding: "한 서비스에 상품 4종(선정산·기업신용·담보·물건금융)이 들어 있고 상태머신·원장·정책이 상품마다 따로여서 도메인 클래스가 24개를 넘는다. 배포 단위 분리 판단의 근거가 문서에 없다"
+      disposition: recorded-not-fixed (경계 후보)
+    - id: KI-2
+      finding: "lemuel.loan.lease_activated 의 소비처가 없다 — 계약 스키마와 발행은 있는데 받는 쪽이 미배선(SPEC.md §5 에 '소비처 미배선' 기재). 리스 개시가 GL 에 반영되지 않는다"
+      disposition: gap (배선 미완)
+    - id: KI-3
+      finding: "신용점수 입력이 외부 2소스(재무제표·뉴스 평판)에 의존하는데, 두 소스가 모두 비어 있을 때 등급이 어떻게 되는지(E 로 떨어지는지 산정 거부인지) 확인하지 않았다"
+      disposition: recorded-not-verified
+    - id: KI-4
+      finding: "자체 원장(LoanLedgerEntry)과 전사 GL(account-service)이 이중 기록된다 — loan 이 자기 원장에 적고 같은 사건을 이벤트로 보내 account 가 다시 분개한다. 두 원장이 어긋났을 때 무엇이 정본인지 문서에 없다"
+      disposition: recorded-not-verified (대사 기준 불명)
+
+  uses:
+    - regression-baseline
+    - contract-drift-gate
+    - interview-portfolio
+    - brownfield-base

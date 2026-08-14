@@ -1,6 +1,9 @@
 package github.lms.lemuel.category.adapter.in.web;
 
+import github.lms.lemuel.category.application.port.in.CheckCategoryCountIntegrityUseCase;
+import github.lms.lemuel.category.application.port.in.CheckCategoryCountIntegrityUseCase.CountIntegrityReport;
 import github.lms.lemuel.category.application.service.EcommerceCategoryService;
+import github.lms.lemuel.category.domain.CategoryProductCountDrift;
 import github.lms.lemuel.category.domain.EcommerceCategory;
 import github.lms.lemuel.common.config.jwt.JwtUtil;
 import org.junit.jupiter.api.DisplayName;
@@ -13,6 +16,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -30,6 +34,7 @@ class AdminEcommerceCategoryControllerTest {
     @Autowired MockMvc mockMvc;
     @MockitoBean JwtUtil jwtUtil;
     @MockitoBean EcommerceCategoryService categoryService;
+    @MockitoBean CheckCategoryCountIntegrityUseCase countIntegrityUseCase;
 
     private EcommerceCategory category() {
         return EcommerceCategory.createRoot("전자제품", "electronics", 5);
@@ -119,5 +124,38 @@ class AdminEcommerceCategoryControllerTest {
     void deleteCategory() throws Exception {
         mockMvc.perform(delete("/admin/categories/1")).andExpect(status().isNoContent());
         verify(categoryService).deleteCategory(1L);
+    }
+
+    @Test
+    @DisplayName("GET /admin/categories/count-integrity: 규모·방향·표본을 함께 준다 — 표본만으로는 조치 우선순위를 못 정한다")
+    void checkCountIntegrity() throws Exception {
+        when(countIntegrityUseCase.check(20)).thenReturn(new CountIntegrityReport(
+                97L,
+                Map.of("OVERCOUNT", 1),
+                List.of(CategoryProductCountDrift.of(1L, "shoes", "신발", 12, 9)),
+                0));
+
+        mockMvc.perform(get("/admin/categories/count-integrity").param("sampleLimit", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.drifted").value(97))
+                .andExpect(jsonPath("$.healthy").value(false))
+                .andExpect(jsonPath("$.byKind.OVERCOUNT").value(1))
+                .andExpect(jsonPath("$.samples[0].categoryId").value(1))
+                .andExpect(jsonPath("$.samples[0].cachedCount").value(12))
+                .andExpect(jsonPath("$.samples[0].actualCount").value(9))
+                .andExpect(jsonPath("$.samples[0].kind").value("OVERCOUNT"));
+    }
+
+    @Test
+    @DisplayName("GET /admin/categories/count-integrity: 표본 상한을 안 주면 기본값으로 검사한다")
+    void checkCountIntegrityUsesDefaultSampleLimit() throws Exception {
+        when(countIntegrityUseCase.check(50)).thenReturn(
+                new CountIntegrityReport(0L, Map.of(), List.of(), 0));
+
+        mockMvc.perform(get("/admin/categories/count-integrity"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.healthy").value(true));
+
+        verify(countIntegrityUseCase).check(50);
     }
 }

@@ -28,6 +28,11 @@ public class DepositAccountPersistenceAdapter
     }
 
     @Override
+    public Optional<SellerDepositAccount> findByIdForUpdate(Long accountId) {
+        return repo.findByIdForUpdate(accountId).map(this::toDomain);
+    }
+
+    @Override
     public SellerDepositAccount save(SellerDepositAccount account) {
         DepositAccountJpaEntity entity;
         if (account.getId() == null) {

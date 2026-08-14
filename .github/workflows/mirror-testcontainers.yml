@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Login to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -36,6 +36,9 @@ jobs:
             "confluentinc/cp-kafka:7.6.1"
             "postgres:17-alpine"
             "postgres:17"
+            # ai-service RAG — pgvector 확장이 포함된 postgres. 확장이 없는 이미지에서는
+            # 마이그레이션 V20260812150000(CREATE EXTENSION vector) 가 실패해 부팅이 죽는다.
+            "pgvector/pgvector:pg17"
             "redis:7-alpine"
             # testcontainers 유틸 — hub.image.name.prefix 가 ryuk 에도 적용되므로 미러 필수
             # (버전은 org.testcontainers 라이브러리 버전에 따라 다름 — 실패 로그의 imageName 참조)

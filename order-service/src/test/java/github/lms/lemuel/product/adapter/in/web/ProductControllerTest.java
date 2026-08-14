@@ -41,6 +41,7 @@ class ProductControllerTest {
     @MockitoBean UpdateProductUseCase updateProductUseCase;
     @MockitoBean ManageProductStatusUseCase manageProductStatusUseCase;
     @MockitoBean ProductImageService productImageService;
+    @MockitoBean github.lms.lemuel.product.application.port.in.SearchProductFacetsUseCase searchProductFacetsUseCase;
 
     private static Product product(Long id, String name) {
         Product p = Product.create(name, "설명", new BigDecimal("1000"), 10);

@@ -25,7 +25,7 @@
 | shared-common | 버전드 라이브러리(1.0.0, composite build): audit·config·exception·outbox·ratelimit·pdf | ✅ |
 | 인증·인가 | JWT(HS256) 발급(order `AuthController`)·검증(shared-common), 역할 ADMIN/MANAGER/USER, IDOR 소유권 대조 | ✅ |
 | Outbox + 멱등 | `outbox_events`(event_id UNIQUE) → 멀티워커 폴러 → 3단 멱등(outbox·processed_events·도메인 UNIQUE) | ✅ |
-| 이벤트 계약-as-code | cross-service 14토픽 JSON Schema + 정본 샘플(testFixtures), 프로듀서·컨슈머 양방향 계약 테스트 (ADR 0024) | ✅ |
+| 이벤트 계약-as-code | cross-service 37토픽 JSON Schema + 정본 샘플(testFixtures), 프로듀서·컨슈머 양방향 계약 테스트 (ADR 0024) — `git ls-files 'shared-common/src/testFixtures/resources/contracts/events/*.schema.json' \| wc -l` | ✅ |
 | 금액·원장 안전 | BigDecimal 강제, 전표 차1·대1 구성적 균형, `PENDING→POSTED→REVERSED` | ✅ |
 | 하네스 게이트 | guard.mjs(PreToolUse·pre-commit·CI 3중), harness-audit, JaCoCo 90% 게이트 | ✅ |
 
@@ -40,6 +40,7 @@
 |----------|----------|------|
 | 회원/인증/멤버십 | `/auth · /users · /memberships` | ✅ |
 | 상품·SKU·카테고리·태그·이미지 | `/api/products · /categories · /api/tags` | ✅ |
+| 카탈로그(옵션 축/값·조합 SKU·진열 편성) | `/admin/option-catalog · /admin/display-sections · /display-sections` — 설계 정본 [`product-catalog-design.md`](product-catalog-design.md) | ✅ |
 | 장바구니·쿠폰(등급별) | `/users/{id}/cart · /coupons` | ✅ |
 | 주문(재고 조건부 차감·Idempotency-Key)·배송 | `/orders · /orders/{id}/shipment` | ✅ |
 | 결제(Toss·분할·환불 동시성) | `/payments · /payments/split · /api/payments/*/refunds` | ✅ |
@@ -116,7 +117,36 @@
 - 멤버십 초대·수락·역할변경(OWNER 전용)·제거(**마지막 OWNER 보호 불변식**)
 - 인가는 JWT 주체의 조직 내 역할로 판정(`OrgAuthorizer`, IDOR 방지)
 - 상태머신: Organization ACTIVE⇄SUSPENDED, Membership INVITED→ACTIVE⇄SUSPENDED→REMOVED
-- **이벤트 발행 전용** `organization.created · member_joined` — 🟡 소비처 미배선(계약 스키마는 존재, 의도된 상태)
+- **이벤트 발행 전용** `organization.created · member_joined · member_role_changed · member_removed` (4토픽, 계약 스키마 존재) — ✅ card-service 가 조직 프로젝션으로 소비(`OrganizationCreatedConsumer` 외 3종)
+
+---
+
+## Phase 5.5 — 법인 부가서비스 (card·insurance·deposit) ✅ DONE 🟡
+> organization 프로젝션 이후 붙은 3개 서비스. card 는 organization 이벤트를 소비하고, insurance·deposit 은
+> 아직 발행 전용(소비처 미배선) — Phase 5 와 마찬가지로 거래/정산 계보와 코드·DB 의존은 0.
+
+### 5.5a card-service (8106, mgmt 8107 / lemuel_card) ✅
+- **Phase 1**(발급·한도·상태·프로젝션) + **Phase 2**(실시간 승인·매입·명세서·지출관리 SaaS) 모두 완료(2026-08-04)
+- 셀러 조직에 마스터한도 부여 → 임직원별 서브한도 카드 발급. 한도 = `floor((sellerPayable+holdbackPayable) × R × H)`
+  (재원은 account-service GL 통제계정 조회 — ADR 0030, card 는 재원을 복제하지 않는다)
+- **핵심 불변식**: `master_limit >= Σ sub_limit`(서로 다른 애그리거트, DB 제약 불가 → 비관적 락 + 재계산으로 방어)
+- Phase 2: 실시간 승인/홀드, 매입·취소·환불, 명세서·상환, 지출관리(제출/승인/반려) 워크플로
+- `lemuel.organization.*` 4종 소비(이탈자 카드 자동 정지) — 이벤트 발행(Outbox) `account_opened·issued·limit_changed·status_changed·authorized·captured·statement_paid`
+
+### 5.5b insurance-service (8108, mgmt 8109 / lemuel_insurance) ✅
+- GA(법인보험대리점) 플랫폼 — 상담 → 가입설계 → 청약 → 계약 → 유지·변경 → 수수료 정산을 하나로 잇는다
+- 상태머신 4종: Application/Policy/Proposal/Commission (전이표 상세는 [`insurance-service.md`](plan/insurance-service.md))
+- 방카슈랑스 확장(V6+): 판매채널 FC/BANCA, 은행 채널 25%룰 모니터링, 대면 상품설명서 교부 증빙(완전판매 게이트)
+- 배치 7종(만기·가입설계 만료·월말 마감·수수료 지급·환수 스윕·일반지급·방카 집중도 감시)
+- PII(주민번호·연락처) 분리 테이블 암호화(`INSURANCE_ENC_KEY` 미설정 시 fail-closed)
+- **이벤트 발행 전용**(9종, Outbox) — 계약 스키마 미등록·소비처 미배선
+
+### 5.5c deposit-service (8112, mgmt 8113 / lemuel_deposit) 🟡
+- 셀러 예치금 **잔고의 단일 진실원** — hold(선점)로 재원을 묶고 offset(상계)으로 소진해 이중사용을 구조적으로 차단
+- IDOR 차단: `/accounts/me` 는 경로에 sellerId 가 없다는 것 자체가 계약(임의 셀러 조회는 별도 경로+ADMIN/MANAGER)
+- 부족분(`DepositOffsetShortfall`)은 무음 실패 대신 명시적으로 적재
+- REST 는 `/api/deposits` 조회 + `/admin/deposits` 수기 콘솔뿐 — **Kafka 컨슈머 미배선**(잔고 변동 입력이 수기 경로뿐)
+- **이벤트 발행 전용**(Outbox) — 계약 스키마 미등록·소비처 미배선
 
 ---
 
@@ -154,6 +184,38 @@
 | 8-5 | operation Phase 4 AI 브리핑 | Phase 3 완료됨 | ⬜ 로드맵 |
 | 8-6 | organization 이벤트 소비처 배선(소비자 생기면 ADR 0024 절차로 계약 편입) | 소비 유스케이스 | ⬜ |
 | 8-7 | 신규 서비스 통합테스트 보강(커버리지 게이트 LINE 90% 후속) | 없음 | 🟡 진행 |
+| 8-8 | 정산운영 콘솔 — 화면 없는 `/admin/**` 표면 4종 노출 (아래 로스터) | 없음(서버 API 는 구현됨) | 🟡 7/11 랜딩 |
+
+### 8-8. 정산운영 콘솔 로스터 (화면 노출 현황)
+> settlement-service 의 `/admin/**` 은 **서버 표면만 있으면 curl·MCP 로만 굴러간다** — 운영자가 눈으로 볼 수단이 없다.
+> 아래는 *화면(라우트+메뉴) 기준* 현황이다. 서버 API 구현 여부는 Phase 2 표가 정본이고, 여기서 ⬜ 는 "API 는 있는데 화면이 없다"는 뜻이다.
+
+| 화면 | 라우트 | 서버 표면 | 상태 |
+|------|--------|----------|------|
+| 정합성 검증 | `/admin/settlement/integrity` | `/admin/integrity` | ✅ `72fcfc390` |
+| 일일 대사 | `/admin/settlement/reconciliation` | `/admin/reconciliation` | ✅ `72fcfc390` |
+| 원장·시산표 | `/admin/settlement/ledger` | `/api/ledger` · `/admin/ledger-periods` | ✅ `72fcfc390` |
+| PG 대사 | `/admin/settlement/pg-reconciliation` | `/admin/pg-reconciliation` | ✅ `9213fc61f` |
+| 차지백 | `/admin/settlement/chargebacks` | `/admin/chargebacks` | ✅ `9e16a4255` |
+| 회수 채권 | `/admin/settlement/recoveries` | `/admin/recoveries` | ✅ `77a3ec8ce` |
+| 월마감 | `/admin/settlement/monthly-closing` | `/admin/monthly-closing` | ✅ `aeadb1937`+`29743b4ed` |
+| 세무(세금계산서) | `/admin/settlement/tax` | `/admin/tax/scans` · `/admin/seller-tax-profiles` · `/admin/tax/settlements/{id}` | ✅ (스캔 리뷰·전표 전기·발행·3자 대사) |
+| 수수료율 | `/admin/settlement/commission-rates` (예정) | `/admin/commission-rates` | ⬜ |
+| DLQ 재처리 | `/admin/settlement/dlq` (예정) | `/admin/dlq` | ⬜ |
+| 이벤트 추적·정산 재구동 | `/admin/settlement/event-track` (예정) | `/admin/event-track` · `/admin/settlements/rerun` | ⬜ |
+
+**라우트 접두사 고정**: 신규 화면도 `/admin/settlement/**` 아래에 둔다 — nginx SPA 폴백이 `/admin` 하위에서
+`(system|operation|ceo|settlement|login)` 만 index.html 로 내려보내므로, 다른 접두사는 새로고침·직접진입이 404 가 된다.
+
+**배선 2스텝**: `App.tsx` 라우트 + (시드 마이그레이션 & `frontend/src/data/menuFallback.ts` 한 행). 메뉴에 넣지 않을
+화면이면 `menu-route-gate` 의 `ROUTES_WITHOUT_MENU` 에 사유를 등록한다(안 하면 CI FAIL).
+
+**화면을 만들지 않는 표면**: 백필·일회성 도구(`/admin/payouts/backfill` · `/admin/payouts/pii` ·
+`/admin/backfill/ledger-reverse` · `/admin/outbox/ledger`)는 제외한다 — 1회성 집행 경로라 화면으로 상설하면
+운영자가 상시 기능으로 오해한다.
+
+**표기 정정**: 커밋 메시지의 `(P0 n/10)` 은 이 로스터로 대체한다. 당시 "10개" 목록이 어느 문서에도 남지 않아
+남은 항목을 코드(화면 없는 admin 컨트롤러)에서 역산했고, 그 결과 총량이 11 로 잡혔다.
 
 ---
 

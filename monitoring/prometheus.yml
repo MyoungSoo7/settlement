@@ -38,6 +38,17 @@ scrape_configs:
           application: 'lemuel-settlement'
           environment: 'production'
 
+  # notification-service (Kotlin standalone, compose 서비스명 notification-service:8130)
+  # 이 서비스는 자체 DB 도 replay 콘솔도 없다 — 재시도 끝에 DLT 로 격리된 알림을 되살릴 자동 경로가
+  # 없으므로, 격리가 발생했다는 사실 자체를 알람으로 잡는 것이 유일한 안전망이다.
+  - job_name: 'notification'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['notification-service:8130']
+        labels:
+          application: 'lemuel-notification'
+          environment: 'production'
+
   # operation-service — 운영 관제(인시던트). 관제의 관제: 이 서비스가 죽으면 인시던트 수집이 침묵하므로
   # up{job="operation"} 알람(OperationServiceDown)의 소스가 된다.
   - job_name: 'operation'

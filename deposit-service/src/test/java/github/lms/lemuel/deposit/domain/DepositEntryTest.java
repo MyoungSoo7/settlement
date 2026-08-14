@@ -1,5 +1,8 @@
 package github.lms.lemuel.deposit.domain;
 
+import github.lms.lemuel.deposit.domain.exception.DepositInvariantViolationException;
+import github.lms.lemuel.deposit.domain.exception.InvalidDepositAmountException;
+import github.lms.lemuel.deposit.domain.exception.InvalidDepositStateException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -90,6 +93,6 @@ class DepositEntryTest {
         entry.assignId(1L);
 
         assertThat(entry.getId()).isEqualTo(1L);
-        assertThatThrownBy(() -> entry.assignId(2L)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> entry.assignId(2L)).isInstanceOf(DepositInvariantViolationException.class);
     }
 }

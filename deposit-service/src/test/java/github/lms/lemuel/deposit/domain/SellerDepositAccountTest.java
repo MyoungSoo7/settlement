@@ -1,5 +1,8 @@
 package github.lms.lemuel.deposit.domain;
 
+import github.lms.lemuel.deposit.domain.exception.DepositInvariantViolationException;
+import github.lms.lemuel.deposit.domain.exception.InvalidDepositAmountException;
+import github.lms.lemuel.deposit.domain.exception.InvalidDepositStateException;
 import github.lms.lemuel.deposit.domain.exception.InsufficientDepositException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -90,7 +93,7 @@ class SellerDepositAccountTest {
         void credit_zero_throws() {
             SellerDepositAccount account = newAccount();
             assertThatThrownBy(() -> account.credit(BigDecimal.ZERO))
-                    .isInstanceOf(IllegalArgumentException.class);
+                    .isInstanceOf(InvalidDepositAmountException.class);
         }
 
         @Test
@@ -98,7 +101,7 @@ class SellerDepositAccountTest {
         void credit_negative_throws() {
             SellerDepositAccount account = newAccount();
             assertThatThrownBy(() -> account.credit(new BigDecimal("-1000")))
-                    .isInstanceOf(IllegalArgumentException.class);
+                    .isInstanceOf(InvalidDepositAmountException.class);
         }
     }
 
@@ -166,7 +169,7 @@ class SellerDepositAccountTest {
         void debit_zero_throws() {
             SellerDepositAccount account = newAccount();
             assertThatThrownBy(() -> account.debit(BigDecimal.ZERO))
-                    .isInstanceOf(IllegalArgumentException.class);
+                    .isInstanceOf(InvalidDepositAmountException.class);
         }
     }
 

@@ -30,10 +30,11 @@
 
 # 모듈: shared-common, order-service, settlement-service, loan-service, financial-statements-service,
 #       economics-service, company-service, operation-service, market-service, ai-service,
-#       common-data-service, investment-service, account-service, gateway-service
+#       common-data-service, investment-service, account-service, organization-service,
+#       card-service, insurance-service, deposit-service, gateway-service
 
 # Docker
-docker compose up -d                                # DB-per-service PG 12종 · ES · Redpanda · 12 services + gateway
+docker compose up -d                                # DB-per-service PG 16종 · ES · Redpanda · 앱 컨테이너 18개(JVM 17 + market-stream)
 docker build --build-arg MODULE=<service> -t lemuel-<name> .   # 컨테이너 이미지 (MODULE 로 서비스 지정)
 ```
 
@@ -47,6 +48,6 @@ docker build --build-arg MODULE=<service> -t lemuel-<name> .   # 컨테이너 �
 ## 작업 이력 / 브랜치 정보
 
 - **메인 라인**: `develop` → `main`. main 은 보호 브랜치(PR 필수, squash 만, 필수 CI 2종). 분리 전 백업 `backup/pre-msa-split`.
-- **MSA 분리 완료**: 12 서비스 + DB-per-service, settlement↔order 이벤트 프로젝션(ADR 0020).
+- **MSA 분리 완료**: 16 서비스 + gateway, 전 서비스 DB-per-service, settlement↔order 이벤트 프로젝션(ADR 0020).
 - **제거된 도메인**: `reservation`(시공 예약) — 모듈·DB·라우팅·프론트·k8s 정리 완료.
 - **TPS 개선**: PgBouncer→Redpanda, settlement 배치/컨슈머 스레드·프로젝션 쿼리·캐시·PDF 비동기화 등.

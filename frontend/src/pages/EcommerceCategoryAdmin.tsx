@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/contexts/useToast';
 import api from '@/api/axios';
 import { apiErrorMessage } from '@/lib/apiError';
+import CategoryCountIntegrityPanel from '@/components/category/CategoryCountIntegrityPanel';
 
 interface EcommerceCategory {
   id: number;
@@ -270,6 +271,9 @@ const EcommerceCategoryAdmin: React.FC = () => {
             {showCreateForm ? '취소' : '+ 최상위 카테고리 생성'}
           </button>
         </div>
+
+        {/* 트리에 붙는 상품수는 캐시다 — 정본(매핑 실계수)과 어긋나도 화면은 여전히 숫자를 보여 준다 */}
+        <CategoryCountIntegrityPanel />
 
         {showCreateForm && (
           <div className="bg-white rounded-lg shadow p-6 mb-6">

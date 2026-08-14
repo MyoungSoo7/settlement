@@ -8,8 +8,10 @@ import github.lms.lemuel.order.application.port.out.SaveOrderPort;
 import github.lms.lemuel.order.application.port.out.SendOrderNotificationPort;
 import github.lms.lemuel.order.domain.Order;
 import github.lms.lemuel.order.domain.OrderItem;
+import github.lms.lemuel.order.domain.OrderItemOption;
 import github.lms.lemuel.order.domain.exception.UserNotExistsException;
 import github.lms.lemuel.product.application.port.in.DecreaseProductStockUseCase;
+import github.lms.lemuel.product.application.port.in.DescribeVariantOptionsUseCase;
 import github.lms.lemuel.product.application.port.in.DecreaseVariantStockUseCase;
 import github.lms.lemuel.product.application.port.out.LoadProductPort;
 import github.lms.lemuel.product.application.port.out.LoadProductVariantPort;
@@ -61,6 +63,7 @@ public class CreateMultiItemOrderService implements CreateMultiItemOrderUseCase 
     private final SendOrderNotificationPort sendNotificationPort;
     private final PublishOrderEventPort publishOrderEventPort;
     private final CouponUseCase couponUseCase;
+    private final DescribeVariantOptionsUseCase describeVariantOptionsUseCase;
 
     public CreateMultiItemOrderService(LoadUserForOrderPort loadUserPort,
                                        LoadProductPort loadProductPort,
@@ -70,7 +73,8 @@ public class CreateMultiItemOrderService implements CreateMultiItemOrderUseCase 
                                        SaveOrderPort saveOrderPort,
                                        SendOrderNotificationPort sendNotificationPort,
                                        PublishOrderEventPort publishOrderEventPort,
-                                       CouponUseCase couponUseCase) {
+                                       CouponUseCase couponUseCase,
+                                       DescribeVariantOptionsUseCase describeVariantOptionsUseCase) {
         this.loadUserPort = loadUserPort;
         this.loadProductPort = loadProductPort;
         this.loadVariantPort = loadVariantPort;
@@ -80,6 +84,7 @@ public class CreateMultiItemOrderService implements CreateMultiItemOrderUseCase 
         this.sendNotificationPort = sendNotificationPort;
         this.publishOrderEventPort = publishOrderEventPort;
         this.couponUseCase = couponUseCase;
+        this.describeVariantOptionsUseCase = describeVariantOptionsUseCase;
     }
 
     @Override
@@ -97,6 +102,7 @@ public class CreateMultiItemOrderService implements CreateMultiItemOrderUseCase 
             BigDecimal unitPrice = product.getPrice();
             String productName = product.getName();
             String sku = null;
+            List<OrderItemOption> options = List.of();
 
             // SKU 라인이면 variant 조회 + 재고 차감 + 옵션 단가(추가금·할인) 반영
             if (line.variantId() != null) {
@@ -111,6 +117,11 @@ public class CreateMultiItemOrderService implements CreateMultiItemOrderUseCase 
                 sku = variant.getSku();
                 // 옵션 단가 = 기준가 + 추가금 - 정액할인 - 정률할인 (ProductVariant 가 우선순위 강제)
                 unitPrice = variant.effectiveUnitPrice(product.getPrice());
+                // 주문 시점 옵션 스냅샷 — 값이 비활성화되거나 개명돼도 이 주문서는 그대로 읽힌다.
+                options = describeVariantOptionsUseCase.describe(line.variantId()).stream()
+                        .map(d -> OrderItemOption.snapshot(d.sortOrder(), d.axisCode(), d.axisName(),
+                                d.valueCode(), d.valueName()))
+                        .toList();
                 decreaseStockUseCase.decrease(line.variantId(), line.quantity());
             } else {
                 // 옵션 없는 일반 상품: products.stock_quantity 를 원자적 조건부 UPDATE 로 차감.
@@ -119,7 +130,7 @@ public class CreateMultiItemOrderService implements CreateMultiItemOrderUseCase 
             }
 
             items.add(OrderItem.newItem(line.productId(), line.variantId(), sku,
-                    productName, unitPrice, line.quantity()));
+                    productName, unitPrice, line.quantity(), options));
         }
 
         // 소계 기준 쿠폰 검증 → 할인 금액 산출 (검증 실패 시 예외 → 트랜잭션 롤백)

@@ -20,5 +20,29 @@ public interface RenderProductDisclosureUseCase {
      * @param sha256 PDF 바이트의 SHA-256 (hex 소문자 64자)
      */
     record RenderedDisclosure(String productCode, String productName, byte[] pdf, String sha256) {
+
+        // 배열 필드라 record 기본 구현은 참조 동일성으로 비교하고 toString 은 [B@... 를 찍는다.
+        // 같은 상품설명서를 두 번 렌더링하면 같은 값으로 다뤄져야 하므로 내용 기준으로 재정의한다.
+        @Override
+        public boolean equals(Object o) {
+            if (!(o instanceof RenderedDisclosure other)) {
+                return false;
+            }
+            return java.util.Objects.equals(productCode, other.productCode)
+                    && java.util.Objects.equals(productName, other.productName)
+                    && java.util.Objects.equals(sha256, other.sha256)
+                    && java.util.Arrays.equals(pdf, other.pdf);
+        }
+
+        @Override
+        public int hashCode() {
+            return 31 * java.util.Objects.hash(productCode, productName, sha256) + java.util.Arrays.hashCode(pdf);
+        }
+
+        @Override
+        public String toString() {
+            return "RenderedDisclosure[productCode=" + productCode + ", productName=" + productName
+                    + ", pdf=" + (pdf == null ? "null" : pdf.length + "B") + ", sha256=" + sha256 + "]";
+        }
     }
 }

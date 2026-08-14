@@ -1,0 +1,159 @@
+# Seed: notification-service 알림 팬아웃·SSE 푸시 as-is 사양 (Ouroboros 방법론 — Interview → Seed 결정화)
+# 상태: CONFIRMED (기존 서비스 seed 와 동일 방식 지시로 승인 승계, 2026-08-13)
+# 원칙: 이 Seed 는 "현행 코드가 실제로 하는 일"의 불변 기술이다. 결함은 교정하지 않고 known_issues 로만 기록한다.
+
+seed:
+  id: notification-service-fanout-v1
+  goal: >-
+    notification-service(Kotlin 폴리글랏 8130 — 도메인 이벤트 5토픽 구독·채널 4종 동시 팬아웃·
+    eventId TTL 멱등·DLT 격리·JWT 파생 수신자 SSE 푸시)의 현행 동작을 실행 가능한 게이트에 매핑된
+    불변 사양으로 결정화해, 회귀 기준선 · 면접/포트폴리오 문서 · 후속 하드닝 베이스로 사용한다.
+
+  scope:
+    included:
+      - Kafka 인바운드 (5토픽·eventId 결정·삼키지 않음 계약)
+      - 에러 핸들링 (재시도 2s x3·유독 즉시 DLT·파티션 -1)
+      - 디스패치 코어 (멱등 게이트·코루틴 팬아웃·채널별 타임아웃/재시도)
+      - 채널 4종 (log·sse 상시 / slack·email 조건부)
+      - SSE 푸시 (JWT 파생 수신자·Last-Event-ID 재개·하트비트·재생 창 상한)
+      - 배포 형태 (JDK21 툴체인·non-root 이미지·게이트웨이/compose 배선 사실)
+    excluded:
+      - 발행측 서비스의 이벤트 계약 정의 (각 서비스 seed 소관)
+      - 실 SMTP/Slack 운영 검증
+
+  constraints:
+    - "shared-common 미의존 — 폴리글랏 독립 모듈. Kafka 에러 핸들링·JWT 검증을 Kotlin 으로 재구현(같은 계약 유지)"
+    - "DB 없음 — 멱등·재생 창 모두 프로세스 메모리(무영속 MVP)"
+    - "Kafka 발행 없음 — 소비 전용(DLT 격리 복사는 예외)"
+    - "JDK 21 툴체인 고정 — JDK25/Kotlin2.3 조합 회피. 빌드 시 JAVA_HOME=JDK21 필수"
+    - "리스너는 예외를 잡지 않는다 — 잡으면 오프셋 커밋 + 메시지 소멸"
+    - "SSE 수신자 키는 검증된 JWT 에서만 파생 — 요청 파라미터 불신(IDOR 차단)"
+
+  invariants:  # as-is 코드 사실 — 파일:라인 근거 (경로 접두 notification-service/src/main/kotlin/github/lms/lemuel/notification/)
+    topic_subscription:
+      source: adapter/in/kafka/DomainEventListener.kt:36-58
+      rule: >-
+        @ConditionalOnProperty(app.kafka.enabled=true, 기본 false) 게이트 하에 5토픽 구독 —
+        lemuel.settlement.confirmed · lemuel.payment.confirmed(Go 웹훅) · lemuel.payment.captured ·
+        lemuel.payment.refunded · lemuel.investment.executed. groupId 기본 notification-service
+      event_id: "헤더 event_id 우선 → payload eventId/id → kafka key 폴백 (:82). key 를 1순위로 쓰면 같은 aggregateId 의 두 번째 이벤트가 dedupe 로 사라진다(주석 명문)"
+    no_swallow_contract:
+      source: adapter/in/kafka/DomainEventListener.kt:16-34,59-74,91-105
+      rule: >-
+        파싱 실패 → UnparseableEventPayloadException(IAE) throw. 전 채널 실패(!deduped && results 비지 않음 && !anySucceeded)
+        → NotificationDispatchFailedException(ISE) throw. 세 비대칭이 의도: 부분 성공은 안 던짐(replay 중복 방지),
+        deduped 는 실패 아님, results 빈 경우(활성 채널 0)는 배포 설정 오류라 스트림 전량 DLT 로 밀지 않음
+    kafka_error_handling:
+      source: adapter/in/kafka/KafkaErrorHandlingConfig.kt:54-175
+      rule: >-
+        FixedBackOff(2000ms, 3회) + notRetryable(JsonProcessingException·IllegalArgumentException·IllegalStateException)
+        → 유독/전채널실패는 즉시 <topic>.DLT. AckMode.RECORD(리스너에 Acknowledgment 파라미터 없어 MANUAL 은 영구 미커밋),
+        enable.auto.commit=false, isolation.level=read_committed, auto.offset.reset=earliest
+      dlt_partition: "TopicPartition(dltTopicOf(topic), -1) — 소스 파티션 번호 고정 금지. 실측 근거: lemuel.payment.captured 6파티션 vs DLT 3파티션이면 격리 publish 자체가 실패. key 는 보존돼 키별 순서는 replay 에도 유지. .DLT.DLT 중복 접미 방지"
+      dlt_producer: "acks=all + enable.idempotence + retries=5 — 격리 복사 자체가 유실되면 안 됨"
+      metrics: "notification.kafka.dlt.published · notification.kafka.retry (형제 Java 서비스와 같은 이름 형태)"
+    dispatch_core:
+      source: application/NotificationDispatcher.kt:21-91
+      rule: >-
+        ① eventId 있으면 dedupe.markIfFirst 선점 실패 시 DispatchResult.skipped() 즉시 반환
+        ② enabled 채널 0개면 warn + 빈 결과(예외 아님)
+        ③ coroutineScope { async }.awaitAll() 로 동시 팬아웃
+        ④ 채널별 withTimeout(3000ms) x maxAttempts 3, 백오프 50/100/200ms(지수)
+        ⑤ TimeoutCancellationException 만 재시도 대상, 그 외 CancellationException 은 재throw(외부 취소 미삼킴)
+    channels:
+      source: adapter/out/channel/{LogChannel,SsePushChannel,SlackChannel,EmailChannel}.kt
+      rule: "log 상시 · sse 상시(구독자 0명도 실패 아님 — 재생 창에는 들어감) · slack 은 SLACK_WEBHOOK_URL 설정 시(비-2xx→ISE) · email 은 MAIL_USERNAME+MAIL_PASSWORD 설정 시(jakarta.mail 직접, Dispatchers.IO)"
+      discovery: "NotificationConfig 가 List<NotificationChannel> 을 주입받아 채널 추가에 설정 변경 불필요"
+    sse_identity:
+      source: adapter/in/web/JwtSubscriberIdentityResolver.kt:35-127
+      rule: >-
+        HS256(jjwt 0.12.5, shared-common JwtUtil 과 같은 라이브러리/버전). 수신자 키 = sub(이메일) + uid +
+        (role==ADMIN 일 때만) NotificationTemplate.OPS_FALLBACK_RECIPIENT. sub·uid 둘 다 없으면 거부.
+        secret < 32byte 또는 미설정이면 key=null → configured=false(fail-closed, 서비스는 계속 기동)
+      token_source: "Authorization: Bearer 우선, 없으면 ?token= (EventSource 가 헤더를 못 실음). 거부 사유는 로그에만, 응답엔 미노출"
+    sse_stream:
+      source: adapter/in/web/NotificationStreamController.kt:61-195 + adapter/out/stream/InMemoryNotificationStream.kt:35-217
+      rule: >-
+        GET /notifications/stream, produces text/event-stream;charset=UTF-8(한글 제목 mojibake 방지 명시).
+        연결 즉시 comment("connected") + reconnectTime 2s 전송(EventSource onopen 트리거). 하트비트 15s 데몬 스레드.
+        emitter timeout 기본 1800000ms. 연결별 writeLock 으로 발행 스레드/하트비트 스레드 프레임 인터리브 방지
+      resume: "Last-Event-ID 헤더 또는 ?lastEventId. 파싱 불가 값은 요청 실패가 아니라 '라이브만'으로 강등(나쁜 저장값으로 영구 에러 루프 방지). 구독 등록과 백로그 적재가 한 락 안 — 재개 무결(gapless)"
+      retention: "수신자당 100건(app.stream.buffer-per-recipient) · 수신자 10000 · 구독자 대기 200. 구독자 있는 수신자 버퍼는 프루닝 대상 제외. 메일박스 초과 시 가장 오래된 것 drop + warn(클라이언트는 id 간극으로 인지)"
+      ordering: "구독자별 mailbox + 비재진입 CAS drain flag — 리스너가 배달 중 publish 해도 중첩 배달이 아니라 뒤에 큐잉. 리스너 호출은 락 밖(느린 브라우저가 발행을 막지 못함). 배달 예외 → 구독자 제거(죽은 클라이언트가 publish 를 실패시키지 않음)"
+    domain_purity:
+      source: domain/{Notification,StreamEvent,NotificationTemplate,NotificationInvariantViolationException}.kt
+      rule: >-
+        Notification data class init 에서 recipient/subject blank 거부 → NotificationInvariantViolationException(IAE 확장).
+        copy() 도 주 생성자를 거치므로 무효 인스턴스 획득 경로 0. StreamEvent.seq >= 1 강제, seq 는 전역 단조(한 구독자가
+        여러 신원으로 듣기 때문에 수신자별이 아니라 전역이어야 재개 id 가 하나로 정렬됨)
+      template: "분류는 선언적 룰 테이블(substring OR exactKey, 첫 매치 승, 미매치 → GENERIC). 수신자 폴백 순서 recipient → sellerId → userId → accountId → ops@lemuel. 금액 폴백 amount → refundAmount → refundedAmount → totalAmount"
+    error_mapping:
+      source: adapter/in/web/NotificationExceptionHandler.kt:22-53
+      rule: "IllegalArgumentException → 400 · StreamUnauthorizedException → 401(사유 미노출) · StreamNotConfiguredException → 503(code STREAM_NOT_CONFIGURED). 인프라 실패는 500 유지"
+
+  event_contracts:
+    published: []  # 없음 — 소비 전용. <topic>.DLT 격리 복사만 존재
+    consumed:
+      - lemuel.settlement.confirmed
+      - lemuel.payment.confirmed
+      - lemuel.payment.captured
+      - lemuel.payment.refunded
+      - lemuel.investment.executed
+    note: "계약 스키마는 shared-common testFixtures 에 있으나 이 모듈은 shared-common 미의존이라 양방향 계약 테스트에 참여하지 않는다 — 드리프트는 런타임 파싱 실패(→DLT)로만 드러난다"
+
+  acceptance_criteria:  # 실행 가능 — 각 AC 는 기존 게이트에 매핑
+    - id: AC-1
+      criterion: 토픽 분류·수신자 폴백·금액 폴백 템플릿 규칙이 일치한다
+      gate: "JAVA_HOME=<JDK21> ./gradlew test — NotificationTemplateTest"
+    - id: AC-2
+      criterion: 멱등 게이트·코루틴 팬아웃·채널별 타임아웃/재시도가 일치한다
+      gate: "NotificationDispatcherTest · DedupeStoreTest"
+    - id: AC-3
+      criterion: 파싱 실패·전 채널 실패가 삼켜지지 않고 DLT 로 격리된다
+      gate: "DomainEventListenerTest · KafkaErrorHandlingConfigTest · DlqEndToEndTest(EmbeddedKafka 실 브로커)"
+    - id: AC-4
+      criterion: SSE 가 JWT 파생 신원으로만 서빙되고 미인증 401 / 미설정 503 이다
+      gate: "JwtSubscriberIdentityResolverTest · NotificationStreamControllerTest · NotificationStreamFailClosedTest"
+    - id: AC-5
+      criterion: 재개(Last-Event-ID)·순서·재생 창 상한이 일치한다
+      gate: "InMemoryNotificationStreamTest"
+    - id: AC-6
+      criterion: 전체 빌드 GREEN (63 tests)
+      gate: "JAVA_HOME=<JDK21> ./gradlew build · .github/workflows/polyglot-ci.yml (Kotlin 매트릭스)"
+
+  known_issues:  # 발견만 기록 — 사양은 as-is 유지
+    - id: KI-1
+      finding: "★ app.security.jwt.secret 이 application.yml 에 아예 없다 → 기본 빈 문자열 → configured=false → /notifications/stream 이 항상 503. 환경변수 플레이스홀더도 미선언이라 주입하려면 릴랙스 바인딩(APP_SECURITY_JWT_SECRET)을 스스로 알아내야 한다. fail-closed 설계는 옳으나 현 구성에서 SSE 푸시 기능 전체가 꺼져 있음"
+      disposition: recorded-not-fixed (high — 기능 비활성)
+    - id: KI-2
+      finding: "★ docker-compose.yml 에 notification-service 컨테이너 정의가 없고 gateway 에 NOTIFICATION_SERVICE_URI 도 없다 — 라우트 기본값 localhost:8130 이 gateway 컨테이너 자신을 가리킨다"
+      disposition: recorded-not-fixed (high — 미배선, gateway seed KI-1 과 동일 사실)
+    - id: KI-3
+      finding: "★ nginx.compose.conf 에 /api/notifications/ 무버퍼 location 부재 — 범용 location 의 proxy_buffering on + read_timeout 60s 에 걸려 SSE 가 묶이고 60초마다 끊긴다(/api/ai/·/api/market-stream/ 은 전용 location 보유)"
+      disposition: recorded-not-fixed (high — gateway seed KI-2 와 동일 사실)
+    - id: KI-4
+      finding: "app.kafka.enabled 기본 false — 실배포에서 APP_KAFKA_ENABLED=true 를 넣지 않으면 입력 소스가 없다. 그런데 대체 입력인 REST /notifications/send 는 게이트웨이 미노출이라, 기본 구성의 이 서비스는 아무 것도 받지 않고 아무 것도 내보내지 않는다"
+      disposition: by-design-with-consequence (기동 편의 목표 G6 의 대가)
+    - id: KI-5
+      finding: "POST /notifications/send · GET /notifications/demo 에 인증이 전혀 없다 — 임의 수신자에게 임의 알림 생성 가능. 유일한 방어가 '게이트웨이에 라우트를 안 올린다' 뿐이라 서비스 포트에 직접 도달 가능한 위치에서는 열려 있다"
+      disposition: recorded-not-fixed (medium — 노출면 통제에만 의존)
+    - id: KI-6
+      finding: "dedupe(TTL 30분)·재생 창이 프로세스 메모리 — 재시작 시 중복 발송, 재개가 조용히 '라이브만'으로 강등. 멀티 레플리카에서는 붙은 레플리카가 가진 것만 재개. 하류 Java 컨슈머 processed_events 멱등 덕에 회계 영향은 0(polyglot-services.md 명문)"
+      disposition: by-design-documented (무영속 MVP)
+    - id: KI-7
+      finding: "docs/sse.md 부재(dangling 참조 3곳 — KDoc 2 + CLAUDE.md)는 2026-08-13 병행 세션이 문서를 추가해 해소됐다. 토큰 URL 트레이드오프·재생 정책·하트비트·멀티레플리카 한계가 그 문서에 수록. 단 KI-1~KI-3(시크릿·배선)은 다루지 않아 이 Seed 가 유일한 기록으로 남는다"
+      disposition: resolved (2026-08-13)
+    - id: KI-8
+      finding: "EmailChannel 활성 경로가 라이브 SMTP 없이 미검증(클래스 주석 명문). Slack 도 실 웹훅 검증 없음 — 단위 테스트는 비활성 경로 + 팬아웃 계약만 덮는다"
+      disposition: by-design-documented (외부 의존 검증 제외)
+    - id: KI-9
+      finding: "부분 실패 채널에 대한 후속 조치가 warn 로그뿐 — 실패 채널만 재전송하는 경로도, 채널별 성공/실패 메트릭도 없다(카운터는 DLT·retry 2종)"
+      disposition: recorded-not-fixed (low)
+    - id: KI-10
+      finding: "shared-common 미의존이라 ADR 0024 양방향 계약 테스트 대상이 아니다 — 5개 구독 토픽의 페이로드 드리프트는 빌드가 아니라 런타임 파싱 실패(→DLT)로만 드러난다"
+      disposition: by-design-with-consequence (폴리글랏 독립의 대가)
+
+  uses:
+    - regression-baseline
+    - interview-portfolio
+    - brownfield-base

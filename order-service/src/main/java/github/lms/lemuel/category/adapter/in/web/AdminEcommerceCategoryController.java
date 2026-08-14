@@ -1,6 +1,7 @@
 package github.lms.lemuel.category.adapter.in.web;
 
 import github.lms.lemuel.category.adapter.in.web.dto.*;
+import github.lms.lemuel.category.application.port.in.CheckCategoryCountIntegrityUseCase;
 import github.lms.lemuel.category.application.service.EcommerceCategoryService;
 import github.lms.lemuel.category.domain.EcommerceCategory;
 import io.swagger.v3.oas.annotations.Operation;
@@ -25,6 +26,7 @@ import java.util.stream.Collectors;
 public class AdminEcommerceCategoryController {
 
     private final EcommerceCategoryService categoryService;
+    private final CheckCategoryCountIntegrityUseCase countIntegrityUseCase;
 
     /**
      * 전체 카테고리 트리 조회 (관리자용)
@@ -161,5 +163,35 @@ public class AdminEcommerceCategoryController {
             @Parameter(description = "카테고리 ID", required = true) @PathVariable Long id) {
         categoryService.deleteCategory(id);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * 상품수 캐시 재계산.
+     *
+     * <p>응답의 갱신 행 수가 0 이면 캐시와 정본(product_ecommerce_categories 실계수)이 일치한다는 뜻이라,
+     * 정합성 점검용 신호로도 쓸 수 있다.
+     */
+    /**
+     * 상품수 캐시 정합 점검.
+     *
+     * <p>고치지 않고 세기만 한다 — 재계산은 아래 경로가 하고, 점검이 조용히 고치면 무엇이 얼마나
+     * 어긋나 있었는지가 사라져 갱신을 빠뜨린 경로를 되짚을 수 없다.
+     */
+    @Operation(summary = "카테고리 상품수 캐시 정합 점검",
+            description = "product_count 캐시와 product_ecommerce_categories 실계수를 대조한다. "
+                    + "전수 규모와 방향별 집계, 차이가 큰 순 표본을 함께 준다. 읽기 전용이다.")
+    @GetMapping("/count-integrity")
+    public ResponseEntity<CategoryCountIntegrityResponse> checkCountIntegrity(
+            @Parameter(description = "표본 상한 (기본 50)")
+            @RequestParam(defaultValue = "50") int sampleLimit) {
+        return ResponseEntity.ok(CategoryCountIntegrityResponse.from(
+                countIntegrityUseCase.check(sampleLimit)));
+    }
+
+    @Operation(summary = "카테고리 상품수 캐시 재계산",
+            description = "product_ecommerce_categories 실계수로 product_count 를 다시 채운다. 갱신된 행 수를 반환한다.")
+    @PostMapping("/refresh-counts")
+    public ResponseEntity<Integer> refreshProductCounts() {
+        return ResponseEntity.ok(categoryService.refreshProductCounts());
     }
 }

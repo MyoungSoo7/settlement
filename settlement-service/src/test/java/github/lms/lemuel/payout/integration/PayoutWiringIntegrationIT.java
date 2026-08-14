@@ -4,6 +4,7 @@ import github.lms.lemuel.SettlementServiceApplication;
 import github.lms.lemuel.payout.application.port.in.RequestPayoutUseCase;
 import github.lms.lemuel.payout.application.service.PayoutConcurrentClaimException;
 import github.lms.lemuel.payout.domain.PayoutType;
+import github.lms.lemuel.settlement.application.port.in.ApplyLoanDeductionUseCase;
 import github.lms.lemuel.settlement.adapter.in.batch.confirm.SettlementConfirmItemWriter;
 import github.lms.lemuel.settlement.adapter.out.persistence.SettlementJpaEntity;
 import github.lms.lemuel.settlement.adapter.out.persistence.SpringDataSettlementJpaRepository;
@@ -85,6 +86,7 @@ class PayoutWiringIntegrationIT {
     @Autowired SettlementConfirmItemWriter confirmWriter;
     @Autowired ReleaseHoldbackUseCase releaseUseCase;
     @Autowired RequestPayoutUseCase requestPayoutUseCase;
+    @Autowired ApplyLoanDeductionUseCase applyLoanDeductionUseCase;
     @Autowired SpringDataSettlementJpaRepository settlementRepo;
     @Autowired JdbcTemplate jdbc;
     @Autowired TransactionTemplate tx;
@@ -95,6 +97,8 @@ class PayoutWiringIntegrationIT {
         jdbc.update("DELETE FROM public.settlement_payment_view");
         // 확정 플로우가 적재한 원장 아웃박스가 settlements 를 FK 참조 — 부모보다 먼저 지운다.
         jdbc.update("DELETE FROM public.ledger_outbox");
+        // L-3 이후 지급 생성이 상환차감 경로를 타므로 차감 기록도 남는다(FK: settlements).
+        jdbc.update("DELETE FROM public.settlement_loan_deductions");
         jdbc.update("DELETE FROM public.settlements");
     }
 
@@ -139,6 +143,8 @@ class PayoutWiringIntegrationIT {
 
         tx.executeWithoutResult(t -> confirmWriter.write(new Chunk<>(List.of(s))));
         long settlementId = settlementIdByPayment(paymentId);
+        // L-3: 지급 생성 트리거는 확정이 아니라 상환차감 수신이다. loan 은 차감 0 에도 항상 발행한다.
+        applyLoanDeductionUseCase.apply(settlementId, sellerId, BigDecimal.ZERO);
 
         assertThat(payoutCount(settlementId, PayoutType.IMMEDIATE)).isEqualTo(1);
         assertThat(payoutAmount(settlementId, PayoutType.IMMEDIATE)).isEqualByComparingTo(expectedImmediate);
@@ -157,12 +163,37 @@ class PayoutWiringIntegrationIT {
 
         tx.executeWithoutResult(t -> confirmWriter.write(new Chunk<>(List.of(s))));
         long settlementId = settlementIdByPayment(paymentId);
+        applyLoanDeductionUseCase.apply(settlementId, sellerId, BigDecimal.ZERO);
 
         // 이벤트/요청 재전달 재현 — 같은 (정산, IMMEDIATE) 을 다시 요청해도 멱등 반환(재생성 없음).
         BigDecimal immediate = payoutAmount(settlementId, PayoutType.IMMEDIATE);
         requestPayoutUseCase.requestPayoutOfType(settlementId, sellerId, immediate, PayoutType.IMMEDIATE);
 
         assertThat(payoutCount(settlementId, PayoutType.IMMEDIATE)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("L-3: 대출 상환차감이 실제 지급액에서 빠진다 — 확정만으로는 지급이 생기지 않는다")
+    void loanDeduction_reducesPayoutAmount() {
+        long paymentId = 5004L;
+        long sellerId = 44L;
+        seedPaymentView(paymentId, sellerId);
+        Settlement s = Settlement.createFromPayment(paymentId, paymentId + 1, new BigDecimal("10000"), LocalDate.now());
+        s.confirm();                       // 홀드백 없음 → immediate = net 9,700
+        BigDecimal immediate = s.getImmediatePayoutAmount();
+
+        tx.executeWithoutResult(t -> confirmWriter.write(new Chunk<>(List.of(s))));
+        long settlementId = settlementIdByPayment(paymentId);
+
+        // 확정만으로는 지급이 없다 — 이 시점에 만들면 뒤늦은 대출차감을 반영할 수 없다(결함의 원인).
+        assertThat(payoutCount(settlementId, PayoutType.IMMEDIATE)).isZero();
+
+        BigDecimal deducted = new BigDecimal("1500");
+        applyLoanDeductionUseCase.apply(settlementId, sellerId, deducted);
+
+        assertThat(payoutCount(settlementId, PayoutType.IMMEDIATE)).isEqualTo(1);
+        assertThat(payoutAmount(settlementId, PayoutType.IMMEDIATE))
+                .isEqualByComparingTo(immediate.subtract(deducted));
     }
 
     // ── AC-2: 홀드백 해제 경로 → HOLDBACK_RELEASE Payout ───────────────────────────────────

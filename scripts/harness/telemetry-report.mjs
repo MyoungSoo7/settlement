@@ -55,6 +55,11 @@ export const GUARD_CANARIES = {
     file: 'settlement-service/src/main/java/github/lms/lemuel/settlement/domain/X.java',
     line: 'throw new IllegalArgumentException("bad");',
   },
+  // 실제 사고 형태 그대로 — script 블록 안 주석에 들어간 빈 표현식.
+  'WORKFLOW-EMPTY-EXPR': {
+    file: '.github/workflows/canary.yml',
+    line: '            // 주석 안이라도 ${{ }} 는 워크플로를 통째로 무효화한다',
+  },
 };
 
 export function canaryResults({ rules = RULES, canaries = GUARD_CANARIES } = {}) {
@@ -94,11 +99,32 @@ function countBy(records, key) {
   return [...counts.entries()].sort((a, b) => b[1] - a[1]);
 }
 
-export function summarize({ hits, usage, suggestions, days = 14, now = new Date() }) {
+// 분모 리포트. 차단 건수만으로는 "안 걸렸다"와 "안 돌았다"가 같은 그림이라, 실행 횟수를
+// 먼저 보여준다. 실행 0 이면 그 아래 규칙별 0회 는 아무 의미도 없다는 것을 명시한다.
+export function runsReport(runs = []) {
+  if (runs.length === 0) {
+    return [
+      '== 가드 실행 (분모) ==',
+      '  기록 없음 — 가드가 한 번도 실행되지 않았거나 이 버전 이전의 로그다.',
+      '  ⚠ 이 상태에서 아래 "0회"는 무위반이 아니라 미측정이다. 결론 내지 말 것.',
+    ].join('\n');
+  }
+  const lines = [`== 가드 실행 (분모) — 총 ${runs.length}회 ==`];
+  for (const [mode, count] of countBy(runs, 'mode')) {
+    const scoped = runs.filter((run) => (run.mode ?? '(unknown)') === mode);
+    const files = scoped.reduce((sum, run) => sum + (Number(run.files) || 0), 0);
+    const blocked = scoped.filter((run) => (Number(run.violations) || 0) > 0).length;
+    lines.push(`  mode ${mode}: ${count}회 실행 · 파일 ${files}건 검사 · 위반 발생 ${blocked}회`);
+  }
+  return lines.join('\n');
+}
+
+export function summarize({ hits, usage, suggestions, runs = [], days = 14, now = new Date() }) {
   const lines = [];
   const since = new Date(now.getTime() - days * 86_400_000).toISOString();
   const recent = hits.filter((hit) => typeof hit.ts === 'string' && hit.ts >= since);
 
+  lines.push(runsReport(runs));
   lines.push(`== 가드 차단 (전체 ${hits.length}건, 최근 ${days}일 ${recent.length}건) ==`);
   const byRule = new Map(countBy(hits, 'id'));
   for (const rule of RULES) lines.push(`  ${String(byRule.get(rule.id) ?? 0).padStart(4)}  ${rule.id}${byRule.get(rule.id) ? '' : '   (0회 — 죽은 규칙 후보 또는 완전 예방)'}`);
@@ -156,6 +182,7 @@ export async function runReportCli(args, io = {}) {
   const hits = readJsonl(resolve(logDir, 'guard-hits.jsonl'));
   const usage = readJsonl(resolve(logDir, 'skill-usage.jsonl'));
   const suggestions = readJsonl(resolve(logDir, 'skill-suggestions.jsonl'));
+  const runs = readJsonl(resolve(logDir, 'guard-runs.jsonl'));
   if (args.includes('--hook')) {
     // 관측은 세션을 절대 깨뜨리지 않는다 — 어떤 실패도 침묵 + exit 0.
     try {
@@ -169,12 +196,13 @@ export async function runReportCli(args, io = {}) {
     } catch { /* silent */ }
     return 0;
   }
-  if (hits.length + usage.length + suggestions.length === 0) {
+  if (hits.length + usage.length + suggestions.length + runs.length === 0) {
     stdout(`harness telemetry: no data yet (${logDir})`);
+    stdout(runsReport(runs));
     stdout(canaryReport());
     return 0;
   }
-  stdout(summarize({ hits, usage, suggestions, days: Number.isFinite(days) && days > 0 ? days : 14, now: io.now ?? new Date() }));
+  stdout(summarize({ hits, usage, suggestions, runs, days: Number.isFinite(days) && days > 0 ? days : 14, now: io.now ?? new Date() }));
   stdout(canaryReport());
   return 0;
 }

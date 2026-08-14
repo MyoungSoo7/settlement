@@ -63,7 +63,8 @@ const ViewerPage: React.FC = () => {
             src={viewer.path}
             title={viewer.name}
             className="w-full h-full border-0"
-            style={{ minHeight: 'calc(100vh - 60px)' }}
+            /* dvh — iOS 주소창 개폐를 따라가는 높이(vh 는 접힌 상태 높이로 고정돼 하단이 잘린다). */
+            style={{ minHeight: 'calc(100dvh - 60px)' }}
           />
         </div>
       </div>

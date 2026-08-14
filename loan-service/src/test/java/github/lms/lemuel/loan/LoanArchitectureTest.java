@@ -18,6 +18,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
  *   <li>application 은 adapter 에 의존하지 않는다.</li>
  *   <li>★ loan-service 는 order/settlement 패키지에 코드 의존 0
  *       — 정산 데이터는 Kafka 이벤트로만 수신한다 (DB-per-service 경계).</li>
+ *   <li>★ 인바운드 포트는 반드시 어떤 인바운드 어댑터에서 호출된다 (도달 가능성).</li>
  * </ul>
  *
  * <p>아직 loan 패키지에 클래스가 없을 수 있으므로 {@code allowEmptyShould(true)} 로

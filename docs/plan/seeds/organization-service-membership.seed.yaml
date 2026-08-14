@@ -1,0 +1,115 @@
+# Seed: organization-service 조직·멤버십 as-is 사양 (Ouroboros 방법론 — Interview → Seed 결정화)
+# 상태: CONFIRMED (settlement/account seed 와 동일 방식 지시로 승인 승계, 2026-08-13)
+# 원칙: 이 Seed 는 "현행 코드가 실제로 하는 일"의 불변 기술이다. 결함은 교정하지 않고 known_issues 로만 기록한다.
+# 자매 Seed: card-service-funding-offset (이 서비스의 이벤트를 조직 프로젝션으로 소비하는 유일한 소비처)
+
+seed:
+  id: organization-service-membership-v1
+  goal: >-
+    organization-service(셀러/기업 조직과 멤버십 — OWNER/MANAGER/STAFF, 이벤트 발행 전용)의
+    현행 동작을 실행 가능한 게이트에 매핑된 불변 사양으로 결정화해, 회귀 기준선 ·
+    계약 드리프트 게이트 · 면접/포트폴리오 문서로 사용한다.
+
+  scope:
+    included:
+      - 조직·멤버십 상태머신과 전이 강제 지점
+      - 역할 위계(OWNER > MANAGER > STAFF)와 마지막 OWNER 보호
+      - 발행 4토픽 계약 표면
+      - 조직 생성 시 자동 OWNER 멤버십
+    excluded:
+      - 소비측(card-service) 조직 프로젝션 상세 — 자매 Seed 담당
+      - 파티셔닝 운영 절차 (러너 존재 사실만)
+
+  constraints:
+    - "상태 전이는 도메인 상태머신이 강제 — 비정상 전이는 타입 예외"
+    - "여러 애그리거트를 가로지르는 불변식(마지막 OWNER)은 애플리케이션 서비스가 강제"
+    - "이벤트 발행은 Outbox 경유만"
+    - "헥사고날: domain 은 adapter 를 import 하지 않는다 (ArchUnit 강제)"
+
+  invariants:  # as-is 코드 사실 — 파일:라인 근거 (경로 접두 organization-service/src/main/java/github/lms/lemuel/organization/)
+    transition_enforced_by_domain:
+      source: domain/Organization.java:47-49 + domain/Membership.java:58-66
+      rule: "canTransitionTo 검사를 통과해야 전이. 위반은 InvalidOrganizationTransitionException / InvalidMembershipTransitionException"
+    role_hierarchy:
+      source: domain/OrgRole.java:8-11
+      rule: "OWNER(3) > MANAGER(2) > STAFF(1) — 숫자가 권한 비교의 근거"
+    membership_states:
+      source: domain/MembershipStatus.java:15-19
+      rule: "INVITED → ACTIVE → SUSPENDED ⇄ ACTIVE, REMOVED 종단"
+    organization_states:
+      source: domain/OrganizationStatus.java:12-14
+      rule: "ACTIVE ⇄ SUSPENDED"
+    last_owner_guard_in_service:
+      source: domain/Membership.java:9-10,74
+      rule: "마지막 OWNER 불변식은 여러 멤버십을 가로지르므로 단일 애그리거트가 알 수 없다 — 애플리케이션 서비스가 LastOwnerException 으로 강제"
+    owner_quorum_predicate:
+      source: domain/Membership.java:89-91
+      rule: "isActiveOwner = status == ACTIVE && role == OWNER — 정지된 OWNER 는 정족수로 세지 않는다"
+    creator_auto_owner:
+      source: domain/Membership.java:19,34-39
+      rule: "조직 생성자는 즉시 ACTIVE 인 OWNER 멤버십을 자동 부여받고 invitedBy 는 self"
+    removed_is_terminal:
+      source: domain/Membership.java:74
+      rule: "REMOVED 멤버십은 역할 변경 불가"
+    publish_only:
+      source: adapter/out/event/OrganizationEventPublisherAdapter.java:48,62,77,90
+      rule: "소비 컨슈머 없음 — 4토픽을 Outbox 로 발행하고 card-service 가 프로젝션으로 받는다"
+
+  event_contracts:
+    publishes:
+      - "OrganizationCreated (조직 생성 — 자동 OWNER 멤버십 동반)"
+      - "OrganizationMemberJoined (초대 수락 → ACTIVE)"
+      - "OrganizationMemberRoleChanged (역할 변경)"
+      - "OrganizationMemberRemoved (멤버 제거)"
+    consumes: []
+    consumers_downstream: "card-service (조직 프로젝션) — 유일한 소비처 (known_issues KI-3)"
+
+  read_surface:
+    source: adapter/in/web/OrganizationController.java:36,51,59,65,74,80,90
+    endpoints:
+      - "POST /api/organizations · GET /api/organizations/{orgId}"
+      - "POST /{orgId}/members (초대) · POST /{orgId}/members/accept (수락)"
+      - "PATCH /{orgId}/members/{userId}/role · DELETE /{orgId}/members/{userId}"
+
+  acceptance_criteria:  # 실행 가능 — 각 AC 는 기존 게이트에 매핑
+    - id: AC-1
+      criterion: 조직·멤버십 상태머신 전이표와 타입 예외가 일치한다
+      gate: "./gradlew :organization-service:test — OrganizationTest · MembershipTest"
+    - id: AC-2
+      criterion: 마지막 OWNER 를 제거·강등할 수 없다
+      gate: "MembershipCommandServiceTest (LastOwnerException)"
+    - id: AC-3
+      criterion: 발행 4토픽이 JSON Schema 계약과 일치한다
+      gate: "OrganizationEventContractTest"
+    - id: AC-4
+      criterion: 조직 생성이 OWNER 멤버십을 동반한다
+      gate: "OrganizationCommandServiceTest · OrganizationLifecycleIntegrationTest"
+    - id: AC-5
+      criterion: 헥사고날 의존 방향 위반 0
+      gate: "OrganizationArchitectureTest (ArchUnit)"
+    - id: AC-6
+      criterion: 인바운드 포트가 모두 어댑터에서 도달 가능하다
+      gate: "InboundPortReachabilityTest"
+    - id: AC-7
+      criterion: 커버리지 LINE >= 90%
+      gate: "./gradlew :organization-service:jacocoTestCoverageVerification (check 편입)"
+
+  known_issues:  # 발견만 기록 — 사양은 as-is 유지
+    - id: KI-1
+      finding: "전용 *-rules 스킬이 없다 — 16서비스 중 organization·insurance·deposit 3곳이 스킬·라우터 배선 공백이며 HARNESS.md 가 '알려진 부채'로 명시한다. 이 Seed 가 그 공백의 사실 근거를 대신 채운다"
+      disposition: recorded-not-fixed (문서화된 부채)
+    - id: KI-2
+      finding: "마지막 OWNER 불변식이 서비스 계층에만 있어 도메인 단위 테스트로는 잡히지 않는다. 동시 요청(두 OWNER 가 서로를 동시에 제거)에서 락 전략이 없으면 둘 다 통과할 수 있는데, 락 여부는 이 Seed 범위에서 확인하지 않았다"
+      disposition: recorded-not-verified (동시성 경계)
+    - id: KI-3
+      finding: "발행 4토픽의 소비처가 card-service 하나뿐 — 조직 변경이 다른 서비스(정산 권한·문서 접근 등)에 반영되지 않으며 그 경계가 의도인지 미배선인지 문서에 없다"
+      disposition: recorded-not-verified
+    - id: KI-4
+      finding: "조직이 SUSPENDED 여도 멤버십 상태는 독립이다 — 정지된 조직의 ACTIVE 멤버가 무엇을 할 수 있는지는 소비측 판단에 맡겨져 있다"
+      disposition: by-design (권한 판정은 소비측)
+
+  uses:
+    - regression-baseline
+    - contract-drift-gate
+    - interview-portfolio
+    - brownfield-base

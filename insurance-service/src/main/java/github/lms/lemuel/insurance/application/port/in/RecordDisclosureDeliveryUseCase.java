@@ -22,6 +22,27 @@ public interface RecordDisclosureDeliveryUseCase {
      * @param pdf      교부된 상품설명서 PDF — delivery.documentSha256 와 해시 일치
      */
     record DeliveredDisclosure(DisclosureDelivery delivery, byte[] pdf) {
+
+        // 배열 필드라 record 기본 구현은 참조 동일성으로 비교하고 toString 은 [B@... 를 찍는다.
+        // 상품설명서 PDF 는 교부 증빙이라 내용 기준 비교가 맞고, 로그에는 바이트를 흘리지 않는다.
+        @Override
+        public boolean equals(Object o) {
+            if (!(o instanceof DeliveredDisclosure other)) {
+                return false;
+            }
+            return java.util.Objects.equals(delivery, other.delivery) && java.util.Arrays.equals(pdf, other.pdf);
+        }
+
+        @Override
+        public int hashCode() {
+            return 31 * java.util.Objects.hashCode(delivery) + java.util.Arrays.hashCode(pdf);
+        }
+
+        @Override
+        public String toString() {
+            return "DeliveredDisclosure[delivery=" + delivery
+                    + ", pdf=" + (pdf == null ? "null" : pdf.length + "B") + "]";
+        }
     }
 
     /**

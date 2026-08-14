@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "lemuel.card.statement_paid",
+  "description": "card-service → account-service (Phase 2 AC3). 청구서 전액 납부 완료 시 발행된다. paidAmount 는 JSON string(BigDecimal.toPlainString, DATA-STANDARD N5) — 숫자로 실으면 소비자 언어에 따라 double 파싱으로 원 단위가 어긋나고, 이 이벤트는 GL 분개까지 흘러가므로 그 오차가 곧 장부 오차다. paymentId 는 결제 자연키(멱등 키)로 required 다 — 재전송·리플레이에서 중복 납부를 구분하는 유일한 수단. cardAccountId 는 파티션 키이자 법인 단위 채권의 귀속처라 required 다. billingYearMonth 는 정산 귀속월 판단의 기준으로 required 다. required 필드는 나중에 추가할 수 없다(파괴적 변경 → 신규 토픽 버전, ADR 0022).",
+  "type": "object",
+  "properties": {
+    "statementId": { "type": "integer" },
+    "cardAccountId": { "type": "integer" },
+    "billingYearMonth": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$"
+    },
+    "paidAmount": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?$" },
+    "totalAmount": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?$" },
+    "paymentId": { "type": "string", "minLength": 1 },
+    "paidAt": { "type": "string", "format": "date-time" }
+  },
+  "required": [
+    "statementId",
+    "cardAccountId",
+    "billingYearMonth",
+    "paidAmount",
+    "paymentId",
+    "paidAt"
+  ],
+  "additionalProperties": true
+}

@@ -41,7 +41,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <ul>
  *   <li>OPEN 명세서 마감(OPEN→CLOSED)</li>
  *   <li>일부 납부(CLOSED→PARTIALLY_PAID)</li>
- *   <li>전액 납부(→PAID) + lemuel.card.statement.paid Outbox 이벤트 발행</li>
+ *   <li>전액 납부(→PAID) + lemuel.card.statement_paid Outbox 이벤트 발행</li>
  *   <li>paymentId 멱등 — 동일 paymentId 재전송은 중복 처리 안 됨</li>
  * </ul>
  */
@@ -155,7 +155,7 @@ class StatementBillingIT {
     }
 
     @Test
-    @DisplayName("전액 납부 — PAID 로 전환 + lemuel.card.statement.paid Outbox 이벤트 발행")
+    @DisplayName("전액 납부 — PAID 로 전환 + lemuel.card.statement_paid Outbox 이벤트 발행")
     void fullPayment_changeStatusToPaid_andPublishesEvent() {
         CardAccount account = createActiveAccount(7003L, "stmt-seller-003", new BigDecimal("500000"));
         YearMonth period = YearMonth.of(2026, 7);

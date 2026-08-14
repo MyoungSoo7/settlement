@@ -126,8 +126,13 @@ public class SecurityConfig {
                         // /actuator/metrics(탐색형 단건 조회 API)는 그대로 인증 필요.
                         .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info", "/actuator/prometheus").permitAll()
                         .requestMatchers("/games/**").permitAll()
+                        // 네비게이션 메뉴 — 응답이 호출자 권한으로 이미 걸러져 나가므로 401 을 만들지 않는다.
+                        // (로그인 화면에서도 셸이 호출한다. 메뉴 숨김은 UX 이고, 실제 인가는 각 API 가 한다.)
+                        .requestMatchers(HttpMethod.GET, "/api/menus/me").permitAll()
                         // 공개 카테고리 API
                         .requestMatchers(HttpMethod.GET, "/categories", "/categories/**").permitAll()
+                        // 진열/기획전 공개 조회 — 노출 판정(기간·활성)은 서버가 하므로 미인증에게도 안전하다.
+                        .requestMatchers(HttpMethod.GET, "/display-sections", "/display-sections/**").permitAll()
                         // 쿠폰 관련 API
                         .requestMatchers(HttpMethod.GET, "/coupons/available").hasAnyRole("ADMIN", "MANAGER", "USER")
                         .requestMatchers(HttpMethod.GET, "/coupons", "/coupons/**").hasAnyRole("ADMIN", "MANAGER")
@@ -138,6 +143,10 @@ public class SecurityConfig {
                         .requestMatchers("/users/admin/all").hasRole("ADMIN")
                         // 관리자 전용 카테고리 API
                         .requestMatchers("/admin/categories/**").hasRole("ADMIN")
+                        // 옵션 축/값 카탈로그 — 백필이 상품 옵션 구조를 대량 생성하므로 ADMIN 만.
+                        .requestMatchers("/admin/option-catalog/**").hasRole("ADMIN")
+                        // 진열 편성 — 무엇이 화면 앞에 오는지를 정하는 콘솔이라 ADMIN 만.
+                        .requestMatchers("/admin/display-sections/**").hasRole("ADMIN")
                         // 송장 일괄 업로드 - 다건 출고를 한 번에 반영. dryRun 기본값이라 파라미터 누락 호출은 미리보기로 떨어진다.
                         .requestMatchers("/admin/shipments/**").hasAnyRole("ADMIN", "MANAGER")
                         // 셀러 등급 콘솔 - 등급은 수수료/정산주기/홀드백을 동시에 바꾸므로 ADMIN 만.
@@ -163,6 +172,11 @@ public class SecurityConfig {
                         // gateway 미라우팅이지만 NodePort 직노출 대비 InternalApiKeyFilter 가 X-Internal-Api-Key 공유
                         // 시크릿을 검증(미설정 시 통과+경고). 여기선 permitAll 로 두고 게이팅은 필터가 담당. 운영선 NetworkPolicy/mTLS 추가 권장.
                         .requestMatchers("/internal/**").permitAll()
+                        // VAN 진입점(card-service 승인·매입·취소·환불) — 게이트웨이 미라우팅이 유일한 방어였고
+                        // 매처 목록에 없어 anyRequest().authenticated() 로 떨어져 있었다. 사용자 토큰 하나로
+                        // 카드 거래를 위조할 수 있다는 뜻이라, /internal/** 과 동일하게 공유 시크릿 필터에 맡긴다.
+                        // (VAN 은 사람이 아니라 기계다 — hasRole 로 여는 문이 아니다.)
+                        .requestMatchers("/van/**").permitAll()
                         // Payout 콘솔 — 송금 권한은 ADMIN 만 (반송 기록·재지급 포함)
                         .requestMatchers("/admin/payouts/**").hasRole("ADMIN")
                         // 미입금 만료 콘솔 — 주문 취소·재고 원복을 수동 트리거하므로 ADMIN 만.
@@ -173,6 +187,11 @@ public class SecurityConfig {
                         // 수수료율 정책 — 정산 금액을 직접 바꾸므로 조회 콘솔과 달리 ADMIN 만.
                         .requestMatchers("/admin/commission-rates/**").hasRole("ADMIN")
                         .requestMatchers("/admin/settlements/**").hasRole("ADMIN")
+                        // 원장 기간 마감·정보계 월마감 — 두 컨트롤러 javadoc 이 "/admin/** ADMIN 게이트 상속"이라
+                        // 적었지만 그런 포괄 매처는 존재한 적이 없어(경로별 열거 방식) authenticated() 로 새고 있었다.
+                        // 기간 마감은 재개봉이 없고 월마감은 마트를 통째로 교체하므로 형제 실행 콘솔과 동일하게 ADMIN 만.
+                        .requestMatchers("/admin/ledger-periods/**").hasRole("ADMIN")
+                        .requestMatchers("/admin/monthly-closing/**").hasRole("ADMIN")
                         // 셀러 지급 계좌 레지스트리 — 등록·정정(PII). 셀러 식별자를 관리자 입력으로 받으므로
                         // ADMIN/MANAGER 게이트로 IDOR 방지 (Seed D1).
                         .requestMatchers("/admin/seller-bank-accounts/**").hasAnyRole("ADMIN", "MANAGER")
@@ -207,6 +226,18 @@ public class SecurityConfig {
                         // 계정계(GL) 조회 콘솔 — owner 잔액·분개·전사 집계·시산표는 회계 백오피스라 관리자·매니저 전용
                         // (프론트도 /admin/ceo/accounts 를 AdminManagerRoute 로 보호). 무권한 노출(owner IDOR·전사 집계) 차단.
                         .requestMatchers("/api/account/**").hasAnyRole("ADMIN", "MANAGER")
+                        // 셀러 예치금 운영 콘솔 — 잔고를 직접 움직이는 수기 경로라 ADMIN 만.
+                        // (자동 경로는 settlement.confirmed·payout.completed 컨슈머다)
+                        .requestMatchers("/admin/deposits/**").hasRole("ADMIN")
+                        // 법인카드 영수증 리뷰 콘솔(ADR 0036) — 대사 종결은 승인 게이트를 여는 운영 판단이라 ADMIN 만.
+                        .requestMatchers("/admin/expense-receipts/**").hasRole("ADMIN")
+                        // 청약서류 리뷰 큐(ADR 0036) — 계약자·피보험자 성명(PII)이 실려 언더라이팅과 같은 등급.
+                        .requestMatchers("/api/insurance/application-documents/**").hasAnyRole("ADMIN", "MANAGER")
+                        // 셀러 예치금 조회 — 남의 계좌를 경로로 지정하는 형태라 운영자 전용.
+                        // 본인 조회(/api/deposits/accounts/me)는 아래 authenticated 로 열되, sellerId 를
+                        // 경로가 아니라 JWT 주체에서만 파생해 IDOR 을 원천 차단한다(/api/seller/bank-account 와 동일).
+                        .requestMatchers(HttpMethod.GET, "/api/deposits/accounts/me").authenticated()
+                        .requestMatchers("/api/deposits/**").hasAnyRole("ADMIN", "MANAGER")
                         // 법인카드 — 인증만 요구하고, 조직 역할(OWNER/MANAGER/STAFF) 판정은
                         // card-service 의 CardOrgAuthorizer 가 멤버십 프로젝션으로 수행한다(IDOR 방지).
                         .requestMatchers("/api/cards/**").authenticated()
@@ -219,6 +250,15 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/banking/pensions/*/benefit-payments")
                         .hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers("/api/banking/**").authenticated()
+                        // 셀러 예치금 — 읽기 표면(/api)과 잔고를 움직이는 표면(/admin)을 경로로 분리한다.
+                        // 본인 조회는 경로에 sellerId 가 없고 JWT 주체에서 파생하므로 인증만 요구하고,
+                        // 임의 셀러 조회는 타인 잔고 열람이라 운영자 전용이다. 순서가 곧 규칙이니
+                        // /accounts/me 매처가 와일드카드보다 먼저 와야 한다.
+                        .requestMatchers(HttpMethod.GET, "/api/deposits/accounts/me").authenticated()
+                        .requestMatchers("/api/deposits/**").hasAnyRole("ADMIN", "MANAGER")
+                        // 수기 입출금·선점·상계는 실자금 원장 조작이라 MANAGER 도 제외하고 ADMIN 만
+                        // (/admin/payouts/** 와 같은 기준).
+                        .requestMatchers("/admin/deposits/**").hasRole("ADMIN")
                         // 결제 환불 이력 조회 (관리자·매니저·본인) — 더 세밀한 권한은 향후 Audit PR 에서
                         .requestMatchers("/api/payments/*/refunds").hasAnyRole("ADMIN", "MANAGER", "USER")
                         // 환불 실행(직접 PG 환불) — "어드민 승인 후 환불" 원칙에 따라 운영자 전용.
@@ -226,6 +266,13 @@ public class SecurityConfig {
                         // 결제 생성/인증/캡처(/payments POST·/authorize·/capture)는 사용자 결제 흐름이라 제한하지 않는다.
                         .requestMatchers(HttpMethod.PATCH, "/payments/*/refund").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers(HttpMethod.POST, "/payments/split/*/refund").hasAnyRole("ADMIN", "MANAGER")
+                        // 보험 언더라이팅(심사 착수·승인·반려) — 승인은 계약을 발행하고 수수료 12회를 확정한다.
+                        // 매처 목록에 없어 anyRequest().authenticated() 로 떨어져 있었고, 그 결과 청약 UUID 만
+                        // 알면 아무 로그인 사용자나 계약을 발행시킬 수 있었다. 접수자(FC)와 심사자는 같은
+                        // 권한일 수 없으므로 백오피스 역할로 분리한다.
+                        .requestMatchers(HttpMethod.POST, "/api/insurance/applications/*/review",
+                                "/api/insurance/applications/*/approve",
+                                "/api/insurance/applications/*/reject").hasAnyRole("ADMIN", "MANAGER")
                         // 나머지는 인증 필요
                         .anyRequest().authenticated()
                 )

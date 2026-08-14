@@ -43,8 +43,10 @@ class DepositServiceTest {
     private SaveDepositEntryPort saveEntryPort;
     private LoadDepositHoldPort loadHoldPort;
     private SaveDepositHoldPort saveHoldPort;
+    private LoadDepositOffsetShortfallPort loadShortfallPort;
     private SaveDepositOffsetShortfallPort saveShortfallPort;
     private PublishDepositEventPort publishEventPort;
+    private DepositProofGate depositProofGate;
 
     private DepositService service;
 
@@ -55,6 +57,7 @@ class DepositServiceTest {
         saveEntryPort = mock(SaveDepositEntryPort.class);
         loadHoldPort = mock(LoadDepositHoldPort.class);
         saveHoldPort = mock(SaveDepositHoldPort.class);
+        loadShortfallPort = mock(LoadDepositOffsetShortfallPort.class);
         saveShortfallPort = mock(SaveDepositOffsetShortfallPort.class);
         publishEventPort = mock(PublishDepositEventPort.class);
 
@@ -70,8 +73,11 @@ class DepositServiceTest {
         when(saveHoldPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(saveShortfallPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
+        // 증빙 게이트는 목 — 증빙 미첨부(no-op) 상태가 기본. 게이트 자체는 DepositProofGateTest 담당.
+        depositProofGate = mock(DepositProofGate.class);
         service = new DepositService(loadAccountPort, saveAccountPort, saveEntryPort,
-                loadHoldPort, saveHoldPort, saveShortfallPort, publishEventPort);
+                loadHoldPort, saveHoldPort, loadShortfallPort, saveShortfallPort, publishEventPort,
+                depositProofGate);
     }
 
     /** 지정 잔고를 가진 영속 계좌. */

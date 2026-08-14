@@ -1,11 +1,11 @@
 package github.lms.lemuel.common;
 
 import github.lms.lemuel.common.config.kafka.KafkaConfig;
+import github.lms.lemuel.common.config.kafka.TopicCatalog;
 import github.lms.lemuel.common.observability.aop.ObservabilityAopProperties;
 import github.lms.lemuel.common.opssignal.NoOpOpsSignalPublisher;
 import github.lms.lemuel.common.opssignal.OpsSignal;
 import github.lms.lemuel.common.opssignal.OpsSignalCategory;
-import org.apache.kafka.clients.admin.NewTopic;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -19,20 +19,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 class MiscUnitsTest {
 
     @Test
-    @DisplayName("KafkaConfig: 4개 토픽이 지정 파티션 수로 정의된다")
-    void kafkaTopics() {
-        KafkaConfig config = new KafkaConfig(5);
-        NewTopic captured = config.paymentCapturedTopic();
-        NewTopic refunded = config.paymentRefundedTopic();
-        NewTopic capturedDlt = config.paymentCapturedDltTopic();
-        NewTopic refundedDlt = config.paymentRefundedDltTopic();
+    @DisplayName("KafkaConfig: 토픽 정의를 들고 있지 않고 카탈로그를 빈으로 노출한다 (ADR 0035)")
+    void kafkaTopicsComeFromCatalog() {
+        // 예전에는 이 설정이 payment 계열 4개만 NewTopic 으로 선언했고 나머지 40여 개는 브로커
+        // 자동생성에 맡겨져 파티션 수가 코드 밖에 있었다. 이제 정본은 topic-catalog.json 이다.
+        KafkaConfig config = new KafkaConfig("order-service");
 
-        assertThat(captured.name()).isEqualTo("lemuel.payment.captured");
-        assertThat(captured.numPartitions()).isEqualTo(5);
-        assertThat(refunded.name()).isEqualTo("lemuel.payment.refunded");
-        assertThat(capturedDlt.name()).isEqualTo("lemuel.payment.captured.DLT");
-        assertThat(refundedDlt.name()).isEqualTo("lemuel.payment.refunded.DLT");
-        assertThat(capturedDlt.numPartitions()).isEqualTo(5);
+        TopicCatalog catalog = config.topicCatalog();
+
+        assertThat(catalog.find("lemuel.payment.captured"))
+                .get()
+                .extracting(TopicCatalog.Topic::owner)
+                .isEqualTo("order-service");
+        assertThat(catalog.find("lemuel.payment.captured").orElseThrow().deadLetterSpec().name())
+                .isEqualTo("lemuel.payment.captured.DLT");
     }
 
     @Test

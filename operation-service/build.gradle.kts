@@ -11,6 +11,7 @@ plugins {
 
 dependencies {
     implementation("github.lms.lemuel:shared-common:1.0.0")   // 버전드 내부 라이브러리(composite build 로 로컬 치환)
+    testImplementation(testFixtures("github.lms.lemuel:shared-common:1.0.0"))   // 아키텍처 가드 픽스처(InboundPortReachability)
 
     // Spring Boot 스타터
     implementation("org.springframework.boot:spring-boot-starter-actuator")

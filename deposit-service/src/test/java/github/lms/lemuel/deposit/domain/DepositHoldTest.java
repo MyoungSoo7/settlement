@@ -1,5 +1,8 @@
 package github.lms.lemuel.deposit.domain;
 
+import github.lms.lemuel.deposit.domain.exception.DepositInvariantViolationException;
+import github.lms.lemuel.deposit.domain.exception.InvalidDepositAmountException;
+import github.lms.lemuel.deposit.domain.exception.InvalidDepositStateException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -53,10 +56,10 @@ class DepositHoldTest {
     void place_rejectsNonPositive() {
         assertThatThrownBy(() -> DepositHold.place(ACCOUNT_ID, DepositHolderType.MANUAL, REF,
                 BigDecimal.ZERO, null))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(InvalidDepositAmountException.class);
         assertThatThrownBy(() -> DepositHold.place(ACCOUNT_ID, DepositHolderType.MANUAL, REF,
                 null, null))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(InvalidDepositAmountException.class);
     }
 
     @Nested
@@ -106,7 +109,7 @@ class DepositHoldTest {
             DepositHold hold = activeHold("50000");
 
             assertThatThrownBy(() -> hold.capture(new BigDecimal("50000.01")))
-                    .isInstanceOf(IllegalArgumentException.class)
+                    .isInstanceOf(InvalidDepositAmountException.class)
                     .hasMessageContaining("remaining");
         }
 
@@ -116,9 +119,9 @@ class DepositHoldTest {
             DepositHold hold = activeHold("50000");
 
             assertThatThrownBy(() -> hold.capture(BigDecimal.ZERO))
-                    .isInstanceOf(IllegalArgumentException.class);
+                    .isInstanceOf(InvalidDepositAmountException.class);
             assertThatThrownBy(() -> hold.capture(null))
-                    .isInstanceOf(IllegalArgumentException.class);
+                    .isInstanceOf(InvalidDepositAmountException.class);
         }
 
         @Test
@@ -128,7 +131,7 @@ class DepositHoldTest {
             hold.capture(new BigDecimal("50000"));
 
             assertThatThrownBy(() -> hold.capture(new BigDecimal("1")))
-                    .isInstanceOf(IllegalStateException.class);
+                    .isInstanceOf(InvalidDepositStateException.class);
         }
     }
 
@@ -144,7 +147,7 @@ class DepositHoldTest {
 
             assertThat(hold.getStatus()).isEqualTo(DepositHoldStatus.EXPIRED);
             assertThat(hold.isActive()).isFalse();
-            assertThatThrownBy(hold::expire).isInstanceOf(IllegalStateException.class);
+            assertThatThrownBy(hold::expire).isInstanceOf(InvalidDepositStateException.class);
         }
 
         @Test
@@ -153,7 +156,7 @@ class DepositHoldTest {
             DepositHold hold = activeHold("10000");
             hold.capture(new BigDecimal("1000"));
 
-            assertThatThrownBy(hold::expire).isInstanceOf(IllegalStateException.class);
+            assertThatThrownBy(hold::expire).isInstanceOf(InvalidDepositStateException.class);
         }
 
         @Test
@@ -175,7 +178,7 @@ class DepositHoldTest {
             DepositHold hold = activeHold("10000");
             hold.expire();
 
-            assertThatThrownBy(hold::voidHold).isInstanceOf(IllegalStateException.class);
+            assertThatThrownBy(hold::voidHold).isInstanceOf(InvalidDepositStateException.class);
         }
 
         @Test
@@ -197,7 +200,7 @@ class DepositHoldTest {
             DepositHold hold = activeHold("10000");
             hold.voidHold();
 
-            assertThatThrownBy(hold::release).isInstanceOf(IllegalStateException.class);
+            assertThatThrownBy(hold::release).isInstanceOf(InvalidDepositStateException.class);
         }
     }
 
@@ -229,7 +232,7 @@ class DepositHoldTest {
             hold.assignId(11L);
 
             assertThat(hold.getId()).isEqualTo(11L);
-            assertThatThrownBy(() -> hold.assignId(12L)).isInstanceOf(IllegalStateException.class);
+            assertThatThrownBy(() -> hold.assignId(12L)).isInstanceOf(DepositInvariantViolationException.class);
         }
     }
 }

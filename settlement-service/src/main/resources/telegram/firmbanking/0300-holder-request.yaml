@@ -1,0 +1,11 @@
+# 예금주조회 요청 — 이체 전 수취인 성명 대조(오입금 예방)에 쓴다.
+telegram: HOLDER_REQUEST
+msgType: "0300"
+description: 예금주 성명조회 요청
+version: 1
+effectiveFrom: 2026-01-01
+include: COMMON_HEADER
+totalLength: 60         # 공통부 34 + 개별부 26
+fields:
+  - { name: BANK_CODE,  length: 10, type: AN }
+  - { name: ACCOUNT_NO, length: 16, type: AN }

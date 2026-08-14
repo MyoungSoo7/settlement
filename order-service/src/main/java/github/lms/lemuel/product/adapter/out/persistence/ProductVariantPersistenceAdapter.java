@@ -37,6 +37,20 @@ public class ProductVariantPersistenceAdapter
     }
 
     @Override
+    public Optional<ProductVariant> loadByOptionSignature(Long productId, String optionSignature) {
+        if (optionSignature == null) {
+            return Optional.empty();
+        }
+        return repository.findByProductIdAndOptionSignature(productId, optionSignature)
+                .map(ProductVariantPersistenceAdapter::toDomain);
+    }
+
+    @Override
+    public List<Long> findProductIdsWithVariants() {
+        return repository.findDistinctProductIds();
+    }
+
+    @Override
     public ProductVariant save(ProductVariant variant) {
         ProductVariantJpaEntity entity;
         if (variant.getId() == null) {
@@ -44,7 +58,8 @@ public class ProductVariantPersistenceAdapter
                     null, variant.getProductId(), variant.getSku(), variant.getOptionName(),
                     variant.getAdditionalPrice(), variant.getDiscountPrice(), variant.getDiscountRate(),
                     variant.getStockQuantity(), variant.getVersion(),
-                    variant.getStatus(), variant.getCreatedAt(), variant.getUpdatedAt()
+                    variant.getStatus(), variant.getOptionSignature(),
+                    variant.getCreatedAt(), variant.getUpdatedAt()
             );
         } else {
             // 변경 감지: 기존 엔티티 로드 → @Version 보존된 채로 도메인 상태만 반영
@@ -58,6 +73,7 @@ public class ProductVariantPersistenceAdapter
                     variant.getAdditionalPrice(),
                     variant.getUpdatedAt()
             );
+            entity.applyOptionSignature(variant.getOptionSignature());
         }
         ProductVariantJpaEntity saved = repository.save(entity);
         return toDomain(saved);
@@ -78,7 +94,7 @@ public class ProductVariantPersistenceAdapter
                 e.getId(), e.getProductId(), e.getSku(), e.getOptionName(),
                 e.getAdditionalPrice(), e.getDiscountPrice(), e.getDiscountRate(),
                 e.getStockQuantity(), e.getVersion(),
-                e.getStatus(), e.getCreatedAt(), e.getUpdatedAt()
+                e.getStatus(), e.getOptionSignature(), e.getCreatedAt(), e.getUpdatedAt()
         );
     }
 }

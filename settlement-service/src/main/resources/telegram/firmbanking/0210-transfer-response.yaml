@@ -1,0 +1,15 @@
+# 지급이체 응답 — 요청 개별부를 그대로 echo 하고 은행 거래번호(TXN_ID)를 덧붙인다.
+telegram: TRANSFER_RESPONSE
+msgType: "0210"
+description: 지급이체 응답
+version: 1
+effectiveFrom: 2026-01-01
+include: COMMON_HEADER
+totalLength: 133        # 공통부 34 + 개별부 99
+fields:
+  - { name: BANK_CODE,   length: 10, type: AN }
+  - { name: ACCOUNT_NO,  length: 16, type: AN }
+  - { name: AMOUNT,      length: 13, type: N, scale: 0 }
+  - { name: HOLDER_NAME, length: 20, type: AN }
+  - { name: REF_ID,      length: 20, type: AN }
+  - { name: TXN_ID,      length: 20, type: AN }   # 은행 거래번호

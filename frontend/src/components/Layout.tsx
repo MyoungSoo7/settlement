@@ -2,6 +2,8 @@ import React, { useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { authApi } from '@/api/auth';
 import { useCart } from '@/contexts/useCart';
+import { useMenus } from '@/contexts/useMenus';
+import { findActiveTrail } from '@/lib/menuTree';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -31,16 +33,25 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navItemProps = (active: boolean, variant: 'admin' | 'user') => ({
     'aria-current': active ? ('page' as const) : undefined,
     className: [
-      'px-4 py-2 rounded-lg font-medium transition-colors text-sm shrink-0',
+      // `tap-target`: 내비 항목은 실측 높이 36px 로 Apple 권장 44pt 미만이다. 항목을 키우면 헤더
+      // 높이(h-16)와 데스크톱 배치가 흔들리므로, 터치 환경에서만 히트 영역을 44×44 로 넓힌다.
+      // 폭은 88px 안팎이라 44px 오버레이가 이웃 항목을 가리지 않는다.
+      'tap-target px-4 py-2 rounded-lg font-medium transition-colors text-sm shrink-0',
       active
         ? (variant === 'admin' ? 'bg-gray-800 text-white' : 'bg-blue-600 text-white')
         : (variant === 'admin' ? 'text-gray-600 hover:bg-gray-100' : 'text-gray-700 hover:bg-blue-50'),
     ].join(' '),
   });
 
-  // 정산 그룹(상품관리·정산관리·정산조회) — 세 경로 중 어디에 있어도 활성
-  const settlementActive =
-    isActive('/product') || isActive('/admin/settlement') || isActive('/settlement/search');
+  /**
+   * 상단 네비 항목은 메뉴 트리의 최상위 노드다(정본은 `menus` 테이블). 활성 판정은
+   * "현재 경로의 가장 긴 접두사인 메뉴"를 고르는 한 가지 규칙으로 통일했다 —
+   * 하드코딩 시절 `/admin`(대시보드)이 모든 `/admin/**` 에서 함께 켜지던 문제와,
+   * 그걸 피하려고 손으로 나열한 정산 그룹 판정에서 `/admin/payouts` 가 빠져 있던
+   * 버그를 규칙 하나로 함께 없앤다.
+   */
+  const { menus } = useMenus();
+  const activeRootId = findActiveTrail(menus, location.pathname)[0]?.id ?? null;
 
   /**
    * 좁은 화면에서 내비는 가로 스크롤 스트립이라 뒤쪽 항목이 화면 밖에 있다. 그대로 두면 사용자가
@@ -55,9 +66,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   }, [location.pathname]);
 
   return (
+    /* 좌우 safe-area 는 `#root`(index.css)가 앱 전체에 한 번 건다 — 셸을 거치지 않는 화면까지
+       덮기 위해서다. 여기서는 세로 인셋만 헤더·푸터가 각각 처리한다. */
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className={`bg-white shadow ${isAdminOrManager ? 'border-b-2 border-gray-800' : ''}`}>
+      {/* Header — 설치형(standalone)에서는 상태바가 문서 위에 겹쳐 뜨므로(black-translucent)
+          헤더가 그만큼 아래에서 시작해야 로고·내비가 시계·배터리에 가리지 않는다. */}
+      <header className={`bg-white shadow pt-safe ${isAdminOrManager ? 'border-b-2 border-gray-800' : ''}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
 
@@ -70,38 +84,19 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 Lemuel
               </Link>
 
-              {/* ── 관리자·매니저 내비 ── */}
-              {user && isAdminOrManager && (
+              {/* ── 내비게이션 ── 항목·순서·노출 역할은 전부 menus 테이블이 정한다.
+                  역할별 분기는 서버가 이미 끝냈으므로 여기서는 색만 고른다. */}
+              {user && menus.length > 0 && (
                 <nav ref={navRef} className="flex space-x-1 min-w-0 overflow-x-auto whitespace-nowrap [scrollbar-width:thin]">
-                  {/* 대시보드만 정확 매칭 — 정산·CEO·시스템이 전부 /admin 하위라 접두 매칭이면
-                      어느 섹션에 있든 대시보드까지 함께 활성으로 칠해진다(활성 항목 2개 → 현재
-                      위치가 흐려지고, aria-current 도 둘이 된다). */}
-                  <Link to="/admin" {...navItemProps(location.pathname === '/admin', 'admin')}>대시보드</Link>
-                  {/* 정산 — 상품관리·정산관리·정산조회 3개 하위 (좌측 사이드바) */}
-                  <Link to="/admin/settlement" {...navItemProps(settlementActive, 'admin')}>
-                    정산
-                  </Link>
-                  <Link to="/ai/chat" {...navItemProps(isActive('/ai/chat'), 'admin')}>AI 도우미</Link>
-                  {/* CEO — ADMIN·MANAGER 공통 (경제지표·재무제표·기업조회·대출관리 4개 하위, 좌측 사이드바) */}
-                  <Link to="/admin/ceo/insight" {...navItemProps(isActive('/admin/ceo'), 'admin')}>
-                    CEO
-                  </Link>
-                  {/* 시스템 — ADMIN 전용 */}
-                  {user.role === 'ADMIN' && (
-                    <Link to="/admin/system/menus" {...navItemProps(isActive('/admin/system'), 'admin')}>
-                      시스템
+                  {menus.map((item) => (
+                    <Link
+                      key={item.id}
+                      to={item.path ?? '#'}
+                      {...navItemProps(item.id === activeRootId, isAdminOrManager ? 'admin' : 'user')}
+                    >
+                      {item.label}
                     </Link>
-                  )}
-                </nav>
-              )}
-
-              {/* ── 일반 사용자 내비 ── 주문하기 + 추천받기 (USER 전용) */}
-              {user && !isAdminOrManager && (
-                <nav ref={navRef} className="flex space-x-1 min-w-0 overflow-x-auto whitespace-nowrap [scrollbar-width:thin]">
-                  <Link to="/order" {...navItemProps(isActive('/order'), 'user')}>주문하기</Link>
-                  {user.role === 'USER' && (
-                    <Link to="/recommend" {...navItemProps(isActive('/recommend'), 'user')}>추천받기</Link>
-                  )}
+                  ))}
                 </nav>
               )}
             </div>
@@ -129,7 +124,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 {user.role === 'USER' && (
                   <Link
                     to="/cart"
-                    className="relative p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    /* tap-target: 실측 40×40 — 터치 환경에서만 눌리는 영역을 44×44 로 넓힌다. */
+                    className="tap-target relative p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                     title="장바구니"
                   >
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -148,7 +144,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 {user.role === 'USER' && (
                   <Link
                     to="/mypage"
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+                    /* tap-target: 실측 68×32 — 마이페이지는 자주 눌리는 진입점이라 히트 영역을 넓힌다. */
+                    className={`tap-target flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
                       isActive('/mypage')
                         ? 'bg-blue-600 text-white'
                         : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'
@@ -165,7 +162,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
                 <button
                   onClick={handleLogout}
-                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm"
+                  className="tap-target px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm"
                 >
                   로그아웃
                 </button>
@@ -179,7 +176,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       <main>{children}</main>
 
       {/* Footer */}
-      <footer className="bg-white border-t mt-12">
+      {/* 홈 인디케이터(하단 바)가 문서 위에 겹치는 기기에서 푸터 문구가 가리지 않게 띄운다. */}
+      <footer className="bg-white border-t mt-12 pb-safe">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center text-gray-600">
             <p className="text-sm">© 2024 Lemuel Settlement System. All rights reserved.</p>

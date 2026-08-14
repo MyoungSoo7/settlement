@@ -7,6 +7,7 @@ import github.lms.lemuel.product.adapter.in.web.request.UpdateProductStockReques
 import github.lms.lemuel.product.adapter.in.web.response.ProductResponse;
 import github.lms.lemuel.product.application.port.in.CreateProductUseCase;
 import github.lms.lemuel.product.application.port.in.GetProductUseCase;
+import github.lms.lemuel.product.application.port.in.SearchProductFacetsUseCase;
 import github.lms.lemuel.product.application.port.in.ManageProductStatusUseCase;
 import github.lms.lemuel.product.application.port.in.UpdateProductUseCase;
 import github.lms.lemuel.product.application.port.in.UpdateProductUseCase.UpdateProductInfoCommand;
@@ -38,6 +39,7 @@ public class ProductController {
     private final UpdateProductUseCase updateProductUseCase;
     private final ManageProductStatusUseCase manageProductStatusUseCase;
     private final github.lms.lemuel.product.application.service.ProductImageService productImageService;
+    private final SearchProductFacetsUseCase searchProductFacetsUseCase;
 
     @Operation(summary = "상품 생성", description = "새 상품을 등록한다.")
     @ApiResponses({
@@ -81,6 +83,31 @@ public class ProductController {
                 .map(p -> ProductResponse.from(p, productImageService.getPrimaryImageUrl(p.getId())))
                 .collect(Collectors.toList());
         return ResponseEntity.ok(responses);
+    }
+
+    @Operation(summary = "옵션 파셋 검색",
+            description = "option=축:값 을 여러 번 넘긴다. 같은 축은 OR, 다른 축은 AND 이며 "
+                    + "AND 는 SKU 하나 안에서 성립한다(빨강 SKU 와 L SKU 를 따로 가진 상품은 걸리지 않는다). "
+                    + "응답의 facets 는 이어서 고를 수 있는 값과 그때 남는 상품 수다.")
+    @GetMapping("/facets")
+    public ResponseEntity<FacetSearchResponse> searchByFacets(
+            @Parameter(description = "옵션 필터. 예: option=색상:빨강&option=사이즈:L")
+            @RequestParam(name = "option", required = false) List<String> options,
+            @RequestParam(required = false) Long categoryId,
+            @Parameter(description = "품절·단종 SKU 를 제외할지. 기본 true — 눌러도 못 사는 값을 보여주지 않는다.")
+            @RequestParam(defaultValue = "true") boolean availableOnly) {
+        SearchProductFacetsUseCase.FacetSearchResult result =
+                searchProductFacetsUseCase.search(options, categoryId, availableOnly);
+        return ResponseEntity.ok(new FacetSearchResponse(
+                result.products().stream()
+                        .map(p -> ProductResponse.from(p, productImageService.getPrimaryImageUrl(p.getId())))
+                        .toList(),
+                result.facets()));
+    }
+
+    /** 파셋 검색 응답 — 결과 상품과 이어 고를 수 있는 파셋. */
+    public record FacetSearchResponse(List<ProductResponse> products,
+                                      List<SearchProductFacetsUseCase.Facet> facets) {
     }
 
     @Operation(summary = "상품 검색", description = "상품명/설명 키워드, 카테고리, 정렬 조건으로 상품을 검색한다.")

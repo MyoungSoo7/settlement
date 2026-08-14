@@ -9,12 +9,15 @@ import {
 import Card from '@/components/Card';
 import Spinner from '@/components/Spinner';
 import { apiErrorMessage } from '@/lib/apiError';
+import { PRINT_DOC, openPrintWindow, putPrintHandoff, type SettlementPrintHandoff } from '@/lib/printHandoff';
 
 const SettlementAdmin: React.FC = () => {
   const [data, setData] = useState<SettlementSearchResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedSettlement, setSelectedSettlement] = useState<SettlementDetail | null>(null);
+  // 상세 API 에 없는 표시값(주문자명·상품명)을 인쇄 창에 넘기기 위해 클릭한 목록 행을 함께 붙든다.
+  const [selectedItem, setSelectedItem] = useState<SettlementSearchItem | null>(null);
 
   const [filters, setFilters] = useState<SettlementSearchRequest>({
     page: 0,
@@ -44,12 +47,27 @@ const SettlementAdmin: React.FC = () => {
   }, [fetchSettlements]);
 
   // 정산 상세 조회
-  const handleViewDetail = async (id: number) => {
+  const handleViewDetail = async (item: SettlementSearchItem) => {
     try {
-      const detail = await settlementApi.getSettlement(id);
+      const detail = await settlementApi.getSettlement(item.settlementId);
+      setSelectedItem(item);
       setSelectedSettlement(detail);
     } catch (err) {
       setError(apiErrorMessage(err, '상세 정보를 불러오는데 실패했습니다.'));
+    }
+  };
+
+  // 정산서 인쇄 — 새 창(/print/settlement/:id)이 스스로 상세를 재조회해 문서를 그린다.
+  // 목록이 들고 있는 금액을 넘기지 않는 이유: 목록 조회 이후 바뀐 상태가 종이에 옛 숫자로 박히면 안 된다.
+  const handlePrint = (item: SettlementSearchItem | null, settlementId: number) => {
+    if (item) {
+      putPrintHandoff<SettlementPrintHandoff>(PRINT_DOC.settlement, settlementId, {
+        ordererName: item.ordererName,
+        productName: item.productName,
+      });
+    }
+    if (!openPrintWindow(`/print/settlement/${settlementId}`)) {
+      setError('팝업이 차단되어 인쇄 창을 열지 못했습니다. 브라우저의 팝업 차단을 해제해 주세요.');
     }
   };
 
@@ -258,10 +276,16 @@ const SettlementAdmin: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
                         <button
-                          onClick={() => handleViewDetail(settlement.settlementId)}
+                          onClick={() => handleViewDetail(settlement)}
                           className="text-blue-600 hover:text-blue-900"
                         >
                           상세보기
+                        </button>
+                        <button
+                          onClick={() => handlePrint(settlement, settlement.settlementId)}
+                          className="text-gray-600 hover:text-gray-900"
+                        >
+                          정산서 인쇄
                         </button>
                       </td>
                     </tr>
@@ -328,7 +352,10 @@ const SettlementAdmin: React.FC = () => {
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-2xl font-bold text-gray-900">정산 상세 정보</h2>
                 <button
-                  onClick={() => setSelectedSettlement(null)}
+                  onClick={() => {
+                    setSelectedSettlement(null);
+                    setSelectedItem(null);
+                  }}
                   className="text-gray-400 hover:text-gray-600"
                 >
                   ✕
@@ -384,6 +411,24 @@ const SettlementAdmin: React.FC = () => {
                     <span className="font-semibold">{selectedSettlement.confirmedAt}</span>
                   </div>
                 )}
+              </div>
+              {/* 모달에서 바로 종이로 — 인쇄 창은 이 정산 건을 스스로 재조회해 그린다. */}
+              <div className="mt-6 flex justify-end gap-2 border-t pt-4">
+                <button
+                  onClick={() => handlePrint(selectedItem, selectedSettlement.id)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  정산서 인쇄
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedSettlement(null);
+                    setSelectedItem(null);
+                  }}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+                >
+                  닫기
+                </button>
               </div>
             </div>
           </div>

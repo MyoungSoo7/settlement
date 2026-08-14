@@ -41,6 +41,16 @@ class CardErrorCodeTest {
     }
 
     @Test
+    @DisplayName("영수증: 판독 실패 503(무폴백) · 미존재 404 · 대사 미통과 승인은 422")
+    void receiptCodes() {
+        assertThat(ErrorCode.CARD_RECEIPT_OCR_UNAVAILABLE.status())
+                .isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        assertThat(ErrorCode.CARD_RECEIPT_NOT_FOUND.status()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(ErrorCode.CARD_RECEIPT_NOT_MATCHED.status())
+                .isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+    }
+
+    @Test
     @DisplayName("code() 는 enum 이름 그대로 — 응답 본문 errorCode 계약")
     void codeIsEnumName() {
         assertThat(ErrorCode.CARD_SCREENING_REJECTED.code()).isEqualTo("CARD_SCREENING_REJECTED");

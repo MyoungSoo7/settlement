@@ -1,0 +1,116 @@
+# Seed: market-service 시세 공개조회 as-is 사양 (Ouroboros 방법론 — Interview → Seed 결정화)
+# 상태: CONFIRMED (settlement/account/deposit seed 와 동일 방식 지시로 승인 승계, 2026-08-13)
+# 원칙: 이 Seed 는 "현행 코드가 실제로 하는 일"의 불변 기술이다. 결함은 교정하지 않고 known_issues 로만 기록한다.
+# 자매 Seed: financial-statements-service-public-read (같은 공개 read-only 위성 패턴)
+
+seed:
+  id: market-service-quotes-v1
+  goal: >-
+    market-service(KRX 일별 시세·시총 공개조회 — 밸류에이션 미계산 경계)의 현행 동작을
+    실행 가능한 게이트에 매핑된 불변 사양으로 결정화해, 회귀 기준선 · 경계 방어 근거 ·
+    면접/포트폴리오 문서로 사용한다.
+
+  scope:
+    included:
+      - 시세 레코드(StockQuote)의 타입 규율과 값 무결성
+      - 종목마스터(Stock) 피드 파생 upsert
+      - 신뢰도 표기(ValueSource)와 도메인 언어 재정의 이력
+      - 공개 GET / /admin 키 게이트 이원화
+      - 수집(KRX) 트리거·스케줄러 경계
+    excluded:
+      - KRX 외부 API 페이로드 상세 (어댑터 사정)
+      - 파티셔닝 운영 절차 (마이그레이션 존재 사실만)
+
+  constraints:
+    - "PER/PBR 등 밸류에이션 계산 금지 — 시세·시총만 서빙, 조인은 소비측"
+    - "금액은 BigDecimal, 수량·원 단위 총액은 BigInteger"
+    - "피드값은 파생 계산 없이 보존"
+    - "GET 공개 / 수집 트리거는 X-Internal-Api-Key 게이트 + gateway 미라우팅"
+    - "shared-common 미의존 — 자체 최소 SecurityConfig"
+
+  invariants:  # as-is 코드 사실 — 파일:라인 근거 (경로 접두 market-service/src/main/java/github/lms/lemuel/market/)
+    no_valuation:
+      source: scripts/harness/guard.mjs (MARKET-NO-VALUATION)
+      rule: "PER/PBR/priceEarnings/priceToBook 대입 코드가 유입되면 실시간·pre-commit·CI 3중으로 차단"
+      rationale: "시세 서비스가 밸류에이션을 만들면 재무 데이터 소유권이 흐려진다 — 조인은 소비측 몫"
+    numeric_typing:
+      source: domain/StockQuote.java:12-22
+      rule: "금액(종가·시가·고가·저가·전일대비·등락률)은 BigDecimal, 수량(거래량·상장주식수)과 원 단위 총액(거래대금·시가총액)은 BigInteger"
+    feed_values_preserved:
+      source: domain/StockQuote.java:12-13
+      rule: "economics 와 달리 이전 관측치에서 파생 계산하지 않고 받은 값을 그대로 저장"
+    required_fields:
+      source: domain/StockQuote.java:25,28,31,34
+      rule: "stockCode·baseDate·closePrice·source 누락은 생성 시점 거부"
+    daily_uniqueness:
+      source: V1__market_core.sql:35
+      rule: "uq_sq_stock_date UNIQUE (stock_code, base_date) — 재수집은 UPSERT 로 대체"
+    value_integrity:
+      source: V20260718300000__stock_quotes_value_checks.sql:12-18
+      rule: "close_price > 0, 나머지 가격·수량 >= 0"
+      exception: "prior_day_diff·fluctuation_rate 는 음수가 정상(하락)이라 CHECK 대상 밖 (:8)"
+      caveat: "NOT VALID 로 ADD 후 같은 파일 :23-25 에서 VALIDATE — 기존 행까지 검증됨 (락 회피 2단 패턴, KI-3 참조)"
+    trust_marker:
+      source: domain/ValueSource.java:14 + V20260810160000__value_source_domain_rename.sql:1-8
+      rule: "SAMPLE(근사 샘플, 신뢰 불가) / EXCHANGE(거래소 공시 실시세, 신뢰 가능)"
+      history: "SEED→SAMPLE, KRX→EXCHANGE 로 재정의. 적재 수단(SEED)과 공급자 이름(KRX)은 도메인 상수가 아니라는 판단 — 공급자가 바뀌면 상수가 거짓이 된다"
+    stock_master_from_feed:
+      source: domain/Stock.java:9
+      rule: "그날 피드에 등장한 종목의 이름/시장을 upsert — 상장/상장폐지가 자동 반영"
+    market_enum:
+      source: V1__market_core.sql:15
+      rule: "chk_stock_market — KOSPI / KOSDAQ / KONEX"
+    public_read_admin_gate:
+      source: adapter/in/web/StockController.java:28 vs adapter/in/web/MarketSyncAdminController.java:24,30 + config/AdminApiKeyFilter.java:18
+      rule: "GET /api/market/stocks(+/{code}/latest, /series)는 공개. POST /admin/market/sync 는 X-Internal-Api-Key 일치 필요 + gateway 미라우팅"
+
+  event_contracts:
+    publishes: []
+    consumes: []
+    note: "Kafka 미사용 공개 read-only 위성 — shared-common 미의존"
+
+  acceptance_criteria:  # 실행 가능 — 각 AC 는 기존 게이트에 매핑
+    - id: AC-1
+      criterion: PER/PBR 계산 코드가 유입되지 않는다
+      gate: "node scripts/harness/guard.mjs — MARKET-NO-VALUATION"
+    - id: AC-2
+      criterion: 금액/수량 타입 분리가 유지된다
+      gate: "./gradlew :market-service:test — MarketPersistenceAdapterTest"
+    - id: AC-3
+      criterion: (종목, 거래일) 중복 적재가 행을 늘리지 않는다 (UPSERT)
+      gate: "uq_sq_stock_date · KrxSyncServiceTest"
+    - id: AC-4
+      criterion: 값 무결성(종가 > 0 등)이 DB 에서 강제된다
+      gate: "V20260718300000 CHECK 3종"
+    - id: AC-5
+      criterion: 수집 실패가 조용히 성공으로 보이지 않는다
+      gate: "KrxSyncServiceFailureTest · MarketSyncSchedulerTest"
+    - id: AC-6
+      criterion: 헥사고날 의존 방향 위반 0
+      gate: "HexagonalArchitectureTest (ArchUnit)"
+    - id: AC-7
+      criterion: /admin/market/sync 가 키 없이 통과하지 않는다 (운영 fail-closed)
+      gate: "MarketWebLayerTest · AdminApiKeyFilter"
+    - id: AC-8
+      criterion: 커버리지 LINE >= 90%
+      gate: "./gradlew :market-service:jacocoTestCoverageVerification (check 편입)"
+
+  known_issues:  # 발견만 기록 — 사양은 as-is 유지
+    - id: KI-1
+      finding: "도메인이 필수값 검증에 generic IllegalArgumentException 을 쓴다(StockQuote.java:25-34, Stock.java:17,23). guard 의 OO-DOMAIN-GENERIC-IAE 는 금융 5서비스 한정이라 market 은 대상 밖"
+      disposition: recorded-not-fixed (게이트 비대칭 — 위성은 *-rules 스킬 커버가 의도된 설계)
+    - id: KI-2
+      finding: "AdminApiKeyFilter 는 키 미설정 시 개발 통과. 운영에서 app.security.internal-key-required=true 주입이 빠지면 수집 트리거가 무인증으로 열린다"
+      disposition: by-design (전 서비스 공통 패턴 — 운영 주입 필수)
+    - id: KI-3
+      finding: "[정정 2026-08-13] 초안은 NOT VALID(:13)만 보고 기존 행 미검증이라 기록했으나, 같은 파일 :23-25 가 VALIDATE CONSTRAINT 3종을 수행한다. 임시 DB 에 마이그레이션 전량 적용해 실측 — chk_sq 4종 convalidated=t, 미검증 제약 0건(파티션 상속본 포함), close_price=-1 INSERT 는 chk_sq_close_price_positive 위반으로 거부. 후속 V20260810160000 은 chk_sq_source 만 DROP/ADD 하므로 값 CHECK 의 검증 상태를 풀지 않는다"
+      disposition: verified-not-an-issue
+    - id: KI-4
+      finding: "ValueSource 재정의가 파티션드 테이블 + CHECK 제약 해제→값 치환→재생성 순서에 의존하는 마이그레이션이었다(V20260810160000:10-14). 같은 형태의 값 집합 변경이 또 필요하면 동일한 순서 함정을 밟는다"
+      disposition: recorded-not-fixed (마이그레이션 패턴 위험)
+
+  uses:
+    - regression-baseline
+    - boundary-defense
+    - interview-portfolio
+    - brownfield-base

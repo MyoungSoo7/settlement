@@ -78,7 +78,21 @@ class PayoutBackfillIdempotencyIT {
         jdbc.update("DELETE FROM public.payouts");
         jdbc.update("DELETE FROM public.settlement_payment_view");
         jdbc.update("DELETE FROM public.ledger_outbox");
+        jdbc.update("DELETE FROM public.settlement_loan_deductions");
         jdbc.update("DELETE FROM public.settlements");
+    }
+
+    /**
+     * loan 상환차감 기록을 심는다 — <b>IMMEDIATE 백필의 전제조건</b>.
+     *
+     * <p>백필은 지급액을 자체 계산하지 않고 확정 경로를 재구동하므로, 차감 기록이 없으면
+     * (= loan 이벤트 미도착) 지급을 만들지 않는다. loan 은 차감 0 인 셀러에게도 항상
+     * {@code repayment_applied} 를 발행하므로 정상 상태에서는 모든 정산에 이 행이 있다.
+     */
+    private void seedLoanDeduction(long settlementId, long sellerId, String deducted) {
+        jdbc.update("INSERT INTO public.settlement_loan_deductions "
+                        + "(settlement_id, seller_id, deducted, created_at) VALUES (?, ?, ?::numeric, now())",
+                settlementId, sellerId, deducted);
     }
 
     /**
@@ -127,6 +141,7 @@ class PayoutBackfillIdempotencyIT {
 
         seedPaymentView(paymentId, sellerId);
         long settlementId = seedDoneSettlement(paymentId);
+        seedLoanDeduction(settlementId, sellerId, "0.00");   // 대출 없는 셀러 — loan 이 0 도 발행한다
 
         // ── 1회차: 1건 생성 ────────────────────────────────────────────────────
         PayoutBackfillReport firstRun = backfillUseCase.backfill(today, today, null);
@@ -178,6 +193,7 @@ class PayoutBackfillIdempotencyIT {
                 """, paymentId, paymentId + 1);
         long settlementId = jdbc.queryForObject(
                 "SELECT id FROM public.settlements WHERE payment_id = ?", Long.class, paymentId);
+        seedLoanDeduction(settlementId, sellerId, "0.00");
 
         // ── 1회차 ────────────────────────────────────────────────────────────
         PayoutBackfillReport firstRun = backfillUseCase.backfill(today, today, null);
@@ -232,7 +248,7 @@ class PayoutBackfillIdempotencyIT {
             long paymentId = 30010L + i;
             long sellerId  = 300L + i;
             seedPaymentView(paymentId, sellerId);
-            seedDoneSettlement(paymentId);
+            seedLoanDeduction(seedDoneSettlement(paymentId), sellerId, "0.00");
         }
 
         // ── 1회차 ────────────────────────────────────────────────────────────
@@ -257,5 +273,51 @@ class PayoutBackfillIdempotencyIT {
         assertThat(totalPayouts)
                 .as("두 번 실행 후 IMMEDIATE Payout 은 정확히 3건")
                 .isEqualTo(3L);
+    }
+
+    // ── 대출 차감 반영 / 미도착 건 보호 ─────────────────────────────────────────
+
+    @Test
+    @DisplayName("IMMEDIATE 백필 금액은 대출 차감을 반영한다 — 총액 지급 금지")
+    void immediateBackfill_appliesRecordedLoanDeduction() {
+        LocalDate today = LocalDate.now();
+        long paymentId = 30020L;
+        long sellerId  = 400L;
+
+        seedPaymentView(paymentId, sellerId);
+        long settlementId = seedDoneSettlement(paymentId);      // net 9,700 · holdback 0
+        seedLoanDeduction(settlementId, sellerId, "2000.00");
+
+        PayoutBackfillReport run = backfillUseCase.backfill(today, today, null);
+
+        assertThat(run.created()).isEqualTo(1L);
+        java.math.BigDecimal immediateAmt = jdbc.queryForObject(
+                "SELECT amount FROM public.payouts WHERE settlement_id = ? AND payout_type = 'IMMEDIATE'",
+                java.math.BigDecimal.class, settlementId);
+        assertThat(immediateAmt)
+                .as("백필 금액 = 즉시지급분(9,700) − 대출차감(2,000). 총액 9,700 이면 대출채권이 사라진다")
+                .isEqualByComparingTo("7700.00");
+    }
+
+    @Test
+    @DisplayName("차감 기록 없는 정산은 백필하지 않는다 — loan 이벤트 미도착 건 보호")
+    void backfill_skipsSettlementWithoutLoanDeductionRecord() {
+        LocalDate today = LocalDate.now();
+        long paymentId = 30030L;
+        long sellerId  = 500L;
+
+        seedPaymentView(paymentId, sellerId);
+        long settlementId = seedDoneSettlement(paymentId);       // 차감 기록 없음 — loan 이벤트 미도착
+
+        PayoutBackfillReport run = backfillUseCase.backfill(today, today, null);
+
+        assertThat(run.created()).isZero();
+        assertThat(run.failed()).isEqualTo(1L);
+        assertThat(payoutCount(settlementId))
+                .as("차감액을 모르는 채 지급하면 대출채권이 사라진다 — 지급을 만들지 않는다")
+                .isZero();
+        assertThat(run.remaining())
+                .as("잔여로 계속 보고돼야 운영자가 loan 이벤트 유실을 인지한다")
+                .isEqualTo(1L);
     }
 }

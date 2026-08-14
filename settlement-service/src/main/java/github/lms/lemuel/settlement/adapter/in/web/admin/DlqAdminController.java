@@ -3,6 +3,7 @@ package github.lms.lemuel.settlement.adapter.in.web.admin;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import github.lms.lemuel.common.audit.application.AuditLogger;
+import github.lms.lemuel.common.log.LogSafe;
 import github.lms.lemuel.common.audit.domain.AuditAction;
 import github.lms.lemuel.settlement.adapter.in.kafka.DlqReplayService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -65,7 +66,7 @@ public class DlqAdminController {
                         "limit", max, "found", messages.size()))
         );
         log.info("[DLQ inspect] operator={}, topic={}, found={}",
-                currentOperator(), topic, messages.size());
+                LogSafe.of(currentOperator()), LogSafe.of(topic), messages.size());
         return ResponseEntity.ok(messages);
     }
 

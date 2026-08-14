@@ -1,5 +1,6 @@
 package github.lms.lemuel.payment.application;
 
+import github.lms.lemuel.common.log.LogSafe;
 import github.lms.lemuel.payment.application.port.in.CapturePaymentPort;
 import github.lms.lemuel.payment.application.port.in.CreatePaymentCommand;
 import github.lms.lemuel.payment.application.port.in.CreatePaymentPort;
@@ -55,7 +56,8 @@ public class TossPaymentService {
      * 4. capture() → CAPTURED + 주문 PAID + 정산 자동 생성
      */
     public PaymentDomain confirmTossPayment(Long dbOrderId, String paymentKey, String tossOrderId, Long amount) {
-        log.info("토스 결제 확인 시작: dbOrderId={}, tossOrderId={}, amount={}", dbOrderId, tossOrderId, amount);
+        log.info("토스 결제 확인 시작: dbOrderId={}, tossOrderId={}, amount={}",
+                dbOrderId, LogSafe.of(tossOrderId), amount);
 
         tossConfirmApiClient.confirm(paymentKey, tossOrderId, amount);
 

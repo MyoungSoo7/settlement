@@ -305,6 +305,8 @@ test('collectAudit cross-checks gradle module roster against CLAUDE.md and STRUC
   const files = {
     'settings.gradle.kts': settings,
     'CLAUDE.md': '├── alpha-service/ # A\n└── gateway-service/ # GW\n',
+    // 구조 정본은 저장소 루트의 STRUCTURE.md 다 — 경로가 어긋나면 trackedSet 조회가 빗나가
+    // 이 문서가 조용히 검사 대상에서 빠진다(실제로 그렇게 방치돼 있었다).
     'STRUCTURE.md': '├── alpha-service/\n└── gateway-service/\n',
   };
   const root = repo(files);
@@ -315,6 +317,35 @@ test('collectAudit cross-checks gradle module roster against CLAUDE.md and STRUC
   assert.match(bad, /CLAUDE\.md module roster missing: alpha-service/);
   assert.doesNotMatch(bad, /STRUCTURE\.md/);
   assert.doesNotMatch(bad, /shared-common/);
+
+  // STRUCTURE.md 도 실제로 검사된다 — 경로 오타로 이 검사가 죽으면 여기서 잡힌다.
+  put(root, 'STRUCTURE.md', '└── gateway-service/\n');
+  const both = collectAudit(root, baseManifest(Object.keys(files))).errors.join('\n');
+  assert.match(both, /STRUCTURE\.md module roster missing: alpha-service/);
+});
+
+test('collectAudit cross-checks settlement 서브도메인 roster against 문서 트리 줄', () => {
+  const files = {
+    'settlement-service/src/main/java/github/lms/lemuel/settlement/domain/Settlement.java': '',
+    'settlement-service/src/main/java/github/lms/lemuel/tax/domain/TaxCalculation.java': '',
+    // 루트 직속 파일은 서브도메인이 아니다(디렉터리만 대상).
+    'settlement-service/src/main/java/github/lms/lemuel/SettlementServiceApplication.java': '',
+    // 첫 줄은 가드레일 문단을 흉내낸 미끼 — 'settlement-service/' 만으로 앵커를 잡으면 여기 걸려
+    // 트리 줄을 못 보고 전부 누락으로 오탐한다(포트 8082 를 함께 요구해 고정).
+    'CLAUDE.md': '- settlement-service/build.gradle.kts 에 order 의존 금지\n'
+      + '├── settlement-service/ # Settlement (8082) — settlement·tax\n',
+    'STRUCTURE.md': '├── settlement-service/ # Settlement (8082)\n'
+      + '│   └── .../{settlement,tax}\n',
+  };
+  const root = repo(files);
+  assert.deepEqual(collectAudit(root, baseManifest(Object.keys(files))).errors, []);
+
+  put(root, 'CLAUDE.md', '- settlement-service/build.gradle.kts 에 order 의존 금지\n'
+    + '├── settlement-service/ # Settlement (8082) — settlement\n');
+  const bad = collectAudit(root, baseManifest(Object.keys(files))).errors.join('\n');
+  assert.match(bad, /CLAUDE\.md settlement 서브도메인 누락: tax/);
+  assert.doesNotMatch(bad, /누락: settlement /);
+  assert.doesNotMatch(bad, /SettlementServiceApplication/);
 });
 
 test('collectAudit resolves HARNESS.md routing map entrypoints against agents, skills, and commands', () => {
@@ -654,4 +685,68 @@ test('repository harness contracts match the tracked manifest oracle', () => {
     cwd: root,
     encoding: 'utf8',
   }), /harness-audit: healthy/i);
+});
+
+// ── 문서 사실 게이트 3종 ────────────────────────────────────────────────────────
+// 2026-08-12 실측 드리프트 3종의 회귀 가드. 각 규칙은 "잡는다" 와 "오탐하지 않는다" 를 짝으로 검증한다.
+const DOC_FACTS_SETTINGS = 'include(\n  "card-service",\n  "organization-service",\n  "deposit-service",\n)';
+
+function docFactsRepo(files) {
+  return repo({
+    'settings.gradle.kts': DOC_FACTS_SETTINGS,
+    'shared-common/src/testFixtures/resources/contracts/events/lemuel.organization.created.schema.json': '{}',
+    'shared-common/src/testFixtures/resources/contracts/events/lemuel.card.issued.schema.json': '{}',
+    ...files,
+  });
+}
+
+function docFactErrors(files) {
+  const root = docFactsRepo(files);
+  return collectAudit(root, baseManifest()).errors.filter((error) => error.startsWith('doc facts:'));
+}
+
+test('doc facts: 계약 토픽 수 주장이 실제 스키마 파일 수와 다르면 실패한다', () => {
+  const errors = docFactErrors({
+    'CLAUDE.md': 'card-service organization-service deposit-service\n- contracts/events/ 는 12토픽 JSON Schema 정본이다.\n',
+  });
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /CLAUDE\.md:2 이벤트 계약 토픽 수 불일치: claimed=12 actual=2/);
+});
+
+test('doc facts: 계약 코퍼스와 무관한 부분집합 토픽 수는 오탐하지 않는다', () => {
+  assert.deepEqual(docFactErrors({
+    'CLAUDE.md': 'card-service organization-service deposit-service\n- contracts/events/ 는 2토픽 정본이다.\n- account 는 6토픽을 소비한다.\n',
+  }), []);
+});
+
+test('doc facts: 어댑터가 실재하는데 미구현으로 적히면 실패한다(card 구현 상태 역전 회귀)', () => {
+  const errors = docFactErrors({
+    'CLAUDE.md': 'organization-service deposit-service\n- card-service/ — REST·스케줄러는 미구현\n',
+    'card-service/src/main/java/github/lms/lemuel/card/adapter/in/web/CardController.java': 'class CardController {}',
+  });
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /CLAUDE\.md:2 구현 상태 역전: card-service 의 REST\(adapter\/in\/web\)는 실재/);
+});
+
+test('doc facts: 어댑터가 실제로 없으면 미배선 기술을 통과시킨다', () => {
+  assert.deepEqual(docFactErrors({
+    'CLAUDE.md': 'card-service organization-service\n- deposit-service/ — Kafka 컨슈머는 미배선\n',
+  }), []);
+});
+
+test('doc facts: 다른 모듈이 토픽을 참조하면 "소비처 미배선" 기술은 실패한다(organization 회귀)', () => {
+  const errors = docFactErrors({
+    'CLAUDE.md': 'card-service deposit-service\n- organization-service — 이벤트 발행 전용(소비처 미배선)\n',
+    'organization-service/src/main/resources/application.yml': 'topic:\n  created: lemuel.organization.created\n',
+    'card-service/src/main/resources/application.yml': 'topic:\n  organization-created: lemuel.organization.created\n',
+  });
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /소비처 배선 있음: lemuel\.organization\.created 를 card-service 가 참조/);
+});
+
+test('doc facts: 발행 모듈 자신의 yml 참조는 소비 근거로 보지 않는다', () => {
+  assert.deepEqual(docFactErrors({
+    'SPEC.md': 'organization-service deposit-service\n| `lemuel.card.issued` | card | 소비처 미배선 — 발행 전용 |\n',
+    'card-service/src/main/resources/application.yml': 'topic:\n  issued: lemuel.card.issued\n',
+  }), []);
 });

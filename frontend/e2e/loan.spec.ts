@@ -1,4 +1,5 @@
-import { test, expect, type Page, type Route } from '@playwright/test';
+import { type Page, type Route } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 /**
  * 대출 화면 신규 UI 동작 검증 — 실제 로그인 + route mock. dev·운영 양쪽에서 동작한다.

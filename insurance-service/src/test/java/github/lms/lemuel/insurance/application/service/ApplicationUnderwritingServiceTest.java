@@ -3,6 +3,7 @@ package github.lms.lemuel.insurance.application.service;
 import github.lms.lemuel.common.audit.application.AuditLogger;
 import github.lms.lemuel.insurance.application.port.in.SubmitApplicationUseCase.SubmitApplicationCommand;
 import github.lms.lemuel.insurance.application.port.in.UnderwriteApplicationUseCase.IssuedPolicySummary;
+import github.lms.lemuel.insurance.application.port.out.LoadApplicationDocumentPort;
 import github.lms.lemuel.insurance.application.port.out.LoadApplicationPort;
 import github.lms.lemuel.insurance.application.port.out.LoadDisclosureDeliveryPort;
 import github.lms.lemuel.insurance.application.port.out.LoadInsuranceProductPort;
@@ -13,13 +14,17 @@ import github.lms.lemuel.insurance.application.port.out.SaveApplicationPort.Appl
 import github.lms.lemuel.insurance.application.port.out.SaveCommissionSchedulePort;
 import github.lms.lemuel.insurance.application.port.out.SavePolicyPort;
 import github.lms.lemuel.insurance.application.port.out.SavePolicyPort.PolicyIssuanceAttributes;
+import github.lms.lemuel.insurance.domain.ApplicationDocument;
 import github.lms.lemuel.insurance.domain.ApplicationStatus;
 import github.lms.lemuel.insurance.domain.CommissionConstants;
 import github.lms.lemuel.insurance.domain.CommissionSchedule;
+import github.lms.lemuel.insurance.domain.DocumentMatchDecision;
+import github.lms.lemuel.insurance.domain.ExtractedApplicationForm;
 import github.lms.lemuel.insurance.domain.InsuranceApplication;
 import github.lms.lemuel.insurance.domain.Policy;
 import github.lms.lemuel.insurance.domain.PolicyStatus;
 import github.lms.lemuel.insurance.domain.SalesChannel;
+import github.lms.lemuel.insurance.domain.exception.ApplicationDocumentNotMatchedException;
 import github.lms.lemuel.insurance.domain.exception.ApplicationNotFoundException;
 import github.lms.lemuel.insurance.domain.exception.DisclosureNotDeliveredException;
 import github.lms.lemuel.insurance.domain.exception.ProductNotFoundException;
@@ -64,15 +69,38 @@ class ApplicationUnderwritingServiceTest {
     @Mock SaveApplicationPort saveApplicationPort;
     @Mock LoadInsuranceProductPort loadProductPort;
     @Mock LoadDisclosureDeliveryPort loadDisclosurePort;
+    @Mock LoadApplicationDocumentPort loadApplicationDocumentPort;
     @Mock SavePolicyPort savePolicyPort;
     @Mock SaveCommissionSchedulePort saveSchedulePort;
     @Mock PublishInsuranceEventPort publishPort;
     @Mock AuditLogger auditLogger;
 
     private ApplicationUnderwritingService service() {
+        return serviceWith(false);
+    }
+
+    private ApplicationUnderwritingService serviceWith(boolean documentRequired) {
         return new ApplicationUnderwritingService(
                 loadApplicationPort, saveApplicationPort, loadProductPort, loadDisclosurePort,
+                loadApplicationDocumentPort,
+                new github.lms.lemuel.insurance.config.ApplicationOcrProperties(
+                        "key", null, null, null, null, documentRequired),
                 savePolicyPort, saveSchedulePort, publishPort, FIXED, auditLogger);
+    }
+
+    /** 대사 상태별 청약서류 픽스처 — 게이트 케이스용. */
+    private static ApplicationDocument documentIn(boolean matched, String note) {
+        ApplicationDocument document = ApplicationDocument.extracted(
+                "11111111-1111-1111-1111-111111111111", "99", "청약서.jpg", "image/jpeg",
+                "hash", 1024L,
+                new ExtractedApplicationForm("홍길동", "김피보", "레무엘 종신보험",
+                        TODAY, new BigDecimal("1200000.00"), new BigDecimal("100000000.00"),
+                        new BigDecimal("0.93")),
+                "gemini-2.5-flash", FIXED.instant());
+        document.applyDecision(matched
+                ? DocumentMatchDecision.matched()
+                : DocumentMatchDecision.mismatched(note), FIXED.instant());
+        return document;
     }
 
     private static ProductSnapshot product() {
@@ -184,6 +212,61 @@ class ApplicationUnderwritingServiceTest {
         verify(saveApplicationPort, never()).update(any());
         verify(savePolicyPort, never()).insertIssued(any(), any());
         verify(publishPort, never()).publishPolicyIssued(any(), any());
+    }
+
+    @Test
+    @DisplayName("서류 대사 게이트(ADR 0036) — 최신 서류가 MATCHED 가 아니면 승인 거부, 청약 상태 불변")
+    void rejectsApprovalWithMismatchedDocument() {
+        InsuranceApplication app = underReview(SalesChannel.FC, null);
+        when(loadApplicationPort.findByApplicationId(app.getApplicationId()))
+                .thenReturn(Optional.of(app));
+        when(loadDisclosurePort.existsForApplication(app.getApplicationId())).thenReturn(true);
+        when(loadApplicationDocumentPort.findLatestByApplicationId(app.getApplicationId()))
+                .thenReturn(Optional.of(documentIn(false, "연 보험료 불일치")));
+
+        assertThatThrownBy(() -> service().approve(app.getApplicationId()))
+                .isInstanceOf(ApplicationDocumentNotMatchedException.class)
+                .hasMessageContaining("MISMATCHED");
+
+        assertThat(app.getStatus()).isEqualTo(ApplicationStatus.UNDER_REVIEW);
+        verify(saveApplicationPort, never()).update(any());
+        verify(savePolicyPort, never()).insertIssued(any(), any());
+    }
+
+    @Test
+    @DisplayName("전면 강제(required=true)면 서류 미첨부 승인이 거절된다 — 청약 상태 불변")
+    void requiredModeBlocksMissingDocument() {
+        InsuranceApplication app = underReview(SalesChannel.FC, null);
+        when(loadApplicationPort.findByApplicationId(app.getApplicationId()))
+                .thenReturn(Optional.of(app));
+        when(loadDisclosurePort.existsForApplication(app.getApplicationId())).thenReturn(true);
+        when(loadApplicationDocumentPort.findLatestByApplicationId(app.getApplicationId()))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> serviceWith(true).approve(app.getApplicationId()))
+                .isInstanceOf(ApplicationDocumentNotMatchedException.class)
+                .hasMessageContaining("첨부되지 않아");
+
+        assertThat(app.getStatus()).isEqualTo(ApplicationStatus.UNDER_REVIEW);
+        verify(savePolicyPort, never()).insertIssued(any(), any());
+    }
+
+    @Test
+    @DisplayName("서류 대사 게이트 — MATCHED 서류면 승인 통과 (서류 없으면 기존 경로 그대로)")
+    void approvesWithMatchedDocument() {
+        InsuranceApplication app = underReview(SalesChannel.FC, null);
+        when(loadApplicationPort.findByApplicationId(app.getApplicationId()))
+                .thenReturn(Optional.of(app));
+        when(loadDisclosurePort.existsForApplication(app.getApplicationId())).thenReturn(true);
+        when(loadApplicationDocumentPort.findLatestByApplicationId(app.getApplicationId()))
+                .thenReturn(Optional.of(documentIn(true, null)));
+        when(loadProductPort.findByCode("PROD-1")).thenReturn(Optional.of(product()));
+        when(savePolicyPort.insertIssued(any(), any())).thenAnswer(inv -> inv.getArgument(0));
+        when(saveSchedulePort.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
+
+        service().approve(app.getApplicationId());
+
+        assertThat(app.getStatus()).isEqualTo(ApplicationStatus.APPROVED);
     }
 
     @Test

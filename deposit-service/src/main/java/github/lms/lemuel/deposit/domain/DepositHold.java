@@ -1,5 +1,8 @@
 package github.lms.lemuel.deposit.domain;
 
+import github.lms.lemuel.deposit.domain.exception.DepositInvariantViolationException;
+import github.lms.lemuel.deposit.domain.exception.InvalidDepositAmountException;
+import github.lms.lemuel.deposit.domain.exception.InvalidDepositStateException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
@@ -54,7 +57,7 @@ public class DepositHold {
                                      String holderReference, BigDecimal amount,
                                      LocalDateTime expiresAt) {
         if (amount == null || amount.signum() <= 0) {
-            throw new IllegalArgumentException("hold 금액은 양수여야 합니다: " + amount);
+            throw new InvalidDepositAmountException("hold 금액은 양수여야 합니다: " + amount, "place", amount);
         }
         LocalDateTime now = LocalDateTime.now();
         return new DepositHold(null, accountId, holderType, holderReference,
@@ -82,12 +85,13 @@ public class DepositHold {
     public BigDecimal capture(BigDecimal captureAmount) {
         requireCapturable();
         if (captureAmount == null || captureAmount.signum() <= 0) {
-            throw new IllegalArgumentException("캡처 금액은 양수여야 합니다: " + captureAmount);
+            throw new InvalidDepositAmountException("캡처 금액은 양수여야 합니다: " + captureAmount, "capture", captureAmount);
         }
         BigDecimal normCapture = norm(captureAmount);
         if (normCapture.compareTo(this.remainingAmount) > 0) {
-            throw new IllegalArgumentException(
-                    "캡처 금액(" + normCapture + ")이 remaining(" + this.remainingAmount + ")을 초과합니다");
+            throw new InvalidDepositAmountException(
+                    "캡처 금액(" + normCapture + ")이 remaining(" + this.remainingAmount + ")을 초과합니다",
+                    "capture", normCapture);
         }
         this.remainingAmount = this.remainingAmount.subtract(normCapture);
         this.status = this.remainingAmount.signum() == 0
@@ -102,7 +106,8 @@ public class DepositHold {
      */
     public void expire() {
         if (this.status != DepositHoldStatus.ACTIVE) {
-            throw new IllegalStateException("ACTIVE 상태만 만료 가능합니다. 현재=" + status);
+            throw new InvalidDepositStateException("ACTIVE 상태만 만료 가능합니다. 현재=" + status,
+                    String.valueOf(status), "expire");
         }
         this.status = DepositHoldStatus.EXPIRED;
         touch();
@@ -114,8 +119,9 @@ public class DepositHold {
     public void voidHold() {
         if (this.status != DepositHoldStatus.ACTIVE
                 && this.status != DepositHoldStatus.PARTIALLY_CAPTURED) {
-            throw new IllegalStateException(
-                    "ACTIVE 또는 PARTIALLY_CAPTURED 상태만 취소 가능합니다. 현재=" + status);
+            throw new InvalidDepositStateException(
+                    "ACTIVE 또는 PARTIALLY_CAPTURED 상태만 취소 가능합니다. 현재=" + status,
+                    String.valueOf(status), "voidHold");
         }
         this.status = DepositHoldStatus.VOIDED;
         touch();
@@ -127,8 +133,9 @@ public class DepositHold {
     public void release() {
         if (this.status != DepositHoldStatus.ACTIVE
                 && this.status != DepositHoldStatus.PARTIALLY_CAPTURED) {
-            throw new IllegalStateException(
-                    "ACTIVE 또는 PARTIALLY_CAPTURED 상태만 해제 가능합니다. 현재=" + status);
+            throw new InvalidDepositStateException(
+                    "ACTIVE 또는 PARTIALLY_CAPTURED 상태만 해제 가능합니다. 현재=" + status,
+                    String.valueOf(status), "release");
         }
         this.status = DepositHoldStatus.RELEASED;
         touch();
@@ -146,8 +153,9 @@ public class DepositHold {
     private void requireCapturable() {
         if (this.status != DepositHoldStatus.ACTIVE
                 && this.status != DepositHoldStatus.PARTIALLY_CAPTURED) {
-            throw new IllegalStateException(
-                    "ACTIVE 또는 PARTIALLY_CAPTURED hold 만 캡처 가능합니다. 현재=" + status);
+            throw new InvalidDepositStateException(
+                    "ACTIVE 또는 PARTIALLY_CAPTURED hold 만 캡처 가능합니다. 현재=" + status,
+                    String.valueOf(status), "capture");
         }
     }
 
@@ -174,7 +182,7 @@ public class DepositHold {
     public long getVersion() { return version; }
 
     public void assignId(Long id) {
-        if (this.id != null) throw new IllegalStateException("이미 ID 가 할당된 hold 입니다");
+        if (this.id != null) throw new DepositInvariantViolationException("이미 ID 가 할당된 hold 입니다");
         this.id = Objects.requireNonNull(id);
     }
 }

@@ -146,7 +146,7 @@ const OperationConsolePage: React.FC = () => {
   const byStatus = summary?.byStatus ?? {};
 
   return (
-    // 시스템 관리(SystemLayout) 콘텐츠 영역에서 렌더링 — 컨테이너/패딩은 레이아웃이 제공
+    // 시스템 관리 그룹(SideNavLayout) 콘텐츠 영역에서 렌더링 — 컨테이너/패딩은 레이아웃이 제공
     <div>
       {/* 헤더 */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">

@@ -4,7 +4,7 @@ import io.github.cdimascio.dotenv.Dotenv;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cache.annotation.EnableCaching;
-import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * deposit-service 독립 부팅 진입점.
@@ -15,16 +15,17 @@ import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
  * <p>루트 {@code github.lms.lemuel} 에서 스캔 → deposit 패키지 + shared-common(JWT SecurityConfig·Outbox·
  * 멱등 인프라·Audit·ShedLock) 빈만 잡힌다. 타 서비스 패키지는 build.gradle.kts 의존에 없어 클래스패스에 없다.
  *
- * <p>{@code @EnableJpaAuditing} 은 deposit 의 JPA 엔티티(DepositAccount/Entry/Hold/OffsetShortfall)
- * 가 {@code @EntityListeners(AuditingEntityListener.class)} + {@code @CreatedDate}/{@code @LastModifiedDate}
- * 를 사용하므로 *필수* 다 — 이 리스너를 실제로 구동하는 것은 이 애노테이션뿐이다.
+ * <p>JPA Auditing 은 {@code deposit.config.JpaAuditingConfig} 로 분리했다 — 여기에 두면
+ * {@code @WebMvcTest} 슬라이스가 JPA 메타모델 없이 {@code jpaAuditingHandler} 를 만들려다 전부 깨진다.
  *
- * <p>{@code @EnableScheduling} 은 현재 deposit 코드에 {@code @Scheduled} 메서드가 없어 생략한다
- * (card 의 한도 재산정 배치 같은 필요가 생기면 그때 추가).
+ * <p>{@code @EnableScheduling} 은 만료 hold 회수 배치({@code DepositHoldExpiryScheduler})에 필요하다.
+ * 이게 꺼져 있으면 스케줄러 빈은 정상 생성되지만 <b>한 번도 호출되지 않는다</b> — 기동 로그에도
+ * 아무 경고가 없어서, 만료된 hold 가 계속 쌓이는 동안 배선이 살아 있다고 착각하기 쉽다.
+ * ShedLock 은 shared-common 의 {@code SchedulingLockConfig} 가 함께 켠다.
  */
 @SpringBootApplication
 @EnableCaching
-@EnableJpaAuditing
+@EnableScheduling
 public class DepositServiceApplication {
 
     public static void main(String[] args) {

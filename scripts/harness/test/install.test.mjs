@@ -7,6 +7,7 @@ import {
   mkdirSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -78,8 +79,14 @@ function put(root, path, content) {
   writeFileSync(target, content);
 }
 
+// findGitRoot 는 실경로를 돌려준다. macOS tmpdir() 은 /var → /private/var 심링크라
+// 픽스처 쪽도 실경로로 정규화해 두지 않으면 개발자 맥에서만 깨진다(리눅스 CI 는 통과).
+function makeTempRoot(prefix) {
+  return realpathSync(mkdtempSync(join(tmpdir(), prefix)));
+}
+
 function createRepo() {
-  const root = mkdtempSync(join(tmpdir(), 'harness-install-'));
+  const root = makeTempRoot('harness-install-');
   temporaryRoots.push(root);
   assert.equal(git(root, 'init').status, 0);
   assert.equal(git(root, 'config', 'user.name', 'Harness Test').status, 0);
@@ -92,7 +99,7 @@ function createRepo() {
 }
 
 function createFreshRepositorySnapshot() {
-  const root = mkdtempSync(join(tmpdir(), 'harness-fresh-repository-'));
+  const root = makeTempRoot('harness-fresh-repository-');
   temporaryRoots.push(root);
   const tracked = git(projectRoot, 'ls-tree', '-r', '--name-only', '-z', 'HEAD').stdout
     .split('\0')
@@ -122,8 +129,22 @@ function cpTestPaths(directory) {
     .filter(existsSync);
 }
 
+// 임시 트리 정리 — 이 테스트는 픽스처 안에서 git 을 여러 번 돌리고(init·add·commit) 자식
+// 하네스 테스트까지 실행한다. 그 프로세스들이 종료 직후에도 잠깐 파일 핸들을 붙들고 있으면
+// rmSync 가 ENOTEMPTY 로 터지는데, after 훅의 예외는 <b>서브테스트가 전부 통과해도</b> 스위트를
+// 실패시킨다(실제로 CI 에서 그렇게 한 번 빨갛게 떴다).
+//
+// 그래서 ① 재시도로 핸들이 풀릴 시간을 주고 ② 그래도 남으면 삼킨다 — 정리 실패는 검증 결과가
+// 아니라 임시 디렉터리 찌꺼기일 뿐이고, OS 가 회수한다. 여기서 스위트를 빨갛게 만들면
+// "게이트가 무엇을 막는지"가 흐려진다.
 test.after(() => {
-  for (const root of temporaryRoots) rmSync(root, { recursive: true, force: true });
+  for (const root of temporaryRoots) {
+    try {
+      rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    } catch {
+      // 의도적 무시 — 위 주석 참조.
+    }
+  }
 });
 
 test('repository-owned harness documentation does not reference the legacy shell installer', () => {

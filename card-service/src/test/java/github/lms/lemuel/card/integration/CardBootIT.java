@@ -98,14 +98,14 @@ class CardBootIT {
     }
 
     @Test
-    @DisplayName("Flyway 마이그레이션이 V2 → V3 → V4 → V5 → V6 → V7 → V8 → V9 순서로 적용된다")
+    @DisplayName("Flyway 마이그레이션이 V2 → V3 → V4 → V5 → V6 → V7 → V8 → V9 → V10 순서로 적용된다")
     void flywayAppliesMigrationsInOrder() {
         List<String> versions = jdbc.queryForList("""
                 SELECT version FROM opslab.flyway_schema_history
                  WHERE version IS NOT NULL
                  ORDER BY installed_rank
                 """, String.class);
-        assertThat(versions).containsExactly("2", "3", "4", "5", "6", "7", "8", "9");
+        assertThat(versions).containsExactly("2", "3", "4", "5", "6", "7", "8", "9", "10");
     }
 
     private boolean tableExists(String table) {

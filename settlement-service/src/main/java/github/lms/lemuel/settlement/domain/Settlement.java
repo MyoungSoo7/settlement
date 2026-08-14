@@ -348,10 +348,10 @@ public class Settlement {
      * ({@code cumulative − settled})이 오작동한다. 따라서 net 만 clawback 만큼 축소한다.
      *
      * <p>DONE 정산은 이미 지급 완료되어 불변 — {@link #adjustForRefund}와 동일하게 예외를 던지고,
-     * 호출자(서비스)가 {@link SettlementAdjustment} 감사 레코드만 남겨 수기 회수로 이관한다.
+     * 호출자(서비스)가 {@link SettlementAdjustment} 조정·역분개·지급후 회수 채권으로 이관한다.
      *
-     * <p><b>Scope 경계</b>: 원장 역분개는 후속 과제다. 기존 {@code enqueueReverse}는 refundId 키 기반이라
-     * 대사에 맞지 않고, chargeback 경로와 동일하게 이 단계에서는 원장을 건드리지 않는다.
+     * <p><b>원장 경계</b>: 역분개는 호출자(서비스)가 PG_RECONCILIATION 출처로 아웃박스에 적재한다
+     * (조정 1건 ↔ 역분개 1건, INV-5). 도메인은 금액만 책임지고 전표를 직접 쓰지 않는다.
      *
      * @param clawbackAmount 회수 금액 (양수)
      */
@@ -503,11 +503,28 @@ public class Settlement {
     }
 
     /**
-     * 셀러에게 즉시 지급 가능한 금액 (보류분 제외).
+     * 셀러에게 <b>지금</b> 지급 가능한 총액 (보류분 제외, 해제 후에는 net 전액).
+     *
+     * <p>"지금 얼마까지 나갈 수 있나"에 답하는 값이라 홀드백 해제 여부에 따라 변한다.
+     * <b>IMMEDIATE payout 의 금액으로는 쓰지 말 것</b> — 그 용도는 {@link #getImmediatePayoutBase()} 다.
      */
     public BigDecimal getImmediatePayoutAmount() {
         if (this.netAmount == null) return BigDecimal.ZERO;
         if (this.holdbackReleased) return this.netAmount;
+        return Money.of(this.netAmount).minus(Money.of(this.holdbackAmount)).max(Money.ZERO).toBigDecimal();
+    }
+
+    /**
+     * IMMEDIATE payout 의 산정 기준 — <b>해제 여부와 무관하게</b> {@code max(net − holdback, 0)}.
+     *
+     * <p>홀드백 해제분은 별도 HOLDBACK_RELEASE payout 이 지급한다. 그래서 IMMEDIATE 금액은 해제
+     * 이후에도 변하지 않아야 하고, 두 payout 의 합이 정확히 net 이 된다.
+     * {@link #getImmediatePayoutAmount()} 를 IMMEDIATE 금액으로 쓰면 확정 직후에는 같은 값이지만
+     * <b>해제 뒤에 IMMEDIATE 를 만드는 경로</b>(지급 누락 백필·상환차감 재구동)에서 net 전액이 나가
+     * 합계가 net 을 초과한다 — INV-6 이중 지급이다.
+     */
+    public BigDecimal getImmediatePayoutBase() {
+        if (this.netAmount == null) return BigDecimal.ZERO;
         return Money.of(this.netAmount).minus(Money.of(this.holdbackAmount)).max(Money.ZERO).toBigDecimal();
     }
 

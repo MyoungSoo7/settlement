@@ -1,0 +1,14 @@
+# 결과조회 응답 — RESULT 가 S/F/N 3값. N(미존재)은 "은행이 요청을 받은 적 없음"이라 재송신 가능 신호다.
+telegram: INQUIRY_RESPONSE
+msgType: "0410"
+description: 이체결과 조회 응답
+version: 1
+effectiveFrom: 2026-01-01
+include: COMMON_HEADER
+totalLength: 91         # 공통부 34 + 개별부 57
+fields:
+  - { name: ORIG_TELEGRAM_NO, length: 12, type: N }
+  - { name: REF_ID,           length: 20, type: AN }
+  - { name: RESULT,           length: 1,  type: AN }   # S 성공 / F 실패 / N 미존재
+  - { name: TXN_ID,           length: 20, type: AN }
+  - { name: ERROR_CODE,       length: 4,  type: AN }

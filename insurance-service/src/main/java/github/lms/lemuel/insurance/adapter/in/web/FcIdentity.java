@@ -15,8 +15,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
  * settlement 의 sellerId = userId 관례와 동형이다. FC 레지스트리(organization 프로젝션 소비)가
  * 생기면 이 메서드 한 곳만 바꾸면 된다.
  *
- * <p>⚠️ 청약·계약 경로는 아직 요청 본문의 fcId 를 신뢰한다(서비스 전역 미완 과제) — 그래서 같은
- * 사람이라도 경로에 따라 FC 식별자가 다를 수 있다. 가입설계 경로만 먼저 JWT 파생으로 닫았다.
+ * <p>사용처: 가입설계 · 계약(해지·철회) · <b>청약 접수</b> · <b>상품설명서 교부</b>. 즉 FC 식별자가
+ * 필요한 모든 쓰기 경로가 이 한 곳을 통과하며, 요청 DTO 어디에도 fcId/deliveredBy 필드는 없다.
+ * 심사 전이(승인·반려)는 FC 가 아니라 백오피스 역할이 하므로 경로 매처가 따로 막는다.
  */
 public final class FcIdentity {
 

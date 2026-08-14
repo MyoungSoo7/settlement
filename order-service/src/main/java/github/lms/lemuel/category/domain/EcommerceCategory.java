@@ -187,6 +187,19 @@ public class EcommerceCategory {
         this.updatedAt = LocalDateTime.now();
     }
 
+    /**
+     * 부모 경로 아래에서 이 카테고리의 slug 경로를 만든다 — 루트면 자기 slug, 아니면 {@code 부모/자기}.
+     *
+     * <p>경로 문자열의 조립 규칙을 도메인이 소유한다. DB 재계산 질의와 이 메서드가 같은 규칙을 따르므로,
+     * 화면에서 조립한 경로와 저장된 경로가 어긋나지 않는다.
+     */
+    public String pathSlugUnder(String parentPathSlug) {
+        if (parentPathSlug == null || parentPathSlug.isBlank()) {
+            return slug;
+        }
+        return parentPathSlug + "/" + slug;
+    }
+
     // 상태 확인 메서드
     public boolean isRoot() {
         return this.parentId == null && this.depth == 0;

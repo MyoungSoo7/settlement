@@ -147,7 +147,10 @@ public class SettlementQueryRepositoryImpl implements SettlementQueryRepository 
                 .leftJoin(product).on(order.productId.eq(product.productId))
                 .where(where)
                 .orderBy(buildOrderSpecifier(condition))
-                .limit(fetchSize + 1)
+                // (long) 캐스트: limit 은 long 을 받는데 int 로 더하면 이론상 오버플로다.
+                // fetchSize 는 위에서 100 으로 클램프되므로 실제로는 넘칠 수 없다 — 정적분석 잡음을
+                // 없애 실제 결함이 묻히지 않게 하려는 것이지, 여기 버그가 있어서가 아니다.
+                .limit((long) fetchSize + 1)
                 .fetch();
 
         boolean hasNext = items.size() > fetchSize;
@@ -250,7 +253,8 @@ public class SettlementQueryRepositoryImpl implements SettlementQueryRepository 
                 .join(user).on(order.userId.eq(user.userId))
                 .where(where)
                 .orderBy(settlement.id.desc())
-                .limit(fetchSize + 1)
+                // 위 조회와 같은 이유 — fetchSize 는 100 클램프라 실제 오버플로는 없다.
+                .limit((long) fetchSize + 1)
                 .fetch();
 
         boolean hasNext = items.size() > fetchSize;

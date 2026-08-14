@@ -1,4 +1,5 @@
-import { test, expect, Page } from '@playwright/test';
+import { type Page } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 const ROLES = [
   { name: 'USER', button: '👤 일반 사용자', expectedPath: '/order', expectedRole: 'USER' },

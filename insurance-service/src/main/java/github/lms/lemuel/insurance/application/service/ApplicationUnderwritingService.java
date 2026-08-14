@@ -4,6 +4,7 @@ import github.lms.lemuel.common.audit.application.AuditLogger;
 import github.lms.lemuel.common.audit.domain.AuditAction;
 import github.lms.lemuel.insurance.application.port.in.SubmitApplicationUseCase;
 import github.lms.lemuel.insurance.application.port.in.UnderwriteApplicationUseCase;
+import github.lms.lemuel.insurance.application.port.out.LoadApplicationDocumentPort;
 import github.lms.lemuel.insurance.application.port.out.LoadApplicationPort;
 import github.lms.lemuel.insurance.application.port.out.LoadDisclosureDeliveryPort;
 import github.lms.lemuel.insurance.application.port.out.LoadInsuranceProductPort;
@@ -14,10 +15,13 @@ import github.lms.lemuel.insurance.application.port.out.SaveApplicationPort.Appl
 import github.lms.lemuel.insurance.application.port.out.SaveCommissionSchedulePort;
 import github.lms.lemuel.insurance.application.port.out.SavePolicyPort;
 import github.lms.lemuel.insurance.application.port.out.SavePolicyPort.PolicyIssuanceAttributes;
+import github.lms.lemuel.insurance.config.ApplicationOcrProperties;
+import github.lms.lemuel.insurance.domain.ApplicationDocumentStatus;
 import github.lms.lemuel.insurance.domain.CommissionSchedule;
 import github.lms.lemuel.insurance.domain.CommissionScheduleFactory;
 import github.lms.lemuel.insurance.domain.InsuranceApplication;
 import github.lms.lemuel.insurance.domain.Policy;
+import github.lms.lemuel.insurance.domain.exception.ApplicationDocumentNotMatchedException;
 import github.lms.lemuel.insurance.domain.exception.ApplicationNotFoundException;
 import github.lms.lemuel.insurance.domain.exception.DisclosureNotDeliveredException;
 import github.lms.lemuel.insurance.domain.exception.ProductNotFoundException;
@@ -60,6 +64,8 @@ public class ApplicationUnderwritingService
     private final SaveApplicationPort saveApplicationPort;
     private final LoadInsuranceProductPort loadProductPort;
     private final LoadDisclosureDeliveryPort loadDisclosurePort;
+    private final LoadApplicationDocumentPort loadApplicationDocumentPort;
+    private final ApplicationOcrProperties applicationOcrProperties;
     private final SavePolicyPort savePolicyPort;
     private final SaveCommissionSchedulePort saveSchedulePort;
     private final PublishInsuranceEventPort publishPort;
@@ -71,6 +77,8 @@ public class ApplicationUnderwritingService
             SaveApplicationPort saveApplicationPort,
             LoadInsuranceProductPort loadProductPort,
             LoadDisclosureDeliveryPort loadDisclosurePort,
+            LoadApplicationDocumentPort loadApplicationDocumentPort,
+            ApplicationOcrProperties applicationOcrProperties,
             SavePolicyPort savePolicyPort,
             SaveCommissionSchedulePort saveSchedulePort,
             PublishInsuranceEventPort publishPort,
@@ -80,6 +88,8 @@ public class ApplicationUnderwritingService
         this.saveApplicationPort = saveApplicationPort;
         this.loadProductPort = loadProductPort;
         this.loadDisclosurePort = loadDisclosurePort;
+        this.loadApplicationDocumentPort = loadApplicationDocumentPort;
+        this.applicationOcrProperties = applicationOcrProperties;
         this.savePolicyPort = savePolicyPort;
         this.saveSchedulePort = saveSchedulePort;
         this.publishPort = publishPort;
@@ -117,6 +127,18 @@ public class ApplicationUnderwritingService
         // 완전판매 게이트 — 상태 전이 전에 검사해 실패 시 청약이 UNDER_REVIEW 로 남는다.
         if (!loadDisclosurePort.existsForApplication(applicationId)) {
             throw new DisclosureNotDeliveredException(applicationId);
+        }
+        // 청약서류 대사 게이트(ADR 0036) — 서류가 첨부돼 있으면 최신 서류가 MATCHED 여야 승인 통과.
+        // 전면 강제(app.insurance.application-ocr.required=true)면 미첨부 자체가 거절 사유이고,
+        // 끄면 점진 도입(기존 경로 그대로)이다.
+        var latestDocument = loadApplicationDocumentPort.findLatestByApplicationId(applicationId);
+        if (latestDocument.isEmpty()) {
+            if (Boolean.TRUE.equals(applicationOcrProperties.required())) {
+                throw ApplicationDocumentNotMatchedException.missing(applicationId);
+            }
+        } else if (latestDocument.get().getStatus() != ApplicationDocumentStatus.MATCHED) {
+            throw new ApplicationDocumentNotMatchedException(
+                    applicationId, latestDocument.get().getStatus(), latestDocument.get().getMatchNote());
         }
         ProductSnapshot product = requireActiveProduct(application.getProductCode());
 

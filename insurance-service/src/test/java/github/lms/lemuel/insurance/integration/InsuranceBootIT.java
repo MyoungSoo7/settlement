@@ -41,6 +41,12 @@ class InsuranceBootIT extends InsuranceIntegrationTestSupport {
     }
 
     @Test
+    @DisplayName("Flyway V11: application_documents 테이블이 생성된다 (청약서류 OCR 대사, ADR 0036)")
+    void flywayCreatesApplicationDocuments() {
+        assertThat(tableExists("application_documents")).isTrue();
+    }
+
+    @Test
     @DisplayName("Flyway V1: insurance 도메인 테이블 8종이 모두 생성된다")
     void flywayCreatesInsuranceDomainTables() {
         assertThat(tableExists("insurance_products")).isTrue();
@@ -55,14 +61,14 @@ class InsuranceBootIT extends InsuranceIntegrationTestSupport {
     }
 
     @Test
-    @DisplayName("Flyway 마이그레이션이 V1 → V10 순서로 적용된다")
+    @DisplayName("Flyway 마이그레이션이 V1 → V11 순서로 적용된다")
     void flywayAppliesMigrationsInOrder() {
         List<String> versions = jdbc.queryForList("""
                 SELECT version FROM opslab.flyway_schema_history
                  WHERE version IS NOT NULL
                  ORDER BY installed_rank
                 """, String.class);
-        assertThat(versions).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10");
+        assertThat(versions).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11");
     }
 
     @Test

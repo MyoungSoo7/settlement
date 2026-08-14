@@ -1,5 +1,7 @@
 package github.lms.lemuel.deposit.domain;
 
+import github.lms.lemuel.deposit.domain.exception.InvalidDepositStateException;
+import github.lms.lemuel.deposit.domain.exception.DepositInvariantViolationException;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.Objects;
@@ -9,7 +11,11 @@ import java.util.Objects;
  *
  * <p>applyOffset 시 가용 재원이 요청액에 못 미칠 때 부족분을 영속화한다.
  * 상태 OPEN → RESOLVED | WRITTEN_OFF.
- * DepositShortfallRetryScheduler 가 주기적으로 OPEN 건을 재상계 시도한다.
+ *
+ * <p><b>해소 주체는 아직 없다.</b> {@link #resolve}/{@link #writeOff} 는 프로덕션 호출자가 0건이고,
+ * OPEN 건을 도는 스케줄러도 존재하지 않는다 — 즉 부족분은 <b>기록되기만 하고 자동으로 해소되지 않는다.</b>
+ * (이 자리에 원래 "DepositShortfallRetryScheduler 가 주기적으로 재상계한다"고 적혀 있었으나 그런 클래스는
+ * 없었다. 없는 동작을 있다고 적으면 부족분 적체를 아무도 보지 않게 된다.)
  */
 public class DepositOffsetShortfall {
 
@@ -64,7 +70,7 @@ public class DepositOffsetShortfall {
     /** 부족분 재상계 성공 — RESOLVED 로 전이. */
     public void resolve(BigDecimal additionalApplied) {
         if (this.status != DepositShortfallStatus.OPEN) {
-            throw new IllegalStateException("OPEN 상태만 resolve 가능합니다. 현재=" + status);
+            throw new InvalidDepositStateException("OPEN 상태만 resolve 가능합니다. 현재=" + status, String.valueOf(status), "resolve");
         }
         this.appliedAmount = this.appliedAmount.add(additionalApplied);
         this.shortfallAmount = this.shortfallAmount.subtract(additionalApplied);
@@ -74,13 +80,13 @@ public class DepositOffsetShortfall {
     /** 수동 상각 — WRITTEN_OFF 로 전이. */
     public void writeOff() {
         if (this.status != DepositShortfallStatus.OPEN) {
-            throw new IllegalStateException("OPEN 상태만 write-off 가능합니다. 현재=" + status);
+            throw new InvalidDepositStateException("OPEN 상태만 write-off 가능합니다. 현재=" + status, String.valueOf(status), "writeOff");
         }
         this.status = DepositShortfallStatus.WRITTEN_OFF;
     }
 
     public void assignId(Long id) {
-        if (this.id != null) throw new IllegalStateException("이미 ID 가 할당된 shortfall 입니다");
+        if (this.id != null) throw new DepositInvariantViolationException("이미 ID 가 할당된 shortfall 입니다");
         this.id = Objects.requireNonNull(id);
     }
 
