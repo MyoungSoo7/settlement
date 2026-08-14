@@ -76,7 +76,7 @@ describe('TaxConsolePage — 스캔 리뷰 큐', () => {
     renderPage();
 
     await waitFor(() => expect(mocked.scans).toHaveBeenCalledWith('MISMATCHED', 50));
-    expect(screen.getByText('inv-2026-08.pdf')).toBeInTheDocument();
+    expect(await screen.findByText('inv-2026-08.pdf')).toBeInTheDocument();
   });
 
   it('OCR 이 미심쩍은 건을 근거와 함께 드러낸다 — 신뢰도·산술 불일치', async () => {
@@ -145,7 +145,7 @@ describe('TaxConsolePage — 정산별 세무', () => {
     lookupSettlement();
 
     await waitFor(() => expect(mocked.reconcile).toHaveBeenCalledWith(55, 42));
-    expect(screen.getByText('WITHHOLDING')).toBeInTheDocument();
+    expect(await screen.findByText('WITHHOLDING')).toBeInTheDocument();
     expect(screen.getByText(/불일치 1건/)).toBeInTheDocument();
   });
 
@@ -154,7 +154,7 @@ describe('TaxConsolePage — 정산별 세무', () => {
     renderPage();
     lookupSettlement();
     await waitFor(() => expect(mocked.reconcile).toHaveBeenCalled());
-    fireEvent.click(screen.getByRole('button', { name: '전표 전기' }));
+    fireEvent.click(await screen.findByRole('button', { name: '전표 전기' }));
 
     await waitFor(() => expect(mocked.post).not.toHaveBeenCalled());
     expect(confirmSpy).toHaveBeenCalled();
@@ -164,7 +164,7 @@ describe('TaxConsolePage — 정산별 세무', () => {
     renderPage();
     lookupSettlement();
     await waitFor(() => expect(mocked.reconcile).toHaveBeenCalledTimes(1));
-    fireEvent.click(screen.getByRole('button', { name: '전표 전기' }));
+    fireEvent.click(await screen.findByRole('button', { name: '전표 전기' }));
 
     await waitFor(() => expect(mocked.post).toHaveBeenCalledWith(55, 42));
     await waitFor(() => expect(mocked.reconcile).toHaveBeenCalledTimes(2));
@@ -175,7 +175,7 @@ describe('TaxConsolePage — 정산별 세무', () => {
     renderPage();
     lookupSettlement();
     await waitFor(() => expect(mocked.reconcile).toHaveBeenCalled());
-    fireEvent.click(screen.getByRole('button', { name: '세금계산서 발행' }));
+    fireEvent.click(await screen.findByRole('button', { name: '세금계산서 발행' }));
 
     await waitFor(() => expect(mocked.issue).not.toHaveBeenCalled());
   });
@@ -185,7 +185,7 @@ describe('TaxConsolePage — 정산별 세무', () => {
     renderPage();
     lookupSettlement();
     await waitFor(() => expect(mocked.reconcile).toHaveBeenCalled());
-    fireEvent.click(screen.getByRole('button', { name: '세금계산서 발행' }));
+    fireEvent.click(await screen.findByRole('button', { name: '세금계산서 발행' }));
 
     await waitFor(() => expect(screen.getByText(/이미 발행/)).toBeInTheDocument());
   });
@@ -226,7 +226,7 @@ describe('TaxConsolePage — 셀러 세무 프로필', () => {
 
     await waitFor(() => expect(mocked.profile).toHaveBeenCalledWith(42));
     // 세무유형은 조회 패널과 편집 셀렉트 양쪽에 나온다 — 조회 결과 쪽을 본다.
-    expect(within(screen.getByTestId('tax-profile')).getByText('INDIVIDUAL')).toBeInTheDocument();
+    expect(within(await screen.findByTestId('tax-profile')).getByText('INDIVIDUAL')).toBeInTheDocument();
   });
 
   it('사업자등록번호는 마스킹된 값 그대로만 보여 준다', async () => {

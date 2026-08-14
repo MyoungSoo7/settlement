@@ -58,6 +58,12 @@ const STATIC_QUERIES = new Map([
 
   // ReconciliationConsolePage.tsx 의 기간 스캔 버튼. 라벨만 scanning 여부로 바뀐다.
   ["ReconciliationConsolePage.test.tsx :: screen.getByRole('button', { name: '기간 스캔' })", '기간 스캔 버튼 — 조건 없이 렌더'],
+
+  // TaxConsolePage.tsx 의 필터 셀렉트와 편집 폼. 둘 다 조회 결과 밖(조건부 렌더 블록 밖)이라
+  // 스캔·프로필이 비어 있어도 마운트부터 있다. 반대로 '전표 전기'·'세금계산서 발행'·tax-profile
+  // 패널은 조건부 블록 안이라 등록하지 않고 재시도 조회로 고쳤다.
+  ["TaxConsolePage.test.tsx :: screen.getByLabelText('상태')", '스캔 상태 필터 — 조건 없이 렌더'],
+  ["TaxConsolePage.test.tsx :: screen.getByLabelText('세무유형')", '등록·정정 폼 셀렉트 — 조건 없이 렌더'],
 ]);
 
 /** 앞선 waitFor 로부터 이 줄 수 안에 있는 조회만 같은 흐름으로 본다. */
