@@ -79,9 +79,9 @@ class MenuSeedIntegrationTest {
     }
 
     @Test
-    @DisplayName("시드 총 45행 — 이관분 31 + 정산운영 그룹 1 + 운영 화면 10 + 시스템 화면 3")
-    void seedsExactlyFortyFive() {
-        assertThat(adapter.findAll()).hasSize(45);
+    @DisplayName("시드 총 46행 — 이관분 31 + 정산운영 그룹 1 + 운영 화면 10 + 시스템 화면 3 + 법인카드(CEO) 1")
+    void seedsExactlyFortySix() {
+        assertThat(adapter.findAll()).hasSize(46);
     }
 
     @Test
@@ -133,12 +133,12 @@ class MenuSeedIntegrationTest {
     }
 
     @Test
-    @DisplayName("CEO 사이드바 13개가 순서대로 들어간다")
+    @DisplayName("CEO 사이드바 14개가 순서대로 들어간다")
     void ceoChildren() {
         assertThat(childrenOf("CEO")).extracting(Menu::getName).containsExactly(
                 "통합 브리핑", "경제지표", "재무제표", "기업조회", "사업장비교",
                 "투자하기", "투자 추천", "대출관리", "대출 상품 안내", "대출 심사·상환 안내",
-                "대출기관 안내", "자산운용펀드 안내", "계정계 현황");
+                "대출기관 안내", "자산운용펀드 안내", "계정계 현황", "법인카드");
     }
 
     @Test
