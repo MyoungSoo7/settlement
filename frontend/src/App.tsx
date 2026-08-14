@@ -59,6 +59,7 @@ const PgReconciliationConsolePage = lazy(() => import('./pages/settlement/PgReco
 const ChargebackConsolePage = lazy(() => import('./pages/settlement/ChargebackConsolePage'));
 const RecoveryConsolePage = lazy(() => import('./pages/settlement/RecoveryConsolePage'));
 const MonthlyClosingConsolePage = lazy(() => import('./pages/settlement/MonthlyClosingConsolePage'));
+const TaxConsolePage = lazy(() => import('./pages/settlement/TaxConsolePage'));
 
 // 인쇄 전용 (레이아웃 없이 문서만 그리는 화면 — 새 창으로 열린다)
 const SettlementPrintPage = lazy(() => import('./pages/print/SettlementPrintPage'));
@@ -182,6 +183,9 @@ function App() {
             {/* 월마감은 서버가 /admin/monthly-closing/** 를 ADMIN 전용으로 막는다 */}
             <Route path="/admin/settlement/monthly-closing"
               element={<AdminOnlyRoute><SideNavLayout><MonthlyClosingConsolePage /></SideNavLayout></AdminOnlyRoute>} />
+            {/* 세무는 서버가 /admin/tax/** · /admin/seller-tax-profiles/** 를 ADMIN·MANAGER 로 막는다 */}
+            <Route path="/admin/settlement/tax"
+              element={<AdminManagerRoute><SideNavLayout><TaxConsolePage /></SideNavLayout></AdminManagerRoute>} />
             {/* 원장 조회는 ADMIN·MANAGER, 시산표·기간 마감은 ADMIN 전용이라 화면 안에서 역할로 가른다
                 (라우트를 ADMIN 으로 잠그면 MANAGER 가 분개 조회조차 못 한다) */}
             <Route path="/admin/settlement/ledger"

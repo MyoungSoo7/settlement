@@ -79,9 +79,9 @@ class MenuSeedIntegrationTest {
     }
 
     @Test
-    @DisplayName("시드 총 41행 — 이관분 31 + 정산운영 그룹 1 + 운영 화면 7 + 시스템 화면 2")
-    void seedsExactlyFortyOne() {
-        assertThat(adapter.findAll()).hasSize(41);
+    @DisplayName("시드 총 43행 — 이관분 31 + 정산운영 그룹 1 + 운영 화면 8 + 시스템 화면 3")
+    void seedsExactlyFortyThree() {
+        assertThat(adapter.findAll()).hasSize(43);
     }
 
     @Test
@@ -102,7 +102,11 @@ class MenuSeedIntegrationTest {
     void settlementOpsChildren() {
         assertThat(childrenOf("정산운영")).extracting(Menu::getName)
                 .containsExactly("정합성 검증", "일일 대사", "PG 대사", "차지백", "회수 채권",
-                        "월마감", "원장·시산표");
+                        "월마감", "세무", "원장·시산표");
+        // 세무는 ADMIN·MANAGER — 서버가 /admin/tax/** 를 그 등급으로 막는다(스캔 리뷰는 MANAGER 몫)
+        assertThat(childrenOf("정산운영").stream()
+                .filter(m -> m.getName().equals("세무")).findFirst().orElseThrow().allowedRoles())
+                .containsExactlyInAnyOrder("ADMIN", "MANAGER");
         // 차지백만 ADMIN — 서버가 /admin/chargebacks/** 를 ADMIN 으로 막는 결정 표면이다
         assertThat(childrenOf("정산운영").stream()
                 .filter(m -> m.getName().equals("차지백")).findFirst().orElseThrow().allowedRoles())
@@ -134,7 +138,7 @@ class MenuSeedIntegrationTest {
     }
 
     @Test
-    @DisplayName("시스템 사이드바 7개 — 앞 3개는 RBAC permission 과 짝지어진다")
+    @DisplayName("시스템 사이드바 8개 — 앞 3개는 RBAC permission 과 짝지어진다")
     void systemChildren() {
         List<Menu> children = childrenOf("시스템 관리");
 
@@ -142,10 +146,10 @@ class MenuSeedIntegrationTest {
         // 운영관리의 sort_order 를 한 칸씩 밀어 이 순서를 유지한다.
         assertThat(children).extracting(Menu::getName).containsExactly(
                 "메뉴 관리", "공통코드 관리", "RBAC 관리", "이커머스 카테고리",
-                "진열 편성", "옵션 카탈로그", "운영관리");
+                "진열 편성", "옵션 카탈로그", "운영관리", "증빙 리뷰 큐");
         assertThat(children).extracting(Menu::getRequiredPermission).containsExactly(
                 "SYSTEM_MENU_MANAGE", "SYSTEM_CODE_MANAGE", "SYSTEM_RBAC_MANAGE",
-                null, null, null, null);
+                null, null, null, null, null);
     }
 
     @Test

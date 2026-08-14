@@ -199,7 +199,7 @@
 | 차지백 | `/admin/settlement/chargebacks` | `/admin/chargebacks` | ✅ `9e16a4255` |
 | 회수 채권 | `/admin/settlement/recoveries` | `/admin/recoveries` | ✅ `77a3ec8ce` |
 | 월마감 | `/admin/settlement/monthly-closing` | `/admin/monthly-closing` | ✅ `aeadb1937`+`29743b4ed` |
-| 세무(세금계산서) | `/admin/settlement/tax` (예정) | `/admin/tax/scans` · `/admin/seller-tax-profiles` · `/admin/tax/settlements/{id}` | ⬜ |
+| 세무(세금계산서) | `/admin/settlement/tax` | `/admin/tax/scans` · `/admin/seller-tax-profiles` · `/admin/tax/settlements/{id}` | ✅ (스캔 리뷰·전표 전기·발행·3자 대사) |
 | 수수료율 | `/admin/settlement/commission-rates` (예정) | `/admin/commission-rates` | ⬜ |
 | DLQ 재처리 | `/admin/settlement/dlq` (예정) | `/admin/dlq` | ⬜ |
 | 이벤트 추적·정산 재구동 | `/admin/settlement/event-track` (예정) | `/admin/event-track` · `/admin/settlements/rerun` | ⬜ |
