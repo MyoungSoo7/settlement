@@ -8,7 +8,7 @@
 | 구분 | 기술 | 구분 | 기술 |
 |------|------|------|------|
 | 언어 | Java 25 | 메시지 | Kafka (Redpanda 호환) |
-| 프레임워크 | Spring Boot 4.0.4 | PG | Toss Payments |
+| 프레임워크 | Spring Boot 4.0.7 | PG | Toss Payments |
 | 빌드 | Gradle 멀티모듈 (Kotlin DSL) | 배치 | Spring Batch |
 | Gateway | Spring Cloud Gateway 2025 | 캐시 | Caffeine(L1) + 선택 Redis(L2) |
 | DB | PostgreSQL 17 | PDF | iText 8 |
@@ -34,7 +34,7 @@
 #       card-service, insurance-service, deposit-service, gateway-service
 
 # Docker
-docker compose up -d                                # DB-per-service PG 16종 · ES · Redpanda · 앱 컨테이너 18개(JVM 17 + market-stream)
+docker compose up -d                                # DB-per-service PG 16종 · ES · Redpanda · 앱 컨테이너 19개(JVM 17 + market-stream + notification) · frontend
 docker build --build-arg MODULE=<service> -t lemuel-<name> .   # 컨테이너 이미지 (MODULE 로 서비스 지정)
 ```
 

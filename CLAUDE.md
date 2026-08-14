@@ -50,8 +50,8 @@ standalone, gateway 미라우팅 — 예외 2종: market-stream 은 `/api/market
 
 ## 기술 스택 (요지)
 
-**Java 25 · Spring Boot 4.0.4 · Gradle(Kotlin DSL) 멀티모듈 · PostgreSQL 17 · Kafka(Redpanda) · Flyway.**
-폴리글랏: Kotlin 2.0/Boot 3.3(JDK 21) · Go 1.22 · Python 3.11/FastAPI(standalone 빌드, `polyglot-ci.yml`).
+**Java 25 · Spring Boot 4.0.7 · Gradle(Kotlin DSL) 멀티모듈 · PostgreSQL 17 · Kafka(Redpanda) · Flyway.**
+폴리글랏: Kotlin 2.0/Boot 3.3(JDK 21) · Go 1.22/1.23 · Python 3.11/FastAPI(standalone 빌드, `polyglot-ci.yml`).
 전체 표(검색·PG·배치·캐시·PDF·관측·RateLimit 등) → [`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md).
 
 ## 모듈 구조
@@ -74,7 +74,7 @@ settlement/                       # Gradle 멀티 모듈 루트
 ├── investment-service/           # 📈 Investment (8100, lemuel_investment) — CEO 투자하기. shared-common 의존
 ├── account-service/              # 🏦 Account (8102, lemuel_account) — 계정계 GL 집계. shared-common 제한 스캔(소비 전용)
 ├── organization-service/         # 👥 Organization (8104, lemuel_organization) — 셀러/기업 조직·멤버십(OWNER/MANAGER/STAFF). shared-common 의존, 이벤트 발행 전용(4토픽 → card-service 가 조직 프로젝션으로 소비)
-├── card-service/                 # 💳 Card (8106/mgmt 8107, lemuel_card) — 법인카드 카드계정·카드(마스터/서브 한도) + 승인·매입·명세서·지출관리(Phase 2). shared-common 의존, 도메인·정책·영속·REST(`/api/cards`)·스케줄러 4종·이벤트 컨슈머 6종까지 구현
+├── card-service/                 # 💳 Card (8106/mgmt 8107, lemuel_card) — 법인카드 카드계정·카드(마스터/서브 한도) + 승인·매입·명세서·지출관리(Phase 2). shared-common 의존, 도메인·정책·영속·REST(`/api/cards` + `/admin/expense-receipts` 리뷰 큐, ADR 0036)·스케줄러 4종·이벤트 컨슈머 7종(구독 토픽 6종 — captured 는 expense/statement 2클래스 분담)까지 구현
 ├── insurance-service/            # 🛡️ Insurance (8108/mgmt 8109, lemuel_insurance) — GA 보험대리점 플랫폼: 상담·가입설계·청약·계약·유지변경·수수료정산. shared-common 의존
 ├── deposit-service/              # 🏧 Deposit (8112/mgmt 8113, lemuel_deposit) — 셀러 예치금 원장(잔고 단일 진실원, hold/offset 로 재원 이중사용 차단). shared-common 의존, REST 는 `/api/deposits` 조회 + `/admin/deposits` 수기 콘솔, Kafka 컨슈머 2종(settlement.confirmed·payout.completed). card 승인·매입은 페이로드에 sellerId 가 없어 미구독 — hold/offset 은 콘솔 경로
 └── gateway-service/              # 🚪 API Gateway (8080) — 라우팅만(자체 인증 필터 없음)
