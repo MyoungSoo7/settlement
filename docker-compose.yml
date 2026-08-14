@@ -889,6 +889,37 @@ services:
       market-service:
         condition: service_healthy
 
+  # 폴리글랏(Kotlin) 알림 팬아웃 — 무영속(DB 없음), Kafka 도메인 이벤트를 코루틴으로 다채널 발송.
+  # gateway /api/notifications/stream 으로만 외부 노출(SSE). /notifications/send·demo 는 인증 없이
+  # 발송하는 내부 경로라 게이트웨이에 올리지 않는다(gateway application.yml 의 라우트 주석과 세트).
+  #
+  # 이 블록이 없던 동안 gateway 의 NOTIFICATION_SERVICE_URI 기본값(http://localhost:8130)이
+  # gateway 컨테이너 자신을 가리켜, compose 배포에서는 /api/notifications/stream 이 통째로
+  # 도달 불가였다 (PR #262 리뷰 지적, docs/plan/seeds/*.seed.yaml 에도 ★ 로 기록돼 있던 건).
+  notification-service:
+    build:
+      context: ./notification-service
+    image: ghcr.io/myoungsoo7/lemuel-notification:latest
+    container_name: lemuel-notification
+    # Slack/이메일 채널은 자격증명이 있을 때만 켜진다(SLACK_WEBHOOK_URL, MAIL_USERNAME/PASSWORD).
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      SERVER_PORT: "8130"
+      # 앱 기본값은 false 다 — 브로커 없이도 뜨게 하려는 것이고, README 가 "실배포에선 켜라"고 적어 둔 값이다.
+      # compose 에는 redpanda 가 있으므로 켠다. 안 켜면 SSE 연결은 되지만 이벤트가 하나도 안 흐른다.
+      APP_KAFKA_ENABLED: "true"
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
+    ports:
+      - "127.0.0.1:8130:8130"
+    restart: unless-stopped
+    # 헬스체크는 걸지 않는다 — 런타임 이미지(eclipse-temurin:21-jre)에 curl/wget 이 없어
+    # 셸 헬스체크가 무조건 실패한다. market-stream-service 와 같은 이유(거기는 distroless).
+    depends_on:
+      redpanda:
+        condition: service_healthy
+
   common-data-service:
     build:
       context: .
@@ -1287,6 +1318,7 @@ services:
       INSURANCE_SERVICE_URI: http://insurance-service:8080
       DEPOSIT_SERVICE_URI: http://deposit-service:8080
       MARKET_STREAM_SERVICE_URI: http://market-stream-service:8110
+      NOTIFICATION_SERVICE_URI: http://notification-service:8130
       JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
     ports:
       - "127.0.0.1:8080:8080"

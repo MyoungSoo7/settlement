@@ -19,6 +19,14 @@ app:
     enabled: ${APP_KAFKA_ENABLED:false}
   dedupe:
     ttl-minutes: ${APP_DEDUPE_TTL_MINUTES:30}
+  security:
+    # SSE 스트림의 구독자 신원 = JWT. 다른 서비스는 shared-common JwtProperties(prefix app.jwt)를 쓰지만
+    # 이 서비스는 자체 리졸버(JwtSubscriberIdentityResolver)라 키가 app.security.jwt.secret 이다.
+    # 이 키가 yml 에 아예 없어서(빈 문자열 기본값) 스트림이 늘 503 이었다 — 주입하려면 릴랙스 바인딩
+    # 이름(APP_SECURITY_JWT_SECRET)을 운영자가 스스로 알아내야 했다. 레포 공통 JWT_SECRET 으로 통일한다.
+    # 값이 비면 fail-closed 로 스트림만 꺼지고(503) 부팅은 계속된다 — 설계 의도 그대로 유지.
+    jwt:
+      secret: ${JWT_SECRET:}
   stream:
     # SSE 재생 창(리플레이) 상한 — 프로세스 메모리라 무한 증가하지 않게 묶어 둔다.
     buffer-per-recipient: ${APP_STREAM_BUFFER_PER_RECIPIENT:100}

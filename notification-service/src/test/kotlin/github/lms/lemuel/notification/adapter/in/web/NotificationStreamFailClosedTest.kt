@@ -14,8 +14,12 @@ import org.springframework.web.context.WebApplicationContext
  * Default configuration carries NO jwt secret (the service must still boot for
  * the Kafka/REST path). The push stream must then refuse to serve rather than
  * fall back to "trust whoever asks".
+ *
+ * 시크릿을 빈 값으로 못박는다 — application.yml 이 `${JWT_SECRET:}` 을 읽게 된 뒤로는
+ * 셸에 JWT_SECRET 이 떠 있는 개발자(예: .env 를 source 한 경우)에게만 이 테스트가
+ * 조용히 다른 걸 검증하게 된다. 주변 환경이 아니라 이 선언이 전제를 정한다.
  */
-@SpringBootTest
+@SpringBootTest(properties = ["app.security.jwt.secret="])
 class NotificationStreamFailClosedTest {
 
     @Autowired lateinit var wac: WebApplicationContext
