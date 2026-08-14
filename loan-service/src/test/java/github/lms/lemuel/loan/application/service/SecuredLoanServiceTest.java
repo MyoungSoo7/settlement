@@ -92,7 +92,9 @@ class SecuredLoanServiceTest {
 
         requestService = new RequestSecuredLoanService(store, valuation, baseRate, metrics, LTV, FIXED_CLOCK);
         disburseService = new DisburseSecuredLoanService(store, store, ledger, events, metrics,
-                NO_DOCUMENTS, FIXED_CLOCK);
+                NO_DOCUMENTS,
+                new github.lms.lemuel.loan.config.CollateralOcrProperties(null, null, null, null, null, null),
+                FIXED_CLOCK);
         repayService = new RepaySecuredLoanService(store, store, ledger, events, metrics);
         collectionService = new SecuredLoanCollectionService(store, store);
     }

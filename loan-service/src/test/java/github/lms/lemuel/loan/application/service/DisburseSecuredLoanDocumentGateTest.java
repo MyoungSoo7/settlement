@@ -6,6 +6,7 @@ import github.lms.lemuel.loan.application.port.out.LoadSecuredLoanPort;
 import github.lms.lemuel.loan.application.port.out.LoanMetricsPort;
 import github.lms.lemuel.loan.application.port.out.PublishSecuredLoanEventPort;
 import github.lms.lemuel.loan.application.port.out.SaveSecuredLoanPort;
+import github.lms.lemuel.loan.config.CollateralOcrProperties;
 import github.lms.lemuel.loan.domain.Borrower;
 import github.lms.lemuel.loan.domain.BorrowerType;
 import github.lms.lemuel.loan.domain.Collateral;
@@ -66,9 +67,14 @@ class DisburseSecuredLoanDocumentGateTest {
 
     @BeforeEach
     void setUp() {
-        service = new DisburseSecuredLoanService(loadSecuredLoanPort, saveSecuredLoanPort,
+        service = serviceWith(false);
+    }
+
+    private DisburseSecuredLoanService serviceWith(boolean required) {
+        return new DisburseSecuredLoanService(loadSecuredLoanPort, saveSecuredLoanPort,
                 appendLedgerPort, publishSecuredLoanEventPort, loanMetricsPort,
-                loadCollateralDocumentPort, FIXED);
+                loadCollateralDocumentPort,
+                new CollateralOcrProperties("key", null, null, null, null, required), FIXED);
     }
 
     private static SecuredLoan requestedLoan() {
@@ -155,6 +161,36 @@ class DisburseSecuredLoanDocumentGateTest {
         when(saveSecuredLoanPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         SecuredLoan approved = service.approve(1L);
+
+        assertThat(approved.getStatus()).isEqualTo(SecuredLoanStatus.APPROVED);
+    }
+
+    @Test
+    @DisplayName("전면 강제(required=true)면 담보형의 서류 미첨부 승인이 422 로 거절된다")
+    void requiredModeBlocksMissingDocument() {
+        when(loadSecuredLoanPort.findByIdForUpdate(1L)).thenReturn(Optional.of(requestedLoan()));
+        when(loadCollateralDocumentPort.findLatestByLoanId(1L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> serviceWith(true).approve(1L))
+                .isInstanceOf(CollateralDocumentNotMatchedException.class)
+                .hasMessageContaining("첨부되지 않아");
+
+        verify(saveSecuredLoanPort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("전면 강제여도 무담보(개인신용)에는 적용되지 않는다 — 담보서류가 성립하지 않는다")
+    void requiredModeSkipsUnsecuredLoan() {
+        SecuredLoan personalCredit = SecuredLoan.reconstitute(1L,
+                new Borrower(BorrowerType.INDIVIDUAL, 77L, "홍길동", null),
+                LoanProductType.PERSONAL_CREDIT, null, new BigDecimal("10000000.00"), 12,
+                new BigDecimal("6.0"), RepaymentMethod.BULLET, 800, "B",
+                BigDecimal.ZERO, SecuredLoanStatus.REQUESTED, APPRAISED_AT, null);
+        when(loadSecuredLoanPort.findByIdForUpdate(1L)).thenReturn(Optional.of(personalCredit));
+        when(loadCollateralDocumentPort.findLatestByLoanId(1L)).thenReturn(Optional.empty());
+        when(saveSecuredLoanPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        SecuredLoan approved = serviceWith(true).approve(1L);
 
         assertThat(approved.getStatus()).isEqualTo(SecuredLoanStatus.APPROVED);
     }

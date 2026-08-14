@@ -76,10 +76,16 @@ class ApplicationUnderwritingServiceTest {
     @Mock AuditLogger auditLogger;
 
     private ApplicationUnderwritingService service() {
+        return serviceWith(false);
+    }
+
+    private ApplicationUnderwritingService serviceWith(boolean documentRequired) {
         return new ApplicationUnderwritingService(
                 loadApplicationPort, saveApplicationPort, loadProductPort, loadDisclosurePort,
-                loadApplicationDocumentPort, savePolicyPort, saveSchedulePort, publishPort,
-                FIXED, auditLogger);
+                loadApplicationDocumentPort,
+                new github.lms.lemuel.insurance.config.ApplicationOcrProperties(
+                        "key", null, null, null, null, documentRequired),
+                savePolicyPort, saveSchedulePort, publishPort, FIXED, auditLogger);
     }
 
     /** 대사 상태별 청약서류 픽스처 — 게이트 케이스용. */
@@ -224,6 +230,24 @@ class ApplicationUnderwritingServiceTest {
 
         assertThat(app.getStatus()).isEqualTo(ApplicationStatus.UNDER_REVIEW);
         verify(saveApplicationPort, never()).update(any());
+        verify(savePolicyPort, never()).insertIssued(any(), any());
+    }
+
+    @Test
+    @DisplayName("전면 강제(required=true)면 서류 미첨부 승인이 거절된다 — 청약 상태 불변")
+    void requiredModeBlocksMissingDocument() {
+        InsuranceApplication app = underReview(SalesChannel.FC, null);
+        when(loadApplicationPort.findByApplicationId(app.getApplicationId()))
+                .thenReturn(Optional.of(app));
+        when(loadDisclosurePort.existsForApplication(app.getApplicationId())).thenReturn(true);
+        when(loadApplicationDocumentPort.findLatestByApplicationId(app.getApplicationId()))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> serviceWith(true).approve(app.getApplicationId()))
+                .isInstanceOf(ApplicationDocumentNotMatchedException.class)
+                .hasMessageContaining("첨부되지 않아");
+
+        assertThat(app.getStatus()).isEqualTo(ApplicationStatus.UNDER_REVIEW);
         verify(savePolicyPort, never()).insertIssued(any(), any());
     }
 

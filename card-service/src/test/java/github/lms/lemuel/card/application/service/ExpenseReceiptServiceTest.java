@@ -62,7 +62,7 @@ class ExpenseReceiptServiceTest {
     void setUp() {
         service = new ExpenseReceiptService(loadExpenseReportPort, loadCardCapturePort,
                 extractReceiptFieldsPort, saveExpenseReceiptPort, loadExpenseReceiptPort,
-                new ReceiptOcrProperties("key", null, null, null, null));
+                new ReceiptOcrProperties("key", null, null, null, null, null));
     }
 
     private static ExpenseReport report() {

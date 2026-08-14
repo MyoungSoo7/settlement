@@ -12,10 +12,13 @@ import java.math.BigDecimal;
  * @param baseUrl         기본 https://generativelanguage.googleapis.com
  * @param maxOutputTokens generationConfig.maxOutputTokens (기본 1024 — 추출 JSON 은 짧다)
  * @param reviewThreshold 판독 신뢰도 리뷰 임계 (기본 0.80) — 미만이면 값 일치와 무관하게 NEEDS_REVIEW
+ * @param required        전면 강제 플래그 (기본 false) — 켜면 담보서류 미첨부 담보대출은 승인 자체가
+ *                        거절된다(422, 무담보 상품 제외). 끄면 점진 도입(첨부된 경우에만 MATCHED 요구)
  */
 @ConfigurationProperties(prefix = "app.loan.collateral-ocr")
 public record CollateralOcrProperties(String apiKey, String model, String baseUrl,
-                                      Integer maxOutputTokens, BigDecimal reviewThreshold) {
+                                      Integer maxOutputTokens, BigDecimal reviewThreshold,
+                                      Boolean required) {
 
     public CollateralOcrProperties {
         if (apiKey == null) {
@@ -33,6 +36,9 @@ public record CollateralOcrProperties(String apiKey, String model, String baseUr
         if (reviewThreshold == null || reviewThreshold.signum() < 0
                 || reviewThreshold.compareTo(BigDecimal.ONE) > 0) {
             reviewThreshold = new BigDecimal("0.80");
+        }
+        if (required == null) {
+            required = Boolean.FALSE;
         }
     }
 }

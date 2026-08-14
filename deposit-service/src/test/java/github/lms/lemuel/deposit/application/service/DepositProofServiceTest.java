@@ -59,7 +59,7 @@ class DepositProofServiceTest {
         savePort = mock(SaveDepositProofPort.class);
         loadPort = mock(LoadDepositProofPort.class);
         service = new DepositProofService(extractPort, savePort, loadPort,
-                new ProofOcrProperties("key", null, null, null, null, null), FIXED);
+                new ProofOcrProperties("key", null, null, null, null, null, null, null), FIXED);
     }
 
     private static ExtractedTransferProof extracted(String confidence, LocalDate date) {

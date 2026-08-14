@@ -120,7 +120,7 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
 | 담보/개인신용 대출 | `/loans/secured`                 | **주택담보**(`/mortgage`)·**금융자산담보**(`/financial-asset`, 예금·채권·주식)·**개인신용**(`/personal`) 3종. `SecuredLoan` 단일 애그리거트가 담보 optional 로 셋을 수용한다. 한도는 담보형=유효담보가치×유형별 인정비율(부동산 LTV 기본 0.70 주입 / 보증 100%·예금 95%·채권 80%·주식 60%), 신용형=외부 CB 점수→등급(≥850 A/≥750 B/≥650 C/≥550 D, 미만 E 불가)별 정액. 담보평가는 위성 실연동(EQUITY=market 종가×수량, REAL_ESTATE=commondata 실거래가) + 실패·키 부재 시 제시값 폴백. 금리=기준금리+가산(담보형 고정 0.8%p / 신용형 A1.5·B2.5·C4.0·D6.0%p). 신청 시점 **422**(한도초과·등급미달). 승인 시 담보 유효화, 실행은 운영자 전용+비관적 락. 장기 분할상환이라 **연체·기한이익상실**이 상태머신에 포함(`DISBURSED→OVERDUE→DEFAULTED`, 직행 금지) |
 | 물건금융(리스·할부) | `/loans/leases`                  | **금융리스·운용리스·할부** 3종. 리스원금=취득원가−선수금−보증금, 월납입은 잔존가치 현가를 뺀 연금현가식(월이율 0이면 균등분할). 불변식: 잔존가치 < 리스원금(회수할 원금이 남아야 한다). 상태 `APPLIED→APPROVED→ACTIVE→{OVERDUE→DEFAULTED, MATURED, EARLY_TERMINATED}`(승인 전 취소·반려). 개시 시 `LEASE_RECEIVABLE` 전표 + `lemuel.loan.lease_activated` 발행. 중도해지는 잔여원금+위약금(상한 10%) 견적 |
 | 담보 운영          | `/loans/secured/{id}/collateral` | 재평가·마진콜 판정(담보유지비율 <1.40 마진콜 / <1.20 강제처분)·담보 처분·보증기관 대위변제. 운영자 전용, 처분·대위변제는 `Idempotency-Key` 선점. 재평가 값은 외부 입력(감정가·시세)이라 배치가 아니라 API 가 진입점                                                                                                                                                                                                    |
-| 담보서류 OCR (ADR 0036) | `/loans/secured/{id}/collateral/documents`(멀티파트 업로드·`/latest` 조회), `/loans/secured/collateral-documents/{id}/review` | 담보서류(감정평가서·등기부) 업로드→Gemini OCR→담보 설정값 자동 대사(감정평가액 정확 일치 · **선순위 채권최고액 — 자기신고값의 유일한 검증 수단** · 평가기준일 ±1일 · 신뢰도 <0.80 리뷰). `(loan_id, file_hash)` 멱등. **승인 게이트**: 서류가 첨부된 대출은 최신 서류 MATCHED 여야 승인(`LOAN_COLLATERAL_DOC_NOT_MATCHED` 422, 무서류는 점진 도입). 판독 실패 무폴백 503. 업로드는 본인/운영자, 리뷰 종결은 운영자 전용 |
+| 담보서류 OCR (ADR 0036) | `/loans/secured/{id}/collateral/documents`(멀티파트 업로드·`/latest` 조회), `/loans/secured/collateral-documents/{id}/review` | 담보서류(감정평가서·등기부) 업로드→Gemini OCR→담보 설정값 자동 대사(감정평가액 정확 일치 · **선순위 채권최고액 — 자기신고값의 유일한 검증 수단** · 평가기준일 ±1일 · 신뢰도 <0.80 리뷰). `(loan_id, file_hash)` 멱등. **승인 게이트**: 서류가 첨부된 대출은 최신 서류 MATCHED 여야 승인(`LOAN_COLLATERAL_DOC_NOT_MATCHED` 422, 무서류는 점진 도입 — `app.loan.collateral-ocr.required=true` 면 담보형 미첨부도 거절). 판독 실패 무폴백 503. 업로드는 본인/운영자, 리뷰 종결은 운영자 전용 |
 | 평판               | `/loans/company-reputation`      | 신용평가용 기업 평판 프로젝션 조회                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | 상환 시뮬레이션    | `POST /loans/repayment/simulate` | 원금·기간·연이자율·상환방식(만기일시 BULLET / 원리금균등 EQUAL_PAYMENT / 원금균등 EQUAL_PRINCIPAL)으로 회차별 상환표를 미리 계산하는 **순수 미리보기**(부수효과·영속화 없음). 원 단위 반올림·마지막 회차 잔여 흡수로 원금 합 일치                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 
@@ -258,7 +258,8 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
 - **영수증 3자 대사(ADR 0036)**: 영수증 업로드 → shared-common `VisionExtractionClient`(Gemini) OCR →
   매입 대조 자동 대사(총액 compareTo 정확 일치 · 거래일 KST ±1일 · 신뢰도 <0.80 은 NEEDS_REVIEW).
   `(report_id, file_hash)` 멱등(재업로드 시 OCR 재호출 없음). **승인 게이트**: 영수증이 첨부된 보고서는
-  최신 영수증이 MATCHED 여야 승인(`CARD_RECEIPT_NOT_MATCHED` 422). 판독 실패는 무폴백 `CARD_RECEIPT_OCR_UNAVAILABLE`(503).
+  최신 영수증이 MATCHED 여야 승인(`CARD_RECEIPT_NOT_MATCHED` 422, `app.card.receipt-ocr.required=true` 면
+  미첨부도 거절). 판독 실패는 무폴백 `CARD_RECEIPT_OCR_UNAVAILABLE`(503).
 - **조직 연동**: `lemuel.organization.member_removed` 소비 → 이탈자 카드 자동 정지(멱등 컨슈머).
 - **이벤트 발행**(Outbox, `aggregateType="Card"`, **파티션 키는 항상 cardAccountId**): `account_opened`·`issued`·
   `limit_changed`·`status_changed`·`account_status_changed`·`authorized`·`captured`·`statement_paid`.
@@ -283,7 +284,8 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
 - **청약서류 대사 게이트(ADR 0036)**: 청약서 업로드 → shared-common `VisionExtractionClient`(Gemini) OCR →
   청약 대조 자동 대사(연 보험료·보장금액 compareTo 정확 일치 · 청약일 접수일 KST ±1일 · 신뢰도 <0.80 은
   NEEDS_REVIEW). `(application_id, file_hash)` 멱등. 승인 시 서류가 첨부돼 있으면 최신 서류가 MATCHED
-  여야 통과(422, 무서류는 점진 도입). 판독 실패는 무폴백 503. PII(주민번호·연락처)는 추출하지 않는다.
+  여야 통과(422, 무서류는 점진 도입 — `app.insurance.application-ocr.required=true` 면 미첨부도 거절).
+  판독 실패는 무폴백 503. PII(주민번호·연락처)는 추출하지 않는다.
 - **상태머신**: Application `SUBMITTED→UNDER_REVIEW→APPROVED/REJECTED` · Policy `ACTIVE→LAPSED/SURRENDERED/EXPIRED/CANCELLED`
   · Proposal `QUOTED→CONVERTED/EXPIRED` · Commission `SCHEDULED→PAID→CLAWBACK_PENDING→CLAWED_BACK/CANCELLED`.
 - **방카슈랑스 확장(V6+)**: 판매채널 `SalesChannel`=FC·BANCA, 은행 채널 **25%룰**(특정 보험사 모집액 집중 한도) 모니터링,
@@ -327,7 +329,8 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
   앵커를 호출자 지정 멱등 키 `(sellerId, referenceType, referenceId)` 로 잡는다 — 증빙을 먼저 첨부하고,
   값 대사(이체금액 compareTo 정확 일치 · 이체일 기표일 ±3일 — 수기 리드타임 흡수, `app.deposit.proof-ocr.date-tolerance-days`)
   는 **기표(credit/debit) 시점**에 실행된다(`DepositProofGate`). 증빙이 첨부된 참조는 MATCHED 여야 기표
-  통과(`DEPOSIT_PROOF_NOT_MATCHED` 422), 무증빙은 그대로 통과(점진 도입 — Kafka 자동 기표 무영향).
+  통과(`DEPOSIT_PROOF_NOT_MATCHED` 422), 무증빙은 그대로 통과(점진 도입 — `app.deposit.proof-ocr.required=true`
+  면 미첨부도 거절하되, 면제 referenceType(기본 SETTLEMENT·PAYOUT)으로 Kafka 자동 기표는 계속 무영향).
   대사 실패 판정은 기표 트랜잭션과 함께 롤백되어 EXTRACTED 로 남는다(요청 값 정정 후 재시도 가능).
   판독 실패는 무폴백 503. 계좌번호는 추출하지 않는다(PII 최소화).
 - **배치 2종**: 만료 hold 회수(`DepositHoldExpiryScheduler`, 매시 5분 KST, ShedLock) — 만료됐는데 재원을

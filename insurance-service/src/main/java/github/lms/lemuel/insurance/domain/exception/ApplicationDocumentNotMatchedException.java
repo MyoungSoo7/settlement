@@ -15,4 +15,14 @@ public class ApplicationDocumentNotMatchedException extends RuntimeException {
         super("청약서류 대사 미통과(" + status + ")로 승인할 수 없습니다: applicationId=" + applicationId
                 + (note == null ? "" : " — " + note));
     }
+
+    /** 전면 강제(required=true)에서 서류 미첨부 승인 시도. */
+    public static ApplicationDocumentNotMatchedException missing(String applicationId) {
+        return new ApplicationDocumentNotMatchedException(
+                "청약서류가 첨부되지 않아 승인할 수 없습니다(전면 강제): applicationId=" + applicationId);
+    }
+
+    private ApplicationDocumentNotMatchedException(String message) {
+        super(message);
+    }
 }

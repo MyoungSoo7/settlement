@@ -70,7 +70,7 @@ class ApplicationDocumentServiceTest {
     void setUp() {
         service = new ApplicationDocumentService(loadApplicationPort, loadApplicationSubmissionPort,
                 extractApplicationFormPort, saveApplicationDocumentPort, loadApplicationDocumentPort,
-                new ApplicationOcrProperties("key", null, null, null, null), FIXED);
+                new ApplicationOcrProperties("key", null, null, null, null, null), FIXED);
     }
 
     private static InsuranceApplication application(ApplicationStatus status) {

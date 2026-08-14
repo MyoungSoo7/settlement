@@ -105,6 +105,11 @@ card/adapter/in/web/  POST /internal/api/v1/expense-reports/{reportId}/receipts 
 - insurance 는 하우스 컨벤션(전용 타입 예외 + 컨트롤러 로컬 핸들러)을, loan 은 `LoanDomainException`(ErrorCode
   경유)을 따랐다 — 예외 매핑 방식은 서비스 관례가 우선이고 상태코드 계약(404/422/503)만 통일했다.
 - PII 최소화: insurance 청약서 프롬프트는 주민번호·연락처를 요구하지 않는다(추출 자체를 배제).
+- **전면 강제 플래그(2026-08-14)**: 각 서비스 OCR 프로퍼티의 `required`(기본 false) 를 켜면 점진 도입이
+  끝나고 **미첨부 자체가 422 거절 사유**가 된다. 경계 2곳이 중요하다 — ① loan 은 담보형에만 적용
+  (무담보 개인신용에는 담보서류가 성립하지 않는다) ② deposit 은 면제 referenceType
+  (`required-exempt-reference-types`, 기본 SETTLEMENT·PAYOUT) 을 둔다 — Kafka 자동 기표는 이벤트가
+  정본이라, 면제 없이 켜면 자동 정산 입금·지급 차감이 전부 멈춘다.
 
 ## 결과
 

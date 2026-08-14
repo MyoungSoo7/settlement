@@ -7,6 +7,7 @@ import github.lms.lemuel.loan.application.port.out.LoadSecuredLoanPort;
 import github.lms.lemuel.loan.application.port.out.LoanMetricsPort;
 import github.lms.lemuel.loan.application.port.out.PublishSecuredLoanEventPort;
 import github.lms.lemuel.loan.application.port.out.SaveSecuredLoanPort;
+import github.lms.lemuel.loan.config.CollateralOcrProperties;
 import github.lms.lemuel.loan.domain.Collateral;
 import github.lms.lemuel.loan.domain.CollateralDocumentStatus;
 import github.lms.lemuel.loan.domain.LoanLedgerEntry;
@@ -38,6 +39,7 @@ public class DisburseSecuredLoanService implements DisburseSecuredLoanUseCase {
     private final PublishSecuredLoanEventPort publishSecuredLoanEventPort;
     private final LoanMetricsPort loanMetricsPort;
     private final LoadCollateralDocumentPort loadCollateralDocumentPort;
+    private final CollateralOcrProperties collateralOcrProperties;
     private final Clock clock;
 
     public DisburseSecuredLoanService(LoadSecuredLoanPort loadSecuredLoanPort,
@@ -46,6 +48,7 @@ public class DisburseSecuredLoanService implements DisburseSecuredLoanUseCase {
                                       PublishSecuredLoanEventPort publishSecuredLoanEventPort,
                                       LoanMetricsPort loanMetricsPort,
                                       LoadCollateralDocumentPort loadCollateralDocumentPort,
+                                      CollateralOcrProperties collateralOcrProperties,
                                       Clock clock) {
         this.loadSecuredLoanPort = loadSecuredLoanPort;
         this.saveSecuredLoanPort = saveSecuredLoanPort;
@@ -53,6 +56,7 @@ public class DisburseSecuredLoanService implements DisburseSecuredLoanUseCase {
         this.publishSecuredLoanEventPort = publishSecuredLoanEventPort;
         this.loanMetricsPort = loanMetricsPort;
         this.loadCollateralDocumentPort = loadCollateralDocumentPort;
+        this.collateralOcrProperties = collateralOcrProperties;
         this.clock = clock;
     }
 
@@ -66,12 +70,16 @@ public class DisburseSecuredLoanService implements DisburseSecuredLoanUseCase {
     @Transactional
     public SecuredLoan approve(Long loanId) {
         SecuredLoan loan = require(loanId);
-        loadCollateralDocumentPort.findLatestByLoanId(loanId).ifPresent(document -> {
-            if (document.getStatus() != CollateralDocumentStatus.MATCHED) {
-                throw new CollateralDocumentNotMatchedException(
-                        loanId, document.getStatus(), document.getMatchNote());
+        var latestDocument = loadCollateralDocumentPort.findLatestByLoanId(loanId);
+        if (latestDocument.isEmpty()) {
+            // 전면 강제(required=true)는 담보형에만 적용 — 무담보(개인신용)에는 담보서류가 성립하지 않는다.
+            if (Boolean.TRUE.equals(collateralOcrProperties.required()) && loan.getCollateral() != null) {
+                throw CollateralDocumentNotMatchedException.missing(loanId);
             }
-        });
+        } else if (latestDocument.get().getStatus() != CollateralDocumentStatus.MATCHED) {
+            throw new CollateralDocumentNotMatchedException(
+                    loanId, latestDocument.get().getStatus(), latestDocument.get().getMatchNote());
+        }
         loan.approve();
         activateCollateral(loan);
         return saveSecuredLoanPort.save(loan);

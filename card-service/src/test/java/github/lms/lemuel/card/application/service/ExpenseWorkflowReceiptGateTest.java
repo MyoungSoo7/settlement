@@ -6,6 +6,7 @@ import github.lms.lemuel.card.application.port.out.LoadExpenseReceiptPort;
 import github.lms.lemuel.card.application.port.out.LoadExpenseReportPort;
 import github.lms.lemuel.card.application.port.out.SaveExpenseReportPort;
 import github.lms.lemuel.card.application.port.out.UpdateDepartmentBudgetPort;
+import github.lms.lemuel.card.config.ReceiptOcrProperties;
 import github.lms.lemuel.card.domain.ExpenseReceipt;
 import github.lms.lemuel.card.domain.ExpenseReceiptStatus;
 import github.lms.lemuel.card.domain.ExpenseReport;
@@ -54,8 +55,13 @@ class ExpenseWorkflowReceiptGateTest {
 
     @BeforeEach
     void setUp() {
-        service = new ExpenseWorkflowService(loadExpenseReportPort, saveExpenseReportPort,
-                loadDepartmentBudgetPort, updateDepartmentBudgetPort, loadExpenseReceiptPort);
+        service = serviceWith(false);
+    }
+
+    private ExpenseWorkflowService serviceWith(boolean required) {
+        return new ExpenseWorkflowService(loadExpenseReportPort, saveExpenseReportPort,
+                loadDepartmentBudgetPort, updateDepartmentBudgetPort, loadExpenseReceiptPort,
+                new ReceiptOcrProperties("key", null, null, null, null, required));
     }
 
     private static ExpenseReport submittedReport() {
@@ -134,5 +140,20 @@ class ExpenseWorkflowReceiptGateTest {
         ExpenseReport approved = service.approve(new ApproveExpenseReportCommand("RPT-1", 99L));
 
         assertThat(approved.getStatus()).isEqualTo(ExpenseReportStatus.APPROVED);
+    }
+
+    @Test
+    @DisplayName("전면 강제(required=true)면 영수증 미첨부 승인이 422 로 거절된다")
+    void requiredModeBlocksMissingReceipt() {
+        when(loadExpenseReportPort.findByReportId("RPT-1")).thenReturn(Optional.of(submittedReport()));
+        when(loadExpenseReceiptPort.findLatestByReportId("RPT-1")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> serviceWith(true).approve(new ApproveExpenseReportCommand("RPT-1", 99L)))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
+                        .isEqualTo(ErrorCode.CARD_RECEIPT_NOT_MATCHED))
+                .hasMessageContaining("첨부되지 않아");
+
+        verify(saveExpenseReportPort, never()).save(any());
     }
 }

@@ -10,6 +10,7 @@ import github.lms.lemuel.card.application.port.out.LoadExpenseReceiptPort;
 import github.lms.lemuel.card.application.port.out.LoadExpenseReportPort;
 import github.lms.lemuel.card.application.port.out.SaveExpenseReportPort;
 import github.lms.lemuel.card.application.port.out.UpdateDepartmentBudgetPort;
+import github.lms.lemuel.card.config.ReceiptOcrProperties;
 import github.lms.lemuel.card.domain.ExpenseReceiptStatus;
 import github.lms.lemuel.card.domain.ExpenseReport;
 import github.lms.lemuel.common.exception.BusinessException;
@@ -66,17 +67,20 @@ public class ExpenseWorkflowService
     private final LoadDepartmentBudgetPort loadDepartmentBudgetPort;
     private final UpdateDepartmentBudgetPort updateDepartmentBudgetPort;
     private final LoadExpenseReceiptPort loadExpenseReceiptPort;
+    private final ReceiptOcrProperties receiptOcrProperties;
 
     public ExpenseWorkflowService(LoadExpenseReportPort loadExpenseReportPort,
                                    SaveExpenseReportPort saveExpenseReportPort,
                                    LoadDepartmentBudgetPort loadDepartmentBudgetPort,
                                    UpdateDepartmentBudgetPort updateDepartmentBudgetPort,
-                                   LoadExpenseReceiptPort loadExpenseReceiptPort) {
+                                   LoadExpenseReceiptPort loadExpenseReceiptPort,
+                                   ReceiptOcrProperties receiptOcrProperties) {
         this.loadExpenseReportPort = loadExpenseReportPort;
         this.saveExpenseReportPort = saveExpenseReportPort;
         this.loadDepartmentBudgetPort = loadDepartmentBudgetPort;
         this.updateDepartmentBudgetPort = updateDepartmentBudgetPort;
         this.loadExpenseReceiptPort = loadExpenseReceiptPort;
+        this.receiptOcrProperties = receiptOcrProperties;
     }
 
     /**
@@ -135,12 +139,18 @@ public class ExpenseWorkflowService
     @Transactional
     public ExpenseReport approve(ApproveExpenseReportCommand command) {
         ExpenseReport report = loadOrThrow(command.reportId());
-        loadExpenseReceiptPort.findLatestByReportId(report.getReportId()).ifPresent(receipt -> {
-            if (receipt.getStatus() != ExpenseReceiptStatus.MATCHED) {
+        var latestReceipt = loadExpenseReceiptPort.findLatestByReportId(report.getReportId());
+        if (latestReceipt.isEmpty()) {
+            // 전면 강제(required=true)면 미첨부 자체가 거절 사유 — 점진 도입이면 기존 경로 그대로.
+            if (Boolean.TRUE.equals(receiptOcrProperties.required())) {
                 throw new BusinessException(ErrorCode.CARD_RECEIPT_NOT_MATCHED,
-                        "영수증 대사 미통과(" + receipt.getStatus() + ") — " + receipt.getMatchNote());
+                        "영수증이 첨부되지 않아 승인할 수 없습니다(전면 강제): " + report.getReportId());
             }
-        });
+        } else if (latestReceipt.get().getStatus() != ExpenseReceiptStatus.MATCHED) {
+            throw new BusinessException(ErrorCode.CARD_RECEIPT_NOT_MATCHED,
+                    "영수증 대사 미통과(" + latestReceipt.get().getStatus() + ") — "
+                            + latestReceipt.get().getMatchNote());
+        }
         report.approve(command.reviewerId());
         ExpenseReport saved = saveExpenseReportPort.save(report);
 

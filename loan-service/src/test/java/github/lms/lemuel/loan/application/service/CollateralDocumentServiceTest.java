@@ -73,7 +73,7 @@ class CollateralDocumentServiceTest {
     void setUp() {
         service = new CollateralDocumentService(loadSecuredLoanPort, extractCollateralDocumentPort,
                 saveCollateralDocumentPort, loadCollateralDocumentPort,
-                new CollateralOcrProperties("key", null, null, null, null), FIXED);
+                new CollateralOcrProperties("key", null, null, null, null, null), FIXED);
     }
 
     private static SecuredLoan mortgageLoan() {

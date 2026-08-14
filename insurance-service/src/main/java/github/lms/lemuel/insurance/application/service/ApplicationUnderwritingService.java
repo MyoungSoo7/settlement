@@ -15,6 +15,7 @@ import github.lms.lemuel.insurance.application.port.out.SaveApplicationPort.Appl
 import github.lms.lemuel.insurance.application.port.out.SaveCommissionSchedulePort;
 import github.lms.lemuel.insurance.application.port.out.SavePolicyPort;
 import github.lms.lemuel.insurance.application.port.out.SavePolicyPort.PolicyIssuanceAttributes;
+import github.lms.lemuel.insurance.config.ApplicationOcrProperties;
 import github.lms.lemuel.insurance.domain.ApplicationDocumentStatus;
 import github.lms.lemuel.insurance.domain.CommissionSchedule;
 import github.lms.lemuel.insurance.domain.CommissionScheduleFactory;
@@ -64,6 +65,7 @@ public class ApplicationUnderwritingService
     private final LoadInsuranceProductPort loadProductPort;
     private final LoadDisclosureDeliveryPort loadDisclosurePort;
     private final LoadApplicationDocumentPort loadApplicationDocumentPort;
+    private final ApplicationOcrProperties applicationOcrProperties;
     private final SavePolicyPort savePolicyPort;
     private final SaveCommissionSchedulePort saveSchedulePort;
     private final PublishInsuranceEventPort publishPort;
@@ -76,6 +78,7 @@ public class ApplicationUnderwritingService
             LoadInsuranceProductPort loadProductPort,
             LoadDisclosureDeliveryPort loadDisclosurePort,
             LoadApplicationDocumentPort loadApplicationDocumentPort,
+            ApplicationOcrProperties applicationOcrProperties,
             SavePolicyPort savePolicyPort,
             SaveCommissionSchedulePort saveSchedulePort,
             PublishInsuranceEventPort publishPort,
@@ -86,6 +89,7 @@ public class ApplicationUnderwritingService
         this.loadProductPort = loadProductPort;
         this.loadDisclosurePort = loadDisclosurePort;
         this.loadApplicationDocumentPort = loadApplicationDocumentPort;
+        this.applicationOcrProperties = applicationOcrProperties;
         this.savePolicyPort = savePolicyPort;
         this.saveSchedulePort = saveSchedulePort;
         this.publishPort = publishPort;
@@ -125,13 +129,17 @@ public class ApplicationUnderwritingService
             throw new DisclosureNotDeliveredException(applicationId);
         }
         // 청약서류 대사 게이트(ADR 0036) — 서류가 첨부돼 있으면 최신 서류가 MATCHED 여야 승인 통과.
-        // 서류가 없으면 기존 경로 그대로(점진 도입) — 완전판매 게이트처럼 필수로 올리는 것은 별도 결정.
-        loadApplicationDocumentPort.findLatestByApplicationId(applicationId).ifPresent(document -> {
-            if (document.getStatus() != ApplicationDocumentStatus.MATCHED) {
-                throw new ApplicationDocumentNotMatchedException(
-                        applicationId, document.getStatus(), document.getMatchNote());
+        // 전면 강제(app.insurance.application-ocr.required=true)면 미첨부 자체가 거절 사유이고,
+        // 끄면 점진 도입(기존 경로 그대로)이다.
+        var latestDocument = loadApplicationDocumentPort.findLatestByApplicationId(applicationId);
+        if (latestDocument.isEmpty()) {
+            if (Boolean.TRUE.equals(applicationOcrProperties.required())) {
+                throw ApplicationDocumentNotMatchedException.missing(applicationId);
             }
-        });
+        } else if (latestDocument.get().getStatus() != ApplicationDocumentStatus.MATCHED) {
+            throw new ApplicationDocumentNotMatchedException(
+                    applicationId, latestDocument.get().getStatus(), latestDocument.get().getMatchNote());
+        }
         ProductSnapshot product = requireActiveProduct(application.getProductCode());
 
         application.approve();

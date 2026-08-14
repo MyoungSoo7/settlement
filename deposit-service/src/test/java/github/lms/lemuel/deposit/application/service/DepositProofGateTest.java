@@ -52,9 +52,13 @@ class DepositProofGateTest {
     void setUp() {
         loadPort = mock(LoadDepositProofPort.class);
         savePort = mock(SaveDepositProofPort.class);
-        gate = new DepositProofGate(loadPort, savePort,
-                new ProofOcrProperties("key", null, null, null, null, null), FIXED);
+        gate = gateWith(false);
         when(savePort.update(any())).thenAnswer(inv -> inv.getArgument(0));
+    }
+
+    private DepositProofGate gateWith(boolean required) {
+        return new DepositProofGate(loadPort, savePort,
+                new ProofOcrProperties("key", null, null, null, null, null, required, null), FIXED);
     }
 
     private static DepositProof proofWith(String amount, LocalDate transferDate) {
@@ -123,6 +127,30 @@ class DepositProofGateTest {
                 .thenReturn(Optional.of(mismatched));
         assertThatThrownBy(() -> gate.assertMatchedIfProofExists(7L, "MANUAL_TOPUP", "TOPUP-001", AMOUNT))
                 .isInstanceOf(DepositProofNotMatchedException.class);
+    }
+
+    @Test
+    @DisplayName("전면 강제(required=true)면 수기 참조의 증빙 미첨부 기표가 422 로 거절된다")
+    void requiredModeBlocksMissingProof() {
+        when(loadPort.findLatestByReference(7L, "MANUAL_TOPUP", "TOPUP-001"))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> gateWith(true)
+                .assertMatchedIfProofExists(7L, "MANUAL_TOPUP", "TOPUP-001", AMOUNT))
+                .isInstanceOf(DepositProofNotMatchedException.class)
+                .hasMessageContaining("첨부되지 않아");
+    }
+
+    @Test
+    @DisplayName("전면 강제여도 면제 referenceType(SETTLEMENT·PAYOUT)은 통과 — Kafka 자동 기표를 멈추지 않는다")
+    void requiredModeExemptsKafkaReferenceTypes() {
+        when(loadPort.findLatestByReference(7L, "SETTLEMENT", "123")).thenReturn(Optional.empty());
+        when(loadPort.findLatestByReference(7L, "PAYOUT", "456")).thenReturn(Optional.empty());
+
+        assertThatCode(() -> {
+            gateWith(true).assertMatchedIfProofExists(7L, "SETTLEMENT", "123", AMOUNT);
+            gateWith(true).assertMatchedIfProofExists(7L, "PAYOUT", "456", AMOUNT);
+        }).doesNotThrowAnyException();
     }
 
     @Test

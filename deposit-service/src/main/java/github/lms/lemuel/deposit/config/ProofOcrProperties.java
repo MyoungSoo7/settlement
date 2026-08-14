@@ -15,11 +15,17 @@ import java.math.BigDecimal;
  * @param dateToleranceDays 이체일 허용 리드타임 (기본 3일) — 은행 이체 후 운영자가 며칠 뒤 수기
  *                          기표하는 정상 업무를 흡수한다. 다른 확산처(±1일)와 다른 이유는
  *                          {@code DepositProofMatcher} javadoc 참조
+ * @param required          전면 강제 플래그 (기본 false) — 켜면 증빙 미첨부 수기 기표가 거절된다(422).
+ *                          면제 referenceType(아래)에는 적용되지 않는다
+ * @param requiredExemptReferenceTypes 전면 강제 면제 referenceType (기본 SETTLEMENT·PAYOUT) —
+ *                          Kafka 자동 기표는 이벤트가 정본이라 사람 증빙 대상이 아니다. 이 면제가
+ *                          없으면 required=true 가 자동 정산 입금·지급 차감을 전부 멈춘다
  */
 @ConfigurationProperties(prefix = "app.deposit.proof-ocr")
 public record ProofOcrProperties(String apiKey, String model, String baseUrl,
                                  Integer maxOutputTokens, BigDecimal reviewThreshold,
-                                 Integer dateToleranceDays) {
+                                 Integer dateToleranceDays, Boolean required,
+                                 java.util.List<String> requiredExemptReferenceTypes) {
 
     public ProofOcrProperties {
         if (apiKey == null) {
@@ -40,6 +46,12 @@ public record ProofOcrProperties(String apiKey, String model, String baseUrl,
         }
         if (dateToleranceDays == null || dateToleranceDays < 0) {
             dateToleranceDays = 3;
+        }
+        if (required == null) {
+            required = Boolean.FALSE;
+        }
+        if (requiredExemptReferenceTypes == null || requiredExemptReferenceTypes.isEmpty()) {
+            requiredExemptReferenceTypes = java.util.List.of("SETTLEMENT", "PAYOUT");
         }
     }
 }

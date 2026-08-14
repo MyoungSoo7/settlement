@@ -68,7 +68,13 @@ public class DepositProofGate {
         Optional<DepositProof> latest =
                 loadDepositProofPort.findLatestByReference(sellerId, referenceType, referenceId);
         if (latest.isEmpty()) {
-            return;   // 증빙 없음 — 점진 도입, 기존 경로 그대로
+            // 전면 강제(required=true)면 미첨부 자체가 거절 사유 — 단 면제 referenceType(기본
+            // SETTLEMENT·PAYOUT, Kafka 자동 기표)은 이벤트가 정본이라 대상이 아니다.
+            if (Boolean.TRUE.equals(properties.required())
+                    && !properties.requiredExemptReferenceTypes().contains(referenceType)) {
+                throw DepositProofNotMatchedException.missing(referenceId);
+            }
+            return;   // 점진 도입 또는 면제 — 기존 경로 그대로
         }
         DepositProof proof = latest.get();
         switch (proof.getStatus()) {
