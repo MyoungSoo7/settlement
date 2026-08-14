@@ -5,13 +5,13 @@
 > 여기에 **Go·Python·Kotlin 폴리글랏 7종**(실시간 시세 스트리밍·결제 웹훅·스크리닝 백테스트·이상탐지·예측·알림·정산 대사)을 더해 **총 24개 서비스**의 폴리글랏 MSA 로 도메인·언어 양방향 확장력을 증명한다.
 > 단일 모놀리스 → **Bounded Context 분리** → **이벤트 드리븐** → **DB-per-service + 이벤트 프로젝션 패턴**(ADR 0020) → **폴리글랏 MSA** 로 진화시킨 헥사고날 백엔드 포트폴리오.
 >
-> 📐 **전체 구성·아키텍처·디자인 패턴·기술 스택 한눈에 → [docs/ARCHITECTURE.md](ARCHITECTURE.md)**
+> 📐 **전체 구성·아키텍처·디자인 패턴·기술 스택 한눈에 → [ARCHITECTURE.md](ARCHITECTURE.md)**
 
 [![Java 25](https://img.shields.io/badge/Java-25-orange)](https://www.oracle.com/java/)
 [![Kotlin 2.0](https://img.shields.io/badge/Kotlin-2.0-purple)](https://kotlinlang.org/)
-[![Go 1.22](https://img.shields.io/badge/Go-1.22-00ADD8)](https://go.dev/)
+[![Go 1.22/1.23](https://img.shields.io/badge/Go-1.22%2F1.23-00ADD8)](https://go.dev/)
 [![Python 3.11](https://img.shields.io/badge/Python-3.11-yellow)](https://www.python.org/)
-[![Spring Boot 4](https://img.shields.io/badge/Spring%20Boot-4.0.4-brightgreen)](https://spring.io/projects/spring-boot)
+[![Spring Boot 4](https://img.shields.io/badge/Spring%20Boot-4.0.7-brightgreen)](https://spring.io/projects/spring-boot)
 [![PostgreSQL 17](https://img.shields.io/badge/PostgreSQL-17-blue)](https://www.postgresql.org/)
 [![Kafka](https://img.shields.io/badge/Kafka-Strimzi%2FRedpanda-red)](https://strimzi.io/)
 [![Polyglot MSA](https://img.shields.io/badge/MSA-24%20services%20(Java·Kotlin·Go·Python)-teal)](ARCHITECTURE.md)
@@ -23,7 +23,7 @@
 
 | 보고 싶은 것 | 한 번에 가는 곳                                                                                                      |
 |---|----------------------------------------------------------------------------------------------------------------------|
-| **✅ "정말 작동하나" (5분, 재현 가능)** | **[docs/plan/SETTLEMENT-VERIFICATION.md](docs/plan/SETTLEMENT-VERIFICATION.md)** — 520 테스트·LINE 94.17% + 불변식 매핑 + 한계 |
+| **✅ "정말 작동하나" (5분, 재현 가능)** | **[docs/plan/SETTLEMENT-VERIFICATION.md](docs/plan/SETTLEMENT-VERIFICATION.md)** — 불변식 매핑 + JaCoCo LINE 90% 게이트 + 한계 (정산 `@Test` 1,443건) |
 | **📄 1장 요약 (이력서 첨부용)** | **[PORTFOLIO.md](docs/PORTFOLIO.md)**                                                                                |
 | **시스템 전체 구조** | [아키텍처 다이어그램 (본 README)](#아키텍처)                                                                         |
 | **Architecture Decision Records** | [docs/adr/](docs/adr/)                                                                                               |
@@ -122,8 +122,8 @@ CQRS 로 분리하고, 대사는 order 의 내부 API 를 호출해 cross-DB 연
 
 | 분류 | 기술 |
 |------|------|
-| 언어 | **Java 25** (코어 16) · **Kotlin 2.0** (이벤트 서비스 2) · **Go 1.22** (엣지 2) · **Python 3.11** (ML 3) |
-| 프레임워크 | Spring Boot 4.0.4 / Spring 7 (Java) · Spring Boot 3.3 (Kotlin) · FastAPI (Python) · `net/http`(Go) |
+| 언어 | **Java 25** (코어 16) · **Kotlin 2.0** (이벤트 서비스 2) · **Go 1.22/1.23** (엣지 2) · **Python 3.11** (ML 3) · **TypeScript** (frontend) |
+| 프레임워크 | Spring Boot 4.0.7 / Spring 7 (Java) · Spring Boot 3.3 (Kotlin) · FastAPI (Python) · `net/http`(Go) · React + Vite (frontend) |
 | 빌드 | Gradle Multi-module (Kotlin DSL) · 폴리글랏은 standalone 빌드 |
 | 데이터베이스 | PostgreSQL 17 (DB-per-service) |
 | 검색 엔진 | Elasticsearch 8.17 (Nori 한글 분석기) |
@@ -153,8 +153,12 @@ CQRS 로 분리하고, 대사는 order 의 내부 API 를 호출해 cross-DB 연
 전체 디렉토리·모듈 트리 정본은 **[STRUCTURE.md](STRUCTURE.md)** 로 분리했다.
 
 - **JVM 코어**: Gradle 멀티모듈 — Java 서비스 16종 + gateway, `shared-common` 은 composite build 라이브러리 (ADR 0021)
-- **폴리글랏 7종**(Go 2 · Python 3 · Kotlin 2, 포트 8110~8131): 루트 레벨 standalone — Gradle·gateway 미포함,
-  `polyglot-ci.yml` 분리 CI, 전용 차트 격리 배포 (정본: [polyglot-services.md](docs/plan/polyglot-services.md))
+- **폴리글랏 7종**(Go 2 · Python 3 · Kotlin 2, 포트 8110~8131): 루트 레벨 standalone — Gradle 미포함,
+  `polyglot-ci.yml` 분리 CI, 전용 차트 격리 배포. gateway 미라우팅이 기본이되 **예외 2종**: market-stream
+  (`/api/market-stream/**` 시세 SSE)·notification(`/api/notifications/stream` 알림 SSE) — 정본:
+  [polyglot-services.md](docs/plan/polyglot-services.md) · [docs/sse.md](docs/sse.md)
+- **frontend**: React 19 + Vite 5 + TypeScript SPA (`frontend/`) — compose 로 nginx 서빙(127.0.0.1:3000),
+  vitest 커버리지 게이트 LINE 90%. 네비게이션 정본은 `menus` 테이블(`GET /api/menus/me`)
 - 각 서비스 내부는 헥사고날 고정 골격: `domain/` · `application/port·service/` · `adapter/{in,out}/`
 
 ---
@@ -329,7 +333,8 @@ JWT_SECRET=local-dev-secret-key-32bytes-min!!   # HS256 — 32바이트 이상
 JWT_TTL_SECONDS=3600
 ```
 
-외부 데이터 수집 키는 전부 선택입니다(미설정 시 해당 서비스는 Flyway 시드 데이터로 동작).
+외부 데이터 수집 키는 전부 선택입니다 — 미설정 시 해당 위성 서비스는 기동은 정상이되 데이터가
+비어 있습니다(샘플 시드는 실데이터 수집 전용 전환 때 제거됨 — 조회는 빈 결과, 수집은 admin 배치 경로).
 발급처는 `.env.example` 의 각 항목 주석 참조 — 단, **공공데이터포털 계열 키는 발급만으로는
 동작하지 않습니다**:
 
@@ -342,9 +347,12 @@ JWT_TTL_SECONDS=3600
 ### 전체 실행
 
 ```bash
-# 1. 인프라 + 16 서비스 모두 빌드/실행
+# 0. (프론트 포함 시) SPA 정적 빌드를 먼저 만든다 — 없으면 frontend 컨테이너가 404 를 준다
+(cd frontend && npm ci && npm run build)
+
+# 1. 인프라 + 앱 컨테이너 19개(JVM 17 + market-stream + notification) + frontend 빌드/실행
 #    기동 순서는 compose healthcheck 기반 depends_on 이 보장:
-#    PG 16종·ES·Redpanda → order/settlement/loan/financial/economics/company/operation/market/ai/common-data/investment/account/organization/card/insurance/deposit → gateway → prometheus/grafana
+#    PG 16종·ES·Redpanda·redis·pgbouncer → 16 서비스 + market-stream/notification → gateway → frontend → prometheus/grafana
 docker compose up -d --build
 
 # 2. 전체 healthcheck 통과 확인 — 모든 서비스가 healthy 가 될 때까지 대기
@@ -368,6 +376,9 @@ docker compose ps        # STATUS 열이 전부 Up (healthy) 이면 성공
 #    - Card:        http://localhost:8106/actuator/health
 #    - Insurance:   http://localhost:8108/actuator/health
 #    - Deposit:     http://localhost:8112/actuator/health
+#    - Market-Stream(Go SSE): http://localhost:8110/healthz
+#    - Notification(Kotlin SSE): http://localhost:8130/actuator/health
+#    - Frontend(SPA): http://127.0.0.1:3000
 #    - Swagger:     http://localhost:8088/swagger-ui.html
 #                   http://localhost:8082/swagger-ui.html
 ```
@@ -397,6 +408,7 @@ docker compose ps        # STATUS 열이 전부 Up (healthy) 이면 성공
 `docs/demo/E2E-SCENARIO.md`(로컬 전용, 저장소 미포함) (단계별 요청값·기대 응답·데이터 초기화 포함)
 
 ```bash
+# postman 컬렉션·환경 파일도 로컬 전용(저장소 미포함) — E2E-SCENARIO.md 와 같은 로컬 docs/demo/ 에 보관
 npx newman run docs/demo/postman-e2e-purchase-flow.json -e docs/demo/postman-environment.json
 ```
 
@@ -407,8 +419,9 @@ npx newman run docs/demo/postman-e2e-purchase-flow.json -e docs/demo/postman-env
 ### 개별 서비스 실행
 
 ```bash
-# 인프라만 (PG 16종 + ES + Redpanda)
-docker compose up -d postgres settlement-db loan-postgres financial-postgres economics-postgres company-postgres operation-postgres market-postgres ai-postgres commondata-postgres investment-postgres account-postgres organization-postgres card-postgres insurance-postgres deposit-postgres elasticsearch redpanda
+# 인프라만 (PG 16종 + ES + Redpanda + redis + pgbouncer)
+#   redis·pgbouncer 를 빼면 order-service 가 depends_on(service_healthy) 조건으로 기동하지 못한다
+docker compose up -d postgres settlement-db loan-postgres financial-postgres economics-postgres company-postgres operation-postgres market-postgres ai-postgres commondata-postgres investment-postgres account-postgres organization-postgres card-postgres insurance-postgres deposit-postgres elasticsearch redpanda redis pgbouncer
 
 # 각 서비스를 IDE 또는 gradle 로
 ./gradlew :order-service:bootRun
@@ -482,11 +495,12 @@ docker build --build-arg MODULE=gateway-service     -t lemuel-gateway .
 | `/api/ai/**` | **ai-service** (자체 DB, AI 챗봇 — JWT USER 이상 + rate limit) |
 | `/api/common-data/**` | **common-data-service** (자체 DB, 공개 조회 — 공공데이터 범용 커넥터) |
 | `/api/organizations/**` | **organization-service** (자체 DB, JWT — 셀러/기업 조직·멤버십·역할) |
-| `/api/cards/**` | **card-service** (자체 DB, JWT — 법인카드 카드계정·카드) |
+| `/api/cards/**`, `/admin/expense-receipts/**` | **card-service** (자체 DB, JWT — 법인카드 카드계정·카드 + 영수증 리뷰 큐 콘솔, ADR 0036) |
 | `/api/insurance/**` | **insurance-service** (자체 DB, JWT — GA 보험대리점 상담·청약·계약·유지변경·수수료 정산) |
 | `/api/deposits/**`, `/admin/deposits/**` | **deposit-service** (자체 DB — 셀러 예치금 원장, `/api` 는 읽기 전용·`/admin` 은 ADMIN 전용 수기 콘솔) |
 | `/api/market-stream/**` | **market-stream-service** (폴리글랏 Go, 8110 — 실시간 시세 SSE, 공개 read-only) |
-| `/api/settlements/**`, `/api/reconciliation/**`, `/api/reports/**` | settlement-service |
+| `/api/notifications/stream` | **notification-service** (폴리글랏 Kotlin, 8130 — 알림 푸시 SSE, JWT. 정확 일치 경로만 — 정본 [docs/sse.md](docs/sse.md)) |
+| `/api/settlements/**`, `/api/reports/**` | settlement-service |
 | `/api/ledger/**` | settlement-service |
 | `/admin/payouts/**`, `/admin/chargebacks/**` | settlement-service |
 | `/admin/pg-reconciliation/**`, `/admin/reconciliation/**`, `/admin/dlq/**` | settlement-service |
@@ -567,7 +581,7 @@ PENDING → READY → SHIPPED → IN_TRANSIT → DELIVERED → (선택) RETURNED
 | ADR (아키텍처 결정 기록) | [`docs/adr/`](./docs/adr/) |
 | Runbook (장애 대응) | [`docs/plan/runbook/`](docs/plan/runbook/) |
 | CI/CD | [`.github/workflows/`](./.github/workflows/) |
-| Kubernetes | `k8s/`(저장소 미포함 — 매니페스트는 로컬 보관) |
+| Kubernetes | [`k8s/buildkit/`](k8s/buildkit/) (인클러스터 이미지 빌드·Trivy 스캔 잡) — 배포 매니페스트 본체는 GitOps 레포(helm-deploy) 소유, 이 저장소 미포함 |
 | Flyway | [`order-service/src/main/resources/db/migration/`](./order-service/src/main/resources/db/migration/) |
 
 ### 주요 ADR
@@ -594,6 +608,11 @@ PENDING → READY → SHIPPED → IN_TRANSIT → DELIVERED → (선택) RETURNED
 - [0021 — shared-common 을 버전드 플랫폼 라이브러리로](./docs/adr/0021-shared-common-as-platform-library.md) *(완료 — composite build + maven-publish 1.0.0)*
 - [0022 — Event Schema Registry](./docs/adr/0022-event-schema-registry.md)
 - [0023 — company-service 뉴스·평판 (독립 위성 서비스)](./docs/adr/0023-company-service-news-reputation.md)
+- [0024 — 이벤트 계약-as-code (JSON Schema + 양방향 계약 테스트)](./docs/adr/0024-event-contract-as-code.md)
+- [0032 — 기간효력 수수료 정책 (effective-dated commission rate)](./docs/adr/0032-effective-dated-commission-rate-policy.md)
+- [0035 — Kafka 토픽 카탈로그 (전송 속성 정본)](./docs/adr/0035-kafka-topic-catalog.md)
+- [0036 — 영수증 OCR 플랫폼](./docs/adr/0036-receipt-ocr-platform.md)
+- …0024~0036 전체(0019 결번, 총 35개)는 [docs/adr/](./docs/adr/) 참조
 
 > 위성 서비스(financial · economics · company · market · common-data)는 **공개 read-only 조회**라 shared-common(JWT/Outbox)을 의존하지 않고
 > 자체 최소 SecurityConfig 를 둔다. operation(콘솔 ADMIN 전용)과 ai(LLM 실비용 → USER 이상 필수)는 예외로 shared-common 의 JWT 스택을 쓴다.
@@ -627,7 +646,7 @@ CI 에서 k6 thresholds 로 회귀 자동 감지.
 | **운영 메트릭은?** | [Grafana Dashboard JSON](monitoring/grafana/dashboards/lemuel-business-kpi.json) — 30+ 커스텀 메트릭 |
 | **부하 테스트 결과?** | 위 표 + [load-test/README.md](load-test/README.md) |
 | **왜 재무제표·경제지표·기업평판을 별도 서비스로?** | 공개 read-only 조회라 거래 컨텍스트와 경계가 다름 → DB-per-service + **shared-common(JWT/Outbox) 미의존**, 자체 최소 SecurityConfig ([ADR 0023](docs/adr/0023-company-service-news-reputation.md)) |
-| **외부 API(DART/ECOS/네이버) 키 없이 데모?** | Flyway **시드 폴백** — 각 서비스 `V2__*_seed.sql` 이 대표 데이터를 적재해 키 없이도 조회 동작, 키 설정 시 수집 배치가 UNIQUE upsert 로 실데이터 대체 |
+| **외부 API(DART/ECOS/네이버) 키 없이 데모?** | 위성 서비스는 **실데이터 수집 전용** — 샘플 시드는 제거됨(키 없으면 기동은 정상, 조회는 빈 결과). 수집은 `/admin/**` 배치 트리거로, UNIQUE upsert 라 재실행 안전. 데모 계정·메뉴 등 코어 시드는 order-service 마이그레이션이 담당 |
 | **Alertmanager 알람이 인시던트가 되는 과정?** | [IngestAlertService](operation-service/src/main/java/github/lms/lemuel/operation/incident/application/service/IngestAlertService.java) — webhook(Bearer) → `(source, correlation_key)` partial unique 로 활성 중복 0, repeat firing refire 병합 |
 | **위성 서비스도 코드·DB 의존 0?** | ✅ financial/economics/company/market/ai/common-data 는 타 서비스 import·DB 공유 없음(ArchUnit 강제). operation·ai 만 shared-common(JWT) 사용, 신호는 Kafka 이벤트로만 수신 |
 | **AI 챗봇의 LLM 벤더 종속은?** | [ChatCompletionPort](ai-service/src/main/java/github/lms/lemuel/ai/chat/application/port/out/ChatCompletionPort.java) 뒤로 LLM 을 `adapter/out/llm` 에만 격리(ArchUnit 강제). 실제로 Gemini/Anthropic 두 어댑터를 `app.ai.provider` 로 스위치(기본 Gemini) — 벤더 전환이 설정 한 줄. LLM 실패 시 폴백 없이 503 + 이력 무저장, bucket4j 로 비용 가드 |
