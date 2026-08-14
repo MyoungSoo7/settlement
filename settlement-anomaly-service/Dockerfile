@@ -1,5 +1,5 @@
 # settlement-anomaly-service --- Python/FastAPI anomaly scoring
-FROM python:3.14-slim
+FROM python:3.11-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
