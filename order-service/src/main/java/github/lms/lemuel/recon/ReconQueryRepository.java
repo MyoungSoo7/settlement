@@ -79,6 +79,9 @@ public class ReconQueryRepository {
      * settlement 의 settlement_adjustments(자기 DB)가 참조하는 refund_id 집합을 받아,
      * cross-DB JOIN 없이 "조정에 연결된 환불 합계"를 산출한다.
      */
+    // 동적 SQL 경고(java:S2077) 억제 — 조립되는 건 id 개수만큼의 물음표 목록이다(값은 전부 바인딩).
+    // IN 절 길이는 SQL 로 바인딩할 수 없어 플레이스홀더만 생성한다.
+    @SuppressWarnings("java:S2077")
     public BigDecimal sumCompletedRefundsByIds(List<Long> refundIds) {
         if (refundIds == null || refundIds.isEmpty()) {
             return BigDecimal.ZERO;

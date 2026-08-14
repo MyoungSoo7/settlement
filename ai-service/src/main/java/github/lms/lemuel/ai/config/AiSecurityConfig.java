@@ -36,6 +36,11 @@ public class AiSecurityConfig {
 
     @Bean
     @Order(1)
+    // CSRF 비활성 경고(java:S4502) 억제 — 이 체인은 세션을 만들지 않는(STATELESS) 토큰 API 다.
+    // 브라우저가 자동으로 실어 보내는 자격증명(쿠키·Basic)을 인증에 쓰지 않으므로 교차 사이트
+    // 요청이 사용자 권한을 획득할 수 없다 — CSRF 토큰이 방어할 대상 자체가 없다.
+    // 세션·쿠키 인증을 도입하는 순간 이 억제는 무효이며 CSRF 보호를 되살려야 한다.
+    @SuppressWarnings("java:S4502")
     public SecurityFilterChain aiSecurityFilterChain(HttpSecurity http) throws Exception {
         http
                 .securityMatcher("/api/ai/**")
