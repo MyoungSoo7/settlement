@@ -90,6 +90,7 @@ export const FALLBACK_MENUS: FallbackMenuNode[] = [
       { id: -71, name: '대출기관 안내', path: '/admin/ceo/lender-guide', icon: '🏦', description: '은행 · 저축은행 · 캐피탈 · 대부업', area: 'CEO', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       { id: -72, name: '자산운용펀드 안내', path: '/admin/ceo/fund-guide', icon: '🧺', description: '부동산 · 주식 · 채권 펀드', area: 'CEO', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       { id: -73, name: '계정계 현황', path: '/admin/ceo/accounts', icon: '🧮', description: '집계 · 시산표 · 잔액', area: 'CEO', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
+      { id: -74, name: '법인카드', path: '/admin/ceo/cards', icon: '💳', description: '카드계정 · 임직원 카드 한도', area: 'CEO', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
     ],
   },
   {

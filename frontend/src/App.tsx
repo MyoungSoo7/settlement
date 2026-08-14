@@ -31,6 +31,7 @@ const CeoInsightPage = lazy(() => import('./pages/CeoInsightPage'));
 const CeoInvestPage = lazy(() => import('./pages/CeoInvestPage'));
 const CeoInvestRecommendPage = lazy(() => import('./pages/CeoInvestRecommendPage'));
 const CeoAccountPage = lazy(() => import('./pages/CeoAccountPage'));
+const CeoCardPage = lazy(() => import('./pages/CeoCardPage'));
 const CeoLoanGuidePage = lazy(() => import('./pages/CeoLoanGuidePage'));
 const CeoLoanProcessGuidePage = lazy(() => import('./pages/CeoLoanProcessGuidePage'));
 const CeoLenderGuidePage = lazy(() => import('./pages/CeoLenderGuidePage'));
@@ -265,6 +266,9 @@ function App() {
               element={<AdminManagerRoute><SideNavLayout><CeoFundGuidePage /></SideNavLayout></AdminManagerRoute>} />
             <Route path="/admin/ceo/accounts"
               element={<AdminManagerRoute><SideNavLayout><CeoAccountPage /></SideNavLayout></AdminManagerRoute>} />
+            {/* 법인카드 (card-service) — 조작 권한은 서버가 조직 멤버십으로 판정, 셸 노출만 ADMIN·MANAGER */}
+            <Route path="/admin/ceo/cards"
+              element={<AdminManagerRoute><SideNavLayout><CeoCardPage /></SideNavLayout></AdminManagerRoute>} />
 
           </Routes>
           </Suspense>
