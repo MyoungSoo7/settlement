@@ -39,7 +39,9 @@ class UploadTaxInvoiceScanCommandTest {
         assertThat(command(bytes("a"))).isNotEqualTo(command(bytes("b")));
         assertThat(command(bytes("a")))
                 .isNotEqualTo(new UploadTaxInvoiceScanCommand(2L, "invoice.pdf", "application/pdf", bytes("a")));
-        assertThat(command(bytes("a"))).isNotEqualTo("레코드가 아닌 것");
+        // 타입이 다른 값과는 assertThat(...).isNotEqualTo 대신 equals 직접 호출로 본다
+        // — 서로 다른 타입을 비교하는 어서션은 "항상 통과"라 검증력이 없다는 지적을 받는다(java:S5845).
+        assertThat(command(bytes("a")).equals("레코드가 아닌 것")).isFalse();
     }
 
     @Test
