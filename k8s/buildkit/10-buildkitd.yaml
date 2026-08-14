@@ -3,7 +3,7 @@
 #
 # 왜 상주형인가: 이 저장소의 Dockerfile 은 Gradle 의존성 캐시를
 #   RUN --mount=type=cache,target=/home/gradle/.gradle
-# 로 잡는다(Dockerfile:33, :57). 이 캐시는 buildkitd 의 로컬 스토어에 살기 때문에,
+# 로 잡는다(Dockerfile:34, :57). 이 캐시는 buildkitd 의 로컬 스토어에 살기 때문에,
 # 데몬을 Job 마다 새로 띄우면 매 빌드가 의존성 전량 재다운로드로 시작한다.
 # 데몬을 살려두고 PVC 를 붙여야 두 번째 빌드부터 실제로 빨라진다.
 #
