@@ -8,11 +8,11 @@ version = "0.1.0"
 description = "Backtests the investment stock-screening trade-plan rules over historical prices and reports risk/return metrics."
 requires-python = ">=3.11"
 dependencies = [
-    "fastapi==0.115.6",
-    "uvicorn[standard]==0.34.0",
-    "pydantic==2.10.4",
+    "fastapi==0.141.1",
+    "uvicorn[standard]==0.52.1",
+    "pydantic==2.13.4",
     "pandas==2.2.3",
-    "numpy==2.2.1",
+    "numpy==2.4.6",
 ]
 
 [project.optional-dependencies]
