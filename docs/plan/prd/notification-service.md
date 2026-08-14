@@ -10,7 +10,7 @@
 > | 역산 기준 | 2026-08-13 `develop` 브랜치 (직전 커밋 `10cdd14e6`)                                      |
 > | 근거      | 프로덕션 Kotlin 24파일, 테스트 11클래스(63 tests), 구독 5토픽, 채널 4종, `application.yml` |
 > | 범위 밖   | 발행측 서비스의 이벤트 계약(각 서비스 소관) · 실 SMTP/Slack 운영 · 알림 이력 영속화       |
-> | 관련 문서 | [`../../inflearn/polyglot-services.md`](../../inflearn/polyglot-services.md) · [`gateway-service.md`](gateway-service.md) · [`../seeds/notification-service-fanout.seed.yaml`](../seeds/notification-service-fanout.seed.yaml) |
+> | 관련 문서 | [`../polyglot-services.md`](../polyglot-services.md) · [`gateway-service.md`](gateway-service.md) · [`../seeds/notification-service-fanout.seed.yaml`](../seeds/notification-service-fanout.seed.yaml) |
 
 ---
 
@@ -215,11 +215,11 @@ notification-service 는 **도메인 이벤트 하나를 받아 활성 채널 �
 붙은 레플리카가 가진 것만 재개된다. `polyglot-services.md` 가 알려진 한계로 명시하고 있으며, 하류 Java
 컨슈머의 `processed_events` 멱등 덕분에 **회계 영향은 없다** — 손상은 수신자 경험에 국한된다.
 
-### G-7. `../../study/sse.md` 정본은 해소됐다 (2026-08-13 추가)
+### G-7. `../../sse.md` 정본은 해소됐다 (2026-08-13 추가)
 
 `JwtSubscriberIdentityResolver:118`·`InMemoryNotificationStream:33` 두 곳의 KDoc 과 루트 `CLAUDE.md` 가
-`../../study/sse.md` 를 SSE 정본으로 참조한다. 역산 착수 시점에는 이 파일이 없어 dangling 참조였으나, **작업 중
-병행 세션이 [`../../study/sse.md`](../../study/sse.md) 를 추가해 해소됐다**(토큰 URL 트레이드오프, 재생 정책, 하트비트,
+`../../sse.md` 를 SSE 정본으로 참조한다. 역산 착수 시점에는 이 파일이 없어 dangling 참조였으나, **작업 중
+병행 세션이 [`../../sse.md`](../../sse.md) 를 추가해 해소됐다**(토큰 URL 트레이드오프, 재생 정책, 하트비트,
 멀티 레플리카 한계까지 수록). 다만 해당 문서도 아래 G-1~G-3(배선·시크릿)은 다루지 않으므로 이 PRD 가
 그 부분의 유일한 기록이다.
 
@@ -243,5 +243,5 @@ warn 로그 외에 없다. 실패 채널만 골라 재전송하는 경로도, �
 | T-4 | 실배포 `APP_KAFKA_ENABLED=true` 주입 경로                        | 없음 (G-4)             |
 | T-5 | `/notifications/send`·`/demo` 인가 게이트                        | 없음 (G-5)             |
 | T-6 | 내구 dedupe·재생 저장소(Redis 등)                                | 인메모리 (G-6)         |
-| T-7 | `../../study/sse.md` 작성 — 코드가 참조하는 정본                        | **해소** (G-7)         |
+| T-7 | `../../sse.md` 작성 — 코드가 참조하는 정본                        | **해소** (G-7)         |
 | T-8 | 채널별 성공/실패 메트릭                                          | 없음 (G-9)             |

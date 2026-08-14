@@ -3,7 +3,7 @@
 > 이커머스 + 정산 MSA 플랫폼(21개 서비스)의 **핵심 유스케이스별 시퀀스 다이어그램**.
 > 서비스 간 연계는 Kafka 이벤트로만 이루어지며(코드·DB 직접 의존 0), 비동기 구간은 `-->>` 및 `Note` 로 명시한다.
 >
-> - 정본 근거: [`../SPEC.md`](../SPEC.md)(기능·이벤트 카탈로그) · [`../ARCHITECTURE.md`](../ARCHITECTURE.md)(패턴) · [`adr`](./docs/adr/)
+> - 정본 근거: [`../SPEC.md`](../SPEC.md)(기능·이벤트 카탈로그) · [`../ARCHITECTURE.md`](../ARCHITECTURE.md)(패턴) · [`adr`](./adr/)
 > - 최종 갱신: 2026-07-16
 
 ---

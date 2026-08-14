@@ -233,7 +233,7 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 - **로컬 통합 검증** — `scripts/verify.sh`: CI(`harness-guard.yml` + `ci.yml`)의 판정을 **같은 순서로** 로컬에서 재현한다.
   하네스 테스트 → 자기 진단 → 변경 파일 가드 → 삭제 가드 → 변경 모듈 Gradle. "다 됐다" 를 자기보고가 아니라 종료 코드로 증명하는 지점.
   `--fast`(Gradle 생략, 수초) · `--all`(전체 build) · `--base <ref>`. 느려지면 우회당하므로 기본 경로는 변경 모듈만 빌드한다(ci.yml 매핑과 동일).
-- **하네스 개선 로그** — `docs/harness/HARNESS-IMPROVEMENT-LOG.md`: 하네스를 고칠 때마다 `status`·`predicted_effect`·`verified_at` 을 남긴다.
+- **하네스 개선 로그** — `docs/plan/HARNESS-IMPROVEMENT-LOG.md`: 하네스를 고칠 때마다 `status`·`predicted_effect`·`verified_at` 을 남긴다.
   규칙을 늘리기만 하고 효과를 잰 적이 없어 아무도 지우지 못하던 문제에 대한 대응 — 예측이 빗나가면 `reverted` 로 남기고 되돌린다.
 - **CI 강제** — `.github/workflows/harness-guard.yml`: PR/푸시마다 변경 파일 가드(`guard.mjs --list`) + 자기 진단을 **로컬 설정과 무관하게** 실행(훅 미설치·`--no-verify` 우회를 CI가 재차단). 기존 `ci.yml`(빌드·테스트·커버리지)와 병존.
 - **하네스 텔레메트리(관측 계층)** — `scripts/harness/telemetry.mjs`: 가드 차단·스킬 사용·라우터 제안을 `.claude/harness/logs/*.jsonl`(gitignore, 비커밋 — `.omc` 는 OMC 플러그인 소유·정리 대상이라 하네스 런타임은 프로젝트 소유 `.claude/harness/` 에 격리)에 append-only 적재. 집계는 `node scripts/harness/telemetry-report.mjs`(규칙별 발화 횟수·0회=죽은 규칙 후보·스킬 사용률·제안 대비 미로드). 관측 실패가 가드를 깨뜨리지 않는 non-fatal 설계, 킬 스위치 `HARNESS_TELEMETRY=off`.

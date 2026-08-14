@@ -40,7 +40,7 @@
 |----------|----------|------|
 | 회원/인증/멤버십 | `/auth · /users · /memberships` | ✅ |
 | 상품·SKU·카테고리·태그·이미지 | `/api/products · /categories · /api/tags` | ✅ |
-| 카탈로그(옵션 축/값·조합 SKU·진열 편성) | `/admin/option-catalog · /admin/display-sections · /display-sections` — 설계 정본 [`../study/product-catalog-design.md`](../study/product-catalog-design.md) | ✅ |
+| 카탈로그(옵션 축/값·조합 SKU·진열 편성) | `/admin/option-catalog · /admin/display-sections · /display-sections` — 설계 정본 [`../plan/product-catalog-design.md`](../plan/product-catalog-design.md) | ✅ |
 | 장바구니·쿠폰(등급별) | `/users/{id}/cart · /coupons` | ✅ |
 | 주문(재고 조건부 차감·Idempotency-Key)·배송 | `/orders · /orders/{id}/shipment` | ✅ |
 | 결제(Toss·분할·환불 동시성) | `/payments · /payments/split · /api/payments/*/refunds` | ✅ |
@@ -135,7 +135,7 @@
 
 ### 5.5b insurance-service (8108, mgmt 8109 / lemuel_insurance) ✅
 - GA(법인보험대리점) 플랫폼 — 상담 → 가입설계 → 청약 → 계약 → 유지·변경 → 수수료 정산을 하나로 잇는다
-- 상태머신 4종: Application/Policy/Proposal/Commission (전이표 상세는 [`insurance-service.md`](../inflearn/insurance-service.md))
+- 상태머신 4종: Application/Policy/Proposal/Commission (전이표 상세는 [`insurance-service.md`](../plan/prd/insurance-service.md))
 - 방카슈랑스 확장(V6+): 판매채널 FC/BANCA, 은행 채널 25%룰 모니터링, 대면 상품설명서 교부 증빙(완전판매 게이트)
 - 배치 7종(만기·가입설계 만료·월말 마감·수수료 지급·환수 스윕·일반지급·방카 집중도 감시)
 - PII(주민번호·연락처) 분리 테이블 암호화(`INSURANCE_ENC_KEY` 미설정 시 fail-closed)
