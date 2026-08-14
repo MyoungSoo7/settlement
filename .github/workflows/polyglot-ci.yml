@@ -245,7 +245,9 @@ jobs:
             # (load 대상이 없다) Trivy 의 tags[0] 참조도 깨진다 — PR 전용 태그를 하나 보장한다.
             # push 이벤트에서는 이 줄이 적용되지 않아 기존 태그 구성이 그대로다.
             type=ref,event=pr
-            type=sha,prefix={{branch}}-
+            # PR 이벤트에서는 {{branch}} 가 빈 값이라 "-<sha7>" 꼴의 불법 태그가 된다(대시 시작).
+            # 어차피 PR 은 푸시하지 않으므로 sha 태그 자체를 끈다.
+            type=sha,prefix={{branch}}-,enable=${{ github.event_name != 'pull_request' }}
             type=raw,value=latest,enable={{is_default_branch}}
       - name: Build and push
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
