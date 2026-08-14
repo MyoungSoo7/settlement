@@ -34,7 +34,7 @@ const blue: OptionAxisValue = {
 const renderPage = () => render(<ToastProvider><OptionCatalogAdminPage /></ToastProvider>);
 
 const openAxis = async (name: string) => {
-  const row = screen.getByText(name).closest('tr')!;
+  const row = (await screen.findByText(name)).closest('tr')!;
   fireEvent.click(within(row).getByRole('button', { name: '값 보기' }));
   await waitFor(() => expect(mocked.listValues).toHaveBeenCalled());
 };
