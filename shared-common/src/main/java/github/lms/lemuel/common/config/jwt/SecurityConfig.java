@@ -262,6 +262,13 @@ public class SecurityConfig {
                         // 결제 생성/인증/캡처(/payments POST·/authorize·/capture)는 사용자 결제 흐름이라 제한하지 않는다.
                         .requestMatchers(HttpMethod.PATCH, "/payments/*/refund").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers(HttpMethod.POST, "/payments/split/*/refund").hasAnyRole("ADMIN", "MANAGER")
+                        // 보험 언더라이팅(심사 착수·승인·반려) — 승인은 계약을 발행하고 수수료 12회를 확정한다.
+                        // 매처 목록에 없어 anyRequest().authenticated() 로 떨어져 있었고, 그 결과 청약 UUID 만
+                        // 알면 아무 로그인 사용자나 계약을 발행시킬 수 있었다. 접수자(FC)와 심사자는 같은
+                        // 권한일 수 없으므로 백오피스 역할로 분리한다.
+                        .requestMatchers(HttpMethod.POST, "/api/insurance/applications/*/review",
+                                "/api/insurance/applications/*/approve",
+                                "/api/insurance/applications/*/reject").hasAnyRole("ADMIN", "MANAGER")
                         // 나머지는 인증 필요
                         .anyRequest().authenticated()
                 )

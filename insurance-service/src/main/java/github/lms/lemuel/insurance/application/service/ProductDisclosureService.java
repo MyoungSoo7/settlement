@@ -4,11 +4,16 @@ import github.lms.lemuel.common.audit.application.AuditLogger;
 import github.lms.lemuel.common.audit.domain.AuditAction;
 import github.lms.lemuel.insurance.application.port.in.RecordDisclosureDeliveryUseCase;
 import github.lms.lemuel.insurance.application.port.in.RenderProductDisclosureUseCase;
+import github.lms.lemuel.insurance.application.port.out.LoadApplicationPort;
 import github.lms.lemuel.insurance.application.port.out.LoadInsuranceProductPort;
 import github.lms.lemuel.insurance.application.port.out.LoadInsuranceProductPort.ProductSnapshot;
 import github.lms.lemuel.insurance.application.port.out.RenderDisclosurePdfPort;
 import github.lms.lemuel.insurance.application.port.out.SaveDisclosureDeliveryPort;
 import github.lms.lemuel.insurance.domain.DisclosureDelivery;
+import github.lms.lemuel.insurance.domain.InsuranceApplication;
+import github.lms.lemuel.insurance.domain.exception.ApplicationNotFoundException;
+import github.lms.lemuel.insurance.domain.exception.ApplicationOwnershipException;
+import github.lms.lemuel.insurance.domain.exception.InvalidDisclosureException;
 import github.lms.lemuel.insurance.domain.exception.ProductNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,16 +34,19 @@ public class ProductDisclosureService
         implements RenderProductDisclosureUseCase, RecordDisclosureDeliveryUseCase {
 
     private final LoadInsuranceProductPort loadProductPort;
+    private final LoadApplicationPort loadApplicationPort;
     private final RenderDisclosurePdfPort renderPdfPort;
     private final SaveDisclosureDeliveryPort saveDeliveryPort;
     private final AuditLogger auditLogger;
 
     public ProductDisclosureService(
             LoadInsuranceProductPort loadProductPort,
+            LoadApplicationPort loadApplicationPort,
             RenderDisclosurePdfPort renderPdfPort,
             SaveDisclosureDeliveryPort saveDeliveryPort,
             AuditLogger auditLogger) {
         this.loadProductPort = loadProductPort;
+        this.loadApplicationPort = loadApplicationPort;
         this.renderPdfPort = renderPdfPort;
         this.saveDeliveryPort = saveDeliveryPort;
         this.auditLogger = auditLogger;
@@ -54,6 +62,7 @@ public class ProductDisclosureService
 
     @Override
     public DeliveredDisclosure record(RecordDeliveryCommand cmd) {
+        verifyAgainstApplication(cmd);
         ProductSnapshot product = loadActiveProduct(cmd.productCode());
         byte[] pdf = renderPdfPort.render(product);
 
@@ -70,6 +79,44 @@ public class ProductDisclosureService
 
         // 교부 = 문서 발급 + 기록의 단일 행위 — 이 바이트의 해시가 방금 저장한 증빙이다.
         return new DeliveredDisclosure(saved, pdf);
+    }
+
+    /**
+     * 청약을 참조한 교부라면 <b>그 청약과 일치하는지</b> 대조한다.
+     *
+     * <p>대조가 없으면 교부 증빙은 "청약과 무관한 아무 문서 1건"이 되고, 승인의 완전판매 게이트는
+     * 그 1건으로 열린다 — 실제로는 계약자에게 아무것도 교부하지 않은 계약이 발행될 수 있다.
+     *
+     * <p>순서에 유의: <b>소유권(403)을 상품·채널 불일치(400)보다 먼저</b> 본다. 반대로 하면
+     * 남의 청약이라도 필드를 맞춰 보며 존재 여부와 내용을 추측할 수 있다.
+     *
+     * <p>{@code applicationId} 가 없는 교부(청약 전 상담 단계 설명서)는 대조 대상이 아니다 —
+     * 이때는 승인 게이트도 이 증빙을 쓰지 않는다.
+     */
+    private void verifyAgainstApplication(RecordDeliveryCommand cmd) {
+        if (cmd.applicationId() == null || cmd.applicationId().isBlank()) {
+            return;
+        }
+        InsuranceApplication application = loadApplicationPort.findByApplicationId(cmd.applicationId())
+                .orElseThrow(() -> new ApplicationNotFoundException(cmd.applicationId()));
+
+        if (!application.getFcId().equals(cmd.deliveredBy())) {
+            throw new ApplicationOwnershipException(cmd.applicationId());
+        }
+        if (!application.getProductCode().equals(cmd.productCode())) {
+            throw new InvalidDisclosureException(
+                    "청약 상품과 다른 상품설명서는 교부 증빙이 될 수 없습니다: 청약="
+                            + application.getProductCode() + ", 교부=" + cmd.productCode());
+        }
+        if (application.getSalesChannel() != cmd.salesChannel()) {
+            throw new InvalidDisclosureException(
+                    "청약 판매채널과 다른 채널로는 교부할 수 없습니다: 청약="
+                            + application.getSalesChannel() + ", 교부=" + cmd.salesChannel());
+        }
+        if (!application.getContractorName().equals(cmd.contractorName())) {
+            // 계약자가 다르면 "그 사람에게 설명했다"는 증빙이 아니다. 이름은 응답에 싣지 않는다(PII).
+            throw new InvalidDisclosureException("청약 계약자와 다른 이름으로는 교부할 수 없습니다");
+        }
     }
 
     private ProductSnapshot loadActiveProduct(String productCode) {
