@@ -208,7 +208,7 @@ describe('CommissionRateConsolePage — 해석 미리보기', () => {
 
     await waitFor(() => expect(mocked.simulate).toHaveBeenCalledWith(
       expect.objectContaining({ sellerId: 77 })));
-    const panel = screen.getByTestId('simulation-result');
+    const panel = await screen.findByTestId('simulation-result');
     expect(within(panel).getByText('SELLER:77')).toBeInTheDocument();
     expect(within(panel).getByText('2.5%')).toBeInTheDocument();
   });
@@ -223,6 +223,6 @@ describe('CommissionRateConsolePage — 해석 미리보기', () => {
 
     await waitFor(() => expect(mocked.simulate).toHaveBeenCalled());
     expect(mocked.simulate.mock.calls[0][0].sellerId).toBeUndefined();
-    expect(within(screen.getByTestId('simulation-result')).getByText('DEFAULT_TIER')).toBeInTheDocument();
+    expect(within(await screen.findByTestId('simulation-result')).getByText('DEFAULT_TIER')).toBeInTheDocument();
   });
 });
