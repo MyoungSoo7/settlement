@@ -87,11 +87,44 @@ _판정 로그_ 다. 지금까지 하네스는 계속 늘어나기만 했고, �
 - **verified_at**: 2026-08-12 — `--deleted-list` 모드가 CI 에 배선돼 있고, 2026-08-12 부터
   `../../scripts/verify.sh` 도 같은 검사를 로컬에서 돈다.
 
+### 2026-08-15 · 문서 사실 게이트에 "서비스 수" 규칙 추가 + 부사 삽입형 소비처 주장 포착
+
+- **status**: verified
+- **동기**: HARNESS.md 가 3주간 `14 마이크로서비스` 로 남아 있었다(실제 16). 같은 문서 안에
+  `자바 16서비스` 줄이 공존해 **자기모순**이었는데도 `harness-audit` 는 healthy 였다 — 모듈 로스터
+  대조가 트리 표기만 보고 산문 주장은 안 봤기 때문. 같은 점검에서 `소비처가 아직 미배선`(organization)
+  이 gate #3 을 통과한 것도 드러났다. card-service 가 4토픽을 실제 소비 중인데, 정규식이
+  `소비처(가) 미배선` 만 보고 사이에 낀 `아직` 을 못 넘었다.
+- **predicted_effect**: 상태 기술 문서에서 서비스 수를 안 고치면 audit FAIL → CI 차단.
+  로스터 앵커(gateway·DB-per-service)가 같은 줄에 있을 때만 주장으로 인정하므로
+  부분집합("금융 5서비스")·폴리글랏 합계(24)는 오탐하지 않는다.
+- **verified_at**: 2026-08-15 — 규칙 투입 직후 실제 저장소에서 `HARNESS.md:67` 1건을 잡았고(수정 후
+  healthy 복귀), 상태 기술 문서 8종 전수에서 오탐 0건. `audit.test.mjs` 가 "잡는다/오탐 안 한다"
+  5쌍으로 고정.
+
 ---
+
+## 측정된 것 (2026-08-15 갱신 — 이전 "못 재는 것" 3항목이 전부 데이터를 갖게 됨)
+
+재현: `node scripts/harness/telemetry-report.mjs` · `node scripts/harness/session-metrics.mjs`
+
+- **위반 시도 빈도** — 가드 실행 1563회(분모: hook 1341 · staged 205 · files 9 · list 8) 대비
+  **차단 11건(0.7%)**, 최근 14일 6건. 최다 `MONEY-PRIMITIVE` 5 · `MSA-BOUNDARY` 4.
+  0회 규칙 7종은 카나리아가 전부 PASS 하므로 "죽은 규칙"이 아니라 **완전 예방**으로 판정된다.
+- **스킬 로드** — `skill-usage.jsonl` **295회**. 상위 `tdd-discipline` 55 · `settlement-domain-rules` 28 ·
+  `verify-before-done` 25 · `idempotency-and-events` 22 · `ledger-invariants` 21.
+  라우터 순응률(제안→로드) **100% (197/197)** — 목표 ≥80% 대비 초과 달성.
+- **상주/온디맨드 비중** — 상주 CLAUDE.md 20.1KB vs 온디맨드 37스킬 183.7KB → **상주 비중 10%**.
+- **완주율·재작업률(KPI-3/4)** — KPI-3 완주율 100%(2/2)이나 **n<10 이라 추이 지표로만** 쓴다.
+  KPI-4 재작업률 최근 30일 **21.6%(183/849)** — 베이스라인 19.3%(2026-07-22) 대비 **상승**했다.
+  하향이 목표였으므로 이 항목은 아직 개선 실패로 읽는 것이 정직하다.
 
 ## 아직 못 재는 것 (정직한 공백)
 
-- **에이전트가 실제로 위반을 시도하는 빈도** — 분모 배선 직후라 데이터가 없다.
-- **스킬 37개 중 값을 하는 것** — `skill-usage.jsonl` 0건. 상주 CLAUDE.md 17.6KB 대비
-  온디맨드 172.3KB(상주 비중 9%)라는 크기는 알지만, 로드 빈도는 모른다.
-- **완주율·재작업률(KPI-3/4)** — `session-metrics.mjs` 는 있으나 입력이 비어 있다.
+- **스킬 37개 중 값을 하는 것** — 로드 빈도는 이제 알지만 **로드가 결과를 바꿨는지**는 모른다.
+  로드 0회 13종(`compliance-review` · `economics-data-rules` · `hookify-to-guard` · `incident-runbooks` ·
+  `market-quotes-rules` · `oo-score` · `operation-signal-rules` · `recon-playbook` · 인터뷰 서브하네스
+  `socrates`·`wonder`·`reflect`·`refine`·`restate`)도 "안 쓰임"과 "해당 상황이 안 옴"이 구분되지 않는다
+  — 가드의 카나리아에 해당하는 장치가 스킬 쪽엔 없다.
+- **KPI-4 상승의 원인** — 재작업률이 올랐다는 사실은 재지만, 하네스 탓인지 작업 성격(대규모 캠페인
+  다수) 탓인지 분해할 축이 없다.
