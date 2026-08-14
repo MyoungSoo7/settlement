@@ -229,6 +229,10 @@ public class SecurityConfig {
                         // 셀러 예치금 운영 콘솔 — 잔고를 직접 움직이는 수기 경로라 ADMIN 만.
                         // (자동 경로는 settlement.confirmed·payout.completed 컨슈머다)
                         .requestMatchers("/admin/deposits/**").hasRole("ADMIN")
+                        // 법인카드 영수증 리뷰 콘솔(ADR 0036) — 대사 종결은 승인 게이트를 여는 운영 판단이라 ADMIN 만.
+                        .requestMatchers("/admin/expense-receipts/**").hasRole("ADMIN")
+                        // 청약서류 리뷰 큐(ADR 0036) — 계약자·피보험자 성명(PII)이 실려 언더라이팅과 같은 등급.
+                        .requestMatchers("/api/insurance/application-documents/**").hasAnyRole("ADMIN", "MANAGER")
                         // 셀러 예치금 조회 — 남의 계좌를 경로로 지정하는 형태라 운영자 전용.
                         // 본인 조회(/api/deposits/accounts/me)는 아래 authenticated 로 열되, sellerId 를
                         // 경로가 아니라 JWT 주체에서만 파생해 IDOR 을 원천 차단한다(/api/seller/bank-account 와 동일).

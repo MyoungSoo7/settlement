@@ -3,9 +3,12 @@ package github.lms.lemuel.deposit.adapter.out.persistence;
 import github.lms.lemuel.deposit.application.port.out.LoadDepositProofPort;
 import github.lms.lemuel.deposit.application.port.out.SaveDepositProofPort;
 import github.lms.lemuel.deposit.domain.DepositProof;
+import github.lms.lemuel.deposit.domain.DepositProofStatus;
 import github.lms.lemuel.deposit.domain.exception.DepositProofNotFoundException;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -36,6 +39,13 @@ public class DepositProofPersistenceAdapter implements SaveDepositProofPort, Loa
     @Override
     public Optional<DepositProof> findById(Long id) {
         return repository.findById(id).map(DepositProofJpaEntity::toDomain);
+    }
+
+    @Override
+    public List<DepositProof> findByStatus(DepositProofStatus status, int limit) {
+        return repository.findByStatusOrderByIdDesc(status, PageRequest.of(0, limit)).stream()
+                .map(DepositProofJpaEntity::toDomain)
+                .toList();
     }
 
     @Override

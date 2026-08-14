@@ -4,10 +4,13 @@ import github.lms.lemuel.insurance.application.port.out.LoadApplicationDocumentP
 import github.lms.lemuel.insurance.application.port.out.LoadApplicationSubmissionPort;
 import github.lms.lemuel.insurance.application.port.out.SaveApplicationDocumentPort;
 import github.lms.lemuel.insurance.domain.ApplicationDocument;
+import github.lms.lemuel.insurance.domain.ApplicationDocumentStatus;
 import github.lms.lemuel.insurance.domain.exception.ApplicationDocumentNotFoundException;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -40,6 +43,13 @@ public class ApplicationDocumentPersistenceAdapter
     @Override
     public Optional<ApplicationDocument> findById(Long id) {
         return repository.findById(id).map(ApplicationDocumentJpaEntity::toDomain);
+    }
+
+    @Override
+    public List<ApplicationDocument> findByStatus(ApplicationDocumentStatus status, int limit) {
+        return repository.findByStatusOrderByIdDesc(status, PageRequest.of(0, limit)).stream()
+                .map(ApplicationDocumentJpaEntity::toDomain)
+                .toList();
     }
 
     @Override

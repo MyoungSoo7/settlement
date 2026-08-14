@@ -75,8 +75,9 @@ spring:
                 - Path=/api/organizations/**
             - id: card-service
               uri: ${CARD_SERVICE_URI:http://localhost:8106}
+              # /admin/expense-receipts 는 영수증 리뷰 큐 콘솔(ADR 0036) — card 최초의 admin 표면
               predicates:
-                - Path=/api/cards/**
+                - Path=/api/cards/**,/admin/expense-receipts/**
             - id: insurance-service
               uri: ${INSURANCE_SERVICE_URI:http://localhost:8108}
               # GA 보험대리점 — 상담·청약·계약·유지변경·수수료 정산. shared-common JWT 체인이 인증 강제

@@ -1,7 +1,9 @@
 package github.lms.lemuel.loan.application.port.out;
 
 import github.lms.lemuel.loan.domain.CollateralDocument;
+import github.lms.lemuel.loan.domain.CollateralDocumentStatus;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -10,6 +12,9 @@ import java.util.Optional;
 public interface LoadCollateralDocumentPort {
 
     Optional<CollateralDocument> findById(Long id);
+
+    /** 상태별 목록(최신 우선) — 리뷰 큐 화면용. */
+    List<CollateralDocument> findByStatus(CollateralDocumentStatus status, int limit);
 
     /** 멱등 선조회 — 같은 파일 재업로드를 OCR 호출 전에 잡는다. */
     Optional<CollateralDocument> findByLoanIdAndFileHash(Long securedLoanId, String fileHash);

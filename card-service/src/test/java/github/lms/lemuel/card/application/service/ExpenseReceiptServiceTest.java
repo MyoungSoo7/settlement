@@ -218,6 +218,16 @@ class ExpenseReceiptServiceTest {
     }
 
     @Test
+    @DisplayName("리뷰 큐 목록 — 상태·limit 을 조회 포트에 그대로 전달한다")
+    void byStatusDelegates() {
+        when(loadExpenseReceiptPort.findByStatus(ExpenseReceiptStatus.NEEDS_REVIEW, 50))
+                .thenReturn(java.util.List.of());
+
+        assertThat(service.byStatus(ExpenseReceiptStatus.NEEDS_REVIEW, 50)).isEmpty();
+        verify(loadExpenseReceiptPort).findByStatus(ExpenseReceiptStatus.NEEDS_REVIEW, 50);
+    }
+
+    @Test
     @DisplayName("리뷰 대상 미존재는 404")
     void reviewNotFound() {
         when(loadExpenseReceiptPort.findById(5L)).thenReturn(Optional.empty());

@@ -3,10 +3,13 @@ package github.lms.lemuel.card.adapter.out.persistence;
 import github.lms.lemuel.card.application.port.out.LoadExpenseReceiptPort;
 import github.lms.lemuel.card.application.port.out.SaveExpenseReceiptPort;
 import github.lms.lemuel.card.domain.ExpenseReceipt;
+import github.lms.lemuel.card.domain.ExpenseReceiptStatus;
 import github.lms.lemuel.common.exception.BusinessException;
 import github.lms.lemuel.common.exception.ErrorCode;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -38,6 +41,13 @@ public class ExpenseReceiptPersistenceAdapter implements SaveExpenseReceiptPort,
     @Override
     public Optional<ExpenseReceipt> findById(Long id) {
         return repository.findById(id).map(ExpenseReceiptJpaEntity::toDomain);
+    }
+
+    @Override
+    public List<ExpenseReceipt> findByStatus(ExpenseReceiptStatus status, int limit) {
+        return repository.findByStatusOrderByIdDesc(status, PageRequest.of(0, limit)).stream()
+                .map(ExpenseReceiptJpaEntity::toDomain)
+                .toList();
     }
 
     @Override

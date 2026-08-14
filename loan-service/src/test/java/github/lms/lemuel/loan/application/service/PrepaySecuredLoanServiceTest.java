@@ -73,6 +73,10 @@ class PrepaySecuredLoanServiceTest {
             return Optional.empty();
         }
         @Override public Optional<CollateralDocument> findLatestByLoanId(Long loanId) { return Optional.empty(); }
+        @Override public java.util.List<CollateralDocument> findByStatus(
+                github.lms.lemuel.loan.domain.CollateralDocumentStatus status, int limit) {
+            return java.util.List.of();
+        }
     };
 
     @BeforeEach

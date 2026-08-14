@@ -75,6 +75,10 @@ class SecuredLoanServiceTest {
         @Override public java.util.Optional<CollateralDocument> findLatestByLoanId(Long loanId) {
             return java.util.Optional.empty();
         }
+        @Override public java.util.List<CollateralDocument> findByStatus(
+                github.lms.lemuel.loan.domain.CollateralDocumentStatus status, int limit) {
+            return java.util.List.of();
+        }
     };
 
     @BeforeEach

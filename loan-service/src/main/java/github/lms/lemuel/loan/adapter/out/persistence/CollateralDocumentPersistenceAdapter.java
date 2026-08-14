@@ -3,9 +3,12 @@ package github.lms.lemuel.loan.adapter.out.persistence;
 import github.lms.lemuel.loan.application.port.out.LoadCollateralDocumentPort;
 import github.lms.lemuel.loan.application.port.out.SaveCollateralDocumentPort;
 import github.lms.lemuel.loan.domain.CollateralDocument;
+import github.lms.lemuel.loan.domain.CollateralDocumentStatus;
 import github.lms.lemuel.loan.domain.exception.CollateralDocumentNotFoundException;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -37,6 +40,13 @@ public class CollateralDocumentPersistenceAdapter
     @Override
     public Optional<CollateralDocument> findById(Long id) {
         return repository.findById(id).map(CollateralDocumentJpaEntity::toDomain);
+    }
+
+    @Override
+    public List<CollateralDocument> findByStatus(CollateralDocumentStatus status, int limit) {
+        return repository.findByStatusOrderByIdDesc(status, PageRequest.of(0, limit)).stream()
+                .map(CollateralDocumentJpaEntity::toDomain)
+                .toList();
     }
 
     @Override

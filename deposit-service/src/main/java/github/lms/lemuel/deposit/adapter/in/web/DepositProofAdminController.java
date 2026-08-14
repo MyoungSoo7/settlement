@@ -91,6 +91,17 @@ public class DepositProofAdminController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
+    @Operation(summary = "증빙 리뷰 큐 — 상태별 목록(최신 우선)",
+            description = "기본 NEEDS_REVIEW. 리뷰 큐 화면이 이 목록을 그린다 (settlement tax 스캔 큐 선례).")
+    @GetMapping("/proofs")
+    public ResponseEntity<java.util.List<DepositProofResponse>> queue(
+            @RequestParam(defaultValue = "NEEDS_REVIEW") github.lms.lemuel.deposit.domain.DepositProofStatus status,
+            @RequestParam(defaultValue = "50") int limit) {
+        return ResponseEntity.ok(getUseCase.byStatus(status, limit).stream()
+                .map(DepositProofAdminController::toResponse)
+                .toList());
+    }
+
     @Operation(summary = "NEEDS_REVIEW 증빙 육안 리뷰 종결 (MATCHED/MISMATCHED)")
     @PostMapping("/proofs/{proofId}/review")
     public ResponseEntity<DepositProofResponse> review(

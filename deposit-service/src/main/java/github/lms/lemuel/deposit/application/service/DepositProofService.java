@@ -132,6 +132,13 @@ public class DepositProofService
         return loadDepositProofPort.findLatestByReference(sellerId, referenceType, referenceId);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public java.util.List<DepositProof> byStatus(github.lms.lemuel.deposit.domain.DepositProofStatus status,
+                                                 int limit) {
+        return loadDepositProofPort.findByStatus(status, limit);
+    }
+
     /** (앵커, fileHash) 멱등 키의 해시 축 — 같은 파일이면 항상 같은 값. */
     static String sha256Hex(byte[] content) {
         try {

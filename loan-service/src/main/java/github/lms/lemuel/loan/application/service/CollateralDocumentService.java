@@ -139,6 +139,13 @@ public class CollateralDocumentService
         return loadCollateralDocumentPort.findLatestByLoanId(loanId);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public java.util.List<CollateralDocument> byStatus(
+            github.lms.lemuel.loan.domain.CollateralDocumentStatus status, int limit) {
+        return loadCollateralDocumentPort.findByStatus(status, limit);
+    }
+
     /** (securedLoanId, fileHash) 멱등 키의 해시 축 — 같은 파일이면 항상 같은 값. */
     static String sha256Hex(byte[] content) {
         try {

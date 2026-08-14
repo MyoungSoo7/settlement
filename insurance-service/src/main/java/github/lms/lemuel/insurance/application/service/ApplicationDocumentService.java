@@ -144,6 +144,13 @@ public class ApplicationDocumentService
         return loadApplicationDocumentPort.findLatestByApplicationId(applicationId);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public java.util.List<ApplicationDocument> byStatus(
+            github.lms.lemuel.insurance.domain.ApplicationDocumentStatus status, int limit) {
+        return loadApplicationDocumentPort.findByStatus(status, limit);
+    }
+
     /** (applicationId, fileHash) 멱등 키의 해시 축 — 같은 파일이면 항상 같은 값. */
     static String sha256Hex(byte[] content) {
         try {

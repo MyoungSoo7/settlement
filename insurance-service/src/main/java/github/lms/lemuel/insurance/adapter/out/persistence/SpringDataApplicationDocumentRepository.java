@@ -1,10 +1,13 @@
 package github.lms.lemuel.insurance.adapter.out.persistence;
 
+import github.lms.lemuel.insurance.domain.ApplicationDocumentStatus;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -12,6 +15,9 @@ public interface SpringDataApplicationDocumentRepository
         extends JpaRepository<ApplicationDocumentJpaEntity, Long> {
 
     Optional<ApplicationDocumentJpaEntity> findByApplicationIdAndFileHash(UUID applicationId, String fileHash);
+
+    /** 리뷰 큐 — 최신 우선 (settlement tax 스캔 큐 선례). */
+    List<ApplicationDocumentJpaEntity> findByStatusOrderByIdDesc(ApplicationDocumentStatus status, Pageable pageable);
 
     Optional<ApplicationDocumentJpaEntity> findFirstByApplicationIdOrderByCreatedAtDescIdDesc(UUID applicationId);
 

@@ -89,6 +89,19 @@ public class CollateralDocumentController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
+    @Operation(summary = "담보서류 리뷰 큐 — 상태별 목록 (운영자)",
+            description = "기본 NEEDS_REVIEW, 최신 우선. 리뷰 큐 화면이 이 목록을 그린다.")
+    @GetMapping("/loans/secured/collateral-documents")
+    public ResponseEntity<java.util.List<CollateralDocumentResponse>> queue(
+            @RequestParam(defaultValue = "NEEDS_REVIEW") github.lms.lemuel.loan.domain.CollateralDocumentStatus status,
+            @RequestParam(defaultValue = "50") int limit,
+            Authentication authentication) {
+        requireOperator(authentication);
+        return ResponseEntity.ok(getUseCase.byStatus(status, limit).stream()
+                .map(CollateralDocumentController::toResponse)
+                .toList());
+    }
+
     @Operation(summary = "NEEDS_REVIEW 서류 육안 리뷰 종결 (운영자)",
             description = "신뢰도 미달·선순위/평가기준일 판독 불가 서류를 MATCHED/MISMATCHED 로 종결한다.")
     @PostMapping("/loans/secured/collateral-documents/{documentId}/review")

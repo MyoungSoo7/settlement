@@ -78,6 +78,22 @@ public class ApplicationDocumentController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
+    /**
+     * 청약서류 리뷰 큐 — 상태별 목록(최신 우선, 기본 NEEDS_REVIEW).
+     *
+     * <p>계약자·피보험자 성명(PII)이 실리므로 shared-common SecurityConfig 가
+     * {@code /api/insurance/application-documents/**} 를 ADMIN/MANAGER 로 게이트한다.
+     */
+    @GetMapping("/api/insurance/application-documents")
+    public ResponseEntity<java.util.List<ApplicationDocumentResponse>> queue(
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "NEEDS_REVIEW")
+            github.lms.lemuel.insurance.domain.ApplicationDocumentStatus status,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "50") int limit) {
+        return ResponseEntity.ok(getUseCase.byStatus(status, limit).stream()
+                .map(ApplicationDocumentController::toResponse)
+                .toList());
+    }
+
     /** NEEDS_REVIEW 서류 육안 리뷰 종결 (MATCHED/MISMATCHED). */
     @PostMapping("/api/insurance/application-documents/{documentId}/review")
     public ResponseEntity<ApplicationDocumentResponse> review(

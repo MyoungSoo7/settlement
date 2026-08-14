@@ -147,6 +147,13 @@ public class ExpenseReceiptService
         return loadExpenseReceiptPort.findLatestByReportId(reportId);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public java.util.List<ExpenseReceipt> byStatus(
+            github.lms.lemuel.card.domain.ExpenseReceiptStatus status, int limit) {
+        return loadExpenseReceiptPort.findByStatus(status, limit);
+    }
+
     /** (reportId, fileHash) 멱등 키의 해시 축 — 같은 파일이면 항상 같은 값. */
     static String sha256Hex(byte[] content) {
         try {
