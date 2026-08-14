@@ -67,11 +67,11 @@ describe('CategoryCountIntegrityPanel', () => {
     await waitFor(() => expect(mocked.checkCounts).toHaveBeenCalledTimes(1));
 
     mocked.checkCounts.mockResolvedValue(healthy);
-    fireEvent.click(screen.getByRole('button', { name: '재계산' }));
+    fireEvent.click(await screen.findByRole('button', { name: '재계산' }));
 
     await waitFor(() => expect(mocked.refreshCounts).toHaveBeenCalled());
     await waitFor(() => expect(mocked.checkCounts).toHaveBeenCalledTimes(2));
-    expect(screen.getByText(/캐시와 실계수가 일치합니다/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/캐시와 실계수가 일치합니다/)).toBeInTheDocument());
   });
 
   it('읽을 수 없는 행이 있으면 조회 조건 자체를 의심하라고 드러낸다', async () => {
