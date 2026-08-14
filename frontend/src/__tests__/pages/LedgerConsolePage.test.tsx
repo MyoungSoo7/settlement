@@ -57,7 +57,7 @@ describe('LedgerConsolePage — 권한 분기', () => {
     renderPage();
 
     await waitFor(() => expect(mocked.trialBalance).toHaveBeenCalledWith(expect.any(String)));
-    expect(screen.getByText(/차대 일치/)).toBeInTheDocument();
+    expect(await screen.findByText(/차대 일치/)).toBeInTheDocument();
     // 계정명은 분개 표에도 나오므로, 시산표에만 있는 잔액 칸으로 확인한다
     expect(screen.getByText('-100,000원')).toBeInTheDocument();
   });
@@ -69,7 +69,7 @@ describe('LedgerConsolePage — 권한 분기', () => {
     await waitFor(() => expect(mocked.entries).toHaveBeenCalled());
     expect(mocked.trialBalance).not.toHaveBeenCalled();
     expect(mocked.period).not.toHaveBeenCalled();
-    expect(screen.getByText(/시산표·기간 마감은 최고 관리자 전용/)).toBeInTheDocument();
+    expect(await screen.findByText(/시산표·기간 마감은 최고 관리자 전용/)).toBeInTheDocument();
   });
 });
 

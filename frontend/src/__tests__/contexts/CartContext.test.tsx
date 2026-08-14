@@ -207,7 +207,7 @@ describe('CartContext', () => {
       renderWith(authValue(7));
 
       await waitFor(() => expect(cartApi.addItem).toHaveBeenCalled());
-      expect(screen.getByText('상품100:2')).toBeInTheDocument();
+      expect(await screen.findByText('상품100:2')).toBeInTheDocument();
     });
 
     it('상품 상세 조회가 실패한 항목만 버리고 나머지는 보여준다', async () => {

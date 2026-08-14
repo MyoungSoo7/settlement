@@ -63,7 +63,7 @@ describe('DisplaySectionAdminPage', () => {
     expect(mocked.listVisible).toHaveBeenCalled();
 
     // 둘 다 active=true 지만, 노출 목록에 든 것만 '노출중' 이다
-    const summerRow = screen.getByText('2026 여름 기획전').closest('tr')!;
+    const summerRow = (await screen.findByText('2026 여름 기획전')).closest('tr')!;
     const springRow = screen.getByText('2026 봄 기획전').closest('tr')!;
     expect(within(summerRow).getByText('노출중')).toBeInTheDocument();
     expect(within(springRow).getByText('비노출')).toBeInTheDocument();
@@ -86,7 +86,7 @@ describe('DisplaySectionAdminPage', () => {
     renderPage();
     await waitFor(() => expect(mocked.listAll).toHaveBeenCalled());
 
-    fireEvent.change(screen.getByLabelText('편성 코드'), { target: { value: 'BEST_SHOES' } });
+    fireEvent.change(await screen.findByLabelText('편성 코드'), { target: { value: 'BEST_SHOES' } });
     fireEvent.change(screen.getByLabelText('편성 이름'), { target: { value: '신발 베스트' } });
     fireEvent.change(screen.getByLabelText('종류'), { target: { value: 'CATEGORY_BEST' } });
     fireEvent.click(screen.getByRole('button', { name: '편성 만들기' }));
@@ -98,7 +98,7 @@ describe('DisplaySectionAdminPage', () => {
     renderPage();
     await waitFor(() => expect(mocked.listAll).toHaveBeenCalledTimes(1));
 
-    fireEvent.change(screen.getByLabelText('편성 코드'), { target: { value: 'EXH_2026_FALL' } });
+    fireEvent.change(await screen.findByLabelText('편성 코드'), { target: { value: 'EXH_2026_FALL' } });
     fireEvent.change(screen.getByLabelText('편성 이름'), { target: { value: '2026 가을 기획전' } });
     fireEvent.change(screen.getByLabelText('시작 시각'), { target: { value: '2026-09-01T00:00' } });
     fireEvent.change(screen.getByLabelText('정렬 순서'), { target: { value: '4' } });
@@ -121,7 +121,7 @@ describe('DisplaySectionAdminPage', () => {
     await waitFor(() => expect(mocked.listAll).toHaveBeenCalled());
     await openSection('2026 여름 기획전');
 
-    fireEvent.change(screen.getByLabelText('상품 ID'), { target: { value: '103' } });
+    fireEvent.change(await screen.findByLabelText('상품 ID'), { target: { value: '103' } });
     fireEvent.change(screen.getByLabelText('표시 순서'), { target: { value: '2' } });
     fireEvent.click(screen.getByLabelText('맨 앞 고정'));
     fireEvent.click(screen.getByRole('button', { name: '상품 담기' }));
@@ -136,7 +136,7 @@ describe('DisplaySectionAdminPage', () => {
     await waitFor(() => expect(mocked.listAll).toHaveBeenCalled());
     await openSection('2026 여름 기획전');
 
-    fireEvent.click(screen.getByRole('button', { name: '상품 담기' }));
+    fireEvent.click(await screen.findByRole('button', { name: '상품 담기' }));
 
     await waitFor(() => expect(mocked.addItem).not.toHaveBeenCalled());
   });
@@ -156,7 +156,7 @@ describe('DisplaySectionAdminPage', () => {
     renderPage();
     await waitFor(() => expect(mocked.listAll).toHaveBeenCalledTimes(1));
 
-    const row = screen.getByText('2026 여름 기획전').closest('tr')!;
+    const row = (await screen.findByText('2026 여름 기획전')).closest('tr')!;
     fireEvent.click(within(row).getByRole('button', { name: '노출 중지' }));
 
     await waitFor(() => expect(mocked.setActive).toHaveBeenCalledWith('EXH_2026_SUMMER', false));
@@ -168,7 +168,7 @@ describe('DisplaySectionAdminPage', () => {
     await waitFor(() => expect(mocked.listAll).toHaveBeenCalled());
     await openSection('2026 봄 기획전');
 
-    fireEvent.change(screen.getByLabelText('기간 종료'), { target: { value: '2026-12-31T23:59' } });
+    fireEvent.change(await screen.findByLabelText('기간 종료'), { target: { value: '2026-12-31T23:59' } });
     fireEvent.click(screen.getByRole('button', { name: '기간 저장' }));
 
     await waitFor(() => expect(mocked.reschedule).toHaveBeenCalledWith('EXH_2026_SPRING',

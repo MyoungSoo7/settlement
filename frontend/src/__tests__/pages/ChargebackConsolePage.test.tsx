@@ -34,7 +34,7 @@ describe('ChargebackConsolePage — 목록', () => {
   it('진입하면 미결(OPEN) 분쟁을 먼저 보여 준다', async () => {
     renderPage();
     await waitFor(() => expect(mocked.list).toHaveBeenCalledWith('OPEN'));
-    expect(screen.getByText('도용·사기')).toBeInTheDocument();
+    expect(await screen.findByText('도용·사기')).toBeInTheDocument();
   });
 
   it('상태 탭을 바꾸면 그 상태로 다시 조회한다', async () => {

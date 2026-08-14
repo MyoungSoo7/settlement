@@ -56,7 +56,7 @@ describe('OptionCatalogAdminPage', () => {
     renderPage();
 
     await waitFor(() => expect(mocked.listAxes).toHaveBeenCalled());
-    expect(screen.getByText('색상')).toBeInTheDocument();
+    expect(await screen.findByText('색상')).toBeInTheDocument();
     expect(screen.getByText('사이즈')).toBeInTheDocument();
   });
 
@@ -90,7 +90,7 @@ describe('OptionCatalogAdminPage', () => {
 
     await openAxis('각인');
 
-    expect(screen.getByText(/표준값 목록을 갖지 않습니다/)).toBeInTheDocument();
+    expect(await screen.findByText(/표준값 목록을 갖지 않습니다/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '값 추가' })).not.toBeInTheDocument();
   });
 
@@ -99,7 +99,7 @@ describe('OptionCatalogAdminPage', () => {
     await waitFor(() => expect(mocked.listAxes).toHaveBeenCalled());
     await openAxis('사이즈');
 
-    fireEvent.change(screen.getByLabelText('값 코드'), { target: { value: 'XL' } });
+    fireEvent.change(await screen.findByLabelText('값 코드'), { target: { value: 'XL' } });
     fireEvent.change(screen.getByLabelText('값 이름'), { target: { value: '특대' } });
     fireEvent.change(screen.getByLabelText('정렬'), { target: { value: '3' } });
     fireEvent.click(screen.getByRole('button', { name: '값 추가' }));
@@ -114,7 +114,7 @@ describe('OptionCatalogAdminPage', () => {
     await waitFor(() => expect(mocked.listAxes).toHaveBeenCalled());
     await openAxis('색상');
 
-    fireEvent.change(screen.getByLabelText('값 코드'), { target: { value: 'GREEN' } });
+    fireEvent.change(await screen.findByLabelText('값 코드'), { target: { value: 'GREEN' } });
     fireEvent.change(screen.getByLabelText('값 이름'), { target: { value: '초록' } });
     fireEvent.click(screen.getByRole('button', { name: '값 추가' }));
 
@@ -146,14 +146,14 @@ describe('OptionCatalogAdminPage', () => {
     fireEvent.click(within(rows[0]).getByRole('button', { name: '내리기' }));
 
     await waitFor(() => expect(mocked.setValueActive).toHaveBeenCalledWith('COLOR', 'RED', false));
-    expect(screen.getByText(/이미 그 값을 파는 상품의 판매를 멈추지 않습니다/)).toBeInTheDocument();
+    expect(await screen.findByText(/이미 그 값을 파는 상품의 판매를 멈추지 않습니다/)).toBeInTheDocument();
   });
 
   it('새 축을 만들면 목록을 다시 읽는다', async () => {
     renderPage();
     await waitFor(() => expect(mocked.listAxes).toHaveBeenCalledTimes(1));
 
-    fireEvent.change(screen.getByLabelText('축 코드'), { target: { value: 'CAPACITY' } });
+    fireEvent.change(await screen.findByLabelText('축 코드'), { target: { value: 'CAPACITY' } });
     fireEvent.change(screen.getByLabelText('축 이름'), { target: { value: '용량' } });
     fireEvent.click(screen.getByRole('button', { name: '축 만들기' }));
 
@@ -166,7 +166,7 @@ describe('OptionCatalogAdminPage', () => {
     renderPage();
     await waitFor(() => expect(mocked.listAxes).toHaveBeenCalled());
 
-    fireEvent.click(screen.getByRole('button', { name: '축 만들기' }));
+    fireEvent.click(await screen.findByRole('button', { name: '축 만들기' }));
 
     await waitFor(() => expect(mocked.createAxis).not.toHaveBeenCalled());
   });
@@ -175,7 +175,7 @@ describe('OptionCatalogAdminPage', () => {
     renderPage();
     await waitFor(() => expect(mocked.listAxes).toHaveBeenCalledTimes(1));
 
-    const row = screen.getByText('색상').closest('tr')!;
+    const row = (await screen.findByText('색상')).closest('tr')!;
     fireEvent.click(within(row).getByRole('button', { name: '내리기' }));
 
     await waitFor(() => expect(mocked.setAxisActive).toHaveBeenCalledWith('COLOR', false));

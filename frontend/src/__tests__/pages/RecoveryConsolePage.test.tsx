@@ -60,7 +60,7 @@ describe('RecoveryConsolePage', () => {
     search('42');
 
     await waitFor(() => expect(mocked.bySeller).toHaveBeenCalledWith(42));
-    expect(screen.getByText(/미상계 잔액 \(OPEN 1건\)/)).toBeInTheDocument();
+    expect(await screen.findByText(/미상계 잔액 \(OPEN 1건\)/)).toBeInTheDocument();
     // 합계 배지와 채권 행의 잔액 칸 두 곳에 같은 금액이 나온다
     expect(screen.getAllByText('30,000원')).toHaveLength(2);
   });

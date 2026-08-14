@@ -173,7 +173,7 @@ describe('PayoutAdminPage', () => {
     renderPage();
     await waitFor(() => expect(payoutApi.listFailed).toHaveBeenCalled());
 
-    fireEvent.click(screen.getByRole('button', { name: '지급 대기' }));
+    fireEvent.click(await screen.findByRole('button', { name: '지급 대기' }));
 
     await waitFor(() => expect(payoutApi.listPending).toHaveBeenCalledWith(50));
     await waitFor(() => expect(screen.getByText('지급 대기 건이 없습니다.')).toBeInTheDocument());

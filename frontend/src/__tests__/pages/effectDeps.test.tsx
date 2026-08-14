@@ -65,7 +65,7 @@ describe('useEffect 의존성 — 재조회 루프 방지', () => {
 
     await waitFor(() => expect(settlementApi.search).toHaveBeenCalledTimes(1));
 
-    await userEvent.type(screen.getByPlaceholderText('주문자명 입력'), 'A');
+    await userEvent.type(await screen.findByPlaceholderText('주문자명 입력'), 'A');
 
     await waitFor(() => expect(settlementApi.search).toHaveBeenCalledTimes(2));
     await new Promise((resolve) => setTimeout(resolve, 50));

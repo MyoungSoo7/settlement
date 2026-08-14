@@ -49,14 +49,14 @@ describe('PgReconciliationConsolePage — 목록·상세', () => {
   it('진입하면 최근 실행 목록을 불러온다', async () => {
     renderPage();
     await waitFor(() => expect(mocked.runs).toHaveBeenCalledTimes(1));
-    expect(screen.getByText('TOSS')).toBeInTheDocument();
+    expect(await screen.findByText('TOSS')).toBeInTheDocument();
   });
 
   it('실행을 열면 상세와 회수 미리보기를 함께 부른다 — 승인 판단에 둘 다 필요하다', async () => {
     renderPage();
     await waitFor(() => expect(mocked.runs).toHaveBeenCalled());
 
-    fireEvent.click(screen.getByRole('button', { name: '열기' }));
+    fireEvent.click(await screen.findByRole('button', { name: '열기' }));
 
     await waitFor(() => expect(mocked.runDetail).toHaveBeenCalledWith(7));
     expect(mocked.clawbackPreview).toHaveBeenCalledWith(7);
@@ -68,7 +68,7 @@ describe('PgReconciliationConsolePage — 목록·상세', () => {
     renderPage();
     await waitFor(() => expect(mocked.runs).toHaveBeenCalled());
 
-    fireEvent.click(screen.getByRole('button', { name: '열기' }));
+    fireEvent.click(await screen.findByRole('button', { name: '열기' }));
 
     expect(await screen.findByText('금액 불일치')).toBeInTheDocument();
   });
@@ -78,7 +78,7 @@ describe('PgReconciliationConsolePage — 승인/거절 안전장치', () => {
   const openDetail = async () => {
     renderPage();
     await waitFor(() => expect(mocked.runs).toHaveBeenCalled());
-    fireEvent.click(screen.getByRole('button', { name: '열기' }));
+    fireEvent.click(await screen.findByRole('button', { name: '열기' }));
     await screen.findByText('금액 불일치');
   };
 
@@ -118,7 +118,7 @@ describe('PgReconciliationConsolePage — 마감 조건', () => {
   it('미결이 남아 있으면 마감 버튼을 잠근다', async () => {
     renderPage();
     await waitFor(() => expect(mocked.runs).toHaveBeenCalled());
-    fireEvent.click(screen.getByRole('button', { name: '열기' }));
+    fireEvent.click(await screen.findByRole('button', { name: '열기' }));
 
     await screen.findByText('금액 불일치');
     expect(screen.getByRole('button', { name: '대사 마감' })).toBeDisabled();
@@ -131,7 +131,7 @@ describe('PgReconciliationConsolePage — 마감 조건', () => {
     });
     renderPage();
     await waitFor(() => expect(mocked.runs).toHaveBeenCalled());
-    fireEvent.click(screen.getByRole('button', { name: '열기' }));
+    fireEvent.click(await screen.findByRole('button', { name: '열기' }));
 
     await waitFor(() => expect(screen.getByRole('button', { name: '대사 마감' })).toBeEnabled());
   });
@@ -143,7 +143,7 @@ describe('PgReconciliationConsolePage — 마감 조건', () => {
     });
     renderPage();
     await waitFor(() => expect(mocked.runs).toHaveBeenCalled());
-    fireEvent.click(screen.getByRole('button', { name: '열기' }));
+    fireEvent.click(await screen.findByRole('button', { name: '열기' }));
 
     await screen.findByText('금액 불일치');
     expect(screen.getByRole('button', { name: '대사 마감' })).toBeDisabled();
@@ -156,7 +156,7 @@ describe('PgReconciliationConsolePage — 업로드', () => {
     renderPage();
     await waitFor(() => expect(mocked.runs).toHaveBeenCalled());
 
-    fireEvent.click(screen.getByRole('button', { name: '업로드 + 대사' }));
+    fireEvent.click(await screen.findByRole('button', { name: '업로드 + 대사' }));
 
     expect(mocked.upload).not.toHaveBeenCalled();
   });
@@ -168,7 +168,7 @@ describe('PgReconciliationConsolePage — 업로드', () => {
     await waitFor(() => expect(mocked.runs).toHaveBeenCalled());
 
     const file = new File(['pg_transaction_id,amount\n'], 'toss.csv', { type: 'text/csv' });
-    fireEvent.change(screen.getByLabelText('정산 CSV'), { target: { files: [file] } });
+    fireEvent.change(await screen.findByLabelText('정산 CSV'), { target: { files: [file] } });
     fireEvent.click(screen.getByRole('button', { name: '업로드 + 대사' }));
 
     await waitFor(() => expect(mocked.upload).toHaveBeenCalledWith('TOSS', expect.any(String), file));
