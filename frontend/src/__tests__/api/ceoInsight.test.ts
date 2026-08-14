@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildCeoBriefing, ceoApi, pickLatestStatement } from '@/api/ceo';
 import { companyApi } from '@/api/company';
 import { economicsApi } from '@/api/economics';
-import { financialApi } from '@/api/financial';
+import { financialApi, type FinancialCompany } from '@/api/financial';
 import { marketApi } from '@/api/market';
 
 vi.mock('@/api/company', () => ({
@@ -12,7 +12,9 @@ vi.mock('@/api/economics', () => ({ economicsApi: { indicators: vi.fn() } }));
 vi.mock('@/api/financial', () => ({ financialApi: { statements: vi.fn(), companies: vi.fn() } }));
 vi.mock('@/api/market', () => ({ marketApi: { latest: vi.fn() } }));
 
-const company = { stockCode: '005930', name: '삼성전자', corpCode: '00126380' } as never;
+const company: FinancialCompany = {
+  stockCode: '005930', name: '삼성전자', corpCode: '00126380', market: 'KOSPI',
+};
 
 const statement = {
   fiscalYear: 2026, fsDivision: 'CFS',

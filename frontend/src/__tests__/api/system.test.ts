@@ -35,13 +35,13 @@ describe('commonCodeApi — 공통코드', () => {
     await commonCodeApi.getGroups();
     expect(mocked.get).toHaveBeenCalledWith('/admin/common-codes/groups');
 
-    await commonCodeApi.createGroup({ groupCode: 'ORDER_STATUS', groupName: '주문상태' });
+    await commonCodeApi.createGroup({ groupCode: 'ORDER_STATUS', name: '주문상태' });
     expect(mocked.post).toHaveBeenCalledWith('/admin/common-codes/groups',
-      { groupCode: 'ORDER_STATUS', groupName: '주문상태' });
+      { groupCode: 'ORDER_STATUS', name: '주문상태' });
 
-    await commonCodeApi.updateGroup('ORDER_STATUS', { groupName: '주문 상태', active: true });
+    await commonCodeApi.updateGroup('ORDER_STATUS', { name: '주문 상태', active: true });
     expect(mocked.put).toHaveBeenCalledWith('/admin/common-codes/groups/ORDER_STATUS',
-      { groupName: '주문 상태', active: true });
+      { name: '주문 상태', active: true });
 
     await commonCodeApi.deleteGroup('ORDER_STATUS');
     expect(mocked.delete).toHaveBeenCalledWith('/admin/common-codes/groups/ORDER_STATUS');
