@@ -137,7 +137,7 @@ dependencies {
     testImplementation("org.flywaydb:flyway-core")
     testImplementation("org.flywaydb:flyway-database-postgresql")
     testImplementation("org.springframework.security:spring-security-test")
-    testImplementation(platform("org.testcontainers:testcontainers-bom:1.21.4"))
+    testImplementation(platform("org.testcontainers:testcontainers-bom:2.0.5"))
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:postgresql")
     // 2-tier 캐시 L2 통합 테스트용 — compileOnly 인 redis 를 테스트 런타임에 올린다.
