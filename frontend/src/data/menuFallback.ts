@@ -56,6 +56,7 @@ export const FALLBACK_MENUS: FallbackMenuNode[] = [
       { id: -106, name: '회수 채권', path: '/admin/settlement/recoveries', icon: '🧲', description: '셀러별 미상계 잔액 · 상계 이력', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       { id: -107, name: '월마감', path: '/admin/settlement/monthly-closing', icon: '📆', description: '셀러 월 정산 마트 집계 · 재실행', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN'] },
       { id: -108, name: '세무', path: '/admin/settlement/tax', icon: '🧾', description: '스캔 리뷰 · 전표 전기 · 세금계산서', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
+      { id: -109, name: '수수료율', path: '/admin/settlement/commission-rates', icon: '⚖️', description: '셀러·등급 요율 정책 · 이력', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN'] },
       { id: -102, name: '원장·시산표', path: '/admin/settlement/ledger', icon: '📒', description: '분개 조회 · 월 시산표 · 기간 마감', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
     ],
   },

@@ -28,6 +28,24 @@ public interface SpringDataCommissionRatePolicyRepository
                                                        @Param("sellerKey") String sellerKey,
                                                        @Param("tierKey") String tierKey);
 
+    /**
+     * 운영 목록 — 살아 있는 정책만. 정렬은 scope → scopeKey → 발효일 역순으로, 같은 대상의 최신 정책이
+     * 먼저 오게 한다(운영자가 "지금 이 셀러에 뭐가 걸렸나"를 위에서부터 읽는다).
+     */
+    @Query("""
+            SELECT p FROM CommissionRatePolicyJpaEntity p
+            WHERE p.closedAt IS NULL
+            ORDER BY p.scope, p.scopeKey, p.effectiveFrom DESC
+            """)
+    List<CommissionRatePolicyJpaEntity> findOpenOrdered();
+
+    /** 운영 목록 — 종료 이력까지. 같은 정렬을 쓴다. */
+    @Query("""
+            SELECT p FROM CommissionRatePolicyJpaEntity p
+            ORDER BY p.scope, p.scopeKey, p.effectiveFrom DESC
+            """)
+    List<CommissionRatePolicyJpaEntity> findAllOrdered();
+
     /** 같은 scope 안에서 기간이 겹치는 살아있는 정책 — 등록 전 사전 확인용(최종 차단은 DB EXCLUDE). */
     @Query("""
             SELECT p FROM CommissionRatePolicyJpaEntity p

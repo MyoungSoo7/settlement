@@ -6,6 +6,7 @@ import github.lms.lemuel.settlement.application.port.in.RegisterCommissionRatePo
 import github.lms.lemuel.settlement.application.port.in.RegisterCommissionRatePolicyUseCase.RegisterPolicyCommand;
 import github.lms.lemuel.settlement.application.port.in.SimulateCommissionRateUseCase;
 import github.lms.lemuel.settlement.application.port.in.SimulateCommissionRateUseCase.RateSimulation;
+import github.lms.lemuel.settlement.application.port.out.ListCommissionRatePoliciesPort;
 import github.lms.lemuel.settlement.application.port.out.SaveCommissionRatePolicyPort;
 import github.lms.lemuel.settlement.domain.CommissionRatePolicy;
 import github.lms.lemuel.settlement.domain.RateScope;
@@ -47,6 +48,7 @@ class CommissionRateAdminControllerTest {
     private RegisterCommissionRatePolicyUseCase registerUseCase;
     private SaveCommissionRatePolicyPort savePort;
     private SimulateCommissionRateUseCase simulateUseCase;
+    private ListCommissionRatePoliciesPort listPort;
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -54,8 +56,10 @@ class CommissionRateAdminControllerTest {
         registerUseCase = mock(RegisterCommissionRatePolicyUseCase.class);
         savePort = mock(SaveCommissionRatePolicyPort.class);
         simulateUseCase = mock(SimulateCommissionRateUseCase.class);
+        listPort = mock(ListCommissionRatePoliciesPort.class);
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new CommissionRateAdminController(registerUseCase, savePort, simulateUseCase))
+                .standaloneSetup(new CommissionRateAdminController(
+                        registerUseCase, savePort, simulateUseCase, listPort))
                 // LocalDate 를 담은 응답·에러가 직렬화되어야 상태코드 검증이 의미를 갖는다.
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(
                         new ObjectMapper().findAndRegisterModules()))
@@ -67,6 +71,13 @@ class CommissionRateAdminControllerTest {
     private CommissionRatePolicy saved() {
         return CommissionRatePolicy.rehydrate(1L, RateScope.SELLER, "77",
                 new BigDecimal("0.01800"), LocalDate.of(2026, 9, 1), null);
+    }
+
+    private ListCommissionRatePoliciesPort.PolicyRow row(java.time.OffsetDateTime closedAt) {
+        return new ListCommissionRatePoliciesPort.PolicyRow(
+                1L, RateScope.SELLER, "77", new BigDecimal("0.01800"),
+                LocalDate.of(2026, 9, 1), null, "계약 갱신", "admin",
+                java.time.OffsetDateTime.parse("2026-08-20T00:00:00Z"), closedAt);
     }
 
     private String body() {
@@ -150,6 +161,42 @@ class CommissionRateAdminControllerTest {
                 .andExpect(jsonPath("$.source").value("SELLER:77"));
 
         verify(simulateUseCase).simulate(eq(77L), eq(SellerTier.VIP), eq(LocalDate.of(2026, 9, 1)));
+    }
+
+    @Test @DisplayName("목록: 기본은 살아 있는 정책만 — 이력까지 섞으면 지금 무엇이 걸렸는지 흐려진다")
+    void list_excludesClosedByDefault() throws Exception {
+        when(listPort.findRows(false)).thenReturn(java.util.List.of(row(null)));
+
+        mockMvc.perform(get("/admin/commission-rates"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(1))
+                .andExpect(jsonPath("$[0].scopeKey").value("77"))
+                // close 하려면 운영자가 id 를 눈으로 봐야 한다 — 목록의 존재 이유다
+                .andExpect(jsonPath("$[0].closed").value(false));
+
+        verify(listPort).findRows(false);
+    }
+
+    @Test @DisplayName("목록: includeClosed=true 면 종료 이력까지 내려준다")
+    void list_includesClosedWhenAsked() throws Exception {
+        when(listPort.findRows(true)).thenReturn(java.util.List.of(
+                row(java.time.OffsetDateTime.parse("2026-08-01T00:00:00Z"))));
+
+        mockMvc.perform(get("/admin/commission-rates").param("includeClosed", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].closed").value(true));
+
+        verify(listPort).findRows(true);
+    }
+
+    @Test @DisplayName("목록: 왜 이 요율인가(reason·createdBy)를 함께 실어 준다 — 감사 근거다")
+    void list_carriesAuditReason() throws Exception {
+        when(listPort.findRows(false)).thenReturn(java.util.List.of(row(null)));
+
+        mockMvc.perform(get("/admin/commission-rates"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].reason").value("계약 갱신"))
+                .andExpect(jsonPath("$[0].createdBy").value("admin"));
     }
 
     @Test @DisplayName("simulate: 파라미터가 없으면 null 로 넘겨 서비스 기본값(오늘·NORMAL)에 맡긴다")

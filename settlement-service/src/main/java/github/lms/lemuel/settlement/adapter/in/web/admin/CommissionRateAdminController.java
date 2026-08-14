@@ -4,6 +4,7 @@ import github.lms.lemuel.settlement.application.port.in.RegisterCommissionRatePo
 import github.lms.lemuel.settlement.application.port.in.RegisterCommissionRatePolicyUseCase.RegisterPolicyCommand;
 import github.lms.lemuel.settlement.application.port.in.SimulateCommissionRateUseCase;
 import github.lms.lemuel.settlement.application.port.in.SimulateCommissionRateUseCase.RateSimulation;
+import github.lms.lemuel.settlement.application.port.out.ListCommissionRatePoliciesPort;
 import github.lms.lemuel.settlement.application.port.out.SaveCommissionRatePolicyPort;
 import github.lms.lemuel.settlement.domain.CommissionRatePolicy;
 import github.lms.lemuel.settlement.domain.RateScope;
@@ -16,6 +17,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.util.List;
 
 /**
  * 수수료율 정책 운영 콘솔 (ADR 0032).
@@ -39,13 +42,16 @@ public class CommissionRateAdminController {
     private final RegisterCommissionRatePolicyUseCase registerUseCase;
     private final SaveCommissionRatePolicyPort savePort;
     private final SimulateCommissionRateUseCase simulateUseCase;
+    private final ListCommissionRatePoliciesPort listPort;
 
     public CommissionRateAdminController(RegisterCommissionRatePolicyUseCase registerUseCase,
                                          SaveCommissionRatePolicyPort savePort,
-                                         SimulateCommissionRateUseCase simulateUseCase) {
+                                         SimulateCommissionRateUseCase simulateUseCase,
+                                         ListCommissionRatePoliciesPort listPort) {
         this.registerUseCase = registerUseCase;
         this.savePort = savePort;
         this.simulateUseCase = simulateUseCase;
+        this.listPort = listPort;
     }
 
     // @Valid 없이는 아래 @NotNull 이 장식으로만 남아, 요율이 빠진 요청이 그대로 통과한다
@@ -55,6 +61,32 @@ public class CommissionRateAdminController {
     @PostMapping
     public ResponseEntity<CommissionRatePolicy> register(@jakarta.validation.Valid @RequestBody RegisterRequest request) {
         return ResponseEntity.ok(registerUseCase.register(request.toCommand(), LocalDate.now()));
+    }
+
+    @Operation(summary = "요율 정책 목록",
+            description = "조기 종료에 필요한 id 와 감사 근거(reason·createdBy)를 함께 준다. "
+                    + "기본은 살아 있는 정책만 — includeClosed=true 로 종료 이력까지 본다.")
+    @GetMapping
+    public ResponseEntity<List<PolicyView>> list(
+            @RequestParam(name = "includeClosed", defaultValue = "false") boolean includeClosed) {
+        return ResponseEntity.ok(listPort.findRows(includeClosed).stream().map(PolicyView::of).toList());
+    }
+
+    /**
+     * 목록 응답 뷰 — 포트 행에 {@code closed} 를 <b>필드로</b> 펼친다.
+     *
+     * <p>레코드의 파생 메서드는 직렬화되지 않아, 계산값을 그대로 두면 화면이 매번
+     * {@code closedAt != null} 을 다시 판정해야 한다. 판정 기준은 서버에 한 벌만 둔다.
+     */
+    public record PolicyView(Long id, RateScope scope, String scopeKey, BigDecimal rate,
+                             LocalDate effectiveFrom, LocalDate effectiveTo,
+                             String reason, String createdBy,
+                             OffsetDateTime createdAt, OffsetDateTime closedAt, boolean closed) {
+        static PolicyView of(ListCommissionRatePoliciesPort.PolicyRow r) {
+            return new PolicyView(r.id(), r.scope(), r.scopeKey(), r.rate(),
+                    r.effectiveFrom(), r.effectiveTo(), r.reason(), r.createdBy(),
+                    r.createdAt(), r.closedAt(), r.closed());
+        }
     }
 
     @Operation(summary = "요율 정책 조기 종료 — 요율 변경은 close + 신규 등록으로 한다")

@@ -17,12 +17,26 @@ import java.util.List;
  */
 @Repository
 public class CommissionRatePolicyPersistenceAdapter implements LoadCommissionRatePolicyPort,
-        github.lms.lemuel.settlement.application.port.out.SaveCommissionRatePolicyPort {
+        github.lms.lemuel.settlement.application.port.out.SaveCommissionRatePolicyPort,
+        github.lms.lemuel.settlement.application.port.out.ListCommissionRatePoliciesPort {
 
     private final SpringDataCommissionRatePolicyRepository repository;
 
     public CommissionRatePolicyPersistenceAdapter(SpringDataCommissionRatePolicyRepository repository) {
         this.repository = repository;
+    }
+
+    @Override
+    public List<PolicyRow> findRows(boolean includeClosed) {
+        return (includeClosed ? repository.findAllOrdered() : repository.findOpenOrdered()).stream()
+                .map(CommissionRatePolicyPersistenceAdapter::toRow)
+                .toList();
+    }
+
+    private static PolicyRow toRow(CommissionRatePolicyJpaEntity e) {
+        return new PolicyRow(e.getId(), RateScope.valueOf(e.getScope()), e.getScopeKey(), e.getRate(),
+                e.getEffectiveFrom(), e.getEffectiveTo(), e.getReason(), e.getCreatedBy(),
+                e.getCreatedAt(), e.getClosedAt());
     }
 
     @Override

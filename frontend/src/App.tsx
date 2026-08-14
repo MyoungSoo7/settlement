@@ -60,6 +60,7 @@ const ChargebackConsolePage = lazy(() => import('./pages/settlement/ChargebackCo
 const RecoveryConsolePage = lazy(() => import('./pages/settlement/RecoveryConsolePage'));
 const MonthlyClosingConsolePage = lazy(() => import('./pages/settlement/MonthlyClosingConsolePage'));
 const TaxConsolePage = lazy(() => import('./pages/settlement/TaxConsolePage'));
+const CommissionRateConsolePage = lazy(() => import('./pages/settlement/CommissionRateConsolePage'));
 
 // 인쇄 전용 (레이아웃 없이 문서만 그리는 화면 — 새 창으로 열린다)
 const SettlementPrintPage = lazy(() => import('./pages/print/SettlementPrintPage'));
@@ -183,6 +184,9 @@ function App() {
             {/* 월마감은 서버가 /admin/monthly-closing/** 를 ADMIN 전용으로 막는다 */}
             <Route path="/admin/settlement/monthly-closing"
               element={<AdminOnlyRoute><SideNavLayout><MonthlyClosingConsolePage /></SideNavLayout></AdminOnlyRoute>} />
+            {/* 요율은 정산 금액을 직접 바꾼다 — 서버가 /admin/commission-rates/** 를 ADMIN 으로만 막는다 */}
+            <Route path="/admin/settlement/commission-rates"
+              element={<AdminOnlyRoute><SideNavLayout><CommissionRateConsolePage /></SideNavLayout></AdminOnlyRoute>} />
             {/* 세무는 서버가 /admin/tax/** · /admin/seller-tax-profiles/** 를 ADMIN·MANAGER 로 막는다 */}
             <Route path="/admin/settlement/tax"
               element={<AdminManagerRoute><SideNavLayout><TaxConsolePage /></SideNavLayout></AdminManagerRoute>} />

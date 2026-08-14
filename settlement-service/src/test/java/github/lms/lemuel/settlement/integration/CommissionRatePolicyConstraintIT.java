@@ -15,6 +15,8 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import static github.lms.lemuel.settlement.application.port.out.ListCommissionRatePoliciesPort.PolicyRow;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -64,6 +66,7 @@ class CommissionRatePolicyConstraintIT {
     }
 
     @Autowired JdbcTemplate jdbc;
+    @Autowired github.lms.lemuel.settlement.application.port.out.ListCommissionRatePoliciesPort listPort;
 
     private void insert(String scopeKey, String rate, String from, String to) {
         jdbc.update("""
@@ -122,5 +125,35 @@ class CommissionRatePolicyConstraintIT {
     void reversedPeriodIsRejected() {
         assertThatThrownBy(() -> insert("VIP_REVERSED", "0.02500", "2026-09-01", "2026-01-01"))
                 .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    /**
+     * 운영 목록 조회 — JPQL 은 컴파일이 잡아 주지 않아 실 DB 로 한 번은 돌려 봐야 한다.
+     * 기본 목록이 종료 이력을 걸러 내는지가 핵심이다(닫힌 정책을 살아 있는 것처럼 보여 주면 오조작한다).
+     */
+    @Test @DisplayName("목록: 기본은 살아 있는 정책만, includeClosed 면 종료분까지")
+    void listRowsFiltersClosed() {
+        jdbc.update("DELETE FROM commission_rate_policy");
+        insert("VIP_LIST_OPEN", "0.02500", "2026-01-01", null);
+        insert("VIP_LIST_CLOSED", "0.02000", "2026-01-01", null);
+        jdbc.update("UPDATE commission_rate_policy SET closed_at = now() WHERE scope_key = 'VIP_LIST_CLOSED'");
+
+        assertThat(listPort.findRows(false)).extracting(PolicyRow::scopeKey)
+                .containsExactly("VIP_LIST_OPEN");
+        assertThat(listPort.findRows(true)).extracting(PolicyRow::scopeKey)
+                .containsExactlyInAnyOrder("VIP_LIST_OPEN", "VIP_LIST_CLOSED");
+    }
+
+    @Test @DisplayName("목록: 감사 근거(reason·createdBy)와 종료 여부를 그대로 실어 온다")
+    void listRowsCarryAuditFields() {
+        jdbc.update("DELETE FROM commission_rate_policy");
+        insert("VIP_LIST_AUDIT", "0.02500", "2026-01-01", null);
+
+        PolicyRow row = listPort.findRows(false).getFirst();
+
+        assertThat(row.reason()).isEqualTo("it");
+        assertThat(row.createdBy()).isEqualTo("it");
+        assertThat(row.closed()).isFalse();
+        assertThat(row.rate()).isEqualByComparingTo("0.025");
     }
 }

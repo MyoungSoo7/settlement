@@ -81,7 +81,6 @@ const SCREEN_PENDING = new Map([
   ['order-service/AdminTrackingUploadController', '송장 일괄 업로드 화면'],
   ['order-service/MembershipController', '멤버십 관리 화면'],
   // --- settlement-service (docs/PLAN.md §8-8) ---
-  ['settlement-service/CommissionRateAdminController', '수수료율 콘솔 — PLAN 8-8'],
   ['settlement-service/DlqAdminController', 'DLQ 재처리 콘솔 — PLAN 8-8'],
   ['settlement-service/EventTrackAdminController', '이벤트 추적 콘솔 — PLAN 8-8'],
   ['settlement-service/SettlementRerunAdminController', '정산 재구동 — PLAN 8-8'],
@@ -131,7 +130,7 @@ const SCREEN_PENDING = new Map([
  * 미노출 부채의 상한. <b>내려가기만 한다</b> — 화면을 붙였으면 이 수를 함께 내린다.
  * 올리려면 그 자체가 리뷰 대상이라는 뜻이다.
  */
-const PENDING_BUDGET = 46;
+const PENDING_BUDGET = 45;
 
 const read = (path) => readFileSync(path, 'utf8');
 
