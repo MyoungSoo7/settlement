@@ -474,7 +474,15 @@ jobs:
     name: Backend - Build & Push to GHCR
     runs-on: ubuntu-latest
     needs: [changes, backend-ci]
-    if: github.event_name != 'pull_request' && needs.changes.outputs.build_any == 'true'
+    # PR 에서도 돈다 — 다만 **푸시하지 않고 빌드·스캔만** 한다(아래 push/load 조건).
+    #
+    # 이전에는 `github.event_name != 'pull_request'` 라 PR 체크에 docker build 가 아예 없었다.
+    # 그래서 Dockerfile 만 바꾼 PR 이 이미지를 한 번도 만들지 않은 채 초록으로 머지된다 —
+    # 실측: PR #233(베이스 이미지 bump, 바뀐 파일이 Dockerfile 9개뿐)에서 이미지 잡 3종이
+    # 전부 skipped 였고 나머지 테스트 잡이 초록을 만들어 머지됐다. 빌드 파손도, 새 베이스가
+    # 물고 온 CRITICAL CVE 도 머지 후 push 실행에서야 드러난다(그때는 이미 늦다 —
+    # 이미지가 안 올라가 배포 스큐가 생기거나, 취약 이미지가 레지스트리에 올라간다).
+    if: needs.changes.outputs.build_any == 'true'
     permissions:
       contents: read
       packages: write
@@ -527,6 +535,10 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}${{ matrix.image_suffix }}
           tags: |
             type=ref,event=branch
+            # PR 에서는 event=branch 가 태그를 만들지 않는다. 태그가 0개면 build-push 가 설 수 없고
+            # (load 대상이 없다) Trivy 의 tags[0] 참조도 깨진다 — PR 전용 태그를 하나 보장한다.
+            # push 이벤트에서는 이 줄이 적용되지 않아 기존 태그 구성이 그대로다.
+            type=ref,event=pr
             type=sha,prefix={{branch}}-
             type=raw,value=latest,enable={{is_default_branch}}
 
@@ -535,7 +547,11 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
-          push: true
+          # buildx 는 --push 와 --load 를 동시에 쓸 수 없다 — 이벤트로 가른다.
+          # PR: 로컬 데몬으로 load 해 아래 Trivy 가 **레지스트리 없이** 스캔한다(푸시 안 함).
+          # push: 종전대로 GHCR 에 올린다.
+          push: ${{ github.event_name != 'pull_request' }}
+          load: ${{ github.event_name == 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           # Dockerfile 의 ARG MODULE 가 비어있으면 'gradle ::bootJar' 처럼 빈 세그먼트가 되어 빌드 실패.
@@ -551,7 +567,9 @@ jobs:
       # 지금까지 아무도 보지 않았다.
       # 게이트 범위: CRITICAL + 이미 수정 버전이 나온 것만(ignore-unfixed) — 미수정 CVE 로
       # 파이프라인이 막히는 상황을 피한다. HIGH 까지 조이려면 severity 에 추가할 것.
-      # 스캔은 push 뒤에 돈다(이미지는 이미 올라간 상태) — 잡이 빨개지면 롤백 판단은 사람이 한다.
+      # PR 에서는 load 된 로컬 이미지를 **올리기 전에** 스캔한다 — 취약 이미지가 레지스트리에
+      # 닿기 전에 막히는 지점이다. push 이벤트에서는 종전대로 올린 뒤 스캔하므로
+      # (이미지는 이미 올라간 상태) 잡이 빨개지면 롤백 판단은 사람이 한다.
       #
       # ⚠ 이 액션은 두 번 깨져 있었다 (둘 다 CI 실측으로 잡음):
       #   ① 원래 `@0.28.0` 으로 적혀 있었는데 그런 ref 자체가 없다(실제 태그는 v0.28.0).
@@ -684,7 +702,10 @@ jobs:
     # frontend-tests 를 needs 에 넣지 않으면 Vitest 가 실패해도 이미지가 그대로 푸시된다
     # (테스트는 빨간불, 배포는 진행 — 게이트를 켠 의미가 없어진다).
     needs: [changes, frontend-ci, frontend-tests]
-    if: github.event_name != 'pull_request' && needs.changes.outputs.frontend == 'true'
+    # backend-ghcr 와 같은 이유로 PR 에서도 돈다 — 푸시 없이 빌드·스캔만(아래 push/load).
+    # frontend/Dockerfile 도 #233 에 섞여 있었고, 이 잡이 skip 이라 새 nginx 베이스가
+    # 빌드되는지도 CVE 가 늘었는지도 PR 에서는 알 수 없었다.
+    if: needs.changes.outputs.frontend == 'true'
     permissions:
       contents: read
       packages: write
@@ -708,6 +729,10 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}
           tags: |
             type=ref,event=branch
+            # PR 에서는 event=branch 가 태그를 만들지 않는다. 태그가 0개면 build-push 가 설 수 없고
+            # (load 대상이 없다) Trivy 의 tags[0] 참조도 깨진다 — PR 전용 태그를 하나 보장한다.
+            # push 이벤트에서는 이 줄이 적용되지 않아 기존 태그 구성이 그대로다.
+            type=ref,event=pr
             type=sha,prefix={{branch}}-
             type=raw,value=latest,enable={{is_default_branch}}
 
@@ -716,7 +741,9 @@ jobs:
         with:
           context: ./frontend
           file: ./frontend/Dockerfile
-          push: true
+          # buildx 는 --push 와 --load 를 동시에 못 쓴다 — PR 은 load 만, push 이벤트는 push 만.
+          push: ${{ github.event_name != 'pull_request' }}
+          load: ${{ github.event_name == 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |

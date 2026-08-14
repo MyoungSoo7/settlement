@@ -208,9 +208,13 @@ jobs:
     name: Build & Push (${{ matrix.name }})
     runs-on: ubuntu-latest
     needs: [changes, go, python, kotlin]
+    # PR 에서도 돈다 — 다만 푸시하지 않고 **빌드만** 한다(아래 push 조건).
+    # 종전에는 `github.event_name == 'push'` 라 PR 체크에 docker build 가 없었다. 언어 잡은
+    # go build·pytest·gradlew build 를 돌 뿐 Dockerfile 을 읽지 않으므로, Dockerfile 만 바꾼
+    # PR 은 이미지를 한 번도 만들지 않고 초록이 된다 — 실측: PR #233(베이스 이미지 bump)에서
+    # 이 잡이 매트릭스 전개도 되기 전에 skipped 였다(체크 이름이 치환 안 된 표현식 원문으로 남았다).
     if: |
-      github.event_name == 'push'
-      && !cancelled()
+      !cancelled()
       && needs.changes.outputs.push_any == 'true'
       && needs.go.result != 'failure' && needs.go.result != 'cancelled'
       && needs.python.result != 'failure' && needs.python.result != 'cancelled'
@@ -237,6 +241,10 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}${{ matrix.suffix }}
           tags: |
             type=ref,event=branch
+            # PR 에서는 event=branch 가 태그를 만들지 않는다. 태그가 0개면 build-push 가 설 수 없고
+            # (load 대상이 없다) Trivy 의 tags[0] 참조도 깨진다 — PR 전용 태그를 하나 보장한다.
+            # push 이벤트에서는 이 줄이 적용되지 않아 기존 태그 구성이 그대로다.
+            type=ref,event=pr
             type=sha,prefix={{branch}}-
             type=raw,value=latest,enable={{is_default_branch}}
       - name: Build and push
@@ -244,7 +252,10 @@ jobs:
         with:
           context: ./${{ matrix.name }}
           file: ./${{ matrix.name }}/Dockerfile
-          push: true
+          # PR 은 빌드까지만 — Dockerfile 이 실제로 서는지 확인하는 게 목적이고 태그를 올릴
+          # 이유는 없다. load 는 하지 않는다(ci.yml 과 달리 이 워크플로에는 이미지 스캐너가
+          # 없어 로컬 이미지를 쓸 소비자가 없다 — 디스크만 쓴다).
+          push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.name }}
