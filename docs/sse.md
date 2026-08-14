@@ -63,9 +63,17 @@ gateway 는 두 경로 모두 프리픽스를 벗겨 전달한다(`RewritePath`)
 SSE 는 프록시 설정 하나로 조용히 죽는다 — 버퍼링이 켜져 있으면 이벤트가 묶이고,
 `proxy_read_timeout` 이 짧으면 유휴 연결이 잘린다.
 
-- `frontend/nginx.conf`·`nginx.compose.conf` 는 `/api/market-stream/` 에 전용 location 을 두어
-  `proxy_buffering off` + `proxy_read_timeout 3600s` 를 건다.
-- ⚠️ **`/api/notifications/stream` 은 아직 전용 location 이 없다** — 일반 `api` location 으로 떨어져
-  버퍼링이 켜진 채 `proxy_read_timeout 60s` 를 받는다. gateway 직결(개발)에서는 정상 동작하지만
-  nginx 를 앞에 둔 compose·배포 경로에서는 60초에 끊긴다. 시세 쪽과 같은 형태의 location 추가가
-  남은 배선이다.
+`frontend/nginx.conf`·`nginx.compose.conf` 는 **두 스트림 모두** 전용 location 을 두어
+`proxy_buffering off` + `proxy_cache off` + `proxy_read_timeout 3600s` 를 건다.
+
+| 경로 | 매칭 | 비고 |
+| --- | --- | --- |
+| `/api/market-stream/` | 프리픽스(`^~`) | `/stream/{code}` 다수 종목 |
+| `/api/notifications/stream` | **정확 일치(`=`)** | gateway 도 와일드카드를 금지한다 — `/notifications/send`·`demo` 는 인증 없이 발송하는 내부 경로라 노출 대상이 아니다. 프리픽스로 열면 그 결정을 프록시 층에서 되돌리는 셈이다. 쿼리스트링(`?token=`)은 location 매칭에 영향을 주지 않아 EventSource 인증 경로도 그대로 탄다 |
+
+전용 location 이 없으면 일반 `api` location 으로 떨어져 버퍼링이 켜진 채 `proxy_read_timeout 60s`
+를 받는다. **gateway 직결(개발)에서는 정상 동작하고 nginx 를 앞에 둔 compose·배포 경로에서만
+깨지는** 형태라 눈에 잘 띄지 않는다 — 실제로 알림 스트림이 한동안 그 상태였다.
+
+실측(스텁 업스트림이 2초 간격으로 3틱 전송): 전용 location 은 2초 간격 그대로 도착하고,
+일반 `api` location 은 스트림이 끝난 뒤 세 틱이 한꺼번에 도착한다.
