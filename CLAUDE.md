@@ -129,6 +129,8 @@ order Kafka 이벤트를 컨슈머(`adapter/in/kafka/`)가 받아 로컬 적재�
   (드리프트는 `kafka.topic.partition.drift` 게이지). 새 토픽은 카탈로그 등록 필수 — 누락 시
   `kafka-topic-gate.test.mjs` 가 CI 에서 FAIL.
 - 토픽 목록·프로듀서/컨슈머 매핑 → [`SPEC.md`](./SPEC.md) §5. 이벤트/멱등 코드 작성 규칙 → `idempotency-and-events` 스킬.
+  **전송 계약·운영 절차(파티션 증설 판단·보존기간·DLT·실측 명령·게이트 4종) 정본은
+  [`docs/kafka.md`](docs/kafka.md)** — 카프카 관련 작업은 여기서 시작한다.
   토픽 추가·페이로드 변경 절차(스키마·샘플·양방향 테스트 배선) → `event-contract-change` 스킬.
 
 ## 도메인 규칙 (요지 — 상세는 SPEC.md §4 + `*-rules` 스킬)
