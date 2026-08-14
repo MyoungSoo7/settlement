@@ -1,5 +1,6 @@
 package github.lms.lemuel.order.application.service;
 
+import github.lms.lemuel.config.TimeConfig;
 import github.lms.lemuel.order.application.port.in.GetPendingStockReclaimUseCase;
 import github.lms.lemuel.order.application.port.out.LoadPendingStockReclaimPort;
 import github.lms.lemuel.order.domain.Order;
@@ -50,12 +51,18 @@ public class GetPendingStockReclaimService implements GetPendingStockReclaimUseC
                 order.getItems().stream().map(GetPendingStockReclaimService::toLine).toList());
     }
 
-    /** 종단 이후 경과일. 시계 오차로 종단 시각이 미래여도 음수를 내지 않는다. */
+    /**
+     * 종단 이후 경과일. 시계 오차로 종단 시각이 미래여도 음수를 내지 않는다.
+     *
+     * <p>두 시각 모두 커머스 업무 표준시(KST)로 기록·조회되므로, 경과 시간은 그 시간대에서 센다.
+     * 시간대 없는 {@code LocalDateTime} 끼리의 뺄셈은 "하루 = 24시간"을 암묵 가정한다 — KST 는
+     * 서머타임이 없어 결과는 같지만, 어느 시간대의 경과인지를 타입에 남긴다.
+     */
     private static long pendingDays(LocalDateTime terminalAt, LocalDateTime now) {
         if (terminalAt == null || now == null) {
             return 0L;
         }
-        long days = Duration.between(terminalAt, now).toDays();
+        long days = Duration.between(terminalAt.atZone(TimeConfig.KST), now.atZone(TimeConfig.KST)).toDays();
         return Math.max(days, 0L);
     }
 

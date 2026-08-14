@@ -81,7 +81,9 @@ class StockReclaimDelayScannerTest {
         ArgumentCaptor<LocalDateTime> from = ArgumentCaptor.forClass(LocalDateTime.class);
         ArgumentCaptor<LocalDateTime> to = ArgumentCaptor.forClass(LocalDateTime.class);
         verify(loadPort).findStockReclaimCrossedBetween(from.capture(), to.capture(), anyInt());
-        assertThat(Duration.between(from.getValue(), to.getValue())).isEqualTo(INTERVAL);
+        // 두 값의 간격이 정확히 스캔주기인지를 "from + 주기 == to" 로 본다 — 시간대 없는 두 시각의
+        // 뺄셈(Duration.between)은 하루=24시간을 암묵 가정하므로 더하기 비교로 대신한다.
+        assertThat(from.getValue().plus(INTERVAL)).isEqualTo(to.getValue());
     }
 
     @Test @DisplayName("지연 건마다 주문·수량·임계를 담은 경고 신호를 쏜다")
