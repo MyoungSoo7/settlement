@@ -58,7 +58,10 @@ jobs:
 
       - name: Install dependencies
         working-directory: frontend
-        run: npm ci
+        # --ignore-scripts: 설치 단계에서 의존성의 lifecycle 스크립트를 실행하지 않는다
+        # (침해된 패키지가 러너 토큰에 닿는 공급망 경로 차단). 실측 확인 — 이 설치로도
+        # vite build·vitest 707건이 그대로 통과한다(esbuild 는 플랫폼 optional dep 로 해결).
+        run: npm ci --ignore-scripts
 
       - name: Install Playwright browsers (chromium/firefox/webkit)
         working-directory: frontend
