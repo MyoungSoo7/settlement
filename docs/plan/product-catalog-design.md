@@ -126,7 +126,7 @@ opslab.product_variants               -- SKU: 재고·가산금·할인·상태
 문제 5가지
 1. **옵션 축·값이 테이블에 없다.** "색상=빨강인 상품 전체" 같은 파셋 검색/필터가 원리적으로 불가능하다.
 2. **문자열이 사실상 조인키다.** 순서·구분자·공백·이름 변경 어디가 틀려도 조용히 못 찾는다.
-   `UNIQUE(product_id, option_name)` 이 이 규약을 스키마에 굳혔다 — ssgb2e 의 `OPTCODE/OPTCODE2` 와 같은 실수다.
+   `UNIQUE(product_id, option_name)` 이 이 규약을 스키마에 굳혔다 —  의 `OPTCODE/OPTCODE2` 와 같은 실수다.
 3. **이름 변경 시 3곳이 어긋난다**: `options_json` / `product_variants.option_name` / 주문 스냅샷.
 4. `resolve()` 가 O(변형 수) 스캔이고 인덱스를 못 탄다.
 5. 옵션 축이 상품별로만 존재 → "사이즈" 가 판매자마다 제각각이라 표준화·통계가 안 된다.
@@ -139,7 +139,7 @@ opslab.product_variants               -- SKU: 재고·가산금·할인·상태
 
 1. **분류 트리는 `ecommerce_categories` 로 단일화**한다. `categories` / `products.category_id` 는 이관 후 제거.
 2. **분류(카테고리)와 진열(전시·기획전)을 분리**한다. 분류는 상품의 성질, 진열은 기간·타깃이 있는 편성이다.
-   ofDentis 가 `isView`/`isSortView` 를 한 테이블에 섞은 실수를 반복하지 않는다.
+    가 `isView`/`isSortView` 를 한 테이블에 섞은 실수를 반복하지 않는다.
 3. **옵션은 3층**으로 나눈다 — ① 표준 축/값 카탈로그(재사용) ② 상품이 채택한 축/값(차수·필수·정렬)
    ③ 조합 SKU(재고·가격). 그리고 ②↔③ 을 잇는 **매핑 테이블**을 조인키로 삼는다.
 4. **`option_name` 문자열 규약을 조인키에서 표시용으로 강등**한다. 정확 조회는 `option_signature`(해시)로.
@@ -159,7 +159,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_ecommerce_categories_path_slug
     ON opslab.ecommerce_categories (path_slug) WHERE deleted_at IS NULL;
 ```
 
-- `path_ids` 는 **ID만** 비정규화한다(ofDentis 가 name 까지 박아 만든 부채를 피한다).
+- `path_ids` 는 **ID만** 비정규화한다( 가 name 까지 박아 만든 부채를 피한다).
   하위 트리 전체 조회는 `WHERE path_ids @> ARRAY[:categoryId]` 한 줄 — 재귀 CTE가 사라진다.
 - 이름은 조인으로 얻는다. 표시용 전체 경로명이 필요하면 읽기 모델에서 조립한다.
 - `path_ids`/`path_slug` 는 **부모 변경(`changeParent`) 시 서브트리 일괄 갱신**이 필요하다.
@@ -180,7 +180,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_product_primary_category
 `is_primary` 가 폐기될 `products.category_id` 의 역할을 대체한다.
 
 > **경계 주의 — 카테고리별 수수료율은 여기에 두지 않는다.**
-> ssgb2e 의 `TBL_PTN_CATE_POINT` 처럼 카테고리를 정책 부착점으로 쓰고 싶어지지만, 정산 수수료 정책은
+>  의 `TBL_PTN_CATE_POINT` 처럼 카테고리를 정책 부착점으로 쓰고 싶어지지만, 정산 수수료 정책은
 > `settlement-service` 소유다(등급별 3.5/2.5/2.0%, 정산시점 `commission_rate` 영구보존).
 > `order-service` 는 상품 이벤트에 카테고리 식별자를 실어 보내고, 정책 판단은 settlement 가 자기
 > 프로젝션에서 한다. 적립·쿠폰처럼 **커머스 소유** 정책만 카테고리에 붙일 수 있다.
@@ -224,7 +224,7 @@ CREATE INDEX IF NOT EXISTS idx_display_items_section_sort
     ON opslab.display_section_items (section_id, is_pinned DESC, sort_order);
 ```
 
-ssgb2e 는 기획전 카테고리(`TBL_PROMOTION_CTY_CODE`), ofDentis 는 기획전 엔티티(`tb_category_special`)를
+  기획전 카테고리(`TBL_PROMOTION_CTY_CODE`), 기획전 엔티티(`tb_category_special`)를
 분류 트리와 **같은 모양으로 복제**했다. 여기서는 기획전을 트리가 아니라 **편성(section)** 으로 모델링해
 트리 코드 중복을 없앤다. `kind` 로 메인 진열·기획전·카테고리 베스트를 한 테이블에서 다룬다.
 
@@ -317,15 +317,15 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_product_variants_signature
 - **정확 조회 O(1)**: 선택 → signature 계산 → `(product_id, option_signature)` 유니크 인덱스 단건 조회.
   현재의 전량 스캔 + 문자열 비교가 사라진다.
 - **파셋 검색**: "색상=빨강인 판매중 SKU" 가 `product_variant_option_values` 조인 한 번.
-- **차수 무제한**: ssgb2e 의 `parent_poid` 2단 한계, `OPTCODE/OPTCODE2` 고정을 구조적으로 회피.
+- **차수 무제한**:  의 `parent_poid` 2단 한계, `OPTCODE/OPTCODE2` 고정을 구조적으로 회피.
 - **조합 단위 재고**: 기존 `product_variants.stock_quantity` 를 그대로 쓴다.
-  ssgb2e 가 부모 옵션 재고를 자식이 상속하던 초과판매 위험이 없다.
+   가 부모 옵션 재고를 자식이 상속하던 초과판매 위험이 없다.
 - **이름 변경 안전**: 값 이름은 `option_axis_values.name` 한 곳. SKU·매핑은 ID로 묶여 있어 영향받지 않는다.
 
 `products.options_json` 의 처지
 - 위 테이블이 정본이 되면 `options_json` 은 **중복 진실원**이 된다. 등록 시점 원본 보존이 목적이라면
   읽기 전용 **감사 사본**으로 격하하고(컬럼 주석·용도 명시), 진열·선택 검증은 전부 테이블에서 읽는다.
-  두 개를 모두 살아 있는 정본으로 두면 ofDentis 가 한 테이블에 엔티티 두 개를 매핑한 것과 같은 상태가 된다.
+  두 개를 모두 살아 있는 정본으로 두면  가 한 테이블에 엔티티 두 개를 매핑한 것과 같은 상태가 된다.
 
 ### 3.4 주문 옵션 스냅샷
 
@@ -347,7 +347,7 @@ CREATE TABLE opslab.order_item_options (
 );
 ```
 
-- ofDentis 의 장바구니 스냅샷(`tb_cart_market_option`)에서 가져온 아이디어를 **주문에만** 적용한다.
+- 장바구니 스냅샷(`tb_cart_market_option`)에서 가져온 아이디어를 **주문에만** 적용한다.
 - **금액은 스냅샷하지 않는다.** 라인 단가는 이미 `order_items` 가 보존하고,
   `ProductVariant.effectiveUnitPrice()` 의 우선순위(기준가 → 추가금 → 정액할인 → 정률할인 FLOOR)가
   환불 역산의 정본이다. 축별 가산금을 여기 또 적으면 합계가 두 곳에서 갈린다.
@@ -384,7 +384,7 @@ CREATE TABLE opslab.order_item_options (
   `getVisibleItems`/`getItems` 로 갈랐다.
 
 Phase 1–2 는 순수 추가라 무중단이다. Phase 4·5 가 되돌리기 어려운 지점이므로 **Phase 3 이 프로덕션에서
-한 사이클 돈 뒤에** 착수한다. ofDentis 가 `tb_market_opt` 에 엔티티 두 개를 남긴 채 멈춘 것이
+한 사이클 돈 뒤에** 착수한다. `tb_market_opt` 에 엔티티 두 개를 남긴 채 멈춘 것이
 "옵션 구조를 절반만 바꾸면 영원히 절반인 채로 남는다"는 사례다.
 
 ## 5. 헥사고날 배치
@@ -408,8 +408,8 @@ order-service/src/main/java/github/lms/lemuel/
 ```
 
 - `option_signature` 계산은 **도메인이 소유**한다. 어댑터나 SQL 로 새면 정렬 규칙이 두 벌이 되어
-  ssgb2e 의 `option_name` 문자열 규약과 똑같은 함정이 재현된다.
-- 옵션 가산금은 `BigDecimal`/`NUMERIC` — ofDentis 의 `price String` 을 그대로 반복하지 않는다.
+   의 `option_name` 문자열 규약과 똑같은 함정이 재현된다.
+- 옵션 가산금은 `BigDecimal`/`NUMERIC` —  `price String` 을 그대로 반복하지 않는다.
 - 도메인 public setter 금지, 팩토리/rehydrate 전용 — `guard.mjs` OO-* 규칙이 실시간으로 강제한다.
 - 새 도메인 패키지가 붙으므로 **스캔·JPA·gateway·nginx·Dockerfile 5곳 배선**이 필요하다
   (`msa-service-wiring` 스킬 참조). 컴파일이 잡아주지 않고 런타임 404 로 조용히 실패한다.
