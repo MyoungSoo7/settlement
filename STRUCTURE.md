@@ -54,7 +54,7 @@ settlement/                              # 모노레포 루트
 │                                        #      매수·매도 등 투자 판단과 그 결과의 책임은 이용자 본인에게 있음
 ├── account-service/                     # 🏦 Account (8102, lemuel_account) — 계정계 GL 집계 (소비 전용)
 ├── organization-service/                # 👥 Organization (8104, lemuel_organization) — 조직·멤버십 (발행 전용)
-├── card-service/                        # 💳 Card (8106/mgmt 8107, lemuel_card) — 법인카드 카드계정·카드(마스터/서브 한도). 도메인·정책·영속(adapter/out/persistence)·REST(adapter/in/web — `/api/cards` + `/admin/expense-receipts` 리뷰 큐)·스케줄러(adapter/in/schedule)·Kafka 컨슈머(adapter/in/kafka, 조직 프로젝션 4 + captured 2) 구현 — Phase 2(승인·매입·명세서·지출관리) 포함
+├── card-service/                        # 💳 Card (8106/mgmt 8107, lemuel_card) — 법인카드 카드계정·카드(마스터/서브 한도). 도메인·정책·영속(adapter/out/persistence)·REST(adapter/in/web — `/api/cards` + `/admin/expense-receipts` 리뷰 큐)·스케줄러(adapter/in/schedule)·Kafka 컨슈머(adapter/in/kafka 7종 — 조직 프로젝션 4 + 평판 1 + captured 2) 구현 — Phase 2(승인·매입·명세서·지출관리) 포함
 ├── insurance-service/                   # 🛡️ Insurance (8108/mgmt 8109, lemuel_insurance) — GA 보험대리점 플랫폼: 상담·가입설계·청약·계약·유지변경·수수료정산. shared-common 의존
 ├── deposit-service/                     # 🏧 Deposit (8112/mgmt 8113, lemuel_deposit) — 셀러 예치금 원장(잔고 단일 진실원, hold/offset 로 재원 이중사용 차단). shared-common 의존, REST 는 `/api/deposits` 조회 + `/admin/deposits` 수기 콘솔, Kafka 컨슈머 2종(settlement.confirmed·payout.completed). card 승인·매입은 페이로드에 sellerId 가 없어 미구독 — hold/offset 은 콘솔 경로
 └── gateway-service/                     # 🚪 API Gateway (8080) — 라우팅만 (자체 인증 필터 없음)
