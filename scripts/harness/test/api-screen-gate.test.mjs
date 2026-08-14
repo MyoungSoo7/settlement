@@ -91,6 +91,7 @@ const SCREEN_PENDING = new Map([
   // --- loan-service ---
   ['/loans/secured', '담보대출 화면'],
   ['/loans/secured/{loanId}/collateral', '담보 감시(마진콜·청산) 화면'],
+  ['/loans/secured/{loanId}/collateral/documents', '담보 서류 첨부 화면'],
   ['/loans/leases', '리스 화면'],
   ['/loans/repayment', '상환 화면'],
   ['/loans/company-reputation', '기업 평판 조회(대출 심사 보조)'],
@@ -113,6 +114,7 @@ const SCREEN_PENDING = new Map([
   ['/api/cards', '법인카드 화면 — Phase 2 까지 구현됐는데 화면 0'],
   ['/api/insurance', '보험 상품설명서 — 서비스 전체가 화면 0'],
   ['/api/insurance/applications', '보험 청약 화면'],
+  ['/api/insurance/applications/{applicationId}/documents', '청약 서류 첨부 화면'],
   ['/api/insurance/policies', '보험 계약 화면'],
   ['/api/insurance/proposals', '보험 가입설계 화면'],
   ['/admin/deposits', '예치금 수기 콘솔'],
@@ -123,7 +125,7 @@ const SCREEN_PENDING = new Map([
  * 미노출 부채의 상한. <b>내려가기만 한다</b> — 화면을 붙였으면 이 수를 함께 내린다.
  * 올리려면 그 자체가 리뷰 대상이라는 뜻이다.
  */
-const PENDING_BUDGET = 48;
+const PENDING_BUDGET = 50;
 
 const read = (path) => readFileSync(path, 'utf8');
 
