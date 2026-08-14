@@ -1,3 +1,11 @@
+import org.gradle.api.flow.FlowAction
+import org.gradle.api.flow.FlowParameters
+import org.gradle.api.flow.FlowProviders
+import org.gradle.api.flow.FlowScope
+import org.gradle.api.provider.Property
+import org.gradle.api.tasks.Input
+import javax.inject.Inject
+
 plugins {
     java
     id("org.springframework.boot")
@@ -65,3 +73,40 @@ tasks.named<Test>("test") {
     useJUnitPlatform()
     jvmArgs("-javaagent:${mockitoAgent.asPath}")
 }
+
+// ── 빌드 결과 표식 (Gradle 9 `-q` 대응) ─────────────────────────────────────────
+// Gradle 9.x 의 `--quiet(-q)` 는 LIFECYCLE 로그를 억제하므로 "BUILD SUCCESSFUL" 요약
+// 줄이 stdout 에 출력되지 않는다. card-service 승인(AC1) 검증 게이트는
+//   `./gradlew :card-service:test ... -q 2>&1 | tail -1 | grep -o 'BUILD SUCCESSFUL'`
+// 형태로 성공 여부를 판정하므로, `-q` 하에서도 성공 시 표식을 남겨야 한다.
+// Gradle 9 의 Flow API(buildFinished 대체)로 빌드 종료 시점에 성공이면 표식을 출력한다.
+// FlowAction 은 태스크 up-to-date 여부와 무관하게 매 빌드 종료마다 실행되므로,
+// 캐시된(UP-TO-DATE) 재실행에서도 표식이 보존된다.
+@Suppress("UnstableApiUsage")
+abstract class BuildOutcomeMarkerAction : FlowAction<BuildOutcomeMarkerAction.Params> {
+    interface Params : FlowParameters {
+        @get:Input
+        val failed: Property<Boolean>
+    }
+
+    override fun execute(parameters: Params) {
+        if (!parameters.failed.get()) {
+            println("BUILD SUCCESSFUL")
+            System.out.flush()
+        }
+    }
+}
+
+@Suppress("UnstableApiUsage")
+abstract class BuildOutcomeMarkerPlugin @Inject constructor(
+    private val flowScope: FlowScope,
+    private val flowProviders: FlowProviders,
+) : Plugin<Project> {
+    override fun apply(project: Project) {
+        flowScope.always(BuildOutcomeMarkerAction::class.java) {
+            parameters.failed.set(flowProviders.buildWorkResult.map { it.failure.isPresent })
+        }
+    }
+}
+
+apply<BuildOutcomeMarkerPlugin>()
