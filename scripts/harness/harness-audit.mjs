@@ -528,9 +528,25 @@ function validateDocFacts(read, tracked, trackedSet, errors) {
     return trackedSet.has(path) ? read(path) : '';
   };
 
+  // Boot 버전 정본은 build.gradle.kts — 문서가 같은 메이저의 다른 패치 버전을 말하면 드리프트다.
+  // (Kotlin 폴리글랏의 Boot 3.x 표기는 메이저가 달라 대상 밖 — 오탐보다 범위 축소.)
+  const gradleRoot = trackedSet.has('build.gradle.kts') ? read('build.gradle.kts') : '';
+  const bootVersion = gradleRoot.match(/id\("org\.springframework\.boot"\)\s+version\s+"(\d+\.\d+\.\d+)"/)?.[1] ?? null;
+  const bootMajor = bootVersion ? `${bootVersion.split('.')[0]}.` : null;
+
   for (const doc of STATE_DOCS) {
     if (!trackedSet.has(doc)) continue;
     const content = read(doc);
+
+    if (bootVersion) {
+      content.split('\n').forEach((lineText, idx) => {
+        for (const m of lineText.matchAll(/Spring(?:%20| )Boot[^0-9\n]{0,4}(\d+\.\d+\.\d+)/gi)) {
+          if (m[1].startsWith(bootMajor) && m[1] !== bootVersion) {
+            errors.push(`doc facts: ${doc}:${idx + 1} Spring Boot 버전 드리프트: 문서=${m[1]} 실제=${bootVersion} (build.gradle.kts)`);
+          }
+        }
+      });
+    }
 
     if (schemaCount > 0) {
       for (const claim of parseContractTopicClaims(content)) {
