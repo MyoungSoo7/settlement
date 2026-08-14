@@ -30,7 +30,10 @@ const message = (over: Partial<Awaited<ReturnType<typeof dlqApi.inspect>>[number
 const renderPage = () => render(<ToastProvider><DlqConsolePage /></ToastProvider>);
 
 const selectTopicAndInspect = async () => {
-  await waitFor(() => expect(mocked.topics).toHaveBeenCalled());
+  // 셀렉트 엘리먼트는 마운트부터 있지만 <option> 은 topics 응답으로 채워진다 — 옵션이 오기 전에
+  // change 를 쏘면 값이 목록에 없어 조용히 무시되고, 이어지는 조회가 빈 토픽으로 나간다.
+  // 그래서 라벨이 아니라 **옵션이 나타날 때까지** 기다린다.
+  await screen.findByRole('option', { name: 'lemuel.payment.captured.DLT' });
   fireEvent.change(screen.getByLabelText('토픽'), { target: { value: 'lemuel.payment.captured.DLT' } });
   fireEvent.click(screen.getByRole('button', { name: '조회' }));
 };
@@ -90,7 +93,7 @@ describe('DlqConsolePage — 인스펙션', () => {
     await selectTopicAndInspect();
 
     await waitFor(() => expect(mocked.inspect).toHaveBeenCalledWith('lemuel.payment.captured.DLT', 20));
-    expect(screen.getByText('java.lang.IllegalStateException')).toBeInTheDocument();
+    expect(await screen.findByText('java.lang.IllegalStateException')).toBeInTheDocument();
     expect(screen.getByText(/settlement already exists/)).toBeInTheDocument();
   });
 
@@ -163,7 +166,7 @@ describe('DlqConsolePage — 재처리', () => {
     renderPage();
     await selectTopicAndInspect();
     await waitFor(() => expect(mocked.inspect).toHaveBeenCalledTimes(1));
-    fireEvent.click(screen.getByRole('button', { name: '재처리' }));
+    fireEvent.click(await screen.findByRole('button', { name: '재처리' }));
 
     await waitFor(() => expect(mocked.inspect).toHaveBeenCalledTimes(2));
   });

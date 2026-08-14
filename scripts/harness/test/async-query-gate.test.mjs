@@ -74,6 +74,11 @@ const STATIC_QUERIES = new Map([
   ["CommissionRateConsolePage.test.tsx :: screen.getByRole('button', { name: '정책 등록' })", '등록 폼 제출 버튼 — 조건 없이 렌더'],
   ["CommissionRateConsolePage.test.tsx :: screen.getByPlaceholderText('왜 이 요율인가')", '등록 폼 사유 입력 — 조건 없이 렌더'],
   ["CommissionRateConsolePage.test.tsx :: screen.getByPlaceholderText('예: 2.5')", '등록 폼 요율 입력 — 조건 없이 렌더'],
+
+  // DlqConsolePage.tsx 의 조회 버튼은 결과 블록 밖이라 마운트부터 있다. 같은 필터 바의 토픽
+  // 셀렉트는 등록하지 않았다 — 엘리먼트는 정적이지만 <option> 은 데이터로 채워져서, 테스트가
+  // **옵션**을 기다리도록 고쳤다(옵션 전에 change 를 쏘면 값이 조용히 무시되고 빈 토픽으로 조회가 나간다).
+  ["DlqConsolePage.test.tsx :: screen.getByRole('button', { name: '조회' })", '조회 버튼 — 조건 없이 렌더'],
 ]);
 
 /** 앞선 waitFor 로부터 이 줄 수 안에 있는 조회만 같은 흐름으로 본다. */
