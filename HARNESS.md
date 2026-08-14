@@ -2,7 +2,7 @@
 
 > Claude Code 개발 하네스 구성 — 헥사고날 + 정산/결제/금융 도메인 전용 에이전트·스킬·커맨드·가드 구성
 
-**Last updated:** 2026-07-25
+**Last updated:** 2026-08-15
 
 ## 목적
 
@@ -56,7 +56,8 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 ├── telemetry.mjs · telemetry-report.mjs · session-metrics.mjs   # 관측 계층 (적재·집계·KPI)
 ├── interview-harness.mjs              # 요구사항 인터뷰 루프(Claude/Codex 듀얼 플랫폼 계약)
 ├── manifest.json                      # 하네스 구성요소 추적 목록 — CI 가 git ls-files 로 실존 검증
-└── test/*.test.mjs (7종)              # 하네스 자기 테스트 — `node --test scripts/harness/test/*.test.mjs`
+└── test/*.test.mjs                    # 하네스 자기 테스트 — `node --test scripts/harness/test/*.test.mjs`
+                                       #   (개수는 세어 쓴다: `git ls-files 'scripts/harness/test/*.test.mjs' | wc -l`)
 
 .codex/{skills,agents,prompts}/        # Codex 미러 — interview-harness 계열은 Claude/Codex 양쪽 정본 쌍으로
                                        #   유지되고 manifest 의 criticalContractPairs 가 드리프트를 차단
@@ -64,7 +65,7 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 
 ## 대상 코드베이스
 
-- **14 마이크로서비스** + API Gateway + `shared-common`(버전드 1.0.0) · **DB-per-service** · 서비스 간 연계는 Kafka 이벤트 + 내부 대사 API 뿐 — **cross-DB 0 · cross-code 0**(이것이 이 하네스가 지키는 핵심 불변식)
+- **16 마이크로서비스** + API Gateway + `shared-common`(버전드 1.0.0) · **DB-per-service** · 서비스 간 연계는 Kafka 이벤트 + 내부 대사 API 뿐 — **cross-DB 0 · cross-code 0**(이것이 이 하네스가 지키는 핵심 불변식)
 - 서비스 로스터·포트·DB·모듈 경계·컨벤션 → `CLAUDE.md` · _reservation(시공 예약) 도메인 제거 완료(에이전트·규칙 폐기)_
 
 ## 서비스별 규칙 스킬 (온디맨드 로드)
@@ -74,9 +75,15 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 `operation-signal` · `ai-chat` · `card-service` — 각 서비스 로직 작성·수정·리뷰 시 해당 `*-rules` 스킬이 강제 규칙(상태머신·정책·경계)을 로드.
 로드는 규율이 아니라 `skill-router.mjs` 가 편집 경로를 보고 **자동 주입**한다(아래 "강제 지점").
 
-> **커버리지 공백(명시)**: 14서비스 중 `organization-service` 만 전용 `*-rules` 스킬이 없다 — 이벤트 발행 전용이고
-> 소비처가 아직 미배선이라 강제할 상태머신·회계 규칙이 없기 때문. 소비처가 붙는 시점에 `organization-rules` 를
-> 추가하고 라우터 표(`ROUTES`)에 경로 1행을 함께 배선한다(조용한 누락이 아니라 알려진 부채).
+> **커버리지 공백(명시)**: 위 13개 스킬은 16서비스 중 13개만 덮는다 — `organization-service` ·
+> `insurance-service` · `deposit-service` 3개가 전용 `*-rules` 스킬도, `skill-router.mjs` `ROUTES` 행도 없다.
+> 성격이 다르므로 분리해 기록한다(조용한 누락이 아니라 알려진 부채):
+>
+> - `organization-service` — 이벤트 발행 전용. 다만 **소비처는 배선돼 있다**(card-service 가 조직 프로젝션으로
+>   4토픽 소비 — `card-service/src/main/resources/application.yml`). 강제할 자체 상태머신·회계 규칙이 얇아 후순위.
+> - `insurance-service` · `deposit-service` — **돈 경로다**(수수료정산·25%룰·완전판매 게이트 / 예치금 원장
+>   hold·offset 재원 이중사용 차단). "저위험 위성이라 스킬 없이 게이트로 충분" 논리가 적용되지 않는
+>   구간이므로 우선 부채다 — 스킬 추가 시 라우터 `ROUTES` 행을 **함께** 배선한다(둘은 같은 사실의 두 표현).
 
 > **에이전트 로스터 설계 원칙 (의도된 공백)**: 전용 서브에이전트는 **고위험·상태보존 축**(정산·GL·이벤트 계약·헥사 경계·보안·쿼리)에만 둔다. 공개 read-only 위성(financial·economics·market·commondata)과 부가(operation·ai)는 상태 변이·회계 리스크가 낮아 **`*-rules` 스킬 + ArchUnit 게이트로 커버하는 것이 의도된 설계**다 — 서비스마다 에이전트를 만들지 않는다(로스터 비대화 = 안티패턴).
 
@@ -161,7 +168,8 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 
 운영 DB 직접 조작 명령 차단(`check-command`).
 
-**skill-router.mjs 라우트 표** (경로 → 주입 스킬, 세션당 스킬별 1회 · 최대 3개): 14개 서비스 디렉토리 → 각 `{서비스}-rules`
+**skill-router.mjs 라우트 표** (경로 → 주입 스킬, 세션당 스킬별 1회 · 최대 3개): 13개 서비스 디렉토리 → 각 `{서비스}-rules`
+(16서비스 중 organization·insurance·deposit 은 스킬 부재로 미배선 — 위 "커버리지 공백" 참조)
 (settlement `ledger` 경로·account 는 `ledger-invariants` 동반) · `outbox/`·`adapter/in/kafka/`·`adapter/out/event/` →
 `idempotency-and-events` · settlement `readmodel|projection` → `projection-view-ops` · `contracts/events/` →
 `event-contract-change` · `.claude/hookify.*.local.md` → `hookify-to-guard` · 그 외 `src/{main,test}/` 첫 편집 → `tdd-discipline`.
@@ -204,6 +212,23 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
   **라인+파일(멀티라인) 이중 스캔**으로 개행 분할 우회를 차단한다. `--staged` 는 돈 경로 프로덕션 변경이 테스트 변경 없이
   스테이지되면 **비차단 DoD 넛지**를 stderr 로 출력한다(차단 안 함 — 완료 판정은 JaCoCo 게이트가 정답, 발화는 텔레메트리 적재).
 - **OO 구조 게이트** — `scripts/harness/test/oo-gate.test.mjs`: 트리 전수 스캔(도메인 setter 0·@Setter 0·금융 5서비스 IAE 0·코어 애그리거트 17종 생성자 봉인·상태 enum 9종 canTransitionTo 전이표 보유). 2026-07-14 OO 캠페인(패널 중앙값 9.5+)의 구조 정본 회귀 방지 — CI 하네스 테스트에 자동 포함. 점수 재채점(LLM 판정)은 📘`oo-score` 스킬.
+- **AOP 프록시 게이트** — `scripts/harness/test/aop-proxy-gate.test.mjs`: 같은 빈 안에서 `this.method()` 로
+  부가기능 메서드를 부르면 프록시를 거치지 않아 `@Retry`·`@CircuitBreaker`·`@Cacheable`·`@Async`·`@PreAuthorize`
+  가 **조용히 무력화**된다(컴파일·테스트 통과, 운영에서만 안 걸림). 리포 전수 소스 스캔 — ArchUnit 1.3 이
+  Java 25 바이트코드를 못 읽어 소스 계층에 둔다.
+- **트랜잭션 롤백 게이트** — `scripts/harness/test/tx-rollback-gate.test.mjs`: 스프링 트랜잭션 AOP 는 언체크만
+  롤백하고 **체크 예외는 커밋**한다. 금융 도메인에서 이 기본값은 조용한 사고(반쪽 커밋)가 되므로
+  `@Transactional` + 체크 예외 조합에 `rollbackFor` 를 강제한다.
+- **Kafka 토픽 카탈로그 게이트** — `scripts/harness/test/kafka-topic-gate.test.mjs`(ADR 0035): 막는 것은
+  "파티션 수가 코드 밖에서 정해지는 상태". 메시지 키가 outbox `aggregateId` 라 파티션 수 변경 =
+  키 재해시 = 이미 쌓인 메시지까지 **순서 보장 소급 붕괴**(되돌릴 수 없다). 새 토픽은 카탈로그 등록 필수.
+- **Kafka 발행부↔카탈로그 게이트** — `scripts/harness/test/kafka-publisher-gate.test.mjs`: 위 게이트는
+  `application.yml` 의 `app.kafka.topic.*` 만 보므로 **발행 전용 토픽**(구독 설정이 없어 yml 에 안 적힘)이
+  카탈로그에서 통째로 샌다. 실제로 두 번 났다(insurance general_payout 2종 누락 · card statement 계약
+  파일명을 옮겨 적어 실재하지 않는 토픽 등재). 발행 코드를 정본으로 카탈로그를 대조한다.
+- **SSE nginx 배선 게이트** — `scripts/harness/test/sse-nginx-gate.test.mjs`: 게이트웨이에 SSE 를 열고 nginx 를
+  안 고치면 요청이 일반 `api` location 으로 떨어져 `proxy_buffering on` + `read_timeout 60s` 를 받는다 —
+  실시간이 아니게 되고 유휴 연결이 60초에 끊긴다. 배선 누락을 빌드 시점에 잡는다(정본 `docs/sse.md`).
 - **스케줄러 락 이름 유일성** — `scripts/harness/test/scheduler-lock-gate.test.mjs`: 같은 `@SchedulerLock`
   이름을 두 배치가 쓰면 락 보유 기간 동안 나머지가 **조용히 스킵**된다(예외·로그 없음 → 컴파일도 CI 도 못 잡음).
   리포 전수로 잠근다. 의도적 공유가 필요하면 게이트의 `ALLOWED_SHARED` 에 근거와 함께 등록.
@@ -230,6 +255,12 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 - **하네스 자기 진단** — `scripts/harness/harness-audit.mjs`: 문서 드리프트를 규율이 아닌 **기계 게이트**로 승격(과거 문서 3주 방치 재발 방지).
   라우팅 맵 dangling 도 기계 검증한다 — 🤖📘⌘ 아이콘 줄의 backtick 진입점 토큰을 agents/skills/commands 실존과 대조
   (에이전트·스킬·커맨드를 삭제/개명하고 라우팅 맵을 안 고치면 audit FAIL → CI 차단).
+  **문서 사실 게이트 4종**(상태 기술 문서 한정): 이벤트 계약 토픽 수 · 구현 상태 역전(어댑터 실재 vs "미구현") ·
+  소비처 배선("소비처 미배선" vs 실제 참조) · **서비스 수**(2026-08-15 추가 — `N 마이크로서비스`/`N개 서비스`
+  주장을 `settings.gradle.kts` 로스터(gateway 제외)와 대조). 모듈 트리 대조는 트리 표기만 보므로 산문 주장이
+  새는 축이 따로 있었다 — HARNESS.md 자신이 3주간 14 로 남아 있었고 같은 문서 안의 "자바 16서비스" 와
+  모순이었다. 로스터 앵커(`API Gateway`·`gateway`·`DB-per-service`)가 같은 줄에 있을 때만 주장으로 인정해
+  부분집합("금융 5서비스")·폴리글랏 합계(24)를 오탐하지 않는다.
 - **로컬 통합 검증** — `scripts/verify.sh`: CI(`harness-guard.yml` + `ci.yml`)의 판정을 **같은 순서로** 로컬에서 재현한다.
   하네스 테스트 → 자기 진단 → 변경 파일 가드 → 삭제 가드 → 변경 모듈 Gradle. "다 됐다" 를 자기보고가 아니라 종료 코드로 증명하는 지점.
   `--fast`(Gradle 생략, 수초) · `--all`(전체 build) · `--base <ref>`. 느려지면 우회당하므로 기본 경로는 변경 모듈만 빌드한다(ci.yml 매핑과 동일).
