@@ -134,8 +134,25 @@ export interface BoardPost {
   secret: boolean;
   status: BoardPostStatus;
   viewCount: number;
+  /** 갤러리 목록용 대표 이미지. 이미지 첨부가 없으면 null — 화면이 자리표시를 그린다 */
+  thumbnailUrl?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export type BoardAttachmentKind = 'IMAGE' | 'FILE';
+
+export interface BoardAttachment {
+  id: number;
+  postId: number;
+  /** 서버가 파일 내용을 보고 정한 종류 — 확장자나 업로드 헤더가 아니다 */
+  kind: BoardAttachmentKind;
+  originalName: string;
+  contentType: string;
+  sizeBytes: number;
+  sortOrder: number;
+  downloadUrl: string;
+  createdAt: string;
 }
 
 export interface BoardComment {
@@ -195,6 +212,28 @@ export const boardPostApi = {
 
   restore: async (boardKey: string, postId: number): Promise<BoardPost> =>
     (await api.post<BoardPost>(`/api/boards/${boardKey}/posts/${postId}/restore`)).data,
+};
+
+export const boardAttachmentApi = {
+  list: async (boardKey: string, postId: number): Promise<BoardAttachment[]> =>
+    (await api.get<BoardAttachment[]>(`/api/boards/${boardKey}/posts/${postId}/attachments`)).data,
+
+  /**
+   * 업로드. Content-Type 은 브라우저가 boundary 와 함께 붙이도록 두고 손대지 않는다.
+   *
+   * 서버는 어차피 이 헤더를 믿지 않는다 — 파일 내용(매직바이트)으로 형식을 다시 판정하고,
+   * 확장자와 다르면 400 으로 거절한다.
+   */
+  upload: async (boardKey: string, postId: number, file: File): Promise<BoardAttachment> => {
+    const form = new FormData();
+    form.append('file', file);
+    return (await api.post<BoardAttachment>(
+      `/api/boards/${boardKey}/posts/${postId}/attachments`, form)).data;
+  },
+
+  remove: async (boardKey: string, attachmentId: number): Promise<void> => {
+    await api.delete(`/api/boards/${boardKey}/attachments/${attachmentId}`);
+  },
 };
 
 export const boardCommentApi = {

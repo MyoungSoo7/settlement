@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  boardApi, boardCommentApi, boardPostApi,
-  BoardComment, BoardDefinition, BoardPost,
+  boardApi, boardAttachmentApi, boardCommentApi, boardPostApi,
+  BoardAttachment, BoardComment, BoardDefinition, BoardPost,
 } from '@/api/board';
 import Spinner from '@/components/Spinner';
 import { apiErrorMessage } from '@/lib/apiError';
@@ -21,6 +21,8 @@ const BoardPostPage: React.FC = () => {
   const [definition, setDefinition] = useState<BoardDefinition | null>(null);
   const [post, setPost] = useState<BoardPost | null>(null);
   const [comments, setComments] = useState<BoardComment[]>([]);
+  const [attachments, setAttachments] = useState<BoardAttachment[]>([]);
+  const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,6 +42,7 @@ const BoardPostPage: React.FC = () => {
       // 댓글이 꺼진 게시판이면 호출 자체를 하지 않는다 — 서버는 어차피 빈 목록을 주지만
       // 없는 기능을 위해 왕복을 늘릴 이유가 없다.
       setComments(def.content.commentsEnabled ? await boardCommentApi.list(boardKey, id) : []);
+      setAttachments(def.attachment.enabled ? await boardAttachmentApi.list(boardKey, id) : []);
       setError(null);
     } catch (e) {
       setError(apiErrorMessage(e, '글을 불러오지 못했습니다.'));
@@ -84,6 +87,30 @@ const BoardPostPage: React.FC = () => {
       await load();
     } catch (e) {
       setError(apiErrorMessage(e, '고정 상태를 바꾸지 못했습니다.'));
+    }
+  };
+
+  const uploadAttachment = async (file: File) => {
+    setUploading(true);
+    try {
+      await boardAttachmentApi.upload(boardKey, id, file);
+      setAttachments(await boardAttachmentApi.list(boardKey, id));
+      setError(null);
+    } catch (e) {
+      // 서버 메시지를 그대로 보여 준다 — "확장자와 다릅니다", "최대 5개까지" 처럼
+      // 사용자가 고칠 수 있는 이유가 담겨 있다.
+      setError(apiErrorMessage(e, '첨부를 올리지 못했습니다.'));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const removeAttachment = async (attachmentId: number) => {
+    try {
+      await boardAttachmentApi.remove(boardKey, attachmentId);
+      setAttachments(await boardAttachmentApi.list(boardKey, id));
+    } catch (e) {
+      setError(apiErrorMessage(e, '첨부를 삭제하지 못했습니다.'));
     }
   };
 
@@ -199,6 +226,68 @@ const BoardPostPage: React.FC = () => {
               />
             ) : (
               <div className="whitespace-pre-wrap text-gray-800 leading-relaxed">{post.content}</div>
+            )}
+
+            {definition?.attachment.enabled && (attachments.length > 0 || post.editable) && (
+              <section className="pt-3 border-t border-gray-100 space-y-3">
+                {/* 이미지는 펼쳐 보여 준다 — 서버가 매직바이트로 IMAGE 라고 판정한 것만 kind 가 IMAGE 다 */}
+                {attachments.filter((a) => a.kind === 'IMAGE').map((image) => (
+                  <figure key={image.id} className="space-y-1">
+                    <img src={image.downloadUrl} alt={image.originalName} loading="lazy"
+                         className="max-w-full rounded-lg border border-gray-100" />
+                    <figcaption className="text-xs text-gray-400 flex items-center gap-2">
+                      {image.originalName}
+                      {post.editable && (
+                        <button onClick={() => removeAttachment(image.id)}
+                                className="text-red-500 hover:text-red-700">삭제</button>
+                      )}
+                    </figcaption>
+                  </figure>
+                ))}
+
+                {attachments.filter((a) => a.kind === 'FILE').length > 0 && (
+                  <ul className="text-sm space-y-1">
+                    {attachments.filter((a) => a.kind === 'FILE').map((file) => (
+                      <li key={file.id} className="flex items-center gap-2">
+                        <a href={file.downloadUrl} className="text-blue-600 hover:underline">
+                          📎 {file.originalName}
+                        </a>
+                        <span className="text-xs text-gray-400">
+                          {Math.ceil(file.sizeBytes / 1024)}KB
+                        </span>
+                        {post.editable && (
+                          <button onClick={() => removeAttachment(file.id)}
+                                  className="text-xs text-red-500 hover:text-red-700">삭제</button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {post.editable && (
+                  <label className="inline-flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                    <span className="px-3 py-1.5 rounded border border-gray-300 hover:bg-gray-50">
+                      {uploading ? '올리는 중...' : '첨부 추가'}
+                    </span>
+                    <input
+                      type="file"
+                      className="hidden"
+                      disabled={uploading}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        // 같은 파일을 다시 고를 수 있도록 값을 비운다(onChange 가 안 걸리는 흔한 함정).
+                        e.target.value = '';
+                        if (file) void uploadAttachment(file);
+                      }}
+                    />
+                    <span className="text-xs text-gray-400">
+                      최대 {definition.attachment.maxCount}개 ·{' '}
+                      {Math.floor(definition.attachment.maxSizeKb / 1024) || 1}MB ·{' '}
+                      {definition.attachment.allowedExtensions.join(', ')}
+                    </span>
+                  </label>
+                )}
+              </section>
             )}
 
             {post.editable && (

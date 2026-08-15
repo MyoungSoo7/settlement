@@ -158,6 +158,42 @@ const BoardPage: React.FC = () => {
         </button>
       </div>
 
+      {/*
+        갤러리 스킨 — 대표 이미지는 목록 응답이 이미 담고 있다(thumbnailUrl). 글마다 첨부를 따로
+        부르면 한 화면에 20번의 왕복이 생기므로, 서버가 페이지 전체를 한 번에 채워 내려준다.
+
+        이미지가 없는 글도 목록에서 빠지지 않는다 — 자리표시를 그린다. "GALLERY 는 대표 이미지 필수"를
+        글 생성 시점에 강제하지 않는 이유는 업로드가 글 생성 이후의 별도 요청이기 때문이다.
+      */}
+      {definition?.skin === 'GALLERY' ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {posts.map((post) => (
+            <button
+              key={post.id}
+              onClick={() => navigate(`/boards/${boardKey}/${post.id}`)}
+              className="text-left bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-md transition-shadow"
+            >
+              <div className="aspect-square bg-gray-100 flex items-center justify-center overflow-hidden">
+                {post.thumbnailUrl ? (
+                  <img src={post.thumbnailUrl} alt={post.title} loading="lazy"
+                       className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-3xl text-gray-300">🖼️</span>
+                )}
+              </div>
+              <div className="p-2">
+                <p className="text-sm font-medium text-gray-900 truncate">{post.title}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{post.authorName} · 조회 {post.viewCount}</p>
+              </div>
+            </button>
+          ))}
+          {posts.length === 0 && (
+            <p className="col-span-full py-12 text-center text-gray-400 text-sm">
+              {search ? '검색 결과가 없습니다.' : '아직 글이 없습니다.'}
+            </p>
+          )}
+        </div>
+      ) : (
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
         <ul className="divide-y divide-gray-100">
           {posts.map((post) => (
@@ -190,6 +226,7 @@ const BoardPage: React.FC = () => {
           )}
         </ul>
       </div>
+      )}
 
       {pageData && pageData.totalPages > 1 && (
         <div className="flex items-center justify-center gap-2 text-sm">
