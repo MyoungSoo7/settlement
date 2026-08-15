@@ -476,6 +476,13 @@ test('Claude settings retain the write guard, advisory skill router, and telemet
           }],
         },
         {
+          matcher: 'Bash',
+          hooks: [{
+            type: 'command',
+            command: 'node "$CLAUDE_PROJECT_DIR/scripts/harness/guard.mjs" --hook-bash',
+          }],
+        },
+        {
           matcher: 'Write|Edit|MultiEdit|Skill',
           hooks: [{
             type: 'command',

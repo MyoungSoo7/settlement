@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
 import {
+  checkCommand,
   checkKafkaDlqWiring,
   checkProtectedDeletions,
   discoverStagedDeletions,
@@ -416,6 +417,65 @@ describe('CLI dispatcher', () => {
   test('self-test child process exits 0', () => {
     const result = spawnSync(process.execPath, ['scripts/harness/guard.mjs', '--self-test'], { cwd: process.cwd() });
     assert.equal(result.status, 0, result.stderr?.toString());
+  });
+});
+
+describe('bash command guard (--hook-bash · 실시간 우회 봉쇄)', () => {
+  const ids = (cmd) => checkCommand(cmd, { allowCommands: false }).map((v) => v.id);
+
+  test('sed/perl 인플레이스·리다이렉트·tee 로 소스를 쓰면 CMD-EDIT-BYPASS', () => {
+    assert.deepEqual(ids("sed -i 's/a/b/' order-service/src/main/java/Order.java"), ['CMD-EDIT-BYPASS']);
+    assert.deepEqual(ids("perl -pi -e 's/a/b/' scripts/harness/guard.mjs"), ['CMD-EDIT-BYPASS']);
+    assert.deepEqual(ids("cat > V20260815__x.sql <<'EOF'"), ['CMD-EDIT-BYPASS']);
+    assert.deepEqual(ids('echo x | tee .github/workflows/ci.yml'), ['CMD-EDIT-BYPASS']);
+  });
+
+  test('읽기 전용 sed·비소스 리다이렉트는 통과한다 (오탐 방지)', () => {
+    assert.deepEqual(ids("sed -n '1,10p' scripts/harness/guard.mjs"), []);
+    assert.deepEqual(ids('node build.mjs > build.log 2>&1'), []);
+    assert.deepEqual(ids('grep -i pattern Money.java'), []);
+    assert.deepEqual(ids('git commit -F commit-msg.txt'), []);
+  });
+
+  test('git --no-verify 는 commit·push 모두 차단', () => {
+    assert.deepEqual(ids('git commit --no-verify -m x'), ['CMD-NO-VERIFY']);
+    assert.deepEqual(ids('git push --no-verify origin develop'), ['CMD-NO-VERIFY']);
+    assert.deepEqual(ids('git commit -m "no-verify 언급만"'), []);
+  });
+
+  test('서비스 DB 직접 쓰기·운영 파드 psql 은 차단, 조회는 통과', () => {
+    assert.deepEqual(ids('psql -d settlement_db -c "UPDATE settlements SET s=1"'), ['CMD-PROD-DB-WRITE']);
+    assert.deepEqual(ids('psql -d lemuel_deposit -c "TRUNCATE deposit_ledger"'), ['CMD-PROD-DB-WRITE']);
+    assert.deepEqual(ids('kubectl exec -it pod -- psql -d lemuel_account'), ['CMD-PROD-DB-WRITE']);
+    assert.deepEqual(ids('psql -d settlement_db -c "SELECT count(*) FROM settlements"'), []);
+  });
+
+  test('lemuel 토픽 직접 produce 는 WARN(비차단)', () => {
+    const violations = checkCommand('rpk topic produce lemuel.order.created', { allowCommands: false });
+    assert.deepEqual(violations.map((v) => [v.id, v.severity]), [['CMD-EVENT-PRODUCE', 'WARN']]);
+  });
+
+  test('HARNESS_ALLOW_CMD opt-in 이면 전부 통과한다', () => {
+    assert.deepEqual(checkCommand('git commit --no-verify', { allowCommands: true }), []);
+  });
+
+  test('--hook-bash: BLOCK 은 exit 2, WARN 만이면 additionalContext + exit 0, 깨진 입력은 fail-open', async () => {
+    const repoRoot = await temporaryRepo();
+    const run = async (stdin) => {
+      const out = [];
+      const code = await runGuardCli(['--hook-bash'], { repoRoot, stdin, stdout: (m) => out.push(m), stderr() {} });
+      return { code, out: out.join('\n') };
+    };
+    const blocked = await run(JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'git commit --no-verify' } }));
+    assert.equal(blocked.code, 2);
+    const warned = await run(JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'rpk topic produce lemuel.x -z none' } }));
+    assert.equal(warned.code, 0);
+    assert.match(warned.out, /CMD-EVENT-PRODUCE/);
+    const broken = await run('{');
+    assert.equal(broken.code, 0); // 운반 수단 계층은 fail-open — 커밋·CI 가 내용 기준으로 재차단
+    const clean = await run(JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'git status' } }));
+    assert.equal(clean.code, 0);
+    assert.equal(clean.out, '');
   });
 });
 

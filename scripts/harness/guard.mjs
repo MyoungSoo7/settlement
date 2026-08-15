@@ -329,6 +329,62 @@ export function checkProtectedDeletions(deletedFiles, options = {}) {
   return violations;
 }
 
+// ── Bash 명령 가드 (PreToolUse matcher: Bash) ────────────────────────────────────────
+//
+// 실시간 파일 가드(--hook)는 매처가 Write|Edit|MultiEdit 뿐이라, Bash 로 우회한 파일 조작
+// (sed -i·perl -i·리다이렉트·heredoc)은 커밋·CI 계층까지 내려가야 잡혔고, 운영 데이터 직접
+// 조작 명령 차단(check-command)은 settlement-copilot **플러그인 소유**라 플러그인 미설치
+// 환경(CI·새 클론·Codex)에는 아예 없었다 — "플러그인 독립" 전제의 구멍. 이 계층이 그 둘을
+// 저장소 네이티브로 닫는다. 내용 검사가 아니라 **운반 수단 차단**이므로 대상을 좁게 유지한다
+// (오탐보다 범위 축소). 의도적 실행은 HARNESS_ALLOW_CMD=1 로 opt-in(실행 기록에 남는다).
+//
+// heredoc/리다이렉트로 소스를 쓰면 백슬래시·NUL 손상이 조용히 발생한 전력이 2회 있고
+// (레포 규율: 저장소 파일은 Write/Edit 도구가 정답), sed -i 는 CRLF 파일 전체 라인엔딩을
+// 뒤집는다 — 차단 대상 확장자는 실시간 파일 가드가 스캔하는 소스 계열로 한정한다.
+const GUARDED_WRITE_EXT = String.raw`\.(?:java|kts?|sql|mjs|ya?ml)\b`;
+export const COMMAND_RULES = [
+  {
+    id: 'CMD-EDIT-BYPASS',
+    severity: 'BLOCK',
+    test: (cmd) =>
+      (/\b(?:sed|perl)\b[^|;&]*\s-[a-zA-Z]*i\b/.test(cmd) && new RegExp(GUARDED_WRITE_EXT).test(cmd))
+      || new RegExp(String.raw`>{1,2}\s*['"]?[\w.$/\\~-]+${GUARDED_WRITE_EXT}`).test(cmd)
+      || new RegExp(String.raw`\btee\b[^|;&]*${GUARDED_WRITE_EXT}`).test(cmd),
+    msg: 'Bash 로 소스 파일(.java/.kt/.sql/.mjs/.yml) 편집 금지 — 실시간 가드(내용 스캔)를 우회하고 heredoc 백슬래시 손실·CRLF churn 전력이 있다. Write/Edit 도구를 사용하세요. 의도한 실행이면 HARNESS_ALLOW_CMD=1',
+  },
+  {
+    id: 'CMD-NO-VERIFY',
+    severity: 'BLOCK',
+    test: (cmd) => /\bgit\b[^|;&]*\b(?:commit|push)\b[^|;&]*--no-verify\b/.test(cmd),
+    msg: 'git --no-verify 금지 — pre-commit 가드 우회는 CI 에서 재차단된다(HARNESS.md 강제 지점). 훅이 오탐이면 가드를 고치는 것이 정답',
+  },
+  {
+    id: 'CMD-PROD-DB-WRITE',
+    severity: 'BLOCK',
+    test: (cmd) =>
+      (/\b(?:psql|pgcli|pg_dump)\b/.test(cmd)
+        && /\b(?:opslab|settlement_db|lemuel_[a-z_]+)\b/.test(cmd)
+        && /\b(?:UPDATE|DELETE|INSERT|TRUNCATE|ALTER|DROP)\s/i.test(cmd))
+      || (/kubectl\s+exec\b/.test(cmd) && /\b(?:psql|pg_dump)\b/.test(cmd)),
+    msg: '서비스 DB 직접 쓰기 금지 — 데이터 정정은 adjustment/역분개 API 경로로만(원장 불변). 조회는 MCP 도구 또는 /admin/integrity API. 로컬 개발 DB 의 의도적 조작이면 HARNESS_ALLOW_CMD=1',
+  },
+  {
+    id: 'CMD-EVENT-PRODUCE',
+    severity: 'WARN',
+    test: (cmd) => /(?:rpk\s+topic\s+produce|kafka-console-producer)/.test(cmd) && /lemuel\./.test(cmd),
+    msg: 'lemuel.* 토픽에 직접 produce — Outbox 를 우회하면 event_id 멱등 체계가 깨질 수 있다. 테스트면 -z none(스나피 네이티브 부재) + 테스트 토픽 권장 (비차단 경고)',
+  },
+];
+
+export function checkCommand(command, options = {}) {
+  const allow = options.allowCommands ?? process.env.HARNESS_ALLOW_CMD === '1';
+  if (allow) return [];
+  const cmd = String(command ?? '');
+  if (cmd.length === 0) return [];
+  return COMMAND_RULES.filter((rule) => rule.test(cmd))
+    .map((rule) => ({ id: rule.id, severity: rule.severity, file: '(bash)', msg: rule.msg }));
+}
+
 // ── KAFKA-DLQ: 컨슈머를 가진 서비스는 반드시 DLT 배선이 닿아야 한다 ──────────────────
 //
 // 왜 라인 규칙이 아니라 저장소 규칙인가: 이 위반은 "잘못 쓴 줄"이 아니라 "없는 파일"이다.
@@ -650,7 +706,7 @@ function emitReport(violations, io = {}) {
 export async function runGuardCli(args, io = {}) {
   const repoRoot = io.repoRoot ?? process.cwd();
   const stderr = io.stderr ?? ((message) => console.error(message));
-  const modes = ['--staged', '--list', '--deleted-list', '--files', '--hook', '--self-test'].filter((mode) => args.includes(mode));
+  const modes = ['--staged', '--list', '--deleted-list', '--files', '--hook', '--hook-bash', '--self-test'].filter((mode) => args.includes(mode));
   if (modes.length !== 1) { stderr('exactly one guard mode is required'); return 2; }
   const mode = modes[0];
   // 인자 검증 실패를 종료 코드만으로 알리면 CI 로그에는 "exit 1" 만 남아 원인 추적이 불가능하다.
@@ -669,6 +725,26 @@ export async function runGuardCli(args, io = {}) {
       const deleted = (await readUtf8Strict(listPath)).split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
       return emitReport(checkProtectedDeletions(deleted), io);
     } catch (error) { stderr(`guard input failed: ${error.message}`); return 1; }
+  }
+  if (mode === '--hook-bash') {
+    if (args.length !== 1) return usage('--hook-bash   (PreToolUse Bash 이벤트 JSON 을 stdin 으로)', 2);
+    // 파일 훅(--hook)과 달리 fail-open 이다: 여기는 내용 불변식이 아니라 운반 수단 차단이라,
+    // 입력 파싱 실패에 fail-closed 하면 하네스 결함 하나가 모든 Bash 실행을 멈춘다(블래스트 반경).
+    // 우회 시도는 커밋(--staged)·CI(--list) 계층이 내용 기준으로 재차단한다.
+    try {
+      const event = JSON.parse(io.stdin ?? await readStdinUtf8Strict());
+      const violations = checkCommand(event?.tool_input?.command);
+      await logGuardHits(repoRoot, 'hook-bash', violations);
+      await logGuardRun(repoRoot, 'hook-bash', { files: 1, violations: violations.length });
+      for (const violation of violations) stderr(`[${violation.id}] ${violation.msg}`);
+      if (violations.some((violation) => violation.severity === 'BLOCK')) return 2;
+      if (violations.length > 0) {
+        const stdout = io.stdout ?? ((message) => console.log(message));
+        stdout(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse',
+          additionalContext: violations.map((violation) => `[${violation.id}] ${violation.msg}`).join('\n') } }));
+      }
+      return 0;
+    } catch (error) { stderr(`guard hook-bash skipped (unparseable input): ${error.message}`); return 0; }
   }
   if (mode === '--hook') {
     if (args.length !== 1) return usage('--hook   (PreToolUse 이벤트 JSON 을 stdin 으로)', 2);

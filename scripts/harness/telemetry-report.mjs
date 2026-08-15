@@ -13,7 +13,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { RULES, scanText } from './guard.mjs';
+import { COMMAND_RULES, RULES, checkCommand, scanText } from './guard.mjs';
 import { LOG_DIR_SEGMENTS } from './telemetry.mjs';
 
 // 가드 카나리아 — 규칙별 "반드시 차단돼야 하는" 최소 위반 픽스처. 차단 0회의 모호성
@@ -60,13 +60,20 @@ export const GUARD_CANARIES = {
     file: '.github/workflows/canary.yml',
     line: '            // 주석 안이라도 ${{ }} 는 워크플로를 통째로 무효화한다',
   },
+  // Bash 명령 계층(COMMAND_RULES) — command 픽스처는 scanText 가 아니라 checkCommand 로 검사한다.
+  'CMD-EDIT-BYPASS': { command: "sed -i 's/a/b/' settlement-service/src/main/java/X.java" },
+  'CMD-NO-VERIFY': { command: 'git commit --no-verify -m x' },
+  'CMD-PROD-DB-WRITE': { command: 'psql -d settlement_db -c "UPDATE settlements SET x=1"' },
+  'CMD-EVENT-PRODUCE': { command: 'rpk topic produce lemuel.order.created' },
 };
 
-export function canaryResults({ rules = RULES, canaries = GUARD_CANARIES } = {}) {
+export function canaryResults({ rules = [...RULES, ...COMMAND_RULES], canaries = GUARD_CANARIES } = {}) {
   return rules.map((rule) => {
     const fixture = canaries[rule.id];
     if (!fixture) return { id: rule.id, status: 'undefined' };
-    const { violations } = scanText(fixture.file, `${fixture.line}\n`);
+    const violations = fixture.command != null
+      ? checkCommand(fixture.command, { allowCommands: false })
+      : scanText(fixture.file, `${fixture.line}\n`).violations;
     return { id: rule.id, status: violations.some((violation) => violation.id === rule.id) ? 'pass' : 'fail' };
   });
 }
@@ -127,8 +134,9 @@ export function summarize({ hits, usage, suggestions, runs = [], days = 14, now 
   lines.push(runsReport(runs));
   lines.push(`== 가드 차단 (전체 ${hits.length}건, 최근 ${days}일 ${recent.length}건) ==`);
   const byRule = new Map(countBy(hits, 'id'));
-  for (const rule of RULES) lines.push(`  ${String(byRule.get(rule.id) ?? 0).padStart(4)}  ${rule.id}${byRule.get(rule.id) ? '' : '   (0회 — 죽은 규칙 후보 또는 완전 예방)'}`);
-  for (const [id, count] of byRule) if (!RULES.some((rule) => rule.id === id)) lines.push(`  ${String(count).padStart(4)}  ${id} (규칙 로스터 외 — 과거 규칙?)`);
+  const roster = [...RULES, ...COMMAND_RULES];
+  for (const rule of roster) lines.push(`  ${String(byRule.get(rule.id) ?? 0).padStart(4)}  ${rule.id}${byRule.get(rule.id) ? '' : '   (0회 — 죽은 규칙 후보 또는 완전 예방)'}`);
+  for (const [id, count] of byRule) if (!roster.some((rule) => rule.id === id)) lines.push(`  ${String(count).padStart(4)}  ${id} (규칙 로스터 외 — 과거 규칙?)`);
   for (const [mode, count] of countBy(hits, 'mode')) lines.push(`  mode ${mode}: ${count}`);
   for (const [day, count] of countBy(recent.map((hit) => ({ day: hit.ts.slice(0, 10) })), 'day').sort()) lines.push(`  ${day}: ${count}`);
 
