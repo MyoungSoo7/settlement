@@ -1,10 +1,11 @@
 # Lemuel 시퀀스 다이어그램 (Sequence Diagrams)
 
-> 이커머스 + 정산 MSA 플랫폼(21개 서비스)의 **핵심 유스케이스별 시퀀스 다이어그램**.
+> 이커머스 + 정산 MSA 플랫폼(24개 서비스 = 16 JVM + gateway + 폴리글랏 7)의 **핵심 유스케이스별 시퀀스 다이어그램**.
 > 서비스 간 연계는 Kafka 이벤트로만 이루어지며(코드·DB 직접 의존 0), 비동기 구간은 `-->>` 및 `Note` 로 명시한다.
 >
 > - 정본 근거: [`../SPEC.md`](../SPEC.md)(기능·이벤트 카탈로그) · [`../ARCHITECTURE.md`](../ARCHITECTURE.md)(패턴) · [`adr`](./adr/)
-> - 최종 갱신: 2026-07-16
+> - 최종 갱신: 2026-08-15 — 이후 유입된 card Phase 2(승인·매입·명세서)·insurance·deposit·영수증 OCR(ADR 0036)
+>   플로우는 아직 다이어그램이 없다. 흐름 자체는 SPEC.md §3.13~3.16 산문이 정본이다.
 
 ---
 
@@ -412,12 +413,12 @@ sequenceDiagram
     participant ADB as lemuel_account
     actor Admin as 운영자(ADMIN/MANAGER)
 
-    Note over K,ACC: 6개 토픽 소비 — settlement.created/confirmed ·<br/>loan.repayment_applied/corporate_loan_disbursed · investment.executed · payment 계열
+    Note over K,ACC: 컨슈머 17종 소비 — settlement 7(created/confirmed/adjusted/canceled/<br/>holdback_released/holdback_consumed/withholding_accrued) · loan 6 ·<br/>seller_recovery 2 · payout.completed · investment.executed
     K-->>ACC: 이벤트 (비동기)
     ACC->>ADB: ① processed_events 멱등 확인
     ACC->>ADB: ② (source_topic, ref_type, ref_id) UNIQUE — 분개 멱등 2단
     ACC->>ADB: account_entries INSERT — 전표당 차변1·대변1 (구성적 균형 팩토리)
-    Note over ADB: 6계정: CASH · LOAN_RECEIVABLE · CORPORATE_LOAN_RECEIVABLE ·<br/>INVESTMENT_ASSET · SELLER_PAYABLE · SETTLEMENT_SCHEDULED
+    Note over ADB: 14계정(GlAccount): CASH · LOAN/CORPORATE/SECURED_LOAN_RECEIVABLE ·<br/>INVESTMENT_ASSET · SELLER_PAYABLE · SETTLEMENT_SCHEDULED · HOLDBACK/WITHHOLDING_PAYABLE ·<br/>SELLER_RECOVERY_RECEIVABLE · 수신 3종(TIME_DEPOSIT/SAVINGS/PENSION_LIABILITY) · INTEREST_EXPENSE
 
     Admin->>ACC: GET /api/account/trial-balance
     ACC->>ADB: 시산표 집계 (차변합 = 대변합 검증)
@@ -606,7 +607,7 @@ sequenceDiagram
 
 ---
 
-## 17. 이벤트 카탈로그 참조 (cross-service 12 계약 토픽)
+## 17. 이벤트 카탈로그 참조 (다이어그램 등장 토픽 발췌 — 계약 스키마 전체는 37개)
 
 | 토픽 | 프로듀서 | 컨슈머 | 등장 다이어그램 |
 |------|---------|--------|----------------|
@@ -617,8 +618,9 @@ sequenceDiagram
 | `lemuel.loan.repayment_applied` | loan | settlement · account | §9.1 |
 | `lemuel.loan.corporate_loan_disbursed` | loan | account | §9.2 |
 | `lemuel.investment.executed` | investment | account · notification | §10 |
-| `lemuel.organization.created` / `.member_joined` | organization | (소비처 미배선 — 발행 전용) | — |
+| `lemuel.organization.created` / `.member_joined` / `.member_removed` / `.member_role_changed` | organization | card(조직 프로젝션 — 4토픽 전부 소비) | — |
 | `lemuel.payment.confirmed` (내부 계약) | payment-webhook(Go) | notification | §14 |
 
-> 계약 스키마·정본 샘플: `../shared-common/src/testFixtures/resources/contracts/events` (ADR 0024).
+> 계약 스키마·정본 샘플: `../shared-common/src/testFixtures/resources/contracts/events` (ADR 0024) —
+> 위 표는 다이어그램에 등장하는 발췌일 뿐이며, card 8종·loan 7종·settlement 7종 등 **총 37 토픽**이 계약 관리된다.
 > 모든 컨슈머는 `processed_events` + 도메인 UNIQUE 로 멱등하며, 발행은 Outbox 를 경유한다(직접 발행 예외: payment-webhook 은 Go 엣지 — 자체 TTL 멱등).

@@ -67,7 +67,7 @@ describe('OptionCatalogAdminPage', () => {
     await openAxis('색상');
 
     expect(mocked.listValues).toHaveBeenCalledWith('COLOR');
-    const rows = screen.getAllByTestId('axis-value-row');
+    const rows = await screen.findAllByTestId('axis-value-row');
     expect(within(rows[0]).getByText('RED')).toBeInTheDocument();
   });
 
@@ -126,7 +126,7 @@ describe('OptionCatalogAdminPage', () => {
     await waitFor(() => expect(mocked.listAxes).toHaveBeenCalled());
     await openAxis('색상');
 
-    const rows = screen.getAllByTestId('axis-value-row');
+    const rows = await screen.findAllByTestId('axis-value-row');
     fireEvent.click(within(rows[0]).getByRole('button', { name: '수정' }));
 
     expect(screen.getByLabelText('값 코드')).toBeDisabled();
@@ -142,7 +142,7 @@ describe('OptionCatalogAdminPage', () => {
     await waitFor(() => expect(mocked.listAxes).toHaveBeenCalled());
     await openAxis('색상');
 
-    const rows = screen.getAllByTestId('axis-value-row');
+    const rows = await screen.findAllByTestId('axis-value-row');
     fireEvent.click(within(rows[0]).getByRole('button', { name: '내리기' }));
 
     await waitFor(() => expect(mocked.setValueActive).toHaveBeenCalledWith('COLOR', 'RED', false));

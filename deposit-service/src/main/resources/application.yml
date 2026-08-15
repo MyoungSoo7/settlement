@@ -13,7 +13,7 @@ spring:
   #   셀러 예치금·에스크로 원장의 단일 진실원 — 다른 서비스(settlement/card/account) 코드·DB 직접 의존 0,
   #   Kafka 이벤트(Outbox 발행)로만 잔액 변동을 외부에 알린다.
   datasource:
-    url: jdbc:postgresql://localhost:5448/lemuel_deposit?reWriteBatchedInserts=true
+    url: jdbc:postgresql://localhost:5449/lemuel_deposit?reWriteBatchedInserts=true
     username: ${POSTGRES_USER}
     password: ${POSTGRES_PASSWORD}
     driver-class-name: org.postgresql.Driver

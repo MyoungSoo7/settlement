@@ -74,6 +74,9 @@ const OperationConsolePage = lazy(() => import('./pages/operation/OperationConso
 const MenuManagementPage = lazy(() => import('./pages/system/MenuManagementPage'));
 const CommonCodeManagementPage = lazy(() => import('./pages/system/CommonCodeManagementPage'));
 const RbacManagementPage = lazy(() => import('./pages/system/RbacManagementPage'));
+const BoardAdminPage = lazy(() => import('./pages/system/BoardAdminPage'));
+const BoardPage = lazy(() => import('./pages/board/BoardPage'));
+const BoardPostPage = lazy(() => import('./pages/board/BoardPostPage'));
 
 // ── 일반 사용자용 (인증 필수, 역할 무관) ──────────────────────────────────
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -147,6 +150,11 @@ function App() {
             <Route path="/workforce"          element={<AdminManagerRoute><WorkforcePage /></AdminManagerRoute>} />
             {/* 한국은행 ECOS 경제지표 — 공공 데이터라 공개. 모든 사용자가 헤더 메뉴로 접근·왕복하도록 Layout 유지 */}
             <Route path="/economics"          element={<Layout><EconomicsPage /></Layout>} />
+            {/* 게시판 — 라우트는 이 둘이 전부다. 어느 게시판인지는 :boardKey 가 정하고, 무엇이 보이는지는
+                서버가 정의(공개 여부·역할)로 판정한다. 게시판을 새로 만들어도 라우트는 늘지 않는다.
+                메뉴 진입점은 관리자가 /admin/system/boards 에서 붙인다(런타임 생성이라 시드에 없다). */}
+            <Route path="/boards/:boardKey"           element={<Layout><BoardPage /></Layout>} />
+            <Route path="/boards/:boardKey/:postId"   element={<Layout><BoardPostPage /></Layout>} />
 
             {/* ── 일반 사용자 (USER + 인증) ── */}
             <Route path="/order"        element={<ProtectedRoute><OrderPage /></ProtectedRoute>} />
@@ -223,6 +231,8 @@ function App() {
               element={<AdminOnlyRoute><SideNavLayout><CommonCodeManagementPage /></SideNavLayout></AdminOnlyRoute>} />
             <Route path="/admin/system/rbac"
               element={<AdminOnlyRoute><SideNavLayout><RbacManagementPage /></SideNavLayout></AdminOnlyRoute>} />
+            <Route path="/admin/system/boards"
+              element={<AdminOnlyRoute><SideNavLayout><BoardAdminPage /></SideNavLayout></AdminOnlyRoute>} />
             <Route path="/admin/system/ecommerce-categories"
               element={<AdminOnlyRoute><SideNavLayout><EcommerceCategoryAdmin /></SideNavLayout></AdminOnlyRoute>} />
             <Route path="/admin/system/display-sections"

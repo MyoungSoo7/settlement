@@ -7,7 +7,7 @@
 
 ```
 settlement/                              # 모노레포 루트
-├── settings.gradle.kts                  # 16 서비스 + gateway 모듈 선언 (shared-common 은 composite build)
+├── settings.gradle.kts                  # 17 서비스 + gateway 모듈 선언 (shared-common 은 composite build)
 ├── build.gradle.kts                     # 부모 빌드 (subprojects 공통 설정, JaCoCo LINE 90% 게이트)
 ├── docker-compose.yml                   # PG 16종 · ES · Redpanda · 앱 컨테이너 19개(JVM 17 + market-stream + notification)
 ├── Dockerfile                           # MODULE 빌드 인자 파라미터화 (JVM 서비스 공용)
@@ -23,11 +23,14 @@ settlement/                              # 모노레포 루트
 │   │   ├── ledger/                      # 복식부기 공통 (균형 팩토리)
 │   │   ├── opssignal/                   # 운영 신호 발행 (절대 throw 금지, fire-and-forget)
 │   │   ├── ratelimit/                   # Bucket4j 기반 rate limiting
-│   │   └── pdf/                         # iText PDF 유틸
+│   │   ├── pdf/                         # iText PDF 유틸
+│   │   ├── ocr/                         # 영수증 OCR 공통 (ADR 0036)
+│   │   ├── autoconfigure/               # 공통 자동구성
+│   │   └── log/                         # 로깅 공통
 │   └── src/testFixtures/resources/contracts/events/   # ★ 이벤트 계약 정본 (37토픽 JSON Schema+샘플, ADR 0024)
 │
 ├── order-service/                       # 🛒 Commerce (8088, opslab)
-│   └── .../{user,order,payment,cart,shipping,product,category,coupon,review,game,menu,rbac,commoncode}
+│   └── .../{user,order,payment,cart,shipping,product,category,coupon,review,game,menu,rbac,commoncode,sellertier}
 │       ├── recon/                       # /internal/recon — 자기 합계 노출(settlement 대사용, ADR 0020)
 │       └── projectionbackfill/          # settlement 프로젝션 백필 (ADR 0020)
 │
@@ -51,16 +54,17 @@ settlement/                              # 모노레포 루트
 │                                        #      매수·매도 등 투자 판단과 그 결과의 책임은 이용자 본인에게 있음
 ├── account-service/                     # 🏦 Account (8102, lemuel_account) — 계정계 GL 집계 (소비 전용)
 ├── organization-service/                # 👥 Organization (8104, lemuel_organization) — 조직·멤버십 (발행 전용)
-├── card-service/                        # 💳 Card (8106/mgmt 8107, lemuel_card) — 법인카드 카드계정·카드(마스터/서브 한도). 도메인·정책·영속(adapter/out/persistence)·REST(adapter/in/web)·스케줄러(adapter/in/schedule) 구현 — Phase 2(승인·매입·명세서·지출관리) 포함
+├── card-service/                        # 💳 Card (8106/mgmt 8107, lemuel_card) — 법인카드 카드계정·카드(마스터/서브 한도). 도메인·정책·영속(adapter/out/persistence)·REST(adapter/in/web — `/api/cards` + `/admin/expense-receipts` 리뷰 큐)·스케줄러(adapter/in/schedule)·Kafka 컨슈머(adapter/in/kafka 7종 — 조직 프로젝션 4 + 평판 1 + captured 2) 구현 — Phase 2(승인·매입·명세서·지출관리) 포함
 ├── insurance-service/                   # 🛡️ Insurance (8108/mgmt 8109, lemuel_insurance) — GA 보험대리점 플랫폼: 상담·가입설계·청약·계약·유지변경·수수료정산. shared-common 의존
 ├── deposit-service/                     # 🏧 Deposit (8112/mgmt 8113, lemuel_deposit) — 셀러 예치금 원장(잔고 단일 진실원, hold/offset 로 재원 이중사용 차단). shared-common 의존, REST 는 `/api/deposits` 조회 + `/admin/deposits` 수기 콘솔, Kafka 컨슈머 2종(settlement.confirmed·payout.completed). card 승인·매입은 페이로드에 sellerId 가 없어 미구독 — hold/offset 은 콘솔 경로
+├── board-service/                       # 📋 Board (8114/mgmt 8115, lemuel_board) — 메타 주도 게시판 플랫폼: `board_definitions` 1행 = 게시판 1개, 프론트 단일 라우트 `/boards/:boardKey` 가 스킨(LIST/GALLERY/FAQ/QNA)으로 렌더. shared-common JWT 만 제한 스캔(Outbox·Audit 엔티티 미스캔), **발행 0·소비 0** — 권한은 역할 allowlist, 메뉴 등록은 관리 화면이 order `/admin/menus` 를 직접 호출
 └── gateway-service/                     # 🚪 API Gateway (8080) — 라우팅만 (자체 인증 필터 없음)
 ```
 
 - `★` = 공개 read-only 위성(shared-common 미의존): GET 공개, `/admin/**` 는 X-Internal-Api-Key 게이트.
 - 각 서비스 내부는 헥사고날 고정 골격: `domain/` · `application/port/{in,out}·service/` · `adapter/{in,out}/`.
 
-## 폴리글랏 7종 — standalone (Gradle·gateway 미포함, 루트 레벨 디렉토리)
+## 폴리글랏 7종 — standalone (Gradle 미포함, 루트 레벨 디렉토리 — gateway 라우팅 예외 2종: market-stream `/api/market-stream/**` · notification `/api/notifications/stream`, 정본 docs/sse.md)
 
 ```
 ├── market-stream-service/               # 🟢 Go  :8110  실시간 시세 SSE/WebSocket (goroutine Hub 팬아웃)
@@ -80,7 +84,7 @@ settlement/                              # 모노레포 루트
 
 ```
 ├── frontend/                            # ⚛️ React(Vite) 관리자/쇼핑 프론트 — nginx 프록시로 gateway 연동
-├── docs/                                # 📚 ADR 31개(adr/) · 러너북(runbook/) · ARCHITECTURE · DEVELOPMENT · 검증(SETTLEMENT-VERIFICATION)
+├── docs/                                # 📚 ADR 35개(adr/, 0019 결번) · 러너북(plan/runbook/) · DEVELOPMENT · 검증(plan/SETTLEMENT-VERIFICATION) — ARCHITECTURE.md 는 저장소 루트
 ├── monitoring/                          # 📊 Prometheus·Grafana 대시보드(비즈니스 KPI)·alert rules
 ├── load-test/                           # 🔥 k6 부하 시나리오 4종
 ├── scripts/harness/                     # 🛡️ 저장소 가드(guard.mjs)·자기진단(harness-audit.mjs)·git hook 설치

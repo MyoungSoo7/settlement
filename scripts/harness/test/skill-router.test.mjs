@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, test } from "node:test";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, utimes, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
   decideHookOutput,
+  pruneStaleState,
   routeSkills,
   runRouterCli,
 } from "../skill-router.mjs";
@@ -61,6 +62,42 @@ describe("routeSkills", () => {
       ["card-service-rules", "tdd-discipline"],
     );
   });
+  test("insurance/deposit sources route to their new *-rules skills (돈 경로 커버리지 공백 해소)", () => {
+    assert.deepEqual(
+      routeSkills(
+        "insurance-service/src/main/java/github/lms/lemuel/insurance/domain/Policy.java",
+      ),
+      ["insurance-domain-rules", "tdd-discipline"],
+    );
+    assert.deepEqual(
+      routeSkills(
+        "deposit-service/src/main/java/github/lms/lemuel/deposit/domain/SellerDepositAccount.java",
+      ),
+      ["deposit-domain-rules", "tdd-discipline"],
+    );
+    assert.deepEqual(
+      routeSkills(
+        "deposit-service/src/main/java/github/lms/lemuel/deposit/adapter/in/kafka/SettlementConfirmedConsumer.java",
+      ),
+      ["deposit-domain-rules", "idempotency-and-events", "tdd-discipline"],
+    );
+  });
+
+  test("organization sources route to organization-domain-rules (커버리지 완결 — 16/16)", () => {
+    assert.deepEqual(
+      routeSkills(
+        "organization-service/src/main/java/github/lms/lemuel/organization/domain/Membership.java",
+      ),
+      ["organization-domain-rules", "tdd-discipline"],
+    );
+    assert.deepEqual(
+      routeSkills(
+        "organization-service/src/main/java/github/lms/lemuel/organization/adapter/out/event/OrganizationEventPublisherAdapter.java",
+      ),
+      ["organization-domain-rules", "idempotency-and-events", "tdd-discipline"],
+    );
+  });
+
   test("card outbox publisher keeps the domain rules ahead of the event procedure", () => {
     assert.deepEqual(
       routeSkills(
@@ -186,6 +223,59 @@ describe("decideHookOutput", () => {
     assert.equal(
       await runRouterCli(["--bogus"], { repoRoot, stderr: () => {} }),
       0,
+    );
+  });
+});
+
+describe("state GC (세션 상태 파일 무한 누적 방지)", () => {
+  const stateDir = (repoRoot) => join(repoRoot, ".claude", "harness", "state");
+  const ageFile = async (path, days, now) => {
+    const stale = new Date(now.getTime() - days * 86_400_000);
+    await utimes(path, stale, stale);
+  };
+
+  test("보존기간을 넘긴 라우터 상태만 지우고, 신선한 상태·다른 파일은 남긴다", async () => {
+    const repoRoot = await temporaryRepo();
+    const now = new Date();
+    await mkdir(stateDir(repoRoot), { recursive: true });
+    const old = join(stateDir(repoRoot), "skill-router-old-session.json");
+    const fresh = join(stateDir(repoRoot), "skill-router-fresh.json");
+    const other = join(stateDir(repoRoot), "other-tool-state.json");
+    for (const f of [old, fresh, other]) await writeFile(f, "{}", "utf8");
+    await ageFile(old, 20, now);
+    await ageFile(other, 20, now); // 라우터 소유가 아닌 파일은 오래돼도 건드리지 않는다
+    assert.equal(await pruneStaleState(repoRoot, { now }), 1);
+    assert.equal(existsSync(old), false);
+    assert.equal(existsSync(fresh), true);
+    assert.equal(existsSync(other), true);
+  });
+
+  test("상태 디렉토리가 없으면 조용히 0 을 반환한다", async () => {
+    assert.equal(await pruneStaleState(await temporaryRepo()), 0);
+  });
+
+  test("훅 경로가 기회적으로 GC 를 수행한다", async () => {
+    const repoRoot = await temporaryRepo();
+    const now = new Date();
+    await mkdir(stateDir(repoRoot), { recursive: true });
+    const old = join(stateDir(repoRoot), "skill-router-dead-session.json");
+    await writeFile(old, "{}", "utf8");
+    await ageFile(old, 20, now);
+    await decideHookOutput(
+      {
+        session_id: "gc-live",
+        tool_name: "Edit",
+        tool_input: {
+          file_path:
+            "loan-service/src/main/java/github/lms/lemuel/loan/domain/LoanAdvance.java",
+        },
+      },
+      { repoRoot, now },
+    );
+    assert.equal(existsSync(old), false);
+    assert.equal(
+      existsSync(join(stateDir(repoRoot), "skill-router-gc-live.json")),
+      true,
     );
   });
 });

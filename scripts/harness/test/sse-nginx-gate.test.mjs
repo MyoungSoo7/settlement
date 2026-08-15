@@ -24,10 +24,15 @@ import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
-/** nginx 를 거치는 SSE 경로. gateway 가 라우팅하는 것만 대상이다(정본: docs/sse.md). */
+/**
+ * nginx 를 거치는 SSE 경로. gateway 가 라우팅하는 것만 대상이다(정본: docs/sse.md).
+ * minReadTimeoutSec: 장기 유휴 스트림(시세·알림)은 600s 이상, ai 챗 스트림은 유한 응답이라
+ * 120s 가 의도값이다(LLM 생성이 60s 를 넘을 수 있어 일반 api 의 60s 로는 잘린다).
+ */
 const SSE_ROUTES = [
-  { path: '/api/market-stream/', service: 'market-stream-service (Go, 8110)' },
-  { path: '/api/notifications/stream', service: 'notification-service (Kotlin, 8130)' },
+  { path: '/api/market-stream/', service: 'market-stream-service (Go, 8110)', minReadTimeoutSec: 600 },
+  { path: '/api/notifications/stream', service: 'notification-service (Kotlin, 8130)', minReadTimeoutSec: 600 },
+  { path: '/api/ai/', service: 'ai-service 챗 SSE (/api/ai/chat/stream, 8096)', minReadTimeoutSec: 120 },
 ];
 
 /** SSE 를 태우는 프론트 nginx 설정 — k8s 이미지용과 compose 용 두 벌이 모두 대상이다. */
@@ -86,8 +91,8 @@ test('SSE location 은 버퍼링을 끄고 장기 연결을 허용한다', () =>
       const readTimeout = /proxy_read_timeout\s+(\d+)s\s*;/.exec(body);
       if (!readTimeout) {
         violations.push(`${file}: ${route.path} — proxy_read_timeout 없음 (기본 60s 로 유휴 연결이 끊긴다)`);
-      } else if (Number(readTimeout[1]) < 600) {
-        violations.push(`${file}: ${route.path} — proxy_read_timeout ${readTimeout[1]}s 는 너무 짧다`);
+      } else if (Number(readTimeout[1]) < route.minReadTimeoutSec) {
+        violations.push(`${file}: ${route.path} — proxy_read_timeout ${readTimeout[1]}s 는 너무 짧다 (최소 ${route.minReadTimeoutSec}s)`);
       }
     }
   }

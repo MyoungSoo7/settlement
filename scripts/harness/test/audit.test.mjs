@@ -431,7 +431,10 @@ test('runAuditCli is injectable and returns a status without exiting the importe
 test('harness guard workflow uses deterministic bases and ordered reproducibility checks', () => {
   const workflow = readFileSync(join(process.cwd(), '.github/workflows/harness-guard.yml'), 'utf8');
   assert.match(workflow, /fetch-depth:\s*0/);
-  assert.match(workflow, /node-version:\s*['"]?22['"]?/);
+  // 러너 Node 를 리터럴로 박지 않는다 — 그 리터럴이 frontend/Dockerfile 의 FROM node 와 갈리는 것이
+  // 실제 사고였다(Dependabot #233, 20 vs 26). 단일 출처는 .nvmrc 이고 일치는 node-version-gate 가 본다.
+  assert.match(workflow, /node-version-file:\s*\.nvmrc/);
+  assert.doesNotMatch(workflow, /^\s*node-version\s*:/m);
   assert.match(workflow, /--diff-filter=ACMR/);
   assert.match(workflow, /git fetch --no-tags origin "\+refs\/heads\/\$\{BASE_REF\}:refs\/remotes\/origin\/\$\{BASE_REF\}"/);
   assert.match(workflow, /git merge-base HEAD "refs\/remotes\/origin\/\$BASE_REF"/);
@@ -473,6 +476,13 @@ test('Claude settings retain the write guard, advisory skill router, and telemet
           hooks: [{
             type: 'command',
             command: 'node "$CLAUDE_PROJECT_DIR/scripts/harness/guard.mjs" --hook',
+          }],
+        },
+        {
+          matcher: 'Bash',
+          hooks: [{
+            type: 'command',
+            command: 'node "$CLAUDE_PROJECT_DIR/scripts/harness/guard.mjs" --hook-bash',
           }],
         },
         {
@@ -687,8 +697,9 @@ test('repository harness contracts match the tracked manifest oracle', () => {
   }), /harness-audit: healthy/i);
 });
 
-// ── 문서 사실 게이트 3종 ────────────────────────────────────────────────────────
-// 2026-08-12 실측 드리프트 3종의 회귀 가드. 각 규칙은 "잡는다" 와 "오탐하지 않는다" 를 짝으로 검증한다.
+// ── 문서 사실 게이트 4종 ────────────────────────────────────────────────────────
+// 2026-08-12 실측 드리프트 3종 + 2026-08-15 서비스 수 드리프트의 회귀 가드.
+// 각 규칙은 "잡는다" 와 "오탐하지 않는다" 를 짝으로 검증한다.
 const DOC_FACTS_SETTINGS = 'include(\n  "card-service",\n  "organization-service",\n  "deposit-service",\n)';
 
 function docFactsRepo(files) {
@@ -748,5 +759,56 @@ test('doc facts: 발행 모듈 자신의 yml 참조는 소비 근거로 보지 �
   assert.deepEqual(docFactErrors({
     'SPEC.md': 'organization-service deposit-service\n| `lemuel.card.issued` | card | 소비처 미배선 — 발행 전용 |\n',
     'card-service/src/main/resources/application.yml': 'topic:\n  issued: lemuel.card.issued\n',
+  }), []);
+});
+
+// 2026-08-15 실측: HARNESS.md 의 "소비처가 아직 미배선" 이 gate #3 을 그대로 통과했다 —
+// 정규식이 `소비처(가) 미배선` 만 보고 사이에 낀 부사("아직")를 못 넘었기 때문. 실제로는 card-service
+// 가 organization 4토픽을 소비 중이라 명백한 오기였다. 부사 삽입형을 같은 주장으로 인정한다.
+test('doc facts: "소비처가 아직 미배선" 처럼 부사가 끼어도 같은 주장으로 잡는다', () => {
+  const errors = docFactErrors({
+    'HARNESS.md': 'card-service deposit-service\n- organization-service — 발행 전용이고 소비처가 아직 미배선이라 규칙이 없다\n',
+    'organization-service/src/main/resources/application.yml': 'topic:\n  created: lemuel.organization.created\n',
+    'card-service/src/main/resources/application.yml': 'topic:\n  organization-created: lemuel.organization.created\n',
+  });
+  assert.equal(errors.length, 1, errors.join('\n'));
+  assert.match(errors[0], /소비처 배선 있음: lemuel\.organization\.created 를 card-service 가 참조/);
+});
+
+test('doc facts: 부사 허용이 무관한 문장을 소비처 주장으로 오탐하지 않는다', () => {
+  assert.deepEqual(docFactErrors({
+    'HARNESS.md': 'card-service deposit-service\n- organization-service 의 소비처 목록은 SPEC 이 정본이고 라우터는 미배선 상태다\n',
+    'organization-service/src/main/resources/application.yml': 'topic:\n  created: lemuel.organization.created\n',
+    'card-service/src/main/resources/application.yml': 'topic:\n  organization-created: lemuel.organization.created\n',
+  }), []);
+});
+
+// 4) 서비스 수 — 2026-08-15 실측: settings.gradle.kts 는 16서비스인데 HARNESS.md 는 3곳에서
+// 14 라고 기술했고(같은 문서 안에서 16 이라 쓴 줄과 자기모순), 모듈 트리 대조는 트리 표기만
+// 보므로 산문 주장을 못 잡았다. 로스터 앵커(gateway·DB-per-service)가 같은 줄에 있을 때만
+// 전체 로스터 주장으로 인정한다 — 부분집합("금융 5서비스")·합계(폴리글랏 포함 24)는 대상 밖.
+test('doc facts: 서비스 수 주장이 모듈 로스터와 다르면 실패한다 (HARNESS 14 vs 16 회귀)', () => {
+  const errors = docFactErrors({
+    'HARNESS.md': '- **2 마이크로서비스** + API Gateway + `shared-common` · **DB-per-service**\n',
+  });
+  assert.equal(errors.length, 1, errors.join('\n'));
+  assert.match(errors[0], /HARNESS\.md:1 서비스 수 불일치: claimed=2 actual=3/);
+});
+
+test('doc facts: gateway-service 는 서비스 수에서 제외한다', () => {
+  assert.deepEqual(docFactErrors({
+    'settings.gradle.kts': 'include(\n  "card-service",\n  "organization-service",\n  "deposit-service",\n  "gateway-service",\n)',
+    'CLAUDE.md': '- **3개 마이크로서비스 + API Gateway** 로 분리한 헥사고날 백엔드.\n',
+  }), []);
+});
+
+test('doc facts: 폴리글랏 합계·앵커 없는 부분집합 서비스 수는 오탐하지 않는다', () => {
+  assert.deepEqual(docFactErrors({
+    'CLAUDE.md': [
+      '- 총 10개 서비스 = 3 + gateway 1 + 폴리글랏 6 (정본: polyglot-services.md)',
+      '- 금융 5서비스 도메인 generic IAE 금지',
+      '- 핵심 2축 외 1개 서비스는 공개조회 전용이다',
+      '- 합계: Java 4종(3 서비스 + gateway) = **10 서비스**',
+    ].join('\n'),
   }), []);
 });

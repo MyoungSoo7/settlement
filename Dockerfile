@@ -29,6 +29,7 @@ COPY organization-service/build.gradle.kts ./organization-service/
 COPY card-service/build.gradle.kts ./card-service/
 COPY insurance-service/build.gradle.kts ./insurance-service/
 COPY deposit-service/build.gradle.kts ./deposit-service/
+COPY board-service/build.gradle.kts ./board-service/
 COPY gateway-service/build.gradle.kts ./gateway-service/
 
 RUN --mount=type=cache,target=/home/gradle/.gradle \
@@ -52,6 +53,7 @@ COPY organization-service ./organization-service
 COPY card-service ./card-service
 COPY insurance-service ./insurance-service
 COPY deposit-service ./deposit-service
+COPY board-service ./board-service
 COPY gateway-service ./gateway-service
 
 RUN --mount=type=cache,target=/home/gradle/.gradle \
@@ -67,6 +69,16 @@ FROM eclipse-temurin:25-jre-alpine
 
 RUN apk add --no-cache curl tini ghostscript
 RUN addgroup -S spring && adduser -S spring -G spring
+
+# 쓰기 가능한 데이터 경로를 **이미지 안에 미리 만들고 소유권을 넘긴다**.
+#
+# 이유: 컨테이너는 비루트(spring)로 돌지만, named volume 의 마운트 지점이 이미지에 없으면
+# Docker 가 그 디렉터리를 root:root 로 만들어 붙인다 → 첨부 업로드가 Permission denied 로 죽는다.
+# 이미지에 있으면 Docker 가 그 소유권을 볼륨에 그대로 복사하므로 spring 이 쓸 수 있다.
+# (로컬 bootRun 에서는 자기 계정으로 쓰기 때문에 절대 드러나지 않는 종류의 사고다 — 실측으로 잡았다.)
+RUN mkdir -p /var/lib/lemuel/board-attachments \
+    && chown -R spring:spring /var/lib/lemuel
+
 USER spring:spring
 
 WORKDIR /app

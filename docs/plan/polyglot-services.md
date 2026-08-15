@@ -4,9 +4,9 @@ settlement MSA 에 언어별 강점을 살려 붙인 신규 서비스 7종(Kotli
 
 | 서비스 | 언어 | 포트 | 역할 | 상태 |
 |---|---|---|---|---|
-| `notification-service` | Kotlin/Boot | 8130 | 도메인 이벤트 알림 팬아웃 (settlement.confirmed·payment.captured/refunded/confirmed·investment.executed 구독 → 채널 발송) | MVP·green |
-| `reconciliation-service` | Kotlin/Boot | 8131 | 대사 스케줄러 스켈레톤 (HTTP 소스 인터페이스만 — 실소스 빈 미등록) | MVP·skeleton |
-| `market-stream-service` | Go | 8110 | 실시간 시세 스트리밍 (SSE `/stream/{code}` + WS `/ws/{code}`), Hub 팬아웃. **7종 중 유일하게 프론트 배선됨** — gateway `/api/market-stream/**`(SSE 만) + docker-compose + CEO 투자 페이지 티커 | MVP·green·프론트 노출 |
+| `notification-service` | Kotlin/Boot | 8130 | 도메인 이벤트 알림 팬아웃 (settlement.confirmed·payment.captured/refunded/confirmed·investment.executed 구독 → 채널 발송) + `/api/notifications/stream` JWT SSE 푸시 허브(`Last-Event-ID` 재생) — gateway·compose·nginx 배선(정본 `docs/sse.md`) | MVP·green·프론트 노출 |
+| `reconciliation-service` | Kotlin/Boot | 8131 | 일일 대사 스케줄러 — 기본 프로파일은 `LiveSources` 가 settlement/order HTTP 실소스 빈을 등록, 번들 샘플은 `demo` 프로파일 격리(`SourceConfig`) | MVP·green |
+| `market-stream-service` | Go | 8110 | 실시간 시세 스트리밍 (SSE `/stream/{code}` + WS `/ws/{code}`), Hub 팬아웃. 프론트 배선 — gateway `/api/market-stream/**`(SSE 만) + docker-compose + CEO 투자 페이지 티커 (notification 과 함께 폴리글랏 프론트 배선 2종 — 정본 `docs/sse.md`) | MVP·green·프론트 노출 |
 | `payment-webhook-service` | Go | 8111 | Toss 결제 웹훅 수신 (HMAC 서명검증·멱등) → Kafka `lemuel.payment.confirmed` | MVP·green |
 | `screening-backtest-service` | Python/FastAPI | 8120 | 투자 스크리닝 규칙 백테스트 (수익률·MDD·Sharpe·승률) | MVP·green |
 | `settlement-anomaly-service` | Python/FastAPI | 8121 | 정산/payout 이상탐지 (MAD z-score + IsolationForest 앙상블) | MVP·green |
@@ -23,8 +23,11 @@ settlement MSA 에 언어별 강점을 살려 붙인 신규 서비스 7종(Kotli
   `processed_events` 멱등으로 방어되므로 회계 영향은 없다. 내구 멱등이 필요해지면 Redis 등 외부 스토어로 교체.
 - **notification 은 auto-commit(at-least-once)**: 처리 중 크래시 시 재소비 → 채널 부분 중복 발송 가능. DLT 없음
   (파싱 실패는 skip, 그 외 예외는 log 후 진행 — 컨테이너는 죽지 않음). 리스너 기본 OFF(`APP_KAFKA_ENABLED:false`).
-- **reconciliation 의 HTTP 소스는 스켈레톤**: `SETTLEMENT_BASE_URL`/`PAYMENT_BASE_URL`(기본 `order-service:8080`)
-  프로퍼티만 있고 실소스 빈이 등록되지 않아 fetch 가 빈 리스트를 반환한다.
+- **reconciliation 의 `INTERNAL_API_KEY` 기본값은 빈 문자열**: 실소스 빈 자체는 기본 프로파일의
+  `LiveSources` 가 `SETTLEMENT_BASE_URL`(기본 `settlement-service:8082`)·`PAYMENT_BASE_URL`(기본
+  `order-service:8080`)로 등록한다 — 과거 "스켈레톤·빈 리스트 반환" 상태는 해소됐고(2026-07-30
+  프로덕션 로그로 확인, `SourceConfig` KDoc), 번들 샘플은 `demo` 프로파일로 격리됐다. 다만 상대
+  서비스가 `internal-key-required=true`(운영) 면 키 미주입 시 401 로 대사가 비게 된다.
 - **screening-backtest 의 `MARKET_BASE_URL` 은 선언만 존재**: 코드는 번들 샘플(`sample_backtest.json`)만 사용 —
   실연동 경로 미구현.
 
@@ -40,7 +43,7 @@ settlement MSA 에 언어별 강점을 살려 붙인 신규 서비스 7종(Kotli
 ## CI
 `../../.github/workflows/polyglot-ci.yml` — `changes` 잡(dorny/paths-filter)이 **변경된 서비스만** 골라
 Go(build+vet+test -race) / Python 3.11(pytest) / Kotlin(gradle build) 매트릭스와 이미지 푸시 매트릭스를
-동적으로 계산한다(서비스 단위 CI — ci.yml 의 JVM 14종과 동일 패턴, 워크플로 파일 변경 시엔 7종 전부 폴백).
+동적으로 계산한다(서비스 단위 CI — ci.yml 의 JVM 17모듈과 동일 패턴, 워크플로 파일 변경 시엔 7종 전부 폴백).
 기존 Java `ci`/harness-guard 와 독립(신규 Java·마이그레이션·ADR 추가 없어 STATUS 카운트 불변).
 
 ## 배포 (후속 — helm-deploy 레포)

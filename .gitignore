@@ -129,9 +129,9 @@ company-service/src/main/resources/pwc/accounting/outputs/*
 .claude/settings.local.json
 .claude/agent-memory/
 .claude/scratch/
-.claude/harness/
-# 루트와 같은 대우 — frontend 하위 하네스 세션 로그도 이력에서 제외 (과거에 추적으로 유입돼 있었다)
-frontend/.claude/harness/
+# 모든 깊이의 .claude/harness 세션 로그를 이력에서 제외 — 루트·frontend 뿐 아니라
+# 잘못된 cwd 의 세션이 src/main/java 하위에 만든 것까지 (과거에 추적으로 유입된 적 있다)
+**/.claude/harness/
 .claude/worktrees/
 .claude/projects/
 .claude/session-env/
@@ -216,3 +216,6 @@ docs/harness/
 docs/inflearn/
 docs/study/
 docs/sse/
+# 게시판 첨부 로컬 저장소 — bootRun 이 여기에 파일을 쓴다(운영은 볼륨 마운트).
+# 사용자가 올린 바이너리라 저장소에 들어갈 이유가 없다.
+board-service/data/

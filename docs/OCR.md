@@ -97,7 +97,7 @@ develop 반영 완료.
 - 모듈 게이트: shared-common·settlement(tax 회귀)·card·insurance·loan·deposit 전부
   `test` + `jacocoTestCoverageVerification`(LINE 90%) GREEN — **Docker 기동 후 IT 포함**(로컬 IT skip
   으로 인한 가짜 판정 배제), 초기 3모듈은 격리 worktree(커밋 트리)에서 재현 검증.
-- 프론트: vitest 568건·lint 0·프로덕션 빌드·menu-route-gate 6/6·harness-audit healthy.
+- 프론트: vitest 전건 통과(당시 568건 — 이후 커버리지 게이트 90% 상향으로 증가)·lint 0·프로덕션 빌드·menu-route-gate 6/6·harness-audit healthy.
 - 실측으로 잡은 결함: Spring 이중 생성자 빈 실패, Flyway 로스터 IT 갱신 누락, card 커버리지
   0.88 미달(어드민 컨트롤러 테스트 보강으로 회복), deposit 테이블명 오추정(BootIT 가 검출).
 

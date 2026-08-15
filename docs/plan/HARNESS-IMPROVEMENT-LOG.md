@@ -27,6 +27,90 @@ _판정 로그_ 다. 지금까지 하네스는 계속 늘어나기만 했고, �
 
 ## 항목
 
+### 2026-08-16 · CI 변경 감지 기준점 — push 는 직전 커밋 대비(전 모듈 실행 제거)
+
+- **status**: verified
+- **동기**: 경로 필터·모듈 매트릭스는 정교하게 짜여 있는데 **입력이 틀려서 무력화**돼 있었다.
+  `dorny/paths-filter` 에 `base` 를 주지 않으면 기본 브랜치(main)와의 merge-base 를 기준으로 삼는데,
+  main 이 develop 보다 1300 커밋 뒤처져 있어 develop push 는 무엇을 바꿨든 전부 바뀐 것으로 잡혔다.
+  `shared` 필터(build.gradle.kts·Dockerfile·ci.yml)가 반드시 걸려 언제나 '전 서비스 재빌드' 분기.
+- **predicted_effect**: push 는 직전 커밋 대비로 판정 → 바뀐 모듈만 실행. PR 은 base 를 비워
+  main 대비 유지 → 머지 전 전량 검증은 그대로. 상시 열린 develop→main 릴리스 PR 이 안전망이라
+  push 쪽을 줄여도 게이트가 약해지지 않는다.
+- **verified_at**: 2026-08-16 · 같은 워크플로·같은 브랜치에서 기준점만 바뀐 두 실행을 대조
+  - before (run 31892010325): `Searching for merge-base main...develop` → `Detected 274 changed files`
+    → 백엔드 모듈 19잡 (문서 2개·tsx 2개만 바꾼 push)
+  - after (run 31894160978): `변경 감지 기준: 직전 커밋 331f6238…` → **`Detected 2 changed files`**
+    → `["backend","shared"]`. 이 실행이 18모듈을 돈 것은 바꾼 파일이 `ci.yml`(=shared) 이라 **의도대로**다.
+- **한계(명시)**:
+  - 폴백이 전량으로 떨어진다 — 최초 push·force-push 로 `before` 를 못 찾으면 base 를 비운다.
+    판단이 갈릴 때 더 도는 쪽을 택한 것이고, 그래서 절감이 항상 보장되지는 않는다.
+  - **문서만 바꾼 push 는 여전히 전 모듈이 돈다.** `backend` 필터가 `'**' + '!frontend/**'` 라 docs 도
+    backend 로 잡히고, 매칭된 서비스가 0개면 '모호한 backend 변경 → 안전하게 전 모듈' 분기를 탄다.
+    이건 별개의 (의도된) 페일세이프이므로 이번 변경 범위 밖에 뒀다 — 줄이려면 그 분기의 안전성을
+    따로 판단해야 한다.
+- **적용**: `ci.yml`, `polyglot-ci.yml`(같은 원인 — 폴리글랏 7종 중 하나만 고쳐도 7개가 전부 돌았다)
+### 2026-08-15 · 리포트 신선도 게이트(report-freshness.mjs) — 낡은 XML 인용 차단
+
+- **status**: candidate
+- **동기**: "가짜 GREEN 4경로" 중 'UP-TO-DATE 낡은 XML' — 직전 빌드 산출물을 이번 변경의 증거로
+  인용하는 실수는 지금까지 운용 지식("인용 전 mtime 확인")으로만 막았다.
+- **predicted_effect**: 게이트 결과 인용 전 `report-freshness <module>` 실행이 관례가 되면, 소스 수정 후
+  재빌드 없이 "통과" 를 주장하는 보고가 STALE(exit 1)로 걸러진다. 리포트 부재(미실행)도 MISSING 으로 구분.
+- **한계(명시)**: mtime 근사 — 소스 무변경 재실행은 fresh 로 본다(옳음), Docker 다운 skip 축은 별개 문제로 남는다.
+- **verified_at**: 미검증 (유닛 6케이스 도입 시점 PASS)
+
+### 2026-08-15 · CI 텔레메트리 로컬 합산(telemetry-ci-pull + --merge)
+
+- **status**: candidate
+- **동기**: 러너 실행 이력이 아티팩트로만 남아 로컬 리포트와 단절 — 규칙 효과 판정의 분모가 로컬
+  체크아웃 하나로 좁았다(상태 관측의 머신 경계 단절).
+- **predicted_effect**: `telemetry-ci-pull.mjs` 수집 + `--merge` 리포트에서 mode list(CI) 실행 분모가
+  로컬 집계에 합산돼, 규칙별 발화/0회 판정이 CI 포함 전체 창으로 넓어진다.
+- **verified_at**: 미검증 (병합·멱등 수집 유닛 4케이스 도입 시점 PASS — 실데이터 합산은 다음 리포트에서)
+
+### 2026-08-15 · organization-domain-rules — 서비스 규칙 커버리지 16/16 완결
+
+- **status**: candidate
+- **동기**: 마지막 미커버 서비스. 발행 전용 경계·활성 OWNER ≥1·card 프로젝션 계약(드리프트 3종)은
+  코드에 있지만 스킬·라우터가 안 실어 주는 지식이었다.
+- **predicted_effect**: organization 경로 편집 시 라우터 주입이 발생하고, 커버리지 공백 섹션이 사라진다
+  (16/16). 이후 신규 서비스 추가 시 "스킬+ROUTES 동시 배선" 관례의 기본값이 된다.
+- **verified_at**: 미검증 (라우팅 2케이스 도입 시점 PASS)
+
+### 2026-08-15 · Bash 명령 가드(COMMAND_RULES, --hook-bash) — 실시간 계층의 두 구멍 봉쇄
+
+- **status**: candidate
+- **동기**: ① 실시간 가드 매처가 `Write|Edit|MultiEdit` 뿐이라 sed -i·heredoc 리다이렉트로 소스를
+  쓰면 내용 스캔을 통째로 우회했다(백슬래시 손실 사고 2회 전력). ② "운영 DB 명령 차단(check-command)"
+  은 settlement-copilot **플러그인 소유**라 플러그인 미설치 환경(CI·새 클론·Codex)엔 아예 없었다 —
+  HARNESS 의 "플러그인 독립" 전제와 모순.
+- **predicted_effect**: telemetry `mode hook-bash` 실행 분모가 세션마다 기록되고, CMD-EDIT-BYPASS /
+  CMD-NO-VERIFY 발화가 0회면 "완전 예방"(카나리아 PASS 로 생존 확인), 발화하면 실시간에서 잡힌
+  우회 시도다. 소스 파일의 heredoc 손상 재발이 0 이 된다.
+- **위험**: 오탐이 Bash 전체를 마찰시킨다 — 대상을 소스 확장자(.java/.kt/.sql/.mjs/.yml)로 좁히고
+  fail-open + `HARNESS_ALLOW_CMD=1` 탈출구를 뒀다. 오탐 발견 시 규칙을 좁힌다(끄지 않는다).
+- **verified_at**: 미검증 (카나리아 4종·유닛 12케이스는 도입 시점 PASS — 실전 발화는 2주 뒤 리포트로)
+
+### 2026-08-15 · skill-router 세션 상태 GC (14일 보존)
+
+- **status**: candidate
+- **동기**: `.claude/harness/state/` 에 세션당 1개 상태 파일이 정리 정책 없이 누적(실측 ~70개).
+  실해는 작지만 "상태 관리에 GC 가 없다"는 구조 결함.
+- **predicted_effect**: 상태 파일 수가 14일 활동 세션 수로 수렴한다(무한 증가 중단). dedupe 동작은
+  불변(신선한 세션 상태는 건드리지 않음 — 테스트 고정).
+- **verified_at**: 미검증 (2주 뒤 `ls .claude/harness/state | wc -l` 로 대조)
+
+### 2026-08-15 · insurance/deposit 도메인 규칙 스킬 + 라우터 배선 (커버리지 공백 해소)
+
+- **status**: candidate
+- **동기**: HARNESS.md 가 스스로 "우선 부채"로 명시한 돈 경로 2서비스(보험 수수료정산·25%룰·완전판매
+  게이트 / 예치금 hold·offset 이중사용 차단)가 전용 `*-rules` 스킬·라우터 행 없이 방치.
+- **predicted_effect**: insurance/deposit 경로 편집 시 라우터가 해당 스킬을 주입하고(순응률 지표에
+  등장), 두 서비스의 도메인 규칙 위반(만료 회수 originalAmount·referenceType 변경·게이트 후퇴 등)이
+  리뷰에서 스킬 근거로 지적된다. 커버리지 공백 섹션은 organization 1개로 축소.
+- **verified_at**: 미검증 (skill-router.test.mjs 라우팅 3케이스는 도입 시점 PASS)
+
 ### 2026-08-12 · 가드 실행 분모(guard-runs.jsonl) 추가
 
 - **status**: candidate
@@ -87,11 +171,44 @@ _판정 로그_ 다. 지금까지 하네스는 계속 늘어나기만 했고, �
 - **verified_at**: 2026-08-12 — `--deleted-list` 모드가 CI 에 배선돼 있고, 2026-08-12 부터
   `../../scripts/verify.sh` 도 같은 검사를 로컬에서 돈다.
 
+### 2026-08-15 · 문서 사실 게이트에 "서비스 수" 규칙 추가 + 부사 삽입형 소비처 주장 포착
+
+- **status**: verified
+- **동기**: HARNESS.md 가 3주간 `14 마이크로서비스` 로 남아 있었다(실제 16). 같은 문서 안에
+  `자바 16서비스` 줄이 공존해 **자기모순**이었는데도 `harness-audit` 는 healthy 였다 — 모듈 로스터
+  대조가 트리 표기만 보고 산문 주장은 안 봤기 때문. 같은 점검에서 `소비처가 아직 미배선`(organization)
+  이 gate #3 을 통과한 것도 드러났다. card-service 가 4토픽을 실제 소비 중인데, 정규식이
+  `소비처(가) 미배선` 만 보고 사이에 낀 `아직` 을 못 넘었다.
+- **predicted_effect**: 상태 기술 문서에서 서비스 수를 안 고치면 audit FAIL → CI 차단.
+  로스터 앵커(gateway·DB-per-service)가 같은 줄에 있을 때만 주장으로 인정하므로
+  부분집합("금융 5서비스")·폴리글랏 합계(24)는 오탐하지 않는다.
+- **verified_at**: 2026-08-15 — 규칙 투입 직후 실제 저장소에서 `HARNESS.md:67` 1건을 잡았고(수정 후
+  healthy 복귀), 상태 기술 문서 8종 전수에서 오탐 0건. `audit.test.mjs` 가 "잡는다/오탐 안 한다"
+  5쌍으로 고정.
+
 ---
+
+## 측정된 것 (2026-08-15 갱신 — 이전 "못 재는 것" 3항목이 전부 데이터를 갖게 됨)
+
+재현: `node scripts/harness/telemetry-report.mjs` · `node scripts/harness/session-metrics.mjs`
+
+- **위반 시도 빈도** — 가드 실행 1563회(분모: hook 1341 · staged 205 · files 9 · list 8) 대비
+  **차단 11건(0.7%)**, 최근 14일 6건. 최다 `MONEY-PRIMITIVE` 5 · `MSA-BOUNDARY` 4.
+  0회 규칙 7종은 카나리아가 전부 PASS 하므로 "죽은 규칙"이 아니라 **완전 예방**으로 판정된다.
+- **스킬 로드** — `skill-usage.jsonl` **295회**. 상위 `tdd-discipline` 55 · `settlement-domain-rules` 28 ·
+  `verify-before-done` 25 · `idempotency-and-events` 22 · `ledger-invariants` 21.
+  라우터 순응률(제안→로드) **100% (197/197)** — 목표 ≥80% 대비 초과 달성.
+- **상주/온디맨드 비중** — 상주 CLAUDE.md 20.1KB vs 온디맨드 37스킬 183.7KB → **상주 비중 10%**.
+- **완주율·재작업률(KPI-3/4)** — KPI-3 완주율 100%(2/2)이나 **n<10 이라 추이 지표로만** 쓴다.
+  KPI-4 재작업률 최근 30일 **21.6%(183/849)** — 베이스라인 19.3%(2026-07-22) 대비 **상승**했다.
+  하향이 목표였으므로 이 항목은 아직 개선 실패로 읽는 것이 정직하다.
 
 ## 아직 못 재는 것 (정직한 공백)
 
-- **에이전트가 실제로 위반을 시도하는 빈도** — 분모 배선 직후라 데이터가 없다.
-- **스킬 37개 중 값을 하는 것** — `skill-usage.jsonl` 0건. 상주 CLAUDE.md 17.6KB 대비
-  온디맨드 172.3KB(상주 비중 9%)라는 크기는 알지만, 로드 빈도는 모른다.
-- **완주율·재작업률(KPI-3/4)** — `session-metrics.mjs` 는 있으나 입력이 비어 있다.
+- **스킬 37개 중 값을 하는 것** — 로드 빈도는 이제 알지만 **로드가 결과를 바꿨는지**는 모른다.
+  로드 0회 13종(`compliance-review` · `economics-data-rules` · `hookify-to-guard` · `incident-runbooks` ·
+  `market-quotes-rules` · `oo-score` · `operation-signal-rules` · `recon-playbook` · 인터뷰 서브하네스
+  `socrates`·`wonder`·`reflect`·`refine`·`restate`)도 "안 쓰임"과 "해당 상황이 안 옴"이 구분되지 않는다
+  — 가드의 카나리아에 해당하는 장치가 스킬 쪽엔 없다.
+- **KPI-4 상승의 원인** — 재작업률이 올랐다는 사실은 재지만, 하네스 탓인지 작업 성격(대규모 캠페인
+  다수) 탓인지 분해할 축이 없다.

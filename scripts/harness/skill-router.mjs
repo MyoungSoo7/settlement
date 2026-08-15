@@ -11,8 +11,8 @@
 //
 // Invariant: 이 훅은 절대 도구 호출을 차단하지 않는다 — 어떤 실패도 exit 0.
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { mkdir, readFile, readdir, stat, unlink, writeFile } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { appendJsonl } from "./telemetry.mjs";
 
@@ -37,6 +37,10 @@ export const ROUTES = [
   [/operation-service\//, ["operation-signal-rules"]],
   [/ai-service\//, ["ai-chat-rules"]],
   [/common-data-service\//, ["commondata-connector-rules"]],
+  [/insurance-service\//, ["insurance-domain-rules"]],
+  [/deposit-service\//, ["deposit-domain-rules"]],
+  [/organization-service\//, ["organization-domain-rules"]],
+  [/board-service\//, ["board-domain-rules"]],
   [
     /(\/outbox\/|adapter\/in\/kafka\/|adapter\/out\/event\/)/i,
     ["idempotency-and-events"],
@@ -95,6 +99,37 @@ async function writeSuggested(statePath, suggested) {
   }
 }
 
+// 세션 상태 GC — 세션당 상태 파일 1개가 영구 누적되던 문제(실측 ~70개, 정리 정책 부재)의 대응.
+// 세션은 며칠이면 끝나므로 mtime 기준 보존기간을 넘긴 파일은 재제안 dedupe 가치가 없다.
+// 정리 실패는 훅 결과에 영향을 주지 않는다(라우터 불변식: 어떤 실패도 exit 0).
+export const STATE_RETENTION_DAYS = 14;
+
+export async function pruneStaleState(
+  repoRoot,
+  { now = new Date(), maxAgeDays = STATE_RETENTION_DAYS } = {},
+) {
+  const stateDir = resolve(repoRoot, ".claude", "harness", "state");
+  const cutoff = now.getTime() - maxAgeDays * 86_400_000;
+  let pruned = 0;
+  try {
+    for (const name of await readdir(stateDir)) {
+      if (!/^skill-router-[\w-]+\.json$/.test(name)) continue;
+      const filePath = join(stateDir, name);
+      try {
+        if ((await stat(filePath)).mtimeMs < cutoff) {
+          await unlink(filePath);
+          pruned += 1;
+        }
+      } catch {
+        /* per-file race (parallel session touching its state) — skip, never fail */
+      }
+    }
+  } catch {
+    /* state dir missing or unreadable — nothing to prune */
+  }
+  return pruned;
+}
+
 async function readStdinUtf8() {
   const chunks = [];
   for await (const chunk of process.stdin) chunks.push(Buffer.from(chunk));
@@ -132,6 +167,8 @@ export async function decideHookOutput(
     const fresh = skills.filter((skill) => !seen.includes(skill));
     if (fresh.length === 0) return null;
     await writeSuggested(statePath, [...seen, ...fresh]);
+    await pruneStaleState(repoRoot, { now }); // 기회적 GC — 새 제안이 생기는 드문 시점에만 돈다
+
     await appendJsonl(
       repoRoot,
       "skill-suggestions.jsonl",

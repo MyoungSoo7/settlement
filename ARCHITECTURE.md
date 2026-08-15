@@ -13,7 +13,7 @@
 
 | # | 서비스 | 포트 | 도메인 / 역할 |
 |---|---|---|---|
-| 1 | **order-service** | 8088 | 커머스 코어 — user·order·payment·cart·shipping·product·category·coupon·review + 정합성 부속(recon·프로젝션 백필) |
+| 1 | **order-service** | 8088 | 커머스 코어 — user·order·payment·cart·shipping·product·category·coupon·review·sellertier(ADR 0031) + 정합성 부속(recon·프로젝션 백필) |
 | 2 | **settlement-service** | 8082/8083 | 정산 코어 — 정산 상태머신·Outbox·역정산·원장(복식부기)·payout·정산 검색(ES). ADR 0020 으로 독립 프로세스 분리 |
 | 3 | **gateway-service** | 8080 | API Gateway (Spring Cloud Gateway) — 경로 라우팅 전용. 인증(JWT)·레이트리밋은 각 서비스가 자체 강제 ([§7](#7-금융권-아키텍처-용어-대응-mci--eai--esb--fep)) |
 | 4 | **loan-service** | 8084 | 선정산·기업대출 (settlement 확정 이벤트 수신) |
@@ -55,7 +55,7 @@
 | **notification-service** | 8130 | 도메인 이벤트(Kafka) → 다채널(log/Slack/email) 알림 + 브라우저 푸시 SSE(`/api/notifications/stream`) | 코루틴 I/O 팬아웃 · 채널별 타임아웃/재시도 격리 · eventId 멱등 · JWT 신원 라우팅/`Last-Event-ID` 재생([`sse.md`](docs/sse.md)) |
 | **reconciliation-service** | 8131 | 정산 대사 (settlement ↔ PG/payout/원장) | sealed Discrepancy(MISSING/EXTRA/AMOUNT/STATUS) · 다소스 코루틴 병렬 fetch · @Scheduled |
 
-**합계**: Java 17종(16 서비스 + gateway) + Go 2 + Python 3 + Kotlin 2 = **24 서비스** (+ shared-common 라이브러리). *런타임은 Java 25 — 위 숫자는 서비스 수다.*
+**합계**: Java 18종(17 서비스 + gateway) + Go 2 + Python 3 + Kotlin 2 = **25 서비스** (+ shared-common 라이브러리). *런타임은 Java 25 — 위 숫자는 서비스 수다.*
 
 ---
 
@@ -63,7 +63,7 @@
 
 - **폴리글랏 MSA** — 동일 클러스터에서 언어별 강점 배치. JVM=도메인/트랜잭션, Go=실시간/멱등 엣지, Python=ML/퀀트. 기존 JVM 서비스가 못 채우는 실시간·데이터 공백을 보완.
 - **헥사고날 (Ports & Adapters)** — 전 서비스가 `domain / application / adapter(in·out)` 로 분리. 의존 방향(도메인은 프레임워크 무의존, application→adapter 금지)을 **ArchUnit 으로 컴파일 게이트화**. ADR 0001.
-- **Bounded Context 분리 + DB-per-service** — 서비스마다 독립 PostgreSQL(`lemuel_*`), 스키마는 서비스별 Flyway 가 관리. 물리 격리로 결합 차단. ADR 0020(order↔settlement DB 분리).
+- **Bounded Context 분리 + DB-per-service** — 서비스마다 독립 PostgreSQL(신규는 `lemuel_*` 규약, 선행 2종은 예외: order=`inter`·settlement=`settlement_db`), 스키마는 서비스별 Flyway 가 관리. 물리 격리로 결합 차단. ADR 0020(order↔settlement DB 분리).
 - **이벤트 드리븐 + CQRS 프로젝션** — 서비스 간 상태는 Kafka 이벤트(`lemuel.<domain>.<event>`)로 전파. settlement 확정·payment·investment 체결 등이 이벤트로 흐르고, 읽기 측은 프로젝션으로 조회. Kafka vs 애플리케이션 이벤트 경계는 ADR 0005.
 - **GitOps 배포** — GitHub Actions(CI, 이미지 빌드·ghcr 푸시) → ArgoCD(k3s 에 선언적 sync) → image-updater(신규 빌드 자동 롤아웃). 코드/설정이 git 이 단일 진실.
 - **관측성 내장** — Micrometer→Prometheus→Grafana(비즈니스 KPI 대시보드), 분산 트레이싱(Outbox 관통, ADR 0012), 중앙 로깅(ELK/fluent-bit).
@@ -100,9 +100,9 @@
 
 | 레이어 | 기술 |
 |---|---|
-| **JVM 언어** | Java 25 (코어 16 서비스 + gateway) · Kotlin 2.0 (신규 이벤트 서비스 2종) |
-| **JVM 프레임워크** | Spring Boot 4.0.4 / Spring 7 (Java) · Spring Boot 3.3 (Kotlin, JDK 21) · Spring Cloud Gateway |
-| **Go** | Go 1.22+ (goroutine, `net/http` SSE/WebSocket, kafka-go, HMAC-SHA256) |
+| **JVM 언어** | Java 25 (코어 17 서비스 + gateway) · Kotlin 2.0 (신규 이벤트 서비스 2종) |
+| **JVM 프레임워크** | Spring Boot 4.0.7 / Spring 7 (Java) · Spring Boot 3.3 (Kotlin, JDK 21) · Spring Cloud Gateway |
+| **Go** | Go 1.22/1.23 혼재 — CI 툴체인 1.23 (goroutine, `net/http` SSE/WebSocket, kafka-go, HMAC-SHA256) |
 | **Python** | Python 3.11 · FastAPI · pandas/numpy · scikit-learn · statsmodels |
 | **빌드** | Gradle Multi-module (Kotlin DSL) · 폴리글랏 서비스는 standalone 빌드 |
 | **DB** | PostgreSQL 17 (DB-per-service) · Flyway 마이그레이션 |
@@ -114,7 +114,7 @@
 | **PG 연동** | Toss Payments (웹훅 HMAC 검증) |
 | **인증/보안** | JWT(HS256) · BCrypt(cost 12) · payout PII AES-256 필드 암호화 |
 | **관측성** | Micrometer + Prometheus + Grafana · 분산 트레이싱 · ELK(fluent-bit) 중앙 로깅 |
-| **테스트/품질** | JUnit 5 · Mockito/MockK · ArchUnit · Testcontainers · JaCoCo · SonarCloud · Snyk · Go `-race` · pytest |
+| **테스트/품질** | JUnit 5 · Mockito/MockK · ArchUnit · Testcontainers · JaCoCo · SonarCloud · CycloneDX SBOM + Trivy (Snyk 대체, 2026-08-12) · Go `-race` · pytest |
 | **CI/CD** | GitHub Actions (빌드·테스트·이미지 push) → GHCR → **ArgoCD + image-updater** (GitOps) |
 | **런타임** | Docker (dev compose) · **k3s (6-node)** + traefik · Cloudflare Tunnel (외부노출) |
 
@@ -124,7 +124,8 @@
 
 ```
 코드 push → GitHub Actions
-  ├─ JVM: Gradle build/test(JaCoCo gate) + SonarCloud + Snyk → ghcr.io/.../settlement-<svc>
+  ├─ JVM: Gradle build/test(JaCoCo gate) + SonarCloud + SBOM(CycloneDX)·Trivy 스캔 → ghcr.io/.../settlement-<svc>
+  ├─ Frontend(frontend-ci): 프로덕션 빌드·vitest → ghcr 푸시 (+ images 집계 잡 = 필수 체크)
   └─ Polyglot(polyglot-ci): Go build+test(-race) / Python pytest / Kotlin gradle → ghcr.io/.../settlement-<svc>
          ↓ (tag: main / main-<sha7> / latest)
       ArgoCD (k3s) — 매니페스트 선언적 sync (helm-deploy 레포)

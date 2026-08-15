@@ -8,7 +8,7 @@
 | 구분 | 기술 | 구분 | 기술 |
 |------|------|------|------|
 | 언어 | Java 25 | 메시지 | Kafka (Redpanda 호환) |
-| 프레임워크 | Spring Boot 4.0.4 | PG | Toss Payments |
+| 프레임워크 | Spring Boot 4.0.7 | PG | Toss Payments |
 | 빌드 | Gradle 멀티모듈 (Kotlin DSL) | 배치 | Spring Batch |
 | Gateway | Spring Cloud Gateway 2025 | 캐시 | Caffeine(L1) + 선택 Redis(L2) |
 | DB | PostgreSQL 17 | PDF | iText 8 |
@@ -34,7 +34,7 @@
 #       card-service, insurance-service, deposit-service, gateway-service
 
 # Docker
-docker compose up -d                                # DB-per-service PG 16종 · ES · Redpanda · 앱 컨테이너 18개(JVM 17 + market-stream)
+docker compose up -d                                # DB-per-service PG 16종 · ES · Redpanda · 앱 컨테이너 19개(JVM 17 + market-stream + notification) · frontend
 docker build --build-arg MODULE=<service> -t lemuel-<name> .   # 컨테이너 이미지 (MODULE 로 서비스 지정)
 ```
 
@@ -48,7 +48,7 @@ docker build --build-arg MODULE=<service> -t lemuel-<name> .   # 컨테이너 �
 ## 작업 이력 / 브랜치 정보
 
 - **메인 라인**: `develop` → `main`. main 은 보호 브랜치(PR 필수, squash 만, **필수 CI 6종** — 목록은 [`CLAUDE.md`](../CLAUDE.md) 작업 프로토콜 절). 분리 전 백업 `backup/pre-msa-split`.
-- **MSA 분리 완료**: 16 서비스 + gateway, 전 서비스 DB-per-service, settlement↔order 이벤트 프로젝션(ADR 0020).
+- **MSA 분리 완료**: 17 서비스 + gateway, 전 서비스 DB-per-service, settlement↔order 이벤트 프로젝션(ADR 0020).
 - **제거된 도메인**: `reservation`(시공 예약) — 모듈·DB·라우팅·프론트·k8s 정리 완료.
 - **TPS 개선**: PgBouncer→Redpanda, settlement 배치/컨슈머 스레드·프로젝션 쿼리·캐시·PDF 비동기화 등.
 - **CI 백엔드 병렬화 (2026-08-14)**: 백엔드 게이트가 단일 잡으로 17모듈을 순차 실행해 14~43분이

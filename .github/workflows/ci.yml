@@ -13,12 +13,30 @@ on:
   pull_request:
     branches: [main, develop]
 
-# 같은 브랜치에 연속 push 하면 이전 실행이 러너를 계속 점유한다(백엔드 잡 정상 55~70분).
-# PR 은 최신 커밋만 검증하면 되므로 취소하고, main/develop push 는 이미지 푸시가 걸려 있어
-# 취소하지 않고 직렬화만 한다(앞 실행이 끝나야 다음이 시작 → 이미지 태그 경합 방지).
+# 연속 push 는 러너를 두고 다툰다. "어느 실행을 살릴 것인가" 가 이 블록의 전부다.
+#
+#   main push 만 직렬화한다 — 이미지 푸시와 운영 스모크가 걸려 있어 중간에 끊으면 안 된다.
+#   PR 과 develop push 는 **최신 커밋이 이긴다**.
+#
+# develop 을 직렬화에서 뺀 이유 (2026-08-15 실측):
+#   ① 직렬화의 전제였던 "백엔드 잡 정상 55~70분" 이 낡았다. 모듈 매트릭스로 쪼갠 뒤 전체 런은
+#      13~14분이다(run 31872579719 push 14분 · 31872582987 pull_request 13분). 오래 도니까
+#      취소하지 말자는 근거가 사라졌다.
+#   ② 직렬화는 대기열에서 **최신 커밋을 떨어뜨린다**. concurrency 그룹의 대기 슬롯은 1개뿐이라
+#      새 push 가 오면 앞서 대기하던 실행이 취소되는데, 정작 러너를 쥐고 있는 것은 가장 낡은
+#      실행이다. 08:07~08:53 develop 실측: push 런 6건 중 완주 0건, 최신 커밋(31bcbd27e)은
+#      pending 에서 취소되고 낡은 커밋이 러너를 붙들었다 — 판정이 낡은 트리로 간다.
+#   ③ 릴리스 PR(develop→main)이 상시 열려 있어 커밋 하나가 push 런 + PR 런 2벌을 만든다.
+#      최신만 남기면 동시 점유가 (버스트 수 × 2벌) 에서 2벌로 떨어진다.
+#
+# 대가: 중간 develop 커밋의 develop-<sha> 이미지는 만들어지지 않는다. 움직이는 develop 태그는
+# 어차피 최신 커밋으로 수렴하고(오히려 취소된 낡은 실행이 태그를 덮는 일이 사라진다),
+# 스테이징이 필요로 하는 것도 최신 develop 이라 받아들인다. 특정 중간 sha 이미지가 필요하면
+# 그 sha 로 워크플로를 재실행할 것.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  # pull_request 의 github.ref 는 refs/pull/<n>/merge 라 이 조건에서 자연히 true 가 된다.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
   JAVA_VERSION: "25"
@@ -58,10 +76,50 @@ jobs:
         with:
           fetch-depth: 0
 
+      # 변경 감지의 기준점을 정한다 — 이 한 값이 "무엇을 돌릴지" 전부를 좌우한다.
+      #
+      # 문제 (2026-08-16 실측): base 를 주지 않으면 dorny 는 **기본 브랜치(main)와의 merge-base**
+      #   를 기준으로 삼는다. main 이 develop 보다 1300 커밋 뒤처져 있어, develop push 는 무엇을
+      #   바꿨든 283개 파일 변경으로 잡힌다 → shared 필터(build.gradle.kts·Dockerfile·ci.yml)가
+      #   반드시 걸려 → 언제나 "전 서비스 재빌드" 분기.
+      #   실제로 문서 2개·tsx 2개만 바꾼 push 가 백엔드 모듈 19개를 전부 돌렸다
+      #   (run 31892010325: "Searching for merge-base main...develop" → "Detected 274 changed files").
+      #   경로 필터가 정교하게 짜여 있는데 입력이 틀려서 무력화돼 있던 것이다.
+      #
+      # 그래서 역할을 나눈다:
+      #   - push(develop)     → 직전 커밋 대비. 바뀐 모듈만 돌려 피드백을 짧게 한다.
+      #   - pull_request      → base 를 비운다(= PR base = main). **머지 전 전량 검증은 그대로**.
+      #     develop→main 릴리스 PR 이 상시 열려 있어, push 에서 안 돈 모듈도 머지 전에 반드시 한 번 돈다.
+      #
+      # 안전 폴백: 최초 push·force-push 는 before 가 0000… 이거나 이미 사라진 커밋을 가리킨다.
+      #   그때는 base 를 비워 **전량 검증으로 떨어뜨린다** — 판단이 갈릴 때는 더 도는 쪽이 옳다.
+      - name: Resolve paths-filter base
+        id: filter_base
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          base=""
+          if [ "${{ github.event_name }}" = "push" ]; then
+            if [ -n "${BEFORE:-}" ] \
+              && [ "$BEFORE" != "0000000000000000000000000000000000000000" ] \
+              && git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+              base="$BEFORE"
+              echo "변경 감지 기준: 직전 커밋 ${BEFORE}"
+            else
+              echo "직전 커밋을 찾을 수 없다(before=${BEFORE:-<empty>}) → 기본 비교(전량 검증)로 떨어뜨린다"
+            fi
+          else
+            echo "pull_request → PR base(main) 와 비교한다(전량 검증)"
+          fi
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+
       - name: Paths filter
         id: filter
         uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         with:
+          # 빈 문자열이면 dorny 기본 동작(기본 브랜치와 비교) — 위 스텝의 폴백이 이 값을 낸다.
+          base: ${{ steps.filter_base.outputs.base }}
           filters: |
             frontend:
               - 'frontend/**'
@@ -97,6 +155,7 @@ jobs:
             card-service: ['card-service/**']
             insurance-service: ['insurance-service/**']
             deposit-service: ['deposit-service/**']
+            board-service: ['board-service/**']
 
       - name: Compute image build matrix (changed services only)
         id: setmatrix
@@ -122,7 +181,8 @@ jobs:
             "organization-service":"-organization",
             "card-service":"-card",
             "insurance-service":"-insurance",
-            "deposit-service":"-deposit"
+            "deposit-service":"-deposit",
+            "board-service":"-board"
           }'
           if echo "$CHANGED" | jq -e 'index("shared")' >/dev/null; then
             # 공용 변경 → 전 서비스 재빌드
@@ -342,7 +402,19 @@ jobs:
           path: artifacts
 
       # 모듈 잡에서 올라온 리포트를 원래 경로로 되돌린다. 아티팩트 이름의 접미사가 모듈명이다.
+      #
+      # 가드를 "0개면 실패"에서 **집합 대조**로 올렸다 (2026-08-15).
+      #   전에는 count -eq 0 만 봤기 때문에 *부분* 유실이 조용히 통과했다. 그런데 Sonar 는 리포트가
+      #   없는 모듈을 건너뛰지 않고 0% 로 집계한다 — develop 분석 2026-08-15T07:52 실측에서
+      #   17개 중 11개가 0% 로 들어가 전체 coverage 57.7%, 품질 게이트 ERROR 가 됐다.
+      #   이제 두 집합을 갈라 본다:
+      #     ① 돌았어야 하는데 리포트가 없다(expected − restored) → 아티팩트 배선 결함 → 실패
+      #     ② 애초에 안 돌았다(all − expected)                  → 정상. 이번 실행 커버리지 집계에서
+      #        제외되며(build.gradle.kts 의 sonar.coverage.exclusions), 어느 모듈이 빠졌는지 남긴다.
       - name: Restore report paths
+        env:
+          TEST_MATRIX: ${{ needs.changes.outputs.test_matrix }}
+          TEST_RESULT: ${{ needs.backend-test.result }}
         run: |
           set -euo pipefail
           shopt -s nullglob
@@ -351,12 +423,31 @@ jobs:
             mkdir -p "$module/build/reports"
             cp -r "$dir/." "$module/build/reports/"
           done
-          count=$(ls -1 */build/reports/jacoco/test/jacocoTestReport.xml 2>/dev/null | wc -l)
-          echo "복원된 커버리지 XML: ${count}개"
-          # 0 개면 Sonar 커버리지가 조용히 0% 로 잡히고 PR 코멘트도 빈손이 된다 — 침묵시키지 않는다.
-          if [ "$count" -eq 0 ] && [ "${{ needs.backend-test.result }}" = "success" ]; then
-            echo "::error::모듈 테스트는 통과했는데 커버리지 XML 이 하나도 복원되지 않았다 — 아티팩트 배선을 확인할 것"
+
+          restored=$(ls -1 */build/reports/jacoco/test/jacocoTestReport.xml 2>/dev/null | cut -d/ -f1 | sort -u || true)
+          # 모듈 로스터 정본은 settings.gradle.kts (harness-audit 의 ci-matrix 규칙과 같은 출처)
+          all=$(sed -n '/^include(/,/^)/p' settings.gradle.kts | grep -oE '"[a-z-]+-service"' | tr -d '"' | sort -u)
+          # jq 실패를 2>/dev/null 로 삼키지 않는다 — 삼키면 expected 가 비어 대조가 통째로 무력화되고
+          # 가드가 "이상 없음"으로 오판한다(정확히 이 가드가 없애려는 실패 양식이다).
+          if [ -n "${TEST_MATRIX:-}" ]; then
+            expected=$(printf '%s' "$TEST_MATRIX" | jq -r '.include[].module' | sort -u)
+          else
+            expected=""
+          fi
+
+          echo "복원된 커버리지 XML: $(echo "$restored" | grep -c . || true)개"
+          echo "  restored: $(echo "$restored" | tr '\n' ' ')"
+          echo "  expected: $(echo "$expected" | tr '\n' ' ')"
+
+          missing=$(comm -23 <(echo "$expected") <(echo "$restored") | grep . || true)
+          if [ -n "$missing" ] && [ "$TEST_RESULT" = "success" ]; then
+            echo "::error::테스트는 통과했는데 커버리지 XML 이 복원되지 않은 모듈이 있다 — 아티팩트 배선을 확인할 것: $(echo "$missing" | tr '\n' ' ')"
             exit 1
+          fi
+
+          uncovered=$(comm -23 <(echo "$all") <(echo "$restored") | grep . || true)
+          if [ -n "$uncovered" ]; then
+            echo "::notice title=커버리지 미측정 모듈::이번 실행에서 테스트가 돌지 않아 Sonar 커버리지 집계에서 제외된다(0% 오보고 방지): $(echo "$uncovered" | tr '\n' ' ')"
           fi
 
       - name: Add coverage comment to PR
@@ -504,7 +595,8 @@ jobs:
     #   card-service         → ghcr.io/myoungsoo7/settlement-card
     #   insurance-service    → ghcr.io/myoungsoo7/settlement-insurance
     #   deposit-service      → ghcr.io/myoungsoo7/settlement-deposit
-    # shared-common·루트 빌드파일·Dockerfile·ci.yml 변경 시엔 changes 잡이 17개 전부 매트릭스에 담는다.
+    #   board-service        → ghcr.io/myoungsoo7/settlement-board
+    # shared-common·루트 빌드파일·Dockerfile·ci.yml 변경 시엔 changes 잡이 18개 전부 매트릭스에 담는다.
     strategy:
       fail-fast: false # 한 서비스 빌드 실패가 다른 서비스 이미지 푸시를 취소하지 않도록
       matrix: ${{ fromJSON(needs.changes.outputs.build_matrix) }}
@@ -609,7 +701,8 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "20"
+          # 단일 출처: 리포 루트 .nvmrc (node-version-gate 가 frontend/Dockerfile 과 major 일치 강제)
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
@@ -681,7 +774,8 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "20"
+          # 단일 출처: 리포 루트 .nvmrc (node-version-gate 가 frontend/Dockerfile 과 major 일치 강제)
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
@@ -846,7 +940,8 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "20"
+          # 단일 출처: 리포 루트 .nvmrc (node-version-gate 가 frontend/Dockerfile 과 major 일치 강제)
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 

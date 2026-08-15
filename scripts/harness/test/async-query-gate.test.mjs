@@ -136,6 +136,13 @@ function racyQueries(path) {
       const line = lines[j];
       // 다음 대기 지점을 만나면 이 흐름은 끝난 것이다.
       if (line.includes('waitFor') || line.includes('findBy')) break;
+      // 최상위(들여쓰기 0)에서 블록이 닫히면 그 실행 흐름도 끝났다. 이어지는 줄은 다음 선언부지
+      // 이 흐름의 후속 조회가 아니다 — `renderPage` 류 헬퍼가 await waitFor 로 끝나면 바로 아래
+      // `const titleInput = () => screen.getByPlaceholderText('제목')` 이 오는데, 그건 실행이
+      // 아니라 정의다(호출 시점에야 평가된다). LOOKAHEAD 가 함수 밖으로 새어 나가 오탐을 냈다 —
+      // 실측: board 2건(BoardPage·BoardPostPage). describe/it 안의 조회는 항상 들여쓰기가 있어
+      // 이 break 에 걸리지 않는다.
+      if (/^\}/.test(line)) break;
       if (!line.includes('screen.getBy')) continue;
 
       const expression = queryExpression(line);

@@ -1,6 +1,12 @@
 # Multi-stage build for React frontend
 # Stage 1: Build
-FROM node:26-alpine AS builder
+# 빌드 툴체인. 이 스테이지의 Node 는 런타임이 아니라 tsc·vite 를 돌리는 도구다 —
+# 런타임은 아래 nginx 스테이지다. 그래서 최신 라인을 좇을 이유가 없고, 반대로 CI 가
+# 검증한 dist 와 여기서 나온 dist 가 다른 엔진 산출물이 되는 것이 진짜 위험이다.
+# 버전 단일 출처는 리포 루트 .nvmrc — #233(Dependabot docker-all 그룹)이 이 줄만 26 으로
+# 올리고 워크플로의 node-version 리터럴은 20 에 남겨 6 메이저가 벌어진 적이 있다.
+# node-version-gate 가 .nvmrc 와 이 major 의 일치를 CI 에서 강제한다.
+FROM node:24-alpine AS builder
 
 WORKDIR /app
 

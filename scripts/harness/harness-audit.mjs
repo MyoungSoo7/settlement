@@ -449,7 +449,7 @@ function validateSubmissionPlacement(read, tracked, trackedSet, errors) {
   }
 }
 
-// ── 문서 사실 게이트 3종 ────────────────────────────────────────────────────────
+// ── 문서 사실 게이트 4종 ────────────────────────────────────────────────────────
 // 로스터·라우팅은 위에서 잡지만, "신규 서비스가 붙은 뒤 상위 문서가 안 따라오는" 드리프트는
 // 새는 축이 따로 있었다(2026-08-12 실측: card 구현 상태가 사실과 반대 · organization 소비처
 // 미배선 주장 4곳 · 계약 토픽 12 vs 실측 36). 셋 다 코드/배선으로 기계 판정이 가능하다.
@@ -511,7 +511,9 @@ export function parseUnconsumedClaims(markdown, modules) {
   const lines = String(markdown).split(/\r?\n/);
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
-    if (!/소비처\s*(?:가\s*)?(?:미배선|없음)/.test(line)) continue;
+    // "소비처가 **아직** 미배선" 처럼 사이에 낀 짧은 부사까지 같은 주장으로 인정한다(2026-08-15 회귀).
+    // 폭은 짧은 토큰 2개까지로 잠근다 — 더 넓히면 "소비처 목록은 … 라우터는 미배선" 같은 무관한 문장을 삼킨다.
+    if (!/소비처\s*(?:가\s*)?(?:[^\s]{1,4}\s+){0,2}(?:미배선|없음)/.test(line)) continue;
     const topics = [...line.matchAll(/lemuel\.[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*/g)].map((m) => m[0]);
     const owners = modules.filter((module) => line.includes(module));
     if (topics.length > 0) claims.push({ line: index + 1, topics, owners });
@@ -520,17 +522,63 @@ export function parseUnconsumedClaims(markdown, modules) {
   return claims;
 }
 
+// 4) 서비스 수 — "N 마이크로서비스"/"N개 서비스" 주장 vs settings.gradle.kts 로스터(gateway 제외).
+// 모듈 트리 대조(validateModuleRoster)는 트리 표기만 보므로 산문 주장이 새는 축이 따로 있었다
+// (2026-08-15 실측: HARNESS.md 가 3곳에서 14 — 같은 문서 안의 "자바 16서비스" 와 자기모순).
+// 전체 로스터 주장으로 인정하는 조건은 같은 줄의 앵커(API Gateway·gateway·DB-per-service) 하나뿐이다.
+// 폴리글랏 합계 줄은 제외하고(코어 로스터가 아니다), 한 줄에 여러 수가 있으면 하나라도 실제와
+// 맞으면 통과시킨다("Java 17종(16 서비스 + gateway) = 24 서비스" 같은 합산 표기 오탐 방지).
+const SERVICE_ROSTER_ANCHOR = /API Gateway|gateway|게이트웨이|DB-per-service/i;
+
+export function parseServiceCountClaims(markdown) {
+  const claims = [];
+  const lines = String(markdown).split(/\r?\n/);
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (!SERVICE_ROSTER_ANCHOR.test(line)) continue;
+    if (/폴리글랏|polyglot/i.test(line)) continue;
+    const counts = [...line.matchAll(/(\d+)\s*(?:개\s*)?(?:마이크로)?서비스/g)].map((m) => Number(m[1]));
+    if (counts.length > 0) claims.push({ line: index + 1, counts });
+  }
+  return claims;
+}
+
 function validateDocFacts(read, tracked, trackedSet, errors) {
   const modules = trackedSet.has('settings.gradle.kts') ? parseGradleModules(read('settings.gradle.kts')) : [];
   const schemaCount = tracked.filter((p) => p.startsWith(CONTRACT_EVENTS_DIR) && p.endsWith('.schema.json')).length;
+  const serviceCount = modules.filter((module) => module !== 'gateway-service').length;
   const ymlOf = (module) => {
     const path = `${module}/src/main/resources/application.yml`;
     return trackedSet.has(path) ? read(path) : '';
   };
 
+  // Boot 버전 정본은 build.gradle.kts — 문서가 같은 메이저의 다른 패치 버전을 말하면 드리프트다.
+  // (Kotlin 폴리글랏의 Boot 3.x 표기는 메이저가 달라 대상 밖 — 오탐보다 범위 축소.)
+  const gradleRoot = trackedSet.has('build.gradle.kts') ? read('build.gradle.kts') : '';
+  const bootVersion = gradleRoot.match(/id\("org\.springframework\.boot"\)\s+version\s+"(\d+\.\d+\.\d+)"/)?.[1] ?? null;
+  const bootMajor = bootVersion ? `${bootVersion.split('.')[0]}.` : null;
+
   for (const doc of STATE_DOCS) {
     if (!trackedSet.has(doc)) continue;
     const content = read(doc);
+
+    if (bootVersion) {
+      content.split('\n').forEach((lineText, idx) => {
+        for (const m of lineText.matchAll(/Spring(?:%20| )Boot[^0-9\n]{0,4}(\d+\.\d+\.\d+)/gi)) {
+          if (m[1].startsWith(bootMajor) && m[1] !== bootVersion) {
+            errors.push(`doc facts: ${doc}:${idx + 1} Spring Boot 버전 드리프트: 문서=${m[1]} 실제=${bootVersion} (build.gradle.kts)`);
+          }
+        }
+      });
+    }
+
+    if (serviceCount > 0) {
+      for (const claim of parseServiceCountClaims(content)) {
+        if (!claim.counts.includes(serviceCount)) {
+          errors.push(`doc facts: ${doc}:${claim.line} 서비스 수 불일치: claimed=${claim.counts.join('/')} actual=${serviceCount} (settings.gradle.kts, gateway 제외)`);
+        }
+      }
+    }
 
     if (schemaCount > 0) {
       for (const claim of parseContractTopicClaims(content)) {

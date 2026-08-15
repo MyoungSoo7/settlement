@@ -11,6 +11,15 @@
         ]
       },
       {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/harness/guard.mjs\" --hook-bash"
+          }
+        ]
+      },
+      {
         "matcher": "Write|Edit|MultiEdit|Skill",
         "hooks": [
           {

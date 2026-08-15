@@ -24,7 +24,9 @@ jobs:
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "22"
+          # 단일 출처: 리포 루트 .nvmrc (node-version-gate 가 frontend/Dockerfile 과 major 일치 강제).
+          # 이 잡만 22 로 남아 있었다 — 게이트를 돌리는 러너가 정작 로스터 밖이었다.
+          node-version-file: .nvmrc
 
       - name: Run harness tests
         run: node --test scripts/harness/test/*.test.mjs

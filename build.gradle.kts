@@ -208,13 +208,30 @@ subprojects {
     // (2026-08-12 실측: coverage 0.0% · new_coverage 0.0%, 저장소 자체 게이트는 LINE 90% 인데도).
     // 멀티모듈은 모듈별로 경로를 줘야 한다 — 루트에 한 번 적으면 서브모듈 리포트를 못 찾는다.
     // 파일은 ci.yml 의 `clean build`(=jacocoTestReport 포함)가 만들고, 그다음 `./gradlew sonar`
-    // 호출이 읽는다. 변경 모듈만 빌드된 경우 없는 모듈은 Sonar 가 경고만 남기고 넘어간다.
+    // 호출이 읽는다.
+    //
+    // ⚠ "리포트가 없는 모듈은 Sonar 가 그냥 넘어간다"는 오해였다 (2026-08-15 반증).
+    //   ci.yml 의 backend-test 매트릭스는 **변경된 모듈만** 돌린다. 안 돌린 모듈은 JaCoCo XML 이
+    //   없는데, 프로젝트에 커버리지 데이터가 하나라도 있으면 Sonar 는 데이터 없는 파일을
+    //   "미커버(0%)"로 집계한다 — 넘어가지 않는다. 실측(develop 분석 2026-08-15T07:52):
+    //     order 0.0%(8,032줄) · investment 0.0% · deposit 0.0% · operation 0.0% · ai 0.0% ·
+    //     commondata 0.0% · financial 0.0% · market 0.0% · economics 0.0% · organization 0.0%
+    //   17개 중 11개가 이렇게 0% 로 들어가 전체 coverage 가 57.7% 로 찍혔고, new_coverage 57.8%
+    //   < 80% 로 품질 게이트가 ERROR 였다. 테스트가 없어서가 아니라 이번 실행에서 안 돌아서다.
+    //
+    //   그래서 이번 실행에 리포트가 없는 모듈은 **커버리지 집계에서만** 뺀다(sonar.coverage.exclusions).
+    //   issues·중복 분석은 그대로 돈다 — 빠지는 건 분모뿐이다. 0% 로 거짓 보고하느니
+    //   "이번 실행에서는 측정 안 함"이 정직하다.
+    //   exists() 는 설정 시점 판정이라 안전하다: XML 은 Gradle 이 뜨기 전에 ci.yml 의
+    //   `Restore report paths` 스텝이 이미 복원해 두고, sonar 태스크 그래프에는 test 가 없다.
     sonar {
         properties {
-            property(
-                "sonar.coverage.jacoco.xmlReportPaths",
-                layout.buildDirectory.file("reports/jacoco/test/jacocoTestReport.xml").get().asFile.path,
-            )
+            val jacocoXml = layout.buildDirectory.file("reports/jacoco/test/jacocoTestReport.xml").get().asFile
+            property("sonar.coverage.jacoco.xmlReportPaths", jacocoXml.path)
+            if (!jacocoXml.exists()) {
+                property("sonar.coverage.exclusions", "**/*")
+                logger.lifecycle("[sonar] ${project.name}: JaCoCo XML 없음 → 커버리지 집계 제외(0% 오보고 방지)")
+            }
         }
     }
 }
@@ -256,17 +273,23 @@ sonar {
         property("sonar.issue.ignore.multicriteria.e2.ruleKey", "text:S8569")
         property("sonar.issue.ignore.multicriteria.e2.resourceKey", "**/build.gradle.kts")
 
-        // ⚠ 미해결(빌드에서 고칠 수 없음): 스캐너가 남기는
-        //   "Could not find ref 'master' in refs/heads, refs/remotes, refs/remotes/upstream
-        //    or refs/remotes/origin" (2026-08-12 run 31611508158 실측)
-        // 원인은 SonarCloud 프로젝트의 **주 브랜치가 `master` 로 등록**돼 있는데 저장소에는 그 ref 가
-        // 없다는 것이다(원격 브랜치는 main·develop 뿐 — master 는 rename 됐다).
+        // ── 브랜치·신규 코드 기준선 (서버 측 설정 — 이 파일에서 바꾸는 값이 아니다) ──────────
+        // 해소됨: 스캐너의 "Could not find ref 'master'" 는 주 브랜치가 master 로 등록돼 있어서였고,
+        // 지금은 서버 주 브랜치가 `develop` 이다(2026-08-15 api/project_branches/list 실측:
+        // develop isMain=true LONG / main 은 mergeBranch=develop 인 SHORT — 분석 이력 없음).
         //
-        // 여기서 sonar.branch.name 을 GITHUB_REF_NAME 으로 주는 우회는 **일부러 하지 않았다**:
-        // 그러면 develop 이 서버의 주 브랜치가 아니라 신규 "브랜치"로 등록되고, 신규 코드 기준선이
-        // 이력 없는 상태에서 다시 잡혀 new_* 지표가 오히려 왜곡된다(현재는 develop 분석이 주 브랜치
-        // 이력에 누적되므로 직전 분석 대비 신규 코드 판정은 정상 동작한다).
-        // 정본 조치는 SonarCloud UI 에서 주 브랜치 이름을 master → develop(또는 main)으로 바꾸는 것이다.
+        // 여기서 sonar.branch.name 을 GITHUB_REF_NAME 으로 주는 우회는 여전히 하지 않는다:
+        // develop 이 신규 "브랜치"로 갈라져 등록되면 신규 코드 기준선이 이력 없는 상태에서 다시 잡힌다.
+        //
+        // ⚠ 신규 코드 정의는 2026-08-15 에 previous_version → **30일(sonar.leak.period=30)** 로 바꿨다
+        //   (SonarCloud api/settings/set, component 스코프 — 인스턴스/조직 값은 건드리지 않았다).
+        //   바꾸기 전 실측: mode=previous_version · 기준선 date=2026-02-24 · parameter="not provided".
+        //   프로젝트 버전이 계속 0.0.1-SNAPSHOT 이라 기준선이 갱신되지 않았고, 그 결과
+        //   new_lines_to_cover 36,820 / lines_to_cover 37,624 = **코드베이스의 98% 가 "신규 코드"**였다.
+        //   그래서 new_coverage(57.8%) 가 사실상 전체 coverage(57.7%) 와 같아졌고 80% 게이트에서
+        //   항상 ERROR 였다 — PR diff 와는 무관한 실패다.
+        //   PR #263 처럼 head 가 develop 인 릴리스 PR 은 Sonar 에 PR 분석이 잡히지 않고
+        //   (api/project_pull_requests/list = []) develop **브랜치 분석**의 게이트가 체크로 붙는다.
     }
 }
 

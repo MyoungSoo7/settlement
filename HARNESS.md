@@ -2,7 +2,7 @@
 
 > Claude Code 개발 하네스 구성 — 헥사고날 + 정산/결제/금융 도메인 전용 에이전트·스킬·커맨드·가드 구성
 
-**Last updated:** 2026-07-25
+**Last updated:** 2026-08-15
 
 ## 목적
 
@@ -29,7 +29,7 @@
 │   ├── gl-ledger-auditor.md           # 계정계 GL 복식부기·시산표·분개 매핑 정합 감사 (account + ledger)
 │   └── event-contract-reviewer.md     # cross-service 이벤트 계약 드리프트·Outbox·멱등 검토 (ADR 0024)
 ├── skills/                            # 온디맨드 절차적 지식 (SKILL.md)
-│   ├── {서비스}-rules/                # 13서비스 강제 도메인 규칙 (아래 참조)
+│   ├── {서비스}-rules/                # 16서비스 전체 강제 도메인 규칙 (아래 참조)
 │   ├── money-safety · ledger-invariants · idempotency-and-events   # 횡단 규칙
 │   ├── recon-playbook · incident-runbooks · compliance-review      # 운영/리뷰
 │   ├── delta-review                                                # diff 위험축 트리아지(어디를 먼저 볼지) — 리뷰 진입 기준
@@ -46,7 +46,7 @@
 │   ├── ai-dev-team.md                 # 전사 역할 산출물 일괄 생성
 │   └── agents/                        # 역할별 산출물 생성 서브커맨드
 ├── settings.json / settings.local.json  # 훅·권한 (PreToolUse 가드·라우터, SessionStart 텔레메트리, allowlist)
-├── harness/                           # 하네스 런타임 (gitignore — logs/ 텔레메트리 jsonl, state/ 라우터 세션 상태)
+├── harness/                           # 하네스 런타임 (gitignore — logs/ 텔레메트리 jsonl, state/ 라우터 세션 상태 · 14일 GC 는 라우터가 기회적 수행)
 └── (worktrees/)                       # 격리 작업공간 (병렬 세션 충돌 회피)
 
 scripts/harness/                       # ★ 실행 코어 — 저장소 추적, 플러그인·MCP 0 의존 (CI 에서 그대로 재실행)
@@ -56,7 +56,8 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 ├── telemetry.mjs · telemetry-report.mjs · session-metrics.mjs   # 관측 계층 (적재·집계·KPI)
 ├── interview-harness.mjs              # 요구사항 인터뷰 루프(Claude/Codex 듀얼 플랫폼 계약)
 ├── manifest.json                      # 하네스 구성요소 추적 목록 — CI 가 git ls-files 로 실존 검증
-└── test/*.test.mjs (7종)              # 하네스 자기 테스트 — `node --test scripts/harness/test/*.test.mjs`
+└── test/*.test.mjs                    # 하네스 자기 테스트 — `node --test scripts/harness/test/*.test.mjs`
+                                       #   (개수는 세어 쓴다: `git ls-files 'scripts/harness/test/*.test.mjs' | wc -l`)
 
 .codex/{skills,agents,prompts}/        # Codex 미러 — interview-harness 계열은 Claude/Codex 양쪽 정본 쌍으로
                                        #   유지되고 manifest 의 criticalContractPairs 가 드리프트를 차단
@@ -64,19 +65,22 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 
 ## 대상 코드베이스
 
-- **14 마이크로서비스** + API Gateway + `shared-common`(버전드 1.0.0) · **DB-per-service** · 서비스 간 연계는 Kafka 이벤트 + 내부 대사 API 뿐 — **cross-DB 0 · cross-code 0**(이것이 이 하네스가 지키는 핵심 불변식)
+- **17 마이크로서비스** + API Gateway + `shared-common`(버전드 1.0.0) · **DB-per-service** · 서비스 간 연계는 Kafka 이벤트 + 내부 대사 API 뿐 — **cross-DB 0 · cross-code 0**(이것이 이 하네스가 지키는 핵심 불변식)
 - 서비스 로스터·포트·DB·모듈 경계·컨벤션 → `CLAUDE.md` · _reservation(시공 예약) 도메인 제거 완료(에이전트·규칙 폐기)_
 
 ## 서비스별 규칙 스킬 (온디맨드 로드)
 
 `order-commerce` · `settlement-domain` · `loan-domain` · `investment-domain` · `account-domain` ·
 `financial-data` · `economics-data` · `market-quotes` · `company-news` · `commondata-connector` ·
-`operation-signal` · `ai-chat` · `card-service` — 각 서비스 로직 작성·수정·리뷰 시 해당 `*-rules` 스킬이 강제 규칙(상태머신·정책·경계)을 로드.
+`operation-signal` · `ai-chat` · `card-service` · `insurance-domain` · `deposit-domain` · `organization-domain` ·
+`board-domain` — 각 서비스 로직 작성·수정·리뷰 시 해당 `*-rules` 스킬이 강제 규칙(상태머신·정책·경계)을 로드.
 로드는 규율이 아니라 `skill-router.mjs` 가 편집 경로를 보고 **자동 주입**한다(아래 "강제 지점").
 
-> **커버리지 공백(명시)**: 14서비스 중 `organization-service` 만 전용 `*-rules` 스킬이 없다 — 이벤트 발행 전용이고
-> 소비처가 아직 미배선이라 강제할 상태머신·회계 규칙이 없기 때문. 소비처가 붙는 시점에 `organization-rules` 를
-> 추가하고 라우터 표(`ROUTES`)에 경로 1행을 함께 배선한다(조용한 누락이 아니라 알려진 부채).
+> **커버리지 완결(2026-08-15)**: 17서비스 전부가 전용 `*-rules` 스킬 + 라우터 `ROUTES` 행을 갖는다
+> (둘은 같은 사실의 두 표현 — `skill-router.test.mjs` 가 회귀 방지). 마지막 3개의 해소 이력:
+> 돈 경로 우선 부채였던 `insurance-domain-rules`(완전판매 게이트·25%룰·환수/12회 분할)·
+> `deposit-domain-rules`(잔고 단일 진실원·hold/offset 이중사용 차단), 그리고 후순위였던
+> `organization-domain-rules`(발행 전용 경계·활성 OWNER ≥1·card 프로젝션 계약 드리프트 3종).
 
 > **에이전트 로스터 설계 원칙 (의도된 공백)**: 전용 서브에이전트는 **고위험·상태보존 축**(정산·GL·이벤트 계약·헥사 경계·보안·쿼리)에만 둔다. 공개 read-only 위성(financial·economics·market·commondata)과 부가(operation·ai)는 상태 변이·회계 리스크가 낮아 **`*-rules` 스킬 + ArchUnit 게이트로 커버하는 것이 의도된 설계**다 — 서비스마다 에이전트를 만들지 않는다(로스터 비대화 = 안티패턴).
 
@@ -94,6 +98,10 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 > | 프로젝션 뷰 추가·드리프트·백필             | 📘`projection-view-ops` (ADR 0020) + 📘`recon-playbook`·`incident-runbooks`                                                                       |
 > | 계정계 GL·시산표·분개                      | 🤖`gl-ledger-auditor` (차1대1 균형·6토픽 매핑·2단 멱등·소비전용) + 📘`ledger-invariants`·`account-domain-rules`                                   |
 > | 법인카드 한도·발급·상태                    | 📘`card-service-rules` (재원 F 공식·`master ≥ Σsub` 비관적 락·하향 클램프·재원 폴백 금지) + 📘`money-safety` → 🚦`CardIssuanceLimitConcurrencyIT` |
+> | 보험 설계·청약·계약·수수료·방카            | 📘`insurance-domain-rules` (완전판매 게이트 2단·25%룰·환수 24개월·12회 분할) + 📘`money-safety`                                                   |
+> | 예치금 원장·hold/offset·상계               | 📘`deposit-domain-rules` (잔고 단일 진실원·이중사용 차단·referenceType 불변) + 📘`ledger-invariants`                                              |
+> | 게시판 정의·스킨·접근 정책                 | 📘`board-domain-rules` (정의가 글 규칙 소유·스킨↔정책 정합·역할 allowlist·발행 0/소비 0·메뉴는 order 소유)                                |
+> | 조직·멤버십·역할(OWNER/MANAGER/STAFF)      | 📘`organization-domain-rules` (발행 전용 경계·활성 OWNER ≥1·card 프로젝션 계약) → 🤖`event-contract-reviewer` (페이로드 변경 시)                  |
 > | 쿼리·인덱스·ES 매핑·성능                   | 🤖`db-query-architect`                                                                                                                            |
 > | MSA 경계 변경                              | 🤖`hexagonal-arch-reviewer` → 🚦ArchUnit (_코드 의존 0 / cross-DB 0_ 위반 차단)                                                                   |
 > | OO 설계 채점·리팩터링 회귀 판정            | 📘`oo-score` (3인 패널 중앙값 ≥9.5) — 결정적 불변식은 🚦`guard.mjs` OO-\* + `oo-gate.test.mjs` 가 선차단                                          |
@@ -130,6 +138,7 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 > | 시점                     | 트리거                                     | 실행                                                                                               | 실패 시                                                            |
 > | ------------------------ | ------------------------------------------ | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
 > | 파일 편집 직전           | PreToolUse `Write\|Edit\|MultiEdit`        | `guard.mjs --hook`                                                                                 | **exit 2 = 편집 차단**                                             |
+> | Bash 명령 실행 직전      | PreToolUse `Bash`                          | `guard.mjs --hook-bash`                                                                            | **exit 2 = 명령 차단** (BLOCK) / WARN 은 additionalContext 만      |
 > | 파일 편집·스킬 호출 직전 | PreToolUse `Write\|Edit\|MultiEdit\|Skill` | `skill-router.mjs --hook`                                                                          | 차단 없음(항상 exit 0) — 스킬 로드 리마인더 주입                   |
 > | 세션 시작                | SessionStart                               | `telemetry-report.mjs --hook`                                                                      | 차단 없음 — 최근 차단·라우터 순응률 요약 주입(알릴 것 없으면 침묵) |
 > | `git commit`             | `core.hooksPath=scripts/harness/hooks`     | `guard.mjs --staged` (내용 스캔 + 하네스 경로 삭제 검사)                                           | **커밋 거부** (`--no-verify` 우회 금지)                            |
@@ -153,15 +162,25 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 `DeadLetterPublishingRecoverer` 배선(폴리글랏 standalone) 중 하나. 폴리글랏도 대상 — `settings.gradle.kts`
 밖이라고 유실이 허용되지 않는다. 안 닿으면 Spring Kafka 기본 `FixedBackOff(0, 9)` 로 떨어져 재시도 소진
 메시지를 조용히 skip = 사실상 유실) ·
+`KAFKA-GROUP-OWNER`(컨슈머 group-id 는 모듈 소유여야 한다 — 두 서비스가 같은 group-id 를 쓰면 카프카가
+한 그룹으로 보고 파티션을 나눠 줘 한쪽이 가져간 메시지가 다른 쪽에 오지 않고 오프셋까지 공유돼 **조용히
+유실**된다. 예외도 로그도 없다. 2026-08-14 실사건: order-service 가 모놀리스 분리 잔재로
+`lemuel-settlement` 그룹을 들고 있었다 — 리스너가 하나 붙는 순간 settlement 파티션을 점유·커밋한다) ·
 `WORKFLOW-EMPTY-EXPR`(`.github/workflows/*.yml` 에 빈 표현식 금지 — Actions 는 워크플로 전체를 표현식
 렉서로 훑으므로 `run`/`script` 블록 **안의 주석**에 있어도 `An expression was expected` 로 파일이 통째로
 무효가 된다. 그 워크플로는 잡 0개·로그 없음·실행 이름이 파일 경로로 뜨는 형태로 죽고, 다른 체크는 초록이라
 드러나지 않는다. YAML 파서·공식 워크플로 스키마·액션 SHA 실재 검증이 전부 통과하는 사각지대라 grep 계층에
 둔다 — 2026-08 pr-review.yml 이 이 한 줄 주석 때문에 며칠간 죽어 있었다).
 
-운영 DB 직접 조작 명령 차단(`check-command`).
+**Bash 명령 계층(COMMAND_RULES, `--hook-bash`)** — 2026-08-15 저장소 네이티브로 신설(종전 `check-command` 는
+settlement-copilot **플러그인 소유**라 플러그인 미설치 환경에 없었다 — "플러그인 독립" 전제의 구멍이었다):
+`CMD-EDIT-BYPASS`(sed -i·perl -i·리다이렉트·tee 로 소스 편집 — 실시간 내용 스캔 우회 봉쇄, Write/Edit 도구가 정답) ·
+`CMD-NO-VERIFY`(git commit/push `--no-verify`) · `CMD-PROD-DB-WRITE`(psql/pgcli/pg_dump 쓰기 + kubectl exec DB 접속) ·
+`CMD-EVENT-PRODUCE`(lemuel.* 토픽 직접 produce — WARN 비차단). 의도적 실행은 `HARNESS_ALLOW_CMD=1` opt-in.
+이 계층은 fail-open(운반 수단 차단이라 입력 파싱 실패가 모든 Bash 를 멈추면 안 된다) — 우회 시도는 커밋·CI 가 내용 기준 재차단.
 
-**skill-router.mjs 라우트 표** (경로 → 주입 스킬, 세션당 스킬별 1회 · 최대 3개): 14개 서비스 디렉토리 → 각 `{서비스}-rules`
+**skill-router.mjs 라우트 표** (경로 → 주입 스킬, 세션당 스킬별 1회 · 최대 3개): 16개 서비스 디렉토리 전부 → 각 `{서비스}-rules`
+(위 "커버리지 완결" 참조)
 (settlement `ledger` 경로·account 는 `ledger-invariants` 동반) · `outbox/`·`adapter/in/kafka/`·`adapter/out/event/` →
 `idempotency-and-events` · settlement `readmodel|projection` → `projection-view-ops` · `contracts/events/` →
 `event-contract-change` · `.claude/hookify.*.local.md` → `hookify-to-guard` · 그 외 `src/{main,test}/` 첫 편집 → `tdd-discipline`.
@@ -175,11 +194,14 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 - **경로 B — 저장소 네이티브(플러그인 0 의존, CI 가능)**:
   - `node scripts/harness/harness-audit.mjs` — 하네스 자기 진단(라우팅 dangling·가드 훅 경로 실존·모듈 로스터·인벤토리)
   - `node scripts/harness/guard.mjs --staged` — 돈/경계/이력 불변식 가드
-  - `node scripts/harness/telemetry-report.mjs` — 가드 발화·스킬 사용/제안 텔레메트리 + 가드 카나리아(`.claude/harness/logs`)
+  - `node scripts/harness/telemetry-report.mjs` — 가드 발화·스킬 사용/제안 텔레메트리 + 가드 카나리아(`.claude/harness/logs`).
+    CI 러너분 합산은 `telemetry-ci-pull.mjs` 수집 후 `--merge .claude/harness/ci-logs`
+  - `node scripts/harness/report-freshness.mjs <module>` — 게이트 리포트 인용 전 신선도 판정(낡은 XML 인용 차단)
   - `node scripts/harness/session-metrics.mjs` — OMC 세션·미션 완주율·재작업률 KPI 리포트(`.omc` 읽기 전용 관측 — KPI 정본은 `docs/ax/omc-harness.md` — 로컬 전용, 저장소 미포함)
   - `./gradlew :<module>:test`·`:jacocoTestCoverageVerification` — 정합 검증(측정 정답)
   - 서비스 자체 `/admin/integrity`·`/api/account/trial-balance` 조회 API(읽기 전용)
-- **불변식**: psql/pg_dump/kafka produce 로 운영 데이터에 직접 손대는 명령을 만들지 않는다(가드가 `check-command` 로 차단).
+- **불변식**: psql/pg_dump/kafka produce 로 운영 데이터에 직접 손대는 명령을 만들지 않는다(저장소 네이티브
+  `guard.mjs --hook-bash` COMMAND_RULES 가 실시간 차단 — 플러그인 check-command 는 설치 시 2차 레이어로 병존).
 
 **MCP 도구 ↔ 플러그인 독립 폴백 매핑** (조용한 "MCP 단독" 금지 — 모든 능력에 폴백 또는 런타임 경계 명시):
 
@@ -204,6 +226,23 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
   **라인+파일(멀티라인) 이중 스캔**으로 개행 분할 우회를 차단한다. `--staged` 는 돈 경로 프로덕션 변경이 테스트 변경 없이
   스테이지되면 **비차단 DoD 넛지**를 stderr 로 출력한다(차단 안 함 — 완료 판정은 JaCoCo 게이트가 정답, 발화는 텔레메트리 적재).
 - **OO 구조 게이트** — `scripts/harness/test/oo-gate.test.mjs`: 트리 전수 스캔(도메인 setter 0·@Setter 0·금융 5서비스 IAE 0·코어 애그리거트 17종 생성자 봉인·상태 enum 9종 canTransitionTo 전이표 보유). 2026-07-14 OO 캠페인(패널 중앙값 9.5+)의 구조 정본 회귀 방지 — CI 하네스 테스트에 자동 포함. 점수 재채점(LLM 판정)은 📘`oo-score` 스킬.
+- **AOP 프록시 게이트** — `scripts/harness/test/aop-proxy-gate.test.mjs`: 같은 빈 안에서 `this.method()` 로
+  부가기능 메서드를 부르면 프록시를 거치지 않아 `@Retry`·`@CircuitBreaker`·`@Cacheable`·`@Async`·`@PreAuthorize`
+  가 **조용히 무력화**된다(컴파일·테스트 통과, 운영에서만 안 걸림). 리포 전수 소스 스캔 — ArchUnit 1.3 이
+  Java 25 바이트코드를 못 읽어 소스 계층에 둔다.
+- **트랜잭션 롤백 게이트** — `scripts/harness/test/tx-rollback-gate.test.mjs`: 스프링 트랜잭션 AOP 는 언체크만
+  롤백하고 **체크 예외는 커밋**한다. 금융 도메인에서 이 기본값은 조용한 사고(반쪽 커밋)가 되므로
+  `@Transactional` + 체크 예외 조합에 `rollbackFor` 를 강제한다.
+- **Kafka 토픽 카탈로그 게이트** — `scripts/harness/test/kafka-topic-gate.test.mjs`(ADR 0035): 막는 것은
+  "파티션 수가 코드 밖에서 정해지는 상태". 메시지 키가 outbox `aggregateId` 라 파티션 수 변경 =
+  키 재해시 = 이미 쌓인 메시지까지 **순서 보장 소급 붕괴**(되돌릴 수 없다). 새 토픽은 카탈로그 등록 필수.
+- **Kafka 발행부↔카탈로그 게이트** — `scripts/harness/test/kafka-publisher-gate.test.mjs`: 위 게이트는
+  `application.yml` 의 `app.kafka.topic.*` 만 보므로 **발행 전용 토픽**(구독 설정이 없어 yml 에 안 적힘)이
+  카탈로그에서 통째로 샌다. 실제로 두 번 났다(insurance general_payout 2종 누락 · card statement 계약
+  파일명을 옮겨 적어 실재하지 않는 토픽 등재). 발행 코드를 정본으로 카탈로그를 대조한다.
+- **SSE nginx 배선 게이트** — `scripts/harness/test/sse-nginx-gate.test.mjs`: 게이트웨이에 SSE 를 열고 nginx 를
+  안 고치면 요청이 일반 `api` location 으로 떨어져 `proxy_buffering on` + `read_timeout 60s` 를 받는다 —
+  실시간이 아니게 되고 유휴 연결이 60초에 끊긴다. 배선 누락을 빌드 시점에 잡는다(정본 `docs/sse.md`).
 - **스케줄러 락 이름 유일성** — `scripts/harness/test/scheduler-lock-gate.test.mjs`: 같은 `@SchedulerLock`
   이름을 두 배치가 쓰면 락 보유 기간 동안 나머지가 **조용히 스킵**된다(예외·로그 없음 → 컴파일도 CI 도 못 잡음).
   리포 전수로 잠근다. 의도적 공유가 필요하면 게이트의 `ALLOWED_SHARED` 에 근거와 함께 등록.
@@ -230,6 +269,18 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 - **하네스 자기 진단** — `scripts/harness/harness-audit.mjs`: 문서 드리프트를 규율이 아닌 **기계 게이트**로 승격(과거 문서 3주 방치 재발 방지).
   라우팅 맵 dangling 도 기계 검증한다 — 🤖📘⌘ 아이콘 줄의 backtick 진입점 토큰을 agents/skills/commands 실존과 대조
   (에이전트·스킬·커맨드를 삭제/개명하고 라우팅 맵을 안 고치면 audit FAIL → CI 차단).
+  **문서 사실 게이트 5종**(상태 기술 문서 한정): 이벤트 계약 토픽 수 · 구현 상태 역전(어댑터 실재 vs "미구현") ·
+  소비처 배선("소비처 미배선" vs 실제 참조) · Spring Boot 버전 드리프트(정본은 `build.gradle.kts` — 문서가
+  같은 메이저의 다른 패치 버전을 말하면 FAIL) · **서비스 수**(2026-08-15 추가 — `N 마이크로서비스`/`N개 서비스`
+  주장을 `settings.gradle.kts` 로스터(gateway 제외)와 대조). 모듈 트리 대조는 트리 표기만 보므로 산문 주장이
+  새는 축이 따로 있었다 — HARNESS.md 자신이 3주간 14 로 남아 있었고 같은 문서 안의 "자바 16서비스" 와
+  모순이었다. 로스터 앵커(`API Gateway`·`gateway`·`DB-per-service`)가 같은 줄에 있을 때만 주장으로 인정해
+  부분집합("금융 5서비스")·폴리글랏 합계(24)를 오탐하지 않는다.
+- **리포트 신선도 게이트** — `scripts/harness/report-freshness.mjs <module>...`: "가짜 GREEN 4경로" 중
+  **UP-TO-DATE 낡은 XML 인용** 축의 기계화. 테스트/JaCoCo XML 이 그 모듈 `src/` 최신 mtime 보다 오래됐으면
+  STALE(exit 1) — 직전 빌드 산출물을 이번 변경의 증거로 인용하는 것을 종료 코드로 차단한다. 리포트가
+  아예 없으면 MISSING(미실행 — "통과" 주장 불가). 지금까지 "인용 전 mtime 확인"은 운용 지식이었다 —
+  게이트 결과를 인용하기 전에 이 명령을 먼저 돌린다.
 - **로컬 통합 검증** — `scripts/verify.sh`: CI(`harness-guard.yml` + `ci.yml`)의 판정을 **같은 순서로** 로컬에서 재현한다.
   하네스 테스트 → 자기 진단 → 변경 파일 가드 → 삭제 가드 → 변경 모듈 Gradle. "다 됐다" 를 자기보고가 아니라 종료 코드로 증명하는 지점.
   `--fast`(Gradle 생략, 수초) · `--all`(전체 build) · `--base <ref>`. 느려지면 우회당하므로 기본 경로는 변경 모듈만 빌드한다(ci.yml 매핑과 동일).
@@ -237,6 +288,10 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
   규칙을 늘리기만 하고 효과를 잰 적이 없어 아무도 지우지 못하던 문제에 대한 대응 — 예측이 빗나가면 `reverted` 로 남기고 되돌린다.
 - **CI 강제** — `.github/workflows/harness-guard.yml`: PR/푸시마다 변경 파일 가드(`guard.mjs --list`) + 자기 진단을 **로컬 설정과 무관하게** 실행(훅 미설치·`--no-verify` 우회를 CI가 재차단). 기존 `ci.yml`(빌드·테스트·커버리지)와 병존.
 - **하네스 텔레메트리(관측 계층)** — `scripts/harness/telemetry.mjs`: 가드 차단·스킬 사용·라우터 제안을 `.claude/harness/logs/*.jsonl`(gitignore, 비커밋 — `.omc` 는 OMC 플러그인 소유·정리 대상이라 하네스 런타임은 프로젝트 소유 `.claude/harness/` 에 격리)에 append-only 적재. 집계는 `node scripts/harness/telemetry-report.mjs`(규칙별 발화 횟수·0회=죽은 규칙 후보·스킬 사용률·제안 대비 미로드). 관측 실패가 가드를 깨뜨리지 않는 non-fatal 설계, 킬 스위치 `HARNESS_TELEMETRY=off`.
+  **머신 경계 봉합(2026-08-15)**: CI 러너의 이력은 아티팩트(`harness-telemetry-*`, 30일)로만 남아 로컬
+  리포트와 단절돼 있었다 — `node scripts/harness/telemetry-ci-pull.mjs` 가 gh CLI 로 최근 run 아티팩트를
+  `.claude/harness/ci-logs/<run_id>/` 에 멱등 수집하고, `telemetry-report.mjs --merge .claude/harness/ci-logs`
+  가 로컬+CI 를 합산 집계한다(수집 실패는 best-effort — 관측 도구는 게이트를 막지 않는다).
   **닫힌 피드백 루프**: SessionStart 훅이 `telemetry-report.mjs --hook` 으로 압축 요약(최근 차단·라우터 순응률·카나리아 생존)을
   세션마다 additionalContext 로 자동 주입 — 사람이 리포트를 돌리지 않아도 관측이 에이전트에게 도달한다(알릴 것 없으면 침묵).
 - **스킬 라우터(권장의 기계화)** — `scripts/harness/skill-router.mjs`: PreToolUse 훅(Write/Edit/MultiEdit/Skill)이 편집 대상 경로를 보고 해당 `*-rules`·횡단 스킬 로드를 additionalContext 리마인더로 주입(세션당 스킬별 1회). 라우팅 맵의 "만지면 로드" 규칙을 문서 규율에서 기계 리마인더로 승격 — 가드가 금지를 강제한다면 라우터는 권장을 주입한다. 절대 차단하지 않음(항상 exit 0).
@@ -258,7 +313,7 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 - [ ] **작성과 검증 분리** — 같은 컨텍스트 자기 승인 금지, `code-reviewer`/`verifier` 별도 패스로 증거 수집
 - [ ] 문서에 휘발성 수치를 적었으면 재현 명령을 병기했는지 확인(값만 적으면 즉시 드리프트)
   > 하나라도 미충족이면 "완료"라고 쓰지 않는다. 커밋은 `develop` 항목별 개별 커밋(PowerShell 은 `git commit -F <file>`).
-  > `main` 반영은 PR·**squash 만**·필수 CI 2종 (직접 push 금지 — 보호 브랜치). 운영 배포는 강한 `JWT_SECRET`·`internal-key-required=true`·외부 API 키 주입 확인.
+  > `main` 반영은 PR·**squash 만**·필수 CI 6종 — 목록은 CLAUDE.md (직접 push 금지 — 보호 브랜치). 운영 배포는 강한 `JWT_SECRET`·`internal-key-required=true`·외부 API 키 주입 확인.
 
 ## 드리프트 방지 규약 (문서 최신성)
 

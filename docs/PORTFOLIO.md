@@ -12,21 +12,21 @@
 
 | 항목 | 수치 |
 |---|---|
-| **Java / Spring Boot** | 25 / 4.0.4 |
+| **Java / Spring Boot** | 25 / 4.0.7 |
 | **마이크로서비스** | **16 비즈니스 서비스 + API Gateway** + `shared-common` 라이브러리 |
 | **DB 분리** | **DB-per-service (16 DB 물리 분리, cross-DB 연결 0)** — opslab / settlement_db / lemuel_loan … |
-| **Flyway 마이그레이션** | **274 개**(`git ls-files '*/src/main/resources/db/migration/V*__*.sql' \| wc -l`) |
-| **ADR** | **31 개** (0001 ~ 0032, 0019 결번) |
-| **테스트** | **테스트 클래스 909개**(`*Test.java`+`*IT.java`, `git ls-files '*/src/test/java/**/*.java' \| grep -E '(Test\|IT)\.java$' \| wc -l`) — 핵심 정산 모듈 **520 테스트 실측 통과**(2026-07-12 측정) |
-| **커버리지 (검증)** | **정산 모듈 LINE 94.17%** (게이트 90%, 2026-07-12 측정) — [SETTLEMENT-VERIFICATION.md](plan/SETTLEMENT-VERIFICATION.md) |
+| **Flyway 마이그레이션** | **306 개**(`git ls-files '*/src/main/resources/db/migration/V*__*.sql' \| wc -l`) |
+| **ADR** | **35 개** (0001 ~ 0036, 0019 결번) |
+| **테스트** | **테스트 클래스 1,031개**(`*Test.java`+`*IT.java`, `git ls-files '*/src/test/java/**/*.java' \| grep -E '(Test\|IT)\.java$' \| wc -l`) — 핵심 정산 모듈 `@Test` **1,443건**(소스 실측) |
+| **커버리지 (검증)** | 전 모듈 **JaCoCo LINE 90% 게이트 강제** — 현재값은 게이트 태스크 실행이 정답. 문서화된 정산 실측 스냅샷(520 테스트·94.17%, 2026-07-12): [SETTLEMENT-VERIFICATION.md](plan/SETTLEMENT-VERIFICATION.md) |
 | **부하테스트** | 4 시나리오 (k6) |
 
 > 휘발성 수치는 문서에 박제하지 않는다 — 각 수치 옆의 `git ls-files` 명령을 그때그때 실행한 결과가 정답이다.
 
-> **깊이는 의도적으로 배분했다.** order(490 파일)·settlement(522 파일, 각 `src/main/java` 기준·테스트 제외:
+> **깊이는 의도적으로 배분했다.** order(550 파일)·settlement(578 파일, 각 `src/main/java` 기준·테스트 제외:
 > `git ls-files '{service}/src/main/java/**/*.java' | wc -l`)가 시그니처이고,
-> 공개조회형 위성 서비스(financial·economics·market·common-data·ai, 각 39~44 파일, 같은 기준)는
-> 수집형이라 **얇은 것이 미완성이 아니라 스코프 선택**이다.
+> 공개조회형 위성 서비스(financial·economics·market·common-data 각 39~44 파일, ai 는 RAG 추가로 64 파일,
+> 같은 기준)는 수집형이라 **얇은 것이 미완성이 아니라 스코프 선택**이다.
 
 ---
 
@@ -36,7 +36,7 @@
 
 ```bash
 ./gradlew :settlement-service:test :settlement-service:jacocoTestCoverageVerification
-# → 520 테스트 통과 (실패 0) · LINE 94.17% · BUILD SUCCESSFUL
+# → 전 테스트 통과 (실패 0) · LINE ≥ 90% 게이트 · BUILD SUCCESSFUL
 ```
 
 무엇이 어떤 테스트로 검증되는지(복식부기 균형·멱등 3계층·동시성·정합성 INV-5~11) + **검증되지 않는 한계까지** 정직하게 정리:
@@ -189,8 +189,9 @@ harness-audit        문서 드리프트·라우팅 dangling·가드 무결성 �
 
 ### 아직 없는 것 (선을 긋는다)
 
-RAG·벡터 검색(pgvector 이미지는 선점했으나 확장 미활성) · Function Calling 실데이터 조회 · 프롬프트 회귀 평가셋(LLM-as-judge) · 파인튜닝.
-ai-service 는 **시스템 프롬프트 + 컨텍스트 윈도의 단순 대화형**이며, 깊이는 정산 쪽에 몰아준 결과다.
+Function Calling 실데이터 조회 · 프롬프트 회귀 평가셋(LLM-as-judge) · 파인튜닝.
+RAG·벡터 검색은 **구현돼 있다**(pgvector 지식베이스 + 임베딩 검색 폴백, ADR 0034 — `app.ai.rag.enabled` 로
+켠다, 기본 off). ai-service 의 나머지 깊이는 정산 쪽에 몰아준 결과다.
 
 ---
 
@@ -199,7 +200,7 @@ ai-service 는 **시스템 프롬프트 + 컨텍스트 윈도의 단순 대화�
 | 질문 | 답변 |
 |---|---|
 | MSA 인데 DB 공유 아닌가요? | [settlement readmodel 프로젝션](../settlement-service/src/main/java/github/lms/lemuel/settlement/adapter/out/readmodel/) + [OrderReconClient](../settlement-service/src/main/java/github/lms/lemuel/recon/OrderReconClient.java) |
-| 정산이 정말 정확한가요? | **[SETTLEMENT-VERIFICATION.md](plan/SETTLEMENT-VERIFICATION.md)** — 520 테스트·94% 커버리지 + 불변식 매핑 + 한계 |
+| 정산이 정말 정확한가요? | **[SETTLEMENT-VERIFICATION.md](plan/SETTLEMENT-VERIFICATION.md)** — `@Test` 1,443건·LINE 90% 게이트 + 불변식 매핑 + 한계 |
 | 결제 PG 장애 시 fallback? | [PgRouter](../order-service/src/main/java/github/lms/lemuel/payment/adapter/out/pg/PgRouter.java) — fallback chain |
 | 환불 중 PG 가 죽으면? | [RefundPaymentUseCase](../order-service/src/main/java/github/lms/lemuel/payment/application/RefundPaymentUseCase.java) — 예외 변환 + 롤백, 유령 환불 방지 |
 | 이벤트 발행 영구 실패 시? | [DLQ + Admin API](../shared-common/src/main/java/github/lms/lemuel/common/outbox/) |
@@ -224,7 +225,7 @@ ai-service 는 **시스템 프롬프트 + 컨텍스트 윈도의 단순 대화�
 
 | 자산 | 위치                                                             |
 |---|------------------------------------------------------------------|
-| **Architecture Decision Records** 31개 | [docs/adr/](adr/)                                                |
+| **Architecture Decision Records** 35개 | [docs/adr/](adr/)                                                |
 | **정산 정확성 검증 문서** | [docs/SETTLEMENT-VERIFICATION.md](plan/SETTLEMENT-VERIFICATION.md)    |
 | **k6 부하테스트** 4 시나리오 | [load-test/](../load-test/)                                      |
 | **Grafana 대시보드** + 커스텀 메트릭 | [monitoring/grafana/dashboards/](../monitoring/grafana/dashboards/) |
@@ -254,10 +255,10 @@ ai-service 는 **시스템 프롬프트 + 컨텍스트 윈도의 단순 대화�
 
 ## 빠른 둘러보기 (5분)
 
-1. **[docs/SETTLEMENT-VERIFICATION.md](plan/SETTLEMENT-VERIFICATION.md)** — "정말 작동하나"의 재현 가능한 답(520 테스트·94%)
+1. **[docs/SETTLEMENT-VERIFICATION.md](plan/SETTLEMENT-VERIFICATION.md)** — "정말 작동하나"의 재현 가능한 답(불변식 매핑 + 게이트)
 2. **[README.md](../README.md)** 의 *"면접관용 빠른 둘러보기"* + 아키텍처 다이어그램
 3. **[docs/adr/0020-order-settlement-db-split.md](adr/0020-order-settlement-db-split.md)** — DB 물리 분리 결정
-4. **[docs/adr/](adr/)** 31개 — 왜 이렇게 설계했는지
+4. **[docs/adr/](adr/)** 35개 — 왜 이렇게 설계했는지
 5. **[LLM 적용 섹션](#llm-적용--프로덕션-서비스--개발-하네스)** — ai-service(벤더 격리·PII·비용 가드) + 개발 하네스(guard 3중 강제)
 
 ---

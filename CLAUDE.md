@@ -5,7 +5,7 @@
 > - **기능·API·유스케이스 상세** → [`SPEC.md`](./SPEC.md) (사람용 기능명세)
 > - **서비스별 강제 도메인 규칙**(상태머신·수수료·정책 등) → `*-domain-rules` / `*-rules` 스킬(온디맨드 로드:
 >   order-commerce·settlement-domain·loan-domain·investment-domain·account-domain·financial-data·economics-data·
->   market-quotes·company-news·commondata-connector·operation-signal·ai-chat)
+>   market-quotes·company-news·commondata-connector·operation-signal·ai-chat·card-service·insurance-domain·deposit-domain·organization-domain)
 > - **사용자 문서** → [`README.md`](./README.md) · **아키텍처 결정** → [`docs/adr/`](./docs/adr/)
 > - **기술 스택·빌드 커맨드·인프라·작업 이력** → [`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md) (참조성 — 필요 시 조회)
 
@@ -33,32 +33,32 @@
 
 ## 프로젝트 개요
 
-주문·결제·정산·선정산/기업대출·투자·계정계·재무제표·경제지표·기업뉴스평판·운영관제·주식시세·AI챗봇·공공데이터·조직/멤버십·법인카드·보험·예치금을
-**16개 마이크로서비스 + API Gateway** 로 분리한 헥사고날 백엔드. 원래 모놀리스였으나 Bounded Context 로 분리.
+주문·결제·정산·선정산/기업대출·투자·계정계·재무제표·경제지표·기업뉴스평판·운영관제·주식시세·AI챗봇·공공데이터·조직/멤버십·법인카드·보험·예치금·게시판을
+**17개 마이크로서비스 + API Gateway** 로 분리한 헥사고날 백엔드. 원래 모놀리스였으나 Bounded Context 로 분리.
 여기에 **폴리글랏 7종**(Kotlin 2 알림·대사 / Go 2 스트리밍·웹훅 / Python 3 백테스트·이상탐지·예측 — Gradle 미포함
 standalone, gateway 미라우팅 — 예외 2종: market-stream 은 `/api/market-stream/**` SSE, notification 은
 `/api/notifications/stream` 알림 푸시 SSE 만 gateway 라우팅 + compose 배선. 정본 [`docs/sse.md`](docs/sse.md))을
-더해 총 24개 서비스 = 16 + gateway 1 + 폴리글랏 7 (정본: `polyglot-services.md` · `ARCHITECTURE.md`).
+더해 총 25개 서비스 = 17 + gateway 1 + 폴리글랏 7 (정본: `polyglot-services.md` · `ARCHITECTURE.md`).
 
-- **16개 서비스 모두 DB-per-service** — order=opslab, settlement=settlement_db, loan=lemuel_loan,
+- **17개 서비스 모두 DB-per-service** — order=opslab, settlement=settlement_db, loan=lemuel_loan,
   financial=lemuel_financial, economics=lemuel_economics, company=lemuel_company, operation=lemuel_operation,
   market=lemuel_market, ai=lemuel_ai, commondata=lemuel_commondata, investment=lemuel_investment, account=lemuel_account,
-  organization=lemuel_organization, card=lemuel_card, insurance=lemuel_insurance, deposit=lemuel_deposit.
+  organization=lemuel_organization, card=lemuel_card, insurance=lemuel_insurance, deposit=lemuel_deposit, board=lemuel_board.
 - 서비스 간 연계는 **Kafka 이벤트로만** (코드·DB 직접 의존 0).
 - order↔settlement 는 settlement 가 자체 DB 에 **이벤트 드리븐 프로젝션**(`settlement_*_view`)을 적재하는 CQRS 로 분리
   (ADR 0020), 대사는 order 내부 API(`/internal/recon`) 호출로 cross-DB 연결 0 유지.
 
 ## 기술 스택 (요지)
 
-**Java 25 · Spring Boot 4.0.4 · Gradle(Kotlin DSL) 멀티모듈 · PostgreSQL 17 · Kafka(Redpanda) · Flyway.**
-폴리글랏: Kotlin 2.0/Boot 3.3(JDK 21) · Go 1.22 · Python 3.11/FastAPI(standalone 빌드, `polyglot-ci.yml`).
+**Java 25 · Spring Boot 4.0.7 · Gradle(Kotlin DSL) 멀티모듈 · PostgreSQL 17 · Kafka(Redpanda) · Flyway.**
+폴리글랏: Kotlin 2.0/Boot 3.3(JDK 21) · Go 1.22/1.23 · Python 3.11/FastAPI(standalone 빌드, `polyglot-ci.yml`).
 전체 표(검색·PG·배치·캐시·PDF·관측·RateLimit 등) → [`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md).
 
 ## 모듈 구조
 
 ```
 settlement/                       # Gradle 멀티 모듈 루트
-├── settings.gradle.kts           # 17 모듈 선언 = 16 서비스 + gateway (shared-common 은 composite build)
+├── settings.gradle.kts           # 18 모듈 선언 = 17 서비스 + gateway (shared-common 은 composite build)
 ├── build.gradle.kts              # 부모 빌드 (subprojects 공통 설정)
 ├── shared-common/                # 📦 java-library: common.{audit, config, exception, outbox, ratelimit, pdf}
 ├── order-service/                # 🛒 Commerce (8088, opslab) — user·order·payment·cart·shipping·product·category·coupon·review·game·(menu·rbac·commoncode·recon·projectionbackfill)
@@ -74,9 +74,10 @@ settlement/                       # Gradle 멀티 모듈 루트
 ├── investment-service/           # 📈 Investment (8100, lemuel_investment) — CEO 투자하기. shared-common 의존
 ├── account-service/              # 🏦 Account (8102, lemuel_account) — 계정계 GL 집계. shared-common 제한 스캔(소비 전용)
 ├── organization-service/         # 👥 Organization (8104, lemuel_organization) — 셀러/기업 조직·멤버십(OWNER/MANAGER/STAFF). shared-common 의존, 이벤트 발행 전용(4토픽 → card-service 가 조직 프로젝션으로 소비)
-├── card-service/                 # 💳 Card (8106/mgmt 8107, lemuel_card) — 법인카드 카드계정·카드(마스터/서브 한도) + 승인·매입·명세서·지출관리(Phase 2). shared-common 의존, 도메인·정책·영속·REST(`/api/cards`)·스케줄러 4종·이벤트 컨슈머 6종까지 구현
+├── card-service/                 # 💳 Card (8106/mgmt 8107, lemuel_card) — 법인카드 카드계정·카드(마스터/서브 한도) + 승인·매입·명세서·지출관리(Phase 2). shared-common 의존, 도메인·정책·영속·REST(`/api/cards` + `/admin/expense-receipts` 리뷰 큐, ADR 0036)·스케줄러 4종·이벤트 컨슈머 7종(구독 토픽 6종 — captured 는 expense/statement 2클래스 분담)까지 구현
 ├── insurance-service/            # 🛡️ Insurance (8108/mgmt 8109, lemuel_insurance) — GA 보험대리점 플랫폼: 상담·가입설계·청약·계약·유지변경·수수료정산. shared-common 의존
 ├── deposit-service/              # 🏧 Deposit (8112/mgmt 8113, lemuel_deposit) — 셀러 예치금 원장(잔고 단일 진실원, hold/offset 로 재원 이중사용 차단). shared-common 의존, REST 는 `/api/deposits` 조회 + `/admin/deposits` 수기 콘솔, Kafka 컨슈머 2종(settlement.confirmed·payout.completed). card 승인·매입은 페이로드에 sellerId 가 없어 미구독 — hold/offset 은 콘솔 경로
+├── board-service/                # 📋 Board (8114/mgmt 8115, lemuel_board) — 메타 주도 게시판 플랫폼: 정의 1행 = 게시판 1개, 프론트 단일 라우트가 스킨(LIST/GALLERY/FAQ/QNA)으로 렌더. shared-common JWT 만 제한 스캔, **발행 0·소비 0**(권한=역할 allowlist, 메뉴 등록은 관리 화면이 order `/admin/menus` 직접 호출)
 └── gateway-service/              # 🚪 API Gateway (8080) — 라우팅만(자체 인증 필터 없음)
 ```
 
