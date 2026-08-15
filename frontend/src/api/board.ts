@@ -109,3 +109,104 @@ export const boardApi = {
   get: async (boardKey: string): Promise<BoardDefinition> =>
     (await api.get<BoardDefinition>(`/api/boards/${boardKey}`)).data,
 };
+
+// ════════════════════════════════════════════════════════════════════════════
+// 게시글 · 댓글 (Phase 2)
+// ════════════════════════════════════════════════════════════════════════════
+
+export type BoardPostStatus = 'PUBLISHED' | 'HIDDEN' | 'DELETED';
+export type BoardCommentStatus = 'PUBLISHED' | 'DELETED';
+
+export interface BoardPost {
+  id: number;
+  boardId: number;
+  categoryCode?: string | null;
+  title: string;
+  /** 목록 응답에는 없다 — 본문은 상세에서만 내려온다 */
+  content?: string | null;
+  contentFormat: BoardContentFormat;
+  /** 마스킹된 표시명(예: 'ad***'). 원문 이메일은 서버에 저장되지 않는다 */
+  authorName: string;
+  mine: boolean;
+  /** 화면이 버튼을 그릴지 정하는 힌트일 뿐 — 실제 인가는 서버가 다시 한다 */
+  editable: boolean;
+  pinned: boolean;
+  secret: boolean;
+  status: BoardPostStatus;
+  viewCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BoardComment {
+  id: number;
+  postId: number;
+  parentId?: number | null;
+  authorName: string;
+  /** 삭제된 댓글은 '삭제된 댓글입니다.' 자리표시로 내려온다 */
+  content: string;
+  mine: boolean;
+  deletable: boolean;
+  status: BoardCommentStatus;
+  createdAt: string;
+}
+
+export interface BoardPageResponse<T> {
+  content: T[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+}
+
+export interface BoardPostRequest {
+  title: string;
+  content: string;
+  categoryCode?: string | null;
+  secret: boolean;
+}
+
+export const boardPostApi = {
+  list: async (
+    boardKey: string,
+    params: { page?: number; size?: number; category?: string; keyword?: string } = {},
+  ): Promise<BoardPageResponse<BoardPost>> =>
+    (await api.get<BoardPageResponse<BoardPost>>(`/api/boards/${boardKey}/posts`, { params })).data,
+
+  /** 조회수가 증가한다. 볼 수 없는 글은 404 */
+  read: async (boardKey: string, postId: number): Promise<BoardPost> =>
+    (await api.get<BoardPost>(`/api/boards/${boardKey}/posts/${postId}`)).data,
+
+  create: async (boardKey: string, body: BoardPostRequest): Promise<BoardPost> =>
+    (await api.post<BoardPost>(`/api/boards/${boardKey}/posts`, body)).data,
+
+  update: async (boardKey: string, postId: number, body: BoardPostRequest): Promise<BoardPost> =>
+    (await api.put<BoardPost>(`/api/boards/${boardKey}/posts/${postId}`, body)).data,
+
+  remove: async (boardKey: string, postId: number): Promise<void> => {
+    await api.delete(`/api/boards/${boardKey}/posts/${postId}`);
+  },
+
+  pin: async (boardKey: string, postId: number, pinned: boolean): Promise<BoardPost> =>
+    (await api.post<BoardPost>(`/api/boards/${boardKey}/posts/${postId}/pin?pinned=${pinned}`)).data,
+
+  hide: async (boardKey: string, postId: number): Promise<BoardPost> =>
+    (await api.post<BoardPost>(`/api/boards/${boardKey}/posts/${postId}/hide`)).data,
+
+  restore: async (boardKey: string, postId: number): Promise<BoardPost> =>
+    (await api.post<BoardPost>(`/api/boards/${boardKey}/posts/${postId}/restore`)).data,
+};
+
+export const boardCommentApi = {
+  list: async (boardKey: string, postId: number): Promise<BoardComment[]> =>
+    (await api.get<BoardComment[]>(`/api/boards/${boardKey}/posts/${postId}/comments`)).data,
+
+  create: async (boardKey: string, postId: number, content: string, parentId?: number | null):
+    Promise<BoardComment> =>
+    (await api.post<BoardComment>(`/api/boards/${boardKey}/posts/${postId}/comments`,
+      { content, parentId: parentId ?? null })).data,
+
+  remove: async (boardKey: string, commentId: number): Promise<void> => {
+    await api.delete(`/api/boards/${boardKey}/comments/${commentId}`);
+  },
+};

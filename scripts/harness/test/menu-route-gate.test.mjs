@@ -63,6 +63,11 @@ const ROUTES_WITHOUT_MENU = new Map([
   ['/mypage', '헤더 MY 버튼으로 진입'],
   ['/tags', '관리 화면 내부 이동'],
   ['/print/settlement/:id', '인쇄 전용 — 새 창으로 열린다'],
+  // 게시판은 메뉴 행이 시드가 아니라 런타임에 만들어진다(관리자가 /admin/system/boards 에서
+  // 기존 POST /admin/menus 로 붙인다). 시드 SQL 과 대조할 대상이 애초에 없으므로 여기 등록한다.
+  // 라우트가 게시판 수만큼 늘지 않는 것이 이 설계의 핵심이다 — docs/plan/board-service.md §2.
+  ['/boards/:boardKey', '메타 주도 게시판 — 메뉴 행은 관리 화면이 런타임에 등록한다'],
+  ['/boards/:boardKey/:postId', '게시글 상세 — 목록에서 진입'],
   ['/admin/system', '그룹 진입 리다이렉트'],
   ['/admin/ceo', '그룹 진입 리다이렉트'],
   ['/admin/operation', '구 경로 리다이렉트'],
