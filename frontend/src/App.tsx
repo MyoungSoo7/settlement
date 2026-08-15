@@ -74,6 +74,7 @@ const OperationConsolePage = lazy(() => import('./pages/operation/OperationConso
 const MenuManagementPage = lazy(() => import('./pages/system/MenuManagementPage'));
 const CommonCodeManagementPage = lazy(() => import('./pages/system/CommonCodeManagementPage'));
 const RbacManagementPage = lazy(() => import('./pages/system/RbacManagementPage'));
+const BoardAdminPage = lazy(() => import('./pages/system/BoardAdminPage'));
 
 // ── 일반 사용자용 (인증 필수, 역할 무관) ──────────────────────────────────
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -223,6 +224,8 @@ function App() {
               element={<AdminOnlyRoute><SideNavLayout><CommonCodeManagementPage /></SideNavLayout></AdminOnlyRoute>} />
             <Route path="/admin/system/rbac"
               element={<AdminOnlyRoute><SideNavLayout><RbacManagementPage /></SideNavLayout></AdminOnlyRoute>} />
+            <Route path="/admin/system/boards"
+              element={<AdminOnlyRoute><SideNavLayout><BoardAdminPage /></SideNavLayout></AdminOnlyRoute>} />
             <Route path="/admin/system/ecommerce-categories"
               element={<AdminOnlyRoute><SideNavLayout><EcommerceCategoryAdmin /></SideNavLayout></AdminOnlyRoute>} />
             <Route path="/admin/system/display-sections"
