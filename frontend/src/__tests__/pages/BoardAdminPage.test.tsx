@@ -144,6 +144,25 @@ describe('BoardAdminPage — 조회와 대조', () => {
     expect(within(row('문의')).getByText('설명 없음')).toBeInTheDocument();
   });
 
+  it('활성인데 메뉴에 없는 게시판을 상단에 모아 경고한다 — 행별 배지만으론 긴 목록에서 놓친다', async () => {
+    // 게시판(lemuel_board)과 메뉴(opslab)는 다른 DB라 FK 로 못 묶는다. 이 대조가 그 자리를 대신하므로
+    // 화면이 안 보여 주면 어긋남을 아무도 모른다(G-5 — 분리의 대가로 수용한 지점).
+    mockedBoard.list.mockResolvedValue([공지, board({ id: 3, boardKey: 'free', name: '자유게시판' })]);
+    await renderPage();
+
+    // '자유게시판'은 배너와 목록 행 양쪽에 나온다 — 배너 안에서 확인한다.
+    const banner = screen.getByText(/메뉴에 없는 게시판/);
+    expect(banner).toHaveTextContent('1개');
+    expect(banner).toHaveTextContent('자유게시판');
+  });
+
+  it('닫힌 게시판은 메뉴가 없어도 세지 않는다 — 정상 절차라 경고가 소음이 된다', async () => {
+    // 기본 픽스처: 공지(활성·연결됨) + 문의(닫힘·메뉴 없음)
+    await renderPage();
+
+    expect(screen.queryByText(/메뉴에 없는 게시판/)).not.toBeInTheDocument();
+  });
+
   it('게시판이 없어진 /boards/ 메뉴는 링크 끊김으로 경고한다', async () => {
     await renderPage();
 

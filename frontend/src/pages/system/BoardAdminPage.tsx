@@ -96,6 +96,20 @@ const BoardAdminPage: React.FC = () => {
     [menus],
   );
 
+  /**
+   * 메뉴에 올라가지 않은 **활성** 게시판.
+   *
+   * 게시판(lemuel_board)과 메뉴(opslab)는 다른 DB라 FK 로 묶을 수 없다 — 이 대조가 그 자리를
+   * 대신한다(설계문서 §3). 행별 배지만 있으면 목록이 길어질 때 놓치므로 상단에 수를 모아 둔다.
+   *
+   * 닫힌 게시판은 세지 않는다. 메뉴에서 내리고 닫는 것이 정상 절차이므로, 그때마다 경고가 뜨면
+   * 경고가 배경 소음이 된다.
+   */
+  const unlinkedBoards = useMemo(
+    () => boards.filter((board) => board.active && !linkedPaths.has(board.path)),
+    [boards, linkedPaths],
+  );
+
   const orphanMenus = useMemo(() => {
     const boardPaths = new Set(boards.map((board) => board.path));
     return flatten(menus).filter(
@@ -279,6 +293,14 @@ const BoardAdminPage: React.FC = () => {
           {notice}
         </div>
       )}
+      {unlinkedBoards.length > 0 && (
+        <div className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">
+          메뉴에 없는 게시판 {unlinkedBoards.length}개 —{' '}
+          {unlinkedBoards.map((board) => board.name).join(', ')}. 만들어져 있지만 네비게이션에서
+          찾아갈 수 없습니다. 각 행의 <b>메뉴에 추가</b>로 올리세요.
+        </div>
+      )}
+
       {orphanMenus.length > 0 && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           링크가 끊긴 메뉴 {orphanMenus.length}건 —{' '}
