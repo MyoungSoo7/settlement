@@ -76,10 +76,50 @@ jobs:
         with:
           fetch-depth: 0
 
+      # 변경 감지의 기준점을 정한다 — 이 한 값이 "무엇을 돌릴지" 전부를 좌우한다.
+      #
+      # 문제 (2026-08-16 실측): base 를 주지 않으면 dorny 는 **기본 브랜치(main)와의 merge-base**
+      #   를 기준으로 삼는다. main 이 develop 보다 1300 커밋 뒤처져 있어, develop push 는 무엇을
+      #   바꿨든 283개 파일 변경으로 잡힌다 → shared 필터(build.gradle.kts·Dockerfile·ci.yml)가
+      #   반드시 걸려 → 언제나 "전 서비스 재빌드" 분기.
+      #   실제로 문서 2개·tsx 2개만 바꾼 push 가 백엔드 모듈 19개를 전부 돌렸다
+      #   (run 31892010325: "Searching for merge-base main...develop" → "Detected 274 changed files").
+      #   경로 필터가 정교하게 짜여 있는데 입력이 틀려서 무력화돼 있던 것이다.
+      #
+      # 그래서 역할을 나눈다:
+      #   - push(develop)     → 직전 커밋 대비. 바뀐 모듈만 돌려 피드백을 짧게 한다.
+      #   - pull_request      → base 를 비운다(= PR base = main). **머지 전 전량 검증은 그대로**.
+      #     develop→main 릴리스 PR 이 상시 열려 있어, push 에서 안 돈 모듈도 머지 전에 반드시 한 번 돈다.
+      #
+      # 안전 폴백: 최초 push·force-push 는 before 가 0000… 이거나 이미 사라진 커밋을 가리킨다.
+      #   그때는 base 를 비워 **전량 검증으로 떨어뜨린다** — 판단이 갈릴 때는 더 도는 쪽이 옳다.
+      - name: Resolve paths-filter base
+        id: filter_base
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          base=""
+          if [ "${{ github.event_name }}" = "push" ]; then
+            if [ -n "${BEFORE:-}" ] \
+              && [ "$BEFORE" != "0000000000000000000000000000000000000000" ] \
+              && git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+              base="$BEFORE"
+              echo "변경 감지 기준: 직전 커밋 ${BEFORE}"
+            else
+              echo "직전 커밋을 찾을 수 없다(before=${BEFORE:-<empty>}) → 기본 비교(전량 검증)로 떨어뜨린다"
+            fi
+          else
+            echo "pull_request → PR base(main) 와 비교한다(전량 검증)"
+          fi
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+
       - name: Paths filter
         id: filter
         uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         with:
+          # 빈 문자열이면 dorny 기본 동작(기본 브랜치와 비교) — 위 스텝의 폴백이 이 값을 낸다.
+          base: ${{ steps.filter_base.outputs.base }}
           filters: |
             frontend:
               - 'frontend/**'

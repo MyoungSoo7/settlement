@@ -64,10 +64,35 @@ jobs:
         with:
           fetch-depth: 0
 
+      # ci.yml 의 같은 스텝과 동일한 이유·동일한 구현이다(2026-08-16).
+      #   base 를 주지 않으면 dorny 는 기본 브랜치(main)와의 merge-base 를 기준으로 삼는데,
+      #   main 이 develop 보다 1300 커밋 뒤처져 있어 develop push 는 무엇을 바꿨든 "전부 바뀜"이 된다
+      #   → 폴리글랏 7종 중 하나만 고쳐도 7개가 전부 돈다.
+      #   push 는 직전 커밋 대비로, PR 은 그대로 base(main) 대비로 둔다 — 머지 전 전량 검증은 유지된다.
+      - name: Resolve paths-filter base
+        id: filter_base
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          base=""
+          if [ "${{ github.event_name }}" = "push" ]; then
+            if [ -n "${BEFORE:-}" ] \
+              && [ "$BEFORE" != "0000000000000000000000000000000000000000" ] \
+              && git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+              base="$BEFORE"
+              echo "변경 감지 기준: 직전 커밋 ${BEFORE}"
+            else
+              echo "직전 커밋을 찾을 수 없다(before=${BEFORE:-<empty>}) → 기본 비교(전량 검증)로 떨어뜨린다"
+            fi
+          fi
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+
       - name: Paths filter
         id: filter
         uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         with:
+          base: ${{ steps.filter_base.outputs.base }}
           filters: |
             workflow: ['.github/workflows/polyglot-ci.yml']
             market-stream-service: ['market-stream-service/**']
