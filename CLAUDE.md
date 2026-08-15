@@ -5,7 +5,7 @@
 > - **기능·API·유스케이스 상세** → [`SPEC.md`](./SPEC.md) (사람용 기능명세)
 > - **서비스별 강제 도메인 규칙**(상태머신·수수료·정책 등) → `*-domain-rules` / `*-rules` 스킬(온디맨드 로드:
 >   order-commerce·settlement-domain·loan-domain·investment-domain·account-domain·financial-data·economics-data·
->   market-quotes·company-news·commondata-connector·operation-signal·ai-chat·card-service·insurance-domain·deposit-domain)
+>   market-quotes·company-news·commondata-connector·operation-signal·ai-chat·card-service·insurance-domain·deposit-domain·organization-domain)
 > - **사용자 문서** → [`README.md`](./README.md) · **아키텍처 결정** → [`docs/adr/`](./docs/adr/)
 > - **기술 스택·빌드 커맨드·인프라·작업 이력** → [`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md) (참조성 — 필요 시 조회)
 

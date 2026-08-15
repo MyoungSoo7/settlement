@@ -83,6 +83,21 @@ describe("routeSkills", () => {
     );
   });
 
+  test("organization sources route to organization-domain-rules (커버리지 완결 — 16/16)", () => {
+    assert.deepEqual(
+      routeSkills(
+        "organization-service/src/main/java/github/lms/lemuel/organization/domain/Membership.java",
+      ),
+      ["organization-domain-rules", "tdd-discipline"],
+    );
+    assert.deepEqual(
+      routeSkills(
+        "organization-service/src/main/java/github/lms/lemuel/organization/adapter/out/event/OrganizationEventPublisherAdapter.java",
+      ),
+      ["organization-domain-rules", "idempotency-and-events", "tdd-discipline"],
+    );
+  });
+
   test("card outbox publisher keeps the domain rules ahead of the event procedure", () => {
     assert.deepEqual(
       routeSkills(

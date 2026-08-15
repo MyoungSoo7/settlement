@@ -39,6 +39,7 @@ export const ROUTES = [
   [/common-data-service\//, ["commondata-connector-rules"]],
   [/insurance-service\//, ["insurance-domain-rules"]],
   [/deposit-service\//, ["deposit-domain-rules"]],
+  [/organization-service\//, ["organization-domain-rules"]],
   [
     /(\/outbox\/|adapter\/in\/kafka\/|adapter\/out\/event\/)/i,
     ["idempotency-and-events"],
