@@ -1,6 +1,7 @@
 package github.lms.lemuel.board.adapter.in.web;
 
 import github.lms.lemuel.board.domain.exception.BoardAccessDeniedException;
+import github.lms.lemuel.board.domain.exception.BoardAttachmentNotFoundException;
 import github.lms.lemuel.board.domain.exception.BoardCommentNotFoundException;
 import github.lms.lemuel.board.domain.exception.BoardInvariantViolationException;
 import github.lms.lemuel.board.domain.exception.BoardNotFoundException;
@@ -11,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -28,9 +30,21 @@ import java.util.stream.Collectors;
 public class BoardExceptionHandler {
 
     @ExceptionHandler({BoardNotFoundException.class, BoardPostNotFoundException.class,
-            BoardCommentNotFoundException.class})
+            BoardCommentNotFoundException.class, BoardAttachmentNotFoundException.class})
     public ResponseEntity<Map<String, String>> handleNotFound(RuntimeException exception) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", exception.getMessage()));
+    }
+
+    /**
+     * 업로드 크기 초과 → 413.
+     *
+     * <p>서블릿 단에서 끊긴 요청이라 도메인까지 오지 않는다. 이걸 매핑하지 않으면 사용자는
+     * 원인을 알 수 없는 500 을 본다 — 고칠 수 있는 오류는 고칠 수 있게 말해 줘야 한다.
+     */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<Map<String, String>> handleTooLarge(MaxUploadSizeExceededException exception) {
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+                .body(Map.of("message", "첨부 파일이 허용 크기를 넘습니다."));
     }
 
     /**

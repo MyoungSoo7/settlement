@@ -46,6 +46,13 @@ spring:
     schemas: board
     locations: classpath:db/migration
 
+  # 첨부 상한. 게시판별 정책(max_attachment_size_kb, 최대 20MB)이 진짜 한도이고 이건 그 위의
+  # 방어선이다 — 여기서 먼저 끊어야 20MB 를 넘는 요청이 애플리케이션 메모리까지 오지 않는다.
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 24MB
+
   lifecycle:
     timeout-per-shutdown-phase: 30s
 
@@ -89,6 +96,12 @@ springdoc:
     path: /swagger-ui.html
 
 app:
+  board:
+    attachment:
+      # 컨테이너에서는 볼륨을 여기에 마운트한다. 이 디렉터리가 사라지면 첨부 행은 남고 파일만
+      # 없어져 다운로드가 404 로 떨어진다(LocalFileSystemAttachmentStorageAdapter 참조).
+      base-dir: ${APP_BOARD_ATTACHMENT_BASE_DIR:./data/board-attachments}
+
   # JWT — shared-common JwtProperties(prefix=app.jwt). order-service 와 동일 시크릿을 공유해야
   # 같은 토큰으로 이 서비스의 /admin/boards 를 호출할 수 있다.
   jwt:

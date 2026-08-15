@@ -216,3 +216,6 @@ docs/harness/
 docs/inflearn/
 docs/study/
 docs/sse/
+# 게시판 첨부 로컬 저장소 — bootRun 이 여기에 파일을 쓴다(운영은 볼륨 마운트).
+# 사용자가 올린 바이너리라 저장소에 들어갈 이유가 없다.
+board-service/data/

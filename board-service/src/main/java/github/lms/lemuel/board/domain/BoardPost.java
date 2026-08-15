@@ -140,6 +140,25 @@ public class BoardPost {
     }
 
     /**
+     * 이 업로드를 이 글에 붙일 수 있는지 — <b>바이트를 디스크에 쓰기 전에</b> 전부 판정한다.
+     *
+     * <p>저장한 뒤에 거절하면 거절당한 파일이 디스크에 남고, 그 정리를 잊는 순간 아무도 참조하지
+     * 않는 바이너리가 쌓인다. 그래서 이 검사는 반환값이 아니라 예외로 흐름을 끊는다.
+     *
+     * @param existingCount 이미 붙어 있는 첨부 수 — 개수 한도는 애그리거트 밖(저장소)의 사실이라 받아 온다
+     */
+    public void assertCanAttach(BoardActor actor, BoardDefinition definition, AttachmentUpload upload,
+                                int existingCount) {
+        assertNotDeleted("첨부");
+        assertCanModify(actor, definition);
+        upload.validateAgainst(definition.getAttachmentPolicy());
+        if (existingCount + 1 > definition.getAttachmentPolicy().maxCount()) {
+            throw new BoardInvariantViolationException(
+                    "첨부는 최대 " + definition.getAttachmentPolicy().maxCount() + "개까지입니다.");
+        }
+    }
+
+    /**
      * 수정·삭제 권한 — 작성자 본인이거나 운영 역할.
      *
      * <p>작성자 판정은 {@link BoardActor#owns(Long)} 이 한다. 미인증({@code userId == null})이

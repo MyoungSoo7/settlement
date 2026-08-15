@@ -2,6 +2,7 @@ package github.lms.lemuel.board.adapter.in.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import github.lms.lemuel.board.application.port.in.BoardPage;
+import github.lms.lemuel.board.application.port.in.BoardAttachmentUseCase;
 import github.lms.lemuel.board.application.port.in.ManagePostUseCase;
 import github.lms.lemuel.board.application.port.in.QueryBoardUseCase;
 import github.lms.lemuel.board.application.port.in.QueryPostUseCase;
@@ -67,6 +68,8 @@ class BoardPostControllerTest {
     ManagePostUseCase managePostUseCase;
     @MockitoBean
     QueryBoardUseCase queryBoardUseCase;
+    @MockitoBean
+    BoardAttachmentUseCase boardAttachmentUseCase;
 
     @AfterEach
     void clear() {

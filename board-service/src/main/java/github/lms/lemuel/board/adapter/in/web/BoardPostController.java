@@ -3,10 +3,12 @@ package github.lms.lemuel.board.adapter.in.web;
 import github.lms.lemuel.board.adapter.in.web.dto.BoardPageResponse;
 import github.lms.lemuel.board.adapter.in.web.dto.BoardPostRequest;
 import github.lms.lemuel.board.adapter.in.web.dto.BoardPostResponse;
+import github.lms.lemuel.board.application.port.in.BoardAttachmentUseCase;
 import github.lms.lemuel.board.application.port.in.ManagePostUseCase;
 import github.lms.lemuel.board.application.port.in.QueryBoardUseCase;
 import github.lms.lemuel.board.application.port.in.QueryPostUseCase;
 import github.lms.lemuel.board.domain.BoardActor;
+import github.lms.lemuel.board.domain.BoardAttachment;
 import github.lms.lemuel.board.domain.BoardPost;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -24,6 +26,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+import java.util.Map;
+
 /**
  * 게시글 API — 게시판 하나 안에서만 의미가 있으므로 경로가 게시판 키에 종속된다.
  *
@@ -40,6 +45,7 @@ public class BoardPostController {
     private final QueryPostUseCase queryPostUseCase;
     private final ManagePostUseCase managePostUseCase;
     private final QueryBoardUseCase queryBoardUseCase;
+    private final BoardAttachmentUseCase boardAttachmentUseCase;
 
     @Operation(summary = "게시글 목록", description = "고정 글이 먼저, 그다음 최신순. 본문은 싣지 않는다.")
     @GetMapping
@@ -55,8 +61,13 @@ public class BoardPostController {
         var result = queryPostUseCase.list(boardKey, actor,
                 new QueryPostUseCase.PostListQuery(page, size, category, keyword));
 
-        return ResponseEntity.ok(BoardPageResponse.from(result,
-                post -> BoardPostResponse.summary(post, actor, canManage)));
+        // 대표 이미지는 페이지 전체를 한 번에 가져온다 — 글마다 부르면 한 화면에 20번의 왕복이 된다.
+        List<Long> postIds = result.content().stream().map(BoardPost::getId).toList();
+        Map<Long, BoardAttachment> thumbnails =
+                boardAttachmentUseCase.firstImageByPost(boardKey, postIds, actor);
+
+        return ResponseEntity.ok(BoardPageResponse.from(result, post -> BoardPostResponse.summary(
+                post, actor, canManage, thumbnailUrl(boardKey, thumbnails.get(post.getId())))));
     }
 
     @Operation(summary = "게시글 상세", description = "조회수가 증가한다. 볼 수 없는 글은 404.")
@@ -126,5 +137,12 @@ public class BoardPostController {
      */
     private boolean canManage(String boardKey, BoardActor actor) {
         return queryBoardUseCase.getByKey(boardKey).canManage(actor.role());
+    }
+
+    /** 첨부 다운로드 주소는 한 곳에서만 만든다 — 응답 DTO 두 곳이 각자 조립하면 반드시 어긋난다. */
+    private static String thumbnailUrl(String boardKey, BoardAttachment attachment) {
+        return attachment == null
+                ? null
+                : "/api/boards/" + boardKey + "/attachments/" + attachment.getId() + "/download";
     }
 }

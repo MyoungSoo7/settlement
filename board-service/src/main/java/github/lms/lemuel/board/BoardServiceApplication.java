@@ -3,6 +3,7 @@ package github.lms.lemuel.board;
 import io.github.cdimascio.dotenv.Dotenv;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 
 /**
  * board-service 독립 부팅 진입점.
@@ -23,6 +24,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * 강제로 물어 컨텍스트가 깨진다.
  */
 @SpringBootApplication(scanBasePackages = "github.lms.lemuel.board")
+@ConfigurationPropertiesScan("github.lms.lemuel.board.config")
 public class BoardServiceApplication {
 
     public static void main(String[] args) {
