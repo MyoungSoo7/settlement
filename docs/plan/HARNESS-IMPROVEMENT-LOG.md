@@ -27,6 +27,34 @@ _판정 로그_ 다. 지금까지 하네스는 계속 늘어나기만 했고, �
 
 ## 항목
 
+### 2026-08-15 · 리포트 신선도 게이트(report-freshness.mjs) — 낡은 XML 인용 차단
+
+- **status**: candidate
+- **동기**: "가짜 GREEN 4경로" 중 'UP-TO-DATE 낡은 XML' — 직전 빌드 산출물을 이번 변경의 증거로
+  인용하는 실수는 지금까지 운용 지식("인용 전 mtime 확인")으로만 막았다.
+- **predicted_effect**: 게이트 결과 인용 전 `report-freshness <module>` 실행이 관례가 되면, 소스 수정 후
+  재빌드 없이 "통과" 를 주장하는 보고가 STALE(exit 1)로 걸러진다. 리포트 부재(미실행)도 MISSING 으로 구분.
+- **한계(명시)**: mtime 근사 — 소스 무변경 재실행은 fresh 로 본다(옳음), Docker 다운 skip 축은 별개 문제로 남는다.
+- **verified_at**: 미검증 (유닛 6케이스 도입 시점 PASS)
+
+### 2026-08-15 · CI 텔레메트리 로컬 합산(telemetry-ci-pull + --merge)
+
+- **status**: candidate
+- **동기**: 러너 실행 이력이 아티팩트로만 남아 로컬 리포트와 단절 — 규칙 효과 판정의 분모가 로컬
+  체크아웃 하나로 좁았다(상태 관측의 머신 경계 단절).
+- **predicted_effect**: `telemetry-ci-pull.mjs` 수집 + `--merge` 리포트에서 mode list(CI) 실행 분모가
+  로컬 집계에 합산돼, 규칙별 발화/0회 판정이 CI 포함 전체 창으로 넓어진다.
+- **verified_at**: 미검증 (병합·멱등 수집 유닛 4케이스 도입 시점 PASS — 실데이터 합산은 다음 리포트에서)
+
+### 2026-08-15 · organization-domain-rules — 서비스 규칙 커버리지 16/16 완결
+
+- **status**: candidate
+- **동기**: 마지막 미커버 서비스. 발행 전용 경계·활성 OWNER ≥1·card 프로젝션 계약(드리프트 3종)은
+  코드에 있지만 스킬·라우터가 안 실어 주는 지식이었다.
+- **predicted_effect**: organization 경로 편집 시 라우터 주입이 발생하고, 커버리지 공백 섹션이 사라진다
+  (16/16). 이후 신규 서비스 추가 시 "스킬+ROUTES 동시 배선" 관례의 기본값이 된다.
+- **verified_at**: 미검증 (라우팅 2케이스 도입 시점 PASS)
+
 ### 2026-08-15 · Bash 명령 가드(COMMAND_RULES, --hook-bash) — 실시간 계층의 두 구멍 봉쇄
 
 - **status**: candidate

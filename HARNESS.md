@@ -29,7 +29,7 @@
 │   ├── gl-ledger-auditor.md           # 계정계 GL 복식부기·시산표·분개 매핑 정합 감사 (account + ledger)
 │   └── event-contract-reviewer.md     # cross-service 이벤트 계약 드리프트·Outbox·멱등 검토 (ADR 0024)
 ├── skills/                            # 온디맨드 절차적 지식 (SKILL.md)
-│   ├── {서비스}-rules/                # 15서비스 강제 도메인 규칙 (아래 참조)
+│   ├── {서비스}-rules/                # 16서비스 전체 강제 도메인 규칙 (아래 참조)
 │   ├── money-safety · ledger-invariants · idempotency-and-events   # 횡단 규칙
 │   ├── recon-playbook · incident-runbooks · compliance-review      # 운영/리뷰
 │   ├── delta-review                                                # diff 위험축 트리아지(어디를 먼저 볼지) — 리뷰 진입 기준
@@ -72,17 +72,14 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 
 `order-commerce` · `settlement-domain` · `loan-domain` · `investment-domain` · `account-domain` ·
 `financial-data` · `economics-data` · `market-quotes` · `company-news` · `commondata-connector` ·
-`operation-signal` · `ai-chat` · `card-service` · `insurance-domain` · `deposit-domain` — 각 서비스 로직 작성·수정·리뷰 시 해당 `*-rules` 스킬이 강제 규칙(상태머신·정책·경계)을 로드.
+`operation-signal` · `ai-chat` · `card-service` · `insurance-domain` · `deposit-domain` · `organization-domain` — 각 서비스 로직 작성·수정·리뷰 시 해당 `*-rules` 스킬이 강제 규칙(상태머신·정책·경계)을 로드.
 로드는 규율이 아니라 `skill-router.mjs` 가 편집 경로를 보고 **자동 주입**한다(아래 "강제 지점").
 
-> **커버리지 공백(명시)**: 위 15개 스킬은 16서비스 중 15개를 덮는다. 남은 1개는 의도된 후순위다:
->
-> - `organization-service` — 이벤트 발행 전용. 다만 **소비처는 배선돼 있다**(card-service 가 조직 프로젝션으로
->   4토픽 소비 — `card-service/src/main/resources/application.yml`). 강제할 자체 상태머신·회계 규칙이 얇아 후순위.
-> - ~~`insurance-service` · `deposit-service`~~ — 돈 경로 우선 부채였던 2개는 2026-08-15 해소:
->   `insurance-domain-rules`(완전판매 게이트·25%룰·환수/12회 분할) · `deposit-domain-rules`(잔고 단일
->   진실원·hold/offset 이중사용 차단) 신설 + 라우터 `ROUTES` 행 동시 배선(둘은 같은 사실의 두 표현 —
->   `skill-router.test.mjs` 가 회귀 방지).
+> **커버리지 완결(2026-08-15)**: 16서비스 전부가 전용 `*-rules` 스킬 + 라우터 `ROUTES` 행을 갖는다
+> (둘은 같은 사실의 두 표현 — `skill-router.test.mjs` 가 회귀 방지). 마지막 3개의 해소 이력:
+> 돈 경로 우선 부채였던 `insurance-domain-rules`(완전판매 게이트·25%룰·환수/12회 분할)·
+> `deposit-domain-rules`(잔고 단일 진실원·hold/offset 이중사용 차단), 그리고 후순위였던
+> `organization-domain-rules`(발행 전용 경계·활성 OWNER ≥1·card 프로젝션 계약 드리프트 3종).
 
 > **에이전트 로스터 설계 원칙 (의도된 공백)**: 전용 서브에이전트는 **고위험·상태보존 축**(정산·GL·이벤트 계약·헥사 경계·보안·쿼리)에만 둔다. 공개 read-only 위성(financial·economics·market·commondata)과 부가(operation·ai)는 상태 변이·회계 리스크가 낮아 **`*-rules` 스킬 + ArchUnit 게이트로 커버하는 것이 의도된 설계**다 — 서비스마다 에이전트를 만들지 않는다(로스터 비대화 = 안티패턴).
 
@@ -102,6 +99,7 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 > | 법인카드 한도·발급·상태                    | 📘`card-service-rules` (재원 F 공식·`master ≥ Σsub` 비관적 락·하향 클램프·재원 폴백 금지) + 📘`money-safety` → 🚦`CardIssuanceLimitConcurrencyIT` |
 > | 보험 설계·청약·계약·수수료·방카            | 📘`insurance-domain-rules` (완전판매 게이트 2단·25%룰·환수 24개월·12회 분할) + 📘`money-safety`                                                   |
 > | 예치금 원장·hold/offset·상계               | 📘`deposit-domain-rules` (잔고 단일 진실원·이중사용 차단·referenceType 불변) + 📘`ledger-invariants`                                              |
+> | 조직·멤버십·역할(OWNER/MANAGER/STAFF)      | 📘`organization-domain-rules` (발행 전용 경계·활성 OWNER ≥1·card 프로젝션 계약) → 🤖`event-contract-reviewer` (페이로드 변경 시)                  |
 > | 쿼리·인덱스·ES 매핑·성능                   | 🤖`db-query-architect`                                                                                                                            |
 > | MSA 경계 변경                              | 🤖`hexagonal-arch-reviewer` → 🚦ArchUnit (_코드 의존 0 / cross-DB 0_ 위반 차단)                                                                   |
 > | OO 설계 채점·리팩터링 회귀 판정            | 📘`oo-score` (3인 패널 중앙값 ≥9.5) — 결정적 불변식은 🚦`guard.mjs` OO-\* + `oo-gate.test.mjs` 가 선차단                                          |
@@ -179,8 +177,8 @@ settlement-copilot **플러그인 소유**라 플러그인 미설치 환경에 �
 `CMD-EVENT-PRODUCE`(lemuel.* 토픽 직접 produce — WARN 비차단). 의도적 실행은 `HARNESS_ALLOW_CMD=1` opt-in.
 이 계층은 fail-open(운반 수단 차단이라 입력 파싱 실패가 모든 Bash 를 멈추면 안 된다) — 우회 시도는 커밋·CI 가 내용 기준 재차단.
 
-**skill-router.mjs 라우트 표** (경로 → 주입 스킬, 세션당 스킬별 1회 · 최대 3개): 15개 서비스 디렉토리 → 각 `{서비스}-rules`
-(16서비스 중 organization 만 스킬 부재로 미배선 — 위 "커버리지 공백" 참조)
+**skill-router.mjs 라우트 표** (경로 → 주입 스킬, 세션당 스킬별 1회 · 최대 3개): 16개 서비스 디렉토리 전부 → 각 `{서비스}-rules`
+(위 "커버리지 완결" 참조)
 (settlement `ledger` 경로·account 는 `ledger-invariants` 동반) · `outbox/`·`adapter/in/kafka/`·`adapter/out/event/` →
 `idempotency-and-events` · settlement `readmodel|projection` → `projection-view-ops` · `contracts/events/` →
 `event-contract-change` · `.claude/hookify.*.local.md` → `hookify-to-guard` · 그 외 `src/{main,test}/` 첫 편집 → `tdd-discipline`.
@@ -194,7 +192,9 @@ settlement-copilot **플러그인 소유**라 플러그인 미설치 환경에 �
 - **경로 B — 저장소 네이티브(플러그인 0 의존, CI 가능)**:
   - `node scripts/harness/harness-audit.mjs` — 하네스 자기 진단(라우팅 dangling·가드 훅 경로 실존·모듈 로스터·인벤토리)
   - `node scripts/harness/guard.mjs --staged` — 돈/경계/이력 불변식 가드
-  - `node scripts/harness/telemetry-report.mjs` — 가드 발화·스킬 사용/제안 텔레메트리 + 가드 카나리아(`.claude/harness/logs`)
+  - `node scripts/harness/telemetry-report.mjs` — 가드 발화·스킬 사용/제안 텔레메트리 + 가드 카나리아(`.claude/harness/logs`).
+    CI 러너분 합산은 `telemetry-ci-pull.mjs` 수집 후 `--merge .claude/harness/ci-logs`
+  - `node scripts/harness/report-freshness.mjs <module>` — 게이트 리포트 인용 전 신선도 판정(낡은 XML 인용 차단)
   - `node scripts/harness/session-metrics.mjs` — OMC 세션·미션 완주율·재작업률 KPI 리포트(`.omc` 읽기 전용 관측 — KPI 정본은 `docs/ax/omc-harness.md` — 로컬 전용, 저장소 미포함)
   - `./gradlew :<module>:test`·`:jacocoTestCoverageVerification` — 정합 검증(측정 정답)
   - 서비스 자체 `/admin/integrity`·`/api/account/trial-balance` 조회 API(읽기 전용)
@@ -274,6 +274,11 @@ settlement-copilot **플러그인 소유**라 플러그인 미설치 환경에 �
   새는 축이 따로 있었다 — HARNESS.md 자신이 3주간 14 로 남아 있었고 같은 문서 안의 "자바 16서비스" 와
   모순이었다. 로스터 앵커(`API Gateway`·`gateway`·`DB-per-service`)가 같은 줄에 있을 때만 주장으로 인정해
   부분집합("금융 5서비스")·폴리글랏 합계(24)를 오탐하지 않는다.
+- **리포트 신선도 게이트** — `scripts/harness/report-freshness.mjs <module>...`: "가짜 GREEN 4경로" 중
+  **UP-TO-DATE 낡은 XML 인용** 축의 기계화. 테스트/JaCoCo XML 이 그 모듈 `src/` 최신 mtime 보다 오래됐으면
+  STALE(exit 1) — 직전 빌드 산출물을 이번 변경의 증거로 인용하는 것을 종료 코드로 차단한다. 리포트가
+  아예 없으면 MISSING(미실행 — "통과" 주장 불가). 지금까지 "인용 전 mtime 확인"은 운용 지식이었다 —
+  게이트 결과를 인용하기 전에 이 명령을 먼저 돌린다.
 - **로컬 통합 검증** — `scripts/verify.sh`: CI(`harness-guard.yml` + `ci.yml`)의 판정을 **같은 순서로** 로컬에서 재현한다.
   하네스 테스트 → 자기 진단 → 변경 파일 가드 → 삭제 가드 → 변경 모듈 Gradle. "다 됐다" 를 자기보고가 아니라 종료 코드로 증명하는 지점.
   `--fast`(Gradle 생략, 수초) · `--all`(전체 build) · `--base <ref>`. 느려지면 우회당하므로 기본 경로는 변경 모듈만 빌드한다(ci.yml 매핑과 동일).
@@ -281,6 +286,10 @@ settlement-copilot **플러그인 소유**라 플러그인 미설치 환경에 �
   규칙을 늘리기만 하고 효과를 잰 적이 없어 아무도 지우지 못하던 문제에 대한 대응 — 예측이 빗나가면 `reverted` 로 남기고 되돌린다.
 - **CI 강제** — `.github/workflows/harness-guard.yml`: PR/푸시마다 변경 파일 가드(`guard.mjs --list`) + 자기 진단을 **로컬 설정과 무관하게** 실행(훅 미설치·`--no-verify` 우회를 CI가 재차단). 기존 `ci.yml`(빌드·테스트·커버리지)와 병존.
 - **하네스 텔레메트리(관측 계층)** — `scripts/harness/telemetry.mjs`: 가드 차단·스킬 사용·라우터 제안을 `.claude/harness/logs/*.jsonl`(gitignore, 비커밋 — `.omc` 는 OMC 플러그인 소유·정리 대상이라 하네스 런타임은 프로젝트 소유 `.claude/harness/` 에 격리)에 append-only 적재. 집계는 `node scripts/harness/telemetry-report.mjs`(규칙별 발화 횟수·0회=죽은 규칙 후보·스킬 사용률·제안 대비 미로드). 관측 실패가 가드를 깨뜨리지 않는 non-fatal 설계, 킬 스위치 `HARNESS_TELEMETRY=off`.
+  **머신 경계 봉합(2026-08-15)**: CI 러너의 이력은 아티팩트(`harness-telemetry-*`, 30일)로만 남아 로컬
+  리포트와 단절돼 있었다 — `node scripts/harness/telemetry-ci-pull.mjs` 가 gh CLI 로 최근 run 아티팩트를
+  `.claude/harness/ci-logs/<run_id>/` 에 멱등 수집하고, `telemetry-report.mjs --merge .claude/harness/ci-logs`
+  가 로컬+CI 를 합산 집계한다(수집 실패는 best-effort — 관측 도구는 게이트를 막지 않는다).
   **닫힌 피드백 루프**: SessionStart 훅이 `telemetry-report.mjs --hook` 으로 압축 요약(최근 차단·라우터 순응률·카나리아 생존)을
   세션마다 additionalContext 로 자동 주입 — 사람이 리포트를 돌리지 않아도 관측이 에이전트에게 도달한다(알릴 것 없으면 침묵).
 - **스킬 라우터(권장의 기계화)** — `scripts/harness/skill-router.mjs`: PreToolUse 훅(Write/Edit/MultiEdit/Skill)이 편집 대상 경로를 보고 해당 `*-rules`·횡단 스킬 로드를 additionalContext 리마인더로 주입(세션당 스킬별 1회). 라우팅 맵의 "만지면 로드" 규칙을 문서 규율에서 기계 리마인더로 승격 — 가드가 금지를 강제한다면 라우터는 권장을 주입한다. 절대 차단하지 않음(항상 exit 0).
