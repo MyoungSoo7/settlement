@@ -3,11 +3,14 @@ package github.lms.lemuel.board.adapter.out.persistence;
 import github.lms.lemuel.board.application.port.out.LoadBoardCommentPort;
 import github.lms.lemuel.board.application.port.out.SaveBoardCommentPort;
 import github.lms.lemuel.board.domain.BoardComment;
+import github.lms.lemuel.board.domain.BoardCommentStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -28,6 +31,15 @@ public class BoardCommentPersistenceAdapter implements LoadBoardCommentPort, Sav
         return repository.findAllByPostIdOrderByIdAsc(postId).stream()
                 .map(BoardCommentJpaEntity::toDomain)
                 .toList();
+    }
+
+    @Override
+    public Map<Long, Integer> countPublishedByPostIds(List<Long> postIds) {
+        if (postIds == null || postIds.isEmpty()) {
+            return Map.of();
+        }
+        return repository.countByPostIdIn(postIds, BoardCommentStatus.PUBLISHED).stream()
+                .collect(Collectors.toMap(row -> (Long) row[0], row -> ((Number) row[1]).intValue()));
     }
 
     @Override

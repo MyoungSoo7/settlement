@@ -32,20 +32,22 @@ public record BoardPostResponse(
         long viewCount,
         /** 갤러리 목록용 대표 이미지 주소. 이미지 첨부가 없으면 null — 화면이 자리표시를 그린다 */
         String thumbnailUrl,
+        /** QNA 목록의 '답변 대기/완료' 판정용. 살아 있는 댓글 수 */
+        int commentCount,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt) {
 
     public static BoardPostResponse detail(BoardPost post, BoardActor actor, boolean canManage) {
-        return of(post, actor, canManage, true, null);
+        return of(post, actor, canManage, true, null, 0);
     }
 
     public static BoardPostResponse summary(BoardPost post, BoardActor actor, boolean canManage,
-                                            String thumbnailUrl) {
-        return of(post, actor, canManage, false, thumbnailUrl);
+                                            String thumbnailUrl, int commentCount) {
+        return of(post, actor, canManage, false, thumbnailUrl, commentCount);
     }
 
     private static BoardPostResponse of(BoardPost post, BoardActor actor, boolean canManage,
-                                        boolean withContent, String thumbnailUrl) {
+                                        boolean withContent, String thumbnailUrl, int commentCount) {
         boolean mine = actor.owns(post.getAuthor().userId());
         return new BoardPostResponse(
                 post.getId(),
@@ -62,6 +64,7 @@ public record BoardPostResponse(
                 post.getStatus(),
                 post.getViewCount(),
                 thumbnailUrl,
+                commentCount,
                 post.getCreatedAt(),
                 post.getUpdatedAt());
     }

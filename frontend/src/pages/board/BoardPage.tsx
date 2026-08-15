@@ -27,6 +27,10 @@ const BoardPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  /** FAQ 아코디언 — 펼친 항목과, 펼칠 때 한 번 불러 기억해 둔 본문 */
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [bodies, setBodies] = useState<Record<number, string>>({});
+
   const [writing, setWriting] = useState(false);
   const [form, setForm] = useState({ title: '', content: '', secret: false });
   const [saving, setSaving] = useState(false);
@@ -51,6 +55,28 @@ const BoardPage: React.FC = () => {
   useEffect(() => {
     void load();
   }, [load]);
+
+  /**
+   * FAQ 항목을 펼치거나 접는다.
+   *
+   * 이미 불러온 본문은 다시 부르지 않는다 — 접었다 폈다 할 때마다 왕복이 생기면 아코디언이
+   * 목록보다 무거워진다. (상세 조회라 조회수는 첫 펼침에만 오른다.)
+   */
+  const toggleFaq = async (postId: number) => {
+    if (expandedId === postId) {
+      setExpandedId(null);
+      return;
+    }
+    setExpandedId(postId);
+    if (bodies[postId] !== undefined) return;
+    try {
+      const detail = await boardPostApi.read(boardKey, postId);
+      setBodies((prev) => ({ ...prev, [postId]: detail.content ?? '' }));
+    } catch (e) {
+      setError(apiErrorMessage(e, '내용을 불러오지 못했습니다.'));
+      setExpandedId(null);
+    }
+  };
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -193,6 +219,40 @@ const BoardPage: React.FC = () => {
             </p>
           )}
         </div>
+      ) : definition?.skin === 'FAQ' ? (
+        /*
+          FAQ 스킨 — 제목을 눌러 그 자리에서 펼친다.
+
+          본문은 목록 응답에 없다(의도적으로 싣지 않는다). 펼칠 때 상세를 한 번 부르고 기억해 둔다 —
+          미리 다 받아 오면 안 펼칠 항목의 본문까지 내려받게 되고, 그건 목록에서 본문을 뺀 이유를
+          그대로 무너뜨린다.
+        */
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <ul className="divide-y divide-gray-100">
+            {posts.map((post) => (
+              <li key={post.id}>
+                <button
+                  onClick={() => void toggleFaq(post.id)}
+                  className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center gap-2"
+                  aria-expanded={expandedId === post.id}
+                >
+                  <span className="text-gray-400">{expandedId === post.id ? '▾' : '▸'}</span>
+                  <span className="font-medium text-gray-900">{post.title}</span>
+                </button>
+                {expandedId === post.id && (
+                  <div className="px-4 pb-4 pl-10 text-sm text-gray-700 whitespace-pre-wrap">
+                    {bodies[post.id] ?? '불러오는 중...'}
+                  </div>
+                )}
+              </li>
+            ))}
+            {posts.length === 0 && (
+              <li className="px-4 py-12 text-center text-gray-400 text-sm">
+                {search ? '검색 결과가 없습니다.' : '아직 등록된 항목이 없습니다.'}
+              </li>
+            )}
+          </ul>
+        </div>
       ) : (
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
         <ul className="divide-y divide-gray-100">
@@ -203,6 +263,16 @@ const BoardPage: React.FC = () => {
               className="px-4 py-3 cursor-pointer hover:bg-gray-50"
             >
               <div className="flex items-center gap-2">
+                {/* QNA 는 "답이 달렸는가"가 목록에서 가장 중요한 정보다 — 제목보다 먼저 온다 */}
+                {definition?.skin === 'QNA' && (
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${
+                    (post.commentCount ?? 0) > 0
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : 'bg-amber-100 text-amber-700'
+                  }`}>
+                    {(post.commentCount ?? 0) > 0 ? '답변완료' : '답변대기'}
+                  </span>
+                )}
                 {post.pinned && (
                   <span className="text-xs px-2 py-0.5 rounded-full bg-rose-100 text-rose-700">공지</span>
                 )}

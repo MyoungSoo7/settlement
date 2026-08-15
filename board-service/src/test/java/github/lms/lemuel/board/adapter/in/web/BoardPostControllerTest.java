@@ -3,6 +3,7 @@ package github.lms.lemuel.board.adapter.in.web;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import github.lms.lemuel.board.application.port.in.BoardPage;
 import github.lms.lemuel.board.application.port.in.BoardAttachmentUseCase;
+import github.lms.lemuel.board.application.port.in.BoardCommentUseCase;
 import github.lms.lemuel.board.application.port.in.ManagePostUseCase;
 import github.lms.lemuel.board.application.port.in.QueryBoardUseCase;
 import github.lms.lemuel.board.application.port.in.QueryPostUseCase;
@@ -70,6 +71,8 @@ class BoardPostControllerTest {
     QueryBoardUseCase queryBoardUseCase;
     @MockitoBean
     BoardAttachmentUseCase boardAttachmentUseCase;
+    @MockitoBean
+    BoardCommentUseCase boardCommentUseCase;
 
     @AfterEach
     void clear() {

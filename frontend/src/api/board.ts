@@ -136,6 +136,8 @@ export interface BoardPost {
   viewCount: number;
   /** 갤러리 목록용 대표 이미지. 이미지 첨부가 없으면 null — 화면이 자리표시를 그린다 */
   thumbnailUrl?: string | null;
+  /** 살아 있는 댓글 수. QNA 목록의 '답변 대기/완료' 배지가 이 값을 쓴다(목록 응답에만 채워진다) */
+  commentCount?: number;
   createdAt: string;
   updatedAt: string;
 }

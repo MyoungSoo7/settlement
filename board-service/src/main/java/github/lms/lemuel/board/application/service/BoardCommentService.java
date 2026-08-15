@@ -21,6 +21,7 @@ import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * 댓글 응용 서비스.
@@ -44,6 +45,17 @@ public class BoardCommentService implements BoardCommentUseCase {
         BoardDefinition definition = readableBoard(boardKey, actor);
         BoardPost post = visiblePost(definition, postId, actor);
         return loadBoardCommentPort.findByPostId(post.getId());
+    }
+
+    @Override
+    public Map<Long, Integer> countByPost(String boardKey, List<Long> postIds, BoardActor actor) {
+        BoardDefinition definition = readableBoard(boardKey, actor);
+        // 댓글이 꺼진 게시판은 셀 것이 없다 — 질의를 아예 내보내지 않는다.
+        if (postIds == null || postIds.isEmpty() || !definition.getContentPolicy().isCommentsEnabled()) {
+            return Map.of();
+        }
+        // 글 목록은 이미 가시성으로 걸러진 결과라 여기서 글별 판정을 다시 하지 않는다.
+        return loadBoardCommentPort.countPublishedByPostIds(postIds);
     }
 
     @Override

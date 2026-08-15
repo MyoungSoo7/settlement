@@ -4,6 +4,7 @@ import github.lms.lemuel.board.adapter.in.web.dto.BoardPageResponse;
 import github.lms.lemuel.board.adapter.in.web.dto.BoardPostRequest;
 import github.lms.lemuel.board.adapter.in.web.dto.BoardPostResponse;
 import github.lms.lemuel.board.application.port.in.BoardAttachmentUseCase;
+import github.lms.lemuel.board.application.port.in.BoardCommentUseCase;
 import github.lms.lemuel.board.application.port.in.ManagePostUseCase;
 import github.lms.lemuel.board.application.port.in.QueryBoardUseCase;
 import github.lms.lemuel.board.application.port.in.QueryPostUseCase;
@@ -46,6 +47,7 @@ public class BoardPostController {
     private final ManagePostUseCase managePostUseCase;
     private final QueryBoardUseCase queryBoardUseCase;
     private final BoardAttachmentUseCase boardAttachmentUseCase;
+    private final BoardCommentUseCase boardCommentUseCase;
 
     @Operation(summary = "게시글 목록", description = "고정 글이 먼저, 그다음 최신순. 본문은 싣지 않는다.")
     @GetMapping
@@ -65,9 +67,13 @@ public class BoardPostController {
         List<Long> postIds = result.content().stream().map(BoardPost::getId).toList();
         Map<Long, BoardAttachment> thumbnails =
                 boardAttachmentUseCase.firstImageByPost(boardKey, postIds, actor);
+        // 댓글 수도 같은 이유로 한 번에 — QNA 목록의 '답변 대기/완료' 배지가 이 값을 쓴다.
+        Map<Long, Integer> commentCounts = boardCommentUseCase.countByPost(boardKey, postIds, actor);
 
         return ResponseEntity.ok(BoardPageResponse.from(result, post -> BoardPostResponse.summary(
-                post, actor, canManage, thumbnailUrl(boardKey, thumbnails.get(post.getId())))));
+                post, actor, canManage,
+                thumbnailUrl(boardKey, thumbnails.get(post.getId())),
+                commentCounts.getOrDefault(post.getId(), 0))));
     }
 
     @Operation(summary = "게시글 상세", description = "조회수가 증가한다. 볼 수 없는 글은 404.")
