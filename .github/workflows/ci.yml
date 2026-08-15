@@ -344,7 +344,19 @@ jobs:
           path: artifacts
 
       # 모듈 잡에서 올라온 리포트를 원래 경로로 되돌린다. 아티팩트 이름의 접미사가 모듈명이다.
+      #
+      # 가드를 "0개면 실패"에서 **집합 대조**로 올렸다 (2026-08-15).
+      #   전에는 count -eq 0 만 봤기 때문에 *부분* 유실이 조용히 통과했다. 그런데 Sonar 는 리포트가
+      #   없는 모듈을 건너뛰지 않고 0% 로 집계한다 — develop 분석 2026-08-15T07:52 실측에서
+      #   17개 중 11개가 0% 로 들어가 전체 coverage 57.7%, 품질 게이트 ERROR 가 됐다.
+      #   이제 두 집합을 갈라 본다:
+      #     ① 돌았어야 하는데 리포트가 없다(expected − restored) → 아티팩트 배선 결함 → 실패
+      #     ② 애초에 안 돌았다(all − expected)                  → 정상. 이번 실행 커버리지 집계에서
+      #        제외되며(build.gradle.kts 의 sonar.coverage.exclusions), 어느 모듈이 빠졌는지 남긴다.
       - name: Restore report paths
+        env:
+          TEST_MATRIX: ${{ needs.changes.outputs.test_matrix }}
+          TEST_RESULT: ${{ needs.backend-test.result }}
         run: |
           set -euo pipefail
           shopt -s nullglob
@@ -353,12 +365,31 @@ jobs:
             mkdir -p "$module/build/reports"
             cp -r "$dir/." "$module/build/reports/"
           done
-          count=$(ls -1 */build/reports/jacoco/test/jacocoTestReport.xml 2>/dev/null | wc -l)
-          echo "복원된 커버리지 XML: ${count}개"
-          # 0 개면 Sonar 커버리지가 조용히 0% 로 잡히고 PR 코멘트도 빈손이 된다 — 침묵시키지 않는다.
-          if [ "$count" -eq 0 ] && [ "${{ needs.backend-test.result }}" = "success" ]; then
-            echo "::error::모듈 테스트는 통과했는데 커버리지 XML 이 하나도 복원되지 않았다 — 아티팩트 배선을 확인할 것"
+
+          restored=$(ls -1 */build/reports/jacoco/test/jacocoTestReport.xml 2>/dev/null | cut -d/ -f1 | sort -u || true)
+          # 모듈 로스터 정본은 settings.gradle.kts (harness-audit 의 ci-matrix 규칙과 같은 출처)
+          all=$(sed -n '/^include(/,/^)/p' settings.gradle.kts | grep -oE '"[a-z-]+-service"' | tr -d '"' | sort -u)
+          # jq 실패를 2>/dev/null 로 삼키지 않는다 — 삼키면 expected 가 비어 대조가 통째로 무력화되고
+          # 가드가 "이상 없음"으로 오판한다(정확히 이 가드가 없애려는 실패 양식이다).
+          if [ -n "${TEST_MATRIX:-}" ]; then
+            expected=$(printf '%s' "$TEST_MATRIX" | jq -r '.include[].module' | sort -u)
+          else
+            expected=""
+          fi
+
+          echo "복원된 커버리지 XML: $(echo "$restored" | grep -c . || true)개"
+          echo "  restored: $(echo "$restored" | tr '\n' ' ')"
+          echo "  expected: $(echo "$expected" | tr '\n' ' ')"
+
+          missing=$(comm -23 <(echo "$expected") <(echo "$restored") | grep . || true)
+          if [ -n "$missing" ] && [ "$TEST_RESULT" = "success" ]; then
+            echo "::error::테스트는 통과했는데 커버리지 XML 이 복원되지 않은 모듈이 있다 — 아티팩트 배선을 확인할 것: $(echo "$missing" | tr '\n' ' ')"
             exit 1
+          fi
+
+          uncovered=$(comm -23 <(echo "$all") <(echo "$restored") | grep . || true)
+          if [ -n "$uncovered" ]; then
+            echo "::notice title=커버리지 미측정 모듈::이번 실행에서 테스트가 돌지 않아 Sonar 커버리지 집계에서 제외된다(0% 오보고 방지): $(echo "$uncovered" | tr '\n' ' ')"
           fi
 
       - name: Add coverage comment to PR
