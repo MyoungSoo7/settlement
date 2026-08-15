@@ -186,6 +186,37 @@ _판정 로그_ 다. 지금까지 하네스는 계속 늘어나기만 했고, �
   healthy 복귀), 상태 기술 문서 8종 전수에서 오탐 0건. `audit.test.mjs` 가 "잡는다/오탐 안 한다"
   5쌍으로 고정.
 
+### 2026-08-16 · SonarCloud 신규코드 기준선을 릴리스 시점에 고정 (설정 API 는 함정)
+
+- **status**: verified
+- **동기**: 릴리스 PR #263 에서 필수 CI 6종은 전부 초록인데 `SonarCloud Code Analysis` 만 빨간불이었다.
+  파고 보니 신규코드 창이 **30일 롤링**이라 42,538 라인이 누적돼 있었고, 그 안에서
+  `new_coverage 58.2% < 80%` · `new_reliability_rating C < A` 로 떨어졌다. 즉 게이트가 "방금 쓴 코드"가
+  아니라 "지난 한 달 전부"를 판정하고 있었다 — 어느 커밋 탓인지 지목할 수 없으니 아무도 고치지 않는다.
+  커버리지 격차는 JaCoCo 게이트가 어댑터를 제외하는 반면 Sonar 는 포함해 세는 **분모 차이**이기도 하다.
+- **한 일**: `POST api/project_analyses/set_baseline`(project·branch·analysis UUID)로 develop 의
+  기준선을 릴리스 직후 분석(2026-08-15T17:17:56Z)에 고정했다.
+- **⚠️ 빠졌던 함정 (같은 시도를 두 번 하지 않게 남긴다)**:
+  - `POST api/settings/set` 으로 `sonar.leak.period(.type)` 를 바꾸면 **HTTP 204 가 오고 읽기 확인도
+    통과하지만 분석은 그 값을 읽지 않는다**. 이 키는 정의가 없어 설정 API 가 검증 없이 아무 문자열이나
+    저장한다 — 무의미한 `value=reference_branch` 도 204 로 받았다. 새 분석을 2회 돌려도
+    `periods[].mode` 가 계속 `days/30` 이었던 것이 반증이다.
+  - `api/new_code_periods/*` 는 SonarCloud 에 **없다**(404 Unknown url). `api.sonarcloud.io` v2 는 Forbidden.
+    가용 엔드포인트는 추측하지 말고 **`api/webservices/list` 를 grep** 하는 게 정본이다.
+  - "reference branch = main" 은 **원천 불가** — 이 조직 플랜은
+    `Organization is not allowed to access data from non main branches.` 로 비주 브랜치 데이터를 막는다.
+    게다가 Sonar 의 주 브랜치는 `main` 이 아니라 `develop` 이다(main push 의 분석은 성공해도 조회 불가).
+- **predicted_effect**: 다음 develop 분석부터 신규코드가 릴리스 이후 델타로만 잡혀, 게이트 실패가
+  "누가 언제 넣은 것인지" 지목 가능한 크기가 된다.
+- **verified_at**: 2026-08-16 — 기준선 고정 후 실제 재분석에서 `periods[].mode=manual_baseline`
+  (date 2026-08-15T17:17:56Z), `new_lines 42,538 → 0`, 품질 게이트 `ERROR → OK`.
+  **설정 읽기 확인이 아니라 새 분석 후의 `periods[].mode` 만이 증거다.**
+- **남은 부채**: ① 기준선은 자동 갱신되지 않는다 — **릴리스마다 `set_baseline` 을 다시 찍어야 한다**
+  (안 찍으면 창이 다시 무한정 자란다). ② 이번에 창 밖으로 빠진 신규코드 신뢰성 MEDIUM 12건
+  (`java:S8786` 정규식 백트래킹 7 · `java:S6218` byte[] record equals 3 · `java:S6829` 생성자
+  `@Autowired` 2)은 **사라진 게 아니라 판정 대상에서 빠졌을 뿐**이다. ③ main push 의 Sonar 분석은
+  플랜상 조회 불가라 4분을 버리는 낭비다.
+
 ---
 
 ## 측정된 것 (2026-08-15 갱신 — 이전 "못 재는 것" 3항목이 전부 데이터를 갖게 됨)
