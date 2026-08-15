@@ -192,7 +192,7 @@ describe('BoardPostPage — 글 조작 (버튼은 서버 힌트로만 그린다)
     fireEvent.click(inArticle().getByRole('button', { name: '삭제' }));
 
     await waitFor(() => expect(mockedPost.remove).not.toHaveBeenCalled());
-    expect(screen.getByRole('heading', { name: '배송이 늦습니다' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: '배송이 늦습니다' })).toBeInTheDocument();
   });
 
   it('삭제 실패는 목록으로 보내지 않고 사유를 남긴다', async () => {
