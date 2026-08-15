@@ -139,7 +139,7 @@ describe('MyPage — 리뷰', () => {
     await userEvent.click(screen.getByRole('button', { name: '내 리뷰' }));
 
     await waitFor(() => expect(mockedReview.getUserReviews).toHaveBeenCalledTimes(2));
-    expect(screen.getByText('좋아요')).toBeInTheDocument();
+    expect(await screen.findByText('좋아요')).toBeInTheDocument();
   });
 
   it('리뷰가 없으면 안내 문구를 보여 준다', async () => {

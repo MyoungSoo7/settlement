@@ -200,7 +200,7 @@ describe('AiChatPage — 전송', () => {
     await waitFor(() => expect(mocked.conversations).toHaveBeenCalledTimes(2));
 
     await type('이어서');
-    await userEvent.click(screen.getByRole('button', { name: '보내기' }));
+    await userEvent.click(await screen.findByRole('button', { name: '보내기' }));
 
     await waitFor(() =>
       expect(mocked.chatStream).toHaveBeenLastCalledWith('이어서', 'c-9', expect.any(Function)),

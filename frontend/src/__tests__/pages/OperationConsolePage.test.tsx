@@ -183,7 +183,7 @@ describe('OperationConsolePage — 필터·페이지', () => {
     fireEvent.change(selects[1], { target: { value: 'CRITICAL' } });
     await waitFor(() => expect(mocked.search).toHaveBeenCalledTimes(2));
 
-    fireEvent.click(screen.getByRole('button', { name: '필터 초기화' }));
+    fireEvent.click(await screen.findByRole('button', { name: '필터 초기화' }));
 
     await waitFor(() => expect(mocked.search).toHaveBeenLastCalledWith({ page: 0, size: 20 }));
   });

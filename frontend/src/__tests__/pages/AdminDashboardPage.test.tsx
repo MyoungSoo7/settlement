@@ -213,8 +213,8 @@ describe('AdminDashboardPage — 주문 관리', () => {
     await userEvent.click(screen.getByRole('button', { name: '취소' }));
 
     await waitFor(() => expect(mockedOrder.cancelOrder).toHaveBeenCalledWith(1));
-    // '취소됨'은 상태 필터 버튼에도 있으므로 그 주문 행 안에서 확인한다
-    const row = screen.getByText('#1').closest('tr') as HTMLElement;
+    // '취소됨'은 상태 필터 버튼에도 있으므로 그 주문 행 안에서 확인한다 (findBy — 갱신 렌더 경합 방지)
+    const row = (await screen.findByText('#1')).closest('tr') as HTMLElement;
     expect(await within(row).findByText('취소됨')).toBeInTheDocument();
   });
 
