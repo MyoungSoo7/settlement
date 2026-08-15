@@ -1,7 +1,7 @@
 # board-service 설계 — 메타 주도 게시판 플랫폼
 
 > 대상: 신규 마이크로서비스 `board-service` (8114/mgmt 8115, `lemuel_board`).
-> 상태: **Phase 2 구현 완료**(정의 CRUD + 게시글·댓글 + LIST 스킨). Phase 3~4 는 §9 참조.
+> 상태: **Phase 2 구현 완료**(정의 CRUD + 게시글·댓글 + LIST 스킨 + HTML 본문 sanitize). Phase 3~4 는 §9 참조.
 > 정본: 이 문서 = 설계 근거, 강제 규칙 = `board-domain-rules` 스킬, 기능 명세 = `SPEC.md` §3.17.
 
 ---
@@ -240,7 +240,7 @@ definition.canManage(role)   // 게시판 단위 운영(고정·숨김) — 게�
 - 확장자 화이트리스트 + **매직바이트 검증**(확장자만 믿으면 안 된다)
 - SVG 업로드 차단 또는 sanitize(스크립트 실행 벡터)
 - 저장 파일명은 서버 생성 UUID — 경로 traversal 원천 차단
-- `content_format=HTML` 게시판은 **서버측 sanitize 필수**(게시판 도입 시 가장 흔한 사고가 XSS)
+- ~~`content_format=HTML` 게시판은 **서버측 sanitize 필수**~~ → **Phase 2 에서 선행 구현**(§13)
 
 ---
 
@@ -250,7 +250,7 @@ definition.canManage(role)   // 게시판 단위 운영(고정·숨김) — 게�
 | --- | --- | --- |
 | **1** ✅ | 서비스 골격 + `BoardDefinition` 도메인·CRUD·관리 화면. 게시판을 만들 수는 있으나 글은 없다 | `:board-service:test` + JaCoCo LINE 90%, 직접·gateway 200 실측, `harness-audit` 통과 |
 | **2** ✅ | `BoardPost`/`BoardComment` + LIST 스킨 + 인가 정책 | IDOR 테스트(소유권 대조가 도메인 안에 있음), 비밀글·숨김 가시성 테스트, 목록 조건 번역 테스트 |
-| 3 | 첨부·이미지 + GALLERY 스킨 | 매직바이트·traversal·XSS 테스트 |
+| 3 | 첨부·이미지 + GALLERY 스킨 | 매직바이트·traversal 테스트 (XSS 는 Phase 2 로 앞당겨 완료) |
 | 4 | FAQ/QNA 스킨 + 메뉴 대조 배지 + 검색 | 고아 메뉴 대조 화면 |
 
 ---
@@ -288,3 +288,34 @@ definition.canManage(role)   // 게시판 단위 운영(고정·숨김) — 게�
   쌓이기 전에 걸어야 한다.
 - **스킨 렌더는 Phase 3 까지 LIST 로 떨어뜨린다.** GALLERY/FAQ/QNA 전용 컴포넌트는 첨부가 붙은
   뒤에 만든다 — 렌더되지 않는 화면보다 목록형으로라도 보이는 편이 낫다.
+
+---
+
+## 13. sanitize 를 Phase 3 에서 앞당긴 이유
+
+Phase 2 종료 시점의 실측: 저장소에 `dangerouslySetInnerHTML` 이 한 곳도 없고 본문은 React 텍스트
+자식으로 렌더돼 이스케이프된다 — **당장의 실행 위험은 0** 이었다. 그런데도 앞당긴 이유는 긴급성이
+아니라 순서 비용이다.
+
+1. **위험은 실행이 아니라 축적에 있다.** 오늘 안전한 건 데이터가 깨끗해서가 아니라 렌더러가
+   이스케이프해서다. 그 사이 `<img src=x onerror=...>` 는 `board_posts.content` 에 원문 그대로
+   쌓이고, 나중에 HTML 렌더를 켜는 **한 줄**이 그동안 쌓인 모든 행을 동시에 발화시킨다.
+2. **미루면 백필이 되는데, 그건 되돌릴 수 없다.** 쓰기 시점 정화는 경계 하나면 끝이지만, 쌓인 뒤에
+   하려면 사용자가 쓴 글을 서버가 임의로 고쳐야 하고 무엇이 공격이고 무엇이 정당한 마크업인지
+   사후에는 판정할 수 없다. `POSTED` 전표를 수정하지 않고 역분개만 하는 것과 같은 이유다.
+3. **훅만 있고 구현이 없는 상태가 가장 위험하다.** 도메인에 `requiresSanitize()` 가 이미 있어서
+   다음 사람은 "저장된 건 정화됐겠지"라고 더 강하게 가정한다.
+4. **Phase 3 과 결이 다르다.** 첨부는 바이너리 경로(매직바이트·traversal·썸네일), sanitize 는 텍스트
+   경로다. 묶으면 리뷰 초점이 흩어지고 보통 더 지루한 쪽이 대충 처리된다.
+
+구현: `SanitizeHtmlPort`(응용 포트) ← `JsoupHtmlSanitizerAdapter`(jsoup `Safelist.relaxed()`,
+화이트리스트). **판단은 도메인**(`BoardContentPolicy.requiresSanitize()`), **수행은 어댑터**,
+둘을 잇는 곳은 `BoardContentSanitizer` 하나뿐이고 작성·수정 두 경로가 모두 지난다 —
+한쪽만 막으면 "수정으로 심는" 우회가 남는다.
+
+**MARKDOWN 은 정화하지 않는다.** 마크다운 원문을 HTML 정화기에 넣으면 코드 블록 안의 정당한 예시
+태그까지 사라진다. 대신 마크다운 렌더러가 raw HTML 을 끄는 것이 계약이다(프론트 책임). 댓글도
+HTML 렌더 경로가 없는 평문이라 정화 대상이 아니다.
+
+프론트는 `contentFormat === 'HTML'` 일 때만 마크업으로 렌더한다. 이 분기를 다른 형식으로 넓히면
+정화를 거치지 않은 원문이 그대로 실행된다.

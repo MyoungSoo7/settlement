@@ -385,7 +385,11 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
   — 원문은 신고·감사 대응을 위해 DB 에만 남는다. 숨김(HIDDEN, 운영자가 되돌릴 수 있음)과 삭제(작성자 의사)를 가른다.
 - **가시성은 질의 조건으로 번역**한다(`PostSearchCriteria`) — 페이지를 읽고 자바에서 걸러 내면
   총건수와 페이지 크기가 어긋난다. 동적 조건은 Specification 으로 만든다(`:param IS NULL OR` JPQL 은 PG bytea 트랩).
-- **Phase 2 범위**: 정의 CRUD + 게시글·댓글 + LIST 스킨(`/boards/:boardKey`, `/boards/:boardKey/:postId`).
+- **HTML 본문은 저장 시점에 정화**한다(`SanitizeHtmlPort` ← jsoup `Safelist.relaxed()` 화이트리스트).
+  작성·수정 두 경로가 모두 `BoardContentSanitizer` 를 지난다 — 한쪽만 막으면 수정으로 심는 우회가 남는다.
+  MARKDOWN·댓글은 대상이 아니다(코드 블록의 정당한 태그까지 지워지고, 댓글은 HTML 렌더 경로가 없다).
+- **Phase 2 범위**: 정의 CRUD + 게시글·댓글 + LIST 스킨(`/boards/:boardKey`, `/boards/:boardKey/:postId`)
+  + HTML 본문 sanitize(Phase 3 에서 앞당김 — 사유는 설계문서 §13).
   첨부·GALLERY 스킨은 Phase 3. 그때까지 다른 스킨은 목록형으로 렌더한다.
 
 ### 3.18 gateway-service — API Gateway (port 8080)

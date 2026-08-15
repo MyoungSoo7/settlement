@@ -182,7 +182,24 @@ const BoardPostPage: React.FC = () => {
               </div>
             </header>
 
-            <div className="whitespace-pre-wrap text-gray-800 leading-relaxed">{post.content}</div>
+            {/*
+              HTML 게시판만 마크업으로 렌더한다. 이것이 안전한 근거는 **서버가 저장 시점에 정화**하기
+              때문이다(JsoupHtmlSanitizerAdapter — 화이트리스트 방식이라 script·on* 이벤트·javascript:
+              프로토콜이 DB 에 들어가지 못한다). 클라이언트 정화에 기대지 않는 이유는 간단하다:
+              화면은 여러 개가 될 수 있고(모바일·이메일 다이제스트·PDF), 정화가 화면마다 복제되면
+              반드시 한 곳이 빠진다. 경계는 쓰기 한 곳이다.
+
+              그래서 이 분기를 다른 형식으로 넓히지 말 것 — TEXT·MARKDOWN 본문은 정화를 거치지 않으므로
+              마크업으로 렌더하는 순간 저장된 원문이 그대로 실행된다.
+            */}
+            {post.contentFormat === 'HTML' ? (
+              <div
+                className="text-gray-800 leading-relaxed board-html"
+                dangerouslySetInnerHTML={{ __html: post.content ?? '' }}
+              />
+            ) : (
+              <div className="whitespace-pre-wrap text-gray-800 leading-relaxed">{post.content}</div>
+            )}
 
             {post.editable && (
               <div className="flex gap-2 pt-2 border-t border-gray-100 text-sm">

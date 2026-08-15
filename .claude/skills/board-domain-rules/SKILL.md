@@ -72,6 +72,20 @@ definition.canRead(role) / canWrite(role) / canComment(role) / canManage(role)
   `bytea` 비교 오류를 낸 전력이 있다.
 - 목록 페이지 크기는 **상한 100**(`PostListQuery`). 없으면 한 방에 게시판 전체를 덤프할 수 있다.
 
+## 2-2. 본문 정화 (XSS)
+
+- **정화는 저장 시점 한 곳**(`BoardContentSanitizer`)에서만 한다. 작성·수정 두 경로가 모두 지나야
+  한다 — 한쪽만 막으면 "수정으로 심는" 우회가 남는다. 새 쓰기 경로를 만들면 여기를 지나게 할 것.
+- **판단은 도메인, 수행은 어댑터**: `BoardContentPolicy.requiresSanitize()` 가 여부를 답하고,
+  `SanitizeHtmlPort` 구현이 방법을 안다. 무엇이 위험한 태그인지는 바깥 세상의 지식이라 도메인에 두지 않는다.
+- **화이트리스트만**(jsoup `Safelist`). 블랙리스트는 `<svg/onload=>` 같은 조합형 우회를 따라잡지 못한다.
+- **HTML 만 정화한다.** MARKDOWN 원문을 HTML 정화기에 넣으면 코드 블록의 정당한 예시 태그까지
+  사라진다 — 마크다운은 렌더러가 raw HTML 을 끄는 것이 계약이다(프론트 책임). 댓글은 HTML 렌더
+  경로가 없는 평문이라 대상이 아니다.
+- **렌더 시점 정화로 미루지 말 것.** 원문을 쌓아 두면 나중에 HTML 렌더를 켜는 한 줄이 그동안
+  쌓인 모든 행을 동시에 발화시킨다. 사후 백필은 사용자가 쓴 글을 서버가 임의로 고치는 일이 된다.
+- 프론트는 `contentFormat === 'HTML'` 일 때만 마크업으로 렌더한다. 이 분기를 넓히지 말 것.
+
 ## 3. 라이프사이클
 
 - **게시판 키(`boardKey`)는 불변**이다. URL 이자 메뉴 행이 가리키는 값이라 바꾸면 이미 나간 링크가
@@ -112,5 +126,5 @@ definition.canRead(role) / canWrite(role) / canComment(role) / canManage(role)
 - 응용·웹 계층에서 스킨·첨부·역할 규칙 재검사 (규칙 이원화)
 - `rehydrate` 경로에서 재검증 — 정책이 강화되면 **기존 게시판 조회 자체가 죽는다**
 - `permissions` 테이블·order DB 조회, Kafka 토픽 추가, `menus` 직접 쓰기
-- HTML 게시판 본문 sanitize 누락(Phase 3) — 게시판 도입 시 가장 흔한 사고가 XSS
+- 정화를 우회하는 쓰기 경로 추가 — 새 쓰기 경로는 반드시 `BoardContentSanitizer` 를 지나야 한다
 - 첨부 확장자만 믿는 검증 — 매직바이트 검사가 정본(Phase 3)

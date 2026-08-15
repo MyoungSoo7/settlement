@@ -39,6 +39,7 @@ public class BoardPostService implements ManagePostUseCase, QueryPostUseCase {
     private final LoadBoardDefinitionPort loadBoardDefinitionPort;
     private final LoadBoardPostPort loadBoardPostPort;
     private final SaveBoardPostPort saveBoardPostPort;
+    private final BoardContentSanitizer contentSanitizer;
     private final Clock clock;
 
     @Override
@@ -46,7 +47,8 @@ public class BoardPostService implements ManagePostUseCase, QueryPostUseCase {
     public BoardPost create(String boardKey, BoardActor actor, BoardAuthor author, PostContentCommand command) {
         BoardDefinition definition = readableBoard(boardKey, actor);
         BoardPost post = BoardPost.create(definition, actor, author,
-                command.title(), command.content(), command.categoryCode(), command.secret(), now());
+                command.title(), contentSanitizer.sanitize(definition, command.content()),
+                command.categoryCode(), command.secret(), now());
         return saveBoardPostPort.save(post);
     }
 
@@ -55,7 +57,8 @@ public class BoardPostService implements ManagePostUseCase, QueryPostUseCase {
     public BoardPost edit(String boardKey, Long postId, BoardActor actor, PostContentCommand command) {
         BoardDefinition definition = readableBoard(boardKey, actor);
         BoardPost post = postOf(definition, postId);
-        post.edit(actor, definition, command.title(), command.content(),
+        // 수정도 작성과 같은 정화를 거친다 — 한쪽만 정화하면 "수정으로 심는" 우회 경로가 남는다.
+        post.edit(actor, definition, command.title(), contentSanitizer.sanitize(definition, command.content()),
                 command.categoryCode(), command.secret(), now());
         return saveBoardPostPort.save(post);
     }

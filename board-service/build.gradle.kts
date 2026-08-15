@@ -30,6 +30,10 @@ dependencies {
     implementation("org.flywaydb:flyway-database-postgresql")
     implementation("org.springframework.boot:spring-boot-flyway")
 
+    // HTML 게시판 본문 sanitize — 저장 시점 정화의 유일한 구현체(JsoupHtmlSanitizerAdapter).
+    // Boot 4 BOM 은 jsoup 버전을 관리하지 않는다(3.x 와 다름) — 직접 고정한다.
+    implementation("org.jsoup:jsoup:1.18.3")
+
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.2")
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
     runtimeOnly("org.postgresql:postgresql:42.7.3")

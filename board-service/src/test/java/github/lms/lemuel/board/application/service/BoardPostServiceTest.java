@@ -6,6 +6,7 @@ import github.lms.lemuel.board.application.port.in.QueryPostUseCase.PostListQuer
 import github.lms.lemuel.board.application.port.out.LoadBoardDefinitionPort;
 import github.lms.lemuel.board.application.port.out.LoadBoardPostPort;
 import github.lms.lemuel.board.application.port.out.PostSearchCriteria;
+import github.lms.lemuel.board.application.port.out.SanitizeHtmlPort;
 import github.lms.lemuel.board.application.port.out.SaveBoardPostPort;
 import github.lms.lemuel.board.domain.BoardAccessPolicy;
 import github.lms.lemuel.board.domain.BoardActor;
@@ -58,13 +59,15 @@ class BoardPostServiceTest {
     private LoadBoardPostPort loadBoardPostPort;
     @Mock
     private SaveBoardPostPort saveBoardPostPort;
+    @Mock
+    private SanitizeHtmlPort sanitizeHtmlPort;
 
     private BoardPostService service;
 
     @BeforeEach
     void setUp() {
         service = new BoardPostService(loadBoardDefinitionPort, loadBoardPostPort, saveBoardPostPort,
-                Clock.fixed(FIXED, ZoneOffset.UTC));
+                new BoardContentSanitizer(sanitizeHtmlPort), Clock.fixed(FIXED, ZoneOffset.UTC));
     }
 
     private static BoardDefinition definition(Long id, List<String> readRoles, boolean active) {
@@ -226,5 +229,44 @@ class BoardPostServiceTest {
 
         service.delete("notice", 5L, AUTHOR);
         verify(saveBoardPostPort, org.mockito.Mockito.times(5)).save(any());
+    }
+    @Test
+    @DisplayName("HTML 게시판은 작성 시점에 본문을 정화해 저장한다")
+    void sanitizesOnCreate() {
+        when(loadBoardDefinitionPort.findByKey("notice"))
+                .thenReturn(Optional.of(htmlDefinition()));
+        when(sanitizeHtmlPort.sanitize("<script>x</script>본문")).thenReturn("본문");
+        when(saveBoardPostPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        BoardPost created = service.create("notice", AUTHOR, AUTHOR_NAME,
+                new PostContentCommand("제목", "<script>x</script>본문", null, false));
+
+        assertThat(created.getContent()).isEqualTo("본문");
+    }
+
+    @Test
+    @DisplayName("수정도 같은 정화를 거친다 — 한쪽만 막으면 '수정으로 심는' 우회가 남는다")
+    void sanitizesOnEdit() {
+        when(loadBoardDefinitionPort.findByKey("notice"))
+                .thenReturn(Optional.of(htmlDefinition()));
+        when(loadBoardPostPort.findById(5L))
+                .thenReturn(Optional.of(post(5L, 1L, false, BoardPostStatus.PUBLISHED)));
+        when(sanitizeHtmlPort.sanitize("<img src=x onerror=alert(1)>")).thenReturn("");
+
+        assertThatThrownBy(() -> service.edit("notice", 5L, AUTHOR,
+                new PostContentCommand("제목", "<img src=x onerror=alert(1)>", null, false)))
+                .isInstanceOf(github.lms.lemuel.board.domain.exception.BoardInvariantViolationException.class);
+
+        // 정화 결과가 빈 본문이면 도메인이 거부한다 — 정화가 통째로 지워 낸 글이 조용히 저장되지 않는다.
+        verify(sanitizeHtmlPort).sanitize("<img src=x onerror=alert(1)>");
+    }
+
+    private static BoardDefinition htmlDefinition() {
+        return BoardDefinition.rehydrate(1L, "notice", "공지", null, BoardSkin.LIST,
+                BoardContentPolicy.rehydrate(BoardContentFormat.HTML, true, true, null),
+                BoardAttachmentPolicy.disabled(),
+                BoardAccessPolicy.rehydrate(List.of(), List.of("USER", "ADMIN"), List.of("USER"),
+                        List.of("ADMIN")),
+                true, NOW, NOW);
     }
 }
