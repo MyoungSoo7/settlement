@@ -54,6 +54,13 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testImplementation("org.mockito:mockito-core")
     testImplementation("com.tngtech.archunit:archunit-junit5:1.4.1")
+
+    // 부팅 IT — 실 PostgreSQL 에 Flyway 체인을 적용하고 ddl-auto:validate 로 매핑 드리프트를 잡는다.
+    // 이게 없으면 마이그레이션과 엔티티가 어긋나도 단위 테스트는 전부 초록이다(가짜 GREEN 경로).
+    testImplementation(platform("org.testcontainers:testcontainers-bom:1.21.4"))
+    testImplementation("org.testcontainers:junit-jupiter")
+    testImplementation("org.testcontainers:postgresql")
+    testImplementation("org.springframework.boot:spring-boot-testcontainers")
 }
 
 val mockitoAgent = configurations.create("mockitoAgent")
