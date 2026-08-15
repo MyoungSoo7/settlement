@@ -42,7 +42,9 @@ const BoardPostPage: React.FC = () => {
       // 댓글이 꺼진 게시판이면 호출 자체를 하지 않는다 — 서버는 어차피 빈 목록을 주지만
       // 없는 기능을 위해 왕복을 늘릴 이유가 없다.
       setComments(def.content.commentsEnabled ? await boardCommentApi.list(boardKey, id) : []);
-      setAttachments(def.attachment.enabled ? await boardAttachmentApi.list(boardKey, id) : []);
+      // 첨부는 상세 응답이 이미 싣고 온다 — 왕복을 하나 줄이고, 게시판이 첨부를 꺼도
+      // 이미 붙은 파일이 화면에 도달한다(정책은 미래를 향하므로 기존 파일은 남는다).
+      setAttachments(detail.attachments ?? []);
       setError(null);
     } catch (e) {
       setError(apiErrorMessage(e, '글을 불러오지 못했습니다.'));
@@ -228,7 +230,12 @@ const BoardPostPage: React.FC = () => {
               <div className="whitespace-pre-wrap text-gray-800 leading-relaxed">{post.content}</div>
             )}
 
-            {definition?.attachment.enabled && (attachments.length > 0 || post.editable) && (
+            {/*
+              첨부 섹션은 **파일이 있으면 언제나** 보여 준다 — 게시판이 첨부를 껐다고 이미 붙은
+              파일을 감추면 데이터는 있는데 아무도 못 보는 상태가 되고, 직링크로는 여전히 받아져
+              화면과 서버가 어긋난다(설계문서 §16). 정책이 막는 것은 '새로 올리는 것'뿐이다.
+            */}
+            {(attachments.length > 0 || (definition?.attachment.enabled && post.editable)) && (
               <section className="pt-3 border-t border-gray-100 space-y-3">
                 {/* 이미지는 펼쳐 보여 준다 — 서버가 매직바이트로 IMAGE 라고 판정한 것만 kind 가 IMAGE 다 */}
                 {attachments.filter((a) => a.kind === 'IMAGE').map((image) => (
@@ -264,7 +271,8 @@ const BoardPostPage: React.FC = () => {
                   </ul>
                 )}
 
-                {post.editable && (
+                {/* 추가 버튼만 정책을 따른다 — 껐으면 새로 올릴 수 없고, 기존 파일은 위에 그대로 있다 */}
+                {definition?.attachment.enabled && post.editable && (
                   <label className="inline-flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
                     <span className="px-3 py-1.5 rounded border border-gray-300 hover:bg-gray-50">
                       {uploading ? '올리는 중...' : '첨부 추가'}

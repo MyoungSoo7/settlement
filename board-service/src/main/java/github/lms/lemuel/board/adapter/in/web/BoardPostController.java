@@ -1,5 +1,6 @@
 package github.lms.lemuel.board.adapter.in.web;
 
+import github.lms.lemuel.board.adapter.in.web.dto.BoardAttachmentResponse;
 import github.lms.lemuel.board.adapter.in.web.dto.BoardPageResponse;
 import github.lms.lemuel.board.adapter.in.web.dto.BoardPostRequest;
 import github.lms.lemuel.board.adapter.in.web.dto.BoardPostResponse;
@@ -81,7 +82,8 @@ public class BoardPostController {
     public ResponseEntity<BoardPostResponse> read(@PathVariable String boardKey, @PathVariable Long postId) {
         BoardActor actor = CurrentActor.resolve();
         BoardPost post = queryPostUseCase.read(boardKey, postId, actor);
-        return ResponseEntity.ok(BoardPostResponse.detail(post, actor, canManage(boardKey, actor)));
+        return ResponseEntity.ok(BoardPostResponse.detail(
+                post, actor, canManage(boardKey, actor), attachmentsOf(boardKey, postId, actor)));
     }
 
     @Operation(summary = "게시글 작성")
@@ -91,7 +93,7 @@ public class BoardPostController {
         BoardActor actor = CurrentActor.resolve();
         BoardPost post = managePostUseCase.create(boardKey, actor, CurrentActor.requireAuthor(), request.toCommand());
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(BoardPostResponse.detail(post, actor, canManage(boardKey, actor)));
+                .body(BoardPostResponse.detail(post, actor, canManage(boardKey, actor), List.of()));
     }
 
     @Operation(summary = "게시글 수정", description = "작성자 본인 또는 게시판 운영 역할만.")
@@ -100,7 +102,7 @@ public class BoardPostController {
                                                   @Valid @RequestBody BoardPostRequest request) {
         BoardActor actor = CurrentActor.resolve();
         BoardPost post = managePostUseCase.edit(boardKey, postId, actor, request.toCommand());
-        return ResponseEntity.ok(BoardPostResponse.detail(post, actor, canManage(boardKey, actor)));
+        return ResponseEntity.ok(BoardPostResponse.detail(post, actor, canManage(boardKey, actor), List.of()));
     }
 
     @Operation(summary = "게시글 삭제", description = "물리 삭제가 아니라 상태 전이다.")
@@ -116,7 +118,7 @@ public class BoardPostController {
                                                  @RequestParam(defaultValue = "true") boolean pinned) {
         BoardActor actor = CurrentActor.resolve();
         BoardPost post = managePostUseCase.changePinned(boardKey, postId, actor, pinned);
-        return ResponseEntity.ok(BoardPostResponse.detail(post, actor, canManage(boardKey, actor)));
+        return ResponseEntity.ok(BoardPostResponse.detail(post, actor, canManage(boardKey, actor), List.of()));
     }
 
     @Operation(summary = "글 숨김", description = "게시판 운영 역할만. 작성자에게도 보이지 않는다.")
@@ -124,7 +126,7 @@ public class BoardPostController {
     public ResponseEntity<BoardPostResponse> hide(@PathVariable String boardKey, @PathVariable Long postId) {
         BoardActor actor = CurrentActor.resolve();
         BoardPost post = managePostUseCase.hide(boardKey, postId, actor);
-        return ResponseEntity.ok(BoardPostResponse.detail(post, actor, canManage(boardKey, actor)));
+        return ResponseEntity.ok(BoardPostResponse.detail(post, actor, canManage(boardKey, actor), List.of()));
     }
 
     @Operation(summary = "숨김 해제")
@@ -132,7 +134,7 @@ public class BoardPostController {
     public ResponseEntity<BoardPostResponse> restore(@PathVariable String boardKey, @PathVariable Long postId) {
         BoardActor actor = CurrentActor.resolve();
         BoardPost post = managePostUseCase.restore(boardKey, postId, actor);
-        return ResponseEntity.ok(BoardPostResponse.detail(post, actor, canManage(boardKey, actor)));
+        return ResponseEntity.ok(BoardPostResponse.detail(post, actor, canManage(boardKey, actor), List.of()));
     }
 
     /**
@@ -143,6 +145,18 @@ public class BoardPostController {
      */
     private boolean canManage(String boardKey, BoardActor actor) {
         return queryBoardUseCase.getByKey(boardKey).canManage(actor.role());
+    }
+
+    /**
+     * 상세에 함께 실을 첨부 목록.
+     *
+     * <p>게시판이 첨부를 꺼도 <b>이미 붙은 것은 실어 보낸다</b> — 정책은 미래를 향하므로 새 업로드만
+     * 막히고 기존 파일은 남는다. 화면이 그걸 못 받으면 데이터는 있는데 아무도 못 보는 상태가 된다.
+     */
+    private List<BoardAttachmentResponse> attachmentsOf(String boardKey, Long postId, BoardActor actor) {
+        return boardAttachmentUseCase.listByPost(boardKey, postId, actor).stream()
+                .map(attachment -> BoardAttachmentResponse.from(attachment, boardKey))
+                .toList();
     }
 
     /**

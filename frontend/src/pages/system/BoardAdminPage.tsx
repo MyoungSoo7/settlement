@@ -429,6 +429,14 @@ const BoardAdminPage: React.FC = () => {
               </label>
             </div>
 
+            {editingId !== null && !form.attachmentsEnabled && (
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                첨부를 끄면 <b>새 업로드만</b> 막힙니다. 이미 붙은 파일은 남아 있고 글에서 그대로
+                보이며 다운로드도 됩니다 — 정책은 미래를 향합니다. 기존 파일을 없애려면 글에서
+                개별 삭제하세요.
+              </p>
+            )}
+
             {form.attachmentsEnabled && (
               <div className="grid grid-cols-3 gap-2">
                 <label className="block">

@@ -16,8 +16,13 @@ import {
  *       확장자로 판단하기 시작하면 서버의 매직바이트 판정과 두 개의 진실이 생긴다.</li>
  *   <li><b>실패 이유를 뭉개지 않는다</b> — "확장자와 다릅니다"·"최대 N개까지"는 사용자가 고칠 수 있는
  *       정보다. '업로드 실패'로 덮으면 그 정보가 사라진다.</li>
- *   <li><b>없는 기능에는 왕복을 쓰지 않는다</b> — 첨부가 꺼진 게시판에서는 목록 호출조차 나가지 않는다.</li>
+ *   <li><b>정책은 미래를 향한다</b> — 게시판이 첨부를 꺼도 이미 붙은 파일은 그대로 보이고
+ *       '추가' 버튼만 사라진다. 감추면 데이터는 있는데 아무도 못 보고, 직링크로는 여전히
+ *       받아져 화면과 서버가 어긋난다(G-6).</li>
  * </ol>
+ *
+ * <p>첨부는 상세 응답이 싣고 온다 — 목록을 따로 부르지 않아 왕복이 하나 줄고, 위 세 번째 항목이
+ * 자연스럽게 성립한다(정의의 플래그가 아니라 <b>실제 데이터</b>가 렌더를 정한다).
  */
 vi.mock('@/api/board', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/api/board')>();
@@ -50,6 +55,7 @@ const detail = (over: Partial<BoardPost> = {}): BoardPost => ({
   id: 7, boardId: 2, categoryCode: null, title: '봄 사진', content: '벚꽃입니다',
   contentFormat: 'TEXT', authorName: 'us***', mine: true, editable: true,
   pinned: false, secret: false, status: 'PUBLISHED', viewCount: 5, thumbnailUrl: null,
+  attachments: [],
   createdAt: '2026-08-15T09:00:00', updatedAt: '2026-08-15T09:00:00',
   ...over,
 });
@@ -89,7 +95,7 @@ describe('BoardPostPage — 첨부', () => {
   });
 
   it('이미지는 펼쳐 보여 주고 파일은 링크로 내려 준다 — 가르는 기준은 서버가 정한 kind 다', async () => {
-    mockedAttachment.list.mockResolvedValue([사진, 자료]);
+    mockedPost.read.mockResolvedValue(detail({ attachments: [사진, 자료] }));
 
     await renderPage();
 
@@ -101,13 +107,33 @@ describe('BoardPostPage — 첨부', () => {
     expect(screen.getByText('3KB')).toBeInTheDocument();
   });
 
-  it('첨부가 꺼진 게시판에서는 목록을 부르지 않는다 — 없는 기능에 왕복을 쓰지 않는다', async () => {
+  it('첨부는 상세 응답이 싣고 온다 — 목록을 따로 부르지 않는다(왕복 절약)', async () => {
+    mockedPost.read.mockResolvedValue(detail({ attachments: [사진] }));
+
+    await renderPage();
+
+    expect(await screen.findByRole('img', { name: '벚꽃.png' })).toBeInTheDocument();
+    expect(mockedAttachment.list).not.toHaveBeenCalled();
+  });
+
+  it('첨부를 꺼도 이미 붙은 파일은 그대로 보이고 추가 버튼만 사라진다 — 정책은 미래를 향한다', async () => {
+    // 껐다고 기존 파일을 감추면 데이터는 있는데 아무도 못 보고, 직링크로는 여전히 받아진다(G-6).
+    mockedBoard.get.mockResolvedValue(definition(false));
+    mockedPost.read.mockResolvedValue(detail({ attachments: [사진] }));
+
+    await renderPage();
+
+    expect(await screen.findByRole('img', { name: '벚꽃.png' })).toBeInTheDocument();
+    expect(screen.queryByText('첨부 추가')).not.toBeInTheDocument();
+  });
+
+  it('첨부가 꺼졌고 파일도 없으면 섹션 자체가 없다', async () => {
     mockedBoard.get.mockResolvedValue(definition(false));
 
     await renderPage();
 
-    expect(mockedAttachment.list).not.toHaveBeenCalled();
     expect(screen.queryByText('첨부 추가')).not.toBeInTheDocument();
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
   });
 
   it('정책 한도를 안내에 그대로 노출한다 — 올리기 전에 알 수 있게', async () => {
@@ -119,7 +145,7 @@ describe('BoardPostPage — 첨부', () => {
 
   it('파일을 고르면 업로드하고 목록을 다시 읽는다', async () => {
     mockedAttachment.upload.mockResolvedValue(사진);
-    mockedAttachment.list.mockResolvedValueOnce([]).mockResolvedValueOnce([사진]);
+    mockedAttachment.list.mockResolvedValue([사진]);
 
     await renderPage();
 
@@ -145,8 +171,7 @@ describe('BoardPostPage — 첨부', () => {
   });
 
   it('첨부 삭제 버튼은 글을 고칠 수 있을 때만 보인다', async () => {
-    mockedAttachment.list.mockResolvedValue([사진]);
-    mockedPost.read.mockResolvedValue(detail({ mine: false, editable: false }));
+    mockedPost.read.mockResolvedValue(detail({ mine: false, editable: false, attachments: [사진] }));
 
     await renderPage();
 
@@ -156,7 +181,8 @@ describe('BoardPostPage — 첨부', () => {
   });
 
   it('삭제하면 목록을 다시 읽는다', async () => {
-    mockedAttachment.list.mockResolvedValueOnce([사진]).mockResolvedValueOnce([]);
+    mockedPost.read.mockResolvedValue(detail({ attachments: [사진] }));
+    mockedAttachment.list.mockResolvedValue([]);
     mockedAttachment.remove.mockResolvedValue(undefined);
 
     await renderPage();

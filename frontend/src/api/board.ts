@@ -138,6 +138,13 @@ export interface BoardPost {
   thumbnailUrl?: string | null;
   /** 살아 있는 댓글 수. QNA 목록의 '답변 대기/완료' 배지가 이 값을 쓴다(목록 응답에만 채워진다) */
   commentCount?: number;
+  /**
+   * 상세 응답에만 실린다.
+   *
+   * 게시판이 첨부를 꺼도 **이미 붙은 첨부는 실려 온다** — 정책은 미래를 향하므로 새 업로드만
+   * 막히고 기존 파일은 남는다. 화면이 이걸 안 그리면 데이터는 있는데 아무도 못 보는 상태가 된다.
+   */
+  attachments?: BoardAttachment[];
   createdAt: string;
   updatedAt: string;
 }

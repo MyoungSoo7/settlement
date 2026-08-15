@@ -200,4 +200,33 @@ class BoardPostControllerTest {
         mockMvc.perform(delete("/api/boards/notice/posts/5")).andExpect(status().isNoContent());
         verify(managePostUseCase).delete(anyString(), any(), any());
     }
+    @Test
+    @DisplayName("상세는 첨부를 함께 싣는다 — 게시판이 첨부를 꺼도 이미 붙은 것은 실어 보낸다")
+    void detailCarriesAttachments() throws Exception {
+        when(queryBoardUseCase.getByKey(anyString())).thenReturn(definition());
+        when(queryPostUseCase.read(anyString(), any(), any())).thenReturn(samplePost());
+        when(boardAttachmentUseCase.listByPost(anyString(), any(), any())).thenReturn(List.of(
+                github.lms.lemuel.board.domain.BoardAttachment.rehydrate(9L, 5L, 1L,
+                        github.lms.lemuel.board.domain.BoardAttachmentKind.IMAGE, "벚꽃.png",
+                        "uuid.png", "board-1/post-5/uuid.png", null, "image/png", 2048, 0, NOW)));
+
+        mockMvc.perform(get("/api/boards/notice/posts/5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.attachments.length()").value(1))
+                .andExpect(jsonPath("$.attachments[0].originalName").value("벚꽃.png"))
+                .andExpect(jsonPath("$.attachments[0].downloadUrl")
+                        .value("/api/boards/notice/attachments/9/download"));
+    }
+
+    @Test
+    @DisplayName("목록에는 첨부를 싣지 않는다 — 한 쪽이 부풀지 않게")
+    void listOmitsAttachments() throws Exception {
+        when(queryBoardUseCase.getByKey(anyString())).thenReturn(definition());
+        when(queryPostUseCase.list(anyString(), any(), any()))
+                .thenReturn(BoardPage.of(List.of(samplePost()), 0, 20, 1));
+
+        mockMvc.perform(get("/api/boards/notice/posts"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].attachments.length()").value(0));
+    }
 }
