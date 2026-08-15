@@ -35,7 +35,7 @@ const spring: DisplaySection = {
 const renderPage = () => render(<ToastProvider><DisplaySectionAdminPage /></ToastProvider>);
 
 const openSection = async (name: string) => {
-  const row = screen.getByText(name).closest('tr')!;
+  const row = (await screen.findByText(name)).closest('tr')!;
   fireEvent.click(within(row).getByRole('button', { name: '열기' }));
   await waitFor(() => expect(mocked.items).toHaveBeenCalled());
 };
@@ -76,7 +76,8 @@ describe('DisplaySectionAdminPage', () => {
     await openSection('2026 여름 기획전');
 
     expect(mocked.items).toHaveBeenCalledWith('EXH_2026_SUMMER');
-    const rows = screen.getAllByTestId('section-item-row');
+    // items 호출 확인과 렌더 반영 사이에 상태 갱신 한 틱이 있다 — findAllBy 로 재시도 조회 (CI 플레이크 실측)
+    const rows = await screen.findAllByTestId('section-item-row');
     expect(within(rows[0]).getByText('101')).toBeInTheDocument();
     expect(within(rows[0]).getByText('고정')).toBeInTheDocument();
     expect(within(rows[1]).getByText('102')).toBeInTheDocument();
@@ -146,7 +147,7 @@ describe('DisplaySectionAdminPage', () => {
     await waitFor(() => expect(mocked.listAll).toHaveBeenCalled());
     await openSection('2026 여름 기획전');
 
-    const rows = screen.getAllByTestId('section-item-row');
+    const rows = await screen.findAllByTestId('section-item-row');
     fireEvent.click(within(rows[1]).getByRole('button', { name: '빼기' }));
 
     await waitFor(() => expect(mocked.removeItem).toHaveBeenCalledWith('EXH_2026_SUMMER', 102));
