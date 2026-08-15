@@ -19,6 +19,7 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -50,6 +51,7 @@ public class AnthropicChatAdapter implements ChatCompletionPort {
     private final AiChatProperties properties;
     private final AnthropicChatModel chatModel;   // 키 미설정 시 null
 
+    @Autowired
     public AnthropicChatAdapter(AiChatProperties properties) {
         this.properties = properties;
         if (properties.configured()) {

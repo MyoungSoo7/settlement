@@ -34,17 +34,20 @@ public class TextLayerTaxInvoiceOcrAdapter implements ExtractTaxInvoiceFieldsPor
     /** 결정적 파서의 신뢰도 — 추정이 아니라 정의다. */
     private static final BigDecimal DETERMINISTIC_CONFIDENCE = new BigDecimal("1.00");
 
+    // 인접한 \s* 가 하이픈·콜론 같은 선택적 구분자를 사이에 두고 같은 공백 구간을 재분배하며
+    // 재시도하면 슈퍼선형 백트래킹이 된다(SonarCloud java:S8786). possessive quantifier(*+, ?+)
+    // 는 한 번 소비한 뒤 되돌려주지 않아 재분배 자체를 없앤다 — 정상 입력의 매칭 결과는 동일하다.
     private static final Pattern SUPPLIER =
-            Pattern.compile("공급자[^0-9\\n]{0,20}(\\d{3}\\s*-?\\s*\\d{2}\\s*-?\\s*\\d{5})");
+            Pattern.compile("공급자[^0-9\\n]{0,20}(\\d{3}\\s*+-?+\\s*+\\d{2}\\s*+-?+\\s*+\\d{5})");
     private static final Pattern BUYER =
-            Pattern.compile("공급받는자[^0-9\\n]{0,20}(\\d{3}\\s*-?\\s*\\d{2}\\s*-?\\s*\\d{5})");
+            Pattern.compile("공급받는자[^0-9\\n]{0,20}(\\d{3}\\s*+-?+\\s*+\\d{2}\\s*+-?+\\s*+\\d{5})");
     private static final Pattern WRITTEN_DATE =
-            Pattern.compile("작성일자\\s*[:：]?\\s*(\\d{4})\\s*[-./]\\s*(\\d{1,2})\\s*[-./]\\s*(\\d{1,2})");
-    private static final Pattern SUPPLY = Pattern.compile("공급\\s*가액\\s*[:：]?\\s*([0-9,]+)");
-    private static final Pattern TAX = Pattern.compile("세\\s*액\\s*[:：]?\\s*([0-9,]+)");
+            Pattern.compile("작성일자\\s*+[:：]?+\\s*+(\\d{4})\\s*+[-./]\\s*+(\\d{1,2})\\s*+[-./]\\s*+(\\d{1,2})");
+    private static final Pattern SUPPLY = Pattern.compile("공급\\s*+가액\\s*+[:：]?+\\s*+([0-9,]+)");
+    private static final Pattern TAX = Pattern.compile("세\\s*+액\\s*+[:：]?+\\s*+([0-9,]+)");
     private static final Pattern TOTAL =
-            Pattern.compile("(?:합계\\s*금액|총\\s*액|합\\s*계)\\s*[:：]?\\s*([0-9,]+)");
-    private static final Pattern APPROVAL = Pattern.compile("승인번호\\s*[:：]?\\s*([A-Za-z0-9\\-]+)");
+            Pattern.compile("(?:합계\\s*+금액|총\\s*+액|합\\s*+계)\\s*+[:：]?+\\s*+([0-9,]+)");
+    private static final Pattern APPROVAL = Pattern.compile("승인번호\\s*+[:：]?+\\s*+([A-Za-z0-9\\-]+)");
 
     @Override
     public boolean isConfigured() {
