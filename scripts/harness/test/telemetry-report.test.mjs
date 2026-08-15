@@ -4,8 +4,9 @@ import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { canaryResults, runReportCli, runsReport } from '../telemetry-report.mjs';
+import { canaryResults, collectMergedLogs, runReportCli, runsReport } from '../telemetry-report.mjs';
 import { LOG_DIR_SEGMENTS, logGuardRun } from '../telemetry.mjs';
+import { runIdsFromListJson, runPullCli } from '../telemetry-ci-pull.mjs';
 
 const NOW = new Date('2026-07-22T09:00:00Z');
 
@@ -69,6 +70,73 @@ describe('가드 실행 분모 (guard-runs.jsonl)', () => {
     const output = [];
     assert.equal(await runReportCli(['--root', root], { stdout: (s) => output.push(s), now: NOW }), 0);
     assert.match(output.join('\n'), /no data yet/);
+  });
+});
+
+describe('CI 텔레메트리 병합 (--merge · 머신 경계 단절 해소)', () => {
+  test('런별 서브디렉토리를 재귀로 걷어 4종 로그를 합산한다', async () => {
+    const root = await temporaryRepo();
+    const runDir = join(root, 'ci-logs', '12345', 'harness-telemetry-12345-1');
+    await mkdir(runDir, { recursive: true });
+    await writeFile(join(runDir, 'guard-hits.jsonl'), JSON.stringify({ ts: '2026-08-15T00:00:00Z', id: 'MSA-BOUNDARY', mode: 'list' }) + '\n', 'utf8');
+    await writeFile(join(runDir, 'guard-runs.jsonl'), JSON.stringify({ ts: '2026-08-15T00:00:00Z', mode: 'list', files: 3, violations: 1 }) + '\n', 'utf8');
+    await writeFile(join(runDir, 'unrelated.txt'), 'ignore me', 'utf8');
+    const merged = collectMergedLogs([join(root, 'ci-logs')]);
+    assert.equal(merged.files, 2);
+    assert.equal(merged['guard-hits.jsonl'].length, 1);
+    assert.equal(merged['guard-runs.jsonl'].length, 1);
+    assert.equal(merged['skill-usage.jsonl'].length, 0);
+  });
+
+  test('--merge 는 로컬 로그와 합산된 리포트를 낸다 (없는 디렉토리는 무해)', async () => {
+    const repoRoot = await temporaryRepo();
+    await seedLog(repoRoot, 'guard-hits.jsonl', [{ ts: '2026-07-21T09:00:00Z', id: 'MONEY-PRIMITIVE', mode: 'hook', file: 'a.java', line: 1 }]);
+    const ciDir = join(repoRoot, 'ci-logs', '777');
+    await mkdir(ciDir, { recursive: true });
+    await writeFile(join(ciDir, 'guard-hits.jsonl'), JSON.stringify({ ts: '2026-07-21T10:00:00Z', id: 'MSA-BOUNDARY', mode: 'list', file: 'b.java', line: 2 }) + '\n', 'utf8');
+    const out = [];
+    const code = await runReportCli(['--merge', 'ci-logs', '--merge', 'no-such-dir'], { repoRoot, now: NOW, stdout: (t) => out.push(t) });
+    assert.equal(code, 0);
+    const text = out.join('\n');
+    assert.match(text, /CI 병합.*로그 파일 1건/);
+    assert.match(text, /전체 2건/); // 로컬 1 + CI 1
+    assert.match(text, /MSA-BOUNDARY/);
+  });
+
+  test('ci-pull: run 목록 파싱은 오염 입력에 안전하고, exec 주입으로 다운로드 흐름을 검증한다', async () => {
+    assert.deepEqual(runIdsFromListJson('[{"databaseId":11},{"databaseId":"x"},{}]'), [11]);
+    assert.deepEqual(runIdsFromListJson('not json'), []);
+    const repoRoot = await temporaryRepo();
+    const calls = [];
+    const io = {
+      repoRoot,
+      stdout() {},
+      stderr() {},
+      exec: (cmd, args) => {
+        calls.push([cmd, args[1]]);
+        if (args[1] === 'list') return '[{"databaseId":1},{"databaseId":2}]';
+        if (args[2] === '2') throw new Error('artifact expired');
+        return '';
+      },
+    };
+    assert.equal(await runPullCli([], io), 0);
+    assert.equal(calls.filter(([, sub]) => sub === 'download').length, 2);
+    // 멱등: 성공한 run 1 은 재실행 시 기수집으로 건너뛴다
+    calls.length = 0;
+    await runPullCli([], io);
+    assert.deepEqual(calls.filter(([, sub]) => sub === 'download').map(([, s]) => s), ['download']);
+  });
+
+  test('ci-pull: gh 자체가 없으면 안내와 함께 exit 1', async () => {
+    const errors = [];
+    const code = await runPullCli([], {
+      repoRoot: await temporaryRepo(),
+      stdout() {},
+      stderr: (m) => errors.push(m),
+      exec: () => { throw new Error('gh: command not found'); },
+    });
+    assert.equal(code, 1);
+    assert.match(errors.join('\n'), /gh CLI/);
   });
 });
 

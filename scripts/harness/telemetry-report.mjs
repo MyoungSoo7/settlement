@@ -10,7 +10,7 @@
 //
 // 로그가 없으면 "no data" 로 정상 종료한다(설치 직후 상태). 항상 exit 0 — 리포트는 게이트가 아니다.
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { COMMAND_RULES, RULES, checkCommand, scanText } from './guard.mjs';
@@ -178,6 +178,29 @@ export function hookSummary({ hits, usage, suggestions, canaries, days = 14, now
   return `하네스 텔레메트리 요약: ${lines.join(' · ')} — 상세: node scripts/harness/telemetry-report.mjs`;
 }
 
+// CI 러너의 텔레메트리는 아티팩트(harness-telemetry-*)로만 남고 로컬 리포트는 로컬 로그만
+// 봤다 — 관측이 머신 경계에서 단절되는 문제의 대응. --merge <dir> 로 내려받은 아티팩트
+// 디렉토리(런별 서브디렉토리 포함, 재귀)를 로컬 집계에 합산한다. 수집은 telemetry-ci-pull.mjs.
+const MERGE_LOG_NAMES = ['guard-hits.jsonl', 'skill-usage.jsonl', 'skill-suggestions.jsonl', 'guard-runs.jsonl'];
+
+export function collectMergedLogs(dirs) {
+  const merged = { 'guard-hits.jsonl': [], 'skill-usage.jsonl': [], 'skill-suggestions.jsonl': [], 'guard-runs.jsonl': [], files: 0 };
+  const walk = (dir) => {
+    let entries;
+    try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const entry of entries) {
+      const path = resolve(dir, entry.name);
+      if (entry.isDirectory()) walk(path);
+      else if (MERGE_LOG_NAMES.includes(entry.name)) {
+        merged[entry.name].push(...readJsonl(path));
+        merged.files += 1;
+      }
+    }
+  };
+  for (const dir of dirs) walk(dir);
+  return merged;
+}
+
 export async function runReportCli(args, io = {}) {
   const stdout = io.stdout ?? ((text) => console.log(text));
   const value = (flag, fallback) => {
@@ -191,6 +214,16 @@ export async function runReportCli(args, io = {}) {
   const usage = readJsonl(resolve(logDir, 'skill-usage.jsonl'));
   const suggestions = readJsonl(resolve(logDir, 'skill-suggestions.jsonl'));
   const runs = readJsonl(resolve(logDir, 'guard-runs.jsonl'));
+  const mergeDirs = args.flatMap((arg, index) => (arg === '--merge' && args[index + 1] ? [resolve(root, args[index + 1])] : []));
+  let mergedFiles = 0;
+  if (mergeDirs.length > 0 && !args.includes('--hook')) {
+    const merged = collectMergedLogs(mergeDirs);
+    hits.push(...merged['guard-hits.jsonl']);
+    usage.push(...merged['skill-usage.jsonl']);
+    suggestions.push(...merged['skill-suggestions.jsonl']);
+    runs.push(...merged['guard-runs.jsonl']);
+    mergedFiles = merged.files;
+  }
   if (args.includes('--hook')) {
     // 관측은 세션을 절대 깨뜨리지 않는다 — 어떤 실패도 침묵 + exit 0.
     try {
@@ -210,6 +243,7 @@ export async function runReportCli(args, io = {}) {
     stdout(canaryReport());
     return 0;
   }
+  if (mergeDirs.length > 0) stdout(`== CI 병합 == ${mergeDirs.length}개 디렉토리에서 로그 파일 ${mergedFiles}건 합산 (수집: node scripts/harness/telemetry-ci-pull.mjs)`);
   stdout(summarize({ hits, usage, suggestions, runs, days: Number.isFinite(days) && days > 0 ? days : 14, now: io.now ?? new Date() }));
   stdout(canaryReport());
   return 0;
