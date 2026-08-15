@@ -33,11 +33,12 @@
 | [0028](0028-procedural-discipline-plugin-independence.md)       | 절차 규율층 플러그인 독립 내재화 + 이중 라우팅 경계                                            | Accepted |
 | [0029](0029-settlement-tax-deliverables.md)                     | 정산 연계 세무 산출물 (부가세·원천징수·세금계산서) — 최초 0027 채택 후 번호 충돌로 0029 재부여 | Accepted |
 | [0030](0030-account-materialized-balance-global-nonnegative.md) | 계정계 통제계정 실체화 잔액 + 잔액 인식 라우팅 전역화                                          | Proposed |
-| [0031](0031-seller-tier-lifecycle.md)                           | 셀러 등급 라이프사이클 (자동 산정 + 변경 이력 + 강등 유예)                                     | Proposed |
-| [0032](0032-effective-dated-commission-rate-policy.md)          | 수수료율 유효기간 정책 (effective-dated + scope 우선순위)                                      | Proposed |
+| [0031](0031-seller-tier-lifecycle.md)                           | 셀러 등급 라이프사이클 (자동 산정 + 변경 이력 + 강등 유예)                                     | Accepted |
+| [0032](0032-effective-dated-commission-rate-policy.md)          | 수수료율 유효기간 정책 (effective-dated + scope 우선순위)                                      | Accepted |
 | [0033](0033-telegram-spec-driven-codegen.md)                    | 전문(電文) 스펙 주도 코드 생성 (telegram spec-driven codegen)                                  | Accepted |
-| [0034](0034-ai-service-rag-pgvector.md)                         | ai-service RAG 지식베이스 (pgvector + 시스템 프롬프트 증강)                                    | Proposed |
+| [0034](0034-ai-service-rag-pgvector.md)                         | ai-service RAG 지식베이스 (pgvector + 시스템 프롬프트 증강)                                    | Accepted |
 | [0035](0035-kafka-topic-catalog.md)                             | Kafka 토픽 카탈로그 (파티션 수를 코드 안으로 — 키 재해시 차단)                                 | Accepted |
+| [0036](0036-receipt-ocr-platform.md)                            | 증빙 OCR 플랫폼화 (도메인 중립 비전 추출 클라이언트 + 법인카드 영수증 3자 대사)                | Accepted |
 
 > **0019 결번**: 0019 번은 ADR 이 작성된 적이 없다(결번). 문서·코드 어디에도 참조가 없어 유실이 아니라
 > 건너뛴 번호로 간주한다. 규칙 1(번호 재사용 금지)에 따라 재할당하지 않는다.

@@ -160,6 +160,10 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 `DeadLetterPublishingRecoverer` 배선(폴리글랏 standalone) 중 하나. 폴리글랏도 대상 — `settings.gradle.kts`
 밖이라고 유실이 허용되지 않는다. 안 닿으면 Spring Kafka 기본 `FixedBackOff(0, 9)` 로 떨어져 재시도 소진
 메시지를 조용히 skip = 사실상 유실) ·
+`KAFKA-GROUP-OWNER`(컨슈머 group-id 는 모듈 소유여야 한다 — 두 서비스가 같은 group-id 를 쓰면 카프카가
+한 그룹으로 보고 파티션을 나눠 줘 한쪽이 가져간 메시지가 다른 쪽에 오지 않고 오프셋까지 공유돼 **조용히
+유실**된다. 예외도 로그도 없다. 2026-08-14 실사건: order-service 가 모놀리스 분리 잔재로
+`lemuel-settlement` 그룹을 들고 있었다 — 리스너가 하나 붙는 순간 settlement 파티션을 점유·커밋한다) ·
 `WORKFLOW-EMPTY-EXPR`(`.github/workflows/*.yml` 에 빈 표현식 금지 — Actions 는 워크플로 전체를 표현식
 렉서로 훑으므로 `run`/`script` 블록 **안의 주석**에 있어도 `An expression was expected` 로 파일이 통째로
 무효가 된다. 그 워크플로는 잡 0개·로그 없음·실행 이름이 파일 경로로 뜨는 형태로 죽고, 다른 체크는 초록이라
@@ -255,8 +259,9 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 - **하네스 자기 진단** — `scripts/harness/harness-audit.mjs`: 문서 드리프트를 규율이 아닌 **기계 게이트**로 승격(과거 문서 3주 방치 재발 방지).
   라우팅 맵 dangling 도 기계 검증한다 — 🤖📘⌘ 아이콘 줄의 backtick 진입점 토큰을 agents/skills/commands 실존과 대조
   (에이전트·스킬·커맨드를 삭제/개명하고 라우팅 맵을 안 고치면 audit FAIL → CI 차단).
-  **문서 사실 게이트 4종**(상태 기술 문서 한정): 이벤트 계약 토픽 수 · 구현 상태 역전(어댑터 실재 vs "미구현") ·
-  소비처 배선("소비처 미배선" vs 실제 참조) · **서비스 수**(2026-08-15 추가 — `N 마이크로서비스`/`N개 서비스`
+  **문서 사실 게이트 5종**(상태 기술 문서 한정): 이벤트 계약 토픽 수 · 구현 상태 역전(어댑터 실재 vs "미구현") ·
+  소비처 배선("소비처 미배선" vs 실제 참조) · Spring Boot 버전 드리프트(정본은 `build.gradle.kts` — 문서가
+  같은 메이저의 다른 패치 버전을 말하면 FAIL) · **서비스 수**(2026-08-15 추가 — `N 마이크로서비스`/`N개 서비스`
   주장을 `settings.gradle.kts` 로스터(gateway 제외)와 대조). 모듈 트리 대조는 트리 표기만 보므로 산문 주장이
   새는 축이 따로 있었다 — HARNESS.md 자신이 3주간 14 로 남아 있었고 같은 문서 안의 "자바 16서비스" 와
   모순이었다. 로스터 앵커(`API Gateway`·`gateway`·`DB-per-service`)가 같은 줄에 있을 때만 주장으로 인정해
@@ -289,7 +294,7 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 - [ ] **작성과 검증 분리** — 같은 컨텍스트 자기 승인 금지, `code-reviewer`/`verifier` 별도 패스로 증거 수집
 - [ ] 문서에 휘발성 수치를 적었으면 재현 명령을 병기했는지 확인(값만 적으면 즉시 드리프트)
   > 하나라도 미충족이면 "완료"라고 쓰지 않는다. 커밋은 `develop` 항목별 개별 커밋(PowerShell 은 `git commit -F <file>`).
-  > `main` 반영은 PR·**squash 만**·필수 CI 2종 (직접 push 금지 — 보호 브랜치). 운영 배포는 강한 `JWT_SECRET`·`internal-key-required=true`·외부 API 키 주입 확인.
+  > `main` 반영은 PR·**squash 만**·필수 CI 6종 — 목록은 CLAUDE.md (직접 push 금지 — 보호 브랜치). 운영 배포는 강한 `JWT_SECRET`·`internal-key-required=true`·외부 API 키 주입 확인.
 
 ## 드리프트 방지 규약 (문서 최신성)
 
