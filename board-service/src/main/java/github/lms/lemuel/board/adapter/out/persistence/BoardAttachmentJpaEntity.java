@@ -41,6 +41,10 @@ public class BoardAttachmentJpaEntity {
     @Column(name = "storage_path", nullable = false, length = 300)
     private String storagePath;
 
+    /** 축소본 경로. NULL 가능 — WEBP 처럼 리더가 없는 형식은 만들지 못한다. */
+    @Column(name = "thumbnail_path", length = 300)
+    private String thumbnailPath;
+
     /** 서버 판정값. 요청 헤더의 Content-Type 이 아니다. */
     @Column(name = "content_type", nullable = false, length = 100)
     private String contentType;
@@ -66,6 +70,7 @@ public class BoardAttachmentJpaEntity {
         entity.originalName = attachment.getOriginalName();
         entity.storedName = attachment.getStoredName();
         entity.storagePath = attachment.getStoragePath();
+        entity.thumbnailPath = attachment.getThumbnailPath();
         entity.contentType = attachment.getContentType();
         entity.sizeBytes = attachment.getSizeBytes();
         entity.sortOrder = attachment.getSortOrder();
@@ -75,7 +80,7 @@ public class BoardAttachmentJpaEntity {
 
     public BoardAttachment toDomain() {
         return BoardAttachment.rehydrate(id, postId, boardId, kind, originalName, storedName,
-                storagePath, contentType, sizeBytes, sortOrder, createdAt);
+                storagePath, thumbnailPath, contentType, sizeBytes, sortOrder, createdAt);
     }
 
     public Long getId() {

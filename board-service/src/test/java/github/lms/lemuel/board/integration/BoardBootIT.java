@@ -91,7 +91,7 @@ class BoardBootIT {
     }
 
     @Test
-    @DisplayName("Flyway 로스터는 V1~V3 이다")
+    @DisplayName("Flyway 로스터는 V1~V4 이다")
     void flywayRoster() {
         List<String> versions = jdbc.queryForList("""
                 SELECT version FROM board.flyway_schema_history
@@ -99,7 +99,7 @@ class BoardBootIT {
                  ORDER BY installed_rank
                 """, String.class);
 
-        assertThat(versions).containsExactly("1", "2", "3");
+        assertThat(versions).containsExactly("1", "2", "3", "4");
     }
 
     @Test

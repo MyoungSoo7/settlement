@@ -23,6 +23,7 @@ public class BoardAttachment {
     private String originalName;
     private String storedName;
     private String storagePath;
+    private String thumbnailPath;
     private String contentType;
     private long sizeBytes;
     private int sortOrder;
@@ -38,8 +39,8 @@ public class BoardAttachment {
      * 이유는 바이트가 이미 디스크에 쓰인 뒤이기 때문이다. 거절은 저장 <b>전에</b> 끝나야 한다.
      */
     public static BoardAttachment of(BoardPost post, AttachmentUpload upload,
-                                     String storedName, String storagePath, int sortOrder,
-                                     OffsetDateTime now) {
+                                     String storedName, String storagePath, String thumbnailPath,
+                                     int sortOrder, OffsetDateTime now) {
         if (storedName == null || storedName.isBlank() || storagePath == null || storagePath.isBlank()) {
             throw new BoardInvariantViolationException("저장 위치는 필수입니다.");
         }
@@ -50,6 +51,7 @@ public class BoardAttachment {
         attachment.originalName = upload.originalName();
         attachment.storedName = storedName;
         attachment.storagePath = storagePath;
+        attachment.thumbnailPath = thumbnailPath;
         attachment.contentType = upload.detectedType().contentType();
         attachment.sizeBytes = upload.sizeBytes();
         attachment.sortOrder = sortOrder;
@@ -59,8 +61,8 @@ public class BoardAttachment {
 
     public static BoardAttachment rehydrate(Long id, Long postId, Long boardId, BoardAttachmentKind kind,
                                             String originalName, String storedName, String storagePath,
-                                            String contentType, long sizeBytes, int sortOrder,
-                                            OffsetDateTime createdAt) {
+                                            String thumbnailPath, String contentType, long sizeBytes,
+                                            int sortOrder, OffsetDateTime createdAt) {
         BoardAttachment attachment = new BoardAttachment();
         attachment.id = id;
         attachment.postId = postId;
@@ -69,6 +71,7 @@ public class BoardAttachment {
         attachment.originalName = originalName;
         attachment.storedName = storedName;
         attachment.storagePath = storagePath;
+        attachment.thumbnailPath = thumbnailPath;
         attachment.contentType = contentType;
         attachment.sizeBytes = sizeBytes;
         attachment.sortOrder = sortOrder;
@@ -132,6 +135,24 @@ public class BoardAttachment {
 
     public String getStoragePath() {
         return storagePath;
+    }
+
+    /** 축소본 경로. 없을 수 있다 — WEBP 처럼 리더가 없는 형식은 축소본을 만들지 못한다. */
+    public String getThumbnailPath() {
+        return thumbnailPath;
+    }
+
+    public boolean hasThumbnail() {
+        return thumbnailPath != null && !thumbnailPath.isBlank();
+    }
+
+    /**
+     * 목록에 내려 줄 경로 — 축소본이 있으면 축소본, 없으면 원본.
+     *
+     * <p>이 선택을 화면이 하게 두면 "썸네일이 없을 때 어떻게 하지"가 화면마다 갈린다.
+     */
+    public String displayPath() {
+        return hasThumbnail() ? thumbnailPath : storagePath;
     }
 
     public String getContentType() {

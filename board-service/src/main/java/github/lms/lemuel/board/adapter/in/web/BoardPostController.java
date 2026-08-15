@@ -139,10 +139,15 @@ public class BoardPostController {
         return queryBoardUseCase.getByKey(boardKey).canManage(actor.role());
     }
 
-    /** 첨부 다운로드 주소는 한 곳에서만 만든다 — 응답 DTO 두 곳이 각자 조립하면 반드시 어긋난다. */
+    /**
+     * 목록 썸네일 주소 — <b>축소본 경로</b>를 가리킨다.
+     *
+     * <p>원본(`/download`)을 가리키면 갤러리 한 페이지가 원본 20장을 내려받는다. 축소본이 없는
+     * 형식(WEBP 등)은 그 엔드포인트가 알아서 원본으로 떨어뜨리므로 화면은 분기하지 않아도 된다.
+     */
     private static String thumbnailUrl(String boardKey, BoardAttachment attachment) {
         return attachment == null
                 ? null
-                : "/api/boards/" + boardKey + "/attachments/" + attachment.getId() + "/download";
+                : "/api/boards/" + boardKey + "/attachments/" + attachment.getId() + "/thumbnail";
     }
 }

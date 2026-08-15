@@ -31,6 +31,14 @@ public interface BoardAttachmentUseCase {
     /** 다운로드 — 볼 수 없는 글의 첨부는 404 다(첨부 URL 로 비밀글이 새지 않게). */
     AttachmentDownload download(String boardKey, Long attachmentId, BoardActor actor);
 
+    /**
+     * 목록용 축소본 다운로드 — 축소본이 없으면 <b>원본으로 떨어뜨린다</b>.
+     *
+     * <p>"없으면 404" 로 두면 화면이 형식마다 분기해야 한다(WEBP 은 축소본이 없다). 그 판단은
+     * 도메인({@code BoardAttachment.displayPath})이 한 곳에서 한다.
+     */
+    AttachmentDownload downloadThumbnail(String boardKey, Long attachmentId, BoardActor actor);
+
     record AttachmentDownload(BoardAttachment attachment, byte[] content) {
     }
 }

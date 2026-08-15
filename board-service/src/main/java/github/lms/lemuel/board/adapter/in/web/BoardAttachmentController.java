@@ -94,6 +94,27 @@ public class BoardAttachmentController {
                 .body(download.content());
     }
 
+    @Operation(summary = "첨부 축소본", description = "목록용. 축소본이 없으면 원본으로 떨어진다.")
+    @GetMapping("/attachments/{attachmentId}/thumbnail")
+    public ResponseEntity<byte[]> thumbnail(@PathVariable String boardKey, @PathVariable Long attachmentId) {
+        var download = boardAttachmentUseCase.downloadThumbnail(boardKey, attachmentId, CurrentActor.resolve());
+        BoardAttachment attachment = download.attachment();
+
+        // 축소본은 항상 PNG 로 만든다(생성기 규약). 원본으로 떨어진 경우에만 판정된 타입을 쓴다.
+        MediaType contentType = attachment.hasThumbnail()
+                ? MediaType.IMAGE_PNG
+                : MediaType.parseMediaType(attachment.getContentType());
+
+        return ResponseEntity.ok()
+                .contentType(contentType)
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline()
+                        .filename(attachment.getOriginalName(), StandardCharsets.UTF_8).build().toString())
+                .header("X-Content-Type-Options", "nosniff")
+                // 축소본은 내용이 바뀌지 않는다(첨부는 수정되지 않고 지웠다 다시 올린다).
+                .header(HttpHeaders.CACHE_CONTROL, "public, max-age=86400")
+                .body(download.content());
+    }
+
     @Operation(summary = "첨부 삭제", description = "글을 고칠 수 있는 사람만 — 첨부는 글의 일부다.")
     @DeleteMapping("/attachments/{attachmentId}")
     public ResponseEntity<Void> delete(@PathVariable String boardKey, @PathVariable Long attachmentId) {

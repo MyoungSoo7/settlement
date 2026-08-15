@@ -1,6 +1,7 @@
 package github.lms.lemuel.board.application.service;
 
 import github.lms.lemuel.board.application.port.out.DetectFileTypePort;
+import github.lms.lemuel.board.application.port.out.GenerateThumbnailPort;
 import github.lms.lemuel.board.application.port.out.LoadBoardAttachmentPort;
 import github.lms.lemuel.board.application.port.out.LoadBoardDefinitionPort;
 import github.lms.lemuel.board.application.port.out.LoadBoardPostPort;
@@ -40,6 +41,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -71,6 +73,8 @@ class BoardAttachmentServiceTest {
     private StoreAttachmentPort storeAttachmentPort;
     @Mock
     private DetectFileTypePort detectFileTypePort;
+    @Mock
+    private GenerateThumbnailPort generateThumbnailPort;
 
     private BoardAttachmentService service;
 
@@ -78,7 +82,7 @@ class BoardAttachmentServiceTest {
     void setUp() {
         service = new BoardAttachmentService(loadBoardDefinitionPort, loadBoardPostPort,
                 loadBoardAttachmentPort, saveBoardAttachmentPort, storeAttachmentPort,
-                detectFileTypePort, Clock.fixed(FIXED, ZoneOffset.UTC));
+                detectFileTypePort, generateThumbnailPort, Clock.fixed(FIXED, ZoneOffset.UTC));
     }
 
     private static BoardDefinition definition(int maxCount) {
@@ -95,8 +99,12 @@ class BoardAttachmentServiceTest {
     }
 
     private static BoardAttachment attachment(Long boardId) {
+        return attachment(boardId, "board-1/post-5/thumb.png");
+    }
+
+    private static BoardAttachment attachment(Long boardId, String thumbnailPath) {
         return BoardAttachment.rehydrate(9L, 5L, boardId, BoardAttachmentKind.IMAGE, "photo.jpg",
-                "uuid.jpg", "board-1/post-5/uuid.jpg", "image/jpeg", 4, 0, NOW);
+                "uuid.jpg", "board-1/post-5/uuid.jpg", thumbnailPath, "image/jpeg", 4, 0, NOW);
     }
 
     @Test
@@ -251,5 +259,100 @@ class BoardAttachmentServiceTest {
 
         assertThat(service.listByPost("gallery", 5L, BoardActor.anonymous())).hasSize(1);
         verify(loadBoardAttachmentPort).findByPostId(eq(5L));
+    }
+    @Test
+    @DisplayName("이미지는 축소본을 함께 저장한다 — 목록이 원본을 내려받지 않게")
+    void storesThumbnailForImage() {
+        when(loadBoardDefinitionPort.findByKey("gallery")).thenReturn(Optional.of(definition(3)));
+        when(loadBoardPostPort.findById(5L)).thenReturn(Optional.of(post()));
+        when(loadBoardAttachmentPort.countByPostId(5L)).thenReturn(0);
+        when(detectFileTypePort.detect(CONTENT)).thenReturn(JPEG);
+        when(generateThumbnailPort.generate(eq(CONTENT), eq("jpg"), anyInt()))
+                .thenReturn(Optional.of(new GenerateThumbnailPort.Thumbnail(new byte[]{9}, "png")));
+        when(storeAttachmentPort.store(1L, 5L, "jpg", CONTENT))
+                .thenReturn(new StoreAttachmentPort.StoredAttachment("uuid.jpg", "board-1/post-5/uuid.jpg"));
+        when(storeAttachmentPort.store(eq(1L), eq(5L), eq("png"), any()))
+                .thenReturn(new StoreAttachmentPort.StoredAttachment("thumb.png", "board-1/post-5/thumb.png"));
+        when(saveBoardAttachmentPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        BoardAttachment saved = service.upload("gallery", 5L, AUTHOR, "photo.jpg", CONTENT);
+
+        assertThat(saved.hasThumbnail()).isTrue();
+        assertThat(saved.displayPath()).isEqualTo("board-1/post-5/thumb.png");
+    }
+
+    @Test
+    @DisplayName("축소본을 못 만들어도 업로드는 성공한다 — 부가 기능이 본 기능을 죽이지 않는다")
+    void uploadSucceedsWithoutThumbnail() {
+        when(loadBoardDefinitionPort.findByKey("gallery")).thenReturn(Optional.of(definition(3)));
+        when(loadBoardPostPort.findById(5L)).thenReturn(Optional.of(post()));
+        when(loadBoardAttachmentPort.countByPostId(5L)).thenReturn(0);
+        when(detectFileTypePort.detect(CONTENT)).thenReturn(JPEG);
+        // WEBP·손상 이미지처럼 리더가 없는 경우
+        when(generateThumbnailPort.generate(any(), anyString(), anyInt())).thenReturn(Optional.empty());
+        when(storeAttachmentPort.store(1L, 5L, "jpg", CONTENT))
+                .thenReturn(new StoreAttachmentPort.StoredAttachment("uuid.jpg", "board-1/post-5/uuid.jpg"));
+        when(saveBoardAttachmentPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        BoardAttachment saved = service.upload("gallery", 5L, AUTHOR, "photo.jpg", CONTENT);
+
+        assertThat(saved.hasThumbnail()).isFalse();
+        assertThat(saved.displayPath()).isEqualTo("board-1/post-5/uuid.jpg");
+        verify(storeAttachmentPort, org.mockito.Mockito.times(1))
+                .store(anyLong(), anyLong(), anyString(), any());
+    }
+
+    @Test
+    @DisplayName("이미지가 아니면 축소본 생성기를 부르지 않는다")
+    void skipsThumbnailForNonImage() {
+        // 이 게시판만 pdf 를 허용한다 — 확장자 정책에 걸려 검증 단계에서 끝나면 검사하려는 것을 못 본다.
+        BoardDefinition withPdf = BoardDefinition.rehydrate(1L, "gallery", "갤러리", null, BoardSkin.GALLERY,
+                BoardContentPolicy.rehydrate(BoardContentFormat.TEXT, true, false, null),
+                BoardAttachmentPolicy.rehydrate(true, 3, 100, List.of("jpg", "png", "pdf")),
+                BoardAccessPolicy.rehydrate(List.of(), List.of("USER"), List.of("USER"), List.of("ADMIN")),
+                true, NOW, NOW);
+        when(loadBoardDefinitionPort.findByKey("gallery")).thenReturn(Optional.of(withPdf));
+        when(loadBoardPostPort.findById(5L)).thenReturn(Optional.of(post()));
+        when(loadBoardAttachmentPort.countByPostId(5L)).thenReturn(0);
+        when(detectFileTypePort.detect(CONTENT))
+                .thenReturn(DetectedFileType.of("pdf", "application/pdf", false));
+        when(storeAttachmentPort.store(1L, 5L, "pdf", CONTENT))
+                .thenReturn(new StoreAttachmentPort.StoredAttachment("uuid.pdf", "board-1/post-5/uuid.pdf"));
+        when(saveBoardAttachmentPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.upload("gallery", 5L, AUTHOR, "안내문.pdf", CONTENT);
+
+        verify(generateThumbnailPort, never()).generate(any(), anyString(), anyInt());
+    }
+
+    @Test
+    @DisplayName("삭제는 원본과 축소본을 함께 지운다")
+    void deleteRemovesBothFiles() {
+        when(loadBoardDefinitionPort.findByKey("gallery")).thenReturn(Optional.of(definition(3)));
+        when(loadBoardAttachmentPort.findById(9L)).thenReturn(Optional.of(attachment(1L)));
+        when(loadBoardPostPort.findById(5L)).thenReturn(Optional.of(post()));
+
+        service.delete("gallery", 9L, AUTHOR);
+
+        verify(storeAttachmentPort).delete("board-1/post-5/uuid.jpg");
+        verify(storeAttachmentPort).delete("board-1/post-5/thumb.png");
+    }
+
+    @Test
+    @DisplayName("축소본 다운로드는 축소본을, 없으면 원본을 읽는다 — 화면이 분기하지 않게")
+    void downloadThumbnailFallsBackToOriginal() {
+        when(loadBoardDefinitionPort.findByKey("gallery")).thenReturn(Optional.of(definition(3)));
+        when(loadBoardPostPort.findById(5L)).thenReturn(Optional.of(post()));
+        when(loadBoardAttachmentPort.findById(9L)).thenReturn(Optional.of(attachment(1L)));
+        when(storeAttachmentPort.read("board-1/post-5/thumb.png")).thenReturn(CONTENT);
+
+        assertThat(service.downloadThumbnail("gallery", 9L, BoardActor.anonymous()).content())
+                .isEqualTo(CONTENT);
+
+        when(loadBoardAttachmentPort.findById(9L)).thenReturn(Optional.of(attachment(1L, null)));
+        when(storeAttachmentPort.read("board-1/post-5/uuid.jpg")).thenReturn(CONTENT);
+
+        assertThat(service.downloadThumbnail("gallery", 9L, BoardActor.anonymous()).content())
+                .isEqualTo(CONTENT);
     }
 }

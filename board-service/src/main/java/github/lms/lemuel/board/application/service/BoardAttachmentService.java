@@ -2,6 +2,7 @@ package github.lms.lemuel.board.application.service;
 
 import github.lms.lemuel.board.application.port.in.BoardAttachmentUseCase;
 import github.lms.lemuel.board.application.port.out.DetectFileTypePort;
+import github.lms.lemuel.board.application.port.out.GenerateThumbnailPort;
 import github.lms.lemuel.board.application.port.out.LoadBoardAttachmentPort;
 import github.lms.lemuel.board.application.port.out.LoadBoardDefinitionPort;
 import github.lms.lemuel.board.application.port.out.LoadBoardPostPort;
@@ -10,6 +11,7 @@ import github.lms.lemuel.board.application.port.out.StoreAttachmentPort;
 import github.lms.lemuel.board.domain.AttachmentUpload;
 import github.lms.lemuel.board.domain.BoardActor;
 import github.lms.lemuel.board.domain.BoardAttachment;
+import github.lms.lemuel.board.domain.BoardAttachmentKind;
 import github.lms.lemuel.board.domain.BoardDefinition;
 import github.lms.lemuel.board.domain.BoardPost;
 import github.lms.lemuel.board.domain.exception.BoardAttachmentNotFoundException;
@@ -42,12 +44,16 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class BoardAttachmentService implements BoardAttachmentUseCase {
 
+    /** 목록 썸네일의 긴 변. 그리드 한 칸이 커야 400px 남짓이라 그 위로는 화면에서 차이가 없다. */
+    private static final int THUMBNAIL_MAX_EDGE = 400;
+
     private final LoadBoardDefinitionPort loadBoardDefinitionPort;
     private final LoadBoardPostPort loadBoardPostPort;
     private final LoadBoardAttachmentPort loadBoardAttachmentPort;
     private final SaveBoardAttachmentPort saveBoardAttachmentPort;
     private final StoreAttachmentPort storeAttachmentPort;
     private final DetectFileTypePort detectFileTypePort;
+    private final GenerateThumbnailPort generateThumbnailPort;
     private final Clock clock;
 
     @Override
@@ -87,12 +93,16 @@ public class BoardAttachmentService implements BoardAttachmentUseCase {
 
         StoreAttachmentPort.StoredAttachment stored = storeAttachmentPort.store(
                 definition.getId(), post.getId(), upload.detectedType().extension(), content);
+        String thumbnailPath = storeThumbnail(definition, post, upload, content);
         try {
             return saveBoardAttachmentPort.save(BoardAttachment.of(
-                    post, upload, stored.storedName(), stored.storagePath(), existing, now()));
+                    post, upload, stored.storedName(), stored.storagePath(), thumbnailPath, existing, now()));
         } catch (RuntimeException e) {
-            // 파일시스템은 트랜잭션 밖이다 — 손으로 되돌린다.
+            // 파일시스템은 트랜잭션 밖이다 — 손으로 되돌린다(축소본까지).
             storeAttachmentPort.delete(stored.storagePath());
+            if (thumbnailPath != null) {
+                storeAttachmentPort.delete(thumbnailPath);
+            }
             throw e;
         }
     }
@@ -108,6 +118,26 @@ public class BoardAttachmentService implements BoardAttachmentUseCase {
         saveBoardAttachmentPort.delete(attachment.getId());
         // 행을 먼저 지운다 — 파일이 남는 것보다 참조가 남는 편이 나쁘다(404 대신 500).
         storeAttachmentPort.delete(attachment.getStoragePath());
+        if (attachment.hasThumbnail()) {
+            storeAttachmentPort.delete(attachment.getThumbnailPath());
+        }
+    }
+
+    /**
+     * 이미지면 축소본을 만들어 함께 저장한다. 만들지 못하면 {@code null} — 실패가 정상 경로다.
+     *
+     * <p>썸네일은 부가 기능이라 여기서 예외가 나 업로드 전체가 실패하면 안 된다. 그 판단은
+     * {@code GenerateThumbnailPort} 구현이 {@code Optional} 로 표현한다.
+     */
+    private String storeThumbnail(BoardDefinition definition, BoardPost post,
+                                  AttachmentUpload upload, byte[] content) {
+        if (upload.kind() != BoardAttachmentKind.IMAGE) {
+            return null;
+        }
+        return generateThumbnailPort.generate(content, upload.detectedType().extension(), THUMBNAIL_MAX_EDGE)
+                .map(thumbnail -> storeAttachmentPort.store(definition.getId(), post.getId(),
+                        thumbnail.extension(), thumbnail.content()).storagePath())
+                .orElse(null);
     }
 
     @Override
@@ -118,6 +148,15 @@ public class BoardAttachmentService implements BoardAttachmentUseCase {
         visiblePost(definition, attachment.getPostId(), actor);
 
         return new AttachmentDownload(attachment, storeAttachmentPort.read(attachment.getStoragePath()));
+    }
+
+    @Override
+    public AttachmentDownload downloadThumbnail(String boardKey, Long attachmentId, BoardActor actor) {
+        BoardDefinition definition = readableBoard(boardKey, actor);
+        BoardAttachment attachment = attachmentOf(definition, attachmentId);
+        visiblePost(definition, attachment.getPostId(), actor);
+
+        return new AttachmentDownload(attachment, storeAttachmentPort.read(attachment.displayPath()));
     }
 
     private BoardDefinition readableBoard(String boardKey, BoardActor actor) {
