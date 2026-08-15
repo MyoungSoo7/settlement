@@ -29,7 +29,7 @@
 │   ├── gl-ledger-auditor.md           # 계정계 GL 복식부기·시산표·분개 매핑 정합 감사 (account + ledger)
 │   └── event-contract-reviewer.md     # cross-service 이벤트 계약 드리프트·Outbox·멱등 검토 (ADR 0024)
 ├── skills/                            # 온디맨드 절차적 지식 (SKILL.md)
-│   ├── {서비스}-rules/                # 13서비스 강제 도메인 규칙 (아래 참조)
+│   ├── {서비스}-rules/                # 15서비스 강제 도메인 규칙 (아래 참조)
 │   ├── money-safety · ledger-invariants · idempotency-and-events   # 횡단 규칙
 │   ├── recon-playbook · incident-runbooks · compliance-review      # 운영/리뷰
 │   ├── delta-review                                                # diff 위험축 트리아지(어디를 먼저 볼지) — 리뷰 진입 기준
@@ -46,7 +46,7 @@
 │   ├── ai-dev-team.md                 # 전사 역할 산출물 일괄 생성
 │   └── agents/                        # 역할별 산출물 생성 서브커맨드
 ├── settings.json / settings.local.json  # 훅·권한 (PreToolUse 가드·라우터, SessionStart 텔레메트리, allowlist)
-├── harness/                           # 하네스 런타임 (gitignore — logs/ 텔레메트리 jsonl, state/ 라우터 세션 상태)
+├── harness/                           # 하네스 런타임 (gitignore — logs/ 텔레메트리 jsonl, state/ 라우터 세션 상태 · 14일 GC 는 라우터가 기회적 수행)
 └── (worktrees/)                       # 격리 작업공간 (병렬 세션 충돌 회피)
 
 scripts/harness/                       # ★ 실행 코어 — 저장소 추적, 플러그인·MCP 0 의존 (CI 에서 그대로 재실행)
@@ -72,18 +72,17 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 
 `order-commerce` · `settlement-domain` · `loan-domain` · `investment-domain` · `account-domain` ·
 `financial-data` · `economics-data` · `market-quotes` · `company-news` · `commondata-connector` ·
-`operation-signal` · `ai-chat` · `card-service` — 각 서비스 로직 작성·수정·리뷰 시 해당 `*-rules` 스킬이 강제 규칙(상태머신·정책·경계)을 로드.
+`operation-signal` · `ai-chat` · `card-service` · `insurance-domain` · `deposit-domain` — 각 서비스 로직 작성·수정·리뷰 시 해당 `*-rules` 스킬이 강제 규칙(상태머신·정책·경계)을 로드.
 로드는 규율이 아니라 `skill-router.mjs` 가 편집 경로를 보고 **자동 주입**한다(아래 "강제 지점").
 
-> **커버리지 공백(명시)**: 위 13개 스킬은 16서비스 중 13개만 덮는다 — `organization-service` ·
-> `insurance-service` · `deposit-service` 3개가 전용 `*-rules` 스킬도, `skill-router.mjs` `ROUTES` 행도 없다.
-> 성격이 다르므로 분리해 기록한다(조용한 누락이 아니라 알려진 부채):
+> **커버리지 공백(명시)**: 위 15개 스킬은 16서비스 중 15개를 덮는다. 남은 1개는 의도된 후순위다:
 >
 > - `organization-service` — 이벤트 발행 전용. 다만 **소비처는 배선돼 있다**(card-service 가 조직 프로젝션으로
 >   4토픽 소비 — `card-service/src/main/resources/application.yml`). 강제할 자체 상태머신·회계 규칙이 얇아 후순위.
-> - `insurance-service` · `deposit-service` — **돈 경로다**(수수료정산·25%룰·완전판매 게이트 / 예치금 원장
->   hold·offset 재원 이중사용 차단). "저위험 위성이라 스킬 없이 게이트로 충분" 논리가 적용되지 않는
->   구간이므로 우선 부채다 — 스킬 추가 시 라우터 `ROUTES` 행을 **함께** 배선한다(둘은 같은 사실의 두 표현).
+> - ~~`insurance-service` · `deposit-service`~~ — 돈 경로 우선 부채였던 2개는 2026-08-15 해소:
+>   `insurance-domain-rules`(완전판매 게이트·25%룰·환수/12회 분할) · `deposit-domain-rules`(잔고 단일
+>   진실원·hold/offset 이중사용 차단) 신설 + 라우터 `ROUTES` 행 동시 배선(둘은 같은 사실의 두 표현 —
+>   `skill-router.test.mjs` 가 회귀 방지).
 
 > **에이전트 로스터 설계 원칙 (의도된 공백)**: 전용 서브에이전트는 **고위험·상태보존 축**(정산·GL·이벤트 계약·헥사 경계·보안·쿼리)에만 둔다. 공개 read-only 위성(financial·economics·market·commondata)과 부가(operation·ai)는 상태 변이·회계 리스크가 낮아 **`*-rules` 스킬 + ArchUnit 게이트로 커버하는 것이 의도된 설계**다 — 서비스마다 에이전트를 만들지 않는다(로스터 비대화 = 안티패턴).
 
@@ -101,6 +100,8 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 > | 프로젝션 뷰 추가·드리프트·백필             | 📘`projection-view-ops` (ADR 0020) + 📘`recon-playbook`·`incident-runbooks`                                                                       |
 > | 계정계 GL·시산표·분개                      | 🤖`gl-ledger-auditor` (차1대1 균형·6토픽 매핑·2단 멱등·소비전용) + 📘`ledger-invariants`·`account-domain-rules`                                   |
 > | 법인카드 한도·발급·상태                    | 📘`card-service-rules` (재원 F 공식·`master ≥ Σsub` 비관적 락·하향 클램프·재원 폴백 금지) + 📘`money-safety` → 🚦`CardIssuanceLimitConcurrencyIT` |
+> | 보험 설계·청약·계약·수수료·방카            | 📘`insurance-domain-rules` (완전판매 게이트 2단·25%룰·환수 24개월·12회 분할) + 📘`money-safety`                                                   |
+> | 예치금 원장·hold/offset·상계               | 📘`deposit-domain-rules` (잔고 단일 진실원·이중사용 차단·referenceType 불변) + 📘`ledger-invariants`                                              |
 > | 쿼리·인덱스·ES 매핑·성능                   | 🤖`db-query-architect`                                                                                                                            |
 > | MSA 경계 변경                              | 🤖`hexagonal-arch-reviewer` → 🚦ArchUnit (_코드 의존 0 / cross-DB 0_ 위반 차단)                                                                   |
 > | OO 설계 채점·리팩터링 회귀 판정            | 📘`oo-score` (3인 패널 중앙값 ≥9.5) — 결정적 불변식은 🚦`guard.mjs` OO-\* + `oo-gate.test.mjs` 가 선차단                                          |
@@ -137,6 +138,7 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 > | 시점                     | 트리거                                     | 실행                                                                                               | 실패 시                                                            |
 > | ------------------------ | ------------------------------------------ | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
 > | 파일 편집 직전           | PreToolUse `Write\|Edit\|MultiEdit`        | `guard.mjs --hook`                                                                                 | **exit 2 = 편집 차단**                                             |
+> | Bash 명령 실행 직전      | PreToolUse `Bash`                          | `guard.mjs --hook-bash`                                                                            | **exit 2 = 명령 차단** (BLOCK) / WARN 은 additionalContext 만      |
 > | 파일 편집·스킬 호출 직전 | PreToolUse `Write\|Edit\|MultiEdit\|Skill` | `skill-router.mjs --hook`                                                                          | 차단 없음(항상 exit 0) — 스킬 로드 리마인더 주입                   |
 > | 세션 시작                | SessionStart                               | `telemetry-report.mjs --hook`                                                                      | 차단 없음 — 최근 차단·라우터 순응률 요약 주입(알릴 것 없으면 침묵) |
 > | `git commit`             | `core.hooksPath=scripts/harness/hooks`     | `guard.mjs --staged` (내용 스캔 + 하네스 경로 삭제 검사)                                           | **커밋 거부** (`--no-verify` 우회 금지)                            |
@@ -170,10 +172,15 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 드러나지 않는다. YAML 파서·공식 워크플로 스키마·액션 SHA 실재 검증이 전부 통과하는 사각지대라 grep 계층에
 둔다 — 2026-08 pr-review.yml 이 이 한 줄 주석 때문에 며칠간 죽어 있었다).
 
-운영 DB 직접 조작 명령 차단(`check-command`).
+**Bash 명령 계층(COMMAND_RULES, `--hook-bash`)** — 2026-08-15 저장소 네이티브로 신설(종전 `check-command` 는
+settlement-copilot **플러그인 소유**라 플러그인 미설치 환경에 없었다 — "플러그인 독립" 전제의 구멍이었다):
+`CMD-EDIT-BYPASS`(sed -i·perl -i·리다이렉트·tee 로 소스 편집 — 실시간 내용 스캔 우회 봉쇄, Write/Edit 도구가 정답) ·
+`CMD-NO-VERIFY`(git commit/push `--no-verify`) · `CMD-PROD-DB-WRITE`(psql/pgcli/pg_dump 쓰기 + kubectl exec DB 접속) ·
+`CMD-EVENT-PRODUCE`(lemuel.* 토픽 직접 produce — WARN 비차단). 의도적 실행은 `HARNESS_ALLOW_CMD=1` opt-in.
+이 계층은 fail-open(운반 수단 차단이라 입력 파싱 실패가 모든 Bash 를 멈추면 안 된다) — 우회 시도는 커밋·CI 가 내용 기준 재차단.
 
-**skill-router.mjs 라우트 표** (경로 → 주입 스킬, 세션당 스킬별 1회 · 최대 3개): 13개 서비스 디렉토리 → 각 `{서비스}-rules`
-(16서비스 중 organization·insurance·deposit 은 스킬 부재로 미배선 — 위 "커버리지 공백" 참조)
+**skill-router.mjs 라우트 표** (경로 → 주입 스킬, 세션당 스킬별 1회 · 최대 3개): 15개 서비스 디렉토리 → 각 `{서비스}-rules`
+(16서비스 중 organization 만 스킬 부재로 미배선 — 위 "커버리지 공백" 참조)
 (settlement `ledger` 경로·account 는 `ledger-invariants` 동반) · `outbox/`·`adapter/in/kafka/`·`adapter/out/event/` →
 `idempotency-and-events` · settlement `readmodel|projection` → `projection-view-ops` · `contracts/events/` →
 `event-contract-change` · `.claude/hookify.*.local.md` → `hookify-to-guard` · 그 외 `src/{main,test}/` 첫 편집 → `tdd-discipline`.
@@ -191,7 +198,8 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
   - `node scripts/harness/session-metrics.mjs` — OMC 세션·미션 완주율·재작업률 KPI 리포트(`.omc` 읽기 전용 관측 — KPI 정본은 `docs/ax/omc-harness.md` — 로컬 전용, 저장소 미포함)
   - `./gradlew :<module>:test`·`:jacocoTestCoverageVerification` — 정합 검증(측정 정답)
   - 서비스 자체 `/admin/integrity`·`/api/account/trial-balance` 조회 API(읽기 전용)
-- **불변식**: psql/pg_dump/kafka produce 로 운영 데이터에 직접 손대는 명령을 만들지 않는다(가드가 `check-command` 로 차단).
+- **불변식**: psql/pg_dump/kafka produce 로 운영 데이터에 직접 손대는 명령을 만들지 않는다(저장소 네이티브
+  `guard.mjs --hook-bash` COMMAND_RULES 가 실시간 차단 — 플러그인 check-command 는 설치 시 2차 레이어로 병존).
 
 **MCP 도구 ↔ 플러그인 독립 폴백 매핑** (조용한 "MCP 단독" 금지 — 모든 능력에 폴백 또는 런타임 경계 명시):
 

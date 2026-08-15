@@ -27,6 +27,39 @@ _판정 로그_ 다. 지금까지 하네스는 계속 늘어나기만 했고, �
 
 ## 항목
 
+### 2026-08-15 · Bash 명령 가드(COMMAND_RULES, --hook-bash) — 실시간 계층의 두 구멍 봉쇄
+
+- **status**: candidate
+- **동기**: ① 실시간 가드 매처가 `Write|Edit|MultiEdit` 뿐이라 sed -i·heredoc 리다이렉트로 소스를
+  쓰면 내용 스캔을 통째로 우회했다(백슬래시 손실 사고 2회 전력). ② "운영 DB 명령 차단(check-command)"
+  은 settlement-copilot **플러그인 소유**라 플러그인 미설치 환경(CI·새 클론·Codex)엔 아예 없었다 —
+  HARNESS 의 "플러그인 독립" 전제와 모순.
+- **predicted_effect**: telemetry `mode hook-bash` 실행 분모가 세션마다 기록되고, CMD-EDIT-BYPASS /
+  CMD-NO-VERIFY 발화가 0회면 "완전 예방"(카나리아 PASS 로 생존 확인), 발화하면 실시간에서 잡힌
+  우회 시도다. 소스 파일의 heredoc 손상 재발이 0 이 된다.
+- **위험**: 오탐이 Bash 전체를 마찰시킨다 — 대상을 소스 확장자(.java/.kt/.sql/.mjs/.yml)로 좁히고
+  fail-open + `HARNESS_ALLOW_CMD=1` 탈출구를 뒀다. 오탐 발견 시 규칙을 좁힌다(끄지 않는다).
+- **verified_at**: 미검증 (카나리아 4종·유닛 12케이스는 도입 시점 PASS — 실전 발화는 2주 뒤 리포트로)
+
+### 2026-08-15 · skill-router 세션 상태 GC (14일 보존)
+
+- **status**: candidate
+- **동기**: `.claude/harness/state/` 에 세션당 1개 상태 파일이 정리 정책 없이 누적(실측 ~70개).
+  실해는 작지만 "상태 관리에 GC 가 없다"는 구조 결함.
+- **predicted_effect**: 상태 파일 수가 14일 활동 세션 수로 수렴한다(무한 증가 중단). dedupe 동작은
+  불변(신선한 세션 상태는 건드리지 않음 — 테스트 고정).
+- **verified_at**: 미검증 (2주 뒤 `ls .claude/harness/state | wc -l` 로 대조)
+
+### 2026-08-15 · insurance/deposit 도메인 규칙 스킬 + 라우터 배선 (커버리지 공백 해소)
+
+- **status**: candidate
+- **동기**: HARNESS.md 가 스스로 "우선 부채"로 명시한 돈 경로 2서비스(보험 수수료정산·25%룰·완전판매
+  게이트 / 예치금 hold·offset 이중사용 차단)가 전용 `*-rules` 스킬·라우터 행 없이 방치.
+- **predicted_effect**: insurance/deposit 경로 편집 시 라우터가 해당 스킬을 주입하고(순응률 지표에
+  등장), 두 서비스의 도메인 규칙 위반(만료 회수 originalAmount·referenceType 변경·게이트 후퇴 등)이
+  리뷰에서 스킬 근거로 지적된다. 커버리지 공백 섹션은 organization 1개로 축소.
+- **verified_at**: 미검증 (skill-router.test.mjs 라우팅 3케이스는 도입 시점 PASS)
+
 ### 2026-08-12 · 가드 실행 분모(guard-runs.jsonl) 추가
 
 - **status**: candidate
