@@ -13,12 +13,30 @@ on:
   pull_request:
     branches: [main, develop]
 
-# 같은 브랜치에 연속 push 하면 이전 실행이 러너를 계속 점유한다(백엔드 잡 정상 55~70분).
-# PR 은 최신 커밋만 검증하면 되므로 취소하고, main/develop push 는 이미지 푸시가 걸려 있어
-# 취소하지 않고 직렬화만 한다(앞 실행이 끝나야 다음이 시작 → 이미지 태그 경합 방지).
+# 연속 push 는 러너를 두고 다툰다. "어느 실행을 살릴 것인가" 가 이 블록의 전부다.
+#
+#   main push 만 직렬화한다 — 이미지 푸시와 운영 스모크가 걸려 있어 중간에 끊으면 안 된다.
+#   PR 과 develop push 는 **최신 커밋이 이긴다**.
+#
+# develop 을 직렬화에서 뺀 이유 (2026-08-15 실측):
+#   ① 직렬화의 전제였던 "백엔드 잡 정상 55~70분" 이 낡았다. 모듈 매트릭스로 쪼갠 뒤 전체 런은
+#      13~14분이다(run 31872579719 push 14분 · 31872582987 pull_request 13분). 오래 도니까
+#      취소하지 말자는 근거가 사라졌다.
+#   ② 직렬화는 대기열에서 **최신 커밋을 떨어뜨린다**. concurrency 그룹의 대기 슬롯은 1개뿐이라
+#      새 push 가 오면 앞서 대기하던 실행이 취소되는데, 정작 러너를 쥐고 있는 것은 가장 낡은
+#      실행이다. 08:07~08:53 develop 실측: push 런 6건 중 완주 0건, 최신 커밋(31bcbd27e)은
+#      pending 에서 취소되고 낡은 커밋이 러너를 붙들었다 — 판정이 낡은 트리로 간다.
+#   ③ 릴리스 PR(develop→main)이 상시 열려 있어 커밋 하나가 push 런 + PR 런 2벌을 만든다.
+#      최신만 남기면 동시 점유가 (버스트 수 × 2벌) 에서 2벌로 떨어진다.
+#
+# 대가: 중간 develop 커밋의 develop-<sha> 이미지는 만들어지지 않는다. 움직이는 develop 태그는
+# 어차피 최신 커밋으로 수렴하고(오히려 취소된 낡은 실행이 태그를 덮는 일이 사라진다),
+# 스테이징이 필요로 하는 것도 최신 develop 이라 받아들인다. 특정 중간 sha 이미지가 필요하면
+# 그 sha 로 워크플로를 재실행할 것.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  # pull_request 의 github.ref 는 refs/pull/<n>/merge 라 이 조건에서 자연히 true 가 된다.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
   JAVA_VERSION: "25"
