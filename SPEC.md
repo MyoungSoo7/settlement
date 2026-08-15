@@ -1,6 +1,6 @@
 # Lemuel 기능명세서 (Functional Specification)
 
-이커머스 + 정산(Settlement) MSA 플랫폼의 전체 기능 명세. 코어 JVM 16개 마이크로서비스 + API Gateway 에
+이커머스 + 정산(Settlement) MSA 플랫폼의 전체 기능 명세. 코어 JVM 17개 마이크로서비스 + API Gateway 에
 폴리글랏 7종(Kotlin 2 · Go 2 · Python 3)을 더한 **총 24개 서비스** 헥사고날 백엔드이며,
 원래 단일 모놀리스였으나 Bounded Context 로 분리했다.
 아키텍처·컨벤션은 [`CLAUDE.md`](./CLAUDE.md), 아키텍처 결정은 [`docs/adr/`](./docs/adr/) 참조.
@@ -349,7 +349,35 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
   `GET /admin/deposits/shortfalls` · `POST .../{id}/resolve`(실제 available 차감, 모자라면 422) ·
   `POST .../{id}/write-off`(잔고 불변).
 
-### 3.17 gateway-service — API Gateway (port 8080)
+### 3.17 board-service — 메타 주도 게시판 (port 8114, mgmt 8115, 자체 DB lemuel_board)
+
+게시판을 **코드가 아니라 데이터로** 만든다. `board_definitions` 1행 = 게시판 1개이고, 프론트의 단일
+라우트 `/boards/:boardKey` 가 정의를 읽어 스킨을 바꿔 그린다 — 게시판을 늘리는 데 배포도 마이그레이션도
+필요 없다. "CRUD 게시판"과 "이미지 게시판"은 별개 도메인이 아니라 같은 도메인의 두 스킨이다.
+설계 근거 정본: [`docs/plan/board-service.md`](docs/plan/board-service.md).
+
+| 도메인    | API                                                                     | 기능                                              |
+| --------- | ----------------------------------------------------------------------- | ------------------------------------------------- |
+| 이용      | `GET /api/boards` · `GET /api/boards/{boardKey}`                        | 활성 + 호출자가 읽을 수 있는 게시판 정의 조회     |
+| 관리 콘솔 | `GET|POST /admin/boards` · `PUT|DELETE /admin/boards/{id}` · `POST /admin/boards/{id}/{activate,deactivate}` (ADMIN) | 게시판 생성 · 정책 수정 · 개폐 · 삭제 |
+
+- **스킨 4종**: `LIST`(공지·자료실) · `GALLERY`(이미지 게시판) · `FAQ`(아코디언) · `QNA`(질문·답변).
+  스킨은 정책을 강제한다 — `GALLERY` 는 첨부를, `QNA` 는 댓글을 끌 수 없다(도메인 조립 시점 차단).
+- **인가는 역할 allowlist**(`read/write/comment/manage_roles`). RBAC `permissions` 코드로 판정하지 않는다 —
+  그 테이블은 order DB 라 읽는 순간 DB-per-service 경계가 무너진다. **읽기가 비면 공개 게시판**(비로그인 포함),
+  쓰기·댓글·운영은 비울 수 없다(익명 쓰기 미지원).
+- **읽을 수 없는 게시판은 403 이 아니라 404** — 403 은 존재를 알려 줘 키 대입으로 비공개 게시판을 훑게 한다.
+- **발행 0 · 소비 0**: Kafka 토픽이 없다. 권한은 역할, 작성자명은 작성 시점 스냅샷, 분류는 order 공통코드 그룹
+  **코드 문자열 참조**(cross-DB FK 아님)라 어떤 외부 조회도 필요 없다.
+- **메뉴 등록은 별도 조작**: `menus` 는 order-service 소유다. 관리 화면이 게시판 생성 후 기존
+  `POST /admin/menus` 를 한 번 더 호출하고, 연결 상태는 두 API 응답을 화면에서 대조해 배지로 보여 준다.
+  게시판 생성이 곧 전사 네비게이션 변경이 되면 테스트 게시판·오타 난 이름이 즉시 모두에게 노출된다.
+- **키(`boardKey`)는 불변**(URL·메뉴 행이 가리킨다), **삭제는 닫힌 게시판만**(운영 중 삭제는 되돌릴 수 없다).
+- 스캔 범위를 board 패키지로 한정해 shared-common Outbox·Audit 엔티티를 끌어오지 않는다 —
+  쓰지 않는 `outbox_events` 를 만들어 두면 다음 사람이 이 서비스가 이벤트를 발행한다고 오해한다.
+- **Phase 1 범위**: 게시판 정의 CRUD + 관리 화면(`/admin/system/boards`)까지. 게시글·댓글·첨부는 Phase 2~3.
+
+### 3.18 gateway-service — API Gateway (port 8080)
 
 - Spring Cloud Gateway(WebFlux). 서비스별 경로 predicate 라우팅. 위성 5종(financial·economics·market·commondata·company)은 공개 조회 API 만 라우팅(수집 트리거
   `/admin/**` 외부 미노출). organization 은 `/api/organizations/**`(JWT 필수)를 라우팅.
@@ -359,7 +387,7 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
   `notification-service` 의 `/api/notifications/stream`(알림 푸시 SSE, JWT 필수). 후자는 스트림 한 경로만
   올린다 — `/notifications/send`·`/demo` 는 인증 없는 내부 발송 경로다. 정본: [`docs/sse.md`](docs/sse.md).
 
-### 3.18 Kotlin 이벤트 서비스 2종 — notification(8130) · reconciliation(8131)
+### 3.19 Kotlin 이벤트 서비스 2종 — notification(8130) · reconciliation(8131)
 
 Boot 3.3 · JDK 21 · 코루틴. **자체 DB 없음**(무영속 MVP) · shared-common 미의존 · gateway 미라우팅
 (예외: notification 의 알림 푸시 SSE 한 경로 — 아래 표).
@@ -369,7 +397,7 @@ Boot 3.3 · JDK 21 · 코루틴. **자체 DB 없음**(무영속 MVP) · shared-c
 | **notification-service** (8130)   | `POST /notifications/send`, `GET /notifications/demo`, **`GET /notifications/stream`(SSE 푸시 허브 — JWT 필수, gateway `/api/notifications/stream`)** + Kafka 리스너 | 도메인 이벤트 5토픽(`settlement.confirmed`·`payment.confirmed/captured/refunded`·`investment.executed`) → 다채널(log/Slack/email) 알림. **코루틴 I/O 팬아웃 + 채널별 타임아웃(3s)/재시도(3회) 격리**, eventId 멱등(TTL 30분). Kafka 리스너는 기본 OFF(`APP_KAFKA_ENABLED=true` 로 활성) — 브로커 없이도 기동·데모 가능 |
 | **reconciliation-service** (8131) | `POST /reconciliation/run`, `GET /reconciliation/demo` + `@Scheduled`(매일 19:00 KST) | 정산 대사 — settlement·payment 소스 **코루틴 병렬 fetch** 후 대조, sealed `Discrepancy`(MISSING/EXTRA/AMOUNT/STATUS) 분류, 허용오차 1원(`tolerance-krw`). 소스 base-url 은 env 주입(기본 샘플 시뮬레이션)                                                                                                              |
 
-### 3.19 Polyglot 서비스 5종 — Go 2 + Python 3 (정본: [`docs/plan/polyglot-services.md`](docs/plan/polyglot-services.md))
+### 3.20 Polyglot 서비스 5종 — Go 2 + Python 3 (정본: [`docs/plan/polyglot-services.md`](docs/plan/polyglot-services.md))
 
 언어별 강점 배치: **Go**=동시성·저지연 엣지, **Python**=데이터/ML/퀀트. 모두 동작 MVP(핵심 로직+헬스체크+테스트+멀티스테이지 Dockerfile, non-root), Gradle 빌드와 독립.
 

@@ -55,7 +55,7 @@
 | **notification-service** | 8130 | 도메인 이벤트(Kafka) → 다채널(log/Slack/email) 알림 + 브라우저 푸시 SSE(`/api/notifications/stream`) | 코루틴 I/O 팬아웃 · 채널별 타임아웃/재시도 격리 · eventId 멱등 · JWT 신원 라우팅/`Last-Event-ID` 재생([`sse.md`](docs/sse.md)) |
 | **reconciliation-service** | 8131 | 정산 대사 (settlement ↔ PG/payout/원장) | sealed Discrepancy(MISSING/EXTRA/AMOUNT/STATUS) · 다소스 코루틴 병렬 fetch · @Scheduled |
 
-**합계**: Java 17종(16 서비스 + gateway) + Go 2 + Python 3 + Kotlin 2 = **24 서비스** (+ shared-common 라이브러리). *런타임은 Java 25 — 위 숫자는 서비스 수다.*
+**합계**: Java 18종(17 서비스 + gateway) + Go 2 + Python 3 + Kotlin 2 = **25 서비스** (+ shared-common 라이브러리). *런타임은 Java 25 — 위 숫자는 서비스 수다.*
 
 ---
 
@@ -100,7 +100,7 @@
 
 | 레이어 | 기술 |
 |---|---|
-| **JVM 언어** | Java 25 (코어 16 서비스 + gateway) · Kotlin 2.0 (신규 이벤트 서비스 2종) |
+| **JVM 언어** | Java 25 (코어 17 서비스 + gateway) · Kotlin 2.0 (신규 이벤트 서비스 2종) |
 | **JVM 프레임워크** | Spring Boot 4.0.7 / Spring 7 (Java) · Spring Boot 3.3 (Kotlin, JDK 21) · Spring Cloud Gateway |
 | **Go** | Go 1.22/1.23 혼재 — CI 툴체인 1.23 (goroutine, `net/http` SSE/WebSocket, kafka-go, HMAC-SHA256) |
 | **Python** | Python 3.11 · FastAPI · pandas/numpy · scikit-learn · statsmodels |

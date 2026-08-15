@@ -40,6 +40,7 @@ export const ROUTES = [
   [/insurance-service\//, ["insurance-domain-rules"]],
   [/deposit-service\//, ["deposit-domain-rules"]],
   [/organization-service\//, ["organization-domain-rules"]],
+  [/board-service\//, ["board-domain-rules"]],
   [
     /(\/outbox\/|adapter\/in\/kafka\/|adapter\/out\/event\/)/i,
     ["idempotency-and-events"],
