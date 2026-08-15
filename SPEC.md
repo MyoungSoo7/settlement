@@ -360,6 +360,8 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
 | --------- | ----------------------------------------------------------------------- | ------------------------------------------------- |
 | 이용      | `GET /api/boards` · `GET /api/boards/{boardKey}`                        | 활성 + 호출자가 읽을 수 있는 게시판 정의 조회     |
 | 관리 콘솔 | `GET|POST /admin/boards` · `PUT|DELETE /admin/boards/{id}` · `POST /admin/boards/{id}/{activate,deactivate}` (ADMIN) | 게시판 생성 · 정책 수정 · 개폐 · 삭제 |
+| 게시글    | `GET /api/boards/{key}/posts`(페이지·분류·검색) · `GET|POST /api/boards/{key}/posts` · `PUT|DELETE .../{postId}` · `POST .../{postId}/{pin,hide,restore}` | 목록(고정 먼저·최신순, 본문 미포함) · 상세(조회수 증가) · 작성 · 수정 · 삭제(상태 전이) · 운영 조작 |
+| 댓글      | `GET|POST /api/boards/{key}/posts/{postId}/comments` · `DELETE /api/boards/{key}/comments/{commentId}` | 목록(삭제분은 자리표시) · 작성(답글 1단) · 삭제 |
 
 - **스킨 4종**: `LIST`(공지·자료실) · `GALLERY`(이미지 게시판) · `FAQ`(아코디언) · `QNA`(질문·답변).
   스킨은 정책을 강제한다 — `GALLERY` 는 첨부를, `QNA` 는 댓글을 끌 수 없다(도메인 조립 시점 차단).
@@ -375,7 +377,16 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
 - **키(`boardKey`)는 불변**(URL·메뉴 행이 가리킨다), **삭제는 닫힌 게시판만**(운영 중 삭제는 되돌릴 수 없다).
 - 스캔 범위를 board 패키지로 한정해 shared-common Outbox·Audit 엔티티를 끌어오지 않는다 —
   쓰지 않는 `outbox_events` 를 만들어 두면 다음 사람이 이 서비스가 이벤트를 발행한다고 오해한다.
-- **Phase 1 범위**: 게시판 정의 CRUD + 관리 화면(`/admin/system/boards`)까지. 게시글·댓글·첨부는 Phase 2~3.
+- **인가는 도메인이 판정한다**: `BoardPost.edit(actor, ...)` 처럼 애그리거트가 주체를 받아 소유권을 대조한다.
+  컨트롤러에 두면 어댑터를 하나 더 만들 때 조용히 빠지고 그게 IDOR 이 된다. 주체는 JWT 에서만 만든다.
+- **작성자 표시명은 마스킹 스냅샷**(`ad***`) — 원문 이메일을 board DB 에 저장하지 않는다(PII 확산 차단).
+  소유권 대조는 `author_id` 로 하므로 인가 정확도는 그대로다.
+- **삭제는 상태 전이**(글·댓글 모두). 삭제된 댓글은 원문 대신 `삭제된 댓글입니다.` 자리표시만 응답에 나간다
+  — 원문은 신고·감사 대응을 위해 DB 에만 남는다. 숨김(HIDDEN, 운영자가 되돌릴 수 있음)과 삭제(작성자 의사)를 가른다.
+- **가시성은 질의 조건으로 번역**한다(`PostSearchCriteria`) — 페이지를 읽고 자바에서 걸러 내면
+  총건수와 페이지 크기가 어긋난다. 동적 조건은 Specification 으로 만든다(`:param IS NULL OR` JPQL 은 PG bytea 트랩).
+- **Phase 2 범위**: 정의 CRUD + 게시글·댓글 + LIST 스킨(`/boards/:boardKey`, `/boards/:boardKey/:postId`).
+  첨부·GALLERY 스킨은 Phase 3. 그때까지 다른 스킨은 목록형으로 렌더한다.
 
 ### 3.18 gateway-service — API Gateway (port 8080)
 

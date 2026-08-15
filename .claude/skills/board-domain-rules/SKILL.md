@@ -15,7 +15,12 @@ description: 메타 주도 게시판 도메인 핵심 규칙 — 정의가 게�
 정의를 인자로 받아 도메인이 조립 시점에 검사한다.
 
 ```java
-BoardPost.create(definition, authorId, authorName, title, content, attachments);  // Phase 2
+BoardPost.create(definition, actor, author, title, content, categoryCode, secret, now);
+//  ├─ 닫힌 게시판                                   → BoardInvariantViolation
+//  ├─ definition.canWrite(actor.role()) 실패        → BoardAccessDenied
+//  ├─ actor 와 author 식별자 불일치(작성자 위조)     → BoardAccessDenied
+//  ├─ 비밀글인데 게시판이 비밀글 불허               → BoardInvariantViolation
+//  └─ 분류 그룹 없는 게시판에 분류 지정              → BoardInvariantViolation
 ```
 
 응용 서비스나 컨트롤러가 `if (definition.isAttachmentsEnabled() && ...)` 로 다시 검사하면
@@ -44,8 +49,28 @@ definition.canRead(role) / canWrite(role) / canComment(role) / canManage(role)
   (익명 쓰기는 스팸 벡터라 미지원). `BoardAccessPolicy.of` 가 강제한다.
 - `canComment` 는 역할 이전에 **댓글 활성 여부**를 먼저 본다 — 댓글이 꺼진 게시판은 역할이 맞아도 false.
 - 역할 문자열을 enum 으로 봉인하지 않는다. 역할은 RBAC 테이블의 데이터라 운영 중 늘어난다.
-- Phase 2 글 수정·삭제는 **JWT 주체(`uid`)와 `author_id` 대조**로 판정한다. 요청 파라미터의 작성자
-  식별자는 절대 신뢰하지 않는다(IDOR).
+- 글·댓글 수정·삭제는 **JWT 주체(`uid`)와 `author_id` 대조**로 판정한다(IDOR). 요청 파라미터의 작성자
+  식별자는 절대 신뢰하지 않는다 — `BoardActor`·`BoardAuthor` 는 웹 어댑터가 JWT 에서만 만든다.
+- **인가는 애그리거트 안에 둔다**: `post.edit(actor, definition, ...)`. 컨트롤러에 두면 어댑터를
+  하나 더 만들 때(관리 콘솔·배치·내부 API) 조용히 빠지고, 그게 IDOR 이 된다.
+- 고정·숨김·복구는 **운영 역할만** — 작성자라도 자기 글을 상단 고정할 수 없다.
+
+## 2-1. 게시글·댓글 규칙 (Phase 2)
+
+- **본문 형식은 작성 시점 스냅샷**. 게시판 정책이 TEXT→HTML 로 바뀌어도 이미 쓴 글의 렌더 방식은
+  그대로다 — 평문으로 쓴 글이 갑자기 마크업으로 해석되면 깨져 보이거나, 더 나쁘게는 실행된다.
+- **작성자 표시명은 마스킹 스냅샷**(`BoardAuthor.fromSubject` → `ad***`). 원문 이메일을 저장하지 않는다.
+- **삭제는 상태 전이**. 글의 `DELETED` 는 종단이다(숨김·복구·수정 불가). 댓글은 `visibleContent()` 가
+  자리표시만 돌려주고 원문은 감사용으로 DB 에만 남는다 — 응답 경로로 절대 내보내지 말 것.
+- **숨김(HIDDEN)과 삭제(DELETED)를 합치지 말 것**. 숨김은 운영자가 되돌릴 수 있는 조치, 삭제는
+  작성자의 의사표시다. 합치면 운영자가 내린 글을 작성자가 되살릴 수 있게 된다.
+  숨긴 글은 **작성자에게도** 보이지 않는다(운영 역할만).
+- **답글은 1단까지**(`resolveParentId`). 다른 글의 댓글·삭제된 댓글에는 답글을 달 수 없다.
+- **가시성은 질의 조건으로 번역**한다(`PostSearchCriteria`) — 페이지를 읽고 자바에서 걸러 내면
+  총건수와 페이지 크기가 어긋난다. 판정 기준은 도메인과 같고 번역만 응용 계층이 한다.
+- 동적 조건은 **Specification** 으로. `:param IS NULL OR col = :param` JPQL 은 PostgreSQL 에서
+  `bytea` 비교 오류를 낸 전력이 있다.
+- 목록 페이지 크기는 **상한 100**(`PostListQuery`). 없으면 한 방에 게시판 전체를 덤프할 수 있다.
 
 ## 3. 라이프사이클
 
@@ -75,7 +100,8 @@ definition.canRead(role) / canWrite(role) / canComment(role) / canManage(role)
 | 키 중복 | 409 |
 | 불변식 위반(스킨↔정책, 형식, 삭제 가드) | 400 |
 | 없는 게시판 | 404 |
-| **읽을 수 없는 게시판** | **404** (403 아님 — 403 은 존재를 알려 줘 키 대입 탐색을 허용한다) |
+| **읽을 수 없는 게시판·게시글** | **404** (403 아님 — 403 은 존재를 알려 줘 키 대입 탐색을 허용한다) |
+| 쓰기·수정·삭제 권한 없음 | **403** — 대상의 존재를 이미 아는 주체의 조작이라 감출 것이 없다 |
 
 `@ExceptionHandler(Exception.class)` catch-all 을 두지 말 것 — 스프링 시큐리티의
 `AccessDeniedException` 까지 삼켜 403 이 500 으로 바뀐다.
