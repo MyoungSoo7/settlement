@@ -28,7 +28,7 @@ public class CommissionRatePolicyPersistenceAdapter implements LoadCommissionRat
 
     @Override
     public List<PolicyRow> findRows(boolean includeClosed) {
-        return (includeClosed ? repository.findAllOrdered() : repository.findOpenOrdered()).stream()
+        return (includeClosed ? repository.findAllOrdered() : repository.findOpenOrdered(LocalDate.now())).stream()
                 .map(CommissionRatePolicyPersistenceAdapter::toRow)
                 .toList();
     }

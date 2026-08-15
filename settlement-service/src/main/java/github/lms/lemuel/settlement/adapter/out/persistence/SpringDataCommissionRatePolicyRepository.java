@@ -29,15 +29,19 @@ public interface SpringDataCommissionRatePolicyRepository
                                                        @Param("tierKey") String tierKey);
 
     /**
-     * 운영 목록 — 살아 있는 정책만. 정렬은 scope → scopeKey → 발효일 역순으로, 같은 대상의 최신 정책이
-     * 먼저 오게 한다(운영자가 "지금 이 셀러에 뭐가 걸렸나"를 위에서부터 읽는다).
+     * 운영 목록 — 살아 있는 정책만: 조기 종료(closed_at)만이 아니라 <b>자연 만료</b>도 걸러 낸다.
+     * 유효기간이 [from, to) 반열림이라 to ≤ 기준일이면 이미 만료인데, closed_at 만 보면 기한부 정책이
+     * 만료 뒤에도 목록에 "살아 있는" 것처럼 남아 종료 버튼까지 노출된다. 정렬은 scope → scopeKey →
+     * 발효일 역순으로, 같은 대상의 최신 정책이 먼저 오게 한다(운영자가 "지금 이 셀러에 뭐가 걸렸나"를
+     * 위에서부터 읽는다).
      */
     @Query("""
             SELECT p FROM CommissionRatePolicyJpaEntity p
             WHERE p.closedAt IS NULL
+              AND (p.effectiveTo IS NULL OR p.effectiveTo > :at)
             ORDER BY p.scope, p.scopeKey, p.effectiveFrom DESC
             """)
-    List<CommissionRatePolicyJpaEntity> findOpenOrdered();
+    List<CommissionRatePolicyJpaEntity> findOpenOrdered(@Param("at") LocalDate at);
 
     /** 운영 목록 — 종료 이력까지. 같은 정렬을 쓴다. */
     @Query("""

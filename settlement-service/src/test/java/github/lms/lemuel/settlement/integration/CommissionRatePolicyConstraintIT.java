@@ -144,6 +144,22 @@ class CommissionRatePolicyConstraintIT {
                 .containsExactlyInAnyOrder("VIP_LIST_OPEN", "VIP_LIST_CLOSED");
     }
 
+    /**
+     * closed_at 만 거르면 기한부 정책이 자연 만료 뒤에도 "살아 있는" 목록에 남아 종료 버튼까지
+     * 노출된다(PR #263 리뷰 P2). 반열림 [from, to) 이라 to 가 오늘이면 이미 만료다.
+     */
+    @Test @DisplayName("목록: 자연 만료(effective_to 경과)도 살아 있는 목록에서 빠진다")
+    void listRowsFilterNaturallyExpired() {
+        jdbc.update("DELETE FROM commission_rate_policy");
+        insert("VIP_LIST_EXPIRED", "0.02000", "2026-01-01", "2026-02-01");
+        insert("VIP_LIST_LIVE", "0.02500", "2026-01-01", null);
+
+        assertThat(listPort.findRows(false)).extracting(PolicyRow::scopeKey)
+                .containsExactly("VIP_LIST_LIVE");
+        assertThat(listPort.findRows(true)).extracting(PolicyRow::scopeKey)
+                .containsExactlyInAnyOrder("VIP_LIST_LIVE", "VIP_LIST_EXPIRED");
+    }
+
     @Test @DisplayName("목록: 감사 근거(reason·createdBy)와 종료 여부를 그대로 실어 온다")
     void listRowsCarryAuditFields() {
         jdbc.update("DELETE FROM commission_rate_policy");
