@@ -2,7 +2,6 @@ package github.lms.lemuel.board.adapter.out.detect;
 
 import github.lms.lemuel.board.application.port.out.DetectFileTypePort;
 import github.lms.lemuel.board.domain.DetectedFileType;
-import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -14,11 +13,11 @@ import java.util.List;
  * 여기 20줄이면 끝난다. 반면 범용 판정기는 수백 개 형식을 인식하려 들어 <b>우리가 받지 않기로 한
  * 형식까지 "정상"으로 만들어</b> 준다 — 화이트리스트를 넓히는 방향의 의존은 이득이 없다.
  *
- * <p><b>인식 못 한 것은 통과시키지 않는다.</b> 여기 없는 형식은 {@link DetectedFileType#unknown()}
- * 이 되고 도메인이 거절한다. 텍스트·CSV 처럼 시그니처가 없는 형식을 첨부로 받으려면 목록을
- * 넓히는 게 아니라 <b>판정 방법</b>을 따로 정해야 한다(현재 범위 밖).
+ * <p><b>인식 못 한 것은 여기서 통과시키지 않는다.</b> 시그니처가 없는 형식(txt·csv·md…)은
+ * {@link TextContentSniffer} 가 내용으로 가린다 — 목록을 넓히는 게 아니라 판정 방법을 따로 둔 것이다.
+ * 두 단계를 잇는 것은 {@link ContentFileTypeDetector} 이고, 이 클래스는 그 안의 1단계다
+ * (그래서 스프링 빈이 아니다 — 포트 구현이 둘이 되면 주입이 갈린다).
  */
-@Component
 public class MagicByteFileTypeDetector implements DetectFileTypePort {
 
     private record Signature(int offset, byte[] magic, DetectedFileType type) {

@@ -95,6 +95,9 @@ definition.canRead(role) / canWrite(role) / canComment(role) / canManage(role)
 - **판정과 선언이 다르면 거절**(`shell.jpg` 우회). 단 jpg/jpeg·docx/zip 처럼 같은 형식의 다른 이름은
   `DetectedFileType.matches` 의 별칭으로 통과시킨다 — 정상 파일이 무더기로 막히면 사람들은 검사를 끄자고 한다.
 - **인식 못 한 형식은 통과시키지 않는다.** 서버가 모르는 바이트를 브라우저는 추측해서 실행할 수 있다.
+- **시그니처가 없는 형식(txt·csv·md·json…)은 내용 스니핑**으로 가린다(`TextContentSniffer`) —
+  NUL 없음 · UTF-8 디코딩 성공 · 제어문자 1% 이하. "확장자가 .txt 면 통과"로 바꾸지 말 것,
+  그 순간 검사가 사라진다. 순서는 **시그니처 → 텍스트**다(PDF 앞부분이 아스키라 뒤집으면 오판).
 - **SVG·HTML·XML 은 정책이 허용해도 차단**(`AttachmentUpload.ALWAYS_BLOCKED`). 스크립트를 담을 수 있는 문서다.
 - **저장 파일명은 서버가 만든 UUID**. 업로더 이름은 표시용으로만 쓰고 경로에 넣지 않는다 — 경로 조작을
   막는 가장 확실한 방법은 정화가 아니라 <b>입력을 쓰지 않는 것</b>이다.
