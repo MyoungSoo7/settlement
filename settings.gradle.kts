@@ -22,6 +22,7 @@ include(
     "card-service",
     "insurance-service",
     "deposit-service",
+    "board-service",
 )
 
 // shared-common 은 독립 빌드(버전드 내부 라이브러리)로 분리.

@@ -90,6 +90,13 @@ spring:
               # 하나의 와일드카드로 합치지 않는다.
               predicates:
                 - Path=/api/deposits/**,/admin/deposits/**
+            - id: board-service
+              uri: ${BOARD_SERVICE_URI:http://localhost:8114}
+              # 메타 주도 게시판 — /api 는 정의 조회(공개 게시판은 미인증도 읽는다),
+              # /admin 은 게시판을 만들고 정책을 바꾸는 콘솔(ADMIN). 두 경로의 권한 등급이
+              # 다르므로 하나의 와일드카드로 합치지 않는다(deposit 과 같은 기준).
+              predicates:
+                - Path=/api/boards/**,/admin/boards/**
             - id: settlement-service
               uri: ${SETTLEMENT_SERVICE_URI:http://localhost:8082}
               # SettlementController 는 /settlements(비-/api), 검색/원장/리포트는 /api, 운영 콘솔은 /admin.

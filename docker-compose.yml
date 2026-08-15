@@ -361,6 +361,28 @@ services:
       timeout: 3s
       retries: 10
 
+  # ★ DB-per-service: board-service 전용 PostgreSQL (메타 주도 게시판 — 정의 1행 = 게시판 1개)
+  board-postgres:
+    image: postgres:17-alpine
+    container_name: lemuel-board-db
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      POSTGRES_DB: lemuel_board
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "127.0.0.1:5450:5432"
+    volumes:
+      - board-postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
   # ★ DB-per-service: card-service 전용 PostgreSQL (셀러 법인카드·임직원 카드 한도 관리)
   card-postgres:
     image: postgres:17-alpine
@@ -1289,6 +1311,47 @@ services:
       redpanda:
         condition: service_healthy
 
+  board-service:
+    build:
+      context: .
+      args:
+        MODULE: board-service
+    image: ghcr.io/myoungsoo7/lemuel-board:latest
+    container_name: lemuel-board
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      # 자체 DB(lemuel_board) — 게시판 정의. Kafka 발행·소비가 없어 redpanda 에 의존하지 않는다.
+      SPRING_DATASOURCE_URL: jdbc:postgresql://board-postgres:5432/lemuel_board?reWriteBatchedInserts=true
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      JWT_ISSUER: ${JWT_ISSUER}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_TTL_SECONDS: ${JWT_TTL_SECONDS}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
+      SERVER_PORT: 8080
+      MANAGEMENT_SERVER_PORT: 8080
+    ports:
+      # 호스트 8114 — 8112/8113 은 deposit 이 쓴다. 8006~8105 는 Windows(Hyper-V) 예약 구간.
+      - "127.0.0.1:8114:8080"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://localhost:8080/actuator/health || exit 1",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    depends_on:
+      board-postgres:
+        condition: service_healthy
+
   gateway-service:
     build:
       context: .
@@ -1317,6 +1380,7 @@ services:
       CARD_SERVICE_URI: http://card-service:8080
       INSURANCE_SERVICE_URI: http://insurance-service:8080
       DEPOSIT_SERVICE_URI: http://deposit-service:8080
+      BOARD_SERVICE_URI: http://board-service:8080
       MARKET_STREAM_SERVICE_URI: http://market-stream-service:8110
       NOTIFICATION_SERVICE_URI: http://notification-service:8130
       JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:InitialRAMPercentage=50.0"
@@ -1479,6 +1543,7 @@ volumes:
   card-postgres-data:
   insurance-postgres-data:
   deposit-postgres-data:
+  board-postgres-data:
   ai-postgres-data:
   elasticsearch-data:
   redpanda-data:

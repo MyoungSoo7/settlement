@@ -1,0 +1,97 @@
+spring:
+  profiles:
+    active: local
+
+  application:
+    name: lemuel-board
+
+  threads:
+    virtual:
+      enabled: true
+
+  # ★ board-service 는 자체 DB(lemuel_board) 를 소유한다 (DB-per-service).
+  #   메타 주도 게시판 플랫폼 — 다른 서비스 코드·DB 의존 0, Kafka 발행·소비도 0 이다.
+  #   (권한은 역할 allowlist, 작성자명은 스냅샷, 메뉴 등록은 관리 화면이 order API 를 직접 호출)
+  datasource:
+    url: jdbc:postgresql://localhost:5450/lemuel_board?reWriteBatchedInserts=true
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      pool-name: lemuel-board-pool
+      maximum-pool-size: ${DB_POOL_MAX:10}
+      minimum-idle: ${DB_POOL_MIN_IDLE:2}
+      connection-timeout: 10000
+      leak-detection-threshold: 30000
+      max-lifetime: 1800000 # 30분 — 유휴 커넥션이 CNI/conntrack 만료로 조용히 죽는 것 방지
+      keepalive-time: 300000 # 5분
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        # ★ 다른 서비스와 달리 opslab 이 아니라 자체 스키마다. 그 이름은 shared-common Outbox 의
+        #   네이티브 쿼리가 하드코딩한 것인데, 이 서비스는 Outbox 를 쓰지 않아 따라갈 이유가 없다.
+        default_schema: board
+        jdbc:
+          batch_size: 30
+        order_inserts: true
+        order_updates: true
+
+  flyway:
+    enabled: true
+    schemas: board
+    locations: classpath:db/migration
+
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+server:
+  # 8114/8115 — 8112/8113 은 deposit 이 쓴다. 8006~8105 는 Windows(Hyper-V) 예약 구간이라 재사용 불가.
+  port: 8114
+  shutdown: graceful
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    prometheus:
+      enabled: true
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
+  health:
+    db:
+      enabled: true
+  server:
+    port: 8115
+  metrics:
+    tags:
+      application: ${spring.application.name}
+      environment: ${ENVIRONMENT:local}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+app:
+  # JWT — shared-common JwtProperties(prefix=app.jwt). order-service 와 동일 시크릿을 공유해야
+  # 같은 토큰으로 이 서비스의 /admin/boards 를 호출할 수 있다.
+  jwt:
+    issuer: ${JWT_ISSUER:lemuel}
+    secret: ${JWT_SECRET}
+    ttl-seconds: ${JWT_TTL_SECONDS:3600}

@@ -1,0 +1,21 @@
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX:20}
+      minimum-idle: ${DB_POOL_MIN_IDLE:5}
+
+  jpa:
+    show-sql: false
+
+logging:
+  level:
+    root: INFO
+    github.lms.lemuel.board: INFO
+
+# 운영에서는 CORS 허용 오리진을 반드시 명시한다 — 기본값(localhost 목록)이 그대로 나가면
+# 로컬 개발 오리진이 운영 응답 헤더에 실린다.
+cors:
+  origins: ${CORS_ORIGINS}
