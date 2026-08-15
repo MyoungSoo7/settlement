@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   boardAdminApi,
   boardApi,
+  boardPostApi,
+  boardCommentApi,
   BOARD_SKINS,
   BOARD_CONTENT_FORMATS,
   BOARD_SKIN_LABEL,
@@ -127,5 +129,97 @@ describe('boardApi (사용자 경로)', () => {
 
     expect(api.get).toHaveBeenCalledWith('/api/boards/notice');
     expect(result.path).toBe('/boards/notice');
+  });
+});
+
+describe('boardPostApi', () => {
+  it('목록은 페이지·검색을 쿼리 파라미터로 넘긴다', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({
+      data: { content: [], page: 1, size: 20, totalElements: 0, totalPages: 0 },
+    });
+
+    await boardPostApi.list('notice', { page: 1, size: 20, keyword: '환불' });
+
+    expect(api.get).toHaveBeenCalledWith('/api/boards/notice/posts', {
+      params: { page: 1, size: 20, keyword: '환불' },
+    });
+  });
+
+  it('파라미터를 생략하면 빈 객체로 보낸다 (서버 기본값에 맡긴다)', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({
+      data: { content: [], page: 0, size: 20, totalElements: 0, totalPages: 0 },
+    });
+
+    await boardPostApi.list('notice');
+
+    expect(api.get).toHaveBeenCalledWith('/api/boards/notice/posts', { params: {} });
+  });
+
+  it('상세·생성·수정·삭제는 모두 게시판 키 아래 경로를 쓴다', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({ data: { id: 7 } });
+    vi.mocked(api.post).mockResolvedValueOnce({ data: { id: 8 } });
+    vi.mocked(api.put).mockResolvedValueOnce({ data: { id: 7 } });
+    vi.mocked(api.delete).mockResolvedValueOnce({ data: undefined });
+    const body = { title: '제목', content: '본문', secret: false };
+
+    await boardPostApi.read('notice', 7);
+    await boardPostApi.create('notice', body);
+    await boardPostApi.update('notice', 7, body);
+    await boardPostApi.remove('notice', 7);
+
+    expect(api.get).toHaveBeenCalledWith('/api/boards/notice/posts/7');
+    expect(api.post).toHaveBeenCalledWith('/api/boards/notice/posts', body);
+    expect(api.put).toHaveBeenCalledWith('/api/boards/notice/posts/7', body);
+    expect(api.delete).toHaveBeenCalledWith('/api/boards/notice/posts/7');
+  });
+
+  it('고정·숨김·복구는 각각 전용 경로다 — 수정으로 상태를 바꾸지 않는다', async () => {
+    vi.mocked(api.post).mockResolvedValue({ data: { id: 7 } });
+
+    await boardPostApi.pin('notice', 7, true);
+    await boardPostApi.hide('notice', 7);
+    await boardPostApi.restore('notice', 7);
+
+    expect(api.post).toHaveBeenNthCalledWith(1, '/api/boards/notice/posts/7/pin?pinned=true');
+    expect(api.post).toHaveBeenNthCalledWith(2, '/api/boards/notice/posts/7/hide');
+    expect(api.post).toHaveBeenNthCalledWith(3, '/api/boards/notice/posts/7/restore');
+  });
+});
+
+describe('boardCommentApi', () => {
+  it('댓글 목록은 글 아래 경로에서 읽는다', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({ data: [] });
+
+    await boardCommentApi.list('qna', 7);
+
+    expect(api.get).toHaveBeenCalledWith('/api/boards/qna/posts/7/comments');
+  });
+
+  it('일반 댓글은 parentId 를 null 로 명시해 보낸다 (undefined 는 필드가 통째로 빠진다)', async () => {
+    vi.mocked(api.post).mockResolvedValueOnce({ data: { id: 1 } });
+
+    await boardCommentApi.create('qna', 7, '답변 부탁드립니다');
+
+    expect(api.post).toHaveBeenCalledWith('/api/boards/qna/posts/7/comments', {
+      content: '답변 부탁드립니다', parentId: null,
+    });
+  });
+
+  it('답글은 부모 댓글 id 를 싣는다', async () => {
+    vi.mocked(api.post).mockResolvedValueOnce({ data: { id: 2 } });
+
+    await boardCommentApi.create('qna', 7, '확인했습니다', 1);
+
+    expect(api.post).toHaveBeenCalledWith('/api/boards/qna/posts/7/comments', {
+      content: '확인했습니다', parentId: 1,
+    });
+  });
+
+  it('댓글 삭제는 글이 아니라 게시판 아래 comments 경로로 간다', async () => {
+    vi.mocked(api.delete).mockResolvedValueOnce({ data: undefined });
+
+    await boardCommentApi.remove('qna', 5);
+
+    expect(api.delete).toHaveBeenCalledWith('/api/boards/qna/comments/5');
   });
 });
