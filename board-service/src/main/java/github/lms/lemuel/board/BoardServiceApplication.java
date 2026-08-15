@@ -4,6 +4,7 @@ import io.github.cdimascio.dotenv.Dotenv;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * board-service 독립 부팅 진입점.
@@ -25,6 +26,9 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
  */
 @SpringBootApplication(scanBasePackages = "github.lms.lemuel.board")
 @ConfigurationPropertiesScan("github.lms.lemuel.board.config")
+// 고아 첨부 청소 배치용. 이게 꺼져 있으면 스케줄러 빈은 정상 생성되지만 한 번도 호출되지 않는다 —
+// 기동 로그에 아무 경고가 없어서 청소가 멈춘 줄 모른 채 파일만 쌓인다(deposit 에서 겪은 함정).
+@EnableScheduling
 public class BoardServiceApplication {
 
     public static void main(String[] args) {

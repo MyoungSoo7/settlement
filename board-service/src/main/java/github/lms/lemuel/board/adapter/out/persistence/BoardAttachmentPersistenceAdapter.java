@@ -8,7 +8,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -49,6 +51,13 @@ public class BoardAttachmentPersistenceAdapter implements LoadBoardAttachmentPor
                 .map(BoardAttachmentJpaEntity::toDomain)
                 .collect(Collectors.toMap(BoardAttachment::getPostId, attachment -> attachment,
                         (existing, replacement) -> existing));
+    }
+
+    @Override
+    public Set<String> findAllReferencedPaths() {
+        Set<String> referenced = new HashSet<>(repository.findAllStoragePaths());
+        referenced.addAll(repository.findAllThumbnailPaths());
+        return referenced;
     }
 
     @Override

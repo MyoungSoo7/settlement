@@ -12,7 +12,10 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 /**
  * 로컬 파일시스템 첨부 저장소.
@@ -70,6 +73,32 @@ public class LocalFileSystemAttachmentStorageAdapter implements StoreAttachmentP
         } catch (IOException e) {
             // 삭제 실패로 호출자의 트랜잭션을 깨지 않는다 — 남은 파일은 청소 대상이지 사고가 아니다.
             log.warn("첨부 파일 삭제 실패(수동 정리 필요): {}", storagePath, e);
+        }
+    }
+
+    @Override
+    public List<StoredFile> listAll() {
+        if (!Files.isDirectory(baseDir)) {
+            // 아직 아무것도 올라오지 않았다 — 청소할 것도 없다.
+            return List.of();
+        }
+        try (Stream<Path> paths = Files.walk(baseDir)) {
+            return paths.filter(Files::isRegularFile)
+                    .map(path -> new StoredFile(
+                            baseDir.relativize(path).toString().replace('\\', '/'), lastModified(path)))
+                    .toList();
+        } catch (IOException e) {
+            throw new UncheckedIOException("첨부 저장소를 훑지 못했습니다: " + baseDir, e);
+        }
+    }
+
+    private static Instant lastModified(Path path) {
+        try {
+            return Files.getLastModifiedTime(path).toInstant();
+        } catch (IOException e) {
+            // 시각을 못 읽으면 "방금 만들어진 것"으로 취급한다 — 유예 기간에 걸려 지워지지 않는다.
+            // 모르는 파일을 지우는 쪽으로 기울면 안 된다.
+            return Instant.now();
         }
     }
 

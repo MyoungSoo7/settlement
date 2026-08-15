@@ -101,6 +101,11 @@ app:
       # 컨테이너에서는 볼륨을 여기에 마운트한다. 이 디렉터리가 사라지면 첨부 행은 남고 파일만
       # 없어져 다운로드가 404 로 떨어진다(LocalFileSystemAttachmentStorageAdapter 참조).
       base-dir: ${APP_BOARD_ATTACHMENT_BASE_DIR:./data/board-attachments}
+      # 고아 파일 청소 — DB 가 참조하지 않는 파일을 지운다. 유예 기간(시간)보다 최근 파일은
+      # 건드리지 않는다: 업로드는 '파일 저장 → DB 기록' 순서라 그 사이 정상 파일도 잠깐 고아처럼 보인다.
+      cleanup-enabled: ${APP_BOARD_ATTACHMENT_CLEANUP_ENABLED:true}
+      cleanup-cron: ${APP_BOARD_ATTACHMENT_CLEANUP_CRON:0 10 4 * * *}
+      cleanup-grace-hours: ${APP_BOARD_ATTACHMENT_CLEANUP_GRACE_HOURS:24}
 
   # JWT — shared-common JwtProperties(prefix=app.jwt). order-service 와 동일 시크릿을 공유해야
   # 같은 토큰으로 이 서비스의 /admin/boards 를 호출할 수 있다.

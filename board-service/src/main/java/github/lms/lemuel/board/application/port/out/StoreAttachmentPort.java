@@ -1,5 +1,8 @@
 package github.lms.lemuel.board.application.port.out;
 
+import java.time.Instant;
+import java.util.List;
+
 /**
  * 첨부 바이너리 저장소.
  *
@@ -21,6 +24,17 @@ public interface StoreAttachmentPort {
     /** 이미 없으면 성공으로 간주한다(멱등). */
     void delete(String storagePath);
 
+    /**
+     * 저장소에 실제로 있는 파일 전부 — 고아 청소가 DB 와 대조하려면 저장소 쪽 사실이 필요하다.
+     *
+     * <p>규모 전제: 게시판 첨부는 수만 건 수준이라 전량 나열이 감당된다. 그 이상으로 커지면
+     * 날짜 파티션 단위 스캔으로 바꿔야 한다.
+     */
+    List<StoredFile> listAll();
+
     record StoredAttachment(String storedName, String storagePath) {
+    }
+
+    record StoredFile(String storagePath, Instant lastModified) {
     }
 }
