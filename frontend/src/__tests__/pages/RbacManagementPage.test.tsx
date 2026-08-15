@@ -254,7 +254,8 @@ describe('RbacManagementPage — 역할 CRUD', () => {
     expect(screen.getByPlaceholderText('CS_AGENT')).toHaveValue('ADMIN_COPY');
     expect(screen.getByPlaceholderText('CS 상담원')).toHaveValue('관리자 (복제)');
 
-    await userEvent.click(screen.getByRole('button', { name: '복제', exact: true }));
+    // ByRoleOptions 에 exact 는 없다(타입 오류) — 정확 일치는 name 정규식으로 표현한다
+    await userEvent.click(screen.getByRole('button', { name: /^복제$/ }));
 
     await waitFor(() => expect(mocked.cloneRole).toHaveBeenCalledWith(1, 'ADMIN_COPY', '관리자 (복제)'));
   });

@@ -98,7 +98,7 @@ describe('aiChatApi.chatStream (SSE)', () => {
 
   it('토큰이 있으면 Authorization 헤더를 붙인다', async () => {
     localStorage.setItem('access_token', 'jwt-token');
-    const spy = vi.fn(() =>
+    const spy = vi.fn((_input: RequestInfo | URL, _init?: RequestInit) =>
       Promise.resolve(sseResponse([`event: done\ndata: ${JSON.stringify(doneEvent)}\n\n`])),
     );
     vi.stubGlobal('fetch', spy);
@@ -111,7 +111,7 @@ describe('aiChatApi.chatStream (SSE)', () => {
   });
 
   it('토큰이 없으면 Authorization 헤더를 붙이지 않는다', async () => {
-    const spy = vi.fn(() =>
+    const spy = vi.fn((_input: RequestInfo | URL, _init?: RequestInit) =>
       Promise.resolve(sseResponse([`event: done\ndata: ${JSON.stringify(doneEvent)}\n\n`])),
     );
     vi.stubGlobal('fetch', spy);

@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import CeoInsightPage from '@/pages/CeoInsightPage';
-import { financialApi } from '@/api/financial';
 import { ceoApi } from '@/api/ceo';
 
 vi.mock('@/api/financial', () => ({ financialApi: { companies: vi.fn(), statements: vi.fn() } }));
@@ -11,7 +10,6 @@ vi.mock('@/api/ceo', async (importOriginal) => {
   return { ...actual, ceoApi: { insight: vi.fn(), searchCompanies: vi.fn() } };
 });
 
-const mockedFinancial = vi.mocked(financialApi);
 const mockedCeo = vi.mocked(ceoApi);
 
 const company = { stockCode: '005930', corpCode: '00126380', name: '삼성전자', market: 'KOSPI' };
