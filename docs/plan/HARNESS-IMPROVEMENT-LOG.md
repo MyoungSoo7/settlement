@@ -27,6 +27,29 @@ _판정 로그_ 다. 지금까지 하네스는 계속 늘어나기만 했고, �
 
 ## 항목
 
+### 2026-08-16 · CI 변경 감지 기준점 — push 는 직전 커밋 대비(전 모듈 실행 제거)
+
+- **status**: verified
+- **동기**: 경로 필터·모듈 매트릭스는 정교하게 짜여 있는데 **입력이 틀려서 무력화**돼 있었다.
+  `dorny/paths-filter` 에 `base` 를 주지 않으면 기본 브랜치(main)와의 merge-base 를 기준으로 삼는데,
+  main 이 develop 보다 1300 커밋 뒤처져 있어 develop push 는 무엇을 바꿨든 전부 바뀐 것으로 잡혔다.
+  `shared` 필터(build.gradle.kts·Dockerfile·ci.yml)가 반드시 걸려 언제나 '전 서비스 재빌드' 분기.
+- **predicted_effect**: push 는 직전 커밋 대비로 판정 → 바뀐 모듈만 실행. PR 은 base 를 비워
+  main 대비 유지 → 머지 전 전량 검증은 그대로. 상시 열린 develop→main 릴리스 PR 이 안전망이라
+  push 쪽을 줄여도 게이트가 약해지지 않는다.
+- **verified_at**: 2026-08-16 · 같은 워크플로·같은 브랜치에서 기준점만 바뀐 두 실행을 대조
+  - before (run 31892010325): `Searching for merge-base main...develop` → `Detected 274 changed files`
+    → 백엔드 모듈 19잡 (문서 2개·tsx 2개만 바꾼 push)
+  - after (run 31894160978): `변경 감지 기준: 직전 커밋 331f6238…` → **`Detected 2 changed files`**
+    → `["backend","shared"]`. 이 실행이 18모듈을 돈 것은 바꾼 파일이 `ci.yml`(=shared) 이라 **의도대로**다.
+- **한계(명시)**:
+  - 폴백이 전량으로 떨어진다 — 최초 push·force-push 로 `before` 를 못 찾으면 base 를 비운다.
+    판단이 갈릴 때 더 도는 쪽을 택한 것이고, 그래서 절감이 항상 보장되지는 않는다.
+  - **문서만 바꾼 push 는 여전히 전 모듈이 돈다.** `backend` 필터가 `'**' + '!frontend/**'` 라 docs 도
+    backend 로 잡히고, 매칭된 서비스가 0개면 '모호한 backend 변경 → 안전하게 전 모듈' 분기를 탄다.
+    이건 별개의 (의도된) 페일세이프이므로 이번 변경 범위 밖에 뒀다 — 줄이려면 그 분기의 안전성을
+    따로 판단해야 한다.
+- **적용**: `ci.yml`, `polyglot-ci.yml`(같은 원인 — 폴리글랏 7종 중 하나만 고쳐도 7개가 전부 돌았다)
 ### 2026-08-15 · 리포트 신선도 게이트(report-freshness.mjs) — 낡은 XML 인용 차단
 
 - **status**: candidate
