@@ -39,6 +39,32 @@ public interface BoardAttachmentUseCase {
      */
     AttachmentDownload downloadThumbnail(String boardKey, Long attachmentId, BoardActor actor);
 
+    /**
+     * 내려받기 1건. {@code content} 가 배열이라 record 기본 구현은 <b>참조 동일성</b>으로 비교하고
+     * {@code toString()} 은 {@code [B@1a2b3c} 를 찍는다 — 둘 다 놀라운 동작이라 재정의한다.
+     * 특히 {@code toString()} 은 첨부 바이트를 로그로 흘릴 수 있어(비밀글의 첨부일 수 있다) 길이만 남긴다.
+     */
     record AttachmentDownload(BoardAttachment attachment, byte[] content) {
+
+        @Override
+        public boolean equals(Object o) {
+            if (!(o instanceof AttachmentDownload other)) {
+                return false;
+            }
+            return java.util.Objects.equals(attachment, other.attachment)
+                    && java.util.Arrays.equals(content, other.content);
+        }
+
+        @Override
+        public int hashCode() {
+            return 31 * java.util.Objects.hashCode(attachment) + java.util.Arrays.hashCode(content);
+        }
+
+        @Override
+        public String toString() {
+            return "AttachmentDownload[attachment="
+                    + (attachment == null ? "null" : attachment.getOriginalName())
+                    + ", content=" + (content == null ? "null" : content.length + "B") + "]";
+        }
     }
 }

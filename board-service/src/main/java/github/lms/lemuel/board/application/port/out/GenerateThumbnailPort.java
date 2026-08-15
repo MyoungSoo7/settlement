@@ -18,6 +18,31 @@ public interface GenerateThumbnailPort {
      */
     Optional<Thumbnail> generate(byte[] source, String extension, int maxEdge);
 
+    /**
+     * 축소본 1건. {@code content} 가 배열이라 record 기본 구현은 <b>참조 동일성</b>으로 비교하고
+     * {@code toString()} 은 {@code [B@1a2b3c} 를 찍는다 — 둘 다 놀라운 동작이라 재정의한다.
+     * {@code toString()} 은 이미지 바이트 대신 길이만 남긴다(로그 오염 방지).
+     */
     record Thumbnail(byte[] content, String extension) {
+
+        @Override
+        public boolean equals(Object o) {
+            if (!(o instanceof Thumbnail other)) {
+                return false;
+            }
+            return java.util.Arrays.equals(content, other.content)
+                    && java.util.Objects.equals(extension, other.extension);
+        }
+
+        @Override
+        public int hashCode() {
+            return 31 * java.util.Arrays.hashCode(content) + java.util.Objects.hashCode(extension);
+        }
+
+        @Override
+        public String toString() {
+            return "Thumbnail[content=" + (content == null ? "null" : content.length + "B")
+                    + ", extension=" + extension + "]";
+        }
     }
 }
