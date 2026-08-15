@@ -86,6 +86,25 @@ definition.canRead(role) / canWrite(role) / canComment(role) / canManage(role)
   쌓인 모든 행을 동시에 발화시킨다. 사후 백필은 사용자가 쓴 글을 서버가 임의로 고치는 일이 된다.
 - 프론트는 `contentFormat === 'HTML'` 일 때만 마크업으로 렌더한다. 이 분기를 넓히지 말 것.
 
+## 2-3. 첨부 (Phase 3)
+
+**요청이 주장하는 값 중 믿는 것이 하나도 없다.**
+
+- **형식은 매직바이트로 판정**한다(`DetectFileTypePort`). 요청의 Content-Type 은 버리고, 판정값을
+  DB 에 저장해 다운로드 응답에 쓴다 — 클라이언트 값을 저장하면 업로더가 응답 헤더를 정하는 셈이 된다.
+- **판정과 선언이 다르면 거절**(`shell.jpg` 우회). 단 jpg/jpeg·docx/zip 처럼 같은 형식의 다른 이름은
+  `DetectedFileType.matches` 의 별칭으로 통과시킨다 — 정상 파일이 무더기로 막히면 사람들은 검사를 끄자고 한다.
+- **인식 못 한 형식은 통과시키지 않는다.** 서버가 모르는 바이트를 브라우저는 추측해서 실행할 수 있다.
+- **SVG·HTML·XML 은 정책이 허용해도 차단**(`AttachmentUpload.ALWAYS_BLOCKED`). 스크립트를 담을 수 있는 문서다.
+- **저장 파일명은 서버가 만든 UUID**. 업로더 이름은 표시용으로만 쓰고 경로에 넣지 않는다 — 경로 조작을
+  막는 가장 확실한 방법은 정화가 아니라 <b>입력을 쓰지 않는 것</b>이다.
+- **다운로드 헤더 3종**: 판정된 Content-Type · 이미지만 `inline`(나머지 `attachment`) ·
+  `X-Content-Type-Options: nosniff`. 셋 중 하나라도 빠지면 브라우저 추측이 우리 판정을 이긴다.
+- **첨부는 글의 일부**다. 볼 수 없는 글의 첨부는 404, 삭제 권한은 글 수정 권한을 그대로 따른다.
+- **순서가 곧 안전**: 판정 → 검증(`post.assertCanAttach`) → 저장 → 행 기록. 저장 뒤에 거절하면
+  거절당한 파일이 디스크에 남는다. DB 기록 실패 시 방금 쓴 파일을 손으로 되돌린다(파일시스템은 트랜잭션 밖).
+- 목록의 대표 이미지는 **한 번의 질의**로 채운다(`findFirstImageByPostIds`). 글마다 부르면 한 화면에 20왕복이다.
+
 ## 3. 라이프사이클
 
 - **게시판 키(`boardKey`)는 불변**이다. URL 이자 메뉴 행이 가리키는 값이라 바꾸면 이미 나간 링크가
@@ -127,4 +146,5 @@ definition.canRead(role) / canWrite(role) / canComment(role) / canManage(role)
 - `rehydrate` 경로에서 재검증 — 정책이 강화되면 **기존 게시판 조회 자체가 죽는다**
 - `permissions` 테이블·order DB 조회, Kafka 토픽 추가, `menus` 직접 쓰기
 - 정화를 우회하는 쓰기 경로 추가 — 새 쓰기 경로는 반드시 `BoardContentSanitizer` 를 지나야 한다
-- 첨부 확장자만 믿는 검증 — 매직바이트 검사가 정본(Phase 3)
+- 첨부 확장자만 믿는 검증 — 매직바이트 판정이 정본이다(§2-3)
+- 업로드 바이트를 검증 전에 저장 — 거절당한 파일이 디스크에 남는다

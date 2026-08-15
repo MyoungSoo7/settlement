@@ -362,6 +362,7 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
 | 관리 콘솔 | `GET|POST /admin/boards` · `PUT|DELETE /admin/boards/{id}` · `POST /admin/boards/{id}/{activate,deactivate}` (ADMIN) | 게시판 생성 · 정책 수정 · 개폐 · 삭제 |
 | 게시글    | `GET /api/boards/{key}/posts`(페이지·분류·검색) · `GET|POST /api/boards/{key}/posts` · `PUT|DELETE .../{postId}` · `POST .../{postId}/{pin,hide,restore}` | 목록(고정 먼저·최신순, 본문 미포함) · 상세(조회수 증가) · 작성 · 수정 · 삭제(상태 전이) · 운영 조작 |
 | 댓글      | `GET|POST /api/boards/{key}/posts/{postId}/comments` · `DELETE /api/boards/{key}/comments/{commentId}` | 목록(삭제분은 자리표시) · 작성(답글 1단) · 삭제 |
+| 첨부      | `GET|POST /api/boards/{key}/posts/{postId}/attachments`(멀티파트) · `GET /api/boards/{key}/attachments/{id}/download` · `DELETE .../attachments/{id}` | 목록 · 업로드(매직바이트 판정) · 다운로드 · 삭제 |
 
 - **스킨 4종**: `LIST`(공지·자료실) · `GALLERY`(이미지 게시판) · `FAQ`(아코디언) · `QNA`(질문·답변).
   스킨은 정책을 강제한다 — `GALLERY` 는 첨부를, `QNA` 는 댓글을 끌 수 없다(도메인 조립 시점 차단).
@@ -388,7 +389,10 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
 - **HTML 본문은 저장 시점에 정화**한다(`SanitizeHtmlPort` ← jsoup `Safelist.relaxed()` 화이트리스트).
   작성·수정 두 경로가 모두 `BoardContentSanitizer` 를 지난다 — 한쪽만 막으면 수정으로 심는 우회가 남는다.
   MARKDOWN·댓글은 대상이 아니다(코드 블록의 정당한 태그까지 지워지고, 댓글은 HTML 렌더 경로가 없다).
-- **Phase 2 범위**: 정의 CRUD + 게시글·댓글 + LIST 스킨(`/boards/:boardKey`, `/boards/:boardKey/:postId`)
+- **첨부는 요청의 주장을 믿지 않는다**: 형식은 매직바이트로 판정하고(선언과 다르면 400), 저장 파일명은
+  서버가 만든 UUID 이며, SVG·HTML·XML 은 정책이 허용해도 차단한다. 다운로드는 판정된 Content-Type +
+  이미지만 inline + `nosniff` 3종 헤더로 나간다. 볼 수 없는 글의 첨부는 404 다(설계문서 §15).
+- **Phase 3 범위**: 정의 CRUD + 게시글·댓글 + LIST/GALLERY 스킨 + sanitize + 첨부
   + HTML 본문 sanitize(Phase 3 에서 앞당김 — 사유는 설계문서 §13).
   첨부·GALLERY 스킨은 Phase 3. 그때까지 다른 스킨은 목록형으로 렌더한다.
 
