@@ -20,9 +20,31 @@ import java.util.List;
  */
 public class MagicByteFileTypeDetector implements DetectFileTypePort {
 
-    private record Signature(int offset, byte[] magic, DetectedFileType type) {
+    /**
+     * 시그니처 1개 — 값이 아니라 <b>판정 동작</b>이다. 두 시그니처가 "같은지"를 묻는 코드는 없다.
+     *
+     * <p>record 로 두지 않는 이유: record 면 컴파일러가 {@code magic} 배열을 <b>참조</b>로 비교하는
+     * equals/hashCode 를 만들어 준다(SonarCloud java:S6218). 쓰이지도 않는 값 의미론이 "내용이 같으면
+     * 같다"는 오해만 남기는 셈이다. 재정의로 덮으면 아무도 부르지 않는 코드가 생기므로, 애초에 값
+     * 의미론을 만들지 않는 쪽을 택했다 — 이 타입이 하는 일은 {@link #matches} 하나다.
+     */
+    private static final class Signature {
 
-        boolean matches(byte[] content) {
+        private final int offset;
+        private final byte[] magic;
+        private final DetectedFileType type;
+
+        private Signature(int offset, byte[] magic, DetectedFileType type) {
+            this.offset = offset;
+            this.magic = magic;
+            this.type = type;
+        }
+
+        private DetectedFileType type() {
+            return type;
+        }
+
+        private boolean matches(byte[] content) {
             if (content.length < offset + magic.length) {
                 return false;
             }
