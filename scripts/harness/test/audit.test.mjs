@@ -431,7 +431,10 @@ test('runAuditCli is injectable and returns a status without exiting the importe
 test('harness guard workflow uses deterministic bases and ordered reproducibility checks', () => {
   const workflow = readFileSync(join(process.cwd(), '.github/workflows/harness-guard.yml'), 'utf8');
   assert.match(workflow, /fetch-depth:\s*0/);
-  assert.match(workflow, /node-version:\s*['"]?22['"]?/);
+  // 러너 Node 를 리터럴로 박지 않는다 — 그 리터럴이 frontend/Dockerfile 의 FROM node 와 갈리는 것이
+  // 실제 사고였다(Dependabot #233, 20 vs 26). 단일 출처는 .nvmrc 이고 일치는 node-version-gate 가 본다.
+  assert.match(workflow, /node-version-file:\s*\.nvmrc/);
+  assert.doesNotMatch(workflow, /^\s*node-version\s*:/m);
   assert.match(workflow, /--diff-filter=ACMR/);
   assert.match(workflow, /git fetch --no-tags origin "\+refs\/heads\/\$\{BASE_REF\}:refs\/remotes\/origin\/\$\{BASE_REF\}"/);
   assert.match(workflow, /git merge-base HEAD "refs\/remotes\/origin\/\$BASE_REF"/);
