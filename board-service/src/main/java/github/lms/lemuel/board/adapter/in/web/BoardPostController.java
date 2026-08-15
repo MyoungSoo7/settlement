@@ -1,0 +1,130 @@
+package github.lms.lemuel.board.adapter.in.web;
+
+import github.lms.lemuel.board.adapter.in.web.dto.BoardPageResponse;
+import github.lms.lemuel.board.adapter.in.web.dto.BoardPostRequest;
+import github.lms.lemuel.board.adapter.in.web.dto.BoardPostResponse;
+import github.lms.lemuel.board.application.port.in.ManagePostUseCase;
+import github.lms.lemuel.board.application.port.in.QueryBoardUseCase;
+import github.lms.lemuel.board.application.port.in.QueryPostUseCase;
+import github.lms.lemuel.board.domain.BoardActor;
+import github.lms.lemuel.board.domain.BoardPost;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * 게시글 API — 게시판 하나 안에서만 의미가 있으므로 경로가 게시판 키에 종속된다.
+ *
+ * <p>모든 경로가 {@code boardKey} 를 지나는 것은 우연이 아니다. 글 식별자만으로 접근하게 두면
+ * 공개 게시판의 경로로 비공개 게시판의 글을 읽는 경로가 생긴다 — 서비스가 게시판↔글 소속을
+ * 대조할 수 있도록 키를 항상 함께 받는다.
+ */
+@Tag(name = "Board Post", description = "게시글 조회·작성")
+@RestController
+@RequestMapping("/api/boards/{boardKey}/posts")
+@RequiredArgsConstructor
+public class BoardPostController {
+
+    private final QueryPostUseCase queryPostUseCase;
+    private final ManagePostUseCase managePostUseCase;
+    private final QueryBoardUseCase queryBoardUseCase;
+
+    @Operation(summary = "게시글 목록", description = "고정 글이 먼저, 그다음 최신순. 본문은 싣지 않는다.")
+    @GetMapping
+    public ResponseEntity<BoardPageResponse<BoardPostResponse>> list(
+            @PathVariable String boardKey,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String keyword) {
+
+        BoardActor actor = CurrentActor.resolve();
+        boolean canManage = canManage(boardKey, actor);
+        var result = queryPostUseCase.list(boardKey, actor,
+                new QueryPostUseCase.PostListQuery(page, size, category, keyword));
+
+        return ResponseEntity.ok(BoardPageResponse.from(result,
+                post -> BoardPostResponse.summary(post, actor, canManage)));
+    }
+
+    @Operation(summary = "게시글 상세", description = "조회수가 증가한다. 볼 수 없는 글은 404.")
+    @GetMapping("/{postId}")
+    public ResponseEntity<BoardPostResponse> read(@PathVariable String boardKey, @PathVariable Long postId) {
+        BoardActor actor = CurrentActor.resolve();
+        BoardPost post = queryPostUseCase.read(boardKey, postId, actor);
+        return ResponseEntity.ok(BoardPostResponse.detail(post, actor, canManage(boardKey, actor)));
+    }
+
+    @Operation(summary = "게시글 작성")
+    @PostMapping
+    public ResponseEntity<BoardPostResponse> create(@PathVariable String boardKey,
+                                                    @Valid @RequestBody BoardPostRequest request) {
+        BoardActor actor = CurrentActor.resolve();
+        BoardPost post = managePostUseCase.create(boardKey, actor, CurrentActor.requireAuthor(), request.toCommand());
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(BoardPostResponse.detail(post, actor, canManage(boardKey, actor)));
+    }
+
+    @Operation(summary = "게시글 수정", description = "작성자 본인 또는 게시판 운영 역할만.")
+    @PutMapping("/{postId}")
+    public ResponseEntity<BoardPostResponse> edit(@PathVariable String boardKey, @PathVariable Long postId,
+                                                  @Valid @RequestBody BoardPostRequest request) {
+        BoardActor actor = CurrentActor.resolve();
+        BoardPost post = managePostUseCase.edit(boardKey, postId, actor, request.toCommand());
+        return ResponseEntity.ok(BoardPostResponse.detail(post, actor, canManage(boardKey, actor)));
+    }
+
+    @Operation(summary = "게시글 삭제", description = "물리 삭제가 아니라 상태 전이다.")
+    @DeleteMapping("/{postId}")
+    public ResponseEntity<Void> delete(@PathVariable String boardKey, @PathVariable Long postId) {
+        managePostUseCase.delete(boardKey, postId, CurrentActor.resolve());
+        return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "상단 고정 · 해제", description = "게시판 운영 역할만.")
+    @PostMapping("/{postId}/pin")
+    public ResponseEntity<BoardPostResponse> pin(@PathVariable String boardKey, @PathVariable Long postId,
+                                                 @RequestParam(defaultValue = "true") boolean pinned) {
+        BoardActor actor = CurrentActor.resolve();
+        BoardPost post = managePostUseCase.changePinned(boardKey, postId, actor, pinned);
+        return ResponseEntity.ok(BoardPostResponse.detail(post, actor, canManage(boardKey, actor)));
+    }
+
+    @Operation(summary = "글 숨김", description = "게시판 운영 역할만. 작성자에게도 보이지 않는다.")
+    @PostMapping("/{postId}/hide")
+    public ResponseEntity<BoardPostResponse> hide(@PathVariable String boardKey, @PathVariable Long postId) {
+        BoardActor actor = CurrentActor.resolve();
+        BoardPost post = managePostUseCase.hide(boardKey, postId, actor);
+        return ResponseEntity.ok(BoardPostResponse.detail(post, actor, canManage(boardKey, actor)));
+    }
+
+    @Operation(summary = "숨김 해제")
+    @PostMapping("/{postId}/restore")
+    public ResponseEntity<BoardPostResponse> restore(@PathVariable String boardKey, @PathVariable Long postId) {
+        BoardActor actor = CurrentActor.resolve();
+        BoardPost post = managePostUseCase.restore(boardKey, postId, actor);
+        return ResponseEntity.ok(BoardPostResponse.detail(post, actor, canManage(boardKey, actor)));
+    }
+
+    /**
+     * 응답의 {@code editable} 힌트를 채우기 위한 조회.
+     *
+     * <p>이 값은 <b>화면이 버튼을 그릴지</b>만 정한다. 실제 인가는 도메인이 매 조작마다 다시 하므로,
+     * 여기서 틀려도 권한이 새지 않는다.
+     */
+    private boolean canManage(String boardKey, BoardActor actor) {
+        return queryBoardUseCase.getByKey(boardKey).canManage(actor.role());
+    }
+}

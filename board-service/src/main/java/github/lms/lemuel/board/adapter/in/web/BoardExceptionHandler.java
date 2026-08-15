@@ -1,7 +1,10 @@
 package github.lms.lemuel.board.adapter.in.web;
 
+import github.lms.lemuel.board.domain.exception.BoardAccessDeniedException;
+import github.lms.lemuel.board.domain.exception.BoardCommentNotFoundException;
 import github.lms.lemuel.board.domain.exception.BoardInvariantViolationException;
 import github.lms.lemuel.board.domain.exception.BoardNotFoundException;
+import github.lms.lemuel.board.domain.exception.BoardPostNotFoundException;
 import github.lms.lemuel.board.domain.exception.DuplicateBoardKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -24,9 +27,21 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 public class BoardExceptionHandler {
 
-    @ExceptionHandler(BoardNotFoundException.class)
-    public ResponseEntity<Map<String, String>> handleNotFound(BoardNotFoundException exception) {
+    @ExceptionHandler({BoardNotFoundException.class, BoardPostNotFoundException.class,
+            BoardCommentNotFoundException.class})
+    public ResponseEntity<Map<String, String>> handleNotFound(RuntimeException exception) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", exception.getMessage()));
+    }
+
+    /**
+     * 권한 없음 → 403.
+     *
+     * <p>읽기 경로는 여기 오지 않는다 — 볼 수 없는 대상은 404 로 답한다(존재 노출 차단).
+     * 이 예외는 대상의 존재를 이미 아는 주체의 쓰기·수정·삭제에만 쓰인다.
+     */
+    @ExceptionHandler(BoardAccessDeniedException.class)
+    public ResponseEntity<Map<String, String>> handleAccessDenied(BoardAccessDeniedException exception) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", exception.getMessage()));
     }
 
     @ExceptionHandler(DuplicateBoardKeyException.class)

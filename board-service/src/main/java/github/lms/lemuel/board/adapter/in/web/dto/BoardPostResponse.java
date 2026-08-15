@@ -1,0 +1,63 @@
+package github.lms.lemuel.board.adapter.in.web.dto;
+
+import github.lms.lemuel.board.domain.BoardActor;
+import github.lms.lemuel.board.domain.BoardContentFormat;
+import github.lms.lemuel.board.domain.BoardPost;
+import github.lms.lemuel.board.domain.BoardPostStatus;
+
+import java.time.OffsetDateTime;
+
+/**
+ * 게시글 응답.
+ *
+ * <p>목록형({@link #summary})은 <b>본문을 싣지 않는다</b>. 목록 한 쪽이 본문 50,000자 × 20건이
+ * 되면 응답이 메가바이트 단위로 부푼다.
+ *
+ * <p>{@code editable} 은 화면이 버튼을 그릴지 정하는 힌트일 뿐이다 — 실제 인가는 언제나 서버가
+ * 다시 한다. 이 값을 신뢰해 서버 검사를 빼면 그 순간 응답 조작으로 남의 글을 고칠 수 있게 된다.
+ */
+public record BoardPostResponse(
+        Long id,
+        Long boardId,
+        String categoryCode,
+        String title,
+        String content,
+        BoardContentFormat contentFormat,
+        String authorName,
+        boolean mine,
+        boolean editable,
+        boolean pinned,
+        boolean secret,
+        BoardPostStatus status,
+        long viewCount,
+        OffsetDateTime createdAt,
+        OffsetDateTime updatedAt) {
+
+    public static BoardPostResponse detail(BoardPost post, BoardActor actor, boolean canManage) {
+        return of(post, actor, canManage, true);
+    }
+
+    public static BoardPostResponse summary(BoardPost post, BoardActor actor, boolean canManage) {
+        return of(post, actor, canManage, false);
+    }
+
+    private static BoardPostResponse of(BoardPost post, BoardActor actor, boolean canManage, boolean withContent) {
+        boolean mine = actor.owns(post.getAuthor().userId());
+        return new BoardPostResponse(
+                post.getId(),
+                post.getBoardId(),
+                post.getCategoryCode(),
+                post.getTitle(),
+                withContent ? post.getContent() : null,
+                post.getContentFormat(),
+                post.getAuthor().displayName(),
+                mine,
+                mine || canManage,
+                post.isPinned(),
+                post.isSecret(),
+                post.getStatus(),
+                post.getViewCount(),
+                post.getCreatedAt(),
+                post.getUpdatedAt());
+    }
+}
