@@ -5,6 +5,8 @@ import github.lms.lemuel.menu.application.port.out.LoadMenuPort;
 import github.lms.lemuel.menu.application.port.out.LoadPermissionCodesPort;
 import github.lms.lemuel.menu.application.port.out.SaveMenuPort;
 import github.lms.lemuel.menu.domain.Menu;
+import github.lms.lemuel.menu.domain.MenuArea;
+import github.lms.lemuel.menu.domain.MenuAttributes;
 import github.lms.lemuel.menu.domain.MenuType;
 import github.lms.lemuel.menu.domain.exception.MenuInvariantViolationException;
 import lombok.RequiredArgsConstructor;
@@ -13,11 +15,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -25,6 +29,14 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Transactional
 public class MenuService implements MenuUseCase {
+
+    private static final Set<String> ADMIN_ONLY_PATHS = Set.of(
+            "/admin/payouts",
+            "/admin/settlement/chargebacks",
+            "/admin/settlement/monthly-closing",
+            "/admin/settlement/commission-rates",
+            "/admin/settlement/dlq"
+    );
 
     private final LoadMenuPort loadMenuPort;
     private final SaveMenuPort saveMenuPort;
@@ -67,6 +79,7 @@ public class MenuService implements MenuUseCase {
             menu.requireSameAreaAs(parent);
             Menu.requireDepthWithin(depthOf(parent, byId) + 1);
         }
+        validateAdminOnlyPolicy(command.attributes());
         Menu saved = saveMenuPort.save(menu);
         log.info("메뉴 생성: id={}, name={}, area={}", saved.getId(), saved.getName(), saved.getArea());
         return saved;
@@ -76,6 +89,7 @@ public class MenuService implements MenuUseCase {
     public Menu updateMenu(Long id, UpdateMenuCommand command) {
         Menu menu = loadMenuPort.findById(id)
                 .orElseThrow(() -> new MenuInvariantViolationException("메뉴를 찾을 수 없습니다: " + id));
+        validateAdminOnlyPolicy(command.attributes());
         validateParentChange(id, command.parentId());
         menu.update(
                 command.attributes(),
@@ -94,6 +108,26 @@ public class MenuService implements MenuUseCase {
         Menu saved = saveMenuPort.save(menu);
         log.info("메뉴 수정: id={}, name={}", saved.getId(), saved.getName());
         return saved;
+    }
+
+    /** 시스템·실자금·마감·이벤트 재처리 메뉴는 설정 API에서도 ADMIN 전용을 강제한다. */
+    private void validateAdminOnlyPolicy(MenuAttributes attrs) {
+        boolean adminOnly = attrs.area() == MenuArea.SYSTEM
+                || (attrs.path() != null && attrs.path().startsWith("/admin/system/"))
+                || ADMIN_ONLY_PATHS.contains(attrs.path());
+        if (!adminOnly) {
+            return;
+        }
+        Set<String> roles = attrs.requiredRole() == null
+                ? Set.of()
+                : Arrays.stream(attrs.requiredRole().split(","))
+                .map(String::trim)
+                .map(value -> value.toUpperCase(Locale.ROOT))
+                .collect(Collectors.toSet());
+        if (!roles.equals(Set.of("ADMIN"))) {
+            throw new MenuInvariantViolationException(
+                    "시스템·민감 운영 메뉴는 ADMIN 역할만 지정할 수 있습니다: " + attrs.path());
+        }
     }
 
     @Override

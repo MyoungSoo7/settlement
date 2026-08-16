@@ -7,7 +7,7 @@
 
 ```
 settlement/                              # 모노레포 루트
-├── settings.gradle.kts                  # 17 서비스 + gateway 모듈 선언 (shared-common 은 composite build)
+├── settings.gradle.kts                  # 18 서비스 + gateway 모듈 선언 (shared-common 은 composite build)
 ├── build.gradle.kts                     # 부모 빌드 (subprojects 공통 설정, JaCoCo LINE 90% 게이트)
 ├── docker-compose.yml                   # PG 16종 · ES · Redpanda · 앱 컨테이너 19개(JVM 17 + market-stream + notification)
 ├── Dockerfile                           # MODULE 빌드 인자 파라미터화 (JVM 서비스 공용)
@@ -58,6 +58,7 @@ settlement/                              # 모노레포 루트
 ├── insurance-service/                   # 🛡️ Insurance (8108/mgmt 8109, lemuel_insurance) — GA 보험대리점 플랫폼: 상담·가입설계·청약·계약·유지변경·수수료정산. shared-common 의존
 ├── deposit-service/                     # 🏧 Deposit (8112/mgmt 8113, lemuel_deposit) — 셀러 예치금 원장(잔고 단일 진실원, hold/offset 로 재원 이중사용 차단). shared-common 의존, REST 는 `/api/deposits` 조회 + `/admin/deposits` 수기 콘솔, Kafka 컨슈머 2종(settlement.confirmed·payout.completed). card 승인·매입은 페이로드에 sellerId 가 없어 미구독 — hold/offset 은 콘솔 경로
 ├── board-service/                       # 📋 Board (8114/mgmt 8115, lemuel_board) — 메타 주도 게시판 플랫폼: `board_definitions` 1행 = 게시판 1개, 프론트 단일 라우트 `/boards/:boardKey` 가 스킨(LIST/GALLERY/FAQ/QNA)으로 렌더. shared-common JWT 만 제한 스캔(Outbox·Audit 엔티티 미스캔), **발행 0·소비 0** — 권한은 역할 allowlist, 메뉴 등록은 관리 화면이 order `/admin/menus` 를 직접 호출
+├── education-service/                   # 🎓 Education (8115, lemuel_education) — 과정·차시·게시 상태·ADMIN 콘텐츠 관리, CoursePublished Outbox
 └── gateway-service/                     # 🚪 API Gateway (8080) — 라우팅만 (자체 인증 필터 없음)
 ```
 

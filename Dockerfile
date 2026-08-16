@@ -30,6 +30,7 @@ COPY card-service/build.gradle.kts ./card-service/
 COPY insurance-service/build.gradle.kts ./insurance-service/
 COPY deposit-service/build.gradle.kts ./deposit-service/
 COPY board-service/build.gradle.kts ./board-service/
+COPY education-service/build.gradle.kts ./education-service/
 COPY gateway-service/build.gradle.kts ./gateway-service/
 
 RUN --mount=type=cache,target=/home/gradle/.gradle \
@@ -54,6 +55,7 @@ COPY card-service ./card-service
 COPY insurance-service ./insurance-service
 COPY deposit-service ./deposit-service
 COPY board-service ./board-service
+COPY education-service ./education-service
 COPY gateway-service ./gateway-service
 
 RUN --mount=type=cache,target=/home/gradle/.gradle \

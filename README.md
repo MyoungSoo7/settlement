@@ -1,7 +1,7 @@
 # Lemuel — 이커머스 + 정산 MSA 플랫폼
 
 > **이커머스 주문 → 셀러 정산 → 복식부기 원장까지, "정확성을 기계로 강제한" 커머스 백엔드.**
-> 커머스(order)·정산(settlement) 두 축의 **깊이**가 시그니처이고, 그 위에 대출·투자·계정계·조직·재무제표·경제지표·기업평판·운영관제·주식시세·AI챗봇·공공데이터·법인카드·보험·예치금을 **17개 마이크로서비스 + API Gateway**(JVM) 로 확장했다.
+> 커머스(order)·정산(settlement) 두 축의 **깊이**가 시그니처이고, 그 위에 대출·투자·계정계·조직·재무제표·경제지표·기업평판·운영관제·주식시세·AI챗봇·공공데이터·법인카드·보험·예치금·교육을 **18개 마이크로서비스 + API Gateway**(JVM) 로 확장했다.
 > 여기에 **Go·Python·Kotlin 폴리글랏 7종**(실시간 시세 스트리밍·결제 웹훅·스크리닝 백테스트·이상탐지·예측·알림·정산 대사)을 더해 **총 24개 서비스**의 폴리글랏 MSA 로 도메인·언어 양방향 확장력을 증명한다.
 > 단일 모놀리스 → **Bounded Context 분리** → **이벤트 드리븐** → **DB-per-service + 이벤트 프로젝션 패턴**(ADR 0020) → **폴리글랏 MSA** 로 진화시킨 헥사고날 백엔드 포트폴리오.
 >
@@ -107,7 +107,7 @@ flowchart LR
 | **장애 격리** | settlement 다운돼도 결제는 계속 | 정산 배치는 비동기 — 즉시 처리 X |
 | **배포 주기** | 잦음 (UI 변경 동행) | 드뭄 (회계 사이클 단위) |
 
-→ 위 차이점이 명확하므로 **서비스 분리** 가 자연스러운 경계. **17개 서비스 모두 DB-per-service**
+→ 위 차이점이 명확하므로 **서비스 분리** 가 자연스러운 경계. **18개 서비스 모두 DB-per-service**
 (order=opslab · settlement=settlement_db · loan=lemuel_loan · financial=lemuel_financial ·
 economics=lemuel_economics · company=lemuel_company · operation=lemuel_operation · market=lemuel_market ·
 ai=lemuel_ai · commondata=lemuel_commondata · investment=lemuel_investment · account=lemuel_account ·
@@ -350,9 +350,9 @@ JWT_TTL_SECONDS=3600
 # 0. (프론트 포함 시) SPA 정적 빌드를 먼저 만든다 — 없으면 frontend 컨테이너가 404 를 준다
 (cd frontend && npm ci && npm run build)
 
-# 1. 인프라 + 앱 컨테이너 19개(JVM 17 + market-stream + notification) + frontend 빌드/실행
+# 1. 인프라 + 앱 컨테이너 20개(JVM 18 + market-stream + notification) + frontend 빌드/실행
 #    기동 순서는 compose healthcheck 기반 depends_on 이 보장:
-#    PG 17종·ES·Redpanda·redis·pgbouncer → 17 서비스 + market-stream/notification → gateway → frontend → prometheus/grafana
+#    PG 18종·ES·Redpanda·redis·pgbouncer → 18 서비스 + market-stream/notification → gateway → frontend → prometheus/grafana
 docker compose up -d --build
 
 # 2. 전체 healthcheck 통과 확인 — 모든 서비스가 healthy 가 될 때까지 대기
@@ -653,7 +653,7 @@ CI 에서 k6 thresholds 로 회귀 자동 감지.
 
 ## 운영 환경 확장 포인트
 
-현재 구성은 **17개 서비스 모두 DB-per-service** 로 물리 분리돼 있고(order=opslab · settlement=settlement_db ·
+현재 구성은 **18개 서비스 모두 DB-per-service** 로 물리 분리돼 있고(order=opslab · settlement=settlement_db ·
 loan=lemuel_loan · financial=lemuel_financial · economics=lemuel_economics · company=lemuel_company ·
 operation=lemuel_operation · market=lemuel_market · ai=lemuel_ai · commondata=lemuel_commondata ·
 investment=lemuel_investment · account=lemuel_account · organization=lemuel_organization · card=lemuel_card ·

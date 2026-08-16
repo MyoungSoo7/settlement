@@ -93,6 +93,39 @@ class MenuServiceTest {
         assertThat(saved.getArea()).isEqualTo(MenuArea.SYSTEM);
     }
 
+    @Test @DisplayName("createMenu - SYSTEM 메뉴는 MANAGER 역할을 거부")
+    void createMenu_systemRequiresAdmin() {
+        assertThatThrownBy(() -> service.createMenu(new MenuUseCase.CreateMenuCommand(
+                MenuAttributes.item("메뉴 관리", "/admin/system/menus", MenuArea.SYSTEM, "MANAGER"),
+                null, 0, true)))
+                .isInstanceOf(MenuInvariantViolationException.class)
+                .hasMessageContaining("ADMIN");
+        verify(saveMenuPort, never()).save(any());
+    }
+
+    @Test @DisplayName("createMenu - 시스템 경로는 영역이 잘못되어도 MANAGER 역할을 거부")
+    void createMenu_systemPathRequiresAdmin() {
+        assertThatThrownBy(() -> service.createMenu(new MenuUseCase.CreateMenuCommand(
+                MenuAttributes.item("메뉴 관리", "/admin/system/menus", MenuArea.BACKOFFICE, "MANAGER"),
+                null, 0, true)))
+                .isInstanceOf(MenuInvariantViolationException.class)
+                .hasMessageContaining("ADMIN");
+        verify(saveMenuPort, never()).save(any());
+    }
+
+    @Test @DisplayName("updateMenu - 지급 메뉴는 ADMIN 외 역할을 거부")
+    void updateMenu_payoutRequiresAdmin() {
+        Menu existing = menu(7L, null, "지급관리", 0);
+        when(loadMenuPort.findById(7L)).thenReturn(Optional.of(existing));
+
+        assertThatThrownBy(() -> service.updateMenu(7L, new MenuUseCase.UpdateMenuCommand(
+                MenuAttributes.item("지급관리", "/admin/payouts", MenuArea.BACKOFFICE, "ADMIN,MANAGER"),
+                null, 0, true, true)))
+                .isInstanceOf(MenuInvariantViolationException.class)
+                .hasMessageContaining("ADMIN");
+        verify(saveMenuPort, never()).save(any());
+    }
+
     @Test @DisplayName("updateMenu - 존재하면 수정 후 저장")
     void updateMenu_success() {
         Menu existing = menu(5L, null, "old", 0);

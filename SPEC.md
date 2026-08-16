@@ -1,6 +1,6 @@
 # Lemuel 기능명세서 (Functional Specification)
 
-이커머스 + 정산(Settlement) MSA 플랫폼의 전체 기능 명세. 코어 JVM 17개 마이크로서비스 + API Gateway 에
+이커머스 + 정산(Settlement) MSA 플랫폼의 전체 기능 명세. 코어 JVM 18개 마이크로서비스 + API Gateway 에
 폴리글랏 7종(Kotlin 2 · Go 2 · Python 3)을 더한 **총 24개 서비스** 헥사고날 백엔드이며,
 원래 단일 모놀리스였으나 Bounded Context 로 분리했다.
 아키텍처·컨벤션은 [`CLAUDE.md`](./CLAUDE.md), 아키텍처 결정은 [`docs/adr/`](./docs/adr/) 참조.

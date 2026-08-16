@@ -156,6 +156,7 @@ jobs:
             insurance-service: ['insurance-service/**']
             deposit-service: ['deposit-service/**']
             board-service: ['board-service/**']
+            education-service: ['education-service/**']
 
       - name: Compute image build matrix (changed services only)
         id: setmatrix
@@ -182,7 +183,8 @@ jobs:
             "card-service":"-card",
             "insurance-service":"-insurance",
             "deposit-service":"-deposit",
-            "board-service":"-board"
+            "board-service":"-board",
+            "education-service":"-education"
           }'
           if echo "$CHANGED" | jq -e 'index("shared")' >/dev/null; then
             # 공용 변경 → 전 서비스 재빌드

@@ -97,6 +97,10 @@ spring:
               # 다르므로 하나의 와일드카드로 합치지 않는다(deposit 과 같은 기준).
               predicates:
                 - Path=/api/boards/**,/admin/boards/**
+            - id: education-service
+              uri: ${EDUCATION_SERVICE_URI:http://localhost:8115}
+              predicates:
+                - Path=/admin/education/**
             - id: settlement-service
               uri: ${SETTLEMENT_SERVICE_URI:http://localhost:8082}
               # SettlementController 는 /settlements(비-/api), 검색/원장/리포트는 /api, 운영 콘솔은 /admin.

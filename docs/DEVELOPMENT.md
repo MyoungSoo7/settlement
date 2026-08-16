@@ -48,10 +48,10 @@ docker build --build-arg MODULE=<service> -t lemuel-<name> .   # 컨테이너 �
 ## 작업 이력 / 브랜치 정보
 
 - **메인 라인**: `develop` → `main`. main 은 보호 브랜치(PR 필수, squash 만, **필수 CI 6종** — 목록은 [`CLAUDE.md`](../CLAUDE.md) 작업 프로토콜 절). 분리 전 백업 `backup/pre-msa-split`.
-- **MSA 분리 완료**: 17 서비스 + gateway, 전 서비스 DB-per-service, settlement↔order 이벤트 프로젝션(ADR 0020).
+- **MSA 분리 완료**: 18 서비스 + gateway, 전 서비스 DB-per-service, settlement↔order 이벤트 프로젝션(ADR 0020).
 - **제거된 도메인**: `reservation`(시공 예약) — 모듈·DB·라우팅·프론트·k8s 정리 완료.
 - **TPS 개선**: PgBouncer→Redpanda, settlement 배치/컨슈머 스레드·프로젝션 쿼리·캐시·PDF 비동기화 등.
-- **CI 백엔드 병렬화 (2026-08-14)**: 백엔드 게이트가 단일 잡으로 17모듈을 순차 실행해 14~43분이
+- **CI 백엔드 병렬화 (2026-08-14)**: 백엔드 게이트가 단일 잡으로 18모듈을 순차 실행해 14~43분이
   걸렸고, 그 사이 다음 push 가 오면 concurrency 대기 슬롯(그룹당 1개)에서 밀려 취소됐다 —
   **develop `ci` 20건 중 완주 2건**(실측). 즉 push 가 잦으면 게이트가 판정을 내지 못했다.
   ① 모듈 매트릭스로 분할(`backend-test`) + 집계 잡(`backend-ci`)이 SBOM·Trivy·Sonar·커버리지
