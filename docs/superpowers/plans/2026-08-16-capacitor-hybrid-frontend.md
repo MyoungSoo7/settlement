@@ -32,15 +32,16 @@
 - Test: `frontend/src/__tests__/api/axios.test.ts`
 
 **Interfaces:**
-- Produces `AuthStorage` with `get(key)`, `set(key, value)`, `remove(key)`, and `clear()` returning Promises.
+- Produces `AuthStorage` with `hydrate()`, `get(key)`, `set(key, value)`, `remove(key)`, and `clear()` returning Promises, plus a synchronous in-memory session cache for existing consumers.
 - Produces `getAuthStorage()` returning the runtime-selected adapter.
 
 - [ ] **Step 1: Write failing tests** for browser storage round-trip, logout cleanup, and 401 cleanup through the async adapter.
 - [ ] **Step 2: Run focused tests** with `npm run test:run -- src/__tests__/lib/authStorage.test.ts src/__tests__/api/auth.test.ts src/__tests__/api/axios.test.ts`; confirm the new contract is initially missing.
 - [ ] **Step 3: Implement the contract** with a browser adapter backed by `window.localStorage`; keep keys typed as the four existing session keys.
-- [ ] **Step 4: Change auth and Axios code** so no production auth code directly calls `localStorage`; await token reads before setting `Authorization` and await cleanup on 401/logout.
-- [ ] **Step 5: Run focused tests** and confirm all pass.
-- [ ] **Step 6: Commit** with `git add frontend/src frontend/src/__tests__ && git commit -m "refactor: abstract frontend auth storage"`.
+- [ ] **Step 4: Change auth and Axios code** so no production auth code directly calls `localStorage`; read the hydrated in-memory cache synchronously and persist writes/cleanup asynchronously.
+- [ ] **Step 5: Hydrate before React render** in `main.tsx`; keep the browser path immediate and fail closed if native hydration fails.
+- [ ] **Step 6: Run focused tests** and confirm all pass.
+- [ ] **Step 7: Commit** with `git add frontend/src frontend/src/__tests__ && git commit -m "refactor: abstract frontend auth storage"`.
 
 ### Task 2: Add Capacitor runtime and native project configuration
 

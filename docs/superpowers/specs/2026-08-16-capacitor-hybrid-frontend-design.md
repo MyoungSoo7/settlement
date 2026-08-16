@@ -23,16 +23,17 @@ Extend the existing Vite React/TypeScript frontend into a web-first Capacitor ap
 
 ## Architecture
 
-The frontend remains a single web-first React application. Native capabilities are accessed through small adapters that feature-detect Capacitor at runtime; browser execution remains the default path. Authentication storage is centralized behind an async interface so Axios and auth flows do not know whether the token is stored in browser storage or native secure storage.
+The frontend remains a single web-first React application. Native capabilities are accessed through small adapters that feature-detect Capacitor at runtime; browser execution remains the default path. Authentication storage is centralized behind an async persistence interface, but the existing synchronous auth API reads an in-memory session cache after one awaited startup hydration. This preserves current route/page contracts while ensuring native secure storage is loaded before React renders.
 
 The initial native implementation uses official Capacitor platform/core plugins where available. Secure token storage must use a maintained native keychain/keystore plugin; `@capacitor/preferences` is not acceptable for the access token because it is a preferences store rather than a security boundary. If no package can support the current Capacitor version cleanly, native secure storage remains an explicit build-time blocker instead of falling back to plaintext storage.
 
 ## Authentication
 
-- Define an async `AuthStorage` contract for `access_token`, `user_email`, `user_role`, and `login_timestamp`.
+- Define an async `AuthStorage` contract for `access_token`, `user_email`, `user_role`, and `login_timestamp` plus a startup `hydrate()` operation.
 - Browser adapter uses `localStorage` behind the contract to preserve current behavior.
 - Capacitor adapter uses native secure storage for the token and may use ordinary preferences for non-sensitive profile metadata.
-- Axios request/response interceptors await the storage adapter and clear all session keys on 401.
+- The auth API reads/writes an in-memory session cache synchronously; writes and clears are persisted through the adapter.
+- `main.tsx` hydrates the cache before rendering; Axios request/response interceptors read the cache synchronously and clear all session keys on 401.
 - Logout and login replacement use the same adapter, avoiding mixed browser/native sessions.
 - Existing tests must cover browser behavior and the 401 cleanup path.
 

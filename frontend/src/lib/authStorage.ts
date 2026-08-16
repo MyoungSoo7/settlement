@@ -48,7 +48,13 @@ const browserStorage: AuthStorage = {
   },
 };
 
-export const getAuthStorage = (): AuthStorage => browserStorage;
+let activeStorage: AuthStorage = browserStorage;
+
+export const setAuthStorage = (storage: AuthStorage): void => {
+  activeStorage = storage;
+};
+
+export const getAuthStorage = (): AuthStorage => activeStorage;
 
 export const hydrateAuthStorage = async (): Promise<void> => {
   const hydrated = await getAuthStorage().hydrate();
