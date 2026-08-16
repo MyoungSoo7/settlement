@@ -1,4 +1,5 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import { getAuthStorage } from '@/lib/authStorage';
 
 // Toast 관리를 위한 전역 참조
 let globalShowToast: ((message: string, type: 'success' | 'error' | 'warning' | 'info') => void) | null = null;
@@ -19,7 +20,7 @@ const api = axios.create({
 // Request Interceptor: JWT 토큰 자동 추가
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    const token = localStorage.getItem('access_token');
+    const token = getAuthStorage().get('access_token');
 
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -44,9 +45,7 @@ api.interceptors.response.use(
         globalShowToast('세션이 만료되었습니다. 다시 로그인해주세요.', 'warning');
       }
 
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('user_email');
-      localStorage.removeItem('user_role');
+      void getAuthStorage().clear();
 
       // 로그인 페이지로 리다이렉트
       if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {

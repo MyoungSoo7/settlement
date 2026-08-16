@@ -1,5 +1,6 @@
 import api from './axios';
 import { LoginRequest, LoginResponse, RegisterRequest, UserResponse } from '@/types';
+import { getAuthStorage } from '@/lib/authStorage';
 
 export const authApi = {
   /**
@@ -45,10 +46,7 @@ export const authApi = {
    * 로그아웃 (클라이언트 측)
    */
   logout: (): void => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('user_email');
-    localStorage.removeItem('user_role');
-    localStorage.removeItem('login_timestamp');
+    void getAuthStorage().clear();
   },
 
   /**
@@ -56,7 +54,8 @@ export const authApi = {
    */
   saveToken: (loginResponse: LoginResponse): void => {
     // 기존 로그인 세션이 있는지 확인
-    const existingEmail = localStorage.getItem('user_email');
+    const storage = getAuthStorage();
+    const existingEmail = storage.get('user_email');
 
     if (existingEmail && existingEmail !== loginResponse.email) {
       console.warn(`세션 교체: ${existingEmail} -> ${loginResponse.email}`);
@@ -65,18 +64,21 @@ export const authApi = {
     }
 
     // 새 세션 저장
-    localStorage.setItem('access_token', loginResponse.token);
-    localStorage.setItem('user_email', loginResponse.email);
-    localStorage.setItem('user_role', loginResponse.role);
-    localStorage.setItem('login_timestamp', new Date().toISOString());
+    void Promise.all([
+      storage.set('access_token', loginResponse.token),
+      storage.set('user_email', loginResponse.email),
+      storage.set('user_role', loginResponse.role),
+      storage.set('login_timestamp', new Date().toISOString()),
+    ]);
   },
 
   /**
    * 현재 사용자 정보 가져오기
    */
   getCurrentUser: (): { email: string; role: string } | null => {
-    const email = localStorage.getItem('user_email');
-    const role = localStorage.getItem('user_role');
+    const storage = getAuthStorage();
+    const email = storage.get('user_email');
+    const role = storage.get('user_role');
 
     if (email && role) {
       return { email, role };
@@ -88,6 +90,6 @@ export const authApi = {
    * 인증 여부 확인
    */
   isAuthenticated: (): boolean => {
-    return !!localStorage.getItem('access_token');
+    return !!getAuthStorage().get('access_token');
   },
 };
