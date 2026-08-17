@@ -9,7 +9,7 @@ description = "Backtests the investment stock-screening trade-plan rules over hi
 requires-python = ">=3.11"
 dependencies = [
     "fastapi==0.141.1",
-    "uvicorn[standard]==0.52.1",
+    "uvicorn[standard]==0.52.3",
     "pydantic==2.13.4",
     "pandas==3.0.5",
     "numpy==2.4.6",

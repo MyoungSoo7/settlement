@@ -1,5 +1,5 @@
 fastapi==0.141.1
-uvicorn[standard]==0.52.1
+uvicorn[standard]==0.52.3
 statsmodels==0.14.6
 numpy==1.26.4
 pandas==2.2.2
