@@ -34,8 +34,8 @@ dependencies {
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
     runtimeOnly("org.postgresql:postgresql:42.7.3")
     implementation("io.github.cdimascio:java-dotenv:5.2.2")
-    implementation("net.javacrumbs.shedlock:shedlock-spring:6.9.2")
-    implementation("net.javacrumbs.shedlock:shedlock-provider-jdbc-template:6.9.2")
+    implementation("net.javacrumbs.shedlock:shedlock-spring:7.8.0")
+    implementation("net.javacrumbs.shedlock:shedlock-provider-jdbc-template:7.8.0")
 
     compileOnly("org.projectlombok:lombok")
     annotationProcessor("org.projectlombok:lombok")
