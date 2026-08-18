@@ -168,3 +168,51 @@ func TestHub_SlowSubscriberDoesNotBlockOthers(t *testing.T) {
 		}
 	}
 }
+
+// TestHub_UnsubscribeDuringBroadcast is a regression test for a
+// send-on-closed-channel panic. broadcast used to snapshot the subscriber
+// channels, release the mutex, and only then send. unsubscribe could close a
+// channel inside that window, leaving the broadcaster to send on an
+// already-closed channel — which the Go spec defines as a run-time panic, not a
+// recoverable error. The panic killed the process, so one client leaving took
+// every other connected client down with it.
+//
+// The churn below is deliberately hostile: many subscribers on a single code, a
+// tick interval short enough that a broadcast is almost always in flight, and
+// repeated mass unsubscribes from separate goroutines.
+func TestHub_UnsubscribeDuringBroadcast(t *testing.T) {
+	const (
+		subscribers = 200
+		rounds      = 40
+	)
+	// 1ms ticks: the quote loop is broadcasting near-continuously.
+	h := New(quote.NewSimulatedSource(7), time.Millisecond, 4, quietLog())
+	defer h.Shutdown()
+
+	// Anchor keeps the code's quote loop alive across rounds, so every round
+	// races against a running broadcaster rather than a cold start.
+	_, anchor := h.Subscribe("005930")
+	defer anchor()
+
+	for round := 0; round < rounds; round++ {
+		unsubs := make([]func(), subscribers)
+		for i := range unsubs {
+			// Deliberately never read: buffers fill, so broadcast also
+			// exercises its drop-oldest path against a closing channel.
+			_, unsubs[i] = h.Subscribe("005930")
+		}
+		var wg sync.WaitGroup
+		wg.Add(len(unsubs))
+		for _, unsub := range unsubs {
+			go func(u func()) {
+				defer wg.Done()
+				u()
+			}(unsub)
+		}
+		wg.Wait()
+	}
+
+	if got := h.SubscriberCount("005930"); got != 1 {
+		t.Fatalf("subscriber count %d want 1 (anchor only)", got)
+	}
+}
