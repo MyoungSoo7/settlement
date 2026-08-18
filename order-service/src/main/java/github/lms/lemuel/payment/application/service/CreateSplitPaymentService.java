@@ -2,6 +2,7 @@ package github.lms.lemuel.payment.application.service;
 
 import github.lms.lemuel.payment.application.port.in.CreateSplitPaymentUseCase;
 import github.lms.lemuel.payment.application.port.out.PgClientPort;
+import github.lms.lemuel.payment.application.port.out.PointTenderPort;
 import github.lms.lemuel.payment.application.port.out.PublishEventPort;
 import github.lms.lemuel.payment.application.port.out.SavePaymentPort;
 import github.lms.lemuel.payment.application.port.out.UpdateOrderStatusPort;
@@ -41,21 +42,24 @@ public class CreateSplitPaymentService implements CreateSplitPaymentUseCase {
     private final UpdateOrderStatusPort updateOrderStatusPort;
     private final PublishEventPort publishEventPort;
     private final github.lms.lemuel.payment.application.port.out.LoadSellerSettlementMetaPort loadSellerSettlementMetaPort;
+    private final PointTenderPort pointTenderPort;
 
     public CreateSplitPaymentService(PgClientPort pgClientPort,
                                       SavePaymentPort savePaymentPort,
                                       UpdateOrderStatusPort updateOrderStatusPort,
                                       PublishEventPort publishEventPort,
-                                      github.lms.lemuel.payment.application.port.out.LoadSellerSettlementMetaPort loadSellerSettlementMetaPort) {
+                                      github.lms.lemuel.payment.application.port.out.LoadSellerSettlementMetaPort loadSellerSettlementMetaPort,
+                                      PointTenderPort pointTenderPort) {
         this.pgClientPort = pgClientPort;
         this.savePaymentPort = savePaymentPort;
         this.updateOrderStatusPort = updateOrderStatusPort;
         this.publishEventPort = publishEventPort;
         this.loadSellerSettlementMetaPort = loadSellerSettlementMetaPort;
+        this.pointTenderPort = pointTenderPort;
     }
 
     @Override
-    public PaymentDomain createSplit(Long orderId, List<TenderRequest> tenderRequests) {
+    public PaymentDomain createSplit(Long orderId, List<TenderRequest> tenderRequests, Long actorUserId) {
         if (tenderRequests == null || tenderRequests.size() < 2) {
             throw new PaymentInvariantViolationException("분할결제는 최소 2 개의 지불수단 필요");
         }
@@ -85,6 +89,10 @@ public class CreateSplitPaymentService implements CreateSplitPaymentUseCase {
         payment.capture();
         PaymentDomain saved = savePaymentPort.save(payment);
 
+        // 포인트 차감은 저장 이후다 — 원장 멱등 키가 tenderId 라, 식별자가 확정되기 전에는
+        // 같은 결제를 두 번 차감했는지 구분할 방법이 없다. 같은 트랜잭션이므로 실패하면 함께 롤백된다.
+        deductPointTenders(saved, actorUserId);
+
         updateOrderStatusPort.updateOrderStatus(saved.getOrderId(), "PAID");
         publishEventPort.publishPaymentCaptured(saved.getId(), saved.getOrderId(), saved.getAmount(),
                 saved.getCapturedAt(),
@@ -107,11 +115,37 @@ public class CreateSplitPaymentService implements CreateSplitPaymentUseCase {
             log.debug("외부 PG tender 처리: type={}, amount={}, pgTxn={}",
                     tender.getType(), tender.getAmount(), pgTxnId);
         } else {
-            // 내부 잔액 차감 (실 운영: PointService.deduct, GiftCardService.consume)
-            // 본 구현은 도메인 모델만 — 실제 잔액 검증/차감 서비스는 별도 도메인의 책임
+            // 내부 잔액 tender — 외부 호출은 없다. 실제 원장 차감은 저장 후 deductPointTenders 에서
+            // 한다(원장 자연키가 tenderId 인데, 저장 전에는 그 식별자가 없기 때문).
             tender.authorize(null);
             tender.capture();
+            if (tender.getType() != TenderType.POINT) {
+                // GIFT_CARD 는 아직 원장이 없다 — 포인트와 같은 구멍이 남아 있다는 사실을
+                // 코드에 드러내 둔다(docs/plan/point-ledger.md).
+                log.warn("원장 없는 내부잔액 tender 통과: type={}, amount={}",
+                        tender.getType(), tender.getAmount());
+            }
             log.debug("내부 잔액 tender 처리: type={}, amount={}", tender.getType(), tender.getAmount());
+        }
+    }
+
+    /**
+     * POINT tender 를 포인트 원장에서 실제로 차감한다.
+     *
+     * <p>여기가 "장부 없는 결제 수단"을 닫는 지점이다. 잔액이 모자라면 예외가 올라와 결제 전체가
+     * 롤백된다 — 검증 없이 통과시키던 이전 동작보다 결제 실패가 옳다.
+     */
+    private void deductPointTenders(PaymentDomain saved, Long actorUserId) {
+        for (PaymentTender tender : saved.getTenders()) {
+            if (tender.getType() != TenderType.POINT) {
+                continue;
+            }
+            if (actorUserId == null) {
+                // 주체를 모른 채 남의 잔액을 건드릴 수는 없다.
+                throw new PaymentInvariantViolationException(
+                        "포인트 결제에는 인증 주체가 필요합니다: paymentId=" + saved.getId());
+            }
+            pointTenderPort.use(actorUserId, tender.getAmount(), tender.getId());
         }
     }
 

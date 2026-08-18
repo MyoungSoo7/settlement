@@ -35,13 +35,33 @@ class RefundSplitPaymentServiceTest {
     private CountingEventPublisher events;
     private RefundSplitPaymentService service;
 
+    private RecordingPointTender recordingPointTender;
+
+    /** 포인트 원장 호출을 기록만 하는 페이크 — 환불 경로가 포인트를 되돌리는지 확인용. */
+    static final class RecordingPointTender
+            implements github.lms.lemuel.payment.application.port.out.PointTenderPort {
+        final java.util.List<String> restored = new java.util.ArrayList<>();
+
+        @Override
+        public void use(Long userId, java.math.BigDecimal amount, Long tenderId) {
+            throw new UnsupportedOperationException("환불 테스트에서는 사용 경로를 타지 않는다");
+        }
+
+        @Override
+        public void restore(java.math.BigDecimal amount, Long tenderId, String refundReference) {
+            restored.add(tenderId + ":" + amount.stripTrailingZeros().toPlainString());
+        }
+    }
+
     @BeforeEach
     void setUp() {
         store = new FakePaymentStore();
         pg = new RecordingPgClient();
         events = new CountingEventPublisher();
+        recordingPointTender = new RecordingPointTender();
         TenderRefundExecutor executor = new TenderRefundExecutor(
-                store, store, pg, (orderId, status) -> store.lastOrderStatus = status, events);
+                store, store, pg, (orderId, status) -> store.lastOrderStatus = status, events,
+                recordingPointTender);
         service = new RefundSplitPaymentService(store, executor);
     }
 

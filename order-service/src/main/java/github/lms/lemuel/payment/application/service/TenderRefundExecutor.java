@@ -2,12 +2,14 @@ package github.lms.lemuel.payment.application.service;
 
 import github.lms.lemuel.payment.application.port.out.LoadPaymentPort;
 import github.lms.lemuel.payment.application.port.out.PgClientPort;
+import github.lms.lemuel.payment.application.port.out.PointTenderPort;
 import github.lms.lemuel.payment.application.port.out.PublishEventPort;
 import github.lms.lemuel.payment.application.port.out.SavePaymentPort;
 import github.lms.lemuel.payment.application.port.out.UpdateOrderStatusPort;
 import github.lms.lemuel.payment.domain.PaymentDomain;
 import github.lms.lemuel.payment.domain.PaymentStatus;
 import github.lms.lemuel.payment.domain.PaymentTender;
+import github.lms.lemuel.payment.domain.TenderType;
 import github.lms.lemuel.payment.domain.exception.PaymentInvariantViolationException;
 import github.lms.lemuel.payment.domain.exception.PaymentNotFoundException;
 import org.slf4j.Logger;
@@ -44,17 +46,20 @@ public class TenderRefundExecutor {
     private final PgClientPort pgClientPort;
     private final UpdateOrderStatusPort updateOrderStatusPort;
     private final PublishEventPort publishEventPort;
+    private final PointTenderPort pointTenderPort;
 
     public TenderRefundExecutor(LoadPaymentPort loadPaymentPort,
                                 SavePaymentPort savePaymentPort,
                                 PgClientPort pgClientPort,
                                 UpdateOrderStatusPort updateOrderStatusPort,
-                                PublishEventPort publishEventPort) {
+                                PublishEventPort publishEventPort,
+                                PointTenderPort pointTenderPort) {
         this.loadPaymentPort = loadPaymentPort;
         this.savePaymentPort = savePaymentPort;
         this.pgClientPort = pgClientPort;
         this.updateOrderStatusPort = updateOrderStatusPort;
         this.publishEventPort = publishEventPort;
+        this.pointTenderPort = pointTenderPort;
     }
 
     /**
@@ -79,9 +84,17 @@ public class TenderRefundExecutor {
             pgClientPort.refund(tender.getPgTransactionId(), portion, idempotencyKey);
             log.info("외부 PG 환불: tenderId={}, type={}, amount={}",
                     tender.getId(), tender.getType(), portion);
+        } else if (tender.getType() == TenderType.POINT) {
+            // 환불 멱등 키(tender + 금액)를 원장 참조로 그대로 넘긴다 — 같은 부분환불을 두 번
+            // 반영하려는 시도는 원장 자연키가 막는다. 복원 대상 계정은 원장이 알고 있으므로
+            // 호출자가 사용자 식별자를 넘기지 않는다(환불은 낸 사람에게 돌아가야 한다).
+            String refundReference = "tender-" + tender.getId() + "-"
+                    + portion.stripTrailingZeros().toPlainString();
+            pointTenderPort.restore(portion, tender.getId(), refundReference);
+            log.info("포인트 복원: tenderId={}, amount={}", tender.getId(), portion);
         } else {
-            // 실 운영: PointService.restore / GiftCardService.refund
-            log.info("내부 잔액 복원: tenderId={}, type={}, amount={}",
+            // GIFT_CARD 는 아직 원장이 없어 복원할 대상이 없다 — 남은 구멍.
+            log.warn("원장 없는 내부잔액 환불: tenderId={}, type={}, amount={}",
                     tender.getId(), tender.getType(), portion);
         }
 

@@ -55,7 +55,8 @@ public class PointEntry {
      */
     private static PointEntry create(PointEntryType type, Long accountId, BigDecimal amount,
                                      String referenceType, String referenceId, int sequence,
-                                     List<PointLotConsumption> allocations, String createdBy, String memo) {
+                                     List<PointLotConsumption> allocations, String createdBy, String memo,
+                                     OffsetDateTime createdAt) {
         BigDecimal value = PointAmounts.requirePoint(amount, type.name().toLowerCase());
         if (allocations == null || allocations.isEmpty()) {
             throw new PointInvariantViolationException(
@@ -69,42 +70,56 @@ public class PointEntry {
                     "불변식 위반: 엔트리 금액(" + value + ") != 로트 배분 합계(" + allocated + ")");
         }
         return new PointEntry(null, accountId, type, value, referenceType, referenceId, sequence,
-                memo, createdBy, OffsetDateTime.now(), List.copyOf(allocations));
+                memo, createdBy, createdAt, List.copyOf(allocations));
     }
 
     public static PointEntry grant(Long accountId, BigDecimal amount, String referenceType,
                                    String referenceId, int sequence,
                                    List<PointLotConsumption> allocations, String createdBy, String memo) {
         return create(PointEntryType.GRANT, accountId, amount, referenceType, referenceId,
-                sequence, allocations, createdBy, memo);
+                sequence, allocations, createdBy, memo, OffsetDateTime.now());
     }
 
     public static PointEntry use(Long accountId, BigDecimal amount, String referenceType,
                                  String referenceId, int sequence,
                                  List<PointLotConsumption> allocations, String createdBy) {
         return create(PointEntryType.USE, accountId, amount, referenceType, referenceId,
-                sequence, allocations, createdBy, null);
+                sequence, allocations, createdBy, null, OffsetDateTime.now());
     }
 
     public static PointEntry restore(Long accountId, BigDecimal amount, String referenceType,
                                      String referenceId, int sequence,
                                      List<PointLotConsumption> allocations, String createdBy) {
         return create(PointEntryType.RESTORE, accountId, amount, referenceType, referenceId,
-                sequence, allocations, createdBy, null);
+                sequence, allocations, createdBy, null, OffsetDateTime.now());
     }
 
     public static PointEntry expire(Long accountId, BigDecimal amount, String referenceType,
                                     String referenceId, int sequence,
                                     List<PointLotConsumption> allocations, String createdBy) {
         return create(PointEntryType.EXPIRE, accountId, amount, referenceType, referenceId,
-                sequence, allocations, createdBy, null);
+                sequence, allocations, createdBy, null, OffsetDateTime.now());
     }
 
     public static PointEntry revoke(Long accountId, BigDecimal amount, String referenceType,
                                     String referenceId, int sequence,
                                     List<PointLotConsumption> allocations, String createdBy) {
         return create(PointEntryType.REVOKE, accountId, amount, referenceType, referenceId,
-                sequence, allocations, createdBy, null);
+                sequence, allocations, createdBy, null, OffsetDateTime.now());
+    }
+
+    /**
+     * 영속 상태로부터 복원. 저장된 행도 같은 불변식을 통과해야 한다 — 저장소가 깨진 행을 돌려주면
+     * 그 사실이 조용히 흡수되지 않고 즉시 드러나야 한다.
+     */
+    public static PointEntry rehydrate(Long id, Long accountId, PointEntryType type, BigDecimal amount,
+                                       String referenceType, String referenceId, int sequence,
+                                       String memo, String createdBy, OffsetDateTime createdAt,
+                                       List<PointLotConsumption> allocations) {
+        PointEntry entry = create(type, accountId, amount, referenceType, referenceId,
+                sequence, allocations, createdBy, memo, createdAt);
+        entry.id = id;
+        return entry;
     }
 
     public void assignId(Long id) {

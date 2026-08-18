@@ -5,6 +5,8 @@ import github.lms.lemuel.payment.application.service.RefundSplitPaymentService;
 import github.lms.lemuel.payment.domain.PaymentDomain;
 import github.lms.lemuel.payment.domain.PaymentTender;
 import github.lms.lemuel.payment.domain.TenderType;
+import github.lms.lemuel.web.security.ResourceOwnership;
+import org.springframework.security.core.context.SecurityContextHolder;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -41,7 +43,11 @@ public class SplitPaymentController {
         List<CreateSplitPaymentUseCase.TenderRequest> tenders = request.tenders().stream()
                 .map(t -> new CreateSplitPaymentUseCase.TenderRequest(t.type(), t.amount()))
                 .toList();
-        PaymentDomain p = createUseCase.createSplit(request.orderId(), tenders);
+        // 결제 주체는 요청 본문이 아니라 JWT 에서 파생한다 — 본문의 userId 를 믿으면
+        // 남의 포인트로 결제할 수 있다(IDOR).
+        long actorUserId = ResourceOwnership.callerUserId(
+                SecurityContextHolder.getContext().getAuthentication());
+        PaymentDomain p = createUseCase.createSplit(request.orderId(), tenders, actorUserId);
         return ResponseEntity.status(HttpStatus.CREATED).body(SplitPaymentResponse.from(p));
     }
 

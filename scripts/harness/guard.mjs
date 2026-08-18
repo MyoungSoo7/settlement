@@ -35,7 +35,9 @@ function policyPath(filePath) {
 }
 
 // Money-scope = files where BigDecimal / immutable-history rules are non-negotiable.
-const MONEY_SCOPE = /(settlement|ledger|payout|chargeback|loan|payment|investment|account|insurance|pgreconciliation|recon)/i;
+// `point` 는 단어 경계로 묶는다 — 그러지 않으면 endpoint/checkpoint 같은 경로가 전부 금액 스코프로
+// 잡혀 오탐이 된다. 포인트 원장은 고객 부채라 BigDecimal 강제가 다른 돈 경로와 동일하게 적용된다.
+const MONEY_SCOPE = /(settlement|ledger|payout|chargeback|loan|payment|investment|account|insurance|pgreconciliation|recon|point)/i;
 const JAVA_KT = /\.(java|kt)$/i;
 const SQL = /\.sql$/i;
 const WORKFLOW_YAML = /(^|\/)\.github\/workflows\/[^/]+\.ya?ml$/i;

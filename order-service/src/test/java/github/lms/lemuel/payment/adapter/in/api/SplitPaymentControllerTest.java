@@ -1,17 +1,23 @@
 package github.lms.lemuel.payment.adapter.in.api;
 
+import github.lms.lemuel.common.config.jwt.AuthPrincipal;
 import github.lms.lemuel.common.config.jwt.JwtUtil;
 import github.lms.lemuel.payment.application.port.in.CreateSplitPaymentUseCase;
 import github.lms.lemuel.payment.application.service.RefundSplitPaymentService;
 import github.lms.lemuel.payment.domain.PaymentDomain;
 import github.lms.lemuel.payment.domain.PaymentTender;
 import github.lms.lemuel.payment.domain.TenderType;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -34,6 +40,23 @@ class SplitPaymentControllerTest {
     @MockitoBean CreateSplitPaymentUseCase createUseCase;
     @MockitoBean RefundSplitPaymentService refundService;
 
+    /**
+     * JWT 주체를 SecurityContext 에 직접 세팅한다. addFilters=false 슬라이스에는 보안 필터가 없어
+     * 홀더에 직접 넣어야 컨트롤러의 주체 파생이 동작한다.
+     */
+    private static void login(long uid) {
+        Authentication auth = new UsernamePasswordAuthenticationToken(
+                new AuthPrincipal(uid, uid + "@x.com", "USER"),
+                null,
+                List.of(new SimpleGrantedAuthority("ROLE_USER")));
+        SecurityContextHolder.getContext().setAuthentication(auth);
+    }
+
+    @AfterEach
+    void clearContext() {
+        SecurityContextHolder.clearContext();
+    }
+
     private PaymentDomain splitPayment() {
         PaymentTender point = PaymentTender.newTender(TenderType.POINT, new BigDecimal("5000"), 1);
         PaymentTender card = PaymentTender.newTender(TenderType.CARD, new BigDecimal("45000"), 2);
@@ -43,7 +66,8 @@ class SplitPaymentControllerTest {
     @Test
     @DisplayName("POST /payments/split 는 분할결제를 생성하고 201 을 반환한다")
     void create() throws Exception {
-        when(createUseCase.createSplit(eq(100L), any())).thenReturn(splitPayment());
+        login(42L);
+        when(createUseCase.createSplit(eq(100L), any(), eq(42L))).thenReturn(splitPayment());
 
         mockMvc.perform(post("/payments/split")
                         .contentType(MediaType.APPLICATION_JSON)

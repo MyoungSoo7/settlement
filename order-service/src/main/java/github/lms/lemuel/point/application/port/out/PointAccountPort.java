@@ -17,6 +17,11 @@ public interface PointAccountPort {
     /** 잔고를 변경하는 모든 경로는 이걸로 잡는다 — 락 없는 조회로 차감하지 마라. */
     Optional<PointAccount> loadForUpdate(Long userId);
 
+    /**
+     * 계정 식별자로 락을 잡는다 — 소멸 배치는 로트에서 출발하므로 userId 를 모른 채 계정을 잠가야 한다.
+     */
+    Optional<PointAccount> loadByIdForUpdate(Long accountId);
+
     PointAccount save(PointAccount account);
 
     /** 계정이 없으면 열고, 있으면 그대로 돌려준다(락 없이). 적립 경로의 진입점. */

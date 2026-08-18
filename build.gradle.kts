@@ -171,6 +171,7 @@ subprojects {
                 element = "PACKAGE"
                 includes = listOf(
                     "github.lms.lemuel.payment.domain.*",
+                    "github.lms.lemuel.point.domain.*",
                     "github.lms.lemuel.order.domain.*",
                     "github.lms.lemuel.product.domain.*",
                     "github.lms.lemuel.cart.domain.*",
