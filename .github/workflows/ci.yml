@@ -263,6 +263,19 @@ jobs:
       packages: read # ghcr 미러 이미지 pull (mirror-testcontainers.yml 참고)
     strategy:
       fail-fast: false # 한 모듈 실패가 나머지 모듈의 판정을 가리지 않도록
+      # Maven Central / plugins.gradle.org 429 방지용 스로틀.
+      #
+      # 의존성이 바뀌는 PR(dependabot bump 등)에서는 setup-java 의 gradle 캐시 키가 통째로
+      # 어긋나 19개 잡이 *동시에* 콜드 리졸브를 돈다. 러너들은 egress IP 를 공유하므로
+      # repo.maven.apache.org 가 429 Too Many Requests 를 뱉고, 잡은 테스트를 시작하지도
+      # 못한 채 죽는다 — 2026-08-19 하루에만 #284 board-service, #288 deposit-service,
+      # #287 gateway-service 가 이 이유로 빨갛게 떴고 셋 다 재실행만으로 통과했다.
+      # (Testcontainers 이미지 쪽 rate limit 은 이미 ghcr 미러로 우회했다. 이건 그 짝인
+      #  *메이븐 아티팩트* 쪽 구멍이다.)
+      #
+      # 5 로 조이면 콜드 리졸브가 4 웨이브로 나뉜다. 모듈당 3~6분이라 전체 벽시계는
+      # 늘지만, 재실행 한 번이 15분이고 사람이 원인을 오해하는 비용은 그보다 크다.
+      max-parallel: 5
       matrix: ${{ fromJSON(needs.changes.outputs.test_matrix) }}
     services:
       postgres:
