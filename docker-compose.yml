@@ -1024,8 +1024,15 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://ai-postgres:5432/lemuel_ai?reWriteBatchedInserts=true
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # LLM provider 선택 — gemini(기본) | anthropic | deepseek. 어댑터는 정확히 하나만 등록된다.
+      APP_AI_PROVIDER: ${APP_AI_PROVIDER:-gemini}
       # Anthropic Messages API 키 (company 감성분석과 공용) — 미설정이면 채팅만 503, 이력 조회는 정상
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # DeepSeek(OpenAI 호환) — provider=deepseek 일 때만 쓰인다. base-url 을 http://host.docker.internal:11434/v1
+      # 로 바꾸면 호스트에서 도는 Ollama 를 그대로 부른다(그때 키는 아무 문자열이나 채워야 미구성 판정을 피한다).
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      APP_AI_DEEPSEEK_MODEL: ${APP_AI_DEEPSEEK_MODEL:-deepseek-chat}
+      APP_AI_DEEPSEEK_BASE_URL: ${APP_AI_DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
       # ── RAG (ADR 0034) — 기본 꺼짐 ──
       # 켜면 마이그레이션이 CREATE EXTENSION vector 를 실행한다. ai-postgres 는 pgvector 이미지이고
       # POSTGRES_USER 가 슈퍼유저라 여기서는 성공한다 (pgvector 는 trusted 확장이 아니라 슈퍼유저를 요구).

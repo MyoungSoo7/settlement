@@ -183,7 +183,10 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
 ### 3.9 ai-service — 대화형 AI 챗봇 (port 8096, lemuel_ai)
 
 - `/api/ai` (ChatController), `/api/ai/conversations` — 컨텍스트 유지 채팅(SSE 스트리밍) + 대화 이력 CRUD.
-- **provider 스위치**(`app.ai.provider`, 기본 gemini): Gemini(RestClient) / Anthropic(Spring AI SDK) 중 하나만 등록.
+- **provider 스위치**(`app.ai.provider`, 기본 gemini): Gemini(RestClient) / Anthropic(Spring AI SDK) /
+  DeepSeek(OpenAI 호환 RestClient) 중 하나만 등록. DeepSeek 어댑터는 `base-url` 만 바꾸면 **로컬 Ollama**
+  (OpenAI 호환 엔드포인트)도 같은 코드로 부른다 — 외부 크레딧 없이 개발·데모 가능.
+  reasoning 계열의 사고과정은 사용자에게 노출하지 않는다(`reasoning_content` 미독출 + 인라인 `<think>` 제거).
 - LLM 실비용 → **JWT USER 이상 필수 + bucket4j 비용가드(분5/일100)**. LLM 어댑터는 `adapter/out/llm` 격리(ArchUnit).
   저장·전송 전 카드/주민번호 PII 마스킹. **RAG 구현 완료**(pgvector 지식베이스 `/api/ai/knowledge` +
   임베딩 검색 폴백, ADR 0034 — `app.ai.rag.enabled`, 기본 off). 로드맵: Function Calling.
