@@ -12,6 +12,9 @@ import java.util.Map;
 
 @Component
 public class OutboxBackedEducationEventPublisher implements PublishEducationEventPort {
+    /** 토픽명은 여기서 파생된다 — lemuel.education.course_published (ADR 0035 카탈로그 등재명). */
+    private static final String AGGREGATE_TYPE = "Education";
+
     private final SaveOutboxEventPort outbox;
     private final ObjectMapper mapper = new ObjectMapper();
     private final TraceContextCapture trace;
@@ -27,7 +30,8 @@ public class OutboxBackedEducationEventPublisher implements PublishEducationEven
                     "courseId", course.getId(), "title", course.getTitle(),
                     "publishedAt", course.getPublishedAt(), "publishedBy", actor,
                     "version", course.getVersion()));
-            outbox.save(OutboxEvent.pending("EducationCourse", course.getId().toString(),
+            String courseId = course.getId().toString();
+            outbox.save(OutboxEvent.pending(AGGREGATE_TYPE, courseId,
                     "CoursePublished", payload, trace.captureCurrentTraceParent()));
         } catch (JsonProcessingException exception) {
             throw new IllegalStateException("Failed to serialize CoursePublished payload", exception);

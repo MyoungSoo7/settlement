@@ -80,6 +80,8 @@
     { "name": "lemuel.deposit.hold_placed", "owner": "deposit-service", "orderingKey": "sellerId", "partitions": 3, "replicas": 1, "retentionDays": 7 },
     { "name": "lemuel.deposit.hold_released", "owner": "deposit-service", "orderingKey": "sellerId", "partitions": 3, "replicas": 1, "retentionDays": 7 },
     { "name": "lemuel.deposit.offset_applied", "owner": "deposit-service", "orderingKey": "sellerId", "partitions": 3, "replicas": 1, "retentionDays": 7 },
-    { "name": "lemuel.deposit.offset_shortfall", "owner": "deposit-service", "orderingKey": "sellerId", "partitions": 3, "replicas": 1, "retentionDays": 7 }
+    { "name": "lemuel.deposit.offset_shortfall", "owner": "deposit-service", "orderingKey": "sellerId", "partitions": 3, "replicas": 1, "retentionDays": 7 },
+
+    { "name": "lemuel.education.course_published", "owner": "education-service", "orderingKey": "courseId", "partitions": 3, "replicas": 1, "retentionDays": 7 }
   ]
 }

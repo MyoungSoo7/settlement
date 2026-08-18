@@ -36,16 +36,19 @@ public class CourseAdminService {
     }
 
     @Transactional(readOnly = true)
-    public CourseJpaEntity get(UUID id) { return courses.findById(id).orElseThrow(() -> new CourseNotFoundException(id)); }
+    public CourseJpaEntity get(UUID id) { return findOrThrow(id); }
+
+    /** 조회를 애노테이션 없는 내부 메서드로 분리한다 — 쓰기 메서드가 get() 을 자기호출하면 프록시를 우회한다(aop-proxy-gate). */
+    private CourseJpaEntity findOrThrow(UUID id) { return courses.findById(id).orElseThrow(() -> new CourseNotFoundException(id)); }
 
     @Transactional
     public CourseJpaEntity update(UUID id, String title, String description, String actor) {
-        CourseJpaEntity course = get(id); course.update(title, description, actor); audit.record("COURSE_UPDATED", "Course", id, actor, "course updated"); return course;
+        CourseJpaEntity course = findOrThrow(id); course.update(title, description, actor); audit.record("COURSE_UPDATED", "Course", id, actor, "course updated"); return course;
     }
 
     @Transactional
     public CourseJpaEntity transition(UUID id, CourseStatus target, String actor) {
-        CourseJpaEntity course = get(id);
+        CourseJpaEntity course = findOrThrow(id);
         switch (target) {
             case PUBLISHED -> course.publish(actor);
             case HIDDEN -> course.hide(actor);
