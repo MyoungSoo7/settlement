@@ -9,6 +9,12 @@
 
 **언어를 능력에 맞게 배치한 폴리글랏 MSA**: JVM(Java/Kotlin)으로 도메인 정합성·트랜잭션, Go 로 동시성·엣지, Python 으로 데이터/ML.
 
+> **서비스 경계(왜 이 18개로 나뉘었는가)의 근거는 [ADR 0037](docs/adr/0037-msa-decomposition-rationale.md)** —
+> 가정한 사업 전제(자사몰 단독 채널·3PL 미보유 직배송·셀러 대상 임베디드 파이낸스 사업부 확장)와
+> 분해 기준 6축(정합성·규제/라이선스·장애격리·배포주기·팀 인지부하·데이터 오너십)으로 서비스마다
+> A(강한 경계)/B(중간)/C(약한 경계, 사실상 데이터 소스 단위) 등급을 매겨 소급 기록했다. 데이터
+> 원천이 다르다는 이유 하나만으로는 분리 사유로 삼지 않는다.
+
 ### JVM · Java 서비스 16종 + Gateway (핵심 도메인 · 정합성)
 
 | # | 서비스 | 포트 | 도메인 / 역할 |
@@ -63,7 +69,7 @@
 
 - **폴리글랏 MSA** — 동일 클러스터에서 언어별 강점 배치. JVM=도메인/트랜잭션, Go=실시간/멱등 엣지, Python=ML/퀀트. 기존 JVM 서비스가 못 채우는 실시간·데이터 공백을 보완.
 - **헥사고날 (Ports & Adapters)** — 전 서비스가 `domain / application / adapter(in·out)` 로 분리. 의존 방향(도메인은 프레임워크 무의존, application→adapter 금지)을 **ArchUnit 으로 컴파일 게이트화**. ADR 0001.
-- **Bounded Context 분리 + DB-per-service** — 서비스마다 독립 PostgreSQL(신규는 `lemuel_*` 규약, 선행 2종은 예외: order=`inter`·settlement=`settlement_db`), 스키마는 서비스별 Flyway 가 관리. 물리 격리로 결합 차단. ADR 0020(order↔settlement DB 분리).
+- **Bounded Context 분리 + DB-per-service** — 서비스마다 독립 PostgreSQL(신규는 `lemuel_*` 규약, 선행 2종은 예외: order=`inter`·settlement=`settlement_db`), 스키마는 서비스별 Flyway 가 관리. 물리 격리로 결합 차단. ADR 0020(order↔settlement DB 분리) · ADR 0037(전체 경계 자체의 분해 기준·등급).
 - **이벤트 드리븐 + CQRS 프로젝션** — 서비스 간 상태는 Kafka 이벤트(`lemuel.<domain>.<event>`)로 전파. settlement 확정·payment·investment 체결 등이 이벤트로 흐르고, 읽기 측은 프로젝션으로 조회. Kafka vs 애플리케이션 이벤트 경계는 ADR 0005.
 - **GitOps 배포** — GitHub Actions(CI, 이미지 빌드·ghcr 푸시) → ArgoCD(k3s 에 선언적 sync) → image-updater(신규 빌드 자동 롤아웃). 코드/설정이 git 이 단일 진실.
 - **관측성 내장** — Micrometer→Prometheus→Grafana(비즈니스 KPI 대시보드), 분산 트레이싱(Outbox 관통, ADR 0012), 중앙 로깅(ELK/fluent-bit).

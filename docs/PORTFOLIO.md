@@ -108,23 +108,29 @@ settlement.created / settlement.confirmed 이벤트만 수신 (코드·DB 의존
 
 ---
 
-## 위성 서비스 — 도메인 확장력 (얇음은 의도)
+## 위성 서비스 — 도메인 확장력 (얇음은 의도, 경계 강도는 스스로 안다)
 
-핵심 2축(커머스·정산) 외 14개 서비스는 **공개조회·수집·소비 전용**으로, 각각 얇지만 서로 다른 설계 제약을 증명한다.
+핵심 2축(커머스·정산) 외 14개 서비스는 **공개조회·수집·소비 전용**으로, 각각 얇지만 서로 다른 설계
+제약을 증명한다. 다만 "얇다"와 "왜 이만큼 쪼갰는가"는 별개 질문이다 — 정합성·규제·장애격리·
+배포주기·팀 인지부하·데이터 오너십 6축으로 서비스별 경계 강도를 스스로 채점해
+[ADR 0037](adr/0037-msa-decomposition-rationale.md)에 **A(강한 경계)/B(중간)/C(약한 경계, 사실상
+데이터 소스 단위)** 로 기록해 두었다.
 
-| 서비스 | 성격 | 증명하는 것 |
-|---|---|---|
-| loan / investment | 비즈니스(saga·점수) | 정산 이벤트로만 연계된 독립 컨텍스트 |
-| account (계정계 GL) | 소비 전용 | 이벤트→복식부기 집계, **발행 코드 없음**(경계 규율) |
-| company / operation | 수집·관제 | Outbox + 문서 JWT / fire-and-forget 신호 |
-| financial / economics / market / commondata | 공개조회 | shared-common 미의존, admin 키 게이트, PER/PBR 미계산 경계 |
-| ai | 챗봇 | provider 스위치 + LLM 격리(ArchUnit) — [아래 LLM 섹션](#llm-적용--프로덕션-서비스--개발-하네스) |
-| organization | 조직·멤버십 | 발행 전용(4토픽 → card 가 프로젝션 소비), 마지막 OWNER 보호 불변식 |
-| card | 법인카드(SaaS) | `master_limit >= Σ sub_limit` 불변식, 재원 조회 폴백 금지(503) |
-| insurance | GA 보험대리점 | 완전판매 게이트, 방카 25%룰, 수수료 환수(clawback) |
-| deposit | 셀러 예치금 원장 | hold/offset 로 재원 이중사용 구조적 차단 |
+| 서비스 | 경계 등급 | 성격 | 증명하는 것 |
+|---|---|---|---|
+| loan / investment | A | 비즈니스(saga·점수) | 정산 이벤트로만 연계된 독립 컨텍스트 |
+| account (계정계 GL) | A | 소비 전용 | 이벤트→복식부기 집계, **발행 코드 없음**(경계 규율) |
+| organization | A | 조직·멤버십 | 발행 전용(4토픽 → card 가 프로젝션 소비), 마지막 OWNER 보호 불변식 |
+| card | A | 법인카드(SaaS) | `master_limit >= Σ sub_limit` 불변식, 재원 조회 폴백 금지(503) |
+| insurance | A | GA 보험대리점 | 완전판매 게이트, 방카 25%룰, 수수료 환수(clawback) |
+| deposit | A | 셀러 예치금 원장 | hold/offset 로 재원 이중사용 구조적 차단 |
+| operation | B | 관제 | fire-and-forget 신호, 절대 throw 금지(비즈니스 경로 무결절) |
+| ai | B | 챗봇 | provider 스위치 + LLM 격리(ArchUnit) — [아래 LLM 섹션](#llm-적용--프로덕션-서비스--개발-하네스) |
+| company | C | 수집 | Outbox + 문서 JWT — 뉴스/평판 수집, 쓰기 오너십은 외부(뉴스 소스)에 있음 |
+| financial / economics / market / commondata | C | 공개조회 | shared-common 미의존, admin 키 게이트, PER/PBR 미계산 경계 — 사실상 외부 데이터 소스별 어댑터, 팀 경계 근거는 약함(ADR 0037 §3) |
 
 > 위성을 다 깊게 파지 않은 것은 **판단**이다 — 시그니처(정산 정확성)에 깊이를 몰아주고, 나머지는 각기 다른 아키텍처 제약을 얇게 증명한다.
+> **C등급(financial/economics/market/commondata/company)은 합병 후보임을 인지한 채 유지한다** — 배치·쿼터 격리라는 기술적 이유는 있으나 조직(팀 인지부하) 경계 근거는 약하다. "근거 없이 쪼갠 것"과 "근거를 알고 감수한 트레이드오프"의 차이를 ADR 0037 에 남긴 이유다.
 
 ---
 
