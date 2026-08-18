@@ -21,6 +21,7 @@ const OrderPage = lazy(() => import('./pages/OrderPage'));
 const RecommendPage = lazy(() => import('./pages/RecommendPage'));
 const CartPage = lazy(() => import('./pages/CartPage'));
 const MyPage = lazy(() => import('./pages/MyPage'));
+const MyBalancesPage = lazy(() => import('./pages/MyBalancesPage'));
 const LoanPage = lazy(() => import('./pages/LoanPage'));
 const TossPaymentSuccess = lazy(() => import('./pages/TossPaymentSuccess'));
 const FinancialStatementsPage = lazy(() => import('./pages/FinancialStatementsPage'));
@@ -38,6 +39,8 @@ const CeoLenderGuidePage = lazy(() => import('./pages/CeoLenderGuidePage'));
 const CeoFundGuidePage = lazy(() => import('./pages/CeoFundGuidePage'));
 const AiChatPage = lazy(() => import('./pages/AiChatPage'));
 const EducationCourseAdminPage = lazy(() => import('./pages/system/EducationCourseAdminPage'));
+const PointConsolePage = lazy(() => import('./pages/system/PointConsolePage'));
+const GiftCardConsolePage = lazy(() => import('./pages/system/GiftCardConsolePage'));
 
 // 관리자 페이지 (lazy load)
 const ProductPage = lazy(() => import('./pages/ProductPage'));
@@ -162,6 +165,7 @@ function App() {
             <Route path="/recommend"    element={<ProtectedRoute><RecommendPage /></ProtectedRoute>} />
             <Route path="/cart"         element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
             <Route path="/mypage"       element={<ProtectedRoute><MyPage /></ProtectedRoute>} />
+            <Route path="/my/balances" element={<ProtectedRoute><MyBalancesPage /></ProtectedRoute>} />
             <Route path="/loans"        element={<ProtectedRoute><LoanPage /></ProtectedRoute>} />
             {/* AI 챗봇 (ai-service) — LLM 비용이 들어 인증 필수(USER 이상), 역할 무관 */}
             <Route path="/ai/chat"      element={<ProtectedRoute><AiChatPage /></ProtectedRoute>} />
@@ -246,6 +250,10 @@ function App() {
               element={<AdminOnlyRoute><SideNavLayout><ProofReviewQueuePage /></SideNavLayout></AdminOnlyRoute>} />
             <Route path="/admin/system/operation"
               element={<AdminOnlyRoute><SideNavLayout><OperationConsolePage /></SideNavLayout></AdminOnlyRoute>} />
+            <Route path="/admin/system/points"
+              element={<AdminOnlyRoute><SideNavLayout><PointConsolePage /></SideNavLayout></AdminOnlyRoute>} />
+            <Route path="/admin/system/gift-cards"
+              element={<AdminOnlyRoute><SideNavLayout><GiftCardConsolePage /></SideNavLayout></AdminOnlyRoute>} />
 
             {/* ── CEO 인사이트 (ADMIN·MANAGER, 좌측 사이드바) — 위성 조회 서비스 묶음 ── */}
             <Route path="/admin/ceo"

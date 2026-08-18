@@ -79,13 +79,13 @@ class MenuSeedIntegrationTest {
     }
 
     @Test
-    @DisplayName("시드 총 48행 — 이관분 31 + 정산운영 그룹 1 + 운영 화면 10 + 시스템 화면 5 + 법인카드(CEO) 1")
+    @DisplayName("시드 총 51행 — 이관분 31 + 정산운영 그룹 1 + 운영 화면 10 + 시스템 화면 7 + 법인카드(CEO) 1 + 구매자 잔액 1")
     void seedsExactlyFortyEight() {
-        assertThat(adapter.findAll()).hasSize(48);
+        assertThat(adapter.findAll()).hasSize(51);
     }
 
     @Test
-    @DisplayName("최상위 10개가 상단 네비 순서대로 들어간다")
+    @DisplayName("최상위 11개가 상단 네비 순서대로 들어간다")
     void rootsInOrder() {
         List<Menu> roots = adapter.findAll().stream()
                 .filter(m -> m.getParentId() == null)
@@ -94,7 +94,7 @@ class MenuSeedIntegrationTest {
 
         assertThat(roots).extracting(Menu::getName).containsExactly(
                 "대시보드", "정산", "정산운영", "배송", "승인", "AI 도우미", "CEO", "시스템 관리",
-                "주문하기", "추천받기");
+                "주문하기", "추천받기", "내 포인트·상품권");
     }
 
     @Test
@@ -142,7 +142,7 @@ class MenuSeedIntegrationTest {
     }
 
     @Test
-    @DisplayName("시스템 사이드바 10개 — 앞 3개와 게시판 관리가 RBAC permission 과 짝지어진다")
+    @DisplayName("시스템 사이드바 12개 — 앞 3개와 게시판 관리가 RBAC permission 과 짝지어진다")
     void systemChildren() {
         List<Menu> children = childrenOf("시스템 관리");
 
@@ -150,10 +150,11 @@ class MenuSeedIntegrationTest {
         // 운영관리의 sort_order 를 한 칸씩 밀어 이 순서를 유지한다.
         assertThat(children).extracting(Menu::getName).containsExactly(
                 "메뉴 관리", "공통코드 관리", "RBAC 관리", "이커머스 카테고리",
-                "진열 편성", "옵션 카탈로그", "운영관리", "증빙 리뷰 큐", "게시판 관리", "교육 관리");
+                "진열 편성", "옵션 카탈로그", "운영관리", "증빙 리뷰 큐", "게시판 관리", "교육 관리",
+                "포인트 운영", "기프트카드 운영");
         assertThat(children).extracting(Menu::getRequiredPermission).containsExactly(
                 "SYSTEM_MENU_MANAGE", "SYSTEM_CODE_MANAGE", "SYSTEM_RBAC_MANAGE",
-                null, null, null, null, null, "SYSTEM_BOARD_MANAGE", null);
+                null, null, null, null, null, "SYSTEM_BOARD_MANAGE", null, null, null);
     }
 
     @Test
@@ -208,14 +209,14 @@ class MenuSeedIntegrationTest {
     }
 
     @Test
-    @DisplayName("구매자 메뉴 2개는 USER 에게만 보인다 — 관리자 네비에는 주문/추천이 없었다")
+    @DisplayName("구매자 메뉴 3개는 USER 에게만 보인다 — 관리자 네비에는 주문/추천/잔액이 없었다")
     void shopMenusAreUserOnly() {
         Set<String> shopNames = adapter.findAll().stream()
                 .filter(m -> m.getArea() == MenuArea.SHOP)
                 .map(Menu::getName)
                 .collect(Collectors.toSet());
 
-        assertThat(shopNames).containsExactlyInAnyOrder("주문하기", "추천받기");
+        assertThat(shopNames).containsExactlyInAnyOrder("주문하기", "추천받기", "내 포인트·상품권");
         assertThat(adapter.findAll()).filteredOn(m -> m.getArea() == MenuArea.SHOP)
                 .allSatisfy(m -> assertThat(m.allowedRoles()).containsExactly("USER"));
     }

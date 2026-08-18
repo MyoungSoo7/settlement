@@ -107,6 +107,8 @@ export const FALLBACK_MENUS: FallbackMenuNode[] = [
       { id: -88, name: '증빙 리뷰 큐', path: '/admin/system/proof-review', icon: '🧾', description: '증빙 OCR 리뷰 큐 (영수증·청약·담보·예치금)', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
       { id: -89, name: '게시판 관리', path: '/admin/system/boards', icon: '📋', description: '게시판 생성 · 스킨 · 권한 정책', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
       { id: -90, name: '교육 관리', path: '/admin/education/courses', icon: '🎓', description: '교육 과정 · 강의 콘텐츠', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
+      { id: -91, name: '포인트 운영', path: '/admin/system/points', icon: '🪙', description: '수기 지급 · 유효기간 소멸', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
+      { id: -92, name: '기프트카드 운영', path: '/admin/system/gift-cards', icon: '🎁', description: '상품권 발행 · 유효기간 소멸', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
     ],
   },
   {
@@ -115,6 +117,10 @@ export const FALLBACK_MENUS: FallbackMenuNode[] = [
   },
   {
     id: -9, name: '추천받기', path: '/recommend', icon: '✨', description: null,
+    area: 'SHOP', type: 'ITEM', roles: ['USER'],
+  },
+  {
+    id: -10, name: '내 포인트·상품권', path: '/my/balances', icon: '🪙', description: null,
     area: 'SHOP', type: 'ITEM', roles: ['USER'],
   },
 ];
