@@ -93,6 +93,7 @@ public class AccountEntry {
     public static final String TOPIC_POINT_USED = "lemuel.point.used";
     public static final String TOPIC_POINT_RESTORED = "lemuel.point.restored";
     public static final String TOPIC_POINT_EXPIRED = "lemuel.point.expired";
+    public static final String TOPIC_POINT_REVOKED = "lemuel.point.revoked";
     /** 백필 청산 분개의 합성 source_topic — 실제 Kafka 토픽이 아니라 자연키 구성용(멱등). */
     public static final String SOURCE_SCHEDULED_CLEARING = "lemuel.account.backfill";
     /**
@@ -404,6 +405,18 @@ public class AccountEntry {
         return of(OwnerType.CUSTOMER, userId,
                 GlAccount.CASH, GlAccount.POINT_LIABILITY, amount,
                 "POINT_RESTORED", entryId, TOPIC_POINT_RESTORED);
+    }
+
+    /**
+     * 포인트 적립 취소 → DR POINT_LIABILITY / CR POINT_PROMOTION_EXPENSE (판촉비 환입).
+     *
+     * <p>소멸({@link #pointExpired})과 잔고 효과는 같지만 상대계정이 다르다 — 소멸은 고객이 안 쓴
+     * 결과라 <b>이익</b>이고, 취소는 애초에 주지 말았어야 할 적립을 되돌리는 것이라 <b>비용 환입</b>이다.
+     */
+    public static AccountEntry pointRevoked(String userId, String entryId, BigDecimal amount) {
+        return of(OwnerType.CUSTOMER, userId,
+                GlAccount.POINT_LIABILITY, GlAccount.POINT_PROMOTION_EXPENSE, amount,
+                "POINT_REVOKED", entryId, TOPIC_POINT_REVOKED);
     }
 
     /** 포인트 소멸 → DR POINT_LIABILITY / CR POINT_BREAKAGE_INCOME. */

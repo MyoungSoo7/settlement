@@ -124,6 +124,17 @@ class PointLedgerConsumerTest {
     }
 
     @Test
+    @DisplayName("point.revoked 정본 샘플 → DR POINT_LIABILITY / CR POINT_PROMOTION_EXPENSE (판촉비 환입)")
+    void revoked() {
+        AccountEntry entry = consumeAndCapture("lemuel.point.revoked");
+
+        assertThat(entry.getDebitAccount()).isEqualTo(GlAccount.POINT_LIABILITY);
+        // 소멸은 이익(BREAKAGE_INCOME), 취소는 비용 환입 — 둘을 합치면 손익에서 분리할 수 없다.
+        assertThat(entry.getCreditAccount()).isEqualTo(GlAccount.POINT_PROMOTION_EXPENSE);
+        assertThat(entry.getRefType()).isEqualTo("POINT_REVOKED");
+    }
+
+    @Test
     @DisplayName("이미 처리한 이벤트는 다시 전기하지 않는다 — 멱등 2단")
     void alreadyProcessedEventIsSkipped() {
         when(processedEventRepository.existsById(any())).thenReturn(true);

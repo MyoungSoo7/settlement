@@ -36,6 +36,7 @@ class ChangeOrderStatusServiceTest {
     @Mock RefundOrderPaymentPort refundOrderPaymentPort;
     @Mock IncreaseProductStockUseCase increaseProductStockUseCase;
     @Mock IncreaseVariantStockUseCase increaseVariantStockUseCase;
+    @Mock github.lms.lemuel.order.application.port.out.OrderPointRewardPort orderPointRewardPort;
     @InjectMocks ChangeOrderStatusService service;
 
     @Test @DisplayName("주문 취소 성공")
@@ -347,5 +348,47 @@ class ChangeOrderStatusServiceTest {
 
         assertThatThrownBy(() -> service.cancelUnpaidOrder(99L, "입금 기한 경과"))
                 .isInstanceOf(OrderNotFoundException.class);
+    }
+
+    @org.junit.jupiter.api.Test
+    @org.junit.jupiter.api.DisplayName("배송 완료 전이는 포인트 적립을 부른다 — 구매 확정 시점이 적립 시점이다")
+    void delivered_triggersEarn() {
+        github.lms.lemuel.order.domain.Order order = orderInStatus(
+                github.lms.lemuel.order.domain.OrderStatus.IN_TRANSIT);
+        org.mockito.Mockito.when(loadOrderPort.findById(1L))
+                .thenReturn(java.util.Optional.of(order));
+        org.mockito.Mockito.when(saveOrderPort.save(org.mockito.ArgumentMatchers.any()))
+                .thenAnswer(call -> call.getArgument(0));
+
+        service.changeShippingStatus(1L, "DELIVERED", "배송 완료", "admin");
+
+        org.mockito.Mockito.verify(orderPointRewardPort).earnOnDelivered(order);
+        org.mockito.Mockito.verify(orderPointRewardPort, org.mockito.Mockito.never())
+                .revokeOnCanceled(org.mockito.ArgumentMatchers.any());
+    }
+
+    @org.junit.jupiter.api.Test
+    @org.junit.jupiter.api.DisplayName("배송 중 전이는 적립을 부르지 않는다 — 확정 전에는 주지 않는다")
+    void inTransit_doesNotEarn() {
+        github.lms.lemuel.order.domain.Order order = orderInStatus(
+                github.lms.lemuel.order.domain.OrderStatus.SHIPPING_PENDING);
+        org.mockito.Mockito.when(loadOrderPort.findById(1L))
+                .thenReturn(java.util.Optional.of(order));
+        org.mockito.Mockito.when(saveOrderPort.save(org.mockito.ArgumentMatchers.any()))
+                .thenAnswer(call -> call.getArgument(0));
+
+        service.changeShippingStatus(1L, "IN_TRANSIT", "출고", "admin");
+
+        org.mockito.Mockito.verify(orderPointRewardPort, org.mockito.Mockito.never())
+                .earnOnDelivered(org.mockito.ArgumentMatchers.any());
+    }
+
+    /** 지정 상태의 주문을 만든다 — 전이 규칙을 통과할 수 있는 최소 형태. */
+    private static github.lms.lemuel.order.domain.Order orderInStatus(
+            github.lms.lemuel.order.domain.OrderStatus status) {
+        return github.lms.lemuel.order.domain.Order.rehydrate(1L, 42L, 1L,
+                new java.math.BigDecimal("50000"), status,
+                java.time.LocalDateTime.now(), java.time.LocalDateTime.now(),
+                java.math.BigDecimal.ZERO, true);
     }
 }

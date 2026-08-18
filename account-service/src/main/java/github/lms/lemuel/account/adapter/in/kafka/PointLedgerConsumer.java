@@ -53,6 +53,7 @@ public class PointLedgerConsumer extends IdempotentEventConsumer {
             "${app.kafka.topic.point-used}",
             "${app.kafka.topic.point-restored}",
             "${app.kafka.topic.point-expired}",
+            "${app.kafka.topic.point-revoked}",
     }, groupId = CONSUMER_GROUP, containerFactory = "kafkaListenerContainerFactory")
     @Transactional
     public void onPointEvent(ConsumerRecord<String, String> record, Acknowledgment ack) {
@@ -86,6 +87,7 @@ public class PointLedgerConsumer extends IdempotentEventConsumer {
             case "used" -> AccountEntry.pointUsed(userId, requiredText(node, "entryId", eventId), amount);
             case "restored" -> AccountEntry.pointRestored(userId, requiredText(node, "entryId", eventId), amount);
             case "expired" -> AccountEntry.pointExpired(userId, requiredText(node, "lotId", eventId), amount);
+            case "revoked" -> AccountEntry.pointRevoked(userId, requiredText(node, "entryId", eventId), amount);
             // 카탈로그에 없는 토픽이 이 리스너에 닿았다는 뜻 — 조용히 넘기면 분개가 통째로 누락된다.
             default -> throw new IllegalStateException(
                     "알 수 없는 포인트 토픽입니다: " + topic + ", eventId=" + eventId);

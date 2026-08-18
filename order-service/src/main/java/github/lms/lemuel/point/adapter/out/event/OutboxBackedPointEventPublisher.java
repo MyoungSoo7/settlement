@@ -85,6 +85,11 @@ public class OutboxBackedPointEventPublisher implements PublishPointEventPort {
     }
 
     @Override
+    public void pointRevoked(PointAccount account, PointEntry entry) {
+        writeOutbox(account, "PointRevoked", ledgerPayload(account, entry));
+    }
+
+    @Override
     public void pointExpired(PointAccount account, PointLot lot, BigDecimal forfeitedAmount) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("userId", account.getUserId());

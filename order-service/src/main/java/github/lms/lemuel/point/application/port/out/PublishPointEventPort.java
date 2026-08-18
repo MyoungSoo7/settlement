@@ -25,6 +25,12 @@ public interface PublishPointEventPort {
     /** 환불 복원 — DR CASH / CR POINT_LIABILITY (사용의 대칭). */
     void pointRestored(PointAccount account, PointEntry entry);
 
+    /**
+     * 적립 취소 — DR POINT_LIABILITY / CR POINT_PROMOTION_EXPENSE (판촉비 환입).
+     * 소멸(이익 인식)과 상대계정이 다르므로 이벤트도 갈라야 한다.
+     */
+    void pointRevoked(PointAccount account, PointEntry entry);
+
     /** 소멸 — DR POINT_LIABILITY / CR POINT_BREAKAGE_INCOME. */
     void pointExpired(PointAccount account, PointLot lot, java.math.BigDecimal forfeitedAmount);
 }

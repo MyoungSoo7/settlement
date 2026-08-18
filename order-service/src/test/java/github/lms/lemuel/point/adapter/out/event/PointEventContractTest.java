@@ -123,6 +123,16 @@ class PointEventContractTest {
     }
 
     @Test
+    @DisplayName("적립 회수 페이로드는 계약을 만족한다 — 소멸과 상대계정이 달라 토픽을 나눈다")
+    void revoked_satisfiesContract() {
+        publisher.pointRevoked(account(), entry("500", "ORDER", "1001"));
+
+        OutboxEvent event = saved();
+        assertThat(event.getEventType()).isEqualTo("PointRevoked");
+        EventContractValidator.assertValid("lemuel.point.revoked", event.getPayload());
+    }
+
+    @Test
     @DisplayName("소멸 페이로드는 계약을 만족한다")
     void expired_satisfiesContract() {
         publisher.pointExpired(account(), lot(PointLotOrigin.ORDER_EARN, "1000", NOW.plusDays(30)),

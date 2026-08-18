@@ -171,8 +171,14 @@ class RefundApprovalIT {
         var increaseVariant = new IncreaseVariantStockService(variantAdapter);
         SaveOrderStatusHistoryPort history = (orderId, from, to, by, reason) -> { };
 
+        // 포인트 적립은 이 시나리오의 관심사가 아니다 — 호출됐다는 사실만 안전하게 흘려보낸다.
+        github.lms.lemuel.order.application.port.out.OrderPointRewardPort noopReward =
+                new github.lms.lemuel.order.application.port.out.OrderPointRewardPort() {
+                    @Override public void earnOnDelivered(github.lms.lemuel.order.domain.Order order) { }
+                    @Override public void revokeOnCanceled(github.lms.lemuel.order.domain.Order order) { }
+                };
         changeStatusService = new ChangeOrderStatusService(orderAdapter, orderAdapter, history,
-                refundOrderPaymentPort, increaseProduct, increaseVariant);
+                refundOrderPaymentPort, increaseProduct, increaseVariant, noopReward);
     }
 
     @Test

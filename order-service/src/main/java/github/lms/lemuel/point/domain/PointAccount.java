@@ -118,10 +118,29 @@ public class PointAccount {
      * 넘는다면 잔고와 로트가 어긋났다는 뜻이라 {@link PointInvariantViolationException} 이다.
      */
     public void expire(BigDecimal amount) {
-        BigDecimal value = requirePoint(amount, "expire");
+        forfeit(amount, "expire", "소멸액");
+    }
+
+    /**
+     * 적립 취소 차감 — 주문이 취소·환불되면 그 주문으로 준 적립분을 회수한다.
+     *
+     * <p>{@link #expire} 와 잔고 효과는 같지만 원장 엔트리 유형과 GL 상대계정이 다르다
+     * (소멸은 이익 인식, 취소는 판촉비 환입). 그래서 메서드를 나눠 호출 지점이 의도를 드러내게 한다.
+     */
+    public void revoke(BigDecimal amount) {
+        forfeit(amount, "revoke", "회수액");
+    }
+
+    /**
+     * 잔고에서 되가져오는 공통 경로. 차감액은 언제나 <b>로트에서 계산되어</b> 넘어오므로 잔액을
+     * 넘을 수 없다 — 넘는다면 잔고와 로트가 어긋났다는 뜻이라 사용자 입력 오류가 아니라 로직 버그다.
+     */
+    private void forfeit(BigDecimal amount, String operation, String label) {
+        BigDecimal value = requirePoint(amount, operation);
         if (available.compareTo(value) < 0) {
             throw new PointInvariantViolationException(
-                    "불변식 위반: 소멸액(" + value + ")이 가용 잔고(" + available + ")를 초과 — 잔고와 로트가 어긋났다");
+                    "불변식 위반: " + label + "(" + value + ")이 가용 잔고(" + available
+                            + ")를 초과 — 잔고와 로트가 어긋났다");
         }
         this.available = this.available.subtract(value);
         this.total = this.total.subtract(value);

@@ -239,6 +239,28 @@ class PointAccountTest {
         }
 
         @Test
+        @DisplayName("적립 취소는 available 을 차감한다 — 주문이 환불되면 그 적립분을 회수한다")
+        void revoke_decreasesAvailable() {
+            PointAccount account = newAccount();
+            account.grant(new BigDecimal("5000"));
+
+            account.revoke(new BigDecimal("1500"));
+
+            assertThat(account.getAvailable()).isEqualByComparingTo(new BigDecimal("3500"));
+            assertInvariant(account);
+        }
+
+        @Test
+        @DisplayName("잔액을 넘는 회수는 불변식 위반이다 — 회수액은 로트에서 계산돼 넘어온다")
+        void revoke_overBalanceIsInvariantViolation() {
+            PointAccount account = newAccount();
+            account.grant(new BigDecimal("1000"));
+
+            assertThatThrownBy(() -> account.revoke(new BigDecimal("2000")))
+                    .isInstanceOf(PointInvariantViolationException.class);
+        }
+
+        @Test
         @DisplayName("잔액을 넘는 소멸은 불변식 위반이다 — 사용자 입력이 아니라 로직 버그")
         void expire_overBalanceIsInvariantViolation() {
             PointAccount account = newAccount();

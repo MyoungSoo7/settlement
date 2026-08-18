@@ -158,6 +158,7 @@ app:
       point-used: lemuel.point.used
       point-restored: lemuel.point.restored
       point-expired: lemuel.point.expired
+      point-revoked: lemuel.point.revoked
       # 수신 (investment → account)
       investment-executed: lemuel.investment.executed
   # ADR 0030 Phase 3 — 실체화 잔액(account_balances) 정기 대사.
