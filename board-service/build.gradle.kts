@@ -79,17 +79,10 @@ tasks.jacocoTestReport {
         xml.required.set(true)
         html.required.set(true)
     }
-    // adapter in/out 서브패키지는 통합 테스트로 별도 검증 — 커버리지 게이트 제외(전 모듈 공통 기준)
-    classDirectories.setFrom(
-        files(classDirectories.files.map {
-            fileTree(it) {
-                exclude(
-                    "github/lms/lemuel/board/adapter/**",
-                    "github/lms/lemuel/board/config/**"
-                )
-            }
-        })
-    )
+    // ⚠️ classDirectories(측정 대상)는 루트 build.gradle.kts 가 단독 소유한다 — 여기서 다시 얹지 말 것.
+    // classDirectories.files 는 설정 시점에 즉시 평가되므로 루트가 이미 교체한 값 위에 같은 관용구를
+    // 한 번 더 얹으면 ① 클린 빌드(=CI 의 `clean :module:build`)에서 빈 집합이 스냅샷되어 측정 대상 0개로
+    // 게이트가 공전하고 ② 산출물이 남은 빌드에서도 엔트리가 개별 .class 파일로 굳어 경로 제외가 무효가 된다.
 }
 
 tasks.jacocoTestCoverageVerification {
@@ -103,14 +96,5 @@ tasks.jacocoTestCoverageVerification {
             }
         }
     }
-    classDirectories.setFrom(
-        files(classDirectories.files.map {
-            fileTree(it) {
-                exclude(
-                    "github/lms/lemuel/board/adapter/**",
-                    "github/lms/lemuel/board/config/**"
-                )
-            }
-        })
-    )
+    // 제외 목록도 루트가 소유한다(adapter in/out·config·util·*Application). 위 주석 참조.
 }

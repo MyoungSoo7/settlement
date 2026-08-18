@@ -155,6 +155,9 @@ subprojects {
                     "**/InvestmentServiceApplication*",
                     "**/AccountServiceApplication*",
                     "**/InsuranceServiceApplication*",
+                    "**/DepositServiceApplication*",
+                    "**/BoardServiceApplication*",
+                    "**/EducationServiceApplication*",
                 )
             }
         })

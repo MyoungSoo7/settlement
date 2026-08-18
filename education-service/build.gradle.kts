@@ -37,10 +37,7 @@ tasks.withType<Test> {
     useJUnitPlatform()
 }
 
-tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
-    classDirectories.setFrom(files(classDirectories.files.map { directory ->
-        fileTree(directory) {
-            exclude("**/adapter/**", "**/config/**", "**/EducationServiceApplication*")
-        }
-    }))
-}
+// ⚠️ classDirectories(측정 대상)는 루트 build.gradle.kts 가 단독 소유한다 — 여기서 다시 얹지 말 것.
+// classDirectories.files 는 설정 시점에 즉시 평가되므로 루트가 이미 교체한 값 위에 같은 관용구를
+// 한 번 더 얹으면 클린 빌드(=CI 의 `clean :module:build`)에서 빈 집합이 스냅샷되어 측정 대상 0개로
+// 게이트가 공전한다. 제외 패턴이 필요하면 루트의 목록에 추가한다.
