@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { pointApi } from '@/api/point';
 import { giftCardApi, type RegisterGiftCardResult } from '@/api/giftCard';
 import { apiErrorMessage } from '@/lib/apiError';

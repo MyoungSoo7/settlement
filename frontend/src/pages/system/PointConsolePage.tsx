@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { pointApi, type ExpirePointResult, type GrantPointResult } from '@/api/point';
 import { apiErrorMessage } from '@/lib/apiError';
 

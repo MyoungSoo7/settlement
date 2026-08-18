@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { giftCardApi, type ExpireGiftCardsResult, type IssuedGiftCard } from '@/api/giftCard';
 import { apiErrorMessage } from '@/lib/apiError';
 
