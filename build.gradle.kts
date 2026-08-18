@@ -29,6 +29,28 @@ allprojects {
     }
 }
 
+// 커버리지 게이트가 "공전"하는 것을 실행 시점에 잡는 스모크.
+//
+// classDirectories 는 설정 시점에 즉시 평가되므로, 클린 빌드(`clean :module:build`)처럼
+// build/classes 가 아직 없는 상태에서 스냅샷되면 측정 대상이 빈 집합으로 굳는다. 그러면
+// 리포트는 클래스 0개로 나오고 LINE 90% 검증은 "위반 없음"으로 통과한다 — 게이트가 켜져
+// 있는데 아무것도 재지 않는다. 2026-08-19 에 deposit·board·education 이 정확히 이 상태였고,
+// 빌드는 초록이었다(d87c43fc). 대상이 0개인지는 반드시 *실행 시점*(doFirst)에 확인해야 한다.
+fun requireNonEmptyCoverageScope(taskName: String, classDirectories: FileCollection) {
+    val measured = classDirectories.asFileTree.matching { include("**/*.class") }.files.size
+    require(measured > 0) {
+        "$taskName 의 커버리지 측정 대상이 0개다 — 게이트가 공전한다. " +
+            "모듈 build.gradle.kts 가 classDirectories 를 다시 얹지 않았는지, " +
+            "제외 패턴이 모듈 전체를 삼키지 않았는지 확인할 것."
+    }
+}
+
+// 측정 대상 0개가 *정상*인 모듈. 잴 코드가 없는 것이지 게이트가 공전하는 것이 아니다.
+// gateway-service 는 Spring Cloud Gateway 라우팅 설정만 있는 모듈로 자바 소스가
+// GatewayServiceApplication 하나뿐이고, 그 하나는 아래 검증 제외 목록에 이미 들어 있다.
+// 여기에 모듈을 추가할 때는 "왜 잴 코드가 없는지"를 반드시 같이 적을 것.
+val modulesWithoutMeasurableCode = setOf("gateway-service")
+
 subprojects {
     apply(plugin = "java")
     apply(plugin = "io.spring.dependency-management")
@@ -111,6 +133,9 @@ subprojects {
         classDirectories.setFrom(classDirectories.files.map { dir ->
             fileTree(dir) { exclude("**/Q*.class") }
         })
+        if (project.name !in modulesWithoutMeasurableCode) {
+            doFirst { requireNonEmptyCoverageScope("jacocoTestReport", classDirectories) }
+        }
     }
 
     // 커버리지 임계값. CI 에서 회귀 시 즉시 빌드 실패 → PR 차단.
@@ -202,6 +227,10 @@ subprojects {
                     minimum = "0.80".toBigDecimal()
                 }
             }
+        }
+
+        if (project.name !in modulesWithoutMeasurableCode) {
+            doFirst { requireNonEmptyCoverageScope("jacocoTestCoverageVerification", classDirectories) }
         }
     }
 
