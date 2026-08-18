@@ -1,8 +1,8 @@
 plugins {
     id("org.springframework.boot") version "3.3.5"
-    id("io.spring.dependency-management") version "1.1.6"
-    kotlin("jvm") version "2.0.21"
-    kotlin("plugin.spring") version "2.0.21"
+    id("io.spring.dependency-management") version "1.1.7"
+    kotlin("jvm") version "2.4.10"
+    kotlin("plugin.spring") version "2.4.10"
 }
 
 group = "github.lms.lemuel"
@@ -41,21 +41,21 @@ dependencies {
     // JWT (HS256) — the push stream verifies the platform token itself; this
     // service has no shared-common on its classpath. Same library and version
     // as shared-common's JwtUtil so the two agree on parsing/validation.
-    implementation("io.jsonwebtoken:jjwt-api:0.12.5")
-    runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.5")
-    runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.5")
+    implementation("io.jsonwebtoken:jjwt-api:0.13.0")
+    runtimeOnly("io.jsonwebtoken:jjwt-impl:0.13.0")
+    runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.13.0")
 
     // Kotlin
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
 
     // Test
     testImplementation("org.springframework.boot:spring-boot-starter-test") {
         exclude(group = "org.mockito")
     }
-    testImplementation("io.mockk:mockk:1.13.13")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+    testImplementation("io.mockk:mockk:1.14.11")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
     // EmbeddedKafka — DLT 격리는 브로커 없이는 "설정이 맞다"까지만 검증된다. 재시도 소진 후
     // 실제로 <topic>.DLT 에 레코드가 도착하는지는 실 브로커로만 증명된다(settlement 의 DlqEndToEndTest 와 동형).
     testImplementation("org.springframework.kafka:spring-kafka-test")

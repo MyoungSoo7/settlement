@@ -44,7 +44,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-flyway")
 
     // SpringDoc OpenAPI
-    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.2")
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.0")
 
     // Caffeine (rate limit 버킷 보관)
     implementation("com.github.ben-manes.caffeine:caffeine")
@@ -56,7 +56,7 @@ dependencies {
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
 
     // PostgreSQL
-    runtimeOnly("org.postgresql:postgresql:42.7.3")
+    runtimeOnly("org.postgresql:postgresql:42.7.13")
 
     // dotenv
     implementation("io.github.cdimascio:java-dotenv:5.2.2")
@@ -75,7 +75,7 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testImplementation("org.mockito:mockito-core")
     // Java 25 클래스 파싱은 ArchUnit 1.4.x 부터 지원
-    testImplementation("com.tngtech.archunit:archunit-junit5:1.4.1")
+    testImplementation("com.tngtech.archunit:archunit-junit5:1.5.0")
     testImplementation(platform("org.testcontainers:testcontainers-bom:1.21.4"))
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:postgresql")

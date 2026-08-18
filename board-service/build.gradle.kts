@@ -32,11 +32,11 @@ dependencies {
 
     // HTML 게시판 본문 sanitize — 저장 시점 정화의 유일한 구현체(JsoupHtmlSanitizerAdapter).
     // Boot 4 BOM 은 jsoup 버전을 관리하지 않는다(3.x 와 다름) — 직접 고정한다.
-    implementation("org.jsoup:jsoup:1.18.3")
+    implementation("org.jsoup:jsoup:1.23.1")
 
-    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.2")
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.0")
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
-    runtimeOnly("org.postgresql:postgresql:42.7.3")
+    runtimeOnly("org.postgresql:postgresql:42.7.13")
     implementation("io.github.cdimascio:java-dotenv:5.2.2")
 
     compileOnly("org.projectlombok:lombok")
@@ -53,7 +53,7 @@ dependencies {
     testImplementation("org.springframework.security:spring-security-test")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testImplementation("org.mockito:mockito-core")
-    testImplementation("com.tngtech.archunit:archunit-junit5:1.4.1")
+    testImplementation("com.tngtech.archunit:archunit-junit5:1.5.0")
 
     // 부팅 IT — 실 PostgreSQL 에 Flyway 체인을 적용하고 ddl-auto:validate 로 매핑 드리프트를 잡는다.
     // 이게 없으면 마이그레이션과 엔티티가 어긋나도 단위 테스트는 전부 초록이다(가짜 GREEN 경로).

@@ -32,7 +32,7 @@ dependencies {
     implementation("org.springframework.kafka:spring-kafka")
 
     // SpringDoc OpenAPI
-    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.2")
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.0")
 
     // QueryDSL (대출 조회/집계)
     implementation("com.querydsl:querydsl-jpa:5.0.0:jakarta")
@@ -50,7 +50,7 @@ dependencies {
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
 
     // PostgreSQL
-    runtimeOnly("org.postgresql:postgresql:42.7.3")
+    runtimeOnly("org.postgresql:postgresql:42.7.13")
 
     // dotenv
     implementation("io.github.cdimascio:java-dotenv:5.2.2")
@@ -78,7 +78,7 @@ dependencies {
     testImplementation("org.mockito:mockito-core")
     // ArchUnit 1.4.x 부터 Java 25 바이트코드 파싱 — 1.3.0 은 클래스 임포트를 조용히 스킵해
     // LoanArchitectureTest 방향 가드가 공허하게 통과(무력화)한다. account/settlement 와 버전 정렬.
-    testImplementation("com.tngtech.archunit:archunit-junit5:1.4.1")
+    testImplementation("com.tngtech.archunit:archunit-junit5:1.5.0")
     testImplementation(platform("org.testcontainers:testcontainers-bom:1.21.4"))
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:postgresql")

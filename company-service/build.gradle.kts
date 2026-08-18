@@ -32,10 +32,10 @@ dependencies {
 
     // 국민연금 사업장가입자 공개데이터 CSV 임포트 — RFC4180 quoted-field(임베디드 콤마/따옴표)가
     // 실제로 원본에 존재해 수동 split(",") 로는 파싱이 깨진다.
-    implementation("org.apache.commons:commons-csv:1.12.0")
+    implementation("org.apache.commons:commons-csv:1.14.1")
 
     // SpringDoc OpenAPI
-    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.2")
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.0")
 
     // Caffeine (기업/기사 조회 캐시)
     implementation("com.github.ben-manes.caffeine:caffeine")
@@ -44,7 +44,7 @@ dependencies {
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
 
     // PostgreSQL
-    runtimeOnly("org.postgresql:postgresql:42.7.3")
+    runtimeOnly("org.postgresql:postgresql:42.7.13")
 
     // dotenv
     implementation("io.github.cdimascio:java-dotenv:5.2.2")
@@ -69,7 +69,7 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testImplementation("org.mockito:mockito-core")
     // Java 25 클래스 파싱은 ArchUnit 1.4.x 부터 지원
-    testImplementation("com.tngtech.archunit:archunit-junit5:1.4.1")
+    testImplementation("com.tngtech.archunit:archunit-junit5:1.5.0")
 }
 
 val mockitoAgent = configurations.create("mockitoAgent")
