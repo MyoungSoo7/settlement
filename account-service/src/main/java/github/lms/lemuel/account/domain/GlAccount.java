@@ -75,7 +75,19 @@ public enum GlAccount {
      * 포인트 소멸이익 (수익, 대변성) — 유효기간이 지나 사라진 포인트만큼 부채가 소멸한다.
      * 인식하지 않고 부채로 이월하면 시산표의 부채가 무한히 쌓여 의미를 잃는다.
      */
-    POINT_BREAKAGE_INCOME(AccountSide.CREDIT);
+    POINT_BREAKAGE_INCOME(AccountSide.CREDIT),
+
+    /**
+     * 미사용 기프트카드 잔액 (부채, 대변성) — 등록된 상품권은 회사가 진 빚이다.
+     * 포인트 부채와 <b>합치지 않는다</b>: 화면도 시산표도 둘을 나눠 보여 줘야 한다. owner=CUSTOMER.
+     */
+    GIFT_CARD_LIABILITY(AccountSide.CREDIT),
+
+    /** 기프트카드 판촉비 (비용, 차변성) — 무상 발행분의 상대계정. */
+    GIFT_CARD_PROMOTION_EXPENSE(AccountSide.DEBIT),
+
+    /** 기프트카드 소멸이익 (수익, 대변성) — 유효기간이 지나 사라진 잔액. */
+    GIFT_CARD_BREAKAGE_INCOME(AccountSide.CREDIT);
 
     private final AccountSide side;
 

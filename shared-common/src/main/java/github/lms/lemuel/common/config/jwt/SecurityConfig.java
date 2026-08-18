@@ -186,6 +186,8 @@ public class SecurityConfig {
                         // 포괄 /admin/** 매처는 이 설정에 존재하지 않으므로(경로별 열거 방식) 반드시
                         // 명시해야 한다 — 빠뜨리면 anyRequest().authenticated() 로 새어 일반 사용자도 호출한다.
                         .requestMatchers("/admin/points/**").hasRole("ADMIN")
+                        // 기프트카드 콘솔 — 발행은 없던 재산을 만들고 소멸 실행은 고객 재산을 지운다.
+                        .requestMatchers("/admin/gift-cards/**").hasRole("ADMIN")
                         // 정산 배치 재실행 콘솔 — 확정·홀드백 해제·지급 실행을 수동 트리거하므로
                         // 조회 콘솔과 달리 MANAGER 에게 열지 않는다. 일자 게이트(미래·소급 상한)는 도메인이 강제.
                         // 수수료율 정책 — 정산 금액을 직접 바꾸므로 조회 콘솔과 달리 ADMIN 만.

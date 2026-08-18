@@ -81,6 +81,9 @@ const SCREEN_PENDING = new Map([
   // 포인트 원장 Phase 1 은 백엔드까지다 — 잔액 조회·수기 지급 화면은 Phase 3.
   ['order-service/PointController', '내 포인트 잔액 화면 — 포인트 원장 Phase 3'],
   ['order-service/AdminPointController', '포인트 수기 지급·소멸 콘솔 — 포인트 원장 Phase 3'],
+  // 기프트카드도 백엔드까지다 — 발행 콘솔과 코드 등록 화면은 후속.
+  ['order-service/GiftCardController', '기프트카드 등록·잔액 화면 — 기프트카드 원장 후속'],
+  ['order-service/AdminGiftCardController', '기프트카드 발행·소멸 콘솔 — 기프트카드 원장 후속'],
   ['order-service/AdminTrackingUploadController', '송장 일괄 업로드 화면'],
   ['order-service/MembershipController', '멤버십 관리 화면'],
   // --- settlement-service (docs/PLAN.md §8-8) ---
@@ -131,7 +134,7 @@ const SCREEN_PENDING = new Map([
  * 미노출 부채의 상한. <b>내려가기만 한다</b> — 화면을 붙였으면 이 수를 함께 내린다.
  * 올리려면 그 자체가 리뷰 대상이라는 뜻이다.
  */
-const PENDING_BUDGET = 45;
+const PENDING_BUDGET = 47;
 
 const read = (path) => readFileSync(path, 'utf8');
 

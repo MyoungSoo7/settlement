@@ -36,6 +36,23 @@ class RefundSplitPaymentServiceTest {
     private RefundSplitPaymentService service;
 
     private RecordingPointTender recordingPointTender;
+    private RecordingGiftCardTender recordingGiftCardTender;
+
+    /** 기프트카드 원장 호출을 기록만 하는 페이크 — 환불 경로가 상품권을 되돌리는지 확인용. */
+    static final class RecordingGiftCardTender
+            implements github.lms.lemuel.payment.application.port.out.GiftCardTenderPort {
+        final java.util.List<String> restored = new java.util.ArrayList<>();
+
+        @Override
+        public void use(Long userId, java.math.BigDecimal amount, Long tenderId) {
+            throw new UnsupportedOperationException("환불 테스트에서는 사용 경로를 타지 않는다");
+        }
+
+        @Override
+        public void restore(java.math.BigDecimal amount, Long tenderId, String refundReference) {
+            restored.add(tenderId + ":" + amount.stripTrailingZeros().toPlainString());
+        }
+    }
 
     /** 포인트 원장 호출을 기록만 하는 페이크 — 환불 경로가 포인트를 되돌리는지 확인용. */
     static final class RecordingPointTender
@@ -59,9 +76,10 @@ class RefundSplitPaymentServiceTest {
         pg = new RecordingPgClient();
         events = new CountingEventPublisher();
         recordingPointTender = new RecordingPointTender();
+        recordingGiftCardTender = new RecordingGiftCardTender();
         TenderRefundExecutor executor = new TenderRefundExecutor(
                 store, store, pg, (orderId, status) -> store.lastOrderStatus = status, events,
-                recordingPointTender);
+                recordingPointTender, recordingGiftCardTender);
         service = new RefundSplitPaymentService(store, executor);
     }
 

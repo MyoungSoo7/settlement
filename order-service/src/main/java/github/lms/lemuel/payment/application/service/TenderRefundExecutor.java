@@ -2,6 +2,7 @@ package github.lms.lemuel.payment.application.service;
 
 import github.lms.lemuel.payment.application.port.out.LoadPaymentPort;
 import github.lms.lemuel.payment.application.port.out.PgClientPort;
+import github.lms.lemuel.payment.application.port.out.GiftCardTenderPort;
 import github.lms.lemuel.payment.application.port.out.PointTenderPort;
 import github.lms.lemuel.payment.application.port.out.PublishEventPort;
 import github.lms.lemuel.payment.application.port.out.SavePaymentPort;
@@ -47,19 +48,22 @@ public class TenderRefundExecutor {
     private final UpdateOrderStatusPort updateOrderStatusPort;
     private final PublishEventPort publishEventPort;
     private final PointTenderPort pointTenderPort;
+    private final GiftCardTenderPort giftCardTenderPort;
 
     public TenderRefundExecutor(LoadPaymentPort loadPaymentPort,
                                 SavePaymentPort savePaymentPort,
                                 PgClientPort pgClientPort,
                                 UpdateOrderStatusPort updateOrderStatusPort,
                                 PublishEventPort publishEventPort,
-                                PointTenderPort pointTenderPort) {
+                                PointTenderPort pointTenderPort,
+                                GiftCardTenderPort giftCardTenderPort) {
         this.loadPaymentPort = loadPaymentPort;
         this.savePaymentPort = savePaymentPort;
         this.pgClientPort = pgClientPort;
         this.updateOrderStatusPort = updateOrderStatusPort;
         this.publishEventPort = publishEventPort;
         this.pointTenderPort = pointTenderPort;
+        this.giftCardTenderPort = giftCardTenderPort;
     }
 
     /**
@@ -92,8 +96,13 @@ public class TenderRefundExecutor {
                     + portion.stripTrailingZeros().toPlainString();
             pointTenderPort.restore(portion, tender.getId(), refundReference);
             log.info("포인트 복원: tenderId={}, amount={}", tender.getId(), portion);
+        } else if (tender.getType() == TenderType.GIFT_CARD) {
+            String refundReference = "tender-" + tender.getId() + "-"
+                    + portion.stripTrailingZeros().toPlainString();
+            giftCardTenderPort.restore(portion, tender.getId(), refundReference);
+            log.info("기프트카드 복원: tenderId={}, amount={}", tender.getId(), portion);
         } else {
-            // GIFT_CARD 는 아직 원장이 없어 복원할 대상이 없다 — 남은 구멍.
+            // 내부잔액 텐더가 늘어났는데 원장을 붙이지 않은 경우다 — 조용히 통과시키지 않는다.
             log.warn("원장 없는 내부잔액 환불: tenderId={}, type={}, amount={}",
                     tender.getId(), tender.getType(), portion);
         }

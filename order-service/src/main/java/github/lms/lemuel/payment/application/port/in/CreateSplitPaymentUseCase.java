@@ -16,7 +16,7 @@ public interface CreateSplitPaymentUseCase {
      * <ul>
      *   <li>외부 PG tender (CARD/KAKAO_PAY 등): PgRouter 경유 authorize → capture</li>
      *   <li>POINT tender: 포인트 원장에서 실제 차감(잔액 부족이면 결제 자체가 실패한다)</li>
-     *   <li>GIFT_CARD tender: 아직 원장이 없어 즉시 capture — 남은 구멍이다(point-ledger.md 참조)</li>
+     *   <li>GIFT_CARD tender: 기프트카드 원장에서 실제 차감(만료 임박 카드부터, gift-card-ledger.md)</li>
      * </ul>
      *
      * <p>일부 tender 가 실패하면 이미 처리된 다른 tender 를 보상 환불 (Saga 형태) — 본 구현은

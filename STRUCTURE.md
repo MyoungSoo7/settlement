@@ -27,7 +27,7 @@ settlement/                              # 모노레포 루트
 │   │   ├── ocr/                         # 영수증 OCR 공통 (ADR 0036)
 │   │   ├── autoconfigure/               # 공통 자동구성
 │   │   └── log/                         # 로깅 공통
-│   └── src/testFixtures/resources/contracts/events/   # ★ 이벤트 계약 정본 (43토픽 JSON Schema+샘플, ADR 0024)
+│   └── src/testFixtures/resources/contracts/events/   # ★ 이벤트 계약 정본 (47토픽 JSON Schema+샘플, ADR 0024)
 │
 ├── order-service/                       # 🛒 Commerce (8088, opslab)
 │   └── .../{user,order,payment,cart,shipping,product,category,coupon,review,game,menu,rbac,commoncode,sellertier}

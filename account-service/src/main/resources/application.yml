@@ -159,6 +159,11 @@ app:
       point-restored: lemuel.point.restored
       point-expired: lemuel.point.expired
       point-revoked: lemuel.point.revoked
+      # 수신 (order/giftcard → account) — 상품권 부채는 포인트 부채와 계정을 나눈다.
+      giftcard-registered: lemuel.giftcard.registered
+      giftcard-used: lemuel.giftcard.used
+      giftcard-restored: lemuel.giftcard.restored
+      giftcard-expired: lemuel.giftcard.expired
       # 수신 (investment → account)
       investment-executed: lemuel.investment.executed
   # ADR 0030 Phase 3 — 실체화 잔액(account_balances) 정기 대사.

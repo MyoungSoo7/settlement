@@ -2,6 +2,7 @@ package github.lms.lemuel.payment.application.service;
 
 import github.lms.lemuel.payment.application.port.in.CreateSplitPaymentUseCase;
 import github.lms.lemuel.payment.application.port.out.PgClientPort;
+import github.lms.lemuel.payment.application.port.out.GiftCardTenderPort;
 import github.lms.lemuel.payment.application.port.out.PointTenderPort;
 import github.lms.lemuel.payment.application.port.out.PublishEventPort;
 import github.lms.lemuel.payment.application.port.out.SavePaymentPort;
@@ -43,19 +44,22 @@ public class CreateSplitPaymentService implements CreateSplitPaymentUseCase {
     private final PublishEventPort publishEventPort;
     private final github.lms.lemuel.payment.application.port.out.LoadSellerSettlementMetaPort loadSellerSettlementMetaPort;
     private final PointTenderPort pointTenderPort;
+    private final GiftCardTenderPort giftCardTenderPort;
 
     public CreateSplitPaymentService(PgClientPort pgClientPort,
                                       SavePaymentPort savePaymentPort,
                                       UpdateOrderStatusPort updateOrderStatusPort,
                                       PublishEventPort publishEventPort,
                                       github.lms.lemuel.payment.application.port.out.LoadSellerSettlementMetaPort loadSellerSettlementMetaPort,
-                                      PointTenderPort pointTenderPort) {
+                                      PointTenderPort pointTenderPort,
+                                      GiftCardTenderPort giftCardTenderPort) {
         this.pgClientPort = pgClientPort;
         this.savePaymentPort = savePaymentPort;
         this.updateOrderStatusPort = updateOrderStatusPort;
         this.publishEventPort = publishEventPort;
         this.loadSellerSettlementMetaPort = loadSellerSettlementMetaPort;
         this.pointTenderPort = pointTenderPort;
+        this.giftCardTenderPort = giftCardTenderPort;
     }
 
     @Override
@@ -91,7 +95,7 @@ public class CreateSplitPaymentService implements CreateSplitPaymentUseCase {
 
         // 포인트 차감은 저장 이후다 — 원장 멱등 키가 tenderId 라, 식별자가 확정되기 전에는
         // 같은 결제를 두 번 차감했는지 구분할 방법이 없다. 같은 트랜잭션이므로 실패하면 함께 롤백된다.
-        deductPointTenders(saved, actorUserId);
+        deductInternalTenders(saved, actorUserId);
 
         updateOrderStatusPort.updateOrderStatus(saved.getOrderId(), "PAID");
         publishEventPort.publishPaymentCaptured(saved.getId(), saved.getOrderId(), saved.getAmount(),
@@ -115,37 +119,39 @@ public class CreateSplitPaymentService implements CreateSplitPaymentUseCase {
             log.debug("외부 PG tender 처리: type={}, amount={}, pgTxn={}",
                     tender.getType(), tender.getAmount(), pgTxnId);
         } else {
-            // 내부 잔액 tender — 외부 호출은 없다. 실제 원장 차감은 저장 후 deductPointTenders 에서
-            // 한다(원장 자연키가 tenderId 인데, 저장 전에는 그 식별자가 없기 때문).
+            // 내부 잔액 tender — 외부 호출은 없다. 실제 원장 차감은 저장 후
+            // deductInternalTenders 에서 한다(원장 자연키가 tenderId 인데, 저장 전에는
+            // 그 식별자가 없기 때문).
             tender.authorize(null);
             tender.capture();
-            if (tender.getType() != TenderType.POINT) {
-                // GIFT_CARD 는 아직 원장이 없다 — 포인트와 같은 구멍이 남아 있다는 사실을
-                // 코드에 드러내 둔다(docs/plan/point-ledger.md).
-                log.warn("원장 없는 내부잔액 tender 통과: type={}, amount={}",
-                        tender.getType(), tender.getAmount());
-            }
             log.debug("내부 잔액 tender 처리: type={}, amount={}", tender.getType(), tender.getAmount());
         }
     }
 
     /**
-     * POINT tender 를 포인트 원장에서 실제로 차감한다.
+     * 내부 잔액 tender(POINT·GIFT_CARD)를 각자의 원장에서 실제로 차감한다.
      *
      * <p>여기가 "장부 없는 결제 수단"을 닫는 지점이다. 잔액이 모자라면 예외가 올라와 결제 전체가
      * 롤백된다 — 검증 없이 통과시키던 이전 동작보다 결제 실패가 옳다.
+     *
+     * <p>차감이 저장 이후인 이유: 두 원장 모두 멱등 키가 tenderId 인데, 저장 전에는 그 식별자가
+     * 없어 같은 결제를 두 번 차감했는지 구분할 수 없다.
      */
-    private void deductPointTenders(PaymentDomain saved, Long actorUserId) {
+    private void deductInternalTenders(PaymentDomain saved, Long actorUserId) {
         for (PaymentTender tender : saved.getTenders()) {
-            if (tender.getType() != TenderType.POINT) {
+            if (tender.getType().usesExternalPg()) {
                 continue;
             }
             if (actorUserId == null) {
                 // 주체를 모른 채 남의 잔액을 건드릴 수는 없다.
                 throw new PaymentInvariantViolationException(
-                        "포인트 결제에는 인증 주체가 필요합니다: paymentId=" + saved.getId());
+                        "내부 잔액 결제에는 인증 주체가 필요합니다: paymentId=" + saved.getId());
             }
-            pointTenderPort.use(actorUserId, tender.getAmount(), tender.getId());
+            if (tender.getType() == TenderType.POINT) {
+                pointTenderPort.use(actorUserId, tender.getAmount(), tender.getId());
+            } else if (tender.getType() == TenderType.GIFT_CARD) {
+                giftCardTenderPort.use(actorUserId, tender.getAmount(), tender.getId());
+            }
         }
     }
 

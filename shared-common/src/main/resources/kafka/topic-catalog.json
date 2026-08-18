@@ -501,6 +501,42 @@
       "replicas": 1,
       "retentionDays": 7,
       "$comment": "주문 취소·환불로 적립 회수 — DR POINT_LIABILITY / CR POINT_PROMOTION_EXPENSE (판촉비 환입)"
+    },
+    {
+      "name": "lemuel.giftcard.registered",
+      "owner": "order-service",
+      "orderingKey": "giftCardId",
+      "partitions": 1,
+      "replicas": 1,
+      "retentionDays": 7,
+      "$comment": "기프트카드 등록 — DR GIFT_CARD_PROMOTION_EXPENSE / CR GIFT_CARD_LIABILITY (부채가 생기는 유일한 지점)"
+    },
+    {
+      "name": "lemuel.giftcard.used",
+      "owner": "order-service",
+      "orderingKey": "giftCardId",
+      "partitions": 1,
+      "replicas": 1,
+      "retentionDays": 7,
+      "$comment": "기프트카드 사용 — DR GIFT_CARD_LIABILITY / CR CASH (정산이 가정한 현금 유입을 상계)"
+    },
+    {
+      "name": "lemuel.giftcard.restored",
+      "owner": "order-service",
+      "orderingKey": "giftCardId",
+      "partitions": 1,
+      "replicas": 1,
+      "retentionDays": 7,
+      "$comment": "기프트카드 환불 복원 — DR CASH / CR GIFT_CARD_LIABILITY (사용의 대칭)"
+    },
+    {
+      "name": "lemuel.giftcard.expired",
+      "owner": "order-service",
+      "orderingKey": "giftCardId",
+      "partitions": 1,
+      "replicas": 1,
+      "retentionDays": 7,
+      "$comment": "기프트카드 소멸 — DR GIFT_CARD_LIABILITY / CR GIFT_CARD_BREAKAGE_INCOME"
     }
   ]
 }

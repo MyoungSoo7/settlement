@@ -43,6 +43,7 @@ class CreateSplitPaymentServiceTest {
     @Mock PublishEventPort publishEventPort;
     @Mock LoadSellerSettlementMetaPort loadSellerSettlementMetaPort;
     @Mock github.lms.lemuel.payment.application.port.out.PointTenderPort pointTenderPort;
+    @Mock github.lms.lemuel.payment.application.port.out.GiftCardTenderPort giftCardTenderPort;
     @InjectMocks CreateSplitPaymentService service;
 
     private static final Long ACTOR_USER_ID = 42L;
@@ -97,8 +98,8 @@ class CreateSplitPaymentServiceTest {
     }
 
     @Test
-    @DisplayName("GIFT_CARD 는 원장이 없어 차감하지 않는다 — 남은 구멍을 테스트로 고정해 둔다")
-    void createSplit_giftCardHasNoLedger() {
+    @DisplayName("GIFT_CARD 도 원장에서 차감된다 — 내부잔액 텐더 두 종류가 모두 검증을 거친다")
+    void createSplit_deductsGiftCardLedger() {
         when(savePaymentPort.save(any())).thenAnswer(i -> i.getArgument(0));
         when(loadSellerSettlementMetaPort.findByPaymentId(any())).thenReturn(Optional.empty());
 
@@ -106,7 +107,8 @@ class CreateSplitPaymentServiceTest {
                 new TenderRequest(TenderType.GIFT_CARD, new BigDecimal("3000")),
                 new TenderRequest(TenderType.POINT, new BigDecimal("2000"))), ACTOR_USER_ID);
 
-        verify(pointTenderPort, times(1)).use(any(), any(), any());
+        verify(pointTenderPort, times(1)).use(eq(ACTOR_USER_ID), eq(new BigDecimal("2000")), any());
+        verify(giftCardTenderPort, times(1)).use(eq(ACTOR_USER_ID), eq(new BigDecimal("3000")), any());
     }
 
     @Test
