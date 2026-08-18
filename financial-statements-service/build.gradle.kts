@@ -26,7 +26,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-flyway")
 
     // SpringDoc OpenAPI
-    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.2")
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.0")
 
     // Caffeine (기업 목록/재무제표 조회 캐시)
     implementation("com.github.ben-manes.caffeine:caffeine")
@@ -35,7 +35,7 @@ dependencies {
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
 
     // PostgreSQL
-    runtimeOnly("org.postgresql:postgresql:42.7.3")
+    runtimeOnly("org.postgresql:postgresql:42.7.13")
 
     // dotenv
     implementation("io.github.cdimascio:java-dotenv:5.2.2")
@@ -53,7 +53,7 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testImplementation("org.mockito:mockito-core")
     // 1.4.x — Java 25 클래스파일(major 69) 파싱 지원 (1.3.0 은 전부 스킵되어 no-classes 실패)
-    testImplementation("com.tngtech.archunit:archunit-junit5:1.4.1")
+    testImplementation("com.tngtech.archunit:archunit-junit5:1.5.0")
 }
 
 val mockitoAgent = configurations.create("mockitoAgent")

@@ -11,7 +11,7 @@ dependencies {
     // 이 CVE 하나로 실패했다(이미지 스캔은 .trivyignore.yaml 을 쓰지 않는다).
     // constraint 를 쓰는 이유: 직접 의존을 새로 추가하지 않고 전이 버전만 끌어올린다.
     constraints {
-        implementation("org.bouncycastle:bcprov-jdk18on:1.84") {
+        implementation("org.bouncycastle:bcprov-jdk18on:1.85.2") {
             because("CVE-2025-14813 (CRITICAL) — spring-cloud-starter 경유 1.81 을 수정판으로 올린다")
         }
     }

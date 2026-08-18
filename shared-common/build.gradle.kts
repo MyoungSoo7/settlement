@@ -35,7 +35,7 @@ dependencies {
     // Spring Boot 의 BOM 을 사용하기 위해 dependency-management 만 적용 (boot plugin 자체는 X — 라이브러리 모듈)
     // ⚠ 루트 build.gradle.kts 의 org.springframework.boot 플러그인 버전과 같은 값을 유지할 것 —
     //   composite build 로 로컬 치환되므로 여기만 뒤처지면 서비스마다 다른 BOM 이 섞인다.
-    api(platform("org.springframework.boot:spring-boot-dependencies:4.0.7"))
+    api(platform("org.springframework.boot:spring-boot-dependencies:4.1.0"))
 
     // Spring 코어
     implementation("org.springframework:spring-aop")
@@ -57,9 +57,9 @@ dependencies {
     api("org.springframework.kafka:spring-kafka")
 
     // JWT (양 서비스 + gateway 공통)
-    api("io.jsonwebtoken:jjwt-api:0.12.5")
-    runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.5")
-    runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.5")
+    api("io.jsonwebtoken:jjwt-api:0.13.0")
+    runtimeOnly("io.jsonwebtoken:jjwt-impl:0.13.0")
+    runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.13.0")
 
     // 구조화 로그
     api("net.logstash.logback:logstash-logback-encoder:7.4")
@@ -72,7 +72,7 @@ dependencies {
     api("com.itextpdf:font-asian:8.0.5")
 
     // SpringDoc (OpenApiConfig 등에서 사용)
-    api("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.2")
+    api("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.0")
 
     // Spring Security (SecurityConfig 등)
     api("org.springframework.security:spring-security-config")
@@ -97,7 +97,7 @@ dependencies {
 
     // Resilience4j CircuitBreaker — 2-tier 캐시 L2(Redis) 호출 보호.
     // 장애 지속 시 회로를 OPEN 해 L2 호출 자체를 차단(타임아웃 대기 0)하고 즉시 L1/DB 로 폴백한다.
-    api("io.github.resilience4j:resilience4j-circuitbreaker:2.2.0")
+    api("io.github.resilience4j:resilience4j-circuitbreaker:2.4.0")
 
     // HikariCP — read-replica 라우팅 데이터소스(ReadReplicaDataSourceConfig)의 컴파일 전용 타입.
     // 런타임 구현은 각 앱 모듈의 spring-boot-starter-data-jpa 가 전이 제공한다.
@@ -116,16 +116,16 @@ dependencies {
     api("com.querydsl:querydsl-jpa:5.0.0:jakarta")
 
     // Lombok (JDK 25 지원 — 1.18.40+ 필요)
-    compileOnly("org.projectlombok:lombok:1.18.40")
-    annotationProcessor("org.projectlombok:lombok:1.18.40")
-    testCompileOnly("org.projectlombok:lombok:1.18.40")
-    testAnnotationProcessor("org.projectlombok:lombok:1.18.40")
+    compileOnly("org.projectlombok:lombok:1.18.46")
+    annotationProcessor("org.projectlombok:lombok:1.18.46")
+    testCompileOnly("org.projectlombok:lombok:1.18.46")
+    testAnnotationProcessor("org.projectlombok:lombok:1.18.46")
 
     // 이벤트 계약(contract-as-code) — 소비 서비스가 testFixtures 좌표로 스키마·검증기·샘플을 공유 (ADR 0024)
     // 아키텍처 가드 픽스처(InboundPortReachability)용 — 소비 서비스가 이미 archunit 을 test 클래스패스에
     // 갖고 있으므로 compileOnly 로 두어 픽스처 소비자에게 버전을 강제하지 않는다.
-    testFixturesCompileOnly("com.tngtech.archunit:archunit-junit5:1.4.1")
-    testFixturesImplementation("com.networknt:json-schema-validator:1.5.6")
+    testFixturesCompileOnly("com.tngtech.archunit:archunit-junit5:1.5.0")
+    testFixturesImplementation("com.networknt:json-schema-validator:1.5.9")
     testFixturesImplementation("com.fasterxml.jackson.core:jackson-databind")
 
     // 테스트
@@ -143,7 +143,7 @@ dependencies {
     // 2-tier 캐시 L2 통합 테스트용 — compileOnly 인 redis 를 테스트 런타임에 올린다.
     testImplementation("org.springframework.boot:spring-boot-starter-data-redis")
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
-    testRuntimeOnly("org.postgresql:postgresql:42.7.3")
+    testRuntimeOnly("org.postgresql:postgresql:42.7.13")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
