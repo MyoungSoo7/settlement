@@ -179,6 +179,19 @@ tasks.withType<Test>().configureEach {
     finalizedBy(tasks.named("jacocoTestReport"))
 }
 
+// 루트 build.gradle.kts 와 같은 스모크. shared-common 은 composite(included) build 라
+// 루트의 subprojects 설정을 전혀 받지 않으므로 정의부터 따로 가져야 한다.
+// 취지는 루트와 동일: 측정 대상이 0개면 리포트는 클래스 0개, LINE 90% 검증은 "위반 없음"으로
+// 조용히 통과한다. classDirectories 는 설정 시점 즉시 평가라 확인은 실행 시점이어야 한다.
+fun requireNonEmptyCoverageScope(taskName: String, classDirectories: FileCollection) {
+    val measured = classDirectories.asFileTree.matching { include("**/*.class") }.files.size
+    require(measured > 0) {
+        "$taskName 의 커버리지 측정 대상이 0개다 — 게이트가 공전한다. " +
+            "classDirectories 를 겹쳐 설정하지 않았는지, 제외 패턴이 모듈 전체를 " +
+            "삼키지 않았는지 확인할 것."
+    }
+}
+
 tasks.named<JacocoReport>("jacocoTestReport") {
     dependsOn(tasks.named("test"))
     reports {
@@ -186,6 +199,7 @@ tasks.named<JacocoReport>("jacocoTestReport") {
         html.required.set(true)
         csv.required.set(false)
     }
+    doFirst { requireNonEmptyCoverageScope("jacocoTestReport", classDirectories) }
 }
 
 tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
@@ -212,6 +226,7 @@ tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
             }
         }
     }
+    doFirst { requireNonEmptyCoverageScope("jacocoTestCoverageVerification", classDirectories) }
 }
 
 tasks.named("check") { dependsOn(tasks.named("jacocoTestCoverageVerification")) }
