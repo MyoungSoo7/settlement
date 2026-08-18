@@ -152,6 +152,12 @@ app:
       secured-loan-disbursed: lemuel.loan.secured_loan_disbursed
       secured-loan-repaid: lemuel.loan.secured_loan_repaid
       secured-loan-principal-repaid: lemuel.loan.secured_loan_principal_repaid
+      # 수신 (order/point → account) — 포인트는 고객 부채, 보너스·적립은 판촉비.
+      point-charged: lemuel.point.charged
+      point-granted: lemuel.point.granted
+      point-used: lemuel.point.used
+      point-restored: lemuel.point.restored
+      point-expired: lemuel.point.expired
       # 수신 (investment → account)
       investment-executed: lemuel.investment.executed
   # ADR 0030 Phase 3 — 실체화 잔액(account_balances) 정기 대사.

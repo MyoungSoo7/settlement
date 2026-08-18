@@ -13,5 +13,7 @@ public enum OwnerType {
     CORPORATE,
     BORROWER,
     /** 수신 상품(정기예금·적금·퇴직연금) 가입자 — ownerId = userId 숫자 문자열. 제도별로 쪼개지 않는다. */
-    DEPOSITOR
+    DEPOSITOR,
+    /** 포인트를 보유한 구매 회원 — ownerId = userId 숫자 문자열. */
+    CUSTOMER
 }
