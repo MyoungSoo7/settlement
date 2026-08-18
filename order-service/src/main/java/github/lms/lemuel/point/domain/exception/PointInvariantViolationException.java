@@ -1,7 +1,7 @@
 package github.lms.lemuel.point.domain.exception;
 
 /**
- * 포인트 원장 불변식 위반 (도메인 계층 — Spring 의존 0).
+ * 포인트 원장 불변식 위반 (도메인 계층 — 매핑하지 않는다: 500 이 옳다).
  *
  * <p>{@code total = available + locked}, 잔고 3필드 음수 금지, 그리고 포인트에만 있는
  * "잔고 요약과 로트 상세의 일치"가 깨졌을 때 던진다.

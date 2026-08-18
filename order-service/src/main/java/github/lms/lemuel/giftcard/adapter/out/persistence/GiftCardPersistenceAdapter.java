@@ -129,6 +129,13 @@ public class GiftCardPersistenceAdapter implements GiftCardPort, GiftCardEntryPo
     }
 
     @Override
+    public boolean existsByReference(Long giftCardId, GiftCardEntryType type,
+                                     String referenceType, String referenceId) {
+        return entries.existsByGiftCardIdAndEntryTypeAndReferenceTypeAndReferenceId(
+                giftCardId, type, referenceType, referenceId);
+    }
+
+    @Override
     public List<GiftCardEntry> loadByReference(GiftCardEntryType type, String referenceType,
                                                String referenceId) {
         return entries.findByEntryTypeAndReferenceTypeAndReferenceIdOrderByIdAsc(

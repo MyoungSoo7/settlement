@@ -55,8 +55,8 @@ public class GrantPointService implements GrantPointUseCase {
 
         int sequence = entryPort.nextSequence(account.getId(), PointEntryType.GRANT,
                 command.referenceType(), command.referenceId());
-        if (entryPort.exists(account.getId(), PointEntryType.GRANT,
-                command.referenceType(), command.referenceId(), sequence)) {
+        if (entryPort.existsByReference(account.getId(), PointEntryType.GRANT,
+                command.referenceType(), command.referenceId())) {
             log.info("포인트 적립 멱등 단축 반환: userId={}, ref={}:{}",
                     command.userId(), command.referenceType(), command.referenceId());
             return new GrantPointResult(null, null, command.amount(), account.getAvailable());

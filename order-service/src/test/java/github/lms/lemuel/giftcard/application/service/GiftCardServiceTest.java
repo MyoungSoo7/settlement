@@ -78,7 +78,7 @@ class GiftCardServiceTest {
         when(cardPort.existsByCodeHash(anyString())).thenReturn(false);
         when(cardPort.loadSpendableReadOnly(anyLong())).thenReturn(List.of());
         when(entryPort.nextSequence(anyLong(), any(), anyString(), anyString())).thenReturn(0);
-        when(entryPort.exists(anyLong(), any(), anyString(), anyString(), anyInt())).thenReturn(false);
+        when(entryPort.existsByReference(anyLong(), any(), anyString(), anyString())).thenReturn(false);
         when(entryPort.append(any())).thenAnswer(call -> {
             GiftCardEntry entry = call.getArgument(0);
             entry.assignId(900L);
@@ -245,7 +245,7 @@ class GiftCardServiceTest {
         void isIdempotent() {
             GiftCard only = card(1L, "10000", GiftCardStatus.REGISTERED, EXPIRES_AT);
             when(cardPort.loadSpendable(USER_ID)).thenReturn(List.of(only));
-            when(entryPort.exists(1L, GiftCardEntryType.USE, "PAYMENT_TENDER", "77", 0))
+            when(entryPort.existsByReference(1L, GiftCardEntryType.USE, "PAYMENT_TENDER", "77"))
                     .thenReturn(true);
 
             UseGiftCardResult result = service.use(new UseGiftCardCommand(

@@ -34,4 +34,14 @@ public interface PointEntryPort {
      * 정상 경로에서 걸러 낸다).
      */
     boolean exists(Long accountId, PointEntryType type, String referenceType, String referenceId, int sequence);
+
+    /**
+     * 이 참조로 <b>이미 기록된 엔트리가 하나라도 있는가</b> — 멱등 판정의 올바른 질문이다.
+     *
+     * <p>{@link #exists} 에 {@link #nextSequence} 결과를 넣어 물으면 안 된다. nextSequence 는
+     * '다음 번호'(max+1)를 주므로 두 번째 호출에서는 아직 없는 번호를 묻게 되어 판정이 언제나
+     * 거짓이 된다 — 실기동에서 이중 차감으로 드러난 결함이다.
+     */
+    boolean existsByReference(Long accountId, PointEntryType type,
+                              String referenceType, String referenceId);
 }

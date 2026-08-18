@@ -12,6 +12,9 @@ public interface PointEntryRepository extends JpaRepository<PointEntryJpaEntity,
     List<PointEntryJpaEntity> findByAccountIdAndEntryTypeAndReferenceTypeAndReferenceIdOrderBySequenceAsc(
             Long accountId, PointEntryType entryType, String referenceType, String referenceId);
 
+    boolean existsByAccountIdAndEntryTypeAndReferenceTypeAndReferenceId(
+            Long accountId, PointEntryType entryType, String referenceType, String referenceId);
+
     boolean existsByAccountIdAndEntryTypeAndReferenceTypeAndReferenceIdAndSequence(
             Long accountId, PointEntryType entryType, String referenceType, String referenceId, int sequence);
 

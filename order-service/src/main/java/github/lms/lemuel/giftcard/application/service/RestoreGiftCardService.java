@@ -71,8 +71,8 @@ public class RestoreGiftCardService implements RestoreGiftCardUseCase {
             }
             int sequence = entryPort.nextSequence(cardId, GiftCardEntryType.RESTORE,
                     command.referenceType(), command.referenceId());
-            if (entryPort.exists(cardId, GiftCardEntryType.RESTORE,
-                    command.referenceType(), command.referenceId(), sequence)) {
+            if (entryPort.existsByReference(cardId, GiftCardEntryType.RESTORE,
+                    command.referenceType(), command.referenceId())) {
                 // 같은 환불을 두 번 반영하지 않는다.
                 continue;
             }

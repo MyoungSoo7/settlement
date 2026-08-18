@@ -74,7 +74,7 @@ class RestorePointServiceTest {
         when(accountPort.save(any())).thenAnswer(call -> call.getArgument(0));
         when(lotPort.saveAll(any())).thenAnswer(call -> call.getArgument(0));
         when(entryPort.nextSequence(anyLong(), any(), anyString(), anyString())).thenReturn(0);
-        when(entryPort.exists(anyLong(), any(), anyString(), anyString(), anyInt())).thenReturn(false);
+        when(entryPort.existsByReference(anyLong(), any(), anyString(), anyString())).thenReturn(false);
         when(entryPort.append(any())).thenAnswer(call -> {
             PointEntry entry = call.getArgument(0);
             entry.assignId(200L);
@@ -187,7 +187,7 @@ class RestorePointServiceTest {
     @Test
     @DisplayName("같은 환불 참조로 두 번 복원하면 두 번째는 멱등 단축 반환한다")
     void restore_isIdempotent() {
-        when(entryPort.exists(ACCOUNT_ID, PointEntryType.RESTORE, "PAYMENT_TENDER_REFUND", "55", 0))
+        when(entryPort.existsByReference(ACCOUNT_ID, PointEntryType.RESTORE, "PAYMENT_TENDER_REFUND", "55"))
                 .thenReturn(true);
 
         RestorePointResult result = service.restore(command("500"));

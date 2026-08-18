@@ -64,7 +64,7 @@ class GrantPointServiceTest {
         when(accountPort.loadForUpdate(USER_ID)).thenReturn(Optional.of(account));
         when(accountPort.save(any())).thenAnswer(call -> call.getArgument(0));
         when(entryPort.nextSequence(anyLong(), any(), anyString(), anyString())).thenReturn(0);
-        when(entryPort.exists(anyLong(), any(), anyString(), anyString(), anyInt())).thenReturn(false);
+        when(entryPort.existsByReference(anyLong(), any(), anyString(), anyString())).thenReturn(false);
         when(entryPort.append(any())).thenAnswer(call -> {
             PointEntry entry = call.getArgument(0);
             entry.assignId(100L);
@@ -120,7 +120,7 @@ class GrantPointServiceTest {
     @Test
     @DisplayName("같은 참조로 두 번 적립하면 두 번째는 멱등 단축 반환한다")
     void grant_isIdempotent() {
-        when(entryPort.exists(ACCOUNT_ID, PointEntryType.GRANT, "CHARGE", "chg-1", 0)).thenReturn(true);
+        when(entryPort.existsByReference(ACCOUNT_ID, PointEntryType.GRANT, "CHARGE", "chg-1")).thenReturn(true);
 
         GrantPointResult result = service.grant(command(PointLotOrigin.ORDER_EARN, "1000"));
 

@@ -67,7 +67,7 @@ public class RevokeOrderPointService implements RevokeOrderPointUseCase {
 
         int sequence = entryPort.nextSequence(account.getId(), PointEntryType.REVOKE,
                 REFERENCE_TYPE, orderRef);
-        if (entryPort.exists(account.getId(), PointEntryType.REVOKE, REFERENCE_TYPE, orderRef, sequence)) {
+        if (entryPort.existsByReference(account.getId(), PointEntryType.REVOKE, REFERENCE_TYPE, orderRef)) {
             log.info("적립 회수 멱등 단축 반환: orderId={}", command.orderId());
             return new RevokeOrderPointResult(BigDecimal.ZERO);
         }

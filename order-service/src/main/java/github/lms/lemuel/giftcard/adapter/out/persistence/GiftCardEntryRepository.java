@@ -9,6 +9,9 @@ import java.util.List;
 
 public interface GiftCardEntryRepository extends JpaRepository<GiftCardEntryJpaEntity, Long> {
 
+    boolean existsByGiftCardIdAndEntryTypeAndReferenceTypeAndReferenceId(
+            Long giftCardId, GiftCardEntryType entryType, String referenceType, String referenceId);
+
     boolean existsByGiftCardIdAndEntryTypeAndReferenceTypeAndReferenceIdAndSequence(
             Long giftCardId, GiftCardEntryType entryType, String referenceType,
             String referenceId, int sequence);

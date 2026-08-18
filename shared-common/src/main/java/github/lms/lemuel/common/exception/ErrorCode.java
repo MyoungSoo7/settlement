@@ -132,7 +132,17 @@ public enum ErrorCode {
     // 수기 기표 증빙 OCR (ADR 0036 확산) — 판독 실패는 무폴백 503, 대사 미통과 기표는 422.
     DEPOSIT_PROOF_NOT_FOUND(HttpStatus.NOT_FOUND, "예치금 증빙을 찾을 수 없습니다."),
     DEPOSIT_PROOF_OCR_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "예치금 증빙 판독에 실패했습니다. 잠시 후 다시 시도해주세요."),
-    DEPOSIT_PROOF_NOT_MATCHED(HttpStatus.UNPROCESSABLE_ENTITY, "예치금 증빙 대사가 완료되지 않아 기표할 수 없습니다.");
+    DEPOSIT_PROOF_NOT_MATCHED(HttpStatus.UNPROCESSABLE_ENTITY, "예치금 증빙 대사가 완료되지 않아 기표할 수 없습니다."),
+
+    // ── 포인트·기프트카드 원장 ────────────────────────────────────────────────
+    // 잔액 부족은 오류가 아니라 정상 답변이라 422 다 — 요청 형식은 옳고 상태가 허락하지 않을 뿐이다.
+    POINT_INSUFFICIENT(HttpStatus.UNPROCESSABLE_ENTITY, "포인트 잔액이 부족합니다."),
+    POINT_INVALID_AMOUNT(HttpStatus.BAD_REQUEST, "포인트 금액이 올바르지 않습니다."),
+    POINT_INVALID_STATE(HttpStatus.BAD_REQUEST, "현재 상태에서는 포인트를 처리할 수 없습니다."),
+    GIFT_CARD_INSUFFICIENT(HttpStatus.UNPROCESSABLE_ENTITY, "기프트카드 잔액이 부족합니다."),
+    GIFT_CARD_INVALID_AMOUNT(HttpStatus.BAD_REQUEST, "기프트카드 금액이 올바르지 않습니다."),
+    // 코드 등록 실패는 사유를 구분하지 않는다 — 구분하면 유효한 코드의 존재가 새어 나간다.
+    GIFT_CARD_INVALID_STATE(HttpStatus.BAD_REQUEST, "사용할 수 없는 기프트카드입니다.");
 
     private final HttpStatus status;
     private final String defaultMessage;

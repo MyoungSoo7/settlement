@@ -161,6 +161,13 @@ public class PointPersistenceAdapter
     }
 
     @Override
+    public boolean existsByReference(Long accountId, PointEntryType type,
+                                     String referenceType, String referenceId) {
+        return entries.existsByAccountIdAndEntryTypeAndReferenceTypeAndReferenceId(
+                accountId, type, referenceType, referenceId);
+    }
+
+    @Override
     public List<PointEntry> loadByReference(Long accountId, PointEntryType type,
                                             String referenceType, String referenceId) {
         return entries

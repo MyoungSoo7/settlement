@@ -67,7 +67,7 @@ class RevokeOrderPointServiceTest {
         when(accountPort.save(any())).thenAnswer(call -> call.getArgument(0));
         when(lotPort.saveAll(any())).thenAnswer(call -> call.getArgument(0));
         when(entryPort.nextSequence(anyLong(), any(), anyString(), anyString())).thenReturn(0);
-        when(entryPort.exists(anyLong(), any(), anyString(), anyString(), anyInt())).thenReturn(false);
+        when(entryPort.existsByReference(anyLong(), any(), anyString(), anyString())).thenReturn(false);
         when(entryPort.append(any())).thenAnswer(call -> {
             PointEntry entry = call.getArgument(0);
             entry.assignId(902L);
@@ -156,7 +156,7 @@ class RevokeOrderPointServiceTest {
     @DisplayName("같은 주문으로 두 번 회수하면 두 번째는 멱등 단축 반환한다")
     void revoke_isIdempotent() {
         givenEarned("500", "500", PointLotStatus.ACTIVE);
-        when(entryPort.exists(ACCOUNT_ID, PointEntryType.REVOKE, "ORDER", "1001", 0)).thenReturn(true);
+        when(entryPort.existsByReference(ACCOUNT_ID, PointEntryType.REVOKE, "ORDER", "1001")).thenReturn(true);
 
         RevokeOrderPointResult result = service.revoke(command());
 

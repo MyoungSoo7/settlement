@@ -81,8 +81,8 @@ public class UseGiftCardService implements UseGiftCardUseCase {
     }
 
     private boolean alreadyCharged(List<GiftCard> cards, UseGiftCardCommand command) {
-        return cards.stream().anyMatch(card -> entryPort.exists(card.getId(), GiftCardEntryType.USE,
-                command.referenceType(), command.referenceId(), 0));
+        return cards.stream().anyMatch(card -> entryPort.existsByReference(card.getId(),
+                GiftCardEntryType.USE, command.referenceType(), command.referenceId()));
     }
 
     /** 잔액 조회 — 결제 화면이 "상품권으로 얼마까지 낼 수 있나"를 물을 때. */

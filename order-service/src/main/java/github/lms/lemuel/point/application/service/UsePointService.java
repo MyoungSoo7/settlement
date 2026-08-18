@@ -67,8 +67,8 @@ public class UsePointService implements UsePointUseCase {
 
         // 같은 tender 를 두 번 차감하지 않는다. L3 UNIQUE 가 최후 방어선이지만,
         // 정상 경로에서 먼저 걸러야 재시도가 예외로 시끄러워지지 않는다.
-        if (entryPort.exists(account.getId(), PointEntryType.USE,
-                command.referenceType(), command.referenceId(), sequence)) {
+        if (entryPort.existsByReference(account.getId(), PointEntryType.USE,
+                command.referenceType(), command.referenceId())) {
             log.info("포인트 사용 멱등 단축 반환: userId={}, ref={}:{}",
                     command.userId(), command.referenceType(), command.referenceId());
             return new UsePointResult(null, command.amount(), account.getAvailable());

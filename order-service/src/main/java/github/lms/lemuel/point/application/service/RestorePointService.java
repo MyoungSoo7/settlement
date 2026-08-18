@@ -75,8 +75,8 @@ public class RestorePointService implements RestorePointUseCase {
 
         int sequence = entryPort.nextSequence(account.getId(), PointEntryType.RESTORE,
                 command.referenceType(), command.referenceId());
-        if (entryPort.exists(account.getId(), PointEntryType.RESTORE,
-                command.referenceType(), command.referenceId(), sequence)) {
+        if (entryPort.existsByReference(account.getId(), PointEntryType.RESTORE,
+                command.referenceType(), command.referenceId())) {
             log.info("포인트 복원 멱등 단축 반환: accountId={}, ref={}:{}",
                     account.getId(), command.referenceType(), command.referenceId());
             return new RestorePointResult(null, command.amount(), account.getAvailable());

@@ -64,7 +64,7 @@ class UsePointServiceTest {
         when(accountPort.save(any())).thenAnswer(call -> call.getArgument(0));
         when(lotPort.saveAll(any())).thenAnswer(call -> call.getArgument(0));
         when(entryPort.nextSequence(anyLong(), any(), anyString(), anyString())).thenReturn(0);
-        when(entryPort.exists(anyLong(), any(), anyString(), anyString(), anyInt())).thenReturn(false);
+        when(entryPort.existsByReference(anyLong(), any(), anyString(), anyString())).thenReturn(false);
         when(entryPort.append(any())).thenAnswer(call -> {
             PointEntry entry = call.getArgument(0);
             entry.assignId(100L);
@@ -155,7 +155,7 @@ class UsePointServiceTest {
     void use_isIdempotentOnSameReference() {
         PointAccount account = accountWith("5000");
         when(accountPort.loadForUpdate(USER_ID)).thenReturn(Optional.of(account));
-        when(entryPort.exists(ACCOUNT_ID, PointEntryType.USE, "PAYMENT_TENDER", "55", 0))
+        when(entryPort.existsByReference(ACCOUNT_ID, PointEntryType.USE, "PAYMENT_TENDER", "55"))
                 .thenReturn(true);
 
         UsePointResult result = service.use(command("2500"));
