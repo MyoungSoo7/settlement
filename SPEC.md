@@ -54,7 +54,7 @@
 
 - **Outbox 패턴**: DB 트랜잭션 안에서 `outbox_events` 에 기록 → 멀티워커 폴러(FOR UPDATE SKIP LOCKED)가 Kafka 발행.
 - **3단 멱등 방어**: `outbox_events.event_id UNIQUE` → 컨슈머 `processed_events(group,event_id)` PK → 도메인 UNIQUE 제약.
-- **이벤트 계약-as-code (ADR 0024)**: cross-service 37개 토픽의 JSON Schema + 정본 샘플이
+- **이벤트 계약-as-code (ADR 0024)**: cross-service 42개 토픽의 JSON Schema + 정본 샘플이
   `shared-common/src/testFixtures/resources/contracts/events/` 에 단일 출처로 존재. 프로듀서·컨슈머 양방향 계약 테스트로 드리프트 차단.
 - **이벤트 드리븐 프로젝션 (ADR 0020)**: settlement 가 order 이벤트를 소비해 자체 DB 에 `settlement_*_view` 적재
   (cross-DB 연결 0). 대사는 order 내부 API `/internal/recon` 호출로 양측이 자기 DB 만 읽는다.
