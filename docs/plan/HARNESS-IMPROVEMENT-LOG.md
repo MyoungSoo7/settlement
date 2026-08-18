@@ -215,7 +215,50 @@ _판정 로그_ 다. 지금까지 하네스는 계속 늘어나기만 했고, �
   (안 찍으면 창이 다시 무한정 자란다). ② 이번에 창 밖으로 빠진 신규코드 신뢰성 MEDIUM 12건
   (`java:S8786` 정규식 백트래킹 7 · `java:S6218` byte[] record equals 3 · `java:S6829` 생성자
   `@Autowired` 2)은 **사라진 게 아니라 판정 대상에서 빠졌을 뿐**이다. ③ main push 의 Sonar 분석은
-  플랜상 조회 불가라 4분을 버리는 낭비다.
+  플랜상 조회 불가라 4분을 버리는 낭비다. ④ **고정한 분석이 보관주기로 삭제되면 기준선이 끊긴다**
+  — 2026-08-18 에 실제로 터졌다(아래 항목).
+
+### 2026-08-18 · 수동 기준선이 보관주기로 끊겨 전 분석이 422 (재발 조건 확정)
+
+- **status**: verified
+- **동기**: develop CI 의 `Backend - Build/Test/JaCoCo/SonarCloud` 만 빨간불이었다. 모듈 테스트 18종은
+  전부 초록인데 `:sonar` 만 죽었다. 위 2026-08-16 항목에서 고정한 기준선 분석이 **SonarCloud 보관주기로
+  삭제**되어 있었다.
+
+  ```
+  HttpException: Error 422 on https://api.sonarcloud.io/analysis/analyses
+  {"msg":"Analysis '3ba45d91-…' configured as manual baseline for the New Code Period
+   no longer exists. Please update the New Code Period configuration."}
+  ```
+
+- **재발 조건(정본)**: `set_baseline` 으로 고정한 분석은 **영구 보존되지 않는다**. 그 분석이 지워지면
+  품질게이트가 미달로 뜨는 게 아니라 **분석 생성 자체가 422 로 거부**된다 — 즉 커버리지·이슈 로그가
+  아예 남지 않고, 릴리스마다 다시 찍지 않으면 어느 날 갑자기 CI 가 멈춘다. 실측: 2026-08-18 기준
+  develop 에 남은 분석은 6개뿐이었고 고정해둔 2026-08-15T17:17:56Z 은 이미 없었다
+  (가장 가까운 잔존분은 2026-08-15T05:35:17Z).
+- **한 일**: `POST api/project_analyses/set_baseline` 로 잔존 분석 중 최신
+  (`a7808667`, 2026-08-18T09:49:36Z, rev `49af8656`)에 재고정(HTTP 200).
+- **⚠️ 오진 함정**: ① 실패 화면이 "테스트 실패"처럼 보인다 — 잡 이름에 Test 가 들어 있고, 같은 시각
+  concurrency 로 취소된 잡들이 섞여 있으면 더 헷갈린다. 실패 로그에서 `HttpException: Error 4xx` 를
+  먼저 찾을 것. ② 로그의 `digest-mismatch: error` 와 `::error::백엔드 모듈 테스트가…` 는 워크플로
+  스크립트의 **에코일 뿐** 실패가 아니다.
+- **predicted_effect**: 재고정 이후 `:sonar` 가 다시 성공하고, 신규코드 창은 재고정 시점 이후 델타로만
+  잡힌다.
+- **verified_at**: 2026-08-18 — 재고정 후 Sonar 잡 재실행 2건이 모두 success(커밋 `1770c956` 13:27→13:34,
+  `3fac8390` 동일). 증거는 설정 읽기가 아니라 새 분석의 `periods[].mode`:
+  `[{"index":1,"mode":"manual_baseline","date":"2026-08-18T09:49:36+0000"}]`.
+- **점검 명령**(끊겼는지 1분 안에 확인):
+
+  ```bash
+  TOKEN=$(grep -m1 '^SONAR_TOKEN=' .env | cut -d= -f2-)
+  curl -s -u "$TOKEN:" "https://sonarcloud.io/api/project_analyses/search?project=MyoungSoo7_settlement&branch=develop&ps=5"
+  # manualNewCodePeriodBaseline:true 인 분석이 하나도 없으면 끊긴 것이다
+  ```
+
+- **남은 부채**: ① 재고정은 여전히 수동이고, **끊긴 사실을 CI 가 알려주지 않는다**(분석이 죽어야 드러난다)
+  — 릴리스 러너북이나 가드에 위 점검 명령을 붙이는 게 다음 후보다. ② 재고정 직후 실측
+  `new_lines 6,329 · new_coverage 77.4% (< 80%) · new_reliability_rating 1.0(A)` — 잡은 통과해도
+  **품질게이트 자체는 커버리지로 미달**이라 main PR 에서 걸린다.
 
 ---
 
