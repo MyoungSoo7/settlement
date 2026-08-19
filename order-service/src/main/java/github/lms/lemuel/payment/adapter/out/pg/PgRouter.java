@@ -40,6 +40,15 @@ public class PgRouter {
     public PgRouter(List<PaymentGatewayAdapter> adapters,
                     PgRoutingProperties properties,
                     MeterRegistry meterRegistry) {
+        // fail-closed: 결제 가능한 PG 가 하나도 없으면 기동을 거부한다.
+        // List 주입은 빈 목록도 허용하므로, 프로파일 게이트로 모의 어댑터가 전부 빠진 운영 환경에서
+        // 라우터만 조용히 떠 버릴 수 있다. 그러면 첫 결제 시도까지 아무도 모른 채 배포가 끝난다 —
+        // 결제 불가는 기동 시점에 드러나야 하는 종류의 사실이다.
+        if (adapters.isEmpty()) {
+            throw new IllegalStateException(
+                    "결제 가능한 PG 어댑터가 하나도 없습니다 — 운영 프로파일에서는 모의 PG(Toss/Kcp/Nice/Inicis)가 "
+                            + "등록되지 않으므로 실 PG 연동 어댑터를 먼저 배선해야 합니다.");
+        }
         this.adaptersByProvider = new LinkedHashMap<>();
         for (PaymentGatewayAdapter adapter : adapters) {
             this.adaptersByProvider.put(adapter.provider(), adapter);

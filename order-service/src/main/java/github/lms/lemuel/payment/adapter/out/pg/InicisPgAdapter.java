@@ -5,6 +5,7 @@ import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -17,6 +18,7 @@ import java.util.UUID;
  * <p>대형 PG. 카드·계좌이체 위주, 일부 간편결제 지원.
  */
 @Component
+@Profile("!prod")
 public class InicisPgAdapter implements PaymentGatewayAdapter {
 
     private static final Logger log = LoggerFactory.getLogger(InicisPgAdapter.class);

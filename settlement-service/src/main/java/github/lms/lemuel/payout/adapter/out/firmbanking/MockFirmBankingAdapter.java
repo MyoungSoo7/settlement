@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -17,9 +18,17 @@ import java.util.concurrent.ThreadLocalRandom;
  *
  * <p>{@code app.firmbanking.failure-rate} 비율로 무작위 실패를 시뮬레이션해 운영자 콘솔의
  * FAILED 처리 흐름을 검증할 수 있게 한다 (시연·테스트 환경).
+ *
+ * <p><b>fail-closed</b>: {@code app.firmbanking.mode=mock} 을 <b>명시</b>해야만 뜨고, prod 프로파일에서는
+ * 명시해도 뜨지 않는다. 예전엔 {@code matchIfMissing = true} 여서 프로퍼티가 해석되지 않으면 조용히
+ * 이게 붙었고, 그러면 지급 배치가 돈을 보내지 않고도 txnId 를 돌려주며 성공으로 기록했다. 돈 경로의
+ * 기본값은 "모의로라도 돌아간다"가 아니라 "뜨지 않는다"여야 한다 — 실 어댑터
+ * ({@link github.lms.lemuel.payout.adapter.out.firmbanking.fep.FepFirmBankingAdapter}, mode=fep)도
+ * 없으면 {@code FirmBankingPort} 빈 부재로 기동이 막힌다.
  */
 @Component
-@ConditionalOnProperty(name = "app.firmbanking.mode", havingValue = "mock", matchIfMissing = true)
+@Profile("!prod")
+@ConditionalOnProperty(name = "app.firmbanking.mode", havingValue = "mock")
 public class MockFirmBankingAdapter implements FirmBankingPort {
 
     private static final Logger log = LoggerFactory.getLogger(MockFirmBankingAdapter.class);
