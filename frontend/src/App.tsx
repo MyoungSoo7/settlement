@@ -67,6 +67,7 @@ const MonthlyClosingConsolePage = lazy(() => import('./pages/settlement/MonthlyC
 const TaxConsolePage = lazy(() => import('./pages/settlement/TaxConsolePage'));
 const CommissionRateConsolePage = lazy(() => import('./pages/settlement/CommissionRateConsolePage'));
 const DlqConsolePage = lazy(() => import('./pages/settlement/DlqConsolePage'));
+const SalesStatsConsolePage = lazy(() => import('./pages/settlement/SalesStatsConsolePage'));
 
 // 인쇄 전용 (레이아웃 없이 문서만 그리는 화면 — 새 창으로 열린다)
 const SettlementPrintPage = lazy(() => import('./pages/print/SettlementPrintPage'));
@@ -212,6 +213,9 @@ function App() {
                 (라우트를 ADMIN 으로 잠그면 MANAGER 가 분개 조회조차 못 한다) */}
             <Route path="/admin/settlement/ledger"
               element={<AdminManagerRoute><SideNavLayout><LedgerConsolePage /></SideNavLayout></AdminManagerRoute>} />
+            {/* 매출 통계는 읽기 전용 집계다 — 서버가 /api/reports/** 를 ADMIN·MANAGER 로 막는다 */}
+            <Route path="/admin/settlement/sales-stats"
+              element={<AdminManagerRoute><SideNavLayout><SalesStatsConsolePage /></SideNavLayout></AdminManagerRoute>} />
 
             {/* 배송 관리 — 주문별 배송 생성·출고·상태 전이 (ShippingController) */}
             <Route path="/admin/shipping"     element={<AdminManagerRoute><ShippingAdminPage /></AdminManagerRoute>} />

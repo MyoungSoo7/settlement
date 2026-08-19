@@ -85,6 +85,11 @@ const STATIC_QUERIES = new Map([
   // 상세·정책·소멸 목록은 조건부 블록 안이라 등록하지 않고 재시도 조회(findByTestId)로 썼다.
   ["PointConsolePage.test.tsx :: screen.getByRole('button', { name: '포인트 지급' })", '지급 폼 제출 버튼 — 조건 없이 렌더'],
   ["PointConsolePage.test.tsx :: screen.getByLabelText('소멸 예정 기준 일수')", '현황 필터 입력 — 조건 없이 렌더'],
+
+  // SalesStatsConsolePage.tsx 의 필터 바 셀렉트 2종. <option> 이 상수 배열(DIMENSIONS·
+  // GRANULARITIES)이라 데이터로 채워지지 않는다 — DLQ 토픽 셀렉트와 달리 옵션을 기다릴 필요가 없다.
+  ["SalesStatsConsolePage.test.tsx :: screen.getByLabelText('집계 축')", '필터 셀렉트 — 옵션이 상수라 마운트부터 완성'],
+  ["SalesStatsConsolePage.test.tsx :: screen.getByLabelText('추이 단위')", '필터 셀렉트 — 옵션이 상수라 마운트부터 완성'],
 ]);
 
 /** 앞선 waitFor 로부터 이 줄 수 안에 있는 조회만 같은 흐름으로 본다. */

@@ -79,9 +79,9 @@ class MenuSeedIntegrationTest {
     }
 
     @Test
-    @DisplayName("시드 총 51행 — 이관분 31 + 정산운영 그룹 1 + 운영 화면 10 + 시스템 화면 7 + 법인카드(CEO) 1 + 구매자 잔액 1")
+    @DisplayName("시드 총 52행 — 이관분 31 + 정산운영 그룹 1 + 운영 화면 11 + 시스템 화면 7 + 법인카드(CEO) 1 + 구매자 잔액 1")
     void seedsExactlyFortyEight() {
-        assertThat(adapter.findAll()).hasSize(51);
+        assertThat(adapter.findAll()).hasSize(52);
     }
 
     @Test
@@ -101,8 +101,12 @@ class MenuSeedIntegrationTest {
     @DisplayName("정산운영 그룹은 운영 화면만 담는다 — 정산 그룹과 섞이지 않는다")
     void settlementOpsChildren() {
         assertThat(childrenOf("정산운영")).extracting(Menu::getName)
-                .containsExactly("정합성 검증", "일일 대사", "PG 대사", "차지백", "회수 채권",
+                .containsExactly("정합성 검증", "매출 통계", "일일 대사", "PG 대사", "차지백", "회수 채권",
                         "월마감", "세무", "수수료율", "DLQ 재처리", "원장·시산표");
+        // 매출 통계는 ADMIN·MANAGER — 서버가 /api/reports/** 를 그 등급으로 막는다(읽기 전용 집계)
+        assertThat(childrenOf("정산운영").stream()
+                .filter(m -> m.getName().equals("매출 통계")).findFirst().orElseThrow().allowedRoles())
+                .containsExactlyInAnyOrder("ADMIN", "MANAGER");
         // 수수료율은 ADMIN 전용 — 요율은 정산 금액을 직접 바꾸므로 MANAGER 에게 열지 않는다(ADR 0032)
         assertThat(childrenOf("정산운영").stream()
                 .filter(m -> m.getName().equals("수수료율")).findFirst().orElseThrow().allowedRoles())
