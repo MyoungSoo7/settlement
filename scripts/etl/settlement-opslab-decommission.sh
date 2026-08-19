@@ -106,7 +106,10 @@ cat <<'NEXT'
 
 ==> decommission 완료. 후속:
     - order-service 의 settlement 테이블 생성 마이그레이션(V2/V4/V5/V6/V35/V43~45/V49/
-      V20260616120000~160000)은 이력 보존상 남는다. 신규 opslab 부트스트랩 시 빈 테이블이
-      재생성되나 order 코드가 사용하지 않으므로 무해(미사용 잔여). 그린필드에선 생략 권장.
+      V20260616120000~160000)은 이력 보존상 남는다. 예전 이 자리에는 "신규 부트스트랩 시 빈
+      테이블이 재생성되나 무해"라고 적혀 있었으나 사실이 아니었다 — V17__seed_data.sql 이
+      settlements 에 1,000행을 채워 좀비가 부활한다. 2026-08-20 부터는 forward drop 마이그레이션
+      V20260820110000__decommission_opslab_settlement_legacy.sql 이 같은 15개 테이블을 제거하므로
+      부활 고리가 끊겼다. 이 스크립트는 배포 전 사전 점검·조기 정리용으로 남는다(중복 실행 무해).
     상세: docs/runbook/settlement-db-decommission.md
 NEXT
