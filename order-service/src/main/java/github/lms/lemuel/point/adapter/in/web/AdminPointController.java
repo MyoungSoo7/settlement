@@ -6,6 +6,11 @@ import github.lms.lemuel.point.application.port.in.ExpirePointLotsUseCase.Expire
 import github.lms.lemuel.point.application.port.in.GrantPointUseCase;
 import github.lms.lemuel.point.application.port.in.GrantPointUseCase.GrantPointCommand;
 import github.lms.lemuel.point.application.port.in.GrantPointUseCase.GrantPointResult;
+import github.lms.lemuel.point.application.port.in.QueryPointConsoleUseCase;
+import github.lms.lemuel.point.application.port.in.QueryPointConsoleUseCase.ExpiringLotView;
+import github.lms.lemuel.point.application.port.in.QueryPointConsoleUseCase.PointAccountDetail;
+import github.lms.lemuel.point.application.port.in.QueryPointConsoleUseCase.PointConsoleSummary;
+import github.lms.lemuel.point.application.port.in.QueryPointConsoleUseCase.PointEarnPolicyView;
 import github.lms.lemuel.point.domain.PointLotOrigin;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -16,6 +21,8 @@ import jakarta.validation.constraints.Positive;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,6 +31,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.List;
 
 /**
  * 관리자 포인트 콘솔.
@@ -32,7 +40,16 @@ import java.time.OffsetDateTime;
  *   POST /admin/points/grants           → 수기 지급(사유 필수)
  *   POST /admin/points/expiry/run       → 소멸 미리보기(무변경)
  *   POST /admin/points/expiry/run?dryRun=false → 실제 소멸 실행
+ *
+ *   GET  /admin/points/summary          → 전체 3자 대조 + 소멸 예정 규모
+ *   GET  /admin/points/accounts/{userId} → 계정 상세(3자 대조 + 로트·원장 내역)
+ *   GET  /admin/points/policies         → 적립률 정책 이력
+ *   GET  /admin/points/expiring         → 소멸 예정 로트
  * </pre>
+ *
+ * <p>조회 4종이 뒤에 붙은 이유: 앞의 쓰기 둘은 <b>되돌리기 어려운 조작</b>인데, 그 전에
+ * "지금 이 계정이 얼마이고 왜 그런가"를 볼 방법이 없었다. 지급·소멸 버튼과 같은 화면에서
+ * 근거를 확인할 수 있어야 조작이 안전해진다.
  *
  * <p>고객 재산을 지우는 배치라 <b>미리보기가 기본값</b>이다 — 파라미터를 빠뜨린 호출이 실행이 되어선
  * 안 된다({@code /admin/payment-expiry} 와 같은 규약).
@@ -51,11 +68,50 @@ public class AdminPointController {
 
     private final GrantPointUseCase grantPointUseCase;
     private final ExpirePointLotsUseCase expirePointLotsUseCase;
+    private final QueryPointConsoleUseCase queryPointConsoleUseCase;
 
     public AdminPointController(GrantPointUseCase grantPointUseCase,
-                                ExpirePointLotsUseCase expirePointLotsUseCase) {
+                                ExpirePointLotsUseCase expirePointLotsUseCase,
+                                QueryPointConsoleUseCase queryPointConsoleUseCase) {
         this.grantPointUseCase = grantPointUseCase;
         this.expirePointLotsUseCase = expirePointLotsUseCase;
+        this.queryPointConsoleUseCase = queryPointConsoleUseCase;
+    }
+
+    @Operation(summary = "포인트 원장 전체 요약",
+            description = "잔고 총액·ACTIVE 로트 합계·원장 누계의 3자 대조와 소멸 예정 규모. "
+                    + "driftedAccountCount 가 0 이 아니면 잔고만 움직이고 기록이 빠진 계정이 있다는 뜻이다.")
+    @GetMapping("/summary")
+    public ResponseEntity<PointConsoleSummary> summary(
+            @RequestParam(name = "withinDays", defaultValue = "30") int withinDays) {
+        return ResponseEntity.ok(queryPointConsoleUseCase.summary(withinDays));
+    }
+
+    @Operation(summary = "계정 상세",
+            description = "잔고 3필드 + 3자 대조 + 최근 로트·원장 내역. 포인트를 한 번도 쓴 적 없는 "
+                    + "사용자는 계정 자체가 없어 404 다(잔액 0 인 계정과 구분된다).")
+    @GetMapping("/accounts/{userId}")
+    public ResponseEntity<PointAccountDetail> account(@PathVariable Long userId) {
+        return queryPointConsoleUseCase.account(userId)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @Operation(summary = "적립률 정책 이력",
+            description = "종료된 행도 함께 돌려준다 — 과거 적립이 왜 그 요율이었는지 설명해야 하므로. "
+                    + "표가 비어 있으면 적립률 0(무행동 착지)이다.")
+    @GetMapping("/policies")
+    public ResponseEntity<List<PointEarnPolicyView>> policies() {
+        return ResponseEntity.ok(queryPointConsoleUseCase.policies());
+    }
+
+    @Operation(summary = "소멸 예정 로트",
+            description = "지정 일수 안에 만료되는 ACTIVE 로트를 만료 임박 순으로. 무기한 로트는 대상이 아니다.")
+    @GetMapping("/expiring")
+    public ResponseEntity<List<ExpiringLotView>> expiring(
+            @RequestParam(name = "withinDays", defaultValue = "30") int withinDays,
+            @RequestParam(name = "limit", defaultValue = "50") int limit) {
+        return ResponseEntity.ok(queryPointConsoleUseCase.expiringLots(withinDays, limit));
     }
 
     @Operation(summary = "포인트 수기 지급",

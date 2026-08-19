@@ -28,6 +28,86 @@ export interface PointBalance {
   available: number;
 }
 
+/**
+ * 원장 3자 대조 — 계정 잔고 · ACTIVE 로트 합계 · 원장 누계.
+ *
+ * <p>셋은 갱신 경로가 달라서, 어긋났다면 잔고만 움직이고 기록이 빠진 트랜잭션이 있었다는 뜻이다.
+ * 화면은 이 값을 <b>판정</b>이 아니라 <b>조사 신호</b>로 그린다.
+ */
+export interface PointLedgerHealth {
+  accountAvailable: number;
+  activeLotRemaining: number;
+  entryNet: number;
+}
+
+export interface PointConsoleSummary {
+  accountCount: number;
+  totalAvailable: number;
+  totalActiveLotRemaining: number;
+  totalEntryNet: number;
+  /** 0 이 아니면 조사 대상 계정이 있다는 뜻. */
+  driftedAccountCount: number;
+  expiringWithinDays: number;
+  expiringAmount: number;
+}
+
+export interface PointLotView {
+  lotId: number;
+  origin: string;
+  originalAmount: number;
+  remainingAmount: number;
+  status: string;
+  grantedAt: string;
+  /** null 이면 무기한 로트 — 소멸 대상이 아니다. */
+  expiresAt: string | null;
+  referenceType: string;
+  referenceId: string;
+}
+
+export interface PointEntryView {
+  entryId: number;
+  entryType: string;
+  amount: number;
+  referenceType: string;
+  referenceId: string;
+  memo: string | null;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface PointAccountDetail {
+  userId: number;
+  accountId: number;
+  status: string;
+  available: number;
+  locked: number;
+  total: number;
+  health: PointLedgerHealth;
+  lots: PointLotView[];
+  entries: PointEntryView[];
+}
+
+export interface PointEarnPolicyView {
+  id: number;
+  scope: string;
+  scopeKey: string;
+  earnRate: number;
+  validityDays: number;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  reason: string;
+  createdBy: string;
+  active: boolean;
+}
+
+export interface ExpiringLotView {
+  userId: number;
+  lotId: number;
+  origin: string;
+  remainingAmount: number;
+  expiresAt: string;
+}
+
 export interface ManualGrantRequest {
   userId: number;
   amount: number;
@@ -52,4 +132,21 @@ export const pointApi = {
     })).data,
 
   myBalance: async () => (await api.get<PointBalance>('/api/points/me')).data,
+
+  summary: async (withinDays = 30) =>
+    (await api.get<PointConsoleSummary>('/admin/points/summary', {
+      params: { withinDays },
+    })).data,
+
+  /** 계정이 없는 사용자는 404 다 — 잔액 0 인 계정과 구분되므로 호출부가 그대로 안내한다. */
+  account: async (userId: number) =>
+    (await api.get<PointAccountDetail>(`/admin/points/accounts/${userId}`)).data,
+
+  policies: async () =>
+    (await api.get<PointEarnPolicyView[]>('/admin/points/policies')).data,
+
+  expiring: async (withinDays = 30, limit = 50) =>
+    (await api.get<ExpiringLotView[]>('/admin/points/expiring', {
+      params: { withinDays, limit },
+    })).data,
 };
