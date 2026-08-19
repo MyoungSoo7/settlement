@@ -1,6 +1,7 @@
 package github.lms.lemuel.point.adapter.out.persistence;
 
 import github.lms.lemuel.point.domain.PointEarnPolicy;
+import github.lms.lemuel.point.domain.PointEarnRounding;
 import github.lms.lemuel.point.domain.PointEarnScope;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -55,6 +56,13 @@ public class PointEarnPolicyJpaEntity {
     @Column(name = "closed_at")
     private OffsetDateTime closedAt;
 
+    @Column(name = "rounding_unit", nullable = false)
+    private int roundingUnit;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "rounding_mode", nullable = false, length = 10)
+    private PointEarnRounding roundingMode;
+
     protected PointEarnPolicyJpaEntity() {
     }
 
@@ -76,6 +84,8 @@ public class PointEarnPolicyJpaEntity {
         entity.reason = policy.getReason();
         entity.createdBy = policy.getCreatedBy();
         entity.createdAt = OffsetDateTime.now();
+        entity.roundingUnit = policy.getRoundingUnit();
+        entity.roundingMode = policy.getRounding();
         return entity;
     }
 
@@ -90,6 +100,6 @@ public class PointEarnPolicyJpaEntity {
 
     PointEarnPolicy toDomain() {
         return PointEarnPolicy.rehydrate(id, scope, scopeKey, earnRate, validityDays,
-                effectiveFrom, effectiveTo, reason, createdBy);
+                effectiveFrom, effectiveTo, reason, createdBy, roundingUnit, roundingMode);
     }
 }

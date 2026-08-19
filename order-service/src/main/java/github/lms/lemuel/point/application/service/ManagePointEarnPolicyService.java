@@ -38,7 +38,8 @@ public class ManagePointEarnPolicyService implements ManagePointEarnPolicyUseCas
         // 도메인이 먼저 형식을 본다(요율 0~1, 유효기간 양수, 종료일 > 시작일, 사유 필수).
         PointEarnPolicy policy = PointEarnPolicy.of(command.scope(), command.scopeKey(),
                 command.earnRate(), command.validityDays(), command.effectiveFrom(),
-                command.effectiveTo(), command.reason(), command.createdBy());
+                command.effectiveTo(), command.reason(), command.createdBy(),
+                command.roundingUnit(), command.rounding());
 
         if (command.effectiveFrom().isBefore(today)) {
             throw new InvalidPointStateException(

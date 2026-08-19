@@ -1,6 +1,7 @@
 package github.lms.lemuel.point.application.port.in;
 
 import github.lms.lemuel.point.domain.PointEarnPolicy;
+import github.lms.lemuel.point.domain.PointEarnRounding;
 import github.lms.lemuel.point.domain.PointEarnScope;
 
 import java.math.BigDecimal;
@@ -31,7 +32,25 @@ public interface ManagePointEarnPolicyUseCase {
      */
     record RegisterPolicyCommand(PointEarnScope scope, String scopeKey, BigDecimal earnRate,
                                  int validityDays, LocalDate effectiveFrom, LocalDate effectiveTo,
-                                 String reason, String createdBy) {
+                                 String reason, String createdBy,
+                                 int roundingUnit, PointEarnRounding rounding) {
+
+        /** 단위·방식을 지정하지 않은 요청은 1 원 단위 버림으로 착지한다(이 기능의 기존 동작). */
+        public RegisterPolicyCommand {
+            if (roundingUnit <= 0) {
+                roundingUnit = 1;
+            }
+            if (rounding == null) {
+                rounding = PointEarnRounding.DOWN;
+            }
+        }
+
+        public RegisterPolicyCommand(PointEarnScope scope, String scopeKey, BigDecimal earnRate,
+                                     int validityDays, LocalDate effectiveFrom, LocalDate effectiveTo,
+                                     String reason, String createdBy) {
+            this(scope, scopeKey, earnRate, validityDays, effectiveFrom, effectiveTo,
+                    reason, createdBy, 1, PointEarnRounding.DOWN);
+        }
     }
 
     /** @param effectiveTo 이 날짜부터 적용하지 않는다(반열림 [from, to)). 오늘 이상이어야 한다 */

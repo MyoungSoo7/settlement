@@ -168,7 +168,9 @@ public class AdminPointController {
         return ResponseEntity.ok(managePointEarnPolicyUseCase.register(
                 new RegisterPolicyCommand(request.scope(), request.scopeKey(), request.earnRate(),
                         request.validityDays(), request.effectiveFrom(), request.effectiveTo(),
-                        request.reason(), actor()),
+                        request.reason(), actor(),
+                        request.roundingUnit() == null ? 1 : request.roundingUnit(),
+                        request.rounding()),
                 LocalDate.now()));
     }
 
@@ -239,7 +241,9 @@ public class AdminPointController {
             @Positive int validityDays,
             @NotNull LocalDate effectiveFrom,
             LocalDate effectiveTo,
-            @NotBlank String reason) {
+            @NotBlank String reason,
+            Integer roundingUnit,
+            github.lms.lemuel.point.domain.PointEarnRounding rounding) {
     }
 
     /** @param effectiveTo 이 날짜부터 적용하지 않는다(반열림). 오늘 이상이어야 한다 */
