@@ -12,8 +12,10 @@ import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.method.annotation.ExceptionHandlerMethodResolver;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.Set;
 
@@ -176,6 +178,23 @@ class ExceptionHandlingTest {
         assertThat(res.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(res.getBody().errorCode()).isEqualTo(ErrorCode.ENDPOINT_NOT_FOUND.code());
         assertThat(res.getBody().message()).isEqualTo(ErrorCode.ENDPOINT_NOT_FOUND.defaultMessage());
+    }
+
+    @Test
+    @DisplayName("디스패치가 고르는 핸들러도 404 다 — catch-all(500)이 다시 가로채지 못한다")
+    void noResourceFoundIsNotSwallowedByCatchAll() throws Exception {
+        NoResourceFoundException ex =
+                new NoResourceFoundException(HttpMethod.GET, "/actuator/health", "actuator/health");
+
+        // 핸들러를 직접 부르는 테스트는 @ExceptionHandler 매핑이 사라져도 통과한다 — 실제 회귀는
+        // "누가 이 예외를 잡는가" 에서 나므로, 런타임과 같은 선택기로 고른 뒤 그 결과를 검증한다.
+        Method resolved = new ExceptionHandlerMethodResolver(GlobalExceptionHandler.class).resolveMethod(ex);
+        assertThat(resolved).isNotNull();
+
+        @SuppressWarnings("unchecked")
+        ResponseEntity<ErrorResponse> res = (ResponseEntity<ErrorResponse>) resolved.invoke(handler, ex);
+        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(res.getBody().errorCode()).isEqualTo(ErrorCode.ENDPOINT_NOT_FOUND.code());
     }
 
     @Test
