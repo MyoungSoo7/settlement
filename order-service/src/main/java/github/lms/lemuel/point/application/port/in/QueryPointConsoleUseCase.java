@@ -81,7 +81,12 @@ public interface QueryPointConsoleUseCase {
                           OffsetDateTime createdAt) {
     }
 
-    /** @param active 오늘 기준으로 적용 중인 행인지 — 종료된 이력과 섞이지 않게 서버가 판정한다 */
+    /**
+     * @param active   오늘 기준으로 적용 중인 행인지 — <b>날짜 범위만</b>으로 판정한다
+     *                 ({@code effective_from <= 오늘 < effective_to})
+     * @param closedAt 운영자가 종료를 지정한 시각. <b>적용 여부가 아니다</b> — 종료일이 미래면
+     *                 그날까지는 {@code active} 가 계속 참이다. "언제 누가 끊었나"의 감사 기록이다
+     */
     record PointEarnPolicyView(Long id,
                                String scope,
                                String scopeKey,
@@ -91,7 +96,8 @@ public interface QueryPointConsoleUseCase {
                                LocalDate effectiveTo,
                                String reason,
                                String createdBy,
-                               boolean active) {
+                               boolean active,
+                               OffsetDateTime closedAt) {
     }
 
     record ExpiringLotView(Long userId,

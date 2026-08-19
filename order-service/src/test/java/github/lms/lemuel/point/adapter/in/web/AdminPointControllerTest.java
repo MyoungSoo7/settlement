@@ -2,20 +2,29 @@ package github.lms.lemuel.point.adapter.in.web;
 
 import github.lms.lemuel.common.config.jwt.JwtUtil;
 import github.lms.lemuel.common.exception.GlobalExceptionHandler;
+import github.lms.lemuel.point.application.port.in.DeductPointUseCase;
+import github.lms.lemuel.point.application.port.in.DeductPointUseCase.DeductPointCommand;
+import github.lms.lemuel.point.application.port.in.DeductPointUseCase.DeductPointResult;
 import github.lms.lemuel.point.application.port.in.ExpirePointLotsUseCase;
 import github.lms.lemuel.point.application.port.in.GrantPointUseCase;
+import github.lms.lemuel.point.application.port.in.ManagePointEarnPolicyUseCase;
+import github.lms.lemuel.point.application.port.in.ManagePointEarnPolicyUseCase.ClosePolicyCommand;
 import github.lms.lemuel.point.application.port.in.QueryPointConsoleUseCase;
 import github.lms.lemuel.point.application.port.in.QueryPointConsoleUseCase.ExpiringLotView;
 import github.lms.lemuel.point.application.port.in.QueryPointConsoleUseCase.PointAccountDetail;
 import github.lms.lemuel.point.application.port.in.QueryPointConsoleUseCase.PointConsoleSummary;
 import github.lms.lemuel.point.application.port.in.QueryPointConsoleUseCase.PointEarnPolicyView;
+import github.lms.lemuel.point.domain.PointEarnPolicy;
+import github.lms.lemuel.point.domain.PointEarnScope;
 import github.lms.lemuel.point.domain.PointLedgerHealth;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -25,11 +34,14 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -50,6 +62,8 @@ class AdminPointControllerTest {
     @MockitoBean GrantPointUseCase grantPointUseCase;
     @MockitoBean ExpirePointLotsUseCase expirePointLotsUseCase;
     @MockitoBean QueryPointConsoleUseCase queryPointConsoleUseCase;
+    @MockitoBean DeductPointUseCase deductPointUseCase;
+    @MockitoBean ManagePointEarnPolicyUseCase managePointEarnPolicyUseCase;
 
     @Test
     @DisplayName("GET /admin/points/summary — 3자 대조와 소멸 예정 규모를 돌려준다")
@@ -108,15 +122,101 @@ class AdminPointControllerTest {
     void policies() throws Exception {
         when(queryPointConsoleUseCase.policies()).thenReturn(List.of(
                 new PointEarnPolicyView(1L, "GLOBAL", "-", new BigDecimal("0.01000"), 365,
-                        LocalDate.of(2026, 1, 1), null, "기본 적립률", "admin", true),
+                        LocalDate.of(2026, 1, 1), null, "기본 적립률", "admin", true, null),
                 new PointEarnPolicyView(2L, "GLOBAL", "-", new BigDecimal("0.00500"), 365,
-                        LocalDate.of(2025, 1, 1), LocalDate.of(2026, 1, 1), "구 요율", "admin", false)));
+                        LocalDate.of(2025, 1, 1), LocalDate.of(2026, 1, 1), "구 요율", "admin", false,
+                        OffsetDateTime.parse("2025-12-20T09:00:00Z"))));
 
         mockMvc.perform(get("/admin/points/policies"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].active").value(true))
                 .andExpect(jsonPath("$[1].active").value(false))
                 .andExpect(jsonPath("$[1].effectiveTo").value("2026-01-01"));
+    }
+
+    @Test
+    @DisplayName("POST /admin/points/deductions — 사유·멱등 키를 그대로 넘긴다")
+    void deduct() throws Exception {
+        when(deductPointUseCase.deduct(any())).thenReturn(
+                new DeductPointResult(9L, new BigDecimal("500"), new BigDecimal("500")));
+
+        mockMvc.perform(post("/admin/points/deductions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"userId":3,"amount":500,"referenceId":"recall-1","reason":"오지급 회수"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.deductedAmount").value(500))
+                .andExpect(jsonPath("$.remainingBalance").value(500));
+
+        ArgumentCaptor<DeductPointCommand> captor = ArgumentCaptor.forClass(DeductPointCommand.class);
+        verify(deductPointUseCase).deduct(captor.capture());
+        assertThat(captor.getValue().referenceId()).isEqualTo("recall-1");
+        assertThat(captor.getValue().reason()).isEqualTo("오지급 회수");
+    }
+
+    @Test
+    @DisplayName("사유 없는 차감은 400 — 근거 없이 고객 재산을 줄이는 요청은 받지 않는다")
+    void deductWithoutReasonIsRejected() throws Exception {
+        mockMvc.perform(post("/admin/points/deductions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"userId":3,"amount":500,"referenceId":"recall-1","reason":"  "}
+                                """))
+                .andExpect(status().isBadRequest());
+
+        verify(deductPointUseCase, org.mockito.Mockito.never()).deduct(any());
+    }
+
+    @Test
+    @DisplayName("POST /admin/points/policies — 등록은 오늘 날짜를 기준으로 판정된다")
+    void registerPolicy() throws Exception {
+        when(managePointEarnPolicyUseCase.register(any(), any())).thenReturn(
+                PointEarnPolicy.rehydrate(5L, PointEarnScope.GLOBAL, "-", new BigDecimal("0.02000"),
+                        365, LocalDate.of(2026, 9, 1), null, "프로모션", "admin:1"));
+
+        mockMvc.perform(post("/admin/points/policies")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"scope":"GLOBAL","scopeKey":"-","earnRate":0.02,"validityDays":365,
+                                 "effectiveFrom":"2026-09-01","reason":"프로모션"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.earnRate").value(0.02));
+
+        ArgumentCaptor<LocalDate> today = ArgumentCaptor.forClass(LocalDate.class);
+        verify(managePointEarnPolicyUseCase).register(any(), today.capture());
+        assertThat(today.getValue()).isEqualTo(LocalDate.now());
+    }
+
+    @Test
+    @DisplayName("POST /admin/points/policies/{id}/close — 없는 정책이면 404")
+    void closeMissingPolicy() throws Exception {
+        when(managePointEarnPolicyUseCase.close(any(), any())).thenReturn(Optional.empty());
+
+        mockMvc.perform(post("/admin/points/policies/99/close")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"effectiveTo\":\"2026-12-01\"}"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("정책 종료는 종료일을 그대로 넘긴다")
+    void closePolicy() throws Exception {
+        when(managePointEarnPolicyUseCase.close(any(), any())).thenReturn(Optional.of(
+                PointEarnPolicy.rehydrate(5L, PointEarnScope.GLOBAL, "-", new BigDecimal("0.01000"),
+                        365, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 1), "기본", "admin:1")));
+
+        mockMvc.perform(post("/admin/points/policies/5/close")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"effectiveTo\":\"2026-12-01\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.effectiveTo").value("2026-12-01"));
+
+        ArgumentCaptor<ClosePolicyCommand> captor = ArgumentCaptor.forClass(ClosePolicyCommand.class);
+        verify(managePointEarnPolicyUseCase).close(captor.capture(), any());
+        assertThat(captor.getValue().policyId()).isEqualTo(5L);
+        assertThat(captor.getValue().effectiveTo()).isEqualTo(LocalDate.of(2026, 12, 1));
     }
 
     @Test

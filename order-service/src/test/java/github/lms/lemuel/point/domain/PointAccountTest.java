@@ -324,6 +324,90 @@ class PointAccountTest {
         }
     }
 
+    /**
+     * 수기 차감 — 운영자가 오지급을 회수하는 경로.
+     *
+     * <p>이미 있는 감액 셋과 구별되는 점이 이 묶음의 전부다:
+     * <ul>
+     *   <li>{@code use} 와 달리 <b>정지 계정에서도</b> 된다 — 잘못 준 돈은 계정을 정지시켜 두고 거둬들인다.
+     *   <li>{@code revoke}/{@code expire} 와 달리 잔액 초과는 <b>불변식 위반(500)이 아니라 입력 오류(400)</b>다.
+     *       운영자가 타이핑한 숫자이므로, 장부가 깨졌다는 신호로 올려서는 안 된다.
+     * </ul>
+     */
+    @Nested
+    @DisplayName("수기 차감")
+    class ManualDeduct {
+
+        @Test
+        @DisplayName("가용 잔고에서 빼고 total 도 함께 줄인다")
+        void deductsFromAvailable() {
+            PointAccount account = newAccount();
+            account.grant(new BigDecimal("1000"));
+
+            account.deduct(new BigDecimal("300"));
+
+            assertThat(account.getAvailable()).isEqualByComparingTo("700");
+            assertThat(account.getTotal()).isEqualByComparingTo("700");
+            assertInvariant(account);
+        }
+
+        @Test
+        @DisplayName("전액도 뺄 수 있다 — 잔액 0 은 정상 착지다")
+        void deductsAll() {
+            PointAccount account = newAccount();
+            account.grant(new BigDecimal("500"));
+
+            account.deduct(new BigDecimal("500"));
+
+            assertThat(account.getAvailable()).isEqualByComparingTo("0");
+            assertInvariant(account);
+        }
+
+        @Test
+        @DisplayName("잔액을 넘으면 입력 오류로 거절한다 — 불변식 위반이 아니다")
+        void rejectsOverBalanceAsBusinessError() {
+            PointAccount account = newAccount();
+            account.grant(new BigDecimal("100"));
+
+            assertThatThrownBy(() -> account.deduct(new BigDecimal("101")))
+                    .isInstanceOf(InsufficientPointException.class)
+                    .isNotInstanceOf(PointInvariantViolationException.class);
+        }
+
+        @Test
+        @DisplayName("정지 계정에서도 차감된다 — 부정 적립은 계정을 잠근 뒤 거둬들인다")
+        void allowedOnSuspendedAccount() {
+            PointAccount account = newAccount();
+            account.grant(new BigDecimal("1000"));
+            account.suspend();
+
+            assertThatCode(() -> account.deduct(new BigDecimal("400"))).doesNotThrowAnyException();
+            assertThat(account.getAvailable()).isEqualByComparingTo("600");
+        }
+
+        @Test
+        @DisplayName("해지 계정에서는 차감할 수 없다 — 잔액 0 이라 뺄 것이 없다")
+        void rejectedOnClosedAccount() {
+            PointAccount account = newAccount();
+            account.close();
+
+            assertThatThrownBy(() -> account.deduct(new BigDecimal("1")))
+                    .isInstanceOf(InvalidPointStateException.class);
+        }
+
+        @Test
+        @DisplayName("0 이하·소수 포인트는 거절한다")
+        void rejectsNonPointAmounts() {
+            PointAccount account = newAccount();
+            account.grant(new BigDecimal("1000"));
+
+            assertThatThrownBy(() -> account.deduct(BigDecimal.ZERO))
+                    .isInstanceOf(InvalidPointAmountException.class);
+            assertThatThrownBy(() -> account.deduct(new BigDecimal("10.5")))
+                    .isInstanceOf(InvalidPointAmountException.class);
+        }
+    }
+
     @Test
     @DisplayName("rehydrate 로 복원한 계정도 불변식을 검증한다")
     void rehydrate_validatesInvariant() {

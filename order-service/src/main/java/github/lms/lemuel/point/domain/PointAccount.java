@@ -132,6 +132,36 @@ public class PointAccount {
     }
 
     /**
+     * 수기 차감 — 운영자가 오지급·부정 적립을 거둬들이는 경로.
+     *
+     * <p>이미 있는 감액 셋과 두 가지가 다르다.
+     *
+     * <ul>
+     *   <li><b>정지 계정에서도 된다</b>({@link #use} 와 다름). 부정 적립을 발견하면 먼저 계정을 잠그고
+     *       거둬들이는 것이 순서인데, 정지가 회수를 막으면 그 순서를 쓸 수 없다. CLOSED 는 잔액이
+     *       0 이어야만 될 수 있는 상태라 뺄 것이 없으므로 거절한다.
+     *   <li><b>잔액 초과는 입력 오류다</b>({@link #revoke}·{@link #expire} 와 다름). 저 둘은 시스템이
+     *       계산한 금액이라 초과하면 장부가 깨진 것이지만, 여기 금액은 <b>운영자가 타이핑한 숫자</b>다.
+     *       500(불변식 위반)으로 올리면 진짜 장부 손상 신호에 노이즈가 섞인다.
+     * </ul>
+     */
+    public void deduct(BigDecimal amount) {
+        BigDecimal value = requirePoint(amount, "deduct");
+        if (status == PointAccountStatus.CLOSED) {
+            throw new InvalidPointStateException(
+                    "해지된 계정에서는 차감할 수 없습니다", status.name(), "deduct");
+        }
+        if (available.compareTo(value) < 0) {
+            throw new InsufficientPointException(
+                    "차감액이 잔액을 초과합니다: 요청 " + value + ", 가용 " + available, value, available);
+        }
+        this.available = this.available.subtract(value);
+        this.total = this.total.subtract(value);
+        touch();
+        enforceInvariant();
+    }
+
+    /**
      * 잔고에서 되가져오는 공통 경로. 차감액은 언제나 <b>로트에서 계산되어</b> 넘어오므로 잔액을
      * 넘을 수 없다 — 넘는다면 잔고와 로트가 어긋났다는 뜻이라 사용자 입력 오류가 아니라 로직 버그다.
      */

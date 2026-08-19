@@ -8,10 +8,23 @@ vi.mock('@/api/point', () => ({
   pointApi: {
     grant: vi.fn(), runExpiry: vi.fn(), myBalance: vi.fn(),
     summary: vi.fn(), account: vi.fn(), policies: vi.fn(), expiring: vi.fn(),
+    deduct: vi.fn(), registerPolicy: vi.fn(), closePolicy: vi.fn(),
   },
 }));
 
 const mocked = vi.mocked(pointApi);
+
+const openPolicy = {
+  id: 1, scope: 'GLOBAL', scopeKey: '-', earnRate: 0.01, validityDays: 365,
+  effectiveFrom: '2026-01-01', effectiveTo: null as string | null, reason: '기본 적립률',
+  createdBy: 'admin', active: true, closedAt: null as string | null,
+};
+
+const closedPolicy = {
+  id: 2, scope: 'GLOBAL', scopeKey: '-', earnRate: 0.005, validityDays: 365,
+  effectiveFrom: '2025-01-01', effectiveTo: '2026-01-01' as string | null, reason: '구 요율',
+  createdBy: 'admin', active: false, closedAt: '2025-12-20T09:00:00Z' as string | null,
+};
 
 const balancedSummary = {
   accountCount: 3,
@@ -233,22 +246,148 @@ describe('PointConsolePage', () => {
     });
 
     it('종료된 정책도 이력으로 함께 보여 준다', async () => {
-      mocked.policies.mockResolvedValue([
-        {
-          id: 1, scope: 'GLOBAL', scopeKey: '-', earnRate: 0.01, validityDays: 365,
-          effectiveFrom: '2026-01-01', effectiveTo: null, reason: '기본 적립률',
-          createdBy: 'admin', active: true,
-        },
-        {
-          id: 2, scope: 'GLOBAL', scopeKey: '-', earnRate: 0.005, validityDays: 365,
-          effectiveFrom: '2025-01-01', effectiveTo: '2026-01-01', reason: '구 요율',
-          createdBy: 'admin', active: false,
-        },
-      ]);
+      mocked.policies.mockResolvedValue([openPolicy, closedPolicy]);
       render(<PointConsolePage />);
 
       expect(await screen.findByTestId('policy-active')).toHaveTextContent('적용 중');
       expect(screen.getByTestId('policy-closed')).toHaveTextContent('종료');
+    });
+
+    it('종료일이 미래면 그날까지는 적용 중이고 "종료 예약됨"으로 알린다', async () => {
+      mocked.policies.mockResolvedValue([{
+        ...openPolicy, effectiveTo: '2026-12-01', active: true,
+        closedAt: '2026-08-20T09:00:00Z',
+      }]);
+      render(<PointConsolePage />);
+
+      expect(await screen.findByTestId('policy-close-scheduled'))
+        .toHaveTextContent('2026-12-01 까지 적용');
+      expect(screen.getByTestId('policy-active')).toHaveTextContent('적용 중');
+    });
+
+    it('무기한 정책에만 종료일 지정 버튼이 뜬다 — 이미 끝난 정책은 다시 끊을 수 없다', async () => {
+      mocked.policies.mockResolvedValue([openPolicy, closedPolicy]);
+      render(<PointConsolePage />);
+
+      await screen.findByTestId('policy-active');
+      expect(screen.getAllByRole('button', { name: '종료일 지정' })).toHaveLength(1);
+    });
+
+    it('종료를 확정하면 지정한 날짜로 끊고 현황을 다시 읽는다', async () => {
+      mocked.policies.mockResolvedValue([openPolicy]);
+      mocked.closePolicy.mockResolvedValue({ ...openPolicy, effectiveTo: '2026-12-01' });
+      const user = userEvent.setup();
+      render(<PointConsolePage />);
+
+      await user.click(await screen.findByRole('button', { name: '종료일 지정' }));
+      fireEvent.change(screen.getByLabelText('정책 종료일'), { target: { value: '2026-12-01' } });
+      await user.click(screen.getByRole('button', { name: '종료 확정' }));
+
+      await waitFor(() => expect(mocked.closePolicy).toHaveBeenCalledWith(1, '2026-12-01'));
+      expect(await screen.findByTestId('policy-notice')).toHaveTextContent('2026-12-01');
+      expect(mocked.policies).toHaveBeenCalledTimes(2);
+    });
+
+    it('등록은 화면의 % 를 0~1 비율로 바꿔 보낸다 — 변환은 한 곳에서만 한다', async () => {
+      mocked.registerPolicy.mockResolvedValue(openPolicy);
+      const user = userEvent.setup();
+      render(<PointConsolePage />);
+
+      await user.type(await screen.findByLabelText('적립률'), '1.5');
+      fireEvent.change(screen.getByLabelText('정책 발효일'), { target: { value: '2026-09-01' } });
+      await user.type(screen.getByLabelText('정책 근거'), '하반기 적립률');
+      await user.click(screen.getByRole('button', { name: '정책 등록' }));
+
+      await waitFor(() => expect(mocked.registerPolicy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          scope: 'GLOBAL', scopeKey: '-', earnRate: 0.015,
+          effectiveFrom: '2026-09-01', reason: '하반기 적립률',
+        }),
+      ));
+    });
+
+    it('기간이 겹쳐 409 면 서버 문구를 그대로 보여 준다 — 먼저 종료하라는 안내다', async () => {
+      mocked.registerPolicy.mockRejectedValue({
+        response: { status: 409, data: { message: '현재 정책의 종료일을 먼저 지정하세요' } },
+      });
+      const user = userEvent.setup();
+      render(<PointConsolePage />);
+
+      await user.type(await screen.findByLabelText('적립률'), '2');
+      fireEvent.change(screen.getByLabelText('정책 발효일'), { target: { value: '2026-09-01' } });
+      await user.type(screen.getByLabelText('정책 근거'), '프로모션');
+      await user.click(screen.getByRole('button', { name: '정책 등록' }));
+
+      expect(await screen.findByTestId('policy-error'))
+        .toHaveTextContent('현재 정책의 종료일을 먼저 지정하세요');
+    });
+  });
+
+  describe('수기 차감', () => {
+    const fillDeductForm = async (user: ReturnType<typeof userEvent.setup>) => {
+      await user.type(screen.getByLabelText('차감 대상 회원 ID'), '3');
+      await user.type(screen.getByLabelText('차감 포인트'), '500');
+      await user.type(screen.getByLabelText('차감 참조 ID'), 'recall-1');
+      await user.type(screen.getByLabelText('차감 사유'), '오지급 회수');
+    };
+
+    it('사유를 입력하기 전에는 차감 버튼이 잠겨 있다 — 지급과 같은 규율이다', async () => {
+      const user = userEvent.setup();
+      render(<PointConsolePage />);
+
+      await user.type(screen.getByLabelText('차감 대상 회원 ID'), '3');
+      await user.type(screen.getByLabelText('차감 포인트'), '500');
+      await user.type(screen.getByLabelText('차감 참조 ID'), 'recall-1');
+      expect(screen.getByRole('button', { name: '포인트 차감' })).toBeDisabled();
+
+      await user.type(screen.getByLabelText('차감 사유'), '오지급 회수');
+      expect(screen.getByRole('button', { name: '포인트 차감' })).toBeEnabled();
+    });
+
+    it('차감하면 참조 ID 를 멱등 키로 그대로 보내고 현황을 다시 읽는다', async () => {
+      mocked.deduct.mockResolvedValue({
+        entryId: 9, deductedAmount: 500, remainingBalance: 500,
+      });
+      const user = userEvent.setup();
+      render(<PointConsolePage />);
+      await waitFor(() => expect(mocked.summary).toHaveBeenCalledTimes(1));
+
+      await fillDeductForm(user);
+      await user.click(screen.getByRole('button', { name: '포인트 차감' }));
+
+      await waitFor(() => expect(mocked.deduct).toHaveBeenCalledWith({
+        userId: 3, amount: 500, referenceId: 'recall-1', reason: '오지급 회수',
+      }));
+      expect(await screen.findByTestId('deduct-result')).toHaveTextContent('차감 완료');
+      await waitFor(() => expect(mocked.summary).toHaveBeenCalledTimes(2));
+    });
+
+    it('멱등 단축 반환(entryId=null)은 중복 차감이 아니었음을 알린다', async () => {
+      mocked.deduct.mockResolvedValue({
+        entryId: null, deductedAmount: 500, remainingBalance: 1000,
+      });
+      const user = userEvent.setup();
+      render(<PointConsolePage />);
+
+      await fillDeductForm(user);
+      await user.click(screen.getByRole('button', { name: '포인트 차감' }));
+
+      expect(await screen.findByTestId('deduct-result'))
+        .toHaveTextContent('이미 차감된 참조 ID');
+    });
+
+    it('잔액 부족(422)은 서버 문구를 그대로 보여 준다', async () => {
+      mocked.deduct.mockRejectedValue({
+        response: { status: 422, data: { message: '차감액이 잔액을 초과합니다' } },
+      });
+      const user = userEvent.setup();
+      render(<PointConsolePage />);
+
+      await fillDeductForm(user);
+      await user.click(screen.getByRole('button', { name: '포인트 차감' }));
+
+      expect(await screen.findByTestId('deduct-error'))
+        .toHaveTextContent('차감액이 잔액을 초과합니다');
     });
   });
 

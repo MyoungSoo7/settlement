@@ -112,6 +112,29 @@ public class PointEntry {
      * 영속 상태로부터 복원. 저장된 행도 같은 불변식을 통과해야 한다 — 저장소가 깨진 행을 돌려주면
      * 그 사실이 조용히 흡수되지 않고 즉시 드러나야 한다.
      */
+    /**
+     * 수기 차감 엔트리 — 운영자가 오지급을 거둬들인 기록.
+     *
+     * <p>유형은 새로 만들지 않고 {@link PointEntryType#REVOKE} 를 쓴다. DB {@code CHECK} 와
+     * 3자 대조 SQL, 이벤트 계약이 모두 현재 5종에 맞춰져 있어서, 유형을 늘리면 그 셋을 함께
+     * 고쳐야 하는데 <b>회수라는 의미는 이미 REVOKE 가 갖고 있다</b>. 주문 적립 회수와는
+     * {@code referenceType} 으로 갈린다 — 여기는 {@code MANUAL}, 저기는 {@code ORDER}.
+     *
+     * <p>사유(memo)를 <b>필수</b>로 받는 것이 이 팩토리의 존재 이유다. 수기 지급과 대칭인데,
+     * 감액 쪽이 오히려 더 중요하다 — 고객 재산이 줄어든 이유를 나중에 설명하지 못하면
+     * 그 차감은 방어할 수 없는 조작이 된다.
+     */
+    public static PointEntry manualDeduct(Long accountId, BigDecimal amount, String referenceId,
+                                          int sequence, List<PointLotConsumption> allocations,
+                                          String createdBy, String memo) {
+        if (memo == null || memo.isBlank()) {
+            throw new PointInvariantViolationException(
+                    "불변식 위반: 수기 차감에는 사유가 필요하다 (근거 없는 감액은 만들 수 없다)");
+        }
+        return create(PointEntryType.REVOKE, accountId, amount, "MANUAL", referenceId,
+                sequence, allocations, createdBy, memo, OffsetDateTime.now());
+    }
+
     public static PointEntry rehydrate(Long id, Long accountId, PointEntryType type, BigDecimal amount,
                                        String referenceType, String referenceId, int sequence,
                                        String memo, String createdBy, OffsetDateTime createdAt,

@@ -1,26 +1,32 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   pointApi,
+  type DeductPointResult,
   type ExpirePointResult,
   type ExpiringLotView,
   type GrantPointResult,
   type PointAccountDetail,
   type PointConsoleSummary,
   type PointEarnPolicyView,
+  type PointEarnScope,
 } from '@/api/point';
 import { apiErrorMessage, apiErrorStatus } from '@/lib/apiError';
 
 /**
  * 포인트 운영 콘솔.
  *
- * <p>두 가지를 한다: <b>수기 지급</b>(없던 돈을 만든다)과 <b>소멸 실행</b>(고객 재산을 지운다).
- * 둘 다 되돌리기 어려운 조작이라 화면이 그 무게를 반영한다.
+ * <p>되돌리기 어려운 조작 넷을 한다: <b>수기 지급</b>(없던 돈을 만든다)·<b>수기 차감</b>(고객
+ * 재산을 거둬들인다)·<b>소멸 실행</b>(고객 재산을 지운다)·<b>정책 편집</b>(앞으로의 적립을 바꾼다).
+ * 화면이 그 무게를 반영한다.
  *
  * <ul>
- *   <li>지급은 <b>사유가 필수</b>다. 근거 없이 포인트가 생기면 나중에 "왜 이 돈이 여기 있나"에
- *       답할 수 없고, 그 순간 원장은 설명력을 잃는다.
+ *   <li>지급·차감 모두 <b>사유가 필수</b>다. 근거 없이 포인트가 생기거나 사라지면 나중에
+ *       "왜 이 돈이 여기 있나/없나"에 답할 수 없고, 그 순간 원장은 설명력을 잃는다.
  *   <li>소멸은 <b>미리보기가 기본</b>이다. 실행하려면 미리보기를 먼저 돌려 규모를 본 뒤에만
  *       버튼이 열린다 — 파라미터를 빠뜨린 클릭이 실행이 되어선 안 된다.
+ *   <li>정책은 <b>고치지 않는다</b>. 종료일 지정으로 자리를 비운 뒤 새 행을 등록하는 2단계다
+ *       (ADR 0032). 화면도 그 순서대로만 조작할 수 있게 배치한다 — 무기한 정책에만
+ *       "종료일 지정" 버튼이 뜬다.
  * </ul>
  *
  * <p>멱등 키(참조 ID)를 화면이 직접 받는 이유: 같은 보상을 두 번 눌러도 한 번만 지급되게 하려면
@@ -57,8 +63,32 @@ export default function PointConsolePage() {
   const [detailError, setDetailError] = useState<string | null>(null);
   const [detailBusy, setDetailBusy] = useState(false);
 
+  const [deductUserId, setDeductUserId] = useState('');
+  const [deductAmount, setDeductAmount] = useState('');
+  const [deductReferenceId, setDeductReferenceId] = useState('');
+  const [deductReason, setDeductReason] = useState('');
+  const [deducting, setDeducting] = useState(false);
+  const [deductResult, setDeductResult] = useState<DeductPointResult | null>(null);
+  const [deductError, setDeductError] = useState<string | null>(null);
+
+  const [policyScope, setPolicyScope] = useState<PointEarnScope>('GLOBAL');
+  const [policyScopeKey, setPolicyScopeKey] = useState('-');
+  const [policyRatePercent, setPolicyRatePercent] = useState('');
+  const [policyValidityDays, setPolicyValidityDays] = useState('365');
+  const [policyFrom, setPolicyFrom] = useState('');
+  const [policyTo, setPolicyTo] = useState('');
+  const [policyReason, setPolicyReason] = useState('');
+  const [policyBusy, setPolicyBusy] = useState(false);
+  const [policyError, setPolicyError] = useState<string | null>(null);
+  const [policyNotice, setPolicyNotice] = useState<string | null>(null);
+  const [closeTarget, setCloseTarget] = useState<PointEarnPolicyView | null>(null);
+  const [closeDate, setCloseDate] = useState('');
+
   const grantDisabled =
     granting || !userId.trim() || !amount.trim() || !referenceId.trim() || !reason.trim();
+
+  const deductDisabled = deducting || !deductUserId.trim() || !deductAmount.trim()
+    || !deductReferenceId.trim() || !deductReason.trim();
 
   const loadOverview = useCallback(async () => {
     setSummaryError(null);
@@ -78,6 +108,70 @@ export default function PointConsolePage() {
   }, [withinDays]);
 
   useEffect(() => { void loadOverview(); }, [loadOverview]);
+
+  const deduct = async () => {
+    setDeductError(null);
+    setDeductResult(null);
+    setDeducting(true);
+    try {
+      setDeductResult(await pointApi.deduct({
+        userId: Number(deductUserId),
+        amount: Number(deductAmount),
+        referenceId: deductReferenceId.trim(),
+        reason: deductReason.trim(),
+      }));
+      // 잔고가 줄었으므로 위쪽 현황은 낡았다 — 지급과 같은 이유로 다시 읽는다.
+      await loadOverview();
+    } catch (err) {
+      setDeductError(apiErrorMessage(err, '포인트 차감에 실패했습니다.'));
+    } finally {
+      setDeducting(false);
+    }
+  };
+
+  const registerPolicy = async () => {
+    setPolicyError(null);
+    setPolicyNotice(null);
+    setPolicyBusy(true);
+    try {
+      // 화면은 사람이 읽는 %, 서버는 0~1 비율을 쓴다. 변환은 한 곳(여기)에서만 한다.
+      await pointApi.registerPolicy({
+        scope: policyScope,
+        scopeKey: policyScopeKey.trim() || '-',
+        earnRate: Number(policyRatePercent) / 100,
+        validityDays: Number(policyValidityDays) || 365,
+        effectiveFrom: policyFrom,
+        effectiveTo: policyTo || null,
+        reason: policyReason.trim(),
+      });
+      setPolicyNotice('정책을 등록했습니다.');
+      setPolicyRatePercent('');
+      setPolicyReason('');
+      await loadOverview();
+    } catch (err) {
+      setPolicyError(apiErrorMessage(err, '정책 등록에 실패했습니다.'));
+    } finally {
+      setPolicyBusy(false);
+    }
+  };
+
+  const closePolicy = async () => {
+    if (!closeTarget) return;
+    setPolicyError(null);
+    setPolicyNotice(null);
+    setPolicyBusy(true);
+    try {
+      await pointApi.closePolicy(closeTarget.id, closeDate);
+      setPolicyNotice(`#${closeTarget.id} 정책을 ${closeDate} 부터 적용하지 않습니다.`);
+      setCloseTarget(null);
+      setCloseDate('');
+      await loadOverview();
+    } catch (err) {
+      setPolicyError(apiErrorMessage(err, '정책 종료에 실패했습니다.'));
+    } finally {
+      setPolicyBusy(false);
+    }
+  };
 
   const lookup = async () => {
     setDetailError(null);
@@ -313,7 +407,7 @@ export default function PointConsolePage() {
         ) : (
           <ul className="space-y-1 text-sm">
             {policies.map(p => (
-              <li key={p.id} className="flex flex-wrap justify-between gap-2 rounded border px-3 py-2">
+              <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 rounded border px-3 py-2">
                 <span>
                   {p.scope}{p.scopeKey && p.scopeKey !== '-' ? `/${p.scopeKey}` : ''} ·
                   {' '}{(p.earnRate * 100).toFixed(3)}% · 유효 {p.validityDays}일
@@ -322,12 +416,114 @@ export default function PointConsolePage() {
                   {p.effectiveFrom} ~ {p.effectiveTo ?? '무기한'} ·{' '}
                   <span data-testid={p.active ? 'policy-active' : 'policy-closed'}>
                     {p.active ? '적용 중' : '종료'}
-                  </span> · {p.reason}
+                  </span>
+                  {p.closedAt && p.active && (
+                    <span data-testid="policy-close-scheduled" className="ml-1 text-amber-700">
+                      (종료 예약됨 — {p.effectiveTo} 까지 적용)
+                    </span>
+                  )}
+                  {' '}· {p.reason}
                 </span>
+                {p.effectiveTo === null && (
+                  <button type="button" onClick={() => setCloseTarget(p)}
+                    className="rounded border px-2 py-1 text-xs">
+                    종료일 지정
+                  </button>
+                )}
               </li>
             ))}
           </ul>
         )}
+
+        {closeTarget && (
+          <div className="space-y-2 rounded border border-amber-300 bg-amber-50 p-3">
+            <p className="text-sm">
+              <b>#{closeTarget.id} {closeTarget.scope}</b> 정책을 언제부터 적용하지 않을지 정합니다.
+              그날 <b>부터</b> 적용되지 않습니다(반열림). 과거 날짜는 지정할 수 없습니다 —
+              그 구간의 적립은 이미 일어났습니다.
+            </p>
+            <div className="flex flex-wrap items-end gap-2">
+              <label className="flex flex-col gap-1">
+                <span className="text-sm">종료일</span>
+                <input aria-label="정책 종료일" type="date" value={closeDate}
+                  onChange={e => setCloseDate(e.target.value)}
+                  className="rounded border px-3 py-2" />
+              </label>
+              <button type="button" onClick={() => void closePolicy()} disabled={policyBusy || !closeDate}
+                className="rounded bg-amber-600 px-4 py-2 text-white disabled:opacity-50">
+                {policyBusy ? '처리 중…' : '종료 확정'}
+              </button>
+              <button type="button" onClick={() => setCloseTarget(null)}
+                className="rounded border px-4 py-2">
+                취소
+              </button>
+            </div>
+          </div>
+        )}
+
+        <details className="rounded border p-3">
+          <summary className="cursor-pointer text-sm font-semibold">새 정책 등록</summary>
+          <p className="mt-2 text-sm text-gray-500">
+            요율을 바꾸려면 <b>현재 정책을 먼저 종료</b>해 자리를 비운 뒤 등록합니다. 겹치면 서버가
+            거절합니다(409). 소급 발효도 등록할 수 없습니다 — 이미 적립된 로트는 그때 요율의
+            스냅샷이라 재계산되지 않습니다.
+          </p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <label className="flex flex-col gap-1">
+              <span className="text-sm">범위</span>
+              <select aria-label="정책 범위" value={policyScope} className="rounded border px-3 py-2"
+                onChange={e => setPolicyScope(e.target.value as PointEarnScope)}>
+                <option value="GLOBAL">GLOBAL — 전체</option>
+                <option value="GRADE">GRADE — 회원 등급</option>
+                <option value="CATEGORY">CATEGORY — 카테고리</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-sm">범위 키 (GLOBAL 은 -)</span>
+              <input aria-label="정책 범위 키" value={policyScopeKey}
+                onChange={e => setPolicyScopeKey(e.target.value)}
+                className="rounded border px-3 py-2" />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-sm">적립률 (%)</span>
+              <input aria-label="적립률" value={policyRatePercent} inputMode="decimal"
+                onChange={e => setPolicyRatePercent(e.target.value)}
+                placeholder="1.0" className="rounded border px-3 py-2" />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-sm">적립 포인트 유효기간(일)</span>
+              <input aria-label="적립 유효기간" value={policyValidityDays} inputMode="numeric"
+                onChange={e => setPolicyValidityDays(e.target.value)}
+                className="rounded border px-3 py-2" />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-sm">발효일 (오늘 이상)</span>
+              <input aria-label="정책 발효일" type="date" value={policyFrom}
+                onChange={e => setPolicyFrom(e.target.value)}
+                className="rounded border px-3 py-2" />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-sm">종료일 — 비우면 무기한</span>
+              <input aria-label="정책 종료일(선택)" type="date" value={policyTo}
+                onChange={e => setPolicyTo(e.target.value)}
+                className="rounded border px-3 py-2" />
+            </label>
+            <label className="flex flex-col gap-1 sm:col-span-2">
+              <span className="text-sm">근거 (필수)</span>
+              <input aria-label="정책 근거" value={policyReason}
+                onChange={e => setPolicyReason(e.target.value)}
+                placeholder="2026 하반기 기본 적립률" className="rounded border px-3 py-2" />
+            </label>
+          </div>
+          <button type="button" onClick={() => void registerPolicy()}
+            disabled={policyBusy || !policyRatePercent.trim() || !policyFrom || !policyReason.trim()}
+            className="mt-3 rounded bg-blue-600 px-4 py-2 text-white disabled:opacity-50">
+            {policyBusy ? '등록 중…' : '정책 등록'}
+          </button>
+        </details>
+
+        {policyError && <p data-testid="policy-error" className="text-red-600">{policyError}</p>}
+        {policyNotice && <p data-testid="policy-notice" className="text-green-700">{policyNotice}</p>}
       </section>
 
       <section className="space-y-3 rounded border p-4">
@@ -394,6 +590,56 @@ export default function PointConsolePage() {
             {grantResult.entryId === null
               ? '이미 지급된 참조 ID 입니다 — 중복 지급되지 않았습니다.'
               : `지급 완료: ${grantResult.grantedAmount.toLocaleString()}P (지급 후 잔액 ${grantResult.remainingBalance.toLocaleString()}P)`}
+          </p>
+        )}
+      </section>
+
+      <section className="space-y-3 rounded border p-4">
+        <h2 className="text-lg font-semibold">수기 차감</h2>
+        <p className="text-sm text-gray-500">
+          오지급·부정 적립을 거둬들입니다. 지급과 대칭으로 <b>사유가 필수</b>이며, 같은 참조 ID 로
+          다시 눌러도 한 번만 빠집니다. 만료가 임박한 로트부터 소비하고, <b>잔액을 넘는 차감은
+          거절</b>됩니다. 정지된 계정에서도 회수할 수 있습니다.
+        </p>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="flex flex-col gap-1">
+            <span className="text-sm">차감 대상 회원 ID</span>
+            <input aria-label="차감 대상 회원 ID" value={deductUserId}
+              onChange={e => setDeductUserId(e.target.value)}
+              inputMode="numeric" className="rounded border px-3 py-2" />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-sm">차감 포인트</span>
+            <input aria-label="차감 포인트" value={deductAmount}
+              onChange={e => setDeductAmount(e.target.value)}
+              inputMode="numeric" className="rounded border px-3 py-2" />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-sm">차감 참조 ID (멱등 키)</span>
+            <input aria-label="차감 참조 ID" value={deductReferenceId}
+              onChange={e => setDeductReferenceId(e.target.value)}
+              placeholder="recall-20260820-001" className="rounded border px-3 py-2" />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-sm">차감 사유 (필수)</span>
+            <input aria-label="차감 사유" value={deductReason}
+              onChange={e => setDeductReason(e.target.value)}
+              placeholder="오지급 회수" className="rounded border px-3 py-2" />
+          </label>
+        </div>
+
+        <button type="button" onClick={() => void deduct()} disabled={deductDisabled}
+          className="rounded bg-red-600 px-4 py-2 text-white disabled:opacity-50">
+          {deducting ? '차감 중…' : '포인트 차감'}
+        </button>
+
+        {deductError && <p data-testid="deduct-error" className="text-red-600">{deductError}</p>}
+        {deductResult && (
+          <p data-testid="deduct-result" className="text-sm text-red-700">
+            {deductResult.entryId === null
+              ? '이미 차감된 참조 ID 입니다 — 중복 차감되지 않았습니다.'
+              : `차감 완료: ${deductResult.deductedAmount.toLocaleString()}P (차감 후 잔액 ${deductResult.remainingBalance.toLocaleString()}P)`}
           </p>
         )}
       </section>

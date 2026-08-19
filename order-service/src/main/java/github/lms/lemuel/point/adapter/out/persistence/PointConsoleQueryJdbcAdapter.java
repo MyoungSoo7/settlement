@@ -125,12 +125,15 @@ public class PointConsoleQueryJdbcAdapter implements PointConsoleQueryPort {
     @Override
     public List<PointEarnPolicyView> policies() {
         // 종료된 행도 함께 준다 — "그때 왜 그 요율이었나"를 설명하려면 이력이 있어야 한다.
-        // active 판정은 오늘 날짜 기준 [effective_from, effective_to) 반열림 + 미종료.
+        //
+        // active 는 [effective_from, effective_to) 반열림 <b>날짜 범위만</b>으로 판정한다.
+        // closed_at 을 조건에 섞으면, 종료일을 미래로 잡아 둔 정책(= 예고된 요율 변경)이 그 즉시
+        // "종료"로 보인다 — 실제로는 그날까지 계속 적립에 쓰이는데도. closed_at 은 적용 여부가
+        // 아니라 "언제 끊었나"의 감사 기록이라, 값으로만 함께 내보낸다.
         return jdbcTemplate.query("""
                 SELECT id, scope, scope_key, earn_rate, validity_days,
-                       effective_from, effective_to, reason, created_by,
-                       (closed_at IS NULL
-                        AND effective_from <= CURRENT_DATE
+                       effective_from, effective_to, reason, created_by, closed_at,
+                       (effective_from <= CURRENT_DATE
                         AND (effective_to IS NULL OR effective_to > CURRENT_DATE)) AS active
                 FROM opslab.point_earn_policy
                 ORDER BY scope, scope_key, effective_from DESC
@@ -145,7 +148,8 @@ public class PointConsoleQueryJdbcAdapter implements PointConsoleQueryPort {
                         rs.getObject("effective_to", LocalDate.class),
                         rs.getString("reason"),
                         rs.getString("created_by"),
-                        rs.getBoolean("active")));
+                        rs.getBoolean("active"),
+                        rs.getObject("closed_at", OffsetDateTime.class)));
     }
 
     @Override

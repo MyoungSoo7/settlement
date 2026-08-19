@@ -104,4 +104,28 @@ class PointEntryTest {
         assertThat(entry.getMemo()).isEqualTo("CS 보상");
         assertThat(entry.getCreatedBy()).isEqualTo("admin:1");
     }
+
+    @Test
+    @DisplayName("수기 차감은 REVOKE 로 기록되고 사유가 함께 남는다 — 사라진 돈도 설명돼야 한다")
+    void manualDeductIsRevokeWithMemo() {
+        PointEntry entry = PointEntry.manualDeduct(ACCOUNT_ID, new BigDecimal("500"), "op-9", 0,
+                List.of(new PointLotConsumption(11L, new BigDecimal("500"))), "admin:1", "오지급 회수");
+
+        assertThat(entry.getType()).isEqualTo(PointEntryType.REVOKE);
+        assertThat(entry.getReferenceType()).isEqualTo("MANUAL");
+        assertThat(entry.getReferenceId()).isEqualTo("op-9");
+        assertThat(entry.getMemo()).isEqualTo("오지급 회수");
+    }
+
+    @Test
+    @DisplayName("수기 차감에 사유가 없으면 거절한다 — 근거 없는 감액은 만들 수 없다")
+    void manualDeductRequiresMemo() {
+        List<PointLotConsumption> allocations =
+                List.of(new PointLotConsumption(11L, new BigDecimal("500")));
+
+        assertThatThrownBy(() -> PointEntry.manualDeduct(ACCOUNT_ID, new BigDecimal("500"), "op-9", 0,
+                allocations, "admin:1", "  "))
+                .isInstanceOf(PointInvariantViolationException.class)
+                .hasMessageContaining("사유");
+    }
 }

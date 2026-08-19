@@ -87,6 +87,9 @@ export interface PointAccountDetail {
   entries: PointEntryView[];
 }
 
+/** 적립률 정책의 범위. 서버 enum(PointEarnScope)과 1:1. */
+export type PointEarnScope = 'GLOBAL' | 'GRADE' | 'CATEGORY';
+
 export interface PointEarnPolicyView {
   id: number;
   scope: string;
@@ -97,7 +100,43 @@ export interface PointEarnPolicyView {
   effectiveTo: string | null;
   reason: string;
   createdBy: string;
+  /** 오늘 기준 적용 여부 — <b>날짜 범위만</b>으로 판정된 값이다. */
   active: boolean;
+  /**
+   * 운영자가 종료를 지정한 시각. 적용 여부가 아니다 — 종료일이 미래면 그날까지 `active` 는 참이다.
+   * "언제 끊었나"의 감사 기록.
+   */
+  closedAt: string | null;
+}
+
+/** 정책은 고치지 않는다 — 종료 + 신규 등록 2단계다(ADR 0032). */
+export interface RegisterPolicyRequest {
+  scope: PointEarnScope;
+  /** GLOBAL 은 관례상 '-', GRADE·CATEGORY 는 등급명·카테고리 코드. */
+  scopeKey: string;
+  /** 0~1 비율(0.01 = 1%). 화면의 % 입력은 호출 전에 100 으로 나눈다. */
+  earnRate: number;
+  validityDays: number;
+  /** 오늘 이상이어야 한다 — 소급 발효는 400. */
+  effectiveFrom: string;
+  effectiveTo?: string | null;
+  reason: string;
+}
+
+export interface ManualDeductRequest {
+  userId: number;
+  amount: number;
+  /** 멱등 키 — 같은 값으로 두 번 눌러도 한 번만 빠진다. */
+  referenceId: string;
+  /** 차감 근거. 없으면 고객 재산이 왜 줄었는지 설명할 수 없다. */
+  reason: string;
+}
+
+/** `entryId` 가 null 이면 같은 referenceId 로 이미 차감된 건이다(멱등 단축 반환). */
+export interface DeductPointResult {
+  entryId: number | null;
+  deductedAmount: number;
+  remainingBalance: number;
 }
 
 export interface ExpiringLotView {
@@ -149,4 +188,17 @@ export const pointApi = {
     (await api.get<ExpiringLotView[]>('/admin/points/expiring', {
       params: { withinDays, limit },
     })).data,
+
+  /** 수기 차감 — 지급의 역방향. 잔액을 넘으면 422 로 거절된다. */
+  deduct: async (body: ManualDeductRequest) =>
+    (await api.post<DeductPointResult>('/admin/points/deductions', body)).data,
+
+  /** 정책 등록 — 같은 범위에 기간이 겹치면 409. 현재 정책을 먼저 종료해야 한다. */
+  registerPolicy: async (body: RegisterPolicyRequest) =>
+    (await api.post<PointEarnPolicyView>('/admin/points/policies', body)).data,
+
+  /** 정책 종료 — 종료일부터 적용하지 않는다(반열림). 과거 날짜는 400. */
+  closePolicy: async (policyId: number, effectiveTo: string) =>
+    (await api.post<PointEarnPolicyView>(
+      `/admin/points/policies/${policyId}/close`, { effectiveTo })).data,
 };

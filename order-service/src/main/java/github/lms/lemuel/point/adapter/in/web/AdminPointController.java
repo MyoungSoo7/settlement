@@ -3,14 +3,22 @@ package github.lms.lemuel.point.adapter.in.web;
 import github.lms.lemuel.point.application.port.in.ExpirePointLotsUseCase;
 import github.lms.lemuel.point.application.port.in.ExpirePointLotsUseCase.ExpirePointCommand;
 import github.lms.lemuel.point.application.port.in.ExpirePointLotsUseCase.ExpirePointResult;
+import github.lms.lemuel.point.application.port.in.DeductPointUseCase;
+import github.lms.lemuel.point.application.port.in.DeductPointUseCase.DeductPointCommand;
+import github.lms.lemuel.point.application.port.in.DeductPointUseCase.DeductPointResult;
 import github.lms.lemuel.point.application.port.in.GrantPointUseCase;
 import github.lms.lemuel.point.application.port.in.GrantPointUseCase.GrantPointCommand;
 import github.lms.lemuel.point.application.port.in.GrantPointUseCase.GrantPointResult;
+import github.lms.lemuel.point.application.port.in.ManagePointEarnPolicyUseCase;
+import github.lms.lemuel.point.application.port.in.ManagePointEarnPolicyUseCase.ClosePolicyCommand;
+import github.lms.lemuel.point.application.port.in.ManagePointEarnPolicyUseCase.RegisterPolicyCommand;
 import github.lms.lemuel.point.application.port.in.QueryPointConsoleUseCase;
 import github.lms.lemuel.point.application.port.in.QueryPointConsoleUseCase.ExpiringLotView;
 import github.lms.lemuel.point.application.port.in.QueryPointConsoleUseCase.PointAccountDetail;
 import github.lms.lemuel.point.application.port.in.QueryPointConsoleUseCase.PointConsoleSummary;
 import github.lms.lemuel.point.application.port.in.QueryPointConsoleUseCase.PointEarnPolicyView;
+import github.lms.lemuel.point.domain.PointEarnPolicy;
+import github.lms.lemuel.point.domain.PointEarnScope;
 import github.lms.lemuel.point.domain.PointLotOrigin;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -30,6 +38,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 
@@ -38,14 +47,21 @@ import java.util.List;
  *
  * <pre>
  *   POST /admin/points/grants           → 수기 지급(사유 필수)
+ *   POST /admin/points/deductions       → 수기 차감(사유 필수) — 지급의 역방향
  *   POST /admin/points/expiry/run       → 소멸 미리보기(무변경)
  *   POST /admin/points/expiry/run?dryRun=false → 실제 소멸 실행
  *
  *   GET  /admin/points/summary          → 전체 3자 대조 + 소멸 예정 규모
  *   GET  /admin/points/accounts/{userId} → 계정 상세(3자 대조 + 로트·원장 내역)
  *   GET  /admin/points/policies         → 적립률 정책 이력
+ *   POST /admin/points/policies         → 적립률 정책 등록(소급 금지)
+ *   POST /admin/points/policies/{id}/close → 적립률 정책 종료일 지정
  *   GET  /admin/points/expiring         → 소멸 예정 로트
  * </pre>
+ *
+ * <p>정책은 <b>고치지 않는다</b>. 등록과 종료 두 조작뿐이고, 요율 변경은 "현재 정책 종료 →
+ * 신규 등록" 2단계다(ADR 0032). 표가 곧 이력이라 과거 값을 덮으면 그때 왜 그 요율로
+ * 적립됐는지 설명할 수 없게 된다.
  *
  * <p>조회 4종이 뒤에 붙은 이유: 앞의 쓰기 둘은 <b>되돌리기 어려운 조작</b>인데, 그 전에
  * "지금 이 계정이 얼마이고 왜 그런가"를 볼 방법이 없었다. 지급·소멸 버튼과 같은 화면에서
@@ -69,13 +85,19 @@ public class AdminPointController {
     private final GrantPointUseCase grantPointUseCase;
     private final ExpirePointLotsUseCase expirePointLotsUseCase;
     private final QueryPointConsoleUseCase queryPointConsoleUseCase;
+    private final DeductPointUseCase deductPointUseCase;
+    private final ManagePointEarnPolicyUseCase managePointEarnPolicyUseCase;
 
     public AdminPointController(GrantPointUseCase grantPointUseCase,
                                 ExpirePointLotsUseCase expirePointLotsUseCase,
-                                QueryPointConsoleUseCase queryPointConsoleUseCase) {
+                                QueryPointConsoleUseCase queryPointConsoleUseCase,
+                                DeductPointUseCase deductPointUseCase,
+                                ManagePointEarnPolicyUseCase managePointEarnPolicyUseCase) {
         this.grantPointUseCase = grantPointUseCase;
         this.expirePointLotsUseCase = expirePointLotsUseCase;
         this.queryPointConsoleUseCase = queryPointConsoleUseCase;
+        this.deductPointUseCase = deductPointUseCase;
+        this.managePointEarnPolicyUseCase = managePointEarnPolicyUseCase;
     }
 
     @Operation(summary = "포인트 원장 전체 요약",
@@ -127,6 +149,42 @@ public class AdminPointController {
         return ResponseEntity.ok(result);
     }
 
+    @Operation(summary = "포인트 수기 차감",
+            description = "오지급·부정 적립을 거둬들인다. 지급과 대칭으로 사유·멱등 키가 필수이며, "
+                    + "잔액을 넘는 차감은 422(잔액 부족)로 거절된다. 정지 계정에서도 차감된다.")
+    @PostMapping("/deductions")
+    public ResponseEntity<DeductPointResult> deduct(@Valid @RequestBody ManualDeductRequest request) {
+        return ResponseEntity.ok(deductPointUseCase.deduct(new DeductPointCommand(
+                request.userId(), request.amount(), request.referenceId(),
+                request.reason(), actor())));
+    }
+
+    @Operation(summary = "적립률 정책 등록",
+            description = "행을 고치지 않고 새 행을 넣는다(ADR 0032). 소급 발효는 400, "
+                    + "같은 범위에 기간이 겹치면 409 — 현재 정책의 종료일을 먼저 지정해야 한다.")
+    @PostMapping("/policies")
+    public ResponseEntity<PointEarnPolicy> registerPolicy(
+            @Valid @RequestBody RegisterPolicyRequest request) {
+        return ResponseEntity.ok(managePointEarnPolicyUseCase.register(
+                new RegisterPolicyCommand(request.scope(), request.scopeKey(), request.earnRate(),
+                        request.validityDays(), request.effectiveFrom(), request.effectiveTo(),
+                        request.reason(), actor()),
+                LocalDate.now()));
+    }
+
+    @Operation(summary = "적립률 정책 종료",
+            description = "종료일을 지정해 자리를 비운다. 반열림이라 그날부터는 적용되지 않는다. "
+                    + "과거 날짜로는 끊을 수 없다 — 그 구간 적립은 이미 일어났다.")
+    @PostMapping("/policies/{policyId}/close")
+    public ResponseEntity<PointEarnPolicy> closePolicy(
+            @PathVariable Long policyId,
+            @Valid @RequestBody ClosePolicyRequest request) {
+        return managePointEarnPolicyUseCase
+                .close(new ClosePolicyCommand(policyId, request.effectiveTo(), actor()), LocalDate.now())
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
     @Operation(summary = "포인트 소멸 실행",
             description = "기본은 미리보기(dryRun=true). 실제 소멸은 dryRun=false 를 명시해야 한다.")
     @PostMapping("/expiry/run")
@@ -153,5 +211,38 @@ public class AdminPointController {
             @NotBlank String referenceId,
             @NotBlank String reason,
             Integer validityDays) {
+    }
+
+    /**
+     * 수기 차감 요청 — 지급과 같은 형태로 받는다.
+     *
+     * <p>사유를 {@code @NotBlank} 로 잠그는 이유는 지급 쪽보다 오히려 강하다: 고객 재산이
+     * 줄어든 근거를 나중에 대지 못하면 그 차감은 방어할 수 없는 조작이 된다.
+     */
+    public record ManualDeductRequest(
+            @NotNull Long userId,
+            @NotNull @Positive BigDecimal amount,
+            @NotBlank String referenceId,
+            @NotBlank String reason) {
+    }
+
+    /**
+     * 적립률 정책 등록 요청.
+     *
+     * @param scopeKey     GLOBAL 은 관례상 {@code "-"}, GRADE·CATEGORY 는 등급명·카테고리 코드
+     * @param effectiveTo  null 이면 무기한 — 다음 정책을 넣을 때 종료일을 지정하게 된다
+     */
+    public record RegisterPolicyRequest(
+            @NotNull PointEarnScope scope,
+            @NotBlank String scopeKey,
+            @NotNull BigDecimal earnRate,
+            @Positive int validityDays,
+            @NotNull LocalDate effectiveFrom,
+            LocalDate effectiveTo,
+            @NotBlank String reason) {
+    }
+
+    /** @param effectiveTo 이 날짜부터 적용하지 않는다(반열림). 오늘 이상이어야 한다 */
+    public record ClosePolicyRequest(@NotNull LocalDate effectiveTo) {
     }
 }

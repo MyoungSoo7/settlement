@@ -58,6 +58,36 @@ public class PointEarnPolicyJpaEntity {
     protected PointEarnPolicyJpaEntity() {
     }
 
+    /**
+     * 신규 등록용 — 도메인이 이미 검증을 마친 값만 받는다.
+     *
+     * <p>세터 대신 팩토리를 두는 이유: 이 표는 <b>행 UPDATE 금지</b>가 규약이라(ADR 0032),
+     * 필드를 개별로 바꿀 수 있는 손잡이를 만들면 규약이 코드로 지켜지지 않는다.
+     * 바꿀 수 있는 것은 종료({@link #closeAt})뿐이다.
+     */
+    static PointEarnPolicyJpaEntity from(PointEarnPolicy policy) {
+        PointEarnPolicyJpaEntity entity = new PointEarnPolicyJpaEntity();
+        entity.scope = policy.getScope();
+        entity.scopeKey = policy.getScopeKey();
+        entity.earnRate = policy.getEarnRate();
+        entity.validityDays = policy.getValidityDays();
+        entity.effectiveFrom = policy.getEffectiveFrom();
+        entity.effectiveTo = policy.getEffectiveTo();
+        entity.reason = policy.getReason();
+        entity.createdBy = policy.getCreatedBy();
+        entity.createdAt = OffsetDateTime.now();
+        return entity;
+    }
+
+    /**
+     * 종료일 지정. {@code closedAt} 은 <b>언제 끊었는지의 기록</b>이지 적용 여부가 아니다 —
+     * 종료일이 미래면 그날까지는 계속 적용된다(적용 여부는 날짜 범위가 정한다).
+     */
+    void closeAt(LocalDate effectiveTo) {
+        this.effectiveTo = effectiveTo;
+        this.closedAt = OffsetDateTime.now();
+    }
+
     PointEarnPolicy toDomain() {
         return PointEarnPolicy.rehydrate(id, scope, scopeKey, earnRate, validityDays,
                 effectiveFrom, effectiveTo, reason, createdBy);

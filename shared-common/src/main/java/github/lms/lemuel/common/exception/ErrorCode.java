@@ -145,6 +145,8 @@ public enum ErrorCode {
     POINT_INSUFFICIENT(HttpStatus.UNPROCESSABLE_ENTITY, "포인트 잔액이 부족합니다."),
     POINT_INVALID_AMOUNT(HttpStatus.BAD_REQUEST, "포인트 금액이 올바르지 않습니다."),
     POINT_INVALID_STATE(HttpStatus.BAD_REQUEST, "현재 상태에서는 포인트를 처리할 수 없습니다."),
+    // 요청 자체는 옳은데 기존 정책과 기간이 겹치는 상태다 — 먼저 현재 정책을 종료해야 자리가 난다(ADR 0032).
+    POINT_POLICY_PERIOD_OVERLAP(HttpStatus.CONFLICT, "같은 범위에 기간이 겹치는 적립률 정책이 이미 있습니다."),
     GIFT_CARD_INSUFFICIENT(HttpStatus.UNPROCESSABLE_ENTITY, "기프트카드 잔액이 부족합니다."),
     GIFT_CARD_INVALID_AMOUNT(HttpStatus.BAD_REQUEST, "기프트카드 금액이 올바르지 않습니다."),
     // 코드 등록 실패는 사유를 구분하지 않는다 — 구분하면 유효한 코드의 존재가 새어 나간다.
