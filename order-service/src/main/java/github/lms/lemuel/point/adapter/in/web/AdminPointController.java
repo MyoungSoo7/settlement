@@ -87,12 +87,15 @@ public class AdminPointController {
     private final QueryPointConsoleUseCase queryPointConsoleUseCase;
     private final DeductPointUseCase deductPointUseCase;
     private final ManagePointEarnPolicyUseCase managePointEarnPolicyUseCase;
+    private final github.lms.lemuel.point.application.port.in.ManagePointUsageLimitUseCase managePointUsageLimitUseCase;
 
     public AdminPointController(GrantPointUseCase grantPointUseCase,
                                 ExpirePointLotsUseCase expirePointLotsUseCase,
                                 QueryPointConsoleUseCase queryPointConsoleUseCase,
                                 DeductPointUseCase deductPointUseCase,
-                                ManagePointEarnPolicyUseCase managePointEarnPolicyUseCase) {
+                                ManagePointEarnPolicyUseCase managePointEarnPolicyUseCase,
+                                github.lms.lemuel.point.application.port.in.ManagePointUsageLimitUseCase managePointUsageLimitUseCase) {
+        this.managePointUsageLimitUseCase = managePointUsageLimitUseCase;
         this.grantPointUseCase = grantPointUseCase;
         this.expirePointLotsUseCase = expirePointLotsUseCase;
         this.queryPointConsoleUseCase = queryPointConsoleUseCase;
@@ -198,6 +201,30 @@ public class AdminPointController {
     }
 
     /** 감사 주체 — 누가 지급·소멸을 실행했는지 원장에 남긴다. */
+    @Operation(summary = "포인트 사용 상한 조회",
+            description = "주문당 포인트 사용 상한(NONE 상한없음 / FIXED_AMOUNT 정액 / ORDER_RATIO 결제액 비율).")
+    @GetMapping("/usage-limit")
+    public ResponseEntity<github.lms.lemuel.point.domain.PointUsageLimit> usageLimit() {
+        return ResponseEntity.ok(managePointUsageLimitUseCase.current());
+    }
+
+    @Operation(summary = "포인트 사용 상한 변경",
+            description = "FIXED_AMOUNT 는 limitAmount, ORDER_RATIO 는 limitRatioPercent(0~100)가 필요하다. "
+                    + "정액 0 은 '포인트 사용 금지'이며 NONE(상한 없음)과 다른 의미다.")
+    @org.springframework.web.bind.annotation.PutMapping("/usage-limit")
+    public ResponseEntity<github.lms.lemuel.point.domain.PointUsageLimit> updateUsageLimit(
+            @Valid @RequestBody UsageLimitRequest request) {
+        return ResponseEntity.ok(managePointUsageLimitUseCase.update(
+                request.type(), request.limitAmount(), request.limitRatioPercent(), actor()));
+    }
+
+    /** @param type 상한 유형. 유형이 요구하지 않는 값은 무시된다 */
+    public record UsageLimitRequest(
+            @NotNull github.lms.lemuel.point.domain.PointUsageLimitType type,
+            BigDecimal limitAmount,
+            BigDecimal limitRatioPercent) {
+    }
+
     private static String actor() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         return authentication == null ? "admin" : "admin:" + authentication.getName();

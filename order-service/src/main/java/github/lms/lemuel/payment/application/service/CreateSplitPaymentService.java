@@ -79,6 +79,13 @@ public class CreateSplitPaymentService implements CreateSplitPaymentUseCase {
             totalAmount = totalAmount.add(req.amount());
         }
 
+        // 포인트 사용 상한 검사 — PG 를 부르기 전에 끊는다. 승인 뒤에 거절하면 취소 보상이 필요해진다.
+        BigDecimal pointAmount = tenders.stream()
+                .filter(t -> t.getType() == TenderType.POINT)
+                .map(PaymentTender::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        pointTenderPort.assertWithinUsageLimit(totalAmount, pointAmount);
+
         // 가장 큰 tender 의 type 을 paymentMethod 표시값으로 사용 (운영자 가시성)
         String paymentMethod = pickPrimaryMethodLabel(tenderRequests);
         PaymentDomain payment = PaymentDomain.createSplit(orderId, tenders, paymentMethod);

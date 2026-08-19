@@ -23,10 +23,18 @@ public class PointTenderAdapter implements PointTenderPort {
 
     private final UsePointUseCase usePointUseCase;
     private final RestorePointUseCase restorePointUseCase;
+    private final github.lms.lemuel.point.application.port.in.ManagePointUsageLimitUseCase usageLimitUseCase;
 
-    public PointTenderAdapter(UsePointUseCase usePointUseCase, RestorePointUseCase restorePointUseCase) {
+    public PointTenderAdapter(UsePointUseCase usePointUseCase, RestorePointUseCase restorePointUseCase,
+                              github.lms.lemuel.point.application.port.in.ManagePointUsageLimitUseCase usageLimitUseCase) {
         this.usePointUseCase = usePointUseCase;
         this.restorePointUseCase = restorePointUseCase;
+        this.usageLimitUseCase = usageLimitUseCase;
+    }
+
+    @Override
+    public void assertWithinUsageLimit(BigDecimal orderAmount, BigDecimal pointAmount) {
+        usageLimitUseCase.assertWithinLimit(orderAmount, pointAmount);
     }
 
     @Override

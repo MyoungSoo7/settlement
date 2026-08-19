@@ -64,6 +64,7 @@ class AdminPointControllerTest {
     @MockitoBean QueryPointConsoleUseCase queryPointConsoleUseCase;
     @MockitoBean DeductPointUseCase deductPointUseCase;
     @MockitoBean ManagePointEarnPolicyUseCase managePointEarnPolicyUseCase;
+    @MockitoBean github.lms.lemuel.point.application.port.in.ManagePointUsageLimitUseCase managePointUsageLimitUseCase;
 
     @Test
     @DisplayName("GET /admin/points/summary — 3자 대조와 소멸 예정 규모를 돌려준다")

@@ -60,6 +60,11 @@ class RefundSplitPaymentServiceTest {
         final java.util.List<String> restored = new java.util.ArrayList<>();
 
         @Override
+        public void assertWithinUsageLimit(java.math.BigDecimal orderAmount, java.math.BigDecimal pointAmount) {
+            // 환불 경로는 사용 상한과 무관하다 — 이미 쓴 포인트를 되돌릴 뿐이다.
+        }
+
+        @Override
         public void use(Long userId, java.math.BigDecimal amount, Long tenderId) {
             throw new UnsupportedOperationException("환불 테스트에서는 사용 경로를 타지 않는다");
         }

@@ -24,6 +24,15 @@ public interface PointTenderPort {
     void use(Long userId, BigDecimal amount, Long tenderId);
 
     /**
+     * 이 결제에서 쓰려는 포인트 총액이 주문당 사용 상한 안인지 검사한다.
+     *
+     * <p>상한은 결제 금액에 대한 규칙이라 포인트 원장 단독으로는 판단할 수 없고(주문 금액을 모른다),
+     * 그렇다고 결제가 정책을 해석하면 규칙이 두 곳에 생긴다 — 금액을 넘겨 포인트가 판단하게 한다.
+     * 상한 초과면 예외가 올라와 결제 트랜잭션이 시작되기 전에 멈춘다(PG 호출 전에 끊는 것이 중요하다).
+     */
+    void assertWithinUsageLimit(BigDecimal orderAmount, BigDecimal pointAmount);
+
+    /**
      * 환불 시 포인트 복원. 복원 대상 계정은 원장이 알고 있으므로 userId 를 받지 않는다 —
      * 환불은 언제나 <b>낸 사람</b>에게 돌아가야 한다.
      *
