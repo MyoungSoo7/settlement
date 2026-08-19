@@ -29,7 +29,7 @@ const TagManagementPage: React.FC = () => {
     try {
       const data = await tagApi.getAllTags();
       setTags(data);
-    } catch (error) {
+    } catch {
       showToast('태그 목록 조회 실패', 'error');
     } finally {
       setLoading(false);
@@ -49,7 +49,7 @@ const TagManagementPage: React.FC = () => {
       setShowCreateForm(false);
       setFormData({ name: '', color: '#6B7280' });
       loadTags();
-    } catch (error) {
+    } catch {
       showToast('태그 생성 실패', 'error');
     }
   };
@@ -62,7 +62,7 @@ const TagManagementPage: React.FC = () => {
       await tagApi.deleteTag(id);
       showToast('태그가 삭제되었습니다', 'success');
       loadTags();
-    } catch (error) {
+    } catch {
       showToast('태그 삭제 실패', 'error');
     }
   };

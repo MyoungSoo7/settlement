@@ -53,7 +53,7 @@ const EcommerceCategoryAdmin: React.FC = () => {
     try {
       const response = await api.get<EcommerceCategory[]>('/admin/categories');
       setCategories(response.data);
-    } catch (error) {
+    } catch {
       showToast('카테고리 목록 조회 실패', 'error');
     } finally {
       setLoading(false);
@@ -91,7 +91,7 @@ const EcommerceCategoryAdmin: React.FC = () => {
       await api.patch(`/admin/categories/${id}/${endpoint}`);
       showToast(`카테고리가 ${isActive ? '비활성화' : '활성화'}되었습니다`, 'success');
       loadCategories();
-    } catch (error) {
+    } catch {
       showToast('카테고리 상태 변경 실패', 'error');
     }
   };
