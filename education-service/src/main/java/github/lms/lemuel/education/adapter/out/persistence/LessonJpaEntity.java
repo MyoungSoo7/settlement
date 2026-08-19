@@ -1,11 +1,19 @@
 package github.lms.lemuel.education.adapter.out.persistence;
 
+import github.lms.lemuel.education.domain.Lesson;
 import github.lms.lemuel.education.domain.LessonContentType;
 import github.lms.lemuel.education.domain.LessonStatus;
-import jakarta.persistence.*;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+
 import java.time.Instant;
 import java.util.UUID;
 
+/** 차시 영속 모델 — 매핑만 한다(규칙은 도메인 {@link Lesson}). */
 @Entity
 @Table(name = "education_lessons", schema = "education")
 public class LessonJpaEntity {
@@ -25,30 +33,33 @@ public class LessonJpaEntity {
     @Version private long version;
 
     protected LessonJpaEntity() { }
-    public static LessonJpaEntity active(UUID id, UUID courseId, String title, int sequence, String type, String ref, String actor) {
-        return active(id, courseId, title, null, sequence, type, ref, true, actor);
-    }
-    public static LessonJpaEntity active(UUID id, UUID courseId, String title, String description, int sequence, String type, String ref, boolean required, String actor) {
+
+    static LessonJpaEntity fromDomain(Lesson lesson) {
         LessonJpaEntity entity = new LessonJpaEntity();
-        entity.id = id; entity.courseId = courseId; entity.title = title; entity.description = description; entity.sequence = sequence;
-        entity.contentType = LessonContentType.valueOf(type); entity.contentRef = ref; entity.required = required;
-        entity.status = LessonStatus.ACTIVE; entity.createdBy = actor; entity.updatedBy = actor;
-        entity.createdAt = Instant.now(); entity.updatedAt = entity.createdAt;
+        entity.id = lesson.id();
+        entity.courseId = lesson.courseId();
+        entity.status = lesson.status();
+        entity.createdBy = lesson.updatedBy();
+        entity.createdAt = Instant.now();
+        entity.sync(lesson);
         return entity;
     }
-    public void changeSequence(int sequence, String actor) { this.sequence = sequence; this.updatedBy = actor; this.updatedAt = Instant.now(); }
-    public void update(String title, String description, String type, String ref, boolean required, String actor) {
-        this.title = title; this.description = description; this.contentType = LessonContentType.valueOf(type);
-        this.contentRef = ref; this.required = required; this.updatedBy = actor; this.updatedAt = Instant.now();
+
+    void sync(Lesson lesson) {
+        this.title = lesson.title();
+        this.description = lesson.description();
+        this.sequence = lesson.sequence();
+        this.contentType = lesson.contentType();
+        this.contentRef = lesson.contentRef();
+        this.required = lesson.required();
+        this.updatedBy = lesson.updatedBy();
+        this.updatedAt = Instant.now();
     }
+
+    Lesson toDomain() {
+        return Lesson.rehydrate(id, courseId, title, description, sequence, contentType, contentRef,
+                required, status, updatedBy, version);
+    }
+
     public UUID getId() { return id; }
-    public UUID getCourseId() { return courseId; }
-    public String getTitle() { return title; }
-    public int getSequence() { return sequence; }
-    public LessonContentType getContentType() { return contentType; }
-    public String getContentRef() { return contentRef; }
-    public boolean isRequired() { return required; }
-    public LessonStatus getStatus() { return status; }
-    public String getUpdatedBy() { return updatedBy; }
-    public long getVersion() { return version; }
 }

@@ -4,7 +4,6 @@ import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.lang.ArchRule;
-import com.tngtech.archunit.library.freeze.FreezingArchRule;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -17,10 +16,9 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
  * 저장소 전체에서 유일한 "포트가 어댑터를 의존하는" 위반이 여기서 나왔다. 규칙이 지켜진 게 아니라
  * 검사가 있는 곳에서만 지켜졌다는 뜻이라, 본 수정보다 가드를 먼저 세운다.
  *
- * <p><b>동결(래칫) 정책</b> — 기존 위반 41건은 {@code src/test/resources/archunit_store} 에 목록으로
- * 커밋해 드러내고, <b>새 위반은 즉시 FAIL</b> 시킨다. 위반을 갚으면 저장소에서 자동으로 빠져 래칫이
- * 조여진다(되돌리려면 다시 FAIL 이므로 후퇴가 불가능하다). 동결 없이 red 로 두면 필수 CI
- * {@code Backend - Build/Test} 가 상시 실패해 main 으로 가는 모든 PR 이 막힌다.
+ * <p>가드를 세울 당시 위반 41건(application→adapter 40 · 포트 시그니처 1)은 동결 저장소에
+ * 기록해 두고 시작했으나, 후속 커밋에서 리포지토리를 아웃바운드 포트로 승격하며 전부 해소돼
+ * 동결 장치를 걷어냈다. 지금은 다른 17개 서비스와 같은 평범한 규칙이다 — 예외 목록이 없다.
  */
 class EducationArchitectureTest {
 
@@ -53,13 +51,6 @@ class EducationArchitectureTest {
         rule.check(classes);
     }
 
-    /**
-     * ⚠️ 동결된 규칙 — 현재 40건 위반(기술부채)이 저장소에 기록돼 있다.
-     *
-     * <p>{@code CourseAdminService}/{@code LessonAdminService} 가 도메인 {@code Course}/{@code Lesson}
-     * 대신 {@code *JpaEntity}·{@code *Repository} 를 직접 다루는 이중 모델 상태다. 갚는 작업은
-     * 리포지토리를 {@code application/port/out} 포트로 승격하는 별도 커밋으로 진행한다.
-     */
     @Test
     void application_은_adapter_에_의존하지_않는다() {
         ArchRule rule = noClasses()
@@ -67,7 +58,7 @@ class EducationArchitectureTest {
                 .should().dependOnClassesThat()
                 .resideInAPackage("..education.adapter..")
                 .allowEmptyShould(true);
-        FreezingArchRule.freeze(rule).check(classes);
+        rule.check(classes);
     }
 
     /**
@@ -75,9 +66,6 @@ class EducationArchitectureTest {
      *
      * <p>포트 시그니처에 JPA 엔티티·{@code Pageable}·서블릿·Kafka 타입이 올라오면 코드 의존성이
      * 안에서 밖으로 뒤집히고, 어댑터를 갈아끼울 때 애플리케이션까지 따라 바뀐다.
-     *
-     * <p>⚠️ 동결된 규칙 — 현재 1건 위반({@code PublishEducationEventPort.coursePublished} 가
-     * {@code CourseJpaEntity} 를 받는다). 저장소 전체 626개 포트 인터페이스 중 유일한 위반이다.
      */
     @Test
     void 포트는_기술_타입을_시그니처에_노출하지_않는다() {
@@ -92,7 +80,7 @@ class EducationArchitectureTest {
                         "org.apache.kafka..",
                         "com.fasterxml.jackson..")
                 .allowEmptyShould(true);
-        FreezingArchRule.freeze(rule).check(classes);
+        rule.check(classes);
     }
 
     @Test

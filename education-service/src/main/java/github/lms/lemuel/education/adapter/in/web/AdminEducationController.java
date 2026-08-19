@@ -1,17 +1,23 @@
 package github.lms.lemuel.education.adapter.in.web;
 
-import github.lms.lemuel.education.adapter.out.persistence.CourseJpaEntity;
+import github.lms.lemuel.education.application.port.out.dto.PageSlice;
+import github.lms.lemuel.education.application.port.out.dto.PageSpec;
 import github.lms.lemuel.education.application.service.CourseAdminService;
 import github.lms.lemuel.education.application.service.LessonAdminService;
-import github.lms.lemuel.education.adapter.out.persistence.LessonJpaEntity;
+import github.lms.lemuel.education.domain.Course;
 import github.lms.lemuel.education.domain.CourseStatus;
+import github.lms.lemuel.education.domain.Lesson;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -24,7 +30,10 @@ public class AdminEducationController {
     @GetMapping
     public Page<CourseResponse> list(@RequestParam(required = false) CourseStatus status,
                                      @RequestParam(defaultValue = "") String query, Pageable pageable) {
-        return service.list(status, query, pageable).map(CourseResponse::from);
+        PageSlice<Course> slice = service.list(status, query, new PageSpec(pageable.getPageNumber(), pageable.getPageSize()));
+        // 응답 JSON 모양(content/totalElements/totalPages/number/size)을 유지하려고 여기서만 Page 로 되싼다.
+        return new PageImpl<>(slice.content().stream().map(CourseResponse::from).toList(),
+                PageRequest.of(slice.page(), slice.size()), slice.totalElements());
     }
 
     @PostMapping
@@ -49,7 +58,7 @@ public class AdminEducationController {
     public CourseResponse close(@PathVariable UUID id, Authentication auth) { return transition(id, CourseStatus.CLOSED, auth); }
 
     @GetMapping("/{courseId}/lessons")
-    public java.util.List<LessonResponse> lessons(@PathVariable UUID courseId) {
+    public List<LessonResponse> lessons(@PathVariable UUID courseId) {
         return lessonService.list(courseId).stream().map(LessonResponse::from).toList();
     }
 
@@ -69,8 +78,8 @@ public class AdminEducationController {
     public void deleteLesson(@PathVariable UUID lessonId, Authentication auth) { lessonService.delete(lessonId, auth.getName()); }
 
     @PostMapping("/{courseId}/lessons/reorder")
-    public java.util.List<LessonResponse> reorder(@PathVariable UUID courseId, @RequestBody ReorderRequest request,
-                                                  Authentication auth) {
+    public List<LessonResponse> reorder(@PathVariable UUID courseId, @RequestBody ReorderRequest request,
+                                        Authentication auth) {
         lessonService.reorder(courseId, request.lessonIds(), auth.getName());
         return lessons(courseId);
     }
@@ -82,14 +91,14 @@ public class AdminEducationController {
     public record CourseRequest(@NotBlank String title, String description) { }
     public record CourseResponse(UUID id, String title, String description, CourseStatus status,
                                  String updatedBy, long version) {
-        static CourseResponse from(CourseJpaEntity c) {
-            return new CourseResponse(c.getId(), c.getTitle(), c.getDescription(), c.getStatus(), c.getUpdatedBy(), c.getVersion());
+        static CourseResponse from(Course c) {
+            return new CourseResponse(c.id(), c.title(), c.description(), c.status(), c.updatedBy(), c.version());
         }
     }
-    public record ReorderRequest(java.util.List<UUID> lessonIds) { }
+    public record ReorderRequest(List<UUID> lessonIds) { }
     public record LessonRequest(@NotBlank String title, String description, int sequence, @NotBlank String contentType,
                                 @NotBlank String contentRef, boolean required) { }
     public record LessonResponse(UUID id, UUID courseId, String title, int sequence, String contentType, String contentRef) {
-        static LessonResponse from(LessonJpaEntity l) { return new LessonResponse(l.getId(), l.getCourseId(), l.getTitle(), l.getSequence(), l.getContentType().name(), l.getContentRef()); }
+        static LessonResponse from(Lesson l) { return new LessonResponse(l.id(), l.courseId(), l.title(), l.sequence(), l.contentType().name(), l.contentRef()); }
     }
 }
