@@ -237,6 +237,15 @@ cart:
   store: ${CART_STORE:jpa}
 
 app:
+  # 배송 — 수취인 안심번호(가상번호) 풀.
+  # validity-days: 배정 후 이 기간이 지나면 회수해 재사용한다. 배송 소요보다 짧게 잡으면
+  #   배송 중 연락 수단이 끊기고, 너무 길게 잡으면 유한한 풀이 마른다.
+  # reclaim-cron: 만료 회수 스케줄. 멈추면 풀이 말라 신규 주문이 실번호로 나간다.
+  shipping:
+    safety-number:
+      validity-days: ${SAFETY_NUMBER_VALIDITY_DAYS:7}
+      reclaim-batch: ${SAFETY_NUMBER_RECLAIM_BATCH:200}
+      reclaim-cron: ${SAFETY_NUMBER_RECLAIM_CRON:0 10 * * * *}
   # 내부 API(/internal/**) 공유 시크릿 — InternalApiKeyFilter 가 X-Internal-Api-Key 헤더를 검증.
   # settlement(OrderReconClient)의 INTERNAL_API_KEY 와 동일해야 한다. 미설정 시 검증 비활성(개발)+경고.
   internal:
