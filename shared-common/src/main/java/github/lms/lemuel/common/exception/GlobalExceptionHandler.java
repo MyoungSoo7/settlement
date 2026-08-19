@@ -14,6 +14,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -157,6 +158,27 @@ public class GlobalExceptionHandler {
         log.warn("[AccessDeniedException] {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(ErrorResponse.of(HttpStatus.FORBIDDEN, ErrorCode.ACCESS_DENIED.code(), ex.getMessage()));
+    }
+
+    /**
+     * 404 - 매핑된 핸들러도 정적 리소스도 없는 경로.
+     *
+     * <p>이 매핑이 없으면 없는 주소 하나가 catch-all(500)로 떨어져 <b>클라이언트 오류가 서버 장애로</b>
+     * 보고된다. 응답 코드만 틀리는 게 아니라 {@code log.error} + 스택트레이스까지 남아서, 로그 기반
+     * 에러 알림이 멀쩡한 서비스를 두고 울린다. 2026-08-19 운영에서 관리 포트를 분리한 서비스
+     * (query/loan/operation/investment/account/organization — actuator 가 별도 포트)의 앱 포트로
+     * {@code /actuator/health} 를 치면 정확히 이 경로로 500 이 나오는 것을 확인했다.
+     *
+     * <p>도메인 {@code XXX_NOT_FOUND} 와 코드를 분리한 이유는 {@link ErrorCode#ENDPOINT_NOT_FOUND} 주석 참조.
+     * 존재하지 않는 경로는 정상 트래픽이므로 {@code warn} 이 아니라 {@code debug} 로 남긴다 — 스캐너가
+     * 로그를 채우게 두지 않기 위해서다.
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNoResourceFound(NoResourceFoundException ex) {
+        log.debug("[NoResourceFoundException] {}", ex.getResourcePath());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ErrorResponse.of(HttpStatus.NOT_FOUND, ErrorCode.ENDPOINT_NOT_FOUND.code(),
+                        ErrorCode.ENDPOINT_NOT_FOUND.defaultMessage()));
     }
 
     // ─── 5xx ────────────────────────────────────────────────────────────────────

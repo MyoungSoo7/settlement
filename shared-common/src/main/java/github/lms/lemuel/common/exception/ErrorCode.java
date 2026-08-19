@@ -21,6 +21,9 @@ public enum ErrorCode {
     INVALID_PARAMETER(HttpStatus.BAD_REQUEST, "요청 파라미터가 올바르지 않습니다."),
     LOCK_TIMEOUT(HttpStatus.CONFLICT, "요청이 몰려 처리하지 못했습니다. 잠시 후 다시 시도해주세요."),
     ACCESS_DENIED(HttpStatus.FORBIDDEN, "이 리소스에 접근할 권한이 없습니다."),
+    // 도메인 리소스 부재(XXX_NOT_FOUND)가 아니라 "그런 엔드포인트 자체가 없다"는 뜻이다. 둘을 섞으면
+    // 클라이언트가 "주문이 없다" 와 "URL 을 잘못 썼다" 를 구분하지 못한다.
+    ENDPOINT_NOT_FOUND(HttpStatus.NOT_FOUND, "요청하신 경로를 찾을 수 없습니다."),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요."),
 
     // ─── order ───────────────────────────────────────────────────────────────

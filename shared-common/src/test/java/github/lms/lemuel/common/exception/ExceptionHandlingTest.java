@@ -5,12 +5,14 @@ import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Path;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.Map;
 import java.util.Set;
@@ -160,6 +162,27 @@ class ExceptionHandlingTest {
         ResponseEntity<ErrorResponse> state = handler.handleIllegalState(new IllegalStateException("상태"));
         assertThat(state.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(state.getBody().errorCode()).isEqualTo(ErrorCode.INVALID_STATE.code());
+    }
+
+    @Test
+    @DisplayName("handleNoResourceFound: 없는 경로 → 404 ENDPOINT_NOT_FOUND (500 아님)")
+    void handleNoResourceFound() {
+        // (httpMethod, requestPath, resourcePath) — 운영에서 실제로 터진 조합 그대로
+        NoResourceFoundException ex =
+                new NoResourceFoundException(HttpMethod.GET, "/actuator/health", "actuator/health");
+        assertThat(ex.getResourcePath()).isEqualTo("actuator/health");
+
+        ResponseEntity<ErrorResponse> res = handler.handleNoResourceFound(ex);
+        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(res.getBody().errorCode()).isEqualTo(ErrorCode.ENDPOINT_NOT_FOUND.code());
+        assertThat(res.getBody().message()).isEqualTo(ErrorCode.ENDPOINT_NOT_FOUND.defaultMessage());
+    }
+
+    @Test
+    @DisplayName("ENDPOINT_NOT_FOUND 는 도메인 XXX_NOT_FOUND 와 구분되는 별도 코드다")
+    void endpointNotFoundIsDistinctFromDomainNotFound() {
+        assertThat(ErrorCode.ENDPOINT_NOT_FOUND.status()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(ErrorCode.ENDPOINT_NOT_FOUND).isNotEqualTo(ErrorCode.ORDER_NOT_FOUND);
     }
 
     @Test
