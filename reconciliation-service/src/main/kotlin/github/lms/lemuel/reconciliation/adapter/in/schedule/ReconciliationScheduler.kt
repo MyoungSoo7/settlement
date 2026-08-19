@@ -8,6 +8,7 @@ import io.micrometer.core.instrument.Gauge
 import io.micrometer.core.instrument.MeterRegistry
 import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import java.time.Instant
@@ -24,12 +25,18 @@ import java.util.concurrent.atomic.AtomicLong
  * 2026-07-30: 결과를 Micrometer 로도 내보낸다. 그전에는 로그에만 남아서, 배치가 샘플
  * 데이터로 매일 같은 가짜 불일치 4건을 뱉는 동안 아무 지표에도 흔적이 없었다.
  * 로그는 사람이 봐야 보이지만 지표는 알림을 걸 수 있다.
+ *
+ * 2026-08-20: 허용오차를 설정에서 읽는다. 그전에는 `app.reconciliation.tolerance-krw` 가
+ * application.yml 에 선언돼 있는데도 읽는 코드가 없어(PRD 알려진 갭 G-3), 스케줄러는 인터페이스
+ * 기본값 1 로 돌았다 — 운영자가 APP_RECONCILIATION_TOLERANCE_KRW 를 올려도 아무 일도 없었다.
+ * 기본값이 그 1 과 같으므로 이 배선 자체가 판정을 바꾸지는 않는다. 바뀌는 건 "이제 조절이 된다" 는 것.
  */
 @Component
 class ReconciliationScheduler(
     private val service: RunReconciliationUseCase,
     private val sources: List<ReconciliationSource>,
     meterRegistry: MeterRegistry,
+    @param:Value("\${app.reconciliation.tolerance-krw:1}") private val toleranceKrw: Long = 1,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -76,7 +83,11 @@ class ReconciliationScheduler(
         log.info("scheduled reconciliation starting for {} (sources={})", period, sources.map { it.name })
         try {
             val report = runBlocking {
-                service.reconcileFromSources(sources = sources, period = period)
+                service.reconcileFromSources(
+                    sources = sources,
+                    period = period,
+                    toleranceKrw = toleranceKrw,
+                )
             }
             lastRunEpochSeconds.set(Instant.now().epochSecond)
             lastDiscrepancies.set(report.discrepancyCount.toLong())

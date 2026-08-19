@@ -28,9 +28,14 @@ class KrxApiClientTest {
     private MockRestServiceServer server;
 
     private KrxApiClient clientWith(KrxProperties props) {
+        // 간격 0 = 대기 없음. 파싱·페이지네이션 검증에 실제 sleep 을 섞으면 스위트만 느려진다.
+        return clientWith(props, 0L);
+    }
+
+    private KrxApiClient clientWith(KrxProperties props, long requestIntervalMs) {
         RestClient.Builder builder = RestClient.builder();
         server = MockRestServiceServer.bindTo(builder).build();
-        return new KrxApiClient(props, builder, new ObjectMapper());
+        return new KrxApiClient(props, builder, new ObjectMapper(), requestIntervalMs);
     }
 
     private static KrxProperties props(String key, int pageSize) {
@@ -73,6 +78,43 @@ class KrxApiClientTest {
         assertThat(first.openPrice()).isEqualByComparingTo("1000");   // "1,000" 콤마 제거
         assertThat(first.volume().toString()).isEqualTo("5000");
         assertThat(prices.get(1).market()).isEqualTo(Market.KOSDAQ);
+        server.verify();
+    }
+
+    @Test
+    void 페이지_사이에_요청_간격을_둔다() {
+        // 2026-08-20 고아 파라미터 감사: app.market.sync.request-interval-ms 는 yml 에 "쿼터 보호용"
+        // 이라 적혀 있었지만 읽는 코드가 없어 실제로는 무간격 연타였다. 값이 동작을 바꾸는지 못 박는다.
+        long intervalMs = 120;
+        KrxApiClient client = clientWith(props("KEY", 1), intervalMs);
+        server.expect(requestTo(containsString("pageNo=1")))
+                .andRespond(withSuccess(okBody(3, "[" + item("005930", "KOSPI", "78000") + "]"), APPLICATION_JSON));
+        server.expect(requestTo(containsString("pageNo=2")))
+                .andRespond(withSuccess(okBody(3, "[" + item("000660", "KOSDAQ", "180000") + "]"), APPLICATION_JSON));
+        server.expect(requestTo(containsString("pageNo=3")))
+                .andRespond(withSuccess(okBody(3, "[" + item("035720", "KOSPI", "55000") + "]"), APPLICATION_JSON));
+
+        long startedAt = System.nanoTime();
+        List<StockPrice> prices = client.fetchQuotes(BASE);
+        long elapsedMs = (System.nanoTime() - startedAt) / 1_000_000;
+
+        assertThat(prices).hasSize(3);
+        // 3 페이지 = 간격 2 회(첫 호출은 지연 없음). 스케줄러 지터로 아래로 새지 않게 여유를 둔다.
+        assertThat(elapsedMs).isGreaterThanOrEqualTo(2 * intervalMs - 20);
+        server.verify();
+    }
+
+    @Test
+    void 요청_간격_0_이면_대기하지_않는다() {
+        KrxApiClient client = clientWith(props("KEY", 1), 0L);
+        server.expect(requestTo(containsString("pageNo=1")))
+                .andRespond(withSuccess(okBody(2, "[" + item("005930", "KOSPI", "78000") + "]"), APPLICATION_JSON));
+        server.expect(requestTo(containsString("pageNo=2")))
+                .andRespond(withSuccess(okBody(2, "[" + item("000660", "KOSDAQ", "180000") + "]"), APPLICATION_JSON));
+
+        long startedAt = System.nanoTime();
+        assertThat(client.fetchQuotes(BASE)).hasSize(2);
+        assertThat((System.nanoTime() - startedAt) / 1_000_000).isLessThan(1_000);
         server.verify();
     }
 

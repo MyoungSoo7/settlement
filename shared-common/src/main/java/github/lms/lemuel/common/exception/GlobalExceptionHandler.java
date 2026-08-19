@@ -16,6 +16,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.Arrays;
@@ -206,6 +207,29 @@ public class GlobalExceptionHandler {
         }
         return builder.body(ErrorResponse.of(HttpStatus.METHOD_NOT_ALLOWED,
                 ErrorCode.METHOD_NOT_ALLOWED.code(), ErrorCode.METHOD_NOT_ALLOWED.defaultMessage()));
+    }
+
+    /**
+     * 413 - 업로드가 허용 크기를 넘음.
+     *
+     * <p>이 예외는 서블릿이 멀티파트를 파싱하다 끊는 것이라 <b>컨트롤러도 도메인도 실행되지 않는다.</b>
+     * 따라서 도메인 크기 검증(order-service {@code ImageUpload.MAX_SIZE_BYTES})으로는 절대 잡히지
+     * 않으며, 전용 매핑이 없으면 catch-all(500)이 가져간다 — 사용자는 "파일이 큽니다" 대신
+     * "서버 오류" 를 보고, 고칠 수 있는 문제를 못 고친다.
+     *
+     * <p>고아 파라미터 감사(2026-08-20)에서 드러난 경로다: order-service 의 멀티파트 한도가
+     * 프로덕션에서 로드되지 않는 프로파일에만 있어 실제 한도가 스프링 기본값 1MB 였고, 그때 나는
+     * 이 예외를 아무도 잡지 않았다. 한도는 설정으로 고쳤고, 여기서는 그 한도를 넘었을 때의
+     * 응답을 규격화한다. board-service 는 이미 자체 advice 로 413 을 주고 있었다.
+     *
+     * <p>400 이 아니라 413 인 이유는 {@link ErrorCode#PAYLOAD_TOO_LARGE} 주석 참조.
+     */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> handleMaxUploadSizeExceeded(MaxUploadSizeExceededException ex) {
+        log.warn("[MaxUploadSizeExceededException] 최대 허용 {} bytes", ex.getMaxUploadSize());
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+                .body(ErrorResponse.of(HttpStatus.PAYLOAD_TOO_LARGE, ErrorCode.PAYLOAD_TOO_LARGE.code(),
+                        ErrorCode.PAYLOAD_TOO_LARGE.defaultMessage()));
     }
 
     // ─── 5xx ────────────────────────────────────────────────────────────────────

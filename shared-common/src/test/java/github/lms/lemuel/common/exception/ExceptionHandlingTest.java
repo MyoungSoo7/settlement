@@ -14,6 +14,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.ExceptionHandlerMethodResolver;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.lang.reflect.Method;
@@ -222,6 +223,32 @@ class ExceptionHandlingTest {
     void endpointNotFoundIsDistinctFromDomainNotFound() {
         assertThat(ErrorCode.ENDPOINT_NOT_FOUND.status()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(ErrorCode.ENDPOINT_NOT_FOUND).isNotEqualTo(ErrorCode.ORDER_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("handleMaxUploadSizeExceeded: 업로드 초과 → 413 PAYLOAD_TOO_LARGE (500 아님)")
+    void handleMaxUploadSizeExceeded() throws Exception {
+        // 서블릿이 멀티파트를 끊는 예외라 컨트롤러도 도메인도 실행되지 않는다 — 도메인 크기 검증
+        // (order-service ImageUpload.MAX_SIZE_BYTES)으로는 잡을 수 없고, 이 매핑이 유일한 방어선이다.
+        MaxUploadSizeExceededException ex = new MaxUploadSizeExceededException(5L * 1024 * 1024);
+
+        // 직접 호출은 @ExceptionHandler 매핑이 사라져도 통과한다. 실제 회귀("catch-all 이 500 으로
+        // 가져감")를 잡으려면 런타임과 같은 선택기로 고른 메서드를 검증해야 한다.
+        Method resolved = new ExceptionHandlerMethodResolver(GlobalExceptionHandler.class).resolveMethod(ex);
+        assertThat(resolved).isNotNull();
+
+        @SuppressWarnings("unchecked")
+        ResponseEntity<ErrorResponse> res = (ResponseEntity<ErrorResponse>) resolved.invoke(handler, ex);
+        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.PAYLOAD_TOO_LARGE);
+        assertThat(res.getBody().errorCode()).isEqualTo(ErrorCode.PAYLOAD_TOO_LARGE.code());
+        assertThat(res.getBody().status()).isEqualTo(413);
+    }
+
+    @Test
+    @DisplayName("PAYLOAD_TOO_LARGE 는 400 이 아니라 413 이다 — 요청이 틀린 게 아니라 크다")
+    void payloadTooLargeIs413NotBadRequest() {
+        assertThat(ErrorCode.PAYLOAD_TOO_LARGE.status()).isEqualTo(HttpStatus.PAYLOAD_TOO_LARGE);
+        assertThat(ErrorCode.PAYLOAD_TOO_LARGE.status()).isNotEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     @Test

@@ -43,14 +43,8 @@ app:
     issuer: test
     secret: test-secret-more-than-32-bytes-long-string-for-hs256
     ttl-seconds: 3600
-  alerting:
-    slack:
-      webhook-url: http://dummy
-      channel: "#test"
-      enabled: false
   mail:
     from: test@example.com
-    support-email: support@example.com
   password-reset:
     token-expiry-minutes: 30
     base-url: http://localhost:5173
@@ -69,8 +63,4 @@ MAIL_PASSWORD: test
 JWT_ISSUER: test
 JWT_SECRET: test-secret-more-than-32-bytes-long-string-for-hs256
 JWT_TTL_SECONDS: 3600
-SLACK_WEBHOOK_URL: http://dummy
-SLACK_CHANNEL: "#test"
-SLACK_ALERTS_ENABLED: false
-SUPPORT_EMAIL: support@example.com
 TOSS_SECRET_KEY: test

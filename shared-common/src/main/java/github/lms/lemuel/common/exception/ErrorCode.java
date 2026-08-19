@@ -27,6 +27,9 @@ public enum ErrorCode {
     // 경로는 있는데 메서드가 다른 경우다. 404 로 뭉치면 클라이언트가 "주소가 틀렸다"로 오인해
     // 엉뚱한 곳을 고친다 — 실제로는 GET/POST 를 바꿔 부르면 되는 상황이다.
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "지원하지 않는 요청 메서드입니다."),
+    // 서블릿이 멀티파트를 끊은 경우다. 도메인 크기 검증(예: ImageUpload)에는 닿지도 못하므로
+    // 도메인 오류로 표현할 수 없다. 400 이 아니라 413 인 이유 — 요청이 틀린 게 아니라 크다.
+    PAYLOAD_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "업로드 파일이 허용 크기를 넘습니다."),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요."),
 
     // ─── order ───────────────────────────────────────────────────────────────
