@@ -1,0 +1,1 @@
+Method <github.lms.lemuel.education.application.port.out.PublishEducationEventPort.coursePublished(github.lms.lemuel.education.adapter.out.persistence.CourseJpaEntity, java.lang.String)> has parameter of type <github.lms.lemuel.education.adapter.out.persistence.CourseJpaEntity> in (PublishEducationEventPort.java:0)

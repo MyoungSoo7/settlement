@@ -1,0 +1,4 @@
+#
+#Thu Aug 20 00:02:40 KST 2026
+no\ classes\ that\ reside\ in\ a\ package\ '..education.application..'\ should\ depend\ on\ classes\ that\ reside\ in\ a\ package\ '..education.adapter..'=7d5eddc0-56b0-4c14-ad8c-725a72f22d34
+no\ classes\ that\ reside\ in\ a\ package\ '..education.application.port..'\ should\ depend\ on\ classes\ that\ reside\ in\ any\ package\ ['..education.adapter..',\ 'jakarta.persistence..',\ 'jakarta.servlet..',\ 'org.springframework..',\ 'org.apache.kafka..',\ 'com.fasterxml.jackson..']=127969d5-80d3-4421-be96-67500d17dac6
