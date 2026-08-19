@@ -115,6 +115,26 @@ class SeedSellerTierSpreadIT {
     }
 
     @Test
+    @DisplayName("새 셀러 계정의 비밀번호가 기존 시드 계정과 동일하다 (로그인 가능)")
+    void newSellerAccountsShareTheSeedPasswordHash() throws Exception {
+        // 해시를 리터럴로 다시 적는 대신 seed_manager 것을 복사한다. V17 은 주석과 실제 해시가
+        // 어긋나 시드 계정 로그인이 항상 401 이었고 V20260706090000 이 뒤늦게 정정했다 —
+        // 복사 방식이면 그 정정이 자동으로 따라오지만, 복사 자체가 깨지면 같은 401 이 돌아온다.
+        Map<String, Long> mismatched = countBy("""
+                SELECT u.email, 1
+                  FROM opslab.users u
+                 WHERE u.email IN ('seed_seller_vip@test.com', 'seed_seller_strategic@test.com')
+                   AND (u.password IS NULL
+                        OR u.password <> (SELECT m.password FROM opslab.users m
+                                           WHERE m.email = 'seed_manager@test.com'))
+                """);
+
+        assertThat(mismatched.keySet())
+                .as("비밀번호 해시가 기존 시드와 다르면 이 계정들로는 로그인할 수 없다")
+                .isEmpty();
+    }
+
+    @Test
     @DisplayName("등급 부여가 seller_tier_assignment 에도 기록된다 (등급 생명주기의 진입점)")
     void tierAssignmentsExistForSeedSellers() throws Exception {
         Map<String, Long> assignments = countBy("""

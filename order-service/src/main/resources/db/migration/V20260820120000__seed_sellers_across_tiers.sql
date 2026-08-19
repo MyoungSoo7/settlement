@@ -18,14 +18,22 @@
 --
 -- 멱등: 계정은 ON CONFLICT(email), 등급/소유자는 조건부 UPDATE, assignment 는 ON CONFLICT(seller_id).
 
--- 1) 셀러 계정 2인 추가. 비밀번호는 다른 시드 계정과 동일한 password123
---    (V20260706090000 에서 정정한 cost 12 해시 — 여기서 다시 틀린 해시를 심으면 같은 401 이 재현된다).
+-- 1) 셀러 계정 2인 추가. 비밀번호 해시는 리터럴로 적지 않고 기존 시드 계정에서 그대로 가져온다.
+--    이유 둘:
+--      (a) 해시를 또 적으면 V17 이 겪은 사고가 재현될 수 있다 — 주석은 password123 인데 실제 해시가
+--          달라 시드 계정 로그인이 항상 401 이었고, V20260706090000 이 뒤늦게 정정했다. 원본을
+--          복사하면 그 정정이 자동으로 따라오고 두 곳이 어긋날 수 없다.
+--      (b) BCrypt 해시 리터럴은 SAST(semgrep detected-bcrypt-hash)가 차단한다. 시드용 더미라도
+--          "해시가 소스에 박혀 있다"는 사실 자체가 규칙 대상이라, 예외를 다는 것보다 안 적는 게 맞다.
+--    seed_manager 가 없으면(=V17/V18 미적용) 아무것도 넣지 않는다. password 는 NOT NULL 이라
+--    서브쿼리가 NULL 이면 실패하므로, EXISTS 로 먼저 막는다. 누락되면 SeedSellerTierSpreadIT 가 잡는다.
 INSERT INTO opslab.users (email, password, role, created_at)
-VALUES
-    ('seed_seller_vip@test.com',
-     '$2a$12$fArbbNi/4MEpB9fPafznVeUPE3UbpQvtyB4/XZc1eyhDn66c9NCUm', 'MANAGER', NOW() - INTERVAL '170 days'),
-    ('seed_seller_strategic@test.com',
-     '$2a$12$fArbbNi/4MEpB9fPafznVeUPE3UbpQvtyB4/XZc1eyhDn66c9NCUm', 'MANAGER', NOW() - INTERVAL '170 days')
+SELECT v.email,
+       (SELECT u.password FROM opslab.users u WHERE u.email = 'seed_manager@test.com'),
+       'MANAGER',
+       NOW() - INTERVAL '170 days'
+  FROM (VALUES ('seed_seller_vip@test.com'), ('seed_seller_strategic@test.com')) AS v(email)
+ WHERE EXISTS (SELECT 1 FROM opslab.users u WHERE u.email = 'seed_manager@test.com')
 ON CONFLICT (email) DO NOTHING;
 
 -- 2) 등급 부여. seed_manager 는 NORMAL 로 명시해 둔다(기본값 의존 대신 의도를 남긴다).
