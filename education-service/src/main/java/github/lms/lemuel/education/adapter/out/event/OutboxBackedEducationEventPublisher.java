@@ -47,7 +47,10 @@ public class OutboxBackedEducationEventPublisher implements PublishEducationEven
             payload.put("publishedAt", course.publishedAt());
             payload.put("publishedBy", actor);
             payload.put("version", course.version());
-            outbox.save(OutboxEvent.pending(AGGREGATE_TYPE, course.id().toString(),
+            // 메시지 키는 지역변수 이름으로 의미를 남긴다 — 카탈로그의 orderingKey(courseId)와
+            // 대조하는 kafka-publisher-gate 가 이 이름을 읽는다(인라인하면 힌트가 toString 이 된다).
+            String courseId = course.id().toString();
+            outbox.save(OutboxEvent.pending(AGGREGATE_TYPE, courseId,
                     "CoursePublished", mapper.writeValueAsString(payload), trace.captureCurrentTraceParent()));
         } catch (JsonProcessingException exception) {
             throw new IllegalStateException("Failed to serialize CoursePublished payload", exception);
