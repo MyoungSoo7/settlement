@@ -90,6 +90,20 @@ jobs:
       - name: Knowledge manifest guard
         run: python3 scripts/knowledge/sync_knowledge.py --check-manifest
 
+      # 설정 키의 '정의' 와 '사용' 이 짝이 맞는지 전수 대조한다. 이 종류의 결함은 아무 신호도
+      # 내지 않아서 — 테스트는 통과하고 앱은 뜨고 파일엔 값이 또렷이 적혀 있다 — 사람 리뷰로는
+      # 잡히지 않는다. 2026-08-20 첫 감사에서 나온 8건 중에는 운영 업로드 한도가 로드되지 않는
+      # 프로파일에만 있어 5MB 라고 적힌 채 1MB 로 돌던 건, 외부 API 호출 간격을 선언만 하고
+      # 읽지 않아 무간격으로 연타하던 건이 있었다. 둘 다 몇 달을 살아남았다.
+      # 리포 밖 의존(helm-deploy)이 없어야 게이트가 자족적이므로 --helm 은 붙이지 않는다.
+      - name: Orphan config-parameter guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -c "import yaml" 2>/dev/null ||
+            pip3 install --quiet --disable-pip-version-check --only-binary :all: pyyaml
+          python3 scripts/config/orphan_audit.py --check
+
       - name: Verify clean working tree
         run: git diff --exit-code
 

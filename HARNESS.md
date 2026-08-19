@@ -100,7 +100,7 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 > | 법인카드 한도·발급·상태                    | 📘`card-service-rules` (재원 F 공식·`master ≥ Σsub` 비관적 락·하향 클램프·재원 폴백 금지) + 📘`money-safety` → 🚦`CardIssuanceLimitConcurrencyIT` |
 > | 보험 설계·청약·계약·수수료·방카            | 📘`insurance-domain-rules` (완전판매 게이트 2단·25%룰·환수 24개월·12회 분할) + 📘`money-safety`                                                   |
 > | 예치금 원장·hold/offset·상계               | 📘`deposit-domain-rules` (잔고 단일 진실원·이중사용 차단·referenceType 불변) + 📘`ledger-invariants`                                              |
-> | 게시판 정의·스킨·접근 정책                 | 📘`board-domain-rules` (정의가 글 규칙 소유·스킨↔정책 정합·역할 allowlist·발행 0/소비 0·메뉴는 order 소유)                                |
+> | 게시판 정의·스킨·접근 정책                 | 📘`board-domain-rules` (정의가 글 규칙 소유·스킨↔정책 정합·역할 allowlist·발행 0/소비 0·메뉴는 order 소유)                                        |
 > | 조직·멤버십·역할(OWNER/MANAGER/STAFF)      | 📘`organization-domain-rules` (발행 전용 경계·활성 OWNER ≥1·card 프로젝션 계약) → 🤖`event-contract-reviewer` (페이로드 변경 시)                  |
 > | 쿼리·인덱스·ES 매핑·성능                   | 🤖`db-query-architect`                                                                                                                            |
 > | MSA 경계 변경                              | 🤖`hexagonal-arch-reviewer` → 🚦ArchUnit (_코드 의존 0 / cross-DB 0_ 위반 차단)                                                                   |
@@ -108,7 +108,7 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 > | 금액 다루는 코드                           | 📘`money-safety` (BigDecimal 강제·라운딩·직렬화)                                                                                                  |
 > | 원장 전표·복식부기                         | 📘`ledger-invariants` → ⌘`/ledger-verify`·`/trial-balance-verify`                                                                                 |
 > | 통합테스트 작성                            | 📘`settlement-integration-test` (Testcontainers) / 🤖`settlement-test-generator`                                                                  |
-> | PR·브랜치 diff 리뷰 착수 ("어디부터 볼까") | 📘`delta-review` (경로 시그널 → P0~P2 위험축 A~K, 세로=안에서 밖으로·가로=프로듀서/계약/컨슈머 3자) → ⌘`/delta-review` → 축별 🤖위임              |
+> | PR·브랜치 diff 리뷰 착수 ("어디부터 볼까") | 📘`delta-review` (경로 시그널 → P0~~P2 위험축 A~~K, 세로=안에서 밖으로·가로=프로듀서/계약/컨슈머 3자) → ⌘`/delta-review` → 축별 🤖위임            |
 > | 릴리즈 전 보안·컴플라이언스                | 🤖`security-auditor` + ⌘`/compliance-scan` (diff PII/이력/감사/권한)                                                                              |
 > | 수수료·홀드백 감사                         | ⌘`/fee-audit` (도메인 정책 + simulate 교차검증)                                                                                                   |
 > | 온콜·장애·알람                             | ⌘`/oncall` + 📘`incident-runbooks`                                                                                                                |
@@ -120,7 +120,7 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 > | 요구사항 모호                              | 📘`interview-harness`(=`socrates`+`evolve-step`+`ontology` 루프)                                                                                  |
 > | 전사 역할 산출물 일괄                      | ⌘`/ai-dev-team` (+ `commands/agents/*` 서브커맨드)                                                                                                |
 > | hookify 규칙 생성·수정 / "훅 굳혀줘"       | 📘`hookify-to-guard` (캡처는 임시, 정본은 guard.mjs 3중 강제 — 이식 후 원본 삭제) — 라우터가 `hookify.*.local.md` 편집 시 주입                    |
-> | 하네스 자기 진단·드리프트                  | ⌘`/harness-check` (audit + 가드) → 🚦`harness-audit.mjs`                                                       |
+> | 하네스 자기 진단·드리프트                  | ⌘`/harness-check` (audit + 가드) → 🚦`harness-audit.mjs`                                                                                          |
 >
 > **원칙:** 결정적인 것은 🚦게이트로 강제 · 판단 필요한 것은 🤖에이전트로 위임 · 작성과 검증은 분리(자기 승인 금지).
 >
@@ -135,14 +135,14 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 문서 규율이 아니라 **훅으로 배선된 실행 지점**이 정본이다. 배선은 `.claude/settings.json` · `scripts/harness/hooks/pre-commit` ·
 `.github/workflows/harness-guard.yml` 세 곳에만 존재한다.
 
-> | 시점                     | 트리거                                     | 실행                                                                                               | 실패 시                                                            |
-> | ------------------------ | ------------------------------------------ | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-> | 파일 편집 직전           | PreToolUse `Write\|Edit\|MultiEdit`        | `guard.mjs --hook`                                                                                 | **exit 2 = 편집 차단**                                             |
-> | Bash 명령 실행 직전      | PreToolUse `Bash`                          | `guard.mjs --hook-bash`                                                                            | **exit 2 = 명령 차단** (BLOCK) / WARN 은 additionalContext 만      |
-> | 파일 편집·스킬 호출 직전 | PreToolUse `Write\|Edit\|MultiEdit\|Skill` | `skill-router.mjs --hook`                                                                          | 차단 없음(항상 exit 0) — 스킬 로드 리마인더 주입                   |
-> | 세션 시작                | SessionStart                               | `telemetry-report.mjs --hook`                                                                      | 차단 없음 — 최근 차단·라우터 순응률 요약 주입(알릴 것 없으면 침묵) |
-> | `git commit`             | `core.hooksPath=scripts/harness/hooks`     | `guard.mjs --staged` (내용 스캔 + 하네스 경로 삭제 검사)                                           | **커밋 거부** (`--no-verify` 우회 금지)                            |
-> | PR·push (develop/main)   | `harness-guard.yml`                        | 하네스 자기 테스트 → `guard.mjs --list` → `guard.mjs --deleted-list` → `harness-audit.mjs` → manifest 추적 검증 → 워킹트리 청결 | **CI 실패** (로컬 훅 미설치·우회를 재차단)                         |
+> | 시점                     | 트리거                                     | 실행                                                                                                                                                             | 실패 시                                                            |
+> | ------------------------ | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+> | 파일 편집 직전           | PreToolUse `Write\|Edit\|MultiEdit`        | `guard.mjs --hook`                                                                                                                                               | **exit 2 = 편집 차단**                                             |
+> | Bash 명령 실행 직전      | PreToolUse `Bash`                          | `guard.mjs --hook-bash`                                                                                                                                          | **exit 2 = 명령 차단** (BLOCK) / WARN 은 additionalContext 만      |
+> | 파일 편집·스킬 호출 직전 | PreToolUse `Write\|Edit\|MultiEdit\|Skill` | `skill-router.mjs --hook`                                                                                                                                        | 차단 없음(항상 exit 0) — 스킬 로드 리마인더 주입                   |
+> | 세션 시작                | SessionStart                               | `telemetry-report.mjs --hook`                                                                                                                                    | 차단 없음 — 최근 차단·라우터 순응률 요약 주입(알릴 것 없으면 침묵) |
+> | `git commit`             | `core.hooksPath=scripts/harness/hooks`     | `guard.mjs --staged` (내용 스캔 + 하네스 경로 삭제 검사)                                                                                                         | **커밋 거부** (`--no-verify` 우회 금지)                            |
+> | PR·push (develop/main)   | `harness-guard.yml`                        | 하네스 자기 테스트 → `guard.mjs --list` → `guard.mjs --deleted-list` → `harness-audit.mjs` → manifest 추적 검증 → 지식 manifest → 설정 고아 감사 → 워킹트리 청결 | **CI 실패** (로컬 훅 미설치·우회를 재차단)                         |
 >
 > 삭제는 내용 스캔으로 잡히지 않는다 — 스테이징·CI 파일 목록이 `--diff-filter=ACMR` 로 삭제(D)를 빼고 오기 때문이다.
 > 그래서 `--staged`/`--deleted-list` 가 삭제 목록을 따로 받아 하네스 경로를 지키고, 실시간 훅(PreToolUse)은
