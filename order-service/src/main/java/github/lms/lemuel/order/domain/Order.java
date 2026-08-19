@@ -88,6 +88,24 @@ public class Order {
      *                       0 보다 커야 하므로 subtotal 미만이어야 한다.
      */
     public static Order createMultiItem(Long userId, List<OrderItem> items, BigDecimal discountAmount) {
+        return createMultiItem(userId, items, discountAmount, BigDecimal.ZERO);
+    }
+
+    /**
+     * 다건 주문 팩토리 (쿠폰 할인 + 배송비 반영) — 결제 금액이 확정되는 유일한 지점.
+     *
+     * <p>{@code amount = subtotal - discount + shippingFee}. 결제는 {@code order.amount} 로
+     * 만들어지므로(CreatePaymentUseCase) 배송비를 amount 밖에 두면 고객에게 청구되지 않고, 반대로
+     * amount 에만 더하고 {@code shippingFee} 를 비워 두면 배송 후 환불에서 배송비를 되돌려주게 된다
+     * ({@link RefundPolicy} 가 이 필드로 차감액을 계산한다). 둘을 한 호출에서 함께 못박는 이유다.
+     *
+     * <p>할인 상한은 <b>배송비를 뺀 소계</b>다 — 배송비를 더해 총액이 양수가 되더라도 상품 대금이
+     * 0 이하인 주문(= 배송비만 결제하는 주문)은 만들지 않는다.
+     *
+     * @param shippingFee 산정된 배송비(없으면 {@code null}/0). 음수 불가.
+     */
+    public static Order createMultiItem(Long userId, List<OrderItem> items,
+                                        BigDecimal discountAmount, BigDecimal shippingFee) {
         if (items == null || items.isEmpty()) {
             throw new OrderInvariantViolationException("다건 주문은 최소 1 개 이상의 아이템이 필요합니다");
         }
@@ -108,9 +126,14 @@ public class Order {
             throw new OrderInvariantViolationException(
                     "할인 금액(" + discount + ") 이 주문 소계(" + subtotal + ") 이상일 수 없습니다");
         }
+        BigDecimal shipping = shippingFee != null ? shippingFee : BigDecimal.ZERO;
+        if (shipping.signum() < 0) {
+            throw new OrderInvariantViolationException("배송비는 음수일 수 없습니다: " + shipping);
+        }
         LocalDateTime now = LocalDateTime.now();
-        Order order = new Order(null, userId, null, subtotal.subtract(discount),
+        Order order = new Order(null, userId, null, subtotal.subtract(discount).add(shipping),
                 OrderStatus.CREATED, now, now);
+        order.shippingFee = shipping;
         order.validateUserId();
         order.validateAmount();
         order.items.addAll(items);

@@ -19,6 +19,7 @@ import github.lms.lemuel.product.domain.Product;
 import github.lms.lemuel.product.domain.ProductVariant;
 import github.lms.lemuel.product.domain.exception.ProductInvariantViolationException;
 import github.lms.lemuel.product.domain.exception.ProductNotFoundException;
+import github.lms.lemuel.shipping.application.port.in.AssessShippingFeeUseCase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -64,6 +65,7 @@ public class CreateMultiItemOrderService implements CreateMultiItemOrderUseCase 
     private final PublishOrderEventPort publishOrderEventPort;
     private final CouponUseCase couponUseCase;
     private final DescribeVariantOptionsUseCase describeVariantOptionsUseCase;
+    private final AssessShippingFeeUseCase assessShippingFeeUseCase;
 
     public CreateMultiItemOrderService(LoadUserForOrderPort loadUserPort,
                                        LoadProductPort loadProductPort,
@@ -74,7 +76,8 @@ public class CreateMultiItemOrderService implements CreateMultiItemOrderUseCase 
                                        SendOrderNotificationPort sendNotificationPort,
                                        PublishOrderEventPort publishOrderEventPort,
                                        CouponUseCase couponUseCase,
-                                       DescribeVariantOptionsUseCase describeVariantOptionsUseCase) {
+                                       DescribeVariantOptionsUseCase describeVariantOptionsUseCase,
+                                       AssessShippingFeeUseCase assessShippingFeeUseCase) {
         this.loadUserPort = loadUserPort;
         this.loadProductPort = loadProductPort;
         this.loadVariantPort = loadVariantPort;
@@ -85,6 +88,7 @@ public class CreateMultiItemOrderService implements CreateMultiItemOrderUseCase 
         this.publishOrderEventPort = publishOrderEventPort;
         this.couponUseCase = couponUseCase;
         this.describeVariantOptionsUseCase = describeVariantOptionsUseCase;
+        this.assessShippingFeeUseCase = assessShippingFeeUseCase;
     }
 
     @Override
@@ -148,7 +152,17 @@ public class CreateMultiItemOrderService implements CreateMultiItemOrderUseCase 
             discount = result.discountAmount();
         }
 
-        Order order = Order.createMultiItem(userId, items, discount);
+        // 배송비 산정 — 셀러별 조건부 무료배송 판정은 쿠폰 할인 전 라인 금액 기준이다
+        // (쿠폰이 배송비를 좌우하면 "쿠폰을 썼더니 배송비가 생겼다"는 역진성이 생긴다).
+        // 상품의 셀러·부과 유형은 요청이 아니라 상품 마스터에서 해석된다 — 클라이언트가 배송비를 정할 수 없다.
+        BigDecimal shippingFee = assessShippingFeeUseCase.assess(
+                items.stream()
+                        .map(item -> new AssessShippingFeeUseCase.OrderLine(
+                                item.getProductId(), item.getLineAmount()))
+                        .toList()
+        ).totalFee();
+
+        Order order = Order.createMultiItem(userId, items, discount, shippingFee);
         Order saved = saveOrderPort.save(order);
 
         // 쿠폰 사용 기록 — 같은 트랜잭션. 한도 초과/1인 1매 중복이면 예외 → 주문·재고 차감까지 전부 롤백
