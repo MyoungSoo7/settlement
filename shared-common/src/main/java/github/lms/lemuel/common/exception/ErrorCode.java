@@ -24,6 +24,9 @@ public enum ErrorCode {
     // 도메인 리소스 부재(XXX_NOT_FOUND)가 아니라 "그런 엔드포인트 자체가 없다"는 뜻이다. 둘을 섞으면
     // 클라이언트가 "주문이 없다" 와 "URL 을 잘못 썼다" 를 구분하지 못한다.
     ENDPOINT_NOT_FOUND(HttpStatus.NOT_FOUND, "요청하신 경로를 찾을 수 없습니다."),
+    // 경로는 있는데 메서드가 다른 경우다. 404 로 뭉치면 클라이언트가 "주소가 틀렸다"로 오인해
+    // 엉뚱한 곳을 고친다 — 실제로는 GET/POST 를 바꿔 부르면 되는 상황이다.
+    METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "지원하지 않는 요청 메서드입니다."),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요."),
 
     // ─── order ───────────────────────────────────────────────────────────────

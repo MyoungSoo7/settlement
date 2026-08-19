@@ -5,10 +5,12 @@ import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -20,6 +22,7 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -179,6 +182,30 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ErrorResponse.of(HttpStatus.NOT_FOUND, ErrorCode.ENDPOINT_NOT_FOUND.code(),
                         ErrorCode.ENDPOINT_NOT_FOUND.defaultMessage()));
+    }
+
+    /**
+     * 405 - 경로는 있는데 메서드가 다른 경우.
+     *
+     * <p>{@link #handleNoResourceFound} 와 같은 결의 누수였다 — 전용 매핑이 없어 catch-all(500)이
+     * 가져갔다. 2026-08-19 실측: POST 전용인 {@code /api/organizations} 에 GET 을 치면 500 +
+     * error 스택트레이스가 났다. 404 로 뭉뚱그리지 않는 이유는 {@link ErrorCode#METHOD_NOT_ALLOWED}
+     * 주석 참조.
+     *
+     * <p>{@code Allow} 헤더는 405 응답의 규격 필수 항목이다(RFC 9110 §15.5.6) — 이게 없으면
+     * 클라이언트는 어떤 메서드로 다시 불러야 하는지 알 수 없다.
+     */
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
+        log.warn("[HttpRequestMethodNotSupportedException] {} - 허용: {}",
+                ex.getMethod(), ex.getSupportedHttpMethods());
+        ResponseEntity.BodyBuilder builder = ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED);
+        Set<HttpMethod> supported = ex.getSupportedHttpMethods();
+        if (supported != null && !supported.isEmpty()) {
+            builder.allow(supported.toArray(new HttpMethod[0]));
+        }
+        return builder.body(ErrorResponse.of(HttpStatus.METHOD_NOT_ALLOWED,
+                ErrorCode.METHOD_NOT_ALLOWED.code(), ErrorCode.METHOD_NOT_ALLOWED.defaultMessage()));
     }
 
     // ─── 5xx ────────────────────────────────────────────────────────────────────

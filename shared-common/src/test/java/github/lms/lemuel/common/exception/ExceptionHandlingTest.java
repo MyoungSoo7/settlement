@@ -11,11 +11,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.ExceptionHandlerMethodResolver;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.lang.reflect.Method;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -195,6 +197,24 @@ class ExceptionHandlingTest {
         ResponseEntity<ErrorResponse> res = (ResponseEntity<ErrorResponse>) resolved.invoke(handler, ex);
         assertThat(res.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(res.getBody().errorCode()).isEqualTo(ErrorCode.ENDPOINT_NOT_FOUND.code());
+    }
+
+    @Test
+    @DisplayName("지원하지 않는 메서드는 405 다 — Allow 헤더로 허용 메서드를 알린다")
+    void methodNotSupportedMapsTo405() throws Exception {
+        // 2026-08-19 실측: POST 전용인 /api/organizations 에 GET 을 치면 500 이 나왔다.
+        HttpRequestMethodNotSupportedException ex =
+                new HttpRequestMethodNotSupportedException("GET", List.of("POST"));
+
+        Method resolved = new ExceptionHandlerMethodResolver(GlobalExceptionHandler.class).resolveMethod(ex);
+        assertThat(resolved).isNotNull();
+
+        @SuppressWarnings("unchecked")
+        ResponseEntity<ErrorResponse> res = (ResponseEntity<ErrorResponse>) resolved.invoke(handler, ex);
+        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
+        assertThat(res.getBody().errorCode()).isEqualTo(ErrorCode.METHOD_NOT_ALLOWED.code());
+        // 405 는 Allow 헤더가 규격 필수다(RFC 9110) — 없으면 클라이언트가 무엇을 써야 할지 모른다.
+        assertThat(res.getHeaders().getAllow()).containsExactly(HttpMethod.POST);
     }
 
     @Test
