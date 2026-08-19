@@ -210,6 +210,74 @@ public class Order {
         this.updatedAt = LocalDateTime.now();
     }
 
+    /**
+     * 라인 단위 부분 취소 — 지정한 라인을 취소 상태로 바꾸고 <b>취소된 라인 금액 합</b>을 돌려준다.
+     *
+     * <p>주문 총액({@link #getAmount()})은 발행된 영수증이라 여기서 바뀌지 않는다. 얼마를 실제로
+     * 되돌려줬는지는 결제의 {@code refundedAmount} 가 들고 있고, 이 메서드는 "어떤 라인이 살아
+     * 있는가"만 확정한다. 그 살아남은 라인이 배송비 재산정의 입력이 된다 — 무료배송 임계를 채우던
+     * 상품이 빠지면 면제됐던 배송비가 되살아난다(실무 커머스의 배송비 재부과 규칙).
+     *
+     * <p><b>배송 시작 후에는 거절</b>한다. 이미 출고된 물건을 "취소"로 처리하면 재고가 장부에만
+     * 돌아오고 실물은 고객에게 있다 — 그 경로는 반품(회수 확인 후 원복)이다.
+     *
+     * @param itemIds 취소할 라인 id 목록(비어 있으면 거절, 주문에 없는 id·이미 취소된 id 도 거절)
+     * @return 취소된 라인들의 {@code lineAmount} 합
+     */
+    public BigDecimal cancelItems(List<Long> itemIds) {
+        if (itemIds == null || itemIds.isEmpty()) {
+            throw new OrderInvariantViolationException("취소할 주문 라인을 지정해야 합니다");
+        }
+        if (!isMultiItem()) {
+            throw new OrderInvariantViolationException("라인이 없는 주문은 부분 취소 대상이 아닙니다");
+        }
+        if (!isItemCancelable()) {
+            throw new InvalidOrderStateException(this.status, OrderStatus.CANCELED);
+        }
+
+        List<OrderItem> targets = new ArrayList<>(itemIds.size());
+        for (Long itemId : itemIds) {
+            OrderItem target = items.stream()
+                    .filter(item -> itemId.equals(item.getId()))
+                    .findFirst()
+                    .orElseThrow(() -> new OrderInvariantViolationException(
+                            "이 주문에 없는 라인입니다: itemId=" + itemId));
+            targets.add(target);
+        }
+
+        // 전량 검증 후 일괄 취소 — 중간 라인에서 실패하면 앞 라인만 취소된 반쪽 상태가 남는다.
+        BigDecimal canceledSubtotal = BigDecimal.ZERO;
+        for (OrderItem target : targets) {
+            if (target.isCanceled()) {
+                throw new OrderInvariantViolationException(
+                        "이미 취소된 주문 라인입니다: itemId=" + target.getId());
+            }
+        }
+        for (OrderItem target : targets) {
+            target.cancel();
+            canceledSubtotal = canceledSubtotal.add(target.getLineAmount());
+        }
+        this.updatedAt = LocalDateTime.now();
+        return canceledSubtotal;
+    }
+
+    /** 아직 취소되지 않은 라인 — 배송비 재산정·출고 대상의 진실의 원천. */
+    public List<OrderItem> activeItems() {
+        return items.stream().filter(item -> !item.isCanceled()).toList();
+    }
+
+    /** 라인이 하나도 남지 않았는지(= 주문 전체가 취소된 것과 같은지). */
+    public boolean allItemsCanceled() {
+        return isMultiItem() && activeItems().isEmpty();
+    }
+
+    /** 라인 단위 취소가 허용되는 단계인지 — 출고 전까지만. */
+    public boolean isItemCancelable() {
+        return this.status == OrderStatus.CREATED
+                || this.status == OrderStatus.PAID
+                || this.status == OrderStatus.SHIPPING_PENDING;
+    }
+
     public boolean isCancelable() {
         return this.status == OrderStatus.CREATED;
     }

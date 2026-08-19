@@ -35,6 +35,7 @@ public class OrderItem {
     private final BigDecimal lineAmount; // unitPrice * quantity
     private final LocalDateTime createdAt;
     private final List<OrderItemOption> options; // 주문 시점 옵션 선택 스냅샷 (옵션 없는 상품은 빈 목록)
+    private LocalDateTime canceledAt;    // 부분 취소된 라인의 취소 시각. null 이면 살아 있는 라인.
 
     public static OrderItem newItem(Long productId, Long variantId, String sku,
                                      String productName, BigDecimal unitPrice, int quantity) {
@@ -84,9 +85,20 @@ public class OrderItem {
                                        String sku, String productName, BigDecimal unitPrice,
                                        int quantity, BigDecimal lineAmount, LocalDateTime createdAt,
                                        List<OrderItemOption> options) {
-        return new OrderItem(id, orderId, productId, variantId, sku, productName,
+        return rehydrate(id, orderId, productId, variantId, sku, productName, unitPrice,
+                quantity, lineAmount, createdAt, options, null);
+    }
+
+    /** 취소 시각까지 복원하는 팩토리 — 재기동 후에도 취소된 라인이 활성으로 되살아나지 않는다. */
+    public static OrderItem rehydrate(Long id, Long orderId, Long productId, Long variantId,
+                                       String sku, String productName, BigDecimal unitPrice,
+                                       int quantity, BigDecimal lineAmount, LocalDateTime createdAt,
+                                       List<OrderItemOption> options, LocalDateTime canceledAt) {
+        OrderItem item = new OrderItem(id, orderId, productId, variantId, sku, productName,
                 unitPrice, quantity, lineAmount, createdAt,
                 options == null ? List.of() : List.copyOf(options));
+        item.canceledAt = canceledAt;
+        return item;
     }
 
     private OrderItem(Long id, Long orderId, Long productId, Long variantId, String sku,
@@ -134,6 +146,22 @@ public class OrderItem {
                 .map(OrderItemOption::describe)
                 .collect(Collectors.joining(" / "));
     }
+
+    /**
+     * 이 라인을 취소 처리한다. 이미 취소된 라인의 재취소는 거절 — 그대로 통과시키면 같은 라인이
+     * 두 번 환불·재고 복원되는 입구가 된다(멱등 no-op 이 아니라 오류다).
+     */
+    void cancel() {
+        if (canceledAt != null) {
+            throw new OrderInvariantViolationException(
+                    "이미 취소된 주문 라인입니다: itemId=" + id);
+        }
+        this.canceledAt = LocalDateTime.now();
+    }
+
+    public boolean isCanceled() { return canceledAt != null; }
+
+    public LocalDateTime getCanceledAt() { return canceledAt; }
 
     public Long getId() { return id; }
     public Long getOrderId() { return orderId; }

@@ -42,6 +42,7 @@ class OrderControllerTest {
     @MockitoBean IdempotentMultiItemOrderUseCase createMultiItemOrderUseCase;
     @MockitoBean GetOrderUseCase getOrderUseCase;
     @MockitoBean ChangeOrderStatusUseCase changeOrderStatusUseCase;
+    @MockitoBean github.lms.lemuel.order.application.port.in.CancelOrderItemsUseCase cancelOrderItemsUseCase;
 
     /** JWT 주체를 SecurityContext 에 직접 세팅(addFilters=false 슬라이스 대응). */
     private static void login(long uid, String role) {
@@ -94,6 +95,34 @@ class OrderControllerTest {
         when(getOrderUseCase.getOrdersByUserId(1L, null, null, null)).thenReturn(List.of());
         mockMvc.perform(get("/orders/user/1"))
                 .andExpect(status().isOk());
+    }
+
+    @Test @DisplayName("POST /orders/{id}/items/cancel - 타인 주문은 403 (IDOR)") void cancelItems_otherForbidden() throws Exception {
+        login(2L, "USER");
+        when(getOrderUseCase.getOrderById(5L)).thenReturn(Order.create(1L, 1L, new BigDecimal("10000")));
+
+        mockMvc.perform(post("/orders/5/items/cancel")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"itemIds\":[1],\"reason\":\"변심\"}"))
+                .andExpect(status().isForbidden());
+
+        verify(cancelOrderItemsUseCase, never()).cancelItems(anyLong(), any(), any(), any());
+    }
+
+    @Test @DisplayName("POST /orders/{id}/items/cancel - 본인 주문은 취소 결과를 돌려준다") void cancelItems_self() throws Exception {
+        login(1L, "USER");
+        when(getOrderUseCase.getOrderById(5L)).thenReturn(Order.create(1L, 1L, new BigDecimal("10000")));
+        when(cancelOrderItemsUseCase.cancelItems(anyLong(), any(), any(), any())).thenReturn(
+                new github.lms.lemuel.order.application.port.in.CancelOrderItemsUseCase.Result(
+                        5L, new BigDecimal("40000"), new BigDecimal("3000"),
+                        new BigDecimal("37000"), false));
+
+        mockMvc.perform(post("/orders/5/items/cancel")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"itemIds\":[1],\"reason\":\"변심\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.refundedAmount").value(37000))
+                .andExpect(jsonPath("$.additionalShippingFee").value(3000));
     }
 
     @Test @DisplayName("POST /orders - 생성") void createOrder() throws Exception {
