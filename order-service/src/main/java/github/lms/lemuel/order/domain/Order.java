@@ -271,6 +271,36 @@ public class Order {
         return isMultiItem() && activeItems().isEmpty();
     }
 
+    /**
+     * 취소·환불 <b>신청 철회</b> — 신청 상태에서 신청 직전 상태로 되돌린다.
+     *
+     * <p>신청 상태(CANCELLATION_REQUESTED / REFUND_REQUESTED)에서 나가는 길이 승인뿐이면, 마음이
+     * 바뀐 고객의 주문은 운영자가 처리할 때까지 묶인다. 철회는 그 막다른 길을 여는 정상 경로다.
+     *
+     * <p>되돌아갈 상태를 임의로 받지 않는다 — <b>그 신청을 낼 수 있었던 상태</b>여야 한다
+     * ({@code restoreTo.canTransitionTo(현재 상태)}). 이 한 줄 덕에 "배송 중이던 주문의 환불
+     * 신청을 철회하면 배송 중으로 돌아간다"가 자동으로 성립하고, 결제된 적 없는 주문이 PAID 로
+     * 승격되는 경로는 열리지 않는다. 전이표를 역방향으로 확장하지 않는 이유이기도 하다 —
+     * 되돌리기는 이 메서드 하나로만 가능하다.
+     *
+     * @param restoreTo 신청 직전 상태(호출자가 상태 이력에서 읽어 온다)
+     */
+    public void withdrawRequest(OrderStatus restoreTo) {
+        if (this.status != OrderStatus.CANCELLATION_REQUESTED
+                && this.status != OrderStatus.REFUND_REQUESTED) {
+            throw new InvalidOrderStateException(this.status, "철회할 신청이 없습니다");
+        }
+        if (restoreTo == null) {
+            throw new OrderInvariantViolationException("철회 후 복귀할 상태를 지정해야 합니다");
+        }
+        if (!restoreTo.canTransitionTo(this.status)) {
+            throw new OrderInvariantViolationException(
+                    "이 신청을 낼 수 없었던 상태로는 되돌릴 수 없습니다: " + restoreTo + " → " + this.status);
+        }
+        this.status = restoreTo;
+        this.updatedAt = LocalDateTime.now();
+    }
+
     /** 라인 단위 취소가 허용되는 단계인지 — 출고 전까지만. */
     public boolean isItemCancelable() {
         return this.status == OrderStatus.CREATED

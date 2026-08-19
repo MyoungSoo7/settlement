@@ -49,6 +49,7 @@ class OrderControllerMoreTest {
     @MockitoBean GetOrderUseCase getOrderUseCase;
     @MockitoBean ChangeOrderStatusUseCase changeOrderStatusUseCase;
     @MockitoBean github.lms.lemuel.order.application.port.in.CancelOrderItemsUseCase cancelOrderItemsUseCase;
+    @MockitoBean github.lms.lemuel.order.application.port.in.WithdrawOrderRequestUseCase withdrawOrderRequestUseCase;
 
     /** JWT 주체를 SecurityContext 에 직접 세팅(addFilters=false 슬라이스 대응 — OrderControllerTest 와 동일). */
     private static void login(long uid, String role) {

@@ -44,6 +44,7 @@ public class OrderController {
     private final GetOrderUseCase getOrderUseCase;
     private final ChangeOrderStatusUseCase changeOrderStatusUseCase;
     private final CancelOrderItemsUseCase cancelOrderItemsUseCase;
+    private final github.lms.lemuel.order.application.port.in.WithdrawOrderRequestUseCase withdrawOrderRequestUseCase;
 
     @Operation(summary = "주문 생성 (단건)", description = "단일 상품 주문 — 레거시 호환 경로.")
     @ApiResponses({
@@ -194,6 +195,26 @@ public class OrderController {
         Order order = changeOrderStatusUseCase.changeShippingStatus(
                 id, request.status(), request.reason(), actor(principal));
         return ResponseEntity.ok(OrderResponse.from(order));
+    }
+
+    @Operation(summary = "취소·환불 신청 철회",
+            description = "취소/환불 신청을 철회해 신청 직전 상태로 되돌린다. 복귀 상태는 상태 이력이 근거이며, "
+                    + "그 신청을 낼 수 없었던 상태로는 되돌리지 않는다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "철회 성공"),
+            @ApiResponse(responseCode = "403", description = "타인 주문"),
+            @ApiResponse(responseCode = "409", description = "철회할 신청이 없음")
+    })
+    @PostMapping("/{id}/request-withdraw")
+    public ResponseEntity<OrderResponse> withdrawRequest(
+            @PathVariable @Positive Long id,
+            @RequestBody(required = false) StatusReasonRequest request,
+            Principal principal) {
+        Order order = getOrderUseCase.getOrderById(id);
+        ResourceOwnership.requireSelfOrAdmin(order.getUserId());
+        String reason = request == null ? null : request.reason();
+        return ResponseEntity.ok(OrderResponse.from(
+                withdrawOrderRequestUseCase.withdraw(id, reason, actor(principal))));
     }
 
     @Operation(summary = "주문 라인 부분 취소",
