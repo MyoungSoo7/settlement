@@ -27,6 +27,34 @@ _판정 로그_ 다. 지금까지 하네스는 계속 늘어나기만 했고, �
 
 ## 항목
 
+### 2026-08-19 · 커버리지 게이트 공전(측정 대상 0개)을 실패로 전환 — 정적+런타임 2겹
+
+- **status**: verified
+- **동기**: LINE 90% 게이트가 **아무것도 재지 않은 채 3개 모듈에서 초록**이었다. JaCoCo 검증은 대상
+  클래스가 0개면 만들 위반이 없어 통과한다 — 커버리지가 높아서가 아니라 잰 게 없어서인데, 빌드는
+  BUILD SUCCESSFUL 이고 리포트 파일도 생성되므로 사람이 XML 의 `<class>` 개수를 세기 전에는 보이지 않는다.
+  원인은 `classDirectories` 이중 적용: 루트가 이미 교체한 값 위에 deposit·board(리포트+검증)·education(검증)이
+  같은 관용구를 다시 얹었고, `classDirectories.files` 가 설정 시점에 즉시 평가되면서 `build/classes` 가 아직
+  없는 클린 빌드(=CI 의 `clean :module:build`)에서 빈 집합이 스냅샷됐다. 산출물이 남은 로컬 빌드에서는
+  0개가 되지 않는 대신 엔트리가 개별 `.class` 파일로 굳어(트리 루트가 파일) 모듈이 얹은 경로 제외가
+  한 건도 매치되지 않았다 — 로컬 수치도 의도한 범위가 아니었다.
+- **predicted_effect**: 측정 대상 소유권을 루트로 단일화 → 세 모듈이 실제로 측정된다. 이후 어떤 경로로든
+  대상이 0개가 되면 빌드가 FAIL 하므로, "가짜 GREEN" 이 조용히 남지 않는다.
+- **verified_at**: 2026-08-19 · 격리 워크트리(CI 조건: 산출물 없는 체크아웃 + `clean`)에서 대조
+  - before: deposit·board 리포트 XML 245바이트/클래스 0개, HTML `No class files specified`, 게이트 통과.
+    education 은 리포트 33개인데 검증 대상 0개. 대조군 organization-service 는 같은 실행에서 39개 측정(정상).
+  - after: 측정 대상 deposit 58 / board 76 / education 18 클래스, LINE 실측 **0.97 / 0.92 / 0.91** 로
+    기존 90% 게이트를 그대로 통과(임계값 1.00 상향 시 Gradle 이 정상 FAIL — 게이트 생존 확인).
+  - 부정 검증: deposit 에 이중 적용을 일부러 되살리자 정적 게이트 FAIL(`deposit-service/build.gradle.kts:97,98`)
+    + 클린 빌드에서 런타임 스모크 FAIL(`[coverage] :deposit-service:jacocoTestCoverageVerification … 0개`).
+- **한계(명시)**: ① 이제 게이트 범위 안에 들어온 `board/adapter/out/storage`(10.0%)·`board/adapter/in/schedule`(16.7%)·
+  `education/adapter/out/audit`(25.0%) 를 루트 제외 목록에 넣을지, 단위 테스트로 덮을지는 **미결**이다
+  (board 의 0.92 는 이 둘을 안고 넘긴 값이다). ② 스모크는 "0개"만 막는다 — 대상이 1개로 쪼그라드는
+  부분 축소는 여전히 못 잡는다.
+- **적용**: `build.gradle.kts`, `shared-common/build.gradle.kts`(별도 빌드라 자체 선언),
+  `deposit-service`·`board-service`·`education-service/build.gradle.kts`,
+  `scripts/harness/test/coverage-scope-gate.test.mjs`, `scripts/harness/manifest.json`
+
 ### 2026-08-16 · CI 변경 감지 기준점 — push 는 직전 커밋 대비(전 모듈 실행 제거)
 
 - **status**: verified

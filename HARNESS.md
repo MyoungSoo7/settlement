@@ -246,6 +246,15 @@ settlement-copilot **플러그인 소유**라 플러그인 미설치 환경에 �
 - **스케줄러 락 이름 유일성** — `scripts/harness/test/scheduler-lock-gate.test.mjs`: 같은 `@SchedulerLock`
   이름을 두 배치가 쓰면 락 보유 기간 동안 나머지가 **조용히 스킵**된다(예외·로그 없음 → 컴파일도 CI 도 못 잡음).
   리포 전수로 잠근다. 의도적 공유가 필요하면 게이트의 `ALLOWED_SHARED` 에 근거와 함께 등록.
+- **커버리지 측정 범위 게이트** — `scripts/harness/test/coverage-scope-gate.test.mjs` + 루트/`shared-common`
+  `build.gradle.kts` 의 런타임 스모크: JaCoCo 검증은 **측정 대상 클래스가 0개면 만들 위반이 없어 통과**한다
+  (커버리지가 높아서가 아니라 잰 게 없어서다 — 빌드는 초록이고 리포트 파일도 생겨서 컴파일도 CI 도 못 잡는다).
+  2026-08-19 deposit·board(리포트+검증)·education(검증)이 실제로 이 상태였다: 아티팩트 XML 클래스 0개,
+  HTML `No class files specified`, 임계값을 1.00 으로 올려도 BUILD SUCCESSFUL. 원인은 루트가 이미 교체한
+  `classDirectories` 위에 모듈이 같은 관용구를 다시 얹은 것 — `classDirectories.files` 가 **설정 시점에 즉시
+  평가**돼 `build/classes` 가 없는 클린 빌드(=CI 의 `clean :module:build`)에서 빈 집합이 스냅샷된다.
+  정적(모듈 빌드 스크립트의 `classDirectories` 재정의 금지)과 런타임(대상 0개면 빌드 FAIL) 두 겹으로 막고,
+  런타임 스모크가 지워지는 것까지 정적 검사가 감시한다.
 - **메뉴↔라우트 정합 게이트** — `scripts/harness/test/menu-route-gate.test.mjs`: 네비게이션 트리의 세 사본
   (시드 SQL `V20260813100000__menu_area_permission.sql` = 정본 · 프론트 폴백 `menuFallback.ts` · `App.tsx` 라우트)을
   대조한다. 메뉴만 있고 라우트가 없으면 **죽은 링크**, 라우트만 있고 메뉴가 없으면 **유령 화면**이 되는데 둘 다
