@@ -61,14 +61,15 @@ class InsuranceBootIT extends InsuranceIntegrationTestSupport {
     }
 
     @Test
-    @DisplayName("Flyway 마이그레이션이 V1 → V11 순서로 적용된다")
+    @DisplayName("Flyway 마이그레이션이 V1 → V12 순서로 적용된다")
     void flywayAppliesMigrationsInOrder() {
         List<String> versions = jdbc.queryForList("""
                 SELECT version FROM opslab.flyway_schema_history
                  WHERE version IS NOT NULL
                  ORDER BY installed_rank
                 """, String.class);
-        assertThat(versions).containsExactly("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11");
+        assertThat(versions).containsExactly(
+                "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12");
     }
 
     @Test
