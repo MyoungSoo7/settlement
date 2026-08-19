@@ -151,7 +151,7 @@ func (h *Hub) runQuoteLoop(ctx context.Context, stockCode string) {
 			return
 		case now := <-ticker.C:
 			price := h.nextPrice(stockCode, base)
-			tick := quote.NewTick(stockCode, price, now)
+			tick := quote.NewTick(stockCode, price, now, h.source.ValueSource())
 			h.broadcast(stockCode, tick)
 		}
 	}

@@ -63,6 +63,12 @@ func NewPollingSource(sim *SimulatedSource, baseURL string, pollInterval time.Du
 // Name implements QuoteSource.
 func (p *PollingSource) Name() string { return "polling" }
 
+// ValueSource implements QuoteSource. Polling grounds only the *base* price in
+// market-service data; the ticks around it are still the simulated walk. So
+// this stays SAMPLE — claiming EXCHANGE here would make a made-up number look
+// like a real quote, which is exactly the confusion the field exists to end.
+func (p *PollingSource) ValueSource() string { return SourceSample }
+
 // BasePrice fetches the latest close from market-service (rate-limited per
 // code) and feeds it into the underlying simulated walk. On any error it falls
 // back to the simulated source's base, so the stream never dies.

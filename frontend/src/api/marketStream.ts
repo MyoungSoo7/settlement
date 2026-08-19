@@ -8,12 +8,32 @@
  * 다루지 못하므로 이 모듈만 EventSource 를 직접 쓴다.
  */
 
+/**
+ * 값 출처 — 이 가격을 믿어도 되는가.
+ * market-service REST 의 `source`(SAMPLE/EXCHANGE)와 같은 어휘를 쓴다.
+ */
+export type QuoteValueSource = 'SAMPLE' | 'EXCHANGE';
+
+export const QUOTE_SOURCE_LABEL: Record<QuoteValueSource, string> = {
+  SAMPLE: '근사 샘플',
+  EXCHANGE: '거래소 실시세',
+};
+
 /** 서버 tick 페이로드 (market-stream internal/quote/quote.go Tick 과 계약) */
 export interface QuoteTick {
   stockCode: string;
   price: number;
   ts: string; // RFC3339 (밀리초 정밀도)
+  /**
+   * 구버전 서버는 이 필드를 보내지 않는다. 없을 때는 신뢰할 수 없는 쪽(SAMPLE)으로
+   * 취급한다 — 표기 누락이 곧 "실시세처럼 보임"이 되면 안 된다.
+   */
+  source?: QuoteValueSource;
 }
+
+/** 출처 미표기 프레임을 안전한 쪽으로 좁힌다. */
+export const tickValueSource = (tick: Pick<QuoteTick, 'source'>): QuoteValueSource =>
+  tick.source === 'EXCHANGE' ? 'EXCHANGE' : 'SAMPLE';
 
 export type QuoteStreamState = 'connecting' | 'open' | 'error';
 

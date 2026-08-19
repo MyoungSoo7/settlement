@@ -44,6 +44,10 @@ func NewSimulatedSource(seed int64) *SimulatedSource {
 // Name implements QuoteSource.
 func (s *SimulatedSource) Name() string { return "simulated" }
 
+// ValueSource implements QuoteSource. A bounded random walk is synthetic by
+// construction, so every tick it produces is SAMPLE.
+func (s *SimulatedSource) ValueSource() string { return SourceSample }
+
 // BasePrice implements QuoteSource. The simulated source has no external
 // knowledge, so it simply adopts (and remembers) the fallback as the base.
 func (s *SimulatedSource) BasePrice(stockCode string, fallback float64) float64 {

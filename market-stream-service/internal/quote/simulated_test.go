@@ -75,7 +75,7 @@ func TestSimulatedSource_SetBaseResetsWalk(t *testing.T) {
 }
 
 func TestNewTick_Shape(t *testing.T) {
-	tk := NewTick("005930", 71234.567, mustTime())
+	tk := NewTick("005930", 71234.567, mustTime(), SourceSample)
 	if tk.StockCode != "005930" {
 		t.Errorf("stockCode: got %q", tk.StockCode)
 	}
