@@ -20,10 +20,13 @@ public class ShippingController {
 
     private final ShippingUseCase useCase;
     private final LoadShipmentPort loadPort;
+    private final github.lms.lemuel.shipping.application.port.in.SafetyNumberUseCase safetyNumberUseCase;
 
-    public ShippingController(ShippingUseCase useCase, LoadShipmentPort loadPort) {
+    public ShippingController(ShippingUseCase useCase, LoadShipmentPort loadPort,
+                              github.lms.lemuel.shipping.application.port.in.SafetyNumberUseCase safetyNumberUseCase) {
         this.useCase = useCase;
         this.loadPort = loadPort;
+        this.safetyNumberUseCase = safetyNumberUseCase;
     }
 
     @Operation(summary = "주문에 대한 배송 생성 (PENDING)")
@@ -34,11 +37,15 @@ public class ShippingController {
         return ResponseEntity.ok(ShipmentResponse.from(s));
     }
 
-    @Operation(summary = "배송 조회")
+    @Operation(summary = "배송 조회",
+            description = "안심번호가 배정된 주문은 수취인 연락처가 가상번호로 대체돼 나간다(phoneMasked=true).")
     @GetMapping
     public ResponseEntity<ShipmentResponse> get(@PathVariable Long orderId) {
+        String safetyNumber = safetyNumberUseCase.findForOrder(orderId)
+                .map(github.lms.lemuel.shipping.domain.SafetyNumber::getVirtualNumber)
+                .orElse(null);
         return loadPort.loadByOrderId(orderId)
-                .map(ShipmentResponse::from)
+                .map(s -> ShipmentResponse.from(s, safetyNumber))
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -92,6 +99,20 @@ public class ShippingController {
     public record ShipRequest(@NotBlank String carrier, @NotBlank String trackingNumber) {}
 
     public record ShipmentResponse(Map<String, Object> shipment) {
+        /**
+         * 안심번호가 배정돼 있으면 수취인 연락처를 그 번호로 <b>대체</b>한다(추가가 아니라 대체다 —
+         * 실번호를 함께 실으면 마스킹의 의미가 없다). 풀 고갈로 번호가 없으면 실번호가 나가며,
+         * 그 사실은 {@code SafetyNumberService} 가 WARN 으로 남긴다.
+         */
+        static ShipmentResponse from(Shipment s, String safetyNumber) {
+            ShipmentResponse base = from(s);
+            if (safetyNumber != null && !safetyNumber.isBlank()) {
+                base.shipment().put("phone", safetyNumber);
+                base.shipment().put("phoneMasked", Boolean.TRUE);
+            }
+            return base;
+        }
+
         static ShipmentResponse from(Shipment s) {
             Map<String, Object> body = new LinkedHashMap<>();
             body.put("id", s.getId());

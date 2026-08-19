@@ -23,6 +23,7 @@ class ShippingServiceTest {
 
     @Mock LoadShipmentPort loadPort;
     @Mock SaveShipmentPort savePort;
+    @Mock github.lms.lemuel.shipping.application.port.in.SafetyNumberUseCase safetyNumberUseCase;
     @InjectMocks ShippingService service;
 
     private ShippingAddress addr() {
