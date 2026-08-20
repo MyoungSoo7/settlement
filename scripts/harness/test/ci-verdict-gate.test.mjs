@@ -143,23 +143,65 @@ describe('ci-verdict 판정 조립', () => {
     assert.equal(r.state, 'UNJUDGED');
   });
 
+  test('중간 후손에서 깨졌다 뒤 후손에서 복구됐으면 PASS + 깨진 지점을 함께 남긴다', () => {
+    // 가까운 결론 하나로 끊으면 남의 커밋이 낸 실패가 대상에 영구히 눌어붙는다
+    // (2026-08-20 자기 실증: guard 가 70e4c9be3 에서 FAIL → 44a8a5b8d 에서 복구됐는데도
+    //  4aeb4bf4b 가 계속 FAIL 로 보고됐다). 가장 나중 판정이 그 내용의 현재 진실이다.
+    const r = build({
+      descendants: ['D1', 'D2'],
+      runsBySha: {
+        D1: [['Frontend - Tests', 'completed', 'failure']],
+        D2: [['Frontend - Tests', 'completed', 'success']],
+      },
+    });
+    assert.equal(r.state, 'PASS');
+    assert.equal(r.at, 'D2');
+    assert.equal(r.brokeAt, 'D1');
+  });
+
+  test('대상 자신이 실패했으면 뒤에서 고쳐져도 그 커밋의 사실은 FAIL — 복구 지점을 함께 남긴다', () => {
+    // bisect·롤백은 "그 커밋이 성했는가" 를 묻는다. 브랜치가 초록이라는 사실로 덮으면 안 된다.
+    const r = build({
+      descendants: ['D1'],
+      runsBySha: {
+        T: [['Frontend - Tests', 'completed', 'failure']],
+        D1: [['Frontend - Tests', 'completed', 'success']],
+      },
+    });
+    assert.equal(r.state, 'FAIL');
+    assert.equal(r.where, 'target');
+    assert.equal(r.flippedTo, 'PASS');
+    assert.equal(r.flippedAt, 'D1');
+  });
+
+  test('뒤 후손에서 깨진 채 끝났으면 FAIL — 통과한 중간 후손으로 덮지 않는다', () => {
+    const r = build({
+      descendants: ['D1', 'D2'],
+      runsBySha: {
+        D1: [['Frontend - Tests', 'completed', 'success']],
+        D2: [['Frontend - Tests', 'completed', 'failure']],
+      },
+    });
+    assert.equal(r.state, 'FAIL');
+    assert.equal(r.at, 'D2');
+  });
+
   test('실행 중이면 UNJUDGED 가 아니라 PENDING', () => {
     const r = build({ runsBySha: { T: [['Frontend - Tests', 'in_progress', null]] } });
     assert.deepEqual(r, { state: 'PENDING', at: 'T', where: 'target' });
-  });
-
-  test('실패는 뒤 커밋의 통과보다 먼저 잡힌다', () => {
-    const r = build({
-      descendants: ['D1'],
-      runsBySha: { T: [['Frontend - Tests', 'completed', 'failure']], D1: [['Frontend - Tests', 'completed', 'success']] },
-    });
-    assert.deepEqual(r, { state: 'FAIL', at: 'T', where: 'target' });
   });
 
   test('한 줄 출력에 상태와 근거 커밋이 함께 담긴다', () => {
     const line = formatLine(check, { state: 'PASS', at: 'abcdef1234567', where: 'descendant' });
     assert.match(line, /PASS/);
     assert.match(line, /abcdef123/);
+  });
+
+  test('뒤집힌 이력은 한 줄 출력에도 남는다', () => {
+    const broke = formatLine(check, { state: 'PASS', at: 'aaaaaaaaa11', where: 'descendant', brokeAt: 'bbbbbbbbb22' });
+    assert.match(broke, /bbbbbbbbb/);
+    const flipped = formatLine(check, { state: 'FAIL', at: 'aaaaaaaaa11', where: 'target', flippedTo: 'PASS', flippedAt: 'ccccccccc33' });
+    assert.match(flipped, /ccccccccc/);
   });
 });
 

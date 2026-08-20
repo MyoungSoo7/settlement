@@ -123,10 +123,32 @@ export function touchesScope(changedFiles, scope) {
  */
 export function assembleVerdict(check, { target, descendants, ancestors, checkRuns, changedFiles, workflowRuns }) {
   const forward = [target, ...descendants];
-  for (const sha of forward) {
-    const verdict = verdictFor(checkRuns(sha), check.name);
-    if (verdict === 'failure') return { state: 'FAIL', at: sha, where: sha === target ? 'target' : 'descendant' };
-    if (verdict === 'success') return { state: 'PASS', at: sha, where: sha === target ? 'target' : 'descendant' };
+
+  // 앞으로 가면서 **결론이 난 판정만** 모은다. 가장 가까운 하나로 끊으면 안 된다 —
+  // 중간 후손에서 한 번 깨졌다가 그 뒤 후손에서 고쳐진 이력이 대상 커밋에 영구히 눌어붙는다
+  // (2026-08-20 자기 실증: guard 가 70e4c9be3 에서 FAIL → 44a8a5b8d 에서 복구됐는데도
+  //  4aeb4bf4b 가 계속 FAIL 로 보고됐다).
+  const chain = forward
+    .map((sha) => ({ sha, verdict: verdictFor(checkRuns(sha), check.name) }))
+    .filter((entry) => entry.verdict !== null);
+
+  if (chain.length > 0) {
+    // 대상 커밋 자신의 판정이 있으면 그것이 그 커밋의 사실이다(bisect·롤백이 이 값을 본다).
+    // 없으면 **가장 나중** 후손의 판정이 그 내용의 현재 진실이다.
+    const own = chain[0].sha === target ? chain[0] : null;
+    const latest = chain[chain.length - 1];
+    const head = own ?? latest;
+    const state = head.verdict === 'failure' ? 'FAIL' : 'PASS';
+    const result = { state, at: head.sha, where: head.sha === target ? 'target' : 'descendant' };
+    // 도중에 뒤집힌 적이 있으면 감추지 않는다 — 헤드라인만 보면 사라지는 사실이다.
+    if (latest.verdict !== head.verdict) {
+      result.flippedTo = latest.verdict === 'failure' ? 'FAIL' : 'PASS';
+      result.flippedAt = latest.sha;
+    } else if (chain.some((entry) => entry.verdict !== head.verdict)) {
+      const broke = chain.find((entry) => entry.verdict !== head.verdict);
+      result.brokeAt = broke.sha;
+    }
+    return result;
   }
   const runsAt = workflowRuns ?? (() => []);
   const pendingAt = forward.find((sha) => hasPending(checkRuns(sha), check.name)
@@ -158,7 +180,10 @@ export function formatLine(check, result) {
       descendant: `후손 ${short} 에서 판정 — 대상 변경을 품은 트리`,
       ancestor: `조상 ${short} 판정 유효 — 이후 ${check.scope} 경로 무변경`,
     }[result.where] ?? '결론 난 판정 없음 — 취소/스킵뿐';
-  return `${SYMBOL[result.state]} ${result.state.padEnd(8)} ${check.name.padEnd(38)} ${where}`;
+  const note = result.flippedTo
+    ? ` · 이후 ${result.flippedAt.slice(0, 9)} 에서 ${result.flippedTo} 로 바뀜`
+    : result.brokeAt ? ` · 중간 ${result.brokeAt.slice(0, 9)} 에서 한 번 깨졌다 복구` : '';
+  return `${SYMBOL[result.state]} ${result.state.padEnd(8)} ${check.name.padEnd(38)} ${where}${note}`;
 }
 
 /**
@@ -270,7 +295,11 @@ export async function runVerdictCli(args, io = {}) {
     return 0;
   }
   for (const r of bad) {
-    if (r.state === 'FAIL') stdout(`❌ ${r.check}: ${r.at.slice(0, 9)} 에서 실패 — 재실행이 아니라 고쳐야 한다.`);
+    if (r.state === 'FAIL') {
+      stdout(r.flippedTo === 'PASS'
+        ? `❌ ${r.check}: ${r.at.slice(0, 9)} 에서 실패했으나 ${r.flippedAt.slice(0, 9)} 에서 복구됐다 — 브랜치는 초록, 이 커밋 자체는 깨져 있다(bisect·롤백 주의).`
+        : `❌ ${r.check}: ${r.at.slice(0, 9)} 에서 실패 — 재실행이 아니라 고쳐야 한다.`);
+    }
     else if (r.state === 'PENDING') stdout(`⏳ ${r.check}: 아직 돌고 있다 — 기다렸다 다시 조회할 것.`);
     else stdout(`⚠️  ${r.check}: 판정이 없다. 취소된 실행은 통과가 아니다.`);
   }
