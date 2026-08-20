@@ -153,7 +153,20 @@ public enum ErrorCode {
     GIFT_CARD_INSUFFICIENT(HttpStatus.UNPROCESSABLE_ENTITY, "기프트카드 잔액이 부족합니다."),
     GIFT_CARD_INVALID_AMOUNT(HttpStatus.BAD_REQUEST, "기프트카드 금액이 올바르지 않습니다."),
     // 코드 등록 실패는 사유를 구분하지 않는다 — 구분하면 유효한 코드의 존재가 새어 나간다.
-    GIFT_CARD_INVALID_STATE(HttpStatus.BAD_REQUEST, "사용할 수 없는 기프트카드입니다.");
+    GIFT_CARD_INVALID_STATE(HttpStatus.BAD_REQUEST, "사용할 수 없는 기프트카드입니다."),
+
+    // ─── education (과정·차시) ───────────────────────────────────────────────────
+    // 코드 문자열 COURSE_NOT_FOUND 는 education 이 자체 advice 로 이미 내보내던 값이다 —
+    // 본문 스키마만 공통으로 바꾸고 코드는 그대로 둬서 기존 클라이언트의 분기를 깨지 않는다.
+    COURSE_NOT_FOUND(HttpStatus.NOT_FOUND, "과정을 찾을 수 없습니다."),
+    // 상태머신 전이 거부 — order/payment 의 INVALID_ORDER_STATE·INVALID_PAYMENT_STATE 와 같은 결이라
+    // 409 가 아닌 400 으로 맞춘다(같은 성격의 실패가 서비스마다 다른 코드로 나가지 않게).
+    COURSE_INVALID_STATE(HttpStatus.BAD_REQUEST, "현재 상태에서는 과정을 변경할 수 없습니다."),
+    // 재정렬 요청이 과정의 차시 집합과 일치하지 않는 경우 — 서버 상태가 아니라 요청이 틀렸다.
+    LESSON_ORDER_INVALID(HttpStatus.BAD_REQUEST, "차시 순서 요청이 과정의 차시 목록과 일치하지 않습니다."),
+    // 경로가 주장한 과정에 그 차시가 없다 — 403 이 아니라 404 다. 403 으로 답하면 "다른 과정에는
+    // 그 차시가 있다"는 사실까지 알려주게 된다.
+    LESSON_NOT_IN_COURSE(HttpStatus.NOT_FOUND, "해당 과정에 속한 차시가 아닙니다.");
 
     private final HttpStatus status;
     private final String defaultMessage;
