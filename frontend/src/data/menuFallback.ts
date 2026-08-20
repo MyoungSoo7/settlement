@@ -58,6 +58,9 @@ export const FALLBACK_MENUS: FallbackMenuNode[] = [
       { id: -107, name: '월마감', path: '/admin/settlement/monthly-closing', icon: '📆', description: '셀러 월 정산 마트 집계 · 재실행', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN'] },
       { id: -108, name: '세무', path: '/admin/settlement/tax', icon: '🧾', description: '스캔 리뷰 · 전표 전기 · 세금계산서', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       { id: -109, name: '수수료율', path: '/admin/settlement/commission-rates', icon: '⚖️', description: '셀러·등급 요율 정책 · 이력', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN'] },
+      // 등급이 요율·주기·홀드백을 동시에 정하므로 '수수료율' 바로 옆이다. 서버가
+      // /admin/seller-tiers/** 를 ADMIN 으로 막는다 — MANAGER 에게 보이면 죽은 링크다.
+      { id: -112, name: '셀러 등급', path: '/admin/settlement/seller-tiers', icon: '🏅', description: '등급 재산정 · 관리자 지정 · 캐시 정합', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN'] },
       { id: -110, name: 'DLQ 재처리', path: '/admin/settlement/dlq', icon: '📮', description: '처리 실패 이벤트 확인 · 재발행', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN'] },
       { id: -102, name: '원장·시산표', path: '/admin/settlement/ledger', icon: '📒', description: '분개 조회 · 월 시산표 · 기간 마감', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
     ],

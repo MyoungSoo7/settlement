@@ -95,13 +95,10 @@ const SCREEN_PENDING = new Map([
   ['order-service/RefundHistoryController', '환불 이력 조회 화면'],
   ['order-service/SplitPaymentController', '분할결제 UI'],
   ['order-service/ProductVariantController', '상품 옵션(SKU) 관리 화면'],
-  ['order-service/AdminSellerTierController', '셀러 등급 관리 — 정산 수수료율과 직결된다'],
-  ['order-service/AdminTrackingUploadController', '송장 일괄 업로드 화면'],
   ['order-service/MembershipController', '멤버십 관리 화면'],
   // --- settlement-service (docs/PLAN.md §8-8) ---
   ['settlement-service/EventTrackAdminController', '이벤트 추적 콘솔 — PLAN 8-8'],
   ['settlement-service/SettlementRerunAdminController', '정산 재구동 — PLAN 8-8'],
-  ['settlement-service/HoldbackPreviewAdminController', '홀드백 미리보기'],
   ['settlement-service/SellerBankAccountAdminController', '셀러 계좌 레지스트리 — PLAN 8-2'],
   ['settlement-service/SellerBankAccountSelfController', '셀러 본인 계좌 등록(셀러 화면)'],
   ['settlement-service/SettlementQueryController', 'ES 기반 정산 검색'],
@@ -129,7 +126,6 @@ const SCREEN_PENDING = new Map([
   ['insurance-service/ProductDisclosureController', '상품설명서 교부 증빙 화면(완전판매 게이트)'],
   // --- deposit-service ---
   ['deposit-service/DepositAdminController', '예치금 수기 콘솔 — 증빙 리뷰 큐만 화면이 있다'],
-  ['deposit-service/DepositController', '예치금 조회 화면'],
   // --- 그 외 ---
   ['ai-service/KnowledgeController', 'AI 지식베이스 관리'],
   ['common-data-service/DataSourceController', '공공데이터 데이터소스 등록 화면'],
@@ -144,7 +140,11 @@ const SCREEN_PENDING = new Map([
 // 2026-08-21: 35 (게이트웨이가 라우팅하지 않는 7종을 MACHINE_ONLY 로 정정 — 화면을 만든 게 아니라
 //              애초에 브라우저가 부를 수 없던 것을 부채로 세고 있었다. 이 7종에 화면을 붙이려면
 //              먼저 게이트웨이 노출 정책을 바꿔야 하고, 그건 화면 작업이 아니라 배선 결정이다.)
-const PENDING_BUDGET = 35;
+// 2026-08-21: 31 (화면 4종을 실제로 붙였다 — 예치금 잔고(내 잔액), 송장 일괄 업로드(배송 관리),
+//              홀드백 해제 미리보기(지급 콘솔), 셀러 등급 콘솔(신규 화면). 앞의 셋은 기존 화면에
+//              구획을 얹었고 넷째만 새 라우트라, 부채 상환 비용이 화면 수와 비례하지 않는다는
+//              방증이기도 하다.)
+const PENDING_BUDGET = 31;
 
 const read = (path) => readFileSync(path, 'utf8');
 

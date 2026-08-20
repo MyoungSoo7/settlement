@@ -3,6 +3,9 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import PayoutAdminPage from '@/pages/PayoutAdminPage';
 import { ToastProvider } from '@/contexts/ToastContext';
 import { payoutApi, type Payout } from '@/api/payout';
+import { settlementApi } from '@/api/settlement';
+
+vi.mock('@/api/settlement', () => ({ settlementApi: { holdbackPreview: vi.fn() } }));
 
 vi.mock('@/api/payout', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/api/payout')>();
@@ -177,5 +180,53 @@ describe('PayoutAdminPage', () => {
 
     await waitFor(() => expect(payoutApi.listPending).toHaveBeenCalledWith(50));
     await waitFor(() => expect(screen.getByText('지급 대기 건이 없습니다.')).toBeInTheDocument());
+  });
+
+  /**
+   * 홀드백 미리보기는 조회 전용이다 — 이 패널에 실행 버튼을 두면 "미리보기 화면에서
+   * 눌렀을 뿐인데 지급이 나갔다"가 가능해진다. 그리고 잘린 결과를 잘렸다고 말하지 않으면
+   * 운영자가 목록 길이를 전체 규모로 읽고 자금 계획을 세운다.
+   */
+  describe('홀드백 해제 미리보기', () => {
+    it('조회 결과를 건수·금액으로 보여 주되 해제 버튼은 두지 않는다', async () => {
+      vi.mocked(settlementApi.holdbackPreview).mockResolvedValue({
+        count: 2, totalAmount: 300000, truncated: false,
+        lines: [
+          { settlementId: 501, paymentId: 900, holdbackAmount: 100000, releaseDate: '2026-09-01' },
+          { settlementId: 502, paymentId: 901, holdbackAmount: 200000, releaseDate: '2026-09-01' },
+        ],
+      });
+      renderPage();
+
+      fireEvent.click(await screen.findByRole('button', { name: '조회' }));
+
+      await waitFor(() => expect(screen.getByText('2건')).toBeInTheDocument());
+      expect(screen.getByText(/이 화면에서는 아무것도 해제되지 않습니다/)).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /해제/ })).not.toBeInTheDocument();
+    });
+
+    it('한도까지 가득 차면 전체가 아니라고 알린다', async () => {
+      vi.mocked(settlementApi.holdbackPreview).mockResolvedValue({
+        count: 200, totalAmount: 50000000, truncated: true,
+        lines: [{ settlementId: 501, paymentId: 900, holdbackAmount: 100000, releaseDate: '2026-09-01' }],
+      });
+      renderPage();
+
+      fireEvent.click(await screen.findByRole('button', { name: '조회' }));
+
+      await waitFor(() => expect(screen.getByText(/전체가 아닙니다/)).toBeInTheDocument());
+    });
+
+    it('풀릴 게 없으면 없다고 말한다 — 빈 표로 두면 조회 실패와 구분되지 않는다', async () => {
+      vi.mocked(settlementApi.holdbackPreview).mockResolvedValue({
+        count: 0, totalAmount: 0, truncated: false, lines: [],
+      });
+      renderPage();
+
+      fireEvent.click(await screen.findByRole('button', { name: '조회' }));
+
+      await waitFor(() =>
+        expect(screen.getByText('이 날짜에 풀릴 홀드백이 없습니다.')).toBeInTheDocument());
+    });
   });
 });

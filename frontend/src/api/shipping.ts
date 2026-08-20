@@ -89,6 +89,23 @@ export const nextShippingActions = (
   }
 };
 
+/** 송장 일괄 등록 행별 결과 — 실패는 사유를 담는다. */
+export interface BulkTrackingLine {
+  orderId: number | null;
+  carrier: string | null;
+  trackingNumber: string | null;
+  applied: boolean;
+  reason: string;
+}
+
+/** `dryRun` 이 true 면 아무것도 바뀌지 않은 미리보기다 — `applied` 는 "반영될 수 있는 행 수"다. */
+export interface BulkTrackingResult {
+  applied: number;
+  failed: number;
+  dryRun: boolean;
+  lines: BulkTrackingLine[];
+}
+
 export const shippingApi = {
   /** GET — 배송이 없으면 404 다(주문은 있으나 배송 생성 전). */
   get: async (orderId: number): Promise<Shipment> => {
@@ -130,5 +147,22 @@ export const shippingApi = {
   markReturned: async (orderId: number): Promise<Shipment> => {
     const response = await api.post<ShipmentEnvelope>(`${base(orderId)}/returned`);
     return response.data.shipment;
+  },
+
+  /**
+   * POST /admin/shipments/tracking-upload — 송장 CSV 일괄 등록.
+   *
+   * <p>**`dryRun` 기본값이 true 인 것은 서버 규약이다.** 수백 행이 한 번에 출고 처리되는 작업이라,
+   * 파라미터를 빠뜨린 호출이 곧바로 실행이 되어선 안 된다. 여기서도 기본값을 그대로 두어
+   * 호출부가 실행을 <b>명시</b>하게 한다 — 기본값을 false 로 뒤집으면 서버가 세운 안전장치를
+   * 클라이언트가 무력화하는 셈이다.
+   */
+  uploadTracking: async (file: File, dryRun = true): Promise<BulkTrackingResult> => {
+    const form = new FormData();
+    form.append('file', file);
+    const response = await api.post<BulkTrackingResult>('/admin/shipments/tracking-upload', form, {
+      params: { dryRun },
+    });
+    return response.data;
   },
 };

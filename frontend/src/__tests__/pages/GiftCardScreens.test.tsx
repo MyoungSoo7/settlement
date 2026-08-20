@@ -12,6 +12,12 @@ vi.mock('@/api/giftCard', () => ({
 vi.mock('@/api/point', () => ({
   pointApi: { grant: vi.fn(), runExpiry: vi.fn(), myBalance: vi.fn() },
 }));
+// 잔액 화면은 예치금도 함께 읽는다. 여기서는 계좌 없는 사용자(=셀러가 아님)를 가정한다 —
+// 예치금 구획 자체가 그려지지 않아 이 파일이 보는 포인트·상품권 계약은 그대로다.
+// 예치금 3상태는 MyBalancesPage.test.tsx 가 따로 못박는다.
+vi.mock('@/api/deposit', () => ({
+  depositApi: { myAccount: vi.fn().mockResolvedValue(null), accountOf: vi.fn() },
+}));
 
 const mockedGiftCard = vi.mocked(giftCardApi);
 const mockedPoint = vi.mocked(pointApi);

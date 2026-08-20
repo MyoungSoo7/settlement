@@ -7,6 +7,7 @@ import {
   PAYOUT_STATUS_LABEL,
   newIdempotencyKey,
 } from '@/api/payout';
+import { settlementApi, type HoldbackReleasePreview } from '@/api/settlement';
 import Spinner from '@/components/Spinner';
 import { errorDetail, apiErrorStatus } from '@/lib/apiError';
 import { useToast } from '@/contexts/useToast';
@@ -177,6 +178,116 @@ const PayoutRow: React.FC<{
         </div>
       )}
     </div>
+  );
+};
+
+/* ─────────────────────────────────────────
+   홀드백 해제 미리보기
+───────────────────────────────────────── */
+
+/**
+ * 그날 무엇이 얼마나 풀려 지급 대상이 되는지 미리 본다.
+ *
+ * <p>이 패널에는 <b>실행 버튼이 없다.</b> 서버 엔드포인트가 조회 전용이고, 실제 해제는 배치나
+ * 재실행 콘솔의 몫이다. 여기에 실행 버튼을 놓으면 "미리보기 화면에서 눌렀을 뿐인데 지급이
+ * 나갔다"가 가능해진다 — 조회 화면과 집행 화면을 섞지 않는다.
+ *
+ * <p>날짜를 미래로 둘 수 있게 열어 둔 이유는 자금 계획이다. 오늘 풀릴 것만 볼 수 있으면
+ * "다음 주에 얼마가 필요한가"에 답할 수 없다.
+ */
+const HoldbackPreviewPanel: React.FC = () => {
+  const today = new Date().toISOString().slice(0, 10);
+  const [date, setDate] = useState(today);
+  const [preview, setPreview] = useState<HoldbackReleasePreview | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      setPreview(await settlementApi.holdbackPreview(date));
+    } catch (err) {
+      setError(errorDetail(err, '홀드백 미리보기를 불러오지 못했습니다.'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <section className="bg-white rounded-xl border border-gray-200 p-4 mb-4 space-y-3"
+      data-testid="holdback-preview">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="font-semibold text-gray-900">홀드백 해제 미리보기</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            조회 전용입니다 — 이 화면에서는 아무것도 해제되지 않습니다.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
+            aria-label="해제 기준일"
+            className="rounded border border-gray-300 px-2 py-1.5 text-sm" />
+          <button type="button" onClick={() => void load()} disabled={loading}
+            className="px-3 py-2 text-sm font-semibold rounded border border-gray-300 text-gray-700 bg-white disabled:opacity-50">
+            {loading ? '조회 중…' : '조회'}
+          </button>
+        </div>
+      </div>
+
+      {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+
+      {preview && (
+        <div className="space-y-2">
+          <div className="grid gap-2 sm:grid-cols-2">
+            <div className="rounded bg-gray-50 p-3">
+              <p className="text-xs text-gray-500">해제 예정</p>
+              <p className="text-lg font-bold text-gray-900">{preview.count}건</p>
+            </div>
+            <div className="rounded bg-gray-50 p-3">
+              <p className="text-xs text-gray-500">해제 금액</p>
+              <p className="text-lg font-bold text-gray-900">{fmt(preview.totalAmount)}</p>
+            </div>
+          </div>
+
+          {/* 잘렸다는 사실을 숨기면 운영자가 목록 길이를 전체 규모로 읽는다. */}
+          {preview.truncated && (
+            <p role="status" className="text-sm text-yellow-800 bg-yellow-50 rounded px-3 py-2">
+              조회 한도까지 가득 찼습니다 — 위 건수·금액은 <b>전체가 아닙니다</b>.
+            </p>
+          )}
+
+          {preview.lines.length > 0 && (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead className="text-left text-gray-500">
+                  <tr>
+                    <th className="py-1 pr-4">정산</th>
+                    <th className="py-1 pr-4">결제</th>
+                    <th className="py-1 pr-4">홀드백</th>
+                    <th className="py-1">해제일</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {preview.lines.map((line) => (
+                    <tr key={line.settlementId} className="border-t border-gray-100">
+                      <td className="py-1 pr-4">#{line.settlementId}</td>
+                      <td className="py-1 pr-4">#{line.paymentId}</td>
+                      <td className="py-1 pr-4">{fmt(line.holdbackAmount)}</td>
+                      <td className="py-1">{line.releaseDate}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {preview.count === 0 && (
+            <p className="text-sm text-gray-500">이 날짜에 풀릴 홀드백이 없습니다.</p>
+          )}
+        </div>
+      )}
+    </section>
   );
 };
 
@@ -354,6 +465,8 @@ const PayoutAdminPage: React.FC = () => {
         </div>
 
         <PreviewPanel onExecuted={() => void load()} />
+
+        <HoldbackPreviewPanel />
 
         <div className="flex bg-white rounded-xl border border-gray-200 p-1 mb-4">
           {([

@@ -23,6 +23,7 @@ vi.mock('@/api/shipping', async (importOriginal) => {
       markDelivered: vi.fn(),
       markReturned: vi.fn(),
       changeAddress: vi.fn(),
+      uploadTracking: vi.fn(),
     },
   };
 });
@@ -291,5 +292,89 @@ describe('ShippingAdminPage — 출고·상태 전이', () => {
     await renderAndWait();
 
     expect(screen.getByText(/CJ대한통운 1234567890/)).toBeInTheDocument();
+  });
+});
+
+/**
+ * 송장 일괄 업로드 — 수백 행이 한 번에 출고 처리되는 작업이라 미리보기가 문턱이다.
+ *
+ * <p>여기서 못박는 것은 "미리보기를 통과한 <b>그 파일</b>에만 반영이 열린다"는 것이다.
+ * 파일을 바꿨는데 이전 판정이 남아 있으면 A 를 미리보고 B 를 반영하게 되고, 그 실수는
+ * 출고가 나간 뒤에야 드러난다.
+ */
+describe('ShippingAdminPage — 송장 일괄 업로드', () => {
+  const csv = () => new File(['order_id,carrier,tracking_number\n7,CJ,123'], 'tracking.csv',
+    { type: 'text/csv' });
+
+  const result = (over: Record<string, unknown> = {}) => ({
+    applied: 2, failed: 1, dryRun: true,
+    lines: [
+      { orderId: 7, carrier: 'CJ', trackingNumber: '123', applied: true, reason: '' },
+      { orderId: 9, carrier: 'CJ', trackingNumber: '', applied: false, reason: '운송장 번호가 없습니다' },
+    ],
+    ...over,
+  });
+
+  it('파일을 고르기 전에는 미리보기·반영 둘 다 잠겨 있다', async () => {
+    mockedShipping.get.mockResolvedValue(shipment());
+    await renderAndWait();
+
+    expect(screen.getByRole('button', { name: '미리보기' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '반영' })).toBeDisabled();
+  });
+
+  it('미리보기는 dryRun=true 로 부르고 실패 행의 사유를 보여 준다', async () => {
+    const user = userEvent.setup();
+    mockedShipping.get.mockResolvedValue(shipment());
+    mockedShipping.uploadTracking.mockResolvedValue(result());
+    await renderAndWait();
+
+    await user.upload(screen.getByLabelText('송장 CSV 파일'), csv());
+    await user.click(screen.getByRole('button', { name: '미리보기' }));
+
+    await waitFor(() => expect(screen.getByTestId('tracking-upload-result')).toBeInTheDocument());
+    expect(mockedShipping.uploadTracking).toHaveBeenCalledWith(expect.any(File), true);
+    expect(screen.getByText(/아직 아무것도 바뀌지 않았습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/운송장 번호가 없습니다/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '2건 반영' })).toBeEnabled();
+  });
+
+  it('파일을 바꾸면 이전 미리보기를 버려 반영 버튼이 다시 잠긴다', async () => {
+    const user = userEvent.setup();
+    mockedShipping.get.mockResolvedValue(shipment());
+    mockedShipping.uploadTracking.mockResolvedValue(result());
+    await renderAndWait();
+
+    const input = screen.getByLabelText('송장 CSV 파일');
+    await user.upload(input, csv());
+    await user.click(screen.getByRole('button', { name: '미리보기' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: '2건 반영' })).toBeEnabled());
+
+    // 다른 파일로 바꾼 순간, 앞선 판정은 이 파일의 것이 아니다.
+    await user.upload(input, new File(['order_id,carrier,tracking_number\n8,LOTTE,999'],
+      'other.csv', { type: 'text/csv' }));
+
+    expect(screen.getByRole('button', { name: '반영' })).toBeDisabled();
+    expect(screen.queryByTestId('tracking-upload-result')).not.toBeInTheDocument();
+  });
+
+  it('반영은 dryRun=false 로 부르고 목록을 다시 읽는다', async () => {
+    const user = userEvent.setup();
+    mockedShipping.get.mockResolvedValue(shipment());
+    mockedShipping.uploadTracking.mockResolvedValue(result());
+    await renderAndWait();
+
+    await user.upload(screen.getByLabelText('송장 CSV 파일'), csv());
+    await user.click(screen.getByRole('button', { name: '미리보기' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: '2건 반영' })).toBeEnabled());
+
+    mockedShipping.uploadTracking.mockResolvedValue(result({ dryRun: false }));
+    mockedAdmin.getAllOrders.mockClear();
+    await user.click(screen.getByRole('button', { name: '2건 반영' }));
+
+    await waitFor(() =>
+      expect(mockedShipping.uploadTracking).toHaveBeenLastCalledWith(expect.any(File), false));
+    expect(screen.getByText(/반영 완료/)).toBeInTheDocument();
+    await waitFor(() => expect(mockedAdmin.getAllOrders).toHaveBeenCalled());
   });
 });

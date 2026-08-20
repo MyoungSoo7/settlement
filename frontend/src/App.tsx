@@ -56,6 +56,7 @@ const ShippingAdminPage = lazy(() => import('./pages/ShippingAdminPage'));
 const ShippingPolicyAdminPage = lazy(() => import('./pages/ShippingPolicyAdminPage'));
 const OrderApprovalPage = lazy(() => import('./pages/OrderApprovalPage'));
 const PayoutAdminPage = lazy(() => import('./pages/PayoutAdminPage'));
+const SellerTierAdminPage = lazy(() => import('./pages/SellerTierAdminPage'));
 
 // 정산운영 콘솔 — settlement-service 운영 API(/admin/**)를 화면으로 노출한다.
 const IntegrityConsolePage = lazy(() => import('./pages/settlement/IntegrityConsolePage'));
@@ -207,6 +208,11 @@ function App() {
             {/* 요율은 정산 금액을 직접 바꾼다 — 서버가 /admin/commission-rates/** 를 ADMIN 으로만 막는다 */}
             <Route path="/admin/settlement/commission-rates"
               element={<AdminOnlyRoute><SideNavLayout><CommissionRateConsolePage /></SideNavLayout></AdminOnlyRoute>} />
+            {/* 셀러 등급도 같은 이유로 ADMIN 전용이다(서버 /admin/seller-tiers/**). API 경로는
+                order-service 의 /admin/seller-tiers 지만 화면 URL 을 /admin/settlement/** 아래 두는 것은
+                nginx SPA 폴백 제약 때문이다 — 위 정산운영 블록 주석 참조. */}
+            <Route path="/admin/settlement/seller-tiers"
+              element={<AdminOnlyRoute><SideNavLayout><SellerTierAdminPage /></SideNavLayout></AdminOnlyRoute>} />
             {/* 세무는 서버가 /admin/tax/** · /admin/seller-tax-profiles/** 를 ADMIN·MANAGER 로 막는다 */}
             <Route path="/admin/settlement/tax"
               element={<AdminManagerRoute><SideNavLayout><TaxConsolePage /></SideNavLayout></AdminManagerRoute>} />
