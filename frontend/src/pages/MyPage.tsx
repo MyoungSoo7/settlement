@@ -8,6 +8,7 @@ import Spinner from '@/components/Spinner';
 import StarRating from '@/components/review/StarRating';
 import ReviewForm from '@/components/review/ReviewForm';
 import ReviewList from '@/components/review/ReviewList';
+import CashReceiptPanel from '@/components/CashReceiptPanel';
 
 const USER_ID = 1;
 
@@ -245,6 +246,10 @@ const MyPage: React.FC = () => {
                         )}
                       </div>
                     )}
+
+                    {/* 현금영수증 — 계좌이체·가상계좌 결제만 대상(카드는 카드사 전표로 이미 신고됨).
+                        결제된 주문에만 노출한다: 입금 전에는 발급할 것이 없다. */}
+                    {order.status === 'PAID' && <CashReceiptPanel orderId={order.id} />}
                   </div>
                 );
               })}

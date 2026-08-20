@@ -163,8 +163,32 @@ class RefundApprovalIT {
         // 이 IT 는 PG 성공 경로만 검증하므로(실패 롤백·독립 커밋 미검증) 동작에 문제없다.
         var refundLifecycle = new RefundLifecycle(refundAdapter, refundAdapter,
                 new github.lms.lemuel.common.opssignal.NoOpOpsSignalPublisher());
+        // 현금영수증도 이 시나리오의 관심사가 아니다 — 카드 결제라 애초에 발급 대상이 아니다.
+        github.lms.lemuel.payment.application.port.in.CashReceiptUseCase noopCashReceipt =
+                new github.lms.lemuel.payment.application.port.in.CashReceiptUseCase() {
+                    @Override public github.lms.lemuel.payment.domain.CashReceipt issue(IssueCommand c) {
+                        throw new UnsupportedOperationException();
+                    }
+                    @Override public github.lms.lemuel.payment.domain.CashReceipt issueForOrder(
+                            Long orderId, Long requesterUserId,
+                            github.lms.lemuel.payment.domain.CashReceiptPurpose purpose,
+                            github.lms.lemuel.payment.domain.CashReceiptIdentifier.Type type,
+                            String value) {
+                        throw new UnsupportedOperationException();
+                    }
+                    @Override public java.util.Optional<github.lms.lemuel.payment.domain.CashReceipt>
+                            findActiveByPayment(Long paymentId, Long requesterUserId) {
+                        return java.util.Optional.empty();
+                    }
+                    @Override public java.util.Optional<github.lms.lemuel.payment.domain.CashReceipt>
+                            findActiveByOrder(Long orderId, Long requesterUserId) {
+                        return java.util.Optional.empty();
+                    }
+                    @Override public void cancelForPayment(Long paymentId, String reason) { }
+                };
         var refundUseCase = new RefundPaymentUseCase(paymentAdapter, paymentAdapter, pgStub,
-                updateOrderStatus, publishPayment, refundAdapter, refundAdapter, refundLifecycle);
+                updateOrderStatus, publishPayment, refundAdapter, refundAdapter, refundLifecycle,
+                noopCashReceipt);
         var getPayment = new GetPaymentUseCase(paymentAdapter);
         RefundOrderPaymentPort refundOrderPaymentPort =
                 new OrderPaymentRefundAdapter(getPayment, refundUseCase);

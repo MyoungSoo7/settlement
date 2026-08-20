@@ -68,6 +68,9 @@ public enum ErrorCode {
     MISSING_IDEMPOTENCY_KEY(HttpStatus.BAD_REQUEST, "멱등성 키(Idempotency-Key)가 필요합니다."),
     REFUND_EXCEEDS_PAYMENT(HttpStatus.CONFLICT, "환불 금액이 결제 금액을 초과합니다."),
     REFUND_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "환불 처리 중 오류가 발생했습니다."),
+    CASH_RECEIPT_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "이 결제는 현금영수증 발급 대상이 아닙니다."),
+    INVALID_CASH_RECEIPT_STATE(HttpStatus.BAD_REQUEST, "현재 상태에서 처리할 수 없는 현금영수증 요청입니다."),
+    DUPLICATE_CASH_RECEIPT(HttpStatus.CONFLICT, "이미 발급된 현금영수증이 있습니다."),
 
     // ─── settlement / ledger ──────────────────────────────────────────────────
     SETTLEMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "정산을 찾을 수 없습니다."),
