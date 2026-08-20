@@ -86,7 +86,6 @@ const SCREEN_PENDING = new Map([
   ['settlement-service/HoldbackPreviewAdminController', '홀드백 미리보기'],
   ['settlement-service/SellerBankAccountAdminController', '셀러 계좌 레지스트리 — PLAN 8-2'],
   ['settlement-service/SellerBankAccountSelfController', '셀러 본인 계좌 등록(셀러 화면)'],
-  ['settlement-service/ReportController', '정산 리포트(PDF) 다운로드'],
   ['settlement-service/SettlementQueryController', 'ES 기반 정산 검색'],
   // 관리자 세무 3종은 /admin/settlement/tax 콘솔로 노출됐다(2026-08-14). 아래 둘은 셀러 화면 몫이라 남는다.
   ['settlement-service/TaxInvoiceScanController', '세금계산서 스캔(셀러 화면)'],
@@ -128,7 +127,8 @@ const SCREEN_PENDING = new Map([
  * 미노출 부채의 상한. <b>내려가기만 한다</b> — 화면을 붙였으면 이 수를 함께 내린다.
  * 올리려면 그 자체가 리뷰 대상이라는 뜻이다.
  */
-const PENDING_BUDGET = 43;
+// 2026-08-20: 42 (ReportController → 매출 통계 콘솔 /admin/settlement/sales-stats 이 cashflow 를 부른다)
+const PENDING_BUDGET = 42;
 
 const read = (path) => readFileSync(path, 'utf8');
 

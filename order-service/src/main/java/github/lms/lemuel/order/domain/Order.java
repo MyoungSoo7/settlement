@@ -88,6 +88,24 @@ public class Order {
      *                       0 보다 커야 하므로 subtotal 미만이어야 한다.
      */
     public static Order createMultiItem(Long userId, List<OrderItem> items, BigDecimal discountAmount) {
+        return createMultiItem(userId, items, discountAmount, BigDecimal.ZERO);
+    }
+
+    /**
+     * 다건 주문 팩토리 (쿠폰 할인 + 배송비 반영) — 결제 금액이 확정되는 유일한 지점.
+     *
+     * <p>{@code amount = subtotal - discount + shippingFee}. 결제는 {@code order.amount} 로
+     * 만들어지므로(CreatePaymentUseCase) 배송비를 amount 밖에 두면 고객에게 청구되지 않고, 반대로
+     * amount 에만 더하고 {@code shippingFee} 를 비워 두면 배송 후 환불에서 배송비를 되돌려주게 된다
+     * ({@link RefundPolicy} 가 이 필드로 차감액을 계산한다). 둘을 한 호출에서 함께 못박는 이유다.
+     *
+     * <p>할인 상한은 <b>배송비를 뺀 소계</b>다 — 배송비를 더해 총액이 양수가 되더라도 상품 대금이
+     * 0 이하인 주문(= 배송비만 결제하는 주문)은 만들지 않는다.
+     *
+     * @param shippingFee 산정된 배송비(없으면 {@code null}/0). 음수 불가.
+     */
+    public static Order createMultiItem(Long userId, List<OrderItem> items,
+                                        BigDecimal discountAmount, BigDecimal shippingFee) {
         if (items == null || items.isEmpty()) {
             throw new OrderInvariantViolationException("다건 주문은 최소 1 개 이상의 아이템이 필요합니다");
         }
@@ -108,9 +126,14 @@ public class Order {
             throw new OrderInvariantViolationException(
                     "할인 금액(" + discount + ") 이 주문 소계(" + subtotal + ") 이상일 수 없습니다");
         }
+        BigDecimal shipping = shippingFee != null ? shippingFee : BigDecimal.ZERO;
+        if (shipping.signum() < 0) {
+            throw new OrderInvariantViolationException("배송비는 음수일 수 없습니다: " + shipping);
+        }
         LocalDateTime now = LocalDateTime.now();
-        Order order = new Order(null, userId, null, subtotal.subtract(discount),
+        Order order = new Order(null, userId, null, subtotal.subtract(discount).add(shipping),
                 OrderStatus.CREATED, now, now);
+        order.shippingFee = shipping;
         order.validateUserId();
         order.validateAmount();
         order.items.addAll(items);
@@ -185,6 +208,104 @@ public class Order {
         }
         this.status = OrderStatus.REFUNDED;
         this.updatedAt = LocalDateTime.now();
+    }
+
+    /**
+     * 라인 단위 부분 취소 — 지정한 라인을 취소 상태로 바꾸고 <b>취소된 라인 금액 합</b>을 돌려준다.
+     *
+     * <p>주문 총액({@link #getAmount()})은 발행된 영수증이라 여기서 바뀌지 않는다. 얼마를 실제로
+     * 되돌려줬는지는 결제의 {@code refundedAmount} 가 들고 있고, 이 메서드는 "어떤 라인이 살아
+     * 있는가"만 확정한다. 그 살아남은 라인이 배송비 재산정의 입력이 된다 — 무료배송 임계를 채우던
+     * 상품이 빠지면 면제됐던 배송비가 되살아난다(실무 커머스의 배송비 재부과 규칙).
+     *
+     * <p><b>배송 시작 후에는 거절</b>한다. 이미 출고된 물건을 "취소"로 처리하면 재고가 장부에만
+     * 돌아오고 실물은 고객에게 있다 — 그 경로는 반품(회수 확인 후 원복)이다.
+     *
+     * @param itemIds 취소할 라인 id 목록(비어 있으면 거절, 주문에 없는 id·이미 취소된 id 도 거절)
+     * @return 취소된 라인들의 {@code lineAmount} 합
+     */
+    public BigDecimal cancelItems(List<Long> itemIds) {
+        if (itemIds == null || itemIds.isEmpty()) {
+            throw new OrderInvariantViolationException("취소할 주문 라인을 지정해야 합니다");
+        }
+        if (!isMultiItem()) {
+            throw new OrderInvariantViolationException("라인이 없는 주문은 부분 취소 대상이 아닙니다");
+        }
+        if (!isItemCancelable()) {
+            throw new InvalidOrderStateException(this.status, OrderStatus.CANCELED);
+        }
+
+        List<OrderItem> targets = new ArrayList<>(itemIds.size());
+        for (Long itemId : itemIds) {
+            OrderItem target = items.stream()
+                    .filter(item -> itemId.equals(item.getId()))
+                    .findFirst()
+                    .orElseThrow(() -> new OrderInvariantViolationException(
+                            "이 주문에 없는 라인입니다: itemId=" + itemId));
+            targets.add(target);
+        }
+
+        // 전량 검증 후 일괄 취소 — 중간 라인에서 실패하면 앞 라인만 취소된 반쪽 상태가 남는다.
+        BigDecimal canceledSubtotal = BigDecimal.ZERO;
+        for (OrderItem target : targets) {
+            if (target.isCanceled()) {
+                throw new OrderInvariantViolationException(
+                        "이미 취소된 주문 라인입니다: itemId=" + target.getId());
+            }
+        }
+        for (OrderItem target : targets) {
+            target.cancel();
+            canceledSubtotal = canceledSubtotal.add(target.getLineAmount());
+        }
+        this.updatedAt = LocalDateTime.now();
+        return canceledSubtotal;
+    }
+
+    /** 아직 취소되지 않은 라인 — 배송비 재산정·출고 대상의 진실의 원천. */
+    public List<OrderItem> activeItems() {
+        return items.stream().filter(item -> !item.isCanceled()).toList();
+    }
+
+    /** 라인이 하나도 남지 않았는지(= 주문 전체가 취소된 것과 같은지). */
+    public boolean allItemsCanceled() {
+        return isMultiItem() && activeItems().isEmpty();
+    }
+
+    /**
+     * 취소·환불 <b>신청 철회</b> — 신청 상태에서 신청 직전 상태로 되돌린다.
+     *
+     * <p>신청 상태(CANCELLATION_REQUESTED / REFUND_REQUESTED)에서 나가는 길이 승인뿐이면, 마음이
+     * 바뀐 고객의 주문은 운영자가 처리할 때까지 묶인다. 철회는 그 막다른 길을 여는 정상 경로다.
+     *
+     * <p>되돌아갈 상태를 임의로 받지 않는다 — <b>그 신청을 낼 수 있었던 상태</b>여야 한다
+     * ({@code restoreTo.canTransitionTo(현재 상태)}). 이 한 줄 덕에 "배송 중이던 주문의 환불
+     * 신청을 철회하면 배송 중으로 돌아간다"가 자동으로 성립하고, 결제된 적 없는 주문이 PAID 로
+     * 승격되는 경로는 열리지 않는다. 전이표를 역방향으로 확장하지 않는 이유이기도 하다 —
+     * 되돌리기는 이 메서드 하나로만 가능하다.
+     *
+     * @param restoreTo 신청 직전 상태(호출자가 상태 이력에서 읽어 온다)
+     */
+    public void withdrawRequest(OrderStatus restoreTo) {
+        if (this.status != OrderStatus.CANCELLATION_REQUESTED
+                && this.status != OrderStatus.REFUND_REQUESTED) {
+            throw new InvalidOrderStateException(this.status, "철회할 신청이 없습니다");
+        }
+        if (restoreTo == null) {
+            throw new OrderInvariantViolationException("철회 후 복귀할 상태를 지정해야 합니다");
+        }
+        if (!restoreTo.canTransitionTo(this.status)) {
+            throw new OrderInvariantViolationException(
+                    "이 신청을 낼 수 없었던 상태로는 되돌릴 수 없습니다: " + restoreTo + " → " + this.status);
+        }
+        this.status = restoreTo;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    /** 라인 단위 취소가 허용되는 단계인지 — 출고 전까지만. */
+    public boolean isItemCancelable() {
+        return this.status == OrderStatus.CREATED
+                || this.status == OrderStatus.PAID
+                || this.status == OrderStatus.SHIPPING_PENDING;
     }
 
     public boolean isCancelable() {

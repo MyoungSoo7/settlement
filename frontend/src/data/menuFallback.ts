@@ -50,6 +50,7 @@ export const FALLBACK_MENUS: FallbackMenuNode[] = [
     description: 'Settlement Operations', area: 'BACKOFFICE', type: 'GROUP', roles: ['ADMIN', 'MANAGER'],
     children: [
       { id: -101, name: '정합성 검증', path: '/admin/settlement/integrity', icon: '🧪', description: '원장·지급·홀드백·체류 8종', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
+      { id: -111, name: '매출 통계', path: '/admin/settlement/sales-stats', icon: '📊', description: '기간 매출 · 전기 대비 · 결제수단/셀러/상품 구성', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       { id: -103, name: '일일 대사', path: '/admin/settlement/reconciliation', icon: '🔀', description: 'order ↔ settlement 이중장부', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       { id: -104, name: 'PG 대사', path: '/admin/settlement/pg-reconciliation', icon: '🧾', description: 'PG 정산파일 업로드 · 차이 승인 · 마감', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       { id: -105, name: '차지백', path: '/admin/settlement/chargebacks', icon: '⚖️', description: '카드사 분쟁 수락 · 기각', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN'] },
@@ -63,7 +64,12 @@ export const FALLBACK_MENUS: FallbackMenuNode[] = [
   },
   {
     id: -3, name: '배송', path: '/admin/shipping', icon: '🚚', description: null,
-    area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'],
+    area: 'BACKOFFICE', type: 'GROUP', roles: ['ADMIN', 'MANAGER'],
+    children: [
+      { id: -31, name: '배송 관리', path: '/admin/shipping', icon: '🚚', description: '주문별 배송 생성 · 출고 · 상태 전이', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
+      // 서버가 /admin/shipping-policies/** 를 ADMIN 으로 막는다 — MANAGER 에게 보이면 죽은 링크다.
+      { id: -32, name: '배송비 정책', path: '/admin/shipping-policies', icon: '💵', description: '셀러 기본배송비 · 무료배송 임계', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN'] },
+    ],
   },
   {
     id: -4, name: '승인', path: '/admin/approvals', icon: '✅', description: null,
@@ -106,6 +112,9 @@ export const FALLBACK_MENUS: FallbackMenuNode[] = [
       { id: -85, name: '운영관리', path: '/admin/system/operation', icon: '🖥️', description: '인시던트 관제 콘솔', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
       { id: -88, name: '증빙 리뷰 큐', path: '/admin/system/proof-review', icon: '🧾', description: '증빙 OCR 리뷰 큐 (영수증·청약·담보·예치금)', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
       { id: -89, name: '게시판 관리', path: '/admin/system/boards', icon: '📋', description: '게시판 생성 · 스킨 · 권한 정책', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
+      { id: -90, name: '교육 관리', path: '/admin/education/courses', icon: '🎓', description: '교육 과정 · 강의 콘텐츠', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
+      { id: -91, name: '포인트 운영', path: '/admin/system/points', icon: '🪙', description: '수기 지급 · 유효기간 소멸', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
+      { id: -92, name: '기프트카드 운영', path: '/admin/system/gift-cards', icon: '🎁', description: '상품권 발행 · 유효기간 소멸', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
     ],
   },
   {
@@ -114,6 +123,10 @@ export const FALLBACK_MENUS: FallbackMenuNode[] = [
   },
   {
     id: -9, name: '추천받기', path: '/recommend', icon: '✨', description: null,
+    area: 'SHOP', type: 'ITEM', roles: ['USER'],
+  },
+  {
+    id: -10, name: '내 포인트·상품권', path: '/my/balances', icon: '🪙', description: null,
     area: 'SHOP', type: 'ITEM', roles: ['USER'],
   },
 ];

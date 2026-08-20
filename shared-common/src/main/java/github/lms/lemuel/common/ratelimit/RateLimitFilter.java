@@ -114,7 +114,12 @@ public class RateLimitFilter extends OncePerRequestFilter {
                         RateLimitPolicy.byActorOrIp(), 10, Duration.ofMinutes(1)),
                 new RateLimitPolicy(
                         "admin", "/admin",
-                        RateLimitPolicy.byActorOrIp(), 30, Duration.ofMinutes(1))
+                        RateLimitPolicy.byActorOrIp(), 30, Duration.ofMinutes(1)),
+                // 기프트카드 코드 등록 — 코드 무차별 대입의 표적이다. 코드 공간이 80비트로 넓어도
+                // 속도 제한이 없으면 봇은 계속 두드린다. 정상 사용자는 분당 몇 번 이상 등록하지 않는다.
+                new RateLimitPolicy(
+                        "giftcard-redeem", "/api/gift-cards/redeem",
+                        RateLimitPolicy.byActorOrIp(), 5, Duration.ofMinutes(1))
         );
     }
 }

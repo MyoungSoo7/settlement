@@ -7,6 +7,8 @@ import github.lms.lemuel.board.domain.exception.BoardInvariantViolationException
 import github.lms.lemuel.board.domain.exception.BoardNotFoundException;
 import github.lms.lemuel.board.domain.exception.BoardPostNotFoundException;
 import github.lms.lemuel.board.domain.exception.DuplicateBoardKeyException;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -25,7 +27,14 @@ import java.util.stream.Collectors;
  *
  * <p>catch-all({@code Exception}) 핸들러는 두지 않는다 — 그런 핸들러가 있으면 스프링 시큐리티의
  * {@code AccessDeniedException} 까지 삼켜 403 이 500 으로 바뀐다(정산 쪽에서 실제로 겪은 함정).
+ *
+ * <p>{@code @Order} 를 명시한 이유: shared-common 의 {@code GlobalExceptionHandler} 와
+ * {@code MethodArgumentNotValidException}·{@code MaxUploadSizeExceededException} 을 함께 다룬다.
+ * 둘 다 순서를 안 정하면 기본값이 같아(LOWEST_PRECEDENCE) 어느 advice 가 이길지 빈 등록 순서에
+ * 달린다 — 빌드에 따라 응답 스키마가 바뀔 수 있다는 뜻이다. 게시판 전용 메시지를 유지하기 위해
+ * 이 advice 를 명시적으로 앞에 둔다.
  */
+@Order(Ordered.LOWEST_PRECEDENCE - 100)
 @RestControllerAdvice
 public class BoardExceptionHandler {
 

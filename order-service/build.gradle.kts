@@ -49,7 +49,11 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
 
     // Resilience4j (Toss PG)
-    implementation("io.github.resilience4j:resilience4j-spring-boot3:2.2.0")
+    // spring-boot3 가 아니라 spring-boot4 다. 이 프로젝트는 Boot 4 인데 여태 Boot3 전용 모듈을
+    // 쓰고 있었고, 2.4.0 부터 들어간 SpringBoot3Verifier 가 그걸 기동 시점에 예외로 막는다
+    // ("Module ...resilience4j-spring-boot3 is only compatible with Spring Boot 3.x").
+    // 2.3.0 이하엔 그 검증기가 없어서 조용히 굴러갔을 뿐, 조합 자체가 원래 틀렸다.
+    implementation("io.github.resilience4j:resilience4j-spring-boot4:2.4.0")
 
     // Rate limiting
     implementation("com.bucket4j:bucket4j-core:8.10.1")

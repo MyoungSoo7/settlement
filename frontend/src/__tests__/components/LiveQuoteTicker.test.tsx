@@ -3,7 +3,9 @@ import { render, screen, act } from '@testing-library/react';
 import LiveQuoteTicker from '@/components/LiveQuoteTicker';
 import { subscribeQuoteStream, type QuoteStreamState, type QuoteTick } from '@/api/marketStream';
 
-vi.mock('@/api/marketStream', () => ({
+// 구독 함수만 갈아끼우고 나머지(출처 상수·정규화 헬퍼)는 실제 구현을 쓴다.
+vi.mock('@/api/marketStream', async (importActual) => ({
+  ...(await importActual<typeof import('@/api/marketStream')>()),
   subscribeQuoteStream: vi.fn(),
 }));
 

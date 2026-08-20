@@ -4,12 +4,14 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIf;
 import org.springframework.cache.Cache;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
+import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -35,7 +37,17 @@ import static org.assertj.core.api.Assertions.assertThat;
  * </ul>
  */
 @Testcontainers
+@EnabledIf(value = "isDockerAvailable", disabledReason = "Docker is not available")
 class TwoTierCacheIntegrationTest {
+
+    // Docker 없는 환경에서는 통째로 건너뛴다 — 저장소의 다른 Testcontainers 테스트
+    // (AuditLogPersistenceAdapterIT·OutboxClaimConcurrencyIT)와 같은 가드다. 이것만 빠져 있어서
+    // 도커를 안 띄운 로컬에서 :shared-common:test 가 initializationError 로 빨갛게 떴고,
+    // "환경 탓인 실패"와 "진짜 실패"가 같은 색으로 보이면 게이트를 읽는 눈이 무뎌진다.
+    static boolean isDockerAvailable() {
+        try { DockerClientFactory.instance().client(); return true; }
+        catch (Throwable ex) { return false; }
+    }
 
     @Container
     static final GenericContainer<?> REDIS =

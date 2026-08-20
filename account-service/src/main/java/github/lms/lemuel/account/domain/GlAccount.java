@@ -57,7 +57,37 @@ public enum GlAccount {
      * 수신이자비용 (비용, 차변성) — 예금·적금·퇴직연금에 지급할 이자를 인식할 때의 상대계정.
      * 이자는 만기·해지·수급 시점에 일괄 확정해 부채로 전기하며(주기 accrual 미도입), 이 계정이 그 차변을 받는다.
      */
-    INTEREST_EXPENSE(AccountSide.DEBIT);
+    INTEREST_EXPENSE(AccountSide.DEBIT),
+
+    /**
+     * 고객 포인트 선수금 (부채, 대변성) — 미사용 포인트는 회사가 고객에게 진 빚이다.
+     * 충전·적립으로 늘고, 사용·소멸로 줄어든다. owner=CUSTOMER.
+     */
+    POINT_LIABILITY(AccountSide.CREDIT),
+
+    /**
+     * 포인트 판촉비 (비용, 차변성) — 충전 보너스·구매 적립처럼 회사가 얹어 준 포인트의 상대계정.
+     * 현금 충전 원금은 여기가 아니라 {@link #CASH} 가 상대계정이다(고객이 실제로 낸 돈이므로).
+     */
+    POINT_PROMOTION_EXPENSE(AccountSide.DEBIT),
+
+    /**
+     * 포인트 소멸이익 (수익, 대변성) — 유효기간이 지나 사라진 포인트만큼 부채가 소멸한다.
+     * 인식하지 않고 부채로 이월하면 시산표의 부채가 무한히 쌓여 의미를 잃는다.
+     */
+    POINT_BREAKAGE_INCOME(AccountSide.CREDIT),
+
+    /**
+     * 미사용 기프트카드 잔액 (부채, 대변성) — 등록된 상품권은 회사가 진 빚이다.
+     * 포인트 부채와 <b>합치지 않는다</b>: 화면도 시산표도 둘을 나눠 보여 줘야 한다. owner=CUSTOMER.
+     */
+    GIFT_CARD_LIABILITY(AccountSide.CREDIT),
+
+    /** 기프트카드 판촉비 (비용, 차변성) — 무상 발행분의 상대계정. */
+    GIFT_CARD_PROMOTION_EXPENSE(AccountSide.DEBIT),
+
+    /** 기프트카드 소멸이익 (수익, 대변성) — 유효기간이 지나 사라진 잔액. */
+    GIFT_CARD_BREAKAGE_INCOME(AccountSide.CREDIT);
 
     private final AccountSide side;
 

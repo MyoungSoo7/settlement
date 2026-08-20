@@ -10,6 +10,19 @@ const emptyForm: MenuCreateRequest & { active: boolean } = {
   requiredRole: '', requiredPermission: '', visible: true, active: true,
 };
 
+const ADMIN_ONLY_PATHS = new Set([
+  '/admin/payouts',
+  '/admin/settlement/chargebacks',
+  '/admin/settlement/monthly-closing',
+  '/admin/settlement/commission-rates',
+  '/admin/settlement/dlq',
+]);
+
+const isAdminOnlyMenu = (form: Pick<MenuCreateRequest, 'area' | 'path'>) =>
+  form.area === 'SYSTEM'
+  || form.path?.trim().startsWith('/admin/system/') === true
+  || ADMIN_ONLY_PATHS.has(form.path?.trim() ?? '');
+
 const MenuManagementPage: React.FC = () => {
   const [tree, setTree] = useState<MenuNode[]>([]);
   const [flat, setFlat] = useState<MenuNode[]>([]);
@@ -80,6 +93,7 @@ const MenuManagementPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
+    const adminOnly = isAdminOnlyMenu(form);
     const body: MenuCreateRequest = {
       name: form.name.trim(),
       shortName: form.shortName?.trim() || undefined,
@@ -90,7 +104,7 @@ const MenuManagementPage: React.FC = () => {
       menuType: form.menuType,
       parentId: form.parentId ? Number(form.parentId) : null,
       sortOrder: Number(form.sortOrder) || 0,
-      requiredRole: form.requiredRole?.trim() || undefined,
+      requiredRole: adminOnly ? 'ADMIN' : form.requiredRole?.trim() || undefined,
       requiredPermission: form.requiredPermission?.trim() || undefined,
       visible: form.visible,
     };
@@ -306,15 +320,23 @@ const MenuManagementPage: React.FC = () => {
             {/* 역할은 단일 값이 아니라 allowlist 다(예: 'ADMIN,MANAGER'). 셀렉트 하나로 두면
                 기존 다중 값이 화면에서 사라졌다가 저장 때 통째로 날아간다. */}
             <Field label="접근 허용 역할 (비우면 제한 없음)">
+              {isAdminOnlyMenu(form) && (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-2">
+                  시스템·민감 운영 메뉴는 ADMIN 전용입니다. 백엔드에서도 MANAGER 노출을 거부합니다.
+                </p>
+              )}
               <div className="flex flex-wrap gap-3 pt-1">
                 {(roles.length ? roles.map((r) => r.code) : ['ADMIN', 'MANAGER', 'USER']).map((code) => {
-                  const selected = (form.requiredRole ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+                  const selected = isAdminOnlyMenu(form)
+                    ? ['ADMIN']
+                    : (form.requiredRole ?? '').split(',').map((s) => s.trim()).filter(Boolean);
                   const checked = selected.includes(code);
                   return (
                     <label key={code} className="flex items-center gap-1.5 text-sm text-gray-700">
                       <input
                         type="checkbox"
                         checked={checked}
+                        disabled={isAdminOnlyMenu(form) && code !== 'ADMIN'}
                         onChange={(e) => setForm((f) => {
                           const current = (f.requiredRole ?? '').split(',').map((s) => s.trim()).filter(Boolean);
                           const next = e.target.checked

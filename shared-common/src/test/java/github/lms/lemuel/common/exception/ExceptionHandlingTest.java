@@ -5,13 +5,20 @@ import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Path;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.method.annotation.ExceptionHandlerMethodResolver;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+import java.lang.reflect.Method;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -160,6 +167,88 @@ class ExceptionHandlingTest {
         ResponseEntity<ErrorResponse> state = handler.handleIllegalState(new IllegalStateException("상태"));
         assertThat(state.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(state.getBody().errorCode()).isEqualTo(ErrorCode.INVALID_STATE.code());
+    }
+
+    @Test
+    @DisplayName("handleNoResourceFound: 없는 경로 → 404 ENDPOINT_NOT_FOUND (500 아님)")
+    void handleNoResourceFound() {
+        // (httpMethod, requestPath, resourcePath) — 운영에서 실제로 터진 조합 그대로
+        NoResourceFoundException ex =
+                new NoResourceFoundException(HttpMethod.GET, "/actuator/health", "actuator/health");
+        assertThat(ex.getResourcePath()).isEqualTo("actuator/health");
+
+        ResponseEntity<ErrorResponse> res = handler.handleNoResourceFound(ex);
+        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(res.getBody().errorCode()).isEqualTo(ErrorCode.ENDPOINT_NOT_FOUND.code());
+        assertThat(res.getBody().message()).isEqualTo(ErrorCode.ENDPOINT_NOT_FOUND.defaultMessage());
+    }
+
+    @Test
+    @DisplayName("디스패치가 고르는 핸들러도 404 다 — catch-all(500)이 다시 가로채지 못한다")
+    void noResourceFoundIsNotSwallowedByCatchAll() throws Exception {
+        NoResourceFoundException ex =
+                new NoResourceFoundException(HttpMethod.GET, "/actuator/health", "actuator/health");
+
+        // 핸들러를 직접 부르는 테스트는 @ExceptionHandler 매핑이 사라져도 통과한다 — 실제 회귀는
+        // "누가 이 예외를 잡는가" 에서 나므로, 런타임과 같은 선택기로 고른 뒤 그 결과를 검증한다.
+        Method resolved = new ExceptionHandlerMethodResolver(GlobalExceptionHandler.class).resolveMethod(ex);
+        assertThat(resolved).isNotNull();
+
+        @SuppressWarnings("unchecked")
+        ResponseEntity<ErrorResponse> res = (ResponseEntity<ErrorResponse>) resolved.invoke(handler, ex);
+        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(res.getBody().errorCode()).isEqualTo(ErrorCode.ENDPOINT_NOT_FOUND.code());
+    }
+
+    @Test
+    @DisplayName("지원하지 않는 메서드는 405 다 — Allow 헤더로 허용 메서드를 알린다")
+    void methodNotSupportedMapsTo405() throws Exception {
+        // 2026-08-19 실측: POST 전용인 /api/organizations 에 GET 을 치면 500 이 나왔다.
+        HttpRequestMethodNotSupportedException ex =
+                new HttpRequestMethodNotSupportedException("GET", List.of("POST"));
+
+        Method resolved = new ExceptionHandlerMethodResolver(GlobalExceptionHandler.class).resolveMethod(ex);
+        assertThat(resolved).isNotNull();
+
+        @SuppressWarnings("unchecked")
+        ResponseEntity<ErrorResponse> res = (ResponseEntity<ErrorResponse>) resolved.invoke(handler, ex);
+        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
+        assertThat(res.getBody().errorCode()).isEqualTo(ErrorCode.METHOD_NOT_ALLOWED.code());
+        // 405 는 Allow 헤더가 규격 필수다(RFC 9110) — 없으면 클라이언트가 무엇을 써야 할지 모른다.
+        assertThat(res.getHeaders().getAllow()).containsExactly(HttpMethod.POST);
+    }
+
+    @Test
+    @DisplayName("ENDPOINT_NOT_FOUND 는 도메인 XXX_NOT_FOUND 와 구분되는 별도 코드다")
+    void endpointNotFoundIsDistinctFromDomainNotFound() {
+        assertThat(ErrorCode.ENDPOINT_NOT_FOUND.status()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(ErrorCode.ENDPOINT_NOT_FOUND).isNotEqualTo(ErrorCode.ORDER_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("handleMaxUploadSizeExceeded: 업로드 초과 → 413 PAYLOAD_TOO_LARGE (500 아님)")
+    void handleMaxUploadSizeExceeded() throws Exception {
+        // 서블릿이 멀티파트를 끊는 예외라 컨트롤러도 도메인도 실행되지 않는다 — 도메인 크기 검증
+        // (order-service ImageUpload.MAX_SIZE_BYTES)으로는 잡을 수 없고, 이 매핑이 유일한 방어선이다.
+        MaxUploadSizeExceededException ex = new MaxUploadSizeExceededException(5L * 1024 * 1024);
+
+        // 직접 호출은 @ExceptionHandler 매핑이 사라져도 통과한다. 실제 회귀("catch-all 이 500 으로
+        // 가져감")를 잡으려면 런타임과 같은 선택기로 고른 메서드를 검증해야 한다.
+        Method resolved = new ExceptionHandlerMethodResolver(GlobalExceptionHandler.class).resolveMethod(ex);
+        assertThat(resolved).isNotNull();
+
+        @SuppressWarnings("unchecked")
+        ResponseEntity<ErrorResponse> res = (ResponseEntity<ErrorResponse>) resolved.invoke(handler, ex);
+        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.PAYLOAD_TOO_LARGE);
+        assertThat(res.getBody().errorCode()).isEqualTo(ErrorCode.PAYLOAD_TOO_LARGE.code());
+        assertThat(res.getBody().status()).isEqualTo(413);
+    }
+
+    @Test
+    @DisplayName("PAYLOAD_TOO_LARGE 는 400 이 아니라 413 이다 — 요청이 틀린 게 아니라 크다")
+    void payloadTooLargeIs413NotBadRequest() {
+        assertThat(ErrorCode.PAYLOAD_TOO_LARGE.status()).isEqualTo(HttpStatus.PAYLOAD_TOO_LARGE);
+        assertThat(ErrorCode.PAYLOAD_TOO_LARGE.status()).isNotEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     @Test

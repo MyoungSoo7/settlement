@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  QUOTE_SOURCE_LABEL,
   subscribeQuoteStream,
+  tickValueSource,
   type QuoteStreamState,
   type QuoteTick,
 } from '@/api/marketStream';
@@ -9,6 +11,10 @@ import Card from '@/components/Card';
 /**
  * 실시간 시세 티커 — market-stream-service SSE 를 구독해 현재가를 1초 간격으로 갱신한다.
  * 직전 틱 대비 등락에 따라 가격을 상승(빨강)/하락(파랑) 색으로 표시한다(국내 시세 관례).
+ *
+ * 'LIVE' 배지는 SSE 연결 상태일 뿐 값의 진위가 아니다. 시세 화면에서 그 둘은 쉽게 뒤섞여
+ * 읽히므로, 틱이 실어 오는 값 출처를 따로 표기한다 — 현재 서버가 내보내는 틱은 랜덤워크
+ * 합성값(SAMPLE)이다.
  */
 const stateBadge: Record<QuoteStreamState, { label: string; cls: string }> = {
   connecting: { label: '연결 중', cls: 'bg-slate-100 text-slate-500' },
@@ -64,6 +70,8 @@ const LiveQuoteTicker: React.FC<Props> = ({ stockCode, name }) => {
         : 'text-slate-900';
   const arrow = direction === 'up' ? '▲' : direction === 'down' ? '▼' : '';
   const badge = stateBadge[state];
+  const valueSource = tick ? tickValueSource(tick) : null;
+  const isSample = valueSource === 'SAMPLE';
 
   return (
     <Card>
@@ -74,6 +82,11 @@ const LiveQuoteTicker: React.FC<Props> = ({ stockCode, name }) => {
             <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${badge.cls}`}>
               {badge.label}
             </span>
+            {isSample && (
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700">
+                {QUOTE_SOURCE_LABEL.SAMPLE}
+              </span>
+            )}
           </div>
           <p className="mt-1 text-xs text-slate-500">
             {name ? `${name} ` : ''}
@@ -93,6 +106,11 @@ const LiveQuoteTicker: React.FC<Props> = ({ stockCode, name }) => {
           )}
         </div>
       </div>
+      {isSample && (
+        <p className="mt-2 text-[11px] text-amber-700">
+          실 시세 피드 연동 전이라 <strong>모의 생성값</strong>입니다 — 투자 판단·계산에 쓰지 마세요.
+        </p>
+      )}
     </Card>
   );
 };

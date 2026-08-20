@@ -40,11 +40,24 @@ public class OrderItemJpaEntity {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    /** 라인 부분 취소 시각. NULL 이면 살아 있는 라인. */
+    @Column(name = "canceled_at")
+    private LocalDateTime canceledAt;
+
     protected OrderItemJpaEntity() { }
 
     public OrderItemJpaEntity(Long id, Long orderId, Long productId, Long variantId, String sku,
                               String productName, BigDecimal unitPrice, int quantity,
                               BigDecimal lineAmount, LocalDateTime createdAt) {
+        this(id, orderId, productId, variantId, sku, productName, unitPrice, quantity,
+                lineAmount, createdAt, null);
+    }
+
+    public OrderItemJpaEntity(Long id, Long orderId, Long productId, Long variantId, String sku,
+                              String productName, BigDecimal unitPrice, int quantity,
+                              BigDecimal lineAmount, LocalDateTime createdAt,
+                              LocalDateTime canceledAt) {
+        this.canceledAt = canceledAt;
         this.id = id;
         this.orderId = orderId;
         this.productId = productId;
@@ -72,6 +85,7 @@ public class OrderItemJpaEntity {
     public int getQuantity() { return quantity; }
     public BigDecimal getLineAmount() { return lineAmount; }
     public LocalDateTime getCreatedAt() { return createdAt; }
+    public LocalDateTime getCanceledAt() { return canceledAt; }
 
     public void setOrderId(Long orderId) { this.orderId = orderId; }
 }

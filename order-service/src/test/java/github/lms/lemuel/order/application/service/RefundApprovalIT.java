@@ -132,8 +132,9 @@ class RefundApprovalIT {
         CouponUseCase coupon = Mockito.mock(CouponUseCase.class); // 쿠폰 미사용 경로
         createOrderService = new CreateMultiItemOrderService(loadUser, productAdapter, variantAdapter,
                 decVariant, decProduct, orderAdapter, notify, publishOrder, coupon,
-                // 옵션 스냅샷은 이 IT 의 검증 범위 밖 — 무해한 스텁
-                variantId -> java.util.List.of());
+                // 옵션 스냅샷·배송비는 이 IT 의 검증 범위 밖 — 무해한 스텁
+                variantId -> java.util.List.of(),
+                lines -> github.lms.lemuel.shipping.domain.ShippingFeeAssessment.none());
 
         // payment→order 상태 반영: 실제 OrderAdapter(→ ChangeOrderStatusService.updateStatus)와 동형인 람다.
         // (수동 조립에서 순환 의존을 끊기 위한 대체 — load → transitionTo → save 로 동일 효과)
@@ -171,8 +172,14 @@ class RefundApprovalIT {
         var increaseVariant = new IncreaseVariantStockService(variantAdapter);
         SaveOrderStatusHistoryPort history = (orderId, from, to, by, reason) -> { };
 
+        // 포인트 적립은 이 시나리오의 관심사가 아니다 — 호출됐다는 사실만 안전하게 흘려보낸다.
+        github.lms.lemuel.order.application.port.out.OrderPointRewardPort noopReward =
+                new github.lms.lemuel.order.application.port.out.OrderPointRewardPort() {
+                    @Override public void earnOnDelivered(github.lms.lemuel.order.domain.Order order) { }
+                    @Override public void revokeOnCanceled(github.lms.lemuel.order.domain.Order order) { }
+                };
         changeStatusService = new ChangeOrderStatusService(orderAdapter, orderAdapter, history,
-                refundOrderPaymentPort, increaseProduct, increaseVariant);
+                refundOrderPaymentPort, increaseProduct, increaseVariant, noopReward);
     }
 
     @Test

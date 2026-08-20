@@ -12,6 +12,12 @@
 | Flyway 마이그레이션 실패 | [db-migration-rollback.md](db-migration-rollback.md) | 앱 기동 실패 |
 | DB 손실 / K8s/리전 장애 | [disaster-recovery.md](disaster-recovery.md) | 다수 critical |
 
+## 정기 절차 (장애 아님)
+
+| 절차 | 런북 |
+|------|------|
+| 릴리스 develop → main (Sonar 기준선 점검·재고정 포함) | [release-develop-to-main.md](release-develop-to-main.md) |
+
 ## 공통 원칙
 
 1. **금액 관련 작업은 트랜잭션 로그 남기기** — `who / when / why` 기록.

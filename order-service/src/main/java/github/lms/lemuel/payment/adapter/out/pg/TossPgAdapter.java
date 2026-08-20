@@ -5,6 +5,7 @@ import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -19,6 +20,7 @@ import java.util.UUID;
  * 호출을 담당한다. 운영에서는 이 어댑터 안에서 RestTemplate / WebClient 를 호출하도록 확장.
  */
 @Component
+@Profile("!prod")
 public class TossPgAdapter implements PaymentGatewayAdapter {
 
     private static final Logger log = LoggerFactory.getLogger(TossPgAdapter.class);

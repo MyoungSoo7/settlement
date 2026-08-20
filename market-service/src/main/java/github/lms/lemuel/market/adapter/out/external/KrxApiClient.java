@@ -7,6 +7,7 @@ import github.lms.lemuel.market.application.port.out.KrxClientPort;
 import github.lms.lemuel.market.domain.Market;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -42,12 +43,15 @@ public class KrxApiClient implements KrxClientPort {
     private final KrxProperties properties;
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
+    private final long requestIntervalMs;
 
     public KrxApiClient(KrxProperties properties, RestClient.Builder restClientBuilder,
-                        ObjectMapper objectMapper) {
+                        ObjectMapper objectMapper,
+                        @Value("${app.market.sync.request-interval-ms:150}") long requestIntervalMs) {
         this.properties = properties;
         this.restClient = restClientBuilder.baseUrl(properties.baseUrl()).build();
         this.objectMapper = objectMapper;
+        this.requestIntervalMs = requestIntervalMs;
     }
 
     @Override
@@ -62,6 +66,9 @@ public class KrxApiClient implements KrxClientPort {
         int pageNo = 1;
         int totalCount = Integer.MAX_VALUE;   // 첫 페이지 응답에서 실제 값으로 갱신
         while ((long) (pageNo - 1) * properties.pageSize() < totalCount) {
+            if (pageNo > 1) {
+                pause();   // 첫 호출은 지연시키지 않는다 — 간격은 "페이지 사이" 에만 필요하다
+            }
             JsonNode body = getBody(basDt, pageNo);
             if (body == null) {
                 break;   // NODATA — 휴장일/미래일
@@ -86,6 +93,28 @@ public class KrxApiClient implements KrxClientPort {
     }
 
     // ---- 내부 구현 ----
+
+    /**
+     * 페이지 호출 사이 간격. data.go.kr 쿼터를 보호한다.
+     *
+     * <p>설정 키({@code app.market.sync.request-interval-ms})는 예전부터 yml 에 "쿼터 보호용 페이지
+     * 호출 간격" 이라는 주석과 함께 있었지만 <b>읽는 코드가 없었다</b>(2026-08-20 고아 파라미터 감사).
+     * 즉 market 만 형제 서비스(company·economics·financial-statements) 와 달리 무간격으로 전 페이지를
+     * 연타하고 있었다. 값을 낮춰도 아무 일이 일어나지 않으니 아무도 눈치채지 못하는 종류의 결함이다.
+     *
+     * <p>0 이하면 간격 없음 — 형제 서비스들과 같은 규약이다.
+     */
+    private void pause() {
+        if (requestIntervalMs <= 0) {
+            return;
+        }
+        try {
+            Thread.sleep(requestIntervalMs);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("KRX 수집 스레드 인터럽트", e);
+        }
+    }
 
     /** 한 페이지 body 노드. NODATA(03)면 null, 그 외 오류 코드는 예외. */
     private JsonNode getBody(String basDt, int pageNo) {

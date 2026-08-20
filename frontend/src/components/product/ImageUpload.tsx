@@ -50,7 +50,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ productId, images, onImagesCh
       });
       showToast('이미지가 업로드되었습니다.', 'success');
       onImagesChange();
-    } catch (error) {
+    } catch {
       showToast('이미지 업로드 실패', 'error');
     } finally {
       setUploading(false);
@@ -82,7 +82,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ productId, images, onImagesCh
       await api.patch(`/admin/products/${productId}/images/${imageId}/primary`);
       showToast('대표 이미지가 설정되었습니다.', 'success');
       onImagesChange();
-    } catch (error) {
+    } catch {
       showToast('대표 이미지 설정 실패', 'error');
     }
   };
@@ -93,7 +93,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ productId, images, onImagesCh
       await api.delete(`/admin/products/${productId}/images/${imageId}`);
       showToast('이미지가 삭제되었습니다.', 'success');
       onImagesChange();
-    } catch (error) {
+    } catch {
       showToast('이미지 삭제 실패', 'error');
     }
   };
@@ -119,7 +119,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ productId, images, onImagesCh
       });
       showToast('이미지 순서가 변경되었습니다.', 'success');
       onImagesChange();
-    } catch (error) {
+    } catch {
       showToast('이미지 순서 변경 실패', 'error');
     }
   };

@@ -156,6 +156,7 @@ jobs:
             insurance-service: ['insurance-service/**']
             deposit-service: ['deposit-service/**']
             board-service: ['board-service/**']
+            education-service: ['education-service/**']
 
       - name: Compute image build matrix (changed services only)
         id: setmatrix
@@ -182,7 +183,8 @@ jobs:
             "card-service":"-card",
             "insurance-service":"-insurance",
             "deposit-service":"-deposit",
-            "board-service":"-board"
+            "board-service":"-board",
+            "education-service":"-education"
           }'
           if echo "$CHANGED" | jq -e 'index("shared")' >/dev/null; then
             # 공용 변경 → 전 서비스 재빌드
@@ -261,6 +263,19 @@ jobs:
       packages: read # ghcr 미러 이미지 pull (mirror-testcontainers.yml 참고)
     strategy:
       fail-fast: false # 한 모듈 실패가 나머지 모듈의 판정을 가리지 않도록
+      # Maven Central / plugins.gradle.org 429 방지용 스로틀.
+      #
+      # 의존성이 바뀌는 PR(dependabot bump 등)에서는 setup-java 의 gradle 캐시 키가 통째로
+      # 어긋나 19개 잡이 *동시에* 콜드 리졸브를 돈다. 러너들은 egress IP 를 공유하므로
+      # repo.maven.apache.org 가 429 Too Many Requests 를 뱉고, 잡은 테스트를 시작하지도
+      # 못한 채 죽는다 — 2026-08-19 하루에만 #284 board-service, #288 deposit-service,
+      # #287 gateway-service 가 이 이유로 빨갛게 떴고 셋 다 재실행만으로 통과했다.
+      # (Testcontainers 이미지 쪽 rate limit 은 이미 ghcr 미러로 우회했다. 이건 그 짝인
+      #  *메이븐 아티팩트* 쪽 구멍이다.)
+      #
+      # 5 로 조이면 콜드 리졸브가 4 웨이브로 나뉜다. 모듈당 3~6분이라 전체 벽시계는
+      # 늘지만, 재실행 한 번이 15분이고 사람이 원인을 오해하는 비용은 그보다 크다.
+      max-parallel: 5
       matrix: ${{ fromJSON(needs.changes.outputs.test_matrix) }}
     services:
       postgres:
@@ -310,12 +325,28 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      # 테스트가 서비스 PG 를 쓸 수 있도록 스키마를 빌드 전에 준비
+      # 테스트가 서비스 PG 를 쓸 수 있도록 스키마를 빌드 전에 준비.
+      #
+      # apt 로 postgresql-client 를 깔지 않는다. 매트릭스 19개 잡이 매번 우분투 미러를 때렸고,
+      # azure.archive.ubuntu.com 이 응답을 멈추면 apt 가 폴백 미러에서 그대로 얼어붙어 45분
+      # timeout-minutes 를 통째로 태웠다 — GitHub 은 그걸 실패가 아니라 conclusion=cancelled 로
+      # 보고하므로 PR 에는 원인 없는 빨간 X 로만 보인다(2026-08-19 실측: #285 에서 19개 중 7개,
+      # #283 에서 19개 중 4개가 이렇게 죽었고 gradle 은 실행조차 못 했다).
+      #
+      # psql 은 postgres 서비스 컨테이너 안에 이미 있다. 거기서 실행하면 외부 네트워크 의존이
+      # 사라지고 이 스텝은 1초로 끝난다. 컨테이너는 5432 를 게시한 유일한 컨테이너로 찾는다
+      # (ES 서비스는 9200 만 게시한다). 컨테이너 안에서는 unix 소켓 + local trust 라 암호가 필요 없다.
       - name: Init schema (opslab)
+        timeout-minutes: 2 # 얼어붙으면 45분이 아니라 2분 만에 죽어야 원인이 보인다
         run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client
-          PGPASSWORD=testpass psql -h localhost -U testuser -d testdb -c "CREATE SCHEMA IF NOT EXISTS opslab;"
+          set -euo pipefail
+          cid=$(docker ps --filter "publish=5432" --format '{{.ID}}' | head -n1)
+          if [ -z "$cid" ]; then
+            echo "::error::5432 를 게시한 컨테이너가 없다 — postgres 서비스 컨테이너 구성을 확인하라"
+            docker ps
+            exit 1
+          fi
+          docker exec "$cid" psql -U testuser -d testdb -c "CREATE SCHEMA IF NOT EXISTS opslab;"
 
       # Testcontainers 가 ghcr 미러(비공개 패키지 가능)에서 pull 할 수 있게 데몬 로그인.
       # Docker Hub rate limit 회피 — 각 모듈 testcontainers.properties 의

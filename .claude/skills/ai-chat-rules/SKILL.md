@@ -28,7 +28,15 @@ description: AI 챗봇 규칙 — PII 마스킹 단일 초크포인트, provider
 
 - 포트 `ChatCompletionPort`(isConfigured/complete/stream). `app.ai.provider` 로 상호배타:
   - `GeminiChatAdapter` `@ConditionalOnProperty(havingValue="gemini", matchIfMissing=true)` = **기본**(RestClient 직접 호출).
-  - `AnthropicChatAdapter` `havingValue="anthropic"`(Spring AI 2.0). → **정확히 하나만 등록**(미설정 시 gemini).
+  - `AnthropicChatAdapter` `havingValue="anthropic"`(Spring AI 2.0).
+  - `DeepSeekChatAdapter` `havingValue="deepseek"` — OpenAI 호환 `POST {base-url}/chat/completions` 를 RestClient 로
+    직접 호출(벤더 SDK 없음). **`base-url` 교체로 로컬 Ollama 재사용**(`http://localhost:11434/v1`) — 키는 임의 문자열이라도
+    채워야 `configured()` 가 참이 된다. → **정확히 하나만 등록**(미설정 시 gemini).
+- **사고과정(CoT) 노출 금지**(DeepSeek 계열): `reasoning_content` 필드는 읽지 않고, `content` 안에 인라인으로 오는
+  `<think>…</think>`(Ollama deepseek-r1)는 `ThinkTagFilter` 가 **청크 경계를 넘어가며** 제거한다. 닫히지 않은 사고 블록은
+  흘리지 않고, 태그 조각으로 스트림이 끝나면 `flush()` 로 본문을 회수한다(유실 금지).
+- **스트리밍 종료 청크 `"content": null` 함정**: `asText("")` 는 NullNode 에 문자열 `"null"` 을 돌려준다 —
+  반드시 `isTextual()` 로 거른다(안 그러면 채팅에 `null` 이 찍힌다).
 - **★ ArchUnit**: `org.springframework.ai..`(및 벤더 SDK) 는 **`ai.chat.adapter.out.llm` 밖에서 참조 금지**. 상위는 포트·도메인 VO 만 안다.
 - 두 어댑터 공통: 빈 응답/파싱실패/5xx/타임아웃 → 전부 `AiUnavailableException`(503). 키 미설정은 **부팅 성공** + isConfigured=false(채팅만 503).
 

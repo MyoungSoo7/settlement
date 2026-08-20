@@ -316,9 +316,10 @@ const ShippingAdminPage: React.FC = () => {
       })
     : orders;
 
+  // 전체 페이지 래퍼는 두지 않는다 — 이 화면은 SideNavLayout(배송 그룹 사이드바) 안에서 그려진다.
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto">
+    <div className="space-y-6">
+      <div>
         <div className="flex items-center justify-between mb-5">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">배송 관리</h1>

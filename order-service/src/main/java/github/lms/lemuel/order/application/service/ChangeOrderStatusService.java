@@ -2,6 +2,7 @@ package github.lms.lemuel.order.application.service;
 
 import github.lms.lemuel.order.application.port.in.ChangeOrderStatusUseCase;
 import github.lms.lemuel.order.application.port.out.LoadOrderPort;
+import github.lms.lemuel.order.application.port.out.OrderPointRewardPort;
 import github.lms.lemuel.order.application.port.out.RefundOrderPaymentPort;
 import github.lms.lemuel.order.application.port.out.SaveOrderStatusHistoryPort;
 import github.lms.lemuel.order.application.port.out.SaveOrderPort;
@@ -37,6 +38,7 @@ public class ChangeOrderStatusService implements ChangeOrderStatusUseCase {
     private final RefundOrderPaymentPort refundOrderPaymentPort;
     private final IncreaseProductStockUseCase increaseProductStockUseCase;
     private final IncreaseVariantStockUseCase increaseVariantStockUseCase;
+    private final OrderPointRewardPort orderPointRewardPort;
 
     @Override
     @Transactional
@@ -51,6 +53,7 @@ public class ChangeOrderStatusService implements ChangeOrderStatusUseCase {
         // 주문 생성 시 차감한 재고를 되돌린다 — 취소 승인·환불 승인 경로와 동일한 역연산.
         // 이 호출이 없으면 직접 취소된 수량만큼 재고가 영구히 판매 불가 상태로 남는다.
         restoreStock(saved);
+        applyPointReward(saved, saved.getStatus());
         return saved;
     }
 
@@ -95,6 +98,7 @@ public class ChangeOrderStatusService implements ChangeOrderStatusUseCase {
         historyPort.save(orderId, previous.name(), finalOrder.getStatus().name(),
                 operator == null || operator.isBlank() ? "system" : operator, reason);
         restoreStock(finalOrder);
+        applyPointReward(finalOrder, finalOrder.getStatus());
         return finalOrder;
     }
 
@@ -145,6 +149,7 @@ public class ChangeOrderStatusService implements ChangeOrderStatusUseCase {
         historyPort.save(orderId, previous.name(), refunded.getStatus().name(),
                 operator == null || operator.isBlank() ? "system" : operator, reason);
         restoreStock(refunded);
+        applyPointReward(refunded, refunded.getStatus());
         if (outcome.deductsShippingFee()) {
             log.info("환불 승인(배송비 차감): orderId={}, 환불액={}, 차감 배송비={}",
                     orderId, outcome.refundableAmount(), outcome.deductedShippingFee());
@@ -232,6 +237,7 @@ public class ChangeOrderStatusService implements ChangeOrderStatusUseCase {
         if (target == OrderStatus.REFUNDED || target == OrderStatus.CANCELED) {
             restoreStock(saved);
         }
+        applyPointReward(saved, target);
         return saved;
     }
 
@@ -257,6 +263,7 @@ public class ChangeOrderStatusService implements ChangeOrderStatusUseCase {
         Order saved = saveOrderPort.save(order);
         historyPort.save(orderId, OrderStatus.CREATED.name(), saved.getStatus().name(), "system", reason);
         restoreStock(saved);
+        applyPointReward(saved, saved.getStatus());
         return true;
     }
 
@@ -268,6 +275,25 @@ public class ChangeOrderStatusService implements ChangeOrderStatusUseCase {
         Order saved = saveOrderPort.save(order);
         historyPort.save(orderId, previous.name(), target.name(),
                 changedBy == null || changedBy.isBlank() ? "system" : changedBy, reason);
+        applyPointReward(saved, target);
         return saved;
+    }
+
+    /**
+     * 상태 전이에 딸린 포인트 적립·회수.
+     *
+     * <p>적립 시점은 <b>배송 완료</b>다. 결제 시점에 주면 취소·환불이 잦은 구간에서 회수 부담이
+     * 커지고, 별도 "구매확정" 상태가 없는 이 도메인에서는 DELIVERED 가 사실상의 확정 시점이다.
+     *
+     * <p>취소·환불에서 회수하지 않으면 상품값은 돌려주고 적립은 남는 구멍이 생긴다. 두 연산 모두
+     * 멱등이라 여러 경로가 겹쳐 호출해도(관리자 승인 + 결제 환불 콜백) 한 번만 반영된다 —
+     * 재고 원복이 같은 이유로 도메인 멱등에 기대는 것과 같은 구조다.
+     */
+    private void applyPointReward(Order saved, OrderStatus target) {
+        if (target == OrderStatus.DELIVERED) {
+            orderPointRewardPort.earnOnDelivered(saved);
+        } else if (target == OrderStatus.CANCELED || target == OrderStatus.REFUNDED) {
+            orderPointRewardPort.revokeOnCanceled(saved);
+        }
     }
 }

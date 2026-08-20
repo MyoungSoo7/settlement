@@ -133,7 +133,9 @@ class CreateMultiItemOrderIT {
                 variantAdapter, optionCatalogAdapter, variantOptionMappingAdapter);
 
         orderService = new CreateMultiItemOrderService(loadUser, productAdapter, variantAdapter,
-                decVariant, decProduct, orderAdapter, notify, publish, couponService, describeOptions);
+                decVariant, decProduct, orderAdapter, notify, publish, couponService, describeOptions,
+                // 배송비는 이 IT 의 검증 범위 밖 — 부과 없음으로 고정
+                lines -> github.lms.lemuel.shipping.domain.ShippingFeeAssessment.none());
     }
 
     @Test

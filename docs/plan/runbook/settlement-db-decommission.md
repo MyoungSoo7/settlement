@@ -75,10 +75,17 @@ pg_restore --dbname "$OPSLAB_URL" --table=<table> opslab-pre-decommission-*.dump
 ## 잔여 사항 (honest notes)
 
 - order-service 의 settlement 테이블 **생성 마이그레이션은 이력 보존상 남는다**
-  (V2/V4/V5/V6/V35/V43~45/V49/V20260616120000~160000). 신규 opslab 부트스트랩 시 빈 테이블이
-  재생성되지만 order 코드가 사용하지 않아 무해한 **미사용 잔여**다. 그린필드 설치에선 생략 권장.
-  (적용된 Flyway 마이그레이션은 삭제 금지 — 되돌리려면 forward drop 마이그레이션이 필요하나,
-  운영 opslab 의 실데이터 보호를 위해 본 정리는 자동 마이그레이션이 아닌 수동 스크립트로 둔다.)
+  (V2/V4/V5/V6/V35/V43~45/V49/V20260616120000~160000). 다만 여기 있던 "신규 부트스트랩 시 빈
+  테이블이 재생성되지만 무해한 미사용 잔여"라는 서술은 **사실이 아니었다** — `V17__seed_data.sql`
+  이 `opslab.settlements` 에 정산 1,000행을 채우므로 재생성되는 것은 빈 테이블이 아니라 좀비
+  데이터다. 수동 스크립트로 운영 DB 를 한 번 정리해도 새 환경을 띄우면 그대로 부활한다.
+  (실측: fresh Postgres 에 order Flyway 전량 적용 시 settlements=1000행 · settlement_schedule_config=3행)
+- 그래서 2026-08-20 부로 정리는 **forward drop 마이그레이션으로 승격**됐다 —
+  `V20260820110000__decommission_opslab_settlement_legacy.sql` 이 위 15개 테이블과 정산계 전용
+  트리거 함수 2개를 제거한다. 부활 고리가 끊겼으므로 그린필드/신규 환경에서 별도 조치가 필요 없다.
+  본 스크립트는 이제 **마이그레이션 배포 전 사전 점검·조기 정리용**으로 남는다(DRY-RUN 으로 행 수와
+  settlement_db 이관 여부를 대조). 양쪽 모두 `DROP TABLE IF EXISTS` 라 중복 실행은 무해하다.
+  가드: `OpslabSettlementDecommissionMigrationIT` 가 실제 Flyway 적용 결과를 검사한다.
 - `settlement_schedule_config` 는 dead 로 확정됐다 — 레포 코드 참조 0(order·settlement 어디에도
   JPA/쿼리 없음) + settlement_db baseline 부재. 따라서 이관이 아니라 **DROP 대상에 포함**했다
   (구 REVIEW → DROP 승격, 스크립트 `DROP_TABLES`·`OpslabDecommissionIT` 미러 반영).

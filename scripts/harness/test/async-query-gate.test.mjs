@@ -79,6 +79,18 @@ const STATIC_QUERIES = new Map([
   // 셀렉트는 등록하지 않았다 — 엘리먼트는 정적이지만 <option> 은 데이터로 채워져서, 테스트가
   // **옵션**을 기다리도록 고쳤다(옵션 전에 change 를 쏘면 값이 조용히 무시되고 빈 토픽으로 조회가 나간다).
   ["DlqConsolePage.test.tsx :: screen.getByRole('button', { name: '조회' })", '조회 버튼 — 조건 없이 렌더'],
+
+  // PointConsolePage.tsx 의 수기 지급 폼과 현황 필터는 조회 결과 밖이다. 현황 4종이 아직
+  // 안 왔어도 폼은 마운트부터 그려진다(잠김 여부만 입력값으로 갈린다). 반대로 3자 대조·계정
+  // 상세·정책·소멸 목록은 조건부 블록 안이라 등록하지 않고 재시도 조회(findByTestId)로 썼다.
+  ["PointConsolePage.test.tsx :: screen.getByRole('button', { name: '포인트 지급' })", '지급 폼 제출 버튼 — 조건 없이 렌더'],
+  ["PointConsolePage.test.tsx :: screen.getByLabelText('소멸 예정 기준 일수')", '현황 필터 입력 — 조건 없이 렌더'],
+  ["PointConsolePage.test.tsx :: screen.getByRole('button', { name: '포인트 차감' })", '차감 폼 제출 버튼 — 조건 없이 렌더'],
+
+  // SalesStatsConsolePage.tsx 의 필터 바 셀렉트 2종. <option> 이 상수 배열(DIMENSIONS·
+  // GRANULARITIES)이라 데이터로 채워지지 않는다 — DLQ 토픽 셀렉트와 달리 옵션을 기다릴 필요가 없다.
+  ["SalesStatsConsolePage.test.tsx :: screen.getByLabelText('집계 축')", '필터 셀렉트 — 옵션이 상수라 마운트부터 완성'],
+  ["SalesStatsConsolePage.test.tsx :: screen.getByLabelText('추이 단위')", '필터 셀렉트 — 옵션이 상수라 마운트부터 완성'],
 ]);
 
 /** 앞선 waitFor 로부터 이 줄 수 안에 있는 조회만 같은 흐름으로 본다. */

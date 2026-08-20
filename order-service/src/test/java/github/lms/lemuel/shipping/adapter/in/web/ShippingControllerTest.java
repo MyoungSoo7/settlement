@@ -34,6 +34,7 @@ class ShippingControllerTest {
     @MockitoBean JwtUtil jwtUtil;
     @MockitoBean ShippingUseCase useCase;
     @MockitoBean LoadShipmentPort loadPort;
+    @MockitoBean github.lms.lemuel.shipping.application.port.in.SafetyNumberUseCase safetyNumberUseCase;
 
     private Shipment shipment(ShippingStatus status) {
         LocalDateTime now = LocalDateTime.now();

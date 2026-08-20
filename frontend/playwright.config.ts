@@ -80,5 +80,21 @@ export default defineConfig({
       testIgnore: CHROMIUM_ONLY,
       workers: 1,
     },
+    {
+      name: 'mobile-320',
+      use: { ...devices['Pixel 7'], viewport: { width: 320, height: 800 } },
+    },
+    {
+      name: 'mobile-375',
+      use: { ...devices['Pixel 7'], viewport: { width: 375, height: 812 } },
+    },
+    {
+      name: 'mobile-390',
+      use: { ...devices['Pixel 7'], viewport: { width: 390, height: 844 } },
+    },
+    {
+      name: 'mobile-landscape',
+      use: { ...devices['Pixel 7'], viewport: { width: 844, height: 390 }, isMobile: true },
+    },
   ],
 });

@@ -5,20 +5,25 @@ import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -157,6 +162,74 @@ public class GlobalExceptionHandler {
         log.warn("[AccessDeniedException] {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(ErrorResponse.of(HttpStatus.FORBIDDEN, ErrorCode.ACCESS_DENIED.code(), ex.getMessage()));
+    }
+
+    /**
+     * 404 - 매핑된 핸들러도 정적 리소스도 없는 경로.
+     *
+     * <p>이 매핑이 없으면 없는 주소 하나가 catch-all(500)로 떨어져 <b>클라이언트 오류가 서버 장애로</b>
+     * 보고된다. 응답 코드만 틀리는 게 아니라 {@code log.error} + 스택트레이스까지 남아서, 로그 기반
+     * 에러 알림이 멀쩡한 서비스를 두고 울린다. 2026-08-19 운영에서 관리 포트를 분리한 서비스
+     * (query/loan/operation/investment/account/organization — actuator 가 별도 포트)의 앱 포트로
+     * {@code /actuator/health} 를 치면 정확히 이 경로로 500 이 나오는 것을 확인했다.
+     *
+     * <p>도메인 {@code XXX_NOT_FOUND} 와 코드를 분리한 이유는 {@link ErrorCode#ENDPOINT_NOT_FOUND} 주석 참조.
+     * 존재하지 않는 경로는 정상 트래픽이므로 {@code warn} 이 아니라 {@code debug} 로 남긴다 — 스캐너가
+     * 로그를 채우게 두지 않기 위해서다.
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNoResourceFound(NoResourceFoundException ex) {
+        log.debug("[NoResourceFoundException] {}", ex.getResourcePath());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ErrorResponse.of(HttpStatus.NOT_FOUND, ErrorCode.ENDPOINT_NOT_FOUND.code(),
+                        ErrorCode.ENDPOINT_NOT_FOUND.defaultMessage()));
+    }
+
+    /**
+     * 405 - 경로는 있는데 메서드가 다른 경우.
+     *
+     * <p>{@link #handleNoResourceFound} 와 같은 결의 누수였다 — 전용 매핑이 없어 catch-all(500)이
+     * 가져갔다. 2026-08-19 실측: POST 전용인 {@code /api/organizations} 에 GET 을 치면 500 +
+     * error 스택트레이스가 났다. 404 로 뭉뚱그리지 않는 이유는 {@link ErrorCode#METHOD_NOT_ALLOWED}
+     * 주석 참조.
+     *
+     * <p>{@code Allow} 헤더는 405 응답의 규격 필수 항목이다(RFC 9110 §15.5.6) — 이게 없으면
+     * 클라이언트는 어떤 메서드로 다시 불러야 하는지 알 수 없다.
+     */
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
+        log.warn("[HttpRequestMethodNotSupportedException] {} - 허용: {}",
+                ex.getMethod(), ex.getSupportedHttpMethods());
+        ResponseEntity.BodyBuilder builder = ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED);
+        Set<HttpMethod> supported = ex.getSupportedHttpMethods();
+        if (supported != null && !supported.isEmpty()) {
+            builder.allow(supported.toArray(new HttpMethod[0]));
+        }
+        return builder.body(ErrorResponse.of(HttpStatus.METHOD_NOT_ALLOWED,
+                ErrorCode.METHOD_NOT_ALLOWED.code(), ErrorCode.METHOD_NOT_ALLOWED.defaultMessage()));
+    }
+
+    /**
+     * 413 - 업로드가 허용 크기를 넘음.
+     *
+     * <p>이 예외는 서블릿이 멀티파트를 파싱하다 끊는 것이라 <b>컨트롤러도 도메인도 실행되지 않는다.</b>
+     * 따라서 도메인 크기 검증(order-service {@code ImageUpload.MAX_SIZE_BYTES})으로는 절대 잡히지
+     * 않으며, 전용 매핑이 없으면 catch-all(500)이 가져간다 — 사용자는 "파일이 큽니다" 대신
+     * "서버 오류" 를 보고, 고칠 수 있는 문제를 못 고친다.
+     *
+     * <p>고아 파라미터 감사(2026-08-20)에서 드러난 경로다: order-service 의 멀티파트 한도가
+     * 프로덕션에서 로드되지 않는 프로파일에만 있어 실제 한도가 스프링 기본값 1MB 였고, 그때 나는
+     * 이 예외를 아무도 잡지 않았다. 한도는 설정으로 고쳤고, 여기서는 그 한도를 넘었을 때의
+     * 응답을 규격화한다. board-service 는 이미 자체 advice 로 413 을 주고 있었다.
+     *
+     * <p>400 이 아니라 413 인 이유는 {@link ErrorCode#PAYLOAD_TOO_LARGE} 주석 참조.
+     */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> handleMaxUploadSizeExceeded(MaxUploadSizeExceededException ex) {
+        log.warn("[MaxUploadSizeExceededException] 최대 허용 {} bytes", ex.getMaxUploadSize());
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+                .body(ErrorResponse.of(HttpStatus.PAYLOAD_TOO_LARGE, ErrorCode.PAYLOAD_TOO_LARGE.code(),
+                        ErrorCode.PAYLOAD_TOO_LARGE.defaultMessage()));
     }
 
     // ─── 5xx ────────────────────────────────────────────────────────────────────

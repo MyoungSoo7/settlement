@@ -72,7 +72,8 @@ public class OrderPersistenceAdapter implements LoadOrderPort, SaveOrderPort, Lo
                 OrderItemJpaEntity itemEntity = new OrderItemJpaEntity(
                         item.getId(), saved.getId(), item.getProductId(), item.getVariantId(),
                         item.getSku(), item.getProductName(), item.getUnitPrice(),
-                        item.getQuantity(), item.getLineAmount(), item.getCreatedAt()
+                        item.getQuantity(), item.getLineAmount(), item.getCreatedAt(),
+                        item.getCanceledAt()   // 부분 취소 표시가 저장에서 유실되면 재기동 후 되살아난다
                 );
                 OrderItemJpaEntity savedItem = orderItemRepository.save(itemEntity);
                 saveItemOptions(savedItem.getId(), item);
@@ -148,7 +149,8 @@ public class OrderPersistenceAdapter implements LoadOrderPort, SaveOrderPort, Lo
         return OrderItem.rehydrate(
                 e.getId(), e.getOrderId(), e.getProductId(), e.getVariantId(),
                 e.getSku(), e.getProductName(), e.getUnitPrice(),
-                e.getQuantity(), e.getLineAmount(), e.getCreatedAt(), options
+                e.getQuantity(), e.getLineAmount(), e.getCreatedAt(), options,
+                e.getCanceledAt()
         );
     }
 }

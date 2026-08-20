@@ -27,6 +27,64 @@ _판정 로그_ 다. 지금까지 하네스는 계속 늘어나기만 했고, �
 
 ## 항목
 
+### 2026-08-20 · CI 판정 조회(ci-verdict.mjs) — 취소된 실행을 통과로 읽는 축 차단
+
+- **status**: candidate
+- **동기**: "가짜 GREEN" 의 5번째 경로. develop 의 ci·harness-guard 는 `cancel-in-progress` 라 연속 push
+  중간 커밋의 실행이 `cancelled` 로 끝나는데, `cancelled` 는 `failure` 가 아니라 브랜치에도 `gh run list` 에도
+  빨간 X 를 남기지 않는다 — **판정이 없는 것과 판정이 통과인 것이 같은 색**이다. 경로 필터가 겹치면 구멍이
+  영구화된다: `Frontend - Tests` 는 `frontend == 'true'` 일 때만 돌고 push 의 변경 감지 기준은 직전 커밋이라,
+  프론트를 바꾼 커밋의 실행이 취소되면 뒤 커밋들이 그 잡을 `skipped` 로 넘겨 그 변경은 영영 테스트되지 않는다.
+  2026-08-19 실측(커밋 `1d17aaa7d`): ci 실행 32292943467 취소 → 잡 단위 재실행(attempt 2)마저 취소 →
+  판정은 상시 열려 있던 릴리스 PR 실행 32299156814 에서 **우연히** 메워졌다. PR 이 닫혀 있었다면 미판정으로 남는다.
+- **predicted_effect**: 커밋의 판정 유무를 눈이 아니라 종료 코드로 묻게 된다 — `success`/`failure` 만 결론으로
+  세고 `cancelled`·`skipped`·진행중은 결론이 아니다. 판정을 대상 → 후손 → 조상+경로 무변경 순으로 찾아
+  `PASS`/`COVERED`/`PENDING`/`UNJUDGED`/`FAIL` 로 가른다. 도입 시점 실측으로 위 2026-08-19 사례를 재현했다
+  (`1d17aaa7d` → 6종 전부 후손 커밋 판정 = 자기 실행은 판정을 내지 못했다는 사실이 그대로 드러남).
+- **드리프트 방어**: `test/ci-verdict-gate.test.mjs` 가 필수 체크 표(이름·경로 조건)를 `ci.yml`·`harness-guard.yml`·
+  `semgrep.yml` 원문 및 CLAUDE.md 목록과 대조한다. 잡 이름이나 `if:` 만 바뀌면 도구는 **없는 체크를 조회해
+  영원히 UNJUDGED** 를 뱉거나(오탐) 조상 판정을 잘못 유효화한다(미탐) — 둘 다 컴파일도 CI 도 못 잡는다.
+  게이트가 실제로 무는지 확인함(scope 를 frontend→backend 로 바꾸면 FAIL, 되돌리면 20/20 PASS).
+- **한계(명시)**: 읽기 전용이다 — 재실행은 사람이 한다(잡 단위 재실행은 경로 필터·concurrency 에 다시 걸리므로
+  실행 전체를 다시 돌려야 하고, 그 판단은 자동화 대상이 아니다). CI 잡으로는 못 만든다(자기 실행을 판정할 수 없다) —
+  릴리스 전·완료 보고 전 수동 조회가 사용 지점이다. 후손 판정을 유효로 세는 규칙은 "대상 커밋 자신은 안 돌았다" 를
+  통과로 바꾸므로, 어디서 판정됐는지를 `PASS(descendant)` 로 항상 함께 출력한다.
+- **도입 당일 자기 실증(2026-08-20)**: 도구가 자기 커밋을 `guard FAIL` 로 오보했다 — 후손 walk 에서 **가장 가까운**
+  결론만 취해서, `70e4c9be3` 에서 깨졌다가 `44a8a5b8d` 에서 복구된 이력이 `4aeb4bf4b` 에 영구히 눌어붙었다
+  (실패 원인은 남의 커밋인 배송정책 컨트롤러 미분류였다). 규칙을 고쳤다: 후손 중 **가장 나중** 판정이 그 내용의
+  현재 진실이고, 대상 커밋 **자신의** 판정이 있으면 그것이 그 커밋의 사실이며(bisect·롤백이 이 값을 본다),
+  도중에 뒤집힌 이력은 `· 중간 <sha> 에서 한 번 깨졌다 복구` / `· 이후 <sha> 에서 PASS 로 바뀜` 으로 함께 남긴다.
+  유닛 3케이스 추가(복구·대상실패·뒤에서다시깨짐).
+- **verified_at**: 미검증 (유닛 23케이스 + 라이브 3커밋 대조 PASS)
+
+### 2026-08-19 · 커버리지 게이트 공전(측정 대상 0개)을 실패로 전환 — 정적+런타임 2겹
+
+- **status**: verified
+- **동기**: LINE 90% 게이트가 **아무것도 재지 않은 채 3개 모듈에서 초록**이었다. JaCoCo 검증은 대상
+  클래스가 0개면 만들 위반이 없어 통과한다 — 커버리지가 높아서가 아니라 잰 게 없어서인데, 빌드는
+  BUILD SUCCESSFUL 이고 리포트 파일도 생성되므로 사람이 XML 의 `<class>` 개수를 세기 전에는 보이지 않는다.
+  원인은 `classDirectories` 이중 적용: 루트가 이미 교체한 값 위에 deposit·board(리포트+검증)·education(검증)이
+  같은 관용구를 다시 얹었고, `classDirectories.files` 가 설정 시점에 즉시 평가되면서 `build/classes` 가 아직
+  없는 클린 빌드(=CI 의 `clean :module:build`)에서 빈 집합이 스냅샷됐다. 산출물이 남은 로컬 빌드에서는
+  0개가 되지 않는 대신 엔트리가 개별 `.class` 파일로 굳어(트리 루트가 파일) 모듈이 얹은 경로 제외가
+  한 건도 매치되지 않았다 — 로컬 수치도 의도한 범위가 아니었다.
+- **predicted_effect**: 측정 대상 소유권을 루트로 단일화 → 세 모듈이 실제로 측정된다. 이후 어떤 경로로든
+  대상이 0개가 되면 빌드가 FAIL 하므로, "가짜 GREEN" 이 조용히 남지 않는다.
+- **verified_at**: 2026-08-19 · 격리 워크트리(CI 조건: 산출물 없는 체크아웃 + `clean`)에서 대조
+  - before: deposit·board 리포트 XML 245바이트/클래스 0개, HTML `No class files specified`, 게이트 통과.
+    education 은 리포트 33개인데 검증 대상 0개. 대조군 organization-service 는 같은 실행에서 39개 측정(정상).
+  - after: 측정 대상 deposit 58 / board 76 / education 18 클래스, LINE 실측 **0.97 / 0.92 / 0.91** 로
+    기존 90% 게이트를 그대로 통과(임계값 1.00 상향 시 Gradle 이 정상 FAIL — 게이트 생존 확인).
+  - 부정 검증: deposit 에 이중 적용을 일부러 되살리자 정적 게이트 FAIL(`deposit-service/build.gradle.kts:97,98`)
+    + 클린 빌드에서 런타임 스모크 FAIL(`[coverage] :deposit-service:jacocoTestCoverageVerification … 0개`).
+- **한계(명시)**: ① 이제 게이트 범위 안에 들어온 `board/adapter/out/storage`(10.0%)·`board/adapter/in/schedule`(16.7%)·
+  `education/adapter/out/audit`(25.0%) 를 루트 제외 목록에 넣을지, 단위 테스트로 덮을지는 **미결**이다
+  (board 의 0.92 는 이 둘을 안고 넘긴 값이다). ② 스모크는 "0개"만 막는다 — 대상이 1개로 쪼그라드는
+  부분 축소는 여전히 못 잡는다.
+- **적용**: `build.gradle.kts`, `shared-common/build.gradle.kts`(별도 빌드라 자체 선언),
+  `deposit-service`·`board-service`·`education-service/build.gradle.kts`,
+  `scripts/harness/test/coverage-scope-gate.test.mjs`, `scripts/harness/manifest.json`
+
 ### 2026-08-16 · CI 변경 감지 기준점 — push 는 직전 커밋 대비(전 모듈 실행 제거)
 
 - **status**: verified
@@ -185,6 +243,80 @@ _판정 로그_ 다. 지금까지 하네스는 계속 늘어나기만 했고, �
 - **verified_at**: 2026-08-15 — 규칙 투입 직후 실제 저장소에서 `HARNESS.md:67` 1건을 잡았고(수정 후
   healthy 복귀), 상태 기술 문서 8종 전수에서 오탐 0건. `audit.test.mjs` 가 "잡는다/오탐 안 한다"
   5쌍으로 고정.
+
+### 2026-08-16 · SonarCloud 신규코드 기준선을 릴리스 시점에 고정 (설정 API 는 함정)
+
+- **status**: verified
+- **동기**: 릴리스 PR #263 에서 필수 CI 6종은 전부 초록인데 `SonarCloud Code Analysis` 만 빨간불이었다.
+  파고 보니 신규코드 창이 **30일 롤링**이라 42,538 라인이 누적돼 있었고, 그 안에서
+  `new_coverage 58.2% < 80%` · `new_reliability_rating C < A` 로 떨어졌다. 즉 게이트가 "방금 쓴 코드"가
+  아니라 "지난 한 달 전부"를 판정하고 있었다 — 어느 커밋 탓인지 지목할 수 없으니 아무도 고치지 않는다.
+  커버리지 격차는 JaCoCo 게이트가 어댑터를 제외하는 반면 Sonar 는 포함해 세는 **분모 차이**이기도 하다.
+- **한 일**: `POST api/project_analyses/set_baseline`(project·branch·analysis UUID)로 develop 의
+  기준선을 릴리스 직후 분석(2026-08-15T17:17:56Z)에 고정했다.
+- **⚠️ 빠졌던 함정 (같은 시도를 두 번 하지 않게 남긴다)**:
+  - `POST api/settings/set` 으로 `sonar.leak.period(.type)` 를 바꾸면 **HTTP 204 가 오고 읽기 확인도
+    통과하지만 분석은 그 값을 읽지 않는다**. 이 키는 정의가 없어 설정 API 가 검증 없이 아무 문자열이나
+    저장한다 — 무의미한 `value=reference_branch` 도 204 로 받았다. 새 분석을 2회 돌려도
+    `periods[].mode` 가 계속 `days/30` 이었던 것이 반증이다.
+  - `api/new_code_periods/*` 는 SonarCloud 에 **없다**(404 Unknown url). `api.sonarcloud.io` v2 는 Forbidden.
+    가용 엔드포인트는 추측하지 말고 **`api/webservices/list` 를 grep** 하는 게 정본이다.
+  - "reference branch = main" 은 **원천 불가** — 이 조직 플랜은
+    `Organization is not allowed to access data from non main branches.` 로 비주 브랜치 데이터를 막는다.
+    게다가 Sonar 의 주 브랜치는 `main` 이 아니라 `develop` 이다(main push 의 분석은 성공해도 조회 불가).
+- **predicted_effect**: 다음 develop 분석부터 신규코드가 릴리스 이후 델타로만 잡혀, 게이트 실패가
+  "누가 언제 넣은 것인지" 지목 가능한 크기가 된다.
+- **verified_at**: 2026-08-16 — 기준선 고정 후 실제 재분석에서 `periods[].mode=manual_baseline`
+  (date 2026-08-15T17:17:56Z), `new_lines 42,538 → 0`, 품질 게이트 `ERROR → OK`.
+  **설정 읽기 확인이 아니라 새 분석 후의 `periods[].mode` 만이 증거다.**
+- **남은 부채**: ① 기준선은 자동 갱신되지 않는다 — **릴리스마다 `set_baseline` 을 다시 찍어야 한다**
+  (안 찍으면 창이 다시 무한정 자란다). ② 이번에 창 밖으로 빠진 신규코드 신뢰성 MEDIUM 12건
+  (`java:S8786` 정규식 백트래킹 7 · `java:S6218` byte[] record equals 3 · `java:S6829` 생성자
+  `@Autowired` 2)은 **사라진 게 아니라 판정 대상에서 빠졌을 뿐**이다. ③ main push 의 Sonar 분석은
+  플랜상 조회 불가라 4분을 버리는 낭비다. ④ **고정한 분석이 보관주기로 삭제되면 기준선이 끊긴다**
+  — 2026-08-18 에 실제로 터졌다(아래 항목).
+
+### 2026-08-18 · 수동 기준선이 보관주기로 끊겨 전 분석이 422 (재발 조건 확정)
+
+- **status**: verified
+- **동기**: develop CI 의 `Backend - Build/Test/JaCoCo/SonarCloud` 만 빨간불이었다. 모듈 테스트 18종은
+  전부 초록인데 `:sonar` 만 죽었다. 위 2026-08-16 항목에서 고정한 기준선 분석이 **SonarCloud 보관주기로
+  삭제**되어 있었다.
+
+  ```
+  HttpException: Error 422 on https://api.sonarcloud.io/analysis/analyses
+  {"msg":"Analysis '3ba45d91-…' configured as manual baseline for the New Code Period
+   no longer exists. Please update the New Code Period configuration."}
+  ```
+
+- **재발 조건(정본)**: `set_baseline` 으로 고정한 분석은 **영구 보존되지 않는다**. 그 분석이 지워지면
+  품질게이트가 미달로 뜨는 게 아니라 **분석 생성 자체가 422 로 거부**된다 — 즉 커버리지·이슈 로그가
+  아예 남지 않고, 릴리스마다 다시 찍지 않으면 어느 날 갑자기 CI 가 멈춘다. 실측: 2026-08-18 기준
+  develop 에 남은 분석은 6개뿐이었고 고정해둔 2026-08-15T17:17:56Z 은 이미 없었다
+  (가장 가까운 잔존분은 2026-08-15T05:35:17Z).
+- **한 일**: `POST api/project_analyses/set_baseline` 로 잔존 분석 중 최신
+  (`a7808667`, 2026-08-18T09:49:36Z, rev `49af8656`)에 재고정(HTTP 200).
+- **⚠️ 오진 함정**: ① 실패 화면이 "테스트 실패"처럼 보인다 — 잡 이름에 Test 가 들어 있고, 같은 시각
+  concurrency 로 취소된 잡들이 섞여 있으면 더 헷갈린다. 실패 로그에서 `HttpException: Error 4xx` 를
+  먼저 찾을 것. ② 로그의 `digest-mismatch: error` 와 `::error::백엔드 모듈 테스트가…` 는 워크플로
+  스크립트의 **에코일 뿐** 실패가 아니다.
+- **predicted_effect**: 재고정 이후 `:sonar` 가 다시 성공하고, 신규코드 창은 재고정 시점 이후 델타로만
+  잡힌다.
+- **verified_at**: 2026-08-18 — 재고정 후 Sonar 잡 재실행 2건이 모두 success(커밋 `1770c956` 13:27→13:34,
+  `3fac8390` 동일). 증거는 설정 읽기가 아니라 새 분석의 `periods[].mode`:
+  `[{"index":1,"mode":"manual_baseline","date":"2026-08-18T09:49:36+0000"}]`.
+- **점검 명령**(끊겼는지 1분 안에 확인):
+
+  ```bash
+  TOKEN=$(grep -m1 '^SONAR_TOKEN=' .env | cut -d= -f2-)
+  curl -s -u "$TOKEN:" "https://sonarcloud.io/api/project_analyses/search?project=MyoungSoo7_settlement&branch=develop&ps=5"
+  # manualNewCodePeriodBaseline:true 인 분석이 하나도 없으면 끊긴 것이다
+  ```
+
+- **남은 부채**: ① 재고정은 여전히 수동이고, **끊긴 사실을 CI 가 알려주지 않는다**(분석이 죽어야 드러난다).
+  점검 명령은 [릴리스 런북](runbook/release-develop-to-main.md) ①·④ 단계에 붙였다 — 자동 감지는 미해결. ② 재고정 직후 실측
+  `new_lines 6,329 · new_coverage 77.4% (< 80%) · new_reliability_rating 1.0(A)` — 잡은 통과해도
+  **품질게이트 자체는 커버리지로 미달**이라 main PR 에서 걸린다.
 
 ---
 

@@ -17,12 +17,15 @@ public class ShippingService implements ShippingUseCase {
     private final LoadShipmentPort loadPort;
     private final SaveShipmentPort savePort;
     private final RestoreReturnedOrderStockPort restoreStockPort;
+    private final github.lms.lemuel.shipping.application.port.in.SafetyNumberUseCase safetyNumberUseCase;
 
     public ShippingService(LoadShipmentPort loadPort, SaveShipmentPort savePort,
-                           RestoreReturnedOrderStockPort restoreStockPort) {
+                           RestoreReturnedOrderStockPort restoreStockPort,
+                           github.lms.lemuel.shipping.application.port.in.SafetyNumberUseCase safetyNumberUseCase) {
         this.loadPort = loadPort;
         this.savePort = savePort;
         this.restoreStockPort = restoreStockPort;
+        this.safetyNumberUseCase = safetyNumberUseCase;
     }
 
     @Override
@@ -30,7 +33,11 @@ public class ShippingService implements ShippingUseCase {
         loadPort.loadByOrderId(orderId).ifPresent(s -> {
             throw new ShipmentInvariantViolationException("이미 배송이 생성된 주문: " + orderId);
         });
-        return savePort.save(Shipment.createPending(orderId, address));
+        Shipment saved = savePort.save(Shipment.createPending(orderId, address));
+        // 배송이 생기는 순간 안심번호를 붙인다 — 기사·판매자에게 실번호가 나가기 전에 확보해야 한다.
+        // 풀이 말라 비어 있어도 배송 생성을 실패시키지 않는다(주문 흐름 전체가 멈춘다). WARN 은 서비스가 남긴다.
+        safetyNumberUseCase.assignForOrder(orderId);
+        return saved;
     }
 
     @Override

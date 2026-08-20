@@ -28,6 +28,11 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         // 셀러 등급 산정(ADR 0031) — 컨트롤러·스케줄러·JdbcTemplate 어댑터가 이 스캔에 걸린다.
         // 빠지면 gateway 라우트는 있는데 핸들러가 없어 /admin/seller-tiers 가 조용히 404 가 된다.
         "github.lms.lemuel.sellertier",
+        // 포인트 원장 — 결제의 POINT 텐더가 이 스캔에 걸린 유스케이스를 호출한다.
+        // 빠지면 텐더 어댑터가 빈을 찾지 못해 결제 경로가 기동 시점에 깨진다.
+        "github.lms.lemuel.point",
+        // 기프트카드 원장 — 결제의 GIFT_CARD 텐더가 이 스캔에 걸린 유스케이스를 호출한다.
+        "github.lms.lemuel.giftcard",
         "github.lms.lemuel.common",
         // ADR 0020 Phase 5.5 — settlement 분리 완료. settlement/ledger/payout/chargeback/
         // pgreconciliation 코드는 settlement-service 로 이전돼 order 소스에 존재하지 않으므로

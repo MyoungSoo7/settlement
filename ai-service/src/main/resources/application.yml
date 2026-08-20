@@ -101,7 +101,8 @@ app:
     ttl-seconds: ${JWT_TTL_SECONDS:3600}
 
   ai:
-    # LLM provider 선택 — gemini(기본) | anthropic. 어댑터가 @ConditionalOnProperty 로 정확히 하나만 등록된다.
+    # LLM provider 선택 — gemini(기본) | anthropic | deepseek.
+    # 어댑터가 @ConditionalOnProperty 로 정확히 하나만 등록된다(오타를 내면 셋 다 등록되지 않아 채팅 빈이 없다).
     provider: ${APP_AI_PROVIDER:gemini}
     chat:
       # (provider=anthropic 일 때) Anthropic Messages API — company-service 감성분석과 동일 env var 공용.
@@ -129,6 +130,19 @@ app:
       model: ${APP_AI_GEMINI_MODEL:gemini-2.5-flash}
       base-url: https://generativelanguage.googleapis.com
       # 2.5 계열은 thinking 이 출력 예산을 먹을 수 있어 넉넉히 잡는다(빈 응답 방지).
+      max-tokens: 2048
+    deepseek:
+      # (provider=deepseek) OpenAI 호환 Chat Completions — POST {base-url}/chat/completions.
+      # 미설정 시: 부팅·이력 조회는 정상, 채팅만 503 안내.
+      api-key: ${DEEPSEEK_API_KEY:}
+      model: ${APP_AI_DEEPSEEK_MODEL:deepseek-chat}
+      # ★ 같은 어댑터로 로컬 Ollama 를 쓸 수 있다(외부 크레딧 없이 개발·데모):
+      #     APP_AI_DEEPSEEK_BASE_URL=http://localhost:11434/v1
+      #     APP_AI_DEEPSEEK_MODEL=deepseek-r1:7b
+      #     DEEPSEEK_API_KEY=ollama   ← Ollama 는 키를 안 보지만, 비워 두면 "미구성"으로 판정돼 채팅이 503 이다
+      #   (RTX 3050 8GB 기준 7b/8b Q4 까지. 671B 본체 R1/V3 는 로컬 구동 불가)
+      base-url: ${APP_AI_DEEPSEEK_BASE_URL:https://api.deepseek.com/v1}
+      # deepseek-reasoner / r1 계열은 사고과정이 예산을 먹으므로 넉넉히(빈 응답 방지).
       max-tokens: 2048
     rate-limit:
       # LLM 비용 가드 — 사용자별 채팅 호출 상한. 초과 시 429 + Retry-After.

@@ -88,6 +88,16 @@ public class AccountEntry {
     public static final String TOPIC_SECURED_LOAN_REPAID = "lemuel.loan.secured_loan_repaid";
     public static final String TOPIC_SECURED_LOAN_PRINCIPAL_REPAID = "lemuel.loan.secured_loan_principal_repaid";
     public static final String TOPIC_INVESTMENT_EXECUTED = "lemuel.investment.executed";
+    public static final String TOPIC_POINT_CHARGED = "lemuel.point.charged";
+    public static final String TOPIC_POINT_GRANTED = "lemuel.point.granted";
+    public static final String TOPIC_POINT_USED = "lemuel.point.used";
+    public static final String TOPIC_POINT_RESTORED = "lemuel.point.restored";
+    public static final String TOPIC_POINT_EXPIRED = "lemuel.point.expired";
+    public static final String TOPIC_POINT_REVOKED = "lemuel.point.revoked";
+    public static final String TOPIC_GIFTCARD_REGISTERED = "lemuel.giftcard.registered";
+    public static final String TOPIC_GIFTCARD_USED = "lemuel.giftcard.used";
+    public static final String TOPIC_GIFTCARD_RESTORED = "lemuel.giftcard.restored";
+    public static final String TOPIC_GIFTCARD_EXPIRED = "lemuel.giftcard.expired";
     /** 백필 청산 분개의 합성 source_topic — 실제 Kafka 토픽이 아니라 자연키 구성용(멱등). */
     public static final String SOURCE_SCHEDULED_CLEARING = "lemuel.account.backfill";
     /**
@@ -360,6 +370,101 @@ public class AccountEntry {
         return of(OwnerType.SELLER, sellerId,
                 GlAccount.INVESTMENT_ASSET, GlAccount.CASH, amount,
                 "INVESTMENT_EXECUTED", orderId, TOPIC_INVESTMENT_EXECUTED);
+    }
+
+    // ── 포인트(owner=CUSTOMER) ─────────────────────────────────────────────────────────────────
+    // 미사용 포인트는 회사의 부채다. 충전 원금은 현금이 실제로 들어오지만, 보너스·적립은 회사가
+    // 비용으로 얹은 몫이라 상대계정이 다르다 — 그래서 charged 와 granted 를 한 팩토리로 합치지 않는다.
+
+    /** 포인트 현금 충전(원금) → DR CASH / CR POINT_LIABILITY. */
+    public static AccountEntry pointCharged(String userId, String lotId, BigDecimal amount) {
+        return of(OwnerType.CUSTOMER, userId,
+                GlAccount.CASH, GlAccount.POINT_LIABILITY, amount,
+                "POINT_CHARGED", lotId, TOPIC_POINT_CHARGED);
+    }
+
+    /** 포인트 적립·보너스·수기지급 → DR POINT_PROMOTION_EXPENSE / CR POINT_LIABILITY. */
+    public static AccountEntry pointGranted(String userId, String lotId, BigDecimal amount) {
+        return of(OwnerType.CUSTOMER, userId,
+                GlAccount.POINT_PROMOTION_EXPENSE, GlAccount.POINT_LIABILITY, amount,
+                "POINT_GRANTED", lotId, TOPIC_POINT_GRANTED);
+    }
+
+    /**
+     * 포인트 사용 → DR POINT_LIABILITY / CR CASH.
+     *
+     * <p>대변이 현금인 이유가 이 매핑의 핵심이다. {@link #settlementCreatedImmediate} 는 주문금액만큼
+     * 현금이 들어왔다고 전기하는데, 포인트로 결제된 몫은 <b>그 시점에 현금이 들어오지 않았다</b>
+     * (충전 시점에 이미 받았다). 이 전표가 그 가공의 현금 유입을 정확히 상계한다 — 덕분에 settlement 은
+     * 포인트의 존재를 몰라도 되고 기존 분개 매핑을 한 줄도 고치지 않는다.
+     */
+    public static AccountEntry pointUsed(String userId, String entryId, BigDecimal amount) {
+        return of(OwnerType.CUSTOMER, userId,
+                GlAccount.POINT_LIABILITY, GlAccount.CASH, amount,
+                "POINT_USED", entryId, TOPIC_POINT_USED);
+    }
+
+    /** 포인트 환불 복원 → DR CASH / CR POINT_LIABILITY (사용의 대칭). */
+    public static AccountEntry pointRestored(String userId, String entryId, BigDecimal amount) {
+        return of(OwnerType.CUSTOMER, userId,
+                GlAccount.CASH, GlAccount.POINT_LIABILITY, amount,
+                "POINT_RESTORED", entryId, TOPIC_POINT_RESTORED);
+    }
+
+    /**
+     * 포인트 적립 취소 → DR POINT_LIABILITY / CR POINT_PROMOTION_EXPENSE (판촉비 환입).
+     *
+     * <p>소멸({@link #pointExpired})과 잔고 효과는 같지만 상대계정이 다르다 — 소멸은 고객이 안 쓴
+     * 결과라 <b>이익</b>이고, 취소는 애초에 주지 말았어야 할 적립을 되돌리는 것이라 <b>비용 환입</b>이다.
+     */
+    public static AccountEntry pointRevoked(String userId, String entryId, BigDecimal amount) {
+        return of(OwnerType.CUSTOMER, userId,
+                GlAccount.POINT_LIABILITY, GlAccount.POINT_PROMOTION_EXPENSE, amount,
+                "POINT_REVOKED", entryId, TOPIC_POINT_REVOKED);
+    }
+
+    /** 포인트 소멸 → DR POINT_LIABILITY / CR POINT_BREAKAGE_INCOME. */
+    public static AccountEntry pointExpired(String userId, String lotId, BigDecimal amount) {
+        return of(OwnerType.CUSTOMER, userId,
+                GlAccount.POINT_LIABILITY, GlAccount.POINT_BREAKAGE_INCOME, amount,
+                "POINT_EXPIRED", lotId, TOPIC_POINT_EXPIRED);
+    }
+
+    // ── 기프트카드(owner=CUSTOMER) ─────────────────────────────────────────────────────────────
+    // 상품권 부채를 포인트 부채와 <b>같은 계정에 담지 않는다</b> — 화면도 시산표도 둘을 나눠 보여
+    // 줘야 하고, 한 계정에 뭉치면 나중에 분리할 방법이 없다.
+
+    /** 기프트카드 등록 → DR GIFT_CARD_PROMOTION_EXPENSE / CR GIFT_CARD_LIABILITY (무상 발행분). */
+    public static AccountEntry giftCardRegistered(String userId, String giftCardId, BigDecimal amount) {
+        return of(OwnerType.CUSTOMER, userId,
+                GlAccount.GIFT_CARD_PROMOTION_EXPENSE, GlAccount.GIFT_CARD_LIABILITY, amount,
+                "GIFTCARD_REGISTERED", giftCardId, TOPIC_GIFTCARD_REGISTERED);
+    }
+
+    /**
+     * 기프트카드 사용 → DR GIFT_CARD_LIABILITY / CR CASH.
+     *
+     * <p>대변이 현금인 이유는 {@link #pointUsed} 와 같다 — settlement 이 주문금액만큼 전기한 현금
+     * 유입 중 상품권 결제분은 실제로 들어오지 않았으므로 이 전표가 상계한다.
+     */
+    public static AccountEntry giftCardUsed(String userId, String entryId, BigDecimal amount) {
+        return of(OwnerType.CUSTOMER, userId,
+                GlAccount.GIFT_CARD_LIABILITY, GlAccount.CASH, amount,
+                "GIFTCARD_USED", entryId, TOPIC_GIFTCARD_USED);
+    }
+
+    /** 기프트카드 환불 복원 → DR CASH / CR GIFT_CARD_LIABILITY (사용의 대칭). */
+    public static AccountEntry giftCardRestored(String userId, String entryId, BigDecimal amount) {
+        return of(OwnerType.CUSTOMER, userId,
+                GlAccount.CASH, GlAccount.GIFT_CARD_LIABILITY, amount,
+                "GIFTCARD_RESTORED", entryId, TOPIC_GIFTCARD_RESTORED);
+    }
+
+    /** 기프트카드 소멸 → DR GIFT_CARD_LIABILITY / CR GIFT_CARD_BREAKAGE_INCOME. */
+    public static AccountEntry giftCardExpired(String userId, String giftCardId, BigDecimal amount) {
+        return of(OwnerType.CUSTOMER, userId,
+                GlAccount.GIFT_CARD_LIABILITY, GlAccount.GIFT_CARD_BREAKAGE_INCOME, amount,
+                "GIFTCARD_EXPIRED", giftCardId, TOPIC_GIFTCARD_EXPIRED);
     }
 
     // ── 수신 상품(banking 서브도메인, owner=DEPOSITOR) ──────────────────────────────────────────

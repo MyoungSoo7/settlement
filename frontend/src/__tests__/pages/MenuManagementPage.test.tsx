@@ -221,16 +221,27 @@ describe('MenuManagementPage — 역할 allowlist', () => {
     })));
   });
 
-  it('역할을 모두 해제하면 제한 없음으로 보낸다', async () => {
+  it('지급 메뉴는 ADMIN 역할을 해제할 수 없다', async () => {
     await renderPage();
     await waitFor(() => expect(screen.getByLabelText('ADMIN')).toBeInTheDocument());
     fireEvent.click(editButtons()[2]); // 지급관리 = 'ADMIN'
-    fireEvent.click(screen.getByLabelText('ADMIN'));
+    expect(screen.getByLabelText('ADMIN')).toBeChecked();
+    expect(screen.getByLabelText('MANAGER')).toBeDisabled();
     fireEvent.click(submit());
 
     await waitFor(() => expect(mockedMenu.update).toHaveBeenCalledWith(12, expect.objectContaining({
-      requiredRole: undefined,
+      requiredRole: 'ADMIN',
     })));
+  });
+
+  it('시스템 메뉴는 ADMIN 역할만 선택할 수 있다', async () => {
+    await renderPage();
+    await waitFor(() => expect(screen.getByLabelText('ADMIN')).toBeInTheDocument());
+    fireEvent.click(editButtons()[3]); // 시스템(2)
+
+    expect(screen.getByLabelText('ADMIN')).toBeChecked();
+    expect(screen.getByLabelText('MANAGER')).toBeDisabled();
+    expect(screen.getByText(/시스템·민감 운영 메뉴는 ADMIN 전용/)).toBeInTheDocument();
   });
 });
 

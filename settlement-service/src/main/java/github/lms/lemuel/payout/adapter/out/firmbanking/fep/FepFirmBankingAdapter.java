@@ -6,6 +6,7 @@ import github.lms.lemuel.payout.application.port.out.FirmBankingPort;
 import github.lms.lemuel.payout.domain.SellerBankAccount;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -49,6 +50,7 @@ public class FepFirmBankingAdapter implements FirmBankingPort {
     private final FepSocketClient client;
     private final AtomicLong telegramSeq = new AtomicLong();
 
+    @Autowired
     public FepFirmBankingAdapter(
             @Value("${app.fep.host:localhost}") String host,
             @Value("${app.fep.port:9410}") int port,

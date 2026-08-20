@@ -151,7 +151,7 @@ func (h *Hub) runQuoteLoop(ctx context.Context, stockCode string) {
 			return
 		case now := <-ticker.C:
 			price := h.nextPrice(stockCode, base)
-			tick := quote.NewTick(stockCode, price, now)
+			tick := quote.NewTick(stockCode, price, now, h.source.ValueSource())
 			h.broadcast(stockCode, tick)
 		}
 	}
@@ -160,31 +160,38 @@ func (h *Hub) runQuoteLoop(ctx context.Context, stockCode string) {
 // broadcast sends a tick to every subscriber of a code without blocking. If a
 // subscriber's buffer is full (slow client), the oldest queued tick is dropped
 // to make room for the newest — a live price stream favours freshness.
+//
+// The mutex is held across the sends, and that is what makes the fan-out safe:
+// unsubscribe closes a subscriber's channel under this same mutex, so a channel
+// can never be closed between the moment we decide to send and the send itself.
+// An earlier version snapshotted the channels and released the lock first,
+// which left exactly that window open — the broadcaster could send on an
+// already-closed channel, and the Go spec makes that a run-time panic rather
+// than a recoverable error, so one departing client killed the process and
+// every other connected client with it.
+//
+// Holding the lock costs nothing in stall risk: every send below is
+// non-blocking, so a slow client is dropped rather than waited on. Hold time is
+// O(subscribers) cheap channel operations once per tick, not O(slowest client).
 func (h *Hub) broadcast(stockCode string, tick quote.Tick) {
 	h.mu.Lock()
+	defer h.mu.Unlock()
+
 	cs, ok := h.codes[stockCode]
 	if !ok {
-		h.mu.Unlock()
 		return
 	}
-	// Snapshot subscriber channels so we can release the lock before sending.
-	chans := make([]chan quote.Tick, 0, len(cs.subs))
 	for sub := range cs.subs {
-		chans = append(chans, sub.ch)
-	}
-	h.mu.Unlock()
-
-	for _, ch := range chans {
 		select {
-		case ch <- tick:
+		case sub.ch <- tick:
 		default:
 			// Buffer full: drop oldest, enqueue newest (best-effort).
 			select {
-			case <-ch:
+			case <-sub.ch:
 			default:
 			}
 			select {
-			case ch <- tick:
+			case sub.ch <- tick:
 			default:
 			}
 		}

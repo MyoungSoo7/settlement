@@ -21,6 +21,7 @@ const OrderPage = lazy(() => import('./pages/OrderPage'));
 const RecommendPage = lazy(() => import('./pages/RecommendPage'));
 const CartPage = lazy(() => import('./pages/CartPage'));
 const MyPage = lazy(() => import('./pages/MyPage'));
+const MyBalancesPage = lazy(() => import('./pages/MyBalancesPage'));
 const LoanPage = lazy(() => import('./pages/LoanPage'));
 const TossPaymentSuccess = lazy(() => import('./pages/TossPaymentSuccess'));
 const FinancialStatementsPage = lazy(() => import('./pages/FinancialStatementsPage'));
@@ -37,6 +38,9 @@ const CeoLoanProcessGuidePage = lazy(() => import('./pages/CeoLoanProcessGuidePa
 const CeoLenderGuidePage = lazy(() => import('./pages/CeoLenderGuidePage'));
 const CeoFundGuidePage = lazy(() => import('./pages/CeoFundGuidePage'));
 const AiChatPage = lazy(() => import('./pages/AiChatPage'));
+const EducationCourseAdminPage = lazy(() => import('./pages/system/EducationCourseAdminPage'));
+const PointConsolePage = lazy(() => import('./pages/system/PointConsolePage'));
+const GiftCardConsolePage = lazy(() => import('./pages/system/GiftCardConsolePage'));
 
 // 관리자 페이지 (lazy load)
 const ProductPage = lazy(() => import('./pages/ProductPage'));
@@ -49,6 +53,7 @@ const OptionCatalogAdminPage = lazy(() => import('./pages/OptionCatalogAdminPage
 const ProofReviewQueuePage = lazy(() => import('./pages/ProofReviewQueuePage'));
 const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'));
 const ShippingAdminPage = lazy(() => import('./pages/ShippingAdminPage'));
+const ShippingPolicyAdminPage = lazy(() => import('./pages/ShippingPolicyAdminPage'));
 const OrderApprovalPage = lazy(() => import('./pages/OrderApprovalPage'));
 const PayoutAdminPage = lazy(() => import('./pages/PayoutAdminPage'));
 
@@ -63,6 +68,7 @@ const MonthlyClosingConsolePage = lazy(() => import('./pages/settlement/MonthlyC
 const TaxConsolePage = lazy(() => import('./pages/settlement/TaxConsolePage'));
 const CommissionRateConsolePage = lazy(() => import('./pages/settlement/CommissionRateConsolePage'));
 const DlqConsolePage = lazy(() => import('./pages/settlement/DlqConsolePage'));
+const SalesStatsConsolePage = lazy(() => import('./pages/settlement/SalesStatsConsolePage'));
 
 // 인쇄 전용 (레이아웃 없이 문서만 그리는 화면 — 새 창으로 열린다)
 const SettlementPrintPage = lazy(() => import('./pages/print/SettlementPrintPage'));
@@ -161,6 +167,7 @@ function App() {
             <Route path="/recommend"    element={<ProtectedRoute><RecommendPage /></ProtectedRoute>} />
             <Route path="/cart"         element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
             <Route path="/mypage"       element={<ProtectedRoute><MyPage /></ProtectedRoute>} />
+            <Route path="/my/balances" element={<ProtectedRoute><MyBalancesPage /></ProtectedRoute>} />
             <Route path="/loans"        element={<ProtectedRoute><LoanPage /></ProtectedRoute>} />
             {/* AI 챗봇 (ai-service) — LLM 비용이 들어 인증 필수(USER 이상), 역할 무관 */}
             <Route path="/ai/chat"      element={<ProtectedRoute><AiChatPage /></ProtectedRoute>} />
@@ -207,9 +214,17 @@ function App() {
                 (라우트를 ADMIN 으로 잠그면 MANAGER 가 분개 조회조차 못 한다) */}
             <Route path="/admin/settlement/ledger"
               element={<AdminManagerRoute><SideNavLayout><LedgerConsolePage /></SideNavLayout></AdminManagerRoute>} />
+            {/* 매출 통계는 읽기 전용 집계다 — 서버가 /api/reports/** 를 ADMIN·MANAGER 로 막는다 */}
+            <Route path="/admin/settlement/sales-stats"
+              element={<AdminManagerRoute><SideNavLayout><SalesStatsConsolePage /></SideNavLayout></AdminManagerRoute>} />
 
             {/* 배송 관리 — 주문별 배송 생성·출고·상태 전이 (ShippingController) */}
-            <Route path="/admin/shipping"     element={<AdminManagerRoute><ShippingAdminPage /></AdminManagerRoute>} />
+            <Route path="/admin/shipping"
+              element={<AdminManagerRoute><SideNavLayout><ShippingAdminPage /></SideNavLayout></AdminManagerRoute>} />
+            {/* 배송비 정책 — 고객이 실제로 지불하는 금액을 바꾼다. 서버가 /admin/shipping-policies/** 를
+                ADMIN 으로 막으므로 MANAGER 에게 열면 눌러도 되돌려보내지는 죽은 링크가 된다. */}
+            <Route path="/admin/shipping-policies"
+              element={<AdminOnlyRoute><SideNavLayout><ShippingPolicyAdminPage /></SideNavLayout></AdminOnlyRoute>} />
             {/* 취소·환불 승인 큐 — 사용자가 신청한 건을 운영자가 종단으로 보낸다 */}
             <Route path="/admin/approvals"    element={<AdminManagerRoute><OrderApprovalPage /></AdminManagerRoute>} />
             <Route path="/tags"               element={<AdminManagerRoute><TagManagementPage /></AdminManagerRoute>} />
@@ -233,6 +248,8 @@ function App() {
               element={<AdminOnlyRoute><SideNavLayout><RbacManagementPage /></SideNavLayout></AdminOnlyRoute>} />
             <Route path="/admin/system/boards"
               element={<AdminOnlyRoute><SideNavLayout><BoardAdminPage /></SideNavLayout></AdminOnlyRoute>} />
+            <Route path="/admin/education/courses"
+              element={<AdminOnlyRoute><SideNavLayout><EducationCourseAdminPage /></SideNavLayout></AdminOnlyRoute>} />
             <Route path="/admin/system/ecommerce-categories"
               element={<AdminOnlyRoute><SideNavLayout><EcommerceCategoryAdmin /></SideNavLayout></AdminOnlyRoute>} />
             <Route path="/admin/system/display-sections"
@@ -243,6 +260,10 @@ function App() {
               element={<AdminOnlyRoute><SideNavLayout><ProofReviewQueuePage /></SideNavLayout></AdminOnlyRoute>} />
             <Route path="/admin/system/operation"
               element={<AdminOnlyRoute><SideNavLayout><OperationConsolePage /></SideNavLayout></AdminOnlyRoute>} />
+            <Route path="/admin/system/points"
+              element={<AdminOnlyRoute><SideNavLayout><PointConsolePage /></SideNavLayout></AdminOnlyRoute>} />
+            <Route path="/admin/system/gift-cards"
+              element={<AdminOnlyRoute><SideNavLayout><GiftCardConsolePage /></SideNavLayout></AdminOnlyRoute>} />
 
             {/* ── CEO 인사이트 (ADMIN·MANAGER, 좌측 사이드바) — 위성 조회 서비스 묶음 ── */}
             <Route path="/admin/ceo"

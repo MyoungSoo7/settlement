@@ -11,6 +11,7 @@ React + TypeScript + Vite 기반의 정산 시스템 프론트엔드
 - **Axios** - HTTP 클라이언트
 - **Tailwind CSS** - 스타일링
 - **date-fns** - 날짜 포맷팅
+- **Capacitor 8** - Android/iOS 하이브리드 앱 런타임
 
 ## 프로젝트 구조
 
@@ -85,12 +86,12 @@ npm run build
 
 - **자동 토큰 관리**: `axios` 인터셉터가 모든 요청에 JWT 토큰을 자동으로 추가
 - **401 에러 처리**: 토큰 만료 시 자동 로그아웃 및 로그인 페이지로 리다이렉트
-- **LocalStorage 기반**: `access_token`, `user_email`, `user_role` 저장
+- **런타임별 저장소**: 브라우저/PWA는 LocalStorage, Capacitor 네이티브 앱은 iOS Keychain/Android Keystore 기반 보안 저장소 사용
 
 ```typescript
 // src/api/axios.ts
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('access_token');
+  const token = getAuthStorage().get('access_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -239,6 +240,30 @@ export const userApi = {
   },
 };
 ```
+
+## Capacitor 하이브리드 앱
+
+웹 빌드 결과(`dist/`)를 Android/iOS WebView에 탑재합니다.
+
+```bash
+npm run build
+npx cap sync
+npx cap open android
+npx cap open ios
+```
+
+`ios` 빌드는 macOS/Xcode가 필요하고, `android` 빌드는 Android SDK/Gradle 환경이 필요합니다. Windows에서는 프로젝트 생성과 `npx cap sync`까지만 확인할 수 있습니다.
+
+네이티브 기능은 `src/lib/` adapter를 통해 접근합니다. 푸시 토큰은 현재 클라이언트에서만 발급하며, 서버 등록 endpoint가 확정되기 전에는 자동 전송하지 않습니다. 결제 성공/실패 URL은 웹 경로와 Capacitor deep link를 같은 라우터 계약으로 처리합니다.
+
+## 모바일 반응형 검증
+
+```bash
+npm run e2e:mobile
+npm run e2e:responsive
+```
+
+검증 대상에는 일반 사용자 화면, AI 채팅, 테이블 중심 정산/관리자 화면이 포함됩니다. 원격 E2E 서버의 인증/데이터 상태에 따라 특정 화면은 별도 확인이 필요합니다.
 
 ## 라이센스
 

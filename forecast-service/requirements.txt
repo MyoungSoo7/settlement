@@ -1,6 +1,10 @@
 fastapi==0.141.1
-uvicorn[standard]==0.52.1
+uvicorn[standard]==0.52.3
 statsmodels==0.14.6
-numpy==1.26.4
-pandas==2.2.2
+# numpy 는 2.x 아래로 내리지 말 것. 1.26.4 엔 cp314 휠이 없어서 pip 가 소스 빌드로
+# 넘어가는데, 런타임 이미지(python:3.14-slim)엔 C 컴파일러가 없어 meson 이
+# "Unknown compiler(s)" 로 죽는다. 같은 3.14 를 쓰는 screening-backtest·
+# settlement-anomaly 가 멀쩡했던 이유도 이미 numpy 2.4.6 이었기 때문이다.
+numpy==2.4.6
+pandas==2.3.3
 pydantic==2.13.4

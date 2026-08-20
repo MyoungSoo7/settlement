@@ -30,6 +30,7 @@ import static org.mockito.Mockito.when;
 class CreateOrderServiceTest {
 
     @Mock LoadUserForOrderPort loadUserForOrderPort;
+    @Mock github.lms.lemuel.product.application.port.out.LoadProductPort loadProductPort;
     @Mock SaveOrderPort saveOrderPort;
     @Mock SendOrderNotificationPort sendOrderNotificationPort;
     @Mock github.lms.lemuel.order.application.port.out.PublishOrderEventPort publishOrderEventPort;
@@ -38,6 +39,8 @@ class CreateOrderServiceTest {
     @Test @DisplayName("정상 주문 생성 + 알림 발송")
     void createOrder_success() {
         when(loadUserForOrderPort.findEmailById(1L)).thenReturn(Optional.of("user@example.com"));
+        when(loadProductPort.findById(10L)).thenReturn(Optional.of(
+                github.lms.lemuel.product.domain.Product.create("상품A", "설명", new BigDecimal("50000"), 100)));
         when(saveOrderPort.save(any())).thenAnswer(inv -> {
             Order o = inv.getArgument(0);
             o.assignId(999L);
@@ -76,10 +79,10 @@ class CreateOrderServiceTest {
                 .isInstanceOf(OrderInvariantViolationException.class);
     }
 
-    @Test @DisplayName("Command 검증: amount null")
+    @Test @DisplayName("Command 검증: amount 0 이하")
     void command_nullAmount() {
         assertThatThrownBy(() -> new CreateOrderUseCase.CreateOrderCommand(
-                1L, 10L, null))
+                1L, 10L, BigDecimal.ZERO))
                 .isInstanceOf(OrderInvariantViolationException.class);
     }
 

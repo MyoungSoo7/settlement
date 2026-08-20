@@ -1,6 +1,6 @@
 # Lemuel 기능명세서 (Functional Specification)
 
-이커머스 + 정산(Settlement) MSA 플랫폼의 전체 기능 명세. 코어 JVM 17개 마이크로서비스 + API Gateway 에
+이커머스 + 정산(Settlement) MSA 플랫폼의 전체 기능 명세. 코어 JVM 18개 마이크로서비스 + API Gateway 에
 폴리글랏 7종(Kotlin 2 · Go 2 · Python 3)을 더한 **총 24개 서비스** 헥사고날 백엔드이며,
 원래 단일 모놀리스였으나 Bounded Context 로 분리했다.
 아키텍처·컨벤션은 [`CLAUDE.md`](./CLAUDE.md), 아키텍처 결정은 [`docs/adr/`](./docs/adr/) 참조.
@@ -54,7 +54,7 @@
 
 - **Outbox 패턴**: DB 트랜잭션 안에서 `outbox_events` 에 기록 → 멀티워커 폴러(FOR UPDATE SKIP LOCKED)가 Kafka 발행.
 - **3단 멱등 방어**: `outbox_events.event_id UNIQUE` → 컨슈머 `processed_events(group,event_id)` PK → 도메인 UNIQUE 제약.
-- **이벤트 계약-as-code (ADR 0024)**: cross-service 37개 토픽의 JSON Schema + 정본 샘플이
+- **이벤트 계약-as-code (ADR 0024)**: cross-service 47개 토픽의 JSON Schema + 정본 샘플이
   `shared-common/src/testFixtures/resources/contracts/events/` 에 단일 출처로 존재. 프로듀서·컨슈머 양방향 계약 테스트로 드리프트 차단.
 - **이벤트 드리븐 프로젝션 (ADR 0020)**: settlement 가 order 이벤트를 소비해 자체 DB 에 `settlement_*_view` 적재
   (cross-DB 연결 0). 대사는 order 내부 API `/internal/recon` 호출로 양측이 자기 DB 만 읽는다.
@@ -100,6 +100,7 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
 | 지급        | `/admin/payouts` (ADMIN)                                                               | 셀러 지급 실행·재시도(펌뱅킹 mock), 반송(bounce) 기록·재지급                                                                                                                                        |
 | 지급 계좌   | `/admin/seller-bank-accounts` (ADMIN/MANAGER) · `/api/seller/bank-account` (셀러 본인) | 지급 계좌 레지스트리 — 관리자 대행 등록·정정과 셀러 셀프서비스 upsert/조회. 셀러 경로는 식별자를 JWT 주체(userId)에서만 파생(IDOR 차단), 계좌번호는 저장 시 암호화(`PAYOUT_ENC_KEY`)·노출 시 마스킹 |
 | 원장/리포트 | `/api/ledger`, `/api/reports` (ADMIN/MANAGER) · `/admin/ledger-periods` (ADMIN)         | 복식부기 원장 조회, 캐시플로우 리포트(PDF), 원장 월마감 — 확정 시산표가 **균형일 때만** 마감(불균형 422), 마감 기간 신규 전표 차단·재개봉 없음                                                       |
+| 매출 통계   | `/api/reports/sales-stats` (ADMIN/MANAGER)                                             | 기간 매출 요약 + **직전 동일 길이 기간** 대비 증감(전기 0 이면 증감률 `null` — 0% 아님), 축별 구성비 5종(결제수단·셀러등급·정산상태·셀러·상품). 기간 상한 366일, 랭킹 상위 N 은 1~100 클램프. 추이는 기존 `/api/reports/cashflow` 재사용 |
 | 세무        | `/admin/tax`, `/admin/seller-tax-profiles` (ADMIN/MANAGER) · `/api/tax-invoices` (셀러) | 부가세 **포함과세** 산출(`floor(수수료×10/110)`), 개인 셀러 원천징수 3.3% 를 **실지급액에서 공제**, 세금계산서 발행·PDF, 셀러 업로드 스캔본 OCR 자동매칭(ADR 0029)                                   |
 | 차지백      | `/admin/chargebacks` (ADMIN)                                                           | 지급 거절/분쟁 처리                                                                                                                                                                                 |
 | PG 대사     | `/admin/pg-reconciliation`, `/admin/reconciliation` (ADMIN/MANAGER)                    | PG 정산파일 업로드→대사→차이 승인/거절(역정산 트리거)                                                                                                                                               |
@@ -183,7 +184,10 @@ order/payment/user/product 는 Kafka 이벤트로 적재하는 자체 프로젝�
 ### 3.9 ai-service — 대화형 AI 챗봇 (port 8096, lemuel_ai)
 
 - `/api/ai` (ChatController), `/api/ai/conversations` — 컨텍스트 유지 채팅(SSE 스트리밍) + 대화 이력 CRUD.
-- **provider 스위치**(`app.ai.provider`, 기본 gemini): Gemini(RestClient) / Anthropic(Spring AI SDK) 중 하나만 등록.
+- **provider 스위치**(`app.ai.provider`, 기본 gemini): Gemini(RestClient) / Anthropic(Spring AI SDK) /
+  DeepSeek(OpenAI 호환 RestClient) 중 하나만 등록. DeepSeek 어댑터는 `base-url` 만 바꾸면 **로컬 Ollama**
+  (OpenAI 호환 엔드포인트)도 같은 코드로 부른다 — 외부 크레딧 없이 개발·데모 가능.
+  reasoning 계열의 사고과정은 사용자에게 노출하지 않는다(`reasoning_content` 미독출 + 인라인 `<think>` 제거).
 - LLM 실비용 → **JWT USER 이상 필수 + bucket4j 비용가드(분5/일100)**. LLM 어댑터는 `adapter/out/llm` 격리(ArchUnit).
   저장·전송 전 카드/주민번호 PII 마스킹. **RAG 구현 완료**(pgvector 지식베이스 `/api/ai/knowledge` +
   임베딩 검색 폴백, ADR 0034 — `app.ai.rag.enabled`, 기본 off). 로드맵: Function Calling.
@@ -466,9 +470,9 @@ DepositHold  : ACTIVE → PARTIALLY_CAPTURED → CAPTURED / EXPIRED / VOIDED / R
 
 ---
 
-## 5. 이벤트 카탈로그 (cross-service 37개 계약 토픽)
+## 5. 이벤트 카탈로그 (cross-service 47개 계약 토픽)
 
-계약 스키마·정본 샘플: `shared-common/src/testFixtures/resources/contracts/events/` (37개, ADR 0024).
+계약 스키마·정본 샘플: `shared-common/src/testFixtures/resources/contracts/events/` (47개, ADR 0024).
 
 > 수치 검증: `git ls-files 'shared-common/src/testFixtures/resources/contracts/events/*.schema.json' | wc -l` → 37
 

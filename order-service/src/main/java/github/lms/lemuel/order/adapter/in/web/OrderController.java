@@ -2,6 +2,7 @@ package github.lms.lemuel.order.adapter.in.web;
 
 import github.lms.lemuel.order.adapter.in.web.request.CreateOrderRequest;
 import github.lms.lemuel.order.adapter.in.web.response.OrderResponse;
+import github.lms.lemuel.order.application.port.in.CancelOrderItemsUseCase;
 import github.lms.lemuel.order.application.port.in.ChangeOrderStatusUseCase;
 import github.lms.lemuel.order.application.port.in.CreateMultiItemOrderUseCase;
 import github.lms.lemuel.order.application.port.in.CreateOrderUseCase;
@@ -42,6 +43,8 @@ public class OrderController {
     private final IdempotentMultiItemOrderUseCase createMultiItemOrderUseCase;
     private final GetOrderUseCase getOrderUseCase;
     private final ChangeOrderStatusUseCase changeOrderStatusUseCase;
+    private final CancelOrderItemsUseCase cancelOrderItemsUseCase;
+    private final github.lms.lemuel.order.application.port.in.WithdrawOrderRequestUseCase withdrawOrderRequestUseCase;
 
     @Operation(summary = "주문 생성 (단건)", description = "단일 상품 주문 — 레거시 호환 경로.")
     @ApiResponses({
@@ -194,9 +197,55 @@ public class OrderController {
         return ResponseEntity.ok(OrderResponse.from(order));
     }
 
+    @Operation(summary = "취소·환불 신청 철회",
+            description = "취소/환불 신청을 철회해 신청 직전 상태로 되돌린다. 복귀 상태는 상태 이력이 근거이며, "
+                    + "그 신청을 낼 수 없었던 상태로는 되돌리지 않는다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "철회 성공"),
+            @ApiResponse(responseCode = "403", description = "타인 주문"),
+            @ApiResponse(responseCode = "409", description = "철회할 신청이 없음")
+    })
+    @PostMapping("/{id}/request-withdraw")
+    public ResponseEntity<OrderResponse> withdrawRequest(
+            @PathVariable @Positive Long id,
+            @RequestBody(required = false) StatusReasonRequest request,
+            Principal principal) {
+        Order order = getOrderUseCase.getOrderById(id);
+        ResourceOwnership.requireSelfOrAdmin(order.getUserId());
+        String reason = request == null ? null : request.reason();
+        return ResponseEntity.ok(OrderResponse.from(
+                withdrawOrderRequestUseCase.withdraw(id, reason, actor(principal))));
+    }
+
+    @Operation(summary = "주문 라인 부분 취소",
+            description = "지정한 주문 라인만 취소한다. 재고 복원 · 배송비 재산정 · 부분 환불이 한 트랜잭션에서 처리되며, "
+                    + "무료배송 조건이 깨지면 면제됐던 배송비가 되살아나 환불액에서 차감된다. 출고 전까지만 가능.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "취소 성공"),
+            @ApiResponse(responseCode = "403", description = "타인 주문"),
+            @ApiResponse(responseCode = "404", description = "주문을 찾을 수 없음"),
+            @ApiResponse(responseCode = "409", description = "출고 후 등 취소 불가 상태")
+    })
+    @PostMapping("/{id}/items/cancel")
+    public ResponseEntity<CancelOrderItemsUseCase.Result> cancelItems(
+            @PathVariable @Positive Long id,
+            @Valid @RequestBody CancelItemsRequest request,
+            Principal principal) {
+        // IDOR 방지 — 취소 대상 주문의 소유자를 JWT 주체와 대조한다(요청 파라미터의 userId 를 믿지 않는다).
+        Order order = getOrderUseCase.getOrderById(id);
+        ResourceOwnership.requireSelfOrAdmin(order.getUserId());
+        return ResponseEntity.ok(cancelOrderItemsUseCase.cancelItems(
+                id, request.itemIds(), request.reason(), actor(principal)));
+    }
+
     private static String actor(Principal principal) {
         return principal == null ? "system" : principal.getName();
     }
+
+    public record CancelItemsRequest(
+            @jakarta.validation.constraints.NotEmpty(message = "취소할 주문 라인을 지정해야 합니다")
+            List<Long> itemIds,
+            String reason) {}
 
     public record StatusReasonRequest(String reason) {}
     public record AdminStatusRequest(String status, String reason) {}

@@ -13,9 +13,22 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-          'vendor-axios': ['axios'],
+        // vite 8 은 번들러가 Rollup → Rolldown 으로 바뀌었다. Rolldown 은 `manualChunks` 의
+        // 객체형(이름 → 모듈 배열)을 받지 않고 함수로 호출하려 들어 "manualChunks is not a
+        // function" 으로 빌드가 죽는다. 같은 의도를 Rolldown 의 `advancedChunks` 로 옮긴다.
+        //
+        // 모듈 id(절대경로)에 대한 test 라서 node_modules 경계를 명시해야 앱 코드의 동명
+        // 디렉터리가 딸려 들어가지 않는다. 구분자는 OS 별로 다르므로 [\\/] 로 둘 다 받는다.
+        // react-router-dom 은 react-router 를 재수출하므로 둘을 같은 청크에 묶는다 —
+        // 나뉘면 라우터가 두 청크로 쪼개져 초기 로드가 오히려 늘어난다.
+        advancedChunks: {
+          groups: [
+            {
+              name: 'vendor-react',
+              test: /node_modules[\\/](react|react-dom|react-router|react-router-dom)[\\/]/,
+            },
+            { name: 'vendor-axios', test: /node_modules[\\/]axios[\\/]/ },
+          ],
         },
       },
     },

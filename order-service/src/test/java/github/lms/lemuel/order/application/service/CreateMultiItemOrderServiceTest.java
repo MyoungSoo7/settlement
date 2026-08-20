@@ -45,7 +45,14 @@ class CreateMultiItemOrderServiceTest {
     @Mock github.lms.lemuel.order.application.port.out.PublishOrderEventPort publishOrderEventPort;
     @Mock CouponUseCase couponUseCase;
     @Mock github.lms.lemuel.product.application.port.in.DescribeVariantOptionsUseCase describeVariantOptionsUseCase;
+    @Mock github.lms.lemuel.shipping.application.port.in.AssessShippingFeeUseCase assessShippingFeeUseCase;
     @InjectMocks CreateMultiItemOrderService service;
+
+    @org.junit.jupiter.api.BeforeEach
+    void noShippingFeeByDefault() {
+        when(assessShippingFeeUseCase.assess(any()))
+                .thenReturn(github.lms.lemuel.shipping.domain.ShippingFeeAssessment.none());
+    }
 
     private Product mockProduct(Long id, String name, BigDecimal price) {
         Product p = Product.create(name, "설명", price, 100);
@@ -70,6 +77,39 @@ class CreateMultiItemOrderServiceTest {
         verify(decreaseProductStockUseCase).decrease(10L, 2);
         verify(decreaseStockUseCase, never()).decrease(any(), anyInt());
         verify(sendNotificationPort).sendOrderConfirmation(eq("user@test.com"), any());
+    }
+
+    @Test @DisplayName("create: 산정된 배송비가 결제 금액에 더해지고 주문에 보존된다")
+    void create_appliesShippingFee() {
+        when(loadUserPort.findEmailById(1L)).thenReturn(Optional.of("user@test.com"));
+        Product product = mockProduct(10L, "상품A", new BigDecimal("10000"));
+        when(loadProductPort.findById(10L)).thenReturn(Optional.of(product));
+        when(saveOrderPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(assessShippingFeeUseCase.assess(any())).thenReturn(
+                new github.lms.lemuel.shipping.domain.ShippingFeeAssessment(
+                        new BigDecimal("3000"), List.of()));
+
+        Order result = service.create(1L, List.of(new CreateMultiItemOrderUseCase.Line(10L, null, 2)));
+
+        assertThat(result.getAmount()).isEqualByComparingTo("23000"); // 20000 + 3000
+        assertThat(result.getShippingFee()).isEqualByComparingTo("3000");
+    }
+
+    @Test @DisplayName("create: 배송비 산정에는 쿠폰 할인 전 라인 금액이 전달된다")
+    void create_shippingAssessedOnPreDiscountAmount() {
+        when(loadUserPort.findEmailById(1L)).thenReturn(Optional.of("user@test.com"));
+        Product product = mockProduct(10L, "상품A", new BigDecimal("10000"));
+        when(loadProductPort.findById(10L)).thenReturn(Optional.of(product));
+        when(saveOrderPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(couponUseCase.validateCoupon(eq("SALE"), eq(1L), any()))
+                .thenReturn(new CouponUseCase.ValidateResult(true, "ok", new BigDecimal("5000"),
+                        new BigDecimal("15000"), null));
+
+        service.create(1L, List.of(new CreateMultiItemOrderUseCase.Line(10L, null, 2)), "SALE");
+
+        verify(assessShippingFeeUseCase).assess(argThat(lines ->
+                lines.size() == 1
+                        && lines.get(0).lineAmount().compareTo(new BigDecimal("20000")) == 0));
     }
 
     @Test @DisplayName("create: SKU 있는 주문 — 재고 차감")

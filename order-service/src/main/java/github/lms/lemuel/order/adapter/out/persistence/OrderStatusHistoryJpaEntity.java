@@ -41,4 +41,12 @@ public class OrderStatusHistoryJpaEntity {
         this.reason = reason;
         this.changedAt = LocalDateTime.now();
     }
+
+    public Long getId() { return id; }
+    public Long getOrderId() { return orderId; }
+    public String getPreviousStatus() { return previousStatus; }
+    public String getNewStatus() { return newStatus; }
+    public String getChangedBy() { return changedBy; }
+    public String getReason() { return reason; }
+    public LocalDateTime getChangedAt() { return changedAt; }
 }

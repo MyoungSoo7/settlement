@@ -7,7 +7,7 @@ spring:
 
   threads:
     virtual:
-      enabled: true  # Java 21+ 가상 스레드 (Tomcat 요청 처리 + @Scheduled). JEP 491(JDK24+)로 synchronized 핀 없음
+      enabled: true # Java 21+ 가상 스레드 (Tomcat 요청 처리 + @Scheduled). JEP 491(JDK24+)로 synchronized 핀 없음
 
   datasource:
     # reWriteBatchedInserts=true → JDBC 배치 INSERT 를 단일 multi-row 문장으로 재작성 (대량 적재 처리량↑)
@@ -31,8 +31,8 @@ spring:
       # 'Connection is not available … (total=0)' 로 터진다 — settlement-service 의 outbox 폴러가
       # 이틀간 46회 이렇게 실패했다. keepalive 로 주기적으로 살아있음을 확인하고,
       # max-lifetime 으로 오래된 커넥션을 선제 교체한다. (economics/market/common-data 는 이미 적용됨)
-      max-lifetime: 1800000     # 30분
-      keepalive-time: 300000    # 5분
+      max-lifetime: 1800000 # 30분
+      keepalive-time: 300000 # 5분
 
   jpa:
     hibernate:
@@ -90,10 +90,10 @@ spring:
   kafka:
     bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
-      acks: all                                 # 모든 in-sync replica 확인 (신뢰성 우선)
+      acks: all # 모든 in-sync replica 확인 (신뢰성 우선)
       retries: 5
       properties:
-        enable.idempotence: true                # 프로듀서 중복 발행 방지
+        enable.idempotence: true # 프로듀서 중복 발행 방지
         max.in.flight.requests.per.connection: 5
         compression.type: lz4
     consumer:
@@ -101,8 +101,8 @@ spring:
       # settlement 와 같은 컨슈머 그룹이 되어 파티션을 나눠 갖고 오프셋까지 공유했을 것이다(정산 이벤트
       # 조용한 유실). 리스너가 0건인 지금 정정한다 — 이관할 오프셋이 없다. guard KAFKA-GROUP-OWNER 강제.
       group-id: lemuel-order
-      auto-offset-reset: earliest               # 새 컨슈머는 시작부터 재생
-      enable-auto-commit: false                 # 수동 ack → 멱등 처리 후 커밋
+      auto-offset-reset: earliest # 새 컨슈머는 시작부터 재생
+      enable-auto-commit: false # 수동 ack → 멱등 처리 후 커밋
       properties:
         isolation.level: read_committed
     listener:
@@ -111,13 +111,13 @@ spring:
 
   # Graceful Shutdown for K8s Rolling Update
   lifecycle:
-    timeout-per-shutdown-phase: 30s  # Pod 종료 시 최대 30초 대기
+    timeout-per-shutdown-phase: 30s # Pod 종료 시 최대 30초 대기
 
   batch:
     jdbc:
-      initialize-schema: always  # BATCH_* 테이블 자동 생성
+      initialize-schema: always # BATCH_* 테이블 자동 생성
     job:
-      enabled: false  # 애플리케이션 시작 시 자동 실행 방지
+      enabled: false # 애플리케이션 시작 시 자동 실행 방지
 
   # Mail Configuration
   mail:
@@ -141,22 +141,37 @@ spring:
           writetimeout: 5000
     default-encoding: UTF-8
 
+  # 업로드 한도는 *항상 로드되는* 이 파일에 둔다.
+  #
+  # 과거엔 application-image.yml(프로파일 `image`)에만 있었는데, 프로덕션은
+  # SPRING_PROFILES_ACTIVE=prod 로 뜨고 profile group/import 도 없어서 그 파일이 로드되지 않았다.
+  # 결과적으로 운영 한도는 스프링 기본값(1MB/10MB)이었고, 도메인(ImageUpload.MAX_SIZE_BYTES=5MB)이
+  # 허용하도록 짜인 1~5MB 파일이 도메인 검증에 닿기도 전에 서블릿에서 잘렸다.
+  # 설정 파일에 5MB 라고 적혀 있는데 실제로는 1MB 로 도는 상태였다 — 프로파일에 값을 숨기면
+  # "적혀 있음" 과 "적용됨" 이 갈린다.
+  servlet:
+    multipart:
+      enabled: true
+      # 도메인 상수(5MB)와 같은 값이다. 한쪽만 바꾸면 서블릿과 도메인의 판정이 어긋난다.
+      max-file-size: ${APP_UPLOAD_MAX_FILE_SIZE:5MB}
+      max-request-size: ${APP_UPLOAD_MAX_REQUEST_SIZE:25MB}
+      file-size-threshold: 2MB
+
 # Server Configuration
 server:
   port: 8088
-  shutdown: graceful  # Graceful Shutdown 활성화
+  shutdown: graceful # Graceful Shutdown 활성화
   tomcat:
     connection-timeout: 20s
     threads:
       max: 200
       min-spare: 10
-    uri-encoding: UTF-8  # URL 파라미터 한글 인코딩
+    uri-encoding: UTF-8 # URL 파라미터 한글 인코딩
   servlet:
     encoding:
       charset: UTF-8
       enabled: true
-      force: true  # 요청/응답 모두 UTF-8 강제
-
+      force: true # 요청/응답 모두 UTF-8 강제
 
 management:
   # 분산 트레이싱 — Micrometer Tracing + OpenTelemetry → Tempo (또는 Jaeger / Zipkin)
@@ -179,12 +194,12 @@ management:
       show-details: when-authorized
       show-components: always
       probes:
-        enabled: true  # K8s Liveness/Readiness Probe 활성화
+        enabled: true # K8s Liveness/Readiness Probe 활성화
   health:
     mail:
       enabled: false
     redis:
-      enabled: ${MANAGEMENT_HEALTH_REDIS_ENABLED:false}  # jpa 모드(기본)엔 Redis 서버 없음 → readiness DOWN 방지. redis 모드 compose 에서 true
+      enabled: ${MANAGEMENT_HEALTH_REDIS_ENABLED:false} # jpa 모드(기본)엔 Redis 서버 없음 → readiness DOWN 방지. redis 모드 compose 에서 true
     livenessState:
       enabled: true
     readinessState:
@@ -192,9 +207,9 @@ management:
     elasticsearch:
       enabled: false
     db:
-      enabled: true  # PostgreSQL Health Check
+      enabled: true # PostgreSQL Health Check
   server:
-    port: 8089  # 로컬 dev: 메인(8080)과 분리. Docker: MANAGEMENT_SERVER_PORT=8080으로 오버라이드하여 단일 포트로 통합
+    port: 8089 # 로컬 dev: 메인(8080)과 분리. Docker: MANAGEMENT_SERVER_PORT=8080으로 오버라이드하여 단일 포트로 통합
   metrics:
     distribution:
       percentiles-histogram:
@@ -217,12 +232,20 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
 
-
 # 장바구니 저장소 선택 — jpa(기본, PostgreSQL) | redis. 빈 충돌 방지를 위해 어댑터가 @ConditionalOnProperty 로 토글된다.
 cart:
   store: ${CART_STORE:jpa}
 
 app:
+  # 배송 — 수취인 안심번호(가상번호) 풀.
+  # validity-days: 배정 후 이 기간이 지나면 회수해 재사용한다. 배송 소요보다 짧게 잡으면
+  #   배송 중 연락 수단이 끊기고, 너무 길게 잡으면 유한한 풀이 마른다.
+  # reclaim-cron: 만료 회수 스케줄. 멈추면 풀이 말라 신규 주문이 실번호로 나간다.
+  shipping:
+    safety-number:
+      validity-days: ${SAFETY_NUMBER_VALIDITY_DAYS:7}
+      reclaim-batch: ${SAFETY_NUMBER_RECLAIM_BATCH:200}
+      reclaim-cron: ${SAFETY_NUMBER_RECLAIM_CRON:0 10 * * * *}
   # 내부 API(/internal/**) 공유 시크릿 — InternalApiKeyFilter 가 X-Internal-Api-Key 헤더를 검증.
   # settlement(OrderReconClient)의 INTERNAL_API_KEY 와 동일해야 한다. 미설정 시 검증 비활성(개발)+경고.
   internal:
@@ -248,13 +271,13 @@ app:
   cache:
     two-tier:
       enabled: ${APP_CACHE_TWO_TIER_ENABLED:false}
-      l1-ttl-seconds: ${APP_CACHE_L1_TTL_SECONDS:60}     # L1 staleness 안전망 (무효화 누락 대비)
-      l2-ttl-seconds: ${APP_CACHE_L2_TTL_SECONDS:600}    # L2 권위 TTL
+      l1-ttl-seconds: ${APP_CACHE_L1_TTL_SECONDS:60} # L1 staleness 안전망 (무효화 누락 대비)
+      l2-ttl-seconds: ${APP_CACHE_L2_TTL_SECONDS:600} # L2 권위 TTL
       max-size: ${APP_CACHE_MAX_SIZE:500}
   kafka:
-    enabled: ${APP_KAFKA_ENABLED:false}         # 로컬 개발 기본 OFF — 프로덕션 compose/K8s 에서 true
+    enabled: ${APP_KAFKA_ENABLED:false} # 로컬 개발 기본 OFF — 프로덕션 compose/K8s 에서 true
     topic:
-      owner: order-service   # ADR 0035 — 이 모듈이 발행(소유)하는 토픽만 만든다(파티션 정본은 topic-catalog.json)
+      owner: order-service # ADR 0035 — 이 모듈이 발행(소유)하는 토픽만 만든다(파티션 정본은 topic-catalog.json)
       payment-captured: lemuel.payment.captured
       payment-refunded: lemuel.payment.refunded
   outbox:
@@ -300,19 +323,20 @@ app:
     issuer: ${JWT_ISSUER}
     secret: ${JWT_SECRET}
     ttl-seconds: ${JWT_TTL_SECONDS}
-  alerting:
-    slack:
-      webhook-url: ${SLACK_WEBHOOK_URL}
-      channel: ${SLACK_CHANNEL}
-      enabled: ${SLACK_ALERTS_ENABLED}
   # 주문 알림 멀티채널 (Strategy + Composite). 메일은 항상 활성, Slack 은 opt-in.
+  #
+  # 예전에 있던 app.alerting.slack.{webhook-url,channel,enabled} 는 2026-08-20 고아 파라미터
+  # 감사에서 읽는 코드가 하나도 없음이 확인돼 제거했다. 실제 슬랙 연동은 아래 app.notification.slack
+  # (SlackOrderNotificationChannel 의 @ConditionalOnProperty/@Value)이 전부다. 두 벌이 남아 있으면
+  # 운영자가 죽은 쪽에 값을 넣고 "왜 알림이 안 오지" 를 하게 된다 — 설정은 읽히는 것만 남긴다.
   notification:
     slack:
       enabled: ${APP_NOTIFICATION_SLACK_ENABLED:false}
       webhook-url: ${APP_NOTIFICATION_SLACK_WEBHOOK_URL:}
   mail:
+    # from 만 읽힌다(MailOrderNotificationChannel, EmailAdapter). 함께 있던 support-email 은
+    # 읽는 코드가 없어 2026-08-20 감사에서 제거했다 — 필요해지면 그때 소비자와 함께 추가한다.
     from: ${MAIL_FROM:}
-    support-email: ${SUPPORT_EMAIL}
   password-reset:
     token-expiry-minutes: 30
     base-url: ${APP_BASE_URL:http://localhost:5173}
@@ -328,10 +352,10 @@ resilience4j:
       pgDefault:
         registerHealthIndicator: true
         slidingWindowType: COUNT_BASED
-        slidingWindowSize: 20                    # 최근 20회 요청 기준
-        minimumNumberOfCalls: 10                 # 최소 10건 수집 후 판정
-        failureRateThreshold: 50                 # 50% 이상 실패면 OPEN
-        waitDurationInOpenState: 30s             # OPEN → HALF_OPEN 대기
+        slidingWindowSize: 20 # 최근 20회 요청 기준
+        minimumNumberOfCalls: 10 # 최소 10건 수집 후 판정
+        failureRateThreshold: 50 # 50% 이상 실패면 OPEN
+        waitDurationInOpenState: 30s # OPEN → HALF_OPEN 대기
         permittedNumberOfCallsInHalfOpenState: 5
         automaticTransitionFromOpenToHalfOpenEnabled: true
         # 4xx 는 PG 쪽의 비즈니스 오류 (결제키 만료 등) 이므로 서킷 판정에서 제외
@@ -369,8 +393,6 @@ resilience4j:
         baseConfig: pgDefault
       inicisPg:
         baseConfig: pgDefault
-
-
 
 # 데모 자동로그인 / 게스트 토글. 운영 false, dev/demo true.
 lemuel:

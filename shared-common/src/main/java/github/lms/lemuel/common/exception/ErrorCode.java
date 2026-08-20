@@ -21,6 +21,15 @@ public enum ErrorCode {
     INVALID_PARAMETER(HttpStatus.BAD_REQUEST, "요청 파라미터가 올바르지 않습니다."),
     LOCK_TIMEOUT(HttpStatus.CONFLICT, "요청이 몰려 처리하지 못했습니다. 잠시 후 다시 시도해주세요."),
     ACCESS_DENIED(HttpStatus.FORBIDDEN, "이 리소스에 접근할 권한이 없습니다."),
+    // 도메인 리소스 부재(XXX_NOT_FOUND)가 아니라 "그런 엔드포인트 자체가 없다"는 뜻이다. 둘을 섞으면
+    // 클라이언트가 "주문이 없다" 와 "URL 을 잘못 썼다" 를 구분하지 못한다.
+    ENDPOINT_NOT_FOUND(HttpStatus.NOT_FOUND, "요청하신 경로를 찾을 수 없습니다."),
+    // 경로는 있는데 메서드가 다른 경우다. 404 로 뭉치면 클라이언트가 "주소가 틀렸다"로 오인해
+    // 엉뚱한 곳을 고친다 — 실제로는 GET/POST 를 바꿔 부르면 되는 상황이다.
+    METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "지원하지 않는 요청 메서드입니다."),
+    // 서블릿이 멀티파트를 끊은 경우다. 도메인 크기 검증(예: ImageUpload)에는 닿지도 못하므로
+    // 도메인 오류로 표현할 수 없다. 400 이 아니라 413 인 이유 — 요청이 틀린 게 아니라 크다.
+    PAYLOAD_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "업로드 파일이 허용 크기를 넘습니다."),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요."),
 
     // ─── order ───────────────────────────────────────────────────────────────
@@ -132,7 +141,32 @@ public enum ErrorCode {
     // 수기 기표 증빙 OCR (ADR 0036 확산) — 판독 실패는 무폴백 503, 대사 미통과 기표는 422.
     DEPOSIT_PROOF_NOT_FOUND(HttpStatus.NOT_FOUND, "예치금 증빙을 찾을 수 없습니다."),
     DEPOSIT_PROOF_OCR_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "예치금 증빙 판독에 실패했습니다. 잠시 후 다시 시도해주세요."),
-    DEPOSIT_PROOF_NOT_MATCHED(HttpStatus.UNPROCESSABLE_ENTITY, "예치금 증빙 대사가 완료되지 않아 기표할 수 없습니다.");
+    DEPOSIT_PROOF_NOT_MATCHED(HttpStatus.UNPROCESSABLE_ENTITY, "예치금 증빙 대사가 완료되지 않아 기표할 수 없습니다."),
+
+    // ── 포인트·기프트카드 원장 ────────────────────────────────────────────────
+    // 잔액 부족은 오류가 아니라 정상 답변이라 422 다 — 요청 형식은 옳고 상태가 허락하지 않을 뿐이다.
+    POINT_INSUFFICIENT(HttpStatus.UNPROCESSABLE_ENTITY, "포인트 잔액이 부족합니다."),
+    POINT_INVALID_AMOUNT(HttpStatus.BAD_REQUEST, "포인트 금액이 올바르지 않습니다."),
+    POINT_INVALID_STATE(HttpStatus.BAD_REQUEST, "현재 상태에서는 포인트를 처리할 수 없습니다."),
+    // 요청 자체는 옳은데 기존 정책과 기간이 겹치는 상태다 — 먼저 현재 정책을 종료해야 자리가 난다(ADR 0032).
+    POINT_POLICY_PERIOD_OVERLAP(HttpStatus.CONFLICT, "같은 범위에 기간이 겹치는 적립률 정책이 이미 있습니다."),
+    GIFT_CARD_INSUFFICIENT(HttpStatus.UNPROCESSABLE_ENTITY, "기프트카드 잔액이 부족합니다."),
+    GIFT_CARD_INVALID_AMOUNT(HttpStatus.BAD_REQUEST, "기프트카드 금액이 올바르지 않습니다."),
+    // 코드 등록 실패는 사유를 구분하지 않는다 — 구분하면 유효한 코드의 존재가 새어 나간다.
+    GIFT_CARD_INVALID_STATE(HttpStatus.BAD_REQUEST, "사용할 수 없는 기프트카드입니다."),
+
+    // ─── education (과정·차시) ───────────────────────────────────────────────────
+    // 코드 문자열 COURSE_NOT_FOUND 는 education 이 자체 advice 로 이미 내보내던 값이다 —
+    // 본문 스키마만 공통으로 바꾸고 코드는 그대로 둬서 기존 클라이언트의 분기를 깨지 않는다.
+    COURSE_NOT_FOUND(HttpStatus.NOT_FOUND, "과정을 찾을 수 없습니다."),
+    // 상태머신 전이 거부 — order/payment 의 INVALID_ORDER_STATE·INVALID_PAYMENT_STATE 와 같은 결이라
+    // 409 가 아닌 400 으로 맞춘다(같은 성격의 실패가 서비스마다 다른 코드로 나가지 않게).
+    COURSE_INVALID_STATE(HttpStatus.BAD_REQUEST, "현재 상태에서는 과정을 변경할 수 없습니다."),
+    // 재정렬 요청이 과정의 차시 집합과 일치하지 않는 경우 — 서버 상태가 아니라 요청이 틀렸다.
+    LESSON_ORDER_INVALID(HttpStatus.BAD_REQUEST, "차시 순서 요청이 과정의 차시 목록과 일치하지 않습니다."),
+    // 경로가 주장한 과정에 그 차시가 없다 — 403 이 아니라 404 다. 403 으로 답하면 "다른 과정에는
+    // 그 차시가 있다"는 사실까지 알려주게 된다.
+    LESSON_NOT_IN_COURSE(HttpStatus.NOT_FOUND, "해당 과정에 속한 차시가 아닙니다.");
 
     private final HttpStatus status;
     private final String defaultMessage;

@@ -65,7 +65,7 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 
 ## 대상 코드베이스
 
-- **17 마이크로서비스** + API Gateway + `shared-common`(버전드 1.0.0) · **DB-per-service** · 서비스 간 연계는 Kafka 이벤트 + 내부 대사 API 뿐 — **cross-DB 0 · cross-code 0**(이것이 이 하네스가 지키는 핵심 불변식)
+- **18 마이크로서비스** + API Gateway + `shared-common`(버전드 1.0.0) · **DB-per-service** · 서비스 간 연계는 Kafka 이벤트 + 내부 대사 API 뿐 — **cross-DB 0 · cross-code 0**(이것이 이 하네스가 지키는 핵심 불변식)
 - 서비스 로스터·포트·DB·모듈 경계·컨벤션 → `CLAUDE.md` · _reservation(시공 예약) 도메인 제거 완료(에이전트·규칙 폐기)_
 
 ## 서비스별 규칙 스킬 (온디맨드 로드)
@@ -76,7 +76,7 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 `board-domain` — 각 서비스 로직 작성·수정·리뷰 시 해당 `*-rules` 스킬이 강제 규칙(상태머신·정책·경계)을 로드.
 로드는 규율이 아니라 `skill-router.mjs` 가 편집 경로를 보고 **자동 주입**한다(아래 "강제 지점").
 
-> **커버리지 완결(2026-08-15)**: 17서비스 전부가 전용 `*-rules` 스킬 + 라우터 `ROUTES` 행을 갖는다
+> **커버리지 완결(2026-08-15)**: 18서비스 전부가 전용 `*-rules` 스킬 + 라우터 `ROUTES` 행을 갖는다
 > (둘은 같은 사실의 두 표현 — `skill-router.test.mjs` 가 회귀 방지). 마지막 3개의 해소 이력:
 > 돈 경로 우선 부채였던 `insurance-domain-rules`(완전판매 게이트·25%룰·환수/12회 분할)·
 > `deposit-domain-rules`(잔고 단일 진실원·hold/offset 이중사용 차단), 그리고 후순위였던
@@ -100,7 +100,7 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 > | 법인카드 한도·발급·상태                    | 📘`card-service-rules` (재원 F 공식·`master ≥ Σsub` 비관적 락·하향 클램프·재원 폴백 금지) + 📘`money-safety` → 🚦`CardIssuanceLimitConcurrencyIT` |
 > | 보험 설계·청약·계약·수수료·방카            | 📘`insurance-domain-rules` (완전판매 게이트 2단·25%룰·환수 24개월·12회 분할) + 📘`money-safety`                                                   |
 > | 예치금 원장·hold/offset·상계               | 📘`deposit-domain-rules` (잔고 단일 진실원·이중사용 차단·referenceType 불변) + 📘`ledger-invariants`                                              |
-> | 게시판 정의·스킨·접근 정책                 | 📘`board-domain-rules` (정의가 글 규칙 소유·스킨↔정책 정합·역할 allowlist·발행 0/소비 0·메뉴는 order 소유)                                |
+> | 게시판 정의·스킨·접근 정책                 | 📘`board-domain-rules` (정의가 글 규칙 소유·스킨↔정책 정합·역할 allowlist·발행 0/소비 0·메뉴는 order 소유)                                        |
 > | 조직·멤버십·역할(OWNER/MANAGER/STAFF)      | 📘`organization-domain-rules` (발행 전용 경계·활성 OWNER ≥1·card 프로젝션 계약) → 🤖`event-contract-reviewer` (페이로드 변경 시)                  |
 > | 쿼리·인덱스·ES 매핑·성능                   | 🤖`db-query-architect`                                                                                                                            |
 > | MSA 경계 변경                              | 🤖`hexagonal-arch-reviewer` → 🚦ArchUnit (_코드 의존 0 / cross-DB 0_ 위반 차단)                                                                   |
@@ -108,7 +108,7 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 > | 금액 다루는 코드                           | 📘`money-safety` (BigDecimal 강제·라운딩·직렬화)                                                                                                  |
 > | 원장 전표·복식부기                         | 📘`ledger-invariants` → ⌘`/ledger-verify`·`/trial-balance-verify`                                                                                 |
 > | 통합테스트 작성                            | 📘`settlement-integration-test` (Testcontainers) / 🤖`settlement-test-generator`                                                                  |
-> | PR·브랜치 diff 리뷰 착수 ("어디부터 볼까") | 📘`delta-review` (경로 시그널 → P0~P2 위험축 A~K, 세로=안에서 밖으로·가로=프로듀서/계약/컨슈머 3자) → ⌘`/delta-review` → 축별 🤖위임              |
+> | PR·브랜치 diff 리뷰 착수 ("어디부터 볼까") | 📘`delta-review` (경로 시그널 → P0~~P2 위험축 A~~K, 세로=안에서 밖으로·가로=프로듀서/계약/컨슈머 3자) → ⌘`/delta-review` → 축별 🤖위임            |
 > | 릴리즈 전 보안·컴플라이언스                | 🤖`security-auditor` + ⌘`/compliance-scan` (diff PII/이력/감사/권한)                                                                              |
 > | 수수료·홀드백 감사                         | ⌘`/fee-audit` (도메인 정책 + simulate 교차검증)                                                                                                   |
 > | 온콜·장애·알람                             | ⌘`/oncall` + 📘`incident-runbooks`                                                                                                                |
@@ -120,7 +120,7 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 > | 요구사항 모호                              | 📘`interview-harness`(=`socrates`+`evolve-step`+`ontology` 루프)                                                                                  |
 > | 전사 역할 산출물 일괄                      | ⌘`/ai-dev-team` (+ `commands/agents/*` 서브커맨드)                                                                                                |
 > | hookify 규칙 생성·수정 / "훅 굳혀줘"       | 📘`hookify-to-guard` (캡처는 임시, 정본은 guard.mjs 3중 강제 — 이식 후 원본 삭제) — 라우터가 `hookify.*.local.md` 편집 시 주입                    |
-> | 하네스 자기 진단·드리프트                  | ⌘`/harness-check` (audit + 가드) → 🚦`harness-audit.mjs`                                                       |
+> | 하네스 자기 진단·드리프트                  | ⌘`/harness-check` (audit + 가드) → 🚦`harness-audit.mjs`                                                                                          |
 >
 > **원칙:** 결정적인 것은 🚦게이트로 강제 · 판단 필요한 것은 🤖에이전트로 위임 · 작성과 검증은 분리(자기 승인 금지).
 >
@@ -135,14 +135,14 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 문서 규율이 아니라 **훅으로 배선된 실행 지점**이 정본이다. 배선은 `.claude/settings.json` · `scripts/harness/hooks/pre-commit` ·
 `.github/workflows/harness-guard.yml` 세 곳에만 존재한다.
 
-> | 시점                     | 트리거                                     | 실행                                                                                               | 실패 시                                                            |
-> | ------------------------ | ------------------------------------------ | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-> | 파일 편집 직전           | PreToolUse `Write\|Edit\|MultiEdit`        | `guard.mjs --hook`                                                                                 | **exit 2 = 편집 차단**                                             |
-> | Bash 명령 실행 직전      | PreToolUse `Bash`                          | `guard.mjs --hook-bash`                                                                            | **exit 2 = 명령 차단** (BLOCK) / WARN 은 additionalContext 만      |
-> | 파일 편집·스킬 호출 직전 | PreToolUse `Write\|Edit\|MultiEdit\|Skill` | `skill-router.mjs --hook`                                                                          | 차단 없음(항상 exit 0) — 스킬 로드 리마인더 주입                   |
-> | 세션 시작                | SessionStart                               | `telemetry-report.mjs --hook`                                                                      | 차단 없음 — 최근 차단·라우터 순응률 요약 주입(알릴 것 없으면 침묵) |
-> | `git commit`             | `core.hooksPath=scripts/harness/hooks`     | `guard.mjs --staged` (내용 스캔 + 하네스 경로 삭제 검사)                                           | **커밋 거부** (`--no-verify` 우회 금지)                            |
-> | PR·push (develop/main)   | `harness-guard.yml`                        | 하네스 자기 테스트 → `guard.mjs --list` → `guard.mjs --deleted-list` → `harness-audit.mjs` → manifest 추적 검증 → 워킹트리 청결 | **CI 실패** (로컬 훅 미설치·우회를 재차단)                         |
+> | 시점                     | 트리거                                     | 실행                                                                                                                                                             | 실패 시                                                            |
+> | ------------------------ | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+> | 파일 편집 직전           | PreToolUse `Write\|Edit\|MultiEdit`        | `guard.mjs --hook`                                                                                                                                               | **exit 2 = 편집 차단**                                             |
+> | Bash 명령 실행 직전      | PreToolUse `Bash`                          | `guard.mjs --hook-bash`                                                                                                                                          | **exit 2 = 명령 차단** (BLOCK) / WARN 은 additionalContext 만      |
+> | 파일 편집·스킬 호출 직전 | PreToolUse `Write\|Edit\|MultiEdit\|Skill` | `skill-router.mjs --hook`                                                                                                                                        | 차단 없음(항상 exit 0) — 스킬 로드 리마인더 주입                   |
+> | 세션 시작                | SessionStart                               | `telemetry-report.mjs --hook`                                                                                                                                    | 차단 없음 — 최근 차단·라우터 순응률 요약 주입(알릴 것 없으면 침묵) |
+> | `git commit`             | `core.hooksPath=scripts/harness/hooks`     | `guard.mjs --staged` (내용 스캔 + 하네스 경로 삭제 검사)                                                                                                         | **커밋 거부** (`--no-verify` 우회 금지)                            |
+> | PR·push (develop/main)   | `harness-guard.yml`                        | 하네스 자기 테스트 → `guard.mjs --list` → `guard.mjs --deleted-list` → `harness-audit.mjs` → manifest 추적 검증 → 지식 manifest → 설정 고아 감사 → 워킹트리 청결 | **CI 실패** (로컬 훅 미설치·우회를 재차단)                         |
 >
 > 삭제는 내용 스캔으로 잡히지 않는다 — 스테이징·CI 파일 목록이 `--diff-filter=ACMR` 로 삭제(D)를 빼고 오기 때문이다.
 > 그래서 `--staged`/`--deleted-list` 가 삭제 목록을 따로 받아 하네스 경로를 지키고, 실시간 훅(PreToolUse)은
@@ -246,6 +246,15 @@ settlement-copilot **플러그인 소유**라 플러그인 미설치 환경에 �
 - **스케줄러 락 이름 유일성** — `scripts/harness/test/scheduler-lock-gate.test.mjs`: 같은 `@SchedulerLock`
   이름을 두 배치가 쓰면 락 보유 기간 동안 나머지가 **조용히 스킵**된다(예외·로그 없음 → 컴파일도 CI 도 못 잡음).
   리포 전수로 잠근다. 의도적 공유가 필요하면 게이트의 `ALLOWED_SHARED` 에 근거와 함께 등록.
+- **커버리지 측정 범위 게이트** — `scripts/harness/test/coverage-scope-gate.test.mjs` + 루트/`shared-common`
+  `build.gradle.kts` 의 런타임 스모크: JaCoCo 검증은 **측정 대상 클래스가 0개면 만들 위반이 없어 통과**한다
+  (커버리지가 높아서가 아니라 잰 게 없어서다 — 빌드는 초록이고 리포트 파일도 생겨서 컴파일도 CI 도 못 잡는다).
+  2026-08-19 deposit·board(리포트+검증)·education(검증)이 실제로 이 상태였다: 아티팩트 XML 클래스 0개,
+  HTML `No class files specified`, 임계값을 1.00 으로 올려도 BUILD SUCCESSFUL. 원인은 루트가 이미 교체한
+  `classDirectories` 위에 모듈이 같은 관용구를 다시 얹은 것 — `classDirectories.files` 가 **설정 시점에 즉시
+  평가**돼 `build/classes` 가 없는 클린 빌드(=CI 의 `clean :module:build`)에서 빈 집합이 스냅샷된다.
+  정적(모듈 빌드 스크립트의 `classDirectories` 재정의 금지)과 런타임(대상 0개면 빌드 FAIL) 두 겹으로 막고,
+  런타임 스모크가 지워지는 것까지 정적 검사가 감시한다.
 - **메뉴↔라우트 정합 게이트** — `scripts/harness/test/menu-route-gate.test.mjs`: 네비게이션 트리의 세 사본
   (시드 SQL `V20260813100000__menu_area_permission.sql` = 정본 · 프론트 폴백 `menuFallback.ts` · `App.tsx` 라우트)을
   대조한다. 메뉴만 있고 라우트가 없으면 **죽은 링크**, 라우트만 있고 메뉴가 없으면 **유령 화면**이 되는데 둘 다
@@ -281,6 +290,23 @@ settlement-copilot **플러그인 소유**라 플러그인 미설치 환경에 �
   STALE(exit 1) — 직전 빌드 산출물을 이번 변경의 증거로 인용하는 것을 종료 코드로 차단한다. 리포트가
   아예 없으면 MISSING(미실행 — "통과" 주장 불가). 지금까지 "인용 전 mtime 확인"은 운용 지식이었다 —
   게이트 결과를 인용하기 전에 이 명령을 먼저 돌린다.
+- **CI 판정 조회** — `scripts/harness/ci-verdict.mjs [sha|ref]` (+ 게이트 `test/ci-verdict-gate.test.mjs`):
+  "가짜 GREEN" 의 또 한 경로인 **취소된 실행이 통과로 읽히는 상태**를 종료 코드로 가른다. develop 의 ci·harness-guard 는
+  `cancel-in-progress` 라 연속 push 중간 커밋의 실행이 `cancelled` 로 끝나는데, `cancelled` 는 `failure` 가 아니라
+  브랜치에도 `gh run list` 에도 빨간 X 가 남지 않는다 — 판정이 **없는** 것과 판정이 **통과** 인 것이 같은 색이다.
+  여기에 경로 필터가 겹치면 구멍이 영구화된다: `Frontend - Tests` 는 `frontend == 'true'` 일 때만 돌고 push 의 변경
+  감지 기준은 **직전 커밋**이라, 프론트를 바꾼 커밋의 실행이 취소되면 뒤 커밋들은 그 잡을 `skipped` 로 넘겨 그 변경은
+  영영 테스트되지 않는다(2026-08-19 실측: 커밋 `1d17aaa7d` — 잡 단위 재실행마저 다시 취소됐고, 판정은 상시 열려 있던
+  릴리스 PR 실행에서 우연히 메워졌다. PR 이 닫혀 있었다면 그대로 미판정). 그래서 `success`/`failure` 만 결론으로 세고
+  `cancelled`·`skipped`·진행중은 결론이 아니며, 판정을 대상 커밋 → 후손 → **조상 + 해당 경로 무변경 증명** 순으로 찾아
+  `PASS`/`COVERED`/`PENDING`/`UNJUDGED`/`FAIL` 로 가른다. 후손 중 **가장 나중** 판정이 그 내용의 현재 진실이다 —
+  가까운 결론 하나로 끊으면 남의 커밋이 낸 중간 실패가 대상에 영구히 눌어붙는다(도입 당일 자기 실증: `guard` 가
+  `70e4c9be3` 에서 FAIL → `44a8a5b8d` 에서 복구됐는데도 `4aeb4bf4b` 가 계속 FAIL 로 보고됐다). 다만 대상 커밋
+  **자신의** 판정이 있으면 그것이 그 커밋의 사실이고(bisect·롤백이 이 값을 본다), 도중에 뒤집힌 이력은 헤드라인
+  옆에 함께 남긴다. 게이트는 판정 규칙과 함께 **필수 체크 표의 드리프트**를
+  막는다 — 체크 이름·경로 조건을 `ci.yml`/`harness-guard.yml`/`semgrep.yml` 원문 및 CLAUDE.md 목록과 대조하므로,
+  잡 이름이나 `if:` 를 바꾸면 조용히 없는 체크를 조회하는 대신 CI 가 FAIL 한다. 읽기 전용이다 — 재실행은 하지 않고
+  필요한 `gh` 명령만 출력한다(잡 단위 재실행은 경로 필터·concurrency 에 다시 걸리므로 실행 전체를 다시 돌려야 한다).
 - **로컬 통합 검증** — `scripts/verify.sh`: CI(`harness-guard.yml` + `ci.yml`)의 판정을 **같은 순서로** 로컬에서 재현한다.
   하네스 테스트 → 자기 진단 → 변경 파일 가드 → 삭제 가드 → 변경 모듈 Gradle. "다 됐다" 를 자기보고가 아니라 종료 코드로 증명하는 지점.
   `--fast`(Gradle 생략, 수초) · `--all`(전체 build) · `--base <ref>`. 느려지면 우회당하므로 기본 경로는 변경 모듈만 빌드한다(ci.yml 매핑과 동일).
