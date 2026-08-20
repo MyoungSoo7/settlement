@@ -1,9 +1,12 @@
 package github.lms.lemuel.user.adapter.out.persistence;
 
+import github.lms.lemuel.user.domain.LoginSecurity;
 import github.lms.lemuel.user.domain.MembershipStatus;
 import github.lms.lemuel.user.domain.User;
 import github.lms.lemuel.user.domain.UserRole;
 import org.springframework.stereotype.Component;
+
+import java.time.LocalDateTime;
 
 /**
  * Domain <-> JpaEntity 수동 매핑.
@@ -28,6 +31,10 @@ public class UserPersistenceMapper {
                 entity.getPhoneNumber(),
                 active,
                 MembershipStatus.fromString(entity.getMembershipStatus()),
+                LoginSecurity.restore(
+                        entity.getFailedLoginAttempts() == null ? 0 : entity.getFailedLoginAttempts(),
+                        entity.getLockedUntil(),
+                        entity.getPasswordChangedAt()),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()
         );
@@ -47,6 +54,14 @@ public class UserPersistenceMapper {
         entity.setActive(domain.isActive());
         entity.setMembershipStatus(
                 domain.getMembershipStatus() == null ? "APPROVED" : domain.getMembershipStatus().name());
+        LoginSecurity security = domain.getLoginSecurity();
+        entity.setFailedLoginAttempts(security == null ? 0 : security.getFailedAttempts());
+        entity.setLockedUntil(security == null ? null : security.getLockedUntil());
+        // password_changed_at 은 NOT NULL 이고 merge 경로에서는 @PrePersist 가 돌지 않는다 —
+        // 기준 시각을 모르는 도메인(레거시 복원)을 그대로 흘리면 UPDATE 가 제약 위반으로 터진다.
+        LocalDateTime passwordChangedAt = security == null ? null : security.getPasswordChangedAt();
+        entity.setPasswordChangedAt(passwordChangedAt != null ? passwordChangedAt
+                : (domain.getCreatedAt() != null ? domain.getCreatedAt() : LocalDateTime.now()));
         entity.setCreatedAt(domain.getCreatedAt());
         entity.setUpdatedAt(domain.getUpdatedAt());
         return entity;

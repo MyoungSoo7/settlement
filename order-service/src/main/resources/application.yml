@@ -250,6 +250,15 @@ app:
   # settlement(OrderReconClient)의 INTERNAL_API_KEY 와 동일해야 한다. 미설정 시 검증 비활성(개발)+경고.
   internal:
     api-key: ${INTERNAL_API_KEY:}
+  security:
+    # 로그인 무차별 대입 방어 + 비밀번호 사용 기한 (LoginSecurityPolicy).
+    # max-failed-attempts: 연속 실패 이 횟수에 닿으면 잠금. 성공 1 회가 누적을 지운다.
+    # lock-minutes: 기한부 잠금 시간. 영구 잠금은 남의 이메일만 알면 서비스 거부를 걸 수 있어 쓰지 않는다.
+    # password-max-age-days: 0 이면 만료 검사 없음. 기준 시각은 users.password_changed_at.
+    login:
+      max-failed-attempts: ${LOGIN_MAX_FAILED_ATTEMPTS:5}
+      lock-minutes: ${LOGIN_LOCK_MINUTES:30}
+      password-max-age-days: ${LOGIN_PASSWORD_MAX_AGE_DAYS:90}
   # 읽기/쓰기 분리 (opt-in). enabled=true 일 때만 라우팅 데이터소스 활성 — readOnly 트랜잭션은 read 로.
   # 활성화 시 write/read 에 Hikari 네이티브 프로퍼티(jdbc-url 등)를 지정한다.
   datasource:

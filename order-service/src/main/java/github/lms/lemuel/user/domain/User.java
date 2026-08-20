@@ -20,6 +20,8 @@ public class User {
     private String phoneNumber;
     private boolean active;
     private MembershipStatus membershipStatus;
+    /** 로그인 보안 상태(연속 실패·잠금·비밀번호 기한). 불변 값 객체를 통째로 교체해 부분 갱신 실수를 막는다. */
+    private LoginSecurity loginSecurity;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -28,6 +30,7 @@ public class User {
         this.role = UserRole.USER;
         this.active = true;
         this.membershipStatus = MembershipStatus.APPROVED;
+        this.loginSecurity = LoginSecurity.initial(LocalDateTime.now());
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
     }
@@ -49,6 +52,7 @@ public class User {
         this.phoneNumber = phoneNumber;
         this.active = active == null || active;
         this.membershipStatus = MembershipStatus.APPROVED;
+        this.loginSecurity = LoginSecurity.initial(createdAt != null ? createdAt : LocalDateTime.now());
         this.createdAt = createdAt != null ? createdAt : LocalDateTime.now();
         this.updatedAt = updatedAt != null ? updatedAt : LocalDateTime.now();
     }
@@ -77,7 +81,20 @@ public class User {
                                  String name, String phoneNumber, boolean active,
                                  MembershipStatus membershipStatus,
                                  LocalDateTime createdAt, LocalDateTime updatedAt) {
+        return rehydrate(id, email, passwordHash, role, name, phoneNumber, active, membershipStatus,
+                LoginSecurity.initial(createdAt), createdAt, updatedAt);
+    }
+
+    /**
+     * 로그인 보안 상태까지 포함한 복원 팩토리. 필드를 User 시그니처에 하나씩 늘리는 대신 값 객체
+     * 하나로 받는다 — 잠금·실패횟수·비밀번호 기한은 항상 함께 읽고 함께 쓰이기 때문이다.
+     */
+    public static User rehydrate(Long id, String email, String passwordHash, UserRole role,
+                                 String name, String phoneNumber, boolean active,
+                                 MembershipStatus membershipStatus, LoginSecurity loginSecurity,
+                                 LocalDateTime createdAt, LocalDateTime updatedAt) {
         User user = new User();
+        user.loginSecurity = loginSecurity != null ? loginSecurity : LoginSecurity.initial(createdAt);
         user.id = id;
         user.email = email;
         user.passwordHash = passwordHash;
@@ -131,7 +148,44 @@ public class User {
 
     public void updatePassword(String newPasswordHash) {
         this.passwordHash = newPasswordHash;
+        // 비밀번호를 바꾸면 사용 기한이 새로 시작하고 잠금도 풀린다 — 재설정을 마친 사용자가
+        // 여전히 잠겨 있으면 재설정이 아무 의미가 없다.
+        this.loginSecurity = this.loginSecurity.afterPasswordChange(LocalDateTime.now());
         this.updatedAt = LocalDateTime.now();
+    }
+
+    // ── 로그인 보안 (무차별 대입 잠금 · 비밀번호 사용 기한) ──────────────────
+    // 판정은 전부 LoginSecurity 값 객체에 있고, User 는 "언제 무엇을 부를지"만 정한다.
+
+    /** 지금 이 계정이 잠겨 있는지. */
+    public boolean isLocked(LocalDateTime now) {
+        return loginSecurity.isLockedAt(now);
+    }
+
+    /** 잠금 해제 예정 시각(잠기지 않았으면 null). 사용자에게 알려 줄 유일한 잠금 정보다. */
+    public LocalDateTime lockedUntil() {
+        return loginSecurity.getLockedUntil();
+    }
+
+    /** 비밀번호 검증 실패 1 건을 기록한다. 임계에 닿으면 이 호출이 잠금을 건다. */
+    public void recordLoginFailure(LoginSecurityPolicy policy, LocalDateTime now) {
+        this.loginSecurity = this.loginSecurity.afterFailure(policy, now);
+        this.updatedAt = now;
+    }
+
+    /** 로그인 성공 — 실패 누적과 잠금을 지운다. */
+    public void recordLoginSuccess(LocalDateTime now) {
+        this.loginSecurity = this.loginSecurity.afterSuccess();
+        this.updatedAt = now;
+    }
+
+    /** 비밀번호 사용 기한 초과 여부. 기준 시각을 모르는 계정은 만료로 보지 않는다. */
+    public boolean isPasswordExpired(LoginSecurityPolicy policy, LocalDateTime now) {
+        return loginSecurity.passwordExpiredAt(policy, now);
+    }
+
+    public LoginSecurity getLoginSecurity() {
+        return loginSecurity;
     }
 
     public void updateProfile(String name, String phoneNumber) {

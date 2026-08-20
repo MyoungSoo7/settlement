@@ -45,6 +45,18 @@ public class UserJpaEntity {
     @Column(name = "membership_status", nullable = false, length = 20)
     private String membershipStatus;
 
+    /** 연속 로그인 실패 횟수 — 성공 시 0 으로 초기화된다. */
+    @Column(name = "failed_login_attempts", nullable = false)
+    private Integer failedLoginAttempts;
+
+    /** 기한부 잠금 해제 시각. NULL 이거나 과거면 잠기지 않은 상태. */
+    @Column(name = "locked_until")
+    private LocalDateTime lockedUntil;
+
+    /** 마지막 비밀번호 변경 시각 — 사용 기한(기본 90 일) 판정 기준. */
+    @Column(name = "password_changed_at", nullable = false)
+    private LocalDateTime passwordChangedAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -67,6 +79,12 @@ public class UserJpaEntity {
         }
         if (membershipStatus == null) {
             membershipStatus = "APPROVED";
+        }
+        if (failedLoginAttempts == null) {
+            failedLoginAttempts = 0;
+        }
+        if (passwordChangedAt == null) {
+            passwordChangedAt = LocalDateTime.now();
         }
     }
 

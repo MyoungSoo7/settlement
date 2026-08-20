@@ -37,6 +37,7 @@ class ChangeOrderStatusServiceTest {
     @Mock IncreaseProductStockUseCase increaseProductStockUseCase;
     @Mock IncreaseVariantStockUseCase increaseVariantStockUseCase;
     @Mock github.lms.lemuel.order.application.port.out.OrderPointRewardPort orderPointRewardPort;
+    @Mock github.lms.lemuel.order.application.port.out.OrderCouponRestorePort orderCouponRestorePort;
     @InjectMocks ChangeOrderStatusService service;
 
     @Test @DisplayName("주문 취소 성공")

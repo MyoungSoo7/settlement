@@ -42,6 +42,9 @@ public enum ErrorCode {
     DUPLICATE_EMAIL(HttpStatus.CONFLICT, "이미 존재하는 이메일입니다."),
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다."),
     INVALID_PASSWORD_RESET_TOKEN(HttpStatus.BAD_REQUEST, "유효하지 않거나 만료된 비밀번호 재설정 토큰입니다."),
+    // 423 LOCKED — 401 로 내리면 클라이언트가 "비밀번호가 틀렸다"로 읽고 재시도를 유도해 잠금만 길어진다.
+    ACCOUNT_LOCKED(HttpStatus.LOCKED, "연속 로그인 실패로 계정이 잠겼습니다. 잠시 후 다시 시도해주세요."),
+    PASSWORD_EXPIRED(HttpStatus.FORBIDDEN, "비밀번호 사용 기한이 지났습니다. 비밀번호를 재설정해주세요."),
 
     // ─── product ─────────────────────────────────────────────────────────────
     PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "상품을 찾을 수 없습니다."),
