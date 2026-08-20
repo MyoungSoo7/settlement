@@ -196,6 +196,10 @@ public class SecurityConfig {
                         // 전체를 보여주므로, 감시받는 사람이 감시 기록을 열람하는 상태가 되면 감사가
                         // 성립하지 않는다. detail_json 에 조작 전후 값이 담기는 것도 같은 이유다.
                         .requestMatchers("/admin/audit-logs/**", "/admin/audit-trail/**").hasRole("ADMIN")
+                        // 회원 관리 콘솔 — 목록 한 페이지가 이메일·이름·연락처 묶음이고, 역할 변경은
+                        // 권한 상승 경로다. MANAGER 에게도 열지 않는다(승인·정지 조작은 기존
+                        // /memberships/** 가 MANAGER 까지 허용하지만, 그건 대상이 특정된 단건이다).
+                        .requestMatchers("/admin/members/**").hasRole("ADMIN")
                         // 정산 배치 재실행 콘솔 — 확정·홀드백 해제·지급 실행을 수동 트리거하므로
                         // 조회 콘솔과 달리 MANAGER 에게 열지 않는다. 일자 게이트(미래·소급 상한)는 도메인이 강제.
                         // 수수료율 정책 — 정산 금액을 직접 바꾸므로 조회 콘솔과 달리 ADMIN 만.

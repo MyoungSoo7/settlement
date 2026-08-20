@@ -95,7 +95,6 @@ const SCREEN_PENDING = new Map([
   ['order-service/RefundHistoryController', '환불 이력 조회 화면'],
   ['order-service/SplitPaymentController', '분할결제 UI'],
   ['order-service/ProductVariantController', '상품 옵션(SKU) 관리 화면'],
-  ['order-service/MembershipController', '멤버십 관리 화면'],
   // --- settlement-service (docs/PLAN.md §8-8) ---
   ['settlement-service/EventTrackAdminController', '이벤트 추적 콘솔 — PLAN 8-8'],
   ['settlement-service/SettlementRerunAdminController', '정산 재구동 — PLAN 8-8'],
@@ -144,7 +143,7 @@ const SCREEN_PENDING = new Map([
 //              홀드백 해제 미리보기(지급 콘솔), 셀러 등급 콘솔(신규 화면). 앞의 셋은 기존 화면에
 //              구획을 얹었고 넷째만 새 라우트라, 부채 상환 비용이 화면 수와 비례하지 않는다는
 //              방증이기도 하다.)
-const PENDING_BUDGET = 31;
+const PENDING_BUDGET = 30;
 
 const read = (path) => readFileSync(path, 'utf8');
 
