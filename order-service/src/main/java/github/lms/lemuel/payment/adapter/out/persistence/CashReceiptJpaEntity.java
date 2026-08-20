@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
  *
  * <p>"결제 1 건당 유효 1 건" 제약은 여기 선언하지 않는다 — 실패·취소 건은 자리를 비워야 하므로
  * {@code WHERE status IN ('REQUESTED','ISSUED','CANCEL_REQUESTED')} 조건이 붙은 부분 UNIQUE
- * 인덱스여야 하고(마이그레이션 {@code V20260821160000}), JPA 애노테이션으로는 표현할 수 없다.
+ * 인덱스여야 하고(마이그레이션 {@code V20260821223700}), JPA 애노테이션으로는 표현할 수 없다.
  */
 @Entity
 @Table(name = "cash_receipts")

@@ -79,9 +79,9 @@ class MenuSeedIntegrationTest {
     }
 
     @Test
-    @DisplayName("시드 총 54행 — 이관분 31 + 정산운영 그룹 1 + 운영 화면 11 + 시스템 화면 7 + 법인카드(CEO) 1 + 구매자 잔액 1 + 배송 하위 2")
-    void seedsExactlyFiftyFour() {
-        assertThat(adapter.findAll()).hasSize(54);
+    @DisplayName("시드 총 59행 — 기존 54 + 셀러 등급 1 + 감사 로그 1 + 회원 관리 1 + 리뷰 관리 1 + 대량주문 1")
+    void seedsExactlyFiftyNine() {
+        assertThat(adapter.findAll()).hasSize(59);
     }
 
     @Test
@@ -94,7 +94,8 @@ class MenuSeedIntegrationTest {
 
         assertThat(roots).extracting(Menu::getName).containsExactly(
                 "대시보드", "정산", "정산운영", "배송", "승인", "AI 도우미", "CEO", "시스템 관리",
-                "주문하기", "추천받기", "내 포인트·상품권");
+                // 대량주문은 관리자 기능이 아니라 구매자가 자기 주문을 올리는 경로다 — SHOP 최상위.
+                "주문하기", "추천받기", "대량주문", "내 포인트·상품권");
     }
 
     @Test
@@ -102,7 +103,7 @@ class MenuSeedIntegrationTest {
     void settlementOpsChildren() {
         assertThat(childrenOf("정산운영")).extracting(Menu::getName)
                 .containsExactly("정합성 검증", "매출 통계", "일일 대사", "PG 대사", "차지백", "회수 채권",
-                        "월마감", "세무", "수수료율", "DLQ 재처리", "원장·시산표");
+                        "월마감", "세무", "수수료율", "셀러 등급", "DLQ 재처리", "원장·시산표");
         // 매출 통계는 ADMIN·MANAGER — 서버가 /api/reports/** 를 그 등급으로 막는다(읽기 전용 집계)
         assertThat(childrenOf("정산운영").stream()
                 .filter(m -> m.getName().equals("매출 통계")).findFirst().orElseThrow().allowedRoles())
@@ -160,7 +161,7 @@ class MenuSeedIntegrationTest {
     }
 
     @Test
-    @DisplayName("시스템 사이드바 12개 — 앞 3개와 게시판 관리가 RBAC permission 과 짝지어진다")
+    @DisplayName("시스템 사이드바 15개 — 앞 3개와 게시판 관리가 RBAC permission 과 짝지어진다")
     void systemChildren() {
         List<Menu> children = childrenOf("시스템 관리");
 
@@ -169,10 +170,11 @@ class MenuSeedIntegrationTest {
         assertThat(children).extracting(Menu::getName).containsExactly(
                 "메뉴 관리", "공통코드 관리", "RBAC 관리", "이커머스 카테고리",
                 "진열 편성", "옵션 카탈로그", "운영관리", "증빙 리뷰 큐", "게시판 관리", "교육 관리",
-                "포인트 운영", "기프트카드 운영");
+                "포인트 운영", "기프트카드 운영", "감사 로그", "회원 관리", "리뷰 관리");
         assertThat(children).extracting(Menu::getRequiredPermission).containsExactly(
                 "SYSTEM_MENU_MANAGE", "SYSTEM_CODE_MANAGE", "SYSTEM_RBAC_MANAGE",
-                null, null, null, null, null, "SYSTEM_BOARD_MANAGE", null, null, null);
+                null, null, null, null, null, "SYSTEM_BOARD_MANAGE", null, null, null,
+                null, null, null);
     }
 
     @Test
@@ -227,14 +229,15 @@ class MenuSeedIntegrationTest {
     }
 
     @Test
-    @DisplayName("구매자 메뉴 3개는 USER 에게만 보인다 — 관리자 네비에는 주문/추천/잔액이 없었다")
+    @DisplayName("구매자 메뉴 4개는 USER 에게만 보인다 — 관리자 네비에는 주문/추천/대량주문/잔액이 없었다")
     void shopMenusAreUserOnly() {
         Set<String> shopNames = adapter.findAll().stream()
                 .filter(m -> m.getArea() == MenuArea.SHOP)
                 .map(Menu::getName)
                 .collect(Collectors.toSet());
 
-        assertThat(shopNames).containsExactlyInAnyOrder("주문하기", "추천받기", "내 포인트·상품권");
+        assertThat(shopNames)
+                .containsExactlyInAnyOrder("주문하기", "추천받기", "대량주문", "내 포인트·상품권");
         assertThat(adapter.findAll()).filteredOn(m -> m.getArea() == MenuArea.SHOP)
                 .allSatisfy(m -> assertThat(m.allowedRoles()).containsExactly("USER"));
     }

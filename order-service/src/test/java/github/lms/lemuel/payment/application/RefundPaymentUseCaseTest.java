@@ -54,6 +54,8 @@ class RefundPaymentUseCaseTest {
     @Mock LoadRefundPort loadRefundPort;
     @Mock SaveRefundPort saveRefundPort;
     @Mock RefundLifecycle refundLifecycle;
+    // 전액 환불 시 현금영수증 취소가 딸려 나간다(카드 결제 시나리오라 실제로는 no-op).
+    @Mock github.lms.lemuel.payment.application.port.in.CashReceiptUseCase cashReceiptUseCase;
     @InjectMocks RefundPaymentUseCase refundPaymentUseCase;
 
     private PaymentDomain capturedPayment() {

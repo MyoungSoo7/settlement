@@ -11,6 +11,9 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         "github.lms.lemuel.user",
         "github.lms.lemuel.order",
         "github.lms.lemuel.cart",
+        // 대량주문 초안(업로드→검증→확정) — 이 스캔이 빠지면 /api/bulk-orders 가 조용히 404 가 되고,
+        // 확정 어댑터가 order/shipping 유스케이스를 못 찾아 기동 시점에는 아무 신호도 나지 않는다.
+        "github.lms.lemuel.bulkorder",
         "github.lms.lemuel.shipping",
         "github.lms.lemuel.payment",
         "github.lms.lemuel.product",

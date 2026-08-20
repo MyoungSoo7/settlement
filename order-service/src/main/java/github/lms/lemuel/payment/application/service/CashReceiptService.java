@@ -61,10 +61,32 @@ public class CashReceiptService implements CashReceiptUseCase {
     @Override
     @Transactional
     public CashReceipt issue(IssueCommand command) {
-        LocalDateTime now = LocalDateTime.now(clock);
-
         PaymentDomain payment = loadPaymentPort.loadById(command.paymentId())
                 .orElseThrow(() -> new PaymentNotFoundException(command.paymentId()));
+        return doIssue(payment, command);
+    }
+
+    @Override
+    @Transactional
+    public CashReceipt issueForOrder(Long orderId, Long requesterUserId, CashReceiptPurpose purpose,
+                                     CashReceiptIdentifier.Type identifierType, String identifierValue) {
+        PaymentDomain payment = loadPaymentPort.loadByOrderId(orderId)
+                .orElseThrow(() -> new CashReceiptNotAllowedException(
+                        "결제 내역이 없는 주문에는 현금영수증을 발급할 수 없습니다: orderId=" + orderId));
+        return doIssue(payment, new IssueCommand(payment.getId(), requesterUserId, purpose,
+                identifierType, identifierValue));
+    }
+
+    /**
+     * 발급 본체 — 두 진입점(결제 기준 / 주문 기준)이 공유한다.
+     *
+     * <p>{@code issueForOrder} 가 {@code issue} 를 부르지 않고 여기로 모이는 이유: 같은 빈 안에서
+     * {@code @Transactional} 메서드를 자기호출하면 프록시를 거치지 않아 그 애노테이션이 아무 일도
+     * 하지 않는다. 지금은 바깥 메서드도 트랜잭션이라 결과가 같지만, 나중에 어느 한쪽의 전파 속성이
+     * 바뀌는 날 조용히 어긋난다.
+     */
+    private CashReceipt doIssue(PaymentDomain payment, IssueCommand command) {
+        LocalDateTime now = LocalDateTime.now(clock);
 
         Long ownerUserId = requireOwnership(command.paymentId(), command.requesterUserId());
 
@@ -102,28 +124,22 @@ public class CashReceiptService implements CashReceiptUseCase {
     }
 
     @Override
-    @Transactional
-    public CashReceipt issueForOrder(Long orderId, Long requesterUserId, CashReceiptPurpose purpose,
-                                     CashReceiptIdentifier.Type identifierType, String identifierValue) {
-        PaymentDomain payment = loadPaymentPort.loadByOrderId(orderId)
-                .orElseThrow(() -> new CashReceiptNotAllowedException(
-                        "결제 내역이 없는 주문에는 현금영수증을 발급할 수 없습니다: orderId=" + orderId));
-        return issue(new IssueCommand(payment.getId(), requesterUserId, purpose,
-                identifierType, identifierValue));
-    }
-
-    @Override
     @Transactional(readOnly = true)
     public Optional<CashReceipt> findActiveByPayment(Long paymentId, Long requesterUserId) {
-        requireOwnership(paymentId, requesterUserId);
-        return cashReceiptPort.findActiveByPaymentId(paymentId);
+        return loadActive(paymentId, requesterUserId);
     }
 
     @Override
     @Transactional(readOnly = true)
     public Optional<CashReceipt> findActiveByOrder(Long orderId, Long requesterUserId) {
         return loadPaymentPort.loadByOrderId(orderId)
-                .flatMap(payment -> findActiveByPayment(payment.getId(), requesterUserId));
+                .flatMap(payment -> loadActive(payment.getId(), requesterUserId));
+    }
+
+    /** 조회 본체 — 두 진입점이 공유한다(자기호출로 프록시를 우회하지 않기 위해 분리). */
+    private Optional<CashReceipt> loadActive(Long paymentId, Long requesterUserId) {
+        requireOwnership(paymentId, requesterUserId);
+        return cashReceiptPort.findActiveByPaymentId(paymentId);
     }
 
     /**

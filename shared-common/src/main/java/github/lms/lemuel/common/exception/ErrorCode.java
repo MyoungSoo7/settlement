@@ -36,6 +36,12 @@ public enum ErrorCode {
     ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "주문을 찾을 수 없습니다."),
     USER_NOT_EXISTS(HttpStatus.BAD_REQUEST, "존재하지 않는 사용자입니다."),
     DUPLICATE_ORDER_SUBMISSION(HttpStatus.CONFLICT, "이미 처리 중이거나 처리된 주문 요청입니다."),
+    // ─── 대량주문(초안 업로드 → 검증 → 확정) ───
+    BULK_ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "대량주문 초안을 찾을 수 없습니다."),
+    BULK_ORDER_INVARIANT(HttpStatus.BAD_REQUEST, "대량주문 초안 구성이 올바르지 않습니다."),
+    INVALID_BULK_ORDER_STATE(HttpStatus.CONFLICT, "현재 상태에서 처리할 수 없는 대량주문 요청입니다."),
+    // 행 단위가 아니라 파일 자체를 읽을 수 없는 경우다 — 행별로 사유를 돌려줄 방법이 없어 전체를 거절한다.
+    INVALID_BULK_ORDER_FILE(HttpStatus.BAD_REQUEST, "업로드 파일을 읽을 수 없습니다."),
 
     // ─── user ────────────────────────────────────────────────────────────────
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."),
