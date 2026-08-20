@@ -13,6 +13,7 @@ import github.lms.lemuel.user.domain.exception.InvalidCredentialsException;
 import github.lms.lemuel.user.domain.exception.PasswordExpiredException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -53,6 +54,15 @@ public class LoginService implements LoginUseCase {
     private final Clock clock;
     private final LoginSecurityPolicy policy;
 
+    /**
+     * 스프링 조립용 생성자.
+     *
+     * <p>{@code @Autowired} 를 반드시 남긴다 — 생성자가 둘이면 스프링은 어느 쪽으로 만들지 정하지
+     * 못하고 기본 생성자를 찾다가 {@code No default constructor found} 로 <b>컨텍스트 기동 자체가
+     * 깨진다</b>. 슬라이스 테스트는 이 빈을 만들지 않아 통과하므로, 전체 컨텍스트가 뜨는 곳에서만
+     * 드러나는 종류의 사고다.
+     */
+    @Autowired
     public LoginService(LoadUserPort loadUserPort,
                         LoginAttemptRecorder attemptRecorder,
                         PasswordHashPort passwordHashPort,
