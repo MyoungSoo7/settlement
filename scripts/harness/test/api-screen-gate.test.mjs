@@ -26,12 +26,18 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { dirname, join, basename } from 'node:path';
+import { dirname, join } from 'node:path';
+import { controllers as extractControllers, norm, walk } from '../lib/java-controllers.mjs';
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
+/**
+ * 이 게이트가 훑는 서비스. `java-controllers.mjs` 의 정본 로스터(18개)보다 <b>좁다</b> —
+ * board·education 은 아직 화면 대조 대상으로 편입되지 않았다. 넓히면 미분류 컨트롤러가
+ * 새로 드러나므로 그때 사유와 함께 분류해야 한다(별도 작업). 라우팅 게이트는 정본 18개를 쓴다.
+ */
 const SERVICES = [
   'order-service', 'settlement-service', 'loan-service', 'investment-service',
   'account-service', 'company-service', 'operation-service', 'market-service',
@@ -63,6 +69,18 @@ const MACHINE_ONLY = new Map([
   ['order-service/SettlementProjectionBackfillController', '일회성 백필(프로젝션 재적재)'],
   ['order-service/AdminStockReclaimController', '배치 트리거 — 미결제 재고 회수'],
   ['order-service/AdminPaymentExpiryController', '배치 트리거 — 결제 만료 처리'],
+  ['investment-service/RecommendationAdminController', '배치 트리거 — 크론과 동일한 스크리닝의 수동 실행(조회는 별도 GET)'],
+  // company 의 쓰기 경로는 통째로 /admin/company/** 이고, 게이트웨이가 이 접두사를 라우팅하지
+  // 않는다(application.yml 주석: "뉴스 수집 트리거(/admin/company/**)는 외부 미노출"). 서비스
+  // 자체도 AdminApiKeyFilter(X-Internal-Api-Key) 로 게이팅한다 — economics/financial/market/
+  // commondata 수집 트리거와 같은 형태다. 브라우저가 부를 수 없는 것을 "화면 부채"로 세면
+  // 예산이 실제로 못 만든 화면을 가려, 정작 만들 수 있는 화면이 묻힌다.
+  ['company-service/CompanyCollectAdminController', '수집 트리거 — 게이트웨이 미노출 + X-Internal-Api-Key 게이트'],
+  ['company-service/CompanyRegistrationAdminController', '기업 등록 — 게이트웨이 미노출 + X-Internal-Api-Key 게이트'],
+  ['company-service/CompanyDocumentAdminController', '문서함 관리 — 게이트웨이 미노출 + X-Internal-Api-Key 게이트'],
+  ['company-service/ReputationAdminController', '평판 스코어 — 게이트웨이 미노출 + X-Internal-Api-Key 게이트'],
+  ['company-service/SellerLinkAdminController', '셀러↔기업 연결 — 게이트웨이 미노출 + X-Internal-Api-Key 게이트'],
+  ['company-service/CompanyWorkforceImportAdminController', '고용현황 임포트 — 게이트웨이 미노출 + X-Internal-Api-Key 게이트'],
 ]);
 
 /**
@@ -101,12 +119,8 @@ const SCREEN_PENDING = new Map([
   ['account-service/InstallmentSavingsController', '적금 화면'],
   ['account-service/TimeDepositController', '예금 화면'],
   // --- company-service ---
-  ['company-service/CompanyCollectAdminController', '뉴스 수집 실행 콘솔'],
-  ['company-service/CompanyRegistrationAdminController', '기업 등록 관리'],
-  ['company-service/CompanyDocumentAdminController', '문서함 관리'],
-  ['company-service/ReputationAdminController', '평판 스코어 관리'],
-  ['company-service/SellerLinkAdminController', '셀러↔기업 연결 관리'],
-  ['company-service/CompanyWorkforceImportAdminController', '고용현황 임포트'],
+  // /admin/company/** 6종은 게이트웨이 미노출이라 MACHINE_ONLY 로 옮겼다. 여기 남은 것은
+  // /api/company/** 로 라우팅돼 브라우저가 부를 수 있는데도 화면이 없는 것뿐이다.
   ['company-service/CompanyWorkforceController', '고용현황 조회 — CEO 화면은 다른 경로를 쓴다'],
   // --- insurance-service ---
   ['insurance-service/InsuranceApplicationController', '보험 청약 화면 — 서류 리뷰 큐만 화면이 있다'],
@@ -117,7 +131,6 @@ const SCREEN_PENDING = new Map([
   ['deposit-service/DepositAdminController', '예치금 수기 콘솔 — 증빙 리뷰 큐만 화면이 있다'],
   ['deposit-service/DepositController', '예치금 조회 화면'],
   // --- 그 외 ---
-  ['investment-service/RecommendationAdminController', '추천 스크리닝 운영 화면'],
   ['ai-service/KnowledgeController', 'AI 지식베이스 관리'],
   ['common-data-service/DataSourceController', '공공데이터 데이터소스 등록 화면'],
   ['organization-service/OrganizationController', '조직·멤버십 화면 — 서비스 전체가 화면 0'],
@@ -128,22 +141,12 @@ const SCREEN_PENDING = new Map([
  * 올리려면 그 자체가 리뷰 대상이라는 뜻이다.
  */
 // 2026-08-20: 42 (ReportController → 매출 통계 콘솔 /admin/settlement/sales-stats 이 cashflow 를 부른다)
-const PENDING_BUDGET = 42;
+// 2026-08-21: 35 (게이트웨이가 라우팅하지 않는 7종을 MACHINE_ONLY 로 정정 — 화면을 만든 게 아니라
+//              애초에 브라우저가 부를 수 없던 것을 부채로 세고 있었다. 이 7종에 화면을 붙이려면
+//              먼저 게이트웨이 노출 정책을 바꿔야 하고, 그건 화면 작업이 아니라 배선 결정이다.)
+const PENDING_BUDGET = 35;
 
 const read = (path) => readFileSync(path, 'utf8');
-
-function walk(dir, out = []) {
-  if (!existsSync(dir)) return out;
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const full = join(dir, entry.name);
-    if (entry.isDirectory()) walk(full, out);
-    else out.push(full);
-  }
-  return out;
-}
-
-/** `${id}`(프론트 템플릿)와 `{id}`(스프링 경로변수)를 같은 와일드카드로 접는다. */
-const norm = (path) => path.replace(/\$?\{[^}]*\}/g, '*').replace(/\/+$/, '') || '/';
 
 /** 프론트가 실제로 부르는 URL — api/ 모듈뿐 아니라 페이지가 api.get() 을 직접 부르는 곳도 있다. */
 function frontendUrls() {
@@ -156,35 +159,17 @@ function frontendUrls() {
 }
 
 /**
- * 자바 서비스의 REST 컨트롤러와 그 엔드포인트 전체.
- * 메서드 경로가 이미 클래스 base 로 시작하면(= 절대 경로 표기) 덧붙이지 않는다.
+ * 이 게이트가 보는 컨트롤러 표면 — 추출은 공유 모듈이 하고, 여기서는 <b>화면 대조에 무의미한
+ * 경로만</b> 덜어낸다. {@code /internal} 은 서비스 간 호출이고 {@code /actuator} 는 관측 표면이라
+ * 브라우저가 부를 일이 없다(그 둘이 게이트웨이로 새지 않았는지는 gateway-route-gate 가 본다).
  */
 function controllers() {
-  const found = [];
-  for (const service of SERVICES) {
-    for (const file of walk(join(REPO_ROOT, service, 'src', 'main', 'java'))) {
-      if (!file.endsWith('.java')) continue;
-      const src = read(file);
-      if (!src.includes('@RestController')) continue;
-
-      const classBase = src.match(/@RequestMapping\(\s*"([^"]+)"/)?.[1] ?? '';
-      const methodPaths = [...src.matchAll(/@(?:Get|Post|Put|Patch|Delete)Mapping\(\s*(?:value\s*=\s*)?"([^"]*)"/g)]
-        .map((m) => m[1]);
-      // 경로 없는 매핑(@GetMapping)은 클래스 base 그 자체를 가리킨다.
-      const bareMapping = /@(?:Get|Post|Put|Patch|Delete)Mapping\s*(?:\(\s*\))?\s*[\r\n]/.test(src);
-
-      const paths = new Set();
-      if (classBase && (bareMapping || methodPaths.length === 0)) paths.add(norm(classBase));
-      for (const mp of methodPaths) {
-        if (!mp) { if (classBase) paths.add(norm(classBase)); continue; }
-        paths.add(norm(classBase && !mp.startsWith(classBase) ? classBase + mp : mp));
-      }
-
-      const endpoints = [...paths].filter((p) => p !== '/' && !p.startsWith('/internal') && !p.startsWith('/actuator'));
-      if (endpoints.length) found.push({ key: `${service}/${basename(file, '.java')}`, endpoints });
-    }
-  }
-  return found;
+  return extractControllers(REPO_ROOT, SERVICES)
+    .map((c) => ({
+      key: c.key,
+      endpoints: c.endpoints.filter((p) => !p.startsWith('/internal') && !p.startsWith('/actuator')),
+    }))
+    .filter((c) => c.endpoints.length > 0);
 }
 
 /** 각 URL 을 최장일치 엔드포인트 하나에만 크레딧한다. */
