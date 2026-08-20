@@ -33,7 +33,7 @@ import java.util.Map;
  * 관리자 대행 등록은 별도 콘솔({@link SellerBankAccountAdminController})이 담당한다.
  *
  * <p>계좌번호는 조회·감사로그 모두 마스킹만 노출하고, 저장 시 암호화는 영속 어댑터의
- * {@code PayoutFieldEncryptionConverter} 가 담당한다(도메인 무오염).
+ * {@code FieldEncryptionConverter} 가 담당한다(도메인 무오염).
  *
  * <p>셀러 자격 검증은 하지 않는다(보안 검수 LOW 수용) — 비셀러 USER 도 자기 행을 만들 수 있으나,
  * payout 은 정산 확정·홀드백 해제 레코드의 sellerId 로만 계좌를 해석하므로 정산이 없는 사용자의

@@ -11,7 +11,7 @@ import github.lms.lemuel.common.audit.application.AuditLogger;
 import github.lms.lemuel.common.audit.domain.AuditAction;
 import github.lms.lemuel.common.config.JacksonCompatConfig;
 import github.lms.lemuel.common.config.jwt.JwtUtil;
-import github.lms.lemuel.idempotency.adapter.out.persistence.ManualIdempotencyGuard;
+import github.lms.lemuel.idempotency.application.port.in.ClaimManualOperationUseCase;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,7 +47,7 @@ class ChargebackAdminControllerTest {
     @MockitoBean OpenChargebackUseCase openUseCase;
     @MockitoBean DecideChargebackUseCase decideUseCase;
     @MockitoBean LoadChargebackPort loadPort;
-    @MockitoBean ManualIdempotencyGuard idempotency;
+    @MockitoBean ClaimManualOperationUseCase idempotency;
     @MockitoBean AuditLogger auditLogger;
 
     private static Chargeback sampleChargeback() {

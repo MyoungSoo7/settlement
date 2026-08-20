@@ -1,5 +1,6 @@
 package github.lms.lemuel.idempotency.adapter.out.persistence;
 
+import github.lms.lemuel.idempotency.application.port.in.ClaimManualOperationUseCase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -15,9 +16,13 @@ import java.time.Instant;
  * {@code Idempotency-Key} 를 PK 로 원자적으로 선점(claim)해 차단한다. 상태머신 가드만으로는 상태 전이
  * 직전의 짧은 경합 창을 완전히 막지 못하므로(두 요청이 같은 시작 상태를 관측), 어댑터 계층의 키 선점을
  * 앞단에 둔다. 키가 없으면(레거시/키 미지정 호출) 멱등 처리를 건너뛴다 — 하위호환.
+ *
+ * <p>다른 슬라이스는 이 구현이 아니라 {@link ClaimManualOperationUseCase} 만 본다.
+ * 구현이 어댑터에 남는 것은 이 가드의 본질이 <b>DB 유니크 제약을 이용한 원자 선점</b>이기 때문이다 —
+ * 저장 기술이 곧 알고리즘이라 그 위에 애플리케이션 서비스를 한 겹 더 얹어도 불변식이 달라지지 않는다.
  */
 @Component
-public class ManualIdempotencyGuard {
+public class ManualIdempotencyGuard implements ClaimManualOperationUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(ManualIdempotencyGuard.class);
 
@@ -33,6 +38,7 @@ public class ManualIdempotencyGuard {
      * @return 처음 보는 키면 {@code true}(호출자는 조작을 진행). 이미 선점된 키면 {@code false}(중복 —
      *     호출자는 409). 키가 null/blank 면 멱등 미적용({@code true}).
      */
+    @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public boolean claim(String idempotencyKey, String endpoint, String operator) {
         if (idempotencyKey == null || idempotencyKey.isBlank()) {

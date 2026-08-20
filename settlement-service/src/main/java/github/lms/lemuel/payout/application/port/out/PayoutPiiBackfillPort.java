@@ -4,7 +4,7 @@ package github.lms.lemuel.payout.application.port.out;
  * 지급계좌 PII 재암호화 백필 아웃바운드 포트 — 평문 잔존 집계 + 페이지 단위 재암호화.
  *
  * <p>구현 어댑터는 각 페이지를 독립 트랜잭션으로 커밋한다(부분 성공 보존). 재암호화는 엔티티 저장 경로를
- * 태워 {@code PayoutFieldEncryptionConverter} 가 자동으로 암호화하게 한다.
+ * 태워 {@code FieldEncryptionConverter} 가 자동으로 암호화하게 한다.
  */
 public interface PayoutPiiBackfillPort {
 

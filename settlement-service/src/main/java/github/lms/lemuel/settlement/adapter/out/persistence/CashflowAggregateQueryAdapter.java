@@ -1,4 +1,4 @@
-package github.lms.lemuel.report.adapter.out.persistence;
+package github.lms.lemuel.settlement.adapter.out.persistence;
 
 import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.DateTemplate;
@@ -7,7 +7,6 @@ import com.querydsl.jpa.impl.JPAQueryFactory;
 import github.lms.lemuel.report.application.port.out.LoadCashflowAggregatePort;
 import github.lms.lemuel.report.domain.BucketGranularity;
 import github.lms.lemuel.report.domain.CashflowBucket;
-import github.lms.lemuel.settlement.adapter.out.persistence.QSettlementJpaEntity;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -17,11 +16,15 @@ import java.time.LocalDate;
 import java.util.List;
 
 /**
- * settlements 테이블을 day/week/month 단위로 집계하는 어댑터.
- * date_trunc(unit, settlement_date) 로 버킷팅 후 합계 컬럼을 투영한다.
+ * report 가 선언한 {@link LoadCashflowAggregatePort} 를 settlement 슬라이스가 구현한다 —
+ * settlements 테이블을 day/week/month 단위로 집계해 {@link CashflowBucket} 으로 넘긴다
+ * (date_trunc(unit, settlement_date) 버킷팅 후 합계 컬럼 투영).
  *
- * <p>주의: report 도메인은 settlement 엔티티(Q클래스)를 읽기만 한다.
- * settlement 도메인 서비스·유스케이스에 의존하지 않으므로 경계는 유지된다.
+ * <p>이 클래스가 <b>settlement 쪽에 사는 이유</b>: 이전에는 report 의 어댑터가 settlement 의 Q클래스를
+ * 직접 읽었다. "읽기만 하니 경계는 유지된다"는 종전 주석은 절반만 맞다 — 읽기여도 settlement 의
+ * <b>저장 스키마(컬럼 이름·타입)가 report 의 컴파일 의존</b>이 되어, settlement 쪽 컬럼 변경이
+ * report 를 깨뜨린다. 집계 SQL 은 데이터를 소유한 슬라이스가 제공하고, report 는 자기가 선언한
+ * 포트만 안다.
  */
 @Repository
 @RequiredArgsConstructor

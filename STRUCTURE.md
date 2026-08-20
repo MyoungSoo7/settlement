@@ -35,7 +35,8 @@ settlement/                              # 모노레포 루트
 │       └── projectionbackfill/          # settlement 프로젝션 백필 (ADR 0020)
 │
 ├── settlement-service/                  # 💰 Settlement (8082/mgmt 8083, standalone, settlement_db)
-│   └── .../{settlement,payout,ledger,tax,chargeback,pgreconciliation,recovery,closing,report,recon,integrity,idempotency}
+│   └── .../{settlement,payout,ledger,tax,chargeback,pgreconciliation,recovery,closing,report,recon,integrity,idempotency,crypto}
+│       └── crypto = 바운디드 컨텍스트가 아닌 슬라이스 공용 인프라(FieldEncryptionConverter — payout·tax 엔티티가 공유)
 │       ├── settlement/adapter/in/kafka/     # Payment/Order/User/Product 이벤트 컨슈머 (프로젝션 적재)
 │       ├── settlement/adapter/out/readmodel/# ★ 이벤트 프로젝션 뷰 (settlement_*_view, 자체 DB 소유)
 │       ├── settlement/adapter/{in/batch, out/search, out/pdf}  # Spring Batch · ES 색인 · 정산서 PDF

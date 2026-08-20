@@ -1,4 +1,4 @@
-package github.lms.lemuel.payout.adapter.out.persistence;
+package github.lms.lemuel.crypto;
 
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
@@ -24,7 +24,7 @@ import java.util.Base64;
  * 자연히 암호문으로 전환된다. 컬럼 폭은 V20260716200200 에서 암호문 수용 크기(512)로 확폭돼 있다.
  */
 @Converter
-public class PayoutFieldEncryptionConverter implements AttributeConverter<String, String> {
+public class FieldEncryptionConverter implements AttributeConverter<String, String> {
 
     /** 암호화 스킴 버전 접두 — 이 접두가 없으면 레거시 평문. */
     static final String PREFIX = "enc:v1:";
@@ -38,12 +38,12 @@ public class PayoutFieldEncryptionConverter implements AttributeConverter<String
     private final SecureRandom random = new SecureRandom();
 
     /** Hibernate 가 인스턴스화하는 기본 생성자 — env 에서 키를 로드한다(미설정 시 부팅 실패). */
-    public PayoutFieldEncryptionConverter() {
+    public FieldEncryptionConverter() {
         this(resolveKeyFromEnv());
     }
 
     /** 테스트 전용: 고정 키 주입. */
-    PayoutFieldEncryptionConverter(byte[] key) {
+    FieldEncryptionConverter(byte[] key) {
         if (key == null || key.length != KEY_BYTES) {
             throw new IllegalStateException(
                     ENV_KEY + " must decode to exactly " + KEY_BYTES + " bytes (AES-256). Got: "

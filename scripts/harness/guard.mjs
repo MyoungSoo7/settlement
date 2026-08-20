@@ -61,6 +61,9 @@ const CAMPAIGN_SERVICES = /(settlement|order|loan|investment|account|insurance|d
 const SETTLEMENT_OWN_PACKAGES = new Set([
   'settlement', 'payout', 'ledger', 'chargeback', 'pgreconciliation',
   'recon', 'recovery', 'report', 'tax', 'idempotency', 'integrity', 'closing',
+  // crypto: 바운디드 컨텍스트가 아니라 슬라이스 공용 인프라(필드 암호화 컨버터).
+  // payout 어댑터 안에 있던 것을 tax 엔티티도 쓰면서 슬라이스 경계를 뚫어, 소유 슬라이스가 없는 곳으로 뺐다.
+  'crypto',
   'common',
 ]);
 

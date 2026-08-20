@@ -1,4 +1,4 @@
-package github.lms.lemuel.payout.adapter.out.persistence;
+package github.lms.lemuel.crypto;
 
 import org.junit.jupiter.api.Test;
 
@@ -6,13 +6,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * PayoutFieldEncryptionConverter 단위 테스트 — 암호화 왕복 / 레거시 평문 통과 / enc:v1 접두 구분.
+ * FieldEncryptionConverter 단위 테스트 — 암호화 왕복 / 레거시 평문 통과 / enc:v1 접두 구분.
  * 고정 키 주입용 package-private 생성자를 사용해 env 의존 없이 검증한다.
  */
-class PayoutFieldEncryptionConverterTest {
+class FieldEncryptionConverterTest {
 
-    private final PayoutFieldEncryptionConverter converter =
-            new PayoutFieldEncryptionConverter(fixedKey());
+    private final FieldEncryptionConverter converter =
+            new FieldEncryptionConverter(fixedKey());
 
     private static byte[] fixedKey() {
         byte[] key = new byte[32];
@@ -28,7 +28,7 @@ class PayoutFieldEncryptionConverterTest {
 
         String encrypted = converter.convertToDatabaseColumn(plain);
 
-        assertThat(encrypted).startsWith(PayoutFieldEncryptionConverter.PREFIX);
+        assertThat(encrypted).startsWith(FieldEncryptionConverter.PREFIX);
         assertThat(encrypted).isNotEqualTo(plain);
         assertThat(converter.convertToEntityAttribute(encrypted)).isEqualTo(plain);
     }
@@ -66,7 +66,7 @@ class PayoutFieldEncryptionConverterTest {
 
     @Test
     void rejects_key_of_wrong_length() {
-        assertThatThrownBy(() -> new PayoutFieldEncryptionConverter(new byte[16]))
+        assertThatThrownBy(() -> new FieldEncryptionConverter(new byte[16]))
                 .isInstanceOf(IllegalStateException.class);
     }
 }

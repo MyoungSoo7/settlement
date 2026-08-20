@@ -6,7 +6,7 @@ import java.util.List;
 /**
  * 지급계좌 PII 재암호화 백필 리포트 — "레거시 평문(enc:v1 접두 없음) 행을 몇 건 재암호화했고 몇 건이 남았는가".
  *
- * <p>배경: 지급계좌 PII 는 앱단 AES-GCM lazy migration(enc:v1 스킴, {@code PayoutFieldEncryptionConverter})으로
+ * <p>배경: 지급계좌 PII 는 앱단 AES-GCM lazy migration(enc:v1 스킴, {@code FieldEncryptionConverter})으로
  * 저장 시 암호화되지만, 암호화 도입 이전 적재된 평문 행은 재저장 전까지 무기한 잔존한다. 이 백필은 그 평문 행을
  * 페이지 단위로 재저장해 암호문으로 강제 전환하고, 실행 후 평문 잔존 건수를 함께 노출해 완료 여부를 기계 판정한다.
  *

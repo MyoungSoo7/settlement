@@ -10,7 +10,7 @@ import github.lms.lemuel.payout.application.port.in.RetryFailedPayoutUseCase;
 import github.lms.lemuel.payout.application.port.out.LoadPayoutPort;
 import github.lms.lemuel.payout.domain.Payout;
 import github.lms.lemuel.payout.domain.PayoutStatus;
-import github.lms.lemuel.idempotency.adapter.out.persistence.ManualIdempotencyGuard;
+import github.lms.lemuel.idempotency.application.port.in.ClaimManualOperationUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
@@ -32,7 +32,7 @@ public class PayoutAdminController {
     private final RetryFailedPayoutUseCase retryUseCase;
     private final ExecutePayoutUseCase executeUseCase;
     private final RecordPayoutBounceUseCase bounceUseCase;
-    private final ManualIdempotencyGuard idempotency;
+    private final ClaimManualOperationUseCase idempotency;
     private final AuditLogger auditLogger;
     private final ObjectMapper objectMapper;
 
@@ -40,7 +40,7 @@ public class PayoutAdminController {
                                   RetryFailedPayoutUseCase retryUseCase,
                                   ExecutePayoutUseCase executeUseCase,
                                   RecordPayoutBounceUseCase bounceUseCase,
-                                  ManualIdempotencyGuard idempotency,
+                                  ClaimManualOperationUseCase idempotency,
                                   AuditLogger auditLogger,
                                   ObjectMapper objectMapper) {
         this.loadPort = loadPort;
