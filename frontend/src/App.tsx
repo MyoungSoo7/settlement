@@ -41,6 +41,7 @@ const AiChatPage = lazy(() => import('./pages/AiChatPage'));
 const EducationCourseAdminPage = lazy(() => import('./pages/system/EducationCourseAdminPage'));
 const PointConsolePage = lazy(() => import('./pages/system/PointConsolePage'));
 const GiftCardConsolePage = lazy(() => import('./pages/system/GiftCardConsolePage'));
+const AuditLogConsolePage = lazy(() => import('./pages/system/AuditLogConsolePage'));
 
 // 관리자 페이지 (lazy load)
 const ProductPage = lazy(() => import('./pages/ProductPage'));
@@ -270,6 +271,8 @@ function App() {
               element={<AdminOnlyRoute><SideNavLayout><PointConsolePage /></SideNavLayout></AdminOnlyRoute>} />
             <Route path="/admin/system/gift-cards"
               element={<AdminOnlyRoute><SideNavLayout><GiftCardConsolePage /></SideNavLayout></AdminOnlyRoute>} />
+            <Route path="/admin/system/audit-logs"
+              element={<AdminOnlyRoute><SideNavLayout><AuditLogConsolePage /></SideNavLayout></AdminOnlyRoute>} />
 
             {/* ── CEO 인사이트 (ADMIN·MANAGER, 좌측 사이드바) — 위성 조회 서비스 묶음 ── */}
             <Route path="/admin/ceo"

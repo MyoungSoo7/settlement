@@ -191,6 +191,11 @@ public class SecurityConfig {
                         .requestMatchers("/admin/points/**").hasRole("ADMIN")
                         // 기프트카드 콘솔 — 발행은 없던 재산을 만들고 소멸 실행은 고객 재산을 지운다.
                         .requestMatchers("/admin/gift-cards/**").hasRole("ADMIN")
+                        // 감사 로그 조회(order=/admin/audit-logs, settlement=/admin/audit-trail).
+                        // 조회 전용인데도 MANAGER 에게 열지 않는 이유: 이 표면은 "누가 무엇을 조작했는가"
+                        // 전체를 보여주므로, 감시받는 사람이 감시 기록을 열람하는 상태가 되면 감사가
+                        // 성립하지 않는다. detail_json 에 조작 전후 값이 담기는 것도 같은 이유다.
+                        .requestMatchers("/admin/audit-logs/**", "/admin/audit-trail/**").hasRole("ADMIN")
                         // 정산 배치 재실행 콘솔 — 확정·홀드백 해제·지급 실행을 수동 트리거하므로
                         // 조회 콘솔과 달리 MANAGER 에게 열지 않는다. 일자 게이트(미래·소급 상한)는 도메인이 강제.
                         // 수수료율 정책 — 정산 금액을 직접 바꾸므로 조회 콘솔과 달리 ADMIN 만.

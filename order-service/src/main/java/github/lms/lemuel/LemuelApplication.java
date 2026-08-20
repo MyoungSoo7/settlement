@@ -25,6 +25,10 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         "github.lms.lemuel.menu",
         "github.lms.lemuel.commoncode",
         "github.lms.lemuel.rbac",
+        // 감사 로그 조회 콘솔 — 적재는 shared-common(common.audit)이 오래전부터 했지만 읽는 경로가
+        // 없었다. 이 스캔이 빠지면 /admin/audit-logs 가 조용히 404 가 된다(적재는 계속되므로 아무도
+        // 눈치채지 못한다).
+        "github.lms.lemuel.auditconsole",
         // 셀러 등급 산정(ADR 0031) — 컨트롤러·스케줄러·JdbcTemplate 어댑터가 이 스캔에 걸린다.
         // 빠지면 gateway 라우트는 있는데 핸들러가 없어 /admin/seller-tiers 가 조용히 404 가 된다.
         "github.lms.lemuel.sellertier",
