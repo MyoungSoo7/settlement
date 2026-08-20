@@ -2,6 +2,7 @@ package github.lms.lemuel.order.application.service;
 
 import github.lms.lemuel.order.application.port.in.ChangeOrderStatusUseCase;
 import github.lms.lemuel.order.application.port.out.LoadOrderPort;
+import github.lms.lemuel.order.application.port.out.OrderCouponRestorePort;
 import github.lms.lemuel.order.application.port.out.OrderPointRewardPort;
 import github.lms.lemuel.order.application.port.out.RefundOrderPaymentPort;
 import github.lms.lemuel.order.application.port.out.SaveOrderStatusHistoryPort;
@@ -39,6 +40,7 @@ public class ChangeOrderStatusService implements ChangeOrderStatusUseCase {
     private final IncreaseProductStockUseCase increaseProductStockUseCase;
     private final IncreaseVariantStockUseCase increaseVariantStockUseCase;
     private final OrderPointRewardPort orderPointRewardPort;
+    private final OrderCouponRestorePort orderCouponRestorePort;
 
     @Override
     @Transactional
@@ -294,6 +296,10 @@ public class ChangeOrderStatusService implements ChangeOrderStatusUseCase {
             orderPointRewardPort.earnOnDelivered(saved);
         } else if (target == OrderStatus.CANCELED || target == OrderStatus.REFUNDED) {
             orderPointRewardPort.revokeOnCanceled(saved);
+            // 쿠폰도 같은 시점에 되돌린다. 포인트 회수만 하고 쿠폰을 두면 "환불은 받았는데
+            // 1 회용 쿠폰은 소멸"하는 비대칭이 남는다 — 레거시 커머스가 취소 SQL 안에서
+            // couponsts 를 미사용으로 되돌리던 처리와 같은 의도다.
+            orderCouponRestorePort.restoreOnCanceled(saved.getId(), "주문 " + target.name());
         }
     }
 }

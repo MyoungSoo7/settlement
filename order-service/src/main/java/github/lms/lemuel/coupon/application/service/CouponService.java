@@ -106,6 +106,35 @@ public class CouponService implements CouponUseCase {
         log.info("쿠폰 사용 완료: code={}, userId={}, orderId={}", code, userId, orderId);
     }
 
+    /**
+     * 주문 취소·환불 시 쿠폰 회수.
+     *
+     * <p>순서가 중요하다: 사용 이력 무효화가 먼저다. 무효화에 성공한 쿠폰에 대해서만 사용 횟수를
+     * 깎아야 중복 호출이 한도를 부풀리지 않는다(무효화 자체가 "이번에 처음 되돌렸다"는 증거).
+     *
+     * <p>사용 횟수 감소가 실패해도(이미 0 — 데이터 이상) 취소 트랜잭션을 깨뜨리지 않는다.
+     * 되돌릴 카운터가 없다는 것은 고객 손해가 아니고, 여기서 예외를 던지면 <b>환불이 막힌다</b>.
+     */
+    @Override
+    public int restoreCouponsForOrder(Long orderId, String reason) {
+        if (orderId == null) {
+            return 0;
+        }
+        List<Long> couponIds = saveCouponPort.revokeUsagesForOrder(orderId, reason);
+        int restored = 0;
+        for (Long couponId : couponIds) {
+            if (saveCouponPort.decrementUsage(couponId)) {
+                restored++;
+            } else {
+                log.warn("쿠폰 사용 횟수 회수 실패(이미 0): couponId={}, orderId={}", couponId, orderId);
+            }
+        }
+        if (restored > 0) {
+            log.info("쿠폰 회수 완료: orderId={}, 쿠폰={}건, reason={}", orderId, restored, reason);
+        }
+        return restored;
+    }
+
     @Override
     @Transactional(readOnly = true)
     public List<Coupon> getAllCoupons() {

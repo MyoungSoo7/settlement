@@ -153,6 +153,21 @@ public class Coupon {
     }
 
     /**
+     * 사용 회수 — 주문이 취소·환불되어 쓴 쿠폰을 되돌려 준다.
+     *
+     * <p>{@link #incrementUsage()} 의 역연산이지만 <b>대칭이 아니다</b>: 사용 횟수는 0 아래로 내려갈 수 없다.
+     * 취소 승인·환불 콜백처럼 종단에 이르는 경로가 여러 개라 중복 호출이 정상 상황이고, 하한이 없으면
+     * 음수 {@code usedCount} 가 남아 한도 계산({@code usedCount < maxUses})이 영구히 헐거워진다.
+     */
+    public void revokeUsage() {
+        if (this.usedCount <= 0) {
+            throw new CouponInvariantViolationException("되돌릴 쿠폰 사용 이력이 없습니다: code=" + code);
+        }
+        this.usedCount--;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    /**
      * 쿠폰 활성화/비활성화. 상태 플래그를 setter 로 노출하지 않고 의미 있는 도메인 동작으로만 변경.
      */
     public void activate() {

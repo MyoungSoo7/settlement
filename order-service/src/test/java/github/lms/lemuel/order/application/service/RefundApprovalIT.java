@@ -178,8 +178,11 @@ class RefundApprovalIT {
                     @Override public void earnOnDelivered(github.lms.lemuel.order.domain.Order order) { }
                     @Override public void revokeOnCanceled(github.lms.lemuel.order.domain.Order order) { }
                 };
+        // 쿠폰 회수도 이 시나리오의 관심사가 아니다(이 주문은 쿠폰을 쓰지 않았다).
+        github.lms.lemuel.order.application.port.out.OrderCouponRestorePort noopCoupon =
+                (orderId, reason) -> { };
         changeStatusService = new ChangeOrderStatusService(orderAdapter, orderAdapter, history,
-                refundOrderPaymentPort, increaseProduct, increaseVariant, noopReward);
+                refundOrderPaymentPort, increaseProduct, increaseVariant, noopReward, noopCoupon);
     }
 
     @Test
