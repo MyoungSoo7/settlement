@@ -3,6 +3,7 @@ package github.lms.lemuel.shipping.application.port.in;
 import github.lms.lemuel.shipping.domain.SellerShippingPolicy;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -21,4 +22,12 @@ public interface ManageSellerShippingPolicyUseCase {
     SellerShippingPolicy upsert(Long sellerId, BigDecimal baseFee, BigDecimal freeThreshold);
 
     Optional<SellerShippingPolicy> find(Long sellerId);
+
+    /**
+     * 등록된 정책 전체 — 운영 콘솔의 목록.
+     *
+     * <p>단건 조회만 있으면 운영자는 sellerId 를 이미 알고 있어야만 정책을 확인할 수 있다.
+     * 그러면 "이 셀러에 정책이 없다"와 "이 셀러 ID 를 잘못 쳤다"가 화면에서 구분되지 않는다.
+     */
+    List<SellerShippingPolicy> findAll();
 }

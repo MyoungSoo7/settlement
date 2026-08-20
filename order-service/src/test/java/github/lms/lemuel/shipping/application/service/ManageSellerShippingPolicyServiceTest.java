@@ -75,4 +75,23 @@ class ManageSellerShippingPolicyServiceTest {
                 Optional.of(SellerShippingPolicy.rehydrate(8L, new BigDecimal("2500"), null)));
         assertThat(service.find(8L)).isPresent();
     }
+
+    @Test
+    @DisplayName("전체 목록은 포트에 위임한다 — 운영자가 '어느 셀러에 정책이 걸렸는지'를 보는 유일한 경로")
+    void findAllDelegates() {
+        when(loadPort.loadAll()).thenReturn(java.util.List.of(
+                SellerShippingPolicy.rehydrate(7L, new BigDecimal("3000"), new BigDecimal("50000")),
+                SellerShippingPolicy.rehydrate(8L, new BigDecimal("2500"), null)));
+
+        assertThat(service.findAll())
+                .extracting(SellerShippingPolicy::getSellerId)
+                .containsExactly(7L, 8L);
+    }
+
+    @Test
+    @DisplayName("정책이 하나도 없으면 빈 목록 — 화면이 null 을 만나지 않는다")
+    void findAllEmpty() {
+        when(loadPort.loadAll()).thenReturn(java.util.List.of());
+        assertThat(service.findAll()).isEmpty();
+    }
 }

@@ -53,6 +53,7 @@ const OptionCatalogAdminPage = lazy(() => import('./pages/OptionCatalogAdminPage
 const ProofReviewQueuePage = lazy(() => import('./pages/ProofReviewQueuePage'));
 const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'));
 const ShippingAdminPage = lazy(() => import('./pages/ShippingAdminPage'));
+const ShippingPolicyAdminPage = lazy(() => import('./pages/ShippingPolicyAdminPage'));
 const OrderApprovalPage = lazy(() => import('./pages/OrderApprovalPage'));
 const PayoutAdminPage = lazy(() => import('./pages/PayoutAdminPage'));
 
@@ -218,7 +219,12 @@ function App() {
               element={<AdminManagerRoute><SideNavLayout><SalesStatsConsolePage /></SideNavLayout></AdminManagerRoute>} />
 
             {/* 배송 관리 — 주문별 배송 생성·출고·상태 전이 (ShippingController) */}
-            <Route path="/admin/shipping"     element={<AdminManagerRoute><ShippingAdminPage /></AdminManagerRoute>} />
+            <Route path="/admin/shipping"
+              element={<AdminManagerRoute><SideNavLayout><ShippingAdminPage /></SideNavLayout></AdminManagerRoute>} />
+            {/* 배송비 정책 — 고객이 실제로 지불하는 금액을 바꾼다. 서버가 /admin/shipping-policies/** 를
+                ADMIN 으로 막으므로 MANAGER 에게 열면 눌러도 되돌려보내지는 죽은 링크가 된다. */}
+            <Route path="/admin/shipping-policies"
+              element={<AdminOnlyRoute><SideNavLayout><ShippingPolicyAdminPage /></SideNavLayout></AdminOnlyRoute>} />
             {/* 취소·환불 승인 큐 — 사용자가 신청한 건을 운영자가 종단으로 보낸다 */}
             <Route path="/admin/approvals"    element={<AdminManagerRoute><OrderApprovalPage /></AdminManagerRoute>} />
             <Route path="/tags"               element={<AdminManagerRoute><TagManagementPage /></AdminManagerRoute>} />

@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * 셀러 배송비 정책 운영 콘솔.
@@ -42,6 +43,14 @@ public class AdminShippingPolicyController {
         SellerShippingPolicy saved =
                 useCase.upsert(sellerId, request.baseFee(), request.freeThreshold());
         return ResponseEntity.ok(PolicyResponse.from(saved));
+    }
+
+    @Operation(summary = "셀러 배송비 정책 목록",
+            description = "등록된 정책 전체(셀러 ID 오름차순). 정책이 없는 셀러는 애초에 행이 없어 목록에 나오지 않으며, "
+                    + "그 셀러의 주문에는 기본배송비가 부과되지 않는다.")
+    @GetMapping
+    public ResponseEntity<List<PolicyResponse>> list() {
+        return ResponseEntity.ok(useCase.findAll().stream().map(PolicyResponse::from).toList());
     }
 
     @Operation(summary = "셀러 배송비 정책 조회")

@@ -79,9 +79,9 @@ class MenuSeedIntegrationTest {
     }
 
     @Test
-    @DisplayName("시드 총 52행 — 이관분 31 + 정산운영 그룹 1 + 운영 화면 11 + 시스템 화면 7 + 법인카드(CEO) 1 + 구매자 잔액 1")
-    void seedsExactlyFortyEight() {
-        assertThat(adapter.findAll()).hasSize(52);
+    @DisplayName("시드 총 54행 — 이관분 31 + 정산운영 그룹 1 + 운영 화면 11 + 시스템 화면 7 + 법인카드(CEO) 1 + 구매자 잔액 1 + 배송 하위 2")
+    void seedsExactlyFiftyFour() {
+        assertThat(adapter.findAll()).hasSize(54);
     }
 
     @Test
@@ -133,6 +133,20 @@ class MenuSeedIntegrationTest {
         assertThat(children).extracting(Menu::getPath)
                 .containsExactly("/product", "/admin/settlement", "/settlement/search", "/admin/payouts");
         assertThat(children.get(3).allowedRoles()).containsExactly("ADMIN");
+        assertThat(children.get(0).allowedRoles()).containsExactlyInAnyOrder("ADMIN", "MANAGER");
+    }
+
+    @Test
+    @DisplayName("배송 사이드바 2개 — 배송비 정책만 ADMIN 전용")
+    void shippingChildren() {
+        List<Menu> children = childrenOf("배송");
+
+        assertThat(byName().get("배송").getType()).isEqualTo(MenuType.GROUP);
+        assertThat(children).extracting(Menu::getName).containsExactly("배송 관리", "배송비 정책");
+        assertThat(children).extracting(Menu::getPath)
+                .containsExactly("/admin/shipping", "/admin/shipping-policies");
+        // 서버가 /admin/shipping-policies/** 를 ADMIN 으로 막는다 — MANAGER 에게 보이면 죽은 링크다.
+        assertThat(children.get(1).allowedRoles()).containsExactly("ADMIN");
         assertThat(children.get(0).allowedRoles()).containsExactlyInAnyOrder("ADMIN", "MANAGER");
     }
 

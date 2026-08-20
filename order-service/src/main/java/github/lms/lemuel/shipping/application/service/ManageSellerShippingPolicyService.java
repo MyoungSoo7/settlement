@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -41,5 +42,11 @@ public class ManageSellerShippingPolicyService implements ManageSellerShippingPo
     @Transactional(readOnly = true)
     public Optional<SellerShippingPolicy> find(Long sellerId) {
         return loadPort.loadBySellerId(sellerId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<SellerShippingPolicy> findAll() {
+        return loadPort.loadAll();
     }
 }

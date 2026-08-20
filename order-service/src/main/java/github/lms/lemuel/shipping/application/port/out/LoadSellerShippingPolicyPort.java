@@ -3,6 +3,7 @@ package github.lms.lemuel.shipping.application.port.out;
 import github.lms.lemuel.shipping.domain.SellerShippingPolicy;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -12,4 +13,13 @@ public interface LoadSellerShippingPolicyPort {
     Map<Long, SellerShippingPolicy> loadBySellerIds(Collection<Long> sellerIds);
 
     Optional<SellerShippingPolicy> loadBySellerId(Long sellerId);
+
+    /**
+     * 등록된 정책 전체(셀러 ID 오름차순).
+     *
+     * <p>주문 계산 경로는 이걸 쓰지 않는다 — 거기서는 주문에 실린 셀러만 배치 조회한다.
+     * 이 메서드는 <b>운영 콘솔 전용</b>이다. 정책은 셀러당 1 행이고 셀러 수만큼만 늘어나므로
+     * 페이지네이션 없이 전량을 읽는다.
+     */
+    List<SellerShippingPolicy> loadAll();
 }

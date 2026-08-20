@@ -64,7 +64,12 @@ export const FALLBACK_MENUS: FallbackMenuNode[] = [
   },
   {
     id: -3, name: '배송', path: '/admin/shipping', icon: '🚚', description: null,
-    area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'],
+    area: 'BACKOFFICE', type: 'GROUP', roles: ['ADMIN', 'MANAGER'],
+    children: [
+      { id: -31, name: '배송 관리', path: '/admin/shipping', icon: '🚚', description: '주문별 배송 생성 · 출고 · 상태 전이', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
+      // 서버가 /admin/shipping-policies/** 를 ADMIN 으로 막는다 — MANAGER 에게 보이면 죽은 링크다.
+      { id: -32, name: '배송비 정책', path: '/admin/shipping-policies', icon: '💵', description: '셀러 기본배송비 · 무료배송 임계', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN'] },
+    ],
   },
   {
     id: -4, name: '승인', path: '/admin/approvals', icon: '✅', description: null,

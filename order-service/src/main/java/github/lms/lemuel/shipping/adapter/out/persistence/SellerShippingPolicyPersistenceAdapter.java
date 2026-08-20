@@ -7,6 +7,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -35,6 +36,11 @@ public class SellerShippingPolicyPersistenceAdapter
     @Override
     public Optional<SellerShippingPolicy> loadBySellerId(Long sellerId) {
         return repository.findById(sellerId).map(this::toDomain);
+    }
+
+    @Override
+    public List<SellerShippingPolicy> loadAll() {
+        return repository.findAllByOrderBySellerIdAsc().stream().map(this::toDomain).toList();
     }
 
     @Override
