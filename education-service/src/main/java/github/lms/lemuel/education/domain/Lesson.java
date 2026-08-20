@@ -1,5 +1,6 @@
 package github.lms.lemuel.education.domain;
 
+import github.lms.lemuel.education.domain.exception.LessonNotInCourseException;
 import github.lms.lemuel.education.domain.exception.LessonOrderViolationException;
 
 import java.util.HashSet;
@@ -76,6 +77,21 @@ public final class Lesson {
     public void changeSequence(int sequence, String actor) {
         this.sequence = sequence;
         this.updatedBy = actor;
+    }
+
+    /**
+     * 이 차시가 주어진 과정에 속하는지 대조한다.
+     *
+     * <p>차시는 독립 식별자를 갖지만 <b>과정 애그리거트에 속한다</b>. 그래서 "차시 하나"만으로
+     * 수정·삭제를 허용하면 URL 이 주장한 소속(`/courses/{courseId}/lessons/{lessonId}`)과 실제
+     * 소속이 어긋나도 아무도 눈치채지 못한다. 대조는 어댑터가 아니라 여기에 둔다 — 진입점이
+     * 늘어나도 규칙은 한 곳에 남는다.
+     */
+    public void requireBelongsTo(UUID expectedCourseId) {
+        if (!courseId.equals(expectedCourseId)) {
+            throw new LessonNotInCourseException(
+                    "lesson " + id + " does not belong to course " + expectedCourseId);
+        }
     }
 
     /** 요청 순서가 이 과정의 차시 전부를 정확히 한 번씩 담고 있는지 검증한다. */

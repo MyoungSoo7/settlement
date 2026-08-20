@@ -47,10 +47,11 @@ public class LessonAdminService {
     }
 
     @Transactional
-    public Lesson update(UUID id, String title, String description, String type, String ref,
+    public Lesson update(UUID courseId, UUID id, String title, String description, String type, String ref,
                          boolean required, String actor) {
         Lesson lesson = loadLesson.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("lesson not found: " + id));
+        lesson.requireBelongsTo(courseId);
         lesson.update(title, description, type, ref, required, actor);
         Lesson saved = saveLesson.save(lesson);
         audit.record("LESSON_UPDATED", "Lesson", id, actor, "lesson updated");
@@ -58,7 +59,10 @@ public class LessonAdminService {
     }
 
     @Transactional
-    public void delete(UUID id, String actor) {
+    public void delete(UUID courseId, UUID id, String actor) {
+        // 없는 차시의 삭제는 이전처럼 조용히 통과시킨다(삭제는 멱등). 존재하는데 다른 과정 소속이면
+        // 거부한다 — 지우고 나서야 "그 과정이 아니었다"는 사실을 알게 되면 되돌릴 방법이 없다.
+        loadLesson.findById(id).ifPresent(lesson -> lesson.requireBelongsTo(courseId));
         deleteLesson.deleteById(id);
         audit.record("LESSON_DELETED", "Lesson", id, actor, "lesson deleted");
     }

@@ -68,14 +68,16 @@ public class AdminEducationController {
         return LessonResponse.from(lessonService.create(courseId, request.title(), request.description(), request.sequence(), request.contentType(), request.contentRef(), request.required(), auth.getName()));
     }
 
+    // courseId 를 받아 서비스로 넘긴다 — 경로가 "이 과정의 이 차시"라고 말하면 서버도 그렇게
+    // 확인해야 한다. 바인딩하지 않던 동안에는 lessonId 만 맞으면 어떤 courseId 로 불러도 통과했다.
     @PutMapping("/{courseId}/lessons/{lessonId}")
-    public LessonResponse updateLesson(@PathVariable UUID lessonId, @Valid @RequestBody LessonRequest request, Authentication auth) {
-        return LessonResponse.from(lessonService.update(lessonId, request.title(), request.description(), request.contentType(), request.contentRef(), request.required(), auth.getName()));
+    public LessonResponse updateLesson(@PathVariable UUID courseId, @PathVariable UUID lessonId, @Valid @RequestBody LessonRequest request, Authentication auth) {
+        return LessonResponse.from(lessonService.update(courseId, lessonId, request.title(), request.description(), request.contentType(), request.contentRef(), request.required(), auth.getName()));
     }
 
     @DeleteMapping("/{courseId}/lessons/{lessonId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteLesson(@PathVariable UUID lessonId, Authentication auth) { lessonService.delete(lessonId, auth.getName()); }
+    public void deleteLesson(@PathVariable UUID courseId, @PathVariable UUID lessonId, Authentication auth) { lessonService.delete(courseId, lessonId, auth.getName()); }
 
     @PostMapping("/{courseId}/lessons/reorder")
     public List<LessonResponse> reorder(@PathVariable UUID courseId, @RequestBody ReorderRequest request,

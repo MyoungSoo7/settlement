@@ -5,6 +5,7 @@ import github.lms.lemuel.education.application.port.out.LoadLessonPort;
 import github.lms.lemuel.education.application.port.out.SaveLessonPort;
 import github.lms.lemuel.education.domain.Lesson;
 import github.lms.lemuel.education.domain.LessonContentType;
+import github.lms.lemuel.education.domain.exception.LessonNotInCourseException;
 import github.lms.lemuel.education.domain.exception.LessonOrderViolationException;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -44,8 +45,8 @@ class LessonAdminServiceTest {
 
         assertThat(service.list(courseId)).containsExactly(existing);
         assertThat(service.create(courseId, "새 차시", "설명", 2, "DOCUMENT", "d1", true, "admin")).isNotNull();
-        Lesson updated = service.update(lessonId, "수정 차시", "설명", "EXTERNAL_LINK", "x1", false, "admin");
-        service.delete(lessonId, "admin");
+        Lesson updated = service.update(courseId, lessonId, "수정 차시", "설명", "EXTERNAL_LINK", "x1", false, "admin");
+        service.delete(courseId, lessonId, "admin");
 
         assertThat(updated.title()).isEqualTo("수정 차시");
         assertThat(updated.contentType()).isEqualTo(LessonContentType.EXTERNAL_LINK);
@@ -57,9 +58,42 @@ class LessonAdminServiceTest {
     void updatingMissingLessonIsReported() {
         when(loadLesson.findById(any())).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.update(UUID.randomUUID(), "제목", null, "VIDEO", "v1", true, "admin"))
+        assertThatThrownBy(() -> service.update(UUID.randomUUID(), UUID.randomUUID(), "제목", null, "VIDEO", "v1", true, "admin"))
                 .isInstanceOf(IllegalArgumentException.class);
         verify(saveLesson, never()).save(any());
+    }
+
+    @Test
+    void updateRejectsLessonThatBelongsToAnotherCourse() {
+        UUID lessonId = UUID.randomUUID();
+        when(loadLesson.findById(lessonId))
+                .thenReturn(Optional.of(lesson(lessonId, UUID.randomUUID(), "남의 과정 차시", 1)));
+
+        assertThatThrownBy(() -> service.update(UUID.randomUUID(), lessonId, "제목", null, "VIDEO", "v1", true, "admin"))
+                .isInstanceOf(LessonNotInCourseException.class);
+        verify(saveLesson, never()).save(any());
+    }
+
+    @Test
+    void deleteRejectsLessonThatBelongsToAnotherCourse() {
+        UUID lessonId = UUID.randomUUID();
+        when(loadLesson.findById(lessonId))
+                .thenReturn(Optional.of(lesson(lessonId, UUID.randomUUID(), "남의 과정 차시", 1)));
+
+        assertThatThrownBy(() -> service.delete(UUID.randomUUID(), lessonId, "admin"))
+                .isInstanceOf(LessonNotInCourseException.class);
+        verify(deleteLesson, never()).deleteById(any());
+    }
+
+    @Test
+    void deletingMissingLessonStaysIdempotent() {
+        // 소속 대조를 넣으면서 "없는 차시 삭제"까지 실패로 바꾸면, 재시도가 안전하지 않게 된다.
+        UUID lessonId = UUID.randomUUID();
+        when(loadLesson.findById(lessonId)).thenReturn(Optional.empty());
+
+        service.delete(UUID.randomUUID(), lessonId, "admin");
+
+        verify(deleteLesson).deleteById(lessonId);
     }
 
     @Test
