@@ -32,6 +32,31 @@ export interface UpsertShippingPolicyRequest {
 
 const BASE = '/admin/shipping-policies';
 
+/**
+ * 서버가 실제로 보내는 모양. REST 응답의 {@code BigDecimal} 은 <b>JSON 숫자</b>다 —
+ * 문자열 직렬화기(PlainStringBigDecimalSerializer)는 Outbox 이벤트에만 걸려 있고 REST 에는 없다.
+ */
+interface SellerShippingPolicyWire {
+  sellerId: number;
+  baseFee: number | string;
+  freeThreshold: number | string | null;
+}
+
+/**
+ * 경계에서 금액을 문자열로 고정한다.
+ *
+ * <p>이걸 하지 않으면 목록의 값이 숫자인 채로 폼 상태에 실려, 문자열을 기대하는 검증
+ * (`value.trim()`)에서 터진다 — 실제로 '변경' 버튼이 화면을 하얗게 만들었다.
+ * 타입 선언만 `string` 으로 두고 런타임을 확인하지 않으면 이런 어긋남은 조용히 남는다.
+ */
+const normalize = (raw: SellerShippingPolicyWire): SellerShippingPolicy => ({
+  sellerId: raw.sellerId,
+  baseFee: String(raw.baseFee),
+  freeThreshold: raw.freeThreshold === null || raw.freeThreshold === undefined
+    ? null
+    : String(raw.freeThreshold),
+});
+
 /** 원 단위 금액 표시. 값이 없으면 '-' 가 아니라 호출부가 문맥에 맞는 문구를 고르게 한다. */
 export const formatWon = (amount: string): string => {
   const n = Number(amount);
@@ -47,16 +72,19 @@ export const describeThreshold = (freeThreshold: string | null): string => {
 export const shippingPolicyApi = {
   /** 등록된 정책 전체(셀러 ID 오름차순). 정책이 없는 셀러는 애초에 행이 없다. */
   list: async (): Promise<SellerShippingPolicy[]> =>
-    (await api.get<SellerShippingPolicy[]>(BASE)).data,
+    (await api.get<SellerShippingPolicyWire[]>(BASE)).data.map(normalize),
 
   /** 단건 조회 — 미등록이면 404 다. 호출부는 이 404 를 오류가 아니라 '미등록'으로 읽는다. */
   get: async (sellerId: number): Promise<SellerShippingPolicy> =>
-    (await api.get<SellerShippingPolicy>(`${BASE}/${sellerId}`)).data,
+    normalize((await api.get<SellerShippingPolicyWire>(`${BASE}/${sellerId}`)).data),
 
-  /** 등록·변경(셀러당 1 건 upsert). 음수 금액은 서버 도메인이 400 으로 거절한다. */
+  /**
+   * 등록·변경(셀러당 1 건 upsert).
+   * 음수 금액은 서버 도메인이 400, 없는 셀러는 404 로 거절한다.
+   */
   upsert: async (
     sellerId: number,
     body: UpsertShippingPolicyRequest
   ): Promise<SellerShippingPolicy> =>
-    (await api.put<SellerShippingPolicy>(`${BASE}/${sellerId}`, body)).data,
+    normalize((await api.put<SellerShippingPolicyWire>(`${BASE}/${sellerId}`, body)).data),
 };
