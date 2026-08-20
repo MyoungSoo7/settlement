@@ -290,6 +290,19 @@ settlement-copilot **플러그인 소유**라 플러그인 미설치 환경에 �
   STALE(exit 1) — 직전 빌드 산출물을 이번 변경의 증거로 인용하는 것을 종료 코드로 차단한다. 리포트가
   아예 없으면 MISSING(미실행 — "통과" 주장 불가). 지금까지 "인용 전 mtime 확인"은 운용 지식이었다 —
   게이트 결과를 인용하기 전에 이 명령을 먼저 돌린다.
+- **CI 판정 조회** — `scripts/harness/ci-verdict.mjs [sha|ref]` (+ 게이트 `test/ci-verdict-gate.test.mjs`):
+  "가짜 GREEN" 의 또 한 경로인 **취소된 실행이 통과로 읽히는 상태**를 종료 코드로 가른다. develop 의 ci·harness-guard 는
+  `cancel-in-progress` 라 연속 push 중간 커밋의 실행이 `cancelled` 로 끝나는데, `cancelled` 는 `failure` 가 아니라
+  브랜치에도 `gh run list` 에도 빨간 X 가 남지 않는다 — 판정이 **없는** 것과 판정이 **통과** 인 것이 같은 색이다.
+  여기에 경로 필터가 겹치면 구멍이 영구화된다: `Frontend - Tests` 는 `frontend == 'true'` 일 때만 돌고 push 의 변경
+  감지 기준은 **직전 커밋**이라, 프론트를 바꾼 커밋의 실행이 취소되면 뒤 커밋들은 그 잡을 `skipped` 로 넘겨 그 변경은
+  영영 테스트되지 않는다(2026-08-19 실측: 커밋 `1d17aaa7d` — 잡 단위 재실행마저 다시 취소됐고, 판정은 상시 열려 있던
+  릴리스 PR 실행에서 우연히 메워졌다. PR 이 닫혀 있었다면 그대로 미판정). 그래서 `success`/`failure` 만 결론으로 세고
+  `cancelled`·`skipped`·진행중은 결론이 아니며, 판정을 대상 커밋 → 후손 → **조상 + 해당 경로 무변경 증명** 순으로 찾아
+  `PASS`/`COVERED`/`PENDING`/`UNJUDGED`/`FAIL` 로 가른다. 게이트는 판정 규칙과 함께 **필수 체크 표의 드리프트**를
+  막는다 — 체크 이름·경로 조건을 `ci.yml`/`harness-guard.yml`/`semgrep.yml` 원문 및 CLAUDE.md 목록과 대조하므로,
+  잡 이름이나 `if:` 를 바꾸면 조용히 없는 체크를 조회하는 대신 CI 가 FAIL 한다. 읽기 전용이다 — 재실행은 하지 않고
+  필요한 `gh` 명령만 출력한다(잡 단위 재실행은 경로 필터·concurrency 에 다시 걸리므로 실행 전체를 다시 돌려야 한다).
 - **로컬 통합 검증** — `scripts/verify.sh`: CI(`harness-guard.yml` + `ci.yml`)의 판정을 **같은 순서로** 로컬에서 재현한다.
   하네스 테스트 → 자기 진단 → 변경 파일 가드 → 삭제 가드 → 변경 모듈 Gradle. "다 됐다" 를 자기보고가 아니라 종료 코드로 증명하는 지점.
   `--fast`(Gradle 생략, 수초) · `--all`(전체 build) · `--base <ref>`. 느려지면 우회당하므로 기본 경로는 변경 모듈만 빌드한다(ci.yml 매핑과 동일).

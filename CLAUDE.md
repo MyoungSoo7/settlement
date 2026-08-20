@@ -161,7 +161,7 @@ order Kafka 이벤트를 컨슈머(`adapter/in/kafka/`)가 받아 로컬 적재�
 - **절차 규율(플러그인 독립, `.claude/skills/` 자체 내재)**: 구현·버그픽스 착수 전 → `tdd-discipline`,
   버그·테스트 실패 조사 → `debugging-discipline`, "완료" 선언·커밋 직전 → `verify-before-done` 스킬 로드.
   외부 플러그인(superpowers 등) 스킬에 위임하지 않는다 — 미설치 환경에서도 동일하게 동작해야 한다.
-- **커밋**: develop 에 항목별 개별 커밋(리뷰·롤백 용이). `main` 은 보호 브랜치(ruleset `settlement`, `~DEFAULT_BRANCH`) — PR 필수(승인 0인·스레드 해소 필수), **squash 만**, deletion·non-fast-forward 금지, **필수 CI 6종**: `Detect changed paths` · `Backend - Build/Test/JaCoCo/SonarCloud` · `Frontend - Production Build & Quality` · `Frontend - Tests` · `guard`(harness-guard) · `SAST (Semgrep OSS)`. 조건부 스킵되는 잡은 `skipped` 로 보고돼 통과 처리되지만, `polyglot-ci` 는 워크플로 수준 `on.paths` 필터라 해당 경로 미변경 PR 에서 체크가 **아예 보고되지 않아** 영구 대기에 빠진다 — 그래서 필수에서 제외한다(정보성 유지).
+- **커밋**: develop 에 항목별 개별 커밋(리뷰·롤백 용이). `main` 은 보호 브랜치(ruleset `settlement`, `~DEFAULT_BRANCH`) — PR 필수(승인 0인·스레드 해소 필수), **squash 만**, deletion·non-fast-forward 금지, **필수 CI 6종**: `Detect changed paths` · `Backend - Build/Test/JaCoCo/SonarCloud` · `Frontend - Production Build & Quality` · `Frontend - Tests` · `guard`(harness-guard) · `SAST (Semgrep OSS)`. 조건부 스킵되는 잡은 `skipped` 로 보고돼 통과 처리되지만, `polyglot-ci` 는 워크플로 수준 `on.paths` 필터라 해당 경로 미변경 PR 에서 체크가 **아예 보고되지 않아** 영구 대기에 빠진다 — 그래서 필수에서 제외한다(정보성 유지). **`cancelled` 는 통과가 아니다** — develop 은 최신 커밋이 이기므로 중간 커밋의 실행은 취소되는데 빨간 X 가 안 남는다. 판정 유무는 눈이 아니라 `node scripts/harness/ci-verdict.mjs [sha]` 로 체크 단위 확인(취소·스킵·진행중은 결론으로 세지 않는다).
   세션 로그·재생성 산출물(.omc/logs/cache)은 커밋 대상 아님. PowerShell 에서 커밋 메시지는 `git commit -F <file>`(here-string `@` 누수 회피).
 - **흔한 함정**:
   - `JWT_SECRET` 은 운영 필수(기본값 없음, ≥32바이트). 테스트는 부모 `build.gradle.kts` 의 test env 로 주입됨.
