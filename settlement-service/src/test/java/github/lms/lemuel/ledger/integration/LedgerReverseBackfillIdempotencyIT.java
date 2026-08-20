@@ -52,6 +52,11 @@ import static org.assertj.core.api.Assertions.assertThat;
                 "spring.jpa.hibernate.ddl-auto=validate",
                 "spring.jpa.properties.hibernate.default_schema=public",
                 "app.kafka.enabled=false",
+                // 백그라운드 폴러 정지 — 이 테스트는 폴러를 수동으로 구동한다(processPort 직접 호출).
+                // 켜 두면 @Scheduled(fixedDelay=5s, 첫 실행 즉시) 폴러가 같은 outbox 작업을 동시에 집어
+                // 역분개 전표가 두 번 삽입되고 uq_ledger_reference_accounts 로 터진다 — 부하가 걸린
+                // 전체 스위트에서만 재현되던 간헐 실패의 원인.
+                "app.ledger-outbox.enabled=false",
                 "app.search.enabled=false",
                 "spring.batch.job.enabled=false",
                 "app.jwt.secret=integration-test-secret-key-32-bytes-min-OK"
