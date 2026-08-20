@@ -344,6 +344,9 @@ app:
 toss:
   secret-key: ${TOSS_SECRET_KEY}
   api-url: https://api.tosspayments.com/v1/payments/confirm
+  # 환불(취소) 엔드포인트. {paymentKey} 는 RestTemplate 의 URI 변수로 치환된다 — 문자열 연결로
+  # 바꾸지 말 것(paymentKey 가 URL 인코딩되지 않는다).
+  cancel-url: https://api.tosspayments.com/v1/payments/{paymentKey}/cancel
 
 # Resilience4j — PG 별 독립 CircuitBreaker (한 PG 장애가 다른 PG 로 전이되지 않도록 격벽)
 resilience4j:
