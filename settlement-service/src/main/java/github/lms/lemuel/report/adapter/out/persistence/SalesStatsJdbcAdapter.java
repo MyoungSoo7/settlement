@@ -58,7 +58,10 @@ public class SalesStatsJdbcAdapter implements LoadSalesStatsPort {
                         rs.getBigDecimal("net")),
                 period.from(), period.endExclusive());
 
-        return CashflowTotals.from(whole == null ? List.of() : List.of(whole));
+        // null 분기를 두지 않는다 — GROUP BY 없는 집계라 행은 항상 정확히 하나이고, 매퍼는 null 을
+        // 돌려주지 않는다. 실행될 수 없는 방어는 방어가 아니라 "여기서 null 이 나올 수 있다"는
+        // 잘못된 신호이고, 그 분기가 합계 0 을 반환하면 장애를 정상 리포트로 위장한다.
+        return CashflowTotals.from(List.of(whole));
     }
 
     // 동적 SQL 경고(java:S2077) 억제 — 조립되는 조각은 전부 enum(SalesDimension)이 고르는

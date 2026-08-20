@@ -223,9 +223,9 @@ public class PointConsoleQueryJdbcAdapter implements PointConsoleQueryPort {
                         rs.getBigDecimal("total_entry_net"),
                         rs.getLong("drifted")));
 
-        return totals == null
-                ? new PointLedgerTotals(0L, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, 0L)
-                : totals;
+        // null 분기를 두지 않는다 — GROUP BY 없는 집계라 계정이 하나도 없어도 행은 1개(전부 0)로
+        // 나오고, 매퍼는 null 을 돌려주지 않는다. 빈 원장은 이미 0 으로 올바르게 표현된다.
+        return totals;
     }
 
     private static RowMapper<PointEntryView> entryMapper() {

@@ -47,7 +47,10 @@ class SalesBreakdownTest {
                     slice("B", 1, "1"),
                     slice("C", 1, "1")));
 
+            // 개수를 먼저 못 박는다 — allSatisfy 만 쓰면 shares() 가 비었을 때도 통과하므로,
+            // 구성비를 하나도 못 만드는 회귀가 나도 이 테스트는 초록으로 남는다(java:S5841).
             assertThat(breakdown.shares())
+                    .hasSize(3)
                     .allSatisfy(share -> assertThat(share.sharePercent()).isEqualByComparingTo("33.33"));
         }
 
@@ -60,6 +63,7 @@ class SalesBreakdownTest {
 
             assertThat(breakdown.totalGmv()).isEqualByComparingTo("0");
             assertThat(breakdown.shares())
+                    .hasSize(2)
                     .allSatisfy(share -> assertThat(share.sharePercent()).isEqualByComparingTo("0"));
         }
     }
