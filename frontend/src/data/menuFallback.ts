@@ -120,6 +120,7 @@ export const FALLBACK_MENUS: FallbackMenuNode[] = [
       { id: -92, name: '기프트카드 운영', path: '/admin/system/gift-cards', icon: '🎁', description: '상품권 발행 · 유효기간 소멸', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
       { id: -93, name: '감사 로그', path: '/admin/system/audit-logs', icon: '🔎', description: '조작 이력 조회 (커머스 · 정산)', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
       { id: -94, name: '회원 관리', path: '/admin/system/members', icon: '👤', description: '회원 검색 · 승인 · 역할 변경', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
+      { id: -95, name: '리뷰 관리', path: '/admin/system/reviews', icon: '⭐', description: '신고 리뷰 블라인드 · 해제', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
     ],
   },
   {

@@ -200,6 +200,9 @@ public class SecurityConfig {
                         // 권한 상승 경로다. MANAGER 에게도 열지 않는다(승인·정지 조작은 기존
                         // /memberships/** 가 MANAGER 까지 허용하지만, 그건 대상이 특정된 단건이다).
                         .requestMatchers("/admin/members/**").hasRole("ADMIN")
+                        // 리뷰 관리 콘솔 — 다루는 것이 개인정보가 아니라 공개된 게시물이고, 신고 대응은
+                        // CS 업무의 일부라 MANAGER 까지 연다(회원 콘솔과 다른 판단).
+                        .requestMatchers("/admin/reviews/**").hasAnyRole("ADMIN", "MANAGER")
                         // 정산 배치 재실행 콘솔 — 확정·홀드백 해제·지급 실행을 수동 트리거하므로
                         // 조회 콘솔과 달리 MANAGER 에게 열지 않는다. 일자 게이트(미래·소급 상한)는 도메인이 강제.
                         // 수수료율 정책 — 정산 금액을 직접 바꾸므로 조회 콘솔과 달리 ADMIN 만.

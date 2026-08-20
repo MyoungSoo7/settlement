@@ -88,9 +88,30 @@ class ReviewServiceTest {
         assertThat(service.getProductReviews(10L)).isEmpty();
     }
 
+    @Test @DisplayName("getProductReviews: 블라인드된 리뷰는 공개 목록에서 빠진다 — 이 필터가 없으면 블라인드 기능 전체가 무의미하다")
+    void getProductReviewsExcludesHidden() {
+        github.lms.lemuel.review.domain.Review visible = github.lms.lemuel.review.domain.Review.create(10L, 1L, 5, "좋아요");
+        github.lms.lemuel.review.domain.Review hidden = github.lms.lemuel.review.domain.Review.create(10L, 2L, 1, "욕설");
+        hidden.hide("신고 접수", 9L);
+        when(loadReviewPort.findByProductId(10L)).thenReturn(List.of(visible, hidden));
+
+        assertThat(service.getProductReviews(10L))
+                .extracting(github.lms.lemuel.review.domain.Review::getContent)
+                .containsExactly("좋아요");
+    }
+
     @Test @DisplayName("getUserReviews: 조회")
     void getUserReviews() {
         when(loadReviewPort.findByUserId(1L)).thenReturn(List.of());
         assertThat(service.getUserReviews(1L)).isEmpty();
+    }
+
+    @Test @DisplayName("getUserReviews: 본인에게는 블라인드된 자기 글도 보인다 — 사라진 이유를 모르는 것이 가장 나쁜 경험이다")
+    void getUserReviewsKeepsHiddenForAuthor() {
+        github.lms.lemuel.review.domain.Review hidden = github.lms.lemuel.review.domain.Review.create(10L, 1L, 1, "욕설");
+        hidden.hide("신고 접수", 9L);
+        when(loadReviewPort.findByUserId(1L)).thenReturn(List.of(hidden));
+
+        assertThat(service.getUserReviews(1L)).hasSize(1);
     }
 }

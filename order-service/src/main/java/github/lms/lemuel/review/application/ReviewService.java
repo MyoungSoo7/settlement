@@ -71,13 +71,26 @@ public class ReviewService {
         log.info("리뷰 삭제 완료: reviewId={}", reviewId);
     }
 
-    /** 상품 리뷰 목록 (평점 최신순) */
+    /**
+     * 상품 리뷰 목록 (최신순).
+     *
+     * <p><b>블라인드된 리뷰는 여기서 빠진다.</b> 이 필터가 없으면 관리자가 신고 리뷰를 숨겨도
+     * 상품 상세에는 그대로 보인다 — 블라인드 기능 전체가 아무 일도 하지 않는 셈이 된다.
+     * 노출을 끊는 지점은 <b>공개 조회 경로</b>이고, 그 판단은 도메인에게 묻는다.
+     */
     @Transactional(readOnly = true)
     public List<Review> getProductReviews(Long productId) {
-        return loadReviewPort.findByProductId(productId);
+        return loadReviewPort.findByProductId(productId).stream()
+                .filter(Review::isVisible)
+                .toList();
     }
 
-    /** 사용자 리뷰 목록 */
+    /**
+     * 사용자 리뷰 목록.
+     *
+     * <p>여기서는 <b>거르지 않는다</b>. 자기 글이 왜 사라졌는지 모르는 것이 가장 나쁜 경험이고,
+     * 숨김 사유를 볼 수 있어야 이의 제기가 성립한다.
+     */
     @Transactional(readOnly = true)
     public List<Review> getUserReviews(Long userId) {
         return loadReviewPort.findByUserId(userId);
