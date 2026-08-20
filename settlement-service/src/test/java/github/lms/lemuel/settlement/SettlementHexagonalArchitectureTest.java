@@ -10,6 +10,7 @@ import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
+import com.tngtech.archunit.library.dependencies.SlicesRuleDefinition;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -36,6 +37,9 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
  */
 class SettlementHexagonalArchitectureTest {
 
+    /** 임포트 건수 하한. settlement-service 는 현재 수백 개를 임포트한다. */
+    private static final int MIN_IMPORTED_CLASSES = 100;
+
     private static JavaClasses settlementClasses;
 
     @BeforeAll
@@ -45,6 +49,23 @@ class SettlementHexagonalArchitectureTest {
                 .withImportOption((Location location) ->
                         !location.contains("/generated/") && !location.contains("/build/generated"))
                 .importPackages("github.lms.lemuel");
+    }
+
+    /**
+     * 임포트 건수 하한 — 이 클래스의 모든 규칙이 {@link #settlementClasses} 를 대상으로 하므로,
+     * 임포트가 0개면 규칙 전부가 <b>공허 통과</b>한다(검사 대상 없이 green). green 과 blind 는 겉으로
+     * 구분되지 않는다.
+     *
+     * <p>가상의 위험이 아니다 — order-service 는 ArchUnit 1.3.0 + Java 25(class major 69) 조합에서
+     * 0개를 임포트한 채 규칙 전부가 green 이었고, {@code AccountArchitectureTest} 주석에도 같은 사고가
+     * 남아 있다. {@code allowEmptyShould(true)} 는 그 상태를 <b>정상 통과로 보이게</b> 만든다.
+     */
+    @Test
+    void importedClassesMustNotBeVacuous() {
+        org.junit.jupiter.api.Assertions.assertTrue(settlementClasses.size() >= MIN_IMPORTED_CLASSES,
+                "아키텍처 규칙의 검사 대상이 " + settlementClasses.size() + "개다 (기대 최소 "
+                        + MIN_IMPORTED_CLASSES + "개). ArchUnit 이 현재 바이트코드 버전을 읽지 못하면 "
+                        + "0개를 임포트하고 이 클래스의 모든 규칙이 공허 통과한다.");
     }
 
     @Test
@@ -133,6 +154,29 @@ class SettlementHexagonalArchitectureTest {
         int dot = rest.indexOf('.');
         String slice = dot < 0 ? rest : rest.substring(0, dot);
         return slice.isEmpty() || "common".equals(slice) ? null : slice;
+    }
+
+    /**
+     * 슬라이스(= {@code github.lms.lemuel.<도메인>} 최상위 패키지) 사이에 순환 의존이 없다.
+     *
+     * <p>이 모듈은 순환 8건으로 시작해 마지막에 규칙을 켰다 — 슬라이스가 13개나 되는 유일한 모듈이라
+     * 순환이 가장 깊게 쌓여 있었다. 두 단계로 걷어냈다:
+     * <ol>
+     *   <li>다른 슬라이스의 <b>어댑터 내부</b>를 읽던 경계 침범을 소유권 역전으로 정리 → 8 → 4
+     *       ({@link #슬라이스는_다른_슬라이스의_어댑터_내부를_참조하지_않는다()} 가 재발을 막는다)</li>
+     *   <li>남은 4건은 침범이 아니라 <b>방향</b>의 문제였다. payout·recovery 가 settlement 의 포트를 직접
+     *       부르던 두 지점을 각자의 요구 포트 + settlement 쪽 브리지로 뒤집어 결합을 settlement→* 한 방향으로 모았다</li>
+     * </ol>
+     *
+     * <p>임포트 공허 통과 방어는 {@link #importedClassesMustNotBeVacuous()} 가 같은 {@link #settlementClasses}
+     * 에 대해 담당한다 — 임포트가 0개면 빈 그래프에 순환이 없어 이 규칙도 조용히 통과한다.
+     */
+    @Test
+    void 슬라이스_사이에_순환_의존이_없다() {
+        SlicesRuleDefinition.slices()
+                .matching("github.lms.lemuel.(*)..")
+                .should().beFreeOfCycles()
+                .check(settlementClasses);
     }
 
     @Test
