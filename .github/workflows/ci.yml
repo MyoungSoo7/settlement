@@ -604,7 +604,11 @@ jobs:
     # 전부 skipped 였고 나머지 테스트 잡이 초록을 만들어 머지됐다. 빌드 파손도, 새 베이스가
     # 물고 온 CRITICAL CVE 도 머지 후 push 실행에서야 드러난다(그때는 이미 늦다 —
     # 이미지가 안 올라가 배포 스큐가 생기거나, 취약 이미지가 레지스트리에 올라간다).
-    if: needs.changes.outputs.build_any == 'true'
+    # 게이트를 두 값에 걸쳐 OR 로 본다 — build_any(불리언 문자열) 하나에만 걸면 그 출력이
+    # 어떤 이유로든 'true' 로 전달되지 않는 순간 잡이 조용히 skipped 되고, 필수 체크는 초록인 채
+    # 이미지만 사라진다(2026-08-20 실측: order-service 단독 변경 push 2건이 이렇게 묻혔다).
+    # 매트릭스 원본이 "빈 매트릭스"가 아니면 빌드할 게 있다는 뜻이므로 그것도 함께 본다.
+    if: 'needs.changes.outputs.build_any == ''true'' || needs.changes.outputs.build_matrix != ''{"include":[]}'''
     permissions:
       contents: read
       packages: write
@@ -923,12 +927,21 @@ jobs:
       contents: read
     steps:
       - name: 이미지 잡 결과 집계
+        env:
+          # 게이트 입력값을 로그에 남긴다 — skipped 의 원인이 "빌드할 게 없어서"인지
+          # "게이트가 잘못 꺼져서"인지 사후에 구분할 수 있어야 한다(2026-08-20 실측 사고).
+          BUILD_ANY: ${{ needs.changes.outputs.build_any }}
+          BUILD_MATRIX: ${{ needs.changes.outputs.build_matrix }}
+          FRONTEND_CHANGED: ${{ needs.changes.outputs.frontend }}
         run: |
           set -euo pipefail
           backend="${{ needs.backend-ghcr.result }}"
           frontend="${{ needs.frontend-ghcr.result }}"
           echo "backend-ghcr : $backend"
           echo "frontend-ghcr: $frontend"
+          echo "changes.build_any    : '${BUILD_ANY}'"
+          echo "changes.build_matrix : '${BUILD_MATRIX}'"
+          echo "changes.frontend     : '${FRONTEND_CHANGED}'"
           # skipped 는 "그 영역에 변경이 없어 빌드할 이미지가 없다" 는 뜻이라 통과시킨다.
           # 다만 failure/cancelled 를 스킵으로 둔갑시키지는 않는다 — 그게 이 잡의 존재 이유다.
           for result in "$backend" "$frontend"; do
@@ -937,6 +950,21 @@ jobs:
               *) echo "::error::이미지 빌드/스캔이 통과하지 않았다 (result=$result)"; exit 1 ;;
             esac
           done
+          # skipped 자체가 정당한지까지 검사한다.
+          #
+          # 2026-08-20 실측: changes 잡이 build_any=true, build_matrix 에 order-service 1건을
+          # 담았는데도 backend-ghcr 이 skipped 로 끝났다. 이 집계 스텝은 skipped 를 무조건
+          # 통과로 취급했기 때문에 **필수 체크가 초록인데 이미지는 없는** 상태가 만들어졌고,
+          # 운영은 옛 이미지에 묶인 채 9 시간 롤아웃이 멈춰 있었다.
+          # "빌드할 게 있었는데 안 빌드됐다" 는 초록이 아니라 빨강이어야 한다.
+          if [ "$backend" = "skipped" ] && [ "${BUILD_ANY}" = "true" ]; then
+            echo "::error::backend-ghcr 이 skipped 인데 빌드 대상이 있었다 (build_matrix=${BUILD_MATRIX}). 이미지가 만들어지지 않았으므로 초록으로 통과시키지 않는다."
+            exit 1
+          fi
+          if [ "$frontend" = "skipped" ] && [ "${FRONTEND_CHANGED}" = "true" ]; then
+            echo "::error::frontend-ghcr 이 skipped 인데 frontend 변경이 있었다. 이미지가 만들어지지 않았다."
+            exit 1
+          fi
           echo "이미지 빌드·스캔 통과"
 
   # main 머지 후 ArgoCD plain Directory 앱의 manifest reconciliation 시간을 둔 다음,
