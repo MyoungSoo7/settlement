@@ -137,6 +137,12 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/coupons/available").hasAnyRole("ADMIN", "MANAGER", "USER")
                         .requestMatchers(HttpMethod.GET, "/coupons", "/coupons/**").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers(HttpMethod.POST, "/coupons/*/use").hasAnyRole("ADMIN", "MANAGER", "USER")
+                        // 쿠폰 생성 — 매처가 없어 anyRequest().authenticated() 로 새고 있었다. 로그인만 하면
+                        // 누구나 자기에게 100% 할인 쿠폰을 발행할 수 있었다는 뜻이다. GET 만 열려 있어
+                        // "닫혀 있다"고 보이기 쉬웠는데, HttpMethod 를 지정한 매처는 그 메서드에만 걸린다.
+                        .requestMatchers(HttpMethod.POST, "/coupons").hasAnyRole("ADMIN", "MANAGER")
+                        // 쿠폰 운영 콘솔 — 중단/재개는 나가는 할인을 즉시 멈추는 조작이다.
+                        .requestMatchers("/admin/coupons/**").hasAnyRole("ADMIN", "MANAGER")
                         // 전체 주문/사용자 조회 (관리자·매니저)
                         .requestMatchers("/orders/admin/all").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers("/orders/admin/**").hasAnyRole("ADMIN", "MANAGER")

@@ -138,7 +138,7 @@ describe('ReviewAdminPage', () => {
     render(<ReviewAdminPage />);
     await waitFor(() => expect(mocked.search).toHaveBeenCalled());
 
-    await user.selectOptions(screen.getByLabelText('평점 상한'), '2');
+    await user.selectOptions(await screen.findByLabelText('평점 상한'), '2');
 
     await waitFor(() =>
       expect(mocked.search.mock.calls.some(([q]) => q.maxRating === 2)).toBe(true));
@@ -180,7 +180,7 @@ describe('ReviewAdminPage', () => {
     render(<ReviewAdminPage />);
     await waitFor(() => expect(mocked.search).toHaveBeenCalled());
 
-    await user.click(screen.getByRole('button', { name: 'CSV 내려받기' }));
+    await user.click(await screen.findByRole('button', { name: 'CSV 내려받기' }));
 
     expect(await screen.findByRole('status')).toHaveTextContent('12,345건 중 앞 5,000건');
     expect(mockedSave).toHaveBeenCalled();

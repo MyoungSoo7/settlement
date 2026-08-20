@@ -89,7 +89,7 @@ describe('MemberAdminPage', () => {
     render(<MemberAdminPage />);
     await waitFor(() => expect(mocked.search).toHaveBeenCalled());
 
-    await user.type(screen.getByLabelText('검색어'), '홍길동');
+    await user.type(await screen.findByLabelText('검색어'), '홍길동');
     await user.click(screen.getByRole('button', { name: '조회' }));
 
     await waitFor(() =>
@@ -183,7 +183,7 @@ describe('MemberAdminPage', () => {
     render(<MemberAdminPage />);
     await waitFor(() => expect(mocked.search).toHaveBeenCalled());
 
-    await user.click(screen.getByRole('button', { name: 'CSV 내려받기' }));
+    await user.click(await screen.findByRole('button', { name: 'CSV 내려받기' }));
 
     const notice = await screen.findByRole('status');
     expect(notice).toHaveTextContent('감사 로그에 남았습니다');
@@ -201,7 +201,7 @@ describe('MemberAdminPage', () => {
     render(<MemberAdminPage />);
     await waitFor(() => expect(mocked.search).toHaveBeenCalled());
 
-    await user.click(screen.getByRole('button', { name: 'CSV 내려받기' }));
+    await user.click(await screen.findByRole('button', { name: 'CSV 내려받기' }));
 
     expect(await screen.findByRole('status')).toHaveTextContent('12,345명 중 앞 5,000명');
   });

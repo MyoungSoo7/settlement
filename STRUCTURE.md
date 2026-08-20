@@ -31,11 +31,12 @@ settlement/                              # 모노레포 루트
 │
 ├── order-service/                       # 🛒 Commerce (8088, opslab)
 │   └── .../{user,order,payment,cart,shipping,product,category,coupon,review,game,menu,rbac,commoncode,sellertier}
+│       ├── auditconsole/                # /admin/audit-logs — 커머스 감사 로그 조회(shared-common common.audit 재사용)
 │       ├── recon/                       # /internal/recon — 자기 합계 노출(settlement 대사용, ADR 0020)
 │       └── projectionbackfill/          # settlement 프로젝션 백필 (ADR 0020)
 │
 ├── settlement-service/                  # 💰 Settlement (8082/mgmt 8083, standalone, settlement_db)
-│   └── .../{settlement,payout,ledger,tax,chargeback,pgreconciliation,recovery,closing,report,recon,integrity,idempotency,crypto}
+│   └── .../{settlement,payout,ledger,tax,chargeback,pgreconciliation,recovery,closing,report,recon,integrity,idempotency,auditconsole,crypto}
 │       └── crypto = 바운디드 컨텍스트가 아닌 슬라이스 공용 인프라(FieldEncryptionConverter — payout·tax 엔티티가 공유)
 │       ├── settlement/adapter/in/kafka/     # Payment/Order/User/Product 이벤트 컨슈머 (프로젝션 적재)
 │       ├── settlement/adapter/out/readmodel/# ★ 이벤트 프로젝션 뷰 (settlement_*_view, 자체 DB 소유)

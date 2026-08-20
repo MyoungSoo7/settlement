@@ -71,7 +71,7 @@ describe('AuditLogConsolePage', () => {
     render(<AuditLogConsolePage />);
     await waitFor(() => expect(mocked.search).toHaveBeenCalled());
 
-    await user.click(screen.getByRole('tab', { name: /정산/ }));
+    await user.click(await screen.findByRole('tab', { name: /정산/ }));
 
     await waitFor(() =>
       expect(mocked.search.mock.calls.some(([scope]) => scope === 'SETTLEMENT')).toBe(true));
@@ -109,7 +109,7 @@ describe('AuditLogConsolePage', () => {
     render(<AuditLogConsolePage />);
     await waitFor(() => expect(mocked.search).toHaveBeenCalled());
 
-    await user.click(screen.getByRole('button', { name: 'CSV 내려받기' }));
+    await user.click(await screen.findByRole('button', { name: 'CSV 내려받기' }));
 
     const notice = await screen.findByRole('status');
     expect(notice).toHaveTextContent('12,345건 중 앞 5,000건');
@@ -127,7 +127,7 @@ describe('AuditLogConsolePage', () => {
     render(<AuditLogConsolePage />);
     await waitFor(() => expect(mocked.search).toHaveBeenCalled());
 
-    await user.click(screen.getByRole('button', { name: 'CSV 내려받기' }));
+    await user.click(await screen.findByRole('button', { name: 'CSV 내려받기' }));
 
     expect(await screen.findByRole('status')).toHaveTextContent('12건을 모두 내려받았습니다');
   });
