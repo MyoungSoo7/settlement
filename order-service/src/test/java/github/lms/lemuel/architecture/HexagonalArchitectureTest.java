@@ -10,6 +10,7 @@ import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import com.tngtech.archunit.core.domain.JavaClasses;
+import com.tngtech.archunit.library.dependencies.SlicesRuleDefinition;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -159,6 +160,28 @@ class HexagonalArchitectureTest {
                 }
             }
         };
+    }
+
+    /**
+     * 슬라이스(= {@code github.lms.lemuel.<도메인>} 최상위 패키지) 사이에 순환 의존이 없다.
+     *
+     * <p>도입 시점 실측 2건을 먼저 없애고 켰다 — {@code order ↔ payment} 와 {@code order ↔ shipping}.
+     * 둘 다 어댑터 침범이 아니라 <b>양방향 제공 포트 호출</b>이었고, 각 쌍에서 어댑터 1개씩을
+     * 능력을 가진 슬라이스로 옮겨 결합을 {@code payment → order → shipping} 한 방향으로 모아 끊었다.
+     *
+     * <p>순환의 대가는 추상적이지 않다: {@code order ↔ payment} 는 스프링 생성자 주입 사이클을 만들어
+     * {@code OrderPaymentRefundAdapter} 가 {@code @Lazy} 로 그것을 틀어막고 있다. 다만 이 규칙이 보는
+     * 것은 컴파일 시점 그래프라, 패키지 이동만으로 그 빈 사이클이 사라지지는 않는다.
+     *
+     * <p>임포트 공허 통과 방어는 {@link #importedClassesMustNotBeVacuous()} 가 같은 {@link #mainClasses}
+     * 에 대해 담당한다 — 임포트가 0개면 빈 그래프에 순환이 없어 이 규칙도 조용히 통과한다.
+     */
+    @Test
+    void 슬라이스_사이에_순환_의존이_없다() {
+        SlicesRuleDefinition.slices()
+                .matching("github.lms.lemuel.(*)..")
+                .should().beFreeOfCycles()
+                .check(mainClasses);
     }
 
     /**

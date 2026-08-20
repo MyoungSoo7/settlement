@@ -1,7 +1,7 @@
 package github.lms.lemuel.order.application.service;
 
 import github.lms.lemuel.common.outbox.adapter.out.persistence.OutboxSchema;
-import github.lms.lemuel.order.adapter.out.persistence.OrderPaymentRefundAdapter;
+import github.lms.lemuel.payment.adapter.out.order.OrderPaymentRefundAdapter;
 import github.lms.lemuel.order.adapter.out.persistence.OrderPersistenceAdapter;
 import github.lms.lemuel.order.adapter.out.persistence.OrderPersistenceMapperImpl;
 import github.lms.lemuel.order.application.port.in.CreateMultiItemOrderUseCase;
