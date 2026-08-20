@@ -79,9 +79,9 @@ class MenuSeedIntegrationTest {
     }
 
     @Test
-    @DisplayName("시드 총 59행 — 기존 54 + 셀러 등급 1 + 감사 로그 1 + 회원 관리 1 + 리뷰 관리 1 + 대량주문 1")
-    void seedsExactlyFiftyNine() {
-        assertThat(adapter.findAll()).hasSize(59);
+    @DisplayName("시드 총 60행 — 기존 54 + 셀러 등급 1 + 감사 로그 1 + 회원 관리 1 + 리뷰 관리 1 + 쿠폰 운영 1 + 대량주문 1")
+    void seedsExactlySixty() {
+        assertThat(adapter.findAll()).hasSize(60);
     }
 
     @Test
@@ -161,7 +161,7 @@ class MenuSeedIntegrationTest {
     }
 
     @Test
-    @DisplayName("시스템 사이드바 15개 — 앞 3개와 게시판 관리가 RBAC permission 과 짝지어진다")
+    @DisplayName("시스템 사이드바 16개 — 앞 3개와 게시판 관리가 RBAC permission 과 짝지어진다")
     void systemChildren() {
         List<Menu> children = childrenOf("시스템 관리");
 
@@ -170,11 +170,11 @@ class MenuSeedIntegrationTest {
         assertThat(children).extracting(Menu::getName).containsExactly(
                 "메뉴 관리", "공통코드 관리", "RBAC 관리", "이커머스 카테고리",
                 "진열 편성", "옵션 카탈로그", "운영관리", "증빙 리뷰 큐", "게시판 관리", "교육 관리",
-                "포인트 운영", "기프트카드 운영", "감사 로그", "회원 관리", "리뷰 관리");
+                "포인트 운영", "기프트카드 운영", "감사 로그", "회원 관리", "리뷰 관리", "쿠폰 운영");
         assertThat(children).extracting(Menu::getRequiredPermission).containsExactly(
                 "SYSTEM_MENU_MANAGE", "SYSTEM_CODE_MANAGE", "SYSTEM_RBAC_MANAGE",
                 null, null, null, null, null, "SYSTEM_BOARD_MANAGE", null, null, null,
-                null, null, null);
+                null, null, null, null);
     }
 
     @Test
