@@ -24,6 +24,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { controllers as extractControllers } from '../lib/java-controllers.mjs';
+import { gatewayPatterns as readGatewayPatterns, matchesPattern } from '../lib/gateway-routes.mjs';
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const read = (path) => readFileSync(path, 'utf8');
@@ -80,42 +81,11 @@ const UNROUTED_BUDGET = 4;
 
 const sorted = (values) => [...new Set(values)].sort();
 
-/** 게이트웨이 {@code - Path=a,b,c} 술어에서 패턴을 뽑는다. */
-function gatewayPatterns() {
-  const yml = read(GATEWAY_YML);
-  const patterns = [];
-  for (const line of yml.matchAll(/^\s*-\s*Path=(.+)$/gm)) {
-    for (const raw of line[1].split(',')) {
-      const pattern = raw.trim();
-      if (pattern.startsWith('/')) patterns.push(pattern);
-    }
-  }
-  return patterns;
-}
-
 /**
- * 스프링 {@code PathPattern} 근사 매칭.
- *
- * <p>`/**` 는 <b>0개 이상</b> 세그먼트다 — `/a/**` 는 `/a` 자신도 매칭한다(컬렉션 루트가 이 규칙에
- * 기대고 있다: {@code GET /admin/commission-rates} 가 {@code /admin/commission-rates/**} 로 열린다).
- * {@code {var}} 와 단일 `*` 는 한 세그먼트다. 정확한 구현을 옮기는 게 아니라 <b>보수적으로</b>
- * 판정하는 것이 목적이다 — 애매하면 "안 닿는다"고 보고 사람이 확인하게 한다.
+ * 게이트웨이 경로표 파서와 {@code PathPattern} 매처는 {@code lib/gateway-routes.mjs} 에 산다 —
+ * {@code spa-fallback-gate} 가 같은 표를 반대 방향(폴백이 이 라우트를 가리는가)에서 읽기 때문이다.
  */
-export function matchesPattern(pattern, path) {
-  // 꼬리 `/**` 를 먼저 자리표로 빼 둔다. 정규식으로 먼저 바꿔 버리면 그 안의 `*` 가 뒤이은
-  // 단일 `*` 치환에 다시 걸려 `(/.[^/]*)?` 같은 것이 된다 — 실제로 그렇게 틀렸고,
-  // 아래 [자기검증] 테스트가 잡았다.
-  // 자리표는 반드시 ASCII 여야 한다. 처음엔 NUL 을 썼는데, 소스에 NUL 이 들어가자 git 이
-  // 이 파일을 바이너리로 취급해 diff 가 사라졌다 — 리뷰가 불가능해진다.
-  const TAIL = '@@TAIL@@';
-  const source = '^' + pattern
-    .replace(/\/\*\*$/, TAIL)
-    .replace(/[.+?^$()|[\]\\]/g, '\\$&')
-    .replace(/\{[^}]*\}/g, '[^/]+')
-    .replace(/\*/g, '[^/]*')
-    .replace(TAIL, '(/.*)?') + '$';
-  return new RegExp(source).test(path);
-}
+const gatewayPatterns = () => readGatewayPatterns(REPO_ROOT);
 
 /** 이 게이트가 판정 대상으로 삼는 컨트롤러(내부 전용 접두사만 가진 것은 ②의 몫이라 제외). */
 function routableControllers() {
