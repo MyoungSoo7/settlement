@@ -34,7 +34,7 @@ import java.util.Objects;
  * </pre>
  *
  * <p><b>왜 order 와 경로가 다른가</b>: 감사 테이블은 서비스마다 자기 DB 에 따로 있다
- * (order={@code opslab.audit_logs}, settlement={@code settlement_db public.audit_logs}).
+ * (order 는 opslab 스키마의 {@code audit_logs}, settlement 은 {@code settlement_db public.audit_logs}).
  * MSA 경계상 한쪽이 다른 쪽 테이블을 읽을 수 없으므로 표면도 둘이다. 같은 경로를 쓰면
  * 게이트웨이가 한쪽으로만 보내 나머지 하나가 <b>존재하는데 도달 불가</b>한 상태가 된다.
  *
