@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ReviewAdminPage from '@/pages/system/ReviewAdminPage';
 import { reviewAdminApi, type ReviewPage, type ReviewRow } from '@/api/reviewAdmin';
@@ -167,6 +167,96 @@ describe('ReviewAdminPage', () => {
     render(<ReviewAdminPage />);
 
     expect(await screen.findByRole('alert')).toBeInTheDocument();
+  });
+
+  it('상태 목록을 못 받아도 화면은 뜬다', async () => {
+    mocked.statuses.mockRejectedValue(new Error('boom'));
+    render(<ReviewAdminPage />);
+
+    await waitFor(() => expect(mocked.search).toHaveBeenCalled());
+    expect(within(await screen.findByLabelText('노출 상태')).getAllByRole('option')).toHaveLength(1);
+  });
+
+  it('CSV 실패도 드러낸다', async () => {
+    mocked.export.mockRejectedValue(new Error('boom'));
+    const user = userEvent.setup();
+    render(<ReviewAdminPage />);
+    await waitFor(() => expect(mocked.search).toHaveBeenCalled());
+
+    await user.click(await screen.findByRole('button', { name: 'CSV 내려받기' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('CSV');
+  });
+
+  it('블라인드 실패는 사용자에게 드러난다', async () => {
+    mocked.search.mockResolvedValue(pageOf([review()]));
+    mocked.hide.mockRejectedValue(new Error('boom'));
+    vi.stubGlobal('prompt', vi.fn().mockReturnValue('욕설'));
+    const user = userEvent.setup();
+    render(<ReviewAdminPage />);
+
+    await user.click(await screen.findByRole('button', { name: '블라인드' }));
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+  });
+
+  it('본문·상품ID·기간 필터는 그대로 질의에 실린다', async () => {
+    const user = userEvent.setup();
+    render(<ReviewAdminPage />);
+    await waitFor(() => expect(mocked.search).toHaveBeenCalled());
+
+    await user.type(await screen.findByLabelText('본문 검색'), '최악');
+    await user.type(screen.getByLabelText('상품 ID'), '2');
+    await user.type(screen.getByLabelText('작성 시작일'), '2026-03-01');
+    await user.type(screen.getByLabelText('작성 종료일'), '2026-03-31');
+    await user.click(screen.getByRole('button', { name: '조회' }));
+
+    await waitFor(() => expect(mocked.search.mock.calls.some(([q]) =>
+      q.keyword === '최악' && q.productId === 2
+      && q.from === '2026-03-01' && q.to === '2026-03-31',
+    )).toBe(true));
+  });
+
+  it('여러 페이지면 이동이 나오고, 조회를 다시 누르면 1페이지로 돌아온다', async () => {
+    mocked.search.mockResolvedValue({
+      ...pageOf([review()]), totalElements: 120, totalPages: 3,
+    });
+    const user = userEvent.setup();
+    render(<ReviewAdminPage />);
+
+    await user.click(await screen.findByRole('button', { name: '다음' }));
+    await waitFor(() => expect(screen.getByText('2 / 3')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: '이전' }));
+    await waitFor(() => expect(screen.getByText('1 / 3')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: '다음' }));
+    await waitFor(() => expect(screen.getByText('2 / 3')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: '조회' }));
+    await waitFor(() => expect(screen.getByText('1 / 3')).toBeInTheDocument());
+  });
+
+  it('상태별 건수 칩을 누르면 그 상태로 좁혀 조회한다', async () => {
+    mocked.statusCounts.mockResolvedValue([{ status: 'HIDDEN', count: 3 }]);
+    const user = userEvent.setup();
+    render(<ReviewAdminPage />);
+
+    await user.click(await screen.findByRole('button', { name: /블라인드 3/ }));
+
+    await waitFor(() =>
+      expect(mocked.search.mock.calls.some(([q]) => q.status === 'HIDDEN')).toBe(true));
+  });
+
+  it('CSV 가 온전하면 전부 받았다고 알린다', async () => {
+    mocked.export.mockResolvedValue({
+      blob: new Blob(['x']), fileName: 'reviews.csv', truncated: false, total: 7,
+    });
+    const user = userEvent.setup();
+    render(<ReviewAdminPage />);
+    await waitFor(() => expect(mocked.search).toHaveBeenCalled());
+
+    await user.click(await screen.findByRole('button', { name: 'CSV 내려받기' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent('7건을 모두 내려받았습니다');
   });
 
   it('CSV 가 잘리면 몇 건 중 몇 건인지 말한다', async () => {

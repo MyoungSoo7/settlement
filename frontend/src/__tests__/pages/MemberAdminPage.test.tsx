@@ -244,6 +244,107 @@ describe('MemberAdminPage', () => {
     expect(mocked.statusCounts.mock.calls.every(([q]) => q.status === undefined)).toBe(true);
   });
 
+  it('역할·상태 목록을 못 받아도 화면은 뜬다 — 필터 하나 때문에 조회 자체를 막지 않는다', async () => {
+    mocked.enums.mockRejectedValue(new Error('boom'));
+    render(<MemberAdminPage />);
+
+    await waitFor(() => expect(mocked.search).toHaveBeenCalled());
+    expect(within(await screen.findByLabelText('역할')).getAllByRole('option')).toHaveLength(1);
+  });
+
+  it('CSV 실패도 드러낸다', async () => {
+    mocked.export.mockRejectedValue(new Error('boom'));
+    const user = userEvent.setup();
+    render(<MemberAdminPage />);
+    await waitFor(() => expect(mocked.search).toHaveBeenCalled());
+
+    await user.click(await screen.findByRole('button', { name: 'CSV 내려받기' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('CSV');
+  });
+
+  it('승인 실패는 사용자에게 드러난다 — 실패한 전이가 성공처럼 보이면 안 된다', async () => {
+    mocked.search.mockResolvedValue(pageOf([member({ membershipStatus: 'PENDING' })]));
+    mocked.approve.mockRejectedValue(new Error('boom'));
+    const user = userEvent.setup();
+    render(<MemberAdminPage />);
+
+    await user.click(await screen.findByRole('button', { name: '승인' }));
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+  });
+
+  it('가입일·역할·계정 상태 필터는 그대로 질의에 실린다', async () => {
+    const user = userEvent.setup();
+    render(<MemberAdminPage />);
+    await waitFor(() => expect(mocked.search).toHaveBeenCalled());
+
+    await user.selectOptions(await screen.findByLabelText('역할'), 'MANAGER');
+    await user.selectOptions(screen.getByLabelText('계정 상태'), 'false');
+    await user.type(screen.getByLabelText('가입 시작일'), '2026-01-01');
+    await user.type(screen.getByLabelText('가입 종료일'), '2026-03-31');
+    await user.click(screen.getByRole('button', { name: '조회' }));
+
+    await waitFor(() => expect(mocked.search.mock.calls.some(([q]) =>
+      q.role === 'MANAGER' && q.active === false
+      && q.joinedFrom === '2026-01-01' && q.joinedTo === '2026-03-31',
+    )).toBe(true));
+  });
+
+  it('여러 페이지면 이동이 나오고, 조회를 다시 누르면 1페이지로 돌아온다', async () => {
+    mocked.search.mockResolvedValue({
+      ...pageOf([member()]), totalElements: 120, totalPages: 3,
+    });
+    const user = userEvent.setup();
+    render(<MemberAdminPage />);
+
+    await user.click(await screen.findByRole('button', { name: '다음' }));
+    await waitFor(() => expect(screen.getByText('2 / 3')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: '이전' }));
+    await waitFor(() => expect(screen.getByText('1 / 3')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: '다음' }));
+    await waitFor(() => expect(screen.getByText('2 / 3')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: '조회' }));
+    await waitFor(() => expect(screen.getByText('1 / 3')).toBeInTheDocument());
+  });
+
+  it('반려·정지 사유를 입력하면 그대로 보낸다', async () => {
+    mocked.search.mockResolvedValue(pageOf([member({ membershipStatus: 'PENDING' })]));
+    mocked.reject.mockResolvedValue(undefined);
+    vi.stubGlobal('prompt', vi.fn().mockReturnValue('서류 미비'));
+    const user = userEvent.setup();
+    render(<MemberAdminPage />);
+
+    await user.click(await screen.findByRole('button', { name: '반려' }));
+
+    await waitFor(() => expect(mocked.reject).toHaveBeenCalledWith(42, '서류 미비'));
+  });
+
+  it('정지 해제는 사유 없이 부른다', async () => {
+    mocked.search.mockResolvedValue(pageOf([member({ membershipStatus: 'SUSPENDED' })]));
+    mocked.reinstate.mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    render(<MemberAdminPage />);
+
+    await user.click(await screen.findByRole('button', { name: '정지 해제' }));
+
+    await waitFor(() => expect(mocked.reinstate).toHaveBeenCalledWith(42));
+  });
+
+  it('역할 변경 프롬프트를 취소하면 사유를 묻지도 않는다', async () => {
+    mocked.search.mockResolvedValue(pageOf([member()]));
+    const prompt = vi.fn().mockReturnValue(null);
+    vi.stubGlobal('prompt', prompt);
+    const user = userEvent.setup();
+    render(<MemberAdminPage />);
+
+    await user.click(await screen.findByRole('button', { name: '역할 변경' }));
+
+    expect(prompt).toHaveBeenCalledTimes(1);
+    expect(mocked.changeRole).not.toHaveBeenCalled();
+  });
+
   it('연락처 없는 회원은 —— 로 그린다 (빈칸이 아니라 없음임을 밝힌다)', async () => {
     mocked.search.mockResolvedValue(pageOf([member({ phoneNumber: null, name: null })]));
     render(<MemberAdminPage />);

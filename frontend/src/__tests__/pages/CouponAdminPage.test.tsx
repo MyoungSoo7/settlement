@@ -167,6 +167,146 @@ describe('CouponAdminPage', () => {
     expect(await screen.findByRole('alert')).toBeInTheDocument();
   });
 
+  it('enum 목록을 못 받아도 화면은 뜬다 — 드롭다운 하나 때문에 조회를 막지 않는다', async () => {
+    mocked.enums.mockRejectedValue(new Error('boom'));
+    render(<CouponAdminPage />);
+
+    await waitFor(() => expect(mocked.search).toHaveBeenCalled());
+    expect(within(await screen.findByLabelText('상태')).getAllByRole('option')).toHaveLength(1);
+  });
+
+  it('재개는 activate 를 부르고 기간·한도가 그대로라는 사실을 알린다', async () => {
+    mocked.search.mockResolvedValue(pageOf([coupon({ active: false, lifecycle: 'INACTIVE' })]));
+    mocked.activate.mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    render(<CouponAdminPage />);
+
+    await user.click(await screen.findByRole('button', { name: '재개' }));
+
+    await waitFor(() => expect(mocked.activate).toHaveBeenCalledWith('WELCOME10'));
+    expect(await screen.findByRole('status')).toHaveTextContent('기간·한도 조건은 그대로');
+  });
+
+  it('중단 실패는 사용자에게 드러난다 — 멈춘 줄 알고 넘어가면 할인이 계속 나간다', async () => {
+    mocked.search.mockResolvedValue(pageOf([coupon()]));
+    mocked.deactivate.mockRejectedValue(new Error('boom'));
+    const user = userEvent.setup();
+    render(<CouponAdminPage />);
+
+    await user.click(await screen.findByRole('button', { name: '중단' }));
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('사용 내역을 다시 누르면 접힌다', async () => {
+    mocked.search.mockResolvedValue(pageOf([coupon()]));
+    mocked.usages.mockResolvedValue([]);
+    const user = userEvent.setup();
+    render(<CouponAdminPage />);
+
+    await user.click(await screen.findByRole('button', { name: '사용 내역' }));
+    await screen.findByText('아직 사용된 적이 없습니다.');
+
+    await user.click(screen.getByRole('button', { name: '사용 내역' }));
+
+    await waitFor(() =>
+      expect(screen.queryByText('아직 사용된 적이 없습니다.')).not.toBeInTheDocument());
+  });
+
+  it('사용 내역 조회 실패도 드러낸다', async () => {
+    mocked.search.mockResolvedValue(pageOf([coupon()]));
+    mocked.usages.mockRejectedValue(new Error('boom'));
+    const user = userEvent.setup();
+    render(<CouponAdminPage />);
+
+    await user.click(await screen.findByRole('button', { name: '사용 내역' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('사용 내역');
+  });
+
+  it('CSV 실패도 드러낸다', async () => {
+    mocked.export.mockRejectedValue(new Error('boom'));
+    const user = userEvent.setup();
+    render(<CouponAdminPage />);
+    await waitFor(() => expect(mocked.search).toHaveBeenCalled());
+
+    await user.click(await screen.findByRole('button', { name: 'CSV 내려받기' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('CSV');
+  });
+
+  it('CSV 가 온전하면 전부 받았다고 알린다', async () => {
+    mocked.export.mockResolvedValue({
+      blob: new Blob(['x']), fileName: 'coupons.csv', truncated: false, total: 9,
+    });
+    const user = userEvent.setup();
+    render(<CouponAdminPage />);
+    await waitFor(() => expect(mocked.search).toHaveBeenCalled());
+
+    await user.click(await screen.findByRole('button', { name: 'CSV 내려받기' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent('9장을 모두 내려받았습니다');
+  });
+
+  it('상태별 장수 칩을 누르면 그 상태로 좁혀 조회한다', async () => {
+    mocked.lifecycleCounts.mockResolvedValue([{ lifecycle: 'EXHAUSTED', count: 4 }]);
+    const user = userEvent.setup();
+    render(<CouponAdminPage />);
+
+    await user.click(await screen.findByRole('button', { name: /한도 소진 4/ }));
+
+    await waitFor(() =>
+      expect(mocked.search.mock.calls.some(([q]) => q.lifecycle === 'EXHAUSTED')).toBe(true));
+  });
+
+  it('코드·유형·기간 필터는 그대로 질의에 실린다', async () => {
+    const user = userEvent.setup();
+    render(<CouponAdminPage />);
+    await waitFor(() => expect(mocked.search).toHaveBeenCalled());
+
+    await user.type(await screen.findByLabelText('쿠폰 코드'), 'WEL');
+    await user.selectOptions(screen.getByLabelText('할인 유형'), 'FIXED');
+    await user.type(screen.getByLabelText('생성 시작일'), '2026-01-01');
+    await user.type(screen.getByLabelText('생성 종료일'), '2026-01-31');
+    await user.click(screen.getByRole('button', { name: '조회' }));
+
+    await waitFor(() => expect(mocked.search.mock.calls.some(([q]) =>
+      q.code === 'WEL' && q.type === 'FIXED'
+      && q.from === '2026-01-01' && q.to === '2026-01-31',
+    )).toBe(true));
+  });
+
+  it('여러 페이지면 이동이 나오고, 조회를 다시 누르면 1페이지로 돌아온다', async () => {
+    mocked.search.mockResolvedValue({
+      ...pageOf([coupon()]), totalElements: 130, totalPages: 3,
+    });
+    const user = userEvent.setup();
+    render(<CouponAdminPage />);
+
+    await user.click(await screen.findByRole('button', { name: '다음' }));
+    await waitFor(() => expect(screen.getByText('2 / 3')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: '이전' }));
+    await waitFor(() => expect(screen.getByText('1 / 3')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: '다음' }));
+    await waitFor(() => expect(screen.getByText('2 / 3')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: '조회' }));
+    await waitFor(() => expect(screen.getByText('1 / 3')).toBeInTheDocument());
+  });
+
+  it('정액 쿠폰은 원 단위로, 최소 주문액이 0 이면 "없음"으로 적는다', async () => {
+    mocked.search.mockResolvedValue(pageOf([
+      coupon({ type: 'FIXED', discountValue: 3000, minOrderAmount: 0, startsAt: '2026-02-01T00:00:00', expiresAt: null }),
+    ]));
+    render(<CouponAdminPage />);
+
+    const table = await screen.findByRole('table');
+    expect(within(table).getByText('3,000원')).toBeInTheDocument();
+    expect(within(table).getByText('없음')).toBeInTheDocument();
+    expect(within(table).getByText(/2026-02-01 ~ 무기한/)).toBeInTheDocument();
+  });
+
   it('CSV 가 잘리면 몇 장 중 몇 장인지 말한다', async () => {
     mocked.export.mockResolvedValue({
       blob: new Blob(['x']), fileName: 'coupons.csv', truncated: true, total: 12345,

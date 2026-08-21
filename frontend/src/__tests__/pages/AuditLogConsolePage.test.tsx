@@ -149,4 +149,61 @@ describe('AuditLogConsolePage', () => {
 
     expect(await screen.findByRole('alert')).toBeInTheDocument();
   });
+
+  it('액션 목록을 못 받아도 화면은 뜬다 — 필터 하나 때문에 조회 자체를 막지 않는다', async () => {
+    mocked.actions.mockRejectedValue(new Error('boom'));
+    render(<AuditLogConsolePage />);
+
+    await waitFor(() => expect(mocked.search).toHaveBeenCalled());
+    // 드롭다운은 "전체" 하나만 남는다.
+    expect(within(await screen.findByLabelText('액션')).getAllByRole('option')).toHaveLength(1);
+  });
+
+  it('CSV 실패도 드러낸다', async () => {
+    mocked.export.mockRejectedValue(new Error('boom'));
+    const user = userEvent.setup();
+    render(<AuditLogConsolePage />);
+    await waitFor(() => expect(mocked.search).toHaveBeenCalled());
+
+    await user.click(await screen.findByRole('button', { name: 'CSV 내려받기' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('CSV');
+  });
+
+  it('필터 입력은 그대로 질의에 실린다 — 기간·행위자·리소스', async () => {
+    const user = userEvent.setup();
+    render(<AuditLogConsolePage />);
+    await waitFor(() => expect(mocked.search).toHaveBeenCalled());
+
+    await user.clear(await screen.findByLabelText('시작일'));
+    await user.type(screen.getByLabelText('시작일'), '2026-03-01');
+    await user.clear(screen.getByLabelText('종료일'));
+    await user.type(screen.getByLabelText('종료일'), '2026-03-31');
+    await user.type(screen.getByLabelText('행위자 이메일'), 'ops@lemuel.io');
+    await user.type(screen.getByLabelText('리소스 유형'), 'PAYOUT');
+    await user.type(screen.getByLabelText('리소스 ID'), 'P-1');
+    await user.click(screen.getByRole('button', { name: '조회' }));
+
+    await waitFor(() => expect(mocked.search.mock.calls.some(([, q]) =>
+      q.from === '2026-03-01' && q.to === '2026-03-31'
+      && q.actorEmail === 'ops@lemuel.io' && q.resourceType === 'PAYOUT' && q.resourceId === 'P-1',
+    )).toBe(true));
+  });
+
+  it('여러 페이지면 페이지 이동이 나오고, 조회를 다시 누르면 1페이지로 돌아온다', async () => {
+    mocked.search.mockResolvedValue(pageWith({ totalElements: 120, totalPages: 3 }));
+    const user = userEvent.setup();
+    render(<AuditLogConsolePage />);
+
+    await user.click(await screen.findByRole('button', { name: '다음' }));
+    await waitFor(() => expect(screen.getByText('2 / 3')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: '이전' }));
+    await waitFor(() => expect(screen.getByText('1 / 3')).toBeInTheDocument());
+
+    // 2페이지에서 조회를 누르면 1페이지로 — 새 조건인데 옛 페이지에 머무르면 빈 결과처럼 보인다.
+    await user.click(screen.getByRole('button', { name: '다음' }));
+    await waitFor(() => expect(screen.getByText('2 / 3')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: '조회' }));
+    await waitFor(() => expect(screen.getByText('1 / 3')).toBeInTheDocument());
+  });
 });
