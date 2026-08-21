@@ -7,6 +7,7 @@ import { join } from "node:path";
 
 import {
   decideHookOutput,
+  defaultRepoRoot,
   pruneStaleState,
   routeSkills,
   runRouterCli,
@@ -369,5 +370,28 @@ describe("telemetry", () => {
     assert.match(report, /MONEY-PRIMITIVE/);
     assert.match(report, /IMMUTABLE-HISTORY.*0회/);
     assert.match(report, /ledger-invariants/);
+  });
+});
+
+describe("repoRoot 기본값", () => {
+  // 훅은 셸의 cwd 를 물려받는다. cwd 를 믿으면 라우터 상태·제안 로그가 하위 디렉터리의
+  // 평행 트리에 쌓이고, src/main/resources 아래에 생긴 것은 jar 에까지 실려 나간다
+  // (2026-08-21 실측: 9개 위치 33개 파일, account/loan 빌드 산출물에서 확인).
+  test("cwd 를 옮겨도 변하지 않는다 — 스크립트 위치에서 도출한다", () => {
+    const original = process.cwd();
+    const before = defaultRepoRoot();
+    try {
+      process.chdir(tmpdir());
+      assert.equal(defaultRepoRoot(), before);
+    } finally {
+      process.chdir(original);
+    }
+  });
+
+  test("도출된 경로 아래에 라우터 자신이 있다", async () => {
+    const source = await readFile(
+      join(defaultRepoRoot(), "scripts", "harness", "skill-router.mjs"), "utf8");
+
+    assert.ok(source.includes("export function defaultRepoRoot"));
   });
 });
