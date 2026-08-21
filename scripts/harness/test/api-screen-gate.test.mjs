@@ -120,9 +120,9 @@ const SCREEN_PENDING = new Map([
   ['loan-service/RepaymentController', '상환 화면'],
   ['loan-service/CompanyReputationController', '기업 평판 조회(대출 심사 보조)'],
   // --- account-service ---
-  ['account-service/RetirementPensionController', '퇴직연금 화면'],
-  ['account-service/InstallmentSavingsController', '적금 화면'],
-  ['account-service/TimeDepositController', '예금 화면'],
+  // 수신 3종은 화면이 생겼다(2026-08-22, /admin/ceo/banking 탭 3개).
+  // 이 부채는 게이트웨이 배선이 선행이었다 — 같은 날 /api/banking/** 를 열기 전까지는
+  // 화면을 만들어도 404 를 부르는 화면이었다(gateway-route-gate 의 UNROUTED_DEBT 3건).
   // --- company-service ---
   // /admin/company/** 6종은 게이트웨이 미노출이라 MACHINE_ONLY 로 옮겼다. 여기 남은 것은
   // /api/company/** 로 라우팅돼 브라우저가 부를 수 있는데도 화면이 없는 것뿐이다.
@@ -177,7 +177,9 @@ const SCREEN_PENDING = new Map([
 // 2026-08-22: 20 (CompanyWorkforceController — 화면을 붙인 게 아니라 거짓 부채를 걷어냈다.
 //              추출기가 쿼리스트링 붙은 URL 을 못 읽어 9개를 못 보고 있었고, 그중 1건이
 //              부채로 잡혀 있었다. 예산이 내려간다고 늘 상환은 아니다.)
-const PENDING_BUDGET = 20;
+// 2026-08-22: 17 (수신 3종 — 정기예금·적금·퇴직연금. 화면 하나에 탭 셋으로 3건을 갚았다.
+//              세 상품이 같은 모양(가입 → 납입 → 만기/중도해지)이라 가능했다.)
+const PENDING_BUDGET = 17;
 
 const read = (path) => readFileSync(path, 'utf8');
 

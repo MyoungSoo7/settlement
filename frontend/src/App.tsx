@@ -37,6 +37,7 @@ const CeoCardPage = lazy(() => import('./pages/CeoCardPage'));
 const CeoLoanGuidePage = lazy(() => import('./pages/CeoLoanGuidePage'));
 const CollateralConsolePage = lazy(() => import('./pages/CollateralConsolePage'));
 const RefundAdminPage = lazy(() => import('./pages/RefundAdminPage'));
+const BankingConsolePage = lazy(() => import('./pages/BankingConsolePage'));
 const CeoLoanProcessGuidePage = lazy(() => import('./pages/CeoLoanProcessGuidePage'));
 const CeoLenderGuidePage = lazy(() => import('./pages/CeoLenderGuidePage'));
 const CeoFundGuidePage = lazy(() => import('./pages/CeoFundGuidePage'));
@@ -355,6 +356,11 @@ function App() {
               element={<AdminManagerRoute><SideNavLayout><CeoFundGuidePage /></SideNavLayout></AdminManagerRoute>} />
             <Route path="/admin/ceo/accounts"
               element={<AdminManagerRoute><SideNavLayout><CeoAccountPage /></SideNavLayout></AdminManagerRoute>} />
+            {/* 수신 상품 3종 — 서버는 authenticated 만 요구하고(계약 주체가 본인) 운용수익 인식·
+                수급 지급 두 조작만 ADMIN·MANAGER 로 막는다. 계정계 표면이 CEO 그룹에 있어 그 옆에
+                두되, 화면 안에서 역할로 운영자 조작을 가른다. */}
+            <Route path="/admin/ceo/banking"
+              element={<AdminManagerRoute><SideNavLayout><BankingConsolePage /></SideNavLayout></AdminManagerRoute>} />
             {/* 법인카드 (card-service) — 조작 권한은 서버가 조직 멤버십으로 판정, 셸 노출만 ADMIN·MANAGER */}
             <Route path="/admin/ceo/cards"
               element={<AdminManagerRoute><SideNavLayout><CeoCardPage /></SideNavLayout></AdminManagerRoute>} />

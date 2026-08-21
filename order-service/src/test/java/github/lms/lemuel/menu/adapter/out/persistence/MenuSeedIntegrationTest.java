@@ -79,9 +79,9 @@ class MenuSeedIntegrationTest {
     }
 
     @Test
-    @DisplayName("시드 총 65행 — 기존 60 + 예치금·상품설명서·담보·조직멤버십·환불 운영")
-    void seedsExactlySixtyFive() {
-        assertThat(adapter.findAll()).hasSize(65);
+    @DisplayName("시드 총 66행 — 기존 60 + 예치금·상품설명서·담보·조직멤버십·환불·수신 상품")
+    void seedsExactlySixtySix() {
+        assertThat(adapter.findAll()).hasSize(66);
     }
 
     @Test
@@ -169,14 +169,15 @@ class MenuSeedIntegrationTest {
     }
 
     @Test
-    @DisplayName("CEO 사이드바 15개가 순서대로 들어간다")
+    @DisplayName("CEO 사이드바 16개가 순서대로 들어간다")
     void ceoChildren() {
         // 담보 감시는 대출관리 뒤 — 같은 서비스의 다른 상품군이고, 대출을 보러 온 자리에서
         // 담보 상태로 이어지는 순서다(V20260822001500).
+        // 수신 상품은 계정계 현황 뒤 — 집계를 본 다음 개별 계약으로 내려간다(V20260822010000).
         assertThat(childrenOf("CEO")).extracting(Menu::getName).containsExactly(
                 "통합 브리핑", "경제지표", "재무제표", "기업조회", "사업장비교",
                 "투자하기", "투자 추천", "대출관리", "담보 감시", "대출 상품 안내", "대출 심사·상환 안내",
-                "대출기관 안내", "자산운용펀드 안내", "계정계 현황", "법인카드");
+                "대출기관 안내", "자산운용펀드 안내", "계정계 현황", "수신 상품", "법인카드");
     }
 
     @Test

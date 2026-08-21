@@ -108,6 +108,9 @@ export const FALLBACK_MENUS: FallbackMenuNode[] = [
       { id: -71, name: '대출기관 안내', path: '/admin/ceo/lender-guide', icon: '🏦', description: '은행 · 저축은행 · 캐피탈 · 대부업', area: 'CEO', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       { id: -72, name: '자산운용펀드 안내', path: '/admin/ceo/fund-guide', icon: '🧺', description: '부동산 · 주식 · 채권 펀드', area: 'CEO', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       { id: -73, name: '계정계 현황', path: '/admin/ceo/accounts', icon: '🧮', description: '집계 · 시산표 · 잔액', area: 'CEO', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
+      // 수신 상품은 계정계 현황 바로 뒤 — 같은 서비스(account)이고, 집계를 본 다음 그 집계를
+      // 만드는 개별 계약으로 내려가는 순서다.
+      { id: -118, name: '수신 상품', path: '/admin/ceo/banking', icon: '🏦', description: '정기예금 · 적금 · 퇴직연금', area: 'CEO', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       { id: -74, name: '법인카드', path: '/admin/ceo/cards', icon: '💳', description: '카드계정 · 임직원 카드 한도', area: 'CEO', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
     ],
   },
