@@ -32,8 +32,12 @@ PROMPT = """첨부한 한국 카드 결제 영수증 이미지에서 다음 필�
   "merchantName": "상호명",
   "transactionDate": "거래일(YYYY-MM-DD)",
   "totalAmount": "결제 총액(숫자만)",
-  "confidence": "판독 신뢰도 0~1"
+  "amountConfidence": "총액 판독 신뢰도 0~1",
+  "dateConfidence": "거래일 판독 신뢰도 0~1"
 }
+신뢰도는 필드마다 따로 판단하라. 한 필드가 또렷하다고 해서 다른 필드까지 확신해서는
+안 된다. 특히 반사광·구김·저해상도로 특정 줄만 뭉개진 경우, 그 줄에서 읽은 값의
+신뢰도만 낮춰라.
 """
 
 #: 모델이 신뢰도를 주지 않았을 때의 보수적 기본값 — 리뷰 큐로 흐르게 한다.
@@ -91,11 +95,20 @@ def _confidence(raw: str | None) -> Decimal:
 
 def map_fields(fields: dict) -> ExtractedReceipt:
     """모델 JSON → 추출 결과. **필드 해석의 정본은 Java 쪽이고 여기는 그 이식본이다.**"""
+    date = _transaction_date(_text(fields, "transactionDate"))
+    # 구형 응답(단일 "confidence")도 받아들인다 — 프롬프트를 바꿔도 모델이 옛 형식으로 답하는
+    # 경우가 있고, 그때 추출을 통째로 잃는 것보다 같은 값을 양쪽에 쓰는 편이 낫다.
+    legacy = _text(fields, "confidence")
+    raw_amount = _text(fields, "amountConfidence")
+    raw_date = _text(fields, "dateConfidence")
     return ExtractedReceipt(
         merchant_name=_text(fields, "merchantName"),
-        transaction_date=_transaction_date(_text(fields, "transactionDate")),
+        transaction_date=date,
         total_amount=_total_amount(_text(fields, "totalAmount")),
-        confidence=_confidence(_text(fields, "confidence")),
+        amount_confidence=_confidence(raw_amount if raw_amount is not None else legacy),
+        # 거래일을 못 읽었으면 신뢰도도 없다 — 없는 필드에 숫자를 붙이지 않는다.
+        date_confidence=None if date is None
+        else _confidence(raw_date if raw_date is not None else legacy),
     )
 
 

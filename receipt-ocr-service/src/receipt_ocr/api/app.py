@@ -65,7 +65,7 @@ def create_app(provider: RapidOcrProvider | None = None) -> FastAPI:
             ),
             # 금액은 문자열이다 — JSON number 로 보내면 받는 쪽에서 float 이 되어 원 단위가 흔들린다.
             "totalAmount": str(extracted.total_amount),
-            "confidence": str(extracted.confidence),
+            "confidence": str(extracted.weakest_confidence),
             "fieldConfidence": {
                 "amount": round(parsed.amount_confidence, 4),
                 "date": None if parsed.date_confidence is None else round(parsed.date_confidence, 4),

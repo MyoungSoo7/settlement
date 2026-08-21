@@ -35,10 +35,16 @@ def _python() -> str:
 #: (설명, 대상파일, 원본조각, 망가뜨린조각) — 전부 CAUGHT 여야 한다.
 MUTATIONS: list[tuple[str, pathlib.Path, str, str]] = [
     (
-        "매처: 신뢰도 게이트 무력화 (판정 순서 정책 파괴)",
+        "매처: 총액 신뢰도 게이트 무력화 (판정 순서 정책 파괴)",
         MATCHER,
-        "    if extracted.confidence < review_threshold:",
-        "    if False and extracted.confidence < review_threshold:",
+        "    if extracted.amount_confidence < review_threshold:",
+        "    if False and extracted.amount_confidence < review_threshold:",
+    ),
+    (
+        "매처: 거래일 신뢰도 게이트 제거 (Phase 3 수정 되돌리기 — 오종결이 돌아온다)",
+        MATCHER,
+        "    if extracted.date_confidence < review_threshold:",
+        "    if False and extracted.date_confidence < review_threshold:",
     ),
     (
         "매처: 거래일 허용 오차를 1일 -> 2일로 확대",
@@ -83,10 +89,10 @@ MUTATIONS: list[tuple[str, pathlib.Path, str, str]] = [
         "        ece += abs(accuracy - avg_confidence) / len(buckets)",
     ),
     (
-        "파서: 필드별 신뢰도를 최솟값 대신 최댓값으로 합침 (baseline 실패 재현)",
+        "파서: 거래일 신뢰도에 총액 신뢰도를 쓴다 (필드별 분리 파괴 — baseline 실패 재현)",
         PARSING,
-        "    value = amount if date is None else min(amount, date)",
-        "    value = amount if date is None else max(amount, date)",
+        "            date_confidence=to_confidence(date.confidence) if date else None,",
+        "            date_confidence=to_confidence(amount.confidence) if date else None,",
     ),
     (
         "파서: 구조 검증(공급가액+부가세=합계) 무력화",

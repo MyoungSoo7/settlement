@@ -182,16 +182,12 @@ def find_date(lines: list[OcrLine]) -> FieldParse | None:
     return max(found, key=lambda item: (item[0], item[1]))[2]
 
 
-def combine_confidence(amount: float, date: float | None) -> Decimal:
-    """필드별 신뢰도를 운영 포트가 요구하는 스칼라 하나로 **보수적으로** 합친다.
+def to_confidence(value: float) -> Decimal:
+    """OCR 점수를 0~1 Decimal 로 정규화한다.
 
-    가장 못 믿는 필드가 전체를 대표한다. 평균이나 최댓값을 쓰면 baseline 이 낸 실패가
-    그대로 재현된다 — 또렷한 총액이 흐릿한 날짜를 덮어 틀린 값으로 종결을 선고하게 된다.
-
-    거래일을 못 읽은 경우(``None``)는 깎지 않는다. 날짜 없음은 그 자체로 리뷰행이라
-    (``ExpenseReceiptMatcher``) 이중으로 벌할 이유가 없다.
+    **합치지 않는다.** 운영 포트가 필드별 신뢰도를 받게 된 뒤로는 두 값을 하나로 줄일 이유가
+    없다 — 줄이는 순간 이 타입이 없애려던 결함(쉬운 필드가 어려운 필드를 덮는 것)이 돌아온다.
     """
-    value = amount if date is None else min(amount, date)
     return Decimal(str(round(max(0.0, min(1.0, value)), 4)))
 
 
@@ -210,7 +206,8 @@ def parse_receipt(lines: list[OcrLine]) -> ParsedReceipt:
             merchant_name=None,  # 상호명은 대사 판정에 쓰이지 않는다 — 읽지 않는다.
             transaction_date=date.value if date else None,
             total_amount=amount.value,
-            confidence=combine_confidence(amount.confidence, date.confidence if date else None),
+            amount_confidence=to_confidence(amount.confidence),
+            date_confidence=to_confidence(date.confidence) if date else None,
         ),
         amount_confidence=amount.confidence,
         date_confidence=date.confidence if date else None,

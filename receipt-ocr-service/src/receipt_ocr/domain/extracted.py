@@ -71,20 +71,44 @@ def to_date(value: object) -> _dt.date | None:
 class ExtractedReceipt:
     """OCR 추출 결과 (불변).
 
+    **신뢰도는 필드마다 따로 갖는다.** 하나로 합쳐 두면 쉬운 필드의 확신이 어려운 필드의
+    불확실성을 덮는다 — 실측에서 비전 모델이 반사광에 덮인 거래일을 6년 틀리게 읽고도 총액이
+    또렷하다는 이유로 0.98 을 붙였고, 그 값이 임계를 넘어 멀쩡한 영수증이 종결됐다.
+
     :param merchant_name: 상호명 — 판독 실패는 None. **대사 판정에 쓰지 않는다**(참고 정보).
     :param transaction_date: 거래일 — 판독 실패는 None.
     :param total_amount: 총액 — 필수·양수. 대사의 근거라 지어낼 수 없다.
-    :param confidence: 판독 신뢰도 0~1 — 필수. 임계 미만이면 값과 무관하게 리뷰 큐로 간다.
+    :param amount_confidence: 총액 판독 신뢰도 0~1 — 필수.
+    :param date_confidence: 거래일 판독 신뢰도 0~1. **거래일이 없으면 None, 있으면 필수** —
+        없는 필드에 신뢰도를 붙이거나 있는 필드의 신뢰도를 빠뜨리면 판정이 흔들린다.
     """
 
     merchant_name: str | None
     transaction_date: _dt.date | None
     total_amount: Decimal
-    confidence: Decimal
+    amount_confidence: Decimal
+    date_confidence: Decimal | None = None
 
     def __post_init__(self) -> None:
         if self.total_amount is None or self.total_amount <= _ZERO:
             raise ValueError(f"영수증 총액은 양수여야 합니다: {self.total_amount}")
-        if self.confidence is None or self.confidence < _ZERO or self.confidence > _ONE:
-            raise ValueError(f"판독 신뢰도는 0~1 이어야 합니다: {self.confidence}")
+        _require_confidence(self.amount_confidence, "총액 판독 신뢰도")
+        if self.transaction_date is None and self.date_confidence is not None:
+            raise ValueError(
+                f"거래일을 못 읽었는데 거래일 신뢰도가 있습니다: {self.date_confidence}"
+            )
+        if self.transaction_date is not None:
+            _require_confidence(self.date_confidence, "거래일 판독 신뢰도")
         object.__setattr__(self, "merchant_name", _normalize_text(self.merchant_name))
+
+    @property
+    def weakest_confidence(self) -> Decimal:
+        """가장 못 믿는 필드의 신뢰도 — **화면 표시용. 판정에 쓰지 말 것.**"""
+        if self.date_confidence is None:
+            return self.amount_confidence
+        return min(self.amount_confidence, self.date_confidence)
+
+
+def _require_confidence(value: Decimal | None, label: str) -> None:
+    if value is None or value < _ZERO or value > _ONE:
+        raise ValueError(f"{label}는 0~1 이어야 합니다: {value}")

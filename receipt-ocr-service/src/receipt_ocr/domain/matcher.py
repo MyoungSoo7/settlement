@@ -65,10 +65,10 @@ def decide(
     ):
         raise ValueError("대사 입력은 전부 필수입니다")
 
-    if extracted.confidence < review_threshold:
+    if extracted.amount_confidence < review_threshold:
         return MatchDecision(
             Outcome.NEEDS_REVIEW,
-            f"판독 신뢰도 미달: {extracted.confidence} < {review_threshold}",
+            f"총액 판독 신뢰도 미달: {extracted.amount_confidence} < {review_threshold}",
         )
 
     if extracted.total_amount != captured_amount:
@@ -79,6 +79,14 @@ def decide(
 
     if extracted.transaction_date is None:
         return MatchDecision(Outcome.NEEDS_REVIEW, "거래일 판독 불가 — 육안 대조 필요")
+
+    if extracted.date_confidence < review_threshold:
+        # 거래일을 못 믿으면서 거래일로 불일치를 선고할 수는 없다. 총액을 또렷하게 읽었다는
+        # 사실은 거래일에 대해 아무것도 보장하지 않는다.
+        return MatchDecision(
+            Outcome.NEEDS_REVIEW,
+            f"거래일 판독 신뢰도 미달: {extracted.date_confidence} < {review_threshold}",
+        )
 
     captured_date = captured_at.astimezone(KST).date()
     day_diff = abs((extracted.transaction_date - captured_date).days)

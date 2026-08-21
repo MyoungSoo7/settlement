@@ -189,19 +189,22 @@ class TestPerFieldConfidence:
         assert parsed.amount_confidence == pytest.approx(0.97 - LARGEST_PENALTY)
         assert parsed.date_confidence == pytest.approx(0.35)
         # 그래도 전체는 더 못 믿는 쪽(날짜 0.35)이 대표한다.
-        assert parsed.extracted.confidence == Decimal("0.35")
+        # 이제 합치지 않는다 — 두 값이 따로 실려 매처가 필드별로 게이트한다.
+        assert parsed.extracted.amount_confidence == Decimal(str(round(0.97 - LARGEST_PENALTY, 4)))
+        assert parsed.extracted.date_confidence == Decimal("0.35")
 
     def test_날짜가_없으면_총액_신뢰도만_쓴다(self):
         # 날짜 None 은 그 자체로 리뷰행이다 — 없는 필드 때문에 총액 신뢰도까지 깎지 않는다.
         parsed = parse_receipt([line("30,810", 0.97, 28.0)])
         assert parsed.date_confidence is None
-        assert parsed.extracted.confidence == Decimal(str(round(0.97 - LARGEST_PENALTY, 4)))
+        assert parsed.extracted.amount_confidence == Decimal(str(round(0.97 - LARGEST_PENALTY, 4)))
+        assert parsed.extracted.date_confidence is None
 
     def test_구조검증된_총액은_날짜가_없어도_임계를_넘는다(self):
         # 공급가액 28,009 + 부가세 2,801 = 30,810 — 날짜를 못 읽어도 총액은 믿을 수 있다.
         # (매처가 날짜 None 을 이유로 리뷰로 보내는 건 별개 경로다.)
         lines = [line("28,009", 0.90, 20.0), line("2,801", 0.90, 20.0), line("30,810", 0.90, 28.0)]
-        assert parse_receipt(lines).extracted.confidence >= Decimal("0.80")
+        assert parse_receipt(lines).extracted.amount_confidence >= Decimal("0.80")
 
     def test_구조검증에_성공하면_총액_신뢰도가_올라간다(self):
         # 공급가액+부가세=합계 가 맞아떨어지는 건 OCR 점수와 독립인 추가 근거다.
@@ -212,4 +215,4 @@ class TestPerFieldConfidence:
 
     def test_신뢰도는_0과_1_사이로_묶인다(self):
         strong = [line("58,273", 0.99, 20.0), line("5,827", 0.99, 20.0), line("64,100", 0.99, 28.0)]
-        assert parse_receipt(strong).extracted.confidence <= Decimal("1")
+        assert parse_receipt(strong).extracted.amount_confidence <= Decimal("1")

@@ -74,7 +74,7 @@ class TestFieldMappingParity:
         assert result.merchant_name == "김밥천국 강남점"
         assert result.transaction_date == _dt.date(2026, 3, 4)
         assert result.total_amount == Decimal("12300")
-        assert result.confidence == Decimal("0.93")
+        assert result.amount_confidence == Decimal("0.93")
 
     @pytest.mark.parametrize("raw,expected", [("12,300", "12300"), ("12300원", "12300"),
                                               ("₩ 12,300 ", "12300"), (12300, "12300")])
@@ -95,13 +95,13 @@ class TestFieldMappingParity:
     @pytest.mark.parametrize("raw", [None, "", "높음", "1.5"])
     def test_신뢰도가_없거나_망가지면_보수적_기본값(self, raw):
         result = map_fields({"totalAmount": "100", "confidence": raw})
-        assert result.confidence == FALLBACK_CONFIDENCE
+        assert result.amount_confidence == FALLBACK_CONFIDENCE
 
     def test_음수_신뢰도는_부호가_사라진다_운영과_공유하는_특성(self):
         # 운영 Java 도 `[^0-9.]` 를 걷어내므로 "-0.2" 는 0.2 가 된다. 부호가 조용히 사라지는
         # 셈이지만 양쪽 결과가 같아야 baseline 이 성립하므로 이식본도 같게 두고 여기 못박는다.
         # (실질 영향은 작다 — 음수든 0.2 든 임계 미만이라 어차피 리뷰 큐로 간다.)
-        assert map_fields({"totalAmount": "100", "confidence": "-0.2"}).confidence == Decimal("0.2")
+        assert map_fields({"totalAmount": "100", "confidence": "-0.2"}).amount_confidence == Decimal("0.2")
 
     def test_상호명_공백은_None_으로_정규화(self):
         assert map_fields({"totalAmount": "100", "merchantName": "   "}).merchant_name is None

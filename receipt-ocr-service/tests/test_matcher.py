@@ -27,13 +27,15 @@ def extraction(
     amount: str = "12300",
     date: _dt.date | None = CAPTURED_DATE,
     confidence: str = "0.95",
+    date_confidence: str | None = None,
     merchant: str | None = "김밥천국 강남점",
 ) -> ExtractedReceipt:
     return ExtractedReceipt(
         merchant_name=merchant,
         transaction_date=date,
         total_amount=Decimal(amount),
-        confidence=Decimal(confidence),
+        amount_confidence=Decimal(confidence),
+        date_confidence=None if date is None else Decimal(date_confidence or confidence),
     )
 
 
@@ -117,3 +119,30 @@ class TestInputValidation:
         decision = decide(extraction(amount="1"), CAPTURED_AMOUNT, CAPTURED_AT, THRESHOLD)
         assert decision.outcome is Outcome.MISMATCHED
         assert decision.note.strip()
+
+
+class TestDateConfidenceGate:
+    """Phase 3 — 필드별 신뢰도. 총액을 확신해도 거래일 확신은 별개다."""
+
+    def test_거래일_신뢰도_미달은_종결이_아니라_리뷰(self):
+        # 실측 회귀: Gemini 가 반사광에 덮인 거래일을 2020-08-11 로 읽었다(정답 2026-03-11).
+        # 신뢰도가 하나였을 때는 총액을 또렷하게 읽었다는 이유로 0.98 이 붙어 MISMATCHED 로
+        # 종결됐다. 이제 모델이 거래일만 0.75 라고 말할 수 있고, 판정은 리뷰로 흐른다.
+        decision = decide(
+            extraction(date=_dt.date(2020, 8, 11), confidence="0.98", date_confidence="0.75"),
+            CAPTURED_AMOUNT, CAPTURED_AT, THRESHOLD,
+        )
+        assert decision.outcome is Outcome.NEEDS_REVIEW
+        assert "거래일" in decision.note
+
+    def test_거래일_신뢰도_임계_동률은_통과_경계(self):
+        assert outcome(date_confidence="0.80") is Outcome.MATCHED
+        assert outcome(date_confidence="0.79") is Outcome.NEEDS_REVIEW
+
+    def test_총액_불일치는_거래일을_못_믿어도_종결이다(self):
+        # 날짜를 못 믿는 것과 총액이 틀린 것은 다른 문제다 — 총액 불일치는 확정적 근거다.
+        assert outcome(amount="99999", date_confidence="0.10") is Outcome.MISMATCHED
+
+    def test_거래일이_없으면_거래일_게이트를_타지_않는다(self):
+        # 날짜 None 은 그 자체로 리뷰행이고, 없는 필드의 신뢰도를 따지지 않는다.
+        assert outcome(date=None, confidence="0.99") is Outcome.NEEDS_REVIEW

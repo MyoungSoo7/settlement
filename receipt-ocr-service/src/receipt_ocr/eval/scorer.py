@@ -93,7 +93,8 @@ class GoldenCase:
             merchant_name=None,
             transaction_date=self.truth_date,
             total_amount=self.truth_amount,
-            confidence=Decimal("1"),
+            amount_confidence=Decimal("1"),
+            date_confidence=None if self.truth_date is None else Decimal("1"),
         )
 
     def truth_outcome(self, review_threshold: Decimal) -> Outcome:
@@ -256,7 +257,7 @@ def score(
             date_ok = _date_within_tolerance(case.truth_date, pred.extracted.transaction_date)
             amount_hits += int(amount_ok)
             date_hits += int(date_ok)
-            calibration.append((float(pred.extracted.confidence), amount_ok and date_ok))
+            calibration.append((float(pred.extracted.weakest_confidence), amount_ok and date_ok))
 
         confusion[(truth, predicted)] += 1
         if predicted is Outcome.NEEDS_REVIEW:
