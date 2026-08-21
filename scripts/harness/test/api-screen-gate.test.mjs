@@ -95,7 +95,6 @@ const SCREEN_PENDING = new Map([
   // RefundHistoryController 도 함께 내려간다: 화면이 행마다 결제별 환불 이력을 실제로 부른다
   // (여러 번 시도한 건의 이중 환불 여부를 실제 완료액으로 판단하는 자리).
   ['order-service/PgRoutingController', 'PG 라우팅 설정 콘솔'],
-  ['order-service/SplitPaymentController', '분할결제 UI'],
   ['order-service/ProductVariantController', '상품 옵션(SKU) 관리 화면'],
   // --- settlement-service (docs/PLAN.md §8-8) ---
   ['settlement-service/EventTrackAdminController', '이벤트 추적 콘솔 — PLAN 8-8'],
@@ -181,7 +180,7 @@ const SCREEN_PENDING = new Map([
 //              세 상품이 같은 모양(가입 → 납입 → 만기/중도해지)이라 가능했다.)
 // 2026-08-22: 14 (보험 3종 — 설계·청약·계약. 그중 PolicyController 1건은 화면이 부르는데도
 //              추출기가 보간 괄호를 못 읽어 안 잡히던 것이라, 추출기 보정과 같이 내려간다.)
-const PENDING_BUDGET = 14;
+const PENDING_BUDGET = 13;
 
 const read = (path) => readFileSync(path, 'utf8');
 

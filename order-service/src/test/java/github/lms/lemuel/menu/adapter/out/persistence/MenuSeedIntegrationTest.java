@@ -79,13 +79,13 @@ class MenuSeedIntegrationTest {
     }
 
     @Test
-    @DisplayName("시드 총 67행 — 기존 60 + 예치금·상품설명서·담보·조직멤버십·환불·수신·보험영업")
-    void seedsExactlySixtySeven() {
-        assertThat(adapter.findAll()).hasSize(67);
+    @DisplayName("시드 총 68행 — 기존 67 + 나눠 결제")
+    void seedsExactlySixtyEight() {
+        assertThat(adapter.findAll()).hasSize(68);
     }
 
     @Test
-    @DisplayName("최상위 11개가 상단 네비 순서대로 들어간다")
+    @DisplayName("최상위 12개가 상단 네비 순서대로 들어간다")
     void rootsInOrder() {
         List<Menu> roots = adapter.findAll().stream()
                 .filter(m -> m.getParentId() == null)
@@ -95,7 +95,8 @@ class MenuSeedIntegrationTest {
         assertThat(roots).extracting(Menu::getName).containsExactly(
                 "대시보드", "정산", "정산운영", "배송", "승인", "AI 도우미", "CEO", "시스템 관리",
                 // 대량주문은 관리자 기능이 아니라 구매자가 자기 주문을 올리는 경로다 — SHOP 최상위.
-                "주문하기", "추천받기", "대량주문", "내 포인트·상품권");
+                // 나눠 결제는 주문(20)과 잔액 확인(30) 사이 — 주문에서 결제로 이어지는 순서다.
+                "주문하기", "추천받기", "대량주문", "나눠 결제", "내 포인트·상품권");
     }
 
     @Test
@@ -254,7 +255,7 @@ class MenuSeedIntegrationTest {
     }
 
     @Test
-    @DisplayName("구매자 메뉴 4개는 USER 에게만 보인다 — 관리자 네비에는 주문/추천/대량주문/잔액이 없었다")
+    @DisplayName("구매자 메뉴 5개는 USER 에게만 보인다 — 관리자 네비에는 주문/추천/대량주문/결제/잔액이 없었다")
     void shopMenusAreUserOnly() {
         Set<String> shopNames = adapter.findAll().stream()
                 .filter(m -> m.getArea() == MenuArea.SHOP)
@@ -262,7 +263,7 @@ class MenuSeedIntegrationTest {
                 .collect(Collectors.toSet());
 
         assertThat(shopNames)
-                .containsExactlyInAnyOrder("주문하기", "추천받기", "대량주문", "내 포인트·상품권");
+                .containsExactlyInAnyOrder("주문하기", "추천받기", "대량주문", "나눠 결제", "내 포인트·상품권");
         assertThat(adapter.findAll()).filteredOn(m -> m.getArea() == MenuArea.SHOP)
                 .allSatisfy(m -> assertThat(m.allowedRoles()).containsExactly("USER"));
     }

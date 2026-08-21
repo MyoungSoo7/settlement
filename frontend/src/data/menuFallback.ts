@@ -156,6 +156,11 @@ export const FALLBACK_MENUS: FallbackMenuNode[] = [
     area: 'SHOP', type: 'ITEM', roles: ['USER'],
   },
   {
+    // 나눠 결제 — 포인트·상품권 원장을 다 만들고도 쓸 화면이 없던 자리를 채운다.
+    id: -12, name: '나눠 결제', path: '/order/pay', icon: '💳', description: '포인트·상품권·카드 혼합 결제',
+    area: 'SHOP', type: 'ITEM', roles: ['USER'],
+  },
+  {
     id: -10, name: '내 포인트·상품권', path: '/my/balances', icon: '🪙', description: null,
     area: 'SHOP', type: 'ITEM', roles: ['USER'],
   },

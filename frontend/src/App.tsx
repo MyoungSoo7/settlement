@@ -23,6 +23,7 @@ const CartPage = lazy(() => import('./pages/CartPage'));
 const MyPage = lazy(() => import('./pages/MyPage'));
 const MyBalancesPage = lazy(() => import('./pages/MyBalancesPage'));
 const BulkOrderPage = lazy(() => import('./pages/BulkOrderPage'));
+const TenderCheckoutPage = lazy(() => import('./pages/TenderCheckoutPage'));
 const LoanPage = lazy(() => import('./pages/LoanPage'));
 const TossPaymentSuccess = lazy(() => import('./pages/TossPaymentSuccess'));
 const FinancialStatementsPage = lazy(() => import('./pages/FinancialStatementsPage'));
@@ -183,6 +184,7 @@ function App() {
             <Route path="/my/balances" element={<ProtectedRoute><MyBalancesPage /></ProtectedRoute>} />
             {/* 대량주문 — 올리는 것과 주문이 나가는 것이 다른 버튼이다(검증/확정 분리). */}
             <Route path="/order/bulk"   element={<ProtectedRoute><BulkOrderPage /></ProtectedRoute>} />
+            <Route path="/order/pay"    element={<ProtectedRoute><TenderCheckoutPage /></ProtectedRoute>} />
             <Route path="/loans"        element={<ProtectedRoute><LoanPage /></ProtectedRoute>} />
             {/* AI 챗봇 (ai-service) — LLM 비용이 들어 인증 필수(USER 이상), 역할 무관 */}
             <Route path="/ai/chat"      element={<ProtectedRoute><AiChatPage /></ProtectedRoute>} />
