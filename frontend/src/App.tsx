@@ -88,6 +88,7 @@ const MenuManagementPage = lazy(() => import('./pages/system/MenuManagementPage'
 const CommonCodeManagementPage = lazy(() => import('./pages/system/CommonCodeManagementPage'));
 const RbacManagementPage = lazy(() => import('./pages/system/RbacManagementPage'));
 const BoardAdminPage = lazy(() => import('./pages/system/BoardAdminPage'));
+const InsuranceDisclosurePage = lazy(() => import('./pages/system/InsuranceDisclosurePage'));
 const BoardPage = lazy(() => import('./pages/board/BoardPage'));
 const BoardPostPage = lazy(() => import('./pages/board/BoardPostPage'));
 
@@ -273,6 +274,11 @@ function App() {
               element={<AdminOnlyRoute><SideNavLayout><RbacManagementPage /></SideNavLayout></AdminOnlyRoute>} />
             <Route path="/admin/system/boards"
               element={<AdminOnlyRoute><SideNavLayout><BoardAdminPage /></SideNavLayout></AdminOnlyRoute>} />
+            {/* 상품설명서 교부 — 서버는 authenticated 만 요구하지만(교부자는 JWT 에서 파생),
+                보험 표면이 이미 시스템 관리 아래 있고(증빙 리뷰 큐) 우리 앱에 FC 역할이 없어
+                ADMIN 으로 맞춘다. FC 역할이 생기면 이 라우트부터 재검토한다. */}
+            <Route path="/admin/system/insurance-disclosures"
+              element={<AdminOnlyRoute><SideNavLayout><InsuranceDisclosurePage /></SideNavLayout></AdminOnlyRoute>} />
             {/* 화면 URL 이 /admin/education/courses 가 아닌 이유: 그 URL 은 education-service 의
                 API 다. 시스템 관리 메뉴 아래 화면이므로 /admin/system/education 으로 둔다. */}
             <Route path="/admin/system/education"

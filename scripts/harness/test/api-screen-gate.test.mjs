@@ -123,7 +123,9 @@ const SCREEN_PENDING = new Map([
   ['insurance-service/InsuranceApplicationController', '보험 청약 화면 — 서류 리뷰 큐만 화면이 있다'],
   ['insurance-service/PolicyController', '보험 계약 화면'],
   ['insurance-service/ProposalController', '보험 가입설계 화면'],
-  ['insurance-service/ProductDisclosureController', '상품설명서 교부 증빙 화면(완전판매 게이트)'],
+  // 상품설명서 교부는 화면이 생겼다(2026-08-21, /admin/system/insurance-disclosures).
+  // 이 부채는 승인 경로를 막고 있었다 — 교부 증빙이 없으면 청약 승인이 409 로 거절되는데
+  // 교부가 API 로만 가능했다. 다만 청약 생성·승인 자체는 아직 화면이 없다(아래 두 항목).
   // --- deposit-service ---
   // 예치금 수기 콘솔은 화면이 생겼다(2026-08-21, /admin/settlement/deposits). 이 부채는
   // "기능을 못 쓴다"가 아니라 "부족분이 영원히 쌓인다"였다 — 도메인 주석이 해소 주체가
@@ -153,7 +155,9 @@ const SCREEN_PENDING = new Map([
 //              정작 정정할 화면이 없었다.)
 // 2026-08-21: 27 (예치금 수기 콘솔 — hold·offset 은 card 이벤트에 sellerId 가 없어 자동화가
 //              막혀 있어 수기 경로가 유일하고, 상계 부족분은 해소 주체가 아예 없어 쌓이기만 했다.)
-const PENDING_BUDGET = 27;
+// 2026-08-21: 26 (보험 상품설명서 교부 — 완전판매 게이트의 입력 경로가 API 뿐이라
+//              청약 승인을 UI 로 통과시킬 방법이 없었다.)
+const PENDING_BUDGET = 26;
 
 const read = (path) => readFileSync(path, 'utf8');
 

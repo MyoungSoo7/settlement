@@ -79,9 +79,9 @@ class MenuSeedIntegrationTest {
     }
 
     @Test
-    @DisplayName("시드 총 61행 — 기존 60 + 예치금 운영 1 (V20260821230000 의 경로 이동 3건은 수를 바꾸지 않는다)")
-    void seedsExactlySixtyOne() {
-        assertThat(adapter.findAll()).hasSize(61);
+    @DisplayName("시드 총 62행 — 기존 60 + 예치금 운영 1 + 상품설명서 교부 1 (경로 이동은 수를 바꾸지 않는다)")
+    void seedsExactlySixtyTwo() {
+        assertThat(adapter.findAll()).hasSize(62);
     }
 
     @Test
@@ -171,19 +171,22 @@ class MenuSeedIntegrationTest {
     }
 
     @Test
-    @DisplayName("시스템 사이드바 16개 — 앞 3개와 게시판 관리가 RBAC permission 과 짝지어진다")
+    @DisplayName("시스템 사이드바 17개 — 앞 3개와 게시판 관리가 RBAC permission 과 짝지어진다")
     void systemChildren() {
         List<Menu> children = childrenOf("시스템 관리");
 
         // 분류(카테고리) → 편성(진열) → 선택지(옵션) → 관제(운영) 순. 뒤에 붙는 화면마다
         // 운영관리의 sort_order 를 한 칸씩 밀어 이 순서를 유지한다.
+        // 상품설명서 교부는 교육 관리 뒤 — 리뷰 큐는 '판정', 이쪽은 '발급'이라 성격이 다르다
+        // (V20260822000500). 완전판매 게이트의 입력 경로가 API 뿐이던 것을 화면으로 연다.
         assertThat(children).extracting(Menu::getName).containsExactly(
                 "메뉴 관리", "공통코드 관리", "RBAC 관리", "이커머스 카테고리",
                 "진열 편성", "옵션 카탈로그", "운영관리", "증빙 리뷰 큐", "게시판 관리", "교육 관리",
+                "상품설명서 교부",
                 "포인트 운영", "기프트카드 운영", "감사 로그", "회원 관리", "리뷰 관리", "쿠폰 운영");
         assertThat(children).extracting(Menu::getRequiredPermission).containsExactly(
                 "SYSTEM_MENU_MANAGE", "SYSTEM_CODE_MANAGE", "SYSTEM_RBAC_MANAGE",
-                null, null, null, null, null, "SYSTEM_BOARD_MANAGE", null, null, null,
+                null, null, null, null, null, "SYSTEM_BOARD_MANAGE", null, null, null, null,
                 null, null, null, null);
     }
 
