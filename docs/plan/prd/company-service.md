@@ -154,7 +154,11 @@ company-service 는 기업의 **비재무 신호**를 모아 여신·투자 판�
 | `/admin/company/collect` | 뉴스 수집 트리거 |
 | `/admin/company/reputation` | 평판 재계산 |
 | `/admin/company/documents` | 문서 업로드·관리 |
-| `/admin/company/companies` · `/workforce` | 마스터·인력 데이터 관리 |
+| `/admin/company/companies` | 기업 마스터 데이터 관리 |
+| `/admin/company/workforce/import` | 국민연금 사업장가입자 CSV 1회 적재 — 파일 경로를 바디로 받는다(원본이 로컬마다 다른 경로). 단건 배치 INSERT 라 동기 처리 |
+| `/admin/company/sellers/{sellerId}/link/{stockCode}` | **셀러↔기업 명시 링크**. `user.registered` 에 기업 연결 키가 없어 자동 매핑이 불가능하므로 운영자가 명시적으로 링크한다 — 링크된 셀러는 다음 평판 등급 변동 이벤트부터 payload 에 동봉돼 loan 이 셀러 신용에 반영한다 |
+
+> 위 관리 경로는 전부 `AdminApiKeyFilter`(`X-Internal-Api-Key`) 게이트이며 **gateway 미라우팅**이다.
 
 ### 9.3 이벤트
 

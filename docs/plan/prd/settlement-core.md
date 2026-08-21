@@ -79,6 +79,8 @@
 | 10  | `recon`            | order 와의 교차 대사(내부 API 상호 호출)                  | `/internal/recon` + `OrderReconClient` |
 | 11  | `integrity`        | 정합성 자가진단 8종                                       | `/admin/integrity`                    |
 | 12  | `idempotency`      | 수기 운영 조작의 멱등 보장(횡단 지원)                     | 내부(`manual_operation_idempotency`)  |
+| 13  | `auditconsole`     | 자금을 움직인 조작의 기록 조회·집계·내보내기              | `/admin/audit-trail`                  |
+| 14  | `crypto`           | 슬라이스 공용 필드 암호화(횡단 지원)                      | 내부(지급 계좌 PII 등)                |
 
 > `../../../SPEC.md` §3.2 는 이 중 7개만 표에 담고 있다 — 로스터 드리프트는 §12-A 참조.
 
@@ -302,6 +304,7 @@ DB 레벨 강제 장치: 불변성 트리거, 체크 제약, 원장 중복 전�
 | 이벤트 운영 | `/admin/dlq/**`, `/admin/outbox/**`, `/admin/event-track/**`                      | ADMIN              |
 | 대사·정합성 | `/admin/pg-reconciliation/**`, `/admin/reconciliation/**`, `/admin/integrity/**`   | ADMIN·MANAGER      |
 | 계좌·세무   | `/admin/seller-bank-accounts/**`, `/admin/seller-tax-profiles/**`, `/admin/tax/**` | ADMIN·MANAGER      |
+| 감사 이력   | `/admin/audit-trail/**` — 조건 검색·액션별 건수·필터 목록·내보내기                 | ADMIN·MANAGER      |
 | 회수        | `/admin/recoveries/**`                                                            | ADMIN·MANAGER      |
 | 월마감      | `/admin/monthly-closing/**`, `/admin/ledger-periods/**`                           | ⚠ §12-B 참조       |
 | 내부 대사   | `/internal/recon/settlements`                                                     | 내부 키 필터       |

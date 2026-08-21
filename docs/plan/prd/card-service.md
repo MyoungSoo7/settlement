@@ -224,6 +224,11 @@ masterLimit = floor(F × R × H)             (원 단위 FLOOR — 반올림으�
 | `/api/cards/**` (8개)       | gateway 라우팅 O             | `authenticated()` + 서비스 내 소유권·역할 판정 |
 | `/van/v1/**` (4개)          | gateway 라우팅 **X**(내부망) | `authenticated()` — §12-B 참조                 |
 | `/internal/api/v1/**` (4개) | gateway 라우팅 **X**         | `permitAll` + `InternalApiKeyFilter`           |
+| `/admin/expense-receipts` (2개) | gateway 라우팅 O         | `/admin/**` ADMIN 게이트 — 영수증 리뷰 큐(ADR 0036) |
+
+`/admin/expense-receipts` 는 OCR 판정이 `NEEDS_REVIEW` 로 흘린 영수증을 사람이 종결하는 큐다 —
+`GET /` 로 큐를 읽고 `POST /{receiptId}/review` 로 판정한다. **OCR 은 사람의 판단을 대체하지 않는다**는
+ADR 0036 무폴백 설계의 사람 쪽 절반이며, 이 경로가 없으면 저신뢰 추출 건이 갈 곳을 잃는다.
 
 ### 9.2 이벤트
 
