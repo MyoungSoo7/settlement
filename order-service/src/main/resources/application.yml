@@ -291,6 +291,17 @@ app:
       payment-refunded: lemuel.payment.refunded
   outbox:
     polling-delay-ms: 2000
+  # 현금영수증 대행 연동. 운영(prod)에서만 실 어댑터가 뜨고, 그 외 프로파일은 모의 어댑터다.
+  # enabled=false(기본)면 운영에서도 실 연동 대신 "발급 불가"를 명시적으로 돌려주는 어댑터가 뜬다
+  # — 대행 계약이 없는 배포에서 기동은 계속되되, 발급되지 않은 것을 발급됐다고 기록하지 않는다.
+  # enabled=true 인데 아래 값이 비어 있으면 기동이 실패한다(fail-closed, CashReceiptApiClient 생성자).
+  cash-receipt:
+    enabled: ${APP_CASH_RECEIPT_ENABLED:false}
+    base-url: ${CASH_RECEIPT_BASE_URL:}
+    issue-path: ${CASH_RECEIPT_ISSUE_PATH:/v1/cash-receipts}
+    cancel-path: ${CASH_RECEIPT_CANCEL_PATH:/v1/cash-receipts/cancel}
+    merchant-id: ${CASH_RECEIPT_MERCHANT_ID:}
+    secret-key: ${CASH_RECEIPT_SECRET_KEY:}
   # 다중 PG 라우팅 정책 — PgRouter 가 결제수단·금액·health 를 보고 어댑터 선택
   pg:
     routing:
@@ -382,6 +393,9 @@ resilience4j:
         baseConfig: pgDefault
       inicisPg:
         baseConfig: pgDefault
+      # 현금영수증 대행 — PG 결제와 격벽을 나눈다(세금 서류 장애가 결제를 끊지 않도록)
+      cashReceipt:
+        baseConfig: pgDefault
   retry:
     configs:
       pgDefault:
@@ -404,6 +418,8 @@ resilience4j:
       nicePg:
         baseConfig: pgDefault
       inicisPg:
+        baseConfig: pgDefault
+      cashReceipt:
         baseConfig: pgDefault
 
 # 데모 자동로그인 / 게스트 토글. 운영 false, dev/demo true.
