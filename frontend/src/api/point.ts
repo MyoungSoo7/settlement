@@ -35,14 +35,14 @@ export interface PointBalance {
  * 화면은 이 값을 <b>판정</b>이 아니라 <b>조사 신호</b>로 그린다.
  */
 export interface PointLedgerHealth {
-  accountAvailable: number;
+  accountTotal: number;
   activeLotRemaining: number;
   entryNet: number;
 }
 
 export interface PointConsoleSummary {
   accountCount: number;
-  totalAvailable: number;
+  totalBalance: number;
   totalActiveLotRemaining: number;
   totalEntryNet: number;
   /** 0 이 아니면 조사 대상 계정이 있다는 뜻. */

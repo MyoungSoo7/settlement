@@ -276,7 +276,7 @@ export default function PointConsolePage() {
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
               {[
                 { label: '계정 수', value: `${summary.accountCount.toLocaleString()}개` },
-                { label: '잔고 총액', value: `${summary.totalAvailable.toLocaleString()}P` },
+                { label: '잔고 총액', value: `${summary.totalBalance.toLocaleString()}P` },
                 { label: 'ACTIVE 로트 합계', value: `${summary.totalActiveLotRemaining.toLocaleString()}P` },
                 { label: '원장 누계', value: `${summary.totalEntryNet.toLocaleString()}P` },
                 { label: `${summary.expiringWithinDays}일 내 소멸 예정`, value: `${summary.expiringAmount.toLocaleString()}P` },
@@ -332,14 +332,14 @@ export default function PointConsolePage() {
               <span>합계 {detail.total.toLocaleString()}P</span>
             </div>
 
-            {detail.health.accountAvailable === detail.health.activeLotRemaining
-              && detail.health.accountAvailable === detail.health.entryNet ? (
+            {detail.health.accountTotal === detail.health.activeLotRemaining
+              && detail.health.accountTotal === detail.health.entryNet ? (
                 <p data-testid="account-health-balanced" className="text-sm text-green-700">
-                  이 계정의 3자 대조는 균형입니다({detail.health.accountAvailable.toLocaleString()}P).
+                  이 계정의 3자 대조는 균형입니다({detail.health.accountTotal.toLocaleString()}P).
                 </p>
               ) : (
                 <p data-testid="account-health-drift" className="text-sm text-red-700">
-                  3자 대조 불일치 — 잔고 {detail.health.accountAvailable.toLocaleString()}P ·
+                  3자 대조 불일치 — 잔고 {detail.health.accountTotal.toLocaleString()}P ·
                   로트 합계 {detail.health.activeLotRemaining.toLocaleString()}P ·
                   원장 누계 {detail.health.entryNet.toLocaleString()}P
                 </p>

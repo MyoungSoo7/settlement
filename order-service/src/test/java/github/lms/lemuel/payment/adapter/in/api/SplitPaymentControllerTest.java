@@ -39,6 +39,7 @@ class SplitPaymentControllerTest {
     @MockitoBean JwtUtil jwtUtil;
     @MockitoBean CreateSplitPaymentUseCase createUseCase;
     @MockitoBean RefundSplitPaymentService refundService;
+    @MockitoBean github.lms.lemuel.payment.application.port.in.ConfirmDepositUseCase confirmDepositUseCase;
 
     /**
      * JWT 주체를 SecurityContext 에 직접 세팅한다. addFilters=false 슬라이스에는 보안 필터가 없어

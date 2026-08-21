@@ -95,9 +95,26 @@ public class CreateSplitPaymentService implements CreateSplitPaymentUseCase {
         String paymentMethod = pickPrimaryMethodLabel(tenderRequests);
         PaymentDomain payment = PaymentDomain.createWithTenders(orderId, tenders, paymentMethod);
 
+        boolean awaitsDeposit = payment.awaitsDeposit();
+        if (awaitsDeposit) {
+            requireHoldableInternalTenders(tenders);
+        }
+
         // 각 tender 처리
         for (PaymentTender tender : tenders) {
-            processTender(tender, orderId);
+            processTender(tender, orderId, awaitsDeposit);
+        }
+
+        if (awaitsDeposit) {
+            // 부모 결제는 READY 로 남는다 — 돈이 아직 안 들어왔고, 미입금 만료 배치가 집어갈 수
+            // 있어야 하기 때문이다(PaymentDomain.expire 는 READY 에서만 EXPIRED 에 도달한다).
+            // 주문도 PAID 로 올리지 않고 payment.captured 도 발행하지 않는다 — 발행하면 입금되지
+            // 않은 주문이 그대로 정산 대상이 된다.
+            PaymentDomain pending = savePaymentPort.save(payment);
+            holdInternalTenders(pending, actorUserId);
+            log.info("입금 대기 결제 생성: paymentId={}, orderId={}, amount={}",
+                    pending.getId(), orderId, pending.getAmount());
+            return pending;
         }
 
         // 부모 Payment 캡처 + 저장
@@ -121,22 +138,64 @@ public class CreateSplitPaymentService implements CreateSplitPaymentUseCase {
         return saved;
     }
 
-    private void processTender(PaymentTender tender, Long orderId) {
+    /**
+     * @param awaitsDeposit 입금 대기 결제면 <b>승인까지만</b> 하고 캡처하지 않는다. 카드 텐더도
+     *                      마찬가지다 — 가상계좌 입금이 끝내 오지 않아 주문이 취소될 수 있는데,
+     *                      카드만 먼저 매입해 두면 그때 환불로 되돌려야 한다.
+     */
+    private void processTender(PaymentTender tender, Long orderId, boolean awaitsDeposit) {
         if (tender.getType().usesExternalPg()) {
             // 외부 PG 호출 — PgRouter 가 자동으로 적합한 PG 어댑터 선택
             String pgTxnId = pgClientPort.authorize(orderId, tender.getAmount(), tender.getType().name());
             tender.authorize(pgTxnId);
-            pgClientPort.capture(pgTxnId, tender.getAmount());
-            tender.capture();
-            log.debug("외부 PG tender 처리: type={}, amount={}, pgTxn={}",
-                    tender.getType(), tender.getAmount(), pgTxnId);
+            if (!awaitsDeposit) {
+                pgClientPort.capture(pgTxnId, tender.getAmount());
+                tender.capture();
+            }
+            log.debug("외부 PG tender 처리: type={}, amount={}, pgTxn={}, 입금대기={}",
+                    tender.getType(), tender.getAmount(), pgTxnId, awaitsDeposit);
         } else {
-            // 내부 잔액 tender — 외부 호출은 없다. 실제 원장 차감은 저장 후
-            // deductInternalTenders 에서 한다(원장 자연키가 tenderId 인데, 저장 전에는
-            // 그 식별자가 없기 때문).
+            // 내부 잔액 tender — 외부 호출은 없다. 실제 원장 차감(또는 선점)은 저장 후에 한다
+            // (원장 자연키가 tenderId 인데, 저장 전에는 그 식별자가 없기 때문).
             tender.authorize(null);
-            tender.capture();
-            log.debug("내부 잔액 tender 처리: type={}, amount={}", tender.getType(), tender.getAmount());
+            if (!awaitsDeposit) {
+                tender.capture();
+            }
+            log.debug("내부 잔액 tender 처리: type={}, amount={}, 입금대기={}",
+                    tender.getType(), tender.getAmount(), awaitsDeposit);
+        }
+    }
+
+    /**
+     * 입금 대기 결제에 쓸 수 있는 내부 잔액 수단인지 — PG 를 부르기 전에 끊는다.
+     *
+     * <p>기프트카드에는 선점 수단이 없다(Phase 2 는 포인트만). 그냥 통과시키면 입금을 기다리는
+     * 동안 같은 카드를 다른 주문에 또 쓸 수 있어, 포인트에서 막은 구멍이 카드 쪽에 그대로 남는다.
+     * 조용히 두는 것보다 명시적으로 거절하는 편이 낫다.
+     */
+    private void requireHoldableInternalTenders(List<PaymentTender> tenders) {
+        boolean hasGiftCard = tenders.stream().anyMatch(t -> t.getType() == TenderType.GIFT_CARD);
+        if (hasGiftCard) {
+            throw new PaymentInvariantViolationException(
+                    "기프트카드는 입금 대기 결제(가상계좌·무통장)에 함께 쓸 수 없습니다 — "
+                            + "선점 수단이 없어 입금 전 이중 사용을 막을 수 없습니다");
+        }
+    }
+
+    /**
+     * 내부 잔액 tender 를 <b>선점</b>한다 — 차감이 아니다. 입금이 확인되면 확정되고, 기한이 지나면
+     * 풀린다. 저장 이후인 이유는 선점의 자연키가 tenderId 이기 때문이다(차감과 같은 이유).
+     */
+    private void holdInternalTenders(PaymentDomain saved, Long actorUserId) {
+        for (PaymentTender tender : saved.getTenders()) {
+            if (tender.getType() != TenderType.POINT) {
+                continue;
+            }
+            if (actorUserId == null) {
+                throw new PaymentInvariantViolationException(
+                        "내부 잔액 선점에는 인증 주체가 필요합니다: paymentId=" + saved.getId());
+            }
+            pointTenderPort.hold(actorUserId, tender.getAmount(), tender.getId());
         }
     }
 

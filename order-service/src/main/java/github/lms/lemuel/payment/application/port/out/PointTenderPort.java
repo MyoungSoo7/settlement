@@ -39,4 +39,29 @@ public interface PointTenderPort {
      * @param refundReference 환불 멱등 키(tender + 금액)
      */
     void restore(BigDecimal amount, Long tenderId, String refundReference);
+
+    /**
+     * 입금 대기 결제의 포인트 <b>선점</b> — 가용에서 빼서 잠근다. 총액은 아직 줄지 않는다.
+     *
+     * <p>가상계좌는 입금 전까지 결제가 확정되지 않는다. 그 사이 차감하지 않으면 같은 포인트를
+     * 다른 주문에 또 쓸 수 있고, 차감해 버리면 미입금 취소마다 복원 경로가 필요하다.
+     *
+     * @param userId 결제 주체 — JWT 에서 파생된 값이어야 한다
+     */
+    void hold(Long userId, BigDecimal amount, Long tenderId);
+
+    /**
+     * 입금이 확인돼 선점을 실제 차감으로 확정한다. 여기서 비로소 로트가 소비되고 USE 엔트리가 남는다.
+     *
+     * <p>{@code userId} 를 받지 않는다 — 계정은 선점 레코드가 알고 있다. 호출자가 넘긴 계정을 믿고
+     * 잠금을 건드리면 남의 계정을 움직이는 통로가 된다.
+     */
+    void captureHold(Long tenderId, Long actorUserId);
+
+    /**
+     * 선점을 풀어 가용으로 되돌린다.
+     *
+     * @param expired 기한 경과로 자동 해제면 {@code true}, 주문 취소 등 명시적 해제면 {@code false}
+     */
+    void releaseHold(Long tenderId, boolean expired);
 }

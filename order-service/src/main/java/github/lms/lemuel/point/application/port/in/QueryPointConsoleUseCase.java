@@ -40,7 +40,7 @@ public interface QueryPointConsoleUseCase {
      * @param expiringAmount      기간 내 소멸 예정 금액 — 고객에게 사라질 재산의 규모
      */
     record PointConsoleSummary(long accountCount,
-                               BigDecimal totalAvailable,
+                               BigDecimal totalBalance,
                                BigDecimal totalActiveLotRemaining,
                                BigDecimal totalEntryNet,
                                long driftedAccountCount,
@@ -114,7 +114,7 @@ public interface QueryPointConsoleUseCase {
 
     /** 전체 집계 원시 값 — 3자 대조와 드리프트 계정 수. */
     record PointLedgerTotals(long accountCount,
-                             BigDecimal totalAvailable,
+                             BigDecimal totalBalance,
                              BigDecimal totalActiveLotRemaining,
                              BigDecimal totalEntryNet,
                              long driftedAccountCount) {

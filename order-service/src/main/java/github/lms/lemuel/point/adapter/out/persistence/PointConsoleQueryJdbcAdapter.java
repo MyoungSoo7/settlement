@@ -192,7 +192,7 @@ public class PointConsoleQueryJdbcAdapter implements PointConsoleQueryPort {
         PointLedgerTotals totals = jdbcTemplate.queryForObject("""
                 WITH per_account AS (
                     SELECT a.id,
-                           a.available,
+                           a.total AS balance,
                            COALESCE(lot.remaining, 0) AS lot_remaining,
                            COALESCE(ent.net, 0)       AS entry_net
                     FROM opslab.point_accounts a
@@ -208,17 +208,17 @@ public class PointConsoleQueryJdbcAdapter implements PointConsoleQueryPort {
                     ) ent ON ent.account_id = a.id
                 )
                 SELECT COUNT(*)                                   AS account_count,
-                       COALESCE(SUM(available), 0)                AS total_available,
+                       COALESCE(SUM(balance), 0)                  AS total_balance,
                        COALESCE(SUM(lot_remaining), 0)            AS total_lot_remaining,
                        COALESCE(SUM(entry_net), 0)                AS total_entry_net,
                        COUNT(*) FILTER (
-                           WHERE available <> lot_remaining OR available <> entry_net
+                           WHERE balance <> lot_remaining OR balance <> entry_net
                        )                                          AS drifted
                 FROM per_account
                 """,
                 (rs, rowNum) -> new PointLedgerTotals(
                         rs.getLong("account_count"),
-                        rs.getBigDecimal("total_available"),
+                        rs.getBigDecimal("total_balance"),
                         rs.getBigDecimal("total_lot_remaining"),
                         rs.getBigDecimal("total_entry_net"),
                         rs.getLong("drifted")));

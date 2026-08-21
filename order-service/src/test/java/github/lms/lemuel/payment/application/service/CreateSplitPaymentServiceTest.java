@@ -12,6 +12,7 @@ import github.lms.lemuel.payment.domain.PaymentDomain;
 import github.lms.lemuel.payment.domain.PaymentStatus;
 import github.lms.lemuel.payment.domain.TenderType;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -208,5 +209,78 @@ class CreateSplitPaymentServiceTest {
     void createWithTenders_null() {
         assertThatThrownBy(() -> service.createWithTenders(1L, null, ACTOR_USER_ID))
                 .isInstanceOf(PaymentInvariantViolationException.class);
+    }
+
+    /**
+     * 가상계좌가 섞이면 <b>돈이 아직 안 들어온</b> 결제다. 예전에는 이 결제도 그 자리에서 캡처해
+     * 주문을 PAID 로 올리고 payment.captured 를 발행했다 — 입금되지 않은 주문이 정산 대상으로
+     * 넘어간다는 뜻이다. 포인트도 즉시 차감돼, 미입금 취소 때 되돌릴 경로가 없었다.
+     */
+    @Nested
+    @DisplayName("입금 대기 결제")
+    class AwaitingDeposit {
+
+        @Test
+        @DisplayName("가상계좌가 섞이면 캡처하지 않는다 — 주문도 PAID 로 올리지 않고 이벤트도 없다")
+        void staysPendingUntilDeposit() {
+            when(pgClientPort.authorize(anyLong(), any(), anyString())).thenReturn("VA-1");
+            when(savePaymentPort.save(any())).thenAnswer(i -> i.getArgument(0));
+
+            PaymentDomain result = service.createWithTenders(600L, List.of(
+                    new TenderRequest(TenderType.VIRTUAL_ACCOUNT, new BigDecimal("9000")),
+                    new TenderRequest(TenderType.POINT, new BigDecimal("1000"))), ACTOR_USER_ID);
+
+            assertThat(result.getStatus()).isEqualTo(PaymentStatus.READY);
+            verify(pgClientPort).authorize(eq(600L), any(), eq("VIRTUAL_ACCOUNT"));
+            verify(pgClientPort, never()).capture(anyString(), any());
+            verify(updateOrderStatusPort, never()).updateOrderStatus(anyLong(), anyString());
+            verify(publishEventPort, never())
+                    .publishPaymentCaptured(any(), any(), any(), any(), any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("포인트는 차감이 아니라 선점된다 — 입금 전에는 총액이 줄지 않는다")
+        void pointIsHeldNotUsed() {
+            when(pgClientPort.authorize(anyLong(), any(), anyString())).thenReturn("VA-1");
+            when(savePaymentPort.save(any())).thenAnswer(i -> i.getArgument(0));
+
+            service.createWithTenders(601L, List.of(
+                    new TenderRequest(TenderType.VIRTUAL_ACCOUNT, new BigDecimal("9000")),
+                    new TenderRequest(TenderType.POINT, new BigDecimal("1000"))), ACTOR_USER_ID);
+
+            verify(pointTenderPort).hold(eq(ACTOR_USER_ID), eq(new BigDecimal("1000")), any());
+            verify(pointTenderPort, never()).use(any(), any(), any());
+        }
+
+        /**
+         * 기프트카드에는 선점이 없다(Phase 2 는 포인트만). 그냥 통과시키면 입금을 기다리는 동안
+         * 같은 카드를 다른 주문에 또 쓸 수 있어, 포인트에서 막은 구멍이 카드 쪽에 그대로 남는다.
+         */
+        @Test
+        @DisplayName("기프트카드는 입금 대기 결제에 쓸 수 없다 — 선점 수단이 없어 이중 사용을 막지 못한다")
+        void giftCardRejectedWhileAwaitingDeposit() {
+            assertThatThrownBy(() -> service.createWithTenders(602L, List.of(
+                    new TenderRequest(TenderType.VIRTUAL_ACCOUNT, new BigDecimal("9000")),
+                    new TenderRequest(TenderType.GIFT_CARD, new BigDecimal("1000"))), ACTOR_USER_ID))
+                    .isInstanceOf(PaymentInvariantViolationException.class)
+                    .hasMessageContaining("기프트카드");
+
+            verify(pgClientPort, never()).authorize(anyLong(), any(), anyString());
+        }
+
+        /** 상한 검사는 PG 를 부르기 전에 끝나야 한다 — 승인 뒤에 거절하면 취소 보상이 필요해진다. */
+        @Test
+        @DisplayName("입금 대기 결제도 사용 상한 검사를 먼저 거친다")
+        void checksUsageLimitFirst() {
+            when(pgClientPort.authorize(anyLong(), any(), anyString())).thenReturn("VA-1");
+            when(savePaymentPort.save(any())).thenAnswer(i -> i.getArgument(0));
+
+            service.createWithTenders(603L, List.of(
+                    new TenderRequest(TenderType.VIRTUAL_ACCOUNT, new BigDecimal("9000")),
+                    new TenderRequest(TenderType.POINT, new BigDecimal("1000"))), ACTOR_USER_ID);
+
+            verify(pointTenderPort).assertWithinUsageLimit(
+                    eq(new BigDecimal("10000")), eq(new BigDecimal("1000")));
+        }
     }
 }
