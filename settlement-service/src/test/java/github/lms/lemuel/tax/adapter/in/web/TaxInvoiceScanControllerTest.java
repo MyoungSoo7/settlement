@@ -69,7 +69,7 @@ class TaxInvoiceScanControllerTest {
     private static TaxInvoiceScan scanOwnedBy(Long sellerId, TaxInvoiceScanStatus status) {
         ExtractedTaxInvoice fields = ExtractedTaxInvoice.of("101-81-00001", "220-81-00001",
                 LocalDate.of(2026, 8, 1), new BigDecimal("100000"), new BigDecimal("10000"),
-                new BigDecimal("110000"), "TI-0000000005", new BigDecimal("0.93"));
+                new BigDecimal("110000"), "TI-0000000005", new BigDecimal("0.93"), new BigDecimal("0.93"));
         return TaxInvoiceScan.rehydrate(3L, sellerId, "invoice.png", "image/png", "a".repeat(64), 4L,
                 fields, "gemini-2.5-flash", status, 42L, null, NOW, NOW);
     }

@@ -106,7 +106,7 @@ public class TaxInvoiceScanService implements ExtractTaxInvoiceScanUseCase, GetT
 
         ExtractedTaxInvoice fields = ExtractedTaxInvoice.of(raw.supplierBusinessNo(), raw.buyerBusinessNo(),
                 raw.writtenDate(), raw.supplyAmount(), raw.taxAmount(), raw.totalAmount(),
-                raw.approvalNumber(), raw.confidence());
+                raw.approvalNumber(), raw.amountConfidence(), raw.approvalNumberConfidence());
 
         OffsetDateTime now = OffsetDateTime.now(clock);
         TaxInvoiceScan scan = TaxInvoiceScan.extracted(command.sellerId(), command.fileName(),
@@ -114,8 +114,17 @@ public class TaxInvoiceScanService implements ExtractTaxInvoiceScanUseCase, GetT
                 ocrPort.modelName(), now);
 
         if (fields.needsReview(confidenceThreshold)) {
-            log.info("세금계산서 스캔 리뷰 필요 sellerId={} confidence={} total={} vat={}", command.sellerId(),
-                    fields.confidence(), fields.totalConsistent(), fields.vatConsistent());
+            // 믿을 수 없는 판독으로는 결론을 기록하지 않는다. EXTRACTED("아직 대사 전") 로 남겨
+            // 사람이 보게 하고, 확정은 관리자가 rematch 를 눌러야 일어난다.
+            //
+            // 종전에는 여기서도 그대로 대사했다. 그 결과 (가) 승인번호를 못 읽었을 뿐인데
+            // UNMATCHED("발행분을 못 찾았다") 라는 틀린 결론이 조사 이력에 남았고, (나) 금액이
+            // 우연히 맞으면 MATCHED 로 갔다 — MATCHED 는 종결이라 관리자가 반려조차 할 수 없다.
+            log.info("세금계산서 스캔 리뷰 필요 — 자동 대사를 건너뜁니다 "
+                            + "sellerId={} 금액신뢰도={} 승인번호신뢰도={} total={} vat={}",
+                    command.sellerId(), fields.amountConfidence(), fields.approvalNumberConfidence(),
+                    fields.totalConsistent(), fields.vatConsistent());
+            return saveScanPort.save(scan);
         }
         applyMatch(scan, now);
         return saveScanPort.save(scan);
@@ -142,6 +151,12 @@ public class TaxInvoiceScanService implements ExtractTaxInvoiceScanUseCase, GetT
 
     @Override
     @Transactional
+    /**
+     * 관리자가 누르는 재대사 — <b>신뢰도 게이트를 타지 않는다.</b>
+     *
+     * <p>자동 경로만 보수적이어야 한다. 사람이 눈으로 확인하고 누른 재대사까지 막으면 저신뢰
+     * 스캔은 영영 EXTRACTED 에 갇혀 반려 외에 길이 없다.
+     */
     public TaxInvoiceScan rematch(Long scanId) {
         TaxInvoiceScan scan = require(scanId);
         applyMatch(scan, OffsetDateTime.now(clock));

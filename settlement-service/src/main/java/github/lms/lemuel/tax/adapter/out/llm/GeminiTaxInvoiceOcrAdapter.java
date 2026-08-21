@@ -46,8 +46,12 @@ public class GeminiTaxInvoiceOcrAdapter implements ExtractTaxInvoiceFieldsPort {
               "taxAmount": "세액(숫자만)",
               "totalAmount": "합계금액(숫자만)",
               "approvalNumber": "승인번호",
-              "confidence": "판독 신뢰도 0~1"
+              "amountConfidence": "금액 3종(공급가액·세액·합계) 판독 신뢰도 0~1",
+              "approvalNumberConfidence": "승인번호 판독 신뢰도 0~1"
             }
+            신뢰도는 축마다 따로 판단하라. 금액을 또렷하게 읽었다고 해서 승인번호까지 확신해서는
+            안 된다. 도장·접힘·인쇄 번짐으로 특정 영역만 뭉개진 경우, 그 영역에서 읽은 값의
+            신뢰도만 낮춰라.
             """;
 
     private final VisionExtractionClient client;
@@ -88,6 +92,11 @@ public class GeminiTaxInvoiceOcrAdapter implements ExtractTaxInvoiceFieldsPort {
         return mapFields(fields);
     }
 
+    /** 프롬프트 회귀 테스트 전용 — 축별 신뢰도 지시가 살아 있는지 확인한다. */
+    static String promptForTest() {
+        return PROMPT;
+    }
+
     /** 모델이 돌려준 JSON 객체를 세금계산서 추출 결과로 옮긴다 — 필드 해석의 정본. */
     static OcrExtraction mapFields(JsonNode fields) {
         return new OcrExtraction(
@@ -98,7 +107,16 @@ public class GeminiTaxInvoiceOcrAdapter implements ExtractTaxInvoiceFieldsPort {
                 amount(fields, "taxAmount", "세액"),
                 amount(fields, "totalAmount", "합계금액"),
                 text(fields, "approvalNumber"),
-                confidence(text(fields, "confidence")));
+                // 구형 응답(단일 "confidence")도 받는다 — 프롬프트를 바꿔도 모델이 옛 형식으로
+                // 답하는 경우가 있고, 그때 추출을 통째로 잃는 것보다 같은 값을 양쪽에 쓰는 편이 낫다.
+                confidence(firstPresent(text(fields, "amountConfidence"), text(fields, "confidence"))),
+                confidence(firstPresent(text(fields, "approvalNumberConfidence"),
+                        text(fields, "confidence"))));
+    }
+
+    /** 새 필드가 없으면 구형 필드로 물러난다. */
+    private static String firstPresent(String preferred, String fallback) {
+        return preferred != null ? preferred : fallback;
     }
 
     private static String text(JsonNode fields, String name) {

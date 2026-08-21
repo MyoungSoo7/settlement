@@ -48,7 +48,7 @@ class TaxInvoiceScanAdminControllerTest {
     private static TaxInvoiceScan scan(TaxInvoiceScanStatus status) {
         ExtractedTaxInvoice fields = ExtractedTaxInvoice.of("101-81-00001", null,
                 LocalDate.of(2026, 8, 1), new BigDecimal("100000"), new BigDecimal("10000"),
-                new BigDecimal("110000"), "TI-0000000005", new BigDecimal("0.61"));
+                new BigDecimal("110000"), "TI-0000000005", new BigDecimal("0.61"), new BigDecimal("0.61"));
         return TaxInvoiceScan.rehydrate(3L, 7L, "invoice.png", "image/png", "a".repeat(64), 4L,
                 fields, "gemini-2.5-flash", status, 42L, "공급가액 불일치", NOW, NOW);
     }

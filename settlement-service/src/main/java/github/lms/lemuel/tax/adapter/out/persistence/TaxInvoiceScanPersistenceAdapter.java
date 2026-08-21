@@ -31,7 +31,7 @@ public class TaxInvoiceScanPersistenceAdapter implements SaveTaxInvoiceScanPort,
                 scan.getId(), scan.getSellerId(), scan.getFileName(), scan.getContentType(),
                 scan.getFileHash(), scan.getSizeBytes(), scan.getStatus(),
                 e.supplier().digits(), e.buyer().digits(), e.writtenDate(),
-                e.supplyAmount(), e.taxAmount(), e.totalAmount(), e.approvalNumber(), e.confidence(),
+                e.supplyAmount(), e.taxAmount(), e.totalAmount(), e.approvalNumber(), e.amountConfidence(), e.approvalNumberConfidence(),
                 scan.getOcrModel(), scan.getLinkedTaxInvoiceId(), scan.getReviewNote(),
                 scan.getCreatedAt(), scan.getUpdatedAt());
         return toDomain(repository.saveAndFlush(entity));
@@ -62,7 +62,7 @@ public class TaxInvoiceScanPersistenceAdapter implements SaveTaxInvoiceScanPort,
         ExtractedTaxInvoice extracted = ExtractedTaxInvoice.of(
                 e.getSupplierBusinessNo(), e.getBuyerBusinessNo(), e.getWrittenDate(),
                 e.getSupplyAmount(), e.getTaxAmount(), e.getTotalAmount(),
-                e.getApprovalNumber(), e.getConfidence());
+                e.getApprovalNumber(), e.getAmountConfidence(), e.getApprovalNumberConfidence());
         return TaxInvoiceScan.rehydrate(e.getId(), e.getSellerId(), e.getFileName(), e.getContentType(),
                 e.getFileHash(), e.getSizeBytes(), extracted, e.getOcrModel(), e.getStatus(),
                 e.getLinkedTaxInvoiceId(), e.getReviewNote(), e.getCreatedAt(), e.getUpdatedAt());

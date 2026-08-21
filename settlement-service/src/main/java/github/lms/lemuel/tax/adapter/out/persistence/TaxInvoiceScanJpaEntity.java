@@ -72,8 +72,12 @@ public class TaxInvoiceScanJpaEntity {
     @Column(name = "approval_number", length = 64)
     private String approvalNumber;
 
-    @Column(name = "confidence", nullable = false, precision = 4, scale = 3)
-    private BigDecimal confidence;
+    @Column(name = "amount_confidence", nullable = false, precision = 4, scale = 3)
+    private BigDecimal amountConfidence;
+
+    /** 승인번호 판독 신뢰도 — 대사 탐색 키라 금액과 따로 본다. */
+    @Column(name = "approval_number_confidence", nullable = false, precision = 4, scale = 3)
+    private BigDecimal approvalNumberConfidence;
 
     @Column(name = "ocr_model", nullable = false, length = 64)
     private String ocrModel;
@@ -97,7 +101,8 @@ public class TaxInvoiceScanJpaEntity {
                             Long sizeBytes, TaxInvoiceScanStatus status, String supplierBusinessNo,
                             String buyerBusinessNo, LocalDate writtenDate, BigDecimal supplyAmount,
                             BigDecimal taxAmount, BigDecimal totalAmount, String approvalNumber,
-                            BigDecimal confidence, String ocrModel, Long linkedTaxInvoiceId,
+                            BigDecimal amountConfidence, BigDecimal approvalNumberConfidence,
+                            String ocrModel, Long linkedTaxInvoiceId,
                             String reviewNote, OffsetDateTime createdAt, OffsetDateTime updatedAt) {
         this.id = id;
         this.sellerId = sellerId;
@@ -113,7 +118,8 @@ public class TaxInvoiceScanJpaEntity {
         this.taxAmount = taxAmount;
         this.totalAmount = totalAmount;
         this.approvalNumber = approvalNumber;
-        this.confidence = confidence;
+        this.amountConfidence = amountConfidence;
+        this.approvalNumberConfidence = approvalNumberConfidence;
         this.ocrModel = ocrModel;
         this.linkedTaxInvoiceId = linkedTaxInvoiceId;
         this.reviewNote = reviewNote;
@@ -177,8 +183,12 @@ public class TaxInvoiceScanJpaEntity {
         return approvalNumber;
     }
 
-    public BigDecimal getConfidence() {
-        return confidence;
+    public BigDecimal getAmountConfidence() {
+        return amountConfidence;
+    }
+
+    public BigDecimal getApprovalNumberConfidence() {
+        return approvalNumberConfidence;
     }
 
     public String getOcrModel() {

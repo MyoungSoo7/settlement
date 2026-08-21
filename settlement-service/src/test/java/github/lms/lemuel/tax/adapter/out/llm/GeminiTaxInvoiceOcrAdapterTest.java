@@ -69,7 +69,8 @@ class GeminiTaxInvoiceOcrAdapterTest {
         assertThat(extraction.taxAmount()).isEqualByComparingTo("100000");
         assertThat(extraction.totalAmount()).isEqualByComparingTo("1100000");
         assertThat(extraction.approvalNumber()).isEqualTo("TI-0000000005");
-        assertThat(extraction.confidence()).isEqualByComparingTo("0.93");
+        assertThat(extraction.amountConfidence()).isEqualByComparingTo("0.93");
+        assertThat(extraction.approvalNumberConfidence()).isEqualByComparingTo("0.93");
     }
 
     @Test
@@ -108,7 +109,7 @@ class GeminiTaxInvoiceOcrAdapterTest {
                  "taxAmount":"100","totalAmount":"1100"}
                 """;
 
-        assertThat(GeminiTaxInvoiceOcrAdapter.mapFields(fields(inner)).confidence())
+        assertThat(GeminiTaxInvoiceOcrAdapter.mapFields(fields(inner)).amountConfidence())
                 .isEqualByComparingTo("0.50");
     }
 
@@ -171,5 +172,44 @@ class GeminiTaxInvoiceOcrAdapterTest {
 
         assertThat(new GeminiTaxInvoiceOcrAdapter(props).isConfigured()).isFalse();
         assertThat(new GeminiTaxInvoiceOcrAdapter(props).modelName()).isNotBlank();
+    }
+
+    @Test
+    @DisplayName("축별 신뢰도를 따로 읽는다 — 금액을 확신해도 승인번호 확신은 별개다")
+    void mapsPerAxisConfidence() {
+        String inner = """
+                {"supplierBusinessNo":"101-81-00001","buyerBusinessNo":"101-81-00002",
+                 "writtenDate":"2026-08-10","supplyAmount":"1000000","taxAmount":"100000",
+                 "totalAmount":"1100000","approvalNumber":"TI-0000000005",
+                 "amountConfidence":"0.97","approvalNumberConfidence":"0.33"}
+                """;
+        OcrExtraction extraction = GeminiTaxInvoiceOcrAdapter.mapFields(fields(inner));
+
+        assertThat(extraction.amountConfidence()).isEqualByComparingTo("0.97");
+        assertThat(extraction.approvalNumberConfidence()).isEqualByComparingTo("0.33");
+    }
+
+    @Test
+    @DisplayName("구형 단일 confidence 응답도 받는다 — 추출을 통째로 잃는 것보다 낫다")
+    void acceptsLegacySingleConfidence() {
+        String inner = """
+                {"supplierBusinessNo":"101-81-00001","buyerBusinessNo":"101-81-00002",
+                 "writtenDate":"2026-08-10","supplyAmount":"1000000","taxAmount":"100000",
+                 "totalAmount":"1100000","approvalNumber":"TI-0000000005","confidence":"0.88"}
+                """;
+        OcrExtraction extraction = GeminiTaxInvoiceOcrAdapter.mapFields(fields(inner));
+
+        assertThat(extraction.amountConfidence()).isEqualByComparingTo("0.88");
+        assertThat(extraction.approvalNumberConfidence()).isEqualByComparingTo("0.88");
+    }
+
+    @Test
+    @DisplayName("프롬프트가 축별 신뢰도를 따로 판단하라고 지시한다")
+    void promptDemandsIndependentConfidence() {
+        // 이 지시가 빠지면 모델은 두 축에 같은 숫자를 주고 축별 게이트가 무력해진다.
+        assertThat(GeminiTaxInvoiceOcrAdapter.promptForTest())
+                .contains("amountConfidence")
+                .contains("approvalNumberConfidence")
+                .contains("축마다 따로 판단하라");
     }
 }
