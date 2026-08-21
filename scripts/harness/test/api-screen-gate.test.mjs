@@ -139,7 +139,8 @@ const SCREEN_PENDING = new Map([
   // --- 그 외 ---
   ['ai-service/KnowledgeController', 'AI 지식베이스 관리'],
   ['common-data-service/DataSourceController', '공공데이터 데이터소스 등록 화면'],
-  ['organization-service/OrganizationController', '조직·멤버십 화면 — 서비스 전체가 화면 0'],
+  // 조직·멤버십 화면이 생겼다(2026-08-22, /admin/system/organizations). organization-service
+  // 최초의 화면이다 — 그전까지 조직을 만들고 사람을 붙이는 경로가 API 뿐이었다.
 ]);
 
 /**
@@ -165,7 +166,8 @@ const SCREEN_PENDING = new Map([
 //              청약 승인을 UI 로 통과시킬 방법이 없었다.)
 // 2026-08-21: 24 (담보 감시 화면 — 재평가·처분·대위변제. SecuredLoanController 는 상세 조회만
 //              불리는데 컨트롤러 단위 판정이라 함께 내려간다. 신청·심사 화면 부재는 위 주석 참조.)
-const PENDING_BUDGET = 24;
+// 2026-08-22: 23 (조직·멤버십 — organization-service 최초의 화면.)
+const PENDING_BUDGET = 23;
 
 const read = (path) => readFileSync(path, 'utf8');
 

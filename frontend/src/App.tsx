@@ -45,6 +45,7 @@ const PointConsolePage = lazy(() => import('./pages/system/PointConsolePage'));
 const GiftCardConsolePage = lazy(() => import('./pages/system/GiftCardConsolePage'));
 const AuditLogConsolePage = lazy(() => import('./pages/system/AuditLogConsolePage'));
 const MemberAdminPage = lazy(() => import('./pages/system/MemberAdminPage'));
+const OrganizationConsolePage = lazy(() => import('./pages/system/OrganizationConsolePage'));
 const ReviewAdminPage = lazy(() => import('./pages/system/ReviewAdminPage'));
 const CouponAdminPage = lazy(() => import('./pages/system/CouponAdminPage'));
 
@@ -302,6 +303,10 @@ function App() {
               element={<AdminOnlyRoute><SideNavLayout><AuditLogConsolePage /></SideNavLayout></AdminOnlyRoute>} />
             <Route path="/admin/system/members"
               element={<AdminOnlyRoute><SideNavLayout><MemberAdminPage /></SideNavLayout></AdminOnlyRoute>} />
+            {/* 조직·멤버십 — 회원 관리 바로 옆이다(사람을 다루는 축이 같다). 서버는 authenticated
+                만 요구하고 조직 내 역할로 인가하지만, 우리 앱의 SYSTEM 영역 관례를 따라 ADMIN. */}
+            <Route path="/admin/system/organizations"
+              element={<AdminOnlyRoute><SideNavLayout><OrganizationConsolePage /></SideNavLayout></AdminOnlyRoute>} />
             <Route path="/admin/system/reviews"
               element={<AdminOnlyRoute><SideNavLayout><ReviewAdminPage /></SideNavLayout></AdminOnlyRoute>} />
             <Route path="/admin/system/coupons"
