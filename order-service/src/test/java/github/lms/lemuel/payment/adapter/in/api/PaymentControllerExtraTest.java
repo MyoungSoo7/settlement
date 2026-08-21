@@ -111,6 +111,42 @@ class PaymentControllerExtraTest {
     }
 
     @Test
+    @DisplayName("POST /payments/toss/confirm 는 ADMIN 이면 소유권 대조를 건너뛰도록 callerUserId=null 로 넘긴다")
+    void confirmTossPaymentAsAdminBypassesOwnership() throws Exception {
+        // 운영 지원은 타인 주문 결제를 대행할 수 있어야 한다 — 대신 금액 대조는 서비스가 그대로 건다.
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
+                new AuthPrincipal(1L, "admin@x.com", "ADMIN"),
+                null,
+                List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))));
+        when(tossPaymentService.confirmTossPayment(10L, "pay-key", "toss-order-1", 15000L, null, null))
+                .thenReturn(domain(PaymentStatus.CAPTURED));
+
+        mockMvc.perform(post("/payments/toss/confirm")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"dbOrderId":10,"paymentKey":"pay-key","tossOrderId":"toss-order-1","amount":15000}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CAPTURED"));
+    }
+
+    @Test
+    @DisplayName("POST /payments/toss/confirm 는 Idempotency-Key 헤더를 그대로 서비스에 넘긴다")
+    void confirmTossPaymentPassesIdempotencyKey() throws Exception {
+        when(tossPaymentService.confirmTossPayment(10L, "pay-key", "toss-order-1", 15000L, 7L, "idem-1"))
+                .thenReturn(domain(PaymentStatus.CAPTURED));
+
+        mockMvc.perform(post("/payments/toss/confirm")
+                        .header("Idempotency-Key", "idem-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"dbOrderId":10,"paymentKey":"pay-key","tossOrderId":"toss-order-1","amount":15000}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CAPTURED"));
+    }
+
+    @Test
     @DisplayName("POST /payments/toss/confirm 는 잘못된 요청을 거부한다")
     void confirmTossPaymentInvalidBody() throws Exception {
         mockMvc.perform(post("/payments/toss/confirm")

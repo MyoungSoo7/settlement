@@ -8,7 +8,9 @@ import github.lms.lemuel.payment.application.port.out.PaymentIdempotencyPort;
 import github.lms.lemuel.payment.application.port.out.SavePaymentPort;
 import github.lms.lemuel.payment.domain.PaymentDomain;
 import github.lms.lemuel.payment.domain.PaymentStatus;
+import github.lms.lemuel.payment.domain.exception.OrderNotFoundException;
 import github.lms.lemuel.payment.domain.exception.PaymentAmountMismatchException;
+import github.lms.lemuel.payment.domain.exception.PaymentNotFoundException;
 import github.lms.lemuel.payment.domain.exception.PaymentOwnershipException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -220,6 +222,19 @@ class TossPaymentServiceTest {
         }
 
         @Test
+        @DisplayName("주문 자체가 없으면 소유권 판정 전에 404 로 끊는다")
+        void rejectsMissingOrder() {
+            when(loadOrderPort.loadOrder(ORDER_ID)).thenReturn(null);
+            givenNoReplay();
+
+            assertThatThrownBy(() -> service.confirmTossPayment(
+                    ORDER_ID, "pay-key-1", "toss-order-1", 10000L, BUYER, null))
+                    .isInstanceOf(OrderNotFoundException.class);
+
+            verify(tossConfirmApiClient, never()).confirm(any(), any(), any());
+        }
+
+        @Test
         @DisplayName("운영자 경로(callerUserId=null)는 소유권 대조를 건너뛰되 금액 대조는 유지한다")
         void adminPathSkipsOwnershipButNotAmount() {
             givenOrder(ORDER_ID, BUYER, "10000");
@@ -262,6 +277,34 @@ class TossPaymentServiceTest {
 
             assertThat(result.getId()).isEqualTo(55L);
             verify(tossConfirmApiClient, never()).confirm(any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("매핑은 있는데 결제가 없으면 조용히 재승인하지 않고 드러낸다")
+        void failsLoudWhenMappedPaymentMissing() {
+            when(paymentIdempotencyPort.findPaymentId("idem-1")).thenReturn(Optional.of(55L));
+            when(loadPaymentPort.loadById(55L)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> service.confirmTossPayment(
+                    ORDER_ID, "pay-key-1", "toss-order-1", 10000L, BUYER, "idem-1"))
+                    .isInstanceOf(PaymentNotFoundException.class);
+
+            verify(tossConfirmApiClient, never()).confirm(any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("일괄 승인도 동일 키 재요청은 PG 를 다시 부르지 않는다")
+        void cartConfirmReplays() {
+            PaymentDomain first = capturedPayment(55L, 100L, "5000", "TOSS:pay-key-cart");
+            when(paymentIdempotencyPort.findPaymentId("idem-cart")).thenReturn(Optional.of(55L));
+            when(loadPaymentPort.loadById(55L)).thenReturn(Optional.of(first));
+
+            List<PaymentDomain> result = service.confirmTossCartPayment(
+                    List.of(100L, 200L), "pay-key-cart", "toss-order-cart", 10000L, BUYER, "idem-cart");
+
+            assertThat(result).extracting(PaymentDomain::getId).containsExactly(55L);
+            verify(tossConfirmApiClient, never()).confirm(any(), any(), any());
+            verify(createPaymentPort, never()).createPayment(any());
         }
 
         @Test
