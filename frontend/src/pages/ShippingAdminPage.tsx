@@ -5,6 +5,7 @@ import {
   Shipment,
   ShippingStatus,
   ShippingAddressRequest,
+  BulkTrackingResult,
   SHIPPING_STATUS_LABEL,
   nextShippingActions,
 } from '@/api/shipping';
@@ -258,6 +259,106 @@ const ShipmentRow: React.FC<{
 };
 
 /* ─────────────────────────────────────────
+   송장 일괄 업로드 (CSV)
+───────────────────────────────────────── */
+
+/**
+ * 수백 행이 한 번에 출고 처리되는 작업이라 <b>미리보기가 먼저</b>다.
+ *
+ * <p>서버도 {@code dryRun} 기본값이 true 지만, 화면은 한 걸음 더 간다 — 미리보기를 통과한
+ * <b>바로 그 파일</b>에 대해서만 반영 버튼이 열린다. 파일을 바꾸면 미리보기 결과를 버리고
+ * 다시 받게 한다. 그러지 않으면 "A 를 미리보고 B 를 반영"이 가능해지는데, 그 실수는 결과가
+ * 나온 뒤에야 드러난다.
+ */
+const TrackingUploadPanel: React.FC<{ onApplied: () => void }> = ({ onApplied }) => {
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<BulkTrackingResult | null>(null);
+  const [applied, setApplied] = useState<BulkTrackingResult | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { showToast } = useToast();
+
+  const pick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // 파일이 바뀌면 이전 판정은 이 파일의 것이 아니다 — 남겨 두면 남의 결과로 반영하게 된다.
+    setFile(e.target.files?.[0] ?? null);
+    setPreview(null);
+    setApplied(null);
+    setError(null);
+  };
+
+  const run = async (dryRun: boolean) => {
+    if (!file) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await shippingApi.uploadTracking(file, dryRun);
+      if (dryRun) {
+        setPreview(result);
+      } else {
+        setApplied(result);
+        setPreview(null);
+        showToast(`${result.applied}건 출고 처리했습니다.`, 'success');
+        onApplied();
+      }
+    } catch (err) {
+      setError(errorDetail(err, '송장 파일을 처리하지 못했습니다.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const result = applied ?? preview;
+
+  return (
+    <section className="rounded-xl border border-gray-200 bg-white p-4 space-y-3"
+      data-testid="tracking-upload">
+      <div>
+        <h2 className="font-semibold text-gray-900">송장 일괄 업로드</h2>
+        <p className="text-sm text-gray-500 mt-1">
+          <code>order_id,carrier,tracking_number</code> 형식의 CSV 를 올립니다. 먼저 미리보기로
+          행별 판정을 확인한 뒤 반영하세요 — 반영은 되돌릴 수 없습니다.
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <input type="file" accept=".csv,text/csv" onChange={pick}
+          aria-label="송장 CSV 파일" className="text-sm" />
+        <button type="button" onClick={() => void run(true)} disabled={!file || busy}
+          className="px-3 py-2 text-sm font-semibold rounded border border-gray-300 bg-white text-gray-700 disabled:opacity-50">
+          {busy ? '처리 중…' : '미리보기'}
+        </button>
+        {/* 미리보기를 통과하지 않은 파일에는 반영 버튼이 열리지 않는다. */}
+        <button type="button" onClick={() => void run(false)}
+          disabled={!file || busy || preview === null || preview.applied === 0}
+          className="px-3 py-2 text-sm font-semibold rounded bg-blue-600 text-white disabled:opacity-50">
+          {preview ? `${preview.applied}건 반영` : '반영'}
+        </button>
+      </div>
+
+      {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+
+      {result && (
+        <div className="space-y-2" data-testid="tracking-upload-result">
+          <p className="text-sm text-gray-700">
+            {result.dryRun ? '미리보기 — 아직 아무것도 바뀌지 않았습니다. ' : '반영 완료. '}
+            성공 {result.applied}건 · 실패 {result.failed}건
+          </p>
+          {result.lines.some((line) => !line.applied) && (
+            <ul className="text-sm text-red-700 space-y-1">
+              {result.lines.filter((line) => !line.applied).map((line, idx) => (
+                <li key={`${line.orderId ?? 'row'}-${idx}`}>
+                  주문 {line.orderId ?? '?'} — {line.reason}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </section>
+  );
+};
+
+/* ─────────────────────────────────────────
    배송 관리 페이지
 ───────────────────────────────────────── */
 const ShippingAdminPage: React.FC = () => {
@@ -331,6 +432,10 @@ const ShippingAdminPage: React.FC = () => {
             className="px-3 py-2 text-sm font-semibold rounded border border-gray-300 text-gray-700 bg-white">
             새로고침
           </button>
+        </div>
+
+        <div className="mb-4">
+          <TrackingUploadPanel onApplied={() => void load()} />
         </div>
 
         <label className="flex items-center gap-2 mb-4 text-sm text-gray-700">

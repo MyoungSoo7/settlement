@@ -8,6 +8,7 @@ import github.lms.lemuel.payment.domain.exception.PaymentInvariantViolationExcep
 import github.lms.lemuel.payment.domain.exception.RefundException;
 import github.lms.lemuel.payment.domain.exception.RefundExceedsPaymentException;
 import github.lms.lemuel.payment.application.port.in.RefundPaymentPort;
+import github.lms.lemuel.payment.application.port.in.CashReceiptUseCase;
 import github.lms.lemuel.payment.application.port.out.LoadPaymentPort;
 import github.lms.lemuel.payment.application.port.out.LoadRefundPort;
 import github.lms.lemuel.payment.application.port.out.PgClientPort;
@@ -58,6 +59,7 @@ public class RefundPaymentUseCase implements RefundPaymentPort {
     private final LoadRefundPort loadRefundPort;
     private final SaveRefundPort saveRefundPort;
     private final RefundLifecycle refundLifecycle;
+    private final CashReceiptUseCase cashReceiptUseCase;
 
     public RefundPaymentUseCase(LoadPaymentPort loadPaymentPort,
                                 SavePaymentPort savePaymentPort,
@@ -66,7 +68,8 @@ public class RefundPaymentUseCase implements RefundPaymentPort {
                                 PublishEventPort publishEventPort,
                                 LoadRefundPort loadRefundPort,
                                 SaveRefundPort saveRefundPort,
-                                RefundLifecycle refundLifecycle) {
+                                RefundLifecycle refundLifecycle,
+                                CashReceiptUseCase cashReceiptUseCase) {
         this.loadPaymentPort = loadPaymentPort;
         this.savePaymentPort = savePaymentPort;
         this.pgClientPort = pgClientPort;
@@ -75,6 +78,7 @@ public class RefundPaymentUseCase implements RefundPaymentPort {
         this.loadRefundPort = loadRefundPort;
         this.saveRefundPort = saveRefundPort;
         this.refundLifecycle = refundLifecycle;
+        this.cashReceiptUseCase = cashReceiptUseCase;
     }
 
     @Override
@@ -187,6 +191,10 @@ public class RefundPaymentUseCase implements RefundPaymentPort {
         // 전액 환불 도달 시점에만 주문 상태 REFUNDED 로 전이 — 부분 환불은 주문 상태 변경 없음.
         if (savedPaymentDomain.getStatus() == PaymentStatus.REFUNDED) {
             updateOrderStatusPort.updateOrderStatus(savedPaymentDomain.getOrderId(), "REFUNDED");
+            // 돈을 전부 돌려줬으면 현금영수증도 취소한다 — 남겨 두면 받지 않은 돈에 소득공제·
+            // 매입세액공제가 붙는다. 현금 결제가 아니었거나 신청하지 않은 주문이면 no-op 이고,
+            // 취소 자체가 실패해도 예외를 올리지 않는다(PG 환불은 이미 끝났다 — 롤백하면 유령 환불).
+            cashReceiptUseCase.cancelForPayment(savedPaymentDomain.getId(), "결제 전액 환불");
         }
 
         // 이벤트 발행 — settlement 모듈은 PaymentRefunded Kafka 이벤트로 자체 정산 조정.

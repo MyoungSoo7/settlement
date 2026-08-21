@@ -10,6 +10,8 @@ const Login: React.FC = () => {
   const [credentials, setCredentials] = useState<LoginRequest>({ email: '', password: '' });
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState<string | null>(null);
+  /** 비밀번호 사용 기한 초과 — 재시도로는 풀리지 않으므로 재설정 경로를 눈앞에 띄운다. */
+  const [passwordExpired, setPasswordExpired] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,7 +28,15 @@ const Login: React.FC = () => {
         navigate('/order');
       }
     } catch (err) {
-      setError(apiErrorMessage(err, '이메일 또는 비밀번호가 올바르지 않습니다.'));
+      // 423 = 연속 실패 잠금, 403 = 비밀번호 사용 기한 초과. 둘 다 "비밀번호가 틀렸다"와 조치가
+      // 다르므로 서버 메시지를 그대로 보여 준다(해제 시각·재설정 안내가 그 안에 있다).
+      const status = apiErrorStatus(err);
+      setError(apiErrorMessage(err,
+        status === 423 ? '연속 로그인 실패로 계정이 잠겼습니다. 잠시 후 다시 시도해주세요.'
+          : status === 403 ? '비밀번호 사용 기한이 지났습니다. 비밀번호를 재설정해주세요.'
+            : '이메일 또는 비밀번호가 올바르지 않습니다.'));
+      // 기한 초과는 재시도로 풀리지 않는다 — 재설정 화면으로 데려간다.
+      setPasswordExpired(status === 403);
     } finally {
       setLoading(false);
     }
@@ -121,6 +131,15 @@ const Login: React.FC = () => {
           {error && (
             <div className="rounded-lg bg-red-50 border border-red-200 p-3">
               <p className="text-sm text-red-800">{error}</p>
+              {passwordExpired && (
+                <button
+                  type="button"
+                  onClick={() => navigate('/forgot-password')}
+                  className="mt-2 text-sm font-semibold text-red-900 underline"
+                >
+                  비밀번호 재설정하러 가기
+                </button>
+              )}
             </div>
           )}
 

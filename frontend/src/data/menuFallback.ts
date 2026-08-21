@@ -58,6 +58,9 @@ export const FALLBACK_MENUS: FallbackMenuNode[] = [
       { id: -107, name: '월마감', path: '/admin/settlement/monthly-closing', icon: '📆', description: '셀러 월 정산 마트 집계 · 재실행', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN'] },
       { id: -108, name: '세무', path: '/admin/settlement/tax', icon: '🧾', description: '스캔 리뷰 · 전표 전기 · 세금계산서', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       { id: -109, name: '수수료율', path: '/admin/settlement/commission-rates', icon: '⚖️', description: '셀러·등급 요율 정책 · 이력', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN'] },
+      // 등급이 요율·주기·홀드백을 동시에 정하므로 '수수료율' 바로 옆이다. 서버가
+      // /admin/seller-tiers/** 를 ADMIN 으로 막는다 — MANAGER 에게 보이면 죽은 링크다.
+      { id: -112, name: '셀러 등급', path: '/admin/settlement/seller-tiers', icon: '🏅', description: '등급 재산정 · 관리자 지정 · 캐시 정합', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN'] },
       { id: -110, name: 'DLQ 재처리', path: '/admin/settlement/dlq', icon: '📮', description: '처리 실패 이벤트 확인 · 재발행', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN'] },
       { id: -102, name: '원장·시산표', path: '/admin/settlement/ledger', icon: '📒', description: '분개 조회 · 월 시산표 · 기간 마감', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
     ],
@@ -115,6 +118,10 @@ export const FALLBACK_MENUS: FallbackMenuNode[] = [
       { id: -90, name: '교육 관리', path: '/admin/education/courses', icon: '🎓', description: '교육 과정 · 강의 콘텐츠', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
       { id: -91, name: '포인트 운영', path: '/admin/system/points', icon: '🪙', description: '수기 지급 · 유효기간 소멸', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
       { id: -92, name: '기프트카드 운영', path: '/admin/system/gift-cards', icon: '🎁', description: '상품권 발행 · 유효기간 소멸', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
+      { id: -93, name: '감사 로그', path: '/admin/system/audit-logs', icon: '🔎', description: '조작 이력 조회 (커머스 · 정산)', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
+      { id: -94, name: '회원 관리', path: '/admin/system/members', icon: '👤', description: '회원 검색 · 승인 · 역할 변경', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
+      { id: -95, name: '리뷰 관리', path: '/admin/system/reviews', icon: '⭐', description: '신고 리뷰 블라인드 · 해제', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
+      { id: -96, name: '쿠폰 운영', path: '/admin/system/coupons', icon: '🎟️', description: '쿠폰 검색 · 중단/재개 · 사용 내역', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
     ],
   },
   {
@@ -123,6 +130,11 @@ export const FALLBACK_MENUS: FallbackMenuNode[] = [
   },
   {
     id: -9, name: '추천받기', path: '/recommend', icon: '✨', description: null,
+    area: 'SHOP', type: 'ITEM', roles: ['USER'],
+  },
+  {
+    // 대량주문 — 관리자 기능이 아니라 구매자가 자기 주문을 올리는 경로다(초안은 올린 사람만 본다).
+    id: -11, name: '대량주문', path: '/order/bulk', icon: '📦', description: 'CSV 업로드 → 검증 → 실주문 전환',
     area: 'SHOP', type: 'ITEM', roles: ['USER'],
   },
   {

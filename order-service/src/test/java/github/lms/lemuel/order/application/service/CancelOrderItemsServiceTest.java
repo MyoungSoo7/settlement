@@ -2,6 +2,7 @@ package github.lms.lemuel.order.application.service;
 
 import github.lms.lemuel.order.application.port.in.CancelOrderItemsUseCase;
 import github.lms.lemuel.order.application.port.out.LoadOrderPort;
+import github.lms.lemuel.order.application.port.out.OrderCouponRestorePort;
 import github.lms.lemuel.order.application.port.out.RefundOrderPaymentPort;
 import github.lms.lemuel.order.application.port.out.SaveOrderPort;
 import github.lms.lemuel.order.application.port.out.SaveOrderStatusHistoryPort;
@@ -49,6 +50,7 @@ class CancelOrderItemsServiceTest {
     private IncreaseProductStockUseCase increaseProductStock;
     private IncreaseVariantStockUseCase increaseVariantStock;
     private AssessShippingFeeUseCase assessShippingFee;
+    private OrderCouponRestorePort couponRestorePort;
     private CancelOrderItemsService service;
 
     @BeforeEach
@@ -60,8 +62,9 @@ class CancelOrderItemsServiceTest {
         increaseProductStock = mock(IncreaseProductStockUseCase.class);
         increaseVariantStock = mock(IncreaseVariantStockUseCase.class);
         assessShippingFee = mock(AssessShippingFeeUseCase.class);
+        couponRestorePort = mock(OrderCouponRestorePort.class);
         service = new CancelOrderItemsService(loadOrderPort, saveOrderPort, historyPort, refundPort,
-                increaseProductStock, increaseVariantStock, assessShippingFee);
+                increaseProductStock, increaseVariantStock, assessShippingFee, couponRestorePort);
         when(saveOrderPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
     }
 
@@ -197,5 +200,28 @@ class CancelOrderItemsServiceTest {
         service.cancelItems(77L, List.of(2L), "단순 변심", "buyer");
 
         verify(refundPort).refundOrderPayment(eq(77L), any(), eq("order-77-items-2"));
+    }
+
+    @Test
+    @DisplayName("전량 취소면 쿠폰을 되돌린다 — 환불받고 1회용 쿠폰만 잃는 비대칭 차단")
+    void fullCancel_restoresCoupon() {
+        freeShippedOrder();
+        when(assessShippingFee.assess(any())).thenReturn(ShippingFeeAssessment.none());
+
+        service.cancelItems(77L, List.of(1L, 2L), "전량 취소", "buyer");
+
+        verify(couponRestorePort).restoreOnCanceled(eq(77L), any());
+    }
+
+    @Test
+    @DisplayName("부분 취소는 쿠폰을 되돌리지 않는다 — 남은 라인이 여전히 그 할인을 받고 있다")
+    void partialCancel_keepsCoupon() {
+        freeShippedOrder();
+        when(assessShippingFee.assess(any()))
+                .thenReturn(new ShippingFeeAssessment(new BigDecimal("3000"), List.of()));
+
+        service.cancelItems(77L, List.of(2L), "부분 취소", "buyer");
+
+        verify(couponRestorePort, never()).restoreOnCanceled(anyLong(), any());
     }
 }

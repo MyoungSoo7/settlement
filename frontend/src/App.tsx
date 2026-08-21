@@ -22,6 +22,7 @@ const RecommendPage = lazy(() => import('./pages/RecommendPage'));
 const CartPage = lazy(() => import('./pages/CartPage'));
 const MyPage = lazy(() => import('./pages/MyPage'));
 const MyBalancesPage = lazy(() => import('./pages/MyBalancesPage'));
+const BulkOrderPage = lazy(() => import('./pages/BulkOrderPage'));
 const LoanPage = lazy(() => import('./pages/LoanPage'));
 const TossPaymentSuccess = lazy(() => import('./pages/TossPaymentSuccess'));
 const FinancialStatementsPage = lazy(() => import('./pages/FinancialStatementsPage'));
@@ -41,6 +42,10 @@ const AiChatPage = lazy(() => import('./pages/AiChatPage'));
 const EducationCourseAdminPage = lazy(() => import('./pages/system/EducationCourseAdminPage'));
 const PointConsolePage = lazy(() => import('./pages/system/PointConsolePage'));
 const GiftCardConsolePage = lazy(() => import('./pages/system/GiftCardConsolePage'));
+const AuditLogConsolePage = lazy(() => import('./pages/system/AuditLogConsolePage'));
+const MemberAdminPage = lazy(() => import('./pages/system/MemberAdminPage'));
+const ReviewAdminPage = lazy(() => import('./pages/system/ReviewAdminPage'));
+const CouponAdminPage = lazy(() => import('./pages/system/CouponAdminPage'));
 
 // 관리자 페이지 (lazy load)
 const ProductPage = lazy(() => import('./pages/ProductPage'));
@@ -56,6 +61,7 @@ const ShippingAdminPage = lazy(() => import('./pages/ShippingAdminPage'));
 const ShippingPolicyAdminPage = lazy(() => import('./pages/ShippingPolicyAdminPage'));
 const OrderApprovalPage = lazy(() => import('./pages/OrderApprovalPage'));
 const PayoutAdminPage = lazy(() => import('./pages/PayoutAdminPage'));
+const SellerTierAdminPage = lazy(() => import('./pages/SellerTierAdminPage'));
 
 // 정산운영 콘솔 — settlement-service 운영 API(/admin/**)를 화면으로 노출한다.
 const IntegrityConsolePage = lazy(() => import('./pages/settlement/IntegrityConsolePage'));
@@ -168,6 +174,8 @@ function App() {
             <Route path="/cart"         element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
             <Route path="/mypage"       element={<ProtectedRoute><MyPage /></ProtectedRoute>} />
             <Route path="/my/balances" element={<ProtectedRoute><MyBalancesPage /></ProtectedRoute>} />
+            {/* 대량주문 — 올리는 것과 주문이 나가는 것이 다른 버튼이다(검증/확정 분리). */}
+            <Route path="/order/bulk"   element={<ProtectedRoute><BulkOrderPage /></ProtectedRoute>} />
             <Route path="/loans"        element={<ProtectedRoute><LoanPage /></ProtectedRoute>} />
             {/* AI 챗봇 (ai-service) — LLM 비용이 들어 인증 필수(USER 이상), 역할 무관 */}
             <Route path="/ai/chat"      element={<ProtectedRoute><AiChatPage /></ProtectedRoute>} />
@@ -207,6 +215,11 @@ function App() {
             {/* 요율은 정산 금액을 직접 바꾼다 — 서버가 /admin/commission-rates/** 를 ADMIN 으로만 막는다 */}
             <Route path="/admin/settlement/commission-rates"
               element={<AdminOnlyRoute><SideNavLayout><CommissionRateConsolePage /></SideNavLayout></AdminOnlyRoute>} />
+            {/* 셀러 등급도 같은 이유로 ADMIN 전용이다(서버 /admin/seller-tiers/**). API 경로는
+                order-service 의 /admin/seller-tiers 지만 화면 URL 을 /admin/settlement/** 아래 두는 것은
+                nginx SPA 폴백 제약 때문이다 — 위 정산운영 블록 주석 참조. */}
+            <Route path="/admin/settlement/seller-tiers"
+              element={<AdminOnlyRoute><SideNavLayout><SellerTierAdminPage /></SideNavLayout></AdminOnlyRoute>} />
             {/* 세무는 서버가 /admin/tax/** · /admin/seller-tax-profiles/** 를 ADMIN·MANAGER 로 막는다 */}
             <Route path="/admin/settlement/tax"
               element={<AdminManagerRoute><SideNavLayout><TaxConsolePage /></SideNavLayout></AdminManagerRoute>} />
@@ -264,6 +277,14 @@ function App() {
               element={<AdminOnlyRoute><SideNavLayout><PointConsolePage /></SideNavLayout></AdminOnlyRoute>} />
             <Route path="/admin/system/gift-cards"
               element={<AdminOnlyRoute><SideNavLayout><GiftCardConsolePage /></SideNavLayout></AdminOnlyRoute>} />
+            <Route path="/admin/system/audit-logs"
+              element={<AdminOnlyRoute><SideNavLayout><AuditLogConsolePage /></SideNavLayout></AdminOnlyRoute>} />
+            <Route path="/admin/system/members"
+              element={<AdminOnlyRoute><SideNavLayout><MemberAdminPage /></SideNavLayout></AdminOnlyRoute>} />
+            <Route path="/admin/system/reviews"
+              element={<AdminOnlyRoute><SideNavLayout><ReviewAdminPage /></SideNavLayout></AdminOnlyRoute>} />
+            <Route path="/admin/system/coupons"
+              element={<AdminOnlyRoute><SideNavLayout><CouponAdminPage /></SideNavLayout></AdminOnlyRoute>} />
 
             {/* ── CEO 인사이트 (ADMIN·MANAGER, 좌측 사이드바) — 위성 조회 서비스 묶음 ── */}
             <Route path="/admin/ceo"

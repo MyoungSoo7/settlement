@@ -22,6 +22,17 @@ public interface CouponUseCase {
      */
     void useCoupon(String code, Long userId, Long orderId);
 
+    /**
+     * 주문 취소·환불로 쿠폰을 되돌려 준다: 사용 이력 무효화 + 사용 횟수 감소.
+     *
+     * <p>돌려주지 않으면 "결제는 환불받았는데 쿠폰만 소멸"하는 구멍이 남는다 — 1회용 쿠폰에서는
+     * 고객이 할인 자체를 잃는다. 여러 종단 경로(취소 승인 · 환불 승인 · PG 환불 콜백)가 겹쳐
+     * 호출해도 안전하도록 <b>멱등</b>하다.
+     *
+     * @return 이번 호출로 되돌린 쿠폰 수. 되돌릴 것이 없었으면 0
+     */
+    int restoreCouponsForOrder(Long orderId, String reason);
+
     List<Coupon> getAllCoupons();
 
     List<ValidateResult> getAvailableCoupons(Long userId, BigDecimal orderAmount, Long productId, Long categoryId);

@@ -163,7 +163,7 @@ describe('guard policy fixtures', () => {
     }
     // settlement 자체 바운디드 컨텍스트 + shared-common(common) 은 허용 (false positive 금지)
     for (const pkg of ['settlement', 'payout', 'ledger', 'chargeback', 'pgreconciliation',
-      'recon', 'recovery', 'report', 'tax', 'idempotency', 'integrity', 'common']) {
+      'recon', 'recovery', 'report', 'tax', 'idempotency', 'integrity', 'closing', 'crypto', 'common']) {
       const result = scanText(file, `import github.lms.lemuel.${pkg}.Foo;`, { now: NOW });
       assert.deepEqual(result.violations, [], `${pkg} 는 허용되어야 한다`);
     }

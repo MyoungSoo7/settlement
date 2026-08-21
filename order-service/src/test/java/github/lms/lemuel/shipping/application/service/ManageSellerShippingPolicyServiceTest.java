@@ -24,13 +24,16 @@ class ManageSellerShippingPolicyServiceTest {
 
     private LoadSellerShippingPolicyPort loadPort;
     private SaveSellerShippingPolicyPort savePort;
+    private github.lms.lemuel.shipping.application.port.out.SellerExistsPort sellerExistsPort;
     private ManageSellerShippingPolicyService service;
 
     @BeforeEach
     void setUp() {
         loadPort = mock(LoadSellerShippingPolicyPort.class);
         savePort = mock(SaveSellerShippingPolicyPort.class);
-        service = new ManageSellerShippingPolicyService(loadPort, savePort);
+        sellerExistsPort = mock(github.lms.lemuel.shipping.application.port.out.SellerExistsPort.class);
+        when(sellerExistsPort.existsById(any())).thenReturn(true);
+        service = new ManageSellerShippingPolicyService(loadPort, savePort, sellerExistsPort);
     }
 
     @Test
@@ -86,6 +89,19 @@ class ManageSellerShippingPolicyServiceTest {
         assertThat(service.findAll())
                 .extracting(SellerShippingPolicy::getSellerId)
                 .containsExactly(7L, 8L);
+    }
+
+    @Test
+    @DisplayName("없는 셀러면 404 로 거절한다 — FK 위반을 500 으로 흘리지 않는다")
+    void unknownSellerIsRejectedBeforeSave() {
+        when(sellerExistsPort.existsById(999L)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.upsert(999L, new BigDecimal("3000"), null))
+                .isInstanceOf(github.lms.lemuel.shipping.domain.exception.SellerNotFoundException.class)
+                .hasMessageContaining("999");
+
+        // 저장까지 갔다면 DB FK 가 DataIntegrityViolationException → 500 으로 올려보냈을 것이다.
+        verify(savePort, never()).save(any());
     }
 
     @Test

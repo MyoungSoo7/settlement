@@ -2,6 +2,7 @@ package github.lms.lemuel.order.application.service;
 
 import github.lms.lemuel.order.application.port.in.CancelOrderItemsUseCase;
 import github.lms.lemuel.order.application.port.out.LoadOrderPort;
+import github.lms.lemuel.order.application.port.out.OrderCouponRestorePort;
 import github.lms.lemuel.order.application.port.out.RefundOrderPaymentPort;
 import github.lms.lemuel.order.application.port.out.SaveOrderPort;
 import github.lms.lemuel.order.application.port.out.SaveOrderStatusHistoryPort;
@@ -51,6 +52,7 @@ public class CancelOrderItemsService implements CancelOrderItemsUseCase {
     private final IncreaseProductStockUseCase increaseProductStockUseCase;
     private final IncreaseVariantStockUseCase increaseVariantStockUseCase;
     private final AssessShippingFeeUseCase assessShippingFeeUseCase;
+    private final OrderCouponRestorePort orderCouponRestorePort;
 
     public CancelOrderItemsService(LoadOrderPort loadOrderPort,
                                    SaveOrderPort saveOrderPort,
@@ -58,7 +60,8 @@ public class CancelOrderItemsService implements CancelOrderItemsUseCase {
                                    RefundOrderPaymentPort refundOrderPaymentPort,
                                    IncreaseProductStockUseCase increaseProductStockUseCase,
                                    IncreaseVariantStockUseCase increaseVariantStockUseCase,
-                                   AssessShippingFeeUseCase assessShippingFeeUseCase) {
+                                   AssessShippingFeeUseCase assessShippingFeeUseCase,
+                                   OrderCouponRestorePort orderCouponRestorePort) {
         this.loadOrderPort = loadOrderPort;
         this.saveOrderPort = saveOrderPort;
         this.historyPort = historyPort;
@@ -66,6 +69,7 @@ public class CancelOrderItemsService implements CancelOrderItemsUseCase {
         this.increaseProductStockUseCase = increaseProductStockUseCase;
         this.increaseVariantStockUseCase = increaseVariantStockUseCase;
         this.assessShippingFeeUseCase = assessShippingFeeUseCase;
+        this.orderCouponRestorePort = orderCouponRestorePort;
     }
 
     @Override
@@ -113,6 +117,11 @@ public class CancelOrderItemsService implements CancelOrderItemsUseCase {
 
         if (fullyCanceled && !paid) {
             order.cancel();   // 결제 전 전량 취소는 그대로 주문 종결
+        }
+        if (fullyCanceled) {
+            // 쿠폰은 <b>전량 취소일 때만</b> 되돌린다. 부분 취소에서는 남은 라인이 여전히 그 할인을
+            // 받고 있으므로 돌려주면 같은 쿠폰을 두 번 쓰는 셈이 된다(할인 안분 재계산은 별개 주제).
+            orderCouponRestorePort.restoreOnCanceled(orderId, "주문 라인 전량 취소");
         }
         saveOrderPort.save(order);
         historyPort.save(orderId, statusBefore.name(), order.getStatus().name(), operator,

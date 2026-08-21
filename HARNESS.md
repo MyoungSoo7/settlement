@@ -268,6 +268,30 @@ settlement-copilot **플러그인 소유**라 플러그인 미설치 환경에 �
   ② `MACHINE_ONLY`(웹훅·VAN 단말·내부키 수집 트리거·일회성 백필) ③ `SCREEN_PENDING`(인정된 화면 부채) 중 하나로
   **사유와 함께** 분류해야 통과한다. 부채는 `PENDING_BUDGET` 래칫으로 **내려가기만** 한다 — 줄었는데 예산을 안 내려도
   FAIL 이라 목록이 늘 정확하다. 추출 정규식이 깨져 전부 통과하는 가짜 GREEN 도 스캔 하한선으로 막는다.
+- **배선(게이트웨이·nginx) 게이트** — `scripts/harness/test/gateway-route-gate.test.mjs`: 화면 커버리지 게이트의
+  **반대편 질문**을 맡는다 — 저쪽은 "부르는 화면이 있는가", 이쪽은 "부르면 닿는가". 브라우저에서 서비스까지 가는
+  길은 **nginx → gateway → service** 세 구간이고 앞의 둘은 각각 경로 allowlist라, 컨트롤러를 추가하면서 라우트를
+  빠뜨리면 서비스는 401(존재)로 답하는데 게이트웨이는 404(경로 없음)로 답한다 — 컴파일러도 다른 게이트도 못 잡고
+  화면에서만 드러난다(2026-08-20 `/admin/shipping-policies` 가 실제로 이렇게 새어 실기동에서 발견됐다).
+  검사는 셋이다: ① 컨트롤러 엔드포인트 ↔ 게이트웨이 `Path` 술어 대조(미배선은 `NOT_ROUTED_BY_DESIGN` 영구 결정 /
+  `UNROUTED_DEBT` 부채 중 하나로 **사유와 함께** 분류, 부채는 `UNROUTED_BUDGET` 래칫으로 내려가기만) ②
+  `/internal`·`/van`·`/actuator` 가 게이트웨이로 **새지 않는지**(이쪽은 누락이 아니라 노출이 사고라 반대로 본다)
+  ③ 게이트웨이 라우팅 세그먼트가 nginx **두 벌**(compose·프로덕션)에서 모두 프록시되는지 — 한쪽만 있으면
+  "로컬에선 되는데 배포하면 안 되는" 경로가 생긴다(도입 시점에 `memberships`·`display-sections` 드리프트 2건을 잡았다).
+  컨트롤러 추출기는 `scripts/harness/lib/java-controllers.mjs` 를 화면 커버리지 게이트와 **공유**한다 — 파서가 두 벌이면
+  드리프트를 막는 하네스 안에서 드리프트가 난다. 매처 자체도 자기검증 테스트로 판별력을 지킨다(도입 시 매처 버그 1건을 잡았다).
+- **SPA 폴백 게이트** — `scripts/harness/test/spa-fallback-gate.test.mjs`: 위 배선 게이트가 "API 가 닿는가"를
+  본다면 이쪽은 **"화면 URL 이 새로고침에서 살아남는가"**를 본다. `/admin` 은 프론트 라우트와 백엔드 admin API 가
+  접두사를 공유하는 유일한 구간이라 nginx 가 폴백 allowlist(`^/admin(/(system|operation|ceo|settlement|login)…`)로
+  가르는데, 화면 URL 을 그 밖에 두면 **클릭 이동은 멀쩡하고 F5·북마크·새 탭에서만** 깨진다. 백엔드 라우트가 없으면
+  404, 있으면 화면 대신 **API JSON 이 브라우저에 렌더**된다. vite dev 에는 nginx 가 없어 개발에선 재현되지 않고,
+  이 불변식이 여태 `App.tsx` **주석에만** 있었던 탓에 라우트 5건이 그대로 새어 나갔다(2026-08-21 실측).
+  검사는 넷이다: ① nginx 두 벌의 폴백 정규식 동일 + **일반 프록시보다 먼저** 등장(정규식 location 은 등장 순서로
+  매칭돼 순서가 규칙의 일부다) ② 폴백 접두사가 게이트웨이 `/admin` 라우트를 **가리지 않는지** — 이 방향이 없으면
+  "폴백 목록에 한 줄 추가"라는 손쉬운 오답이 통과하는데, 그 한 줄은 이번엔 프론트가 그 API 를 못 부르게 만든다
+  ③ 모든 `/admin` 라우트가 폴백에 걸리거나 `FALLBACK_PENDING` 에 **사유와 함께** 등록(`PENDING_BUDGET` 래칫)
+  ④ 부채 목록에 사라진 라우트·이미 고쳐진 항목이 남아 있지 않은지. 게이트웨이 경로표 파서와 `PathPattern` 매처는
+  `scripts/harness/lib/gateway-routes.mjs` 를 배선 게이트와 **공유**한다.
 - **프론트 테스트 렌더 경합 게이트** — `scripts/harness/test/async-query-gate.test.mjs`: `waitFor(API 가 불렸는지)`로
   기다린 뒤 곧바로 `screen.getBy*` 로 데이터 의존 엘리먼트를 집는 형태를 막는다. 호출된 시점과 렌더에 반영된 시점
   사이에 상태 갱신 한 틱이 있어 **로컬에선 늘 통과하고 CI 러너에서만 랜덤하게 실패**한다 — 2026-08-13 하루에 두

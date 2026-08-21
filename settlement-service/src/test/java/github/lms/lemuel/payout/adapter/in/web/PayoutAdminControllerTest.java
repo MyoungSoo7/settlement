@@ -12,7 +12,7 @@ import github.lms.lemuel.payout.domain.Payout;
 import github.lms.lemuel.payout.domain.PayoutBounce;
 import github.lms.lemuel.payout.domain.PayoutStatus;
 import github.lms.lemuel.payout.domain.SellerBankAccount;
-import github.lms.lemuel.idempotency.adapter.out.persistence.ManualIdempotencyGuard;
+import github.lms.lemuel.idempotency.application.port.in.ClaimManualOperationUseCase;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,7 +49,7 @@ class PayoutAdminControllerTest {
     @MockitoBean RetryFailedPayoutUseCase retryUseCase;
     @MockitoBean ExecutePayoutUseCase executeUseCase;
     @MockitoBean RecordPayoutBounceUseCase bounceUseCase;
-    @MockitoBean ManualIdempotencyGuard idempotency;
+    @MockitoBean ClaimManualOperationUseCase idempotency;
     @MockitoBean AuditLogger auditLogger;
 
     private static Payout samplePayout() {

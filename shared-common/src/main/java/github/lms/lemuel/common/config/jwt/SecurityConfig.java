@@ -137,6 +137,12 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/coupons/available").hasAnyRole("ADMIN", "MANAGER", "USER")
                         .requestMatchers(HttpMethod.GET, "/coupons", "/coupons/**").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers(HttpMethod.POST, "/coupons/*/use").hasAnyRole("ADMIN", "MANAGER", "USER")
+                        // 쿠폰 생성 — 매처가 없어 anyRequest().authenticated() 로 새고 있었다. 로그인만 하면
+                        // 누구나 자기에게 100% 할인 쿠폰을 발행할 수 있었다는 뜻이다. GET 만 열려 있어
+                        // "닫혀 있다"고 보이기 쉬웠는데, HttpMethod 를 지정한 매처는 그 메서드에만 걸린다.
+                        .requestMatchers(HttpMethod.POST, "/coupons").hasAnyRole("ADMIN", "MANAGER")
+                        // 쿠폰 운영 콘솔 — 중단/재개는 나가는 할인을 즉시 멈추는 조작이다.
+                        .requestMatchers("/admin/coupons/**").hasAnyRole("ADMIN", "MANAGER")
                         // 전체 주문/사용자 조회 (관리자·매니저)
                         .requestMatchers("/orders/admin/all").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers("/orders/admin/**").hasAnyRole("ADMIN", "MANAGER")
@@ -191,6 +197,18 @@ public class SecurityConfig {
                         .requestMatchers("/admin/points/**").hasRole("ADMIN")
                         // 기프트카드 콘솔 — 발행은 없던 재산을 만들고 소멸 실행은 고객 재산을 지운다.
                         .requestMatchers("/admin/gift-cards/**").hasRole("ADMIN")
+                        // 감사 로그 조회(order=/admin/audit-logs, settlement=/admin/audit-trail).
+                        // 조회 전용인데도 MANAGER 에게 열지 않는 이유: 이 표면은 "누가 무엇을 조작했는가"
+                        // 전체를 보여주므로, 감시받는 사람이 감시 기록을 열람하는 상태가 되면 감사가
+                        // 성립하지 않는다. detail_json 에 조작 전후 값이 담기는 것도 같은 이유다.
+                        .requestMatchers("/admin/audit-logs/**", "/admin/audit-trail/**").hasRole("ADMIN")
+                        // 회원 관리 콘솔 — 목록 한 페이지가 이메일·이름·연락처 묶음이고, 역할 변경은
+                        // 권한 상승 경로다. MANAGER 에게도 열지 않는다(승인·정지 조작은 기존
+                        // /memberships/** 가 MANAGER 까지 허용하지만, 그건 대상이 특정된 단건이다).
+                        .requestMatchers("/admin/members/**").hasRole("ADMIN")
+                        // 리뷰 관리 콘솔 — 다루는 것이 개인정보가 아니라 공개된 게시물이고, 신고 대응은
+                        // CS 업무의 일부라 MANAGER 까지 연다(회원 콘솔과 다른 판단).
+                        .requestMatchers("/admin/reviews/**").hasAnyRole("ADMIN", "MANAGER")
                         // 정산 배치 재실행 콘솔 — 확정·홀드백 해제·지급 실행을 수동 트리거하므로
                         // 조회 콘솔과 달리 MANAGER 에게 열지 않는다. 일자 게이트(미래·소급 상한)는 도메인이 강제.
                         // 수수료율 정책 — 정산 금액을 직접 바꾸므로 조회 콘솔과 달리 ADMIN 만.

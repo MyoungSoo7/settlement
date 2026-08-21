@@ -7,6 +7,9 @@ public enum AuditAction {
     REFUND_COMPLETED,
     REFUND_FAILED,
     USER_ROLE_CHANGED,
+    // 관리자 콘솔에서 회원 명부를 CSV 로 내보냄. 조회는 상태를 바꾸지 않지만 PII 가 밖으로
+    // 나가는 사건이라, 목록을 보는 것과 가져가는 것은 감사에서 같은 무게가 아니다.
+    MEMBER_LIST_EXPORTED,
     LOGIN_SUCCESS,
     LOGIN_FAILED,
     CASHFLOW_REPORT_ACCESSED,

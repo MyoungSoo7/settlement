@@ -12,7 +12,7 @@ import github.lms.lemuel.chargeback.domain.ChargebackSource;
 import github.lms.lemuel.chargeback.domain.ChargebackStatus;
 import github.lms.lemuel.common.audit.application.AuditLogger;
 import github.lms.lemuel.common.audit.domain.AuditAction;
-import github.lms.lemuel.idempotency.adapter.out.persistence.ManualIdempotencyGuard;
+import github.lms.lemuel.idempotency.application.port.in.ClaimManualOperationUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
@@ -50,14 +50,14 @@ public class ChargebackAdminController {
     private final OpenChargebackUseCase openUseCase;
     private final DecideChargebackUseCase decideUseCase;
     private final LoadChargebackPort loadPort;
-    private final ManualIdempotencyGuard idempotency;
+    private final ClaimManualOperationUseCase idempotency;
     private final AuditLogger auditLogger;
     private final ObjectMapper objectMapper;
 
     public ChargebackAdminController(OpenChargebackUseCase openUseCase,
                                       DecideChargebackUseCase decideUseCase,
                                       LoadChargebackPort loadPort,
-                                      ManualIdempotencyGuard idempotency,
+                                      ClaimManualOperationUseCase idempotency,
                                       AuditLogger auditLogger,
                                       ObjectMapper objectMapper) {
         this.openUseCase = openUseCase;

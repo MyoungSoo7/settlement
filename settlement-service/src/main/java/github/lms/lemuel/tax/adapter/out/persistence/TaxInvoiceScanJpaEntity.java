@@ -1,6 +1,6 @@
 package github.lms.lemuel.tax.adapter.out.persistence;
 
-import github.lms.lemuel.payout.adapter.out.persistence.PayoutFieldEncryptionConverter;
+import github.lms.lemuel.crypto.FieldEncryptionConverter;
 import github.lms.lemuel.tax.domain.scan.TaxInvoiceScanStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
@@ -19,7 +19,7 @@ import java.time.OffsetDateTime;
 /**
  * 세금계산서 스캔 영속 엔티티. {@code (seller_id, file_hash)} UNIQUE 로 재업로드 멱등을 DB 가 보증한다.
  *
- * <p>사업자등록번호는 {@link PayoutFieldEncryptionConverter}(AES-GCM enc:v1)로 앱단 암호화해 저장한다
+ * <p>사업자등록번호는 {@link FieldEncryptionConverter}(AES-GCM enc:v1)로 앱단 암호화해 저장한다
  * — {@code SellerTaxProfileJpaEntity} 와 동일 스킴·동일 키(PAYOUT_ENC_KEY).
  */
 @Entity
@@ -49,11 +49,11 @@ public class TaxInvoiceScanJpaEntity {
     @Column(name = "status", nullable = false, length = 20)
     private TaxInvoiceScanStatus status;
 
-    @Convert(converter = PayoutFieldEncryptionConverter.class)
+    @Convert(converter = FieldEncryptionConverter.class)
     @Column(name = "supplier_business_no_enc", columnDefinition = "text")
     private String supplierBusinessNo;
 
-    @Convert(converter = PayoutFieldEncryptionConverter.class)
+    @Convert(converter = FieldEncryptionConverter.class)
     @Column(name = "buyer_business_no_enc", columnDefinition = "text")
     private String buyerBusinessNo;
 

@@ -36,12 +36,21 @@ public enum ErrorCode {
     ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "주문을 찾을 수 없습니다."),
     USER_NOT_EXISTS(HttpStatus.BAD_REQUEST, "존재하지 않는 사용자입니다."),
     DUPLICATE_ORDER_SUBMISSION(HttpStatus.CONFLICT, "이미 처리 중이거나 처리된 주문 요청입니다."),
+    // ─── 대량주문(초안 업로드 → 검증 → 확정) ───
+    BULK_ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "대량주문 초안을 찾을 수 없습니다."),
+    BULK_ORDER_INVARIANT(HttpStatus.BAD_REQUEST, "대량주문 초안 구성이 올바르지 않습니다."),
+    INVALID_BULK_ORDER_STATE(HttpStatus.CONFLICT, "현재 상태에서 처리할 수 없는 대량주문 요청입니다."),
+    // 행 단위가 아니라 파일 자체를 읽을 수 없는 경우다 — 행별로 사유를 돌려줄 방법이 없어 전체를 거절한다.
+    INVALID_BULK_ORDER_FILE(HttpStatus.BAD_REQUEST, "업로드 파일을 읽을 수 없습니다."),
 
     // ─── user ────────────────────────────────────────────────────────────────
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."),
     DUPLICATE_EMAIL(HttpStatus.CONFLICT, "이미 존재하는 이메일입니다."),
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다."),
     INVALID_PASSWORD_RESET_TOKEN(HttpStatus.BAD_REQUEST, "유효하지 않거나 만료된 비밀번호 재설정 토큰입니다."),
+    // 423 LOCKED — 401 로 내리면 클라이언트가 "비밀번호가 틀렸다"로 읽고 재시도를 유도해 잠금만 길어진다.
+    ACCOUNT_LOCKED(HttpStatus.LOCKED, "연속 로그인 실패로 계정이 잠겼습니다. 잠시 후 다시 시도해주세요."),
+    PASSWORD_EXPIRED(HttpStatus.FORBIDDEN, "비밀번호 사용 기한이 지났습니다. 비밀번호를 재설정해주세요."),
 
     // ─── product ─────────────────────────────────────────────────────────────
     PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "상품을 찾을 수 없습니다."),
@@ -65,6 +74,9 @@ public enum ErrorCode {
     MISSING_IDEMPOTENCY_KEY(HttpStatus.BAD_REQUEST, "멱등성 키(Idempotency-Key)가 필요합니다."),
     REFUND_EXCEEDS_PAYMENT(HttpStatus.CONFLICT, "환불 금액이 결제 금액을 초과합니다."),
     REFUND_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "환불 처리 중 오류가 발생했습니다."),
+    CASH_RECEIPT_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "이 결제는 현금영수증 발급 대상이 아닙니다."),
+    INVALID_CASH_RECEIPT_STATE(HttpStatus.BAD_REQUEST, "현재 상태에서 처리할 수 없는 현금영수증 요청입니다."),
+    DUPLICATE_CASH_RECEIPT(HttpStatus.CONFLICT, "이미 발급된 현금영수증이 있습니다."),
 
     // ─── settlement / ledger ──────────────────────────────────────────────────
     SETTLEMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "정산을 찾을 수 없습니다."),

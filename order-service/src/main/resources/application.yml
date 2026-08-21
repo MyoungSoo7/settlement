@@ -250,6 +250,15 @@ app:
   # settlement(OrderReconClient)의 INTERNAL_API_KEY 와 동일해야 한다. 미설정 시 검증 비활성(개발)+경고.
   internal:
     api-key: ${INTERNAL_API_KEY:}
+  security:
+    # 로그인 무차별 대입 방어 + 비밀번호 사용 기한 (LoginSecurityPolicy).
+    # max-failed-attempts: 연속 실패 이 횟수에 닿으면 잠금. 성공 1 회가 누적을 지운다.
+    # lock-minutes: 기한부 잠금 시간. 영구 잠금은 남의 이메일만 알면 서비스 거부를 걸 수 있어 쓰지 않는다.
+    # password-max-age-days: 0 이면 만료 검사 없음. 기준 시각은 users.password_changed_at.
+    login:
+      max-failed-attempts: ${LOGIN_MAX_FAILED_ATTEMPTS:5}
+      lock-minutes: ${LOGIN_LOCK_MINUTES:30}
+      password-max-age-days: ${LOGIN_PASSWORD_MAX_AGE_DAYS:90}
   # 읽기/쓰기 분리 (opt-in). enabled=true 일 때만 라우팅 데이터소스 활성 — readOnly 트랜잭션은 read 로.
   # 활성화 시 write/read 에 Hikari 네이티브 프로퍼티(jdbc-url 등)를 지정한다.
   datasource:
@@ -282,6 +291,17 @@ app:
       payment-refunded: lemuel.payment.refunded
   outbox:
     polling-delay-ms: 2000
+  # 현금영수증 대행 연동. 운영(prod)에서만 실 어댑터가 뜨고, 그 외 프로파일은 모의 어댑터다.
+  # enabled=false(기본)면 운영에서도 실 연동 대신 "발급 불가"를 명시적으로 돌려주는 어댑터가 뜬다
+  # — 대행 계약이 없는 배포에서 기동은 계속되되, 발급되지 않은 것을 발급됐다고 기록하지 않는다.
+  # enabled=true 인데 아래 값이 비어 있으면 기동이 실패한다(fail-closed, CashReceiptApiClient 생성자).
+  cash-receipt:
+    enabled: ${APP_CASH_RECEIPT_ENABLED:false}
+    base-url: ${CASH_RECEIPT_BASE_URL:}
+    issue-path: ${CASH_RECEIPT_ISSUE_PATH:/v1/cash-receipts}
+    cancel-path: ${CASH_RECEIPT_CANCEL_PATH:/v1/cash-receipts/cancel}
+    merchant-id: ${CASH_RECEIPT_MERCHANT_ID:}
+    secret-key: ${CASH_RECEIPT_SECRET_KEY:}
   # 다중 PG 라우팅 정책 — PgRouter 가 결제수단·금액·health 를 보고 어댑터 선택
   pg:
     routing:
@@ -344,6 +364,9 @@ app:
 toss:
   secret-key: ${TOSS_SECRET_KEY}
   api-url: https://api.tosspayments.com/v1/payments/confirm
+  # 환불(취소) 엔드포인트. {paymentKey} 는 RestTemplate 의 URI 변수로 치환된다 — 문자열 연결로
+  # 바꾸지 말 것(paymentKey 가 URL 인코딩되지 않는다).
+  cancel-url: https://api.tosspayments.com/v1/payments/{paymentKey}/cancel
 
 # Resilience4j — PG 별 독립 CircuitBreaker (한 PG 장애가 다른 PG 로 전이되지 않도록 격벽)
 resilience4j:
@@ -370,6 +393,9 @@ resilience4j:
         baseConfig: pgDefault
       inicisPg:
         baseConfig: pgDefault
+      # 현금영수증 대행 — PG 결제와 격벽을 나눈다(세금 서류 장애가 결제를 끊지 않도록)
+      cashReceipt:
+        baseConfig: pgDefault
   retry:
     configs:
       pgDefault:
@@ -392,6 +418,8 @@ resilience4j:
       nicePg:
         baseConfig: pgDefault
       inicisPg:
+        baseConfig: pgDefault
+      cashReceipt:
         baseConfig: pgDefault
 
 # 데모 자동로그인 / 게스트 토글. 운영 false, dev/demo true.

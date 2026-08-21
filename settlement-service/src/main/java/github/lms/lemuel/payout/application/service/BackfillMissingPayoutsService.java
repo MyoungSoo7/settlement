@@ -6,7 +6,7 @@ import github.lms.lemuel.payout.application.port.out.PayoutBackfillQueryPort;
 import github.lms.lemuel.payout.application.port.out.PayoutBackfillQueryPort.SettlementForPayout;
 import github.lms.lemuel.payout.domain.PayoutBackfillReport;
 import github.lms.lemuel.payout.domain.PayoutType;
-import github.lms.lemuel.settlement.application.port.in.ApplyLoanDeductionUseCase;
+import github.lms.lemuel.payout.application.port.out.RedriveSettlementDeductionPort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -25,7 +25,7 @@ import java.util.List;
  *
  * <h3>IMMEDIATE 는 재구동, HOLDBACK_RELEASE 는 직접 생성</h3>
  * IMMEDIATE 지급액은 원천징수·대출 상환차감·채권상계를 거쳐 정해지므로 백필이 자체 계산하지 않고
- * 확정 경로의 종착점({@link ApplyLoanDeductionUseCase#redriveFromRecordedDeduction})을 재구동한다.
+ * 확정 경로의 종착점({@link RedriveSettlementDeductionPort#redriveFromRecordedDeduction})을 재구동한다.
  * HOLDBACK_RELEASE 는 유보분 해제라 차감 대상이 아니므로 그대로 생성한다.
  *
  * <h3>멱등성 보장</h3>
@@ -53,17 +53,17 @@ public class BackfillMissingPayoutsService implements BackfillMissingPayoutsUseC
 
     private final PayoutBackfillQueryPort queryPort;
     private final RequestPayoutUseCase requestPayoutUseCase;
-    private final ApplyLoanDeductionUseCase applyLoanDeductionUseCase;
+    private final RedriveSettlementDeductionPort redriveSettlementDeductionPort;
     private final int defaultPageSize;
 
     public BackfillMissingPayoutsService(
             PayoutBackfillQueryPort queryPort,
             RequestPayoutUseCase requestPayoutUseCase,
-            ApplyLoanDeductionUseCase applyLoanDeductionUseCase,
+            RedriveSettlementDeductionPort redriveSettlementDeductionPort,
             @Value("${app.payout.backfill.page-size:" + DEFAULT_PAGE_SIZE + "}") int defaultPageSize) {
         this.queryPort = queryPort;
         this.requestPayoutUseCase = requestPayoutUseCase;
-        this.applyLoanDeductionUseCase = applyLoanDeductionUseCase;
+        this.redriveSettlementDeductionPort = redriveSettlementDeductionPort;
         this.defaultPageSize = defaultPageSize;
     }
 
@@ -161,7 +161,7 @@ public class BackfillMissingPayoutsService implements BackfillMissingPayoutsUseC
             return Result.SKIPPED;
         }
         try {
-            boolean redriven = applyLoanDeductionUseCase.redriveFromRecordedDeduction(
+            boolean redriven = redriveSettlementDeductionPort.redriveFromRecordedDeduction(
                     s.settlementId(), s.sellerId());
             if (!redriven) {
                 log.warn("[PayoutBackfill] 대출 차감 기록 없음 — 백필하지 않는다(loan 이벤트 미도착 의심). "

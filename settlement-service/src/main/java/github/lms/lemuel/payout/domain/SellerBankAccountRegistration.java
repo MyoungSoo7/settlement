@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
  * 시점에 따라 정정될 수 있는 <b>가변 원천</b>이다. Payout 생성 시점에 {@link #toBankAccount()} 로
  * 스냅샷을 떠서 Payout 에 넘긴다 — 이후 계좌가 정정돼도 이미 생성된 Payout 스냅샷은 불변.
  *
- * <p>계좌번호는 도메인에선 평문으로 다루고, 영속 어댑터({@code PayoutFieldEncryptionConverter})가
+ * <p>계좌번호는 도메인에선 평문으로 다루고, 영속 어댑터({@code FieldEncryptionConverter})가
  * 저장 시 암호화한다(도메인 무오염). 생성·정정은 팩토리/도메인 메서드 전용 — public setter 없음.
  */
 public class SellerBankAccountRegistration {

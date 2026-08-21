@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
  * 레지스트리)과 <b>동형</b>으로 관리자 CRUD(upsert) 원천을 둔다. 신규 cross-service 프로젝션을 만들지 않고
  * settlement 자체에서 세무유형을 확보한다(ADR 0029 자족형).
  *
- * <p>사업자등록번호는 도메인에선 평문으로 다루고, 영속 어댑터({@code PayoutFieldEncryptionConverter})가
+ * <p>사업자등록번호는 도메인에선 평문으로 다루고, 영속 어댑터({@code FieldEncryptionConverter})가
  * 저장 시 암호화한다(도메인 무오염). public setter 없음 — 생성·정정은 팩토리/도메인 메서드 전용.
  *
  * <p>불변식: 사업자(BUSINESS)는 사업자등록번호(10자리 숫자)가 필수, 개인(INDIVIDUAL)은 미보유(null).

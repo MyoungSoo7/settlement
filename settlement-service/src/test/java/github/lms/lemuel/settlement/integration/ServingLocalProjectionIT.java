@@ -1,7 +1,7 @@
 package github.lms.lemuel.settlement.integration;
 
 import github.lms.lemuel.SettlementServiceApplication;
-import github.lms.lemuel.report.adapter.out.persistence.CashflowAggregateQueryAdapter;
+import github.lms.lemuel.settlement.adapter.out.persistence.CashflowAggregateQueryAdapter;
 import github.lms.lemuel.report.domain.BucketGranularity;
 import github.lms.lemuel.report.domain.CashflowBucket;
 import github.lms.lemuel.settlement.adapter.in.web.response.SettlementPageResponse;
