@@ -89,7 +89,9 @@ describe('BankingConsolePage — 정기예금', () => {
   });
 
   it('중도해지 확인 문구에 두 이율을 함께 적는다', async () => {
-    const confirmSpy = vi.fn(() => false);
+    // 인자 타입을 적어 둔다 — `vi.fn(() => false)` 는 인자 없는 함수로 추론돼
+    // mock.calls[0][0] 접근이 타입 오류가 된다(typecheck:tests 가 잡는다).
+    const confirmSpy = vi.fn((_message?: string) => false);
     vi.stubGlobal('confirm', confirmSpy);
     mockedDeposit.listMine.mockResolvedValue([deposit()]);
     render(<BankingConsolePage />);
