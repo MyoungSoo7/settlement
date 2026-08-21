@@ -2,11 +2,15 @@
 # 상태: CONFIRMED (Restate 게이트 승인 완료, 2026-07-18)
 # 생성: 2026-07-18, 인터뷰 세션 interview_20260718_093314 (MCP 폴백 → 직접 인터뷰 모드)
 # 원칙: 이 Seed 는 "현행 코드가 실제로 하는 일"의 불변 기술이다. 결함은 교정하지 않고 known_issues 로만 기록한다.
+# 개정: v1.1 (2026-08-22, develop 92d25c463 대조) — Payment 상태머신 7상태(EXPIRED 추가) · 계약 표면 5→16토픽 ·
+#       텐더 타입 9종 · AC-2 게이트 7클래스 · KI-3(미소비 발행 3종) 추가. 사양 변경이 아니라 코드 이동분의 재기술이다.
 
 seed:
   id: order-service-core-commerce-v1
+  revision: v1.1
+  revision_baseline: "develop 92d25c463 (2026-08-22)"
   goal: >-
-    order-service 핵심 커머스 루프(주문·결제·환불·재고·쿠폰 + 5개 발행 이벤트 계약)의
+    order-service 핵심 커머스 루프(주문·결제·환불·재고·쿠폰 + 16개 발행 이벤트 계약)의
     현행 동작을 실행 가능한 게이트에 매핑된 불변 사양으로 결정화해,
     회귀 기준선 · 계약 드리프트 게이트 · 면접/포트폴리오 문서 · 후속 기능 베이스로 사용한다.
 
@@ -16,12 +20,18 @@ seed:
       - payment (결제·분할결제 tender·환불)
       - product 재고 차감/복원 (조건부 UPDATE 경로만)
       - coupon 적용/사용 제한
-      - 발행 이벤트 계약 표면 5토픽 (user·product 는 이벤트 계약만)
+      - 발행 이벤트 계약 표면 16토픽 (user·product 는 이벤트 계약만, point·giftcard 는 계약 표면 + 텐더 타입만)
     excluded:
       - cart, shipping, review, game, menu, rbac, commoncode, category 서브도메인 내부
       - user 도메인 내부 (가입/멤버십 로직 — user.registered 계약 표면만 포함)
       - product 도메인 내부 (상품 관리 — product.changed 계약 표면 + 재고 차감 경로만 포함)
       - recon, projectionbackfill (settlement 측 대사는 별도 계약)
+      # v1.1 — 2026-08 이후 들어온 컨텍스트. 발행 계약 표면(point 6 · giftcard 4 토픽)과
+      # payment 텐더 타입(POINT · GIFT_CARD)만 이 Seed 에 편입하고, 원장 내부 규칙
+      # (로트/LIFO 소진 · 선점 hold · 적립 정책 · 사용 상한)은 별도 Seed 대상으로 남긴다.
+      - point 원장 내부 (로트·선점·적립 정책·사용 상한)
+      - giftcard 원장 내부 (코드 발행·선점·잔액 소진)
+      - bulkorder, auditconsole, sellertier 내부
 
   constraints:
     - "MSA 경계: settlement 는 order 를 import 하지 않는다 — 연계는 Kafka 이벤트 + /internal/recon 만 (ADR 0020)"
@@ -46,12 +56,26 @@ seed:
         terminal: [CANCELED, REFUNDED, REFUND_COMPLETED]
       notes: "환불 완료 종단은 REFUNDED 로 일원화. 결제 후 모든 진행 단계에서 환불 진입 허용."
     payment_state_machine:
-      source: order-service/src/main/java/github/lms/lemuel/payment/domain/PaymentStatus.java:22-37
-      transitions: "READY→AUTHORIZED→CAPTURED→REFUNDED, AUTHORIZED→CANCELED; FAILED/CANCELED/REFUNDED 종단"
+      source: order-service/src/main/java/github/lms/lemuel/payment/domain/PaymentStatus.java:27-43  # canTransitionTo — 전이 판정 단일 출처
+      states: [READY, AUTHORIZED, CAPTURED, FAILED, CANCELED, REFUNDED, EXPIRED]
+      transitions:
+        READY: [AUTHORIZED, EXPIRED]
+        AUTHORIZED: [CAPTURED, CANCELED]
+        CAPTURED: [REFUNDED]
+        terminal: [FAILED, CANCELED, REFUNDED, EXPIRED]
+      notes: >-
+        EXPIRED 는 승인 前(READY)에서만 도달한다 — 가상계좌·무통장의 입금 기한이 지나 결제가 성립하지
+        못한 상태다. 승인 이후에는 자금이 이미 잡혀 있으므로 취소(AUTHORIZED→CANCELED)·환불
+        (CAPTURED→REFUNDED) 경로를 쓴다. FAILED 는 도메인 전이 메서드가 없어 어떤 전이의 원천도 대상도 아니다.
+      v1_delta: "v1 은 4상태(READY/AUTHORIZED/CAPTURED/REFUNDED + CANCELED)로 기술했다. EXPIRED 와 READY→EXPIRED 는 가상계좌 입금 대기 도입과 함께 들어왔다."
       tender_states: [PENDING, AUTHORIZED, CAPTURED, REFUNDED, FAILED]
+      tender_types: [CARD, KAKAO_PAY, NAVER_PAY, PAYCO, SAMSUNG_PAY, BANK_TRANSFER, VIRTUAL_ACCOUNT, POINT, GIFT_CARD]
+      tender_type_notes: >-
+        TenderType 은 (usesExternalPg, awaitsDeposit) 두 축을 갖는다. BANK_TRANSFER·VIRTUAL_ACCOUNT 만
+        awaitsDeposit=true 이며, POINT·GIFT_CARD 는 외부 PG 를 쓰지 않는 사내 원장 텐더다(v1.1 신규).
     refund_invariants:
       lock: "payment 행 SELECT FOR UPDATE (PaymentJpaRepository.java:32, PESSIMISTIC_WRITE), READ_COMMITTED"
-      over_refund_guard: "3중 — 락 전 스냅샷 검증(RefundPaymentUseCase.java:127) → 락 내 재확정(:153) → 도메인 최종 방어선(PaymentDomain.java:150,188 / tender 단위 PaymentTender.java:103)"
+      over_refund_guard: "3중 — 락 전 스냅샷 검증(payment/application/RefundPaymentUseCase.java:129) → 락 내 재확정(:155) → 도메인 최종 방어선(PaymentDomain.java:168,221 / tender 단위 PaymentTender.java:103)"  # v1.1 재대조: 클래스가 application/service/ → application/ 로 이동, 라인 이동
       history: "환불 이력(REQUESTED)은 payment 락 획득 前 REQUIRES_NEW 로 INSERT (RefundLifecycle — FOR KEY SHARE/FOR UPDATE 데드락 회피)"
       partial_refund: "허용 — tender 단위 잔여 환불 가능액 검증"
     order_idempotency:
@@ -61,26 +85,52 @@ seed:
       source: order-service/src/main/java/github/lms/lemuel/product/adapter/out/persistence/SpringDataProductJpaRepository.java:42-43 (variant 동형 :30-31)
       mechanism: "원자적 조건부 UPDATE: SET stock = stock - q WHERE stock >= q AND status <> DISCONTINUED; 0 도달 시 OUT_OF_STOCK, 복원은 역연산(+q, 품절 부활)"
     coupon:
-      source: order-service/src/main/java/github/lms/lemuel/coupon/domain/Coupon.java:90,144
-      rules: "PERCENTAGE/정액 타입(CouponType), usedCount >= maxUses 차단, 사용 시 usedCount 증가"
+      source: order-service/src/main/java/github/lms/lemuel/coupon/domain/Coupon.java:97,151,163  # v1.1 재대조 (구 90,144)
+      rules: "PERCENTAGE/정액 타입(CouponType), usedCount >= maxUses 차단(:97), 사용 시 usedCount 증가(:151)"
+      restore: "v1.1 신규 — 주문 취소·환불 시 usedCount 감소(:163). usedCount <= 0 이면 감소하지 않는다 — 음수가 남으면 한도 계산이 영구히 헐거워지기 때문이다."
 
-  event_contracts:  # 발행 5토픽 — 정본: shared-common/src/testFixtures/resources/contracts/events/
+  event_contracts:  # 발행 16토픽 — 정본: shared-common/src/testFixtures/resources/contracts/events/
     topics:
+      # v1 계약 표면 (5)
       - lemuel.order.created
       - lemuel.payment.captured
       - lemuel.payment.refunded
       - lemuel.user.registered
       - lemuel.product.changed
-    routing: "Outbox 컨벤션 라우팅 (aggregate/eventType → topic, OutboxBackedOrderEventPublisher 계열)"
+      # 셀러등급 (1)
+      - lemuel.seller.tier_changed
+      # 포인트 원장 (6) — v1.1 신규
+      - lemuel.point.charged
+      - lemuel.point.granted
+      - lemuel.point.used
+      - lemuel.point.restored
+      - lemuel.point.expired
+      - lemuel.point.revoked
+      # 기프트카드 원장 (4) — v1.1 신규
+      - lemuel.giftcard.registered
+      - lemuel.giftcard.used
+      - lemuel.giftcard.restored
+      - lemuel.giftcard.expired
+    not_catalogued:  # 발행 코드는 있으나 ADR 0035 카탈로그가 사유와 함께 제외한 3종 (→ KI-3)
+      - topic: lemuel.payment.created
+        reason: "레거시 — 어느 서비스도 참조하지 않음"
+      - topic: lemuel.payment.authorized
+        reason: "레거시 — 어느 서비스도 참조하지 않음"
+      - topic: lemuel.user.membership_changed
+        reason: "cross-service 소비자가 생기면 편입 (ADR 0024)"
+    publishers: [Order, Payment, User, Product, Seller, Point, GiftCard]  # aggregateType 기준 7종
+    routing: "Outbox 컨벤션 라우팅 (aggregateType/eventType → topic, OutboxBacked*EventPublisher 계열)"
     schema_source: shared-common/src/testFixtures/resources/contracts/events/*.schema.json (+samples)
+    transport_source: shared-common/src/main/resources/kafka/topic-catalog.json  # 파티션·순서키·보존 (ADR 0035)
 
   acceptance_criteria:  # 실행 가능 — 각 AC 는 기존 게이트에 매핑
     - id: AC-1
       criterion: 상태머신 전이표가 위 invariants 와 일치한다 (임의 전이 차단)
       gate: "./gradlew :order-service:test — OrderStatus/PaymentDomain 도메인 테스트"
     - id: AC-2
-      criterion: 발행 이벤트 5토픽이 JSON Schema 계약과 일치한다 (드리프트 시 빌드 실패)
-      gate: "OrderEventContractTest · PaymentEventContractTest · UserEventContractTest · ProductEventContractTest"
+      criterion: 발행 이벤트 16토픽이 JSON Schema 계약과 일치한다 (드리프트 시 빌드 실패)
+      gate: "OrderEventContractTest · PaymentEventContractTest · UserEventContractTest · ProductEventContractTest · SellerTierEventContractTest · PointEventContractTest · GiftCardEventContractTest"
+      note: "계약 테스트는 스키마 일치만 본다 — 미소비 토픽(KI-3)은 이 게이트로 잡히지 않는다."
     - id: AC-3
       criterion: 헥사고날 의존 방향 위반 0 (domain→adapter import 금지)
       gate: "HexagonalArchitectureTest (ArchUnit)"
@@ -101,6 +151,14 @@ seed:
     - id: KI-2
       finding: "REFUND_COMPLETED 상태가 @Deprecated 로 잔존 (DB 과거 행 호환) — 신규 전이는 없으나 enum 표면에 남아 있음"
       disposition: by-design (호환 목적)
+    - id: KI-3
+      since: v1.1
+      finding: >-
+        발행 3종(PaymentCreated·PaymentAuthorized·UserMembershipChanged)에 소비자가 없다. 토픽 카탈로그가
+        각각 '레거시, 어느 서비스도 참조하지 않음'·'소비자가 생기면 편입'으로 분류해 등재에서 제외했는데
+        발행 코드는 그대로라, 매 결제·멤버십 변경마다 아무도 읽지 않는 Outbox 행이 쌓인다. 계약 테스트는
+        스키마 드리프트만 보므로 이 상태를 잡지 못한다.
+      disposition: recorded-not-fixed
 
   uses:
     - regression-baseline   # 리팩터링·기능 추가 시 '기존 동작 불변' 판정 정본
