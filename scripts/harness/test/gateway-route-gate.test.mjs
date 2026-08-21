@@ -69,15 +69,20 @@ const NOT_ROUTED_BY_DESIGN = new Map([
  * 여기부터 지워야 한다(라우트 없이 화면만 만들면 404 를 부르는 화면이 된다).
  */
 const UNROUTED_DEBT = new Map([
-  ['order-service/AdminRefundController', '환불 관리 콘솔(/admin/refunds) — 화면·라우트 모두 미착수'],
-  ['account-service/RetirementPensionController', '퇴직연금(/api/banking/**) — 계정계 뱅킹 3종 일괄 미노출'],
-  ['account-service/InstallmentSavingsController', '적금(/api/banking/**) — 계정계 뱅킹 3종 일괄 미노출'],
-  ['account-service/TimeDepositController', '예금(/api/banking/**) — 계정계 뱅킹 3종 일괄 미노출'],
+  // 2026-08-22: 4건을 모두 배선했다(/admin/refunds/** · /api/banking/**).
+  //   노출 전에 인가부터 확인했다 — 게이트웨이 라우팅은 "밖에서 닿게 만드는" 결정이라,
+  //   서버가 막지 않는 경로를 열면 그게 곧 무인증 공개다.
+  //   · /admin/refunds/**  → SecurityConfig 가 ADMIN·MANAGER 로 게이트
+  //   · /api/banking/**    → authenticated. 단 운용수익 인식·수급 지급 두 POST 만 ADMIN·MANAGER
+  //                          (기관이 돈을 인식·지급하는 행위라 가입자에게 열면 임의 증액이 된다)
+  //   account-service 는 제한 스캔이지만 배제 대상이 common.outbox.* 뿐이라 SecurityConfig 는
+  //   그대로 로드된다 — 이걸 확인하지 않고 열었다면 뱅킹 3종이 무인증으로 공개될 뻔했다.
 ]);
 
 /** 미배선 부채의 상한. <b>내려가기만 한다</b> — 라우트를 붙였으면 이 수를 함께 내린다. */
 // 2026-08-21: 4 (게이트 신설 시점의 실측값)
-const UNROUTED_BUDGET = 4;
+// 2026-08-22: 0 (환불 콘솔·계정계 뱅킹 3종 배선 — 인가 확인 후 노출)
+const UNROUTED_BUDGET = 0;
 
 const sorted = (values) => [...new Set(values)].sort();
 
