@@ -176,7 +176,8 @@ class PointIdempotencyRegressionTest {
     void useIsIdempotentAcrossCalls() {
         lotPort.save(PointLot.issue(ACCOUNT_ID, PointLotOrigin.ORDER_EARN, new BigDecimal("10000"),
                 NOW, null, "SEED", "1"));
-        UsePointService service = new UsePointService(accountPort, lotPort, entryPort, eventPort);
+        UsePointService service = new UsePointService(accountPort,
+                new PointSpendRecorder(accountPort, lotPort, entryPort, eventPort));
         UsePointCommand command = new UsePointCommand(
                 USER_ID, new BigDecimal("3000"), "PAYMENT_TENDER", "77", "user:42");
 
