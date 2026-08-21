@@ -500,19 +500,29 @@ DepositHold  : ACTIVE → PARTIALLY_CAPTURED → CAPTURED / EXPIRED / VOIDED / R
 | `lemuel.organization.created` / `.member_joined` / `.member_role_changed`                                   | organization | card(조직·멤버 프로젝션 — created 는 SELLER 만, 소유자 OWNER 멤버십 포함 적재)                 |
 | `lemuel.organization.member_removed`                                                                        | organization | card(이탈자 카드 자동 정지)                                                                    |
 | `lemuel.card.account_opened` / `.issued` / `.limit_changed` / `.status_changed` / `.account_status_changed` | card         | 소비처 미배선 — 발행 전용                                                                      |
-| `lemuel.card.authorized`                                                                                    | card         | Phase 2 완료 — 승인 홀드 생성(Phase2ContractPlaceholderTest + CardEventContractTest 계약 검증) |
+| `lemuel.card.authorized`                                                                                    | card         | **소비처 미배선 — 발행 전용**(승인 홀드는 card 내부에서 생성된다. 계약 검증만 존재: Phase2ContractPlaceholderTest + CardEventContractTest) |
 | `lemuel.card.captured`                                                                                      | card         | card 자기 소비 2그룹 — `lemuel-card-expense`(경비보고서 DRAFT 자동생성)·`lemuel-card-statement`(명세서 적재). 계약: CardEventContractTest |
-| `lemuel.card.statement_paid`                                                                                | card         | Phase 2 완료 — 명세서 전액 납부(ADR 0022 신규 토픽, 하위호환)                                  |
+| `lemuel.card.statement_paid`                                                                                | card         | **소비처 미배선 — 발행 전용**(명세서 전액 납부 통지, ADR 0022 신규 토픽·하위호환)               |
 
 부가(계약 스키마 없음): `lemuel.ops.*`(실패 신호 `*.failed` + `stock.depleted`·`stock.reclaim_delayed`·`shipping.delayed`), `lemuel.pgreconciliation.discrepancy_approved`,
 `lemuel.payment.confirmed`(payment-webhook-service(Go) 발행 → notification 소비 — 내부 계약).
 
-발행 전용(소비처 미배선 — 의도된 상태, 소비자가 생기면 ADR 0024 절차로 계약 편입):
-`lemuel.payment.created` / `lemuel.payment.authorized`(결제 라이프사이클 관측용),
-`lemuel.user.membership_changed`, `lemuel.card.*`(5종 — 청구 사이클 3단계에서 소비 예정),
-`lemuel.insurance.*`(9종 — `policy_issued`·`policy_status_changed`·`commission_confirmed`·`commission_paid`·
-`commission_clawback_triggered`·`commission_monthly_closed`·`banca_rule_violated`·`general_payout_requested`·`general_payout_paid`),
-`lemuel.deposit.*`(5종 — `balance_changed`·`hold_placed`·`hold_released`·`offset_applied`·`offset_shortfall`).
+발행 전용(소비처 미배선 — 의도된 상태, 소비자가 생기면 ADR 0024 절차로 계약 편입).
+**이 목록은 `topic-consumer-gate.test.mjs` 가 기계로 강제한다** — 카탈로그 토픽 중 어떤 서비스도
+구독하지 않는 것이 여기 없으면 CI 가 FAIL 한다(2026-08-22 신설. 그전까지 이 목록은 card 5종으로
+적혀 있었고 그 뒤 늘어난 4종을 아무도 대조하지 않았다):
+
+- `lemuel.payment.created` / `lemuel.payment.authorized` — 결제 라이프사이클 관측용(레거시)
+- `lemuel.user.membership_changed` — cross-service 소비자가 생기면 편입
+- `lemuel.card.*` **7종** — `account_opened`·`account_status_changed`·`limit_changed`·`issued`·
+  `status_changed`(청구 사이클 3단계에서 소비 예정) + `authorized`·`statement_paid`
+- `lemuel.insurance.*` 9종 — `policy_issued`·`policy_status_changed`·`commission_confirmed`·`commission_paid`·
+  `commission_clawback_triggered`·`commission_monthly_closed`·`banca_rule_violated`·`general_payout_requested`·`general_payout_paid`
+- `lemuel.deposit.*` 5종 — `balance_changed`·`hold_placed`·`hold_released`·`offset_applied`·`offset_shortfall`
+- `lemuel.loan.lease_activated` — 리스 개시 통지
+- `lemuel.education.course_published` — 소비처 미배선인 데다 **폴러 미배선으로 Kafka 발행 자체가 되지 않는다**
+  (`docs/plan/prd/education-service.md` G-1 · `outbox-poller-gate` KNOWN_UNWIRED)
+
 insurance·deposit 토픽은 아직 계약 스키마(testFixtures)에 편입되지 않았다.
 역방향 예약: `lemuel.ops.order.failed` 는 operation 이 구독하지만 emit 지점 미배선(OpsSignalCategory 주석 참조).
 
