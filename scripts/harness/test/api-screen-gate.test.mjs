@@ -106,8 +106,14 @@ const SCREEN_PENDING = new Map([
   ['settlement-service/TaxInvoiceScanController', '세금계산서 스캔(셀러 화면)'],
   ['settlement-service/TaxInvoiceSellerController', '세금계산서 조회(셀러 화면)'],
   // --- loan-service ---
-  ['loan-service/SecuredLoanController', '담보대출 화면 — 서류 리뷰 큐만 화면이 있다'],
-  ['loan-service/CollateralController', '담보 감시(재평가·마진콜·청산) 화면'],
+  // 담보 감시 화면이 생겼다(2026-08-21, /admin/ceo/collateral). 재평가·마진콜 판정과
+  // 실행(처분·대위변제)은 서비스·정책·테스트가 다 있었는데 부르는 어댑터가 없어 담보 가치가
+  // 반토막 나도 아무 일이 없었고, 어댑터가 생긴 뒤에도 부르는 화면이 없어 사람이 못 손댔다.
+  //
+  // ⚠️ SecuredLoanController 도 함께 내려가는데, 이 게이트는 <b>컨트롤러 단위</b>로 판정하기
+  //    때문이다(엔드포인트 하나만 불려도 커버). 실제로 화면이 부르는 것은 상세 조회
+  //    GET /loans/secured/{id} 하나뿐이고, 신청 3종(mortgage·financial-asset·personal)과
+  //    승인·반려·실행은 여전히 화면이 없다. 담보대출 신청·심사 화면은 별도 작업으로 남는다.
   ['loan-service/LeaseController', '리스 화면'],
   ['loan-service/RepaymentController', '상환 화면'],
   ['loan-service/CompanyReputationController', '기업 평판 조회(대출 심사 보조)'],
@@ -157,7 +163,9 @@ const SCREEN_PENDING = new Map([
 //              막혀 있어 수기 경로가 유일하고, 상계 부족분은 해소 주체가 아예 없어 쌓이기만 했다.)
 // 2026-08-21: 26 (보험 상품설명서 교부 — 완전판매 게이트의 입력 경로가 API 뿐이라
 //              청약 승인을 UI 로 통과시킬 방법이 없었다.)
-const PENDING_BUDGET = 26;
+// 2026-08-21: 24 (담보 감시 화면 — 재평가·처분·대위변제. SecuredLoanController 는 상세 조회만
+//              불리는데 컨트롤러 단위 판정이라 함께 내려간다. 신청·심사 화면 부재는 위 주석 참조.)
+const PENDING_BUDGET = 24;
 
 const read = (path) => readFileSync(path, 'utf8');
 

@@ -97,6 +97,9 @@ export const FALLBACK_MENUS: FallbackMenuNode[] = [
       { id: -66, name: '투자하기', path: '/admin/ceo/invest', icon: '💹', description: '재무점수 기반 투자', area: 'CEO', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       { id: -67, name: '투자 추천', path: '/admin/ceo/invest-recommend', icon: '🧭', description: '규칙 스크리닝 추천 종목', area: 'CEO', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       { id: -68, name: '대출관리', path: '/admin/ceo/loans', icon: '💸', description: '선정산 · 기업대출', area: 'CEO', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
+      // 담보 감시는 대출관리 바로 뒤 — 같은 서비스의 다른 상품군(담보대출)이고, 대출을 보러 온
+      // 자리에서 담보 상태로 이어지는 순서다.
+      { id: -115, name: '담보 감시', path: '/admin/ceo/collateral', icon: '🏚️', description: '재평가 · 마진콜 · 처분 · 대위변제', area: 'CEO', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       { id: -69, name: '대출 상품 안내', path: '/admin/ceo/loan-guide', icon: '📖', description: '개인신용 · 주택담보', area: 'CEO', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       { id: -70, name: '대출 심사·상환 안내', path: '/admin/ceo/loan-process', icon: '🧾', description: '심사 · 신용평가 · 상환', area: 'CEO', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       { id: -71, name: '대출기관 안내', path: '/admin/ceo/lender-guide', icon: '🏦', description: '은행 · 저축은행 · 캐피탈 · 대부업', area: 'CEO', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },

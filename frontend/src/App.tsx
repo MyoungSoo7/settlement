@@ -35,6 +35,7 @@ const CeoInvestRecommendPage = lazy(() => import('./pages/CeoInvestRecommendPage
 const CeoAccountPage = lazy(() => import('./pages/CeoAccountPage'));
 const CeoCardPage = lazy(() => import('./pages/CeoCardPage'));
 const CeoLoanGuidePage = lazy(() => import('./pages/CeoLoanGuidePage'));
+const CollateralConsolePage = lazy(() => import('./pages/CollateralConsolePage'));
 const CeoLoanProcessGuidePage = lazy(() => import('./pages/CeoLoanProcessGuidePage'));
 const CeoLenderGuidePage = lazy(() => import('./pages/CeoLenderGuidePage'));
 const CeoFundGuidePage = lazy(() => import('./pages/CeoFundGuidePage'));
@@ -325,6 +326,10 @@ function App() {
               element={<AdminManagerRoute><SideNavLayout><CeoInvestRecommendPage /></SideNavLayout></AdminManagerRoute>} />
             <Route path="/admin/ceo/loans"
               element={<AdminManagerRoute><SideNavLayout><LoanPage /></SideNavLayout></AdminManagerRoute>} />
+            {/* 담보 감시 — 서버가 /loans/secured/{id}/collateral/** 를 ADMIN·MANAGER 로 막는다
+                (JWT 권한에서만 판정). 대출 표면이 이미 CEO 그룹에 있어 그 옆에 둔다. */}
+            <Route path="/admin/ceo/collateral"
+              element={<AdminManagerRoute><SideNavLayout><CollateralConsolePage /></SideNavLayout></AdminManagerRoute>} />
             <Route path="/admin/ceo/loan-guide"
               element={<AdminManagerRoute><SideNavLayout><CeoLoanGuidePage /></SideNavLayout></AdminManagerRoute>} />
             {/* 대출 심사·상환 안내 — 심사 절차·신용평가 산식·상환 구조 (정적 콘텐츠, API 없음) */}
