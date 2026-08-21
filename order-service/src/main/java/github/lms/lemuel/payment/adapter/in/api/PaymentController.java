@@ -12,9 +12,12 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import github.lms.lemuel.web.security.ResourceOwnership;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -123,19 +126,29 @@ public class PaymentController {
      * 토스페이먼츠 결제 확인
      * POST /payments/toss/confirm
      */
-    @Operation(summary = "Toss 결제 확인", description = "토스페이먼츠 단건 결제 승인 요청을 처리한다.")
+    @Operation(summary = "Toss 결제 확인",
+            description = "토스페이먼츠 단건 결제 승인 요청을 처리한다. 승인 전에 주문 소유권과 금액을 서버에서 대조한다. "
+                    + "Idempotency-Key 헤더를 주면 동일 키의 재요청은 최초 승인 결과를 그대로 반환한다"
+                    + "(미지정 시 paymentKey 가 멱등 키가 된다).")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "승인 성공"),
+            @ApiResponse(responseCode = "200", description = "승인 성공(또는 동일 키 replay)"),
             @ApiResponse(responseCode = "400", description = "Toss 승인 실패"),
-            @ApiResponse(responseCode = "404", description = "주문/결제를 찾을 수 없음")
+            @ApiResponse(responseCode = "403", description = "본인 소유가 아닌 주문"),
+            @ApiResponse(responseCode = "404", description = "주문/결제를 찾을 수 없음"),
+            @ApiResponse(responseCode = "409", description = "승인 금액이 주문 금액과 불일치")
     })
     @PostMapping("/toss/confirm")
-    public ResponseEntity<PaymentResponse> confirmTossPayment(@Valid @RequestBody TossPaymentConfirmRequest request) {
+    public ResponseEntity<PaymentResponse> confirmTossPayment(
+            @Valid @RequestBody TossPaymentConfirmRequest request,
+            @Parameter(description = "결제 승인 멱등 키(미지정 시 paymentKey 사용)", required = false)
+                @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
         PaymentDomain paymentDomain = tossPaymentService.confirmTossPayment(
                 request.getDbOrderId(),
                 request.getPaymentKey(),
                 request.getTossOrderId(),
-                request.getAmount()
+                request.getAmount(),
+                callerUserIdOrAdminBypass(),
+                idempotencyKey
         );
         return ResponseEntity.ok(new PaymentResponse(paymentDomain));
     }
@@ -151,16 +164,38 @@ public class PaymentController {
     })
     @PostMapping("/toss/cart/confirm")
     public ResponseEntity<List<PaymentResponse>> confirmTossCartPayment(
-            @Valid @RequestBody TossCartConfirmRequest request) {
+            @Valid @RequestBody TossCartConfirmRequest request,
+            @Parameter(description = "결제 승인 멱등 키(미지정 시 paymentKey 사용)", required = false)
+                @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
         List<PaymentDomain> payments = tossPaymentService.confirmTossCartPayment(
                 request.getOrderIds(),
                 request.getPaymentKey(),
                 request.getTossOrderId(),
-                request.getTotalAmount()
+                request.getTotalAmount(),
+                callerUserIdOrAdminBypass(),
+                idempotencyKey
         );
         List<PaymentResponse> responses = payments.stream()
                 .map(PaymentResponse::new)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(responses);
+    }
+
+    /**
+     * 승인 요청자의 사용자 ID — 소유권 대조 기준값.
+     *
+     * <p>요청 본문의 {@code dbOrderId}/{@code orderIds} 는 신뢰하지 않는다(IDOR). 대조 상대는
+     * <b>JWT 주체</b>에서만 파생하며, 판정 자체는 주문 소유자를 읽을 수 있는 서비스 계층이 한다.
+     *
+     * <p>ADMIN/MANAGER 는 {@code null} 을 돌려 소유권 대조를 건너뛴다 — 세무·문서함 컨트롤러와
+     * 같은 정책이다(운영 지원 시 타인 주문 결제를 대행할 수 있어야 한다). 금액 대조는 운영자
+     * 경로에서도 그대로 적용된다.
+     */
+    private Long callerUserIdOrAdminBypass() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (ResourceOwnership.isAdminOrManager(authentication)) {
+            return null;
+        }
+        return ResourceOwnership.callerUserId(authentication);
     }
 }

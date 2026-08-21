@@ -72,6 +72,10 @@ public enum ErrorCode {
     INVALID_PAYMENT_STATE(HttpStatus.BAD_REQUEST, "잘못된 결제 상태입니다."),
     INVALID_ORDER_STATE(HttpStatus.BAD_REQUEST, "잘못된 주문 상태입니다."),
     MISSING_IDEMPOTENCY_KEY(HttpStatus.BAD_REQUEST, "멱등성 키(Idempotency-Key)가 필요합니다."),
+    // PG 승인 금액과 서버가 보관한 주문 금액이 다르다 — 클라이언트가 결제창 금액을 낮춰 연 경우가
+    // 대표적이다. 400(요청 형식 오류)이 아니라 409 인 이유: 요청 자체는 문법적으로 유효하고,
+    // 서버가 보관한 상태와 "충돌"한 것이기 때문이다(REFUND_EXCEEDS_PAYMENT 와 같은 결).
+    PAYMENT_AMOUNT_MISMATCH(HttpStatus.CONFLICT, "결제 금액이 주문 금액과 일치하지 않습니다."),
     REFUND_EXCEEDS_PAYMENT(HttpStatus.CONFLICT, "환불 금액이 결제 금액을 초과합니다."),
     REFUND_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "환불 처리 중 오류가 발생했습니다."),
     CASH_RECEIPT_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "이 결제는 현금영수증 발급 대상이 아닙니다."),

@@ -9,12 +9,19 @@ import github.lms.lemuel.payment.application.port.in.GetPaymentPort;
 import github.lms.lemuel.payment.application.port.in.RefundPaymentPort;
 import github.lms.lemuel.payment.domain.PaymentDomain;
 import github.lms.lemuel.payment.domain.PaymentStatus;
+import github.lms.lemuel.common.config.jwt.AuthPrincipal;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -35,6 +42,24 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(controllers = PaymentController.class)
 @AutoConfigureMockMvc(addFilters = false)
 class PaymentControllerExtraTest {
+
+    /**
+     * {@code addFilters=false} 라 보안 필터가 SecurityContext 를 채워주지 않는다. Toss confirm 은
+     * 소유권 대조 기준을 JWT 주체에서 파생하므로, 주체가 없으면 403 이다 — 직접 세팅한다.
+     */
+    @BeforeEach
+    void login() {
+        Authentication auth = new UsernamePasswordAuthenticationToken(
+                new AuthPrincipal(7L, "buyer@x.com", "USER"),
+                null,
+                List.of(new SimpleGrantedAuthority("ROLE_USER")));
+        SecurityContextHolder.getContext().setAuthentication(auth);
+    }
+
+    @AfterEach
+    void clearContext() {
+        SecurityContextHolder.clearContext();
+    }
 
     @Autowired MockMvc mockMvc;
     @MockitoBean JwtUtil jwtUtil;
@@ -73,7 +98,7 @@ class PaymentControllerExtraTest {
     @Test
     @DisplayName("POST /payments/toss/confirm 는 Toss 결제 확인을 위임한다")
     void confirmTossPayment() throws Exception {
-        when(tossPaymentService.confirmTossPayment(10L, "pay-key", "toss-order-1", 15000L))
+        when(tossPaymentService.confirmTossPayment(10L, "pay-key", "toss-order-1", 15000L, 7L, null))
                 .thenReturn(domain(PaymentStatus.CAPTURED));
 
         mockMvc.perform(post("/payments/toss/confirm")
@@ -99,7 +124,7 @@ class PaymentControllerExtraTest {
     @Test
     @DisplayName("POST /payments/toss/cart/confirm 는 여러 결제 응답 목록을 반환한다")
     void confirmTossCartPayment() throws Exception {
-        when(tossPaymentService.confirmTossCartPayment(any(), any(), any(), any()))
+        when(tossPaymentService.confirmTossCartPayment(any(), any(), any(), any(), any(), any()))
                 .thenReturn(List.of(domain(PaymentStatus.CAPTURED), domain(PaymentStatus.CAPTURED)));
 
         mockMvc.perform(post("/payments/toss/cart/confirm")
