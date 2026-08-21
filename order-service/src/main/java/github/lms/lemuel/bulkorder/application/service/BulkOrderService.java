@@ -173,14 +173,31 @@ public class BulkOrderService implements BulkOrderUseCase {
 
     private PlaceBulkOrderLinePort.Line toLine(BulkOrderRow row, List<BulkOrderColumnSpec> specs) {
         return new PlaceBulkOrderLinePort.Line(
-                Long.valueOf(row.value(specs, ITEM_PRODUCT_ID).trim()),
-                Integer.parseInt(row.value(specs, ITEM_QUANTITY).trim()),
+                Long.valueOf(requiredValue(row, specs, ITEM_PRODUCT_ID)),
+                Integer.parseInt(requiredValue(row, specs, ITEM_QUANTITY)),
                 row.value(specs, ITEM_RECIPIENT_NAME),
                 row.value(specs, ITEM_RECIPIENT_PHONE),
                 row.value(specs, ITEM_POSTAL_CODE),
                 row.value(specs, ITEM_ADDRESS1),
                 row.value(specs, ITEM_ADDRESS2),
                 row.value(specs, ITEM_MEMO));
+    }
+
+    /**
+     * 주문을 만들 수 없는 필수 셀을 사유가 읽히는 예외로 바꾼다.
+     *
+     * <p>검증을 통과한 행이라도 여기서 빈 값이 나올 수 있다: 업로드·검증과 확정 사이에 운영자가
+     * 열 정의를 지우면 값을 꺼낼 업무 코드가 사라져 {@code value()} 가 null 을 돌려준다. 그대로
+     * 두면 {@code NullPointerException} 이 행 사유로 남는데, 운영자에게는 조사할 단서가 0 이다.
+     */
+    private static String requiredValue(BulkOrderRow row, List<BulkOrderColumnSpec> specs, String itemCode) {
+        String value = row.value(specs, itemCode);
+        if (value == null || value.isBlank()) {
+            throw new InvalidBulkOrderFileException(
+                    "필수 값이 비어 있습니다: itemCode=" + itemCode + ", row=" + row.getRowNumber()
+                            + " (열 정의가 지워졌는지 확인해 주세요)");
+        }
+        return value.trim();
     }
 
     /** 운영자에게 보일 사유. 메시지가 없는 예외는 타입 이름이라도 남긴다(빈 칸이면 조사할 단서가 0). */

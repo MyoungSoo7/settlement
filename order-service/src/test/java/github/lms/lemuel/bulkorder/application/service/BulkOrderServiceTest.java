@@ -222,4 +222,25 @@ class BulkOrderServiceTest {
                 100L, 2, "홍길동", "010-1234-5678", "06236",
                 "서울시 강남구 테헤란로 1", "3층", "부재 시 경비실"));
     }
+
+    @Test
+    @DisplayName("확정 시점에 필수 열 정의가 사라졌으면 그 행만 사유를 남기고 실패한다 — 사유가 NPE 면 단서가 0")
+    void confirmWithMissingRequiredSpecLeavesReadableReason() {
+        BulkOrderDraft draft = service.uploadAndValidate(UPLOADER, "bulk.csv",
+                List.of(goodRow("100"), goodRow("101")));
+        when(draftPort.findById(draft.getId())).thenReturn(Optional.of(draft));
+
+        // 업로드·검증을 마친 뒤 운영자가 상품번호 열 정의를 지운 상황. 행에는 값이 남아 있지만
+        // 업무 코드로 값을 꺼낼 근거가 사라져 value() 가 null 을 돌려준다.
+        when(columnSpecPort.findAllOrdered()).thenReturn(
+                SPECS.stream().filter(spec -> !"product_id".equals(spec.itemCode())).toList());
+
+        BulkOrderUseCase.ConfirmResult result = service.confirm(draft.getId(), UPLOADER);
+
+        assertThat(result.created()).isZero();
+        assertThat(result.failed()).isEqualTo(2);
+        assertThat(result.lines()).allSatisfy(line ->
+                assertThat(line.error()).contains("product_id"));
+        verify(placeLinePort, never()).place(anyLong(), any());
+    }
 }
