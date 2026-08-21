@@ -19,6 +19,15 @@ vi.mock('@/api/deposit', () => ({
   depositApi: { myAccount: vi.fn().mockResolvedValue(null), accountOf: vi.fn() },
 }));
 
+// 지급 계좌도 같은 이유로 막아 둔다. 안 막으면 조회가 실패해 계좌 구획이 자기 alert 를 띄우고,
+// 이 파일이 보는 "등록 실패 문구" alert 와 섞여 어느 쪽을 집는지 모르게 된다.
+// 계좌 구획의 규율은 MyBalancesPage.test.tsx 가 따로 못박는다.
+vi.mock('@/api/sellerBankAccount', () => ({
+  sellerBankAccountApi: {
+    mine: vi.fn().mockResolvedValue(null), saveMine: vi.fn(), of: vi.fn(), save: vi.fn(),
+  },
+}));
+
 const mockedGiftCard = vi.mocked(giftCardApi);
 const mockedPoint = vi.mocked(pointApi);
 

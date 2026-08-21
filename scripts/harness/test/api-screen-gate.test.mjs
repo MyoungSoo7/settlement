@@ -98,8 +98,9 @@ const SCREEN_PENDING = new Map([
   // --- settlement-service (docs/PLAN.md §8-8) ---
   ['settlement-service/EventTrackAdminController', '이벤트 추적 콘솔 — PLAN 8-8'],
   ['settlement-service/SettlementRerunAdminController', '정산 재구동 — PLAN 8-8'],
-  ['settlement-service/SellerBankAccountAdminController', '셀러 계좌 레지스트리 — PLAN 8-2'],
-  ['settlement-service/SellerBankAccountSelfController', '셀러 본인 계좌 등록(셀러 화면)'],
+  // 셀러 계좌 2종은 화면이 생겼다(2026-08-21): 셀프는 '내 잔액'의 정산 계좌 구획,
+  // 운영자 대행은 지급 콘솔의 셀러 계좌 패널. 계좌가 없으면 payout 이 아예 생성되지 않아
+  // 실패 목록에도 안 뜨는데, 그동안 고치는 방법이 DB 직접 수정뿐이었다.
   ['settlement-service/SettlementQueryController', 'ES 기반 정산 검색'],
   // 관리자 세무 3종은 /admin/settlement/tax 콘솔로 노출됐다(2026-08-14). 아래 둘은 셀러 화면 몫이라 남는다.
   ['settlement-service/TaxInvoiceScanController', '세금계산서 스캔(셀러 화면)'],
@@ -143,7 +144,12 @@ const SCREEN_PENDING = new Map([
 //              홀드백 해제 미리보기(지급 콘솔), 셀러 등급 콘솔(신규 화면). 앞의 셋은 기존 화면에
 //              구획을 얹었고 넷째만 새 라우트라, 부채 상환 비용이 화면 수와 비례하지 않는다는
 //              방증이기도 하다.)
-const PENDING_BUDGET = 30;
+// 2026-08-21: 28 (셀러 지급 계좌 2종 — 셀프 등록은 '내 잔액', 운영자 대행은 지급 콘솔의
+//              구획으로 붙였다. 이 부채는 성격이 달랐다: 화면이 없어 기능을 못 쓰는 정도가
+//              아니라, 계좌가 없으면 payout 이 생성조차 되지 않아 실패 목록에도 안 뜨는
+//              무증상 정지였다. 반송 처리 안내는 "계좌 정정이 선행"이라고 적혀 있는데
+//              정작 정정할 화면이 없었다.)
+const PENDING_BUDGET = 28;
 
 const read = (path) => readFileSync(path, 'utf8');
 

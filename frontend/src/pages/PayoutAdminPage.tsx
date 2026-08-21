@@ -8,6 +8,12 @@ import {
   newIdempotencyKey,
 } from '@/api/payout';
 import { settlementApi, type HoldbackReleasePreview } from '@/api/settlement';
+import {
+  sellerBankAccountApi,
+  type SellerBankAccountInput,
+  type SellerBankAccountView,
+} from '@/api/sellerBankAccount';
+import SellerBankAccountForm from '@/components/SellerBankAccountForm';
 import Spinner from '@/components/Spinner';
 import { errorDetail, apiErrorStatus } from '@/lib/apiError';
 import { useToast } from '@/contexts/useToast';
@@ -415,6 +421,119 @@ const PreviewPanel: React.FC<{ onExecuted: () => void }> = ({ onExecuted }) => {
 /* ─────────────────────────────────────────
    지급 콘솔
 ───────────────────────────────────────── */
+/**
+ * 셀러 지급 계좌 레지스트리 — 이 콘솔 안에 있는 이유.
+ *
+ * <p>반송(bounce) 처리의 <b>선행 조건</b>이 계좌 정정이다. 반송을 기록하면 서버가 정정된 계좌로
+ * 새 송금을 재발행하는데, 계좌를 안 고치고 반송만 기록하면 같은 틀린 계좌로 또 나간다.
+ * 안내는 있는데 고칠 화면이 없어서 그동안 DB 를 직접 고쳐야 했다.
+ *
+ * <p>계좌 미등록은 <b>실패로도 안 보인다</b>: payout 이 아예 생성되지 않아 아래 실패·대기 목록
+ * 어디에도 뜨지 않는다. 그래서 셀러 번호로 직접 조회하는 입구가 필요하다.
+ */
+const SellerBankAccountPanel: React.FC = () => {
+  const { showToast } = useToast();
+  const [sellerInput, setSellerInput] = useState('');
+  /** 조회를 끝낸 셀러. 입력칸이 아니라 <b>이 값</b>으로 저장한다. */
+  const [loadedSellerId, setLoadedSellerId] = useState<number | null>(null);
+  const [account, setAccount] = useState<SellerBankAccountView | null>(null);
+  const [looking, setLooking] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const parsedSellerId = Number(sellerInput.trim());
+  const validSellerId = sellerInput.trim() !== '' && Number.isInteger(parsedSellerId) && parsedSellerId > 0;
+
+  /**
+   * 셀러 번호를 고치면 조회 결과를 버린다. 안 버리면 "A 를 조회해 놓고 B 로 바꾼 뒤 저장"이
+   * 가능해지는데, 화면에는 여전히 A 의 계좌가 떠 있어 조작자는 A 를 고쳤다고 믿는다.
+   */
+  const changeSeller = (value: string) => {
+    setSellerInput(value);
+    setLoadedSellerId(null);
+    setAccount(null);
+    setError(null);
+  };
+
+  const lookup = async () => {
+    if (!validSellerId) return;
+    setLooking(true);
+    setError(null);
+    try {
+      setAccount(await sellerBankAccountApi.of(parsedSellerId));
+      setLoadedSellerId(parsedSellerId);
+    } catch (err) {
+      setError(errorDetail(err, '셀러 계좌를 조회하지 못했습니다.'));
+    } finally {
+      setLooking(false);
+    }
+  };
+
+  const save = async (input: SellerBankAccountInput) => {
+    if (loadedSellerId === null) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const saved = await sellerBankAccountApi.save(loadedSellerId, input);
+      setAccount(saved);
+      showToast(`셀러 ${loadedSellerId} 계좌를 저장했습니다 (${saved.bank} ${saved.account}).`, 'success');
+    } catch (err) {
+      setError(errorDetail(err, '셀러 계좌를 저장하지 못했습니다.'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <section className="bg-white rounded-xl border border-gray-200 p-4 mb-4 space-y-3"
+      data-testid="seller-bank-account-panel">
+      <div>
+        <h2 className="font-semibold text-gray-900">셀러 지급 계좌</h2>
+        <p className="text-sm text-gray-500 mt-1">
+          계좌가 없으면 정산이 확정돼도 송금이 <b>만들어지지 않습니다</b> — 아래 실패·대기 목록에도
+          뜨지 않으니 셀러 번호로 직접 확인하세요. 반송 처리 전에는 계좌 정정이 먼저입니다.
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="text-sm" htmlFor="sba-seller-id">
+          <span className="text-gray-600">셀러 번호</span>
+          <input id="sba-seller-id" value={sellerInput} inputMode="numeric"
+            onChange={(e) => changeSeller(e.target.value)}
+            className="mt-1 block w-40 rounded border px-3 py-2 font-mono" />
+        </label>
+        {/* 이름이 그냥 '조회'면 홀드백 패널의 조회 버튼과 구분되지 않는다 —
+            보이는 화면에서는 위치로 알 수 있지만 스크린리더에는 같은 버튼 둘이다. */}
+        <button type="button" onClick={() => void lookup()} disabled={!validSellerId || looking}
+          className="rounded border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 disabled:opacity-50">
+          {looking ? '조회 중…' : '계좌 조회'}
+        </button>
+      </div>
+
+      {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+
+      {loadedSellerId !== null && (
+        <div className="space-y-3 border-t pt-3" data-testid="sba-result">
+          {account ? (
+            <p className="text-sm" data-testid="sba-current">
+              셀러 <b>{loadedSellerId}</b> · <span className="font-mono">{account.bank} {account.account}</span>
+              {' '}· 예금주 {account.holder}
+            </p>
+          ) : (
+            <p role="alert" className="text-sm text-amber-800" data-testid="sba-missing">
+              셀러 <b>{loadedSellerId}</b> 는 <b>등록된 계좌가 없습니다.</b> 이 셀러의 정산금은
+              지금 지급되지 않고 있습니다.
+            </p>
+          )}
+
+          <SellerBankAccountForm current={account} saving={saving}
+            onSubmit={(input) => void save(input)} idPrefix="admin-sba" />
+        </div>
+      )}
+    </section>
+  );
+};
+
 const PayoutAdminPage: React.FC = () => {
   const [tab, setTab] = useState<Tab>('failed');
   const [payouts, setPayouts] = useState<Payout[]>([]);
@@ -463,6 +582,8 @@ const PayoutAdminPage: React.FC = () => {
             새로고침
           </button>
         </div>
+
+        <SellerBankAccountPanel />
 
         <PreviewPanel onExecuted={() => void load()} />
 
