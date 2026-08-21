@@ -1,5 +1,7 @@
 # Pinned runtime dependencies for receipt-ocr-service.
-# Phase 0 (평가 하네스)에서 실제로 쓰는 것만 선언한다 — FastAPI 서빙 의존성은 Phase 1 에서 추가.
+fastapi==0.141.1
+uvicorn[standard]==0.52.3
 pillow==12.3.0
 httpx==0.28.1
 tzdata==2026.3
+rapidocr-onnxruntime==1.2.3

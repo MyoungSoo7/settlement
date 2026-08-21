@@ -21,6 +21,7 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 MATCHER = ROOT / "src" / "receipt_ocr" / "domain" / "matcher.py"
 SCORER = ROOT / "src" / "receipt_ocr" / "eval" / "scorer.py"
+PARSING = ROOT / "src" / "receipt_ocr" / "providers" / "parsing.py"
 
 
 def _python() -> str:
@@ -80,6 +81,36 @@ MUTATIONS: list[tuple[str, pathlib.Path, str, str]] = [
         SCORER,
         "        ece += weight * abs(accuracy - avg_confidence)",
         "        ece += abs(accuracy - avg_confidence) / len(buckets)",
+    ),
+    (
+        "파서: 필드별 신뢰도를 최솟값 대신 최댓값으로 합침 (baseline 실패 재현)",
+        PARSING,
+        "    value = amount if date is None else min(amount, date)",
+        "    value = amount if date is None else max(amount, date)",
+    ),
+    (
+        "파서: 구조 검증(공급가액+부가세=합계) 무력화",
+        PARSING,
+        "    structural = _structural_total(candidates)",
+        "    structural = None",
+    ),
+    (
+        "파서: 구조 검증 실패 시의 벌점 제거",
+        PARSING,
+        "LARGEST_PENALTY = 0.25",
+        "LARGEST_PENALTY = 0.0",
+    ),
+    (
+        "파서: 할인 음수줄을 총액 후보로 허용",
+        PARSING,
+        '            if match.start() > 0 and line.text[match.start() - 1] == "-":',
+        "            if False:",
+    ),
+    (
+        "파서: 말이 안 되는 날짜를 그대로 통과",
+        PARSING,
+        "    try:\n        return _dt.date(year, month, day)\n    except ValueError:\n        return None",
+        "    try:\n        return _dt.date(year, month, 1)\n    except ValueError:\n        return None",
     ),
     (
         "채점기: 추출 실패를 정답으로 취급",

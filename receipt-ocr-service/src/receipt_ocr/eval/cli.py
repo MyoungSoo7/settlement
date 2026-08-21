@@ -71,6 +71,10 @@ def cmd_build(args: argparse.Namespace) -> int:
 
 
 def _build_provider(args: argparse.Namespace):
+    if args.provider in ("local", "local-prep"):
+        from ..providers.local_ocr import RapidOcrProvider
+
+        return RapidOcrProvider(preprocess=args.provider == "local-prep")
     if args.provider == "gemini":
         from ..providers.gemini import GeminiProvider
 
@@ -144,6 +148,14 @@ def cmd_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_serve(args: argparse.Namespace) -> int:
+    """추출 API 를 띄운다 — Phase 3 에서 Java 어댑터가 부를 자리."""
+    import uvicorn
+
+    uvicorn.run("receipt_ocr.api.app:app", host=args.host, port=args.port, log_level="info")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="receipt_ocr", description="영수증 OCR 평가 하네스")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -156,7 +168,9 @@ def build_parser() -> argparse.ArgumentParser:
     build.set_defaults(func=cmd_build)
 
     run = sub.add_parser("run", help="프로바이더 평가")
-    run.add_argument("--provider", default="gemini", choices=["gemini"])
+    run.add_argument("--provider", default="gemini",
+                     choices=["gemini", "local", "local-prep"],
+                     help="local=자체 호스팅 OCR, local-prep=대비 정규화 전처리 포함")
     run.add_argument("--model", default="gemini-2.5-flash")
     run.add_argument("--goldenset", default=str(DEFAULT_GOLDENSET))
     run.add_argument("--threshold", default=str(DEFAULT_REVIEW_THRESHOLD))
@@ -170,6 +184,12 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--price-out", dest="price_out", default="0",
                      help="출력 100만 토큰당 USD")
     run.set_defaults(func=cmd_run)
+
+    serve = sub.add_parser("serve", help="추출 API 서빙")
+    # 8123 — 폴리글랏 파이썬 대역(8120~8122) 다음 자리.
+    serve.add_argument("--port", type=int, default=8123)
+    serve.add_argument("--host", default="0.0.0.0")
+    serve.set_defaults(func=cmd_serve)
     return parser
 
 
