@@ -110,6 +110,27 @@ function claimNumber(status, patterns) {
   return null;
 }
 
+/**
+ * YAML 주석(`#` 이후)을 제거한다 — 따옴표 안의 `#` 은 값이므로 남긴다.
+ *
+ * 배선 판정에 원문을 쓰면 "왜 구독하지 않는지" 적어 둔 주석이 구독 근거로 읽힌다. 설명이 자세한
+ * 설정일수록 오탐이 늘어나는 구조였다(deposit application.yml, 2026-08-22).
+ */
+export function stripYamlComments(yaml) {
+  return String(yaml).split('\n').map((line) => {
+    let quote = null;
+    for (let i = 0; i < line.length; i += 1) {
+      const ch = line[i];
+      if (quote) {
+        if (ch === '\\') i += 1;
+        else if (ch === quote) quote = null;
+      } else if (ch === '"' || ch === "'") quote = ch;
+      else if (ch === '#') return line.slice(0, i);
+    }
+    return line;
+  }).join('\n');
+}
+
 export function parseGradleModules(settings) {
   // "includeBuild(" 은 "include(" 부분문자열을 포함하지 않으므로 오매치 없음
   const block = String(settings).match(/include\(([\s\S]*?)\)/);
@@ -552,6 +573,16 @@ function validateDocFacts(read, tracked, trackedSet, errors) {
     return trackedSet.has(path) ? read(path) : '';
   };
 
+  /**
+   * YAML 주석을 걷어낸 본문 — 소비 배선 판정에 쓴다.
+   *
+   * 주석은 배선이 아니다. deposit 의 application.yml 은 `# ※ lemuel.card.authorized 는 아직
+   * 구독하지 않는다` 라고 **구독하지 않는 이유**를 적어 두는데, 원문 substring 검색은 이를 소비
+   * 근거로 읽어 SPEC 의 "소비처 미배선" 기술을 거짓으로 판정했다(2026-08-22). 설명이 자세할수록
+   * 오탐이 늘어나는 검사였다 — 주석을 지우는 쪽이 정답이다.
+   */
+  const ymlBodyOf = (module) => stripYamlComments(ymlOf(module));
+
   // Boot 버전 정본은 build.gradle.kts — 문서가 같은 메이저의 다른 패치 버전을 말하면 드리프트다.
   // (Kotlin 폴리글랏의 Boot 3.x 표기는 메이저가 달라 대상 밖 — 오탐보다 범위 축소.)
   const gradleRoot = trackedSet.has('build.gradle.kts') ? read('build.gradle.kts') : '';
@@ -602,7 +633,7 @@ function validateDocFacts(read, tracked, trackedSet, errors) {
         // 모듈만 지목된 주장 — 그 모듈 yml 이 선언한 자기 도메인 토픽을 발행분으로 본다.
         topics = claim.owners.flatMap((owner) => {
           const prefix = `lemuel.${owner.replace(/-service$/, '').replace(/-/g, '')}.`;
-          return [...ymlOf(owner).matchAll(/lemuel\.[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*/g)]
+          return [...ymlBodyOf(owner).matchAll(/lemuel\.[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*/g)]
             .map((m) => m[0])
             .filter((topic) => topic.startsWith(prefix));
         });
@@ -615,7 +646,7 @@ function validateDocFacts(read, tracked, trackedSet, errors) {
         for (const module of modules) {
           if (module.replace(/-service$/, '').replace(/-/g, '') === domain) producers.add(module);
         }
-        const consumer = modules.find((module) => !producers.has(module) && ymlOf(module).includes(topic));
+        const consumer = modules.find((module) => !producers.has(module) && ymlBodyOf(module).includes(topic));
         if (consumer) {
           errors.push(`doc facts: ${doc}:${claim.line} 소비처 배선 있음: ${topic} 를 ${consumer} 가 참조하는데 "소비처 미배선"으로 기술됨`);
         }
