@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "receipt-ocr-service"
+version = "0.1.0"
+description = "Self-hosted receipt field extraction (vision OCR) with a domain-scored evaluation harness."
+requires-python = ">=3.11"
+# Phase 0(평가 하네스)에서 실제로 쓰는 것만 선언한다.
+# FastAPI/uvicorn 서빙 의존성은 Phase 1(로컬 모델 서빙)에서 추가한다.
+dependencies = [
+    "pillow==12.3.0",
+    "httpx==0.28.1",
+    # 매입일 KST 환산이 대사 정책이라 tz DB 를 런타임 의존성으로 고정한다 —
+    # 시스템 tz DB 가 없는 플랫폼(Windows·slim 이미지)에서 ZoneInfoNotFoundError 로 죽는다.
+    "tzdata==2026.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.1.1",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-q"
