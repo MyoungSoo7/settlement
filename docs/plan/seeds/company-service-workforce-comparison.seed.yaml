@@ -301,7 +301,8 @@ deferred_to_implementation:
     지표 하위 객체(headcount·estimatedAnnualSalary), industryCode, sido·sigungu, GroupComparison.level·groupKey(집단 부재),
     unavailableReason(비교 성공), differenceRate(중앙값 0), estimatedAnnualSalary(가입자수 0), salaryCapMonthlyAmount(고시표 밖).
 - 항목: ErrorResponse 스키마·오류 코드·검증 우선순위
-  결정: company-service 기존 계약 {"message": ...} 재사용(GlobalExceptionHandler — IAE 400 / NoSuchElement 404). 새 오류 봉투를
+  결정: >-
+    company-service 기존 계약 {"message": ...} 재사용(GlobalExceptionHandler — IAE 400 / NoSuchElement 404). 새 오류 봉투를
     만들지 않는다(기존 엔드포인트 응답이 바뀌므로). 검증 순서는 누락 → 형식 → 길이로 고정하고 파라미터 순서는
     name → bizRegNoPrefix → snapshotMonth. 빈 문자열·공백은 누락 취급, 사업장명 상한 200자(컬럼 폭), 상세 파라미터는
     required=false 로 받아 WorkplaceKey 가 검증한다(프레임워크 기본 오류 본문 회피). 같은 파라미터 중복은 Spring 이 콤마로

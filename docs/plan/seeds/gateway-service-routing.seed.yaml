@@ -92,7 +92,7 @@ seed:
       disposition: recorded-not-fixed (medium)
     - id: KI-4
       finding: "경로 화이트리스트 수기 유지 — order predicate 32경로·settlement 22경로. 백엔드 컨트롤러 추가 시 누락하면 컴파일·테스트 통과 후 런타임 404(msa-service-wiring 스킬이 다루는 함정). nginx 는 같은 문제를 겪고 allowlist 를 버리는 방향으로 전환했으나(nginx.compose.conf:31-34 주석) 게이트웨이만 allowlist 유지"
-      disposition: by-design-documented (트레이드오프: 노출면 통제 vs 유지비)
+      disposition: "by-design-documented (트레이드오프: 노출면 통제 vs 유지비)"
     - id: KI-5
       finding: "compose 가 SPRING_PROFILES_ACTIVE=prod 를 주입하나 application-prod.yml 이 없다 — 무해하지만 'prod 는 다르게 동작한다'는 오해 유발"
       disposition: recorded-not-fixed (low)

@@ -1,0 +1,149 @@
+# Seed: receipt-ocr-service 영수증 추출·채점 하네스 as-is 사양
+# 상태: CONFIRMED (2026-08-22 역산, Phase 0·1 완료 시점)
+# 원칙: 이 Seed 는 "현행 코드가 실제로 하는 일"의 불변 기술이다. 결함은 교정하지 않고 known_issues 로만 기록한다.
+
+seed:
+  id: receipt-ocr-service-extraction-harness-v1
+  revision: v1
+  revision_baseline: "develop 92d25c463 (2026-08-22)"
+  goal: >-
+    영수증 필드 추출의 자체 구현과, 그것을 운영 대사 규칙·비대칭 비용으로 채점하는 하네스의 현행
+    동작을 불변 사양으로 결정화해, 프로바이더 교체 판단의 회귀 기준선 · Phase 2(파인튜닝)·
+    Phase 3(Java 어댑터 교체)의 베이스로 사용한다.
+
+  scope:
+    included:
+      - 합성 골든셋 생성 규칙 (시나리오 5 × 촬영조건 7)
+      - 채점 규칙 (운영 대사 판정 + 비대칭 비용 + ECE + 지연 백분위)
+      - 추출 API 계약 (POST /extract — 200/400/413/503)
+      - 총액 판정 3근거 · 무폴백 원칙
+      - Java 계약 동형성 (VO 검증 · baseline 프롬프트 원문)
+    excluded:
+      - 실물 영수증 라벨셋 (미확보 — KI-4)
+      - 파인튜닝 (Phase 2)
+      - Java 어댑터 교체 (Phase 3)
+      - 운영 배포·모니터링 (미배선 — KI-1)
+      - 상호명 판독 품질 (대사 판정에 쓰이지 않는다)
+
+  constraints:
+    - "금액은 Decimal — float 금지(저장소 가드레일 동형), 직렬화는 문자열"
+    - "총액 미판독은 503 무폴백 — 부분 결과를 지어내지 않는다 (ADR 0036)"
+    - "채점은 운영 대사 규칙을 통과시킨 뒤 판정끼리 대조한다 (필드 정확도로 채점하지 않는다)"
+    - "Java VO 가 거부하는 값은 여기서도 거부한다 — 아니면 평가 숫자가 거짓말이 된다"
+    - "합성 점수는 모델 간 상대 비교·하네스 검증 전용 — 절대 성능 주장 금지"
+
+  invariants:  # as-is 코드 사실 — 파일:라인 근거
+    scoring_costs:
+      source: receipt-ocr-service/src/receipt_ocr/eval/scorer.py:28-36
+      values: {review: 1, unavailable: 3, premature_close: 10, false_mismatch: 25, false_match: 25}
+      rule: "가중 오류비용이 단일 판정 지표다 — 정확도가 올라도 비용이 나빠질 수 있다(실측: 전처리 57→79)"
+    match_decision:
+      source: receipt-ocr-service/src/receipt_ocr/domain/matcher.py:45
+      origin: "Java ExpenseReceiptMatcher 이식본"
+      date_tolerance_days: 1        # matcher.py:26
+      timezone: Asia/Seoul          # matcher.py:23
+      outcomes: [MATCHED, NEEDS_REVIEW, MISMATCHED, UNAVAILABLE]
+      first_branch: "신뢰도 임계 미달이면 값 일치와 무관하게 NEEDS_REVIEW (최우선 분기)"
+      excluded_field: "상호명 — 가맹점 등록명과 상시 불일치하므로 판정에 쓰지 않는다"
+    amount_resolution:
+      source: receipt-ocr-service/src/receipt_ocr/providers/parsing.py:144-151
+      order:
+        - {method: structural, rule: "공급가액 + 부가세 = 합계 를 만족하는 조합의 합", confidence_delta: +0.15}  # :49
+        - {method: largest, rule: "합계 줄의 큰 글자 추측", confidence_delta: -0.25}                              # :58
+        - {method: fail, rule: "둘 다 실패하면 ParseFailed — 지어내지 않는다"}                                    # :106, :205
+      rationale: "구조 검증은 OCR 점수와 독립인 근거라 신뢰도를 올릴 자격이 있다. 크기는 추측이라 벌점"
+    no_fallback:
+      total_amount: "미판독 → ParseFailed → HTTP 503 (api/app.py:53). 엔진 붕괴도 같은 계약(:56)"
+      transaction_date: "미판독 → null 로 내보낸다 → 대사 규칙이 NEEDS_REVIEW 로 흘린다(설계된 안전 경로)"
+    api_contract:
+      max_bytes: 12582912           # api/app.py:26
+      empty_body: 400               # :42
+      too_large: 413                # :45
+      extraction_failed: 503        # :53, :56
+      body_style: "이미지는 요청 본문 그대로 — multipart 아님"
+      amount_serialization: "문자열 — JSON number 로 보내면 받는 쪽 float 이 되어 원 단위가 흔들린다"
+      field_confidence: "fieldConfidence.{amount,date} 를 함께 싣는다 — Java 포트가 아직 못 받지만 서버는 먼저 내보낸다(KI-3)"
+    goldenset:
+      path: receipt-ocr-service/data/goldenset.json
+      schema_version: 1
+      count: 35
+      scenarios: {CLEAN: MATCHED, NEXT_DAY: MATCHED, NO_DATE: NEEDS_REVIEW, AMOUNT_TAMPERED: MISMATCHED, STALE_DATE: MISMATCHED}
+      conditions: [PRISTINE, FADED, CRUMPLED, SKEWED, LOW_LIGHT, LOW_RES, GLARE]
+      seed: 20260821
+      discount_variant: "3건에 1건은 할인·포인트가 붙어 금액 후보가 여러 개다"
+      caveat: "합성이다 — 렌더러 글자는 완벽한 디지털 글리프라 감열지 번짐을 흉내만 낸다"
+
+  baseline_measurements:   # 2026-08-21, 35건, 임계 0.80
+    gemini-2.5-flash: {outcome_agreement: 0.886, critical_premature_close: 1, critical_false_pass: 0,
+                       amount_exact: 1.000, review_rate: 0.171, latency_p50_ms: 5289, external_transfer: true}
+    local+prep:       {outcome_agreement: 0.429, critical_premature_close: 1, critical_false_pass: 0,
+                       amount_exact: 0.794, review_rate: 0.629, latency_p50_ms: 1937, external_transfer: false}
+    headline: >-
+      정확도는 baseline 에 크게 못 미치지만 치명 오류는 동률(1건)이고 실패가 종결이 아니라 리뷰로 흐른다 —
+      비대칭 비용 설계가 의도대로 작동했다. 자체 구현의 논거는 정확도가 아니라 필드별 신뢰도·지연·외부전송 제거다.
+
+  event_contracts:
+    topics: []          # 발행 0
+    consumers: []       # 소비 0
+    note: "Kafka 의존 없음 — 파일 기반 하네스 + HTTP 서빙"
+
+  acceptance_criteria:
+    - id: AC-1
+      criterion: 대사 판정 규칙이 Java 매처와 동형이다
+      gate: "pytest tests/test_matcher.py (13 케이스)"
+    - id: AC-2
+      criterion: 비대칭 비용·ECE·지연 백분위 채점이 정의대로 동작한다
+      gate: "pytest tests/test_scorer.py (22)"
+    - id: AC-3
+      criterion: 총액 3근거·날짜 파싱이 실제 OCR 출력 형태를 견딘다
+      gate: "pytest tests/test_parsing.py (27)"
+    - id: AC-4
+      criterion: API 계약 200/400/413/503 과 무폴백이 성립한다
+      gate: "pytest tests/test_api.py (10)"
+    - id: AC-5
+      criterion: baseline 프롬프트가 Java 원문과 문자 단위로 일치한다
+      gate: "pytest tests/test_gemini_provider.py (22)"
+    - id: AC-6
+      criterion: 골든셋 생성·렌더가 시드로 재현된다
+      gate: "pytest tests/test_generator.py tests/test_renderer.py tests/test_goldenset.py (36)"
+    - id: AC-7
+      criterion: 테스트가 정책 훼손을 실제로 탐지한다
+      gate: "python tools/mutation_check.py"
+    - id: AC-8
+      criterion: CI 가 이 코드를 돌린다
+      gate: "polyglot-ci.yml 또는 전용 워크플로"
+      status: MISSING   # KI-1
+
+  known_issues:
+    - id: KI-1
+      finding: >-
+        아무도 이 서비스를 부르지 않는다. compose·gateway·CI·Dockerfile 어디에도 없고 card-service 의
+        ExtractReceiptFieldsPort 구현은 여전히 GeminiReceiptOcrAdapter 하나다. 폴리글랏 7종은
+        polyglot-ci.yml 경로 필터에 있는데 이 서비스만 없어 CI 가 코드를 한 번도 돌리지 않는다.
+      disposition: recorded-not-fixed
+      refs: [docs/plan/prd/receipt-ocr-service.md G-1/T-1]
+    - id: KI-2
+      finding: >-
+        판정 일치율 42.9% vs baseline 88.6%. 격차 대부분이 리뷰 큐 범람(62.9% vs 17.1%)에서 온다 —
+        OCR 토큰 점수는 "이 글자를 이렇게 읽었다"는 확신이지 "이 값이 총액이다"라는 확신이 아니라
+        운영 임계 0.80 과 스케일이 맞지 않는다.
+      disposition: recorded-not-fixed  # Phase 2 과제
+    - id: KI-3
+      finding: "fieldConfidence 를 받을 곳이 없다 — Java ExtractedReceipt 는 스칼라 confidence 하나만 받는다. 지금 교체해도 baseline 의 치명 오류 패턴이 Java 경계에서 재현된다"
+      disposition: recorded-not-fixed
+    - id: KI-4
+      finding: "골든셋이 합성 35건이다 — 35건에서 '치명 1건'은 0건과 2건을 통계적으로 구분하지 못한다"
+      disposition: recorded-not-fixed
+    - id: KI-5
+      finding: >-
+        CLI 기본 생성 수량은 40 인데 추적된 골든셋은 35건이다(시나리오 5 × 조건 7의 정확한 교차).
+        기본값으로 재생성하면 골든셋이 조용히 바뀌어 과거 리포트와 비교 불가가 된다 —
+        저장본을 만든 인자 조합이 코드에도 데이터에도 기록돼 있지 않다.
+      disposition: recorded-not-fixed
+    - id: KI-6
+      finding: "운영 임계값(0.80)이 card-service 설정에서 온 값인데 양쪽을 묶는 드리프트 가드가 없다 — 프롬프트에는 가드(AC-5)가 있는데 임계값에는 없다"
+      disposition: recorded-not-fixed
+
+  uses:
+    - regression-baseline    # 프로바이더 교체 판정의 기준선
+    - brownfield-base        # Phase 2·3 인터뷰 컨텍스트

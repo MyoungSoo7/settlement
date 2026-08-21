@@ -1,0 +1,151 @@
+# Seed: education-service 과정·차시 저작 as-is 사양
+# 상태: CONFIRMED (2026-08-22 역산)
+# 원칙: 이 Seed 는 "현행 코드가 실제로 하는 일"의 불변 기술이다. 결함은 교정하지 않고 known_issues 로만 기록한다.
+
+seed:
+  id: education-service-course-authoring-v1
+  revision: v1
+  revision_baseline: "develop 92d25c463 (2026-08-22)"
+  goal: >-
+    education-service 의 과정·차시 저작 루프(상태머신 4상태 · 차시 순서 불변식 · 소속 대조 ·
+    공개 이벤트 적재)의 현행 동작을 실행 가능한 게이트에 매핑된 불변 사양으로 결정화해,
+    회귀 기준선 · 학습자 경로를 붙일 때의 베이스 · 면접/포트폴리오 문서로 사용한다.
+
+  scope:
+    included:
+      - Course 상태머신 (DRAFT/PUBLISHED/HIDDEN/CLOSED)
+      - Lesson 순서 불변식 · 재정렬 2단 저장
+      - 차시 소속 대조 (경로가 주장한 소속을 서버가 확인)
+      - 감사 로그 적재
+      - CoursePublished Outbox 적재 계약 표면
+    excluded:
+      - 수강·진도·이수 (미구현 — KI-2)
+      - 콘텐츠 저장 (content_ref 참조만 보관)
+      - 학습자 공개 조회 경로 (존재하지 않음)
+      - 프론트 화면(/admin/system/education) 내부
+      - Kafka 실제 발행 (미배선 — KI-1)
+
+  constraints:
+    - "헥사고날: domain 은 adapter 를 import 하지 않는다 (EducationArchitectureTest 강제)"
+    - "도메인은 스프링을 모른다 — 예외→HTTP 번역은 어댑터(advice) 몫, BusinessException 상속 금지"
+    - "이벤트 발행은 Outbox 경유만 (직접 kafkaTemplate 발행 금지, ADR 0024)"
+    - "오류 응답은 전 서비스 공통 ErrorResponse 스키마(errorCode) 를 쓴다"
+    - "shared-common 은 제한 스캔 — 필요한 빈만 명시적 @Import (전역 스캔 없음)"
+
+  invariants:  # as-is 코드 사실 — 파일:라인 근거
+    course_state_machine:
+      source: education-service/src/main/java/github/lms/lemuel/education/domain/Course.java:58-81
+      states: [DRAFT, PUBLISHED, HIDDEN, CLOSED]
+      transitions:
+        DRAFT: [PUBLISHED]
+        PUBLISHED: [HIDDEN, CLOSED]
+        HIDDEN: [PUBLISHED, CLOSED]
+        terminal: [CLOSED]
+      enforcement: "각 전이 메서드가 허용 원천을 검사(publish :58 / hide :65 / close :71), 위반은 InvalidCourseStateException(require :78)"
+      db_guard: education-service/src/main/resources/db/migration/V1__education_schema.sql:15  # status CHECK 4값
+      creation: "항상 DRAFT — Course.draft(:41) 단일 팩토리. 영속 복원은 rehydrate(:46) 전용"
+    lesson_ordering:
+      unique_constraint: education-service/src/main/resources/db/migration/V1__education_schema.sql:33  # (course_id, sequence)
+      reorder_validation: education-service/src/main/java/github/lms/lemuel/education/domain/Lesson.java:98  # validateReorder
+      reorder_rule: "요청이 그 과정의 차시를 정확히 한 번씩 담아야 한다 — 개수·중복·집합 전수 대조. 부분 재정렬 경로 없음"
+      two_phase_save: education-service/src/main/java/github/lms/lemuel/education/application/service/LessonAdminService.java:78
+      two_phase_reason: >-
+        (course_id, sequence) UNIQUE 때문에 두 차시를 맞바꾸면 중간 상태에서 값이 겹친다.
+        전부 -1..-n 으로 민 뒤 1..n 을 쓴다. changeSequence(Lesson.java:77)가 음수를 허용하는 이유.
+    lesson_ownership:
+      source: education-service/src/main/java/github/lms/lemuel/education/domain/Lesson.java:90  # requireBelongsTo
+      call_sites: [LessonAdminService.java:50 (update), LessonAdminService.java:62 (delete)]
+      rule: "경로의 courseId 와 차시 소속을 대조 — 불일치는 404 LESSON_NOT_IN_COURSE. 대조는 어댑터가 아니라 도메인에 있다"
+      delete_semantics: "없는 차시 삭제는 조용히 통과(멱등), 존재하는데 소속이 다르면 거부"
+    event_emission:
+      source: education-service/src/main/java/github/lms/lemuel/education/application/service/CourseAdminService.java:76
+      rule: "공개(PUBLISHED) 전이에서만 CoursePublished 적재 — 수정·숨김·종료는 발행하지 않는다"
+    proxy_safety:
+      source: education-service/src/main/java/github/lms/lemuel/education/application/service/CourseAdminService.java:53
+      rule: "쓰기 메서드는 @Transactional 붙은 get() 이 아니라 애노테이션 없는 findOrThrow 를 부른다(자기호출 프록시 우회 방지)"
+
+  event_contracts:
+    topics:
+      - lemuel.education.course_published
+    aggregate_type: Education
+    event_type: CoursePublished
+    ordering_key: courseId
+    payload_fields: [courseId, title, publishedAt, publishedBy, version]
+    consumers: []          # 소비 0
+    actually_published: false   # ★ Outbox 까지만 간다 — known_issues KI-1
+    transport_source: shared-common/src/main/resources/kafka/topic-catalog.json
+    serializer_note: >-
+      publisher 는 반드시 outboxObjectMapper 를 주입받는다. new ObjectMapper() 를 쓰면 publishedAt(Instant)
+      직렬화가 InvalidDefinitionException 으로 터져 과정 공개가 통째로 실패한다 — 실제로 그 상태였고
+      어댑터에 테스트가 없어 드러나지 않았다.
+
+  error_contract:
+    - {code: COURSE_NOT_FOUND, status: 404, when: 없는 과정 조회·수정·전이}
+    - {code: COURSE_INVALID_STATE, status: 400, when: 허용되지 않는 상태 전이}
+    - {code: LESSON_ORDER_INVALID, status: 400, when: 재정렬 요청이 차시 목록과 불일치}
+    - {code: LESSON_NOT_IN_COURSE, status: 404, when: 경로의 과정에 속하지 않는 차시}
+
+  acceptance_criteria:
+    - id: AC-1
+      criterion: Course 상태머신 전이표가 위 invariants 와 일치하고 비정상 전이를 차단한다
+      gate: "./gradlew :education-service:test — CourseTest"
+    - id: AC-2
+      criterion: 차시 순서·소속 불변식(전량 교체 재정렬·소속 대조·삭제 멱등)이 성립한다
+      gate: "LessonTest · LessonAdminServiceTest"
+    - id: AC-3
+      criterion: 오류 응답이 전 서비스 공통 ErrorResponse 스키마다
+      gate: "EducationErrorContractTest · EducationExceptionHandlerTest"
+    - id: AC-4
+      criterion: 헥사고날 의존 방향 위반 0
+      gate: "EducationArchitectureTest (ArchUnit)"
+    - id: AC-5
+      criterion: 커버리지 LINE >= 90%
+      gate: "./gradlew :education-service:jacocoTestCoverageVerification"
+    - id: AC-6
+      criterion: 공개 전이에서만 이벤트가 적재되고 페이로드 직렬화가 성공한다
+      gate: "CoursePublicationEventTest · OutboxBackedEducationEventPublisherTest"
+    - id: AC-7
+      criterion: Outbox 폴러가 배선돼 있다
+      gate: "scripts/harness/test/outbox-poller-gate.test.mjs"
+      status: KNOWN_UNWIRED   # KI-1 — 현재 면제 등록 상태
+
+  known_issues:
+    - id: KI-1
+      finding: >-
+        공개 이벤트가 Kafka 로 나가지 않는다. spring-kafka 의존·bootstrap-servers 설정·폴러 빈이 전부 없다.
+        스캔이 github.lms.lemuel.education 으로 한정돼 shared-common 의 OutboxPublisherScheduler(@Component)가
+        붙지 않고 PersistenceConfig 도 이를 들이지 않는다. outbox_events 에 PENDING 행만 쌓인다.
+      impact: "lemuel.education.course_published 는 카탈로그 등재 토픽이면서 생산된 적이 없다"
+      disposition: recorded-not-fixed
+      note: "배선 시 토픽이 브로커에 생성되며 파티션 수가 소급 불가로 고정된다(ADR 0035) — 별도 결정 필요"
+      refs: [docs/plan/prd/education-service.md G-1/T-1, scripts/harness/test/outbox-poller-gate.test.mjs]
+    - id: KI-2
+      finding: "학습자 경로가 없다 — 공개 API 0, 전 경로 hasRole('ADMIN'). PUBLISHED 는 현재 관리 목록의 라벨일 뿐이다"
+      disposition: recorded-not-fixed
+    - id: KI-3
+      finding: >-
+        server.port 기본값 8115 가 board-service 의 management.server.port 와 겹친다. compose 는 컨테이너
+        내부 8080 을 써서 무사하지만 로컬 동시 기동은 나중에 뜬 쪽이 기동 실패한다.
+      disposition: recorded-not-fixed
+    - id: KI-4
+      finding: >-
+        LessonStatus.HIDDEN 에 도달할 애플리케이션 경로가 없다. status 가 final 이고 create() 는 항상
+        ACTIVE 를 넣으며 상태 변경 메서드가 없다 — rehydrate 로만 들어올 수 있다.
+      disposition: recorded-not-fixed
+    - id: KI-5
+      finding: "삭제 감사 로그가 실제로 지운 것과 지울 게 없던 것을 구분하지 못한다(멱등의 대가) — delete() 가 존재 여부와 무관하게 LESSON_DELETED 를 남긴다"
+      disposition: recorded-not-fixed
+    - id: KI-6
+      finding: "재정렬 비용이 차시 수에 비례한다(항상 2n 회 UPDATE + 낙관적 락 버전 증가). 전량 교체 인터페이스라 부분 변경을 알릴 방법이 없다"
+      disposition: by-design (UNIQUE 제약 회피의 대가)
+    - id: KI-7
+      finding: "Course.publish 가 Instant.now() 를 직접 부른다(시계 미주입) — 테스트에서 publishedAt 고정 불가"
+      disposition: recorded-not-fixed
+    - id: KI-8
+      finding: "education_audit_logs 에 파티셔닝이 없다(common-data·financial 등은 파티션 + 런웨이 러너 보유)"
+      disposition: recorded-not-fixed
+
+  uses:
+    - regression-baseline
+    - contract-drift-gate
+    - brownfield-base       # 학습자 경로 추가 시 인터뷰 컨텍스트
