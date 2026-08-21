@@ -65,9 +65,13 @@ export default defineConfig({
       // 내리는 쪽으로 대응하게 되고, 그러면 게이트가 숫자만 남는다. 여유가 소진되면
       // 임계치를 내리지 말고 새 코드에 테스트를 붙일 것.
       //
-      // lines 만 거는 이유: statements(88.8%)·branches(82.9%)는 아직 90 에 못 미친다. 지금 함께
-      // 걸면 곧바로 빨간 게이트가 되어 아무도 신뢰하지 않게 된다 — 올라간 축부터 잠근다.
-      thresholds: { lines: 90 },
+      // 축을 하나씩 잠근다. 아직 90 에 못 미치는 축을 미리 걸면 곧바로 빨간 게이트가 되고,
+      // 그러면 아무도 신뢰하지 않게 된다 — 올라간 축부터 잠근다.
+      //
+      // 2026-08-22 실측(전체 src 기준): lines 93.4% · statements 91.5% · branches 86.4% ·
+      // functions 87.9%. statements 가 90 을 넘어 여유 약 135문(1.5%p)이 생겨 함께 잠근다.
+      // branches·functions 는 아직 미달이라 그대로 둔다 — 올라오면 그때 추가할 것.
+      thresholds: { lines: 90, statements: 90 },
     },
   },
   server: {
