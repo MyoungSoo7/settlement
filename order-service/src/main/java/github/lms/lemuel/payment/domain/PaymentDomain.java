@@ -183,6 +183,22 @@ public class PaymentDomain {
         return !tenders.isEmpty();
     }
 
+    /**
+     * 이 결제가 <b>돈이 아직 들어오지 않은</b> 상태인가 — 즉시 캡처 금지·포인트 선점·미입금 만료의 판정축.
+     *
+     * <p>텐더 결제는 <b>텐더 목록</b>으로 판정한다. {@code paymentMethod} 는 가장 큰 텐더에서 만든
+     * 표시값이라(카드 90,000 + 가상계좌 10,000 → {@code "SPLIT:CARD"}) 그 문자열만 보면 가상계좌가
+     * 섞인 결제를 통째로 놓친다 — 그런 결제는 재고를 붙잡은 채 영원히 만료되지 않는다.
+     *
+     * <p>텐더가 없는 일반 결제만 수단 문자열로 판정한다(그때는 그것이 유일한 정보다).
+     */
+    public boolean awaitsDeposit() {
+        if (isSplit()) {
+            return tenders.stream().anyMatch(t -> t.getType().awaitsDeposit());
+        }
+        return PaymentExpiryPolicy.isDepositMethod(paymentMethod);
+    }
+
     public List<PaymentTender> getTenders() {
         return List.copyOf(tenders);
     }

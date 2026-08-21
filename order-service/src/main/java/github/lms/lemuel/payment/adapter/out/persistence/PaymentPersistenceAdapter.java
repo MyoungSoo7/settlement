@@ -47,11 +47,14 @@ public class PaymentPersistenceAdapter implements LoadPaymentPort, SavePaymentPo
 
     @Override
     public List<PaymentDomain> findPendingCreatedBefore(java.time.LocalDateTime cutoff, int limit) {
-        // 만료 후보는 tender 를 hydrate 하지 않는다 — 수단 판정은 payment_method 로 충분하다.
+        // 만료 후보도 tender 를 hydrate 한다. 예전엔 "수단 판정은 payment_method 로 충분하다"고 보고
+        // 건너뛰었으나, 텐더 결제의 payment_method 는 가장 큰 텐더에서 만든 표시값이라("SPLIT:CARD")
+        // 그 뒤에 숨은 가상계좌 텐더를 놓친다 — 그 결제는 만료 후보에 들지 못하고 재고를 붙잡은 채
+        // 잔류한다. 판정의 진실원은 텐더 목록이다(PaymentDomain.awaitsDeposit).
         return paymentJpaRepository
                 .findPendingCreatedBefore(cutoff, org.springframework.data.domain.PageRequest.of(0, limit))
                 .stream()
-                .map(paymentMapper::toDomain)
+                .map(this::toDomainWithTenders)
                 .toList();
     }
 

@@ -57,8 +57,8 @@ public class ExpirePendingPaymentsService implements ExpirePendingPaymentsUseCas
 
         for (PaymentDomain payment : candidates) {
             // 쿼리는 시각만 거르므로 수단·경계 판정은 도메인 정책이 다시 본다(모르는 수단은 만료 대상 아님).
-            if (!PaymentExpiryPolicy.isExpired(
-                    payment.getPaymentMethod(), payment.getCreatedAt(), ttl, now)) {
+            // 결제 기준 판정을 쓴다 — 수단 문자열만 보면 "SPLIT:CARD" 뒤의 가상계좌 텐더를 놓친다.
+            if (!PaymentExpiryPolicy.isExpired(payment, ttl, now)) {
                 skipped++;
                 continue;
             }

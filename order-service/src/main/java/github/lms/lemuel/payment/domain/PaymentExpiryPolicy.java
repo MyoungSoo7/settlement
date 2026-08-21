@@ -4,8 +4,6 @@ import github.lms.lemuel.payment.domain.exception.PaymentInvariantViolationExcep
 
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.EnumSet;
-import java.util.Set;
 
 /**
  * 미입금 결제 만료 정책 (순수 도메인 규칙 — 프레임워크·시계 의존 0).
@@ -22,16 +20,17 @@ import java.util.Set;
  */
 public final class PaymentExpiryPolicy {
 
-    /** 입금 대기형 수단 — 카드·간편결제는 PG 가 즉시 성공/실패를 확정하므로 "입금 대기"가 없다. */
-    private static final Set<TenderType> DEPOSIT_METHODS =
-            EnumSet.of(TenderType.VIRTUAL_ACCOUNT, TenderType.BANK_TRANSFER);
-
     private PaymentExpiryPolicy() {
     }
 
-    /** 입금 대기형(만료 대상) 수단인지. 미상값·null 은 false. */
+    /**
+     * 입금 대기형(만료 대상) 수단인지. 미상값·null 은 false.
+     *
+     * <p>목록을 여기에 다시 두지 않고 {@link TenderType#awaitsDeposit()} 에 묻는다 — 같은 사실이
+     * 두 곳에 적혀 있으면 수단을 추가할 때 한쪽만 고쳐지고 그 사실을 아무도 모른다.
+     */
     public static boolean isDepositMethod(String paymentMethod) {
-        return parse(paymentMethod).map(DEPOSIT_METHODS::contains).orElse(false);
+        return parse(paymentMethod).map(TenderType::awaitsDeposit).orElse(false);
     }
 
     /** 입금 기한 = 생성시각 + TTL. */
@@ -56,6 +55,22 @@ public final class PaymentExpiryPolicy {
             return false;
         }
         return now.isAfter(deadline(createdAt, ttl));
+    }
+
+    /**
+     * 결제 기준 만료 판정 — <b>텐더 결제는 반드시 이쪽</b>을 쓴다.
+     *
+     * <p>{@link #isExpired(String, LocalDateTime, Duration, LocalDateTime)} 는 수단 문자열만 보므로
+     * {@code "SPLIT:CARD"} 라벨 뒤에 숨은 가상계좌 텐더를 놓친다 — 그 결제는 만료 후보에 들어가지
+     * 못하고 재고를 붙잡은 채 잔류한다. 판정의 진실원은 텐더 목록이다
+     * ({@link PaymentDomain#awaitsDeposit()}).
+     */
+    public static boolean isExpired(PaymentDomain payment, Duration ttl, LocalDateTime now) {
+        if (payment == null || now == null || payment.getCreatedAt() == null
+                || !payment.awaitsDeposit()) {
+            return false;
+        }
+        return now.isAfter(deadline(payment.getCreatedAt(), ttl));
     }
 
     private static java.util.Optional<TenderType> parse(String paymentMethod) {
