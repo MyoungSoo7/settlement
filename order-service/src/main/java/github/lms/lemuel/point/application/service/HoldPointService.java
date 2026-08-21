@@ -84,10 +84,14 @@ public class HoldPointService implements HoldPointUseCase {
 
     @Override
     public void capture(String referenceType, String referenceId, String actor) {
-        PointHold hold = holdPort.findByReference(referenceType, referenceId)
+        Long accountId = holdPort.findAccountIdByReference(referenceType, referenceId)
                 .orElseThrow(() -> new PointInvariantViolationException(
                         "확정할 포인트 선점이 없습니다: ref=" + referenceType + ":" + referenceId
                                 + " — 선점 없이 확정하면 받지 않은 포인트를 받은 셈이 된다"));
+
+        // 잠금을 먼저 얻고 그 안에서 선점을 처음 적재한다 — 순서가 뒤바뀌면 판정이 낡는다(아래 참조).
+        PointAccount account = lockAccount(accountId);
+        PointHold hold = loadAuthoritative(referenceType, referenceId);
 
         if (hold.getStatus() == github.lms.lemuel.point.domain.PointHoldStatus.CAPTURED) {
             log.info("포인트 선점 확정 멱등 단축 반환: ref={}:{}", referenceType, referenceId);
@@ -100,7 +104,6 @@ public class HoldPointService implements HoldPointUseCase {
                     hold.getStatus().name(), "capture");
         }
 
-        PointAccount account = lockAccount(hold);
         account.captureHold(hold.getAmount());
         hold.capture(OffsetDateTime.now());
         holdPort.save(hold);
@@ -113,14 +116,16 @@ public class HoldPointService implements HoldPointUseCase {
 
     @Override
     public void release(String referenceType, String referenceId, boolean expired) {
-        Optional<PointHold> found = holdPort.findByReference(referenceType, referenceId);
-        if (found.isEmpty()) {
+        Optional<Long> accountId = holdPort.findAccountIdByReference(referenceType, referenceId);
+        if (accountId.isEmpty()) {
             // 포인트를 쓰지 않은 결제이거나 애초에 선점하지 않은 건. 막으면 만료 배치가 함께 멈춘다.
             log.warn("해제할 포인트 선점이 없습니다 — 건너뜁니다: ref={}:{}", referenceType, referenceId);
             return;
         }
 
-        PointHold hold = found.get();
+        PointAccount account = lockAccount(accountId.get());
+        PointHold hold = loadAuthoritative(referenceType, referenceId);
+
         if (hold.getStatus() == github.lms.lemuel.point.domain.PointHoldStatus.CAPTURED) {
             // 입금이 먼저 이겼다. 여기서 풀면 이미 쓴 포인트가 되살아나 없는 잔고가 생긴다.
             throw new InvalidPointStateException(
@@ -132,7 +137,6 @@ public class HoldPointService implements HoldPointUseCase {
             return;
         }
 
-        PointAccount account = lockAccount(hold);
         account.releaseHold(hold.getAmount());
         if (expired) {
             hold.expire(OffsetDateTime.now());
@@ -153,9 +157,27 @@ public class HoldPointService implements HoldPointUseCase {
      * <p>호출자(입금 확인·만료 배치)는 tender 만 쥐고 있고 어느 계정 것인지 모른다. 호출자가 넘긴
      * 계정을 믿으면 남의 계정 잠금을 푸는 통로가 된다.
      */
-    private PointAccount lockAccount(PointHold hold) {
-        return accountPort.loadByIdForUpdate(hold.getAccountId())
+    private PointAccount lockAccount(Long accountId) {
+        return accountPort.loadByIdForUpdate(accountId)
                 .orElseThrow(() -> new PointInvariantViolationException(
-                        "선점이 가리키는 계정이 없습니다: accountId=" + hold.getAccountId()));
+                        "선점이 가리키는 계정이 없습니다: accountId=" + accountId));
+    }
+
+    /**
+     * 계정 잠금을 얻은 <b>뒤에</b> 선점을 처음 적재한다 — 이 순서가 경합 방어의 핵심이다.
+     *
+     * <p>잠금 전에 한 번 읽어 두면 두 가지가 겹쳐 무너진다. 첫째, 읽은 시점과 잠금 시점 사이에
+     * 다른 트랜잭션이 이 선점을 해소할 수 있다(check-then-act). 둘째, 그래서 잠금 뒤에 다시
+     * 조회해도 하이버네이트가 <b>영속성 컨텍스트에 남은 낡은 인스턴스</b>를 돌려주므로 재조회가
+     * 소용없다. 그래서 잠금 전에는 계정 id 만 스칼라로 묻는다
+     * ({@code findAccountIdByReference}).
+     *
+     * <p>동시 해제 12건이 전부 잔고를 되돌리려 해 불변식 위반으로 터지던 것을
+     * {@code PointHoldConcurrencyIT} 가 잡아 드러난 순서다.
+     */
+    private PointHold loadAuthoritative(String referenceType, String referenceId) {
+        return holdPort.findByReference(referenceType, referenceId)
+                .orElseThrow(() -> new PointInvariantViolationException(
+                        "선점이 사라졌습니다: ref=" + referenceType + ":" + referenceId));
     }
 }

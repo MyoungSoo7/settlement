@@ -88,6 +88,10 @@ class HoldPointServiceTest {
             return h;
         });
         when(holdPort.findByReference(anyString(), anyString())).thenReturn(Optional.empty());
+        // 확정·해제는 계정 잠금을 먼저 얻어야 해서 계정 id 를 스칼라로 먼저 묻는다
+        // (선점 엔티티를 잠금 전에 적재하면 잠금 뒤 재조회가 낡은 상태를 돌려준다).
+        when(holdPort.findAccountIdByReference(anyString(), anyString()))
+                .thenReturn(Optional.of(ACCOUNT_ID));
     }
 
     /** 확정 경로가 쓰는 로트·원장 목 — 확정 테스트에서만 필요하다. */
@@ -215,6 +219,8 @@ class HoldPointServiceTest {
         @Test
         @DisplayName("선점이 아예 없으면 예외 — 안 받은 포인트를 받은 셈 칠 수 없다")
         void missingHoldThrows() {
+        when(holdPort.findAccountIdByReference(anyString(), anyString()))
+                .thenReturn(Optional.empty());
             assertThatThrownBy(() -> service.capture(REF_TYPE, REF_ID, "user:42"))
                     .isInstanceOf(PointInvariantViolationException.class);
         }
@@ -255,6 +261,8 @@ class HoldPointServiceTest {
         @Test
         @DisplayName("선점이 없으면 조용히 넘어간다 — 만료 배치를 세우지 않는다")
         void missingHoldIsNoOp() {
+        when(holdPort.findAccountIdByReference(anyString(), anyString()))
+                .thenReturn(Optional.empty());
             service.release(REF_TYPE, REF_ID, true);
 
             assertThat(account.getTotal()).isEqualByComparingTo("10000");

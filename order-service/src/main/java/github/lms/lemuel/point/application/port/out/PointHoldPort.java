@@ -20,6 +20,15 @@ public interface PointHoldPort {
     Optional<PointHold> findByReference(String referenceType, String referenceId);
 
     /**
+     * 선점이 걸린 계정 id 만 읽는다 — <b>선점 자체를 적재하지 않고</b>.
+     *
+     * <p>확정·해제는 계정 잠금을 먼저 얻어야 하는데, 그러려면 계정 id 가 필요하다. 그렇다고 잠금
+     * 전에 선점을 통째로 읽으면 그 인스턴스가 영속성 컨텍스트에 남아 잠금 이후 재조회가 낡은
+     * 상태를 돌려준다 — 이미 해소된 선점을 ACTIVE 로 착각하게 된다. 그래서 id 만 먼저 묻는다.
+     */
+    Optional<Long> findAccountIdByReference(String referenceType, String referenceId);
+
+    /**
      * 계정이 지금 잠그고 있는 총액 — 3자 대조가 {@code point_accounts.locked} 와 맞춰 보는 값.
      * 선점이 없으면 0 을 돌려준다(null 아님).
      */

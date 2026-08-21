@@ -222,6 +222,11 @@ public class PointPersistenceAdapter
     }
 
     @Override
+    public Optional<Long> findAccountIdByReference(String referenceType, String referenceId) {
+        return holds.findAccountIdByReference(referenceType, referenceId);
+    }
+
+    @Override
     public BigDecimal activeAmount(Long accountId) {
         return holds.sumActive(accountId, PointHoldStatus.ACTIVE);
     }
