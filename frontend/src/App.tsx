@@ -93,6 +93,7 @@ const CommonCodeManagementPage = lazy(() => import('./pages/system/CommonCodeMan
 const RbacManagementPage = lazy(() => import('./pages/system/RbacManagementPage'));
 const BoardAdminPage = lazy(() => import('./pages/system/BoardAdminPage'));
 const InsuranceDisclosurePage = lazy(() => import('./pages/system/InsuranceDisclosurePage'));
+const InsuranceSalesPage = lazy(() => import('./pages/system/InsuranceSalesPage'));
 const BoardPage = lazy(() => import('./pages/board/BoardPage'));
 const BoardPostPage = lazy(() => import('./pages/board/BoardPostPage'));
 
@@ -289,6 +290,10 @@ function App() {
                 ADMIN 으로 맞춘다. FC 역할이 생기면 이 라우트부터 재검토한다. */}
             <Route path="/admin/system/insurance-disclosures"
               element={<AdminOnlyRoute><SideNavLayout><InsuranceDisclosurePage /></SideNavLayout></AdminOnlyRoute>} />
+            {/* 보험 영업 체인(설계→청약→승인→계약). 교부 화면 바로 옆이다 — 승인이 그 교부 증빙을
+                요구하므로 두 화면을 오가게 된다. 교부와 같은 이유로 ADMIN(FC 역할이 없다). */}
+            <Route path="/admin/system/insurance-sales"
+              element={<AdminOnlyRoute><SideNavLayout><InsuranceSalesPage /></SideNavLayout></AdminOnlyRoute>} />
             {/* 화면 URL 이 /admin/education/courses 가 아닌 이유: 그 URL 은 education-service 의
                 API 다. 시스템 관리 메뉴 아래 화면이므로 /admin/system/education 으로 둔다. */}
             <Route path="/admin/system/education"

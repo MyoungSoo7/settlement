@@ -131,9 +131,9 @@ const SCREEN_PENDING = new Map([
   // (`/api/company/workforce?${params}`)을 못 읽어 "화면 없음"으로 집계했다.
   // 추출기를 고치고 여기서 지운다 — 화면을 만드는 게 아니라 세는 법이 틀렸던 경우다.
   // --- insurance-service ---
-  ['insurance-service/InsuranceApplicationController', '보험 청약 화면 — 서류 리뷰 큐만 화면이 있다'],
-  ['insurance-service/PolicyController', '보험 계약 화면'],
-  ['insurance-service/ProposalController', '보험 가입설계 화면'],
+  // 보험 영업 체인이 화면으로 이어졌다(2026-08-22, /admin/system/insurance-sales).
+  // 어제 붙인 상품설명서 교부가 여는 '승인'이 이 체인의 한 단계인데 그 승인을 누를 화면이
+  // 없어 증빙만 남기고 끝나 있었다. 설계 → 전환 → 청약 → 승인 → 계약이 한 화면에서 이어진다.
   // 상품설명서 교부는 화면이 생겼다(2026-08-21, /admin/system/insurance-disclosures).
   // 이 부채는 승인 경로를 막고 있었다 — 교부 증빙이 없으면 청약 승인이 409 로 거절되는데
   // 교부가 API 로만 가능했다. 다만 청약 생성·승인 자체는 아직 화면이 없다(아래 두 항목).
@@ -179,7 +179,9 @@ const SCREEN_PENDING = new Map([
 //              부채로 잡혀 있었다. 예산이 내려간다고 늘 상환은 아니다.)
 // 2026-08-22: 17 (수신 3종 — 정기예금·적금·퇴직연금. 화면 하나에 탭 셋으로 3건을 갚았다.
 //              세 상품이 같은 모양(가입 → 납입 → 만기/중도해지)이라 가능했다.)
-const PENDING_BUDGET = 17;
+// 2026-08-22: 14 (보험 3종 — 설계·청약·계약. 그중 PolicyController 1건은 화면이 부르는데도
+//              추출기가 보간 괄호를 못 읽어 안 잡히던 것이라, 추출기 보정과 같이 내려간다.)
+const PENDING_BUDGET = 14;
 
 const read = (path) => readFileSync(path, 'utf8');
 
@@ -188,12 +190,19 @@ function frontendUrls() {
   const urls = new Set();
   for (const file of walk(join(REPO_ROOT, 'frontend', 'src'))) {
     if (!/\.(ts|tsx)$/.test(file) || file.includes('__tests__')) continue;
+    // 템플릿 보간을 <b>먼저</b> 균일한 토큰으로 접는다. 경로 문자류에 괄호가 없어서
+    // `${encodeURIComponent(id)}` 같은 보간이 들어가면 매치가 통째로 실패하기 때문이다
+    // (encodeURIComponent 는 이 저장소의 URL 관례다 — coupon·display-section·option-catalog 등).
+    const source = read(file).replace(/\$\{[^}]*\}/g, '${x}');
+
     // 닫는 따옴표 앞의 쿼리스트링을 허용하고 <b>경로만</b> 캡처한다.
-    // 이 `(?:\?...)?` 가 없으면 `/api/company/workforce?${params}` 같은 호출이 통째로
-    // 안 잡힌다 — `?` 가 경로 문자류에 없어 매치가 실패하기 때문이다. 그러면 화면이 멀쩡히
-    // 부르고 있는 컨트롤러가 "화면 없음"으로 집계된다(2026-08-22 실측: URL 9개가 가려져
-    // CompanyWorkforceController 1건이 거짓 부채로 잡혀 있었다).
-    for (const m of read(file).matchAll(/['"`](\/[a-zA-Z0-9/{}$_.*-]+)(?:\?[^'"`]*)?['"`]/g)) {
+    // 이 `(?:\?...)?` 가 없으면 `/api/company/workforce?${params}` 같은 호출이 통째로 안 잡힌다.
+    //
+    // 두 보정 모두 같은 실패를 막는다: <b>화면이 멀쩡히 부르는데 "화면 없음"으로 집계되는 것</b>.
+    // 스캔이 0이 되는 실패와 달리 조용히 부채를 부풀리는 방향이라 오래 산다.
+    // 2026-08-22 실측 — 쿼리스트링: URL 9개 가려짐(CompanyWorkforceController 1건 거짓 부채),
+    //                   보간 괄호: URL 19개 가려짐(PolicyController 1건 거짓 부채).
+    for (const m of source.matchAll(/['"`](\/[a-zA-Z0-9/{}$_.*-]+)(?:\?[^'"`]*)?['"`]/g)) {
       urls.add(norm(m[1]));
     }
   }
@@ -295,7 +304,9 @@ test('[자기검증] 쿼리스트링이 붙은 호출도 경로로 읽는다', (
     "api.get('/api/company/workforce/detail?name=x&page=1')",
     'api.get(`/admin/refunds`)',
     'api.delete(`/api/organizations/${id}/members/${userId}`)',
-  ].join('\n');
+    // 보간 안에 함수 호출이 들어가는 형태 — 이 저장소의 URL 관례다.
+    'api.post(`/api/insurance/policies/${encodeURIComponent(policyNumber)}/surrender`)',
+  ].join('\n').replace(/\$\{[^}]*\}/g, '${x}');
   for (const m of sample.matchAll(/['"`](\/[a-zA-Z0-9/{}$_.*-]+)(?:\?[^'"`]*)?['"`]/g)) {
     urls.add(norm(m[1]));
   }
@@ -304,6 +315,8 @@ test('[자기검증] 쿼리스트링이 붙은 호출도 경로로 읽는다', (
   assert.ok(urls.has('/api/company/workforce/detail'), '작은따옴표 + 쿼리스트링도 읽어야 한다');
   assert.ok(urls.has('/admin/refunds'), '쿼리 없는 경로는 그대로 읽어야 한다');
   assert.ok(urls.has('/api/organizations/*/members/*'), '경로변수는 와일드카드로 접어야 한다');
+  assert.ok(urls.has('/api/insurance/policies/*/surrender'),
+    '보간 안에 함수 호출이 있어도 읽어야 한다 — 괄호 때문에 매치가 통째로 실패하던 자리다');
   // 쿼리스트링 자체가 경로로 새어 들어오면 안 된다 — 그러면 어떤 엔드포인트에도 안 붙는다.
   assert.ok([...urls].every((u) => !u.includes('?')), '캡처는 경로까지다');
 });

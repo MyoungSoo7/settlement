@@ -79,9 +79,9 @@ class MenuSeedIntegrationTest {
     }
 
     @Test
-    @DisplayName("시드 총 66행 — 기존 60 + 예치금·상품설명서·담보·조직멤버십·환불·수신 상품")
-    void seedsExactlySixtySix() {
-        assertThat(adapter.findAll()).hasSize(66);
+    @DisplayName("시드 총 67행 — 기존 60 + 예치금·상품설명서·담보·조직멤버십·환불·수신·보험영업")
+    void seedsExactlySixtySeven() {
+        assertThat(adapter.findAll()).hasSize(67);
     }
 
     @Test
@@ -181,7 +181,7 @@ class MenuSeedIntegrationTest {
     }
 
     @Test
-    @DisplayName("시스템 사이드바 18개 — 앞 3개와 게시판 관리가 RBAC permission 과 짝지어진다")
+    @DisplayName("시스템 사이드바 19개 — 앞 3개와 게시판 관리가 RBAC permission 과 짝지어진다")
     void systemChildren() {
         List<Menu> children = childrenOf("시스템 관리");
 
@@ -192,13 +192,14 @@ class MenuSeedIntegrationTest {
         assertThat(children).extracting(Menu::getName).containsExactly(
                 "메뉴 관리", "공통코드 관리", "RBAC 관리", "이커머스 카테고리",
                 "진열 편성", "옵션 카탈로그", "운영관리", "증빙 리뷰 큐", "게시판 관리", "교육 관리",
-                "상품설명서 교부",
+                // 보험 영업은 교부 뒤 — 승인이 그 교부 증빙을 요구한다(V20260822012000).
+                "상품설명서 교부", "보험 영업",
                 "포인트 운영", "기프트카드 운영", "감사 로그", "회원 관리", "조직 · 멤버십",
                 "리뷰 관리", "쿠폰 운영");
         assertThat(children).extracting(Menu::getRequiredPermission).containsExactly(
                 "SYSTEM_MENU_MANAGE", "SYSTEM_CODE_MANAGE", "SYSTEM_RBAC_MANAGE",
                 null, null, null, null, null, "SYSTEM_BOARD_MANAGE", null, null, null, null,
-                null, null, null, null, null);
+                null, null, null, null, null, null);
     }
 
     @Test
