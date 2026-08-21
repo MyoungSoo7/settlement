@@ -139,7 +139,7 @@ class PaymentPersistenceAdapterTest {
         PaymentPersistenceAdapter adapter = adapter();
         PaymentTender t1 = PaymentTender.newTender(TenderType.POINT, new BigDecimal("5000"), 1);
         PaymentTender t2 = PaymentTender.newTender(TenderType.CARD, new BigDecimal("45000"), 2);
-        PaymentDomain domain = PaymentDomain.createSplit(100L, List.of(t1, t2), "SPLIT");
+        PaymentDomain domain = PaymentDomain.createWithTenders(100L, List.of(t1, t2), "SPLIT");
 
         PaymentJpaEntity saved = entity(1L, "READY");
         saved.setAmount(new BigDecimal("50000"));

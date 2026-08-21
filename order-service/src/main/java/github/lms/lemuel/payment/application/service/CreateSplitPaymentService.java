@@ -21,16 +21,21 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 분할결제 생성 서비스.
+ * 텐더 기반 결제 생성 서비스 — 지불수단이 하나든 여럿이든 이 경로 하나를 탄다.
  *
  * <p>흐름:
  * <ol>
  *   <li>요청된 tender 들을 sequence 순서로 PaymentTender 도메인으로 변환</li>
  *   <li>외부 PG tender → PgRouter.authorize/capture (각 tender 별 독립 PG 거래)</li>
- *   <li>내부 잔액 tender → 외부 호출 없이 즉시 CAPTURED (실 운영에서는 PointService/GiftCardService 호출)</li>
- *   <li>모든 tender 가 성공하면 Payment.createSplit + 저장 + 주문 PAID 전이 + outbox 이벤트</li>
+ *   <li>내부 잔액 tender → 외부 호출 없이 즉시 CAPTURED, 저장 후 원장에서 실제 차감</li>
+ *   <li>모든 tender 가 성공하면 {@code PaymentDomain.createWithTenders} + 저장 + 주문 PAID 전이 + outbox 이벤트</li>
  *   <li>중간에 실패 시 트랜잭션 롤백 → 이미 처리된 외부 PG 거래는 별도 보상 처리 필요 (Saga, 본 구현은 단순화)</li>
  * </ol>
+ *
+ * <p><b>클래스 이름에 "Split" 이 남아 있는 이유</b>: 이제 텐더 1 개(포인트·기프트카드 전액 결제)도
+ * 받으므로 이름이 좁아졌지만, 클래스·REST 경로({@code /payments/split})까지 바꾸면 게이트웨이·
+ * nginx 배선과 외부 계약이 함께 움직인다. 의미가 넓어진 것은 메서드 이름
+ * ({@code createWithTenders})과 이 주석으로 표시하고, 경로 개명은 별건으로 남긴다.
  */
 @Service
 @Transactional
@@ -63,12 +68,12 @@ public class CreateSplitPaymentService implements CreateSplitPaymentUseCase {
     }
 
     @Override
-    public PaymentDomain createSplit(Long orderId, List<TenderRequest> tenderRequests, Long actorUserId) {
-        if (tenderRequests == null || tenderRequests.size() < 2) {
-            throw new PaymentInvariantViolationException("분할결제는 최소 2 개의 지불수단 필요");
+    public PaymentDomain createWithTenders(Long orderId, List<TenderRequest> tenderRequests, Long actorUserId) {
+        if (tenderRequests == null || tenderRequests.isEmpty()) {
+            throw new PaymentInvariantViolationException("결제에는 최소 1 개의 지불수단이 필요합니다");
         }
 
-        log.info("분할결제 시작: orderId={}, tenders={}", orderId, tenderRequests.size());
+        log.info("텐더 결제 시작: orderId={}, tenders={}", orderId, tenderRequests.size());
 
         List<PaymentTender> tenders = new ArrayList<>(tenderRequests.size());
         int seq = 1;
@@ -88,7 +93,7 @@ public class CreateSplitPaymentService implements CreateSplitPaymentUseCase {
 
         // 가장 큰 tender 의 type 을 paymentMethod 표시값으로 사용 (운영자 가시성)
         String paymentMethod = pickPrimaryMethodLabel(tenderRequests);
-        PaymentDomain payment = PaymentDomain.createSplit(orderId, tenders, paymentMethod);
+        PaymentDomain payment = PaymentDomain.createWithTenders(orderId, tenders, paymentMethod);
 
         // 각 tender 처리
         for (PaymentTender tender : tenders) {
@@ -162,11 +167,19 @@ public class CreateSplitPaymentService implements CreateSplitPaymentUseCase {
         }
     }
 
+    /**
+     * 운영 화면에 보일 결제수단 표시값.
+     *
+     * <p>지불수단이 하나뿐이면 <b>{@code "SPLIT:"} 을 붙이지 않는다</b>. 붙이면 분할결제가 아닌
+     * 결제가 운영 화면·정산 프로젝션에서 분할결제로 읽힌다 — 표시값은 사실이어야 한다.
+     * 이 값은 {@code CashReceipt.isCashTender} 가 보는 값이기도 해서, 접두어가 붙어 있으면
+     * 단일 계좌이체 결제가 현금영수증 발급 대상에서 조용히 빠진다.
+     */
     private String pickPrimaryMethodLabel(List<TenderRequest> reqs) {
         TenderType primary = reqs.stream()
                 .max((a, b) -> a.amount().compareTo(b.amount()))
                 .map(TenderRequest::type)
                 .orElse(TenderType.CARD);
-        return "SPLIT:" + primary.name();
+        return reqs.size() == 1 ? primary.name() : "SPLIT:" + primary.name();
     }
 }

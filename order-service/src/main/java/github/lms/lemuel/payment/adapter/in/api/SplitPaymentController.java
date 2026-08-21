@@ -36,8 +36,10 @@ public class SplitPaymentController {
         this.refundService = refundService;
     }
 
-    @Operation(summary = "분할결제 생성",
-            description = "여러 지불수단(포인트/상품권/카드)을 동시 사용. 합계가 주문 금액과 정확히 일치해야 한다.")
+    @Operation(summary = "텐더 결제 생성 (분할 포함)",
+            description = "지불수단(포인트/상품권/카드) 1 개 이상으로 결제한다. 포인트·상품권 전액 결제도 "
+                    + "이 경로로 들어온다 — 일반 결제 경로는 지불수단을 모델링하지 않아 원장 차감·복원이 "
+                    + "걸릴 자리가 없다. 합계가 주문 금액과 정확히 일치해야 한다.")
     @PostMapping
     public ResponseEntity<SplitPaymentResponse> create(@Valid @RequestBody SplitPaymentRequest request) {
         List<CreateSplitPaymentUseCase.TenderRequest> tenders = request.tenders().stream()
@@ -47,7 +49,7 @@ public class SplitPaymentController {
         // 남의 포인트로 결제할 수 있다(IDOR).
         long actorUserId = ResourceOwnership.callerUserId(
                 SecurityContextHolder.getContext().getAuthentication());
-        PaymentDomain p = createUseCase.createSplit(request.orderId(), tenders, actorUserId);
+        PaymentDomain p = createUseCase.createWithTenders(request.orderId(), tenders, actorUserId);
         return ResponseEntity.status(HttpStatus.CREATED).body(SplitPaymentResponse.from(p));
     }
 

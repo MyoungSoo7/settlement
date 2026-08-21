@@ -23,12 +23,13 @@ public interface CreateSplitPaymentUseCase {
      * 트랜잭션 안에서 시도하므로 RuntimeException 발생 시 자동 롤백.
      *
      * @param orderId 주문 ID
-     * @param tenders 지불수단 라인 목록 (최소 2 개)
+     * @param tenders 지불수단 라인 목록. <b>1 개 이상</b> — 포인트·기프트카드 전액 결제가 이 경로로
+     *                들어온다(일반 결제 경로는 지불수단을 모델링하지 않아 원장 차감이 걸릴 자리가 없다)
      * @param actorUserId 결제 주체. <b>JWT 에서 파생</b>한 값이어야 한다 — 요청 본문의 userId 를
      *                    그대로 신뢰하면 남의 포인트로 결제할 수 있다(IDOR).
      * @return 생성·캡처 완료된 PaymentDomain
      */
-    PaymentDomain createSplit(Long orderId, List<TenderRequest> tenders, Long actorUserId);
+    PaymentDomain createWithTenders(Long orderId, List<TenderRequest> tenders, Long actorUserId);
 
     record TenderRequest(TenderType type, BigDecimal amount) {
         public TenderRequest {

@@ -51,17 +51,26 @@ public class PaymentDomain {
     }
 
     /**
-     * 분할결제 팩토리. tenders 합계를 amount 로 자동 계산하여 도메인 불변식 보장
+     * 텐더 기반 결제 팩토리. tenders 합계를 amount 로 자동 계산해 도메인 불변식을 보장한다
      * (외부에서 amount 수동 지정 불가).
      *
+     * <p><b>왜 1 개도 허용하는가</b> — 예전에는 "최소 2 개"였고, 1 개면 일반 결제
+     * ({@link #create})를 쓰라고 했다. 그런데 일반 결제는 {@code paymentMethod} 문자열만 알 뿐
+     * <b>지불수단을 모델링하지 않아서</b>, 포인트·기프트카드 원장의 차감·복원이 걸릴 자리가 없다.
+     * 그 결과 포인트 원장을 다 만들어 놓고도 <b>포인트만으로 결제하는 것이 불가능</b>했다
+     * (docs/plan/point-ledger.md §6 ③). 텐더 개념을 두 번째로 만드는 대신 이 팩토리의 하한을
+     * 1 로 내린다 — 지불수단이 하나든 셋이든 같은 경로를 타야 환불 복원도 한 곳에서 끝난다.
+     *
+     * <p>0 개는 여전히 거부한다. 금액을 계산할 근거가 없기 때문이다.
+     *
      * @param orderId 주문 ID
-     * @param tenders 지불수단 라인들. 최소 2 개 — 1 개면 일반 결제 사용
-     * @param paymentMethod 표시용 메서드명 (예: "SPLIT" 또는 가장 큰 tender 의 type)
+     * @param tenders 지불수단 라인들. 1 개 이상
+     * @param paymentMethod 표시용 메서드명 (1 개면 그 수단명, 2 개 이상이면 {@code "SPLIT:"} + 최대 tender 의 type)
      */
-    public static PaymentDomain createSplit(Long orderId, List<PaymentTender> tenders,
+    public static PaymentDomain createWithTenders(Long orderId, List<PaymentTender> tenders,
                                              String paymentMethod) {
-        if (tenders == null || tenders.size() < 2) {
-            throw new PaymentInvariantViolationException("분할결제는 최소 2 개의 지불수단이 필요합니다");
+        if (tenders == null || tenders.isEmpty()) {
+            throw new PaymentInvariantViolationException("결제에는 최소 1 개의 지불수단이 필요합니다");
         }
         BigDecimal total = tenders.stream()
                 .map(PaymentTender::getAmount)

@@ -34,7 +34,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("CreateSplitPaymentService — 분할결제 생성")
+@DisplayName("CreateSplitPaymentService — 텐더 기반 결제 생성")
 class CreateSplitPaymentServiceTest {
 
     @Mock PgClientPort pgClientPort;
@@ -50,13 +50,13 @@ class CreateSplitPaymentServiceTest {
 
     @Test
     @DisplayName("외부 PG + 내부 잔액 tender 혼합 → CAPTURED 저장 + 주문 PAID + 이벤트 발행")
-    void createSplit_mixedTenders() {
+    void createWithTenders_mixedTenders() {
         when(pgClientPort.authorize(anyLong(), any(), anyString())).thenReturn("PGTX-1");
         when(savePaymentPort.save(any())).thenAnswer(i -> i.getArgument(0));
         when(loadSellerSettlementMetaPort.findByPaymentId(any()))
                 .thenReturn(Optional.of(new SellerSettlementMeta(9L, "VIP", "T+3")));
 
-        PaymentDomain result = service.createSplit(100L, List.of(
+        PaymentDomain result = service.createWithTenders(100L, List.of(
                 new TenderRequest(TenderType.CARD, new BigDecimal("35000")),
                 new TenderRequest(TenderType.POINT, new BigDecimal("5000"))), ACTOR_USER_ID);
 
@@ -71,11 +71,11 @@ class CreateSplitPaymentServiceTest {
 
     @Test
     @DisplayName("모두 내부 잔액 tender 면 PG 호출 없음")
-    void createSplit_allInternal() {
+    void createWithTenders_allInternal() {
         when(savePaymentPort.save(any())).thenAnswer(i -> i.getArgument(0));
         when(loadSellerSettlementMetaPort.findByPaymentId(any())).thenReturn(Optional.empty());
 
-        PaymentDomain result = service.createSplit(200L, List.of(
+        PaymentDomain result = service.createWithTenders(200L, List.of(
                 new TenderRequest(TenderType.POINT, new BigDecimal("3000")),
                 new TenderRequest(TenderType.GIFT_CARD, new BigDecimal("2000"))), ACTOR_USER_ID);
 
@@ -83,14 +83,87 @@ class CreateSplitPaymentServiceTest {
         verify(pgClientPort, never()).authorize(anyLong(), any(), anyString());
     }
 
+    /**
+     * 포인트 전액 결제 — 이 경로가 열리기 전에는 포인트 원장을 다 만들어 놓고도
+     * "포인트만으로 결제"가 불가능했다(docs/plan/point-ledger.md §6 ③).
+     */
+    @Test
+    @DisplayName("포인트 tender 하나로 전액 결제 — PG 호출 없이 원장에서 전액 차감된다")
+    void createWithTenders_pointOnly() {
+        when(savePaymentPort.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(loadSellerSettlementMetaPort.findByPaymentId(any())).thenReturn(Optional.empty());
+
+        PaymentDomain result = service.createWithTenders(400L,
+                List.of(new TenderRequest(TenderType.POINT, new BigDecimal("12000"))), ACTOR_USER_ID);
+
+        assertThat(result.getStatus()).isEqualTo(PaymentStatus.CAPTURED);
+        assertThat(result.getAmount()).isEqualByComparingTo("12000");
+        assertThat(result.getTenders()).hasSize(1);
+        verify(pgClientPort, never()).authorize(anyLong(), any(), anyString());
+        verify(pointTenderPort).use(eq(ACTOR_USER_ID), eq(new BigDecimal("12000")), any());
+        verify(updateOrderStatusPort).updateOrderStatus(400L, "PAID");
+    }
+
+    @Test
+    @DisplayName("기프트카드 tender 하나로 전액 결제")
+    void createWithTenders_giftCardOnly() {
+        when(savePaymentPort.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(loadSellerSettlementMetaPort.findByPaymentId(any())).thenReturn(Optional.empty());
+
+        PaymentDomain result = service.createWithTenders(401L,
+                List.of(new TenderRequest(TenderType.GIFT_CARD, new BigDecimal("30000"))), ACTOR_USER_ID);
+
+        assertThat(result.getAmount()).isEqualByComparingTo("30000");
+        verify(giftCardTenderPort).use(eq(ACTOR_USER_ID), eq(new BigDecimal("30000")), any());
+        verify(pgClientPort, never()).authorize(anyLong(), any(), anyString());
+    }
+
+    /**
+     * 사용 상한은 PG 를 부르기 전에 본다. 전액 결제는 비율이 100% 라 상한 정책이 걸리면
+     * 여기서 끊겨야 한다 — 승인 뒤에 거절하면 취소 보상이 필요해진다.
+     */
+    @Test
+    @DisplayName("포인트 전액 결제도 사용 상한 검사를 거친다 — 주문 전액이 기준액으로 넘어간다")
+    void createWithTenders_pointOnlyChecksUsageLimit() {
+        when(savePaymentPort.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(loadSellerSettlementMetaPort.findByPaymentId(any())).thenReturn(Optional.empty());
+
+        service.createWithTenders(402L,
+                List.of(new TenderRequest(TenderType.POINT, new BigDecimal("12000"))), ACTOR_USER_ID);
+
+        verify(pointTenderPort).assertWithinUsageLimit(
+                eq(new BigDecimal("12000")), eq(new BigDecimal("12000")));
+    }
+
+    /**
+     * 지불수단이 하나뿐인 결제에 "SPLIT:" 을 붙이면 운영 화면에서 분할결제로 읽힌다.
+     * 표시값은 사실이어야 한다.
+     */
+    @Test
+    @DisplayName("paymentMethod 라벨 — 텐더 1 개면 수단명 그대로, 2 개 이상이면 SPLIT: 접두")
+    void createWithTenders_paymentMethodLabel() {
+        when(savePaymentPort.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(loadSellerSettlementMetaPort.findByPaymentId(any())).thenReturn(Optional.empty());
+        when(pgClientPort.authorize(anyLong(), any(), anyString())).thenReturn("PGTX-9");
+
+        PaymentDomain single = service.createWithTenders(500L,
+                List.of(new TenderRequest(TenderType.POINT, new BigDecimal("1000"))), ACTOR_USER_ID);
+        PaymentDomain multi = service.createWithTenders(501L, List.of(
+                new TenderRequest(TenderType.CARD, new BigDecimal("9000")),
+                new TenderRequest(TenderType.POINT, new BigDecimal("1000"))), ACTOR_USER_ID);
+
+        assertThat(single.getPaymentMethod()).isEqualTo("POINT");
+        assertThat(multi.getPaymentMethod()).isEqualTo("SPLIT:CARD");
+    }
+
     @Test
     @DisplayName("POINT tender 는 포인트 원장에서 실제로 차감된다 — 장부 없는 결제 수단을 닫는 지점")
-    void createSplit_deductsPointLedger() {
+    void createWithTenders_deductsPointLedger() {
         when(pgClientPort.authorize(anyLong(), any(), anyString())).thenReturn("PGTX-1");
         when(savePaymentPort.save(any())).thenAnswer(i -> i.getArgument(0));
         when(loadSellerSettlementMetaPort.findByPaymentId(any())).thenReturn(Optional.empty());
 
-        service.createSplit(100L, List.of(
+        service.createWithTenders(100L, List.of(
                 new TenderRequest(TenderType.CARD, new BigDecimal("35000")),
                 new TenderRequest(TenderType.POINT, new BigDecimal("5000"))), ACTOR_USER_ID);
 
@@ -99,11 +172,11 @@ class CreateSplitPaymentServiceTest {
 
     @Test
     @DisplayName("GIFT_CARD 도 원장에서 차감된다 — 내부잔액 텐더 두 종류가 모두 검증을 거친다")
-    void createSplit_deductsGiftCardLedger() {
+    void createWithTenders_deductsGiftCardLedger() {
         when(savePaymentPort.save(any())).thenAnswer(i -> i.getArgument(0));
         when(loadSellerSettlementMetaPort.findByPaymentId(any())).thenReturn(Optional.empty());
 
-        service.createSplit(200L, List.of(
+        service.createWithTenders(200L, List.of(
                 new TenderRequest(TenderType.GIFT_CARD, new BigDecimal("3000")),
                 new TenderRequest(TenderType.POINT, new BigDecimal("2000"))), ACTOR_USER_ID);
 
@@ -113,10 +186,10 @@ class CreateSplitPaymentServiceTest {
 
     @Test
     @DisplayName("인증 주체 없이 포인트로 결제할 수 없다 — 주체를 모른 채 남의 잔액을 건드리지 않는다")
-    void createSplit_pointRequiresActor() {
+    void createWithTenders_pointRequiresActor() {
         when(savePaymentPort.save(any())).thenAnswer(i -> i.getArgument(0));
 
-        assertThatThrownBy(() -> service.createSplit(300L, List.of(
+        assertThatThrownBy(() -> service.createWithTenders(300L, List.of(
                 new TenderRequest(TenderType.POINT, new BigDecimal("1000")),
                 new TenderRequest(TenderType.GIFT_CARD, new BigDecimal("1000"))), null))
                 .isInstanceOf(PaymentInvariantViolationException.class);
@@ -124,17 +197,16 @@ class CreateSplitPaymentServiceTest {
     }
 
     @Test
-    @DisplayName("tender 1개면 예외")
-    void createSplit_tooFew() {
-        assertThatThrownBy(() -> service.createSplit(1L,
-                List.of(new TenderRequest(TenderType.CARD, new BigDecimal("100"))), ACTOR_USER_ID))
+    @DisplayName("tender 가 없으면 예외 — 금액을 계산할 근거가 없다")
+    void createWithTenders_empty() {
+        assertThatThrownBy(() -> service.createWithTenders(1L, List.of(), ACTOR_USER_ID))
                 .isInstanceOf(PaymentInvariantViolationException.class);
     }
 
     @Test
     @DisplayName("tender null 이면 예외")
-    void createSplit_null() {
-        assertThatThrownBy(() -> service.createSplit(1L, null, ACTOR_USER_ID))
+    void createWithTenders_null() {
+        assertThatThrownBy(() -> service.createWithTenders(1L, null, ACTOR_USER_ID))
                 .isInstanceOf(PaymentInvariantViolationException.class);
     }
 }
