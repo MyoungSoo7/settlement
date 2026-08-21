@@ -42,7 +42,7 @@ export const FALLBACK_MENUS: FallbackMenuNode[] = [
       { id: -21, name: '상품관리', path: '/product', icon: '📦', description: '상품 · 재고 관리', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       { id: -22, name: '정산관리', path: '/admin/settlement', icon: '💰', description: '정산 생성 · 확정', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       { id: -23, name: '정산조회', path: '/settlement/search', icon: '🔍', description: '정산 내역 조회', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
-      { id: -24, name: '지급관리', path: '/admin/payouts', icon: '🏦', description: '송금 실행 · 실패 처리', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN'] },
+      { id: -24, name: '지급관리', path: '/admin/settlement/payouts', icon: '🏦', description: '송금 실행 · 실패 처리', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN'] },
     ],
   },
   {
@@ -71,7 +71,7 @@ export const FALLBACK_MENUS: FallbackMenuNode[] = [
     children: [
       { id: -31, name: '배송 관리', path: '/admin/shipping', icon: '🚚', description: '주문별 배송 생성 · 출고 · 상태 전이', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       // 서버가 /admin/shipping-policies/** 를 ADMIN 으로 막는다 — MANAGER 에게 보이면 죽은 링크다.
-      { id: -32, name: '배송비 정책', path: '/admin/shipping-policies', icon: '💵', description: '셀러 기본배송비 · 무료배송 임계', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN'] },
+      { id: -32, name: '배송비 정책', path: '/admin/shipping/policies', icon: '💵', description: '셀러 기본배송비 · 무료배송 임계', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN'] },
     ],
   },
   {
@@ -115,7 +115,7 @@ export const FALLBACK_MENUS: FallbackMenuNode[] = [
       { id: -85, name: '운영관리', path: '/admin/system/operation', icon: '🖥️', description: '인시던트 관제 콘솔', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
       { id: -88, name: '증빙 리뷰 큐', path: '/admin/system/proof-review', icon: '🧾', description: '증빙 OCR 리뷰 큐 (영수증·청약·담보·예치금)', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
       { id: -89, name: '게시판 관리', path: '/admin/system/boards', icon: '📋', description: '게시판 생성 · 스킨 · 권한 정책', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
-      { id: -90, name: '교육 관리', path: '/admin/education/courses', icon: '🎓', description: '교육 과정 · 강의 콘텐츠', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
+      { id: -90, name: '교육 관리', path: '/admin/system/education', icon: '🎓', description: '교육 과정 · 강의 콘텐츠', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
       { id: -91, name: '포인트 운영', path: '/admin/system/points', icon: '🪙', description: '수기 지급 · 유효기간 소멸', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
       { id: -92, name: '기프트카드 운영', path: '/admin/system/gift-cards', icon: '🎁', description: '상품권 발행 · 유효기간 소멸', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
       { id: -93, name: '감사 로그', path: '/admin/system/audit-logs', icon: '🔎', description: '조작 이력 조회 (커머스 · 정산)', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },

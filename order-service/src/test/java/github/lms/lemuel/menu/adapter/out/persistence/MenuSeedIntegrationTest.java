@@ -132,7 +132,9 @@ class MenuSeedIntegrationTest {
         assertThat(children).extracting(Menu::getName)
                 .containsExactly("상품관리", "정산관리", "정산조회", "지급관리");
         assertThat(children).extracting(Menu::getPath)
-                .containsExactly("/product", "/admin/settlement", "/settlement/search", "/admin/payouts");
+                // 지급 콘솔은 /admin/payouts 였다 — nginx SPA 폴백 밖이라 새로고침이 깨져 옮겼다
+                // (V20260821230000). API 경로 /admin/payouts/** 는 그대로다.
+                .containsExactly("/product", "/admin/settlement", "/settlement/search", "/admin/settlement/payouts");
         assertThat(children.get(3).allowedRoles()).containsExactly("ADMIN");
         assertThat(children.get(0).allowedRoles()).containsExactlyInAnyOrder("ADMIN", "MANAGER");
     }
@@ -145,7 +147,9 @@ class MenuSeedIntegrationTest {
         assertThat(byName().get("배송").getType()).isEqualTo(MenuType.GROUP);
         assertThat(children).extracting(Menu::getName).containsExactly("배송 관리", "배송비 정책");
         assertThat(children).extracting(Menu::getPath)
-                .containsExactly("/admin/shipping", "/admin/shipping-policies");
+                // 화면 URL 은 /admin/shipping/policies — 배송 그룹 아래다. API 는 /admin/shipping-policies/**
+                // 로 그대로이며, 화면이 그 URL 을 쓰면 새로고침 때 API 응답이 렌더된다(V20260821230000).
+                .containsExactly("/admin/shipping", "/admin/shipping/policies");
         // 서버가 /admin/shipping-policies/** 를 ADMIN 으로 막는다 — MANAGER 에게 보이면 죽은 링크다.
         assertThat(children.get(1).allowedRoles()).containsExactly("ADMIN");
         assertThat(children.get(0).allowedRoles()).containsExactlyInAnyOrder("ADMIN", "MANAGER");

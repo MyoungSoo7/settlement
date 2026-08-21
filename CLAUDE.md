@@ -175,7 +175,7 @@ order Kafka 이벤트를 컨슈머(`adapter/in/kafka/`)가 받아 로컬 적재�
     ① `App.tsx` 라우트 추가 ② 시드 마이그레이션 + `frontend/src/data/menuFallback.ts` 에 메뉴 행 추가. 메뉴에 넣지
     않을 화면이면 `menu-route-gate.test.mjs` 의 `ROUTES_WITHOUT_MENU` 에 사유 등록(안 하면 CI FAIL).
     메뉴 **구조**(path·area·parent·권한)는 마이그레이션으로만 — 운영 화면 편집은 표시 속성(이름·순서·노출·아이콘)까지.
-    관리자 화면 URL 은 반드시 nginx SPA 폴백 접두사(`/admin/{system|operation|ceo|settlement|login}/**`) **아래** 둔다 —
+    관리자 화면 URL 은 반드시 nginx SPA 폴백 접두사(`/admin/{system|operation|ceo|settlement|shipping|approvals|login}/**`) **아래** 둔다 —
     밖에 두면 클릭 이동만 되고 **새로고침·북마크·새 탭에서 404**(또는 API JSON 이 그대로 렌더)다. vite dev 엔 nginx 가
     없어 개발에선 안 보인다. `spa-fallback-gate.test.mjs` 가 CI 에서 잡는다. 폴백 목록에 이름을 더하는 것은 대개
     오답이다 — 같은 URL 의 백엔드 API 를 프론트가 못 부르게 된다(그래서 화면 URL 을 옮기는 쪽이 정답).

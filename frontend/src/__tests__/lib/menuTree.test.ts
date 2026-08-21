@@ -30,8 +30,11 @@ describe('findActiveTrail — 가장 긴 접두사가 이긴다', () => {
     expect(findActiveRoot(adminMenus, '/product')?.name).toBe('정산');
   });
 
-  it('/admin/payouts 에서 상단 정산이 켜진다 — 하드코딩 시절 빠져 있던 경로', () => {
-    const trail = findActiveTrail(adminMenus, '/admin/payouts');
+  // 지급 콘솔은 형제('정산관리' = /admin/settlement)의 경로를 접두사로 포함한다.
+  // 가장 긴 접두사 하나만 고르는 규칙이라야 지급관리가 켜진다 — 짧은 쪽을 고르면
+  // 지급 화면에서 사이드바가 '정산관리'를 가리킨다.
+  it('/admin/settlement/payouts 는 형제가 아니라 자기 자신이 활성이다', () => {
+    const trail = findActiveTrail(adminMenus, '/admin/settlement/payouts');
     expect(trail.map((n) => n.name)).toEqual(['정산', '지급관리']);
   });
 

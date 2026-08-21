@@ -40,7 +40,7 @@ const node = (over: Partial<MenuNode> & Pick<MenuNode, 'id' | 'name'>): MenuNode
 
 /** 정산(1) > [정산관리(11), 지급관리(12)] · 시스템(2) > [메뉴 관리(21)] */
 const 정산관리 = node({ id: 11, name: '정산관리', parentId: 1, path: '/admin/settlement', sortOrder: 0, requiredRole: 'ADMIN,MANAGER' });
-const 지급관리 = node({ id: 12, name: '지급관리', parentId: 1, path: '/admin/payouts', sortOrder: 1, requiredRole: 'ADMIN' });
+const 지급관리 = node({ id: 12, name: '지급관리', parentId: 1, path: '/admin/settlement/payouts', sortOrder: 1, requiredRole: 'ADMIN' });
 const 메뉴관리 = node({ id: 21, name: '메뉴 관리', parentId: 2, path: '/admin/system/menus', sortOrder: 0 });
 const 정산 = node({ id: 1, name: '정산', menuType: 'GROUP', sortOrder: 0, children: [정산관리, 지급관리] });
 const 시스템 = node({ id: 2, name: '시스템', menuType: 'GROUP', area: 'SYSTEM', sortOrder: 1, children: [메뉴관리] });

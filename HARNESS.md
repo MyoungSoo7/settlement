@@ -282,10 +282,14 @@ settlement-copilot **플러그인 소유**라 플러그인 미설치 환경에 �
   드리프트를 막는 하네스 안에서 드리프트가 난다. 매처 자체도 자기검증 테스트로 판별력을 지킨다(도입 시 매처 버그 1건을 잡았다).
 - **SPA 폴백 게이트** — `scripts/harness/test/spa-fallback-gate.test.mjs`: 위 배선 게이트가 "API 가 닿는가"를
   본다면 이쪽은 **"화면 URL 이 새로고침에서 살아남는가"**를 본다. `/admin` 은 프론트 라우트와 백엔드 admin API 가
-  접두사를 공유하는 유일한 구간이라 nginx 가 폴백 allowlist(`^/admin(/(system|operation|ceo|settlement|login)…`)로
-  가르는데, 화면 URL 을 그 밖에 두면 **클릭 이동은 멀쩡하고 F5·북마크·새 탭에서만** 깨진다. 백엔드 라우트가 없으면
-  404, 있으면 화면 대신 **API JSON 이 브라우저에 렌더**된다. vite dev 에는 nginx 가 없어 개발에선 재현되지 않고,
-  이 불변식이 여태 `App.tsx` **주석에만** 있었던 탓에 라우트 5건이 그대로 새어 나갔다(2026-08-21 실측).
+  접두사를 공유하는 유일한 구간이라 nginx 가 폴백 allowlist(**네비 그룹 접두사** —
+  `^/admin(/(system|operation|ceo|settlement|shipping|approvals|login)…`)로 가르는데, 화면 URL 을 그 밖에 두면
+  **클릭 이동은 멀쩡하고 F5·북마크·새 탭에서만** 깨진다. 백엔드 라우트가 없으면 404, 있으면 화면 대신
+  **API JSON 이 브라우저에 렌더**된다. vite dev 에는 nginx 가 없어 개발에선 재현되지 않고,
+  이 불변식이 여태 `App.tsx` **주석에만** 있었던 탓에 라우트 5건이 그대로 새어 나갔다(2026-08-21 실측 → 같은 날 전건 수리:
+  그룹 등록 2건 `shipping`·`approvals`, URL 이동 3건 `payouts`→`settlement/payouts` ·
+  `shipping-policies`→`shipping/policies` · `education/courses`→`system/education` — 셋은 백엔드 API 와 URL 이 겹쳐
+  폴백 등록이 불가능했다. API 경로는 하나도 바뀌지 않았다).
   검사는 넷이다: ① nginx 두 벌의 폴백 정규식 동일 + **일반 프록시보다 먼저** 등장(정규식 location 은 등장 순서로
   매칭돼 순서가 규칙의 일부다) ② 폴백 접두사가 게이트웨이 `/admin` 라우트를 **가리지 않는지** — 이 방향이 없으면
   "폴백 목록에 한 줄 추가"라는 손쉬운 오답이 통과하는데, 그 한 줄은 이번엔 프론트가 그 API 를 못 부르게 만든다

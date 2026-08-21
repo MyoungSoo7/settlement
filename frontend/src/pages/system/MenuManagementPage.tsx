@@ -11,7 +11,7 @@ const emptyForm: MenuCreateRequest & { active: boolean } = {
 };
 
 const ADMIN_ONLY_PATHS = new Set([
-  '/admin/payouts',
+  '/admin/settlement/payouts',
   '/admin/settlement/chargebacks',
   '/admin/settlement/monthly-closing',
   '/admin/settlement/commission-rates',
