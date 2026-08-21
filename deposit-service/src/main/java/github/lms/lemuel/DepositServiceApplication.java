@@ -22,6 +22,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * 이게 꺼져 있으면 스케줄러 빈은 정상 생성되지만 <b>한 번도 호출되지 않는다</b> — 기동 로그에도
  * 아무 경고가 없어서, 만료된 hold 가 계속 쌓이는 동안 배선이 살아 있다고 착각하기 쉽다.
  * ShedLock 은 shared-common 의 {@code SchedulingLockConfig} 가 함께 켠다.
+ *
+ * <p>배포 단위(ADR 0020): 이 모듈은 {@code ghcr.io/myoungsoo7/settlement-deposit} 이미지 한 장으로 나간다.
  */
 @SpringBootApplication
 @EnableCaching
