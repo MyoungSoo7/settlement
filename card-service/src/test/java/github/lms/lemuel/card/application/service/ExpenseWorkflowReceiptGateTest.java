@@ -75,7 +75,7 @@ class ExpenseWorkflowReceiptGateTest {
         ExpenseReceipt receipt = ExpenseReceipt.extracted("RPT-1", "CAP-1", 10L, 77L,
                 "receipt.jpg", "image/jpeg", "hash", 1024L,
                 new ExtractedReceipt("김밥천국", LocalDate.of(2026, 8, 10),
-                        new BigDecimal("12000"), new BigDecimal("0.93")),
+                        new BigDecimal("12000"), new BigDecimal("0.93"), new BigDecimal("0.93")),
                 "gemini-2.5-flash", CAPTURED_AT);
         switch (status) {
             case MATCHED -> receipt.applyDecision(ReceiptMatchDecision.matched(), CAPTURED_AT);

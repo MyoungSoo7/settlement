@@ -57,7 +57,7 @@ class ExpenseReceiptAdapterTest {
         return ExpenseReceipt.extracted("RPT-1", "CAP-1", 3L, 77L, "영수증.jpg", "image/jpeg",
                 "hash-abc", 2048L,
                 new ExtractedReceipt("스타벅스 강남점", LocalDate.of(2026, 8, 12),
-                        new BigDecimal("12000"), new BigDecimal("0.91")),
+                        new BigDecimal("12000"), new BigDecimal("0.91"), new BigDecimal("0.91")),
                 "gemini-2.5-flash", NOW);
     }
 

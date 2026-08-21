@@ -24,7 +24,15 @@ class ExpenseReceiptMatcherTest {
     private static final BigDecimal CAPTURED_AMOUNT = new BigDecimal("12000");
 
     private static ExtractedReceipt receipt(String amount, LocalDate date, String confidence) {
-        return new ExtractedReceipt("김밥천국", date, new BigDecimal(amount), new BigDecimal(confidence));
+        return receipt(amount, date, confidence, confidence);
+    }
+
+    /** 필드별 신뢰도를 다르게 주는 변형 — 거래일이 null 이면 거래일 신뢰도도 null 이다. */
+    private static ExtractedReceipt receipt(String amount, LocalDate date,
+                                            String amountConfidence, String dateConfidence) {
+        return new ExtractedReceipt("김밥천국", date, new BigDecimal(amount),
+                new BigDecimal(amountConfidence),
+                date == null ? null : new BigDecimal(dateConfidence));
     }
 
     @Test
@@ -101,7 +109,8 @@ class ExpenseReceiptMatcherTest {
     @DisplayName("거래일 판독 불가(null)는 불일치가 아니라 NEEDS_REVIEW")
     void unreadableDateNeedsReview() {
         ReceiptMatchDecision decision = ExpenseReceiptMatcher.decide(
-                new ExtractedReceipt("김밥천국", null, new BigDecimal("12000"), new BigDecimal("0.93")),
+                new ExtractedReceipt("김밥천국", null, new BigDecimal("12000"),
+                        new BigDecimal("0.93"), null),
                 CAPTURED_AMOUNT, CAPTURED_AT, THRESHOLD);
 
         assertThat(decision.status()).isEqualTo(ExpenseReceiptStatus.NEEDS_REVIEW);
@@ -115,5 +124,45 @@ class ExpenseReceiptMatcherTest {
                 receipt("99999", LocalDate.of(2026, 8, 10), "0.30"), CAPTURED_AMOUNT, CAPTURED_AT, THRESHOLD);
 
         assertThat(decision.status()).isEqualTo(ExpenseReceiptStatus.NEEDS_REVIEW);
+    }
+
+    @Test
+    @DisplayName("총액을 확신해도 거래일 신뢰도가 미달이면 종결이 아니라 NEEDS_REVIEW")
+    void lowDateConfidenceGoesToReviewNotMismatch() {
+        // 실측 회귀: 비전 모델이 반사광에 덮인 거래일을 2020-08-11 로 읽고(정답 2026-08-10)
+        // 총액이 또렷하다는 이유로 0.98 을 붙였다. 신뢰도가 하나였을 때 이 케이스는 MISMATCHED
+        // 로 종결됐고, 멀쩡한 영수증이 재첨부 없이는 돌아올 수 없었다.
+        ReceiptMatchDecision decision = ExpenseReceiptMatcher.decide(
+                receipt("12000", LocalDate.of(2020, 8, 11), "0.98", "0.30"),
+                CAPTURED_AMOUNT, CAPTURED_AT, THRESHOLD);
+
+        assertThat(decision.status()).isEqualTo(ExpenseReceiptStatus.NEEDS_REVIEW);
+        assertThat(decision.note()).contains("거래일");
+    }
+
+    @Test
+    @DisplayName("거래일 신뢰도 게이트는 날짜 대조보다 먼저다 — 임계 동률(0.80)은 통과")
+    void dateConfidenceGatePrecedesDateComparison() {
+        ReceiptMatchDecision below = ExpenseReceiptMatcher.decide(
+                receipt("12000", LocalDate.of(2026, 8, 10), "0.95", "0.79"),
+                CAPTURED_AMOUNT, CAPTURED_AT, THRESHOLD);
+        ReceiptMatchDecision atThreshold = ExpenseReceiptMatcher.decide(
+                receipt("12000", LocalDate.of(2026, 8, 10), "0.95", "0.80"),
+                CAPTURED_AMOUNT, CAPTURED_AT, THRESHOLD);
+
+        assertThat(below.status()).isEqualTo(ExpenseReceiptStatus.NEEDS_REVIEW);
+        assertThat(atThreshold.status()).isEqualTo(ExpenseReceiptStatus.MATCHED);
+    }
+
+    @Test
+    @DisplayName("거래일 신뢰도가 낮아도 총액이 실제로 어긋나면 MISMATCHED 다")
+    void amountMismatchStillClosesEvenWithWeakDate() {
+        // 날짜를 못 믿는 것과 총액이 틀린 것은 다른 문제다. 총액 불일치는 증빙이 아니라는
+        // 확정적 근거이므로 리뷰로 미루지 않는다.
+        ReceiptMatchDecision decision = ExpenseReceiptMatcher.decide(
+                receipt("99999", LocalDate.of(2026, 8, 10), "0.95", "0.10"),
+                CAPTURED_AMOUNT, CAPTURED_AT, THRESHOLD);
+
+        assertThat(decision.status()).isEqualTo(ExpenseReceiptStatus.MISMATCHED);
     }
 }

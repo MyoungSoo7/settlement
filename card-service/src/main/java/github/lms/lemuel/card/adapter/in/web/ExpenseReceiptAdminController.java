@@ -79,6 +79,12 @@ public class ExpenseReceiptAdminController {
         throw new AccessDeniedException("인증 주체에서 사용자 식별자를 확인할 수 없습니다.");
     }
 
+
+    /** 거래일을 못 읽었으면 신뢰도도 없다 — 0 으로 채우면 "확신 없음" 과 구분되지 않는다. */
+    private static String nullableConfidence(java.math.BigDecimal value) {
+        return value == null ? null : value.toPlainString();
+    }
+
     private static ExpenseReceiptResponse toResponse(ExpenseReceipt receipt) {
         return new ExpenseReceiptResponse(
                 receipt.getId(),
@@ -88,7 +94,10 @@ public class ExpenseReceiptAdminController {
                 receipt.getExtracted().merchantName(),
                 receipt.getExtracted().transactionDate(),
                 receipt.getExtracted().totalAmount().toPlainString(),
-                receipt.getExtracted().confidence().toPlainString(),
+                // confidence 는 화면 하위호환용 대표값(가장 못 믿는 필드) — 판정은 필드별로 한다.
+                receipt.getExtracted().weakestConfidence().toPlainString(),
+                receipt.getExtracted().amountConfidence().toPlainString(),
+                nullableConfidence(receipt.getExtracted().dateConfidence()),
                 receipt.getMatchNote(),
                 receipt.getOcrModel(),
                 receipt.getFileName(),

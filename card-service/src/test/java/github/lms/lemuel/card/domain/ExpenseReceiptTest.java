@@ -22,7 +22,7 @@ class ExpenseReceiptTest {
 
     private static ExtractedReceipt extracted() {
         return new ExtractedReceipt("김밥천국", LocalDate.of(2026, 8, 10),
-                new BigDecimal("12000"), new BigDecimal("0.93"));
+                new BigDecimal("12000"), new BigDecimal("0.93"), new BigDecimal("0.93"));
     }
 
     private static ExpenseReceipt newReceipt() {

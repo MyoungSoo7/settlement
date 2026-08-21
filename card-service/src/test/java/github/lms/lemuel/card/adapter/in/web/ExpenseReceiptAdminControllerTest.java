@@ -58,7 +58,7 @@ class ExpenseReceiptAdminControllerTest {
         ExpenseReceipt receipt = ExpenseReceipt.extracted("RPT-1", "CAP-1", 10L, 77L,
                 "receipt.jpg", "image/jpeg", "hash", 1024L,
                 new ExtractedReceipt("김밥천국", LocalDate.of(2026, 8, 10),
-                        new BigDecimal("12000"), new BigDecimal("0.50")),
+                        new BigDecimal("12000"), new BigDecimal("0.50"), new BigDecimal("0.50")),
                 "gemini-2.5-flash", Instant.parse("2026-08-14T01:00:00Z"));
         if (status == ExpenseReceiptStatus.NEEDS_REVIEW) {
             receipt.applyDecision(ReceiptMatchDecision.needsReview("신뢰도 미달"),
