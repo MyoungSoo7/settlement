@@ -55,6 +55,9 @@ export const FALLBACK_MENUS: FallbackMenuNode[] = [
       { id: -104, name: 'PG 대사', path: '/admin/settlement/pg-reconciliation', icon: '🧾', description: 'PG 정산파일 업로드 · 차이 승인 · 마감', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       { id: -105, name: '차지백', path: '/admin/settlement/chargebacks', icon: '⚖️', description: '카드사 분쟁 수락 · 기각', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN'] },
       { id: -106, name: '회수 채권', path: '/admin/settlement/recoveries', icon: '🧲', description: '셀러별 미상계 잔액 · 상계 이력', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
+      // 차지백 · 회수 채권 다음 — 셋 다 "나간 돈을 되돌리는" 축이다. 환불(우리가 자발적으로
+      // 돌려줌) → 차지백(카드사가 강제로 회수) → 회수 채권(셀러에게서 되받음) 순으로 읽힌다.
+      { id: -117, name: '환불 운영', path: '/admin/settlement/refunds', icon: '↩️', description: '재시도 소진 건 · 결제별 환불 이력', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       // 예치금은 회수 채권 바로 뒤다 — 둘 다 셀러에게서 재원을 끌어오는 축이고, 상계 부족분이
       // 회수 채권과 같은 종류의 미결 잔여물이라 나란히 읽힌다.
       { id: -113, name: '예치금 운영', path: '/admin/settlement/deposits', icon: '🏧', description: '수기 입출금 · 선점 · 상계 · 부족분 해소', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN'] },

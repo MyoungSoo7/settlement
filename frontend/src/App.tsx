@@ -36,6 +36,7 @@ const CeoAccountPage = lazy(() => import('./pages/CeoAccountPage'));
 const CeoCardPage = lazy(() => import('./pages/CeoCardPage'));
 const CeoLoanGuidePage = lazy(() => import('./pages/CeoLoanGuidePage'));
 const CollateralConsolePage = lazy(() => import('./pages/CollateralConsolePage'));
+const RefundAdminPage = lazy(() => import('./pages/RefundAdminPage'));
 const CeoLoanProcessGuidePage = lazy(() => import('./pages/CeoLoanProcessGuidePage'));
 const CeoLenderGuidePage = lazy(() => import('./pages/CeoLenderGuidePage'));
 const CeoFundGuidePage = lazy(() => import('./pages/CeoFundGuidePage'));
@@ -229,6 +230,12 @@ function App() {
                 nginx SPA 폴백 제약 때문이다 — 위 정산운영 블록 주석 참조. */}
             <Route path="/admin/settlement/seller-tiers"
               element={<AdminOnlyRoute><SideNavLayout><SellerTierAdminPage /></SideNavLayout></AdminOnlyRoute>} />
+            {/* 환불 운영 — 화면 URL 이 /admin/refunds 가 아닌 이유: 그 URL 은 order-service 의
+                API 이고 2026-08-22 에 게이트웨이로 노출됐다. 화면이 같은 URL 을 쓰면 새로고침 때
+                API 응답이 렌더된다(spa-fallback-gate ② 가 그 오답을 막는다).
+                서버가 /admin/refunds/** 를 ADMIN·MANAGER 로 막으므로 라우트도 그에 맞춘다. */}
+            <Route path="/admin/settlement/refunds"
+              element={<AdminManagerRoute><SideNavLayout><RefundAdminPage /></SideNavLayout></AdminManagerRoute>} />
             {/* 예치금 운영 — 서버가 /admin/deposits/** 를 ADMIN 전용으로 막는다(잔고를 움직인다).
                 조회용 /api/deposits/** 만 MANAGER 도 되지만, 이 화면은 조작이 본체라 ADMIN 으로 맞춘다. */}
             <Route path="/admin/settlement/deposits"

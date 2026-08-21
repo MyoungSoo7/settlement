@@ -90,9 +90,11 @@ const MACHINE_ONLY = new Map([
 const SCREEN_PENDING = new Map([
   // --- order-service ---
   ['order-service/PublicEcommerceCategoryController', '쇼핑 카테고리 탐색 — 관리 화면만 있다'],
-  ['order-service/AdminRefundController', '환불 관리 콘솔'],
+  // 환불 운영 콘솔이 생겼다(2026-08-22, /admin/settlement/refunds). 자동 재시도 5회가 끝나면
+  // 스케줄러가 손대지 않는데, 그 대상을 볼 화면이 없었다 — 사람이 안 하면 영영 처리되지 않는 건이다.
+  // RefundHistoryController 도 함께 내려간다: 화면이 행마다 결제별 환불 이력을 실제로 부른다
+  // (여러 번 시도한 건의 이중 환불 여부를 실제 완료액으로 판단하는 자리).
   ['order-service/PgRoutingController', 'PG 라우팅 설정 콘솔'],
-  ['order-service/RefundHistoryController', '환불 이력 조회 화면'],
   ['order-service/SplitPaymentController', '분할결제 UI'],
   ['order-service/ProductVariantController', '상품 옵션(SKU) 관리 화면'],
   // --- settlement-service (docs/PLAN.md §8-8) ---
@@ -167,7 +169,9 @@ const SCREEN_PENDING = new Map([
 // 2026-08-21: 24 (담보 감시 화면 — 재평가·처분·대위변제. SecuredLoanController 는 상세 조회만
 //              불리는데 컨트롤러 단위 판정이라 함께 내려간다. 신청·심사 화면 부재는 위 주석 참조.)
 // 2026-08-22: 23 (조직·멤버십 — organization-service 최초의 화면.)
-const PENDING_BUDGET = 23;
+// 2026-08-22: 21 (환불 운영 콘솔 — 목록과 결제별 이력을 둘 다 부른다. 게이트웨이 배선이
+//              선행이었고 같은 날 열렸다: 그전에는 화면을 만들어도 404 를 부르는 화면이었다.)
+const PENDING_BUDGET = 21;
 
 const read = (path) => readFileSync(path, 'utf8');
 

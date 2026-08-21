@@ -79,9 +79,9 @@ class MenuSeedIntegrationTest {
     }
 
     @Test
-    @DisplayName("시드 총 64행 — 기존 60 + 예치금 운영 · 상품설명서 교부 · 담보 감시 · 조직 멤버십")
-    void seedsExactlySixtyFour() {
-        assertThat(adapter.findAll()).hasSize(64);
+    @DisplayName("시드 총 65행 — 기존 60 + 예치금·상품설명서·담보·조직멤버십·환불 운영")
+    void seedsExactlySixtyFive() {
+        assertThat(adapter.findAll()).hasSize(65);
     }
 
     @Test
@@ -103,9 +103,16 @@ class MenuSeedIntegrationTest {
     void settlementOpsChildren() {
         // 예치금 운영은 회수 채권 바로 뒤다 — 둘 다 셀러에게서 재원을 끌어오는 축이고,
         // 상계 부족분이 회수 채권과 같은 종류의 미결 잔여물이다(V20260821233000).
+        // 환불 운영은 회수 채권 뒤 — 환불·차지백·회수 채권 셋 다 "나간 돈을 되돌리는" 축이다
+        // (V20260822004000). 예치금 마이그레이션이 먼저 심어졌으므로 환불이 그 앞으로 들어간다.
         assertThat(childrenOf("정산운영")).extracting(Menu::getName)
                 .containsExactly("정합성 검증", "매출 통계", "일일 대사", "PG 대사", "차지백", "회수 채권",
-                        "예치금 운영", "월마감", "세무", "수수료율", "셀러 등급", "DLQ 재처리", "원장·시산표");
+                        "환불 운영", "예치금 운영", "월마감", "세무", "수수료율", "셀러 등급",
+                        "DLQ 재처리", "원장·시산표");
+        // 환불은 ADMIN·MANAGER — 서버가 /admin/refunds/** 를 그 등급으로 막는다(조회 전용 표면)
+        assertThat(childrenOf("정산운영").stream()
+                .filter(m -> m.getName().equals("환불 운영")).findFirst().orElseThrow().allowedRoles())
+                .containsExactlyInAnyOrder("ADMIN", "MANAGER");
         // 예치금은 ADMIN 전용 — 서버가 /admin/deposits/** 를 hasRole("ADMIN") 으로 잠근다(잔고를 움직인다)
         assertThat(childrenOf("정산운영").stream()
                 .filter(m -> m.getName().equals("예치금 운영")).findFirst().orElseThrow().allowedRoles())
