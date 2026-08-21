@@ -60,13 +60,15 @@ class ConfirmDepositServiceTest {
     @Mock PublishEventPort publishEventPort;
     @Mock LoadSellerSettlementMetaPort loadSellerSettlementMetaPort;
     @Mock PointTenderPort pointTenderPort;
+    @Mock github.lms.lemuel.payment.application.port.out.GiftCardTenderPort giftCardTenderPort;
 
     private ConfirmDepositService service;
 
     @BeforeEach
     void setUp() {
         service = new ConfirmDepositService(loadPaymentPort, savePaymentPort, pgClientPort,
-                updateOrderStatusPort, publishEventPort, loadSellerSettlementMetaPort, pointTenderPort);
+                updateOrderStatusPort, publishEventPort, loadSellerSettlementMetaPort, pointTenderPort,
+                giftCardTenderPort);
         lenient().when(savePaymentPort.save(any())).thenAnswer(i -> i.getArgument(0));
         lenient().when(loadSellerSettlementMetaPort.findByPaymentId(any())).thenReturn(Optional.empty());
     }

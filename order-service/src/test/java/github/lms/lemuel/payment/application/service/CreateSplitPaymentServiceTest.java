@@ -253,19 +253,21 @@ class CreateSplitPaymentServiceTest {
         }
 
         /**
-         * 기프트카드에는 선점이 없다(Phase 2 는 포인트만). 그냥 통과시키면 입금을 기다리는 동안
-         * 같은 카드를 다른 주문에 또 쓸 수 있어, 포인트에서 막은 구멍이 카드 쪽에 그대로 남는다.
+         * 기프트카드도 선점된다(Phase 2). 예전에는 선점 수단이 없어 입금 대기 결제에서 아예
+         * 거절했는데, 그러면 상품권을 가진 고객이 가상계좌로 결제할 수 없었다.
          */
         @Test
-        @DisplayName("기프트카드는 입금 대기 결제에 쓸 수 없다 — 선점 수단이 없어 이중 사용을 막지 못한다")
-        void giftCardRejectedWhileAwaitingDeposit() {
-            assertThatThrownBy(() -> service.createWithTenders(602L, List.of(
-                    new TenderRequest(TenderType.VIRTUAL_ACCOUNT, new BigDecimal("9000")),
-                    new TenderRequest(TenderType.GIFT_CARD, new BigDecimal("1000"))), ACTOR_USER_ID))
-                    .isInstanceOf(PaymentInvariantViolationException.class)
-                    .hasMessageContaining("기프트카드");
+        @DisplayName("기프트카드도 차감이 아니라 선점된다 — 입금 전에는 카드 잔액이 줄지 않는다")
+        void giftCardIsHeldWhileAwaitingDeposit() {
+            when(pgClientPort.authorize(anyLong(), any(), anyString())).thenReturn("VA-1");
+            when(savePaymentPort.save(any())).thenAnswer(i -> i.getArgument(0));
 
-            verify(pgClientPort, never()).authorize(anyLong(), any(), anyString());
+            service.createWithTenders(602L, List.of(
+                    new TenderRequest(TenderType.VIRTUAL_ACCOUNT, new BigDecimal("9000")),
+                    new TenderRequest(TenderType.GIFT_CARD, new BigDecimal("1000"))), ACTOR_USER_ID);
+
+            verify(giftCardTenderPort).hold(eq(ACTOR_USER_ID), eq(new BigDecimal("1000")), any());
+            verify(giftCardTenderPort, never()).use(any(), any(), any());
         }
 
         /** 상한 검사는 PG 를 부르기 전에 끝나야 한다 — 승인 뒤에 거절하면 취소 보상이 필요해진다. */

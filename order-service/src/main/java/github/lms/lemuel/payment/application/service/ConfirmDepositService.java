@@ -4,6 +4,7 @@ import github.lms.lemuel.payment.application.port.in.ConfirmDepositUseCase;
 import github.lms.lemuel.payment.application.port.out.LoadPaymentPort;
 import github.lms.lemuel.payment.application.port.out.LoadSellerSettlementMetaPort;
 import github.lms.lemuel.payment.application.port.out.PgClientPort;
+import github.lms.lemuel.payment.application.port.out.GiftCardTenderPort;
 import github.lms.lemuel.payment.application.port.out.PointTenderPort;
 import github.lms.lemuel.payment.application.port.out.PublishEventPort;
 import github.lms.lemuel.payment.application.port.out.SavePaymentPort;
@@ -48,6 +49,7 @@ public class ConfirmDepositService implements ConfirmDepositUseCase {
     private final PublishEventPort publishEventPort;
     private final LoadSellerSettlementMetaPort loadSellerSettlementMetaPort;
     private final PointTenderPort pointTenderPort;
+    private final GiftCardTenderPort giftCardTenderPort;
 
     public ConfirmDepositService(LoadPaymentPort loadPaymentPort,
                                  SavePaymentPort savePaymentPort,
@@ -55,7 +57,8 @@ public class ConfirmDepositService implements ConfirmDepositUseCase {
                                  UpdateOrderStatusPort updateOrderStatusPort,
                                  PublishEventPort publishEventPort,
                                  LoadSellerSettlementMetaPort loadSellerSettlementMetaPort,
-                                 PointTenderPort pointTenderPort) {
+                                 PointTenderPort pointTenderPort,
+                                 GiftCardTenderPort giftCardTenderPort) {
         this.loadPaymentPort = loadPaymentPort;
         this.savePaymentPort = savePaymentPort;
         this.pgClientPort = pgClientPort;
@@ -63,6 +66,7 @@ public class ConfirmDepositService implements ConfirmDepositUseCase {
         this.publishEventPort = publishEventPort;
         this.loadSellerSettlementMetaPort = loadSellerSettlementMetaPort;
         this.pointTenderPort = pointTenderPort;
+        this.giftCardTenderPort = giftCardTenderPort;
     }
 
     @Override
@@ -95,14 +99,19 @@ public class ConfirmDepositService implements ConfirmDepositUseCase {
 
         // 2) 내부 잔액 선점 확정 — 여기서 비로소 로트가 소비되고 USE 엔트리가 남는다.
         for (PaymentTender tender : payment.getTenders()) {
-            if (tender.getType() == TenderType.POINT) {
-                if (actorUserId == null) {
-                    throw new PaymentInvariantViolationException(
-                            "선점 확정에는 인증 주체가 필요합니다: paymentId=" + paymentId);
-                }
-                pointTenderPort.captureHold(tender.getId(), actorUserId);
-                tender.capture();
+            if (tender.getType().usesExternalPg()) {
+                continue;
             }
+            if (actorUserId == null) {
+                throw new PaymentInvariantViolationException(
+                        "선점 확정에는 인증 주체가 필요합니다: paymentId=" + paymentId);
+            }
+            if (tender.getType() == TenderType.POINT) {
+                pointTenderPort.captureHold(tender.getId(), actorUserId);
+            } else if (tender.getType() == TenderType.GIFT_CARD) {
+                giftCardTenderPort.captureHold(tender.getId(), actorUserId);
+            }
+            tender.capture();
         }
 
         // 3) 부모 결제 확정.

@@ -52,6 +52,21 @@ class RefundSplitPaymentServiceTest {
         public void restore(java.math.BigDecimal amount, Long tenderId, String refundReference) {
             restored.add(tenderId + ":" + amount.stripTrailingZeros().toPlainString());
         }
+        // 선점 경로는 입금 대기 결제 전용이다. 환불은 이미 확정된 결제만 대상이라 여기 오면 흐름이 틀렸다.
+        @Override
+        public void hold(Long userId, java.math.BigDecimal amount, Long tenderId) {
+            throw new UnsupportedOperationException("환불 테스트에서는 선점 경로를 타지 않는다");
+        }
+
+        @Override
+        public void captureHold(Long tenderId, Long actorUserId) {
+            throw new UnsupportedOperationException("환불 테스트에서는 선점 경로를 타지 않는다");
+        }
+
+        @Override
+        public void releaseHold(Long tenderId, boolean expired) {
+            throw new UnsupportedOperationException("환불 테스트에서는 선점 경로를 타지 않는다");
+        }
     }
 
     /** 포인트 원장 호출을 기록만 하는 페이크 — 환불 경로가 포인트를 되돌리는지 확인용. */

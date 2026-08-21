@@ -96,9 +96,6 @@ public class CreateSplitPaymentService implements CreateSplitPaymentUseCase {
         PaymentDomain payment = PaymentDomain.createWithTenders(orderId, tenders, paymentMethod);
 
         boolean awaitsDeposit = payment.awaitsDeposit();
-        if (awaitsDeposit) {
-            requireHoldableInternalTenders(tenders);
-        }
 
         // 각 tender 처리
         for (PaymentTender tender : tenders) {
@@ -167,35 +164,23 @@ public class CreateSplitPaymentService implements CreateSplitPaymentUseCase {
     }
 
     /**
-     * 입금 대기 결제에 쓸 수 있는 내부 잔액 수단인지 — PG 를 부르기 전에 끊는다.
-     *
-     * <p>기프트카드에는 선점 수단이 없다(Phase 2 는 포인트만). 그냥 통과시키면 입금을 기다리는
-     * 동안 같은 카드를 다른 주문에 또 쓸 수 있어, 포인트에서 막은 구멍이 카드 쪽에 그대로 남는다.
-     * 조용히 두는 것보다 명시적으로 거절하는 편이 낫다.
-     */
-    private void requireHoldableInternalTenders(List<PaymentTender> tenders) {
-        boolean hasGiftCard = tenders.stream().anyMatch(t -> t.getType() == TenderType.GIFT_CARD);
-        if (hasGiftCard) {
-            throw new PaymentInvariantViolationException(
-                    "기프트카드는 입금 대기 결제(가상계좌·무통장)에 함께 쓸 수 없습니다 — "
-                            + "선점 수단이 없어 입금 전 이중 사용을 막을 수 없습니다");
-        }
-    }
-
-    /**
      * 내부 잔액 tender 를 <b>선점</b>한다 — 차감이 아니다. 입금이 확인되면 확정되고, 기한이 지나면
      * 풀린다. 저장 이후인 이유는 선점의 자연키가 tenderId 이기 때문이다(차감과 같은 이유).
      */
     private void holdInternalTenders(PaymentDomain saved, Long actorUserId) {
         for (PaymentTender tender : saved.getTenders()) {
-            if (tender.getType() != TenderType.POINT) {
+            if (tender.getType().usesExternalPg()) {
                 continue;
             }
             if (actorUserId == null) {
                 throw new PaymentInvariantViolationException(
                         "내부 잔액 선점에는 인증 주체가 필요합니다: paymentId=" + saved.getId());
             }
-            pointTenderPort.hold(actorUserId, tender.getAmount(), tender.getId());
+            if (tender.getType() == TenderType.POINT) {
+                pointTenderPort.hold(actorUserId, tender.getAmount(), tender.getId());
+            } else if (tender.getType() == TenderType.GIFT_CARD) {
+                giftCardTenderPort.hold(actorUserId, tender.getAmount(), tender.getId());
+            }
         }
     }
 

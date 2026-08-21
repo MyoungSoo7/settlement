@@ -31,15 +31,18 @@ public class PaymentExpiryProcessor {
     private final SavePaymentPort savePaymentPort;
     private final CancelUnpaidOrderPort cancelUnpaidOrderPort;
     private final github.lms.lemuel.payment.application.port.out.PointTenderPort pointTenderPort;
+    private final github.lms.lemuel.payment.application.port.out.GiftCardTenderPort giftCardTenderPort;
 
     public PaymentExpiryProcessor(LoadPaymentPort loadPaymentPort,
                                   SavePaymentPort savePaymentPort,
                                   CancelUnpaidOrderPort cancelUnpaidOrderPort,
-                                  github.lms.lemuel.payment.application.port.out.PointTenderPort pointTenderPort) {
+                                  github.lms.lemuel.payment.application.port.out.PointTenderPort pointTenderPort,
+                                  github.lms.lemuel.payment.application.port.out.GiftCardTenderPort giftCardTenderPort) {
         this.loadPaymentPort = loadPaymentPort;
         this.savePaymentPort = savePaymentPort;
         this.cancelUnpaidOrderPort = cancelUnpaidOrderPort;
         this.pointTenderPort = pointTenderPort;
+        this.giftCardTenderPort = giftCardTenderPort;
     }
 
     /**
@@ -76,6 +79,8 @@ public class PaymentExpiryProcessor {
         for (PaymentTender tender : payment.getTenders()) {
             if (tender.getType() == TenderType.POINT) {
                 pointTenderPort.releaseHold(tender.getId(), true);
+            } else if (tender.getType() == TenderType.GIFT_CARD) {
+                giftCardTenderPort.releaseHold(tender.getId(), true);
             }
         }
     }

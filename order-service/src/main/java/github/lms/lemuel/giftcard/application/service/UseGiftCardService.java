@@ -2,6 +2,7 @@ package github.lms.lemuel.giftcard.application.service;
 
 import github.lms.lemuel.giftcard.application.port.in.UseGiftCardUseCase;
 import github.lms.lemuel.giftcard.application.port.out.GiftCardEntryPort;
+import github.lms.lemuel.giftcard.application.port.out.GiftCardHoldPort;
 import github.lms.lemuel.giftcard.application.port.out.GiftCardPort;
 import github.lms.lemuel.giftcard.application.port.out.PublishGiftCardEventPort;
 import github.lms.lemuel.giftcard.domain.GiftCard;
@@ -37,12 +38,24 @@ public class UseGiftCardService implements UseGiftCardUseCase {
     private final GiftCardPort giftCardPort;
     private final GiftCardEntryPort entryPort;
     private final PublishGiftCardEventPort eventPort;
+    private final GiftCardHoldPort holdPort;
 
     public UseGiftCardService(GiftCardPort giftCardPort, GiftCardEntryPort entryPort,
-                              PublishGiftCardEventPort eventPort) {
+                              PublishGiftCardEventPort eventPort, GiftCardHoldPort holdPort) {
         this.giftCardPort = giftCardPort;
         this.entryPort = entryPort;
         this.eventPort = eventPort;
+        this.holdPort = holdPort;
+    }
+
+    /**
+     * 입금 대기 결제가 잠가 둔 몫 — 즉시 결제도 <b>반드시</b> 이걸 빼고 봐야 한다.
+     *
+     * <p>빼지 않으면 여기서 잠긴 잔액까지 써 버리고, 나중에 그 입금이 도착했을 때 확정할 잔액이
+     * 남아 있지 않다. 기프트카드는 잠긴 금액을 카드에 저장하지 않으므로 매번 계산해 넘긴다.
+     */
+    private Map<Long, BigDecimal> heldAmounts(List<GiftCard> cards) {
+        return holdPort.activeAmountsByCardIds(cards.stream().map(GiftCard::getId).toList());
     }
 
     @Override
@@ -51,14 +64,16 @@ public class UseGiftCardService implements UseGiftCardUseCase {
 
         // 같은 tender 를 두 번 차감하지 않는다. 카드가 여러 장이라 어느 한 장이라도 기록돼 있으면
         // 이미 처리된 요청이다.
+        Map<Long, BigDecimal> held = heldAmounts(cards);
+
         if (alreadyCharged(cards, command)) {
             log.info("기프트카드 사용 멱등 단축 반환: userId={}, ref={}:{}",
                     command.userId(), command.referenceType(), command.referenceId());
             return new UseGiftCardResult(command.amount(), 0,
-                    GiftCardSelector.spendableBalance(cards));
+                    GiftCardSelector.spendableBalance(cards, held));
         }
 
-        List<GiftCardCharge> charges = GiftCardSelector.consume(cards, command.amount());
+        List<GiftCardCharge> charges = GiftCardSelector.consume(cards, command.amount(), held);
         Map<Long, GiftCard> byId = new HashMap<>();
         for (GiftCard card : cards) {
             byId.put(card.getId(), card);
@@ -74,7 +89,7 @@ public class UseGiftCardService implements UseGiftCardUseCase {
             eventPort.giftCardUsed(card, entry);
         }
 
-        BigDecimal remaining = GiftCardSelector.spendableBalance(cards);
+        BigDecimal remaining = GiftCardSelector.spendableBalance(cards, held);
         log.info("기프트카드 사용: userId={}, amount={}, cards={}, 잔액={}",
                 command.userId(), command.amount(), charges.size(), remaining);
         return new UseGiftCardResult(command.amount(), charges.size(), remaining);
@@ -88,6 +103,7 @@ public class UseGiftCardService implements UseGiftCardUseCase {
     /** 잔액 조회 — 결제 화면이 "상품권으로 얼마까지 낼 수 있나"를 물을 때. */
     @Transactional(readOnly = true)
     public BigDecimal spendableBalance(Long userId) {
-        return GiftCardSelector.spendableBalance(giftCardPort.loadSpendableReadOnly(userId));
+        List<GiftCard> cards = giftCardPort.loadSpendableReadOnly(userId);
+        return GiftCardSelector.spendableBalance(cards, heldAmounts(cards));
     }
 }

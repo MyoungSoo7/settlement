@@ -25,4 +25,22 @@ public interface GiftCardTenderPort {
      * 환불은 언제나 낸 사람에게 돌아가야 한다.
      */
     void restore(BigDecimal amount, Long tenderId, String refundReference);
+
+    /**
+     * 입금 대기 결제의 상품권 <b>선점</b> — 만료 임박 순으로 카드를 골라 잠근다.
+     *
+     * <p>포인트와 달리 <b>카드 잔액을 건드리지 않는다</b>. 기프트카드는 잠긴 금액을 저장하지 않고
+     * 가용액을 계산으로 구하므로, 선점 시점에는 선점 행만 생긴다.
+     */
+    void hold(Long userId, BigDecimal amount, Long tenderId);
+
+    /** 입금이 확인돼 선점을 실제 차감으로 확정한다 — 여기서 카드가 깎이고 USE 엔트리가 남는다. */
+    void captureHold(Long tenderId, Long actorUserId);
+
+    /**
+     * 선점을 푼다. 카드 잔액은 애초에 건드리지 않았으므로 선점 상태만 바뀐다.
+     *
+     * @param expired 기한 경과로 자동 해제면 {@code true}
+     */
+    void releaseHold(Long tenderId, boolean expired);
 }
