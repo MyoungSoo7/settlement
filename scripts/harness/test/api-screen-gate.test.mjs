@@ -126,7 +126,10 @@ const SCREEN_PENDING = new Map([
   // --- company-service ---
   // /admin/company/** 6종은 게이트웨이 미노출이라 MACHINE_ONLY 로 옮겼다. 여기 남은 것은
   // /api/company/** 로 라우팅돼 브라우저가 부를 수 있는데도 화면이 없는 것뿐이다.
-  ['company-service/CompanyWorkforceController', '고용현황 조회 — CEO 화면은 다른 경로를 쓴다'],
+  // 2026-08-22: 이 항목은 <b>부채가 아니었다</b>. 고용현황 화면(/admin/ceo/workforce)이 세
+  // 엔드포인트를 모두 부르고 있었는데, URL 추출기가 쿼리스트링 붙은 템플릿 리터럴
+  // (`/api/company/workforce?${params}`)을 못 읽어 "화면 없음"으로 집계했다.
+  // 추출기를 고치고 여기서 지운다 — 화면을 만드는 게 아니라 세는 법이 틀렸던 경우다.
   // --- insurance-service ---
   ['insurance-service/InsuranceApplicationController', '보험 청약 화면 — 서류 리뷰 큐만 화면이 있다'],
   ['insurance-service/PolicyController', '보험 계약 화면'],
@@ -171,7 +174,10 @@ const SCREEN_PENDING = new Map([
 // 2026-08-22: 23 (조직·멤버십 — organization-service 최초의 화면.)
 // 2026-08-22: 21 (환불 운영 콘솔 — 목록과 결제별 이력을 둘 다 부른다. 게이트웨이 배선이
 //              선행이었고 같은 날 열렸다: 그전에는 화면을 만들어도 404 를 부르는 화면이었다.)
-const PENDING_BUDGET = 21;
+// 2026-08-22: 20 (CompanyWorkforceController — 화면을 붙인 게 아니라 거짓 부채를 걷어냈다.
+//              추출기가 쿼리스트링 붙은 URL 을 못 읽어 9개를 못 보고 있었고, 그중 1건이
+//              부채로 잡혀 있었다. 예산이 내려간다고 늘 상환은 아니다.)
+const PENDING_BUDGET = 20;
 
 const read = (path) => readFileSync(path, 'utf8');
 
@@ -180,7 +186,14 @@ function frontendUrls() {
   const urls = new Set();
   for (const file of walk(join(REPO_ROOT, 'frontend', 'src'))) {
     if (!/\.(ts|tsx)$/.test(file) || file.includes('__tests__')) continue;
-    for (const m of read(file).matchAll(/['"`](\/[a-zA-Z0-9/{}$_.*-]+)['"`]/g)) urls.add(norm(m[1]));
+    // 닫는 따옴표 앞의 쿼리스트링을 허용하고 <b>경로만</b> 캡처한다.
+    // 이 `(?:\?...)?` 가 없으면 `/api/company/workforce?${params}` 같은 호출이 통째로
+    // 안 잡힌다 — `?` 가 경로 문자류에 없어 매치가 실패하기 때문이다. 그러면 화면이 멀쩡히
+    // 부르고 있는 컨트롤러가 "화면 없음"으로 집계된다(2026-08-22 실측: URL 9개가 가려져
+    // CompanyWorkforceController 1건이 거짓 부채로 잡혀 있었다).
+    for (const m of read(file).matchAll(/['"`](\/[a-zA-Z0-9/{}$_.*-]+)(?:\?[^'"`]*)?['"`]/g)) {
+      urls.add(norm(m[1]));
+    }
   }
   return urls;
 }
@@ -268,4 +281,27 @@ test('추출기가 살아 있다 (스캔이 비면 판정 전체가 거짓이 �
   // 추출 정규식이 깨져 0개가 되면 위 테스트들은 조용히 전부 통과한다.
   assert.ok(controllers().length >= 100, '컨트롤러 스캔 결과가 비정상적으로 적습니다.');
   assert.ok(frontendUrls().size >= 150, '프론트 URL 스캔 결과가 비정상적으로 적습니다.');
+});
+
+test('[자기검증] 쿼리스트링이 붙은 호출도 경로로 읽는다', () => {
+  // 이 형태를 못 읽으면 화면이 멀쩡히 부르는 컨트롤러가 "화면 없음"으로 집계된다 —
+  // 스캔이 0이 되는 실패와 달리 <b>조용히 부채를 부풀리는</b> 실패라 더 오래 산다.
+  // 실제로 CompanyWorkforceController 가 그렇게 잡혀 있었다(2026-08-22).
+  const urls = new Set();
+  const sample = [
+    'api.get<T>(`/api/company/workforce?${params}`)',
+    "api.get('/api/company/workforce/detail?name=x&page=1')",
+    'api.get(`/admin/refunds`)',
+    'api.delete(`/api/organizations/${id}/members/${userId}`)',
+  ].join('\n');
+  for (const m of sample.matchAll(/['"`](\/[a-zA-Z0-9/{}$_.*-]+)(?:\?[^'"`]*)?['"`]/g)) {
+    urls.add(norm(m[1]));
+  }
+
+  assert.ok(urls.has('/api/company/workforce'), '템플릿 리터럴 + 쿼리스트링을 읽어야 한다');
+  assert.ok(urls.has('/api/company/workforce/detail'), '작은따옴표 + 쿼리스트링도 읽어야 한다');
+  assert.ok(urls.has('/admin/refunds'), '쿼리 없는 경로는 그대로 읽어야 한다');
+  assert.ok(urls.has('/api/organizations/*/members/*'), '경로변수는 와일드카드로 접어야 한다');
+  // 쿼리스트링 자체가 경로로 새어 들어오면 안 된다 — 그러면 어떤 엔드포인트에도 안 붙는다.
+  assert.ok([...urls].every((u) => !u.includes('?')), '캡처는 경로까지다');
 });
