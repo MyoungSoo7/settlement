@@ -62,6 +62,7 @@ const ShippingPolicyAdminPage = lazy(() => import('./pages/ShippingPolicyAdminPa
 const OrderApprovalPage = lazy(() => import('./pages/OrderApprovalPage'));
 const PayoutAdminPage = lazy(() => import('./pages/PayoutAdminPage'));
 const SellerTierAdminPage = lazy(() => import('./pages/SellerTierAdminPage'));
+const DepositAdminPage = lazy(() => import('./pages/DepositAdminPage'));
 
 // 정산운영 콘솔 — settlement-service 운영 API(/admin/**)를 화면으로 노출한다.
 const IntegrityConsolePage = lazy(() => import('./pages/settlement/IntegrityConsolePage'));
@@ -225,6 +226,10 @@ function App() {
                 nginx SPA 폴백 제약 때문이다 — 위 정산운영 블록 주석 참조. */}
             <Route path="/admin/settlement/seller-tiers"
               element={<AdminOnlyRoute><SideNavLayout><SellerTierAdminPage /></SideNavLayout></AdminOnlyRoute>} />
+            {/* 예치금 운영 — 서버가 /admin/deposits/** 를 ADMIN 전용으로 막는다(잔고를 움직인다).
+                조회용 /api/deposits/** 만 MANAGER 도 되지만, 이 화면은 조작이 본체라 ADMIN 으로 맞춘다. */}
+            <Route path="/admin/settlement/deposits"
+              element={<AdminOnlyRoute><SideNavLayout><DepositAdminPage /></SideNavLayout></AdminOnlyRoute>} />
             {/* 세무는 서버가 /admin/tax/** · /admin/seller-tax-profiles/** 를 ADMIN·MANAGER 로 막는다 */}
             <Route path="/admin/settlement/tax"
               element={<AdminManagerRoute><SideNavLayout><TaxConsolePage /></SideNavLayout></AdminManagerRoute>} />

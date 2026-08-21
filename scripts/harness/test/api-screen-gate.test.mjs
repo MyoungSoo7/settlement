@@ -125,7 +125,9 @@ const SCREEN_PENDING = new Map([
   ['insurance-service/ProposalController', '보험 가입설계 화면'],
   ['insurance-service/ProductDisclosureController', '상품설명서 교부 증빙 화면(완전판매 게이트)'],
   // --- deposit-service ---
-  ['deposit-service/DepositAdminController', '예치금 수기 콘솔 — 증빙 리뷰 큐만 화면이 있다'],
+  // 예치금 수기 콘솔은 화면이 생겼다(2026-08-21, /admin/settlement/deposits). 이 부채는
+  // "기능을 못 쓴다"가 아니라 "부족분이 영원히 쌓인다"였다 — 도메인 주석이 해소 주체가
+  // 없다고 명시했고 resolve/writeOff 의 프로덕션 호출자가 0건이었다.
   // --- 그 외 ---
   ['ai-service/KnowledgeController', 'AI 지식베이스 관리'],
   ['common-data-service/DataSourceController', '공공데이터 데이터소스 등록 화면'],
@@ -149,7 +151,9 @@ const SCREEN_PENDING = new Map([
 //              아니라, 계좌가 없으면 payout 이 생성조차 되지 않아 실패 목록에도 안 뜨는
 //              무증상 정지였다. 반송 처리 안내는 "계좌 정정이 선행"이라고 적혀 있는데
 //              정작 정정할 화면이 없었다.)
-const PENDING_BUDGET = 28;
+// 2026-08-21: 27 (예치금 수기 콘솔 — hold·offset 은 card 이벤트에 sellerId 가 없어 자동화가
+//              막혀 있어 수기 경로가 유일하고, 상계 부족분은 해소 주체가 아예 없어 쌓이기만 했다.)
+const PENDING_BUDGET = 27;
 
 const read = (path) => readFileSync(path, 'utf8');
 

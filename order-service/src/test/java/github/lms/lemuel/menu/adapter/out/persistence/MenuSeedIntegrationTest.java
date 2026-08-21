@@ -79,9 +79,9 @@ class MenuSeedIntegrationTest {
     }
 
     @Test
-    @DisplayName("시드 총 60행 — 기존 54 + 셀러 등급 1 + 감사 로그 1 + 회원 관리 1 + 리뷰 관리 1 + 쿠폰 운영 1 + 대량주문 1")
-    void seedsExactlySixty() {
-        assertThat(adapter.findAll()).hasSize(60);
+    @DisplayName("시드 총 61행 — 기존 60 + 예치금 운영 1 (V20260821230000 의 경로 이동 3건은 수를 바꾸지 않는다)")
+    void seedsExactlySixtyOne() {
+        assertThat(adapter.findAll()).hasSize(61);
     }
 
     @Test
@@ -101,9 +101,15 @@ class MenuSeedIntegrationTest {
     @Test
     @DisplayName("정산운영 그룹은 운영 화면만 담는다 — 정산 그룹과 섞이지 않는다")
     void settlementOpsChildren() {
+        // 예치금 운영은 회수 채권 바로 뒤다 — 둘 다 셀러에게서 재원을 끌어오는 축이고,
+        // 상계 부족분이 회수 채권과 같은 종류의 미결 잔여물이다(V20260821233000).
         assertThat(childrenOf("정산운영")).extracting(Menu::getName)
                 .containsExactly("정합성 검증", "매출 통계", "일일 대사", "PG 대사", "차지백", "회수 채권",
-                        "월마감", "세무", "수수료율", "셀러 등급", "DLQ 재처리", "원장·시산표");
+                        "예치금 운영", "월마감", "세무", "수수료율", "셀러 등급", "DLQ 재처리", "원장·시산표");
+        // 예치금은 ADMIN 전용 — 서버가 /admin/deposits/** 를 hasRole("ADMIN") 으로 잠근다(잔고를 움직인다)
+        assertThat(childrenOf("정산운영").stream()
+                .filter(m -> m.getName().equals("예치금 운영")).findFirst().orElseThrow().allowedRoles())
+                .containsExactly("ADMIN");
         // 매출 통계는 ADMIN·MANAGER — 서버가 /api/reports/** 를 그 등급으로 막는다(읽기 전용 집계)
         assertThat(childrenOf("정산운영").stream()
                 .filter(m -> m.getName().equals("매출 통계")).findFirst().orElseThrow().allowedRoles())
