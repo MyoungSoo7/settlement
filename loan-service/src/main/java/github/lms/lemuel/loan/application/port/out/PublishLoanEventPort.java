@@ -15,9 +15,9 @@ import java.math.BigDecimal;
  */
 public interface PublishLoanEventPort {
 
-    /** 선지급 실행 — settlement 가 payout 으로 셀러에게 송금하도록 요청. */
+    /** 선정산 대출이 실행되어 셀러에게 선지급된 사실을 알린다. */
     void publishDisbursementRequested(LoanAdvance loan);
 
-    /** 상환 차감 완료 — settlement 가 순지급액(amount-deducted) 으로 payout 하도록 통지. */
+    /** 정산건에서 대출 상환액(deducted)이 차감 적용된 사실을 알린다. */
     void publishRepaymentApplied(long settlementId, long sellerId, BigDecimal deducted);
 }

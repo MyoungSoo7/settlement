@@ -26,7 +26,8 @@ import java.time.LocalDateTime;
  * <p>신청 시점과 실행 시점 사이에 담보(정산예정금)가 변할 수 있으므로, 실행 직전에
  * 비관적 락으로 미지급 합계를 재조회해 한도를 재검증한다(동시 선지급 경합 직렬화).
  * 통과 시 DISBURSED 로 전이하고 실행 시각(KST)을 찍어 만기(dueAt = 실행시각 + financingDays)를 확정한 뒤,
- * LoanDisbursementRequested 를 Outbox 에 기록 → settlement 가 payout 으로 셀러에게 실제 송금한다.
+ * LoanDisbursementRequested 를 Outbox 에 기록한다 — 선지급이 일어났다는 사실의 선언이며, 이 서비스는 뒤이어 무엇이
+ * 일어나는지를 지시하지도 전제하지도 않는다(구독 여부와 반응은 각 소비자의 판단이다).
  */
 @Service
 public class DisburseLoanService implements DisburseLoanUseCase {
