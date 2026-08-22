@@ -2,6 +2,8 @@
 
 > **상태: DESIGN** (미구현) · 정본 데이터: [`card-service-funding-offset.seed.yaml`](card-service-funding-offset.seed.yaml)
 > ⚠️ 자매 Seed 들과 성격이 다르다 — 이것은 **as-is 회귀 기준선이 아니라 실행 대상 스펙**이다.
+> card-service 의 as-is 기준선은 [`card-service-corporate-card`](card-service-corporate-card.seed.md) 다 —
+> 이 스펙이 닫으려는 구멍(`R = 0.70` 이 위험을 줄일 뿐 닫지 않는다)은 그 Seed 의 KI-1 로 기록돼 있다.
 > 산출 경위: `card-service.md` 역산 PRD §12-A(최상위 리스크) → 추적항목 C-1 에서 파생.
 > Ouroboros MCP(interview→generate_seed)를 쓸 수 없어(무크레딧 키 캐시) PRD 근거 위에서 손으로 작성했다.
 
