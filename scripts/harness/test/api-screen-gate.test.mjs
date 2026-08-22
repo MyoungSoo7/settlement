@@ -119,10 +119,9 @@ const SCREEN_PENDING = new Map([
   //    GET /loans/secured/{id} 하나뿐이고, 신청 3종(mortgage·financial-asset·personal)과
   //    승인·반려·실행은 여전히 화면이 없다. 담보대출 신청·심사 화면은 별도 작업으로 남는다.
   ['loan-service/LeaseController', '리스 화면'],
-  // 2026-08-22 사유 정정: "상환 화면"이 아니다. POST /loans/repayment/simulate 하나뿐이고
-  // 대출 생성·영속화와 무관한 <b>부수효과 없는 미리보기</b>다 — 상환 처리가 아니라 계산기다.
-  // 부수효과가 없어 기존 대출 화면에 구획으로 얹기 쉬운 축에 속한다.
-  ['loan-service/RepaymentController', '상환표 시뮬레이터(부수효과 없음) — 회차별 상환 미리보기'],
+  // 상환표 시뮬레이터는 화면이 생겼다(2026-08-22, 대출하기 화면의 '상환표' 탭).
+  // 사유를 먼저 정정한 것이 그대로 설계가 됐다 — "상환 화면"이 아니라 부수효과 없는 계산기라,
+  // 라우트·메뉴·마이그레이션 없이 기존 화면에 탭 하나로 붙었다. 이 세션에서 가장 싼 상환이다.
   // 2026-08-22 사유 보강: company-service 평판과 <b>다른 표면</b>이다. loan 이 company 이벤트로
   // 자체 DB 에 적재한 로컬 프로젝션이고(ADR 0023 Phase 3) 조회 키가 stockCode 다.
   // CEO '기업조회' 화면(/api/company/**)과 혼동하면 이미 있는 화면을 또 만들게 된다.
@@ -189,7 +188,8 @@ const SCREEN_PENDING = new Map([
 //              세 상품이 같은 모양(가입 → 납입 → 만기/중도해지)이라 가능했다.)
 // 2026-08-22: 14 (보험 3종 — 설계·청약·계약. 그중 PolicyController 1건은 화면이 부르는데도
 //              추출기가 보간 괄호를 못 읽어 안 잡히던 것이라, 추출기 보정과 같이 내려간다.)
-const PENDING_BUDGET = 13;
+// 2026-08-22: 12 (상환표 시뮬레이터 — 기존 대출 화면에 탭 하나. 배선 0.)
+const PENDING_BUDGET = 12;
 
 const read = (path) => readFileSync(path, 'utf8');
 

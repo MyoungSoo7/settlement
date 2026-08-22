@@ -120,3 +120,46 @@ export const loanApi = {
     return res.data;
   },
 };
+
+/**
+ * 상환 스케줄 시뮬레이션 — loan-service {@code RepaymentController}.
+ *
+ * <p><b>부수효과가 없다.</b> 대출 생성·영속화와 무관한 순수 계산이라(서버 주석) 아무 값이나
+ * 넣어 돌려 봐도 남는 것이 없다. 그래서 확인 절차 없이 바로 계산해도 되는, 이 저장소에서 드문
+ * 종류의 조작이다 — 다른 콘솔들이 확인을 받는 이유(되돌릴 수 없음)가 여기엔 없다.
+ */
+export type RepaymentMethod = 'BULLET' | 'EQUAL_PAYMENT' | 'EQUAL_PRINCIPAL';
+
+export interface RepaymentSimulateRequest {
+  principal: number;
+  /** 1~600 개월 — 서버가 강제한다. */
+  termMonths: number;
+  annualRatePercent: number;
+  method: RepaymentMethod;
+}
+
+export interface RepaymentInstallment {
+  installmentNo: number;
+  principalPortion: number;
+  interest: number;
+  payment: number;
+  remainingBalance: number;
+}
+
+export interface RepaymentSchedule {
+  principal: number;
+  termMonths: number;
+  annualRatePercent: number;
+  method: RepaymentMethod;
+  /** 서버가 내려주는 한글명 — 화면이 코드↔라벨 표를 또 들고 있으면 드리프트한다. */
+  methodLabel: string;
+  totalPrincipal: number;
+  totalInterest: number;
+  totalPayment: number;
+  installments: RepaymentInstallment[];
+}
+
+export const repaymentApi = {
+  simulate: async (req: RepaymentSimulateRequest): Promise<RepaymentSchedule> =>
+    (await api.post<RepaymentSchedule>('/loans/repayment/simulate', req)).data,
+};
