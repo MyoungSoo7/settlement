@@ -72,10 +72,13 @@ beforeEach(() => {
 afterEach(() => confirmSpy.mockRestore());
 
 describe('TaxConsolePage — 스캔 리뷰 큐', () => {
-  it('진입하면 사람 손이 필요한 상태(MISMATCHED)를 먼저 띄운다', async () => {
+  it('진입하면 사람 손이 필요한 상태 3종을 한 번에 띄운다', async () => {
     renderPage();
 
-    await waitFor(() => expect(mocked.scans).toHaveBeenCalledWith('MISMATCHED', 50));
+    // 상태별로 쪼개 열면 다른 곳에 쌓인 건을 놓친다 — 특히 저신뢰 보류(EXTRACTED).
+    await waitFor(() =>
+      expect(mocked.scans).toHaveBeenCalledWith(['EXTRACTED', 'MISMATCHED', 'UNMATCHED'], 50),
+    );
     expect(await screen.findByText('inv-2026-08.pdf')).toBeInTheDocument();
   });
 

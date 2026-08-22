@@ -8,6 +8,7 @@ import github.lms.lemuel.tax.domain.scan.TaxInvoiceScanStatus;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -52,8 +53,8 @@ public class TaxInvoiceScanPersistenceAdapter implements SaveTaxInvoiceScanPort,
     }
 
     @Override
-    public List<TaxInvoiceScan> findByStatus(TaxInvoiceScanStatus status, int limit) {
-        return repository.findByStatusOrderByIdDesc(status, PageRequest.of(0, limit)).stream()
+    public List<TaxInvoiceScan> findByStatusIn(Collection<TaxInvoiceScanStatus> statuses, int limit) {
+        return repository.findByStatusInOrderByIdDesc(statuses, PageRequest.of(0, limit)).stream()
                 .map(TaxInvoiceScanPersistenceAdapter::toDomain)
                 .toList();
     }

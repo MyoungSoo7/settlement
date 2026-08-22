@@ -28,6 +28,21 @@ public class TaxInvoiceScanAdminController {
 
     private static final int DEFAULT_LIMIT = 50;
 
+    /**
+     * 기본 큐 = <b>사람 손이 필요한 상태 전부</b>.
+     *
+     * <p>종전 기본값은 {@code MISMATCHED} 하나였다. 저신뢰 판독이 자동 대사를 건너뛰고
+     * {@code EXTRACTED} 에 남게 되면서, 그 건들이 기본 화면에 보이지 않는 사각지대가 생겼다 —
+     * 보류시켜 놓고 아무도 안 보면 고치지 않은 것과 같다.
+     *
+     * <p>종결 상태({@code MATCHED}·{@code REJECTED})는 넣지 않는다. 넣는 순간 큐가 이력 조회가
+     * 되어 정작 조치가 필요한 건이 묻힌다.
+     */
+    static final List<TaxInvoiceScanStatus> REVIEW_QUEUE = List.of(
+            TaxInvoiceScanStatus.EXTRACTED,
+            TaxInvoiceScanStatus.MISMATCHED,
+            TaxInvoiceScanStatus.UNMATCHED);
+
     private final GetTaxInvoiceScanUseCase getUseCase;
     private final ReviewTaxInvoiceScanUseCase reviewUseCase;
 
@@ -37,12 +52,19 @@ public class TaxInvoiceScanAdminController {
         this.reviewUseCase = reviewUseCase;
     }
 
-    @Operation(summary = "리뷰 큐 조회(상태별)")
+    /**
+     * 리뷰 큐 조회 — {@code ?status=A&status=B} 로 여러 상태를 한 번에 받는다.
+     *
+     * <p>생략하면 {@link #REVIEW_QUEUE}(사람 손이 필요한 3종)를 연다.
+     */
+    @Operation(summary = "리뷰 큐 조회(상태 복수 지정 가능, 기본은 사람 손이 필요한 3종)")
     @GetMapping
     public ResponseEntity<List<TaxInvoiceScanView>> queue(
-            @RequestParam(defaultValue = "MISMATCHED") TaxInvoiceScanStatus status,
+            @RequestParam(required = false) List<TaxInvoiceScanStatus> status,
             @RequestParam(defaultValue = "" + DEFAULT_LIMIT) int limit) {
-        return ResponseEntity.ok(getUseCase.byStatus(status, limit).stream()
+        List<TaxInvoiceScanStatus> statuses =
+                (status == null || status.isEmpty()) ? REVIEW_QUEUE : status;
+        return ResponseEntity.ok(getUseCase.byStatuses(statuses, limit).stream()
                 .map(TaxInvoiceScanView::of)
                 .toList());
     }

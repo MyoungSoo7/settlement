@@ -31,6 +31,7 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.HexFormat;
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -136,9 +137,12 @@ public class TaxInvoiceScanService implements ExtractTaxInvoiceScanUseCase, GetT
     }
 
     @Override
-    public List<TaxInvoiceScan> byStatus(TaxInvoiceScanStatus status, int limit) {
+    public List<TaxInvoiceScan> byStatuses(Collection<TaxInvoiceScanStatus> statuses, int limit) {
+        if (statuses == null || statuses.isEmpty()) {
+            throw new IllegalArgumentException("조회할 상태를 하나 이상 지정해야 합니다");
+        }
         int bounded = Math.clamp(limit, 1, MAX_QUEUE_LIMIT);
-        return loadScanPort.findByStatus(status, bounded);
+        return loadScanPort.findByStatusIn(statuses, bounded);
     }
 
     @Override

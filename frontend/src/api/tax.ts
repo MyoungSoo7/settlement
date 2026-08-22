@@ -85,9 +85,18 @@ export interface TaxReconciliation {
 }
 
 export const taxApi = {
-  /** 스캔 리뷰 큐 — 상태별 조회 */
-  scans: async (status: TaxScanStatus, limit = 50): Promise<TaxInvoiceScan[]> =>
-    (await api.get<TaxInvoiceScan[]>('/admin/tax/scans', { params: { status, limit } })).data,
+  /**
+   * 스캔 리뷰 큐 — 상태 하나 또는 여럿을 한 번에 조회한다.
+   *
+   * 사람 손이 필요한 상태는 셋이다(보류·불일치·미매칭). 화면을 상태별로 쪼개면 한 곳만 보다가
+   * 나머지에 쌓인 건을 놓친다. 서버는 `?status=A&status=B` 형태로 받는다.
+   */
+  scans: async (status: TaxScanStatus | TaxScanStatus[], limit = 50): Promise<TaxInvoiceScan[]> =>
+    (await api.get<TaxInvoiceScan[]>('/admin/tax/scans', {
+      params: { status, limit },
+      // axios 기본은 status[]=A 로 직렬화한다 — 스프링이 못 읽으므로 반복 키로 편다.
+      paramsSerializer: { indexes: null },
+    })).data,
 
   /** 스캔 반려(종결) — 사유는 감사 근거라 비워 보내지 않는다 */
   rejectScan: async (scanId: number, note: string): Promise<TaxInvoiceScan> =>
