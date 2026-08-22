@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import Spinner from '@/components/Spinner';
+import PgRoutingHealthCard from '@/components/PgRoutingHealthCard';
 import { useToast } from '@/contexts/useToast';
 import {
   operationApi,
@@ -180,6 +181,10 @@ const OperationConsolePage: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* PG 라우터 상태 — 인시던트를 보러 온 자리에서 "결제가 어느 경로로 나가는지"를 함께 본다.
+          order-service 표면이지만 읽는 맥락이 관제라 여기 둔다(장애 중 즉시 확인). */}
+      <PgRoutingHealthCard />
 
       {/* 요약 카드 */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">

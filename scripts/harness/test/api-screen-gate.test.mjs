@@ -94,10 +94,9 @@ const SCREEN_PENDING = new Map([
   // 스케줄러가 손대지 않는데, 그 대상을 볼 화면이 없었다 — 사람이 안 하면 영영 처리되지 않는 건이다.
   // RefundHistoryController 도 함께 내려간다: 화면이 행마다 결제별 환불 이력을 실제로 부른다
   // (여러 번 시도한 건의 이중 환불 여부를 실제 완료액으로 판단하는 자리).
-  // 2026-08-22 사유 정정: "설정 콘솔"이 아니다. GET /admin/pg/health 하나뿐이고 서킷브레이커
-  // 스냅샷을 돌려주는 <b>읽기 전용</b>이다(설정 엔드포인트가 아예 없다). 붙인다면 운영 관제의
-  // 상태 카드 한 장이지 설정 화면이 아니다 — 사유를 그대로 읽으면 없는 UI 를 만들게 된다.
-  ['order-service/PgRoutingController', 'PG 라우팅 상태 점검(읽기 전용) — 어느 PG 가 OPEN 인지 확인'],
+  // PG 라우터 상태 카드가 생겼다(2026-08-22, 운영 관제 상단). 사유를 먼저 "설정 콘솔"에서
+  // "읽기 전용 상태 점검"으로 정정한 것이 그대로 설계가 됐다 — 조작 버튼 없는 스냅샷 한 장이고,
+  // order-service 표면이지만 읽는 맥락이 관제라 operation 화면에 얹었다.
   ['order-service/ProductVariantController', '상품 옵션(SKU) 관리 화면'],
   // --- settlement-service (docs/PLAN.md §8-8) ---
   ['settlement-service/EventTrackAdminController', '이벤트 추적 콘솔 — PLAN 8-8'],
@@ -189,7 +188,8 @@ const SCREEN_PENDING = new Map([
 // 2026-08-22: 14 (보험 3종 — 설계·청약·계약. 그중 PolicyController 1건은 화면이 부르는데도
 //              추출기가 보간 괄호를 못 읽어 안 잡히던 것이라, 추출기 보정과 같이 내려간다.)
 // 2026-08-22: 12 (상환표 시뮬레이터 — 기존 대출 화면에 탭 하나. 배선 0.)
-const PENDING_BUDGET = 12;
+// 2026-08-22: 11 (PG 라우터 상태 카드 — 운영 관제에 구획 하나. 배선 0.)
+const PENDING_BUDGET = 11;
 
 const read = (path) => readFileSync(path, 'utf8');
 

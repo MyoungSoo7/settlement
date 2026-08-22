@@ -5,6 +5,13 @@ import { operationApi } from '@/api/operation';
 
 const showToast = vi.fn();
 
+// PG 라우터 상태 카드가 이 화면 안에 있다 — 막지 않으면 실제 axios 를 부르고, 그 결과에 따라
+// 버튼 문구('조회 중…' ↔ 'PG 상태 새로고침')가 바뀌어 이 파일의 버튼 조회가 불안정해진다.
+// 카드 자체의 규율은 PgRoutingHealthCard.test.tsx 가 따로 못박는다.
+vi.mock('@/api/pgRouting', () => ({
+  pgRoutingApi: { health: vi.fn().mockResolvedValue({ providers: {}, healthy: true }) },
+}));
+
 vi.mock('@/contexts/useToast', () => ({
   useToast: () => ({ showToast }),
 }));
