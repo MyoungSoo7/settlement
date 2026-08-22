@@ -6,7 +6,7 @@
 >
 > | 항목      | 값                                                                                          |
 > | --------- | --------------------------------------------------------------------------------------------- |
-> | 대상 범위 | `education-service`(8115, DB `lemuel_education`, 스키마 `education`) 전체 — 과정·차시 관리    |
+> | 대상 범위 | `education-service`(8116, mgmt 8117, DB `lemuel_education`, 스키마 `education`) 전체 — 과정·차시 관리 |
 > | 역산 기준 | 2026-08-22 `develop` 브랜치 (HEAD `92d25c463`)                                               |
 > | 근거      | 도메인 5개 클래스 + 예외 3종, 진입 어댑터 1종(관리 REST 12엔드포인트), Flyway V1 단일, 테스트 11개 클래스 |
 > | 범위 밖   | 수강·진도·이수(미구현) · 콘텐츠 저장(참조만 보관) · 결제 연동 · 학습자 경로                  |
@@ -183,10 +183,10 @@ education-service 는 **과정의 생애를 상태로 강제하고, 차시 순�
 
 | 지점            | 값                                                                   |
 | --------------- | -------------------------------------------------------------------- |
-| gateway         | `Path=/admin/education/**` → `EDUCATION_SERVICE_URI`(기본 8115)      |
+| gateway         | `Path=/admin/education/**` → `EDUCATION_SERVICE_URI`(기본 8116)      |
 | 프론트 라우트   | `/admin/system/education` (`AdminOnlyRoute`)                         |
 | 메뉴            | `menuFallback.ts` id `-90` '교육 관리', area `SYSTEM`, roles `ADMIN` |
-| compose         | `education-postgres` + `education-service`(호스트 127.0.0.1:8115)     |
+| compose         | `education-postgres` + `education-service`(호스트 127.0.0.1:8116)     |
 | Dockerfile      | `MODULE=education-service`                                           |
 
 > 화면 URL 이 `/admin/education/courses` 가 **아닌** 이유: 그 URL 은 이 서비스의 API 다. nginx SPA
@@ -231,12 +231,23 @@ education-service 는 **과정의 생애를 상태로 강제하고, 차시 순�
 `hasRole('ADMIN')` 이다. 수강 신청·진도·이수 판정도 없다. 즉 현재 `PUBLISHED` 는 관리 목록의 라벨일
 뿐이고, 상태머신이 지키는 "초안 노출 금지"(G1)의 반대편 가치가 아직 실현되지 않았다.
 
-### G-3. 로컬 실행 시 포트가 board-service 관리 포트와 겹친다
+### G-3. ~~로컬 실행 시 포트가 board-service 관리 포트와 겹친다~~ → ✅ 2026-08-23 해소
 
-`education/application.yml` 의 `server.port` 기본값이 **8115** 인데, `board-service` 의
-`management.server.port` 도 **8115** 다. compose 에서는 둘 다 컨테이너 내부 8080 을 쓰고 호스트만
-board 8114 / education 8115 로 갈라 충돌하지 않지만, **로컬에서 두 서비스를 같이 띄우면 나중에 뜬 쪽이
-기동 실패한다.** CLAUDE.md 모듈 트리에도 두 값이 그대로 적혀 있어 문서만 봐서는 충돌이 보이지 않는다.
+`education/application.yml` 의 `server.port` 기본값이 **8115** 였는데, `board-service` 의
+`management.server.port` 도 **8115** 였다. compose 에서는 둘 다 컨테이너 내부 8080 을 쓰고 호스트만
+board 8114 / education 8115 로 갈라 드러나지 않았지만, **로컬에서 두 서비스를 같이 띄우면 나중에 뜬 쪽이
+기동 실패했다.** CLAUDE.md 모듈 트리에도 두 값이 그대로 적혀 있어 문서만 봐서는 충돌이 보이지 않았다.
+
+**조치** — education 을 board 다음 짝(**8116/8117**)으로 옮기고, 포트가 적혀 있던 곳을 함께 고쳤다.
+
+| 축 | 조치 |
+|---|---|
+| 앱 | `education/application.yml` — `server.port` 기본값 `8116`, `management.server.port` 기본값 `8117` 신설(board 와 같은 분리형). 선택 근거 주석도 함께 남겼다 |
+| 배선 | gateway `EDUCATION_SERVICE_URI` 기본값 `localhost:8116` · compose 호스트 매핑 `127.0.0.1:8116:8080`(컨테이너 내부는 여전히 8080 이라 헬스체크 불변) |
+| 문서 | CLAUDE·STRUCTURE·ARCHITECTURE·README·SPEC·이 PRD·gateway PRD·Seed 3종 |
+
+8006~8105 는 Windows(Hyper-V) 예약 구간이라 되돌아갈 수 없고, 8110~8123 은 폴리글랏이 쓴다 —
+board(8114/8115) 바로 다음인 8116/8117 이 규약상 유일하게 자연스러운 자리다.
 
 ### G-4. `LessonStatus.HIDDEN` 에 도달할 방법이 없다
 
@@ -270,7 +281,7 @@ board 8114 / education 8115 로 갈라 충돌하지 않지만, **로컬에서 �
 | --- | -------------------------------------------------------- | ----------------------------- |
 | T-1 | Outbox 폴러·Kafka 배선 (또는 카탈로그에서 토픽 철회)     | **미배선** (G-1)              |
 | T-2 | 학습자 공개 조회·수강 경로                               | 없음 (G-2)                    |
-| T-3 | education/board 포트 충돌 정리                           | 미해소 (G-3)                  |
+| T-3 | education/board 포트 충돌 정리                           | ✅ 해소 2026-08-23 (G-3)      |
 | T-4 | `LessonStatus.HIDDEN` 도달 경로 또는 값 제거             | 미결정 (G-4)                  |
 | T-5 | education Seed 결정화(`docs/plan/seeds/`)                | 없음 (board 와 함께 2건)      |
 | T-6 | 감사 로그 파티셔닝                                       | 없음 (G-6)                    |

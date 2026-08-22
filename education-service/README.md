@@ -4,7 +4,7 @@
 
 ## Local
 
-- HTTP: `8115`
+- HTTP: `8116` (management/actuator: `8117`)
 - PostgreSQL: `lemuel_education` on host port `5451`
 - Gateway: `/admin/education/**`
 - Authorization: `ROLE_ADMIN`

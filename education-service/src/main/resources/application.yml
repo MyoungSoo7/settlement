@@ -20,7 +20,9 @@ spring:
     create-schemas: true
     locations: classpath:db/migration
 server:
-  port: ${SERVER_PORT:8115}
+  # 8116/8117 — 8114/8115 는 board 가 쓴다(8115 는 board 의 management 포트라 예전 8115 기본값과
+  # 로컬 동시 기동에서 충돌했다). 8006~8105 는 Windows(Hyper-V) 예약 구간이라 재사용 불가.
+  port: ${SERVER_PORT:8116}
   shutdown: graceful
   servlet:
     encoding:
@@ -30,6 +32,7 @@ server:
 management:
   endpoints.web.exposure.include: health,info,metrics,prometheus
   endpoint.health.probes.enabled: true
+  server.port: ${MANAGEMENT_SERVER_PORT:8117}
 app:
   jwt:
     issuer: ${JWT_ISSUER:lemuel}

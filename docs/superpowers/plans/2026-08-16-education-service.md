@@ -10,6 +10,10 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-16-education-service-design.md`
 
+> **Superseded detail (2026-08-23):** the local port below (`8115`) collided with board-service's
+> `management.server.port`. The service now runs on **8116** (management **8117**) — see
+> `docs/plan/prd/education-service.md` G-3. This plan is kept as the historical record.
+
 ## Global Constraints
 
 - Keep the hexagonal boundary: domain packages do not import Spring, JPA, web, or adapter classes.

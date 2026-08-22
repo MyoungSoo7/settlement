@@ -124,9 +124,17 @@ seed:
       disposition: recorded-not-fixed
     - id: KI-3
       finding: >-
-        server.port 기본값 8115 가 board-service 의 management.server.port 와 겹친다. compose 는 컨테이너
-        내부 8080 을 써서 무사하지만 로컬 동시 기동은 나중에 뜬 쪽이 기동 실패한다.
-      disposition: recorded-not-fixed
+        server.port 기본값 8115 가 board-service 의 management.server.port 와 겹쳤다. compose 는 컨테이너
+        내부 8080 을 써서 무사했지만 로컬 동시 기동은 나중에 뜬 쪽이 기동 실패했다.
+      resolution: >-
+        education 을 8116/8117 로 옮겼다 — application.yml 의 server.port 기본값 8116 +
+        management.server.port 기본값 8117 신설(board 와 같은 분리형), gateway EDUCATION_SERVICE_URI
+        기본값 localhost:8116, compose 호스트 매핑 127.0.0.1:8116:8080(컨테이너 내부는 8080 유지라
+        헬스체크 불변). 8006~8105 는 Windows 예약, 8110~8123 은 폴리글랏이라 board 다음 짝이 유일한 자리였다.
+      disposition: fixed
+      refs: [education-service/src/main/resources/application.yml,
+             gateway-service/src/main/resources/application.yml, docker-compose.yml,
+             docs/plan/prd/education-service.md G-3]
     - id: KI-4
       finding: >-
         LessonStatus.HIDDEN 에 도달할 애플리케이션 경로가 없다. status 가 final 이고 create() 는 항상

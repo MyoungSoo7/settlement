@@ -103,7 +103,7 @@ spring:
               predicates:
                 - Path=/api/boards/**,/admin/boards/**
             - id: education-service
-              uri: ${EDUCATION_SERVICE_URI:http://localhost:8115}
+              uri: ${EDUCATION_SERVICE_URI:http://localhost:8116}
               predicates:
                 - Path=/admin/education/**
             - id: settlement-service

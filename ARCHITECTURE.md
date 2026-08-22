@@ -37,7 +37,7 @@
 | 16 | **insurance-service** | 8108/8109 | GA 보험대리점 — 상담·가입설계·청약·계약·유지변경·수수료정산 |
 | 17 | **deposit-service** | 8112/8113 | 셀러 예치금 원장 (잔고 단일 진실원, hold/offset) |
 | 18 | **board-service** | 8114/8115 | 메타 주도 게시판 — 정의 1행 = 게시판 1개, 스킨(LIST/GALLERY/FAQ/QNA) 렌더. 발행 0·소비 0 |
-| 19 | **education-service** | 8115 | 교육 과정·차시·게시 상태 (ADMIN 콘텐츠 관리) — CoursePublished Outbox |
+| 19 | **education-service** | 8116/8117 | 교육 과정·차시·게시 상태 (ADMIN 콘텐츠 관리) — CoursePublished Outbox |
 
 > **shared-common** — 버전드 플랫폼 라이브러리(ADR 0021, composite build + maven-publish). JWT SecurityConfig · Outbox · 멱등 인프라 · JacksonCompat 등 코어 서비스가 공유. *서비스가 아니라 라이브러리.*
 

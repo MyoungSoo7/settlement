@@ -136,7 +136,7 @@ gateway-service 는 **하나의 오리진(8080)으로 전부를 받아 경로로
 | 15 | `insurance-service` | 8108 | `/api/insurance/**` |
 | 16 | `deposit-service` | 8112 | `/api/deposits/**`·`/admin/deposits/**` |
 | 17 | `board-service` | 8114 | `/api/boards/**`·`/admin/boards/**` |
-| 18 | `education-service` | 8115 | `/admin/education/**` |
+| 18 | `education-service` | 8116 | `/admin/education/**` |
 | 19 | `market-stream-service` | 8110 | `/api/market-stream/**` → `RewritePath` → `/{segment}` |
 | 20 | `notification-service` | 8130 | `/api/notifications/stream`(정확 일치) → `RewritePath` → `/notifications/stream` |
 

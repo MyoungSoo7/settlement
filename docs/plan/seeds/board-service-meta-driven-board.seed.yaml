@@ -161,9 +161,15 @@ seed:
   known_issues:
     - id: KI-1
       finding: >-
-        management.server.port 가 8115 로 education-service 의 server.port 기본값과 겹친다.
-        compose 는 컨테이너 내부 8080 을 써서 무사하지만 로컬 동시 기동은 나중에 뜬 쪽이 기동 실패한다.
-      disposition: recorded-not-fixed
+        management.server.port 가 8115 로 education-service 의 server.port 기본값과 겹쳤다.
+        compose 는 컨테이너 내부 8080 을 써서 무사했지만 로컬 동시 기동은 나중에 뜬 쪽이 기동 실패했다.
+      resolution: >-
+        board 는 그대로 두고 education 을 8116/8117 로 옮겼다(education/application.yml 의
+        server.port 기본값 8116 + management.server.port 기본값 8117 신설). board 의 8114/8115 는
+        이미 gateway·compose·문서에 퍼져 있어 옮기는 쪽의 파급이 더 작았다.
+      disposition: fixed
+      refs: [education-service/src/main/resources/application.yml,
+             docs/plan/prd/education-service.md G-3]
     - id: KI-2
       finding: >-
         메뉴 행이 시드가 아니라 런타임에 만들어져 menu-route-gate 의 시드 대조 대상이 아니다

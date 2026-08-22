@@ -89,8 +89,10 @@ orderingKey `courseId`. 페이로드: `courseId`·`title`·`publishedAt`·`publi
   고정된다(ADR 0035) — 별도 결정 사항. PRD G-1 / T-1.
 - **KI-2**: **학습자 경로가 없다.** 공개 API 0, 전 경로 `hasRole('ADMIN')`. 즉 `PUBLISHED` 는 현재
   관리 목록의 라벨일 뿐이다. PRD G-2.
-- **KI-3**: `server.port` 기본값 8115 가 board-service 의 `management.server.port` 와 겹친다.
-  compose 는 컨테이너 내부 8080 을 써서 무사하지만 **로컬 동시 기동은 나중에 뜬 쪽이 실패**한다.
+- **KI-3** *(해소 2026-08-23)*: `server.port` 기본값 8115 가 board-service 의
+  `management.server.port` 와 겹쳐 **로컬 동시 기동은 나중에 뜬 쪽이 실패**했다(compose 는 컨테이너
+  내부 8080 이라 드러나지 않았다). **8116/8117** 로 옮기고 gateway 기본 URI·compose 호스트 매핑·
+  문서 8곳을 함께 고쳤다. PRD G-3 참조.
 - **KI-4**: `LessonStatus.HIDDEN` 에 도달할 애플리케이션 경로가 없다. `status` 가 `final` 이고
   `create()` 는 항상 `ACTIVE` 를 넣으며 상태 변경 메서드가 없다 — `rehydrate` 로만 들어올 수 있다.
 - **KI-5**: 삭제 감사 로그가 **실제로 지운 것과 지울 게 없던 것을 구분하지 못한다** —

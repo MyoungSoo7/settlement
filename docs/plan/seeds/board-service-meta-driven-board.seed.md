@@ -108,8 +108,10 @@
 
 ## Known Issues (발견만 기록 — 사양은 as-is 유지)
 
-- **KI-1**: `management.server.port` 가 **8115** 로 education-service 의 `server.port` 기본값과 겹친다.
-  compose 는 컨테이너 내부 8080 을 써서 무사하지만 **로컬 동시 기동은 나중에 뜬 쪽이 실패**한다.
+- **KI-1** *(해소 2026-08-23)*: `management.server.port` 가 **8115** 로 education-service 의
+  `server.port` 기본값과 겹쳐 **로컬 동시 기동은 나중에 뜬 쪽이 실패**했다(compose 는 컨테이너 내부
+  8080 이라 드러나지 않았다). board 는 그대로 두고 **education 을 8116/8117 로** 옮겨 해소했다 —
+  board 의 8114/8115 는 이미 gateway·compose·문서에 퍼져 있어 옮기는 쪽의 파급이 더 작았다.
 - **KI-2**: 메뉴 행이 시드가 아니라 런타임에 만들어져 `menu-route-gate` 의 시드 대조 대상이 아니다
   (`ROUTES_WITHOUT_MENU` 에 사유와 함께 등록됨). 즉 **게시판 라우트의 메뉴 존재는 기계로 검증되지 않는다** —
   라우트가 게시판 수만큼 늘지 않는 설계의 대가다.

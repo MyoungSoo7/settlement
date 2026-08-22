@@ -99,7 +99,7 @@ flowchart LR
 ```
 
 > 위 다이어그램은 **커머스→정산→여신/계정계 주 흐름**만 그린다. 여기 없는 6종
-> (organization :8104 · card :8106 · insurance :8108 · deposit :8112 · board :8114 · education :8115)
+> (organization :8104 · card :8106 · insurance :8108 · deposit :8112 · board :8114 · education :8116)
 > 도 동일하게 DB-per-service + Kafka 연계다 — JVM 18 + gateway + 폴리글랏 7 = 26 전체 인벤토리는
 > [ARCHITECTURE.md](ARCHITECTURE.md) §1 참조.
 
