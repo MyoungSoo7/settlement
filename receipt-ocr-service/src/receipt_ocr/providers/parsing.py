@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import datetime as _dt
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal
 from typing import Any
 
@@ -214,4 +214,51 @@ def parse_receipt(lines: list[OcrLine]) -> ParsedReceipt:
         amount_method=amount.method,
         amount_source=amount.source,
         date_source=date.source if date else None,
+    )
+
+
+def choose_pass(candidates: list[ParsedReceipt]) -> ParsedReceipt:
+    """여러 판독(원본·전처리 등) 중 무엇을 채택할지 정한다.
+
+    **전처리는 양날이다.** Phase 1 실측에서 대비 정규화는 총액 판독을 올리면서 가중 오류비용은
+    악화시켰다 — 더 자신 있게 읽은 값이 임계를 넘어 종결로 갔기 때문이다. 그래서 둘 중 하나를
+    미리 고르지 않고, 둘 다 읽은 뒤 **OCR 점수와 독립인 근거**로 고른다.
+
+    총액은 ``structural``(공급가액+부가세=합계) 이 선 판독을 우선한다. 금액끼리 산술이
+    맞아떨어지는 것은 "글자를 이렇게 읽었다" 는 확신과 다른 종류의 증거다.
+
+    거래일은 **총액과 따로** 고른다. 총액에서 진 패스가 날짜만 읽어냈다면 그 날짜를 버릴 이유가
+    없다 — 두 필드는 서로 다른 영역에서 읽히고, 뭉개지는 영역도 다르다.
+
+    :raises ParseFailed: 후보가 하나도 없을 때(어느 패스도 총액을 못 읽었다).
+    """
+    usable = [c for c in candidates if c is not None]
+    if not usable:
+        raise ParseFailed("어느 판독에서도 총액을 읽지 못했습니다")
+    if len(usable) == 1:
+        return usable[0]
+
+    best = max(usable, key=lambda c: (c.amount_method == "structural", c.amount_confidence))
+    dated = [c for c in usable if c.date_confidence is not None]
+    if not dated:
+        return best
+
+    # 거래일은 가장 또렷하게 읽은 패스에서 가져온다. 두 패스가 같은 날짜를 읽었다면 그 합의는
+    # 각각보다 강한 증거이므로 더 낮은 쪽 점수를 굳이 쓸 이유가 없다.
+    best_date = max(dated, key=lambda c: c.date_confidence)
+    if best_date is best:
+        return best
+
+    # 총액은 best, 거래일은 best_date 에서 가져와 합친다.
+    return replace(
+        best,
+        extracted=ExtractedReceipt(
+            merchant_name=best.extracted.merchant_name,
+            transaction_date=best_date.extracted.transaction_date,
+            total_amount=best.extracted.total_amount,
+            amount_confidence=best.extracted.amount_confidence,
+            date_confidence=to_confidence(best_date.date_confidence),
+        ),
+        date_confidence=best_date.date_confidence,
+        date_source=best_date.date_source,
     )

@@ -1,0 +1,1476 @@
+{
+  "schema_version": 1,
+  "count": 105,
+  "cases": [
+    {
+      "case_id": "SYN-0000",
+      "capture": {
+        "capture_id": "CAP-0000",
+        "amount": "99800",
+        "captured_at": "2026-03-15T08:24:56+09:00"
+      },
+      "truth_amount": "99800",
+      "truth_date": "2026-03-15",
+      "image_path": "build/train-images/SYN-0000.jpg",
+      "note": "",
+      "scenario": "CLEAN",
+      "condition": "PRISTINE"
+    },
+    {
+      "case_id": "SYN-0001",
+      "capture": {
+        "capture_id": "CAP-0001",
+        "amount": "21996",
+        "captured_at": "2026-03-13T23:52:29+09:00"
+      },
+      "truth_amount": "21996",
+      "truth_date": "2026-03-14",
+      "image_path": "build/train-images/SYN-0001.jpg",
+      "note": "심야 결제 — 전표 날짜가 매입일 +1",
+      "scenario": "NEXT_DAY",
+      "condition": "PRISTINE"
+    },
+    {
+      "case_id": "SYN-0002",
+      "capture": {
+        "capture_id": "CAP-0002",
+        "amount": "117100",
+        "captured_at": "2026-03-20T09:57:13+09:00"
+      },
+      "truth_amount": "117100",
+      "truth_date": null,
+      "image_path": "build/train-images/SYN-0002.jpg",
+      "note": "간이 영수증 — 거래일 미인쇄",
+      "scenario": "NO_DATE",
+      "condition": "PRISTINE"
+    },
+    {
+      "case_id": "SYN-0003",
+      "capture": {
+        "capture_id": "CAP-0003",
+        "amount": "13285",
+        "captured_at": "2026-03-09T16:00:40+09:00"
+      },
+      "truth_amount": "40600",
+      "truth_date": "2026-03-09",
+      "image_path": "build/train-images/SYN-0003.jpg",
+      "note": "금액 불일치 — 다른 건 영수증 오첨부",
+      "scenario": "AMOUNT_TAMPERED",
+      "condition": "PRISTINE"
+    },
+    {
+      "case_id": "SYN-0004",
+      "capture": {
+        "capture_id": "CAP-0004",
+        "amount": "23840",
+        "captured_at": "2026-03-08T14:00:45+09:00"
+      },
+      "truth_amount": "23840",
+      "truth_date": "2026-02-10",
+      "image_path": "build/train-images/SYN-0004.jpg",
+      "note": "과거 영수증 재첨부",
+      "scenario": "STALE_DATE",
+      "condition": "PRISTINE"
+    },
+    {
+      "case_id": "SYN-0005",
+      "capture": {
+        "capture_id": "CAP-0005",
+        "amount": "47600",
+        "captured_at": "2026-03-19T14:47:08+09:00"
+      },
+      "truth_amount": "47600",
+      "truth_date": "2026-03-19",
+      "image_path": "build/train-images/SYN-0005.jpg",
+      "note": "",
+      "scenario": "CLEAN",
+      "condition": "FADED"
+    },
+    {
+      "case_id": "SYN-0006",
+      "capture": {
+        "capture_id": "CAP-0006",
+        "amount": "16500",
+        "captured_at": "2026-03-18T23:52:47+09:00"
+      },
+      "truth_amount": "16500",
+      "truth_date": "2026-03-19",
+      "image_path": "build/train-images/SYN-0006.jpg",
+      "note": "심야 결제 — 전표 날짜가 매입일 +1",
+      "scenario": "NEXT_DAY",
+      "condition": "FADED"
+    },
+    {
+      "case_id": "SYN-0007",
+      "capture": {
+        "capture_id": "CAP-0007",
+        "amount": "33626",
+        "captured_at": "2026-03-13T09:36:13+09:00"
+      },
+      "truth_amount": "33626",
+      "truth_date": null,
+      "image_path": "build/train-images/SYN-0007.jpg",
+      "note": "간이 영수증 — 거래일 미인쇄",
+      "scenario": "NO_DATE",
+      "condition": "FADED"
+    },
+    {
+      "case_id": "SYN-0008",
+      "capture": {
+        "capture_id": "CAP-0008",
+        "amount": "37191",
+        "captured_at": "2026-03-22T22:31:32+09:00"
+      },
+      "truth_amount": "75000",
+      "truth_date": "2026-03-22",
+      "image_path": "build/train-images/SYN-0008.jpg",
+      "note": "금액 불일치 — 다른 건 영수증 오첨부",
+      "scenario": "AMOUNT_TAMPERED",
+      "condition": "FADED"
+    },
+    {
+      "case_id": "SYN-0009",
+      "capture": {
+        "capture_id": "CAP-0009",
+        "amount": "48000",
+        "captured_at": "2026-03-24T16:17:02+09:00"
+      },
+      "truth_amount": "48000",
+      "truth_date": "2026-03-03",
+      "image_path": "build/train-images/SYN-0009.jpg",
+      "note": "과거 영수증 재첨부",
+      "scenario": "STALE_DATE",
+      "condition": "FADED"
+    },
+    {
+      "case_id": "SYN-0010",
+      "capture": {
+        "capture_id": "CAP-0010",
+        "amount": "19135",
+        "captured_at": "2026-03-16T11:44:53+09:00"
+      },
+      "truth_amount": "19135",
+      "truth_date": "2026-03-16",
+      "image_path": "build/train-images/SYN-0010.jpg",
+      "note": "",
+      "scenario": "CLEAN",
+      "condition": "CRUMPLED"
+    },
+    {
+      "case_id": "SYN-0011",
+      "capture": {
+        "capture_id": "CAP-0011",
+        "amount": "69900",
+        "captured_at": "2026-03-14T23:52:22+09:00"
+      },
+      "truth_amount": "69900",
+      "truth_date": "2026-03-15",
+      "image_path": "build/train-images/SYN-0011.jpg",
+      "note": "심야 결제 — 전표 날짜가 매입일 +1",
+      "scenario": "NEXT_DAY",
+      "condition": "CRUMPLED"
+    },
+    {
+      "case_id": "SYN-0012",
+      "capture": {
+        "capture_id": "CAP-0012",
+        "amount": "18800",
+        "captured_at": "2026-03-24T13:50:17+09:00"
+      },
+      "truth_amount": "18800",
+      "truth_date": null,
+      "image_path": "build/train-images/SYN-0012.jpg",
+      "note": "간이 영수증 — 거래일 미인쇄",
+      "scenario": "NO_DATE",
+      "condition": "CRUMPLED"
+    },
+    {
+      "case_id": "SYN-0013",
+      "capture": {
+        "capture_id": "CAP-0013",
+        "amount": "2068",
+        "captured_at": "2026-03-22T08:44:53+09:00"
+      },
+      "truth_amount": "15015",
+      "truth_date": "2026-03-22",
+      "image_path": "build/train-images/SYN-0013.jpg",
+      "note": "금액 불일치 — 다른 건 영수증 오첨부",
+      "scenario": "AMOUNT_TAMPERED",
+      "condition": "CRUMPLED"
+    },
+    {
+      "case_id": "SYN-0014",
+      "capture": {
+        "capture_id": "CAP-0014",
+        "amount": "12900",
+        "captured_at": "2026-03-11T21:19:40+09:00"
+      },
+      "truth_amount": "12900",
+      "truth_date": "2026-02-26",
+      "image_path": "build/train-images/SYN-0014.jpg",
+      "note": "과거 영수증 재첨부",
+      "scenario": "STALE_DATE",
+      "condition": "CRUMPLED"
+    },
+    {
+      "case_id": "SYN-0015",
+      "capture": {
+        "capture_id": "CAP-0015",
+        "amount": "158700",
+        "captured_at": "2026-03-22T09:54:44+09:00"
+      },
+      "truth_amount": "158700",
+      "truth_date": "2026-03-22",
+      "image_path": "build/train-images/SYN-0015.jpg",
+      "note": "",
+      "scenario": "CLEAN",
+      "condition": "SKEWED"
+    },
+    {
+      "case_id": "SYN-0016",
+      "capture": {
+        "capture_id": "CAP-0016",
+        "amount": "27492",
+        "captured_at": "2026-03-14T23:52:29+09:00"
+      },
+      "truth_amount": "27492",
+      "truth_date": "2026-03-15",
+      "image_path": "build/train-images/SYN-0016.jpg",
+      "note": "심야 결제 — 전표 날짜가 매입일 +1",
+      "scenario": "NEXT_DAY",
+      "condition": "SKEWED"
+    },
+    {
+      "case_id": "SYN-0017",
+      "capture": {
+        "capture_id": "CAP-0017",
+        "amount": "63900",
+        "captured_at": "2026-03-16T11:47:57+09:00"
+      },
+      "truth_amount": "63900",
+      "truth_date": null,
+      "image_path": "build/train-images/SYN-0017.jpg",
+      "note": "간이 영수증 — 거래일 미인쇄",
+      "scenario": "NO_DATE",
+      "condition": "SKEWED"
+    },
+    {
+      "case_id": "SYN-0018",
+      "capture": {
+        "capture_id": "CAP-0018",
+        "amount": "27208",
+        "captured_at": "2026-03-16T18:37:04+09:00"
+      },
+      "truth_amount": "61100",
+      "truth_date": "2026-03-16",
+      "image_path": "build/train-images/SYN-0018.jpg",
+      "note": "금액 불일치 — 다른 건 영수증 오첨부",
+      "scenario": "AMOUNT_TAMPERED",
+      "condition": "SKEWED"
+    },
+    {
+      "case_id": "SYN-0019",
+      "capture": {
+        "capture_id": "CAP-0019",
+        "amount": "8648",
+        "captured_at": "2026-03-04T09:15:33+09:00"
+      },
+      "truth_amount": "8648",
+      "truth_date": "2026-02-27",
+      "image_path": "build/train-images/SYN-0019.jpg",
+      "note": "과거 영수증 재첨부",
+      "scenario": "STALE_DATE",
+      "condition": "SKEWED"
+    },
+    {
+      "case_id": "SYN-0020",
+      "capture": {
+        "capture_id": "CAP-0020",
+        "amount": "43600",
+        "captured_at": "2026-03-06T16:56:52+09:00"
+      },
+      "truth_amount": "43600",
+      "truth_date": "2026-03-06",
+      "image_path": "build/train-images/SYN-0020.jpg",
+      "note": "",
+      "scenario": "CLEAN",
+      "condition": "LOW_LIGHT"
+    },
+    {
+      "case_id": "SYN-0021",
+      "capture": {
+        "capture_id": "CAP-0021",
+        "amount": "45100",
+        "captured_at": "2026-03-06T23:52:56+09:00"
+      },
+      "truth_amount": "45100",
+      "truth_date": "2026-03-07",
+      "image_path": "build/train-images/SYN-0021.jpg",
+      "note": "심야 결제 — 전표 날짜가 매입일 +1",
+      "scenario": "NEXT_DAY",
+      "condition": "LOW_LIGHT"
+    },
+    {
+      "case_id": "SYN-0022",
+      "capture": {
+        "capture_id": "CAP-0022",
+        "amount": "45162",
+        "captured_at": "2026-03-09T18:45:42+09:00"
+      },
+      "truth_amount": "45162",
+      "truth_date": null,
+      "image_path": "build/train-images/SYN-0022.jpg",
+      "note": "간이 영수증 — 거래일 미인쇄",
+      "scenario": "NO_DATE",
+      "condition": "LOW_LIGHT"
+    },
+    {
+      "case_id": "SYN-0023",
+      "capture": {
+        "capture_id": "CAP-0023",
+        "amount": "673",
+        "captured_at": "2026-03-12T16:57:56+09:00"
+      },
+      "truth_amount": "5100",
+      "truth_date": "2026-03-12",
+      "image_path": "build/train-images/SYN-0023.jpg",
+      "note": "금액 불일치 — 다른 건 영수증 오첨부",
+      "scenario": "AMOUNT_TAMPERED",
+      "condition": "LOW_LIGHT"
+    },
+    {
+      "case_id": "SYN-0024",
+      "capture": {
+        "capture_id": "CAP-0024",
+        "amount": "22700",
+        "captured_at": "2026-03-20T13:54:24+09:00"
+      },
+      "truth_amount": "22700",
+      "truth_date": "2026-03-15",
+      "image_path": "build/train-images/SYN-0024.jpg",
+      "note": "과거 영수증 재첨부",
+      "scenario": "STALE_DATE",
+      "condition": "LOW_LIGHT"
+    },
+    {
+      "case_id": "SYN-0025",
+      "capture": {
+        "capture_id": "CAP-0025",
+        "amount": "65648",
+        "captured_at": "2026-03-21T18:32:59+09:00"
+      },
+      "truth_amount": "65648",
+      "truth_date": "2026-03-21",
+      "image_path": "build/train-images/SYN-0025.jpg",
+      "note": "",
+      "scenario": "CLEAN",
+      "condition": "LOW_RES"
+    },
+    {
+      "case_id": "SYN-0026",
+      "capture": {
+        "capture_id": "CAP-0026",
+        "amount": "175300",
+        "captured_at": "2026-03-16T23:52:55+09:00"
+      },
+      "truth_amount": "175300",
+      "truth_date": "2026-03-17",
+      "image_path": "build/train-images/SYN-0026.jpg",
+      "note": "심야 결제 — 전표 날짜가 매입일 +1",
+      "scenario": "NEXT_DAY",
+      "condition": "LOW_RES"
+    },
+    {
+      "case_id": "SYN-0027",
+      "capture": {
+        "capture_id": "CAP-0027",
+        "amount": "24000",
+        "captured_at": "2026-03-24T17:37:43+09:00"
+      },
+      "truth_amount": "24000",
+      "truth_date": null,
+      "image_path": "build/train-images/SYN-0027.jpg",
+      "note": "간이 영수증 — 거래일 미인쇄",
+      "scenario": "NO_DATE",
+      "condition": "LOW_RES"
+    },
+    {
+      "case_id": "SYN-0028",
+      "capture": {
+        "capture_id": "CAP-0028",
+        "amount": "30215",
+        "captured_at": "2026-03-14T13:59:50+09:00"
+      },
+      "truth_amount": "39270",
+      "truth_date": "2026-03-14",
+      "image_path": "build/train-images/SYN-0028.jpg",
+      "note": "금액 불일치 — 다른 건 영수증 오첨부",
+      "scenario": "AMOUNT_TAMPERED",
+      "condition": "LOW_RES"
+    },
+    {
+      "case_id": "SYN-0029",
+      "capture": {
+        "capture_id": "CAP-0029",
+        "amount": "75300",
+        "captured_at": "2026-03-07T11:44:26+09:00"
+      },
+      "truth_amount": "75300",
+      "truth_date": "2026-02-13",
+      "image_path": "build/train-images/SYN-0029.jpg",
+      "note": "과거 영수증 재첨부",
+      "scenario": "STALE_DATE",
+      "condition": "LOW_RES"
+    },
+    {
+      "case_id": "SYN-0030",
+      "capture": {
+        "capture_id": "CAP-0030",
+        "amount": "97000",
+        "captured_at": "2026-03-24T08:53:31+09:00"
+      },
+      "truth_amount": "97000",
+      "truth_date": "2026-03-24",
+      "image_path": "build/train-images/SYN-0030.jpg",
+      "note": "",
+      "scenario": "CLEAN",
+      "condition": "GLARE"
+    },
+    {
+      "case_id": "SYN-0031",
+      "capture": {
+        "capture_id": "CAP-0031",
+        "amount": "60630",
+        "captured_at": "2026-03-15T23:52:38+09:00"
+      },
+      "truth_amount": "60630",
+      "truth_date": "2026-03-16",
+      "image_path": "build/train-images/SYN-0031.jpg",
+      "note": "심야 결제 — 전표 날짜가 매입일 +1",
+      "scenario": "NEXT_DAY",
+      "condition": "GLARE"
+    },
+    {
+      "case_id": "SYN-0032",
+      "capture": {
+        "capture_id": "CAP-0032",
+        "amount": "20600",
+        "captured_at": "2026-03-16T15:48:48+09:00"
+      },
+      "truth_amount": "20600",
+      "truth_date": null,
+      "image_path": "build/train-images/SYN-0032.jpg",
+      "note": "간이 영수증 — 거래일 미인쇄",
+      "scenario": "NO_DATE",
+      "condition": "GLARE"
+    },
+    {
+      "case_id": "SYN-0033",
+      "capture": {
+        "capture_id": "CAP-0033",
+        "amount": "66779",
+        "captured_at": "2026-03-15T10:56:07+09:00"
+      },
+      "truth_amount": "68100",
+      "truth_date": "2026-03-15",
+      "image_path": "build/train-images/SYN-0033.jpg",
+      "note": "금액 불일치 — 다른 건 영수증 오첨부",
+      "scenario": "AMOUNT_TAMPERED",
+      "condition": "GLARE"
+    },
+    {
+      "case_id": "SYN-0034",
+      "capture": {
+        "capture_id": "CAP-0034",
+        "amount": "36195",
+        "captured_at": "2026-03-17T13:29:17+09:00"
+      },
+      "truth_amount": "36195",
+      "truth_date": "2026-03-03",
+      "image_path": "build/train-images/SYN-0034.jpg",
+      "note": "과거 영수증 재첨부",
+      "scenario": "STALE_DATE",
+      "condition": "GLARE"
+    },
+    {
+      "case_id": "SYN-0035",
+      "capture": {
+        "capture_id": "CAP-0035",
+        "amount": "52800",
+        "captured_at": "2026-03-14T14:03:31+09:00"
+      },
+      "truth_amount": "52800",
+      "truth_date": "2026-03-14",
+      "image_path": "build/train-images/SYN-0035.jpg",
+      "note": "",
+      "scenario": "CLEAN",
+      "condition": "PRISTINE"
+    },
+    {
+      "case_id": "SYN-0036",
+      "capture": {
+        "capture_id": "CAP-0036",
+        "amount": "58400",
+        "captured_at": "2026-03-18T23:52:44+09:00"
+      },
+      "truth_amount": "58400",
+      "truth_date": "2026-03-19",
+      "image_path": "build/train-images/SYN-0036.jpg",
+      "note": "심야 결제 — 전표 날짜가 매입일 +1",
+      "scenario": "NEXT_DAY",
+      "condition": "PRISTINE"
+    },
+    {
+      "case_id": "SYN-0037",
+      "capture": {
+        "capture_id": "CAP-0037",
+        "amount": "1615",
+        "captured_at": "2026-03-19T13:55:12+09:00"
+      },
+      "truth_amount": "1615",
+      "truth_date": null,
+      "image_path": "build/train-images/SYN-0037.jpg",
+      "note": "간이 영수증 — 거래일 미인쇄",
+      "scenario": "NO_DATE",
+      "condition": "PRISTINE"
+    },
+    {
+      "case_id": "SYN-0038",
+      "capture": {
+        "capture_id": "CAP-0038",
+        "amount": "41324",
+        "captured_at": "2026-03-21T22:50:04+09:00"
+      },
+      "truth_amount": "69000",
+      "truth_date": "2026-03-21",
+      "image_path": "build/train-images/SYN-0038.jpg",
+      "note": "금액 불일치 — 다른 건 영수증 오첨부",
+      "scenario": "AMOUNT_TAMPERED",
+      "condition": "PRISTINE"
+    },
+    {
+      "case_id": "SYN-0039",
+      "capture": {
+        "capture_id": "CAP-0039",
+        "amount": "83100",
+        "captured_at": "2026-03-04T08:32:18+09:00"
+      },
+      "truth_amount": "83100",
+      "truth_date": "2026-02-28",
+      "image_path": "build/train-images/SYN-0039.jpg",
+      "note": "과거 영수증 재첨부",
+      "scenario": "STALE_DATE",
+      "condition": "PRISTINE"
+    },
+    {
+      "case_id": "SYN-0040",
+      "capture": {
+        "capture_id": "CAP-0040",
+        "amount": "55776",
+        "captured_at": "2026-03-19T15:32:00+09:00"
+      },
+      "truth_amount": "55776",
+      "truth_date": "2026-03-19",
+      "image_path": "build/train-images/SYN-0040.jpg",
+      "note": "",
+      "scenario": "CLEAN",
+      "condition": "FADED"
+    },
+    {
+      "case_id": "SYN-0041",
+      "capture": {
+        "capture_id": "CAP-0041",
+        "amount": "23400",
+        "captured_at": "2026-03-21T23:52:08+09:00"
+      },
+      "truth_amount": "23400",
+      "truth_date": "2026-03-22",
+      "image_path": "build/train-images/SYN-0041.jpg",
+      "note": "심야 결제 — 전표 날짜가 매입일 +1",
+      "scenario": "NEXT_DAY",
+      "condition": "FADED"
+    },
+    {
+      "case_id": "SYN-0042",
+      "capture": {
+        "capture_id": "CAP-0042",
+        "amount": "125200",
+        "captured_at": "2026-03-14T21:52:15+09:00"
+      },
+      "truth_amount": "125200",
+      "truth_date": null,
+      "image_path": "build/train-images/SYN-0042.jpg",
+      "note": "간이 영수증 — 거래일 미인쇄",
+      "scenario": "NO_DATE",
+      "condition": "FADED"
+    },
+    {
+      "case_id": "SYN-0043",
+      "capture": {
+        "capture_id": "CAP-0043",
+        "amount": "15477",
+        "captured_at": "2026-03-11T12:13:13+09:00"
+      },
+      "truth_amount": "30794",
+      "truth_date": "2026-03-11",
+      "image_path": "build/train-images/SYN-0043.jpg",
+      "note": "금액 불일치 — 다른 건 영수증 오첨부",
+      "scenario": "AMOUNT_TAMPERED",
+      "condition": "FADED"
+    },
+    {
+      "case_id": "SYN-0044",
+      "capture": {
+        "capture_id": "CAP-0044",
+        "amount": "55500",
+        "captured_at": "2026-03-22T16:50:29+09:00"
+      },
+      "truth_amount": "55500",
+      "truth_date": "2026-03-08",
+      "image_path": "build/train-images/SYN-0044.jpg",
+      "note": "과거 영수증 재첨부",
+      "scenario": "STALE_DATE",
+      "condition": "FADED"
+    },
+    {
+      "case_id": "SYN-0045",
+      "capture": {
+        "capture_id": "CAP-0045",
+        "amount": "29100",
+        "captured_at": "2026-03-23T17:16:26+09:00"
+      },
+      "truth_amount": "29100",
+      "truth_date": "2026-03-23",
+      "image_path": "build/train-images/SYN-0045.jpg",
+      "note": "",
+      "scenario": "CLEAN",
+      "condition": "CRUMPLED"
+    },
+    {
+      "case_id": "SYN-0046",
+      "capture": {
+        "capture_id": "CAP-0046",
+        "amount": "25080",
+        "captured_at": "2026-03-14T23:52:25+09:00"
+      },
+      "truth_amount": "25080",
+      "truth_date": "2026-03-15",
+      "image_path": "build/train-images/SYN-0046.jpg",
+      "note": "심야 결제 — 전표 날짜가 매입일 +1",
+      "scenario": "NEXT_DAY",
+      "condition": "CRUMPLED"
+    },
+    {
+      "case_id": "SYN-0047",
+      "capture": {
+        "capture_id": "CAP-0047",
+        "amount": "39200",
+        "captured_at": "2026-03-14T14:55:51+09:00"
+      },
+      "truth_amount": "39200",
+      "truth_date": null,
+      "image_path": "build/train-images/SYN-0047.jpg",
+      "note": "간이 영수증 — 거래일 미인쇄",
+      "scenario": "NO_DATE",
+      "condition": "CRUMPLED"
+    },
+    {
+      "case_id": "SYN-0048",
+      "capture": {
+        "capture_id": "CAP-0048",
+        "amount": "50530",
+        "captured_at": "2026-03-13T16:50:12+09:00"
+      },
+      "truth_amount": "74700",
+      "truth_date": "2026-03-13",
+      "image_path": "build/train-images/SYN-0048.jpg",
+      "note": "금액 불일치 — 다른 건 영수증 오첨부",
+      "scenario": "AMOUNT_TAMPERED",
+      "condition": "CRUMPLED"
+    },
+    {
+      "case_id": "SYN-0049",
+      "capture": {
+        "capture_id": "CAP-0049",
+        "amount": "17510",
+        "captured_at": "2026-03-12T17:09:45+09:00"
+      },
+      "truth_amount": "17510",
+      "truth_date": "2026-03-07",
+      "image_path": "build/train-images/SYN-0049.jpg",
+      "note": "과거 영수증 재첨부",
+      "scenario": "STALE_DATE",
+      "condition": "CRUMPLED"
+    },
+    {
+      "case_id": "SYN-0050",
+      "capture": {
+        "capture_id": "CAP-0050",
+        "amount": "1800",
+        "captured_at": "2026-03-10T17:52:32+09:00"
+      },
+      "truth_amount": "1800",
+      "truth_date": "2026-03-10",
+      "image_path": "build/train-images/SYN-0050.jpg",
+      "note": "",
+      "scenario": "CLEAN",
+      "condition": "SKEWED"
+    },
+    {
+      "case_id": "SYN-0051",
+      "capture": {
+        "capture_id": "CAP-0051",
+        "amount": "87200",
+        "captured_at": "2026-03-08T23:52:31+09:00"
+      },
+      "truth_amount": "87200",
+      "truth_date": "2026-03-09",
+      "image_path": "build/train-images/SYN-0051.jpg",
+      "note": "심야 결제 — 전표 날짜가 매입일 +1",
+      "scenario": "NEXT_DAY",
+      "condition": "SKEWED"
+    },
+    {
+      "case_id": "SYN-0052",
+      "capture": {
+        "capture_id": "CAP-0052",
+        "amount": "22253",
+        "captured_at": "2026-03-19T14:10:32+09:00"
+      },
+      "truth_amount": "22253",
+      "truth_date": null,
+      "image_path": "build/train-images/SYN-0052.jpg",
+      "note": "간이 영수증 — 거래일 미인쇄",
+      "scenario": "NO_DATE",
+      "condition": "SKEWED"
+    },
+    {
+      "case_id": "SYN-0053",
+      "capture": {
+        "capture_id": "CAP-0053",
+        "amount": "32254",
+        "captured_at": "2026-03-15T22:10:35+09:00"
+      },
+      "truth_amount": "61200",
+      "truth_date": "2026-03-15",
+      "image_path": "build/train-images/SYN-0053.jpg",
+      "note": "금액 불일치 — 다른 건 영수증 오첨부",
+      "scenario": "AMOUNT_TAMPERED",
+      "condition": "SKEWED"
+    },
+    {
+      "case_id": "SYN-0054",
+      "capture": {
+        "capture_id": "CAP-0054",
+        "amount": "61500",
+        "captured_at": "2026-03-04T16:25:06+09:00"
+      },
+      "truth_amount": "61500",
+      "truth_date": "2026-02-04",
+      "image_path": "build/train-images/SYN-0054.jpg",
+      "note": "과거 영수증 재첨부",
+      "scenario": "STALE_DATE",
+      "condition": "SKEWED"
+    },
+    {
+      "case_id": "SYN-0055",
+      "capture": {
+        "capture_id": "CAP-0055",
+        "amount": "10374",
+        "captured_at": "2026-03-04T10:04:56+09:00"
+      },
+      "truth_amount": "10374",
+      "truth_date": "2026-03-04",
+      "image_path": "build/train-images/SYN-0055.jpg",
+      "note": "",
+      "scenario": "CLEAN",
+      "condition": "LOW_LIGHT"
+    },
+    {
+      "case_id": "SYN-0056",
+      "capture": {
+        "capture_id": "CAP-0056",
+        "amount": "8300",
+        "captured_at": "2026-03-13T23:52:55+09:00"
+      },
+      "truth_amount": "8300",
+      "truth_date": "2026-03-14",
+      "image_path": "build/train-images/SYN-0056.jpg",
+      "note": "심야 결제 — 전표 날짜가 매입일 +1",
+      "scenario": "NEXT_DAY",
+      "condition": "LOW_LIGHT"
+    },
+    {
+      "case_id": "SYN-0057",
+      "capture": {
+        "capture_id": "CAP-0057",
+        "amount": "5900",
+        "captured_at": "2026-03-22T11:09:27+09:00"
+      },
+      "truth_amount": "5900",
+      "truth_date": null,
+      "image_path": "build/train-images/SYN-0057.jpg",
+      "note": "간이 영수증 — 거래일 미인쇄",
+      "scenario": "NO_DATE",
+      "condition": "LOW_LIGHT"
+    },
+    {
+      "case_id": "SYN-0058",
+      "capture": {
+        "capture_id": "CAP-0058",
+        "amount": "18510",
+        "captured_at": "2026-03-14T16:01:54+09:00"
+      },
+      "truth_amount": "30969",
+      "truth_date": "2026-03-14",
+      "image_path": "build/train-images/SYN-0058.jpg",
+      "note": "금액 불일치 — 다른 건 영수증 오첨부",
+      "scenario": "AMOUNT_TAMPERED",
+      "condition": "LOW_LIGHT"
+    },
+    {
+      "case_id": "SYN-0059",
+      "capture": {
+        "capture_id": "CAP-0059",
+        "amount": "22400",
+        "captured_at": "2026-03-04T20:04:57+09:00"
+      },
+      "truth_amount": "22400",
+      "truth_date": "2026-02-27",
+      "image_path": "build/train-images/SYN-0059.jpg",
+      "note": "과거 영수증 재첨부",
+      "scenario": "STALE_DATE",
+      "condition": "LOW_LIGHT"
+    },
+    {
+      "case_id": "SYN-0060",
+      "capture": {
+        "capture_id": "CAP-0060",
+        "amount": "20800",
+        "captured_at": "2026-03-05T08:38:11+09:00"
+      },
+      "truth_amount": "20800",
+      "truth_date": "2026-03-05",
+      "image_path": "build/train-images/SYN-0060.jpg",
+      "note": "",
+      "scenario": "CLEAN",
+      "condition": "LOW_RES"
+    },
+    {
+      "case_id": "SYN-0061",
+      "capture": {
+        "capture_id": "CAP-0061",
+        "amount": "14025",
+        "captured_at": "2026-03-14T23:52:19+09:00"
+      },
+      "truth_amount": "14025",
+      "truth_date": "2026-03-15",
+      "image_path": "build/train-images/SYN-0061.jpg",
+      "note": "심야 결제 — 전표 날짜가 매입일 +1",
+      "scenario": "NEXT_DAY",
+      "condition": "LOW_RES"
+    },
+    {
+      "case_id": "SYN-0062",
+      "capture": {
+        "capture_id": "CAP-0062",
+        "amount": "82000",
+        "captured_at": "2026-03-21T09:23:37+09:00"
+      },
+      "truth_amount": "82000",
+      "truth_date": null,
+      "image_path": "build/train-images/SYN-0062.jpg",
+      "note": "간이 영수증 — 거래일 미인쇄",
+      "scenario": "NO_DATE",
+      "condition": "LOW_RES"
+    },
+    {
+      "case_id": "SYN-0063",
+      "capture": {
+        "capture_id": "CAP-0063",
+        "amount": "25299",
+        "captured_at": "2026-03-15T12:26:09+09:00"
+      },
+      "truth_amount": "45200",
+      "truth_date": "2026-03-15",
+      "image_path": "build/train-images/SYN-0063.jpg",
+      "note": "금액 불일치 — 다른 건 영수증 오첨부",
+      "scenario": "AMOUNT_TAMPERED",
+      "condition": "LOW_RES"
+    },
+    {
+      "case_id": "SYN-0064",
+      "capture": {
+        "capture_id": "CAP-0064",
+        "amount": "93670",
+        "captured_at": "2026-03-10T16:03:31+09:00"
+      },
+      "truth_amount": "93670",
+      "truth_date": "2026-02-24",
+      "image_path": "build/train-images/SYN-0064.jpg",
+      "note": "과거 영수증 재첨부",
+      "scenario": "STALE_DATE",
+      "condition": "LOW_RES"
+    },
+    {
+      "case_id": "SYN-0065",
+      "capture": {
+        "capture_id": "CAP-0065",
+        "amount": "59800",
+        "captured_at": "2026-03-10T09:34:09+09:00"
+      },
+      "truth_amount": "59800",
+      "truth_date": "2026-03-10",
+      "image_path": "build/train-images/SYN-0065.jpg",
+      "note": "",
+      "scenario": "CLEAN",
+      "condition": "GLARE"
+    },
+    {
+      "case_id": "SYN-0066",
+      "capture": {
+        "capture_id": "CAP-0066",
+        "amount": "65400",
+        "captured_at": "2026-03-21T23:52:56+09:00"
+      },
+      "truth_amount": "65400",
+      "truth_date": "2026-03-22",
+      "image_path": "build/train-images/SYN-0066.jpg",
+      "note": "심야 결제 — 전표 날짜가 매입일 +1",
+      "scenario": "NEXT_DAY",
+      "condition": "GLARE"
+    },
+    {
+      "case_id": "SYN-0067",
+      "capture": {
+        "capture_id": "CAP-0067",
+        "amount": "42570",
+        "captured_at": "2026-03-15T08:32:05+09:00"
+      },
+      "truth_amount": "42570",
+      "truth_date": null,
+      "image_path": "build/train-images/SYN-0067.jpg",
+      "note": "간이 영수증 — 거래일 미인쇄",
+      "scenario": "NO_DATE",
+      "condition": "GLARE"
+    },
+    {
+      "case_id": "SYN-0068",
+      "capture": {
+        "capture_id": "CAP-0068",
+        "amount": "27014",
+        "captured_at": "2026-03-20T09:59:03+09:00"
+      },
+      "truth_amount": "51400",
+      "truth_date": "2026-03-20",
+      "image_path": "build/train-images/SYN-0068.jpg",
+      "note": "금액 불일치 — 다른 건 영수증 오첨부",
+      "scenario": "AMOUNT_TAMPERED",
+      "condition": "GLARE"
+    },
+    {
+      "case_id": "SYN-0069",
+      "capture": {
+        "capture_id": "CAP-0069",
+        "amount": "84400",
+        "captured_at": "2026-03-22T08:40:39+09:00"
+      },
+      "truth_amount": "84400",
+      "truth_date": "2026-03-08",
+      "image_path": "build/train-images/SYN-0069.jpg",
+      "note": "과거 영수증 재첨부",
+      "scenario": "STALE_DATE",
+      "condition": "GLARE"
+    },
+    {
+      "case_id": "SYN-0070",
+      "capture": {
+        "capture_id": "CAP-0070",
+        "amount": "37668",
+        "captured_at": "2026-03-06T08:09:09+09:00"
+      },
+      "truth_amount": "37668",
+      "truth_date": "2026-03-06",
+      "image_path": "build/train-images/SYN-0070.jpg",
+      "note": "",
+      "scenario": "CLEAN",
+      "condition": "PRISTINE"
+    },
+    {
+      "case_id": "SYN-0071",
+      "capture": {
+        "capture_id": "CAP-0071",
+        "amount": "29600",
+        "captured_at": "2026-03-09T23:52:50+09:00"
+      },
+      "truth_amount": "29600",
+      "truth_date": "2026-03-10",
+      "image_path": "build/train-images/SYN-0071.jpg",
+      "note": "심야 결제 — 전표 날짜가 매입일 +1",
+      "scenario": "NEXT_DAY",
+      "condition": "PRISTINE"
+    },
+    {
+      "case_id": "SYN-0072",
+      "capture": {
+        "capture_id": "CAP-0072",
+        "amount": "50800",
+        "captured_at": "2026-03-06T20:27:02+09:00"
+      },
+      "truth_amount": "50800",
+      "truth_date": null,
+      "image_path": "build/train-images/SYN-0072.jpg",
+      "note": "간이 영수증 — 거래일 미인쇄",
+      "scenario": "NO_DATE",
+      "condition": "PRISTINE"
+    },
+    {
+      "case_id": "SYN-0073",
+      "capture": {
+        "capture_id": "CAP-0073",
+        "amount": "44481",
+        "captured_at": "2026-03-14T14:47:51+09:00"
+      },
+      "truth_amount": "61074",
+      "truth_date": "2026-03-14",
+      "image_path": "build/train-images/SYN-0073.jpg",
+      "note": "금액 불일치 — 다른 건 영수증 오첨부",
+      "scenario": "AMOUNT_TAMPERED",
+      "condition": "PRISTINE"
+    },
+    {
+      "case_id": "SYN-0074",
+      "capture": {
+        "capture_id": "CAP-0074",
+        "amount": "137600",
+        "captured_at": "2026-03-14T22:05:13+09:00"
+      },
+      "truth_amount": "137600",
+      "truth_date": "2026-02-26",
+      "image_path": "build/train-images/SYN-0074.jpg",
+      "note": "과거 영수증 재첨부",
+      "scenario": "STALE_DATE",
+      "condition": "PRISTINE"
+    },
+    {
+      "case_id": "SYN-0075",
+      "capture": {
+        "capture_id": "CAP-0075",
+        "amount": "23600",
+        "captured_at": "2026-03-24T09:33:13+09:00"
+      },
+      "truth_amount": "23600",
+      "truth_date": "2026-03-24",
+      "image_path": "build/train-images/SYN-0075.jpg",
+      "note": "",
+      "scenario": "CLEAN",
+      "condition": "FADED"
+    },
+    {
+      "case_id": "SYN-0076",
+      "capture": {
+        "capture_id": "CAP-0076",
+        "amount": "81404",
+        "captured_at": "2026-03-05T23:52:02+09:00"
+      },
+      "truth_amount": "81404",
+      "truth_date": "2026-03-06",
+      "image_path": "build/train-images/SYN-0076.jpg",
+      "note": "심야 결제 — 전표 날짜가 매입일 +1",
+      "scenario": "NEXT_DAY",
+      "condition": "FADED"
+    },
+    {
+      "case_id": "SYN-0077",
+      "capture": {
+        "capture_id": "CAP-0077",
+        "amount": "17200",
+        "captured_at": "2026-03-14T21:22:45+09:00"
+      },
+      "truth_amount": "17200",
+      "truth_date": null,
+      "image_path": "build/train-images/SYN-0077.jpg",
+      "note": "간이 영수증 — 거래일 미인쇄",
+      "scenario": "NO_DATE",
+      "condition": "FADED"
+    },
+    {
+      "case_id": "SYN-0078",
+      "capture": {
+        "capture_id": "CAP-0078",
+        "amount": "39457",
+        "captured_at": "2026-03-24T14:02:53+09:00"
+      },
+      "truth_amount": "46000",
+      "truth_date": "2026-03-24",
+      "image_path": "build/train-images/SYN-0078.jpg",
+      "note": "금액 불일치 — 다른 건 영수증 오첨부",
+      "scenario": "AMOUNT_TAMPERED",
+      "condition": "FADED"
+    },
+    {
+      "case_id": "SYN-0079",
+      "capture": {
+        "capture_id": "CAP-0079",
+        "amount": "61380",
+        "captured_at": "2026-03-23T16:45:00+09:00"
+      },
+      "truth_amount": "61380",
+      "truth_date": "2026-03-09",
+      "image_path": "build/train-images/SYN-0079.jpg",
+      "note": "과거 영수증 재첨부",
+      "scenario": "STALE_DATE",
+      "condition": "FADED"
+    },
+    {
+      "case_id": "SYN-0080",
+      "capture": {
+        "capture_id": "CAP-0080",
+        "amount": "45500",
+        "captured_at": "2026-03-20T18:20:43+09:00"
+      },
+      "truth_amount": "45500",
+      "truth_date": "2026-03-20",
+      "image_path": "build/train-images/SYN-0080.jpg",
+      "note": "",
+      "scenario": "CLEAN",
+      "condition": "CRUMPLED"
+    },
+    {
+      "case_id": "SYN-0081",
+      "capture": {
+        "capture_id": "CAP-0081",
+        "amount": "7400",
+        "captured_at": "2026-03-21T23:52:04+09:00"
+      },
+      "truth_amount": "7400",
+      "truth_date": "2026-03-22",
+      "image_path": "build/train-images/SYN-0081.jpg",
+      "note": "심야 결제 — 전표 날짜가 매입일 +1",
+      "scenario": "NEXT_DAY",
+      "condition": "CRUMPLED"
+    },
+    {
+      "case_id": "SYN-0082",
+      "capture": {
+        "capture_id": "CAP-0082",
+        "amount": "17472",
+        "captured_at": "2026-03-10T17:06:38+09:00"
+      },
+      "truth_amount": "17472",
+      "truth_date": null,
+      "image_path": "build/train-images/SYN-0082.jpg",
+      "note": "간이 영수증 — 거래일 미인쇄",
+      "scenario": "NO_DATE",
+      "condition": "CRUMPLED"
+    },
+    {
+      "case_id": "SYN-0083",
+      "capture": {
+        "capture_id": "CAP-0083",
+        "amount": "84409",
+        "captured_at": "2026-03-15T20:22:16+09:00"
+      },
+      "truth_amount": "90100",
+      "truth_date": "2026-03-15",
+      "image_path": "build/train-images/SYN-0083.jpg",
+      "note": "금액 불일치 — 다른 건 영수증 오첨부",
+      "scenario": "AMOUNT_TAMPERED",
+      "condition": "CRUMPLED"
+    },
+    {
+      "case_id": "SYN-0084",
+      "capture": {
+        "capture_id": "CAP-0084",
+        "amount": "133600",
+        "captured_at": "2026-03-17T08:04:29+09:00"
+      },
+      "truth_amount": "133600",
+      "truth_date": "2026-03-10",
+      "image_path": "build/train-images/SYN-0084.jpg",
+      "note": "과거 영수증 재첨부",
+      "scenario": "STALE_DATE",
+      "condition": "CRUMPLED"
+    },
+    {
+      "case_id": "SYN-0085",
+      "capture": {
+        "capture_id": "CAP-0085",
+        "amount": "93330",
+        "captured_at": "2026-03-05T20:57:38+09:00"
+      },
+      "truth_amount": "93330",
+      "truth_date": "2026-03-05",
+      "image_path": "build/train-images/SYN-0085.jpg",
+      "note": "",
+      "scenario": "CLEAN",
+      "condition": "SKEWED"
+    },
+    {
+      "case_id": "SYN-0086",
+      "capture": {
+        "capture_id": "CAP-0086",
+        "amount": "21300",
+        "captured_at": "2026-03-18T23:52:49+09:00"
+      },
+      "truth_amount": "21300",
+      "truth_date": "2026-03-19",
+      "image_path": "build/train-images/SYN-0086.jpg",
+      "note": "심야 결제 — 전표 날짜가 매입일 +1",
+      "scenario": "NEXT_DAY",
+      "condition": "SKEWED"
+    },
+    {
+      "case_id": "SYN-0087",
+      "capture": {
+        "capture_id": "CAP-0087",
+        "amount": "47900",
+        "captured_at": "2026-03-06T16:45:53+09:00"
+      },
+      "truth_amount": "47900",
+      "truth_date": null,
+      "image_path": "build/train-images/SYN-0087.jpg",
+      "note": "간이 영수증 — 거래일 미인쇄",
+      "scenario": "NO_DATE",
+      "condition": "SKEWED"
+    },
+    {
+      "case_id": "SYN-0088",
+      "capture": {
+        "capture_id": "CAP-0088",
+        "amount": "13548",
+        "captured_at": "2026-03-05T15:26:36+09:00"
+      },
+      "truth_amount": "24225",
+      "truth_date": "2026-03-05",
+      "image_path": "build/train-images/SYN-0088.jpg",
+      "note": "금액 불일치 — 다른 건 영수증 오첨부",
+      "scenario": "AMOUNT_TAMPERED",
+      "condition": "SKEWED"
+    },
+    {
+      "case_id": "SYN-0089",
+      "capture": {
+        "capture_id": "CAP-0089",
+        "amount": "67700",
+        "captured_at": "2026-03-11T20:42:50+09:00"
+      },
+      "truth_amount": "67700",
+      "truth_date": "2026-02-18",
+      "image_path": "build/train-images/SYN-0089.jpg",
+      "note": "과거 영수증 재첨부",
+      "scenario": "STALE_DATE",
+      "condition": "SKEWED"
+    },
+    {
+      "case_id": "SYN-0090",
+      "capture": {
+        "capture_id": "CAP-0090",
+        "amount": "79200",
+        "captured_at": "2026-03-22T13:59:02+09:00"
+      },
+      "truth_amount": "79200",
+      "truth_date": "2026-03-22",
+      "image_path": "build/train-images/SYN-0090.jpg",
+      "note": "",
+      "scenario": "CLEAN",
+      "condition": "LOW_LIGHT"
+    },
+    {
+      "case_id": "SYN-0091",
+      "capture": {
+        "capture_id": "CAP-0091",
+        "amount": "25098",
+        "captured_at": "2026-03-23T23:52:17+09:00"
+      },
+      "truth_amount": "25098",
+      "truth_date": "2026-03-24",
+      "image_path": "build/train-images/SYN-0091.jpg",
+      "note": "심야 결제 — 전표 날짜가 매입일 +1",
+      "scenario": "NEXT_DAY",
+      "condition": "LOW_LIGHT"
+    },
+    {
+      "case_id": "SYN-0092",
+      "capture": {
+        "capture_id": "CAP-0092",
+        "amount": "26000",
+        "captured_at": "2026-03-12T10:38:11+09:00"
+      },
+      "truth_amount": "26000",
+      "truth_date": null,
+      "image_path": "build/train-images/SYN-0092.jpg",
+      "note": "간이 영수증 — 거래일 미인쇄",
+      "scenario": "NO_DATE",
+      "condition": "LOW_LIGHT"
+    },
+    {
+      "case_id": "SYN-0093",
+      "capture": {
+        "capture_id": "CAP-0093",
+        "amount": "31939",
+        "captured_at": "2026-03-10T13:09:40+09:00"
+      },
+      "truth_amount": "60000",
+      "truth_date": "2026-03-10",
+      "image_path": "build/train-images/SYN-0093.jpg",
+      "note": "금액 불일치 — 다른 건 영수증 오첨부",
+      "scenario": "AMOUNT_TAMPERED",
+      "condition": "LOW_LIGHT"
+    },
+    {
+      "case_id": "SYN-0094",
+      "capture": {
+        "capture_id": "CAP-0094",
+        "amount": "87720",
+        "captured_at": "2026-03-12T18:34:50+09:00"
+      },
+      "truth_amount": "87720",
+      "truth_date": "2026-02-28",
+      "image_path": "build/train-images/SYN-0094.jpg",
+      "note": "과거 영수증 재첨부",
+      "scenario": "STALE_DATE",
+      "condition": "LOW_LIGHT"
+    },
+    {
+      "case_id": "SYN-0095",
+      "capture": {
+        "capture_id": "CAP-0095",
+        "amount": "13600",
+        "captured_at": "2026-03-23T19:08:13+09:00"
+      },
+      "truth_amount": "13600",
+      "truth_date": "2026-03-23",
+      "image_path": "build/train-images/SYN-0095.jpg",
+      "note": "",
+      "scenario": "CLEAN",
+      "condition": "LOW_RES"
+    },
+    {
+      "case_id": "SYN-0096",
+      "capture": {
+        "capture_id": "CAP-0096",
+        "amount": "57000",
+        "captured_at": "2026-03-24T23:52:22+09:00"
+      },
+      "truth_amount": "57000",
+      "truth_date": "2026-03-25",
+      "image_path": "build/train-images/SYN-0096.jpg",
+      "note": "심야 결제 — 전표 날짜가 매입일 +1",
+      "scenario": "NEXT_DAY",
+      "condition": "LOW_RES"
+    },
+    {
+      "case_id": "SYN-0097",
+      "capture": {
+        "capture_id": "CAP-0097",
+        "amount": "12672",
+        "captured_at": "2026-03-15T13:52:00+09:00"
+      },
+      "truth_amount": "12672",
+      "truth_date": null,
+      "image_path": "build/train-images/SYN-0097.jpg",
+      "note": "간이 영수증 — 거래일 미인쇄",
+      "scenario": "NO_DATE",
+      "condition": "LOW_RES"
+    },
+    {
+      "case_id": "SYN-0098",
+      "capture": {
+        "capture_id": "CAP-0098",
+        "amount": "84015",
+        "captured_at": "2026-03-08T17:11:24+09:00"
+      },
+      "truth_amount": "123100",
+      "truth_date": "2026-03-08",
+      "image_path": "build/train-images/SYN-0098.jpg",
+      "note": "금액 불일치 — 다른 건 영수증 오첨부",
+      "scenario": "AMOUNT_TAMPERED",
+      "condition": "LOW_RES"
+    },
+    {
+      "case_id": "SYN-0099",
+      "capture": {
+        "capture_id": "CAP-0099",
+        "amount": "13700",
+        "captured_at": "2026-03-13T09:23:18+09:00"
+      },
+      "truth_amount": "13700",
+      "truth_date": "2026-02-23",
+      "image_path": "build/train-images/SYN-0099.jpg",
+      "note": "과거 영수증 재첨부",
+      "scenario": "STALE_DATE",
+      "condition": "LOW_RES"
+    },
+    {
+      "case_id": "SYN-0100",
+      "capture": {
+        "capture_id": "CAP-0100",
+        "amount": "10057",
+        "captured_at": "2026-03-17T08:22:17+09:00"
+      },
+      "truth_amount": "10057",
+      "truth_date": "2026-03-17",
+      "image_path": "build/train-images/SYN-0100.jpg",
+      "note": "",
+      "scenario": "CLEAN",
+      "condition": "GLARE"
+    },
+    {
+      "case_id": "SYN-0101",
+      "capture": {
+        "capture_id": "CAP-0101",
+        "amount": "67800",
+        "captured_at": "2026-03-19T23:52:24+09:00"
+      },
+      "truth_amount": "67800",
+      "truth_date": "2026-03-20",
+      "image_path": "build/train-images/SYN-0101.jpg",
+      "note": "심야 결제 — 전표 날짜가 매입일 +1",
+      "scenario": "NEXT_DAY",
+      "condition": "GLARE"
+    },
+    {
+      "case_id": "SYN-0102",
+      "capture": {
+        "capture_id": "CAP-0102",
+        "amount": "12900",
+        "captured_at": "2026-03-16T08:55:38+09:00"
+      },
+      "truth_amount": "12900",
+      "truth_date": null,
+      "image_path": "build/train-images/SYN-0102.jpg",
+      "note": "간이 영수증 — 거래일 미인쇄",
+      "scenario": "NO_DATE",
+      "condition": "GLARE"
+    },
+    {
+      "case_id": "SYN-0103",
+      "capture": {
+        "capture_id": "CAP-0103",
+        "amount": "47635",
+        "captured_at": "2026-03-19T08:23:56+09:00"
+      },
+      "truth_amount": "74620",
+      "truth_date": "2026-03-19",
+      "image_path": "build/train-images/SYN-0103.jpg",
+      "note": "금액 불일치 — 다른 건 영수증 오첨부",
+      "scenario": "AMOUNT_TAMPERED",
+      "condition": "GLARE"
+    },
+    {
+      "case_id": "SYN-0104",
+      "capture": {
+        "capture_id": "CAP-0104",
+        "amount": "20900",
+        "captured_at": "2026-03-23T08:53:18+09:00"
+      },
+      "truth_amount": "20900",
+      "truth_date": "2026-03-17",
+      "image_path": "build/train-images/SYN-0104.jpg",
+      "note": "과거 영수증 재첨부",
+      "scenario": "STALE_DATE",
+      "condition": "GLARE"
+    }
+  ]
+}

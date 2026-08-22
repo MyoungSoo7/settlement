@@ -71,10 +71,11 @@ def cmd_build(args: argparse.Namespace) -> int:
 
 
 def _build_provider(args: argparse.Namespace):
-    if args.provider in ("local", "local-prep"):
+    if args.provider in ("local", "local-prep", "local-multipass"):
         from ..providers.local_ocr import RapidOcrProvider
 
-        return RapidOcrProvider(preprocess=args.provider == "local-prep")
+        return RapidOcrProvider(preprocess=args.provider == "local-prep",
+                                multipass=args.provider == "local-multipass")
     if args.provider == "gemini":
         from ..providers.gemini import GeminiProvider
 
@@ -169,8 +170,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     run = sub.add_parser("run", help="프로바이더 평가")
     run.add_argument("--provider", default="gemini",
-                     choices=["gemini", "local", "local-prep"],
-                     help="local=자체 호스팅 OCR, local-prep=대비 정규화 전처리 포함")
+                     choices=["gemini", "local", "local-prep", "local-multipass"],
+                     help="local=자체 호스팅 OCR, local-prep=전처리 포함, "
+                          "local-multipass=원본·전처리 둘 다 읽고 구조 검증으로 중재")
     run.add_argument("--model", default="gemini-2.5-flash")
     run.add_argument("--goldenset", default=str(DEFAULT_GOLDENSET))
     run.add_argument("--threshold", default=str(DEFAULT_REVIEW_THRESHOLD))
@@ -190,6 +192,9 @@ def build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--port", type=int, default=8123)
     serve.add_argument("--host", default="0.0.0.0")
     serve.set_defaults(func=cmd_serve)
+
+    from ..calib.cli import register as register_calibrate
+    register_calibrate(sub)
     return parser
 
 

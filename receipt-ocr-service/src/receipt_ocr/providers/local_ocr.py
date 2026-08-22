@@ -18,7 +18,18 @@ import time
 from decimal import Decimal
 
 from .base import ExtractionResult
-from .parsing import OcrLine, ParseFailed, ParsedReceipt, parse_receipt
+from .parsing import OcrLine, ParseFailed, ParsedReceipt, choose_pass, parse_receipt
+
+
+def _autocontrast(content: bytes) -> bytes:
+    """대비 정규화 — 감열지 퇴색·저조도에서 글자를 살린다."""
+    from PIL import Image, ImageOps
+
+    with Image.open(io.BytesIO(content)) as image:
+        grayscale = ImageOps.autocontrast(image.convert("L"), cutoff=1)
+        buffer = io.BytesIO()
+        grayscale.convert("RGB").save(buffer, format="PNG")
+        return buffer.getvalue()
 
 
 def _to_float(value) -> float:
@@ -58,16 +69,27 @@ class RapidOcrProvider:
     :param preprocess: 대비 정규화를 먼저 걸지 여부. 저조도·퇴색 영수증에서 효과를 보려는
         것이지만, **켠 채로 baseline 과 비교하면 무엇이 기여했는지 알 수 없다** — 먼저 끄고
         재고, 그다음 켜서 차이를 본다.
+    :param calibration: 신뢰도 교정 모델(선택). 주면 원점수 대신 "이 판독이 맞을 확률" 을 싣는다.
+        **없으면 원점수로 돈다** — 모델 파일 하나 없다고 추출이 멈추면 안 된다.
+    :param multipass: 원본과 전처리본을 **둘 다** 읽고 구조 검증으로 중재한다
+        (:func:`~receipt_ocr.providers.parsing.choose_pass`). 켜면 ``preprocess`` 는 무시된다.
+        비용은 이미지당 OCR 2회다.
     """
 
-    def __init__(self, engine=None, *, preprocess: bool = False, label: str = "rapidocr"):
+    def __init__(self, engine=None, *, preprocess: bool = False, multipass: bool = False,
+                 calibration=None, label: str = "rapidocr"):
         self._engine = engine
         self._preprocess = preprocess
+        self._multipass = multipass
+        self._calibration = calibration
         self._label = label
 
     @property
     def name(self) -> str:
-        return f"{self._label}{'+prep' if self._preprocess else ''}"
+        suffix = "+multipass" if self._multipass else ("+prep" if self._preprocess else "")
+        if self._calibration is not None:
+            suffix += "+calib"
+        return f"{self._label}{suffix}"
 
     @property
     def configured(self) -> bool:
@@ -82,20 +104,42 @@ class RapidOcrProvider:
 
     def _prepare(self, content: bytes) -> bytes:
         """대비 정규화 — 감열지 퇴색·저조도에서 글자를 살리려는 전처리."""
-        if not self._preprocess:
-            return content
-        from PIL import Image, ImageOps
+        return _autocontrast(content) if self._preprocess else content
 
-        with Image.open(io.BytesIO(content)) as image:
-            grayscale = ImageOps.autocontrast(image.convert("L"), cutoff=1)
-            buffer = io.BytesIO()
-            grayscale.convert("RGB").save(buffer, format="PNG")
-            return buffer.getvalue()
+    def _read(self, image: bytes) -> list[OcrLine]:
+        raw, _ = self._ensure_engine()(image)
+        return to_lines(raw)
 
     def parse(self, content: bytes) -> ParsedReceipt:
         """추출 상세(필드별 신뢰도 포함)까지 돌려준다 — 분석용 진입점."""
-        raw, _ = self._ensure_engine()(self._prepare(content))
-        return parse_receipt(to_lines(raw))
+        if not self._multipass:
+            lines = self._read(self._prepare(content))
+            return self._calibrated(parse_receipt(lines), lines)
+
+        # 한 패스가 실패해도 다른 패스가 살아 있으면 추출은 성립한다 — 개별 실패를 삼키고
+        # 중재로 넘긴다. 둘 다 실패하면 choose_pass 가 끊는다.
+        passes: list[tuple[ParsedReceipt, list[OcrLine]]] = []
+        for image in (content, _autocontrast(content)):
+            lines = self._read(image)
+            try:
+                passes.append((parse_receipt(lines), lines))
+            except ParseFailed:
+                continue
+        chosen = choose_pass([p for p, _ in passes])
+        # 특징은 채택된 판독을 만든 줄들에서 뽑는다 — 다른 패스의 줄로 교정하면 엉뚱한 확률이 나온다.
+        lines = next(
+            (ln for p, ln in passes
+             if p.amount_source == chosen.amount_source and p.amount_method == chosen.amount_method),
+            passes[0][1],
+        )
+        return self._calibrated(chosen, lines)
+
+    def _calibrated(self, parsed: ParsedReceipt, lines: list[OcrLine]) -> ParsedReceipt:
+        if self._calibration is None:
+            return parsed
+        from ..calib.apply import calibrate  # 교정은 선택 사항 — 없을 때 import 도 하지 않는다
+
+        return calibrate(parsed, lines, self._calibration)
 
     def extract(self, content: bytes, content_type: str) -> ExtractionResult:
         started = time.perf_counter()

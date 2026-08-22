@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "heads": {
+    "amount": {
+      "feature_names": [
+        "amount_score",
+        "is_structural",
+        "amount_candidates",
+        "height_ratio",
+        "page_score",
+        "line_count"
+      ],
+      "weights": [
+        0.037328975906495546,
+        0.10423139228954903,
+        0.047068874801101515,
+        0.21737357859534007,
+        -0.005431002465327395,
+        -0.5148641668083097
+      ],
+      "bias": 8.105979165309332,
+      "trained_on": 23,
+      "positive_rate": 0.8695652173913043
+    },
+    "date": {
+      "feature_names": [
+        "date_score",
+        "has_time",
+        "date_candidates",
+        "page_score",
+        "line_count"
+      ],
+      "weights": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bias": 4.595119850134589,
+      "trained_on": 10,
+      "positive_rate": 0.99
+    }
+  }
+}

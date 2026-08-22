@@ -21,6 +21,8 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 MATCHER = ROOT / "src" / "receipt_ocr" / "domain" / "matcher.py"
 SCORER = ROOT / "src" / "receipt_ocr" / "eval" / "scorer.py"
+APPLY = ROOT / "src" / "receipt_ocr" / "calib" / "apply.py"
+SWEEP = ROOT / "src" / "receipt_ocr" / "calib" / "sweep.py"
 PARSING = ROOT / "src" / "receipt_ocr" / "providers" / "parsing.py"
 
 
@@ -117,6 +119,40 @@ MUTATIONS: list[tuple[str, pathlib.Path, str, str]] = [
         PARSING,
         "    try:\n        return _dt.date(year, month, day)\n    except ValueError:\n        return None",
         "    try:\n        return _dt.date(year, month, 1)\n    except ValueError:\n        return None",
+    ),
+    (
+        "파서: 다중 패스에서 구조 검증 우선을 버리고 점수만 본다",
+        PARSING,
+        'key=lambda c: (c.amount_method == "structural", c.amount_confidence))',
+        "key=lambda c: c.amount_confidence)",
+    ),
+    (
+        "파서: 다중 패스에서 거래일을 총액 우승 패스 것으로만 쓴다",
+        PARSING,
+        "    best_date = max(dated, key=lambda c: c.date_confidence)",
+        "    best_date = best if best.date_confidence is not None else dated[0]",
+    ),
+    (
+        "교정: 거래일 축에 총액 모델을 쓴다 (축 분리 파괴)",
+        APPLY,
+        "    date_probability = None if date_feats is None else model.date.probability(date_feats)",
+        "    date_probability = None if date_feats is None else model.amount.probability(
+"
+        "        amount_features(parsed, lines))",
+    ),
+    (
+        "교정: 모델이 없어도 신뢰도를 덮어쓴다 (원점수 경로 파괴)",
+        APPLY,
+        "    if model is None:
+        return parsed",
+        "    if model is None:
+        model = model",
+    ),
+    (
+        "임계 탐색: 비용이 같을 때 치명 오류를 무시한다",
+        SWEEP,
+        "key=lambda p: (p.weighted_cost, p.critical_total, p.review_rate))",
+        "key=lambda p: (p.weighted_cost, p.review_rate))",
     ),
     (
         "채점기: 추출 실패를 정답으로 취급",
