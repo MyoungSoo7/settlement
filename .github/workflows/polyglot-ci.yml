@@ -229,6 +229,13 @@ jobs:
         if: matrix.service == 'receipt-ocr-service'
         run: |
           set -euo pipefail
+          # 렌더러는 한글 폰트가 없으면 **예외로 끊는다**(두부 글자로 조용히 렌더하면 골든셋이
+          # 통째로 쓰레기가 되므로 fail-fast 가 맞는 자리다). ubuntu 러너에는 CJK 폰트가 없어
+          # 여기서 깔아 준다 — 후보 경로 중 /usr/share/fonts/truetype/nanum/NanumGothic.ttf.
+          # 폰트가 달라도 골든셋 JSON(정답 라벨)은 바뀌지 않는다: 생성기는 폰트와 무관하고
+          # 렌더러는 이미지 픽셀만 만든다.
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq fonts-nanum > /dev/null
           count=$(python -c "import json;print(json.load(open('data/goldenset.json'))['count'])")
           echo "골든셋 복원: ${count}건 (시드는 빌더 기본값)"
           PYTHONPATH=src python -m receipt_ocr build --count "$count"
