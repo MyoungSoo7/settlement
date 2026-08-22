@@ -5,13 +5,13 @@
 seed:
   id: gateway-service-routing-v1
   goal: >-
-    gateway-service(Spring Cloud Gateway WebFlux 8080 — 단일 오리진 라우팅 18건·프리픽스 무변경 전달·
+    gateway-service(Spring Cloud Gateway WebFlux 8080 — 단일 오리진 라우팅 20건·프리픽스 무변경 전달·
     위성 admin 경로 미노출·폴리글랏 2종 RewritePath)의 현행 동작을 실행 가능한 게이트에 매핑된
     불변 사양으로 결정화해, 회귀 기준선 · 면접/포트폴리오 문서 · 후속 배선 베이스로 사용한다.
 
   scope:
     included:
-      - 라우트 정의 18건 (predicate·백엔드 URI 환경변수·필터)
+      - 라우트 정의 20건 (predicate·백엔드 URI 환경변수·필터)
       - 노출면 정책 (위성 /admin/** 미등록, deposit 등급 분리, notification 정확일치)
       - 런타임 형태 (reactive 고정·무상태·graceful shutdown·actuator)
       - 배포 배선 (compose 환경변수·depends_on·nginx 프론트 프록시 경계)
@@ -77,7 +77,7 @@ seed:
       criterion: 이미지에 CRITICAL CVE 0
       gate: ".github/workflows — Trivy image scan (CRITICAL gate)"
     - id: AC-4
-      criterion: 라우트 대상 16 Java 서비스 로스터가 settings.gradle.kts 와 일치한다
+      criterion: 라우트 대상 18 Java 서비스 로스터가 settings.gradle.kts 와 일치한다
       gate: "node scripts/harness/harness-audit.mjs (로스터 드리프트 차단)"
 
   known_issues:  # 발견만 기록 — 사양은 as-is 유지
@@ -88,7 +88,7 @@ seed:
       finding: "★ /api/notifications/stream 에 nginx 무버퍼 location 이 없다 — 범용 regex location(nginx.compose.conf:79-90)에 잡혀 proxy_buffering 기본 on + proxy_read_timeout 60s. KI-1 이 해소돼도 SSE 가 묶여 도착하고 60초마다 끊긴다 (/api/ai/·/api/market-stream/ 은 전용 무버퍼 location 보유)"
       disposition: recorded-not-fixed (high — SSE 품질)
     - id: KI-3
-      finding: "라우트 테스트가 18건 중 5건 id 만 어서트 — 나머지 13건은 삭제·오타에도 테스트 통과. 라우트 목록이 이 서비스의 유일한 프로덕션 로직인데 대부분 회귀 보호 밖"
+      finding: "라우트 테스트가 20건 중 5건 id 만 어서트 — 나머지 15건은 삭제·오타에도 테스트 통과. 라우트 목록이 이 서비스의 유일한 프로덕션 로직인데 대부분 회귀 보호 밖"
       disposition: recorded-not-fixed (medium)
     - id: KI-4
       finding: "경로 화이트리스트 수기 유지 — order predicate 32경로·settlement 22경로. 백엔드 컨트롤러 추가 시 누락하면 컴파일·테스트 통과 후 런타임 404(msa-service-wiring 스킬이 다루는 함정). nginx 는 같은 문제를 겪고 allowlist 를 버리는 방향으로 전환했으나(nginx.compose.conf:31-34 주석) 게이트웨이만 allowlist 유지"

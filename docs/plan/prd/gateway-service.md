@@ -16,7 +16,7 @@
 
 ## 1. 배경과 문제
 
-브라우저 한 대가 **24개 서비스의 포트를 알고 있어야 한다면** 프론트엔드는 배포 토폴로지에 묶인다. 서비스가
+브라우저 한 대가 **26개 서비스의 포트를 알고 있어야 한다면** 프론트엔드는 배포 토폴로지에 묶인다. 서비스가
 하나 늘 때마다 프론트 빌드가 바뀌고, CORS 오리진이 늘고, 셀러 화면 하나가 5개 포트를 동시에 호출한다.
 
 | 문제                | 구체적 손상                                                                    |
@@ -61,7 +61,7 @@ gateway-service 는 **하나의 오리진(8080)으로 전부를 받아 경로로
 
 | 영역        | 기능                                                                       |
 | ----------- | -------------------------------------------------------------------------- |
-| 라우팅      | 경로 predicate 18건 → 백엔드 16 Java + 폴리글랏 2                          |
+| 라우팅      | 경로 predicate 20건 → 백엔드 18 Java + 폴리글랏 2                          |
 | 경로 변환   | `RewritePath` 2건(폴리글랏 프리픽스 제거)                                  |
 | 노출 통제   | 위성 서비스 `/admin/**` 미등록으로 외부 차단                               |
 | 운영        | actuator health·info·metrics·prometheus, graceful shutdown                 |
@@ -92,7 +92,7 @@ gateway-service 는 **하나의 오리진(8080)으로 전부를 받아 경로로
 
 | FR   | 요구사항                                                        | 강제 지점                                          |
 | ---- | --------------------------------------------------------------- | -------------------------------------------------- |
-| FR-1 | 라우트는 18건이며 백엔드 URI 는 전부 환경변수로 주입된다        | `application.yml` routes                           |
+| FR-1 | 라우트는 20건이며 백엔드 URI 는 전부 환경변수로 주입된다        | `application.yml` routes                           |
 | FR-2 | 게이트웨이는 경로 프리픽스를 바꾸지 않는다                      | 필터 미사용(예외 2건만 `RewritePath`)              |
 | FR-3 | 폴리글랏 2종은 프리픽스를 벗겨 전달한다                         | `RewritePath` (market-stream·notification)         |
 | FR-4 | notification 은 스트림 **단일 경로**만 노출한다(와일드카드 금지) | `Path=/api/notifications/stream` (정확 일치)      |
@@ -115,7 +115,7 @@ gateway-service 는 **하나의 오리진(8080)으로 전부를 받아 경로로
 
 ## 9. 인터페이스
 
-### 9.1 라우트 표 (18건)
+### 9.1 라우트 표 (20건)
 
 | # | 라우트 id | 기본 URI | 경로 predicate(요약) |
 |---|---|---|---|
@@ -135,10 +135,13 @@ gateway-service 는 **하나의 오리진(8080)으로 전부를 받아 경로로
 | 14 | `card-service` | 8106 | `/api/cards/**` |
 | 15 | `insurance-service` | 8108 | `/api/insurance/**` |
 | 16 | `deposit-service` | 8112 | `/api/deposits/**`·`/admin/deposits/**` |
-| 17 | `market-stream-service` | 8110 | `/api/market-stream/**` → `RewritePath` → `/{segment}` |
-| 18 | `notification-service` | 8130 | `/api/notifications/stream`(정확 일치) → `RewritePath` → `/notifications/stream` |
+| 17 | `board-service` | 8114 | `/api/boards/**`·`/admin/boards/**` |
+| 18 | `education-service` | 8115 | `/admin/education/**` |
+| 19 | `market-stream-service` | 8110 | `/api/market-stream/**` → `RewritePath` → `/{segment}` |
+| 20 | `notification-service` | 8130 | `/api/notifications/stream`(정확 일치) → `RewritePath` → `/notifications/stream` |
 
-> 16개 Java 서비스 **전부** 라우팅된다. 폴리글랏 7종 중 라우팅되는 것은 위 2종뿐이다.
+> 18개 Java 서비스 **전부** 라우팅된다. 폴리글랏 7종 중 라우팅되는 것은 위 2종뿐이다.
+> education 은 공개 표면이 없어 `/admin/education/**` 하나만 등록돼 있다(ADMIN 콘텐츠 관리 전용).
 
 ### 9.2 운영 엔드포인트
 
@@ -183,10 +186,10 @@ compose 배선은 market-stream 한쪽만 사실이다.
 location(`^/(auth|api|admin|...)`)에 잡힌다. 거기는 `proxy_buffering` 기본값(on) + `proxy_read_timeout 60s` 라,
 G-1 이 해소돼도 브라우저는 이벤트를 묶여서 받고 60초마다 끊긴다.
 
-### G-3. 라우트 테스트가 18건 중 5건만 어서트한다
+### G-3. 라우트 테스트가 20건 중 5건만 어서트한다
 
 `GatewayServiceApplicationTest.routesAreConfigured` 는 `order-service-orders`·`settlement-service`·`ai-service`·
-`loan-service`·`operation-service` 5개 id 만 확인한다. 나머지 13개 라우트는 **삭제되거나 오타가 나도 테스트가
+`loan-service`·`operation-service` 5개 id 만 확인한다. 나머지 15개 라우트는 **삭제되거나 오타가 나도 테스트가
 통과한다.** 라우트 목록이 이 서비스의 유일한 프로덕션 로직인데 그 대부분이 회귀 보호를 받지 못한다.
 
 ### G-4. 경로 화이트리스트가 수기 유지되는 긴 목록이다

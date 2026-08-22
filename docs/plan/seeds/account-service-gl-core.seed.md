@@ -20,7 +20,7 @@
 
 **제외**
 
-- 수신 3종(정기예금·적금·퇴직연금) 도메인 — 계정과목 경계 사실만 기재, 상세는 별도 Seed
+- 수신 3종(정기예금·적금·퇴직연금) 도메인 — 계정과목 경계 사실만 기재. 상세는 [account-service-banking-deposits](account-service-banking-deposits.seed.md)
 - 감사로그 파티셔닝 운영 절차(마이그레이션 사실만)
 
 ## 핵심 불변식 (as-is, 파일:라인 근거)

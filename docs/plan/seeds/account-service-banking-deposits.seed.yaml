@@ -1,0 +1,213 @@
+# Seed: account-service 수신 3종(정기예금·적금·퇴직연금) as-is 사양
+# 상태: CONFIRMED (역산 결정화, 2026-08-22)
+# 원칙: 이 Seed 는 "현행 코드가 실제로 하는 일"의 불변 기술이다. 결함은 교정하지 않고 known_issues 로만 기록한다.
+# 자매 Seed: account-service-gl-core — 그 Seed 가 excluded 로 명시한 "수신 3종 도메인 상세"가 이 문서다.
+
+seed:
+  id: account-service-banking-deposits-v1
+  goal: >-
+    account-service 수신 3종(정기예금·적금·퇴직연금)의 현행 동작 — 상태머신·이자 산식·수급 자격·
+    서브원장과 GL 동시 기표 — 을 실행 가능한 게이트에 매핑된 불변 사양으로 결정화해,
+    회귀 기준선 · 이자 계산 계약의 드리프트 방지 · 면접/포트폴리오 문서로 사용한다.
+
+  scope:
+    included:
+      - 상태머신 3종(TimeDeposit·Savings·Pension)과 종단 상태 규약
+      - 이자 산식 3종(ACT/365 단리·월복리·회차 일수가중)과 반올림 규약
+      - 퇴직연금 제도(DB·DC·IRP) 속성 규칙과 수급 자격(BenefitType)
+      - 소유권 대조(IDOR)와 운영자 경로의 비대칭
+      - REST 표면 19엔드포인트와 인가 등급 분리
+    excluded:
+      - GL 전표 생성 규칙 자체 (account-service-gl-core Seed 불변식 1·2 소관)
+      - 이벤트 소비 27토픽 매핑 (동상)
+      - 세제(이자소득세·연금소득세) — 코드에 존재하지 않는다 (known_issues KI-1)
+      - 시산표·통제계정 대사 조회 표면 (동상)
+
+  constraints:
+    - "금액은 BigDecimal — double 금지. 이진 부동소수 오차는 원 단위로 내려와 GL 수신부채가 0 으로 안 닫히는 사고가 된다"
+    - "중간 나눗셈은 반드시 scale·RoundingMode 명시 — 무지정 divide 는 무한소수에서 ArithmeticException"
+    - "최종 이자는 원 단위(scale 0) HALF_UP, 합계에 딱 한 번만 반올림"
+    - "일수 기준은 ACT/365 고정 — 윤년에도 분모 366 을 쓰지 않는다"
+    - "도메인 규칙 위반은 타입 도메인 예외로 — generic IAE 금지 (guard.mjs OO-* 규칙)"
+    - "헥사고날: domain 은 adapter 를 import 하지 않는다 (ArchUnit 강제)"
+    - "account 는 소비 전용 — 수신 3종도 이벤트를 발행하지 않는다"
+
+  invariants:  # as-is 코드 사실 — 파일:라인 근거 (경로 접두 account-service/src/main/java/github/lms/lemuel/account/banking/)
+    state_machines:
+      time_deposit:
+        source: timedeposit/domain/TimeDepositStatus.java:12,15
+        rule: "ACTIVE -> CLOSED 2상태. 만기해지·중도해지가 같은 종단 상태를 쓴다 — 갈리는 것은 상태가 아니라 적용 이율뿐이다. CLOSED 에서 되살아나는 전이 없음"
+      savings:
+        source: savings/domain/SavingsStatus.java:11-12
+        rule: "ACTIVE -> CLOSED 2상태. 상태를 둘로 쪼개면 '해지된 계약인가?'를 묻는 모든 지점이 두 값을 알아야 한다(주석 명문)"
+      pension:
+        source: pension/domain/PensionStatus.java:12,15,18
+        rule: "ACCUMULATING -> RECEIVING -> CLOSED 단방향. 적립 중에만 부담금·중도인출, 수급 개시 후에는 급여 지급만 성립"
+    single_settlement_point:
+      source: timedeposit/domain/TimeDeposit.java:13-17,104-125
+      rule: >-
+        정기예금 이자는 개설 시점에 확정하지 않고 만기·중도해지 때 단 한 번 settledInterest 로 굳혀
+        payoutAmount = principal + settledInterest 를 지급한다. 주기 accrual 테이블도 이자 스케줄러도 없다.
+      rationale: "확정 지점이 하나면 스케줄러 누락·중복 실행으로 이자가 새는 사고 자체가 성립하지 않는다"
+    shared_formula_different_rate:
+      source: timedeposit/domain/TimeDeposit.java:104,109,113
+      rule: "close(closingDate, appliedRate) 하나를 closeOnMaturity(annualRate)·closeEarly(earlyTerminationRate)가 공유 — 두 경로가 갈라질 수 없다"
+    day_count_basis:
+      source: timedeposit/domain/TimeDepositInterest.java:31 + savings/domain/InstallmentSavingsInterest.java:41 + pension/domain/RetirementPension.java:59
+      rule: "ACT/365 — 분모는 언제나 상수 365. 윤년 366 미사용. 세 도메인이 같은 상수를 쓴다"
+    rounding_contract:
+      source: timedeposit/domain/TimeDepositInterest.java:16-27 + savings/domain/InstallmentSavingsInterest.java:31-36
+      rules:
+        - "전 구간 BigDecimal — double 금지"
+        - "중간 나눗셈은 scale 10 HALF_UP 명시 (INTERMEDIATE_SCALE)"
+        - "최종 이자는 원 단위(scale 0) HALF_UP"
+        - "적금은 합계에 딱 한 번만 반올림 — 회차마다 반올림하면 회차 수만큼 오차가 누적돼 예금주에게 유·불리로 표류한다"
+    savings_interest_weighting:
+      source: savings/domain/InstallmentSavingsInterest.java:14-21,58
+      rule: "Σ_i (paidAmount_i × rate × daysHeld_i / 365), daysHeld_i = 그 회차의 실제 납입일 → 만기(또는 중도해지)일"
+      why_different: "정기예금은 원금 하나가 통째로 예치되지만 적금은 회차마다 예치 시작일이 다르다"
+    overdue_has_no_penalty:
+      source: savings/domain/InstallmentSavingsInterest.java:26-29
+      rule: "연체는 만기일을 밀지 않는다. 늦어진 paidOn 만큼 daysHeld 가 자동으로 줄어 그 회차 이자만 감소 — 별도 페널티 계수 없음"
+    monthly_compound_stub:
+      source: timedeposit/domain/TimeDepositInterest.java:81-105
+      rule: "자투리 단리의 원금은 최초 원금이 아니라 복리 적립 후 잔액. 자투리 시작일 openedOn.plusMonths(경과개월) 이라 월말 보정(1/31 -> 2/28)은 LocalDate 규칙을 따른다"
+    savings_type_exclusivity:
+      source: savings/domain/InstallmentSavings.java:123-135
+      rule: "정액적립식에는 회차 한도(paymentLimit) 금지, 자유적립식에는 월 약정액(monthlyAmount) 금지 — 둘 다 InvalidSavingsTermsException"
+    scheme_drives_rules:
+      source: pension/domain/PensionScheme.java:25-32,47-61
+      rule: "부담금 주체·사업장 필수 여부·중도인출 허용이 전부 enum 상수 속성. 애그리게이트는 제도별 if 분기를 갖지 않는다"
+      table:
+        DB: "사업장 필수 · EMPLOYER 만 · 중도인출 불가(제도적으로)"
+        DC: "사업장 필수 · EMPLOYER + EMPLOYEE · 법정 사유 중도인출 가능"
+        IRP: "사업장명을 받아서도 안 됨 · EMPLOYEE 만 · 법정 사유 중도인출 가능"
+    benefit_eligibility:
+      source: pension/domain/BenefitType.java:17-20,41-43
+      rule: "ANNUITY = 만 55세 AND 가입 10년, LUMP_SUM = 만 55세만. 애그리게이트는 minimumAge·minimumSubscribedYears 두 값만 비교"
+      minimum_subscription_age: "가입 자체는 만 15세 이상 (RetirementPension.java:62 MINIMUM_SUBSCRIPTION_AGE)"
+    interest_amount_not_client_supplied:
+      source: pension/application/service/RetirementPensionService.java:82-99 + timedeposit/domain/TimeDepositInterest.java:61-64
+      rule: "settleInterest 는 금액을 인자로 받지 않는다 — 계약이율·적립금·경과일수로 산출. 산출 이자 0원이면 거래도 전표도 만들지 않는다(AccountEntry 팩토리가 0 을 거부)"
+    subledger_and_gl_same_tx:
+      source: pension/application/service/RetirementPensionService.java:77,97,129,140 + savings/application/service/CloseInstallmentSavingsService.java:83,88
+      rule: "RecordAccountEntryUseCase.record() 직접 호출 — 이벤트 발행 경로가 아니다. 같은 서비스 안이라 Outbox 를 경유하면 서브원장과 GL 이 갈라지는 창이 생긴다"
+    gl_natural_key_from_aggregate:
+      source: pension/domain/RetirementPension.java:32-36 + pension/application/service/RetirementPensionService.java:186-187
+      rule: "모든 상태 변경 메서드가 방금 만든 PensionTransaction 을 반환하고, 서비스는 그 seq 를 RP-{pensionId}-{seq} 자연키로 넘긴다 — 서비스가 seq 를 스스로 세지 않게 하는 것이 반환값의 목적"
+    liability_accounts_are_credit:
+      source: ../domain/GlAccount.java:48,51,54
+      rule: "TIME_DEPOSIT_LIABILITY · INSTALLMENT_SAVINGS_LIABILITY · RETIREMENT_PENSION_LIABILITY 전부 CREDIT — 방향이 enum 에 고정돼 팩토리가 뒤집을 수 없다"
+    won_scale_before_gl:
+      source: pension/domain/RetirementPension.java:28-31,53
+      rule: "GL 전표는 소수 2자리를 허용하지만 반올림을 거부하므로, 도메인이 원 단위(scale 0 HALF_UP)로 미리 닫아 서브원장↔GL 드리프트를 원천 차단한다"
+    ownership_check_immediately_after_load:
+      source: pension/application/service/RetirementPensionService.java:157-160
+      rule: "loadOwned 가 계약을 읽고 즉시 소유자를 대조 — 이 순서가 IDOR 방어의 전부다(가입자 경로 전용)"
+    operator_path_asymmetry:
+      source: pension/application/service/RetirementPensionService.java:83-88,119-123
+      rule: >-
+        운용수익 확정·급여 지급은 ADMIN/MANAGER 경로라 호출자 신원으로 소유권을 대조하지 않는다
+        (대조하면 운영자가 어떤 계약도 만질 수 없어 경로 자체가 죽는다).
+        대신 전표 owner 를 계약에 적힌 가입자에서 뽑아 운영자가 남의 이자를 자기 앞으로 기표시킬 여지를 없앤다.
+    immutable_aggregate:
+      source: timedeposit/domain/TimeDeposit.java:22-24
+      rule: "모든 필드 final — 해지는 상태를 바꾸는 대신 닫힌 새 인스턴스를 반환한다. 세터가 없으니 '절반만 닫힌' 중간 상태가 존재할 수 없다"
+
+  authorization:
+    source: shared-common/src/main/java/github/lms/lemuel/common/config/jwt/SecurityConfig.java:275-279
+    default: "/api/banking/** 은 authenticated — 계약 주체가 가입자 본인"
+    elevated:
+      - "POST /api/banking/pensions/*/interest-settlements — ADMIN/MANAGER (가입자에게 열면 임의 증액이 된다)"
+      - "POST /api/banking/pensions/*/benefit-payments — ADMIN/MANAGER (지급 실행)"
+    gateway: "gateway-service/src/main/resources/application.yml:74-75 — /api/account/**,/api/banking/** 한 라우트로 전달"
+
+  rest_surface:
+    total_endpoints: 19
+    pensions:
+      source: pension/adapter/in/web/RetirementPensionController.java:54,66,76,90,108,121,130,139,147
+      base: /api/banking/pensions
+      endpoints: "개설 · 부담금 · 운용수익확정 · 수급개시 · 급여지급 · 중도인출 · 단건조회 · 목록조회 (8)"
+    savings:
+      source: savings/adapter/in/web/InstallmentSavingsController.java:41,60,76,92,101,110,121
+      base: /api/banking/savings
+      endpoints: "개설 · 회차납입 · 만기해지 · 중도해지 · 단건조회 · 목록조회 (6)"
+    time_deposits:
+      source: timedeposit/adapter/in/web/TimeDepositController.java:35,50,64,71,77,83
+      base: /api/banking/time-deposits
+      endpoints: "개설 · 만기해지 · 중도해지 · 단건조회 · 목록조회 (5)"
+
+  persistence:
+    migrations:
+      - V20260809030500__account_banking_deposit_products.sql
+      - V20260809031000__banking_time_deposit.sql
+      - V20260809031500__banking_installment_savings.sql
+      - V20260809032000__banking_retirement_pension.sql
+
+  event_contracts:
+    publishes: []
+    consumes: []
+    note: >-
+      수신 3종은 Kafka 표면이 없다 — 거래가 REST 로 들어와 같은 트랜잭션에서 서브원장과 GL 에 동시에 앉는다.
+      account 전체의 발행 금지 경계(AccountArchitectureTest)가 이 도메인에도 적용된다.
+
+  acceptance_criteria:
+    - id: AC-1
+      criterion: 만기해지·중도해지가 같은 산식에 다른 이율만 적용한다
+      gate: "./gradlew :account-service:test — TimeDepositTest · TimeDepositInterestTest"
+    - id: AC-2
+      criterion: ACT/365 · 원 단위 HALF_UP · 합계 1회 반올림이 지켜진다
+      gate: "TimeDepositInterestTest · InstallmentSavingsInterestTest"
+    - id: AC-3
+      criterion: 적금 이자가 회차별 일수 가중으로 계산된다(연체 포함)
+      gate: "InstallmentSavingsInterestTest"
+    - id: AC-4
+      criterion: 제도별 부담금 주체·사업장·중도인출 조합이 강제된다
+      gate: "PensionSchemeTest · RetirementPensionTest"
+    - id: AC-5
+      criterion: 수급 자격(연령·가입기간) 미달 시 개시가 거부된다
+      gate: "RetirementPensionTest — BenefitEligibilityNotMetException"
+    - id: AC-6
+      criterion: 이자 0원이면 GL 전표를 만들지 않는다
+      gate: "RetirementPensionServiceTest · TimeDepositServiceTest"
+    - id: AC-7
+      criterion: 남의 계약을 조회·변경할 수 없다(IDOR)
+      gate: "TimeDepositControllerTest · InstallmentSavingsControllerTest · RetirementPensionControllerTest"
+    - id: AC-8
+      criterion: 도메인 규칙 위반이 타입 예외로 나온다(generic IAE 0)
+      gate: "PensionDomainExceptionTest · node scripts/harness/guard.mjs --staged (OO-* 규칙)"
+    - id: AC-9
+      criterion: 커버리지 LINE >= 90%
+      gate: "./gradlew :account-service:jacocoTestCoverageVerification"
+
+  test_assets:
+    count: 19
+    path: account-service/src/test/java/github/lms/lemuel/account/banking/
+    breakdown: "도메인 7 · 서비스 6 · 컨트롤러 3 · 영속 2 · 제도상수 1"
+
+  known_issues:  # 발견만 기록 — 사양은 as-is 유지
+    - id: KI-1
+      finding: "세제가 통째로 없다 — 이자소득세·연금소득세 원천징수가 코드에 존재하지 않아 payoutAmount 는 세전 금액이다. 실제 수신 상품이라면 지급 시점에 원천징수 전표가 한 짝 더 필요하다"
+      disposition: recorded-not-fixed (범위 밖 — settlement 의 withholding_accrued 와 동형 설계가 후보)
+    - id: KI-2
+      finding: >-
+        만기 자동해지 경로가 없고 만기 판정 자체가 죽은 코드다 — TimeDeposit.isMatured(asOf)
+        (TimeDeposit.java:127) 의 프로덕션 호출자가 0건이고 부르는 곳은 TimeDepositTest.java:266-268 뿐이다.
+        만기가 지난 계약을 닫는 인바운드 어댑터도 없다(account 의 @Scheduled 2건은 BalanceReconScheduler·
+        PartitionMaintenanceRunner 로 둘 다 banking 이 아니다). 결과적으로 만기 후에도 POST /close 를
+        누가 부를 때까지 ACTIVE 로 남고, 그 사이 /close-early 를 부르면 중도해지 이율이 그대로 적용된다.
+      disposition: recorded-not-fixed (도달성 격차 — 호출 경로 grep 실측 0건)
+    - id: KI-3
+      finding: "퇴직연금 급여 지급에 지급 주기 개념이 없다 — payBenefit 은 금액을 받아 차감할 뿐이고, ANNUITY 와 LUMP_SUM 의 스케줄 차이가 개시 자격 판정 이후로는 사라진다"
+      disposition: recorded-not-fixed
+    - id: KI-4
+      finding: "수신 상품과 집계 원장이 한 배포 단위에 있다 — '소비 전용 집계'라는 account 의 정체성과 '자기 거래를 만드는 상품 도메인'이 섞여 있다(gl-core Seed KI-3 와 같은 지적)"
+      disposition: recorded-not-fixed (경계 후보 — 지금은 서브원장↔GL 동시 기표가 그 대가로 얻은 것)
+    - id: KI-5
+      finding: "거래 이력 테이블이 비대칭이다 — 퇴직연금은 PensionTransaction 으로 거래를 남기지만(그래서 seq 자연키가 가능하다) 정기예금은 이력 없이 애그리거트 필드에 확정값만 굳힌다. 같은 서비스 안에서 감사 가능성의 등급이 다르다"
+      disposition: recorded-not-fixed
+
+  uses:
+    - regression-baseline
+    - contract-drift-gate
+    - interview-portfolio
