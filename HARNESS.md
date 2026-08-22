@@ -252,16 +252,21 @@ settlement-copilot **플러그인 소유**라 플러그인 미설치 환경에 �
 - **민감 경로 인가 출처 게이트(2026-08-23 신설)** — `scripts/harness/test/security-matcher-gate.test.mjs`:
   위 인가 판정 게이트가 "선언된 규칙이 그대로 판정되는가"를 본다면, 이쪽은 **선언 자체가 있는가**를 본다 —
   즉 *지워짐·순서*가 아니라 **애초에 안 쓴 것**을 잡는다. `/admin`·`/internal`·`/van` 엔드포인트에
-  인가 출처(① SecurityConfig 매처 ② `@PreAuthorize` ③ 위성 `AdminApiKeyFilter` ④ 사유 있는 면제)가
-  하나도 없으면 FAIL. 두 번째 규칙은 **부분 메서드 커버** — 같은 경로에 역할 매처가 있는데 다른 메서드만
-  빠진 상태(쿠폰 생성이 정확히 이 형태였다: `GET /coupons` 는 `hasAnyRole`, `POST /coupons` 는 무매처라
-  조회가 막혀 "닫혀 있다"고 보였다).
-  **과거 사고 4건 중 3건을 재현으로 검증했다**(포인트 콘솔·VAN·쿠폰 생성 — 각각 매처를 지우면 FAIL).
-  남은 1건(보험 언더라이팅 승인)은 같은 경로에 형제 매처도 없고 민감 접두사도 아니라 이 축으로는 안 잡힌다.
-  검출기 자기검증 7건은 **만들며 실제로 밟은 버그**를 그대로 케이스로 남긴 것이다 — 특히
+  인가 출처가 하나도 없으면 FAIL. 출처는 넷을 인정한다 — ① SecurityConfig 매처 ② `@PreAuthorize`
+  ③ 위성 `AdminApiKeyFilter` ④ **핸들러 내부 프로그래매틱 판정**(`requireAdmin(auth)` 또는 JWT 주체 파생 후
+  소유권 대조 = IDOR 가드). 그 외 정말 인증만으로 충분하면 사유와 함께 면제 등록.
+  나머지 두 규칙은 **부분 메서드 커버**(같은 경로에 역할 매처가 있는데 다른 메서드만 빠진 상태 — 쿠폰 생성이
+  이 형태였다: `GET /coupons` 는 `hasAnyRole`, `POST` 는 무매처라 조회가 막혀 "닫혀 있다"고 보였다)와
+  **결정 동작 무방비**(approve·reject·disburse·write-off 등 남의 개체 상태를 뒤집는 동작에 인가 출처가 0).
+  **과거 사고 4건을 전부 재현으로 검증했다** — 매처를 지우면 각각 FAIL 한다: 포인트 콘솔 10건 · VAN 4건 ·
+  쿠폰 생성 1건 · 보험 언더라이팅 3건.
+  검출기 자기검증 9건은 **만들며 실제로 밟은 버그**를 그대로 케이스로 남긴 것이다 — 특히
   주석 제거 정규식이 `"/payments/*/refund"` 의 `/*` 를 주석 시작으로 먹어 **79개 매처 중 6개만 파싱하고도
   조용히 통과**했다(→ 문자열 인식 스트리퍼 `scripts/harness/lib/java-source.mjs`), 서비스별 자체
-  SecurityConfig 를 안 보면 board·education 의 멀쩡한 19경로가 미보호로 뜬다.
+  SecurityConfig 를 안 보면 board·education 의 멀쩡한 19경로가 미보호로 뜨며, 핸들러 본문을 자를 때
+  `@PostMapping("/{id}/disburse")` 의 `{id}` 를 본문 시작으로 읽으면 `requireAdmin` 으로 막힌 대출 경로
+  20건이 미보호로 뜬다. `Authentication` 파라미터의 단순 존재는 신호로 치지 않는다 — 인정하면 12건이
+  실제 검사 없이 면제된다(실측).
 - **인가 판정 게이트(2026-08-23 신설)** — `shared-common/src/test/.../jwt/SecurityAuthorizationMatrixTest`:
   `SecurityConfig` 는 포괄 `/admin/**` 매처가 없고 경로를 하나씩 열거하는 방식이라 **빠뜨린 경로가 조용히
   `anyRequest().authenticated()` 로 떨어진다** — 로그인만 하면 누구나 호출할 수 있다는 뜻이고, 그 사고는
@@ -427,4 +432,4 @@ node scripts/harness/harness-audit.mjs
 - `CLAUDE.md` — 에이전트 운용 규칙 / 아키텍처 경계·컨벤션
 - `SPEC.md` — 전체 기능명세(엔드포인트·도메인 규칙·이벤트 카탈로그)
 - `docs/PORTFOLIO.md` — 면접용 1장 요약 · `README.md` — 아키텍처 개요
-- `docs/adr/` — 아키텍처 결정 기록
+- `docs/plan/adr/` — 아키텍처 결정 기록

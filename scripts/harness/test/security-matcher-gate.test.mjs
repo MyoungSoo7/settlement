@@ -15,11 +15,18 @@
 // 판정하는지**를 필터 체인에 요청을 흘려 확인한다. 이 게이트는 반대편 — **선언 자체가 있는지**를 본다.
 // 전자는 지워짐·순서를, 후자는 애초에 안 쓴 것을 잡는다.
 //
+// 규칙 셋:
+//   1) 민감 경로(/admin·/internal·/van)에 인가 출처가 하나도 없으면 FAIL.
+//   2) 같은 경로에 역할 매처가 있는데 일부 메서드만 빠지면 FAIL — 쿠폰 사고 형태.
+//   3) 결정/심사 동작(approve·reject·disburse·write-off …)에 인가 출처가 하나도 없으면 FAIL —
+//      보험 언더라이팅 사고 형태. 이 셋으로 위 사고 4건이 전부 재현 검증된다.
+//
 // 인가 출처는 네 곳이며 하나라도 있으면 통과다(설계상 어느 쪽이든 유효하다):
 //   ① 서비스가 실제로 로드하는 SecurityConfig 의 requestMatchers — 역할/permitAll 등 명시 결정
 //   ② @PreAuthorize (클래스 또는 메서드 레벨 메서드시큐리티)
 //   ③ AdminApiKeyFilter (위성 서비스의 X-Internal-Api-Key 게이트 — 사람이 아니라 기계가 부르는 경로)
-//   ④ ALLOWED_UNMATCHED 등록(사유 필수)
+//   ④ 핸들러 내부 프로그래매틱 판정 — requireAdmin(auth) 또는 JWT 주체 파생 후 소유권 대조(IDOR 가드)
+//   그 외에 정말 인증만으로 충분하면 ALLOWED_UNMATCHED 에 사유와 함께 등록한다.
 //
 // ★ 검출기 자기검증: 아래 unit 케이스들은 전부 **이 게이트를 만들며 실제로 밟은 버그**다.
 //   합성 케이스만으로는 네 건 모두 통과했고, 리포에 돌린 순간 드러났다.
@@ -130,10 +137,77 @@ export function parseEndpoints(source, { service = '', className = '' } = {}) {
       method: verb,
       path: norm(path),
       preAuthorize: classPreAuthorize || before.includes('@PreAuthorize'),
+      programmaticAuth: PROGRAMMATIC_AUTH.test(handlerSlice(src, m.index)),
     });
   }
   return out;
 }
+
+/**
+ * 핸들러 하나의 시그니처+본문만 잘라낸다.
+ *
+ * <p>단순히 "매핑 애노테이션 뒤 첫 여는 중괄호"를 본문 시작으로 잡으면 `@PostMapping("/{id}/disburse")`
+ * 의 `{id}` 를 본문으로 읽는다. 그렇게 자르면 실제 본문의 인가 검사를 못 보고, `requireAdmin` 으로
+ * 멀쩡히 막혀 있는 대출 상각·실행 경로가 미보호로 뜬다(실측에서 20건이 그렇게 떴다).
+ * 애노테이션 괄호 → 뒤따르는 애노테이션들 → 파라미터 괄호를 차례로 건너뛴 뒤의 중괄호가 본문이다.
+ */
+export function handlerSlice(src, mappingIndex) {
+  let cursor = mappingIndex;
+  const rel = src.slice(mappingIndex).search(/\(|\r?\n/);
+  if (rel >= 0 && src[mappingIndex + rel] === '(') {
+    const close = matchingParen(src, mappingIndex + rel);
+    if (close > 0) cursor = close + 1;
+  }
+  for (;;) {
+    const next = src.slice(cursor).search(/\S/);
+    if (next < 0 || src[cursor + next] !== '@') break;
+    const paren = src.indexOf('(', cursor + next);
+    const nl = src.indexOf('\n', cursor + next);
+    if (paren > 0 && (nl < 0 || paren < nl)) {
+      const c = matchingParen(src, paren);
+      cursor = c > 0 ? c + 1 : cursor + next + 1;
+    } else cursor = nl < 0 ? src.length : nl + 1;
+  }
+  const paren = src.indexOf('(', cursor);
+  if (paren > 0) {
+    const c = matchingParen(src, paren);
+    if (c > 0) cursor = c + 1;
+  }
+  const brace = src.indexOf('{', cursor);
+  if (brace < 0) return src.slice(mappingIndex, cursor);
+  let depth = 0;
+  let i = brace;
+  for (; i < src.length; i++) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}') { depth--; if (depth === 0) break; }
+  }
+  return src.slice(mappingIndex, Math.min(i + 1, src.length));
+}
+
+/**
+ * 핸들러가 **스스로** 인가를 판정하는가(④번째 축).
+ *
+ * <p>이 코드베이스의 인가는 URL 매처만이 아니다 — `requireAdmin(auth)` 로 역할을 보거나,
+ * 식별자를 JWT 주체에서 파생해 소유권을 대조한다(IDOR 가드레일). 선정산 대출 실행이 그 예로,
+ * 매처는 없지만 `callerSellerId(authentication)` 와 대조해 남의 대출 실행을 막는다.
+ *
+ * <p><b>`Authentication` 파라미터의 단순 존재는 신호로 치지 않는다.</b> 받아만 놓고 안 보는 핸들러가
+ * 게이트를 통과해 버리기 때문이다. 실측하면 그 약한 신호만으로 통과했을 상태변경 엔드포인트가
+ * <b>12건</b> 있다(account 수신·operation 인시던트·ai 챗) — 지금은 다른 축에 걸리지 않아 위반이 아니지만,
+ * 인정해 두면 나중에 그 12건이 결정 동작으로 바뀔 때 조용히 면제된다.
+ */
+export const PROGRAMMATIC_AUTH = new RegExp([
+  '@AuthenticationPrincipal',
+  '\\bAuthPrincipal\\b',              // 이 프로젝트의 JWT 주체 타입
+  'SecurityContextHolder',
+  '\\bcurrent[A-Z]\\w*\\s*\\(',        // currentDepositorId() · currentFcId()
+  '\\bcaller[A-Z]\\w*\\s*\\(',         // callerSellerId()
+  // requireAdmin·requireOperator·requireSelf·requirePrincipal … 이 저장소의 인가 헬퍼 관용구.
+  // Objects.requireNonNull 은 인가가 아니므로 뺀다 — 안 빼면 널체크가 인가로 통과한다.
+  '\\brequire(?!NonNull)[A-Z]\\w*\\s*\\(',
+  'AccessDeniedException',
+  'Identity\\.current',
+].join('|'));
 
 /** 매처가 이 엔드포인트를 덮는가 — 메서드 지정 매처는 그 메서드에만 걸린다. */
 export function covers(matcher, endpoint) {
@@ -158,6 +232,7 @@ export function findUnprotected(root, services = JAVA_SERVICES) {
         if (!SENSITIVE_PREFIX.test(ep.path)) continue;
         if (ep.preAuthorize) continue;                                     // ②
         if (keyGated && ep.path.startsWith('/admin/')) continue;           // ③
+        if (ep.programmaticAuth) continue;                                 // ④
         const hit = matchers.find((m) => covers(m, ep));
         if (hit && hit.decision !== 'authenticated') continue;             // ①
         const key = `${service} ${ep.method} ${ep.path}`;
@@ -197,7 +272,7 @@ export function findPartialMethodCoverage(root, services = JAVA_SERVICES) {
       const raw = readFileSync(file, 'utf8');
       if (!raw.includes('@RestController')) continue;
       for (const ep of parseEndpoints(raw, { service, className: basename(file, '.java') })) {
-        if (ep.preAuthorize) continue;
+        if (ep.preAuthorize || ep.programmaticAuth) continue;
         if (keyGated && ep.path.startsWith('/admin/')) continue;
         const hit = matchers.find((m) => covers(m, ep));
         if (hit && hit.decision !== 'authenticated') continue;
@@ -212,6 +287,56 @@ export function findPartialMethodCoverage(root, services = JAVA_SERVICES) {
         const key = `${service} ${ep.method} ${ep.path}`;
         if (ALLOWED_UNMATCHED.has(key)) continue;
         out.push({ ...ep, siblingMethods: [...new Set(siblings.map((s) => s.method))].join(',') });
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * 결정/심사 동작 — **남의 개체 상태를 뒤집는** 백오피스 액션의 마지막 경로 세그먼트.
+ *
+ * <p>목록은 이 저장소의 실제 컨트롤러에서 뽑았다(리스·담보대출·멤버십·정산·보험). 여기 있는 동작은
+ * "인증된 아무나"가 눌러도 되는 것이 아니다 — 승인은 계약을 발행하고, 실행은 자금을 내보내고,
+ * 상각은 손실을 확정한다.
+ *
+ * <p>동작 목록으로 좁히는 이유는 노이즈다. "인가 출처가 없는 상태변경"만으로 세면 52건이 걸리는데
+ * 그 대부분은 `POST /orders`·`POST /reviews` 처럼 <b>인증된 사용자면 맞는</b> 자기 행위다.
+ * 결정 동작으로 좁히면 현재 0건이고, 보험 언더라이팅 사고는 그대로 걸린다.
+ */
+const DECISION_ACTIONS = new Set([
+  'approve', 'reject', 'review',
+  'disburse', 'write-off', 'settle', 'liquidate', 'subrogate', 'dispose',
+  'suspend', 'reinstate', 'escalate',
+  'default', 'mature', 'overdue', 'early-termination',
+]);
+
+const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+/** 결정 동작인데 인가 출처가 하나도 없는 엔드포인트 — 보험 언더라이팅 사고 형태. */
+export function findUnguardedDecisionActions(root, services = JAVA_SERVICES) {
+  const out = [];
+  for (const service of services) {
+    const config = securityConfigFor(root, service);
+    if (!config) continue;
+    const matchers = parseMatchers(readFileSync(config.path, 'utf8'));
+    const keyGated = hasAdminApiKeyFilter(root, service);
+
+    for (const file of walk(join(root, service, 'src', 'main', 'java'))) {
+      if (!file.endsWith('.java')) continue;
+      const raw = readFileSync(file, 'utf8');
+      if (!raw.includes('@RestController')) continue;
+      for (const ep of parseEndpoints(raw, { service, className: basename(file, '.java') })) {
+        if (!MUTATING.has(ep.method)) continue;
+        const segments = ep.path.split('/').filter(Boolean);
+        if (!DECISION_ACTIONS.has(segments[segments.length - 1])) continue;
+        if (ep.preAuthorize || ep.programmaticAuth) continue;
+        if (keyGated && ep.path.startsWith('/admin/')) continue;
+        const hit = matchers.find((m) => covers(m, ep));
+        if (hit && hit.decision !== 'authenticated') continue;
+        const key = `${service} ${ep.method} ${ep.path}`;
+        if (ALLOWED_UNMATCHED.has(key)) continue;
+        out.push(ep);
       }
     }
   }
@@ -260,6 +385,19 @@ describe('민감 경로 인가 출처 게이트', () => {
       `같은 경로에 역할 매처가 있는데 일부 메서드만 빠진 곳 ${holes.length}건 —\n`
         + '조회는 막혀 있어 "닫혀 있다"고 보이지만 그 메서드는 로그인만 하면 통과한다.\n'
         + `쿠폰 생성이 정확히 이 형태였다.\n${lines.join('\n')}`,
+    );
+  });
+
+  test('승인·실행·상각 같은 결정 동작에 인가 출처가 있다 — 보험 언더라이팅 사고 형태', () => {
+    const holes = findUnguardedDecisionActions(repoRoot);
+    const lines = holes.map((h) => `  ${h.service} ${h.method} ${h.path}  [${h.className}]`);
+    assert.equal(
+      holes.length,
+      0,
+      `결정 동작인데 인가 출처가 없는 엔드포인트 ${holes.length}건 —\n`
+        + '승인은 계약을 발행하고 실행은 자금을 내보내며 상각은 손실을 확정한다.\n'
+        + '"인증된 아무나"가 누를 수 있으면 안 되는 동작들이다.\n'
+        + `보험 언더라이팅 승인이 정확히 이 형태였다(청약 UUID 만 알면 계약 발행).\n${lines.join('\n')}`,
     );
   });
 
