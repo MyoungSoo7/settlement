@@ -20,7 +20,7 @@ seed:
       - 물건금융(리스·할부)의 잔가 허용/필수 구분
       - 발행·소비 이벤트 표면
     excluded:
-      - 담보 재평가·마진콜 상세 (Collateral*·MarginCall* — 별도 Seed 대상)
+      - 담보 재평가·마진콜 상세 (Collateral*·MarginCall*) — 정본은 loan-service-collateral-risk Seed
       - 외부 재무제표·평판 API 클라이언트 페이로드
 
   constraints:

@@ -1,0 +1,211 @@
+# Seed: loan-service 담보 재평가·마진콜·실행 as-is 사양
+# 상태: CONFIRMED (역산 결정화, 2026-08-22)
+# 원칙: 이 Seed 는 "현행 코드가 실제로 하는 일"의 불변 기술이다. 결함은 교정하지 않고 known_issues 로만 기록한다.
+# 자매 Seed: loan-service-lending — 그 Seed 가 excluded 로 명시한 "담보 재평가·마진콜 상세"가 이 문서다.
+
+seed:
+  id: loan-service-collateral-risk-v1
+  goal: >-
+    loan-service 담보 리스크 관리(재평가 → 마진콜 판정 → 강제 처분·대위변제·상각)의 현행 동작을
+    실행 가능한 게이트에 매핑된 불변 사양으로 결정화해, 회귀 기준선 · 임계 정책의 드리프트 방지 ·
+    면접/포트폴리오 문서로 사용한다.
+
+  scope:
+    included:
+      - 담보·마진콜 상태머신 2종과 대출 상태머신과의 분리
+      - 유지비율 임계(140% 마진콜 / 120% 청산)와 교차곱 판정
+      - 담보 유형 계열(Category)이 가르는 행위 — 마진콜·처분·대위변제
+      - 실행 3경로(처분·대위변제·상각)와 손실 계정 분리
+      - 재평가 이력 append-only 규약과 유효담보가치 산식
+    excluded:
+      - 여신 4종의 심사·한도·수수료 (loan-service-lending Seed 소관)
+      - 담보 문서 OCR 대조 (CollateralDocument* — 인접 기능, 별도 관심사)
+      - 연체·기한이익상실 전이 (SecuredLoanCollectionService 소관)
+      - 위성 시세 어댑터의 외부 연동 상세
+
+  constraints:
+    - "금액은 BigDecimal — 임계 판정은 나눗셈이 아니라 교차곱(절사 오차가 임계를 넘기지 못하게)"
+    - "재평가는 이력 append — 설정 시점 평가액을 덮지 않는다"
+    - "담보 상태머신과 대출 상태머신은 결합하지 않는다"
+    - "손실은 경로마다 하나의 계정으로만 기표 — 이중 인식 금지"
+    - "동시 판정·동시 실행은 비관적 락으로 직렬화"
+    - "헥사고날: domain 은 adapter 를 import 하지 않는다 (ArchUnit 강제)"
+
+  invariants:  # as-is 코드 사실 — 파일:라인 근거 (경로 접두 loan-service/src/main/java/github/lms/lemuel/loan/)
+    collateral_lifecycle:
+      source: domain/CollateralStatus.java:15-20,26-38
+      rule: "PLEDGED -> ACTIVE -> RELEASED (+ 심사 거절 시 PLEDGED -> RELEASED). RELEASED 는 종료 상태"
+      rationale: "담보는 대출보다 먼저 설정되고 완제 후에 말소되므로 대출 생명주기와 1:1로 겹치지 않는다"
+    margin_call_lifecycle:
+      source: domain/MarginCallStatus.java:17-22,26-37
+      rule: "OPEN -> RESOLVED | ESCALATED, 둘 다 종료 상태"
+      rationale: "대출 1건에 여러 번 발생하고 각 발생이 독립적으로 해소·이관된다. 대출 상태에 녹이면 이력이 덮여 어느 시점에 몇 번 부족했는지 재현할 수 없다"
+    transition_table_single_source:
+      source: domain/Collateral.java:133 + domain/MarginCall.java:88
+      rule: "애그리거트 전이 가드가 enum 의 canTransitionTo 에 위임 — 표에 없는 전이는 InvalidLoanStateException"
+    type_category_drives_behavior:
+      source: domain/CollateralType.java:6-13,64-77 + domain/SecuredLoanPolicy.java:62-68
+      rule: >-
+        인정비율을 유형별 파라미터가 아니라 유형 자체로 나눈다 — 파라미터로 두면 인정비율이 담보 행마다
+        달라져 정책이 데이터로 새어 나간다. 계열(Category)은 행위를 가른다.
+      ltv: "GUARANTEE 1.00 · DEPOSIT 0.95 · BOND 0.80 · EQUITY 0.60 · REAL_ESTATE 는 주입값(app.loan.secured.real-estate-ltv, 기본 0.70)"
+      predicates: "supportsMarginCall = FINANCIAL_ASSET · supportsSubrogation = GUARANTEE · supportsDisposal = GUARANTEE 아닌 전부"
+    margin_call_only_financial_assets:
+      source: application/service/RevalueCollateralService.java:74-79
+      rule: "주택담보는 시세가 떨어져도 추가담보를 요구하지 않는 상품이라 재평가 이력만 남기고 조치는 없다"
+    thresholds:
+      source: domain/SecuredLoanPolicy.java:53,55,257-265
+      rule: "마진콜 140% 미달 · 청산 120% 미달. 청산 구간은 마진콜 구간을 포함한다"
+    cross_multiplication_judgement:
+      source: domain/SecuredLoanPolicy.java:245-248,276-280
+      rule: >-
+        coverageRatio 는 표시용이고 판정에 쓰지 않는다 — scale 2 절사 시 139,999,999/100,000,000 이
+        1.40 으로 올라붙어 임계를 통과한다. 판정은 유효담보가치 < 잔액 × 임계 교차곱으로 한다.
+    zero_outstanding_no_action:
+      source: domain/SecuredLoanPolicy.java:281-283
+      rule: "잔액이 0 이면 담보력을 따질 대상이 아니라 belowThreshold 가 즉시 false"
+    effective_value:
+      source: domain/Collateral.java:120-122 + application/service/RevalueCollateralService.java:125-134
+      rule: "유효담보가치 = max(0, 평가액 − 선순위). 재평가 경로는 Collateral#effectiveValue() 를 쓰지 않고 같은 규칙을 최신 시가에 다시 적용한다(엔티티 값은 설정 시점 스냅샷)"
+    revaluation_is_append_only:
+      source: application/service/RevalueCollateralService.java:27-29,72-73
+      rule: "재평가는 이력 행으로만 쌓이고 설정 시점 평가액을 덮지 않는다 — 덮으면 한도 산정 근거가 사후에 바뀌어 재현이 불가능해진다"
+    revalue_and_judge_same_tx:
+      source: application/service/RevalueCollateralService.java:24-26
+      rule: "시가를 새로 안 시점이 곧 조치를 결정해야 하는 시점 — 기록만 하고 판정을 미루면 그 사이 담보 부족이 방치된다"
+    pessimistic_lock_on_judgement:
+      source: application/service/RevalueCollateralService.java:62-65
+      rule: "findByIdForUpdate 로 동시 판정을 직렬화 — 같은 부족 상황으로 마진콜이 두 번 열리지 않게"
+    open_call_reused_amount_preserved:
+      source: application/service/RevalueCollateralService.java:100-103
+      rule: "이미 활성 마진콜이 있으면 새로 열지 않고 요구액은 최초 발생 시점 값을 보존한다"
+    liquidation_opens_then_escalates:
+      source: application/service/RevalueCollateralService.java:88-96
+      rule: "청산선 미달이어도 마진콜을 먼저 열고 즉시 ESCALATED 로 이관 표시 — 이관 사실을 남기지 않고 대출만 부도 처리하면 '왜 처분했는지'의 근거가 사라진다"
+    revaluation_does_not_touch_loan_status:
+      source: application/service/RevalueCollateralService.java:31-34
+      rule: "연체·기한이익상실 전이는 SecuredLoanCollectionService 몫 — 마진콜 판정이 대출 상태머신을 건드리면 두 생명주기가 결합되고 배치가 실수로 대출을 부도 처리하는 사고 경로가 생긴다"
+    recovery_resolves_open_call:
+      source: application/service/RevalueCollateralService.java:107-111
+      rule: "유지비율 회복 시 열린 마진콜을 RESOLVED 로 닫는다"
+    required_amount_positive_only:
+      source: domain/MarginCall.java:53-56
+      rule: "요구액 0 이하는 담보가 충분하다는 뜻이라 마진콜 대상이 아니다 — LoanInvariantViolationException"
+    enforcement_after_default_only:
+      source: application/service/EnforceCollateralService.java:25-27
+      rule: "기한이익상실(DEFAULTED) 이후에만 실행 — 그 전에는 회수 가능한 채권이라 상각 전이가 도메인 상태머신에서 막힌다"
+    enforcement_path_by_category:
+      source: application/service/EnforceCollateralService.java:73-77,110-114
+      rule: "처분은 supportsDisposal(), 대위변제는 supportsSubrogation() 통과 필수 — 보증부를 처분 경로로, 금융자산을 대위변제 경로로 밀어넣을 수 없다"
+    loss_accounts_split_by_path:
+      source: application/service/EnforceCollateralService.java:28-31,97-101,125-129
+      rule: >-
+        처분 부족분 -> securedDisposalShortfall(담보물을 실제로 처분한 결과),
+        대위변제 미보증분 -> securedWriteOff(처분 없이 회수 불능 확정).
+        두 전표를 같이 쓰면 손실이 이중 인식되므로 경로마다 하나만 기표한다.
+    disposal_surplus:
+      source: application/service/EnforceCollateralService.java:88-93
+      rule: "proceeds − 실행 전 잔액이 양수일 때만 securedDisposalSurplus 전표. 회수는 loan.repay 가 잔액 초과 차감을 클램프한다"
+    guarantee_coverage:
+      source: domain/SecuredLoanPolicy.java:49-50
+      rule: "보증기관 부담 85%(GUARANTEE_COVERAGE_RATIO), 나머지 15%는 우리 신용리스크 — 미보증분은 대손 인식"
+    principal_repaid_per_event:
+      source: application/service/EnforceCollateralService.java:84-87,120-123
+      rule: "처분·대위변제 회수마다 publishPrincipalRepaid(loan, recovered, 'COLLATERAL_DISPOSAL'|'SUBROGATION') 발행 — 완제 이벤트만으로는 계정계가 기중 잔액을 모른다(#183)"
+    release_after_enforcement:
+      source: application/service/EnforceCollateralService.java:132-137
+      rule: "실행이 끝나면 RELEASED 가 아닌 담보를 release() 후 저장"
+    pessimistic_lock_on_enforcement:
+      source: application/service/EnforceCollateralService.java:33
+      rule: "동시 처분 요청에도 회수·상각 전표가 중복되지 않게 비관적 락으로 조회"
+
+  inbound_surface:  # 도달성 실측 — 유스케이스명으로 adapter/in grep
+    source: adapter/in/web/CollateralController.java:44,62,74,91
+    endpoints:
+      - "POST /loans/secured/{loanId}/collateral/revalue -> RevalueCollateralUseCase"
+      - "POST /loans/secured/{loanId}/collateral/dispose -> EnforceCollateralUseCase#dispose"
+      - "POST /loans/secured/{loanId}/collateral/subrogate -> EnforceCollateralUseCase#subrogate"
+    note: >-
+      세 경로 모두 인바운드 어댑터가 유스케이스를 실제로 호출한다(grep 실측).
+      2026-08-13 역산 시점에는 이 컨트롤러가 없어 마진콜 140%·청산 120% 판정이 도달 불가였다 —
+      그때는 정책 상수·서비스·단위테스트만 있었다.
+
+  persistence:
+    migrations:
+      - V20260730180000__secured_loan_phase2_collateral.sql
+      - V20260730200000__collateral_revaluation_margin_call.sql
+      - V20260730210000__secured_loan_write_off_status.sql
+      - V20260730233000__secured_loan_financial_asset_product.sql
+
+  event_contracts:
+    publishes:
+      - "lemuel.loan.secured_loan_principal_repaid — 실행 회수 건별 원금 감소"
+      - "lemuel.loan.secured_loan_repaid — 완제"
+    consumes: []
+    note: "담보 리스크는 외부 이벤트를 듣지 않는다 (known_issues KI-1 과 직결)"
+
+  acceptance_criteria:
+    - id: AC-1
+      criterion: 140%/120% 임계 판정이 교차곱으로 절사 오차 없이 동작한다
+      gate: "./gradlew :loan-service:test — SecuredLoanPolicyTest · RevalueCollateralServiceTest"
+    - id: AC-2
+      criterion: 금융자산 계열만 마진콜 대상이다
+      gate: "RevalueCollateralServiceTest · CollateralTest"
+    - id: AC-3
+      criterion: 열린 마진콜이 있으면 중복 생성되지 않고 요구액이 보존된다
+      gate: "RevalueCollateralServiceTest"
+    - id: AC-4
+      criterion: 청산 구간에서 마진콜이 열린 뒤 ESCALATED 로 이관된다
+      gate: "RevalueCollateralServiceTest · MarginCallTest"
+    - id: AC-5
+      criterion: 유지비율 회복 시 열린 마진콜이 해소된다
+      gate: "RevalueCollateralServiceTest"
+    - id: AC-6
+      criterion: 상태 전이표 밖 전이가 거부된다
+      gate: "CollateralStatusTest · MarginCallTest"
+    - id: AC-7
+      criterion: 처분·대위변제가 계열 술어로 강제된다
+      gate: "EnforceCollateralServiceTest"
+    - id: AC-8
+      criterion: 처분손실과 대손이 같은 실행에서 이중 인식되지 않는다
+      gate: "EnforceCollateralServiceTest"
+    - id: AC-9
+      criterion: 선순위 차감이 유효담보가치에 반영된다
+      gate: "CollateralSeniorClaimTest"
+    - id: AC-10
+      criterion: 커버리지 LINE >= 90%
+      gate: "./gradlew :loan-service:jacocoTestCoverageVerification"
+
+  known_issues:  # 발견만 기록 — 사양은 as-is 유지
+    - id: KI-1
+      finding: >-
+        재평가를 아무도 자동으로 부르지 않는다 — loan-service 의 @Scheduled 는 LoanOverdueScheduler
+        (연체 스캔, 매일 03:00)와 PartitionMaintenanceRunner 2건뿐이고 담보 재평가 배치가 없다.
+        소비 토픽도 0이다. 시가는 계속 움직이는데 아무도 묻지 않고, 누군가 POST .../revalue 를
+        손으로 부를 때까지 담보 부족이 발견되지 않는다. 판정 로직은 배선돼 있으나 주기적 발동 경로가 없다.
+      disposition: recorded-not-fixed (도달성 격차 — @Scheduled grep 실측)
+    - id: KI-2
+      finding: >-
+        재평가액을 호출자가 준다 — revalue(loanId, revaluedValue, source) 가 시가를 요청 본문에서 받는다.
+        위성 시세 어댑터(SatelliteCollateralValuationAdapter / CollateralValuationPort)는 존재하지만
+        설정 시점 평가(RequestSecuredLoanService)에서만 쓰이고 재평가 경로에 연결돼 있지 않다.
+        마진콜을 촉발하는 값이 시장이 아니라 운영자 입력이며 source 는 자유 문자열이라 출처가 강제되지 않는다.
+      disposition: recorded-not-fixed (KI-1 과 한 쌍 — 자동 재평가를 붙일 때 함께 결정할 사항)
+    - id: KI-3
+      finding: >-
+        담보 없는 대출 재평가와 처분 매각대금 검증이 generic IllegalArgumentException 이다
+        (RevalueCollateralService.java:70 · EnforceCollateralService.java:67,75,112).
+        loan 도메인은 LoanInvariantViolationException 계열을 쓰는데 이 네 곳만 타입이 다르다 —
+        guard.mjs 의 OO-DOMAIN-GENERIC-IAE 는 when: isDomainMain 이라 application/service/ 를 보지 않는다.
+      disposition: recorded-not-fixed (일관성 격차)
+    - id: KI-4
+      finding: "coverageRatio 는 표시 전용인데 반환 타입이 판정값과 구분되지 않는다 — 같은 BigDecimal 이라 호출자가 임계와 직접 비교해도 컴파일된다. 주석(SecuredLoanPolicy.java:245-248)이 유일한 방어"
+      disposition: recorded-not-fixed (타입으로 못 박을 후보)
+    - id: KI-5
+      finding: "마진콜 이관(ESCALATED)이 아무 사건도 알리지 않는다 — DB 행 상태로만 남고 이벤트 발행도 알림도 없어, 강제 처분 단계로 넘어간 사실을 알려면 누군가 조회해야 한다"
+      disposition: recorded-not-fixed (notification-service 연계 후보)
+
+  uses:
+    - regression-baseline
+    - contract-drift-gate
+    - interview-portfolio

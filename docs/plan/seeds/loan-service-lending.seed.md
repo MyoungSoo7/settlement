@@ -23,7 +23,7 @@
 
 **제외**
 
-- 담보 재평가·마진콜 상세(`Collateral*`·`MarginCall*` — 별도 Seed 대상)
+- 담보 재평가·마진콜 상세(`Collateral*`·`MarginCall*`) — 정본은 [loan-service-collateral-risk](loan-service-collateral-risk.seed.md)
 - 외부 재무제표·평판 API 클라이언트 페이로드
 
 ## 핵심 불변식 (as-is, 파일:라인 근거)
