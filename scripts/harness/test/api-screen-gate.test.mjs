@@ -94,7 +94,10 @@ const SCREEN_PENDING = new Map([
   // 스케줄러가 손대지 않는데, 그 대상을 볼 화면이 없었다 — 사람이 안 하면 영영 처리되지 않는 건이다.
   // RefundHistoryController 도 함께 내려간다: 화면이 행마다 결제별 환불 이력을 실제로 부른다
   // (여러 번 시도한 건의 이중 환불 여부를 실제 완료액으로 판단하는 자리).
-  ['order-service/PgRoutingController', 'PG 라우팅 설정 콘솔'],
+  // 2026-08-22 사유 정정: "설정 콘솔"이 아니다. GET /admin/pg/health 하나뿐이고 서킷브레이커
+  // 스냅샷을 돌려주는 <b>읽기 전용</b>이다(설정 엔드포인트가 아예 없다). 붙인다면 운영 관제의
+  // 상태 카드 한 장이지 설정 화면이 아니다 — 사유를 그대로 읽으면 없는 UI 를 만들게 된다.
+  ['order-service/PgRoutingController', 'PG 라우팅 상태 점검(읽기 전용) — 어느 PG 가 OPEN 인지 확인'],
   ['order-service/ProductVariantController', '상품 옵션(SKU) 관리 화면'],
   // --- settlement-service (docs/PLAN.md §8-8) ---
   ['settlement-service/EventTrackAdminController', '이벤트 추적 콘솔 — PLAN 8-8'],
@@ -116,8 +119,14 @@ const SCREEN_PENDING = new Map([
   //    GET /loans/secured/{id} 하나뿐이고, 신청 3종(mortgage·financial-asset·personal)과
   //    승인·반려·실행은 여전히 화면이 없다. 담보대출 신청·심사 화면은 별도 작업으로 남는다.
   ['loan-service/LeaseController', '리스 화면'],
-  ['loan-service/RepaymentController', '상환 화면'],
-  ['loan-service/CompanyReputationController', '기업 평판 조회(대출 심사 보조)'],
+  // 2026-08-22 사유 정정: "상환 화면"이 아니다. POST /loans/repayment/simulate 하나뿐이고
+  // 대출 생성·영속화와 무관한 <b>부수효과 없는 미리보기</b>다 — 상환 처리가 아니라 계산기다.
+  // 부수효과가 없어 기존 대출 화면에 구획으로 얹기 쉬운 축에 속한다.
+  ['loan-service/RepaymentController', '상환표 시뮬레이터(부수효과 없음) — 회차별 상환 미리보기'],
+  // 2026-08-22 사유 보강: company-service 평판과 <b>다른 표면</b>이다. loan 이 company 이벤트로
+  // 자체 DB 에 적재한 로컬 프로젝션이고(ADR 0023 Phase 3) 조회 키가 stockCode 다.
+  // CEO '기업조회' 화면(/api/company/**)과 혼동하면 이미 있는 화면을 또 만들게 된다.
+  ['loan-service/CompanyReputationController', '셀러 평판 프로젝션 조회 — loan 로컬(ADR 0023 P3), company 표면과 별개'],
   // --- account-service ---
   // 수신 3종은 화면이 생겼다(2026-08-22, /admin/ceo/banking 탭 3개).
   // 이 부채는 게이트웨이 배선이 선행이었다 — 같은 날 /api/banking/** 를 열기 전까지는
