@@ -1,9 +1,9 @@
 name: polyglot-ci
 
-# 폴리글랏 서비스(Go 2·Python 3·Kotlin 2) 전용 CI — 기존 Java `ci` 워크플로와 독립.
+# 폴리글랏 서비스(Go 2·Python 3·Kotlin 2 = 배포 단위 7종) 전용 CI — 기존 Java `ci` 워크플로와 독립.
 # MSA 원칙(ci.yml 의 changes 잡과 동일 패턴): dorny/paths-filter 로 변경된 서비스만 골라
 # 언어별 테스트 매트릭스와 이미지 푸시 매트릭스를 동적으로 계산한다.
-# 이 워크플로 파일 자체가 바뀌면 7종 전부 재검증한다(안전 폴백).
+# 이 워크플로 파일 자체가 바뀌면 전 서비스 재검증한다(안전 폴백).
 # 필수 체크는 아니고(정보성), Java harness-guard/STATUS 카운트에는 영향이 없다.
 
 on:
@@ -119,16 +119,22 @@ jobs:
             "notification-service":"-notification",
             "reconciliation-service":"-reconciliation"
           }'
+          # 검증만 하고 이미지는 만들지 않는 서비스를 여기에 적는다(현재 없음).
+          # mapping(=배포 단위)에 넣으면 push 매트릭스가 없는 Dockerfile 을 빌드하려다 죽는다.
+          # receipt-ocr-service 는 아직 여기 없다 — 소스(calib)가 커밋되기 전이라 게이트를 걸면
+          # 실제 코드가 아니라 "아직 없는 코드"를 재게 된다. 그 작업이 랜딩되면 추가할 것.
+          test_only='[]'
           langs='{
             "go":["market-stream-service","payment-webhook-service"],
             "python":["screening-backtest-service","settlement-anomaly-service","forecast-service"],
             "kotlin":["notification-service","reconciliation-service"]
           }'
+          all_services=$(echo "$mapping" | jq -c --argjson t "$test_only" 'keys + $t | unique')
           if echo "$CHANGED" | jq -e 'index("workflow")' >/dev/null; then
-            # 워크플로 자체 변경 → 7종 전부 재검증
-            services=$(echo "$mapping" | jq -c 'keys')
+            # 워크플로 자체 변경 → 전 서비스 재검증(배포 단위 + 검증 전용)
+            services="$all_services"
           else
-            services=$(echo "$mapping" | jq -c --argjson ch "$CHANGED" 'keys | map(select(. as $k | $ch | index($k)))')
+            services=$(echo "$all_services" | jq -c --argjson ch "$CHANGED" 'map(select(. as $k | $ch | index($k)))')
           fi
           go_matrix=$(echo "$langs" | jq -c --argjson s "$services" '.go | map(select(. as $k | $s | index($k)))')
           py_matrix=$(echo "$langs" | jq -c --argjson s "$services" '.python | map(select(. as $k | $s | index($k)))')
@@ -168,6 +174,21 @@ jobs:
       - run: go build ./...
       - run: go vet ./...
       - run: go test -race ./...
+      # 커버리지 게이트 — 자바 모듈의 JaCoCo LINE 0.90 과 같은 기준선.
+      # 측정 범위는 ./internal/... 이다. cmd/server 는 부트스트랩(플래그 읽고 배선하고 리스닝)이라
+      # 자바 게이트가 `**/*Application*` 을 빼는 것과 같은 이유로 제외한다 — 다만 거기 있는 순수
+      # 헬퍼(getenv·parseBrokers·loadConfig·buildSource)는 `go test ./...` 가 그대로 돌린다.
+      - name: Coverage gate (internal >= 90%)
+        run: |
+          set -euo pipefail
+          go test -covermode=atomic -coverprofile=coverage.out ./internal/...
+          total=$(go tool cover -func=coverage.out | awk '/^total:/ { gsub("%","",$3); print $3 }')
+          echo "internal 커버리지: ${total}% (기준 90%)"
+          awk -v t="$total" 'BEGIN { exit (t + 0 >= 90) ? 0 : 1 }' || {
+            echo "::error::${{ matrix.service }} 커버리지 ${total}% < 90%"
+            go tool cover -func=coverage.out | grep -v '100.0%$' || true
+            exit 1
+          }
 
   python:
     name: Python test (${{ matrix.service }})
@@ -195,9 +216,13 @@ jobs:
         run: |
           [ -f requirements.txt ] && pip install --only-binary :all: -r requirements.txt || true
           [ -f requirements-dev.txt ] && pip install --only-binary :all: -r requirements-dev.txt || true
-          pip install --only-binary :all: "pytest==9.1.1" "httpx==0.28.1"
-      - name: Test
-        run: pytest -q
+          pip install --only-binary :all: "pytest==9.1.1" "httpx==0.28.1" "pytest-cov==7.0.0"
+      # 커버리지 게이트 — 자바 모듈의 JaCoCo LINE 0.90 과 같은 기준선.
+      # 분모는 반드시 `src` 다. 옵션 없이 재면 커버리지는 **테스트가 import 한 파일만** 세고,
+      # `--cov=.` 로 재면 100% 인 테스트 파일 자체가 분모에 섞여 수치를 부풀린다
+      # (실측: forecast-service 가 `--cov=.` 로는 93%, `--cov=src` 로는 87% 였다).
+      - name: Test with coverage gate (src >= 90%)
+        run: pytest -q --cov=src --cov-report=term-missing:skip-covered --cov-fail-under=90
 
   kotlin:
     name: Kotlin build & test (${{ matrix.service }})
@@ -219,6 +244,8 @@ jobs:
           java-version: "21"
           cache: gradle
       - run: chmod +x gradlew
+      # `build` 는 `check` 를 거치고, 두 모듈 모두 check → jacocoTestCoverageVerification
+      # (LINE 0.90, 자바 모듈과 같은 기준선)을 걸어 뒀다. 별도 스텝이 필요 없다.
       - run: ./gradlew build --no-daemon
 
   # 이미지 빌드 & ghcr 푸시 — push 이벤트(main/develop)에서 **변경된 서비스만**. 테스트 통과 후 실행.

@@ -222,6 +222,12 @@ settlement-copilot **플러그인 소유**라 플러그인 미설치 환경에 �
 
 - **ArchUnit** — 헥사고날 경계·서비스 간 의존 방향
 - **JaCoCo** — CI LINE 90% / 핵심 도메인 INSTRUCTION 80% (측정은 게이트 태스크가 정답)
+- **폴리글랏 커버리지 게이트(2026-08-22 신설)** — 자바와 같은 기준선(LINE/statement 90%)을 폴리글랏에도 건다.
+  Kotlin 2종은 JaCoCo(`check` → `jacocoTestCoverageVerification`), Go 2종은 `polyglot-ci.yml` 의
+  `go tool cover` 총계 판정(범위 `./internal/...` — `cmd/server` 부트스트랩은 자바의 `*Application*` 제외와 같은 이유로 제외),
+  Python 은 `pytest --cov=src --cov-fail-under=90`. **분모를 `src` 로 못박는 것이 요점이다** — 옵션 없이 재면
+  테스트가 import 한 파일만 세고, `--cov=.` 로 재면 100% 인 테스트 파일이 분모에 섞여 수치가 부풀려진다
+  (실측: forecast-service 가 `--cov=.` 93% / `--cov=src` 87%).
 - **이벤트 계약 테스트** — cross-service 토픽 스키마 드리프트 빌드 시점 차단 (ADR 0024). 계약 토픽 수는 여기 복제하지 않는다 —
   정본은 `shared-common/src/testFixtures/resources/contracts/events/` (`git ls-files 'shared-common/src/testFixtures/resources/contracts/events/*.schema.json' | wc -l`)
 - **돈 경로 가드(저장소 추적)** — `scripts/harness/guard.mjs`: 실시간 PreToolUse(exit 2 차단) + git pre-commit(`core.hooksPath`, `node scripts/harness/install-hooks.mjs`) 이중. 플러그인 독립 — BigDecimal·이력불변·MSA 경계·account 발행금지·market 밸류에이션 + **OO 구조(도메인 public setter·@Setter/@Data·금융 5서비스 generic IAE)** 위반 차단. `--no-verify` 우회 금지. copilot 플러그인 가드가 있으면 2차 레이어로 병존.
