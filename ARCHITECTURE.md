@@ -1,11 +1,11 @@
 # 아키텍처 개요 (Architecture Overview)
 
-> Lemuel 은 **이커머스 주문 → 셀러 정산 → 복식부기 원장**을 코어로, 그 위에 대출·투자·계정계·재무제표·경제지표·기업평판·운영관제·시세·AI·공공데이터·실시간/ML/이벤트 서비스를 확장한 **폴리글랏 MSA 플랫폼**이다.
+> Lemuel 은 **이커머스 주문 → 셀러 정산 → 복식부기 원장**을 코어로, 그 위에 대출·투자·계정계·조직·법인카드·보험·예치금·게시판·교육·재무제표·경제지표·기업평판·운영관제·시세·AI·공공데이터·실시간/ML/이벤트 서비스를 확장한 **폴리글랏 MSA 플랫폼**이다.
 > 본 문서는 *현재 서비스 구성 · 적용 아키텍처 · 디자인 패턴 · 기술 스택*을 한 곳에서 정리한다. 결정 배경은 [ADR](docs/adr/) 참조.
 
 ---
 
-## 1. 서비스 인벤토리 — 24개 서비스 (+ 플랫폼 라이브러리)
+## 1. 서비스 인벤토리 — 26개 서비스 (+ 플랫폼 라이브러리)
 
 **언어를 능력에 맞게 배치한 폴리글랏 MSA**: JVM(Java/Kotlin)으로 도메인 정합성·트랜잭션, Go 로 동시성·엣지, Python 으로 데이터/ML.
 
@@ -15,7 +15,7 @@
 > A(강한 경계)/B(중간)/C(약한 경계, 사실상 데이터 소스 단위) 등급을 매겨 소급 기록했다. 데이터
 > 원천이 다르다는 이유 하나만으로는 분리 사유로 삼지 않는다.
 
-### JVM · Java 서비스 16종 + Gateway (핵심 도메인 · 정합성)
+### JVM · Java 서비스 18종 + Gateway (핵심 도메인 · 정합성)
 
 | # | 서비스 | 포트 | 도메인 / 역할 |
 |---|---|---|---|
@@ -36,6 +36,8 @@
 | 15 | **card-service** | 8106/8107 | 법인카드 카드계정·카드(마스터/서브 한도) — 승인·매입·명세서·지출관리 |
 | 16 | **insurance-service** | 8108/8109 | GA 보험대리점 — 상담·가입설계·청약·계약·유지변경·수수료정산 |
 | 17 | **deposit-service** | 8112/8113 | 셀러 예치금 원장 (잔고 단일 진실원, hold/offset) |
+| 18 | **board-service** | 8114/8115 | 메타 주도 게시판 — 정의 1행 = 게시판 1개, 스킨(LIST/GALLERY/FAQ/QNA) 렌더. 발행 0·소비 0 |
+| 19 | **education-service** | 8115 | 교육 과정·차시·게시 상태 (ADMIN 콘텐츠 관리) — CoursePublished Outbox |
 
 > **shared-common** — 버전드 플랫폼 라이브러리(ADR 0021, composite build + maven-publish). JWT SecurityConfig · Outbox · 멱등 인프라 · JacksonCompat 등 코어 서비스가 공유. *서비스가 아니라 라이브러리.*
 
@@ -63,13 +65,16 @@
 
 **합계**: Java 19종(18 서비스 + gateway) + Go 2 + Python 3 + Kotlin 2 = **26 서비스** (+ shared-common 라이브러리). *런타임은 Java 25 — 위 숫자는 서비스 수다.*
 
+> **이 26 밖의 standalone 1종**: `receipt-ocr-service`(Python/FastAPI, 기본 :8123) — 법인카드 영수증 필드 추출의 자체 구현과 도메인 채점 하네스([ADR 0036](docs/adr/0036-receipt-ocr-platform.md)). **compose·polyglot-ci·helm 차트 어디에도 배선돼 있지 않고** 운영 어댑터도 여전히 `GeminiReceiptOcrAdapter` 라, 서비스 수에 세지 않는다. 배선되면 Python 4종으로 편입한다.
+
 ---
 
 ## 2. 적용 아키텍처 (Applied Architecture)
 
 - **폴리글랏 MSA** — 동일 클러스터에서 언어별 강점 배치. JVM=도메인/트랜잭션, Go=실시간/멱등 엣지, Python=ML/퀀트. 기존 JVM 서비스가 못 채우는 실시간·데이터 공백을 보완.
 - **헥사고날 (Ports & Adapters)** — 전 서비스가 `domain / application / adapter(in·out)` 로 분리. 의존 방향(도메인은 프레임워크 무의존, application→adapter 금지)을 **ArchUnit 으로 컴파일 게이트화**. ADR 0001.
-- **Bounded Context 분리 + DB-per-service** — 서비스마다 독립 PostgreSQL(신규는 `lemuel_*` 규약, 선행 2종은 예외: order=`inter`·settlement=`settlement_db`), 스키마는 서비스별 Flyway 가 관리. 물리 격리로 결합 차단. ADR 0020(order↔settlement DB 분리) · ADR 0037(전체 경계 자체의 분해 기준·등급).
+- **Bounded Context 분리 + DB-per-service** — 서비스마다 독립 PostgreSQL(신규는 `lemuel_*` 규약, 선행 2종은 예외: order·settlement). 스키마는 서비스별 Flyway 가 관리. 물리 격리로 결합 차단. ADR 0020(order↔settlement DB 분리) · ADR 0037(전체 경계 자체의 분해 기준·등급).
+  > order 는 **DB명이 환경별로 다르다** — compose 는 `inter`, 로컬 `application.yml` 기본값은 `opslab`. 문서 곳곳의 "order=opslab" 은 **스키마명**(`default_schema: opslab`, 전 환경 공통)을 가리킨다. order 의 `JdbcTemplate` 원시 SQL 이 `opslab.` 한정을 요구하는 이유이기도 하다.
 - **이벤트 드리븐 + CQRS 프로젝션** — 서비스 간 상태는 Kafka 이벤트(`lemuel.<domain>.<event>`)로 전파. settlement 확정·payment·investment 체결 등이 이벤트로 흐르고, 읽기 측은 프로젝션으로 조회. Kafka vs 애플리케이션 이벤트 경계는 ADR 0005.
 - **GitOps 배포** — GitHub Actions(CI, 이미지 빌드·ghcr 푸시) → ArgoCD(k3s 에 선언적 sync) → image-updater(신규 빌드 자동 롤아웃). 코드/설정이 git 이 단일 진실.
 - **관측성 내장** — Micrometer→Prometheus→Grafana(비즈니스 KPI 대시보드), 분산 트레이싱(Outbox 관통, ADR 0012), 중앙 로깅(ELK/fluent-bit).

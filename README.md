@@ -1,8 +1,9 @@
 # Lemuel — 이커머스 + 정산 MSA 플랫폼
 
 > **이커머스 주문 → 셀러 정산 → 복식부기 원장까지, "정확성을 기계로 강제한" 커머스 백엔드.**
-> 커머스(order)·정산(settlement) 두 축의 **깊이**가 시그니처이고, 그 위에 대출·투자·계정계·조직·재무제표·경제지표·기업평판·운영관제·주식시세·AI챗봇·공공데이터·법인카드·보험·예치금·교육을 **18개 마이크로서비스 + API Gateway**(JVM) 로 확장했다.
-> 여기에 **Go·Python·Kotlin 폴리글랏 7종**(실시간 시세 스트리밍·결제 웹훅·스크리닝 백테스트·이상탐지·예측·알림·정산 대사)을 더해 **총 24개 서비스**의 폴리글랏 MSA 로 도메인·언어 양방향 확장력을 증명한다.
+> 커머스(order)·정산(settlement) 두 축의 **깊이**가 시그니처이고, 그 위에 대출·투자·계정계·조직·재무제표·경제지표·기업평판·운영관제·주식시세·AI챗봇·공공데이터·법인카드·보험·예치금·게시판·교육을 **18개 마이크로서비스 + API Gateway**(JVM) 로 확장했다.
+> 여기에 **Go·Python·Kotlin 폴리글랏 7종**(실시간 시세 스트리밍·결제 웹훅·스크리닝 백테스트·이상탐지·예측·알림·정산 대사)을 더해 **총 26개 서비스**의 폴리글랏 MSA 로 도메인·언어 양방향 확장력을 증명한다.
+> (이 26 밖에 배포 배선이 없는 standalone 1종이 더 있다 — `receipt-ocr-service`(Python, 영수증 판독 자립·평가 하네스, [ADR 0036](./docs/adr/0036-receipt-ocr-platform.md)). compose·CI·차트 미배선이라 서비스 수에 세지 않는다.)
 > 단일 모놀리스 → **Bounded Context 분리** → **이벤트 드리븐** → **DB-per-service + 이벤트 프로젝션 패턴**(ADR 0020) → **폴리글랏 MSA** 로 진화시킨 헥사고날 백엔드 포트폴리오.
 >
 > 📐 **전체 구성·아키텍처·디자인 패턴·기술 스택 한눈에 → [ARCHITECTURE.md](ARCHITECTURE.md)**
@@ -14,7 +15,7 @@
 [![Spring Boot 4](https://img.shields.io/badge/Spring%20Boot-4.0.7-brightgreen)](https://spring.io/projects/spring-boot)
 [![PostgreSQL 17](https://img.shields.io/badge/PostgreSQL-17-blue)](https://www.postgresql.org/)
 [![Kafka](https://img.shields.io/badge/Kafka-Strimzi%2FRedpanda-red)](https://strimzi.io/)
-[![Polyglot MSA](https://img.shields.io/badge/MSA-24%20services%20(Java·Kotlin·Go·Python)-teal)](ARCHITECTURE.md)
+[![Polyglot MSA](https://img.shields.io/badge/MSA-26%20services%20(Java·Kotlin·Go·Python)-teal)](ARCHITECTURE.md)
 [![GitOps](https://img.shields.io/badge/CD-ArgoCD%20GitOps-orange)](ARCHITECTURE.md#5-cicd-파이프라인)
 [![Hexagonal](https://img.shields.io/badge/Architecture-Hexagonal-purple)](docs/adr/0001-hexagonal-architecture.md)
 [![ArchUnit Enforced](https://img.shields.io/badge/ArchUnit-Enforced-success)](order-service/src/test/java/github/lms/lemuel/architecture/HexagonalArchitectureTest.java)
@@ -97,6 +98,11 @@ flowchart LR
     style SAT fill:#f6ffed,stroke:#52c41a
 ```
 
+> 위 다이어그램은 **커머스→정산→여신/계정계 주 흐름**만 그린다. 여기 없는 6종
+> (organization :8104 · card :8106 · insurance :8108 · deposit :8112 · board :8114 · education :8115)
+> 도 동일하게 DB-per-service + Kafka 연계다 — JVM 18 + gateway + 폴리글랏 7 = 26 전체 인벤토리는
+> [ARCHITECTURE.md](ARCHITECTURE.md) §1 참조.
+
 ### 서비스 책임 분리 근거
 
 | 차원 | Commerce (order-service) | Settlement (settlement-service) |
@@ -111,7 +117,8 @@ flowchart LR
 (order=opslab · settlement=settlement_db · loan=lemuel_loan · financial=lemuel_financial ·
 economics=lemuel_economics · company=lemuel_company · operation=lemuel_operation · market=lemuel_market ·
 ai=lemuel_ai · commondata=lemuel_commondata · investment=lemuel_investment · account=lemuel_account ·
-organization=lemuel_organization · card=lemuel_card · insurance=lemuel_insurance · deposit=lemuel_deposit) 로 물리 분리하고,
+organization=lemuel_organization · card=lemuel_card · insurance=lemuel_insurance · deposit=lemuel_deposit ·
+board=lemuel_board · education=lemuel_education) 로 물리 분리하고,
 연계는 **Kafka 이벤트로만** 한다. order↔settlement 는 settlement 가 자체 DB 에 이벤트 프로젝션을 적재하는
 CQRS 로 분리하고, 대사는 order 의 내부 API 를 호출해 cross-DB 연결 0 을 유지한다
 ([ADR 0020](docs/adr/0020-order-settlement-db-split.md) — 완료).
@@ -122,7 +129,7 @@ CQRS 로 분리하고, 대사는 order 의 내부 API 를 호출해 cross-DB 연
 
 | 분류 | 기술 |
 |------|------|
-| 언어 | **Java 25** (코어 16) · **Kotlin 2.0** (이벤트 서비스 2) · **Go 1.22/1.23** (엣지 2) · **Python 3.11** (ML 3) · **TypeScript** (frontend) |
+| 언어 | **Java 25** (코어 18 + gateway) · **Kotlin 2.0** (이벤트 서비스 2) · **Go 1.22/1.23** (엣지 2) · **Python 3.11** (ML 3 + receipt-ocr) · **TypeScript** (frontend) |
 | 프레임워크 | Spring Boot 4.0.7 / Spring 7 (Java) · Spring Boot 3.3 (Kotlin) · FastAPI (Python) · `net/http`(Go) · React + Vite (frontend) |
 | 빌드 | Gradle Multi-module (Kotlin DSL) · 폴리글랏은 standalone 빌드 |
 | 데이터베이스 | PostgreSQL 17 (DB-per-service) |
@@ -152,7 +159,7 @@ CQRS 로 분리하고, 대사는 order 의 내부 API 를 호출해 cross-DB 연
 
 전체 디렉토리·모듈 트리 정본은 **[STRUCTURE.md](STRUCTURE.md)** 로 분리했다.
 
-- **JVM 코어**: Gradle 멀티모듈 — Java 서비스 16종 + gateway, `shared-common` 은 composite build 라이브러리 (ADR 0021)
+- **JVM 코어**: Gradle 멀티모듈 — Java 서비스 18종 + gateway, `shared-common` 은 composite build 라이브러리 (ADR 0021)
 - **폴리글랏 7종**(Go 2 · Python 3 · Kotlin 2, 포트 8110~8131): 루트 레벨 standalone — Gradle 미포함,
   `polyglot-ci.yml` 분리 CI, 전용 차트 격리 배포. gateway 미라우팅이 기본이되 **예외 2종**: market-stream
   (`/api/market-stream/**` 시세 SSE)·notification(`/api/notifications/stream` 알림 SSE) — 정본:
@@ -350,7 +357,7 @@ JWT_TTL_SECONDS=3600
 # 0. (프론트 포함 시) SPA 정적 빌드를 먼저 만든다 — 없으면 frontend 컨테이너가 404 를 준다
 (cd frontend && npm ci && npm run build)
 
-# 1. 인프라 + 앱 컨테이너 20개(JVM 18 + market-stream + notification) + frontend 빌드/실행
+# 1. 인프라 + 앱 컨테이너 21개(JVM 19 = 18 서비스 + gateway, + market-stream + notification) + frontend 빌드/실행
 #    기동 순서는 compose healthcheck 기반 depends_on 이 보장:
 #    PG 18종·ES·Redpanda·redis·pgbouncer → 18 서비스 + market-stream/notification → gateway → frontend → prometheus/grafana
 docker compose up -d --build
@@ -419,9 +426,9 @@ npx newman run docs/demo/postman-e2e-purchase-flow.json -e docs/demo/postman-env
 ### 개별 서비스 실행
 
 ```bash
-# 인프라만 (PG 16종 + ES + Redpanda + redis + pgbouncer)
+# 인프라만 (PG 18종 + ES + Redpanda + redis + pgbouncer)
 #   redis·pgbouncer 를 빼면 order-service 가 depends_on(service_healthy) 조건으로 기동하지 못한다
-docker compose up -d postgres settlement-db loan-postgres financial-postgres economics-postgres company-postgres operation-postgres market-postgres ai-postgres commondata-postgres investment-postgres account-postgres organization-postgres card-postgres insurance-postgres deposit-postgres elasticsearch redpanda redis pgbouncer
+docker compose up -d postgres settlement-db loan-postgres financial-postgres economics-postgres company-postgres operation-postgres market-postgres ai-postgres commondata-postgres investment-postgres account-postgres organization-postgres card-postgres insurance-postgres deposit-postgres board-postgres education-postgres elasticsearch redpanda redis pgbouncer
 
 # 각 서비스를 IDE 또는 gradle 로
 ./gradlew :order-service:bootRun
@@ -612,7 +619,9 @@ PENDING → READY → SHIPPED → IN_TRANSIT → DELIVERED → (선택) RETURNED
 - [0032 — 기간효력 수수료 정책 (effective-dated commission rate)](./docs/adr/0032-effective-dated-commission-rate-policy.md)
 - [0035 — Kafka 토픽 카탈로그 (전송 속성 정본)](./docs/adr/0035-kafka-topic-catalog.md)
 - [0036 — 영수증 OCR 플랫폼](./docs/adr/0036-receipt-ocr-platform.md)
-- …0024~0036 전체(0019 결번, 총 35개)는 [docs/adr/](./docs/adr/) 참조
+- [0037 — MSA 서비스 경계 근거 (사업 전제 + 분해 기준 6축)](./docs/adr/0037-msa-decomposition-rationale.md)
+- …0024~0037 전체(0019 결번, 총 36개)는 [docs/adr/](./docs/adr/) 참조
+  (검증: `ls docs/adr/[0-9]*.md | wc -l`)
 
 > 위성 서비스(financial · economics · company · market · common-data)는 **공개 read-only 조회**라 shared-common(JWT/Outbox)을 의존하지 않고
 > 자체 최소 SecurityConfig 를 둔다. operation(콘솔 ADMIN 전용)과 ai(LLM 실비용 → USER 이상 필수)는 예외로 shared-common 의 JWT 스택을 쓴다.
@@ -657,7 +666,7 @@ CI 에서 k6 thresholds 로 회귀 자동 감지.
 loan=lemuel_loan · financial=lemuel_financial · economics=lemuel_economics · company=lemuel_company ·
 operation=lemuel_operation · market=lemuel_market · ai=lemuel_ai · commondata=lemuel_commondata ·
 investment=lemuel_investment · account=lemuel_account · organization=lemuel_organization · card=lemuel_card ·
-insurance=lemuel_insurance · deposit=lemuel_deposit),
+insurance=lemuel_insurance · deposit=lemuel_deposit · board=lemuel_board · education=lemuel_education),
 이벤트 프로젝션 패턴 덕분에 다음 단계로의 확장이 깨끗합니다:
 
 1. ~~**DB 분리**~~ — ✅ 완료. settlement 가 자체 `settlement_db` 의 projection 테이블에 Kafka 이벤트 컨슈머가

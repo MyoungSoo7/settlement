@@ -29,7 +29,7 @@
 │   ├── gl-ledger-auditor.md           # 계정계 GL 복식부기·시산표·분개 매핑 정합 감사 (account + ledger)
 │   └── event-contract-reviewer.md     # cross-service 이벤트 계약 드리프트·Outbox·멱등 검토 (ADR 0024)
 ├── skills/                            # 온디맨드 절차적 지식 (SKILL.md)
-│   ├── {서비스}-rules/                # 16서비스 전체 강제 도메인 규칙 (아래 참조)
+│   ├── {서비스}-rules/                # 17종 — 18서비스 중 education 만 미보유 (아래 참조)
 │   ├── money-safety · ledger-invariants · idempotency-and-events   # 횡단 규칙
 │   ├── recon-playbook · incident-runbooks · compliance-review      # 운영/리뷰
 │   ├── delta-review                                                # diff 위험축 트리아지(어디를 먼저 볼지) — 리뷰 진입 기준
@@ -73,11 +73,14 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 `order-commerce` · `settlement-domain` · `loan-domain` · `investment-domain` · `account-domain` ·
 `financial-data` · `economics-data` · `market-quotes` · `company-news` · `commondata-connector` ·
 `operation-signal` · `ai-chat` · `card-service` · `insurance-domain` · `deposit-domain` · `organization-domain` ·
-`board-domain` — 각 서비스 로직 작성·수정·리뷰 시 해당 `*-rules` 스킬이 강제 규칙(상태머신·정책·경계)을 로드.
+`board-domain` — **17종**. 각 서비스 로직 작성·수정·리뷰 시 해당 `*-rules` 스킬이 강제 규칙(상태머신·정책·경계)을 로드.
 로드는 규율이 아니라 `skill-router.mjs` 가 편집 경로를 보고 **자동 주입**한다(아래 "강제 지점").
 
-> **커버리지 완결(2026-08-15)**: 18서비스 전부가 전용 `*-rules` 스킬 + 라우터 `ROUTES` 행을 갖는다
-> (둘은 같은 사실의 두 표현 — `skill-router.test.mjs` 가 회귀 방지). 마지막 3개의 해소 이력:
+> **커버리지 현황**: 2026-08-15 시점의 17서비스는 전부 전용 `*-rules` 스킬 + 라우터 `ROUTES` 행을 갖는다
+> (둘은 같은 사실의 두 표현 — `skill-router.test.mjs` 가 회귀 방지).
+> **미충족 1건 — `education-service`**: 그 뒤 추가된 18번째 서비스로, 전용 규칙 스킬도 라우터 행도 아직 없다
+> (현재 정본은 PRD `docs/plan/prd/education-service.md`). 즉 라우터가 커버하는 것은 **18개 중 17개**다.
+> 마지막 3개의 해소 이력:
 > 돈 경로 우선 부채였던 `insurance-domain-rules`(완전판매 게이트·25%룰·환수/12회 분할)·
 > `deposit-domain-rules`(잔고 단일 진실원·hold/offset 이중사용 차단), 그리고 후순위였던
 > `organization-domain-rules`(발행 전용 경계·활성 OWNER ≥1·card 프로젝션 계약 드리프트 3종).
@@ -179,8 +182,8 @@ settlement-copilot **플러그인 소유**라 플러그인 미설치 환경에 �
 `CMD-EVENT-PRODUCE`(lemuel.* 토픽 직접 produce — WARN 비차단). 의도적 실행은 `HARNESS_ALLOW_CMD=1` opt-in.
 이 계층은 fail-open(운반 수단 차단이라 입력 파싱 실패가 모든 Bash 를 멈추면 안 된다) — 우회 시도는 커밋·CI 가 내용 기준 재차단.
 
-**skill-router.mjs 라우트 표** (경로 → 주입 스킬, 세션당 스킬별 1회 · 최대 3개): 16개 서비스 디렉토리 전부 → 각 `{서비스}-rules`
-(위 "커버리지 완결" 참조)
+**skill-router.mjs 라우트 표** (경로 → 주입 스킬, 세션당 스킬별 1회 · 최대 3개): 17개 서비스 디렉토리 → 각 `{서비스}-rules`
+(education-service 만 미배선 — 위 "커버리지 현황" 참조)
 (settlement `ledger` 경로·account 는 `ledger-invariants` 동반) · `outbox/`·`adapter/in/kafka/`·`adapter/out/event/` →
 `idempotency-and-events` · settlement `readmodel|projection` → `projection-view-ops` · `contracts/events/` →
 `event-contract-change` · `.claude/hookify.*.local.md` → `hookify-to-guard` · 그 외 `src/{main,test}/` 첫 편집 → `tdd-discipline`.

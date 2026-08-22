@@ -12,6 +12,12 @@ settlement MSA 에 언어별 강점을 살려 붙인 신규 서비스 7종(Kotli
 | `settlement-anomaly-service` | Python/FastAPI | 8121 | 정산/payout 이상탐지 (MAD z-score + IsolationForest 앙상블) | MVP·green |
 | `forecast-service` | Python/FastAPI | 8122 | 정산액/매출 시계열 예측 (Holt-Winters + seasonal-naive) | MVP·green |
 
+> **이 7종에 포함되지 않는 standalone 1종**: `receipt-ocr-service`(Python/FastAPI, 기본 `:8123`) — 법인카드
+> 영수증 필드 추출의 자체 구현(RapidOCR + 도메인 파서)과 대사 판정 기준 채점 하네스([ADR 0036](../adr/0036-receipt-ocr-platform.md),
+> 기록 [`../OCR.md`](../OCR.md)). **docker-compose·`polyglot-ci.yml`·helm 차트 어디에도 배선돼 있지 않고**
+> card-service 의 운영 어댑터도 여전히 `GeminiReceiptOcrAdapter` 다. 배선되는 시점에 이 표로 편입한다
+> (그때 폴리글랏은 Python 4종·총 8종이 된다).
+
 ## 언어 선택 근거 (polyglot MSA)
 - **Kotlin** — JVM 생태(Spring Kafka·스케줄러)를 그대로 쓰되 코루틴/간결 문법으로 이벤트 팬아웃·배치성 워크로드를 가볍게.
 - **Go** — 동시성·저지연·엣지. 다수 커넥션 실시간 스트리밍(goroutine 팬아웃)과 빠르고 멱등한 웹훅 수신에 JVM 대비 유리.
@@ -43,7 +49,7 @@ settlement MSA 에 언어별 강점을 살려 붙인 신규 서비스 7종(Kotli
 ## CI
 `../../.github/workflows/polyglot-ci.yml` — `changes` 잡(dorny/paths-filter)이 **변경된 서비스만** 골라
 Go(build+vet+test -race) / Python 3.11(pytest) / Kotlin(gradle build) 매트릭스와 이미지 푸시 매트릭스를
-동적으로 계산한다(서비스 단위 CI — ci.yml 의 JVM 17모듈과 동일 패턴, 워크플로 파일 변경 시엔 7종 전부 폴백).
+동적으로 계산한다(서비스 단위 CI — ci.yml 의 JVM 19모듈(18 서비스 + gateway)과 동일 패턴, 워크플로 파일 변경 시엔 7종 전부 폴백).
 기존 Java `ci`/harness-guard 와 독립(신규 Java·마이그레이션·ADR 추가 없어 STATUS 카운트 불변).
 
 ## 배포 (후속 — helm-deploy 레포)

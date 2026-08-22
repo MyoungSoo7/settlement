@@ -3,13 +3,13 @@
 > 저장소 전체 디렉토리·모듈 구조의 정본. 서비스 책임·API 는 [`SPEC.md`](SPEC.md),
 > 아키텍처 개요·패턴은 [`ARCHITECTURE.md`](ARCHITECTURE.md), 에이전트 지침은 [`CLAUDE.md`](CLAUDE.md) 참조.
 
-## JVM 코어 — Gradle 멀티모듈 (Java 서비스 16종 + Gateway + shared-common)
+## JVM 코어 — Gradle 멀티모듈 (Java 서비스 18종 + Gateway + shared-common)
 
 ```
 settlement/                              # 모노레포 루트
 ├── settings.gradle.kts                  # 18 서비스 + gateway 모듈 선언 (shared-common 은 composite build)
 ├── build.gradle.kts                     # 부모 빌드 (subprojects 공통 설정, JaCoCo LINE 90% 게이트)
-├── docker-compose.yml                   # PG 16종 · ES · Redpanda · 앱 컨테이너 19개(JVM 17 + market-stream + notification)
+├── docker-compose.yml                   # PG 18종 · ES · Redpanda · 앱 컨테이너 21개(JVM 19 = 18 서비스+gateway, + market-stream + notification) + frontend
 ├── Dockerfile                           # MODULE 빌드 인자 파라미터화 (JVM 서비스 공용)
 │
 ├── shared-common/                       # 📦 버전드 플랫폼 라이브러리 (java-library, ADR 0021)
@@ -30,7 +30,7 @@ settlement/                              # 모노레포 루트
 │   └── src/testFixtures/resources/contracts/events/   # ★ 이벤트 계약 정본 (56토픽 JSON Schema+샘플, ADR 0024)
 │
 ├── order-service/                       # 🛒 Commerce (8088, opslab)
-│   └── .../{user,order,payment,cart,shipping,product,category,coupon,review,game,menu,rbac,commoncode,sellertier}
+│   └── .../{user,order,bulkorder,payment,point,giftcard,cart,shipping,product,category,coupon,review,game,menu,rbac,commoncode,sellertier}
 │       ├── auditconsole/                # /admin/audit-logs — 커머스 감사 로그 조회(shared-common common.audit 재사용)
 │       ├── recon/                       # /internal/recon — 자기 합계 노출(settlement 대사용, ADR 0020)
 │       └── projectionbackfill/          # settlement 프로젝션 백필 (ADR 0020)
@@ -80,16 +80,19 @@ settlement/                              # 모노레포 루트
 ```
 
 - 자체 DB 없음(무영속 MVP) · CI 는 `.github/workflows/polyglot-ci.yml` 분리(**변경 서비스만** 동적 매트릭스 —
-  JVM ci.yml 과 동일 패턴, 24종 전부 서비스 단위 CI) · 배포는 전용 차트 격리
+  JVM ci.yml 과 동일 패턴, 26종 전부 서비스 단위 CI) · 배포는 전용 차트 격리
   (`charts/polyglot-services`, helm-deploy 레포). 정본: [`docs/plan/polyglot-services.md`](docs/plan/polyglot-services.md).
 
 ## 부속 디렉토리
 
 ```
 ├── frontend/                            # ⚛️ React(Vite) 관리자/쇼핑 프론트 — nginx 프록시로 gateway 연동
-├── docs/                                # 📚 ADR 35개(adr/, 0019 결번) · 러너북(plan/runbook/) · DEVELOPMENT · 검증(plan/SETTLEMENT-VERIFICATION) — ARCHITECTURE.md 는 저장소 루트
+├── docs/                                # 📚 ADR 36개(adr/, 0019 결번) · 러너북(plan/runbook/) · DEVELOPMENT · 검증(plan/SETTLEMENT-VERIFICATION) — ARCHITECTURE.md 는 저장소 루트
 ├── monitoring/                          # 📊 Prometheus·Grafana 대시보드(비즈니스 KPI)·alert rules
 ├── load-test/                           # 🔥 k6 부하 시나리오 4종
 ├── scripts/harness/                     # 🛡️ 저장소 가드(guard.mjs)·자기진단(harness-audit.mjs)·git hook 설치
-└── https/ · gradle/                     # 로컬 TLS · Gradle wrapper
+├── k8s/                                 # ☸️ 운영 매니페스트 일부 (정본 배포 배선은 helm-deploy 레포 + ArgoCD)
+├── .claude/                             # 🤖 에이전트 자산 — 스킬·커맨드·에이전트 정의 (플러그인 독립, 저장소 추적)
+├── receipt-ocr-service/                 # 🐍 Py 영수증 판독 자립 + 채점 하네스 (ADR 0036) — standalone·미배선(compose·CI·차트 없음), 기본 :8123
+└── gradle/                              # Gradle wrapper   ※ `https/`(로컬 TLS)는 .gitignore — 저장소 미추적
 ```

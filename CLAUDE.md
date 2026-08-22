@@ -5,7 +5,8 @@
 > - **기능·API·유스케이스 상세** → [`SPEC.md`](./SPEC.md) (사람용 기능명세)
 > - **서비스별 강제 도메인 규칙**(상태머신·수수료·정책 등) → `*-domain-rules` / `*-rules` 스킬(온디맨드 로드:
 >   order-commerce·settlement-domain·loan-domain·investment-domain·account-domain·financial-data·economics-data·
->   market-quotes·company-news·commondata-connector·operation-signal·ai-chat·card-service·insurance-domain·deposit-domain·organization-domain)
+>   market-quotes·company-news·commondata-connector·operation-signal·ai-chat·card-service·insurance-domain·deposit-domain·organization-domain·board-domain
+>   — 17종. education 은 전용 규칙 스킬이 아직 없다: PRD `docs/plan/prd/education-service.md` 가 정본)
 > - **사용자 문서** → [`README.md`](./README.md) · **아키텍처 결정** → [`docs/adr/`](./docs/adr/)
 > - **기술 스택·빌드 커맨드·인프라·작업 이력** → [`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md) (참조성 — 필요 시 조회)
 
@@ -33,17 +34,20 @@
 
 ## 프로젝트 개요
 
-주문·결제·정산·선정산/기업대출·투자·계정계·재무제표·경제지표·기업뉴스평판·운영관제·주식시세·AI챗봇·공공데이터·조직/멤버십·법인카드·보험·예치금·게시판을
+주문·결제(포인트·기프트카드 원장 포함)·정산·선정산/기업대출·투자·계정계·재무제표·경제지표·기업뉴스평판·운영관제·주식시세·AI챗봇·공공데이터·조직/멤버십·법인카드·보험·예치금·게시판·교육을
 **18개 마이크로서비스 + API Gateway** 로 분리한 헥사고날 백엔드. 원래 모놀리스였으나 Bounded Context 로 분리.
 여기에 **폴리글랏 7종**(Kotlin 2 알림·대사 / Go 2 스트리밍·웹훅 / Python 3 백테스트·이상탐지·예측 — Gradle 미포함
 standalone, gateway 미라우팅 — 예외 2종: market-stream 은 `/api/market-stream/**` SSE, notification 은
 `/api/notifications/stream` 알림 푸시 SSE 만 gateway 라우팅 + compose 배선. 정본 [`docs/sse.md`](docs/sse.md))을
 더해 총 26개 서비스 = 18 + gateway 1 + 폴리글랏 7 (정본: `polyglot-services.md` · `ARCHITECTURE.md`).
+이 26 밖에 `receipt-ocr-service`(Python, 영수증 판독 자립·채점 하네스, ADR 0036)가 있으나 **compose·CI·차트 미배선**
+standalone 이라 서비스 수에 세지 않는다.
 
 - **18개 서비스 모두 DB-per-service** — order=opslab, settlement=settlement_db, loan=lemuel_loan,
   financial=lemuel_financial, economics=lemuel_economics, company=lemuel_company, operation=lemuel_operation,
   market=lemuel_market, ai=lemuel_ai, commondata=lemuel_commondata, investment=lemuel_investment, account=lemuel_account,
-  organization=lemuel_organization, card=lemuel_card, insurance=lemuel_insurance, deposit=lemuel_deposit, board=lemuel_board.
+  organization=lemuel_organization, card=lemuel_card, insurance=lemuel_insurance, deposit=lemuel_deposit, board=lemuel_board,
+  education=lemuel_education. (order 만 DB명이 환경별로 갈린다 — compose `inter` / 로컬 기본 `opslab`. "opslab" 은 전 환경 공통 **스키마**명.)
 - 서비스 간 연계는 **Kafka 이벤트로만** (코드·DB 직접 의존 0).
 - order↔settlement 는 settlement 가 자체 DB 에 **이벤트 드리븐 프로젝션**(`settlement_*_view`)을 적재하는 CQRS 로 분리
   (ADR 0020), 대사는 order 내부 API(`/internal/recon`) 호출로 cross-DB 연결 0 유지.
@@ -61,7 +65,7 @@ settlement/                       # Gradle 멀티 모듈 루트
 ├── settings.gradle.kts           # 19 모듈 선언 = 18 서비스 + gateway (shared-common 은 composite build)
 ├── build.gradle.kts              # 부모 빌드 (subprojects 공통 설정)
 ├── shared-common/                # 📦 java-library: common.{audit, config, exception, outbox, ratelimit, pdf}
-├── order-service/                # 🛒 Commerce (8088, opslab) — user·order·payment·cart·shipping·product·category·coupon·review·game·(menu·rbac·commoncode·auditconsole·recon·projectionbackfill)
+├── order-service/                # 🛒 Commerce (8088, 스키마 opslab) — user·order·bulkorder·payment·point·giftcard·cart·shipping·product·category·coupon·review·game·(menu·rbac·commoncode·sellertier·auditconsole·recon·projectionbackfill)
 ├── settlement-service/           # 💰 Settlement (8082, settlement_db, standalone) — settlement·payout·ledger·tax·chargeback·pgreconciliation·recovery·closing·report·recon·integrity·idempotency·auditconsole(감사 이력 조회 `/admin/audit-trail`)·crypto(슬라이스 공용 필드암호화)
 ├── loan-service/                 # 💸 Loan (8084, lemuel_loan) — 선정산 + 기업대출(CEO). shared-common 의존
 ├── financial-statements-service/ # 📊 Financial (8086, lemuel_financial) — 재무제표 공개조회. ★shared-common 미의존
@@ -78,7 +82,7 @@ settlement/                       # Gradle 멀티 모듈 루트
 ├── insurance-service/            # 🛡️ Insurance (8108/mgmt 8109, lemuel_insurance) — GA 보험대리점 플랫폼: 상담·가입설계·청약·계약·유지변경·수수료정산. shared-common 의존
 ├── deposit-service/              # 🏧 Deposit (8112/mgmt 8113, lemuel_deposit) — 셀러 예치금 원장(잔고 단일 진실원, hold/offset 로 재원 이중사용 차단). shared-common 의존, REST 는 `/api/deposits` 조회 + `/admin/deposits` 수기 콘솔, Kafka 컨슈머 2종(settlement.confirmed·payout.completed). card 승인·매입은 페이로드에 sellerId 가 없어 미구독 — hold/offset 은 콘솔 경로
 ├── board-service/                # 📋 Board (8114/mgmt 8115, lemuel_board) — 메타 주도 게시판 플랫폼: 정의 1행 = 게시판 1개, 프론트 단일 라우트가 스킨(LIST/GALLERY/FAQ/QNA)으로 렌더. shared-common JWT 만 제한 스캔, **발행 0·소비 0**(권한=역할 allowlist, 메뉴 등록은 관리 화면이 order `/admin/menus` 직접 호출)
-├── education-service/            # 🎓 Education (8115, lemuel_education) — 과정·차시·게시 상태·ADMIN 콘텐츠 관리, CoursePublished Outbox
+├── education-service/            # 🎓 Education (8115, lemuel_education) — 과정·차시·게시 상태·ADMIN 콘텐츠 관리, CoursePublished Outbox. ⚠️ 로컬 bootRun 한정 포트 충돌: board 의 mgmt 포트가 같은 8115 라 두 서비스를 동시에 bootRun 하면 바인드 실패(compose 는 컨테이너 내부 8080 이라 무관)
 └── gateway-service/              # 🚪 API Gateway (8080) — 라우팅만(자체 인증 필터 없음)
 ```
 

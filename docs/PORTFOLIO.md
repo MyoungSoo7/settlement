@@ -1,7 +1,7 @@
 # Lemuel — 이커머스 + 정산 MSA 플랫폼
 
 > **이커머스 주문 → 셀러 정산 → 복식부기 원장까지, "정확성을 기계로 강제한" 커머스 백엔드.**
-> 핵심은 커머스(order)·정산(settlement) 두 축의 **깊이**이고, 그 위에 대출·투자·계정계·재무·경제·평판·관제·시세·AI·공공데이터 **위성 서비스로 도메인 확장력**을 증명한다.
+> 핵심은 커머스(order)·정산(settlement) 두 축의 **깊이**이고, 그 위에 대출·투자·계정계·조직·법인카드·보험·예치금·게시판·교육·재무·경제·평판·관제·시세·AI·공공데이터 **위성 서비스로 도메인 확장력**을 증명한다.
 > 이커머스 플랫폼 · 커머스 SaaS · 결제/정산 솔루션 도메인의 백엔드 포지션을 염두에 둔 1장 요약.
 
 🔗 **GitHub**: https://github.com/MyoungSoo7/settlement (`develop` 브랜치)
@@ -13,19 +13,19 @@
 | 항목 | 수치 |
 |---|---|
 | **Java / Spring Boot** | 25 / 4.0.7 |
-| **마이크로서비스** | **16 비즈니스 서비스 + API Gateway** + `shared-common` 라이브러리 |
-| **DB 분리** | **DB-per-service (16 DB 물리 분리, cross-DB 연결 0)** — opslab / settlement_db / lemuel_loan … |
-| **Flyway 마이그레이션** | **306 개**(`git ls-files '*/src/main/resources/db/migration/V*__*.sql' \| wc -l`) |
-| **ADR** | **35 개** (0001 ~ 0036, 0019 결번) |
-| **테스트** | **테스트 클래스 1,031개**(`*Test.java`+`*IT.java`, `git ls-files '*/src/test/java/**/*.java' \| grep -E '(Test\|IT)\.java$' \| wc -l`) — 핵심 정산 모듈 `@Test` **1,443건**(소스 실측) |
+| **마이크로서비스** | **18 비즈니스 서비스 + API Gateway** + `shared-common` 라이브러리 (+ 폴리글랏 7 = 총 26) |
+| **DB 분리** | **DB-per-service (18 DB 물리 분리, cross-DB 연결 0)** — opslab / settlement_db / lemuel_loan … |
+| **Flyway 마이그레이션** | **354 개**(`git ls-files '*/src/main/resources/db/migration/V*__*.sql' \| wc -l`) |
+| **ADR** | **36 개** (0001 ~ 0037, 0019 결번) |
+| **테스트** | **테스트 클래스 1,186개**(`*Test.java`+`*IT.java`, `git ls-files '*/src/test/java/**/*.java' \| grep -E '(Test\|IT)\.java$' \| wc -l`) — 핵심 정산 모듈 `@Test` **1,522건**(소스 실측) |
 | **커버리지 (검증)** | 전 모듈 **JaCoCo LINE 90% 게이트 강제** — 현재값은 게이트 태스크 실행이 정답. 문서화된 정산 실측 스냅샷(520 테스트·94.17%, 2026-07-12): [SETTLEMENT-VERIFICATION.md](plan/SETTLEMENT-VERIFICATION.md) |
 | **부하테스트** | 4 시나리오 (k6) |
 
 > 휘발성 수치는 문서에 박제하지 않는다 — 각 수치 옆의 `git ls-files` 명령을 그때그때 실행한 결과가 정답이다.
 
-> **깊이는 의도적으로 배분했다.** order(550 파일)·settlement(578 파일, 각 `src/main/java` 기준·테스트 제외:
+> **깊이는 의도적으로 배분했다.** order(797 파일)·settlement(600 파일, 각 `src/main/java` 기준·테스트 제외:
 > `git ls-files '{service}/src/main/java/**/*.java' | wc -l`)가 시그니처이고,
-> 공개조회형 위성 서비스(financial·economics·market·common-data 각 39~44 파일, ai 는 RAG 추가로 64 파일,
+> 공개조회형 위성 서비스(financial·economics·market·common-data 각 39~44 파일, ai 는 RAG 추가로 66 파일,
 > 같은 기준)는 수집형이라 **얇은 것이 미완성이 아니라 스코프 선택**이다.
 
 ---
@@ -110,7 +110,7 @@ settlement.created / settlement.confirmed 이벤트만 수신 (코드·DB 의존
 
 ## 위성 서비스 — 도메인 확장력 (얇음은 의도, 경계 강도는 스스로 안다)
 
-핵심 2축(커머스·정산) 외 14개 서비스는 **공개조회·수집·소비 전용**으로, 각각 얇지만 서로 다른 설계
+핵심 2축(커머스·정산) 외 16개 서비스는 **공개조회·수집·소비 전용**으로, 각각 얇지만 서로 다른 설계
 제약을 증명한다. 다만 "얇다"와 "왜 이만큼 쪼갰는가"는 별개 질문이다 — 정합성·규제·장애격리·
 배포주기·팀 인지부하·데이터 오너십 6축으로 서비스별 경계 강도를 스스로 채점해
 [ADR 0037](adr/0037-msa-decomposition-rationale.md)에 **A(강한 경계)/B(중간)/C(약한 경계, 사실상
@@ -128,6 +128,7 @@ settlement.created / settlement.confirmed 이벤트만 수신 (코드·DB 의존
 | ai | B | 챗봇 | provider 스위치 + LLM 격리(ArchUnit) — [아래 LLM 섹션](#llm-적용--프로덕션-서비스--개발-하네스) |
 | company | C | 수집 | Outbox + 문서 JWT — 뉴스/평판 수집, 쓰기 오너십은 외부(뉴스 소스)에 있음 |
 | financial / economics / market / commondata | C | 공개조회 | shared-common 미의존, admin 키 게이트, PER/PBR 미계산 경계 — 사실상 외부 데이터 소스별 어댑터, 팀 경계 근거는 약함(ADR 0037 §3) |
+| board / education | C | 콘텐츠 | 메타 주도 게시판(정의 1행 = 게시판 1개, 발행 0·소비 0) · 교육 과정/차시 상태머신. 배포 주기·트래픽이 코어와 달라 분리했으나 팀 경계 근거는 약함(ADR 0037) |
 
 > 위성을 다 깊게 파지 않은 것은 **판단**이다 — 시그니처(정산 정확성)에 깊이를 몰아주고, 나머지는 각기 다른 아키텍처 제약을 얇게 증명한다.
 > **C등급(financial/economics/market/commondata/company)은 합병 후보임을 인지한 채 유지한다** — 배치·쿼터 격리라는 기술적 이유는 있으나 조직(팀 인지부하) 경계 근거는 약하다. "근거 없이 쪼갠 것"과 "근거를 알고 감수한 트레이드오프"의 차이를 ADR 0037 에 남긴 이유다.
@@ -231,7 +232,7 @@ RAG·벡터 검색은 **구현돼 있다**(pgvector 지식베이스 + 임베딩 
 
 | 자산 | 위치                                                             |
 |---|------------------------------------------------------------------|
-| **Architecture Decision Records** 35개 | [docs/adr/](adr/)                                                |
+| **Architecture Decision Records** 36개 | [docs/adr/](adr/)                                                |
 | **정산 정확성 검증 문서** | [docs/SETTLEMENT-VERIFICATION.md](plan/SETTLEMENT-VERIFICATION.md)    |
 | **k6 부하테스트** 4 시나리오 | [load-test/](../load-test/)                                      |
 | **Grafana 대시보드** + 커스텀 메트릭 | [monitoring/grafana/dashboards/](../monitoring/grafana/dashboards/) |
@@ -264,7 +265,7 @@ RAG·벡터 검색은 **구현돼 있다**(pgvector 지식베이스 + 임베딩 
 1. **[docs/SETTLEMENT-VERIFICATION.md](plan/SETTLEMENT-VERIFICATION.md)** — "정말 작동하나"의 재현 가능한 답(불변식 매핑 + 게이트)
 2. **[README.md](../README.md)** 의 *"면접관용 빠른 둘러보기"* + 아키텍처 다이어그램
 3. **[docs/adr/0020-order-settlement-db-split.md](adr/0020-order-settlement-db-split.md)** — DB 물리 분리 결정
-4. **[docs/adr/](adr/)** 35개 — 왜 이렇게 설계했는지
+4. **[docs/adr/](adr/)** 36개 — 왜 이렇게 설계했는지
 5. **[LLM 적용 섹션](#llm-적용--프로덕션-서비스--개발-하네스)** — ai-service(벤더 격리·PII·비용 가드) + 개발 하네스(guard 3중 강제)
 
 ---
