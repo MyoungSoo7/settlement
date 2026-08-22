@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "lemuel.organization.created",
-  "description": "organization-service(OrganizationEventPublisherAdapter) → 소비자. 조직이 생성되면 발행된다. type 은 SELLER|CORPORATE, externalRef 는 nullable 비즈니스 키(sellerId 또는 stockCode). ownerUserId 는 생성자(자동 OWNER).",
+  "description": "조직이 생성된 사실. type 은 SELLER|CORPORATE, externalRef 는 nullable 비즈니스 키(sellerId 또는 stockCode). ownerUserId 는 생성자(자동 OWNER).",
   "type": "object",
   "properties": {
     "organizationId": { "type": "integer" },

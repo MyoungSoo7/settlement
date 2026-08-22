@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "lemuel.insurance.general_payout_paid",
-  "description": "insurance-service → settlement/account. 해지환급금·만기금 실지급 완료. payoutId 가 멱등 축이다.",
+  "description": "해지환급금·만기금이 실지급된 사실. payoutId 가 멱등 축이다.",
   "type": "object",
   "properties": {
     "policyNumber": {

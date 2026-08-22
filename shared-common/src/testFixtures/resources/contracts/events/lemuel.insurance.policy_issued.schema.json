@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "lemuel.insurance.policy_issued",
-  "description": "insurance-service → loan/investment. 계약 발행. 보장금액을 실어 신용보강 관점에서 소비된다. 파티션 키는 policyNumber — 한 계약의 발행·상태변경·수수료가 같은 파티션에 순서대로 떨어져야 소비자가 일관된 상태를 본다. 금액은 plain string(DATA-STANDARD N5).",
+  "description": "보험 계약이 발행된 사실. 보장금액을 함께 실어 신용보강 관점에서도 읽을 수 있게 한다. 파티션 키는 policyNumber — 한 계약의 발행·상태변경·수수료가 같은 파티션에 순서대로 떨어져야 일관된 상태로 읽힌다. 금액은 plain string(DATA-STANDARD N5).",
   "type": "object",
   "properties": {
     "policyNumber": {

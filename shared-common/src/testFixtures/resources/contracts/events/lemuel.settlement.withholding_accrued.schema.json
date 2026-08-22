@@ -1,7 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "lemuel.settlement.withholding_accrued",
-  "description": "settlement-service → account-service. 정산 확정(payout 산정) 시점에 개인 셀러 원천징수가 실제 지급액에서 공제될 때 발행되어 GL 에 DR SELLER_PAYABLE / CR WITHHOLDING_PAYABLE(payout 감액분 반제)로 전기된다(ADR 0026 Option ① 확장, ADR 0029 §B 2026-07-24 정정 — HIGH #4 실지급 통합 봉합). 금액(amount)은 JSON string(BigDecimal.toPlainString, DATA-STANDARD N5).",
+  "description": "정산 확정(payout 산정) 시점에 개인 셀러 원천징수가 실제 지급액에서 공제된 사실. 금액(amount)은 JSON string(BigDecimal.toPlainString, DATA-STANDARD N5).",
+  "$comment": "참고(계약 아님) — 회계 해석: DR SELLER_PAYABLE / CR WITHHOLDING_PAYABLE(payout 감액분 반제, ADR 0026 Option ① 확장 · ADR 0029 §B).",
   "type": "object",
   "properties": {
     "settlementId": { "type": "integer" },

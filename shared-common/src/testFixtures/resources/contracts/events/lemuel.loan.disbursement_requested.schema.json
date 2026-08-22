@@ -1,7 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "lemuel.loan.disbursement_requested",
-  "description": "loan-service(LoanEventPublisherAdapter) → account-service(LoanDisbursementRequestedConsumer). 선정산 대출 실행(셀러 선지급) 통지 — account 가 DR LOAN_RECEIVABLE / CR CASH 분개로 소비하는 money-critical 계약. amount 는 선지급 원금(JSON string(BigDecimal.toPlainString, DATA-STANDARD N5))으로 도메인 팩토리(LoanAdvance.request)가 양수를 강제하므로 0 을 배제하는 not-pattern 을 둔다.",
+  "description": "선정산 대출이 실행되어 셀러에게 선지급된 사실. amount 는 선지급 원금(JSON string(BigDecimal.toPlainString, DATA-STANDARD N5))으로, 도메인 팩토리(LoanAdvance.request)가 양수를 강제하므로 0 을 배제하는 not-pattern 을 둔다.",
+  "$comment": "참고(계약 아님) — 토픽명이 명령형(_requested)이다. 실제로 실린 것은 지급이 일어난 사실이며, 이름은 초기 명명 잔재다(리네이밍 = 신규 토픽 비용이라 다음 계약 변경 때 정리한다).",
   "type": "object",
   "properties": {
     "loanId": { "type": "integer" },

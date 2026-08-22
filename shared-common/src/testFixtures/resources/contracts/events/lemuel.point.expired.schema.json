@@ -1,7 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "lemuel.point.expired",
-  "description": "order-service(point) → account-service. 유효기간 소멸. GL: DR POINT_LIABILITY / CR POINT_BREAKAGE_INCOME (소멸이익 인식 — 부채로 이월하지 않는다).",
+  "description": "포인트가 유효기간 소멸로 사라진 사실.",
+  "$comment": "참고(계약 아님) — 회계 해석: DR POINT_LIABILITY / CR POINT_BREAKAGE_INCOME(소멸이익 인식 — 부채로 이월하지 않는다).",
   "type": "object",
   "properties": {
     "userId": {

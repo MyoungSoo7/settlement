@@ -1,7 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "lemuel.insurance.general_payout_requested",
-  "description": "insurance-service → settlement/account. 해지환급금·만기금 지급 요청. 산출 근거(경과월·적용률·납입보험료 합계)를 함께 싣는다 — 금액만 오면 지급 심사가 원장을 다시 계산해야 한다.",
+  "description": "해지환급금·만기금 지급이 요청된 사실. 산출 근거(경과월·적용률·납입보험료 합계)를 함께 싣는다 — 금액만 오면 지급 심사가 원장을 다시 계산해야 한다.",
+  "$comment": "참고(계약 아님) — 토픽명이 명령형(_requested)이다. 이름만으로는 \"누군가 지급을 실행하라\"로 읽히지만 계약이 보장하는 것은 요청이 접수된 사실뿐이며, 실행 여부는 수신 측 판단이다.",
   "type": "object",
   "properties": {
     "policyNumber": {

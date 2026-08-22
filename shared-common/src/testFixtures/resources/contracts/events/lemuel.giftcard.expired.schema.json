@@ -1,7 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "lemuel.giftcard.expired",
-  "description": "order-service(giftcard) → account-service. 유효기간 소멸(낙전). GL: DR GIFT_CARD_LIABILITY / CR GIFT_CARD_BREAKAGE_INCOME — 소멸이익 인식. amount 는 소멸한 잔액이며 remainingAmount 는 소멸 후 값(0)이다.",
+  "description": "상품권이 유효기간 소멸(낙전)로 사라진 사실. amount 는 소멸한 잔액이며 remainingAmount 는 소멸 후 값(0)이다.",
+  "$comment": "참고(계약 아님) — 회계 해석: DR GIFT_CARD_LIABILITY / CR GIFT_CARD_BREAKAGE_INCOME(소멸이익 인식).",
   "type": "object",
   "properties": {
     "giftCardId": {

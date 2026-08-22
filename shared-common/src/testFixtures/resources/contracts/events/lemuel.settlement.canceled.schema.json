@@ -1,7 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "lemuel.settlement.canceled",
-  "description": "settlement-service → account-service. 정산 자체가 취소될 때 발행되어 잔여 즉시분·유보분을 각각 반제하는 2전표로 전기된다(ADR 0026 Option ①): DR SELLER_PAYABLE / CR CASH(즉시분 잔여) + DR HOLDBACK_PAYABLE / CR CASH(유보분 잔여). 금액은 모두 JSON string(BigDecimal.toPlainString, DATA-STANDARD N5).",
+  "description": "정산 자체가 취소된 사실. 잔여 즉시분과 잔여 유보분을 각각 싣는다 — 취소 시점에 남아 있던 두 몫은 성격이 달라 합산해 버리면 되돌릴 수 없다. 금액은 모두 JSON string(BigDecimal.toPlainString, DATA-STANDARD N5).",
+  "$comment": "참고(계약 아님) — 회계 해석: DR SELLER_PAYABLE / CR CASH(즉시분 잔여) + DR HOLDBACK_PAYABLE / CR CASH(유보분 잔여) 2전표 반제(ADR 0026 Option ①).",
   "type": "object",
   "properties": {
     "settlementId": { "type": "integer" },

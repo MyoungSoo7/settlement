@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "lemuel.payment.refunded",
-  "description": "order-service(OutboxBackedEventPublisher) → settlement-service(PaymentRefundedViewConsumer: 프로젝션 갱신 / PaymentRefundedSettlementAdjustConsumer: 역정산). refundedAmount=누적(뷰 갱신용), refundAmount=건별 delta(역정산용), refundId=원장 역분개 연결. 금액은 BigDecimal.toPlainString() 문자열. 둘 중 최소 하나의 금액 필드는 필수 — 금액 없는 환불 이벤트는 계약 위반.",
+  "description": "결제가 환불된 사실. refundedAmount 는 누적 환불액, refundAmount 는 이번 건의 delta, refundId 는 환불 건 식별자(원장 역분개 연결에 쓰인다). 금액은 BigDecimal.toPlainString() 문자열. 둘 중 최소 하나의 금액 필드는 필수 — 금액 없는 환불 이벤트는 계약 위반.",
   "type": "object",
   "properties": {
     "paymentId": { "type": "integer" },

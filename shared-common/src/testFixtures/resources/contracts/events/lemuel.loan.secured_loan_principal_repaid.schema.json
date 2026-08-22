@@ -1,7 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "lemuel.loan.secured_loan_principal_repaid",
-  "description": "loan-service(SecuredLoanEventPublisherAdapter) → account-service(GL 분개 DR CASH / CR SECURED_LOAN_RECEIVABLE). 담보/개인신용 대출의 원금이 실제로 줄어들 때마다 건별로 발행한다 — 회차 상환·중도상환·담보 처분 회수·대위변제 회수. 완제 이벤트(lemuel.loan.secured_loan_repaid)만으로는 기중 잔액을 알 수 없어 완제 전까지 계정계 채권이 최초 계약 원금으로 고정되던 문제(#183)를 해소한다. principalRepaid 는 요청액이 아니라 잔액 clamp 이후 실제 차감액이고, outstandingAfter 는 차감 후 잔액이다. 금액은 전부 BigDecimal 이므로 JSON string(DATA-STANDARD N5). 소비측은 outbox event_id 단위로 멱등 처리한다(같은 대출에 여러 건이 발생하므로 loanId 는 멱등키가 될 수 없다).",
+  "description": "담보/개인신용 대출의 원금이 실제로 줄어든 사실 — 회차 상환·중도상환·담보 처분 회수·대위변제 회수마다 건별로 발행한다. 완제 이벤트(lemuel.loan.secured_loan_repaid)만으로는 기중 잔액을 알 수 없어 완제 전까지 채권이 최초 계약 원금으로 고정되던 문제(#183)를 해소한다. principalRepaid 는 요청액이 아니라 잔액 clamp 이후 실제 차감액이고, outstandingAfter 는 차감 후 잔액이다. 금액은 전부 BigDecimal 이므로 JSON string(DATA-STANDARD N5). 멱등은 outbox event_id 단위로 판정한다(같은 대출에 여러 건이 발생하므로 loanId 는 멱등키가 될 수 없다).",
+  "$comment": "참고(계약 아님) — 회계 해석: DR CASH / CR SECURED_LOAN_RECEIVABLE.",
   "type": "object",
   "properties": {
     "loanId": { "type": "integer" },

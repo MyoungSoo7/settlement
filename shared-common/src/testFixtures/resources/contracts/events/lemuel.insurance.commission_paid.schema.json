@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "lemuel.insurance.commission_paid",
-  "description": "insurance-service → settlement/account. 수수료 1회차 실지급. 회차 단위라 installmentNo 가 멱등 판정의 축이다(policyNumber + commissionId + installmentNo).",
+  "description": "수수료 1회차가 실지급된 사실. 회차 단위라 installmentNo 가 멱등 판정의 축이다(policyNumber + commissionId + installmentNo).",
   "type": "object",
   "properties": {
     "policyNumber": {

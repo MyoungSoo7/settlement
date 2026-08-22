@@ -1,7 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "lemuel.settlement.holdback_consumed",
-  "description": "settlement-service → account-service. 보유 중인 홀드백이 조정·차감 등으로 소진되어 실제 현금 유출로 정산될 때 발행되어 GL 에 DR HOLDBACK_PAYABLE / CR CASH(유보 소진)로 전기된다(ADR 0026 Option ①). 금액(amount)은 JSON string(BigDecimal.toPlainString, DATA-STANDARD N5). settlementId 는 소진 사유가 조정건 단독일 경우 null 허용하지 않음(정본 샘플 기준 항상 존재) — 다만 필수는 아니다.",
+  "description": "보유 중이던 홀드백이 조정·차감 등으로 소진되어 현금 유출로 정산된 사실. 금액(amount)은 JSON string(BigDecimal.toPlainString, DATA-STANDARD N5). settlementId 는 정본 샘플 기준 항상 존재하지만 필수는 아니다(조정건 단독 소진 경로).",
+  "$comment": "참고(계약 아님) — 회계 해석: DR HOLDBACK_PAYABLE / CR CASH(유보 소진, ADR 0026 Option ①).",
   "type": "object",
   "properties": {
     "sourceAdjustmentId": { "type": "integer" },

@@ -1,7 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "lemuel.settlement.created",
-  "description": "settlement-service(SettlementKafkaEventPublisherAdapter) → loan-service(SettlementCreatedConsumer). 셀러별 미지급 정산예정금(담보) 로컬 뷰 적재. 금액(amount/holdbackAmount)은 JSON string 이다(BigDecimal.toPlainString, DATA-STANDARD N5 — 과거 number 였으나 payment 계열과 통일). 소비측은 asText() 파싱이라 number/string 양쪽 호환. dueDate 는 항상 존재하되 null 허용(ISO-8601 date). holdbackAmount(optional, ADR 0026 Option ①)는 amount 중 홀드백으로 유보되는 금액 — account-service 도 소비하여 DR CASH / CR SELLER_PAYABLE(즉시분 I=amount−holdbackAmount) + DR CASH / CR HOLDBACK_PAYABLE(유보분 holdbackAmount) 2전표 분할 전기에 사용된다.",
+  "description": "셀러별 정산이 생성된 사실. 금액(amount/holdbackAmount)은 JSON string 이다(BigDecimal.toPlainString, DATA-STANDARD N5 — 과거 number 였으나 payment 계열과 통일했고, asText() 파싱이면 number/string 양쪽 호환). dueDate 는 항상 존재하되 null 허용(ISO-8601 date). holdbackAmount(optional, ADR 0026 Option ①)는 amount 중 홀드백으로 유보되는 금액이며, 즉시분은 amount − holdbackAmount 로 도출된다.",
+  "$comment": "참고(계약 아님) — 회계 해석: DR CASH / CR SELLER_PAYABLE(즉시분) + DR CASH / CR HOLDBACK_PAYABLE(유보분) 2전표 분할 전기.",
   "type": "object",
   "properties": {
     "settlementId": { "type": "integer" },

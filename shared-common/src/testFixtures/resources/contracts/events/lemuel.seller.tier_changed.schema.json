@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "lemuel.seller.tier_changed",
-  "description": "order-service(SellerTierEventPublisher) → settlement-service(SellerTierChangedEventConsumer). 셀러 등급 변경 통지 (ADR 0031). 소비측은 조회·리포트용 뷰 갱신에만 쓴다 — 정산 계산은 결제 시점 등급(PaymentCaptured 동봉값)을 그대로 쓰며, 등급 변경은 미래 정산에만 반영된다(비소급, ADR 0014 §4). prevTier 는 최초 부여 시 null.",
+  "description": "셀러 등급이 변경된 사실 (ADR 0031). 등급 변경은 비소급이다 — 정산 계산은 결제 시점 등급(PaymentCaptured 동봉값)을 그대로 쓰고, 변경된 등급은 이후 정산부터 반영된다(ADR 0014 §4). prevTier 는 최초 부여 시 null.",
   "type": "object",
   "properties": {
     "sellerId": { "type": "integer" },

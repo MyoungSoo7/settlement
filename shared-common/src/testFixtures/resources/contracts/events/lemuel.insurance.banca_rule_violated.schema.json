@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "lemuel.insurance.banca_rule_violated",
-  "description": "insurance-service → operation(관제). 방카슈랑스 25% 룰 위반 — 한 은행이 한 보험사 상품을 부문 보험료의 25% 초과로 판매했다. share·분자·분모를 모두 실어 수신 측이 판정을 재현할 수 있게 한다 (비율만 오면 \"무엇 때문에 넘었나\"를 다시 물어야 한다).",
+  "description": "방카슈랑스 25% 룰이 위반된 사실 — 한 은행이 한 보험사 상품을 부문 보험료의 25% 초과로 판매했다. share·분자·분모를 모두 실어 수신 측이 판정을 재현할 수 있게 한다 (\"무엇 때문에 넘었나\"를 되묻지 않아도 되도록).",
   "type": "object",
   "properties": {
     "year": {

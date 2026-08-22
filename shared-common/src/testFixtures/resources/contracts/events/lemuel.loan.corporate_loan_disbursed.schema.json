@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "lemuel.loan.corporate_loan_disbursed",
-  "description": "loan-service(CorporateLoanEventPublisherAdapter) → 소비측(CEO 브리핑/원장 정합성 등). 상장사 기업 신용대출 실행(지급) 사실을 통지한다. principal/fee 는 금액이므로 JSON string(BigDecimal.toPlainString, DATA-STANDARD N5 — 전 계열 통일). fee 는 0 가능(무수수료 조건)이므로 비음수 패턴. stockCode 는 6자리 종목코드.",
+  "description": "상장사 기업 신용대출이 실행(지급)된 사실. principal/fee 는 금액이므로 JSON string(BigDecimal.toPlainString, DATA-STANDARD N5)(전 계열 통일). fee 는 0 가능(무수수료 조건)이므로 비음수 패턴. stockCode 는 6자리 종목코드.",
   "type": "object",
   "properties": {
     "loanId": { "type": "integer" },

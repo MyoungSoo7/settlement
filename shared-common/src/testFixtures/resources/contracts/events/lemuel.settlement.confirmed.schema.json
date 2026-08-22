@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "lemuel.settlement.confirmed",
-  "description": "settlement-service(SettlementKafkaEventPublisherAdapter) → loan-service(SettlementConfirmedConsumer). 상환 saga 의 loan 측 진입점 — 확정 정산금(amount)에서 미상환 대출을 FIFO 차감한다. amount 는 JSON string(BigDecimal.toPlainString, DATA-STANDARD N5).",
+  "description": "정산이 확정된 사실. amount 는 확정 정산금으로 JSON string(BigDecimal.toPlainString, DATA-STANDARD N5).",
   "type": "object",
   "properties": {
     "settlementId": { "type": "integer" },

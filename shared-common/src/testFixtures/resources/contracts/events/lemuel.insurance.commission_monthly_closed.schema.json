@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "lemuel.insurance.commission_monthly_closed",
-  "description": "insurance-service → settlement/account. FC 별 월 수수료 마감. 파티션 키는 closingId.",
+  "description": "FC 별 월 수수료가 마감된 사실. 파티션 키는 closingId.",
   "type": "object",
   "properties": {
     "closingId": {

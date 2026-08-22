@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "lemuel.insurance.commission_clawback_triggered",
-  "description": "insurance-service → settlement/account. 계약이 종단 상태에 도달해 기지급 수수료를 환수한다(24개월 창구). paidTotal 과 clawbackAmount 를 함께 싣는다 — 환수액만 오면 소비자가 \"전액인가 일부인가\"를 알 수 없다.",
+  "description": "계약이 종단 상태에 도달해 기지급 수수료 환수가 성립한 사실(24개월 창구). paidTotal 과 clawbackAmount 를 함께 싣는다 — 환수액만 오면 전액인지 일부인지 알 수 없다.",
   "type": "object",
   "properties": {
     "policyNumber": {
