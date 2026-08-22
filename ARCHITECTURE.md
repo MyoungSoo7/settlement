@@ -1,7 +1,7 @@
 # 아키텍처 개요 (Architecture Overview)
 
 > Lemuel 은 **이커머스 주문 → 셀러 정산 → 복식부기 원장**을 코어로, 그 위에 대출·투자·계정계·조직·법인카드·보험·예치금·게시판·교육·재무제표·경제지표·기업평판·운영관제·시세·AI·공공데이터·실시간/ML/이벤트 서비스를 확장한 **폴리글랏 MSA 플랫폼**이다.
-> 본 문서는 *현재 서비스 구성 · 적용 아키텍처 · 디자인 패턴 · 기술 스택*을 한 곳에서 정리한다. 결정 배경은 [ADR](docs/adr/) 참조.
+> 본 문서는 *현재 서비스 구성 · 적용 아키텍처 · 디자인 패턴 · 기술 스택*을 한 곳에서 정리한다. 결정 배경은 [ADR](docs/plan/adr/) 참조.
 
 ---
 
@@ -9,7 +9,7 @@
 
 **언어를 능력에 맞게 배치한 폴리글랏 MSA**: JVM(Java/Kotlin)으로 도메인 정합성·트랜잭션, Go 로 동시성·엣지, Python 으로 데이터/ML.
 
-> **서비스 경계(왜 이 18개로 나뉘었는가)의 근거는 [ADR 0037](docs/adr/0037-msa-decomposition-rationale.md)** —
+> **서비스 경계(왜 이 18개로 나뉘었는가)의 근거는 [ADR 0037](docs/plan/adr/0037-msa-decomposition-rationale.md)** —
 > 가정한 사업 전제(자사몰 단독 채널·3PL 미보유 직배송·셀러 대상 임베디드 파이낸스 사업부 확장)와
 > 분해 기준 6축(정합성·규제/라이선스·장애격리·배포주기·팀 인지부하·데이터 오너십)으로 서비스마다
 > A(강한 경계)/B(중간)/C(약한 경계, 사실상 데이터 소스 단위) 등급을 매겨 소급 기록했다. 데이터
@@ -65,7 +65,7 @@
 
 **합계**: Java 19종(18 서비스 + gateway) + Go 2 + Python 3 + Kotlin 2 = **26 서비스** (+ shared-common 라이브러리). *런타임은 Java 25 — 위 숫자는 서비스 수다.*
 
-> **이 26 밖의 standalone 1종**: `receipt-ocr-service`(Python/FastAPI, 기본 :8123) — 법인카드 영수증 필드 추출의 자체 구현과 도메인 채점 하네스([ADR 0036](docs/adr/0036-receipt-ocr-platform.md)). **compose·polyglot-ci·helm 차트 어디에도 배선돼 있지 않고** 운영 어댑터도 여전히 `GeminiReceiptOcrAdapter` 라, 서비스 수에 세지 않는다. 배선되면 Python 4종으로 편입한다.
+> **이 26 밖의 standalone 1종**: `receipt-ocr-service`(Python/FastAPI, 기본 :8123) — 법인카드 영수증 필드 추출의 자체 구현과 도메인 채점 하네스([ADR 0036](docs/plan/adr/0036-receipt-ocr-platform.md)). **polyglot-ci 의 테스트 매트릭스에만** 얹혀 있고(2026-08-22, 커버리지 게이트 90% — 이미지 푸시는 없다) **compose·helm 차트에는 배선돼 있지 않으며** 운영 어댑터도 여전히 `GeminiReceiptOcrAdapter` 라, 서비스 수에 세지 않는다. **배포 단위로** 배선되면 Python 4종으로 편입한다.
 
 ---
 

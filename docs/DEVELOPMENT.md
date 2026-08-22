@@ -25,6 +25,7 @@
 ./gradlew :<module>:compileJava                     # 모듈별 컴파일 (예: :order-service:compileJava)
 ./gradlew :<module>:test                            # 모듈별 테스트
 ./gradlew :<module>:jacocoTestCoverageVerification  # 커버리지 게이트(측정 정답, LINE 90%)
+node scripts/coverage/jacoco-report.mjs <XML> --gate  # 어느 클래스가 몇 줄 비었는지(게이트와 같은 범위)
 ./gradlew :<module>:bootRun                         # 모듈별 부트런
 ./gradlew :<module>:bootJar                         # 모듈별 jar
 

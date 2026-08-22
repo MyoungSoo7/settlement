@@ -7,7 +7,7 @@
 >   order-commerce·settlement-domain·loan-domain·investment-domain·account-domain·financial-data·economics-data·
 >   market-quotes·company-news·commondata-connector·operation-signal·ai-chat·card-service·insurance-domain·deposit-domain·organization-domain·board-domain
 >   — 17종. education 은 전용 규칙 스킬이 아직 없다: PRD `docs/plan/prd/education-service.md` 가 정본)
-> - **사용자 문서** → [`README.md`](./README.md) · **아키텍처 결정** → [`docs/adr/`](./docs/adr/)
+> - **사용자 문서** → [`README.md`](./README.md) · **아키텍처 결정** → [`docs/plan/adr/`](docs/plan/adr/)
 > - **기술 스택·빌드 커맨드·인프라·작업 이력** → [`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md) (참조성 — 필요 시 조회)
 
 ## 🚫 핵심 가드레일 (위반 시 아키텍처·회계 손상 — 절대 금지)
@@ -154,6 +154,12 @@ order Kafka 이벤트를 컨슈머(`adapter/in/kafka/`)가 받아 로컬 적재�
 - **MSA 경계**: settlement ↔ order 코드·DB 의존 0 (Kafka 프로젝션 + `/internal/recon` 만).
 - **커버리지 게이트**: JaCoCo CI **LINE 최소 90%**, 핵심 도메인 패키지 INSTRUCTION 80% 강제(`build.gradle.kts`).
   adapter in/out 서브패키지는 게이트 제외(통합 테스트로 별도 검증). 측정은 게이트 태스크가 정답.
+  **같은 기준선이 폴리글랏·프론트에도 걸려 있다**(2026-08-22): Kotlin 2종은 JaCoCo(`check` 연결),
+  Go 2종은 `go tool cover` 총계(범위 `./internal/...` — `cmd/server` 부트스트랩은 자바의 `*Application*`
+  제외와 같은 이유로 제외), Python 4종은 `pytest --cov=src --cov-fail-under=90`, 프론트는
+  `vite.config.ts` thresholds(lines·statements 90). **파이썬 분모는 반드시 `src`** — 옵션 없이 재면
+  테스트가 import 한 파일만 세고 `--cov=.` 로 재면 테스트 파일이 분모에 섞여 부풀려진다.
+  수치는 여기 박제하지 않는다(→ 게이트 태스크가 정답, `docs/DEVELOPMENT.md` 재현 명령).
 - **OO 구조 게이트**: 도메인 public setter·@Setter/@Data 금지, 금융 5서비스 도메인 generic IAE 금지,
   코어 애그리거트는 rehydrate/팩토리 전용 — `guard.mjs` OO-* 규칙(실시간)과 `oo-gate.test.mjs`(CI 전수)가
   기계 강제. 5축 점수 재채점(패널 중앙값 ≥9.5)은 `oo-score` 스킬.

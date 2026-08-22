@@ -4,7 +4,7 @@
 폴리글랏 7종(Kotlin 2 · Go 2 · Python 3)을 더한 **총 26개 서비스** 헥사고날 백엔드이며,
 원래 단일 모놀리스였으나 Bounded Context 로 분리했다.
 (위 26 밖에 미배선 standalone 1종이 더 있다 — `receipt-ocr-service`, §3.21.)
-아키텍처·컨벤션은 [`CLAUDE.md`](./CLAUDE.md), 아키텍처 결정은 [`docs/adr/`](./docs/adr/) 참조.
+아키텍처·컨벤션은 [`CLAUDE.md`](./CLAUDE.md), 아키텍처 결정은 [`docs/plan/adr/`](docs/plan/adr/) 참조.
 
 - 문서 상태: 현행 코드 기준 요약 명세 (엔드포인트 표면 + 도메인 규칙 + 이벤트 흐름)
 - 범위: **백엔드 표면**이다. 프론트 화면(라우트·메뉴)은 이 문서가 아니라 `menus` 시드 +
@@ -527,8 +527,9 @@ Boot 3.3 · JDK 21 · 코루틴. **자체 DB 없음**(무영속 MVP) · shared-c
   테스트·이미지 푸시(서비스 단위 CI, JVM `ci.yml` 과 동일 패턴). Java `ci`/harness-guard 와 독립.
 
 **별도 standalone — `receipt-ocr-service`(Python/FastAPI, 기본 8123, ADR 0036)**: 법인카드 영수증
-필드 추출의 **자체 구현 + 그것을 숫자로 판정하는 채점 하네스**. 위 7종과 달리 **compose·gateway·
-polyglot-ci 어디에도 배선돼 있지 않다**(의도된 현 상태 — PRD N6/G-1). 정본
+필드 추출의 **자체 구현 + 그것을 숫자로 판정하는 채점 하네스**. 위 7종과 달리 **compose·gateway 에
+배선돼 있지 않다**(의도된 현 상태 — PRD N6/G-1). polyglot-ci 에는 2026-08-22 부터 **테스트 매트릭스로만**
+얹혀 있다(커버리지 게이트 90%, 이미지 푸시 매트릭스에는 없음 — Dockerfile 이 없어 배포 단위가 아니다). 정본
 [`docs/plan/prd/receipt-ocr-service.md`](docs/plan/prd/receipt-ocr-service.md).
 
 - 표면은 `GET /health` · `POST /extract` 둘뿐. 추론은 **RapidOCR(ONNX, CPU) 로컬**이라 네트워크 호출·건당 비용이 0.
@@ -669,7 +670,7 @@ deposit 토픽은 아직 계약 스키마(testFixtures)에 편입되지 않았�
 - 아키텍처·컨벤션: [`CLAUDE.md`](./CLAUDE.md) · 사용자 문서: [`README.md`](./README.md)
 - 아키텍처 개요(26서비스 인벤토리·패턴·스택): [`ARCHITECTURE.md`](ARCHITECTURE.md) · 폴리글랏 정본: [`docs/plan/polyglot-services.md`](docs/plan/polyglot-services.md)
 - 서비스별 역산 PRD 27종: [`docs/plan/prd/`](docs/plan/prd/) · 결정화 Seed: [`docs/plan/seeds/`](docs/plan/seeds/)
-- 아키텍처 결정: [`docs/adr/`](./docs/adr/) (ADR 0020 DB 분리, 0024 이벤트 계약, 0026 계정계 payout 인식(제안),
+- 아키텍처 결정: [`docs/plan/adr/`](docs/plan/adr/) (ADR 0020 DB 분리, 0024 이벤트 계약, 0026 계정계 payout 인식(제안),
   0035 토픽 카탈로그, 0036 영수증 OCR 플랫폼, 0037 MSA 분해 근거 등)
 - 도메인 규칙 스킬 **17종**(`.claude/skills/*-rules` / `*-domain-rules`): settlement · order-commerce · loan ·
   investment · account · card-service · organization · insurance · deposit · board · company-news · financial-data ·

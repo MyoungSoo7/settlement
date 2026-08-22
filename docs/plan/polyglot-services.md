@@ -13,9 +13,11 @@ settlement MSA 에 언어별 강점을 살려 붙인 신규 서비스 7종(Kotli
 | `forecast-service` | Python/FastAPI | 8122 | 정산액/매출 시계열 예측 (Holt-Winters + seasonal-naive) | MVP·green |
 
 > **이 7종에 포함되지 않는 standalone 1종**: `receipt-ocr-service`(Python/FastAPI, 기본 `:8123`) — 법인카드
-> 영수증 필드 추출의 자체 구현(RapidOCR + 도메인 파서)과 대사 판정 기준 채점 하네스([ADR 0036](../adr/0036-receipt-ocr-platform.md),
-> 기록 [`../OCR.md`](../OCR.md)). **docker-compose·`polyglot-ci.yml`·helm 차트 어디에도 배선돼 있지 않고**
-> card-service 의 운영 어댑터도 여전히 `GeminiReceiptOcrAdapter` 다. 배선되는 시점에 이 표로 편입한다
+> 영수증 필드 추출의 자체 구현(RapidOCR + 도메인 파서)과 대사 판정 기준 채점 하네스([ADR 0036](adr/0036-receipt-ocr-platform.md),
+> 기록 [`../OCR.md`](../OCR.md)). `polyglot-ci.yml` 의 **python 테스트 매트릭스에만** 얹혀 있고
+> (2026-08-22, 커버리지 게이트 90% 적용 — 이미지 푸시 매트릭스에는 없다), **docker-compose·helm 차트에는
+> 여전히 배선돼 있지 않으며** card-service 의 운영 어댑터도 여전히 `GeminiReceiptOcrAdapter` 다.
+> 그래서 아직 이 표에 넣지 않는다 — **배포 단위로 배선되는 시점**에 편입한다
 > (그때 폴리글랏은 Python 4종·총 8종이 된다).
 
 ## 언어 선택 근거 (polyglot MSA)
@@ -44,13 +46,23 @@ settlement MSA 에 언어별 강점을 살려 붙인 신규 서비스 7종(Kotli
 
 ## 로컬 실행/테스트
 - Go: `cd <svc> && go test ./... && go run ./cmd/server`
+- 커버리지(자바 모듈의 JaCoCo LINE 0.90 과 같은 기준선, 2026-08-22 신설):
+  Go `go test -coverprofile=c.out ./internal/... && go tool cover -func=c.out`(총계 90% 판정,
+  `cmd/server` 부트스트랩은 자바의 `*Application*` 제외와 같은 이유로 범위 밖) ·
+  Python `pytest --cov=src --cov-fail-under=90`(**분모는 반드시 `src`** — 옵션 없이 재면 테스트가
+  import 한 파일만 세고 `--cov=.` 로 재면 테스트 파일이 분모에 섞여 부풀려진다) ·
+  Kotlin 은 `./gradlew build` 가 `check` → `jacocoTestCoverageVerification` 을 물고 있어 별도 명령이 없다.
 - Python: **Python 3.11** 필수(pinned deps 는 3.14 wheel 없음). `python3.11 -m venv .venv && .venv/bin/pip install -r requirements.txt -r requirements-dev.txt && .venv/bin/pytest`
 
 ## CI
 `../../.github/workflows/polyglot-ci.yml` — `changes` 잡(dorny/paths-filter)이 **변경된 서비스만** 골라
-Go(build+vet+test -race) / Python 3.11(pytest) / Kotlin(gradle build) 매트릭스와 이미지 푸시 매트릭스를
+Go(build+vet+test -race+커버리지 게이트) / Python 3.11(pytest+커버리지 게이트) / Kotlin(gradle build,
+`check` 가 JaCoCo 게이트를 문다) 매트릭스와 이미지 푸시 매트릭스를
 동적으로 계산한다(서비스 단위 CI — ci.yml 의 JVM 19모듈(18 서비스 + gateway)과 동일 패턴, 워크플로 파일 변경 시엔 7종 전부 폴백).
-기존 Java `ci`/harness-guard 와 독립(신규 Java·마이그레이션·ADR 추가 없어 STATUS 카운트 불변).
+기존 Java `ci`/harness-guard 와 독립.
+여기에 **검증 전용** 1종(`receipt-ocr-service`)이 같은 워크플로의 python 매트릭스에 얹혀 있다 —
+Dockerfile 이 없어 배포 단위가 아니므로 이미지 푸시 매트릭스에는 들어가지 않는다(위 7종 카운트 불변).
+골든셋이 참조하는 영수증 이미지는 생성 산출물이라 pytest 앞에 렌더 스텝으로 복원한다(한글 폰트 필요).
 
 ## 배포 (후속 — helm-deploy 레포)
 각 서비스의 helm 차트 + ArgoCD image-updater 이미지 목록 + DB/시크릿 배선은 이 PR 범위 밖. 이미지 태그 컨벤션은 기존 `settlement-<svc>:main` 을 따르되, 비-JVM 이라 별도 이미지 빌드 파이프라인 필요.
