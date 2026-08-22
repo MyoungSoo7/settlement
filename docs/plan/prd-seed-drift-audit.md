@@ -284,4 +284,4 @@ R-2 는 "선언된 범위 밖이라 격차가 아니다"로 넘겼지만, **선�
 | R2-2 | gateway Seed 의 compose 배선 수치(15개 서비스 URI·depends_on) | `docker-compose.yml` 이 미커밋 상태라 미측정 |
 | R2-3 | R-3(order 미소비 발행 3종)·R-4(education Outbox 폴러) | 1회차 그대로 — 존치/제거는 결정 사항 |
 | R2-4 | R-5 Seed yaml 파싱 게이트화 | 미해결(수기 검증만 — 이번에도 38종 전건 파싱 확인) |
-| R2-5 | settlement `report` 슬라이스 | 여전히 어느 Seed 의 범위에도 없다 |
+| R2-5 | settlement `report` 슬라이스 | **해소 (2026-08-23)** — `settlement-service-report` Seed 신설. settlement 10슬라이스 전부 Seed 범위 안 |

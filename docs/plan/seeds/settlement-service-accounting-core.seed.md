@@ -13,7 +13,7 @@
 
 | 포함 | 제외 |
 |------|------|
-| settlement (생성·상태머신·수수료 스냅샷·홀드백·환불 조정) | chargeback · pgreconciliation · report · recon 내부 |
+| settlement (생성·상태머신·수수료 스냅샷·홀드백·환불 조정) | chargeback · pgreconciliation · recon 내부 · report(→ [settlement-service-report](settlement-service-report.seed.md)) |
 | payout (출금 상태머신) | integrity 스위트, search 인덱싱 내부 |
 | ledger (복식부기 전표) | |
 | 소비 6토픽 + 발행 2토픽 계약 표면 | |
