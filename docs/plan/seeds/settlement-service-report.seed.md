@@ -197,12 +197,13 @@
 | AC-11 | 불일치 시 체크별 Counter 가 증가한다 | `GenerateCashflowReportServiceTest` |
 | AC-12 | 셀러 스코프 조회가 대사를 건너뛴다 | `GenerateCashflowReportServiceTest` · `ReportControllerTest` |
 | AC-13 | PDF 가 `application/pdf` + `attachment` 로 나간다 | `ReportControllerPdfTest` · `CashflowPdfAdapterTest` |
-| AC-14 | ~~`/api/reports/**` 가 ADMIN·MANAGER 로 제한된다~~ | **게이트 없음 — KI-7** |
+| AC-14 | `/api/reports/**` 가 ADMIN·MANAGER 로 제한된다 | `SecurityAuthorizationMatrixTest` (shared-common) |
 | AC-15 | 모든 인바운드 포트가 어댑터에서 도달 가능하다 | `InboundPortReachabilityTest` (ArchUnit) |
 | AC-16 | 커버리지 LINE >= 90% | `./gradlew :settlement-service:jacocoTestCoverageVerification` |
 
-> AC-14 는 **의도적으로 미충족 상태로 남긴다**. 규칙은 `SecurityConfig` 에 선언돼 있으나
-> 그것을 어서트하는 테스트가 없다(KI-7). 없는 게이트를 있는 것처럼 적지 않는다.
+> AC-14 는 이 Seed 를 쓸 당시 **게이트가 없어 UNMET 이었다**(KI-7). 2026-08-23 에
+> `SecurityAuthorizationMatrixTest` 를 세워 닫았다 — 실제 `springSecurityFilterChain` 에 요청을 흘려
+> 상태코드로 판정을 읽는 방식이라 **매처 삭제와 순서 변경을 모두** 잡는다.
 
 **테스트 자산**: 13개 클래스 — 도메인 7(`ReportPeriodTest`·`SalesComparisonTest`·`SalesBreakdownTest`·
 `CashflowTotalsTest`·`CashflowReportTest`·`CashflowReconciliationTest`·`BucketGranularityTest`) ·
@@ -244,12 +245,14 @@
   애플리케이션 계층에 없다.
   → `recorded-not-fixed` (구조 일관성 — 규칙을 늘릴지 결정 사항)
 
-- **KI-7 역할 제한에 회귀 가드가 없다.** `/api/reports/**` = ADMIN·MANAGER 는
-  `shared-common/.../SecurityConfig.java:250` 한 줄에만 있고, **이를 어서트하는 테스트가 리포트 쪽에도
-  shared-common 쪽에도 없다**(`ReportControllerTest`·`SalesStatsControllerTest`·`ReportControllerPdfTest`
-  모두 인가를 세우지 않는다). 그 한 줄이 지워지거나 매처 순서가 바뀌어도 **테스트는 전부 초록이다** —
-  셀러별 거래액과 이메일(KI-1)이 열리는 방향의 회귀인데 컴파일러도 테스트도 보지 못한다.
-  → `recorded-not-fixed` (게이트 공백 — AC-14 가 이것을 가리킨다)
+- **KI-7 역할 제한에 회귀 가드가 없다** — ✅ **해소 (2026-08-23)**. `/api/reports/**` = ADMIN·MANAGER 는
+  `shared-common/.../SecurityConfig.java:250` 한 줄에만 있고 이를 어서트하는 테스트가 없었다.
+  `shared-common/.../SecurityAuthorizationMatrixTest` 로 닫았다 — 실제 필터 체인에 요청을 흘려
+  미인증 401 · USER 403 · ADMIN/MANAGER 통과를 리포트 5경로에 대해 확인한다.
+  **RED 를 목격하고 세운 게이트다**: 매처 한 줄을 지우면 USER 가 403 이 아니라 **200** 을 받는다
+  (`anyRequest().authenticated()` 로 새는 실패 모드 그대로). 정적 grep 으로는 순서 변경을 볼 수 없어
+  판정을 직접 읽는 방식을 골랐다.
+  → `resolved`
 
 - **KI-6 `/sellers/{sellerId}/cashflow` 는 이름과 달리 셀러가 못 쓴다.** `/api/reports/**` 가
   ADMIN·MANAGER 이므로 이 경로는 **운영자가 특정 셀러를 들여다보는 용도**다. 셀러 자가 조회 경로는

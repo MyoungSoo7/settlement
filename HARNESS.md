@@ -249,6 +249,15 @@ settlement-copilot **플러그인 소유**라 플러그인 미설치 환경에 �
   `application.yml` 의 `app.kafka.topic.*` 만 보므로 **발행 전용 토픽**(구독 설정이 없어 yml 에 안 적힘)이
   카탈로그에서 통째로 샌다. 실제로 두 번 났다(insurance general_payout 2종 누락 · card statement 계약
   파일명을 옮겨 적어 실재하지 않는 토픽 등재). 발행 코드를 정본으로 카탈로그를 대조한다.
+- **인가 판정 게이트(2026-08-23 신설)** — `shared-common/src/test/.../jwt/SecurityAuthorizationMatrixTest`:
+  `SecurityConfig` 는 포괄 `/admin/**` 매처가 없고 경로를 하나씩 열거하는 방식이라 **빠뜨린 경로가 조용히
+  `anyRequest().authenticated()` 로 떨어진다** — 로그인만 하면 누구나 호출할 수 있다는 뜻이고, 그 사고는
+  이미 네 번 났다(쿠폰 생성으로 자기에게 100% 할인 발행 · VAN 진입점을 사용자 토큰으로 위조 · 포인트 콘솔 ·
+  보험 언더라이팅 승인). 네 건 다 **컴파일도 테스트도 통과한 채** 들어갔다. 기존 `SecurityConfigContextTest` 는
+  체인이 *빌드되는지*만 봐서 매처 삭제·순서 변경을 못 잡았다. 이 게이트는 실제 `springSecurityFilterChain` 에
+  요청을 흘려 **상태코드로 판정을 읽는다**(미인증 401 · 권한부족 403 · 통과 200) — 정적 grep 으로는 볼 수 없는
+  **매처 순서**까지 덮는 이유다. 커버 대상은 `/api/reports/**`(Seed `settlement-service-report` KI-7) ·
+  정산 계열 조회 · 위 누출 이력 4경로. 경로를 추가할 땐 `@ValueSource` 에 한 줄 더한다.
 - **SSE nginx 배선 게이트** — `scripts/harness/test/sse-nginx-gate.test.mjs`: 게이트웨이에 SSE 를 열고 nginx 를
   안 고치면 요청이 일반 `api` location 으로 떨어져 `proxy_buffering on` + `read_timeout 60s` 를 받는다 —
   실시간이 아니게 되고 유휴 연결이 60초에 끊긴다. 배선 누락을 빌드 시점에 잡는다(정본 `docs/sse.md`).
