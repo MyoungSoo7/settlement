@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "lemuel.insurance.policy_status_changed",
+  "description": "insurance-service → loan/investment. 계약 상태 전이(D7 허용 전이 7종)를 외부에 알린다. previousStatus 를 함께 싣는 이유: 소비자가 자기 스냅샷과 비교해 전이를 놓쳤는지 알 수 있어야 한다.",
+  "type": "object",
+  "properties": {
+    "policyNumber": {
+      "type": "string"
+    },
+    "fcId": {
+      "type": "string"
+    },
+    "previousStatus": {
+      "type": "string"
+    },
+    "newStatus": {
+      "type": "string"
+    },
+    "lapsedAt": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "policyNumber",
+    "fcId",
+    "previousStatus",
+    "newStatus"
+  ],
+  "additionalProperties": true
+}

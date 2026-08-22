@@ -523,7 +523,9 @@ DepositHold  : ACTIVE → PARTIALLY_CAPTURED → CAPTURED / EXPIRED / VOIDED / R
 - `lemuel.education.course_published` — 소비처 미배선인 데다 **폴러 미배선으로 Kafka 발행 자체가 되지 않는다**
   (`docs/plan/prd/education-service.md` G-1 · `outbox-poller-gate` KNOWN_UNWIRED)
 
-insurance·deposit 토픽은 아직 계약 스키마(testFixtures)에 편입되지 않았다.
+insurance 9종은 **계약 스키마·정본 샘플·프로듀서 계약 테스트까지 편입됐다**(2026-08-22, ADR 0024) —
+소비처만 아직 없다. 소비자가 생기면 컨슈머 계약 테스트를 붙이는 것으로 끝난다.
+deposit 토픽은 아직 계약 스키마(testFixtures)에 편입되지 않았다.
 역방향 예약: `lemuel.ops.order.failed` 는 operation 이 구독하지만 emit 지점 미배선(OpsSignalCategory 주석 참조).
 
 ---

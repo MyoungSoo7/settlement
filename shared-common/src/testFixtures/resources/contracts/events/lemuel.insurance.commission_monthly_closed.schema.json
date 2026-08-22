@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "lemuel.insurance.commission_monthly_closed",
+  "description": "insurance-service → settlement/account. FC 별 월 수수료 마감. 파티션 키는 closingId.",
+  "type": "object",
+  "properties": {
+    "closingId": {
+      "type": "string"
+    },
+    "fcId": {
+      "type": "string"
+    },
+    "closingMonth": {
+      "type": "string"
+    },
+    "totalPaidAmount": {
+      "type": "string",
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "installmentCount": {
+      "type": "integer"
+    }
+  },
+  "required": [
+    "closingId",
+    "fcId",
+    "closingMonth",
+    "totalPaidAmount",
+    "installmentCount"
+  ],
+  "additionalProperties": true
+}

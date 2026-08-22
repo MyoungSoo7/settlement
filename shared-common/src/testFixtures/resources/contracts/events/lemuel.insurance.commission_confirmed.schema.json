@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "lemuel.insurance.commission_confirmed",
+  "description": "insurance-service → settlement/account. 초년도 선지급 수수료 스케줄 확정(D4, 12회 분할). 스케줄 전체를 한 이벤트에 담는다 — 회차별로 쪼개면 소비자가 \"12개가 다 왔는가\"를 스스로 세야 한다.",
+  "type": "object",
+  "properties": {
+    "policyNumber": {
+      "type": "string"
+    },
+    "schedules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "commissionId": {
+            "type": "string"
+          },
+          "fcId": {
+            "type": "string"
+          },
+          "recipientType": {
+            "type": "string"
+          },
+          "installmentNo": {
+            "type": "integer"
+          },
+          "installmentAmount": {
+            "type": "string",
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+          },
+          "firstYearTotal": {
+            "type": "string",
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+          },
+          "dueDate": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "commissionId",
+          "fcId",
+          "installmentNo",
+          "installmentAmount",
+          "firstYearTotal"
+        ],
+        "additionalProperties": true
+      }
+    }
+  },
+  "required": [
+    "policyNumber",
+    "schedules"
+  ],
+  "additionalProperties": true
+}
