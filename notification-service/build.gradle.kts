@@ -3,10 +3,17 @@ plugins {
     id("io.spring.dependency-management") version "1.1.6"
     kotlin("jvm") version "2.0.21"
     kotlin("plugin.spring") version "2.0.21"
+    jacoco
 }
 
 group = "github.lms.lemuel"
 version = "0.1.0"
+
+// 커버리지 측정에서 뺄 것 — 부트스트랩 클래스뿐이다. 자바 모듈처럼 adapter 전체를 빼면
+// 이 서비스는 잴 코드가 domain 몇 개만 남아 게이트가 사실상 공전한다(이 모듈은 어댑터가 본체다).
+val coverageExclusions = listOf(
+    "**/NotificationServiceApplication*",
+)
 
 java {
     toolchain {
@@ -69,4 +76,43 @@ kotlin {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+    finalizedBy(tasks.named("jacocoTestReport"))
 }
+
+// 커버리지 게이트 — 자바 모듈(루트 build.gradle.kts LINE 0.90)과 같은 기준선.
+// 폴리글랏이라고 게이트가 없으면 "테스트는 있는데 얼마나 덮는지는 아무도 모르는" 상태가 된다.
+jacoco {
+    toolVersion = "0.8.12"
+}
+
+tasks.named<JacocoReport>("jacocoTestReport") {
+    dependsOn(tasks.named("test"))
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+    }
+    classDirectories.setFrom(classDirectories.files.map { dir ->
+        fileTree(dir) { exclude(coverageExclusions) }
+    })
+}
+
+tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
+    dependsOn(tasks.named("jacocoTestReport"))
+    classDirectories.setFrom(classDirectories.files.map { dir ->
+        fileTree(dir) { exclude(coverageExclusions) }
+    })
+    violationRules {
+        rule {
+            limit {
+                counter = "LINE"
+                minimum = "0.90".toBigDecimal()
+            }
+        }
+    }
+    doFirst {
+        val measured = classDirectories.asFileTree.matching { include("**/*.class") }.files.size
+        require(measured > 0) { "커버리지 측정 대상이 0개다 — 게이트가 공전한다." }
+    }
+}
+
+tasks.named("check") { dependsOn(tasks.named("jacocoTestCoverageVerification")) }
