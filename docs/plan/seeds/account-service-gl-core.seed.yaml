@@ -14,11 +14,11 @@ seed:
     included:
       - 전표(AccountEntry) 생성 규칙 — 구성적 균형·금액 정규화·팩토리 전용
       - 계정과목(GlAccount 14종)과 차/대 방향 고정
-      - 이벤트→분개 매핑 17토픽 (소비 전용, 발행 0)
+      - 이벤트→분개 매핑 27토픽 (소비 전용, 발행 0)
       - 멱등 3단 방어의 account 측 구현 (processed_events + 자연키 UNIQUE)
       - append-only 강제(트리거·CHECK)와 조회 표면(시산표·통제계정 대사)
     excluded:
-      - 수신 3종(정기예금·적금·퇴직연금) 도메인 상세 — 계정과목 경계 사실만 기재, 별도 Seed 대상
+      - 수신 3종(정기예금·적금·퇴직연금) 도메인 상세 — 계정과목 경계 사실만 기재. 정본은 account-service-banking-deposits Seed
       - 감사로그 파티셔닝 운영 절차 (마이그레이션 존재 사실만)
 
   constraints:
@@ -69,7 +69,7 @@ seed:
   event_contracts:
     publishes: []   # 소비 전용 — 발행 0 (invariants.consume_only)
     consumes:
-      count: 17
+      count: 27
       group: "lemuel-account (컨슈머별 CONSUMER_GROUP 상수)"
       mapping:
         - "settlement.created → settlementCreatedImmediate (AccountEntry.java:148)"
@@ -84,6 +84,8 @@ seed:
         - "loan.corporate_loan_disbursed → corporateLoanDisbursed"
         - "loan.secured_loan_disbursed / .secured_loan_repaid / .secured_loan_principal_repaid → 동명 팩토리 3종"
         - "investment.executed → investmentExecuted"
+        - "point.charged / .granted / .used / .restored / .expired / .revoked → 동명 팩토리 6종 (PointLedgerConsumer.java:85-90)"
+        - "giftcard.registered / .used / .restored / .expired → 동명 팩토리 4종 (GiftCardLedgerConsumer.java:79-86)"
 
   read_surface:
     source: adapter/in/web/AccountController.java:37,44,53,58,63,72,92

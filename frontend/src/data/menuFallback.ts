@@ -42,7 +42,7 @@ export const FALLBACK_MENUS: FallbackMenuNode[] = [
       { id: -21, name: '상품관리', path: '/product', icon: '📦', description: '상품 · 재고 관리', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       { id: -22, name: '정산관리', path: '/admin/settlement', icon: '💰', description: '정산 생성 · 확정', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       { id: -23, name: '정산조회', path: '/settlement/search', icon: '🔍', description: '정산 내역 조회', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
-      { id: -24, name: '지급관리', path: '/admin/payouts', icon: '🏦', description: '송금 실행 · 실패 처리', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN'] },
+      { id: -24, name: '지급관리', path: '/admin/settlement/payouts', icon: '🏦', description: '송금 실행 · 실패 처리', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN'] },
     ],
   },
   {
@@ -55,6 +55,12 @@ export const FALLBACK_MENUS: FallbackMenuNode[] = [
       { id: -104, name: 'PG 대사', path: '/admin/settlement/pg-reconciliation', icon: '🧾', description: 'PG 정산파일 업로드 · 차이 승인 · 마감', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       { id: -105, name: '차지백', path: '/admin/settlement/chargebacks', icon: '⚖️', description: '카드사 분쟁 수락 · 기각', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN'] },
       { id: -106, name: '회수 채권', path: '/admin/settlement/recoveries', icon: '🧲', description: '셀러별 미상계 잔액 · 상계 이력', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
+      // 차지백 · 회수 채권 다음 — 셋 다 "나간 돈을 되돌리는" 축이다. 환불(우리가 자발적으로
+      // 돌려줌) → 차지백(카드사가 강제로 회수) → 회수 채권(셀러에게서 되받음) 순으로 읽힌다.
+      { id: -117, name: '환불 운영', path: '/admin/settlement/refunds', icon: '↩️', description: '재시도 소진 건 · 결제별 환불 이력', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
+      // 예치금은 회수 채권 바로 뒤다 — 둘 다 셀러에게서 재원을 끌어오는 축이고, 상계 부족분이
+      // 회수 채권과 같은 종류의 미결 잔여물이라 나란히 읽힌다.
+      { id: -113, name: '예치금 운영', path: '/admin/settlement/deposits', icon: '🏧', description: '수기 입출금 · 선점 · 상계 · 부족분 해소', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN'] },
       { id: -107, name: '월마감', path: '/admin/settlement/monthly-closing', icon: '📆', description: '셀러 월 정산 마트 집계 · 재실행', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN'] },
       { id: -108, name: '세무', path: '/admin/settlement/tax', icon: '🧾', description: '스캔 리뷰 · 전표 전기 · 세금계산서', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       { id: -109, name: '수수료율', path: '/admin/settlement/commission-rates', icon: '⚖️', description: '셀러·등급 요율 정책 · 이력', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN'] },
@@ -71,7 +77,7 @@ export const FALLBACK_MENUS: FallbackMenuNode[] = [
     children: [
       { id: -31, name: '배송 관리', path: '/admin/shipping', icon: '🚚', description: '주문별 배송 생성 · 출고 · 상태 전이', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       // 서버가 /admin/shipping-policies/** 를 ADMIN 으로 막는다 — MANAGER 에게 보이면 죽은 링크다.
-      { id: -32, name: '배송비 정책', path: '/admin/shipping-policies', icon: '💵', description: '셀러 기본배송비 · 무료배송 임계', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN'] },
+      { id: -32, name: '배송비 정책', path: '/admin/shipping/policies', icon: '💵', description: '셀러 기본배송비 · 무료배송 임계', area: 'BACKOFFICE', type: 'ITEM', roles: ['ADMIN'] },
     ],
   },
   {
@@ -94,11 +100,17 @@ export const FALLBACK_MENUS: FallbackMenuNode[] = [
       { id: -66, name: '투자하기', path: '/admin/ceo/invest', icon: '💹', description: '재무점수 기반 투자', area: 'CEO', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       { id: -67, name: '투자 추천', path: '/admin/ceo/invest-recommend', icon: '🧭', description: '규칙 스크리닝 추천 종목', area: 'CEO', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       { id: -68, name: '대출관리', path: '/admin/ceo/loans', icon: '💸', description: '선정산 · 기업대출', area: 'CEO', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
+      // 담보 감시는 대출관리 바로 뒤 — 같은 서비스의 다른 상품군(담보대출)이고, 대출을 보러 온
+      // 자리에서 담보 상태로 이어지는 순서다.
+      { id: -115, name: '담보 감시', path: '/admin/ceo/collateral', icon: '🏚️', description: '재평가 · 마진콜 · 처분 · 대위변제', area: 'CEO', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       { id: -69, name: '대출 상품 안내', path: '/admin/ceo/loan-guide', icon: '📖', description: '개인신용 · 주택담보', area: 'CEO', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       { id: -70, name: '대출 심사·상환 안내', path: '/admin/ceo/loan-process', icon: '🧾', description: '심사 · 신용평가 · 상환', area: 'CEO', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       { id: -71, name: '대출기관 안내', path: '/admin/ceo/lender-guide', icon: '🏦', description: '은행 · 저축은행 · 캐피탈 · 대부업', area: 'CEO', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       { id: -72, name: '자산운용펀드 안내', path: '/admin/ceo/fund-guide', icon: '🧺', description: '부동산 · 주식 · 채권 펀드', area: 'CEO', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       { id: -73, name: '계정계 현황', path: '/admin/ceo/accounts', icon: '🧮', description: '집계 · 시산표 · 잔액', area: 'CEO', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
+      // 수신 상품은 계정계 현황 바로 뒤 — 같은 서비스(account)이고, 집계를 본 다음 그 집계를
+      // 만드는 개별 계약으로 내려가는 순서다.
+      { id: -118, name: '수신 상품', path: '/admin/ceo/banking', icon: '🏦', description: '정기예금 · 적금 · 퇴직연금', area: 'CEO', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
       { id: -74, name: '법인카드', path: '/admin/ceo/cards', icon: '💳', description: '카드계정 · 임직원 카드 한도', area: 'CEO', type: 'ITEM', roles: ['ADMIN', 'MANAGER'] },
     ],
   },
@@ -115,11 +127,17 @@ export const FALLBACK_MENUS: FallbackMenuNode[] = [
       { id: -85, name: '운영관리', path: '/admin/system/operation', icon: '🖥️', description: '인시던트 관제 콘솔', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
       { id: -88, name: '증빙 리뷰 큐', path: '/admin/system/proof-review', icon: '🧾', description: '증빙 OCR 리뷰 큐 (영수증·청약·담보·예치금)', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
       { id: -89, name: '게시판 관리', path: '/admin/system/boards', icon: '📋', description: '게시판 생성 · 스킨 · 권한 정책', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
-      { id: -90, name: '교육 관리', path: '/admin/education/courses', icon: '🎓', description: '교육 과정 · 강의 콘텐츠', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
+      { id: -90, name: '교육 관리', path: '/admin/system/education', icon: '🎓', description: '교육 과정 · 강의 콘텐츠', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
+      // 증빙 리뷰 큐 바로 뒤가 아니라 교육 뒤에 둔다 — 리뷰 큐는 '판정', 이쪽은 '발급'이라 성격이 다르다.
+      { id: -114, name: '상품설명서 교부', path: '/admin/system/insurance-disclosures', icon: '📜', description: '보험 상품설명서 미리보기 · 교부 증빙', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
+      // 보험 영업은 교부 바로 뒤 — 승인이 그 교부 증빙을 요구해 두 화면을 오가게 된다.
+      { id: -119, name: '보험 영업', path: '/admin/system/insurance-sales', icon: '📝', description: '가입설계 · 청약 · 승인 · 계약', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
       { id: -91, name: '포인트 운영', path: '/admin/system/points', icon: '🪙', description: '수기 지급 · 유효기간 소멸', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
       { id: -92, name: '기프트카드 운영', path: '/admin/system/gift-cards', icon: '🎁', description: '상품권 발행 · 유효기간 소멸', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
       { id: -93, name: '감사 로그', path: '/admin/system/audit-logs', icon: '🔎', description: '조작 이력 조회 (커머스 · 정산)', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
       { id: -94, name: '회원 관리', path: '/admin/system/members', icon: '👤', description: '회원 검색 · 승인 · 역할 변경', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
+      // 조직·멤버십은 회원 관리 바로 뒤 — 개인(회원)을 본 다음 그 사람이 속한 조직으로 이어진다.
+      { id: -116, name: '조직 · 멤버십', path: '/admin/system/organizations', icon: '🏢', description: '셀러/기업 조직 · 초대 · 역할', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
       { id: -95, name: '리뷰 관리', path: '/admin/system/reviews', icon: '⭐', description: '신고 리뷰 블라인드 · 해제', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
       { id: -96, name: '쿠폰 운영', path: '/admin/system/coupons', icon: '🎟️', description: '쿠폰 검색 · 중단/재개 · 사용 내역', area: 'SYSTEM', type: 'ITEM', roles: ['ADMIN'] },
     ],
@@ -135,6 +153,11 @@ export const FALLBACK_MENUS: FallbackMenuNode[] = [
   {
     // 대량주문 — 관리자 기능이 아니라 구매자가 자기 주문을 올리는 경로다(초안은 올린 사람만 본다).
     id: -11, name: '대량주문', path: '/order/bulk', icon: '📦', description: 'CSV 업로드 → 검증 → 실주문 전환',
+    area: 'SHOP', type: 'ITEM', roles: ['USER'],
+  },
+  {
+    // 나눠 결제 — 포인트·상품권 원장을 다 만들고도 쓸 화면이 없던 자리를 채운다.
+    id: -12, name: '나눠 결제', path: '/order/pay', icon: '💳', description: '포인트·상품권·카드 혼합 결제',
     area: 'SHOP', type: 'ITEM', roles: ['USER'],
   },
   {

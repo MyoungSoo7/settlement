@@ -30,6 +30,7 @@ public class OrderAdapter implements LoadOrderPort, UpdateOrderStatusPort, Cance
         Order order = getOrderUseCase.getOrderById(orderId);
         return new OrderInfo(
                 order.getId(),
+                order.getUserId(),
                 order.getAmount(),
                 order.getStatus().name()
         );

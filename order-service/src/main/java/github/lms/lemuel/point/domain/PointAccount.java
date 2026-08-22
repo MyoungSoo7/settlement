@@ -18,8 +18,14 @@ import java.time.OffsetDateTime;
  * 여러 애그리거트에 걸친 불변식이라 이 클래스 혼자 검증할 수 없다 — 응용 서비스가 로트 소비 계획과
  * 함께 원자적으로 갱신하고, 정기 대사가 사후 검증한다.
  *
- * <p>{@code locked} 는 Phase 2(입금대기 결제의 포인트 선점)까지 항상 0 이다. 컬럼과 불변식을
- * 처음부터 두는 이유는, 나중에 추가하면 CHECK 제약을 갈아엎어야 하기 때문이다.
+ * <p>{@code locked} 는 입금 대기 결제의 <b>선점</b>({@link PointHold})이 붙잡아 두는 몫이다.
+ * 이동 경로는 셋뿐이다 — {@link #hold}(가용→잠금) · {@link #captureHold}(잠금→소비) ·
+ * {@link #releaseHold}(잠금→가용).
+ *
+ * <p><b>현재 이 셋을 부르는 응용 경로는 없다</b>(도메인만 선행 구현). 텐더 결제가 가상계좌를
+ * 즉시 캡처하고 있어 입금 대기 창 자체가 없기 때문이다 — 그 창을 만드는 것이 다음 단계다.
+ * 따라서 실제 {@code locked} 는 아직 항상 0 이고, 3자 대조({@link PointLedgerHealth})의 비교축을
+ * {@code available} 에서 {@code total} 로 옮기는 작업도 그때 함께 간다.
  */
 public class PointAccount {
 
@@ -159,6 +165,71 @@ public class PointAccount {
         this.total = this.total.subtract(value);
         touch();
         enforceInvariant();
+    }
+
+    /**
+     * 입금 대기 결제를 위한 선점 — 가용에서 빼서 잠근다. <b>총액은 그대로다</b>(아직 쓴 것이 아니다).
+     *
+     * <p>{@link #use} 와 같은 상태 조건을 쓴다. 선점은 사용의 예약이므로, 지금 쓸 수 없는 계정이면
+     * 나중에 확정할 수도 없다 — 잠가 두기만 하고 못 쓰는 상태를 만들 이유가 없다.
+     *
+     * <p>가용 초과는 <b>사용자 입력 오류</b>({@link InsufficientPointException})다 — 주문자가
+     * 요청한 금액이지 시스템이 계산한 값이 아니다. 이미 잠긴 몫이 가용에서 빠져 있으므로,
+     * 같은 포인트를 두 주문이 함께 잠그는 일은 여기서 막힌다.
+     */
+    public void hold(BigDecimal amount) {
+        BigDecimal value = requirePoint(amount, "hold");
+        if (!status.allowsUse()) {
+            throw new InvalidPointStateException(
+                    "사용할 수 없는 계정 상태입니다: " + status, status.name(), "hold");
+        }
+        if (available.compareTo(value) < 0) {
+            throw new InsufficientPointException(
+                    "포인트 잔액 부족: 요청 " + value + ", 가용 " + available, value, available);
+        }
+        this.available = this.available.subtract(value);
+        this.locked = this.locked.add(value);
+        touch();
+        enforceInvariant();
+    }
+
+    /**
+     * 입금이 확인돼 잠근 몫을 실제로 쓴다 — 가용은 그대로, <b>총액이 준다</b>.
+     *
+     * <p>확정 금액은 선점 레코드에서 오므로 잠근 것을 넘을 수 없다. 넘는다면 선점과 잔고가
+     * 어긋났다는 뜻이라 입력 오류가 아니라 불변식 위반이다({@link #forfeit} 와 같은 판단).
+     */
+    public void captureHold(BigDecimal amount) {
+        BigDecimal value = requireLocked(amount, "captureHold", "확정액");
+        this.locked = this.locked.subtract(value);
+        this.total = this.total.subtract(value);
+        touch();
+        enforceInvariant();
+    }
+
+    /**
+     * 선점을 풀어 가용으로 되돌린다 — <b>총액은 그대로다</b>.
+     *
+     * <p>계정 상태를 묻지 않는다. 고객 재산을 돌려주는 방향이라 정지 계정에서도 막을 이유가 없고
+     * ({@link #restore} 와 같은 판단), 오히려 잠가 둔 채로 두는 쪽이 나쁘다.
+     */
+    public void releaseHold(BigDecimal amount) {
+        BigDecimal value = requireLocked(amount, "releaseHold", "해제액");
+        this.locked = this.locked.subtract(value);
+        this.available = this.available.add(value);
+        touch();
+        enforceInvariant();
+    }
+
+    /** 잠긴 잔고에서 빼는 두 경로의 공통 검증. 금액은 선점 레코드에서 오므로 초과는 불변식 위반이다. */
+    private BigDecimal requireLocked(BigDecimal amount, String operation, String label) {
+        BigDecimal value = requirePoint(amount, operation);
+        if (locked.compareTo(value) < 0) {
+            throw new PointInvariantViolationException(
+                    "불변식 위반: " + label + "(" + value + ")이 잠긴 잔고(" + locked
+                            + ")를 초과 — 선점과 잔고가 어긋났다");
+        }
+        return value;
     }
 
     /**

@@ -17,7 +17,7 @@ spring:
               # prefix 가 혼재한다: 거래/회원/인증계는 비-/api(/auth,/users,/orders,/payments,/coupons,
               # /reviews,/games,/categories,/memberships,/products), 상품/카테고리/태그/환불이력은 /api.
               predicates:
-                - Path=/auth/**,/users/**,/orders/**,/payments/**,/coupons/**,/reviews/**,/games/**,/categories/**,/memberships/**,/products/**,/api/products/**,/api/categories/**,/api/tags/**,/api/payments/**,/api/menus/**,/admin/categories/**,/admin/products/**,/admin/pg/**,/admin/menus/**,/admin/common-codes/**,/admin/rbac/**,/admin/settlement-projection/**,/admin/payment-expiry/**,/admin/stock-reclaim/**,/admin/seller-tiers/**,/admin/shipments/**,/admin/shipping-policies/**,/admin/option-catalog/**,/display-sections/**,/admin/display-sections/**,/api/points/**,/admin/points/**,/api/gift-cards/**,/api/bulk-orders/**,/admin/gift-cards/**,/admin/audit-logs/**,/admin/members/**,/admin/reviews/**,/admin/coupons/**
+                - Path=/auth/**,/users/**,/orders/**,/payments/**,/coupons/**,/reviews/**,/games/**,/categories/**,/memberships/**,/products/**,/api/products/**,/api/categories/**,/api/tags/**,/api/payments/**,/api/menus/**,/admin/categories/**,/admin/products/**,/admin/pg/**,/admin/menus/**,/admin/common-codes/**,/admin/rbac/**,/admin/settlement-projection/**,/admin/payment-expiry/**,/admin/stock-reclaim/**,/admin/seller-tiers/**,/admin/shipments/**,/admin/shipping-policies/**,/admin/option-catalog/**,/display-sections/**,/admin/display-sections/**,/api/points/**,/admin/points/**,/api/gift-cards/**,/api/bulk-orders/**,/admin/gift-cards/**,/admin/audit-logs/**,/admin/members/**,/admin/reviews/**,/admin/coupons/**,/admin/refunds/**
             - id: loan-service
               uri: ${LOAN_SERVICE_URI:http://localhost:8084}
               predicates:
@@ -65,9 +65,14 @@ spring:
                 - Path=/api/investment/**
             - id: account-service
               uri: ${ACCOUNT_SERVICE_URI:http://localhost:8102}
-              # 계정계 — 대출·투자·정산 GL 집계/시산표. shared-common JWT 체인이 인증 강제
+              # 계정계 — 대출·투자·정산 GL 집계/시산표. shared-common JWT 체인이 인증 강제.
+              # /api/banking/** 은 수신 상품 3종(정기예금·적금·퇴직연금)이다. 계약 주체가 가입자
+              # 본인이라 authenticated 로 열되, "기관이 돈을 인식·지급하는" 두 경로
+              # (운용수익 인식·수급 지급)만 SecurityConfig 가 ADMIN/MANAGER 로 막는다 —
+              # 가입자에게 열어두면 임의 증액이 되기 때문이다. account-service 는 제한 스캔이지만
+              # 배제 대상이 common.outbox.* 뿐이라 SecurityConfig 는 그대로 로드된다(무인증 노출 아님).
               predicates:
-                - Path=/api/account/**
+                - Path=/api/account/**,/api/banking/**
             - id: organization-service
               uri: ${ORGANIZATION_SERVICE_URI:http://localhost:8104}
               # 조직관리 — 셀러/기업 조직·멤버십·역할. shared-common JWT 체인이 인증 강제
@@ -98,7 +103,7 @@ spring:
               predicates:
                 - Path=/api/boards/**,/admin/boards/**
             - id: education-service
-              uri: ${EDUCATION_SERVICE_URI:http://localhost:8115}
+              uri: ${EDUCATION_SERVICE_URI:http://localhost:8116}
               predicates:
                 - Path=/admin/education/**
             - id: settlement-service

@@ -40,12 +40,53 @@ class PaymentExpiryProcessorTest {
     @Mock LoadPaymentPort loadPaymentPort;
     @Mock SavePaymentPort savePaymentPort;
     @Mock CancelUnpaidOrderPort cancelUnpaidOrderPort;
+    @Mock github.lms.lemuel.payment.application.port.out.PointTenderPort pointTenderPort;
     @InjectMocks PaymentExpiryProcessor processor;
 
     private PaymentDomain pending(Long id, PaymentStatus status) {
         LocalDateTime created = LocalDateTime.of(2026, 8, 1, 9, 0);
         return PaymentDomain.rehydrate(id, 7000L, new BigDecimal("25000"), BigDecimal.ZERO,
                 status, "VIRTUAL_ACCOUNT", null, null, created, created);
+    }
+
+    /** 가상계좌 + 포인트 선점이 걸린 입금 대기 결제. */
+    private PaymentDomain pendingWithHeldPoint(Long id) {
+        LocalDateTime created = LocalDateTime.of(2026, 8, 1, 9, 0);
+        PaymentDomain payment = pending(id, PaymentStatus.READY);
+        payment.replaceTenders(java.util.List.of(
+                github.lms.lemuel.payment.domain.PaymentTender.rehydrate(
+                        901L, id, github.lms.lemuel.payment.domain.TenderType.VIRTUAL_ACCOUNT,
+                        new BigDecimal("20000"), BigDecimal.ZERO, "VA-1",
+                        github.lms.lemuel.payment.domain.TenderStatus.AUTHORIZED, 1, created, created),
+                github.lms.lemuel.payment.domain.PaymentTender.rehydrate(
+                        902L, id, github.lms.lemuel.payment.domain.TenderType.POINT,
+                        new BigDecimal("5000"), BigDecimal.ZERO, null,
+                        github.lms.lemuel.payment.domain.TenderStatus.AUTHORIZED, 2, created, created)));
+        return payment;
+    }
+
+    /**
+     * 선점을 풀지 않고 만료시키면 고객 포인트가 <b>영영 잠긴다</b> — 주문은 취소돼 사라지고,
+     * 그 주문을 근거로 잠긴 잔고를 풀어 줄 사람이 아무도 없다.
+     */
+    @Test @DisplayName("만료 시 포인트 선점을 함께 푼다 — 사유는 기한 경과")
+    void releasesPointHoldOnExpiry() {
+        when(loadPaymentPort.loadByIdForUpdate(5L)).thenReturn(Optional.of(pendingWithHeldPoint(5L)));
+        when(cancelUnpaidOrderPort.cancelUnpaidOrder(anyLong(), anyString())).thenReturn(true);
+
+        processor.expireAndCancelOrder(5L);
+
+        verify(pointTenderPort).releaseHold(902L, true);
+    }
+
+    @Test @DisplayName("포인트 텐더가 없으면 선점 해제를 부르지 않는다")
+    void noHoldToReleaseWhenNoPointTender() {
+        when(loadPaymentPort.loadByIdForUpdate(6L)).thenReturn(Optional.of(pending(6L, PaymentStatus.READY)));
+        when(cancelUnpaidOrderPort.cancelUnpaidOrder(anyLong(), anyString())).thenReturn(true);
+
+        processor.expireAndCancelOrder(6L);
+
+        verify(pointTenderPort, never()).releaseHold(anyLong(), org.mockito.ArgumentMatchers.anyBoolean());
     }
 
     @Test @DisplayName("결제를 EXPIRED 로 저장하고 주문을 취소한다")

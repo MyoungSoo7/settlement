@@ -8,7 +8,7 @@
 > | --------- | ------------------------------------------------------------------------------------------- |
 > | 대상 범위 | `card-service`(8106, mgmt 8107, DB `lemuel_card`) 전체 — Phase 1(발급·한도) + Phase 2(승인·매입·명세서·지출관리) |
 > | 역산 기준 | 2026-08-13 `develop` 브랜치                                                                 |
-> | 근거      | 도메인 21개 클래스, 진입 어댑터 8종, 유스케이스 서비스 21개, Kafka 컨슈머 6종, 스케줄러 4종, Flyway V2~V9, 테스트 45개 클래스 |
+> | 근거      | 도메인 26개 클래스, 진입 어댑터 8종, 유스케이스 서비스 23개, Kafka 컨슈머 7종(구독 6토픽), 발행 8토픽, 스케줄러 4종, Flyway 10개(V2~V20260822010000), 테스트 60개 클래스 |
 > | 범위 밖   | 카드 실물 발급·VAN 실연동·회계 전표(account-service GL) — §2.2                              |
 > | 관련 문서 | [`../../../SPEC.md`](../../../SPEC.md) §3.14 · `card-service-rules` 스킬(강제 규칙 정본) · ADR 0022·0030 |
 
@@ -224,6 +224,11 @@ masterLimit = floor(F × R × H)             (원 단위 FLOOR — 반올림으�
 | `/api/cards/**` (8개)       | gateway 라우팅 O             | `authenticated()` + 서비스 내 소유권·역할 판정 |
 | `/van/v1/**` (4개)          | gateway 라우팅 **X**(내부망) | `authenticated()` — §12-B 참조                 |
 | `/internal/api/v1/**` (4개) | gateway 라우팅 **X**         | `permitAll` + `InternalApiKeyFilter`           |
+| `/admin/expense-receipts` (2개) | gateway 라우팅 O         | `/admin/**` ADMIN 게이트 — 영수증 리뷰 큐(ADR 0036) |
+
+`/admin/expense-receipts` 는 OCR 판정이 `NEEDS_REVIEW` 로 흘린 영수증을 사람이 종결하는 큐다 —
+`GET /` 로 큐를 읽고 `POST /{receiptId}/review` 로 판정한다. **OCR 은 사람의 판단을 대체하지 않는다**는
+ADR 0036 무폴백 설계의 사람 쪽 절반이며, 이 경로가 없으면 저신뢰 추출 건이 갈 곳을 잃는다.
 
 ### 9.2 이벤트
 

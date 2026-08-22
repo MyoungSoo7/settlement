@@ -708,8 +708,25 @@ function emitReport(violations, io = {}) {
   return 1;
 }
 
+/**
+ * 저장소 루트 — **cwd 가 아니라 이 스크립트의 위치에서** 도출한다.
+ *
+ * 훅은 셸의 cwd 를 물려받는다(`$CLAUDE_PROJECT_DIR` 은 스크립트 경로만 정한다). Bash 도구의
+ * cwd 가 하위 디렉터리에 남아 있는 채로 가드가 돌면 repoRoot 가 그 하위 디렉터리가 되어 둘이
+ * 깨진다: ① 정상 저장소 경로가 `normalizeRepoPath` 에서 "outside repository" 로 차단되고(정상
+ * 편집이 exit 2), ② 텔레메트리가 `frontend/src/.claude/harness/logs/` 같은 평행 트리에 쌓여
+ * 분모에서 빠진다(실측 29회 유실, 2026-08-19~21).
+ *
+ * guard.mjs 는 항상 `<repo>/scripts/harness/` 에 있으므로 스크립트 위치에서 두 단계 올라가면
+ * cwd 와 무관하게 정확하다. 워크트리에서도 그 워크트리의 루트가 잡힌다 — 남의 체크아웃을
+ * 검사하지 않는다는 뜻이라 이쪽이 오히려 옳다.
+ */
+export function defaultRepoRoot() {
+  return resolve(fileURLToPath(new URL('../..', import.meta.url)));
+}
+
 export async function runGuardCli(args, io = {}) {
-  const repoRoot = io.repoRoot ?? process.cwd();
+  const repoRoot = io.repoRoot ?? defaultRepoRoot();
   const stderr = io.stderr ?? ((message) => console.error(message));
   const modes = ['--staged', '--list', '--deleted-list', '--files', '--hook', '--hook-bash', '--self-test'].filter((mode) => args.includes(mode));
   if (modes.length !== 1) { stderr('exactly one guard mode is required'); return 2; }

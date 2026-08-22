@@ -33,7 +33,14 @@ COPY board-service/build.gradle.kts ./board-service/
 COPY education-service/build.gradle.kts ./education-service/
 COPY gateway-service/build.gradle.kts ./gateway-service/
 
-RUN --mount=type=cache,target=/home/gradle/.gradle \
+# 캐시 id 를 모듈별로 가른다(id=gradle-${MODULE}).
+#
+# 이유: id 를 생략하면 BuildKit 이 target 경로로 캐시 ID 를 만들어 19개 모듈이 같은
+# /home/gradle/.gradle 를 sharing=shared 로 동시에 쓴다. Gradle user home 은 동시 접근에
+# 안전하지 않아 `docker compose build`(= 전 모듈 동시 빌드) 가 journal-1.lock 타임아웃으로
+# 무더기 실패한다. CI 는 모듈을 따로 빌드해서 이 결함이 드러나지 않았다 — 실측으로 잡았다.
+# 아래 bootJar 스텝도 같은 이유로 동일하게 갈라야 한다(둘 중 하나만 고치면 여전히 깨진다).
+RUN --mount=type=cache,id=gradle-${MODULE},target=/home/gradle/.gradle \
     gradle --no-daemon :${MODULE}:dependencies || true
 
 # 전체 소스 복사
@@ -58,7 +65,7 @@ COPY board-service ./board-service
 COPY education-service ./education-service
 COPY gateway-service ./gateway-service
 
-RUN --mount=type=cache,target=/home/gradle/.gradle \
+RUN --mount=type=cache,id=gradle-${MODULE},target=/home/gradle/.gradle \
     gradle --no-daemon :${MODULE}:bootJar -x test
 
 # bootJar 결과를 고정 경로로 복사 (Spring Boot 가 만드는 *-plain.jar 는 제외)

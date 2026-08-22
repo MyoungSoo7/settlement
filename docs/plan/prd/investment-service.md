@@ -8,7 +8,7 @@
 > | --------- | ---------------------------------------------------------------------------------------- |
 > | 대상 범위 | `investment-service`(8100, DB `lemuel_investment`) 전체 — 투자점수·등급·투자주문·재원  |
 > | 역산 기준 | 2026-08-13 `develop` 브랜치                                                            |
-> | 근거      | 도메인 점수·등급·주문 애그리거트, 발행 1토픽·소비 1토픽, 테스트 20+ 클래스              |
+> | 근거      | 도메인 31개 클래스(점수·등급·주문 애그리거트), 발행 1토픽·소비 1토픽, Flyway 12개, 테스트 52개 클래스 |
 > | 범위 밖   | 실제 증권 체결(모의) · 종목 추천 스크리닝 내부 · 재무/시세 원천(각 서비스 소관)         |
 > | 관련 문서 | [`../../../SPEC.md`](../../../SPEC.md) · `investment-domain-rules` 스킬 · [`investment-service-scoring-order.seed.yaml`](../seeds/investment-service-scoring-order.seed.yaml) |
 
@@ -149,6 +149,14 @@ investment-service 는 **재무 기반 점수로 판단 근거를 만들고, 확
 | POST | `/api/investments/orders/{id}/execute` | 집행 |
 | POST | `/api/investments/orders/{id}/cancel` | 취소 |
 | GET | `/api/investments/...` | 점수·등급·주문 조회(소유권 대조) |
+| POST | `/api/investment/recommendations/screen` | **추천 스크리닝 수동 트리거(ADMIN)** — 크론과 동일한 판정 경로를 즉석 실행(운영·배포 직후 즉시 채우기용). 상태를 바꾸는 운영 액션이라 일반 조회와 분리했다 |
+
+> `screen` 은 `date` 미지정이면 크론과 같은 경로로 돈다 — **추천일은 실행일이 아니라 시세 기준일**이다.
+> 실행일로 세트를 만들면 크론이 그 날짜를 최신으로 오인해 이후 실행을 통째로 건너뛴다. `date` 명시는
+> 백필·데이터 정정 때만.
+>
+> 경로가 `/api/investment/`(단수)로 주문 계열 `/api/investments/`(복수)와 다르다 — 오타처럼 보이지만
+> 현행 코드가 그렇다. 바꾸면 이미 배포된 호출자가 깨지므로 as-is 로 기록한다.
 
 ### 9.2 이벤트
 

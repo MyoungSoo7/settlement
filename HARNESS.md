@@ -29,7 +29,7 @@
 │   ├── gl-ledger-auditor.md           # 계정계 GL 복식부기·시산표·분개 매핑 정합 감사 (account + ledger)
 │   └── event-contract-reviewer.md     # cross-service 이벤트 계약 드리프트·Outbox·멱등 검토 (ADR 0024)
 ├── skills/                            # 온디맨드 절차적 지식 (SKILL.md)
-│   ├── {서비스}-rules/                # 16서비스 전체 강제 도메인 규칙 (아래 참조)
+│   ├── {서비스}-rules/                # 17종 — 18서비스 중 education 만 미보유 (아래 참조)
 │   ├── money-safety · ledger-invariants · idempotency-and-events   # 횡단 규칙
 │   ├── recon-playbook · incident-runbooks · compliance-review      # 운영/리뷰
 │   ├── delta-review                                                # diff 위험축 트리아지(어디를 먼저 볼지) — 리뷰 진입 기준
@@ -73,11 +73,14 @@ scripts/harness/                       # ★ 실행 코어 — 저장소 추적,
 `order-commerce` · `settlement-domain` · `loan-domain` · `investment-domain` · `account-domain` ·
 `financial-data` · `economics-data` · `market-quotes` · `company-news` · `commondata-connector` ·
 `operation-signal` · `ai-chat` · `card-service` · `insurance-domain` · `deposit-domain` · `organization-domain` ·
-`board-domain` — 각 서비스 로직 작성·수정·리뷰 시 해당 `*-rules` 스킬이 강제 규칙(상태머신·정책·경계)을 로드.
+`board-domain` — **17종**. 각 서비스 로직 작성·수정·리뷰 시 해당 `*-rules` 스킬이 강제 규칙(상태머신·정책·경계)을 로드.
 로드는 규율이 아니라 `skill-router.mjs` 가 편집 경로를 보고 **자동 주입**한다(아래 "강제 지점").
 
-> **커버리지 완결(2026-08-15)**: 18서비스 전부가 전용 `*-rules` 스킬 + 라우터 `ROUTES` 행을 갖는다
-> (둘은 같은 사실의 두 표현 — `skill-router.test.mjs` 가 회귀 방지). 마지막 3개의 해소 이력:
+> **커버리지 현황**: 2026-08-15 시점의 17서비스는 전부 전용 `*-rules` 스킬 + 라우터 `ROUTES` 행을 갖는다
+> (둘은 같은 사실의 두 표현 — `skill-router.test.mjs` 가 회귀 방지).
+> **미충족 1건 — `education-service`**: 그 뒤 추가된 18번째 서비스로, 전용 규칙 스킬도 라우터 행도 아직 없다
+> (현재 정본은 PRD `docs/plan/prd/education-service.md`). 즉 라우터가 커버하는 것은 **18개 중 17개**다.
+> 마지막 3개의 해소 이력:
 > 돈 경로 우선 부채였던 `insurance-domain-rules`(완전판매 게이트·25%룰·환수/12회 분할)·
 > `deposit-domain-rules`(잔고 단일 진실원·hold/offset 이중사용 차단), 그리고 후순위였던
 > `organization-domain-rules`(발행 전용 경계·활성 OWNER ≥1·card 프로젝션 계약 드리프트 3종).
@@ -179,8 +182,8 @@ settlement-copilot **플러그인 소유**라 플러그인 미설치 환경에 �
 `CMD-EVENT-PRODUCE`(lemuel.* 토픽 직접 produce — WARN 비차단). 의도적 실행은 `HARNESS_ALLOW_CMD=1` opt-in.
 이 계층은 fail-open(운반 수단 차단이라 입력 파싱 실패가 모든 Bash 를 멈추면 안 된다) — 우회 시도는 커밋·CI 가 내용 기준 재차단.
 
-**skill-router.mjs 라우트 표** (경로 → 주입 스킬, 세션당 스킬별 1회 · 최대 3개): 16개 서비스 디렉토리 전부 → 각 `{서비스}-rules`
-(위 "커버리지 완결" 참조)
+**skill-router.mjs 라우트 표** (경로 → 주입 스킬, 세션당 스킬별 1회 · 최대 3개): 17개 서비스 디렉토리 → 각 `{서비스}-rules`
+(education-service 만 미배선 — 위 "커버리지 현황" 참조)
 (settlement `ledger` 경로·account 는 `ledger-invariants` 동반) · `outbox/`·`adapter/in/kafka/`·`adapter/out/event/` →
 `idempotency-and-events` · settlement `readmodel|projection` → `projection-view-ops` · `contracts/events/` →
 `event-contract-change` · `.claude/hookify.*.local.md` → `hookify-to-guard` · 그 외 `src/{main,test}/` 첫 편집 → `tdd-discipline`.
@@ -219,6 +222,12 @@ settlement-copilot **플러그인 소유**라 플러그인 미설치 환경에 �
 
 - **ArchUnit** — 헥사고날 경계·서비스 간 의존 방향
 - **JaCoCo** — CI LINE 90% / 핵심 도메인 INSTRUCTION 80% (측정은 게이트 태스크가 정답)
+- **폴리글랏 커버리지 게이트(2026-08-22 신설)** — 자바와 같은 기준선(LINE/statement 90%)을 폴리글랏에도 건다.
+  Kotlin 2종은 JaCoCo(`check` → `jacocoTestCoverageVerification`), Go 2종은 `polyglot-ci.yml` 의
+  `go tool cover` 총계 판정(범위 `./internal/...` — `cmd/server` 부트스트랩은 자바의 `*Application*` 제외와 같은 이유로 제외),
+  Python 은 `pytest --cov=src --cov-fail-under=90`. **분모를 `src` 로 못박는 것이 요점이다** — 옵션 없이 재면
+  테스트가 import 한 파일만 세고, `--cov=.` 로 재면 100% 인 테스트 파일이 분모에 섞여 수치가 부풀려진다
+  (실측: forecast-service 가 `--cov=.` 93% / `--cov=src` 87%).
 - **이벤트 계약 테스트** — cross-service 토픽 스키마 드리프트 빌드 시점 차단 (ADR 0024). 계약 토픽 수는 여기 복제하지 않는다 —
   정본은 `shared-common/src/testFixtures/resources/contracts/events/` (`git ls-files 'shared-common/src/testFixtures/resources/contracts/events/*.schema.json' | wc -l`)
 - **돈 경로 가드(저장소 추적)** — `scripts/harness/guard.mjs`: 실시간 PreToolUse(exit 2 차단) + git pre-commit(`core.hooksPath`, `node scripts/harness/install-hooks.mjs`) 이중. 플러그인 독립 — BigDecimal·이력불변·MSA 경계·account 발행금지·market 밸류에이션 + **OO 구조(도메인 public setter·@Setter/@Data·금융 5서비스 generic IAE)** 위반 차단. `--no-verify` 우회 금지. copilot 플러그인 가드가 있으면 2차 레이어로 병존.
@@ -240,6 +249,33 @@ settlement-copilot **플러그인 소유**라 플러그인 미설치 환경에 �
   `application.yml` 의 `app.kafka.topic.*` 만 보므로 **발행 전용 토픽**(구독 설정이 없어 yml 에 안 적힘)이
   카탈로그에서 통째로 샌다. 실제로 두 번 났다(insurance general_payout 2종 누락 · card statement 계약
   파일명을 옮겨 적어 실재하지 않는 토픽 등재). 발행 코드를 정본으로 카탈로그를 대조한다.
+- **민감 경로 인가 출처 게이트(2026-08-23 신설)** — `scripts/harness/test/security-matcher-gate.test.mjs`:
+  위 인가 판정 게이트가 "선언된 규칙이 그대로 판정되는가"를 본다면, 이쪽은 **선언 자체가 있는가**를 본다 —
+  즉 *지워짐·순서*가 아니라 **애초에 안 쓴 것**을 잡는다. `/admin`·`/internal`·`/van` 엔드포인트에
+  인가 출처가 하나도 없으면 FAIL. 출처는 넷을 인정한다 — ① SecurityConfig 매처 ② `@PreAuthorize`
+  ③ 위성 `AdminApiKeyFilter` ④ **핸들러 내부 프로그래매틱 판정**(`requireAdmin(auth)` 또는 JWT 주체 파생 후
+  소유권 대조 = IDOR 가드). 그 외 정말 인증만으로 충분하면 사유와 함께 면제 등록.
+  나머지 두 규칙은 **부분 메서드 커버**(같은 경로에 역할 매처가 있는데 다른 메서드만 빠진 상태 — 쿠폰 생성이
+  이 형태였다: `GET /coupons` 는 `hasAnyRole`, `POST` 는 무매처라 조회가 막혀 "닫혀 있다"고 보였다)와
+  **결정 동작 무방비**(approve·reject·disburse·write-off 등 남의 개체 상태를 뒤집는 동작에 인가 출처가 0).
+  **과거 사고 4건을 전부 재현으로 검증했다** — 매처를 지우면 각각 FAIL 한다: 포인트 콘솔 10건 · VAN 4건 ·
+  쿠폰 생성 1건 · 보험 언더라이팅 3건.
+  검출기 자기검증 9건은 **만들며 실제로 밟은 버그**를 그대로 케이스로 남긴 것이다 — 특히
+  주석 제거 정규식이 `"/payments/*/refund"` 의 `/*` 를 주석 시작으로 먹어 **79개 매처 중 6개만 파싱하고도
+  조용히 통과**했다(→ 문자열 인식 스트리퍼 `scripts/harness/lib/java-source.mjs`), 서비스별 자체
+  SecurityConfig 를 안 보면 board·education 의 멀쩡한 19경로가 미보호로 뜨며, 핸들러 본문을 자를 때
+  `@PostMapping("/{id}/disburse")` 의 `{id}` 를 본문 시작으로 읽으면 `requireAdmin` 으로 막힌 대출 경로
+  20건이 미보호로 뜬다. `Authentication` 파라미터의 단순 존재는 신호로 치지 않는다 — 인정하면 12건이
+  실제 검사 없이 면제된다(실측).
+- **인가 판정 게이트(2026-08-23 신설)** — `shared-common/src/test/.../jwt/SecurityAuthorizationMatrixTest`:
+  `SecurityConfig` 는 포괄 `/admin/**` 매처가 없고 경로를 하나씩 열거하는 방식이라 **빠뜨린 경로가 조용히
+  `anyRequest().authenticated()` 로 떨어진다** — 로그인만 하면 누구나 호출할 수 있다는 뜻이고, 그 사고는
+  이미 네 번 났다(쿠폰 생성으로 자기에게 100% 할인 발행 · VAN 진입점을 사용자 토큰으로 위조 · 포인트 콘솔 ·
+  보험 언더라이팅 승인). 네 건 다 **컴파일도 테스트도 통과한 채** 들어갔다. 기존 `SecurityConfigContextTest` 는
+  체인이 *빌드되는지*만 봐서 매처 삭제·순서 변경을 못 잡았다. 이 게이트는 실제 `springSecurityFilterChain` 에
+  요청을 흘려 **상태코드로 판정을 읽는다**(미인증 401 · 권한부족 403 · 통과 200) — 정적 grep 으로는 볼 수 없는
+  **매처 순서**까지 덮는 이유다. 커버 대상은 `/api/reports/**`(Seed `settlement-service-report` KI-7) ·
+  정산 계열 조회 · 위 누출 이력 4경로. 경로를 추가할 땐 `@ValueSource` 에 한 줄 더한다.
 - **SSE nginx 배선 게이트** — `scripts/harness/test/sse-nginx-gate.test.mjs`: 게이트웨이에 SSE 를 열고 nginx 를
   안 고치면 요청이 일반 `api` location 으로 떨어져 `proxy_buffering on` + `read_timeout 60s` 를 받는다 —
   실시간이 아니게 되고 유휴 연결이 60초에 끊긴다. 배선 누락을 빌드 시점에 잡는다(정본 `docs/sse.md`).
@@ -282,10 +318,14 @@ settlement-copilot **플러그인 소유**라 플러그인 미설치 환경에 �
   드리프트를 막는 하네스 안에서 드리프트가 난다. 매처 자체도 자기검증 테스트로 판별력을 지킨다(도입 시 매처 버그 1건을 잡았다).
 - **SPA 폴백 게이트** — `scripts/harness/test/spa-fallback-gate.test.mjs`: 위 배선 게이트가 "API 가 닿는가"를
   본다면 이쪽은 **"화면 URL 이 새로고침에서 살아남는가"**를 본다. `/admin` 은 프론트 라우트와 백엔드 admin API 가
-  접두사를 공유하는 유일한 구간이라 nginx 가 폴백 allowlist(`^/admin(/(system|operation|ceo|settlement|login)…`)로
-  가르는데, 화면 URL 을 그 밖에 두면 **클릭 이동은 멀쩡하고 F5·북마크·새 탭에서만** 깨진다. 백엔드 라우트가 없으면
-  404, 있으면 화면 대신 **API JSON 이 브라우저에 렌더**된다. vite dev 에는 nginx 가 없어 개발에선 재현되지 않고,
-  이 불변식이 여태 `App.tsx` **주석에만** 있었던 탓에 라우트 5건이 그대로 새어 나갔다(2026-08-21 실측).
+  접두사를 공유하는 유일한 구간이라 nginx 가 폴백 allowlist(**네비 그룹 접두사** —
+  `^/admin(/(system|operation|ceo|settlement|shipping|approvals|login)…`)로 가르는데, 화면 URL 을 그 밖에 두면
+  **클릭 이동은 멀쩡하고 F5·북마크·새 탭에서만** 깨진다. 백엔드 라우트가 없으면 404, 있으면 화면 대신
+  **API JSON 이 브라우저에 렌더**된다. vite dev 에는 nginx 가 없어 개발에선 재현되지 않고,
+  이 불변식이 여태 `App.tsx` **주석에만** 있었던 탓에 라우트 5건이 그대로 새어 나갔다(2026-08-21 실측 → 같은 날 전건 수리:
+  그룹 등록 2건 `shipping`·`approvals`, URL 이동 3건 `payouts`→`settlement/payouts` ·
+  `shipping-policies`→`shipping/policies` · `education/courses`→`system/education` — 셋은 백엔드 API 와 URL 이 겹쳐
+  폴백 등록이 불가능했다. API 경로는 하나도 바뀌지 않았다).
   검사는 넷이다: ① nginx 두 벌의 폴백 정규식 동일 + **일반 프록시보다 먼저** 등장(정규식 location 은 등장 순서로
   매칭돼 순서가 규칙의 일부다) ② 폴백 접두사가 게이트웨이 `/admin` 라우트를 **가리지 않는지** — 이 방향이 없으면
   "폴백 목록에 한 줄 추가"라는 손쉬운 오답이 통과하는데, 그 한 줄은 이번엔 프론트가 그 API 를 못 부르게 만든다
@@ -392,4 +432,4 @@ node scripts/harness/harness-audit.mjs
 - `CLAUDE.md` — 에이전트 운용 규칙 / 아키텍처 경계·컨벤션
 - `SPEC.md` — 전체 기능명세(엔드포인트·도메인 규칙·이벤트 카탈로그)
 - `docs/PORTFOLIO.md` — 면접용 1장 요약 · `README.md` — 아키텍처 개요
-- `docs/adr/` — 아키텍처 결정 기록
+- `docs/plan/adr/` — 아키텍처 결정 기록

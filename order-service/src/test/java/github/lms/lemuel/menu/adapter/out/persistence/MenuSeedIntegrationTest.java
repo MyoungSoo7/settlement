@@ -79,13 +79,13 @@ class MenuSeedIntegrationTest {
     }
 
     @Test
-    @DisplayName("시드 총 60행 — 기존 54 + 셀러 등급 1 + 감사 로그 1 + 회원 관리 1 + 리뷰 관리 1 + 쿠폰 운영 1 + 대량주문 1")
-    void seedsExactlySixty() {
-        assertThat(adapter.findAll()).hasSize(60);
+    @DisplayName("시드 총 68행 — 기존 67 + 나눠 결제")
+    void seedsExactlySixtyEight() {
+        assertThat(adapter.findAll()).hasSize(68);
     }
 
     @Test
-    @DisplayName("최상위 11개가 상단 네비 순서대로 들어간다")
+    @DisplayName("최상위 12개가 상단 네비 순서대로 들어간다")
     void rootsInOrder() {
         List<Menu> roots = adapter.findAll().stream()
                 .filter(m -> m.getParentId() == null)
@@ -95,15 +95,29 @@ class MenuSeedIntegrationTest {
         assertThat(roots).extracting(Menu::getName).containsExactly(
                 "대시보드", "정산", "정산운영", "배송", "승인", "AI 도우미", "CEO", "시스템 관리",
                 // 대량주문은 관리자 기능이 아니라 구매자가 자기 주문을 올리는 경로다 — SHOP 최상위.
-                "주문하기", "추천받기", "대량주문", "내 포인트·상품권");
+                // 나눠 결제는 주문(20)과 잔액 확인(30) 사이 — 주문에서 결제로 이어지는 순서다.
+                "주문하기", "추천받기", "대량주문", "나눠 결제", "내 포인트·상품권");
     }
 
     @Test
     @DisplayName("정산운영 그룹은 운영 화면만 담는다 — 정산 그룹과 섞이지 않는다")
     void settlementOpsChildren() {
+        // 예치금 운영은 회수 채권 바로 뒤다 — 둘 다 셀러에게서 재원을 끌어오는 축이고,
+        // 상계 부족분이 회수 채권과 같은 종류의 미결 잔여물이다(V20260821233000).
+        // 환불 운영은 회수 채권 뒤 — 환불·차지백·회수 채권 셋 다 "나간 돈을 되돌리는" 축이다
+        // (V20260822004000). 예치금 마이그레이션이 먼저 심어졌으므로 환불이 그 앞으로 들어간다.
         assertThat(childrenOf("정산운영")).extracting(Menu::getName)
                 .containsExactly("정합성 검증", "매출 통계", "일일 대사", "PG 대사", "차지백", "회수 채권",
-                        "월마감", "세무", "수수료율", "셀러 등급", "DLQ 재처리", "원장·시산표");
+                        "환불 운영", "예치금 운영", "월마감", "세무", "수수료율", "셀러 등급",
+                        "DLQ 재처리", "원장·시산표");
+        // 환불은 ADMIN·MANAGER — 서버가 /admin/refunds/** 를 그 등급으로 막는다(조회 전용 표면)
+        assertThat(childrenOf("정산운영").stream()
+                .filter(m -> m.getName().equals("환불 운영")).findFirst().orElseThrow().allowedRoles())
+                .containsExactlyInAnyOrder("ADMIN", "MANAGER");
+        // 예치금은 ADMIN 전용 — 서버가 /admin/deposits/** 를 hasRole("ADMIN") 으로 잠근다(잔고를 움직인다)
+        assertThat(childrenOf("정산운영").stream()
+                .filter(m -> m.getName().equals("예치금 운영")).findFirst().orElseThrow().allowedRoles())
+                .containsExactly("ADMIN");
         // 매출 통계는 ADMIN·MANAGER — 서버가 /api/reports/** 를 그 등급으로 막는다(읽기 전용 집계)
         assertThat(childrenOf("정산운영").stream()
                 .filter(m -> m.getName().equals("매출 통계")).findFirst().orElseThrow().allowedRoles())
@@ -132,7 +146,9 @@ class MenuSeedIntegrationTest {
         assertThat(children).extracting(Menu::getName)
                 .containsExactly("상품관리", "정산관리", "정산조회", "지급관리");
         assertThat(children).extracting(Menu::getPath)
-                .containsExactly("/product", "/admin/settlement", "/settlement/search", "/admin/payouts");
+                // 지급 콘솔은 /admin/payouts 였다 — nginx SPA 폴백 밖이라 새로고침이 깨져 옮겼다
+                // (V20260821230000). API 경로 /admin/payouts/** 는 그대로다.
+                .containsExactly("/product", "/admin/settlement", "/settlement/search", "/admin/settlement/payouts");
         assertThat(children.get(3).allowedRoles()).containsExactly("ADMIN");
         assertThat(children.get(0).allowedRoles()).containsExactlyInAnyOrder("ADMIN", "MANAGER");
     }
@@ -145,36 +161,46 @@ class MenuSeedIntegrationTest {
         assertThat(byName().get("배송").getType()).isEqualTo(MenuType.GROUP);
         assertThat(children).extracting(Menu::getName).containsExactly("배송 관리", "배송비 정책");
         assertThat(children).extracting(Menu::getPath)
-                .containsExactly("/admin/shipping", "/admin/shipping-policies");
+                // 화면 URL 은 /admin/shipping/policies — 배송 그룹 아래다. API 는 /admin/shipping-policies/**
+                // 로 그대로이며, 화면이 그 URL 을 쓰면 새로고침 때 API 응답이 렌더된다(V20260821230000).
+                .containsExactly("/admin/shipping", "/admin/shipping/policies");
         // 서버가 /admin/shipping-policies/** 를 ADMIN 으로 막는다 — MANAGER 에게 보이면 죽은 링크다.
         assertThat(children.get(1).allowedRoles()).containsExactly("ADMIN");
         assertThat(children.get(0).allowedRoles()).containsExactlyInAnyOrder("ADMIN", "MANAGER");
     }
 
     @Test
-    @DisplayName("CEO 사이드바 14개가 순서대로 들어간다")
+    @DisplayName("CEO 사이드바 16개가 순서대로 들어간다")
     void ceoChildren() {
+        // 담보 감시는 대출관리 뒤 — 같은 서비스의 다른 상품군이고, 대출을 보러 온 자리에서
+        // 담보 상태로 이어지는 순서다(V20260822001500).
+        // 수신 상품은 계정계 현황 뒤 — 집계를 본 다음 개별 계약으로 내려간다(V20260822010000).
         assertThat(childrenOf("CEO")).extracting(Menu::getName).containsExactly(
                 "통합 브리핑", "경제지표", "재무제표", "기업조회", "사업장비교",
-                "투자하기", "투자 추천", "대출관리", "대출 상품 안내", "대출 심사·상환 안내",
-                "대출기관 안내", "자산운용펀드 안내", "계정계 현황", "법인카드");
+                "투자하기", "투자 추천", "대출관리", "담보 감시", "대출 상품 안내", "대출 심사·상환 안내",
+                "대출기관 안내", "자산운용펀드 안내", "계정계 현황", "수신 상품", "법인카드");
     }
 
     @Test
-    @DisplayName("시스템 사이드바 16개 — 앞 3개와 게시판 관리가 RBAC permission 과 짝지어진다")
+    @DisplayName("시스템 사이드바 19개 — 앞 3개와 게시판 관리가 RBAC permission 과 짝지어진다")
     void systemChildren() {
         List<Menu> children = childrenOf("시스템 관리");
 
         // 분류(카테고리) → 편성(진열) → 선택지(옵션) → 관제(운영) 순. 뒤에 붙는 화면마다
         // 운영관리의 sort_order 를 한 칸씩 밀어 이 순서를 유지한다.
+        // 상품설명서 교부는 교육 관리 뒤 — 리뷰 큐는 '판정', 이쪽은 '발급'이라 성격이 다르다
+        // (V20260822000500). 완전판매 게이트의 입력 경로가 API 뿐이던 것을 화면으로 연다.
         assertThat(children).extracting(Menu::getName).containsExactly(
                 "메뉴 관리", "공통코드 관리", "RBAC 관리", "이커머스 카테고리",
                 "진열 편성", "옵션 카탈로그", "운영관리", "증빙 리뷰 큐", "게시판 관리", "교육 관리",
-                "포인트 운영", "기프트카드 운영", "감사 로그", "회원 관리", "리뷰 관리", "쿠폰 운영");
+                // 보험 영업은 교부 뒤 — 승인이 그 교부 증빙을 요구한다(V20260822012000).
+                "상품설명서 교부", "보험 영업",
+                "포인트 운영", "기프트카드 운영", "감사 로그", "회원 관리", "조직 · 멤버십",
+                "리뷰 관리", "쿠폰 운영");
         assertThat(children).extracting(Menu::getRequiredPermission).containsExactly(
                 "SYSTEM_MENU_MANAGE", "SYSTEM_CODE_MANAGE", "SYSTEM_RBAC_MANAGE",
-                null, null, null, null, null, "SYSTEM_BOARD_MANAGE", null, null, null,
-                null, null, null, null);
+                null, null, null, null, null, "SYSTEM_BOARD_MANAGE", null, null, null, null,
+                null, null, null, null, null, null);
     }
 
     @Test
@@ -229,7 +255,7 @@ class MenuSeedIntegrationTest {
     }
 
     @Test
-    @DisplayName("구매자 메뉴 4개는 USER 에게만 보인다 — 관리자 네비에는 주문/추천/대량주문/잔액이 없었다")
+    @DisplayName("구매자 메뉴 5개는 USER 에게만 보인다 — 관리자 네비에는 주문/추천/대량주문/결제/잔액이 없었다")
     void shopMenusAreUserOnly() {
         Set<String> shopNames = adapter.findAll().stream()
                 .filter(m -> m.getArea() == MenuArea.SHOP)
@@ -237,7 +263,7 @@ class MenuSeedIntegrationTest {
                 .collect(Collectors.toSet());
 
         assertThat(shopNames)
-                .containsExactlyInAnyOrder("주문하기", "추천받기", "대량주문", "내 포인트·상품권");
+                .containsExactlyInAnyOrder("주문하기", "추천받기", "대량주문", "나눠 결제", "내 포인트·상품권");
         assertThat(adapter.findAll()).filteredOn(m -> m.getArea() == MenuArea.SHOP)
                 .allSatisfy(m -> assertThat(m.allowedRoles()).containsExactly("USER"));
     }

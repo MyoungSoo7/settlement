@@ -4,8 +4,12 @@ import PayoutAdminPage from '@/pages/PayoutAdminPage';
 import { ToastProvider } from '@/contexts/ToastContext';
 import { payoutApi, type Payout } from '@/api/payout';
 import { settlementApi } from '@/api/settlement';
+import { sellerBankAccountApi } from '@/api/sellerBankAccount';
 
 vi.mock('@/api/settlement', () => ({ settlementApi: { holdbackPreview: vi.fn() } }));
+vi.mock('@/api/sellerBankAccount', () => ({
+  sellerBankAccountApi: { mine: vi.fn(), saveMine: vi.fn(), of: vi.fn(), save: vi.fn() },
+}));
 
 vi.mock('@/api/payout', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/api/payout')>();
@@ -227,6 +231,80 @@ describe('PayoutAdminPage', () => {
 
       await waitFor(() =>
         expect(screen.getByText('이 날짜에 풀릴 홀드백이 없습니다.')).toBeInTheDocument());
+    });
+  });
+
+  /**
+   * 계좌 미등록은 <b>실패로도 안 보인다</b> — payout 이 아예 만들어지지 않아 실패·대기 목록
+   * 어디에도 없다. 그래서 셀러 번호로 직접 조회하는 입구가 이 콘솔에 있다.
+   */
+  describe('셀러 지급 계좌', () => {
+    const account = {
+      sellerId: 7, bank: 'KB', account: '****1234', holder: '홍길동',
+      updatedAt: '2026-08-21T00:00:00Z',
+    };
+
+    const lookupSeller = async (id: string) => {
+      fireEvent.change(screen.getByLabelText('셀러 번호'), { target: { value: id } });
+      // 홀드백 패널에도 '조회' 버튼이 있다 — 이름이 겹치면 스크린리더에서 구분되지 않으므로
+      // 화면 쪽을 '계좌 조회'로 구분했다. 이 조회가 그 사실을 붙잡아 준다.
+      fireEvent.click(screen.getByRole('button', { name: '계좌 조회' }));
+    };
+
+    it('미등록 셀러는 "지금 지급되지 않고 있다"고 말한다', async () => {
+      vi.mocked(sellerBankAccountApi.of).mockResolvedValue(null);
+      renderPage();
+
+      await waitFor(() => expect(screen.getByTestId('seller-bank-account-panel')).toBeInTheDocument());
+      await lookupSeller('7');
+
+      await waitFor(() => expect(screen.getByTestId('sba-missing')).toBeInTheDocument());
+      expect(screen.getByTestId('sba-missing')).toHaveTextContent('지금 지급되지 않고 있습니다');
+    });
+
+    it('조회 후 셀러 번호를 바꾸면 앞선 결과를 버린다 — 엉뚱한 셀러 계좌를 덮어쓰지 않는다', async () => {
+      vi.mocked(sellerBankAccountApi.of).mockResolvedValue(account);
+      renderPage();
+
+      await waitFor(() => expect(screen.getByTestId('seller-bank-account-panel')).toBeInTheDocument());
+      await lookupSeller('7');
+      await waitFor(() => expect(screen.getByTestId('sba-current')).toBeInTheDocument());
+
+      // 조회는 7 로 해 놓고 입력칸만 9 로 바꾼 상황. 화면에 7 의 계좌가 남아 있으면
+      // 조작자는 7 을 고치는 줄 알고 저장하는데 실제로는 9 에 쓰인다.
+      fireEvent.change(screen.getByLabelText('셀러 번호'), { target: { value: '9' } });
+
+      expect(screen.queryByTestId('sba-result')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('sba-current')).not.toBeInTheDocument();
+    });
+
+    it('저장은 조회한 셀러를 대상으로 한다', async () => {
+      vi.mocked(sellerBankAccountApi.of).mockResolvedValue(null);
+      vi.mocked(sellerBankAccountApi.save).mockResolvedValue(account);
+      renderPage();
+
+      await waitFor(() => expect(screen.getByTestId('seller-bank-account-panel')).toBeInTheDocument());
+      await lookupSeller('7');
+      await waitFor(() => expect(screen.getByTestId('sba-result')).toBeInTheDocument());
+
+      fireEvent.change(screen.getByLabelText('은행'), { target: { value: 'KB' } });
+      fireEvent.change(screen.getByLabelText('예금주'), { target: { value: '홍길동' } });
+      fireEvent.change(screen.getByLabelText('계좌번호'), { target: { value: '110123456789' } });
+      fireEvent.change(screen.getByLabelText('계좌번호 확인'), { target: { value: '110123456789' } });
+      fireEvent.click(screen.getByRole('button', { name: '계좌 등록' }));
+
+      await waitFor(() => expect(sellerBankAccountApi.save).toHaveBeenCalledWith(7, {
+        bankCode: 'KB', accountNumber: '110123456789', accountHolder: '홍길동',
+      }));
+    });
+
+    it('조회 전에는 입력 폼이 없다 — 대상 없이 계좌를 쓸 수 있으면 안 된다', async () => {
+      renderPage();
+
+      await waitFor(() => expect(screen.getByTestId('seller-bank-account-panel')).toBeInTheDocument());
+
+      expect(screen.queryByTestId('sba-result')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('계좌번호')).not.toBeInTheDocument();
     });
   });
 });

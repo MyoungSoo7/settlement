@@ -38,8 +38,12 @@ public class GeminiReceiptOcrAdapter implements ExtractReceiptFieldsPort {
               "merchantName": "상호명",
               "transactionDate": "거래일(YYYY-MM-DD)",
               "totalAmount": "결제 총액(숫자만)",
-              "confidence": "판독 신뢰도 0~1"
+              "amountConfidence": "총액 판독 신뢰도 0~1",
+              "dateConfidence": "거래일 판독 신뢰도 0~1"
             }
+            신뢰도는 필드마다 따로 판단하라. 한 필드가 또렷하다고 해서 다른 필드까지 확신해서는
+            안 된다. 특히 반사광·구김·저해상도로 특정 줄만 뭉개진 경우, 그 줄에서 읽은 값의
+            신뢰도만 낮춰라.
             """;
 
     private final VisionExtractionClient client;
@@ -82,13 +86,26 @@ public class GeminiReceiptOcrAdapter implements ExtractReceiptFieldsPort {
         return mapFields(fields);
     }
 
+    /** 프롬프트 회귀 테스트 전용 — 필드별 신뢰도 지시가 살아 있는지 확인한다. */
+    static String promptForTest() {
+        return PROMPT;
+    }
+
     /** 모델이 돌려준 JSON 객체를 영수증 추출 결과로 옮긴다 — 필드 해석의 정본. */
     static ExtractedReceipt mapFields(JsonNode fields) {
+        LocalDate date = transactionDate(text(fields, "transactionDate"));
+        // 구형 응답(단일 "confidence")도 받아들인다 — 프롬프트를 바꿔도 모델이 옛 형식으로
+        // 답하는 경우가 있고, 그때 추출을 통째로 잃는 것보다 같은 값을 양쪽에 쓰는 편이 낫다.
+        String legacy = text(fields, "confidence");
+        String rawAmount = text(fields, "amountConfidence");
+        String rawDate = text(fields, "dateConfidence");
         return new ExtractedReceipt(
                 text(fields, "merchantName"),
-                transactionDate(text(fields, "transactionDate")),
+                date,
                 totalAmount(text(fields, "totalAmount")),
-                confidence(text(fields, "confidence")));
+                confidence(rawAmount != null ? rawAmount : legacy),
+                // 거래일을 못 읽었으면 신뢰도도 없다 — 없는 필드에 숫자를 붙이지 않는다.
+                date == null ? null : confidence(rawDate != null ? rawDate : legacy));
     }
 
     private static String text(JsonNode fields, String name) {

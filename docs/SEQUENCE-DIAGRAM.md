@@ -1,6 +1,6 @@
 # Lemuel 시퀀스 다이어그램 (Sequence Diagrams)
 
-> 이커머스 + 정산 MSA 플랫폼(24개 서비스 = 16 JVM + gateway + 폴리글랏 7)의 **핵심 유스케이스별 시퀀스 다이어그램**.
+> 이커머스 + 정산 MSA 플랫폼(26개 서비스 = 18 JVM + gateway + 폴리글랏 7)의 **핵심 유스케이스별 시퀀스 다이어그램**.
 > 서비스 간 연계는 Kafka 이벤트로만 이루어지며(코드·DB 직접 의존 0), 비동기 구간은 `-->>` 및 `Note` 로 명시한다.
 >
 > - 정본 근거: [`../SPEC.md`](../SPEC.md)(기능·이벤트 카탈로그) · [`../ARCHITECTURE.md`](../ARCHITECTURE.md)(패턴) · [`adr`](./adr/)
@@ -622,5 +622,6 @@ sequenceDiagram
 | `lemuel.payment.confirmed` (내부 계약) | payment-webhook(Go) | notification | §14 |
 
 > 계약 스키마·정본 샘플: `../shared-common/src/testFixtures/resources/contracts/events` (ADR 0024) —
-> 위 표는 다이어그램에 등장하는 발췌일 뿐이며, card 8종·loan 7종·settlement 7종 등 **총 37 토픽**이 계약 관리된다.
+> 위 표는 다이어그램에 등장하는 발췌일 뿐이며, card 8종·loan 7종·settlement 7종·insurance 9종·point 6종 등
+> **총 56 토픽**이 계약 관리된다(검증: `ls shared-common/src/testFixtures/resources/contracts/events/*.schema.json | wc -l`).
 > 모든 컨슈머는 `processed_events` + 도메인 UNIQUE 로 멱등하며, 발행은 Outbox 를 경유한다(직접 발행 예외: payment-webhook 은 Go 엣지 — 자체 TTL 멱등).

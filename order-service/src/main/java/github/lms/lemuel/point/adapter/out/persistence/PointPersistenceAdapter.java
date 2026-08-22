@@ -3,18 +3,22 @@ package github.lms.lemuel.point.adapter.out.persistence;
 import github.lms.lemuel.point.application.port.out.PointAccountPort;
 import github.lms.lemuel.point.application.port.out.PointEarnPolicyPort;
 import github.lms.lemuel.point.application.port.out.PointEntryPort;
+import github.lms.lemuel.point.application.port.out.PointHoldPort;
 import github.lms.lemuel.point.application.port.out.PointLotPort;
 import github.lms.lemuel.point.domain.PointAccount;
 import github.lms.lemuel.point.domain.PointEarnPolicy;
 import github.lms.lemuel.point.domain.PointEarnScope;
 import github.lms.lemuel.point.domain.PointEntry;
 import github.lms.lemuel.point.domain.PointEntryType;
+import github.lms.lemuel.point.domain.PointHold;
+import github.lms.lemuel.point.domain.PointHoldStatus;
 import github.lms.lemuel.point.domain.PointLot;
 import github.lms.lemuel.point.domain.PointLotStatus;
 import github.lms.lemuel.point.domain.exception.PointInvariantViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -30,19 +34,22 @@ import java.util.Optional;
  */
 @Component
 public class PointPersistenceAdapter
-        implements PointAccountPort, PointLotPort, PointEntryPort, PointEarnPolicyPort {
+        implements PointAccountPort, PointLotPort, PointEntryPort, PointEarnPolicyPort, PointHoldPort {
 
     private final PointAccountRepository accounts;
     private final PointLotRepository lots;
     private final PointEntryRepository entries;
     private final PointEarnPolicyRepository policies;
+    private final PointHoldRepository holds;
 
     public PointPersistenceAdapter(PointAccountRepository accounts, PointLotRepository lots,
-                                   PointEntryRepository entries, PointEarnPolicyRepository policies) {
+                                   PointEntryRepository entries, PointEarnPolicyRepository policies,
+                                   PointHoldRepository holds) {
         this.accounts = accounts;
         this.lots = lots;
         this.entries = entries;
         this.policies = policies;
+        this.holds = holds;
     }
 
     // ── PointAccountPort ──────────────────────────────────────────────────────
@@ -188,6 +195,40 @@ public class PointPersistenceAdapter
                     "같은 참조가 여러 계정에 존재합니다: " + referenceType + ":" + referenceId);
         }
         return accountIds.stream().findFirst();
+    }
+
+    // ── PointHoldPort ─────────────────────────────────────────────────────────
+
+    @Override
+    public PointHold save(PointHold hold) {
+        if (hold.getId() == null) {
+            PointHoldJpaEntity saved = holds.save(PointHoldJpaEntity.from(hold));
+            hold.assignId(saved.getId());
+            return hold;
+        }
+        // 기존 행은 관리 상태의 엔티티에 변경분만 얹는다 — from() 으로 새 인스턴스를 만들어 save 하면
+        // 생성 시각처럼 도메인이 들고 있지 않은 값이 덮여 쓰인다.
+        holds.findById(hold.getId())
+                .orElseThrow(() -> new PointInvariantViolationException(
+                        "저장된 선점을 찾을 수 없습니다: id=" + hold.getId()))
+                .apply(hold);
+        return hold;
+    }
+
+    @Override
+    public Optional<PointHold> findByReference(String referenceType, String referenceId) {
+        return holds.findByReferenceTypeAndReferenceId(referenceType, referenceId)
+                .map(PointHoldJpaEntity::toDomain);
+    }
+
+    @Override
+    public Optional<Long> findAccountIdByReference(String referenceType, String referenceId) {
+        return holds.findAccountIdByReference(referenceType, referenceId);
+    }
+
+    @Override
+    public BigDecimal activeAmount(Long accountId) {
+        return holds.sumActive(accountId, PointHoldStatus.ACTIVE);
     }
 
     // ── PointEarnPolicyPort ───────────────────────────────────────────────────

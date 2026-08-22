@@ -1,0 +1,225 @@
+# Seed: card-service 법인카드 as-is 사양 (한도·승인·매입·명세서·지출관리)
+# 상태: CONFIRMED (역산 결정화, 2026-08-22)
+# 원칙: 이 Seed 는 "현행 코드가 실제로 하는 일"의 불변 기술이다. 결함은 교정하지 않고 known_issues 로만 기록한다.
+# 관계: card-service-funding-offset 은 상태 DESIGN(미구현 to-be) 이라 회귀 기준선이 아니다.
+#       이 Seed 가 그 아래의 as-is 이고, funding-offset 은 이 위에 얹을 스펙이다.
+
+seed:
+  id: card-service-corporate-card-v1
+  goal: >-
+    card-service(법인카드 — 카드계정·카드 한도 배분, 승인·매입, 청구 사이클, 지출증빙 대사)의
+    현행 동작을 실행 가능한 게이트에 매핑된 불변 사양으로 결정화해, 회귀 기준선 ·
+    이벤트 계약 드리프트 방지 · funding-offset 스펙의 착지 기준으로 사용한다.
+
+  scope:
+    included:
+      - 상태머신 6종(카드계정·카드·홀드·명세서·영수증·지출품의)
+      - 한도 산정식 F x R x H 와 masterLimit >= Σ subLimit 불변식
+      - 승인 4거절사유와 가맹점/MCC 정책 6축
+      - 청구 사이클(개시·적재·마감·납부·연체)과 배치 4종
+      - 매입↔영수증 대사 판정 순서와 NEEDS_REVIEW 리뷰 큐
+    excluded:
+      - 재원 F 의 산출 자체 (account-service GL 소관, ADR 0030)
+      - deposit hold/offset 연계 (card-service-funding-offset Seed, 미구현)
+      - 조직·멤버십 도메인 (organization-service 소관 — 여기선 프로젝션 소비만)
+      - OCR 제공자 내부 (Gemini 어댑터 구현 상세)
+
+  constraints:
+    - "금액은 BigDecimal — 한도는 floor, 대사 총액은 compareTo 정확 일치(허용 오차 금지)"
+    - "DeclineReason 4종 고정 — 이벤트 계약에 직렬화되므로 값 추가는 소비자 계약 파괴(ADR 0022)"
+    - "이벤트는 Outbox 경유, 순서키(파티션 키)는 전부 cardAccountId"
+    - "MSA 경계 — organization·company 는 프로젝션으로만 소비, 코드·DB 의존 0"
+    - "헥사고날: domain 은 adapter 를 import 하지 않는다 (CardArchitectureTest)"
+    - "모든 인바운드 포트는 어댑터에서 도달 가능해야 한다 (InboundPortReachabilityTest)"
+
+  invariants:  # as-is 코드 사실 — 파일:라인 근거 (경로 접두 card-service/src/main/java/github/lms/lemuel/card/)
+    master_sub_limit:
+      source: domain/CardAccount.java:13-14,132-142
+      rule: "masterLimit >= Σ subLimit 이 애그리거트의 핵심 책임. 발급·서브한도 변경은 assertCanIssue 통과 필수, 초과 시 SubLimitExceededException"
+    limit_formula:
+      source: domain/CardLimitPolicy.java:10-15 + domain/ReputationGrade.java:11-15
+      rule: "masterLimit = floor(F x R x H), F = sellerPayable + holdbackPayable, R = 인정비율(기본 0.70), H = 평판 haircut"
+      haircut: "A 1.00 · B 1.00 · C 0.85 · D 0.70 · E 0.00"
+    why_r_is_not_one:
+      source: domain/CardLimitPolicy.java:17-19
+      rule: >-
+        F 는 곧 셀러에게 지급될 돈이라 카드 이용과 정산 지급이 같은 재원을 두 번 쓸 수 있다.
+        실제 상계는 청구 사이클의 몫이고 그때까지 R 이 그 위험을 흡수한다. 상계가 구현되면 재조정 대상.
+    downward_clamp:
+      source: domain/CardAccount.java:145-158
+      rule: "마스터 하향은 Σ서브한도를 하한으로 클램프하고 LimitChangeResult.clamped 로 그 사실을 반환한다"
+      rationale: "이미 배분한 임직원 한도 아래로 내리면 카드가 사전 통지 없이 무력화된다. 재산정이 자동으로 도는 경로라 도메인에서 하한을 강제한다"
+    rescreen_updates_evidence:
+      source: domain/CardAccount.java:160-183
+      rule: >-
+        재심사는 한도와 LimitSnapshot 을 함께 갱신한다. changeMasterLimit 만 쓰면 스냅샷이 개설 시점
+        근거로 남아 서로 다른 심사를 가리키는 두 값이 된다. 영속 계층이 screened_at 을 스냅샷 변화로
+        판정하므로 그 어긋남은 그대로 감사 기록의 거짓말이 된다.
+      active_only: "ACTIVE 만 허용(SUSPENDED 제외) — 배치가 자동으로 한도를 다시 얹으면 정지 사유 해소를 아무도 확인하지 않은 채 여신이 되살아난다. 복귀는 명시적 resume()"
+      no_builder_bypass: "Builder 는 영속 재구성 전용이라 전이 가드를 건너뛴다 — 열면 CLOSED·REJECTED 계정도 배치가 조용히 되살릴 수 있다"
+    snapshot_required:
+      source: domain/CardAccount.java:63-67,86-92 + domain/CardLimitPolicy.java:47-48
+      rule: "ACTIVE·REJECTED 전이는 LimitSnapshot 필수 — 근거 없이 한도가 생기는 경로가 없다. 스냅샷은 부호 있는 원본값을 보존(시산표로 한도 재현)"
+    state_machines:
+      source: domain/{CardAccountStatus,CardStatus,HoldStatus,StatementStatus,ExpenseReceiptStatus,ExpenseReportStatus}.java
+      rule: "6종 모두 전이표가 enum 단일 출처, 표 밖 전이는 InvalidCardTransitionException"
+      transitions:
+        card_account: "SCREENING -> ACTIVE|REJECTED · ACTIVE -> SUSPENDED|CLOSED|DELINQUENT · SUSPENDED -> ACTIVE|CLOSED · DELINQUENT -> ACTIVE|CLOSED (CardAccountStatus.java:29-34)"
+        card: "ISSUED <-> SUSPENDED · 둘 다 -> CANCELED (CardStatus.java:20-22)"
+        hold: "ACTIVE -> CAPTURED|PARTIALLY_CAPTURED|VOIDED|EXPIRED (HoldStatus.java:22-30)"
+        statement: "OPEN -> CLOSED -> PARTIALLY_PAID -> PAID · CLOSED -> DELINQUENT -> PAID (StatementStatus.java:31-36)"
+        expense_receipt: "EXTRACTED -> MATCHED|MISMATCHED|NEEDS_REVIEW (ExpenseReceiptStatus.java:17-25)"
+        expense_report: "DRAFT -> SUBMITTED -> APPROVED|REJECTED (ExpenseReportStatus.java:20-26)"
+      delinquency_cascade: "명세서가 DELINQUENT 가 되면 연계 카드계정도 DELINQUENT 로 전이 (CardStatement.java:16-17)"
+    available_limit:
+      source: domain/AuthorizationHold.java:14-22
+      rule: "availableMaster = masterLimit − Σ(ACTIVE 홀드, 계정) · availableSub = subLimit − Σ(ACTIVE 홀드, 카드) · available = min(둘)"
+    authorization_idempotency:
+      source: domain/AuthorizationHold.java:10-13
+      rule: "authorizationId 가 자연키이자 멱등 키 — 재요청 시 기존 홀드 반환, DB UNIQUE 가 최후 차단선"
+    decline_reasons_frozen:
+      source: domain/DeclineReason.java:4-18
+      rule: "정확히 4종(LIMIT_EXCEEDED·CARD_SUSPENDED·MEMBER_INACTIVE·MERCHANT_POLICY_VIOLATION). lemuel.card.authorized 에 직렬화되므로 값 추가는 소비자 계약 파괴 — 신규 사유는 신규 토픽 버전으로만(ADR 0022)"
+    merchant_policy:
+      source: domain/MerchantPolicy.java:12-15,22-30,54-61
+      rule: "평가 축 6종 — 차단 MCC · 허용 MCC(비면 전체 허용) · 1회/일/월 한도 · 해외 · 온라인"
+      opacity: "세부 사유(MCC 차단인지 한도 초과인지)는 로그에만 남긴다 — 거절 메시지를 세분화하면 정책을 역추적당한다"
+    member_inactive_via_projection:
+      source: adapter/in/kafka/Organization*Consumer.java (4종)
+      rule: "임직원 이탈은 organization 4토픽 프로젝션으로 판정 — card 는 organization 을 코드·DB 로 의존하지 않는다"
+    billing_cycle:
+      source: adapter/in/kafka/CardCapturedStatementConsumer.java + adapter/in/schedule/StatementBillingScheduler.java + adapter/in/web/StatementPaymentInternalApiAdapter.java
+      rule: >-
+        lemuel.card.captured 를 두 컨슈머가 분담한다 — CardCapturedStatementConsumer(명세서 개시·적재)와
+        CardCapturedExpenseConsumer(지출품의 생성). 마감은 배치(매월 1일 01:00 KST), 납부는 내부 API.
+      one_per_cycle: "명세서는 카드계정 x 청구주기(YearMonth)당 1개 (CardStatement.java:15-16)"
+      reachability_note: >-
+        2026-08-13 역산 시점에는 청구 사이클 입력이 통째로 없었다(통합테스트가 명세서를 대신 생성했다).
+        지금은 네 유스케이스 모두 인바운드 어댑터가 호출한다(grep 실측 + InboundPortReachabilityTest).
+    batch_schedule:
+      source: adapter/in/schedule/*.java
+      zone: Asia/Seoul
+      rule: "명세서 마감 매월 1일 01:00 -> 연체 판정 매일 02:00 -> 한도 재산정 매일 03:30 -> 홀드 만료 매일 04:00 (시각이 겹치지 않는다)"
+    receipt_matching_order:
+      source: domain/ExpenseReceiptMatcher.java:12-27
+      rule: "판정 순서가 곧 정책이다"
+      steps:
+        - "신뢰도 미달 -> NEEDS_REVIEW (믿을 수 없는 값으로 불일치를 선고하면 멀쩡한 영수증이 MISMATCHED 로 종결된다)"
+        - "총액 -> compareTo 정확 일치 (1원 차이도 불일치 — 허용 오차를 두면 그만큼의 증빙 없는 지출이 통과한다)"
+        - "거래일 신뢰도 미달 -> NEEDS_REVIEW (총액을 또렷하게 읽은 사실은 거래일을 보장하지 않는다. 신뢰도가 한 필드였던 시절 비전 모델이 거래일을 6년 틀리고도 0.98 을 붙였다)"
+        - "거래일 -> 매입일(KST) ±1일 (VAN 매입 시점과 전표 시점의 하루 차 흡수). 판독 불가(null)는 불일치가 아니라 리뷰"
+      merchant_name_excluded: "상호명은 판정에 쓰지 않는다 — OCR 상호 표기는 가맹점 등록명과 상시 불일치"
+      human_half: "NEEDS_REVIEW 는 /admin/expense-receipts 리뷰 큐에서 사람이 종결한다(ADR 0036 무폴백 설계의 사람 쪽 절반)"
+
+  event_contracts:
+    publishes:
+      count: 8
+      ordering_key: cardAccountId
+      topics:
+        - lemuel.card.account_opened
+        - lemuel.card.account_status_changed
+        - lemuel.card.issued
+        - lemuel.card.status_changed
+        - lemuel.card.limit_changed
+        - lemuel.card.authorized
+        - lemuel.card.captured
+        - lemuel.card.statement_paid
+    consumes:
+      topics: 6
+      consumer_classes: 7
+      detail: "lemuel.card.captured(자기 발행을 되받아 명세서·지출 2클래스가 분담) · lemuel.organization.{created,member_joined,member_removed,member_role_changed} · lemuel.company.reputation_changed"
+
+  rest_surface:
+    seller_employee: /api/cards
+    admin_review: "/admin/expense-receipts · /admin/expense-receipts/{receiptId}/review"
+    internal: "/internal/api/v1/cards · /internal/api/v1/statements"
+    van: "/van/v1/{authorizations,captures,refunds,voids}"
+
+  acceptance_criteria:
+    - id: AC-1
+      criterion: masterLimit >= Σ 활성 서브한도가 어떤 경로에서도 깨지지 않는다
+      gate: "./gradlew :card-service:test — CardAccountTest · IssueCardServiceTest · ChangeSubLimitServiceTest · CardIssuanceLimitConcurrencyIT"
+    - id: AC-2
+      criterion: 마스터 하향이 Σ서브한도로 클램프되고 그 사실이 반환된다
+      gate: "CardAccountTest · LimitRecalculationClampIT"
+    - id: AC-3
+      criterion: 재심사가 한도와 LimitSnapshot 을 함께 갱신한다
+      gate: "CardAccountTest · RecalculateCardLimitsServiceTest · LimitSnapshotTest"
+    - id: AC-4
+      criterion: 한도 산정식 floor(F x R x H) 와 등급 haircut 이 고정된다
+      gate: "CardLimitPolicyTest · ReputationGradeTest · ScreeningResultTest"
+    - id: AC-5
+      criterion: 승인 경로가 내부 API·VAN 양쪽에서 같은 결론을 낸다
+      gate: "EntryPointParityTest · AuthorizationInternalApiAdapterTest · AuthorizationVanAdapterTest · ConcurrentAuthorizationIT"
+    - id: AC-6
+      criterion: 거절 사유 4종이 이벤트 계약과 일치한다(값 추가 = 계약 파괴)
+      gate: "CardEventContractTest · EventContractConsumerTest"
+    - id: AC-7
+      criterion: 상태 전이표 밖 전이가 거부된다
+      gate: "CardAccountTest · CardTest · CardStatementTest · ExpenseReceiptStatusTest"
+    - id: AC-8
+      criterion: 가맹점/MCC 정책 6축이 강제된다
+      gate: "MerchantPolicyTest · DelinquencyAuthorizationIT"
+    - id: AC-9
+      criterion: 총액 1원 차이가 MATCHED 로 통과하지 않는다
+      gate: "ExpenseReceiptMatcherTest"
+    - id: AC-10
+      criterion: 신뢰도 미달·거래일 판독 불가가 MISMATCHED 가 아니라 NEEDS_REVIEW 다
+      gate: "ExpenseReceiptMatcherTest · ExtractedReceiptTest"
+    - id: AC-11
+      criterion: 증빙 없는 지출품의가 승인으로 넘어가지 않는다
+      gate: "ExpenseWorkflowReceiptGateTest · ExpenseWorkflowDecouplingTest · ExpenseWorkflowIT"
+    - id: AC-12
+      criterion: 모든 인바운드 포트가 어댑터에서 도달 가능하다
+      gate: "InboundPortReachabilityTest (ArchUnit, 전이적 판정)"
+      note: "이 Seed 에서 가장 중요한 게이트 — 그 주석이 인용하는 실제 사례가 loan 담보 재평가와 card 명세서 개시다"
+    - id: AC-13
+      criterion: 발행 8토픽이 계약 스키마·카탈로그와 일치한다
+      gate: "node --test scripts/harness/test/kafka-topic-gate.test.mjs · CardEventContractTest"
+    - id: AC-14
+      criterion: 승인 지연이 예산 안에 든다
+      gate: "AuthorizationLatencyTest"
+    - id: AC-15
+      criterion: 커버리지 LINE >= 90%
+      gate: "./gradlew :card-service:jacocoTestCoverageVerification"
+
+  test_assets:
+    total_files: 60
+    unit_and_slice: 46
+    integration: 14
+    integration_names: "CaptureIT · HoldExpiryIT · StatementBillingIT · ConcurrentAuthorizationIT · CardIssuanceLimitConcurrencyIT · LimitRecalculationClampIT · DelinquencyAuthorizationIT · MemberRemovedSuspendsCardIT · ExpenseWorkflowIT · OrgProjectionIntegrationIT · CardPersistenceIT · CardBootIT · RefundIT · VoidIT"
+    flyway: "10개 (V2 ~ V20260822010000)"
+
+  known_issues:  # 발견만 기록 — 사양은 as-is 유지
+    - id: KI-1
+      finding: >-
+        재원을 두 번 쓸 수 있는 구조가 열려 있다 — 불변식 why_r_is_not_one 이 스스로 적어 둔 그대로
+        R = 0.70 은 위험을 줄일 뿐 닫지 않는다. deposit hold/offset 연계는 아직 DESIGN 이라
+        카드 한도가 담보로 삼은 정산금이 그대로 셀러에게 지급될 수 있다.
+      disposition: recorded-not-fixed (to-be 스펙 존재 — card-service-funding-offset Seed)
+    - id: KI-2
+      finding: "lemuel.card.captured 를 자기가 발행하고 자기가 소비한다 — 명세서 적재·지출품의 생성이 자기 발행 토픽을 되받는 구조라 브로커 지연이 곧 청구 지연이다. 매입 직후 명세서를 조회하면 아직 반영 전일 수 있다"
+      disposition: by-design (Outbox 경유 일관성 — 다만 지연 관측 지표는 없다)
+    - id: KI-3
+      finding: "CardLimitPolicy 생성자가 generic IllegalArgumentException 을 던진다(CardLimitPolicy.java:31,35). card 도메인은 타입 예외 계열을 쓰는데 이 둘은 예외 — 다만 도메인 규칙 위반이 아니라 설정 오류(주입값 검증)라 성격이 다르다"
+      disposition: recorded-not-fixed (경계 판단 필요)
+    - id: KI-4
+      finding: "승인 거절 사유의 세부가 로그에만 남는다 — 정책 역추적을 막는 의도된 설계지만 셀러가 '왜 거절됐는지' 스스로 알 수 없다는 뜻이기도 하다. 운영 문의가 로그 조회로만 풀린다"
+      disposition: by-design-documented (트레이드오프)
+    - id: KI-5
+      finding: "E 등급 haircut 이 0.00 이라 한도가 0 이 된다 — 계정은 ACTIVE 인데 한도만 0 인 상태가 성립하고 사용자에게는 SUSPENDED 와 구분되지 않는다(둘 다 카드가 안 긁힌다). 거절 사유만 LIMIT_EXCEEDED vs CARD_SUSPENDED 로 갈린다"
+      disposition: recorded-not-fixed
+    - id: KI-6
+      finding: >-
+        만료된 홀드의 뒤늦은 매입은 예외로 거부된다 — 홀드 만료 배치(매일 04:00)가 먼저 돌면 홀드가
+        EXPIRED 가 되고, 그 뒤 도착한 VAN 매입은 AuthorizationHold.capture 의 가드
+        (ACTIVE·PARTIALLY_CAPTURED 만 허용, AuthorizationHold.java:84-87)에 걸려 IllegalStateException 으로
+        실패한다. 카드사는 매입했는데 우리 원장에는 안 남는 상태가 성립할 수 있고 보정 절차가 문서화돼 있지 않다.
+        매입 멱등(CaptureHoldService.java:62-65)은 재전송을 흡수할 뿐 만료를 되돌리지 않으며,
+        HoldExpiryIT 는 만료 후 매입 경로를 덮지 않는다.
+      disposition: recorded-not-fixed (실측 확인 — 러너북 후보)
+
+  uses:
+    - regression-baseline
+    - contract-drift-gate
+    - interview-portfolio

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "lemuel.insurance.general_payout_paid",
+  "description": "해지환급금·만기금이 실지급된 사실. payoutId 가 멱등 축이다.",
+  "type": "object",
+  "properties": {
+    "policyNumber": {
+      "type": "string"
+    },
+    "payoutId": {
+      "type": "string"
+    },
+    "payoutType": {
+      "type": "string"
+    },
+    "amount": {
+      "type": "string",
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "paidOn": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "policyNumber",
+    "payoutId",
+    "payoutType",
+    "amount",
+    "paidOn"
+  ],
+  "additionalProperties": true
+}

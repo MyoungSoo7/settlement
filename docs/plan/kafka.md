@@ -47,7 +47,9 @@
 
 ## 2. 토픽 카탈로그
 
-정본: `../../shared-common/src/main/resources/kafka/topic-catalog.json` (**52개 토픽**)
+정본: `../../shared-common/src/main/resources/kafka/topic-catalog.json` (**63개 토픽** — 검증:
+`node -e "console.log(require('./shared-common/src/main/resources/kafka/topic-catalog.json').topics.length)"`.
+계약 스키마 56개보다 넓다 — `lemuel.ops.*` 등 계약 없는 내부 토픽도 전송 속성은 카탈로그가 관리한다)
 
 | 필드 | 의미 |
 | --- | --- |

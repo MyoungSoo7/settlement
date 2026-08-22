@@ -47,7 +47,7 @@ public class PointConsoleQueryService implements QueryPointConsoleUseCase {
         BigDecimal expiring = port.expiringAmount(horizon(window));
         return new PointConsoleSummary(
                 totals.accountCount(),
-                totals.totalAvailable(),
+                totals.totalBalance(),
                 totals.totalActiveLotRemaining(),
                 totals.totalEntryNet(),
                 totals.driftedAccountCount(),
@@ -66,7 +66,9 @@ public class PointConsoleQueryService implements QueryPointConsoleUseCase {
                 row.available(),
                 row.locked(),
                 row.total(),
-                PointLedgerHealth.of(row.available(),
+                // 선점(locked)이 걸린 계정에서도 성립하는 축은 total 이다 — 선점은 로트를 건드리지
+                // 않으므로 available 로 비교하면 선점액만큼 정상 계정이 드리프트로 잡힌다.
+                PointLedgerHealth.of(row.total(),
                         port.activeLotRemaining(row.accountId()),
                         port.entryNet(row.accountId())),
                 port.recentLots(row.accountId(), DETAIL_HISTORY_LIMIT),

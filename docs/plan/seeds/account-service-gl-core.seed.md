@@ -20,7 +20,7 @@
 
 **제외**
 
-- 수신 3종(정기예금·적금·퇴직연금) 도메인 — 계정과목 경계 사실만 기재, 상세는 별도 Seed
+- 수신 3종(정기예금·적금·퇴직연금) 도메인 — 계정과목 경계 사실만 기재. 상세는 [account-service-banking-deposits](account-service-banking-deposits.seed.md)
 - 감사로그 파티셔닝 운영 절차(마이그레이션 사실만)
 
 ## 핵심 불변식 (as-is, 파일:라인 근거)
@@ -45,7 +45,7 @@
 
 **발행 0** — 소비 전용 서비스다(불변식 7).
 
-**소비 17토픽** → 각 토픽이 정확히 한 종류의 분개로 매핑된다.
+**소비 27토픽** → 각 토픽이 정확히 한 종류의 분개로 매핑된다.
 
 | 원천 | 토픽 | 분개 팩토리 |
 |---|---|---|
@@ -61,6 +61,10 @@
 | loan | `loan.corporate_loan_disbursed` | `corporateLoanDisbursed` |
 | loan | `loan.secured_loan_disbursed` / `.secured_loan_repaid` / `.secured_loan_principal_repaid` | 동명 팩토리 3종 |
 | investment | `investment.executed` | `investmentExecuted` |
+| order | `point.charged` / `.granted` | `pointCharged:380` / `pointGranted:387` (`PointLedgerConsumer.java:85-86`) |
+| order | `point.used` / `.restored` | `pointUsed:401` / `pointRestored:408` (`:87-88`) |
+| order | `point.expired` / `.revoked` | `pointExpired:427` / `pointRevoked:420` (`:89-90`) |
+| order | `giftcard.registered` / `.used` / `.restored` / `.expired` | `giftCardRegistered:438`·`giftCardUsed:450`·`giftCardRestored:457`·`giftCardExpired:464` (`GiftCardLedgerConsumer.java:79-86`) |
 
 ## 수용 기준 (게이트 매핑)
 

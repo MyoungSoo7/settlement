@@ -42,21 +42,21 @@ const NGINX_CONFS = ['frontend/nginx.conf', 'frontend/nginx.compose.conf'];
 /**
  * 폴백에서 빠져 있는 {@code /admin} 라우트 = <b>인정된 부채</b>. 새로고침하면 지금 깨진다.
  *
- * <p>단순히 폴백 목록에 이름을 더하는 것으로는 못 고치는 것이 섞여 있다 — 아래 "겹침" 표시가
- * 붙은 셋은 <b>백엔드 API 와 URL 이 완전히 같아서</b>, 폴백에 넣으면 이번엔 프론트가 그 API 를
- * 못 부른다(②가 그 오답을 막는다). 그쪽은 화면 URL 을 옮기는 것이 정답이다.
+ * <p>등록하기 전에 먼저 고칠 수 있는지 보라. 고치는 법은 둘이다:
+ *   - 화면이 <b>네비 그룹</b>이면 nginx 폴백 목록에 그룹으로 등록한다(백엔드 API 와 겹치지 않을 때만).
+ *   - 그 외에는 <b>화면 URL 을 그룹 아래로 옮긴다</b>(`/admin/&lt;그룹&gt;/&lt;화면&gt;`).
+ * 백엔드 API 와 URL 이 겹치는 화면은 반드시 후자다 — 폴백에 넣으면 프론트가 그 API 를 못 부른다.
  */
 const FALLBACK_PENDING = new Map([
-  ['/admin/approvals', '상단 네비 "승인" — 게이트웨이에 /admin/approvals 라우트 자체가 없다 → 404'],
-  ['/admin/shipping', '상단 네비 "배송" — API 는 /admin/shipments 라 게이트웨이 라우트 없음 → 404'],
-  ['/admin/payouts', '지급관리 — settlement /admin/payouts/** 와 겹침(루트 GET 이 없어 404)'],
-  ['/admin/shipping-policies', '배송비 정책 — order /admin/shipping-policies/** 와 겹침 → API JSON 이 렌더된다'],
-  ['/admin/education/courses', '교육 관리 — education /admin/education/** 와 겹침 → API JSON 이 렌더된다'],
+  // 2026-08-21: 신설 시점의 5건을 모두 갚았다.
+  //   그룹 등록 2건 — /admin/shipping(배송) · /admin/approvals(승인)
+  //   URL 이동 3건 — payouts → settlement/payouts · shipping-policies → shipping/policies
+  //                  · education/courses → system/education (셋 다 백엔드 API 와 URL 이 겹쳤다)
 ]);
 
 /** 폴백 미등록 부채의 상한. <b>내려가기만 한다</b> — 고쳤으면 이 수를 함께 내린다. */
-// 2026-08-21: 5 (게이트 신설 시점의 실측값)
-const PENDING_BUDGET = 5;
+// 2026-08-21: 5 (게이트 신설 시점의 실측값) → 0 (전건 수리)
+const PENDING_BUDGET = 0;
 
 const sorted = (values) => [...new Set(values)].sort();
 

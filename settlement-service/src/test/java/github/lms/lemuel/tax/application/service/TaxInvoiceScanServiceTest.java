@@ -75,9 +75,16 @@ class TaxInvoiceScanServiceTest {
     }
 
     private static OcrExtraction extraction(String supply, String tax, String total, String approvalNumber) {
+        return extraction(supply, tax, total, approvalNumber, "0.95", "0.95");
+    }
+
+    /** 축별 신뢰도를 다르게 주는 변형 — 금액은 또렷한데 승인번호만 뭉개진 경우 등. */
+    private static OcrExtraction extraction(String supply, String tax, String total,
+                                            String approvalNumber, String amountConfidence,
+                                            String approvalConfidence) {
         return new OcrExtraction("101-81-00001", "101-81-00001", WRITTEN,
                 new BigDecimal(supply), new BigDecimal(tax), new BigDecimal(total),
-                approvalNumber, new BigDecimal("0.95"));
+                approvalNumber, new BigDecimal(amountConfidence), new BigDecimal(approvalConfidence));
     }
 
     private static TaxInvoice issued(Long sellerId, String supply, String tax) {
@@ -243,15 +250,66 @@ class TaxInvoiceScanServiceTest {
     }
 
     @Test
-    @DisplayName("리뷰 필요 판정 — 저신뢰 추출은 needsReview 로 드러난다")
-    void lowConfidenceIsFlagged() {
+    @DisplayName("저신뢰 추출은 자동 대사를 하지 않는다 — 믿을 수 없는 값으로 결론을 기록하지 않는다")
+    void lowConfidenceSkipsAutoReconciliation() {
+        // 종전에는 저신뢰여도 그대로 대사해 UNMATCHED("발행분을 못 찾았다")를 기록했다. 승인번호를
+        // 못 읽어서 못 찾은 것을 "없다" 고 단정한 셈이라, 조사 이력에 틀린 결론이 남았다.
         when(ocrPort.extract(CONTENT, "image/png")).thenReturn(new OcrExtraction(
                 "101-81-00001", null, WRITTEN, new BigDecimal("100000"), new BigDecimal("10000"),
-                new BigDecimal("110000"), null, new BigDecimal("0.42")));
+                new BigDecimal("110000"), null, new BigDecimal("0.42"), new BigDecimal("0.42")));
 
         TaxInvoiceScan scan = service.extract(command());
 
         assertThat(scan.getExtracted().needsReview(new BigDecimal("0.80"))).isTrue();
-        assertThat(scan.getStatus()).isEqualTo(TaxInvoiceScanStatus.UNMATCHED);
+        assertThat(scan.getStatus()).isEqualTo(TaxInvoiceScanStatus.EXTRACTED);
+    }
+
+    @Test
+    @DisplayName("저신뢰인데 금액이 우연히 맞아도 MATCHED(종결)로 자동 확정하지 않는다")
+    void lowConfidenceIsNeverAutoConfirmedIntoTerminalState() {
+        // MATCHED 는 종결이라 관리자가 반려조차 할 수 없다. 믿을 수 없는 판독이 되돌릴 수 없는
+        // 상태로 굳는 것이 이 도메인에서 가장 비싼 실패다.
+        when(ocrPort.extract(CONTENT, "image/png"))
+                .thenReturn(extraction("100000", "10000", "110000", TaxInvoice.numberFor(5L),
+                        "0.95", "0.40"));
+        when(loadInvoicePort.findBySettlementId(5L)).thenReturn(Optional.of(issued(SELLER, "100000", "10000")));
+
+        TaxInvoiceScan scan = service.extract(command());
+
+        assertThat(scan.getStatus()).isEqualTo(TaxInvoiceScanStatus.EXTRACTED);
+        assertThat(scan.getStatus().isTerminal()).isFalse();
+    }
+
+    @Test
+    @DisplayName("금액이 또렷해도 승인번호가 뭉개졌으면 리뷰 대상이다 — 축이 다르면 확신도 다르다")
+    void crispAmountsDoNotVouchForTheApprovalNumber() {
+        when(ocrPort.extract(CONTENT, "image/png"))
+                .thenReturn(extraction("100000", "10000", "110000", "TX-2026-0000005",
+                        "0.99", "0.35"));
+
+        TaxInvoiceScan scan = service.extract(command());
+
+        assertThat(scan.getExtracted().needsReview(new BigDecimal("0.80"))).isTrue();
+        assertThat(scan.getExtracted().amountConfidence()).isEqualByComparingTo("0.99");
+        assertThat(scan.getExtracted().approvalNumberConfidence()).isEqualByComparingTo("0.35");
+    }
+
+    @Test
+    @DisplayName("rematch 는 관리자 결정이라 저신뢰여도 대사한다 — 자동 확정만 막는다")
+    void rematchReconcilesEvenWhenLowConfidence() {
+        // 자동 경로만 보수적이어야 한다. 사람이 눈으로 보고 누른 재대사까지 막으면 저신뢰 스캔은
+        // 영영 EXTRACTED 에 갇혀 반려 외에 길이 없다.
+        when(ocrPort.extract(CONTENT, "image/png"))
+                .thenReturn(extraction("100000", "10000", "110000", TaxInvoice.numberFor(5L),
+                        "0.40", "0.40"));
+        TaxInvoiceScan scan = service.extract(command());
+        assertThat(scan.getStatus()).isEqualTo(TaxInvoiceScanStatus.EXTRACTED);
+
+        when(loadScanPort.findById(1L)).thenReturn(Optional.of(scan));
+        when(loadInvoicePort.findBySettlementId(5L)).thenReturn(Optional.of(issued(SELLER, "100000", "10000")));
+
+        TaxInvoiceScan rematched = service.rematch(1L);
+
+        assertThat(rematched.getStatus()).isEqualTo(TaxInvoiceScanStatus.MATCHED);
     }
 }

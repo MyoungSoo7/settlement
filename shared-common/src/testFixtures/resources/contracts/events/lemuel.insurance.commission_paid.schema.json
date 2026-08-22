@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "lemuel.insurance.commission_paid",
+  "description": "수수료 1회차가 실지급된 사실. 회차 단위라 installmentNo 가 멱등 판정의 축이다(policyNumber + commissionId + installmentNo).",
+  "type": "object",
+  "properties": {
+    "policyNumber": {
+      "type": "string"
+    },
+    "commissionId": {
+      "type": "string"
+    },
+    "fcId": {
+      "type": "string"
+    },
+    "installmentNo": {
+      "type": "integer"
+    },
+    "paidAmount": {
+      "type": "string",
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "paidAt": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "policyNumber",
+    "commissionId",
+    "installmentNo",
+    "paidAmount",
+    "paidAt"
+  ],
+  "additionalProperties": true
+}

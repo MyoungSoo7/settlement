@@ -5,8 +5,9 @@
 > - **기능·API·유스케이스 상세** → [`SPEC.md`](./SPEC.md) (사람용 기능명세)
 > - **서비스별 강제 도메인 규칙**(상태머신·수수료·정책 등) → `*-domain-rules` / `*-rules` 스킬(온디맨드 로드:
 >   order-commerce·settlement-domain·loan-domain·investment-domain·account-domain·financial-data·economics-data·
->   market-quotes·company-news·commondata-connector·operation-signal·ai-chat·card-service·insurance-domain·deposit-domain·organization-domain)
-> - **사용자 문서** → [`README.md`](./README.md) · **아키텍처 결정** → [`docs/adr/`](./docs/adr/)
+>   market-quotes·company-news·commondata-connector·operation-signal·ai-chat·card-service·insurance-domain·deposit-domain·organization-domain·board-domain
+>   — 17종. education 은 전용 규칙 스킬이 아직 없다: PRD `docs/plan/prd/education-service.md` 가 정본)
+> - **사용자 문서** → [`README.md`](./README.md) · **아키텍처 결정** → [`docs/plan/adr/`](docs/plan/adr/)
 > - **기술 스택·빌드 커맨드·인프라·작업 이력** → [`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md) (참조성 — 필요 시 조회)
 
 ## 🚫 핵심 가드레일 (위반 시 아키텍처·회계 손상 — 절대 금지)
@@ -33,17 +34,20 @@
 
 ## 프로젝트 개요
 
-주문·결제·정산·선정산/기업대출·투자·계정계·재무제표·경제지표·기업뉴스평판·운영관제·주식시세·AI챗봇·공공데이터·조직/멤버십·법인카드·보험·예치금·게시판을
+주문·결제(포인트·기프트카드 원장 포함)·정산·선정산/기업대출·투자·계정계·재무제표·경제지표·기업뉴스평판·운영관제·주식시세·AI챗봇·공공데이터·조직/멤버십·법인카드·보험·예치금·게시판·교육을
 **18개 마이크로서비스 + API Gateway** 로 분리한 헥사고날 백엔드. 원래 모놀리스였으나 Bounded Context 로 분리.
 여기에 **폴리글랏 7종**(Kotlin 2 알림·대사 / Go 2 스트리밍·웹훅 / Python 3 백테스트·이상탐지·예측 — Gradle 미포함
 standalone, gateway 미라우팅 — 예외 2종: market-stream 은 `/api/market-stream/**` SSE, notification 은
 `/api/notifications/stream` 알림 푸시 SSE 만 gateway 라우팅 + compose 배선. 정본 [`docs/sse.md`](docs/sse.md))을
 더해 총 26개 서비스 = 18 + gateway 1 + 폴리글랏 7 (정본: `polyglot-services.md` · `ARCHITECTURE.md`).
+이 26 밖에 `receipt-ocr-service`(Python, 영수증 판독 자립·채점 하네스, ADR 0036)가 있으나 **compose·CI·차트 미배선**
+standalone 이라 서비스 수에 세지 않는다.
 
 - **18개 서비스 모두 DB-per-service** — order=opslab, settlement=settlement_db, loan=lemuel_loan,
   financial=lemuel_financial, economics=lemuel_economics, company=lemuel_company, operation=lemuel_operation,
   market=lemuel_market, ai=lemuel_ai, commondata=lemuel_commondata, investment=lemuel_investment, account=lemuel_account,
-  organization=lemuel_organization, card=lemuel_card, insurance=lemuel_insurance, deposit=lemuel_deposit, board=lemuel_board.
+  organization=lemuel_organization, card=lemuel_card, insurance=lemuel_insurance, deposit=lemuel_deposit, board=lemuel_board,
+  education=lemuel_education. (order 만 DB명이 환경별로 갈린다 — compose `inter` / 로컬 기본 `opslab`. "opslab" 은 전 환경 공통 **스키마**명.)
 - 서비스 간 연계는 **Kafka 이벤트로만** (코드·DB 직접 의존 0).
 - order↔settlement 는 settlement 가 자체 DB 에 **이벤트 드리븐 프로젝션**(`settlement_*_view`)을 적재하는 CQRS 로 분리
   (ADR 0020), 대사는 order 내부 API(`/internal/recon`) 호출로 cross-DB 연결 0 유지.
@@ -61,7 +65,7 @@ settlement/                       # Gradle 멀티 모듈 루트
 ├── settings.gradle.kts           # 19 모듈 선언 = 18 서비스 + gateway (shared-common 은 composite build)
 ├── build.gradle.kts              # 부모 빌드 (subprojects 공통 설정)
 ├── shared-common/                # 📦 java-library: common.{audit, config, exception, outbox, ratelimit, pdf}
-├── order-service/                # 🛒 Commerce (8088, opslab) — user·order·payment·cart·shipping·product·category·coupon·review·game·(menu·rbac·commoncode·auditconsole·recon·projectionbackfill)
+├── order-service/                # 🛒 Commerce (8088, 스키마 opslab) — user·order·bulkorder·payment·point·giftcard·cart·shipping·product·category·coupon·review·game·(menu·rbac·commoncode·sellertier·auditconsole·recon·projectionbackfill)
 ├── settlement-service/           # 💰 Settlement (8082, settlement_db, standalone) — settlement·payout·ledger·tax·chargeback·pgreconciliation·recovery·closing·report·recon·integrity·idempotency·auditconsole(감사 이력 조회 `/admin/audit-trail`)·crypto(슬라이스 공용 필드암호화)
 ├── loan-service/                 # 💸 Loan (8084, lemuel_loan) — 선정산 + 기업대출(CEO). shared-common 의존
 ├── financial-statements-service/ # 📊 Financial (8086, lemuel_financial) — 재무제표 공개조회. ★shared-common 미의존
@@ -78,7 +82,7 @@ settlement/                       # Gradle 멀티 모듈 루트
 ├── insurance-service/            # 🛡️ Insurance (8108/mgmt 8109, lemuel_insurance) — GA 보험대리점 플랫폼: 상담·가입설계·청약·계약·유지변경·수수료정산. shared-common 의존
 ├── deposit-service/              # 🏧 Deposit (8112/mgmt 8113, lemuel_deposit) — 셀러 예치금 원장(잔고 단일 진실원, hold/offset 로 재원 이중사용 차단). shared-common 의존, REST 는 `/api/deposits` 조회 + `/admin/deposits` 수기 콘솔, Kafka 컨슈머 2종(settlement.confirmed·payout.completed). card 승인·매입은 페이로드에 sellerId 가 없어 미구독 — hold/offset 은 콘솔 경로
 ├── board-service/                # 📋 Board (8114/mgmt 8115, lemuel_board) — 메타 주도 게시판 플랫폼: 정의 1행 = 게시판 1개, 프론트 단일 라우트가 스킨(LIST/GALLERY/FAQ/QNA)으로 렌더. shared-common JWT 만 제한 스캔, **발행 0·소비 0**(권한=역할 allowlist, 메뉴 등록은 관리 화면이 order `/admin/menus` 직접 호출)
-├── education-service/            # 🎓 Education (8115, lemuel_education) — 과정·차시·게시 상태·ADMIN 콘텐츠 관리, CoursePublished Outbox
+├── education-service/            # 🎓 Education (8116/mgmt 8117, lemuel_education) — 과정·차시·게시 상태·ADMIN 콘텐츠 관리, CoursePublished Outbox
 └── gateway-service/              # 🚪 API Gateway (8080) — 라우팅만(자체 인증 필터 없음)
 ```
 
@@ -150,6 +154,12 @@ order Kafka 이벤트를 컨슈머(`adapter/in/kafka/`)가 받아 로컬 적재�
 - **MSA 경계**: settlement ↔ order 코드·DB 의존 0 (Kafka 프로젝션 + `/internal/recon` 만).
 - **커버리지 게이트**: JaCoCo CI **LINE 최소 90%**, 핵심 도메인 패키지 INSTRUCTION 80% 강제(`build.gradle.kts`).
   adapter in/out 서브패키지는 게이트 제외(통합 테스트로 별도 검증). 측정은 게이트 태스크가 정답.
+  **같은 기준선이 폴리글랏·프론트에도 걸려 있다**(2026-08-22): Kotlin 2종은 JaCoCo(`check` 연결),
+  Go 2종은 `go tool cover` 총계(범위 `./internal/...` — `cmd/server` 부트스트랩은 자바의 `*Application*`
+  제외와 같은 이유로 제외), Python 4종은 `pytest --cov=src --cov-fail-under=90`, 프론트는
+  `vite.config.ts` thresholds(lines·statements 90). **파이썬 분모는 반드시 `src`** — 옵션 없이 재면
+  테스트가 import 한 파일만 세고 `--cov=.` 로 재면 테스트 파일이 분모에 섞여 부풀려진다.
+  수치는 여기 박제하지 않는다(→ 게이트 태스크가 정답, `docs/DEVELOPMENT.md` 재현 명령).
 - **OO 구조 게이트**: 도메인 public setter·@Setter/@Data 금지, 금융 5서비스 도메인 generic IAE 금지,
   코어 애그리거트는 rehydrate/팩토리 전용 — `guard.mjs` OO-* 규칙(실시간)과 `oo-gate.test.mjs`(CI 전수)가
   기계 강제. 5축 점수 재채점(패널 중앙값 ≥9.5)은 `oo-score` 스킬.
@@ -175,7 +185,7 @@ order Kafka 이벤트를 컨슈머(`adapter/in/kafka/`)가 받아 로컬 적재�
     ① `App.tsx` 라우트 추가 ② 시드 마이그레이션 + `frontend/src/data/menuFallback.ts` 에 메뉴 행 추가. 메뉴에 넣지
     않을 화면이면 `menu-route-gate.test.mjs` 의 `ROUTES_WITHOUT_MENU` 에 사유 등록(안 하면 CI FAIL).
     메뉴 **구조**(path·area·parent·권한)는 마이그레이션으로만 — 운영 화면 편집은 표시 속성(이름·순서·노출·아이콘)까지.
-    관리자 화면 URL 은 반드시 nginx SPA 폴백 접두사(`/admin/{system|operation|ceo|settlement|login}/**`) **아래** 둔다 —
+    관리자 화면 URL 은 반드시 nginx SPA 폴백 접두사(`/admin/{system|operation|ceo|settlement|shipping|approvals|login}/**`) **아래** 둔다 —
     밖에 두면 클릭 이동만 되고 **새로고침·북마크·새 탭에서 404**(또는 API JSON 이 그대로 렌더)다. vite dev 엔 nginx 가
     없어 개발에선 안 보인다. `spa-fallback-gate.test.mjs` 가 CI 에서 잡는다. 폴백 목록에 이름을 더하는 것은 대개
     오답이다 — 같은 URL 의 백엔드 API 를 프론트가 못 부르게 된다(그래서 화면 URL 을 옮기는 쪽이 정답).

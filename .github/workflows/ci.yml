@@ -243,8 +243,28 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # 레지스트리 스로틀일 때만 재시도한다. max-parallel 스로틀(아래 matrix 잡 참고)로도 남는
+      # 구멍이 있다 — 이 잡은 matrix 밖이라 스로틀 대상이 아니고, 러너들은 egress IP 를 공유하므로
+      # repo.maven.apache.org 가 429/403 을 뱉으면 의존성 해석 단계에서 통째로 죽는다
+      # (2026-08-22 실측: gson 2.10.1 403 Forbidden, 23초 만에 BUILD FAILED — 테스트 0건 실행).
+      # Gradle 은 HTTP 4xx 를 재시도하지 않으므로 여기서 감싼다.
+      #
+      # 테스트 실패는 절대 재시도하지 않는다. 로그에 레지스트리 스로틀 흔적이 있을 때만 다시 돈다 —
+      # 무조건 재시도하면 플래키 테스트를 초록으로 덮고 실패 원인을 감춘다.
       - name: Build & Test shared-common (JaCoCo gate)
-        run: ./gradlew -p shared-common clean build --no-daemon --stacktrace
+        run: |
+          set +e
+          for attempt in 1 2 3; do
+            ./gradlew -p shared-common clean build --no-daemon --stacktrace 2>&1 | tee /tmp/gradle-shared-common.log
+            status=${PIPESTATUS[0]}
+            [ "$status" -eq 0 ] && exit 0
+            grep -qE 'Received status code (403|429) from server|Too Many Requests' \
+              /tmp/gradle-shared-common.log || exit "$status"
+            echo "::warning::메이븐 레지스트리 스로틀로 실패 — ${attempt}차 재시도"
+            sleep $((attempt * 30))
+          done
+          echo "::error::재시도 3회 모두 레지스트리 스로틀로 실패했다 — 일시 장애가 아니라 조달 구조를 봐야 한다"
+          exit 1
         env:
           TESTCONTAINERS_RYUK_DISABLED: "true"
 
@@ -361,7 +381,22 @@ jobs:
       # build = compile + test + jacocoTestReport + jacocoTestCoverageVerification (게이트 포함, build.gradle.kts:157)
       # Testcontainers 기반 통합테스트는 러너의 Docker 데몬을 사용한다.
       - name: Build & Test ${{ matrix.module }} (JaCoCo gate)
-        run: ./gradlew clean :${{ matrix.module }}:build --no-daemon --stacktrace
+        # 레지스트리 스로틀일 때만 재시도 — 근거와 규칙은 위 shared-common 잡 주석 참고.
+        # (max-parallel 5 로 콜드 리졸브를 4 웨이브로 나눠도 429 가 완전히 사라지지는 않았다.)
+        run: |
+          set +e
+          for attempt in 1 2 3; do
+            ./gradlew clean :${{ matrix.module }}:build --no-daemon --stacktrace 2>&1 \
+              | tee /tmp/gradle-${{ matrix.module }}.log
+            status=${PIPESTATUS[0]}
+            [ "$status" -eq 0 ] && exit 0
+            grep -qE 'Received status code (403|429) from server|Too Many Requests' \
+              /tmp/gradle-${{ matrix.module }}.log || exit "$status"
+            echo "::warning::메이븐 레지스트리 스로틀로 실패 — ${attempt}차 재시도"
+            sleep $((attempt * 30))
+          done
+          echo "::error::재시도 3회 모두 레지스트리 스로틀로 실패했다 — 일시 장애가 아니라 조달 구조를 봐야 한다"
+          exit 1
         env:
           # ryuk(정리용 유틸 컨테이너) 비활성화 — 러너는 일회용이라 불필요하고,
           # 이미지 치환과 얽혀 모듈별 test JVM 에서 비결정적 hang 을 유발했다 (2026-07-08).
@@ -443,6 +478,7 @@ jobs:
       #     ② 애초에 안 돌았다(all − expected)                  → 정상. 이번 실행 커버리지 집계에서
       #        제외되며(build.gradle.kts 의 sonar.coverage.exclusions), 어느 모듈이 빠졌는지 남긴다.
       - name: Restore report paths
+        id: coverage
         env:
           TEST_MATRIX: ${{ needs.changes.outputs.test_matrix }}
           TEST_RESULT: ${{ needs.backend-test.result }}
@@ -455,7 +491,17 @@ jobs:
             cp -r "$dir/." "$module/build/reports/"
           done
 
-          restored=$(ls -1 */build/reports/jacoco/test/jacocoTestReport.xml 2>/dev/null | cut -d/ -f1 | sort -u || true)
+          # ⚠ nullglob + `ls -1 <패턴>` 을 쓰면 안 된다 (2026-08-22 실측으로 확인한 결함).
+          #   이 스텝은 위의 아티팩트 루프 때문에 nullglob 을 켠다. 그 상태에서 XML 이 하나도 없으면
+          #   패턴이 **통째로 사라져** 명령이 인자 없는 `ls -1` 이 되고, 저장소 루트 전체가 출력된다.
+          #   그러면 restored 에 AGENTS.md·CLAUDE.md 같은 파일과 함께 *모듈 디렉토리 이름까지* 들어가
+          #   아래 두 대조가 동시에 무력화된다:
+          #     · missing(expected − restored) = 공집합 → 아티팩트 배선이 통째로 끊겨도 통과
+          #     · uncovered(all − restored)    = 공집합 → 미측정 모듈 기록조차 안 남음
+          #   실측 근거: run 32530600570 로그 "복원된 커버리지 XML: 51개 / restored: AGENTS.md
+          #   ARCHITECTURE.md CLAUDE.md Dockerfile …" — 그 실행의 백엔드 테스트는 skipped 였다.
+          #   글로브 결과를 for 로 받으면 nullglob 에서 루프가 0회 돌아 의도대로 빈 값이 된다.
+          restored=$(for f in */build/reports/jacoco/test/jacocoTestReport.xml; do echo "${f%%/*}"; done | sort -u)
           # 모듈 로스터 정본은 settings.gradle.kts (harness-audit 의 ci-matrix 규칙과 같은 출처)
           all=$(sed -n '/^include(/,/^)/p' settings.gradle.kts | grep -oE '"[a-z-]+-service"' | tr -d '"' | sort -u)
           # jq 실패를 2>/dev/null 로 삼키지 않는다 — 삼키면 expected 가 비어 대조가 통째로 무력화되고
@@ -479,6 +525,14 @@ jobs:
           uncovered=$(comm -23 <(echo "$all") <(echo "$restored") | grep . || true)
           if [ -n "$uncovered" ]; then
             echo "::notice title=커버리지 미측정 모듈::이번 실행에서 테스트가 돌지 않아 Sonar 커버리지 집계에서 제외된다(0% 오보고 방지): $(echo "$uncovered" | tr '\n' ' ')"
+          fi
+
+          # 커버리지를 한 모듈도 못 실은 회차인지 아래 Sonar 스텝에 알린다.
+          # (판정은 그쪽 주석 참조 — 여기서는 사실만 내보낸다.)
+          if [ -n "$restored" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Add coverage comment to PR
@@ -578,8 +632,31 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
+      # 커버리지를 한 모듈도 싣지 못한 회차는 분석하지 않는다 (2026-08-22 추가).
+      #
+      # 왜 스킵이 맞는가 — SonarCloud 의 브랜치 품질 게이트는 **마지막 분석 하나**로 결정된다.
+      #   커버리지 XML 이 0개면 build.gradle.kts 가 전 모듈에 sonar.coverage.exclusions="**/*" 를
+      #   걸어(0% 오보고 방지) 분석에 커버 가능한 라인이 남지 않는다. 그러면 new_coverage 조건이
+      #   게이트 결과에서 **통째로 사라지고**, 남은 조건만으로 status=OK 가 된다.
+      #   즉 "측정을 못 한 회차"가 "측정해서 실패했던 회차"의 판정을 초록으로 덮어쓴다.
+      #   실측(2026-08-22): new_coverage 79.8%(ERROR)였던 develop 이, 백엔드 테스트가 스킵된
+      #   문서/파이썬 전용 푸시들의 분석으로 갈아치워지며 status=OK 가 됐다
+      #   (api/measures new_lines=40263 인데 new_lines_to_cover=0 — 커버리지 데이터 자체가 없다).
+      #
+      # 무엇을 잃는가 — 그 회차의 비커버리지 지적(java/githubactions/text 규칙)이 미뤄진다.
+      #   영구 유실은 아니다: Sonar 는 매 분석마다 diff 가 아니라 **트리 전체**를 본다. 다음
+      #   백엔드 변경 푸시의 분석이 그 파일들을 그대로 다시 읽고, 신규 코드 기준도 시간축
+      #   (sonar.leak.period=30)이라 그때도 신규로 잡힌다. 커버리지 판정을 잃는 쪽이 더 비싸다.
+      #
+      # 그리고 이 조건은 백엔드 테스트가 도는 회차에는 항상 참이라, 실질적인 분석 빈도는
+      # "백엔드가 바뀐 푸시마다"로 유지된다.
+      - name: SonarCloud 커버리지 미측정 회차 — 분석 건너뜀
+        if: github.event_name != 'pull_request' && steps.sonar_token.outputs.present == 'true' && steps.coverage.outputs.present != 'true'
+        run: |
+          echo "::warning title=SonarCloud 분석 건너뜀(커버리지 없음)::이번 실행은 커버리지 XML 이 0개라 분석하지 않았다. 분석했다면 new_coverage 조건이 빠진 채 품질 게이트가 초록으로 덮어써진다. 백엔드 변경이 포함된 다음 푸시에서 정상 분석된다."
+
       - name: SonarCloud Scan (analysis must succeed)
-        if: github.event_name != 'pull_request' && steps.sonar_token.outputs.present == 'true'
+        if: github.event_name != 'pull_request' && steps.sonar_token.outputs.present == 'true' && steps.coverage.outputs.present == 'true'
         # DB·ES 환경변수를 뗐다 — 이 잡에는 서비스 컨테이너가 없다(테스트는 backend-test 가 이미 끝냈다).
         # `sonar` 는 subprojects 의 compileJava 에만 의존하므로 DB 가 필요 없다(build.gradle.kts 하단 주석).
         # 없는 포트를 가리키는 값을 남겨두면 "설정돼 있으니 동작한다"는 착시만 만든다.

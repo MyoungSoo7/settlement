@@ -1,7 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "lemuel.point.restored",
-  "description": "order-service(point) → account-service. 환불 복원(사용의 대칭). GL: DR CASH / CR POINT_LIABILITY. 복원 대상 계정은 원 사용 엔트리에서 도출되므로 페이로드의 accountId 는 결과이지 입력이 아니다.",
+  "description": "환불로 포인트가 복원된 사실(사용의 대칭). 복원 대상 계정은 원 사용 엔트리에서 도출되므로 페이로드의 accountId 는 결과이지 입력이 아니다.",
+  "$comment": "참고(계약 아님) — 회계 해석: DR CASH / CR POINT_LIABILITY.",
   "type": "object",
   "properties": {
     "userId": {

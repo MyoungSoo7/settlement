@@ -59,7 +59,10 @@ class UsePointServiceTest {
         lotPort = mock(PointLotPort.class);
         entryPort = mock(PointEntryPort.class);
         eventPort = mock(PublishPointEventPort.class);
-        service = new UsePointService(accountPort, lotPort, entryPort, eventPort);
+        // 로트·원장·이벤트는 PointSpendRecorder 가 맡는다. 목을 그대로 물린 실제 recorder 를 쓰면
+        // 이 테스트가 보던 상호작용(소비 순서·엔트리·이벤트)을 그대로 계속 본다.
+        service = new UsePointService(accountPort,
+                new PointSpendRecorder(accountPort, lotPort, entryPort, eventPort));
 
         when(accountPort.save(any())).thenAnswer(call -> call.getArgument(0));
         when(lotPort.saveAll(any())).thenAnswer(call -> call.getArgument(0));

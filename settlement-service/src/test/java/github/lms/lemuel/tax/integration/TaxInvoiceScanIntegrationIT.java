@@ -151,7 +151,7 @@ class TaxInvoiceScanIntegrationIT {
         TaxInvoiceScan scan = extractUseCase.extract(upload("1,000,000", "100,000", "1,100,000", "TI-0000000005"));
 
         assertThat(scan.getStatus()).isEqualTo(TaxInvoiceScanStatus.MISMATCHED);
-        List<TaxInvoiceScan> queue = getUseCase.byStatus(TaxInvoiceScanStatus.MISMATCHED, 10);
+        List<TaxInvoiceScan> queue = getUseCase.byStatuses(List.of(TaxInvoiceScanStatus.MISMATCHED), 10);
         assertThat(queue).extracting(TaxInvoiceScan::getId).contains(scan.getId());
     }
 
@@ -202,5 +202,27 @@ class TaxInvoiceScanIntegrationIT {
         String status = jdbc.queryForObject(
                 "SELECT status FROM public.tax_invoice_scans WHERE id = ?", String.class, scan.getId());
         assertThat(status).isEqualTo("REJECTED");
+    }
+
+    @Test
+    @DisplayName("리뷰 큐는 보류·불일치·미매칭을 한 번에 걷어온다 — 상태별로 쪼개 보지 않아도 된다")
+    void reviewQueueSpansEveryHumanAttentionStatus() {
+        // 보류(EXTRACTED) — 텍스트 파서는 신뢰도 1.0 이므로 산술 불일치로 needsReview 를 만든다.
+        // 세액 50,000 은 공급가액 1,000,000 의 10%(=100,000)가 아니다 → vatConsistent 실패.
+        TaxInvoiceScan held = extractUseCase.extract(
+                upload("1,000,000", "50,000", "1,050,000", "TI-0000000007"));
+        // 미매칭(UNMATCHED) — 발행분이 없는 승인번호
+        TaxInvoiceScan unmatched = extractUseCase.extract(
+                upload("2,000,000", "200,000", "2,200,000", "TI-0000000009"));
+
+        assertThat(held.getStatus()).isEqualTo(TaxInvoiceScanStatus.EXTRACTED);
+        assertThat(unmatched.getStatus()).isEqualTo(TaxInvoiceScanStatus.UNMATCHED);
+
+        List<TaxInvoiceScan> queue = getUseCase.byStatuses(
+                List.of(TaxInvoiceScanStatus.EXTRACTED, TaxInvoiceScanStatus.MISMATCHED,
+                        TaxInvoiceScanStatus.UNMATCHED), 50);
+
+        assertThat(queue).extracting(TaxInvoiceScan::getId)
+                .contains(held.getId(), unmatched.getId());
     }
 }

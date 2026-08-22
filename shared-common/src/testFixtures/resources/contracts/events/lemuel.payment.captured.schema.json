@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "lemuel.payment.captured",
-  "description": "order-service(OutboxBackedEventPublisher) → settlement-service(PaymentEventKafkaConsumer). 정산 생성 + settlement_payment_view 프로젝션 적재. 금액은 BigDecimal.toPlainString() 문자열(정밀도 보존). sellerId/sellerTier/settlementCycle 은 Event-Carried State Transfer(ADR 0020 Phase 1) — 셀러 미할당 시 생략.",
+  "description": "결제가 승인·매입(capture)된 사실. 금액은 BigDecimal.toPlainString() 문자열(정밀도 보존). sellerId/sellerTier/settlementCycle 은 Event-Carried State Transfer(ADR 0020 Phase 1)로 함께 실어, 수신 측이 원본 서비스를 되묻지 않고 자기 판단을 끝낼 수 있게 한다 — 셀러 미할당 시 생략.",
   "type": "object",
   "properties": {
     "paymentId": { "type": "integer" },

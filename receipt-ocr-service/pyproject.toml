@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "receipt-ocr-service"
+version = "0.1.0"
+description = "Self-hosted receipt field extraction (vision OCR) with a domain-scored evaluation harness."
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi==0.141.1",
+    "uvicorn[standard]==0.52.3",
+    # 자체 호스팅 OCR — ONNX Runtime CPU 추론이라 GPU·외부 호출이 없다.
+    "rapidocr-onnxruntime==1.2.3",
+    "pillow==12.3.0",
+    "httpx==0.28.1",
+    # 매입일 KST 환산이 대사 정책이라 tz DB 를 런타임 의존성으로 고정한다 —
+    # 시스템 tz DB 가 없는 플랫폼(Windows·slim 이미지)에서 ZoneInfoNotFoundError 로 죽는다.
+    "tzdata==2026.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.1.1",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+# 커버리지 게이트를 기본 실행에 묶어 둔다 — 자바 모듈의 JaCoCo LINE 0.90 과 같은 기준선.
+#
+# 분모는 반드시 `src` 다. 옵션 없이 재면 커버리지는 **테스트가 import 한 파일만** 세고,
+# `--cov=.` 로 재면 100% 인 테스트 파일 자체가 분모에 섞여 수치를 부풀린다. 어느 쪽이든
+# "테스트가 없는 모듈일수록 커버리지가 좋아 보이는" 역설이 생겨 게이트가 착시가 된다.
+addopts = "-q --cov=src --cov-report=term-missing:skip-covered --cov-fail-under=90"

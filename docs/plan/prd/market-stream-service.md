@@ -8,7 +8,7 @@
 > | --------- | ------------------------------------------------------------------------------------------ |
 > | 대상 범위 | `market-stream-service`(8110, Go 1.22, **DB 없음**) — 종목 시세 실시간 SSE/WS 팬아웃      |
 > | 역산 기준 | 2026-08-13 `develop` 브랜치                                                              |
-> | 근거      | Go 프로덕션 7파일, 테스트 4파일, 게이트웨이 라우트·compose 배선·프론트 티커 컴포넌트     |
+> | 근거      | Go 프로덕션 7파일, 테스트 11파일, 게이트웨이 라우트·compose 배선·프론트 티커 컴포넌트    |
 > | 범위 밖   | KRX 실시세 수집·시가총액(→ `market-service`) · 밸류에이션 계산(소비측 몫)                |
 > | 관련 문서 | [`../polyglot-services.md`](../polyglot-services.md) · [`market-service.md`](market-service.md) · [`../seeds/market-stream-service-streaming.seed.yaml`](../seeds/market-stream-service-streaming.seed.yaml) |
 

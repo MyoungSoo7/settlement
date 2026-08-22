@@ -42,8 +42,8 @@
 
 ## 이벤트 계약
 
-**소비 8토픽** — 도메인 성공 신호 3종(`order.created`·`payment.captured`·`settlement.created`)과
-운영 실패 신호 5종(`ops.order.failed`·`ops.payment.failed`·`ops.stock.depleted`·`ops.stock.reclaim_delayed`·
+**소비 9토픽** — 도메인 성공 신호 3종(`order.created`·`payment.captured`·`settlement.created`)과
+운영 실패 신호 6종(`ops.order.failed`·`ops.payment.failed`·`ops.stock.depleted`·`ops.stock.reclaim_delayed`·
 `ops.shipping.delayed`·`ops.settlement.failed`)을 받아 버킷에 누적한다.
 **발행 0** — 이 서비스는 관제 종단이다.
 

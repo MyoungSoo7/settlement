@@ -30,7 +30,22 @@ import Spinner from '@/components/Spinner';
 
 type Tab = 'scans' | 'settlement' | 'profile';
 
-const SCAN_STATUSES: TaxScanStatus[] = ['MISMATCHED', 'UNMATCHED', 'EXTRACTED', 'MATCHED', 'REJECTED'];
+/** 사람 손이 필요한 상태 — 저신뢰 보류·금액 불일치·미매칭. 서버 기본 큐와 같은 집합이다. */
+const REVIEW_QUEUE: TaxScanStatus[] = ['EXTRACTED', 'MISMATCHED', 'UNMATCHED'];
+
+/** 큐 필터 — 기본은 '리뷰 필요' 묶음이다. 상태별로 쪼개 보면 다른 곳에 쌓인 건을 놓친다. */
+type ScanFilter = 'REVIEW' | TaxScanStatus;
+
+const SCAN_FILTERS: ScanFilter[] = ['REVIEW', 'EXTRACTED', 'MISMATCHED', 'UNMATCHED', 'MATCHED', 'REJECTED'];
+
+const FILTER_LABEL: Record<ScanFilter, string> = {
+  REVIEW: '리뷰 필요(보류·불일치·미매칭)',
+  EXTRACTED: 'EXTRACTED (저신뢰 보류)',
+  MATCHED: 'MATCHED',
+  MISMATCHED: 'MISMATCHED',
+  UNMATCHED: 'UNMATCHED',
+  REJECTED: 'REJECTED',
+};
 
 const STATUS_STYLE: Record<TaxScanStatus, string> = {
   EXTRACTED: 'bg-gray-100 text-gray-700',
@@ -83,20 +98,25 @@ const TaxConsolePage: React.FC = () => {
 
 type Toast = (message: string, type: 'success' | 'error' | 'warning' | 'info') => void;
 
-/** 스캔 리뷰 큐 — 기본은 MISMATCHED(사람 손이 필요한 상태)로 연다. */
+/**
+ * 스캔 리뷰 큐 — 기본은 '리뷰 필요' 묶음(보류·불일치·미매칭)을 한 화면에 연다.
+ *
+ * 종전에는 MISMATCHED 하나만 기본이었다. 저신뢰 판독이 자동 대사를 건너뛰고 EXTRACTED 에
+ * 남게 되면서, 그 건들이 기본 화면에 보이지 않는 사각지대가 생겼다.
+ */
 const ScanQueue: React.FC<{ showToast: Toast }> = ({ showToast }) => {
-  const [status, setStatus] = useState<TaxScanStatus>('MISMATCHED');
+  const [status, setStatus] = useState<ScanFilter>('REVIEW');
   const [scans, setScans] = useState<TaxInvoiceScan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notes, setNotes] = useState<Record<number, string>>({});
   const [busy, setBusy] = useState(false);
 
-  const load = useCallback(async (target: TaxScanStatus) => {
+  const load = useCallback(async (target: ScanFilter) => {
     setLoading(true);
     setError(null);
     try {
-      setScans(await taxApi.scans(target, 50));
+      setScans(await taxApi.scans(target === 'REVIEW' ? REVIEW_QUEUE : target, 50));
     } catch (err) {
       setScans([]);
       setError(apiErrorMessage(err, '스캔 큐를 불러오지 못했습니다.'));
@@ -144,10 +164,10 @@ const ScanQueue: React.FC<{ showToast: Toast }> = ({ showToast }) => {
       <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-3">
         <label htmlFor="scan-status" className="text-sm font-medium text-gray-600">상태</label>
         <select
-          id="scan-status" value={status} className="input w-48"
-          onChange={(e) => setStatus(e.target.value as TaxScanStatus)}
+          id="scan-status" value={status} className="input w-64"
+          onChange={(e) => setStatus(e.target.value as ScanFilter)}
         >
-          {SCAN_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+          {SCAN_FILTERS.map((s) => <option key={s} value={s}>{FILTER_LABEL[s]}</option>)}
         </select>
         <span className="text-xs text-gray-400">최대 50건</span>
       </div>

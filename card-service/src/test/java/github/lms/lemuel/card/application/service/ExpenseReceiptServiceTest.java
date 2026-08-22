@@ -88,7 +88,7 @@ class ExpenseReceiptServiceTest {
         when(extractReceiptFieldsPort.isConfigured()).thenReturn(true);
         when(extractReceiptFieldsPort.modelName()).thenReturn("gemini-2.5-flash");
         when(extractReceiptFieldsPort.extract(CONTENT, "image/jpeg")).thenReturn(new ExtractedReceipt(
-                "김밥천국", LocalDate.of(2026, 8, 10), new BigDecimal("12000"), new BigDecimal("0.93")));
+                "김밥천국", LocalDate.of(2026, 8, 10), new BigDecimal("12000"), new BigDecimal("0.93"), new BigDecimal("0.93")));
         when(loadCardCapturePort.findByCaptureId("CAP-1")).thenReturn(Optional.of(capture()));
         when(saveExpenseReceiptPort.saveNew(any(), eq(CONTENT)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -110,7 +110,7 @@ class ExpenseReceiptServiceTest {
         when(extractReceiptFieldsPort.isConfigured()).thenReturn(true);
         when(extractReceiptFieldsPort.modelName()).thenReturn("gemini-2.5-flash");
         when(extractReceiptFieldsPort.extract(CONTENT, "image/jpeg")).thenReturn(new ExtractedReceipt(
-                "김밥천국", LocalDate.of(2026, 8, 10), new BigDecimal("15000"), new BigDecimal("0.93")));
+                "김밥천국", LocalDate.of(2026, 8, 10), new BigDecimal("15000"), new BigDecimal("0.93"), new BigDecimal("0.93")));
         when(loadCardCapturePort.findByCaptureId("CAP-1")).thenReturn(Optional.of(capture()));
         when(saveExpenseReceiptPort.saveNew(any(), eq(CONTENT)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -141,7 +141,7 @@ class ExpenseReceiptServiceTest {
         ExpenseReceipt existing = ExpenseReceipt.extracted("RPT-1", "CAP-1", 10L, 77L,
                 "receipt.jpg", "image/jpeg", ExpenseReceiptService.sha256Hex(CONTENT), 1024L,
                 new ExtractedReceipt("김밥천국", LocalDate.of(2026, 8, 10),
-                        new BigDecimal("12000"), new BigDecimal("0.93")),
+                        new BigDecimal("12000"), new BigDecimal("0.93"), new BigDecimal("0.93")),
                 "gemini-2.5-flash", CAPTURED_AT);
         when(loadExpenseReportPort.findByReportId("RPT-1")).thenReturn(Optional.of(report()));
         when(loadExpenseReceiptPort.findByReportIdAndFileHash("RPT-1",
@@ -182,7 +182,7 @@ class ExpenseReceiptServiceTest {
                 .thenReturn(Optional.empty());
         when(extractReceiptFieldsPort.isConfigured()).thenReturn(true);
         when(extractReceiptFieldsPort.extract(CONTENT, "image/jpeg")).thenReturn(new ExtractedReceipt(
-                "김밥천국", LocalDate.of(2026, 8, 10), new BigDecimal("12000"), new BigDecimal("0.93")));
+                "김밥천국", LocalDate.of(2026, 8, 10), new BigDecimal("12000"), new BigDecimal("0.93"), new BigDecimal("0.93")));
         when(loadCardCapturePort.findByCaptureId("CAP-1")).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.attach(command()))
                 .isInstanceOf(BusinessException.class)
@@ -202,7 +202,7 @@ class ExpenseReceiptServiceTest {
     void reviewMatches() {
         ExpenseReceipt needsReview = ExpenseReceipt.extracted("RPT-1", "CAP-1", 10L, 77L,
                 "receipt.jpg", "image/jpeg", "hash", 1024L,
-                new ExtractedReceipt("김밥천국", null, new BigDecimal("12000"), new BigDecimal("0.50")),
+                new ExtractedReceipt("김밥천국", null, new BigDecimal("12000"), new BigDecimal("0.50"), null),
                 "gemini-2.5-flash", CAPTURED_AT);
         needsReview.applyDecision(ReceiptMatchDecision.needsReview("거래일 판독 불가"), CAPTURED_AT);
         when(loadExpenseReceiptPort.findById(5L)).thenReturn(Optional.of(needsReview));

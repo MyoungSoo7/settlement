@@ -8,7 +8,7 @@
 > | --------- | ------------------------------------------------------------------------------------------ |
 > | 대상 범위 | `screening-backtest-service`(8120, Python 3.11 / FastAPI, **DB 없음**) — 매매계획 규칙의 과거 성과 검증 |
 > | 역산 기준 | 2026-08-13 `develop` 브랜치                                                              |
-> | 근거      | Python 프로덕션 8파일, 테스트 3파일, 번들 샘플 `data/sample_backtest.json`               |
+> | 근거      | Python 프로덕션 10파일, 테스트 3파일, 번들 샘플 `data/sample_backtest.json`              |
 > | 범위 밖   | 투자점수 산정·주문 집행(→ `investment-service`) · 시세 수집(→ `market-service`)         |
 > | 관련 문서 | [`../polyglot-services.md`](../polyglot-services.md) · `investment-domain-rules` 스킬 · [`../seeds/screening-backtest-service-backtest.seed.yaml`](../seeds/screening-backtest-service-backtest.seed.yaml) |
 

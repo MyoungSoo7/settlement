@@ -1,0 +1,11 @@
+{
+  "policyNumber": "P-2026-000123",
+  "fcId": "FC-0007",
+  "status": "IN_FORCE",
+  "effectiveDate": "2026-08-01",
+  "maturityDate": "2046-08-01",
+  "premiumAmount": "120000",
+  "coverageAmount": "100000000",
+  "salesChannel": "BANCA",
+  "partnerBankCode": "004"
+}

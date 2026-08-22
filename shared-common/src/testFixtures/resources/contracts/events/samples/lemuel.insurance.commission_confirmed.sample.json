@@ -1,0 +1,23 @@
+{
+  "policyNumber": "P-2026-000123",
+  "schedules": [
+    {
+      "commissionId": "C-2026-000123-01",
+      "fcId": "FC-0007",
+      "recipientType": "FC",
+      "installmentNo": 1,
+      "installmentAmount": "50000",
+      "firstYearTotal": "600000",
+      "dueDate": "2026-09-01"
+    },
+    {
+      "commissionId": "C-2026-000123-02",
+      "fcId": "FC-0007",
+      "recipientType": "FC",
+      "installmentNo": 2,
+      "installmentAmount": "50000",
+      "firstYearTotal": "600000",
+      "dueDate": "2026-10-01"
+    }
+  ]
+}

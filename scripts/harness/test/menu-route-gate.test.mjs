@@ -82,19 +82,46 @@ const read = (path) => readFileSync(path, 'utf8');
  * 고르는 조건"이지 새로 생기는 메뉴가 아니라서, 같이 세면 한 경로가 두 번 잡힌다
  * (실제로 '원장·시산표' 의 정렬을 바꾸는 UPDATE 가 그렇게 잡혔다).
  *
- * <p>한계: `UPDATE menus SET path = '/new'` 처럼 경로 자체를 갱신하면 이 추출기는 새 경로를
- * 못 본다 → 폴백과 어긋나 게이트가 FAIL 한다. 조용히 통과하는 것보다 낫게 실패하도록 둔 선택이며,
- * 경로 변경은 DELETE + INSERT 로 표현한다.
+ * <p>경로 <b>이동</b>({@code UPDATE menus SET path = '/new' WHERE path = '/old'})은 별도로 읽어
+ * 누적 목록에서 제자리 치환한다. 예전에는 이 형태를 못 읽어 "경로 변경은 DELETE + INSERT 로
+ * 표현하라"고 안내했지만, 그건 같은 메뉴에 새 id 를 주는 셈이라 참조가 끊긴다. 실제로 화면 URL 3개를
+ * 옮겨야 했을 때(2026-08-21, SPA 폴백) UPDATE 가 옳은 표현이었다.
+ */
+
+/** 마이그레이션 한 벌이 <b>새로 심는</b> 경로 — 조건절과 갱신문의 경로는 새 메뉴가 아니라서 뺀다. */
+function insertedPaths(sql) {
+  const body = sql
+    .split('\n')
+    .filter((line) => !/^\s*(DELETE|UPDATE|SET)\b/i.test(line))
+    .filter((line) => !/^\s*(WHERE|AND|OR)\b/i.test(line))
+    .join('\n');
+  return [...body.matchAll(/'(\/[^']*)'/g)].map((m) => m[1]);
+}
+
+/**
+ * {@code UPDATE menus SET path = '/new' … WHERE path = '/old'} 을 (from → to) 로 읽는다.
+ * {@code [^;]*?} 로 한 문장 안에 가둔다 — 문장 경계를 넘으면 엉뚱한 두 경로를 짝지을 수 있다.
+ */
+function pathRenames(sql) {
+  return [...sql.matchAll(
+    /UPDATE\s+menus\s+SET\s+path\s*=\s*'(\/[^']*)'[^;]*?WHERE\s+path\s*=\s*'(\/[^']*)'/gi)]
+    .map((m) => ({ from: m[2], to: m[1] }));
+}
+
+/**
+ * 마이그레이션을 <b>시간순으로</b> 적용해 최종 경로 목록을 만든다. 순서가 중요하다 —
+ * 나중 파일이 앞선 파일이 심은 경로를 옮기기 때문이다.
  */
 function seedPaths() {
-  return seedSqlFiles().flatMap((file) => {
-    const sql = read(file)
-      .split('\n')
-      .filter((line) => !/^\s*(DELETE|UPDATE)\b/i.test(line))
-      .filter((line) => !/^\s*(WHERE|AND|OR)\b/i.test(line))
-      .join('\n');
-    return [...sql.matchAll(/'(\/[^']*)'/g)].map((m) => m[1]);
-  });
+  const paths = [];
+  for (const file of seedSqlFiles()) {
+    const sql = read(file);
+    paths.push(...insertedPaths(sql));
+    for (const { from, to } of pathRenames(sql)) {
+      for (let i = 0; i < paths.length; i++) if (paths[i] === from) paths[i] = to;
+    }
+  }
+  return paths;
 }
 
 function fallbackPaths() {
@@ -143,6 +170,27 @@ test('메뉴 없는 라우트 allowlist 에 죽은 항목이 없다', () => {
 
   assert.deepEqual(stale, [],
     `이미 사라진 라우트가 allowlist 에 남아 있습니다: ${stale.join(', ')}`);
+});
+
+test('[자기검증] 경로 이동(UPDATE)을 새 메뉴가 아니라 이동으로 읽는다', () => {
+  const move = `
+    UPDATE menus SET path = '/admin/system/education', updated_at = NOW()
+     WHERE path = '/admin/education/courses';
+  `;
+  assert.deepEqual(insertedPaths(move), [],
+    '갱신문의 경로를 새 메뉴로 세면 메뉴 수가 늘어난 것처럼 보인다');
+  assert.deepEqual(pathRenames(move),
+    [{ from: '/admin/education/courses', to: '/admin/system/education' }]);
+
+  // 경로가 아닌 컬럼을 바꾸는 UPDATE 는 이동이 아니다(실제로 menu_type 을 바꾸는 것이 있다).
+  assert.deepEqual(pathRenames("UPDATE menus SET menu_type = 'GROUP' WHERE name = '배송';"), []);
+
+  // 두 문장을 가로질러 엉뚱한 짝을 만들면 안 된다.
+  const two = `
+    UPDATE menus SET path = '/a' WHERE name = 'x';
+    UPDATE menus SET sort_order = 1 WHERE path = '/b';
+  `;
+  assert.deepEqual(pathRenames(two), [], '문장 경계를 넘어 짝지으면 경로가 조용히 뒤바뀐다');
 });
 
 test('삭제된 사이드바 셸 3종이 되살아나지 않았다', () => {

@@ -22,11 +22,31 @@ public class GiftCardTenderAdapter implements GiftCardTenderPort {
 
     private final UseGiftCardUseCase useGiftCardUseCase;
     private final RestoreGiftCardUseCase restoreGiftCardUseCase;
+    private final github.lms.lemuel.giftcard.application.port.in.HoldGiftCardUseCase holdUseCase;
 
     public GiftCardTenderAdapter(UseGiftCardUseCase useGiftCardUseCase,
-                                 RestoreGiftCardUseCase restoreGiftCardUseCase) {
+                                 RestoreGiftCardUseCase restoreGiftCardUseCase,
+                                 github.lms.lemuel.giftcard.application.port.in.HoldGiftCardUseCase holdUseCase) {
         this.useGiftCardUseCase = useGiftCardUseCase;
         this.restoreGiftCardUseCase = restoreGiftCardUseCase;
+        this.holdUseCase = holdUseCase;
+    }
+
+    @Override
+    public void hold(Long userId, BigDecimal amount, Long tenderId) {
+        holdUseCase.hold(new github.lms.lemuel.giftcard.application.port.in.HoldGiftCardUseCase.HoldCommand(
+                userId, amount, USE_REFERENCE_TYPE, String.valueOf(tenderId)));
+    }
+
+    @Override
+    public void captureHold(Long tenderId, Long actorUserId) {
+        // 확정이 남기는 USE 엔트리의 참조는 즉시 결제와 같다 — 그래야 환불 복원이 경로를 가리지 않는다.
+        holdUseCase.capture(USE_REFERENCE_TYPE, String.valueOf(tenderId), "user:" + actorUserId);
+    }
+
+    @Override
+    public void releaseHold(Long tenderId, boolean expired) {
+        holdUseCase.release(USE_REFERENCE_TYPE, String.valueOf(tenderId), expired);
     }
 
     @Override

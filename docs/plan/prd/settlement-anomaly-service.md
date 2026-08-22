@@ -8,7 +8,7 @@
 > | --------- | ------------------------------------------------------------------------------------------ |
 > | 대상 범위 | `settlement-anomaly-service`(8121, Python 3.11 / FastAPI, **DB 없음**) — 정산·지급 레코드 이상 점수화 |
 > | 역산 기준 | 2026-08-13 `develop` 브랜치                                                              |
-> | 근거      | Python 프로덕션 10파일, 테스트 3파일, 앙상블 2계층(MAD z + IsolationForest), 번들 샘플 데이터 |
+> | 근거      | Python 프로덕션 12파일, 테스트 3파일, 앙상블 2계층(MAD z + IsolationForest), 번들 샘플 데이터 |
 > | 범위 밖   | 정산 금액 산정(→ `settlement-service`) · 인시던트 라이프사이클(→ `operation-service`)   |
 > | 관련 문서 | [`../polyglot-services.md`](../polyglot-services.md) · `operation-signal-rules` 스킬 · [`../seeds/settlement-anomaly-service-scoring.seed.yaml`](../seeds/settlement-anomaly-service-scoring.seed.yaml) |
 

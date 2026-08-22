@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "lemuel.card.authorized",
-  "description": "card-service → account-service (2단계, 발행 코드는 아직 없음 — 계약만 선확정). 카드 승인이 성립하면 발행된다. amount 는 JSON string(BigDecimal.toPlainString, DATA-STANDARD N5) — 숫자로 실으면 소비자 언어에 따라 double 파싱으로 원 단위가 어긋나고, 이 이벤트는 GL 분개까지 흘러가므로 그 오차가 곧 장부 오차다. remainingSubLimit 은 승인 후 잔여 서브한도로, 소비측이 자체 재계산 없이 검증에 쓸 수 있다(optional — 승인 경로가 잔여를 계산하지 못하는 구현도 허용). authorizationId 는 카드사 승인번호(mock 포함)로 멱등 자연키다 — 재전송·리플레이에서 중복 승인을 구분하는 유일한 수단이라 required 다. cardAccountId 를 required 로 둔 이유는 파티션 키가 1단계 카드 이벤트와 같은 cardAccountId 이기 때문이다: 계약에 없으면 2단계 구현자가 cardId 로 파티셔닝할 여지가 남고, 그러면 같은 계정의 발급·한도변경·승인이 다른 파티션으로 흩어져 소비자가 순서를 잃는다. required 필드는 나중에 추가할 수 없다(파괴적 변경 → 신규 토픽 버전, ADR 0022) — 소비자가 0인 지금이 못 박을 수 있는 유일한 시점이다.",
+  "description": "카드 승인이 성립하면 발행된다. amount 는 JSON string(BigDecimal.toPlainString, DATA-STANDARD N5) — 숫자로 실으면 소비자 언어에 따라 double 파싱으로 원 단위가 어긋나고, 이 금액은 장부에 그대로 실리는 값이라 그 오차가 곧 장부 오차다. remainingSubLimit 은 승인 후 잔여 서브한도로, 소비측이 자체 재계산 없이 검증에 쓸 수 있다(optional — 승인 경로가 잔여를 계산하지 못하는 구현도 허용). authorizationId 는 카드사 승인번호(mock 포함)로 멱등 자연키다 — 재전송·리플레이에서 중복 승인을 구분하는 유일한 수단이라 required 다. cardAccountId 를 required 로 둔 이유는 파티션 키가 카드 계열 이벤트와 같은 cardAccountId 이기 때문이다: 계약에 없으면 cardId 로 파티셔닝할 여지가 남고, 그러면 같은 계정의 발급·한도변경·승인이 다른 파티션으로 흩어져 소비자가 순서를 잃는다. required 필드는 나중에 추가할 수 없다(파괴적 변경 → 신규 토픽 버전, ADR 0022).",
   "type": "object",
   "properties": {
     "authorizationId": { "type": "string", "minLength": 1 },

@@ -47,7 +47,7 @@ class GeminiReceiptOcrAdapterTest {
         assertThat(extracted.merchantName()).isEqualTo("김밥천국 강남점");
         assertThat(extracted.transactionDate()).isEqualTo(LocalDate.of(2026, 8, 10));
         assertThat(extracted.totalAmount()).isEqualByComparingTo("12000");
-        assertThat(extracted.confidence()).isEqualByComparingTo("0.93");
+        assertThat(extracted.amountConfidence()).isEqualByComparingTo("0.93");
     }
 
     @Test
@@ -81,10 +81,10 @@ class GeminiReceiptOcrAdapterTest {
     void confidenceFallsBackLow() {
         assertThat(GeminiReceiptOcrAdapter.mapFields(fields("""
                 {"merchantName":"가게","transactionDate":"2026-08-10","totalAmount":"1000"}
-                """)).confidence()).isEqualByComparingTo("0.50");
+                """)).amountConfidence()).isEqualByComparingTo("0.50");
         assertThat(GeminiReceiptOcrAdapter.mapFields(fields("""
                 {"merchantName":"가게","transactionDate":"2026-08-10","totalAmount":"1000","confidence":"7"}
-                """)).confidence()).isEqualByComparingTo("0.50");
+                """)).amountConfidence()).isEqualByComparingTo("0.50");
     }
 
     @Test
@@ -101,5 +101,63 @@ class GeminiReceiptOcrAdapterTest {
                 .isInstanceOf(BusinessException.class)
                 .satisfies(e -> assertThat(((BusinessException) e).getErrorCode())
                         .isEqualTo(ErrorCode.CARD_RECEIPT_OCR_UNAVAILABLE));
+    }
+
+    @Test
+    @DisplayName("필드별 신뢰도를 따로 읽는다 — 총액을 확신해도 거래일 확신은 별개다")
+    void mapsPerFieldConfidence() {
+        ExtractedReceipt extracted = GeminiReceiptOcrAdapter.mapFields(fields("""
+                {"merchantName":"가게","transactionDate":"2026-08-10","totalAmount":"12000",
+                 "amountConfidence":"0.98","dateConfidence":"0.31"}
+                """));
+
+        assertThat(extracted.amountConfidence()).isEqualByComparingTo("0.98");
+        assertThat(extracted.dateConfidence()).isEqualByComparingTo("0.31");
+    }
+
+    @Test
+    @DisplayName("구형 단일 confidence 응답도 받는다 — 추출을 통째로 잃는 것보다 낫다")
+    void acceptsLegacySingleConfidence() {
+        ExtractedReceipt extracted = GeminiReceiptOcrAdapter.mapFields(fields("""
+                {"merchantName":"가게","transactionDate":"2026-08-10","totalAmount":"12000",
+                 "confidence":"0.88"}
+                """));
+
+        assertThat(extracted.amountConfidence()).isEqualByComparingTo("0.88");
+        assertThat(extracted.dateConfidence()).isEqualByComparingTo("0.88");
+    }
+
+    @Test
+    @DisplayName("거래일을 못 읽으면 거래일 신뢰도는 null — 모델이 숫자를 줘도 버린다")
+    void dateConfidenceIsNullWhenDateUnreadable() {
+        ExtractedReceipt extracted = GeminiReceiptOcrAdapter.mapFields(fields("""
+                {"merchantName":"가게","transactionDate":"언제인지 모름","totalAmount":"12000",
+                 "amountConfidence":"0.95","dateConfidence":"0.90"}
+                """));
+
+        assertThat(extracted.transactionDate()).isNull();
+        assertThat(extracted.dateConfidence()).isNull();
+    }
+
+    @Test
+    @DisplayName("거래일 신뢰도 누락도 보수적 0.50 — 리뷰 큐로 흐르게")
+    void dateConfidenceFallsBackLow() {
+        ExtractedReceipt extracted = GeminiReceiptOcrAdapter.mapFields(fields("""
+                {"merchantName":"가게","transactionDate":"2026-08-10","totalAmount":"1000",
+                 "amountConfidence":"0.99"}
+                """));
+
+        assertThat(extracted.amountConfidence()).isEqualByComparingTo("0.99");
+        assertThat(extracted.dateConfidence()).isEqualByComparingTo("0.50");
+    }
+
+    @Test
+    @DisplayName("프롬프트가 필드별 신뢰도를 따로 판단하라고 지시한다")
+    void promptDemandsIndependentConfidence() {
+        // 이 지시가 빠지면 모델은 두 필드에 같은 숫자를 주고, 필드별 게이트가 무력해진다.
+        assertThat(GeminiReceiptOcrAdapter.promptForTest())
+                .contains("amountConfidence")
+                .contains("dateConfidence")
+                .contains("필드마다 따로 판단하라");
     }
 }

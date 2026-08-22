@@ -48,7 +48,7 @@ class TaxInvoiceScanAdminControllerTest {
     private static TaxInvoiceScan scan(TaxInvoiceScanStatus status) {
         ExtractedTaxInvoice fields = ExtractedTaxInvoice.of("101-81-00001", null,
                 LocalDate.of(2026, 8, 1), new BigDecimal("100000"), new BigDecimal("10000"),
-                new BigDecimal("110000"), "TI-0000000005", new BigDecimal("0.61"));
+                new BigDecimal("110000"), "TI-0000000005", new BigDecimal("0.61"), new BigDecimal("0.61"));
         return TaxInvoiceScan.rehydrate(3L, 7L, "invoice.png", "image/png", "a".repeat(64), 4L,
                 fields, "gemini-2.5-flash", status, 42L, "공급가액 불일치", NOW, NOW);
     }
@@ -56,7 +56,7 @@ class TaxInvoiceScanAdminControllerTest {
     @Test
     @DisplayName("리뷰 큐 — 상태로 조회한다")
     void queue() throws Exception {
-        when(getUseCase.byStatus(eq(TaxInvoiceScanStatus.MISMATCHED), eq(50)))
+        when(getUseCase.byStatuses(eq(List.of(TaxInvoiceScanStatus.MISMATCHED)), eq(50)))
                 .thenReturn(List.of(scan(TaxInvoiceScanStatus.MISMATCHED)));
 
         mockMvc.perform(get("/admin/tax/scans?status=MISMATCHED&limit=50"))
@@ -97,5 +97,43 @@ class TaxInvoiceScanAdminControllerTest {
 
         mockMvc.perform(post("/admin/tax/scans/404/rematch"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("리뷰 큐 — 여러 상태를 한 번에 조회한다")
+    void queueAcceptsMultipleStatuses() throws Exception {
+        // 사람 손이 필요한 상태는 셋이다. 화면을 셋으로 쪼개면 한 곳만 보다가 나머지를 놓친다.
+        when(getUseCase.byStatuses(
+                eq(List.of(TaxInvoiceScanStatus.EXTRACTED, TaxInvoiceScanStatus.MISMATCHED)), eq(50)))
+                .thenReturn(List.of(scan(TaxInvoiceScanStatus.EXTRACTED),
+                        scan(TaxInvoiceScanStatus.MISMATCHED)));
+
+        mockMvc.perform(get("/admin/tax/scans?status=EXTRACTED&status=MISMATCHED&limit=50"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].status").value("EXTRACTED"))
+                .andExpect(jsonPath("$[1].status").value("MISMATCHED"));
+    }
+
+    @Test
+    @DisplayName("상태를 안 주면 사람 손이 필요한 3종을 기본으로 연다")
+    void queueDefaultsToTheHumanAttentionSet() throws Exception {
+        // 종전 기본값은 MISMATCHED 하나였다. 저신뢰 보류(EXTRACTED)가 기본 화면에 안 보여
+        // "고쳤는데 아무도 안 보는" 사각지대가 생겼다.
+        when(getUseCase.byStatuses(eq(TaxInvoiceScanAdminController.REVIEW_QUEUE), eq(50)))
+                .thenReturn(List.of(scan(TaxInvoiceScanStatus.EXTRACTED)));
+
+        mockMvc.perform(get("/admin/tax/scans"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].status").value("EXTRACTED"));
+    }
+
+    @Test
+    @DisplayName("종결 상태(MATCHED·REJECTED)는 기본 큐에 들어오지 않는다")
+    void terminalStatusesAreNotInTheDefaultQueue() {
+        // 기본값이 종결까지 쓸어오면 큐가 이력 조회로 변해 리뷰 대상이 묻힌다.
+        org.assertj.core.api.Assertions.assertThat(TaxInvoiceScanAdminController.REVIEW_QUEUE)
+                .containsExactly(TaxInvoiceScanStatus.EXTRACTED, TaxInvoiceScanStatus.MISMATCHED,
+                        TaxInvoiceScanStatus.UNMATCHED)
+                .noneMatch(TaxInvoiceScanStatus::isTerminal);
     }
 }

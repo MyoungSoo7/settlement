@@ -186,6 +186,18 @@ export async function decideHookOutput(
   }
 }
 
+/**
+ * 저장소 루트 — cwd 가 아니라 이 스크립트의 위치에서 도출한다(guard.mjs 와 같은 규약).
+ *
+ * 훅은 셸의 cwd 를 물려받으므로 process.cwd() 를 믿으면 라우터 상태·제안 로그가
+ * `<하위 디렉터리>/.claude/harness/` 라는 평행 트리에 쌓인다. 실제로 9개 위치에 33개 파일이
+ * 그렇게 생겼고, 그중 account/loan 의 src/main/resources 아래 것들은 **jar 에까지 실려 나갔다**
+ * (빌드 산출물에서 실측). 라우터는 advisory 라 조용히 실패해서 아무도 눈치채지 못했다.
+ */
+export function defaultRepoRoot() {
+  return resolve(fileURLToPath(new URL("../..", import.meta.url)));
+}
+
 export async function runRouterCli(args, io = {}) {
   if (args[0] !== "--hook" || args.length !== 1) {
     (io.stderr ?? ((m) => console.error(m)))("usage: skill-router.mjs --hook");
@@ -194,7 +206,7 @@ export async function runRouterCli(args, io = {}) {
   try {
     const event = JSON.parse(io.stdin ?? (await readStdinUtf8()));
     const output = await decideHookOutput(event, {
-      repoRoot: io.repoRoot ?? process.cwd(),
+      repoRoot: io.repoRoot ?? defaultRepoRoot(),
       now: io.now,
     });
     if (output) (io.stdout ?? ((m) => console.log(m)))(output);

@@ -31,7 +31,10 @@ import java.util.stream.Collectors;
 public class MenuService implements MenuUseCase {
 
     private static final Set<String> ADMIN_ONLY_PATHS = Set.of(
-            "/admin/payouts",
+            // 화면 URL 이다(API 경로 /admin/payouts/** 가 아니다). 2026-08-21 에 nginx SPA 폴백
+            // 밖이라 새로고침이 깨져 /admin/settlement/payouts 로 옮겼다 — 여기를 같이 옮기지
+            // 않으면 지급 메뉴에서 ADMIN 잠금이 조용히 풀린다(경로가 안 맞으니 검사에 안 걸린다).
+            "/admin/settlement/payouts",
             "/admin/settlement/chargebacks",
             "/admin/settlement/monthly-closing",
             "/admin/settlement/commission-rates",

@@ -206,7 +206,7 @@ class GiftCardServiceTest {
 
         @BeforeEach
         void init() {
-            service = new UseGiftCardService(cardPort, entryPort, eventPort);
+            service = new UseGiftCardService(cardPort, entryPort, eventPort, noGiftCardHolds());
         }
 
         @Test
@@ -413,11 +413,27 @@ class GiftCardServiceTest {
         GiftCard sooner = card(2L, "10000", GiftCardStatus.REGISTERED, EXPIRES_AT.minusDays(200));
         when(cardPort.loadSpendable(USER_ID)).thenReturn(List.of(later, sooner));
 
-        new UseGiftCardService(cardPort, entryPort, eventPort).use(new UseGiftCardCommand(
+        new UseGiftCardService(cardPort, entryPort, eventPort, noGiftCardHolds()).use(new UseGiftCardCommand(
                 USER_ID, new BigDecimal("5000"), "PAYMENT_TENDER", "77", "user:42"));
 
         ArgumentCaptor<GiftCardEntry> captor = ArgumentCaptor.forClass(GiftCardEntry.class);
         verify(entryPort).append(captor.capture());
         assertThat(captor.getValue().getGiftCardId()).isEqualTo(2L);
+    }
+
+    /** 선점이 없는 상태 — 이 테스트들은 즉시 사용 경로만 본다. */
+    private static github.lms.lemuel.giftcard.application.port.out.GiftCardHoldPort noGiftCardHolds() {
+        return new github.lms.lemuel.giftcard.application.port.out.GiftCardHoldPort() {
+            @Override public java.util.List<github.lms.lemuel.giftcard.domain.GiftCardHold> saveHolds(
+                    java.util.List<github.lms.lemuel.giftcard.domain.GiftCardHold> holds) { return holds; }
+            @Override public github.lms.lemuel.giftcard.domain.GiftCardHold save(
+                    github.lms.lemuel.giftcard.domain.GiftCardHold hold) { return hold; }
+            @Override public java.util.List<github.lms.lemuel.giftcard.domain.GiftCardHold> findByReference(
+                    String referenceType, String referenceId) { return java.util.List.of(); }
+            @Override public java.util.List<Long> findCardIdsByReference(
+                    String referenceType, String referenceId) { return java.util.List.of(); }
+            @Override public java.util.Map<Long, java.math.BigDecimal> activeAmountsByCardIds(
+                    java.util.Collection<Long> cardIds) { return java.util.Map.of(); }
+        };
     }
 }

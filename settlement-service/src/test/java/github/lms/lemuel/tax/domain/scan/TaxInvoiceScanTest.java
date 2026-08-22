@@ -24,7 +24,7 @@ class TaxInvoiceScanTest {
     private static ExtractedTaxInvoice fields() {
         return ExtractedTaxInvoice.of("101-81-00001", "101-81-00001", LocalDate.of(2026, 8, 1),
                 new BigDecimal("100000"), new BigDecimal("10000"), new BigDecimal("110000"),
-                "TI-0000000005", new BigDecimal("0.96"));
+                "TI-0000000005", new BigDecimal("0.96"), new BigDecimal("0.96"));
     }
 
     private static TaxInvoiceScan scan() {

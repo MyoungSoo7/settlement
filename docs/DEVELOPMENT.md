@@ -25,16 +25,18 @@
 ./gradlew :<module>:compileJava                     # 모듈별 컴파일 (예: :order-service:compileJava)
 ./gradlew :<module>:test                            # 모듈별 테스트
 ./gradlew :<module>:jacocoTestCoverageVerification  # 커버리지 게이트(측정 정답, LINE 90%)
+node scripts/coverage/jacoco-report.mjs <XML> --gate  # 어느 클래스가 몇 줄 비었는지(게이트와 같은 범위)
 ./gradlew :<module>:bootRun                         # 모듈별 부트런
 ./gradlew :<module>:bootJar                         # 모듈별 jar
 
-# 모듈: shared-common, order-service, settlement-service, loan-service, financial-statements-service,
-#       economics-service, company-service, operation-service, market-service, ai-service,
-#       common-data-service, investment-service, account-service, organization-service,
-#       card-service, insurance-service, deposit-service, gateway-service
+# 모듈(19 = 18 서비스 + gateway, 정본 settings.gradle.kts): shared-common, order-service, settlement-service,
+#       loan-service, financial-statements-service, economics-service, company-service, operation-service,
+#       market-service, ai-service, common-data-service, investment-service, account-service,
+#       organization-service, card-service, insurance-service, deposit-service, board-service,
+#       education-service, gateway-service
 
 # Docker
-docker compose up -d                                # DB-per-service PG 16종 · ES · Redpanda · 앱 컨테이너 19개(JVM 17 + market-stream + notification) · frontend
+docker compose up -d                                # DB-per-service PG 18종 · ES · Redpanda · 앱 컨테이너 21개(JVM 19 = 18 서비스+gateway, + market-stream + notification) · frontend
 docker build --build-arg MODULE=<service> -t lemuel-<name> .   # 컨테이너 이미지 (MODULE 로 서비스 지정)
 ```
 

@@ -90,45 +90,68 @@ const MACHINE_ONLY = new Map([
 const SCREEN_PENDING = new Map([
   // --- order-service ---
   ['order-service/PublicEcommerceCategoryController', '쇼핑 카테고리 탐색 — 관리 화면만 있다'],
-  ['order-service/AdminRefundController', '환불 관리 콘솔'],
-  ['order-service/PgRoutingController', 'PG 라우팅 설정 콘솔'],
-  ['order-service/RefundHistoryController', '환불 이력 조회 화면'],
-  ['order-service/SplitPaymentController', '분할결제 UI'],
+  // 환불 운영 콘솔이 생겼다(2026-08-22, /admin/settlement/refunds). 자동 재시도 5회가 끝나면
+  // 스케줄러가 손대지 않는데, 그 대상을 볼 화면이 없었다 — 사람이 안 하면 영영 처리되지 않는 건이다.
+  // RefundHistoryController 도 함께 내려간다: 화면이 행마다 결제별 환불 이력을 실제로 부른다
+  // (여러 번 시도한 건의 이중 환불 여부를 실제 완료액으로 판단하는 자리).
+  // PG 라우터 상태 카드가 생겼다(2026-08-22, 운영 관제 상단). 사유를 먼저 "설정 콘솔"에서
+  // "읽기 전용 상태 점검"으로 정정한 것이 그대로 설계가 됐다 — 조작 버튼 없는 스냅샷 한 장이고,
+  // order-service 표면이지만 읽는 맥락이 관제라 operation 화면에 얹었다.
   ['order-service/ProductVariantController', '상품 옵션(SKU) 관리 화면'],
   // --- settlement-service (docs/PLAN.md §8-8) ---
   ['settlement-service/EventTrackAdminController', '이벤트 추적 콘솔 — PLAN 8-8'],
   ['settlement-service/SettlementRerunAdminController', '정산 재구동 — PLAN 8-8'],
-  ['settlement-service/SellerBankAccountAdminController', '셀러 계좌 레지스트리 — PLAN 8-2'],
-  ['settlement-service/SellerBankAccountSelfController', '셀러 본인 계좌 등록(셀러 화면)'],
+  // 셀러 계좌 2종은 화면이 생겼다(2026-08-21): 셀프는 '내 잔액'의 정산 계좌 구획,
+  // 운영자 대행은 지급 콘솔의 셀러 계좌 패널. 계좌가 없으면 payout 이 아예 생성되지 않아
+  // 실패 목록에도 안 뜨는데, 그동안 고치는 방법이 DB 직접 수정뿐이었다.
   ['settlement-service/SettlementQueryController', 'ES 기반 정산 검색'],
   // 관리자 세무 3종은 /admin/settlement/tax 콘솔로 노출됐다(2026-08-14). 아래 둘은 셀러 화면 몫이라 남는다.
   ['settlement-service/TaxInvoiceScanController', '세금계산서 스캔(셀러 화면)'],
   ['settlement-service/TaxInvoiceSellerController', '세금계산서 조회(셀러 화면)'],
   // --- loan-service ---
-  ['loan-service/SecuredLoanController', '담보대출 화면 — 서류 리뷰 큐만 화면이 있다'],
-  ['loan-service/CollateralController', '담보 감시(재평가·마진콜·청산) 화면'],
+  // 담보 감시 화면이 생겼다(2026-08-21, /admin/ceo/collateral). 재평가·마진콜 판정과
+  // 실행(처분·대위변제)은 서비스·정책·테스트가 다 있었는데 부르는 어댑터가 없어 담보 가치가
+  // 반토막 나도 아무 일이 없었고, 어댑터가 생긴 뒤에도 부르는 화면이 없어 사람이 못 손댔다.
+  //
+  // ⚠️ SecuredLoanController 도 함께 내려가는데, 이 게이트는 <b>컨트롤러 단위</b>로 판정하기
+  //    때문이다(엔드포인트 하나만 불려도 커버). 실제로 화면이 부르는 것은 상세 조회
+  //    GET /loans/secured/{id} 하나뿐이고, 신청 3종(mortgage·financial-asset·personal)과
+  //    승인·반려·실행은 여전히 화면이 없다. 담보대출 신청·심사 화면은 별도 작업으로 남는다.
   ['loan-service/LeaseController', '리스 화면'],
-  ['loan-service/RepaymentController', '상환 화면'],
-  ['loan-service/CompanyReputationController', '기업 평판 조회(대출 심사 보조)'],
+  // 상환표 시뮬레이터는 화면이 생겼다(2026-08-22, 대출하기 화면의 '상환표' 탭).
+  // 사유를 먼저 정정한 것이 그대로 설계가 됐다 — "상환 화면"이 아니라 부수효과 없는 계산기라,
+  // 라우트·메뉴·마이그레이션 없이 기존 화면에 탭 하나로 붙었다. 이 세션에서 가장 싼 상환이다.
+  // 2026-08-22 사유 보강: company-service 평판과 <b>다른 표면</b>이다. loan 이 company 이벤트로
+  // 자체 DB 에 적재한 로컬 프로젝션이고(ADR 0023 Phase 3) 조회 키가 stockCode 다.
+  // CEO '기업조회' 화면(/api/company/**)과 혼동하면 이미 있는 화면을 또 만들게 된다.
+  ['loan-service/CompanyReputationController', '셀러 평판 프로젝션 조회 — loan 로컬(ADR 0023 P3), company 표면과 별개'],
   // --- account-service ---
-  ['account-service/RetirementPensionController', '퇴직연금 화면'],
-  ['account-service/InstallmentSavingsController', '적금 화면'],
-  ['account-service/TimeDepositController', '예금 화면'],
+  // 수신 3종은 화면이 생겼다(2026-08-22, /admin/ceo/banking 탭 3개).
+  // 이 부채는 게이트웨이 배선이 선행이었다 — 같은 날 /api/banking/** 를 열기 전까지는
+  // 화면을 만들어도 404 를 부르는 화면이었다(gateway-route-gate 의 UNROUTED_DEBT 3건).
   // --- company-service ---
   // /admin/company/** 6종은 게이트웨이 미노출이라 MACHINE_ONLY 로 옮겼다. 여기 남은 것은
   // /api/company/** 로 라우팅돼 브라우저가 부를 수 있는데도 화면이 없는 것뿐이다.
-  ['company-service/CompanyWorkforceController', '고용현황 조회 — CEO 화면은 다른 경로를 쓴다'],
+  // 2026-08-22: 이 항목은 <b>부채가 아니었다</b>. 고용현황 화면(/admin/ceo/workforce)이 세
+  // 엔드포인트를 모두 부르고 있었는데, URL 추출기가 쿼리스트링 붙은 템플릿 리터럴
+  // (`/api/company/workforce?${params}`)을 못 읽어 "화면 없음"으로 집계했다.
+  // 추출기를 고치고 여기서 지운다 — 화면을 만드는 게 아니라 세는 법이 틀렸던 경우다.
   // --- insurance-service ---
-  ['insurance-service/InsuranceApplicationController', '보험 청약 화면 — 서류 리뷰 큐만 화면이 있다'],
-  ['insurance-service/PolicyController', '보험 계약 화면'],
-  ['insurance-service/ProposalController', '보험 가입설계 화면'],
-  ['insurance-service/ProductDisclosureController', '상품설명서 교부 증빙 화면(완전판매 게이트)'],
+  // 보험 영업 체인이 화면으로 이어졌다(2026-08-22, /admin/system/insurance-sales).
+  // 어제 붙인 상품설명서 교부가 여는 '승인'이 이 체인의 한 단계인데 그 승인을 누를 화면이
+  // 없어 증빙만 남기고 끝나 있었다. 설계 → 전환 → 청약 → 승인 → 계약이 한 화면에서 이어진다.
+  // 상품설명서 교부는 화면이 생겼다(2026-08-21, /admin/system/insurance-disclosures).
+  // 이 부채는 승인 경로를 막고 있었다 — 교부 증빙이 없으면 청약 승인이 409 로 거절되는데
+  // 교부가 API 로만 가능했다. 다만 청약 생성·승인 자체는 아직 화면이 없다(아래 두 항목).
   // --- deposit-service ---
-  ['deposit-service/DepositAdminController', '예치금 수기 콘솔 — 증빙 리뷰 큐만 화면이 있다'],
+  // 예치금 수기 콘솔은 화면이 생겼다(2026-08-21, /admin/settlement/deposits). 이 부채는
+  // "기능을 못 쓴다"가 아니라 "부족분이 영원히 쌓인다"였다 — 도메인 주석이 해소 주체가
+  // 없다고 명시했고 resolve/writeOff 의 프로덕션 호출자가 0건이었다.
   // --- 그 외 ---
   ['ai-service/KnowledgeController', 'AI 지식베이스 관리'],
   ['common-data-service/DataSourceController', '공공데이터 데이터소스 등록 화면'],
-  ['organization-service/OrganizationController', '조직·멤버십 화면 — 서비스 전체가 화면 0'],
+  // 조직·멤버십 화면이 생겼다(2026-08-22, /admin/system/organizations). organization-service
+  // 최초의 화면이다 — 그전까지 조직을 만들고 사람을 붙이는 경로가 API 뿐이었다.
 ]);
 
 /**
@@ -143,7 +166,30 @@ const SCREEN_PENDING = new Map([
 //              홀드백 해제 미리보기(지급 콘솔), 셀러 등급 콘솔(신규 화면). 앞의 셋은 기존 화면에
 //              구획을 얹었고 넷째만 새 라우트라, 부채 상환 비용이 화면 수와 비례하지 않는다는
 //              방증이기도 하다.)
-const PENDING_BUDGET = 30;
+// 2026-08-21: 28 (셀러 지급 계좌 2종 — 셀프 등록은 '내 잔액', 운영자 대행은 지급 콘솔의
+//              구획으로 붙였다. 이 부채는 성격이 달랐다: 화면이 없어 기능을 못 쓰는 정도가
+//              아니라, 계좌가 없으면 payout 이 생성조차 되지 않아 실패 목록에도 안 뜨는
+//              무증상 정지였다. 반송 처리 안내는 "계좌 정정이 선행"이라고 적혀 있는데
+//              정작 정정할 화면이 없었다.)
+// 2026-08-21: 27 (예치금 수기 콘솔 — hold·offset 은 card 이벤트에 sellerId 가 없어 자동화가
+//              막혀 있어 수기 경로가 유일하고, 상계 부족분은 해소 주체가 아예 없어 쌓이기만 했다.)
+// 2026-08-21: 26 (보험 상품설명서 교부 — 완전판매 게이트의 입력 경로가 API 뿐이라
+//              청약 승인을 UI 로 통과시킬 방법이 없었다.)
+// 2026-08-21: 24 (담보 감시 화면 — 재평가·처분·대위변제. SecuredLoanController 는 상세 조회만
+//              불리는데 컨트롤러 단위 판정이라 함께 내려간다. 신청·심사 화면 부재는 위 주석 참조.)
+// 2026-08-22: 23 (조직·멤버십 — organization-service 최초의 화면.)
+// 2026-08-22: 21 (환불 운영 콘솔 — 목록과 결제별 이력을 둘 다 부른다. 게이트웨이 배선이
+//              선행이었고 같은 날 열렸다: 그전에는 화면을 만들어도 404 를 부르는 화면이었다.)
+// 2026-08-22: 20 (CompanyWorkforceController — 화면을 붙인 게 아니라 거짓 부채를 걷어냈다.
+//              추출기가 쿼리스트링 붙은 URL 을 못 읽어 9개를 못 보고 있었고, 그중 1건이
+//              부채로 잡혀 있었다. 예산이 내려간다고 늘 상환은 아니다.)
+// 2026-08-22: 17 (수신 3종 — 정기예금·적금·퇴직연금. 화면 하나에 탭 셋으로 3건을 갚았다.
+//              세 상품이 같은 모양(가입 → 납입 → 만기/중도해지)이라 가능했다.)
+// 2026-08-22: 14 (보험 3종 — 설계·청약·계약. 그중 PolicyController 1건은 화면이 부르는데도
+//              추출기가 보간 괄호를 못 읽어 안 잡히던 것이라, 추출기 보정과 같이 내려간다.)
+// 2026-08-22: 12 (상환표 시뮬레이터 — 기존 대출 화면에 탭 하나. 배선 0.)
+// 2026-08-22: 11 (PG 라우터 상태 카드 — 운영 관제에 구획 하나. 배선 0.)
+const PENDING_BUDGET = 11;
 
 const read = (path) => readFileSync(path, 'utf8');
 
@@ -152,7 +198,21 @@ function frontendUrls() {
   const urls = new Set();
   for (const file of walk(join(REPO_ROOT, 'frontend', 'src'))) {
     if (!/\.(ts|tsx)$/.test(file) || file.includes('__tests__')) continue;
-    for (const m of read(file).matchAll(/['"`](\/[a-zA-Z0-9/{}$_.*-]+)['"`]/g)) urls.add(norm(m[1]));
+    // 템플릿 보간을 <b>먼저</b> 균일한 토큰으로 접는다. 경로 문자류에 괄호가 없어서
+    // `${encodeURIComponent(id)}` 같은 보간이 들어가면 매치가 통째로 실패하기 때문이다
+    // (encodeURIComponent 는 이 저장소의 URL 관례다 — coupon·display-section·option-catalog 등).
+    const source = read(file).replace(/\$\{[^}]*\}/g, '${x}');
+
+    // 닫는 따옴표 앞의 쿼리스트링을 허용하고 <b>경로만</b> 캡처한다.
+    // 이 `(?:\?...)?` 가 없으면 `/api/company/workforce?${params}` 같은 호출이 통째로 안 잡힌다.
+    //
+    // 두 보정 모두 같은 실패를 막는다: <b>화면이 멀쩡히 부르는데 "화면 없음"으로 집계되는 것</b>.
+    // 스캔이 0이 되는 실패와 달리 조용히 부채를 부풀리는 방향이라 오래 산다.
+    // 2026-08-22 실측 — 쿼리스트링: URL 9개 가려짐(CompanyWorkforceController 1건 거짓 부채),
+    //                   보간 괄호: URL 19개 가려짐(PolicyController 1건 거짓 부채).
+    for (const m of source.matchAll(/['"`](\/[a-zA-Z0-9/{}$_.*-]+)(?:\?[^'"`]*)?['"`]/g)) {
+      urls.add(norm(m[1]));
+    }
   }
   return urls;
 }
@@ -240,4 +300,31 @@ test('추출기가 살아 있다 (스캔이 비면 판정 전체가 거짓이 �
   // 추출 정규식이 깨져 0개가 되면 위 테스트들은 조용히 전부 통과한다.
   assert.ok(controllers().length >= 100, '컨트롤러 스캔 결과가 비정상적으로 적습니다.');
   assert.ok(frontendUrls().size >= 150, '프론트 URL 스캔 결과가 비정상적으로 적습니다.');
+});
+
+test('[자기검증] 쿼리스트링이 붙은 호출도 경로로 읽는다', () => {
+  // 이 형태를 못 읽으면 화면이 멀쩡히 부르는 컨트롤러가 "화면 없음"으로 집계된다 —
+  // 스캔이 0이 되는 실패와 달리 <b>조용히 부채를 부풀리는</b> 실패라 더 오래 산다.
+  // 실제로 CompanyWorkforceController 가 그렇게 잡혀 있었다(2026-08-22).
+  const urls = new Set();
+  const sample = [
+    'api.get<T>(`/api/company/workforce?${params}`)',
+    "api.get('/api/company/workforce/detail?name=x&page=1')",
+    'api.get(`/admin/refunds`)',
+    'api.delete(`/api/organizations/${id}/members/${userId}`)',
+    // 보간 안에 함수 호출이 들어가는 형태 — 이 저장소의 URL 관례다.
+    'api.post(`/api/insurance/policies/${encodeURIComponent(policyNumber)}/surrender`)',
+  ].join('\n').replace(/\$\{[^}]*\}/g, '${x}');
+  for (const m of sample.matchAll(/['"`](\/[a-zA-Z0-9/{}$_.*-]+)(?:\?[^'"`]*)?['"`]/g)) {
+    urls.add(norm(m[1]));
+  }
+
+  assert.ok(urls.has('/api/company/workforce'), '템플릿 리터럴 + 쿼리스트링을 읽어야 한다');
+  assert.ok(urls.has('/api/company/workforce/detail'), '작은따옴표 + 쿼리스트링도 읽어야 한다');
+  assert.ok(urls.has('/admin/refunds'), '쿼리 없는 경로는 그대로 읽어야 한다');
+  assert.ok(urls.has('/api/organizations/*/members/*'), '경로변수는 와일드카드로 접어야 한다');
+  assert.ok(urls.has('/api/insurance/policies/*/surrender'),
+    '보간 안에 함수 호출이 있어도 읽어야 한다 — 괄호 때문에 매치가 통째로 실패하던 자리다');
+  // 쿼리스트링 자체가 경로로 새어 들어오면 안 된다 — 그러면 어떤 엔드포인트에도 안 붙는다.
+  assert.ok([...urls].every((u) => !u.includes('?')), '캡처는 경로까지다');
 });

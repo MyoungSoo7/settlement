@@ -42,6 +42,23 @@ class PointLedgerHealthTest {
             assertThat(health.balanced()).isTrue();
         }
 
+        /**
+         * 비교축이 {@code total} 인 이유를 그대로 단정한다. 선점({@link PointHold})은 가용에서
+         * 잠금으로 옮길 뿐 <b>로트를 건드리지 않으므로</b> Σ remaining 은 그대로다 — 가용으로
+         * 비교했다면 선점이 걸린 정상 계정이 매번 드리프트로 잡혔을 것이다.
+         */
+        @Test
+        @DisplayName("선점이 걸린 계정도 균형이다 — 가용으로 비교했다면 정상 계정이 조사 대상이 됐다")
+        void heldAccountIsBalancedOnTotal() {
+            // 총액 10,000 = 가용 7,000 + 선점 3,000. 로트·원장은 여전히 10,000.
+            assertThat(PointLedgerHealth.of(won("10000"), won("10000"), won("10000")).balanced())
+                    .isTrue();
+
+            PointLedgerHealth byAvailable = PointLedgerHealth.of(won("7000"), won("10000"), won("10000"));
+            assertThat(byAvailable.balanced()).isFalse();
+            assertThat(byAvailable.lotDrift()).isEqualByComparingTo("-3000");
+        }
+
         @Test
         @DisplayName("모두 0 이면 균형이다 — 거래가 없는 신규 계정")
         void emptyAccountIsBalanced() {
@@ -104,7 +121,7 @@ class PointLedgerHealthTest {
         void nullAvailable() {
             PointLedgerHealth health = PointLedgerHealth.of(null, won("500"), won("500"));
 
-            assertThat(health.accountAvailable()).isEqualByComparingTo("0");
+            assertThat(health.accountTotal()).isEqualByComparingTo("0");
             assertThat(health.lotDrift()).isEqualByComparingTo("-500");
         }
     }

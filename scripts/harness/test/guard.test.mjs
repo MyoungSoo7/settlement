@@ -23,6 +23,7 @@ import {
   stripComments,
   scanText,
   checkConsumerGroupOwnership,
+  defaultRepoRoot,
   expectedGroupId,
   resolveGroupId,
 } from '../guard.mjs';
@@ -982,5 +983,27 @@ describe('KAFKA-GROUP-OWNER (컨슈머 그룹 ID 소유권)', () => {
     const actualRepoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
     assert.deepEqual(checkConsumerGroupOwnership(actualRepoRoot), []);
+  });
+});
+
+describe('repoRoot 기본값', () => {
+  // 훅은 셸의 cwd 를 물려받는다. Bash 도구의 cwd 가 하위 디렉터리에 남아 있던 상태로 가드가
+  // 돌면 repoRoot 가 그 하위 디렉터리가 되어, 정상 저장소 경로가 "outside repository" 로
+  // 차단되고 텔레메트리도 평행 트리에 쌓인다. cwd 에 기대지 않는다는 것을 못 박는다.
+  test('cwd 를 옮겨도 변하지 않는다 — 스크립트 위치에서 도출한다', async () => {
+    const original = process.cwd();
+    const before = defaultRepoRoot();
+    try {
+      process.chdir(tmpdir());
+      assert.equal(defaultRepoRoot(), before);
+    } finally {
+      process.chdir(original);
+    }
+  });
+
+  test('도출된 경로가 실제 저장소 루트다 — 그 아래 guard.mjs 가 있다', async () => {
+    const source = await readFile(join(defaultRepoRoot(), 'scripts', 'harness', 'guard.mjs'), 'utf8');
+
+    assert.ok(source.includes('export function defaultRepoRoot'));
   });
 });

@@ -66,8 +66,12 @@ public class ExpenseReceiptJpaEntity {
     @Column(name = "total_amount", nullable = false, precision = 19, scale = 2)
     private BigDecimal totalAmount;
 
-    @Column(name = "confidence", nullable = false, precision = 3, scale = 2)
-    private BigDecimal confidence;
+    @Column(name = "amount_confidence", nullable = false, precision = 3, scale = 2)
+    private BigDecimal amountConfidence;
+
+    /** 거래일을 못 읽었으면 NULL — 없는 필드에 신뢰도를 붙이지 않는다. */
+    @Column(name = "date_confidence", precision = 3, scale = 2)
+    private BigDecimal dateConfidence;
 
     @Column(name = "ocr_model", nullable = false, length = 100)
     private String ocrModel;
@@ -106,7 +110,8 @@ public class ExpenseReceiptJpaEntity {
         e.merchantName = receipt.getExtracted().merchantName();
         e.transactionDate = receipt.getExtracted().transactionDate();
         e.totalAmount = receipt.getExtracted().totalAmount();
-        e.confidence = receipt.getExtracted().confidence();
+        e.amountConfidence = receipt.getExtracted().amountConfidence();
+        e.dateConfidence = receipt.getExtracted().dateConfidence();
         e.ocrModel = receipt.getOcrModel();
         e.status = receipt.getStatus();
         e.matchNote = receipt.getMatchNote();
@@ -135,7 +140,8 @@ public class ExpenseReceiptJpaEntity {
                 .contentType(contentType)
                 .fileHash(fileHash)
                 .sizeBytes(sizeBytes)
-                .extracted(new ExtractedReceipt(merchantName, transactionDate, totalAmount, confidence))
+                .extracted(new ExtractedReceipt(merchantName, transactionDate, totalAmount,
+                        amountConfidence, dateConfidence))
                 .ocrModel(ocrModel)
                 .status(status)
                 .matchNote(matchNote)

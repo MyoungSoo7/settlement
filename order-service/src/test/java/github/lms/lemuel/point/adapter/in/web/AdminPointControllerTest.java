@@ -76,7 +76,7 @@ class AdminPointControllerTest {
         mockMvc.perform(get("/admin/points/summary"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accountCount").value(5))
-                .andExpect(jsonPath("$.totalAvailable").value(5000))
+                .andExpect(jsonPath("$.totalBalance").value(5000))
                 .andExpect(jsonPath("$.totalActiveLotRemaining").value(4800))
                 .andExpect(jsonPath("$.driftedAccountCount").value(2))
                 .andExpect(jsonPath("$.expiringAmount").value(250));

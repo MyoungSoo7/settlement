@@ -19,8 +19,22 @@ spring:
     default-schema: education
     create-schemas: true
     locations: classpath:db/migration
+  # Outbox → Kafka 발행 전송 설정.
+  #   app.kafka.enabled=false(기본) 이면 KafkaOutboxPublisher 대신 ApplicationEventOutboxPublisher
+  #   폴백이 등록돼 in-process no-op 으로 발행 처리된다 — 로컬은 브로커 없이도 부팅한다.
+  #   소비는 하지 않는다(컨슈머 0) — consumer 설정을 두지 않는 것이 그 경계의 표현이다.
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      acks: all
+      retries: 5
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
 server:
-  port: ${SERVER_PORT:8115}
+  # 8116/8117 — 8114/8115 는 board 가 쓴다(8115 는 board 의 management 포트라 예전 8115 기본값과
+  # 로컬 동시 기동에서 충돌했다). 8006~8105 는 Windows(Hyper-V) 예약 구간이라 재사용 불가.
+  port: ${SERVER_PORT:8116}
   shutdown: graceful
   servlet:
     encoding:
@@ -30,8 +44,19 @@ server:
 management:
   endpoints.web.exposure.include: health,info,metrics,prometheus
   endpoint.health.probes.enabled: true
+  server.port: ${MANAGEMENT_SERVER_PORT:8117}
 app:
   jwt:
     issuer: ${JWT_ISSUER:lemuel}
     secret: ${JWT_SECRET}
     ttl-seconds: ${JWT_TTL_SECONDS:3600}
+  kafka:
+    enabled: ${APP_KAFKA_ENABLED:false}
+    topic:
+      # ADR 0035 — 이 모듈이 발행(소유)하는 토픽만 만든다(파티션 정본은 topic-catalog.json).
+      owner: education-service
+      # 발행 전용(소비처 미배선 — SPEC.md §5). Outbox 폴러가 aggregateType="Education" +
+      # eventType="CoursePublished" 에서 이 토픽명을 파생한다.
+      course-published: lemuel.education.course_published
+  outbox:
+    polling-delay-ms: ${APP_OUTBOX_POLLING_DELAY_MS:2000}   # OutboxPublisherScheduler 폴링 주기

@@ -41,9 +41,10 @@ seed:
       flow: "approve → 같은 tx Outbox 적재(PgReconciliationOutboxEventAdapter) → 폴러 Kafka 발행 → lemuel.pgreconciliation.discrepancy_approved → PgReconciliationApprovedSettlementAdjustConsumer (서비스 내부 self-consume 토픽)"
       clawback_rules:  # 회수(셀러에게서 환수) 방향만 — 과소 정산(셀러에게 지급)은 명시적 skip
         source: settlement-service/src/main/java/github/lms/lemuel/settlement/adapter/in/kafka/PgReconciliationApprovedSettlementAdjustConsumer.java:95-145
-        - "AMOUNT_MISMATCH (pg < internal): clawback = |difference|"
-        - "MISSING_PG: clawback = internalAmount 전액"
-        - "그 외/회수 대상 아님: 조용히 버리지 않고 pg.reconciliation.adjustments.skipped{reason} 메트릭 + WARN"
+        rules:
+          - "AMOUNT_MISMATCH (pg < internal): clawback = |difference|"
+          - "MISSING_PG: clawback = internalAmount 전액"
+          - "그 외/회수 대상 아님: 조용히 버리지 않고 pg.reconciliation.adjustments.skipped{reason} 메트릭 + WARN"
     clawback_application:
       source: settlement-service/src/main/java/github/lms/lemuel/settlement/application/service/ApplyReconciliationAdjustmentService.java:65-106
       rules:

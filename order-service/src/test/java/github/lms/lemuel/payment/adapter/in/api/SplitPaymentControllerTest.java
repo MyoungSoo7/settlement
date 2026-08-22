@@ -39,6 +39,7 @@ class SplitPaymentControllerTest {
     @MockitoBean JwtUtil jwtUtil;
     @MockitoBean CreateSplitPaymentUseCase createUseCase;
     @MockitoBean RefundSplitPaymentService refundService;
+    @MockitoBean github.lms.lemuel.payment.application.port.in.ConfirmDepositUseCase confirmDepositUseCase;
 
     /**
      * JWT 주체를 SecurityContext 에 직접 세팅한다. addFilters=false 슬라이스에는 보안 필터가 없어
@@ -60,14 +61,14 @@ class SplitPaymentControllerTest {
     private PaymentDomain splitPayment() {
         PaymentTender point = PaymentTender.newTender(TenderType.POINT, new BigDecimal("5000"), 1);
         PaymentTender card = PaymentTender.newTender(TenderType.CARD, new BigDecimal("45000"), 2);
-        return PaymentDomain.createSplit(100L, List.of(point, card), "SPLIT");
+        return PaymentDomain.createWithTenders(100L, List.of(point, card), "SPLIT");
     }
 
     @Test
     @DisplayName("POST /payments/split 는 분할결제를 생성하고 201 을 반환한다")
     void create() throws Exception {
         login(42L);
-        when(createUseCase.createSplit(eq(100L), any(), eq(42L))).thenReturn(splitPayment());
+        when(createUseCase.createWithTenders(eq(100L), any(), eq(42L))).thenReturn(splitPayment());
 
         mockMvc.perform(post("/payments/split")
                         .contentType(MediaType.APPLICATION_JSON)

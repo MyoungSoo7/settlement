@@ -49,7 +49,7 @@ describe('SideNavLayout — 세 벌이던 사이드바 셸을 트리 하나로',
   });
 
   it('현재 항목에 aria-current=page 가 하나만 붙는다', () => {
-    const { container } = renderAt('/admin/payouts', resolveFallbackMenus('ADMIN'));
+    const { container } = renderAt('/admin/settlement/payouts', resolveFallbackMenus('ADMIN'));
 
     const current = container.querySelectorAll('[aria-current="page"]');
     expect(current).toHaveLength(1);

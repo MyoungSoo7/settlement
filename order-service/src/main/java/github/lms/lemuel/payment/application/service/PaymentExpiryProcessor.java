@@ -4,6 +4,8 @@ import github.lms.lemuel.payment.application.port.out.CancelUnpaidOrderPort;
 import github.lms.lemuel.payment.application.port.out.LoadPaymentPort;
 import github.lms.lemuel.payment.application.port.out.SavePaymentPort;
 import github.lms.lemuel.payment.domain.PaymentDomain;
+import github.lms.lemuel.payment.domain.PaymentTender;
+import github.lms.lemuel.payment.domain.TenderType;
 import github.lms.lemuel.payment.domain.exception.PaymentNotFoundException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -28,13 +30,19 @@ public class PaymentExpiryProcessor {
     private final LoadPaymentPort loadPaymentPort;
     private final SavePaymentPort savePaymentPort;
     private final CancelUnpaidOrderPort cancelUnpaidOrderPort;
+    private final github.lms.lemuel.payment.application.port.out.PointTenderPort pointTenderPort;
+    private final github.lms.lemuel.payment.application.port.out.GiftCardTenderPort giftCardTenderPort;
 
     public PaymentExpiryProcessor(LoadPaymentPort loadPaymentPort,
                                   SavePaymentPort savePaymentPort,
-                                  CancelUnpaidOrderPort cancelUnpaidOrderPort) {
+                                  CancelUnpaidOrderPort cancelUnpaidOrderPort,
+                                  github.lms.lemuel.payment.application.port.out.PointTenderPort pointTenderPort,
+                                  github.lms.lemuel.payment.application.port.out.GiftCardTenderPort giftCardTenderPort) {
         this.loadPaymentPort = loadPaymentPort;
         this.savePaymentPort = savePaymentPort;
         this.cancelUnpaidOrderPort = cancelUnpaidOrderPort;
+        this.pointTenderPort = pointTenderPort;
+        this.giftCardTenderPort = giftCardTenderPort;
     }
 
     /**
@@ -50,7 +58,30 @@ public class PaymentExpiryProcessor {
 
         payment.expire();
         savePaymentPort.save(payment);
+        releasePointHolds(payment);
 
         return cancelUnpaidOrderPort.cancelUnpaidOrder(payment.getOrderId(), REASON);
+    }
+
+    /**
+     * 입금 대기 동안 잠가 둔 포인트를 푼다.
+     *
+     * <p>풀지 않고 만료시키면 고객 포인트가 <b>영영 잠긴다</b> — 주문은 취소돼 사라지고, 그 주문을
+     * 근거로 잠긴 잔고를 풀어 줄 사람이 아무도 남지 않는다.
+     *
+     * <p>같은 트랜잭션에서 푼다. 결제는 EXPIRED 인데 잔고만 잠긴 채로 남는 조합을 만들지 않기
+     * 위해서다 — 해제가 실패하면 이 건 전체가 롤백되고 다음 주기가 다시 집는다(멱등).
+     */
+    private void releasePointHolds(PaymentDomain payment) {
+        if (!payment.isSplit()) {
+            return;
+        }
+        for (PaymentTender tender : payment.getTenders()) {
+            if (tender.getType() == TenderType.POINT) {
+                pointTenderPort.releaseHold(tender.getId(), true);
+            } else if (tender.getType() == TenderType.GIFT_CARD) {
+                giftCardTenderPort.releaseHold(tender.getId(), true);
+            }
+        }
     }
 }

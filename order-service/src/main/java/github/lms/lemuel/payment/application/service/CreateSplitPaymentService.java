@@ -21,16 +21,21 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 분할결제 생성 서비스.
+ * 텐더 기반 결제 생성 서비스 — 지불수단이 하나든 여럿이든 이 경로 하나를 탄다.
  *
  * <p>흐름:
  * <ol>
  *   <li>요청된 tender 들을 sequence 순서로 PaymentTender 도메인으로 변환</li>
  *   <li>외부 PG tender → PgRouter.authorize/capture (각 tender 별 독립 PG 거래)</li>
- *   <li>내부 잔액 tender → 외부 호출 없이 즉시 CAPTURED (실 운영에서는 PointService/GiftCardService 호출)</li>
- *   <li>모든 tender 가 성공하면 Payment.createSplit + 저장 + 주문 PAID 전이 + outbox 이벤트</li>
+ *   <li>내부 잔액 tender → 외부 호출 없이 즉시 CAPTURED, 저장 후 원장에서 실제 차감</li>
+ *   <li>모든 tender 가 성공하면 {@code PaymentDomain.createWithTenders} + 저장 + 주문 PAID 전이 + outbox 이벤트</li>
  *   <li>중간에 실패 시 트랜잭션 롤백 → 이미 처리된 외부 PG 거래는 별도 보상 처리 필요 (Saga, 본 구현은 단순화)</li>
  * </ol>
+ *
+ * <p><b>클래스 이름에 "Split" 이 남아 있는 이유</b>: 이제 텐더 1 개(포인트·기프트카드 전액 결제)도
+ * 받으므로 이름이 좁아졌지만, 클래스·REST 경로({@code /payments/split})까지 바꾸면 게이트웨이·
+ * nginx 배선과 외부 계약이 함께 움직인다. 의미가 넓어진 것은 메서드 이름
+ * ({@code createWithTenders})과 이 주석으로 표시하고, 경로 개명은 별건으로 남긴다.
  */
 @Service
 @Transactional
@@ -63,12 +68,12 @@ public class CreateSplitPaymentService implements CreateSplitPaymentUseCase {
     }
 
     @Override
-    public PaymentDomain createSplit(Long orderId, List<TenderRequest> tenderRequests, Long actorUserId) {
-        if (tenderRequests == null || tenderRequests.size() < 2) {
-            throw new PaymentInvariantViolationException("분할결제는 최소 2 개의 지불수단 필요");
+    public PaymentDomain createWithTenders(Long orderId, List<TenderRequest> tenderRequests, Long actorUserId) {
+        if (tenderRequests == null || tenderRequests.isEmpty()) {
+            throw new PaymentInvariantViolationException("결제에는 최소 1 개의 지불수단이 필요합니다");
         }
 
-        log.info("분할결제 시작: orderId={}, tenders={}", orderId, tenderRequests.size());
+        log.info("텐더 결제 시작: orderId={}, tenders={}", orderId, tenderRequests.size());
 
         List<PaymentTender> tenders = new ArrayList<>(tenderRequests.size());
         int seq = 1;
@@ -88,11 +93,25 @@ public class CreateSplitPaymentService implements CreateSplitPaymentUseCase {
 
         // 가장 큰 tender 의 type 을 paymentMethod 표시값으로 사용 (운영자 가시성)
         String paymentMethod = pickPrimaryMethodLabel(tenderRequests);
-        PaymentDomain payment = PaymentDomain.createSplit(orderId, tenders, paymentMethod);
+        PaymentDomain payment = PaymentDomain.createWithTenders(orderId, tenders, paymentMethod);
+
+        boolean awaitsDeposit = payment.awaitsDeposit();
 
         // 각 tender 처리
         for (PaymentTender tender : tenders) {
-            processTender(tender, orderId);
+            processTender(tender, orderId, awaitsDeposit);
+        }
+
+        if (awaitsDeposit) {
+            // 부모 결제는 READY 로 남는다 — 돈이 아직 안 들어왔고, 미입금 만료 배치가 집어갈 수
+            // 있어야 하기 때문이다(PaymentDomain.expire 는 READY 에서만 EXPIRED 에 도달한다).
+            // 주문도 PAID 로 올리지 않고 payment.captured 도 발행하지 않는다 — 발행하면 입금되지
+            // 않은 주문이 그대로 정산 대상이 된다.
+            PaymentDomain pending = savePaymentPort.save(payment);
+            holdInternalTenders(pending, actorUserId);
+            log.info("입금 대기 결제 생성: paymentId={}, orderId={}, amount={}",
+                    pending.getId(), orderId, pending.getAmount());
+            return pending;
         }
 
         // 부모 Payment 캡처 + 저장
@@ -116,22 +135,52 @@ public class CreateSplitPaymentService implements CreateSplitPaymentUseCase {
         return saved;
     }
 
-    private void processTender(PaymentTender tender, Long orderId) {
+    /**
+     * @param awaitsDeposit 입금 대기 결제면 <b>승인까지만</b> 하고 캡처하지 않는다. 카드 텐더도
+     *                      마찬가지다 — 가상계좌 입금이 끝내 오지 않아 주문이 취소될 수 있는데,
+     *                      카드만 먼저 매입해 두면 그때 환불로 되돌려야 한다.
+     */
+    private void processTender(PaymentTender tender, Long orderId, boolean awaitsDeposit) {
         if (tender.getType().usesExternalPg()) {
             // 외부 PG 호출 — PgRouter 가 자동으로 적합한 PG 어댑터 선택
             String pgTxnId = pgClientPort.authorize(orderId, tender.getAmount(), tender.getType().name());
             tender.authorize(pgTxnId);
-            pgClientPort.capture(pgTxnId, tender.getAmount());
-            tender.capture();
-            log.debug("외부 PG tender 처리: type={}, amount={}, pgTxn={}",
-                    tender.getType(), tender.getAmount(), pgTxnId);
+            if (!awaitsDeposit) {
+                pgClientPort.capture(pgTxnId, tender.getAmount());
+                tender.capture();
+            }
+            log.debug("외부 PG tender 처리: type={}, amount={}, pgTxn={}, 입금대기={}",
+                    tender.getType(), tender.getAmount(), pgTxnId, awaitsDeposit);
         } else {
-            // 내부 잔액 tender — 외부 호출은 없다. 실제 원장 차감은 저장 후
-            // deductInternalTenders 에서 한다(원장 자연키가 tenderId 인데, 저장 전에는
-            // 그 식별자가 없기 때문).
+            // 내부 잔액 tender — 외부 호출은 없다. 실제 원장 차감(또는 선점)은 저장 후에 한다
+            // (원장 자연키가 tenderId 인데, 저장 전에는 그 식별자가 없기 때문).
             tender.authorize(null);
-            tender.capture();
-            log.debug("내부 잔액 tender 처리: type={}, amount={}", tender.getType(), tender.getAmount());
+            if (!awaitsDeposit) {
+                tender.capture();
+            }
+            log.debug("내부 잔액 tender 처리: type={}, amount={}, 입금대기={}",
+                    tender.getType(), tender.getAmount(), awaitsDeposit);
+        }
+    }
+
+    /**
+     * 내부 잔액 tender 를 <b>선점</b>한다 — 차감이 아니다. 입금이 확인되면 확정되고, 기한이 지나면
+     * 풀린다. 저장 이후인 이유는 선점의 자연키가 tenderId 이기 때문이다(차감과 같은 이유).
+     */
+    private void holdInternalTenders(PaymentDomain saved, Long actorUserId) {
+        for (PaymentTender tender : saved.getTenders()) {
+            if (tender.getType().usesExternalPg()) {
+                continue;
+            }
+            if (actorUserId == null) {
+                throw new PaymentInvariantViolationException(
+                        "내부 잔액 선점에는 인증 주체가 필요합니다: paymentId=" + saved.getId());
+            }
+            if (tender.getType() == TenderType.POINT) {
+                pointTenderPort.hold(actorUserId, tender.getAmount(), tender.getId());
+            } else if (tender.getType() == TenderType.GIFT_CARD) {
+                giftCardTenderPort.hold(actorUserId, tender.getAmount(), tender.getId());
+            }
         }
     }
 
@@ -162,11 +211,19 @@ public class CreateSplitPaymentService implements CreateSplitPaymentUseCase {
         }
     }
 
+    /**
+     * 운영 화면에 보일 결제수단 표시값.
+     *
+     * <p>지불수단이 하나뿐이면 <b>{@code "SPLIT:"} 을 붙이지 않는다</b>. 붙이면 분할결제가 아닌
+     * 결제가 운영 화면·정산 프로젝션에서 분할결제로 읽힌다 — 표시값은 사실이어야 한다.
+     * 이 값은 {@code CashReceipt.isCashTender} 가 보는 값이기도 해서, 접두어가 붙어 있으면
+     * 단일 계좌이체 결제가 현금영수증 발급 대상에서 조용히 빠진다.
+     */
     private String pickPrimaryMethodLabel(List<TenderRequest> reqs) {
         TenderType primary = reqs.stream()
                 .max((a, b) -> a.amount().compareTo(b.amount()))
                 .map(TenderRequest::type)
                 .orElse(TenderType.CARD);
-        return "SPLIT:" + primary.name();
+        return reqs.size() == 1 ? primary.name() : "SPLIT:" + primary.name();
     }
 }

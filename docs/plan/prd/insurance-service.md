@@ -8,7 +8,7 @@
 > | --------- | ----------------------------------------------------------------------------------------------- |
 > | 대상 범위 | `insurance-service`(8108, mgmt 8109, DB `lemuel_insurance`) — 상담·설계·청약·계약·유지·수수료정산 |
 > | 역산 기준 | 2026-08-13 `develop` 브랜치                                                                   |
-> | 근거      | 도메인 22+ 클래스, REST 4개 컨텍스트, 배치 7종, 발행 4·소비 1 토픽, 테스트 42개 클래스        |
+> | 근거      | 도메인 58개 클래스, REST 4개 컨텍스트, 배치 7종, 발행 9·소비 1 토픽, Flyway 12개, 테스트 64개 클래스 |
 > | 범위 밖   | 원수사 실연동(전문·API) · 보험료 요율 산출 테이블 · 보험금 지급 심사                            |
 > | 관련 문서 | [`../../../SPEC.md`](../../../SPEC.md) · [`insurance-service-ga-platform.seed.yaml`](../seeds/insurance-service-ga-platform.seed.yaml) · `../../plan/prd/insurance-service.md` |
 

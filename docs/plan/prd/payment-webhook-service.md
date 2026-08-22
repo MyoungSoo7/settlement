@@ -8,7 +8,7 @@
 > | --------- | ------------------------------------------------------------------------------------------ |
 > | 대상 범위 | `payment-webhook-service`(8111, Go 1.22, **DB 없음**) — PG 결제 웹훅 수신 → 정규화 이벤트 발행 |
 > | 역산 기준 | 2026-08-13 `develop` 브랜치                                                              |
-> | 근거      | Go 프로덕션 6파일, 테스트 3파일, `lemuel.payment.confirmed` 발행 계약                    |
+> | 근거      | Go 프로덕션 7파일, 테스트 9파일, `lemuel.payment.confirmed` 발행 계약                    |
 > | 범위 밖   | 결제 승인·취소(→ `order-service`) · 정산 반영(→ `settlement-service`) · PG 대사          |
 > | 관련 문서 | [`../polyglot-services.md`](../polyglot-services.md) · ADR 0024(이벤트 계약) · [`../seeds/payment-webhook-service-ingest.seed.yaml`](../seeds/payment-webhook-service-ingest.seed.yaml) |
 

@@ -2,6 +2,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { pointApi } from '@/api/point';
 import { giftCardApi, type RegisterGiftCardResult } from '@/api/giftCard';
 import { depositApi, type DepositAccount } from '@/api/deposit';
+import {
+  sellerBankAccountApi,
+  type SellerBankAccountInput,
+  type SellerBankAccountView,
+} from '@/api/sellerBankAccount';
+import SellerBankAccountForm from '@/components/SellerBankAccountForm';
 import { apiErrorMessage } from '@/lib/apiError';
 
 /**
@@ -33,6 +39,11 @@ export default function MyBalancesPage() {
   const [redeemed, setRedeemed] = useState<RegisterGiftCardResult | null>(null);
   const [redeemError, setRedeemError] = useState<string | null>(null);
 
+  const [bankAccount, setBankAccount] = useState<SellerBankAccountView | null>(null);
+  const [savingAccount, setSavingAccount] = useState(false);
+  const [accountError, setAccountError] = useState<string | null>(null);
+  const [accountSaved, setAccountSaved] = useState(false);
+
   const load = useCallback(async () => {
     setLoadError(null);
     try {
@@ -49,7 +60,21 @@ export default function MyBalancesPage() {
     }
   }, []);
 
+  /**
+   * 지급 계좌는 잔액과 <b>따로</b> 불러온다. 같은 Promise.all 에 넣으면 계좌 조회가 실패했을 때
+   * (구 토큰이면 서버가 403 을 준다) 멀쩡한 포인트·기프트카드 잔액까지 화면에서 사라진다.
+   */
+  const loadAccount = useCallback(async () => {
+    setAccountError(null);
+    try {
+      setBankAccount(await sellerBankAccountApi.mine());
+    } catch (err) {
+      setAccountError(apiErrorMessage(err, '지급 계좌를 불러오지 못했습니다.'));
+    }
+  }, []);
+
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void loadAccount(); }, [loadAccount]);
 
   const redeem = async () => {
     setRedeemError(null);
@@ -67,6 +92,25 @@ export default function MyBalancesPage() {
       setRedeeming(false);
     }
   };
+
+  const saveAccount = async (input: SellerBankAccountInput) => {
+    setAccountError(null);
+    setAccountSaved(false);
+    setSavingAccount(true);
+    try {
+      setBankAccount(await sellerBankAccountApi.saveMine(input));
+      setAccountSaved(true);
+    } catch (err) {
+      setAccountError(apiErrorMessage(err, '지급 계좌를 저장하지 못했습니다.'));
+    } finally {
+      setSavingAccount(false);
+    }
+  };
+
+  // 예치 계좌가 있으면 셀러가 확실하다. 셀러인데 지급 계좌가 없으면 정산금이 나갈 곳이 없는
+  // 상태이며, 서버는 이때 payout 을 만들지 않고 WARN 만 남긴다 — 화면이 알려 주지 않으면
+  // 셀러는 "정산은 됐다는데 돈이 안 들어온다"만 겪는다.
+  const payoutBlocked = deposit !== null && bankAccount === null;
 
   return (
     <main className="mx-auto max-w-2xl p-6 space-y-8">
@@ -119,6 +163,49 @@ export default function MyBalancesPage() {
           </p>
         </section>
       )}
+
+      <section className="space-y-3 rounded border p-4" data-testid="bank-account-section">
+        <h2 className="text-lg font-semibold">정산금 받을 계좌</h2>
+        <p className="text-sm text-gray-500">
+          판매 정산금이 입금될 계좌입니다. 판매자가 아니라면 비워 두셔도 됩니다.
+        </p>
+
+        {payoutBlocked && (
+          <p role="alert" className="rounded bg-amber-50 p-3 text-sm text-amber-800"
+            data-testid="payout-blocked-warning">
+            등록된 계좌가 없어 <b>정산금이 지급되지 않습니다.</b> 정산이 확정돼도 보낼 곳이 없어
+            송금이 만들어지지 않으니, 계좌를 먼저 등록해 주세요.
+          </p>
+        )}
+
+        {bankAccount ? (
+          <dl className="rounded bg-gray-50 p-3 text-sm" data-testid="bank-account-current">
+            <div className="flex gap-2">
+              <dt className="text-gray-500">현재 계좌</dt>
+              <dd className="font-mono">{bankAccount.bank} {bankAccount.account}</dd>
+            </div>
+            <div className="flex gap-2">
+              <dt className="text-gray-500">예금주</dt>
+              <dd>{bankAccount.holder}</dd>
+            </div>
+          </dl>
+        ) : (
+          <p className="text-sm text-gray-500" data-testid="bank-account-empty">
+            아직 등록된 계좌가 없습니다.
+          </p>
+        )}
+
+        <SellerBankAccountForm current={bankAccount} saving={savingAccount}
+          onSubmit={input => void saveAccount(input)} idPrefix="my-sba" />
+
+        {accountError && <p role="alert" className="text-red-600">{accountError}</p>}
+        {accountSaved && bankAccount && (
+          <p role="status" className="text-sm text-green-700" data-testid="bank-account-saved">
+            저장했습니다. 뒤 4자리 <b className="font-mono">{bankAccount.account}</b> 가 내 계좌가
+            맞는지 은행 앱에서 확인해 주세요 — 보안상 전체 번호는 다시 보여 드릴 수 없습니다.
+          </p>
+        )}
+      </section>
 
       <section className="space-y-3 rounded border p-4">
         <h2 className="text-lg font-semibold">기프트카드 등록</h2>

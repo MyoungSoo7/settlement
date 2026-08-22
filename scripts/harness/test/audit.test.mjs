@@ -14,6 +14,7 @@ import {
   parseScanBasePackages,
   readContractCases,
   runAuditCli,
+  stripYamlComments,
   validateManifest,
 } from '../harness-audit.mjs';
 import {
@@ -773,6 +774,36 @@ test('doc facts: "소비처가 아직 미배선" 처럼 부사가 끼어도 같�
   });
   assert.equal(errors.length, 1, errors.join('\n'));
   assert.match(errors[0], /소비처 배선 있음: lemuel\.organization\.created 를 card-service 가 참조/);
+});
+
+// 2026-08-22 실측: SPEC 이 lemuel.card.authorized 를 "소비처 미배선"으로 적었는데 audit 이 이를
+// 거짓이라 판정했다. 근거는 deposit application.yml 의 **주석** —
+// "※ lemuel.card.authorized / lemuel.card.captured 는 아직 구독하지 않는다" 였다. 왜 구독하지
+// 않는지 자세히 적어 둘수록 오탐이 늘어나는 검사였다. 주석은 배선이 아니다.
+test('doc facts: yml 주석에 적힌 토픽명을 소비 배선으로 세지 않는다', () => {
+  assert.deepEqual(docFactErrors({
+    'SPEC.md': 'card-service deposit-service\n| `lemuel.card.authorized` | card | 소비처 미배선 — 발행 전용 |\n',
+    'card-service/src/main/resources/application.yml': 'topic:\n  authorized: lemuel.card.authorized\n',
+    'deposit-service/src/main/resources/application.yml':
+      'topic:\n  # lemuel.card.authorized 는 아직 구독하지 않는다 — 페이로드에 sellerId 가 없다\n  payout-completed: lemuel.payout.completed\n',
+  }), []);
+});
+
+test('doc facts: 주석이 아닌 실제 키의 토픽 참조는 여전히 소비로 잡는다', () => {
+  const errors = docFactErrors({
+    'SPEC.md': 'card-service deposit-service\n| `lemuel.card.authorized` | card | 소비처 미배선 — 발행 전용 |\n',
+    'card-service/src/main/resources/application.yml': 'topic:\n  authorized: lemuel.card.authorized\n',
+    'deposit-service/src/main/resources/application.yml': 'topic:\n  card-authorized: lemuel.card.authorized\n',
+  });
+  assert.equal(errors.length, 1, errors.join('\n'));
+  assert.match(errors[0], /소비처 배선 있음: lemuel\.card\.authorized 를 deposit-service 가 참조/);
+});
+
+test('stripYamlComments: 따옴표 안의 # 는 값이므로 남긴다', () => {
+  assert.equal(stripYamlComments('key: "a#b"   # 주석'), 'key: "a#b"   ');
+  assert.equal(stripYamlComments("key: 'x#y'"), "key: 'x#y'");
+  assert.equal(stripYamlComments('# 전부 주석'), '');
+  assert.equal(stripYamlComments('a: 1\n# c\nb: 2'), 'a: 1\n\nb: 2');
 });
 
 test('doc facts: 부사 허용이 무관한 문장을 소비처 주장으로 오탐하지 않는다', () => {

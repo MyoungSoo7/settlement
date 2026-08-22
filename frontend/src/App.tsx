@@ -23,6 +23,7 @@ const CartPage = lazy(() => import('./pages/CartPage'));
 const MyPage = lazy(() => import('./pages/MyPage'));
 const MyBalancesPage = lazy(() => import('./pages/MyBalancesPage'));
 const BulkOrderPage = lazy(() => import('./pages/BulkOrderPage'));
+const TenderCheckoutPage = lazy(() => import('./pages/TenderCheckoutPage'));
 const LoanPage = lazy(() => import('./pages/LoanPage'));
 const TossPaymentSuccess = lazy(() => import('./pages/TossPaymentSuccess'));
 const FinancialStatementsPage = lazy(() => import('./pages/FinancialStatementsPage'));
@@ -35,6 +36,9 @@ const CeoInvestRecommendPage = lazy(() => import('./pages/CeoInvestRecommendPage
 const CeoAccountPage = lazy(() => import('./pages/CeoAccountPage'));
 const CeoCardPage = lazy(() => import('./pages/CeoCardPage'));
 const CeoLoanGuidePage = lazy(() => import('./pages/CeoLoanGuidePage'));
+const CollateralConsolePage = lazy(() => import('./pages/CollateralConsolePage'));
+const RefundAdminPage = lazy(() => import('./pages/RefundAdminPage'));
+const BankingConsolePage = lazy(() => import('./pages/BankingConsolePage'));
 const CeoLoanProcessGuidePage = lazy(() => import('./pages/CeoLoanProcessGuidePage'));
 const CeoLenderGuidePage = lazy(() => import('./pages/CeoLenderGuidePage'));
 const CeoFundGuidePage = lazy(() => import('./pages/CeoFundGuidePage'));
@@ -44,6 +48,7 @@ const PointConsolePage = lazy(() => import('./pages/system/PointConsolePage'));
 const GiftCardConsolePage = lazy(() => import('./pages/system/GiftCardConsolePage'));
 const AuditLogConsolePage = lazy(() => import('./pages/system/AuditLogConsolePage'));
 const MemberAdminPage = lazy(() => import('./pages/system/MemberAdminPage'));
+const OrganizationConsolePage = lazy(() => import('./pages/system/OrganizationConsolePage'));
 const ReviewAdminPage = lazy(() => import('./pages/system/ReviewAdminPage'));
 const CouponAdminPage = lazy(() => import('./pages/system/CouponAdminPage'));
 
@@ -62,6 +67,7 @@ const ShippingPolicyAdminPage = lazy(() => import('./pages/ShippingPolicyAdminPa
 const OrderApprovalPage = lazy(() => import('./pages/OrderApprovalPage'));
 const PayoutAdminPage = lazy(() => import('./pages/PayoutAdminPage'));
 const SellerTierAdminPage = lazy(() => import('./pages/SellerTierAdminPage'));
+const DepositAdminPage = lazy(() => import('./pages/DepositAdminPage'));
 
 // 정산운영 콘솔 — settlement-service 운영 API(/admin/**)를 화면으로 노출한다.
 const IntegrityConsolePage = lazy(() => import('./pages/settlement/IntegrityConsolePage'));
@@ -87,6 +93,8 @@ const MenuManagementPage = lazy(() => import('./pages/system/MenuManagementPage'
 const CommonCodeManagementPage = lazy(() => import('./pages/system/CommonCodeManagementPage'));
 const RbacManagementPage = lazy(() => import('./pages/system/RbacManagementPage'));
 const BoardAdminPage = lazy(() => import('./pages/system/BoardAdminPage'));
+const InsuranceDisclosurePage = lazy(() => import('./pages/system/InsuranceDisclosurePage'));
+const InsuranceSalesPage = lazy(() => import('./pages/system/InsuranceSalesPage'));
 const BoardPage = lazy(() => import('./pages/board/BoardPage'));
 const BoardPostPage = lazy(() => import('./pages/board/BoardPostPage'));
 
@@ -176,6 +184,7 @@ function App() {
             <Route path="/my/balances" element={<ProtectedRoute><MyBalancesPage /></ProtectedRoute>} />
             {/* 대량주문 — 올리는 것과 주문이 나가는 것이 다른 버튼이다(검증/확정 분리). */}
             <Route path="/order/bulk"   element={<ProtectedRoute><BulkOrderPage /></ProtectedRoute>} />
+            <Route path="/order/pay"    element={<ProtectedRoute><TenderCheckoutPage /></ProtectedRoute>} />
             <Route path="/loans"        element={<ProtectedRoute><LoanPage /></ProtectedRoute>} />
             {/* AI 챗봇 (ai-service) — LLM 비용이 들어 인증 필수(USER 이상), 역할 무관 */}
             <Route path="/ai/chat"      element={<ProtectedRoute><AiChatPage /></ProtectedRoute>} />
@@ -188,13 +197,18 @@ function App() {
             <Route path="/admin/settlement"   element={<AdminManagerRoute><SideNavLayout><SettlementAdmin /></SideNavLayout></AdminManagerRoute>} />
             <Route path="/settlement/search"   element={<AdminManagerRoute><SideNavLayout><SettlementDashboard /></SideNavLayout></AdminManagerRoute>} />
             {/* 지급 콘솔 — 실자금 송금이라 /admin/payouts/** 는 서버가 ADMIN 전용으로 게이트한다.
-                MANAGER 에게 화면만 열어 주면 전부 403 이 되므로 라우트도 AdminOnlyRoute 로 맞춘다. */}
-            <Route path="/admin/payouts"      element={<AdminOnlyRoute><SideNavLayout><PayoutAdminPage /></SideNavLayout></AdminOnlyRoute>} />
+                MANAGER 에게 화면만 열어 주면 전부 403 이 되므로 라우트도 AdminOnlyRoute 로 맞춘다.
+                화면 URL 이 /admin/payouts 가 아닌 이유: 그 URL 은 백엔드 API 가 이미 쓴다. 같으면
+                nginx 가 이 경로를 게이트웨이로 보내 버려, 새로고침하면 화면 대신 API 응답이 뜬다. */}
+            <Route path="/admin/settlement/payouts"
+              element={<AdminOnlyRoute><SideNavLayout><PayoutAdminPage /></SideNavLayout></AdminOnlyRoute>} />
 
             {/* ── 정산운영 콘솔 (ADMIN·MANAGER) ──
                 URL 이 /admin/settlement/** 아래인 이유: nginx SPA 폴백이 /admin 하위에서
-                (system|operation|ceo|settlement|login) 만 index.html 로 내려보낸다. 다른 접두사를
-                쓰면 새로고침·직접진입이 404 가 된다. API 는 /admin/integrity 처럼 별도 접두사라 충돌 없음. */}
+                네비 그룹 접두사(system|operation|ceo|settlement|shipping|approvals|login)만
+                index.html 로 내려보낸다. 다른 접두사를 쓰면 새로고침·직접진입이 404 가 된다.
+                API 는 /admin/integrity 처럼 별도 접두사라 충돌 없음.
+                이 규칙은 이제 spa-fallback-gate.test.mjs 가 강제한다 — 주석만 있던 동안 5건이 샜다. */}
             <Route path="/admin/settlement/integrity"
               element={<AdminManagerRoute><SideNavLayout><IntegrityConsolePage /></SideNavLayout></AdminManagerRoute>} />
             <Route path="/admin/settlement/reconciliation"
@@ -220,6 +234,16 @@ function App() {
                 nginx SPA 폴백 제약 때문이다 — 위 정산운영 블록 주석 참조. */}
             <Route path="/admin/settlement/seller-tiers"
               element={<AdminOnlyRoute><SideNavLayout><SellerTierAdminPage /></SideNavLayout></AdminOnlyRoute>} />
+            {/* 환불 운영 — 화면 URL 이 /admin/refunds 가 아닌 이유: 그 URL 은 order-service 의
+                API 이고 2026-08-22 에 게이트웨이로 노출됐다. 화면이 같은 URL 을 쓰면 새로고침 때
+                API 응답이 렌더된다(spa-fallback-gate ② 가 그 오답을 막는다).
+                서버가 /admin/refunds/** 를 ADMIN·MANAGER 로 막으므로 라우트도 그에 맞춘다. */}
+            <Route path="/admin/settlement/refunds"
+              element={<AdminManagerRoute><SideNavLayout><RefundAdminPage /></SideNavLayout></AdminManagerRoute>} />
+            {/* 예치금 운영 — 서버가 /admin/deposits/** 를 ADMIN 전용으로 막는다(잔고를 움직인다).
+                조회용 /api/deposits/** 만 MANAGER 도 되지만, 이 화면은 조작이 본체라 ADMIN 으로 맞춘다. */}
+            <Route path="/admin/settlement/deposits"
+              element={<AdminOnlyRoute><SideNavLayout><DepositAdminPage /></SideNavLayout></AdminOnlyRoute>} />
             {/* 세무는 서버가 /admin/tax/** · /admin/seller-tax-profiles/** 를 ADMIN·MANAGER 로 막는다 */}
             <Route path="/admin/settlement/tax"
               element={<AdminManagerRoute><SideNavLayout><TaxConsolePage /></SideNavLayout></AdminManagerRoute>} />
@@ -235,8 +259,10 @@ function App() {
             <Route path="/admin/shipping"
               element={<AdminManagerRoute><SideNavLayout><ShippingAdminPage /></SideNavLayout></AdminManagerRoute>} />
             {/* 배송비 정책 — 고객이 실제로 지불하는 금액을 바꾼다. 서버가 /admin/shipping-policies/** 를
-                ADMIN 으로 막으므로 MANAGER 에게 열면 눌러도 되돌려보내지는 죽은 링크가 된다. */}
-            <Route path="/admin/shipping-policies"
+                ADMIN 으로 막으므로 MANAGER 에게 열면 눌러도 되돌려보내지는 죽은 링크가 된다.
+                화면 URL 은 배송 그룹 아래(/admin/shipping/policies)다 — /admin/shipping-policies 는
+                백엔드 API 가 쓰는 URL 이라, 화면이 같은 곳에 있으면 새로고침에서 API 응답이 뜬다. */}
+            <Route path="/admin/shipping/policies"
               element={<AdminOnlyRoute><SideNavLayout><ShippingPolicyAdminPage /></SideNavLayout></AdminOnlyRoute>} />
             {/* 취소·환불 승인 큐 — 사용자가 신청한 건을 운영자가 종단으로 보낸다 */}
             <Route path="/admin/approvals"    element={<AdminManagerRoute><OrderApprovalPage /></AdminManagerRoute>} />
@@ -261,7 +287,18 @@ function App() {
               element={<AdminOnlyRoute><SideNavLayout><RbacManagementPage /></SideNavLayout></AdminOnlyRoute>} />
             <Route path="/admin/system/boards"
               element={<AdminOnlyRoute><SideNavLayout><BoardAdminPage /></SideNavLayout></AdminOnlyRoute>} />
-            <Route path="/admin/education/courses"
+            {/* 상품설명서 교부 — 서버는 authenticated 만 요구하지만(교부자는 JWT 에서 파생),
+                보험 표면이 이미 시스템 관리 아래 있고(증빙 리뷰 큐) 우리 앱에 FC 역할이 없어
+                ADMIN 으로 맞춘다. FC 역할이 생기면 이 라우트부터 재검토한다. */}
+            <Route path="/admin/system/insurance-disclosures"
+              element={<AdminOnlyRoute><SideNavLayout><InsuranceDisclosurePage /></SideNavLayout></AdminOnlyRoute>} />
+            {/* 보험 영업 체인(설계→청약→승인→계약). 교부 화면 바로 옆이다 — 승인이 그 교부 증빙을
+                요구하므로 두 화면을 오가게 된다. 교부와 같은 이유로 ADMIN(FC 역할이 없다). */}
+            <Route path="/admin/system/insurance-sales"
+              element={<AdminOnlyRoute><SideNavLayout><InsuranceSalesPage /></SideNavLayout></AdminOnlyRoute>} />
+            {/* 화면 URL 이 /admin/education/courses 가 아닌 이유: 그 URL 은 education-service 의
+                API 다. 시스템 관리 메뉴 아래 화면이므로 /admin/system/education 으로 둔다. */}
+            <Route path="/admin/system/education"
               element={<AdminOnlyRoute><SideNavLayout><EducationCourseAdminPage /></SideNavLayout></AdminOnlyRoute>} />
             <Route path="/admin/system/ecommerce-categories"
               element={<AdminOnlyRoute><SideNavLayout><EcommerceCategoryAdmin /></SideNavLayout></AdminOnlyRoute>} />
@@ -281,6 +318,10 @@ function App() {
               element={<AdminOnlyRoute><SideNavLayout><AuditLogConsolePage /></SideNavLayout></AdminOnlyRoute>} />
             <Route path="/admin/system/members"
               element={<AdminOnlyRoute><SideNavLayout><MemberAdminPage /></SideNavLayout></AdminOnlyRoute>} />
+            {/* 조직·멤버십 — 회원 관리 바로 옆이다(사람을 다루는 축이 같다). 서버는 authenticated
+                만 요구하고 조직 내 역할로 인가하지만, 우리 앱의 SYSTEM 영역 관례를 따라 ADMIN. */}
+            <Route path="/admin/system/organizations"
+              element={<AdminOnlyRoute><SideNavLayout><OrganizationConsolePage /></SideNavLayout></AdminOnlyRoute>} />
             <Route path="/admin/system/reviews"
               element={<AdminOnlyRoute><SideNavLayout><ReviewAdminPage /></SideNavLayout></AdminOnlyRoute>} />
             <Route path="/admin/system/coupons"
@@ -305,6 +346,10 @@ function App() {
               element={<AdminManagerRoute><SideNavLayout><CeoInvestRecommendPage /></SideNavLayout></AdminManagerRoute>} />
             <Route path="/admin/ceo/loans"
               element={<AdminManagerRoute><SideNavLayout><LoanPage /></SideNavLayout></AdminManagerRoute>} />
+            {/* 담보 감시 — 서버가 /loans/secured/{id}/collateral/** 를 ADMIN·MANAGER 로 막는다
+                (JWT 권한에서만 판정). 대출 표면이 이미 CEO 그룹에 있어 그 옆에 둔다. */}
+            <Route path="/admin/ceo/collateral"
+              element={<AdminManagerRoute><SideNavLayout><CollateralConsolePage /></SideNavLayout></AdminManagerRoute>} />
             <Route path="/admin/ceo/loan-guide"
               element={<AdminManagerRoute><SideNavLayout><CeoLoanGuidePage /></SideNavLayout></AdminManagerRoute>} />
             {/* 대출 심사·상환 안내 — 심사 절차·신용평가 산식·상환 구조 (정적 콘텐츠, API 없음) */}
@@ -318,6 +363,11 @@ function App() {
               element={<AdminManagerRoute><SideNavLayout><CeoFundGuidePage /></SideNavLayout></AdminManagerRoute>} />
             <Route path="/admin/ceo/accounts"
               element={<AdminManagerRoute><SideNavLayout><CeoAccountPage /></SideNavLayout></AdminManagerRoute>} />
+            {/* 수신 상품 3종 — 서버는 authenticated 만 요구하고(계약 주체가 본인) 운용수익 인식·
+                수급 지급 두 조작만 ADMIN·MANAGER 로 막는다. 계정계 표면이 CEO 그룹에 있어 그 옆에
+                두되, 화면 안에서 역할로 운영자 조작을 가른다. */}
+            <Route path="/admin/ceo/banking"
+              element={<AdminManagerRoute><SideNavLayout><BankingConsolePage /></SideNavLayout></AdminManagerRoute>} />
             {/* 법인카드 (card-service) — 조작 권한은 서버가 조직 멤버십으로 판정, 셸 노출만 ADMIN·MANAGER */}
             <Route path="/admin/ceo/cards"
               element={<AdminManagerRoute><SideNavLayout><CeoCardPage /></SideNavLayout></AdminManagerRoute>} />

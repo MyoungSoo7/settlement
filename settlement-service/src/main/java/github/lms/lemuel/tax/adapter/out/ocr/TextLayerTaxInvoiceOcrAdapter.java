@@ -79,6 +79,9 @@ public class TextLayerTaxInvoiceOcrAdapter implements ExtractTaxInvoiceFieldsPor
                 amount(TAX, text, "세액"),
                 amount(TOTAL, text, "합계금액"),
                 group(APPROVAL, text),
+                // 결정적 파서다 — 정규식이 잡았으면 그 값이고, 못 잡으면 null 이다. 중간이 없어
+                // 두 축 모두 같은 확신을 갖는다(추측이 개입하는 LLM 쪽과 다른 점).
+                DETERMINISTIC_CONFIDENCE,
                 DETERMINISTIC_CONFIDENCE);
     }
 

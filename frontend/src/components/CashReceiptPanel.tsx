@@ -59,7 +59,8 @@ const CashReceiptPanel: React.FC<Props> = ({ orderId }) => {
     try {
       setReceipt(await cashReceiptApi.getByOrder(orderId));
     } catch (err) {
-      // 404/400 은 "이 주문은 대상이 아님" — 조회 단계에서는 조용히 넘기고 발급 시 안내한다.
+      // 404 는 "아직 발급한 적 없음" — 오류가 아니므로 조용히 넘기고 발급 폼을 띄운다.
+      // 그 밖은 드러낸다. 400(카드 결제라 대상 아님)까지 삼키면 "대상 아님"과 장애가 같아 보인다.
       if (apiErrorStatus(err) !== 404) {
         setError(apiErrorMessage(err, '현금영수증 조회에 실패했습니다.'));
       }

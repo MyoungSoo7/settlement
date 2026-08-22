@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "lemuel.insurance.banca_rule_violated",
+  "description": "방카슈랑스 25% 룰이 위반된 사실 — 한 은행이 한 보험사 상품을 부문 보험료의 25% 초과로 판매했다. share·분자·분모를 모두 실어 수신 측이 판정을 재현할 수 있게 한다 (\"무엇 때문에 넘었나\"를 되묻지 않아도 되도록).",
+  "type": "object",
+  "properties": {
+    "year": {
+      "type": "string"
+    },
+    "bankCode": {
+      "type": "string"
+    },
+    "sector": {
+      "type": "string"
+    },
+    "insurerCode": {
+      "type": "string"
+    },
+    "share": {
+      "type": "string",
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "insurerPremiumSum": {
+      "type": "string",
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    },
+    "sectorPremiumTotal": {
+      "type": "string",
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    }
+  },
+  "required": [
+    "year",
+    "bankCode",
+    "sector",
+    "insurerCode",
+    "share",
+    "insurerPremiumSum",
+    "sectorPremiumTotal"
+  ],
+  "additionalProperties": true
+}

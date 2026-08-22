@@ -20,6 +20,7 @@ class TaxInvoiceScanMatcherTest {
     private static ExtractedTaxInvoice scanned(String supply, String tax, String total, String approvalNumber) {
         return ExtractedTaxInvoice.of("101-81-00001", "101-81-00001", WRITTEN,
                 new BigDecimal(supply), new BigDecimal(tax), new BigDecimal(total), approvalNumber,
+                new BigDecimal("0.95"),
                 new BigDecimal("0.95"));
     }
 

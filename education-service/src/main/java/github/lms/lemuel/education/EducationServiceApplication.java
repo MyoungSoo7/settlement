@@ -6,6 +6,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.context.annotation.Import;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * education-service 독립 부팅 진입점.
@@ -18,9 +19,15 @@ import org.springframework.context.annotation.Import;
  * 스프링 기본 응답으로 나가 {@code errorCode} 가 빠진다. 상태 코드는 맞아서 눈에 잘 띄지 않지만,
  * 공용 클라이언트는 education 응답만 따로 파싱해야 했다 — 2026-08-20 전 서비스 405 점검에서
  * 18개 중 유일하게 어긋난 서비스로 드러났다.
+ *
+ * <p>{@code @EnableScheduling} 은 Outbox 폴러({@code OutboxPollingTrigger} 의 {@code @Scheduled})를
+ * 켠다. 빈을 들이는 것만으로는 부족하다 — 스케줄링이 꺼져 있으면 폴러가 등록만 된 채 영영 돌지
+ * 않고, 그 상태는 기동 로그에도 API 응답에도 나타나지 않는다(배선은
+ * {@code config.OutboxPublishingConfig} 참조).
  */
 @SpringBootApplication(scanBasePackages = "github.lms.lemuel.education")
 @ConfigurationPropertiesScan("github.lms.lemuel.education.config")
+@EnableScheduling
 @Import(GlobalExceptionHandler.class)
 public class EducationServiceApplication {
 

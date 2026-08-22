@@ -13,6 +13,10 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-jackson")
+    // Outbox → Kafka 발행. app.kafka.enabled=false(기본) 면 KafkaOutboxPublisher 대신
+    // ApplicationEventOutboxPublisher 폴백이 등록돼 로컬은 브로커 없이도 부팅한다.
+    implementation("org.springframework.boot:spring-boot-starter-kafka")
+    implementation("org.springframework.kafka:spring-kafka")
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")
     implementation("org.springframework.boot:spring-boot-flyway")

@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import {
   loanApi,
+  repaymentApi,
   LoanResponse,
   type CorporateCredit,
   type CorporateLoan,
+  type RepaymentMethod,
+  type RepaymentSchedule,
 } from '@/api/loan';
 import { financialApi, type FinancialCompany, type FinancialCompanyPage } from '@/api/financial';
 import { authApi } from '@/api/auth';
@@ -40,7 +43,8 @@ const creditGradeClass = (grade: string) => ({
   E: 'bg-red-600 text-white',
 }[grade] ?? 'bg-gray-500 text-white');
 
-type Tab = 'seller' | 'corporate';
+// 시뮬레이터는 두 대출 상품 어느 쪽에도 종속되지 않는 계산기라 별도 탭이다.
+type Tab = 'seller' | 'corporate' | 'simulate';
 
 // ── 셀러 선정산 대출 섹션 ─────────────────────────────────────────
 const SellerLoanSection: React.FC = () => {
@@ -605,6 +609,143 @@ const CorporateLoanSection: React.FC = () => {
   );
 };
 
+/**
+ * 상환 스케줄 시뮬레이터 — 두 대출 상품 어느 쪽에도 종속되지 않는 계산기라 별도 탭이다.
+ *
+ * <p><b>부수효과가 없다.</b> 서버가 "대출 생성·영속화와 무관한 순수 미리보기"라고 못박은
+ * 표면이라, 이 화면만은 확인 절차 없이 바로 계산한다 — 다른 콘솔들이 확인을 받는 이유
+ * (되돌릴 수 없음)가 여기엔 없다. 확인을 붙이면 오히려 "이것도 위험한가" 하는 잘못된 신호가 된다.
+ *
+ * <p><b>상환방식 한글명을 화면이 짓지 않는다.</b> 서버가 {@code methodLabel} 로 내려준다 —
+ * 코드↔라벨 표를 화면이 또 들고 있으면 서버가 방식을 추가할 때 조용히 어긋난다.
+ */
+const RepaymentSimulatorSection: React.FC = () => {
+  const [principal, setPrincipal] = useState('100000000');
+  const [termMonths, setTermMonths] = useState('36');
+  const [annualRatePercent, setAnnualRatePercent] = useState('5.5');
+  const [method, setMethod] = useState<RepaymentMethod>('EQUAL_PAYMENT');
+  const [schedule, setSchedule] = useState<RepaymentSchedule | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // 서버가 1~600 개월로 강제한다 — 화면이 먼저 막아 400 왕복을 줄인다.
+  const months = Number(termMonths);
+  const validTerm = Number.isInteger(months) && months >= 1 && months <= 600;
+  const ready = Number(principal) > 0 && validTerm && Number(annualRatePercent) >= 0;
+
+  const simulate = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      setSchedule(await repaymentApi.simulate({
+        principal: Number(principal), termMonths: months,
+        annualRatePercent: Number(annualRatePercent), method,
+      }));
+    } catch (err) {
+      setSchedule(null);
+      setError(apiErrorMessage(err, '상환표를 계산하지 못했습니다.'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const field = 'mt-1 w-full rounded border px-3 py-2';
+
+  return (
+    <Card>
+      <div className="space-y-4" data-testid="repayment-simulator">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">상환표 미리보기</h2>
+          <p className="mt-1 text-sm text-gray-500">
+            원금·기간·이율·상환방식으로 회차별 상환표를 계산합니다.
+            <b> 아무것도 저장되지 않습니다</b> — 대출 신청과 무관한 계산입니다.
+          </p>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-4">
+          <label className="block text-sm">
+            <span className="text-gray-600">원금</span>
+            <input aria-label="원금" value={principal} inputMode="numeric" className={field}
+              onChange={(e) => setPrincipal(e.target.value)} />
+          </label>
+          <label className="block text-sm">
+            <span className="text-gray-600">기간(개월)</span>
+            <input aria-label="기간(개월)" value={termMonths} inputMode="numeric" className={field}
+              onChange={(e) => setTermMonths(e.target.value)} />
+          </label>
+          <label className="block text-sm">
+            <span className="text-gray-600">연이율(%)</span>
+            <input aria-label="연이율(%)" value={annualRatePercent} inputMode="decimal" className={field}
+              onChange={(e) => setAnnualRatePercent(e.target.value)} />
+          </label>
+          <label className="block text-sm">
+            <span className="text-gray-600">상환방식</span>
+            <select aria-label="상환방식" value={method} className={field}
+              onChange={(e) => setMethod(e.target.value as RepaymentMethod)}>
+              <option value="BULLET">만기일시상환</option>
+              <option value="EQUAL_PAYMENT">원리금균등상환</option>
+              <option value="EQUAL_PRINCIPAL">원금균등상환</option>
+            </select>
+          </label>
+        </div>
+
+        {!validTerm && termMonths.trim() !== '' && (
+          <p className="text-xs text-amber-700" data-testid="term-hint">
+            기간은 1~600개월만 가능합니다.
+          </p>
+        )}
+
+        <button type="button" onClick={() => void simulate()} disabled={!ready || loading}
+          className="rounded bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+          {loading ? '계산 중…' : '계산'}
+        </button>
+
+        {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+
+        {schedule && (
+          <div className="space-y-3" data-testid="repayment-result">
+            <dl className="grid gap-2 rounded bg-gray-50 p-3 text-sm sm:grid-cols-4">
+              <div><dt className="text-gray-500">상환방식</dt>
+                <dd data-testid="method-label">{schedule.methodLabel}</dd></div>
+              <div><dt className="text-gray-500">원금 합계</dt><dd>{fmt(schedule.totalPrincipal)}</dd></div>
+              {/* 이자 합계를 크게 둔다 — 방식을 바꿔 보는 이유가 이 숫자다. */}
+              <div><dt className="text-gray-500">이자 합계</dt>
+                <dd className="font-bold text-emerald-700" data-testid="total-interest">
+                  {fmt(schedule.totalInterest)}
+                </dd></div>
+              <div><dt className="text-gray-500">총 납입액</dt>
+                <dd className="font-bold" data-testid="total-payment">{fmt(schedule.totalPayment)}</dd></div>
+            </dl>
+
+            <div className="max-h-80 overflow-y-auto">
+              <table className="w-full text-sm" data-testid="installment-table">
+                <thead className="sticky top-0 bg-white text-left text-gray-500">
+                  <tr>
+                    <th className="py-2">회차</th><th className="text-right">납입원금</th>
+                    <th className="text-right">이자</th><th className="text-right">납입액</th>
+                    <th className="text-right">잔액</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {schedule.installments.map((it) => (
+                    <tr key={it.installmentNo} className="border-t">
+                      <td className="py-1.5">{it.installmentNo}</td>
+                      <td className="text-right">{fmt(it.principalPortion)}</td>
+                      <td className="text-right">{fmt(it.interest)}</td>
+                      <td className="text-right">{fmt(it.payment)}</td>
+                      <td className="text-right text-gray-600">{fmt(it.remainingBalance)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+};
+
 const LoanPage: React.FC = () => {
   const [tab, setTab] = useState<Tab>('seller');
 
@@ -614,7 +755,9 @@ const LoanPage: React.FC = () => {
         <div className="text-center">
           <h1 className="text-3xl font-bold text-gray-900">대출하기</h1>
           <p className="mt-1 text-sm text-gray-500">
-            {tab === 'seller' ? '선정산 대출 — 셀러의 미확정 정산금을 담보로 선지급' : '기업대출 — 코스피 상장사 신용평가 기반 대출'}
+            {tab === 'seller' ? '선정산 대출 — 셀러의 미확정 정산금을 담보로 선지급'
+              : tab === 'corporate' ? '기업대출 — 코스피 상장사 신용평가 기반 대출'
+                : '상환표 미리보기 — 저장되지 않는 계산입니다'}
           </p>
         </div>
 
@@ -635,9 +778,19 @@ const LoanPage: React.FC = () => {
           >
             기업대출
           </button>
+          <button
+            onClick={() => setTab('simulate')}
+            className={`px-5 py-2 rounded-lg text-sm font-semibold transition-colors ${
+              tab === 'simulate' ? 'bg-emerald-600 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+            }`}
+          >
+            상환표
+          </button>
         </div>
 
-        {tab === 'seller' ? <SellerLoanSection /> : <CorporateLoanSection />}
+        {tab === 'seller' && <SellerLoanSection />}
+        {tab === 'corporate' && <CorporateLoanSection />}
+        {tab === 'simulate' && <RepaymentSimulatorSection />}
       </div>
     </div>
   );

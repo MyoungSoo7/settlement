@@ -28,7 +28,7 @@ const closedPolicy = {
 
 const balancedSummary = {
   accountCount: 3,
-  totalAvailable: 12000,
+  totalBalance: 12000,
   totalActiveLotRemaining: 12000,
   totalEntryNet: 12000,
   driftedAccountCount: 0,
@@ -185,7 +185,7 @@ describe('PointConsolePage', () => {
       mocked.account.mockResolvedValue({
         userId: 3, accountId: 70, status: 'ACTIVE',
         available: 12000, locked: 0, total: 12000,
-        health: { accountAvailable: 12000, activeLotRemaining: 12000, entryNet: 12000 },
+        health: { accountTotal: 12000, activeLotRemaining: 12000, entryNet: 12000 },
         lots: [{
           lotId: 1, origin: 'MANUAL_GRANT', originalAmount: 5000, remainingAmount: 5000,
           status: 'ACTIVE', grantedAt: '2026-08-18T14:31:50Z', expiresAt: '2027-08-18T14:31:50Z',
@@ -212,7 +212,7 @@ describe('PointConsolePage', () => {
       mocked.account.mockResolvedValue({
         userId: 3, accountId: 70, status: 'ACTIVE',
         available: 1000, locked: 0, total: 1000,
-        health: { accountAvailable: 1000, activeLotRemaining: 700, entryNet: 1000 },
+        health: { accountTotal: 1000, activeLotRemaining: 700, entryNet: 1000 },
         lots: [], entries: [],
       });
       const user = userEvent.setup();

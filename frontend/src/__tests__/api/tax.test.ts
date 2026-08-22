@@ -40,6 +40,7 @@ describe('taxApi 스캔 리뷰 큐', () => {
 
     expect(api.get).toHaveBeenCalledWith('/admin/tax/scans', {
       params: { status: 'EXTRACTED', limit: 50 },
+      paramsSerializer: { indexes: null },
     });
     expect(result[0].needsReview).toBe(true);
   });
@@ -51,6 +52,7 @@ describe('taxApi 스캔 리뷰 큐', () => {
 
     expect(api.get).toHaveBeenCalledWith('/admin/tax/scans', {
       params: { status: 'MISMATCHED', limit: 10 },
+      paramsSerializer: { indexes: null },
     });
   });
 

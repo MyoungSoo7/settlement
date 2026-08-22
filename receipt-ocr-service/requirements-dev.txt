@@ -1,0 +1,7 @@
+-r requirements.txt
+pytest==9.1.1
+pytest-cov==7.0.0
+# 교정 모델 **학습** 전용. 서빙에는 넣지 않는다 — 학습은 계수 JSON 을 뱉고, 운영 경로는
+# 그 JSON 으로 시그모이드 하나만 계산한다(calib/model.py). 런타임 requirements 에 올리면
+# 그 설계가 무너지고 이미지가 수백 MB 커진다.
+scikit-learn==1.9.0

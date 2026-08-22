@@ -119,7 +119,7 @@ class MenuServiceTest {
         when(loadMenuPort.findById(7L)).thenReturn(Optional.of(existing));
 
         assertThatThrownBy(() -> service.updateMenu(7L, new MenuUseCase.UpdateMenuCommand(
-                MenuAttributes.item("지급관리", "/admin/payouts", MenuArea.BACKOFFICE, "ADMIN,MANAGER"),
+                MenuAttributes.item("지급관리", "/admin/settlement/payouts", MenuArea.BACKOFFICE, "ADMIN,MANAGER"),
                 null, 0, true, true)))
                 .isInstanceOf(MenuInvariantViolationException.class)
                 .hasMessageContaining("ADMIN");

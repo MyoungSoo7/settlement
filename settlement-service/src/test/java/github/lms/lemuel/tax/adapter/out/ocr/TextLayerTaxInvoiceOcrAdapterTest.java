@@ -53,7 +53,10 @@ class TextLayerTaxInvoiceOcrAdapterTest {
     @Test
     @DisplayName("결정적 파서이므로 신뢰도는 1.00 이다 (모델 추정치가 아니다)")
     void deterministicConfidence() {
-        assertThat(adapter.extract(utf8(SAMPLE), "text/plain").confidence()).isEqualByComparingTo("1.00");
+        assertThat(adapter.extract(utf8(SAMPLE), "text/plain").amountConfidence())
+                .isEqualByComparingTo("1.00");
+        assertThat(adapter.extract(utf8(SAMPLE), "text/plain").approvalNumberConfidence())
+                .isEqualByComparingTo("1.00");
         assertThat(adapter.isConfigured()).isTrue();
         assertThat(adapter.modelName()).isEqualTo("text-layer-v1");
     }

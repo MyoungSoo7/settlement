@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "lemuel.organization.member_removed",
-  "description": "organization-service(OrganizationEventPublisherAdapter) → card-service. 멤버십이 REMOVED(터미널)로 전이되면 발행된다. 소비측은 해당 임직원의 카드를 SUSPENDED 로 전이해야 한다 — 이 이벤트가 없으면 퇴사자 카드가 유효한 채로 남는다.",
+  "description": "멤버십이 REMOVED(터미널)로 전이된 사실 — 그 사람은 더 이상 조직의 구성원이 아니다. 이 사실을 놓치면 퇴사자에게 발급된 권한·수단이 유효한 채로 남는다.",
   "type": "object",
   "properties": {
     "organizationId": { "type": "integer" },

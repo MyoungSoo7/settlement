@@ -1,0 +1,12 @@
+{
+  "policyNumber": "P-2026-000123",
+  "payoutId": "PO-2026-000045",
+  "payoutType": "SURRENDER",
+  "amount": "850000",
+  "paidPremiumTotal": "1200000",
+  "appliedRate": "0.7083",
+  "elapsedMonths": 10,
+  "installmentCount": 10,
+  "requestedOn": "2027-06-15",
+  "fcId": "FC-0007"
+}

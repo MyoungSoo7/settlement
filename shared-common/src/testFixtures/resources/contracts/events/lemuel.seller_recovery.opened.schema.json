@@ -1,7 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "lemuel.seller_recovery.opened",
-  "description": "settlement-service → account-service. 지급 완료 후 회수가 필요한 채권(SellerRecovery)이 발생할 때 발행되어 GL 에 DR SELLER_RECOVERY_RECEIVABLE / CR CASH(지급후 회수채권 발생)로 전기된다(ADR 0026 Option ①). amount 는 JSON string(BigDecimal.toPlainString, DATA-STANDARD N5).",
+  "description": "지급 완료 후 회수가 필요한 채권(SellerRecovery)이 발생한 사실. amount 는 JSON string(BigDecimal.toPlainString, DATA-STANDARD N5).",
+  "$comment": "참고(계약 아님) — 회계 해석: DR SELLER_RECOVERY_RECEIVABLE / CR CASH(지급후 회수채권 발생, ADR 0026 Option ①).",
   "type": "object",
   "properties": {
     "recoveryId": { "type": "integer" },

@@ -80,6 +80,12 @@ frontend/test-results/
 frontend/blob-report/
 frontend/playwright/.cache/
 
+### TypeScript 증분 빌드 캐시 (재생성 산출물) ###
+# `tsc --build` 가 남기는 파일 목록·타임스탬프 캐시. 머신·실행마다 내용이 달라져
+# 커밋하면 매 빌드가 diff 를 만든다. 지워도 다음 빌드가 다시 만든다.
+# 깊이 무관 패턴 — frontend 외 워크스페이스가 늘어도 그대로 커버한다.
+*.tsbuildinfo
+
 ### Local repro/debug scripts (절대 커밋 금지) ###
 frontend/repro-*.mjs
 
@@ -223,3 +229,12 @@ board-service/data/
 # omp(Oh My Pi) 로컬 에이전트 설정 — 개인 툴이라 저장소 하네스(HARNESS.md)의 일부가 아니다.
 # 추적하면 공개 저장소에 개인 설정이 실린다.
 .omp/
+
+### 커버리지 측정 산출물 (재생성 대상) ###
+# Go 커버리지 프로파일 — polyglot-ci 의 커버리지 게이트가 서비스 디렉토리에 남긴다.
+# 매 실행마다 내용이 달라지고, 지워도 다음 측정이 다시 만든다.
+*-service/coverage.out
+# Python 커버리지 원본 — pytest-cov 가 남긴다(리포트는 term 으로만 쓴다).
+**/.coverage
+**/coverage.xml
+**/htmlcov/

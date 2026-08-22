@@ -27,7 +27,7 @@ class ExtractedTaxInvoiceTest {
     private static ExtractedTaxInvoice of(String supply, String tax, String total, String confidence) {
         return ExtractedTaxInvoice.of("101-81-00001", "101-81-00001", WRITTEN,
                 new BigDecimal(supply), new BigDecimal(tax), new BigDecimal(total),
-                "TI-0000000005", new BigDecimal(confidence));
+                "TI-0000000005", new BigDecimal(confidence), new BigDecimal(confidence));
     }
 
     @Test
@@ -102,7 +102,7 @@ class ExtractedTaxInvoiceTest {
     void invalidSupplierNeedsReview() {
         ExtractedTaxInvoice extracted = ExtractedTaxInvoice.of("101-81-00002", null, WRITTEN,
                 new BigDecimal("100000"), new BigDecimal("10000"), new BigDecimal("110000"),
-                null, new BigDecimal("0.99"));
+                null, new BigDecimal("0.99"), new BigDecimal("0.99"));
 
         assertThat(extracted.supplier().isValid()).isFalse();
         assertThat(extracted.needsReview(THRESHOLD)).isTrue();
@@ -120,12 +120,12 @@ class ExtractedTaxInvoiceTest {
     @DisplayName("금액 누락·작성일자 누락은 예외")
     void missingRequiredThrows() {
         assertThatThrownBy(() -> ExtractedTaxInvoice.of("101-81-00001", null, WRITTEN,
-                null, BigDecimal.ZERO, BigDecimal.ZERO, null, new BigDecimal("0.9")))
+                null, BigDecimal.ZERO, BigDecimal.ZERO, null, new BigDecimal("0.9"), new BigDecimal("0.9")))
                 .isInstanceOf(TaxInvariantViolationException.class)
                 .hasMessageContaining("공급가액");
 
         assertThatThrownBy(() -> ExtractedTaxInvoice.of("101-81-00001", null, null,
-                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, null, new BigDecimal("0.9")))
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, null, new BigDecimal("0.9"), new BigDecimal("0.9")))
                 .isInstanceOf(TaxInvariantViolationException.class)
                 .hasMessageContaining("작성일자");
     }
@@ -140,8 +140,57 @@ class ExtractedTaxInvoiceTest {
                 .isInstanceOf(TaxInvariantViolationException.class)
                 .hasMessageContaining("신뢰도");
         assertThatThrownBy(() -> ExtractedTaxInvoice.of("101-81-00001", null, WRITTEN,
-                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, null, null))
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, null, null, null))
                 .isInstanceOf(TaxInvariantViolationException.class)
                 .hasMessageContaining("신뢰도");
+    }
+
+    @Test
+    @DisplayName("금액이 또렷해도 승인번호 신뢰도가 미달이면 리뷰 대상이다")
+    void weakApprovalNumberAloneTriggersReview() {
+        // 금액 3종은 서로 산술로 교차검증되지만 승인번호는 교차검증할 상대가 없다.
+        // 금액을 잘 읽었다는 사실이 승인번호에 대해 보장하는 것은 없다.
+        ExtractedTaxInvoice extracted = ExtractedTaxInvoice.of("101-81-00001", "101-81-00001",
+                LocalDate.of(2026, 8, 10), new BigDecimal("100000"), new BigDecimal("10000"),
+                new BigDecimal("110000"), "TI-0000000005",
+                new BigDecimal("0.99"), new BigDecimal("0.40"));
+
+        assertThat(extracted.needsReview(THRESHOLD)).isTrue();
+    }
+
+    @Test
+    @DisplayName("승인번호가 또렷해도 금액 신뢰도가 미달이면 리뷰 대상이다")
+    void weakAmountAloneTriggersReview() {
+        ExtractedTaxInvoice extracted = ExtractedTaxInvoice.of("101-81-00001", "101-81-00001",
+                LocalDate.of(2026, 8, 10), new BigDecimal("100000"), new BigDecimal("10000"),
+                new BigDecimal("110000"), "TI-0000000005",
+                new BigDecimal("0.40"), new BigDecimal("0.99"));
+
+        assertThat(extracted.needsReview(THRESHOLD)).isTrue();
+    }
+
+    @Test
+    @DisplayName("weakestConfidence 는 가장 못 믿는 축을 돌려준다 — 표시 전용")
+    void weakestConfidencePicksTheLeastTrustedAxis() {
+        ExtractedTaxInvoice extracted = ExtractedTaxInvoice.of("101-81-00001", "101-81-00001",
+                LocalDate.of(2026, 8, 10), new BigDecimal("100000"), new BigDecimal("10000"),
+                new BigDecimal("110000"), "TI-0000000005",
+                new BigDecimal("0.99"), new BigDecimal("0.31"));
+
+        assertThat(extracted.weakestConfidence()).isEqualByComparingTo("0.31");
+    }
+
+    @Test
+    @DisplayName("두 축 모두 0~1 범위 필수 — 누락·범위 밖은 거부")
+    void bothAxesMustBeInRange() {
+        assertThatThrownBy(() -> ExtractedTaxInvoice.of("101-81-00001", "101-81-00001",
+                LocalDate.of(2026, 8, 10), new BigDecimal("100000"), new BigDecimal("10000"),
+                new BigDecimal("110000"), "TI-1", new BigDecimal("0.9"), null))
+                .isInstanceOf(TaxInvariantViolationException.class)
+                .hasMessageContaining("승인번호");
+        assertThatThrownBy(() -> ExtractedTaxInvoice.of("101-81-00001", "101-81-00001",
+                LocalDate.of(2026, 8, 10), new BigDecimal("100000"), new BigDecimal("10000"),
+                new BigDecimal("110000"), "TI-1", new BigDecimal("1.01"), new BigDecimal("0.9")))
+                .isInstanceOf(TaxInvariantViolationException.class);
     }
 }
