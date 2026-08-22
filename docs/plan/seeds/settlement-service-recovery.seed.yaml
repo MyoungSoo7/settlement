@@ -1,0 +1,146 @@
+# Seed: settlement-service 지급후 회수 as-is 사양 (채권 발생·상계·수기 이관)
+# 상태: CONFIRMED (역산 결정화, 2026-08-22)
+# 원칙: 이 Seed 는 "현행 코드가 실제로 하는 일"의 불변 기술이다. 결함은 교정하지 않고 known_issues 로만 기록한다.
+# 자매 Seed: settlement-service-accounting-core(범위 밖이던 recovery 슬라이스) · settlement-service-tax
+
+seed:
+  id: settlement-service-recovery-v1
+  goal: >-
+    settlement-service 지급후 회수 슬라이스(이미 송금이 끝난 뒤 발생한 마이너스 조정을 채권으로 세워
+    후속 정산에서 상계하고, 회수되지 않는 건을 수기로 이관하는 흐름)의 현행 동작을 실행 가능한
+    게이트에 매핑된 불변 사양으로 결정화한다.
+
+  context: >-
+    정산은 확정되면 송금된다. 송금이 끝난 뒤에 환불·차지백·PG 대사 조정이 도착하면 차감할 대상이
+    이미 셀러 계좌에 가 있다. 그 순간 그 돈은 정산 조정이 아니라 채권이 된다 — 받는 방법은
+    다음 정산에서 빼거나 사람이 회수하는 것뿐이다.
+
+  scope:
+    included:
+      - 채권 상태머신 3상태와 단방향 이관
+      - 발생 판정 4단계(멱등 -> 송금완료 -> 홀드백 흡수 -> 잔여 채권화)
+      - 상계 알고리즘(오래된 순 비관락, 잔액 상한, 초과분 이월)
+      - 정체 채권 이관 배치
+    excluded:
+      - 조정 자체의 발생 규칙 (환불·차지백·PG 대사 각 슬라이스 소관)
+      - 홀드백 소진 규칙 (정산 애그리거트 소유 — 포트로만 요청)
+      - 지급(payout) 상태머신 (settlement-service-accounting-core Seed 소관)
+
+  constraints:
+    - "금액은 BigDecimal — 상계는 잔액 상한(min)으로만"
+    - "채권 전이는 단방향 — MANUAL_REQUIRED 에서 OPEN 복귀 없음"
+    - "정산 애그리거트를 직접 열지 않는다 — 홀드백 흡수는 포트 요청으로만"
+    - "도메인 규칙 위반은 RecoveryInvariantViolationException / InvalidRecoveryStateException 으로 — generic IAE 금지"
+    - "팩토리 전용·public setter 없음"
+
+  invariants:  # as-is 코드 사실 — 파일:라인 근거 (경로 접두 settlement-service/src/main/java/github/lms/lemuel/recovery/)
+    state_machine:
+      source: domain/RecoveryStatus.java:6-11,18-24
+      rule: "OPEN -> CLOSED(전액 상계) · OPEN -> MANUAL_REQUIRED -> CLOSED(수기 회수 완료). CLOSED 는 종결"
+      one_way: "MANUAL_REQUIRED -> OPEN 복귀 없음 — 자동 상계로 되돌리려면 채권을 새로 발생시킨다"
+    factory_only:
+      source: domain/SellerRecovery.java:17,40
+      rule: "open(발생)·rehydrate(영속 복원) 전용, public 생성자·setter 없음. 채권 원금은 양수"
+    origination_order:
+      source: application/service/RecoverPostPayoutAdjustmentService.java:22-27
+      steps:
+        - "조정 1건 = 채권 1건 멱등"
+        - "즉시지급 Payout 이 COMPLETED(송금 완료) 아니면 대상 아님 — 아직 안 나간 돈은 채권이 아니라 그냥 조정이다"
+        - "미해제 holdback 에서 우선 흡수"
+        - "잔여만 채권으로 열고 발생 분개 1건(Dr AR / Cr AP)"
+    holdback_via_port:
+      source: application/service/RecoverPostPayoutAdjustmentService.java:29-30
+      rule: "홀드백 소진은 정산의 규칙이므로 AbsorbSettlementHoldbackPort 로 '얼마를 흡수해 달라'만 요청하고 결과만 받는다 — 슬라이스 경계를 포트로 유지"
+    fail_closed_on_seller_resolution:
+      source: application/service/RecoverPostPayoutAdjustmentService.java:25-27
+      rule: "셀러 해석 실패 시 아무것도 바꾸지 않고 종료 — 조정 레코드가 수기 대응 근거로 남는다. 절반만 처리된 상태를 만들지 않는다"
+    allocate_clamped:
+      source: domain/SellerRecovery.java:71-92
+      rule: "consumed = min(outstanding, requested). 초과분은 호출자가 같은 셀러의 다음 채권으로 넘긴다. 잔액 0 도달 시 스스로 CLOSED 전이 + closedAt 기록"
+    offset_traversal:
+      source: application/service/OffsetSellerRecoveryService.java:19-23
+      rule: "셀러의 OPEN 채권을 오래된 순으로 비관락 스캔하며 소진. 잔액 검증·CLOSED 전이는 도메인 소유, 서비스는 순회·이력·분개만 오케스트레이션"
+      joins_confirm_tx: "별도 배치가 아니라 후속 정산 확정 청크 트랜잭션에 합류 — 확정과 상계가 갈라지는 창이 없다"
+      idempotency: "(recovery, settlement) UNIQUE + 기존 상계 총액 재사용"
+    escalation_batch:
+      source: application/service/EscalateStaleSellerRecoveryService.java:17-20
+      rule: "OPEN 채권 중 마지막 활동이 유예 기간을 넘긴 건을 MANUAL_REQUIRED 로 이관. 홀드백 해제 배치와 동일하게 100건씩 페이지 처리로 락 경합 최소화"
+    typed_exceptions:
+      source: domain/exception/
+      rule: "RecoveryInvariantViolationException(불변식) · InvalidRecoveryStateException(상태) — generic IAE 미사용"
+
+  inbound_surface:  # 도달성 실측 — 유스케이스명 grep (전이적 호출 포함)
+    escalate: "EscalateStaleRecoveryUseCase <- settlement/adapter/in/batch/RecoveryEscalationScheduler (매일 새벽)"
+    offset: "OffsetSellerRecoveryUseCase <- settlement/application/service/ApplyLoanDeductionService (확정 경로에서 전이적 호출)"
+    record: "RecordPostPayoutRecoveryUseCase <- chargeback/ChargebackService · settlement/AdjustSettlementForRefundService · settlement/ApplyReconciliationAdjustmentService"
+    admin: "/admin/recoveries — 조회·수기 종결 (adapter/in/web/RecoveryAdminController.java:24)"
+    guard: "세 유스케이스 모두 전이적으로 어댑터에서 도달 가능하며 InboundPortReachabilityTest 가 강제한다"
+
+  event_contracts:
+    publishes:
+      - "lemuel.seller_recovery.opened — account GL 이 recoveryOpened 분개로 수신"
+      - "lemuel.seller_recovery.offset — account GL 이 recoveryOffset 분개로 수신"
+    consumes: []
+
+  acceptance_criteria:
+    - id: AC-1
+      criterion: MANUAL_REQUIRED -> OPEN 복귀가 불가능하다
+      gate: "./gradlew :settlement-service:test — SellerRecoveryTest"
+    - id: AC-2
+      criterion: 상계가 잔액을 넘지 않고 초과 요청은 잔액만 소비한다
+      gate: "SellerRecoveryTest · RecoveryAllocationTest"
+    - id: AC-3
+      criterion: 잔액 0 도달 시 스스로 CLOSED 로 전이한다
+      gate: "SellerRecoveryTest"
+    - id: AC-4
+      criterion: 송금 완료가 아닌 조정은 채권이 되지 않는다
+      gate: "RecoverPostPayoutAdjustmentServiceTest"
+    - id: AC-5
+      criterion: 홀드백 흡수가 채권 발생보다 먼저 일어난다
+      gate: "RecoverPostPayoutAdjustmentServiceTest"
+    - id: AC-6
+      criterion: 같은 조정이 채권을 두 번 만들지 않는다
+      gate: "RecoverPostPayoutAdjustmentServiceTest · PostPayoutRecoveryIntegrationIT"
+    - id: AC-7
+      criterion: 같은 정산의 상계 재실행이 총액을 늘리지 않는다
+      gate: "OffsetSellerRecoveryServiceTest + (recovery, settlement) UNIQUE"
+    - id: AC-8
+      criterion: 정체 채권이 유예 기간 후 이관된다
+      gate: "EscalateStaleSellerRecoveryServiceTest · RecoveryEscalationIntegrationIT"
+    - id: AC-9
+      criterion: 모든 인바운드 포트가 어댑터에서 도달 가능하다
+      gate: "InboundPortReachabilityTest (ArchUnit)"
+    - id: AC-10
+      criterion: 발행 2토픽이 계약 스키마와 일치한다
+      gate: "SellerRecoveryEventContractTest"
+    - id: AC-11
+      criterion: 커버리지 LINE >= 90%
+      gate: "./gradlew :settlement-service:jacocoTestCoverageVerification"
+
+  test_assets:
+    total_files: 8
+    unit: 6
+    integration: 2
+    integration_names: "PostPayoutRecoveryIntegrationIT · RecoveryEscalationIntegrationIT"
+
+  known_issues:  # 발견만 기록 — 사양은 as-is 유지
+    - id: KI-1
+      finding: >-
+        회수율에 상한이 없다 — 채권은 후속 정산이 있어야 상계된다. 거래를 멈춘 셀러의 채권은
+        영원히 OPEN 이다가 유예 기간이 지나 MANUAL_REQUIRED 로만 간다. 수기 회수의 실제 성공 여부는
+        이 슬라이스가 알지 못하며 CLOSED 는 '사람이 다 받았다고 눌렀다'는 뜻일 뿐이다.
+      disposition: recorded-not-fixed (경계 — 실제 회수는 시스템 밖)
+    - id: KI-2
+      finding: "MANUAL_REQUIRED 이후의 알림·독촉 경로가 없다 — 이관은 상태 변경으로 끝나고 이벤트도 알림도 없어 누군가 /admin/recoveries 를 열어봐야 안다"
+      disposition: recorded-not-fixed (notification 연계 후보)
+    - id: KI-3
+      finding: "상계 순서가 '오래된 순'으로 고정 — 금액이 큰 채권을 먼저 회수하는 정책도, 특정 채권 우선 지정 경로도 없다. 공정하지만 회수 총액을 최대화하는 순서는 아니다"
+      disposition: by-design (단순성 선택 — 정책이 필요해지면 도메인에 명시할 지점)
+    - id: KI-4
+      finding: "채권 상계가 확정 트랜잭션에 합류한다 — 일관성을 얻는 대신 채권 스캔이 느려지면 정산 확정 자체가 느려진다. 페이지 처리는 이관 배치에만 있고 상계 경로에는 없다"
+      disposition: recorded-not-fixed (성능 경계)
+
+  uses:
+    - regression-baseline
+    - contract-drift-gate
+    - interview-portfolio
