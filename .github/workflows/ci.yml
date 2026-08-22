@@ -243,8 +243,28 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # 레지스트리 스로틀일 때만 재시도한다. max-parallel 스로틀(아래 matrix 잡 참고)로도 남는
+      # 구멍이 있다 — 이 잡은 matrix 밖이라 스로틀 대상이 아니고, 러너들은 egress IP 를 공유하므로
+      # repo.maven.apache.org 가 429/403 을 뱉으면 의존성 해석 단계에서 통째로 죽는다
+      # (2026-08-22 실측: gson 2.10.1 403 Forbidden, 23초 만에 BUILD FAILED — 테스트 0건 실행).
+      # Gradle 은 HTTP 4xx 를 재시도하지 않으므로 여기서 감싼다.
+      #
+      # 테스트 실패는 절대 재시도하지 않는다. 로그에 레지스트리 스로틀 흔적이 있을 때만 다시 돈다 —
+      # 무조건 재시도하면 플래키 테스트를 초록으로 덮고 실패 원인을 감춘다.
       - name: Build & Test shared-common (JaCoCo gate)
-        run: ./gradlew -p shared-common clean build --no-daemon --stacktrace
+        run: |
+          set +e
+          for attempt in 1 2 3; do
+            ./gradlew -p shared-common clean build --no-daemon --stacktrace 2>&1 | tee /tmp/gradle-shared-common.log
+            status=${PIPESTATUS[0]}
+            [ "$status" -eq 0 ] && exit 0
+            grep -qE 'Received status code (403|429) from server|Too Many Requests' \
+              /tmp/gradle-shared-common.log || exit "$status"
+            echo "::warning::메이븐 레지스트리 스로틀로 실패 — ${attempt}차 재시도"
+            sleep $((attempt * 30))
+          done
+          echo "::error::재시도 3회 모두 레지스트리 스로틀로 실패했다 — 일시 장애가 아니라 조달 구조를 봐야 한다"
+          exit 1
         env:
           TESTCONTAINERS_RYUK_DISABLED: "true"
 
@@ -361,7 +381,22 @@ jobs:
       # build = compile + test + jacocoTestReport + jacocoTestCoverageVerification (게이트 포함, build.gradle.kts:157)
       # Testcontainers 기반 통합테스트는 러너의 Docker 데몬을 사용한다.
       - name: Build & Test ${{ matrix.module }} (JaCoCo gate)
-        run: ./gradlew clean :${{ matrix.module }}:build --no-daemon --stacktrace
+        # 레지스트리 스로틀일 때만 재시도 — 근거와 규칙은 위 shared-common 잡 주석 참고.
+        # (max-parallel 5 로 콜드 리졸브를 4 웨이브로 나눠도 429 가 완전히 사라지지는 않았다.)
+        run: |
+          set +e
+          for attempt in 1 2 3; do
+            ./gradlew clean :${{ matrix.module }}:build --no-daemon --stacktrace 2>&1 \
+              | tee /tmp/gradle-${{ matrix.module }}.log
+            status=${PIPESTATUS[0]}
+            [ "$status" -eq 0 ] && exit 0
+            grep -qE 'Received status code (403|429) from server|Too Many Requests' \
+              /tmp/gradle-${{ matrix.module }}.log || exit "$status"
+            echo "::warning::메이븐 레지스트리 스로틀로 실패 — ${attempt}차 재시도"
+            sleep $((attempt * 30))
+          done
+          echo "::error::재시도 3회 모두 레지스트리 스로틀로 실패했다 — 일시 장애가 아니라 조달 구조를 봐야 한다"
+          exit 1
         env:
           # ryuk(정리용 유틸 컨테이너) 비활성화 — 러너는 일회용이라 불필요하고,
           # 이미지 치환과 얽혀 모듈별 test JVM 에서 비결정적 hang 을 유발했다 (2026-07-08).
