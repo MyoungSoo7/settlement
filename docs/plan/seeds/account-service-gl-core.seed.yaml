@@ -14,7 +14,7 @@ seed:
     included:
       - 전표(AccountEntry) 생성 규칙 — 구성적 균형·금액 정규화·팩토리 전용
       - 계정과목(GlAccount 14종)과 차/대 방향 고정
-      - 이벤트→분개 매핑 17토픽 (소비 전용, 발행 0)
+      - 이벤트→분개 매핑 27토픽 (소비 전용, 발행 0)
       - 멱등 3단 방어의 account 측 구현 (processed_events + 자연키 UNIQUE)
       - append-only 강제(트리거·CHECK)와 조회 표면(시산표·통제계정 대사)
     excluded:

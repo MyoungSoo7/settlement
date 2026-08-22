@@ -8,7 +8,7 @@
 > | --------- | --------------------------------------------------------------------------------------- |
 > | 대상 범위 | `common-data-service`(8098, DB `lemuel_commondata`) 전체 — data.go.kr 범용 커넥터      |
 > | 역산 기준 | 2026-08-13 `develop` 브랜치                                                           |
-> | 근거      | 도메인 4개 클래스, 진입 어댑터 2종(공개 REST·관리 REST), Flyway V1~V20260802, 감사 파티셔닝 |
+> | 근거      | 도메인 4개 클래스, 진입 어댑터 2종(공개 REST·관리 REST), Flyway 4개(V1~V20260802), 테스트 19개 클래스, 감사 파티셔닝 |
 > | 범위 밖   | 개별 데이터셋의 도메인 해석(소비측 몫) · data.go.kr 외 공급자 · 스케줄 수집            |
 > | 관련 문서 | [`../../../SPEC.md`](../../../SPEC.md) · `commondata-connector-rules` 스킬 · [`common-data-service-connector.seed.yaml`](../seeds/common-data-service-connector.seed.yaml) |
 

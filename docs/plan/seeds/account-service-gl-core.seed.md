@@ -45,7 +45,7 @@
 
 **발행 0** — 소비 전용 서비스다(불변식 7).
 
-**소비 17토픽** → 각 토픽이 정확히 한 종류의 분개로 매핑된다.
+**소비 27토픽** → 각 토픽이 정확히 한 종류의 분개로 매핑된다.
 
 | 원천 | 토픽 | 분개 팩토리 |
 |---|---|---|
@@ -61,6 +61,10 @@
 | loan | `loan.corporate_loan_disbursed` | `corporateLoanDisbursed` |
 | loan | `loan.secured_loan_disbursed` / `.secured_loan_repaid` / `.secured_loan_principal_repaid` | 동명 팩토리 3종 |
 | investment | `investment.executed` | `investmentExecuted` |
+| order | `point.charged` / `.granted` | `pointCharged:380` / `pointGranted:387` (`PointLedgerConsumer.java:85-86`) |
+| order | `point.used` / `.restored` | `pointUsed:401` / `pointRestored:408` (`:87-88`) |
+| order | `point.expired` / `.revoked` | `pointExpired:427` / `pointRevoked:420` (`:89-90`) |
+| order | `giftcard.registered` / `.used` / `.restored` / `.expired` | `giftCardRegistered:438`·`giftCardUsed:450`·`giftCardRestored:457`·`giftCardExpired:464` (`GiftCardLedgerConsumer.java:79-86`) |
 
 ## 수용 기준 (게이트 매핑)
 

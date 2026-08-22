@@ -8,7 +8,7 @@
 > | --------- | ------------------------------------------------------------------------------------------ |
 > | 대상 범위 | `operation-service`(8092, DB `lemuel_operation`) 전체 — 인시던트·신호버킷·이상탐지       |
 > | 역산 기준 | 2026-08-13 `develop` 브랜치                                                              |
-> | 근거      | incident/signal/anomaly 3개 하위 컨텍스트, 소비 8토픽, 테스트 14+ 클래스                 |
+> | 근거      | incident/signal/anomaly 3개 하위 컨텍스트(도메인 17개 클래스), 소비 9토픽, Flyway 13개, 테스트 20개 클래스 |
 > | 범위 밖   | Prometheus/Alertmanager 설정(`../../../monitoring`) · 폴리글랏 이상탐지(settlement-anomaly, Python) |
 > | 관련 문서 | [`../../../SPEC.md`](../../../SPEC.md) · `operation-signal-rules` 스킬 · [`operation-service-incident-signal.seed.yaml`](../seeds/operation-service-incident-signal.seed.yaml) |
 
@@ -63,7 +63,7 @@ operation-service 는 알림과 도메인 신호를 **인시던트라는 1급 �
 | 영역 | 기능 |
 |---|---|
 | 인시던트 | 생성·병합(refire)·타임라인·자동 해소·상태 전이 |
-| 신호 | 8토픽 소비 → 5분 버킷 UPSERT 누적, 실패율 파생 |
+| 신호 | 9토픽 소비 → 5분 버킷 UPSERT 누적, 실패율 파생 |
 | 이상탐지 | 롤링 윈도 베이스라인 + 임계로 verdict 산출 |
 | 수신 | Alertmanager webhook(항상 200, permitAll) |
 | 조회 | 인시던트 목록·상세 |
@@ -142,7 +142,7 @@ operation-service 는 알림과 도메인 신호를 **인시던트라는 1급 �
 
 ### 9.2 이벤트
 
-**소비 8** — 성공 3(`order.created`·`payment.captured`·`settlement.created`) + 실패 5(`ops.order.failed`·
+**소비 9** — 성공 3(`order.created`·`payment.captured`·`settlement.created`) + 실패 6(`ops.order.failed`·
 `ops.payment.failed`·`ops.stock.depleted`·`ops.stock.reclaim_delayed`·`ops.shipping.delayed`·`ops.settlement.failed`).
 **발행 0.**
 

@@ -8,7 +8,7 @@
 > | --------- | ---------------------------------------------------------------------------------------- |
 > | 대상 범위 | `market-service`(8094, DB `lemuel_market`) 전체 — KRX 일별 시세·시총 공개조회          |
 > | 역산 기준 | 2026-08-13 `develop` 브랜치                                                            |
-> | 근거      | 도메인 5개 클래스, 진입 어댑터 3종(REST 2·스케줄러 1), Flyway V1~V20260810, 테스트 10개 클래스 |
+> | 근거      | 도메인 5개 클래스, 진입 어댑터 3종(REST 2·스케줄러 1), Flyway 6개(V1~V20260810), 테스트 15개 클래스 |
 > | 범위 밖   | PER/PBR 등 밸류에이션 계산(설계상 금지) · KRX 외 공급자 · 실시간 틱(→ market-stream)   |
 > | 관련 문서 | [`../../../SPEC.md`](../../../SPEC.md) · `market-quotes-rules` 스킬(강제 규칙 정본) · [`market-service-quotes.seed.yaml`](../seeds/market-service-quotes.seed.yaml) |
 

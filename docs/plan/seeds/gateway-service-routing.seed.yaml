@@ -29,11 +29,11 @@ seed:
 
   invariants:  # as-is 코드 사실 — 파일:라인 근거 (경로 접두 gateway-service/)
     route_table:
-      source: src/main/resources/application.yml:12-159
+      source: src/main/resources/application.yml:14-130
       rule: >-
-        라우트 18건 = 16 Java 서비스 전부 + 폴리글랏 2종(market-stream·notification).
+        라우트 20건 = 18 Java 서비스 전부 + 폴리글랏 2종(market-stream·notification).
         모든 uri 는 ${<SVC>_SERVICE_URI:http://localhost:<port>} 형태 — 배포 시 주입, 기본값은 로컬 포트.
-      java_routes: "order(8088)·settlement(8082)·loan(8084)·financial(8086)·economics(8087)·company(8090)·operation(8092)·market(8094)·ai(8096)·commondata(8098)·investment(8100)·account(8102)·organization(8104)·card(8106)·insurance(8108)·deposit(8112)"
+      java_routes: "order(8088)·settlement(8082)·loan(8084)·financial(8086)·economics(8087)·company(8090)·operation(8092)·market(8094)·ai(8096)·commondata(8098)·investment(8100)·account(8102)·organization(8104)·card(8106)·insurance(8108)·deposit(8112)·board(8114)·education(8115)"
       polyglot_routes: "market-stream(8110)·notification(8130) — 나머지 폴리글랏 5종은 라우트 없음"
     prefix_passthrough:
       source: src/main/resources/application.yml:16-19

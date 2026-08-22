@@ -8,7 +8,7 @@
 > | --------- | --------------------------------------------------------------------------------------------- |
 > | 대상 범위 | `financial-statements-service`(8086, DB `lemuel_financial`) 전체 — DART 재무제표 공개조회     |
 > | 역산 기준 | 2026-08-13 `develop` 브랜치                                                                 |
-> | 근거      | 도메인 4개 클래스, 진입 어댑터 3종(공개 REST·관리 REST·스케줄러 2), 감사 파티셔닝            |
+> | 근거      | 도메인 4개 클래스, 진입 어댑터 3종(공개 REST·관리 REST·스케줄러 2), Flyway 4개, 테스트 20개 클래스, 감사 파티셔닝 |
 > | 범위 밖   | PER/PBR 등 시장가 결합 지표(시세는 market-service 소관) · 재무 예측 · DART 외 공급자         |
 > | 관련 문서 | [`../../../SPEC.md`](../../../SPEC.md) · `financial-data-rules` 스킬 · [`financial-statements-service-public-read.seed.yaml`](../seeds/financial-statements-service-public-read.seed.yaml) |
 

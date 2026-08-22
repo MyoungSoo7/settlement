@@ -8,7 +8,7 @@
 > | --------- | ------------------------------------------------------------------------------------------ |
 > | 대상 범위 | `notification-service`(8130, Kotlin 2.0.21 / Boot 3.3.5 / JDK 21, **DB 없음**) — 이벤트 알림 팬아웃 + SSE 푸시 |
 > | 역산 기준 | 2026-08-13 `develop` 브랜치 (직전 커밋 `10cdd14e6`)                                      |
-> | 근거      | 프로덕션 Kotlin 24파일, 테스트 11클래스(63 tests), 구독 5토픽, 채널 4종, `application.yml` |
+> | 근거      | 프로덕션 Kotlin 26파일, 테스트 11클래스(63 tests), 구독 5토픽, 채널 4종, `application.yml` |
 > | 범위 밖   | 발행측 서비스의 이벤트 계약(각 서비스 소관) · 실 SMTP/Slack 운영 · 알림 이력 영속화       |
 > | 관련 문서 | [`../polyglot-services.md`](../polyglot-services.md) · [`gateway-service.md`](gateway-service.md) · [`../seeds/notification-service-fanout.seed.yaml`](../seeds/notification-service-fanout.seed.yaml) |
 

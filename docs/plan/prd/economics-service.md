@@ -8,7 +8,7 @@
 > | --------- | ------------------------------------------------------------------------------------------ |
 > | 대상 범위 | `economics-service`(8087, DB `lemuel_economics`) 전체 — ECOS 경제지표 공개조회            |
 > | 역산 기준 | 2026-08-13 `develop` 브랜치                                                              |
-> | 근거      | 도메인 5개 클래스, 진입 어댑터 3종(REST 2·스케줄러 1), Flyway V1~V20260716, 테스트 12개 클래스 |
+> | 근거      | 도메인 5개 클래스, 진입 어댑터 3종(REST 2·스케줄러 1), Flyway 4개(V1~V20260716), 테스트 20개 클래스 |
 > | 범위 밖   | ECOS 외 통계 공급자 · 지표 예측(→ forecast-service, Python) · 파생지표 저장               |
 > | 관련 문서 | [`../../../SPEC.md`](../../../SPEC.md) · `economics-data-rules` 스킬(강제 규칙 정본) · [`economics-service-indicators.seed.yaml`](../seeds/economics-service-indicators.seed.yaml) |
 

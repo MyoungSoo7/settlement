@@ -8,7 +8,7 @@
 > | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 > | 대상 범위 | `reconciliation-service`(8131, Kotlin 2.0.21 / Boot 3.3.5 / JDK 21, **DB 없음**) — 일 1회 정산 대사 배치                                                                            |
 > | 역산 기준 | 2026-08-13 `develop` 브랜치                                                                                                                                                         |
-> | 근거      | 프로덕션 Kotlin 15파일, 테스트 4클래스, 소스 어댑터 4종(실 HTTP 2 + 샘플 2), `application.yml`                                                                                      |
+> | 근거      | 프로덕션 Kotlin 16파일, 테스트 4클래스, 소스 어댑터 4종(실 HTTP 2 + 샘플 2), `application.yml`                                                                                      |
 > | 범위 밖   | settlement/order 의 `/internal/recon` 구현(각 서비스 소관) · 불일치의 회계 처리·조정 전표                                                                                           |
 > | 관련 문서 | [`../polyglot-services.md`](../polyglot-services.md) · `recon-playbook` 스킬 · [`../seeds/reconciliation-service-batch.seed.yaml`](../seeds/reconciliation-service-batch.seed.yaml) |
 

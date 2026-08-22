@@ -8,7 +8,7 @@
 > | --------- | ------------------------------------------------------------------------------------------ |
 > | 대상 범위 | `gateway-service`(8080, DB 없음) — Spring Cloud Gateway(WebFlux) 라우팅 표면 전체         |
 > | 역산 기준 | 2026-08-13 `develop` 브랜치                                                              |
-> | 근거      | 프로덕션 코드 2파일 58줄(앱 클래스 + 라우트 YAML 18건), 테스트 2개, compose 배선, nginx 프론트 프록시 |
+> | 근거      | 프로덕션 코드 2파일 163줄(앱 클래스 12줄 + 라우트 YAML 151줄 · 라우트 20건), 테스트 2개, compose 배선, nginx 프론트 프록시 |
 > | 범위 밖   | 각 백엔드 서비스의 인증·인가·도메인 규칙(각 서비스 소관) · k8s Ingress(helm-deploy 레포)  |
 > | 관련 문서 | [`../../../SPEC.md`](../../../SPEC.md) · [`../polyglot-services.md`](../polyglot-services.md) · [`../seeds/gateway-service-routing.seed.yaml`](../seeds/gateway-service-routing.seed.yaml) |
 

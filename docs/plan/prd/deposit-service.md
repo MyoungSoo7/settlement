@@ -8,7 +8,7 @@
 > | --------- | ------------------------------------------------------------------------------------------ |
 > | 대상 범위 | `deposit-service`(8112, mgmt 8113, DB `lemuel_deposit`) 전체 — 예치금 원장·hold·상계     |
 > | 역산 기준 | 2026-08-13 `develop` 브랜치                                                              |
-> | 근거      | 도메인 9개 클래스, 진입 어댑터 2종(공개 REST·관리 REST), Flyway V1~V3, 테스트 9개 클래스 |
+> | 근거      | 도메인 21개 클래스, 진입 어댑터 2종(공개 REST·관리 REST) + Kafka 컨슈머 2종, 발행 5토픽, Flyway 5개(V1~V20260814140000), 테스트 27개 클래스 |
 > | 범위 밖   | 재원 산정 공식(card-service 소관) · 실제 송금 실행(settlement payout)                     |
 > | 관련 문서 | [`../../../SPEC.md`](../../../SPEC.md) · [`deposit-service-ledger.seed.yaml`](../seeds/deposit-service-ledger.seed.yaml) · `card-service-rules`(재원 소비측) |
 

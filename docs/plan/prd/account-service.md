@@ -8,7 +8,7 @@
 > | --------- | ------------------------------------------------------------------------------------------ |
 > | 대상 범위 | `account-service`(8102, DB `lemuel_account`) — 전사 GL 집계 + 수신 3종(정기예금·적금·퇴직연금) |
 > | 역산 기준 | 2026-08-13 `develop` 브랜치                                                              |
-> | 근거      | 도메인 GL 코어 + banking 3종, 소비 17토픽, 컨슈머 12+, 테스트 36개 클래스                |
+> | 근거      | 도메인 55개 클래스(GL 코어 + banking 3종), 소비 27토픽, 컨슈머 19종, Flyway 24개, 테스트 46개 클래스 |
 > | 범위 밖   | 정산·대출·투자의 도메인 규칙(각 서비스 소관) · 실제 송금 · 외부 회계 시스템 연동          |
 > | 관련 문서 | [`../../../SPEC.md`](../../../SPEC.md) · `account-domain-rules`·`ledger-invariants` 스킬 · ADR 0026 · [`account-service-gl-core.seed.yaml`](../seeds/account-service-gl-core.seed.yaml) |
 

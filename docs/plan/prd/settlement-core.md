@@ -7,7 +7,7 @@
 > | ----------- | ------------------------------------------------------------------------------------------------- |
 > | 대상 범위   | `settlement-service`(8082, mgmt 8083, DB `settlement_db`) + `order-service` 연계면                |
 > | 역산 기준   | 2026-08-12 `develop` 브랜치 작업트리                                                              |
-> | 근거        | 도메인/서비스/어댑터 소스, Flyway 42개 마이그레이션, `application.yml`, shared-common `SecurityConfig` |
+> | 근거        | 도메인/서비스/어댑터 소스, Flyway 43개 마이그레이션, `application.yml`, shared-common `SecurityConfig` |
 > | 범위 밖     | loan · investment · card · insurance · deposit · organization 등 (§2.2 경계만 기술)                |
 > | 관련 문서   | [`../../../SPEC.md`](../../../SPEC.md) §3.2 · [`../../../CLAUDE.md`](../../../CLAUDE.md) · [`../../adr`](../../adr/) · `settlement-domain-rules` 스킬 |
 
