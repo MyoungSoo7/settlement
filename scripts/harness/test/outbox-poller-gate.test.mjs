@@ -31,6 +31,11 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..'
 /** 폴러 빈이 사는 패키지·클래스 — shared-common 의 @Component 라 스캔에 잡혀야 한다. */
 const POLLER_PKG = 'github.lms.lemuel.common.outbox.application.service';
 const POLLER_CLASS = 'OutboxPublisherScheduler';
+/** 주기 실행을 거는 클래스 — 여기 붙은 @Scheduled 는 @EnableScheduling 없이는 동작하지 않는다. */
+const TRIGGER_CLASS = 'OutboxPollingTrigger';
+/** shared-common 에서 @EnableScheduling 을 들고 있는 설정 — 전체 스캔 서비스는 이걸로 켜진다. */
+const SCHEDULING_PKG = 'github.lms.lemuel.common.config.elasticsearch';
+const SCHEDULING_CLASS = 'AsyncConfig';
 
 /**
  * 폴러가 배선되지 않았음이 **확인된** 서비스와 그 사유.
@@ -39,12 +44,7 @@ const POLLER_CLASS = 'OutboxPublisherScheduler';
  * 있고 아직 못 고쳤다"는 뜻이다. 고치면 이 항목을 반드시 지워야 한다(아래 죽은 항목 검사가 강제).
  * 새 서비스를 여기 넣어 게이트를 통과시키는 것은 우회다.
  */
-const KNOWN_UNWIRED = new Map([
-  ['education-service',
-    '2026-08-22 확인 — spring-kafka 의존·bootstrap·폴러 빈 3축 모두 없음. '
-    + '배선하면 lemuel.education.course_published 가 브로커에 생성되며 파티션 수가 소급 불가로 '
-    + '고정된다(ADR 0035) — 별도 결정 필요. docs/plan/prd/education-service.md G-1 / T-1'],
-]);
+const KNOWN_UNWIRED = new Map([]);
 
 /** 블록·라인 주석 제거 — "주석이 배선을 대신하지 못한다". */
 export function stripComments(src) {
@@ -54,10 +54,15 @@ export function stripComments(src) {
 const covers = (base, pkg) => pkg === base || pkg.startsWith(`${base}.`);
 
 /**
- * 이 소스가 폴러 빈을 컨텍스트에 들이는 경로를 반환한다(없으면 빈 배열).
- * 근거를 문자열로 남기는 이유 — 통과했을 때 **무엇 덕분에 통과했는지**가 보여야 한다.
+ * shared-common 의 어떤 빈이 이 소스를 통해 컨텍스트에 들어오는 경로를 반환한다(없으면 빈 배열).
+ *
+ * 근거를 문자열로 남기는 이유 — 통과했을 때 **무엇 덕분에 통과했는지**가 보여야 한다. 첫 검출기는
+ * 소스 전문 정규식이라 자바독 언급만으로 통과시켰고, 그때도 "통과"라는 결과만 남았다.
+ *
+ * @param targetPkg   대상 빈이 사는 패키지(스캔이 이 패키지를 덮어야 한다)
+ * @param targetClass 대상 클래스명(@Import 로 직접 들일 때 쓰는 이름)
  */
-export function pollerGrants(rawSrc) {
+export function beanGrants(rawSrc, targetPkg, targetClasses) {
   const src = stripComments(rawSrc);
   const grants = [];
 
@@ -67,19 +72,43 @@ export function pollerGrants(rawSrc) {
     if (!/scanBasePackages/.test(args)) grants.push('@SpringBootApplication 전체 스캔');
     else {
       for (const m of args.matchAll(/"([^"]+)"/g)) {
-        if (covers(m[1], POLLER_PKG)) grants.push(`scanBasePackages="${m[1]}"`);
+        if (covers(m[1], targetPkg)) grants.push(`scanBasePackages="${m[1]}"`);
       }
     }
   }
   for (const m of src.matchAll(/@ComponentScan\s*\(([\s\S]*?)\)/g)) {
     for (const s of m[1].matchAll(/"([^"]+)"/g)) {
-      if (covers(s[1], POLLER_PKG)) grants.push(`@ComponentScan("${s[1]}")`);
+      if (covers(s[1], targetPkg)) grants.push(`@ComponentScan("${s[1]}")`);
     }
   }
   for (const m of src.matchAll(/@Import\s*\(([\s\S]*?)\)/g)) {
-    if (m[1].includes(POLLER_CLASS)) grants.push(`@Import(${POLLER_CLASS})`);
+    for (const cls of targetClasses) {
+      if (m[1].includes(cls)) grants.push(`@Import(${cls})`);
+    }
   }
   return grants;
+}
+
+/** 폴러 빈 도달 경로. */
+export function pollerGrants(rawSrc) {
+  return beanGrants(rawSrc, POLLER_PKG, [POLLER_CLASS, TRIGGER_CLASS]);
+}
+
+/**
+ * 주기 실행이 켜져 있는가 — {@code @EnableScheduling} 이 컨텍스트에 도달하는가.
+ *
+ * ★ 이 축이 왜 따로 필요한가: {@code @Scheduled} 는 {@code OutboxPollingTrigger} 에 붙어 있고,
+ * {@code @EnableScheduling} 이 없으면 그 빈은 **등록만 된 채 영영 돌지 않는다.** 빈 도달 경로만
+ * 검사하면 이 상태를 GREEN 으로 읽는다 — education 을 배선하다 실제로 밟은 함정이다.
+ * 기동 로그에도 API 응답에도 증상이 없다.
+ *
+ * ★ 자기 소스의 애노테이션만 보면 안 된다: settlement 등 전체 스캔 서비스는 shared-common 의
+ * {@code AsyncConfig}(@EnableScheduling) 를 스캔으로 가져간다. 그 경로를 모르면 실제로 발행 중인
+ * 서비스를 미배선으로 오탐한다 — 실측으로 밟았다.
+ */
+export function schedulingGrants(rawSrc) {
+  const own = /@EnableScheduling\b/.test(stripComments(rawSrc)) ? ['@EnableScheduling'] : [];
+  return [...own, ...beanGrants(rawSrc, SCHEDULING_PKG, [SCHEDULING_CLASS])];
 }
 
 function walkJava(dir, out = []) {
@@ -101,10 +130,12 @@ function outboxProducers() {
     if (!files.length) continue;
 
     let writesOutbox = false;
+    const schedulingReasons = [];
     const grants = [];
     for (const f of files) {
       const raw = readFileSync(f, 'utf8');
       if (stripComments(raw).includes('SaveOutboxEventPort')) writesOutbox = true;
+      schedulingReasons.push(...schedulingGrants(raw));
       grants.push(...pollerGrants(raw));
     }
     if (!writesOutbox) continue;
@@ -117,6 +148,7 @@ function outboxProducers() {
     result.push({
       name: entry.name,
       grants,
+      scheduling: schedulingReasons,
       hasKafkaDependency: /spring-kafka|spring-boot-starter-kafka/.test(gradle),
       hasBootstrapConfig: /bootstrap-servers/.test(yml),
     });
@@ -124,10 +156,11 @@ function outboxProducers() {
   return result.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/** 세 축이 모두 서야 이벤트가 실제로 나간다. */
+/** 네 축이 모두 서야 이벤트가 실제로 나간다 — 하나라도 빠지면 조용히 안 나간다. */
 export function unwiredAxes(svc) {
   const axes = [];
   if (!svc.grants.length) axes.push('폴러 빈 도달 경로 없음');
+  if (!svc.scheduling.length) axes.push('@EnableScheduling 도달 경로 없음(폴러가 등록만 되고 돌지 않는다)');
   if (!svc.hasKafkaDependency) axes.push('spring-kafka 의존 없음');
   if (!svc.hasBootstrapConfig) axes.push('bootstrap-servers 설정 없음');
   return axes;
@@ -162,6 +195,26 @@ describe('Outbox 폴러 배선', () => {
       ['@ComponentScan("github.lms.lemuel.common.outbox")']);
     assert.deepEqual(pollerGrants(`@Import({${POLLER_CLASS}.class, Other.class})\nclass A {}`),
       [`@Import(${POLLER_CLASS})`]);
+  });
+
+  test('[자기검증] @EnableScheduling 을 주석과 구분한다', () => {
+    assert.deepEqual(schedulingGrants('@Configuration\n@EnableScheduling\nclass A {}'), ['@EnableScheduling']);
+    assert.deepEqual(schedulingGrants('// @EnableScheduling 은 폴러를 켠다\nclass A {}'), []);
+    assert.deepEqual(schedulingGrants('/** @EnableScheduling 참조 */\nclass A {}'), []);
+    assert.deepEqual(schedulingGrants('class A {}'), []);
+  });
+
+  test('[자기검증] 전체 스캔은 shared-common AsyncConfig 로 스케줄링을 켠다', () => {
+    // settlement 등은 자기 소스에 @EnableScheduling 이 없다 — 전체 스캔이
+    // github.lms.lemuel.common.config.elasticsearch.AsyncConfig 를 가져가서 켜진다.
+    // 이 경로를 모르면 실제로 발행 중인 서비스를 미배선으로 오탐한다.
+    assert.deepEqual(schedulingGrants('@SpringBootApplication\nclass A {}'),
+      ['@SpringBootApplication 전체 스캔']);
+    assert.deepEqual(schedulingGrants(`@Import(${SCHEDULING_CLASS}.class)\nclass A {}`),
+      [`@Import(${SCHEDULING_CLASS})`]);
+    // 자기 패키지만 스캔하면 켜지지 않는다.
+    assert.deepEqual(
+      schedulingGrants('@SpringBootApplication(scanBasePackages = "github.lms.lemuel.education")\nclass A {}'), []);
   });
 
   test('[자기검증] 폴러 패키지를 덮지 않는 스캔은 인정하지 않는다', () => {

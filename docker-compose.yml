@@ -1407,6 +1407,10 @@ services:
       JWT_ISSUER: ${JWT_ISSUER}
       JWT_SECRET: ${JWT_SECRET}
       JWT_TTL_SECONDS: ${JWT_TTL_SECONDS}
+      # Outbox → Kafka 발행(발행 전용 — 소비 컨슈머 없음). 이 두 값이 없으면 폴러가 돌아도
+      # in-process 폴백으로 처리돼 lemuel.education.course_published 가 브로커에 닿지 않는다.
+      APP_KAFKA_ENABLED: "true"
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
       SERVER_PORT: 8080
       MANAGEMENT_SERVER_PORT: 8080
     ports:

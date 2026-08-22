@@ -82,11 +82,10 @@ orderingKey `courseId`. 페이로드: `courseId`·`title`·`publishedAt`·`publi
 
 ## Known Issues (발견만 기록 — 사양은 as-is 유지)
 
-- **KI-1**: **공개 이벤트가 Kafka 로 나가지 않는다.** `spring-kafka` 의존·`bootstrap-servers` 설정·
-  폴러 빈이 전부 없다. 스캔이 `github.lms.lemuel.education` 으로 한정돼 shared-common 의
-  `OutboxPublisherScheduler`(@Component)가 붙지 않고 `PersistenceConfig` 도 이를 들이지 않는다.
-  `outbox_events` 에 PENDING 행만 쌓인다. 배선하면 토픽이 브로커에 생성되며 파티션 수가 소급 불가로
-  고정된다(ADR 0035) — 별도 결정 사항. PRD G-1 / T-1.
+- **KI-1** *(해소 2026-08-22)*: 공개 이벤트가 Kafka 로 나가지 않았다 — `spring-kafka` 의존·
+  `bootstrap-servers` 설정·폴러 빈·`@EnableScheduling` 이 전부 없었다. 네 축을 모두 배선했다.
+  **네 번째가 함정이었다**: `@Scheduled` 는 `OutboxPollingTrigger` 에 붙어 있어 스케줄링이 꺼져
+  있으면 빈이 등록만 된 채 영영 돌지 않고, 기동 로그에도 API 응답에도 증상이 없다. PRD G-1 참조.
 - **KI-2**: **학습자 경로가 없다.** 공개 API 0, 전 경로 `hasRole('ADMIN')`. 즉 `PUBLISHED` 는 현재
   관리 목록의 라벨일 뿐이다. PRD G-2.
 - **KI-3** *(해소 2026-08-23)*: `server.port` 기본값 8115 가 board-service 의

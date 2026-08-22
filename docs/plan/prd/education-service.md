@@ -10,7 +10,7 @@
 > | 역산 기준 | 2026-08-22 `develop` 브랜치 (HEAD `92d25c463`)                                               |
 > | 근거      | 도메인 5개 클래스 + 예외 3종, 진입 어댑터 1종(관리 REST 12엔드포인트), Flyway V1 단일, 테스트 11개 클래스 |
 > | 범위 밖   | 수강·진도·이수(미구현) · 콘텐츠 저장(참조만 보관) · 결제 연동 · 학습자 경로                  |
-> | 관련 문서 | [`../../../SPEC.md`](../../../SPEC.md) · [`../../../CLAUDE.md`](../../../CLAUDE.md) · **Seed 없음**(→ T-5) |
+> | 관련 문서 | [`../../../SPEC.md`](../../../SPEC.md) · [`../../../CLAUDE.md`](../../../CLAUDE.md) · [`../seeds/education-service-course-authoring.seed.yaml`](../seeds/education-service-course-authoring.seed.yaml) |
 
 ---
 
@@ -59,7 +59,7 @@ education-service 는 **과정의 생애를 상태로 강제하고, 차시 순�
 | --------------------- | -------------------------------------------------------------- |
 | **교육 운영자(ADMIN)** | 과정을 만들고 차시를 붙이고 순서를 잡아 공개·숨김·종료한다     |
 | **관리자 콘솔(프론트)** | `/admin/system/education` 화면에서 위 조작을 수행한다          |
-| **하류 서비스**        | `CoursePublished` 를 받아 알림·노출에 쓴다 — **현재 소비자 0**(→ G-1) |
+| **하류 서비스**        | `CoursePublished` 를 받아 알림·노출에 쓴다 — **현재 소비자 0**(SPEC §5 발행 전용 — 인정된 상태) |
 
 ## 4. 제품 범위 — 기능 맵
 
@@ -177,7 +177,8 @@ education-service 는 **과정의 생애를 상태로 강제하고, 차시 순�
 
 **소비 0.**
 
-> ⚠️ 이 발행은 **Outbox 테이블까지만 간다.** Kafka 로 나가지 않는다 — G-1 참조.
+> 2026-08-22 이전에는 이 발행이 **Outbox 테이블까지만** 갔다(폴러 미배선). 지금은 네 축이 모두
+> 서 있어 브로커까지 닿는다 — G-1 참조. 소비처가 0 인 것은 SPEC §5 가 인정하는 상태다.
 
 ### 9.3 배선
 
@@ -196,7 +197,7 @@ education-service 는 **과정의 생애를 상태로 강제하고, 차시 순�
 
 | NFR   | 요구                        | 현재 상태                                                          |
 | ----- | --------------------------- | ------------------------------------------------------------------ |
-| NFR-1 | shared-common **제한 스캔** | `scanBasePackages="...education"` + 필요한 빈만 `@Import`          |
+| NFR-1 | shared-common **제한 스캔** | `scanBasePackages="...education"` + 필요한 빈만 `@Import`(발행 측만 — 소비 측 배선은 의도적으로 제외) |
 | NFR-2 | 커버리지 LINE ≥ 90%         | JaCoCo 게이트                                                      |
 | NFR-3 | 헥사고날 의존 방향          | `EducationArchitectureTest`(ArchUnit)                              |
 | NFR-4 | 오류 스키마 전 서비스 동형  | `EducationErrorContractTest` — 2026-08-20 18개 중 유일한 이탈을 해소 |
@@ -205,25 +206,40 @@ education-service 는 **과정의 생애를 상태로 강제하고, 차시 순�
 
 ## 11. 배치
 
-**없다.** 스케줄러·배치 잡 0. 감사 로그 파티션 러너도 없다(→ G-6).
+도메인 배치는 **없다**(스케줄러·배치 잡 0, 감사 로그 파티션 러너도 없다 → G-6).
+
+인프라 주기 작업은 하나 있다 — **Outbox 폴러**(`app.outbox.polling-delay-ms`, 기본 2s)가
+PENDING 행을 집어 발행한다. 테스트에서는 부모 `build.gradle.kts` 가 `app.outbox.polling.enabled=false`
+로 끈다(컨텍스트 종료 시 Hikari 셧다운과 경합해 WARN 을 쏟기 때문).
 
 ## 12. 역산에서 드러난 격차
 
-### G-1. 공개 이벤트가 Kafka 로 나가지 않는다 — 최상위
+### G-1. ~~공개 이벤트가 Kafka 로 나가지 않는다~~ → ✅ 2026-08-22 해소
 
-`OutboxBackedEducationEventPublisher` 는 `education.outbox_events` 에 `PENDING` 행을 넣는다. 그런데
-이 서비스에는 **그 행을 집어 Kafka 로 보낼 주체가 없다**:
+`OutboxBackedEducationEventPublisher` 는 `education.outbox_events` 에 `PENDING` 행을 넣었지만,
+**그 행을 집어 Kafka 로 보낼 주체가 없었다** — `spring-kafka` 의존 없음 · `bootstrap-servers` 설정
+없음 · 폴러 빈 없음 · compose 에 Kafka 환경변수 없음. 스캔이 `github.lms.lemuel.education` 로
+한정돼 shared-common 의 `OutboxPublisherScheduler`(@Component)가 붙지 않았고 `PersistenceConfig` 도
+이를 들이지 않았다. 결과적으로 `lemuel.education.course_published` 는 카탈로그에 소유 토픽으로
+등재돼 있으면서 **한 번도 생산된 적이 없었다.**
 
-- `build.gradle.kts` 에 `spring-kafka` 의존이 없다.
-- `application.yml` 에 `spring.kafka`·bootstrap 설정이 없다.
-- 스캔이 `github.lms.lemuel.education` 로 한정돼 shared-common 의 `OutboxPublisherScheduler`(@Component)가
-  붙지 않고, `PersistenceConfig` 도 이를 `@Import` 하지 않는다.
-- docker-compose 의 education 서비스에 Kafka 환경변수가 없고 redpanda 의존도 없다.
+**조치** — 네 축을 모두 세웠다.
 
-결과: `lemuel.education.course_published` 는 **카탈로그에 소유 토픽으로 등재돼 있지만 실제로 생산된
-적이 없다.** organization·investment 등은 전체 스캔(`@SpringBootApplication`)이라 폴러가 자동으로
-붙는데, education 만 제한 스캔이라 조용히 빠졌다. 컴파일도 테스트도 이 상태를 잡지 못한다 —
-`OutboxBackedEducationEventPublisherTest` 는 Outbox 적재까지만 검증하기 때문이다.
+| 축 | 조치 |
+|---|---|
+| 의존 | `build.gradle.kts` 에 `spring-boot-starter-kafka` · `spring-kafka` |
+| 설정 | `spring.kafka.bootstrap-servers` + producer(멱등·acks all) · `app.kafka.enabled`(기본 false) · `app.outbox.polling-delay-ms` |
+| 빈 | `config.OutboxPublishingConfig` — 발행 측만 명시 `@Import`(소비 측은 들이지 않는다. education 스키마에 `processed_events` 가 없다) |
+| 주기 실행 | `EducationServiceApplication` 에 `@EnableScheduling` |
+
+**네 번째 축이 함정이었다.** `@Scheduled` 는 `OutboxPollingTrigger` 에 붙어 있고, `@EnableScheduling`
+이 없으면 그 빈은 **등록만 된 채 영영 돌지 않는다** — 기동 로그에도 API 응답에도 증상이 없다.
+빈 존재만 검사하는 게이트는 이 상태를 GREEN 으로 읽는다. `outbox-poller-gate` 에 이 축을 추가했고,
+`OutboxPublishingWiringTest` 가 스케줄 태스크 등록까지 단언한다(`@EnableScheduling` 을 떼면 그
+테스트 하나만 RED 가 되는 것을 확인했다).
+
+> 소비처는 여전히 0 이다 — 이는 SPEC §5 "발행 전용" 정책이 **인정하는 상태**이며(insurance 9·
+> deposit 5·card 7종이 같은 처지), 계약 스키마 편입 트리거는 소비처 등장 시점이다.
 
 ### G-2. 학습자 경로가 없다
 
@@ -279,9 +295,9 @@ board(8114/8115) 바로 다음인 8116/8117 이 규약상 유일하게 자연스
 
 | #   | 항목                                                     | 상태                          |
 | --- | -------------------------------------------------------- | ----------------------------- |
-| T-1 | Outbox 폴러·Kafka 배선 (또는 카탈로그에서 토픽 철회)     | **미배선** (G-1)              |
+| T-1 | Outbox 폴러·Kafka 배선                                   | ✅ 해소 2026-08-22 (G-1)      |
 | T-2 | 학습자 공개 조회·수강 경로                               | 없음 (G-2)                    |
 | T-3 | education/board 포트 충돌 정리                           | ✅ 해소 2026-08-23 (G-3)      |
 | T-4 | `LessonStatus.HIDDEN` 도달 경로 또는 값 제거             | 미결정 (G-4)                  |
-| T-5 | education Seed 결정화(`docs/plan/seeds/`)                | 없음 (board 와 함께 2건)      |
+| T-5 | education Seed 결정화(`docs/plan/seeds/`)                | ✅ 완료 2026-08-22            |
 | T-6 | 감사 로그 파티셔닝                                       | 없음 (G-6)                    |

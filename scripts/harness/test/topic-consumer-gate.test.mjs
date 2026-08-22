@@ -59,10 +59,10 @@ const PUBLISH_ONLY = new Map([
   ['lemuel.deposit.offset_shortfall', 'SPEC §5 발행 전용 — 소비처 생길 때 계약 편입'],
   // loan
   ['lemuel.loan.lease_activated', '발행 전용 — 리스 개시 통지, 소비처 미배선'],
-  // education — 미소비이면서 **발행조차 되지 않는다**(outbox-poller-gate KNOWN_UNWIRED 참조)
+  // education — 발행은 2026-08-22 배선 완료(outbox-poller-gate 가 강제), 소비처만 아직 없다
   ['lemuel.education.course_published',
-    '발행 전용 — 소비처 미배선. 더불어 폴러 미배선으로 Kafka 발행 자체가 안 된다: '
-    + 'docs/plan/prd/education-service.md G-1 / outbox-poller-gate KNOWN_UNWIRED'],
+    'SPEC §5 발행 전용 — 소비처 미배선(과정 공개 통지). 폴러 미배선은 2026-08-22 해소: '
+    + 'docs/plan/prd/education-service.md G-1'],
 ]);
 
 /** 블록·라인 주석 제거 — 주석 속 토픽명을 구독으로 세지 않는다. */
